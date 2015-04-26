@@ -1,10 +1,14 @@
 cmake_minimum_required(VERSION 2.8.7)
 
 project(bpf-tools)
+set(CMAKE_BUILD_TYPE Debug)
+
+enable_testing()
 
 find_package(BISON)
 find_package(FLEX)
 find_package(LLVM REQUIRED CONFIG)
+message(STATUS "Found LLVM: ${LLVM_INCLUDE_DIRS}")
 find_program(XXD xxd)
 if (${XXD} STREQUAL "XXD-NOTFOUND")
   message(FATAL_ERROR "program xxd not found, install vim-common")
@@ -13,8 +17,15 @@ find_program(CLANG clang)
 if (${CLANG} STREQUAL "CLANG-NOTFOUND")
   message(FATAL_ERROR "program clang not found, install clang with bpf support")
 endif()
+execute_process(COMMAND ${CLANG} --version OUTPUT_VARIABLE CLANG_VERSION_RAW)
+string(REGEX MATCH "[0-9]+[.][0-9]+[.][0-9]+" CLANG_VERSION ${CLANG_VERSION_RAW})
+message(STATUS "Found CLANG: ${CLANG} (found version \"${CLANG_VERSION}\")")
+if (CLANG_VERSION VERSION_LESS 3.6.0)
+  message(FATAL_ERROR "requires clang version >= 3.6.0, ${CLANG_VERSION} found")
+endif()
 
 set(CMAKE_C_FLAGS "-Wall")
 set(CMAKE_CXX_FLAGS "-std=c++11 -Wall")
 
-add_subdirectory(jit)
+add_subdirectory(src)
+add_subdirectory(tests)

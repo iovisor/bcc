@@ -1,28 +1,37 @@
 #!/usr/bin/env python
 
-# test program to count the packets sent to a device in a .5
-# second period
-
-import time
-import netaddr
-from ctypes import *
-from src.bpf import BPF
-
-prog = BPF("socket1", "tests/test2.dp", "tests/proto.dph")
+from ctypes import c_uint, c_ulonglong, Structure
+from netaddr import IPAddress
+from bpf import BPF
+from socket import socket, AF_INET, SOCK_DGRAM
+from time import sleep
+from unittest import main, TestCase
 
 class Key(Structure):
     _fields_ = [("dip", c_uint),
                 ("sip", c_uint)]
 class Leaf(Structure):
-    _fields_ = [("rx_pkts", c_ulong),
-                ("tx_pkts", c_ulong)]
+    _fields_ = [("xdip", c_uint),
+                ("xsip", c_uint),
+                ("xlated_pkts", c_ulonglong)]
 
-prog.attach("eth0")
-stats = prog.table("stats", Key, Leaf)
+class TestBPFSocket(TestCase):
+    def setUp(self):
+        self.prog = BPF("main", "test2.b", "proto.b",
+                BPF.BPF_PROG_TYPE_SCHED_CLS, debug=0)
+        with open("/sys/class/net/eth0/ifindex") as f:
+            ifindex = int(f.read())
+        self.prog.attach_filter(ifindex, 10, 1)
 
-time.sleep(0.5)
+    def test_xlate(self):
+        xlate = self.prog.table("xlate", Key, Leaf)
+        key = Key(IPAddress("172.16.1.1").value, IPAddress("172.16.1.2").value)
+        leaf = Leaf(IPAddress("192.168.1.1").value, IPAddress("192.168.1.2").value, 0)
+        xlate.put(key, leaf)
+        udp = socket(AF_INET, SOCK_DGRAM)
+        udp.sendto(b"a" * 10, ("172.16.1.1", 5000))
+        leaf = xlate.get(key)
+        self.assertGreater(leaf.xlated_pkts, 0)
 
-for key in stats.iter():
-    leaf = stats.get(key)
-    print(netaddr.IPAddress(key.sip), "=>", netaddr.IPAddress(key.dip),
-          "rx", leaf.rx_pkts, "tx", leaf.tx_pkts)
+if __name__ == "__main__":
+    main()
