@@ -1,0 +1,67 @@
+
+@1.0.0
+#name 'socket1'
+#packed 'false'
+
+struct IPKey {
+  dip:32
+  sip:32
+}
+struct IPLeaf {
+  rx_pkts:64
+  tx_pkts:64
+}
+Table<IPKey, IPLeaf, FIXED_MATCH, LRU> stats(1024)
+
+var ret:32 = 0
+
+state INIT {
+  goto proto::ethernet
+}
+
+state proto::ethernet {
+}
+
+state proto::dot1q {
+}
+
+state proto::ip {
+  var rx:32 = 0
+  var tx:32 = 0
+  var IPKey key
+  if $ip.dst > $ip.src {
+    key.dip = $ip.dst
+    key.sip = $ip.src
+    rx = 1
+    if false {
+      return 3
+    }
+  } else {
+    key.dip = $ip.src
+    key.sip = $ip.dst
+    tx = 1
+    ret = 1
+  }
+  var IPLeaf *leaf
+  stats.lookup(key, leaf) {}
+  on_valid(leaf) {
+    atomic_add(leaf.rx_pkts, rx)
+    atomic_add(leaf.tx_pkts, tx)
+  } else {
+    var IPLeaf newleaf{rx_pkts = rx, tx_pkts = tx}
+    stats.update(key, newleaf) {}
+  }
+}
+
+state proto::udp {
+}
+
+state proto::vxlan {
+}
+
+state proto::gre {
+}
+
+state EOP {
+  return ret
+}

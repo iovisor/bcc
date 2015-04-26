@@ -1,0 +1,45 @@
+
+@1.0.0
+#name test1
+struct SomeKey {
+  foo:3
+  foo1:9
+  foo2:63
+}
+struct SomeLeaf {
+  bar:64
+}
+Table<SomeKey, SomeLeaf, FIXED_MATCH, LRU> stats(8)
+
+state INIT {
+  goto proto::ethernet
+}
+
+var ret:32 = 0
+
+state proto::ethernet {
+  var SomeKey sk2{foo = 2}
+  stats.lookup(sk2) {
+    on_match stats (var SomeLeaf *l21) {
+      atomic_add(l21.bar, 1)
+    }
+    on_miss stats () {
+      ret = 1
+    }
+  }
+  var SomeKey sk3{foo = 3}
+  stats.lookup(sk3) {
+  }
+  var SomeKey sk4{foo = 4}
+  var SomeLeaf sl4{bar = 1}
+  stats.update(sk4, sl4) { }
+  var SomeKey sk5{foo = 5}
+  var SomeLeaf sl5{bar = 1}
+  stats.update(sk5, sl5) {
+    on_failure stats (var SomeKey *k21) {}
+  }
+}
+
+state EOP {
+  return ret
+}

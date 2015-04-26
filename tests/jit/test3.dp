@@ -1,0 +1,70 @@
+// test for packet modification
+
+@1.0.0
+#name 'classifier'
+#packed 'false'
+
+struct IPKey {
+  dip:32
+  sip:32
+}
+struct IPLeaf {
+  xdip:32
+  xsip:32
+  xlated_pkts:64
+}
+Table<IPKey, IPLeaf, FIXED_MATCH, LRU> xlate(1024)
+
+var ret:32 = 1
+
+var orig_dip:32 = 0
+var orig_sip:32 = 0
+var IPLeaf *xleaf;
+
+state INIT {
+  goto proto::ethernet
+}
+
+state proto::ethernet {
+}
+
+state proto::dot1q {
+}
+
+state proto::ip {
+  orig_dip = $ip.dst
+  orig_sip = $ip.src
+  var IPKey key{dip=orig_dip, sip=orig_sip}
+  xlate.lookup(key, xleaf) {}
+  on_valid(xleaf) {
+    incr_cksum(@ip.hchecksum, orig_dip, xleaf.xdip)
+    incr_cksum(@ip.hchecksum, orig_sip, xleaf.xsip)
+    pkt.rewrite_field($ip.dst, xleaf.xdip)
+    pkt.rewrite_field($ip.src, xleaf.xsip)
+    atomic_add(xleaf.xlated_pkts, 1)
+  }
+}
+
+state proto::udp {
+  on_valid(xleaf) {
+    incr_cksum(@udp.crc, orig_dip, xleaf.xdip, 1)
+    incr_cksum(@udp.crc, orig_sip, xleaf.xsip, 1)
+  }
+}
+
+state proto::tcp {
+  on_valid(xleaf) {
+    incr_cksum(@tcp.cksum, orig_dip, xleaf.xdip, 1)
+    incr_cksum(@tcp.cksum, orig_sip, xleaf.xsip, 1)
+  }
+}
+
+state proto::vxlan {
+}
+
+state proto::gre {
+}
+
+state EOP {
+  return ret
+}

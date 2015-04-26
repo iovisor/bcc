@@ -1,0 +1,155 @@
+
+@1.0.0
+#packed 'true'
+
+struct ethernet {
+  dst:48
+  src:48
+  type:16
+}
+
+state ethernet {
+  switch $ethernet.type {
+    case 0x0800 {
+      next proto::ip
+    }
+    case 0x8100 {
+      next proto::dot1q
+    }
+    case * {
+      goto EOP
+    }
+  }
+}
+
+
+struct dot1q {
+  pri:3
+  cfi:1
+  vlanid:12
+  type:16
+}
+
+state dot1q {
+  switch $dot1q.type {
+    case 0x0800 {
+      next proto::ip
+    }
+    case * {
+      goto EOP
+    }
+  }
+}
+
+
+struct ip {
+  ver:4
+  hlen:4
+  tos:8
+  tlen:16
+  identification:16
+  ffo_unused:1
+  df:1
+  mf:1
+  foffset:13
+  ttl:8
+  nextp:8
+  hchecksum:16
+  src:32
+  dst:32
+}
+
+state ip {
+  switch $ip.nextp {
+    case 6 {
+      next proto::tcp
+    }
+    case 17 {
+      next proto::udp
+    }
+    case 47 {
+      next proto::gre
+    }
+    case * {
+      goto EOP
+    }
+  }
+}
+
+
+struct udp {
+  sport:16
+  dport:16
+  length:16
+  crc:16
+}
+
+state udp {
+  switch $udp.dport {
+    case 8472 {
+      next proto::vxlan
+    }
+    case * {
+      goto EOP
+    }
+  }
+}
+
+struct tcp {
+  src_port:16
+  dst_port:16
+  seq_num:32
+  ack_num:32
+  offset:4
+  reserved:4
+  flag_cwr:1
+  flag_ece:1
+  flag_urg:1
+  flag_ack:1
+  flag_psh:1
+  flag_rst:1
+  flag_syn:1
+  flag_fin:1
+  rcv_wnd:16
+  cksum:16
+  urg_ptr:16
+}
+
+state tcp {
+  goto EOP
+}
+
+struct vxlan {
+  rsv1:4
+  iflag:1
+  rsv2:3
+  rsv3:24
+  key:24
+  rsv4:8
+}
+
+state vxlan {
+  goto EOP
+}
+
+
+struct gre {
+  cflag:1
+  rflag:1
+  kflag:1
+  snflag:1
+  srflag:1
+  recurflag:3
+  reserved:5
+  vflag:3
+  protocol:16
+  key:32
+}
+
+state gre {
+  switch $gre.protocol {
+    case * {
+      goto EOP
+    }
+  }
+}
