@@ -10,7 +10,6 @@ class Ptr(Structure):
 class Counters(Structure):
     _fields_ = [("stat1", c_ulong)]
 
-tracing = "/sys/kernel/debug/tracing"
 class TestTracingEvent(TestCase):
     def setUp(self):
         self.prog = BPF("trace2", "trace2.b", "kprobe.b",

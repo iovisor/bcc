@@ -22,7 +22,7 @@ class TestKprobe(TestCase):
         self.stats = self.prog.table("stats", Key, Leaf)
         self.prog.attach_kprobe("sys_write", "sys_wr", 0, -1)
         self.prog.attach_kprobe("sys_read", "sys_rd", 0, -1)
-        self.prog.attach_kprobe("htab_map_get_next_key", "sys_bpf")
+        self.prog.attach_kprobe("htab_map_get_next_key", "sys_bpf", 0, -1)
 
     def test_trace1(self):
         with open("/dev/null", "a") as f:

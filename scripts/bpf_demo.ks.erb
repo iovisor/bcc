@@ -1,0 +1,126 @@
+# Minimal Kickstart file
+install
+text
+reboot
+lang en_US.UTF-8
+
+# repo to install the OS
+url --url=<%= @mirror %>/Everything/x86_64/os/
+
+keyboard us
+network --bootproto dhcp
+rootpw <%= @password %>
+authconfig --enableshadow --passalgo=sha512 --enablefingerprint
+firewall --enabled --ssh
+selinux --enforcing
+timezone --utc America/Los_Angeles
+#firstboot --disable
+bootloader --location=mbr --append="console=tty0 console=ttyS0,115200 rd_NO_PLYMOUTH crashkernel=auto"
+zerombr
+clearpart --all --initlabel
+autopart --type=lvm
+repo --name=everything --baseurl=<%= @mirror %>/Everything/x86_64/os/
+
+#Just core packages
+%packages --nobase
+@core
+ntp
+@c-development
+@development-tools
+@rpm-development-tools
+ncurses-devel
+vim
+bc
+kexec-tools
+cmake
+clang
+libmnl-devel
+libstdc++-static
+python-netaddr
+%end
+
+%post --log=/root/anaconda-post.log
+echo Kickstart post
+
+chkconfig NetworkManager off
+chkconfig network on
+
+chkconfig ntpd on
+
+yum -y clean metadata
+yum -y update
+
+hostname <%= @name %>.<%= @domain %>
+echo "<%= @name %>.<%= @domain %>" > /etc/hostname
+
+cat > /usr/local/bin/bpf-kernel-setup <<'DELIM__'
+#!/bin/bash
+set -e -x
+numcpu=$(grep -c ^processor /proc/cpuinfo)
+
+git clone https://git.kernel.org/pub/scm/linux/kernel/git/davem/net-next.git
+cd net-next/
+
+cp /boot/config-$(uname -r) ./
+cp ./config-$(uname -r) .config
+
+make -j$numcpu mrproper
+make -j$numcpu nconfig
+make -j$numcpu bzImage
+make -j$numcpu modules
+sudo make modules_install
+sudo make install
+sudo make INSTALL_HDR_PATH=/usr/local headers_install
+
+release=$(<include/config/kernel.release)
+echo "kexec -l /boot/vmlinuz-$release --initrd=/boot/initramfs-$release.img --reuse-cmdline; reboot" > /usr/local/bin/kexec-$release
+chmod +x /usr/local/bin/kexec-$release
+ln -fs kexec-$release /usr/local/bin/kexec-latest
+
+DELIM__
+chmod +x /usr/local/bin/bpf-kernel-setup
+
+cat > /usr/local/bin/bpf-llvm-setup <<'DELIM__'
+#!/bin/bash
+set -e -x
+numcpu=$(grep -c ^processor /proc/cpuinfo)
+
+git clone https://github.com/llvm-mirror/llvm.git
+mkdir llvm/build/
+cd llvm/build/
+
+cmake .. \
+  -DBUILD_SHARED_LIBS=OFF \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DLLVM_ENABLE_TERMINFO=OFF \
+  -DLLVM_TARGETS_TO_BUILD="ARM;CppBackend;X86;BPF" \
+  -DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD=BPF \
+  -DCMAKE_INSTALL_PREFIX=/opt/local/llvm
+
+make -j$numcpu
+sudo make install
+grep -q llvm $HOME/.bashrc || echo 'PATH=/opt/local/llvm/bin:$PATH' >> $HOME/.bashrc
+
+DELIM__
+chmod +x /usr/local/bin/bpf-llvm-setup
+
+cat > /usr/local/bin/bcc-setup <<'DELIM__'
+#!/bin/bash
+set -e -x
+numcpu=$(grep -c ^processor /proc/cpuinfo)
+
+repo=ssh://git@github.com/plumgrid/bcc.git
+git ls-remote $repo 2>&1 > /dev/null
+if [[ $? -ne 0 ]]; then
+  repo=https://<%= @github_access_token %>@github.com/plumgrid/bcc.git
+fi
+git clone $repo
+mkdir bcc/build/
+cd bcc/build/
+cmake ..
+make -j$numcpu
+make test
+DELIM__
+chmod +x /usr/local/bin/bcc-setup
+
+%end
