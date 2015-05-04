@@ -69,7 +69,6 @@ tmp_ks_file=$tmpdir/$img_name.ks
 
 function cleanup() {
   set +e
-  read -p "brk: "
   [[ -d "$tmpdir" ]] && rm -fr "$tmpdir"
   local destroy_kvm=n
   [[ -f "/etc/libvirt/qemu/$img_name.xml" ]] && read -p "Destroy libvirt VM (y/n)? " destroy_kvm
