@@ -315,30 +315,34 @@ StatusTuple CodegenLLVM::visit_ident_expr_node(IdentExprNode *n) {
 
 StatusTuple CodegenLLVM::visit_assign_expr_node(AssignExprNode *n) {
   if (n->bitop_) {
-    TRY2(n->id_->accept(this));
+    TRY2(n->lhs_->accept(this));
     emit(" = (");
-    TRY2(n->id_->accept(this));
-    emit(" & ~((((%s)1 << %d) - 1) << %d)) | (", bits_to_uint(n->id_->bit_width_),
+    TRY2(n->lhs_->accept(this));
+    emit(" & ~((((%s)1 << %d) - 1) << %d)) | (", bits_to_uint(n->lhs_->bit_width_),
          n->bitop_->bit_width_, n->bitop_->bit_offset_);
     TRY2(n->rhs_->accept(this));
     emit(" << %d)", n->bitop_->bit_offset_);
     return mkstatus_(n, "unsupported");
   } else {
-    if (n->id_->flags_[ExprNode::PROTO]) {
-      auto f = n->id_->struct_type_->field(n->id_->sub_name_);
-      emit("bpf_dins(%s%s + %zu, %zu, %zu, ", n->id_->decl_->scope_id(), n->id_->c_str(),
-           f->bit_offset_ >> 3, f->bit_offset_ & 0x7, f->bit_width_);
-      TRY2(n->rhs_->accept(this));
-      emit(")");
+    if (n->lhs_->flags_[ExprNode::PROTO]) {
+      // auto f = n->lhs_->struct_type_->field(n->id_->sub_name_);
+      // emit("bpf_dins(%s%s + %zu, %zu, %zu, ", n->id_->decl_->scope_id(), n->id_->c_str(),
+      //      f->bit_offset_ >> 3, f->bit_offset_ & 0x7, f->bit_width_);
+      // TRY2(n->rhs_->accept(this));
+      // emit(")");
       return mkstatus_(n, "unsupported");
     } else {
       TRY2(n->rhs_->accept(this));
-      Value *rhs = pop_expr();
-      TRY2(n->id_->accept(this));
-      Value *lhs = pop_expr();
-      if (!n->rhs_->is_ref())
-        rhs = B.CreateIntCast(rhs, cast<PointerType>(lhs->getType())->getElementType(), false);
-      B.CreateStore(rhs, lhs);
+      if (n->lhs_->is_pkt()) {
+        TRY2(n->lhs_->accept(this));
+      } else {
+        Value *rhs = pop_expr();
+        TRY2(n->lhs_->accept(this));
+        Value *lhs = pop_expr();
+        if (!n->rhs_->is_ref())
+          rhs = B.CreateIntCast(rhs, cast<PointerType>(lhs->getType())->getElementType(), false);
+        B.CreateStore(rhs, lhs);
+      }
     }
   }
   return mkstatus(0);
@@ -682,6 +686,12 @@ StatusTuple CodegenLLVM::emit_log(MethodCallExprNode *n) {
   return mkstatus(0);
 }
 
+StatusTuple CodegenLLVM::emit_packet_rewrite_field(MethodCallExprNode *n) {
+  TRY2(n->args_[1]->accept(this));
+  TRY2(n->args_[0]->accept(this));
+  return mkstatus(0);
+}
+
 StatusTuple CodegenLLVM::emit_atomic_add(MethodCallExprNode *n) {
   TRY2(n->args_[0]->accept(this));
   Value *lhs = B.CreateBitCast(pop_expr(), Type::getInt64PtrTy(ctx()));
@@ -741,6 +751,8 @@ StatusTuple CodegenLLVM::visit_method_call_expr_node(MethodCallExprNode *n) {
       TRY2(emit_table_update(n));
     } else if (n->id_->sub_name_ == "delete") {
       TRY2(emit_table_delete(n));
+    } else if (n->id_->sub_name_ == "rewrite_field" && n->id_->name_ == "pkt") {
+      TRY2(emit_packet_rewrite_field(n));
     }
   } else if (n->id_->name_ == "atomic_add") {
     TRY2(emit_atomic_add(n));
@@ -952,24 +964,25 @@ StatusTuple CodegenLLVM::visit_struct_variable_decl_stmt_node(StructVariableDecl
       ConstantPointerNull *const_null = ConstantPointerNull::get(cast<PointerType>(ptr_stype));
       B.CreateStore(const_null, ptr_a);
     } else {
-      string var = n->scope_id() + n->id_->name_;
-      /* zero initialize array to be filled in with packet header */
-      emit("uint64_t __%s[%zu] = {}; uint8_t *%s = (uint8_t*)__%s;",
-           var.c_str(), ((decl->bit_width_ >> 3) + 7) >> 3, var.c_str(), var.c_str());
-      for (auto it = n->init_.begin(); it != n->init_.end(); ++it) {
-        auto asn = static_cast<AssignExprNode*>(it->get());
-        if (auto f = decl->field(asn->id_->sub_name_)) {
-          size_t bit_offset = f->bit_offset_;
-          size_t bit_width = f->bit_width_;
-          if (asn->bitop_) {
-            bit_offset += f->bit_width_ - (asn->bitop_->bit_offset_ + asn->bitop_->bit_width_);
-            bit_width = std::min(bit_width - asn->bitop_->bit_offset_, asn->bitop_->bit_width_);
-          }
-          emit(" bpf_dins(%s + %zu, %zu, %zu, ", var.c_str(), bit_offset >> 3, bit_offset & 0x7, bit_width);
-          TRY2(asn->rhs_->accept(this));
-          emit(");");
-        }
-      }
+      return mkstatus_(n, "unsupported");
+      // string var = n->scope_id() + n->id_->name_;
+      // /* zero initialize array to be filled in with packet header */
+      // emit("uint64_t __%s[%zu] = {}; uint8_t *%s = (uint8_t*)__%s;",
+      //      var.c_str(), ((decl->bit_width_ >> 3) + 7) >> 3, var.c_str(), var.c_str());
+      // for (auto it = n->init_.begin(); it != n->init_.end(); ++it) {
+      //   auto asn = static_cast<AssignExprNode*>(it->get());
+      //   if (auto f = decl->field(asn->id_->sub_name_)) {
+      //     size_t bit_offset = f->bit_offset_;
+      //     size_t bit_width = f->bit_width_;
+      //     if (asn->bitop_) {
+      //       bit_offset += f->bit_width_ - (asn->bitop_->bit_offset_ + asn->bitop_->bit_width_);
+      //       bit_width = std::min(bit_width - asn->bitop_->bit_offset_, asn->bitop_->bit_width_);
+      //     }
+      //     emit(" bpf_dins(%s + %zu, %zu, %zu, ", var.c_str(), bit_offset >> 3, bit_offset & 0x7, bit_width);
+      //     TRY2(asn->rhs_->accept(this));
+      //     emit(");");
+      //   }
+      // }
     }
   } else {
     if (n->is_pointer()) {

@@ -138,15 +138,15 @@ StatusTuple TypeCheck::visit_ident_expr_node(IdentExprNode *n) {
 
 StatusTuple TypeCheck::visit_assign_expr_node(AssignExprNode *n) {
   /// @todo check lhs is assignable
-  TRY2(n->id_->accept(this));
-  if (n->id_->typeof_ == ExprNode::STRUCT) {
+  TRY2(n->lhs_->accept(this));
+  if (n->lhs_->typeof_ == ExprNode::STRUCT) {
     TRY2(n->rhs_->accept(this));
     if (n->rhs_->typeof_ != ExprNode::STRUCT)
       return mkstatus_(n, "Right-hand side of assignment must be a struct");
   } else {
-    if (n->id_->typeof_ != ExprNode::INTEGER)
+    if (n->lhs_->typeof_ != ExprNode::INTEGER)
       return mkstatus_(n, "Left-hand side of assignment must be a numeric type");
-    if (!n->id_->flags_[ExprNode::WRITE])
+    if (!n->lhs_->flags_[ExprNode::WRITE])
       return mkstatus_(n, "Left-hand side of assignment is read-only");
     TRY2(n->rhs_->accept(this));
     if (n->rhs_->typeof_ != ExprNode::INTEGER)
@@ -173,7 +173,7 @@ StatusTuple TypeCheck::visit_packet_expr_node(PacketExprNode *n) {
     else
       n->bit_width_ = sub_decl->bit_width_;
   }
-  n->flags_[ExprNode::WRITE] = false;
+  n->flags_[ExprNode::WRITE] = true;
   return mkstatus(0);
 }
 
@@ -305,6 +305,9 @@ StatusTuple TypeCheck::visit_method_call_expr_node(MethodCallExprNode *n) {
       TRY2(check_update_method(n));
     } else if (n->id_->sub_name_ == "delete") {
       TRY2(check_delete_method(n));
+    } else if (n->id_->sub_name_ == "rewrite_field" && n->id_->name_ == "pkt") {
+      TRY2(expect_method_arg(n, 2));
+      n->args_[0]->flags_[ExprNode::IS_LHS] = true;
     }
   } else if (n->id_->name_ == "log") {
     if (n->args_.size() < 1)
@@ -382,7 +385,8 @@ StatusTuple TypeCheck::visit_struct_variable_decl_stmt_node(StructVariableDeclSt
     set<string> used;
     for (auto i = n->init_.begin(); i != n->init_.end(); ++i) {
       auto asn = static_cast<AssignExprNode*>(i->get());
-      used.insert(asn->id_->sub_name_);
+      auto id = static_cast<IdentExprNode *>(asn->lhs_.get());
+      used.insert(id->sub_name_);
     }
     for (auto f = type->stmts_.begin(); f != type->stmts_.end(); ++f) {
       if (used.find((*f)->id_->name_) == used.end()) {
