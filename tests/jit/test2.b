@@ -36,8 +36,9 @@ u32 main (struct proto::skbuff *skb) {
     on_valid(xleaf) {
       incr_cksum(@ip.hchecksum, orig_dip, xleaf.xdip);
       incr_cksum(@ip.hchecksum, orig_sip, xleaf.xsip);
+      // the below are equivalent
       pkt.rewrite_field($ip.dst, xleaf.xdip);
-      pkt.rewrite_field($ip.src, xleaf.xsip);
+      $ip.src = xleaf.xsip;
       atomic_add(xleaf.xlated_pkts, 1);
     }
   }

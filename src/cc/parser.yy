@@ -446,6 +446,9 @@ assign_expr
   | dotted_ident bitop TEQUAL expr
     { $$ = new AssignExprNode(IdentExprNode::Ptr($1), ExprNode::Ptr($4)); $$->bitop_ = BitopExprNode::Ptr($2);
       parser.set_loc($$, @$); }
+  | expr TEQUAL expr
+    { $$ = new AssignExprNode(ExprNode::Ptr($1), ExprNode::Ptr($3));
+      parser.set_loc($$, @$); }
   ;
 
 return_expr
@@ -471,9 +474,11 @@ expr
       parser.set_loc($$, @$); }
   | TDOLLAR dotted_ident
     { $$ = new PacketExprNode(IdentExprNode::Ptr($2));
+      $$->flags_[ExprNode::IS_PKT] = true;
       parser.set_loc($$, @$); }
   | TDOLLAR dotted_ident bitop
     { $$ = new PacketExprNode(IdentExprNode::Ptr($2)); $$->bitop_ = BitopExprNode::Ptr($3);
+      $$->flags_[ExprNode::IS_PKT] = true;
       parser.set_loc($$, @$); }
   | TGOTO scoped_ident
     { $$ = new GotoExprNode(IdentExprNode::Ptr($2), false);

@@ -150,7 +150,7 @@ class ExprNode : public Node {
   typedef unique_ptr<ExprNode> Ptr;
   virtual StatusTuple accept(Visitor* v) = 0;
   enum expr_type { STRUCT, INTEGER, STRING, VOID, UNKNOWN };
-  enum prop_flag { READ = 0, WRITE, PROTO, IS_LHS, IS_REF, LAST };
+  enum prop_flag { READ = 0, WRITE, PROTO, IS_LHS, IS_REF, IS_PKT, LAST };
   expr_type typeof_;
   StructDeclStmtNode *struct_type_;
   size_t bit_width_;
@@ -165,6 +165,7 @@ class ExprNode : public Node {
   }
   bool is_lhs() const { return flags_[IS_LHS]; }
   bool is_ref() const { return flags_[IS_REF]; }
+  bool is_pkt() const { return flags_[IS_PKT]; }
 };
 
 typedef vector<ExprNode::Ptr> ExprNodeList;
@@ -244,11 +245,18 @@ class AssignExprNode : public ExprNode {
  public:
   DECLARE(AssignExprNode)
 
-  IdentExprNode::Ptr id_;
+  //IdentExprNode *id_;
+  ExprNode::Ptr lhs_;
   ExprNode::Ptr rhs_;
   AssignExprNode(IdentExprNode::Ptr id, ExprNode::Ptr rhs)
-      : id_(move(id)), rhs_(move(rhs)) {
-    id_->flags_[ExprNode::IS_LHS] = true;
+      : lhs_(move(id)), rhs_(move(rhs)) {
+    //id_ = (IdentExprNode *)lhs_.get();
+    lhs_->flags_[ExprNode::IS_LHS] = true;
+  }
+  AssignExprNode(ExprNode::Ptr lhs, ExprNode::Ptr rhs)
+      : lhs_(move(lhs)), rhs_(move(rhs)) {
+    //id_ = nullptr;
+    lhs_->flags_[ExprNode::IS_LHS] = true;
   }
 };
 

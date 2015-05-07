@@ -67,7 +67,8 @@ StructVariableDeclStmtNode *Parser::variable_add(StructVariableDeclStmtNode *dec
     for (auto arg = args->begin(); arg != args->end(); ++arg) {
       // decorate with the name of this decl
       auto n = static_cast<AssignExprNode *>(arg->get());
-      n->id_->prepend_dot(decl->id_->name_);
+      auto id = static_cast<IdentExprNode *>(n->lhs_.get());
+      id->prepend_dot(decl->id_->name_);
     }
   } else {
     fprintf(stderr, "must use key = value syntax\n");

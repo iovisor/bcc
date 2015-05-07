@@ -98,7 +98,7 @@ StatusTuple Printer::visit_ident_expr_node(IdentExprNode* n) {
 }
 
 StatusTuple Printer::visit_assign_expr_node(AssignExprNode* n) {
-  TRY2(n->id_->accept(this));
+  TRY2(n->lhs_->accept(this));
   fprintf(out_, " = ");
   TRY2(n->rhs_->accept(this));
   return mkstatus(0);
