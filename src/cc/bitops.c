@@ -16,57 +16,57 @@
  * ====================================================================
  */
 
-#include <stdint.h>
-#include "linux/bpf.h"
+#include <linux/skbuff.h>
+#include <linux/bpf.h>
 #include "bpf_helpers.h"
 #define assert(v)
 
-static inline uint16_t bpf_ntohs(uint16_t val) {
+static inline u16 bpf_ntohs(u16 val) {
   /* will be recognized by gcc into rotate insn and eventually rolw 8 */
   return (val << 8) | (val >> 8);
 }
 
-static inline uint32_t bpf_ntohl(uint32_t val) {
+static inline u32 bpf_ntohl(u32 val) {
   /* gcc will use bswapsi2 insn */
   return __builtin_bswap32(val);
 }
 
-static inline uint64_t bpf_ntohll(uint64_t val) {
+static inline u64 bpf_ntohll(u64 val) {
   /* gcc will use bswapdi2 insn */
   return __builtin_bswap64(val);
 }
 
 static inline unsigned __int128 bpf_ntoh128(unsigned __int128 val) {
-  return (((unsigned __int128)bpf_ntohll(val) << 64) | (uint64_t)bpf_ntohll(val >> 64));
+  return (((unsigned __int128)bpf_ntohll(val) << 64) | (u64)bpf_ntohll(val >> 64));
 }
 
-static inline uint16_t bpf_htons(uint16_t val) {
+static inline u16 bpf_htons(u16 val) {
   return bpf_ntohs(val);
 }
 
-static inline uint32_t bpf_htonl(uint32_t val) {
+static inline u32 bpf_htonl(u32 val) {
   return bpf_ntohl(val);
 }
-static inline uint64_t bpf_htonll(uint64_t val) {
+static inline u64 bpf_htonll(u64 val) {
   return bpf_ntohll(val);
 }
 static inline unsigned __int128 bpf_hton128(unsigned __int128 val) {
   return bpf_ntoh128(val);
 }
 
-static inline uint64_t load_dword(void *skb, uint64_t off) {
-  return ((uint64_t)load_word(skb, off) << 4) | load_word(skb, off + 4);
+static inline u64 load_dword(void *skb, u64 off) {
+  return ((u64)load_word(skb, off) << 4) | load_word(skb, off + 4);
 }
 
-void bpf_store_byte(void *skb, uint64_t off, uint64_t val) asm("llvm.bpf.store.byte");
-void bpf_store_half(void *skb, uint64_t off, uint64_t val) asm("llvm.bpf.store.half");
-void bpf_store_word(void *skb, uint64_t off, uint64_t val) asm("llvm.bpf.store.word");
-static inline void bpf_store_dword(void *skb, uint64_t off, uint64_t val) {
-  bpf_store_word(skb, off, (uint32_t)val);
+void bpf_store_byte(void *skb, u64 off, u64 val) asm("llvm.bpf.store.byte");
+void bpf_store_half(void *skb, u64 off, u64 val) asm("llvm.bpf.store.half");
+void bpf_store_word(void *skb, u64 off, u64 val) asm("llvm.bpf.store.word");
+static inline void bpf_store_dword(void *skb, u64 off, u64 val) {
+  bpf_store_word(skb, off, (u32)val);
   bpf_store_word(skb, off + 4, val >> 32);
 }
 
-#define MASK(_n) ((_n) < 64 ? (1ull << (_n)) - 1 : ((uint64_t)-1LL))
+#define MASK(_n) ((_n) < 64 ? (1ull << (_n)) - 1 : ((u64)-1LL))
 #define MASK128(_n) ((_n) < 128 ? ((unsigned __int128)1 << (_n)) - 1 : ((unsigned __int128)-1))
 
 struct _skbuff;
@@ -74,7 +74,7 @@ struct bpf_context;
 
 //static inline __attribute__((always_inline))
 SEC("helpers")
-uint64_t bpf_dext_pkt(void *pkt, uint64_t off, uint64_t bofs, uint64_t bsz) {
+u64 bpf_dext_pkt(void *pkt, u64 off, u64 bofs, u64 bsz) {
   if (bofs == 0 && bsz == 8) {
     return load_byte(pkt, off);
   } else if (bofs + bsz <= 8) {
@@ -97,40 +97,40 @@ uint64_t bpf_dext_pkt(void *pkt, uint64_t off, uint64_t bofs, uint64_t bsz) {
 
 //static inline __attribute__((always_inline))
 SEC("helpers")
-void bpf_dins_pkt(void *pkt, uint64_t off, uint64_t bofs, uint64_t bsz, uint64_t val) {
+void bpf_dins_pkt(void *pkt, u64 off, u64 bofs, u64 bsz, u64 val) {
   // The load_xxx function does a bswap before returning the short/word/dword,
   // so the value in register will always be host endian. However, the bytes
   // written back need to be in network order.
   if (bofs == 0 && bsz == 8) {
     bpf_skb_store_bytes(pkt, off, &val, 1, 0);
   } else if (bofs + bsz <= 8) {
-    uint8_t v = load_byte(pkt, off);
+    u8 v = load_byte(pkt, off);
     v &= ~(MASK(bsz) << (8 - (bofs + bsz)));
     v |= ((val & MASK(bsz)) << (8 - (bofs + bsz)));
     bpf_skb_store_bytes(pkt, off, &v, 1, 0);
   } else if (bofs == 0 && bsz == 16) {
-    uint16_t v = bpf_htons(val);
+    u16 v = bpf_htons(val);
     bpf_skb_store_bytes(pkt, off, &v, 2, 0);
   } else if (bofs + bsz <= 16) {
-    uint16_t v = load_half(pkt, off);
+    u16 v = load_half(pkt, off);
     v &= ~(MASK(bsz) << (16 - (bofs + bsz)));
     v |= ((val & MASK(bsz)) << (16 - (bofs + bsz)));
     v = bpf_htons(v);
     bpf_skb_store_bytes(pkt, off, &v, 2, 0);
   } else if (bofs == 0 && bsz == 32) {
-    uint32_t v = bpf_htonl(val);
+    u32 v = bpf_htonl(val);
     bpf_skb_store_bytes(pkt, off, &v, 4, 0);
   } else if (bofs + bsz <= 32) {
-    uint32_t v = load_word(pkt, off);
+    u32 v = load_word(pkt, off);
     v &= ~(MASK(bsz) << (32 - (bofs + bsz)));
     v |= ((val & MASK(bsz)) << (32 - (bofs + bsz)));
     v = bpf_htonl(v);
     bpf_skb_store_bytes(pkt, off, &v, 4, 0);
   } else if (bofs == 0 && bsz == 64) {
-    uint64_t v = bpf_htonll(val);
+    u64 v = bpf_htonll(val);
     bpf_skb_store_bytes(pkt, off, &v, 8, 0);
   } else if (bofs + bsz <= 64) {
-    uint64_t v = load_dword(pkt, off);
+    u64 v = load_dword(pkt, off);
     v &= ~(MASK(bsz) << (64 - (bofs + bsz)));
     v |= ((val & MASK(bsz)) << (64 - (bofs + bsz)));
     v = bpf_htonll(v);
@@ -150,7 +150,7 @@ void * bpf_map_lookup_elem_(uintptr_t map, void *key) {
 }
 
 SEC("helpers")
-int bpf_map_update_elem_(uintptr_t map, void *key, void *value, uint64_t flags) {
+int bpf_map_update_elem_(uintptr_t map, void *key, void *value, u64 flags) {
   return bpf_map_update_elem((void *)map, key, value, flags);
 }
 
@@ -160,12 +160,12 @@ int bpf_map_delete_elem_(uintptr_t map, void *key) {
 }
 
 SEC("helpers")
-int bpf_skb_store_bytes_(void *ctx, uint64_t off, void *from, uint64_t len, uint64_t flags) {
+int bpf_skb_store_bytes_(void *ctx, u64 off, void *from, u64 len, u64 flags) {
   return bpf_skb_store_bytes(ctx, off, from, len, flags);
 }
 
 SEC("helpers")
-int bpf_l3_csum_replace_(void *ctx, uint64_t off, uint64_t from, uint64_t to, uint64_t flags) {
+int bpf_l3_csum_replace_(void *ctx, u64 off, u64 from, u64 to, u64 flags) {
   switch (flags & 0xf) {
     case 2:
       return bpf_l3_csum_replace(ctx, off, bpf_htons(from), bpf_htons(to), flags);
@@ -180,7 +180,7 @@ int bpf_l3_csum_replace_(void *ctx, uint64_t off, uint64_t from, uint64_t to, ui
 }
 
 SEC("helpers")
-int bpf_l4_csum_replace_(void *ctx, uint64_t off, uint64_t from, uint64_t to, uint64_t flags) {
+int bpf_l4_csum_replace_(void *ctx, u64 off, u64 from, u64 to, u64 flags) {
   switch (flags & 0xf) {
     case 2:
       return bpf_l4_csum_replace(ctx, off, bpf_htons(from), bpf_htons(to), flags);
