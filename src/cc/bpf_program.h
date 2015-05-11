@@ -26,6 +26,7 @@
 
 namespace llvm {
 class ExecutionEngine;
+class LLVMContext;
 class Module;
 }
 
@@ -42,7 +43,8 @@ class BPFProgram {
   int parse();
   int finalize();
   void dump_ir();
-  std::string load_helper() const;
+  int load_helper(std::unique_ptr<llvm::Module> *mod);
+  int kbuild_flags(const char *uname_release, std::vector<std::string> *cflags);
  public:
   BPFProgram(unsigned flags);
   ~BPFProgram();
@@ -55,6 +57,7 @@ class BPFProgram {
   unsigned flags_;  // 0x1 for printing
   std::string filename_;
   std::string proto_filename_;
+  std::unique_ptr<llvm::LLVMContext> ctx_;
   std::unique_ptr<llvm::ExecutionEngine> engine_;
   llvm::Module *mod_;
   std::unique_ptr<ebpf::cc::Parser> parser_;

@@ -440,15 +440,17 @@ numeric
   ;
 
 assign_expr
-  : dotted_ident TEQUAL expr
+  : expr TEQUAL expr
+    { $$ = new AssignExprNode(ExprNode::Ptr($1), ExprNode::Ptr($3));
+      parser.set_loc($$, @$); }
+  /* The below has a reduce/reduce conflict.
+     TODO: ensure the above is handled in the type check properly */
+  /*| dotted_ident TEQUAL expr
     { $$ = new AssignExprNode(IdentExprNode::Ptr($1), ExprNode::Ptr($3));
       parser.set_loc($$, @$); }
   | dotted_ident bitop TEQUAL expr
     { $$ = new AssignExprNode(IdentExprNode::Ptr($1), ExprNode::Ptr($4)); $$->bitop_ = BitopExprNode::Ptr($2);
-      parser.set_loc($$, @$); }
-  | expr TEQUAL expr
-    { $$ = new AssignExprNode(ExprNode::Ptr($1), ExprNode::Ptr($3));
-      parser.set_loc($$, @$); }
+      parser.set_loc($$, @$); }*/
   ;
 
 return_expr
