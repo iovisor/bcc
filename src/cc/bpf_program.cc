@@ -185,7 +185,7 @@ class TmpDir {
   explicit TmpDir(const string &prefix = "/tmp/bcc-")
       : ok_(false), prefix_(prefix) {
     prefix_ += "XXXXXX";
-    if (::mkdtemp((char *)prefix.data()) == NULL)
+    if (::mkdtemp((char *)prefix_.data()) == NULL)
       ::perror("mkdtemp");
     else
       ok_ = true;
