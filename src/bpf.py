@@ -13,6 +13,8 @@ lib.bpf_program_size.restype = ct.c_size_t
 lib.bpf_program_size.argtypes = [ct.c_void_p, ct.c_char_p]
 lib.bpf_program_license.restype = ct.c_char_p
 lib.bpf_program_license.argtypes = [ct.c_void_p]
+lib.bpf_program_kern_version.restype = ct.c_uint
+lib.bpf_program_kern_version.argtypes = [ct.c_void_p]
 lib.bpf_program_table_fd.restype = ct.c_int
 lib.bpf_program_table_fd.argtypes = [ct.c_void_p, ct.c_char_p]
 
@@ -33,7 +35,7 @@ lib.bpf_attach_filter.restype = ct.c_int
 lib.bpf_attach_filter.argtypes = [ct.c_int, ct.c_char_p, ct.c_uint, ct.c_ubyte, ct.c_uint]
 lib.bpf_prog_load.restype = ct.c_int
 lib.bpf_prog_load.argtypes = [ct.c_int, ct.c_void_p, ct.c_size_t,
-        ct.c_char_p]
+        ct.c_char_p, ct.c_uint]
 lib.bpf_attach_kprobe.restype = ct.c_int
 lib.bpf_attach_kprobe.argtypes = [ct.c_int, ct.c_char_p, ct.c_char_p, ct.c_int, ct.c_int, ct.c_int]
 
@@ -67,7 +69,8 @@ class BPF(object):
         self.fd[prog_name] = lib.bpf_prog_load(self.prog_type,
                 lib.bpf_program_start(self.prog, prog_name.encode("ascii")),
                 lib.bpf_program_size(self.prog, prog_name.encode("ascii")),
-                lib.bpf_program_license(self.prog))
+                lib.bpf_program_license(self.prog),
+                lib.bpf_program_kern_version(self.prog))
 
         if self.fd[prog_name] < 0:
             print((ct.c_char * 65536).in_dll(lib, "bpf_log_buf").value)

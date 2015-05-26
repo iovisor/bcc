@@ -3,7 +3,13 @@
 from ctypes import c_uint, c_ulong, Structure
 from bpf import BPF
 from time import sleep
+import sys
 from unittest import main, TestCase
+
+arg1 = sys.argv.pop(1)
+arg2 = ""
+if len(sys.argv) > 1:
+  arg2 = sys.argv.pop(1)
 
 class Ptr(Structure):
     _fields_ = [("ptr", c_ulong)]
@@ -12,7 +18,7 @@ class Counters(Structure):
 
 class TestTracingEvent(TestCase):
     def setUp(self):
-        self.prog = BPF("trace2", "trace2.b", "kprobe.b",
+        self.prog = BPF("trace2", arg1, arg2,
                 prog_type=BPF.BPF_PROG_TYPE_KPROBE, debug=0)
         self.prog.load("count_sched")
         self.stats = self.prog.table("stats", Ptr, Counters)

@@ -103,7 +103,7 @@ std::string tmp_str_cc;
 "u32"                   return save(Tok::TU32);
 "u64"                   return save(Tok::TU64);
 
-[a-zA-Z][a-zA-Z0-9_]*   return save(Tok::TIDENTIFIER);
+[a-zA-Z_][a-zA-Z0-9_]*  return save(Tok::TIDENTIFIER);
 [0-9]+                  return save(Tok::TINTEGER);
 0x[0-9a-fA-F]+          return save(Tok::THEXINTEGER);
 

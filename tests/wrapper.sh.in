@@ -3,8 +3,8 @@
 #set -x
 
 name=$1; shift
-cmd=$1; shift
 kind=$1; shift
+cmd=$1; shift
 
 PYTHONPATH=@CMAKE_SOURCE_DIR@/src
 LD_LIBRARY_PATH=@CMAKE_BINARY_DIR@:@CMAKE_BINARY_DIR@/src/cc
@@ -30,11 +30,11 @@ function ns_run() {
   sudo ip netns exec $ns ip link set eth0 up
   sudo ip addr add dev $ns.out 172.16.1.1/24
   sudo ip link set $ns.out up
-  sudo bash -c "PYTHONPATH=$PYTHONPATH LD_LIBRARY_PATH=$LD_LIBRARY_PATH ip netns exec $ns $cmd $@"
+  sudo bash -c "PYTHONPATH=$PYTHONPATH LD_LIBRARY_PATH=$LD_LIBRARY_PATH ip netns exec $ns $cmd $1 $2"
   return $?
 }
 function sudo_run() {
-  sudo bash -c "PYTHONPATH=$PYTHONPATH LD_LIBRARY_PATH=$LD_LIBRARY_PATH $cmd $@"
+  sudo bash -c "PYTHONPATH=$PYTHONPATH LD_LIBRARY_PATH=$LD_LIBRARY_PATH $cmd $1 $2"
   return $?
 }
 

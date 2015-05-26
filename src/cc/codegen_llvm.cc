@@ -1151,7 +1151,10 @@ StatusTuple CodegenLLVM::visit_func_decl_stmt_node(FuncDeclStmtNode *n) {
     VariableDeclStmtNode *formal = it->get();
     if (formal->is_struct()) {
       StructType *stype;
-      TRY2(lookup_struct_type(formal, &stype));
+      //TRY2(lookup_struct_type(formal, &stype));
+      auto var = (StructVariableDeclStmtNode *)formal;
+      stype = mod_->getTypeByName("struct." + var->struct_id_->name_);
+      if (!stype) return mkstatus_(n, "could not find type %s", var->struct_id_->c_str());
       formals.push_back(PointerType::getUnqual(stype));
     } else {
       formals.push_back(B.getIntNTy(formal->bit_width_));

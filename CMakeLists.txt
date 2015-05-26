@@ -22,6 +22,7 @@ find_library(libclangEdit NAMES clangEdit HINTS ${CLANG_SEARCH})
 find_library(libclangFrontend NAMES clangFrontend HINTS ${CLANG_SEARCH})
 find_library(libclangLex NAMES clangLex HINTS ${CLANG_SEARCH})
 find_library(libclangParse NAMES clangParse HINTS ${CLANG_SEARCH})
+find_library(libclangRewrite NAMES clangRewrite HINTS ${CLANG_SEARCH})
 find_library(libclangSema NAMES clangSema HINTS ${CLANG_SEARCH})
 find_library(libclangSerialization NAMES clangSerialization HINTS ${CLANG_SEARCH})
 

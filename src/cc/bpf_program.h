@@ -31,6 +31,7 @@ class Module;
 }
 
 namespace ebpf {
+class BPFTable;
 
 namespace cc {
 class CodegenLLVM;
@@ -43,7 +44,8 @@ class BPFProgram {
   int parse();
   int finalize();
   void dump_ir();
-  int load_helper(std::unique_ptr<llvm::Module> *mod);
+  int load_file_module(std::unique_ptr<llvm::Module> *mod, const std::string &file);
+  int load_includes(const std::string &tmpfile);
   int kbuild_flags(const char *uname_release, std::vector<std::string> *cflags);
  public:
   BPFProgram(unsigned flags);
@@ -53,6 +55,7 @@ class BPFProgram {
   size_t size(const std::string &name) const;
   int table_fd(const std::string &name) const;
   char * license() const;
+  unsigned kern_version() const;
  private:
   unsigned flags_;  // 0x1 for printing
   std::string filename_;
@@ -64,6 +67,7 @@ class BPFProgram {
   std::unique_ptr<ebpf::cc::Parser> proto_parser_;
   std::unique_ptr<ebpf::cc::CodegenLLVM> codegen_;
   std::map<std::string, std::tuple<uint8_t *, uintptr_t>> sections_;
+  std::unique_ptr<std::map<std::string, BPFTable>> tables_;
 };
 
 }  // namespace ebpf
