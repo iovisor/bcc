@@ -19,7 +19,7 @@ int bpf_get_next_key(int fd, void *key, void *next_key);
 
 int bpf_prog_load(enum bpf_prog_type prog_type,
 		  const struct bpf_insn *insns, int insn_len,
-		  const char *license);
+		  const char *license, unsigned kern_version);
 int bpf_attach_socket(int sockfd, int progfd);
 int bpf_attach_filter(int progfd, const char *prog_name, uint32_t ifindex,
                       uint8_t prio, uint32_t classid);

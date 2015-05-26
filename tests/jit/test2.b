@@ -13,7 +13,11 @@ struct IPLeaf {
 };
 Table<IPKey, IPLeaf, FIXED_MATCH, NONE> xlate(1024);
 
-u32 main (struct proto::skbuff *skb) {
+struct skbuff {
+  u32 type:32;
+};
+
+u32 main (struct skbuff *skb) {
   u32 ret:32 = 1;
 
   u32 orig_dip:32 = 0;

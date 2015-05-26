@@ -1,18 +1,6 @@
 
 #packed "true"
 
-struct skbuff {
-  u32 len:32;
-  u32 pkt_type:32;
-  u32 mark:32;
-  u32 queue_mapping:32;
-  u32 protocol:32;
-  u32 vlan_present:32;
-  u32 vlan_tci:32;
-  u32 vlan_proto:32;
-  u32 priority:32;
-};
-
 struct ethernet {
   u64 dst:48;
   u64 src:48;

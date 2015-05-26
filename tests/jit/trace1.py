@@ -4,7 +4,13 @@ from ctypes import c_uint, c_ulong, Structure
 from bpf import BPF
 import os
 from time import sleep
+import sys
 from unittest import main, TestCase
+
+arg1 = sys.argv.pop(1)
+arg2 = ""
+if len(sys.argv) > 1:
+  arg2 = sys.argv.pop(1)
 
 class Key(Structure):
     _fields_ = [("fd", c_ulong)]
@@ -14,7 +20,7 @@ class Leaf(Structure):
 
 class TestKprobe(TestCase):
     def setUp(self):
-        self.prog = BPF("trace1", "trace1.b", "kprobe.b",
+        self.prog = BPF("trace1", arg1, arg2,
                 prog_type=BPF.BPF_PROG_TYPE_KPROBE, debug=0)
         self.prog.load("sys_wr")
         self.prog.load("sys_rd")

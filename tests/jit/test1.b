@@ -1,5 +1,3 @@
-#packed "false"
-
 struct IPKey {
   u32 dip:32;
   u32 sip:32;
@@ -10,7 +8,11 @@ struct IPLeaf {
 };
 Table<IPKey, IPLeaf, FIXED_MATCH, AUTO> stats(1024);
 
-u32 main(struct proto::skbuff *skb) {
+struct skbuff {
+  u32 type:32;
+};
+
+u32 main(struct skbuff *skb) {
   u32 ret:32 = 0;
 
   goto proto::ethernet;

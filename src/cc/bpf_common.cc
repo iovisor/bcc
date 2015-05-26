@@ -35,6 +35,12 @@ char * bpf_program_license(void *program) {
   return prog->license();
 }
 
+unsigned bpf_program_kern_version(void *program) {
+  auto prog = static_cast<ebpf::BPFProgram *>(program);
+  if (!prog) return 0;
+  return prog->kern_version();
+}
+
 int bpf_program_table_fd(void *program, const char *table_name) {
   auto prog = static_cast<ebpf::BPFProgram *>(program);
   if (!prog) return -1;

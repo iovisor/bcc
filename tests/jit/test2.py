@@ -4,8 +4,14 @@ from ctypes import c_uint, c_ulonglong, Structure
 from netaddr import IPAddress
 from bpf import BPF
 from socket import socket, AF_INET, SOCK_DGRAM
+import sys
 from time import sleep
 from unittest import main, TestCase
+
+arg1 = sys.argv.pop(1)
+arg2 = ""
+if len(sys.argv) > 1:
+  arg2 = sys.argv.pop(1)
 
 class Key(Structure):
     _fields_ = [("dip", c_uint),
@@ -17,7 +23,7 @@ class Leaf(Structure):
 
 class TestBPFSocket(TestCase):
     def setUp(self):
-        self.prog = BPF("main", "test2.b", "proto.b",
+        self.prog = BPF("main", arg1, arg2,
                 BPF.BPF_PROG_TYPE_SCHED_CLS, debug=0)
         with open("/sys/class/net/eth0/ifindex") as f:
             ifindex = int(f.read())

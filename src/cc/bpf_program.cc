@@ -8,22 +8,22 @@
 #include <sys/utsname.h>
 #include <unistd.h>
 #include <vector>
+#include <linux/bpf.h>
 
 #include <clang/Basic/FileManager.h>
 #include <clang/Basic/TargetInfo.h>
 #include <clang/CodeGen/BackendUtil.h>
 #include <clang/CodeGen/CodeGenAction.h>
-#include <clang/CodeGen/ModuleBuilder.h>
 #include <clang/Driver/Compilation.h>
 #include <clang/Driver/Driver.h>
 #include <clang/Driver/Job.h>
 #include <clang/Driver/Tool.h>
 #include <clang/Frontend/CompilerInstance.h>
 #include <clang/Frontend/CompilerInvocation.h>
+#include <clang/Frontend/FrontendActions.h>
 #include <clang/Frontend/FrontendDiagnostic.h>
 #include <clang/Frontend/TextDiagnosticPrinter.h>
 #include <clang/FrontendTool/Utils.h>
-#include "clang/Parse/ParseAST.h"
 
 #include <llvm/ADT/STLExtras.h>
 #include <llvm/ExecutionEngine/MCJIT.h>
@@ -45,12 +45,9 @@
 #include "parser.h"
 #include "type_check.h"
 #include "codegen_llvm.h"
+#include "b_frontend_action.h"
 #include "bpf_program.h"
-
-#define KERNEL_MODULES_DIR "/lib/modules"
-
-// This is temporary, to be removed in the next commit
-#define HELPER_FILE "../../src/cc/bitops.c"
+#include "kbuild_helper.h"
 
 namespace ebpf {
 
@@ -108,177 +105,7 @@ BPFProgram::~BPFProgram() {
   ctx_.reset();
 }
 
-int BPFProgram::parse() {
-  int rc;
-
-  proto_parser_ = make_unique<ebpf::cc::Parser>(proto_filename_);
-  rc = proto_parser_->parse();
-  if (rc) {
-    fprintf(stderr, "In file: %s\n", filename_.c_str());
-    return rc;
-  }
-
-  parser_ = make_unique<ebpf::cc::Parser>(filename_);
-  rc = parser_->parse();
-  if (rc) {
-    fprintf(stderr, "In file: %s\n", filename_.c_str());
-    return rc;
-  }
-
-  //ebpf::cc::Printer printer(stderr);
-  //printer.visit(parser_->root_node_);
-
-  ebpf::cc::TypeCheck type_check(parser_->scopes_.get(), proto_parser_->scopes_.get(), parser_->pragmas_);
-  auto ret = type_check.visit(parser_->root_node_);
-  if (get<0>(ret) != 0 || get<1>(ret).size()) {
-    fprintf(stderr, "Type error @line=%d: %s\n", get<0>(ret), get<1>(ret).c_str());
-    exit(1);
-  }
-
-  codegen_ = ebpf::make_unique<ebpf::cc::CodegenLLVM>(mod_, parser_->scopes_.get(), proto_parser_->scopes_.get());
-  ret = codegen_->visit(parser_->root_node_);
-  if (get<0>(ret) != 0 || get<1>(ret).size()) {
-    fprintf(stderr, "Codegen error @line=%d: %s\n", get<0>(ret), get<1>(ret).c_str());
-    return get<0>(ret);
-  }
-
-  return 0;
-}
-
-// Helper with pushd/popd semantics
-class DirStack {
- public:
-  explicit DirStack(const char *dst) : ok_(false) {
-    if (getcwd(cwd_, sizeof(cwd_)) == NULL) {
-      ::perror("getcwd");
-      return;
-    }
-    if (::chdir(dst)) {
-      fprintf(stderr, "chdir(%s): %s\n", dst, strerror(errno));
-      return;
-    }
-    ok_ = true;
-  }
-  ~DirStack() {
-    if (!ok_) return;
-    if (::chdir(cwd_)) {
-      fprintf(stderr, "chdir(%s): %s\n", cwd_, strerror(errno));
-    }
-  }
-  bool ok() const { return ok_; }
-  const char * cwd() const { return cwd_; }
- private:
-  bool ok_;
-  char cwd_[256];
-};
-
-struct FileDeleter {
-  void operator() (FILE *fp) {
-    fclose(fp);
-  }
-};
-typedef std::unique_ptr<FILE, FileDeleter> FILEPtr;
-
-// Scoped class to manage the creation/deletion of tmpdirs
-class TmpDir {
- public:
-  explicit TmpDir(const string &prefix = "/tmp/bcc-")
-      : ok_(false), prefix_(prefix) {
-    prefix_ += "XXXXXX";
-    if (::mkdtemp((char *)prefix_.data()) == NULL)
-      ::perror("mkdtemp");
-    else
-      ok_ = true;
-  }
-  ~TmpDir() {
-    auto fn = [] (const char *path, const struct stat *, int) -> int {
-      return ::remove(path);
-    };
-    if (::ftw(prefix_.c_str(), fn, 20) < 0)
-      ::perror("ftw");
-    else
-      ::remove(prefix_.c_str());
-  }
-  bool ok() const { return ok_; }
-  const string & str() const { return prefix_; }
- private:
-  bool ok_;
-  string prefix_;
-};
-
-// Compute the kbuild flags for the currently running kernel
-// Do this by:
-//   1. Create temp Makefile with stub dummy.c
-//   2. Run module build on that makefile, saving the computed flags to a file
-//   3. Cache the file for fast flag lookup in subsequent runs
-//  Note: Depending on environment, different cache locations may be desired. In
-//  case we eventually support non-root user programs, cache in $HOME.
-
-// Makefile helper for kbuild_flags
-static int learn_flags(const string &tmpdir, const char *uname_release, const char *cachefile) {
-  {
-    // Create a kbuild file to generate the flags
-    string makefile = tmpdir + "/Makefile";
-    FILEPtr mf(::fopen(makefile.c_str(), "w"));
-    if (!mf)
-      return -1;
-    fprintf(&*mf, "obj-y := dummy.o\n");
-    fprintf(&*mf, "CACHEDIR=$(dir %s)\n", cachefile);
-    fprintf(&*mf, "$(CACHEDIR):\n");
-    fprintf(&*mf, "\t@mkdir -p $(CACHEDIR)\n");
-    fprintf(&*mf, "$(obj)/%%.o: $(src)/%%.c $(CACHEDIR)\n");
-    fprintf(&*mf, "\t@echo -n \"$(NOSTDINC_FLAGS) $(LINUXINCLUDE) $(EXTRA_CFLAGS) "
-                    "-D__KERNEL__ -Wno-unused-value -Wno-pointer-sign \" > %s\n", cachefile);
-  }
-  {
-    string cfile = tmpdir + "/dummy.c";
-    FILEPtr cf(::fopen(cfile.c_str(), "w"));
-    if (!cf)
-      return -1;
-  }
-  string cmd = "make -s";
-  cmd += " -C " KERNEL_MODULES_DIR "/" + string(uname_release) + "/build";
-  cmd += " M=" + tmpdir + " dummy.o";
-  int rc = ::system(cmd.c_str());
-  if (rc < 0) {
-    ::perror("system");
-    return -1;
-  }
-  return ::open(cachefile, O_RDONLY);
-}
-
-// read the flags from cache or learn
-int BPFProgram::kbuild_flags(const char *uname_release, vector<string> *cflags) {
-  char cachefile[256];
-  char *home = ::getenv("HOME");
-  if (home)
-    snprintf(cachefile, sizeof(cachefile), "%s/.cache/bcc/%s.flags", home, uname_release);
-  else
-    snprintf(cachefile, sizeof(cachefile), "/var/run/bcc/%s.flags", uname_release);
-  int cachefd = ::open(cachefile, O_RDONLY);
-  if (cachefd < 0) {
-    TmpDir tmpdir;
-    if (!tmpdir.ok())
-      return -1;
-    cachefd = learn_flags(tmpdir.str(), uname_release, cachefile);
-    if (cachefd < 0)
-      return -1;
-  }
-  FILEPtr f(::fdopen(cachefd, "r"));
-  size_t len = 0;
-  char *line = NULL;
-  ssize_t nread;
-  while ((nread = getdelim(&line, &len, ' ', &*f)) >= 0) {
-    if (nread == 0 || (nread == 1 && line[0] == ' ')) continue;
-    if (line[nread - 1] == ' ')
-      --nread;
-    cflags->push_back(string(line, nread));
-  }
-  free(line);
-  return 0;
-}
-
-int BPFProgram::load_helper(unique_ptr<llvm::Module> *mod) {
+int BPFProgram::load_file_module(unique_ptr<llvm::Module> *mod, const string &file) {
   using namespace clang;
 
   struct utsname un;
@@ -286,33 +113,39 @@ int BPFProgram::load_helper(unique_ptr<llvm::Module> *mod) {
   char kdir[256];
   snprintf(kdir, sizeof(kdir), "%s/%s/build", KERNEL_MODULES_DIR, un.release);
 
+  // clang needs to run inside the kernel dir
   DirStack dstack(kdir);
   if (!dstack.ok())
     return -1;
 
-  string file = string(dstack.cwd()) + "/" HELPER_FILE;
-  vector<const char *> flags_cstr({"-fsyntax-only", "-emit-llvm", "-o", "/dev/null",
-                                   "-c", file.c_str()});
+  string abs_file = string(dstack.cwd()) + "/" + file;
+  if (file[0] == '/')
+    abs_file = file;
+  vector<const char *> flags_cstr({"-O0", "-emit-llvm", "-I", dstack.cwd(),
+                                   "-x", "c", "-c", abs_file.c_str()});
 
+  KBuildHelper kbuild_helper;
   vector<string> kflags;
-  if (kbuild_flags(un.release, &kflags))
+  if (kbuild_helper.get_flags(un.release, &kflags))
     return -1;
   for (auto it = kflags.begin(); it != kflags.end(); ++it)
     flags_cstr.push_back(it->c_str());
 
+  // set up the error reporting class
   IntrusiveRefCntPtr<DiagnosticOptions> diag_opts(new DiagnosticOptions());
   auto diag_client = new TextDiagnosticPrinter(llvm::errs(), &*diag_opts);
 
   IntrusiveRefCntPtr<DiagnosticIDs> DiagID(new DiagnosticIDs());
   DiagnosticsEngine diags(DiagID, &*diag_opts, diag_client);
 
+  // set up the command line argument wrapper
   driver::Driver drv("", "x86_64-unknown-linux-gnu", diags);
   drv.setTitle("bcc-clang-driver");
   drv.setCheckInputsExist(false);
 
   unique_ptr<driver::Compilation> compilation(drv.BuildCompilation(flags_cstr));
   if (!compilation)
-    return 0;
+    return -1;
 
   // expect exactly 1 job, otherwise error
   const driver::JobList &jobs = compilation->getJobs();
@@ -332,38 +165,54 @@ int BPFProgram::load_helper(unique_ptr<llvm::Module> *mod) {
 
   // Initialize a compiler invocation object from the clang (-cc1) arguments.
   const driver::ArgStringList &ccargs = cmd.getArguments();
-  auto invocation = make_unique<CompilerInvocation>();
-  CompilerInvocation::CreateFromArgs(*invocation, const_cast<const char **>(ccargs.data()),
-                                     const_cast<const char **>(ccargs.data()) + ccargs.size(), diags);
 
-  // Show the invocation, with -v.
-  if (invocation->getHeaderSearchOpts().Verbose)
-    jobs.Print(llvm::errs(), "\n", true);
-
-  // Create a compiler instance to handle the actual work.
-  CompilerInstance compiler;
-  compiler.setInvocation(invocation.release());
-
-  // Create the compilers actual diagnostics engine.
-  compiler.createDiagnostics();
-  if (!compiler.hasDiagnostics())
+  // first pass
+  auto invocation1 = make_unique<CompilerInvocation>();
+  if (!CompilerInvocation::CreateFromArgs(*invocation1, const_cast<const char **>(ccargs.data()),
+                                          const_cast<const char **>(ccargs.data()) + ccargs.size(), diags))
     return -1;
 
-  // Create and execute the frontend to generate an LLVM bitcode module.
-  EmitLLVMOnlyAction act(&*ctx_);
-  if (!compiler.ExecuteAction(act))
-    return -1;
+  CompilerInstance compiler1;
+  compiler1.setInvocation(invocation1.release());
+  compiler1.createDiagnostics();
 
-  *mod = act.takeModule();
+  // capture the rewritten c file
+  string out_str;
+  llvm::raw_string_ostream os(out_str);
+  BFrontendAction bact(os);
+  if (!compiler1.ExecuteAction(bact))
+    return -1;
+  // this contains the open FDs
+  tables_ = bact.take_tables();
+
+  // second pass, clear input and take rewrite buffer
+  auto invocation2 = make_unique<CompilerInvocation>();
+  if (!CompilerInvocation::CreateFromArgs(*invocation2, const_cast<const char **>(ccargs.data()),
+                                          const_cast<const char **>(ccargs.data()) + ccargs.size(), diags))
+    return -1;
+  CompilerInstance compiler2;
+  invocation2->getPreprocessorOpts().addRemappedFile("<bcc-memory-buffer>",
+                                                     llvm::MemoryBuffer::getMemBuffer(out_str).release());
+  invocation2->getFrontendOpts().Inputs.clear();
+  invocation2->getFrontendOpts().Inputs.push_back(FrontendInputFile("<bcc-memory-buffer>", IK_C));
+  // suppress warnings in the 2nd pass, but bail out on errors (our fault)
+  invocation2->getDiagnosticOpts().IgnoreWarnings = true;
+  compiler2.setInvocation(invocation2.release());
+  compiler2.createDiagnostics();
+
+  EmitLLVMOnlyAction ir_act(&*ctx_);
+  if (!compiler2.ExecuteAction(ir_act))
+    return -1;
+  *mod = ir_act.takeModule();
 
   return 0;
 }
 
 // Load in a pre-built list of functions into the initial Module object, then
 // build an ExecutionEngine.
-int BPFProgram::init_engine() {
+int BPFProgram::load_includes(const string &tmpfile) {
   unique_ptr<Module> mod;
-  if (load_helper(&mod))
+  if (load_file_module(&mod, tmpfile))
     return -1;
   mod_ = &*mod;
 
@@ -391,6 +240,47 @@ void BPFProgram::dump_ir() {
   legacy::PassManager PM;
   PM.add(createPrintModulePass(outs()));
   PM.run(*mod_);
+}
+
+int BPFProgram::parse() {
+  int rc;
+
+  proto_parser_ = make_unique<ebpf::cc::Parser>(proto_filename_);
+  rc = proto_parser_->parse();
+  if (rc) {
+    fprintf(stderr, "In file: %s\n", filename_.c_str());
+    return rc;
+  }
+
+  parser_ = make_unique<ebpf::cc::Parser>(filename_);
+  rc = parser_->parse();
+  if (rc) {
+    fprintf(stderr, "In file: %s\n", filename_.c_str());
+    return rc;
+  }
+
+  //ebpf::cc::Printer printer(stderr);
+  //printer.visit(parser_->root_node_);
+
+  ebpf::cc::TypeCheck type_check(parser_->scopes_.get(), proto_parser_->scopes_.get(), parser_->pragmas_);
+  auto ret = type_check.visit(parser_->root_node_);
+  if (get<0>(ret) != 0 || get<1>(ret).size()) {
+    fprintf(stderr, "Type error @line=%d: %s\n", get<0>(ret), get<1>(ret).c_str());
+    return -1;
+  }
+
+  // TODO: clean this
+  if (load_includes("../../src/cc/bpf_helpers.h") < 0)
+    return -1;
+
+  codegen_ = ebpf::make_unique<ebpf::cc::CodegenLLVM>(mod_, parser_->scopes_.get(), proto_parser_->scopes_.get());
+  ret = codegen_->visit(parser_->root_node_);
+  if (get<0>(ret) != 0 || get<1>(ret).size()) {
+    fprintf(stderr, "Codegen error @line=%d: %s\n", get<0>(ret), get<1>(ret).c_str());
+    return get<0>(ret);
+  }
+
+  return 0;
 }
 
 int BPFProgram::finalize() {
@@ -439,8 +329,20 @@ char * BPFProgram::license() const {
   return (char *)get<0>(section->second);
 }
 
+unsigned BPFProgram::kern_version() const {
+  auto section = sections_.find("version");
+  if (section == sections_.end())
+    return 0;
+
+  return *(unsigned *)get<0>(section->second);
+}
+
 int BPFProgram::table_fd(const string &name) const {
-  return codegen_->get_table_fd(name);
+  int fd = codegen_ ? codegen_->get_table_fd(name) : -1;
+  if (fd >= 0) return fd;
+  auto table_it = tables_->find(name);
+  if (table_it == tables_->end()) return -1;
+  return table_it->second.fd;
 }
 
 int BPFProgram::load(const string &filename, const string &proto_filename) {
@@ -450,10 +352,15 @@ int BPFProgram::load(const string &filename, const string &proto_filename) {
   }
   filename_ = filename;
   proto_filename_ = proto_filename;
-  if (int rc = init_engine())
-    return rc;
-  if (int rc = parse())
-    return rc;
+  if (proto_filename_.empty()) {
+    // direct load of .b file
+    if (int rc = load_includes(filename_))
+      return rc;
+  } else {
+    // old lex .b file
+    if (int rc = parse())
+      return rc;
+  }
   if (int rc = finalize())
     return rc;
   return 0;
