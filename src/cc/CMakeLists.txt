@@ -9,7 +9,7 @@ ADD_FLEX_BISON_DEPENDENCY(Lexer Parser)
 
 set(CMAKE_SHARED_LINKER_FLAGS "-static-libstdc++ -Wl,--exclude-libs=ALL")
 
-add_library(bpfprog SHARED bpf_common.cc bpf_program.cc codegen_llvm.cc
+add_library(bpfprog SHARED bpf_common.cc bpf_module.cc codegen_llvm.cc
   node.cc parser.cc printer.cc type_check.cc libbpf.c b_frontend_action.cc
   kbuild_helper.cc
   ${BISON_Parser_OUTPUTS} ${FLEX_Lexer_OUTPUTS})

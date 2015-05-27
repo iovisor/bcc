@@ -38,19 +38,21 @@ class CodegenLLVM;
 class Parser;
 }
 
-class BPFProgram {
+class BPFModule {
  private:
   int init_engine();
   int parse();
   int finalize();
   void dump_ir();
-  int load_file_module(std::unique_ptr<llvm::Module> *mod, const std::string &file);
+  int load_file_module(std::unique_ptr<llvm::Module> *mod, const std::string &file, bool in_memory);
   int load_includes(const std::string &tmpfile);
+  int load_cfile(const std::string &file, bool in_memory);
   int kbuild_flags(const char *uname_release, std::vector<std::string> *cflags);
  public:
-  BPFProgram(unsigned flags);
-  ~BPFProgram();
+  BPFModule(unsigned flags);
+  ~BPFModule();
   int load(const std::string &filename, const std::string &proto_filename);
+  int load_string(const std::string &text);
   uint8_t * start(const std::string &name) const;
   size_t size(const std::string &name) const;
   int table_fd(const std::string &name) const;

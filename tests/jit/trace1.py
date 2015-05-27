@@ -20,15 +20,14 @@ class Leaf(Structure):
 
 class TestKprobe(TestCase):
     def setUp(self):
-        self.prog = BPF("trace1", arg1, arg2,
-                prog_type=BPF.BPF_PROG_TYPE_KPROBE, debug=0)
-        self.prog.load("sys_wr")
-        self.prog.load("sys_rd")
-        self.prog.load("sys_bpf")
-        self.stats = self.prog.table("stats", Key, Leaf)
-        self.prog.attach_kprobe("sys_write", "sys_wr", 0, -1)
-        self.prog.attach_kprobe("sys_read", "sys_rd", 0, -1)
-        self.prog.attach_kprobe("htab_map_get_next_key", "sys_bpf", 0, -1)
+        b = BPF("trace1", arg1, arg2, debug=0)
+        fn1 = b.load_func("sys_wr", BPF.KPROBE)
+        fn2 = b.load_func("sys_rd", BPF.KPROBE)
+        fn3 = b.load_func("sys_bpf", BPF.KPROBE)
+        self.stats = b.load_table("stats", Key, Leaf)
+        BPF.attach_kprobe(fn1, "sys_write", 0, -1)
+        BPF.attach_kprobe(fn2, "sys_read", 0, -1)
+        BPF.attach_kprobe(fn2, "htab_map_get_next_key", 0, -1)
 
     def test_trace1(self):
         with open("/dev/null", "a") as f:

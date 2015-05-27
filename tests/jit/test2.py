@@ -23,20 +23,20 @@ class Leaf(Structure):
 
 class TestBPFSocket(TestCase):
     def setUp(self):
-        self.prog = BPF("main", arg1, arg2,
-                BPF.BPF_PROG_TYPE_SCHED_CLS, debug=0)
+        b = BPF("test2", arg1, arg2, debug=0)
         with open("/sys/class/net/eth0/ifindex") as f:
             ifindex = int(f.read())
-        self.prog.attach_filter(ifindex, 10, 1)
+        fn = b.load_func("main", BPF.SCHED_CLS)
+        BPF.attach_filter(fn, ifindex, 10, 1)
+        self.xlate = b.load_table("xlate", Key, Leaf)
 
     def test_xlate(self):
-        xlate = self.prog.table("xlate", Key, Leaf)
         key = Key(IPAddress("172.16.1.1").value, IPAddress("172.16.1.2").value)
         leaf = Leaf(IPAddress("192.168.1.1").value, IPAddress("192.168.1.2").value, 0)
-        xlate.put(key, leaf)
+        self.xlate.put(key, leaf)
         udp = socket(AF_INET, SOCK_DGRAM)
         udp.sendto(b"a" * 10, ("172.16.1.1", 5000))
-        leaf = xlate.get(key)
+        leaf = self.xlate.get(key)
         self.assertGreater(leaf.xlated_pkts, 0)
 
 if __name__ == "__main__":

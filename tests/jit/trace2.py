@@ -6,10 +6,20 @@ from time import sleep
 import sys
 from unittest import main, TestCase
 
-arg1 = sys.argv.pop(1)
-arg2 = ""
-if len(sys.argv) > 1:
-  arg2 = sys.argv.pop(1)
+text = """
+#include <linux/ptrace.h>
+#include "../../src/cc/bpf_helpers.h"
+struct Ptr { u64 ptr; };
+struct Counters { u64 stat1; };
+BPF_TABLE("hash", struct Ptr, struct Counters, stats, 1024);
+
+BPF_EXPORT(count_sched)
+int count_sched(struct pt_regs *ctx) {
+  struct Ptr key = {.ptr=ctx->bx};
+  stats.data[(u64)&key].stat1++;
+  return 0;
+}
+"""
 
 class Ptr(Structure):
     _fields_ = [("ptr", c_ulong)]
@@ -18,11 +28,10 @@ class Counters(Structure):
 
 class TestTracingEvent(TestCase):
     def setUp(self):
-        self.prog = BPF("trace2", arg1, arg2,
-                prog_type=BPF.BPF_PROG_TYPE_KPROBE, debug=0)
-        self.prog.load("count_sched")
-        self.stats = self.prog.table("stats", Ptr, Counters)
-        self.prog.attach_kprobe("schedule+50", "count_sched", 0, -1)
+        b = BPF("trace2", text=text, debug=0)
+        fn = b.load_func("count_sched", BPF.KPROBE)
+        self.stats = b.load_table("stats", Ptr, Counters)
+        BPF.attach_kprobe(fn, "schedule+50", 0, -1)
 
     def test_sched1(self):
         for i in range(0, 100):

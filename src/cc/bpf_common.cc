@@ -1,50 +1,59 @@
-#include "cc/bpf_program.h"
+#include "cc/bpf_module.h"
 #include "cc/bpf_common.h"
 
 extern "C" {
-void * bpf_program_create(const char *filename, const char *proto_filename, unsigned flags) {
-  auto prog = new ebpf::BPFProgram(flags);
-  if (prog->load(filename, proto_filename) != 0) {
-    delete prog;
+void * bpf_module_create(const char *filename, const char *proto_filename, unsigned flags) {
+  auto mod = new ebpf::BPFModule(flags);
+  if (mod->load(filename, proto_filename) != 0) {
+    delete mod;
     return nullptr;
   }
-  return prog;
+  return mod;
 }
 
-void bpf_program_destroy(void *program) {
-  auto prog = static_cast<ebpf::BPFProgram *>(program);
-  if (!prog) return;
-  delete prog;
+void * bpf_module_create_from_string(const char *text, unsigned flags) {
+  auto mod = new ebpf::BPFModule(flags);
+  if (mod->load_string(text) != 0) {
+    delete mod;
+    return nullptr;
+  }
+  return mod;
 }
 
-void * bpf_program_start(void *program, const char *name) {
-  auto prog = static_cast<ebpf::BPFProgram *>(program);
-  if (!prog) return nullptr;
-  return prog->start(name);
+void bpf_module_destroy(void *program) {
+  auto mod = static_cast<ebpf::BPFModule *>(program);
+  if (!mod) return;
+  delete mod;
 }
 
-size_t bpf_program_size(void *program, const char *name) {
-  auto prog = static_cast<ebpf::BPFProgram *>(program);
-  if (!prog) return 0;
-  return prog->size(name);
+void * bpf_function_start(void *program, const char *name) {
+  auto mod = static_cast<ebpf::BPFModule *>(program);
+  if (!mod) return nullptr;
+  return mod->start(name);
 }
 
-char * bpf_program_license(void *program) {
-  auto prog = static_cast<ebpf::BPFProgram *>(program);
-  if (!prog) return nullptr;
-  return prog->license();
+size_t bpf_function_size(void *program, const char *name) {
+  auto mod = static_cast<ebpf::BPFModule *>(program);
+  if (!mod) return 0;
+  return mod->size(name);
 }
 
-unsigned bpf_program_kern_version(void *program) {
-  auto prog = static_cast<ebpf::BPFProgram *>(program);
-  if (!prog) return 0;
-  return prog->kern_version();
+char * bpf_module_license(void *program) {
+  auto mod = static_cast<ebpf::BPFModule *>(program);
+  if (!mod) return nullptr;
+  return mod->license();
 }
 
-int bpf_program_table_fd(void *program, const char *table_name) {
-  auto prog = static_cast<ebpf::BPFProgram *>(program);
-  if (!prog) return -1;
-  return prog->table_fd(table_name);
+unsigned bpf_module_kern_version(void *program) {
+  auto mod = static_cast<ebpf::BPFModule *>(program);
+  if (!mod) return 0;
+  return mod->kern_version();
+}
+
+int bpf_table_fd(void *program, const char *table_name) {
+  auto mod = static_cast<ebpf::BPFModule *>(program);
+  if (!mod) return -1;
+  return mod->table_fd(table_name);
 }
 
 }
