@@ -14,10 +14,10 @@ if len(sys.argv) > 1:
 
 class TestBlkRequest(TestCase):
     def setUp(self):
-        b = BPF("trace3", arg1, arg2, debug=0)
+        b = BPF(arg1, arg2, debug=0)
         fn1 = b.load_func("probe_blk_start_request", BPF.KPROBE)
         fn2 = b.load_func("probe_blk_update_request", BPF.KPROBE)
-        self.latency = b.load_table("latency", c_uint, c_ulong)
+        self.latency = b.get_table("latency", c_uint, c_ulong)
         BPF.attach_kprobe(fn1, "blk_start_request", -1, 0)
         BPF.attach_kprobe(fn2, "blk_update_request", -1, 0)
 
