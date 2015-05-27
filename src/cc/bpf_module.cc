@@ -46,7 +46,7 @@
 #include "type_check.h"
 #include "codegen_llvm.h"
 #include "b_frontend_action.h"
-#include "bpf_program.h"
+#include "bpf_module.h"
 #include "kbuild_helper.h"
 
 namespace ebpf {
@@ -91,7 +91,7 @@ class MyMemoryManager : public SectionMemoryManager {
   map<string, tuple<uint8_t *, uintptr_t>> *sections_;
 };
 
-BPFProgram::BPFProgram(unsigned flags)
+BPFModule::BPFModule(unsigned flags)
     : flags_(flags), ctx_(new LLVMContext) {
   LLVMInitializeBPFTarget();
   LLVMInitializeBPFTargetMC();
@@ -100,12 +100,12 @@ BPFProgram::BPFProgram(unsigned flags)
   LLVMLinkInMCJIT(); /* call empty function to force linking of MCJIT */
 }
 
-BPFProgram::~BPFProgram() {
+BPFModule::~BPFModule() {
   engine_.reset();
   ctx_.reset();
 }
 
-int BPFProgram::load_file_module(unique_ptr<llvm::Module> *mod, const string &file) {
+int BPFModule::load_file_module(unique_ptr<llvm::Module> *mod, const string &file, bool in_memory) {
   using namespace clang;
 
   struct utsname un;
@@ -118,11 +118,18 @@ int BPFProgram::load_file_module(unique_ptr<llvm::Module> *mod, const string &fi
   if (!dstack.ok())
     return -1;
 
-  string abs_file = string(dstack.cwd()) + "/" + file;
-  if (file[0] == '/')
-    abs_file = file;
+  string abs_file;
+  if (in_memory) {
+    abs_file = "<bcc-memory-buffer>";
+  } else {
+    if (file.substr(0, 1) == "/")
+      abs_file = file;
+    else
+      abs_file = string(dstack.cwd()) + "/" + file;
+  }
+
   vector<const char *> flags_cstr({"-O0", "-emit-llvm", "-I", dstack.cwd(),
-                                   "-x", "c", "-c", abs_file.c_str()});
+                                  "-x", "c", "-c", abs_file.c_str()});
 
   KBuildHelper kbuild_helper;
   vector<string> kflags;
@@ -172,6 +179,13 @@ int BPFProgram::load_file_module(unique_ptr<llvm::Module> *mod, const string &fi
                                           const_cast<const char **>(ccargs.data()) + ccargs.size(), diags))
     return -1;
 
+  if (in_memory) {
+    invocation1->getPreprocessorOpts().addRemappedFile("<bcc-memory-buffer>",
+                                                       llvm::MemoryBuffer::getMemBuffer(file).release());
+    invocation1->getFrontendOpts().Inputs.clear();
+    invocation1->getFrontendOpts().Inputs.push_back(FrontendInputFile("<bcc-memory-buffer>", IK_C));
+  }
+
   CompilerInstance compiler1;
   compiler1.setInvocation(invocation1.release());
   compiler1.createDiagnostics();
@@ -208,11 +222,10 @@ int BPFProgram::load_file_module(unique_ptr<llvm::Module> *mod, const string &fi
   return 0;
 }
 
-// Load in a pre-built list of functions into the initial Module object, then
-// build an ExecutionEngine.
-int BPFProgram::load_includes(const string &tmpfile) {
+// load an entire c file as a module
+int BPFModule::load_cfile(const string &file, bool in_memory) {
   unique_ptr<Module> mod;
-  if (load_file_module(&mod, tmpfile))
+  if (load_file_module(&mod, file, in_memory))
     return -1;
   mod_ = &*mod;
 
@@ -236,13 +249,44 @@ int BPFProgram::load_includes(const string &tmpfile) {
   return 0;
 }
 
-void BPFProgram::dump_ir() {
+// NOTE: this is a duplicate of the above, but planning to deprecate if we
+// settle on clang as the frontend
+
+// Load in a pre-built list of functions into the initial Module object, then
+// build an ExecutionEngine.
+int BPFModule::load_includes(const string &tmpfile) {
+  unique_ptr<Module> mod;
+  if (load_file_module(&mod, tmpfile, false))
+    return -1;
+  mod_ = &*mod;
+
+  mod_->setDataLayout("e-m:e-i64:64-f80:128-n8:16:32:64-S128");
+  mod_->setTargetTriple("bpf-pc-linux");
+
+  for (auto fn = mod_->getFunctionList().begin(); fn != mod_->getFunctionList().end(); ++fn)
+    fn->addFnAttr(Attribute::AlwaysInline);
+
+  string err;
+  engine_ = unique_ptr<ExecutionEngine>(EngineBuilder(move(mod))
+      .setErrorStr(&err)
+      .setMCJITMemoryManager(make_unique<MyMemoryManager>(&sections_))
+      .setMArch("bpf")
+      .create());
+  if (!engine_) {
+    fprintf(stderr, "Could not create ExecutionEngine: %s\n", err.c_str());
+    return -1;
+  }
+
+  return 0;
+}
+
+void BPFModule::dump_ir() {
   legacy::PassManager PM;
   PM.add(createPrintModulePass(outs()));
   PM.run(*mod_);
 }
 
-int BPFProgram::parse() {
+int BPFModule::parse() {
   int rc;
 
   proto_parser_ = make_unique<ebpf::cc::Parser>(proto_filename_);
@@ -283,7 +327,7 @@ int BPFProgram::parse() {
   return 0;
 }
 
-int BPFProgram::finalize() {
+int BPFModule::finalize() {
   if (verifyModule(*mod_, &errs())) {
     if (flags_ & 1)
       dump_ir();
@@ -305,7 +349,7 @@ int BPFProgram::finalize() {
   return 0;
 }
 
-uint8_t * BPFProgram::start(const string &name) const {
+uint8_t * BPFModule::start(const string &name) const {
   auto section = sections_.find("." + name);
   if (section == sections_.end())
     return nullptr;
@@ -313,7 +357,7 @@ uint8_t * BPFProgram::start(const string &name) const {
   return get<0>(section->second);
 }
 
-size_t BPFProgram::size(const string &name) const {
+size_t BPFModule::size(const string &name) const {
   auto section = sections_.find("." + name);
   if (section == sections_.end())
     return 0;
@@ -321,7 +365,7 @@ size_t BPFProgram::size(const string &name) const {
   return get<1>(section->second);
 }
 
-char * BPFProgram::license() const {
+char * BPFModule::license() const {
   auto section = sections_.find("license");
   if (section == sections_.end())
     return nullptr;
@@ -329,7 +373,7 @@ char * BPFProgram::license() const {
   return (char *)get<0>(section->second);
 }
 
-unsigned BPFProgram::kern_version() const {
+unsigned BPFModule::kern_version() const {
   auto section = sections_.find("version");
   if (section == sections_.end())
     return 0;
@@ -337,7 +381,7 @@ unsigned BPFProgram::kern_version() const {
   return *(unsigned *)get<0>(section->second);
 }
 
-int BPFProgram::table_fd(const string &name) const {
+int BPFModule::table_fd(const string &name) const {
   int fd = codegen_ ? codegen_->get_table_fd(name) : -1;
   if (fd >= 0) return fd;
   auto table_it = tables_->find(name);
@@ -345,7 +389,7 @@ int BPFProgram::table_fd(const string &name) const {
   return table_it->second.fd;
 }
 
-int BPFProgram::load(const string &filename, const string &proto_filename) {
+int BPFModule::load(const string &filename, const string &proto_filename) {
   if (!sections_.empty()) {
     fprintf(stderr, "Program already initialized\n");
     return -1;
@@ -354,13 +398,27 @@ int BPFProgram::load(const string &filename, const string &proto_filename) {
   proto_filename_ = proto_filename;
   if (proto_filename_.empty()) {
     // direct load of .b file
-    if (int rc = load_includes(filename_))
+    if (int rc = load_cfile(filename_, false))
       return rc;
   } else {
     // old lex .b file
     if (int rc = parse())
       return rc;
   }
+  if (int rc = finalize())
+    return rc;
+  return 0;
+}
+
+int BPFModule::load_string(const string &text) {
+  if (!sections_.empty()) {
+    fprintf(stderr, "Program already initialized\n");
+    return -1;
+  }
+  filename_ = "<memory>";
+  if (int rc = load_cfile(text, true))
+    return rc;
+
   if (int rc = finalize())
     return rc;
   return 0;
