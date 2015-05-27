@@ -18,6 +18,7 @@ struct _name##_table_t { \
   _leaf_type * (*get) (_key_type *); \
   int (*put) (_key_type *, _leaf_type *); \
   int (*delete) (_key_type *); \
+  void (*call) (void *, int index); \
   _leaf_type data[_max_entries]; \
 }; \
 __attribute__((section("maps/" _table_type))) \
@@ -34,17 +35,19 @@ unsigned _version SEC("version") = LINUX_VERSION_CODE;
 /* helper functions called from eBPF programs written in C */
 static void *(*bpf_map_lookup_elem)(void *map, void *key) =
 	(void *) BPF_FUNC_map_lookup_elem;
-static int (*bpf_map_update_elem)(void *map, void *key, void *value,
-				  unsigned long long flags) =
+static int (*bpf_map_update_elem)(void *map, void *key, void *value, u64 flags) =
 	(void *) BPF_FUNC_map_update_elem;
 static int (*bpf_map_delete_elem)(void *map, void *key) =
 	(void *) BPF_FUNC_map_delete_elem;
-static int (*bpf_probe_read)(void *dst, unsigned long long size, void *unsafe_ptr) =
+static int (*bpf_probe_read)(void *dst, u64 size, void *unsafe_ptr) =
 	(void *) BPF_FUNC_probe_read;
-static unsigned long long (*bpf_ktime_get_ns)(void) =
+static u64 (*bpf_ktime_get_ns)(void) =
 	(void *) BPF_FUNC_ktime_get_ns;
-static int (*bpf_trace_printk)(const char *fmt, unsigned long long fmt_size, ...) =
+static int (*bpf_trace_printk)(const char *fmt, u64 fmt_size, ...) =
 	(void *) BPF_FUNC_trace_printk;
+static void bpf_tail_call_(u64 map_fd, void *ctx, int index) {
+  ((void (*)(void *, u64, int))BPF_FUNC_tail_call)(ctx, map_fd, index);
+}
 
 /* llvm builtin functions that eBPF C program may use to
  * emit BPF_LD_ABS and BPF_LD_IND instructions
@@ -205,11 +208,6 @@ int bpf_map_update_elem_(uintptr_t map, void *key, void *value, u64 flags) {
 SEC("helpers")
 int bpf_map_delete_elem_(uintptr_t map, void *key) {
   return bpf_map_delete_elem((void *)map, key);
-}
-
-SEC("helpers")
-int bpf_skb_store_bytes_(void *ctx, u64 off, void *from, u64 len, u64 flags) {
-  return bpf_skb_store_bytes(ctx, off, from, len, flags);
 }
 
 SEC("helpers")

@@ -24,10 +24,10 @@ class Leaf(Structure):
 
 class TestBPFSocket(TestCase):
     def setUp(self):
-        b = BPF("test1", arg1, arg2, debug=0)
+        b = BPF(arg1, arg2, debug=0)
         fn = b.load_func("main", BPF.SOCKET_FILTER)
         BPF.attach_socket(fn, "eth0")
-        self.stats = b.load_table("stats", Key, Leaf)
+        self.stats = b.get_table("stats", Key, Leaf)
 
     def test_ping(self):
         cmd = ["ping", "-f", "-c", "100", "172.16.1.1"]

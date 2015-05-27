@@ -50,19 +50,22 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
         string prefix, suffix;
         string map_update_policy = "BPF_ANY";
         if (memb_name == "get") {
-          prefix = "bpf_map_lookup_elem_";
+          prefix = "bpf_map_lookup_elem";
           suffix = ")";
         } else if (memb_name == "put") {
-          prefix = "bpf_map_update_elem_";
+          prefix = "bpf_map_update_elem";
           suffix = ", " + map_update_policy + ")";
         } else if (memb_name == "delete") {
-          prefix = "bpf_map_delete_elem_";
+          prefix = "bpf_map_delete_elem";
+          suffix = ")";
+        } else if (memb_name == "call") {
+          prefix = "bpf_tail_call_";
           suffix = ")";
         } else {
           llvm::errs() << "error: unknown bpf_table operation " << memb_name << "\n";
           return false;
         }
-        prefix += "(bpf_pseudo_fd(1, " + fd + "), ";
+        prefix += "((void *)bpf_pseudo_fd(1, " + fd + "), ";
 
         SourceRange argRange(Call->getArg(0)->getLocStart(),
                              Call->getArg(Call->getNumArgs()-1)->getLocEnd());
@@ -153,6 +156,8 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
       map_type = BPF_MAP_TYPE_HASH;
     else if (A->getName() == "maps/array")
       map_type = BPF_MAP_TYPE_ARRAY;
+    else if (A->getName() == "maps/prog")
+      map_type = BPF_MAP_TYPE_PROG_ARRAY;
     table.fd = bpf_create_map(map_type, table.key_size, table.leaf_size, table.max_entries);
     if (table.fd < 0) {
       llvm::errs() << "error: could not open bpf fd\n";

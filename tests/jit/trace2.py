@@ -28,9 +28,9 @@ class Counters(Structure):
 
 class TestTracingEvent(TestCase):
     def setUp(self):
-        b = BPF("trace2", text=text, debug=0)
+        b = BPF(text=text, debug=0)
         fn = b.load_func("count_sched", BPF.KPROBE)
-        self.stats = b.load_table("stats", Ptr, Counters)
+        self.stats = b.get_table("stats", Ptr, Counters)
         BPF.attach_kprobe(fn, "schedule+50", 0, -1)
 
     def test_sched1(self):

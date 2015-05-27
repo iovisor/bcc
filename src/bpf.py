@@ -109,9 +109,8 @@ class BPF(object):
                 raise StopIteration()
             return next_key
 
-    def __init__(self, name, dp_file="", dph_file="", text=None, debug=0):
+    def __init__(self, dp_file="", dph_file="", text=None, debug=0):
         self.debug = debug
-        self.name = name
         self.funcs = {}
         if text:
             self.module = lib.bpf_module_create_from_string(text.encode("ascii"), self.debug)
@@ -124,7 +123,7 @@ class BPF(object):
 
     def load_func(self, func_name, prog_type):
         if lib.bpf_function_start(self.module, func_name.encode("ascii")) == None:
-            raise Exception("Unknown program %s" % self.name)
+            raise Exception("Unknown program %s" % func_name)
 
         fd = lib.bpf_prog_load(prog_type,
                 lib.bpf_function_start(self.module, func_name.encode("ascii")),
@@ -142,7 +141,7 @@ class BPF(object):
 
         return fn
 
-    def load_table(self, name, keytype, leaftype):
+    def get_table(self, name, keytype, leaftype):
         map_fd = lib.bpf_table_fd(self.module,
                 ct.c_char_p(name.encode("ascii")))
         if map_fd < 0:
@@ -165,7 +164,9 @@ class BPF(object):
         fn.sock = sock
 
     @staticmethod
-    def attach_filter(fn, ifindex, prio, classid):
+    def attach_classifier(fn, ifname, prio=10, classid=1):
+        with open("/sys/class/net/%s/ifindex" % ifname) as f:
+            ifindex = int(f.read())
         if not isinstance(fn, BPF.Function):
             raise Exception("arg 1 must be of type BPF.Function")
         res = lib.bpf_attach_filter(fn.fd, fn.name, ifindex, prio, classid)

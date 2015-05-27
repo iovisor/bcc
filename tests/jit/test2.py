@@ -23,12 +23,10 @@ class Leaf(Structure):
 
 class TestBPFSocket(TestCase):
     def setUp(self):
-        b = BPF("test2", arg1, arg2, debug=0)
-        with open("/sys/class/net/eth0/ifindex") as f:
-            ifindex = int(f.read())
+        b = BPF(arg1, arg2, debug=0)
         fn = b.load_func("main", BPF.SCHED_CLS)
-        BPF.attach_filter(fn, ifindex, 10, 1)
-        self.xlate = b.load_table("xlate", Key, Leaf)
+        BPF.attach_classifier(fn, "eth0")
+        self.xlate = b.get_table("xlate", Key, Leaf)
 
     def test_xlate(self):
         key = Key(IPAddress("172.16.1.1").value, IPAddress("172.16.1.2").value)
