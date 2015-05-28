@@ -169,7 +169,7 @@ class BPF(object):
             ifindex = int(f.read())
         if not isinstance(fn, BPF.Function):
             raise Exception("arg 1 must be of type BPF.Function")
-        res = lib.bpf_attach_filter(fn.fd, fn.name, ifindex, prio, classid)
+        res = lib.bpf_attach_filter(fn.fd, fn.name.encode("ascii"), ifindex, prio, classid)
         if res < 0:
             raise Exception("Failed to filter with BPF")
 
