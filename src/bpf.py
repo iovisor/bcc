@@ -149,7 +149,7 @@ class BPF(object):
         return BPF.Table(self, map_fd, keytype, leaftype)
 
     @staticmethod
-    def attach_socket(fn, dev):
+    def attach_raw_socket(fn, dev):
         if not isinstance(fn, BPF.Function):
             raise Exception("arg 1 must be of type BPF.Function")
         sock = lib.bpf_open_raw_sock(dev.encode("ascii"))

@@ -23,8 +23,8 @@ class Leaf(Structure):
 
 class TestBPFSocket(TestCase):
     def setUp(self):
-        b = BPF(arg1, arg2, debug=0)
-        fn = b.load_func("main", BPF.SCHED_CLS)
+        b = BPF(arg1, arg2, debug=1)
+        fn = b.load_func("on_packet", BPF.SCHED_CLS)
         BPF.attach_classifier(fn, "eth0")
         self.xlate = b.get_table("xlate", Key, Leaf)
 

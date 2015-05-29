@@ -12,7 +12,7 @@ struct skbuff {
   u32 type:32;
 };
 
-u32 main(struct skbuff *skb) {
+u32 on_packet(struct skbuff *skb) {
   u32 ret:32 = 0;
 
   goto proto::ethernet;

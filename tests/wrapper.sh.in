@@ -28,6 +28,7 @@ function ns_run() {
   sudo ip netns exec $ns tc qdisc add dev eth0 root prio
   sudo ip netns exec $ns ip addr add dev eth0 172.16.1.2/24
   sudo ip netns exec $ns ip link set eth0 up
+  sudo ip netns exec $ns ethtool -K eth0 tx off
   sudo ip addr add dev $ns.out 172.16.1.1/24
   sudo ip link set $ns.out up
   sudo bash -c "PYTHONPATH=$PYTHONPATH LD_LIBRARY_PATH=$LD_LIBRARY_PATH ip netns exec $ns $cmd $1 $2"
