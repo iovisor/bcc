@@ -69,7 +69,7 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
           txt += "if (!leaf) {";
           txt += " " + update + ", " + arg0 + ", " + arg1 + ", " + map_update_policy + ");";
           txt += " leaf = " + lookup + ", " + arg0 + ");";
-          txt += " if (!leaf) return -1;";
+          txt += " if (!leaf) return 0;";
           txt += "}";
           txt += "leaf;})";
         } else {
@@ -137,7 +137,7 @@ bool BTypeVisitor::VisitArraySubscriptExpr(ArraySubscriptExpr *Arr) {
           txt         += " typeof(" + name + ".leaf) zleaf = {0};";
           txt         += " " + update + ", " + args + ", &zleaf, " + map_update_policy + ");";
           txt         += " leaf = " + lookup + ", " + args + ");";
-          txt         += " if (!leaf) return -1;";
+          txt         += " if (!leaf) return 0;";
           txt         += "}";
           txt         += "leaf;}))";
           rewriter_.ReplaceText(SourceRange(Arr->getLocStart(), Arr->getLocEnd()), txt);
