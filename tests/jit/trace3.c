@@ -30,14 +30,14 @@ BPF_EXPORT(probe_blk_start_request)
 int probe_blk_start_request(struct pt_regs *ctx) {
   struct Request rq = {.rq = ctx->di};
   struct Time tm = {.start = bpf_ktime_get_ns()};
-  requests.put(&rq, &tm);
+  requests.update(&rq, &tm);
   return 0;
 }
 
 BPF_EXPORT(probe_blk_update_request)
 int probe_blk_update_request(struct pt_regs *ctx) {
   struct Request rq = {.rq = ctx->di};
-  struct Time *tm = requests.get(&rq);
+  struct Time *tm = requests.lookup(&rq);
   if (!tm) return 0;
   u64 delta = bpf_ktime_get_ns() - tm->start;
   requests.delete(&rq);
@@ -46,6 +46,9 @@ int probe_blk_update_request(struct pt_regs *ctx) {
   u32 index = (lg * 64 + (delta - base) * 64 / base) * 3 / 64;
   if (index >= SLOTS)
     index = SLOTS - 1;
-  __sync_fetch_and_add(&latency.data[(u64)&index], 1);
+
+  u64 zero = 0;
+  u64 *val = latency.lookup_or_init(&index, &zero);
+  lock_xadd(val, 1);
   return 0;
 }

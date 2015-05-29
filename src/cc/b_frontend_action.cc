@@ -15,6 +15,7 @@ int bpf_create_map(enum bpf_map_type map_type, int key_size, int value_size,
 namespace ebpf {
 using std::map;
 using std::string;
+using std::to_string;
 using std::unique_ptr;
 using namespace clang;
 
@@ -39,6 +40,11 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
       if (SectionAttr *A = Ref->getDecl()->getAttr<SectionAttr>()) {
         if (!A->getName().startswith("maps"))
           return true;
+
+        SourceRange argRange(Call->getArg(0)->getLocStart(),
+                             Call->getArg(Call->getNumArgs()-1)->getLocEnd());
+        string args = rewriter_.getRewrittenText(argRange);
+
         // find the table fd, which was opened at declaration time
         auto table_it = tables_.find(Ref->getDecl()->getName());
         if (table_it == tables_.end()) {
@@ -46,31 +52,48 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
               << "initialized handle for bpf_table";
           return false;
         }
-        string fd = std::to_string(table_it->second.fd);
+        string fd = to_string(table_it->second.fd);
         string prefix, suffix;
         string map_update_policy = "BPF_ANY";
-        if (memb_name == "get") {
-          prefix = "bpf_map_lookup_elem";
-          suffix = ")";
-        } else if (memb_name == "put") {
-          prefix = "bpf_map_update_elem";
-          suffix = ", " + map_update_policy + ")";
-        } else if (memb_name == "delete") {
-          prefix = "bpf_map_delete_elem";
-          suffix = ")";
-        } else if (memb_name == "call") {
-          prefix = "bpf_tail_call_";
-          suffix = ")";
+        string txt;
+        if (memb_name == "lookup_or_init") {
+          string map_update_policy = "BPF_NOEXIST";
+          string name = Ref->getDecl()->getName();
+          string arg0 = rewriter_.getRewrittenText(SourceRange(Call->getArg(0)->getLocStart(),
+                                                               Call->getArg(0)->getLocEnd()));
+          string arg1 = rewriter_.getRewrittenText(SourceRange(Call->getArg(1)->getLocStart(),
+                                                               Call->getArg(1)->getLocEnd()));
+          string lookup = "bpf_map_lookup_elem_(bpf_pseudo_fd(1, " + fd + ")";
+          string update = "bpf_map_update_elem_(bpf_pseudo_fd(1, " + fd + ")";
+          txt  = "({typeof(" + name + ".leaf) *leaf = " + lookup + ", " + arg0 + "); ";
+          txt += "if (!leaf) {";
+          txt += " " + update + ", " + arg0 + ", " + arg1 + ", " + map_update_policy + ");";
+          txt += " leaf = " + lookup + ", " + arg0 + ");";
+          txt += " if (!leaf) return -1;";
+          txt += "}";
+          txt += "leaf;})";
         } else {
-          llvm::errs() << "error: unknown bpf_table operation " << memb_name << "\n";
-          return false;
-        }
-        prefix += "((void *)bpf_pseudo_fd(1, " + fd + "), ";
+          if (memb_name == "lookup") {
+            prefix = "bpf_map_lookup_elem";
+            suffix = ")";
+          } else if (memb_name == "update") {
+            prefix = "bpf_map_update_elem";
+            suffix = ", " + map_update_policy + ")";
+          } else if (memb_name == "delete") {
+            prefix = "bpf_map_delete_elem";
+            suffix = ")";
+          } else if (memb_name == "call") {
+            prefix = "bpf_tail_call_";
+            suffix = ")";
+          } else {
+            llvm::errs() << "error: unknown bpf_table operation " << memb_name << "\n";
+            return false;
+          }
+          prefix += "((void *)bpf_pseudo_fd(1, " + fd + "), ";
 
-        SourceRange argRange(Call->getArg(0)->getLocStart(),
-                             Call->getArg(Call->getNumArgs()-1)->getLocEnd());
-        string args = rewriter_.getRewrittenText(argRange);
-        rewriter_.ReplaceText(SourceRange(Call->getLocStart(), Call->getLocEnd()), prefix + args + suffix);
+          txt = prefix + args + suffix;
+        }
+        rewriter_.ReplaceText(SourceRange(Call->getLocStart(), Call->getLocEnd()), txt);
         return true;
       }
     }
@@ -102,7 +125,7 @@ bool BTypeVisitor::VisitArraySubscriptExpr(ArraySubscriptExpr *Arr) {
                 << "initialized handle for bpf_table";
             return false;
           }
-          string fd = std::to_string(table_it->second.fd);
+          string fd = to_string(table_it->second.fd);
           string map_update_policy = "BPF_NOEXIST";
           string name = Ref->getDecl()->getName();
           SourceRange argRange(RHS->getLocStart(), RHS->getLocEnd());
@@ -118,6 +141,25 @@ bool BTypeVisitor::VisitArraySubscriptExpr(ArraySubscriptExpr *Arr) {
           txt         += "}";
           txt         += "leaf;}))";
           rewriter_.ReplaceText(SourceRange(Arr->getLocStart(), Arr->getLocEnd()), txt);
+        }
+      }
+    }
+  }
+  return true;
+}
+
+bool BTypeVisitor::VisitMemberExpr(MemberExpr *E) {
+  Expr *Base = E->getBase()->IgnoreImplicit();
+  if (DeclRefExpr *Ref = dyn_cast<DeclRefExpr>(Base)) {
+    if (DeprecatedAttr *A = Ref->getDecl()->getAttr<DeprecatedAttr>()) {
+      if (A->getMessage() == "packet") {
+        if (FieldDecl *F = dyn_cast<FieldDecl>(E->getMemberDecl())) {
+          uint64_t ofs = C.getFieldOffset(F);
+          uint64_t sz = F->isBitField() ? F->getBitWidthValue(C) : C.getTypeSize(F->getType());
+          string base = rewriter_.getRewrittenText(SourceRange(Base->getLocStart(), Base->getLocEnd()));
+          string text = "bpf_dext_pkt(skb, (u64)" + base + "+" + to_string(ofs >> 3)
+              + ", " + to_string(ofs & 0x7) + ", " + to_string(sz) + ")";
+          rewriter_.ReplaceText(SourceRange(E->getLocStart(), E->getLocEnd()), text);
         }
       }
     }
@@ -165,11 +207,6 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
     }
     tables_[Decl->getName()] = table;
   }
-  return true;
-}
-bool BTypeVisitor::VisitDeclRefExpr(DeclRefExpr *E) {
-  //ValueDecl *D = E->getDecl();
-  //BPFTableAttr *A = D->getAttr<BPFTableAttr>();
   return true;
 }
 
