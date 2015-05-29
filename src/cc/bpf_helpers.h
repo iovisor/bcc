@@ -15,14 +15,28 @@
 struct _name##_table_t { \
   _key_type key; \
   _leaf_type leaf; \
-  _leaf_type * (*get) (_key_type *); \
-  int (*put) (_key_type *, _leaf_type *); \
+  _leaf_type * (*lookup) (_key_type *); \
+  _leaf_type * (*lookup_or_init) (_key_type *, _leaf_type *); \
+  int (*update) (_key_type *, _leaf_type *); \
   int (*delete) (_key_type *); \
   void (*call) (void *, int index); \
   _leaf_type data[_max_entries]; \
 }; \
 __attribute__((section("maps/" _table_type))) \
 struct _name##_table_t _name
+
+// packet parsing state machine helpers
+#define STATE_MACHINE(name) \
+  BPF_EXPORT(name) int _##name(struct __sk_buff *skb)
+#define BEGIN(next) \
+  u64 _parse_cursor = 0; \
+  goto next
+
+#define PROTO(name) \
+  goto EOP; \
+name: ; \
+  struct name##_t *name __attribute__((deprecated("packet"))) = (void *)_parse_cursor; \
+  _parse_cursor += sizeof(*name);
 
 // export this function to llvm by putting it into a specially named section
 //#define BPF_EXPORT(_ret, _name, ...) SEC("." #_name) _ret _name(__VA_ARGS__)
@@ -239,5 +253,7 @@ int bpf_l4_csum_replace_(void *ctx, u64 off, u64 from, u64 to, u64 flags) {
   }
   return bpf_l4_csum_replace(ctx, off, from, to, flags);
 }
+
+#define lock_xadd(ptr, val) ((void)__sync_fetch_and_add(ptr, val))
 
 #endif

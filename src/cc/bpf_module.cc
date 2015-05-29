@@ -129,7 +129,8 @@ int BPFModule::load_file_module(unique_ptr<llvm::Module> *mod, const string &fil
   }
 
   vector<const char *> flags_cstr({"-O0", "-emit-llvm", "-I", dstack.cwd(),
-                                  "-x", "c", "-c", abs_file.c_str()});
+                                   "-Wno-deprecated-declarations",
+                                   "-x", "c", "-c", abs_file.c_str()});
 
   KBuildHelper kbuild_helper;
   vector<string> kflags;

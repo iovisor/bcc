@@ -40,7 +40,7 @@ class BTypeVisitor : public clang::RecursiveASTVisitor<BTypeVisitor> {
   bool VisitCallExpr(clang::CallExpr *Call);
   bool VisitVarDecl(clang::VarDecl *Decl);
   bool VisitArraySubscriptExpr(clang::ArraySubscriptExpr *E);
-  bool VisitDeclRefExpr(clang::DeclRefExpr *E);
+  bool VisitMemberExpr(clang::MemberExpr *E);
 
  private:
   clang::ASTContext &C;
