@@ -31,10 +31,10 @@ class TestBPFSocket(TestCase):
     def test_xlate(self):
         key = Key(IPAddress("172.16.1.1").value, IPAddress("172.16.1.2").value)
         leaf = Leaf(IPAddress("192.168.1.1").value, IPAddress("192.168.1.2").value, 0)
-        self.xlate.put(key, leaf)
+        self.xlate.update(key, leaf)
         udp = socket(AF_INET, SOCK_DGRAM)
         udp.sendto(b"a" * 10, ("172.16.1.1", 5000))
-        leaf = self.xlate.get(key)
+        leaf = self.xlate.lookup(key)
         self.assertGreater(leaf.xlated_pkts, 0)
         udp.close()
 

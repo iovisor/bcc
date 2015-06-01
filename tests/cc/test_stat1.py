@@ -33,11 +33,11 @@ class TestBPFSocket(TestCase):
         cmd = ["ping", "-f", "-c", "100", "172.16.1.1"]
         check_call(cmd)
         #for key in self.stats.iter():
-        #    leaf = self.stats.get(key)
+        #    leaf = self.stats.lookup(key)
         #    print(IPAddress(key.sip), "=>", IPAddress(key.dip),
         #          "rx", leaf.rx_pkts, "tx", leaf.tx_pkts)
         key = Key(IPAddress("172.16.1.2").value, IPAddress("172.16.1.1").value)
-        leaf = self.stats.get(key)
+        leaf = self.stats.lookup(key)
         self.assertEqual(leaf.rx_pkts, 100)
         self.assertEqual(leaf.tx_pkts, 100)
 

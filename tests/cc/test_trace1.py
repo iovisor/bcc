@@ -37,7 +37,7 @@ class TestKprobe(TestCase):
             for i in range(0, 200):
                 os.read(f.fileno(), 1)
         for key in self.stats.iter():
-            leaf = self.stats.get(key)
+            leaf = self.stats.lookup(key)
             print("fd %x:" % key.fd, "stat1 %d" % leaf.stat1, "stat2 %d" % leaf.stat2)
 
 if __name__ == "__main__":

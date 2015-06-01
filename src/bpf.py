@@ -62,7 +62,7 @@ class BPF(object):
             self.keytype = keytype
             self.leaftype = leaftype
 
-        def get(self, key):
+        def lookup(self, key):
             key_p = ct.pointer(key)
             leaf = self.leaftype()
             leaf_p = ct.pointer(leaf)
@@ -73,7 +73,7 @@ class BPF(object):
                 raise Exception("Could not lookup in table")
             return leaf
 
-        def put(self, key, leaf, flags=0):
+        def update(self, key, leaf, flags=0):
             key_p = ct.pointer(key)
             leaf_p = ct.pointer(leaf)
             res = lib.bpf_update_elem(self.map_fd,
