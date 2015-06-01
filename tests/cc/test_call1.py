@@ -24,17 +24,17 @@ class TestBPFSocket(TestCase):
         eop_fn = b.load_func("eop", BPF.SCHED_CLS)
         BPF.attach_classifier(ether_fn, "eth0")
         self.jump = b.get_table("jump", c_int, c_int)
-        self.jump.put(c_int(S_ARP), c_int(arp_fn.fd))
-        self.jump.put(c_int(S_IP), c_int(ip_fn.fd))
-        self.jump.put(c_int(S_EOP), c_int(eop_fn.fd))
+        self.jump.update(c_int(S_ARP), c_int(arp_fn.fd))
+        self.jump.update(c_int(S_IP), c_int(ip_fn.fd))
+        self.jump.update(c_int(S_EOP), c_int(eop_fn.fd))
         self.stats = b.get_table("stats", c_int, c_ulonglong)
 
     def test_jumps(self):
         udp = socket(AF_INET, SOCK_DGRAM)
         udp.sendto(b"a" * 10, ("172.16.1.1", 5000))
-        self.assertGreater(self.stats.get(c_int(S_IP)).value, 0)
-        self.assertGreater(self.stats.get(c_int(S_ARP)).value, 0)
-        self.assertGreater(self.stats.get(c_int(S_EOP)).value, 1)
+        self.assertGreater(self.stats.lookup(c_int(S_IP)).value, 0)
+        self.assertGreater(self.stats.lookup(c_int(S_ARP)).value, 0)
+        self.assertGreater(self.stats.lookup(c_int(S_EOP)).value, 1)
 
 if __name__ == "__main__":
     main()

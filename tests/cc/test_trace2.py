@@ -37,7 +37,7 @@ class TestTracingEvent(TestCase):
         for i in range(0, 100):
             sleep(0.01)
         for key in self.stats.iter():
-            leaf = self.stats.get(key)
+            leaf = self.stats.lookup(key)
             print("ptr %x:" % key.ptr, "stat1 %x" % leaf.stat1)
 
 if __name__ == "__main__":
