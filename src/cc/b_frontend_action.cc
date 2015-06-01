@@ -148,12 +148,42 @@ bool BTypeVisitor::VisitArraySubscriptExpr(ArraySubscriptExpr *Arr) {
   return true;
 }
 
-bool BTypeVisitor::VisitMemberExpr(MemberExpr *E) {
-  Expr *Base = E->getBase()->IgnoreImplicit();
+bool BTypeVisitor::VisitBinaryOperator(BinaryOperator *E) {
+  if (!E->isAssignmentOp())
+    return true;
+  Expr *LHS = E->getLHS()->IgnoreImplicit();
+  Expr *RHS = E->getRHS()->IgnoreImplicit();
+  if (MemberExpr *Memb = dyn_cast<MemberExpr>(LHS)) {
+    if (DeclRefExpr *Base = dyn_cast<DeclRefExpr>(Memb->getBase()->IgnoreImplicit())) {
+      if (DeprecatedAttr *A = Base->getDecl()->getAttr<DeprecatedAttr>()) {
+        if (A->getMessage() == "packet") {
+          if (FieldDecl *F = dyn_cast<FieldDecl>(Memb->getMemberDecl())) {
+            uint64_t ofs = C.getFieldOffset(F);
+            uint64_t sz = F->isBitField() ? F->getBitWidthValue(C) : C.getTypeSize(F->getType());
+            string base = rewriter_.getRewrittenText(SourceRange(Base->getLocStart(), Base->getLocEnd()));
+            string rhs = rewriter_.getRewrittenText(SourceRange(RHS->getLocStart(), RHS->getLocEnd()));
+            string text = "bpf_dins_pkt(skb, (u64)" + base + "+" + to_string(ofs >> 3)
+                + ", " + to_string(ofs & 0x7) + ", " + to_string(sz) + ", " + rhs + ")";
+            rewriter_.ReplaceText(SourceRange(E->getLocStart(), E->getLocEnd()), text);
+          }
+        }
+      }
+    }
+  }
+  return true;
+}
+bool BTypeVisitor::VisitImplicitCastExpr(ImplicitCastExpr *E) {
+  // use dext only for RValues
+  if (E->getCastKind() != CK_LValueToRValue)
+    return true;
+  MemberExpr *Memb = dyn_cast<MemberExpr>(E->IgnoreImplicit());
+  if (!Memb)
+    return true;
+  Expr *Base = Memb->getBase()->IgnoreImplicit();
   if (DeclRefExpr *Ref = dyn_cast<DeclRefExpr>(Base)) {
     if (DeprecatedAttr *A = Ref->getDecl()->getAttr<DeprecatedAttr>()) {
       if (A->getMessage() == "packet") {
-        if (FieldDecl *F = dyn_cast<FieldDecl>(E->getMemberDecl())) {
+        if (FieldDecl *F = dyn_cast<FieldDecl>(Memb->getMemberDecl())) {
           uint64_t ofs = C.getFieldOffset(F);
           uint64_t sz = F->isBitField() ? F->getBitWidthValue(C) : C.getTypeSize(F->getType());
           string base = rewriter_.getRewrittenText(SourceRange(Base->getLocStart(), Base->getLocEnd()));

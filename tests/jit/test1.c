@@ -12,8 +12,8 @@ struct IPLeaf {
 
 BPF_TABLE("hash", struct IPKey, struct IPLeaf, stats, 256);
 
-BPF_EXPORT(main)
-int _main(struct __sk_buff *skb) {
+BPF_EXPORT(on_packet)
+int on_packet(struct __sk_buff *skb) {
   BEGIN(ethernet);
 
   PROTO(ethernet) {

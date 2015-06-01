@@ -254,6 +254,11 @@ int bpf_l4_csum_replace_(void *ctx, u64 off, u64 from, u64 to, u64 flags) {
   return bpf_l4_csum_replace(ctx, off, from, to, flags);
 }
 
+#define incr_cksum_l3(expr, oldval, newval) \
+  bpf_l3_csum_replace_(skb, (u64)expr, oldval, newval, sizeof(newval))
+#define incr_cksum_l4(expr, oldval, newval, is_pseudo) \
+  bpf_l4_csum_replace_(skb, (u64)expr, oldval, newval, ((is_pseudo & 0x1) << 4) | sizeof(newval))
+
 #define lock_xadd(ptr, val) ((void)__sync_fetch_and_add(ptr, val))
 
 #endif
