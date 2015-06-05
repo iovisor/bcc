@@ -25,7 +25,6 @@ function ns_run() {
   sudo ip link add $ns.in type veth peer name $ns.out
   sudo ip link set $ns.in netns $ns
   sudo ip netns exec $ns ip link set $ns.in name eth0
-  sudo ip netns exec $ns tc qdisc add dev eth0 root prio
   sudo ip netns exec $ns ip addr add dev eth0 172.16.1.2/24
   sudo ip netns exec $ns ip link set eth0 up
   sudo ip netns exec $ns ethtool -K eth0 tx off

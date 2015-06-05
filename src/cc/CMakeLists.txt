@@ -23,4 +23,4 @@ set(clang_libs ${libclangFrontend} ${libclangSerialization} ${libclangDriver} ${
   ${libclangAST} ${libclangLex} ${libclangBasic})
 
 # Link against LLVM libraries
-target_link_libraries(bpfprog ${clang_libs} ${llvm_libs} LLVMBPFCodeGen mnl)
+target_link_libraries(bpfprog ${clang_libs} ${llvm_libs} LLVMBPFCodeGen)
