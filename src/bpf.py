@@ -176,7 +176,7 @@ class BPF(object):
         fn.sock = sock
 
     @staticmethod
-    def attach_kprobe(fn, event, pid=-1, cpu=0, group_fd=-1):
+    def attach_kprobe(fn, event, pid=0, cpu=-1, group_fd=-1):
         if not isinstance(fn, BPF.Function):
             raise Exception("arg 1 must be of type BPF.Function")
         ev_name = "p_" + event.replace("+", "_")
