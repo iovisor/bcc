@@ -2,6 +2,8 @@
 #define __BPF_HELPERS_H
 
 #include <linux/bpf.h>
+#include <linux/filter.h>
+#include <linux/if_packet.h>
 #include <linux/version.h>
 
 /* helper macro to place programs, maps, license in
@@ -30,6 +32,7 @@ struct _name##_table_t _name
   BPF_EXPORT(name) int _##name(struct __sk_buff *skb)
 #define BEGIN(next) \
   u64 _parse_cursor = 0; \
+  u64 _parse_base = skb->pkt_type == PACKET_OUTGOING ? 0 : BPF_LL_OFF; \
   goto next
 
 #define PROTO(name) \

@@ -24,7 +24,7 @@ int parse_ether(struct __sk_buff *skb) {
     case 0x0806: jump.call(skb, S_ARP);
   }
   jump.call(skb, S_EOP);
-  return 0;
+  return 1;
 }
 
 BPF_EXPORT(parse_arp)
@@ -37,7 +37,7 @@ int parse_arp(struct __sk_buff *skb) {
   if (leaf) (*leaf)++;
 
   jump.call(skb, S_EOP);
-  return 0;
+  return 1;
 }
 
 BPF_EXPORT(parse_ip)
@@ -50,7 +50,7 @@ int parse_ip(struct __sk_buff *skb) {
   if (leaf) (*leaf)++;
 
   jump.call(skb, S_EOP);
-  return 0;
+  return 1;
 }
 
 BPF_EXPORT(eop)
@@ -58,5 +58,5 @@ int eop(struct __sk_buff *skb) {
   int key = S_EOP;
   u64 *leaf = stats.lookup(&key);
   if (leaf) (*leaf)++;
-  return 0;
+  return 1;
 }

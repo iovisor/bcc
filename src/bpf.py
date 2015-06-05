@@ -35,8 +35,6 @@ lib.bpf_open_raw_sock.restype = ct.c_int
 lib.bpf_open_raw_sock.argtypes = [ct.c_char_p]
 lib.bpf_attach_socket.restype = ct.c_int
 lib.bpf_attach_socket.argtypes = [ct.c_int, ct.c_int]
-lib.bpf_attach_filter.restype = ct.c_int
-lib.bpf_attach_filter.argtypes = [ct.c_int, ct.c_char_p, ct.c_uint, ct.c_ubyte, ct.c_uint]
 lib.bpf_prog_load.restype = ct.c_int
 lib.bpf_prog_load.argtypes = [ct.c_int, ct.c_void_p, ct.c_size_t,
         ct.c_char_p, ct.c_uint]
@@ -162,16 +160,6 @@ class BPF(object):
             raise Exception("Failed to attach BPF to device %s: %s"
                     % (dev, errstr))
         fn.sock = sock
-
-    @staticmethod
-    def attach_classifier(fn, ifname, prio=10, classid=1):
-        with open("/sys/class/net/%s/ifindex" % ifname) as f:
-            ifindex = int(f.read())
-        if not isinstance(fn, BPF.Function):
-            raise Exception("arg 1 must be of type BPF.Function")
-        res = lib.bpf_attach_filter(fn.fd, fn.name.encode("ascii"), ifindex, prio, classid)
-        if res < 0:
-            raise Exception("Failed to filter with BPF")
 
     @staticmethod
     def attach_kprobe(fn, event, pid=-1, cpu=0, group_fd=-1):

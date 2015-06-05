@@ -13,6 +13,18 @@ struct dot1q_t {
   u16 type;
 } __attribute__((packed));
 
+struct arp_t {
+  u16 htype;
+  u16 ptype;
+  u8 hlen;
+  u8 plen;
+  u16 oper;
+  u64 sha:48;
+  u64 spa:32;
+  u64 tha:48;
+  u32 tpa;
+} __attribute__((packed));
+
 struct ip_t {
   u8 ver:4;           // byte 0
   u8 hlen:4;
