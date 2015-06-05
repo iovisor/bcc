@@ -1,3 +1,5 @@
+# Copyright (c) PLUMgrid, Inc.
+# Licensed under the Apache License, Version 2.0 (the "License")
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 include_directories(${LLVM_INCLUDE_DIRS})

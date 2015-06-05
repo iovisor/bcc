@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+# Copyright (c) PLUMgrid, Inc.
+# Licensed under the Apache License, Version 2.0 (the "License")
 
 from ctypes import c_ushort, c_int, c_ulonglong
 from netaddr import IPAddress

@@ -108,10 +108,10 @@ cat > /usr/local/bin/bcc-setup <<'DELIM__'
 set -e -x
 numcpu=$(grep -c ^processor /proc/cpuinfo)
 
-repo=ssh://git@github.com/plumgrid/bcc.git
+repo=ssh://git@github.com/iovisor/bcc.git
 git ls-remote $repo 2>&1 > /dev/null
 if [[ $? -ne 0 ]]; then
-  repo=https://<%= @github_access_token %>@github.com/plumgrid/bcc.git
+  repo=https://<%= @github_access_token %>@github.com/iovisor/bcc.git
 fi
 git clone $repo
 mkdir bcc/build/

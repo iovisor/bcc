@@ -1,3 +1,5 @@
+// Copyright (c) PLUMgrid, Inc.
+// Licensed under the Apache License, Version 2.0 (the "License")
 #include "kprobe.b"
 struct Ptr { u64 ptr:64; };
 struct Counters { u64 stat1:64; };

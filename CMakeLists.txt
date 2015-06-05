@@ -1,3 +1,5 @@
+# Copyright (c) PLUMgrid, Inc.
+# Licensed under the Apache License, Version 2.0 (the "License")
 cmake_minimum_required(VERSION 2.8.7)
 
 project(bpf-tools)
