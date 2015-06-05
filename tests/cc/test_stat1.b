@@ -1,3 +1,5 @@
+// Copyright (c) PLUMgrid, Inc.
+// Licensed under the Apache License, Version 2.0 (the "License")
 struct IPKey {
   u32 dip:32;
   u32 sip:32;

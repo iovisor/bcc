@@ -1,3 +1,5 @@
+// Copyright (c) PLUMgrid, Inc.
+// Licensed under the Apache License, Version 2.0 (the "License")
 #include <linux/ptrace.h>
 #include "../../src/cc/bpf_helpers.h"
 struct Ptr { u64 ptr; };
