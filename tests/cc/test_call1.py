@@ -3,6 +3,7 @@
 from ctypes import c_ushort, c_int, c_ulonglong
 from netaddr import IPAddress
 from bpf import BPF
+from pyroute2 import IPRoute
 from socket import socket, AF_INET, SOCK_DGRAM
 import sys
 from time import sleep
@@ -22,7 +23,10 @@ class TestBPFSocket(TestCase):
         arp_fn = b.load_func("parse_arp", BPF.SCHED_CLS)
         ip_fn = b.load_func("parse_ip", BPF.SCHED_CLS)
         eop_fn = b.load_func("eop", BPF.SCHED_CLS)
-        BPF.attach_classifier(ether_fn, "eth0")
+        ip = IPRoute()
+        ifindex = ip.link_lookup(ifname="eth0")[0]
+        ip.tc("add-filter", "bpf", ifindex, ":1", fd=ether_fn.fd,
+              name=ether_fn.name, parent="0:", action="ok", classid=1)
         self.jump = b.get_table("jump", c_int, c_int)
         self.jump.update(c_int(S_ARP), c_int(arp_fn.fd))
         self.jump.update(c_int(S_IP), c_int(ip_fn.fd))
@@ -32,6 +36,7 @@ class TestBPFSocket(TestCase):
     def test_jumps(self):
         udp = socket(AF_INET, SOCK_DGRAM)
         udp.sendto(b"a" * 10, ("172.16.1.1", 5000))
+        udp.close()
         self.assertGreater(self.stats.lookup(c_int(S_IP)).value, 0)
         self.assertGreater(self.stats.lookup(c_int(S_ARP)).value, 0)
         self.assertGreater(self.stats.lookup(c_int(S_EOP)).value, 1)

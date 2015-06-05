@@ -187,7 +187,7 @@ bool BTypeVisitor::VisitImplicitCastExpr(ImplicitCastExpr *E) {
           uint64_t ofs = C.getFieldOffset(F);
           uint64_t sz = F->isBitField() ? F->getBitWidthValue(C) : C.getTypeSize(F->getType());
           string base = rewriter_.getRewrittenText(SourceRange(Base->getLocStart(), Base->getLocEnd()));
-          string text = "bpf_dext_pkt(skb, (u64)" + base + "+" + to_string(ofs >> 3)
+          string text = "bpf_dext_pkt(skb, _parse_base + (u64)" + base + "+" + to_string(ofs >> 3)
               + ", " + to_string(ofs & 0x7) + ", " + to_string(sz) + ")";
           rewriter_.ReplaceText(SourceRange(E->getLocStart(), E->getLocEnd()), text);
         }

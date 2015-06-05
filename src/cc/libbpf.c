@@ -2,7 +2,6 @@
 #include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <libmnl/libmnl.h>
 #include <linux/bpf.h>
 #include <linux/if_packet.h>
 #include <linux/pkt_cls.h>
@@ -12,9 +11,11 @@
 #include <linux/version.h>
 #include <net/ethernet.h>
 #include <net/if.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
+#include <unistd.h>
 
 #include "libbpf.h"
 
@@ -133,88 +134,6 @@ int bpf_open_raw_sock(const char *name)
 
 int bpf_attach_socket(int sock, int prog) {
   return setsockopt(sock, SOL_SOCKET, 50 /*SO_ATTACH_BPF*/, &prog, sizeof(prog));
-}
-
-static int cb(const struct nlmsghdr *nlh, void *data) {
-  struct nlmsgerr *err;
-  if (nlh->nlmsg_type == NLMSG_ERROR) {
-    err = mnl_nlmsg_get_payload(nlh);
-    if (err->error != 0) {
-      fprintf(stderr, "bpf tc netlink command failed (%d): %s\n",
-          err->error, strerror(-1 * err->error));
-      return -1;
-    } else {
-      return 0;
-    }
-  } else {
-    return -1;
-  }
-}
-
-int bpf_attach_filter(int progfd, const char *prog_name,
-                      uint32_t ifindex, uint8_t prio, uint32_t classid) {
-  int rc = -1;
-  char buf[1024];
-  struct nlmsghdr *nlh;
-  struct tcmsg *tc;
-  struct nlattr *opt;
-  struct mnl_socket *nl = NULL;
-  unsigned int portid;
-  ssize_t bytes;
-  int seq = getpid();
-
-  memset(buf, 0, sizeof(buf));
-
-  nlh = mnl_nlmsg_put_header(buf);
-
-  nlh->nlmsg_type = RTM_NEWTFILTER;
-  nlh->nlmsg_flags = NLM_F_REQUEST | NLM_F_CREATE | NLM_F_ACK | NLM_F_EXCL;
-  nlh->nlmsg_seq = seq;
-  tc = mnl_nlmsg_put_extra_header(nlh, sizeof(*tc));
-  tc->tcm_family = AF_UNSPEC;
-  tc->tcm_info = TC_H_MAKE(prio << 16, htons(ETH_P_ALL));
-  tc->tcm_ifindex = ifindex;
-  mnl_attr_put_strz(nlh, TCA_KIND, "bpf");
-  opt = mnl_attr_nest_start(nlh, TCA_OPTIONS);
-  mnl_attr_put_u32(nlh, TCA_BPF_FD, progfd);
-  mnl_attr_put_strz(nlh, TCA_BPF_NAME, prog_name);
-  mnl_attr_put_u32(nlh, TCA_BPF_CLASSID, classid);
-  mnl_attr_nest_end(nlh, opt);
-
-  nl = mnl_socket_open(NETLINK_ROUTE);
-  if (!nl || (uintptr_t)nl == (uintptr_t)-1) {
-    perror("mnl_socket_open");
-    goto cleanup;
-  }
-
-  if (mnl_socket_bind(nl, 0, MNL_SOCKET_AUTOPID) < 0) {
-    perror("mnl_socket_bind");
-    goto cleanup;
-  }
-
-  portid = mnl_socket_get_portid(nl);
-
-  if (mnl_socket_sendto(nl, nlh, nlh->nlmsg_len) < 0) {
-    perror("mnl_socket_sendto");
-    goto cleanup;
-  }
-  if ((bytes = mnl_socket_recvfrom(nl, buf, sizeof(buf))) < 0) {
-    perror("mnl_socket_recvfrom");
-    goto cleanup;
-  }
-
-  if (mnl_cb_run(buf, bytes, seq, portid, cb, NULL) < 0) {
-    perror("mnl_cb_run");
-    goto cleanup;
-  }
-
-  rc = 0;
-
-cleanup:
-  if (nl && (uintptr_t)nl != (uintptr_t)-1)
-    if (mnl_socket_close(nl) < 0)
-      perror("mnl_socket_close");
-  return rc;
 }
 
 static int bpf_attach_tracing_event(int progfd, const char *event_path, pid_t pid, int cpu, int group_fd)
