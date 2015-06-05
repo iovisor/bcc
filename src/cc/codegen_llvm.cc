@@ -1024,7 +1024,7 @@ StatusTuple CodegenLLVM::visit_integer_variable_decl_stmt_node(IntegerVariableDe
 
 StatusTuple CodegenLLVM::visit_struct_decl_stmt_node(StructDeclStmtNode *n) {
   ++indent_;
-  StructType *struct_type = StructType::create(ctx(), "struct." + n->id_->name_);
+  StructType *struct_type = StructType::create(ctx(), "_struct." + n->id_->name_);
   vector<Type *> fields;
   for (auto it = n->stmts_.begin(); it != n->stmts_.end(); ++it)
     fields.push_back(B.getIntNTy((*it)->bit_width_));
@@ -1089,9 +1089,9 @@ StatusTuple CodegenLLVM::visit_table_decl_stmt_node(TableDeclStmtNode *n) {
     else
       return mkstatus_(n, "Table type %s not implemented", n->type_id()->name_.c_str());
 
-    StructType *decl_struct = mod_->getTypeByName("struct." + n->id_->name_);
+    StructType *decl_struct = mod_->getTypeByName("_struct." + n->id_->name_);
     if (!decl_struct)
-      decl_struct = StructType::create(ctx(), "struct." + n->id_->name_);
+      decl_struct = StructType::create(ctx(), "_struct." + n->id_->name_);
     if (decl_struct->isOpaque())
       decl_struct->setBody(std::vector<Type *>({Type::getInt32Ty(ctx()), Type::getInt32Ty(ctx()),
                                                 Type::getInt32Ty(ctx()), Type::getInt32Ty(ctx())}),
@@ -1156,7 +1156,7 @@ StatusTuple CodegenLLVM::visit_func_decl_stmt_node(FuncDeclStmtNode *n) {
       StructType *stype;
       //TRY2(lookup_struct_type(formal, &stype));
       auto var = (StructVariableDeclStmtNode *)formal;
-      stype = mod_->getTypeByName("struct." + var->struct_id_->name_);
+      stype = mod_->getTypeByName("_struct." + var->struct_id_->name_);
       if (!stype) return mkstatus_(n, "could not find type %s", var->struct_id_->c_str());
       formals.push_back(PointerType::getUnqual(stype));
     } else {
