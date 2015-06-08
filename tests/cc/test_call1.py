@@ -27,8 +27,9 @@ class TestBPFSocket(TestCase):
         eop_fn = b.load_func("eop", BPF.SCHED_CLS)
         ip = IPRoute()
         ifindex = ip.link_lookup(ifname="eth0")[0]
+        ip.tc("add", "sfq", ifindex, "1:")
         ip.tc("add-filter", "bpf", ifindex, ":1", fd=ether_fn.fd,
-              name=ether_fn.name, parent="0:", action="ok", classid=1)
+              name=ether_fn.name, parent="1:", action="ok", classid=1)
         self.jump = b.get_table("jump", c_int, c_int)
         self.jump.update(c_int(S_ARP), c_int(arp_fn.fd))
         self.jump.update(c_int(S_IP), c_int(ip_fn.fd))
