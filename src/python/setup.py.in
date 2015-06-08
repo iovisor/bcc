@@ -1,0 +1,13 @@
+# Copyright (c) PLUMgrid, Inc.
+# Licensed under the Apache License, Version 2.0 (the "License")
+from distutils.core import setup
+
+setup(name='bpf',
+      version='@REVISION@',
+      description='BPF Loader Library',
+      author='Brenden Blanco',
+      author_email='bblanco@plumgrid.com',
+      url='http://plumgrid.com',
+      packages=['bpf'],
+      platforms=['Linux'],
+      requires=[])

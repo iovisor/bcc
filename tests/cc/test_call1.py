@@ -20,7 +20,7 @@ S_IP = 4
 
 class TestBPFSocket(TestCase):
     def setUp(self):
-        b = BPF(dp_file=arg1, debug=0)
+        b = BPF(src_file=arg1, debug=0)
         ether_fn = b.load_func("parse_ether", BPF.SCHED_CLS)
         arp_fn = b.load_func("parse_arp", BPF.SCHED_CLS)
         ip_fn = b.load_func("parse_ip", BPF.SCHED_CLS)

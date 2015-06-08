@@ -1,11 +1,11 @@
 # Copyright 2015 PLUMgrid
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 # http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -121,17 +121,17 @@ class BPF(object):
                 raise StopIteration()
             return next_key
 
-    def __init__(self, dp_file="", dph_file="", text=None, debug=0):
+    def __init__(self, src_file="", hdr_file="", text=None, debug=0):
         self.debug = debug
         self.funcs = {}
         if text:
             self.module = lib.bpf_module_create_from_string(text.encode("ascii"), self.debug)
         else:
-            self.module = lib.bpf_module_create(dp_file.encode("ascii"),
-                    dph_file.encode("ascii"), self.debug)
+            self.module = lib.bpf_module_create(src_file.encode("ascii"),
+                    hdr_file.encode("ascii"), self.debug)
 
         if self.module == None:
-            raise Exception("Failed to compile BPF module %s" % dp_file)
+            raise Exception("Failed to compile BPF module %s" % src_file)
 
     def load_func(self, func_name, prog_type):
         if lib.bpf_function_start(self.module, func_name.encode("ascii")) == None:
