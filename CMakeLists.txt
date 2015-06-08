@@ -7,6 +7,8 @@ set(CMAKE_BUILD_TYPE Debug)
 
 enable_testing()
 
+include(scripts/GetGitRevisionDescription.cmake)
+
 find_package(BISON)
 find_package(FLEX)
 find_package(LLVM REQUIRED CONFIG)
@@ -31,5 +33,6 @@ find_library(libclangSerialization NAMES clangSerialization HINTS ${CLANG_SEARCH
 set(CMAKE_C_FLAGS "-Wall")
 set(CMAKE_CXX_FLAGS "-std=c++11 -Wall")
 
+add_subdirectory(scripts)
 add_subdirectory(src)
 add_subdirectory(tests)
