@@ -32,11 +32,17 @@ class TestBPFFilter(TestCase):
         fn = b.load_func("on_packet", BPF.SCHED_CLS)
         ip = IPRoute()
         ifindex = ip.link_lookup(ifname="eth0")[0]
+        # set up a network to change the flow:
+        #             outside      |       inside
+        # 172.16.1.1 - 172.16.1.2  |  192.168.1.1 - 192.16.1.2
         ip.addr("del", index=ifindex, address="172.16.1.2", mask=24)
         ip.addr("add", index=ifindex, address="192.168.1.2", mask=24)
+        # add an ingress and egress qdisc
         ip.tc("add", "ingress", ifindex, "ffff:")
+        ip.tc("add", "sfq", ifindex, "1:")
+        # add same program to both ingress/egress, so pkt is translated in both directions
         ip.tc("add-filter", "bpf", ifindex, ":1", fd=fn.fd, name=fn.name, parent="ffff:", action="ok", classid=1)
-        ip.tc("add-filter", "bpf", ifindex, ":2", fd=fn.fd, name=fn.name, parent="0:", action="ok", classid=1)
+        ip.tc("add-filter", "bpf", ifindex, ":2", fd=fn.fd, name=fn.name, parent="1:", action="ok", classid=1)
         self.xlate = b.get_table("xlate", Key, Leaf)
 
     def test_xlate(self):
