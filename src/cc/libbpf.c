@@ -148,7 +148,7 @@ int bpf_open_raw_sock(const char *name)
 }
 
 int bpf_attach_socket(int sock, int prog) {
-  return setsockopt(sock, SOL_SOCKET, 50 /*SO_ATTACH_BPF*/, &prog, sizeof(prog));
+  return setsockopt(sock, SOL_SOCKET, SO_ATTACH_BPF, &prog, sizeof(prog));
 }
 
 static int bpf_attach_tracing_event(int progfd, const char *event_path, pid_t pid, int cpu, int group_fd)

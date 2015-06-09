@@ -77,7 +77,7 @@ static u64 (*bpf_ktime_get_ns)(void) =
 static int (*bpf_trace_printk)(const char *fmt, u64 fmt_size, ...) =
 	(void *) BPF_FUNC_trace_printk;
 static u64 (*bpf_clone_redirect)(void *ctx, u64 ifindex, u64 flags) =
-	(void *)BPF_FUNC_clone_redirect;
+	(void *) BPF_FUNC_clone_redirect;
 static void bpf_tail_call_(u64 map_fd, void *ctx, int index) {
   ((void (*)(void *, u64, int))BPF_FUNC_tail_call)(ctx, map_fd, index);
 }
