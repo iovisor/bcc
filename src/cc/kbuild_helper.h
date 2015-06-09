@@ -57,6 +57,10 @@ class DirStack {
   char cwd_[256];
 };
 
+static int ftw_cb(const char *path, const struct stat *, int) {
+  return ::remove(path);
+}
+
 // Scoped class to manage the creation/deletion of tmpdirs
 class TmpDir {
  public:
@@ -69,10 +73,7 @@ class TmpDir {
       ok_ = true;
   }
   ~TmpDir() {
-    auto fn = [] (const char *path, const struct stat *, int) -> int {
-      return ::remove(path);
-    };
-    if (::ftw(prefix_.c_str(), fn, 20) < 0)
+    if (::ftw(prefix_.c_str(), ftw_cb, 20) < 0)
       ::perror("ftw");
     else
       ::remove(prefix_.c_str());

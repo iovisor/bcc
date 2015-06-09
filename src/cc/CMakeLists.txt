@@ -9,7 +9,9 @@ BISON_TARGET(Parser parser.yy ${CMAKE_CURRENT_BINARY_DIR}/parser.yy.cc COMPILE_F
 FLEX_TARGET(Lexer lexer.ll ${CMAKE_CURRENT_BINARY_DIR}/lexer.ll.cc COMPILE_FLAGS "--c++ --o lexer.ll.cc")
 ADD_FLEX_BISON_DEPENDENCY(Lexer Parser)
 
-set(CMAKE_SHARED_LINKER_FLAGS "-static-libstdc++ -Wl,--exclude-libs=ALL")
+# if gcc 4.9 or higher is used, static libstdc++ is a good option
+#set(CMAKE_SHARED_LINKER_FLAGS "-static-libstdc++ -Wl,--exclude-libs=ALL")
+set(CMAKE_SHARED_LINKER_FLAGS "-Wl,--exclude-libs=ALL")
 
 add_library(bpfprog SHARED bpf_common.cc bpf_module.cc codegen_llvm.cc
   node.cc parser.cc printer.cc type_check.cc libbpf.c b_frontend_action.cc
