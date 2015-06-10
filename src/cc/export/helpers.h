@@ -147,7 +147,7 @@ static inline unsigned __int128 bpf_hton128(unsigned __int128 val) {
 }
 
 static inline u64 load_dword(void *skb, u64 off) {
-  return ((u64)load_word(skb, off) << 4) | load_word(skb, off + 4);
+  return ((u64)load_word(skb, off) << 32) | load_word(skb, off + 4);
 }
 
 void bpf_store_byte(void *skb, u64 off, u64 val) asm("llvm.bpf.store.byte");
@@ -179,8 +179,10 @@ u64 bpf_dext_pkt(void *pkt, u64 off, u64 bofs, u64 bsz) {
     return load_word(pkt, off);
   } else if (bofs + bsz <= 32) {
     return load_word(pkt, off) >> (32 - (bofs + bsz))  &  MASK(bsz);
+  } else if (bofs == 0 && bsz == 64) {
+    return load_dword(pkt, off);
   } else if (bofs + bsz <= 64) {
-    return bpf_ntohll(load_dword(pkt, off)) >> (64 - (bofs + bsz))  &  MASK(bsz);
+    return load_dword(pkt, off) >> (64 - (bofs + bsz))  &  MASK(bsz);
   }
   return 0;
 }
