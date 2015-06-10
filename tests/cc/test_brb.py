@@ -74,6 +74,7 @@ from time import sleep
 from unittest import main, TestCase
 import subprocess
 import commands
+import struct
 
 arg1 = sys.argv.pop(1)
 
@@ -82,12 +83,7 @@ class Bpf_Dest(Structure):
                 ("port_id", c_uint)]
 
 class Eth_Addr(Structure):
-    _fields_ = [("addr0", c_ubyte),
-                ("addr1", c_ubyte),
-                ("addr2", c_ubyte),
-                ("addr3", c_ubyte),
-                ("addr4", c_ubyte),
-                ("addr5", c_ubyte)]
+    _fields_ = [("addr", c_ulonglong)]
 
 class TestBPFSocket(TestCase):
     def setup_vm_ns(self, ns, veth_in, veth_out):
@@ -150,12 +146,10 @@ class TestBPFSocket(TestCase):
         self.br1_dest = b.get_table("br1_dest", c_uint, Bpf_Dest)
         self.br1_mac = b.get_table("br1_mac", Eth_Addr, c_uint)
         self.br1_rtr = b.get_table("br1_rtr", c_uint, c_uint)
-        self.br1_mac_ifindex = b.get_table("br1_mac_ifindex", Eth_Addr, c_uint)
 
         self.br2_dest = b.get_table("br2_dest", c_uint, Bpf_Dest)
         self.br2_mac = b.get_table("br2_mac", Eth_Addr, c_uint)
         self.br2_rtr = b.get_table("br2_rtr", c_uint, c_uint)
-        self.br2_mac_ifindex = b.get_table("br2_mac_ifindex", Eth_Addr, c_uint)
 
     def connect_ports(self, prog_id_pem, prog_id_br, curr_pem_pid, curr_br_pid,
                       ip, br_dest_map, br_mac_map,
@@ -167,9 +161,7 @@ class TestBPFSocket(TestCase):
         ifindex = ip.link_lookup(ifname=ns_eth_out)[0]
         self.pem_port.update(c_uint(curr_pem_pid), c_uint(ifindex))
         self.pem_ifindex.update(c_uint(ifindex), c_uint(curr_pem_pid))
-        mac1 = vm_mac.split(':')
-        mac_addr = Eth_Addr(int(mac1[0], 16), int(mac1[1], 16), int(mac1[2], 16),
-                            int(mac1[3], 16), int(mac1[4], 16), int(mac1[5], 16))
+        mac_addr = Eth_Addr(struct.unpack('!Q', "\0\0" + vm_mac.replace(':', '').decode('hex'))[0])
         br_mac_map.update(mac_addr, c_uint(curr_br_pid))
 
     def attach_filter(self, ip, ifname, fd, name):

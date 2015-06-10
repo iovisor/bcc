@@ -15,8 +15,10 @@ typedef struct bpf_dest {
     u32 port_id;
 } bpf_dest_t;
 
+// use u64 to represent eth_addr.
+// maintain the structure though to indicate the semantics
 typedef struct eth_addr {
-    u8 addr[6];
+    u64 addr;
 } eth_addr_t;
 
 // Program table definitions for tail calls
@@ -115,7 +117,6 @@ static int br_common(struct __sk_buff *skb, int which_br) {
     u32 tx_port_id;
     bpf_dest_t *dest_p;
     u32 index, *rtrif_p;
-    u64 mac_addr;
 
     if (skb->tc_index == 0) {
         skb->tc_index = 1;
@@ -128,11 +129,10 @@ static int br_common(struct __sk_buff *skb, int which_br) {
 
     BEGIN(ethernet);
     PROTO(ethernet) {
-        mac_addr = bpf_htonll(ethernet->dst);
-        _memcpy(dmac.addr, (u8 *)&mac_addr + 2, 6);
+        dmac.addr = ethernet->dst;
         if (meta.prog_id != 0) {
             /* send to the router */
-            if (dmac.addr[0] & dmac.addr[1] & dmac.addr[2] & dmac.addr[3] & dmac.addr[4] & dmac.addr[5] == 0xff) {
+            if (dmac.addr == 0xffffffffffffULL) {
                  index = 0;
                  if (which_br == 1)
                      rtrif_p = br1_rtr.lookup(&index);
@@ -181,8 +181,7 @@ static int br_common(struct __sk_buff *skb, int which_br) {
                 __u32 ifindex = *rtrif_p;
                 eth_addr_t smac;
 
-                mac_addr = bpf_htonll(ethernet->src);
-                _memcpy(smac.addr, (u8 *)&mac_addr + 2, 6);
+		smac.addr = ethernet->src;
                 if (which_br == 1)
                     br1_mac_ifindex.update(&smac, &ifindex);
                 else
