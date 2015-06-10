@@ -16,7 +16,7 @@ message(STATUS "Found LLVM: ${LLVM_INCLUDE_DIRS}")
 
 # clang is linked as a library, but the library path searching is
 # primitively supported, unlike libLLVM
-set(CLANG_SEARCH "/opt/local/llvm/lib")
+set(CLANG_SEARCH "/opt/local/llvm/lib;${LLVM_LIBRARY_DIRS}")
 find_library(libclangAnalysis NAMES clangAnalysis HINTS ${CLANG_SEARCH})
 find_library(libclangAST NAMES clangAST HINTS ${CLANG_SEARCH})
 find_library(libclangBasic NAMES clangBasic HINTS ${CLANG_SEARCH})
@@ -32,6 +32,9 @@ find_library(libclangSerialization NAMES clangSerialization HINTS ${CLANG_SEARCH
 if(libclangBasic STREQUAL "libclangBasic-NOTFOUND")
   message(FATAL_ERROR "Unable to find clang libraries")
 endif()
+FOREACH(DIR ${LLVM_INCLUDE_DIRS})
+  include_directories("${DIR}/../tools/clang/include")
+ENDFOREACH()
 
 set(CMAKE_C_FLAGS "-Wall")
 set(CMAKE_CXX_FLAGS "-std=c++11 -Wall")
