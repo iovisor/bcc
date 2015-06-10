@@ -9,7 +9,6 @@ from bpf import BPF
 from subprocess import call
 
 prog = """
-#include "src/cc/bpf_helpers.h"
 BPF_EXPORT(hello)
 int hello(void *ctx) {
   char fmt[] = "Hello, World!\\n";

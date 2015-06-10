@@ -85,6 +85,7 @@ set -e -x
 numcpu=$(grep -c ^processor /proc/cpuinfo)
 
 git clone https://github.com/llvm-mirror/llvm.git
+git clone https://github.com/llvm-mirror/clang.git llvm/tools/clang
 mkdir llvm/build/
 cd llvm/build/
 
@@ -93,7 +94,6 @@ cmake .. \
   -DCMAKE_BUILD_TYPE=Release \
   -DLLVM_ENABLE_TERMINFO=OFF \
   -DLLVM_TARGETS_TO_BUILD="ARM;CppBackend;X86;BPF" \
-  -DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD=BPF \
   -DCMAKE_INSTALL_PREFIX=/opt/local/llvm
 
 make -j$numcpu

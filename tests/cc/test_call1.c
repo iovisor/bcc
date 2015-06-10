@@ -1,6 +1,5 @@
 // Copyright (c) PLUMgrid, Inc.
 // Licensed under the Apache License, Version 2.0 (the "License")
-#include "../../src/cc/bpf_helpers.h"
 
 BPF_TABLE("prog", int, int, jump, 64);
 BPF_TABLE("array", int, u64, stats, 64);

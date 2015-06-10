@@ -9,9 +9,19 @@ BISON_TARGET(Parser parser.yy ${CMAKE_CURRENT_BINARY_DIR}/parser.yy.cc COMPILE_F
 FLEX_TARGET(Lexer lexer.ll ${CMAKE_CURRENT_BINARY_DIR}/lexer.ll.cc COMPILE_FLAGS "--c++ --o lexer.ll.cc")
 ADD_FLEX_BISON_DEPENDENCY(Lexer Parser)
 
-# if gcc 4.9 or higher is used, static libstdc++ is a good option
-#set(CMAKE_SHARED_LINKER_FLAGS "-static-libstdc++ -Wl,--exclude-libs=ALL")
+# prune unused llvm static library stuff when linking into the new .so
 set(CMAKE_SHARED_LINKER_FLAGS "-Wl,--exclude-libs=ALL")
+
+# if gcc 4.9 or higher is used, static libstdc++ is a good option
+if (CMAKE_COMPILER_IS_GNUCC)
+  execute_process(COMMAND ${CMAKE_C_COMPILER} -dumpversion OUTPUT_VARIABLE GCC_VERSION)
+  if (GCC_VERSION VERSION_GREATER 4.9 OR GCC_VERSION VERSION_EQUAL 4.9)
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -static-libstdc++")
+  endif()
+endif()
+
+# tell the shared library where it is being installed so it can find shared header files
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBCC_INSTALL_PREFIX='\"${CMAKE_INSTALL_PREFIX}\"'")
 
 add_library(bpfprog SHARED bpf_common.cc bpf_module.cc codegen_llvm.cc
   node.cc parser.cc printer.cc type_check.cc libbpf.c b_frontend_action.cc
@@ -30,3 +40,5 @@ set(clang_libs ${libclangFrontend} ${libclangSerialization} ${libclangDriver} ${
 target_link_libraries(bpfprog ${clang_libs} ${llvm_libs} LLVMBPFCodeGen)
 
 install(TARGETS bpfprog LIBRARY DESTINATION lib)
+install(DIRECTORY export/ DESTINATION share/bcc/include/bcc
+  FILES_MATCHING PATTERN "*.h")
