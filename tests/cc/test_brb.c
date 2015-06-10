@@ -2,9 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (the "License")
 #include <bcc/proto.h>
 
-/* compiler workaround */
-#define _htonl __builtin_bswap32
-#define _htons __builtin_bswap16
+#define _memcpy __builtin_memcpy
 
 // meta data passed between bpf programs
 typedef struct bpf_metadata {
@@ -117,6 +115,7 @@ static int br_common(struct __sk_buff *skb, int which_br) {
     u32 tx_port_id;
     bpf_dest_t *dest_p;
     u32 index, *rtrif_p;
+    u64 mac_addr;
 
     if (skb->tc_index == 0) {
         skb->tc_index = 1;
@@ -129,9 +128,8 @@ static int br_common(struct __sk_buff *skb, int which_br) {
 
     BEGIN(ethernet);
     PROTO(ethernet) {
-        // ethernet->dst seems not working, so tentatively use the primitive C API.
-        *(__u32 *)&dmac.addr[0] = _htonl(load_word(skb, 0));
-        *(__u16 *)&dmac.addr[4] = _htons(load_half(skb, 4));
+        mac_addr = bpf_htonll(ethernet->dst);
+        _memcpy(dmac.addr, (u8 *)&mac_addr + 2, 6);
         if (meta.prog_id != 0) {
             /* send to the router */
             if (dmac.addr[0] & dmac.addr[1] & dmac.addr[2] & dmac.addr[3] & dmac.addr[4] & dmac.addr[5] == 0xff) {
@@ -172,7 +170,6 @@ static int br_common(struct __sk_buff *skb, int which_br) {
 
     PROTO(arp) {
         /* mac learning */
-        // arpop = load_half(skb, 20);
         arpop = arp->oper;
         if (arpop == 2) {
             index = 0;
@@ -184,9 +181,8 @@ static int br_common(struct __sk_buff *skb, int which_br) {
                 __u32 ifindex = *rtrif_p;
                 eth_addr_t smac;
 
-                *(__u16 *)&smac.addr[0] = _htons(load_half(skb, 6));
-                *(__u16 *)&smac.addr[2] = _htons(load_half(skb, 8));
-                *(__u16 *)&smac.addr[4] = _htons(load_half(skb, 10));
+                mac_addr = bpf_htonll(ethernet->src);
+                _memcpy(smac.addr, (u8 *)&mac_addr + 2, 6);
                 if (which_br == 1)
                     br1_mac_ifindex.update(&smac, &ifindex);
                 else
