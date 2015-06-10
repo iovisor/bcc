@@ -43,7 +43,7 @@ To get started using this toolchain, one needs:
   * `CONFIG_BPF_JIT=y`
   * `CONFIG_HAVE_BPF_JIT=y`
   * `CONFIG_BPF_EVENTS=y` [optional, for kprobes]
-* LLVM 3.7 or newer, compiled with BPF support (currently experimental)
+* LLVM 3.7 or newer, compiled with BPF support (default=on)
 * Clang 3.7, built from the same tree as LLVM
 * pyroute2, version X.X (currently master, tag TBD) or newer
 * cmake, gcc-4.7, flex, bison
