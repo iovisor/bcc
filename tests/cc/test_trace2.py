@@ -10,7 +10,6 @@ from unittest import main, TestCase
 
 text = """
 #include <linux/ptrace.h>
-#include "../../src/cc/bpf_helpers.h"
 struct Ptr { u64 ptr; };
 struct Counters { u64 stat1; };
 BPF_TABLE("hash", struct Ptr, struct Counters, stats, 1024);

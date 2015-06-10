@@ -2,7 +2,6 @@
 // Licensed under the Apache License, Version 2.0 (the "License")
 #include <linux/ptrace.h>
 #include <linux/blkdev.h>
-#include "../../src/cc/bpf_helpers.h"
 struct Request { u64 rq; };
 struct Time { u64 start; };
 BPF_TABLE("hash", struct Request, struct Time, requests, 1024);

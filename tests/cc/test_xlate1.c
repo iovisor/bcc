@@ -1,7 +1,6 @@
 // Copyright (c) PLUMgrid, Inc.
 // Licensed under the Apache License, Version 2.0 (the "License")
-#include "../../src/cc/bpf_helpers.h"
-#include "../../src/cc/proto.h"
+#include <bcc/proto.h>
 struct IPKey {
   u32 dip;
   u32 sip;

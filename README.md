@@ -36,88 +36,68 @@ The features of this toolkit include:
 
 To get started using this toolchain, one needs:
 * Linux kernel 4.1 or newer, with these flags enabled:
-  * CONFIG_BPF=y
-  * CONFIG_BPF_SYSCALL=y
-  * CONFIG_NET_CLS_BPF=m [optional, for tc filters]
-  * CONFIG_NET_ACT_BPF=m [optional, for tc actions]
-  * CONFIG_BPF_JIT=y
-  * CONFIG_HAVE_BPF_JIT=y
-  * CONFIG_BPF_EVENTS=y [optional, for kprobes]
+  * `CONFIG_BPF=y`
+  * `CONFIG_BPF_SYSCALL=y`
+  * `CONFIG_NET_CLS_BPF=m` [optional, for tc filters]
+  * `CONFIG_NET_ACT_BPF=m` [optional, for tc actions]
+  * `CONFIG_BPF_JIT=y`
+  * `CONFIG_HAVE_BPF_JIT=y`
+  * `CONFIG_BPF_EVENTS=y` [optional, for kprobes]
 * LLVM 3.7 or newer, compiled with BPF support (currently experimental)
-* Clang 3.5 or newer (this requirement is orthoganal to the LLVM requirement,
-                      and the versions do not necessarily need to match)
-* cmake, gcc-4.9, flex, bison, xxd, libstdc++-static, libmnl-devel
+* Clang 3.7, built from the same tree as LLVM
+* pyroute2, version X.X (currently master, tag TBD) or newer
+* cmake, gcc-4.7, flex, bison
 
 ## Getting started
 
-Included in the scripts/ directory of this project is a VM kickstart script that
-captures the above requirements inside a Fedora VM. Before running the script,
-ensure that virt-install is available on the system.
+### Demo VM
 
-`./build_bpf_demo.sh -n bpf-demo -k bpf_demo.ks.erb`
+See https://github.com/iovisor/bcc/scripts/README.md for a script that can
+be used to set up a libvirt VM with the required dependencies.
 
-After setting up the initial VM, log in (the default password is 'iovisor')
-and determine the DHCP IP. SSH to this IP as root.
+### Quick Setup
 
-To set up a kernel with the right options, run `bpf-kernel-setup`.
+If the LLVM and Linux kernel requirements are satisfied, testing out this
+package should be as simple as:
 
 ```
-[root@bpf-demo ~]# bpf-kernel-setup
-Cloning into 'net-next'...
-```
-After pulling the net-next branch, the kernel config menu should pop up. Ensure
-that the below settings are proper.
-```
-General setup --->
-  [*] Enable bpf() system call
-Networking support --->
-  Networking options --->
-    QoS and/or fair queueing --->
-      <M> BPF-based classifier
-      <M> BPF based action
-    [*] enable BPF Just In Time compiler
-```
-Once the .config is saved, the build will proceed and install the resulting
-kernel. This kernel has updated userspace headers (e.g. the bpf() syscall) which
-install into /usr/local/include...proper packaging for this will be
-distro-dependent.
-
-Next, run `bpf-llvm-setup` to pull and compile LLVM with BPF support enabled.
-```
-[root@bpf-demo ~]# bpf-llvm-setup
-Cloning into 'llvm'...
-```
-The resulting libraries will be installed into /opt/local/llvm.
-
-Next, reboot into the new kernel, either manually or by using the kexec helper.
-```
-[root@bpf-demo ~]# kexec-4.1.0-rc1+
-Connection to 192.168.122.247 closed by remote host.
-Connection to 192.168.122.247 closed.
+git clone https://github.com/iovisor/bcc.git
+cd bcc; mkdir build; cd build
+cmake .. -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_PREFIX_PATH=/opt/local/llvm
+make -j$(grep -c ^processor /proc/cpuinfo)
+sudo make install
+cd ../../
+sudo python examples/hello_world.py
+<ctrl-C>
 ```
 
-Reconnect and run the final step, building and testing bcc.
-```
-[root@bpf-demo ~]# bcc-setup
-Cloning into 'bcc'...
-...
-Linking CXX shared library libbpfprog.so
-[100%] Built target bpfprog
-...
-Running tests...
-Test project /root/bcc/build
-    Start 1: py_test1
-1/4 Test #1: py_test1 .........................   Passed    0.24 sec
-    Start 2: py_test2
-2/4 Test #2: py_test2 .........................   Passed    0.53 sec
-    Start 3: py_trace1
-3/4 Test #3: py_trace1 ........................   Passed    0.09 sec
-    Start 4: py_trace2
-4/4 Test #4: py_trace2 ........................   Passed    1.06 sec
+Change `CMAKE_PREFIX_PATH` if llvm is installed elsewhere.
 
-100% tests passed, 0 tests failed out of 4
+### Cleaning up
+
+Since packaging is currently not available, one can cleanup the collateral of
+bcc by doing:
+
+```
+sudo rm -rf /usr/{lib/libbpf.prog.so,include/bcc,share/bcc}
+sudo pip uninstall bpf
 ```
 
+### Building LLVM
+
+See http://llvm.org/docs/GettingStarted.html for the full guide.
+
+The short version:
+
+```
+git clone https://github.com/llvm-mirror/llvm.git llvm
+git clone https://github.com/llvm-mirror/clang.git llvm/tools/clang
+mkdir llvm/build/
+cd llvm/build/
+cmake .. -DCMAKE_INSTALL_PREFIX=/opt/local/llvm
+make -j$(grep -c ^processor /proc/cpuinfo)
+sudo make install
+```
 
 ## Release notes
 

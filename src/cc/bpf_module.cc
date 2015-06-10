@@ -151,6 +151,10 @@ int BPFModule::load_file_module(unique_ptr<llvm::Module> *mod, const string &fil
   vector<string> kflags;
   if (kbuild_helper.get_flags(un.release, &kflags))
     return -1;
+  kflags.push_back("-include");
+  kflags.push_back(BCC_INSTALL_PREFIX "/share/bcc/include/bcc/helpers.h");
+  kflags.push_back("-I");
+  kflags.push_back(BCC_INSTALL_PREFIX "/share/bcc/include");
   for (auto it = kflags.begin(); it != kflags.end(); ++it)
     flags_cstr.push_back(it->c_str());
 
@@ -329,8 +333,7 @@ int BPFModule::parse() {
     return -1;
   }
 
-  // TODO: clean this
-  if (load_includes("../../src/cc/bpf_helpers.h") < 0)
+  if (load_includes(BCC_INSTALL_PREFIX "/share/bcc/include/bcc/helpers.h") < 0)
     return -1;
 
   codegen_ = ebpf::make_unique<ebpf::cc::CodegenLLVM>(mod_, parser_->scopes_.get(), proto_parser_->scopes_.get());
