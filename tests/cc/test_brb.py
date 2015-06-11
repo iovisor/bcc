@@ -73,7 +73,6 @@ import sys
 from time import sleep
 from unittest import main, TestCase
 import subprocess
-import commands
 import struct
 
 arg1 = sys.argv.pop(1)
@@ -232,8 +231,10 @@ class TestBPFSocket(TestCase):
         self.config_router_ns(self.ns_router, self.vm1_rtr_ip, self.vm2_rtr_ip)
 
         # get vm mac address
-        self.vm1_mac = commands.getoutput('ip netns exec ' + self.ns1 + ' cat /sys/class/net/eth0/address')
-        self.vm2_mac = commands.getoutput('ip netns exec ' + self.ns2 + ' cat /sys/class/net/eth0/address')
+        self.vm1_mac = subprocess.check_output(["ip", "netns", "exec", self.ns1, "cat", "/sys/class/net/eth0/address"])
+	self.vm1_mac = self.vm1_mac.strip()
+        self.vm2_mac = subprocess.check_output(["ip", "netns", "exec", self.ns2, "cat", "/sys/class/net/eth0/address"])
+	self.vm2_mac = self.vm2_mac.strip()
 
         # load the program and configure maps
         self.config_maps()
