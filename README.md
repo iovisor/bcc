@@ -67,7 +67,7 @@ cd bcc; mkdir build; cd build
 cmake .. -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_PREFIX_PATH=/opt/local/llvm
 make -j$(grep -c ^processor /proc/cpuinfo)
 sudo make install
-cd ../../
+cd ../
 sudo python examples/hello_world.py
 <ctrl-C>
 ```
