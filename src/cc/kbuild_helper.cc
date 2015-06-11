@@ -52,7 +52,7 @@ int KBuildHelper::learn_flags(const string &tmpdir, const char *uname_release, c
     if (!cf)
       return -1;
   }
-  string cmd = "make -s";
+  string cmd = "make CROSS_COMPILE= -s";
   cmd += " -C " KERNEL_MODULES_DIR "/" + string(uname_release) + "/build";
   cmd += " M=" + tmpdir + " dummy.o";
   int rc = ::system(cmd.c_str());

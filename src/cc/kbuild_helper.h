@@ -57,7 +57,7 @@ class DirStack {
   char cwd_[256];
 };
 
-static int ftw_cb(const char *path, const struct stat *, int) {
+static int ftw_cb(const char *path, const struct stat *, int, struct FTW *) {
   return ::remove(path);
 }
 
@@ -73,7 +73,7 @@ class TmpDir {
       ok_ = true;
   }
   ~TmpDir() {
-    if (::ftw(prefix_.c_str(), ftw_cb, 20) < 0)
+    if (::nftw(prefix_.c_str(), ftw_cb, 20, FTW_DEPTH) < 0)
       ::perror("ftw");
     else
       ::remove(prefix_.c_str());
