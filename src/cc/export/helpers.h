@@ -17,7 +17,7 @@
 #define __BPF_HELPERS_H
 
 #include <uapi/linux/bpf.h>
-#include <linux/if_packet.h>
+#include <uapi/linux/if_packet.h>
 #include <linux/version.h>
 
 /* helper macro to place programs, maps, license in

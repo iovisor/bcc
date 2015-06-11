@@ -12,10 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import atexit
 import ctypes as ct
 import os
 
-lib = ct.cdll.LoadLibrary("libbpfprog.so")
+lib = ct.CDLL("libbpfprog.so")
 
 # keep in sync with bpf_common.h
 lib.bpf_module_create.restype = ct.c_void_p
@@ -54,6 +55,17 @@ lib.bpf_prog_load.argtypes = [ct.c_int, ct.c_void_p, ct.c_size_t,
         ct.c_char_p, ct.c_uint]
 lib.bpf_attach_kprobe.restype = ct.c_int
 lib.bpf_attach_kprobe.argtypes = [ct.c_int, ct.c_char_p, ct.c_char_p, ct.c_int, ct.c_int, ct.c_int]
+lib.bpf_detach_kprobe.restype = ct.c_int
+lib.bpf_detach_kprobe.argtypes = [ct.c_char_p]
+
+open_kprobes = {}
+
+@atexit.register
+def cleanup_kprobes():
+    for k, v in open_kprobes.items():
+        os.close(v)
+        desc = "-:kprobes/%s" % k
+        lib.bpf_detach_kprobe(desc.encode("ascii"))
 
 class BPF(object):
     SOCKET_FILTER = 1
@@ -185,7 +197,20 @@ class BPF(object):
                 desc.encode("ascii"), pid, cpu, group_fd)
         if res < 0:
             raise Exception("Failed to attach BPF to kprobe")
+        open_kprobes[ev_name] = res
         return res
+
+    @staticmethod
+    def detach_kprobe(event):
+        ev_name = "p_" + event.replace("+", "_")
+        if ev_name not in open_kprobes:
+            raise Exception("Kprobe %s is not attached" % event)
+        os.close(open_kprobes[ev_name])
+        desc = "-:kprobes/%s" % ev_name
+        res = lib.bpf_detach_kprobe(desc.encode("ascii"))
+        if res < 0:
+            raise Exception("Failed to detach BPF from kprobe")
+        del open_kprobes[ev_name]
 
     @staticmethod
     def attach_kretprobe(fn, event, pid=-1, cpu=0, group_fd=-1):
@@ -197,5 +222,18 @@ class BPF(object):
                 desc.encode("ascii"), pid, cpu, group_fd)
         if res < 0:
             raise Exception("Failed to attach BPF to kprobe")
+        open_kprobes[ev_name] = res
         return res
+
+    @staticmethod
+    def detach_kretprobe(event):
+        ev_name = "r_" + event.replace("+", "_")
+        if ev_name not in open_kprobes:
+            raise Exception("Kretprobe %s is not attached" % event)
+        os.close(open_kprobes[ev_name])
+        desc = "-:kprobes/%s" % ev_name
+        res = lib.bpf_detach_kprobe(desc.encode("ascii"))
+        if res < 0:
+            raise Exception("Failed to detach BPF from kprobe")
+        del open_kprobes[ev_name]
 
