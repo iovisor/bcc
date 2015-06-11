@@ -14,3 +14,17 @@ Q: hello_world.py still fails with:
    bpf: Operation not permitted
    Exception: Failed to load BPF program hello
 A: sudo
+
+Q: How do I fulfill the Linux kernel version requirement?
+A: You need to obtain a recent version of the Linux source code
+   (please look at the README for the exact version), enable the
+   configuration options listed in the README file, install the image,
+   modules and headers, update your bootloader and reboot into the new
+   kernel.
+
+   If you want to compile your own kernel, you can fetch the sources
+   from kernel.org or through your Linux distribution.
+   To install, you need all of the following:
+      make install
+      make modules_install
+      make headers_install INSTALL_HDR_PATH=/usr/local/
