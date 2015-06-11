@@ -73,8 +73,6 @@ sudo python examples/hello_world.py
 ```
 
 Change `CMAKE_PREFIX_PATH` if llvm is installed elsewhere.
-Change CMAKE_INSTALL_PREFIX to /usr/local if your python package installation
-is under /usr/local install /usr.
 
 ### Cleaning up
 
