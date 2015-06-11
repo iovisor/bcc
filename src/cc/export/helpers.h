@@ -16,8 +16,7 @@
 #ifndef __BPF_HELPERS_H
 #define __BPF_HELPERS_H
 
-#include <linux/bpf.h>
-#include <linux/filter.h>
+#include <uapi/linux/bpf.h>
 #include <linux/if_packet.h>
 #include <linux/version.h>
 
