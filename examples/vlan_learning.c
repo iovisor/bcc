@@ -15,7 +15,6 @@ BPF_TABLE("hash", u64, struct ifindex_leaf_t, egress, 4096);
 // redirect based on mac -> out_ifindex (config-driven)
 BPF_TABLE("hash", u64, struct ifindex_leaf_t, ingress, 4096);
 
-BPF_EXPORT(handle_phys2virt)
 int handle_phys2virt(struct __sk_buff *skb) {
   BEGIN(ethernet);
   PROTO(ethernet) {
@@ -37,7 +36,6 @@ EOP:
   return 1;
 }
 
-BPF_EXPORT(handle_virt2phys)
 int handle_virt2phys(struct __sk_buff *skb) {
   BEGIN(ethernet);
   PROTO(ethernet) {

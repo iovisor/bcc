@@ -39,6 +39,12 @@ BTypeVisitor::BTypeVisitor(ASTContext &C, Rewriter &rewriter, map<string, BPFTab
 }
 
 bool BTypeVisitor::VisitFunctionDecl(FunctionDecl *D) {
+  // put each non-static non-inline function decl in its own section, to be
+  // extracted by the MemoryManager
+  if (D->isExternallyVisible() && D->hasBody()) {
+    string attr = string("__attribute__((section(\".") + D->getName().str() + "\")))";
+    rewriter_.InsertText(D->getLocStart(), attr);
+  }
   return true;
 }
 

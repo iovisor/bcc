@@ -54,7 +54,6 @@ BPF_TABLE("array", u32, u32, br2_rtr, 1);
 // <mac, ifindex>
 BPF_TABLE("hash", eth_addr_t, u32, br2_mac_ifindex, 1);
 
-BPF_EXPORT(pem)
 int pem(struct __sk_buff *skb) {
     bpf_metadata_t meta = {};
     u32 ifindex;
@@ -217,12 +216,10 @@ EOP:
     return 0;
 }
 
-BPF_EXPORT(br1)
 int br1(struct __sk_buff *skb) {
     return br_common(skb, 1);
 }
 
-BPF_EXPORT(br2)
 int br2(struct __sk_buff *skb) {
     return br_common(skb, 2);
 }
