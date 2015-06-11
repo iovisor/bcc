@@ -42,8 +42,6 @@ __attribute__((section("maps/" _table_type))) \
 struct _name##_table_t _name
 
 // packet parsing state machine helpers
-#define STATE_MACHINE(name) \
-  BPF_EXPORT(name) int _##name(struct __sk_buff *skb)
 #define BEGIN(next) \
   u64 _parse_cursor = 0; \
   goto next
@@ -53,10 +51,6 @@ struct _name##_table_t _name
 name: ; \
   struct name##_t *name __attribute__((deprecated("packet"))) = (void *)_parse_cursor; \
   _parse_cursor += sizeof(*name);
-
-// export this function to llvm by putting it into a specially named section
-//#define BPF_EXPORT(_ret, _name, ...) SEC("." #_name) _ret _name(__VA_ARGS__)
-#define BPF_EXPORT(_name) __attribute__((section("." #_name)))
 
 char _license[4] SEC("license") = "GPL";
 
@@ -163,7 +157,7 @@ static inline void bpf_store_dword(void *skb, u64 off, u64 val) {
 
 struct bpf_context;
 
-//static inline __attribute__((always_inline))
+static inline __attribute__((always_inline))
 SEC("helpers")
 u64 bpf_dext_pkt(void *pkt, u64 off, u64 bofs, u64 bsz) {
   if (bofs == 0 && bsz == 8) {
@@ -186,7 +180,7 @@ u64 bpf_dext_pkt(void *pkt, u64 off, u64 bofs, u64 bsz) {
   return 0;
 }
 
-//static inline __attribute__((always_inline))
+static inline __attribute__((always_inline))
 SEC("helpers")
 void bpf_dins_pkt(void *pkt, u64 off, u64 bofs, u64 bsz, u64 val) {
   // The load_xxx function does a bswap before returning the short/word/dword,
@@ -229,21 +223,25 @@ void bpf_dins_pkt(void *pkt, u64 off, u64 bofs, u64 bsz, u64 val) {
   }
 }
 
+static inline __attribute__((always_inline))
 SEC("helpers")
 void * bpf_map_lookup_elem_(uintptr_t map, void *key) {
   return bpf_map_lookup_elem((void *)map, key);
 }
 
+static inline __attribute__((always_inline))
 SEC("helpers")
 int bpf_map_update_elem_(uintptr_t map, void *key, void *value, u64 flags) {
   return bpf_map_update_elem((void *)map, key, value, flags);
 }
 
+static inline __attribute__((always_inline))
 SEC("helpers")
 int bpf_map_delete_elem_(uintptr_t map, void *key) {
   return bpf_map_delete_elem((void *)map, key);
 }
 
+static inline __attribute__((always_inline))
 SEC("helpers")
 int bpf_l3_csum_replace_(void *ctx, u64 off, u64 from, u64 to, u64 flags) {
   switch (flags & 0xf) {
@@ -259,6 +257,7 @@ int bpf_l3_csum_replace_(void *ctx, u64 off, u64 from, u64 to, u64 flags) {
   return bpf_l3_csum_replace(ctx, off, from, to, flags);
 }
 
+static inline __attribute__((always_inline))
 SEC("helpers")
 int bpf_l4_csum_replace_(void *ctx, u64 off, u64 from, u64 to, u64 flags) {
   switch (flags & 0xf) {

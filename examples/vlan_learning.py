@@ -44,7 +44,7 @@ class ifindex_leaf_t(Structure):
                 ("tx_bytes", c_ulonglong)]
 
 # load the bpf program
-b = BPF(src_file="examples/vlan_learning.c", debug=0)
+b = BPF(src_file="examples/vlan_learning.c", debug=1)
 phys_fn = b.load_func("handle_phys2virt", BPF.SCHED_CLS)
 virt_fn = b.load_func("handle_virt2phys", BPF.SCHED_CLS)
 

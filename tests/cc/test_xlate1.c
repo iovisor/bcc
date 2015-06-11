@@ -13,7 +13,6 @@ struct IPLeaf {
 };
 BPF_TABLE("hash", struct IPKey, struct IPLeaf, xlate, 1024);
 
-BPF_EXPORT(on_packet)
 int on_packet(struct __sk_buff *skb) {
 
   u32 orig_dip = 0;

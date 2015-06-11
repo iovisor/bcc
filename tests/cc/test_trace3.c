@@ -27,7 +27,6 @@ static u32 log2l(u64 v) {
     return log2(v);
 }
 
-BPF_EXPORT(probe_blk_start_request)
 int probe_blk_start_request(struct pt_regs *ctx) {
   struct Request rq = {.rq = ctx->di};
   struct Time tm = {.start = bpf_ktime_get_ns()};
@@ -35,7 +34,6 @@ int probe_blk_start_request(struct pt_regs *ctx) {
   return 0;
 }
 
-BPF_EXPORT(probe_blk_update_request)
 int probe_blk_update_request(struct pt_regs *ctx) {
   struct Request rq = {.rq = ctx->di};
   struct Time *tm = requests.lookup(&rq);

@@ -11,7 +11,6 @@ enum states {
   S_IP
 };
 
-BPF_EXPORT(parse_ether)
 int parse_ether(struct __sk_buff *skb) {
   size_t cur = 0;
   size_t next = cur + 14;
@@ -28,7 +27,6 @@ int parse_ether(struct __sk_buff *skb) {
   return 1;
 }
 
-BPF_EXPORT(parse_arp)
 int parse_arp(struct __sk_buff *skb) {
   size_t cur = 14;  // TODO: get from ctx
   size_t next = cur + 28;
@@ -41,7 +39,6 @@ int parse_arp(struct __sk_buff *skb) {
   return 1;
 }
 
-BPF_EXPORT(parse_ip)
 int parse_ip(struct __sk_buff *skb) {
   size_t cur = 14;  // TODO: get from ctx
   size_t next = cur + 20;
@@ -54,7 +51,6 @@ int parse_ip(struct __sk_buff *skb) {
   return 1;
 }
 
-BPF_EXPORT(eop)
 int eop(struct __sk_buff *skb) {
   int key = S_EOP;
   u64 *leaf = stats.lookup(&key);
