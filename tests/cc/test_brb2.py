@@ -66,7 +66,6 @@ import sys
 from time import sleep
 from unittest import main, TestCase
 import subprocess
-import commands
 
 arg1 = sys.argv.pop(1)
 
