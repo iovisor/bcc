@@ -67,12 +67,14 @@ cd bcc; mkdir build; cd build
 cmake .. -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_PREFIX_PATH=/opt/local/llvm
 make -j$(grep -c ^processor /proc/cpuinfo)
 sudo make install
-cd ../../
+cd ../
 sudo python examples/hello_world.py
 <ctrl-C>
 ```
 
 Change `CMAKE_PREFIX_PATH` if llvm is installed elsewhere.
+Change CMAKE_INSTALL_PREFIX to /usr/local if your python package installation
+is under /usr/local install /usr.
 
 ### Cleaning up
 
