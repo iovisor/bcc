@@ -229,3 +229,25 @@ cleanup:
   return rc;
 }
 
+int bpf_detach_kprobe(const char *event_desc) {
+  int rc = -1, kfd = -1;
+
+  kfd = open("/sys/kernel/debug/tracing/kprobe_events", O_WRONLY | O_APPEND, 0);
+  if (kfd < 0) {
+    perror("open(kprobe_events)");
+    goto cleanup;
+  }
+
+  if (write(kfd, event_desc, strlen(event_desc)) < 0) {
+    perror("write(kprobe_events)");
+    goto cleanup;
+  }
+  rc = 0;
+
+cleanup:
+  if (kfd >= 0)
+    close(kfd);
+
+  return rc;
+}
+
