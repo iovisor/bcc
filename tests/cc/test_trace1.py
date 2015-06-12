@@ -14,11 +14,14 @@ arg2 = ""
 if len(sys.argv) > 1:
   arg2 = sys.argv.pop(1)
 
-class Key(Structure):
-    _fields_ = [("fd", c_ulong)]
-class Leaf(Structure):
-    _fields_ = [("stat1", c_ulong),
-                ("stat2", c_ulong)]
+Key = None
+Leaf = None
+if arg1.endswith(".b"):
+    class Key(Structure):
+        _fields_ = [("fd", c_ulong)]
+    class Leaf(Structure):
+        _fields_ = [("stat1", c_ulong),
+                    ("stat2", c_ulong)]
 
 class TestKprobe(TestCase):
     def setUp(self):

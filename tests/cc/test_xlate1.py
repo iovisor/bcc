@@ -2,7 +2,6 @@
 # Copyright (c) PLUMgrid, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
 
-from ctypes import c_uint, c_ulonglong, Structure
 from netaddr import IPAddress
 from bpf import BPF
 from pyroute2 import IPRoute
@@ -16,15 +15,6 @@ arg1 = sys.argv.pop(1)
 arg2 = ""
 if len(sys.argv) > 1:
   arg2 = sys.argv.pop(1)
-
-class Key(Structure):
-    _fields_ = [("dip", c_uint),
-                ("sip", c_uint)]
-class Leaf(Structure):
-    _fields_ = [("xdip", c_uint),
-                ("xsip", c_uint),
-                ("ip_xlated_pkts", c_ulonglong),
-                ("arp_xlated_pkts", c_ulonglong)]
 
 class TestBPFFilter(TestCase):
     def setUp(self):
@@ -43,14 +33,14 @@ class TestBPFFilter(TestCase):
         # add same program to both ingress/egress, so pkt is translated in both directions
         ip.tc("add-filter", "bpf", ifindex, ":1", fd=fn.fd, name=fn.name, parent="ffff:", action="ok", classid=1)
         ip.tc("add-filter", "bpf", ifindex, ":2", fd=fn.fd, name=fn.name, parent="1:", action="ok", classid=1)
-        self.xlate = b.get_table("xlate", Key, Leaf)
+        self.xlate = b.get_table("xlate")
 
     def test_xlate(self):
-        key1 = Key(IPAddress("172.16.1.2").value, IPAddress("172.16.1.1").value)
-        leaf1 = Leaf(IPAddress("192.168.1.2").value, IPAddress("192.168.1.1").value, 0, 0)
+        key1 = self.xlate.Key(IPAddress("172.16.1.2").value, IPAddress("172.16.1.1").value)
+        leaf1 = self.xlate.Leaf(IPAddress("192.168.1.2").value, IPAddress("192.168.1.1").value, 0, 0)
         self.xlate.update(key1, leaf1)
-        key2 = Key(IPAddress("192.168.1.1").value, IPAddress("192.168.1.2").value)
-        leaf2 = Leaf(IPAddress("172.16.1.1").value, IPAddress("172.16.1.2").value, 0, 0)
+        key2 = self.xlate.Key(IPAddress("192.168.1.1").value, IPAddress("192.168.1.2").value)
+        leaf2 = self.xlate.Leaf(IPAddress("172.16.1.1").value, IPAddress("172.16.1.2").value, 0, 0)
         self.xlate.update(key2, leaf2)
         call(["ping", "-c1", "192.168.1.1"])
         leaf = self.xlate.lookup(key1)

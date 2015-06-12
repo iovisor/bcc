@@ -28,6 +28,8 @@ unsigned bpf_module_kern_version(void *program);
 void * bpf_function_start(void *program, const char *name);
 size_t bpf_function_size(void *program, const char *name);
 int bpf_table_fd(void *program, const char *table_name);
+const char * bpf_table_key_desc(void *program, const char *table_name);
+const char * bpf_table_leaf_desc(void *program, const char *table_name);
 
 #ifdef __cplusplus
 }

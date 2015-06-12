@@ -54,6 +54,8 @@ class BPFModule {
   uint8_t * start(const std::string &name) const;
   size_t size(const std::string &name) const;
   int table_fd(const std::string &name) const;
+  const char * table_key_desc(const std::string &name) const;
+  const char * table_leaf_desc(const std::string &name) const;
   char * license() const;
   unsigned kern_version() const;
  private:

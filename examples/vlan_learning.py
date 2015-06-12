@@ -38,18 +38,13 @@ num_workers = 3
 num_clients = 9
 num_vlans = 16
 
-class ifindex_leaf_t(Structure):
-    _fields_ = [("out_ifindex", c_int),
-                ("tx_pkts", c_ulonglong),
-                ("tx_bytes", c_ulonglong)]
-
 # load the bpf program
 b = BPF(src_file="examples/vlan_learning.c", debug=0)
 phys_fn = b.load_func("handle_phys2virt", BPF.SCHED_CLS)
 virt_fn = b.load_func("handle_virt2phys", BPF.SCHED_CLS)
 
-ingress = b.get_table("ingress", c_ulonglong, ifindex_leaf_t)
-egress = b.get_table("egress", c_ulonglong, ifindex_leaf_t)
+ingress = b.get_table("ingress")
+egress = b.get_table("egress")
 
 ipdb_workers = []
 ipdb_clients = []
@@ -127,7 +122,7 @@ for i in range(0, num_clients):
     # assign this client to the given worker
     idx = ipdb.interfaces["wrk%dp1" % worker_choice]["index"]
     mac = int(macaddr.replace(":", ""), 16)
-    ingress.update(c_ulonglong(mac), ifindex_leaf_t(idx, 0, 0))
+    ingress.update(ingress.Key(mac), ingress.Leaf(idx, 0, 0))
 
     cmd = ["bash", "-c", "for i in {1..8}; do curl 172.16.1.5 -o /dev/null; sleep 1; done"]
     client_processes.append(NSPopen(client.nl.netns, cmd))

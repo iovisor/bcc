@@ -71,4 +71,16 @@ int bpf_table_fd(void *program, const char *table_name) {
   return mod->table_fd(table_name);
 }
 
+const char * bpf_table_key_desc(void *program, const char *table_name) {
+  auto mod = static_cast<ebpf::BPFModule *>(program);
+  if (!mod) return nullptr;
+  return mod->table_key_desc(table_name);
+}
+
+const char * bpf_table_leaf_desc(void *program, const char *table_name) {
+  auto mod = static_cast<ebpf::BPFModule *>(program);
+  if (!mod) return nullptr;
+  return mod->table_leaf_desc(table_name);
+}
+
 }

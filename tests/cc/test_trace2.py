@@ -16,21 +16,17 @@ BPF_TABLE("hash", struct Ptr, struct Counters, stats, 1024);
 
 int count_sched(struct pt_regs *ctx) {
   struct Ptr key = {.ptr=ctx->bx};
-  stats.data[(u64)&key].stat1++;
+  struct Counters zleaf = {0};
+  stats.lookup_or_init(&key, &zleaf)->stat1++;
   return 0;
 }
 """
-
-class Ptr(Structure):
-    _fields_ = [("ptr", c_ulong)]
-class Counters(Structure):
-    _fields_ = [("stat1", c_ulong)]
 
 class TestTracingEvent(TestCase):
     def setUp(self):
         b = BPF(text=text, debug=0)
         fn = b.load_func("count_sched", BPF.KPROBE)
-        self.stats = b.get_table("stats", Ptr, Counters)
+        self.stats = b.get_table("stats")
         BPF.attach_kprobe(fn, "schedule+50", 0, -1)
 
     def test_sched1(self):

@@ -41,6 +41,23 @@ struct BPFTable {
   size_t key_size;
   size_t leaf_size;
   size_t max_entries;
+  std::string key_desc;
+  std::string leaf_desc;
+};
+
+// Helper visitor for constructing a string representation of a key/leaf decl
+class BMapDeclVisitor : public clang::RecursiveASTVisitor<BMapDeclVisitor> {
+ public:
+  explicit BMapDeclVisitor(clang::ASTContext &C, std::string &result);
+  bool VisitRecordDecl(clang::RecordDecl *Decl);
+  bool VisitFieldDecl(clang::FieldDecl *Decl);
+  bool VisitBuiltinType(const clang::BuiltinType *T);
+  bool VisitTypedefType(const clang::TypedefType *T);
+  bool VisitTagType(const clang::TagType *T);
+  const std::string & str() const { return result_; }
+ private:
+  clang::ASTContext &C;
+  std::string &result_;
 };
 
 // Type visitor and rewriter for B programs.
@@ -54,7 +71,6 @@ class BTypeVisitor : public clang::RecursiveASTVisitor<BTypeVisitor> {
   bool VisitFunctionDecl(clang::FunctionDecl *D);
   bool VisitCallExpr(clang::CallExpr *Call);
   bool VisitVarDecl(clang::VarDecl *Decl);
-  bool VisitArraySubscriptExpr(clang::ArraySubscriptExpr *E);
   bool VisitBinaryOperator(clang::BinaryOperator *E);
   bool VisitImplicitCastExpr(clang::ImplicitCastExpr *E);
 
