@@ -95,7 +95,7 @@ class TestBPFSocket(TestCase):
     def config_vm_ns(self, ns, ip_addr, net_mask, ip_gw):
         subprocess.call(["ip", "netns", "exec", ns, "ip", "addr", "add", ip_addr + "/24", "dev", "eth0"])
         subprocess.call(["ip", "netns", "exec", ns, "ip", "link", "set", "eth0", "up"])
-        subprocess.call(["ip", "netns", "exec", ns, "route", "add", "-net", net_mask + "/24", "gw", ip_gw])
+        subprocess.call(["ip", "netns", "exec", ns, "ip", "route", "add", net_mask + "/24", "via", ip_gw])
 
     def setup_router_ns(self, ns, veth1_in, veth1_out, veth2_in, veth2_out):
         subprocess.call(["ip", "netns", "add", ns])
