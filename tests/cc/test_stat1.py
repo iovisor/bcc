@@ -17,12 +17,15 @@ arg2 = ""
 if len(sys.argv) > 1:
   arg2 = sys.argv.pop(1)
 
-class Key(Structure):
-    _fields_ = [("dip", c_uint),
-                ("sip", c_uint)]
-class Leaf(Structure):
-    _fields_ = [("rx_pkts", c_ulong),
-                ("tx_pkts", c_ulong)]
+Key = None
+Leaf = None
+if arg1.endswith(".b"):
+    class Key(Structure):
+        _fields_ = [("dip", c_uint),
+                    ("sip", c_uint)]
+    class Leaf(Structure):
+        _fields_ = [("rx_pkts", c_ulong),
+                    ("tx_pkts", c_ulong)]
 
 class TestBPFSocket(TestCase):
     def setUp(self):
@@ -38,7 +41,7 @@ class TestBPFSocket(TestCase):
         #    leaf = self.stats.lookup(key)
         #    print(IPAddress(key.sip), "=>", IPAddress(key.dip),
         #          "rx", leaf.rx_pkts, "tx", leaf.tx_pkts)
-        key = Key(IPAddress("172.16.1.2").value, IPAddress("172.16.1.1").value)
+        key = self.stats.Key(IPAddress("172.16.1.2").value, IPAddress("172.16.1.1").value)
         leaf = self.stats.lookup(key)
         self.assertEqual(leaf.rx_pkts, 100)
         self.assertEqual(leaf.tx_pkts, 100)

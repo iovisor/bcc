@@ -34,6 +34,44 @@ using std::to_string;
 using std::unique_ptr;
 using namespace clang;
 
+// Encode the struct layout as a json description
+BMapDeclVisitor::BMapDeclVisitor(ASTContext &C, string &result)
+    : C(C), result_(result) {}
+bool BMapDeclVisitor::VisitFieldDecl(FieldDecl *D) {
+  result_ += "\"";
+  result_ += D->getName();
+  result_ += "\",";
+  return true;
+}
+bool BMapDeclVisitor::VisitRecordDecl(RecordDecl *D) {
+  result_ += "[\"";
+  result_ += D->getName();
+  result_ += "\", [";
+  for (auto F : D->getDefinition()->fields()) {
+    result_ += "[";
+    TraverseDecl(F);
+    if (F->isBitField())
+      result_ += ", " + to_string(F->getBitWidthValue(C));
+    result_ += "], ";
+  }
+  if (!D->getDefinition()->field_empty())
+    result_.erase(result_.end() - 2);
+  result_ += "]]";
+  return false;
+}
+bool BMapDeclVisitor::VisitTagType(const TagType *T) {
+  return TraverseDecl(T->getDecl()->getDefinition());
+}
+bool BMapDeclVisitor::VisitTypedefType(const TypedefType *T) {
+  return TraverseDecl(T->getDecl());
+}
+bool BMapDeclVisitor::VisitBuiltinType(const BuiltinType *T) {
+  result_ += "\"";
+  result_ += T->getName(C.getPrintingPolicy());
+  result_ += "\"";
+  return true;
+}
+
 BTypeVisitor::BTypeVisitor(ASTContext &C, Rewriter &rewriter, map<string, BPFTable> &tables)
     : C(C), rewriter_(rewriter), out_(llvm::errs()), tables_(tables) {
 }
@@ -122,53 +160,6 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
   return true;
 }
 
-// look for table subscript references, and turn them into auto table entries:
-// table.data[key]
-//  becomes:
-// struct Key key = {123};
-// struct Leaf *leaf = table.get(&key);
-// if (!leaf) {
-//   struct Leaf zleaf = {0};
-//   table.put(&key, &zleaf, BPF_NOEXIST);
-//   leaf = table.get(&key);
-//   if (!leaf) return -1;
-// }
-bool BTypeVisitor::VisitArraySubscriptExpr(ArraySubscriptExpr *Arr) {
-  Expr *LHS = Arr->getLHS()->IgnoreImplicit();
-  Expr *RHS = Arr->getRHS()->IgnoreImplicit();
-  if (MemberExpr *Memb = dyn_cast<MemberExpr>(LHS)) {
-    if (DeclRefExpr *Ref = dyn_cast<DeclRefExpr>(Memb->getBase())) {
-      if (SectionAttr *A = Ref->getDecl()->getAttr<SectionAttr>()) {
-        if (A->getName().startswith("maps")) {
-          auto table_it = tables_.find(Ref->getDecl()->getName());
-          if (table_it == tables_.end()) {
-            C.getDiagnostics().Report(Ref->getLocEnd(), diag::err_expected)
-                << "initialized handle for bpf_table";
-            return false;
-          }
-          string fd = to_string(table_it->second.fd);
-          string map_update_policy = "BPF_NOEXIST";
-          string name = Ref->getDecl()->getName();
-          SourceRange argRange(RHS->getLocStart(), RHS->getLocEnd());
-          string args = rewriter_.getRewrittenText(argRange);
-          string lookup = "bpf_map_lookup_elem_(bpf_pseudo_fd(1, " + fd + ")";
-          string update = "bpf_map_update_elem_(bpf_pseudo_fd(1, " + fd + ")";
-          string txt = "(*({typeof(" + name + ".leaf) *leaf = " + lookup + ", " + args + "); ";
-          txt         += "if (!leaf) {";
-          txt         += " typeof(" + name + ".leaf) zleaf = {0};";
-          txt         += " " + update + ", " + args + ", &zleaf, " + map_update_policy + ");";
-          txt         += " leaf = " + lookup + ", " + args + ");";
-          txt         += " if (!leaf) return 0;";
-          txt         += "}";
-          txt         += "leaf;}))";
-          rewriter_.ReplaceText(SourceRange(Arr->getLocStart(), Arr->getLocEnd()), txt);
-        }
-      }
-    }
-  }
-  return true;
-}
-
 bool BTypeVisitor::VisitBinaryOperator(BinaryOperator *E) {
   if (!E->isAssignmentOp())
     return true;
@@ -237,8 +228,12 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
       size_t sz = C.getTypeSize(F->getType()) >> 3;
       if (F->getName() == "key") {
         table.key_size = sz;
+        BMapDeclVisitor visitor(C, table.key_desc);
+        visitor.TraverseType(F->getType());
       } else if (F->getName() == "leaf") {
         table.leaf_size = sz;
+        BMapDeclVisitor visitor(C, table.leaf_desc);
+        visitor.TraverseType(F->getType());
       } else if (F->getName() == "data") {
         table.max_entries = sz / table.leaf_size;
       }
@@ -256,7 +251,7 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
       llvm::errs() << "error: could not open bpf fd\n";
       return false;
     }
-    tables_[Decl->getName()] = table;
+    tables_[Decl->getName()] = std::move(table);
   }
   return true;
 }

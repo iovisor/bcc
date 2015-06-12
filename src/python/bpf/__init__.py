@@ -14,6 +14,7 @@
 
 import atexit
 import ctypes as ct
+import json
 import os
 
 lib = ct.CDLL("libbpfprog.so")
@@ -35,6 +36,10 @@ lib.bpf_function_size.restype = ct.c_size_t
 lib.bpf_function_size.argtypes = [ct.c_void_p, ct.c_char_p]
 lib.bpf_table_fd.restype = ct.c_int
 lib.bpf_table_fd.argtypes = [ct.c_void_p, ct.c_char_p]
+lib.bpf_table_key_desc.restype = ct.c_char_p
+lib.bpf_table_key_desc.argtypes = [ct.c_void_p, ct.c_char_p]
+lib.bpf_table_leaf_desc.restype = ct.c_char_p
+lib.bpf_table_leaf_desc.argtypes = [ct.c_void_p, ct.c_char_p]
 
 # keep in sync with libbpf.h
 lib.bpf_get_next_key.restype = ct.c_int
@@ -83,12 +88,12 @@ class BPF(object):
         def __init__(self, bpf, map_fd, keytype, leaftype):
             self.bpf = bpf
             self.map_fd = map_fd
-            self.keytype = keytype
-            self.leaftype = leaftype
+            self.Key = keytype
+            self.Leaf = leaftype
 
         def lookup(self, key):
             key_p = ct.pointer(key)
-            leaf = self.leaftype()
+            leaf = self.Leaf()
             leaf_p = ct.pointer(leaf)
             res = lib.bpf_lookup_elem(self.map_fd,
                     ct.cast(key_p, ct.c_void_p),
@@ -108,9 +113,9 @@ class BPF(object):
 
         class Iter(object):
             def __init__(self, table, keytype):
-                self.keytype = keytype
+                self.Key = keytype
                 self.table = table
-                self.key = keytype()
+                self.key = self.Key()
             def __iter__(self):
                 return self
             def __next__(self):
@@ -120,10 +125,10 @@ class BPF(object):
                 return self.key
 
         def iter(self):
-            return BPF.Table.Iter(self, self.keytype)
+            return BPF.Table.Iter(self, self.Key)
 
         def next(self, key):
-            next_key = self.keytype()
+            next_key = self.Key()
             next_key_p = ct.pointer(next_key)
             key_p = ct.pointer(key)
             res = lib.bpf_get_next_key(self.map_fd,
@@ -165,11 +170,51 @@ class BPF(object):
 
         return fn
 
-    def get_table(self, name, keytype, leaftype):
-        map_fd = lib.bpf_table_fd(self.module,
-                ct.c_char_p(name.encode("ascii")))
+    str2ctype = {
+        "_Bool": ct.c_bool,
+        "char": ct.c_char,
+        "wchar_t": ct.c_wchar,
+        "char": ct.c_byte,
+        "unsigned char": ct.c_ubyte,
+        "short": ct.c_short,
+        "unsigned short": ct.c_ushort,
+        "int": ct.c_int,
+        "unsigned int": ct.c_uint,
+        "long": ct.c_long,
+        "unsigned long": ct.c_ulong,
+        "long long": ct.c_longlong,
+        "unsigned long long": ct.c_ulonglong,
+        "float": ct.c_float,
+        "double": ct.c_double,
+        "long double": ct.c_longdouble
+    }
+    @staticmethod
+    def _decode_table_type(desc):
+        if isinstance(desc, str):
+            return BPF.str2ctype[desc]
+        fields = []
+        for t in desc[1]:
+            if len(t) == 2:
+                fields.append((t[0], BPF._decode_table_type(t[1])))
+            elif len(t) == 3:
+                fields.append((t[0], BPF._decode_table_type(t[1]), t[2]))
+        cls = type(desc[0], (ct.Structure,), dict(_fields_=fields))
+        return cls
+
+    def get_table(self, name, keytype=None, leaftype=None):
+        map_fd = lib.bpf_table_fd(self.module, name.encode("ascii"))
         if map_fd < 0:
             raise Exception("Failed to find BPF Table %s" % name)
+        if not keytype:
+            key_desc = lib.bpf_table_key_desc(self.module, name.encode("ascii"))
+            if not key_desc:
+                raise Exception("Failed to load BPF Table %s key desc" % name)
+            keytype = BPF._decode_table_type(json.loads(key_desc.decode()))
+        if not leaftype:
+            leaf_desc = lib.bpf_table_leaf_desc(self.module, name.encode("ascii"))
+            if not leaf_desc:
+                raise Exception("Failed to load BPF Table %s leaf desc" % name)
+            leaftype = BPF._decode_table_type(json.loads(leaf_desc.decode()))
         return BPF.Table(self, map_fd, keytype, leaftype)
 
     @staticmethod

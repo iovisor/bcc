@@ -38,18 +38,13 @@ num_workers = 3
 num_clients = 9
 num_vlans = 16
 
-class ifindex_leaf_t(Structure):
-    _fields_ = [("out_ifindex", c_int),
-                ("tx_pkts", c_ulonglong),
-                ("tx_bytes", c_ulonglong)]
-
 # load the bpf program
 b = BPF(src_file="examples/vlan_learning.c", debug=0)
 phys_fn = b.load_func("handle_phys2virt", BPF.SCHED_CLS)
 virt_fn = b.load_func("handle_virt2phys", BPF.SCHED_CLS)
 
-ingress = b.get_table("ingress", c_ulonglong, ifindex_leaf_t)
-egress = b.get_table("egress", c_ulonglong, ifindex_leaf_t)
+ingress = b.get_table("ingress")
+egress = b.get_table("egress")
 
 ipdb_workers = []
 ipdb_clients = []

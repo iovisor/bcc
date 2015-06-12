@@ -408,6 +408,20 @@ int BPFModule::table_fd(const string &name) const {
   return table_it->second.fd;
 }
 
+const char * BPFModule::table_key_desc(const string &name) const {
+  if (codegen_) return nullptr;
+  auto table_it = tables_->find(name);
+  if (table_it == tables_->end()) return nullptr;
+  return table_it->second.key_desc.c_str();
+}
+
+const char * BPFModule::table_leaf_desc(const string &name) const {
+  if (codegen_) return nullptr;
+  auto table_it = tables_->find(name);
+  if (table_it == tables_->end()) return nullptr;
+  return table_it->second.leaf_desc.c_str();
+}
+
 int BPFModule::load(const string &filename, const string &proto_filename) {
   if (!sections_.empty()) {
     fprintf(stderr, "Program already initialized\n");
