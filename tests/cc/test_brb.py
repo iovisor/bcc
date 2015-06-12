@@ -65,7 +65,7 @@
 # 8: OK
 
 from ctypes import c_ubyte, c_ushort, c_uint, c_ulonglong, Structure
-from netaddr import IPAddress
+from netaddr import IPAddress, EUI
 from bpf import BPF
 from pyroute2 import IPRoute
 from socket import socket, AF_INET, SOCK_DGRAM
@@ -95,7 +95,7 @@ class TestBPFSocket(TestCase):
     def config_vm_ns(self, ns, ip_addr, net_mask, ip_gw):
         subprocess.call(["ip", "netns", "exec", ns, "ip", "addr", "add", ip_addr + "/24", "dev", "eth0"])
         subprocess.call(["ip", "netns", "exec", ns, "ip", "link", "set", "eth0", "up"])
-        subprocess.call(["ip", "netns", "exec", ns, "route", "add", "-net", net_mask + "/24", "gw", ip_gw])
+        subprocess.call(["ip", "netns", "exec", ns, "ip", "route", "add", net_mask + "/24", "via", ip_gw])
 
     def setup_router_ns(self, ns, veth1_in, veth1_out, veth2_in, veth2_out):
         subprocess.call(["ip", "netns", "add", ns])
@@ -160,7 +160,7 @@ class TestBPFSocket(TestCase):
         ifindex = ip.link_lookup(ifname=ns_eth_out)[0]
         self.pem_port.update(c_uint(curr_pem_pid), c_uint(ifindex))
         self.pem_ifindex.update(c_uint(ifindex), c_uint(curr_pem_pid))
-        mac_addr = Eth_Addr(struct.unpack('!Q', "\0\0" + vm_mac.replace(':', '').decode('hex'))[0])
+        mac_addr = Eth_Addr(int(EUI(vm_mac.decode())))
         br_mac_map.update(mac_addr, c_uint(curr_br_pid))
 
     def attach_filter(self, ip, ifname, fd, name):
@@ -232,9 +232,9 @@ class TestBPFSocket(TestCase):
 
         # get vm mac address
         self.vm1_mac = subprocess.check_output(["ip", "netns", "exec", self.ns1, "cat", "/sys/class/net/eth0/address"])
-	self.vm1_mac = self.vm1_mac.strip()
+        self.vm1_mac = self.vm1_mac.strip()
         self.vm2_mac = subprocess.check_output(["ip", "netns", "exec", self.ns2, "cat", "/sys/class/net/eth0/address"])
-	self.vm2_mac = self.vm2_mac.strip()
+        self.vm2_mac = self.vm2_mac.strip()
 
         # load the program and configure maps
         self.config_maps()
