@@ -23,25 +23,22 @@
 #
 # ......
 # 8: ARPING 100.1.1.254 from 100.1.1.1 eth0
-# 8: Unicast reply from 100.1.1.254 [E6:5F:05:95:4B:41]  0.532ms
+# 8: Unicast reply from 100.1.1.254 [76:62:B5:5C:8C:6F]  0.533ms
 # 8: Sent 1 probes (1 broadcast(s))
 # 8: Received 1 response(s)
 # 8: ARPING 200.1.1.254 from 200.1.1.1 eth0
-# 8: Unicast reply from 200.1.1.254 [46:99:94:FB:6D:23]  0.522ms
+# 8: Unicast reply from 200.1.1.254 [F2:F0:B4:ED:7B:1B]  0.524ms
 # 8: Sent 1 probes (1 broadcast(s))
 # 8: Received 1 response(s)
 # 8: PING 200.1.1.1 (200.1.1.1) 56(84) bytes of data.
-# 8: 64 bytes from 200.1.1.1: icmp_req=1 ttl=63 time=0.066 ms
-# 8: 64 bytes from 200.1.1.1: icmp_req=2 ttl=63 time=0.024 ms
-# 8: 64 bytes from 200.1.1.1: icmp_req=3 ttl=63 time=0.052 ms
-# 8: 64 bytes from 200.1.1.1: icmp_req=4 ttl=63 time=0.050 ms
-# 8: 64 bytes from 200.1.1.1: icmp_req=5 ttl=63 time=0.052 ms
+# 8: 64 bytes from 200.1.1.1: icmp_req=1 ttl=63 time=0.074 ms
+# 8: 64 bytes from 200.1.1.1: icmp_req=2 ttl=63 time=0.061 ms
 # 8: 
 # 8: --- 200.1.1.1 ping statistics ---
-# 8: 5 packets transmitted, 5 received, 0% packet loss, time 3999ms
-# 8: rtt min/avg/max/mdev = 0.024/0.048/0.066/0.016 ms
+# 8: 2 packets transmitted, 2 received, 0% packet loss, time 999ms
+# 8: rtt min/avg/max/mdev = 0.061/0.067/0.074/0.010 ms
 # 8: [ ID] Interval       Transfer     Bandwidth
-# 8: [  5]  0.0- 1.0 sec  4.35 GBytes  37.4 Gbits/sec
+# 8: [  5]  0.0- 1.0 sec  4.00 GBytes  34.3 Gbits/sec
 # 8: Starting netserver with host 'IN(6)ADDR_ANY' port '12865' and family AF_UNSPEC
 # 8: MIGRATED TCP STREAM TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to 200.1.1.1 (200.1.1.1) port 0 AF_INET : demo
 # 8: Recv   Send    Send                          
@@ -49,18 +46,18 @@
 # 8: Size   Size    Size     Time     Throughput  
 # 8: bytes  bytes   bytes    secs.    10^6bits/sec  
 # 8: 
-# 8:  87380  16384  65160    10.00    45045.58   
+# 8:  87380  16384  65160    1.00     41991.68   
 # 8: MIGRATED TCP REQUEST/RESPONSE TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to 200.1.1.1 (200.1.1.1) port 0 AF_INET : demo : first burst 0
 # 8: Local /Remote
 # 8: Socket Size   Request  Resp.   Elapsed  Trans.
 # 8: Send   Recv   Size     Size    Time     Rate         
 # 8: bytes  Bytes  bytes    bytes   secs.    per sec   
 # 8: 
-# 8: 16384  87380  1        1       10.00    50563.99   
+# 8: 16384  87380  1        1       1.00     48645.53   
 # 8: 16384  87380 
 # 8: .
 # 8: ----------------------------------------------------------------------
-# 8: Ran 1 test in 32.956s
+# 8: Ran 1 test in 11.296s
 # 8: 
 # 8: OK
 
@@ -247,7 +244,7 @@ class TestBPFSocket(TestCase):
         subprocess.call(["ip", "netns", "exec", self.ns2, "arping", "-w", "1", "-c", "1", "-I", "eth0",
                          self.vm2_rtr_ip])
         # ping
-        subprocess.call(["ip", "netns", "exec", self.ns1, "ping", self.vm2_ip, "-c", "5"])
+        subprocess.call(["ip", "netns", "exec", self.ns1, "ping", self.vm2_ip, "-c", "2"])
         # minimum one arp reply, 5 icmp reply
         self.assertGreater(self.pem_stats.lookup(c_uint(0)).value, 5)
 
@@ -260,8 +257,8 @@ class TestBPFSocket(TestCase):
         # netperf, run server on the background
         subprocess.Popen(["ip", "netns", "exec", self.ns2, "netserver"])
         sleep(1)
-        subprocess.call(["ip", "netns", "exec", self.ns1, "netperf", "-H", self.vm2_ip, "--", "-m", "65160"])
-        subprocess.call(["ip", "netns", "exec", self.ns1, "netperf", "-H", self.vm2_ip, "-t", "TCP_RR"])
+        subprocess.call(["ip", "netns", "exec", self.ns1, "netperf", "-l", "1", "-H", self.vm2_ip, "--", "-m", "65160"])
+        subprocess.call(["ip", "netns", "exec", self.ns1, "netperf", "-l", "1", "-H", self.vm2_ip, "-t", "TCP_RR"])
         subprocess.call(["ip", "netns", "exec", self.ns2, "killall", "netserver"])
 
         # cleanup, tear down the veths and namespaces
