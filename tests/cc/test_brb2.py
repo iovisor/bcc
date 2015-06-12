@@ -24,17 +24,14 @@
 #
 # ......
 # 9: PING 200.1.1.1 (200.1.1.1) 56(84) bytes of data.
-# 9: 64 bytes from 200.1.1.1: icmp_req=1 ttl=63 time=0.086 ms
-# 9: 64 bytes from 200.1.1.1: icmp_req=2 ttl=63 time=0.058 ms
-# 9: 64 bytes from 200.1.1.1: icmp_req=3 ttl=63 time=0.058 ms
-# 9: 64 bytes from 200.1.1.1: icmp_req=4 ttl=63 time=0.057 ms
-# 9: 64 bytes from 200.1.1.1: icmp_req=5 ttl=63 time=0.058 ms
+# 9: 64 bytes from 200.1.1.1: icmp_req=1 ttl=63 time=0.090 ms
+# 9: 64 bytes from 200.1.1.1: icmp_req=2 ttl=63 time=0.032 ms
 # 9: 
 # 9: --- 200.1.1.1 ping statistics ---
-# 9: 5 packets transmitted, 5 received, 0% packet loss, time 3999ms
-# 9: rtt min/avg/max/mdev = 0.057/0.063/0.086/0.013 ms
+# 9: 2 packets transmitted, 2 received, 0% packet loss, time 999ms
+# 9: rtt min/avg/max/mdev = 0.032/0.061/0.090/0.029 ms
 # 9: [ ID] Interval       Transfer     Bandwidth
-# 9: [  5]  0.0- 1.0 sec  3.96 GBytes  34.0 Gbits/sec
+# 9: [  5]  0.0- 1.0 sec  3.80 GBytes  32.6 Gbits/sec
 # 9: Starting netserver with host 'IN(6)ADDR_ANY' port '12865' and family AF_UNSPEC
 # 9: MIGRATED TCP STREAM TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to 200.1.1.1 (200.1.1.1) port 0 AF_INET : demo
 # 9: Recv   Send    Send                          
@@ -42,18 +39,18 @@
 # 9: Size   Size    Size     Time     Throughput  
 # 9: bytes  bytes   bytes    secs.    10^6bits/sec  
 # 9: 
-# 9:  87380  16384  65160    10.00    39108.86   
+# 9:  87380  16384  65160    1.00     39940.46   
 # 9: MIGRATED TCP REQUEST/RESPONSE TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to 200.1.1.1 (200.1.1.1) port 0 AF_INET : demo : first burst 0
 # 9: Local /Remote
 # 9: Socket Size   Request  Resp.   Elapsed  Trans.
 # 9: Send   Recv   Size     Size    Time     Rate         
 # 9: bytes  Bytes  bytes    bytes   secs.    per sec   
 # 9: 
-# 9: 16384  87380  1        1       10.00    46834.27   
+# 9: 16384  87380  1        1       1.00     46387.80   
 # 9: 16384  87380 
 # 9: .
 # 9: ----------------------------------------------------------------------
-# 9: Ran 1 test in 29.144s
+# 9: Ran 1 test in 7.495s
 # 9: 
 # 9: OK
 
@@ -191,7 +188,7 @@ class TestBPFSocket(TestCase):
 
     def test_brb2(self):
         # ping
-        subprocess.call(["ip", "netns", "exec", self.ns1, "ping", self.vm2_ip, "-c", "5"])
+        subprocess.call(["ip", "netns", "exec", self.ns1, "ping", self.vm2_ip, "-c", "2"])
         # minimum one arp request/reply, 5 icmp request/reply
         self.assertGreater(self.pem_stats.lookup(c_uint(0)).value, 11)
 
@@ -204,8 +201,8 @@ class TestBPFSocket(TestCase):
         # netperf, run server on the background
         subprocess.Popen(["ip", "netns", "exec", self.ns2, "netserver"])
         sleep(1)
-        subprocess.call(["ip", "netns", "exec", self.ns1, "netperf", "-H", self.vm2_ip, "--", "-m", "65160"])
-        subprocess.call(["ip", "netns", "exec", self.ns1, "netperf", "-H", self.vm2_ip, "-t", "TCP_RR"])
+        subprocess.call(["ip", "netns", "exec", self.ns1, "netperf", "-l", "1", "-H", self.vm2_ip, "--", "-m", "65160"])
+        subprocess.call(["ip", "netns", "exec", self.ns1, "netperf", "-l", "1", "-H", self.vm2_ip, "-t", "TCP_RR"])
         subprocess.call(["ip", "netns", "exec", self.ns2, "killall", "netserver"])
 
         # cleanup, tear down the veths and namespaces
