@@ -15,6 +15,7 @@
 import atexit
 import ctypes as ct
 import json
+from past.builtins import basestring
 import os
 
 lib = ct.CDLL("libbpfprog.so")
@@ -190,7 +191,7 @@ class BPF(object):
     }
     @staticmethod
     def _decode_table_type(desc):
-        if isinstance(desc, str):
+        if isinstance(desc, basestring):
             return BPF.str2ctype[desc]
         fields = []
         for t in desc[1]:
@@ -198,7 +199,7 @@ class BPF(object):
                 fields.append((t[0], BPF._decode_table_type(t[1])))
             elif len(t) == 3:
                 fields.append((t[0], BPF._decode_table_type(t[1]), t[2]))
-        cls = type(desc[0], (ct.Structure,), dict(_fields_=fields))
+        cls = type(str(desc[0]), (ct.Structure,), dict(_fields_=fields))
         return cls
 
     def get_table(self, name, keytype=None, leaftype=None):

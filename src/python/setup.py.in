@@ -10,4 +10,4 @@ setup(name='bpf',
       url='http://plumgrid.com',
       packages=['bpf'],
       platforms=['Linux'],
-      requires=[])
+      install_requires=['future'])
