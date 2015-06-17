@@ -66,6 +66,7 @@ class SharedNetSimulation(object):
         ns_ipdb = IPDB(nl=NetNS(name))
         ipdb.create(ifname="%sa" % name, kind="veth", peer="%sb" % name).commit()
         with ipdb.interfaces["%sb" % name] as v:
+            # move half of veth into namespace
             v.net_ns_fd = ns_ipdb.nl.netns
         with ipdb.interfaces["%sa" % name] as v:
             v.up()
@@ -80,7 +81,7 @@ class SharedNetSimulation(object):
                    parent="ffff:", action="ok", classid=1)
         self.ipdbs.append(ns_ipdb)
         self.namespaces.append(ns_ipdb.nl)
-        cmd = ["iperf", "-s", "-B", ipaddr.split("/")[0]]
+        cmd = ["netserver", "-D"]
         self.processes.append(NSPopen(ns_ipdb.nl.netns, cmd))
         return (ns_ipdb, ifc)
 
@@ -110,8 +111,10 @@ class SharedNetSimulation(object):
 try:
     sim = SharedNetSimulation()
     sim.start()
-    print("Network ready. Create a shell in the wan0 namespace and test with iperf")
-    print(" e.g.: ip netns exec wan0 iperf -t 2 -c 172.16.1.100")
+    print("Network ready. Create a shell in the wan0 namespace and test with netperf")
+    print("   (Neighbors are 172.16.1.100-%d, and LAN clients are 172.16.1.150-%d)"
+            % (100 + num_neighbors - 1, 150 + num_locals - 1))
+    print(" e.g.: ip netns exec wan0 netperf -H 172.16.1.100 -l 2")
     input("Press enter when finished: ")
 finally:
     if "sim" in locals(): sim.release()
