@@ -53,7 +53,7 @@ int classify_neighbor(struct __sk_buff *skb) {
     u32 sip = ip->src;
     struct ipkey key = {.client_ip=sip};
     int val = 1;
-    learned_ips.lookup_or_init(&key, &val);
+    learned_ips.update(&key, &val);
     goto EOP;
   }
 EOP:
