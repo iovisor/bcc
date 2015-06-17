@@ -73,6 +73,14 @@ static int (*bpf_trace_printk_)(const char *fmt, u64 fmt_size, ...) =
   ({ char fmt[] = _fmt; bpf_trace_printk_(fmt, sizeof(fmt), ##__VA_ARGS__); })
 static u64 (*bpf_clone_redirect)(void *ctx, u64 ifindex, u64 flags) =
 	(void *) BPF_FUNC_clone_redirect;
+static u64 (*bpf_get_smp_processor_id)(void) =
+	(void *) BPF_FUNC_get_smp_processor_id;
+static u64 (*bpf_get_current_pid_tgid)(void) =
+	(void *) BPF_FUNC_get_current_pid_tgid;
+static u64 (*bpf_get_current_uid_gid)(void) =
+	(void *) BPF_FUNC_get_current_uid_gid;
+static int (*bpf_get_current_comm)(void *buf, int buf_size) =
+	(void *) BPF_FUNC_get_current_comm;
 static void bpf_tail_call_(u64 map_fd, void *ctx, int index) {
   ((void (*)(void *, u64, int))BPF_FUNC_tail_call)(ctx, map_fd, index);
 }
