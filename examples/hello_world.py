@@ -10,8 +10,7 @@ from subprocess import call
 
 prog = """
 int hello(void *ctx) {
-  char fmt[] = "Hello, World!\\n";
-  bpf_trace_printk(fmt, sizeof(fmt));
+  bpf_trace_printk("Hello, World!\\n");
   return 0;
 };
 """
