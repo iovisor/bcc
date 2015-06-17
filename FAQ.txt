@@ -34,3 +34,7 @@ A: You need to obtain a recent version of the Linux source code
       make install
       make modules_install
       make headers_install INSTALL_HDR_PATH=/usr/local/
+
+Q: hello_world.py fails with:
+   ImportError: No module named past.builtins
+A: sudo pip install future
