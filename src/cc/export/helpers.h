@@ -67,8 +67,10 @@ static int (*bpf_probe_read)(void *dst, u64 size, void *unsafe_ptr) =
 	(void *) BPF_FUNC_probe_read;
 static u64 (*bpf_ktime_get_ns)(void) =
 	(void *) BPF_FUNC_ktime_get_ns;
-static int (*bpf_trace_printk)(const char *fmt, u64 fmt_size, ...) =
+static int (*bpf_trace_printk_)(const char *fmt, u64 fmt_size, ...) =
 	(void *) BPF_FUNC_trace_printk;
+#define bpf_trace_printk(_fmt, ...) \
+  ({ char fmt[] = _fmt; bpf_trace_printk_(fmt, sizeof(fmt), ##__VA_ARGS__); })
 static u64 (*bpf_clone_redirect)(void *ctx, u64 ifindex, u64 flags) =
 	(void *) BPF_FUNC_clone_redirect;
 static void bpf_tail_call_(u64 map_fd, void *ctx, int index) {
