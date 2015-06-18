@@ -151,14 +151,14 @@ class TestBPFSocket(TestCase):
                       ip, br_dest_map, br_mac_map,
                       ns_eth_out, vm_mac, vm_ip):
         val = Bpf_Dest(prog_id_br, curr_br_pid)
-        self.pem_dest.update(c_uint(curr_pem_pid), val)
+        self.pem_dest[c_uint(curr_pem_pid)] = val
         val = Bpf_Dest(prog_id_pem, curr_pem_pid)
-        br_dest_map.update(c_uint(curr_br_pid), val)
+        br_dest_map[c_uint(curr_br_pid)] = val
         ifindex = ip.link_lookup(ifname=ns_eth_out)[0]
-        self.pem_port.update(c_uint(curr_pem_pid), c_uint(ifindex))
-        self.pem_ifindex.update(c_uint(ifindex), c_uint(curr_pem_pid))
+        self.pem_port[c_uint(curr_pem_pid)] = c_uint(ifindex)
+        self.pem_ifindex[c_uint(ifindex)] = c_uint(curr_pem_pid)
         mac_addr = Eth_Addr(int(EUI(vm_mac.decode())))
-        br_mac_map.update(mac_addr, c_uint(curr_br_pid))
+        br_mac_map[mac_addr] = c_uint(curr_br_pid)
 
     def attach_filter(self, ip, ifname, fd, name):
         ifindex = ip.link_lookup(ifname=ifname)[0]
@@ -185,9 +185,9 @@ class TestBPFSocket(TestCase):
         self.get_table(b)
 
         # configure jump table
-        self.jump.update(c_uint(prog_id_pem), c_uint(pem_fn.fd))
-        self.jump.update(c_uint(prog_id_br1), c_uint(br1_fn.fd))
-        self.jump.update(c_uint(prog_id_br2), c_uint(br2_fn.fd))
+        self.jump[c_uint(prog_id_pem)] = c_uint(pem_fn.fd)
+        self.jump[c_uint(prog_id_br1)] = c_uint(br1_fn.fd)
+        self.jump[c_uint(prog_id_br2)] = c_uint(br2_fn.fd)
 
         # connect pem and br1
         curr_pem_pid = curr_pem_pid + 1
@@ -205,9 +205,9 @@ class TestBPFSocket(TestCase):
 
         # connect <br1, rtr> and <br2, rtr>
         ifindex = ip.link_lookup(ifname=self.nsrtr_eth0_out)[0]
-        self.br1_rtr.update(c_uint(0), c_uint(ifindex))
+        self.br1_rtr[c_uint(0)] = c_uint(ifindex)
         ifindex = ip.link_lookup(ifname=self.nsrtr_eth1_out)[0]
-        self.br2_rtr.update(c_uint(0), c_uint(ifindex))
+        self.br2_rtr[c_uint(0)] = c_uint(ifindex)
 
         # tc filter setup with bpf programs attached
         self.attach_filter(ip, self.ns1_eth_out, pem_fn.fd, pem_fn.name)
@@ -246,7 +246,7 @@ class TestBPFSocket(TestCase):
         # ping
         subprocess.call(["ip", "netns", "exec", self.ns1, "ping", self.vm2_ip, "-c", "2"])
         # minimum one arp reply, 5 icmp reply
-        self.assertGreater(self.pem_stats.lookup(c_uint(0)).value, 5)
+        self.assertGreater(self.pem_stats[c_uint(0)].value, 5)
 
         # iperf, run server on the background
         subprocess.Popen(["ip", "netns", "exec", self.ns2, "iperf", "-s", "-xSCD"])

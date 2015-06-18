@@ -153,10 +153,10 @@ class TestBPFSocket(TestCase):
         ns2_ifindex = ip.link_lookup(ifname=self.ns2_eth_out)[0]
         br1_ifindex = ip.link_lookup(ifname=self.veth_br1_2_pem)[0]
         br2_ifindex = ip.link_lookup(ifname=self.veth_br2_2_pem)[0]
-        self.pem_dest.update(c_uint(ns1_ifindex), c_uint(br1_ifindex))
-        self.pem_dest.update(c_uint(br1_ifindex), c_uint(ns1_ifindex))
-        self.pem_dest.update(c_uint(ns2_ifindex), c_uint(br2_ifindex))
-        self.pem_dest.update(c_uint(br2_ifindex), c_uint(ns2_ifindex))
+        self.pem_dest[c_uint(ns1_ifindex)] = c_uint(br1_ifindex)
+        self.pem_dest[c_uint(br1_ifindex)] = c_uint(ns1_ifindex)
+        self.pem_dest[c_uint(ns2_ifindex)] = c_uint(br2_ifindex)
+        self.pem_dest[c_uint(br2_ifindex)] = c_uint(ns2_ifindex)
 
         # tc filter setup with bpf programs attached
         self.attach_filter(ip, self.ns1_eth_out, pem_fn.fd, pem_fn.name)
@@ -190,7 +190,7 @@ class TestBPFSocket(TestCase):
         # ping
         subprocess.call(["ip", "netns", "exec", self.ns1, "ping", self.vm2_ip, "-c", "2"])
         # minimum one arp request/reply, 5 icmp request/reply
-        self.assertGreater(self.pem_stats.lookup(c_uint(0)).value, 11)
+        self.assertGreater(self.pem_stats[c_uint(0)].value, 11)
 
         # iperf, run server on the background
         subprocess.Popen(["ip", "netns", "exec", self.ns2, "iperf", "-s", "-xSCD"])

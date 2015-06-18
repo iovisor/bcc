@@ -41,8 +41,7 @@ class TestKprobe(TestCase):
         with open("/etc/services", "r") as f:
             for i in range(0, 200):
                 os.read(f.fileno(), 1)
-        for key in self.stats.iter():
-            leaf = self.stats.lookup(key)
+        for key, leaf in self.stats.items():
             print("fd %x:" % key.fd, "stat1 %d" % leaf.stat1, "stat2 %d" % leaf.stat2)
 
 if __name__ == "__main__":
