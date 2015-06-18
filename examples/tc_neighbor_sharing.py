@@ -27,6 +27,7 @@
 
 from bpf import BPF
 from pyroute2 import IPRoute, NetNS, IPDB, NSPopen
+from simulation import Simulation
 import sys
 from time import sleep
 
@@ -42,16 +43,14 @@ num_neighbors = 3
 num_locals = 2
 
 # class to build the simulation network
-class SharedNetSimulation(object):
+class SharedNetSimulation(Simulation):
 
-    def __init__(self):
-        self.ipdbs = []
-        self.namespaces = []
-        self.processes = []
+    def __init__(self, ipdb):
+        super(SharedNetSimulation, self).__init__(ipdb)
 
         # Create the wan namespace, and attach an ingress filter for throttling
         # inbound (download) traffic
-        (self.wan, wan_if) = self._create_ns("wan0", "172.16.1.5/24", None)
+        wan_if = self._create_ns("wan0", ipaddr="172.16.1.5/24")[1]
         ipr.tc("add", "ingress", wan_if["index"], "ffff:")
         ipr.tc("add-filter", "bpf", wan_if["index"], ":1", fd=wan_fn.fd,
                prio=1, name=wan_fn.name, parent="ffff:", action="drop",
@@ -61,39 +60,22 @@ class SharedNetSimulation(object):
                classid=2, rate="1024kbit", burst=1024 * 32, mtu=16 * 1024)
         self.wan_if = wan_if
 
-    # helper function to create a namespace and a veth connecting it
-    def _create_ns(self, name, ipaddr, fn):
-        ns_ipdb = IPDB(nl=NetNS(name))
-        ipdb.create(ifname="%sa" % name, kind="veth", peer="%sb" % name).commit()
-        with ipdb.interfaces["%sb" % name] as v:
-            # move half of veth into namespace
-            v.net_ns_fd = ns_ipdb.nl.netns
-        with ipdb.interfaces["%sa" % name] as v:
-            v.up()
-        with ns_ipdb.interfaces["%sb" % name] as v:
-            v.ifname = "eth0"
-            v.add_ip("%s" % ipaddr)
-            v.up()
-        ifc = ipdb.interfaces["%sa" % name]
-        if fn:
-            ipr.tc("add", "ingress", ifc["index"], "ffff:")
-            ipr.tc("add-filter", "bpf", ifc["index"], ":1", fd=fn.fd, name=fn.name,
-                   parent="ffff:", action="ok", classid=1)
-        self.ipdbs.append(ns_ipdb)
-        self.namespaces.append(ns_ipdb.nl)
-        cmd = ["netserver", "-D"]
-        self.processes.append(NSPopen(ns_ipdb.nl.netns, cmd))
-        return (ns_ipdb, ifc)
-
-    # start the namespaces that compose the network, interconnect them with the bridge,
-    # and attach the tc filters
+    # start the namespaces that compose the network, interconnect them with the
+    # bridge, and attach the tc filters
     def start(self):
         neighbor_list = []
         local_list = []
+        cmd = ["netserver", "-D"]
         for i in range(0, num_neighbors):
-            neighbor_list.append(self._create_ns("neighbor%d" % i, "172.16.1.%d/24" % (i + 100), neighbor_fn))
+            ipaddr = "172.16.1.%d/24" % (i + 100)
+            ret = self._create_ns("neighbor%d" % i, ipaddr=ipaddr,
+                                  fn=neighbor_fn, cmd=cmd)
+            neighbor_list.append(ret)
         for i in range(0, num_locals):
-            local_list.append(self._create_ns("local%d" % i, "172.16.1.%d/24" % (i + 150), pass_fn))
+            ipaddr = "172.16.1.%d/24" % (i + 150)
+            ret = self._create_ns("local%d" % i, ipaddr=ipaddr,
+                                  fn=pass_fn, cmd=cmd)
+            local_list.append(ret)
 
         with ipdb.create(ifname="br100", kind="bridge") as br100:
             for x in neighbor_list:
@@ -103,13 +85,8 @@ class SharedNetSimulation(object):
             br100.add_port(self.wan_if)
             br100.up()
 
-    def release(self):
-        for p in self.processes: p.kill(); p.release()
-        for db in self.ipdbs: db.release()
-        for ns in self.namespaces: ns.remove()
-
 try:
-    sim = SharedNetSimulation()
+    sim = SharedNetSimulation(ipdb)
     sim.start()
     print("Network ready. Create a shell in the wan0 namespace and test with netperf")
     print("   (Neighbors are 172.16.1.100-%d, and LAN clients are 172.16.1.150-%d)"
@@ -119,7 +96,6 @@ try:
 finally:
     if "sim" in locals(): sim.release()
     if "br100" in ipdb.interfaces: ipdb.interfaces.br100.remove().commit()
-    sleep(2)
     ipdb.release()
 
 
