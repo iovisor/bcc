@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import atexit
+from collections import MutableMapping
 import ctypes as ct
 import json
 from past.builtins import basestring
@@ -85,14 +86,14 @@ class BPF(object):
             self.name = name
             self.fd = fd
 
-    class Table(object):
+    class Table(MutableMapping):
         def __init__(self, bpf, map_fd, keytype, leaftype):
             self.bpf = bpf
             self.map_fd = map_fd
             self.Key = keytype
             self.Leaf = leaftype
 
-        def lookup(self, key):
+        def __getitem__(self, key):
             key_p = ct.pointer(key)
             leaf = self.Leaf()
             leaf_p = ct.pointer(leaf)
@@ -100,17 +101,34 @@ class BPF(object):
                     ct.cast(key_p, ct.c_void_p),
                     ct.cast(leaf_p, ct.c_void_p))
             if res < 0:
-                raise Exception("Could not lookup in table")
+                raise KeyError
             return leaf
 
-        def update(self, key, leaf, flags=0):
+        def __setitem__(self, key, leaf):
             key_p = ct.pointer(key)
             leaf_p = ct.pointer(leaf)
             res = lib.bpf_update_elem(self.map_fd,
                     ct.cast(key_p, ct.c_void_p),
-                    ct.cast(leaf_p, ct.c_void_p), flags)
+                    ct.cast(leaf_p, ct.c_void_p), 0)
             if res < 0:
                 raise Exception("Could not update table")
+
+        def __len__(self):
+            i = 0
+            for k in self: i += 1
+            return i
+
+        def __delitem__(self, key):
+            key_p = ct.pointer(key)
+            res = lib.bpf_delete_elem(self.map_fd, ct.cast(key_p, ct.c_void_p))
+            if res < 0:
+                raise KeyError
+
+        def __iter__(self):
+            return BPF.Table.Iter(self, self.Key)
+
+        def iter(self): return self.__iter__()
+        def keys(self): return self.__iter__()
 
         class Iter(object):
             def __init__(self, table, keytype):
@@ -124,9 +142,6 @@ class BPF(object):
             def next(self):
                 self.key = self.table.next(self.key)
                 return self.key
-
-        def iter(self):
-            return BPF.Table.Iter(self, self.Key)
 
         def next(self, key):
             next_key = self.Key()

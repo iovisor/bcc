@@ -38,15 +38,15 @@ class TestBPFFilter(TestCase):
     def test_xlate(self):
         key1 = self.xlate.Key(IPAddress("172.16.1.2").value, IPAddress("172.16.1.1").value)
         leaf1 = self.xlate.Leaf(IPAddress("192.168.1.2").value, IPAddress("192.168.1.1").value, 0, 0)
-        self.xlate.update(key1, leaf1)
+        self.xlate[key1] = leaf1
         key2 = self.xlate.Key(IPAddress("192.168.1.1").value, IPAddress("192.168.1.2").value)
         leaf2 = self.xlate.Leaf(IPAddress("172.16.1.1").value, IPAddress("172.16.1.2").value, 0, 0)
-        self.xlate.update(key2, leaf2)
+        self.xlate[key2] = leaf2
         call(["ping", "-c1", "192.168.1.1"])
-        leaf = self.xlate.lookup(key1)
+        leaf = self.xlate[key1]
         self.assertGreater(leaf.ip_xlated_pkts, 0)
         self.assertGreater(leaf.arp_xlated_pkts, 0)
-        leaf = self.xlate.lookup(key2)
+        leaf = self.xlate[key2]
         self.assertGreater(leaf.ip_xlated_pkts, 0)
         self.assertGreater(leaf.arp_xlated_pkts, 0)
 

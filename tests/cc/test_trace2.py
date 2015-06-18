@@ -32,8 +32,7 @@ class TestTracingEvent(TestCase):
     def test_sched1(self):
         for i in range(0, 100):
             sleep(0.01)
-        for key in self.stats.iter():
-            leaf = self.stats.lookup(key)
+        for key, leaf in self.stats.items():
             print("ptr %x:" % key.ptr, "stat1 %x" % leaf.stat1)
 
 if __name__ == "__main__":

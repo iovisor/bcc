@@ -138,11 +138,9 @@ sleep(10)
 input("Press enter to exit: ")
 
 stats_collect = {}
-for key in ingress.iter():
-    leaf = ingress.lookup(key)
+for key, leaf in ingress.items():
     stats_collect[key.value] = [leaf.tx_pkts, leaf.tx_bytes, 0, 0]
-for key in egress.iter():
-    leaf = egress.lookup(key)
+for key, leaf in egress.items():
     x = stats_collect.get(key.value, [0, 0, 0, 0])
     x[2] = leaf.tx_pkts
     x[3] = leaf.tx_bytes

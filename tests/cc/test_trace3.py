@@ -32,8 +32,7 @@ class TestBlkRequest(TestCase):
                              "count=1024", "bs=4096"])
             subprocess.call(["sync"])
         os.unlink("/opt/trace3.txt")
-        for key in self.latency.iter():
-            leaf = self.latency.lookup(key)
+        for key, leaf in self.latency.items():
             print("latency %u:" % key.value, "count %u" % leaf.value)
         sys.stdout.flush()
 
