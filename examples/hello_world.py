@@ -2,8 +2,8 @@
 # Copyright (c) PLUMgrid, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
 
-# run in project directory with:
-# sudo bash -c "PYTHONPATH=$PWD/src LD_LIBRARY_PATH=$PWD/build/src/cc examples/hello_world.py"
+# run in project examples directory with:
+# sudo ./hello_world.py"
 
 from bpf import BPF
 from subprocess import call
