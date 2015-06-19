@@ -24,6 +24,7 @@
 #     switch     |  subinterface                              |
 
 from bpf import BPF
+from builtins import input
 from ctypes import c_uint, c_int, c_ulonglong, Structure
 from pyroute2 import IPRoute, NetNS, IPDB, NSPopen
 from random import shuffle
@@ -34,8 +35,7 @@ import sys
 ipr = IPRoute()
 ipdb = IPDB(nl=ipr)
 
-num_workers = 3
-num_clients = 9
+num_clients = 3
 num_vlans = 16
 
 # load the bpf program
@@ -52,7 +52,7 @@ class VlanSimulation(Simulation):
 
     def start(self):
         # start identical workers each in a namespace
-        for i in range(0, num_workers):
+        for i in range(0, num_clients):
             httpmod = ("SimpleHTTPServer" if sys.version_info[0] < 3
                        else "http.server")
             cmd = ["python", "-m", httpmod, "80"]
@@ -84,32 +84,27 @@ class VlanSimulation(Simulation):
         # allocate vlans randomly
         available_vlans = [i for i in range(2, 2 + num_vlans)]
         shuffle(available_vlans)
-        available_ips = [[i for i in range(100, 105)] for i in range(0, num_workers)]
+        available_ips = [[i for i in range(100, 105)] for i in range(0, num_clients)]
 
         # these are simulations of physical clients
         for i in range(0, num_clients):
-            worker_i = i % num_workers
-            ipaddr = "172.16.1.%d" % available_ips[worker_i].pop(0)
             macaddr = ("02:00:00:%.2x:%.2x:%.2x" %
                        ((i >> 16) & 0xff, (i >> 8) & 0xff, i & 0xff))
 
-            # program arp manually
-            p = NSPopen("worker%d" % worker_i, ["arp", "-s", ipaddr, macaddr])
-            p.communicate(); p.wait(); p.release()
-
             # assign this client to the given worker
-            idx = self.ipdb.interfaces["worker%da" % worker_i]["index"]
+            idx = self.ipdb.interfaces["worker%da" % i]["index"]
             mac = int(macaddr.replace(":", ""), 16)
             ingress[ingress.Key(mac)] = ingress.Leaf(idx, 0, 0)
 
             # test traffic with curl loop
             cmd = ["bash", "-c",
                    "for i in {1..8}; do curl 172.16.1.5 -o /dev/null; sleep 1; done"]
-            br_ifc = self.ipdb.create(ifname="br100.%d" % i, kind="vlan", link=br100,
+            br_ifc = self.ipdb.create(ifname="br100.%d" % i, kind="vlan",
+                                      link=br100,
                                       vlan_id=available_vlans.pop(0)).commit()
             (out_ifc, in_ifc) = self._create_ns("client%d" % i, in_ifc=br_ifc,
-                                                ipaddr=ipaddr + "/24", macaddr=macaddr,
-                                                cmd=cmd)[1:3]
+                                                ipaddr="172.16.1.100/24",
+                                                macaddr=macaddr, cmd=cmd)[1:3]
 
 try:
     sim = VlanSimulation(ipdb)
