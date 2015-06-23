@@ -30,6 +30,7 @@ from pyroute2 import IPRoute, NetNS, IPDB, NSPopen
 from simulation import Simulation
 import sys
 from time import sleep
+from builtins import input
 
 ipr = IPRoute()
 ipdb = IPDB(nl=ipr)
@@ -92,7 +93,7 @@ try:
     print("   (Neighbors are 172.16.1.100-%d, and LAN clients are 172.16.1.150-%d)"
             % (100 + num_neighbors - 1, 150 + num_locals - 1))
     print(" e.g.: ip netns exec wan0 netperf -H 172.16.1.100 -l 2")
-    raw_input("Press enter when finished: ")
+    input("Press enter when finished: ")
 finally:
     if "sim" in locals(): sim.release()
     if "br100" in ipdb.interfaces: ipdb.interfaces.br100.remove().commit()
