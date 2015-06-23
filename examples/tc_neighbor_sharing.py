@@ -30,6 +30,7 @@ from pyroute2 import IPRoute, NetNS, IPDB, NSPopen
 from simulation import Simulation
 import sys
 from time import sleep
+from builtins import input
 
 ipr = IPRoute()
 ipdb = IPDB(nl=ipr)
