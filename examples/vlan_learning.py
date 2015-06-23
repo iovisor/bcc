@@ -25,7 +25,6 @@
 
 from bpf import BPF
 from builtins import input
-from ctypes import c_uint, c_int, c_ulonglong, Structure
 from pyroute2 import IPRoute, NetNS, IPDB, NSPopen
 from random import shuffle
 from time import sleep

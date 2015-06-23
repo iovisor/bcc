@@ -45,6 +45,9 @@ struct _name##_table_t _name
 #define BEGIN(next) \
   u64 _parse_cursor = 0; \
   goto next
+#define BEGIN_OFFSET(next, _base_offset) \
+  u64 _parse_cursor = (_base_offset); \
+  goto next
 
 #define PROTO(name) \
   goto EOP; \
