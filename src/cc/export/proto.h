@@ -82,3 +82,12 @@ struct tcp_t {
   unsigned short  cksum;      // byte 16
   unsigned short  urg_ptr;
 } __attribute__((packed));
+
+struct vxlan_t {
+  unsigned int rsv1:4;
+  unsigned int iflag:1;
+  unsigned int rsv2:3;
+  unsigned int rsv3:24;
+  unsigned int key:24;
+  unsigned int rsv4:8;
+} __attribute__((packed));
