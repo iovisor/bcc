@@ -74,13 +74,6 @@ import struct
 
 arg1 = sys.argv.pop(1)
 
-class Bpf_Dest(Structure):
-    _fields_ = [("prog_id", c_uint),
-                ("port_id", c_uint)]
-
-class Eth_Addr(Structure):
-    _fields_ = [("addr", c_ulonglong)]
-
 class TestBPFSocket(TestCase):
     def setup_vm_ns(self, ns, veth_in, veth_out):
         subprocess.call(["ip", "link", "add", veth_in, "type", "veth", "peer", "name", veth_out])
@@ -132,32 +125,30 @@ class TestBPFSocket(TestCase):
         self.vm2_rtr_mask   = "200.1.1.0"
 
     def get_table(self, b):
-        self.jump = b.get_table("jump", c_uint, c_uint)
+        self.jump = b.get_table("jump")
 
-        self.pem_dest = b.get_table("pem_dest", c_uint, Bpf_Dest)
-        self.pem_port = b.get_table("pem_port", c_uint, c_uint)
-        self.pem_ifindex = b.get_table("pem_ifindex", c_uint, c_uint)
-        self.pem_stats = b.get_table("pem_stats", c_uint, c_uint)
+        self.pem_dest = b.get_table("pem_dest")
+        self.pem_port = b.get_table("pem_port")
+        self.pem_ifindex = b.get_table("pem_ifindex")
+        self.pem_stats = b.get_table("pem_stats")
 
-        self.br1_dest = b.get_table("br1_dest", c_uint, Bpf_Dest)
-        self.br1_mac = b.get_table("br1_mac", Eth_Addr, c_uint)
-        self.br1_rtr = b.get_table("br1_rtr", c_uint, c_uint)
+        self.br1_dest = b.get_table("br1_dest")
+        self.br1_mac = b.get_table("br1_mac")
+        self.br1_rtr = b.get_table("br1_rtr")
 
-        self.br2_dest = b.get_table("br2_dest", c_uint, Bpf_Dest)
-        self.br2_mac = b.get_table("br2_mac", Eth_Addr, c_uint)
-        self.br2_rtr = b.get_table("br2_rtr", c_uint, c_uint)
+        self.br2_dest = b.get_table("br2_dest")
+        self.br2_mac = b.get_table("br2_mac")
+        self.br2_rtr = b.get_table("br2_rtr")
 
     def connect_ports(self, prog_id_pem, prog_id_br, curr_pem_pid, curr_br_pid,
                       ip, br_dest_map, br_mac_map,
                       ns_eth_out, vm_mac, vm_ip):
-        val = Bpf_Dest(prog_id_br, curr_br_pid)
-        self.pem_dest[c_uint(curr_pem_pid)] = val
-        val = Bpf_Dest(prog_id_pem, curr_pem_pid)
-        br_dest_map[c_uint(curr_br_pid)] = val
+        self.pem_dest[c_uint(curr_pem_pid)] = self.pem_dest.Leaf(prog_id_br, curr_br_pid)
+        br_dest_map[c_uint(curr_br_pid)] = br_dest_map.Leaf(prog_id_pem, curr_pem_pid)
         ifindex = ip.link_lookup(ifname=ns_eth_out)[0]
         self.pem_port[c_uint(curr_pem_pid)] = c_uint(ifindex)
         self.pem_ifindex[c_uint(ifindex)] = c_uint(curr_pem_pid)
-        mac_addr = Eth_Addr(int(EUI(vm_mac.decode())))
+        mac_addr = br_mac_map.Key(int(EUI(vm_mac.decode())))
         br_mac_map[mac_addr] = c_uint(curr_br_pid)
 
     def attach_filter(self, ip, ifname, fd, name):

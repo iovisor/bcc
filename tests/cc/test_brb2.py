@@ -143,8 +143,8 @@ class TestBPFSocket(TestCase):
     def config_maps(self):
         b = BPF(src_file=arg1, debug=0)
         pem_fn = b.load_func("pem", BPF.SCHED_CLS)
-        self.pem_dest= b.get_table("pem_dest", c_uint, c_uint)
-        self.pem_stats = b.get_table("pem_stats", c_uint, c_uint)
+        self.pem_dest= b.get_table("pem_dest")
+        self.pem_stats = b.get_table("pem_stats")
         ip = IPRoute()
 
         # pem just relays packets between VM and its corresponding
