@@ -14,19 +14,19 @@ from time import sleep
 ipr = IPRoute()
 ipdb = IPDB(nl=ipr)
 
-b = BPF(src_file="tunnel_monitor.c", debug=0)
+b = BPF(src_file="monitor.c", debug=0)
 ingress_fn = b.load_func("handle_ingress", BPF.SCHED_CLS)
 egress_fn = b.load_func("handle_egress", BPF.SCHED_CLS)
 outer_fn = b.load_func("handle_outer", BPF.SCHED_CLS)
 inner_fn = b.load_func("handle_inner", BPF.SCHED_CLS)
 stats = b.get_table("stats")
+# using jump table for inner and outer packet split
 parser = b.get_table("parser")
 parser[c_int(1)] = c_int(outer_fn.fd)
 parser[c_int(2)] = c_int(inner_fn.fd)
 
 ifc = ipdb.interfaces.eth0
 
-# monitor one host...move this inside the netns to be more realistic
 ipr.tc("add", "ingress", ifc.index, "ffff:")
 ipr.tc("add-filter", "bpf", ifc.index, ":1", fd=ingress_fn.fd,
        name=ingress_fn.name, parent="ffff:", action="ok", classid=1)
@@ -69,12 +69,12 @@ while True:
 
     prev = tmp
 
-    with open("/root/chord-transitions/data/tunnel.json.new", "w") as f:
+    with open("./chord-transitions/data/tunnel.json.new", "w") as f:
         json.dump(result_total, f)
-    rename("/root/chord-transitions/data/tunnel.json.new", "/root/chord-transitions/data/tunnel.json")
-    with open("/root/chord-transitions/data/tunnel-delta.json.new", "w") as f:
+    rename("./chord-transitions/data/tunnel.json.new", "./chord-transitions/data/tunnel.json")
+    with open("./chord-transitions/data/tunnel-delta.json.new", "w") as f:
         json.dump(result_delta, f)
-    rename("/root/chord-transitions/data/tunnel-delta.json.new", "/root/chord-transitions/data/tunnel-delta.json")
+    rename("./chord-transitions/data/tunnel-delta.json.new", "./chord-transitions/data/tunnel-delta.json")
     sleep(5)
 ipdb.release()
 
