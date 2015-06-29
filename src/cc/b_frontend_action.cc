@@ -32,6 +32,7 @@ using std::map;
 using std::string;
 using std::to_string;
 using std::unique_ptr;
+using std::vector;
 using namespace clang;
 
 // Encode the struct layout as a json description
@@ -80,9 +81,31 @@ bool BTypeVisitor::VisitFunctionDecl(FunctionDecl *D) {
   // put each non-static non-inline function decl in its own section, to be
   // extracted by the MemoryManager
   if (D->isExternallyVisible() && D->hasBody()) {
-    string attr = string("__attribute__((section(\".") + D->getName().str() + "\")))";
+    string attr = string("__attribute__((section(\".") + D->getName().str() + "\")))\n";
     rewriter_.InsertText(D->getLocStart(), attr);
+    // remember the arg names of the current function...first one is the ctx
+    fn_args_.clear();
+    for (auto arg : D->params()) {
+      if (arg->getName() == "") {
+        C.getDiagnostics().Report(arg->getLocEnd(), diag::err_expected)
+            << "named arguments in BPF program definition";
+        return false;
+      }
+      fn_args_.push_back(arg->getName());
+    }
   }
+  return true;
+}
+
+// Reverse the order of call traversal so that parameters inside of
+// function calls will get rewritten before the call itself, otherwise
+// text mangling will result.
+bool BTypeVisitor::TraverseCallExpr(CallExpr *Call) {
+  for (auto child : Call->children())
+    if (!TraverseStmt(child))
+      return false;
+  if (!WalkUpFromCallExpr(Call))
+    return false;
   return true;
 }
 
@@ -152,8 +175,54 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
 
           txt = prefix + args + suffix;
         }
+        if (!rewriter_.isRewritable(Call->getLocStart())) {
+          C.getDiagnostics().Report(Call->getLocStart(), diag::err_expected)
+              << "use of map function not in a macro";
+          return false;
+        }
         rewriter_.ReplaceText(SourceRange(Call->getLocStart(), Call->getLocEnd()), txt);
         return true;
+      }
+    }
+  } else if (Call->getCalleeDecl()) {
+    NamedDecl *Decl = dyn_cast<NamedDecl>(Call->getCalleeDecl());
+    if (!Decl) return true;
+    if (AsmLabelAttr *A = Decl->getAttr<AsmLabelAttr>()) {
+      // Functions with the tag asm("llvm.bpf.extra") are implemented in the
+      // rewriter rather than as a macro since they may also include nested
+      // rewrites, and clang::Rewriter does not support rewrites in macros,
+      // unless one preprocesses the entire source file.
+      if (A->getLabel() == "llvm.bpf.extra") {
+        if (!rewriter_.isRewritable(Call->getLocStart())) {
+          C.getDiagnostics().Report(Call->getLocStart(), diag::err_expected)
+              << "use of extra builtin not in a macro";
+          return false;
+        }
+
+        vector<string> args;
+        for (auto arg : Call->arguments())
+          args.push_back(rewriter_.getRewrittenText(SourceRange(arg->getLocStart(), arg->getLocEnd())));
+
+        string text;
+        if (Decl->getName() == "incr_cksum_l3") {
+          text = "bpf_l3_csum_replace_(" + fn_args_[0] + ", (u64)";
+          text += args[0] + ", " + args[1] + ", " + args[2] + ", sizeof(" + args[2] + "))";
+        } else if (Decl->getName() == "incr_cksum_l4") {
+          text = "bpf_l4_csum_replace_(" + fn_args_[0] + ", (u64)";
+          text += args[0] + ", " + args[1] + ", " + args[2];
+          text += ", ((" + args[3] + " & 0x1) << 4) | sizeof(" + args[2] + "))";
+        } else if (Decl->getName() == "bpf_trace_printk") {
+          //  #define bpf_trace_printk(fmt, args...)
+          //    ({ char _fmt[] = fmt; bpf_trace_printk_(_fmt, sizeof(_fmt), args...); })
+          text = "({ char _fmt[] = " + args[0] + "; bpf_trace_printk_(_fmt, sizeof(_fmt), ";
+          for (auto arg = args.begin() + 1; arg != args.end(); ++arg) {
+            text += *arg;
+            if (arg + 1 != args.end())
+              text += ", ";
+          }
+          text += "); })";
+        }
+        rewriter_.ReplaceText(SourceRange(Call->getLocStart(), Call->getLocEnd()), text);
       }
     }
   }
@@ -170,11 +239,16 @@ bool BTypeVisitor::VisitBinaryOperator(BinaryOperator *E) {
       if (DeprecatedAttr *A = Base->getDecl()->getAttr<DeprecatedAttr>()) {
         if (A->getMessage() == "packet") {
           if (FieldDecl *F = dyn_cast<FieldDecl>(Memb->getMemberDecl())) {
+            if (!rewriter_.isRewritable(E->getLocStart())) {
+              C.getDiagnostics().Report(E->getLocStart(), diag::err_expected)
+                  << "use of \"packet\" header type not in a macro";
+              return false;
+            }
             uint64_t ofs = C.getFieldOffset(F);
             uint64_t sz = F->isBitField() ? F->getBitWidthValue(C) : C.getTypeSize(F->getType());
             string base = rewriter_.getRewrittenText(SourceRange(Base->getLocStart(), Base->getLocEnd()));
             string rhs = rewriter_.getRewrittenText(SourceRange(RHS->getLocStart(), RHS->getLocEnd()));
-            string text = "bpf_dins_pkt(skb, (u64)" + base + "+" + to_string(ofs >> 3)
+            string text = "bpf_dins_pkt(" + fn_args_[0] + ", (u64)" + base + "+" + to_string(ofs >> 3)
                 + ", " + to_string(ofs & 0x7) + ", " + to_string(sz) + ", " + rhs + ")";
             rewriter_.ReplaceText(SourceRange(E->getLocStart(), E->getLocEnd()), text);
           }
@@ -196,11 +270,15 @@ bool BTypeVisitor::VisitImplicitCastExpr(ImplicitCastExpr *E) {
     if (DeprecatedAttr *A = Ref->getDecl()->getAttr<DeprecatedAttr>()) {
       if (A->getMessage() == "packet") {
         if (FieldDecl *F = dyn_cast<FieldDecl>(Memb->getMemberDecl())) {
+          if (!rewriter_.isRewritable(E->getLocStart())) {
+            C.getDiagnostics().Report(E->getLocStart(), diag::err_expected)
+                << "use of \"packet\" header type not in a macro";
+            return false;
+          }
           uint64_t ofs = C.getFieldOffset(F);
           uint64_t sz = F->isBitField() ? F->getBitWidthValue(C) : C.getTypeSize(F->getType());
-          string base = rewriter_.getRewrittenText(SourceRange(Base->getLocStart(), Base->getLocEnd()));
-          string text = "bpf_dext_pkt(skb, (u64)" + base + "+" + to_string(ofs >> 3)
-              + ", " + to_string(ofs & 0x7) + ", " + to_string(sz) + ")";
+          string text = "bpf_dext_pkt(" + fn_args_[0] + ", (u64)" + Ref->getDecl()->getName().str() + "+"
+              + to_string(ofs >> 3) + ", " + to_string(ofs & 0x7) + ", " + to_string(sz) + ")";
           rewriter_.ReplaceText(SourceRange(E->getLocStart(), E->getLocEnd()), text);
         }
       }

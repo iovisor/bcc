@@ -20,3 +20,5 @@ add_test(NAME py_test_brb WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   COMMAND ${TEST_WRAPPER} py_brb_c sudo ${CMAKE_CURRENT_SOURCE_DIR}/test_brb.py test_brb.c)
 add_test(NAME py_test_brb2 WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   COMMAND ${TEST_WRAPPER} py_brb2_c sudo ${CMAKE_CURRENT_SOURCE_DIR}/test_brb2.py test_brb2.c)
+add_test(NAME py_test_clang WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  COMMAND ${TEST_WRAPPER} py_clang sudo ${CMAKE_CURRENT_SOURCE_DIR}/test_clang.py)

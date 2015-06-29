@@ -68,6 +68,7 @@ class BTypeVisitor : public clang::RecursiveASTVisitor<BTypeVisitor> {
  public:
   explicit BTypeVisitor(clang::ASTContext &C, clang::Rewriter &rewriter,
                         std::map<std::string, BPFTable> &tables);
+  bool TraverseCallExpr(clang::CallExpr *Call);
   bool VisitFunctionDecl(clang::FunctionDecl *D);
   bool VisitCallExpr(clang::CallExpr *Call);
   bool VisitVarDecl(clang::VarDecl *Decl);
@@ -79,6 +80,7 @@ class BTypeVisitor : public clang::RecursiveASTVisitor<BTypeVisitor> {
   clang::Rewriter &rewriter_;  /// modifications to the source go into this class
   llvm::raw_ostream &out_;  /// for debugging
   std::map<std::string, BPFTable> &tables_;  /// store the open FDs
+  std::vector<std::string> fn_args_;
 };
 
 // A helper class to the frontend action, walks the decls
