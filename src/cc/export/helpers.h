@@ -72,8 +72,7 @@ static u64 (*bpf_ktime_get_ns)(void) =
 	(void *) BPF_FUNC_ktime_get_ns;
 static int (*bpf_trace_printk_)(const char *fmt, u64 fmt_size, ...) =
 	(void *) BPF_FUNC_trace_printk;
-#define bpf_trace_printk(_fmt, ...) \
-  ({ char fmt[] = _fmt; bpf_trace_printk_(fmt, sizeof(fmt), ##__VA_ARGS__); })
+int bpf_trace_printk(const char *fmt, ...) asm("llvm.bpf.extra");
 static u64 (*bpf_clone_redirect)(void *ctx, u64 ifindex, u64 flags) =
 	(void *) BPF_FUNC_clone_redirect;
 static u64 (*bpf_get_smp_processor_id)(void) =
@@ -286,10 +285,8 @@ int bpf_l4_csum_replace_(void *ctx, u64 off, u64 from, u64 to, u64 flags) {
   return bpf_l4_csum_replace(ctx, off, from, to, flags);
 }
 
-#define incr_cksum_l3(expr, oldval, newval) \
-  bpf_l3_csum_replace_(skb, (u64)expr, oldval, newval, sizeof(newval))
-#define incr_cksum_l4(expr, oldval, newval, is_pseudo) \
-  bpf_l4_csum_replace_(skb, (u64)expr, oldval, newval, ((is_pseudo & 0x1) << 4) | sizeof(newval))
+int incr_cksum_l3(void *off, u64 oldval, u64 newval) asm("llvm.bpf.extra");
+int incr_cksum_l4(void *off, u64 oldval, u64 newval, u64 flags) asm("llvm.bpf.extra");
 
 #define lock_xadd(ptr, val) ((void)__sync_fetch_and_add(ptr, val))
 
