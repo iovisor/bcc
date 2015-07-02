@@ -19,14 +19,16 @@ int pass(struct __sk_buff *skb) {
 // returns: > 0 when an IP is known
 //          = 0 when an IP is not known, or non-IP traffic
 int classify_wan(struct __sk_buff *skb) {
-  BEGIN(ethernet);
-  PROTO(ethernet) {
+  u8 *cursor = 0;
+  ethernet: {
+    struct ethernet_t *ethernet = cursor_advance(cursor, sizeof(*ethernet));
     switch (ethernet->type) {
-      case 0x0800: goto ip;
+      case ETH_P_IP: goto ip;
+      default: goto EOP;
     }
-    goto EOP;
   }
-  PROTO(ip) {
+  ip: {
+    struct ip_t *ip = cursor_advance(cursor, sizeof(*ip));
     u32 dip = ip->dst;
     struct ipkey key = {.client_ip=dip};
     int *val = learned_ips.lookup(&key);
@@ -42,14 +44,16 @@ EOP:
 // Mark the inserted entry with a non-zero value to be used by the classify_wan
 // lookup.
 int classify_neighbor(struct __sk_buff *skb) {
-  BEGIN(ethernet);
-  PROTO(ethernet) {
+  u8 *cursor = 0;
+  ethernet: {
+    struct ethernet_t *ethernet = cursor_advance(cursor, sizeof(*ethernet));
     switch (ethernet->type) {
-      case 0x0800: goto ip;
+      case ETH_P_IP: goto ip;
+      default: goto EOP;
     }
-    goto EOP;
   }
-  PROTO(ip) {
+  ip: {
+    struct ip_t *ip = cursor_advance(cursor, sizeof(*ip));
     u32 sip = ip->src;
     struct ipkey key = {.client_ip=sip};
     int val = 1;

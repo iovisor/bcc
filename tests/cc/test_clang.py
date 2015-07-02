@@ -13,12 +13,10 @@ class TestClang(TestCase):
         text = """
 #include <bcc/proto.h>
 int handle_packet(void *ctx) {
-  BEGIN(ethernet);
-  PROTO(ethernet) {
-    bpf_trace_printk("ethernet->dst = %llx, ethernet->src = %llx\\n",
-                     ethernet->dst, ethernet->src);
-  }
-EOP:
+  u8 *cursor = 0;
+  struct ethernet_t *ethernet = cursor_advance(cursor, sizeof(*ethernet));
+  bpf_trace_printk("ethernet->dst = %llx, ethernet->src = %llx\\n",
+                   ethernet->dst, ethernet->src);
   return 0;
 }
 """

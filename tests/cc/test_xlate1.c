@@ -14,29 +14,33 @@ struct IPLeaf {
 BPF_TABLE("hash", struct IPKey, struct IPLeaf, xlate, 1024);
 
 int on_packet(struct __sk_buff *skb) {
+  u8 *cursor = 0;
 
   u32 orig_dip = 0;
   u32 orig_sip = 0;
   struct IPLeaf *xleaf;
 
-  BEGIN(ethernet);
-  PROTO(ethernet) {
+  ethernet: {
+    struct ethernet_t *ethernet = cursor_advance(cursor, sizeof(*ethernet));
     switch (ethernet->type) {
-      case 0x0800: goto ip;
-      case 0x0806: goto arp;
-      case 0x8100: goto dot1q;
+      case ETH_P_IP: goto ip;
+      case ETH_P_ARP: goto arp;
+      case ETH_P_8021Q: goto dot1q;
+      default: goto EOP;
     }
-    goto EOP;
   }
 
-  PROTO(dot1q) {
+  dot1q: {
+    struct dot1q_t *dot1q = cursor_advance(cursor, sizeof(*dot1q));
     switch (dot1q->type) {
-      case 0x0806: goto arp;
-      case 0x0800: goto ip;
+      case ETH_P_IP: goto ip;
+      case ETH_P_ARP: goto arp;
+      default: goto EOP;
     }
-    goto EOP;
   }
-  PROTO(arp) {
+
+  arp: {
+    struct arp_t *arp = cursor_advance(cursor, sizeof(*arp));
     orig_dip = arp->tpa;
     orig_sip = arp->spa;
     struct IPKey key = {.dip=orig_dip, .sip=orig_sip};
@@ -49,7 +53,8 @@ int on_packet(struct __sk_buff *skb) {
     goto EOP;
   }
 
-  PROTO(ip) {
+  ip: {
+    struct ip_t *ip = cursor_advance(cursor, sizeof(*ip));
     orig_dip = ip->dst;
     orig_sip = ip->src;
     struct IPKey key = {.dip=orig_dip, .sip=orig_sip};
@@ -64,11 +69,12 @@ int on_packet(struct __sk_buff *skb) {
     switch (ip->nextp) {
       case 6: goto tcp;
       case 17: goto udp;
+      default: goto EOP;
     }
-    goto EOP;
   }
 
-  PROTO(udp) {
+  udp: {
+    struct udp_t *udp = cursor_advance(cursor, sizeof(*udp));
     if (xleaf) {
       incr_cksum_l4(&udp->crc, orig_dip, xleaf->xdip, 1);
       incr_cksum_l4(&udp->crc, orig_sip, xleaf->xsip, 1);
@@ -76,7 +82,8 @@ int on_packet(struct __sk_buff *skb) {
     goto EOP;
   }
 
-  PROTO(tcp) {
+  tcp: {
+    struct tcp_t *tcp = cursor_advance(cursor, sizeof(*tcp));
     if (xleaf) {
       incr_cksum_l4(&tcp->cksum, orig_dip, xleaf->xdip, 1);
       incr_cksum_l4(&tcp->cksum, orig_sip, xleaf->xsip, 1);

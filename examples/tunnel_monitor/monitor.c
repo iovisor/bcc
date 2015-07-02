@@ -57,37 +57,43 @@ int handle_egress(struct __sk_buff *skb) {
 
 // parse the outer vxlan frame
 int handle_outer(struct __sk_buff *skb) {
-  BEGIN(ethernet);
-  PROTO(ethernet) {
-    // filter bcast/mcast from the stats
-    if (ethernet->dst & (1ull << 40))
-      return 1;
-    switch (ethernet->type) {
-      case 0x0800: goto ip;
-    }
-    goto EOP;
+  u8 *cursor = 0;
+
+  struct ethernet_t *ethernet = cursor_advance(cursor, sizeof(*ethernet));
+
+  // filter bcast/mcast from the stats
+  if (ethernet->dst & (1ull << 40))
+    goto finish;
+
+  switch (ethernet->type) {
+    case 0x0800: goto ip;
+    default: goto finish;
   }
-  PROTO(ip) {
-    skb->cb[CB_SIP] = ip->src;
-    skb->cb[CB_DIP] = ip->dst;
-    switch (ip->nextp) {
-      case 17: goto udp;
-    }
-    goto EOP;
+
+ip: ;
+  struct ip_t *ip = cursor_advance(cursor, sizeof(*ip));
+  skb->cb[CB_SIP] = ip->src;
+  skb->cb[CB_DIP] = ip->dst;
+
+  switch (ip->nextp) {
+    case 17: goto udp;
+    default: goto finish;
   }
-  PROTO(udp) {
-    switch (udp->dport) {
-      case 4789: goto vxlan;
-    }
-    goto EOP;
+
+udp: ;
+  struct udp_t *udp = cursor_advance(cursor, sizeof(*udp));
+  switch (udp->dport) {
+    case 4789: goto vxlan;
+    default: goto finish;
   }
-  PROTO(vxlan) {
-    skb->cb[CB_VNI] = vxlan->key;
-    skb->cb[CB_OFFSET] = (u64)vxlan + sizeof(*vxlan);
-    parser.call(skb, 2);
-    goto EOP;
-  }
-EOP:
+
+vxlan: ;
+  struct vxlan_t *vxlan = cursor_advance(cursor, sizeof(*vxlan));
+  skb->cb[CB_VNI] = vxlan->key;
+  skb->cb[CB_OFFSET] = (u64)vxlan + sizeof(*vxlan);
+  parser.call(skb, 2);
+
+finish:
   return 1;
 }
 
@@ -100,19 +106,19 @@ int handle_inner(struct __sk_buff *skb) {
     .outer_sip = skb->cb[CB_SIP],
     .outer_dip = skb->cb[CB_DIP]
   };
-  BEGIN_OFFSET(ethernet, skb->cb[CB_OFFSET]);
-  PROTO(ethernet) {
-    switch (ethernet->type) {
-      case 0x0800: goto ip;
-    }
-    goto EOP;
+  u8 *cursor = (u8 *)(u64)skb->cb[CB_OFFSET];
+
+  struct ethernet_t *ethernet = cursor_advance(cursor, sizeof(*ethernet));
+  switch (ethernet->type) {
+    case 0x0800: goto ip;
+    default: goto finish;
   }
-  PROTO(ip) {
-    key.inner_sip = ip->src;
-    key.inner_dip = ip->dst;
-    goto EOP;
-  }
-EOP:
+ip: ;
+  struct ip_t *ip = cursor_advance(cursor, sizeof(*ip));
+  key.inner_sip = ip->src;
+  key.inner_dip = ip->dst;
+
+finish:
   // consistent ordering
   if (key.outer_dip < key.outer_sip)
     swap_ipkey(&key);

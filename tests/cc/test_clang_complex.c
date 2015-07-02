@@ -42,6 +42,7 @@ BPF_TABLE("hash", struct SlaveKey, struct SlaveLeaf, slave_map, 10);
 
 int handle_packet(struct __sk_buff *skb) {
   int ret = 0;
+  u8 *cursor = 0;
 
   if (skb->pkt_type == 0) {
     // tx
@@ -70,26 +71,25 @@ int handle_packet(struct __sk_buff *skb) {
     ret = 0;
   }
 
-  BEGIN(ethernet);
-
-  PROTO(ethernet) {
-    switch (ethernet->type) {
-      case 0x0806: goto arp;
-      case 0x0800: goto ip;
-      case 0x8100: goto dot1q;
-    }
-    goto EOP;
+  struct ethernet_t *ethernet = cursor_advance(cursor, sizeof(*ethernet));
+  switch (ethernet->type) {
+    case ETH_P_IP: goto ip;
+    case ETH_P_ARP: goto arp;
+    case ETH_P_8021Q: goto dot1q;
+    default: goto EOP;
   }
 
-  PROTO(dot1q) {
+  dot1q: {
+    struct dot1q_t *dot1q = cursor_advance(cursor, sizeof(*dot1q));
     switch (dot1q->type) {
-      case 0x0806: goto arp;
-      case 0x0800: goto ip;
+      case ETH_P_IP: goto ip;
+      case ETH_P_ARP: goto arp;
+      default: goto EOP;
     }
-    goto EOP;
   }
 
-  PROTO(arp) {
+  arp: {
+    struct arp_t *arp = cursor_advance(cursor, sizeof(*arp));
     if (skb->pkt_type) {
       if (arp->oper == 1) {
         struct MacaddrKey mac_key = {.ip=arp->spa};
@@ -100,17 +100,20 @@ int handle_packet(struct __sk_buff *skb) {
     goto EOP;
   }
 
-  PROTO(ip) {
+  struct ip_t *ip = cursor_advance(cursor, sizeof(*ip));
+  ip: {
     switch (ip->nextp) {
       case 6: goto tcp;
       case 17: goto udp;
+      default: goto EOP;
     }
+  }
+  tcp: {
+    struct tcp_t *tcp = cursor_advance(cursor, sizeof(*tcp));
     goto EOP;
   }
-  PROTO(tcp) {
-    goto EOP;
-  }
-  PROTO(udp) {
+  udp: {
+    struct udp_t *udp = cursor_advance(cursor, sizeof(*udp));
     if (udp->dport != 5000) {
        goto EOP;
     }

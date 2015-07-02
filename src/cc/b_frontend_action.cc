@@ -381,6 +381,18 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
       return false;
     }
     tables_[Decl->getName()] = std::move(table);
+  } else if (const PointerType *P = Decl->getType()->getAs<PointerType>()) {
+    // if var is a pointer to a packet type, clone the annotation into the var
+    // decl so that the packet dext/dins rewriter can catch it
+    if (const RecordType *RT = P->getPointeeType()->getAs<RecordType>()) {
+      if (const RecordDecl *RD = RT->getDecl()->getDefinition()) {
+        if (DeprecatedAttr *DA = RD->getAttr<DeprecatedAttr>()) {
+          if (DA->getMessage() == "packet") {
+            Decl->addAttr(DA->clone(C));
+          }
+        }
+      }
+    }
   }
   return true;
 }

@@ -16,8 +16,9 @@ BPF_TABLE("hash", int, struct ifindex_leaf_t, egress, 4096);
 BPF_TABLE("hash", u64, struct ifindex_leaf_t, ingress, 4096);
 
 int handle_phys2virt(struct __sk_buff *skb) {
-  BEGIN(ethernet);
-  PROTO(ethernet) {
+  u8 *cursor = 0;
+  ethernet: {
+    struct ethernet_t *ethernet = cursor_advance(cursor, sizeof(*ethernet));
     u64 src_mac = ethernet->src;
     struct ifindex_leaf_t *leaf = ingress.lookup(&src_mac);
     if (leaf) {
@@ -33,13 +34,13 @@ int handle_phys2virt(struct __sk_buff *skb) {
       bpf_clone_redirect(skb, leaf->out_ifindex, 0);
     }
   }
-EOP:
   return 1;
 }
 
 int handle_virt2phys(struct __sk_buff *skb) {
-  BEGIN(ethernet);
-  PROTO(ethernet) {
+  u8 *cursor = 0;
+  ethernet: {
+    struct ethernet_t *ethernet = cursor_advance(cursor, sizeof(*ethernet));
     int src_ifindex = skb->ifindex;
     struct ifindex_leaf_t *leaf = egress.lookup(&src_ifindex);
     if (leaf) {
@@ -48,6 +49,5 @@ int handle_virt2phys(struct __sk_buff *skb) {
       bpf_clone_redirect(skb, leaf->out_ifindex, 0);
     }
   }
-EOP:
   return 1;
 }

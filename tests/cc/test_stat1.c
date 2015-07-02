@@ -15,20 +15,26 @@ struct IPLeaf {
 BPF_TABLE("hash", struct IPKey, struct IPLeaf, stats, 256);
 
 int on_packet(struct __sk_buff *skb) {
-  BEGIN(ethernet);
-
-  PROTO(ethernet) {
+  u8 *cursor = 0;
+  ethernet: {
+    struct ethernet_t *ethernet = cursor_advance(cursor, sizeof(*ethernet));
     switch (ethernet->type) {
-      case 0x0800: goto ip;
-      case 0x8100: goto dot1q;
+        case ETH_P_IP: goto ip;
+        case ETH_P_8021Q: goto dot1q;
+        default: goto EOP;
     }
   }
-  PROTO(dot1q) {
+
+  dot1q: {
+    struct dot1q_t *dot1q = cursor_advance(cursor, sizeof(*dot1q));
     switch (dot1q->type) {
-      case 0x0800: goto ip;
+      case ETH_P_8021Q: goto ip;
+      default: goto EOP;
     }
   }
-  PROTO(ip) {
+
+  ip: {
+    struct ip_t *ip = cursor_advance(cursor, sizeof(*ip));
     int rx = 0, tx = 0;
     struct IPKey key;
     if (ip->dst > ip->src) {
@@ -45,6 +51,7 @@ int on_packet(struct __sk_buff *skb) {
     lock_xadd(&leaf->rx_pkts, rx);
     lock_xadd(&leaf->tx_pkts, tx);
   }
+
 EOP:
   return 0;
 }
