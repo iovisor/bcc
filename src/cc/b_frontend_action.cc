@@ -28,6 +28,13 @@ int bpf_create_map(enum bpf_map_type map_type, int key_size, int value_size,
                    int max_entries);
 
 namespace ebpf {
+
+const char *calling_conv_regs_x86[] = {
+  "di", "si", "dx", "cx", "r8", "r9"
+};
+// todo: support more archs
+const char **calling_conv_regs = calling_conv_regs_x86;
+
 using std::map;
 using std::string;
 using std::to_string;
@@ -91,7 +98,7 @@ bool BTypeVisitor::VisitFunctionDecl(FunctionDecl *D) {
             << "named arguments in BPF program definition";
         return false;
       }
-      fn_args_.push_back(arg->getName());
+      fn_args_.push_back(arg);
     }
   }
   return true;
@@ -205,10 +212,10 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
 
         string text;
         if (Decl->getName() == "incr_cksum_l3") {
-          text = "bpf_l3_csum_replace_(" + fn_args_[0] + ", (u64)";
+          text = "bpf_l3_csum_replace_(" + fn_args_[0]->getName().str() + ", (u64)";
           text += args[0] + ", " + args[1] + ", " + args[2] + ", sizeof(" + args[2] + "))";
         } else if (Decl->getName() == "incr_cksum_l4") {
-          text = "bpf_l4_csum_replace_(" + fn_args_[0] + ", (u64)";
+          text = "bpf_l4_csum_replace_(" + fn_args_[0]->getName().str() + ", (u64)";
           text += args[0] + ", " + args[1] + ", " + args[2];
           text += ", ((" + args[3] + " & 0x1) << 4) | sizeof(" + args[2] + "))";
         } else if (Decl->getName() == "bpf_trace_printk") {
@@ -225,6 +232,50 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
         rewriter_.ReplaceText(SourceRange(Call->getLocStart(), Call->getLocEnd()), text);
       }
     }
+  }
+  return true;
+}
+
+bool BTypeVisitor::TraverseMemberExpr(MemberExpr *E) {
+  for (auto child : E->children())
+    if (!TraverseStmt(child))
+      return false;
+  if (!WalkUpFromMemberExpr(E))
+    return false;
+  return true;
+}
+
+bool BTypeVisitor::VisitMemberExpr(MemberExpr *E) {
+  if (DeclRefExpr *Ref = dyn_cast<DeclRefExpr>(E->getBase()->IgnoreImplicit())) {
+    auto it = std::find(fn_args_.begin() + 1, fn_args_.end(), Ref->getDecl());
+    if (it != fn_args_.end()) {
+      FieldDecl *F = dyn_cast<FieldDecl>(E->getMemberDecl());
+      string base_type = Ref->getType()->getPointeeType().getAsString();
+      string pre, post;
+      pre = "({ " + E->getType().getAsString() + " _val; memset(&_val, 0, sizeof(_val));";
+      pre += " bpf_probe_read(&_val, sizeof(_val), ";
+      post = " + offsetof(" + base_type + ", " + F->getName().str() + ")";
+      post += "); _val; })";
+      rewriter_.InsertText(E->getLocStart(), pre);
+      rewriter_.ReplaceText(SourceRange(E->getOperatorLoc(), E->getLocEnd()), post);
+    }
+  }
+  return true;
+}
+
+bool BTypeVisitor::VisitDeclRefExpr(DeclRefExpr *E) {
+  auto it = std::find(fn_args_.begin() + 1, fn_args_.end(), E->getDecl());
+  if (it != fn_args_.end()) {
+    if (!rewriter_.isRewritable(E->getLocStart())) {
+      C.getDiagnostics().Report(E->getLocStart(), diag::err_expected)
+          << "use of probe argument not in a macro";
+      return false;
+    }
+    size_t d = std::distance(fn_args_.begin() + 1, it);
+    const char *reg = calling_conv_regs[d];
+    string text = "((u64)" + fn_args_[0]->getName().str() + "->" + string(reg) + ")";
+    rewriter_.ReplaceText(SourceRange(E->getLocStart(), E->getLocEnd()), text);
+    return true;
   }
   return true;
 }
@@ -248,7 +299,7 @@ bool BTypeVisitor::VisitBinaryOperator(BinaryOperator *E) {
             uint64_t sz = F->isBitField() ? F->getBitWidthValue(C) : C.getTypeSize(F->getType());
             string base = rewriter_.getRewrittenText(SourceRange(Base->getLocStart(), Base->getLocEnd()));
             string rhs = rewriter_.getRewrittenText(SourceRange(RHS->getLocStart(), RHS->getLocEnd()));
-            string text = "bpf_dins_pkt(" + fn_args_[0] + ", (u64)" + base + "+" + to_string(ofs >> 3)
+            string text = "bpf_dins_pkt(" + fn_args_[0]->getName().str() + ", (u64)" + base + "+" + to_string(ofs >> 3)
                 + ", " + to_string(ofs & 0x7) + ", " + to_string(sz) + ", " + rhs + ")";
             rewriter_.ReplaceText(SourceRange(E->getLocStart(), E->getLocEnd()), text);
           }
@@ -277,7 +328,7 @@ bool BTypeVisitor::VisitImplicitCastExpr(ImplicitCastExpr *E) {
           }
           uint64_t ofs = C.getFieldOffset(F);
           uint64_t sz = F->isBitField() ? F->getBitWidthValue(C) : C.getTypeSize(F->getType());
-          string text = "bpf_dext_pkt(" + fn_args_[0] + ", (u64)" + Ref->getDecl()->getName().str() + "+"
+          string text = "bpf_dext_pkt(" + fn_args_[0]->getName().str() + ", (u64)" + Ref->getDecl()->getName().str() + "+"
               + to_string(ofs >> 3) + ", " + to_string(ofs & 0x7) + ", " + to_string(sz) + ")";
           rewriter_.ReplaceText(SourceRange(E->getLocStart(), E->getLocEnd()), text);
         }
