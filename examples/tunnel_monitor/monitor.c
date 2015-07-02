@@ -57,9 +57,9 @@ int handle_egress(struct __sk_buff *skb) {
 
 // parse the outer vxlan frame
 int handle_outer(struct __sk_buff *skb) {
-  u8 *skb_cursor = 0;
+  u8 *cursor = 0;
 
-  struct ethernet_t *ethernet = bpf_consume_skb(skb_cursor, sizeof(*ethernet));
+  struct ethernet_t *ethernet = cursor_advance(cursor, sizeof(*ethernet));
 
   // filter bcast/mcast from the stats
   if (ethernet->dst & (1ull << 40))
@@ -71,7 +71,7 @@ int handle_outer(struct __sk_buff *skb) {
   }
 
 ip: ;
-  struct ip_t *ip = bpf_consume_skb(skb_cursor, sizeof(*ip));
+  struct ip_t *ip = cursor_advance(cursor, sizeof(*ip));
   skb->cb[CB_SIP] = ip->src;
   skb->cb[CB_DIP] = ip->dst;
 
@@ -81,14 +81,14 @@ ip: ;
   }
 
 udp: ;
-  struct udp_t *udp = bpf_consume_skb(skb_cursor, sizeof(*udp));
+  struct udp_t *udp = cursor_advance(cursor, sizeof(*udp));
   switch (udp->dport) {
     case 4789: goto vxlan;
     default: goto finish;
   }
 
 vxlan: ;
-  struct vxlan_t *vxlan = bpf_consume_skb(skb_cursor, sizeof(*vxlan));
+  struct vxlan_t *vxlan = cursor_advance(cursor, sizeof(*vxlan));
   skb->cb[CB_VNI] = vxlan->key;
   skb->cb[CB_OFFSET] = (u64)vxlan + sizeof(*vxlan);
   parser.call(skb, 2);
@@ -106,15 +106,15 @@ int handle_inner(struct __sk_buff *skb) {
     .outer_sip = skb->cb[CB_SIP],
     .outer_dip = skb->cb[CB_DIP]
   };
-  u8 *skb_cursor = (u8 *)(u64)skb->cb[CB_OFFSET];
+  u8 *cursor = (u8 *)(u64)skb->cb[CB_OFFSET];
 
-  struct ethernet_t *ethernet = bpf_consume_skb(skb_cursor, sizeof(*ethernet));
+  struct ethernet_t *ethernet = cursor_advance(cursor, sizeof(*ethernet));
   switch (ethernet->type) {
     case 0x0800: goto ip;
     default: goto finish;
   }
 ip: ;
-  struct ip_t *ip = bpf_consume_skb(skb_cursor, sizeof(*ip));
+  struct ip_t *ip = cursor_advance(cursor, sizeof(*ip));
   key.inner_sip = ip->src;
   key.inner_dip = ip->dst;
 
