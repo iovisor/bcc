@@ -42,18 +42,8 @@ __attribute__((section("maps/" _table_type))) \
 struct _name##_table_t _name
 
 // packet parsing state machine helpers
-#define BEGIN(next) \
-  u64 _parse_cursor = 0; \
-  goto next
-#define BEGIN_OFFSET(next, _base_offset) \
-  u64 _parse_cursor = (_base_offset); \
-  goto next
-
-#define PROTO(name) \
-  goto EOP; \
-name: ; \
-  struct name##_t *name __attribute__((deprecated("packet"))) = (void *)_parse_cursor; \
-  _parse_cursor += sizeof(*name);
+#define cursor_advance(_cursor, _len) \
+  ({ void *_tmp = _cursor; _cursor += _len; _tmp; })
 
 char _license[4] SEC("license") = "GPL";
 

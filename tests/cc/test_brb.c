@@ -106,6 +106,7 @@ int pem(struct __sk_buff *skb) {
 
 static int br_common(struct __sk_buff *skb, int which_br) __attribute__((always_inline));
 static int br_common(struct __sk_buff *skb, int which_br) {
+    u8 *cursor = 0;
     bpf_metadata_t meta = {};
     u16 proto;
     u16 arpop;
@@ -126,8 +127,8 @@ static int br_common(struct __sk_buff *skb, int which_br) {
         meta.rx_port_id = skb->cb[1];
     }
 
-    BEGIN(ethernet);
-    PROTO(ethernet) {
+    struct ethernet_t *ethernet = cursor_advance(cursor, sizeof(*ethernet));
+    {
         dmac.addr = ethernet->dst;
         if (meta.prog_id != 0) {
             /* send to the router */
@@ -152,22 +153,24 @@ static int br_common(struct __sk_buff *skb, int which_br) {
         }
 
         switch (ethernet->type) {
-            case 0x0800: goto ip;
-            case 0x0806: goto arp;
-            case 0x8100: goto dot1q;
+            case ETH_P_IP: goto ip;
+            case ETH_P_ARP: goto arp;
+            case ETH_P_8021Q: goto dot1q;
+            default: goto EOP;
         }
-        goto EOP;
     }
 
-    PROTO(dot1q) {
+    dot1q: {
+        struct dot1q_t *dot1q = cursor_advance(cursor, sizeof(*dot1q));
         switch(dot1q->type) {
-            case 0x0806: goto arp;
-            case 0x0800: goto ip;
+            case ETH_P_IP: goto ip;
+            case ETH_P_ARP: goto arp;
+            default: goto EOP;
         }
-        goto EOP;
     }
 
-    PROTO(arp) {
+    arp: {
+        struct arp_t *arp = cursor_advance(cursor, sizeof(*arp));
         /* mac learning */
         arpop = arp->oper;
         if (arpop == 2) {
@@ -180,7 +183,7 @@ static int br_common(struct __sk_buff *skb, int which_br) {
                 __u32 ifindex = *rtrif_p;
                 eth_addr_t smac;
 
-		smac.addr = ethernet->src;
+                smac.addr = ethernet->src;
                 if (which_br == 1)
                     br1_mac_ifindex.update(&smac, &ifindex);
                 else
@@ -190,7 +193,8 @@ static int br_common(struct __sk_buff *skb, int which_br) {
         goto xmit;
     }
 
-    PROTO(ip) {
+    ip: {
+        struct ip_t *ip = cursor_advance(cursor, sizeof(*ip));
         goto xmit;
     }
 

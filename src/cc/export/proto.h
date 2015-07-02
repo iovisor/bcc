@@ -14,18 +14,22 @@
  * limitations under the License.
  */
 
+#include <uapi/linux/if_ether.h>
+
+#define BPF_PACKET_HEADER __attribute__((packed)) __attribute__((deprecated("packet")))
+
 struct ethernet_t {
   unsigned long long  dst:48;
   unsigned long long  src:48;
   unsigned int        type:16;
-} __attribute__((packed));
+} BPF_PACKET_HEADER;
 
 struct dot1q_t {
   unsigned short pri:3;
   unsigned short cfi:1;
   unsigned short vlanid:12;
   unsigned short type;
-} __attribute__((packed));
+} BPF_PACKET_HEADER;
 
 struct arp_t {
   unsigned short      htype;
@@ -37,7 +41,7 @@ struct arp_t {
   unsigned long long  spa:32;
   unsigned long long  tha:48;
   unsigned int        tpa;
-} __attribute__((packed));
+} BPF_PACKET_HEADER;
 
 struct ip_t {
   unsigned char   ver:4;           // byte 0
@@ -54,14 +58,14 @@ struct ip_t {
   unsigned short  hchecksum;
   unsigned int    src;            // byte 12
   unsigned int    dst;            // byte 16
-} __attribute__((packed));
+} BPF_PACKET_HEADER;
 
 struct udp_t {
   unsigned short sport;
   unsigned short dport;
   unsigned short length;
   unsigned short crc;
-} __attribute__((packed));
+} BPF_PACKET_HEADER;
 
 struct tcp_t {
   unsigned short  src_port;   // byte 0
@@ -81,7 +85,7 @@ struct tcp_t {
   unsigned short  rcv_wnd;
   unsigned short  cksum;      // byte 16
   unsigned short  urg_ptr;
-} __attribute__((packed));
+} BPF_PACKET_HEADER;
 
 struct vxlan_t {
   unsigned int rsv1:4;
@@ -90,4 +94,4 @@ struct vxlan_t {
   unsigned int rsv3:24;
   unsigned int key:24;
   unsigned int rsv4:8;
-} __attribute__((packed));
+} BPF_PACKET_HEADER;
