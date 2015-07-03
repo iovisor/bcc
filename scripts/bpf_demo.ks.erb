@@ -108,15 +108,19 @@ chmod +x /usr/local/bin/bpf-llvm-setup
 cat > /usr/local/bin/bcc-setup <<'DELIM__'
 #!/bin/bash
 set -e -x
+
+git clone https://github.com/svinota/pyroute2.git
+(cd pyroute2; make install)
+
 numcpu=$(grep -c ^processor /proc/cpuinfo)
 
 git clone https://github.com/iovisor/bcc.git
 mkdir bcc/build/
 cd bcc/build/
+git checkout bblanco_dev
 export PATH=/opt/local/llvm/bin:$PATH
 cmake .. -DCMAKE_INSTALL_PREFIX=/usr
 make -j$numcpu
-make test
 DELIM__
 chmod +x /usr/local/bin/bcc-setup
 

@@ -13,6 +13,7 @@ if(LIB64)
   set(LIBSUFFIX 64)
 endif()
 
+if(NOT PYTHON_ONLY)
 find_package(BISON)
 find_package(FLEX)
 find_package(LLVM REQUIRED CONFIG)
@@ -42,6 +43,7 @@ ENDFOREACH()
 
 set(CMAKE_C_FLAGS "-Wall")
 set(CMAKE_CXX_FLAGS "-std=c++11 -Wall")
+endif()
 
 add_subdirectory(scripts)
 add_subdirectory(src)
