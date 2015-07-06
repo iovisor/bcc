@@ -101,13 +101,12 @@ int pem(struct __sk_buff *skb) {
         }
     }
 
-    return 0;
+    return 1;
 }
 
 static int br_common(struct __sk_buff *skb, int which_br) __attribute__((always_inline));
 static int br_common(struct __sk_buff *skb, int which_br) {
     u8 *cursor = 0;
-    bpf_metadata_t meta = {};
     u16 proto;
     u16 arpop;
     eth_addr_t dmac;
@@ -118,20 +117,16 @@ static int br_common(struct __sk_buff *skb, int which_br) {
     bpf_dest_t *dest_p;
     u32 index, *rtrif_p;
 
-    if (skb->tc_index == 0) {
-        skb->tc_index = 1;
-        skb->cb[0] = skb->cb[1] = 0;
-        meta.prog_id = meta.rx_port_id = 0;
-    } else {
-        meta.prog_id = skb->cb[0];
-        meta.rx_port_id = skb->cb[1];
-    }
-
     struct ethernet_t *ethernet = cursor_advance(cursor, sizeof(*ethernet));
+    /* handle ethernet packet header */
     {
         dmac.addr = ethernet->dst;
-        if (meta.prog_id != 0) {
-            /* send to the router */
+        /* skb->tc_index may be preserved accross router namespace if router simply rewrite packet
+         * and send it back.
+         */
+        if (skb->tc_index == 1) {
+            /* packet from pem, send to the router, set tc_index to 2 */
+            skb->tc_index = 2;
             if (dmac.addr == 0xffffffffffffULL) {
                  index = 0;
                  if (which_br == 1)
@@ -149,9 +144,11 @@ static int br_common(struct __sk_buff *skb, int which_br) {
                  if (rtrif_p)
                      bpf_clone_redirect(skb, *rtrif_p, 0);
              }
-             return 0;
+             return 1;
         }
 
+        /* set the tc_index to 1 so pem knows it is from internal */
+        skb->tc_index = 1;
         switch (ethernet->type) {
             case ETH_P_IP: goto ip;
             case ETH_P_ARP: goto arp;
@@ -217,7 +214,7 @@ xmit:
     }
 
 EOP:
-    return 0;
+    return 1;
 }
 
 int br1(struct __sk_buff *skb) {

@@ -65,7 +65,6 @@ from ctypes import c_ubyte, c_ushort, c_uint, c_ulonglong, Structure
 from netaddr import IPAddress, EUI
 from bpf import BPF
 from pyroute2 import IPRoute
-from socket import socket, AF_INET, SOCK_DGRAM
 import sys
 from time import sleep
 from unittest import main, TestCase
@@ -80,10 +79,12 @@ class TestBPFSocket(TestCase):
         subprocess.call(["ip", "netns", "add", ns])
         subprocess.call(["ip", "link", "set", veth_in, "netns", ns])
         subprocess.call(["ip", "netns", "exec", ns, "ip", "link", "set", veth_in, "name", "eth0"])
+        subprocess.call(["sysctl", "-q", "-w", "net.ipv6.conf." + veth_out+ ".disable_ipv6=1"])
         subprocess.call(["ip", "link", "set", veth_out, "up"])
 
     def config_vm_ns(self, ns, ip_addr, net_mask, ip_gw):
         subprocess.call(["ip", "netns", "exec", ns, "ip", "addr", "add", ip_addr + "/24", "dev", "eth0"])
+        subprocess.call(["ip", "netns", "exec", ns, "sysctl", "-q", "-w", "net.ipv6.conf.eth0.disable_ipv6=1"])
         subprocess.call(["ip", "netns", "exec", ns, "ip", "link", "set", "eth0", "up"])
         subprocess.call(["ip", "netns", "exec", ns, "ip", "route", "add", net_mask + "/24", "via", ip_gw])
 
@@ -95,14 +96,19 @@ class TestBPFSocket(TestCase):
         subprocess.call(["ip", "link", "add", veth2_in, "type", "veth", "peer", "name", veth2_out])
         subprocess.call(["ip", "link", "set", veth2_in, "netns", ns])
         subprocess.call(["ip", "netns", "exec", ns, "ip", "link", "set", veth2_in, "name", "eth1"])
+        subprocess.call(["sysctl", "-q", "-w", "net.ipv6.conf." + veth1_out+ ".disable_ipv6=1"])
+        subprocess.call(["sysctl", "-q", "-w", "net.ipv6.conf." + veth2_out+ ".disable_ipv6=1"])
         subprocess.call(["ip", "link", "set", veth1_out, "up"])
         subprocess.call(["ip", "link", "set", veth2_out, "up"])
 
     def config_router_ns(self, ns, ip_eth0, ip_eth1):
         subprocess.call(["ip", "netns", "exec", ns, "ip", "addr", "add", ip_eth0 + "/24", "dev", "eth0"])
+        subprocess.call(["ip", "netns", "exec", ns, "sysctl", "-q", "-w", "net.ipv6.conf.eth0.disable_ipv6=1"])
         subprocess.call(["ip", "netns", "exec", ns, "ip", "link", "set", "eth0", "up"])
         subprocess.call(["ip", "netns", "exec", ns, "ip", "addr", "add", ip_eth1 + "/24", "dev", "eth1"])
+        subprocess.call(["ip", "netns", "exec", ns, "sysctl", "-q", "-w", "net.ipv6.conf.eth1.disable_ipv6=1"])
         subprocess.call(["ip", "netns", "exec", ns, "ip", "link", "set", "eth1", "up"])
+        subprocess.call(["ip", "netns", "exec", ns, "sysctl", "-w", "net.ipv4.ip_forward=1"])
 
     def set_default_const(self):
         self.ns1            = "ns1"
@@ -206,56 +212,58 @@ class TestBPFSocket(TestCase):
         self.attach_filter(ip, self.nsrtr_eth0_out, br1_fn.fd, br1_fn.name)
         self.attach_filter(ip, self.nsrtr_eth1_out, br2_fn.fd, br2_fn.name)
 
-    def setUp(self):
-
-        # set up the environment
-        self.set_default_const()
-        self.setup_vm_ns(self.ns1, self.ns1_eth_in, self.ns1_eth_out)
-        self.setup_vm_ns(self.ns2, self.ns2_eth_in, self.ns2_eth_out)
-        self.config_vm_ns(self.ns1, self.vm1_ip, self.vm2_rtr_mask, self.vm1_rtr_ip)
-        self.config_vm_ns(self.ns2, self.vm2_ip, self.vm1_rtr_mask, self.vm2_rtr_ip)
-        self.setup_router_ns(self.ns_router, self.nsrtr_eth0_in, self.nsrtr_eth0_out,
-                             self.nsrtr_eth1_in, self.nsrtr_eth1_out)
-        self.config_router_ns(self.ns_router, self.vm1_rtr_ip, self.vm2_rtr_ip)
-
-        # get vm mac address
-        self.vm1_mac = subprocess.check_output(["ip", "netns", "exec", self.ns1, "cat", "/sys/class/net/eth0/address"])
-        self.vm1_mac = self.vm1_mac.strip()
-        self.vm2_mac = subprocess.check_output(["ip", "netns", "exec", self.ns2, "cat", "/sys/class/net/eth0/address"])
-        self.vm2_mac = self.vm2_mac.strip()
-
-        # load the program and configure maps
-        self.config_maps()
-
     def test_brb(self):
-        # our bridge is not smart enough, so send arping for router learning to prevent router
-        # from sending out arp request
-        subprocess.call(["ip", "netns", "exec", self.ns1, "arping", "-w", "1", "-c", "1", "-I", "eth0",
-                         self.vm1_rtr_ip])
-        subprocess.call(["ip", "netns", "exec", self.ns2, "arping", "-w", "1", "-c", "1", "-I", "eth0",
-                         self.vm2_rtr_ip])
-        # ping
-        subprocess.call(["ip", "netns", "exec", self.ns1, "ping", self.vm2_ip, "-c", "2"])
-        # minimum one arp reply, 5 icmp reply
-        self.assertGreater(self.pem_stats[c_uint(0)].value, 5)
+        try:
+            # set up the environment
+            self.set_default_const()
+            self.setup_vm_ns(self.ns1, self.ns1_eth_in, self.ns1_eth_out)
+            self.setup_vm_ns(self.ns2, self.ns2_eth_in, self.ns2_eth_out)
+            self.config_vm_ns(self.ns1, self.vm1_ip, self.vm2_rtr_mask, self.vm1_rtr_ip)
+            self.config_vm_ns(self.ns2, self.vm2_ip, self.vm1_rtr_mask, self.vm2_rtr_ip)
+            self.setup_router_ns(self.ns_router, self.nsrtr_eth0_in, self.nsrtr_eth0_out,
+                                 self.nsrtr_eth1_in, self.nsrtr_eth1_out)
+            self.config_router_ns(self.ns_router, self.vm1_rtr_ip, self.vm2_rtr_ip)
 
-        # iperf, run server on the background
-        subprocess.Popen(["ip", "netns", "exec", self.ns2, "iperf", "-s", "-xSCD"])
-        sleep(1)
-        subprocess.call(["ip", "netns", "exec", self.ns1, "iperf", "-c", self.vm2_ip, "-t", "1", "-xSC"])
-        subprocess.call(["ip", "netns", "exec", self.ns2, "killall", "iperf"])
+            # get vm mac address
+            self.vm1_mac = subprocess.check_output(["ip", "netns", "exec", self.ns1, "cat", "/sys/class/net/eth0/address"])
+            self.vm1_mac = self.vm1_mac.strip()
+            self.vm2_mac = subprocess.check_output(["ip", "netns", "exec", self.ns2, "cat", "/sys/class/net/eth0/address"])
+            self.vm2_mac = self.vm2_mac.strip()
 
-        # netperf, run server on the background
-        subprocess.Popen(["ip", "netns", "exec", self.ns2, "netserver"])
-        sleep(1)
-        subprocess.call(["ip", "netns", "exec", self.ns1, "netperf", "-l", "1", "-H", self.vm2_ip, "--", "-m", "65160"])
-        subprocess.call(["ip", "netns", "exec", self.ns1, "netperf", "-l", "1", "-H", self.vm2_ip, "-t", "TCP_RR"])
-        subprocess.call(["ip", "netns", "exec", self.ns2, "killall", "netserver"])
+            # load the program and configure maps
+            self.config_maps()
 
-        # cleanup, tear down the veths and namespaces
-        subprocess.call(["ip", "netns", "del", self.ns1])
-        subprocess.call(["ip", "netns", "del", self.ns2])
-        subprocess.call(["ip", "netns", "del", self.ns_router])
+            # our bridge is not smart enough, so send arping for router learning to prevent router
+            # from sending out arp request
+            subprocess.call(["ip", "netns", "exec", self.ns1, "arping", "-w", "1", "-c", "1", "-I", "eth0",
+                             self.vm1_rtr_ip])
+            subprocess.call(["ip", "netns", "exec", self.ns2, "arping", "-w", "1", "-c", "1", "-I", "eth0",
+                             self.vm2_rtr_ip])
+            # ping
+            subprocess.call(["ip", "netns", "exec", self.ns1, "ping", self.vm2_ip, "-c", "2"])
+            # pem_stats only counts pem->bridge traffic, each VM has 4: arping/arp request/2 icmp request
+            # total 8 packets should be counted
+            self.assertEqual(self.pem_stats[c_uint(0)].value, 8)
+
+            # iperf, run server on the background
+            subprocess.Popen(["ip", "netns", "exec", self.ns2, "iperf", "-s", "-xSCD"])
+            sleep(1)
+            subprocess.call(["ip", "netns", "exec", self.ns1, "iperf", "-c", self.vm2_ip, "-t", "1", "-xSC"])
+            subprocess.call(["ip", "netns", "exec", self.ns2, "killall", "iperf"])
+
+            # netperf, run server on the background
+            subprocess.Popen(["ip", "netns", "exec", self.ns2, "netserver"])
+            sleep(1)
+            subprocess.call(["ip", "netns", "exec", self.ns1, "netperf", "-l", "1", "-H", self.vm2_ip, "--", "-m", "65160"])
+            subprocess.call(["ip", "netns", "exec", self.ns1, "netperf", "-l", "1", "-H", self.vm2_ip, "-t", "TCP_RR"])
+            subprocess.call(["ip", "netns", "exec", self.ns2, "killall", "netserver"])
+
+        finally:
+            # cleanup, tear down the veths and namespaces
+            ns_list = subprocess.check_output(["ip", "netns", "list"]).split()
+            if self.ns1 in ns_list: subprocess.call(["ip", "netns", "del", self.ns1])
+            if self.ns2 in ns_list: subprocess.call(["ip", "netns", "del", self.ns2])
+            if self.ns_router in ns_list: subprocess.call(["ip", "netns", "del", self.ns_router])
 
 
 if __name__ == "__main__":
