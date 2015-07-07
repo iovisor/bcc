@@ -16,5 +16,9 @@ add_custom_command(OUTPUT ${PIP_INSTALLABLE}
   DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/bpf/__init__.py ${CMAKE_CURRENT_BINARY_DIR}/setup.py
   )
 add_custom_target(bpf_py ALL DEPENDS ${PIP_INSTALLABLE})
-install(CODE "execute_process(COMMAND python setup.py install -f
+
+if(EXISTS "/etc/debian_version")
+  set(PYTHON_FLAGS "${PYTHON_FLAGS} --install-layout deb")
+endif()
+install(CODE "execute_process(COMMAND python setup.py install -f ${PYTHON_FLAGS}
   --prefix=${CMAKE_INSTALL_PREFIX} WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})")

@@ -16,8 +16,9 @@ import atexit
 from collections import MutableMapping
 import ctypes as ct
 import json
-from past.builtins import basestring
 import os
+import sys
+basestring = (unicode if sys.version_info[0] < 3 else str)
 
 lib = ct.CDLL("libbpfprog.so")
 
@@ -187,22 +188,22 @@ class BPF(object):
         return fn
 
     str2ctype = {
-        "_Bool": ct.c_bool,
-        "char": ct.c_char,
-        "wchar_t": ct.c_wchar,
-        "char": ct.c_byte,
-        "unsigned char": ct.c_ubyte,
-        "short": ct.c_short,
-        "unsigned short": ct.c_ushort,
-        "int": ct.c_int,
-        "unsigned int": ct.c_uint,
-        "long": ct.c_long,
-        "unsigned long": ct.c_ulong,
-        "long long": ct.c_longlong,
-        "unsigned long long": ct.c_ulonglong,
-        "float": ct.c_float,
-        "double": ct.c_double,
-        "long double": ct.c_longdouble
+        u"_Bool": ct.c_bool,
+        u"char": ct.c_char,
+        u"wchar_t": ct.c_wchar,
+        u"char": ct.c_byte,
+        u"unsigned char": ct.c_ubyte,
+        u"short": ct.c_short,
+        u"unsigned short": ct.c_ushort,
+        u"int": ct.c_int,
+        u"unsigned int": ct.c_uint,
+        u"long": ct.c_long,
+        u"unsigned long": ct.c_ulong,
+        u"long long": ct.c_longlong,
+        u"unsigned long long": ct.c_ulonglong,
+        u"float": ct.c_float,
+        u"double": ct.c_double,
+        u"long double": ct.c_longdouble
     }
     @staticmethod
     def _decode_table_type(desc):
