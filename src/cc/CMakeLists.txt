@@ -3,6 +3,8 @@
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 include_directories(${LLVM_INCLUDE_DIRS})
+# todo: if check for kernel version
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/compat)
 add_definitions(${LLVM_DEFINITIONS})
 
 BISON_TARGET(Parser parser.yy ${CMAKE_CURRENT_BINARY_DIR}/parser.yy.cc COMPILE_FLAGS "-o parser.yy.cc -v --debug")
@@ -39,6 +41,6 @@ set(clang_libs ${libclangFrontend} ${libclangSerialization} ${libclangDriver} ${
 # Link against LLVM libraries
 target_link_libraries(bpfprog ${clang_libs} ${llvm_libs} LLVMBPFCodeGen)
 
-install(TARGETS bpfprog LIBRARY DESTINATION lib)
+install(TARGETS bpfprog LIBRARY DESTINATION lib${LIBSUFFIX})
 install(DIRECTORY export/ DESTINATION share/bcc/include/bcc
   FILES_MATCHING PATTERN "*.h")

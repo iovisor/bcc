@@ -48,7 +48,7 @@ done
 
 PASSWORD=${PASSWORD:-"iovisor"}
 BRIDGE=${BRIDGE:-virbr0}
-MIRROR=${MIRROR:-http://mirror.pnl.gov/fedora/linux/releases/21}
+MIRROR=${MIRROR:-http://mirror.pnl.gov/fedora/linux/releases/22}
 MEM=${MEM:-4094}
 CPU=${CPU:-4}
 SIZE=${SIZE:-40}

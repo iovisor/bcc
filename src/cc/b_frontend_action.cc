@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 #include <linux/bpf.h>
+#include <linux/version.h>
 
 #include <clang/AST/ASTConsumer.h>
 #include <clang/AST/ASTContext.h>
@@ -373,8 +374,10 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
       map_type = BPF_MAP_TYPE_HASH;
     else if (A->getName() == "maps/array")
       map_type = BPF_MAP_TYPE_ARRAY;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,2,0)
     else if (A->getName() == "maps/prog")
       map_type = BPF_MAP_TYPE_PROG_ARRAY;
+#endif
     table.fd = bpf_create_map(map_type, table.key_size, table.leaf_size, table.max_entries);
     if (table.fd < 0) {
       llvm::errs() << "error: could not open bpf fd\n";

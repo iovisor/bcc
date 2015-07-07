@@ -1,6 +1,11 @@
 # Copyright (c) PLUMgrid, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
 from distutils.core import setup
+import os
+import sys
+
+if os.environ.get('DESTDIR'):
+    sys.argv += ['--root', os.environ['DESTDIR']]
 
 setup(name='bpf',
       version='@REVISION@',
@@ -9,5 +14,4 @@ setup(name='bpf',
       author_email='bblanco@plumgrid.com',
       url='http://plumgrid.com',
       packages=['bpf'],
-      platforms=['Linux'],
-      install_requires=['future'])
+      platforms=['Linux'])

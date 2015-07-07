@@ -2,13 +2,18 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 cmake_minimum_required(VERSION 2.8.7)
 
-project(bpf-tools)
-set(CMAKE_BUILD_TYPE Debug)
+project(bcc)
+set(CMAKE_BUILD_TYPE Release)
 
 enable_testing()
 
 include(scripts/GetGitRevisionDescription.cmake)
+get_property(LIB64 GLOBAL PROPERTY FIND_LIBRARY_USE_LIB64_PATHS)
+if(LIB64)
+  set(LIBSUFFIX 64)
+endif()
 
+if(NOT PYTHON_ONLY)
 find_package(BISON)
 find_package(FLEX)
 find_package(LLVM REQUIRED CONFIG)
@@ -16,7 +21,7 @@ message(STATUS "Found LLVM: ${LLVM_INCLUDE_DIRS}")
 
 # clang is linked as a library, but the library path searching is
 # primitively supported, unlike libLLVM
-set(CLANG_SEARCH "/opt/local/llvm/lib;${LLVM_LIBRARY_DIRS}")
+set(CLANG_SEARCH "/opt/local/llvm/lib;/usr/lib/llvm-3.7/lib;${LLVM_LIBRARY_DIRS}")
 find_library(libclangAnalysis NAMES clangAnalysis HINTS ${CLANG_SEARCH})
 find_library(libclangAST NAMES clangAST HINTS ${CLANG_SEARCH})
 find_library(libclangBasic NAMES clangBasic HINTS ${CLANG_SEARCH})
@@ -38,7 +43,22 @@ ENDFOREACH()
 
 set(CMAKE_C_FLAGS "-Wall")
 set(CMAKE_CXX_FLAGS "-std=c++11 -Wall")
+endif()
 
 add_subdirectory(scripts)
 add_subdirectory(src)
 add_subdirectory(tests)
+
+set(CPACK_PACKAGE_NAME "libbcc")
+set(CPACK_PACKAGE_VERSION "${REVISION}")
+set(CPACK_PACKAGE_CONTACT "Brenden Blanco <bblanco@plumgrid.com")
+if(EXISTS "/etc/redhat-release")
+  set(CPACK_GENERATOR "RPM")
+else()
+  set(CPACK_GENERATOR "DEB")
+endif()
+set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}")
+set(CPACK_DEBIAN_PACKAGE_ARCHITECTURE "amd64")
+set(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6, libstdc++6, python")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Shared Library for BPF Compiler Collection (BCC)")
+include(CPack)

@@ -34,6 +34,24 @@
 
 #include "libbpf.h"
 
+// TODO: remove these defines when linux-libc-dev exports them properly
+
+#ifndef __NR_bpf
+#define __NR_bpf 321
+#endif
+
+#ifndef SO_ATTACH_BPF
+#define SO_ATTACH_BPF 50
+#endif
+
+#ifndef PERF_EVENT_IOC_SET_BPF
+#define PERF_EVENT_IOC_SET_BPF _IOW('$', 8, __u32)
+#endif
+
+#ifndef PERF_FLAG_FD_CLOEXEC
+#define PERF_FLAG_FD_CLOEXEC (1UL << 3)
+#endif
+
 static __u64 ptr_to_u64(void *ptr)
 {
   return (__u64) (unsigned long) ptr;
