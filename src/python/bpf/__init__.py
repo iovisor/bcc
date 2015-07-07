@@ -155,12 +155,26 @@ class BPF(object):
                 raise StopIteration()
             return next_key
 
+    @staticmethod
+    def _find_file(filename):
+        """ If filename is invalid, search in ./ of argv[0] """
+        if filename:
+            if not os.path.isfile(filename):
+                t = "/".join([os.path.abspath(os.path.dirname(sys.argv[0])), filename])
+                if os.path.isfile(t):
+                    filename = t
+                else:
+                    raise Exception("Could not find file %s" % filename)
+        return filename
+
     def __init__(self, src_file="", hdr_file="", text=None, debug=0):
         self.debug = debug
         self.funcs = {}
         if text:
             self.module = lib.bpf_module_create_from_string(text.encode("ascii"), self.debug)
         else:
+            src_file = BPF._find_file(src_file)
+            hdr_file = BPF._find_file(hdr_file)
             self.module = lib.bpf_module_create(src_file.encode("ascii"),
                     hdr_file.encode("ascii"), self.debug)
 

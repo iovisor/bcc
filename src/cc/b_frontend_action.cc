@@ -222,7 +222,9 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
         } else if (Decl->getName() == "bpf_trace_printk") {
           //  #define bpf_trace_printk(fmt, args...)
           //    ({ char _fmt[] = fmt; bpf_trace_printk_(_fmt, sizeof(_fmt), args...); })
-          text = "({ char _fmt[] = " + args[0] + "; bpf_trace_printk_(_fmt, sizeof(_fmt), ";
+          text = "({ char _fmt[] = " + args[0] + "; bpf_trace_printk_(_fmt, sizeof(_fmt)";
+          if (args.size() > 1)
+            text += ", ";
           for (auto arg = args.begin() + 1; arg != args.end(); ++arg) {
             text += *arg;
             if (arg + 1 != args.end())
