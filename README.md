@@ -170,13 +170,11 @@ To build the toolchain from source, one needs:
 * cmake, gcc (>=4.7), flex, bison
 
 * Add the [LLVM binary repo](http://llvm.org/apt/) to your apt sources
-  * `echo "deb http://llvm.org/apt/trusty/ llvm-toolchain-trusty main" \
-    | sudo tee /etc/apt/sources.list.d/llvm.list`
+  * `echo "deb http://llvm.org/apt/trusty/ llvm-toolchain-trusty main" | sudo tee /etc/apt/sources.list.d/llvm.list`
   * `wget -O - http://llvm.org/apt/llvm-snapshot.gpg.key | sudo apt-key add -`
   * `sudo apt-get update`
 * Install build dependencies
-  * `sudo apt-get -y install bison build-essential cmake flex git \
-    libedit-dev python zlib1g-dev`
+  * `sudo apt-get -y install bison build-essential cmake flex git libedit-dev python zlib1g-dev`
 * Install LLVM and Clang development libs
   * `sudo apt-get -y install libllvm3.7 llvm-3.7-dev libclang-3.7-dev`
 * Install and compile BCC
