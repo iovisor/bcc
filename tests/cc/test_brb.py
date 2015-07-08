@@ -228,34 +228,36 @@ class TestBPFSocket(TestCase):
         self.config_maps()
 
     def test_brb(self):
-        # our bridge is not smart enough, so send arping for router learning to prevent router
-        # from sending out arp request
-        subprocess.call(["ip", "netns", "exec", self.ns1, "arping", "-w", "1", "-c", "1", "-I", "eth0",
-                         self.vm1_rtr_ip])
-        subprocess.call(["ip", "netns", "exec", self.ns2, "arping", "-w", "1", "-c", "1", "-I", "eth0",
-                         self.vm2_rtr_ip])
-        # ping
-        subprocess.call(["ip", "netns", "exec", self.ns1, "ping", self.vm2_ip, "-c", "2"])
-        # minimum one arp reply, 5 icmp reply
-        self.assertGreater(self.pem_stats[c_uint(0)].value, 5)
+        try:
+            # our bridge is not smart enough, so send arping for router learning to prevent router
+            # from sending out arp request
+            subprocess.call(["ip", "netns", "exec", self.ns1, "arping", "-w", "1", "-c", "1", "-I", "eth0",
+                             self.vm1_rtr_ip])
+            subprocess.call(["ip", "netns", "exec", self.ns2, "arping", "-w", "1", "-c", "1", "-I", "eth0",
+                             self.vm2_rtr_ip])
+            # ping
+            subprocess.call(["ip", "netns", "exec", self.ns1, "ping", self.vm2_ip, "-c", "2"])
+            # minimum one arp reply, 2 icmp reply
+            self.assertGreater(self.pem_stats[c_uint(0)].value, 2)
 
-        # iperf, run server on the background
-        subprocess.Popen(["ip", "netns", "exec", self.ns2, "iperf", "-s", "-xSCD"])
-        sleep(1)
-        subprocess.call(["ip", "netns", "exec", self.ns1, "iperf", "-c", self.vm2_ip, "-t", "1", "-xSC"])
-        subprocess.call(["ip", "netns", "exec", self.ns2, "killall", "iperf"])
+            # iperf, run server on the background
+            subprocess.Popen(["ip", "netns", "exec", self.ns2, "iperf", "-s", "-xSCD"])
+            sleep(1)
+            subprocess.call(["ip", "netns", "exec", self.ns1, "iperf", "-c", self.vm2_ip, "-t", "1", "-xSC"])
+            subprocess.call(["ip", "netns", "exec", self.ns2, "killall", "iperf"])
 
-        # netperf, run server on the background
-        subprocess.Popen(["ip", "netns", "exec", self.ns2, "netserver"])
-        sleep(1)
-        subprocess.call(["ip", "netns", "exec", self.ns1, "netperf", "-l", "1", "-H", self.vm2_ip, "--", "-m", "65160"])
-        subprocess.call(["ip", "netns", "exec", self.ns1, "netperf", "-l", "1", "-H", self.vm2_ip, "-t", "TCP_RR"])
-        subprocess.call(["ip", "netns", "exec", self.ns2, "killall", "netserver"])
+            # netperf, run server on the background
+            subprocess.Popen(["ip", "netns", "exec", self.ns2, "netserver"])
+            sleep(1)
+            subprocess.call(["ip", "netns", "exec", self.ns1, "netperf", "-l", "1", "-H", self.vm2_ip, "--", "-m", "65160"])
+            subprocess.call(["ip", "netns", "exec", self.ns1, "netperf", "-l", "1", "-H", self.vm2_ip, "-t", "TCP_RR"])
+            subprocess.call(["ip", "netns", "exec", self.ns2, "killall", "netserver"])
 
-        # cleanup, tear down the veths and namespaces
-        subprocess.call(["ip", "netns", "del", self.ns1])
-        subprocess.call(["ip", "netns", "del", self.ns2])
-        subprocess.call(["ip", "netns", "del", self.ns_router])
+        finally:
+            # cleanup, tear down the veths and namespaces
+            subprocess.call(["ip", "netns", "del", self.ns1])
+            subprocess.call(["ip", "netns", "del", self.ns2])
+            subprocess.call(["ip", "netns", "del", self.ns_router])
 
 
 if __name__ == "__main__":
