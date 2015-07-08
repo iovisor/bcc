@@ -4,8 +4,12 @@ This directory contains source code for BCC, a toolkit for creating small
 programs that can be dynamically loaded into a Linux kernel.
 
 The compiler relies upon eBPF (Extended Berkeley Packet Filters), which is a
-feature in Linux kernels starting from 3.19. Currently, this compiler leverages
+feature in Linux kernels starting from 3.15. Currently, this compiler leverages
 features which are mostly available in Linux 4.1 and above.
+
+## Installing
+
+See [INSTALL.md](INSTALL.md) for installation steps on your platform.
 
 ## Motivation
 
@@ -97,11 +101,77 @@ bcc/examples$ sudo python hello_world.py
 
 ### Networking
 
-Walkthrough TBD, see
-[Neighbor Sharing example](examples/tc_neighbor_sharing.py) for longer
-example.
+At RedHat Summit 2015, BCC was presented as part of a [session on BPF](http://www.devnation.org/#7784f1f7513e8542e4db519e79ff5eec).
+A multi-host vxlan environment is simulated and a BPF program used to monitor
+one of the physical interfaces. The BPF program keeps statistics on the inner
+and outer IP addresses traversing the interface, and the userspace component
+turns those statistics into a graph showing the traffic distribution at
+multiple granularities. See the code [here](examples/tunnel_monitor).
+
+[![Screenshot](http://img.youtube.com/vi/yYy3Cwce02k/0.jpg)](https://youtu.be/yYy3Cwce02k)
 
 ### Tracing
+
+Here is a slightly more complex tracing example than Hello World. This program
+will be invoked for every task change in the kernel, and record in a BPF map
+the new and old pids.
+
+The C program below introduces two new concepts.
+The first is the macro `BPF_TABLE`. This defines a table (type="hash"), with key
+type `key_t` and leaf type `u64` (a single counter). The table name is `stats`,
+containing 1024 entries maximum. One can `lookup`, `lookup_or_init`, `update`,
+and `delete` entries from the table.
+The second concept is the prev argument. This argument is treated specially by
+the BCC frontend, such that accesses to this variable are read from the saved
+context that is passed by the kprobe infrastructure. The prototype of the args
+starting from position 1 should match the prototype of the kernel function being
+kprobed. If done so, the program will have seamless access to the function
+parameters.
+```c
+#include <uapi/linux/ptrace.h>
+#include <linux/sched.h>
+
+struct key_t {
+  u32 prev_pid;
+  u32 curr_pid;
+};
+// map_type, key_type, leaf_type, table_name, num_entry
+BPF_TABLE("hash", struct key_t, u64, stats, 1024);
+int count_sched(struct pt_regs *ctx, struct task_struct *prev) {
+  struct key_t key = {};
+  u64 zero = 0, *val;
+
+  key.curr_pid = bpf_get_current_pid_tgid();
+  key.prev_pid = prev->pid;
+
+  val = stats.lookup_or_init(&key, &zero);
+  (*val)++;
+  return 0;
+}
+```
+[Source code listing](examples/task_switch.c)
+
+The userspace component loads the file shown above, and attaches it to the
+`finish_task_switch` kernel function (which takes one `struct task_struct *`
+argument). The `get_table` API returns an object that gives dict-style access
+to the stats BPF map. The python program could use that handle to modify the
+kernel table as well.
+```python
+from bpf import BPF
+from time import sleep
+
+b = BPF(src_file="task_switch.c")
+fn = b.load_func("count_sched", BPF.KPROBE)
+stats = b.get_table("stats")
+BPF.attach_kprobe(fn, "finish_task_switch")
+
+# generate many schedule events
+for i in range(0, 100): sleep(0.01)
+
+for k, v in stats.items():
+    print("task_switch[%5d->%5d]=%u" % (k.prev_pid, k.curr_pid, v.value))
+```
+[Source code listing](examples/task_switch.py)
 
 ## Requirements
 
@@ -124,67 +194,4 @@ As of this writing, binary packages for the above requirements are available
 in unstable formats. Both Ubuntu and Fedora have 4.2-rcX builds with the above
 flags defaulted to on. LLVM provides 3.7 Ubuntu packages (but not Fedora yet).
 
-### Ubuntu - Docker edition
-
-The build dependencies are captured in a [Dockerfile](Dockerfile.ubuntu), the
-output of which is a .deb for easy installation.
-
-* Start with a recent Ubuntu install (tested with 14.04 LTS)
-* Install a [>= 4.2 kernel](http://kernel.ubuntu.com/~kernel-ppa/mainline/)
-  with headers
-* Reboot
-* Install [docker](https://docs.docker.com/installation/ubuntulinux/)
-  (`wget -qO- https://get.docker.com/ | sh`)
-* Run the Dockerfile for Ubuntu - results in an installable .deb
-  * `git clone https://github.com/iovisor/bcc; cd bcc`
-  * `docker build -t bcc -f Dockerfile.ubuntu .`
-  * `docker run --rm -v /tmp:/mnt bcc sh -c "cp /root/bcc/build/*.deb /mnt"`
-  * `sudo dpkg -i /tmp/libbcc*.deb`
-* Run the example
-  * `sudo python /usr/share/bcc/examples/hello_world.py`
-
-### Fedora - Docker edition
-
-The build dependencies are captured in a [Dockerfile](Dockerfile.fedora), the
-output of which is a .rpm for easy installation. This version takes longer since
-LLVM needs to be compiled from source.
-
-* Start with a recent Fedora install (tested with F22)
-* Install a [>= 4.2 kernel](http://alt.fedoraproject.org/pub/alt/rawhide-kernel-nodebug/x86_64/)
-  with headers
-* Reboot
-* Install [docker](https://docs.docker.com/installation/fedora/)
-* Run the Dockerfile for Fedora - results in an installable .rpm
-  * `git clone https://github.com/iovisor/bcc; cd bcc`
-  * `docker build -t bcc -f Dockerfile.fedora .`
-  * `docker run --rm -v /tmp:/mnt bcc sh -c "cp /root/bcc/build/*.rpm /mnt"`
-  * `sudo rpm -ivh /tmp/libbcc*.rpm`
-* Run the example
-  * `sudo python /usr/share/bcc/examples/hello_world.py`
-
-### Ubuntu - From source
-
-To build the toolchain from source, one needs:
-* LLVM 3.7 or newer, compiled with BPF support (default=on)
-* Clang 3.7, built from the same tree as LLVM
-* cmake, gcc (>=4.7), flex, bison
-
-* Add the [LLVM binary repo](http://llvm.org/apt/) to your apt sources
-  * `echo "deb http://llvm.org/apt/trusty/ llvm-toolchain-trusty main" | sudo tee /etc/apt/sources.list.d/llvm.list`
-  * `wget -O - http://llvm.org/apt/llvm-snapshot.gpg.key | sudo apt-key add -`
-  * `sudo apt-get update`
-* Install build dependencies
-  * `sudo apt-get -y install bison build-essential cmake flex git libedit-dev python zlib1g-dev`
-* Install LLVM and Clang development libs
-  * `sudo apt-get -y install libllvm3.7 llvm-3.7-dev libclang-3.7-dev`
-* Install and compile BCC
-  * `git clone https://github.com/iovisor/bcc.git`
-  * `mkdir bcc/build; cd bcc/build`
-  * `cmake .. -DCMAKE_INSTALL_PREFIX=/usr`
-  * `make -j$(grep -c ^process /proc/cpuinfo)`
-  * `sudo make install`
-
-## Release notes
-
-* 0.1
-  * Initial commit
+See [INSTALL.md](INSTALL.md) for installation steps on your platform.
