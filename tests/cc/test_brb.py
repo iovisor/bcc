@@ -61,74 +61,31 @@
 # 8: 
 # 8: OK
 
-from ctypes import c_ubyte, c_ushort, c_uint, c_ulonglong, Structure
+from ctypes import c_uint
 from netaddr import IPAddress, EUI
 from bpf import BPF
-from pyroute2 import IPRoute
+from pyroute2 import IPRoute, NetNS, IPDB, NSPopen
 import sys
 from time import sleep
 from unittest import main, TestCase
-import subprocess
-import struct
+from simulation import Simulation
 
 arg1 = sys.argv.pop(1)
+ipr = IPRoute()
+ipdb = IPDB(nl=ipr)
+sim = Simulation(ipdb)
 
 class TestBPFSocket(TestCase):
-    def setup_vm_ns(self, ns, veth_in, veth_out):
-        subprocess.call(["ip", "link", "add", veth_in, "type", "veth", "peer", "name", veth_out])
-        subprocess.call(["ip", "netns", "add", ns])
-        subprocess.call(["ip", "link", "set", veth_in, "netns", ns])
-        subprocess.call(["ip", "netns", "exec", ns, "ip", "link", "set", veth_in, "name", "eth0"])
-        subprocess.call(["sysctl", "-q", "-w", "net.ipv6.conf." + veth_out+ ".disable_ipv6=1"])
-        subprocess.call(["ip", "link", "set", veth_out, "up"])
-
-    def config_vm_ns(self, ns, ip_addr, net_mask, ip_gw):
-        subprocess.call(["ip", "netns", "exec", ns, "ip", "addr", "add", ip_addr + "/24", "dev", "eth0"])
-        subprocess.call(["ip", "netns", "exec", ns, "sysctl", "-q", "-w", "net.ipv6.conf.eth0.disable_ipv6=1"])
-        subprocess.call(["ip", "netns", "exec", ns, "ip", "link", "set", "eth0", "up"])
-        subprocess.call(["ip", "netns", "exec", ns, "ip", "route", "add", net_mask + "/24", "via", ip_gw])
-
-    def setup_router_ns(self, ns, veth1_in, veth1_out, veth2_in, veth2_out):
-        subprocess.call(["ip", "netns", "add", ns])
-        subprocess.call(["ip", "link", "add", veth1_in, "type", "veth", "peer", "name", veth1_out])
-        subprocess.call(["ip", "link", "set", veth1_in, "netns", ns])
-        subprocess.call(["ip", "netns", "exec", ns, "ip", "link", "set", veth1_in, "name", "eth0"])
-        subprocess.call(["ip", "link", "add", veth2_in, "type", "veth", "peer", "name", veth2_out])
-        subprocess.call(["ip", "link", "set", veth2_in, "netns", ns])
-        subprocess.call(["ip", "netns", "exec", ns, "ip", "link", "set", veth2_in, "name", "eth1"])
-        subprocess.call(["sysctl", "-q", "-w", "net.ipv6.conf." + veth1_out+ ".disable_ipv6=1"])
-        subprocess.call(["sysctl", "-q", "-w", "net.ipv6.conf." + veth2_out+ ".disable_ipv6=1"])
-        subprocess.call(["ip", "link", "set", veth1_out, "up"])
-        subprocess.call(["ip", "link", "set", veth2_out, "up"])
-
-    def config_router_ns(self, ns, ip_eth0, ip_eth1):
-        subprocess.call(["ip", "netns", "exec", ns, "ip", "addr", "add", ip_eth0 + "/24", "dev", "eth0"])
-        subprocess.call(["ip", "netns", "exec", ns, "sysctl", "-q", "-w", "net.ipv6.conf.eth0.disable_ipv6=1"])
-        subprocess.call(["ip", "netns", "exec", ns, "ip", "link", "set", "eth0", "up"])
-        subprocess.call(["ip", "netns", "exec", ns, "ip", "addr", "add", ip_eth1 + "/24", "dev", "eth1"])
-        subprocess.call(["ip", "netns", "exec", ns, "sysctl", "-q", "-w", "net.ipv6.conf.eth1.disable_ipv6=1"])
-        subprocess.call(["ip", "netns", "exec", ns, "ip", "link", "set", "eth1", "up"])
-        subprocess.call(["ip", "netns", "exec", ns, "sysctl", "-w", "net.ipv4.ip_forward=1"])
-
     def set_default_const(self):
         self.ns1            = "ns1"
-        self.ns1_eth_in     = "v1"
-        self.ns1_eth_out    = "v2"
         self.ns2            = "ns2"
-        self.ns2_eth_in     = "v3"
-        self.ns2_eth_out    = "v4"
         self.ns_router      = "ns_router"
-        self.nsrtr_eth0_in  = "v10"
-        self.nsrtr_eth0_out = "v11"
-        self.nsrtr_eth1_in  = "v12"
-        self.nsrtr_eth1_out = "v13"
-
         self.vm1_ip         = "100.1.1.1"
         self.vm2_ip         = "200.1.1.1"
         self.vm1_rtr_ip     = "100.1.1.254"
         self.vm2_rtr_ip     = "200.1.1.254"
-        self.vm1_rtr_mask   = "100.1.1.0"
-        self.vm2_rtr_mask   = "200.1.1.0"
+        self.vm1_rtr_mask   = "100.1.1.0/24"
+        self.vm2_rtr_mask   = "200.1.1.0/24"
 
     def get_table(self, b):
         self.jump = b.get_table("jump")
@@ -147,29 +104,15 @@ class TestBPFSocket(TestCase):
         self.br2_rtr = b.get_table("br2_rtr")
 
     def connect_ports(self, prog_id_pem, prog_id_br, curr_pem_pid, curr_br_pid,
-                      ip, br_dest_map, br_mac_map,
-                      ns_eth_out, vm_mac, vm_ip):
+                      br_dest_map, br_mac_map, ifindex, vm_mac, vm_ip):
         self.pem_dest[c_uint(curr_pem_pid)] = self.pem_dest.Leaf(prog_id_br, curr_br_pid)
         br_dest_map[c_uint(curr_br_pid)] = br_dest_map.Leaf(prog_id_pem, curr_pem_pid)
-        ifindex = ip.link_lookup(ifname=ns_eth_out)[0]
         self.pem_port[c_uint(curr_pem_pid)] = c_uint(ifindex)
         self.pem_ifindex[c_uint(ifindex)] = c_uint(curr_pem_pid)
         mac_addr = br_mac_map.Key(int(EUI(vm_mac.decode())))
         br_mac_map[mac_addr] = c_uint(curr_br_pid)
 
-    def attach_filter(self, ip, ifname, fd, name):
-        ifindex = ip.link_lookup(ifname=ifname)[0]
-        ip.tc("add", "ingress", ifindex, "ffff:")
-        ip.tc("add-filter", "bpf", ifindex, ":1", fd=fd, name=name,
-              parent="ffff:", action="drop", classid=1)
-
     def config_maps(self):
-        b = BPF(src_file=arg1, debug=0)
-        pem_fn = b.load_func("pem", BPF.SCHED_CLS)
-        br1_fn = b.load_func("br1", BPF.SCHED_CLS)
-        br2_fn = b.load_func("br2", BPF.SCHED_CLS)
-        ip = IPRoute()
-
         # program id
         prog_id_pem = 1
         prog_id_br1 = 2
@@ -179,91 +122,91 @@ class TestBPFSocket(TestCase):
         curr_pem_pid = 0
         curr_br1_pid = 0
         curr_br2_pid = 0
-        self.get_table(b)
 
         # configure jump table
-        self.jump[c_uint(prog_id_pem)] = c_uint(pem_fn.fd)
-        self.jump[c_uint(prog_id_br1)] = c_uint(br1_fn.fd)
-        self.jump[c_uint(prog_id_br2)] = c_uint(br2_fn.fd)
+        self.jump[c_uint(prog_id_pem)] = c_uint(self.pem_fn.fd)
+        self.jump[c_uint(prog_id_br1)] = c_uint(self.br1_fn.fd)
+        self.jump[c_uint(prog_id_br2)] = c_uint(self.br2_fn.fd)
 
         # connect pem and br1
         curr_pem_pid = curr_pem_pid + 1
         curr_br1_pid = curr_br1_pid + 1
         self.connect_ports(prog_id_pem, prog_id_br1, curr_pem_pid, curr_br1_pid,
-                      ip, self.br1_dest, self.br1_mac,
-                      self.ns1_eth_out, self.vm1_mac, self.vm1_ip)
+                      self.br1_dest, self.br1_mac,
+                      self.ns1_eth_out.index, self.vm1_mac, self.vm1_ip)
 
         # connect pem and br2
         curr_pem_pid = curr_pem_pid + 1
         curr_br2_pid = curr_br2_pid + 1
         self.connect_ports(prog_id_pem, prog_id_br2, curr_pem_pid, curr_br2_pid,
-                      ip, self.br2_dest, self.br2_mac,
-                      self.ns2_eth_out, self.vm2_mac, self.vm2_ip)
+                      self.br2_dest, self.br2_mac,
+                      self.ns2_eth_out.index, self.vm2_mac, self.vm2_ip)
 
         # connect <br1, rtr> and <br2, rtr>
-        ifindex = ip.link_lookup(ifname=self.nsrtr_eth0_out)[0]
-        self.br1_rtr[c_uint(0)] = c_uint(ifindex)
-        ifindex = ip.link_lookup(ifname=self.nsrtr_eth1_out)[0]
-        self.br2_rtr[c_uint(0)] = c_uint(ifindex)
-
-        # tc filter setup with bpf programs attached
-        self.attach_filter(ip, self.ns1_eth_out, pem_fn.fd, pem_fn.name)
-        self.attach_filter(ip, self.ns2_eth_out, pem_fn.fd, pem_fn.name)
-        self.attach_filter(ip, self.nsrtr_eth0_out, br1_fn.fd, br1_fn.name)
-        self.attach_filter(ip, self.nsrtr_eth1_out, br2_fn.fd, br2_fn.name)
+        self.br1_rtr[c_uint(0)] = c_uint(self.nsrtr_eth0_out.index)
+        self.br2_rtr[c_uint(0)] = c_uint(self.nsrtr_eth1_out.index)
 
     def test_brb(self):
         try:
-            # set up the environment
+            b = BPF(src_file=arg1, debug=0)
+            self.pem_fn = b.load_func("pem", BPF.SCHED_CLS)
+            self.br1_fn = b.load_func("br1", BPF.SCHED_CLS)
+            self.br2_fn = b.load_func("br2", BPF.SCHED_CLS)
+            self.get_table(b)
+
+            # set up the topology
             self.set_default_const()
-            self.setup_vm_ns(self.ns1, self.ns1_eth_in, self.ns1_eth_out)
-            self.setup_vm_ns(self.ns2, self.ns2_eth_in, self.ns2_eth_out)
-            self.config_vm_ns(self.ns1, self.vm1_ip, self.vm2_rtr_mask, self.vm1_rtr_ip)
-            self.config_vm_ns(self.ns2, self.vm2_ip, self.vm1_rtr_mask, self.vm2_rtr_ip)
-            self.setup_router_ns(self.ns_router, self.nsrtr_eth0_in, self.nsrtr_eth0_out,
-                                 self.nsrtr_eth1_in, self.nsrtr_eth1_out)
-            self.config_router_ns(self.ns_router, self.vm1_rtr_ip, self.vm2_rtr_ip)
+            (ns1_ipdb, self.ns1_eth_out, unused) = sim._create_ns(self.ns1, ipaddr=self.vm1_ip+'/24', fn=self.pem_fn, action='drop',
+                                                                  disable_ipv6=True)
+            (ns2_ipdb, self.ns2_eth_out, unused) = sim._create_ns(self.ns2, ipaddr=self.vm2_ip+'/24', fn=self.pem_fn, action='drop',
+                                                                  disable_ipv6=True)
+            ns1_ipdb.routes.add({'dst': self.vm2_rtr_mask, 'gateway': self.vm1_rtr_ip}).commit()
+            ns2_ipdb.routes.add({'dst': self.vm1_rtr_mask, 'gateway': self.vm2_rtr_ip}).commit()
+            self.vm1_mac = ns1_ipdb.interfaces['eth0'].address
+            self.vm2_mac = ns2_ipdb.interfaces['eth0'].address
 
-            # get vm mac address
-            self.vm1_mac = subprocess.check_output(["ip", "netns", "exec", self.ns1, "cat", "/sys/class/net/eth0/address"])
-            self.vm1_mac = self.vm1_mac.strip()
-            self.vm2_mac = subprocess.check_output(["ip", "netns", "exec", self.ns2, "cat", "/sys/class/net/eth0/address"])
-            self.vm2_mac = self.vm2_mac.strip()
+            (rt_ipdb, self.nsrtr_eth0_out, unused) = sim._create_ns(self.ns_router, ipaddr=self.vm1_rtr_ip+'/24', fn=self.br1_fn,
+                                                                    action='drop', disable_ipv6=True)
+            (rt_ipdb, self.nsrtr_eth1_out, unused) = sim._ns_add_ifc(self.ns_router, "eth1", ipaddr=self.vm2_rtr_ip+'/24',
+                                                                     fn=self.br2_fn, action='drop', disable_ipv6=True)
+            nsp = NSPopen(rt_ipdb.nl.netns, ["sysctl", "-w", "net.ipv4.ip_forward=1"]); nsp.wait(); nsp.release()
 
-            # load the program and configure maps
+            # configure maps
             self.config_maps()
 
             # our bridge is not smart enough, so send arping for router learning to prevent router
             # from sending out arp request
-            subprocess.call(["ip", "netns", "exec", self.ns1, "arping", "-w", "1", "-c", "1", "-I", "eth0",
-                             self.vm1_rtr_ip])
-            subprocess.call(["ip", "netns", "exec", self.ns2, "arping", "-w", "1", "-c", "1", "-I", "eth0",
-                             self.vm2_rtr_ip])
+            nsp = NSPopen(ns1_ipdb.nl.netns, ["arping", "-w", "1", "-c", "1", "-I", "eth0", self.vm1_rtr_ip]); nsp.wait(); nsp.release()
+            nsp = NSPopen(ns2_ipdb.nl.netns, ["arping", "-w", "1", "-c", "1", "-I", "eth0", self.vm2_rtr_ip]); nsp.wait(); nsp.release()
+
             # ping
-            subprocess.call(["ip", "netns", "exec", self.ns1, "ping", self.vm2_ip, "-c", "2"])
+            nsp = NSPopen(ns1_ipdb.nl.netns, ["ping", self.vm2_ip, "-c", "2"]); nsp.wait(); nsp.release()
             # pem_stats only counts pem->bridge traffic, each VM has 4: arping/arp request/2 icmp request
             # total 8 packets should be counted
             self.assertEqual(self.pem_stats[c_uint(0)].value, 8)
 
             # iperf, run server on the background
-            subprocess.Popen(["ip", "netns", "exec", self.ns2, "iperf", "-s", "-xSCD"])
+            nsp_server = NSPopen(ns2_ipdb.nl.netns, ["iperf", "-s", "-xSCD"])
             sleep(1)
-            subprocess.call(["ip", "netns", "exec", self.ns1, "iperf", "-c", self.vm2_ip, "-t", "1", "-xSC"])
-            subprocess.call(["ip", "netns", "exec", self.ns2, "killall", "iperf"])
+            nsp = NSPopen(ns1_ipdb.nl.netns, ["iperf", "-c", self.vm2_ip, "-t", "1", "-xSC"]); nsp.wait(); nsp.release()
+            nsp_server.kill(); nsp_server.wait(); nsp.release()
 
             # netperf, run server on the background
-            subprocess.Popen(["ip", "netns", "exec", self.ns2, "netserver"])
+            nsp_server = NSPopen(ns2_ipdb.nl.netns, ["netserver"])
             sleep(1)
-            subprocess.call(["ip", "netns", "exec", self.ns1, "netperf", "-l", "1", "-H", self.vm2_ip, "--", "-m", "65160"])
-            subprocess.call(["ip", "netns", "exec", self.ns1, "netperf", "-l", "1", "-H", self.vm2_ip, "-t", "TCP_RR"])
-            subprocess.call(["ip", "netns", "exec", self.ns2, "killall", "netserver"])
+            nsp = NSPopen(ns1_ipdb.nl.netns, ["netperf", "-l", "1", "-H", self.vm2_ip, "--", "-m", "65160"]); nsp.wait(); nsp.release()
+            nsp = NSPopen(ns1_ipdb.nl.netns, ["netperf", "-l", "1", "-H", self.vm2_ip, "-t", "TCP_RR"]); nsp.wait(); nsp.release()
+            nsp_server.kill(); nsp_server.wait(); nsp.release()
 
         finally:
-            # cleanup, tear down the veths and namespaces
-            ns_list = subprocess.check_output(["ip", "netns", "list"]).split()
-            if self.ns1 in ns_list: subprocess.call(["ip", "netns", "del", self.ns1])
-            if self.ns2 in ns_list: subprocess.call(["ip", "netns", "del", self.ns2])
-            if self.ns_router in ns_list: subprocess.call(["ip", "netns", "del", self.ns_router])
+            # this is a little bit hacker, but we want to be sure to remove all created interfaces
+            # ns1_eth_out, ns2_eth_out, nsrtr_eth0_out, nsrtr_eth1_out
+            if "ns1eth0a" in ipdb.interfaces: ipdb.interfaces.ns1eth0a.remove().commit()
+            if "ns2eth0a" in ipdb.interfaces: ipdb.interfaces.ns2eth0a.remove().commit()
+            if "ns_routereth0a" in ipdb.interfaces: ipdb.interfaces.ns_routereth0a.remove().commit()
+            if "ns_routereth1a" in ipdb.interfaces: ipdb.interfaces.ns_routereth1a.remove().commit()
+            sim.release()
+            ipdb.release()
 
 
 if __name__ == "__main__":
