@@ -196,25 +196,19 @@ class TestBPFSocket(TestCase):
             # total 8 packets should be counted
             self.assertEqual(self.pem_stats[c_uint(0)].value, 8)
 
-            # iperf, run server on the background
-            nsp_server = NSPopen(ns2_ipdb.nl.netns, ["iperf", "-s", "-xSCD"])
+            nsp_server = NSPopen(ns2_ipdb.nl.netns, ["iperf", "-s", "-xSC"])
             sleep(1)
             nsp = NSPopen(ns1_ipdb.nl.netns, ["iperf", "-c", self.vm2_ip, "-t", "1", "-xSC"])
             nsp.wait(); nsp.release()
             nsp_server.kill(); nsp_server.wait(); nsp_server.release()
-            # nsp_server.kill() may not really kill the process which may hold reference to the net device
-            # the below old fashion way seems working
-            nsp = NSPopen(ns2_ipdb.nl.netns, ["killall", "iperf"]); nsp.wait(); nsp.release()
 
-            # netperf, run server on the background
-            nsp_server = NSPopen(ns2_ipdb.nl.netns, ["netserver"])
+            nsp_server = NSPopen(ns2_ipdb.nl.netns, ["netserver", "-D"])
             sleep(1)
             nsp = NSPopen(ns1_ipdb.nl.netns, ["netperf", "-l", "1", "-H", self.vm2_ip, "--", "-m", "65160"])
             nsp.wait(); nsp.release()
             nsp = NSPopen(ns1_ipdb.nl.netns, ["netperf", "-l", "1", "-H", self.vm2_ip, "-t", "TCP_RR"])
             nsp.wait(); nsp.release()
             nsp_server.kill(); nsp_server.wait(); nsp_server.release()
-            nsp = NSPopen(ns2_ipdb.nl.netns, ["killall", "netserver"]); nsp.wait(); nsp.release()
 
         finally:
             sim.release()
