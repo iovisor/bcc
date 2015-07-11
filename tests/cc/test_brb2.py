@@ -54,72 +54,41 @@
 # 9: 
 # 9: OK
 
-from ctypes import c_ubyte, c_ushort, c_uint, c_ulonglong, Structure
-from netaddr import IPAddress
+from ctypes import c_uint
 from bpf import BPF
-from pyroute2 import IPRoute
-from socket import socket, AF_INET, SOCK_DGRAM
+from pyroute2 import IPRoute, NetNS, IPDB, NSPopen
 import sys
 from time import sleep
 from unittest import main, TestCase
 import subprocess
+from simulation import Simulation
 
 arg1 = sys.argv.pop(1)
+ipr = IPRoute()
+ipdb = IPDB(nl=ipr)
+sim = Simulation(ipdb)
+
 
 class TestBPFSocket(TestCase):
-    def setup_vm_ns(self, ns, veth_in, veth_out):
-        subprocess.call(["ip", "link", "add", veth_in, "type", "veth", "peer", "name", veth_out])
-        subprocess.call(["ip", "netns", "add", ns])
-        subprocess.call(["ip", "link", "set", veth_in, "netns", ns])
-        subprocess.call(["ip", "netns", "exec", ns, "ip", "link", "set", veth_in, "name", "eth0"])
-        subprocess.call(["ip", "link", "set", veth_out, "up"])
-
-    def config_vm_ns(self, ns, ip_addr, net_mask, ip_gw):
-        subprocess.call(["ip", "netns", "exec", ns, "ip", "addr", "add", ip_addr + "/24", "dev", "eth0"])
-        subprocess.call(["ip", "netns", "exec", ns, "ip", "link", "set", "eth0", "up"])
-        subprocess.call(["ip", "netns", "exec", ns, "route", "add", "-net", net_mask + "/24", "gw", ip_gw])
-
-    def setup_router_ns(self, ns, veth1_in, veth1_out, veth2_in, veth2_out):
-        subprocess.call(["ip", "netns", "add", ns])
-        subprocess.call(["ip", "link", "add", veth1_in, "type", "veth", "peer", "name", veth1_out])
-        subprocess.call(["ip", "link", "set", veth1_in, "netns", ns])
-        subprocess.call(["ip", "netns", "exec", ns, "ip", "link", "set", veth1_in, "name", "eth0"])
-        subprocess.call(["ip", "link", "add", veth2_in, "type", "veth", "peer", "name", veth2_out])
-        subprocess.call(["ip", "link", "set", veth2_in, "netns", ns])
-        subprocess.call(["ip", "netns", "exec", ns, "ip", "link", "set", veth2_in, "name", "eth1"])
-        subprocess.call(["ip", "link", "set", veth1_out, "up"])
-        subprocess.call(["ip", "link", "set", veth2_out, "up"])
-
-    def config_router_ns(self, ns, ip_eth0, ip_eth1):
-        subprocess.call(["ip", "netns", "exec", ns, "ip", "addr", "add", ip_eth0 + "/24", "dev", "eth0"])
-        subprocess.call(["ip", "netns", "exec", ns, "ip", "link", "set", "eth0", "up"])
-        subprocess.call(["ip", "netns", "exec", ns, "ip", "addr", "add", ip_eth1 + "/24", "dev", "eth1"])
-        subprocess.call(["ip", "netns", "exec", ns, "ip", "link", "set", "eth1", "up"])
-
-    def setup_br(self, br, veth_rt_2_br):
+    def setup_br(self, br, veth_rt_2_br, veth_pem_2_br, veth_br_2_pem):
+        # create veth which connecting pem and br
+        with ipdb.create(ifname=veth_pem_2_br, kind="veth", peer=veth_br_2_pem) as v:
+            v.up()
+        ipdb.interfaces[veth_br_2_pem].up().commit()
+        subprocess.call(["sysctl", "-q", "-w", "net.ipv6.conf." + veth_pem_2_br + ".disable_ipv6=1"])
+        subprocess.call(["sysctl", "-q", "-w", "net.ipv6.conf." + veth_br_2_pem + ".disable_ipv6=1"])
+        
         # set up the bridge and add router interface as one of its slaves
-        subprocess.call(["ip", "link", "add", "name", br, "type", "bridge"])
-        subprocess.call(["ip", "link", "set", "dev", veth_rt_2_br, "master", br])
-        subprocess.call(["ip", "link", "set", br, "up"])
-
-    def br_add_pem_link(self, br, veth_pem_2_br, veth_br_2_pem):
-        subprocess.call(["ip", "link", "add", veth_pem_2_br, "type", "veth", "peer", "name", veth_br_2_pem])
-        subprocess.call(["ip", "link", "set", "dev", veth_pem_2_br, "master", br])
-        subprocess.call(["ip", "link", "set", veth_pem_2_br, "up"])
-        subprocess.call(["ip", "link", "set", veth_br_2_pem, "up"])
-
+        with ipdb.create(ifname=br, kind="bridge") as br1:
+            br1.add_port(ipdb.interfaces[veth_pem_2_br])
+            br1.add_port(ipdb.interfaces[veth_rt_2_br])
+            br1.up()
+        subprocess.call(["sysctl", "-q", "-w", "net.ipv6.conf." + br + ".disable_ipv6=1"])
+            
     def set_default_const(self):
         self.ns1            = "ns1"
-        self.ns1_eth_in     = "v1"
-        self.ns1_eth_out    = "v2"
         self.ns2            = "ns2"
-        self.ns2_eth_in     = "v3"
-        self.ns2_eth_out    = "v4"
         self.ns_router      = "ns_router"
-        self.nsrtr_eth0_in  = "v10"
-        self.nsrtr_eth0_out = "v11"
-        self.nsrtr_eth1_in  = "v12"
-        self.nsrtr_eth1_out = "v13"
         self.br1            = "br1"
         self.veth_pem_2_br1 = "v20"
         self.veth_br1_2_pem = "v21"
@@ -131,88 +100,91 @@ class TestBPFSocket(TestCase):
         self.vm2_ip         = "200.1.1.1"
         self.vm1_rtr_ip     = "100.1.1.254"
         self.vm2_rtr_ip     = "200.1.1.254"
-        self.vm1_rtr_mask   = "100.1.1.0"
-        self.vm2_rtr_mask   = "200.1.1.0"
+        self.vm1_rtr_mask   = "100.1.1.0/24"
+        self.vm2_rtr_mask   = "200.1.1.0/24"
 
-    def attach_filter(self, ip, ifname, fd, name):
-        ifindex = ip.link_lookup(ifname=ifname)[0]
-        ip.tc("add", "ingress", ifindex, "ffff:")
-        ip.tc("add-filter", "bpf", ifindex, ":1", fd=fd, name=name,
+    def attach_filter(self, ifname, fd, name):
+        ifindex = ipdb.interfaces[ifname].index
+        ipr.tc("add", "ingress", ifindex, "ffff:")
+        ipr.tc("add-filter", "bpf", ifindex, ":1", fd=fd, name=name,
               parent="ffff:", action="drop", classid=1)
 
     def config_maps(self):
-        b = BPF(src_file=arg1, debug=0)
-        pem_fn = b.load_func("pem", BPF.SCHED_CLS)
-        self.pem_dest= b.get_table("pem_dest")
-        self.pem_stats = b.get_table("pem_stats")
-        ip = IPRoute()
-
         # pem just relays packets between VM and its corresponding
         # slave link in the bridge interface
-        ns1_ifindex = ip.link_lookup(ifname=self.ns1_eth_out)[0]
-        ns2_ifindex = ip.link_lookup(ifname=self.ns2_eth_out)[0]
-        br1_ifindex = ip.link_lookup(ifname=self.veth_br1_2_pem)[0]
-        br2_ifindex = ip.link_lookup(ifname=self.veth_br2_2_pem)[0]
+        ns1_ifindex = self.ns1_eth_out.index
+        ns2_ifindex = self.ns2_eth_out.index
+        br1_ifindex = ipdb.interfaces[self.veth_br1_2_pem].index
+        br2_ifindex = ipdb.interfaces[self.veth_br2_2_pem].index
         self.pem_dest[c_uint(ns1_ifindex)] = c_uint(br1_ifindex)
         self.pem_dest[c_uint(br1_ifindex)] = c_uint(ns1_ifindex)
         self.pem_dest[c_uint(ns2_ifindex)] = c_uint(br2_ifindex)
         self.pem_dest[c_uint(br2_ifindex)] = c_uint(ns2_ifindex)
 
         # tc filter setup with bpf programs attached
-        self.attach_filter(ip, self.ns1_eth_out, pem_fn.fd, pem_fn.name)
-        self.attach_filter(ip, self.ns2_eth_out, pem_fn.fd, pem_fn.name)
-        self.attach_filter(ip, self.veth_br1_2_pem, pem_fn.fd, pem_fn.name)
-        self.attach_filter(ip, self.veth_br2_2_pem, pem_fn.fd, pem_fn.name)
-
-    def setUp(self):
-
-        # set up the environment
-        self.set_default_const()
-        self.setup_vm_ns(self.ns1, self.ns1_eth_in, self.ns1_eth_out)
-        self.setup_vm_ns(self.ns2, self.ns2_eth_in, self.ns2_eth_out)
-        self.config_vm_ns(self.ns1, self.vm1_ip, self.vm2_rtr_mask, self.vm1_rtr_ip)
-        self.config_vm_ns(self.ns2, self.vm2_ip, self.vm1_rtr_mask, self.vm2_rtr_ip)
-        self.setup_router_ns(self.ns_router, self.nsrtr_eth0_in, self.nsrtr_eth0_out,
-                             self.nsrtr_eth1_in, self.nsrtr_eth1_out)
-        self.config_router_ns(self.ns_router, self.vm1_rtr_ip, self.vm2_rtr_ip)
-
-        # for each VM connecting to pem, there will be a corresponding veth
-        # connecting to the bridge
-        self.setup_br(self.br1, self.nsrtr_eth0_out)
-        self.br_add_pem_link(self.br1, self.veth_pem_2_br1, self.veth_br1_2_pem)
-        self.setup_br(self.br2, self.nsrtr_eth1_out)
-        self.br_add_pem_link(self.br2, self.veth_pem_2_br2, self.veth_br2_2_pem)
-
-        # load the program and configure maps
-        self.config_maps()
+        self.attach_filter(self.veth_br1_2_pem, self.pem_fn.fd, self.pem_fn.name)
+        self.attach_filter(self.veth_br2_2_pem, self.pem_fn.fd, self.pem_fn.name)
 
     def test_brb2(self):
-        # ping
-        subprocess.call(["ip", "netns", "exec", self.ns1, "ping", self.vm2_ip, "-c", "2"])
-        # minimum one arp request/reply, 5 icmp request/reply
-        self.assertGreater(self.pem_stats[c_uint(0)].value, 11)
+        try:
+            b = BPF(src_file=arg1, debug=0)
+            self.pem_fn = b.load_func("pem", BPF.SCHED_CLS)
+            self.pem_dest= b.get_table("pem_dest")
+            self.pem_stats = b.get_table("pem_stats")
 
-        # iperf, run server on the background
-        subprocess.Popen(["ip", "netns", "exec", self.ns2, "iperf", "-s", "-xSCD"])
-        sleep(1)
-        subprocess.call(["ip", "netns", "exec", self.ns1, "iperf", "-c", self.vm2_ip, "-t", "1", "-xSC"])
-        subprocess.call(["ip", "netns", "exec", self.ns2, "killall", "iperf"])
+            # set up the topology
+            self.set_default_const()
+            (ns1_ipdb, self.ns1_eth_out, _) = sim._create_ns(self.ns1, ipaddr=self.vm1_ip+'/24',
+                                                             fn=self.pem_fn, action='drop',
+                                                             disable_ipv6=True)
+            (ns2_ipdb, self.ns2_eth_out, _) = sim._create_ns(self.ns2, ipaddr=self.vm2_ip+'/24',
+                                                             fn=self.pem_fn, action='drop',
+                                                             disable_ipv6=True)
+            ns1_ipdb.routes.add({'dst': self.vm2_rtr_mask, 'gateway': self.vm1_rtr_ip}).commit()
+            ns2_ipdb.routes.add({'dst': self.vm1_rtr_mask, 'gateway': self.vm2_rtr_ip}).commit()
 
-        # netperf, run server on the background
-        subprocess.Popen(["ip", "netns", "exec", self.ns2, "netserver"])
-        sleep(1)
-        subprocess.call(["ip", "netns", "exec", self.ns1, "netperf", "-l", "1", "-H", self.vm2_ip, "--", "-m", "65160"])
-        subprocess.call(["ip", "netns", "exec", self.ns1, "netperf", "-l", "1", "-H", self.vm2_ip, "-t", "TCP_RR"])
-        subprocess.call(["ip", "netns", "exec", self.ns2, "killall", "netserver"])
+            (_, self.nsrtr_eth0_out, _) = sim._create_ns(self.ns_router, ipaddr=self.vm1_rtr_ip+'/24',
+                                                         disable_ipv6=True)
+            (rt_ipdb, self.nsrtr_eth1_out, _) = sim._ns_add_ifc(self.ns_router, "eth1", "ns_router2",
+                                                                ipaddr=self.vm2_rtr_ip+'/24',
+                                                                disable_ipv6=True)
+            # enable ip forwarding in router ns
+            nsp = NSPopen(rt_ipdb.nl.netns, ["sysctl", "-w", "net.ipv4.ip_forward=1"])
+            nsp.wait(); nsp.release()
 
-        # cleanup, tear down the veths and namespaces
-        subprocess.call(["ip", "link", "del", self.veth_br1_2_pem])
-        subprocess.call(["ip", "link", "del", self.veth_br2_2_pem])
-        subprocess.call(["ip", "link", "del", self.br1])
-        subprocess.call(["ip", "link", "del", self.br2])
-        subprocess.call(["ip", "netns", "del", self.ns1])
-        subprocess.call(["ip", "netns", "del", self.ns2])
-        subprocess.call(["ip", "netns", "del", self.ns_router])
+            # for each VM connecting to pem, there will be a corresponding veth connecting to the bridge
+            self.setup_br(self.br1, self.nsrtr_eth0_out.ifname, self.veth_pem_2_br1, self.veth_br1_2_pem)
+            self.setup_br(self.br2, self.nsrtr_eth1_out.ifname, self.veth_pem_2_br2, self.veth_br2_2_pem)
+
+            # load the program and configure maps
+            self.config_maps()
+
+            # ping
+            nsp = NSPopen(ns1_ipdb.nl.netns, ["ping", self.vm2_ip, "-c", "2"]); nsp.wait(); nsp.release()
+            # one arp request/reply, 2 icmp request/reply per VM, total 6 packets per VM, 12 packets total
+            self.assertEqual(self.pem_stats[c_uint(0)].value, 12)
+
+            nsp_server = NSPopen(ns2_ipdb.nl.netns, ["iperf", "-s", "-xSC"])
+            sleep(1)
+            nsp = NSPopen(ns1_ipdb.nl.netns, ["iperf", "-c", self.vm2_ip, "-t", "1", "-xSC"])
+            nsp.wait(); nsp.release()
+            nsp_server.kill(); nsp_server.wait(); nsp_server.release()
+
+            nsp_server = NSPopen(ns2_ipdb.nl.netns, ["netserver", "-D"])
+            sleep(1)
+            nsp = NSPopen(ns1_ipdb.nl.netns, ["netperf", "-l", "1", "-H", self.vm2_ip, "--", "-m", "65160"])
+            nsp.wait(); nsp.release()
+            nsp = NSPopen(ns1_ipdb.nl.netns, ["netperf", "-l", "1", "-H", self.vm2_ip, "-t", "TCP_RR"])
+            nsp.wait(); nsp.release()
+            nsp_server.kill(); nsp_server.wait(); nsp_server.release()
+
+        finally:
+            if self.br1 in ipdb.interfaces: ipdb.interfaces[self.br1].remove().commit()
+            if self.br2 in ipdb.interfaces: ipdb.interfaces[self.br2].remove().commit()
+            if self.veth_pem_2_br1 in ipdb.interfaces: ipdb.interfaces[self.veth_pem_2_br1].remove().commit()
+            if self.veth_pem_2_br2 in ipdb.interfaces: ipdb.interfaces[self.veth_pem_2_br2].remove().commit()
+            sim.release()
+            ipdb.release()
 
 
 if __name__ == "__main__":

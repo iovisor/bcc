@@ -24,5 +24,5 @@ int pem(struct __sk_buff *skb) {
         bpf_clone_redirect(skb, *ifindex_p, 0);
     }
 
-    return 0;
+    return 1;
 }
