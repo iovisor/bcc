@@ -201,7 +201,10 @@ class TestBPFSocket(TestCase):
             sleep(1)
             nsp = NSPopen(ns1_ipdb.nl.netns, ["iperf", "-c", self.vm2_ip, "-t", "1", "-xSC"])
             nsp.wait(); nsp.release()
-            nsp_server.kill(); nsp_server.wait(); nsp.release()
+            nsp_server.kill(); nsp_server.wait(); nsp_server.release()
+            # nsp_server.kill() may not really kill the process which may hold reference to the net device
+            # the below old fashion way seems working
+            nsp = NSPopen(ns2_ipdb.nl.netns, ["killall", "iperf"]); nsp.wait(); nsp.release()
 
             # netperf, run server on the background
             nsp_server = NSPopen(ns2_ipdb.nl.netns, ["netserver"])
@@ -210,15 +213,10 @@ class TestBPFSocket(TestCase):
             nsp.wait(); nsp.release()
             nsp = NSPopen(ns1_ipdb.nl.netns, ["netperf", "-l", "1", "-H", self.vm2_ip, "-t", "TCP_RR"])
             nsp.wait(); nsp.release()
-            nsp_server.kill(); nsp_server.wait(); nsp.release()
+            nsp_server.kill(); nsp_server.wait(); nsp_server.release()
+            nsp = NSPopen(ns2_ipdb.nl.netns, ["killall", "netserver"]); nsp.wait(); nsp.release()
 
         finally:
-            # this is a little bit hacker, but we want to be sure to remove all created interfaces
-            # ns1_eth_out, ns2_eth_out, nsrtr_eth0_out, nsrtr_eth1_out
-            if "ns1a" in ipdb.interfaces: ipdb.interfaces.ns1a.remove().commit()
-            if "ns2a" in ipdb.interfaces: ipdb.interfaces.ns2a.remove().commit()
-            if "ns_routera" in ipdb.interfaces: ipdb.interfaces.ns_routera.remove().commit()
-            if "ns_router2a" in ipdb.interfaces: ipdb.interfaces.ns_router2a.remove().commit()
             sim.release()
             ipdb.release()
 
