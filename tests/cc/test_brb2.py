@@ -134,19 +134,23 @@ class TestBPFSocket(TestCase):
 
             # set up the topology
             self.set_default_const()
-            (ns1_ipdb, self.ns1_eth_out, unused) = sim._create_ns(self.ns1, ipaddr=self.vm1_ip+'/24', fn=self.pem_fn,
-                                                                  action='drop', disable_ipv6=True)
-            (ns2_ipdb, self.ns2_eth_out, unused) = sim._create_ns(self.ns2, ipaddr=self.vm2_ip+'/24', fn=self.pem_fn,
-                                                                  action='drop', disable_ipv6=True)
+            (ns1_ipdb, self.ns1_eth_out, _) = sim._create_ns(self.ns1, ipaddr=self.vm1_ip+'/24',
+                                                             fn=self.pem_fn, action='drop',
+                                                             disable_ipv6=True)
+            (ns2_ipdb, self.ns2_eth_out, _) = sim._create_ns(self.ns2, ipaddr=self.vm2_ip+'/24',
+                                                             fn=self.pem_fn, action='drop',
+                                                             disable_ipv6=True)
             ns1_ipdb.routes.add({'dst': self.vm2_rtr_mask, 'gateway': self.vm1_rtr_ip}).commit()
             ns2_ipdb.routes.add({'dst': self.vm1_rtr_mask, 'gateway': self.vm2_rtr_ip}).commit()
 
-            (rt_ipdb, self.nsrtr_eth0_out, unused) = sim._create_ns(self.ns_router, ipaddr=self.vm1_rtr_ip+'/24',
-                                                                    disable_ipv6=True)
-            (rt_ipdb, self.nsrtr_eth1_out, unused) = sim._ns_add_ifc(self.ns_router, "eth1", ipaddr=self.vm2_rtr_ip+'/24',
-                                                                     disable_ipv6=True)
+            (_, self.nsrtr_eth0_out, _) = sim._create_ns(self.ns_router, ipaddr=self.vm1_rtr_ip+'/24',
+                                                         disable_ipv6=True)
+            (rt_ipdb, self.nsrtr_eth1_out, _) = sim._ns_add_ifc(self.ns_router, "eth1", "ns_router2",
+                                                                ipaddr=self.vm2_rtr_ip+'/24',
+                                                                disable_ipv6=True)
             # enable ip forwarding in router ns
-            nsp = NSPopen(rt_ipdb.nl.netns, ["sysctl", "-w", "net.ipv4.ip_forward=1"]); nsp.wait(); nsp.release()
+            nsp = NSPopen(rt_ipdb.nl.netns, ["sysctl", "-w", "net.ipv4.ip_forward=1"])
+            nsp.wait(); nsp.release()
 
             # for each VM connecting to pem, there will be a corresponding veth connecting to the bridge
             self.setup_br(self.br1, self.nsrtr_eth0_out.ifname, self.veth_pem_2_br1, self.veth_br1_2_pem)
@@ -163,23 +167,26 @@ class TestBPFSocket(TestCase):
             # iperf, run server on the background
             nsp_server = NSPopen(ns2_ipdb.nl.netns, ["iperf", "-s", "-xSCD"])
             sleep(1)
-            nsp = NSPopen(ns1_ipdb.nl.netns, ["iperf", "-c", self.vm2_ip, "-t", "1", "-xSC"]); nsp.wait(); nsp.release()
+            nsp = NSPopen(ns1_ipdb.nl.netns, ["iperf", "-c", self.vm2_ip, "-t", "1", "-xSC"])
+            nsp.wait(); nsp.release()
             nsp_server.kill(); nsp_server.wait(); nsp.release()
 
             # netperf, run server on the background
             nsp_server = NSPopen(ns2_ipdb.nl.netns, ["netserver"])
             sleep(1)
-            nsp = NSPopen(ns1_ipdb.nl.netns, ["netperf", "-l", "1", "-H", self.vm2_ip, "--", "-m", "65160"]); nsp.wait(); nsp.release()
-            nsp = NSPopen(ns1_ipdb.nl.netns, ["netperf", "-l", "1", "-H", self.vm2_ip, "-t", "TCP_RR"]); nsp.wait(); nsp.release()
+            nsp = NSPopen(ns1_ipdb.nl.netns, ["netperf", "-l", "1", "-H", self.vm2_ip, "--", "-m", "65160"])
+            nsp.wait(); nsp.release()
+            nsp = NSPopen(ns1_ipdb.nl.netns, ["netperf", "-l", "1", "-H", self.vm2_ip, "-t", "TCP_RR"])
+            nsp.wait(); nsp.release()
             nsp_server.kill(); nsp_server.wait(); nsp.release()
 
         finally:
             # this is a little bit hacker, but we want to be sure to remove all created interfaces
             # ns1_eth_out, ns2_eth_out, nsrtr_eth0_out, nsrtr_eth1_out
-            if "ns1eth0a" in ipdb.interfaces: ipdb.interfaces.ns1eth0a.remove().commit()
-            if "ns2eth0a" in ipdb.interfaces: ipdb.interfaces.ns2eth0a.remove().commit()
-            if "ns_routereth0a" in ipdb.interfaces: ipdb.interfaces.ns_routereth0a.remove().commit()
-            if "ns_routereth1a" in ipdb.interfaces: ipdb.interfaces.ns_routereth1a.remove().commit()
+            if "ns1a" in ipdb.interfaces: ipdb.interfaces.ns1a.remove().commit()
+            if "ns2a" in ipdb.interfaces: ipdb.interfaces.ns2a.remove().commit()
+            if "ns_routera" in ipdb.interfaces: ipdb.interfaces.ns_routera.remove().commit()
+            if "ns_router2a" in ipdb.interfaces: ipdb.interfaces.ns_router2a.remove().commit()
 
             if self.br1 in ipdb.interfaces: ipdb.interfaces[self.br1].remove().commit()
             if self.br2 in ipdb.interfaces: ipdb.interfaces[self.br2].remove().commit()

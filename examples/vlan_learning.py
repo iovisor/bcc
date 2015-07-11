@@ -91,7 +91,7 @@ class VlanSimulation(Simulation):
                        ((i >> 16) & 0xff, (i >> 8) & 0xff, i & 0xff))
 
             # assign this client to the given worker
-            idx = self.ipdb.interfaces["worker%deth0a" % i]["index"]
+            idx = self.ipdb.interfaces["worker%da" % i]["index"]
             mac = int(macaddr.replace(":", ""), 16)
             ingress[ingress.Key(mac)] = ingress.Leaf(idx, 0, 0)
 

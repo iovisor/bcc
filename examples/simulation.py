@@ -15,8 +15,12 @@ class Simulation(object):
         self.released = False
 
     # helper function to add additional ifc to namespace
-    def _ns_add_ifc(self, name, ns_ifc, in_ifc=None, out_ifc=None, ipaddr=None,
-                    macaddr=None, fn=None, cmd=None, action="ok", disable_ipv6=False):
+    # if called directly outside Simulation class, "ifc_base_name" should be
+    # different from "name", the "ifc_base_name" and "name" are the same for
+    # the first ifc created by namespace
+    def _ns_add_ifc(self, name, ns_ifc, ifc_base_name, in_ifc=None, out_ifc=None,
+                    ipaddr=None, macaddr=None, fn=None, cmd=None, action="ok",
+                    disable_ipv6=False):
         if name in self.ipdbs:
             ns_ipdb = self.ipdbs[name]
         else:
@@ -24,8 +28,8 @@ class Simulation(object):
         if in_ifc:
             in_ifname = in_ifc.ifname
         else:
-            out_ifc = self.ipdb.create(ifname="%s%sa" % (name, ns_ifc), kind="veth",
-                                       peer="%s%sb" % (name, ns_ifc)).commit()
+            out_ifc = self.ipdb.create(ifname="%sa" % ifc_base_name, kind="veth",
+                                       peer="%sb" % ifc_base_name).commit()
             in_ifc = self.ipdb.interfaces[out_ifc.peer]
             in_ifname = in_ifc.ifname
         with in_ifc as v:
@@ -40,8 +44,10 @@ class Simulation(object):
             v.up()
         # if required, disable ipv6 before attaching the filter
         if disable_ipv6:
-            subprocess.call(["sysctl", "-q", "-w", "net.ipv6.conf." + out_ifc.ifname+ ".disable_ipv6=1"])
-            nsp = NSPopen(ns_ipdb.nl.netns, ["sysctl", "-q", "-w", "net.ipv6.conf." + ns_ifc + ".disable_ipv6=1"])
+            subprocess.call(["sysctl", "-q", "-w",
+                             "net.ipv6.conf." + out_ifc.ifname+ ".disable_ipv6=1"])
+            nsp = NSPopen(ns_ipdb.nl.netns,
+                          ["sysctl", "-q", "-w", "net.ipv6.conf." + ns_ifc + ".disable_ipv6=1"])
             nsp.wait(); nsp.release()
         if fn and out_ifc:
             self.ipdb.nl.tc("add", "ingress", out_ifc["index"], "ffff:")
@@ -55,8 +61,9 @@ class Simulation(object):
     # helper function to create a namespace and a veth connecting it
     def _create_ns(self, name, in_ifc=None, out_ifc=None, ipaddr=None,
                    macaddr=None, fn=None, cmd=None, action="ok", disable_ipv6=False):
-        (ns_ipdb, out_ifc, in_ifc) = self._ns_add_ifc(name, "eth0", in_ifc, out_ifc, ipaddr,
-                                                      macaddr, fn, cmd, action, disable_ipv6)
+        (ns_ipdb, out_ifc, in_ifc) = self._ns_add_ifc(name, "eth0", name, in_ifc, out_ifc,
+                                                      ipaddr, macaddr, fn, cmd, action,
+                                                      disable_ipv6)
         self.ipdbs[ns_ipdb.nl.netns] = ns_ipdb
         self.namespaces.append(ns_ipdb.nl)
         return (ns_ipdb, out_ifc, in_ifc)
