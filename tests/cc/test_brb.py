@@ -109,7 +109,7 @@ class TestBPFSocket(TestCase):
         br_dest_map[c_uint(curr_br_pid)] = br_dest_map.Leaf(prog_id_pem, curr_pem_pid)
         self.pem_port[c_uint(curr_pem_pid)] = c_uint(ifindex)
         self.pem_ifindex[c_uint(ifindex)] = c_uint(curr_pem_pid)
-        mac_addr = br_mac_map.Key(int(EUI(vm_mac.decode())))
+        mac_addr = br_mac_map.Key(int(EUI(vm_mac)))
         br_mac_map[mac_addr] = c_uint(curr_br_pid)
 
     def config_maps(self):

@@ -18,13 +18,18 @@ class Simulation(object):
     # if called directly outside Simulation class, "ifc_base_name" should be
     # different from "name", the "ifc_base_name" and "name" are the same for
     # the first ifc created by namespace
-    def _ns_add_ifc(self, name, ns_ifc, ifc_base_name, in_ifc=None, out_ifc=None,
-                    ipaddr=None, macaddr=None, fn=None, cmd=None, action="ok",
-                    disable_ipv6=False):
+    def _ns_add_ifc(self, name, ns_ifc, ifc_base_name=None, in_ifc=None,
+                    out_ifc=None, ipaddr=None, macaddr=None, fn=None, cmd=None,
+                    action="ok", disable_ipv6=False):
         if name in self.ipdbs:
             ns_ipdb = self.ipdbs[name]
         else:
             ns_ipdb = IPDB(nl=NetNS(name))
+            if disable_ipv6:
+                cmd = ["sysctl", "-q", "-w", "net.ipv6.conf.default.disable_ipv6=1"]
+                nsp = NSPopen(ns_ipdb.nl.netns, cmd)
+                nsp.wait(); nsp.release()
+            ns_ipdb.interfaces.lo.up().commit()
         if in_ifc:
             in_ifname = in_ifc.ifname
         else:
@@ -43,13 +48,6 @@ class Simulation(object):
             if ipaddr: v.add_ip("%s" % ipaddr)
             if macaddr: v.address = macaddr
             v.up()
-        # if required, disable ipv6 before attaching the filter
-        if disable_ipv6:
-            subprocess.call(["sysctl", "-q", "-w",
-                             "net.ipv6.conf." + out_ifc.ifname+ ".disable_ipv6=1"])
-            nsp = NSPopen(ns_ipdb.nl.netns,
-                          ["sysctl", "-q", "-w", "net.ipv6.conf." + ns_ifc + ".disable_ipv6=1"])
-            nsp.wait(); nsp.release()
         if fn and out_ifc:
             self.ipdb.nl.tc("add", "ingress", out_ifc["index"], "ffff:")
             self.ipdb.nl.tc("add-filter", "bpf", out_ifc["index"], ":1",
