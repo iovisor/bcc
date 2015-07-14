@@ -37,6 +37,7 @@ class Simulation(object):
             v.net_ns_fd = ns_ipdb.nl.netns
         in_ifc = ns_ipdb.interfaces[in_ifname]
         if out_ifc: out_ifc.up().commit()
+        ns_ipdb.interfaces.lo.up().commit()
         with in_ifc as v:
             v.ifname = ns_ifc
             if ipaddr: v.add_ip("%s" % ipaddr)
@@ -73,7 +74,13 @@ class Simulation(object):
         self.released = True
         for p in self.processes:
             if p.released: continue
-            p.kill(); p.wait(); p.release()
+            try:
+                p.kill()
+                p.wait()
+            except:
+                pass
+            finally:
+                p.release()
         for name, db in self.ipdbs.items(): db.release()
         for ns in self.namespaces: ns.remove()
 
