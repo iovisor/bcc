@@ -26,7 +26,8 @@ class Simulation(object):
         else:
             ns_ipdb = IPDB(nl=NetNS(name))
             if disable_ipv6:
-                cmd = ["sysctl", "-q", "-w", "net.ipv6.conf.default.disable_ipv6=1"]
+                cmd = ["sysctl", "-q", "-w",
+                       "net.ipv6.conf.default.disable_ipv6=1"]
                 nsp = NSPopen(ns_ipdb.nl.netns, cmd)
                 nsp.wait(); nsp.release()
             ns_ipdb.interfaces.lo.up().commit()
@@ -48,6 +49,10 @@ class Simulation(object):
             if ipaddr: v.add_ip("%s" % ipaddr)
             if macaddr: v.address = macaddr
             v.up()
+        if disable_ipv6:
+            cmd = ["sysctl", "-q", "-w",
+                   "net.ipv6.conf.%s.disable_ipv6=1" % out_ifc.ifname]
+            subprocess.call(cmd)
         if fn and out_ifc:
             self.ipdb.nl.tc("add", "ingress", out_ifc["index"], "ffff:")
             self.ipdb.nl.tc("add-filter", "bpf", out_ifc["index"], ":1",
