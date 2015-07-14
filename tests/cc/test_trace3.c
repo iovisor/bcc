@@ -28,26 +28,23 @@ static u32 log2l(u64 v) {
 }
 
 int probe_blk_start_request(struct pt_regs *ctx) {
-  struct Request rq = {.rq = ctx->di};
-  struct Time tm = {.start = bpf_ktime_get_ns()};
-  requests.update(&rq, &tm);
+  requests.update((struct Request){ctx->di}, (struct Time){bpf_ktime_get_ns()});
   return 0;
 }
 
 int probe_blk_update_request(struct pt_regs *ctx) {
   struct Request rq = {.rq = ctx->di};
-  struct Time *tm = requests.lookup(&rq);
+  struct Time *tm = requests.lookup(rq);
   if (!tm) return 0;
   u64 delta = bpf_ktime_get_ns() - tm->start;
-  requests.delete(&rq);
+  requests.delete(rq);
   u64 lg = log2l(delta);
   u64 base = 1ull << lg;
   u32 index = (lg * 64 + (delta - base) * 64 / base) * 3 / 64;
   if (index >= SLOTS)
     index = SLOTS - 1;
 
-  u64 zero = 0;
-  u64 *val = latency.lookup_or_init(&index, &zero);
+  u64 *val = latency.lookup_or_init(index, 0);
   lock_xadd(val, 1);
   return 0;
 }

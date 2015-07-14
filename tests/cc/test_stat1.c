@@ -46,8 +46,7 @@ int on_packet(struct __sk_buff *skb) {
       key.sip = ip->dst;
       tx = 1;
     }
-    struct IPLeaf zleaf = {0};
-    struct IPLeaf *leaf = stats.lookup_or_init(&key, &zleaf);
+    struct IPLeaf *leaf = stats.lookup_or_init(key, (struct IPLeaf){0});
     lock_xadd(&leaf->rx_pkts, rx);
     lock_xadd(&leaf->tx_pkts, tx);
   }

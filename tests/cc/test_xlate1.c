@@ -43,8 +43,7 @@ int on_packet(struct __sk_buff *skb) {
     struct arp_t *arp = cursor_advance(cursor, sizeof(*arp));
     orig_dip = arp->tpa;
     orig_sip = arp->spa;
-    struct IPKey key = {.dip=orig_dip, .sip=orig_sip};
-    xleaf = xlate.lookup(&key);
+    xleaf = xlate.lookup((struct IPKey){orig_dip, orig_sip});
     if (xleaf) {
       arp->tpa = xleaf->xdip;
       arp->spa = xleaf->xsip;
@@ -57,8 +56,7 @@ int on_packet(struct __sk_buff *skb) {
     struct ip_t *ip = cursor_advance(cursor, sizeof(*ip));
     orig_dip = ip->dst;
     orig_sip = ip->src;
-    struct IPKey key = {.dip=orig_dip, .sip=orig_sip};
-    xleaf = xlate.lookup(&key);
+    xleaf = xlate.lookup((struct IPKey){orig_dip, orig_sip});
     if (xleaf) {
       ip->dst = xleaf->xdip;
       incr_cksum_l3(&ip->hchecksum, orig_dip, xleaf->xdip);

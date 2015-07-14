@@ -4,41 +4,41 @@
 #include <bcc/proto.h>
 
 // hash
-struct FwdKey {
+typedef struct {
   u32 dip:32;
-};
-struct FwdLeaf {
+} FwdKey;
+typedef struct {
   u32 fwd_idx:32;
-};
-BPF_TABLE("hash", struct FwdKey, struct FwdLeaf, fwd_map, 1);
+} FwdLeaf;
+BPF_TABLE("hash", FwdKey, FwdLeaf, fwd_map, 1);
 
 // array
-struct ConfigKey {
+typedef struct {
   u32 index;
-};
-struct ConfigLeaf {
+} ConfigKey;
+typedef struct {
   u32 bpfdev_ip;
   u32 slave_ip;
-};
-BPF_TABLE("array", struct ConfigKey, struct ConfigLeaf, config_map, 1);
+} ConfigLeaf;
+BPF_TABLE("array", ConfigKey, ConfigLeaf, config_map, 1);
 
 // hash
-struct MacaddrKey {
+typedef struct {
   u32 ip;
-};
-struct MacaddrLeaf {
+} MacaddrKey;
+typedef struct {
   u64 mac;
-};
-BPF_TABLE("hash", struct MacaddrKey, struct MacaddrLeaf, macaddr_map, 11);
+} MacaddrLeaf;
+BPF_TABLE("hash", MacaddrKey, MacaddrLeaf, macaddr_map, 11);
 
 // hash
-struct SlaveKey {
+typedef struct {
   u32 slave_ip;
-};
-struct SlaveLeaf {
+} SlaveKey;
+typedef struct {
   u32 slave_ifindex;
-};
-BPF_TABLE("hash", struct SlaveKey, struct SlaveLeaf, slave_map, 10);
+} SlaveLeaf;
+BPF_TABLE("hash", SlaveKey, SlaveLeaf, slave_map, 10);
 
 int handle_packet(struct __sk_buff *skb) {
   int ret = 0;
@@ -49,8 +49,7 @@ int handle_packet(struct __sk_buff *skb) {
     // make sure configured
     u32 slave_ip;
 
-    struct ConfigKey cfg_key = {.index = 0};
-    struct ConfigLeaf *cfg_leaf = config_map.lookup(&cfg_key);
+    ConfigLeaf *cfg_leaf = config_map.lookup((ConfigKey){0});
     if (cfg_leaf) {
       slave_ip = cfg_leaf->slave_ip;
     } else {
@@ -59,8 +58,7 @@ int handle_packet(struct __sk_buff *skb) {
 
     // make sure slave configured
     // tx, default to the single slave
-    struct SlaveKey slave_key = {.slave_ip = slave_ip};
-    struct SlaveLeaf *slave_leaf = slave_map.lookup(&slave_key);
+    SlaveLeaf *slave_leaf = slave_map.lookup((SlaveKey){slave_ip});
     if (slave_leaf) {
       ret = slave_leaf->slave_ifindex;
     } else {
@@ -92,9 +90,7 @@ int handle_packet(struct __sk_buff *skb) {
     struct arp_t *arp = cursor_advance(cursor, sizeof(*arp));
     if (skb->pkt_type) {
       if (arp->oper == 1) {
-        struct MacaddrKey mac_key = {.ip=arp->spa};
-        struct MacaddrLeaf mac_leaf = {.mac=arp->sha};
-        macaddr_map.update(&mac_key, &mac_leaf);
+        macaddr_map.update((MacaddrKey){arp->spa}, (MacaddrLeaf){arp->sha});
       }
     }
     goto EOP;
@@ -119,8 +115,7 @@ int handle_packet(struct __sk_buff *skb) {
     }
     if (skb->pkt_type) {
       // lookup and then forward
-      struct FwdKey fwd_key = {.dip=ip->dst};
-      struct FwdLeaf *fwd_val = fwd_map.lookup(&fwd_key);
+      FwdLeaf *fwd_val = fwd_map.lookup((FwdKey){ip->dst});
       if (fwd_val) {
          return fwd_val->fwd_idx;
       }
@@ -131,22 +126,18 @@ int handle_packet(struct __sk_buff *skb) {
       u64 src_mac;
       u64 dst_mac;
 
-      struct ConfigKey cfg_key = {.index = 0};
-      struct ConfigLeaf *cfg_leaf = config_map.lookup(&cfg_key);
+      ConfigLeaf *cfg_leaf = config_map.lookup((ConfigKey){0});
       if (cfg_leaf) {
-        struct MacaddrKey mac_key = {.ip = cfg_leaf->bpfdev_ip};
-        struct MacaddrLeaf *mac_leaf;
+        MacaddrLeaf *mac_leaf;
 
-        mac_key.ip = cfg_leaf->bpfdev_ip;
-        mac_leaf = macaddr_map.lookup(&mac_key);
+        mac_leaf = macaddr_map.lookup((MacaddrKey){cfg_leaf->bpfdev_ip});
         if (mac_leaf) {
           src_mac = mac_leaf->mac;
         } else {
           goto EOP;
         }
 
-        mac_key.ip = cfg_leaf->slave_ip;
-        mac_leaf = macaddr_map.lookup(&mac_key);
+        mac_leaf = macaddr_map.lookup((MacaddrKey){cfg_leaf->slave_ip});
         if (mac_leaf) {
           dst_mac = mac_leaf->mac;
         } else {

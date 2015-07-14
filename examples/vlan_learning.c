@@ -19,15 +19,12 @@ int handle_phys2virt(struct __sk_buff *skb) {
   u8 *cursor = 0;
   ethernet: {
     struct ethernet_t *ethernet = cursor_advance(cursor, sizeof(*ethernet));
-    u64 src_mac = ethernet->src;
-    struct ifindex_leaf_t *leaf = ingress.lookup(&src_mac);
+    struct ifindex_leaf_t *leaf = ingress.lookup(ethernet->src);
     if (leaf) {
       lock_xadd(&leaf->tx_pkts, 1);
       lock_xadd(&leaf->tx_bytes, skb->len);
       // auto-program reverse direction table
-      int out_ifindex = leaf->out_ifindex;
-      struct ifindex_leaf_t zleaf = {0};
-      struct ifindex_leaf_t *out_leaf = egress.lookup_or_init(&out_ifindex, &zleaf);
+      struct ifindex_leaf_t *out_leaf = egress.lookup_or_init(leaf->out_ifindex, (struct ifindex_leaf_t){0});
       // relearn when mac moves ifindex
       if (out_leaf->out_ifindex != skb->ifindex)
         out_leaf->out_ifindex = skb->ifindex;
@@ -41,8 +38,7 @@ int handle_virt2phys(struct __sk_buff *skb) {
   u8 *cursor = 0;
   ethernet: {
     struct ethernet_t *ethernet = cursor_advance(cursor, sizeof(*ethernet));
-    int src_ifindex = skb->ifindex;
-    struct ifindex_leaf_t *leaf = egress.lookup(&src_ifindex);
+    struct ifindex_leaf_t *leaf = egress.lookup(skb->ifindex);
     if (leaf) {
       lock_xadd(&leaf->tx_pkts, 1);
       lock_xadd(&leaf->tx_bytes, skb->len);
