@@ -159,8 +159,12 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
           string lookup = "bpf_map_lookup_elem_(" + pseudo_fd;
           string update = "bpf_map_update_elem_(" + pseudo_fd;
           txt  = "({typeof(" + name + ".leaf) *_leaf; ";
-          txt += "typeof(" + name + ".key) _key = " + arg0 + "; ";
-          txt += "typeof(" + name + ".leaf) _zleaf = " + arg1 + "; ";
+          txt += "typeof(" + name + ".key) _key __attribute__((aligned(8))); ";
+          txt += "memset(&_key, 0, sizeof(_key)); ";
+          txt += "_key = " + arg0 + "; ";
+          txt += "typeof(" + name + ".leaf) _zleaf __attribute__((aligned(8))); ";
+          txt += "memset(&_zleaf, 0, sizeof(_zleaf)); ";
+          txt += "_zleaf = " + arg1 + "; ";
           txt += "_leaf = " + lookup + ", &_key); ";
           txt += "if (!_leaf) {";
           txt += " " + update + ", &_key, &_zleaf, " + map_update_policy + ");";
@@ -170,15 +174,23 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
           txt += "_leaf;})";
         } else if (memb_name == "lookup") {
           txt  = "({typeof(" + name + ".leaf) *_leaf; ";
-          txt += "typeof(" + name + ".key) _key = " + arg0 + "; ";
+          txt += "typeof(" + name + ".key) _key __attribute__((aligned(8))); ";
+          txt += "memset(&_key, 0, sizeof(_key)); ";
+          txt += "_key = " + arg0 + "; ";
           txt += "_leaf = bpf_map_lookup_elem(" + pseudo_fd + ", &_key); ";
           txt += "_leaf;})";
         } else if (memb_name == "update") {
-          txt  = "({typeof(" + name + ".key) _key = " + arg0 + "; ";
-          txt += "typeof(" + name + ".leaf) _leaf = " + arg1 + "; ";
+          txt  = "({typeof(" + name + ".key) _key __attribute__((aligned(8))); ";
+          txt += "memset(&_key, 0, sizeof(_key)); ";
+          txt += "_key = " + arg0 + "; ";
+          txt += "typeof(" + name + ".leaf) _leaf __attribute__((aligned(8))); ";
+          txt += "memset(&_leaf, 0, sizeof(_leaf)); ";
+          txt += "_leaf = " + arg1 + "; ";
           txt += "bpf_map_update_elem(" + pseudo_fd + ", &_key, &_leaf, " + map_update_policy + ");})";
         } else if (memb_name == "delete") {
-          txt  = "({typeof(" + name + ".key) _key = " + arg0 + "; ";
+          txt  = "({typeof(" + name + ".key) _key __attribute__((aligned(8))); ";
+          txt += "memset(&_key, 0, sizeof(_key)); ";
+          txt += "_key = " + arg0 + "; ";
           txt += "bpf_map_delete_elem(" + pseudo_fd + ", &_key);})";
         } else if (memb_name == "call") {
           txt = "bpf_tail_call_(" + pseudo_fd + ", " + args + ")";
