@@ -29,9 +29,7 @@ int classify_wan(struct __sk_buff *skb) {
   }
   ip: {
     struct ip_t *ip = cursor_advance(cursor, sizeof(*ip));
-    u32 dip = ip->dst;
-    struct ipkey key = {.client_ip=dip};
-    int *val = learned_ips.lookup(&key);
+    int *val = learned_ips.lookup((struct ipkey){ip->dst});
     if (val)
       return *val;
     goto EOP;
@@ -54,10 +52,7 @@ int classify_neighbor(struct __sk_buff *skb) {
   }
   ip: {
     struct ip_t *ip = cursor_advance(cursor, sizeof(*ip));
-    u32 sip = ip->src;
-    struct ipkey key = {.client_ip=sip};
-    int val = 1;
-    learned_ips.update(&key, &val);
+    learned_ips.update((struct ipkey){ip->src}, 1);
     goto EOP;
   }
 EOP:

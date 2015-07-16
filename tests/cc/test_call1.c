@@ -15,8 +15,7 @@ int parse_ether(struct __sk_buff *skb) {
   size_t cur = 0;
   size_t next = cur + 14;
 
-  int key = S_ETHER;
-  u64 *leaf = stats.lookup(&key);
+  u64 *leaf = stats.lookup(S_ETHER);
   if (leaf) (*leaf)++;
 
   switch (bpf_dext_pkt(skb, cur + 12, 0, 16)) {
@@ -31,8 +30,7 @@ int parse_arp(struct __sk_buff *skb) {
   size_t cur = 14;  // TODO: get from ctx
   size_t next = cur + 28;
 
-  int key = S_ARP;
-  u64 *leaf = stats.lookup(&key);
+  u64 *leaf = stats.lookup(S_ARP);
   if (leaf) (*leaf)++;
 
   jump.call(skb, S_EOP);
@@ -43,8 +41,7 @@ int parse_ip(struct __sk_buff *skb) {
   size_t cur = 14;  // TODO: get from ctx
   size_t next = cur + 20;
 
-  int key = S_IP;
-  u64 *leaf = stats.lookup(&key);
+  u64 *leaf = stats.lookup(S_IP);
   if (leaf) (*leaf)++;
 
   jump.call(skb, S_EOP);
@@ -52,8 +49,7 @@ int parse_ip(struct __sk_buff *skb) {
 }
 
 int eop(struct __sk_buff *skb) {
-  int key = S_EOP;
-  u64 *leaf = stats.lookup(&key);
+  u64 *leaf = stats.lookup(S_EOP);
   if (leaf) (*leaf)++;
   return 1;
 }

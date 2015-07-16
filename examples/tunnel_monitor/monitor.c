@@ -124,8 +124,7 @@ finish:
   // consistent ordering
   if (key.outer_dip < key.outer_sip)
     swap_ipkey(&key);
-  struct counters zleaf = {0};
-  struct counters *leaf = stats.lookup_or_init(&key, &zleaf);
+  struct counters *leaf = stats.lookup_or_init(key, (struct counters){0});
   if (is_ingress) {
     lock_xadd(&leaf->rx_pkts, 1);
     lock_xadd(&leaf->rx_bytes, skb->len);

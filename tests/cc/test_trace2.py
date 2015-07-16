@@ -10,14 +10,10 @@ from unittest import main, TestCase
 
 text = """
 #include <linux/ptrace.h>
-struct Ptr { u64 ptr; };
-struct Counters { u64 stat1; };
-BPF_TABLE("hash", struct Ptr, struct Counters, stats, 1024);
+BPF_TABLE("hash", u64, u64, stats, 1024);
 
 int count_sched(struct pt_regs *ctx) {
-  struct Ptr key = {.ptr=ctx->bx};
-  struct Counters zleaf = {0};
-  stats.lookup_or_init(&key, &zleaf)->stat1++;
+  (*stats.lookup_or_init(ctx->bx, 0))++;
   return 0;
 }
 """
@@ -33,7 +29,7 @@ class TestTracingEvent(TestCase):
         for i in range(0, 100):
             sleep(0.01)
         for key, leaf in self.stats.items():
-            print("ptr %x:" % key.ptr, "stat1 %x" % leaf.stat1)
+            print("ptr %x:" % key.value, "stat1 %x" % leaf.value)
 
 if __name__ == "__main__":
     main()

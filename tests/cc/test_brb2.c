@@ -9,15 +9,11 @@ BPF_TABLE("hash", u32, u32, pem_dest, 256);
 BPF_TABLE("array", u32, u32, pem_stats, 1);
 
 int pem(struct __sk_buff *skb) {
-    u32 ifindex_in, *ifindex_p;
-
-    ifindex_in = skb->ingress_ifindex;
-    ifindex_p = pem_dest.lookup(&ifindex_in);
+    u32 *ifindex_p = pem_dest.lookup(skb->ingress_ifindex);
     if (ifindex_p) {
 #if 1
         /* accumulate stats */
-        u32 index = 0;
-        u32 *value = pem_stats.lookup(&index);
+        u32 *value = pem_stats.lookup(0);
         if (value)
             lock_xadd(value, 1);
 #endif

@@ -75,10 +75,10 @@ int pem(struct __sk_buff *skb) {
     if (!meta.prog_id) {
         /* from external */
         ifindex = skb->ingress_ifindex;
-        tx_port_id_p = pem_ifindex.lookup(&ifindex);
+        tx_port_id_p = pem_ifindex.lookup(ifindex);
         if (tx_port_id_p) {
             tx_port_id = *tx_port_id_p;
-            dest_p = pem_dest.lookup(&tx_port_id);
+            dest_p = pem_dest.lookup(tx_port_id);
             if (dest_p) {
                 skb->cb[0] = dest_p->prog_id;
                 skb->cb[1] = dest_p->port_id;
@@ -88,12 +88,12 @@ int pem(struct __sk_buff *skb) {
     } else {
         /* from internal */
         rx_port = meta.rx_port_id;
-        ifindex_p = pem_port.lookup(&rx_port);
+        ifindex_p = pem_port.lookup(rx_port);
         if (ifindex_p) {
 #if 1
             /* accumulate stats, may hurt performance slightly */
             u32 index = 0;
-            u32 *value = pem_stats.lookup(&index);
+            u32 *value = pem_stats.lookup(index);
             if (value)
                 lock_xadd(value, 1);
 #endif
@@ -130,17 +130,17 @@ static int br_common(struct __sk_buff *skb, int which_br) {
             if (dmac.addr == 0xffffffffffffULL) {
                  index = 0;
                  if (which_br == 1)
-                     rtrif_p = br1_rtr.lookup(&index);
+                     rtrif_p = br1_rtr.lookup(index);
                  else 
-                     rtrif_p = br2_rtr.lookup(&index);
+                     rtrif_p = br2_rtr.lookup(index);
                  if (rtrif_p)
                      bpf_clone_redirect(skb, *rtrif_p, 0);
              } else {
                  /* the dmac address should match the router's */
                  if (which_br == 1)
-                     rtrif_p = br1_mac_ifindex.lookup(&dmac);
+                     rtrif_p = br1_mac_ifindex.lookup(dmac);
                  else
-                     rtrif_p = br2_mac_ifindex.lookup(&dmac);
+                     rtrif_p = br2_mac_ifindex.lookup(dmac);
                  if (rtrif_p)
                      bpf_clone_redirect(skb, *rtrif_p, 0);
              }
@@ -173,18 +173,18 @@ static int br_common(struct __sk_buff *skb, int which_br) {
         if (arpop == 2) {
             index = 0;
             if (which_br == 1)
-                rtrif_p = br1_rtr.lookup(&index);
+                rtrif_p = br1_rtr.lookup(index);
             else
-                rtrif_p = br2_rtr.lookup(&index);
+                rtrif_p = br2_rtr.lookup(index);
             if (rtrif_p) {
                 __u32 ifindex = *rtrif_p;
                 eth_addr_t smac;
 
                 smac.addr = ethernet->src;
                 if (which_br == 1)
-                    br1_mac_ifindex.update(&smac, &ifindex);
+                    br1_mac_ifindex.update(smac, ifindex);
                 else
-                    br2_mac_ifindex.update(&smac, &ifindex);
+                    br2_mac_ifindex.update(smac, ifindex);
             }
         }
         goto xmit;
@@ -197,15 +197,15 @@ static int br_common(struct __sk_buff *skb, int which_br) {
 
 xmit:
     if (which_br == 1)
-        tx_port_id_p = br1_mac.lookup(&dmac);
+        tx_port_id_p = br1_mac.lookup(dmac);
     else
-        tx_port_id_p = br2_mac.lookup(&dmac);
+        tx_port_id_p = br2_mac.lookup(dmac);
     if (tx_port_id_p) {
         tx_port_id = *tx_port_id_p;
         if (which_br == 1)
-            dest_p = br1_dest.lookup(&tx_port_id);
+            dest_p = br1_dest.lookup(tx_port_id);
         else
-            dest_p = br2_dest.lookup(&tx_port_id);
+            dest_p = br2_dest.lookup(tx_port_id);
         if (dest_p) {
             skb->cb[0] = dest_p->prog_id;
             skb->cb[1] = dest_p->port_id;

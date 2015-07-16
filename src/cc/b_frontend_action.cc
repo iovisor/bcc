@@ -134,6 +134,12 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
         SourceRange argRange(Call->getArg(0)->getLocStart(),
                              Call->getArg(Call->getNumArgs()-1)->getLocEnd());
         string args = rewriter_.getRewrittenText(argRange);
+        string arg0 = rewriter_.getRewrittenText(SourceRange(Call->getArg(0)->getLocStart(),
+                                                             Call->getArg(0)->getLocEnd()));
+        string arg1;
+        if (Call->getNumArgs() > 1)
+          arg1 = rewriter_.getRewrittenText(SourceRange(Call->getArg(1)->getLocStart(),
+                                                        Call->getArg(1)->getLocEnd()));
 
         // find the table fd, which was opened at declaration time
         auto table_it = tables_.find(Ref->getDecl()->getName());
@@ -143,45 +149,54 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
           return false;
         }
         string fd = to_string(table_it->second.fd);
+        string pseudo_fd = "bpf_pseudo_fd(1, " + fd + ")";
         string prefix, suffix;
         string map_update_policy = "BPF_ANY";
+        string name = Ref->getDecl()->getName();
         string txt;
         if (memb_name == "lookup_or_init") {
-          string map_update_policy = "BPF_NOEXIST";
-          string name = Ref->getDecl()->getName();
-          string arg0 = rewriter_.getRewrittenText(SourceRange(Call->getArg(0)->getLocStart(),
-                                                               Call->getArg(0)->getLocEnd()));
-          string arg1 = rewriter_.getRewrittenText(SourceRange(Call->getArg(1)->getLocStart(),
-                                                               Call->getArg(1)->getLocEnd()));
-          string lookup = "bpf_map_lookup_elem_(bpf_pseudo_fd(1, " + fd + ")";
-          string update = "bpf_map_update_elem_(bpf_pseudo_fd(1, " + fd + ")";
-          txt  = "({typeof(" + name + ".leaf) *leaf = " + lookup + ", " + arg0 + "); ";
-          txt += "if (!leaf) {";
-          txt += " " + update + ", " + arg0 + ", " + arg1 + ", " + map_update_policy + ");";
-          txt += " leaf = " + lookup + ", " + arg0 + ");";
-          txt += " if (!leaf) return 0;";
-          txt += "}";
-          txt += "leaf;})";
+          map_update_policy = "BPF_NOEXIST";
+          string lookup = "bpf_map_lookup_elem_(" + pseudo_fd;
+          string update = "bpf_map_update_elem_(" + pseudo_fd;
+          txt  = "({typeof(" + name + ".leaf) *_leaf; ";
+          txt += "typeof(" + name + ".key) _key __attribute__((aligned(8))); ";
+          txt += "memset(&_key, 0, sizeof(_key)); ";
+          txt += "_key = " + arg0 + "; ";
+          txt += "typeof(" + name + ".leaf) _zleaf __attribute__((aligned(8))); ";
+          txt += "memset(&_zleaf, 0, sizeof(_zleaf)); ";
+          txt += "_zleaf = " + arg1 + "; ";
+          txt += "_leaf = " + lookup + ", &_key); ";
+          txt += "if (!_leaf) {";
+          txt += " " + update + ", &_key, &_zleaf, " + map_update_policy + ");";
+          txt += " _leaf = " + lookup + ", &_key);";
+          txt += " if (!_leaf) return 0;";
+          txt += "} ";
+          txt += "_leaf;})";
+        } else if (memb_name == "lookup") {
+          txt  = "({typeof(" + name + ".leaf) *_leaf; ";
+          txt += "typeof(" + name + ".key) _key __attribute__((aligned(8))); ";
+          txt += "memset(&_key, 0, sizeof(_key)); ";
+          txt += "_key = " + arg0 + "; ";
+          txt += "_leaf = bpf_map_lookup_elem(" + pseudo_fd + ", &_key); ";
+          txt += "_leaf;})";
+        } else if (memb_name == "update") {
+          txt  = "({typeof(" + name + ".key) _key __attribute__((aligned(8))); ";
+          txt += "memset(&_key, 0, sizeof(_key)); ";
+          txt += "_key = " + arg0 + "; ";
+          txt += "typeof(" + name + ".leaf) _leaf __attribute__((aligned(8))); ";
+          txt += "memset(&_leaf, 0, sizeof(_leaf)); ";
+          txt += "_leaf = " + arg1 + "; ";
+          txt += "bpf_map_update_elem(" + pseudo_fd + ", &_key, &_leaf, " + map_update_policy + ");})";
+        } else if (memb_name == "delete") {
+          txt  = "({typeof(" + name + ".key) _key __attribute__((aligned(8))); ";
+          txt += "memset(&_key, 0, sizeof(_key)); ";
+          txt += "_key = " + arg0 + "; ";
+          txt += "bpf_map_delete_elem(" + pseudo_fd + ", &_key);})";
+        } else if (memb_name == "call") {
+          txt = "bpf_tail_call_(" + pseudo_fd + ", " + args + ")";
         } else {
-          if (memb_name == "lookup") {
-            prefix = "bpf_map_lookup_elem";
-            suffix = ")";
-          } else if (memb_name == "update") {
-            prefix = "bpf_map_update_elem";
-            suffix = ", " + map_update_policy + ")";
-          } else if (memb_name == "delete") {
-            prefix = "bpf_map_delete_elem";
-            suffix = ")";
-          } else if (memb_name == "call") {
-            prefix = "bpf_tail_call_";
-            suffix = ")";
-          } else {
-            llvm::errs() << "error: unknown bpf_table operation " << memb_name << "\n";
-            return false;
-          }
-          prefix += "((void *)bpf_pseudo_fd(1, " + fd + "), ";
-
-          txt = prefix + args + suffix;
+          llvm::errs() << "error: unknown bpf_table operation " << memb_name << "\n";
+          return false;
         }
         if (!rewriter_.isRewritable(Call->getLocStart())) {
           C.getDiagnostics().Report(Call->getLocStart(), diag::err_expected)
