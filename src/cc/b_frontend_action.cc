@@ -386,6 +386,10 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
         if (KERNEL_VERSION(major,minor,0) >= KERNEL_VERSION(4,2,0))
           map_type = BPF_MAP_TYPE_PROG_ARRAY;
       }
+      if (map_type == BPF_MAP_TYPE_UNSPEC) {
+        llvm::errs() << "error: maps/prog is not supported\n";
+        return false;
+      }
     }
     table.fd = bpf_create_map(map_type, table.key_size, table.leaf_size, table.max_entries);
     if (table.fd < 0) {
