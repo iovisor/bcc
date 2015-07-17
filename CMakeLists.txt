@@ -16,8 +16,18 @@ endif()
 if(NOT PYTHON_ONLY)
 find_package(BISON)
 find_package(FLEX)
-find_package(LLVM REQUIRED CONFIG)
-message(STATUS "Found LLVM: ${LLVM_INCLUDE_DIRS}")
+
+if(EXISTS /usr/share/llvm-3.7/cmake/LLVMConfig.cmake)
+  # Likely we have a standard installation with pre-built packages
+  set(BASE_LLVM_INSTALL_DIR "/usr/lib/llvm-3.7")
+  set(LLVM_INCLUDE_DIRS "${BASE_LLVM_INSTALL_DIR}/include")
+  set(LLVM_DEFINITIONS "-D__STDC_LIMIT_MACROS;-D__STDC_CONSTANT_MACROS")
+  set(LLVM_LIBRARY_DIRS "${BASE_LLVM_INSTALL_DIR}/lib")
+  set(FIND_LLVM_PACKAGE_CALLED 0)
+else()
+  find_package(LLVM)
+  set(FIND_LLVM_PACKAGE_CALLED 1)
+endif()
 
 # clang is linked as a library, but the library path searching is
 # primitively supported, unlike libLLVM
@@ -40,6 +50,13 @@ endif()
 FOREACH(DIR ${LLVM_INCLUDE_DIRS})
   include_directories("${DIR}/../tools/clang/include")
 ENDFOREACH()
+
+if(FIND_LLVM_PACKAGE_CALLED EQUAL 0)
+  # LLVMExports.cmake and LLVMExports-release.cmake are adapted from a local
+  # llvm cmake build with -DBUILD_SHARED_LIBS=OFF
+  set(_IMPORT_PREFIX "${BASE_LLVM_INSTALL_DIR}")
+  include("LLVMExports.cmake")
+endif()
 
 set(CMAKE_C_FLAGS "-Wall")
 set(CMAKE_CXX_FLAGS "-std=c++11 -Wall")
