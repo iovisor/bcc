@@ -177,7 +177,8 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
             prefix = "bpf_tail_call_";
             suffix = ")";
           } else {
-            llvm::errs() << "error: unknown bpf_table operation " << memb_name << "\n";
+            C.getDiagnostics().Report(Call->getLocStart(), diag::err_expected)
+                << "valid bpf_table operation";
             return false;
           }
           prefix += "((void *)bpf_pseudo_fd(1, " + fd + "), ";
@@ -387,13 +388,15 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
           map_type = BPF_MAP_TYPE_PROG_ARRAY;
       }
       if (map_type == BPF_MAP_TYPE_UNSPEC) {
-        llvm::errs() << "error: maps/prog is not supported\n";
+        C.getDiagnostics().Report(Decl->getLocStart(), diag::err_expected)
+            << "kernel supporting maps/prog";
         return false;
       }
     }
     table.fd = bpf_create_map(map_type, table.key_size, table.leaf_size, table.max_entries);
     if (table.fd < 0) {
-      llvm::errs() << "error: could not open bpf fd\n";
+      C.getDiagnostics().Report(Decl->getLocStart(), diag::err_expected)
+           << "valid bpf fd";
       return false;
     }
     tables_[Decl->getName()] = std::move(table);
