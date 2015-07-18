@@ -15,6 +15,7 @@
  */
 #include <linux/bpf.h>
 #include <linux/version.h>
+#include <sys/utsname.h>
 
 #include <clang/AST/ASTConsumer.h>
 #include <clang/AST/ASTContext.h>
@@ -176,7 +177,8 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
             prefix = "bpf_tail_call_";
             suffix = ")";
           } else {
-            llvm::errs() << "error: unknown bpf_table operation " << memb_name << "\n";
+            C.getDiagnostics().Report(Call->getLocStart(), diag::err_expected)
+                << "valid bpf_table operation";
             return false;
           }
           prefix += "((void *)bpf_pseudo_fd(1, " + fd + "), ";
@@ -376,13 +378,25 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
       map_type = BPF_MAP_TYPE_HASH;
     else if (A->getName() == "maps/array")
       map_type = BPF_MAP_TYPE_ARRAY;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,2,0)
-    else if (A->getName() == "maps/prog")
-      map_type = BPF_MAP_TYPE_PROG_ARRAY;
-#endif
+    else if (A->getName() == "maps/prog") {
+      struct utsname un;
+      if (uname(&un) == 0) {
+        int major = 0, minor = 0;
+        // release format: <major>.<minor>.<revision>[-<othertag>]
+        sscanf(un.release, "%d.%d.", &major, &minor);
+        if (KERNEL_VERSION(major,minor,0) >= KERNEL_VERSION(4,2,0))
+          map_type = BPF_MAP_TYPE_PROG_ARRAY;
+      }
+      if (map_type == BPF_MAP_TYPE_UNSPEC) {
+        C.getDiagnostics().Report(Decl->getLocStart(), diag::err_expected)
+            << "kernel supporting maps/prog";
+        return false;
+      }
+    }
     table.fd = bpf_create_map(map_type, table.key_size, table.leaf_size, table.max_entries);
     if (table.fd < 0) {
-      llvm::errs() << "error: could not open bpf fd\n";
+      C.getDiagnostics().Report(Decl->getLocStart(), diag::err_expected)
+           << "valid bpf fd";
       return false;
     }
     tables_[Decl->getName()] = std::move(table);
