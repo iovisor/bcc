@@ -32,7 +32,9 @@ add_library(bpfprog SHARED bpf_common.cc bpf_module.cc codegen_llvm.cc
 
 # BPF is still experimental otherwise it should be available
 #llvm_map_components_to_libnames(llvm_libs bpf mcjit irreader passes)
-llvm_map_components_to_libnames(llvm_libs mcjit irreader passes linker instrumentation objcarcopts bitwriter option)
+#llvm_map_components_to_libnames(llvm_libs mcjit irreader passes linker instrumentation objcarcopts bitwriter option)
+set(llvm_libs "LLVMMCJIT;LLVMIRReader;LLVMPasses;LLVMLinker;LLVMInstrumentation;LLVMObjCARCOpts;LLVMBitWriter;LLVMOption")
+
 # order is important
 set(clang_libs ${libclangFrontend} ${libclangSerialization} ${libclangDriver} ${libclangParse}
   ${libclangSema} ${libclangCodeGen} ${libclangAnalysis} ${libclangRewrite} ${libclangEdit}
