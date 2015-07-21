@@ -182,6 +182,9 @@ class BPF(object):
             raise Exception("Failed to compile BPF module %s" % src_file)
 
     def load_func(self, func_name, prog_type):
+        if func_name in self.funcs:
+            return self.funcs[func_name]
+
         if lib.bpf_function_start(self.module, func_name.encode("ascii")) == None:
             raise Exception("Unknown program %s" % func_name)
 
