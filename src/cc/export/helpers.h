@@ -74,6 +74,12 @@ static u64 (*bpf_get_current_uid_gid)(void) =
 	(void *) BPF_FUNC_get_current_uid_gid;
 static int (*bpf_get_current_comm)(void *buf, int buf_size) =
 	(void *) BPF_FUNC_get_current_comm;
+static u64 (*bpf_get_cgroup_classid)(void *ctx) =
+        (void *) BPF_FUNC_get_cgroup_classid;
+static u64 (*bpf_skb_vlan_push)(void *ctx, u16 proto, u16 vlan_tci) =
+        (void *) BPF_FUNC_skb_vlan_push;
+static u64 (*bpf_skb_vlan_pop)(void *ctx) =
+        (void *) BPF_FUNC_skb_vlan_pop;
 static void bpf_tail_call_(u64 map_fd, void *ctx, int index) {
   ((void (*)(void *, u64, int))BPF_FUNC_tail_call)(ctx, map_fd, index);
 }

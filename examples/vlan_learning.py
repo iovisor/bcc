@@ -14,14 +14,14 @@
 # overlapping IP spaces and the traffic will still work.
 
 #                |           bpf program                      |
-# cli0 --|       | |----\                     /--|-- worker0  |
-# cli1 --| trunk | |----->-handle_p2v(pkt)-> /---|-- worker1  |
-# cli2 --|=======|=|----/                   /----|-- worker2  |
-# ...  --|       | |---/ <-handle_v2p(pkt)-<-----|--  ...     |
-# cliN --|       | |--/                     \----|-- workerM  |
-#        |       |  ^                           ^             |
-#      phys      |  vlan                      veth            |
-#     switch     |  subinterface                              |
+# cli0 --|       |                            /--|-- worker0  |
+# cli1 --| trunk | +->--->-handle_p2v(pkt)-> /---|-- worker1  |
+# cli2 --|=======|=+                        /----|-- worker2  |
+# ...  --|       | +-<---<-handle_v2p(pkt)-<-----|--  ...     |
+# cliN --|       |                          \----|-- workerM  |
+#        |       |                              ^             |
+#      phys      |                            veth            |
+#     switch     |                                            |
 
 from bpf import BPF
 from builtins import input
@@ -63,22 +63,12 @@ class VlanSimulation(Simulation):
             v.up()
         self.ipdb.interfaces.eth0b.up().commit()
 
-        # connect the trunk to the bridge
-        with self.ipdb.create(ifname="br100", kind="bridge") as br100:
-            br100.add_port(self.ipdb.interfaces.eth0b)
-            br100.up()
-
-        # for each vlan, create a subinterface on the eth...most of these will be
-        # unused, but still listening and waiting for a client to send traffic on
-        for i in range(2, 2 + num_vlans):
-            with self.ipdb.create(ifname="eth0a.%d" % i, kind="vlan",
-                                  link=ipdb.interfaces.eth0a, vlan_id=i) as v:
-                v.up()
-            v = self.ipdb.interfaces["eth0a.%d" % i]
-            # add the bpf program for demuxing phys2virt packets
-            ipr.tc("add", "ingress", v["index"], "ffff:")
-            ipr.tc("add-filter", "bpf", v["index"], ":1", fd=phys_fn.fd,
-                   name=phys_fn.name, parent="ffff:", action="drop", classid=1)
+        # eth0a will be hooked to clients with vlan interfaces
+        # add the bpf program to eth0b for demuxing phys2virt packets
+        v = self.ipdb.interfaces["eth0b"]
+        ipr.tc("add", "ingress", v["index"], "ffff:")
+        ipr.tc("add-filter", "bpf", v["index"], ":1", fd=phys_fn.fd,
+               name=phys_fn.name, parent="ffff:", action="drop", classid=1)
 
         # allocate vlans randomly
         available_vlans = [i for i in range(2, 2 + num_vlans)]
@@ -93,15 +83,15 @@ class VlanSimulation(Simulation):
             # assign this client to the given worker
             idx = self.ipdb.interfaces["worker%da" % i]["index"]
             mac = int(macaddr.replace(":", ""), 16)
-            ingress[ingress.Key(mac)] = ingress.Leaf(idx, 0, 0)
+            ingress[ingress.Key(mac)] = ingress.Leaf(idx, 0, 0, 0, 0)
 
             # test traffic with curl loop
             cmd = ["bash", "-c",
                    "for i in {1..8}; do curl 172.16.1.5 -o /dev/null; sleep 1; done"]
-            br_ifc = self.ipdb.create(ifname="br100.%d" % i, kind="vlan",
-                                      link=br100,
-                                      vlan_id=available_vlans.pop(0)).commit()
-            (out_ifc, in_ifc) = self._create_ns("client%d" % i, in_ifc=br_ifc,
+            client_ifc = self.ipdb.create(ifname="eth0a.%d" % i, kind="vlan",
+                                          link=self.ipdb.interfaces["eth0a"],
+                                          vlan_id=available_vlans.pop(0)).commit()
+            (out_ifc, in_ifc) = self._create_ns("client%d" % i, in_ifc=client_ifc,
                                                 ipaddr="172.16.1.100/24",
                                                 macaddr=macaddr, cmd=cmd)[1:3]
 
@@ -123,6 +113,5 @@ try:
         print("                 tx pkts = %u, tx bytes = %u" % (v[2], v[3]))
 finally:
     if "eth0a" in ipdb.interfaces: ipdb.interfaces.eth0a.remove().commit()
-    if "br100" in ipdb.interfaces: ipdb.interfaces.br100.remove().commit()
     if "sim" in locals(): sim.release()
     ipdb.release()
