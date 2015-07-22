@@ -249,6 +249,15 @@ enum bpf_func_id {
 	 * Return: 0 on success
 	 */
 	BPF_FUNC_get_current_comm,
+
+	/**
+	 * bpf_get_cgroup_classid(skb) - retrieve a proc's classid
+	 * @skb: pointer to skb
+	 * Return: classid if != 0
+	 */
+	BPF_FUNC_get_cgroup_classid,
+	BPF_FUNC_skb_vlan_push, /* bpf_skb_vlan_push(skb, vlan_proto, vlan_tci) */
+	BPF_FUNC_skb_vlan_pop,  /* bpf_skb_vlan_pop(skb) */
 	__BPF_FUNC_MAX_ID,
 };
 
