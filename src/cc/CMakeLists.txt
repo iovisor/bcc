@@ -44,3 +44,5 @@ target_link_libraries(bpfprog ${clang_libs} ${llvm_libs} LLVMBPFCodeGen)
 install(TARGETS bpfprog LIBRARY DESTINATION lib${LIBSUFFIX})
 install(DIRECTORY export/ DESTINATION share/bcc/include/bcc
   FILES_MATCHING PATTERN "*.h")
+install(FILES bpf_common.h ../libbpf.h DESTINATION include/bcc)
+install(FILES bcc.h DESTINATION include)

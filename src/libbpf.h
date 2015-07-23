@@ -15,7 +15,8 @@
  */
 /* eBPF mini library */
 
-#pragma once
+#ifndef LIBBPF_H
+#define LIBBPF_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -209,4 +210,6 @@ extern char bpf_log_buf[LOG_BUF_SIZE];
 
 #ifdef __cplusplus
 }
+#endif
+
 #endif
