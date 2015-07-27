@@ -13,15 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#pragma once
+
+#ifndef BPF_COMMON_H
+#define BPF_COMMON_H
 
 #include <stdint.h>
+#include <stdlib.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 void * bpf_module_create(const char *filename, const char *proto_filename, unsigned flags);
+void * bpf_module_create_from_string(const char *text, unsigned flags);
 void bpf_module_destroy(void *program);
 char * bpf_module_license(void *program);
 unsigned bpf_module_kern_version(void *program);
@@ -33,4 +37,6 @@ const char * bpf_table_leaf_desc(void *program, const char *table_name);
 
 #ifdef __cplusplus
 }
+#endif
+
 #endif
