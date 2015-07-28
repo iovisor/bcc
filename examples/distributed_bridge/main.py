@@ -3,6 +3,7 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 
 from sys import argv
+from builtins import input
 from pyroute2 import IPRoute, NetNS, IPDB, NSPopen
 from simulation import Simulation
 from subprocess import PIPE
