@@ -90,7 +90,7 @@ bool BTypeVisitor::VisitFunctionDecl(FunctionDecl *D) {
   // put each non-static non-inline function decl in its own section, to be
   // extracted by the MemoryManager
   if (D->isExternallyVisible() && D->hasBody()) {
-    string attr = string("__attribute__((section(\".") + D->getName().str() + "\")))\n";
+    string attr = string("__attribute__((section(\".bpf.fn.") + D->getName().str() + "\")))\n";
     rewriter_.InsertText(D->getLocStart(), attr);
     // remember the arg names of the current function...first one is the ctx
     fn_args_.clear();

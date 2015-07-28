@@ -41,16 +41,40 @@ void bpf_module_destroy(void *program) {
   delete mod;
 }
 
+size_t bpf_num_functions(void *program) {
+  auto mod = static_cast<ebpf::BPFModule *>(program);
+  if (!mod) return 0;
+  return mod->num_functions();
+}
+
+const char * bpf_function_name(void *program, size_t id) {
+  auto mod = static_cast<ebpf::BPFModule *>(program);
+  if (!mod) return nullptr;
+  return mod->function_name(id);
+}
+
 void * bpf_function_start(void *program, const char *name) {
   auto mod = static_cast<ebpf::BPFModule *>(program);
   if (!mod) return nullptr;
-  return mod->start(name);
+  return mod->function_start(name);
+}
+
+void * bpf_function_start_id(void *program, size_t id) {
+  auto mod = static_cast<ebpf::BPFModule *>(program);
+  if (!mod) return nullptr;
+  return mod->function_start(id);
 }
 
 size_t bpf_function_size(void *program, const char *name) {
   auto mod = static_cast<ebpf::BPFModule *>(program);
   if (!mod) return 0;
-  return mod->size(name);
+  return mod->function_size(name);
+}
+
+size_t bpf_function_size_id(void *program, size_t id) {
+  auto mod = static_cast<ebpf::BPFModule *>(program);
+  if (!mod) return 0;
+  return mod->function_size(id);
 }
 
 char * bpf_module_license(void *program) {
@@ -65,10 +89,28 @@ unsigned bpf_module_kern_version(void *program) {
   return mod->kern_version();
 }
 
+size_t bpf_num_tables(void *program) {
+  auto mod = static_cast<ebpf::BPFModule *>(program);
+  if (!mod) return -1;
+  return mod->num_tables();
+}
+
 int bpf_table_fd(void *program, const char *table_name) {
   auto mod = static_cast<ebpf::BPFModule *>(program);
   if (!mod) return -1;
   return mod->table_fd(table_name);
+}
+
+int bpf_table_fd_id(void *program, size_t id) {
+  auto mod = static_cast<ebpf::BPFModule *>(program);
+  if (!mod) return -1;
+  return mod->table_fd(id);
+}
+
+const char * bpf_table_name(void *program, size_t id) {
+  auto mod = static_cast<ebpf::BPFModule *>(program);
+  if (!mod) return nullptr;
+  return mod->table_name(id);
 }
 
 const char * bpf_table_key_desc(void *program, const char *table_name) {
@@ -77,10 +119,22 @@ const char * bpf_table_key_desc(void *program, const char *table_name) {
   return mod->table_key_desc(table_name);
 }
 
+const char * bpf_table_key_desc_id(void *program, size_t id) {
+  auto mod = static_cast<ebpf::BPFModule *>(program);
+  if (!mod) return nullptr;
+  return mod->table_key_desc(id);
+}
+
 const char * bpf_table_leaf_desc(void *program, const char *table_name) {
   auto mod = static_cast<ebpf::BPFModule *>(program);
   if (!mod) return nullptr;
   return mod->table_leaf_desc(table_name);
+}
+
+const char * bpf_table_leaf_desc_id(void *program, size_t id) {
+  auto mod = static_cast<ebpf::BPFModule *>(program);
+  if (!mod) return nullptr;
+  return mod->table_leaf_desc(id);
 }
 
 }

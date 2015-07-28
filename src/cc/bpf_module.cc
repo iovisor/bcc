@@ -76,6 +76,8 @@ using std::unique_ptr;
 using std::vector;
 using namespace llvm;
 
+const string BPFModule::FN_PREFIX = ".bpf.fn.";
+
 // Snooping class to remember the sections as the JIT creates them
 class MyMemoryManager : public SectionMemoryManager {
  public:
@@ -365,19 +367,55 @@ int BPFModule::finalize() {
 
   engine_->finalizeObject();
 
+  // give functions an id
+  for (auto section : sections_)
+    if (!strncmp(FN_PREFIX.c_str(), section.first.c_str(), FN_PREFIX.size()))
+      function_names_.push_back(section.first);
+
+  for (auto table : *tables_)
+    table_names_.push_back(table.first);
+
   return 0;
 }
 
-uint8_t * BPFModule::start(const string &name) const {
-  auto section = sections_.find("." + name);
+size_t BPFModule::num_functions() const {
+  return function_names_.size();
+}
+
+const char * BPFModule::function_name(size_t id) const {
+  if (id >= function_names_.size())
+    return nullptr;
+  return function_names_[id].c_str() + FN_PREFIX.size();
+}
+
+uint8_t * BPFModule::function_start(size_t id) const {
+  if (id >= function_names_.size())
+    return nullptr;
+  auto section = sections_.find(function_names_[id]);
+  if (section == sections_.end())
+    return nullptr;
+  return get<0>(section->second);
+}
+
+uint8_t * BPFModule::function_start(const string &name) const {
+  auto section = sections_.find(FN_PREFIX + name);
   if (section == sections_.end())
     return nullptr;
 
   return get<0>(section->second);
 }
 
-size_t BPFModule::size(const string &name) const {
-  auto section = sections_.find("." + name);
+size_t BPFModule::function_size(size_t id) const {
+  if (id >= function_names_.size())
+    return 0;
+  auto section = sections_.find(function_names_[id]);
+  if (section == sections_.end())
+    return 0;
+  return get<1>(section->second);
+}
+
+size_t BPFModule::function_size(const string &name) const {
+  auto section = sections_.find(FN_PREFIX + name);
   if (section == sections_.end())
     return 0;
 
@@ -400,6 +438,10 @@ unsigned BPFModule::kern_version() const {
   return *(unsigned *)get<0>(section->second);
 }
 
+size_t BPFModule::num_tables() const {
+  return table_names_.size();
+}
+
 int BPFModule::table_fd(const string &name) const {
   int fd = codegen_ ? codegen_->get_table_fd(name) : -1;
   if (fd >= 0) return fd;
@@ -408,11 +450,31 @@ int BPFModule::table_fd(const string &name) const {
   return table_it->second.fd;
 }
 
+int BPFModule::table_fd(size_t id) const {
+  if (id >= table_names_.size()) return -1;
+  return table_fd(table_names_[id]);
+}
+
+const char * BPFModule::table_name(size_t id) const {
+  if (id >= table_names_.size()) return nullptr;
+  return table_names_[id].c_str();
+}
+
+const char * BPFModule::table_key_desc(size_t id) const {
+  if (id >= table_names_.size()) return nullptr;
+  return table_key_desc(table_names_[id]);
+}
+
 const char * BPFModule::table_key_desc(const string &name) const {
   if (codegen_) return nullptr;
   auto table_it = tables_->find(name);
   if (table_it == tables_->end()) return nullptr;
   return table_it->second.key_desc.c_str();
+}
+
+const char * BPFModule::table_leaf_desc(size_t id) const {
+  if (id >= table_names_.size()) return nullptr;
+  return table_leaf_desc(table_names_[id]);
 }
 
 const char * BPFModule::table_leaf_desc(const string &name) const {
