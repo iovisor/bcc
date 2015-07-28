@@ -2,9 +2,15 @@
 # Copyright (c) PLUMgrid, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
 
+from sys import argv
 from pyroute2 import IPRoute, NetNS, IPDB, NSPopen
 from simulation import Simulation
 from subprocess import PIPE
+
+if len(argv) > 1 and argv[1] == "mesh":
+  multicast = 0
+else:
+  multicast = 1
 
 ipr = IPRoute()
 ipdb = IPDB(nl=ipr)
@@ -24,7 +30,10 @@ class TunnelSimulation(Simulation):
             ipaddr = "172.16.1.%d/24" % (100 + i)
             host_info.append(self._create_ns("host%d" % i, ipaddr=ipaddr,
                 disable_ipv6=True))
-            cmd = ["python", "tunnel.py"]
+            if multicast:
+              cmd = ["python", "tunnel.py"]
+            else:
+              cmd = ["python", "tunnel_mesh.py", str(num_hosts), str(i)]
             p = NSPopen(host_info[i][0].nl.netns, cmd, stdin=PIPE)
             self.processes.append(p)
         with self.ipdb.create(ifname="br-fabric", kind="bridge") as br:
