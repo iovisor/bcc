@@ -76,7 +76,7 @@ using std::unique_ptr;
 using std::vector;
 using namespace llvm;
 
-const string BPFModule::FN_PREFIX = ".bpf.fn.";
+const string BPFModule::FN_PREFIX = BPF_FN_PREFIX;
 
 // Snooping class to remember the sections as the JIT creates them
 class MyMemoryManager : public SectionMemoryManager {

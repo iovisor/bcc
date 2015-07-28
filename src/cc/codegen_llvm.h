@@ -37,6 +37,8 @@ class StructType;
 class SwitchInst;
 }
 
+#define BPF_FN_PREFIX ".bpf.fn."
+
 namespace ebpf {
 namespace cc {
 
