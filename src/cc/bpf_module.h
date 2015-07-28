@@ -38,6 +38,7 @@ class Parser;
 
 class BPFModule {
  private:
+  static const std::string FN_PREFIX;
   int init_engine();
   int parse();
   int finalize();
@@ -51,10 +52,19 @@ class BPFModule {
   ~BPFModule();
   int load(const std::string &filename, const std::string &proto_filename);
   int load_string(const std::string &text);
-  uint8_t * start(const std::string &name) const;
-  size_t size(const std::string &name) const;
+  size_t num_functions() const;
+  uint8_t * function_start(size_t id) const;
+  uint8_t * function_start(const std::string &name) const;
+  const char * function_name(size_t id) const;
+  size_t function_size(size_t id) const;
+  size_t function_size(const std::string &name) const;
+  size_t num_tables() const;
+  int table_fd(size_t id) const;
   int table_fd(const std::string &name) const;
+  const char * table_name(size_t id) const;
+  const char * table_key_desc(size_t id) const;
   const char * table_key_desc(const std::string &name) const;
+  const char * table_leaf_desc(size_t id) const;
   const char * table_leaf_desc(const std::string &name) const;
   char * license() const;
   unsigned kern_version() const;
@@ -70,6 +80,8 @@ class BPFModule {
   std::unique_ptr<ebpf::cc::CodegenLLVM> codegen_;
   std::map<std::string, std::tuple<uint8_t *, uintptr_t>> sections_;
   std::unique_ptr<std::map<std::string, BPFTable>> tables_;
+  std::vector<std::string> table_names_;
+  std::vector<std::string> function_names_;
 };
 
 }  // namespace ebpf

@@ -25,9 +25,7 @@
 
 #include "b_frontend_action.h"
 
-extern "C"
-int bpf_create_map(enum bpf_map_type map_type, int key_size, int value_size,
-                   int max_entries);
+#include "libbpf.h"
 
 namespace ebpf {
 
@@ -90,7 +88,7 @@ bool BTypeVisitor::VisitFunctionDecl(FunctionDecl *D) {
   // put each non-static non-inline function decl in its own section, to be
   // extracted by the MemoryManager
   if (D->isExternallyVisible() && D->hasBody()) {
-    string attr = string("__attribute__((section(\".") + D->getName().str() + "\")))\n";
+    string attr = string("__attribute__((section(\"") + BPF_FN_PREFIX + D->getName().str() + "\")))\n";
     rewriter_.InsertText(D->getLocStart(), attr);
     // remember the arg names of the current function...first one is the ctx
     fn_args_.clear();

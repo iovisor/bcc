@@ -49,6 +49,10 @@ int bpf_detach_kprobe(const char *event_desc);
 #define LOG_BUF_SIZE 65536
 extern char bpf_log_buf[LOG_BUF_SIZE];
 
+// Put non-static/inline functions in their own section with this prefix +
+// fn_name to enable discovery by the bcc library.
+#define BPF_FN_PREFIX ".bpf.fn."
+
 /* ALU ops on registers, bpf_add|sub|...: dst_reg += src_reg */
 
 #define BPF_ALU64_REG(OP, DST, SRC)				\
