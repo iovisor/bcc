@@ -63,6 +63,7 @@
 #include "b_frontend_action.h"
 #include "bpf_module.h"
 #include "kbuild_helper.h"
+#include "libbpf.h"
 
 namespace ebpf {
 

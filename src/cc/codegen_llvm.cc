@@ -38,9 +38,7 @@
 #include "cc/lexer.h"
 #include "cc/type_helper.h"
 #include "linux/bpf.h"
-
-extern "C"
-int bpf_create_map(int map_type, int key_size, int value_size, int max_entries);
+#include "libbpf.h"
 
 namespace ebpf {
 namespace cc {
@@ -801,7 +799,7 @@ StatusTuple CodegenLLVM::visit_table_index_expr_node(TableIndexExprNode *n) {
   // result = lookup(key)
   Value *lookup1 = B.CreateBitCast(B.CreateCall(lookup_fn, vector<Value *>({pseudo_map_fd, key_ptr})), leaf_ptype);
 
-  Value *result;
+  Value *result = nullptr;
   if (n->table_->policy_id()->name_ == "AUTO") {
     Function *parent = B.GetInsertBlock()->getParent();
     BasicBlock *label_start = B.GetInsertBlock();
@@ -1079,7 +1077,7 @@ StatusTuple CodegenLLVM::visit_table_decl_stmt_node(TableDeclStmtNode *n) {
     auto leaf = scopes_->top_struct()->lookup(n->leaf_id()->name_, /*search_local*/true);
     if (!leaf) return mkstatus_(n, "cannot find leaf %s", n->leaf_id()->name_.c_str());
 
-    int map_type = BPF_MAP_TYPE_UNSPEC;
+    bpf_map_type map_type = BPF_MAP_TYPE_UNSPEC;
     if (n->type_id()->name_ == "FIXED_MATCH")
       map_type = BPF_MAP_TYPE_HASH;
     else if (n->type_id()->name_ == "INDEXED")
