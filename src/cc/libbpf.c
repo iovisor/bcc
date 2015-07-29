@@ -119,23 +119,26 @@ char bpf_log_buf[LOG_BUF_SIZE];
 
 int bpf_prog_load(enum bpf_prog_type prog_type,
                   const struct bpf_insn *insns, int prog_len,
-                  const char *license, unsigned kern_version)
+                  const char *license, unsigned kern_version,
+                  char *log_buf, unsigned log_buf_size)
 {
+  log_buf = log_buf ? log_buf : bpf_log_buf;
+  log_buf_size = log_buf_size ? log_buf_size : LOG_BUF_SIZE;
   union bpf_attr attr = {
     .prog_type = prog_type,
     .insns = ptr_to_u64((void *) insns),
     .insn_cnt = prog_len / sizeof(struct bpf_insn),
     .license = ptr_to_u64((void *) license),
-    .log_buf = ptr_to_u64(bpf_log_buf),
-    .log_size = LOG_BUF_SIZE,
+    .log_buf = ptr_to_u64(log_buf),
+    .log_size = log_buf_size,
     .log_level = 1,
   };
 
   attr.kern_version = kern_version;
-  bpf_log_buf[0] = 0;
+  log_buf[0] = 0;
 
   int ret = syscall(__NR_bpf, BPF_PROG_LOAD, &attr, sizeof(attr));
-  if (ret < 0) {
+  if (ret < 0 && log_buf == bpf_log_buf) {
     fprintf(stderr, "bpf: %s\n%s\n", strerror(errno), bpf_log_buf);
   }
   return ret;

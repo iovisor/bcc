@@ -60,7 +60,7 @@ lib.bpf_attach_socket.restype = ct.c_int
 lib.bpf_attach_socket.argtypes = [ct.c_int, ct.c_int]
 lib.bpf_prog_load.restype = ct.c_int
 lib.bpf_prog_load.argtypes = [ct.c_int, ct.c_void_p, ct.c_size_t,
-        ct.c_char_p, ct.c_uint]
+        ct.c_char_p, ct.c_uint, ct.c_char_p, ct.c_uint]
 lib.bpf_attach_kprobe.restype = ct.c_int
 lib.bpf_attach_kprobe.argtypes = [ct.c_int, ct.c_char_p, ct.c_char_p, ct.c_int, ct.c_int, ct.c_int]
 lib.bpf_detach_kprobe.restype = ct.c_int
@@ -192,7 +192,8 @@ class BPF(object):
                 lib.bpf_function_start(self.module, func_name.encode("ascii")),
                 lib.bpf_function_size(self.module, func_name.encode("ascii")),
                 lib.bpf_module_license(self.module),
-                lib.bpf_module_kern_version(self.module))
+                lib.bpf_module_kern_version(self.module),
+                None, 0)
 
         if fd < 0:
             print((ct.c_char * 65536).in_dll(lib, "bpf_log_buf").value)

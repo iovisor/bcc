@@ -37,13 +37,14 @@ int bpf_get_next_key(int fd, void *key, void *next_key);
 
 int bpf_prog_load(enum bpf_prog_type prog_type,
 		  const struct bpf_insn *insns, int insn_len,
-		  const char *license, unsigned kern_version);
+		  const char *license, unsigned kern_version,
+		  char *log_buf, unsigned log_buf_size);
 int bpf_attach_socket(int sockfd, int progfd);
 
 /* create RAW socket and bind to interface 'name' */
 int bpf_open_raw_sock(const char *name);
 
-int bpf_attach_kprobe(int progfd, const char *event, const char *event_desc, pid_t pid, int cpu, int group_fd);
+int bpf_attach_kprobe(int progfd, const char *event, const char *event_desc, int pid, int cpu, int group_fd);
 int bpf_detach_kprobe(const char *event_desc);
 
 #define LOG_BUF_SIZE 65536
