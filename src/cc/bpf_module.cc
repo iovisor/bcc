@@ -252,7 +252,7 @@ int BPFModule::load_cfile(const string &file, bool in_memory) {
     return -1;
   mod_ = &*mod;
 
-  mod_->setDataLayout("e-m:e-i64:64-f80:128-n8:16:32:64-S128");
+  mod_->setDataLayout("e-m:e-p:64:64-i64:64-n32:64-S128");
   mod_->setTargetTriple("bpf-pc-linux");
 
   for (auto fn = mod_->getFunctionList().begin(); fn != mod_->getFunctionList().end(); ++fn)
@@ -283,7 +283,7 @@ int BPFModule::load_includes(const string &tmpfile) {
     return -1;
   mod_ = &*mod;
 
-  mod_->setDataLayout("e-m:e-i64:64-f80:128-n8:16:32:64-S128");
+  mod_->setDataLayout("e-m:e-p:64:64-i64:64-n32:64-S128");
   mod_->setTargetTriple("bpf-pc-linux");
 
   for (auto fn = mod_->getFunctionList().begin(); fn != mod_->getFunctionList().end(); ++fn)
