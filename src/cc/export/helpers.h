@@ -83,9 +83,9 @@ static u64 (*bpf_skb_vlan_pop)(void *ctx) =
 static void bpf_tail_call_(u64 map_fd, void *ctx, int index) {
   ((void (*)(void *, u64, int))BPF_FUNC_tail_call)(ctx, map_fd, index);
 }
-static int (*bpf_skb_get_tunnel_key)(void *ctx, void *to, u32 size) =
+static int (*bpf_skb_get_tunnel_key)(void *ctx, void *to, u32 size, u64 flags) =
   (void *) BPF_FUNC_skb_get_tunnel_key;
-static int (*bpf_skb_set_tunnel_key)(void *ctx, void *from, u32 size) =
+static int (*bpf_skb_set_tunnel_key)(void *ctx, void *from, u32 size, u64 flags) =
   (void *) BPF_FUNC_skb_set_tunnel_key;
 #endif
 

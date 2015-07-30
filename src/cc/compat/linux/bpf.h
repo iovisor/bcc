@@ -260,11 +260,12 @@ enum bpf_func_id {
 	BPF_FUNC_skb_vlan_pop,  /* bpf_skb_vlan_pop(skb) */
 
 	/**
-	 * bpf_skb_[gs]et_tunnel_key(skb, struct bpf_tunnel_key *key, int size)
+	 * bpf_skb_[gs]et_tunnel_key(skb, key, size, flags)
 	 * retrieve or populate tunnel metadata
 	 * @skb: pointer to skb
 	 * @key: pointer to 'struct bpf_tunnel_key'
 	 * @size: size of 'struct bpf_tunnel_key'
+	 * @flags: room for future extensions
 	 * Retrun: 0 on success
 	 */
 	BPF_FUNC_skb_get_tunnel_key,
