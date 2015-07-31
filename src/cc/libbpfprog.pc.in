@@ -1,0 +1,14 @@
+prefix=@CMAKE_INSTALL_PREFIX@
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+datarootdir=${prefix}/share
+
+compatdir=${includedir}/bcc/compat
+
+Name: libbpfprog
+Version: @REVISION@
+Description: BPF Program library
+Requires:
+Libs: -L${libdir} -lbpfprog
+Cflags: -I${includedir} -I${compatdir}
