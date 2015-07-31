@@ -24,10 +24,6 @@
 extern "C" {
 #endif
 
-struct bpf_insn;
-enum bpf_map_type;
-enum bpf_prog_type;
-
 int bpf_create_map(enum bpf_map_type map_type, int key_size, int value_size,
 		   int max_entries);
 int bpf_update_elem(int fd, void *key, void *value, unsigned long long flags);

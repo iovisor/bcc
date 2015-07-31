@@ -6,6 +6,7 @@ include_directories(${LLVM_INCLUDE_DIRS})
 # todo: if check for kernel version
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/compat)
 add_definitions(${LLVM_DEFINITIONS})
+configure_file(libbpfprog.pc.in ${CMAKE_CURRENT_BINARY_DIR}/libbpfprog.pc @ONLY)
 
 BISON_TARGET(Parser parser.yy ${CMAKE_CURRENT_BINARY_DIR}/parser.yy.cc COMPILE_FLAGS "-o parser.yy.cc -v --debug")
 FLEX_TARGET(Lexer lexer.ll ${CMAKE_CURRENT_BINARY_DIR}/lexer.ll.cc COMPILE_FLAGS "--c++ --o lexer.ll.cc")
@@ -45,3 +46,6 @@ install(TARGETS bpfprog LIBRARY DESTINATION lib${LIBSUFFIX})
 install(DIRECTORY export/ DESTINATION share/bcc/include/bcc
   FILES_MATCHING PATTERN "*.h")
 install(FILES bpf_common.h ../libbpf.h DESTINATION include/bcc)
+install(DIRECTORY compat/linux/ DESTINATION include/bcc/compat/linux
+  FILES_MATCHING PATTERN "*.h")
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libbpfprog.pc DESTINATION lib${LIBSUFFIX}/pkgconfig)
