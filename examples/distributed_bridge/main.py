@@ -32,7 +32,7 @@ class TunnelSimulation(Simulation):
             host_info.append(self._create_ns("host%d" % i, ipaddr=ipaddr,
                 disable_ipv6=True))
             if multicast:
-              cmd = ["python", "tunnel.py"]
+              cmd = ["python", "tunnel.py", str(i)]
             else:
               cmd = ["python", "tunnel_mesh.py", str(num_hosts), str(i)]
             p = NSPopen(host_info[i][0].nl.netns, cmd, stdin=PIPE)
