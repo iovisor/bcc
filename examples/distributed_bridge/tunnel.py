@@ -2,6 +2,7 @@
 # Copyright (c) PLUMgrid, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
 
+from sys import argv
 from bpf import BPF
 from builtins import input
 from ctypes import c_int, c_uint
@@ -11,6 +12,8 @@ from netaddr import EUI, IPAddress
 from pyroute2 import IPRoute, NetNS, IPDB, NSPopen
 from socket import htons, AF_INET
 from threading import Thread
+
+host_id = int(argv[1])
 
 b = BPF(src_file="tunnel.c")
 ingress_fn = b.load_func("handle_ingress", BPF.SCHED_CLS)
@@ -60,6 +63,8 @@ def run():
             ifc_gc.append(v.ifname)
             ifc_gc.append(br.ifname)
             vni2if[c_uint(vni)] = c_int(v.index)
+            ipaddr = "99.1.%d.%d/24" % (i, host_id + 1)
+            br.add_ip(ipaddr)
 
 try:
     run()
