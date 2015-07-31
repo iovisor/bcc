@@ -208,6 +208,7 @@ int BPFModule::load_file_module(unique_ptr<llvm::Module> *mod, const string &fil
     invocation1->getFrontendOpts().Inputs.clear();
     invocation1->getFrontendOpts().Inputs.push_back(FrontendInputFile("<bcc-memory-buffer>", IK_C));
   }
+  invocation1->getFrontendOpts().DisableFree = false;
 
   CompilerInstance compiler1;
   compiler1.setInvocation(invocation1.release());
@@ -232,6 +233,7 @@ int BPFModule::load_file_module(unique_ptr<llvm::Module> *mod, const string &fil
                                                      llvm::MemoryBuffer::getMemBuffer(out_str).release());
   invocation2->getFrontendOpts().Inputs.clear();
   invocation2->getFrontendOpts().Inputs.push_back(FrontendInputFile("<bcc-memory-buffer>", IK_C));
+  invocation2->getFrontendOpts().DisableFree = false;
   // suppress warnings in the 2nd pass, but bail out on errors (our fault)
   invocation2->getDiagnosticOpts().IgnoreWarnings = true;
   compiler2.setInvocation(invocation2.release());
