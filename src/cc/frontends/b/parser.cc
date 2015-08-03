@@ -17,8 +17,8 @@
 #include <algorithm>
 #include <assert.h>
 #include "exception.h"
-#include "cc/parser.h"
-#include "cc/type_helper.h"
+#include "parser.h"
+#include "type_helper.h"
 
 namespace ebpf {
 namespace cc {

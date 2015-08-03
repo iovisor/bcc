@@ -18,7 +18,7 @@
 
 #include <stdio.h>
 
-#include "cc/node.h"
+#include "node.h"
 
 namespace ebpf {
 namespace cc {

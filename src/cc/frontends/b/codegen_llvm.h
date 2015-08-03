@@ -21,8 +21,8 @@
 #include <string>
 #include <set>
 
-#include "cc/node.h"
-#include "cc/scope.h"
+#include "node.h"
+#include "scope.h"
 
 namespace llvm {
 class AllocaInst;

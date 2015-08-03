@@ -27,7 +27,7 @@
 
 #include <iostream> // NOLINT
 #include <list>
-#include "cc/parser.yy.hh"
+#include "parser.yy.hh"
 
 namespace ebpf {
 namespace cc {

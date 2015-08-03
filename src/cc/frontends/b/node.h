@@ -22,7 +22,7 @@
 #include <memory>
 #include <algorithm>
 #include <stdint.h>
-#include "cc/scope.h"
+#include "scope.h"
 
 #define REVISION_MASK 0xfff
 #define MAJOR_VER_POS 22

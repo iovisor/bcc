@@ -2,18 +2,21 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
+include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+# to be removed
+include_directories(${CMAKE_CURRENT_BINARY_DIR}/frontends/b)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/frontends/b)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/frontends/clang)
 include_directories(${LLVM_INCLUDE_DIRS})
 # todo: if check for kernel version
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/compat)
 add_definitions(${LLVM_DEFINITIONS})
 configure_file(libbpfprog.pc.in ${CMAKE_CURRENT_BINARY_DIR}/libbpfprog.pc @ONLY)
 
-BISON_TARGET(Parser parser.yy ${CMAKE_CURRENT_BINARY_DIR}/parser.yy.cc COMPILE_FLAGS "-o parser.yy.cc -v --debug")
-FLEX_TARGET(Lexer lexer.ll ${CMAKE_CURRENT_BINARY_DIR}/lexer.ll.cc COMPILE_FLAGS "--c++ --o lexer.ll.cc")
-ADD_FLEX_BISON_DEPENDENCY(Lexer Parser)
-
 # prune unused llvm static library stuff when linking into the new .so
 set(CMAKE_SHARED_LINKER_FLAGS "-Wl,--exclude-libs=ALL")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
 
 # if gcc 4.9 or higher is used, static libstdc++ is a good option
 if (CMAKE_COMPILER_IS_GNUCC)
@@ -26,10 +29,7 @@ endif()
 # tell the shared library where it is being installed so it can find shared header files
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBCC_INSTALL_PREFIX='\"${CMAKE_INSTALL_PREFIX}\"'")
 
-add_library(bpfprog SHARED bpf_common.cc bpf_module.cc codegen_llvm.cc
-  node.cc parser.cc printer.cc type_check.cc libbpf.c b_frontend_action.cc
-  kbuild_helper.cc
-  ${BISON_Parser_OUTPUTS} ${FLEX_Lexer_OUTPUTS})
+add_library(bpfprog SHARED bpf_common.cc bpf_module.cc libbpf.c)
 
 # BPF is still experimental otherwise it should be available
 #llvm_map_components_to_libnames(llvm_libs bpf mcjit irreader passes)
@@ -40,7 +40,7 @@ set(clang_libs ${libclangFrontend} ${libclangSerialization} ${libclangDriver} ${
   ${libclangAST} ${libclangLex} ${libclangBasic})
 
 # Link against LLVM libraries
-target_link_libraries(bpfprog ${clang_libs} ${llvm_libs} LLVMBPFCodeGen)
+target_link_libraries(bpfprog b_frontend clang_frontend ${clang_libs} ${llvm_libs} LLVMBPFCodeGen)
 
 install(TARGETS bpfprog LIBRARY DESTINATION lib${LIBSUFFIX})
 install(DIRECTORY export/ DESTINATION share/bcc/include/bcc
@@ -49,3 +49,5 @@ install(FILES bpf_common.h ../libbpf.h DESTINATION include/bcc)
 install(DIRECTORY compat/linux/ DESTINATION include/bcc/compat/linux
   FILES_MATCHING PATTERN "*.h")
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libbpfprog.pc DESTINATION lib${LIBSUFFIX}/pkgconfig)
+
+add_subdirectory(frontends)

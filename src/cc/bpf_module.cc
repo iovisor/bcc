@@ -57,10 +57,10 @@
 #include <llvm/Transforms/IPO/PassManagerBuilder.h>
 
 #include "exception.h"
-#include "parser.h"
-#include "type_check.h"
-#include "codegen_llvm.h"
-#include "b_frontend_action.h"
+#include "frontends/b/parser.h"
+#include "frontends/b/type_check.h"
+#include "frontends/b/codegen_llvm.h"
+#include "frontends/clang/b_frontend_action.h"
 #include "bpf_module.h"
 #include "kbuild_helper.h"
 #include "libbpf.h"

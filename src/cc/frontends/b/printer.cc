@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#include "cc/printer.h"
-#include "cc/lexer.h"
+#include "printer.h"
+#include "lexer.h"
 #include "exception.h"
 
 namespace ebpf {

@@ -18,8 +18,8 @@
 
 #include <vector>
 #include <string>
-#include "cc/node.h"
-#include "cc/scope.h"
+#include "node.h"
+#include "scope.h"
 
 namespace ebpf {
 namespace cc {
