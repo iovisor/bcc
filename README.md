@@ -1,3 +1,4 @@
+![BCC Logo](images/logo2.png)
 # BPF Compiler Collection (BCC)
 
 This directory contains source code for BCC, a toolkit for creating small
