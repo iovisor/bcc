@@ -16,33 +16,18 @@
 
 #pragma once
 
-#include <map>
 #include <memory>
 #include <string>
-
-namespace llvm {
-class Module;
-class LLVMContext;
-}
+#include <tuple>
 
 namespace ebpf {
 
-class BPFTable;
-
-namespace cc {
-class Parser;
-class CodegenLLVM;
+template <class T, class... Args>
+typename std::enable_if<!std::is_array<T>::value, std::unique_ptr<T>>::type
+make_unique(Args &&... args) {
+  return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
 }
 
-class ClangLoader {
- public:
-  explicit ClangLoader(llvm::LLVMContext *ctx);
-  ~ClangLoader();
-  int parse(std::unique_ptr<llvm::Module> *mod,
-            std::unique_ptr<std::map<std::string, BPFTable>> *tables,
-            const std::string &file, bool in_memory);
- private:
-  llvm::LLVMContext *ctx_;
-};
+typedef std::tuple<int, std::string> StatusTuple;
 
 }  // namespace ebpf

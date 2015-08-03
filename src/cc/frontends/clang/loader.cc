@@ -14,9 +14,59 @@
  * limitations under the License.
  */
 
+#include <map>
+#include <string>
+#include <algorithm>
+#include <fcntl.h>
+#include <ftw.h>
+#include <map>
+#include <stdio.h>
+#include <string>
+#include <sys/stat.h>
+#include <sys/utsname.h>
+#include <unistd.h>
+#include <vector>
+#include <linux/bpf.h>
+
+#include <clang/Basic/FileManager.h>
+#include <clang/Basic/TargetInfo.h>
+#include <clang/CodeGen/BackendUtil.h>
+#include <clang/CodeGen/CodeGenAction.h>
+#include <clang/Driver/Compilation.h>
+#include <clang/Driver/Driver.h>
+#include <clang/Driver/Job.h>
+#include <clang/Driver/Tool.h>
+#include <clang/Frontend/CompilerInstance.h>
+#include <clang/Frontend/CompilerInvocation.h>
+#include <clang/Frontend/FrontendActions.h>
+#include <clang/Frontend/FrontendDiagnostic.h>
+#include <clang/Frontend/TextDiagnosticPrinter.h>
+#include <clang/FrontendTool/Utils.h>
+
+#include <llvm/IR/Module.h>
+
+#include "common.h"
+#include "exception.h"
+#include "kbuild_helper.h"
+#include "b_frontend_action.h"
+#include "loader.h"
+
+using std::map;
+using std::string;
+using std::unique_ptr;
+using std::vector;
+
 namespace ebpf {
 
-int Loader::load_file_module(unique_ptr<llvm::Module> *mod, const string &file, bool in_memory) {
+ClangLoader::ClangLoader(llvm::LLVMContext *ctx)
+    : ctx_(ctx)
+{}
+
+ClangLoader::~ClangLoader() {}
+
+int ClangLoader::parse(unique_ptr<llvm::Module> *mod,
+                       unique_ptr<map<string, BPFTable>> *tables,
+                       const string &file, bool in_memory) {
   using namespace clang;
 
   struct utsname un;
@@ -114,7 +164,7 @@ int Loader::load_file_module(unique_ptr<llvm::Module> *mod, const string &file, 
   if (!compiler1.ExecuteAction(bact))
     return -1;
   // this contains the open FDs
-  tables_ = bact.take_tables();
+  *tables = bact.take_tables();
 
   // second pass, clear input and take rewrite buffer
   auto invocation2 = make_unique<CompilerInvocation>();

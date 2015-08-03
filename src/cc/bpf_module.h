@@ -31,6 +31,7 @@ class Module;
 namespace ebpf {
 class BPFTable;
 class BLoader;
+class ClangLoader;
 
 class BPFModule {
  private:
@@ -73,6 +74,7 @@ class BPFModule {
   std::unique_ptr<llvm::ExecutionEngine> engine_;
   llvm::Module *mod_;
   std::unique_ptr<BLoader> b_loader_;
+  std::unique_ptr<ClangLoader> clang_loader_;
   std::map<std::string, std::tuple<uint8_t *, uintptr_t>> sections_;
   std::unique_ptr<std::map<std::string, BPFTable>> tables_;
   std::vector<std::string> table_names_;

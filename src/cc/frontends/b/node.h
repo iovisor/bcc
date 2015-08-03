@@ -22,6 +22,8 @@
 #include <memory>
 #include <algorithm>
 #include <stdint.h>
+
+#include "common.h"
 #include "scope.h"
 
 #define REVISION_MASK 0xfff
@@ -40,14 +42,6 @@
 #define STATUS_RETURN __attribute((warn_unused_result)) StatusTuple
 
 namespace ebpf {
-
-template <class T, class... Args>
-typename std::enable_if<!std::is_array<T>::value, std::unique_ptr<T>>::type
-make_unique(Args &&... args) {
-  return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
-}
-
-typedef std::tuple<int, std::string> StatusTuple;
 
 namespace cc {
 
