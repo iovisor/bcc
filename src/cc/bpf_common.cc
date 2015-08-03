@@ -17,16 +17,25 @@
 #include "cc/bpf_common.h"
 
 extern "C" {
-void * bpf_module_create(const char *filename, const char *proto_filename, unsigned flags) {
+void * bpf_module_create_b(const char *filename, const char *proto_filename, unsigned flags) {
   auto mod = new ebpf::BPFModule(flags);
-  if (mod->load(filename, proto_filename) != 0) {
+  if (mod->load_b(filename, proto_filename) != 0) {
     delete mod;
     return nullptr;
   }
   return mod;
 }
 
-void * bpf_module_create_from_string(const char *text, unsigned flags) {
+void * bpf_module_create_c(const char *filename, unsigned flags) {
+  auto mod = new ebpf::BPFModule(flags);
+  if (mod->load_c(filename) != 0) {
+    delete mod;
+    return nullptr;
+  }
+  return mod;
+}
+
+void * bpf_module_create_c_from_string(const char *text, unsigned flags) {
   auto mod = new ebpf::BPFModule(flags);
   if (mod->load_string(text) != 0) {
     delete mod;

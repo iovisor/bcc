@@ -30,17 +30,13 @@ class Module;
 
 namespace ebpf {
 class BPFTable;
-
-namespace cc {
-class CodegenLLVM;
-class Parser;
-}
+class BLoader;
 
 class BPFModule {
  private:
   static const std::string FN_PREFIX;
   int init_engine();
-  int parse();
+  int parse(llvm::Module *mod);
   int finalize();
   void dump_ir();
   int load_file_module(std::unique_ptr<llvm::Module> *mod, const std::string &file, bool in_memory);
@@ -50,7 +46,8 @@ class BPFModule {
  public:
   BPFModule(unsigned flags);
   ~BPFModule();
-  int load(const std::string &filename, const std::string &proto_filename);
+  int load_b(const std::string &filename, const std::string &proto_filename);
+  int load_c(const std::string &filename);
   int load_string(const std::string &text);
   size_t num_functions() const;
   uint8_t * function_start(size_t id) const;
@@ -75,9 +72,7 @@ class BPFModule {
   std::unique_ptr<llvm::LLVMContext> ctx_;
   std::unique_ptr<llvm::ExecutionEngine> engine_;
   llvm::Module *mod_;
-  std::unique_ptr<ebpf::cc::Parser> parser_;
-  std::unique_ptr<ebpf::cc::Parser> proto_parser_;
-  std::unique_ptr<ebpf::cc::CodegenLLVM> codegen_;
+  std::unique_ptr<BLoader> b_loader_;
   std::map<std::string, std::tuple<uint8_t *, uintptr_t>> sections_;
   std::unique_ptr<std::map<std::string, BPFTable>> tables_;
   std::vector<std::string> table_names_;

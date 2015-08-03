@@ -35,6 +35,8 @@ class LLVMContext;
 class Module;
 class StructType;
 class SwitchInst;
+class Value;
+class GlobalVariable;
 }
 
 namespace ebpf {

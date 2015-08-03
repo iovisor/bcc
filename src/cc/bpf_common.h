@@ -24,8 +24,9 @@
 extern "C" {
 #endif
 
-void * bpf_module_create(const char *filename, const char *proto_filename, unsigned flags);
-void * bpf_module_create_from_string(const char *text, unsigned flags);
+void * bpf_module_create_b(const char *filename, const char *proto_filename, unsigned flags);
+void * bpf_module_create_c(const char *filename, unsigned flags);
+void * bpf_module_create_c_from_string(const char *text, unsigned flags);
 void bpf_module_destroy(void *program);
 char * bpf_module_license(void *program);
 unsigned bpf_module_kern_version(void *program);

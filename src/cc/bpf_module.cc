@@ -57,9 +57,7 @@
 #include <llvm/Transforms/IPO/PassManagerBuilder.h>
 
 #include "exception.h"
-#include "frontends/b/parser.h"
-#include "frontends/b/type_check.h"
-#include "frontends/b/codegen_llvm.h"
+#include "frontends/b/loader.h"
 #include "frontends/clang/b_frontend_action.h"
 #include "bpf_module.h"
 #include "kbuild_helper.h"
@@ -311,46 +309,6 @@ void BPFModule::dump_ir() {
   PM.run(*mod_);
 }
 
-int BPFModule::parse() {
-  int rc;
-
-  proto_parser_ = make_unique<ebpf::cc::Parser>(proto_filename_);
-  rc = proto_parser_->parse();
-  if (rc) {
-    fprintf(stderr, "In file: %s\n", filename_.c_str());
-    return rc;
-  }
-
-  parser_ = make_unique<ebpf::cc::Parser>(filename_);
-  rc = parser_->parse();
-  if (rc) {
-    fprintf(stderr, "In file: %s\n", filename_.c_str());
-    return rc;
-  }
-
-  //ebpf::cc::Printer printer(stderr);
-  //printer.visit(parser_->root_node_);
-
-  ebpf::cc::TypeCheck type_check(parser_->scopes_.get(), proto_parser_->scopes_.get(), parser_->pragmas_);
-  auto ret = type_check.visit(parser_->root_node_);
-  if (get<0>(ret) != 0 || get<1>(ret).size()) {
-    fprintf(stderr, "Type error @line=%d: %s\n", get<0>(ret), get<1>(ret).c_str());
-    return -1;
-  }
-
-  if (load_includes(BCC_INSTALL_PREFIX "/share/bcc/include/bcc/helpers.h") < 0)
-    return -1;
-
-  codegen_ = ebpf::make_unique<ebpf::cc::CodegenLLVM>(mod_, parser_->scopes_.get(), proto_parser_->scopes_.get());
-  ret = codegen_->visit(parser_->root_node_);
-  if (get<0>(ret) != 0 || get<1>(ret).size()) {
-    fprintf(stderr, "Codegen error @line=%d: %s\n", get<0>(ret), get<1>(ret).c_str());
-    return get<0>(ret);
-  }
-
-  return 0;
-}
-
 int BPFModule::finalize() {
   if (verifyModule(*mod_, &errs())) {
     if (flags_ & 1)
@@ -446,7 +404,7 @@ size_t BPFModule::num_tables() const {
 }
 
 int BPFModule::table_fd(const string &name) const {
-  int fd = codegen_ ? codegen_->get_table_fd(name) : -1;
+  int fd = b_loader_ ? b_loader_->get_table_fd(name) : -1;
   if (fd >= 0) return fd;
   auto table_it = tables_->find(name);
   if (table_it == tables_->end()) return -1;
@@ -469,7 +427,7 @@ const char * BPFModule::table_key_desc(size_t id) const {
 }
 
 const char * BPFModule::table_key_desc(const string &name) const {
-  if (codegen_) return nullptr;
+  if (b_loader_) return nullptr;
   auto table_it = tables_->find(name);
   if (table_it == tables_->end()) return nullptr;
   return table_it->second.key_desc.c_str();
@@ -481,39 +439,59 @@ const char * BPFModule::table_leaf_desc(size_t id) const {
 }
 
 const char * BPFModule::table_leaf_desc(const string &name) const {
-  if (codegen_) return nullptr;
+  if (b_loader_) return nullptr;
   auto table_it = tables_->find(name);
   if (table_it == tables_->end()) return nullptr;
   return table_it->second.leaf_desc.c_str();
 }
 
-int BPFModule::load(const string &filename, const string &proto_filename) {
+// load a B file, which comes in two parts
+int BPFModule::load_b(const string &filename, const string &proto_filename) {
   if (!sections_.empty()) {
     fprintf(stderr, "Program already initialized\n");
     return -1;
   }
-  filename_ = filename;
-  proto_filename_ = proto_filename;
-  if (proto_filename_.empty()) {
-    // direct load of .b file
-    if (int rc = load_cfile(filename_, false))
-      return rc;
-  } else {
-    // old lex .b file
-    if (int rc = parse())
-      return rc;
+  if (filename.empty() || proto_filename.empty()) {
+    fprintf(stderr, "Invalid filenames\n");
+    return -1;
   }
+
+  // Helpers are inlined in the following file (C). Load the definitions and
+  // pass the partially compiled module to the B frontend to continue with.
+  if (int rc = load_includes(BCC_INSTALL_PREFIX "/share/bcc/include/bcc/helpers.h"))
+    return rc;
+
+  b_loader_.reset(new BLoader);
+  if (int rc = b_loader_->parse(mod_, filename, proto_filename))
+    return rc;
   if (int rc = finalize())
     return rc;
   return 0;
 }
 
+// load a C file
+int BPFModule::load_c(const string &filename) {
+  if (!sections_.empty()) {
+    fprintf(stderr, "Program already initialized\n");
+    return -1;
+  }
+  if (filename.empty()) {
+    fprintf(stderr, "Invalid filename\n");
+    return -1;
+  }
+  if (int rc = load_cfile(filename, false))
+    return rc;
+  if (int rc = finalize())
+    return rc;
+  return 0;
+}
+
+// load a C text string
 int BPFModule::load_string(const string &text) {
   if (!sections_.empty()) {
     fprintf(stderr, "Program already initialized\n");
     return -1;
   }
-  filename_ = "<memory>";
   if (int rc = load_cfile(text, true))
     return rc;
 
