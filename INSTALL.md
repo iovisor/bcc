@@ -30,7 +30,7 @@ To build the toolchain from source, one needs:
   * `git clone http://llvm.org/git/llvm.git`
   * `cd llvm/tools; git clone http://llvm.org/git/clang.git`
   * `cd ..; mkdir -p build/install; cd build`
-  * `cmake -G "Unix Makefiles" -DLLVM_TARGETS_TO_BUILD="BPF" -DCMAKE_INSTALL_PREFIX=$PWD/install ..`
+  * `cmake -G "Unix Makefiles" -DLLVM_TARGETS_TO_BUILD="BPF;X86" -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$PWD/install ..`
   * `make -j4`
   * `make install`
   * `export PATH=$PWD/install/bin:$PATH`
