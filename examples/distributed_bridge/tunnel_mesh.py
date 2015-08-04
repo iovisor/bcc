@@ -67,8 +67,8 @@ def run():
                     br.add_port(v)
                     br.up()
                     ifc_gc.append(v.ifname)
-                    ipaddr = "99.1.%d.%d/24" % (i, host_id + 1)
-                    br.add_ip(ipaddr)
+            ipaddr = "99.1.%d.%d/24" % (j, host_id + 1)
+            br.add_ip(ipaddr)
             ifc_gc.append(br.ifname)
 
 try:
