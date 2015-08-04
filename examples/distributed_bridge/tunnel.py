@@ -12,6 +12,7 @@ from netaddr import EUI, IPAddress
 from pyroute2 import IPRoute, NetNS, IPDB, NSPopen
 from socket import htons, AF_INET
 from threading import Thread
+from subprocess import call
 
 host_id = int(argv[1])
 
@@ -68,11 +69,11 @@ def run():
 
 try:
     run()
+    ipdb.release()
     input("")
     print("---")
     for k, v in mac2host.items():
         print(EUI(k.mac), k.ifindex, IPAddress(v.remote_ipv4),
               v.tunnel_id, v.rx_pkts, v.tx_pkts)
 finally:
-    for v in ifc_gc: ipdb.interfaces[v].remove().commit()
-    ipdb.release()
+    for v in ifc_gc: call(["ip", "link", "del", v])
