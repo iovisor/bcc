@@ -24,7 +24,15 @@ class Simulation(object):
         if name in self.ipdbs:
             ns_ipdb = self.ipdbs[name]
         else:
-            ns_ipdb = IPDB(nl=NetNS(name))
+            try:
+                nl=NetNS(name)
+                self.namespaces.append(nl)
+            except KeyboardInterrupt:
+                # remove the namespace if it has been created
+                pyroute2.netns.remove(name)
+                raise
+            ns_ipdb = IPDB(nl)
+            self.ipdbs[nl.netns] = ns_ipdb
             if disable_ipv6:
                 cmd = ["sysctl", "-q", "-w",
                        "net.ipv6.conf.default.disable_ipv6=1"]
@@ -33,17 +41,26 @@ class Simulation(object):
             ns_ipdb.interfaces.lo.up().commit()
         if in_ifc:
             in_ifname = in_ifc.ifname
+            with in_ifc as v:
+                # move half of veth into namespace
+                v.net_ns_fd = ns_ipdb.nl.netns
         else:
-            out_ifc = self.ipdb.create(ifname="%sa" % ifc_base_name, kind="veth",
-                                       peer="%sb" % ifc_base_name).commit()
-            in_ifc = self.ipdb.interfaces[out_ifc.peer]
-            in_ifname = in_ifc.ifname
-        with in_ifc as v:
-            # move half of veth into namespace
-            v.net_ns_fd = ns_ipdb.nl.netns
-        in_ifc = ns_ipdb.interfaces[in_ifname]
+            try:
+                out_ifc = self.ipdb.create(ifname="%sa" % ifc_base_name, kind="veth",
+                                           peer="%sb" % ifc_base_name).commit()
+                in_ifc = self.ipdb.interfaces[out_ifc.peer]
+                in_ifname = in_ifc.ifname
+                with in_ifc as v:
+                    v.net_ns_fd = ns_ipdb.nl.netns
+            except KeyboardInterrupt:
+                # explicitly remove the interface
+                out_ifname = "%sa" % ifc_base_name
+                if out_ifname in self.ipdb.interfaces: self.ipdb.interfaces[out_ifname].remove().commit()
+                raise
+
         if out_ifc: out_ifc.up().commit()
         ns_ipdb.interfaces.lo.up().commit()
+        in_ifc = ns_ipdb.interfaces[in_ifname]
         with in_ifc as v:
             v.ifname = ns_ifc
             if ipaddr: v.add_ip("%s" % ipaddr)
@@ -68,8 +85,6 @@ class Simulation(object):
         (ns_ipdb, out_ifc, in_ifc) = self._ns_add_ifc(name, "eth0", name, in_ifc, out_ifc,
                                                       ipaddr, macaddr, fn, cmd, action,
                                                       disable_ipv6)
-        self.ipdbs[ns_ipdb.nl.netns] = ns_ipdb
-        self.namespaces.append(ns_ipdb.nl)
         return (ns_ipdb, out_ifc, in_ifc)
 
     def release(self):
