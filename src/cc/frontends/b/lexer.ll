@@ -15,14 +15,14 @@
  */
 
 %{
-#include "cc/lexer.h"
+#include "lexer.h"
 %}
 
 %option yylineno nodefault yyclass="Lexer" noyywrap c++ prefix="ebpfcc"
 %option never-interactive
 %{
 #include <string>
-#include "cc/parser.yy.hh"
+#include "parser.yy.hh"
 std::string tmp_str_cc;
 %}
 

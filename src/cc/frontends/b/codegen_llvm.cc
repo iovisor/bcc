@@ -34,9 +34,9 @@
 #include <llvm/IR/Module.h>
 
 #include "exception.h"
-#include "cc/codegen_llvm.h"
-#include "cc/lexer.h"
-#include "cc/type_helper.h"
+#include "codegen_llvm.h"
+#include "lexer.h"
+#include "type_helper.h"
 #include "linux/bpf.h"
 #include "libbpf.h"
 

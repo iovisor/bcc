@@ -74,7 +74,7 @@ static u64 (*bpf_get_current_uid_gid)(void) =
 	(void *) BPF_FUNC_get_current_uid_gid;
 static int (*bpf_get_current_comm)(void *buf, int buf_size) =
 	(void *) BPF_FUNC_get_current_comm;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,3,0)
+//#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,3,0)
 static u64 (*bpf_get_cgroup_classid)(void *ctx) =
         (void *) BPF_FUNC_get_cgroup_classid;
 static u64 (*bpf_skb_vlan_push)(void *ctx, u16 proto, u16 vlan_tci) =
@@ -88,7 +88,7 @@ static int (*bpf_skb_get_tunnel_key)(void *ctx, void *to, u32 size, u64 flags) =
   (void *) BPF_FUNC_skb_get_tunnel_key;
 static int (*bpf_skb_set_tunnel_key)(void *ctx, void *from, u32 size, u64 flags) =
   (void *) BPF_FUNC_skb_set_tunnel_key;
-#endif
+//#endif
 #endif
 
 /* llvm builtin functions that eBPF C program may use to

@@ -16,27 +16,33 @@
 
 #pragma once
 
-#include <stdio.h>
+#include <map>
+#include <memory>
+#include <string>
 
-#include "cc/node.h"
+namespace llvm {
+class Module;
+class LLVMContext;
+}
 
 namespace ebpf {
+
+class BPFTable;
+
 namespace cc {
+class Parser;
+class CodegenLLVM;
+}
 
-class Printer : public Visitor {
+class ClangLoader {
  public:
-  explicit Printer(FILE* out) : out_(out), indent_(0) {}
-
-  void print_indent();
-
-#define VISIT(type, func) virtual STATUS_RETURN visit_##func(type* n);
-  EXPAND_NODES(VISIT)
-#undef VISIT
-
+  explicit ClangLoader(llvm::LLVMContext *ctx);
+  ~ClangLoader();
+  int parse(std::unique_ptr<llvm::Module> *mod,
+            std::unique_ptr<std::map<std::string, BPFTable>> *tables,
+            const std::string &file, bool in_memory);
  private:
-  FILE* out_;
-  int indent_;
+  llvm::LLVMContext *ctx_;
 };
 
-}  // namespace cc
 }  // namespace ebpf

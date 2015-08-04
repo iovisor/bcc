@@ -27,7 +27,7 @@
     #include <memory>
     #include <vector>
     #include <string>
-    #include "cc/node.h"
+    #include "node.h"
     // forward declaration
     namespace ebpf { namespace cc {
         class Lexer;
@@ -42,8 +42,8 @@
 }
 
 %{
-    #include "cc/node.h"
-    #include "cc/parser.h"
+    #include "node.h"
+    #include "parser.h"
     using std::unique_ptr;
     using std::vector;
     using std::string;
@@ -620,7 +620,7 @@ void ebpf::cc::BisonParser::error(const ebpf::cc::BisonParser::location_type &lo
     std::cerr << "Error: " << loc << " " << msg << std::endl;
 }
 
-#include "cc/lexer.h"
+#include "lexer.h"
 static int yylex(ebpf::cc::BisonParser::semantic_type *yylval,
                  ebpf::cc::BisonParser::location_type *yylloc,
                  ebpf::cc::Lexer &lexer) {

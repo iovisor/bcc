@@ -21,8 +21,8 @@
 #include <string>
 #include <set>
 
-#include "cc/node.h"
-#include "cc/scope.h"
+#include "node.h"
+#include "scope.h"
 
 namespace llvm {
 class AllocaInst;
@@ -35,6 +35,8 @@ class LLVMContext;
 class Module;
 class StructType;
 class SwitchInst;
+class Value;
+class GlobalVariable;
 }
 
 namespace ebpf {

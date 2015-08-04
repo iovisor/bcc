@@ -17,8 +17,8 @@
 #include <set>
 #include <algorithm>
 #include "exception.h"
-#include "cc/type_check.h"
-#include "cc/lexer.h"
+#include "type_check.h"
+#include "lexer.h"
 
 namespace ebpf {
 namespace cc {

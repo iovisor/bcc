@@ -17,9 +17,9 @@
 #pragma once
 
 #include <fstream> // NOLINT
-#include "cc/node.h"
-#include "cc/lexer.h"
-#include "cc/scope.h"
+#include "node.h"
+#include "lexer.h"
+#include "scope.h"
 
 namespace ebpf {
 namespace cc {

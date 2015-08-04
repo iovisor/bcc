@@ -18,7 +18,7 @@
 #include <vector>
 #include <string>
 
-#include "cc/node.h"
+#include "node.h"
 
 namespace ebpf {
 namespace cc {

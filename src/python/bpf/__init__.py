@@ -23,10 +23,12 @@ basestring = (unicode if sys.version_info[0] < 3 else str)
 lib = ct.CDLL("libbpfprog.so")
 
 # keep in sync with bpf_common.h
-lib.bpf_module_create.restype = ct.c_void_p
-lib.bpf_module_create.argtypes = [ct.c_char_p, ct.c_char_p, ct.c_uint]
-lib.bpf_module_create_from_string.restype = ct.c_void_p
-lib.bpf_module_create_from_string.argtypes = [ct.c_char_p, ct.c_uint]
+lib.bpf_module_create_b.restype = ct.c_void_p
+lib.bpf_module_create_b.argtypes = [ct.c_char_p, ct.c_char_p, ct.c_uint]
+lib.bpf_module_create_c.restype = ct.c_void_p
+lib.bpf_module_create_c.argtypes = [ct.c_char_p, ct.c_uint]
+lib.bpf_module_create_c_from_string.restype = ct.c_void_p
+lib.bpf_module_create_c_from_string.argtypes = [ct.c_char_p, ct.c_uint]
 lib.bpf_module_destroy.restype = None
 lib.bpf_module_destroy.argtypes = [ct.c_void_p]
 lib.bpf_module_license.restype = ct.c_char_p
@@ -171,12 +173,16 @@ class BPF(object):
         self.debug = debug
         self.funcs = {}
         if text:
-            self.module = lib.bpf_module_create_from_string(text.encode("ascii"), self.debug)
+            self.module = lib.bpf_module_create_c_from_string(text.encode("ascii"), self.debug)
         else:
             src_file = BPF._find_file(src_file)
             hdr_file = BPF._find_file(hdr_file)
-            self.module = lib.bpf_module_create(src_file.encode("ascii"),
-                    hdr_file.encode("ascii"), self.debug)
+            if src_file.endswith(".b"):
+                self.module = lib.bpf_module_create_b(src_file.encode("ascii"),
+                        hdr_file.encode("ascii"), self.debug)
+            else:
+                self.module = lib.bpf_module_create_c(src_file.encode("ascii"),
+                        self.debug)
 
         if self.module == None:
             raise Exception("Failed to compile BPF module %s" % src_file)
