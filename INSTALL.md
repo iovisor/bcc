@@ -1,6 +1,8 @@
 # Ubuntu - Docker edition
 
-The build dependencies are captured in a [Dockerfile](Dockerfile.ubuntu), the
+_The following no longer works until [LLVM Bug 24154](https://llvm.org/bugs/show_bug.cgi?id=24154) is resolved_
+
+<s>The build dependencies are captured in a [Dockerfile](Dockerfile.ubuntu), the
 output of which is a .deb for easy installation.
 
 * Start with a recent Ubuntu install (tested with 14.04 LTS)
@@ -15,7 +17,7 @@ output of which is a .deb for easy installation.
   * `docker run --rm -v /tmp:/mnt bcc sh -c "cp /root/bcc/build/*.deb /mnt"`
   * `sudo dpkg -i /tmp/libbcc*.deb`
 * Run the example
-  * `sudo python /usr/share/bcc/examples/hello_world.py`
+  * `sudo python /usr/share/bcc/examples/hello_world.py`</s>
 
 # Fedora - Docker edition
 
@@ -38,7 +40,9 @@ LLVM needs to be compiled from source.
 
 # Ubuntu - From source
 
-To build the toolchain from source, one needs:
+_The following no longer works until [LLVM Bug 24154](https://llvm.org/bugs/show_bug.cgi?id=24154) is resolved_
+
+<s>To build the toolchain from source, one needs:
 * LLVM 3.7 or newer, compiled with BPF support (default=on)
 * Clang 3.7, built from the same tree as LLVM
 * cmake, gcc (>=4.7), flex, bison
@@ -56,5 +60,4 @@ To build the toolchain from source, one needs:
   * `mkdir bcc/build; cd bcc/build`
   * `cmake .. -DCMAKE_INSTALL_PREFIX=/usr`
   * `make`
-  * `sudo make install`
-
+  * `sudo make install`</s>
