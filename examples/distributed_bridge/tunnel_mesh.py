@@ -12,6 +12,7 @@ from netaddr import EUI, IPAddress
 from pyroute2 import IPRoute, NetNS, IPDB, NSPopen
 from socket import htons, AF_INET
 from threading import Thread
+from subprocess import call
 
 num_hosts = int(argv[1])
 host_id = int(argv[2])
@@ -73,8 +74,8 @@ def run():
 
 try:
     run()
+    ipdb.release()
     input("")
     print("---")
 finally:
-    for v in ifc_gc: ipdb.interfaces[v].remove().commit()
-    ipdb.release()
+    for v in ifc_gc: call(["ip", "link", "del", v])
