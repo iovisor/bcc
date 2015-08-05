@@ -1,5 +1,19 @@
 # Copyright (c) PLUMgrid, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
+
+find_program(ARPING arping)
+if(ARPING STREQUAL "ARPING-NOTFOUND")
+  message(WARNING "Recommended test program 'arping' not found")
+endif()
+find_program(NETPERF netperf)
+if(NETPERF STREQUAL "NETPERF-NOTFOUND")
+  message(WARNING "Recommended test program 'netperf' not found")
+endif()
+find_program(IPERF iperf)
+if(IPERF STREQUAL "IPERF-NOTFOUND")
+  message(WARNING "Recommended test program 'iperf' not found")
+endif()
+
 add_test(NAME py_test_stat1_b WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   COMMAND ${TEST_WRAPPER} py_stat1_b namespace ${CMAKE_CURRENT_SOURCE_DIR}/test_stat1.py test_stat1.b proto.b)
 add_test(NAME py_test_stat1_c WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
