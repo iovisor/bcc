@@ -64,6 +64,9 @@ static int (*bpf_trace_printk_)(const char *fmt, u64 fmt_size, ...) =
 	(void *) BPF_FUNC_trace_printk;
 int bpf_trace_printk(const char *fmt, ...) asm("llvm.bpf.extra");
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4,2,0)
+static void bpf_tail_call_(u64 map_fd, void *ctx, int index) {
+  ((void (*)(void *, u64, int))BPF_FUNC_tail_call)(ctx, map_fd, index);
+}
 static int (*bpf_clone_redirect)(void *ctx, u64 ifindex, u64 flags) =
 	(void *) BPF_FUNC_clone_redirect;
 static u64 (*bpf_get_smp_processor_id)(void) =
@@ -81,9 +84,6 @@ static u64 (*bpf_skb_vlan_push)(void *ctx, u16 proto, u16 vlan_tci) =
         (void *) BPF_FUNC_skb_vlan_push;
 static u64 (*bpf_skb_vlan_pop)(void *ctx) =
         (void *) BPF_FUNC_skb_vlan_pop;
-static void bpf_tail_call_(u64 map_fd, void *ctx, int index) {
-  ((void (*)(void *, u64, int))BPF_FUNC_tail_call)(ctx, map_fd, index);
-}
 static int (*bpf_skb_get_tunnel_key)(void *ctx, void *to, u32 size, u64 flags) =
   (void *) BPF_FUNC_skb_get_tunnel_key;
 static int (*bpf_skb_set_tunnel_key)(void *ctx, void *from, u32 size, u64 flags) =
