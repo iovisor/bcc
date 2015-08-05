@@ -3,15 +3,15 @@
 
 find_program(ARPING arping)
 if(ARPING STREQUAL "ARPING-NOTFOUND")
-  message(WARNING "Required test program 'arping' not found")
+  message(WARNING "Recommended test program 'arping' not found")
 endif()
 find_program(NETPERF netperf)
 if(NETPERF STREQUAL "NETPERF-NOTFOUND")
-  message(WARNING "Required test program 'netperf' not found")
+  message(WARNING "Recommended test program 'netperf' not found")
 endif()
 find_program(IPERF iperf)
 if(IPERF STREQUAL "IPERF-NOTFOUND")
-  message(WARNING "Required test program 'iperf' not found")
+  message(WARNING "Recommended test program 'iperf' not found")
 endif()
 
 add_test(NAME py_test_stat1_b WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
