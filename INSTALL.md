@@ -1,3 +1,40 @@
+# Ubuntu - Binary
+
+Install a 4.2+ kernel from http://kernel.ubuntu.com/~kernel-ppa/mainline,
+for example:
+
+```bash
+VER=4.2.0-040200rc5
+REL=201508030228
+PREFIX=http://kernel.ubuntu.com/~kernel-ppa/mainline/v4.2-rc5-unstable
+wget ${PREFIX}/linux-headers-${VER}-generic_${VER}.${REL}_amd64.deb
+wget ${PREFIX}/linux-headers-${VER}_${VER}.${REL}_all.deb
+wget ${PREFIX}/linux-image-${VER}-generic_${VER}.${REL}_amd64.deb
+sudo dpkg -i linux-*${VER}.${REL}*.deb
+# reboot
+```
+
+Tagged binary packages are built for Ubuntu Trusty (14.04) and hosted at
+http://52.8.15.63/apt/.
+
+To install:
+```bash
+sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys D4284CDD
+echo "deb http://52.8.15.63/apt trusty main" | sudo tee /etc/apt/sources.list.d/iovisor.list
+sudo apt-get update
+sudo apt-get install libbcc
+```
+
+Test it:
+`sudo python /usr/share/bcc/examples/hello_world.py`
+
+(Optional) Install pyroute2 for additional networking features
+```bash
+git clone https://github.com/svinota/pyroute2
+cd pyroute2; sudo make install
+sudo python /usr/share/bcc/examples/simple_tc.py
+```
+
 # Fedora - Docker edition
 
 The build dependencies are captured in a [Dockerfile](Dockerfile.fedora), the
