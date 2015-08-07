@@ -19,7 +19,7 @@
 
 namespace ebpf {
 
-struct BPFTable {
+struct TableDesc {
   int fd;
   size_t key_size;  // sizes are in bytes
   size_t leaf_size;

@@ -145,7 +145,7 @@ void BScanfVisitor::finalize(string &result) {
   result += "}\n";
 }
 
-BTypeVisitor::BTypeVisitor(ASTContext &C, Rewriter &rewriter, map<string, BPFTable> &tables)
+BTypeVisitor::BTypeVisitor(ASTContext &C, Rewriter &rewriter, map<string, TableDesc> &tables)
     : C(C), rewriter_(rewriter), out_(llvm::errs()), tables_(tables) {
 }
 
@@ -419,7 +419,7 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
       return false;
     }
     const RecordDecl *RD = R->getDecl()->getDefinition();
-    BPFTable table;
+    TableDesc table;
     unsigned i = 0;
     for (auto F : RD->fields()) {
       size_t sz = C.getTypeSize(F->getType()) >> 3;
@@ -489,7 +489,7 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
   return true;
 }
 
-BTypeConsumer::BTypeConsumer(ASTContext &C, Rewriter &rewriter, map<string, BPFTable> &tables)
+BTypeConsumer::BTypeConsumer(ASTContext &C, Rewriter &rewriter, map<string, TableDesc> &tables)
     : visitor_(C, rewriter, tables) {
 }
 
@@ -500,7 +500,7 @@ bool BTypeConsumer::HandleTopLevelDecl(DeclGroupRef D) {
 }
 
 BFrontendAction::BFrontendAction(llvm::raw_ostream &os)
-    : rewriter_(new Rewriter), os_(os), tables_(new map<string, BPFTable>) {
+    : rewriter_(new Rewriter), os_(os), tables_(new map<string, TableDesc>) {
 }
 
 void BFrontendAction::EndSourceFileAction() {

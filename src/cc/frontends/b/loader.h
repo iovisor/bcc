@@ -26,7 +26,7 @@ class Module;
 
 namespace ebpf {
 
-class BPFTable;
+class TableDesc;
 
 namespace cc {
 class Parser;
@@ -38,7 +38,7 @@ class BLoader {
   BLoader();
   ~BLoader();
   int parse(llvm::Module *mod, const std::string &filename, const std::string &proto_filename,
-            std::unique_ptr<std::map<std::string, BPFTable>> *tables);
+            std::unique_ptr<std::map<std::string, TableDesc>> *tables);
   int get_table_fd(const std::string &name) const;
  private:
   std::unique_ptr<cc::Parser> parser_;

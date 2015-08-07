@@ -27,7 +27,7 @@ class LLVMContext;
 
 namespace ebpf {
 
-class BPFTable;
+class TableDesc;
 
 namespace cc {
 class Parser;
@@ -39,7 +39,7 @@ class ClangLoader {
   explicit ClangLoader(llvm::LLVMContext *ctx);
   ~ClangLoader();
   int parse(std::unique_ptr<llvm::Module> *mod,
-            std::unique_ptr<std::map<std::string, BPFTable>> *tables,
+            std::unique_ptr<std::map<std::string, TableDesc>> *tables,
             const std::string &file, bool in_memory);
  private:
   llvm::LLVMContext *ctx_;
