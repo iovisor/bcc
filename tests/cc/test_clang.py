@@ -46,5 +46,16 @@ int count_foo(struct pt_regs *ctx, unsigned long a, unsigned long b) {
         b = BPF(text=text, debug=0)
         fn = b.load_func("count_foo", BPF.KPROBE)
 
+    def test_scanf(self):
+        text = """
+BPF_TABLE("hash", int, struct { int a; int b; }, stats, 10);
+int foo(void *ctx) {
+    return 0;
+}
+"""
+        b = BPF(text=text, debug=0)
+        fn = b.load_func("foo", BPF.KPROBE)
+        # todo: the actual test
+
 if __name__ == "__main__":
     main()

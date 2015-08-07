@@ -51,6 +51,13 @@ bool BMapDeclVisitor::VisitFieldDecl(FieldDecl *D) {
   result_ += "\",";
   return true;
 }
+
+bool BMapDeclVisitor::TraverseRecordDecl(RecordDecl *D) {
+  // skip children, handled in Visit...
+  if (!WalkUpFromRecordDecl(D))
+    return false;
+  return true;
+}
 bool BMapDeclVisitor::VisitRecordDecl(RecordDecl *D) {
   result_ += "[\"";
   result_ += D->getName();
@@ -65,7 +72,7 @@ bool BMapDeclVisitor::VisitRecordDecl(RecordDecl *D) {
   if (!D->getDefinition()->field_empty())
     result_.erase(result_.end() - 2);
   result_ += "]]";
-  return false;
+  return true;
 }
 bool BMapDeclVisitor::VisitTagType(const TagType *T) {
   return TraverseDecl(T->getDecl()->getDefinition());
@@ -78,6 +85,64 @@ bool BMapDeclVisitor::VisitBuiltinType(const BuiltinType *T) {
   result_ += T->getName(C.getPrintingPolicy());
   result_ += "\"";
   return true;
+}
+
+BScanfVisitor::BScanfVisitor(ASTContext &C)
+    : C(C), n_args_(0) {}
+
+bool BScanfVisitor::VisitFieldDecl(FieldDecl *D) {
+  args_ += "&val->" + D->getName().str();
+  ++n_args_;
+  return true;
+}
+
+bool BScanfVisitor::TraverseRecordDecl(RecordDecl *D) {
+  // skip children, handled in Visit...
+  if (!WalkUpFromRecordDecl(D))
+    return false;
+  return true;
+}
+
+bool BScanfVisitor::VisitRecordDecl(RecordDecl *D) {
+  if (type_.empty())
+    type_ = "struct " + D->getDefinition()->getName().str();
+  fmt_ += "{ ";
+  for (auto F : D->getDefinition()->fields()) {
+    TraverseDecl(F);
+    if (F->isBitField())
+      fmt_ += ", " + to_string(F->getBitWidthValue(C));
+    fmt_ += ", ";
+    args_ += ", ";
+  }
+  if (!D->getDefinition()->field_empty()) {
+    fmt_.erase(fmt_.end() - 2);
+    args_.erase(args_.end() - 2);
+  }
+  fmt_ += "}";
+  return true;
+}
+bool BScanfVisitor::VisitTagType(const TagType *T) {
+  return TraverseDecl(T->getDecl()->getDefinition());
+}
+bool BScanfVisitor::VisitTypedefType(const TypedefType *T) {
+  return TraverseDecl(T->getDecl());
+}
+bool BScanfVisitor::VisitBuiltinType(const BuiltinType *T) {
+  if (type_.empty()) {
+    type_ = T->getName(C.getPrintingPolicy());
+    args_ += "val";
+    ++n_args_;
+  }
+  fmt_ += "%i";
+  return true;
+}
+void BScanfVisitor::finalize(string &result) {
+  result  = "int read_entry(const char *str, void *buf) {\n";
+  result += "  " + type_ + " *val = buf;\n";
+  result += "  int n = sscanf(str, \"" + fmt_ + "\", " + args_ + ");\n";
+  result += "  if (n < " + std::to_string(n_args_) + ") return -1;\n";
+  result += "  return 0;\n";
+  result += "}\n";
 }
 
 BTypeVisitor::BTypeVisitor(ASTContext &C, Rewriter &rewriter, map<string, BPFTable> &tables)
@@ -361,11 +426,21 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
       if (F->getName() == "key") {
         table.key_size = sz;
         BMapDeclVisitor visitor(C, table.key_desc);
-        visitor.TraverseType(F->getType());
+        if (!visitor.TraverseType(F->getType()))
+          return false;
+        BScanfVisitor scanf_visitor(C);
+        if (!scanf_visitor.TraverseType(F->getType()))
+          return false;
+        scanf_visitor.finalize(table.key_reader);
       } else if (F->getName() == "leaf") {
         table.leaf_size = sz;
         BMapDeclVisitor visitor(C, table.leaf_desc);
-        visitor.TraverseType(F->getType());
+        if (!visitor.TraverseType(F->getType()))
+          return false;
+        BScanfVisitor scanf_visitor(C);
+        if (!scanf_visitor.TraverseType(F->getType()))
+          return false;
+        scanf_visitor.finalize(table.leaf_reader);
       } else if (F->getName() == "data") {
         table.max_entries = sz / table.leaf_size;
       }

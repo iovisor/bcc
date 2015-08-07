@@ -16,6 +16,7 @@ configure_file(libbpfprog.pc.in ${CMAKE_CURRENT_BINARY_DIR}/libbpfprog.pc @ONLY)
 # prune unused llvm static library stuff when linking into the new .so
 set(CMAKE_SHARED_LINKER_FLAGS "-Wl,--exclude-libs=ALL")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-strict-aliasing")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
 
 # if gcc 4.9 or higher is used, static libstdc++ is a good option
@@ -33,7 +34,9 @@ add_library(bpfprog SHARED bpf_common.cc bpf_module.cc libbpf.c)
 
 # BPF is still experimental otherwise it should be available
 #llvm_map_components_to_libnames(llvm_libs bpf mcjit irreader passes)
-llvm_map_components_to_libnames(llvm_libs mcjit irreader passes linker instrumentation objcarcopts bitwriter option)
+llvm_map_components_to_libnames(llvm_libs mcjit irreader passes linker
+  instrumentation objcarcopts bitwriter option x86codegen)
+message(STATUS "llvm_libs=${llvm_libs}")
 # order is important
 set(clang_libs ${libclangFrontend} ${libclangSerialization} ${libclangDriver} ${libclangParse}
   ${libclangSema} ${libclangCodeGen} ${libclangAnalysis} ${libclangRewrite} ${libclangEdit}

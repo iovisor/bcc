@@ -43,21 +43,42 @@ struct BPFTable {
   size_t max_entries;
   std::string key_desc;
   std::string leaf_desc;
+  std::string key_reader;
+  std::string leaf_reader;
 };
 
 // Helper visitor for constructing a string representation of a key/leaf decl
 class BMapDeclVisitor : public clang::RecursiveASTVisitor<BMapDeclVisitor> {
  public:
   explicit BMapDeclVisitor(clang::ASTContext &C, std::string &result);
+  bool TraverseRecordDecl(clang::RecordDecl *Decl);
   bool VisitRecordDecl(clang::RecordDecl *Decl);
   bool VisitFieldDecl(clang::FieldDecl *Decl);
   bool VisitBuiltinType(const clang::BuiltinType *T);
   bool VisitTypedefType(const clang::TypedefType *T);
   bool VisitTagType(const clang::TagType *T);
-  const std::string & str() const { return result_; }
  private:
   clang::ASTContext &C;
   std::string &result_;
+};
+
+// Helper visitor for constructing a fscanf routine for key/leaf decl
+class BScanfVisitor : public clang::RecursiveASTVisitor<BScanfVisitor> {
+ public:
+  explicit BScanfVisitor(clang::ASTContext &C);
+  bool TraverseRecordDecl(clang::RecordDecl *Decl);
+  bool VisitRecordDecl(clang::RecordDecl *Decl);
+  bool VisitFieldDecl(clang::FieldDecl *Decl);
+  bool VisitBuiltinType(const clang::BuiltinType *T);
+  bool VisitTypedefType(const clang::TypedefType *T);
+  bool VisitTagType(const clang::TagType *T);
+  void finalize(std::string &result);
+ private:
+  clang::ASTContext &C;
+  size_t n_args_;
+  std::string fmt_;
+  std::string args_;
+  std::string type_;
 };
 
 // Type visitor and rewriter for B programs.

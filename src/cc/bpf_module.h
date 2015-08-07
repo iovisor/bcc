@@ -39,11 +39,14 @@ class BPFModule {
   int init_engine();
   int parse(llvm::Module *mod);
   int finalize();
-  void dump_ir();
+  int annotate();
+  std::unique_ptr<llvm::ExecutionEngine> make_reader(llvm::LLVMContext &ctx);
+  void dump_ir(llvm::Module &mod);
   int load_file_module(std::unique_ptr<llvm::Module> *mod, const std::string &file, bool in_memory);
   int load_includes(const std::string &tmpfile);
   int load_cfile(const std::string &file, bool in_memory);
   int kbuild_flags(const char *uname_release, std::vector<std::string> *cflags);
+  int run_pass_manager(llvm::Module &mod);
  public:
   BPFModule(unsigned flags);
   ~BPFModule();
@@ -62,8 +65,12 @@ class BPFModule {
   const char * table_name(size_t id) const;
   const char * table_key_desc(size_t id) const;
   const char * table_key_desc(const std::string &name) const;
+  size_t table_key_size(size_t id) const;
+  size_t table_key_size(const std::string &name) const;
   const char * table_leaf_desc(size_t id) const;
   const char * table_leaf_desc(const std::string &name) const;
+  size_t table_leaf_size(size_t id) const;
+  size_t table_leaf_size(const std::string &name) const;
   char * license() const;
   unsigned kern_version() const;
  private:
@@ -72,7 +79,7 @@ class BPFModule {
   std::string proto_filename_;
   std::unique_ptr<llvm::LLVMContext> ctx_;
   std::unique_ptr<llvm::ExecutionEngine> engine_;
-  llvm::Module *mod_;
+  std::unique_ptr<llvm::Module> mod_;
   std::unique_ptr<BLoader> b_loader_;
   std::unique_ptr<ClangLoader> clang_loader_;
   std::map<std::string, std::tuple<uint8_t *, uintptr_t>> sections_;

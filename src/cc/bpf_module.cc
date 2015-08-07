@@ -38,6 +38,7 @@
 #include <llvm/Support/FormattedStream.h>
 #include <llvm/Support/Host.h>
 #include <llvm/Support/SourceMgr.h>
+#include <llvm/Support/TargetSelect.h>
 #include <llvm/Transforms/IPO.h>
 #include <llvm/Transforms/IPO/PassManagerBuilder.h>
 
@@ -95,6 +96,8 @@ class MyMemoryManager : public SectionMemoryManager {
 
 BPFModule::BPFModule(unsigned flags)
     : flags_(flags), ctx_(new LLVMContext) {
+  InitializeNativeTarget();
+  InitializeNativeTargetAsmPrinter();
   LLVMInitializeBPFTarget();
   LLVMInitializeBPFTargetMC();
   LLVMInitializeBPFTargetInfo();
@@ -107,31 +110,34 @@ BPFModule::~BPFModule() {
   ctx_.reset();
 }
 
+unique_ptr<ExecutionEngine> BPFModule::make_reader(LLVMContext &ctx) {
+  auto m = make_unique<Module>("scanf_reader", ctx);
+  Module *mod = &*m;
+  auto structs = mod->getIdentifiedStructTypes();
+  for (auto s : structs) {
+    fprintf(stderr, "struct %s\n", s->getName().str().c_str());
+  }
+
+  dump_ir(*mod);
+  run_pass_manager(*mod);
+
+  string err;
+  map<string, tuple<uint8_t *, uintptr_t>> sections;
+  EngineBuilder builder(move(m));
+  builder.setErrorStr(&err);
+  builder.setMCJITMemoryManager(make_unique<MyMemoryManager>(&sections));
+  builder.setUseOrcMCJITReplacement(true);
+  auto engine = unique_ptr<ExecutionEngine>(builder.create());
+  if (!engine)
+    fprintf(stderr, "Could not create ExecutionEngine: %s\n", err.c_str());
+  return engine;
+}
+
 // load an entire c file as a module
 int BPFModule::load_cfile(const string &file, bool in_memory) {
   clang_loader_ = make_unique<ClangLoader>(&*ctx_);
-  unique_ptr<Module> mod;
-  if (clang_loader_->parse(&mod, &tables_, file, in_memory))
+  if (clang_loader_->parse(&mod_, &tables_, file, in_memory))
     return -1;
-  mod_ = &*mod;
-
-  mod_->setDataLayout("e-m:e-p:64:64-i64:64-n32:64-S128");
-  mod_->setTargetTriple("bpf-pc-linux");
-
-  for (auto fn = mod_->getFunctionList().begin(); fn != mod_->getFunctionList().end(); ++fn)
-    fn->addFnAttr(Attribute::AlwaysInline);
-
-  string err;
-  engine_ = unique_ptr<ExecutionEngine>(EngineBuilder(move(mod))
-      .setErrorStr(&err)
-      .setMCJITMemoryManager(make_unique<MyMemoryManager>(&sections_))
-      .setMArch("bpf")
-      .create());
-  if (!engine_) {
-    fprintf(stderr, "Could not create ExecutionEngine: %s\n", err.c_str());
-    return -1;
-  }
-
   return 0;
 }
 
@@ -142,41 +148,44 @@ int BPFModule::load_cfile(const string &file, bool in_memory) {
 // build an ExecutionEngine.
 int BPFModule::load_includes(const string &tmpfile) {
   clang_loader_ = make_unique<ClangLoader>(&*ctx_);
-  unique_ptr<Module> mod;
-  if (clang_loader_->parse(&mod, &tables_, tmpfile, false))
+  if (clang_loader_->parse(&mod_, &tables_, tmpfile, false))
     return -1;
-  mod_ = &*mod;
+  return 0;
+}
 
-  mod_->setDataLayout("e-m:e-p:64:64-i64:64-n32:64-S128");
-  mod_->setTargetTriple("bpf-pc-linux");
-
+int BPFModule::annotate() {
   for (auto fn = mod_->getFunctionList().begin(); fn != mod_->getFunctionList().end(); ++fn)
     fn->addFnAttr(Attribute::AlwaysInline);
 
-  string err;
-  engine_ = unique_ptr<ExecutionEngine>(EngineBuilder(move(mod))
-      .setErrorStr(&err)
-      .setMCJITMemoryManager(make_unique<MyMemoryManager>(&sections_))
-      .setMArch("bpf")
-      .create());
-  if (!engine_) {
-    fprintf(stderr, "Could not create ExecutionEngine: %s\n", err.c_str());
-    return -1;
+  //for (auto s : mod_->getIdentifiedStructTypes()) {
+  //  llvm::errs() << "struct " << s->getName() << "\n";
+  //  for (auto e : s->elements()) {
+  //    llvm::errs() << " ";
+  //    e->print(llvm::errs());
+  //    llvm::errs() << "\n";
+  //  }
+  //}
+
+  if (1) {
+    auto engine = make_reader(*ctx_);
+    if (engine)
+      engine->finalizeObject();
   }
+
 
   return 0;
 }
 
-void BPFModule::dump_ir() {
+void BPFModule::dump_ir(Module &mod) {
   legacy::PassManager PM;
   PM.add(createPrintModulePass(outs()));
-  PM.run(*mod_);
+  PM.run(mod);
 }
 
-int BPFModule::finalize() {
-  if (verifyModule(*mod_, &errs())) {
+int BPFModule::run_pass_manager(Module &mod) {
+  if (verifyModule(mod, &errs())) {
     if (flags_ & 1)
-      dump_ir();
+      dump_ir(mod);
     return -1;
   }
 
@@ -188,7 +197,30 @@ int BPFModule::finalize() {
   PMB.populateModulePassManager(PM);
   if (flags_ & 1)
     PM.add(createPrintModulePass(outs()));
-  PM.run(*mod_);
+  PM.run(mod);
+  return 0;
+}
+
+int BPFModule::finalize() {
+  Module *mod = &*mod_;
+
+  mod->setDataLayout("e-m:e-p:64:64-i64:64-n32:64-S128");
+  mod->setTargetTriple("bpf-pc-linux");
+
+  string err;
+  EngineBuilder builder(move(mod_));
+  builder.setErrorStr(&err);
+  builder.setMCJITMemoryManager(make_unique<MyMemoryManager>(&sections_));
+  builder.setMArch("bpf");
+  builder.setUseOrcMCJITReplacement(true);
+  engine_ = unique_ptr<ExecutionEngine>(builder.create());
+  if (!engine_) {
+    fprintf(stderr, "Could not create ExecutionEngine: %s\n", err.c_str());
+    return -1;
+  }
+
+  if (int rc = run_pass_manager(*mod))
+    return rc;
 
   engine_->finalizeObject();
 
@@ -308,6 +340,27 @@ const char * BPFModule::table_leaf_desc(const string &name) const {
   if (table_it == tables_->end()) return nullptr;
   return table_it->second.leaf_desc.c_str();
 }
+size_t BPFModule::table_key_size(size_t id) const {
+  if (id >= table_names_.size()) return 0;
+  return table_key_size(table_names_[id]);
+}
+size_t BPFModule::table_key_size(const string &name) const {
+  if (b_loader_) return 0;
+  auto table_it = tables_->find(name);
+  if (table_it == tables_->end()) return 0;
+  return table_it->second.key_size;
+}
+
+size_t BPFModule::table_leaf_size(size_t id) const {
+  if (id >= table_names_.size()) return 0;
+  return table_leaf_size(table_names_[id]);
+}
+size_t BPFModule::table_leaf_size(const string &name) const {
+  if (b_loader_) return 0;
+  auto table_it = tables_->find(name);
+  if (table_it == tables_->end()) return 0;
+  return table_it->second.leaf_size;
+}
 
 // load a B file, which comes in two parts
 int BPFModule::load_b(const string &filename, const string &proto_filename) {
@@ -324,9 +377,11 @@ int BPFModule::load_b(const string &filename, const string &proto_filename) {
   // pass the partially compiled module to the B frontend to continue with.
   if (int rc = load_includes(BCC_INSTALL_PREFIX "/share/bcc/include/bcc/helpers.h"))
     return rc;
+  if (int rc = annotate())
+    return rc;
 
   b_loader_.reset(new BLoader);
-  if (int rc = b_loader_->parse(mod_, filename, proto_filename))
+  if (int rc = b_loader_->parse(&*mod_, filename, proto_filename))
     return rc;
   if (int rc = finalize())
     return rc;
@@ -345,6 +400,8 @@ int BPFModule::load_c(const string &filename) {
   }
   if (int rc = load_cfile(filename, false))
     return rc;
+  if (int rc = annotate())
+    return rc;
   if (int rc = finalize())
     return rc;
   return 0;
@@ -357,6 +414,8 @@ int BPFModule::load_string(const string &text) {
     return -1;
   }
   if (int rc = load_cfile(text, true))
+    return rc;
+  if (int rc = annotate())
     return rc;
 
   if (int rc = finalize())

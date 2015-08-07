@@ -146,4 +146,28 @@ const char * bpf_table_leaf_desc_id(void *program, size_t id) {
   return mod->table_leaf_desc(id);
 }
 
+size_t bpf_table_key_size(void *program, const char *table_name) {
+  auto mod = static_cast<ebpf::BPFModule *>(program);
+  if (!mod) return 0;
+  return mod->table_key_size(table_name);
+}
+
+size_t bpf_table_key_size_id(void *program, size_t id) {
+  auto mod = static_cast<ebpf::BPFModule *>(program);
+  if (!mod) return 0;
+  return mod->table_key_size(id);
+}
+
+size_t bpf_table_leaf_size(void *program, const char *table_name) {
+  auto mod = static_cast<ebpf::BPFModule *>(program);
+  if (!mod) return 0;
+  return mod->table_leaf_size(table_name);
+}
+
+size_t bpf_table_leaf_size_id(void *program, size_t id) {
+  auto mod = static_cast<ebpf::BPFModule *>(program);
+  if (!mod) return 0;
+  return mod->table_leaf_size(id);
+}
+
 }
