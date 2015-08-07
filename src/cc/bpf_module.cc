@@ -157,6 +157,12 @@ int BPFModule::annotate() {
   for (auto fn = mod_->getFunctionList().begin(); fn != mod_->getFunctionList().end(); ++fn)
     fn->addFnAttr(Attribute::AlwaysInline);
 
+  for (auto table : *tables_) {
+    table_names_.push_back(table.first);
+    GlobalValue *gvar = mod_->getNamedValue(table.first);
+    if (!gvar) continue;
+    llvm::errs() << "table " << gvar->getName() << "\n";
+  }
   //for (auto s : mod_->getIdentifiedStructTypes()) {
   //  llvm::errs() << "struct " << s->getName() << "\n";
   //  for (auto e : s->elements()) {
@@ -228,9 +234,6 @@ int BPFModule::finalize() {
   for (auto section : sections_)
     if (!strncmp(FN_PREFIX.c_str(), section.first.c_str(), FN_PREFIX.size()))
       function_names_.push_back(section.first);
-
-  for (auto table : *tables_)
-    table_names_.push_back(table.first);
 
   return 0;
 }
@@ -377,11 +380,11 @@ int BPFModule::load_b(const string &filename, const string &proto_filename) {
   // pass the partially compiled module to the B frontend to continue with.
   if (int rc = load_includes(BCC_INSTALL_PREFIX "/share/bcc/include/bcc/helpers.h"))
     return rc;
-  if (int rc = annotate())
-    return rc;
 
   b_loader_.reset(new BLoader);
-  if (int rc = b_loader_->parse(&*mod_, filename, proto_filename))
+  if (int rc = b_loader_->parse(&*mod_, filename, proto_filename, &tables_))
+    return rc;
+  if (int rc = annotate())
     return rc;
   if (int rc = finalize())
     return rc;

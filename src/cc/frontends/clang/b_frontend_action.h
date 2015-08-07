@@ -23,6 +23,8 @@
 #include <clang/Frontend/FrontendAction.h>
 #include <clang/Rewrite/Core/Rewriter.h>
 
+#include "table_desc.h"
+
 namespace clang {
 class ASTConsumer;
 class ASTContext;
@@ -35,17 +37,6 @@ class StringRef;
 }
 
 namespace ebpf {
-
-struct BPFTable {
-  int fd;
-  size_t key_size;
-  size_t leaf_size;
-  size_t max_entries;
-  std::string key_desc;
-  std::string leaf_desc;
-  std::string key_reader;
-  std::string leaf_reader;
-};
 
 // Helper visitor for constructing a string representation of a key/leaf decl
 class BMapDeclVisitor : public clang::RecursiveASTVisitor<BMapDeclVisitor> {

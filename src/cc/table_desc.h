@@ -14,36 +14,20 @@
  * limitations under the License.
  */
 
-#pragma once
-
-#include <map>
-#include <memory>
+#include <cstdint>
 #include <string>
-
-namespace llvm {
-class Module;
-}
 
 namespace ebpf {
 
-class BPFTable;
-
-namespace cc {
-class Parser;
-class CodegenLLVM;
-}
-
-class BLoader {
- public:
-  BLoader();
-  ~BLoader();
-  int parse(llvm::Module *mod, const std::string &filename, const std::string &proto_filename,
-            std::unique_ptr<std::map<std::string, BPFTable>> *tables);
-  int get_table_fd(const std::string &name) const;
- private:
-  std::unique_ptr<cc::Parser> parser_;
-  std::unique_ptr<cc::Parser> proto_parser_;
-  std::unique_ptr<cc::CodegenLLVM> codegen_;
+struct BPFTable {
+  int fd;
+  size_t key_size;  // sizes are in bytes
+  size_t leaf_size;
+  size_t max_entries;
+  std::string key_desc;
+  std::string leaf_desc;
+  std::string key_reader;
+  std::string leaf_reader;
 };
 
 }  // namespace ebpf

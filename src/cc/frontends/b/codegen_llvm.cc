@@ -36,6 +36,7 @@
 #include "exception.h"
 #include "codegen_llvm.h"
 #include "lexer.h"
+#include "table_desc.h"
 #include "type_helper.h"
 #include "linux/bpf.h"
 #include "libbpf.h"
@@ -47,6 +48,7 @@ using namespace llvm;
 
 using std::for_each;
 using std::make_tuple;
+using std::map;
 using std::pair;
 using std::set;
 using std::string;
@@ -1219,7 +1221,7 @@ StatusTuple CodegenLLVM::visit_func_decl_stmt_node(FuncDeclStmtNode *n) {
   return mkstatus(0);
 }
 
-StatusTuple CodegenLLVM::visit(Node* root) {
+StatusTuple CodegenLLVM::visit(Node* root, map<string, BPFTable> &tables) {
   scopes_->set_current(scopes_->top_state());
   scopes_->set_current(scopes_->top_var());
 
@@ -1232,6 +1234,15 @@ StatusTuple CodegenLLVM::visit(Node* root) {
     TRY2((*it)->accept(this));
   //TRY2(print_parser());
 
+  for (auto table : tables_) {
+    BPFTable desc = {
+      table_fds_[table.first],
+      table.first->key_type_->bit_width_ >> 3,
+      table.first->leaf_type_->bit_width_ >> 3,
+      table.first->size_,
+    };
+    tables[table.first->id_->name_] = desc;
+  }
   return mkstatus(0);
 }
 

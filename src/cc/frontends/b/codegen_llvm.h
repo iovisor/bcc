@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <map>
 #include <stdio.h>
 #include <vector>
 #include <string>
@@ -40,6 +41,8 @@ class GlobalVariable;
 }
 
 namespace ebpf {
+class BPFTable;
+
 namespace cc {
 
 class BlockStack;
@@ -60,7 +63,7 @@ class CodegenLLVM : public Visitor {
   EXPAND_NODES(VISIT)
 #undef VISIT
 
-  virtual STATUS_RETURN visit(Node* n);
+  virtual STATUS_RETURN visit(Node* n, std::map<string, BPFTable> &tables);
 
   int get_table_fd(const std::string &name) const;
 

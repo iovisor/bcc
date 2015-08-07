@@ -18,9 +18,12 @@
 #include "type_check.h"
 #include "codegen_llvm.h"
 #include "loader.h"
+#include "table_desc.h"
 
 using std::get;
+using std::map;
 using std::string;
+using std::unique_ptr;
 
 namespace ebpf {
 
@@ -30,7 +33,8 @@ BLoader::BLoader() {
 BLoader::~BLoader() {
 }
 
-int BLoader::parse(llvm::Module *mod, const string &filename, const string &proto_filename) {
+int BLoader::parse(llvm::Module *mod, const string &filename, const string &proto_filename,
+                   unique_ptr<map<string, BPFTable>> *tables) {
   int rc;
 
   proto_parser_ = make_unique<ebpf::cc::Parser>(proto_filename);
@@ -57,8 +61,10 @@ int BLoader::parse(llvm::Module *mod, const string &filename, const string &prot
     return -1;
   }
 
+  *tables = make_unique<map<string, BPFTable>>();
+
   codegen_ = ebpf::make_unique<ebpf::cc::CodegenLLVM>(mod, parser_->scopes_.get(), proto_parser_->scopes_.get());
-  ret = codegen_->visit(parser_->root_node_);
+  ret = codegen_->visit(parser_->root_node_, **tables);
   if (get<0>(ret) != 0 || get<1>(ret).size()) {
     fprintf(stderr, "Codegen error @line=%d: %s\n", get<0>(ret), get<1>(ret).c_str());
     return get<0>(ret);
