@@ -24,8 +24,10 @@
 
 namespace llvm {
 class ExecutionEngine;
+class Function;
 class LLVMContext;
 class Module;
+class Type;
 }
 
 namespace ebpf {
@@ -40,7 +42,8 @@ class BPFModule {
   int parse(llvm::Module *mod);
   int finalize();
   int annotate();
-  std::unique_ptr<llvm::ExecutionEngine> make_reader(llvm::LLVMContext &ctx);
+  std::unique_ptr<llvm::ExecutionEngine> finalize_reader(std::unique_ptr<llvm::Module> mod);
+  int make_reader(llvm::Module *mod, llvm::Type *type);
   void dump_ir(llvm::Module &mod);
   int load_file_module(std::unique_ptr<llvm::Module> *mod, const std::string &file, bool in_memory);
   int load_includes(const std::string &tmpfile);
@@ -86,6 +89,7 @@ class BPFModule {
   std::unique_ptr<std::map<std::string, TableDesc>> tables_;
   std::vector<std::string> table_names_;
   std::vector<std::string> function_names_;
+  std::map<llvm::Type *, llvm::Function *> readers_;
 };
 
 }  // namespace ebpf

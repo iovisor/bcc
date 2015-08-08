@@ -46,9 +46,9 @@ int count_foo(struct pt_regs *ctx, unsigned long a, unsigned long b) {
         b = BPF(text=text, debug=0)
         fn = b.load_func("count_foo", BPF.KPROBE)
 
-    def test_scanf(self):
+    def test_sscanf(self):
         text = """
-BPF_TABLE("hash", int, struct { int a; int b; }, stats, 10);
+BPF_TABLE("hash", int, struct { u64 a; u64 b; u64 c:31; u64 d:33; struct { u32 a; u32 b; } s; }, stats, 10);
 int foo(void *ctx) {
     return 0;
 }

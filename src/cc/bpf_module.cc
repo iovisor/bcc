@@ -29,6 +29,7 @@
 #include <llvm/ExecutionEngine/MCJIT.h>
 #include <llvm/ExecutionEngine/SectionMemoryManager.h>
 #include <llvm/IRReader/IRReader.h>
+#include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/IRPrintingPasses.h>
 #include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/LLVMContext.h>
@@ -110,22 +111,86 @@ BPFModule::~BPFModule() {
   ctx_.reset();
 }
 
-unique_ptr<ExecutionEngine> BPFModule::make_reader(LLVMContext &ctx) {
-  auto m = make_unique<Module>("scanf_reader", ctx);
-  Module *mod = &*m;
-  auto structs = mod->getIdentifiedStructTypes();
-  for (auto s : structs) {
-    fprintf(stderr, "struct %s\n", s->getName().str().c_str());
+// recursive helper to capture the arguments
+void parse_type(IRBuilder<> &B, vector<Value *> *args, string *fmt, Type *type, Value *out) {
+  if (StructType *st = dyn_cast<StructType>(type)) {
+    *fmt += "{ ";
+    unsigned idx = 0;
+    for (auto field : st->elements()) {
+      parse_type(B, args, fmt, field, B.CreateStructGEP(type, out, idx++));
+      *fmt += " ";
+    }
+    *fmt += "}";
+  } else if (dyn_cast<IntegerType>(type)) {
+    *fmt += "%lli";
+    args->push_back(out);
   }
+}
 
-  dump_ir(*mod);
+int BPFModule::make_reader(Module *mod, Type *type) {
+  if (readers_.find(type) != readers_.end()) return 0;
+
+  // int read(const char *in, Type *out) {
+  //   int n = sscanf(in, "{ %i ... }", &out->field1, ...);
+  //   if (n != num_fields) return -1;
+  //   return 0;
+  // }
+
+  IRBuilder<> B(*ctx_);
+
+  vector<Type *> fn_args({B.getInt8PtrTy(), PointerType::getUnqual(type)});
+  FunctionType *fn_type = FunctionType::get(B.getInt32Ty(), fn_args, /*isVarArg=*/false);
+  Function *fn = Function::Create(fn_type, GlobalValue::ExternalLinkage,
+                                  "reader" + std::to_string(readers_.size()), mod);
+  auto arg_it = fn->arg_begin();
+  Argument *arg_in = arg_it++;
+  arg_in->setName("in");
+  Argument *arg_out = arg_it++;
+  arg_out->setName("out");
+
+  BasicBlock *label_entry = BasicBlock::Create(*ctx_, "entry", fn);
+  BasicBlock *label_exit = BasicBlock::Create(*ctx_, "exit", fn);
+  B.SetInsertPoint(label_entry);
+
+  vector<Value *> args;
+  string fmt;
+  parse_type(B, &args, &fmt, type, arg_out);
+
+  GlobalVariable *fmt_gvar = B.CreateGlobalString(fmt, "fmt");
+
+  args.insert(args.begin(), B.CreateInBoundsGEP(fmt_gvar, vector<Value *>({B.getInt64(0), B.getInt64(0)})));
+  args.insert(args.begin(), arg_in);
+
+  vector<Type *> sscanf_fn_args({B.getInt8PtrTy(), B.getInt8PtrTy()});
+  FunctionType *sscanf_fn_type = FunctionType::get(B.getInt32Ty(), sscanf_fn_args, /*isVarArg=*/true);
+  Function *sscanf_fn = mod->getFunction("__isoc99_sscanf");
+  if (!sscanf_fn)
+    sscanf_fn = Function::Create(sscanf_fn_type, GlobalValue::ExternalLinkage, "__isoc99_sscanf", mod);
+
+  CallInst *call = B.CreateCall(sscanf_fn, args);
+  BasicBlock *label_then = BasicBlock::Create(*ctx_, "then", fn);
+
+  Value *is_neq = B.CreateICmpNE(call, B.getInt32(args.size() - 2));
+  B.CreateCondBr(is_neq, label_then, label_exit);
+
+  B.SetInsertPoint(label_then);
+  B.CreateRet(B.getInt32(-1));
+
+  B.SetInsertPoint(label_exit);
+  B.CreateRet(B.getInt32(0));
+
+  readers_[type] = fn;
+  return 0;
+}
+
+unique_ptr<ExecutionEngine> BPFModule::finalize_reader(unique_ptr<Module> m) {
+  Module *mod = &*m;
+
   run_pass_manager(*mod);
 
   string err;
-  map<string, tuple<uint8_t *, uintptr_t>> sections;
   EngineBuilder builder(move(m));
   builder.setErrorStr(&err);
-  builder.setMCJITMemoryManager(make_unique<MyMemoryManager>(&sections));
   builder.setUseOrcMCJITReplacement(true);
   auto engine = unique_ptr<ExecutionEngine>(builder.create());
   if (!engine)
@@ -157,34 +222,36 @@ int BPFModule::annotate() {
   for (auto fn = mod_->getFunctionList().begin(); fn != mod_->getFunctionList().end(); ++fn)
     fn->addFnAttr(Attribute::AlwaysInline);
 
+  // separate module to hold the reader functions
+  auto m = make_unique<Module>("sscanf", *ctx_);
+
   for (auto table : *tables_) {
     table_names_.push_back(table.first);
     GlobalValue *gvar = mod_->getNamedValue(table.first);
     if (!gvar) continue;
-    llvm::errs() << "table " << gvar->getName() << "\n";
-  }
-  //for (auto s : mod_->getIdentifiedStructTypes()) {
-  //  llvm::errs() << "struct " << s->getName() << "\n";
-  //  for (auto e : s->elements()) {
-  //    llvm::errs() << " ";
-  //    e->print(llvm::errs());
-  //    llvm::errs() << "\n";
-  //  }
-  //}
-
-  if (1) {
-    auto engine = make_reader(*ctx_);
-    if (engine)
-      engine->finalizeObject();
+    if (PointerType *pt = dyn_cast<PointerType>(gvar->getType())) {
+      if (StructType *st = dyn_cast<StructType>(pt->getElementType())) {
+        if (st->getNumElements() < 2) continue;
+        Type *key_type = st->elements()[0];
+        Type *leaf_type = st->elements()[1];
+        if (int rc = make_reader(&*m, key_type))
+          return rc;
+        if (int rc = make_reader(&*m, leaf_type))
+          return rc;
+      }
+    }
   }
 
+  auto engine = finalize_reader(move(m));
+  if (engine)
+    engine->finalizeObject();
 
   return 0;
 }
 
 void BPFModule::dump_ir(Module &mod) {
   legacy::PassManager PM;
-  PM.add(createPrintModulePass(outs()));
+  PM.add(createPrintModulePass(errs()));
   PM.run(mod);
 }
 
