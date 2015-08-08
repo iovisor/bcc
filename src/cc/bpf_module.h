@@ -87,8 +87,8 @@ class BPFModule {
   std::unique_ptr<BLoader> b_loader_;
   std::unique_ptr<ClangLoader> clang_loader_;
   std::map<std::string, std::tuple<uint8_t *, uintptr_t>> sections_;
-  std::unique_ptr<std::map<std::string, TableDesc>> tables_;
-  std::vector<std::string> table_names_;
+  std::unique_ptr<std::vector<TableDesc>> tables_;
+  std::map<std::string, size_t> table_names_;
   std::vector<std::string> function_names_;
   std::map<llvm::Type *, llvm::Function *> readers_;
 };

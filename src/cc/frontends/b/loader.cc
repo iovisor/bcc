@@ -21,9 +21,9 @@
 #include "table_desc.h"
 
 using std::get;
-using std::map;
 using std::string;
 using std::unique_ptr;
+using std::vector;
 
 namespace ebpf {
 
@@ -34,7 +34,7 @@ BLoader::~BLoader() {
 }
 
 int BLoader::parse(llvm::Module *mod, const string &filename, const string &proto_filename,
-                   unique_ptr<map<string, TableDesc>> *tables) {
+                   unique_ptr<vector<TableDesc>> *tables) {
   int rc;
 
   proto_parser_ = make_unique<ebpf::cc::Parser>(proto_filename);
@@ -61,7 +61,7 @@ int BLoader::parse(llvm::Module *mod, const string &filename, const string &prot
     return -1;
   }
 
-  *tables = make_unique<map<string, TableDesc>>();
+  *tables = make_unique<vector<TableDesc>>();
 
   codegen_ = ebpf::make_unique<ebpf::cc::CodegenLLVM>(mod, parser_->scopes_.get(), proto_parser_->scopes_.get());
   ret = codegen_->visit(parser_->root_node_, **tables);

@@ -225,9 +225,10 @@ int BPFModule::annotate() {
   // separate module to hold the reader functions
   auto m = make_unique<Module>("sscanf", *ctx_);
 
+  size_t id = 0;
   for (auto table : *tables_) {
-    table_names_.push_back(table.first);
-    GlobalValue *gvar = mod_->getNamedValue(table.first);
+    table_names_[table.name] = id++;
+    GlobalValue *gvar = mod_->getNamedValue(table.name);
     if (!gvar) continue;
     if (PointerType *pt = dyn_cast<PointerType>(gvar->getType())) {
       if (StructType *st = dyn_cast<StructType>(pt->getElementType())) {
@@ -366,66 +367,66 @@ unsigned BPFModule::kern_version() const {
 }
 
 size_t BPFModule::num_tables() const {
-  return table_names_.size();
+  return tables_->size();
 }
 
 int BPFModule::table_fd(const string &name) const {
-  auto table_it = tables_->find(name);
-  if (table_it == tables_->end()) return -1;
-  return table_it->second.fd;
+  auto it = table_names_.find(name);
+  if (it == table_names_.end()) return -1;
+  return table_fd(it->second);
 }
 
 int BPFModule::table_fd(size_t id) const {
-  if (id >= table_names_.size()) return -1;
-  return table_fd(table_names_[id]);
+  if (id >= tables_->size()) return -1;
+  return (*tables_)[id].fd;
 }
 
 const char * BPFModule::table_name(size_t id) const {
-  if (id >= table_names_.size()) return nullptr;
-  return table_names_[id].c_str();
+  if (id >= tables_->size()) return nullptr;
+  return (*tables_)[id].name.c_str();
 }
 
 const char * BPFModule::table_key_desc(size_t id) const {
-  if (id >= table_names_.size()) return nullptr;
-  return table_key_desc(table_names_[id]);
+  if (b_loader_) return nullptr;
+  if (id >= tables_->size()) return nullptr;
+  return (*tables_)[id].key_desc.c_str();
 }
 
 const char * BPFModule::table_key_desc(const string &name) const {
-  if (b_loader_) return nullptr;
-  auto table_it = tables_->find(name);
-  if (table_it == tables_->end()) return nullptr;
-  return table_it->second.key_desc.c_str();
+  auto it = table_names_.find(name);
+  if (it == table_names_.end()) return nullptr;
+  return table_key_desc(it->second);
 }
 
 const char * BPFModule::table_leaf_desc(size_t id) const {
-  if (id >= table_names_.size()) return nullptr;
-  return table_leaf_desc(table_names_[id]);
+  if (b_loader_) return nullptr;
+  if (id >= tables_->size()) return nullptr;
+  return (*tables_)[id].leaf_desc.c_str();
 }
 
 const char * BPFModule::table_leaf_desc(const string &name) const {
-  if (b_loader_) return nullptr;
-  auto table_it = tables_->find(name);
-  if (table_it == tables_->end()) return nullptr;
-  return table_it->second.leaf_desc.c_str();
+  auto it = table_names_.find(name);
+  if (it == table_names_.end()) return nullptr;
+  return table_leaf_desc(it->second);
 }
 size_t BPFModule::table_key_size(size_t id) const {
-  if (id >= table_names_.size()) return 0;
-  return table_key_size(table_names_[id]);
+  if (id >= tables_->size()) return 0;
+  return (*tables_)[id].key_size;
 }
 size_t BPFModule::table_key_size(const string &name) const {
-  auto table_it = tables_->find(name);
-  if (table_it == tables_->end()) return 0;
-  return table_it->second.key_size;
+  auto it = table_names_.find(name);
+  if (it == table_names_.end()) return 0;
+  return table_key_size(it->second);
 }
 
 size_t BPFModule::table_leaf_size(size_t id) const {
-  if (id >= table_names_.size()) return 0;
-  return table_leaf_size(table_names_[id]);
+  if (id >= tables_->size()) return 0;
+  return (*tables_)[id].leaf_size;
 }
 size_t BPFModule::table_leaf_size(const string &name) const {
-  auto table_it = tables_->find(name);
-  if (table_it == tables_->end()) return 0;
-  return table_it->second.leaf_size;
+  auto it = table_names_.find(name);
+  if (it == table_names_.end()) return 0;
+  return table_leaf_size(it->second);
 }
 
 // load a B file, which comes in two parts

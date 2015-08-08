@@ -38,8 +38,7 @@ class ClangLoader {
  public:
   explicit ClangLoader(llvm::LLVMContext *ctx);
   ~ClangLoader();
-  int parse(std::unique_ptr<llvm::Module> *mod,
-            std::unique_ptr<std::map<std::string, TableDesc>> *tables,
+  int parse(std::unique_ptr<llvm::Module> *mod, std::unique_ptr<std::vector<TableDesc>> *tables,
             const std::string &file, bool in_memory);
  private:
   llvm::LLVMContext *ctx_;

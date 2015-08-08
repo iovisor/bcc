@@ -87,65 +87,7 @@ bool BMapDeclVisitor::VisitBuiltinType(const BuiltinType *T) {
   return true;
 }
 
-BScanfVisitor::BScanfVisitor(ASTContext &C)
-    : C(C), n_args_(0) {}
-
-bool BScanfVisitor::VisitFieldDecl(FieldDecl *D) {
-  args_ += "&val->" + D->getName().str();
-  ++n_args_;
-  return true;
-}
-
-bool BScanfVisitor::TraverseRecordDecl(RecordDecl *D) {
-  // skip children, handled in Visit...
-  if (!WalkUpFromRecordDecl(D))
-    return false;
-  return true;
-}
-
-bool BScanfVisitor::VisitRecordDecl(RecordDecl *D) {
-  if (type_.empty())
-    type_ = "struct " + D->getDefinition()->getName().str();
-  fmt_ += "{ ";
-  for (auto F : D->getDefinition()->fields()) {
-    TraverseDecl(F);
-    if (F->isBitField())
-      fmt_ += ", " + to_string(F->getBitWidthValue(C));
-    fmt_ += ", ";
-    args_ += ", ";
-  }
-  if (!D->getDefinition()->field_empty()) {
-    fmt_.erase(fmt_.end() - 2);
-    args_.erase(args_.end() - 2);
-  }
-  fmt_ += "}";
-  return true;
-}
-bool BScanfVisitor::VisitTagType(const TagType *T) {
-  return TraverseDecl(T->getDecl()->getDefinition());
-}
-bool BScanfVisitor::VisitTypedefType(const TypedefType *T) {
-  return TraverseDecl(T->getDecl());
-}
-bool BScanfVisitor::VisitBuiltinType(const BuiltinType *T) {
-  if (type_.empty()) {
-    type_ = T->getName(C.getPrintingPolicy());
-    args_ += "val";
-    ++n_args_;
-  }
-  fmt_ += "%i";
-  return true;
-}
-void BScanfVisitor::finalize(string &result) {
-  result  = "int read_entry(const char *str, void *buf) {\n";
-  result += "  " + type_ + " *val = buf;\n";
-  result += "  int n = sscanf(str, \"" + fmt_ + "\", " + args_ + ");\n";
-  result += "  if (n < " + std::to_string(n_args_) + ") return -1;\n";
-  result += "  return 0;\n";
-  result += "}\n";
-}
-
-BTypeVisitor::BTypeVisitor(ASTContext &C, Rewriter &rewriter, map<string, TableDesc> &tables)
+BTypeVisitor::BTypeVisitor(ASTContext &C, Rewriter &rewriter, vector<TableDesc> &tables)
     : C(C), rewriter_(rewriter), out_(llvm::errs()), tables_(tables) {
 }
 
@@ -200,13 +142,15 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
         string args = rewriter_.getRewrittenText(argRange);
 
         // find the table fd, which was opened at declaration time
-        auto table_it = tables_.find(Ref->getDecl()->getName());
+        auto table_it = tables_.begin();
+        for (; table_it != tables_.end(); ++table_it)
+          if (table_it->name == Ref->getDecl()->getName()) break;
         if (table_it == tables_.end()) {
           C.getDiagnostics().Report(Ref->getLocEnd(), diag::err_expected)
               << "initialized handle for bpf_table";
           return false;
         }
-        string fd = to_string(table_it->second.fd);
+        string fd = to_string(table_it->fd);
         string prefix, suffix;
         string map_update_policy = "BPF_ANY";
         string txt;
@@ -419,7 +363,10 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
       return false;
     }
     const RecordDecl *RD = R->getDecl()->getDefinition();
+
     TableDesc table;
+    table.name = Decl->getName();
+
     unsigned i = 0;
     for (auto F : RD->fields()) {
       size_t sz = C.getTypeSize(F->getType()) >> 3;
@@ -428,19 +375,11 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
         BMapDeclVisitor visitor(C, table.key_desc);
         if (!visitor.TraverseType(F->getType()))
           return false;
-        BScanfVisitor scanf_visitor(C);
-        if (!scanf_visitor.TraverseType(F->getType()))
-          return false;
-        scanf_visitor.finalize(table.key_reader);
       } else if (F->getName() == "leaf") {
         table.leaf_size = sz;
         BMapDeclVisitor visitor(C, table.leaf_desc);
         if (!visitor.TraverseType(F->getType()))
           return false;
-        BScanfVisitor scanf_visitor(C);
-        if (!scanf_visitor.TraverseType(F->getType()))
-          return false;
-        scanf_visitor.finalize(table.leaf_reader);
       } else if (F->getName() == "data") {
         table.max_entries = sz / table.leaf_size;
       }
@@ -472,7 +411,7 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
            << "valid bpf fd";
       return false;
     }
-    tables_[Decl->getName()] = std::move(table);
+    tables_.push_back(std::move(table));
   } else if (const PointerType *P = Decl->getType()->getAs<PointerType>()) {
     // if var is a pointer to a packet type, clone the annotation into the var
     // decl so that the packet dext/dins rewriter can catch it
@@ -489,7 +428,7 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
   return true;
 }
 
-BTypeConsumer::BTypeConsumer(ASTContext &C, Rewriter &rewriter, map<string, TableDesc> &tables)
+BTypeConsumer::BTypeConsumer(ASTContext &C, Rewriter &rewriter, vector<TableDesc> &tables)
     : visitor_(C, rewriter, tables) {
 }
 
@@ -500,7 +439,7 @@ bool BTypeConsumer::HandleTopLevelDecl(DeclGroupRef D) {
 }
 
 BFrontendAction::BFrontendAction(llvm::raw_ostream &os)
-    : rewriter_(new Rewriter), os_(os), tables_(new map<string, TableDesc>) {
+    : rewriter_(new Rewriter), os_(os), tables_(new vector<TableDesc>) {
 }
 
 void BFrontendAction::EndSourceFileAction() {

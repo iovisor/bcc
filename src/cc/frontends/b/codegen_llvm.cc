@@ -1218,7 +1218,7 @@ StatusTuple CodegenLLVM::visit_func_decl_stmt_node(FuncDeclStmtNode *n) {
   return mkstatus(0);
 }
 
-StatusTuple CodegenLLVM::visit(Node* root, map<string, TableDesc> &tables) {
+StatusTuple CodegenLLVM::visit(Node* root, vector<TableDesc> &tables) {
   scopes_->set_current(scopes_->top_state());
   scopes_->set_current(scopes_->top_var());
 
@@ -1232,13 +1232,14 @@ StatusTuple CodegenLLVM::visit(Node* root, map<string, TableDesc> &tables) {
   //TRY2(print_parser());
 
   for (auto table : tables_) {
-    TableDesc desc = {
+    tables.push_back({
+      table.first->id_->name_,
       table_fds_[table.first],
       table.first->key_type_->bit_width_ >> 3,
       table.first->leaf_type_->bit_width_ >> 3,
       table.first->size_,
-    };
-    tables[table.first->id_->name_] = desc;
+      "", "",
+    });
   }
   return mkstatus(0);
 }

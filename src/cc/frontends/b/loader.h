@@ -38,7 +38,7 @@ class BLoader {
   BLoader();
   ~BLoader();
   int parse(llvm::Module *mod, const std::string &filename, const std::string &proto_filename,
-            std::unique_ptr<std::map<std::string, TableDesc>> *tables);
+            std::unique_ptr<std::vector<TableDesc>> *tables);
  private:
   std::unique_ptr<cc::Parser> parser_;
   std::unique_ptr<cc::Parser> proto_parser_;

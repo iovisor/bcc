@@ -53,25 +53,6 @@ class BMapDeclVisitor : public clang::RecursiveASTVisitor<BMapDeclVisitor> {
   std::string &result_;
 };
 
-// Helper visitor for constructing a fscanf routine for key/leaf decl
-class BScanfVisitor : public clang::RecursiveASTVisitor<BScanfVisitor> {
- public:
-  explicit BScanfVisitor(clang::ASTContext &C);
-  bool TraverseRecordDecl(clang::RecordDecl *Decl);
-  bool VisitRecordDecl(clang::RecordDecl *Decl);
-  bool VisitFieldDecl(clang::FieldDecl *Decl);
-  bool VisitBuiltinType(const clang::BuiltinType *T);
-  bool VisitTypedefType(const clang::TypedefType *T);
-  bool VisitTagType(const clang::TagType *T);
-  void finalize(std::string &result);
- private:
-  clang::ASTContext &C;
-  size_t n_args_;
-  std::string fmt_;
-  std::string args_;
-  std::string type_;
-};
-
 // Type visitor and rewriter for B programs.
 // It will look for B-specific features and rewrite them into a valid
 // C program. As part of the processing, open the necessary BPF tables
@@ -79,7 +60,7 @@ class BScanfVisitor : public clang::RecursiveASTVisitor<BScanfVisitor> {
 class BTypeVisitor : public clang::RecursiveASTVisitor<BTypeVisitor> {
  public:
   explicit BTypeVisitor(clang::ASTContext &C, clang::Rewriter &rewriter,
-                        std::map<std::string, TableDesc> &tables);
+                        std::vector<TableDesc> &tables);
   bool TraverseCallExpr(clang::CallExpr *Call);
   bool TraverseMemberExpr(clang::MemberExpr *E);
   bool VisitFunctionDecl(clang::FunctionDecl *D);
@@ -94,7 +75,7 @@ class BTypeVisitor : public clang::RecursiveASTVisitor<BTypeVisitor> {
   clang::ASTContext &C;
   clang::Rewriter &rewriter_;  /// modifications to the source go into this class
   llvm::raw_ostream &out_;  /// for debugging
-  std::map<std::string, TableDesc> &tables_;  /// store the open FDs
+  std::vector<TableDesc> &tables_;  /// store the open FDs
   std::vector<clang::ParmVarDecl *> fn_args_;
 };
 
@@ -102,7 +83,7 @@ class BTypeVisitor : public clang::RecursiveASTVisitor<BTypeVisitor> {
 class BTypeConsumer : public clang::ASTConsumer {
  public:
   explicit BTypeConsumer(clang::ASTContext &C, clang::Rewriter &rewriter,
-                         std::map<std::string, TableDesc> &tables);
+                         std::vector<TableDesc> &tables);
   bool HandleTopLevelDecl(clang::DeclGroupRef D) override;
  private:
   BTypeVisitor visitor_;
@@ -125,11 +106,11 @@ class BFrontendAction : public clang::ASTFrontendAction {
       CreateASTConsumer(clang::CompilerInstance &Compiler, llvm::StringRef InFile) override;
 
   // take ownership of the table-to-fd mapping data structure
-  std::unique_ptr<std::map<std::string, TableDesc>> take_tables() { return move(tables_); }
+  std::unique_ptr<std::vector<TableDesc>> take_tables() { return move(tables_); }
  private:
   std::unique_ptr<clang::Rewriter> rewriter_;
   llvm::raw_ostream &os_;
-  std::unique_ptr<std::map<std::string, TableDesc>> tables_;
+  std::unique_ptr<std::vector<TableDesc>> tables_;
 };
 
 }  // namespace visitor

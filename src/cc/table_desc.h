@@ -20,14 +20,13 @@
 namespace ebpf {
 
 struct TableDesc {
+  std::string name;
   int fd;
   size_t key_size;  // sizes are in bytes
   size_t leaf_size;
   size_t max_entries;
   std::string key_desc;
   std::string leaf_desc;
-  std::string key_reader;
-  std::string leaf_reader;
 };
 
 }  // namespace ebpf
