@@ -242,9 +242,9 @@ int BPFModule::annotate() {
     }
   }
 
-  auto engine = finalize_reader(move(m));
-  if (engine)
-    engine->finalizeObject();
+  reader_engine_ = finalize_reader(move(m));
+  if (reader_engine_)
+    reader_engine_->finalizeObject();
 
   return 0;
 }
@@ -370,8 +370,6 @@ size_t BPFModule::num_tables() const {
 }
 
 int BPFModule::table_fd(const string &name) const {
-  int fd = b_loader_ ? b_loader_->get_table_fd(name) : -1;
-  if (fd >= 0) return fd;
   auto table_it = tables_->find(name);
   if (table_it == tables_->end()) return -1;
   return table_it->second.fd;
@@ -415,7 +413,6 @@ size_t BPFModule::table_key_size(size_t id) const {
   return table_key_size(table_names_[id]);
 }
 size_t BPFModule::table_key_size(const string &name) const {
-  if (b_loader_) return 0;
   auto table_it = tables_->find(name);
   if (table_it == tables_->end()) return 0;
   return table_it->second.key_size;
@@ -426,7 +423,6 @@ size_t BPFModule::table_leaf_size(size_t id) const {
   return table_leaf_size(table_names_[id]);
 }
 size_t BPFModule::table_leaf_size(const string &name) const {
-  if (b_loader_) return 0;
   auto table_it = tables_->find(name);
   if (table_it == tables_->end()) return 0;
   return table_it->second.leaf_size;

@@ -73,9 +73,4 @@ int BLoader::parse(llvm::Module *mod, const string &filename, const string &prot
   return 0;
 }
 
-int BLoader::get_table_fd(const string &name) const {
-  if (!codegen_) return -1;
-  return codegen_->get_table_fd(name);
-}
-
 }  // namespace ebpf

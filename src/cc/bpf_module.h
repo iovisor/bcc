@@ -82,6 +82,7 @@ class BPFModule {
   std::string proto_filename_;
   std::unique_ptr<llvm::LLVMContext> ctx_;
   std::unique_ptr<llvm::ExecutionEngine> engine_;
+  std::unique_ptr<llvm::ExecutionEngine> reader_engine_;
   std::unique_ptr<llvm::Module> mod_;
   std::unique_ptr<BLoader> b_loader_;
   std::unique_ptr<ClangLoader> clang_loader_;
