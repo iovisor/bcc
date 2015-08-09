@@ -26,6 +26,7 @@
 #include <linux/bpf.h>
 
 #include <llvm/ADT/STLExtras.h>
+#include <llvm/ExecutionEngine/GenericValue.h>
 #include <llvm/ExecutionEngine/MCJIT.h>
 #include <llvm/ExecutionEngine/SectionMemoryManager.h>
 #include <llvm/IRReader/IRReader.h>
@@ -121,14 +122,25 @@ void parse_type(IRBuilder<> &B, vector<Value *> *args, string *fmt, Type *type, 
       *fmt += " ";
     }
     *fmt += "}";
-  } else if (dyn_cast<IntegerType>(type)) {
-    *fmt += "%lli";
+  } else if (IntegerType *it = dyn_cast<IntegerType>(type)) {
+    if (it->getBitWidth() <= 8)
+      *fmt += "%hhi";
+    else if (it->getBitWidth() <= 16)
+      *fmt += "%hi";
+    else if (it->getBitWidth() <= 32)
+      *fmt += "%i";
+    else if (it->getBitWidth() <= 64)
+      *fmt += "%li";
+    else
+      *fmt += "%lli";
     args->push_back(out);
   }
 }
 
-int BPFModule::make_reader(Module *mod, Type *type) {
-  if (readers_.find(type) != readers_.end()) return 0;
+Function * BPFModule::make_reader(Module *mod, Type *type) {
+  auto fn_it = readers_.find(type);
+  if (fn_it != readers_.end())
+    return fn_it->second;
 
   // int read(const char *in, Type *out) {
   //   int n = sscanf(in, "{ %i ... }", &out->field1, ...);
@@ -138,11 +150,15 @@ int BPFModule::make_reader(Module *mod, Type *type) {
 
   IRBuilder<> B(*ctx_);
 
-  vector<Type *> fn_args({B.getInt8PtrTy(), PointerType::getUnqual(type)});
+  // The JIT currently supports a limited number of function prototypes, use the
+  // int (*) (int, char **, const char **) version
+  vector<Type *> fn_args({B.getInt32Ty(), B.getInt8PtrTy(), PointerType::getUnqual(type)});
   FunctionType *fn_type = FunctionType::get(B.getInt32Ty(), fn_args, /*isVarArg=*/false);
   Function *fn = Function::Create(fn_type, GlobalValue::ExternalLinkage,
                                   "reader" + std::to_string(readers_.size()), mod);
   auto arg_it = fn->arg_begin();
+  Argument *arg_argc = arg_it++;
+  arg_argc->setName("argc");
   Argument *arg_in = arg_it++;
   arg_in->setName("in");
   Argument *arg_out = arg_it++;
@@ -163,11 +179,15 @@ int BPFModule::make_reader(Module *mod, Type *type) {
 
   vector<Type *> sscanf_fn_args({B.getInt8PtrTy(), B.getInt8PtrTy()});
   FunctionType *sscanf_fn_type = FunctionType::get(B.getInt32Ty(), sscanf_fn_args, /*isVarArg=*/true);
-  Function *sscanf_fn = mod->getFunction("__isoc99_sscanf");
+  Function *sscanf_fn = mod->getFunction("sscanf");
   if (!sscanf_fn)
-    sscanf_fn = Function::Create(sscanf_fn_type, GlobalValue::ExternalLinkage, "__isoc99_sscanf", mod);
+    sscanf_fn = Function::Create(sscanf_fn_type, GlobalValue::ExternalLinkage, "sscanf", mod);
+  sscanf_fn->setCallingConv(CallingConv::C);
+  sscanf_fn->addFnAttr(Attribute::NoUnwind);
 
   CallInst *call = B.CreateCall(sscanf_fn, args);
+  call->setTailCall(true);
+
   BasicBlock *label_then = BasicBlock::Create(*ctx_, "then", fn);
 
   Value *is_neq = B.CreateICmpNE(call, B.getInt32(args.size() - 2));
@@ -180,7 +200,7 @@ int BPFModule::make_reader(Module *mod, Type *type) {
   B.CreateRet(B.getInt32(0));
 
   readers_[type] = fn;
-  return 0;
+  return fn;
 }
 
 unique_ptr<ExecutionEngine> BPFModule::finalize_reader(unique_ptr<Module> m) {
@@ -226,7 +246,7 @@ int BPFModule::annotate() {
   auto m = make_unique<Module>("sscanf", *ctx_);
 
   size_t id = 0;
-  for (auto table : *tables_) {
+  for (auto &table : *tables_) {
     table_names_[table.name] = id++;
     GlobalValue *gvar = mod_->getNamedValue(table.name);
     if (!gvar) continue;
@@ -235,10 +255,16 @@ int BPFModule::annotate() {
         if (st->getNumElements() < 2) continue;
         Type *key_type = st->elements()[0];
         Type *leaf_type = st->elements()[1];
-        if (int rc = make_reader(&*m, key_type))
-          return rc;
-        if (int rc = make_reader(&*m, leaf_type))
-          return rc;
+        table.key_reader = make_reader(&*m, key_type);
+        if (!table.key_reader) {
+          errs() << "Failed to compile reader for " << *key_type << "\n";
+          continue;
+        }
+        table.leaf_reader = make_reader(&*m, leaf_type);
+        if (!table.leaf_reader) {
+          errs() << "Failed to compile reader for " << *leaf_type << "\n";
+          continue;
+        }
       }
     }
   }
@@ -427,6 +453,39 @@ size_t BPFModule::table_leaf_size(const string &name) const {
   auto it = table_names_.find(name);
   if (it == table_names_.end()) return 0;
   return table_leaf_size(it->second);
+}
+
+int BPFModule::table_update(const string &name, const char *key_str, const char *leaf_str) {
+  auto it = table_names_.find(name);
+  if (it == table_names_.end()) return 0;
+  return table_update(it->second, key_str, leaf_str);
+}
+
+int BPFModule::table_update(size_t id, const char *key_str, const char *leaf_str) {
+  if (id >= tables_->size()) return -1;
+
+  const TableDesc &desc = (*tables_)[id];
+  if (desc.fd < 0) return -1;
+
+  if (!reader_engine_ || !desc.key_reader || !desc.leaf_reader) {
+    fprintf(stderr, "Table sscanf not available\n");
+    return -1;
+  }
+
+  unique_ptr<uint8_t[]> key(new uint8_t[desc.key_size]);
+  unique_ptr<uint8_t[]> leaf(new uint8_t[desc.leaf_size]);
+  GenericValue rc;
+  rc = reader_engine_->runFunction(desc.key_reader, vector<GenericValue>({GenericValue(),
+                                                                          GenericValue((void *)key_str),
+                                                                          GenericValue((void *)key.get())}));
+  if (rc.IntVal != 0)
+    return -1;
+  rc = reader_engine_->runFunction(desc.leaf_reader, vector<GenericValue>({GenericValue(),
+                                                                           GenericValue((void *)leaf_str),
+                                                                           GenericValue((void *)leaf.get())}));
+  if (rc.IntVal != 0)
+    return -1;
+  return bpf_update_elem(desc.fd, key.get(), leaf.get(), 0);
 }
 
 // load a B file, which comes in two parts

@@ -45,6 +45,8 @@ lib.bpf_table_key_desc.restype = ct.c_char_p
 lib.bpf_table_key_desc.argtypes = [ct.c_void_p, ct.c_char_p]
 lib.bpf_table_leaf_desc.restype = ct.c_char_p
 lib.bpf_table_leaf_desc.argtypes = [ct.c_void_p, ct.c_char_p]
+lib.bpf_table_update.restype = ct.c_int
+lib.bpf_table_update.argtypes = [ct.c_void_p, ct.c_char_p, ct.c_char_p, ct.c_char_p]
 
 # keep in sync with libbpf.h
 lib.bpf_get_next_key.restype = ct.c_int
@@ -257,6 +259,12 @@ class BPF(object):
                 raise Exception("Failed to load BPF Table %s leaf desc" % name)
             leaftype = BPF._decode_table_type(json.loads(leaf_desc.decode()))
         return BPF.Table(self, map_fd, keytype, leaftype)
+
+    def update_table(self, name, key, leaf):
+        res = lib.bpf_table_update(self.module, name.encode("ascii"), key.encode("ascii"),
+                leaf.encode("ascii"))
+        if res < 0:
+            raise Exception("update_table failed")
 
     @staticmethod
     def attach_raw_socket(fn, dev):

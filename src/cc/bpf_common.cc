@@ -170,4 +170,16 @@ size_t bpf_table_leaf_size_id(void *program, size_t id) {
   return mod->table_leaf_size(id);
 }
 
+int bpf_table_update(void *program, const char *table_name, const char *key, const char *leaf) {
+  auto mod = static_cast<ebpf::BPFModule *>(program);
+  if (!mod) return 0;
+  return mod->table_update(table_name, key, leaf);
+}
+
+int bpf_table_update_id(void *program, size_t id, const char *key, const char *leaf) {
+  auto mod = static_cast<ebpf::BPFModule *>(program);
+  if (!mod) return 0;
+  return mod->table_update(id, key, leaf);
+}
+
 }

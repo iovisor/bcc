@@ -17,6 +17,10 @@
 #include <cstdint>
 #include <string>
 
+namespace llvm {
+class Function;
+}
+
 namespace ebpf {
 
 struct TableDesc {
@@ -27,6 +31,8 @@ struct TableDesc {
   size_t max_entries;
   std::string key_desc;
   std::string leaf_desc;
+  llvm::Function *key_reader;
+  llvm::Function *leaf_reader;
 };
 
 }  // namespace ebpf
