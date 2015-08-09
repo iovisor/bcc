@@ -3,7 +3,7 @@
 cmake_minimum_required(VERSION 2.8.7)
 
 project(bcc)
-set(CMAKE_BUILD_TYPE Debug)
+set(CMAKE_BUILD_TYPE Release)
 
 enable_testing()
 
@@ -41,8 +41,8 @@ FOREACH(DIR ${LLVM_INCLUDE_DIRS})
   include_directories("${DIR}/../tools/clang/include")
 ENDFOREACH()
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall")
+set(CMAKE_C_FLAGS "-Wall")
+set(CMAKE_CXX_FLAGS "-std=c++11 -Wall")
 endif()
 
 add_subdirectory(scripts)
