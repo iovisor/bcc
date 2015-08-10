@@ -44,6 +44,12 @@ const char * bpf_table_key_desc(void *program, const char *table_name);
 const char * bpf_table_key_desc_id(void *program, size_t id);
 const char * bpf_table_leaf_desc(void *program, const char *table_name);
 const char * bpf_table_leaf_desc_id(void *program, size_t id);
+size_t bpf_table_key_size(void *program, const char *table_name);
+size_t bpf_table_key_size_id(void *program, size_t id);
+size_t bpf_table_leaf_size(void *program, const char *table_name);
+size_t bpf_table_leaf_size_id(void *program, size_t id);
+int bpf_table_update(void *program, const char *table_name, const char *key, const char *leaf);
+int bpf_table_update_id(void *program, size_t id, const char *key, const char *leaf);
 
 #ifdef __cplusplus
 }

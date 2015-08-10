@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include <map>
+#include <memory>
 #include <string>
 
 namespace llvm {
@@ -23,6 +25,8 @@ class Module;
 }
 
 namespace ebpf {
+
+class TableDesc;
 
 namespace cc {
 class Parser;
@@ -33,8 +37,8 @@ class BLoader {
  public:
   BLoader();
   ~BLoader();
-  int parse(llvm::Module *mod, const std::string &filename, const std::string &proto_filename);
-  int get_table_fd(const std::string &name) const;
+  int parse(llvm::Module *mod, const std::string &filename, const std::string &proto_filename,
+            std::unique_ptr<std::vector<TableDesc>> *tables);
  private:
   std::unique_ptr<cc::Parser> parser_;
   std::unique_ptr<cc::Parser> proto_parser_;

@@ -36,6 +36,7 @@
 #include "exception.h"
 #include "codegen_llvm.h"
 #include "lexer.h"
+#include "table_desc.h"
 #include "type_helper.h"
 #include "linux/bpf.h"
 #include "libbpf.h"
@@ -47,6 +48,7 @@ using namespace llvm;
 
 using std::for_each;
 using std::make_tuple;
+using std::map;
 using std::pair;
 using std::set;
 using std::string;
@@ -1085,20 +1087,17 @@ StatusTuple CodegenLLVM::visit_table_decl_stmt_node(TableDeclStmtNode *n) {
     else
       return mkstatus_(n, "Table type %s not implemented", n->type_id()->name_.c_str());
 
+    StructType *key_stype, *leaf_stype;
+    TRY2(lookup_struct_type(n->key_type_, &key_stype));
+    TRY2(lookup_struct_type(n->leaf_type_, &leaf_stype));
     StructType *decl_struct = mod_->getTypeByName("_struct." + n->id_->name_);
     if (!decl_struct)
       decl_struct = StructType::create(ctx(), "_struct." + n->id_->name_);
     if (decl_struct->isOpaque())
-      decl_struct->setBody(std::vector<Type *>({Type::getInt32Ty(ctx()), Type::getInt32Ty(ctx()),
-                                                Type::getInt32Ty(ctx()), Type::getInt32Ty(ctx())}),
-                           /*isPacked=*/false);
+      decl_struct->setBody(vector<Type *>({key_stype, leaf_stype}), /*isPacked=*/false);
     GlobalVariable *decl_gvar = new GlobalVariable(*mod_, decl_struct, false,
                                                    GlobalValue::ExternalLinkage, 0, n->id_->name_);
     decl_gvar->setSection("maps");
-    vector<Constant *> struct_init = { B.getInt32(map_type), B.getInt32(key->bit_width_ / 8),
-                                       B.getInt32(leaf->bit_width_ / 8), B.getInt32(n->size_)};
-    Constant *const_struct = ConstantStruct::get(decl_struct, struct_init);
-    decl_gvar->setInitializer(const_struct);
     tables_[n] = decl_gvar;
 
     int map_fd = bpf_create_map(map_type, key->bit_width_ / 8, leaf->bit_width_ / 8, n->size_);
@@ -1168,7 +1167,7 @@ StatusTuple CodegenLLVM::visit_func_decl_stmt_node(FuncDeclStmtNode *n) {
 
   BasicBlock *label_entry = BasicBlock::Create(ctx(), "entry", fn);
   B.SetInsertPoint(label_entry);
-  string scoped_entry_label = std::to_string((uintptr_t)fn) + "::entry";
+  string scoped_entry_label = to_string((uintptr_t)fn) + "::entry";
   labels_[scoped_entry_label] = label_entry;
   BasicBlock *label_return = resolve_label("DONE");
   retval_ = new AllocaInst(fn->getReturnType(), "ret", label_entry);
@@ -1219,7 +1218,7 @@ StatusTuple CodegenLLVM::visit_func_decl_stmt_node(FuncDeclStmtNode *n) {
   return mkstatus(0);
 }
 
-StatusTuple CodegenLLVM::visit(Node* root) {
+StatusTuple CodegenLLVM::visit(Node* root, vector<TableDesc> &tables) {
   scopes_->set_current(scopes_->top_state());
   scopes_->set_current(scopes_->top_var());
 
@@ -1232,6 +1231,16 @@ StatusTuple CodegenLLVM::visit(Node* root) {
     TRY2((*it)->accept(this));
   //TRY2(print_parser());
 
+  for (auto table : tables_) {
+    tables.push_back({
+      table.first->id_->name_,
+      table_fds_[table.first],
+      table.first->key_type_->bit_width_ >> 3,
+      table.first->leaf_type_->bit_width_ >> 3,
+      table.first->size_,
+      "", "",
+    });
+  }
   return mkstatus(0);
 }
 
@@ -1263,7 +1272,7 @@ StatusTuple CodegenLLVM::print_header() {
   return mkstatus(0);
 }
 
-int CodegenLLVM::get_table_fd(const std::string &name) const {
+int CodegenLLVM::get_table_fd(const string &name) const {
   TableDeclStmtNode *table = scopes_->top_table()->lookup(name);
   if (!table)
     return -1;
@@ -1291,7 +1300,7 @@ Value * CodegenLLVM::pop_expr() {
 
 BasicBlock * CodegenLLVM::resolve_label(const string &label) {
   Function *parent = B.GetInsertBlock()->getParent();
-  string scoped_label = std::to_string((uintptr_t)parent) + "::" + label;
+  string scoped_label = to_string((uintptr_t)parent) + "::" + label;
   auto it = labels_.find(scoped_label);
   if (it != labels_.end()) return it->second;
   BasicBlock *label_new = BasicBlock::Create(ctx(), label, parent);

@@ -14,34 +14,25 @@
  * limitations under the License.
  */
 
-#pragma once
-
-#include <map>
-#include <memory>
+#include <cstdint>
 #include <string>
 
 namespace llvm {
-class Module;
-class LLVMContext;
+class Function;
 }
 
 namespace ebpf {
 
-class TableDesc;
-
-namespace cc {
-class Parser;
-class CodegenLLVM;
-}
-
-class ClangLoader {
- public:
-  explicit ClangLoader(llvm::LLVMContext *ctx);
-  ~ClangLoader();
-  int parse(std::unique_ptr<llvm::Module> *mod, std::unique_ptr<std::vector<TableDesc>> *tables,
-            const std::string &file, bool in_memory);
- private:
-  llvm::LLVMContext *ctx_;
+struct TableDesc {
+  std::string name;
+  int fd;
+  size_t key_size;  // sizes are in bytes
+  size_t leaf_size;
+  size_t max_entries;
+  std::string key_desc;
+  std::string leaf_desc;
+  llvm::Function *key_reader;
+  llvm::Function *leaf_reader;
 };
 
 }  // namespace ebpf

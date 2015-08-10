@@ -64,8 +64,7 @@ ClangLoader::ClangLoader(llvm::LLVMContext *ctx)
 
 ClangLoader::~ClangLoader() {}
 
-int ClangLoader::parse(unique_ptr<llvm::Module> *mod,
-                       unique_ptr<map<string, BPFTable>> *tables,
+int ClangLoader::parse(unique_ptr<llvm::Module> *mod, unique_ptr<vector<TableDesc>> *tables,
                        const string &file, bool in_memory) {
   using namespace clang;
 

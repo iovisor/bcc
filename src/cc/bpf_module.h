@@ -24,12 +24,14 @@
 
 namespace llvm {
 class ExecutionEngine;
+class Function;
 class LLVMContext;
 class Module;
+class Type;
 }
 
 namespace ebpf {
-class BPFTable;
+class TableDesc;
 class BLoader;
 class ClangLoader;
 
@@ -39,11 +41,15 @@ class BPFModule {
   int init_engine();
   int parse(llvm::Module *mod);
   int finalize();
-  void dump_ir();
+  int annotate();
+  std::unique_ptr<llvm::ExecutionEngine> finalize_reader(std::unique_ptr<llvm::Module> mod);
+  llvm::Function * make_reader(llvm::Module *mod, llvm::Type *type);
+  void dump_ir(llvm::Module &mod);
   int load_file_module(std::unique_ptr<llvm::Module> *mod, const std::string &file, bool in_memory);
   int load_includes(const std::string &tmpfile);
   int load_cfile(const std::string &file, bool in_memory);
   int kbuild_flags(const char *uname_release, std::vector<std::string> *cflags);
+  int run_pass_manager(llvm::Module &mod);
  public:
   BPFModule(unsigned flags);
   ~BPFModule();
@@ -62,8 +68,14 @@ class BPFModule {
   const char * table_name(size_t id) const;
   const char * table_key_desc(size_t id) const;
   const char * table_key_desc(const std::string &name) const;
+  size_t table_key_size(size_t id) const;
+  size_t table_key_size(const std::string &name) const;
   const char * table_leaf_desc(size_t id) const;
   const char * table_leaf_desc(const std::string &name) const;
+  size_t table_leaf_size(size_t id) const;
+  size_t table_leaf_size(const std::string &name) const;
+  int table_update(size_t id, const char *key, const char *leaf);
+  int table_update(const std::string &name, const char *key, const char *leaf);
   char * license() const;
   unsigned kern_version() const;
  private:
@@ -72,13 +84,15 @@ class BPFModule {
   std::string proto_filename_;
   std::unique_ptr<llvm::LLVMContext> ctx_;
   std::unique_ptr<llvm::ExecutionEngine> engine_;
-  llvm::Module *mod_;
+  std::unique_ptr<llvm::ExecutionEngine> reader_engine_;
+  std::unique_ptr<llvm::Module> mod_;
   std::unique_ptr<BLoader> b_loader_;
   std::unique_ptr<ClangLoader> clang_loader_;
   std::map<std::string, std::tuple<uint8_t *, uintptr_t>> sections_;
-  std::unique_ptr<std::map<std::string, BPFTable>> tables_;
-  std::vector<std::string> table_names_;
+  std::unique_ptr<std::vector<TableDesc>> tables_;
+  std::map<std::string, size_t> table_names_;
   std::vector<std::string> function_names_;
+  std::map<llvm::Type *, llvm::Function *> readers_;
 };
 
 }  // namespace ebpf

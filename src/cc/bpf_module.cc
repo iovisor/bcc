@@ -26,9 +26,11 @@
 #include <linux/bpf.h>
 
 #include <llvm/ADT/STLExtras.h>
+#include <llvm/ExecutionEngine/GenericValue.h>
 #include <llvm/ExecutionEngine/MCJIT.h>
 #include <llvm/ExecutionEngine/SectionMemoryManager.h>
 #include <llvm/IRReader/IRReader.h>
+#include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/IRPrintingPasses.h>
 #include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/LLVMContext.h>
@@ -38,6 +40,7 @@
 #include <llvm/Support/FormattedStream.h>
 #include <llvm/Support/Host.h>
 #include <llvm/Support/SourceMgr.h>
+#include <llvm/Support/TargetSelect.h>
 #include <llvm/Transforms/IPO.h>
 #include <llvm/Transforms/IPO/PassManagerBuilder.h>
 
@@ -95,6 +98,8 @@ class MyMemoryManager : public SectionMemoryManager {
 
 BPFModule::BPFModule(unsigned flags)
     : flags_(flags), ctx_(new LLVMContext) {
+  InitializeNativeTarget();
+  InitializeNativeTargetAsmPrinter();
   LLVMInitializeBPFTarget();
   LLVMInitializeBPFTargetMC();
   LLVMInitializeBPFTargetInfo();
@@ -107,31 +112,117 @@ BPFModule::~BPFModule() {
   ctx_.reset();
 }
 
+// recursive helper to capture the arguments
+void parse_type(IRBuilder<> &B, vector<Value *> *args, string *fmt, Type *type, Value *out) {
+  if (StructType *st = dyn_cast<StructType>(type)) {
+    *fmt += "{ ";
+    unsigned idx = 0;
+    for (auto field : st->elements()) {
+      parse_type(B, args, fmt, field, B.CreateStructGEP(type, out, idx++));
+      *fmt += " ";
+    }
+    *fmt += "}";
+  } else if (IntegerType *it = dyn_cast<IntegerType>(type)) {
+    if (it->getBitWidth() <= 8)
+      *fmt += "%hhi";
+    else if (it->getBitWidth() <= 16)
+      *fmt += "%hi";
+    else if (it->getBitWidth() <= 32)
+      *fmt += "%i";
+    else if (it->getBitWidth() <= 64)
+      *fmt += "%li";
+    else
+      *fmt += "%lli";
+    args->push_back(out);
+  }
+}
+
+Function * BPFModule::make_reader(Module *mod, Type *type) {
+  auto fn_it = readers_.find(type);
+  if (fn_it != readers_.end())
+    return fn_it->second;
+
+  // int read(const char *in, Type *out) {
+  //   int n = sscanf(in, "{ %i ... }", &out->field1, ...);
+  //   if (n != num_fields) return -1;
+  //   return 0;
+  // }
+
+  IRBuilder<> B(*ctx_);
+
+  // The JIT currently supports a limited number of function prototypes, use the
+  // int (*) (int, char **, const char **) version
+  vector<Type *> fn_args({B.getInt32Ty(), B.getInt8PtrTy(), PointerType::getUnqual(type)});
+  FunctionType *fn_type = FunctionType::get(B.getInt32Ty(), fn_args, /*isVarArg=*/false);
+  Function *fn = Function::Create(fn_type, GlobalValue::ExternalLinkage,
+                                  "reader" + std::to_string(readers_.size()), mod);
+  auto arg_it = fn->arg_begin();
+  Argument *arg_argc = arg_it++;
+  arg_argc->setName("argc");
+  Argument *arg_in = arg_it++;
+  arg_in->setName("in");
+  Argument *arg_out = arg_it++;
+  arg_out->setName("out");
+
+  BasicBlock *label_entry = BasicBlock::Create(*ctx_, "entry", fn);
+  BasicBlock *label_exit = BasicBlock::Create(*ctx_, "exit", fn);
+  B.SetInsertPoint(label_entry);
+
+  vector<Value *> args;
+  string fmt;
+  parse_type(B, &args, &fmt, type, arg_out);
+
+  GlobalVariable *fmt_gvar = B.CreateGlobalString(fmt, "fmt");
+
+  args.insert(args.begin(), B.CreateInBoundsGEP(fmt_gvar, vector<Value *>({B.getInt64(0), B.getInt64(0)})));
+  args.insert(args.begin(), arg_in);
+
+  vector<Type *> sscanf_fn_args({B.getInt8PtrTy(), B.getInt8PtrTy()});
+  FunctionType *sscanf_fn_type = FunctionType::get(B.getInt32Ty(), sscanf_fn_args, /*isVarArg=*/true);
+  Function *sscanf_fn = mod->getFunction("sscanf");
+  if (!sscanf_fn)
+    sscanf_fn = Function::Create(sscanf_fn_type, GlobalValue::ExternalLinkage, "sscanf", mod);
+  sscanf_fn->setCallingConv(CallingConv::C);
+  sscanf_fn->addFnAttr(Attribute::NoUnwind);
+
+  CallInst *call = B.CreateCall(sscanf_fn, args);
+  call->setTailCall(true);
+
+  BasicBlock *label_then = BasicBlock::Create(*ctx_, "then", fn);
+
+  Value *is_neq = B.CreateICmpNE(call, B.getInt32(args.size() - 2));
+  B.CreateCondBr(is_neq, label_then, label_exit);
+
+  B.SetInsertPoint(label_then);
+  B.CreateRet(B.getInt32(-1));
+
+  B.SetInsertPoint(label_exit);
+  B.CreateRet(B.getInt32(0));
+
+  readers_[type] = fn;
+  return fn;
+}
+
+unique_ptr<ExecutionEngine> BPFModule::finalize_reader(unique_ptr<Module> m) {
+  Module *mod = &*m;
+
+  run_pass_manager(*mod);
+
+  string err;
+  EngineBuilder builder(move(m));
+  builder.setErrorStr(&err);
+  builder.setUseOrcMCJITReplacement(true);
+  auto engine = unique_ptr<ExecutionEngine>(builder.create());
+  if (!engine)
+    fprintf(stderr, "Could not create ExecutionEngine: %s\n", err.c_str());
+  return engine;
+}
+
 // load an entire c file as a module
 int BPFModule::load_cfile(const string &file, bool in_memory) {
   clang_loader_ = make_unique<ClangLoader>(&*ctx_);
-  unique_ptr<Module> mod;
-  if (clang_loader_->parse(&mod, &tables_, file, in_memory))
+  if (clang_loader_->parse(&mod_, &tables_, file, in_memory))
     return -1;
-  mod_ = &*mod;
-
-  mod_->setDataLayout("e-m:e-p:64:64-i64:64-n32:64-S128");
-  mod_->setTargetTriple("bpf-pc-linux");
-
-  for (auto fn = mod_->getFunctionList().begin(); fn != mod_->getFunctionList().end(); ++fn)
-    fn->addFnAttr(Attribute::AlwaysInline);
-
-  string err;
-  engine_ = unique_ptr<ExecutionEngine>(EngineBuilder(move(mod))
-      .setErrorStr(&err)
-      .setMCJITMemoryManager(make_unique<MyMemoryManager>(&sections_))
-      .setMArch("bpf")
-      .create());
-  if (!engine_) {
-    fprintf(stderr, "Could not create ExecutionEngine: %s\n", err.c_str());
-    return -1;
-  }
-
   return 0;
 }
 
@@ -142,41 +233,59 @@ int BPFModule::load_cfile(const string &file, bool in_memory) {
 // build an ExecutionEngine.
 int BPFModule::load_includes(const string &tmpfile) {
   clang_loader_ = make_unique<ClangLoader>(&*ctx_);
-  unique_ptr<Module> mod;
-  if (clang_loader_->parse(&mod, &tables_, tmpfile, false))
+  if (clang_loader_->parse(&mod_, &tables_, tmpfile, false))
     return -1;
-  mod_ = &*mod;
+  return 0;
+}
 
-  mod_->setDataLayout("e-m:e-p:64:64-i64:64-n32:64-S128");
-  mod_->setTargetTriple("bpf-pc-linux");
-
+int BPFModule::annotate() {
   for (auto fn = mod_->getFunctionList().begin(); fn != mod_->getFunctionList().end(); ++fn)
     fn->addFnAttr(Attribute::AlwaysInline);
 
-  string err;
-  engine_ = unique_ptr<ExecutionEngine>(EngineBuilder(move(mod))
-      .setErrorStr(&err)
-      .setMCJITMemoryManager(make_unique<MyMemoryManager>(&sections_))
-      .setMArch("bpf")
-      .create());
-  if (!engine_) {
-    fprintf(stderr, "Could not create ExecutionEngine: %s\n", err.c_str());
-    return -1;
+  // separate module to hold the reader functions
+  auto m = make_unique<Module>("sscanf", *ctx_);
+
+  size_t id = 0;
+  for (auto &table : *tables_) {
+    table_names_[table.name] = id++;
+    GlobalValue *gvar = mod_->getNamedValue(table.name);
+    if (!gvar) continue;
+    if (PointerType *pt = dyn_cast<PointerType>(gvar->getType())) {
+      if (StructType *st = dyn_cast<StructType>(pt->getElementType())) {
+        if (st->getNumElements() < 2) continue;
+        Type *key_type = st->elements()[0];
+        Type *leaf_type = st->elements()[1];
+        table.key_reader = make_reader(&*m, key_type);
+        if (!table.key_reader) {
+          errs() << "Failed to compile reader for " << *key_type << "\n";
+          continue;
+        }
+        table.leaf_reader = make_reader(&*m, leaf_type);
+        if (!table.leaf_reader) {
+          errs() << "Failed to compile reader for " << *leaf_type << "\n";
+          continue;
+        }
+      }
+    }
   }
+
+  reader_engine_ = finalize_reader(move(m));
+  if (reader_engine_)
+    reader_engine_->finalizeObject();
 
   return 0;
 }
 
-void BPFModule::dump_ir() {
+void BPFModule::dump_ir(Module &mod) {
   legacy::PassManager PM;
-  PM.add(createPrintModulePass(outs()));
-  PM.run(*mod_);
+  PM.add(createPrintModulePass(errs()));
+  PM.run(mod);
 }
 
-int BPFModule::finalize() {
-  if (verifyModule(*mod_, &errs())) {
+int BPFModule::run_pass_manager(Module &mod) {
+  if (verifyModule(mod, &errs())) {
     if (flags_ & 1)
-      dump_ir();
+      dump_ir(mod);
     return -1;
   }
 
@@ -188,7 +297,30 @@ int BPFModule::finalize() {
   PMB.populateModulePassManager(PM);
   if (flags_ & 1)
     PM.add(createPrintModulePass(outs()));
-  PM.run(*mod_);
+  PM.run(mod);
+  return 0;
+}
+
+int BPFModule::finalize() {
+  Module *mod = &*mod_;
+
+  mod->setDataLayout("e-m:e-p:64:64-i64:64-n32:64-S128");
+  mod->setTargetTriple("bpf-pc-linux");
+
+  string err;
+  EngineBuilder builder(move(mod_));
+  builder.setErrorStr(&err);
+  builder.setMCJITMemoryManager(make_unique<MyMemoryManager>(&sections_));
+  builder.setMArch("bpf");
+  builder.setUseOrcMCJITReplacement(true);
+  engine_ = unique_ptr<ExecutionEngine>(builder.create());
+  if (!engine_) {
+    fprintf(stderr, "Could not create ExecutionEngine: %s\n", err.c_str());
+    return -1;
+  }
+
+  if (int rc = run_pass_manager(*mod))
+    return rc;
 
   engine_->finalizeObject();
 
@@ -196,9 +328,6 @@ int BPFModule::finalize() {
   for (auto section : sections_)
     if (!strncmp(FN_PREFIX.c_str(), section.first.c_str(), FN_PREFIX.size()))
       function_names_.push_back(section.first);
-
-  for (auto table : *tables_)
-    table_names_.push_back(table.first);
 
   return 0;
 }
@@ -264,49 +393,99 @@ unsigned BPFModule::kern_version() const {
 }
 
 size_t BPFModule::num_tables() const {
-  return table_names_.size();
+  return tables_->size();
 }
 
 int BPFModule::table_fd(const string &name) const {
-  int fd = b_loader_ ? b_loader_->get_table_fd(name) : -1;
-  if (fd >= 0) return fd;
-  auto table_it = tables_->find(name);
-  if (table_it == tables_->end()) return -1;
-  return table_it->second.fd;
+  auto it = table_names_.find(name);
+  if (it == table_names_.end()) return -1;
+  return table_fd(it->second);
 }
 
 int BPFModule::table_fd(size_t id) const {
-  if (id >= table_names_.size()) return -1;
-  return table_fd(table_names_[id]);
+  if (id >= tables_->size()) return -1;
+  return (*tables_)[id].fd;
 }
 
 const char * BPFModule::table_name(size_t id) const {
-  if (id >= table_names_.size()) return nullptr;
-  return table_names_[id].c_str();
+  if (id >= tables_->size()) return nullptr;
+  return (*tables_)[id].name.c_str();
 }
 
 const char * BPFModule::table_key_desc(size_t id) const {
-  if (id >= table_names_.size()) return nullptr;
-  return table_key_desc(table_names_[id]);
+  if (b_loader_) return nullptr;
+  if (id >= tables_->size()) return nullptr;
+  return (*tables_)[id].key_desc.c_str();
 }
 
 const char * BPFModule::table_key_desc(const string &name) const {
-  if (b_loader_) return nullptr;
-  auto table_it = tables_->find(name);
-  if (table_it == tables_->end()) return nullptr;
-  return table_it->second.key_desc.c_str();
+  auto it = table_names_.find(name);
+  if (it == table_names_.end()) return nullptr;
+  return table_key_desc(it->second);
 }
 
 const char * BPFModule::table_leaf_desc(size_t id) const {
-  if (id >= table_names_.size()) return nullptr;
-  return table_leaf_desc(table_names_[id]);
+  if (b_loader_) return nullptr;
+  if (id >= tables_->size()) return nullptr;
+  return (*tables_)[id].leaf_desc.c_str();
 }
 
 const char * BPFModule::table_leaf_desc(const string &name) const {
-  if (b_loader_) return nullptr;
-  auto table_it = tables_->find(name);
-  if (table_it == tables_->end()) return nullptr;
-  return table_it->second.leaf_desc.c_str();
+  auto it = table_names_.find(name);
+  if (it == table_names_.end()) return nullptr;
+  return table_leaf_desc(it->second);
+}
+size_t BPFModule::table_key_size(size_t id) const {
+  if (id >= tables_->size()) return 0;
+  return (*tables_)[id].key_size;
+}
+size_t BPFModule::table_key_size(const string &name) const {
+  auto it = table_names_.find(name);
+  if (it == table_names_.end()) return 0;
+  return table_key_size(it->second);
+}
+
+size_t BPFModule::table_leaf_size(size_t id) const {
+  if (id >= tables_->size()) return 0;
+  return (*tables_)[id].leaf_size;
+}
+size_t BPFModule::table_leaf_size(const string &name) const {
+  auto it = table_names_.find(name);
+  if (it == table_names_.end()) return 0;
+  return table_leaf_size(it->second);
+}
+
+int BPFModule::table_update(const string &name, const char *key_str, const char *leaf_str) {
+  auto it = table_names_.find(name);
+  if (it == table_names_.end()) return 0;
+  return table_update(it->second, key_str, leaf_str);
+}
+
+int BPFModule::table_update(size_t id, const char *key_str, const char *leaf_str) {
+  if (id >= tables_->size()) return -1;
+
+  const TableDesc &desc = (*tables_)[id];
+  if (desc.fd < 0) return -1;
+
+  if (!reader_engine_ || !desc.key_reader || !desc.leaf_reader) {
+    fprintf(stderr, "Table sscanf not available\n");
+    return -1;
+  }
+
+  unique_ptr<uint8_t[]> key(new uint8_t[desc.key_size]);
+  unique_ptr<uint8_t[]> leaf(new uint8_t[desc.leaf_size]);
+  GenericValue rc;
+  rc = reader_engine_->runFunction(desc.key_reader, vector<GenericValue>({GenericValue(),
+                                                                          GenericValue((void *)key_str),
+                                                                          GenericValue((void *)key.get())}));
+  if (rc.IntVal != 0)
+    return -1;
+  rc = reader_engine_->runFunction(desc.leaf_reader, vector<GenericValue>({GenericValue(),
+                                                                           GenericValue((void *)leaf_str),
+                                                                           GenericValue((void *)leaf.get())}));
+  if (rc.IntVal != 0)
+    return -1;
+  return bpf_update_elem(desc.fd, key.get(), leaf.get(), 0);
 }
 
 // load a B file, which comes in two parts
@@ -326,7 +505,9 @@ int BPFModule::load_b(const string &filename, const string &proto_filename) {
     return rc;
 
   b_loader_.reset(new BLoader);
-  if (int rc = b_loader_->parse(mod_, filename, proto_filename))
+  if (int rc = b_loader_->parse(&*mod_, filename, proto_filename, &tables_))
+    return rc;
+  if (int rc = annotate())
     return rc;
   if (int rc = finalize())
     return rc;
@@ -345,6 +526,8 @@ int BPFModule::load_c(const string &filename) {
   }
   if (int rc = load_cfile(filename, false))
     return rc;
+  if (int rc = annotate())
+    return rc;
   if (int rc = finalize())
     return rc;
   return 0;
@@ -357,6 +540,8 @@ int BPFModule::load_string(const string &text) {
     return -1;
   }
   if (int rc = load_cfile(text, true))
+    return rc;
+  if (int rc = annotate())
     return rc;
 
   if (int rc = finalize())

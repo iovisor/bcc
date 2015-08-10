@@ -23,6 +23,8 @@
 #include <clang/Frontend/FrontendAction.h>
 #include <clang/Rewrite/Core/Rewriter.h>
 
+#include "table_desc.h"
+
 namespace clang {
 class ASTConsumer;
 class ASTContext;
@@ -36,25 +38,16 @@ class StringRef;
 
 namespace ebpf {
 
-struct BPFTable {
-  int fd;
-  size_t key_size;
-  size_t leaf_size;
-  size_t max_entries;
-  std::string key_desc;
-  std::string leaf_desc;
-};
-
 // Helper visitor for constructing a string representation of a key/leaf decl
 class BMapDeclVisitor : public clang::RecursiveASTVisitor<BMapDeclVisitor> {
  public:
   explicit BMapDeclVisitor(clang::ASTContext &C, std::string &result);
+  bool TraverseRecordDecl(clang::RecordDecl *Decl);
   bool VisitRecordDecl(clang::RecordDecl *Decl);
   bool VisitFieldDecl(clang::FieldDecl *Decl);
   bool VisitBuiltinType(const clang::BuiltinType *T);
   bool VisitTypedefType(const clang::TypedefType *T);
   bool VisitTagType(const clang::TagType *T);
-  const std::string & str() const { return result_; }
  private:
   clang::ASTContext &C;
   std::string &result_;
@@ -67,7 +60,7 @@ class BMapDeclVisitor : public clang::RecursiveASTVisitor<BMapDeclVisitor> {
 class BTypeVisitor : public clang::RecursiveASTVisitor<BTypeVisitor> {
  public:
   explicit BTypeVisitor(clang::ASTContext &C, clang::Rewriter &rewriter,
-                        std::map<std::string, BPFTable> &tables);
+                        std::vector<TableDesc> &tables);
   bool TraverseCallExpr(clang::CallExpr *Call);
   bool TraverseMemberExpr(clang::MemberExpr *E);
   bool VisitFunctionDecl(clang::FunctionDecl *D);
@@ -82,7 +75,7 @@ class BTypeVisitor : public clang::RecursiveASTVisitor<BTypeVisitor> {
   clang::ASTContext &C;
   clang::Rewriter &rewriter_;  /// modifications to the source go into this class
   llvm::raw_ostream &out_;  /// for debugging
-  std::map<std::string, BPFTable> &tables_;  /// store the open FDs
+  std::vector<TableDesc> &tables_;  /// store the open FDs
   std::vector<clang::ParmVarDecl *> fn_args_;
 };
 
@@ -90,7 +83,7 @@ class BTypeVisitor : public clang::RecursiveASTVisitor<BTypeVisitor> {
 class BTypeConsumer : public clang::ASTConsumer {
  public:
   explicit BTypeConsumer(clang::ASTContext &C, clang::Rewriter &rewriter,
-                         std::map<std::string, BPFTable> &tables);
+                         std::vector<TableDesc> &tables);
   bool HandleTopLevelDecl(clang::DeclGroupRef D) override;
  private:
   BTypeVisitor visitor_;
@@ -113,11 +106,11 @@ class BFrontendAction : public clang::ASTFrontendAction {
       CreateASTConsumer(clang::CompilerInstance &Compiler, llvm::StringRef InFile) override;
 
   // take ownership of the table-to-fd mapping data structure
-  std::unique_ptr<std::map<std::string, BPFTable>> take_tables() { return move(tables_); }
+  std::unique_ptr<std::vector<TableDesc>> take_tables() { return move(tables_); }
  private:
   std::unique_ptr<clang::Rewriter> rewriter_;
   llvm::raw_ostream &os_;
-  std::unique_ptr<std::map<std::string, BPFTable>> tables_;
+  std::unique_ptr<std::vector<TableDesc>> tables_;
 };
 
 }  // namespace visitor
