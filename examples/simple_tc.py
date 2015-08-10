@@ -5,6 +5,7 @@
 from bpf import BPF
 from pyroute2 import IPRoute
 
+print("Simple program to test pyroute2 IPRoute tc interface")
 ipr = IPRoute()
 
 text = """
