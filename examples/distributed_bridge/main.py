@@ -51,9 +51,12 @@ try:
     sim = TunnelSimulation(ipdb)
     sim.start()
     input("Press enter to quit:")
+    for p in sim.processes: p.communicate(b"\n")
+except:
+    if "sim" in locals():
+        for p in sim.processes: p.kill(); p.wait()
 finally:
     if "br-fabric" in ipdb.interfaces: ipdb.interfaces["br-fabric"].remove().commit()
-    for p in sim.processes: p.communicate(b"\n")
-    sim.release()
+    if "sim" in locals(): sim.release()
     ipdb.release()
     null.close()
