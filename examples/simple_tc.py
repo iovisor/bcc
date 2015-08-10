@@ -27,3 +27,4 @@ try:
            name=fn.name, parent="1:", action="ok", classid=1)
 finally:
     if "idx" in locals(): ipr.link_remove(idx)
+print("BPF tc functionality - SCHED_CLS: OK")

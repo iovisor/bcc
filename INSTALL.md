@@ -27,6 +27,7 @@ sudo apt-get install libbcc
 
 Test it:
 `sudo python /usr/share/bcc/examples/hello_world.py`
+`sudo python /usr/share/bcc/examples/task_switch.py`
 
 (Optional) Install pyroute2 for additional networking features
 ```bash
