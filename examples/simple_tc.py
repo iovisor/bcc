@@ -5,7 +5,6 @@
 from bpf import BPF
 from pyroute2 import IPRoute
 
-print("Simple program to test pyroute2 IPRoute tc interface")
 ipr = IPRoute()
 
 text = """
@@ -28,3 +27,4 @@ try:
            name=fn.name, parent="1:", action="ok", classid=1)
 finally:
     if "idx" in locals(): ipr.link_remove(idx)
+print("BPF tc functionality - SCHED_CLS: OK")
