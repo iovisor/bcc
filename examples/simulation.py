@@ -1,4 +1,5 @@
 import subprocess
+import pyroute2
 from pyroute2 import IPRoute, NetNS, IPDB, NSPopen
 
 class Simulation(object):
@@ -34,9 +35,9 @@ class Simulation(object):
             ns_ipdb = IPDB(nl)
             self.ipdbs[nl.netns] = ns_ipdb
             if disable_ipv6:
-                cmd = ["sysctl", "-q", "-w",
+                cmd1 = ["sysctl", "-q", "-w",
                        "net.ipv6.conf.default.disable_ipv6=1"]
-                nsp = NSPopen(ns_ipdb.nl.netns, cmd)
+                nsp = NSPopen(ns_ipdb.nl.netns, cmd1)
                 nsp.wait(); nsp.release()
             ns_ipdb.interfaces.lo.up().commit()
         if in_ifc:
@@ -67,9 +68,9 @@ class Simulation(object):
             if macaddr: v.address = macaddr
             v.up()
         if disable_ipv6:
-            cmd = ["sysctl", "-q", "-w",
+            cmd1 = ["sysctl", "-q", "-w",
                    "net.ipv6.conf.%s.disable_ipv6=1" % out_ifc.ifname]
-            subprocess.call(cmd)
+            subprocess.call(cmd1)
         if fn and out_ifc:
             self.ipdb.nl.tc("add", "ingress", out_ifc["index"], "ffff:")
             self.ipdb.nl.tc("add-filter", "bpf", out_ifc["index"], ":1",
