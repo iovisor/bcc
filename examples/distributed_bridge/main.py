@@ -6,7 +6,7 @@ from sys import argv
 from builtins import input
 from pyroute2 import IPRoute, NetNS, IPDB, NSPopen
 from simulation import Simulation
-from subprocess import PIPE
+from subprocess import PIPE, call
 
 if len(argv) > 1 and argv[1] == "mesh":
   multicast = 0
@@ -40,6 +40,12 @@ class TunnelSimulation(Simulation):
         with self.ipdb.create(ifname="br-fabric", kind="bridge") as br:
             for host in host_info: br.add_port(host[1])
             br.up()
+        print("Validating connectivity")
+        for i in range(1, num_hosts):
+            for j in range(0, 2):
+                print("VNI%d between host0 and host%d" % (10000 + j, i))
+                call(["ip", "netns", "exec", "host%d" % i,
+                      "ping", "99.1.%d.1" % j, "-c", "3", "-i", "0.2", "-q"])
 
 try:
     sim = TunnelSimulation(ipdb)

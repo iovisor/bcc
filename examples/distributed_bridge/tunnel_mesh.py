@@ -76,6 +76,5 @@ try:
     run()
     ipdb.release()
     input("")
-    print("---")
 finally:
     for v in ifc_gc: call(["ip", "link", "del", v])
