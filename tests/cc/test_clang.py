@@ -65,5 +65,26 @@ int foo(void *ctx) {
         self.assertEqual(l.s.a, 5)
         self.assertEqual(l.s.b, 6)
 
+    def test_iosnoop(self):
+        text = """
+#include <linux/blkdev.h>
+#include <uapi/linux/ptrace.h>
+
+struct key_t {
+    struct request *req;
+};
+
+BPF_TABLE("hash", struct key_t, u64, start, 1024);
+int do_request(struct pt_regs *ctx, struct request *req) {
+    struct key_t key = {};
+
+    bpf_trace_printk("traced start %d\\n", req->__data_len);
+
+    return 0;
+}
+"""
+        b = BPF(text=text, debug=0)
+        fn = b.load_func("do_request", BPF.KPROBE)
+
 if __name__ == "__main__":
     main()
