@@ -64,7 +64,10 @@ bool BMapDeclVisitor::VisitRecordDecl(RecordDecl *D) {
   result_ += "\", [";
   for (auto F : D->getDefinition()->fields()) {
     result_ += "[";
-    TraverseDecl(F);
+    if (F->getType()->isPointerType())
+      result_ += "\"unsigned long long\"";
+    else
+      TraverseDecl(F);
     if (F->isBitField())
       result_ += ", " + to_string(F->getBitWidthValue(C));
     result_ += "], ";
