@@ -54,7 +54,7 @@ try:
     for p in sim.processes: p.communicate(b"\n")
 except:
     if "sim" in locals():
-        for p in sim.processes: p.kill(); p.wait()
+        for p in sim.processes: p.kill(); p.wait(); p.release()
 finally:
     if "br-fabric" in ipdb.interfaces: ipdb.interfaces["br-fabric"].remove().commit()
     if "sim" in locals(): sim.release()
