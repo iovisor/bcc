@@ -48,8 +48,8 @@ class Simulation(object):
                 v.net_ns_fd = ns_ipdb.nl.netns
         else:
             # delete the potentially leaf-over veth interfaces
-            subprocess.call(["ip", "link", "del", "%sa" % ifc_base_name],
-                            stderr=open(os.devnull, 'w'))
+            ipr = IPRoute()
+            for i in ipr.link_lookup(ifname='%sa' % ifc_base_name): ipr.link_remove(i)
             try:
                 out_ifc = self.ipdb.create(ifname="%sa" % ifc_base_name, kind="veth",
                                            peer="%sb" % ifc_base_name).commit()
