@@ -109,31 +109,52 @@ BPFModule::BPFModule(unsigned flags)
 
 BPFModule::~BPFModule() {
   engine_.reset();
+  rw_engine_.reset();
   ctx_.reset();
 }
 
+static void debug_printf(Module *mod, IRBuilder<> &B, const string &fmt, vector<Value *> args) {
+  GlobalVariable *fmt_gvar = B.CreateGlobalString(fmt, "fmt");
+  args.insert(args.begin(), B.CreateInBoundsGEP(fmt_gvar, vector<Value *>({B.getInt64(0), B.getInt64(0)})));
+  args.insert(args.begin(), B.getInt64((uintptr_t)stderr));
+  Function *fprintf_fn = mod->getFunction("fprintf");
+  if (!fprintf_fn) {
+    vector<Type *> fprintf_fn_args({B.getInt64Ty(), B.getInt8PtrTy()});
+    FunctionType *fprintf_fn_type = FunctionType::get(B.getInt32Ty(), fprintf_fn_args, /*isvarArg=*/true);
+    fprintf_fn = Function::Create(fprintf_fn_type, GlobalValue::ExternalLinkage, "fprintf", mod);
+    fprintf_fn->setCallingConv(CallingConv::C);
+    fprintf_fn->addFnAttr(Attribute::NoUnwind);
+  }
+  B.CreateCall(fprintf_fn, args);
+}
+
 // recursive helper to capture the arguments
-void parse_type(IRBuilder<> &B, vector<Value *> *args, string *fmt, Type *type, Value *out) {
+static void parse_type(IRBuilder<> &B, vector<Value *> *args, string *fmt,
+                       Type *type, Value *out, bool is_writer) {
   if (StructType *st = dyn_cast<StructType>(type)) {
     *fmt += "{ ";
     unsigned idx = 0;
     for (auto field : st->elements()) {
-      parse_type(B, args, fmt, field, B.CreateStructGEP(type, out, idx++));
+      parse_type(B, args, fmt, field, B.CreateStructGEP(type, out, idx++), is_writer);
       *fmt += " ";
     }
     *fmt += "}";
   } else if (IntegerType *it = dyn_cast<IntegerType>(type)) {
+    if (is_writer)
+      *fmt += "0x";
     if (it->getBitWidth() <= 8)
-      *fmt += "%hhi";
+      *fmt += "%hh";
     else if (it->getBitWidth() <= 16)
-      *fmt += "%hi";
+      *fmt += "%h";
     else if (it->getBitWidth() <= 32)
-      *fmt += "%i";
-    else if (it->getBitWidth() <= 64)
-      *fmt += "%li";
+      *fmt += "%l";
     else
-      *fmt += "%lli";
-    args->push_back(out);
+      *fmt += "%ll";
+    if (is_writer)
+      *fmt += "x";
+    else
+      *fmt += "i";
+    args->push_back(is_writer ? B.CreateLoad(out) : out);
   }
 }
 
@@ -168,14 +189,13 @@ Function * BPFModule::make_reader(Module *mod, Type *type) {
   BasicBlock *label_exit = BasicBlock::Create(*ctx_, "exit", fn);
   B.SetInsertPoint(label_entry);
 
-  vector<Value *> args;
+  vector<Value *> args({arg_in, nullptr});
   string fmt;
-  parse_type(B, &args, &fmt, type, arg_out);
+  parse_type(B, &args, &fmt, type, arg_out, false);
 
   GlobalVariable *fmt_gvar = B.CreateGlobalString(fmt, "fmt");
 
-  args.insert(args.begin(), B.CreateInBoundsGEP(fmt_gvar, vector<Value *>({B.getInt64(0), B.getInt64(0)})));
-  args.insert(args.begin(), arg_in);
+  args[1] = B.CreateInBoundsGEP(fmt_gvar, vector<Value *>({B.getInt64(0), B.getInt64(0)}));
 
   vector<Type *> sscanf_fn_args({B.getInt8PtrTy(), B.getInt8PtrTy()});
   FunctionType *sscanf_fn_type = FunctionType::get(B.getInt32Ty(), sscanf_fn_args, /*isVarArg=*/true);
@@ -203,7 +223,63 @@ Function * BPFModule::make_reader(Module *mod, Type *type) {
   return fn;
 }
 
-unique_ptr<ExecutionEngine> BPFModule::finalize_reader(unique_ptr<Module> m) {
+Function * BPFModule::make_writer(Module *mod, Type *type) {
+  auto fn_it = writers_.find(type);
+  if (fn_it != writers_.end())
+    return fn_it->second;
+
+  // int write(int len, char *out, Type *in) {
+  //   return snprintf(out, len, "{ %i ... }", out->field1, ...);
+  // }
+
+  IRBuilder<> B(*ctx_);
+
+  // The JIT currently supports a limited number of function prototypes, use the
+  // int (*) (int, char **, const char **) version
+  vector<Type *> fn_args({B.getInt32Ty(), B.getInt8PtrTy(), PointerType::getUnqual(type)});
+  FunctionType *fn_type = FunctionType::get(B.getInt32Ty(), fn_args, /*isVarArg=*/false);
+  Function *fn = Function::Create(fn_type, GlobalValue::ExternalLinkage,
+                                  "writer" + std::to_string(writers_.size()), mod);
+  auto arg_it = fn->arg_begin();
+  Argument *arg_len = arg_it++;
+  arg_len->setName("len");
+  Argument *arg_out = arg_it++;
+  arg_out->setName("out");
+  Argument *arg_in = arg_it++;
+  arg_in->setName("in");
+
+  BasicBlock *label_entry = BasicBlock::Create(*ctx_, "entry", fn);
+  B.SetInsertPoint(label_entry);
+
+  vector<Value *> args({arg_out, B.CreateZExt(arg_len, B.getInt64Ty()), nullptr});
+  string fmt;
+  parse_type(B, &args, &fmt, type, arg_in, true);
+
+  GlobalVariable *fmt_gvar = B.CreateGlobalString(fmt, "fmt");
+
+  args[2] = B.CreateInBoundsGEP(fmt_gvar, vector<Value *>({B.getInt64(0), B.getInt64(0)}));
+
+  if (0)
+    debug_printf(mod, B, "%d %p %p\n", vector<Value *>({arg_len, arg_out, arg_in}));
+
+  vector<Type *> snprintf_fn_args({B.getInt8PtrTy(), B.getInt64Ty(), B.getInt8PtrTy()});
+  FunctionType *snprintf_fn_type = FunctionType::get(B.getInt32Ty(), snprintf_fn_args, /*isVarArg=*/true);
+  Function *snprintf_fn = mod->getFunction("snprintf");
+  if (!snprintf_fn)
+    snprintf_fn = Function::Create(snprintf_fn_type, GlobalValue::ExternalLinkage, "snprintf", mod);
+  snprintf_fn->setCallingConv(CallingConv::C);
+  snprintf_fn->addFnAttr(Attribute::NoUnwind);
+
+  CallInst *call = B.CreateCall(snprintf_fn, args);
+  call->setTailCall(true);
+
+  B.CreateRet(call);
+
+  writers_[type] = fn;
+  return fn;
+}
+
+unique_ptr<ExecutionEngine> BPFModule::finalize_rw(unique_ptr<Module> m) {
   Module *mod = &*m;
 
   run_pass_manager(*mod);
@@ -256,22 +332,24 @@ int BPFModule::annotate() {
         Type *key_type = st->elements()[0];
         Type *leaf_type = st->elements()[1];
         table.key_reader = make_reader(&*m, key_type);
-        if (!table.key_reader) {
+        if (!table.key_reader)
           errs() << "Failed to compile reader for " << *key_type << "\n";
-          continue;
-        }
         table.leaf_reader = make_reader(&*m, leaf_type);
-        if (!table.leaf_reader) {
+        if (!table.leaf_reader)
           errs() << "Failed to compile reader for " << *leaf_type << "\n";
-          continue;
-        }
+        table.key_writer = make_writer(&*m, key_type);
+        if (!table.key_writer)
+          errs() << "Failed to compile writer for " << *key_type << "\n";
+        table.leaf_writer = make_writer(&*m, leaf_type);
+        if (!table.leaf_writer)
+          errs() << "Failed to compile writer for " << *leaf_type << "\n";
       }
     }
   }
 
-  reader_engine_ = finalize_reader(move(m));
-  if (reader_engine_)
-    reader_engine_->finalizeObject();
+  rw_engine_ = finalize_rw(move(m));
+  if (rw_engine_)
+    rw_engine_->finalizeObject();
 
   return 0;
 }
@@ -467,7 +545,7 @@ int BPFModule::table_update(size_t id, const char *key_str, const char *leaf_str
   const TableDesc &desc = (*tables_)[id];
   if (desc.fd < 0) return -1;
 
-  if (!reader_engine_ || !desc.key_reader || !desc.leaf_reader) {
+  if (!rw_engine_ || !desc.key_reader || !desc.leaf_reader) {
     fprintf(stderr, "Table sscanf not available\n");
     return -1;
   }
@@ -475,17 +553,78 @@ int BPFModule::table_update(size_t id, const char *key_str, const char *leaf_str
   unique_ptr<uint8_t[]> key(new uint8_t[desc.key_size]);
   unique_ptr<uint8_t[]> leaf(new uint8_t[desc.leaf_size]);
   GenericValue rc;
-  rc = reader_engine_->runFunction(desc.key_reader, vector<GenericValue>({GenericValue(),
-                                                                          GenericValue((void *)key_str),
-                                                                          GenericValue((void *)key.get())}));
+  rc = rw_engine_->runFunction(desc.key_reader, vector<GenericValue>({GenericValue(),
+                                                                      GenericValue((void *)key_str),
+                                                                      GenericValue((void *)key.get())}));
   if (rc.IntVal != 0)
     return -1;
-  rc = reader_engine_->runFunction(desc.leaf_reader, vector<GenericValue>({GenericValue(),
-                                                                           GenericValue((void *)leaf_str),
-                                                                           GenericValue((void *)leaf.get())}));
+  rc = rw_engine_->runFunction(desc.leaf_reader, vector<GenericValue>({GenericValue(),
+                                                                       GenericValue((void *)leaf_str),
+                                                                       GenericValue((void *)leaf.get())}));
   if (rc.IntVal != 0)
     return -1;
   return bpf_update_elem(desc.fd, key.get(), leaf.get(), 0);
+}
+
+struct TableIterator {
+  TableIterator(size_t key_size, size_t leaf_size)
+      : key(new uint8_t[key_size]), leaf(new uint8_t[leaf_size]) {
+  }
+  unique_ptr<uint8_t[]> key;
+  unique_ptr<uint8_t[]> leaf;
+  uint8_t keyb[512];
+};
+
+int BPFModule::table_key_printf(size_t id, char *buf, size_t buflen, const void *key) {
+  if (id >= tables_->size()) {
+    fprintf(stderr, "table id %zu out of range\n", id);
+    return -1;
+  }
+
+  const TableDesc &desc = (*tables_)[id];
+  if (!desc.key_writer) {
+    fprintf(stderr, "table snprintf not implemented for %s key\n", desc.name.c_str());
+    return -1;
+  }
+  GenericValue gv_buflen;
+  gv_buflen.IntVal = APInt(32, buflen, true);
+  vector<GenericValue> args({gv_buflen, GenericValue((void *)buf), GenericValue((void *)key)});
+  GenericValue rc = rw_engine_->runFunction(desc.key_writer, args);
+  if (rc.IntVal.isNegative()) {
+    perror("snprintf");
+    return -1;
+  }
+  if (rc.IntVal.sge(buflen)) {
+    fprintf(stderr, "snprintf ran out of buffer space\n");
+    return -1;
+  }
+  return 0;
+}
+
+int BPFModule::table_leaf_printf(size_t id, char *buf, size_t buflen, const void *leaf) {
+  if (id >= tables_->size()) {
+    fprintf(stderr, "table id %zu out of range\n", id);
+    return -1;
+  }
+
+  const TableDesc &desc = (*tables_)[id];
+  if (!desc.leaf_writer) {
+    fprintf(stderr, "table snprintf not implemented for %s leaf\n", desc.name.c_str());
+    return -1;
+  }
+  GenericValue gv_buflen;
+  gv_buflen.IntVal = buflen;
+  vector<GenericValue> args({gv_buflen, GenericValue((void *)buf), GenericValue((void *)leaf)});
+  GenericValue rc = rw_engine_->runFunction(desc.leaf_writer, args);
+  if (rc.IntVal.isNegative()) {
+    perror("snprintf");
+    return -1;
+  }
+  if (rc.IntVal.sge(buflen)) {
+    fprintf(stderr, "snprintf ran out of buffer space\n");
+    return -1;
+  }
+  return 0;
 }
 
 // load a B file, which comes in two parts

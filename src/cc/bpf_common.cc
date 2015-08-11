@@ -182,4 +182,15 @@ int bpf_table_update_id(void *program, size_t id, const char *key, const char *l
   return mod->table_update(id, key, leaf);
 }
 
+int bpf_table_key_snprintf(void *program, size_t id, char *buf, size_t buflen, const void *key) {
+  auto mod = static_cast<ebpf::BPFModule *>(program);
+  if (!mod) return 0;
+  return mod->table_key_printf(id, buf, buflen, key);
+}
+int bpf_table_leaf_snprintf(void *program, size_t id, char *buf, size_t buflen, const void *leaf) {
+  auto mod = static_cast<ebpf::BPFModule *>(program);
+  if (!mod) return 0;
+  return mod->table_key_printf(id, buf, buflen, leaf);
+}
+
 }
