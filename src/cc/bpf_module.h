@@ -72,11 +72,13 @@ class BPFModule {
   size_t table_key_size(size_t id) const;
   size_t table_key_size(const std::string &name) const;
   int table_key_printf(size_t id, char *buf, size_t buflen, const void *key);
+  int table_key_scanf(size_t id, const char *buf, void *key);
   const char * table_leaf_desc(size_t id) const;
   const char * table_leaf_desc(const std::string &name) const;
   size_t table_leaf_size(size_t id) const;
   size_t table_leaf_size(const std::string &name) const;
   int table_leaf_printf(size_t id, char *buf, size_t buflen, const void *leaf);
+  int table_leaf_scanf(size_t id, const char *buf, void *leaf);
   int table_update(size_t id, const char *key, const char *leaf);
   int table_update(const std::string &name, const char *key, const char *leaf);
   char * license() const;

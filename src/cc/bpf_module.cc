@@ -627,6 +627,42 @@ int BPFModule::table_leaf_printf(size_t id, char *buf, size_t buflen, const void
   return 0;
 }
 
+int BPFModule::table_key_scanf(size_t id, const char *key_str, void *key) {
+  if (id >= tables_->size()) return -1;
+
+  const TableDesc &desc = (*tables_)[id];
+  if (desc.fd < 0) return -1;
+
+  if (!rw_engine_ || !desc.key_reader) {
+    fprintf(stderr, "Table sscanf not available\n");
+    return -1;
+  }
+
+  vector<GenericValue> args({GenericValue(), GenericValue((void *)key_str), GenericValue(key)});
+  GenericValue rc = rw_engine_->runFunction(desc.key_reader, args);
+  if (rc.IntVal != 0)
+    return -1;
+  return 0;
+}
+
+int BPFModule::table_leaf_scanf(size_t id, const char *leaf_str, void *leaf) {
+  if (id >= tables_->size()) return -1;
+
+  const TableDesc &desc = (*tables_)[id];
+  if (desc.fd < 0) return -1;
+
+  if (!rw_engine_ || !desc.leaf_reader) {
+    fprintf(stderr, "Table sscanf not available\n");
+    return -1;
+  }
+
+  vector<GenericValue> args({GenericValue(), GenericValue((void *)leaf_str), GenericValue(leaf)});
+  GenericValue rc = rw_engine_->runFunction(desc.leaf_reader, args);
+  if (rc.IntVal != 0)
+    return -1;
+  return 0;
+}
+
 // load a B file, which comes in two parts
 int BPFModule::load_b(const string &filename, const string &proto_filename) {
   if (!sections_.empty()) {

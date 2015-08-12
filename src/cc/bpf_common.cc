@@ -193,4 +193,15 @@ int bpf_table_leaf_snprintf(void *program, size_t id, char *buf, size_t buflen, 
   return mod->table_key_printf(id, buf, buflen, leaf);
 }
 
+int bpf_table_key_sscanf(void *program, size_t id, const char *buf, void *key) {
+  auto mod = static_cast<ebpf::BPFModule *>(program);
+  if (!mod) return 0;
+  return mod->table_key_scanf(id, buf, key);
+}
+int bpf_table_leaf_sscanf(void *program, size_t id, const char *buf, void *leaf) {
+  auto mod = static_cast<ebpf::BPFModule *>(program);
+  if (!mod) return 0;
+  return mod->table_key_scanf(id, buf, leaf);
+}
+
 }
