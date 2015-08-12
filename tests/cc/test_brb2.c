@@ -10,16 +10,20 @@ BPF_TABLE("array", u32, u32, pem_stats, 1);
 
 int pem(struct __sk_buff *skb) {
     u32 ifindex_in, *ifindex_p;
+    u8 *cursor = 0;
+    struct ethernet_t *ethernet = cursor_advance(cursor, sizeof(*ethernet));
 
     ifindex_in = skb->ingress_ifindex;
     ifindex_p = pem_dest.lookup(&ifindex_in);
     if (ifindex_p) {
 #if 1
-        /* accumulate stats */
-        u32 index = 0;
-        u32 *value = pem_stats.lookup(&index);
-        if (value)
-            lock_xadd(value, 1);
+        if (ethernet->type == 0x0800 || ethernet->type == 0x0806) {
+            /* accumulate stats */
+            u32 index = 0;
+            u32 *value = pem_stats.lookup(&index);
+            if (value)
+                lock_xadd(value, 1);
+        }
 #endif
         bpf_clone_redirect(skb, *ifindex_p, 0);
     }
