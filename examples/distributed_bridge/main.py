@@ -43,6 +43,10 @@ class TunnelSimulation(Simulation):
         print("Validating connectivity")
         for i in range(1, num_hosts):
             for j in range(0, 2):
+                out = 1
+                while out:
+                    out = call(["ip", "netns", "exec", "host%d" % i,
+                                "ip", "addr", "show", "br%d" % j], stdout=null, stderr=null)
                 print("VNI%d between host0 and host%d" % (10000 + j, i))
                 call(["ip", "netns", "exec", "host%d" % i,
                       "ping", "99.1.%d.1" % j, "-c", "3", "-i", "0.2", "-q"])
