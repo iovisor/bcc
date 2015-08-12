@@ -33,6 +33,8 @@ struct TableDesc {
   std::string leaf_desc;
   llvm::Function *key_reader;
   llvm::Function *leaf_reader;
+  llvm::Function *key_writer;
+  llvm::Function *leaf_writer;
 };
 
 }  // namespace ebpf

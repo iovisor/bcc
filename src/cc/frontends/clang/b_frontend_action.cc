@@ -227,24 +227,24 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
         if (Decl->getName() == "incr_cksum_l3") {
           text = "bpf_l3_csum_replace_(" + fn_args_[0]->getName().str() + ", (u64)";
           text += args[0] + ", " + args[1] + ", " + args[2] + ", sizeof(" + args[2] + "))";
+          rewriter_.ReplaceText(SourceRange(Call->getLocStart(), Call->getLocEnd()), text);
         } else if (Decl->getName() == "incr_cksum_l4") {
           text = "bpf_l4_csum_replace_(" + fn_args_[0]->getName().str() + ", (u64)";
           text += args[0] + ", " + args[1] + ", " + args[2];
           text += ", ((" + args[3] + " & 0x1) << 4) | sizeof(" + args[2] + "))";
+          rewriter_.ReplaceText(SourceRange(Call->getLocStart(), Call->getLocEnd()), text);
         } else if (Decl->getName() == "bpf_trace_printk") {
           //  #define bpf_trace_printk(fmt, args...)
           //    ({ char _fmt[] = fmt; bpf_trace_printk_(_fmt, sizeof(_fmt), args...); })
           text = "({ char _fmt[] = " + args[0] + "; bpf_trace_printk_(_fmt, sizeof(_fmt)";
-          if (args.size() > 1)
-            text += ", ";
-          for (auto arg = args.begin() + 1; arg != args.end(); ++arg) {
-            text += *arg;
-            if (arg + 1 != args.end())
-              text += ", ";
+          if (args.size() <= 1) {
+            text += "); })";
+            rewriter_.ReplaceText(SourceRange(Call->getLocStart(), Call->getLocEnd()), text);
+          } else {
+            rewriter_.ReplaceText(SourceRange(Call->getLocStart(), Call->getArg(0)->getLocEnd()), text);
+            rewriter_.InsertTextAfter(Call->getLocEnd(), "); }");
           }
-          text += "); })";
         }
-        rewriter_.ReplaceText(SourceRange(Call->getLocStart(), Call->getLocEnd()), text);
       }
     }
   }

@@ -42,8 +42,9 @@ class BPFModule {
   int parse(llvm::Module *mod);
   int finalize();
   int annotate();
-  std::unique_ptr<llvm::ExecutionEngine> finalize_reader(std::unique_ptr<llvm::Module> mod);
+  std::unique_ptr<llvm::ExecutionEngine> finalize_rw(std::unique_ptr<llvm::Module> mod);
   llvm::Function * make_reader(llvm::Module *mod, llvm::Type *type);
+  llvm::Function * make_writer(llvm::Module *mod, llvm::Type *type);
   void dump_ir(llvm::Module &mod);
   int load_file_module(std::unique_ptr<llvm::Module> *mod, const std::string &file, bool in_memory);
   int load_includes(const std::string &tmpfile);
@@ -70,10 +71,12 @@ class BPFModule {
   const char * table_key_desc(const std::string &name) const;
   size_t table_key_size(size_t id) const;
   size_t table_key_size(const std::string &name) const;
+  int table_key_printf(size_t id, char *buf, size_t buflen, const void *key);
   const char * table_leaf_desc(size_t id) const;
   const char * table_leaf_desc(const std::string &name) const;
   size_t table_leaf_size(size_t id) const;
   size_t table_leaf_size(const std::string &name) const;
+  int table_leaf_printf(size_t id, char *buf, size_t buflen, const void *leaf);
   int table_update(size_t id, const char *key, const char *leaf);
   int table_update(const std::string &name, const char *key, const char *leaf);
   char * license() const;
@@ -84,7 +87,7 @@ class BPFModule {
   std::string proto_filename_;
   std::unique_ptr<llvm::LLVMContext> ctx_;
   std::unique_ptr<llvm::ExecutionEngine> engine_;
-  std::unique_ptr<llvm::ExecutionEngine> reader_engine_;
+  std::unique_ptr<llvm::ExecutionEngine> rw_engine_;
   std::unique_ptr<llvm::Module> mod_;
   std::unique_ptr<BLoader> b_loader_;
   std::unique_ptr<ClangLoader> clang_loader_;
@@ -93,6 +96,7 @@ class BPFModule {
   std::map<std::string, size_t> table_names_;
   std::vector<std::string> function_names_;
   std::map<llvm::Type *, llvm::Function *> readers_;
+  std::map<llvm::Type *, llvm::Function *> writers_;
 };
 
 }  // namespace ebpf
