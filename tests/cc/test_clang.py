@@ -86,5 +86,17 @@ int do_request(struct pt_regs *ctx, struct request *req) {
         b = BPF(text=text, debug=0)
         fn = b.load_func("do_request", BPF.KPROBE)
 
+    def test_blk_start_request(self):
+        text = """
+#include <linux/blkdev.h>
+#include <uapi/linux/ptrace.h>
+int do_request(struct pt_regs *ctx, int req) {
+    bpf_trace_printk("req ptr: 0x%x\\n", req);
+    return 0;
+}
+"""
+        b = BPF(text=text, debug=0)
+        fn = b.load_func("do_request", BPF.KPROBE)
+
 if __name__ == "__main__":
     main()
