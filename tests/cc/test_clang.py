@@ -55,9 +55,11 @@ int foo(void *ctx) {
 """
         b = BPF(text=text, debug=0)
         fn = b.load_func("foo", BPF.KPROBE)
-        b.update_table("stats", "2", "{ 2 3 0x1000000004 { 5 6 }}")
         t = b.get_table("stats")
-        l = t[t.Key(2)]
+        s1 = t.key_sprintf(t.Key(2))
+        self.assertEqual(s1, b"0x2")
+        s2 = t.leaf_sprintf(t.Leaf(2, 3, 4, 1, (5, 6)))
+        l = t.leaf_scanf(s2)
         self.assertEqual(l.a, 2)
         self.assertEqual(l.b, 3)
         self.assertEqual(l.c, 4)

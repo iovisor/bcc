@@ -31,10 +31,10 @@ struct TableDesc {
   size_t max_entries;
   std::string key_desc;
   std::string leaf_desc;
-  llvm::Function *key_reader;
-  llvm::Function *leaf_reader;
-  llvm::Function *key_writer;
-  llvm::Function *leaf_writer;
+  llvm::Function *key_sscanf;
+  llvm::Function *leaf_sscanf;
+  llvm::Function *key_snprintf;
+  llvm::Function *leaf_snprintf;
 };
 
 }  // namespace ebpf
