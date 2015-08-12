@@ -1,3 +1,4 @@
+import os
 import subprocess
 import pyroute2
 from pyroute2 import IPRoute, NetNS, IPDB, NSPopen
@@ -46,6 +47,10 @@ class Simulation(object):
                 # move half of veth into namespace
                 v.net_ns_fd = ns_ipdb.nl.netns
         else:
+            # delete the potentially leaf-over veth interfaces
+            ipr = IPRoute()
+            for i in ipr.link_lookup(ifname='%sa' % ifc_base_name): ipr.link_remove(i)
+            ipr.close()
             try:
                 out_ifc = self.ipdb.create(ifname="%sa" % ifc_base_name, kind="veth",
                                            peer="%sb" % ifc_base_name).commit()
