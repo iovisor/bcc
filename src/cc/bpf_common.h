@@ -37,6 +37,7 @@ void * bpf_function_start(void *program, const char *name);
 size_t bpf_function_size_id(void *program, size_t id);
 size_t bpf_function_size(void *program, const char *name);
 size_t bpf_num_tables(void *program);
+size_t bpf_table_id(void *program, const char *table_name);
 int bpf_table_fd(void *program, const char *table_name);
 int bpf_table_fd_id(void *program, size_t id);
 const char * bpf_table_name(void *program, size_t id);
@@ -52,8 +53,6 @@ int bpf_table_key_snprintf(void *program, size_t id, char *buf, size_t buflen, c
 int bpf_table_leaf_snprintf(void *program, size_t id, char *buf, size_t buflen, const void *leaf);
 int bpf_table_key_sscanf(void *program, size_t id, const char *buf, void *key);
 int bpf_table_leaf_sscanf(void *program, size_t id, const char *buf, void *leaf);
-int bpf_table_update(void *program, const char *table_name, const char *key, const char *leaf);
-int bpf_table_update_id(void *program, size_t id, const char *key, const char *leaf);
 
 #ifdef __cplusplus
 }

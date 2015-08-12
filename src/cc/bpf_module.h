@@ -64,6 +64,7 @@ class BPFModule {
   size_t function_size(size_t id) const;
   size_t function_size(const std::string &name) const;
   size_t num_tables() const;
+  size_t table_id(const std::string &name) const;
   int table_fd(size_t id) const;
   int table_fd(const std::string &name) const;
   const char * table_name(size_t id) const;
@@ -79,8 +80,6 @@ class BPFModule {
   size_t table_leaf_size(const std::string &name) const;
   int table_leaf_printf(size_t id, char *buf, size_t buflen, const void *leaf);
   int table_leaf_scanf(size_t id, const char *buf, void *leaf);
-  int table_update(size_t id, const char *key, const char *leaf);
-  int table_update(const std::string &name, const char *key, const char *leaf);
   char * license() const;
   unsigned kern_version() const;
  private:

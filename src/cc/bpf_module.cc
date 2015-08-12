@@ -26,7 +26,6 @@
 #include <linux/bpf.h>
 
 #include <llvm/ADT/STLExtras.h>
-#include <llvm/ExecutionEngine/GenericValue.h>
 #include <llvm/ExecutionEngine/MCJIT.h>
 #include <llvm/ExecutionEngine/SectionMemoryManager.h>
 #include <llvm/IRReader/IRReader.h>
@@ -63,6 +62,9 @@ using std::tuple;
 using std::unique_ptr;
 using std::vector;
 using namespace llvm;
+
+typedef int (* sscanf_fn) (const char *, void *);
+typedef int (* snprintf_fn) (char *, size_t, const void *);
 
 const string BPFModule::FN_PREFIX = BPF_FN_PREFIX;
 
@@ -147,9 +149,9 @@ static void parse_type(IRBuilder<> &B, vector<Value *> *args, string *fmt,
     else if (it->getBitWidth() <= 16)
       *fmt += "%h";
     else if (it->getBitWidth() <= 32)
-      *fmt += "%l";
+      *fmt += "%";
     else
-      *fmt += "%ll";
+      *fmt += "%l";
     if (is_writer)
       *fmt += "x";
     else
@@ -171,15 +173,11 @@ Function * BPFModule::make_reader(Module *mod, Type *type) {
 
   IRBuilder<> B(*ctx_);
 
-  // The JIT currently supports a limited number of function prototypes, use the
-  // int (*) (int, char **, const char **) version
-  vector<Type *> fn_args({B.getInt32Ty(), B.getInt8PtrTy(), PointerType::getUnqual(type)});
+  vector<Type *> fn_args({B.getInt8PtrTy(), PointerType::getUnqual(type)});
   FunctionType *fn_type = FunctionType::get(B.getInt32Ty(), fn_args, /*isVarArg=*/false);
   Function *fn = Function::Create(fn_type, GlobalValue::ExternalLinkage,
                                   "reader" + std::to_string(readers_.size()), mod);
   auto arg_it = fn->arg_begin();
-  Argument *arg_argc = arg_it++;
-  arg_argc->setName("argc");
   Argument *arg_in = arg_it++;
   arg_in->setName("in");
   Argument *arg_out = arg_it++;
@@ -196,6 +194,9 @@ Function * BPFModule::make_reader(Module *mod, Type *type) {
   GlobalVariable *fmt_gvar = B.CreateGlobalString(fmt, "fmt");
 
   args[1] = B.CreateInBoundsGEP(fmt_gvar, vector<Value *>({B.getInt64(0), B.getInt64(0)}));
+
+  if (0)
+    debug_printf(mod, B, "%p %p\n", vector<Value *>({arg_in, arg_out}));
 
   vector<Type *> sscanf_fn_args({B.getInt8PtrTy(), B.getInt8PtrTy()});
   FunctionType *sscanf_fn_type = FunctionType::get(B.getInt32Ty(), sscanf_fn_args, /*isVarArg=*/true);
@@ -234,17 +235,15 @@ Function * BPFModule::make_writer(Module *mod, Type *type) {
 
   IRBuilder<> B(*ctx_);
 
-  // The JIT currently supports a limited number of function prototypes, use the
-  // int (*) (int, char **, const char **) version
-  vector<Type *> fn_args({B.getInt32Ty(), B.getInt8PtrTy(), PointerType::getUnqual(type)});
+  vector<Type *> fn_args({B.getInt8PtrTy(), B.getInt64Ty(), PointerType::getUnqual(type)});
   FunctionType *fn_type = FunctionType::get(B.getInt32Ty(), fn_args, /*isVarArg=*/false);
   Function *fn = Function::Create(fn_type, GlobalValue::ExternalLinkage,
                                   "writer" + std::to_string(writers_.size()), mod);
   auto arg_it = fn->arg_begin();
-  Argument *arg_len = arg_it++;
-  arg_len->setName("len");
   Argument *arg_out = arg_it++;
   arg_out->setName("out");
+  Argument *arg_len = arg_it++;
+  arg_len->setName("len");
   Argument *arg_in = arg_it++;
   arg_in->setName("in");
 
@@ -331,18 +330,18 @@ int BPFModule::annotate() {
         if (st->getNumElements() < 2) continue;
         Type *key_type = st->elements()[0];
         Type *leaf_type = st->elements()[1];
-        table.key_reader = make_reader(&*m, key_type);
-        if (!table.key_reader)
-          errs() << "Failed to compile reader for " << *key_type << "\n";
-        table.leaf_reader = make_reader(&*m, leaf_type);
-        if (!table.leaf_reader)
-          errs() << "Failed to compile reader for " << *leaf_type << "\n";
-        table.key_writer = make_writer(&*m, key_type);
-        if (!table.key_writer)
-          errs() << "Failed to compile writer for " << *key_type << "\n";
-        table.leaf_writer = make_writer(&*m, leaf_type);
-        if (!table.leaf_writer)
-          errs() << "Failed to compile writer for " << *leaf_type << "\n";
+        table.key_sscanf = make_reader(&*m, key_type);
+        if (!table.key_sscanf)
+          errs() << "Failed to compile sscanf for " << *key_type << "\n";
+        table.leaf_sscanf = make_reader(&*m, leaf_type);
+        if (!table.leaf_sscanf)
+          errs() << "Failed to compile sscanf for " << *leaf_type << "\n";
+        table.key_snprintf = make_writer(&*m, key_type);
+        if (!table.key_snprintf)
+          errs() << "Failed to compile snprintf for " << *key_type << "\n";
+        table.leaf_snprintf = make_writer(&*m, leaf_type);
+        if (!table.leaf_snprintf)
+          errs() << "Failed to compile snprintf for " << *leaf_type << "\n";
       }
     }
   }
@@ -474,10 +473,14 @@ size_t BPFModule::num_tables() const {
   return tables_->size();
 }
 
-int BPFModule::table_fd(const string &name) const {
+size_t BPFModule::table_id(const string &name) const {
   auto it = table_names_.find(name);
-  if (it == table_names_.end()) return -1;
-  return table_fd(it->second);
+  if (it == table_names_.end()) return ~0ull;
+  return it->second;
+}
+
+int BPFModule::table_fd(const string &name) const {
+  return table_fd(table_id(name));
 }
 
 int BPFModule::table_fd(size_t id) const {
@@ -497,9 +500,7 @@ const char * BPFModule::table_key_desc(size_t id) const {
 }
 
 const char * BPFModule::table_key_desc(const string &name) const {
-  auto it = table_names_.find(name);
-  if (it == table_names_.end()) return nullptr;
-  return table_key_desc(it->second);
+  return table_key_desc(table_id(name));
 }
 
 const char * BPFModule::table_leaf_desc(size_t id) const {
@@ -509,18 +510,14 @@ const char * BPFModule::table_leaf_desc(size_t id) const {
 }
 
 const char * BPFModule::table_leaf_desc(const string &name) const {
-  auto it = table_names_.find(name);
-  if (it == table_names_.end()) return nullptr;
-  return table_leaf_desc(it->second);
+  return table_leaf_desc(table_id(name));
 }
 size_t BPFModule::table_key_size(size_t id) const {
   if (id >= tables_->size()) return 0;
   return (*tables_)[id].key_size;
 }
 size_t BPFModule::table_key_size(const string &name) const {
-  auto it = table_names_.find(name);
-  if (it == table_names_.end()) return 0;
-  return table_key_size(it->second);
+  return table_key_size(table_id(name));
 }
 
 size_t BPFModule::table_leaf_size(size_t id) const {
@@ -528,42 +525,7 @@ size_t BPFModule::table_leaf_size(size_t id) const {
   return (*tables_)[id].leaf_size;
 }
 size_t BPFModule::table_leaf_size(const string &name) const {
-  auto it = table_names_.find(name);
-  if (it == table_names_.end()) return 0;
-  return table_leaf_size(it->second);
-}
-
-int BPFModule::table_update(const string &name, const char *key_str, const char *leaf_str) {
-  auto it = table_names_.find(name);
-  if (it == table_names_.end()) return 0;
-  return table_update(it->second, key_str, leaf_str);
-}
-
-int BPFModule::table_update(size_t id, const char *key_str, const char *leaf_str) {
-  if (id >= tables_->size()) return -1;
-
-  const TableDesc &desc = (*tables_)[id];
-  if (desc.fd < 0) return -1;
-
-  if (!rw_engine_ || !desc.key_reader || !desc.leaf_reader) {
-    fprintf(stderr, "Table sscanf not available\n");
-    return -1;
-  }
-
-  unique_ptr<uint8_t[]> key(new uint8_t[desc.key_size]);
-  unique_ptr<uint8_t[]> leaf(new uint8_t[desc.leaf_size]);
-  GenericValue rc;
-  rc = rw_engine_->runFunction(desc.key_reader, vector<GenericValue>({GenericValue(),
-                                                                      GenericValue((void *)key_str),
-                                                                      GenericValue((void *)key.get())}));
-  if (rc.IntVal != 0)
-    return -1;
-  rc = rw_engine_->runFunction(desc.leaf_reader, vector<GenericValue>({GenericValue(),
-                                                                       GenericValue((void *)leaf_str),
-                                                                       GenericValue((void *)leaf.get())}));
-  if (rc.IntVal != 0)
-    return -1;
-  return bpf_update_elem(desc.fd, key.get(), leaf.get(), 0);
+  return table_leaf_size(table_id(name));
 }
 
 struct TableIterator {
@@ -576,25 +538,23 @@ struct TableIterator {
 };
 
 int BPFModule::table_key_printf(size_t id, char *buf, size_t buflen, const void *key) {
-  if (id >= tables_->size()) {
-    fprintf(stderr, "table id %zu out of range\n", id);
-    return -1;
-  }
-
+  if (id >= tables_->size()) return -1;
   const TableDesc &desc = (*tables_)[id];
-  if (!desc.key_writer) {
-    fprintf(stderr, "table snprintf not implemented for %s key\n", desc.name.c_str());
+  if (!desc.key_snprintf) {
+    fprintf(stderr, "Key snprintf not available\n");
     return -1;
   }
-  GenericValue gv_buflen;
-  gv_buflen.IntVal = APInt(32, buflen, true);
-  vector<GenericValue> args({gv_buflen, GenericValue((void *)buf), GenericValue((void *)key)});
-  GenericValue rc = rw_engine_->runFunction(desc.key_writer, args);
-  if (rc.IntVal.isNegative()) {
+  snprintf_fn fn = (snprintf_fn)rw_engine_->getPointerToFunction(desc.key_snprintf);
+  if (!fn) {
+    fprintf(stderr, "Key snprintf not available in JIT Engine\n");
+    return -1;
+  }
+  int rc = (*fn)(buf, buflen, key);
+  if (rc < 0) {
     perror("snprintf");
     return -1;
   }
-  if (rc.IntVal.sge(buflen)) {
+  if ((size_t)rc >= buflen) {
     fprintf(stderr, "snprintf ran out of buffer space\n");
     return -1;
   }
@@ -602,25 +562,23 @@ int BPFModule::table_key_printf(size_t id, char *buf, size_t buflen, const void 
 }
 
 int BPFModule::table_leaf_printf(size_t id, char *buf, size_t buflen, const void *leaf) {
-  if (id >= tables_->size()) {
-    fprintf(stderr, "table id %zu out of range\n", id);
-    return -1;
-  }
-
+  if (id >= tables_->size()) return -1;
   const TableDesc &desc = (*tables_)[id];
-  if (!desc.leaf_writer) {
-    fprintf(stderr, "table snprintf not implemented for %s leaf\n", desc.name.c_str());
+  if (!desc.leaf_snprintf) {
+    fprintf(stderr, "Key snprintf not available\n");
     return -1;
   }
-  GenericValue gv_buflen;
-  gv_buflen.IntVal = buflen;
-  vector<GenericValue> args({gv_buflen, GenericValue((void *)buf), GenericValue((void *)leaf)});
-  GenericValue rc = rw_engine_->runFunction(desc.leaf_writer, args);
-  if (rc.IntVal.isNegative()) {
+  snprintf_fn fn = (snprintf_fn)rw_engine_->getPointerToFunction(desc.leaf_snprintf);
+  if (!fn) {
+    fprintf(stderr, "Leaf snprintf not available in JIT Engine\n");
+    return -1;
+  }
+  int rc = (*fn)(buf, buflen, leaf);
+  if (rc < 0) {
     perror("snprintf");
     return -1;
   }
-  if (rc.IntVal.sge(buflen)) {
+  if ((size_t)rc >= buflen) {
     fprintf(stderr, "snprintf ran out of buffer space\n");
     return -1;
   }
@@ -629,37 +587,43 @@ int BPFModule::table_leaf_printf(size_t id, char *buf, size_t buflen, const void
 
 int BPFModule::table_key_scanf(size_t id, const char *key_str, void *key) {
   if (id >= tables_->size()) return -1;
-
   const TableDesc &desc = (*tables_)[id];
-  if (desc.fd < 0) return -1;
-
-  if (!rw_engine_ || !desc.key_reader) {
-    fprintf(stderr, "Table sscanf not available\n");
+  if (!desc.key_sscanf) {
+    fprintf(stderr, "Key sscanf not available\n");
     return -1;
   }
 
-  vector<GenericValue> args({GenericValue(), GenericValue((void *)key_str), GenericValue(key)});
-  GenericValue rc = rw_engine_->runFunction(desc.key_reader, args);
-  if (rc.IntVal != 0)
+  sscanf_fn fn = (sscanf_fn)rw_engine_->getPointerToFunction(desc.key_sscanf);
+  if (!fn) {
+    fprintf(stderr, "Key sscanf not available in JIT Engine\n");
     return -1;
+  }
+  int rc = (*fn)(key_str, key);
+  if (rc != 0) {
+    perror("sscanf");
+    return -1;
+  }
   return 0;
 }
 
 int BPFModule::table_leaf_scanf(size_t id, const char *leaf_str, void *leaf) {
   if (id >= tables_->size()) return -1;
-
   const TableDesc &desc = (*tables_)[id];
-  if (desc.fd < 0) return -1;
-
-  if (!rw_engine_ || !desc.leaf_reader) {
-    fprintf(stderr, "Table sscanf not available\n");
+  if (!desc.leaf_sscanf) {
+    fprintf(stderr, "Key sscanf not available\n");
     return -1;
   }
 
-  vector<GenericValue> args({GenericValue(), GenericValue((void *)leaf_str), GenericValue(leaf)});
-  GenericValue rc = rw_engine_->runFunction(desc.leaf_reader, args);
-  if (rc.IntVal != 0)
+  sscanf_fn fn = (sscanf_fn)rw_engine_->getPointerToFunction(desc.leaf_sscanf);
+  if (!fn) {
+    fprintf(stderr, "Leaf sscanf not available in JIT Engine\n");
     return -1;
+  }
+  int rc = (*fn)(leaf_str, leaf);
+  if (rc != 0) {
+    perror("sscanf");
+    return -1;
+  }
   return 0;
 }
 

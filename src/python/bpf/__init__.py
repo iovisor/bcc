@@ -39,14 +39,26 @@ lib.bpf_function_start.restype = ct.c_void_p
 lib.bpf_function_start.argtypes = [ct.c_void_p, ct.c_char_p]
 lib.bpf_function_size.restype = ct.c_size_t
 lib.bpf_function_size.argtypes = [ct.c_void_p, ct.c_char_p]
+lib.bpf_table_id.restype = ct.c_ulonglong
+lib.bpf_table_id.argtypes = [ct.c_void_p, ct.c_char_p]
 lib.bpf_table_fd.restype = ct.c_int
 lib.bpf_table_fd.argtypes = [ct.c_void_p, ct.c_char_p]
 lib.bpf_table_key_desc.restype = ct.c_char_p
 lib.bpf_table_key_desc.argtypes = [ct.c_void_p, ct.c_char_p]
 lib.bpf_table_leaf_desc.restype = ct.c_char_p
 lib.bpf_table_leaf_desc.argtypes = [ct.c_void_p, ct.c_char_p]
-lib.bpf_table_update.restype = ct.c_int
-lib.bpf_table_update.argtypes = [ct.c_void_p, ct.c_char_p, ct.c_char_p, ct.c_char_p]
+lib.bpf_table_key_snprintf.restype = ct.c_int
+lib.bpf_table_key_snprintf.argtypes = [ct.c_void_p, ct.c_ulonglong,
+        ct.c_char_p, ct.c_ulonglong, ct.c_void_p]
+lib.bpf_table_leaf_snprintf.restype = ct.c_int
+lib.bpf_table_leaf_snprintf.argtypes = [ct.c_void_p, ct.c_ulonglong,
+        ct.c_char_p, ct.c_ulonglong, ct.c_void_p]
+lib.bpf_table_key_sscanf.restype = ct.c_int
+lib.bpf_table_key_sscanf.argtypes = [ct.c_void_p, ct.c_ulonglong,
+        ct.c_char_p, ct.c_void_p]
+lib.bpf_table_leaf_sscanf.restype = ct.c_int
+lib.bpf_table_leaf_sscanf.argtypes = [ct.c_void_p, ct.c_ulonglong,
+        ct.c_char_p, ct.c_void_p]
 
 # keep in sync with libbpf.h
 lib.bpf_get_next_key.restype = ct.c_int
@@ -92,11 +104,48 @@ class BPF(object):
             self.fd = fd
 
     class Table(MutableMapping):
-        def __init__(self, bpf, map_fd, keytype, leaftype):
+        def __init__(self, bpf, map_id, map_fd, keytype, leaftype):
             self.bpf = bpf
+            self.map_id = map_id
             self.map_fd = map_fd
             self.Key = keytype
             self.Leaf = leaftype
+
+        def key_sprintf(self, key):
+            key_p = ct.pointer(key)
+            buf = ct.create_string_buffer(ct.sizeof(self.Key) * 8)
+            res = lib.bpf_table_key_snprintf(self.bpf.module, self.map_id,
+                    buf, len(buf), key_p)
+            if res < 0:
+                raise Exception("Could not printf key")
+            return buf.value
+
+        def leaf_sprintf(self, leaf):
+            leaf_p = ct.pointer(leaf)
+            buf = ct.create_string_buffer(ct.sizeof(self.Leaf) * 8)
+            res = lib.bpf_table_leaf_snprintf(self.bpf.module, self.map_id,
+                    buf, len(buf), leaf_p)
+            if res < 0:
+                raise Exception("Could not printf leaf")
+            return buf.value
+
+        def key_scanf(self, key_str):
+            key = self.Key()
+            key_p = ct.pointer(key)
+            res = lib.bpf_table_key_sscanf(self.bpf.module, self.map_id,
+                    key_str, key_p)
+            if res < 0:
+                raise Exception("Could not scanf key")
+            return key
+
+        def leaf_scanf(self, leaf_str):
+            leaf = self.Leaf()
+            leaf_p = ct.pointer(leaf)
+            res = lib.bpf_table_leaf_sscanf(self.bpf.module, self.map_id,
+                    leaf_str, leaf_p)
+            if res < 0:
+                raise Exception("Could not scanf leaf")
+            return leaf
 
         def __getitem__(self, key):
             key_p = ct.pointer(key)
@@ -245,6 +294,7 @@ class BPF(object):
         return cls
 
     def get_table(self, name, keytype=None, leaftype=None):
+        map_id = lib.bpf_table_id(self.module, name.encode("ascii"))
         map_fd = lib.bpf_table_fd(self.module, name.encode("ascii"))
         if map_fd < 0:
             raise Exception("Failed to find BPF Table %s" % name)
@@ -258,13 +308,7 @@ class BPF(object):
             if not leaf_desc:
                 raise Exception("Failed to load BPF Table %s leaf desc" % name)
             leaftype = BPF._decode_table_type(json.loads(leaf_desc.decode()))
-        return BPF.Table(self, map_fd, keytype, leaftype)
-
-    def update_table(self, name, key, leaf):
-        res = lib.bpf_table_update(self.module, name.encode("ascii"), key.encode("ascii"),
-                leaf.encode("ascii"))
-        if res < 0:
-            raise Exception("update_table failed")
+        return BPF.Table(self, map_id, map_fd, keytype, leaftype)
 
     @staticmethod
     def attach_raw_socket(fn, dev):
