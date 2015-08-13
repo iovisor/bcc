@@ -12,10 +12,11 @@ from netaddr import EUI, IPAddress
 from pyroute2 import IPRoute, NetNS, IPDB, NSPopen
 from socket import htons, AF_INET
 from threading import Thread
-from subprocess import call
+from subprocess import call, Popen, PIPE
 
 num_hosts = int(argv[1])
 host_id = int(argv[2])
+dhcp = int(argv[3])
 
 b = BPF(src_file="tunnel_mesh.c")
 ingress_fn = b.load_func("handle_ingress", BPF.SCHED_CLS)
@@ -31,6 +32,10 @@ ifc = ipdb.interfaces.eth0
 
 # ifcs to cleanup at the end
 ifc_gc = []
+
+# dhcp server and client processes
+d_serv = []
+d_client = []
 
 def run():
     with ipdb.create(ifname="vxlan0", kind="vxlan", vxlan_id=0,
@@ -68,13 +73,58 @@ def run():
                     br.add_port(v)
                     br.up()
                     ifc_gc.append(v.ifname)
-            ipaddr = "99.1.%d.%d/24" % (j, host_id + 1)
-            br.add_ip(ipaddr)
+            if dhcp == 0:
+                ipaddr = "99.1.%d.%d/24" % (j, host_id + 1)
+                br.add_ip(ipaddr)
             ifc_gc.append(br.ifname)
+
+    # dhcp server only runs on host 0
+    if dhcp == 1 and host_id == 0:
+        for j in range(0, 2):
+            v1 = "dhcp%d_v1" % j
+            v2 = "dhcp%d_v2" % j
+            br = ipdb.interfaces["br%d" % j]
+            with ipdb.create(ifname=v1, kind="veth", peer=v2) as v:
+                    v.up()
+            br.add_port(ipdb.interfaces[v1]).commit()
+            dhcp_v2 = ipdb.interfaces[v2]
+            dhcp_v2.add_ip("99.1.%d.1/24" % j).up().commit()
+
+            call(["/bin/rm", "-f", "/tmp/dnsmasq.%d.leases" % j])
+            cmd = ["dnsmasq", "-d", "--bind-interfaces", "--strict-order",
+                   "--conf-file=",
+                   "--dhcp-range", "99.1.%d.2,99.1.%d.254,255.255.255.0,12h" % (j, j),
+                   "--dhcp-no-override", "--except-interface=lo",
+                   "--interface=dhcp%d_v2" % j,
+                   "--dhcp-authoritative",
+                   "--dhcp-leasefile=/tmp/dnsmasq.%d.leases" % j]
+            d_serv.append(Popen(cmd, stdout=PIPE, stderr=PIPE))
+
+    # dhcp client to assign ip address for each bridge
+    if dhcp == 1:
+        for j in range(0, 2):
+            call(["/bin/rm", "-rf", "/tmp/dhcp_%d_%d" % (host_id, j)])
+            call(["mkdir", "/tmp/dhcp_%d_%d" % (host_id, j)])
+            call(["touch", "/tmp/dhcp_%d_%d/dhclient.conf" % (host_id, j)])
+            call(["touch", "/tmp/dhcp_%d_%d/dhclient.lease" % (host_id, j)])
+            cmd = ["dhclient", "-d", "br%d" % j,
+                   "-cf", "/tmp/dhcp_%d_%d/dhclient.conf" % (host_id, j),
+                   "-lf", "/tmp/dhcp_%d_%d/dhclient.lease" % (host_id, j)]
+            d_client.append(Popen(cmd, stdout=PIPE, stderr=PIPE))
+
+            # make sure we get address for eth0
+            retry = -1
+            while retry < 0:
+                check = Popen(["ip", "addr", "show", "br%d" % j], stdout=PIPE, stderr=PIPE)
+                out = check.stdout.read()
+                checkip = "99.1.%d" % j
+                retry = out.find(checkip)
 
 try:
     run()
-    ipdb.release()
     input("")
 finally:
     for v in ifc_gc: call(["ip", "link", "del", v])
+    ipdb.release()
+    for p in d_client: p.kill()
+    for p in d_serv: p.kill()
