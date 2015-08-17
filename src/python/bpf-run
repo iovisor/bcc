@@ -4,14 +4,15 @@ import sys
 
 USAGE = """\
 usage: {argv0} <opts> -p probe_func -c cmd
- -c cmd      contents of the program to run, omitting prototype
+ -c cmd      contents of the program to run, omitting prototype (required)
  -d name     dump table <name> upon exit
+ -f format   format string to apply to trace output (see python str.format())
  -n sec      run for <sec> seconds and then exit (default=-1)
  -p probe    kernel entry point to trace (required)
  -t          attach to kernel trace output
  -v          increase verbosity
 example:
- {argv0} -p sys_clone -c 'bpf_trace_printk("hello\\n");' -t\
+ {argv0} -p sys_clone -c 'bpf_trace_printk("Hello, World!\\n");' -t\
 """
 
 wrapper = """
@@ -35,7 +36,7 @@ def main():
     import signal
 
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "c:d:hn:p:tv")
+        opts, args = getopt.getopt(sys.argv[1:], "c:d:f:hn:p:tv")
     except getopt.error, msg:
         print_usage_and_exit(2, msg)
 
@@ -45,15 +46,17 @@ def main():
     dump_tables = []
     verbose = 0
     nsec = 0
+    format_str = None
 
     for o, a in opts:
+        if o == "-c": runcmd = a
         if o == "-d": dump_tables.append(a)
+        if o == "-f": format_str = a
+        if o == "-h": print_usage_and_exit(0)
         if o == "-n": nsec = int(a)
+        if o == "-p": probe_fn = a
         if o == "-t": trace = 1
         if o == "-v": verbose += 1
-        if o == "-c": runcmd = a
-        if o == "-p": probe_fn = a
-        if o == "-h": print_usage_and_exit(0)
 
     if not runcmd or not probe_fn:
         print_usage_and_exit(2, "Error: -p and -c arguments are required")
@@ -75,7 +78,11 @@ def main():
             with open("/sys/kernel/debug/tracing/trace_pipe") as f:
                 while True:
                     line = f.readline(128)
-                    print(line.rstrip())
+                    line = line.rstrip()
+                    if format_str:
+                        args=line.split(None, 5)
+                        line = format_str.format(*args)
+                    print(line)
                     sys.stdout.flush()
         elif nsec:
             signal.pause()
