@@ -6,6 +6,7 @@ macro(symlink_file SRC DST)
 endmacro()
 
 symlink_file(${CMAKE_CURRENT_SOURCE_DIR}/bpf ${CMAKE_CURRENT_BINARY_DIR}/bpf)
+symlink_file(${CMAKE_CURRENT_SOURCE_DIR}/bpf-run ${CMAKE_CURRENT_BINARY_DIR}/bpf-run)
 
 set(PIP_INSTALLABLE "${CMAKE_CURRENT_BINARY_DIR}/dist/bpf-${REVISION}.tar.gz")
 configure_file(setup.py.in ${CMAKE_CURRENT_BINARY_DIR}/setup.py @ONLY)
