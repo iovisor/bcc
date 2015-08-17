@@ -14,4 +14,5 @@ setup(name='bpf',
       author_email='bblanco@plumgrid.com',
       url='http://plumgrid.com',
       packages=['bpf'],
+      scripts=['bpf-run'],
       platforms=['Linux'])
