@@ -7,11 +7,14 @@ from builtins import input
 from pyroute2 import IPRoute, NetNS, IPDB, NSPopen
 from simulation import Simulation
 from subprocess import PIPE, call, Popen
+import re
 
+dhcp = 0
+multicast = 1
 if len(argv) > 1 and argv[1] == "mesh":
-  multicast = 0
-else:
-  multicast = 1
+    multicast = 0
+    if len(argv) > 2 and argv[2] == "dhcp":
+       dhcp = 1
 
 ipr = IPRoute()
 ipdb = IPDB(nl=ipr)
@@ -34,12 +37,33 @@ class TunnelSimulation(Simulation):
             if multicast:
               cmd = ["python", "tunnel.py", str(i)]
             else:
-              cmd = ["python", "tunnel_mesh.py", str(num_hosts), str(i)]
+              cmd = ["python", "tunnel_mesh.py", str(num_hosts), str(i), str(dhcp)]
             p = NSPopen(host_info[i][0].nl.netns, cmd, stdin=PIPE)
             self.processes.append(p)
         with self.ipdb.create(ifname="br-fabric", kind="bridge") as br:
             for host in host_info: br.add_port(host[1])
             br.up()
+
+        # get host0 bridge ip's
+        host0_br_ips = []
+        if dhcp == 1:
+            print("Waiting for host0 br1/br2 ip addresses available")
+            for j in range(0, 2):
+                retry = -1
+                ip_out = None
+                while retry < 0:
+                    check = Popen(["ip", "netns", "exec", "host0",
+                                   "ip", "addr", "show", "br%d" % j], stdout=PIPE, stderr=PIPE)
+                    ip_out = check.stdout.read()
+                    checkip = "99.1.%d" % j
+                    retry = ip_out.find(checkip)
+                p = re.compile(("99.1.%d." % j) + "\d+")
+                host0_br_ips.append(p.findall(ip_out)[0])
+        else:
+            host0_br_ips.append("99.1.0.1")
+            host0_br_ips.append("99.1.1.1")
+
+        # traffic test
         print("Validating connectivity")
         for i in range(1, num_hosts):
             for j in range(0, 2):
@@ -48,11 +72,11 @@ class TunnelSimulation(Simulation):
                     check = Popen(["ip", "netns", "exec", "host%d" % i,
                                    "ip", "addr", "show", "br%d" % j], stdout=PIPE, stderr=PIPE)
                     out = check.stdout.read()
-                    checkip = "99.1.%d.%d" % (j, i+1)
+                    checkip = "99.1.%d" % j
                     retry = out.find(checkip)
                 print("VNI%d between host0 and host%d" % (10000 + j, i))
                 call(["ip", "netns", "exec", "host%d" % i,
-                      "ping", "99.1.%d.1" % j, "-c", "3", "-i", "0.2", "-q"])
+                      "ping", host0_br_ips[j], "-c", "3", "-i", "0.2", "-q"])
 
 try:
     sim = TunnelSimulation(ipdb)
