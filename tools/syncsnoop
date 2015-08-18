@@ -11,6 +11,7 @@
 #
 # 13-Aug-2015	Brendan Gregg	Created this.
 
+from __future__ import print_function
 from bpf import BPF
 import sys
 
@@ -24,13 +25,13 @@ int do_sync(void *ctx) {
 BPF.attach_kprobe(b.load_func("do_sync", BPF.KPROBE), "sys_sync")
 
 # header
-print "%-18s %s" % ("TIME(s)", "CALL")
+print("%-18s %s" % ("TIME(s)", "CALL"))
 
 # open trace pipe
 try:
 	trace = open("/sys/kernel/debug/tracing/trace_pipe", "r")
 except:
-	print >> sys.stderr, "ERROR: opening trace_pipe"
+	print("ERROR: opening trace_pipe", file=sys.stderr)
 	exit(1)
 
 # format output
@@ -43,4 +44,4 @@ while 1:
 	prolog, time_s, colon, word = line.rsplit(" ", 3)
 	time_s = time_s[:-1]	# strip trailing ":"
 
-	print "%-18s %s" % (time_s, word)
+	print("%-18s %s" % (time_s, word))

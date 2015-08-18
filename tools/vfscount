@@ -10,6 +10,7 @@
 #
 # 14-Aug-2015	Brendan Gregg	Created this.
 
+from __future__ import print_function
 from bpf import BPF
 from ctypes import c_ushort, c_int, c_ulonglong
 from time import sleep, strftime
@@ -23,7 +24,7 @@ def load_kallsyms():
 	try:
 		syms = open(symfile, "r")
 	except:
-		print >> stderr, "ERROR: reading " + symfile
+		print("ERROR: reading " + symfile, file=sys.stderr)
 		exit()
 	line = syms.readline()
 	for line in iter(syms):
@@ -39,7 +40,7 @@ def ksym(addr):
 	start = -1
 	end = len(ksym_addrs)
 	while end != start + 1:
-		mid = (start + end) / 2
+		mid = int((start + end) / 2)
 		if addr < ksym_addrs[mid]:
 			end = mid
 		else:
@@ -60,7 +61,7 @@ BPF.attach_kprobe(fn, "vfs_create")
 counts = b.get_table("counts")
 
 # header
-print "Tracing... Ctrl-C to end."
+print("Tracing... Ctrl-C to end.")
 
 # output
 try:
@@ -68,6 +69,6 @@ try:
 except KeyboardInterrupt:
 	pass
 
-print "\n%-16s %-12s %8s" % ("ADDR", "FUNC", "COUNT")
+print("\n%-16s %-12s %8s" % ("ADDR", "FUNC", "COUNT"))
 for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
-	print "%-16x %-12s %8d" % (k.ip, ksym(k.ip), v.value)
+	print("%-16x %-12s %8d" % (k.ip, ksym(k.ip), v.value))

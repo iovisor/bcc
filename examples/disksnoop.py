@@ -10,6 +10,7 @@
 #
 # 11-Aug-2015	Brendan Gregg	Created this.
 
+from __future__ import print_function
 from bpf import BPF
 import sys
 
@@ -21,13 +22,13 @@ BPF.attach_kprobe(b.load_func("do_request", BPF.KPROBE), "blk_start_request")
 BPF.attach_kprobe(b.load_func("do_completion", BPF.KPROBE), "blk_update_request")
 
 # header
-print "%-18s %-2s %-7s %8s" % ("TIME(s)", "T", "BYTES", "LAT(ms)")
+print("%-18s %-2s %-7s %8s" % ("TIME(s)", "T", "BYTES", "LAT(ms)"))
 
 # open trace pipe
 try:
 	trace = open("/sys/kernel/debug/tracing/trace_pipe", "r")
 except:
-	print >> sys.stderr, "ERROR: opening trace_pipe"
+	print("ERROR: opening trace_pipe", file=sys.stderr)
 	exit(1)
 
 # format output
@@ -49,4 +50,4 @@ while 1:
 		type_s = "R"
 	ms = float(int(us_s, 10)) / 1000
 
-	print "%-18s %-2s %-7s %8.2f" % (time_s, type_s, bytes_s, ms)
+	print("%-18s %-2s %-7s %8.2f" % (time_s, type_s, bytes_s, ms))

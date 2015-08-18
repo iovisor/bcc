@@ -25,7 +25,7 @@ stats = b.get_table("stats")
 S_COUNT = 1
 
 # header
-print "Tracing... Ctrl-C to end."
+print("Tracing... Ctrl-C to end.")
 
 # output
 last = 0
@@ -35,6 +35,6 @@ while (1):
 	except KeyboardInterrupt:
 		pass; exit()
 
-	print "%s: PIDs/sec: %d" % (strftime("%H:%M:%S"),
-	    (stats[c_int(S_COUNT)].value - last))
+	print("%s: PIDs/sec: %d" % (strftime("%H:%M:%S"),
+	    (stats[c_int(S_COUNT)].value - last)))
 	last = stats[c_int(S_COUNT)].value
