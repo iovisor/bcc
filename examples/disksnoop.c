@@ -11,7 +11,7 @@
  */
 
 #include <uapi/linux/ptrace.h>
-#include "../../linux-4.2-rc5/include/linux/blkdev.h"
+#include <linux/blkdev.h>
 
 struct key_t {
 	struct request *req;

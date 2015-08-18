@@ -12,7 +12,7 @@
  */
 
 #include <uapi/linux/ptrace.h>
-#include "../../linux-4.2-rc5/include/linux/blkdev.h"
+#include <linux/blkdev.h>
 
 BPF_TABLE("array", int, u64, dist, 64);
 
