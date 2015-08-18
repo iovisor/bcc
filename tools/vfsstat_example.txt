@@ -1,0 +1,36 @@
+Demonstrations of vfsstat, the Linux eBPF/bcc version.
+
+
+This traces some common VFS calls and prints per-second summaries. By default,
+the output interval is one second:
+
+# ./vfsstat 
+TIME         READ/s  WRITE/s CREATE/s   OPEN/s  FSYNC/s
+18:35:32:       231       12        4       98        0
+18:35:33:       274       13        4      106        0
+18:35:34:       586       86        4      251        0
+18:35:35:       241       15        4       99        0
+18:35:36:       232       10        4       98        0
+18:35:37:       244       10        4      107        0
+18:35:38:       235       13        4       97        0
+18:35:39:      6749     2633        4     1446        0
+18:35:40:       277       31        4      115        0
+18:35:41:       238       16        6      102        0
+18:35:42:       284       50        8      114        0
+^C
+
+
+Here we are using an output interval of five seconds, and printing three output
+lines:
+
+# ./vfsstat 5 3
+TIME         READ/s  WRITE/s CREATE/s   OPEN/s  FSYNC/s
+18:35:55:       238        8        3      101        0
+18:36:00:       962      233        4      247        0
+18:36:05:       241        8        3      100        0
+
+
+Full usage:
+
+# ./vfsstat -h
+USAGE: ./vfsstat [interval [count]]

@@ -1,0 +1,70 @@
+Demonstrations of bitehist.py, the Linux eBPF/bcc version.
+
+This prints a power-of-2 histogram to show the block I/O size distribution.
+By default, a summary is printed every five seconds:
+
+# ./bitehist.py
+Tracing... Hit Ctrl-C to end.
+
+     kbytes          : count     distribution
+       0 -> 1        : 0        |                                      |
+       2 -> 3        : 0        |                                      |
+       4 -> 7        : 26       |*************                         |
+       8 -> 15       : 3        |*                                     |
+      16 -> 31       : 5        |**                                    |
+      32 -> 63       : 6        |***                                   |
+      64 -> 127      : 7        |***                                   |
+     128 -> 255      : 75       |**************************************|
+
+     kbytes          : count     distribution
+       0 -> 1        : 0        |                                      |
+       2 -> 3        : 0        |                                      |
+       4 -> 7        : 83       |**************************************|
+       8 -> 15       : 2        |                                      |
+      16 -> 31       : 6        |**                                    |
+      32 -> 63       : 6        |**                                    |
+      64 -> 127      : 5        |**                                    |
+     128 -> 255      : 21       |*********                             |
+^C
+     kbytes          : count     distribution
+       0 -> 1        : 0        |                                      |
+       2 -> 3        : 0        |                                      |
+       4 -> 7        : 8        |**************************************|
+
+The first output shows a bimodal distribution. The largest mode of 75 I/O were
+between 128 and 255 Kbytes in size, and another mode of 26 I/O were between 4
+and 7 Kbytes in size. 
+
+The next output summary shows the workload is doing more 4 - 7 Kbyte I/O.
+
+The final output is partial, showing what was measured until Ctrl-C was hit.
+
+
+For an output interval of one second, and three summaries:
+
+# ./bitehist.py 1 3
+Tracing... Hit Ctrl-C to end.
+
+     kbytes          : count     distribution
+       0 -> 1        : 0        |                                      |
+       2 -> 3        : 0        |                                      |
+       4 -> 7        : 4        |**************************************|
+
+     kbytes          : count     distribution
+       0 -> 1        : 0        |                                      |
+       2 -> 3        : 0        |                                      |
+       4 -> 7        : 5        |**************************************|
+       8 -> 15       : 0        |                                      |
+      16 -> 31       : 0        |                                      |
+      32 -> 63       : 1        |*******                               |
+
+     kbytes          : count     distribution
+       0 -> 1        : 0        |                                      |
+       2 -> 3        : 0        |                                      |
+       4 -> 7        : 4        |**************************************|
+
+
+Full usage:
+
+# ./bitehist.py -h
+USAGE: ./bitehist.py [interval [count]]

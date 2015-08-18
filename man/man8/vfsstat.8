@@ -1,0 +1,65 @@
+.TH vfsstat 8  "2015-08-18" "USER COMMANDS"
+.SH NAME
+vfsstat \- Statistics for some common VFS calls. Uses Linux eBPF/bcc.
+.SH SYNOPSIS
+.B vfsstat
+[interval [count]]
+.SH DESCRIPTION
+This traces some common VFS calls and prints per-second summaries. This can
+be useful for general workload characterization, and looking for patterns
+in operation usage over time.
+
+This works by tracing some kernel vfs functions using dynamic tracing, and will
+need updating to match any changes to these functions. Edit the script to
+customize which functions are traced. Also see vfscount, which is more
+easily customized to trace multiple functions.
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH EXAMPLES
+.TP
+Print summaries each second:
+#
+.B vfsstat
+.TP
+Print output every five seconds, three times:
+#
+.B vfsstat 5 3
+.SH FIELDS
+.TP
+READ/s
+Number of vfs_read() calls as a per-second average.
+.TP
+WRITE/s
+Number of vfs_write() calls as a per-second average.
+.TP
+CREATE/s
+Number of vfs_create() calls as a per-second average.
+.TP
+OPEN/s
+Number of vfs_open() calls as a per-second average.
+.TP
+FSYNC/s
+Number of vfs_fsync() calls as a per-second average.
+.SH OVERHEAD
+This traces various kernel vfs functions and maintains in-kernel counts, which
+are asynchronously copied to user-space. While the rate of VFS operations can
+be very high (>1M/sec), this is a relatively efficient way to trace these
+events, and so the overhead is expected to be small for normal workloads.
+Measure in a test environment.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Brendan Gregg
+.SH SEE ALSO
+vfscount(8)

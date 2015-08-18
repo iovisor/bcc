@@ -1,0 +1,52 @@
+.TH vfscount 8  "2015-08-18" "USER COMMANDS"
+.SH NAME
+vfscount \- Count some common VFS calls. Uses Linux eBPF/bcc.
+.SH SYNOPSIS
+.B vfscount
+.SH DESCRIPTION
+This counts common VFS calls. This can be useful for general workload
+characterization of these operations.
+
+This works by tracing some kernel vfs functions using dynamic tracing, and will
+need updating to match any changes to these functions. Edit the script to
+customize and add functions to trace, which is easy to do.
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH EXAMPLES
+.TP
+Count some VFS calls until Ctrl-C is hit:
+#
+.B vfscount
+.SH FIELDS
+.TP
+ADDR
+Address of the instruction pointer that was traced (only useful if the FUNC column is suspicious and you would like to double check the translation).
+.TP
+FUNC
+Kernel function name
+.TP
+COUNT
+Number of calls while tracing
+.SH OVERHEAD
+This traces various kernel vfs functions and maintains in-kernel counts, which
+are asynchronously copied to user-space. While the rate of VFS operations can
+be very high (>1M/sec), this is a relatively efficient way to trace these
+events, and so the overhead is expected to be small for normal workloads.
+Measure in a test environment.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Brendan Gregg
+.SH SEE ALSO
+vfsstat(8)

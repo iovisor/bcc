@@ -1,0 +1,22 @@
+Demonstrations of pidpersec, the Linux eBPF/bcc version.
+
+
+This shows the number of new processes created per second, measured by tracing
+the kernel fork() routine:
+
+# ./pidpersec
+Tracing... Ctrl-C to end.
+18:33:06: PIDs/sec: 4
+18:33:07: PIDs/sec: 5
+18:33:08: PIDs/sec: 4
+18:33:09: PIDs/sec: 4
+18:33:10: PIDs/sec: 21
+18:33:11: PIDs/sec: 5
+18:33:12: PIDs/sec: 4
+18:33:13: PIDs/sec: 4
+
+Each second there are four new processes (this happens to be caused by a
+launcher script that is retrying in a loop, and encountering errors).
+
+At 18:33:10, I typed "man ls" in another server session, which caused an
+increase in the number of new processes as the necessary commands were run.

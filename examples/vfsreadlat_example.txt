@@ -1,0 +1,63 @@
+Demonstrations of vfsreadlat.py, the Linux eBPF/bcc version.
+
+
+This example traces the latency of vfs_read (time from call to return), printing 
+it as a histogram distribution. By default, output is every five seconds:
+
+# ./vfsreadlat.py 
+Tracing... Hit Ctrl-C to end.
+
+     usecs           : count     distribution
+       0 -> 1        : 4457     |*************************************+|
+       2 -> 3        : 447      |***                                   |
+       4 -> 7        : 2059     |*****************                     |
+       8 -> 15       : 1179     |**********                            |
+      16 -> 31       : 63       |                                      |
+      32 -> 63       : 0        |                                      |
+      64 -> 127      : 2        |                                      |
+     128 -> 255      : 0        |                                      |
+     256 -> 511      : 3        |                                      |
+     512 -> 1023     : 1        |                                      |
+    1024 -> 2047     : 3        |                                      |
+    2048 -> 4095     : 2        |                                      |
+    4096 -> 8191     : 0        |                                      |
+    8192 -> 16383    : 0        |                                      |
+   16384 -> 32767    : 0        |                                      |
+   32768 -> 65535    : 0        |                                      |
+   65536 -> 131071   : 4        |                                      |
+  131072 -> 262143   : 2        |                                      |
+  262144 -> 524287   : 0        |                                      |
+  524288 -> 1048575  : 4        |                                      |
+^C
+     usecs           : count     distribution
+       0 -> 1        : 241      |*************************************+|
+       2 -> 3        : 17       |**                                    |
+       4 -> 7        : 2        |                                      |
+       8 -> 15       : 4        |                                      |
+      16 -> 31       : 2        |                                      |
+      32 -> 63       : 0        |                                      |
+      64 -> 127      : 1        |                                      |
+     128 -> 255      : 0        |                                      |
+     256 -> 511      : 1        |                                      |
+     512 -> 1023     : 1        |                                      |
+    1024 -> 2047     : 0        |                                      |
+    2048 -> 4095     : 1        |                                      |
+    4096 -> 8191     : 0        |                                      |
+    8192 -> 16383    : 0        |                                      |
+   16384 -> 32767    : 0        |                                      |
+   32768 -> 65535    : 0        |                                      |
+   65536 -> 131071   : 0        |                                      |
+  131072 -> 262143   : 0        |                                      |
+  262144 -> 524287   : 0        |                                      |
+  524288 -> 1048575  : 1        |                                      |
+
+These examples show outliers in the 524 - 1048 milliseconds range. Since
+vfs_read() will catch many types of events, this could be anything including
+keystroke latency on ssh sessions. Further drilling with bcc will be necessary
+to identify more details.
+
+
+Full usage:
+
+# ./vfsreadlat.py -h
+USAGE: ./vfsreadlat.py [interval [count]]
