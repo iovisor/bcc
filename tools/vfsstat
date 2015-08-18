@@ -42,7 +42,7 @@ BPF.attach_kprobe(b.load_func("do_write", BPF.KPROBE), "vfs_write")
 BPF.attach_kprobe(b.load_func("do_fsync", BPF.KPROBE), "vfs_fsync")
 BPF.attach_kprobe(b.load_func("do_open", BPF.KPROBE), "vfs_open")
 BPF.attach_kprobe(b.load_func("do_create", BPF.KPROBE), "vfs_create")
-stats = b.get_table("stats", c_int, c_ulonglong)
+stats = b.get_table("stats")
 
 # stat column labels and indexes
 stat_types = {

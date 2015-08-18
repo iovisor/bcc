@@ -40,7 +40,7 @@ if len(argv) > 1:
 # load BPF program
 b = BPF(src_file = "bitehist.c")
 BPF.attach_kprobe(b.load_func("do_request", BPF.KPROBE), "blk_start_request")
-dist = b.get_table("dist", c_int, c_ulonglong)
+dist = b.get_table("dist")
 dist_max = 64
 
 # header
