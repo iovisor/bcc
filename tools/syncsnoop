@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python
 #
 # syncsnoop	Trace sync() syscall.
 #		For Linux, uses BCC, eBPF. Embedded C.
