@@ -1,0 +1,40 @@
+Demonstrations of disksnoop.py, the Linux eBPF/bcc version.
+
+
+This traces block I/O, a prints a line to summarize each I/O completed:
+
+# ./disksnoop.py 
+TIME(s)            T  BYTES    LAT(ms)
+16458043.435457    W  4096        2.73
+16458043.435981    W  4096        3.24
+16458043.436012    W  4096        3.13
+16458043.437326    W  4096        4.44
+16458044.126545    R  4096       42.82
+16458044.129872    R  4096        3.24
+16458044.130705    R  4096        0.73
+16458044.142813    R  4096       12.01
+16458044.147302    R  4096        4.33
+16458044.148117    R  4096        0.71
+16458044.148950    R  4096        0.70
+16458044.164332    R  4096       15.29
+16458044.168003    R  4096        3.58
+16458044.171676    R  4096        3.59
+16458044.172453    R  4096        0.72
+16458044.173213    R  4096        0.71
+16458044.173989    R  4096        0.72
+16458044.174739    R  4096        0.70
+16458044.190334    R  4096       15.52
+16458044.196608    R  4096        6.17
+16458044.203091    R  4096        6.35
+
+The output includes a basic timestamp (in seconds), the type of I/O (W == write,
+R == read, M == metadata), the size of the I/O in bytes, and the latency (or
+duration) of the I/O in milliseconds.
+
+The latency is measured from I/O request to the device, to the device
+completion. This excludes latency spent queued in the OS.
+
+Most of the I/O in this example were 0.7 and 4 milliseconds in duration. There
+was an outlier of 42.82 milliseconds, a read which followed many writes (the
+high latency may have been caused by the writes still being serviced on the
+storage device).
