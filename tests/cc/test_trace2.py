@@ -25,9 +25,8 @@ int count_sched(struct pt_regs *ctx) {
 class TestTracingEvent(TestCase):
     def setUp(self):
         b = BPF(text=text, debug=0)
-        fn = b.load_func("count_sched", BPF.KPROBE)
         self.stats = b.get_table("stats")
-        BPF.attach_kprobe(fn, "schedule+50", 0, -1)
+        b.attach_kprobe(event="schedule+50", fn_name="count_sched", pid=0, cpu=-1)
 
     def test_sched1(self):
         for i in range(0, 100):

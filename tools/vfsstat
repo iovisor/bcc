@@ -37,11 +37,11 @@ if len(argv) > 1:
 
 # load BPF program
 b = BPF(src_file = "vfsstat.c")
-BPF.attach_kprobe(b.load_func("do_read", BPF.KPROBE), "vfs_read")
-BPF.attach_kprobe(b.load_func("do_write", BPF.KPROBE), "vfs_write")
-BPF.attach_kprobe(b.load_func("do_fsync", BPF.KPROBE), "vfs_fsync")
-BPF.attach_kprobe(b.load_func("do_open", BPF.KPROBE), "vfs_open")
-BPF.attach_kprobe(b.load_func("do_create", BPF.KPROBE), "vfs_create")
+b.attach_kprobe(event="vfs_read", fn_name="do_read")
+b.attach_kprobe(event="vfs_write", fn_name="do_write")
+b.attach_kprobe(event="vfs_fsync", fn_name="do_fsync")
+b.attach_kprobe(event="vfs_open", fn_name="do_open")
+b.attach_kprobe(event="vfs_create", fn_name="do_create")
 stats = b.get_table("stats")
 
 # stat column labels and indexes

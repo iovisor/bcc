@@ -39,8 +39,8 @@ if len(argv) > 1:
 
 # load BPF program
 b = BPF(src_file = "vfsreadlat.c")
-BPF.attach_kprobe(b.load_func("do_entry", BPF.KPROBE), "vfs_read")
-BPF.attach_kretprobe(b.load_func("do_return", BPF.KPROBE), "vfs_read")
+b.attach_kprobe(event="vfs_read", fn_name="do_entry")
+b.attach_kretprobe(event="vfs_read", fn_name="do_return")
 dist = b.get_table("dist")
 dist_max = 64
 
