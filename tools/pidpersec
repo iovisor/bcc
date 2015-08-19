@@ -18,7 +18,7 @@ from time import sleep, strftime
 
 # load BPF program
 b = BPF(src_file = "pidpersec.c")
-BPF.attach_kprobe(b.load_func("do_count", BPF.KPROBE), "sched_fork")
+b.attach_kprobe(event="sched_fork", fn_name="do_count")
 stats = b.get_table("stats")
 
 # stat indexes

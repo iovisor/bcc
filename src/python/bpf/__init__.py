@@ -325,10 +325,8 @@ class BPF(object):
                     % (dev, errstr))
         fn.sock = sock
 
-    @staticmethod
-    def attach_kprobe(fn, event, pid=0, cpu=-1, group_fd=-1):
-        if not isinstance(fn, BPF.Function):
-            raise Exception("arg 1 must be of type BPF.Function")
+    def attach_kprobe(self, event="", fn_name="", pid=0, cpu=-1, group_fd=-1):
+        fn = self.load_func(fn_name, BPF.KPROBE)
         ev_name = "p_" + event.replace("+", "_")
         desc = "p:kprobes/%s %s" % (ev_name, event)
         res = lib.bpf_attach_kprobe(fn.fd, ev_name.encode("ascii"),
@@ -350,10 +348,8 @@ class BPF(object):
             raise Exception("Failed to detach BPF from kprobe")
         del open_kprobes[ev_name]
 
-    @staticmethod
-    def attach_kretprobe(fn, event, pid=-1, cpu=0, group_fd=-1):
-        if not isinstance(fn, BPF.Function):
-            raise Exception("arg 1 must be of type BPF.Function")
+    def attach_kretprobe(self, event="", fn_name="", pid=-1, cpu=0, group_fd=-1):
+        fn = self.load_func(fn_name, BPF.KPROBE)
         ev_name = "r_" + event.replace("+", "_")
         desc = "r:kprobes/%s %s" % (ev_name, event)
         res = lib.bpf_attach_kprobe(fn.fd, ev_name.encode("ascii"),

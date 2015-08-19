@@ -52,12 +52,11 @@ load_kallsyms()
 
 # load BPF program
 b = BPF(src_file = "vfscount.c")
-fn = b.load_func("do_count", BPF.KPROBE)
-BPF.attach_kprobe(fn, "vfs_read")
-BPF.attach_kprobe(fn, "vfs_write")
-BPF.attach_kprobe(fn, "vfs_fsync")
-BPF.attach_kprobe(fn, "vfs_open")
-BPF.attach_kprobe(fn, "vfs_create")
+b.attach_kprobe(event="vfs_read", fn_name="do_count")
+b.attach_kprobe(event="vfs_write", fn_name="do_count")
+b.attach_kprobe(event="vfs_fsync", fn_name="do_count")
+b.attach_kprobe(event="vfs_open", fn_name="do_count")
+b.attach_kprobe(event="vfs_create", fn_name="do_count")
 counts = b.get_table("counts")
 
 # header

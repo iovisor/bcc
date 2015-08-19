@@ -6,9 +6,8 @@ from bpf import BPF
 from time import sleep
 
 b = BPF(src_file="task_switch.c")
-fn = b.load_func("count_sched", BPF.KPROBE)
 stats = b.get_table("stats")
-BPF.attach_kprobe(fn, "finish_task_switch")
+b.attach_kprobe(event="finish_task_switch", fn_name="count_sched")
 
 # generate many schedule events
 for i in range(0, 100): sleep(0.01)

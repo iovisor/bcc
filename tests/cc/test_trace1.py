@@ -26,13 +26,10 @@ if arg1.endswith(".b"):
 class TestKprobe(TestCase):
     def setUp(self):
         b = BPF(arg1, arg2, debug=0)
-        fn1 = b.load_func("sys_wr", BPF.KPROBE)
-        fn2 = b.load_func("sys_rd", BPF.KPROBE)
-        fn3 = b.load_func("sys_bpf", BPF.KPROBE)
         self.stats = b.get_table("stats", Key, Leaf)
-        BPF.attach_kprobe(fn1, "sys_write", 0, -1)
-        BPF.attach_kprobe(fn2, "sys_read", 0, -1)
-        BPF.attach_kprobe(fn2, "htab_map_get_next_key", 0, -1)
+        b.attach_kprobe(event="sys_write", fn_name="sys_wr", pid=0, cpu=-1)
+        b.attach_kprobe(event="sys_read", fn_name="sys_rd", pid=0, cpu=-1)
+        b.attach_kprobe(event="htab_map_get_next_key", fn_name="sys_rd", pid=0, cpu=-1)
 
     def test_trace1(self):
         with open("/dev/null", "a") as f:
