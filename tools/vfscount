@@ -57,7 +57,6 @@ b.attach_kprobe(event="vfs_write", fn_name="do_count")
 b.attach_kprobe(event="vfs_fsync", fn_name="do_count")
 b.attach_kprobe(event="vfs_open", fn_name="do_count")
 b.attach_kprobe(event="vfs_create", fn_name="do_count")
-counts = b.get_table("counts")
 
 # header
 print("Tracing... Ctrl-C to end.")
@@ -69,5 +68,6 @@ except KeyboardInterrupt:
 	pass
 
 print("\n%-16s %-12s %8s" % ("ADDR", "FUNC", "COUNT"))
+counts = b.get_table("counts")
 for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
 	print("%-16x %-12s %8d" % (k.ip, ksym(k.ip), v.value))

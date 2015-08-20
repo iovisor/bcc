@@ -63,12 +63,12 @@ def stars(val, val_max, width):
 		text = text[:-1] + "+"
 	return text
 
-def print_log2_hist(d, val_type):
+def print_log2_hist(dist, val_type):
 	idx_max = -1
 	val_max = 0
 	for i in range(1, dist_max + 1):
 		try:
-			val = b["dist"][c_int(i)].value - last[i]
+			val = dist[c_int(i)].value - last[i]
 			if (val > 0):
 				idx_max = i
 			if (val > val_max):
@@ -83,10 +83,10 @@ def print_log2_hist(d, val_type):
 		if (low == high):
 			low -= 1
 		try:
-			val = b["dist"][c_int(i)].value - last[i]
+			val = dist[c_int(i)].value - last[i]
 			print("%8d -> %-8d : %-8d |%-*s|" % (low, high, val,
 			    stars_max, stars(val, val_max, stars_max)))
-			last[i] = b["dist"][c_int(i)].value
+			last[i] = dist[c_int(i)].value
 		except:
 			break
 
