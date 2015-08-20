@@ -41,7 +41,6 @@ if len(argv) > 1:
 b = BPF(src_file = "vfsreadlat.c")
 b.attach_kprobe(event="vfs_read", fn_name="do_entry")
 b.attach_kretprobe(event="vfs_read", fn_name="do_return")
-dist = b.get_table("dist")
 dist_max = 64
 
 # header
@@ -69,7 +68,7 @@ def print_log2_hist(d, val_type):
 	val_max = 0
 	for i in range(1, dist_max + 1):
 		try:
-			val = dist[c_int(i)].value - last[i]
+			val = b["dist"][c_int(i)].value - last[i]
 			if (val > 0):
 				idx_max = i
 			if (val > val_max):
@@ -84,10 +83,10 @@ def print_log2_hist(d, val_type):
 		if (low == high):
 			low -= 1
 		try:
-			val = dist[c_int(i)].value - last[i]
+			val = b["dist"][c_int(i)].value - last[i]
 			print("%8d -> %-8d : %-8d |%-*s|" % (low, high, val,
 			    stars_max, stars(val, val_max, stars_max)))
-			last[i] = dist[c_int(i)].value
+			last[i] = b["dist"][c_int(i)].value
 		except:
 			break
 
@@ -105,6 +104,6 @@ while (1):
 		pass; do_exit = 1
 
 	print
-	print_log2_hist(dist, "usecs")
+	print_log2_hist(b["dist"], "usecs")
 	if do_exit:
 		exit()

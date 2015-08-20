@@ -223,6 +223,7 @@ class BPF(object):
     def __init__(self, src_file="", hdr_file="", text=None, debug=0):
         self.debug = debug
         self.funcs = {}
+        self.tables = {}
         if text:
             self.module = lib.bpf_module_create_c_from_string(text.encode("ascii"), self.debug)
         else:
@@ -297,7 +298,7 @@ class BPF(object):
         map_id = lib.bpf_table_id(self.module, name.encode("ascii"))
         map_fd = lib.bpf_table_fd(self.module, name.encode("ascii"))
         if map_fd < 0:
-            raise Exception("Failed to find BPF Table %s" % name)
+            raise KeyError
         if not keytype:
             key_desc = lib.bpf_table_key_desc(self.module, name.encode("ascii"))
             if not key_desc:
@@ -309,6 +310,23 @@ class BPF(object):
                 raise Exception("Failed to load BPF Table %s leaf desc" % name)
             leaftype = BPF._decode_table_type(json.loads(leaf_desc.decode()))
         return BPF.Table(self, map_id, map_fd, keytype, leaftype)
+
+    def __getitem__(self, key):
+        if key not in self.tables:
+            self.tables[key] = self.get_table(key)
+        return self.tables[key]
+
+    def __setitem__(self, key, leaf):
+        self.tables[key] = leaf
+
+    def __len__(self):
+        return len(self.tables)
+
+    def __delitem__(self, key):
+        del self.tables[key]
+
+    def __iter__(self):
+        return self.tables.__iter__()
 
     @staticmethod
     def attach_raw_socket(fn, dev):
