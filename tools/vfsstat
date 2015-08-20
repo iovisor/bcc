@@ -42,7 +42,6 @@ b.attach_kprobe(event="vfs_write", fn_name="do_write")
 b.attach_kprobe(event="vfs_fsync", fn_name="do_fsync")
 b.attach_kprobe(event="vfs_open", fn_name="do_open")
 b.attach_kprobe(event="vfs_create", fn_name="do_create")
-stats = b.get_table("stats")
 
 # stat column labels and indexes
 stat_types = {
@@ -79,9 +78,9 @@ while (1):
 	for stype in stat_types.keys():
 		idx = stat_types[stype]
 		try:
-			delta = stats[c_int(idx)].value - last[idx]
+			delta = b["stats"][c_int(idx)].value - last[idx]
 			print(" %8d" % (delta / interval), end="")
-			last[idx] = stats[c_int(idx)].value
+			last[idx] = b["stats"][c_int(idx)].value
 		except:
 			print(" %8d" % 0, end="")
 	print("")

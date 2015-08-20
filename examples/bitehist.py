@@ -40,7 +40,6 @@ if len(argv) > 1:
 # load BPF program
 b = BPF(src_file = "bitehist.c")
 b.attach_kprobe(event="blk_start_request", fn_name="do_request")
-dist = b.get_table("dist")
 dist_max = 64
 
 # header
@@ -63,7 +62,7 @@ def stars(val, val_max, width):
 		text = text[:-1] + "+"
 	return text
 
-def print_log2_hist(d, val_type):
+def print_log2_hist(dist, val_type):
 	idx_max = -1
 	val_max = 0
 	for i in range(1, dist_max + 1):
@@ -104,6 +103,6 @@ while (1):
 		pass; do_exit = 1
 
 	print
-	print_log2_hist(dist, "kbytes")
+	print_log2_hist(b["dist"], "kbytes")
 	if do_exit:
 		exit()

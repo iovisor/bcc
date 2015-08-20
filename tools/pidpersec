@@ -19,10 +19,9 @@ from time import sleep, strftime
 # load BPF program
 b = BPF(src_file = "pidpersec.c")
 b.attach_kprobe(event="sched_fork", fn_name="do_count")
-stats = b.get_table("stats")
 
 # stat indexes
-S_COUNT = 1
+S_COUNT = c_int(1)
 
 # header
 print("Tracing... Ctrl-C to end.")
@@ -36,5 +35,5 @@ while (1):
 		pass; exit()
 
 	print("%s: PIDs/sec: %d" % (strftime("%H:%M:%S"),
-	    (stats[c_int(S_COUNT)].value - last)))
-	last = stats[c_int(S_COUNT)].value
+	    (b["stats"][S_COUNT].value - last)))
+	last = b["stats"][S_COUNT].value
