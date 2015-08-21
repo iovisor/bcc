@@ -172,7 +172,8 @@ int bpf_attach_socket(int sock, int prog) {
   return setsockopt(sock, SOL_SOCKET, SO_ATTACH_BPF, &prog, sizeof(prog));
 }
 
-static int bpf_attach_tracing_event(int progfd, const char *event_path, pid_t pid, int cpu, int group_fd)
+static int bpf_attach_tracing_event(int progfd, const char *event_path,
+    pid_t pid, int cpu, int group_fd)
 {
   int efd = -1, rc = -1, pfd = -1;
   ssize_t bytes = -1;
@@ -223,13 +224,15 @@ cleanup:
   return rc;
 }
 
-int bpf_attach_kprobe(int progfd, const char *event,
+#define TRACEFS "/sys/kernel/debug/tracing"
+
+int bpf_attach_kprobe(int progfd, const char *instance, const char *event,
                       const char *event_desc, pid_t pid,
                       int cpu, int group_fd) {
   int rc = -1, kfd = -1;
   char buf[256];
 
-  kfd = open("/sys/kernel/debug/tracing/kprobe_events", O_WRONLY | O_APPEND, 0);
+  kfd = open(TRACEFS "/kprobe_events", O_WRONLY | O_APPEND, 0);
   if (kfd < 0) {
     perror("open(kprobe_events)");
     goto cleanup;
@@ -240,8 +243,13 @@ int bpf_attach_kprobe(int progfd, const char *event,
     goto cleanup;
   }
 
-  snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/events/kprobes/%s", event);
-  rc = bpf_attach_tracing_event(progfd, buf, -1/*pid*/, 0/*cpu*/, -1/*group_fd*/);
+  if (instance && instance[0] != '\0')
+    snprintf(buf, sizeof(buf), "%s/instances/%s/events/kprobes/%s",
+        TRACEFS, instance, event);
+  else
+    snprintf(buf, sizeof(buf), "%s/events/kprobes/%s", TRACEFS, event);
+
+  rc = bpf_attach_tracing_event(progfd, buf, pid, cpu, group_fd);
 
 cleanup:
   if (kfd >= 0)
@@ -253,7 +261,7 @@ cleanup:
 int bpf_detach_kprobe(const char *event_desc) {
   int rc = -1, kfd = -1;
 
-  kfd = open("/sys/kernel/debug/tracing/kprobe_events", O_WRONLY | O_APPEND, 0);
+  kfd = open(TRACEFS "/kprobe_events", O_WRONLY | O_APPEND, 0);
   if (kfd < 0) {
     perror("open(kprobe_events)");
     goto cleanup;

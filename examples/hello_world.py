@@ -16,7 +16,4 @@ int hello(void *ctx) {
 """
 b = BPF(text=prog)
 b.attach_kprobe(event="sys_clone", fn_name="hello")
-try:
-    call(["cat", "/sys/kernel/debug/tracing/trace_pipe"])
-except KeyboardInterrupt:
-    pass
+b.trace_print()

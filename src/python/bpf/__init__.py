@@ -15,6 +15,7 @@
 import atexit
 from collections import MutableMapping
 import ctypes as ct
+import fcntl
 import json
 import os
 import sys
@@ -78,11 +79,15 @@ lib.bpf_prog_load.restype = ct.c_int
 lib.bpf_prog_load.argtypes = [ct.c_int, ct.c_void_p, ct.c_size_t,
         ct.c_char_p, ct.c_uint, ct.c_char_p, ct.c_uint]
 lib.bpf_attach_kprobe.restype = ct.c_int
-lib.bpf_attach_kprobe.argtypes = [ct.c_int, ct.c_char_p, ct.c_char_p, ct.c_int, ct.c_int, ct.c_int]
+lib.bpf_attach_kprobe.argtypes = [ct.c_int, ct.c_char_p, ct.c_char_p,
+        ct.c_char_p, ct.c_int, ct.c_int, ct.c_int]
 lib.bpf_detach_kprobe.restype = ct.c_int
 lib.bpf_detach_kprobe.argtypes = [ct.c_char_p]
 
 open_kprobes = {}
+kprobe_instance = None
+tracefile = None
+TRACEFS = "/sys/kernel/debug/tracing"
 
 @atexit.register
 def cleanup_kprobes():
@@ -90,6 +95,17 @@ def cleanup_kprobes():
         os.close(v)
         desc = "-:kprobes/%s" % k
         lib.bpf_detach_kprobe(desc.encode("ascii"))
+    if tracefile:
+        tracefile.close()
+    if kprobe_instance:
+        os.rmdir("%s/instances/%s" % (TRACEFS, kprobe_instance))
+
+def ensure_kprobe_instance():
+    global kprobe_instance
+    if not kprobe_instance:
+        kprobe_instance = "bcc-%d" % os.getpid()
+        os.mkdir("%s/instances/%s" % (TRACEFS, kprobe_instance))
+    return kprobe_instance
 
 class BPF(object):
     SOCKET_FILTER = 1
@@ -347,8 +363,10 @@ class BPF(object):
         fn = self.load_func(fn_name, BPF.KPROBE)
         ev_name = "p_" + event.replace("+", "_")
         desc = "p:kprobes/%s %s" % (ev_name, event)
-        res = lib.bpf_attach_kprobe(fn.fd, ev_name.encode("ascii"),
-                desc.encode("ascii"), pid, cpu, group_fd)
+        ensure_kprobe_instance()
+        res = lib.bpf_attach_kprobe(fn.fd, kprobe_instance.encode("ascii"),
+                ev_name.encode("ascii"), desc.encode("ascii"),
+                pid, cpu, group_fd)
         if res < 0:
             raise Exception("Failed to attach BPF to kprobe")
         open_kprobes[ev_name] = res
@@ -370,8 +388,10 @@ class BPF(object):
         fn = self.load_func(fn_name, BPF.KPROBE)
         ev_name = "r_" + event.replace("+", "_")
         desc = "r:kprobes/%s %s" % (ev_name, event)
-        res = lib.bpf_attach_kprobe(fn.fd, ev_name.encode("ascii"),
-                desc.encode("ascii"), pid, cpu, group_fd)
+        ensure_kprobe_instance()
+        res = lib.bpf_attach_kprobe(fn.fd, kprobe_instance.encode("ascii"),
+                ev_name.encode("ascii"), desc.encode("ascii"),
+                pid, cpu, group_fd)
         if res < 0:
             raise Exception("Failed to attach BPF to kprobe")
         open_kprobes[ev_name] = res
@@ -389,3 +409,48 @@ class BPF(object):
             raise Exception("Failed to detach BPF from kprobe")
         del open_kprobes[ev_name]
 
+    @staticmethod
+    def trace_open(nonblocking=False):
+        """trace_open(nonblocking=False)
+
+        Open the trace_pipe if not already open
+        """
+
+        global tracefile
+        if not tracefile:
+            if not kprobe_instance:
+                raise Exception("Trace pipe inactive, call attach_kprobe first")
+            tracefile = open("%s/instances/%s/trace_pipe"
+                    % (TRACEFS, kprobe_instance))
+            if nonblocking:
+                fd = trace.fileno()
+                fl = fcntl.fcntl(fd, fcntl.F_GETFL)
+                fcntl.fcntl(fd, fcntl.F_SETFL, fl | os.O_NONBLOCK)
+        return tracefile
+
+    @staticmethod
+    def trace_readline(nonblocking=True):
+        """trace_readline(nonblocking=True)
+
+        Read from the kernel debug trace pipe and return one line
+        If nonblocking is False, this will block until ctrl-C is pressed.
+        """
+
+        trace = BPF.trace_open(nonblocking)
+
+        line = None
+        try:
+            line = trace.readline(128).rstrip()
+        except BlockingIOError:
+            pass
+        return line
+
+    @staticmethod
+    def trace_print():
+        try:
+            while True:
+                line = BPF.trace_readline(nonblocking=False)
+                print(line)
+                sys.stdout.flush()
+        except KeyboardInterrupt:
+            exit()
