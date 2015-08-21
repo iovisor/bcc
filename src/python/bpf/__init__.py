@@ -15,6 +15,7 @@
 import atexit
 from collections import MutableMapping
 import ctypes as ct
+import fcntl
 import json
 import os
 import sys
@@ -78,11 +79,14 @@ lib.bpf_prog_load.restype = ct.c_int
 lib.bpf_prog_load.argtypes = [ct.c_int, ct.c_void_p, ct.c_size_t,
         ct.c_char_p, ct.c_uint, ct.c_char_p, ct.c_uint]
 lib.bpf_attach_kprobe.restype = ct.c_int
-lib.bpf_attach_kprobe.argtypes = [ct.c_int, ct.c_char_p, ct.c_char_p, ct.c_int, ct.c_int, ct.c_int]
+lib.bpf_attach_kprobe.argtypes = [ct.c_int, ct.c_char_p,
+        ct.c_char_p, ct.c_int, ct.c_int, ct.c_int]
 lib.bpf_detach_kprobe.restype = ct.c_int
 lib.bpf_detach_kprobe.argtypes = [ct.c_char_p]
 
 open_kprobes = {}
+tracefile = None
+TRACEFS = "/sys/kernel/debug/tracing"
 
 @atexit.register
 def cleanup_kprobes():
@@ -90,6 +94,8 @@ def cleanup_kprobes():
         os.close(v)
         desc = "-:kprobes/%s" % k
         lib.bpf_detach_kprobe(desc.encode("ascii"))
+    if tracefile:
+        tracefile.close()
 
 class BPF(object):
     SOCKET_FILTER = 1
@@ -389,3 +395,45 @@ class BPF(object):
             raise Exception("Failed to detach BPF from kprobe")
         del open_kprobes[ev_name]
 
+    @staticmethod
+    def trace_open(nonblocking=False):
+        """trace_open(nonblocking=False)
+
+        Open the trace_pipe if not already open
+        """
+
+        global tracefile
+        if not tracefile:
+            tracefile = open("%s/trace_pipe" % TRACEFS)
+            if nonblocking:
+                fd = trace.fileno()
+                fl = fcntl.fcntl(fd, fcntl.F_GETFL)
+                fcntl.fcntl(fd, fcntl.F_SETFL, fl | os.O_NONBLOCK)
+        return tracefile
+
+    @staticmethod
+    def trace_readline(nonblocking=True):
+        """trace_readline(nonblocking=True)
+
+        Read from the kernel debug trace pipe and return one line
+        If nonblocking is False, this will block until ctrl-C is pressed.
+        """
+
+        trace = BPF.trace_open(nonblocking)
+
+        line = None
+        try:
+            line = trace.readline(128).rstrip()
+        except BlockingIOError:
+            pass
+        return line
+
+    @staticmethod
+    def trace_print():
+        try:
+            while True:
+                line = BPF.trace_readline(nonblocking=False)
+                print(line)
+                sys.stdout.flush()
+        except KeyboardInterrupt:
+            exit()
