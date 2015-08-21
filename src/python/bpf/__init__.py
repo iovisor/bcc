@@ -78,11 +78,14 @@ lib.bpf_prog_load.restype = ct.c_int
 lib.bpf_prog_load.argtypes = [ct.c_int, ct.c_void_p, ct.c_size_t,
         ct.c_char_p, ct.c_uint, ct.c_char_p, ct.c_uint]
 lib.bpf_attach_kprobe.restype = ct.c_int
-lib.bpf_attach_kprobe.argtypes = [ct.c_int, ct.c_char_p, ct.c_char_p, ct.c_int, ct.c_int, ct.c_int]
+lib.bpf_attach_kprobe.argtypes = [ct.c_int, ct.c_char_p, ct.c_char_p,
+        ct.c_char_p, ct.c_int, ct.c_int, ct.c_int]
 lib.bpf_detach_kprobe.restype = ct.c_int
 lib.bpf_detach_kprobe.argtypes = [ct.c_char_p]
 
 open_kprobes = {}
+kprobe_instance = None
+TRACEFS = "/sys/kernel/debug/tracing"
 
 @atexit.register
 def cleanup_kprobes():
@@ -90,6 +93,15 @@ def cleanup_kprobes():
         os.close(v)
         desc = "-:kprobes/%s" % k
         lib.bpf_detach_kprobe(desc.encode("ascii"))
+    if kprobe_instance:
+        os.rmdir("%s/instances/%s" % (TRACEFS, kprobe_instance))
+
+def ensure_kprobe_instance():
+    global kprobe_instance
+    if not kprobe_instance:
+        kprobe_instance = "bcc-%d" % os.getpid()
+        os.mkdir("%s/instances/%s" % (TRACEFS, kprobe_instance))
+    return kprobe_instance
 
 class BPF(object):
     SOCKET_FILTER = 1
@@ -347,8 +359,10 @@ class BPF(object):
         fn = self.load_func(fn_name, BPF.KPROBE)
         ev_name = "p_" + event.replace("+", "_")
         desc = "p:kprobes/%s %s" % (ev_name, event)
-        res = lib.bpf_attach_kprobe(fn.fd, ev_name.encode("ascii"),
-                desc.encode("ascii"), pid, cpu, group_fd)
+        ensure_kprobe_instance()
+        res = lib.bpf_attach_kprobe(fn.fd, kprobe_instance.encode("ascii"),
+                ev_name.encode("ascii"), desc.encode("ascii"),
+                pid, cpu, group_fd)
         if res < 0:
             raise Exception("Failed to attach BPF to kprobe")
         open_kprobes[ev_name] = res
@@ -370,8 +384,10 @@ class BPF(object):
         fn = self.load_func(fn_name, BPF.KPROBE)
         ev_name = "r_" + event.replace("+", "_")
         desc = "r:kprobes/%s %s" % (ev_name, event)
-        res = lib.bpf_attach_kprobe(fn.fd, ev_name.encode("ascii"),
-                desc.encode("ascii"), pid, cpu, group_fd)
+        ensure_kprobe_instance()
+        res = lib.bpf_attach_kprobe(fn.fd, kprobe_instance.encode("ascii"),
+                ev_name.encode("ascii"), desc.encode("ascii"),
+                pid, cpu, group_fd)
         if res < 0:
             raise Exception("Failed to attach BPF to kprobe")
         open_kprobes[ev_name] = res
