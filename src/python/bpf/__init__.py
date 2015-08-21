@@ -15,6 +15,7 @@
 import atexit
 from collections import MutableMapping
 import ctypes as ct
+import fcntl
 import json
 import os
 import sys
@@ -85,6 +86,7 @@ lib.bpf_detach_kprobe.argtypes = [ct.c_char_p]
 
 open_kprobes = {}
 kprobe_instance = None
+tracefile = None
 TRACEFS = "/sys/kernel/debug/tracing"
 
 @atexit.register
@@ -93,6 +95,8 @@ def cleanup_kprobes():
         os.close(v)
         desc = "-:kprobes/%s" % k
         lib.bpf_detach_kprobe(desc.encode("ascii"))
+    if tracefile:
+        tracefile.close()
     if kprobe_instance:
         os.rmdir("%s/instances/%s" % (TRACEFS, kprobe_instance))
 
@@ -405,3 +409,48 @@ class BPF(object):
             raise Exception("Failed to detach BPF from kprobe")
         del open_kprobes[ev_name]
 
+    @staticmethod
+    def trace_open(nonblocking=False):
+        """trace_open(nonblocking=False)
+
+        Open the trace_pipe if not already open
+        """
+
+        global tracefile
+        if not tracefile:
+            if not kprobe_instance:
+                raise Exception("Trace pipe inactive, call attach_kprobe first")
+            tracefile = open("%s/instances/%s/trace_pipe"
+                    % (TRACEFS, kprobe_instance))
+            if nonblocking:
+                fd = trace.fileno()
+                fl = fcntl.fcntl(fd, fcntl.F_GETFL)
+                fcntl.fcntl(fd, fcntl.F_SETFL, fl | os.O_NONBLOCK)
+        return tracefile
+
+    @staticmethod
+    def trace_readline(nonblocking=True):
+        """trace_readline(nonblocking=True)
+
+        Read from the kernel debug trace pipe and return one line
+        If nonblocking is False, this will block until ctrl-C is pressed.
+        """
+
+        trace = BPF.trace_open(nonblocking)
+
+        line = None
+        try:
+            line = trace.readline(128).rstrip()
+        except BlockingIOError:
+            pass
+        return line
+
+    @staticmethod
+    def trace_print():
+        try:
+            while True:
+                line = BPF.trace_readline(nonblocking=False)
+                print(line)
+                sys.stdout.flush()
+        except KeyboardInterrupt:
+            exit()
