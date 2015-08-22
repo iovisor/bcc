@@ -49,6 +49,12 @@ class TestBPFSocket(TestCase):
             x = self.stats[key]
         with self.assertRaises(KeyError):
             del self.stats[key]
+        self.stats.clear()
+        self.assertEqual(len(self.stats), 0)
+        self.stats[key] = leaf
+        self.assertEqual(len(self.stats), 1)
+        self.stats.clear()
+        self.assertEqual(len(self.stats), 0)
 
 if __name__ == "__main__":
     main()
