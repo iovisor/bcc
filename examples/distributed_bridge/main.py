@@ -49,16 +49,10 @@ class TunnelSimulation(Simulation):
         if dhcp == 1:
             print("Waiting for host0 br1/br2 ip addresses available")
             for j in range(0, 2):
-                retry = -1
-                ip_out = None
-                while retry < 0:
-                    check = Popen(["ip", "netns", "exec", "host0",
-                                   "ip", "addr", "show", "br%d" % j], stdout=PIPE, stderr=PIPE)
-                    ip_out = check.stdout.read()
-                    checkip = "99.1.%d" % j
-                    retry = ip_out.find(checkip)
-                p = re.compile(("99.1.%d." % j) + "\d+")
-                host0_br_ips.append(p.findall(ip_out)[0])
+                interface = host_info[0][0].interfaces["br%d" % j]
+                interface.wait_ip("99.1.0.0", 16, timeout=60)
+                host0_br_ips = [x[0] for x in interface.ipaddr
+                                if x[0].startswith("99.1")]
         else:
             host0_br_ips.append("99.1.0.1")
             host0_br_ips.append("99.1.1.1")
@@ -67,13 +61,8 @@ class TunnelSimulation(Simulation):
         print("Validating connectivity")
         for i in range(1, num_hosts):
             for j in range(0, 2):
-                retry = -1
-                while retry < 0:
-                    check = Popen(["ip", "netns", "exec", "host%d" % i,
-                                   "ip", "addr", "show", "br%d" % j], stdout=PIPE, stderr=PIPE)
-                    out = check.stdout.read()
-                    checkip = "99.1.%d" % j
-                    retry = out.find(checkip)
+                interface = host_info[i][0].interfaces["br%d" % j]
+                interface.wait_ip("99.1.0.0", 16, timeout=60)
                 print("VNI%d between host0 and host%d" % (10000 + j, i))
                 call(["ip", "netns", "exec", "host%d" % i,
                       "ping", host0_br_ips[j], "-c", "3", "-i", "0.2", "-q"])
