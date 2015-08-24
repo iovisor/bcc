@@ -6,14 +6,13 @@
 # sudo ./hello_world.py"
 
 from bpf import BPF
-from subprocess import call
 
 prog = """
 int hello(void *ctx) {
   bpf_trace_printk("Hello, World!\\n");
   return 0;
-};
+}
 """
 b = BPF(text=prog)
 b.attach_kprobe(event="sys_clone", fn_name="hello")
-b.trace_print()
+b.trace_print(fmt="{1} {5}")

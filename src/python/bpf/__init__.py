@@ -389,7 +389,7 @@ class BPF(object):
         if res < 0:
             raise Exception("Failed to attach BPF to kprobe")
         open_kprobes[ev_name] = res
-        return res
+        return self
 
     @staticmethod
     def detach_kprobe(event):
@@ -412,7 +412,7 @@ class BPF(object):
         if res < 0:
             raise Exception("Failed to attach BPF to kprobe")
         open_kprobes[ev_name] = res
-        return res
+        return self
 
     @staticmethod
     def detach_kretprobe(event):
@@ -437,14 +437,33 @@ class BPF(object):
         if not tracefile:
             tracefile = open("%s/trace_pipe" % TRACEFS)
             if nonblocking:
-                fd = trace.fileno()
+                fd = tracefile.fileno()
                 fl = fcntl.fcntl(fd, fcntl.F_GETFL)
                 fcntl.fcntl(fd, fcntl.F_SETFL, fl | os.O_NONBLOCK)
         return tracefile
 
     @staticmethod
-    def trace_readline(nonblocking=True):
-        """trace_readline(nonblocking=True)
+    def trace_readline_fields(nonblocking=False):
+        """trace_readline_fields(nonblocking=False)
+
+        Read from the kernel debug trace pipe and return a tuple of the
+        fields (task, pid, cpu, flags, timestamp, msg) or None if no
+        line was read (nonblocking=True)
+        """
+        line = BPF.trace_readline(nonblocking)
+        if line:
+            task = line[:16].lstrip()
+            line = line[17:]
+            ts_end = line.find(":")
+            pid, cpu, flags, ts = line[:ts_end].split()
+            cpu = cpu[1:-1]
+            msg = line[ts_end + 4:]
+            return (task, int(pid), int(cpu), flags, float(ts), msg)
+        return
+
+    @staticmethod
+    def trace_readline(nonblocking=False):
+        """trace_readline(nonblocking=False)
 
         Read from the kernel debug trace pipe and return one line
         If nonblocking is False, this will block until ctrl-C is pressed.
@@ -454,17 +473,28 @@ class BPF(object):
 
         line = None
         try:
-            line = trace.readline(128).rstrip()
-        except BlockingIOError:
+            line = trace.readline(1024).rstrip()
+        except IOError:
             pass
+        except KeyboardInterrupt:
+            exit()
         return line
 
     @staticmethod
-    def trace_print():
-        try:
-            while True:
+    def trace_print(fmt=None):
+        """trace_print(fmt=None)
+
+        Read from the kernel debug trace pipe and print on stdout.
+        If fmt is specified, apply as a format string to the output. See
+        trace_readline_fields for the members of the tuple
+        example: trace_print(fmt="pid {1}, msg = {5}")
+        """
+
+        while True:
+            if fmt:
+                fields = BPF.trace_readline_fields(nonblocking=False)
+                line = fmt.format(*fields)
+            else:
                 line = BPF.trace_readline(nonblocking=False)
-                print(line)
-                sys.stdout.flush()
-        except KeyboardInterrupt:
-            exit()
+            print(line)
+            sys.stdout.flush()
