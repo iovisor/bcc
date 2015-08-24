@@ -1232,9 +1232,15 @@ StatusTuple CodegenLLVM::visit(Node* root, vector<TableDesc> &tables) {
   //TRY2(print_parser());
 
   for (auto table : tables_) {
+    bpf_map_type map_type = BPF_MAP_TYPE_UNSPEC;
+    if (table.first->type_id()->name_ == "FIXED_MATCH")
+      map_type = BPF_MAP_TYPE_HASH;
+    else if (table.first->type_id()->name_ == "INDEXED")
+      map_type = BPF_MAP_TYPE_ARRAY;
     tables.push_back({
       table.first->id_->name_,
       table_fds_[table.first],
+      map_type,
       table.first->key_type_->bit_width_ >> 3,
       table.first->leaf_type_->bit_width_ >> 3,
       table.first->size_,

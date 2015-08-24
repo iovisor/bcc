@@ -68,6 +68,8 @@ class BPFModule {
   int table_fd(size_t id) const;
   int table_fd(const std::string &name) const;
   const char * table_name(size_t id) const;
+  int table_type(const std::string &name) const;
+  int table_type(size_t id) const;
   const char * table_key_desc(size_t id) const;
   const char * table_key_desc(const std::string &name) const;
   size_t table_key_size(size_t id) const;

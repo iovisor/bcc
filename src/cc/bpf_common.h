@@ -40,6 +40,8 @@ size_t bpf_num_tables(void *program);
 size_t bpf_table_id(void *program, const char *table_name);
 int bpf_table_fd(void *program, const char *table_name);
 int bpf_table_fd_id(void *program, size_t id);
+int bpf_table_type(void *program, const char *table_name);
+int bpf_table_type_id(void *program, size_t id);
 const char * bpf_table_name(void *program, size_t id);
 const char * bpf_table_key_desc(void *program, const char *table_name);
 const char * bpf_table_key_desc_id(void *program, size_t id);

@@ -122,6 +122,18 @@ int bpf_table_fd_id(void *program, size_t id) {
   return mod->table_fd(id);
 }
 
+int bpf_table_type(void *program, const char *table_name) {
+  auto mod = static_cast<ebpf::BPFModule *>(program);
+  if (!mod) return -1;
+  return mod->table_type(table_name);
+}
+
+int bpf_table_type_id(void *program, size_t id) {
+  auto mod = static_cast<ebpf::BPFModule *>(program);
+  if (!mod) return -1;
+  return mod->table_type(id);
+}
+
 const char * bpf_table_name(void *program, size_t id) {
   auto mod = static_cast<ebpf::BPFModule *>(program);
   if (!mod) return nullptr;
