@@ -408,6 +408,7 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
         return false;
       }
     }
+    table.type = map_type;
     table.fd = bpf_create_map(map_type, table.key_size, table.leaf_size, table.max_entries);
     if (table.fd < 0) {
       C.getDiagnostics().Report(Decl->getLocStart(), diag::err_expected)

@@ -44,6 +44,8 @@ lib.bpf_table_id.restype = ct.c_ulonglong
 lib.bpf_table_id.argtypes = [ct.c_void_p, ct.c_char_p]
 lib.bpf_table_fd.restype = ct.c_int
 lib.bpf_table_fd.argtypes = [ct.c_void_p, ct.c_char_p]
+lib.bpf_table_type_id.restype = ct.c_int
+lib.bpf_table_type_id.argtypes = [ct.c_void_p, ct.c_ulonglong]
 lib.bpf_table_key_desc.restype = ct.c_char_p
 lib.bpf_table_key_desc.argtypes = [ct.c_void_p, ct.c_char_p]
 lib.bpf_table_leaf_desc.restype = ct.c_char_p
@@ -103,6 +105,10 @@ class BPF(object):
     SCHED_CLS = 3
     SCHED_ACT = 4
 
+    HASH = 1
+    ARRAY = 2
+    PROG_ARRAY = 3
+
     class Function(object):
         def __init__(self, bpf, name, fd):
             self.bpf = bpf
@@ -116,6 +122,7 @@ class BPF(object):
             self.map_fd = map_fd
             self.Key = keytype
             self.Leaf = leaftype
+            self.ttype = lib.bpf_table_type_id(self.bpf.module, self.map_id)
 
         def key_sprintf(self, key):
             key_p = ct.pointer(key)
@@ -180,9 +187,33 @@ class BPF(object):
 
         def __delitem__(self, key):
             key_p = ct.pointer(key)
-            res = lib.bpf_delete_elem(self.map_fd, ct.cast(key_p, ct.c_void_p))
-            if res < 0:
-                raise KeyError
+            ttype = lib.bpf_table_type_id(self.bpf.module, self.map_id)
+            # Deleting from array type maps does not have an effect, so
+            # zero out the entry instead.
+            if ttype in (BPF.ARRAY, BPF.PROG_ARRAY):
+                leaf = self.Leaf()
+                leaf_p = ct.pointer(leaf)
+                res = lib.bpf_update_elem(self.map_fd,
+                        ct.cast(key_p, ct.c_void_p),
+                        ct.cast(leaf_p, ct.c_void_p), 0)
+                if res < 0:
+                    raise Exception("Could not clear item")
+            else:
+                res = lib.bpf_delete_elem(self.map_fd,
+                        ct.cast(key_p, ct.c_void_p))
+                if res < 0:
+                    raise KeyError
+
+        def clear(self):
+            if self.ttype in (BPF.ARRAY, BPF.PROG_ARRAY):
+                # Special case clear, since this class is currently behaving
+                # like a dict but popitem on an array causes an infinite loop.
+                # TODO: derive Table from array.array instead
+                for k in self.keys():
+                    self.__delitem__(k)
+            else:
+                super(BPF.Table, self).clear()
+
 
         def __iter__(self):
             return BPF.Table.Iter(self, self.Key)

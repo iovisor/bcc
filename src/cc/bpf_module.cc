@@ -488,6 +488,15 @@ int BPFModule::table_fd(size_t id) const {
   return (*tables_)[id].fd;
 }
 
+int BPFModule::table_type(const string &name) const {
+  return table_type(table_id(name));
+}
+
+int BPFModule::table_type(size_t id) const {
+  if (id >= tables_->size()) return -1;
+  return (*tables_)[id].type;
+}
+
 const char * BPFModule::table_name(size_t id) const {
   if (id >= tables_->size()) return nullptr;
   return (*tables_)[id].name.c_str();
