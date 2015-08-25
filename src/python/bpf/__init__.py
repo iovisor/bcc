@@ -259,6 +259,21 @@ class BPF(object):
         return filename
 
     def __init__(self, src_file="", hdr_file="", text=None, debug=0):
+        """Create a a new BPF module with the given source code.
+
+        Note:
+            All fields are marked as optional, but either `src_file` or `text`
+            must be supplied, and not both.
+
+        Args:
+            src_file (Optional[str]): Path to a source file for the module
+            hdr_file (Optional[str]): Path to a helper header file for the `src_file`
+            text (Optional[str]): Contents of a source file for the module
+            debug (Optional[int]): Flags used for debug prints, can be |'d together
+                0x1: print LLVM IR to stderr
+                0x2: print BPF bytecode to stderr
+        """
+
         self.debug = debug
         self.funcs = {}
         self.tables = {}
@@ -284,16 +299,19 @@ class BPF(object):
         if lib.bpf_function_start(self.module, func_name.encode("ascii")) == None:
             raise Exception("Unknown program %s" % func_name)
 
+        log_buf = ct.create_string_buffer(65536) if self.debug else None
+
         fd = lib.bpf_prog_load(prog_type,
                 lib.bpf_function_start(self.module, func_name.encode("ascii")),
                 lib.bpf_function_size(self.module, func_name.encode("ascii")),
                 lib.bpf_module_license(self.module),
                 lib.bpf_module_kern_version(self.module),
-                None, 0)
+                log_buf, ct.sizeof(log_buf) if log_buf else 0)
+
+        if self.debug & 0x2:
+            print(log_buf.value.decode(), file=sys.stderr)
 
         if fd < 0:
-            print((ct.c_char * 65536).in_dll(lib, "bpf_log_buf").value)
-            #print(ct.c_char_p.in_dll(lib, "bpf_log_buf").value)
             raise Exception("Failed to load BPF program %s" % func_name)
 
         fn = BPF.Function(self, func_name, fd)
