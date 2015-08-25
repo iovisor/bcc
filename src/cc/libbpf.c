@@ -122,8 +122,6 @@ int bpf_prog_load(enum bpf_prog_type prog_type,
                   const char *license, unsigned kern_version,
                   char *log_buf, unsigned log_buf_size)
 {
-  log_buf = log_buf ? log_buf : bpf_log_buf;
-  log_buf_size = log_buf_size ? log_buf_size : LOG_BUF_SIZE;
   union bpf_attr attr = {
     .prog_type = prog_type,
     .insns = ptr_to_u64((void *) insns),
@@ -131,14 +129,19 @@ int bpf_prog_load(enum bpf_prog_type prog_type,
     .license = ptr_to_u64((void *) license),
     .log_buf = ptr_to_u64(log_buf),
     .log_size = log_buf_size,
-    .log_level = 1,
+    .log_level = log_buf ? 1 : 0,
   };
 
   attr.kern_version = kern_version;
-  log_buf[0] = 0;
+  if (log_buf)
+    log_buf[0] = 0;
 
   int ret = syscall(__NR_bpf, BPF_PROG_LOAD, &attr, sizeof(attr));
-  if (ret < 0 && log_buf == bpf_log_buf) {
+  if (ret < 0 && !log_buf) {
+    // caller did not specify log_buf but failure should be printed,
+    // so call recursively and print the result to stderr
+    bpf_prog_load(prog_type, insns, prog_len, license, kern_version,
+        bpf_log_buf, LOG_BUF_SIZE);
     fprintf(stderr, "bpf: %s\n%s\n", strerror(errno), bpf_log_buf);
   }
   return ret;

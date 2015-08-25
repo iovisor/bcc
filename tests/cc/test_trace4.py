@@ -4,7 +4,6 @@
 
 from bpf import BPF
 import os
-from socket import socket, AF_INET, SOCK_DGRAM
 import sys
 from unittest import main, TestCase
 
@@ -23,18 +22,13 @@ class TestKprobeRgx(TestCase):
           return 0;
         }
         """)
-        self.b.attach_kprobe(event_re="^SyS_send.*", fn_name="hello",
-                pid=0, cpu=-1)
-        self.b.attach_kretprobe(event_re="^SyS_send.*", fn_name="goodbye",
-                pid=1, cpu=-1)
+        self.b.attach_kprobe(event_re="^SyS_bp.*", fn_name="hello")
+        self.b.attach_kretprobe(event_re="^SyS_bp.*", fn_name="goodbye")
 
     def test_send1(self):
-        udp = socket(AF_INET, SOCK_DGRAM)
-        udp.sendto(b"a" * 10, ("127.0.0.1", 5000))
-        udp.close()
         k1 = self.b["stats"].Key(1)
         k2 = self.b["stats"].Key(2)
-        self.assertEqual(self.b["stats"][k1].val, self.b["stats"][k2].val)
+        self.assertEqual(self.b["stats"][k1].val, self.b["stats"][k2].val + 1)
 
 if __name__ == "__main__":
     main()
