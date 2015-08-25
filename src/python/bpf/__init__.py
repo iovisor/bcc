@@ -18,6 +18,7 @@ import ctypes as ct
 import fcntl
 import json
 import os
+from subprocess import Popen, PIPE
 import sys
 basestring = (unicode if sys.version_info[0] < 3 else str)
 
@@ -380,7 +381,23 @@ class BPF(object):
                     % (dev, errstr))
         fn.sock = sock
 
-    def attach_kprobe(self, event="", fn_name="", pid=0, cpu=-1, group_fd=-1):
+    @staticmethod
+    def _get_kprobe_functions(event_re):
+        p = Popen(["awk", "$1 ~ /%s/ { print $1 }" % event_re,
+            "%s/available_filter_functions" % TRACEFS], stdout=PIPE)
+        lines = p.communicate()[0].decode().split()
+        return [line.rstrip() for line in lines if line != "\n"]
+
+    def attach_kprobe(self, event="", fn_name="", event_re="",
+            pid=0, cpu=-1, group_fd=-1):
+
+        # allow the caller to glob multiple functions together
+        if event_re:
+            for line in BPF._get_kprobe_functions(event_re):
+                self.attach_kprobe(event=line, fn_name=fn_name, pid=pid,
+                        cpu=cpu, group_fd=group_fd)
+            return
+
         fn = self.load_func(fn_name, BPF.KPROBE)
         ev_name = "p_" + event.replace("+", "_")
         desc = "p:kprobes/%s %s" % (ev_name, event)
@@ -403,7 +420,16 @@ class BPF(object):
             raise Exception("Failed to detach BPF from kprobe")
         del open_kprobes[ev_name]
 
-    def attach_kretprobe(self, event="", fn_name="", pid=-1, cpu=0, group_fd=-1):
+    def attach_kretprobe(self, event="", fn_name="", event_re="",
+            pid=-1, cpu=0, group_fd=-1):
+
+        # allow the caller to glob multiple functions together
+        if event_re:
+            for line in BPF._get_kprobe_functions(event_re):
+                self.attach_kretprobe(event=line, fn_name=fn_name, pid=pid,
+                        cpu=cpu, group_fd=group_fd)
+            return
+
         fn = self.load_func(fn_name, BPF.KPROBE)
         ev_name = "r_" + event.replace("+", "_")
         desc = "r:kprobes/%s %s" % (ev_name, event)
@@ -452,6 +478,8 @@ class BPF(object):
         """
         line = BPF.trace_readline(nonblocking)
         if line:
+            # don't print messages related to lost events
+            if line.startswith("CPU:"): return
             task = line[:16].lstrip()
             line = line[17:]
             ts_end = line.find(":")
@@ -493,6 +521,7 @@ class BPF(object):
         while True:
             if fmt:
                 fields = BPF.trace_readline_fields(nonblocking=False)
+                if not fields: continue
                 line = fmt.format(*fields)
             else:
                 line = BPF.trace_readline(nonblocking=False)

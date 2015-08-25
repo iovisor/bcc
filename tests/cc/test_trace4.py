@@ -1,0 +1,40 @@
+#!/usr/bin/env python
+# Copyright (c) PLUMgrid, Inc.
+# Licensed under the Apache License, Version 2.0 (the "License")
+
+from bpf import BPF
+import os
+from socket import socket, AF_INET, SOCK_DGRAM
+import sys
+from unittest import main, TestCase
+
+class TestKprobeRgx(TestCase):
+    def setUp(self):
+        self.b = BPF(text="""
+        typedef struct { int idx; } Key;
+        typedef struct { u64 val; } Val;
+        BPF_TABLE("array", Key, Val, stats, 3);
+        int hello(void *ctx) {
+          stats.lookup_or_init(&(Key){1}, &(Val){0})->val++;
+          return 0;
+        }
+        int goodbye(void *ctx) {
+          stats.lookup_or_init(&(Key){2}, &(Val){0})->val++;
+          return 0;
+        }
+        """)
+        self.b.attach_kprobe(event_re="^SyS_send.*", fn_name="hello",
+                pid=0, cpu=-1)
+        self.b.attach_kretprobe(event_re="^SyS_send.*", fn_name="goodbye",
+                pid=1, cpu=-1)
+
+    def test_send1(self):
+        udp = socket(AF_INET, SOCK_DGRAM)
+        udp.sendto(b"a" * 10, ("127.0.0.1", 5000))
+        udp.close()
+        k1 = self.b["stats"].Key(1)
+        k2 = self.b["stats"].Key(2)
+        self.assertEqual(self.b["stats"][k1].val, self.b["stats"][k2].val)
+
+if __name__ == "__main__":
+    main()
