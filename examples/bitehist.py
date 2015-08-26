@@ -44,9 +44,6 @@ dist_max = 64
 
 # header
 print("Tracing... Hit Ctrl-C to end.")
-last = {}
-for i in range(1, dist_max + 1):
-	last[i] = 0
 
 # functions
 stars_max = 38
@@ -67,7 +64,7 @@ def print_log2_hist(dist, val_type):
 	val_max = 0
 	for i in range(1, dist_max + 1):
 		try:
-			val = dist[c_int(i)].value - last[i]
+			val = dist[c_int(i)].value
 			if (val > 0):
 				idx_max = i
 			if (val > val_max):
@@ -82,10 +79,9 @@ def print_log2_hist(dist, val_type):
 		if (low == high):
 			low -= 1
 		try:
-			val = dist[c_int(i)].value - last[i]
+			val = dist[c_int(i)].value
 			print("%8d -> %-8d : %-8d |%-*s|" % (low, high, val,
 			    stars_max, stars(val, val_max, stars_max)))
-			last[i] = dist[c_int(i)].value
 		except:
 			break
 
@@ -104,5 +100,6 @@ while (1):
 
 	print
 	print_log2_hist(b["dist"], "kbytes")
+	b["dist"].clear()
 	if do_exit:
 		exit()
