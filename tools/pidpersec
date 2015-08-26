@@ -28,7 +28,6 @@ S_COUNT = c_int(1)
 print("Tracing... Ctrl-C to end.")
 
 # output
-last = 0
 while (1):
 	try:
 		sleep(1)
@@ -36,5 +35,5 @@ while (1):
 		exit()
 
 	print("%s: PIDs/sec: %d" % (strftime("%H:%M:%S"),
-	    (b["stats"][S_COUNT].value)))
+	    b["stats"][S_COUNT].value))
 	b["stats"].clear()

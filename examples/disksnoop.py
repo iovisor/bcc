@@ -33,16 +33,10 @@ except:
 
 # format output
 while 1:
-	try:
-		line = trace.readline().rstrip()
-	except KeyboardInterrupt:
-		pass; exit()
-	prolog, time_s, colon, bytes_s, flags_s, us_s = \
-		line.rsplit(" ", 5)
+	(task, pid, cpu, flags, ts, msg) = b.trace_readline_fields()
+	(bytes_s, bflags_s, us_s) = msg.split()
 
-	time_s = time_s[:-1]	# strip trailing ":"
-	flags = int(flags_s, 16)
-	if flags & REQ_WRITE:
+	if int(bflags_s, 16) & REQ_WRITE:
 		type_s = "W"
 	elif bytes_s == "0":	# see blk_fill_rwbs() for logic
 		type_s = "M"
@@ -50,4 +44,4 @@ while 1:
 		type_s = "R"
 	ms = float(int(us_s, 10)) / 1000
 
-	print("%-18s %-2s %-7s %8.2f" % (time_s, type_s, bytes_s, ms))
+	print("%-18.9f %-2s %-7s %8.2f" % (ts, type_s, bytes_s, ms))

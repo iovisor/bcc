@@ -54,11 +54,9 @@ stat_types = {
 
 # header
 print("%-8s  " % "TIME", end="")
-last = {}
 for stype in stat_types.keys():
 	print(" %8s" % (stype + "/s"), end="")
 	idx = stat_types[stype]
-	last[idx] = 0
 print("")
 
 # output
@@ -78,9 +76,9 @@ while (1):
 	for stype in stat_types.keys():
 		idx = stat_types[stype]
 		try:
-			delta = b["stats"][c_int(idx)].value - last[idx]
-			print(" %8d" % (delta / interval), end="")
-			last[idx] = b["stats"][c_int(idx)].value
+			val = b["stats"][c_int(idx)].value / interval
+			print(" %8d" % val, end="")
 		except:
 			print(" %8d" % 0, end="")
+	b["stats"].clear()
 	print("")
