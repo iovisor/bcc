@@ -6,9 +6,9 @@ datarootdir=${prefix}/share
 
 compatdir=${includedir}/bcc/compat
 
-Name: libbpfprog
+Name: libbcc
 Version: @REVISION@
-Description: BPF Program library
+Description: BCC Program library
 Requires:
-Libs: -L${libdir} -lbpfprog
+Libs: -L${libdir} -lbcc
 Cflags: -I${includedir} -I${compatdir}

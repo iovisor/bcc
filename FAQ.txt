@@ -5,9 +5,9 @@ A: Install pyroute2:
    cd pyroute2; sudo make install
 
 Q: hello_world.py fails with:
-   OSError: libbpfprog.so: cannot open shared object file: No such file or directory
+   OSError: libbcc.so: cannot open shared object file: No such file or directory
 A: make sure to 'make install' and add the directory
-   where libbpfprog.so was installed into your LD_LIBRARY_PATH
+   where libbcc.so was installed into your LD_LIBRARY_PATH
    export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
 
 Q: hello_world.py fails with:
