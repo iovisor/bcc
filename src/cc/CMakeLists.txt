@@ -11,7 +11,7 @@ include_directories(${LLVM_INCLUDE_DIRS})
 # todo: if check for kernel version
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/compat)
 add_definitions(${LLVM_DEFINITIONS})
-configure_file(libbpfprog.pc.in ${CMAKE_CURRENT_BINARY_DIR}/libbpfprog.pc @ONLY)
+configure_file(libbcc.pc.in ${CMAKE_CURRENT_BINARY_DIR}/libbcc.pc @ONLY)
 
 # prune unused llvm static library stuff when linking into the new .so
 set(CMAKE_SHARED_LINKER_FLAGS "-Wl,--exclude-libs=ALL")
@@ -29,7 +29,8 @@ endif()
 # tell the shared library where it is being installed so it can find shared header files
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBCC_INSTALL_PREFIX='\"${CMAKE_INSTALL_PREFIX}\"'")
 
-add_library(bpfprog SHARED bpf_common.cc bpf_module.cc libbpf.c)
+add_library(bcc SHARED bpf_common.cc bpf_module.cc libbpf.c)
+set_target_properties(bcc PROPERTIES VERSION ${REVISION} SOVERSION 0)
 
 # BPF is still experimental otherwise it should be available
 #llvm_map_components_to_libnames(llvm_libs bpf mcjit irreader passes)
@@ -41,14 +42,19 @@ set(clang_libs ${libclangFrontend} ${libclangSerialization} ${libclangDriver} ${
   ${libclangAST} ${libclangLex} ${libclangBasic})
 
 # Link against LLVM libraries
-target_link_libraries(bpfprog b_frontend clang_frontend ${clang_libs} ${llvm_libs} LLVMBPFCodeGen)
+target_link_libraries(bcc b_frontend clang_frontend ${clang_libs} ${llvm_libs} LLVMBPFCodeGen)
 
-install(TARGETS bpfprog LIBRARY DESTINATION lib${LIBSUFFIX})
-install(DIRECTORY export/ DESTINATION share/bcc/include/bcc
+install(TARGETS bcc LIBRARY COMPONENT libbcc
+  DESTINATION lib${LIBSUFFIX})
+install(DIRECTORY export/ COMPONENT libbcc
+  DESTINATION share/bcc/include/bcc
   FILES_MATCHING PATTERN "*.h")
-install(FILES bpf_common.h ../libbpf.h DESTINATION include/bcc)
-install(DIRECTORY compat/linux/ DESTINATION include/bcc/compat/linux
+install(FILES bpf_common.h ../libbpf.h COMPONENT libbcc
+  DESTINATION include/bcc)
+install(DIRECTORY compat/linux/ COMPONENT libbcc
+  DESTINATION include/bcc/compat/linux
   FILES_MATCHING PATTERN "*.h")
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libbpfprog.pc DESTINATION lib${LIBSUFFIX}/pkgconfig)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libbcc.pc COMPONENT libbcc
+  DESTINATION lib${LIBSUFFIX}/pkgconfig)
 
 add_subdirectory(frontends)

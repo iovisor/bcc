@@ -22,4 +22,5 @@ if(EXISTS "/etc/debian_version")
   set(PYTHON_FLAGS "${PYTHON_FLAGS} --install-layout deb")
 endif()
 install(CODE "execute_process(COMMAND python setup.py install -f ${PYTHON_FLAGS}
-  --prefix=${CMAKE_INSTALL_PREFIX} WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})")
+  --prefix=${CMAKE_INSTALL_PREFIX} WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})"
+  COMPONENT python)

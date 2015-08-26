@@ -1,0 +1,7 @@
+Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: bcc
+Source: https://github.com/iovisor/bcc
+
+Files: *
+Copyright: 2015 PLUMgrid, Inc.
+License: Apache-2.0

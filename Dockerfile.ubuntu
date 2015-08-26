@@ -9,11 +9,12 @@ RUN printf "deb http://llvm.org/apt/trusty/ llvm-toolchain-trusty main\ndeb-src 
 RUN wget -q -O - http://llvm.org/apt/llvm-snapshot.gpg.key | apt-key add -
 RUN apt-get -y update
 
-RUN apt-get -y install bison build-essential cmake flex git libedit-dev python zlib1g-dev
-RUN apt-get -y install libllvm3.7 llvm-3.7-dev libclang-3.7-dev
+RUN apt-get -y install bison build-essential cmake debhelper devscripts flex git libedit-dev python zlib1g-dev
+RUN apt-get -y install libllvm3.8 llvm-3.8-dev libclang-3.8-dev
 
 RUN mkdir -p /root/bcc/build
 COPY ./ /root/bcc/
-WORKDIR /root/bcc/build
-RUN cmake .. -DCMAKE_INSTALL_PREFIX=/usr
-RUN make -j$(grep -c ^process /proc/cpuinfo) package
+WORKDIR /root
+RUN tar zcf bcc_0.1.1.orig.tar.gz bcc/
+WORKDIR /root/bcc
+RUN DEB_BUILD_OPTIONS="nocheck parallel=4" debuild -us -uc

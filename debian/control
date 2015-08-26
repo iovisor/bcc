@@ -1,0 +1,24 @@
+Source: bcc
+Maintainer: Brenden Blanco <bblanco@plumgrid.com>
+Section: misc
+Priority: optional
+Standards-Version: 3.9.5
+Build-Depends: debhelper (>= 9), cmake, libllvm3.8, llvm-3.8-dev, libclang-3.8-dev
+Homepage: https://github.com/iovisor/bcc
+
+Package: libbcc
+Architecture: amd64
+Depends: libc6, libstdc++6, make, gcc
+Description: Shared Library for BPF Compiler Collection (BCC)
+ Shared Library for BPF Compiler Collection to control BPF programs
+ from userspace.
+
+Package: libbcc-examples
+Architecture: any
+Depends: libbcc
+Description: Shared Library for BPF Compiler Collection (BCC)
+
+Package: python-bpf
+Architecture: all
+Depends: libbcc, python
+Description: Python wrappers for BPF Compiler Collection (BCC)
