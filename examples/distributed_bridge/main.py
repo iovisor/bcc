@@ -9,12 +9,22 @@ from simulation import Simulation
 from subprocess import PIPE, call, Popen
 import re
 
-dhcp = 0
 multicast = 1
-if len(argv) > 1 and argv[1] == "mesh":
+dhcp = 0
+gretap = 0
+
+if "mesh" in argv:
     multicast = 0
-    if len(argv) > 2 and argv[2] == "dhcp":
-       dhcp = 1
+
+if "dhcp" in argv:
+    dhcp = 1
+    multicast = 0
+
+if "gretap" in argv:
+    gretap = 1
+    multicast = 0
+
+print("multicast %d dhcp %d gretap %d" % (multicast, dhcp, gretap))
 
 ipr = IPRoute()
 ipdb = IPDB(nl=ipr)
@@ -37,7 +47,7 @@ class TunnelSimulation(Simulation):
             if multicast:
               cmd = ["python", "tunnel.py", str(i)]
             else:
-              cmd = ["python", "tunnel_mesh.py", str(num_hosts), str(i), str(dhcp)]
+              cmd = ["python", "tunnel_mesh.py", str(num_hosts), str(i), str(dhcp), str(gretap)]
             p = NSPopen(host_info[i][0].nl.netns, cmd, stdin=PIPE)
             self.processes.append(p)
         with self.ipdb.create(ifname="br-fabric", kind="bridge") as br:

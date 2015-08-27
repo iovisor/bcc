@@ -17,6 +17,7 @@ from subprocess import call, Popen, PIPE
 num_hosts = int(argv[1])
 host_id = int(argv[2])
 dhcp = int(argv[3])
+gretap = int(argv[4])
 
 b = BPF(src_file="tunnel_mesh.c")
 ingress_fn = b.load_func("handle_ingress", BPF.SCHED_CLS)
@@ -38,13 +39,19 @@ d_serv = []
 d_client = []
 
 def run():
-    with ipdb.create(ifname="vxlan0", kind="vxlan", vxlan_id=0,
-                     vxlan_link=ifc, vxlan_port=htons(4789),
-                     vxlan_flowbased=True,
-                     vxlan_collect_metadata=True,
-                     vxlan_learning=False) as vx:
-        vx.up()
-        ifc_gc.append(vx.ifname)
+    if gretap:
+        with ipdb.create(ifname="gretap1", kind="gretap", gre_ikey=0, gre_okey=0,
+                         gre_local='172.16.1.%d' % (100 + host_id),
+                         gre_ttl=16, gre_collect_metadata=1) as vx:
+            vx.up()
+            ifc_gc.append(vx.ifname)
+    else:
+        with ipdb.create(ifname="vxlan0", kind="vxlan", vxlan_id=0,
+                         vxlan_link=ifc, vxlan_port=htons(4789),
+                         vxlan_collect_metadata=True,
+                         vxlan_learning=False) as vx:
+            vx.up()
+            ifc_gc.append(vx.ifname)
 
     conf[c_int(1)] = c_int(vx.index)
 
