@@ -1,0 +1,24 @@
+FROM centos:6
+
+MAINTAINER Brenden Blanco <bblanco@plumgrid.com>
+
+RUN yum -y install @rpm-development-tools @c-development @development-tools cmake libstdc++-static
+RUN yum -y install bison bzip2 file flex gcc gcc-c++ git glibc-devel glibc-devel glibc-utils libgcc svn tar texinfo-tex wget zip zlib-devel
+
+
+WORKDIR /root
+RUN svn co svn://gcc.gnu.org/svn/gcc/tags/gcc_5_1_0_release/ && cd gcc_5_1_0_release && ./contrib/download_prerequisites
+RUN mkdir gcc_5_1_0_release_build && cd gcc_5_1_0_release_build && ../gcc_5_1_0_release/configure --disable-multilib && make -j8 && make install
+RUN echo "/usr/local/lib64" > /etc/ld.so.conf.d/usrLocalLib64.conf && ldconfig
+
+RUN wget https://www.python.org/ftp/python/2.7.10/Python-2.7.10.tgz && tar zxf Python-2.7.10.tgz && cd Python-2.7.10 && ./configure && make -j8 && make install
+
+RUN git clone https://github.com/llvm-mirror/llvm.git llvm && git clone https://github.com/llvm-mirror/clang.git llvm/tools/clang && mkdir llvm/build
+
+RUN cd llvm/build && cmake .. -DCMAKE_C_COMPILER=/usr/local/bin/gcc -DCMAKE_CXX_COMPILER=/usr/local/bin/g++ -DBUILD_SHARED_LIBS=OFF -DCMAKE_BUILD_TYPE=Release -DLLVM_TARGETS_TO_BUILD="X86;BPF" && make -j$(grep -c ^process /proc/cpuinfo)
+
+COPY ./ /root/bcc/
+RUN rm /etc/ld.so.conf.d/usrLocalLib64.conf && ldconfig
+#RUN mkdir bcc/build && cd bcc/build && cmake .. -DCMAKE_C_COMPILER=/usr/local/bin/gcc -DCMAKE_CXX_COMPILER=/usr/local/bin/g++ -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_PREFIX_PATH=/root/llvm/build && make -j8
+
+RUN yum -y install rpm-build python2-devel
