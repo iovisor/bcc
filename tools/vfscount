@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #
-# vfscount	Count some VFS calls.
+# vfscount	Count VFS calls ("vfs_*").
 #		For Linux, uses BCC, eBPF. See .c file.
 #
 # Written as a basic example of counting functions.
@@ -36,7 +36,7 @@ def load_kallsyms():
 		ksym_addrs.append(addr)
 		ksym_names.append(name)
 	syms.close()
-def ksym(addr):
+def _ksym_addr2index(addr):
 	start = -1
 	end = len(ksym_addrs)
 	while end != start + 1:
@@ -45,18 +45,17 @@ def ksym(addr):
 			end = mid
 		else:
 			start = mid
-	if start == -1:
+	return start
+def ksym(addr):
+	idx = _ksym_addr2index(addr)
+	if idx == -1:
 		return "[unknown]"
-	return ksym_names[start]
+	return ksym_names[idx]
 load_kallsyms()
 
 # load BPF program
 b = BPF(src_file = "vfscount.c")
-b.attach_kprobe(event="vfs_read", fn_name="do_count")
-b.attach_kprobe(event="vfs_write", fn_name="do_count")
-b.attach_kprobe(event="vfs_fsync", fn_name="do_count")
-b.attach_kprobe(event="vfs_open", fn_name="do_count")
-b.attach_kprobe(event="vfs_create", fn_name="do_count")
+b.attach_kprobe(event_re="^vfs_.*", fn_name="do_count")
 
 # header
 print("Tracing... Ctrl-C to end.")
@@ -67,7 +66,7 @@ try:
 except KeyboardInterrupt:
 	pass
 
-print("\n%-16s %-12s %8s" % ("ADDR", "FUNC", "COUNT"))
+print("\n%-16s %-26s %8s" % ("ADDR", "FUNC", "COUNT"))
 counts = b.get_table("counts")
 for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
-	print("%-16x %-12s %8d" % (k.ip, ksym(k.ip), v.value))
+	print("%-16x %-26s %8d" % (k.ip, ksym(k.ip), v.value))

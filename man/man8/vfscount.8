@@ -1,15 +1,15 @@
 .TH vfscount 8  "2015-08-18" "USER COMMANDS"
 .SH NAME
-vfscount \- Count some common VFS calls. Uses Linux eBPF/bcc.
+vfscount \- Count VFS calls ("vfs_*"). Uses Linux eBPF/bcc.
 .SH SYNOPSIS
 .B vfscount
 .SH DESCRIPTION
-This counts common VFS calls. This can be useful for general workload
+This counts VFS calls. This can be useful for general workload
 characterization of these operations.
 
-This works by tracing some kernel vfs functions using dynamic tracing, and will
-need updating to match any changes to these functions. Edit the script to
-customize and add functions to trace, which is easy to do.
+This works by tracing all kernel functions beginning with "vfs_" using dynamic
+tracing. This may match more functions than you are interested in measuring:
+Edit the script to customize which functions to trace.
 
 Since this uses BPF, only the root user can use this tool.
 .SH REQUIREMENTS
@@ -30,11 +30,13 @@ Kernel function name
 COUNT
 Number of calls while tracing
 .SH OVERHEAD
-This traces various kernel vfs functions and maintains in-kernel counts, which
+This traces kernel vfs functions and maintains in-kernel counts, which
 are asynchronously copied to user-space. While the rate of VFS operations can
 be very high (>1M/sec), this is a relatively efficient way to trace these
 events, and so the overhead is expected to be small for normal workloads.
-Measure in a test environment.
+Measure in a test environment, and if overheads are an issue, edit the script
+to reduce the types of vfs functions traced (currently all beginning with
+"vfs_").
 .SH SOURCE
 This is from bcc.
 .IP
