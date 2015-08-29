@@ -11,7 +11,7 @@ URL:            https://github.com/iovisor/bcc
 Source0:        https://github.com/iovisor/bcc/archive/v%{version}.zip
 
 BuildArch:      x86_64
-BuildRequires:  python2-devel, cmake >= 2.8.7
+BuildRequires:  python2-devel, cmake >= 2.8.7, flex
 
 %description
 Python bindings for BPF Compiler Collection (BCC). Control a BPF program
