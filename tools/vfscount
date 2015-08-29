@@ -16,43 +16,6 @@ from ctypes import c_ushort, c_int, c_ulonglong
 from time import sleep, strftime
 from sys import stderr
 
-# kernel symbol translation
-ksym_addrs = []			# addresses for binary search
-ksym_names = []			# same index as ksym_addrs
-def load_kallsyms():
-	symfile = "/proc/kallsyms"
-	try:
-		syms = open(symfile, "r")
-	except:
-		print("ERROR: reading " + symfile, file=sys.stderr)
-		exit()
-	line = syms.readline()
-	for line in iter(syms):
-		cols = line.split()
-		name = cols[2]
-		if name[:4] != "vfs_":	# perf optimization
-			continue
-		addr = int(cols[0], 16)
-		ksym_addrs.append(addr)
-		ksym_names.append(name)
-	syms.close()
-def _ksym_addr2index(addr):
-	start = -1
-	end = len(ksym_addrs)
-	while end != start + 1:
-		mid = int((start + end) / 2)
-		if addr < ksym_addrs[mid]:
-			end = mid
-		else:
-			start = mid
-	return start
-def ksym(addr):
-	idx = _ksym_addr2index(addr)
-	if idx == -1:
-		return "[unknown]"
-	return ksym_names[idx]
-load_kallsyms()
-
 # load BPF program
 b = BPF(src_file = "vfscount.c")
 b.attach_kprobe(event_re="^vfs_.*", fn_name="do_count")
@@ -69,4 +32,4 @@ except KeyboardInterrupt:
 print("\n%-16s %-26s %8s" % ("ADDR", "FUNC", "COUNT"))
 counts = b.get_table("counts")
 for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
-	print("%-16x %-26s %8d" % (k.ip, ksym(k.ip), v.value))
+	print("%-16x %-26s %8d" % (k.ip, b.ksym(k.ip), v.value))
