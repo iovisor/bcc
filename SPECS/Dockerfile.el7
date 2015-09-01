@@ -1,0 +1,19 @@
+# Copyright (c) PLUMgrid, Inc.
+# Licensed under the Apache License, Version 2.0 (the "License")
+
+FROM centos:7
+
+MAINTAINER Brenden Blanco <bblanco@plumgrid.com>
+
+RUN yum -y install bison cmake flex gcc gcc-c++ make python2-devel rpm-build wget zlib-devel
+
+WORKDIR /root
+RUN mkdir -p {BUILD,RPMS,SOURCES,SPECS,SRPMS}
+RUN cd SOURCES && wget http://llvm.org/pre-releases/3.7.0/rc3/llvm-3.7.0rc3.src.tar.xz
+RUN cd SOURCES && wget http://llvm.org/pre-releases/3.7.0/rc3/cfe-3.7.0rc3.src.tar.xz
+RUN cd SOURCES && wget https://github.com/iovisor/bcc/archive/v0.1.5.tar.gz
+
+RUN cd SPECS && wget https://raw.githubusercontent.com/iovisor/bcc/v0.1.5/SPECS/bcc.el7.spec
+#COPY SPECS/bcc.el7.spec SPECS/
+
+RUN rpmbuild --define "_topdir `pwd`" -ba SPECS/bcc.el7.spec
