@@ -1,8 +1,8 @@
 %define debug_package %{nil}
-%define llvmver 3.7.0rc3
+%define llvmver 3.7.0
 
 Name:           bcc
-Version:        0.1.5
+Version:        0.1.6
 Release:        1%{?dist}
 Summary:        BPF Compiler Collection (BCC)
 
@@ -10,8 +10,8 @@ Group:          Development/Languages
 License:        ASL 2.0
 URL:            https://github.com/iovisor/bcc
 Source0:        https://github.com/iovisor/bcc/archive/v%{version}.tar.gz
-Source1:        http://llvm.org/pre-releases/3.7.0/rc3/llvm-%{llvmver}.src.tar.xz
-Source2:        http://llvm.org/pre-releases/3.7.0/rc3/cfe-%{llvmver}.src.tar.xz
+Source1:        http://llvm.org/releases/3.7.0/llvm-%{llvmver}.src.tar.xz
+Source2:        http://llvm.org/releases/3.7.0/cfe-%{llvmver}.src.tar.xz
 
 BuildArch:      x86_64
 BuildRequires:  bison, cmake >= 2.8.7, flex, gcc, gcc-c++, python2-devel
