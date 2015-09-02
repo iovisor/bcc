@@ -2,12 +2,12 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 
 %define debug_package %{nil}
-%define llvmver 3.7.0rc3
+%define llvmver 3.7.0
 %define gccver 5.1.0
 %define pythonver 2.7.10
 
 Name:           bcc
-Version:        0.1.5
+Version:        0.1.6
 Release:        1%{?dist}
 Summary:        BPF Compiler Collection (BCC)
 
@@ -17,8 +17,8 @@ URL:            https://github.com/iovisor/bcc
 Source0:        https://github.com/iovisor/bcc/archive/v%{version}.tar.gz
 Source1:        https://ftp.gnu.org/gnu/gcc/gcc-%{gccver}/gcc-%{gccver}.tar.gz
 Source2:        https://www.python.org/ftp/python/%{pythonver}/Python-%{pythonver}.tgz
-Source3:        http://llvm.org/pre-releases/3.7.0/rc3/llvm-%{llvmver}.src.tar.xz
-Source4:        http://llvm.org/pre-releases/3.7.0/rc3/cfe-%{llvmver}.src.tar.xz
+Source3:        http://llvm.org/releases/3.7.0/llvm-%{llvmver}.src.tar.xz
+Source4:        http://llvm.org/releases/3.7.0/cfe-%{llvmver}.src.tar.xz
 
 BuildArch:      x86_64
 BuildRequires:  bison, bzip2, cmake >= 2.8.7, file, flex, gcc, gcc-c++, git, glibc-devel, glibc-utils, python2-devel, rpm-build, svn, tar, texinfo-tex, wget, zip, zlib-devel

@@ -1,3 +1,10 @@
+bcc (0.1.6-1) unstable; urgency=low
+
+  * Stability fixes
+  * Improvements to python API
+  * Tracing features
+  * Support for kernel 4.2 features
+
 bcc (0.1.5-1) unstable; urgency=low
 
   * Initial release
