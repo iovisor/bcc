@@ -5,6 +5,8 @@ bcc (0.1.6-1) unstable; urgency=low
   * Tracing features
   * Support for kernel 4.2 features
 
+ -- Brenden Blanco <bblanco@plumgrid.com>  Wed, 02 Sep 2015 16:23:19 +0000
+
 bcc (0.1.5-1) unstable; urgency=low
 
   * Initial release
