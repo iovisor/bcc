@@ -26,7 +26,7 @@ class Module;
 
 namespace ebpf {
 
-class TableDesc;
+struct TableDesc;
 
 namespace cc {
 class Parser;

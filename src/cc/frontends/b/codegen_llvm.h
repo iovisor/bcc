@@ -41,7 +41,7 @@ class GlobalVariable;
 }
 
 namespace ebpf {
-class TableDesc;
+struct TableDesc;
 
 namespace cc {
 
@@ -63,7 +63,7 @@ class CodegenLLVM : public Visitor {
   EXPAND_NODES(VISIT)
 #undef VISIT
 
-  virtual STATUS_RETURN visit(Node* n, std::vector<TableDesc> &tables);
+  STATUS_RETURN visit(Node* n, std::vector<TableDesc> &tables);
 
   int get_table_fd(const std::string &name) const;
 

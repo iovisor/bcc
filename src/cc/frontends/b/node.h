@@ -619,9 +619,6 @@ class Visitor {
  public:
   typedef StatusTuple Ret;
   virtual ~Visitor() {}
-  virtual STATUS_RETURN visit(Node* n) {
-    return n->accept(this);
-  }
 #define VISIT(type, func) virtual STATUS_RETURN visit_##func(type* n) = 0;
   EXPAND_NODES(VISIT)
 #undef VISIT

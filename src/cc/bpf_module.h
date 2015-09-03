@@ -31,7 +31,7 @@ class Type;
 }
 
 namespace ebpf {
-class TableDesc;
+struct TableDesc;
 class BLoader;
 class ClangLoader;
 

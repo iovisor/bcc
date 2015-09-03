@@ -26,8 +26,8 @@ namespace cc {
 
 class TypeCheck : public Visitor {
  public:
-  TypeCheck(Scopes *scopes, Scopes *proto_scopes, const std::map<std::string, std::string>& pragmas)
-      : scopes_(scopes), proto_scopes_(proto_scopes), pragmas_(pragmas) {}
+  TypeCheck(Scopes *scopes, Scopes *proto_scopes)
+      : scopes_(scopes), proto_scopes_(proto_scopes) {}
 
   virtual STATUS_RETURN visit(Node* n);
   STATUS_RETURN expect_method_arg(MethodCallExprNode* n, size_t num, size_t num_def_args);
@@ -43,7 +43,6 @@ class TypeCheck : public Visitor {
   Scopes *scopes_;
   Scopes *proto_scopes_;
   vector<string> errors_;
-  const std::map<std::string, std::string> &pragmas_;
 };
 
 }  // namespace cc
