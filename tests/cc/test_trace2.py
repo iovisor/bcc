@@ -3,7 +3,7 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 
 from ctypes import c_uint, c_ulong, Structure
-from bpf import BPF
+from bcc import BPF
 from time import sleep
 import sys
 from unittest import main, TestCase

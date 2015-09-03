@@ -25,7 +25,7 @@
 #            pass()                                              |
 
 
-from bpf import BPF
+from bcc import BPF
 from pyroute2 import IPRoute, NetNS, IPDB, NSPopen
 from simulation import Simulation
 import sys

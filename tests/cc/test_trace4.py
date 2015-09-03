@@ -2,7 +2,7 @@
 # Copyright (c) PLUMgrid, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
 
-from bpf import BPF
+from bcc import BPF
 import os
 import sys
 from unittest import main, TestCase

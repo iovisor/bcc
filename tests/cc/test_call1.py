@@ -4,7 +4,7 @@
 
 from ctypes import c_ushort, c_int, c_ulonglong
 from netaddr import IPAddress
-from bpf import BPF
+from bcc import BPF
 from pyroute2 import IPRoute
 from socket import socket, AF_INET, SOCK_DGRAM
 import sys

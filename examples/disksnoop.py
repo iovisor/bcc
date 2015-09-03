@@ -11,7 +11,7 @@
 # 11-Aug-2015	Brendan Gregg	Created this.
 
 from __future__ import print_function
-from bpf import BPF
+from bcc import BPF
 import sys
 
 REQ_WRITE = 1		# from include/linux/blk_types.h

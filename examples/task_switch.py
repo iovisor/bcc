@@ -2,7 +2,7 @@
 # Copyright (c) PLUMgrid, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
 
-from bpf import BPF
+from bcc import BPF
 from time import sleep
 
 b = BPF(src_file="task_switch.c")

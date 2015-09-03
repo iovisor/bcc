@@ -23,7 +23,7 @@
 #      phys      |                            veth            |
 #     switch     |                                            |
 
-from bpf import BPF
+from bcc import BPF
 from builtins import input
 from pyroute2 import IPRoute, NetNS, IPDB, NSPopen
 from random import shuffle

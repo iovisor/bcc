@@ -3,7 +3,7 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 
 from netaddr import IPAddress
-from bpf import BPF
+from bcc import BPF
 from pyroute2 import IPRoute
 from socket import socket, AF_INET, SOCK_DGRAM
 from subprocess import call
