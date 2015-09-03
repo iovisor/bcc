@@ -59,56 +59,56 @@ static __u64 ptr_to_u64(void *ptr)
 
 int bpf_create_map(enum bpf_map_type map_type, int key_size, int value_size, int max_entries)
 {
-  union bpf_attr attr = {
-    .map_type = map_type,
-    .key_size = key_size,
-    .value_size = value_size,
-    .max_entries = max_entries
-  };
+  union bpf_attr attr;
+  memset(&attr, 0, sizeof(attr));
+  attr.map_type = map_type;
+  attr.key_size = key_size;
+  attr.value_size = value_size;
+  attr.max_entries = max_entries;
 
   return syscall(__NR_bpf, BPF_MAP_CREATE, &attr, sizeof(attr));
 }
 
 int bpf_update_elem(int fd, void *key, void *value, unsigned long long flags)
 {
-  union bpf_attr attr = {
-    .map_fd = fd,
-    .key = ptr_to_u64(key),
-    .value = ptr_to_u64(value),
-    .flags = flags,
-  };
+  union bpf_attr attr;
+  memset(&attr, 0, sizeof(attr));
+  attr.map_fd = fd;
+  attr.key = ptr_to_u64(key);
+  attr.value = ptr_to_u64(value);
+  attr.flags = flags;
 
   return syscall(__NR_bpf, BPF_MAP_UPDATE_ELEM, &attr, sizeof(attr));
 }
 
 int bpf_lookup_elem(int fd, void *key, void *value)
 {
-  union bpf_attr attr = {
-    .map_fd = fd,
-    .key = ptr_to_u64(key),
-    .value = ptr_to_u64(value),
-  };
+  union bpf_attr attr;
+  memset(&attr, 0, sizeof(attr));
+  attr.map_fd = fd;
+  attr.key = ptr_to_u64(key);
+  attr.value = ptr_to_u64(value);
 
   return syscall(__NR_bpf, BPF_MAP_LOOKUP_ELEM, &attr, sizeof(attr));
 }
 
 int bpf_delete_elem(int fd, void *key)
 {
-  union bpf_attr attr = {
-    .map_fd = fd,
-    .key = ptr_to_u64(key),
-  };
+  union bpf_attr attr;
+  memset(&attr, 0, sizeof(attr));
+  attr.map_fd = fd;
+  attr.key = ptr_to_u64(key);
 
   return syscall(__NR_bpf, BPF_MAP_DELETE_ELEM, &attr, sizeof(attr));
 }
 
 int bpf_get_next_key(int fd, void *key, void *next_key)
 {
-  union bpf_attr attr = {
-    .map_fd = fd,
-    .key = ptr_to_u64(key),
-    .next_key = ptr_to_u64(next_key),
-  };
+  union bpf_attr attr;
+  memset(&attr, 0, sizeof(attr));
+  attr.map_fd = fd;
+  attr.key = ptr_to_u64(key);
+  attr.next_key = ptr_to_u64(next_key);
 
   return syscall(__NR_bpf, BPF_MAP_GET_NEXT_KEY, &attr, sizeof(attr));
 }
@@ -122,15 +122,15 @@ int bpf_prog_load(enum bpf_prog_type prog_type,
                   const char *license, unsigned kern_version,
                   char *log_buf, unsigned log_buf_size)
 {
-  union bpf_attr attr = {
-    .prog_type = prog_type,
-    .insns = ptr_to_u64((void *) insns),
-    .insn_cnt = prog_len / sizeof(struct bpf_insn),
-    .license = ptr_to_u64((void *) license),
-    .log_buf = ptr_to_u64(log_buf),
-    .log_size = log_buf_size,
-    .log_level = log_buf ? 1 : 0,
-  };
+  union bpf_attr attr;
+  memset(&attr, 0, sizeof(attr));
+  attr.prog_type = prog_type;
+  attr.insns = ptr_to_u64((void *) insns);
+  attr.insn_cnt = prog_len / sizeof(struct bpf_insn);
+  attr.license = ptr_to_u64((void *) license);
+  attr.log_buf = ptr_to_u64(log_buf);
+  attr.log_size = log_buf_size;
+  attr.log_level = log_buf ? 1 : 0;
 
   attr.kern_version = kern_version;
   if (log_buf)
