@@ -41,6 +41,7 @@ The features of this toolkit include:
       tc actions, and kprobes
 * Bindings for Python
 * Examples for socket filters, tc classifiers, and kprobes
+* Self-contained tools for tracing a running system
 
 In the future, more bindings besides python will likely be supported. Feel free
 to add support for the language of your choice and send a pull request!
@@ -77,19 +78,14 @@ For this example, we will call the program every time `fork()` is called by a
 userspace process. Underneath the hood, fork translates to the `clone` syscall,
 so we will attach our program to the kernel symbol `sys_clone`.
 ```python
-fn = b.load_func("hello", BPF.KPROBE)
-BPF.attach_kprobe(fn, "sys_clone")
+b.attach_kprobe(event="sys_clone", fn_name="hello")
 ```
 
 The python process will then print the trace printk circular buffer until ctrl-c
 is pressed. The BPF program is removed from the kernel when the userspace
 process that loaded it closes the fd (or exits).
 ```python
-from subprocess import call
-try:
-    call(["cat", "/sys/kernel/debug/tracing/trace_pipe"])
-except KeyboardInterrupt:
-    pass
+b.trace_print()
 ```
 
 Output:
