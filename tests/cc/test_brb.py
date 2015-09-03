@@ -63,7 +63,7 @@
 
 from ctypes import c_uint
 from netaddr import IPAddress, EUI
-from bpf import BPF
+from bcc import BPF
 from pyroute2 import IPRoute, NetNS, IPDB, NSPopen
 import sys
 from time import sleep

@@ -5,7 +5,7 @@
 # run in project examples directory with:
 # sudo ./hello_world.py"
 
-from bpf import BPF
+from bcc import BPF
 
 prog = """
 int hello(void *ctx) {

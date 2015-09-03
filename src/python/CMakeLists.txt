@@ -5,18 +5,17 @@ macro(symlink_file SRC DST)
   execute_process(COMMAND ${CMAKE_COMMAND} -E create_symlink ${SRC} ${DST})
 endmacro()
 
-symlink_file(${CMAKE_CURRENT_SOURCE_DIR}/bpf ${CMAKE_CURRENT_BINARY_DIR}/bpf)
-symlink_file(${CMAKE_CURRENT_SOURCE_DIR}/bpf-run ${CMAKE_CURRENT_BINARY_DIR}/bpf-run)
+symlink_file(${CMAKE_CURRENT_SOURCE_DIR}/bcc ${CMAKE_CURRENT_BINARY_DIR}/bcc)
 
-set(PIP_INSTALLABLE "${CMAKE_CURRENT_BINARY_DIR}/dist/bpf-${REVISION}.tar.gz")
+set(PIP_INSTALLABLE "${CMAKE_CURRENT_BINARY_DIR}/dist/bcc-${REVISION}.tar.gz")
 configure_file(setup.py.in ${CMAKE_CURRENT_BINARY_DIR}/setup.py @ONLY)
 # build the pip installable
 add_custom_command(OUTPUT ${PIP_INSTALLABLE}
   COMMAND python setup.py sdist
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/bpf/__init__.py ${CMAKE_CURRENT_BINARY_DIR}/setup.py
+  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/bcc/__init__.py ${CMAKE_CURRENT_BINARY_DIR}/setup.py
   )
-add_custom_target(bpf_py ALL DEPENDS ${PIP_INSTALLABLE})
+add_custom_target(bcc_py ALL DEPENDS ${PIP_INSTALLABLE})
 
 if(EXISTS "/etc/debian_version")
   set(PYTHON_FLAGS "${PYTHON_FLAGS} --install-layout deb")

@@ -7,7 +7,7 @@
 
 from ctypes import c_uint, c_ulong, Structure
 from netaddr import IPAddress
-from bpf import BPF
+from bcc import BPF
 from subprocess import check_call
 import sys
 from unittest import main, TestCase

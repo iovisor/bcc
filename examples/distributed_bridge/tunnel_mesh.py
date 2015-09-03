@@ -3,7 +3,7 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 
 from sys import argv
-from bpf import BPF
+from bcc import BPF
 from builtins import input
 from ctypes import c_int, c_uint
 from http.server import HTTPServer, SimpleHTTPRequestHandler

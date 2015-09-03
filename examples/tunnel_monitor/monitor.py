@@ -2,7 +2,7 @@
 # Copyright (c) PLUMgrid, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
 
-from bpf import BPF
+from bcc import BPF
 from ctypes import c_uint, c_int, c_ulonglong, Structure
 import json
 from netaddr import IPAddress

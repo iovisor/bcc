@@ -65,15 +65,14 @@ Summary: Examples for BPF Compiler Collection (BCC)
 %description -n libbcc-examples
 Examples for BPF Compiler Collection (BCC)
 
-%package -n python-bpf
+%package -n python-bcc
 Summary: Python bindings for BPF Compiler Collection (BCC)
-%description -n python-bpf
+%description -n python-bcc
 Python bindings for BPF Compiler Collection (BCC)
 
-%files -n python-bpf
-%{python_sitelib}/bpf*
+%files -n python-bcc
+%{python_sitelib}/bcc*
 %exclude %{python_sitelib}/*.egg-info
-/usr/bin/bpf-run
 
 %files -n libbcc
 /usr/lib64/*

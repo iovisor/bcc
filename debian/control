@@ -18,7 +18,7 @@ Architecture: any
 Depends: libbcc
 Description: Shared Library for BPF Compiler Collection (BCC)
 
-Package: python-bpf
+Package: python-bcc
 Architecture: all
 Depends: libbcc, python
 Description: Python wrappers for BPF Compiler Collection (BCC)

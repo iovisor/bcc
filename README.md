@@ -55,7 +55,7 @@ detail of how this all works.
 
 First, we should include the BPF class from the bpf module:
 ```python
-from bpf import BPF
+from bcc import BPF
 ```
 
 Since the C code is so short, we will embed it inside the python script.
@@ -158,7 +158,7 @@ argument). The `get_table` API returns an object that gives dict-style access
 to the stats BPF map. The python program could use that handle to modify the
 kernel table as well.
 ```python
-from bpf import BPF
+from bcc import BPF
 from time import sleep
 
 b = BPF(src_file="task_switch.c")

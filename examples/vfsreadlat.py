@@ -15,7 +15,7 @@
 #
 # 15-Aug-2015	Brendan Gregg	Created this.
 
-from bpf import BPF
+from bcc import BPF
 from ctypes import c_ushort, c_int, c_ulonglong
 from time import sleep
 from sys import argv
