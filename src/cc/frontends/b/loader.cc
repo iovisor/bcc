@@ -54,7 +54,7 @@ int BLoader::parse(llvm::Module *mod, const string &filename, const string &prot
   //ebpf::cc::Printer printer(stderr);
   //printer.visit(parser_->root_node_);
 
-  ebpf::cc::TypeCheck type_check(parser_->scopes_.get(), proto_parser_->scopes_.get(), parser_->pragmas_);
+  ebpf::cc::TypeCheck type_check(parser_->scopes_.get(), proto_parser_->scopes_.get());
   auto ret = type_check.visit(parser_->root_node_);
   if (get<0>(ret) != 0 || get<1>(ret).size()) {
     fprintf(stderr, "Type error @line=%d: %s\n", get<0>(ret), get<1>(ret).c_str());
