@@ -88,6 +88,7 @@ make install/strip DESTDIR=%{buildroot}
 
 %package -n libbcc
 Summary: Shared Library for BPF Compiler Collection (BCC)
+Requires: make, gcc
 %description -n libbcc
 Shared Library for BPF Compiler Collection (BCC)
 

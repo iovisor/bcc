@@ -1,5 +1,4 @@
 %define debug_package %{nil}
-%define llvmver 3.7.0
 
 Name:           bcc
 Version:        0.1.6
@@ -9,9 +8,7 @@ Summary:        BPF Compiler Collection (BCC)
 Group:          Development/Languages
 License:        ASL 2.0
 URL:            https://github.com/iovisor/bcc
-Source0:        https://github.com/iovisor/bcc/archive/v%{version}.tar.gz
-Source1:        http://llvm.org/releases/3.7.0/llvm-%{llvmver}.src.tar.xz
-Source2:        http://llvm.org/releases/3.7.0/cfe-%{llvmver}.src.tar.xz
+Source0:        bcc.tar.gz
 
 BuildArch:      x86_64
 BuildRequires:  bison, cmake >= 2.8.7, flex, gcc, gcc-c++, python2-devel
@@ -22,24 +19,9 @@ userspace.
 
 
 %prep
-%setup -T -b 1 -n llvm-%{llvmver}.src
-mkdir tools/clang
-tar -xvvJf %{_sourcedir}/cfe-%{llvmver}.src.tar.xz -C tools/clang --strip 1
-%setup -D -n bcc-%{version}
+%setup -n bcc
 
 %build
-
-export LD_LIBRARY_PATH="%{_builddir}/usr/lib64"
-export PATH="%{_builddir}/usr/bin":$PATH
-
-# build llvm
-pushd %{_builddir}/llvm-%{llvmver}.src
-mkdir build
-cd build
-../configure --disable-assertions --enable-optimized --prefix="%{_builddir}/usr"
-make -j`grep -c ^process /proc/cpuinfo`
-make install
-popd
 
 mkdir build
 pushd build
@@ -57,7 +39,7 @@ make install/strip DESTDIR=%{buildroot}
 
 %package -n libbcc
 Summary: Shared Library for BPF Compiler Collection (BCC)
-Requires: make, gcc
+Requires: gcc, make
 %description -n libbcc
 Shared Library for BPF Compiler Collection (BCC)
 
