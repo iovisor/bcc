@@ -94,6 +94,9 @@ bcc/examples$ sudo python hello_world.py
           python-7282  [002] d...  3757.488508: : Hello, World!
 ```
 
+For an explanation of the meaning of the printed fields, see the trace_pipe
+section of the [kernel ftrace doc](https://www.kernel.org/doc/Documentation/trace/ftrace.txt).
+
 [Source code listing](examples/hello_world.py)
 
 ### Networking
@@ -134,6 +137,9 @@ struct key_t {
 };
 // map_type, key_type, leaf_type, table_name, num_entry
 BPF_TABLE("hash", struct key_t, u64, stats, 1024);
+// attach to finish_task_switch in kernel/sched/core.c, which has the following
+// prototype:
+//   struct rq *finish_task_switch(struct task_struct *prev)
 int count_sched(struct pt_regs *ctx, struct task_struct *prev) {
   struct key_t key = {};
   u64 zero = 0, *val;
@@ -149,10 +155,11 @@ int count_sched(struct pt_regs *ctx, struct task_struct *prev) {
 [Source code listing](examples/task_switch.c)
 
 The userspace component loads the file shown above, and attaches it to the
-`finish_task_switch` kernel function (which takes one `struct task_struct *`
-argument). The `get_table` API returns an object that gives dict-style access
-to the stats BPF map. The python program could use that handle to modify the
-kernel table as well.
+`finish_task_switch` kernel function.
+The [] operator of the BPF object gives access to each BPF_TABLE in the
+program, allowing pass-through access to the values residing in the kernel. Use
+the object as you would any other python dict object: read, update, and deletes
+are all allowed.
 ```python
 from bcc import BPF
 from time import sleep
@@ -168,25 +175,6 @@ for k, v in b["stats"].items():
 ```
 [Source code listing](examples/task_switch.py)
 
-## Requirements
-
-To get started using this toolchain in binary format, one needs:
-* Linux kernel 4.1 or newer, with these flags enabled:
-  * `CONFIG_BPF=y`
-  * `CONFIG_BPF_SYSCALL=y`
-  * `CONFIG_NET_CLS_BPF=m` [optional, for tc filters]
-  * `CONFIG_NET_ACT_BPF=m` [optional, for tc actions]
-  * `CONFIG_BPF_JIT=y`
-  * `CONFIG_HAVE_BPF_JIT=y`
-  * `CONFIG_BPF_EVENTS=y` [optional, for kprobes]
-* Headers for the above kernel
-* gcc, make, python
-* python-pyroute2 (for some networking features only)
-
 ## Getting started
-
-As of this writing, binary packages for the above requirements are available
-in unstable formats. Both Ubuntu and Fedora have 4.2-rcX builds with the above
-flags defaulted to on. LLVM provides 3.7 Ubuntu packages (but not Fedora yet).
 
 See [INSTALL.md](INSTALL.md) for installation steps on your platform.

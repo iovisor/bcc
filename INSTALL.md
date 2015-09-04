@@ -14,7 +14,7 @@ sudo dpkg -i linux-*${VER}.${REL}*.deb
 # reboot
 ```
 
-Tagged binary packages are built for Ubuntu Trusty (14.04) and hosted at
+Tagged bcc binary packages are built for Ubuntu Trusty (14.04) and hosted at
 http://52.8.15.63/apt/.
 
 To install:
@@ -47,7 +47,8 @@ sudo dnf install -y kernel-core-4.2.0-1.fc24.x86_64 kernel-4.2.0-1.fc24.x86_64 k
 # reboot
 ```
 
-Tagged binary packages are built for Fedora 22 and hosted at http://52.8.15.63/yum/.
+Tagged bcc binary packages are built for Fedora 22 and hosted at
+http://52.8.15.63/yum/.
 
 To install:
 ```bash
