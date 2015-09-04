@@ -19,7 +19,5 @@ endif()
 
 # strip leading 'v', and make unique for the tag
 message(STATUS "Revision is ${REVISION}")
-set(REVISION "${REVISION}" PARENT_SCOPE)
 # rpm/deb packaging uses this, only works on whole tag numbers
 string(SUBSTRING "${GIT_TAG_LAST}" 1 -1 REVISION_LAST)
-set(REVISION_LAST "${REVISION_LAST}" PARENT_SCOPE)

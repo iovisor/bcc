@@ -7,7 +7,8 @@ set(CMAKE_BUILD_TYPE Release)
 
 enable_testing()
 
-include(scripts/GetGitRevisionDescription.cmake)
+include(cmake/GetGitRevisionDescription.cmake)
+include(cmake/version.cmake)
 get_property(LIB64 GLOBAL PROPERTY FIND_LIBRARY_USE_LIB64_PATHS)
 if(LIB64)
   set(LIBSUFFIX 64)
@@ -45,7 +46,6 @@ set(CMAKE_C_FLAGS "-Wall")
 set(CMAKE_CXX_FLAGS "-std=c++11 -Wall")
 endif()
 
-add_subdirectory(scripts)
 add_subdirectory(examples)
 add_subdirectory(src)
 add_subdirectory(tests)

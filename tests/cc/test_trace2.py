@@ -26,13 +26,13 @@ class TestTracingEvent(TestCase):
     def setUp(self):
         b = BPF(text=text, debug=0)
         self.stats = b.get_table("stats")
-        b.attach_kprobe(event="schedule+50", fn_name="count_sched", pid=0, cpu=-1)
+        b.attach_kprobe(event="finish_task_switch", fn_name="count_sched", pid=0, cpu=-1)
 
     def test_sched1(self):
         for i in range(0, 100):
             sleep(0.01)
         for key, leaf in self.stats.items():
-            print("ptr %x:" % key.ptr, "stat1 %x" % leaf.stat1)
+            print("ptr %x:" % key.ptr, "stat1 %d" % leaf.stat1)
 
 if __name__ == "__main__":
     main()
