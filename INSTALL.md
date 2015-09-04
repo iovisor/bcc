@@ -51,8 +51,8 @@ Tagged binary packages are built for Fedora 22 and hosted at http://52.8.15.63/y
 
 To install:
 ```bash
-wget http://52.8.15.63/yum/main/f22/iovisor.repo -O /etc/yum.repos.d/iovisor.repo
-dnf install -y libbcc libbcc-examples python-bcc
+sudo wget http://52.8.15.63/yum/main/f22/iovisor.repo -O /etc/yum.repos.d/iovisor.repo
+sudo dnf install -y libbcc libbcc-examples python-bcc
 ```
 
 # Ubuntu - From source
@@ -82,7 +82,7 @@ To build the toolchain from source, one needs:
 # Fedora - From source
 
 * Install build dependencies
-  * `sudo dnf install -y cmake ethtool git iperf libstdc++-static python-netaddr python-pip gcc gcc-c++ make zlib-devel`
+  * `sudo dnf install -y bison cmake ethtool flex git iperf libstdc++-static python-netaddr python-pip gcc gcc-c++ make zlib-devel`
   * `sudo dnf install -y http://pkgs.repoforge.org/netperf/netperf-2.6.0-1.el6.rf.x86_64.rpm`
   * `sudo pip install pyroute2`
 * Install binary clang
