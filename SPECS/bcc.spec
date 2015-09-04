@@ -1,0 +1,66 @@
+%define debug_package %{nil}
+
+Name:           bcc
+Version:        0.1.6
+Release:        1%{?dist}
+Summary:        BPF Compiler Collection (BCC)
+
+Group:          Development/Languages
+License:        ASL 2.0
+URL:            https://github.com/iovisor/bcc
+Source0:        bcc.tar.gz
+
+BuildArch:      x86_64
+BuildRequires:  bison, cmake >= 2.8.7, flex, gcc, gcc-c++, python2-devel
+
+%description
+Python bindings for BPF Compiler Collection (BCC). Control a BPF program from
+userspace.
+
+
+%prep
+%setup -n bcc
+
+%build
+
+mkdir build
+pushd build
+cmake .. -DREVISION=%{version} -DCMAKE_INSTALL_PREFIX=/usr
+make -j`grep -c ^process /proc/cpuinfo`
+popd
+
+%install
+pushd build
+make install/strip DESTDIR=%{buildroot}
+
+%changelog
+* Fri Jul 03 2015 Brenden Blanco <bblanco@plumgrid.com> - 0.1.1-2
+- Initial RPM Release
+
+%package -n libbcc
+Summary: Shared Library for BPF Compiler Collection (BCC)
+Requires: gcc, make
+%description -n libbcc
+Shared Library for BPF Compiler Collection (BCC)
+
+%package -n libbcc-examples
+Summary: Examples for BPF Compiler Collection (BCC)
+%description -n libbcc-examples
+Examples for BPF Compiler Collection (BCC)
+
+%package -n python-bcc
+Summary: Python bindings for BPF Compiler Collection (BCC)
+%description -n python-bcc
+Python bindings for BPF Compiler Collection (BCC)
+
+%files -n python-bcc
+%{python_sitelib}/bcc*
+%exclude %{python_sitelib}/*.egg-info
+
+%files -n libbcc
+/usr/lib64/*
+/usr/share/bcc/include/*
+/usr/include/bcc/*
+
+%files -n libbcc-examples
+/usr/share/bcc/examples/*
