@@ -13,7 +13,6 @@
 
 from __future__ import print_function
 from bcc import BPF
-import sys
 
 # load BPF program
 b = BPF(text = """
@@ -22,26 +21,12 @@ int do_sync(void *ctx) {
 	return 0;
 };
 """)
-b.attach_kprobe(event="sys_sync")
+b.attach_kprobe(event="sys_sync", fn_name="do_sync")
 
 # header
 print("%-18s %s" % ("TIME(s)", "CALL"))
 
-# open trace pipe
-try:
-	trace = open("/sys/kernel/debug/tracing/trace_pipe", "r")
-except:
-	print("ERROR: opening trace_pipe", file=sys.stderr)
-	exit(1)
-
 # format output
 while 1:
-	try:
-		line = trace.readline().rstrip()
-	except KeyboardInterrupt:
-		pass; exit()
-
-	prolog, time_s, colon, word = line.rsplit(" ", 3)
-	time_s = time_s[:-1]	# strip trailing ":"
-
-	print("%-18s %s" % (time_s, word))
+	(task, pid, cpu, flags, ts, msg) = b.trace_readline_fields()
+	print("%-18.9f %s" % (ts, msg))

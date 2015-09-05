@@ -12,7 +12,6 @@
 
 from __future__ import print_function
 from bcc import BPF
-import sys
 
 REQ_WRITE = 1		# from include/linux/blk_types.h
 
@@ -23,13 +22,6 @@ b.attach_kprobe(event="blk_update_request", fn_name="do_completion")
 
 # header
 print("%-18s %-2s %-7s %8s" % ("TIME(s)", "T", "BYTES", "LAT(ms)"))
-
-# open trace pipe
-try:
-	trace = open("/sys/kernel/debug/tracing/trace_pipe", "r")
-except:
-	print("ERROR: opening trace_pipe", file=sys.stderr)
-	exit(1)
 
 # format output
 while 1:
