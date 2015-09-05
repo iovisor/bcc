@@ -492,8 +492,8 @@ class BPF(object):
         return tracefile
 
     @staticmethod
-    def trace_readline_fields(nonblocking=False):
-        """trace_readline_fields(nonblocking=False)
+    def trace_fields(nonblocking=False):
+        """trace_fields(nonblocking=False)
 
         Read from the kernel debug trace pipe and return a tuple of the
         fields (task, pid, cpu, flags, timestamp, msg) or None if no
@@ -537,13 +537,13 @@ class BPF(object):
 
         Read from the kernel debug trace pipe and print on stdout.
         If fmt is specified, apply as a format string to the output. See
-        trace_readline_fields for the members of the tuple
+        trace_fields for the members of the tuple
         example: trace_print(fmt="pid {1}, msg = {5}")
         """
 
         while True:
             if fmt:
-                fields = BPF.trace_readline_fields(nonblocking=False)
+                fields = BPF.trace_fields(nonblocking=False)
                 if not fields: continue
                 line = fmt.format(*fields)
             else:

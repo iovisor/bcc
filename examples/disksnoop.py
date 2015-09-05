@@ -25,7 +25,7 @@ print("%-18s %-2s %-7s %8s" % ("TIME(s)", "T", "BYTES", "LAT(ms)"))
 
 # format output
 while 1:
-	(task, pid, cpu, flags, ts, msg) = b.trace_readline_fields()
+	(task, pid, cpu, flags, ts, msg) = b.trace_fields()
 	(bytes_s, bflags_s, us_s) = msg.split()
 
 	if int(bflags_s, 16) & REQ_WRITE:
