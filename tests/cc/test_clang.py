@@ -100,5 +100,13 @@ int do_request(struct pt_regs *ctx, int req) {
         b = BPF(text=text, debug=0)
         fn = b.load_func("do_request", BPF.KPROBE)
 
+    def test_bpf_hash(self):
+        text = """
+BPF_HASH(table1);
+BPF_HASH(table2, u32);
+BPF_HASH(table3, u32, int);
+"""
+        b = BPF(text=text, debug=0)
+
 if __name__ == "__main__":
     main()
