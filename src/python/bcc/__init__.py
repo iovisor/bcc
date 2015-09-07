@@ -95,6 +95,7 @@ KALLSYMS = "/proc/kallsyms"
 ksym_addrs = []
 ksym_names = []
 ksym_loaded = 0
+stars_max = 38
 
 @atexit.register
 def cleanup_kprobes():
@@ -219,6 +220,52 @@ class BPF(object):
                     self.__delitem__(k)
             else:
                 super(BPF.Table, self).clear()
+
+        @staticmethod
+        def _stars(val, val_max, width):
+            i = 0
+            text = ""
+            while (1):
+                if (i > (width * val / val_max) - 1) or (i > width - 1):
+                    break
+                text += "*"
+                i += 1
+            if val > val_max:
+                text = text[:-1] + "+"
+            return text
+
+        def print_log2_hist(self, val_type="value"):
+            """print_log2_hist(type=value)
+
+            Prints a table as a log2 histogram. The table must be stored as
+            log2. The type argument is optional, and is a column header.
+            """
+            global stars_max
+            log2_dist_max = 64
+            idx_max = -1
+            val_max = 0
+            for i in range(1, log2_dist_max + 1):
+                try:
+                    val = self[ct.c_int(i)].value
+                    if (val > 0):
+                        idx_max = i
+                    if (val > val_max):
+                        val_max = val
+                except:
+                    break
+            if idx_max > 0:
+                print("     %-15s : count     distribution" % val_type);
+            for i in range(1, idx_max + 1):
+                low = (1 << i) >> 1
+                high = (1 << i) - 1
+                if (low == high):
+                    low -= 1
+                try:
+                    val = self[ct.c_int(i)].value
+                    print("%8d -> %-8d : %-8d |%-*s|" % (low, high, val,
+                        stars_max, self._stars(val, val_max, stars_max)))
+                except:
+                    break
 
 
         def __iter__(self):
