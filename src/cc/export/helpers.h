@@ -41,6 +41,20 @@ struct _name##_table_t { \
 __attribute__((section("maps/" _table_type))) \
 struct _name##_table_t _name
 
+#define BPF_HASH1(_name) \
+  BPF_TABLE("hash", u64, u64, _name, 10240)
+#define BPF_HASH2(_name, _key_type) \
+  BPF_TABLE("hash", _key_type, u64, _name, 10240)
+#define BPF_HASH3(_name, _key_type, _leaf_type) \
+  BPF_TABLE("hash", _key_type, _leaf_type, _name, 10240)
+// helper for default-variable macro function
+#define BPF_HASHX(_1, _2, _3, NAME, ...) NAME
+
+// Define a hash function, some arguments optional
+// BPF_HASH(name, key_type=u64, leaf_type=u64, size=10240)
+#define BPF_HASH(...) \
+  BPF_HASHX(__VA_ARGS__, BPF_HASH3, BPF_HASH2, BPF_HASH1)(__VA_ARGS__)
+
 // packet parsing state machine helpers
 #define cursor_advance(_cursor, _len) \
   ({ void *_tmp = _cursor; _cursor += _len; _tmp; })

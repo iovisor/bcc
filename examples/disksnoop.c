@@ -16,7 +16,7 @@
 struct key_t {
 	struct request *req;
 };
-BPF_TABLE("hash", struct key_t, u64, start, 10240);
+BPF_HASH(start, struct key_t);
 
 int do_request(struct pt_regs *ctx, struct request *req) {
 	struct key_t key = {};

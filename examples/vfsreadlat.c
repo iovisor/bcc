@@ -17,7 +17,7 @@ struct key_t {
 	u32 pid;
 };
 
-BPF_TABLE("hash", struct key_t, u64, start, 10240);
+BPF_HASH(start, struct key_t);
 BPF_TABLE("array", int, u64, dist, 64);
 
 static unsigned int log2(unsigned int v)
