@@ -546,10 +546,11 @@ class BPF(object):
         fields (task, pid, cpu, flags, timestamp, msg) or None if no
         line was read (nonblocking=True)
         """
-        line = BPF.trace_readline(nonblocking)
-        if line:
+        while True:
+            line = BPF.trace_readline(nonblocking)
+            if not line and nonblocking: return (None,) * 6
             # don't print messages related to lost events
-            if line.startswith("CPU:"): return
+            if line.startswith("CPU:"): continue
             task = line[:16].lstrip()
             line = line[17:]
             ts_end = line.find(":")
@@ -557,7 +558,6 @@ class BPF(object):
             cpu = cpu[1:-1]
             msg = line[ts_end + 4:]
             return (task, int(pid), int(cpu), flags, float(ts), msg)
-        return
 
     @staticmethod
     def trace_readline(nonblocking=False):
