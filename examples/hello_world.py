@@ -4,15 +4,10 @@
 
 # run in project examples directory with:
 # sudo ./hello_world.py"
+# see trace_fields.py for a longer example
 
 from bcc import BPF
 
-prog = """
-int hello(void *ctx) {
-  bpf_trace_printk("Hello, World!\\n");
-  return 0;
-}
-"""
-b = BPF(text=prog)
+b = BPF(text='void hello(void *ctx) { bpf_trace_printk("Hello, World!\\n"); }')
 b.attach_kprobe(event="sys_clone", fn_name="hello")
-b.trace_print(fmt="{1} {5}")
+b.trace_print()
