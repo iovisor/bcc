@@ -46,6 +46,28 @@ int count_foo(struct pt_regs *ctx, unsigned long a, unsigned long b) {
         b = BPF(text=text, debug=0)
         fn = b.load_func("count_foo", BPF.KPROBE)
 
+    def test_probe_read_keys(self):
+        text = """
+#include <uapi/linux/ptrace.h>
+#include <linux/blkdev.h>
+BPF_HASH(start, struct request *);
+int do_request(struct pt_regs *ctx, struct request *req) {
+    u64 ts = bpf_ktime_get_ns();
+    start.update(&req, &ts);
+    return 0;
+}
+
+int do_completion(struct pt_regs *ctx, struct request *req) {
+    u64 *tsp = start.lookup(&req);
+    if (tsp != 0) {
+        start.delete(&req);
+    }
+    return 0;
+}
+"""
+        b = BPF(text=text, debug=0)
+        fns = b.load_funcs(BPF.KPROBE)
+
     def test_sscanf(self):
         text = """
 BPF_TABLE("hash", int, struct { u64 a; u64 b; u64 c:36; u64 d:28; struct { u32 a; u32 b; } s; }, stats, 10);

@@ -295,7 +295,7 @@ unique_ptr<ExecutionEngine> BPFModule::finalize_rw(unique_ptr<Module> m) {
 
 // load an entire c file as a module
 int BPFModule::load_cfile(const string &file, bool in_memory) {
-  clang_loader_ = make_unique<ClangLoader>(&*ctx_);
+  clang_loader_ = make_unique<ClangLoader>(&*ctx_, flags_);
   if (clang_loader_->parse(&mod_, &tables_, file, in_memory))
     return -1;
   return 0;
@@ -307,7 +307,7 @@ int BPFModule::load_cfile(const string &file, bool in_memory) {
 // Load in a pre-built list of functions into the initial Module object, then
 // build an ExecutionEngine.
 int BPFModule::load_includes(const string &tmpfile) {
-  clang_loader_ = make_unique<ClangLoader>(&*ctx_);
+  clang_loader_ = make_unique<ClangLoader>(&*ctx_, flags_);
   if (clang_loader_->parse(&mod_, &tables_, tmpfile, false))
     return -1;
   return 0;
@@ -652,7 +652,7 @@ int BPFModule::load_b(const string &filename, const string &proto_filename) {
   if (int rc = load_includes(BCC_INSTALL_PREFIX "/share/bcc/include/bcc/helpers.h"))
     return rc;
 
-  b_loader_.reset(new BLoader);
+  b_loader_.reset(new BLoader(flags_));
   if (int rc = b_loader_->parse(&*mod_, filename, proto_filename, &tables_))
     return rc;
   if (int rc = annotate())
