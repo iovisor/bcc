@@ -548,7 +548,7 @@ class BPF(object):
                 if fn.name.startswith("kprobe__"):
                     self.attach_kprobe(event=fn.name[8:], fn_name=fn.name)
                 elif fn.name.startswith("kretprobe__"):
-                    self.attach_kprobe(event=fn.name[11:], fn_name=fn.name)
+                    self.attach_kretprobe(event=fn.name[11:], fn_name=fn.name)
 
     def trace_open(self, nonblocking=False):
         """trace_open(nonblocking=False)
