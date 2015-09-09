@@ -102,6 +102,7 @@ bool BTypeVisitor::VisitFunctionDecl(FunctionDecl *D) {
     rewriter_.InsertText(D->getLocStart(), attr);
     // remember the arg names of the current function...first one is the ctx
     fn_args_.clear();
+    string preamble = "{";
     for (auto arg : D->params()) {
       if (arg->getName() == "") {
         C.getDiagnostics().Report(arg->getLocEnd(), diag::err_expected)
@@ -109,7 +110,15 @@ bool BTypeVisitor::VisitFunctionDecl(FunctionDecl *D) {
         return false;
       }
       fn_args_.push_back(arg);
+      if (fn_args_.size() > 1) {
+        size_t d = fn_args_.size() - 2;
+        const char *reg = calling_conv_regs[d];
+        preamble += arg->getName().str() + " = " + fn_args_[0]->getName().str() + "->" + string(reg) + ";";
+      }
     }
+    // for each trace argument, convert the variable from ptregs to something on stack
+    if (CompoundStmt *S = dyn_cast<CompoundStmt>(D->getBody()))
+      rewriter_.ReplaceText(S->getLBracLoc(), 1, preamble);
   }
   return true;
 }
@@ -274,23 +283,6 @@ bool BTypeVisitor::VisitMemberExpr(MemberExpr *E) {
       rewriter_.InsertText(E->getLocStart(), pre);
       rewriter_.ReplaceText(SourceRange(E->getOperatorLoc(), E->getLocEnd()), post);
     }
-  }
-  return true;
-}
-
-bool BTypeVisitor::VisitDeclRefExpr(DeclRefExpr *E) {
-  auto it = std::find(fn_args_.begin() + 1, fn_args_.end(), E->getDecl());
-  if (it != fn_args_.end()) {
-    if (!rewriter_.isRewritable(E->getLocStart())) {
-      C.getDiagnostics().Report(E->getLocStart(), diag::err_expected)
-          << "use of probe argument not in a macro";
-      return false;
-    }
-    size_t d = std::distance(fn_args_.begin() + 1, it);
-    const char *reg = calling_conv_regs[d];
-    string text = "((u64)" + fn_args_[0]->getName().str() + "->" + string(reg) + ")";
-    rewriter_.ReplaceText(SourceRange(E->getLocStart(), E->getLocEnd()), text);
-    return true;
   }
   return true;
 }
