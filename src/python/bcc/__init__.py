@@ -348,13 +348,20 @@ class BPF(object):
         if self.module == None:
             raise Exception("Failed to compile BPF module %s" % src_file)
 
-    def load_func(self, func_name, prog_type):
-        # empty func_name signifies auto-detection...works when only 1 fn exists
-        if not func_name:
-            if lib.bpf_num_functions(self.module) != 1:
-                raise Exception("Param func_name is None but num_functions > 1, ambiguous")
-            func_name = lib.bpf_function_name(self.module, 0).decode()
+    def load_funcs(self, prog_type=KPROBE):
+        """load_funcs(prog_type=KPROBE)
 
+        Load all functions in this BPF module with the given type.
+        Returns a list of the function handles."""
+
+        fns = []
+        for i in range(0, lib.bpf_num_functions(self.module)):
+            func_name = lib.bpf_function_name(self.module, i).decode()
+            fns.append(self.load_func(func_name, prog_type))
+
+        return fns
+
+    def load_func(self, func_name, prog_type):
         if func_name in self.funcs:
             return self.funcs[func_name]
 
@@ -600,8 +607,12 @@ class BPF(object):
         # Cater to one-liner case where attach_kprobe is omitted and C function
         # name matches that of the kprobe.
         if len(open_kprobes) == 0:
-            fn = self.load_func(None, BPF.KPROBE)
-            self.attach_kprobe(event=fn.name, fn_name=fn.name)
+            fns = self.load_funcs(BPF.KPROBE)
+            for fn in fns:
+                if fn.name.startswith("kprobe__"):
+                    self.attach_kprobe(event=fn.name[8:], fn_name=fn.name)
+                elif fn.name.startswith("kretprobe__"):
+                    self.attach_kprobe(event=fn.name[11:], fn_name=fn.name)
 
         while True:
             if fmt:
