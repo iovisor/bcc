@@ -277,7 +277,7 @@ bool BTypeVisitor::VisitMemberExpr(MemberExpr *E) {
       string base_type = Ref->getType()->getPointeeType().getAsString();
       string pre, post;
       pre = "({ " + E->getType().getAsString() + " _val; memset(&_val, 0, sizeof(_val));";
-      pre += " bpf_probe_read(&_val, sizeof(_val), ";
+      pre += " bpf_probe_read(&_val, sizeof(_val), (u64)";
       post = " + offsetof(" + base_type + ", " + F->getName().str() + ")";
       post += "); _val; })";
       rewriter_.InsertText(E->getLocStart(), pre);
