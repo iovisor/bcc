@@ -442,13 +442,14 @@ bool BTypeConsumer::HandleTopLevelDecl(DeclGroupRef D) {
   return true;
 }
 
-BFrontendAction::BFrontendAction(llvm::raw_ostream &os)
-    : rewriter_(new Rewriter), os_(os), tables_(new vector<TableDesc>) {
+BFrontendAction::BFrontendAction(llvm::raw_ostream &os, unsigned flags)
+    : os_(os), flags_(flags), rewriter_(new Rewriter), tables_(new vector<TableDesc>) {
 }
 
 void BFrontendAction::EndSourceFileAction() {
   // uncomment to see rewritten source
-  //rewriter_->getEditBuffer(rewriter_->getSourceMgr().getMainFileID()).write(llvm::errs());
+  if (flags_ & 0x4)
+    rewriter_->getEditBuffer(rewriter_->getSourceMgr().getMainFileID()).write(llvm::errs());
   rewriter_->getEditBuffer(rewriter_->getSourceMgr().getMainFileID()).write(os_);
   os_.flush();
 }

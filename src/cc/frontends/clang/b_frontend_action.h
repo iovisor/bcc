@@ -67,7 +67,6 @@ class BTypeVisitor : public clang::RecursiveASTVisitor<BTypeVisitor> {
   bool VisitCallExpr(clang::CallExpr *Call);
   bool VisitVarDecl(clang::VarDecl *Decl);
   bool VisitMemberExpr(clang::MemberExpr *E);
-  bool VisitDeclRefExpr(clang::DeclRefExpr *E);
   bool VisitBinaryOperator(clang::BinaryOperator *E);
   bool VisitImplicitCastExpr(clang::ImplicitCastExpr *E);
 
@@ -96,7 +95,7 @@ class BFrontendAction : public clang::ASTFrontendAction {
  public:
   // Initialize with the output stream where the new source file contents
   // should be written.
-  explicit BFrontendAction(llvm::raw_ostream &os);
+  BFrontendAction(llvm::raw_ostream &os, unsigned flags);
 
   // Called by clang when the AST has been completed, here the output stream
   // will be flushed.
@@ -108,8 +107,9 @@ class BFrontendAction : public clang::ASTFrontendAction {
   // take ownership of the table-to-fd mapping data structure
   std::unique_ptr<std::vector<TableDesc>> take_tables() { return move(tables_); }
  private:
-  std::unique_ptr<clang::Rewriter> rewriter_;
   llvm::raw_ostream &os_;
+  unsigned flags_;
+  std::unique_ptr<clang::Rewriter> rewriter_;
   std::unique_ptr<std::vector<TableDesc>> tables_;
 };
 
