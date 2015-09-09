@@ -38,6 +38,10 @@ lib.bpf_module_license.restype = ct.c_char_p
 lib.bpf_module_license.argtypes = [ct.c_void_p]
 lib.bpf_module_kern_version.restype = ct.c_uint
 lib.bpf_module_kern_version.argtypes = [ct.c_void_p]
+lib.bpf_num_functions.restype = ct.c_ulonglong
+lib.bpf_num_functions.argtypes = [ct.c_void_p]
+lib.bpf_function_name.restype = ct.c_char_p
+lib.bpf_function_name.argtypes = [ct.c_void_p, ct.c_ulonglong]
 lib.bpf_function_start.restype = ct.c_void_p
 lib.bpf_function_start.argtypes = [ct.c_void_p, ct.c_char_p]
 lib.bpf_function_size.restype = ct.c_size_t
@@ -345,6 +349,12 @@ class BPF(object):
             raise Exception("Failed to compile BPF module %s" % src_file)
 
     def load_func(self, func_name, prog_type):
+        # empty func_name signifies auto-detection...works when only 1 fn exists
+        if not func_name:
+            if lib.bpf_num_functions(self.module) != 1:
+                raise Exception("Param func_name is None but num_functions > 1, ambiguous")
+            func_name = lib.bpf_function_name(self.module, 0).decode()
+
         if func_name in self.funcs:
             return self.funcs[func_name]
 
@@ -578,9 +588,8 @@ class BPF(object):
             exit()
         return line
 
-    @staticmethod
-    def trace_print(fmt=None):
-        """trace_print(fmt=None)
+    def trace_print(self, fmt=None):
+        """trace_print(self, fmt=None)
 
         Read from the kernel debug trace pipe and print on stdout.
         If fmt is specified, apply as a format string to the output. See
@@ -588,13 +597,19 @@ class BPF(object):
         example: trace_print(fmt="pid {1}, msg = {5}")
         """
 
+        # Cater to one-liner case where attach_kprobe is omitted and C function
+        # name matches that of the kprobe.
+        if len(open_kprobes) == 0:
+            fn = self.load_func(None, BPF.KPROBE)
+            self.attach_kprobe(event=fn.name, fn_name=fn.name)
+
         while True:
             if fmt:
-                fields = BPF.trace_fields(nonblocking=False)
+                fields = self.trace_fields(nonblocking=False)
                 if not fields: continue
                 line = fmt.format(*fields)
             else:
-                line = BPF.trace_readline(nonblocking=False)
+                line = self.trace_readline(nonblocking=False)
             print(line)
             sys.stdout.flush()
 

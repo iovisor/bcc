@@ -8,6 +8,4 @@
 
 from bcc import BPF
 
-b = BPF(text='void hello(void *ctx) { bpf_trace_printk("Hello, World!\\n"); }')
-b.attach_kprobe(event="sys_clone", fn_name="hello")
-b.trace_print()
+BPF(text='void sys_clone(void *ctx) { bpf_trace_printk("Hello, World!\\n"); }').trace_print()
