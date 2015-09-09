@@ -609,7 +609,10 @@ class BPF(object):
         if len(open_kprobes) == 0:
             fns = self.load_funcs(BPF.KPROBE)
             for fn in fns:
-                self.attach_kprobe(event=fn.name, fn_name=fn.name)
+                if fn.name.startswith("kprobe__"):
+                    self.attach_kprobe(event=fn.name[8:], fn_name=fn.name)
+                elif fn.name.startswith("kretprobe__"):
+                    self.attach_kprobe(event=fn.name[11:], fn_name=fn.name)
 
         while True:
             if fmt:
