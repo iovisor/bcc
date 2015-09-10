@@ -10,7 +10,7 @@ eBPF was [described by](https://lkml.org/lkml/2015/4/14/232) Ingo Molnár as:
 
 > One of the more interesting features in this cycle is the ability to attach eBPF programs (user-defined, sandboxed bytecode executed by the kernel) to kprobes. This allows user-defined instrumentation on a live kernel image that can never crash, hang or interfere with the kernel negatively.
 
-BCC makes writing eBPF programs easier to do, with kernel instrumentation in C,
+BCC makes  eBPF programs easier to write, with kernel instrumentation in C
 and a front-end in Python. It is suited for many tasks, including advanced
 performance analysis and network traffic control.
 
@@ -57,7 +57,7 @@ pair of .c and .py files, and some are directories of files.
 Examples:
 
 - examples/[bitehist.py](examples/bitehist.py) examples/[bitehist.c](examples/bitehist.c): Block I/O size histogram. [Examples](examples/bitehist_example.txt).
-- examples/[disksnoop.py](examples/disksnoop.py) examples/[disksnoop.c](examples/disksnoop.c): Trace block device I/O showing latency. [Examples](examples/disksnoop_example.txt).
+- examples/[disksnoop.py](examples/disksnoop.py) examples/[disksnoop.c](examples/disksnoop.c): Trace block device I/O latency. [Examples](examples/disksnoop_example.txt).
 - examples/[hello_world.py](examples/hello_world.py): Prints "Hello, World!" for new processes.
 - examples/[trace_fields.py](examples/trace_fields.py): Simple example of printing fields from traced events.
 - examples/[vfsreadlat.py](examples/vfsreadlat.py) examples/[vfsreadlat.c](examples/vfsreadlat.c): VFS read latency distribution. [Examples](examples/vfsreadlat_example.txt).
@@ -79,7 +79,7 @@ Examples:
 - examples/[simulation.py](examples/simulation.py): Simulation example.
 - examples/[simulation.py](examples/simulation.py): Simulation example.
 - examples/[tc_neighbor_sharing.py](examples/tc_neighbor_sharing.py) examples/[tc_neighbor_sharing.c](examples/tc_neighbor_sharing.c): Per-IP classification and rate limiting.
-- examples/[tunnel_monitor/](examples/tunnel_monitor): Efficiently monitor traffic flows in and out of an interface. [Example video](https://www.youtube.com/watch?v=yYy3Cwce02k).
+- examples/[tunnel_monitor/](examples/tunnel_monitor): Efficiently monitor traffic flows. [Example video](https://www.youtube.com/watch?v=yYy3Cwce02k).
 - examples/[vlan_learning.py](examples/vlan_learning.py) examples/[vlan_learning.c](examples/vlan_learning.c): Demux Ethernet traffic into worker veth+namespaces.
 
 ## Motivation
