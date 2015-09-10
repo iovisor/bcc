@@ -71,9 +71,6 @@ BPF(text='void kprobe__sys_clone(void *ctx) { bpf_trace_printk("Hello, World!\\n
 For this example, we will call the program every time `fork()` is called by a
 userspace process. Underneath the hood, fork translates to the `clone` syscall.
 BCC recognizes prefix kprobe__, and will auto attach our program to the kernel symbol `sys_clone`.
-```python
-b.attach_kprobe(event="sys_clone", fn_name="kprobe__sys_hello")
-```
 
 The python process will then print the trace printk circular buffer until ctrl-c
 is pressed. The BPF program is removed from the kernel when the userspace
