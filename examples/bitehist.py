@@ -18,7 +18,6 @@ from time import sleep
 
 # load BPF program
 b = BPF(src_file = "bitehist.c")
-b.attach_kprobe(event="blk_start_request", fn_name="do_request")
 
 # header
 print("Tracing... Hit Ctrl-C to end.")
