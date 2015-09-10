@@ -30,5 +30,12 @@ class TestKprobeRgx(TestCase):
         k2 = self.b["stats"].Key(2)
         self.assertEqual(self.b["stats"][k1].val, self.b["stats"][k2].val + 1)
 
+class TestKprobeReplace(TestCase):
+    def setUp(self):
+        self.b = BPF(text="int empty(void *ctx) { return 0; }")
+
+    def test_periods(self):
+        self.b.attach_kprobe(event_re="^tcp_enter_cwr.*", fn_name="empty")
+
 if __name__ == "__main__":
     main()

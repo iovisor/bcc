@@ -473,7 +473,10 @@ class BPF(object):
         p = Popen(["awk", "$1 ~ /%s/ { print $1 }" % event_re,
             "%s/available_filter_functions" % TRACEFS], stdout=PIPE)
         lines = p.communicate()[0].decode().split()
-        return [line.rstrip() for line in lines if line != "\n"]
+        with open("%s/../kprobes/blacklist" % TRACEFS) as f:
+            blacklist = [line.split()[1] for line in f.readlines()]
+        return [line.rstrip() for line in lines if
+                (line != "\n" and line not in blacklist)]
 
     def attach_kprobe(self, event="", fn_name="", event_re="",
             pid=0, cpu=-1, group_fd=-1):
@@ -481,12 +484,15 @@ class BPF(object):
         # allow the caller to glob multiple functions together
         if event_re:
             for line in BPF._get_kprobe_functions(event_re):
-                self.attach_kprobe(event=line, fn_name=fn_name, pid=pid,
-                        cpu=cpu, group_fd=group_fd)
+                try:
+                    self.attach_kprobe(event=line, fn_name=fn_name, pid=pid,
+                            cpu=cpu, group_fd=group_fd)
+                except:
+                    pass
             return
 
         fn = self.load_func(fn_name, BPF.KPROBE)
-        ev_name = "p_" + event.replace("+", "_")
+        ev_name = "p_" + event.replace("+", "_").replace(".", "_")
         desc = "p:kprobes/%s %s" % (ev_name, event)
         res = lib.bpf_attach_kprobe(fn.fd, ev_name.encode("ascii"),
                 desc.encode("ascii"), pid, cpu, group_fd)
@@ -497,7 +503,7 @@ class BPF(object):
 
     @staticmethod
     def detach_kprobe(event):
-        ev_name = "p_" + event.replace("+", "_")
+        ev_name = "p_" + event.replace("+", "_").replace(".", "_")
         if ev_name not in open_kprobes:
             raise Exception("Kprobe %s is not attached" % event)
         os.close(open_kprobes[ev_name])
@@ -513,12 +519,15 @@ class BPF(object):
         # allow the caller to glob multiple functions together
         if event_re:
             for line in BPF._get_kprobe_functions(event_re):
-                self.attach_kretprobe(event=line, fn_name=fn_name, pid=pid,
-                        cpu=cpu, group_fd=group_fd)
+                try:
+                    self.attach_kretprobe(event=line, fn_name=fn_name, pid=pid,
+                            cpu=cpu, group_fd=group_fd)
+                except:
+                    pass
             return
 
         fn = self.load_func(fn_name, BPF.KPROBE)
-        ev_name = "r_" + event.replace("+", "_")
+        ev_name = "r_" + event.replace("+", "_").replace(".", "_")
         desc = "r:kprobes/%s %s" % (ev_name, event)
         res = lib.bpf_attach_kprobe(fn.fd, ev_name.encode("ascii"),
                 desc.encode("ascii"), pid, cpu, group_fd)
@@ -529,7 +538,7 @@ class BPF(object):
 
     @staticmethod
     def detach_kretprobe(event):
-        ev_name = "r_" + event.replace("+", "_")
+        ev_name = "r_" + event.replace("+", "_").replace(".", "_")
         if ev_name not in open_kprobes:
             raise Exception("Kretprobe %s is not attached" % event)
         os.close(open_kprobes[ev_name])
