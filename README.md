@@ -76,8 +76,7 @@ Examples:
 
 - examples/[distributed_bridge/](examples/distributed_bridge): Distributed bridge example.
 - examples/[simple_tc.py](examples/simple_tc.py): Simple traffic control example.
-- examples/[simulation.py](examples/simulation.py): Simulation example.
-- examples/[simulation.py](examples/simulation.py): Simulation example.
+- examples/[simulation.py](examples/simulation.py): Simulation helper.
 - examples/[tc_neighbor_sharing.py](examples/tc_neighbor_sharing.py) examples/[tc_neighbor_sharing.c](examples/tc_neighbor_sharing.c): Per-IP classification and rate limiting.
 - examples/[tunnel_monitor/](examples/tunnel_monitor): Efficiently monitor traffic flows. [Example video](https://www.youtube.com/watch?v=yYy3Cwce02k).
 - examples/[vlan_learning.py](examples/vlan_learning.py) examples/[vlan_learning.c](examples/vlan_learning.c): Demux Ethernet traffic into worker veth+namespaces.
