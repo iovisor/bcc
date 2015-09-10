@@ -4,9 +4,9 @@ Install a 4.2+ kernel from http://kernel.ubuntu.com/~kernel-ppa/mainline,
 for example:
 
 ```bash
-VER=4.2.0-040200
-REL=201508301530
-PREFIX=http://kernel.ubuntu.com/~kernel-ppa/mainline/v4.2-unstable
+VER=4.2.0-999
+REL=201509072200
+PREFIX=http://kernel.ubuntu.com/~kernel-ppa/mainline/daily/2015-09-08-unstable/
 wget ${PREFIX}/linux-headers-${VER}-generic_${VER}.${REL}_amd64.deb
 wget ${PREFIX}/linux-headers-${VER}_${VER}.${REL}_all.deb
 wget ${PREFIX}/linux-image-${VER}-generic_${VER}.${REL}_amd64.deb
