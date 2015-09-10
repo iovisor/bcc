@@ -16,12 +16,10 @@ from bcc import BPF
 
 # load BPF program
 b = BPF(text = """
-int do_sync(void *ctx) {
+void kprobe__sys_sync(void *ctx) {
 	bpf_trace_printk("sync()\\n");
-	return 0;
 };
 """)
-b.attach_kprobe(event="sys_sync", fn_name="do_sync")
 
 # header
 print("%-18s %s" % ("TIME(s)", "CALL"))
