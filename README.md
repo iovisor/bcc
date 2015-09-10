@@ -10,9 +10,9 @@ eBPF was [described by](https://lkml.org/lkml/2015/4/14/232) Ingo Molnár as:
 
 > One of the more interesting features in this cycle is the ability to attach eBPF programs (user-defined, sandboxed bytecode executed by the kernel) to kprobes. This allows user-defined instrumentation on a live kernel image that can never crash, hang or interfere with the kernel negatively.
 
-BCC makes  eBPF programs easier to write, with kernel instrumentation in C
-and a front-end in Python. It is suited for many tasks, including advanced
-performance analysis and network traffic control.
+BCC makes eBPF programs easier to write, with kernel instrumentation in C
+and a front-end in Python. It is suited for many tasks, including performance
+analysis and network traffic control.
 
 ## Screenshot
 
