@@ -18,7 +18,7 @@ struct key_t {
 };
 BPF_HASH(start, struct key_t);
 
-int do_request(struct pt_regs *ctx, struct request *req) {
+int kprobe__blk_start_request(struct pt_regs *ctx, struct request *req) {
 	struct key_t key = {};
 	u64 ts;
 
@@ -30,7 +30,7 @@ int do_request(struct pt_regs *ctx, struct request *req) {
 	return 0;
 }
 
-int do_completion(struct pt_regs *ctx, struct request *req) {
+int kprobe__blk_update_request(struct pt_regs *ctx, struct request *req) {
 	struct key_t key = {};
 	u64 *tsp, delta;
 
