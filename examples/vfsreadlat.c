@@ -13,11 +13,7 @@
 
 #include <uapi/linux/ptrace.h>
 
-struct key_t {
-	u32 pid;
-};
-
-BPF_HASH(start, struct key_t);
+BPF_HASH(start, u32);
 BPF_TABLE("array", int, u64, dist, 64);
 
 static unsigned int log2(unsigned int v)
@@ -44,29 +40,29 @@ static unsigned int log2l(unsigned long v)
 
 int do_entry(struct pt_regs *ctx)
 {
-	struct key_t key = {};
-	u64 ts, *val, zero = 0;
+	u32 pid;
+	u64 ts, *val;
 
-	key.pid = bpf_get_current_pid_tgid();
+	pid = bpf_get_current_pid_tgid();
 	ts = bpf_ktime_get_ns();
-	start.update(&key, &ts);
+	start.update(&pid, &ts);
 	return 0;
 }
 
 int do_return(struct pt_regs *ctx)
 {
-	struct key_t key = {};
+	u32 pid;
 	u64 *tsp, delta;
 
-	key.pid = bpf_get_current_pid_tgid();
-	tsp = start.lookup(&key);
+	pid = bpf_get_current_pid_tgid();
+	tsp = start.lookup(&pid);
 
 	if (tsp != 0) {
 		delta = bpf_ktime_get_ns() - *tsp;
 		int index = log2l(delta / 1000);
 		u64 *leaf = dist.lookup(&index);
 		if (leaf) (*leaf)++;
-		start.delete(&key);
+		start.delete(&pid);
 	}
 
 	return 0;
