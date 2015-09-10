@@ -239,7 +239,9 @@ int bpf_attach_kprobe(int progfd, const char *event,
   }
 
   if (write(kfd, event_desc, strlen(event_desc)) < 0) {
-    perror("write(kprobe_events)");
+    fprintf(stderr, "write of \"%s\" into kprobe_events failed: %s\n", event_desc, strerror(errno));
+    if (errno == EINVAL)
+      fprintf(stderr, "check dmesg output for possible cause\n");
     goto cleanup;
   }
 
