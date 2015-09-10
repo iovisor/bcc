@@ -348,6 +348,10 @@ class BPF(object):
         if self.module == None:
             raise Exception("Failed to compile BPF module %s" % src_file)
 
+        # If any "kprobe__" prefixed functions were defined, they will be
+        # loaded and attached here.
+        self._trace_autoload()
+
     def load_funcs(self, prog_type=KPROBE):
         """load_funcs(prog_type=KPROBE)
 
@@ -552,11 +556,13 @@ class BPF(object):
         # Cater to one-liner case where attach_kprobe is omitted and C function
         # name matches that of the kprobe.
         if len(open_kprobes) == 0:
-            fns = self.load_funcs(BPF.KPROBE)
-            for fn in fns:
-                if fn.name.startswith("kprobe__"):
+            for i in range(0, lib.bpf_num_functions(self.module)):
+                func_name = lib.bpf_function_name(self.module, i).decode()
+                if func_name.startswith("kprobe__"):
+                    fn = self.load_func(func_name, BPF.KPROBE)
                     self.attach_kprobe(event=fn.name[8:], fn_name=fn.name)
-                elif fn.name.startswith("kretprobe__"):
+                elif func_name.startswith("kretprobe__"):
+                    fn = self.load_func(func_name, BPF.KPROBE)
                     self.attach_kretprobe(event=fn.name[11:], fn_name=fn.name)
 
     def trace_open(self, nonblocking=False):
@@ -564,7 +570,6 @@ class BPF(object):
 
         Open the trace_pipe if not already open
         """
-        self._trace_autoload()
         global tracefile
         if not tracefile:
             tracefile = open("%s/trace_pipe" % TRACEFS)

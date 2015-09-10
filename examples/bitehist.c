@@ -38,7 +38,7 @@ static unsigned int log2l(unsigned long v)
 		return log2(v) + 1;
 }
 
-int do_request(struct pt_regs *ctx, struct request *req)
+int kprobe__blk_start_request(struct pt_regs *ctx, struct request *req)
 {
 	int index = log2l(req->__data_len / 1024);
 	u64 *leaf = dist.lookup(&index);
