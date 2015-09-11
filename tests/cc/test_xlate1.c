@@ -92,5 +92,5 @@ int on_packet(struct __sk_buff *skb) {
   }
 
 EOP:
-  return 1;
+  return 0;
 }
