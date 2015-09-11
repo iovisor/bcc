@@ -134,21 +134,12 @@ The BPF program always takes at least one argument, which is a pointer to the
 context for this type of program. Different program types have different calling
 conventions, but for this one we don't care so `void *` is fine.
 ```python
-prog = """
-int hello(void *ctx) {
-  bpf_trace_printk("Hello, World!\\n");
-  return 0;
-};
-"""
-b = BPF(text=prog)
+BPF(text='void kprobe__sys_clone(void *ctx) { bpf_trace_printk("Hello, World!\\n"); }').trace_print()
 ```
 
 For this example, we will call the program every time `fork()` is called by a
-userspace process. Underneath the hood, fork translates to the `clone` syscall,
-so we will attach our program to the kernel symbol `sys_clone`.
-```python
-b.attach_kprobe(event="sys_clone", fn_name="hello")
-```
+userspace process. Underneath the hood, fork translates to the `clone` syscall.
+BCC recognizes prefix kprobe__, and will auto attach our program to the kernel symbol `sys_clone`.
 
 The python process will then print the trace printk circular buffer until ctrl-c
 is pressed. The BPF program is removed from the kernel when the userspace
@@ -159,7 +150,7 @@ b.trace_print()
 
 Output:
 ```
-bcc/examples$ sudo python hello_world.py 
+bcc/examples$ sudo python hello_world.py
           python-7282  [002] d...  3757.488508: : Hello, World!
 ```
 
