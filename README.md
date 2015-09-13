@@ -1,16 +1,85 @@
 ![BCC Logo](images/logo2.png)
 # BPF Compiler Collection (BCC)
 
-This directory contains source code for BCC, a toolkit for creating small
-programs that can be dynamically loaded into a Linux kernel.
+BCC is a toolkit for creating efficient kernel tracing and manipulation
+programs, and includes several useful tools and examples. It makes use of eBPF
+(Extended Berkeley Packet Filters), a new feature that was first added to
+Linux 3.15. Much of what BCC uses requires Linux 4.1 and above.
 
-The compiler relies upon eBPF (Extended Berkeley Packet Filters), which is a
-feature in Linux kernels starting from 3.15. Currently, this compiler leverages
-features which are mostly available in Linux 4.1 and above.
+eBPF was [described by](https://lkml.org/lkml/2015/4/14/232) Ingo Molnár as:
+
+> One of the more interesting features in this cycle is the ability to attach eBPF programs (user-defined, sandboxed bytecode executed by the kernel) to kprobes. This allows user-defined instrumentation on a live kernel image that can never crash, hang or interfere with the kernel negatively.
+
+BCC makes eBPF programs easier to write, with kernel instrumentation in C
+and a front-end in Python. It is suited for many tasks, including performance
+analysis and network traffic control.
+
+## Screenshot
+
+This example traces a disk I/O kernel function, and populates an in-kernel
+power-of-2 histogram of the I/O size. For efficiency, only the histogram
+summary is returned to user-level.
+
+```Shell
+# ./bitehist.py 
+Tracing... Hit Ctrl-C to end.
+^C
+     value           : count     distribution
+       0 -> 1        : 3        |                                      |
+       2 -> 3        : 0        |                                      |
+       4 -> 7        : 211      |**********                            |
+       8 -> 15       : 0        |                                      |
+      16 -> 31       : 0        |                                      |
+      32 -> 63       : 0        |                                      |
+      64 -> 127      : 1        |                                      |
+     128 -> 255      : 800      |**************************************|
+```
+
+The above output shows a bimodal distribution, where the largest mode of
+800 I/O was between 128 and 255 Kbytes in size.
+
+See the source: [bitehist.c](examples/bitehist.c) and
+[bitehist.py](examples/bitehist.py). What this traces, what this stores, and how
+the data is presented, can be entirely customized. This shows only some of
+many possible capabilities.
 
 ## Installing
 
 See [INSTALL.md](INSTALL.md) for installation steps on your platform.
+
+## Contents
+
+Some of these are single files that contain both C and Python, others have a
+pair of .c and .py files, and some are directories of files.
+
+### Tracing
+
+Examples:
+
+- examples/[bitehist.py](examples/bitehist.py) examples/[bitehist.c](examples/bitehist.c): Block I/O size histogram. [Examples](examples/bitehist_example.txt).
+- examples/[disksnoop.py](examples/disksnoop.py) examples/[disksnoop.c](examples/disksnoop.c): Trace block device I/O latency. [Examples](examples/disksnoop_example.txt).
+- examples/[hello_world.py](examples/hello_world.py): Prints "Hello, World!" for new processes.
+- examples/[trace_fields.py](examples/trace_fields.py): Simple example of printing fields from traced events.
+- examples/[vfsreadlat.py](examples/vfsreadlat.py) examples/[vfsreadlat.c](examples/vfsreadlat.c): VFS read latency distribution. [Examples](examples/vfsreadlat_example.txt).
+
+Tools:
+
+- tools/[funccount](tools/funccount): Count kernel function calls. [Examples](tools/funccount_example.txt).
+- tools/[pidpersec](tools/pidpersec): Count new processes (via fork). [Examples](tools/pidpersec_example.txt).
+- tools/[syncsnoop](tools/syncsnoop): Trace sync() syscall. [Examples](tools/syncsnoop_example.txt).
+- tools/[vfscount](tools/vfscount) tools/[vfscount.c](tools/vfscount.c): Count VFS calls. [Examples](tools/vfscount_example.txt).
+- tools/[vfsstat](tools/vfsstat) tools/[vfsstat.c](tools/vfsstat.c): Count some VFS calls, with column output. [Examples](tools/vfsstat_example.txt).
+
+### Networking
+
+Examples:
+
+- examples/[distributed_bridge/](examples/distributed_bridge): Distributed bridge example.
+- examples/[simple_tc.py](examples/simple_tc.py): Simple traffic control example.
+- examples/[simulation.py](examples/simulation.py): Simulation helper.
+- examples/[tc_neighbor_sharing.py](examples/tc_neighbor_sharing.py) examples/[tc_neighbor_sharing.c](examples/tc_neighbor_sharing.c): Per-IP classification and rate limiting.
+- examples/[tunnel_monitor/](examples/tunnel_monitor): Efficiently monitor traffic flows. [Example video](https://www.youtube.com/watch?v=yYy3Cwce02k).
+- examples/[vlan_learning.py](examples/vlan_learning.py) examples/[vlan_learning.c](examples/vlan_learning.c): Demux Ethernet traffic into worker veth+namespaces.
 
 ## Motivation
 
@@ -46,11 +115,11 @@ The features of this toolkit include:
 In the future, more bindings besides python will likely be supported. Feel free
 to add support for the language of your choice and send a pull request!
 
-## Examples
+## Tutorial
 
-This toolchain is currently composed of two parts: a C wrapper around LLVM, and
-a Python API to interact with the running program. Later, we will go into more
-detail of how this all works.
+The BCC toolchain is currently composed of two parts: a C wrapper around LLVM,
+and a Python API to interact with the running program. Later, we will go into
+more detail of how this all works.
 
 ### Hello, World
 
@@ -65,32 +134,20 @@ The BPF program always takes at least one argument, which is a pointer to the
 context for this type of program. Different program types have different calling
 conventions, but for this one we don't care so `void *` is fine.
 ```python
-prog = """
-int hello(void *ctx) {
-  bpf_trace_printk("Hello, World!\\n");
-  return 0;
-};
-"""
-b = BPF(text=prog)
+BPF(text='void kprobe__sys_clone(void *ctx) { bpf_trace_printk("Hello, World!\\n"); }').trace_print()
 ```
 
 For this example, we will call the program every time `fork()` is called by a
-userspace process. Underneath the hood, fork translates to the `clone` syscall,
-so we will attach our program to the kernel symbol `sys_clone`.
-```python
-b.attach_kprobe(event="sys_clone", fn_name="hello")
-```
+userspace process. Underneath the hood, fork translates to the `clone` syscall.
+BCC recognizes prefix `kprobe__`, and will auto attach our program to the kernel symbol `sys_clone`.
 
 The python process will then print the trace printk circular buffer until ctrl-c
 is pressed. The BPF program is removed from the kernel when the userspace
 process that loaded it closes the fd (or exits).
-```python
-b.trace_print()
-```
 
 Output:
 ```
-bcc/examples$ sudo python hello_world.py 
+bcc/examples$ sudo python hello_world.py
           python-7282  [002] d...  3757.488508: : Hello, World!
 ```
 

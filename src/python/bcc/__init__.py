@@ -38,6 +38,10 @@ lib.bpf_module_license.restype = ct.c_char_p
 lib.bpf_module_license.argtypes = [ct.c_void_p]
 lib.bpf_module_kern_version.restype = ct.c_uint
 lib.bpf_module_kern_version.argtypes = [ct.c_void_p]
+lib.bpf_num_functions.restype = ct.c_ulonglong
+lib.bpf_num_functions.argtypes = [ct.c_void_p]
+lib.bpf_function_name.restype = ct.c_char_p
+lib.bpf_function_name.argtypes = [ct.c_void_p, ct.c_ulonglong]
 lib.bpf_function_start.restype = ct.c_void_p
 lib.bpf_function_start.argtypes = [ct.c_void_p, ct.c_char_p]
 lib.bpf_function_size.restype = ct.c_size_t
@@ -95,6 +99,7 @@ KALLSYMS = "/proc/kallsyms"
 ksym_addrs = []
 ksym_names = []
 ksym_loaded = 0
+stars_max = 38
 
 @atexit.register
 def cleanup_kprobes():
@@ -220,6 +225,52 @@ class BPF(object):
             else:
                 super(BPF.Table, self).clear()
 
+        @staticmethod
+        def _stars(val, val_max, width):
+            i = 0
+            text = ""
+            while (1):
+                if (i > (width * val / val_max) - 1) or (i > width - 1):
+                    break
+                text += "*"
+                i += 1
+            if val > val_max:
+                text = text[:-1] + "+"
+            return text
+
+        def print_log2_hist(self, val_type="value"):
+            """print_log2_hist(type=value)
+
+            Prints a table as a log2 histogram. The table must be stored as
+            log2. The type argument is optional, and is a column header.
+            """
+            global stars_max
+            log2_dist_max = 64
+            idx_max = -1
+            val_max = 0
+            for i in range(1, log2_dist_max + 1):
+                try:
+                    val = self[ct.c_int(i)].value
+                    if (val > 0):
+                        idx_max = i
+                    if (val > val_max):
+                        val_max = val
+                except:
+                    break
+            if idx_max > 0:
+                print("     %-15s : count     distribution" % val_type);
+            for i in range(1, idx_max + 1):
+                low = (1 << i) >> 1
+                high = (1 << i) - 1
+                if (low == high):
+                    low -= 1
+                try:
+                    val = self[ct.c_int(i)].value
+                    print("%8d -> %-8d : %-8d |%-*s|" % (low, high, val,
+                        stars_max, self._stars(val, val_max, stars_max)))
+                except:
+                    break
+
 
         def __iter__(self):
             return BPF.Table.Iter(self, self.Key)
@@ -296,6 +347,23 @@ class BPF(object):
 
         if self.module == None:
             raise Exception("Failed to compile BPF module %s" % src_file)
+
+        # If any "kprobe__" prefixed functions were defined, they will be
+        # loaded and attached here.
+        self._trace_autoload()
+
+    def load_funcs(self, prog_type=KPROBE):
+        """load_funcs(prog_type=KPROBE)
+
+        Load all functions in this BPF module with the given type.
+        Returns a list of the function handles."""
+
+        fns = []
+        for i in range(0, lib.bpf_num_functions(self.module)):
+            func_name = lib.bpf_function_name(self.module, i).decode()
+            fns.append(self.load_func(func_name, prog_type))
+
+        return fns
 
     def load_func(self, func_name, prog_type):
         if func_name in self.funcs:
@@ -409,7 +477,10 @@ class BPF(object):
         p = Popen(["awk", "$1 ~ /%s/ { print $1 }" % event_re,
             "%s/available_filter_functions" % TRACEFS], stdout=PIPE)
         lines = p.communicate()[0].decode().split()
-        return [line.rstrip() for line in lines if line != "\n"]
+        with open("%s/../kprobes/blacklist" % TRACEFS) as f:
+            blacklist = [line.split()[1] for line in f.readlines()]
+        return [line.rstrip() for line in lines if
+                (line != "\n" and line not in blacklist)]
 
     def attach_kprobe(self, event="", fn_name="", event_re="",
             pid=0, cpu=-1, group_fd=-1):
@@ -417,12 +488,15 @@ class BPF(object):
         # allow the caller to glob multiple functions together
         if event_re:
             for line in BPF._get_kprobe_functions(event_re):
-                self.attach_kprobe(event=line, fn_name=fn_name, pid=pid,
-                        cpu=cpu, group_fd=group_fd)
+                try:
+                    self.attach_kprobe(event=line, fn_name=fn_name, pid=pid,
+                            cpu=cpu, group_fd=group_fd)
+                except:
+                    pass
             return
 
         fn = self.load_func(fn_name, BPF.KPROBE)
-        ev_name = "p_" + event.replace("+", "_")
+        ev_name = "p_" + event.replace("+", "_").replace(".", "_")
         desc = "p:kprobes/%s %s" % (ev_name, event)
         res = lib.bpf_attach_kprobe(fn.fd, ev_name.encode("ascii"),
                 desc.encode("ascii"), pid, cpu, group_fd)
@@ -433,7 +507,7 @@ class BPF(object):
 
     @staticmethod
     def detach_kprobe(event):
-        ev_name = "p_" + event.replace("+", "_")
+        ev_name = "p_" + event.replace("+", "_").replace(".", "_")
         if ev_name not in open_kprobes:
             raise Exception("Kprobe %s is not attached" % event)
         os.close(open_kprobes[ev_name])
@@ -449,12 +523,15 @@ class BPF(object):
         # allow the caller to glob multiple functions together
         if event_re:
             for line in BPF._get_kprobe_functions(event_re):
-                self.attach_kretprobe(event=line, fn_name=fn_name, pid=pid,
-                        cpu=cpu, group_fd=group_fd)
+                try:
+                    self.attach_kretprobe(event=line, fn_name=fn_name, pid=pid,
+                            cpu=cpu, group_fd=group_fd)
+                except:
+                    pass
             return
 
         fn = self.load_func(fn_name, BPF.KPROBE)
-        ev_name = "r_" + event.replace("+", "_")
+        ev_name = "r_" + event.replace("+", "_").replace(".", "_")
         desc = "r:kprobes/%s %s" % (ev_name, event)
         res = lib.bpf_attach_kprobe(fn.fd, ev_name.encode("ascii"),
                 desc.encode("ascii"), pid, cpu, group_fd)
@@ -465,7 +542,7 @@ class BPF(object):
 
     @staticmethod
     def detach_kretprobe(event):
-        ev_name = "r_" + event.replace("+", "_")
+        ev_name = "r_" + event.replace("+", "_").replace(".", "_")
         if ev_name not in open_kprobes:
             raise Exception("Kretprobe %s is not attached" % event)
         os.close(open_kprobes[ev_name])
@@ -475,13 +552,24 @@ class BPF(object):
             raise Exception("Failed to detach BPF from kprobe")
         del open_kprobes[ev_name]
 
-    @staticmethod
-    def trace_open(nonblocking=False):
+    def _trace_autoload(self):
+        # Cater to one-liner case where attach_kprobe is omitted and C function
+        # name matches that of the kprobe.
+        if len(open_kprobes) == 0:
+            for i in range(0, lib.bpf_num_functions(self.module)):
+                func_name = lib.bpf_function_name(self.module, i).decode()
+                if func_name.startswith("kprobe__"):
+                    fn = self.load_func(func_name, BPF.KPROBE)
+                    self.attach_kprobe(event=fn.name[8:], fn_name=fn.name)
+                elif func_name.startswith("kretprobe__"):
+                    fn = self.load_func(func_name, BPF.KPROBE)
+                    self.attach_kretprobe(event=fn.name[11:], fn_name=fn.name)
+
+    def trace_open(self, nonblocking=False):
         """trace_open(nonblocking=False)
 
         Open the trace_pipe if not already open
         """
-
         global tracefile
         if not tracefile:
             tracefile = open("%s/trace_pipe" % TRACEFS)
@@ -491,18 +579,18 @@ class BPF(object):
                 fcntl.fcntl(fd, fcntl.F_SETFL, fl | os.O_NONBLOCK)
         return tracefile
 
-    @staticmethod
-    def trace_fields(nonblocking=False):
+    def trace_fields(self, nonblocking=False):
         """trace_fields(nonblocking=False)
 
         Read from the kernel debug trace pipe and return a tuple of the
         fields (task, pid, cpu, flags, timestamp, msg) or None if no
         line was read (nonblocking=True)
         """
-        line = BPF.trace_readline(nonblocking)
-        if line:
+        while True:
+            line = self.trace_readline(nonblocking)
+            if not line and nonblocking: return (None,) * 6
             # don't print messages related to lost events
-            if line.startswith("CPU:"): return
+            if line.startswith("CPU:"): continue
             task = line[:16].lstrip()
             line = line[17:]
             ts_end = line.find(":")
@@ -510,17 +598,15 @@ class BPF(object):
             cpu = cpu[1:-1]
             msg = line[ts_end + 4:]
             return (task, int(pid), int(cpu), flags, float(ts), msg)
-        return
 
-    @staticmethod
-    def trace_readline(nonblocking=False):
+    def trace_readline(self, nonblocking=False):
         """trace_readline(nonblocking=False)
 
         Read from the kernel debug trace pipe and return one line
         If nonblocking is False, this will block until ctrl-C is pressed.
         """
 
-        trace = BPF.trace_open(nonblocking)
+        trace = self.trace_open(nonblocking)
 
         line = None
         try:
@@ -531,9 +617,8 @@ class BPF(object):
             exit()
         return line
 
-    @staticmethod
-    def trace_print(fmt=None):
-        """trace_print(fmt=None)
+    def trace_print(self, fmt=None):
+        """trace_print(self, fmt=None)
 
         Read from the kernel debug trace pipe and print on stdout.
         If fmt is specified, apply as a format string to the output. See
@@ -543,11 +628,11 @@ class BPF(object):
 
         while True:
             if fmt:
-                fields = BPF.trace_fields(nonblocking=False)
+                fields = self.trace_fields(nonblocking=False)
                 if not fields: continue
                 line = fmt.format(*fields)
             else:
-                line = BPF.trace_readline(nonblocking=False)
+                line = self.trace_readline(nonblocking=False)
             print(line)
             sys.stdout.flush()
 

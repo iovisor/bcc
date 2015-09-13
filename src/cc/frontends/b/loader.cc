@@ -27,7 +27,8 @@ using std::vector;
 
 namespace ebpf {
 
-BLoader::BLoader() {
+BLoader::BLoader(unsigned flags) : flags_(flags) {
+  (void)flags_;
 }
 
 BLoader::~BLoader() {

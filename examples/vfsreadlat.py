@@ -41,50 +41,9 @@ if len(argv) > 1:
 b = BPF(src_file = "vfsreadlat.c")
 b.attach_kprobe(event="vfs_read", fn_name="do_entry")
 b.attach_kretprobe(event="vfs_read", fn_name="do_return")
-dist_max = 64
 
 # header
 print("Tracing... Hit Ctrl-C to end.")
-
-# functions
-stars_max = 38
-def stars(val, val_max, width):
-	i = 0
-	text = ""
-	while (1):
-		if (i > (width * val / val_max) - 1) or (i > width - 1):
-			break
-		text += "*"
-		i += 1
-	if val > val_max:
-		text = text[:-1] + "+"
-	return text
-
-def print_log2_hist(dist, val_type):
-	idx_max = -1
-	val_max = 0
-	for i in range(1, dist_max + 1):
-		try:
-			val = dist[c_int(i)].value
-			if (val > 0):
-				idx_max = i
-			if (val > val_max):
-				val_max = val
-		except:
-			break
-	if idx_max > 0:
-		print("     %-15s : count     distribution" % val_type);
-	for i in range(1, idx_max + 1):
-		low = (1 << i) >> 1
-		high = (1 << i) - 1
-		if (low == high):
-			low -= 1
-		try:
-			val = dist[c_int(i)].value
-			print("%8d -> %-8d : %-8d |%-*s|" % (low, high, val,
-			    stars_max, stars(val, val_max, stars_max)))
-		except:
-			break
 
 # output
 loop = 0
@@ -100,7 +59,7 @@ while (1):
 		pass; do_exit = 1
 
 	print
-	print_log2_hist(b["dist"], "usecs")
+	b["dist"].print_log2_hist("usecs")
 	b["dist"].clear()
 	if do_exit:
 		exit()

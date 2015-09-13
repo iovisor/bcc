@@ -102,6 +102,7 @@ bool BTypeVisitor::VisitFunctionDecl(FunctionDecl *D) {
     rewriter_.InsertText(D->getLocStart(), attr);
     // remember the arg names of the current function...first one is the ctx
     fn_args_.clear();
+    string preamble = "{";
     for (auto arg : D->params()) {
       if (arg->getName() == "") {
         C.getDiagnostics().Report(arg->getLocEnd(), diag::err_expected)
@@ -109,7 +110,15 @@ bool BTypeVisitor::VisitFunctionDecl(FunctionDecl *D) {
         return false;
       }
       fn_args_.push_back(arg);
+      if (fn_args_.size() > 1) {
+        size_t d = fn_args_.size() - 2;
+        const char *reg = calling_conv_regs[d];
+        preamble += arg->getName().str() + " = " + fn_args_[0]->getName().str() + "->" + string(reg) + ";";
+      }
     }
+    // for each trace argument, convert the variable from ptregs to something on stack
+    if (CompoundStmt *S = dyn_cast<CompoundStmt>(D->getBody()))
+      rewriter_.ReplaceText(S->getLBracLoc(), 1, preamble);
   }
   return true;
 }
@@ -268,29 +277,12 @@ bool BTypeVisitor::VisitMemberExpr(MemberExpr *E) {
       string base_type = Ref->getType()->getPointeeType().getAsString();
       string pre, post;
       pre = "({ " + E->getType().getAsString() + " _val; memset(&_val, 0, sizeof(_val));";
-      pre += " bpf_probe_read(&_val, sizeof(_val), ";
+      pre += " bpf_probe_read(&_val, sizeof(_val), (u64)";
       post = " + offsetof(" + base_type + ", " + F->getName().str() + ")";
       post += "); _val; })";
       rewriter_.InsertText(E->getLocStart(), pre);
       rewriter_.ReplaceText(SourceRange(E->getOperatorLoc(), E->getLocEnd()), post);
     }
-  }
-  return true;
-}
-
-bool BTypeVisitor::VisitDeclRefExpr(DeclRefExpr *E) {
-  auto it = std::find(fn_args_.begin() + 1, fn_args_.end(), E->getDecl());
-  if (it != fn_args_.end()) {
-    if (!rewriter_.isRewritable(E->getLocStart())) {
-      C.getDiagnostics().Report(E->getLocStart(), diag::err_expected)
-          << "use of probe argument not in a macro";
-      return false;
-    }
-    size_t d = std::distance(fn_args_.begin() + 1, it);
-    const char *reg = calling_conv_regs[d];
-    string text = "((u64)" + fn_args_[0]->getName().str() + "->" + string(reg) + ")";
-    rewriter_.ReplaceText(SourceRange(E->getLocStart(), E->getLocEnd()), text);
-    return true;
   }
   return true;
 }
@@ -442,13 +434,14 @@ bool BTypeConsumer::HandleTopLevelDecl(DeclGroupRef D) {
   return true;
 }
 
-BFrontendAction::BFrontendAction(llvm::raw_ostream &os)
-    : rewriter_(new Rewriter), os_(os), tables_(new vector<TableDesc>) {
+BFrontendAction::BFrontendAction(llvm::raw_ostream &os, unsigned flags)
+    : os_(os), flags_(flags), rewriter_(new Rewriter), tables_(new vector<TableDesc>) {
 }
 
 void BFrontendAction::EndSourceFileAction() {
   // uncomment to see rewritten source
-  //rewriter_->getEditBuffer(rewriter_->getSourceMgr().getMainFileID()).write(llvm::errs());
+  if (flags_ & 0x4)
+    rewriter_->getEditBuffer(rewriter_->getSourceMgr().getMainFileID()).write(llvm::errs());
   rewriter_->getEditBuffer(rewriter_->getSourceMgr().getMainFileID()).write(os_);
   os_.flush();
 }

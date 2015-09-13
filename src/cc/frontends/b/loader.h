@@ -35,11 +35,12 @@ class CodegenLLVM;
 
 class BLoader {
  public:
-  BLoader();
+  explicit BLoader(unsigned flags);
   ~BLoader();
   int parse(llvm::Module *mod, const std::string &filename, const std::string &proto_filename,
             std::unique_ptr<std::vector<TableDesc>> *tables);
  private:
+  unsigned flags_;
   std::unique_ptr<cc::Parser> parser_;
   std::unique_ptr<cc::Parser> proto_parser_;
   std::unique_ptr<cc::CodegenLLVM> codegen_;

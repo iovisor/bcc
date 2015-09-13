@@ -58,8 +58,8 @@ using std::vector;
 
 namespace ebpf {
 
-ClangLoader::ClangLoader(llvm::LLVMContext *ctx)
-    : ctx_(ctx)
+ClangLoader::ClangLoader(llvm::LLVMContext *ctx, unsigned flags)
+    : ctx_(ctx), flags_(flags)
 {}
 
 ClangLoader::~ClangLoader() {}
@@ -138,6 +138,13 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, unique_ptr<vector<TableDes
   // Initialize a compiler invocation object from the clang (-cc1) arguments.
   const driver::ArgStringList &ccargs = cmd.getArguments();
 
+  if (flags_ & 0x4) {
+    llvm::errs() << "clang";
+    for (auto arg : ccargs)
+      llvm::errs() << " " << arg;
+    llvm::errs() << "\n";
+  }
+
   // first pass
   auto invocation1 = make_unique<CompilerInvocation>();
   if (!CompilerInvocation::CreateFromArgs(*invocation1, const_cast<const char **>(ccargs.data()),
@@ -159,7 +166,7 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, unique_ptr<vector<TableDes
   // capture the rewritten c file
   string out_str;
   llvm::raw_string_ostream os(out_str);
-  BFrontendAction bact(os);
+  BFrontendAction bact(os, flags_);
   if (!compiler1.ExecuteAction(bact))
     return -1;
   // this contains the open FDs

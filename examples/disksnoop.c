@@ -13,36 +13,23 @@
 #include <uapi/linux/ptrace.h>
 #include <linux/blkdev.h>
 
-struct key_t {
-	struct request *req;
-};
-BPF_TABLE("hash", struct key_t, u64, start, 10240);
+BPF_HASH(start, struct request *);
 
-int do_request(struct pt_regs *ctx, struct request *req) {
-	struct key_t key = {};
-	u64 ts;
-
+void kprobe__blk_start_request(struct pt_regs *ctx, struct request *req) {
 	// stash start timestamp by request ptr
-	ts = bpf_ktime_get_ns();
-	key.req = req;
-	start.update(&key, &ts);
+	u64 ts = bpf_ktime_get_ns();
 
-	return 0;
+	start.update(&req, &ts);
 }
 
-int do_completion(struct pt_regs *ctx, struct request *req) {
-	struct key_t key = {};
+void kprobe__blk_update_request(struct pt_regs *ctx, struct request *req) {
 	u64 *tsp, delta;
 
-	key.req = req;
-	tsp = start.lookup(&key);
-
+	tsp = start.lookup(&req);
 	if (tsp != 0) {
 		delta = bpf_ktime_get_ns() - *tsp;
 		bpf_trace_printk("%d %x %d\n", req->__data_len,
 		    req->cmd_flags, delta / 1000);
-		start.delete(&key);
+		start.delete(&req);
 	}
-
-	return 0;
 }
