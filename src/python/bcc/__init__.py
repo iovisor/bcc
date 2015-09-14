@@ -392,7 +392,7 @@ class BPF(object):
 
         return fn
 
-    def ebpf(self, func_name):
+    def dump_func(self, func_name):
         """
         Return the eBPF bytecodes for the specified function as a string
         """
