@@ -4,7 +4,7 @@
 
 from netaddr import IPAddress
 from bcc import BPF
-from pyroute2 import IPRoute
+from pyroute2 import IPRoute, protocols
 from socket import socket, AF_INET, SOCK_DGRAM
 from subprocess import call
 import sys
@@ -19,7 +19,7 @@ if len(sys.argv) > 1:
 class TestBPFFilter(TestCase):
     def setUp(self):
         b = BPF(arg1, arg2, debug=0)
-        fn = b.load_func("on_packet", BPF.SCHED_CLS)
+        fn = b.load_func("on_packet", BPF.SCHED_ACT)
         ip = IPRoute()
         ifindex = ip.link_lookup(ifname="eth0")[0]
         # set up a network to change the flow:
@@ -31,8 +31,11 @@ class TestBPFFilter(TestCase):
         ip.tc("add", "ingress", ifindex, "ffff:")
         ip.tc("add", "sfq", ifindex, "1:")
         # add same program to both ingress/egress, so pkt is translated in both directions
-        ip.tc("add-filter", "bpf", ifindex, ":1", fd=fn.fd, name=fn.name, parent="ffff:", action="ok", classid=1)
-        ip.tc("add-filter", "bpf", ifindex, ":2", fd=fn.fd, name=fn.name, parent="1:", action="ok", classid=1)
+        action = {"kind": "bpf", "fd": fn.fd, "name": fn.name, "action": "ok"}
+        ip.tc("add-filter", "u32", ifindex, ":1", parent="ffff:", action=[action],
+                protocol=protocols.ETH_P_ALL, classid=1, target=0x10002, keys=['0x0/0x0+0'])
+        ip.tc("add-filter", "u32", ifindex, ":2", parent="1:", action=[action],
+                protocol=protocols.ETH_P_ALL, classid=1, target=0x10002, keys=['0x0/0x0+0'])
         self.xlate = b.get_table("xlate")
 
     def test_xlate(self):
