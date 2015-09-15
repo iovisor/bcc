@@ -392,6 +392,17 @@ class BPF(object):
 
         return fn
 
+    def dump_func(self, func_name):
+        """
+        Return the eBPF bytecodes for the specified function as a string
+        """
+        if lib.bpf_function_start(self.module, func_name.encode("ascii")) == None:
+            raise Exception("Unknown program %s" % func_name)
+
+        start, = lib.bpf_function_start(self.module, func_name.encode("ascii")),
+        size, = lib.bpf_function_size(self.module, func_name.encode("ascii")),
+        return ct.string_at(start, size)
+
     str2ctype = {
         u"_Bool": ct.c_bool,
         u"char": ct.c_char,
