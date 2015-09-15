@@ -16,6 +16,7 @@
 
 #include <map>
 #include <memory>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -62,7 +63,6 @@ class BTypeVisitor : public clang::RecursiveASTVisitor<BTypeVisitor> {
   explicit BTypeVisitor(clang::ASTContext &C, clang::Rewriter &rewriter,
                         std::vector<TableDesc> &tables);
   bool TraverseCallExpr(clang::CallExpr *Call);
-  bool TraverseMemberExpr(clang::MemberExpr *E);
   bool VisitFunctionDecl(clang::FunctionDecl *D);
   bool VisitCallExpr(clang::CallExpr *Call);
   bool VisitVarDecl(clang::VarDecl *Decl);
@@ -76,6 +76,7 @@ class BTypeVisitor : public clang::RecursiveASTVisitor<BTypeVisitor> {
   llvm::raw_ostream &out_;  /// for debugging
   std::vector<TableDesc> &tables_;  /// store the open FDs
   std::vector<clang::ParmVarDecl *> fn_args_;
+  std::set<clang::Expr *> visited_;
 };
 
 // A helper class to the frontend action, walks the decls

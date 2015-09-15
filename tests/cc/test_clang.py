@@ -130,5 +130,40 @@ BPF_HASH(table3, u32, int);
 """
         b = BPF(text=text, debug=0)
 
+    def test_consecutive_probe_read(self):
+        text = """
+#include <linux/fs.h>
+#include <linux/mount.h>
+BPF_HASH(table1, struct super_block *);
+int trace_entry(struct pt_regs *ctx, struct file *file) {
+    if (!file) return 0;
+    struct vfsmount *mnt = file->f_path.mnt;
+    if (mnt) {
+        struct super_block *k = mnt->mnt_sb;
+        u64 zero = 0;
+        table1.update(&k, &zero);
+        k = mnt->mnt_sb;
+        table1.update(&k, &zero);
+    }
+
+    return 0;
+}
+"""
+        b = BPF(text=text, debug=0)
+        fn = b.load_func("trace_entry", BPF.KPROBE)
+
+    def test_nested_probe_read(self):
+        text = """
+#include <linux/fs.h>
+int trace_entry(struct pt_regs *ctx, struct file *file) {
+    if (!file) return 0;
+    const char *name = file->f_path.dentry->d_name.name;
+    bpf_trace_printk("%s\\n", name);
+    return 0;
+}
+"""
+        b = BPF(text=text, debug=0)
+        fn = b.load_func("trace_entry", BPF.KPROBE)
+
 if __name__ == "__main__":
     main()
