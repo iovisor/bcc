@@ -90,6 +90,27 @@ bool BMapDeclVisitor::VisitBuiltinType(const BuiltinType *T) {
   return true;
 }
 
+class BProbeChecker : public clang::RecursiveASTVisitor<BProbeChecker> {
+ public:
+  bool VisitDeclRefExpr(clang::DeclRefExpr *E) {
+    if (E->getDecl()->hasAttr<UnavailableAttr>())
+      return false;
+    return true;
+  }
+};
+
+// Visit a piece of the AST and mark it as needing probe reads
+class BProbeSetter : public clang::RecursiveASTVisitor<BProbeSetter> {
+ public:
+  explicit BProbeSetter(ASTContext &C) : C(C) {}
+  bool VisitDeclRefExpr(clang::DeclRefExpr *E) {
+    E->getDecl()->addAttr(UnavailableAttr::CreateImplicit(C, "ptregs"));
+    return true;
+  }
+ private:
+  ASTContext &C;
+};
+
 BTypeVisitor::BTypeVisitor(ASTContext &C, Rewriter &rewriter, vector<TableDesc> &tables)
     : C(C), rewriter_(rewriter), out_(llvm::errs()), tables_(tables) {
 }
@@ -111,6 +132,7 @@ bool BTypeVisitor::VisitFunctionDecl(FunctionDecl *D) {
       }
       fn_args_.push_back(arg);
       if (fn_args_.size() > 1) {
+        arg->addAttr(UnavailableAttr::CreateImplicit(C, "ptregs"));
         size_t d = fn_args_.size() - 2;
         const char *reg = calling_conv_regs[d];
         preamble += arg->getName().str() + " = " + fn_args_[0]->getName().str() + "->" + string(reg) + ";";
@@ -260,30 +282,34 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
   return true;
 }
 
-bool BTypeVisitor::TraverseMemberExpr(MemberExpr *E) {
-  for (auto child : E->children())
-    if (!TraverseStmt(child))
-      return false;
-  if (!WalkUpFromMemberExpr(E))
-    return false;
-  return true;
-}
-
 bool BTypeVisitor::VisitMemberExpr(MemberExpr *E) {
-  if (DeclRefExpr *Ref = dyn_cast<DeclRefExpr>(E->getBase()->IgnoreImplicit())) {
-    auto it = std::find(fn_args_.begin() + 1, fn_args_.end(), Ref->getDecl());
-    if (it != fn_args_.end()) {
-      FieldDecl *F = dyn_cast<FieldDecl>(E->getMemberDecl());
-      string base_type = Ref->getType()->getPointeeType().getAsString();
-      string pre, post;
-      pre = "({ " + E->getType().getAsString() + " _val; memset(&_val, 0, sizeof(_val));";
-      pre += " bpf_probe_read(&_val, sizeof(_val), (u64)";
-      post = " + offsetof(" + base_type + ", " + F->getName().str() + ")";
-      post += "); _val; })";
-      rewriter_.InsertText(E->getLocStart(), pre);
-      rewriter_.ReplaceText(SourceRange(E->getOperatorLoc(), E->getLocEnd()), post);
-    }
+  if (visited_.find(E) != visited_.end()) return true;
+
+  // Checks to see if the expression references something that needs to be run
+  // through bpf_probe_read.
+  BProbeChecker checker;
+  if (checker.TraverseStmt(E))
+    return true;
+
+  Expr *base;
+  SourceLocation rhs_start, op;
+  for (MemberExpr *M = E; M; M = dyn_cast<MemberExpr>(M->getBase())) {
+    visited_.insert(M);
+    rhs_start = M->getLocEnd();
+    base = M->getBase();
+    op = M->getOperatorLoc();
+    if (M->isArrow())
+      break;
   }
+  string rhs = rewriter_.getRewrittenText(SourceRange(rhs_start, E->getLocEnd()));
+  string base_type = base->getType()->getPointeeType().getAsString();
+  string pre, post;
+  pre = "({ " + E->getType().getAsString() + " _val; memset(&_val, 0, sizeof(_val));";
+  pre += " bpf_probe_read(&_val, sizeof(_val), (u64)";
+  post = " + offsetof(" + base_type + ", " + rhs + ")";
+  post += "); _val; })";
+  rewriter_.InsertText(E->getLocStart(), pre);
+  rewriter_.ReplaceText(SourceRange(op, E->getLocEnd()), post);
   return true;
 }
 
@@ -313,6 +339,12 @@ bool BTypeVisitor::VisitBinaryOperator(BinaryOperator *E) {
         }
       }
     }
+  }
+  // copy probe attribute from RHS to LHS if present
+  BProbeChecker checker;
+  if (!checker.TraverseStmt(E->getRHS())) {
+    BProbeSetter setter(C);
+    setter.TraverseStmt(E->getLHS());
   }
   return true;
 }
@@ -420,6 +452,11 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
         }
       }
     }
+  }
+  if (Expr *E = Decl->getInit()) {
+    BProbeChecker checker;
+    if (!checker.TraverseStmt(E))
+      Decl->addAttr(UnavailableAttr::CreateImplicit(C, "ptregs"));
   }
   return true;
 }
