@@ -15,14 +15,14 @@
 
 BPF_HASH(start, struct request *);
 
-void kprobe__blk_start_request(struct pt_regs *ctx, struct request *req) {
+void trace_start(struct pt_regs *ctx, struct request *req) {
 	// stash start timestamp by request ptr
 	u64 ts = bpf_ktime_get_ns();
 
 	start.update(&req, &ts);
 }
 
-void kprobe__blk_update_request(struct pt_regs *ctx, struct request *req) {
+void trace_completion(struct pt_regs *ctx, struct request *req) {
 	u64 *tsp, delta;
 
 	tsp = start.lookup(&req);
