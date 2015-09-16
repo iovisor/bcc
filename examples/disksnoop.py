@@ -17,6 +17,9 @@ REQ_WRITE = 1		# from include/linux/blk_types.h
 
 # load BPF program
 b = BPF(src_file="disksnoop.c")
+b.attach_kprobe(event="blk_start_request", fn_name="trace_start")
+b.attach_kprobe(event="blk_mq_start_request", fn_name="trace_start")
+b.attach_kprobe(event="blk_account_io_completion", fn_name="trace_completion")
 
 # header
 print("%-18s %-2s %-7s %8s" % ("TIME(s)", "T", "BYTES", "LAT(ms)"))
