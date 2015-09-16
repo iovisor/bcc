@@ -64,6 +64,7 @@ Examples:
 
 Tools:
 
+- tools/[biosnoop](tools/biosnoop): Trace block device I/O with PID and latency. [Examples](tools/biosnoop_example.txt).
 - tools/[funccount](tools/funccount): Count kernel function calls. [Examples](tools/funccount_example.txt).
 - tools/[pidpersec](tools/pidpersec): Count new processes (via fork). [Examples](tools/pidpersec_example.txt).
 - tools/[syncsnoop](tools/syncsnoop): Trace sync() syscall. [Examples](tools/syncsnoop_example.txt).
