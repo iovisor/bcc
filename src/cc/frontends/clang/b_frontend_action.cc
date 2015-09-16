@@ -304,7 +304,7 @@ bool BTypeVisitor::VisitMemberExpr(MemberExpr *E) {
   string rhs = rewriter_.getRewrittenText(SourceRange(rhs_start, E->getLocEnd()));
   string base_type = base->getType()->getPointeeType().getAsString();
   string pre, post;
-  pre = "({ " + E->getType().getAsString() + " _val; memset(&_val, 0, sizeof(_val));";
+  pre = "({ typeof(" + E->getType().getAsString() + ") _val; memset(&_val, 0, sizeof(_val));";
   pre += " bpf_probe_read(&_val, sizeof(_val), (u64)";
   post = " + offsetof(" + base_type + ", " + rhs + ")";
   post += "); _val; })";

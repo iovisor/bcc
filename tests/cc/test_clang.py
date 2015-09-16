@@ -165,5 +165,12 @@ int trace_entry(struct pt_regs *ctx, struct file *file) {
         b = BPF(text=text, debug=0)
         fn = b.load_func("trace_entry", BPF.KPROBE)
 
+    def test_char_array_probe(self):
+        BPF(text="""#include <linux/blkdev.h>
+int kprobe__blk_update_request(struct pt_regs *ctx, struct request *req) {
+    bpf_trace_printk("%s\\n", req->rq_disk->disk_name);
+    return 0;
+}""")
+
 if __name__ == "__main__":
     main()
