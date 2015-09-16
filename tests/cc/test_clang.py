@@ -172,5 +172,40 @@ int kprobe__blk_update_request(struct pt_regs *ctx, struct request *req) {
     return 0;
 }""")
 
+    def test_probe_read_helper(self):
+        b = BPF(text="""
+#include <linux/fs.h>
+static void print_file_name(struct file *file) {
+    if (!file) return;
+    const char *name = file->f_path.dentry->d_name.name;
+    bpf_trace_printk("%s\\n", name);
+}
+int trace_entry(struct pt_regs *ctx, struct file *file) {
+    print_file_name(file);
+    return 0;
+}
+""")
+        fn = b.load_func("trace_entry", BPF.KPROBE)
+
+    def test_probe_struct_assign(self):
+        b = BPF(text = """
+#include <uapi/linux/ptrace.h>
+struct args_t {
+    const char *filename;
+    int flags;
+    int mode;
+};
+int kprobe__sys_open(struct pt_regs *ctx, const char *filename,
+        int flags, int mode) {
+    struct args_t args = {};
+    args.filename = filename;
+    args.flags = flags;
+    args.mode = mode;
+    bpf_trace_printk("%s\\n", args.filename);
+    return 0;
+};
+""")
+
+
 if __name__ == "__main__":
     main()
