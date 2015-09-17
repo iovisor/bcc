@@ -180,12 +180,20 @@ static void print_file_name(struct file *file) {
     const char *name = file->f_path.dentry->d_name.name;
     bpf_trace_printk("%s\\n", name);
 }
-int trace_entry(struct pt_regs *ctx, struct file *file) {
+static void print_file_name2(int unused, struct file *file) {
+    print_file_name(file);
+}
+int trace_entry1(struct pt_regs *ctx, struct file *file) {
     print_file_name(file);
     return 0;
 }
+int trace_entry2(struct pt_regs *ctx, int unused, struct file *file) {
+    print_file_name2(unused, file);
+    return 0;
+}
 """)
-        fn = b.load_func("trace_entry", BPF.KPROBE)
+        fn = b.load_func("trace_entry1", BPF.KPROBE)
+        fn = b.load_func("trace_entry2", BPF.KPROBE)
 
     def test_probe_struct_assign(self):
         b = BPF(text = """
