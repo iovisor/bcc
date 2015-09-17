@@ -104,7 +104,6 @@ int pem(struct __sk_buff *skb) {
     return 1;
 }
 
-static int br_common(struct __sk_buff *skb, int which_br) __attribute__((always_inline));
 static int br_common(struct __sk_buff *skb, int which_br) {
     u8 *cursor = 0;
     u16 proto;

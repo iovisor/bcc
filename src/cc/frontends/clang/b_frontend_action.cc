@@ -21,6 +21,7 @@
 #include <clang/AST/ASTContext.h>
 #include <clang/AST/RecordLayout.h>
 #include <clang/Frontend/CompilerInstance.h>
+#include <clang/Frontend/MultiplexConsumer.h>
 #include <clang/Rewrite/Core/Rewriter.h>
 
 #include "b_frontend_action.h"
@@ -36,6 +37,7 @@ const char *calling_conv_regs_x86[] = {
 const char **calling_conv_regs = calling_conv_regs_x86;
 
 using std::map;
+using std::set;
 using std::string;
 using std::to_string;
 using std::unique_ptr;
@@ -90,26 +92,106 @@ bool BMapDeclVisitor::VisitBuiltinType(const BuiltinType *T) {
   return true;
 }
 
-class BProbeChecker : public clang::RecursiveASTVisitor<BProbeChecker> {
+class ProbeChecker : public clang::RecursiveASTVisitor<ProbeChecker> {
  public:
+  explicit ProbeChecker(Expr *arg, const set<Decl *> &ptregs)
+      : needs_probe_(false), ptregs_(ptregs) {
+    if (arg)
+      TraverseStmt(arg);
+  }
   bool VisitDeclRefExpr(clang::DeclRefExpr *E) {
-    if (E->getDecl()->hasAttr<UnavailableAttr>())
-      return false;
+    if (ptregs_.find(E->getDecl()) != ptregs_.end())
+      needs_probe_ = true;
     return true;
   }
+  bool needs_probe() const { return needs_probe_; }
+ private:
+  bool needs_probe_;
+  const set<Decl *> &ptregs_;
 };
 
 // Visit a piece of the AST and mark it as needing probe reads
-class BProbeSetter : public clang::RecursiveASTVisitor<BProbeSetter> {
+class ProbeSetter : public clang::RecursiveASTVisitor<ProbeSetter> {
  public:
-  explicit BProbeSetter(ASTContext &C) : C(C) {}
+  explicit ProbeSetter(set<Decl *> *ptregs) : ptregs_(ptregs) {}
   bool VisitDeclRefExpr(clang::DeclRefExpr *E) {
-    E->getDecl()->addAttr(UnavailableAttr::CreateImplicit(C, "ptregs"));
+    ptregs_->insert(E->getDecl());
     return true;
   }
  private:
-  ASTContext &C;
+  set<Decl *> *ptregs_;
 };
+
+ProbeVisitor::ProbeVisitor(Rewriter &rewriter) : rewriter_(rewriter) {}
+
+bool ProbeVisitor::VisitVarDecl(VarDecl *Decl) {
+  if (Expr *E = Decl->getInit()) {
+    if (ProbeChecker(E, ptregs_).needs_probe())
+      set_ptreg(Decl);
+  }
+  return true;
+}
+bool ProbeVisitor::VisitCallExpr(CallExpr *Call) {
+  if (FunctionDecl *F = dyn_cast<FunctionDecl>(Call->getCalleeDecl())) {
+    if (F->hasBody()) {
+      unsigned i = 0;
+      for (auto arg : Call->arguments()) {
+        if (ProbeChecker(arg, ptregs_).needs_probe())
+          ptregs_.insert(F->getParamDecl(i));
+        ++i;
+      }
+      if (fn_visited_.find(F) == fn_visited_.end()) {
+        fn_visited_.insert(F);
+        TraverseDecl(F);
+      }
+    }
+  }
+  return true;
+}
+bool ProbeVisitor::VisitBinaryOperator(BinaryOperator *E) {
+  if (!E->isAssignmentOp())
+    return true;
+  // copy probe attribute from RHS to LHS if present
+  if (ProbeChecker(E->getRHS(), ptregs_).needs_probe()) {
+    ProbeSetter setter(&ptregs_);
+    setter.TraverseStmt(E->getLHS());
+  }
+  return true;
+}
+bool ProbeVisitor::VisitMemberExpr(MemberExpr *E) {
+  if (memb_visited_.find(E) != memb_visited_.end()) return true;
+
+  // Checks to see if the expression references something that needs to be run
+  // through bpf_probe_read.
+  if (!ProbeChecker(E, ptregs_).needs_probe())
+    return true;
+
+  Expr *base;
+  SourceLocation rhs_start, op;
+  bool found = false;
+  for (MemberExpr *M = E; M; M = dyn_cast<MemberExpr>(M->getBase())) {
+    memb_visited_.insert(M);
+    rhs_start = M->getLocEnd();
+    base = M->getBase();
+    op = M->getOperatorLoc();
+    if (M->isArrow()) {
+      found = true;
+      break;
+    }
+  }
+  if (!found)
+    return true;
+  string rhs = rewriter_.getRewrittenText(SourceRange(rhs_start, E->getLocEnd()));
+  string base_type = base->getType()->getPointeeType().getAsString();
+  string pre, post;
+  pre = "({ typeof(" + E->getType().getAsString() + ") _val; memset(&_val, 0, sizeof(_val));";
+  pre += " bpf_probe_read(&_val, sizeof(_val), (u64)";
+  post = " + offsetof(" + base_type + ", " + rhs + ")";
+  post += "); _val; })";
+  rewriter_.InsertText(E->getLocStart(), pre);
+  rewriter_.ReplaceText(SourceRange(op, E->getLocEnd()), post);
+  return true;
+}
 
 BTypeVisitor::BTypeVisitor(ASTContext &C, Rewriter &rewriter, vector<TableDesc> &tables)
     : C(C), rewriter_(rewriter), out_(llvm::errs()), tables_(tables) {
@@ -141,6 +223,11 @@ bool BTypeVisitor::VisitFunctionDecl(FunctionDecl *D) {
     // for each trace argument, convert the variable from ptregs to something on stack
     if (CompoundStmt *S = dyn_cast<CompoundStmt>(D->getBody()))
       rewriter_.ReplaceText(S->getLBracLoc(), 1, preamble);
+  } else if (D->hasBody() &&
+             rewriter_.getSourceMgr().getFileID(D->getLocStart())
+               == rewriter_.getSourceMgr().getMainFileID()) {
+    // rewritable functions that are static should be always treated as helper
+    rewriter_.InsertText(D->getLocStart(), "__attribute__((always_inline))\n");
   }
   return true;
 }
@@ -282,37 +369,6 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
   return true;
 }
 
-bool BTypeVisitor::VisitMemberExpr(MemberExpr *E) {
-  if (visited_.find(E) != visited_.end()) return true;
-
-  // Checks to see if the expression references something that needs to be run
-  // through bpf_probe_read.
-  BProbeChecker checker;
-  if (checker.TraverseStmt(E))
-    return true;
-
-  Expr *base;
-  SourceLocation rhs_start, op;
-  for (MemberExpr *M = E; M; M = dyn_cast<MemberExpr>(M->getBase())) {
-    visited_.insert(M);
-    rhs_start = M->getLocEnd();
-    base = M->getBase();
-    op = M->getOperatorLoc();
-    if (M->isArrow())
-      break;
-  }
-  string rhs = rewriter_.getRewrittenText(SourceRange(rhs_start, E->getLocEnd()));
-  string base_type = base->getType()->getPointeeType().getAsString();
-  string pre, post;
-  pre = "({ typeof(" + E->getType().getAsString() + ") _val; memset(&_val, 0, sizeof(_val));";
-  pre += " bpf_probe_read(&_val, sizeof(_val), (u64)";
-  post = " + offsetof(" + base_type + ", " + rhs + ")";
-  post += "); _val; })";
-  rewriter_.InsertText(E->getLocStart(), pre);
-  rewriter_.ReplaceText(SourceRange(op, E->getLocEnd()), post);
-  return true;
-}
-
 bool BTypeVisitor::VisitBinaryOperator(BinaryOperator *E) {
   if (!E->isAssignmentOp())
     return true;
@@ -339,12 +395,6 @@ bool BTypeVisitor::VisitBinaryOperator(BinaryOperator *E) {
         }
       }
     }
-  }
-  // copy probe attribute from RHS to LHS if present
-  BProbeChecker checker;
-  if (!checker.TraverseStmt(E->getRHS())) {
-    BProbeSetter setter(C);
-    setter.TraverseStmt(E->getLHS());
   }
   return true;
 }
@@ -453,11 +503,6 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
       }
     }
   }
-  if (Expr *E = Decl->getInit()) {
-    BProbeChecker checker;
-    if (!checker.TraverseStmt(E))
-      Decl->addAttr(UnavailableAttr::CreateImplicit(C, "ptregs"));
-  }
   return true;
 }
 
@@ -465,9 +510,27 @@ BTypeConsumer::BTypeConsumer(ASTContext &C, Rewriter &rewriter, vector<TableDesc
     : visitor_(C, rewriter, tables) {
 }
 
-bool BTypeConsumer::HandleTopLevelDecl(DeclGroupRef D) {
-  for (auto it : D)
-    visitor_.TraverseDecl(it);
+bool BTypeConsumer::HandleTopLevelDecl(DeclGroupRef Group) {
+  for (auto D : Group)
+    visitor_.TraverseDecl(D);
+  return true;
+}
+
+ProbeConsumer::ProbeConsumer(clang::ASTContext &C, Rewriter &rewriter)
+    : visitor_(rewriter) {}
+
+bool ProbeConsumer::HandleTopLevelDecl(clang::DeclGroupRef Group) {
+  for (auto D : Group) {
+    if (FunctionDecl *F = dyn_cast<FunctionDecl>(D)) {
+      if (F->isExternallyVisible() && F->hasBody()) {
+        for (auto arg : F->parameters()) {
+          if (arg != F->getParamDecl(0))
+            visitor_.set_ptreg(arg);
+        }
+        visitor_.TraverseDecl(D);
+      }
+    }
+  }
   return true;
 }
 
@@ -476,7 +539,6 @@ BFrontendAction::BFrontendAction(llvm::raw_ostream &os, unsigned flags)
 }
 
 void BFrontendAction::EndSourceFileAction() {
-  // uncomment to see rewritten source
   if (flags_ & 0x4)
     rewriter_->getEditBuffer(rewriter_->getSourceMgr().getMainFileID()).write(llvm::errs());
   rewriter_->getEditBuffer(rewriter_->getSourceMgr().getMainFileID()).write(os_);
@@ -485,7 +547,10 @@ void BFrontendAction::EndSourceFileAction() {
 
 unique_ptr<ASTConsumer> BFrontendAction::CreateASTConsumer(CompilerInstance &Compiler, llvm::StringRef InFile) {
   rewriter_->setSourceMgr(Compiler.getSourceManager(), Compiler.getLangOpts());
-  return unique_ptr<ASTConsumer>(new BTypeConsumer(Compiler.getASTContext(), *rewriter_, *tables_));
+  vector<unique_ptr<ASTConsumer>> consumers;
+  consumers.push_back(unique_ptr<ASTConsumer>(new ProbeConsumer(Compiler.getASTContext(), *rewriter_)));
+  consumers.push_back(unique_ptr<ASTConsumer>(new BTypeConsumer(Compiler.getASTContext(), *rewriter_, *tables_)));
+  return unique_ptr<ASTConsumer>(new MultiplexConsumer(move(consumers)));
 }
 
 }

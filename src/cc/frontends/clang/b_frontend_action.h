@@ -66,7 +66,6 @@ class BTypeVisitor : public clang::RecursiveASTVisitor<BTypeVisitor> {
   bool VisitFunctionDecl(clang::FunctionDecl *D);
   bool VisitCallExpr(clang::CallExpr *Call);
   bool VisitVarDecl(clang::VarDecl *Decl);
-  bool VisitMemberExpr(clang::MemberExpr *E);
   bool VisitBinaryOperator(clang::BinaryOperator *E);
   bool VisitImplicitCastExpr(clang::ImplicitCastExpr *E);
 
@@ -79,14 +78,39 @@ class BTypeVisitor : public clang::RecursiveASTVisitor<BTypeVisitor> {
   std::set<clang::Expr *> visited_;
 };
 
+// Do a depth-first search to rewrite all pointers that need to be probed
+class ProbeVisitor : public clang::RecursiveASTVisitor<ProbeVisitor> {
+ public:
+  explicit ProbeVisitor(clang::Rewriter &rewriter);
+  bool VisitVarDecl(clang::VarDecl *Decl);
+  bool VisitCallExpr(clang::CallExpr *Call);
+  bool VisitBinaryOperator(clang::BinaryOperator *E);
+  bool VisitMemberExpr(clang::MemberExpr *E);
+  void set_ptreg(clang::Decl *D) { ptregs_.insert(D); }
+ private:
+  clang::Rewriter &rewriter_;
+  std::set<clang::Decl *> fn_visited_;
+  std::set<clang::Expr *> memb_visited_;
+  std::set<clang::Decl *> ptregs_;
+};
+
 // A helper class to the frontend action, walks the decls
 class BTypeConsumer : public clang::ASTConsumer {
  public:
   explicit BTypeConsumer(clang::ASTContext &C, clang::Rewriter &rewriter,
                          std::vector<TableDesc> &tables);
-  bool HandleTopLevelDecl(clang::DeclGroupRef D) override;
+  bool HandleTopLevelDecl(clang::DeclGroupRef Group) override;
  private:
   BTypeVisitor visitor_;
+};
+
+// A helper class to the frontend action, walks the decls
+class ProbeConsumer : public clang::ASTConsumer {
+ public:
+  ProbeConsumer(clang::ASTContext &C, clang::Rewriter &rewriter);
+  bool HandleTopLevelDecl(clang::DeclGroupRef Group) override;
+ private:
+  ProbeVisitor visitor_;
 };
 
 // Create a B program in 2 phases (everything else is normal C frontend):
