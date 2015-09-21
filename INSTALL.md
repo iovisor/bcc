@@ -1,18 +1,20 @@
 # Ubuntu - Binary
 
-Install a 4.2+ kernel from http://kernel.ubuntu.com/~kernel-ppa/mainline,
+Install a 4.3+ kernel from http://kernel.ubuntu.com/~kernel-ppa/mainline,
 for example:
 
 ```bash
-VER=4.2.0-999
-REL=201509072200
-PREFIX=http://kernel.ubuntu.com/~kernel-ppa/mainline/daily/2015-09-08-unstable/
+VER=4.3.0-999
+PREFIX=http://kernel.ubuntu.com/~kernel-ppa/mainline/daily/2015-09-21-unstable/
+REL=201509202159
 wget ${PREFIX}/linux-headers-${VER}-generic_${VER}.${REL}_amd64.deb
 wget ${PREFIX}/linux-headers-${VER}_${VER}.${REL}_all.deb
 wget ${PREFIX}/linux-image-${VER}-generic_${VER}.${REL}_amd64.deb
 sudo dpkg -i linux-*${VER}.${REL}*.deb
 # reboot
 ```
+
+Update PREFIX to the latest date, and you can browse the files in the PREFIX url to find the REL number.
 
 Tagged bcc binary packages are built for Ubuntu Trusty (14.04) and hosted at
 http://52.8.15.63/apt/.
