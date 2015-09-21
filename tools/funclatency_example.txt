@@ -1,0 +1,225 @@
+Demonstrations of funclatency, the Linux eBPF/bcc version.
+
+
+Timing the do_sys_open() kernel function until Ctrl-C:
+
+# ./funclatency do_sys_open
+Tracing do_sys_open... Hit Ctrl-C to end.
+^C
+     nsecs           : count     distribution
+       0 -> 1        : 0        |                                      |
+       2 -> 3        : 0        |                                      |
+       4 -> 7        : 0        |                                      |
+       8 -> 15       : 0        |                                      |
+      16 -> 31       : 0        |                                      |
+      32 -> 63       : 0        |                                      |
+      64 -> 127      : 0        |                                      |
+     128 -> 255      : 0        |                                      |
+     256 -> 511      : 0        |                                      |
+     512 -> 1023     : 0        |                                      |
+    1024 -> 2047     : 0        |                                      |
+    2048 -> 4095     : 124      |****************                      |
+    4096 -> 8191     : 291      |**************************************|
+    8192 -> 16383    : 36       |****                                  |
+   16384 -> 32767    : 16       |**                                    |
+   32768 -> 65535    : 8        |*                                     |
+   65536 -> 131071   : 0        |                                      |
+  131072 -> 262143   : 0        |                                      |
+  262144 -> 524287   : 0        |                                      |
+  524288 -> 1048575  : 0        |                                      |
+ 1048576 -> 2097151  : 0        |                                      |
+ 2097152 -> 4194303  : 1        |                                      |
+Detaching...
+
+The output shows a histogram of function latency (call time), measured from when
+the function began executing (was called) to when it finished (returned).
+
+This example output shows that most of the time, do_sys_open() took between
+2048 and 65536 nanoseconds (2 to 65 microseconds). The peak of this distribution
+shows 291 calls of between 4096 and 8191 nanoseconds. There was also one
+occurrance, an outlier, in the 2 to 4 millisecond range.
+
+How this works: the function entry and return are traced using the kernel kprobe
+and kretprobe tracer. Timestamps are collected, the delta time calculated, which
+is the bucketized and stored as an in-kernel histogram for efficiency. The
+histgram is visible in the output: it's the "count" column; everything else is
+decoration. Only the count column is copied to user-level on output. This is an
+efficient way to time kernel functions and examine their latency distribution.
+
+
+Now vfs_read() is traced, and a microseconds histogram printed:
+
+# ./funclatency -u vfs_read
+Tracing vfs_read... Hit Ctrl-C to end.
+^C
+     usecs           : count     distribution
+       0 -> 1        : 1143     |**************************************|
+       2 -> 3        : 420      |*************                         |
+       4 -> 7        : 159      |*****                                 |
+       8 -> 15       : 295      |*********                             |
+      16 -> 31       : 25       |                                      |
+      32 -> 63       : 5        |                                      |
+      64 -> 127      : 1        |                                      |
+     128 -> 255      : 0        |                                      |
+     256 -> 511      : 0        |                                      |
+     512 -> 1023     : 0        |                                      |
+    1024 -> 2047     : 1        |                                      |
+    2048 -> 4095     : 0        |                                      |
+    4096 -> 8191     : 5        |                                      |
+    8192 -> 16383    : 0        |                                      |
+   16384 -> 32767    : 0        |                                      |
+   32768 -> 65535    : 0        |                                      |
+   65536 -> 131071   : 7        |                                      |
+  131072 -> 262143   : 7        |                                      |
+  262144 -> 524287   : 3        |                                      |
+  524288 -> 1048575  : 7        |                                      |
+Detaching...
+
+This shows a bimodal distribution. Many vfs_read() calls were faster than 15
+microseconds, however, there was also a small handful between 65 milliseconds
+and 1 second, seen at the bottom of the table. These are likely network reads
+from SSH, waiting on interactive keystrokes.
+
+
+Tracing do_nanosleep() in milliseconds:
+
+# ./funclatency -m do_nanosleep
+Tracing do_nanosleep... Hit Ctrl-C to end.
+^C
+     msecs           : count     distribution
+       0 -> 1        : 0        |                                      |
+       2 -> 3        : 0        |                                      |
+       4 -> 7        : 0        |                                      |
+       8 -> 15       : 0        |                                      |
+      16 -> 31       : 0        |                                      |
+      32 -> 63       : 0        |                                      |
+      64 -> 127      : 0        |                                      |
+     128 -> 255      : 0        |                                      |
+     256 -> 511      : 0        |                                      |
+     512 -> 1023     : 328      |**************************************|
+    1024 -> 2047     : 0        |                                      |
+    2048 -> 4095     : 0        |                                      |
+    4096 -> 8191     : 32       |***                                   |
+    8192 -> 16383    : 0        |                                      |
+   16384 -> 32767    : 0        |                                      |
+   32768 -> 65535    : 2        |                                      |
+Detaching...
+
+This looks like it has found threads that are sleeping every 1, 5, and 60
+seconds.
+
+
+An interval can be provided using -i, and timestamps added using -T. For
+example, tracing vfs_read() latency in milliseconds and printing output
+every 5 seconds:
+
+# ./funclatency -mTi 5 vfs_read
+Tracing vfs_read... Hit Ctrl-C to end.
+
+20:10:08
+     msecs           : count     distribution
+       0 -> 1        : 1500     |*************************************+|
+       2 -> 3        : 3        |                                      |
+       4 -> 7        : 1        |                                      |
+       8 -> 15       : 2        |                                      |
+      16 -> 31       : 0        |                                      |
+      32 -> 63       : 0        |                                      |
+      64 -> 127      : 4        |                                      |
+     128 -> 255      : 3        |                                      |
+     256 -> 511      : 1        |                                      |
+     512 -> 1023     : 7        |                                      |
+
+20:10:13
+     msecs           : count     distribution
+       0 -> 1        : 1251     |*************************************+|
+       2 -> 3        : 3        |                                      |
+       4 -> 7        : 2        |                                      |
+       8 -> 15       : 0        |                                      |
+      16 -> 31       : 2        |                                      |
+      32 -> 63       : 3        |                                      |
+      64 -> 127      : 5        |                                      |
+     128 -> 255      : 5        |                                      |
+     256 -> 511      : 3        |                                      |
+     512 -> 1023     : 6        |                                      |
+    1024 -> 2047     : 2        |                                      |
+
+20:10:18
+     msecs           : count     distribution
+       0 -> 1        : 1265     |*************************************+|
+       2 -> 3        : 0        |                                      |
+       4 -> 7        : 5        |                                      |
+       8 -> 15       : 9        |                                      |
+      16 -> 31       : 7        |                                      |
+      32 -> 63       : 1        |                                      |
+      64 -> 127      : 2        |                                      |
+     128 -> 255      : 3        |                                      |
+     256 -> 511      : 5        |                                      |
+     512 -> 1023     : 5        |                                      |
+    1024 -> 2047     : 0        |                                      |
+    2048 -> 4095     : 1        |                                      |
+^C
+20:10:20
+     msecs           : count     distribution
+       0 -> 1        : 249      |*************************************+|
+       2 -> 3        : 0        |                                      |
+       4 -> 7        : 0        |                                      |
+       8 -> 15       : 1        |                                      |
+      16 -> 31       : 0        |                                      |
+      32 -> 63       : 0        |                                      |
+      64 -> 127      : 0        |                                      |
+     128 -> 255      : 0        |                                      |
+     256 -> 511      : 0        |                                      |
+     512 -> 1023     : 1        |                                      |
+Detaching...
+
+
+A single process can be traced, which filters in-kernel for efficiency. Here,
+the vfs_read() function is timed as milliseconds for PID 17064, which is a
+bash shell:
+
+# ./funclatency -mp 17064 vfs_read
+Tracing vfs_read... Hit Ctrl-C to end.
+^C
+     msecs           : count     distribution
+       0 -> 1        : 1        |**                                    |
+       2 -> 3        : 0        |                                      |
+       4 -> 7        : 0        |                                      |
+       8 -> 15       : 1        |**                                    |
+      16 -> 31       : 2        |*****                                 |
+      32 -> 63       : 0        |                                      |
+      64 -> 127      : 13       |**************************************|
+     128 -> 255      : 10       |*****************************         |
+     256 -> 511      : 4        |***********                           |
+Detaching...
+
+The distribution between 64 and 511 milliseconds shows keystroke latency.
+
+
+USAGE message:
+
+# ./funclatency  -h
+usage: funclatency [-h] [-p PID] [-i INTERVAL] [-T] [-u] [-m] [-r] pattern
+
+Time kernel funcitons and print latency as a histogram
+
+positional arguments:
+  pattern               search expression for kernel functions
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -p PID, --pid PID     trace this PID only
+  -i INTERVAL, --interval INTERVAL
+                        summary interval, seconds
+  -T, --timestamp       include timestamp on output
+  -u, --microseconds    microsecond histogram
+  -m, --milliseconds    millisecond histogram
+  -r, --regexp          use regular expressions. Default is "*" wildcards
+                        only.
+
+examples:
+    ./funclatency do_sys_open       # time the do_sys_open() kenel function
+    ./funclatency -u vfs_read       # time vfs_read(), in microseconds
+    ./funclatency -m do_nanosleep   # time do_nanosleep(), in milliseconds
+    ./funclatency -mTi 5 vfs_read   # output every 5 seconds, with timestamps
+    ./funclatency -p 181 vfs_read   # time process 181 only
+    ./funclatency 'vfs_fstat*'      # time both vfs_fstat() and vfs_fstatat()
