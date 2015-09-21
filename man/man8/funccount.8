@@ -64,12 +64,10 @@ COUNT
 Number of calls while tracing
 .SH OVERHEAD
 This traces kernel functions and maintains in-kernel counts, which
-are asynchronously copied to user-space. While the rate of VFS operations can
+are asynchronously copied to user-space. While the rate of kernel calls
 be very high (>1M/sec), this is a relatively efficient way to trace these
 events, and so the overhead is expected to be small for normal workloads.
-Measure in a test environment, and if overheads are an issue, edit the script
-to reduce the types of vfs functions traced (currently all beginning with
-"vfs_").
+Measure in a test environment before use.
 .SH SOURCE
 This is from bcc.
 .IP
