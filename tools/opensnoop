@@ -89,7 +89,7 @@ start_ts = 0
 # format output
 while 1:
 	(task, pid, cpu, flags, ts, msg) = b.trace_fields()
-	(filenamp, ret_s) = msg.split(" ")
+	(filename, ret_s) = msg.split(" ")
 
 	ret = int(ret_s)
 	if (args.failed and (ret >= 0)):
@@ -106,4 +106,4 @@ while 1:
 		if start_ts == 0:
 			start_ts = ts
 		print("%-14.9f" % (ts - start_ts), end="")
-	print("%-6d %-16s %4s %3s %s" % (pid, task, fd_s, err, filenamp))
+	print("%-6d %-16s %4s %3s %s" % (pid, task, fd_s, err, filename))
