@@ -64,6 +64,7 @@ Examples:
 
 Tools:
 
+- tools/[biolatency](tools/biolatency): Summarize block device I/O latency as a histogram. [Examples](tools/biolatency_example.txt).
 - tools/[biosnoop](tools/biosnoop): Trace block device I/O with PID and latency. [Examples](tools/biosnoop_example.txt).
 - tools/[funccount](tools/funccount): Count kernel function calls. [Examples](tools/funccount_example.txt).
 - tools/[funclatency](tools/funclatency): Time kernel functions and show their latency distribution. [Examples](tools/funclatency_example.txt).
