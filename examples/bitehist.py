@@ -28,4 +28,4 @@ try:
 except KeyboardInterrupt:
 	print
 
-b["dist"].print_log2_hist()
+b["dist"].print_log2_hist("kbytes")

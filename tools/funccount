@@ -17,7 +17,6 @@ from __future__ import print_function
 from bcc import BPF
 from time import sleep, strftime
 import argparse
-import re
 import signal
 
 # arguments
@@ -63,24 +62,21 @@ struct key_t {
 BPF_HASH(counts, struct key_t);
 
 int trace_count(struct pt_regs *ctx) {
-	FILTER_START
+	FILTER
 	struct key_t key = {};
 	u64 zero = 0, *val;
 	key.ip = ctx->ip;
 	val = counts.lookup_or_init(&key, &zero);
 	(*val)++;
-	FILTER_DONE
 	return 0;
 }
 """
 if args.pid:
-	bpf_text = bpf_text.replace('FILTER_START',
+	bpf_text = bpf_text.replace('FILTER',
 	    ('u32 pid; pid = bpf_get_current_pid_tgid(); ' +
-	    'if (pid == %s) {') % (args.pid))
-	bpf_text = bpf_text.replace('FILTER_DONE', '}')
+	    'if (pid != %s) { return 0; }') % (args.pid))
 else:
-	bpf_text = bpf_text.replace('FILTER_START', '')
-	bpf_text = bpf_text.replace('FILTER_DONE', '')
+	bpf_text = bpf_text.replace('FILTER', '')
 if debug:
 	print(bpf_text)
 b = BPF(text=bpf_text)
