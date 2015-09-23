@@ -9,10 +9,7 @@ enable_testing()
 
 include(cmake/GetGitRevisionDescription.cmake)
 include(cmake/version.cmake)
-get_property(LIB64 GLOBAL PROPERTY FIND_LIBRARY_USE_LIB64_PATHS)
-if(LIB64)
-  set(LIBSUFFIX 64)
-endif()
+include(GNUInstallDirs)
 
 if(NOT PYTHON_ONLY)
 find_package(BISON)

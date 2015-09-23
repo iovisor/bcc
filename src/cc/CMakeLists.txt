@@ -51,7 +51,7 @@ set(clang_libs ${libclangFrontend} ${libclangSerialization} ${libclangDriver} ${
 target_link_libraries(bcc b_frontend clang_frontend ${clang_libs} ${llvm_libs} LLVMBPFCodeGen)
 
 install(TARGETS bcc LIBRARY COMPONENT libbcc
-  DESTINATION lib${LIBSUFFIX})
+  DESTINATION ${CMAKE_INSTALL_LIBDIR})
 install(DIRECTORY export/ COMPONENT libbcc
   DESTINATION share/bcc/include/bcc
   FILES_MATCHING PATTERN "*.h")
@@ -61,6 +61,6 @@ install(DIRECTORY compat/linux/ COMPONENT libbcc
   DESTINATION include/bcc/compat/linux
   FILES_MATCHING PATTERN "*.h")
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libbcc.pc COMPONENT libbcc
-  DESTINATION lib${LIBSUFFIX}/pkgconfig)
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
 
 add_subdirectory(frontends)
