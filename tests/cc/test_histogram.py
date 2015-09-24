@@ -5,10 +5,11 @@
 from bcc import BPF
 from ctypes import c_int, c_ulonglong
 import random
+import time
 from unittest import main, TestCase
 
 class TestHistogram(TestCase):
-    def _test_simple(self):
+    def test_simple(self):
         b = BPF(text="""
 #include <uapi/linux/ptrace.h>
 #include <linux/bpf.h>
@@ -50,6 +51,22 @@ int kprobe__htab_map_delete_elem(struct pt_regs *ctx, struct bpf_map *map, u64 *
                 except: pass
                 try: del b["stub2"][c_ulonglong(1 << i)]
                 except: pass
+        b["hist1"].print_log2_hist()
+
+    def test_chars(self):
+        b = BPF(text="""
+#include <uapi/linux/ptrace.h>
+#include <linux/sched.h>
+typedef struct { char name[TASK_COMM_LEN]; u64 slot; } Key;
+BPF_HISTOGRAM(hist1, Key, 1024);
+int kprobe__finish_task_switch(struct pt_regs *ctx, struct task_struct *prev) {
+    Key k = {.slot = bpf_log2l(prev->real_start_time)};
+    if (!bpf_get_current_comm(&k.name, sizeof(k.name)))
+        hist1.increment(k);
+    return 0;
+}
+""")
+        for i in range(0, 100): time.sleep(0.01)
         b["hist1"].print_log2_hist()
 
 

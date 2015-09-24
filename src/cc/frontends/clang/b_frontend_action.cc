@@ -70,6 +70,8 @@ bool BMapDeclVisitor::VisitRecordDecl(RecordDecl *D) {
       result_ += "\"" + F->getName().str() + "\", \"unsigned long long\"";
     else
       TraverseDecl(F);
+    if (const ConstantArrayType *T = dyn_cast<ConstantArrayType>(F->getType()))
+      result_ += ", [" + T->getSize().toString(10, false) + "]";
     if (F->isBitField())
       result_ += ", " + to_string(F->getBitWidthValue(C));
     result_ += "], ";

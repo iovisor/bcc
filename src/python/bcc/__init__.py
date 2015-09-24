@@ -256,7 +256,7 @@ class BPF(object):
                     slot = getattr(k, f2)
                     vals[slot] = v.value
                 for bucket, vals in tmp.items():
-                    print("\nBucket %s = %x" % (bucket_type, bucket))
+                    print("\nBucket %s = %r" % (bucket_type, bucket))
                     self._print_log2_hist(vals, val_type, 0)
             else:
                 vals = [0] * 65
@@ -429,7 +429,6 @@ class BPF(object):
         u"_Bool": ct.c_bool,
         u"char": ct.c_char,
         u"wchar_t": ct.c_wchar,
-        u"char": ct.c_byte,
         u"unsigned char": ct.c_ubyte,
         u"short": ct.c_short,
         u"unsigned short": ct.c_ushort,
@@ -452,7 +451,10 @@ class BPF(object):
             if len(t) == 2:
                 fields.append((t[0], BPF._decode_table_type(t[1])))
             elif len(t) == 3:
-                fields.append((t[0], BPF._decode_table_type(t[1]), t[2]))
+                if isinstance(t[2], list):
+                    fields.append((t[0], BPF._decode_table_type(t[1]) * t[2][0]))
+                else:
+                    fields.append((t[0], BPF._decode_table_type(t[1]), t[2]))
             else:
                 raise Exception("Failed to decode type %s" % str(t))
         cls = type(str(desc[0]), (ct.Structure,), dict(_fields_=fields))
