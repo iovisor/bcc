@@ -85,6 +85,7 @@ class ProbeVisitor : public clang::RecursiveASTVisitor<ProbeVisitor> {
   bool VisitVarDecl(clang::VarDecl *Decl);
   bool VisitCallExpr(clang::CallExpr *Call);
   bool VisitBinaryOperator(clang::BinaryOperator *E);
+  bool VisitUnaryOperator(clang::UnaryOperator *E);
   bool VisitMemberExpr(clang::MemberExpr *E);
   void set_ptreg(clang::Decl *D) { ptregs_.insert(D); }
  private:

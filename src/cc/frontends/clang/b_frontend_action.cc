@@ -158,6 +158,23 @@ bool ProbeVisitor::VisitBinaryOperator(BinaryOperator *E) {
   }
   return true;
 }
+bool ProbeVisitor::VisitUnaryOperator(UnaryOperator *E) {
+  if (E->getOpcode() != UO_Deref)
+    return true;
+  if (memb_visited_.find(E) != memb_visited_.end())
+    return true;
+  if (!ProbeChecker(E, ptregs_).needs_probe())
+    return true;
+  memb_visited_.insert(E);
+  Expr *sub = E->getSubExpr();
+  string rhs = rewriter_.getRewrittenText(SourceRange(sub->getLocStart(), sub->getLocEnd()));
+  string text;
+  text = "({ typeof(" + E->getType().getAsString() + ") _val; memset(&_val, 0, sizeof(_val));";
+  text += " bpf_probe_read(&_val, sizeof(_val), (u64)";
+  text += rhs + "); _val; })";
+  rewriter_.ReplaceText(SourceRange(E->getLocStart(), E->getLocEnd()), text);
+  return true;
+}
 bool ProbeVisitor::VisitMemberExpr(MemberExpr *E) {
   if (memb_visited_.find(E) != memb_visited_.end()) return true;
 
