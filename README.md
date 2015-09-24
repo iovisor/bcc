@@ -240,3 +240,13 @@ for k, v in b["stats"].items():
 ## Getting started
 
 See [INSTALL.md](INSTALL.md) for installation steps on your platform.
+
+## Contributing
+Already pumped up to commit some code? Here are some resources to join the
+discussions in the [IOVisor](https://www.iovisor.org/) community and see
+what you want to work on.
+
+* _Mailing List:_ http://lists.iovisor.org/mailman/listinfo/iovisor-dev
+* _IRC:_ #iovisor at irc.oftc.net
+* _IRC Logs:_ https://scrollback.io/iovisor/all
+* _BCC Issue Tracker:_ [Github Issues](https://github.com/iovisor/bcc/issues)
