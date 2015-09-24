@@ -45,7 +45,7 @@ bpf_text = """
 #include <uapi/linux/ptrace.h>
 #include <linux/blkdev.h>
 
-BPF_TABLE(\"array\", int, u64, dist, 64);
+BPF_HISTOGRAM(dist);
 BPF_HASH(start, struct request *);
 
 // time block I/O
@@ -70,9 +70,7 @@ int trace_req_completion(struct pt_regs *ctx, struct request *req)
 	FACTOR
 
 	// store as histogram
-	int index = bpf_log2l(delta);
-	u64 *leaf = dist.lookup(&index);
-	if (leaf) (*leaf)++;
+	dist.increment(bpf_log2l(delta));
 
 	start.delete(&req);
 	return 0;

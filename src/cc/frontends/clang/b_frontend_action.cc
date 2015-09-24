@@ -67,9 +67,11 @@ bool BMapDeclVisitor::VisitRecordDecl(RecordDecl *D) {
   for (auto F : D->getDefinition()->fields()) {
     result_ += "[";
     if (F->getType()->isPointerType())
-      result_ += "\"unsigned long long\"";
+      result_ += "\"" + F->getName().str() + "\", \"unsigned long long\"";
     else
       TraverseDecl(F);
+    if (const ConstantArrayType *T = dyn_cast<ConstantArrayType>(F->getType()))
+      result_ += ", [" + T->getSize().toString(10, false) + "]";
     if (F->isBitField())
       result_ += ", " + to_string(F->getBitWidthValue(C));
     result_ += "], ";
@@ -158,6 +160,23 @@ bool ProbeVisitor::VisitBinaryOperator(BinaryOperator *E) {
   }
   return true;
 }
+bool ProbeVisitor::VisitUnaryOperator(UnaryOperator *E) {
+  if (E->getOpcode() != UO_Deref)
+    return true;
+  if (memb_visited_.find(E) != memb_visited_.end())
+    return true;
+  if (!ProbeChecker(E, ptregs_).needs_probe())
+    return true;
+  memb_visited_.insert(E);
+  Expr *sub = E->getSubExpr();
+  string rhs = rewriter_.getRewrittenText(SourceRange(sub->getLocStart(), sub->getLocEnd()));
+  string text;
+  text = "({ typeof(" + E->getType().getAsString() + ") _val; memset(&_val, 0, sizeof(_val));";
+  text += " bpf_probe_read(&_val, sizeof(_val), (u64)";
+  text += rhs + "); _val; })";
+  rewriter_.ReplaceText(SourceRange(E->getLocStart(), E->getLocEnd()), text);
+  return true;
+}
 bool ProbeVisitor::VisitMemberExpr(MemberExpr *E) {
   if (memb_visited_.find(E) != memb_visited_.end()) return true;
 
@@ -194,7 +213,7 @@ bool ProbeVisitor::VisitMemberExpr(MemberExpr *E) {
 }
 
 BTypeVisitor::BTypeVisitor(ASTContext &C, Rewriter &rewriter, vector<TableDesc> &tables)
-    : C(C), rewriter_(rewriter), out_(llvm::errs()), tables_(tables) {
+    : C(C), diag_(C.getDiagnostics()), rewriter_(rewriter), out_(llvm::errs()), tables_(tables) {
 }
 
 bool BTypeVisitor::VisitFunctionDecl(FunctionDecl *D) {
@@ -276,7 +295,7 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
         string map_update_policy = "BPF_ANY";
         string txt;
         if (memb_name == "lookup_or_init") {
-          string map_update_policy = "BPF_NOEXIST";
+          map_update_policy = "BPF_NOEXIST";
           string name = Ref->getDecl()->getName();
           string arg0 = rewriter_.getRewrittenText(SourceRange(Call->getArg(0)->getLocStart(),
                                                                Call->getArg(0)->getLocEnd()));
@@ -291,6 +310,19 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
           txt += " if (!leaf) return 0;";
           txt += "}";
           txt += "leaf;})";
+        } else if (memb_name == "increment") {
+          string name = Ref->getDecl()->getName();
+          string arg0 = rewriter_.getRewrittenText(SourceRange(Call->getArg(0)->getLocStart(),
+                                                               Call->getArg(0)->getLocEnd()));
+          string lookup = "bpf_map_lookup_elem_(bpf_pseudo_fd(1, " + fd + ")";
+          string update = "bpf_map_update_elem_(bpf_pseudo_fd(1, " + fd + ")";
+          txt  = "({ typeof(" + name + ".key) _key = " + arg0 + "; ";
+          if (table_it->type == BPF_MAP_TYPE_HASH) {
+            txt += "typeof(" + name + ".leaf) _zleaf; memset(&_zleaf, 0, sizeof(_zleaf)); ";
+            txt += update + ", &_key, &_zleaf, BPF_NOEXIST); ";
+          }
+          txt += "typeof(" + name + ".leaf) *_leaf = " + lookup + ", &_key); ";
+          txt += "if (_leaf) (*_leaf)++; })";
         } else {
           if (memb_name == "lookup") {
             prefix = "bpf_map_lookup_elem";
@@ -463,11 +495,21 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
       ++i;
     }
     bpf_map_type map_type = BPF_MAP_TYPE_UNSPEC;
-    if (A->getName() == "maps/hash")
+    if (A->getName() == "maps/hash") {
       map_type = BPF_MAP_TYPE_HASH;
-    else if (A->getName() == "maps/array")
+    } else if (A->getName() == "maps/array") {
       map_type = BPF_MAP_TYPE_ARRAY;
-    else if (A->getName() == "maps/prog") {
+    } else if (A->getName() == "maps/histogram") {
+      if (table.key_desc == "\"int\"")
+        map_type = BPF_MAP_TYPE_ARRAY;
+      else
+        map_type = BPF_MAP_TYPE_HASH;
+      if (table.leaf_desc != "\"unsigned long long\"") {
+        unsigned diag_id = diag_.getCustomDiagID(DiagnosticsEngine::Error,
+                                                 "histogram leaf type must be u64, got %0");
+        diag_.Report(Decl->getLocStart(), diag_id) << table.leaf_desc;
+      }
+    } else if (A->getName() == "maps/prog") {
       struct utsname un;
       if (uname(&un) == 0) {
         int major = 0, minor = 0;
@@ -485,8 +527,9 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
     table.type = map_type;
     table.fd = bpf_create_map(map_type, table.key_size, table.leaf_size, table.max_entries);
     if (table.fd < 0) {
-      C.getDiagnostics().Report(Decl->getLocStart(), diag::err_expected)
-           << "valid bpf fd";
+      unsigned diag_id = C.getDiagnostics().getCustomDiagID(DiagnosticsEngine::Error,
+                                                            "could not open bpf map: %0");
+      C.getDiagnostics().Report(Decl->getLocStart(), diag_id) << strerror(errno);
       return false;
     }
     tables_.push_back(std::move(table));

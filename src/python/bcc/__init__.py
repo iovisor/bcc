@@ -99,7 +99,7 @@ KALLSYMS = "/proc/kallsyms"
 ksym_addrs = []
 ksym_names = []
 ksym_loaded = 0
-stars_max = 38
+stars_max = 40
 
 @atexit.register
 def cleanup_kprobes():
@@ -238,38 +238,60 @@ class BPF(object):
                 text = text[:-1] + "+"
             return text
 
-        def print_log2_hist(self, val_type="value"):
-            """print_log2_hist(type=value)
+        def print_log2_hist(self, val_type="value", bucket_type="ptr"):
+            """print_log2_hist(val_type="value", bucket_type="ptr")
 
             Prints a table as a log2 histogram. The table must be stored as
-            log2. The type argument is optional, and is a column header.
+            log2. The val_type argument is optional, and is a column header.
+            If the histogram has a secondary key, multiple tables will print
+            and bucket_type can be used as a header description for each.
             """
+            if isinstance(self.Key(), ct.Structure):
+                tmp = {}
+                f1 = self.Key._fields_[0][0]
+                f2 = self.Key._fields_[1][0]
+                for k, v in self.items():
+                    bucket = getattr(k, f1)
+                    vals = tmp[bucket] = tmp.get(bucket, [0] * 65)
+                    slot = getattr(k, f2)
+                    vals[slot] = v.value
+                for bucket, vals in tmp.items():
+                    print("\nBucket %s = %r" % (bucket_type, bucket))
+                    self._print_log2_hist(vals, val_type, 0)
+            else:
+                vals = [0] * 65
+                for k, v in self.items():
+                    vals[k.value] = v.value
+                self._print_log2_hist(vals, val_type, 0)
+
+        def _print_log2_hist(self, vals, val_type, val_max):
             global stars_max
             log2_dist_max = 64
             idx_max = -1
-            val_max = 0
-            for i in range(1, log2_dist_max + 1):
-                try:
-                    val = self[ct.c_int(i)].value
-                    if (val > 0):
-                        idx_max = i
-                    if (val > val_max):
-                        val_max = val
-                except:
-                    break
+
+            for i, v in enumerate(vals):
+                if v > 0: idx_max = i
+                if v > val_max: val_max = v
+
+            if idx_max <= 32:
+                header = "     %-19s : count     distribution"
+                body = "%10d -> %-10d : %-8d |%-*s|"
+                stars = stars_max
+            else:
+                header = "               %-29s : count     distribution"
+                body = "%20d -> %-20d : %-8d |%-*s|"
+                stars = int(stars_max / 2)
+
             if idx_max > 0:
-                print("     %-15s : count     distribution" % val_type);
+                print(header % val_type);
             for i in range(1, idx_max + 1):
                 low = (1 << i) >> 1
                 high = (1 << i) - 1
                 if (low == high):
                     low -= 1
-                try:
-                    val = self[ct.c_int(i)].value
-                    print("%8d -> %-8d : %-8d |%-*s|" % (low, high, val,
-                        stars_max, self._stars(val, val_max, stars_max)))
-                except:
-                    break
+                val = vals[i]
+                print(body % (low, high, val, stars,
+                              self._stars(val, val_max, stars)))
 
 
         def __iter__(self):
@@ -407,7 +429,6 @@ class BPF(object):
         u"_Bool": ct.c_bool,
         u"char": ct.c_char,
         u"wchar_t": ct.c_wchar,
-        u"char": ct.c_byte,
         u"unsigned char": ct.c_ubyte,
         u"short": ct.c_short,
         u"unsigned short": ct.c_ushort,
@@ -430,7 +451,12 @@ class BPF(object):
             if len(t) == 2:
                 fields.append((t[0], BPF._decode_table_type(t[1])))
             elif len(t) == 3:
-                fields.append((t[0], BPF._decode_table_type(t[1]), t[2]))
+                if isinstance(t[2], list):
+                    fields.append((t[0], BPF._decode_table_type(t[1]) * t[2][0]))
+                else:
+                    fields.append((t[0], BPF._decode_table_type(t[1]), t[2]))
+            else:
+                raise Exception("Failed to decode type %s" % str(t))
         cls = type(str(desc[0]), (ct.Structure,), dict(_fields_=fields))
         return cls
 

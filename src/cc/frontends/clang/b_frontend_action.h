@@ -71,6 +71,7 @@ class BTypeVisitor : public clang::RecursiveASTVisitor<BTypeVisitor> {
 
  private:
   clang::ASTContext &C;
+  clang::DiagnosticsEngine &diag_;
   clang::Rewriter &rewriter_;  /// modifications to the source go into this class
   llvm::raw_ostream &out_;  /// for debugging
   std::vector<TableDesc> &tables_;  /// store the open FDs
@@ -85,6 +86,7 @@ class ProbeVisitor : public clang::RecursiveASTVisitor<ProbeVisitor> {
   bool VisitVarDecl(clang::VarDecl *Decl);
   bool VisitCallExpr(clang::CallExpr *Call);
   bool VisitBinaryOperator(clang::BinaryOperator *E);
+  bool VisitUnaryOperator(clang::UnaryOperator *E);
   bool VisitMemberExpr(clang::MemberExpr *E);
   void set_ptreg(clang::Decl *D) { ptregs_.insert(D); }
  private:
