@@ -13,13 +13,10 @@
 #include <uapi/linux/ptrace.h>
 #include <linux/blkdev.h>
 
-BPF_TABLE("array", int, u64, dist, 64);
+BPF_HISTOGRAM(dist);
 
 int kprobe__blk_account_io_completion(struct pt_regs *ctx, struct request *req)
 {
-	int index = bpf_log2l(req->__data_len / 1024);
-	u64 *leaf = dist.lookup(&index);
-	if (leaf) (*leaf)++;
-
+	dist.increment(bpf_log2l(req->__data_len / 1024));
 	return 0;
 }

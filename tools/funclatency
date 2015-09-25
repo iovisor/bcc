@@ -62,8 +62,8 @@ bpf_text = """
 #include <uapi/linux/ptrace.h>
 #include <linux/blkdev.h>
 
-BPF_TABLE(\"array\", int, u64, dist, 64);
 BPF_HASH(start, u32);
+BPF_HISTOGRAM(dist);
 
 int trace_func_entry(struct pt_regs *ctx)
 {
@@ -91,9 +91,7 @@ int trace_func_return(struct pt_regs *ctx)
 	FACTOR
 
 	// store as histogram
-	int index = bpf_log2l(delta);
-	u64 *leaf = dist.lookup(&index);
-	if (leaf) (*leaf)++;
+	dist.increment(bpf_log2l(delta));
 
 	return 0;
 }

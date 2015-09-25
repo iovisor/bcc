@@ -24,7 +24,7 @@ summary is returned to user-level.
 # ./bitehist.py 
 Tracing... Hit Ctrl-C to end.
 ^C
-     value           : count     distribution
+     kbytes          : count     distribution
        0 -> 1        : 3        |                                      |
        2 -> 3        : 0        |                                      |
        4 -> 7        : 211      |**********                            |
