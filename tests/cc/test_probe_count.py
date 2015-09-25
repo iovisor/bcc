@@ -22,7 +22,7 @@ class TestKprobeCnt(TestCase):
             for line in f:
                 if str(line).startswith("vfs_"):
                     actual_cnt += 1
-        open_cnt = self.b.get_open_kprobes()
+        open_cnt = self.b.num_open_kprobes()
         self.assertEqual(actual_cnt, open_cnt)
 
 if __name__ == "__main__":

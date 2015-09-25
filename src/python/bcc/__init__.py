@@ -736,8 +736,8 @@ class BPF(object):
         return ksym_names[idx] + hex(offset)
 
     @staticmethod
-    def get_open_kprobes():
-        """ get_open_kprobes()
+    def num_open_kprobes():
+        """num_open_kprobes()
 
         Get the number of open K[ret]probes. Can be useful for scenarios where
         event_re is used while attaching and detaching probes
