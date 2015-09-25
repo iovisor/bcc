@@ -13,7 +13,7 @@
 #include <uapi/linux/ptrace.h>
 
 BPF_HASH(start, u32);
-BPF_TABLE("array", int, u64, dist, 64);
+BPF_HISTOGRAM(dist);
 
 int do_entry(struct pt_regs *ctx)
 {
@@ -36,9 +36,7 @@ int do_return(struct pt_regs *ctx)
 
 	if (tsp != 0) {
 		delta = bpf_ktime_get_ns() - *tsp;
-		int index = bpf_log2l(delta / 1000);
-		u64 *leaf = dist.lookup(&index);
-		if (leaf) (*leaf)++;
+		dist.increment(bpf_log2l(delta / 1000));
 		start.delete(&pid);
 	}
 

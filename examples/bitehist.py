@@ -22,10 +22,11 @@ b = BPF(src_file = "bitehist.c")
 # header
 print("Tracing... Hit Ctrl-C to end.")
 
-# output
+# trace until Ctrl-C
 try:
 	sleep(99999999)
 except KeyboardInterrupt:
 	print
 
+# output
 b["dist"].print_log2_hist("kbytes")
