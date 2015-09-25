@@ -12,6 +12,11 @@
 # multiple functions is of limited use, since the output has one histogram for
 # everything. Future versions should split the output histogram by the function.
 #
+# Currently nested or recursive functions are not supported properly, and
+# timestamps will be overwritten, creating dubious output. Try to match single
+# functions, or groups of functions that run at the same stack layer, and
+# don't ultimately call each other.
+#
 # Copyright (c) 2015 Brendan Gregg.
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
@@ -31,6 +36,7 @@ examples = """examples:
     ./funclatency -mTi 5 vfs_read   # output every 5 seconds, with timestamps
     ./funclatency -p 181 vfs_read   # time process 181 only
     ./funclatency 'vfs_fstat*'      # time both vfs_fstat() and vfs_fstatat()
+    ./funclatency -F 'vfs_r*'       # show one histogram per matched function
 """
 parser = argparse.ArgumentParser(
 	description="Time kernel funcitons and print latency as a histogram",
@@ -46,6 +52,8 @@ parser.add_argument("-u", "--microseconds", action="store_true",
 	help="microsecond histogram")
 parser.add_argument("-m", "--milliseconds", action="store_true",
 	help="millisecond histogram")
+parser.add_argument("-F", "--function", action="store_true",
+	help="show a separate histogram per function")
 parser.add_argument("-r", "--regexp", action="store_true",
 	help="use regular expressions. Default is \"*\" wildcards only.")
 parser.add_argument("pattern",
@@ -62,8 +70,13 @@ bpf_text = """
 #include <uapi/linux/ptrace.h>
 #include <linux/blkdev.h>
 
+typedef struct ip_key {
+	u64 ip;
+	u64 slot;
+} ip_key_t;
+
 BPF_HASH(start, u32);
-BPF_HISTOGRAM(dist);
+STORAGE
 
 int trace_func_entry(struct pt_regs *ctx)
 {
@@ -71,6 +84,7 @@ int trace_func_entry(struct pt_regs *ctx)
 	u64 ts = bpf_ktime_get_ns();
 
 	FILTER
+	ENTRYSTORE
 	start.update(&pid, &ts);
 
 	return 0;
@@ -91,11 +105,13 @@ int trace_func_return(struct pt_regs *ctx)
 	FACTOR
 
 	// store as histogram
-	dist.increment(bpf_log2l(delta));
+	STORE
 
 	return 0;
 }
 """
+
+# code substitutions
 if args.pid:
 	bpf_text = bpf_text.replace('FILTER',
 	    'if (pid != %s) { return 0; }' % args.pid)
@@ -110,6 +126,21 @@ elif args.microseconds:
 else:
 	bpf_text = bpf_text.replace('FACTOR', '')
 	label = "nsecs"
+if args.function:
+	bpf_text = bpf_text.replace('STORAGE', 'BPF_HASH(ipaddr, u32);\n' +
+	    'BPF_HISTOGRAM(dist, ip_key_t);')
+	# stash the IP on entry, as on return it's kretprobe_trampoline:
+	bpf_text = bpf_text.replace('ENTRYSTORE',
+	    'u64 ip = ctx->ip; ipaddr.update(&pid, &ip);')
+	bpf_text = bpf_text.replace('STORE',
+	    'u64 ip, *ipp = ipaddr.lookup(&pid); if (ipp) { ip = *ipp; ' +
+	    'dist.increment((ip_key_t){ip, bpf_log2l(delta)}); ' +
+	    'ipaddr.delete(&pid); }')
+else:
+	bpf_text = bpf_text.replace('STORAGE', 'BPF_HISTOGRAM(dist);')
+	bpf_text = bpf_text.replace('ENTRYSTORE', '')
+	bpf_text = bpf_text.replace('STORE',
+	    'dist.increment(bpf_log2l(delta));')
 if debug:
 	print(bpf_text)
 
@@ -130,6 +161,20 @@ if matched == 0:
 print("Tracing %d functions for \"%s\"... Hit Ctrl-C to end." %
     (matched / 2, args.pattern))
 
+# custom output (from __init__.py)
+def print_log2_hist_byfunc(self, val_type="value"):
+	tmp = {}
+	f1 = self.Key._fields_[0][0]
+	f2 = self.Key._fields_[1][0]
+	for k, v in self.items():
+	    bucket = getattr(k, f1)
+	    vals = tmp[bucket] = tmp.get(bucket, [0] * 65)
+	    slot = getattr(k, f2)
+	    vals[slot] = v.value
+	for bucket, vals in tmp.items():
+	    print("\nFunction = %s" % BPF.ksym(bucket))
+	    self._print_log2_hist(vals, val_type, 0)
+
 # output
 exiting = 0 if args.interval else 1
 dist = b.get_table("dist")
@@ -145,7 +190,10 @@ while (1):
 	if args.timestamp:
 		print("%-8s\n" % strftime("%H:%M:%S"), end="")
 
-	dist.print_log2_hist(label)
+	if args.function:
+		print_log2_hist_byfunc(dist, label)
+	else:
+		dist.print_log2_hist(label)
 	dist.clear()
 
 	if exiting:
