@@ -2,7 +2,7 @@
 .SH NAME
 biolatency \- Summarize block device I/O latency as a histogram.
 .SH SYNOPSIS
-.B biolatency [\-h] [\-T] [\-Q] [\-m] [interval [count]]
+.B biolatency [\-h] [\-T] [\-Q] [\-m] [\-D] [interval [count]]
 .SH DESCRIPTION
 biolatency traces block device I/O (disk I/O), and records the distribution
 of I/O latency (time). This is printed as a histogram either on Ctrl-C, or
@@ -30,6 +30,9 @@ Include timestamps on output.
 \-m
 Output histogram in milliseconds.
 .TP
+\-D
+Print a histogram per disk device.
+.TP
 interval
 Output interval, in seconds.
 .TP
@@ -53,6 +56,10 @@ include timestamps on output:
 Include OS queued time in I/O time:
 #
 .B biolatency \-Q
+.TP
+Show a latency histogram for each disk device separately:
+#
+.B biolatency \-D
 .SH FIELDS
 .TP
 usecs
