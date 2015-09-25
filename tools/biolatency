@@ -3,7 +3,7 @@
 # biolatency	Summarize block device I/O latency as a histogram.
 #		For Linux, uses BCC, eBPF.
 #
-# USAGE: biolatency [-h] [-T] [-Q] [-m] [interval] [count]
+# USAGE: biolatency [-h] [-T] [-Q] [-m] [-D] [interval] [count]
 #
 # Copyright (c) 2015 Brendan Gregg.
 # Licensed under the Apache License, Version 2.0 (the "License")
@@ -21,6 +21,7 @@ examples = """examples:
     ./biolatency 1 10       # print 1 second summaries, 10 times
     ./biolatency -mT 1      # 1s summaries, milliseconds, and timestamps
     ./biolatency -Q         # include OS queued time in I/O time
+    ./biolatency -D         # show each disk device separately
 """
 parser = argparse.ArgumentParser(
 	description="Summarize block device I/O latency as a histogram",
@@ -32,6 +33,8 @@ parser.add_argument("-Q", "--queued", action="store_true",
 	help="include OS queued time in I/O time")
 parser.add_argument("-m", "--milliseconds", action="store_true",
 	help="millisecond histogram")
+parser.add_argument("-D", "--disks", action="store_true",
+	help="print a histogram per disk device")
 parser.add_argument("interval", nargs="?", default=99999999,
 	help="output interval, in seconds")
 parser.add_argument("count", nargs="?", default=99999999,
@@ -40,13 +43,17 @@ args = parser.parse_args()
 countdown = int(args.count)
 debug = 0
 
-# load BPF program
+# define BPF program
 bpf_text = """
 #include <uapi/linux/ptrace.h>
 #include <linux/blkdev.h>
 
-BPF_HISTOGRAM(dist);
+typedef struct disk_key {
+	char disk[DISK_NAME_LEN];
+	u64 slot;
+} disk_key_t;
 BPF_HASH(start, struct request *);
+STORAGE
 
 // time block I/O
 int trace_req_start(struct pt_regs *ctx, struct request *req)
@@ -70,18 +77,31 @@ int trace_req_completion(struct pt_regs *ctx, struct request *req)
 	FACTOR
 
 	// store as histogram
-	dist.increment(bpf_log2l(delta));
+	STORE
 
 	start.delete(&req);
 	return 0;
 }
 """
+
+# code substitutions
 if args.milliseconds:
 	bpf_text = bpf_text.replace('FACTOR', 'delta /= 1000000;')
 	label = "msecs"
 else:
 	bpf_text = bpf_text.replace('FACTOR', 'delta /= 1000;')
 	label = "usecs"
+if args.disks:
+	bpf_text = bpf_text.replace('STORAGE',
+	    'BPF_HISTOGRAM(dist, disk_key_t);')
+	bpf_text = bpf_text.replace('STORE',
+	    'disk_key_t key = {.slot = bpf_log2l(delta)}; ' +
+	    'bpf_probe_read(&key.disk, sizeof(key.disk), ' +
+	    'req->rq_disk->disk_name); dist.increment(key);')
+else:
+	bpf_text = bpf_text.replace('STORAGE', 'BPF_HISTOGRAM(dist);')
+	bpf_text = bpf_text.replace('STORE',
+	    'dist.increment(bpf_log2l(delta));')
 if debug:
 	print(bpf_text)
 
@@ -110,7 +130,7 @@ while (1):
 	if args.timestamp:
 		print("%-8s\n" % strftime("%H:%M:%S"), end="")
 
-	dist.print_log2_hist(label)
+	dist.print_log2_hist(label, "disk")
 	dist.clear()
 
 	countdown -= 1

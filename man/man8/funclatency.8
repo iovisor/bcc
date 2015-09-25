@@ -2,7 +2,7 @@
 .SH NAME
 funclatency \- Time kernel funcitons and print latency as a histogram.
 .SH SYNOPSIS
-.B funclatency [\-h] [\-p PID] [\-i INTERVAL] [\-T] [\-u] [\-m] [\-r] pattern
+.B funclatency [\-h] [\-p PID] [\-i INTERVAL] [\-T] [\-u] [\-m] [\-r] [\-F] pattern
 .SH DESCRIPTION
 This tool traces kernel function calls and times their duration (latency), and
 shows the latency distribution as a histogram. The time is measured from when
@@ -11,6 +11,11 @@ time and time spent blocked.
 
 This tool uses in-kernel eBPF maps for storing timestamps and the histogram,
 for efficiency.
+
+Currently nested or recursive functions are not supported properly, and
+timestamps will be overwritten, creating dubious output. Try to match single
+functions, or groups of functions that run at the same stack layer, and
+don't ultimately call each other.
 
 WARNING: This uses dynamic tracing of (what can be many) kernel functions, an
 activity that has had issues on some kernel versions (risk of panics or
@@ -41,6 +46,9 @@ Output histogram in microseconds.
 \-m
 Output histogram in milliseconds.
 .TP
+\-F
+Print a separate histogram per function matched.
+.TP
 \-r
 Use regular expressions for the search pattern.
 .SH EXAMPLES
@@ -68,6 +76,10 @@ Time vfs_read() for process ID 181 only:
 Time both vfs_fstat() and vfs_fstatat() calls, by use of a wildcard:
 #
 .B funclatency 'vfs_fstat*'
+.TP
+Time both vfs_fstat* calls, and print a separate histogram for each:
+#
+.B funclatency -F 'vfs_fstat*'
 .SH FIELDS
 .TP
 necs

@@ -195,10 +195,52 @@ Detaching...
 The distribution between 64 and 511 milliseconds shows keystroke latency.
 
 
+The -F option can be used to print a histogram per function. Eg:
+
+# ./funclatency -uF 'vfs_r*'
+Tracing 5 functions for "vfs_r*"... Hit Ctrl-C to end.
+^C
+
+Function = vfs_read
+     usecs               : count     distribution
+         0 -> 1          : 1044     |****************************************|
+         2 -> 3          : 383      |**************                          |
+         4 -> 7          : 76       |**                                      |
+         8 -> 15         : 41       |*                                       |
+        16 -> 31         : 26       |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 1        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 0        |                                        |
+      1024 -> 2047       : 0        |                                        |
+      2048 -> 4095       : 4        |                                        |
+      4096 -> 8191       : 2        |                                        |
+      8192 -> 16383      : 0        |                                        |
+     16384 -> 32767      : 0        |                                        |
+     32768 -> 65535      : 2        |                                        |
+     65536 -> 131071     : 5        |                                        |
+    131072 -> 262143     : 5        |                                        |
+    262144 -> 524287     : 3        |                                        |
+    524288 -> 1048575    : 7        |                                        |
+
+Function = vfs_rename
+     usecs               : count     distribution
+         0 -> 1          : 2        |****                                    |
+         2 -> 3          : 2        |****                                    |
+         4 -> 7          : 2        |****                                    |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 6        |*************                           |
+        32 -> 63         : 18       |****************************************|
+Detaching...
+
+
+
 USAGE message:
 
-# ./funclatency  -h
-usage: funclatency [-h] [-p PID] [-i INTERVAL] [-T] [-u] [-m] [-r] pattern
+# ./funclatency -h
+usage: funclatency [-h] [-p PID] [-i INTERVAL] [-T] [-u] [-m] [-F] [-r]
+                   pattern
 
 Time kernel funcitons and print latency as a histogram
 
@@ -213,6 +255,7 @@ optional arguments:
   -T, --timestamp       include timestamp on output
   -u, --microseconds    microsecond histogram
   -m, --milliseconds    millisecond histogram
+  -F, --function        show a separate histogram per function
   -r, --regexp          use regular expressions. Default is "*" wildcards
                         only.
 
@@ -223,3 +266,4 @@ examples:
     ./funclatency -mTi 5 vfs_read   # output every 5 seconds, with timestamps
     ./funclatency -p 181 vfs_read   # time process 181 only
     ./funclatency 'vfs_fstat*'      # time both vfs_fstat() and vfs_fstatat()
+    ./funclatency -F 'vfs_r*'       # show one histogram per matched function

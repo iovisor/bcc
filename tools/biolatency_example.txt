@@ -136,10 +136,72 @@ queues of their own, which are always included in the latency, with or
 without -Q.
 
 
+The -D option will print a histogram per disk. Eg:
+
+# ./biolatency -D
+Tracing block device I/O... Hit Ctrl-C to end.
+^C
+
+Bucket disk = 'xvdb'
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 1        |                                        |
+       256 -> 511        : 33       |**********************                  |
+       512 -> 1023       : 36       |************************                |
+      1024 -> 2047       : 58       |****************************************|
+      2048 -> 4095       : 51       |***********************************     |
+      4096 -> 8191       : 21       |**************                          |
+      8192 -> 16383      : 2        |*                                       |
+
+Bucket disk = 'xvdc'
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 1        |                                        |
+       256 -> 511        : 38       |***********************                 |
+       512 -> 1023       : 42       |*************************               |
+      1024 -> 2047       : 66       |****************************************|
+      2048 -> 4095       : 40       |************************                |
+      4096 -> 8191       : 14       |********                                |
+
+Bucket disk = 'xvda1'
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 18       |**********                              |
+       512 -> 1023       : 67       |*************************************   |
+      1024 -> 2047       : 35       |*******************                     |
+      2048 -> 4095       : 71       |****************************************|
+      4096 -> 8191       : 65       |************************************    |
+      8192 -> 16383      : 65       |************************************    |
+     16384 -> 32767      : 20       |***********                             |
+     32768 -> 65535      : 7        |***                                     |
+
+This output sows that xvda1 has much higher latency, usually between 0.5 ms
+and 32 ms, whereas xvdc is usually between 0.2 ms and 4 ms.
+
+
 USAGE message:
 
 # ./biolatency -h
-usage: biolatency [-h] [-T] [-Q] [-m] [interval] [count]
+usage: biolatency [-h] [-T] [-Q] [-m] [-D] [interval] [count]
 
 Summarize block device I/O latency as a histogram
 
@@ -152,9 +214,11 @@ optional arguments:
   -T, --timestamp     include timestamp on output
   -Q, --queued        include OS queued time in I/O time
   -m, --milliseconds  millisecond histogram
+  -D, --disks         print a histogram per disk device
 
 examples:
     ./biolatency            # summarize block I/O latency as a histogram
     ./biolatency 1 10       # print 1 second summaries, 10 times
     ./biolatency -mT 1      # 1s summaries, milliseconds, and timestamps
     ./biolatency -Q         # include OS queued time in I/O time
+    ./biolatency -D         # show each disk device separately
