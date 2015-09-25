@@ -33,6 +33,7 @@
 #include <unistd.h>
 
 #include "libbpf.h"
+#include "perf_reader.h"
 
 // TODO: remove these defines when linux-libc-dev exports them properly
 
@@ -175,8 +176,8 @@ int bpf_attach_socket(int sock, int prog) {
   return setsockopt(sock, SOL_SOCKET, SO_ATTACH_BPF, &prog, sizeof(prog));
 }
 
-static int bpf_attach_tracing_event(int progfd, const char *event_path, pid_t pid, int cpu, int group_fd)
-{
+static int bpf_attach_tracing_event(int progfd, const char *event_path,
+    struct perf_reader *reader, int pid, int cpu, int group_fd) {
   int efd = -1, rc = -1, pfd = -1;
   ssize_t bytes = -1;
   char buf[256];
@@ -197,7 +198,7 @@ static int bpf_attach_tracing_event(int progfd, const char *event_path, pid_t pi
   buf[bytes] = '\0';
   attr.config = strtol(buf, NULL, 0);
   attr.type = PERF_TYPE_TRACEPOINT;
-  attr.sample_type = PERF_SAMPLE_RAW;
+  attr.sample_type = PERF_SAMPLE_RAW | PERF_SAMPLE_CALLCHAIN;
   attr.sample_period = 1;
   attr.wakeup_events = 1;
   pfd = syscall(__NR_perf_event_open, &attr, pid, cpu, group_fd, PERF_FLAG_FD_CLOEXEC);
@@ -205,6 +206,10 @@ static int bpf_attach_tracing_event(int progfd, const char *event_path, pid_t pi
     perror("perf_event_open");
     goto cleanup;
   }
+
+  if (perf_reader_mmap(reader, pfd, attr.sample_type) < 0)
+    goto cleanup;
+
   if (ioctl(pfd, PERF_EVENT_IOC_SET_BPF, progfd) < 0) {
     perror("ioctl(PERF_EVENT_IOC_SET_BPF)");
     goto cleanup;
@@ -226,11 +231,17 @@ cleanup:
   return rc;
 }
 
-int bpf_attach_kprobe(int progfd, const char *event,
-                      const char *event_desc, pid_t pid,
-                      int cpu, int group_fd) {
+void * bpf_attach_kprobe(int progfd, const char *event,
+                         const char *event_desc, pid_t pid,
+                         int cpu, int group_fd, perf_reader_cb cb,
+                         void *cb_cookie) {
   int rc = -1, kfd = -1;
   char buf[256];
+  struct perf_reader *reader = NULL;
+
+  reader = perf_reader_new(-1, 8, cb, cb_cookie);
+  if (!reader)
+    goto cleanup;
 
   kfd = open("/sys/kernel/debug/tracing/kprobe_events", O_WRONLY | O_APPEND, 0);
   if (kfd < 0) {
@@ -246,13 +257,17 @@ int bpf_attach_kprobe(int progfd, const char *event,
   }
 
   snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/events/kprobes/%s", event);
-  rc = bpf_attach_tracing_event(progfd, buf, -1/*pid*/, 0/*cpu*/, -1/*group_fd*/);
+  rc = bpf_attach_tracing_event(progfd, buf, reader, pid, cpu, group_fd);
 
 cleanup:
   if (kfd >= 0)
     close(kfd);
+  if (reader && rc < 0) {
+    perf_reader_free(reader);
+    reader = NULL;
+  }
 
-  return rc;
+  return reader;
 }
 
 int bpf_detach_kprobe(const char *event_desc) {
