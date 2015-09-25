@@ -161,20 +161,6 @@ if matched == 0:
 print("Tracing %d functions for \"%s\"... Hit Ctrl-C to end." %
     (matched / 2, args.pattern))
 
-# custom output (from __init__.py)
-def print_log2_hist_byfunc(self, val_type="value"):
-	tmp = {}
-	f1 = self.Key._fields_[0][0]
-	f2 = self.Key._fields_[1][0]
-	for k, v in self.items():
-	    bucket = getattr(k, f1)
-	    vals = tmp[bucket] = tmp.get(bucket, [0] * 65)
-	    slot = getattr(k, f2)
-	    vals[slot] = v.value
-	for bucket, vals in tmp.items():
-	    print("\nFunction = %s" % BPF.ksym(bucket))
-	    self._print_log2_hist(vals, val_type, 0)
-
 # output
 exiting = 0 if args.interval else 1
 dist = b.get_table("dist")
@@ -191,7 +177,7 @@ while (1):
 		print("%-8s\n" % strftime("%H:%M:%S"), end="")
 
 	if args.function:
-		print_log2_hist_byfunc(dist, label)
+		dist.print_log2_hist(label, "Function", BPF.ksym)
 	else:
 		dist.print_log2_hist(label)
 	dist.clear()

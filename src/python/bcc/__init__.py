@@ -238,13 +238,17 @@ class BPF(object):
                 text = text[:-1] + "+"
             return text
 
-        def print_log2_hist(self, val_type="value", bucket_type="ptr"):
-            """print_log2_hist(val_type="value", bucket_type="ptr")
+        def print_log2_hist(self, val_type="value", section_header="Bucket ptr",
+                section_print_fn=None):
+            """print_log2_hist(val_type="value", section_header="Bucket ptr",
+                               section_print_fn=None)
 
             Prints a table as a log2 histogram. The table must be stored as
             log2. The val_type argument is optional, and is a column header.
             If the histogram has a secondary key, multiple tables will print
-            and bucket_type can be used as a header description for each.
+            and section_header can be used as a header description for each.
+            If section_print_fn is not None, it will be passed the bucket value
+            to format into a string as it sees fit.
             """
             if isinstance(self.Key(), ct.Structure):
                 tmp = {}
@@ -256,7 +260,11 @@ class BPF(object):
                     slot = getattr(k, f2)
                     vals[slot] = v.value
                 for bucket, vals in tmp.items():
-                    print("\nBucket %s = %r" % (bucket_type, bucket))
+                    if section_print_fn:
+                        print("\n%s = %s" % (section_header,
+                            section_print_fn(bucket)))
+                    else:
+                        print("\n%s = %r" % (section_header, bucket))
                     self._print_log2_hist(vals, val_type, 0)
             else:
                 vals = [0] * 65
