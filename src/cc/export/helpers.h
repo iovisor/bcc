@@ -36,6 +36,7 @@ struct _name##_table_t { \
   int (*update) (_key_type *, _leaf_type *); \
   int (*delete) (_key_type *); \
   void (*call) (void *, int index); \
+  void (*increment) (_key_type); \
   _leaf_type data[_max_entries]; \
 }; \
 __attribute__((section("maps/" _table_type))) \
@@ -54,6 +55,19 @@ struct _name##_table_t _name
 // BPF_HASH(name, key_type=u64, leaf_type=u64, size=10240)
 #define BPF_HASH(...) \
   BPF_HASHX(__VA_ARGS__, BPF_HASH3, BPF_HASH2, BPF_HASH1)(__VA_ARGS__)
+
+#define BPF_HIST1(_name) \
+  BPF_TABLE("histogram", int, u64, _name, 64)
+#define BPF_HIST2(_name, _key_type) \
+  BPF_TABLE("histogram", _key_type, u64, _name, 64)
+#define BPF_HIST3(_name, _key_type, _size) \
+  BPF_TABLE("histogram", _key_type, u64, _name, _size)
+#define BPF_HISTX(_1, _2, _3, NAME, ...) NAME
+
+// Define a histogram, some arguments optional
+// BPF_HISTOGRAM(name, key_type=int, size=64)
+#define BPF_HISTOGRAM(...) \
+  BPF_HISTX(__VA_ARGS__, BPF_HIST3, BPF_HIST2, BPF_HIST1)(__VA_ARGS__)
 
 // packet parsing state machine helpers
 #define cursor_advance(_cursor, _len) \
