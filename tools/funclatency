@@ -86,8 +86,8 @@ int trace_func_return(struct pt_regs *ctx)
 	if (tsp == 0) {
 		return 0; 	// missed start
 	}
-	start.delete(&pid);
 	delta = bpf_ktime_get_ns() - *tsp;
+	start.delete(&pid);
 	FACTOR
 
 	// store as histogram
