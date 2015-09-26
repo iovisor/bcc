@@ -1,0 +1,53 @@
+Demonstrations of tcpv4connect, the Linux eBPF/bcc version.
+
+
+This tool traces the kernel function performing active TCP IPv4 connections
+(eg, via a connect() syscall; accept() are passive connections). Some example
+output (IP addresses changed to protect the innocent):
+
+# ./tcpv4connect 
+PID    COMM         SADDR            DADDR            DPORT
+1479   telnet       127.0.0.1        127.0.0.1        23  
+1469   curl         10.201.219.236   54.245.105.25    80  
+1469   curl         10.201.219.236   54.67.101.145    80  
+
+This output shows three connections, one from a "telnet" process and two from
+"curl". The output details shows the source address, destination address,
+and destination port. This traces attempted connections: these may have failed.
+
+The overhead of this tool should be negligible, since it is only tracing the
+kernel function performing a connect. It is not tracing every packet and then
+filtering.
+
+
+The -t option prints a timestamp column:
+
+# ./tcpv4connect -t
+TIME(s)  PID    COMM         SADDR            DADDR            DPORT
+31.871   2482   local_agent  10.103.219.236   10.251.148.38    7001
+31.874   2482   local_agent  10.103.219.236   10.101.3.132     7001
+31.878   2482   local_agent  10.103.219.236   10.171.133.98    7101
+90.917   2482   local_agent  10.103.219.236   10.251.148.38    7001
+90.928   2482   local_agent  10.103.219.236   10.102.64.230    7001
+90.938   2482   local_agent  10.103.219.236   10.115.167.169   7101
+
+The output shows some periodic connections (or attempts) from a "local_agent"
+process to various other addresses. A few connections occur every minute.
+
+
+USAGE message:
+
+# ./tcpv4connect -h
+usage: tcpv4connect [-h] [-t] [-p PID]
+
+Trace TCP IPv4 connects
+
+optional arguments:
+  -h, --help         show this help message and exit
+  -t, --timestamp    include timestamp on output
+  -p PID, --pid PID  trace this PID only
+
+examples:
+    ./tcpv4connect           # trace all open() syscalls
+    ./tcpv4connect -t        # include timestamps
+    ./tcpv4connect -p 181    # only trace PID 181
