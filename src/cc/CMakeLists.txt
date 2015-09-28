@@ -35,7 +35,7 @@ endif()
 # tell the shared library where it is being installed so it can find shared header files
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBCC_INSTALL_PREFIX='\"${CMAKE_INSTALL_PREFIX}\"'")
 
-add_library(bcc SHARED bpf_common.cc bpf_module.cc libbpf.c)
+add_library(bcc SHARED bpf_common.cc bpf_module.cc libbpf.c perf_reader.c)
 set_target_properties(bcc PROPERTIES VERSION ${REVISION_LAST} SOVERSION 0)
 
 # BPF is still experimental otherwise it should be available

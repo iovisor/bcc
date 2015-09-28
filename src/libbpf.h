@@ -40,7 +40,12 @@ int bpf_attach_socket(int sockfd, int progfd);
 /* create RAW socket and bind to interface 'name' */
 int bpf_open_raw_sock(const char *name);
 
-int bpf_attach_kprobe(int progfd, const char *event, const char *event_desc, int pid, int cpu, int group_fd);
+typedef void (*perf_reader_cb)(void *cb_cookie, int pid, uint64_t callchain_num,
+                               void *callchain);
+
+void * bpf_attach_kprobe(int progfd, const char *event, const char *event_desc,
+                         int pid, int cpu, int group_fd, perf_reader_cb cb,
+                         void *cb_cookie);
 int bpf_detach_kprobe(const char *event_desc);
 
 #define LOG_BUF_SIZE 65536

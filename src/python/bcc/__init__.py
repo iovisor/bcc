@@ -86,11 +86,17 @@ lib.bpf_attach_socket.argtypes = [ct.c_int, ct.c_int]
 lib.bpf_prog_load.restype = ct.c_int
 lib.bpf_prog_load.argtypes = [ct.c_int, ct.c_void_p, ct.c_size_t,
         ct.c_char_p, ct.c_uint, ct.c_char_p, ct.c_uint]
-lib.bpf_attach_kprobe.restype = ct.c_int
-lib.bpf_attach_kprobe.argtypes = [ct.c_int, ct.c_char_p,
-        ct.c_char_p, ct.c_int, ct.c_int, ct.c_int]
+lib.bpf_attach_kprobe.restype = ct.c_void_p
+_CB_TYPE = ct.CFUNCTYPE(None, ct.py_object, ct.c_int,
+        ct.c_ulonglong, ct.POINTER(ct.c_ulonglong))
+lib.bpf_attach_kprobe.argtypes = [ct.c_int, ct.c_char_p, ct.c_char_p, ct.c_int,
+        ct.c_int, ct.c_int, _CB_TYPE, ct.py_object]
 lib.bpf_detach_kprobe.restype = ct.c_int
 lib.bpf_detach_kprobe.argtypes = [ct.c_char_p]
+lib.perf_reader_poll.restype = ct.c_int
+lib.perf_reader_poll.argtypes = [ct.c_int, ct.POINTER(ct.c_void_p)]
+lib.perf_reader_free.restype = None
+lib.perf_reader_free.argtypes = [ct.c_void_p]
 
 open_kprobes = {}
 tracefile = None
@@ -104,9 +110,10 @@ stars_max = 40
 @atexit.register
 def cleanup_kprobes():
     for k, v in open_kprobes.items():
-        os.close(v)
+        lib.perf_reader_free(v)
         desc = "-:kprobes/%s" % k
         lib.bpf_detach_kprobe(desc.encode("ascii"))
+    open_kprobes.clear()
     if tracefile:
         tracefile.close()
 
@@ -344,7 +351,7 @@ class BPF(object):
                     raise Exception("Could not find file %s" % filename)
         return filename
 
-    def __init__(self, src_file="", hdr_file="", text=None, debug=0):
+    def __init__(self, src_file="", hdr_file="", text=None, cb=None, debug=0):
         """Create a a new BPF module with the given source code.
 
         Note:
@@ -360,6 +367,8 @@ class BPF(object):
                 0x2: print BPF bytecode to stderr
         """
 
+        self._reader_cb_impl = _CB_TYPE(BPF._reader_cb)
+        self._user_cb = cb
         self.debug = debug
         self.funcs = {}
         self.tables = {}
@@ -502,6 +511,11 @@ class BPF(object):
     def __iter__(self):
         return self.tables.__iter__()
 
+    def _reader_cb(self, pid, callchain_num, callchain):
+        if self._user_cb:
+            cc = tuple(callchain[i] for i in range(0, callchain_num))
+            self._user_cb(pid, cc)
+
     @staticmethod
     def attach_raw_socket(fn, dev):
         if not isinstance(fn, BPF.Function):
@@ -528,7 +542,7 @@ class BPF(object):
                 (line != "\n" and line not in blacklist)]
 
     def attach_kprobe(self, event="", fn_name="", event_re="",
-            pid=0, cpu=-1, group_fd=-1):
+            pid=-1, cpu=0, group_fd=-1):
 
         # allow the caller to glob multiple functions together
         if event_re:
@@ -544,8 +558,10 @@ class BPF(object):
         ev_name = "p_" + event.replace("+", "_").replace(".", "_")
         desc = "p:kprobes/%s %s" % (ev_name, event)
         res = lib.bpf_attach_kprobe(fn.fd, ev_name.encode("ascii"),
-                desc.encode("ascii"), pid, cpu, group_fd)
-        if res < 0:
+                desc.encode("ascii"), pid, cpu, group_fd,
+                self._reader_cb_impl, ct.cast(id(self), ct.py_object))
+        res = ct.cast(res, ct.c_void_p)
+        if res == None:
             raise Exception("Failed to attach BPF to kprobe")
         open_kprobes[ev_name] = res
         return self
@@ -579,8 +595,10 @@ class BPF(object):
         ev_name = "r_" + event.replace("+", "_").replace(".", "_")
         desc = "r:kprobes/%s %s" % (ev_name, event)
         res = lib.bpf_attach_kprobe(fn.fd, ev_name.encode("ascii"),
-                desc.encode("ascii"), pid, cpu, group_fd)
-        if res < 0:
+                desc.encode("ascii"), pid, cpu, group_fd,
+                self._reader_cb_impl, ct.cast(id(self), ct.py_object))
+        res = ct.cast(res, ct.c_void_p)
+        if res == None:
             raise Exception("Failed to attach BPF to kprobe")
         open_kprobes[ev_name] = res
         return self
@@ -751,3 +769,18 @@ class BPF(object):
         event_re is used while attaching and detaching probes
         """
         return len(open_kprobes)
+
+    def kprobe_poll(self):
+        """kprobe_poll(self)
+
+        Poll from the ring buffers for all of the open kprobes, calling the
+        cb() that was given in the BPF constructor for each entry.
+        """
+        readers = (ct.c_void_p * len(open_kprobes))()
+        for i, v in enumerate(open_kprobes.values()):
+            readers[i] = v
+        try:
+            lib.perf_reader_poll(len(open_kprobes), readers)
+        except KeyboardInterrupt:
+            pass
+
