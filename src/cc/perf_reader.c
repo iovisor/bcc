@@ -54,7 +54,8 @@ void perf_reader_free(void *ptr) {
   if (ptr) {
     struct perf_reader *reader = ptr;
     munmap(reader->base, reader->page_size * (reader->page_cnt + 1));
-    close(reader->fd);
+    if (reader->fd >= 0)
+      close(reader->fd);
     free(reader->buf);
     free(ptr);
   }
