@@ -214,6 +214,27 @@ int kprobe__sys_open(struct pt_regs *ctx, const char *filename,
 };
 """)
 
+    def test_task_switch(self):
+        b = BPF(text="""
+#include <uapi/linux/ptrace.h>
+#include <linux/sched.h>
+struct key_t {
+  u32 prev_pid;
+  u32 curr_pid;
+};
+BPF_TABLE("hash", struct key_t, u64, stats, 1024);
+int kprobe__finish_task_switch(struct pt_regs *ctx, struct task_struct *prev) {
+  struct key_t key = {};
+  u64 zero = 0, *val;
+  key.curr_pid = bpf_get_current_pid_tgid();
+  key.prev_pid = prev->pid;
+
+  val = stats.lookup_or_init(&key, &zero);
+  (*val)++;
+  return 0;
+}
+""")
+
 
 if __name__ == "__main__":
     main()

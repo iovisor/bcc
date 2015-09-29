@@ -94,14 +94,17 @@ bool BMapDeclVisitor::VisitBuiltinType(const BuiltinType *T) {
   return true;
 }
 
-class ProbeChecker : public clang::RecursiveASTVisitor<ProbeChecker> {
+class ProbeChecker : public RecursiveASTVisitor<ProbeChecker> {
  public:
   explicit ProbeChecker(Expr *arg, const set<Decl *> &ptregs)
       : needs_probe_(false), ptregs_(ptregs) {
     if (arg)
       TraverseStmt(arg);
   }
-  bool VisitDeclRefExpr(clang::DeclRefExpr *E) {
+  bool VisitCallExpr(CallExpr *E) {
+    return false;
+  }
+  bool VisitDeclRefExpr(DeclRefExpr *E) {
     if (ptregs_.find(E->getDecl()) != ptregs_.end())
       needs_probe_ = true;
     return true;
@@ -113,10 +116,10 @@ class ProbeChecker : public clang::RecursiveASTVisitor<ProbeChecker> {
 };
 
 // Visit a piece of the AST and mark it as needing probe reads
-class ProbeSetter : public clang::RecursiveASTVisitor<ProbeSetter> {
+class ProbeSetter : public RecursiveASTVisitor<ProbeSetter> {
  public:
   explicit ProbeSetter(set<Decl *> *ptregs) : ptregs_(ptregs) {}
-  bool VisitDeclRefExpr(clang::DeclRefExpr *E) {
+  bool VisitDeclRefExpr(DeclRefExpr *E) {
     ptregs_->insert(E->getDecl());
     return true;
   }
@@ -161,7 +164,7 @@ bool ProbeVisitor::VisitBinaryOperator(BinaryOperator *E) {
   return true;
 }
 bool ProbeVisitor::VisitUnaryOperator(UnaryOperator *E) {
-  if (E->getOpcode() != UO_Deref)
+  if (E->getOpcode() == UO_AddrOf)
     return true;
   if (memb_visited_.find(E) != memb_visited_.end())
     return true;
@@ -559,10 +562,10 @@ bool BTypeConsumer::HandleTopLevelDecl(DeclGroupRef Group) {
   return true;
 }
 
-ProbeConsumer::ProbeConsumer(clang::ASTContext &C, Rewriter &rewriter)
+ProbeConsumer::ProbeConsumer(ASTContext &C, Rewriter &rewriter)
     : visitor_(rewriter) {}
 
-bool ProbeConsumer::HandleTopLevelDecl(clang::DeclGroupRef Group) {
+bool ProbeConsumer::HandleTopLevelDecl(DeclGroupRef Group) {
   for (auto D : Group) {
     if (FunctionDecl *F = dyn_cast<FunctionDecl>(D)) {
       if (F->isExternallyVisible() && F->hasBody()) {
