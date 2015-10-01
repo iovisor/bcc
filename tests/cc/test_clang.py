@@ -235,6 +235,19 @@ int kprobe__finish_task_switch(struct pt_regs *ctx, struct task_struct *prev) {
 }
 """)
 
+    def test_probe_simple_assign(self):
+        b = BPF(text="""
+#include <uapi/linux/ptrace.h>
+#include <linux/gfp.h>
+struct leaf { size_t size; };
+BPF_HASH(simple_map, u32, struct leaf);
+int kprobe____kmalloc(struct pt_regs *ctx, size_t size) {
+    u32 pid = bpf_get_current_pid_tgid();
+    struct leaf* leaf = simple_map.lookup(&pid);
+    if (leaf)
+        leaf->size += size;
+    return 0;
+}""", debug=4)
 
 if __name__ == "__main__":
     main()

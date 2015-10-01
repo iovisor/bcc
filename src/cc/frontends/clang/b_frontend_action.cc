@@ -97,11 +97,15 @@ bool BMapDeclVisitor::VisitBuiltinType(const BuiltinType *T) {
 class ProbeChecker : public RecursiveASTVisitor<ProbeChecker> {
  public:
   explicit ProbeChecker(Expr *arg, const set<Decl *> &ptregs)
-      : needs_probe_(false), ptregs_(ptregs) {
-    if (arg)
+      : needs_probe_(false), is_transitive_(false), ptregs_(ptregs) {
+    if (arg) {
       TraverseStmt(arg);
+      if (arg->getType()->isPointerType())
+        is_transitive_ = needs_probe_;
+    }
   }
   bool VisitCallExpr(CallExpr *E) {
+    needs_probe_ = false;
     return false;
   }
   bool VisitDeclRefExpr(DeclRefExpr *E) {
@@ -110,8 +114,10 @@ class ProbeChecker : public RecursiveASTVisitor<ProbeChecker> {
     return true;
   }
   bool needs_probe() const { return needs_probe_; }
+  bool is_transitive() const { return is_transitive_; }
  private:
   bool needs_probe_;
+  bool is_transitive_;
   const set<Decl *> &ptregs_;
 };
 
@@ -131,7 +137,7 @@ ProbeVisitor::ProbeVisitor(Rewriter &rewriter) : rewriter_(rewriter) {}
 
 bool ProbeVisitor::VisitVarDecl(VarDecl *Decl) {
   if (Expr *E = Decl->getInit()) {
-    if (ProbeChecker(E, ptregs_).needs_probe())
+    if (ProbeChecker(E, ptregs_).is_transitive())
       set_ptreg(Decl);
   }
   return true;
@@ -157,7 +163,7 @@ bool ProbeVisitor::VisitBinaryOperator(BinaryOperator *E) {
   if (!E->isAssignmentOp())
     return true;
   // copy probe attribute from RHS to LHS if present
-  if (ProbeChecker(E->getRHS(), ptregs_).needs_probe()) {
+  if (ProbeChecker(E->getRHS(), ptregs_).is_transitive()) {
     ProbeSetter setter(&ptregs_);
     setter.TraverseStmt(E->getLHS());
   }
@@ -570,7 +576,7 @@ bool ProbeConsumer::HandleTopLevelDecl(DeclGroupRef Group) {
     if (FunctionDecl *F = dyn_cast<FunctionDecl>(D)) {
       if (F->isExternallyVisible() && F->hasBody()) {
         for (auto arg : F->parameters()) {
-          if (arg != F->getParamDecl(0))
+          if (arg != F->getParamDecl(0) && !arg->getType()->isFundamentalType())
             visitor_.set_ptreg(arg);
         }
         visitor_.TraverseDecl(D);
