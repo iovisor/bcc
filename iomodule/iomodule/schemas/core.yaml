@@ -1,0 +1,319 @@
+swagger: '2.0'
+info:
+  title: IOModule Core API
+  description: Connect IO Modules together
+  version: 0.1.6
+  contact:
+    name: IOVisor Project
+    email: dev@iovisor.org
+    url: 'https://github.com/iovisor'
+  license:
+    name: Apache 2.0
+    url: 'http://www.apache.org/licenses/LICENSE-2.0'
+host: 52.8.15.63
+basePath: /v1
+schemes:
+  - https
+consumes:
+  - application/json
+produces:
+  - application/json
+definitions:
+  moduleType: &ModuleType
+    id: moduleType
+    type: object
+    required:
+      - uuid
+    properties:
+      uuid:
+        type: string
+        format: uuid
+      capabilities:
+        type: array
+        items:
+          type: string
+      name:
+        type: string
+  module: &Module
+    id: module
+    type: object
+    required:
+      - uuid
+      - module_type
+    properties:
+      uuid:
+        type: string
+        format: uuid
+      display_name:
+        type: string
+      module_type:
+        type: string
+  newModule: &NewModule
+    id: newModule
+    type: object
+    required:
+      - module_type
+    properties:
+      display_name:
+        type: string
+      module_type:
+        type: string
+  connection: &Connection
+    id: connection
+    type: object
+    required:
+      - uuid
+    properties:
+      uuid:
+        type: string
+        format: uuid
+      display_name:
+        type: string
+      interfaces:
+        type: array
+        items:
+          type: string
+  newConnection: &NewConnection
+    id: newConnection
+    type: object
+    required:
+      - interfaces
+    properties:
+      uuid:
+        type: string
+        format: uuid
+      display_name:
+        type: string
+      interfaces:
+        type: array
+        items:
+          type: string
+  errorModel: &ErrorModel
+    id: errorModel
+    type: object
+    required:
+      - code
+      - message
+    properties:
+      code:
+        type: integer
+        format: int32
+      message:
+        type: string
+paths:
+  /module_types/:
+    get:
+      summary: Module Types
+      description: >
+        The Module Types endpoint returns information about the types of
+        modules that can be instantiated in the engine.
+      operationId: findModuleTypes
+      tags: 
+        - Module Types
+      responses:
+        '200':
+          description: An array of module types
+          schema:
+            type: array
+            items:
+              *ModuleType
+        default:
+          description: Unexpected error
+          schema:
+            *ErrorModel
+  /modules/:
+    get:
+      summary: Modules
+      description: >
+        The Modules endpoint returns information about the modules loaded in
+        the system.
+      operationId: findModules
+      tags:
+        - Modules
+      responses:
+        '200':
+          description: An array of modules
+          schema:
+            id: modules
+            type: array
+            items:
+              *Module
+        default:
+          description: Unexpected error
+          schema:
+            *ErrorModel
+    post:
+      description: Creates a new module in the system.
+      operationId: addModule
+      produces:
+        - application/json
+      parameters:
+        - name: uuid
+          in: body
+          description: Module to add to the system.
+          required: true
+          schema:
+            *NewModule
+      tags:
+        - Modules
+      responses:
+        '200':
+          description: Module response
+          schema:
+            *Module
+        default:
+          description: unexpected error
+          schema:
+            *ErrorModel
+  '/modules/{uuid}':
+    get:
+      description: Returns a module based on a single UUID.
+      operationId: findModuleByUUID
+      produces:
+        - application/json
+      parameters:
+        - name: uuid
+          in: path
+          description: UUID of module to fetch
+          required: true
+          type: string
+          format: uuid
+      tags:
+        - Modules
+      responses:
+        '200':
+          description: Module response
+          schema:
+            *Module
+        default:
+          description: unexpected error
+          schema:
+            *ErrorModel
+    put:
+      description: Updates a module in the system.
+      operationId: updateModule
+      produces:
+        - application/json
+      parameters:
+        - name: uuid
+          in: body
+          description: Module to update in the system.
+          required: true
+          schema:
+            *Module
+      tags:
+        - Modules
+      responses:
+        '200':
+          description: Module response
+          schema:
+            *Module
+        default:
+          description: unexpected error
+          schema:
+            *ErrorModel
+    delete:
+      description: deletes a single module based on the UUID supplied
+      operationId: deleteModule
+      parameters:
+        - name: uuid
+          in: path
+          description: UUID of module to delete
+          required: true
+          type: string
+          format: uuid
+      tags:
+        - Modules
+      responses:
+        '204':
+          description: Module deleted
+        default:
+          description: unexpected error
+          schema:
+            *ErrorModel
+  /connections/:
+    get:
+      summary: Connections
+      description: >
+        The Connections endpoint returns information about the connections made
+        between module interfaces.
+      operationId: findConnections
+      tags:
+        - Connections
+      responses:
+        '200':
+          description: An array of connections
+          schema:
+            type: array
+            items:
+              *Connection
+        default:
+          description: Unexpected error
+          schema:
+            *ErrorModel
+    post:
+      description: Creates a new connection in the system.
+      operationId: addConnection
+      produces:
+        - application/json
+      parameters:
+        - name: uuid
+          in: body
+          description: Connection to add to the system.
+          required: true
+          schema:
+            *NewConnection
+      tags:
+        - Connections
+      responses:
+        '200':
+          description: Connection response
+          schema:
+            *Connection
+        default:
+          description: unexpected error
+          schema:
+            *ErrorModel
+  '/connections/{uuid}':
+    get:
+      description: Returns a connection based on a single UUID.
+      operationId: findConnectionByUUID
+      produces:
+        - application/json
+      parameters:
+        - name: uuid
+          in: path
+          description: UUID of connection to fetch
+          required: true
+          type: string
+          format: uuid
+      tags:
+        - Connections
+      responses:
+        '200':
+          description: Connection response
+          schema:
+            *Connection
+        default:
+          description: unexpected error
+          schema:
+            *ErrorModel
+    delete:
+      description: deletes a single connection based on the UUID supplied
+      operationId: deleteConnection
+      parameters:
+        - name: uuid
+          in: path
+          description: UUID of connection to delete
+          required: true
+          type: string
+          format: uuid
+      tags:
+        - Connections
+      responses:
+        '204':
+          description: Connection deleted
+        default:
+          description: unexpected error
+          schema:
+            *ErrorModel
