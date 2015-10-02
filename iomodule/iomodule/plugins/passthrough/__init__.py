@@ -13,7 +13,11 @@
 # limitations under the License.
 
 import bcc
+import os
+
 from iomodule.core import iomodule
+
+_dir = os.path.dirname(__file__)
 
 class Passthrough(iomodule.IOModule):
     _capabilities_ = ["ebpf"]
@@ -21,7 +25,8 @@ class Passthrough(iomodule.IOModule):
 
     def __init__(self, *args, **kwargs):
         super(Passthrough, self).__init__(*args, **kwargs)
-        self.b = bcc.BPF("passthrough.c")
+        self.b = bcc.BPF(os.path.join(_dir, "passthrough.c"))
+        self.pairs = self.b["pairs"]
         self.fn = self.b.load_func("recv", self.b.SCHED_ACT)
         self.half = None
 
@@ -29,8 +34,8 @@ class Passthrough(iomodule.IOModule):
         (idx1, idx2) = self.mm.get_index_pair(name)
         print("ifc_create", name, idx1, idx2)
         if self.half:
-            self.b["pairs"][c_int(self.half)] = c_int(idx1)
-            self.b["pairs"][c_int(idx1)] = c_int(self.half)
+            self.pairs[self.pairs.Key(self.half)] = self.pairs.Leaf(idx1)
+            self.pairs[self.pairs.Key(idx1)] = self.pairs.Leaf(self.half)
             print("connecting", self.half, idx1)
             self.half = None
         else:

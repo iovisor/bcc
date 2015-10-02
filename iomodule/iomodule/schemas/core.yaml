@@ -69,7 +69,7 @@ definitions:
         format: uuid
       display_name:
         type: string
-      interfaces:
+      iomodules:
         type: array
         items:
           type: string
@@ -77,14 +77,14 @@ definitions:
     id: newConnection
     type: object
     required:
-      - interfaces
+      - iomodules
     properties:
       uuid:
         type: string
         format: uuid
       display_name:
         type: string
-      interfaces:
+      iomodules:
         type: array
         items:
           type: string
@@ -236,7 +236,7 @@ paths:
       summary: Connections
       description: >
         The Connections endpoint returns information about the connections made
-        between module interfaces.
+        between iomodules
       operationId: findConnections
       tags:
         - Connections

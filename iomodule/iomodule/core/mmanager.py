@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import bcc
+from ctypes import c_int
 import os
 import pyroute2
 from . import utils
@@ -52,8 +53,8 @@ class ModuleManager(object):
         action = dict(kind="bpf", fd=fn.fd, name=fn.name, action="drop")
         self.ipr.tc("add", "ingress", ifindex, "ffff:")
         self.ipr.tc("add-filter", "u32", ifindex, ":1", parent="ffff:",
-                action=action, protocol=protocols.ETH_P_ALL, classid=1,
-                target=0x10000, keys=["0x0/0x0+0"])
+                action=action, protocol=pyroute2.protocols.ETH_P_ALL,
+                classid=1, target=0x10000, keys=["0x0/0x0+0"])
 
     def connect(self, ifc1, ifc2, iom1, iom2):
         if ifc1 > 0 and ifc2 > 0:
@@ -75,7 +76,7 @@ class ModuleManager(object):
             self.b["forward"][c_int(-ifc2)] = c_int(iom2.fd())
             self.b["forward"][c_int(-ifc2 ^ 1)] = c_int(self.tailcall_fn.fd)
             # todo: share forward table with all programs
-            iom1.b["forward"][c_int(-ifc2 ^ 1)] = c_int(self.tailcall_fn.fd)
+            iom2.b["forward"][c_int(-ifc2 ^ 1)] = c_int(self.tailcall_fn.fd)
             self._add_ingress_action(ifc1, self.netdev_fn)
         else:
             if -ifc1 ^ 1 != -ifc2:
