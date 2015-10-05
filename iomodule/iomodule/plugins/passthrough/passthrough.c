@@ -12,7 +12,7 @@ static int ifc_get(struct __sk_buff *skb) {
   return in;
 }
 static int ifc_send(struct __sk_buff *skb, int out) {
-  bpf_trace_printk("pair: ifc_send %p %d\n", skb, out);
+  //bpf_trace_printk("pair: ifc_send %p %d\n", skb, out);
   if (out < 0) {
     out = -out;
     // ports are programmed in the table in odd/even pairs
@@ -28,7 +28,7 @@ BPF_TABLE("hash", int, int, pairs, 1024);
 
 int recv(struct __sk_buff *skb) {
   int in = ifc_get(skb);
-  bpf_trace_printk("pair: in %p %d\n", skb, in);
+  //bpf_trace_printk("pair: in %p %d\n", skb, in);
 
   // if odd number, send to even and vice versa
   int *out = pairs.lookup(&in);

@@ -5,7 +5,7 @@
 
 BPF_TABLE("prog", int, int, forward, 65536);
 static int ifc_send(struct __sk_buff *skb, int out) {
-  bpf_trace_printk("tunnel: ifc_send %p %d\n", skb, out);
+  //bpf_trace_printk("tunnel: ifc_send %p %d\n", skb, out);
   if (out < 0) {
     out = -out;
     // ports are programmed in the table in odd/even pairs
@@ -55,7 +55,6 @@ int recv_local(struct __sk_buff *skb) {
 
   if (!cfg) return TC_ACT_SHOT;
 
-  bpf_trace_printk("recv_local\n");
   if (skb->tc_index) {
     bpf_trace_printk("from external\n");
     // don't send it back out to encap device

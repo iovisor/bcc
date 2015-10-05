@@ -37,3 +37,5 @@ c3=$(curl_ localhost:5000/connections/ -d '{"iomodules": ['${pt2}', '${br2}']}' 
 c4=$(curl_ localhost:5000/connections/ -d '{"iomodules": ['${tn1}', '${br1}']}' | jq .data.uuid)
 
 # br1 <-> pt1 <-> pt2 <-> br2
+#  |
+# tn1
