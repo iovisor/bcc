@@ -31,12 +31,10 @@ class Passthrough(iomodule.IOModule):
         self.half = None
 
     def _ifc_create(self, name):
-        (idx1, idx2) = self.mm.get_index_pair(name)
-        print("ifc_create", name, idx1, idx2)
+        (idx1, idx2) = self.mm().get_index_pair(name, self)
         if self.half:
             self.pairs[self.pairs.Key(self.half)] = self.pairs.Leaf(idx1)
             self.pairs[self.pairs.Key(idx1)] = self.pairs.Leaf(self.half)
-            print("connecting", self.half, idx1)
             self.half = None
         else:
             self.half = idx1

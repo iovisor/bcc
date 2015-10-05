@@ -22,18 +22,21 @@ class Bridge(iomodule.IOModule):
 
     def __init__(self, *args, **kwargs):
         super(Bridge, self).__init__(*args, **kwargs)
+        self.config = kwargs.get("config", {})
         self.ipdb = pyroute2.IPDB(nl=pyroute2.NetNS(self.name))
         with self.ipdb.create(ifname="br0", kind="bridge") as br:
+            if self.config.get("ipaddr"):
+                br.add_ip(self.config["ipaddr"])
             br.up()
         self.num_ifcs = 0
         atexit.register(self.release)
 
     def _ifc_create(self, name):
-        with self.mm.ipdb.create(kind="veth",
+        with self.mm().ipdb.create(kind="veth",
                 ifname="%s.%d" % (self.name, self.num_ifcs),
                 peer="%s.%db" % (self.name, self.num_ifcs)) as ifc1:
             ifc1.up()
-        with self.mm.ipdb.interfaces["%s.%db" % (self.name, self.num_ifcs)] as ifc2:
+        with self.mm().ipdb.interfaces["%s.%db" % (self.name, self.num_ifcs)] as ifc2:
             ifc2.net_ns_fd = self.ipdb.nl.netns
             ifc2.ifname = name
             ifc2.up()

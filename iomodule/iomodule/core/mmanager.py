@@ -32,9 +32,13 @@ class ModuleManager(object):
         self.ipr = kwargs.get("ipr", pyroute2.IPRoute())
         self.ipdb = kwargs.get("ipdb", pyroute2.IPDB(nl=self.ipr))
 
-    def get_index_pair(self, name):
+    def get_index_pair(self, name, iom):
         if name in self._connections:
-            i = self._connections[name]
+            (i, m) = self._connections[name]
+            # repeat call by owner iomodule, return same pair
+            if m == iom:
+                return (-(i << 1), -((i << 1) ^ 1))
+            # peer call, invert the indices
             return (-((i << 1) ^ 1), -(i << 1))
         index = self._index
         index += 1
@@ -44,12 +48,12 @@ class ModuleManager(object):
             if not self._indices[index]:
                 self._index = index
                 self._indices[index] = True
-                self._connections[name] = index
+                self._connections[name] = (index, iom)
                 return (-(index << 1), -((index << 1) ^ 1))
             index += 1
         raise Exception("Unable to allocate new index")
 
-    def _add_ingress_action(self, ifindex, fn):
+    def add_ingress_action(self, ifindex, fn):
         action = dict(kind="bpf", fd=fn.fd, name=fn.name, action="drop")
         self.ipr.tc("add", "ingress", ifindex, "ffff:")
         self.ipr.tc("add-filter", "u32", ifindex, ":1", parent="ffff:",
@@ -60,8 +64,8 @@ class ModuleManager(object):
         if ifc1 > 0 and ifc2 > 0:
             self.b["patch"][c_int(ifc1)] = c_int(ifc2)
             self.b["patch"][c_int(ifc2)] = c_int(ifc1)
-            self._add_ingress_action(ifc1, self.netdev_fn)
-            self._add_ingress_action(ifc2, self.netdev_fn)
+            self.add_ingress_action(ifc1, self.netdev_fn)
+            self.add_ingress_action(ifc2, self.netdev_fn)
         elif ifc1 < 0 and ifc2 > 0:
             self.b["patch"][c_int(ifc1)] = c_int(ifc2)
             self.b["patch"][c_int(ifc2)] = c_int(ifc1)
@@ -69,7 +73,7 @@ class ModuleManager(object):
             self.b["forward"][c_int(-ifc1 ^ 1)] = c_int(self.tailcall_fn.fd)
             # todo: share forward table with all programs
             iom1.b["forward"][c_int(-ifc1 ^ 1)] = c_int(self.tailcall_fn.fd)
-            self._add_ingress_action(ifc2, self.netdev_fn)
+            self.add_ingress_action(ifc2, self.netdev_fn)
         elif ifc2 < 0 and ifc1 > 0:
             self.b["patch"][c_int(ifc2)] = c_int(ifc1)
             self.b["patch"][c_int(ifc1)] = c_int(ifc2)
@@ -77,7 +81,7 @@ class ModuleManager(object):
             self.b["forward"][c_int(-ifc2 ^ 1)] = c_int(self.tailcall_fn.fd)
             # todo: share forward table with all programs
             iom2.b["forward"][c_int(-ifc2 ^ 1)] = c_int(self.tailcall_fn.fd)
-            self._add_ingress_action(ifc1, self.netdev_fn)
+            self.add_ingress_action(ifc1, self.netdev_fn)
         else:
             if -ifc1 ^ 1 != -ifc2:
                 raise Exception("bpf ifc indices are not a matched pair")

@@ -13,7 +13,7 @@ BPF_TABLE("prog", int, int, forward, 65536);
 //}
 
 static int ifc_send(struct __sk_buff *skb, int out) {
-  //bpf_trace_printk("patch: ifc_send %p %d\n", skb, out);
+  bpf_trace_printk("patch: ifc_send %p %d\n", skb, out);
   if (out < 0) {
     out = -out;
     // ports are programmed in the table in odd/even pairs
@@ -29,7 +29,7 @@ BPF_TABLE("hash", int, int, patch, 1024);
 
 int recv_netdev(struct __sk_buff *skb) {
   int in = skb->ifindex;
-  //bpf_trace_printk("recv_netdev: in %p %d\n", skb, in);
+  bpf_trace_printk("recv_netdev: in %p %d\n", skb, in);
   int *out = patch.lookup(&in);
   if (out)
     return ifc_send(skb, *out);
@@ -39,7 +39,7 @@ int recv_netdev(struct __sk_buff *skb) {
 
 int recv_tailcall(struct __sk_buff *skb) {
   int in = skb->cb[0];
-  //bpf_trace_printk("recv_tailcall: in %p %d\n", skb, in);
+  bpf_trace_printk("recv_tailcall: in %p %d\n", skb, in);
   int *out = patch.lookup(&in);
   if (out)
     return ifc_send(skb, *out);

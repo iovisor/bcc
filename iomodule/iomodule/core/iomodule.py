@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import weakref
+
 from . import mmanager
 
 class IOModule(object):
@@ -20,8 +22,8 @@ class IOModule(object):
 
     def __init__(self, *args, **kwargs):
         self.name = kwargs.get("name", "(nil)")
-        self.mm = kwargs.get("mmanager")
-        if not isinstance(self.mm, mmanager.ModuleManager):
+        self.mm = weakref.ref(kwargs.get("mmanager"))
+        if not isinstance(self.mm(), mmanager.ModuleManager):
             raise Exception("Argument mmanager must be provided")
         self.interfaces = {}
 

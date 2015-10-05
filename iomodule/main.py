@@ -26,6 +26,7 @@ import iomodule.core as core
 import iomodule.core.mmanager as mmanager
 import iomodule.plugins.bridge as bridge
 import iomodule.plugins.passthrough as passthrough
+import iomodule.plugins.tunnel as tunnel
 
 logging.basicConfig(level=logging.INFO)
 app = flask.Flask(__name__)
@@ -42,7 +43,7 @@ class ModuleTypeAPI(flask.views.MethodView):
     def get():
         "Get a list of module types\n---\n%s"
         mods = []
-        for mod in [passthrough, bridge]:
+        for mod in [passthrough, bridge, tunnel]:
             mods.append({
                     "capabilities": mod.cls.capabilities(),
                     "uuid": mod.cls.uuid(),
@@ -74,9 +75,14 @@ class ModuleAPI(flask.views.MethodView):
             raise exc.BadRequest("Expected json object")
         obj["uuid"] = str(uuid.uuid4())
         if obj["module_type"] == "Bridge":
-            m = bridge.cls(mmanager=mm, name=obj["uuid"][:8])
+            m = bridge.cls(mmanager=mm, name=obj["uuid"][:8],
+                    config=obj.get("config"))
         elif obj["module_type"] == "Passthrough":
-            m = passthrough.cls(mmanager=mm)
+            m = passthrough.cls(mmanager=mm, name=obj["uuid"][:8],
+                    config=obj.get("config"))
+        elif obj["module_type"] == "Tunnel":
+            m = tunnel.cls(mmanager=mm, name=obj["uuid"][:8],
+                    config=obj.get("config"))
         iomodules[obj["uuid"]] = m
         return flask.jsonify(data=obj)
 
@@ -188,4 +194,6 @@ connections = {}
 try:
     app.run()
 finally:
+    del mm
+    connections.clear()
     iomodules.clear()
