@@ -653,18 +653,21 @@ class BPF(object):
         fields (task, pid, cpu, flags, timestamp, msg) or None if no
         line was read (nonblocking=True)
         """
-        while True:
-            line = self.trace_readline(nonblocking)
-            if not line and nonblocking: return (None,) * 6
-            # don't print messages related to lost events
-            if line.startswith("CPU:"): continue
-            task = line[:16].lstrip()
-            line = line[17:]
-            ts_end = line.find(":")
-            pid, cpu, flags, ts = line[:ts_end].split()
-            cpu = cpu[1:-1]
-            msg = line[ts_end + 4:]
-            return (task, int(pid), int(cpu), flags, float(ts), msg)
+        try:
+            while True:
+                line = self.trace_readline(nonblocking)
+                if not line and nonblocking: return (None,) * 6
+                # don't print messages related to lost events
+                if line.startswith("CPU:"): continue
+                task = line[:16].lstrip()
+                line = line[17:]
+                ts_end = line.find(":")
+                pid, cpu, flags, ts = line[:ts_end].split()
+                cpu = cpu[1:-1]
+                msg = line[ts_end + 4:]
+                return (task, int(pid), int(cpu), flags, float(ts), msg)
+        except KeyboardInterrupt:
+            exit()
 
     def trace_readline(self, nonblocking=False):
         """trace_readline(nonblocking=False)
@@ -693,15 +696,18 @@ class BPF(object):
         example: trace_print(fmt="pid {1}, msg = {5}")
         """
 
-        while True:
-            if fmt:
-                fields = self.trace_fields(nonblocking=False)
-                if not fields: continue
-                line = fmt.format(*fields)
-            else:
-                line = self.trace_readline(nonblocking=False)
-            print(line)
-            sys.stdout.flush()
+        try:
+            while True:
+                if fmt:
+                    fields = self.trace_fields(nonblocking=False)
+                    if not fields: continue
+                    line = fmt.format(*fields)
+                else:
+                    line = self.trace_readline(nonblocking=False)
+                print(line)
+                sys.stdout.flush()
+        except KeyboardInterrupt:
+            exit()
 
     @staticmethod
     def _load_kallsyms():
