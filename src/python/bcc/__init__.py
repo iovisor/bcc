@@ -319,7 +319,16 @@ class BPF(object):
             def __init__(self, table, keytype):
                 self.Key = keytype
                 self.table = table
-                self.key = self.Key()
+                k = self.Key()
+                kp = ct.pointer(k)
+                # if 0 is a valid key, try a few alternatives
+                if k in table:
+                    ct.memset(kp, 0xff, ct.sizeof(k))
+                    if k in table:
+                        ct.memset(kp, 0x55, ct.sizeof(k))
+                        if k in table:
+                            raise Exception("Unable to allocate iterator")
+                self.key = k
             def __iter__(self):
                 return self
             def __next__(self):
