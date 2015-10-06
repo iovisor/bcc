@@ -223,14 +223,9 @@ class BPF(object):
                     raise KeyError
 
         def clear(self):
-            if self.ttype in (BPF.ARRAY, BPF.PROG_ARRAY):
-                # Special case clear, since this class is currently behaving
-                # like a dict but popitem on an array causes an infinite loop.
-                # TODO: derive Table from array.array instead
-                for k in self.keys():
-                    self.__delitem__(k)
-            else:
-                super(BPF.Table, self).clear()
+            # default clear uses popitem, which can race with the bpf prog
+            for k in self.keys():
+                self.__delitem__(k)
 
         @staticmethod
         def _stars(val, val_max, width):
