@@ -223,14 +223,9 @@ class BPF(object):
                     raise KeyError
 
         def clear(self):
-            if self.ttype in (BPF.ARRAY, BPF.PROG_ARRAY):
-                # Special case clear, since this class is currently behaving
-                # like a dict but popitem on an array causes an infinite loop.
-                # TODO: derive Table from array.array instead
-                for k in self.keys():
-                    self.__delitem__(k)
-            else:
-                super(BPF.Table, self).clear()
+            # default clear uses popitem, which can race with the bpf prog
+            for k in self.keys():
+                self.__delitem__(k)
 
         @staticmethod
         def _stars(val, val_max, width):
@@ -319,7 +314,16 @@ class BPF(object):
             def __init__(self, table, keytype):
                 self.Key = keytype
                 self.table = table
-                self.key = self.Key()
+                k = self.Key()
+                kp = ct.pointer(k)
+                # if 0 is a valid key, try a few alternatives
+                if k in table:
+                    ct.memset(kp, 0xff, ct.sizeof(k))
+                    if k in table:
+                        ct.memset(kp, 0x55, ct.sizeof(k))
+                        if k in table:
+                            raise Exception("Unable to allocate iterator")
+                self.key = k
             def __iter__(self):
                 return self
             def __next__(self):

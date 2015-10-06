@@ -56,5 +56,24 @@ class TestBPFSocket(TestCase):
         self.stats.clear()
         self.assertEqual(len(self.stats), 0)
 
+    def test_empty_key(self):
+        # test with a 0 key
+        self.stats.clear()
+        self.stats[self.stats.Key()] = self.stats.Leaf(100, 200)
+        x = self.stats.popitem()
+        self.stats[self.stats.Key(10, 20)] = self.stats.Leaf(300, 400)
+        with self.assertRaises(KeyError):
+            x = self.stats[self.stats.Key()]
+        (_, x) = self.stats.popitem()
+        self.assertEqual(x.rx_pkts, 300)
+        self.assertEqual(x.tx_pkts, 400)
+        self.stats.clear()
+        self.assertEqual(len(self.stats), 0)
+        self.stats[self.stats.Key()] = x
+        self.stats[self.stats.Key(0, 1)] = x
+        self.stats[self.stats.Key(0, 2)] = x
+        self.stats[self.stats.Key(0, 3)] = x
+        self.assertEqual(len(self.stats), 4)
+
 if __name__ == "__main__":
     main()
