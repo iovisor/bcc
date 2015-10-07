@@ -100,8 +100,9 @@ int handle_packet(struct __sk_buff *skb) {
     goto EOP;
   }
 
-  struct ip_t *ip = cursor_advance(cursor, sizeof(*ip));
+  struct ip_t *ip;
   ip: {
+    ip = cursor_advance(cursor, sizeof(*ip));
     switch (ip->nextp) {
       case 6: goto tcp;
       case 17: goto udp;
