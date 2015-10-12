@@ -1,7 +1,7 @@
 %define debug_package %{nil}
 
 Name:           bcc
-Version:        0.1.6
+Version:        0.1.7
 Release:        1%{?dist}
 Summary:        BPF Compiler Collection (BCC)
 
@@ -25,7 +25,7 @@ userspace.
 
 mkdir build
 pushd build
-cmake .. -DREVISION=%{version} -DCMAKE_INSTALL_PREFIX=/usr
+cmake .. -DREVISION_LAST=%{version} -DREVISION=%{version} -DCMAKE_INSTALL_PREFIX=/usr
 make -j`grep -c ^process /proc/cpuinfo`
 popd
 
@@ -34,6 +34,9 @@ pushd build
 make install/strip DESTDIR=%{buildroot}
 
 %changelog
+* Mon Oct 12 2015 Brenden Blanco <bblanco@plumgrid.com> - 0.1.2-1
+- Add better version numbering into libbcc.so
+
 * Fri Jul 03 2015 Brenden Blanco <bblanco@plumgrid.com> - 0.1.1-2
 - Initial RPM Release
 
@@ -55,7 +58,6 @@ Python bindings for BPF Compiler Collection (BCC)
 
 %files -n python-bcc
 %{python_sitelib}/bcc*
-%exclude %{python_sitelib}/*.egg-info
 
 %files -n libbcc
 /usr/lib64/*
@@ -64,3 +66,7 @@ Python bindings for BPF Compiler Collection (BCC)
 
 %files -n libbcc-examples
 /usr/share/bcc/examples/*
+%exclude /usr/share/bcc/examples/*.pyc
+%exclude /usr/share/bcc/examples/*.pyo
+%exclude /usr/share/bcc/examples/*/*.pyc
+%exclude /usr/share/bcc/examples/*/*.pyo
