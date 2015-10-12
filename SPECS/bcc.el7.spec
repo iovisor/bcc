@@ -2,7 +2,7 @@
 %define llvmver 3.7.0
 
 Name:           bcc
-Version:        0.1.6
+Version:        0.1.7
 Release:        1%{?dist}
 Summary:        BPF Compiler Collection (BCC)
 
