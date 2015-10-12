@@ -14,7 +14,7 @@ trap cleanup EXIT
 mkdir $TMP/bcc
 cp -a * $TMP/bcc
 pushd $TMP
-tar zcf bcc_0.1.6.orig.tar.gz bcc/
+tar zcf bcc_0.1.7.orig.tar.gz bcc/
 cd bcc
 DEB_BUILD_OPTIONS="nocheck parallel=${PARALLEL}" debuild -us -uc
 popd

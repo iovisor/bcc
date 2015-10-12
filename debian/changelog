@@ -1,3 +1,10 @@
+bcc (0.1.7-1) unstable; urgency=low
+
+  * Tracing features and bugfixes
+  * Built against LLVM 3.8 HEAD
+
+ -- Brenden Blanco <bblanco@plumgrid.com>  Mon, 12 Oct 2015 16:47:09 +0000
+
 bcc (0.1.6-1) unstable; urgency=low
 
   * Stability fixes
