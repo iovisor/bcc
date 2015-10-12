@@ -61,6 +61,13 @@ int kretprobe__tcp_v4_connect(struct pt_regs *ctx)
 		return 0;	// missed entry
 	}
 
+	if (ret != 0) {
+		// failed to send SYNC packet, socket __sk_common.{skc_rcv_saddr, ...}
+		// may not be populated properly.
+		currsock.delete(&pid);
+		return 0;
+	}
+
 	// pull in details
 	struct sock *skp = *skpp;
 	u32 saddr = 0, daddr = 0;
