@@ -20,4 +20,6 @@ endif()
 # strip leading 'v', and make unique for the tag
 message(STATUS "Revision is ${REVISION}")
 # rpm/deb packaging uses this, only works on whole tag numbers
-string(SUBSTRING "${GIT_TAG_LAST}" 1 -1 REVISION_LAST)
+if(NOT REVISION_LAST)
+  string(SUBSTRING "${GIT_TAG_LAST}" 1 -1 REVISION_LAST)
+endif()
