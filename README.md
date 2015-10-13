@@ -72,7 +72,8 @@ Tools:
 - tools/[opensnoop](tools/opensnoop): Trace open() syscalls. [Examples](tools/opensnoop_example.txt).
 - tools/[pidpersec](tools/pidpersec): Count new processes (via fork). [Examples](tools/pidpersec_example.txt).
 - tools/[syncsnoop](tools/syncsnoop): Trace sync() syscall. [Examples](tools/syncsnoop_example.txt).
-- tools/[tcpv4connect](tools/tcpv4connect): Trace TCP IPv4 active connections. [Examples](tools/tcpv4connect_example.txt).
+- tools/[tcpaccept](tools/tcpaccept): Trace TCP passive connections (accept()). [Examples](tools/tcpaccept_example.txt).
+- tools/[tcpv4connect](tools/tcpv4connect): Trace TCP IPv4 active connections (connect()). [Examples](tools/tcpv4connect_example.txt).
 - tools/[vfscount](tools/vfscount) tools/[vfscount.c](tools/vfscount.c): Count VFS calls. [Examples](tools/vfscount_example.txt).
 - tools/[vfsstat](tools/vfsstat) tools/[vfsstat.c](tools/vfsstat.c): Count some VFS calls, with column output. [Examples](tools/vfsstat_example.txt).
 
