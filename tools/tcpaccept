@@ -7,8 +7,6 @@
 #
 # This uses dynamic tracing of the kernel inet_csk_accept() socket function
 # (from tcp_prot.accept), and will need to be modified to match kernel changes.
-# This also traces DCCP traffic; check for future versions where this should
-# be filtered (should be done via "sk_protocol != IPPROTO_TCP").
 #
 # IPv4 addresses are printed as dotted quads. For IPv6 addresses, the last four
 # bytes are printed after "..."; check for future versions with better IPv6
@@ -52,6 +50,13 @@ int kretprobe__inet_csk_accept(struct pt_regs *ctx)
 	u32 pid = bpf_get_current_pid_tgid();
 
 	if (newsk == NULL)
+		return 0;
+
+	// check this is TCP
+	u8 protocol = 0;
+	// workaround for reading the sk_protocol bitfield:
+	bpf_probe_read(&protocol, 1, (void *)((long)&newsk->sk_wmem_queued) - 3);
+	if (protocol != IPPROTO_TCP)
 		return 0;
 
 	// pull in details

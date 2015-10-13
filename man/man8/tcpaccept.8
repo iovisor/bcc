@@ -10,8 +10,6 @@ troubleshooting to see what new connections the local server is accepting.
 
 This uses dynamic tracing of the kernel inet_csk_accept() socket function (from
 tcp_prot.accept), and will need to be modified to match kernel changes.
-This also traces DCCP traffic; check for future versions where this should
-be filtered.
 
 This tool only traces successful TCP accept()s. Connection attempts to closed
 ports will not be shown (those can be traced via other functions).
