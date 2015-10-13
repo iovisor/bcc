@@ -1,6 +1,6 @@
 .TH tcpv4connect 8  "2015-08-25" "USER COMMANDS"
 .SH NAME
-tcpv4connect \- Trace TCP IPv4 active connections. Uses Linux eBPF/bcc.
+tcpv4connect \- Trace TCP IPv4 active connections (connect()). Uses Linux eBPF/bcc.
 .SH SYNOPSIS
 .B tcpv4connect [\-h] [\-t] [\-x] [\-p PID]
 .SH DESCRIPTION
@@ -76,4 +76,4 @@ Unstable - in development.
 .SH AUTHOR
 Brendan Gregg
 .SH SEE ALSO
-funccount(8), tcpdump(8)
+tcpaccept(8), funccount(8), tcpdump(8)
