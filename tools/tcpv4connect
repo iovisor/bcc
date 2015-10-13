@@ -16,7 +16,7 @@ import argparse
 
 # arguments
 examples = """examples:
-    ./tcpv4connect           # trace all open() syscalls
+    ./tcpv4connect           # trace all TCP IPv4 connect()s
     ./tcpv4connect -t        # include timestamps
     ./tcpv4connect -p 181    # only trace PID 181
 """

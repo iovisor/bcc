@@ -25,7 +25,7 @@ import argparse
 
 # arguments
 examples = """examples:
-    ./tcpaccept           # trace all open() syscalls
+    ./tcpaccept           # trace all TCP accept()s
     ./tcpaccept -t        # include timestamps
     ./tcpaccept -p 181    # only trace PID 181
 """
