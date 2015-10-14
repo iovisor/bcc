@@ -19,4 +19,4 @@ struct perf_reader;
 struct perf_reader * perf_reader_new(int fd, int page_cnt, perf_reader_cb cb, void *cb_cookie);
 void perf_reader_free(void *ptr);
 int perf_reader_mmap(struct perf_reader *reader, int fd, unsigned long sample_type);
-int perf_reader_poll(int num_readers, struct perf_reader **readers);
+int perf_reader_poll(int num_readers, struct perf_reader **readers, int timeout);

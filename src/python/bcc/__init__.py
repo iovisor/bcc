@@ -94,7 +94,7 @@ lib.bpf_attach_kprobe.argtypes = [ct.c_int, ct.c_char_p, ct.c_char_p, ct.c_int,
 lib.bpf_detach_kprobe.restype = ct.c_int
 lib.bpf_detach_kprobe.argtypes = [ct.c_char_p]
 lib.perf_reader_poll.restype = ct.c_int
-lib.perf_reader_poll.argtypes = [ct.c_int, ct.POINTER(ct.c_void_p)]
+lib.perf_reader_poll.argtypes = [ct.c_int, ct.POINTER(ct.c_void_p), ct.c_int]
 lib.perf_reader_free.restype = None
 lib.perf_reader_free.argtypes = [ct.c_void_p]
 
@@ -780,7 +780,7 @@ class BPF(object):
         """
         return len(open_kprobes)
 
-    def kprobe_poll(self):
+    def kprobe_poll(self, timeout = -1):
         """kprobe_poll(self)
 
         Poll from the ring buffers for all of the open kprobes, calling the
@@ -790,7 +790,7 @@ class BPF(object):
         for i, v in enumerate(open_kprobes.values()):
             readers[i] = v
         try:
-            lib.perf_reader_poll(len(open_kprobes), readers)
+            lib.perf_reader_poll(len(open_kprobes), readers, timeout)
         except KeyboardInterrupt:
             pass
 
