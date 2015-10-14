@@ -205,11 +205,11 @@ static void event_read(struct perf_reader *reader) {
   }
 }
 
-int perf_reader_poll(int num_readers, struct perf_reader **readers) {
+int perf_reader_poll(int num_readers, struct perf_reader **readers, int timeout) {
   struct pollfd pfds[] = {
     {readers[0]->fd, POLLIN},
   };
-  if (poll(pfds, num_readers, -1) > 0) {
+  if (poll(pfds, num_readers, timeout) > 0) {
     int i;
     for (i = 0; i < num_readers; ++i) {
       if (pfds[i].revents & POLLIN)
