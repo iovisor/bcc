@@ -59,6 +59,7 @@ Examples:
 - examples/[bitehist.py](examples/bitehist.py) examples/[bitehist.c](examples/bitehist.c): Block I/O size histogram. [Examples](examples/bitehist_example.txt).
 - examples/[disksnoop.py](examples/disksnoop.py) examples/[disksnoop.c](examples/disksnoop.c): Trace block device I/O latency. [Examples](examples/disksnoop_example.txt).
 - examples/[hello_world.py](examples/hello_world.py): Prints "Hello, World!" for new processes.
+- examples/[tcpv4connect](examples/tcpv4connect): Trace TCP IPv4 active connections. [Examples](examples/tcpv4connect_example.txt).
 - examples/[trace_fields.py](examples/trace_fields.py): Simple example of printing fields from traced events.
 - examples/[vfsreadlat.py](examples/vfsreadlat.py) examples/[vfsreadlat.c](examples/vfsreadlat.c): VFS read latency distribution. [Examples](examples/vfsreadlat_example.txt).
 
@@ -73,7 +74,7 @@ Tools:
 - tools/[pidpersec](tools/pidpersec): Count new processes (via fork). [Examples](tools/pidpersec_example.txt).
 - tools/[syncsnoop](tools/syncsnoop): Trace sync() syscall. [Examples](tools/syncsnoop_example.txt).
 - tools/[tcpaccept](tools/tcpaccept): Trace TCP passive connections (accept()). [Examples](tools/tcpaccept_example.txt).
-- tools/[tcpv4connect](tools/tcpv4connect): Trace TCP IPv4 active connections (connect()). [Examples](tools/tcpv4connect_example.txt).
+- tools/[tcpconnect](tools/tcpconnect): Trace TCP active connections (connect()). [Examples](tools/tcpconnect_example.txt).
 - tools/[vfscount](tools/vfscount) tools/[vfscount.c](tools/vfscount.c): Count VFS calls. [Examples](tools/vfscount_example.txt).
 - tools/[vfsstat](tools/vfsstat) tools/[vfsstat.c](tools/vfsstat.c): Count some VFS calls, with column output. [Examples](tools/vfsstat_example.txt).
 
