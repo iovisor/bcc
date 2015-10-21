@@ -69,9 +69,11 @@ Tools:
 - tools/[biosnoop](tools/biosnoop): Trace block device I/O with PID and latency. [Examples](tools/biosnoop_example.txt).
 - tools/[funccount](tools/funccount): Count kernel function calls. [Examples](tools/funccount_example.txt).
 - tools/[funclatency](tools/funclatency): Time kernel functions and show their latency distribution. [Examples](tools/funclatency_example.txt).
+- tools/[hardirqs](tools/hardirqs):  Measure hard IRQ (hard interrupt) event time. [Examples](tools/hardirqs_example.txt).
 - tools/[killsnoop](tools/killsnoop): Trace signals issued by the kill() syscall. [Examples](tools/killsnoop_example.txt).
 - tools/[opensnoop](tools/opensnoop): Trace open() syscalls. [Examples](tools/opensnoop_example.txt).
 - tools/[pidpersec](tools/pidpersec): Count new processes (via fork). [Examples](tools/pidpersec_example.txt).
+- tools/[softirqs](tools/softirqs):  Measure soft IRQ (soft interrupt) event time. [Examples](tools/softirqs_example.txt).
 - tools/[syncsnoop](tools/syncsnoop): Trace sync() syscall. [Examples](tools/syncsnoop_example.txt).
 - tools/[tcpaccept](tools/tcpaccept): Trace TCP passive connections (accept()). [Examples](tools/tcpaccept_example.txt).
 - tools/[tcpconnect](tools/tcpconnect): Trace TCP active connections (connect()). [Examples](tools/tcpconnect_example.txt).
