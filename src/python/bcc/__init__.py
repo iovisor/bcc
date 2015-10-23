@@ -575,7 +575,7 @@ class BPF(object):
         ev_name = "p_" + event.replace("+", "_").replace(".", "_")
         if ev_name not in open_kprobes:
             raise Exception("Kprobe %s is not attached" % event)
-        os.close(open_kprobes[ev_name])
+        lib.perf_reader_free(open_kprobes[ev_name])
         desc = "-:kprobes/%s" % ev_name
         res = lib.bpf_detach_kprobe(desc.encode("ascii"))
         if res < 0:
@@ -612,7 +612,7 @@ class BPF(object):
         ev_name = "r_" + event.replace("+", "_").replace(".", "_")
         if ev_name not in open_kprobes:
             raise Exception("Kretprobe %s is not attached" % event)
-        os.close(open_kprobes[ev_name])
+        lib.perf_reader_free(open_kprobes[ev_name])
         desc = "-:kprobes/%s" % ev_name
         res = lib.bpf_detach_kprobe(desc.encode("ascii"))
         if res < 0:
