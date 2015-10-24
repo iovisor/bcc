@@ -31,10 +31,30 @@ br2=$(curl_ localhost:5000/modules/ -d '{
 }' | jq .data.uuid)
 pt1=$(curl_ localhost:5000/modules/ -d '{"module_type": "Passthrough", "display_name": "pt1"}' | jq .data.uuid)
 pt2=$(curl_ localhost:5000/modules/ -d '{"module_type": "Passthrough", "display_name": "pt2"}' | jq .data.uuid)
-c1=$(curl_ localhost:5000/connections/ -d '{"iomodules": ['${br1}', '${pt1}']}' | jq .data.uuid)
-c2=$(curl_ localhost:5000/connections/ -d '{"iomodules": ['${pt1}', '${pt2}']}' | jq .data.uuid)
-c3=$(curl_ localhost:5000/connections/ -d '{"iomodules": ['${pt2}', '${br2}']}' | jq .data.uuid)
-c4=$(curl_ localhost:5000/connections/ -d '{"iomodules": ['${tn1}', '${br1}']}' | jq .data.uuid)
+c1=$(curl_ localhost:5000/connections/ -d '{
+  "iomodules": [
+    {"uuid": '${br1}', "interface": null},
+    {"uuid": '${pt1}', "interface": null}
+  ]
+}' | jq .data.uuid)
+c2=$(curl_ localhost:5000/connections/ -d '{
+  "iomodules": [
+    {"uuid": '${pt1}', "interface": null},
+    {"uuid": '${pt2}', "interface": null}
+  ]
+}' | jq .data.uuid)
+c3=$(curl_ localhost:5000/connections/ -d '{
+  "iomodules": [
+    {"uuid": '${pt2}', "interface": null},
+    {"uuid": '${br2}', "interface": null}
+  ]
+}' | jq .data.uuid)
+c4=$(curl_ localhost:5000/connections/ -d '{
+  "iomodules": [
+    {"uuid": '${tn1}', "interface": null},
+    {"uuid": '${br1}', "interface": null}
+  ]
+}' | jq .data.uuid)
 
 # br1 <-> pt1 <-> pt2 <-> br2
 #  |

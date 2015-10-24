@@ -37,6 +37,9 @@ class IOModule(object):
     def ifc_delete(self, name):
         pass
 
+    def ifc_lookup(self, name):
+        return self.interfaces.get(name)
+
     def is_bpf(self):
         return "ebpf" in self._capabilities_
 

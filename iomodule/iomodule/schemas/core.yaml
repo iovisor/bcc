@@ -72,7 +72,13 @@ definitions:
       iomodules:
         type: array
         items:
-          type: string
+          type: object
+          properties:
+            uuid:
+              type: string
+              format: uuid
+            interface:
+              type: string
   newConnection: &NewConnection
     id: newConnection
     type: object
@@ -87,7 +93,13 @@ definitions:
       iomodules:
         type: array
         items:
-          type: string
+          type: object
+          properties:
+            uuid:
+              type: string
+              format: uuid
+            interface:
+              type: string
   errorModel: &ErrorModel
     id: errorModel
     type: object

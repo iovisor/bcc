@@ -19,14 +19,18 @@ import flask.views
 import flask_swagger
 import werkzeug.exceptions as exc
 import logging
+import os
 import yaml
 import uuid
 
 import iomodule.core as core
 import iomodule.core.mmanager as mmanager
+import iomodule.core.ifc_iomodule as ifc_iomodule
 import iomodule.plugins.bridge as bridge
 import iomodule.plugins.passthrough as passthrough
 import iomodule.plugins.tunnel as tunnel
+
+_dir = os.path.dirname(__file__)
 
 logging.basicConfig(level=logging.INFO)
 app = flask.Flask(__name__)
@@ -34,7 +38,7 @@ app = flask.Flask(__name__)
 Dumper = yaml.SafeDumper
 Dumper.ignore_aliases = lambda self, data: True
 
-with open("iomodule/schemas/core.yaml") as f:
+with open(os.path.join(_dir, "iomodule/schemas/core.yaml")) as f:
     schema = yaml.load(f)
 
 class ModuleTypeAPI(flask.views.MethodView):
@@ -73,7 +77,7 @@ class ModuleAPI(flask.views.MethodView):
         obj = flask.request.get_json()
         if not obj:
             raise exc.BadRequest("Expected json object")
-        obj["uuid"] = str(uuid.uuid4())
+        obj["uuid"] = obj.get("uuid", str(uuid.uuid4()))
         if obj["module_type"] == "Bridge":
             m = bridge.cls(mmanager=mm, name=obj["uuid"][:8],
                     config=obj.get("config"))
@@ -137,16 +141,20 @@ class ConnectionAPI(flask.views.MethodView):
         obj = flask.request.get_json()
         if not obj:
             raise exc.BadRequest("Expected json object")
-        obj["uuid"] = str(uuid.uuid4())
+        obj["uuid"] = obj.get("uuid", str(uuid.uuid4()))
         if not isinstance(obj.get("iomodules"), list):
             raise exc.BadRequest("Missing iomodules[] from body")
         if len(obj["iomodules"]) != 2:
             raise exc.BadRequest("Length of iomodules[] should be exactly 2")
-        ioms = [iomodules.get(m) for m in obj["iomodules"]]
+        ioms = [iomodules.get(m["uuid"]) for m in obj["iomodules"]]
         if not (ioms[0] and ioms[1] and ioms[0] != ioms[1]):
             raise exc.BadRequest("Malformed iomodule[]")
-        ifc1 = ioms[0].ifc_create(obj["uuid"][:8])
-        ifc2 = ioms[1].ifc_create(obj["uuid"][:8])
+        ifc1 = ioms[0].ifc_lookup(obj["iomodules"][0].get("interface"))
+        if not ifc1:
+            ifc1 = ioms[0].ifc_create(obj["uuid"][:8])
+        ifc2 = ioms[1].ifc_lookup(obj["iomodules"][1].get("interface"))
+        if not ifc2:
+            ifc2 = ioms[1].ifc_create(obj["uuid"][:8])
         mm.connect(ifc1, ifc2, ioms[0], ioms[1])
         connections[obj["uuid"]] = obj["iomodules"]
         return flask.jsonify(data=obj)
@@ -188,8 +196,12 @@ def spec():
     swag["info"]["title"] = "IOModule Manager API"
     return flask.jsonify(swag)
 
+@app.errorhandler(400)
+def error_400(exception):
+    return exception.description, 400, {"Content-Type": "text/plain"}
+
 mm = mmanager.ModuleManager()
-iomodules = {}
+iomodules = {"interfaces": ifc_iomodule.cls(mmanager=mm, name="interfaces")}
 connections = {}
 try:
     app.run()
