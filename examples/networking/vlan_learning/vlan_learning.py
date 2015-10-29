@@ -2,27 +2,6 @@
 # Copyright (c) PLUMgrid, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
 
-# This example shows a unique way to use a BPF program to demux any ethernet
-# traffic into a pool of worker veth+namespaces (or any ifindex-based
-# destination) depending on a configurable mapping of src-mac to ifindex. As
-# part of the ingress processing, the program will dynamically learn the source
-# ifindex of the matched source mac.
-
-# Simulate a physical network with a vlan aware switch and clients that may
-# connect to any vlan. The program will detect the known clients and pass the
-# traffic through to a dedicated namespace for processing. Clients may have
-# overlapping IP spaces and the traffic will still work.
-
-#                |           bpf program                      |
-# cli0 --|       |                            /--|-- worker0  |
-# cli1 --| trunk | +->--->-handle_p2v(pkt)-> /---|-- worker1  |
-# cli2 --|=======|=+                        /----|-- worker2  |
-# ...  --|       | +-<---<-handle_v2p(pkt)-<-----|--  ...     |
-# cliN --|       |                          \----|-- workerM  |
-#        |       |                              ^             |
-#      phys      |                            veth            |
-#     switch     |                                            |
-
 from bcc import BPF
 from builtins import input
 from pyroute2 import IPRoute, NetNS, IPDB, NSPopen
