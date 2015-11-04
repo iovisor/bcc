@@ -2,29 +2,6 @@
 # Copyright (c) PLUMgrid, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
 
-# This example shows how a combination of BPF programs can be used to perform
-# per-IP classification and rate limiting. The simulation in this example
-# shows an example where N+M devices are combined and use 1 WAN. Traffic sent
-# from/to the "neighbor" devices have their combined bandwidth capped at
-# 128kbit, and the rest of the traffic can use an additional 1Mbit.
-
-# This works by sharing a map between various tc ingress filters, each with
-# a related set of bpf functions attached. The map stores a list of dynamically
-# learned ip addresses that were seen on the neighbor devices and should be
-# throttled.
-
-#                          /------------\                        |
-# neigh1 --|->->->->->->->-|            |                        |
-# neigh2 --|->->->->->->->-|    <-128kb-|        /------\        |
-# neigh3 --|->->->->->->->-|            |  wan0  | wan  |        |
-#          | ^             |   br100    |-<-<-<--| sim  |        |
-#          | clsfy_neigh() |            |   ^    \------/        |
-# lan1 ----|->->->->->->->-|    <--1Mb--|   |                    |
-# lan2 ----|->->->->->->->-|            |   classify_wan()       |
-#            ^             \------------/                        |
-#            pass()                                              |
-
-
 from bcc import BPF
 from pyroute2 import IPRoute, NetNS, IPDB, NSPopen
 from simulation import Simulation

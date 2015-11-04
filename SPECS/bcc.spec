@@ -70,3 +70,5 @@ Python bindings for BPF Compiler Collection (BCC)
 %exclude /usr/share/bcc/examples/*.pyo
 %exclude /usr/share/bcc/examples/*/*.pyc
 %exclude /usr/share/bcc/examples/*/*.pyo
+%exclude /usr/share/bcc/examples/*/*/*.pyc
+%exclude /usr/share/bcc/examples/*/*/*.pyo
