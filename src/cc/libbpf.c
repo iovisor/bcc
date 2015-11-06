@@ -293,6 +293,7 @@ error:
 }
 
 void * bpf_open_perf_buffer(perf_reader_raw_cb raw_cb, void *cb_cookie, int pid, int cpu) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,4,0)
   int pfd;
   struct perf_event_attr attr = {};
   struct perf_reader *reader = NULL;
@@ -328,4 +329,8 @@ error:
     perf_reader_free(reader);
 
   return NULL;
+#else
+  fprintf(stderr, "PERF_COUNT_SW_BPF_OUTPUT feature unsupported\n");
+  return NULL;
+#endif
 }
