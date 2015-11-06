@@ -16,6 +16,7 @@
 #include <linux/bpf.h>
 #include <linux/version.h>
 #include <sys/utsname.h>
+#include <unistd.h>
 
 #include <clang/AST/ASTConsumer.h>
 #include <clang/AST/ASTContext.h>
@@ -332,13 +333,14 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
           }
           txt += "typeof(" + name + ".leaf) *_leaf = " + lookup + ", &_key); ";
           txt += "if (_leaf) (*_leaf)++; })";
-        } else if (memb_name == "perf_output") {
+        } else if (memb_name == "perf_submit") {
           string name = Ref->getDecl()->getName();
           string arg0 = rewriter_.getRewrittenText(SourceRange(Call->getArg(0)->getLocStart(),
                                                                Call->getArg(0)->getLocEnd()));
           string args_other = rewriter_.getRewrittenText(SourceRange(Call->getArg(1)->getLocStart(),
-                                                                     Call->getArg(3)->getLocEnd()));
-          txt = "bpf_perf_event_output(" + arg0 + ", bpf_pseudo_fd(1, " + fd + "), " + args_other + ")";
+                                                                     Call->getArg(2)->getLocEnd()));
+          txt = "bpf_perf_event_output(" + arg0 + ", bpf_pseudo_fd(1, " + fd + ")";
+          txt += ", bpf_get_smp_processor_id(), " + args_other + ")";
         } else {
           if (memb_name == "lookup") {
             prefix = "bpf_map_lookup_elem";
@@ -413,6 +415,12 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
             rewriter_.ReplaceText(SourceRange(Call->getLocStart(), Call->getArg(0)->getLocEnd()), text);
             rewriter_.InsertTextAfter(Call->getLocEnd(), "); }");
           }
+        } else if (Decl->getName() == "bpf_num_cpus") {
+          int numcpu = sysconf(_SC_NPROCESSORS_ONLN);
+          if (numcpu <= 0)
+            numcpu = 1;
+          text = to_string(numcpu);
+          rewriter_.ReplaceText(SourceRange(Call->getLocStart(), Call->getLocEnd()), text);
         }
       }
     }
@@ -538,6 +546,13 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
     } else if (A->getName() == "maps/prog") {
       if (KERNEL_VERSION(major,minor,0) >= KERNEL_VERSION(4,2,0))
         map_type = BPF_MAP_TYPE_PROG_ARRAY;
+    } else if (A->getName() == "maps/perf_output") {
+      if (KERNEL_VERSION(major,minor,0) >= KERNEL_VERSION(4,3,0))
+        map_type = BPF_MAP_TYPE_PERF_EVENT_ARRAY;
+      int numcpu = sysconf(_SC_NPROCESSORS_ONLN);
+      if (numcpu <= 0)
+        numcpu = 1;
+      table.max_entries = numcpu;
     } else if (A->getName() == "maps/perf_array") {
       if (KERNEL_VERSION(major,minor,0) >= KERNEL_VERSION(4,3,0))
         map_type = BPF_MAP_TYPE_PERF_EVENT_ARRAY;

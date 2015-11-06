@@ -42,14 +42,25 @@ struct _name##_table_t { \
 __attribute__((section("maps/" _table_type))) \
 struct _name##_table_t _name
 
+// Table for pushing custom events to userspace via ring buffer
+#define BPF_PERF_OUTPUT(_name) \
+struct _name##_table_t { \
+  int key; \
+  u32 leaf; \
+  /* map.perf_submit(ctx, data, data_size) */ \
+  int (*perf_submit) (void *, void *, u32); \
+  u32 data[0]; \
+}; \
+__attribute__((section("maps/perf_output"))) \
+struct _name##_table_t _name
+
+// Table for reading hw perf cpu counters
 #define BPF_PERF_ARRAY(_name, _max_entries) \
 struct _name##_table_t { \
   int key; \
   u32 leaf; \
   /* counter = map.perf_read(index) */ \
   u64 (*perf_read) (int); \
-  /* map.perf_ouput(ctx, index, data, data_size) */ \
-  int (*perf_output) (void *, int, void *, u32); \
   u32 data[_max_entries]; \
 }; \
 __attribute__((section("maps/perf_array"))) \
@@ -364,6 +375,7 @@ int bpf_l4_csum_replace_(void *ctx, u64 off, u64 from, u64 to, u64 flags) {
 
 int incr_cksum_l3(void *off, u64 oldval, u64 newval) asm("llvm.bpf.extra");
 int incr_cksum_l4(void *off, u64 oldval, u64 newval, u64 flags) asm("llvm.bpf.extra");
+int bpf_num_cpus() asm("llvm.bpf.extra");
 
 #define lock_xadd(ptr, val) ((void)__sync_fetch_and_add(ptr, val))
 

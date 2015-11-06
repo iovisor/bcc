@@ -9,22 +9,21 @@
 import atexit
 from bcc import BPF
 import ctypes
-import multiprocessing
 
 counter = 0
-def cb(cookie, data, size):
+def cb(cpu, data, size):
     global counter
     counter += 1
 
 prog = """
-BPF_PERF_ARRAY(events, NUMCPU);
+BPF_PERF_OUTPUT(events);
 BPF_TABLE("array", int, u64, counters, 10);
 int kprobe__sys_write(void *ctx) {
   struct {
     u64 ts;
   } data = {bpf_ktime_get_ns()};
   int rc;
-  if ((rc = events.perf_output(ctx, bpf_get_smp_processor_id(), &data, sizeof(data))) < 0)
+  if ((rc = events.perf_submit(ctx, &data, sizeof(data))) < 0)
     bpf_trace_printk("perf_output failed: %d\\n", rc);
   int zero = 0;
   u64 *val = counters.lookup(&zero);
@@ -32,10 +31,8 @@ int kprobe__sys_write(void *ctx) {
   return 0;
 }
 """
-numcpu = multiprocessing.cpu_count()
-prog = prog.replace("NUMCPU", str(numcpu))
 b = BPF(text=prog)
-b["events"].open_perf_buffers(cb, None)
+b["events"].open_perf_buffer(cb)
 
 @atexit.register
 def print_counter():

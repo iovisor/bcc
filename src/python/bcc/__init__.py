@@ -187,35 +187,27 @@ class BPF(object):
                 raise Exception("Could not scanf leaf")
             return leaf
 
-        def open_perf_buffers(self, cb, cookie):
-            """open_perf_buffers(cb, cookie)
+        def open_perf_buffer(self, callback):
+            """open_perf_buffers(callback)
 
-            Opens ring buffers, one for each cpu, to receive custom perf event
-            data from the bpf program. The program is expected to use the cpu-id
-            as the key of the perf_output call.
+            Opens a set of per-cpu ring buffer to receive custom perf event
+            data from the bpf program. The callback will be invoked for each
+            event submitted from the kernel, up to millions per second.
             """
 
             for i in range(0, multiprocessing.cpu_count()):
-                self.open_perf_buffer(i, cb, cookie, cpu=i)
+                self._open_perf_buffer(i, callback)
 
-        def open_perf_buffer(self, key, cb, cookie, pid=-1, cpu=0):
-            """open_perf_buffer(key, cb, cookie, pid=-1, cpu=0)
-
-            Open a ring buffer to receive custom perf event data from the bpf
-            program. The callback cb is invoked for each event submitted, which
-            can be up to millions of events per second. The signature of cb
-            should be cb(cookie, data, data_size).
-            """
-
-            fn = _RAW_CB_TYPE(lambda x, data, size: cb(cookie, data, size))
-            reader = lib.bpf_open_perf_buffer(fn, None, pid, cpu)
+        def _open_perf_buffer(self, cpu, callback):
+            fn = _RAW_CB_TYPE(lambda _, data, size: callback(cpu, data, size))
+            reader = lib.bpf_open_perf_buffer(fn, None, -1, cpu)
             if not reader:
                 raise Exception("Could not open perf buffer")
             fd = lib.perf_reader_fd(reader)
-            self[self.Key(key)] = self.Leaf(fd)
-            open_kprobes[(id(self), key)] = reader
+            self[self.Key(cpu)] = self.Leaf(fd)
+            open_kprobes[(id(self), cpu)] = reader
             # keep a refcnt
-            self._cbs[key] = (fn, cookie)
+            self._cbs[cpu] = fn
 
         def close_perf_buffer(self, key):
             reader = open_kprobes.get((id(self), key))
