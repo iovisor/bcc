@@ -42,6 +42,19 @@ struct _name##_table_t { \
 __attribute__((section("maps/" _table_type))) \
 struct _name##_table_t _name
 
+#define BPF_PERF_ARRAY(_name, _max_entries) \
+struct _name##_table_t { \
+  int key; \
+  u32 leaf; \
+  /* counter = map.perf_read(index) */ \
+  u64 (*perf_read) (int); \
+  /* map.perf_ouput(ctx, index, data, data_size) */ \
+  int (*perf_output) (void *, int, void *, u32); \
+  u32 data[_max_entries]; \
+}; \
+__attribute__((section("maps/perf_array"))) \
+struct _name##_table_t _name
+
 #define BPF_HASH1(_name) \
   BPF_TABLE("hash", u64, u64, _name, 10240)
 #define BPF_HASH2(_name, _key_type) \
@@ -117,6 +130,16 @@ static int (*bpf_skb_get_tunnel_key)(void *ctx, void *to, u32 size, u64 flags) =
   (void *) BPF_FUNC_skb_get_tunnel_key;
 static int (*bpf_skb_set_tunnel_key)(void *ctx, void *from, u32 size, u64 flags) =
   (void *) BPF_FUNC_skb_set_tunnel_key;
+static int (*bpf_perf_event_read)(void *map, u32 index) =
+  (void *) BPF_FUNC_perf_event_read;
+#endif
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,4,0)
+static int (*bpf_redirect)(int ifindex, u32 flags) =
+  (void *) BPF_FUNC_redirect;
+static u32 (*bpf_get_route_realm)(void *ctx) =
+  (void *) BPF_FUNC_get_route_realm;
+static int (*bpf_perf_event_output)(void *ctx, void *map, u32 index, void *data, u32 size) =
+  (void *) BPF_FUNC_perf_event_output;
 #endif
 
 /* llvm builtin functions that eBPF C program may use to

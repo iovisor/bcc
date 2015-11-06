@@ -42,6 +42,7 @@ int bpf_open_raw_sock(const char *name);
 
 typedef void (*perf_reader_cb)(void *cb_cookie, int pid, uint64_t callchain_num,
                                void *callchain);
+typedef void (*perf_reader_raw_cb)(void *cb_cookie, void *raw, int raw_size);
 
 void * bpf_attach_kprobe(int progfd, const char *event, const char *event_desc,
                          int pid, int cpu, int group_fd, perf_reader_cb cb,

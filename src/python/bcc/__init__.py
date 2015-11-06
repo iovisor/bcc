@@ -89,14 +89,19 @@ lib.bpf_prog_load.argtypes = [ct.c_int, ct.c_void_p, ct.c_size_t,
 lib.bpf_attach_kprobe.restype = ct.c_void_p
 _CB_TYPE = ct.CFUNCTYPE(None, ct.py_object, ct.c_int,
         ct.c_ulonglong, ct.POINTER(ct.c_ulonglong))
+_RAW_CB_TYPE = ct.CFUNCTYPE(None, ct.py_object, ct.c_void_p, ct.c_int)
 lib.bpf_attach_kprobe.argtypes = [ct.c_int, ct.c_char_p, ct.c_char_p, ct.c_int,
         ct.c_int, ct.c_int, _CB_TYPE, ct.py_object]
 lib.bpf_detach_kprobe.restype = ct.c_int
 lib.bpf_detach_kprobe.argtypes = [ct.c_char_p]
+lib.bpf_open_perf_buffer.restype = ct.c_void_p
+lib.bpf_open_perf_buffer.argtypes = [_RAW_CB_TYPE, ct.py_object]
 lib.perf_reader_poll.restype = ct.c_int
 lib.perf_reader_poll.argtypes = [ct.c_int, ct.POINTER(ct.c_void_p), ct.c_int]
 lib.perf_reader_free.restype = None
 lib.perf_reader_free.argtypes = [ct.c_void_p]
+lib.perf_reader_fd.restype = int
+lib.perf_reader_fd.argtypes = [ct.c_void_p]
 
 open_kprobes = {}
 tracefile = None
@@ -111,8 +116,9 @@ stars_max = 40
 def cleanup_kprobes():
     for k, v in open_kprobes.items():
         lib.perf_reader_free(v)
-        desc = "-:kprobes/%s" % k
-        lib.bpf_detach_kprobe(desc.encode("ascii"))
+        if isinstance(k, str):
+            desc = "-:kprobes/%s" % k
+            lib.bpf_detach_kprobe(desc.encode("ascii"))
     open_kprobes.clear()
     if tracefile:
         tracefile.close()
@@ -126,6 +132,7 @@ class BPF(object):
     HASH = 1
     ARRAY = 2
     PROG_ARRAY = 3
+    PERF_EVENT_ARRAY = 4
 
     class Function(object):
         def __init__(self, bpf, name, fd):
@@ -178,6 +185,21 @@ class BPF(object):
                 raise Exception("Could not scanf leaf")
             return leaf
 
+        def open_perf_buffer(self, key, cb, cookie):
+            reader = lib.bpf_open_perf_buffer(_RAW_CB_TYPE(cb),
+                    ct.cast(id(cookie), ct.py_object))
+            if not reader:
+                raise Exception("Could not open perf buffer")
+            fd = lib.perf_reader_fd(reader)
+            self[self.Key(key)] = self.Leaf(fd)
+            open_kprobes[(id(self), key)] = reader
+
+        def close_perf_buffer(self, key):
+            reader = open_kprobes.get((id(self), key))
+            if reader:
+                lib.perf_reader_free(reader)
+                del(open_kprobes[(id(self), key)])
+
         def __getitem__(self, key):
             key_p = ct.pointer(key)
             leaf = self.Leaf()
@@ -208,7 +230,7 @@ class BPF(object):
             ttype = lib.bpf_table_type_id(self.bpf.module, self.map_id)
             # Deleting from array type maps does not have an effect, so
             # zero out the entry instead.
-            if ttype in (BPF.ARRAY, BPF.PROG_ARRAY):
+            if ttype in (BPF.ARRAY, BPF.PROG_ARRAY, BPF.PERF_EVENT_ARRAY):
                 leaf = self.Leaf()
                 leaf_p = ct.pointer(leaf)
                 res = lib.bpf_update_elem(self.map_fd,
@@ -216,6 +238,8 @@ class BPF(object):
                         ct.cast(leaf_p, ct.c_void_p), 0)
                 if res < 0:
                     raise Exception("Could not clear item")
+                if ttype == BPF.PERF_EVENT_ARRAY:
+                    self.close_perf_buffer(key)
             else:
                 res = lib.bpf_delete_elem(self.map_fd,
                         ct.cast(key_p, ct.c_void_p))
@@ -792,5 +816,5 @@ class BPF(object):
         try:
             lib.perf_reader_poll(len(open_kprobes), readers, timeout)
         except KeyboardInterrupt:
-            pass
+            exit()
 

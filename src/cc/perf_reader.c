@@ -26,8 +26,11 @@
 #include "libbpf.h"
 #include "perf_reader.h"
 
+int perf_reader_page_cnt = 8;
+
 struct perf_reader {
   perf_reader_cb cb;
+  perf_reader_raw_cb raw_cb;
   void *cb_cookie; // to be returned in the cb
   void *buf; // for keeping segmented data
   size_t buf_size;
@@ -35,18 +38,20 @@ struct perf_reader {
   int page_size;
   int page_cnt;
   int fd;
+  uint32_t type;
   uint64_t sample_type;
 };
 
-struct perf_reader * perf_reader_new(int fd, int page_cnt, perf_reader_cb cb, void *cb_cookie) {
+struct perf_reader * perf_reader_new(perf_reader_cb cb, perf_reader_raw_cb raw_cb, void *cb_cookie) {
   struct perf_reader *reader = calloc(1, sizeof(struct perf_reader));
   if (!reader)
     return NULL;
   reader->cb = cb;
+  reader->raw_cb = raw_cb;
   reader->cb_cookie = cb_cookie;
-  reader->fd = fd;
+  reader->fd = -1;
   reader->page_size = getpagesize();
-  reader->page_cnt = page_cnt;
+  reader->page_cnt = perf_reader_page_cnt;
   return reader;
 }
 
@@ -61,18 +66,20 @@ void perf_reader_free(void *ptr) {
   }
 }
 
-int perf_reader_mmap(struct perf_reader *reader, int fd, uint64_t sample_type) {
+int perf_reader_mmap(struct perf_reader *reader, unsigned type, unsigned long sample_type) {
   int mmap_size = reader->page_size * (reader->page_cnt + 1);
 
-  if (!reader->cb)
-    return 0;
+  if (reader->fd < 0) {
+    fprintf(stderr, "%s: reader fd is not set\n", __FUNCTION__);
+    return -1;
+  }
 
-  reader->base = mmap(NULL, mmap_size, PROT_READ | PROT_WRITE , MAP_SHARED, fd, 0);
+  reader->base = mmap(NULL, mmap_size, PROT_READ | PROT_WRITE , MAP_SHARED, reader->fd, 0);
   if (reader->base == MAP_FAILED) {
     perror("mmap");
     return -1;
   }
-  reader->fd = fd;
+  reader->type = type;
   reader->sample_type = sample_type;
 
   return 0;
@@ -90,7 +97,7 @@ struct perf_sample_trace_kprobe {
   uint64_t ip;
 };
 
-static void sample_parse(struct perf_reader *reader, void *data, int size) {
+static void parse_tracepoint(struct perf_reader *reader, void *data, int size) {
   uint8_t *ptr = data;
   struct perf_event_header *header = (void *)data;
 
@@ -153,6 +160,40 @@ static void sample_parse(struct perf_reader *reader, void *data, int size) {
     reader->cb(reader->cb_cookie, tk ? tk->common.pid : -1, num_callchain, callchain);
 }
 
+static void parse_sw(struct perf_reader *reader, void *data, int size) {
+  uint8_t *ptr = data;
+  struct perf_event_header *header = (void *)data;
+
+  struct {
+      uint32_t size;
+      char data[0];
+  } *raw = NULL;
+
+  ptr += sizeof(*header);
+  if (ptr > (uint8_t *)data + size) {
+    fprintf(stderr, "%s: corrupt sample header\n", __FUNCTION__);
+    return;
+  }
+
+  if (reader->sample_type & PERF_SAMPLE_RAW) {
+    raw = (void *)ptr;
+    ptr += sizeof(raw->size) + raw->size;
+    if (ptr > (uint8_t *)data + size) {
+      fprintf(stderr, "%s: corrupt raw sample\n", __FUNCTION__);
+      return;
+    }
+  }
+
+  // sanity check
+  if (ptr != (uint8_t *)data + size) {
+    fprintf(stderr, "%s: extra data at end of sample\n", __FUNCTION__);
+    return;
+  }
+
+  if (reader->raw_cb)
+    reader->raw_cb(reader->cb_cookie, raw->data, raw->size);
+}
+
 static uint64_t read_data_head(struct perf_event_mmap_page *perf_header) {
   uint64_t data_head = *((volatile uint64_t *)&perf_header->data_head);
   asm volatile("" ::: "memory");
@@ -194,12 +235,16 @@ static void event_read(struct perf_reader *reader) {
       ptr = reader->buf;
     }
 
-    if (e->type == PERF_RECORD_LOST)
+    if (e->type == PERF_RECORD_LOST) {
       fprintf(stderr, "Lost %lu samples\n", *(uint64_t *)(ptr + sizeof(*e)));
-    else if (e->type == PERF_RECORD_SAMPLE)
-      sample_parse(reader, ptr, e->size);
-    else
+    } else if (e->type == PERF_RECORD_SAMPLE) {
+      if (reader->type == PERF_TYPE_TRACEPOINT)
+        parse_tracepoint(reader, ptr, e->size);
+      else if (reader->type == PERF_TYPE_SOFTWARE)
+        parse_sw(reader, ptr, e->size);
+    } else {
       fprintf(stderr, "%s: unknown sample type %d\n", __FUNCTION__, e->type);
+    }
 
     write_data_tail(perf_header, perf_header->data_tail + e->size);
   }
@@ -223,3 +268,10 @@ int perf_reader_poll(int num_readers, struct perf_reader **readers, int timeout)
   return 0;
 }
 
+void perf_reader_set_fd(struct perf_reader *reader, int fd) {
+  reader->fd = fd;
+}
+
+int perf_reader_fd(struct perf_reader *reader) {
+  return reader->fd;
+}

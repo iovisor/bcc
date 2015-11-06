@@ -178,8 +178,8 @@ int bpf_attach_socket(int sock, int prog) {
 
 static int bpf_attach_tracing_event(int progfd, const char *event_path,
     struct perf_reader *reader, int pid, int cpu, int group_fd) {
-  int efd = -1, rc = -1, pfd = -1;
-  ssize_t bytes = -1;
+  int efd = -1, rc = -1, pfd;
+  ssize_t bytes;
   char buf[256];
   struct perf_event_attr attr = {};
 
@@ -206,8 +206,9 @@ static int bpf_attach_tracing_event(int progfd, const char *event_path,
     perror("perf_event_open");
     goto cleanup;
   }
+  perf_reader_set_fd(reader, pfd);
 
-  if (perf_reader_mmap(reader, pfd, attr.sample_type) < 0)
+  if (perf_reader_mmap(reader, attr.type, attr.sample_type) < 0)
     goto cleanup;
 
   if (ioctl(pfd, PERF_EVENT_IOC_SET_BPF, progfd) < 0) {
@@ -219,14 +220,11 @@ static int bpf_attach_tracing_event(int progfd, const char *event_path,
     goto cleanup;
   }
 
-  rc = pfd;
-  pfd = -1;
+  rc = 0;
 
 cleanup:
   if (efd >= 0)
     close(efd);
-  if (pfd >= 0)
-    close(pfd);
 
   return rc;
 }
@@ -239,7 +237,7 @@ void * bpf_attach_kprobe(int progfd, const char *event,
   char buf[256];
   struct perf_reader *reader = NULL;
 
-  reader = perf_reader_new(-1, 8, cb, cb_cookie);
+  reader = perf_reader_new(cb, NULL, cb_cookie);
   if (!reader)
     goto cleanup;
 
@@ -292,3 +290,40 @@ cleanup:
   return rc;
 }
 
+void * bpf_open_perf_buffer(perf_reader_raw_cb raw_cb, void *cb_cookie) {
+  int rc = -1, pfd;
+  struct perf_event_attr attr = {};
+
+  struct perf_reader *reader = perf_reader_new(NULL, raw_cb, cb_cookie);
+
+  if (!reader)
+    goto cleanup;
+
+  attr.config = PERF_COUNT_SW_BPF_OUTPUT;
+  attr.type = PERF_TYPE_SOFTWARE;
+  attr.sample_type = PERF_SAMPLE_RAW;
+  pfd = syscall(__NR_perf_event_open, &attr, -1, 0, -1, PERF_FLAG_FD_CLOEXEC);
+  if (pfd < 0) {
+    perror("perf_event_open");
+    goto cleanup;
+  }
+  perf_reader_set_fd(reader, pfd);
+
+  if (perf_reader_mmap(reader, attr.type, attr.sample_type) < 0)
+    goto cleanup;
+
+  if (ioctl(pfd, PERF_EVENT_IOC_ENABLE, 0) < 0) {
+    perror("ioctl(PERF_EVENT_IOC_ENABLE)");
+    goto cleanup;
+  }
+
+  rc = 0;
+
+cleanup:
+  if (reader && rc < 0) {
+    perf_reader_free(reader);
+    reader = NULL;
+  }
+
+  return reader;
+}
