@@ -18,6 +18,7 @@ from collections import MutableMapping
 import ctypes as ct
 import fcntl
 import json
+import multiprocessing
 import os
 from subprocess import Popen, PIPE
 import sys
@@ -95,7 +96,7 @@ lib.bpf_attach_kprobe.argtypes = [ct.c_int, ct.c_char_p, ct.c_char_p, ct.c_int,
 lib.bpf_detach_kprobe.restype = ct.c_int
 lib.bpf_detach_kprobe.argtypes = [ct.c_char_p]
 lib.bpf_open_perf_buffer.restype = ct.c_void_p
-lib.bpf_open_perf_buffer.argtypes = [_RAW_CB_TYPE, ct.py_object]
+lib.bpf_open_perf_buffer.argtypes = [_RAW_CB_TYPE, ct.py_object, ct.c_int, ct.c_int]
 lib.perf_reader_poll.restype = ct.c_int
 lib.perf_reader_poll.argtypes = [ct.c_int, ct.POINTER(ct.c_void_p), ct.c_int]
 lib.perf_reader_free.restype = None
@@ -148,6 +149,7 @@ class BPF(object):
             self.Key = keytype
             self.Leaf = leaftype
             self.ttype = lib.bpf_table_type_id(self.bpf.module, self.map_id)
+            self._cbs = {}
 
         def key_sprintf(self, key):
             key_p = ct.pointer(key)
@@ -185,20 +187,42 @@ class BPF(object):
                 raise Exception("Could not scanf leaf")
             return leaf
 
-        def open_perf_buffer(self, key, cb, cookie):
-            reader = lib.bpf_open_perf_buffer(_RAW_CB_TYPE(cb),
-                    ct.cast(id(cookie), ct.py_object))
+        def open_perf_buffers(self, cb, cookie):
+            """open_perf_buffers(cb, cookie)
+
+            Opens ring buffers, one for each cpu, to receive custom perf event
+            data from the bpf program. The program is expected to use the cpu-id
+            as the key of the perf_output call.
+            """
+
+            for i in range(0, multiprocessing.cpu_count()):
+                self.open_perf_buffer(i, cb, cookie, cpu=i)
+
+        def open_perf_buffer(self, key, cb, cookie, pid=-1, cpu=0):
+            """open_perf_buffer(key, cb, cookie, pid=-1, cpu=0)
+
+            Open a ring buffer to receive custom perf event data from the bpf
+            program. The callback cb is invoked for each event submitted, which
+            can be up to millions of events per second. The signature of cb
+            should be cb(cookie, data, data_size).
+            """
+
+            fn = _RAW_CB_TYPE(lambda x, data, size: cb(cookie, data, size))
+            reader = lib.bpf_open_perf_buffer(fn, None, pid, cpu)
             if not reader:
                 raise Exception("Could not open perf buffer")
             fd = lib.perf_reader_fd(reader)
             self[self.Key(key)] = self.Leaf(fd)
             open_kprobes[(id(self), key)] = reader
+            # keep a refcnt
+            self._cbs[key] = (fn, cookie)
 
         def close_perf_buffer(self, key):
             reader = open_kprobes.get((id(self), key))
             if reader:
                 lib.perf_reader_free(reader)
                 del(open_kprobes[(id(self), key)])
+            del self._cbs[key]
 
         def __getitem__(self, key):
             key_p = ct.pointer(key)
@@ -810,10 +834,10 @@ class BPF(object):
         Poll from the ring buffers for all of the open kprobes, calling the
         cb() that was given in the BPF constructor for each entry.
         """
-        readers = (ct.c_void_p * len(open_kprobes))()
-        for i, v in enumerate(open_kprobes.values()):
-            readers[i] = v
         try:
+            readers = (ct.c_void_p * len(open_kprobes))()
+            for i, v in enumerate(open_kprobes.values()):
+                readers[i] = v
             lib.perf_reader_poll(len(open_kprobes), readers, timeout)
         except KeyboardInterrupt:
             exit()
