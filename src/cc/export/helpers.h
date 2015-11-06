@@ -42,6 +42,30 @@ struct _name##_table_t { \
 __attribute__((section("maps/" _table_type))) \
 struct _name##_table_t _name
 
+// Table for pushing custom events to userspace via ring buffer
+#define BPF_PERF_OUTPUT(_name) \
+struct _name##_table_t { \
+  int key; \
+  u32 leaf; \
+  /* map.perf_submit(ctx, data, data_size) */ \
+  int (*perf_submit) (void *, void *, u32); \
+  u32 data[0]; \
+}; \
+__attribute__((section("maps/perf_output"))) \
+struct _name##_table_t _name
+
+// Table for reading hw perf cpu counters
+#define BPF_PERF_ARRAY(_name, _max_entries) \
+struct _name##_table_t { \
+  int key; \
+  u32 leaf; \
+  /* counter = map.perf_read(index) */ \
+  u64 (*perf_read) (int); \
+  u32 data[_max_entries]; \
+}; \
+__attribute__((section("maps/perf_array"))) \
+struct _name##_table_t _name
+
 #define BPF_HASH1(_name) \
   BPF_TABLE("hash", u64, u64, _name, 10240)
 #define BPF_HASH2(_name, _key_type) \
@@ -79,44 +103,54 @@ unsigned _version SEC("version") = LINUX_VERSION_CODE;
 
 /* helper functions called from eBPF programs written in C */
 static void *(*bpf_map_lookup_elem)(void *map, void *key) =
-	(void *) BPF_FUNC_map_lookup_elem;
+  (void *) BPF_FUNC_map_lookup_elem;
 static int (*bpf_map_update_elem)(void *map, void *key, void *value, u64 flags) =
-	(void *) BPF_FUNC_map_update_elem;
+  (void *) BPF_FUNC_map_update_elem;
 static int (*bpf_map_delete_elem)(void *map, void *key) =
-	(void *) BPF_FUNC_map_delete_elem;
+  (void *) BPF_FUNC_map_delete_elem;
 static int (*bpf_probe_read)(void *dst, u64 size, void *unsafe_ptr) =
-	(void *) BPF_FUNC_probe_read;
+  (void *) BPF_FUNC_probe_read;
 static u64 (*bpf_ktime_get_ns)(void) =
-	(void *) BPF_FUNC_ktime_get_ns;
+  (void *) BPF_FUNC_ktime_get_ns;
 static int (*bpf_trace_printk_)(const char *fmt, u64 fmt_size, ...) =
-	(void *) BPF_FUNC_trace_printk;
+  (void *) BPF_FUNC_trace_printk;
 int bpf_trace_printk(const char *fmt, ...) asm("llvm.bpf.extra");
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4,2,0)
 static void bpf_tail_call_(u64 map_fd, void *ctx, int index) {
   ((void (*)(void *, u64, int))BPF_FUNC_tail_call)(ctx, map_fd, index);
 }
-static int (*bpf_clone_redirect)(void *ctx, u64 ifindex, u64 flags) =
-	(void *) BPF_FUNC_clone_redirect;
+static int (*bpf_clone_redirect)(void *ctx, int ifindex, u32 flags) =
+  (void *) BPF_FUNC_clone_redirect;
 static u64 (*bpf_get_smp_processor_id)(void) =
-	(void *) BPF_FUNC_get_smp_processor_id;
+  (void *) BPF_FUNC_get_smp_processor_id;
 static u64 (*bpf_get_current_pid_tgid)(void) =
-	(void *) BPF_FUNC_get_current_pid_tgid;
+  (void *) BPF_FUNC_get_current_pid_tgid;
 static u64 (*bpf_get_current_uid_gid)(void) =
-	(void *) BPF_FUNC_get_current_uid_gid;
+  (void *) BPF_FUNC_get_current_uid_gid;
 static int (*bpf_get_current_comm)(void *buf, int buf_size) =
-	(void *) BPF_FUNC_get_current_comm;
+  (void *) BPF_FUNC_get_current_comm;
+#endif
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4,3,0)
 static u64 (*bpf_get_cgroup_classid)(void *ctx) =
-        (void *) BPF_FUNC_get_cgroup_classid;
+  (void *) BPF_FUNC_get_cgroup_classid;
 static u64 (*bpf_skb_vlan_push)(void *ctx, u16 proto, u16 vlan_tci) =
-        (void *) BPF_FUNC_skb_vlan_push;
+  (void *) BPF_FUNC_skb_vlan_push;
 static u64 (*bpf_skb_vlan_pop)(void *ctx) =
-        (void *) BPF_FUNC_skb_vlan_pop;
+  (void *) BPF_FUNC_skb_vlan_pop;
 static int (*bpf_skb_get_tunnel_key)(void *ctx, void *to, u32 size, u64 flags) =
   (void *) BPF_FUNC_skb_get_tunnel_key;
 static int (*bpf_skb_set_tunnel_key)(void *ctx, void *from, u32 size, u64 flags) =
   (void *) BPF_FUNC_skb_set_tunnel_key;
+static int (*bpf_perf_event_read)(void *map, u32 index) =
+  (void *) BPF_FUNC_perf_event_read;
 #endif
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,4,0)
+static int (*bpf_redirect)(int ifindex, u32 flags) =
+  (void *) BPF_FUNC_redirect;
+static u32 (*bpf_get_route_realm)(void *ctx) =
+  (void *) BPF_FUNC_get_route_realm;
+static int (*bpf_perf_event_output)(void *ctx, void *map, u32 index, void *data, u32 size) =
+  (void *) BPF_FUNC_perf_event_output;
 #endif
 
 /* llvm builtin functions that eBPF C program may use to
@@ -124,31 +158,31 @@ static int (*bpf_skb_set_tunnel_key)(void *ctx, void *from, u32 size, u64 flags)
  */
 struct sk_buff;
 unsigned long long load_byte(void *skb,
-			     unsigned long long off) asm("llvm.bpf.load.byte");
+  unsigned long long off) asm("llvm.bpf.load.byte");
 unsigned long long load_half(void *skb,
-			     unsigned long long off) asm("llvm.bpf.load.half");
+  unsigned long long off) asm("llvm.bpf.load.half");
 unsigned long long load_word(void *skb,
-			     unsigned long long off) asm("llvm.bpf.load.word");
+  unsigned long long off) asm("llvm.bpf.load.word");
 
 /* a helper structure used by eBPF C program
  * to describe map attributes to elf_bpf loader
  */
 struct bpf_map_def {
-	unsigned int type;
-	unsigned int key_size;
-	unsigned int value_size;
-	unsigned int max_entries;
+  unsigned int type;
+  unsigned int key_size;
+  unsigned int value_size;
+  unsigned int max_entries;
 };
 
 static int (*bpf_skb_store_bytes)(void *ctx, unsigned long long off, void *from,
-				  unsigned long long len, unsigned long long flags) =
-	(void *) BPF_FUNC_skb_store_bytes;
+                                  unsigned long long len, unsigned long long flags) =
+  (void *) BPF_FUNC_skb_store_bytes;
 static int (*bpf_l3_csum_replace)(void *ctx, unsigned long long off, unsigned long long from,
-				  unsigned long long to, unsigned long long flags) =
-	(void *) BPF_FUNC_l3_csum_replace;
+                                  unsigned long long to, unsigned long long flags) =
+  (void *) BPF_FUNC_l3_csum_replace;
 static int (*bpf_l4_csum_replace)(void *ctx, unsigned long long off, unsigned long long from,
-				  unsigned long long to, unsigned long long flags) =
-	(void *) BPF_FUNC_l4_csum_replace;
+                                  unsigned long long to, unsigned long long flags) =
+  (void *) BPF_FUNC_l4_csum_replace;
 
 static inline u16 bpf_ntohs(u16 val) {
   /* will be recognized by gcc into rotate insn and eventually rolw 8 */
@@ -201,24 +235,24 @@ static inline void bpf_store_dword(void *skb, u64 off, u64 val) {
 
 static unsigned int bpf_log2(unsigned int v)
 {
-	unsigned int r;
-	unsigned int shift;
+  unsigned int r;
+  unsigned int shift;
 
-	r = (v > 0xFFFF) << 4; v >>= r;
-	shift = (v > 0xFF) << 3; v >>= shift; r |= shift;
-	shift = (v > 0xF) << 2; v >>= shift; r |= shift;
-	shift = (v > 0x3) << 1; v >>= shift; r |= shift;
-	r |= (v >> 1);
-	return r;
+  r = (v > 0xFFFF) << 4; v >>= r;
+  shift = (v > 0xFF) << 3; v >>= shift; r |= shift;
+  shift = (v > 0xF) << 2; v >>= shift; r |= shift;
+  shift = (v > 0x3) << 1; v >>= shift; r |= shift;
+  r |= (v >> 1);
+  return r;
 }
 
 static unsigned int bpf_log2l(unsigned long v)
 {
-	unsigned int hi = v >> 32;
-	if (hi)
-		return bpf_log2(hi) + 32 + 1;
-	else
-		return bpf_log2(v) + 1;
+  unsigned int hi = v >> 32;
+  if (hi)
+    return bpf_log2(hi) + 32 + 1;
+  else
+    return bpf_log2(v) + 1;
 }
 
 struct bpf_context;
@@ -341,6 +375,7 @@ int bpf_l4_csum_replace_(void *ctx, u64 off, u64 from, u64 to, u64 flags) {
 
 int incr_cksum_l3(void *off, u64 oldval, u64 newval) asm("llvm.bpf.extra");
 int incr_cksum_l4(void *off, u64 oldval, u64 newval, u64 flags) asm("llvm.bpf.extra");
+int bpf_num_cpus() asm("llvm.bpf.extra");
 
 #define lock_xadd(ptr, val) ((void)__sync_fetch_and_add(ptr, val))
 

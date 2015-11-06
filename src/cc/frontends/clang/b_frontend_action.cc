@@ -16,6 +16,7 @@
 #include <linux/bpf.h>
 #include <linux/version.h>
 #include <sys/utsname.h>
+#include <unistd.h>
 
 #include <clang/AST/ASTConsumer.h>
 #include <clang/AST/ASTContext.h>
@@ -332,6 +333,14 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
           }
           txt += "typeof(" + name + ".leaf) *_leaf = " + lookup + ", &_key); ";
           txt += "if (_leaf) (*_leaf)++; })";
+        } else if (memb_name == "perf_submit") {
+          string name = Ref->getDecl()->getName();
+          string arg0 = rewriter_.getRewrittenText(SourceRange(Call->getArg(0)->getLocStart(),
+                                                               Call->getArg(0)->getLocEnd()));
+          string args_other = rewriter_.getRewrittenText(SourceRange(Call->getArg(1)->getLocStart(),
+                                                                     Call->getArg(2)->getLocEnd()));
+          txt = "bpf_perf_event_output(" + arg0 + ", bpf_pseudo_fd(1, " + fd + ")";
+          txt += ", bpf_get_smp_processor_id(), " + args_other + ")";
         } else {
           if (memb_name == "lookup") {
             prefix = "bpf_map_lookup_elem";
@@ -344,6 +353,9 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
             suffix = ")";
           } else if (memb_name == "call") {
             prefix = "bpf_tail_call_";
+            suffix = ")";
+          } else if (memb_name == "perf_read") {
+            prefix = "bpf_perf_event_read";
             suffix = ")";
           } else {
             C.getDiagnostics().Report(Call->getLocStart(), diag::err_expected)
@@ -403,6 +415,12 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
             rewriter_.ReplaceText(SourceRange(Call->getLocStart(), Call->getArg(0)->getLocEnd()), text);
             rewriter_.InsertTextAfter(Call->getLocEnd(), "); }");
           }
+        } else if (Decl->getName() == "bpf_num_cpus") {
+          int numcpu = sysconf(_SC_NPROCESSORS_ONLN);
+          if (numcpu <= 0)
+            numcpu = 1;
+          text = to_string(numcpu);
+          rewriter_.ReplaceText(SourceRange(Call->getLocStart(), Call->getLocEnd()), text);
         }
       }
     }
@@ -482,6 +500,13 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
     }
     const RecordDecl *RD = R->getDecl()->getDefinition();
 
+    int major = 0, minor = 0;
+    struct utsname un;
+    if (uname(&un) == 0) {
+      // release format: <major>.<minor>.<revision>[-<othertag>]
+      sscanf(un.release, "%d.%d.", &major, &minor);
+    }
+
     TableDesc table;
     table.name = Decl->getName();
 
@@ -519,20 +544,27 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
         diag_.Report(Decl->getLocStart(), diag_id) << table.leaf_desc;
       }
     } else if (A->getName() == "maps/prog") {
-      struct utsname un;
-      if (uname(&un) == 0) {
-        int major = 0, minor = 0;
-        // release format: <major>.<minor>.<revision>[-<othertag>]
-        sscanf(un.release, "%d.%d.", &major, &minor);
-        if (KERNEL_VERSION(major,minor,0) >= KERNEL_VERSION(4,2,0))
-          map_type = BPF_MAP_TYPE_PROG_ARRAY;
-      }
-      if (map_type == BPF_MAP_TYPE_UNSPEC) {
-        C.getDiagnostics().Report(Decl->getLocStart(), diag::err_expected)
-            << "kernel supporting maps/prog";
-        return false;
-      }
+      if (KERNEL_VERSION(major,minor,0) >= KERNEL_VERSION(4,2,0))
+        map_type = BPF_MAP_TYPE_PROG_ARRAY;
+    } else if (A->getName() == "maps/perf_output") {
+      if (KERNEL_VERSION(major,minor,0) >= KERNEL_VERSION(4,3,0))
+        map_type = BPF_MAP_TYPE_PERF_EVENT_ARRAY;
+      int numcpu = sysconf(_SC_NPROCESSORS_ONLN);
+      if (numcpu <= 0)
+        numcpu = 1;
+      table.max_entries = numcpu;
+    } else if (A->getName() == "maps/perf_array") {
+      if (KERNEL_VERSION(major,minor,0) >= KERNEL_VERSION(4,3,0))
+        map_type = BPF_MAP_TYPE_PERF_EVENT_ARRAY;
     }
+
+    if (map_type == BPF_MAP_TYPE_UNSPEC) {
+      unsigned diag_id = C.getDiagnostics().getCustomDiagID(DiagnosticsEngine::Error,
+                                                            "unsupported map type: %0");
+      C.getDiagnostics().Report(Decl->getLocStart(), diag_id) << A->getName();
+      return false;
+    }
+
     table.type = map_type;
     table.fd = bpf_create_map(map_type, table.key_size, table.leaf_size, table.max_entries);
     if (table.fd < 0) {
