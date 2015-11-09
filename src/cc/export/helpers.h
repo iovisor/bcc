@@ -20,6 +20,10 @@
 #include <uapi/linux/if_packet.h>
 #include <linux/version.h>
 
+#ifndef CONFIG_BPF_SYSCALL
+#error "CONFIG_BPF_SYSCALL is undefined, please check your .config or ask your Linux distro to enable this feature"
+#endif
+
 /* helper macro to place programs, maps, license in
  * different sections in elf_bpf file. Section names
  * are interpreted by elf_bpf loader
