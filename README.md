@@ -38,8 +38,8 @@ Tracing... Hit Ctrl-C to end.
 The above output shows a bimodal distribution, where the largest mode of
 800 I/O was between 128 and 255 Kbytes in size.
 
-See the source: [bitehist.c](examples/bitehist.c) and
-[bitehist.py](examples/bitehist.py). What this traces, what this stores, and how
+See the source: [bitehist.c](examples/tracing/bitehist.c) and
+[bitehist.py](examples/tracing/bitehist.py). What this traces, what this stores, and how
 the data is presented, can be entirely customized. This shows only some of
 many possible capabilities.
 
@@ -56,12 +56,12 @@ pair of .c and .py files, and some are directories of files.
 
 Examples:
 
-- examples/[bitehist.py](examples/bitehist.py) examples/[bitehist.c](examples/bitehist.c): Block I/O size histogram. [Examples](examples/bitehist_example.txt).
-- examples/[disksnoop.py](examples/disksnoop.py) examples/[disksnoop.c](examples/disksnoop.c): Trace block device I/O latency. [Examples](examples/disksnoop_example.txt).
+- examples/tracing/[bitehist.py](examples/tracing/bitehist.py) examples/tracing/[bitehist.c](examples/tracing/bitehist.c): Block I/O size histogram. [Examples](examples/tracing/bitehist_example.txt).
+- examples/tracing/[disksnoop.py](examples/tracing/disksnoop.py) examples/tracing/[disksnoop.c](examples/tracing/disksnoop.c): Trace block device I/O latency. [Examples](examples/tracing/disksnoop_example.txt).
 - examples/[hello_world.py](examples/hello_world.py): Prints "Hello, World!" for new processes.
-- examples/[tcpv4connect](examples/tcpv4connect): Trace TCP IPv4 active connections. [Examples](examples/tcpv4connect_example.txt).
-- examples/[trace_fields.py](examples/trace_fields.py): Simple example of printing fields from traced events.
-- examples/[vfsreadlat.py](examples/vfsreadlat.py) examples/[vfsreadlat.c](examples/vfsreadlat.c): VFS read latency distribution. [Examples](examples/vfsreadlat_example.txt).
+- examples/tracing/[tcpv4connect](examples/tracing/tcpv4connect): Trace TCP IPv4 active connections. [Examples](examples/tracing/tcpv4connect_example.txt).
+- examples/tracing/[trace_fields.py](examples/tracing/trace_fields.py): Simple example of printing fields from traced events.
+- examples/tracing/[vfsreadlat.py](examples/tracing/vfsreadlat.py) examples/tracing/[vfsreadlat.c](examples/tracing/vfsreadlat.c): VFS read latency distribution. [Examples](examples/tracing/vfsreadlat_example.txt).
 
 Tools:
 
@@ -84,12 +84,12 @@ Tools:
 
 Examples:
 
-- examples/[distributed_bridge/](examples/distributed_bridge): Distributed bridge example.
-- examples/[simple_tc.py](examples/simple_tc.py): Simple traffic control example.
-- examples/[simulation.py](examples/simulation.py): Simulation helper.
-- examples/[tc_neighbor_sharing.py](examples/tc_neighbor_sharing.py) examples/[tc_neighbor_sharing.c](examples/tc_neighbor_sharing.c): Per-IP classification and rate limiting.
-- examples/[tunnel_monitor/](examples/tunnel_monitor): Efficiently monitor traffic flows. [Example video](https://www.youtube.com/watch?v=yYy3Cwce02k).
-- examples/[vlan_learning.py](examples/vlan_learning.py) examples/[vlan_learning.c](examples/vlan_learning.c): Demux Ethernet traffic into worker veth+namespaces.
+- examples/networking/[distributed_bridge/](examples/networking/distributed_bridge): Distributed bridge example.
+- examples/networking/[simple_tc.py](examples/networking/simple_tc.py): Simple traffic control example.
+- examples/networking/[simulation.py](examples/networking/simulation.py): Simulation helper.
+- examples/networking/neighbor_sharing/[tc_neighbor_sharing.py](examples/networking/neighbor_sharing/tc_neighbor_sharing.py) examples/networking/neighbor_sharing/[tc_neighbor_sharing.c](examples/networking/neighbor_sharing/tc_neighbor_sharing.c): Per-IP classification and rate limiting.
+- examples/networking/[tunnel_monitor/](examples/networking/tunnel_monitor): Efficiently monitor traffic flows. [Example video](https://www.youtube.com/watch?v=yYy3Cwce02k).
+- examples/networking/vlan_learning/[vlan_learning.py](examples/networking/vlan_learning/vlan_learning.py) examples/[vlan_learning.c](examples/networking/vlan_learning/vlan_learning.c): Demux Ethernet traffic into worker veth+namespaces.
 
 ## Motivation
 
@@ -173,7 +173,7 @@ A multi-host vxlan environment is simulated and a BPF program used to monitor
 one of the physical interfaces. The BPF program keeps statistics on the inner
 and outer IP addresses traversing the interface, and the userspace component
 turns those statistics into a graph showing the traffic distribution at
-multiple granularities. See the code [here](examples/tunnel_monitor).
+multiple granularities. See the code [here](examples/networking/tunnel_monitor).
 
 [![Screenshot](http://img.youtube.com/vi/yYy3Cwce02k/0.jpg)](https://youtu.be/yYy3Cwce02k)
 
@@ -219,7 +219,7 @@ int count_sched(struct pt_regs *ctx, struct task_struct *prev) {
   return 0;
 }
 ```
-[Source code listing](examples/task_switch.c)
+[Source code listing](examples/tracing/task_switch.c)
 
 The userspace component loads the file shown above, and attaches it to the
 `finish_task_switch` kernel function.
@@ -240,7 +240,7 @@ for i in range(0, 100): sleep(0.01)
 for k, v in b["stats"].items():
     print("task_switch[%5d->%5d]=%u" % (k.prev_pid, k.curr_pid, v.value))
 ```
-[Source code listing](examples/task_switch.py)
+[Source code listing](examples/tracing/task_switch.py)
 
 ## Getting started
 
