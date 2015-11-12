@@ -249,5 +249,19 @@ int kprobe____kmalloc(struct pt_regs *ctx, size_t size) {
     return 0;
 }""", debug=4)
 
+    def test_unop_probe_read(self):
+        text = """
+#include <linux/blkdev.h>
+int trace_entry(struct pt_regs *ctx, struct request *req) {
+    if (!(req->bio->bi_rw & 1))
+        return 1;
+    if (((req->bio->bi_rw)))
+        return 1;
+    return 0;
+}
+"""
+        b = BPF(text=text)
+        fn = b.load_func("trace_entry", BPF.KPROBE)
+
 if __name__ == "__main__":
     main()
