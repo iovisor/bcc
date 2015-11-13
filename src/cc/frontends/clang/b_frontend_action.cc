@@ -109,6 +109,9 @@ class ProbeChecker : public RecursiveASTVisitor<ProbeChecker> {
     needs_probe_ = false;
     return false;
   }
+  bool VisitParenExpr(ParenExpr *E) {
+    return false;
+  }
   bool VisitDeclRefExpr(DeclRefExpr *E) {
     if (ptregs_.find(E->getDecl()) != ptregs_.end())
       needs_probe_ = true;
