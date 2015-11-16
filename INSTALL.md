@@ -19,9 +19,9 @@ Install a 4.3+ kernel from http://kernel.ubuntu.com/~kernel-ppa/mainline,
 for example:
 
 ```bash
-VER=4.3.0-999
-PREFIX=http://kernel.ubuntu.com/~kernel-ppa/mainline/daily/2015-09-21-unstable/
-REL=201509202159
+VER=4.3.0-040300
+PREFIX=http://kernel.ubuntu.com/~kernel-ppa/mainline/v4.3-wily/
+REL=201511020949
 wget ${PREFIX}/linux-headers-${VER}-generic_${VER}.${REL}_amd64.deb
 wget ${PREFIX}/linux-headers-${VER}_${VER}.${REL}_all.deb
 wget ${PREFIX}/linux-image-${VER}-generic_${VER}.${REL}_amd64.deb
@@ -81,21 +81,24 @@ To build the toolchain from source, one needs:
 * cmake, gcc (>=4.7), flex, bison
 
 * Install build dependencies
-  * `sudo apt-get -y install bison build-essential cmake flex git libedit-dev python zlib1g-dev`
-* Build LLVM and Clang development libs
-  * `git clone http://llvm.org/git/llvm.git`
-  * `cd llvm/tools; git clone http://llvm.org/git/clang.git`
-  * `cd ..; mkdir -p build/install; cd build`
-  * `cmake -G "Unix Makefiles" -DLLVM_TARGETS_TO_BUILD="BPF;X86" -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$PWD/install ..`
-  * `make -j4`
-  * `make install`
-  * `export PATH=$PWD/install/bin:$PATH`
+```
+VER=trusty
+echo "deb http://llvm.org/apt/$VER/ llvm-toolchain-$VER-3.7 main
+deb-src http://llvm.org/apt/$VER/ llvm-toolchain-$VER-3.7 main" | \
+  sudo tee /etc/apt/sources.list.d/llvm.list
+wget -O - http://llvm.org/apt/llvm-snapshot.gpg.key | sudo apt-key add -
+sudo apt-get update
+sudo apt-get -y install bison build-essential cmake flex git libedit-dev \
+  libllvm3.7 llvm-3.7-dev libclang-3.7-dev python zlib1g-dev
+```
 * Install and compile BCC
-  * `git clone https://github.com/iovisor/bcc.git`
-  * `mkdir bcc/build; cd bcc/build`
-  * `cmake .. -DCMAKE_INSTALL_PREFIX=/usr`
-  * `make`
-  * `sudo make install`
+```
+git clone https://github.com/iovisor/bcc.git
+mkdir bcc/build; cd bcc/build
+cmake .. -DCMAKE_INSTALL_PREFIX=/usr
+make
+sudo make install
+```
 
 # Fedora - From source
 
@@ -113,3 +116,12 @@ To build the toolchain from source, one needs:
   * `cmake .. -DCMAKE_INSTALL_PREFIX=/usr`
   * `make`
   * `sudo make install`
+
+# [Old] Build LLVM and Clang development libs
+  * `git clone http://llvm.org/git/llvm.git`
+  * `cd llvm/tools; git clone http://llvm.org/git/clang.git`
+  * `cd ..; mkdir -p build/install; cd build`
+  * `cmake -G "Unix Makefiles" -DLLVM_TARGETS_TO_BUILD="BPF;X86" -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$PWD/install ..`
+  * `make -j4`
+  * `make install`
+  * `export PATH=$PWD/install/bin:$PATH`
