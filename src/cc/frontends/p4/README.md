@@ -238,18 +238,12 @@ Here are some limitations imposed on the P4 programs:
 
 * arithmetic on data wider than 32 bits is not supported
 
-* mutating the network packet does not work.  The P4 programs allow
-  users to express packet header mutations; however, the generated
-  code does not currently include packet reassembly (i.e., a P4
-  "deparser"), which would store the mutated headers back into the
-  network packet.  Some of this functionality could be implemented in
-  the future, but currently the EBPF interfaces to the kernel do not
-  permit arbitrary packet mutations.
+* checksum computations are not implemented.  In consequence, programs
+  that IP/TCP/UDP headers will produce incorrect packet headers.
 
 * EBPF does not offer support for ternary or LPM tables
 
-* cloning and recirculation and not supported, since the underlying
-  TC-based framework does not support some of this functionality.
+* P4 cloning and recirculation and not supported
 
 * meters and registers are not supported; only direct counters are
   currently supported.  EBPF can potentially support registers and

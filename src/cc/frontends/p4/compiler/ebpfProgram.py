@@ -11,6 +11,7 @@ import ebpfAction
 import ebpfInstance
 import ebpfConditional
 import ebpfCounter
+import ebpfDeparser
 import programSerializer
 import target
 from compilationException import *
@@ -62,6 +63,7 @@ class EbpfProgram(object):
         self.metadata = []  # metadata instances
         self.stacks = []    # header stack instances EbpfHeaderStack
         self.parsers = []   # all parsers
+        self.deparser = None
         self.entryPoints = []  # control-flow entry points from parser
         self.counters = []
         self.entryPointLabels = {}  # maps p4_node from entryPoints
@@ -123,6 +125,7 @@ class EbpfProgram(object):
             self.conditionals.append(conditional)
 
         self.egressEntry = self.hlir.p4_egress_ptr
+        self.deparser = ebpfDeparser.EbpfDeparser(self.hlir)
 
     def isInternalAction(self, action):
         # This is a heuristic really to guess which actions are built-in
@@ -173,6 +176,8 @@ class EbpfProgram(object):
 
         self.generateParser(serializer)
         self.generatePipeline(serializer)
+
+        self.generateDeparser(serializer)
 
         serializer.emitIndent()
         serializer.appendLine("end:")
@@ -334,6 +339,9 @@ class EbpfProgram(object):
             "struct {0} {1}",
             self.metadataStructTypeName,
             self.metadataStructName)
+
+    def generateDeparser(self, serializer):
+        self.deparser.serialize(serializer, self)
 
     def generateInitializeMetadata(self, serializer):
         assert isinstance(serializer, programSerializer.ProgramSerializer)
