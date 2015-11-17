@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # Copyright (c) PLUMgrid, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
 
@@ -33,7 +33,7 @@ class VlanSimulation(Simulation):
         for i in range(0, num_clients):
             httpmod = ("SimpleHTTPServer" if sys.version_info[0] < 3
                        else "http.server")
-            cmd = ["python", "-m", httpmod, "80"]
+            cmd = ["python3", "-m", httpmod, "80"]
             self._create_ns("worker%d" % i, cmd=cmd, fn=virt_fn, action="drop",
                             ipaddr="172.16.1.5/24")
 
