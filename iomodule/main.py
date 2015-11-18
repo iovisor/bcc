@@ -29,6 +29,7 @@ import iomodule.core.ifc_iomodule as ifc_iomodule
 import iomodule.plugins.bridge as bridge
 import iomodule.plugins.passthrough as passthrough
 import iomodule.plugins.tunnel as tunnel
+import iomodule.plugins.p4switch as p4switch
 
 _dir = os.path.dirname(__file__)
 
@@ -47,7 +48,7 @@ class ModuleTypeAPI(flask.views.MethodView):
     def get():
         "Get a list of module types\n---\n%s"
         mods = []
-        for mod in [passthrough, bridge, tunnel]:
+        for mod in [passthrough, bridge, tunnel, p4switch]:
             mods.append({
                     "capabilities": mod.cls.capabilities(),
                     "uuid": mod.cls.uuid(),
@@ -86,6 +87,9 @@ class ModuleAPI(flask.views.MethodView):
                     config=obj.get("config"))
         elif obj["module_type"] == "Tunnel":
             m = tunnel.cls(mmanager=mm, name=obj["uuid"][:8],
+                    config=obj.get("config"))
+        elif obj["module_type"] == "P4Switch":
+            m = p4switch.cls(mmanager=mm, name=obj["uuid"][:8],
                     config=obj.get("config"))
         iomodules[obj["uuid"]] = m
         return flask.jsonify(data=obj)
