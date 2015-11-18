@@ -5,12 +5,6 @@
 // supports 32K "links"
 BPF_TABLE("prog", int, int, forward, 65536);
 
-static int ifc_get(struct __sk_buff *skb) {
-  int in = skb->cb[0];
-  if (!in)
-    in = skb->ifindex;
-  return in;
-}
 static int ifc_send(struct __sk_buff *skb, int out) {
   //bpf_trace_printk("pair: ifc_send %p %d\n", skb, out);
   if (out < 0) {
