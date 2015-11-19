@@ -48,7 +48,7 @@ class Tunnel(iomodule.IOModule):
         self.conf[self.conf.Key(1)] = self.conf.Leaf(self.vx)
         self.mm().add_ingress_action(self.vx, self.tunnel_fn)
 
-    def _ifc_create(self, name):
+    def _ifc_create(self, name, *args, **kwargs):
         (idx1, idx2) = self.mm().get_index_pair(name, self)
         ipaddr = netaddr.IPAddress(self.config.get("peer_ip", "0.0.0.0"))
         self.t2if[self.t2if.Key(self.vni, ipaddr)] = self.t2if.Leaf(idx1)

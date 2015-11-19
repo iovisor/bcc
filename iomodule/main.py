@@ -155,10 +155,12 @@ class ConnectionAPI(flask.views.MethodView):
             raise exc.BadRequest("Malformed iomodule[]")
         ifc1 = ioms[0].ifc_lookup(obj["iomodules"][0].get("interface"))
         if not ifc1:
-            ifc1 = ioms[0].ifc_create(obj["uuid"][:8])
+            ifc1 = ioms[0].ifc_create(obj["uuid"][:8],
+                config=obj["iomodules"][0].get("config"))
         ifc2 = ioms[1].ifc_lookup(obj["iomodules"][1].get("interface"))
         if not ifc2:
-            ifc2 = ioms[1].ifc_create(obj["uuid"][:8])
+            ifc2 = ioms[1].ifc_create(obj["uuid"][:8],
+                config=obj["iomodules"][1].get("config"))
         mm.connect(ifc1, ifc2, ioms[0], ioms[1])
         connections[obj["uuid"]] = obj["iomodules"]
         return flask.jsonify(data=obj)

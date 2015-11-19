@@ -13,9 +13,11 @@
 # limitations under the License.
 
 import bcc
+import ctypes
 import os
 import tempfile
 import sys
+import netaddr
 sys.path.append("/home/bblanco/work/bcc/src/cc/frontends/p4/compiler")
 import target
 from p4_hlir.main import HLIR
@@ -52,15 +54,19 @@ class P4Switch(iomodule.IOModule):
             serializer = ProgramSerializer()
             e.toC(serializer)
             self.b = bcc.BPF(text=serializer.toString())
+            self.fn = self.b.load_func("ebpf_filter", self.b.SCHED_ACT)
 
-    def _ifc_create(self, name):
+    def _ifc_create(self, name, *args, **kwargs):
         (idx1, idx2) = self.mm().get_index_pair(name, self)
-        if self.half:
-            self.pairs[self.pairs.Key(self.half)] = self.pairs.Leaf(idx1)
-            self.pairs[self.pairs.Key(idx1)] = self.pairs.Leaf(self.half)
-            self.half = None
-        else:
-            self.half = idx1
+        config = kwargs.get("config", {})
+        nexthop = config.get("nexthop", [])
+        t = self.b.get_table("routing")
+        for nh in nexthop:
+            action_hit = ctypes.c_uint(1)
+            key = t.Key(netaddr.IPAddress(nh).value)
+            leaf = t.leaf_scanf("{ 1 { { %d } } }" % idx1)
+            t[key] = leaf
+        #t[t.Key(vrf, netaddr.IPAddress("0.0.0.0").value)] = t.Leaf(action_hit, ctypes.c_ushort(idx1))
         return idx2
 
     def fd(self):

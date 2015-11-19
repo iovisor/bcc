@@ -27,11 +27,17 @@ class Bridge(iomodule.IOModule):
         with self.ipdb.create(ifname="br0", kind="bridge") as br:
             if self.config.get("ipaddr"):
                 br.add_ip(self.config["ipaddr"])
+            if self.config.get("mac"):
+                br.address=self.config["mac"]
             br.up()
+        if self.config.get("arp"):
+            cmd = ["arp", "-s"] + self.config["arp"].split(" ")
+            nsp = pyroute2.NSPopen(self.ipdb.nl.netns, cmd)
+            nsp.wait(); nsp.release()
         self.num_ifcs = 0
         atexit.register(self.release)
 
-    def _ifc_create(self, name):
+    def _ifc_create(self, name, *args, **kwargs):
         with self.mm().ipdb.create(kind="veth",
                 ifname="%s.%d" % (self.name, self.num_ifcs),
                 peer="%s.%db" % (self.name, self.num_ifcs)) as ifc1:
@@ -39,8 +45,9 @@ class Bridge(iomodule.IOModule):
         with self.mm().ipdb.interfaces["%s.%db" % (self.name, self.num_ifcs)] as ifc2:
             ifc2.net_ns_fd = self.ipdb.nl.netns
             ifc2.ifname = name
-            ifc2.up()
         self.ipdb.interfaces.br0.add_port(ifc2).commit()
+        self.ipdb.interfaces.br0.up().commit()
+        self.ipdb.interfaces[name].up().commit()
         self.num_ifcs += 1
         return ifc1.index
 

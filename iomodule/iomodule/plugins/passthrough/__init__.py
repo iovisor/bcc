@@ -30,7 +30,7 @@ class Passthrough(iomodule.IOModule):
         self.fn = self.b.load_func("recv", self.b.SCHED_ACT)
         self.half = None
 
-    def _ifc_create(self, name):
+    def _ifc_create(self, name, *args, **kwargs):
         (idx1, idx2) = self.mm().get_index_pair(name, self)
         if self.half:
             self.pairs[self.pairs.Key(self.half)] = self.pairs.Leaf(idx1)

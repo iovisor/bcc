@@ -168,6 +168,12 @@ class EbpfProgram(object):
         self.generateInitializeMetadata(serializer)
         serializer.endOfStatement(True)
 
+        serializer.appendFormat(
+"""
+            //bpf_trace_printk("p4: in %d\\n", {1}->cb[0]);
+            {0}.standard_metadata.ingress_port = {1}->cb[0];
+""", self.metadataStructName, self.packetName)
+
         self.createLocalVariables(serializer)
         serializer.newline()
 
@@ -193,7 +199,7 @@ class EbpfProgram(object):
                 serializer.increaseIndent()
                 serializer.emitIndent()
                 serializer.appendFormat(
-                    "bpf_clone_redirect({0}, {1}.standard_metadata.{2}, 0);",
+                    "ifc_send({0}, {1}.standard_metadata.{2});",
                     self.packetName, self.metadataStructName,
                     self.egressPortName)
                 serializer.newline()
@@ -255,6 +261,21 @@ class EbpfProgram(object):
         serializer.appendLine(
             "#define EBPF_MASK(t, w) ((((t)(1)) << (w)) - (t)1)")
         serializer.appendLine("#define BYTES(w) ((w + 7) / 8)")
+        serializer.appendLine('BPF_TABLE("prog", int, int, forward, 65536);')
+        serializer.append(
+"""
+static int ifc_send(struct __sk_buff *skb, int out) {
+  if (out & 0x1000)
+    out |= 0xffff0000;
+  //bpf_trace_printk("p4: ifc_send %p %d\\n", skb, out);
+  if (out < 0) {
+    out = -out;
+    skb->cb[0] = -(out ^ 1);
+    forward.call(skb, out);
+  }
+  return TC_ACT_SHOT;
+}
+""")
 
         self.config.generateDword(serializer)
 

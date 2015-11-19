@@ -22,7 +22,7 @@ class Interfaces(iomodule.IOModule):
     def __init__(self, *args, **kwargs):
         super(Interfaces, self).__init__(*args, **kwargs)
 
-    def _ifc_create(self, name):
+    def _ifc_create(self, name, *args, **kwargs):
         if name not in self.mm().ipdb.interfaces:
             raise Exception("%s not in interface list" % name)
         return self.mm().ipdb.interfaces[name].index

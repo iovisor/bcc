@@ -27,10 +27,10 @@ class IOModule(object):
             raise Exception("Argument mmanager must be provided")
         self.interfaces = {}
 
-    def ifc_create(self, name):
+    def ifc_create(self, name, *args, **kwargs):
         if name in self.interfaces:
             raise Exception("interface %s already exists" % name)
-        i = self._ifc_create(name)
+        i = self._ifc_create(name, *args, **kwargs)
         self.interfaces[name] = i
         return i
 
