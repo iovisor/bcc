@@ -44,5 +44,7 @@ set(CMAKE_CXX_FLAGS "-std=c++11 -Wall")
 endif()
 
 add_subdirectory(examples)
+add_subdirectory(man)
 add_subdirectory(src)
 add_subdirectory(tests)
+add_subdirectory(tools)
