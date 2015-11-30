@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # Copyright (c) PLUMgrid, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
 
@@ -45,9 +45,9 @@ class TunnelSimulation(Simulation):
             host_info.append(self._create_ns("host%d" % i, ipaddr=ipaddr,
                 disable_ipv6=True))
             if multicast:
-              cmd = ["python", "tunnel.py", str(i)]
+              cmd = ["python3", "tunnel.py", str(i)]
             else:
-              cmd = ["python", "tunnel_mesh.py", str(num_hosts), str(i), str(dhcp), str(gretap)]
+              cmd = ["python3", "tunnel_mesh.py", str(num_hosts), str(i), str(dhcp), str(gretap)]
             p = NSPopen(host_info[i][0].nl.netns, cmd, stdin=PIPE)
             self.processes.append(p)
         with self.ipdb.create(ifname="br-fabric", kind="bridge") as br:

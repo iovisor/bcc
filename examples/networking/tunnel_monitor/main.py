@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # Copyright (c) PLUMgrid, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
 
@@ -61,7 +61,7 @@ class TunnelSimulation(Simulation):
 
         # pick one host to start the monitor in
         host = host_info[0]
-        cmd = ["python", "monitor.py"]
+        cmd = ["python3", "monitor.py"]
         p = NSPopen(host[0].nl.netns, cmd)
         self.processes.append(p)
 
