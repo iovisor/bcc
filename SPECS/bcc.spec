@@ -51,16 +51,19 @@ Shared Library for BPF Compiler Collection (BCC)
 
 %package -n libbcc-examples
 Summary: Examples for BPF Compiler Collection (BCC)
+Requires: libbcc
 %description -n libbcc-examples
 Examples for BPF Compiler Collection (BCC)
 
 %package -n python-bcc
 Summary: Python bindings for BPF Compiler Collection (BCC)
+Requires: libbcc
 %description -n python-bcc
 Python bindings for BPF Compiler Collection (BCC)
 
 %package -n bcc-tools
 Summary: Command line tools for BPF Compiler Collection (BCC)
+Requires: python-bcc
 %description -n bcc-tools
 Command line tools for BPF Compiler Collection (BCC)
 
