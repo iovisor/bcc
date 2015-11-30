@@ -8,4 +8,4 @@ set(EXAMPLE_FILES biolatency_example.txt funclatency_example.txt
   softirqs_example.txt tcpaccept_example.txt vfscount_example.txt)
 install(PROGRAMS ${PROGRAMS} DESTINATION share/bcc/tools)
 install(FILES ${C_FILES} DESTINATION share/bcc/tools)
-install(FILES ${EXAMPLE_FILES} DESTINATION share/bcc/doc/tools)
+install(FILES ${EXAMPLE_FILES} DESTINATION share/bcc/tools/doc)
