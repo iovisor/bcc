@@ -365,6 +365,12 @@ class EbpfTable(object):
             serializer.newline()
 
         serializer.blockEnd(True)
+        if not "hit" in nextNode:
+            # Catch-all
+            serializer.emitIndent()
+            serializer.appendFormat("goto end;")
+            serializer.newline()
+
         serializer.blockEnd(True)
 
     def runAction(self, serializer, tableName, valueName, program, nextNode):
