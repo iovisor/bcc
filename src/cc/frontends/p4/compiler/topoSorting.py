@@ -86,4 +86,3 @@ class Graph(object):
             return None
 
         return topo_sorting
-

@@ -483,11 +483,9 @@ class EbpfProgram(object):
         done = set()
         while len(nodestoadd) > 0:
             todo = nodestoadd.pop()
-            if todo is None:
-                todo = nextEntryPoint
-            if todo is None:
-                continue
             if todo in done:
+                continue
+            if todo is None:
                 continue
 
             print("Generating ", todo.name)
@@ -503,3 +501,6 @@ class EbpfProgram(object):
         for e in self.entryPoints:
             todo.add(e)
         self.generatePipelineInternal(serializer, todo, self.egressEntry)
+        todo = set()
+        todo.add(self.egressEntry)
+        self.generatePipelineInternal(serializer, todo, None)
