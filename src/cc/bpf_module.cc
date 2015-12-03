@@ -178,9 +178,11 @@ Function * BPFModule::make_reader(Module *mod, Type *type) {
   Function *fn = Function::Create(fn_type, GlobalValue::ExternalLinkage,
                                   "reader" + std::to_string(readers_.size()), mod);
   auto arg_it = fn->arg_begin();
-  Argument *arg_in = arg_it++;
+  Argument *arg_in = &*arg_it;
+  ++arg_it;
   arg_in->setName("in");
-  Argument *arg_out = arg_it++;
+  Argument *arg_out = &*arg_it;
+  ++arg_it;
   arg_out->setName("out");
 
   BasicBlock *label_entry = BasicBlock::Create(*ctx_, "entry", fn);
@@ -240,11 +242,14 @@ Function * BPFModule::make_writer(Module *mod, Type *type) {
   Function *fn = Function::Create(fn_type, GlobalValue::ExternalLinkage,
                                   "writer" + std::to_string(writers_.size()), mod);
   auto arg_it = fn->arg_begin();
-  Argument *arg_out = arg_it++;
+  Argument *arg_out = &*arg_it;
+  ++arg_it;
   arg_out->setName("out");
-  Argument *arg_len = arg_it++;
+  Argument *arg_len = &*arg_it;
+  ++arg_it;
   arg_len->setName("len");
-  Argument *arg_in = arg_it++;
+  Argument *arg_in = &*arg_it;
+  ++arg_it;
   arg_in->setName("in");
 
   BasicBlock *label_entry = BasicBlock::Create(*ctx_, "entry", fn);
