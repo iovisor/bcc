@@ -1180,7 +1180,7 @@ StatusTuple CodegenLLVM::visit_func_decl_stmt_node(FuncDeclStmtNode *n) {
     TRY2((*formal)->accept(this));
     Value *ptr = vars_[formal->get()];
     if (!ptr) return mkstatus_(n, "cannot locate memory location for arg %s", (*formal)->id_->c_str());
-    B.CreateStore(arg, ptr);
+    B.CreateStore(&*arg, ptr);
 
     // Type *ptype;
     // if ((*formal)->is_struct()) {
