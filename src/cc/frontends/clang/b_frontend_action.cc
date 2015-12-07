@@ -67,10 +67,7 @@ bool BMapDeclVisitor::VisitRecordDecl(RecordDecl *D) {
   result_ += "\", [";
   for (auto F : D->getDefinition()->fields()) {
     result_ += "[";
-    if (F->getType()->isPointerType())
-      result_ += "\"" + F->getName().str() + "\", \"unsigned long long\"";
-    else
-      TraverseDecl(F);
+    TraverseDecl(F);
     if (const ConstantArrayType *T = dyn_cast<ConstantArrayType>(F->getType()))
       result_ += ", [" + T->getSize().toString(10, false) + "]";
     if (F->isBitField())
@@ -79,8 +76,18 @@ bool BMapDeclVisitor::VisitRecordDecl(RecordDecl *D) {
   }
   if (!D->getDefinition()->field_empty())
     result_.erase(result_.end() - 2);
-  result_ += "]]";
+  result_ += "]";
+  if (D->isUnion())
+    result_ += ", \"union\"";
+  else if (D->isStruct())
+    result_ += ", \"struct\"";
+  result_ += "]";
   return true;
+}
+// pointer to anything should be treated as terminal, don't recurse further
+bool BMapDeclVisitor::VisitPointerType(const PointerType *T) {
+  result_ += "\"unsigned long long\"";
+  return false;
 }
 bool BMapDeclVisitor::VisitTagType(const TagType *T) {
   return TraverseDecl(T->getDecl()->getDefinition());
@@ -510,22 +517,32 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
       sscanf(un.release, "%d.%d.", &major, &minor);
     }
 
-    TableDesc table;
+    TableDesc table = {};
     table.name = Decl->getName();
 
     unsigned i = 0;
     for (auto F : RD->fields()) {
       size_t sz = C.getTypeSize(F->getType()) >> 3;
       if (F->getName() == "key") {
+        if (sz == 0) {
+          unsigned diag_id = C.getDiagnostics().getCustomDiagID(DiagnosticsEngine::Error,
+                                                                "invalid zero-sized leaf");
+          C.getDiagnostics().Report(F->getLocStart(), diag_id);
+          return false;
+        }
         table.key_size = sz;
         BMapDeclVisitor visitor(C, table.key_desc);
-        if (!visitor.TraverseType(F->getType()))
-          return false;
+        visitor.TraverseType(F->getType());
       } else if (F->getName() == "leaf") {
+        if (sz == 0) {
+          unsigned diag_id = C.getDiagnostics().getCustomDiagID(DiagnosticsEngine::Error,
+                                                                "invalid zero-sized leaf");
+          C.getDiagnostics().Report(F->getLocStart(), diag_id);
+          return false;
+        }
         table.leaf_size = sz;
         BMapDeclVisitor visitor(C, table.leaf_desc);
-        if (!visitor.TraverseType(F->getType()))
-          return false;
+        visitor.TraverseType(F->getType());
       } else if (F->getName() == "data") {
         table.max_entries = sz / table.leaf_size;
       }

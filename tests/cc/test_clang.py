@@ -247,7 +247,7 @@ int kprobe____kmalloc(struct pt_regs *ctx, size_t size) {
     if (leaf)
         leaf->size += size;
     return 0;
-}""", debug=4)
+}""")
 
     def test_unop_probe_read(self):
         text = """
@@ -262,6 +262,30 @@ int trace_entry(struct pt_regs *ctx, struct request *req) {
 """
         b = BPF(text=text)
         fn = b.load_func("trace_entry", BPF.KPROBE)
+
+    def test_complex_leaf_types(self):
+        text = """
+struct list;
+struct list {
+  struct list *selfp;
+  struct list *another_selfp;
+  struct list *selfp_array[2];
+};
+struct empty {
+};
+union emptyu {
+  struct empty *em1;
+  struct empty em2;
+  struct empty em3;
+  struct empty em4;
+};
+BPF_TABLE("array", int, struct list, t1, 1);
+BPF_TABLE("array", int, struct list *, t2, 1);
+BPF_TABLE("array", int, union emptyu, t3, 1);
+"""
+        b = BPF(text=text)
+        import ctypes
+        self.assertEqual(ctypes.sizeof(b["t3"].Leaf), 8)
 
 if __name__ == "__main__":
     main()

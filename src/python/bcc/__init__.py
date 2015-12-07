@@ -518,7 +518,13 @@ class BPF(object):
                     fields.append((t[0], BPF._decode_table_type(t[1]), t[2]))
             else:
                 raise Exception("Failed to decode type %s" % str(t))
-        cls = type(str(desc[0]), (ct.Structure,), dict(_fields_=fields))
+        base = ct.Structure
+        if len(desc) > 2:
+            if desc[2] == u"union":
+                base = ct.Union
+            elif desc[2] == u"struct":
+                base = ct.Structure
+        cls = type(str(desc[0]), (base,), dict(_fields_=fields))
         return cls
 
     def get_table(self, name, keytype=None, leaftype=None):

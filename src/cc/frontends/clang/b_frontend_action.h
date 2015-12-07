@@ -49,6 +49,7 @@ class BMapDeclVisitor : public clang::RecursiveASTVisitor<BMapDeclVisitor> {
   bool VisitBuiltinType(const clang::BuiltinType *T);
   bool VisitTypedefType(const clang::TypedefType *T);
   bool VisitTagType(const clang::TagType *T);
+  bool VisitPointerType(const clang::PointerType *T);
  private:
   clang::ASTContext &C;
   std::string &result_;
