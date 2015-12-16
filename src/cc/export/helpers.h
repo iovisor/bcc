@@ -46,6 +46,10 @@ struct _name##_table_t { \
 __attribute__((section("maps/" _table_type))) \
 struct _name##_table_t _name
 
+#define BPF_TABLE_EXPORT(_name) \
+__attribute__((section("maps/export"))) \
+struct _name##_table_t __##_name
+
 // Table for pushing custom events to userspace via ring buffer
 #define BPF_PERF_OUTPUT(_name) \
 struct _name##_table_t { \
