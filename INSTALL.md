@@ -1,6 +1,16 @@
-# Kernel requirements
+# Installing BCC
 
-## Requirements
+* [Kernel Configuration](#kernel-configuration)
+* [Packages](#packages)
+  - [Ubuntu](#ubuntu---binary)
+  - [Fedora](#fedora---binary)
+  - [Arch](#arch---aur)
+* [Source](#source)
+  - [Ubuntu](#ubuntu---source)
+  - [Fedora](#fedora---source)
+* [Older Instructions](#older-instructions)
+
+## Kernel Configuration
 
 In general, to use these features, a Linux kernel version 4.1 or newer is
 required. In addition, the following flags should be set:
@@ -18,7 +28,9 @@ CONFIG_HAVE_BPF_JIT=y
 CONFIG_BPF_EVENTS=y
 ```
 
-# Ubuntu - Binary
+# Packages
+
+## Ubuntu - Binary
 
 Install a 4.3+ kernel from http://kernel.ubuntu.com/~kernel-ppa/mainline,
 for example:
@@ -58,7 +70,7 @@ cd pyroute2; sudo make install
 sudo python /usr/share/bcc/examples/simple_tc.py
 ```
 
-# Fedora - Binary
+## Fedora - Binary
 
 Install a 4.2+ kernel from
 http://alt.fedoraproject.org/pub/alt/rawhide-kernel-nodebug, for example:
@@ -78,14 +90,27 @@ sudo wget http://52.8.15.63/yum/main/f22/iovisor.repo -O /etc/yum.repos.d/ioviso
 sudo dnf install -y libbcc libbcc-examples python-bcc
 ```
 
-# Ubuntu - From source
+## Arch - AUR
+
+Upgrade the kernel to minimum 4.3.1-1 first; the ```CONFIG_BPF_SYSCALL=y``` configuration was not added until [this kernel release](https://bugs.archlinux.org/task/47008).
+
+Install these packages using any AUR helper such as [pacaur](https://aur.archlinux.org/packages/pacaur), [yaourt](https://aur.archlinux.org/packages/yaourt), [cower](https://aur.archlinux.org/packages/cower), etc.:
+```
+bcc bcc-tools python-bcc python2-bcc
+```
+All build and install dependencies are listed [in the PKGBUILD](https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=bcc) and should install automatically.
+
+
+# Source
+
+## Ubuntu - Source
 
 To build the toolchain from source, one needs:
 * LLVM 3.7 or newer, compiled with BPF support (default=on)
 * Clang 3.7, built from the same tree as LLVM
 * cmake, gcc (>=4.7), flex, bison
 
-## Install build dependencies
+### Install build dependencies
 ```
 VER=trusty
 echo "deb http://llvm.org/apt/$VER/ llvm-toolchain-$VER-3.7 main
@@ -97,7 +122,7 @@ sudo apt-get -y install bison build-essential cmake flex git libedit-dev \
   libllvm3.7 llvm-3.7-dev libclang-3.7-dev python zlib1g-dev
 ```
 
-## Install and compile BCC
+### Install and compile BCC
 ```
 git clone https://github.com/iovisor/bcc.git
 mkdir bcc/build; cd bcc/build
@@ -106,9 +131,9 @@ make
 sudo make install
 ```
 
-# Fedora - From source
+## Fedora - Source
 
-## Install build dependencies
+### Install build dependencies
 
 ```
 sudo dnf install -y bison cmake ethtool flex git iperf libstdc++-static \
@@ -118,14 +143,14 @@ sudo dnf install -y \
 sudo pip install pyroute2
 ```
 
-## Install binary clang
+### Install binary clang
 
 ```
 wget http://llvm.org/releases/3.7.0/clang+llvm-3.7.0-x86_64-fedora22.tar.xz
 sudo tar xf clang+llvm-3.7.0-x86_64-fedora22.tar.xz -C /usr/local --strip 1
 ```
 
-## Install and compile BCC
+### Install and compile BCC
 ```
 git clone https://github.com/iovisor/bcc.git
 mkdir bcc/build; cd bcc/build
@@ -136,7 +161,10 @@ make
 sudo make install
 ```
 
-# [Old] Build LLVM and Clang development libs
+# Older Instructions
+
+## Build LLVM and Clang development libs
+
 ```
 git clone http://llvm.org/git/llvm.git
 cd llvm/tools; git clone http://llvm.org/git/clang.git
@@ -147,3 +175,4 @@ make -j4
 make install
 export PATH=$PWD/install/bin:$PATH
 ```
+
