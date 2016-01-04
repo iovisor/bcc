@@ -93,13 +93,9 @@ class TmpDir {
 //  Note: Depending on environment, different cache locations may be desired. In
 //  case we eventually support non-root user programs, cache in $HOME.
 class KBuildHelper {
- private:
-  int learn_flags(const std::string &tmpdir, const char *uname_release, const char *cachefile);
  public:
   KBuildHelper();
-  int get_flags(const char *uname_release, std::vector<std::string> *cflags);
- private:
-  std::string cache_dir_;
+  int get_flags(const char *uname_machine, std::vector<std::string> *cflags);
 };
 
 }  // namespace ebpf

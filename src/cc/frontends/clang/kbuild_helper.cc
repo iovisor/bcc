@@ -23,70 +23,54 @@ using std::string;
 using std::vector;
 
 KBuildHelper::KBuildHelper() {
-  char *home = ::getenv("HOME");
-  if (home)
-    cache_dir_ = string(home) + "/.cache/bcc";
-  else
-    cache_dir_ = "/var/run/bcc";
-}
-
-// Makefile helper for kbuild_flags
-int KBuildHelper::learn_flags(const string &tmpdir, const char *uname_release, const char *cachefile) {
-  {
-    // Create a kbuild file to generate the flags
-    string makefile = tmpdir + "/Makefile";
-    FILEPtr mf(::fopen(makefile.c_str(), "w"));
-    if (!mf)
-      return -1;
-    fprintf(&*mf, "obj-y := dummy.o\n");
-    fprintf(&*mf, "CACHEDIR=$(dir %s)\n", cachefile);
-    fprintf(&*mf, "$(CACHEDIR):\n");
-    fprintf(&*mf, "\t@mkdir -p $(CACHEDIR)\n");
-    fprintf(&*mf, "$(obj)/%%.o: $(src)/%%.c $(CACHEDIR)\n");
-    fprintf(&*mf, "\t@echo -n \"$(NOSTDINC_FLAGS) $(LINUXINCLUDE) $(EXTRA_CFLAGS) "
-                    "-D__KERNEL__ -Wno-unused-value -Wno-pointer-sign \" > %s\n", cachefile);
-  }
-  {
-    string cfile = tmpdir + "/dummy.c";
-    FILEPtr cf(::fopen(cfile.c_str(), "w"));
-    if (!cf)
-      return -1;
-  }
-  string cmd = "make CROSS_COMPILE= -s";
-  cmd += " -C " KERNEL_MODULES_DIR "/" + string(uname_release) + "/build";
-  cmd += " M=" + tmpdir + " dummy.o";
-  int rc = ::system(cmd.c_str());
-  if (rc < 0) {
-    ::perror("system");
-    return -1;
-  }
-  return ::open(cachefile, O_RDONLY);
 }
 
 // read the flags from cache or learn
-int KBuildHelper::get_flags(const char *uname_release, vector<string> *cflags) {
-  char cachefile[256];
-  snprintf(cachefile, sizeof(cachefile), "%s/%s.flags", cache_dir_.c_str(), uname_release);
-  int cachefd = ::open(cachefile, O_RDONLY);
-  if (cachefd < 0) {
-    TmpDir tmpdir;
-    if (!tmpdir.ok())
-      return -1;
-    cachefd = learn_flags(tmpdir.str(), uname_release, cachefile);
-    if (cachefd < 0)
-      return -1;
+int KBuildHelper::get_flags(const char *uname_machine, vector<string> *cflags) {
+  //uname -m | sed -e s/i.86/x86/ -e s/x86_64/x86/ -e s/sun4u/sparc64/ -e s/arm.*/arm/
+  //               -e s/sa110/arm/ -e s/s390x/s390/ -e s/parisc64/parisc/
+  //               -e s/ppc.*/powerpc/ -e s/mips.*/mips/ -e s/sh[234].*/sh/
+  //               -e s/aarch64.*/arm64/
+
+  string arch = uname_machine;
+  if (!strncmp(uname_machine, "x86_64", 6)) {
+    arch = "x86";
+  } else if (uname_machine[0] == 'i' && !strncmp(&uname_machine[2], "86", 2)) {
+    arch = "x86";
+  } else if (!strncmp(uname_machine, "arm", 3)) {
+    arch = "arm";
+  } else if (!strncmp(uname_machine, "sa110", 5)) {
+    arch = "arm";
+  } else if (!strncmp(uname_machine, "s390x", 5)) {
+    arch = "s390";
+  } else if (!strncmp(uname_machine, "parisc64", 8)) {
+    arch = "parisc";
+  } else if (!strncmp(uname_machine, "ppc", 3)) {
+    arch = "powerpc";
+  } else if (!strncmp(uname_machine, "mips", 4)) {
+    arch = "mips";
+  } else if (!strncmp(uname_machine, "sh", 2)) {
+    arch = "sh";
+  } else if (!strncmp(uname_machine, "aarch64", 7)) {
+    arch = "arm64";
   }
-  FILEPtr f(::fdopen(cachefd, "r"));
-  size_t len = 0;
-  char *line = NULL;
-  ssize_t nread;
-  while ((nread = getdelim(&line, &len, ' ', &*f)) >= 0) {
-    if (nread == 0 || (nread == 1 && line[0] == ' ')) continue;
-    if (line[nread - 1] == ' ')
-      --nread;
-    cflags->push_back(string(line, nread));
-  }
-  free(line);
+
+  cflags->push_back("-nostdinc");
+  cflags->push_back("-isystem");
+  cflags->push_back(BCC_INSTALL_PREFIX "/share/bcc/lib/clang/include");
+  cflags->push_back("-I./arch/"+arch+"/include");
+  cflags->push_back("-Iarch/"+arch+"/include/generated/uapi");
+  cflags->push_back("-Iarch/"+arch+"/include/generated");
+  cflags->push_back("-Iinclude");
+  cflags->push_back("-I./arch/"+arch+"/include/uapi");
+  cflags->push_back("-Iarch/"+arch+"/include/generated/uapi");
+  cflags->push_back("-I./include/uapi");
+  cflags->push_back("-Iinclude/generated/uapi");
+  cflags->push_back("-include");
+  cflags->push_back("./include/linux/kconfig.h");
+  cflags->push_back("-D__KERNEL__");
+  cflags->push_back("-Wno-unused-value");
+  cflags->push_back("-Wno-pointer-sign");
   return 0;
 }
 

@@ -62,5 +62,8 @@ install(DIRECTORY compat/linux/ COMPONENT libbcc
   FILES_MATCHING PATTERN "*.h")
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libbcc.pc COMPONENT libbcc
   DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
+install(DIRECTORY clang COMPONENT libbcc
+  DESTINATION share/bcc/lib
+  FILES_MATCHING PATTERN "*.h")
 
 add_subdirectory(frontends)
