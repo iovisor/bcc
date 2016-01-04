@@ -90,11 +90,12 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, unique_ptr<vector<TableDes
 
   vector<const char *> flags_cstr({"-O0", "-emit-llvm", "-I", dstack.cwd(),
                                    "-Wno-deprecated-declarations",
+                                   "-Wno-gnu-variable-sized-type-not-at-end",
                                    "-x", "c", "-c", abs_file.c_str()});
 
   KBuildHelper kbuild_helper;
   vector<string> kflags;
-  if (kbuild_helper.get_flags(un.release, &kflags))
+  if (kbuild_helper.get_flags(un.machine, &kflags))
     return -1;
   kflags.push_back("-include");
   kflags.push_back(BCC_INSTALL_PREFIX "/share/bcc/include/bcc/helpers.h");

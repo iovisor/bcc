@@ -88,7 +88,6 @@ make install/strip DESTDIR=%{buildroot}
 
 %package -n libbcc
 Summary: Shared Library for BPF Compiler Collection (BCC)
-Requires: make, gcc
 %description -n libbcc
 Shared Library for BPF Compiler Collection (BCC)
 
@@ -109,6 +108,7 @@ Python bindings for BPF Compiler Collection (BCC)
 %files -n libbcc
 /usr/lib64/*
 /usr/share/bcc/include/*
+/usr/share/bcc/lib/*
 /usr/include/bcc/*
 
 %files -n libbcc-examples
