@@ -299,9 +299,9 @@ unique_ptr<ExecutionEngine> BPFModule::finalize_rw(unique_ptr<Module> m) {
 }
 
 // load an entire c file as a module
-int BPFModule::load_cfile(const string &file, bool in_memory) {
+int BPFModule::load_cfile(const string &file, bool in_memory, const char *cflags[], int ncflags) {
   clang_loader_ = make_unique<ClangLoader>(&*ctx_, flags_);
-  if (clang_loader_->parse(&mod_, &tables_, file, in_memory))
+  if (clang_loader_->parse(&mod_, &tables_, file, in_memory, cflags, ncflags))
     return -1;
   return 0;
 }
@@ -313,7 +313,7 @@ int BPFModule::load_cfile(const string &file, bool in_memory) {
 // build an ExecutionEngine.
 int BPFModule::load_includes(const string &tmpfile) {
   clang_loader_ = make_unique<ClangLoader>(&*ctx_, flags_);
-  if (clang_loader_->parse(&mod_, &tables_, tmpfile, false))
+  if (clang_loader_->parse(&mod_, &tables_, tmpfile, false, nullptr, 0))
     return -1;
   return 0;
 }
@@ -668,7 +668,7 @@ int BPFModule::load_b(const string &filename, const string &proto_filename) {
 }
 
 // load a C file
-int BPFModule::load_c(const string &filename) {
+int BPFModule::load_c(const string &filename, const char *cflags[], int ncflags) {
   if (!sections_.empty()) {
     fprintf(stderr, "Program already initialized\n");
     return -1;
@@ -677,7 +677,7 @@ int BPFModule::load_c(const string &filename) {
     fprintf(stderr, "Invalid filename\n");
     return -1;
   }
-  if (int rc = load_cfile(filename, false))
+  if (int rc = load_cfile(filename, false, cflags, ncflags))
     return rc;
   if (int rc = annotate())
     return rc;
@@ -687,12 +687,12 @@ int BPFModule::load_c(const string &filename) {
 }
 
 // load a C text string
-int BPFModule::load_string(const string &text) {
+int BPFModule::load_string(const string &text, const char *cflags[], int ncflags) {
   if (!sections_.empty()) {
     fprintf(stderr, "Program already initialized\n");
     return -1;
   }
-  if (int rc = load_cfile(text, true))
+  if (int rc = load_cfile(text, true, cflags, ncflags))
     return rc;
   if (int rc = annotate())
     return rc;

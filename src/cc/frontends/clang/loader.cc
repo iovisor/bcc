@@ -65,7 +65,7 @@ ClangLoader::ClangLoader(llvm::LLVMContext *ctx, unsigned flags)
 ClangLoader::~ClangLoader() {}
 
 int ClangLoader::parse(unique_ptr<llvm::Module> *mod, unique_ptr<vector<TableDesc>> *tables,
-                       const string &file, bool in_memory) {
+                       const string &file, bool in_memory, const char *cflags[], int ncflags) {
   using namespace clang;
 
   struct utsname un;
@@ -103,6 +103,10 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, unique_ptr<vector<TableDes
   kflags.push_back(BCC_INSTALL_PREFIX "/share/bcc/include");
   for (auto it = kflags.begin(); it != kflags.end(); ++it)
     flags_cstr.push_back(it->c_str());
+  if (cflags) {
+    for (auto i = 0; i < ncflags; ++i)
+      flags_cstr.push_back(cflags[i]);
+  }
 
   // set up the error reporting class
   IntrusiveRefCntPtr<DiagnosticOptions> diag_opts(new DiagnosticOptions());
