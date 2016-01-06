@@ -48,15 +48,15 @@ class BPFModule {
   void dump_ir(llvm::Module &mod);
   int load_file_module(std::unique_ptr<llvm::Module> *mod, const std::string &file, bool in_memory);
   int load_includes(const std::string &tmpfile);
-  int load_cfile(const std::string &file, bool in_memory);
+  int load_cfile(const std::string &file, bool in_memory, const char *cflags[], int ncflags);
   int kbuild_flags(const char *uname_release, std::vector<std::string> *cflags);
   int run_pass_manager(llvm::Module &mod);
  public:
   BPFModule(unsigned flags);
   ~BPFModule();
   int load_b(const std::string &filename, const std::string &proto_filename);
-  int load_c(const std::string &filename);
-  int load_string(const std::string &text);
+  int load_c(const std::string &filename, const char *cflags[], int ncflags);
+  int load_string(const std::string &text, const char *cflags[], int ncflags);
   size_t num_functions() const;
   uint8_t * function_start(size_t id) const;
   uint8_t * function_start(const std::string &name) const;

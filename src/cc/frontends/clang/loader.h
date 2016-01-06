@@ -39,7 +39,7 @@ class ClangLoader {
   explicit ClangLoader(llvm::LLVMContext *ctx, unsigned flags);
   ~ClangLoader();
   int parse(std::unique_ptr<llvm::Module> *mod, std::unique_ptr<std::vector<TableDesc>> *tables,
-            const std::string &file, bool in_memory);
+            const std::string &file, bool in_memory, const char *cflags[], int ncflags);
  private:
   llvm::LLVMContext *ctx_;
   unsigned flags_;

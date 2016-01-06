@@ -30,9 +30,11 @@ lib = ct.CDLL("libbcc.so")
 lib.bpf_module_create_b.restype = ct.c_void_p
 lib.bpf_module_create_b.argtypes = [ct.c_char_p, ct.c_char_p, ct.c_uint]
 lib.bpf_module_create_c.restype = ct.c_void_p
-lib.bpf_module_create_c.argtypes = [ct.c_char_p, ct.c_uint]
+lib.bpf_module_create_c.argtypes = [ct.c_char_p, ct.c_uint,
+        ct.POINTER(ct.c_char_p), ct.c_int]
 lib.bpf_module_create_c_from_string.restype = ct.c_void_p
-lib.bpf_module_create_c_from_string.argtypes = [ct.c_char_p, ct.c_uint]
+lib.bpf_module_create_c_from_string.argtypes = [ct.c_char_p, ct.c_uint,
+        ct.POINTER(ct.c_char_p), ct.c_int]
 lib.bpf_module_destroy.restype = None
 lib.bpf_module_destroy.argtypes = [ct.c_void_p]
 lib.bpf_module_license.restype = ct.c_char_p
@@ -395,7 +397,7 @@ class BPF(object):
                     raise Exception("Could not find file %s" % filename)
         return filename
 
-    def __init__(self, src_file="", hdr_file="", text=None, cb=None, debug=0):
+    def __init__(self, src_file="", hdr_file="", text=None, cb=None, debug=0, cflags=[]):
         """Create a a new BPF module with the given source code.
 
         Note:
@@ -416,8 +418,11 @@ class BPF(object):
         self.debug = debug
         self.funcs = {}
         self.tables = {}
+        cflags_array = (ct.c_char_p * len(cflags))()
+        for i, s in enumerate(cflags): cflags_array[i] = s.encode("ascii")
         if text:
-            self.module = lib.bpf_module_create_c_from_string(text.encode("ascii"), self.debug)
+            self.module = lib.bpf_module_create_c_from_string(text.encode("ascii"),
+                    self.debug, cflags_array, len(cflags_array))
         else:
             src_file = BPF._find_file(src_file)
             hdr_file = BPF._find_file(hdr_file)
@@ -426,7 +431,7 @@ class BPF(object):
                         hdr_file.encode("ascii"), self.debug)
             else:
                 self.module = lib.bpf_module_create_c(src_file.encode("ascii"),
-                        self.debug)
+                        self.debug, cflags_array, len(cflags_array))
 
         if self.module == None:
             raise Exception("Failed to compile BPF module %s" % src_file)

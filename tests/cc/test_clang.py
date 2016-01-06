@@ -287,5 +287,13 @@ BPF_TABLE("array", int, union emptyu, t3, 1);
         import ctypes
         self.assertEqual(ctypes.sizeof(b["t3"].Leaf), 8)
 
+    def test_cflags(self):
+        text = """
+#ifndef MYFLAG
+#error "MYFLAG not set as expected"
+#endif
+"""
+        b = BPF(text=text, cflags=["-DMYFLAG"])
+
 if __name__ == "__main__":
     main()
