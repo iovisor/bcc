@@ -295,5 +295,9 @@ BPF_TABLE("array", int, union emptyu, t3, 1);
 """
         b = BPF(text=text, cflags=["-DMYFLAG"])
 
+    def test_exported_maps(self):
+        b1 = BPF(text="""BPF_TABLE_PUBLIC("hash", int, int, table1, 10);""")
+        b2 = BPF(text="""BPF_TABLE("extern", int, int, table1, 10);""")
+
 if __name__ == "__main__":
     main()
