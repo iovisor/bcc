@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 PLUMgrid, Inc.
+ * Copyright (c) 2016 PLUMgrid, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,28 +16,23 @@
 
 #pragma once
 
-#include <cstdint>
+#include <map>
 #include <string>
-
-namespace llvm {
-class Function;
-}
 
 namespace ebpf {
 
-struct TableDesc {
-  std::string name;
-  int fd;
-  int type;
-  size_t key_size;  // sizes are in bytes
-  size_t leaf_size;
-  size_t max_entries;
-  std::string key_desc;
-  std::string leaf_desc;
-  llvm::Function *key_sscanf;
-  llvm::Function *leaf_sscanf;
-  llvm::Function *key_snprintf;
-  llvm::Function *leaf_snprintf;
+struct TableDesc;
+
+class SharedTables {
+ public:
+  static SharedTables * instance();
+  // add an fd to the shared table, return true if successfully inserted
+  bool insert_fd(const std::string &name, int fd);
+  // lookup an fd in the shared table, or -1 if not found
+  int lookup_fd(const std::string &name) const;
+ private:
+  static SharedTables *instance_;
+  std::map<std::string, int> tables_;
 };
 
-}  // namespace ebpf
+}

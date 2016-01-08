@@ -46,6 +46,12 @@ struct _name##_table_t { \
 __attribute__((section("maps/" _table_type))) \
 struct _name##_table_t _name
 
+// define a table same as above but allow it to be referenced by other modules
+#define BPF_TABLE_PUBLIC(_table_type, _key_type, _leaf_type, _name, _max_entries) \
+BPF_TABLE(_table_type, _key_type, _leaf_type, _name, _max_entries); \
+__attribute__((section("maps/export"))) \
+struct _name##_table_t __##_name
+
 // Table for pushing custom events to userspace via ring buffer
 #define BPF_PERF_OUTPUT(_name) \
 struct _name##_table_t { \
