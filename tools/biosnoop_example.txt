@@ -36,11 +36,11 @@ $ iostat -x 1
 avg-cpu:  %user   %nice %system %iowait  %steal   %idle
            0.12    0.00    0.12    0.00    0.00   99.75
 
-Device:         rrqm/s   wrqm/s     r/s     w/s    rkB/s    wkB/s avgrq-sz avgqu-sz   await r_await w_await  svctm  %util
-xvda              0.00     0.00    0.00    4.00     0.00    16.00     8.00     0.00    0.00    0.00    0.00   0.00   0.00
-xvdb              0.00     0.00    0.00    0.00     0.00     0.00     0.00     0.00    0.00    0.00    0.00   0.00   0.00
-xvdc              0.00     0.00    0.00    0.00     0.00     0.00     0.00     0.00    0.00    0.00    0.00   0.00   0.00
-md0               0.00     0.00    0.00    0.00     0.00     0.00     0.00     0.00    0.00    0.00    0.00   0.00   0.00
+Device: rrqm/s  wrqm/s    r/s    w/s  rkB/s  wkB/s  await  svctm  %util
+xvda      0.00    0.00   0.00   4.00   0.00  16.00   0.00   0.00   0.00
+xvdb      0.00    0.00   0.00   0.00   0.00   0.00   0.00   0.00   0.00
+xvdc      0.00    0.00   0.00   0.00   0.00   0.00   0.00   0.00   0.00
+md0       0.00    0.00   0.00   0.00   0.00   0.00   0.00   0.00   0.00
 
 There are 4 write IOPS.
 
