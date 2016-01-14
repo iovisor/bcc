@@ -5,7 +5,7 @@ biolatency traces block device I/O (disk I/O), and records the distribution
 of I/O latency (time), printing this as a histogram when Ctrl-C is hit.
 For example:
 
-# ./biolatency 
+# ./biolatency
 Tracing block device I/O... Hit Ctrl-C to end.
 ^C
      usecs           : count     distribution

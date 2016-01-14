@@ -5,12 +5,12 @@ This tool traces the kernel function performing active TCP connections
 (eg, via a connect() syscall; accept() are passive connections). Some example
 output (IP addresses changed to protect the innocent):
 
-# ./tcpconnect 
+# ./tcpconnect
 PID    COMM         IP SADDR            DADDR            DPORT
-1479   telnet       4  127.0.0.1        127.0.0.1        23  
-1469   curl         4  10.201.219.236   54.245.105.25    80  
-1469   curl         4  10.201.219.236   54.67.101.145    80  
-11072  ssh          6  ...fe8203ac      ...fe82abcd      22  
+1479   telnet       4  127.0.0.1        127.0.0.1        23
+1469   curl         4  10.201.219.236   54.245.105.25    80
+1469   curl         4  10.201.219.236   54.67.101.145    80
+11072  ssh          6  ...fe8203ac      ...fe82abcd      22
 
 This output shows four connections, one from a "telnet" process, two from
 "curl", and one from "ssh". The output details shows the IP version, source

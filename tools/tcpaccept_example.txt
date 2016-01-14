@@ -7,8 +7,8 @@ addresses changed to protect the innocent):
 
 # ./tcpaccept
 PID    COMM         IP RADDR            LADDR            LPORT
-907    sshd         4  192.168.56.1     192.168.56.102   22  
-907    sshd         4  127.0.0.1        127.0.0.1        22  
+907    sshd         4  192.168.56.1     192.168.56.102   22
+907    sshd         4  127.0.0.1        127.0.0.1        22
 5389   perl         6  ...fec0ae21      ...fec0ae21      7001
 
 This output shows three connections, two to PID 907, an "sshd" process listening
@@ -30,9 +30,9 @@ The -t option prints a timestamp column:
 
 # ./tcpaccept -t
 TIME(s)  PID    COMM         IP RADDR            LADDR            LPORT
-0.000    907    sshd         4  127.0.0.1        127.0.0.1        22  
-0.992    907    sshd         4  127.0.0.1        127.0.0.1        22  
-1.984    907    sshd         4  127.0.0.1        127.0.0.1        22  
+0.000    907    sshd         4  127.0.0.1        127.0.0.1        22
+0.992    907    sshd         4  127.0.0.1        127.0.0.1        22
+1.984    907    sshd         4  127.0.0.1        127.0.0.1        22
 
 
 USAGE message:

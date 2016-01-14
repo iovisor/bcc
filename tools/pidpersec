@@ -1,8 +1,8 @@
 #!/usr/bin/python
-# vim: ts=8 noet sw=8
+# @lint-avoid-python-3-compatibility-imports
 #
-# pidpersec	Count new processes (via fork).
-#		For Linux, uses BCC, eBPF. See .c file.
+# pidpersec Count new processes (via fork).
+#           For Linux, uses BCC, eBPF. See .c file.
 #
 # USAGE: pidpersec
 #
@@ -11,14 +11,14 @@
 # Copyright (c) 2015 Brendan Gregg.
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
-# 11-Aug-2015	Brendan Gregg	Created this.
+# 11-Aug-2015   Brendan Gregg   Created this.
 
 from bcc import BPF
-from ctypes import c_ushort, c_int, c_ulonglong
+from ctypes import c_int
 from time import sleep, strftime
 
 # load BPF program
-b = BPF(src_file = "pidpersec.c")
+b = BPF(src_file="pidpersec.c")
 b.attach_kprobe(event="sched_fork", fn_name="do_count")
 
 # stat indexes
@@ -29,11 +29,11 @@ print("Tracing... Ctrl-C to end.")
 
 # output
 while (1):
-	try:
-		sleep(1)
-	except KeyboardInterrupt:
-		exit()
+    try:
+        sleep(1)
+    except KeyboardInterrupt:
+        exit()
 
-	print("%s: PIDs/sec: %d" % (strftime("%H:%M:%S"),
-	    b["stats"][S_COUNT].value))
-	b["stats"].clear()
+    print("%s: PIDs/sec: %d" % (strftime("%H:%M:%S"),
+        b["stats"][S_COUNT].value))
+    b["stats"].clear()
