@@ -4,7 +4,7 @@ Demonstrations of hardirqs, the Linux eBPF/bcc version.
 This program traces hard interrupts (irqs), and stores timing statistics
 in-kernel for efficiency. For example:
 
-# ./hardirqs 
+# ./hardirqs
 Tracing hard irq event time... Hit Ctrl-C to end.
 ^C
 HARDIRQ                    TOTAL_usecs

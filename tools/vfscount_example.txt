@@ -3,7 +3,7 @@ Demonstrations of vfscount, the Linux eBPF/bcc version.
 
 This counts VFS calls, by tracing all kernel functions beginning with "vfs_":
 
-# ./vfscount 
+# ./vfscount
 Tracing... Ctrl-C to end.
 ^C
 ADDR             FUNC                          COUNT

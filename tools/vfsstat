@@ -1,7 +1,8 @@
 #!/usr/bin/python
+# @lint-avoid-python-3-compatibility-imports
 #
-# vfsstat	Count some VFS calls.
-#		For Linux, uses BCC, eBPF. See .c file.
+# vfsstat   Count some VFS calls.
+#           For Linux, uses BCC, eBPF. See .c file.
 #
 # Written as a basic example of counting multiple events as a stat tool.
 #
@@ -10,33 +11,33 @@
 # Copyright (c) 2015 Brendan Gregg.
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
-# 14-Aug-2015	Brendan Gregg	Created this.
+# 14-Aug-2015   Brendan Gregg   Created this.
 
 from __future__ import print_function
 from bcc import BPF
-from ctypes import c_ushort, c_int, c_ulonglong
+from ctypes import c_int
 from time import sleep, strftime
 from sys import argv
 
 def usage():
-	print("USAGE: %s [interval [count]]" % argv[0])
-	exit()
+    print("USAGE: %s [interval [count]]" % argv[0])
+    exit()
 
 # arguments
 interval = 1
 count = -1
 if len(argv) > 1:
-	try:
-		interval = int(argv[1])
-		if interval == 0:
-			raise
-		if len(argv) > 2:
-			count = int(argv[2])
-	except:	# also catches -h, --help
-		usage()
+    try:
+        interval = int(argv[1])
+        if interval == 0:
+            raise
+        if len(argv) > 2:
+            count = int(argv[2])
+    except:  # also catches -h, --help
+        usage()
 
 # load BPF program
-b = BPF(src_file = "vfsstat.c")
+b = BPF(src_file="vfsstat.c")
 b.attach_kprobe(event="vfs_read", fn_name="do_read")
 b.attach_kprobe(event="vfs_write", fn_name="do_write")
 b.attach_kprobe(event="vfs_fsync", fn_name="do_fsync")
@@ -45,40 +46,41 @@ b.attach_kprobe(event="vfs_create", fn_name="do_create")
 
 # stat column labels and indexes
 stat_types = {
-	"READ" : 1,
-	"WRITE" : 2,
-	"FSYNC" : 3,
-	"OPEN" : 4,
-	"CREATE" : 5
+    "READ": 1,
+    "WRITE": 2,
+    "FSYNC": 3,
+    "OPEN": 4,
+    "CREATE": 5
 }
 
 # header
 print("%-8s  " % "TIME", end="")
 for stype in stat_types.keys():
-	print(" %8s" % (stype + "/s"), end="")
-	idx = stat_types[stype]
+    print(" %8s" % (stype + "/s"), end="")
+    idx = stat_types[stype]
 print("")
 
 # output
 i = 0
 while (1):
-	if count > 0:
-		i += 1
-		if i > count:
-			exit()
-	try:
-		sleep(interval)
-	except KeyboardInterrupt:
-		pass; exit()
+    if count > 0:
+        i += 1
+        if i > count:
+            exit()
+    try:
+        sleep(interval)
+    except KeyboardInterrupt:
+        pass
+        exit()
 
-	print("%-8s: " % strftime("%H:%M:%S"), end="")
-	# print each statistic as a column
-	for stype in stat_types.keys():
-		idx = stat_types[stype]
-		try:
-			val = b["stats"][c_int(idx)].value / interval
-			print(" %8d" % val, end="")
-		except:
-			print(" %8d" % 0, end="")
-	b["stats"].clear()
-	print("")
+    print("%-8s: " % strftime("%H:%M:%S"), end="")
+    # print each statistic as a column
+    for stype in stat_types.keys():
+        idx = stat_types[stype]
+        try:
+            val = b["stats"][c_int(idx)].value / interval
+            print(" %8d" % val, end="")
+        except:
+            print(" %8d" % 0, end="")
+    b["stats"].clear()
+    print("")

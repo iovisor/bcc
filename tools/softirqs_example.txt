@@ -4,7 +4,7 @@ Demonstrations of softirqs, the Linux eBPF/bcc version.
 This program traces soft interrupts (irqs), and stores timing statistics
 in-kernel for efficiency. For example:
 
-# ./softirqs 
+# ./softirqs
 Tracing soft irq event time... Hit Ctrl-C to end.
 ^C
 SOFTIRQ                    TOTAL_usecs
