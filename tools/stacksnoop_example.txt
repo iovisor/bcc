@@ -1,0 +1,103 @@
+Demonstrations of stacksnoop, the Linux eBPF/bcc version.
+
+
+This program traces the given kernel function and prints the kernel stack trace
+for every call. This tool is useful for studying low frequency kernel functions,
+to see how they were invoked. For exmaple, tracing the ext4_sync_fs() call:
+
+# ./stacksnoop ext4_sync_fs
+TIME(s)            STACK
+42005194.132250004 
+42005194.132253997 ip: ffffffff81280461 ext4_sync_fs
+42005194.132256001 r0: ffffffff811ed7f9 iterate_supers
+42005194.132257000 r1: ffffffff8121ba25 sys_sync
+42005194.132257000 r2: ffffffff81775cb6 entry_SYSCALL_64_fastpath
+42005194.132275000 
+42005194.132275999 ip: ffffffff81280461 ext4_sync_fs
+42005194.132275999 r0: ffffffff811ed7f9 iterate_supers
+42005194.132276997 r1: ffffffff8121ba35 sys_sync
+42005194.132276997 r2: ffffffff81775cb6 entry_SYSCALL_64_fastpath
+
+This shows that ext4_sync_fs() was called by iterate_supers(), which was called
+by sys_sync(), and so on. (It tells me that this was a syscall invoked sync,
+so an application has requested it.)
+
+The "ip" refers to the instruction pointer, and the "r#" refers to the return
+address for each stack frame.
+
+For high frequency functions, see stackcount, which summarizes in-kernel for
+efficiency. If you don't know if your function is low or high frequency, try
+funccount.
+
+
+The -v option includes more fields, including the on-CPU process (COMM and PID):
+
+# ./stacksnoop -v ext4_sync_fs
+TIME(s)            COMM         PID    CPU STACK
+42005557.056332998 sync         22352  1   
+42005557.056336999 sync         22352  1   ip: ffffffff81280461 ext4_sync_fs
+42005557.056339003 sync         22352  1   r0: ffffffff811ed7f9 iterate_supers
+42005557.056340002 sync         22352  1   r1: ffffffff8121ba25 sys_sync
+42005557.056340002 sync         22352  1   r2: ffffffff81775cb6 entry_SYSCALL_64_fastpath
+42005557.056358002 sync         22352  1   
+42005557.056358002 sync         22352  1   ip: ffffffff81280461 ext4_sync_fs
+42005557.056359001 sync         22352  1   r0: ffffffff811ed7f9 iterate_supers
+42005557.056359999 sync         22352  1   r1: ffffffff8121ba35 sys_sync
+42005557.056359999 sync         22352  1   r2: ffffffff81775cb6 entry_SYSCALL_64_fastpath
+
+This identifies the application issuing the sync syscall: the sync(1) command
+(COMM column).
+
+
+Here's another example, showing the path to second_overflow() and on-CPU
+process:
+
+# ./stacksnoop -v second_overflow
+TIME(s)            COMM         PID    CPU STACK
+42005696.529449999 <idle>       0      0   
+42005696.529457003 <idle>       0      0   ip: ffffffff810e5701 second_overflow
+42005696.529459000 <idle>       0      0   r0: ffffffff810ecb1b tick_do_update_jiffies64
+42005696.529459998 <idle>       0      0   r1: ffffffff810ed6e0 tick_irq_enter
+42005696.529459998 <idle>       0      0   r2: ffffffff8107a195 irq_enter
+42005696.529460996 <idle>       0      0   r3: ffffffff8146bb6f xen_evtchn_do_upcall
+42005696.529460996 <idle>       0      0   r4: ffffffff81777a2e xen_do_hypervisor_callback
+42005697.616295002 <idle>       0      0   
+42005697.616301000 <idle>       0      0   ip: ffffffff810e5701 second_overflow
+42005697.616302997 <idle>       0      0   r0: ffffffff810ecb1b tick_do_update_jiffies64
+42005697.616304003 <idle>       0      0   r1: ffffffff810ed6e0 tick_irq_enter
+42005697.616304003 <idle>       0      0   r2: ffffffff8107a195 irq_enter
+42005697.616305001 <idle>       0      0   r3: ffffffff8146bb6f xen_evtchn_do_upcall
+42005697.616305001 <idle>       0      0   r4: ffffffff81777a2e xen_do_hypervisor_callback
+42005698.556240998 <idle>       0      1   
+42005698.556247003 <idle>       0      1   ip: ffffffff810e5701 second_overflow
+42005698.556249000 <idle>       0      1   r0: ffffffff810ecb1b tick_do_update_jiffies64
+42005698.556249000 <idle>       0      1   r1: ffffffff810ed6e0 tick_irq_enter
+42005698.556249999 <idle>       0      1   r2: ffffffff8107a195 irq_enter
+42005698.556249999 <idle>       0      1   r3: ffffffff8146bb6f xen_evtchn_do_upcall
+42005698.556250997 <idle>       0      1   r4: ffffffff81777a2e xen_do_hypervisor_callback
+[...]
+
+This fires every second (see TIME(s)), and is from tick_do_update_jiffies64().
+
+
+USAGE message:
+
+# ./stacksnoop -h
+usage: stacksnoop [-h] [-p PID] [-s] [-v] function
+
+Trace and print kernel stack traces for a kernel function
+
+positional arguments:
+  function           kernel function name
+
+optional arguments:
+  -h, --help         show this help message and exit
+  -p PID, --pid PID  trace this PID only
+  -s, --offset       show address offsets
+  -v, --verbose      print more fields
+
+examples:
+    ./stacksnoop ext4_sync_fs    # print kernel stack traces for ext4_sync_fs
+    ./stacksnoop -s ext4_sync_fs    # ... also show symbol offsets
+    ./stacksnoop -v ext4_sync_fs    # ... show extra columns
+    ./stacksnoop -p 185 ext4_sync_fs    # ... only when PID 185 is on-CPU
