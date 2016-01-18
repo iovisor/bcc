@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#include <unistd.h>
+
 #include "shared_table.h"
 
 namespace ebpf {
@@ -40,6 +42,15 @@ bool SharedTables::insert_fd(const string &name, int fd) {
   if (tables_.find(name) != tables_.end())
     return false;
   tables_[name] = fd;
+  return true;
+}
+
+bool SharedTables::remove_fd(const string &name) {
+  auto table = tables_.find(name);
+  if (table == tables_.end())
+    return false;
+  close(table->second);
+  tables_.erase(table);
   return true;
 }
 

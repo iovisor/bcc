@@ -49,6 +49,7 @@
 #include "frontends/clang/b_frontend_action.h"
 #include "bpf_module.h"
 #include "kbuild_helper.h"
+#include "shared_table.h"
 #include "libbpf.h"
 
 namespace ebpf {
@@ -113,6 +114,10 @@ BPFModule::~BPFModule() {
   engine_.reset();
   rw_engine_.reset();
   ctx_.reset();
+  for (auto table : *tables_) {
+    if (table.is_shared)
+      SharedTables::instance()->remove_fd(table.name);
+  }
 }
 
 static void debug_printf(Module *mod, IRBuilder<> &B, const string &fmt, vector<Value *> args) {
