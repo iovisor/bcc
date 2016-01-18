@@ -599,6 +599,7 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
         C.getDiagnostics().Report(Decl->getLocStart(), diag_id) << table.name << "already in use";
         return false;
       }
+      table_it->is_shared = true;
       return true;
     }
 
