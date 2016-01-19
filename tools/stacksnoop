@@ -56,7 +56,7 @@ static int print_frame(u64 *bp, int *depth) {
         u64 ret = 0;
         if (bpf_probe_read(&ret, sizeof(ret), (void *)(*bp+8)))
             return 0;
-        if (!ret || ret < __START_KERNEL_map)
+        if (ret < __START_KERNEL_map)
             return 0;
         bpf_trace_printk("r%d: %llx\\n", *depth, ret);
         if (bpf_probe_read(bp, sizeof(*bp), (void *)*bp))
