@@ -92,22 +92,22 @@ int offcpu(struct pt_regs *ctx) {
 
 int oncpu(struct pt_regs *ctx) {
     u32 pid = bpf_get_current_pid_tgid();
-    FILTER
-    u64 ts = bpf_ktime_get_ns();
-    struct key_t key = {};
-    u64 zero = 0, *val, bp = 0, *tsp, delta;
-    int depth = 0;
+    u64 *tsp;
 
     // calculate delta time
     tsp = start.lookup(&pid);
     if (tsp == 0)
-        return 0;        // missed start
-    delta = bpf_ktime_get_ns() - *tsp;
+        return 0;        // missed start or filtered
+    u64 delta = bpf_ktime_get_ns() - *tsp;
     start.delete(&pid);
     delta = delta / 1000;
     if (delta < MINBLOCK_US)
         return 0;
 
+    // create map key
+    u64 zero = 0, *val, bp = 0;
+    int depth = 0;
+    struct key_t key = {};
     bpf_get_current_comm(&key.name, sizeof(key.name));
     bp = ctx->bp;
 
