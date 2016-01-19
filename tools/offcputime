@@ -74,7 +74,7 @@ static u64 get_frame(u64 *bp) {
         if (bpf_probe_read(&ret, sizeof(ret), (void *)(*bp+8)))
             return 0;
         if (bpf_probe_read(bp, sizeof(*bp), (void *)*bp))
-            bp = 0;
+            *bp = 0;
         if (ret < __START_KERNEL_map)
             return 0;
         return ret;
