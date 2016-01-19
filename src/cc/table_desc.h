@@ -38,6 +38,7 @@ struct TableDesc {
   llvm::Function *leaf_sscanf;
   llvm::Function *key_snprintf;
   llvm::Function *leaf_snprintf;
+  bool is_shared;
 };
 
 }  // namespace ebpf
