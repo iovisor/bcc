@@ -3,7 +3,7 @@
 # offcputime    Summarize off-CPU time by kernel stack trace
 #               For Linux, uses BCC, eBPF.
 #
-# USAGE: offcputime [-h] [-p PID] [-i INTERVAL] [-T] [duration]
+# USAGE: offcputime [-h] [-u] [-p PID] [-i INTERVAL] [-T] [duration]
 #
 # The current implementation uses an unrolled loop for x86_64, and was written
 # as a proof of concept. This implementation should be replaced in the future

@@ -723,8 +723,8 @@ creating your "off-CPU time flame graphs".
 
 USAGE message:
 
-./offcputime --help
-usage: offcputime [-h] [-p PID] [-v] [-f] [duration]
+# ./offcputime -h
+usage: offcputime [-h] [-u] [-p PID] [-v] [-f] [duration]
 
 Summarize off-CPU time by kernel stack trace
 
@@ -733,6 +733,7 @@ positional arguments:
 
 optional arguments:
   -h, --help         show this help message and exit
+  -u, --useronly     user threads only (no kernel threads)
   -p PID, --pid PID  trace this PID only
   -v, --verbose      show raw addresses
   -f, --folded       output folded format
@@ -741,4 +742,5 @@ examples:
     ./offcputime             # trace off-CPU stack time until Ctrl-C
     ./offcputime 5           # trace for 5 seconds only
     ./offcputime -f 5        # 5 seconds, and output in folded format
+    ./offcputime -u          # don't include kernel threads (user only)
     ./offcputime -p 185      # trace fo PID 185 only
