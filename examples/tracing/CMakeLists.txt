@@ -1,6 +1,6 @@
-set(EXAMPLE_FILES bitehist.c bitehist_example.txt disksnoop.c
-  disksnoop_example.txt task_switch.c tcpv4connect tcpv4connect_example.txt
-  vfsreadlat.c vfsreadlat_example.txt)
-set(EXAMPLE_PROGRAMS bitehist.py disksnoop.py task_switch.py trace_fields.py vfsreadlat.py)
-install(FILES ${EXAMPLE_FILES} DESTINATION share/bcc/examples/tracing)
-install(PROGRAMS ${EXAMPLE_PROGRAMS} DESTINATION share/bcc/examples/tracing)
+file(GLOB C_FILES *.c)
+file(GLOB PY_FILES *.py)
+file(GLOB TXT_FILES *.txt)
+install(PROGRAMS ${PY_FILES} DESTINATION share/bcc/examples/tracing)
+install(FILES ${C_FILES} DESTINATION share/bcc/examples/tracing)
+install(FILES ${TXT_FILES} DESTINATION share/bcc/examples/tracing)

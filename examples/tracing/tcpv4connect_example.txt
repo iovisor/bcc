@@ -1,11 +1,11 @@
-Demonstrations of tcpv4connect, the Linux eBPF/bcc version.
+Demonstrations of tcpv4connect.py, the Linux eBPF/bcc version.
 
 
 This example traces the kernel function performing active TCP IPv4 connections
 (eg, via a connect() syscall; accept() are passive connections). Some example
 output (IP addresses changed to protect the innocent):
 
-# ./tcpv4connect 
+# ./tcpv4connect.py
 PID    COMM         SADDR            DADDR            DPORT
 1479   telnet       127.0.0.1        127.0.0.1        23  
 1469   curl         10.201.219.236   54.245.105.25    80  

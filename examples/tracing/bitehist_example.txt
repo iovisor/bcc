@@ -3,7 +3,7 @@ Demonstrations of bitehist.py, the Linux eBPF/bcc version.
 This prints a power-of-2 histogram to show the block I/O size distribution.
 A summary is printed after Ctrl-C is hit.
 
-# ./bitehist.py 
+# ./bitehist.py
 Tracing... Hit Ctrl-C to end.
 ^C
      kbytes          : count     distribution
