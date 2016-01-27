@@ -24,7 +24,7 @@ from subprocess import Popen, PIPE
 import sys
 basestring = (unicode if sys.version_info[0] < 3 else str)
 
-lib = ct.CDLL("libbcc.so")
+lib = ct.CDLL("libbcc.so.0")
 
 # keep in sync with bpf_common.h
 lib.bpf_module_create_b.restype = ct.c_void_p
