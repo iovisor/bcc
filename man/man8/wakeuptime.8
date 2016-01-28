@@ -1,24 +1,25 @@
-.TH offcputime 8  "2016-01-14" "USER COMMANDS"
+.TH wakeuptime 8  "2016-01-27" "USER COMMANDS"
 .SH NAME
-offcputime \- Summarize off-CPU time by kernel stack trace. Uses Linux eBPF/bcc.
+wakeuptime \- Summarize sleep to wakeup time by waker kernel stack. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B offcputime [\-h] [\-u] [\-p PID] [\-i INTERVAL] [\-T] [duration]
+.B wakeuptime [\-h] [\-u] [\-p PID] [\-i INTERVAL] [\-T] [duration]
 .SH DESCRIPTION
-This program shows kernel stack traces and task names that were blocked and
-"off-CPU", and the total duration they were not running: their "off-CPU time".
-It works by tracing when threads block and when they return to CPU, measuring
-both the time they were off-CPU and the blocked kernel stack trace and the
-task name. This data is summarized in the kernel using an eBPF map, and by
-summing the off-CPU time by unique stack trace and task name.
+This program shows the kernel stack traces for threads that woke up other 
+blocked threads, along with the process names of the waker and target, along
+with a sum of the time that the target was blocked: the "blocked time".
+It works by tracing when threads block and when they were then woken up, and
+measuring the time delta. This time measurement will be very similar to off-CPU
+time, however, off-CPU time may include a little extra time spent waiting
+on a run queue to be scheduled. The stack traces, process names, and time spent
+blocked is summarized in the kernel using an eBPF map for efficiency.
 
 The output summary will help you identify reasons why threads
-were blocking, and quantify the time they were off-CPU. This spans all types
-of blocking activity: disk I/O, network I/O, locks, page faults, involuntary
-context switches, etc.
+were blocking by showing who woke them up, along with the time they were
+blocked. This spans all types of blocking activity: disk I/O, network I/O,
+locks, page faults, involuntary context switches, etc.
 
-This is complementary to CPU profiling (e.g., CPU flame graphs) which shows
-the time spent on-CPU. This shows the time spent off-CPU, and the output,
-especially the -f format, can be used to generate an "off-CPU time flame graph".
+This can be used in conjunction with offcputime, which shows the stack trace
+of the blocked thread. wakeuptime shows the stack trace of the waker thread.
 
 See http://www.brendangregg.com/FlameGraphs/offcpuflamegraphs.html
 
@@ -46,21 +47,25 @@ duration
 Duration to trace, in seconds.
 .SH EXAMPLES
 .TP
-Trace all thread blocking events, and summarize (in-kernel) by kernel stack trace and total off-CPU time:
+Trace all thread blocking events, and summarize (in-kernel) by kernel stack trace and total blocked time:
 #
-.B offcputime
+.B wakeuptime
+.TP
+Trace user-mode target threads only:
+#
+.B wakeuptime -u
 .TP
 Trace for 5 seconds only:
 #
-.B offcputime 5
+.B wakeuptime 5
 .TP
 Trace for 5 seconds, and emit output in folded stack format (suitable for flame graphs):
 #
-.B offcputime -f 5
+.B wakeuptime -f 5
 .TP
 Trace PID 185 only:
 #
-.B offcputime -p 185
+.B wakeuptime -p 185
 .SH OVERHEAD
 This summarizes unique stack traces in-kernel for efficiency, allowing it to
 trace a higher rate of events than methods that post-process in user space. The
@@ -86,4 +91,4 @@ Unstable - in development.
 .SH AUTHOR
 Brendan Gregg
 .SH SEE ALSO
-stackcount(8)
+offcputime(8), stackcount(8)

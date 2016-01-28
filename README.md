@@ -65,23 +65,24 @@ Examples:
 
 Tools:
 
-- tools/[biolatency](tools/biolatency): Summarize block device I/O latency as a histogram. [Examples](tools/biolatency_example.txt).
-- tools/[biosnoop](tools/biosnoop): Trace block device I/O with PID and latency. [Examples](tools/biosnoop_example.txt).
-- tools/[funccount](tools/funccount): Count kernel function calls. [Examples](tools/funccount_example.txt).
-- tools/[funclatency](tools/funclatency): Time kernel functions and show their latency distribution. [Examples](tools/funclatency_example.txt).
-- tools/[hardirqs](tools/hardirqs):  Measure hard IRQ (hard interrupt) event time. [Examples](tools/hardirqs_example.txt).
-- tools/[killsnoop](tools/killsnoop): Trace signals issued by the kill() syscall. [Examples](tools/killsnoop_example.txt).
-- tools/[offcputime](tools/offcputime): Summarize off-CPU time by kernel stack trace. [Examples](tools/offcputime_example.txt).
-- tools/[opensnoop](tools/opensnoop): Trace open() syscalls. [Examples](tools/opensnoop_example.txt).
-- tools/[pidpersec](tools/pidpersec): Count new processes (via fork). [Examples](tools/pidpersec_example.txt).
-- tools/[softirqs](tools/softirqs):  Measure soft IRQ (soft interrupt) event time. [Examples](tools/softirqs_example.txt).
-- tools/[stackcount](tools/stackcount): Count kernel function calls and their stack traces. [Examples](tools/stackcount_example.txt).
-- tools/[stacksnoop](tools/stacksnoop): Trace a kernel function and print all kernel stack traces. [Examples](tools/stacksnoop_example.txt).
-- tools/[syncsnoop](tools/syncsnoop): Trace sync() syscall. [Examples](tools/syncsnoop_example.txt).
-- tools/[tcpaccept](tools/tcpaccept): Trace TCP passive connections (accept()). [Examples](tools/tcpaccept_example.txt).
-- tools/[tcpconnect](tools/tcpconnect): Trace TCP active connections (connect()). [Examples](tools/tcpconnect_example.txt).
-- tools/[vfscount](tools/vfscount) tools/[vfscount.c](tools/vfscount.c): Count VFS calls. [Examples](tools/vfscount_example.txt).
-- tools/[vfsstat](tools/vfsstat) tools/[vfsstat.c](tools/vfsstat.c): Count some VFS calls, with column output. [Examples](tools/vfsstat_example.txt).
+- tools/[biolatency](tools/biolatency.py): Summarize block device I/O latency as a histogram. [Examples](tools/biolatency_example.txt).
+- tools/[biosnoop](tools/biosnoop.py): Trace block device I/O with PID and latency. [Examples](tools/biosnoop_example.txt).
+- tools/[funccount](tools/funccount.py): Count kernel function calls. [Examples](tools/funccount_example.txt).
+- tools/[funclatency](tools/funclatency.py): Time kernel functions and show their latency distribution. [Examples](tools/funclatency_example.txt).
+- tools/[hardirqs](tools/hardirqs.py):  Measure hard IRQ (hard interrupt) event time. [Examples](tools/hardirqs_example.txt).
+- tools/[killsnoop](tools/killsnoop.py): Trace signals issued by the kill() syscall. [Examples](tools/killsnoop_example.txt).
+- tools/[offcputime](tools/offcputime.py): Summarize off-CPU time by kernel stack trace. [Examples](tools/offcputime_example.txt).
+- tools/[opensnoop](tools/opensnoop.py): Trace open() syscalls. [Examples](tools/opensnoop_example.txt).
+- tools/[pidpersec](tools/pidpersec.py): Count new processes (via fork). [Examples](tools/pidpersec_example.txt).
+- tools/[softirqs](tools/softirqs.py):  Measure soft IRQ (soft interrupt) event time. [Examples](tools/softirqs_example.txt).
+- tools/[stackcount](tools/stackcount.py): Count kernel function calls and their stack traces. [Examples](tools/stackcount_example.txt).
+- tools/[stacksnoop](tools/stacksnoop.py): Trace a kernel function and print all kernel stack traces. [Examples](tools/stacksnoop_example.txt).
+- tools/[syncsnoop](tools/syncsnoop.py): Trace sync() syscall. [Examples](tools/syncsnoop_example.txt).
+- tools/[tcpaccept](tools/tcpaccept.py): Trace TCP passive connections (accept()). [Examples](tools/tcpaccept_example.txt).
+- tools/[tcpconnect](tools/tcpconnect.py): Trace TCP active connections (connect()). [Examples](tools/tcpconnect_example.txt).
+- tools/[vfscount](tools/vfscount.py) tools/[vfscount.c](tools/vfscount.c): Count VFS calls. [Examples](tools/vfscount_example.txt).
+- tools/[vfsstat](tools/vfsstat.py) tools/[vfsstat.c](tools/vfsstat.c): Count some VFS calls, with column output. [Examples](tools/vfsstat_example.txt).
+- tools/[wakeuptime](tools/wakeuptime.py): Summarize sleep to wakeup time by waker kernel stack. [Examples](tools/wakeuptime_example.txt).
 
 ### Networking
 
