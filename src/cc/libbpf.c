@@ -260,10 +260,10 @@ error:
   return -1;
 }
 
-void * bpf_attach_kprobe(int progfd, const char *event,
-                         const char *event_desc, pid_t pid,
-                         int cpu, int group_fd, perf_reader_cb cb,
-                         void *cb_cookie) {
+static void * bpf_attach_probe(int progfd, const char *event,
+                               const char *event_desc, const char *event_type,
+                               pid_t pid, int cpu, int group_fd,
+                               perf_reader_cb cb, void *cb_cookie) {
   int kfd = -1;
   char buf[256];
   struct perf_reader *reader = NULL;
@@ -272,20 +272,21 @@ void * bpf_attach_kprobe(int progfd, const char *event,
   if (!reader)
     goto error;
 
-  kfd = open("/sys/kernel/debug/tracing/kprobe_events", O_WRONLY | O_APPEND, 0);
+  snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/%s_events", event_type);
+  kfd = open(buf, O_WRONLY | O_APPEND, 0);
   if (kfd < 0) {
-    perror("open(kprobe_events)");
+    fprintf(stderr, "open(%s): %s\n", buf, strerror(errno));
     goto error;
   }
 
   if (write(kfd, event_desc, strlen(event_desc)) < 0) {
-    fprintf(stderr, "write of \"%s\" into kprobe_events failed: %s\n", event_desc, strerror(errno));
+    fprintf(stderr, "write(%s, \"%s\") failed: %s\n", buf, event_desc, strerror(errno));
     if (errno == EINVAL)
       fprintf(stderr, "check dmesg output for possible cause\n");
     goto error;
   }
 
-  snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/events/kprobes/%s", event);
+  snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/events/%ss/%s", event_type, event);
   if (bpf_attach_tracing_event(progfd, buf, reader, pid, cpu, group_fd) < 0)
     goto error;
 
@@ -300,17 +301,33 @@ error:
   return NULL;
 }
 
-int bpf_detach_kprobe(const char *event_desc) {
+void * bpf_attach_kprobe(int progfd, const char *event,
+                        const char *event_desc,
+                        pid_t pid, int cpu, int group_fd,
+                        perf_reader_cb cb, void *cb_cookie) {
+  return bpf_attach_probe(progfd, event, event_desc, "kprobe", pid, cpu, group_fd, cb, cb_cookie);
+}
+
+void * bpf_attach_uprobe(int progfd, const char *event,
+                        const char *event_desc,
+                        pid_t pid, int cpu, int group_fd,
+                        perf_reader_cb cb, void *cb_cookie) {
+  return bpf_attach_probe(progfd, event, event_desc, "uprobe", pid, cpu, group_fd, cb, cb_cookie);
+}
+
+static int bpf_detach_probe(const char *event_desc, const char *event_type) {
   int kfd = -1;
 
-  kfd = open("/sys/kernel/debug/tracing/kprobe_events", O_WRONLY | O_APPEND, 0);
+  char buf[256];
+  snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/%s_events", event_type);
+  kfd = open(buf, O_WRONLY | O_APPEND, 0);
   if (kfd < 0) {
-    perror("open(kprobe_events)");
+    fprintf(stderr, "open(%s): %s\n", buf, strerror(errno));
     goto error;
   }
 
   if (write(kfd, event_desc, strlen(event_desc)) < 0) {
-    perror("write(kprobe_events)");
+    fprintf(stderr, "write(%s): %s\n", buf, strerror(errno));
     goto error;
   }
 
@@ -321,6 +338,14 @@ error:
     close(kfd);
 
   return -1;
+}
+
+int bpf_detach_kprobe(const char *event_desc) {
+  return bpf_detach_probe(event_desc, "kprobe");
+}
+
+int bpf_detach_uprobe(const char *event_desc) {
+  return bpf_detach_probe(event_desc, "uprobe");
 }
 
 void * bpf_open_perf_buffer(perf_reader_raw_cb raw_cb, void *cb_cookie, int pid, int cpu) {
