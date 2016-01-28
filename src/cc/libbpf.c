@@ -234,7 +234,7 @@ static int bpf_attach_tracing_event(int progfd, const char *event_path,
   attr.wakeup_events = 1;
   pfd = syscall(__NR_perf_event_open, &attr, pid, cpu, group_fd, PERF_FLAG_FD_CLOEXEC);
   if (pfd < 0) {
-    perror("perf_event_open");
+    fprintf(stderr, "perf_event_open(%s/id): %s\n", event_path, strerror(errno));
     goto error;
   }
   perf_reader_set_fd(reader, pfd);

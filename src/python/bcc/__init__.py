@@ -765,7 +765,7 @@ class BPF(object):
         if not addr:
             raise Exception("could not determine address of symbol %s" % sym)
 
-        return (path, load_addr+addr)
+        return (path, addr-load_addr)
 
     def attach_uprobe(self, name="", sym="", addr=None,
             fn_name="", pid=-1, cpu=0, group_fd=-1):
