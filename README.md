@@ -65,6 +65,7 @@ Examples:
 
 Tools:
 
+- tools/[bashreadline](tools/bashreadline.py): Print entered bash commands system wide. [Examples](tools/bashreadline_example.txt).
 - tools/[biolatency](tools/biolatency.py): Summarize block device I/O latency as a histogram. [Examples](tools/biolatency_example.txt).
 - tools/[biosnoop](tools/biosnoop.py): Trace block device I/O with PID and latency. [Examples](tools/biosnoop_example.txt).
 - tools/[funccount](tools/funccount.py): Count kernel function calls. [Examples](tools/funccount_example.txt).
