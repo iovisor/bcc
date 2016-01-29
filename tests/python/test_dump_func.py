@@ -15,9 +15,9 @@ class TestDumpFunc(TestCase):
                 return 1;
             }""")
 
-        self.assertEquals(
-            "\xb7\x00\x00\x00\x01\x00\x00\x00" +
-            "\x95\x00\x00\x00\x00\x00\x00\x00",
+        self.assertEqual(
+            b"\xb7\x00\x00\x00\x01\x00\x00\x00" +
+            b"\x95\x00\x00\x00\x00\x00\x00\x00",
             b.dump_func("entry"))
 
 if __name__ == "__main__":
