@@ -725,7 +725,9 @@ class BPF(object):
             return cls._lib_load_address_cache[path]
 
         # "LOAD off    0x0000000000000000 vaddr 0x0000000000400000 paddr 0x..."
-        with os.popen("""/usr/bin/objdump -x %s | awk '$1 == "LOAD" && $3 ~ /^[0x]*$/ { print $5 }'""" % path) as f:
+        with os.popen("""/usr/bin/objdump -x %s | \
+                awk '$1 == "LOAD" && $3 ~ /^[0x]*$/ \
+                { print $5 }'""" % path) as f:
             data = f.read().rstrip()
         if not data:
             return None
@@ -741,7 +743,9 @@ class BPF(object):
         if sym in symbols:
             return symbols[sym]
 
-        with os.popen("""objdump -tT %s | awk -v sym=%s '$NF == sym && $4 == ".text"  { print $1; exit }'""" % (path, sym)) as f:
+        with os.popen("""/usr/bin/objdump -tT %s | \
+                awk -v sym=%s '$NF == sym && $4 == ".text"  \
+                { print $1; exit }'""" % (path, sym)) as f:
             data = f.read().rstrip()
         if not data:
             return None
@@ -769,6 +773,21 @@ class BPF(object):
 
     def attach_uprobe(self, name="", sym="", addr=None,
             fn_name="", pid=-1, cpu=0, group_fd=-1):
+        """attach_uprobe(name="", sym="", addr=None, fn_name=""
+                         pid=-1, cpu=0, group_fd=-1)
+
+        Run the bpf function denoted by fn_name every time the symbol sym in
+        the library or binary 'name' is encountered. The real address addr may
+        be supplied in place of sym. Optional parameters pid, cpu, and group_fd
+        can be used to filter the probe.
+
+        Libraries can be given in the name argument without the lib prefix, or
+        with the full path (/usr/lib/...). Binaries can be given only with the
+        full path (/bin/sh).
+
+        Example: BPF(text).attach_uprobe("c", "malloc")
+                 BPF(text).attach_uprobe("/usr/bin/python", "main")
+        """
 
         (path, addr) = BPF._check_path_symbol(name, sym, addr)
 
@@ -786,6 +805,12 @@ class BPF(object):
 
     @classmethod
     def detach_uprobe(cls, name="", sym="", addr=None):
+        """detach_uprobe(name="", sym="", addr=None)
+
+        Stop running a bpf function that is attached to symbol 'sym' in library
+        or binary 'name'.
+        """
+
         (path, addr) = BPF._check_path_symbol(name, sym, addr)
         ev_name = "p_%s_0x%x" % (cls._probe_repl.sub("_", path), addr)
         if ev_name not in open_uprobes:
@@ -799,6 +824,13 @@ class BPF(object):
 
     def attach_uretprobe(self, name="", sym="", addr=None,
             fn_name="", pid=-1, cpu=0, group_fd=-1):
+        """attach_uretprobe(name="", sym="", addr=None, fn_name=""
+                            pid=-1, cpu=0, group_fd=-1)
+
+        Run the bpf function denoted by fn_name every time the symbol sym in
+        the library or binary 'name' finishes execution. See attach_uprobe for
+        meaning of additional parameters.
+        """
 
         (path, addr) = BPF._check_path_symbol(name, sym, addr)
 
@@ -816,6 +848,12 @@ class BPF(object):
 
     @classmethod
     def detach_uretprobe(cls, name="", sym="", addr=None):
+        """detach_uretprobe(name="", sym="", addr=None)
+
+        Stop running a bpf function that is attached to symbol 'sym' in library
+        or binary 'name'.
+        """
+
         (path, addr) = BPF._check_path_symbol(name, sym, addr)
         ev_name = "r_%s_0x%x" % (cls._probe_repl.sub("_", path), addr)
         if ev_name not in open_uprobes:
