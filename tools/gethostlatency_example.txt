@@ -1,0 +1,21 @@
+Demonstrations of gethostlatency, the Linux eBPF/bcc version.
+
+
+This traces host name lookup calls (getaddrinfo(), gethostbyname(), and
+gethostbyname2()), and shows the PID and command performing the lookup, the
+latency (duration) of the call in milliseconds, and the host string:
+
+# ./gethostlatency
+TIME      PID    COMM          LATms HOST
+06:10:24  28011  wget          90.00 www.iovisor.org
+06:10:28  28127  wget           0.00 www.iovisor.org
+06:10:41  28404  wget           9.00 www.netflix.com
+06:10:48  28544  curl          35.00 www.netflix.com.au
+06:11:10  29054  curl          31.00 www.plumgrid.com
+06:11:16  29195  curl           3.00 www.facebook.com
+06:11:25  29404  curl          72.00 foo
+06:11:28  29475  curl           1.00 foo
+
+In this example, the first call to lookup "www.iovisor.org" took 90 ms, and
+the second took 0 ms (cached). The slowest call in this example was to "foo",
+which was an unsuccessful lookup.
