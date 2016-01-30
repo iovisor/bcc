@@ -2,7 +2,7 @@
 .SH NAME
 offcputime \- Summarize off-CPU time by kernel stack trace. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B offcputime [\-h] [\-u] [\-p PID] [\-i INTERVAL] [\-T] [duration]
+.B offcputime [\-h] [\-u] [\-p PID] [\-v] [\-f] [duration]
 .SH DESCRIPTION
 This program shows kernel stack traces and task names that were blocked and
 "off-CPU", and the total duration they were not running: their "off-CPU time".
@@ -33,11 +33,14 @@ CONFIG_BPF and bcc.
 \-h
 Print usage message.
 .TP
+\-f
+Print output in folded stack format.
+.TP
 \-u
 Only trace user threads (not kernel threads).
 .TP
 \-v
-Show raw addresses.
+Show raw addresses (for non-folded output).
 .TP
 \-p PID
 Trace this process ID only (filtered in-kernel).

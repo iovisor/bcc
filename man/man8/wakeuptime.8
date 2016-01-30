@@ -2,7 +2,7 @@
 .SH NAME
 wakeuptime \- Summarize sleep to wakeup time by waker kernel stack. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B wakeuptime [\-h] [\-u] [\-p PID] [\-i INTERVAL] [\-T] [duration]
+.B wakeuptime [\-h] [\-u] [\-p PID] [\-v] [\-f] [duration]
 .SH DESCRIPTION
 This program shows the kernel stack traces for threads that woke up other 
 blocked threads, along with the process names of the waker and target, along
@@ -34,11 +34,14 @@ CONFIG_BPF and bcc.
 \-h
 Print usage message.
 .TP
+\-f
+Print output in folded stack format.
+.TP
 \-u
 Only trace user threads (not kernel threads).
 .TP
 \-v
-Show raw addresses.
+Show raw addresses (for non-folded format).
 .TP
 \-p PID
 Trace this process ID only (filtered in-kernel).
