@@ -1,0 +1,96 @@
+.TH offwaketime 8  "2016-01-30" "USER COMMANDS"
+.SH NAME
+offwaketime \- Summarize blocked time by kernel off-CPU stack + waker stack. Uses Linux eBPF/bcc.
+.SH SYNOPSIS
+.B offwaketime [\-h] [\-u] [\-p PID] [\-v] [\-f] [duration]
+.SH DESCRIPTION
+This program shows kernel stack traces and task names that were blocked and
+"off-CPU", along with the stack traces and task names for the threads that woke
+them, and the total elapsed time from when they blocked to when they were woken
+up.  This combines the summaries from both the offcputime and wakeuptime tools.
+The time measurement will be very similar to off-CPU time, however, off-CPU time
+may include a little extra time spent waiting on a run queue to be scheduled.
+The combined stacks, task names, and total time is summarized in kernel context
+for efficiency, using an eBPF map.
+
+The output summary will further help you identify reasons why threads
+were blocking, and quantify the time from when they were blocked to woken up.
+This spans all types of blocking activity: disk I/O, network I/O, locks, page
+faults, swapping, sleeping, involuntary context switches, etc.
+
+This is complementary to CPU profiling (e.g., CPU flame graphs) which shows
+the time spent on-CPU. This shows the time spent blocked off-CPU, and the
+output, especially the -f format, can be used to generate an "off-wake time
+flame graph".
+
+See http://www.brendangregg.com/FlameGraphs/offcpuflamegraphs.html
+
+The stack depth is currently limited to 20 for the off-CPU stack, and 10 for
+the waker stack, and the stack traces are kernel mode only. Check for newer
+versions where this should be improved.
+
+This currently only works on x86_64. Check for future versions.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH OPTIONS
+.TP
+\-h
+Print usage message.
+.TP
+\-f
+Output stacks in folded format.
+.TP
+\-u
+Only trace user threads (not kernel threads).
+.TP
+\-v
+Show raw addresses for non-folded mode.
+.TP
+\-p PID
+Trace this process ID only (filtered in-kernel).
+.TP
+duration
+Duration to trace, in seconds.
+.SH EXAMPLES
+.TP
+Trace all thread blocking events, and summarize (in-kernel) by kernel off-CPU stack trace, waker stack traces, task names, and total blocked time:
+#
+.B offwaketime
+.TP
+Trace for 5 seconds only:
+#
+.B offwaketime 5
+.TP
+Trace for 5 seconds, and emit output in folded stack format (suitable for flame graphs), user-mode threads only:
+#
+.B offwaketime -fu 5
+.TP
+Trace PID 185 only:
+#
+.B offwaketime -p 185
+.SH OVERHEAD
+This summarizes unique stack trace pairs in-kernel for efficiency, allowing it
+to trace a higher rate of events than methods that post-process in user space.
+The stack trace and time data is only copied to user space once, when the output
+is printed. While these techniques greatly lower overhead, scheduler events are
+still a high frequency event, as they can exceed 1 million events per second,
+and so caution should still be used. Test before production use.
+
+If the overhead is still a problem, take a look at the MINBLOCK_US tunable in
+the code. If your aim is to chase down longer blocking events, then this could
+be increased to filter shorter blocking events, further lowering overhead.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Brendan Gregg
+.SH SEE ALSO
+offcputime(8), wakeuptime(8)

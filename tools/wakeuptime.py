@@ -3,7 +3,7 @@
 # wakeuptime    Summarize sleep to wakeup time by waker kernel stack
 #               For Linux, uses BCC, eBPF.
 #
-# USAGE: wakeuptime [-h] [-u] [-p PID] [-i INTERVAL] [-T] [duration]
+# USAGE: wakeuptime [-h] [-u] [-p PID] [-v] [-f] [duration]
 #
 # The current implementation uses an unrolled loop for x86_64, and was written
 # as a proof of concept. This implementation should be replaced in the future
