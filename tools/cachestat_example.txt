@@ -1,0 +1,75 @@
+# ./cachestat -h
+USAGE: ./cachestat [-T] [ interval [count] ]
+
+show Linux page cache hit/miss statistics including read and write hit %
+
+optional arguments:
+  -T              include timestamp on output
+
+examples:
+    ./cachestat             # run with default option of 5 seconds delay
+    ./cachestat -T          # run with default option of 5 seconds delay with timestamps
+    ./cachestat 1           # print every second hit/miss stats
+    ./cachestat -T 1        # include timestamps with one second samples
+    ./cachestat 1 5         # run with interval of one second for five iterations
+    ./cachestat -T 1 5      # include timestamps with interval of one second for five iterations
+    
+
+# ./cachestat 1
+    HITS   MISSES  DIRTIES READ_HIT% WRITE_HIT%   BUFFERS_MB  CACHED_MB
+       0       58        0     0.0%   100.0%            0      11334
+  146113        0        0   100.0%     0.0%            0      11334
+  244143        0        0   100.0%     0.0%            0      11334
+  216833        0        0   100.0%     0.0%            0      11334
+  248209        0        0   100.0%     0.0%            0      11334
+  205825        0        0   100.0%     0.0%            0      11334
+  286654        0        0   100.0%     0.0%            0      11334
+  275850        0        0   100.0%     0.0%            0      11334
+  272883        0        0   100.0%     0.0%            0      11334
+  261633        0        0   100.0%     0.0%            0      11334
+  252826        0        0   100.0%     0.0%            0      11334
+  235253       70        3   100.0%     0.0%            0      11335
+  204946        0        0   100.0%     0.0%            0      11335
+       0        0        0     0.0%     0.0%            0      11335
+       0        0        0     0.0%     0.0%            0      11335
+       0        0        0     0.0%     0.0%            0      11335
+
+Above shows the reading of a 12GB file already cached in the OS page cache and again below with timestamps.
+
+# ./cachestat -T 1
+TIME         HITS   MISSES  DIRTIES READ_HIT% WRITE_HIT%   BUFFERS_MB  CACHED_MB
+16:07:10        0        0        0     0.0%     0.0%            0      11336
+16:07:11        0        0        0     0.0%     0.0%            0      11336
+16:07:12   117849        0        0   100.0%     0.0%            0      11336
+16:07:13   212558        0        0   100.0%     0.0%            0      11336
+16:07:14   302559        1        0   100.0%     0.0%            0      11336
+16:07:15   309230        0        0   100.0%     0.0%            0      11336
+16:07:16   305701        0        0   100.0%     0.0%            0      11336
+16:07:17   312754        0        0   100.0%     0.0%            0      11336
+16:07:18   308406        0        0   100.0%     0.0%            0      11336
+16:07:19   298185        0        0   100.0%     0.0%            0      11336
+16:07:20   236128        0        0   100.0%     0.0%            0      11336
+16:07:21   257616        0        0   100.0%     0.0%            0      11336
+16:07:22   179792        0        0   100.0%     0.0%            0      11336
+
+Command used to generate the activity
+# dd if=/root/mnt2/testfile of=/dev/null bs=8192
+1442795+0 records in
+1442795+0 records out
+11819376640 bytes (12 GB) copied, 3.9301 s, 3.0 GB/s
+
+Below shows the dirty ratio increasing as we add a file to the page cache 
+# ./cachestat.py
+    HITS   MISSES  DIRTIES  READ_HIT% WRITE_HIT%   BUFFERS_MB  CACHED_MB
+    1074       44       13      94.9%       2.9%            1        223
+    2195      170        8      92.5%       6.8%            1        143
+     182       53       56      53.6%       1.3%            1        143
+   62480    40960    20480      40.6%      19.8%            1        223
+       7        2        5      22.2%      22.2%            1        223
+     348        0        0     100.0%       0.0%            1        223
+       0        0        0       0.0%       0.0%            1        223
+       0        0        0       0.0%       0.0%            1        223
+       0        0        0       0.0%       0.0%            1        223
+       0        0        0       0.0%       0.0%            1        223
+
+The file copied into page cache was named 80m with a size of 83886080 (83886080/4096) = 20480, this matches what we see under dirties
