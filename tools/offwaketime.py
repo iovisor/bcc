@@ -17,11 +17,11 @@
 # Copyright 2016 Netflix, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
-# 20-Jan-2016	Brendan Gregg	Created this.
+# 20-Jan-2016   Brendan Gregg   Created this.
 
 from __future__ import print_function
 from bcc import BPF
-from time import sleep, strftime
+from time import sleep
 import argparse
 import signal
 
@@ -184,37 +184,8 @@ int oncpu(struct pt_regs *ctx, struct task_struct *p) {
 out:
     woke = wokeby.lookup(&pid);
     if (woke) {
-        // unrolled loop (MAXWDEPTH):
-        depth = 0;
-        key.wret[depth] = woke->ret[depth]; depth++;
-        key.wret[depth] = woke->ret[depth]; depth++;
-        key.wret[depth] = woke->ret[depth]; depth++;
-        key.wret[depth] = woke->ret[depth]; depth++;
-        key.wret[depth] = woke->ret[depth]; depth++;
-        key.wret[depth] = woke->ret[depth]; depth++;
-        key.wret[depth] = woke->ret[depth]; depth++;
-        key.wret[depth] = woke->ret[depth]; depth++;
-        key.wret[depth] = woke->ret[depth]; depth++;
-        key.wret[depth] = woke->ret[depth];
-
-        // unrolled loop (TASK_COMM_LEN):
-        depth = 0;
-        key.waker[depth] = woke->name[depth]; depth++;
-        key.waker[depth] = woke->name[depth]; depth++;
-        key.waker[depth] = woke->name[depth]; depth++;
-        key.waker[depth] = woke->name[depth]; depth++;
-        key.waker[depth] = woke->name[depth]; depth++;
-        key.waker[depth] = woke->name[depth]; depth++;
-        key.waker[depth] = woke->name[depth]; depth++;
-        key.waker[depth] = woke->name[depth]; depth++;
-        key.waker[depth] = woke->name[depth]; depth++;
-        key.waker[depth] = woke->name[depth]; depth++;
-        key.waker[depth] = woke->name[depth]; depth++;
-        key.waker[depth] = woke->name[depth]; depth++;
-        key.waker[depth] = woke->name[depth]; depth++;
-        key.waker[depth] = woke->name[depth]; depth++;
-        key.waker[depth] = woke->name[depth]; depth++;
-        key.waker[depth] = woke->name[depth];
+        __builtin_memcpy(&key.wret, woke->ret, sizeof(key.wret));
+        __builtin_memcpy(&key.waker, woke->name, TASK_COMM_LEN);
         wokeby.delete(&pid);
     }
 
