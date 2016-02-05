@@ -299,5 +299,9 @@ BPF_TABLE("array", int, union emptyu, t3, 1);
         b1 = BPF(text="""BPF_TABLE_PUBLIC("hash", int, int, table1, 10);""")
         b2 = BPF(text="""BPF_TABLE("extern", int, int, table1, 10);""")
 
+    def test_syntax_error(self):
+        with self.assertRaises(Exception):
+            b = BPF(text="""int failure(void *ctx) { if (); return 0; }""")
+
 if __name__ == "__main__":
     main()
