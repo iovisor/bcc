@@ -55,7 +55,7 @@ install(TARGETS bcc LIBRARY COMPONENT libbcc
 install(DIRECTORY export/ COMPONENT libbcc
   DESTINATION share/bcc/include/bcc
   FILES_MATCHING PATTERN "*.h")
-install(FILES bpf_common.h ../libbpf.h COMPONENT libbcc
+install(FILES bpf_common.h bpf_module.h ../libbpf.h COMPONENT libbcc
   DESTINATION include/bcc)
 install(DIRECTORY compat/linux/ COMPONENT libbcc
   DESTINATION include/bcc/compat/linux
