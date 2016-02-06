@@ -177,7 +177,7 @@ section of the [kernel ftrace doc](https://www.kernel.org/doc/Documentation/trac
 
 ### Networking
 
-At RedHat Summit 2015, BCC was presented as part of a [session on BPF](http://www.devnation.org/#7784f1f7513e8542e4db519e79ff5eec).
+At Red Hat Summit 2015, BCC was presented as part of a [session on BPF](http://www.devnation.org/#7784f1f7513e8542e4db519e79ff5eec).
 A multi-host vxlan environment is simulated and a BPF program used to monitor
 one of the physical interfaces. The BPF program keeps statistics on the inner
 and outer IP addresses traversing the interface, and the userspace component

@@ -113,7 +113,7 @@ several types of hooks available:
   through the socket/interface.
 
 EBPF programs can be used for many purposes; the main use cases are
-dynamic tracing and monitoring, and packet procesisng.  We are mostly
+dynamic tracing and monitoring, and packet processing.  We are mostly
 interested in the latter use case in this document.
 
 #### EBPF Tables
@@ -219,7 +219,7 @@ very complex packet filters and simple packet forwarding engines.  In
 the spirit of open-source "release early, release often", we expect
 that the compiler's capabilities will improve gradually.
 
-* Packet filtering is peformed using the `drop()` action.  Packets
+* Packet filtering is performed using the `drop()` action.  Packets
   that are not dropped will be forwarded.
 
 * Packet forwarding is performed by setting the
@@ -233,7 +233,7 @@ Here are some limitations imposed on the P4 programs:
   EBPF program).  In the future the compiler should probably generate
   two separate EBPF programs.
 
-* arbirary parsers can be compiled, but the BCC compiler will reject
+* arbitrary parsers can be compiled, but the BCC compiler will reject
   parsers that contain cycles
 
 * arithmetic on data wider than 32 bits is not supported
@@ -311,7 +311,7 @@ p4toEbpf.py file.p4 -o file.c
 
 The P4 compiler first runs the C preprocessor on the input P4 file.
 Some of the command-line options are passed directly to the
-preprocesor.
+preprocessor.
 
 The following compiler options are available:
 
