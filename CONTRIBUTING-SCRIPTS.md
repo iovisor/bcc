@@ -36,5 +36,6 @@ A checklist for bcc tool development:
 1. **Read your example.txt file**. Does this sound too niche or convoluted? Are you spending too much time explaining caveats? These can be hints that perhaps you should fix your tool, or abandon it! Perhaps it better belongs as an /example, and not a tool. I've abandoned many tools at this stage.
 1. **Write a man page**. Either ROFF (.8), markdown (.md), or plain text (.txt): so long as it documents the important sections, particularly columns (fields) and caveats. These go under man/man8. See the other examples. Include a section on overhead, and pull no punches. It's better for end users to know about high overhead beforehand, than to discover it the hard way. Also explain caveats. Don't assume those will be obvious to tool users.
 1. **Read your man page**. For ROFF: nroff -man filename. Like before, this exercise is like saying something out loud. Does it sound too niche or convoluted? Again, hints that you might need to go back and fix things, or abandon it.
+1. **Spell check your documentation**. Use a spell checker like aspell to check your document quality before committing.
 1. **Add an entry to README.md**.
 1. If you made it this far, pull request!
