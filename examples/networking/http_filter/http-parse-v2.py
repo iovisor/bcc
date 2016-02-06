@@ -109,7 +109,7 @@ local_dictionary = {}
 
 while 1:
   #retrieve raw packet from socket
-  packet_str = os.read(socket_fd,4096) #set packet lenght to max packet lenght on the interface
+  packet_str = os.read(socket_fd,4096) #set packet length to max packet length on the interface
   packet_count += 1
 
   #DEBUG - print raw packet in hex format
@@ -133,18 +133,18 @@ while 1:
   #value to multiply * 4 byte
   #e.g. IHL = 5 ; IP Header Length = 5 * 4 byte = 20 byte
   #
-  #Total Lenght: This 16-bit field defines the entire packet size, 
+  #Total length: This 16-bit field defines the entire packet size, 
   #including header and data, in bytes.
 
-  #calculate packet total lenght
-  total_lenght = packet_bytearray[ETH_HLEN + 2]               #load MSB
-  total_lenght = total_lenght << 8                            #shift MSB
-  total_lenght = total_lenght + packet_bytearray[ETH_HLEN+3]  #add LSB
+  #calculate packet total length
+  total_length = packet_bytearray[ETH_HLEN + 2]               #load MSB
+  total_length = total_length << 8                            #shift MSB
+  total_length = total_length + packet_bytearray[ETH_HLEN+3]  #add LSB
   
-  #calculate ip header lenght
+  #calculate ip header length
   ip_header_length = packet_bytearray[ETH_HLEN]               #load Byte
   ip_header_length = ip_header_length & 0x0F                  #mask bits 0..3
-  ip_header_length = ip_header_length << 2                    #shift to obtain lenght
+  ip_header_length = ip_header_length << 2                    #shift to obtain length
 
   #retrieve ip source/dest
   ip_src_str = packet_str[ETH_HLEN+12:ETH_HLEN+16]                #ip source offset 12..15
@@ -168,10 +168,10 @@ while 1:
   #value to multiply * 4 byte
   #e.g. DataOffset = 5 ; TCP Header Length = 5 * 4 byte = 20 byte
 
-  #calculate tcp header lenght
-  tcp_header_lenght = packet_bytearray[ETH_HLEN + ip_header_length + 12]  #load Byte
-  tcp_header_lenght = tcp_header_lenght & 0xF0                            #mask bit 4..7
-  tcp_header_lenght = tcp_header_lenght >> 2                              #SHR 4 ; SHL 2 -> SHR 2
+  #calculate tcp header length
+  tcp_header_length = packet_bytearray[ETH_HLEN + ip_header_length + 12]  #load Byte
+  tcp_header_length = tcp_header_length & 0xF0                            #mask bit 4..7
+  tcp_header_length = tcp_header_length >> 2                              #SHR 4 ; SHL 2 -> SHR 2
   
   #retrieve port source/dest
   port_src_str = packet_str[ETH_HLEN+ip_header_length:ETH_HLEN+ip_header_length+2]
@@ -181,7 +181,7 @@ while 1:
   port_dst = int(toHex(port_dst_str),16)
 
   #calculate payload offset
-  payload_offset = ETH_HLEN + ip_header_length + tcp_header_lenght
+  payload_offset = ETH_HLEN + ip_header_length + tcp_header_length
   
   #payload_string contains only packet payload
   payload_string = packet_str[(payload_offset):(len(packet_bytearray))]
