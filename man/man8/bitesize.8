@@ -1,0 +1,52 @@
+.TH bitesize 8  "2016-02-05" "USER COMMANDS"
+.SH NAME
+bitesize \- Summarize block device I/O size as a histogram \- Linux eBPF/bcc.
+.SH SYNOPSIS
+.B bitesize
+.SH DESCRIPTION
+Show I/O distribution for requested block sizes, by process name.
+
+This works by tracing block I/O kernel functions using dynamic
+tracing and prints a historgram of I/O size.
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH EXAMPLES
+.TP
+Count I/O size per process until Ctrl-C is hit:
+#
+.B bitesize
+.SH FIELDS
+.TP
+Kbtes
+Size in kilobytes of range
+.TP
+count
+How many I/O fell into this range
+.TP
+distribution
+An ASCII bar chart to visualize the distribution (count column)
+
+.SH OVERHEAD
+This traces kernel block I/O functions to update a histgroam, which are
+asynchronously copied to user-space. This method is very efficient, and 
+the overhead for most storage I/O rates (< 10k IOPS) should be negligible. 
+If you have a higher IOPS storage environment, test and quantify the overhead 
+before use.
+
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Allan McAleavy
+.SH SEE ALSO
+https://github.com/brendangregg/systemtap-lwtools/blob/master/disk/bitesize-nd.stp
