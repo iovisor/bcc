@@ -37,12 +37,12 @@ the function began executing (was called) to when it finished (returned).
 This example output shows that most of the time, do_sys_open() took between
 2048 and 65536 nanoseconds (2 to 65 microseconds). The peak of this distribution
 shows 291 calls of between 4096 and 8191 nanoseconds. There was also one
-occurrance, an outlier, in the 2 to 4 millisecond range.
+occurrence, an outlier, in the 2 to 4 millisecond range.
 
 How this works: the function entry and return are traced using the kernel kprobe
 and kretprobe tracer. Timestamps are collected, the delta time calculated, which
 is the bucketized and stored as an in-kernel histogram for efficiency. The
-histgram is visible in the output: it's the "count" column; everything else is
+histogram is visible in the output: it's the "count" column; everything else is
 decoration. Only the count column is copied to user-level on output. This is an
 efficient way to time kernel functions and examine their latency distribution.
 
@@ -242,7 +242,7 @@ USAGE message:
 usage: funclatency [-h] [-p PID] [-i INTERVAL] [-T] [-u] [-m] [-F] [-r]
                    pattern
 
-Time kernel funcitons and print latency as a histogram
+Time kernel functions and print latency as a histogram
 
 positional arguments:
   pattern               search expression for kernel functions
@@ -260,7 +260,7 @@ optional arguments:
                         only.
 
 examples:
-    ./funclatency do_sys_open       # time the do_sys_open() kenel function
+    ./funclatency do_sys_open       # time the do_sys_open() kernel function
     ./funclatency -u vfs_read       # time vfs_read(), in microseconds
     ./funclatency -m do_nanosleep   # time do_nanosleep(), in milliseconds
     ./funclatency -mTi 5 vfs_read   # output every 5 seconds, with timestamps

@@ -743,4 +743,4 @@ examples:
     ./offcputime 5           # trace for 5 seconds only
     ./offcputime -f 5        # 5 seconds, and output in folded format
     ./offcputime -u          # don't include kernel threads (user only)
-    ./offcputime -p 185      # trace fo PID 185 only
+    ./offcputime -p 185      # trace for PID 185 only

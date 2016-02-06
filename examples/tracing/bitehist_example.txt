@@ -21,5 +21,5 @@ between 128 and 255 Kbytes in size, and another mode of 211 I/O were between
 4 and 7 Kbytes in size.
 
 Understanding this distribution is useful for characterizing workloads and
-understanding performance. The existance of this distribution is not visible
+understanding performance. The existence of this distribution is not visible
 from averages alone.
