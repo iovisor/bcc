@@ -275,6 +275,11 @@ class EbpfTable(object):
         keyname = "key"
         valueName = "value"
 
+        serializer.newline()
+        serializer.emitIndent()
+        serializer.appendFormat("{0}:", program.getLabel(self))
+        serializer.newline()
+
         serializer.emitIndent()
         serializer.blockStart()
 
@@ -283,17 +288,12 @@ class EbpfTable(object):
         serializer.newline()
 
         serializer.emitIndent()
-        serializer.appendFormat("struct {0} {1};", self.keyTypeName, keyname)
+        serializer.appendFormat("struct {0} {1} = {{}};", self.keyTypeName, keyname)
         serializer.newline()
 
         serializer.emitIndent()
         serializer.appendFormat(
             "struct {0} *{1};", self.valueTypeName, valueName)
-        serializer.newline()
-
-        serializer.newline()
-        serializer.emitIndent()
-        serializer.appendFormat("{0}:", program.getLabel(self))
         serializer.newline()
 
         self.key.serializeConstruction(serializer, keyname, program)

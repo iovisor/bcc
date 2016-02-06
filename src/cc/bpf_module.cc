@@ -114,9 +114,11 @@ BPFModule::~BPFModule() {
   engine_.reset();
   rw_engine_.reset();
   ctx_.reset();
-  for (auto table : *tables_) {
-    if (table.is_shared)
-      SharedTables::instance()->remove_fd(table.name);
+  if (tables_) {
+    for (auto table : *tables_) {
+      if (table.is_shared)
+        SharedTables::instance()->remove_fd(table.name);
+    }
   }
 }
 
