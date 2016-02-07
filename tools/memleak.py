@@ -32,6 +32,87 @@ class Time(object):
 			raise OSError(errno_, os.strerror(errno_))
 		return t.tv_sec*1e9 + t.tv_nsec
 
+class StackDecoder(object):
+	def __init__(self, pid, bpf):
+		"""
+		TODO
+		"""
+		self.pid = pid
+		self.bpf = bpf
+		self.ranges_cache = {}
+		self.refresh_code_ranges()
+
+	def refresh_code_ranges(self):
+		"""
+		TODO
+		"""
+		if self.pid == -1:
+			return
+		self.code_ranges = self._get_code_ranges()
+
+	def _get_code_ranges(self):
+		ranges = {}
+		raw_ranges = open("/proc/%d/maps" % self.pid).readlines()
+		for raw_range in raw_ranges:
+			parts = raw_range.split()
+			if len(parts) < 6 or parts[5][0] == '[' or not 'x' in parts[1]:
+				continue
+			binary = parts[5]
+			range_parts = parts[0].split('-')
+			addr_range = (int(range_parts[0], 16), int(range_parts[1], 16))
+			ranges[binary] = addr_range
+		return ranges
+
+	def _get_sym_ranges(self, binary):
+		if binary in self.ranges_cache:
+			return self.ranges_cache[binary]
+		sym_ranges = {}
+		raw_symbols = run_command("objdump -t %s" % binary)
+		for raw_symbol in raw_symbols:
+			parts = raw_symbol.split()
+			if len(parts) < 6 or parts[3] != ".text" or parts[2] != "F":
+				continue
+			sym_start = int(parts[0], 16)
+			sym_len = int(parts[4], 16)
+			sym_name = parts[5]
+			sym_ranges[sym_name] = (sym_start, sym_len)
+		self.ranges_cache[binary] = sym_ranges
+		return sym_ranges
+
+	def _decode_sym(self, binary, offset):
+		sym_ranges = self._get_sym_ranges(binary)
+		for name, (start, length) in sym_ranges.items():
+			if offset >= start and offset <= (start + length):
+				return "%s+0x%x" % (name, offset - start)
+		return "%x" % offset
+
+	def _decode_addr(self, addr):
+		code_ranges = self._get_code_ranges()
+		for binary, (start, end) in code_ranges.items():
+			if addr >= start and addr <= end:
+				offset = addr - start if binary.endswith(".so") else addr
+				return "%s [%s]" % (self._decode_sym(binary, offset), binary)
+		return "%x" % addr
+
+	def decode_stack(self, info):
+		"""
+		TODO
+		"""
+		stack = ""
+		if info.num_frames <= 0:
+			return "???"
+		for i in range(0, info.num_frames):
+			addr = info.callstack[i]
+			if kernel_trace:
+				stack += " %s [kernel] (%x) ;" % (self.bpf.ksym(addr), addr)
+			else:
+				stack += " %s (%x) ;" % (self._decode_addr(addr), addr)
+		return stack
+
+def run_command(command):
+	p = subprocess.Popen(command.split(), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+	return iter(p.stdout.readline, b'')
+
 examples = """
 EXAMPLES:
 
@@ -43,6 +124,8 @@ EXAMPLES:
 ./memleak.py -p $(pidof allocs) -a -i 10
 	Trace allocations and display allocated addresses, sizes, and stacks
 	every 10 seconds for outstanding allocations
+./memleak.py -c "./allocs"
+	Run the specified command and trace its allocations
 ./memleak.py
 	Trace allocations in kernel mode and display a summary of outstanding
 	allocations every 5 seconds
@@ -70,15 +153,20 @@ parser.add_argument("-a", "--show-allocs", default=False, action="store_true",
 	help="show allocation addresses and sizes as well as call stacks")
 parser.add_argument("-o", "--older", default=500,
 	help="prune allocations younger than this age in milliseconds")
-# TODO Run a command and trace that command (-c)
+parser.add_argument("-c", "--command",
+	help="execute and trace the specified command")
 
 args = parser.parse_args()
 
 pid = -1 if args.pid is None else int(args.pid)
-kernel_trace = (pid == -1)
+command = args.command
+kernel_trace = (pid == -1 and command is None)
 trace_all = args.trace
 interval = int(args.interval)
 min_age_ns = 1e6*int(args.older)
+
+if not command is None:
+	pass # TODO Run command, get its pid and trace that
 
 bpf_source = open("memleak.c").read()
 bpf_source = bpf_source.replace("SHOULD_PRINT", "1" if trace_all else "0")
@@ -96,66 +184,7 @@ else:
 	bpf_program.attach_kretprobe(event="__kmalloc", fn_name="alloc_exit")
 	bpf_program.attach_kprobe(event="kfree", fn_name="free_enter")
 
-def get_code_ranges(pid):
-	ranges = {}
-	raw_ranges = open("/proc/%d/maps" % pid).readlines()
-	for raw_range in raw_ranges:
-		parts = raw_range.split()
-		if len(parts) < 6 or parts[5][0] == '[' or not 'x' in parts[1]:
-			continue
-		binary = parts[5]
-		range_parts = parts[0].split('-')
-		addr_range = (int(range_parts[0], 16), int(range_parts[1], 16))
-		ranges[binary] = addr_range
-	return ranges
-
-def run_command(command):
-	p = subprocess.Popen(command.split(), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-	return iter(p.stdout.readline, b'')
-
-ranges_cache = {}
-
-def get_sym_ranges(binary):
-	if binary in ranges_cache:
-		return ranges_cache[binary]
-	sym_ranges = {}
-	raw_symbols = run_command("objdump -t %s" % binary)
-	for raw_symbol in raw_symbols:
-		parts = raw_symbol.split()
-		if len(parts) < 6 or parts[3] != ".text" or parts[2] != "F":
-			continue
-		sym_start = int(parts[0], 16)
-		sym_len = int(parts[4], 16)
-		sym_name = parts[5]
-		sym_ranges[sym_name] = (sym_start, sym_len)
-	ranges_cache[binary] = sym_ranges
-	return sym_ranges
-
-def decode_sym(binary, offset):
-	sym_ranges = get_sym_ranges(binary)
-	for name, (start, length) in sym_ranges.items():
-		if offset >= start and offset <= (start + length):
-			return "%s+0x%x" % (name, offset - start)
-	return "%x" % offset
-
-def decode_addr(code_ranges, addr):
-	for binary, (start, end) in code_ranges.items():
-		if addr >= start and addr <= end:
-			offset = addr - start if binary.endswith(".so") else addr
-			return "%s [%s]" % (decode_sym(binary, offset), binary)
-	return "%x" % addr
-
-def decode_stack(info):
-	stack = ""
-	if info.num_frames <= 0:
-		return "???"
-	for i in range(0, info.num_frames):
-		addr = info.callstack[i]
-		if kernel_trace:
-			stack += " %s [kernel] (%x) ;" % (bpf_program.ksym(addr), addr)
-		else:
-			stack += " %s (%x) ;" % (decode_addr(code_ranges, addr), addr)
-	return stack
+decoder = StackDecoder(pid, bpf_program)
 
 def print_outstanding():
 	stacks = {}
@@ -164,7 +193,7 @@ def print_outstanding():
 	for address, info in sorted(allocs.items(), key=lambda a: -a[1].size):
 		if Time.monotonic_time() - min_age_ns < info.timestamp_ns:
 			continue
-		stack = decode_stack(info)
+		stack = decoder.decode_stack(info)
 		if stack in stacks: stacks[stack] = (stacks[stack][0] + 1, stacks[stack][1] + info.size)
 		else:               stacks[stack] = (1, info.size)
 		if args.show_allocs:
@@ -180,7 +209,6 @@ while True:
 			sleep(interval)
 		except KeyboardInterrupt:
 			exit()
-		if not kernel_trace:
-			code_ranges = get_code_ranges(pid)
+		decoder.refresh_code_ranges()	
 		print_outstanding()
 
