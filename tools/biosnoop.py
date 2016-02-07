@@ -31,12 +31,10 @@ BPF_HASH(infobyreq, struct request *, struct val_t);
 // cache PID and comm by-req
 int trace_pid_start(struct pt_regs *ctx, struct request *req)
 {
-    u32 pid;
     struct val_t val = {};
 
-    pid = bpf_get_current_pid_tgid();
     if (bpf_get_current_comm(&val.name, sizeof(val.name)) == 0) {
-        val.pid = pid;
+        val.pid = bpf_get_current_pid_tgid();
         infobyreq.update(&req, &val);
     }
 
