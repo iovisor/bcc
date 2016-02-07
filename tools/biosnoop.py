@@ -21,23 +21,21 @@ b = BPF(text="""
 #include <linux/blkdev.h>
 
 struct val_t {
+    u32 pid;
     char name[TASK_COMM_LEN];
 };
 
 BPF_HASH(start, struct request *);
-BPF_HASH(pidbyreq, struct request *, u32);
-BPF_HASH(commbyreq, struct request *, struct val_t);
+BPF_HASH(infobyreq, struct request *, struct val_t);
 
 // cache PID and comm by-req
 int trace_pid_start(struct pt_regs *ctx, struct request *req)
 {
-    u32 pid;
     struct val_t val = {};
 
-    pid = bpf_get_current_pid_tgid();
-    pidbyreq.update(&req, &pid);
     if (bpf_get_current_comm(&val.name, sizeof(val.name)) == 0) {
-        commbyreq.update(&req, &val);
+        val.pid = bpf_get_current_pid_tgid();
+        infobyreq.update(&req, &val);
     }
 
     return 0;
@@ -74,12 +72,11 @@ int trace_req_completion(struct pt_regs *ctx, struct request *req)
     // As bpf_trace_prink() is limited to a maximum of 1 string and 2
     // integers, we'll use more than one to output the data.
     //
-    valp = commbyreq.lookup(&req);
-    pidp = pidbyreq.lookup(&req);
-    if (pidp == 0 || valp == 0) {
+    valp = infobyreq.lookup(&req);
+    if (valp == 0) {
         bpf_trace_printk("0 0 ? %d\\n", req->__data_len);
     } else {
-        bpf_trace_printk("0 %d %s %d\\n", *pidp, valp->name,
+        bpf_trace_printk("0 %d %s %d\\n", valp->pid, valp->name,
             req->__data_len);
     }
 
@@ -93,8 +90,7 @@ int trace_req_completion(struct pt_regs *ctx, struct request *req)
     }
 
     start.delete(&req);
-    pidbyreq.delete(&req);
-    commbyreq.delete(&req);
+    infobyreq.delete(&req);
 
     return 0;
 }
