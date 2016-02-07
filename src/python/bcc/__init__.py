@@ -286,6 +286,30 @@ class BPF(object):
                 if res < 0:
                     raise KeyError
 
+        # override the MutableMapping's implementation of these since they
+        # don't handle KeyError nicely
+        def itervalues(self):
+            for key in self:
+                # a map entry may be deleted in between discovering the key and
+                # fetching the value, suppress such errors
+                try:
+                    yield self[key]
+                except KeyError:
+                    pass
+
+        def iteritems(self):
+            for key in self:
+                try:
+                    yield (key, self[key])
+                except KeyError:
+                    pass
+
+        def items(self):
+            return [item for item in self.iteritems()]
+
+        def values(self):
+            return [value for value in self.itervalues()]
+
         def clear(self):
             # default clear uses popitem, which can race with the bpf prog
             for k in self.keys():
