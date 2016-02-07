@@ -148,6 +148,19 @@ static void parse_type(IRBuilder<> &B, vector<Value *> *args, string *fmt,
       *fmt += " ";
     }
     *fmt += "}";
+  } else if (ArrayType *at = dyn_cast<ArrayType>(type)) {
+    *fmt += "[ ";
+    for (size_t i = 0; i < at->getNumElements(); ++i) {
+      parse_type(B, args, fmt, at->getElementType(), B.CreateStructGEP(type, out, i), is_writer);
+      *fmt += " ";
+    }
+    *fmt += "]";
+  } else if (PointerType *pt = dyn_cast<PointerType>(type)) {
+    *fmt += "0xl";
+    if (is_writer)
+      *fmt += "x";
+    else
+      *fmt += "i";
   } else if (IntegerType *it = dyn_cast<IntegerType>(type)) {
     if (is_writer)
       *fmt += "0x";
