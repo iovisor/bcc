@@ -121,6 +121,7 @@ def decode_stack(info):
 			stack += " %s (%x) ;" % (decode_addr(code_ranges, addr), addr)
 	return stack
 
+# Adapted from http://stackoverflow.com/a/1205762
 CLOCK_MONOTONIC_RAW = 4 # see <linux/time.h>
 
 class timespec(ctypes.Structure):
