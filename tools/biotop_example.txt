@@ -1,0 +1,187 @@
+Demonstrations of biotop, the Linux eBPF/bcc version.
+
+
+Short for block device I/O top, biotop summarizes which processes are
+performing disk I/O. It's top for disks. Sample output:
+
+# ./biotop
+Tracing... Output every 1 secs. Hit Ctrl-C to end
+
+08:04:11 loadavg: 1.48 0.87 0.45 1/287 14547
+
+PID    COMM             D MAJ MIN DISK       I/O  Kbytes  AVGms
+14501  cksum            R 202 1   xvda1      361   28832   3.39
+6961   dd               R 202 1   xvda1     1628   13024   0.59
+13855  dd               R 202 1   xvda1     1627   13016   0.59
+326    jbd2/xvda1-8     W 202 1   xvda1        3     168   3.00
+1880   supervise        W 202 1   xvda1        2       8   6.71
+1873   supervise        W 202 1   xvda1        2       8   2.51
+1871   supervise        W 202 1   xvda1        2       8   1.57
+1876   supervise        W 202 1   xvda1        2       8   1.22
+1892   supervise        W 202 1   xvda1        2       8   0.62
+1878   supervise        W 202 1   xvda1        2       8   0.78
+1886   supervise        W 202 1   xvda1        2       8   1.30
+1894   supervise        W 202 1   xvda1        2       8   3.46
+1869   supervise        W 202 1   xvda1        2       8   0.73
+1888   supervise        W 202 1   xvda1        2       8   1.48
+
+By default the screen refreshes every 1 second, and shows the top 20 disk
+consumers, sorted on total Kbytes. The first line printed is the header,
+which has the time and then the contents of /proc/loadavg.
+
+For the interval summarized by the output above, the "cksum" command performed
+361 disk reads to the "xvda1" device, for a total of 28832 Kbytes, with an
+average I/O time of 3.39 ms. Two "dd" processes were also reading from the
+same disk, which a higher I/O rate and lower latency. While the average I/O
+size is not printed, it can be determined by dividing the Kbytes column by
+the I/O column.
+
+The columns through to Kbytes show the workload applied. The final column,
+AVGms, shows resulting performance. Other bcc tools can be used to get more
+details when needed: biolatency and biosnoop.
+
+Many years ago I created the original "iotop", and later regretted not calling
+it diskiotop or blockiotop, as "io" alone is ambiguous. This time it is biotop.
+
+
+The -C option can be used to prevent the screen from clearing (my preference).
+Here's using it with a 5 second interval:
+
+# ./biotop -C 5
+Tracing... Output every 5 secs. Hit Ctrl-C to end
+
+08:09:44 loadavg: 0.42 0.44 0.39 2/282 22115
+
+PID    COMM             D MAJ MIN DISK       I/O  Kbytes  AVGms
+22069  dd               R 202 1   xvda1     5993   47976   0.33
+326    jbd2/xvda1-8     W 202 1   xvda1        3     168   2.67
+1866   svscan           R 202 1   xvda1       33     132   1.24
+1880   supervise        W 202 1   xvda1       10      40   0.56
+1873   supervise        W 202 1   xvda1       10      40   0.79
+1871   supervise        W 202 1   xvda1       10      40   0.78
+1876   supervise        W 202 1   xvda1       10      40   0.68
+1892   supervise        W 202 1   xvda1       10      40   0.71
+1878   supervise        W 202 1   xvda1       10      40   0.65
+1886   supervise        W 202 1   xvda1       10      40   0.78
+1894   supervise        W 202 1   xvda1       10      40   0.80
+1869   supervise        W 202 1   xvda1       10      40   0.91
+1888   supervise        W 202 1   xvda1       10      40   0.63
+22069  bash             R 202 1   xvda1        1      16  19.94
+9251   kworker/u16:2    W 202 16  xvdb         2       8   0.13
+
+08:09:49 loadavg: 0.47 0.44 0.39 1/282 22231
+
+PID    COMM             D MAJ MIN DISK       I/O  Kbytes  AVGms
+22069  dd               R 202 1   xvda1    13450  107600   0.35
+22199  cksum            R 202 1   xvda1      941   45548   4.63
+326    jbd2/xvda1-8     W 202 1   xvda1        3     168   2.93
+24467  kworker/0:2      W 202 16  xvdb         1      64   0.28
+1880   supervise        W 202 1   xvda1       10      40   0.81
+1873   supervise        W 202 1   xvda1       10      40   0.81
+1871   supervise        W 202 1   xvda1       10      40   1.03
+1876   supervise        W 202 1   xvda1       10      40   0.76
+1892   supervise        W 202 1   xvda1       10      40   0.74
+1878   supervise        W 202 1   xvda1       10      40   0.94
+1886   supervise        W 202 1   xvda1       10      40   0.76
+1894   supervise        W 202 1   xvda1       10      40   0.69
+1869   supervise        W 202 1   xvda1       10      40   0.72
+1888   supervise        W 202 1   xvda1       10      40   1.70
+22199  bash             R 202 1   xvda1        2      20   0.35
+482    xfsaild/md0      W 202 16  xvdb         5      13   0.27
+482    xfsaild/md0      W 202 32  xvdc         2       8   0.33
+31331  pickup           R 202 1   xvda1        1       4   0.31
+
+08:09:54 loadavg: 0.51 0.45 0.39 2/282 22346
+
+PID    COMM             D MAJ MIN DISK       I/O  Kbytes  AVGms
+22069  dd               R 202 1   xvda1    14689  117512   0.32
+326    jbd2/xvda1-8     W 202 1   xvda1        3     168   2.33
+1880   supervise        W 202 1   xvda1       10      40   0.65
+1873   supervise        W 202 1   xvda1       10      40   1.08
+1871   supervise        W 202 1   xvda1       10      40   0.66
+1876   supervise        W 202 1   xvda1       10      40   0.79
+1892   supervise        W 202 1   xvda1       10      40   0.67
+1878   supervise        W 202 1   xvda1       10      40   0.66
+1886   supervise        W 202 1   xvda1       10      40   1.02
+1894   supervise        W 202 1   xvda1       10      40   0.88
+1869   supervise        W 202 1   xvda1       10      40   0.89
+1888   supervise        W 202 1   xvda1       10      40   1.25
+
+08:09:59 loadavg: 0.55 0.46 0.40 2/282 22461
+
+PID    COMM             D MAJ MIN DISK       I/O  Kbytes  AVGms
+22069  dd               R 202 1   xvda1    14442  115536   0.33
+326    jbd2/xvda1-8     W 202 1   xvda1        3     168   3.46
+1880   supervise        W 202 1   xvda1       10      40   0.87
+1873   supervise        W 202 1   xvda1       10      40   0.87
+1871   supervise        W 202 1   xvda1       10      40   0.78
+1876   supervise        W 202 1   xvda1       10      40   0.86
+1892   supervise        W 202 1   xvda1       10      40   0.89
+1878   supervise        W 202 1   xvda1       10      40   0.87
+1886   supervise        W 202 1   xvda1       10      40   0.86
+1894   supervise        W 202 1   xvda1       10      40   1.06
+1869   supervise        W 202 1   xvda1       10      40   1.12
+1888   supervise        W 202 1   xvda1       10      40   0.98
+
+08:10:04 loadavg: 0.59 0.47 0.40 3/282 22576
+
+PID    COMM             D MAJ MIN DISK       I/O  Kbytes  AVGms
+22069  dd               R 202 1   xvda1    14179  113432   0.34
+326    jbd2/xvda1-8     W 202 1   xvda1        3     168   2.39
+1880   supervise        W 202 1   xvda1       10      40   0.81
+1873   supervise        W 202 1   xvda1       10      40   1.02
+1871   supervise        W 202 1   xvda1       10      40   1.15
+1876   supervise        W 202 1   xvda1       10      40   1.10
+1892   supervise        W 202 1   xvda1       10      40   0.77
+1878   supervise        W 202 1   xvda1       10      40   0.72
+1886   supervise        W 202 1   xvda1       10      40   0.81
+1894   supervise        W 202 1   xvda1       10      40   0.86
+1869   supervise        W 202 1   xvda1       10      40   0.83
+1888   supervise        W 202 1   xvda1       10      40   0.79
+24467  kworker/0:2      R 202 32  xvdc         3      12   0.26
+1056   cron             R 202 1   xvda1        2       8   0.30
+24467  kworker/0:2      R 202 16  xvdb         1       4   0.23
+
+08:10:09 loadavg: 0.54 0.46 0.40 2/281 22668
+
+PID    COMM             D MAJ MIN DISK       I/O  Kbytes  AVGms
+22069  dd               R 202 1   xvda1      250    2000   0.34
+326    jbd2/xvda1-8     W 202 1   xvda1        3     168   2.40
+1880   supervise        W 202 1   xvda1        8      32   0.93
+1873   supervise        W 202 1   xvda1        8      32   0.76
+1871   supervise        W 202 1   xvda1        8      32   0.60
+1876   supervise        W 202 1   xvda1        8      32   0.61
+1892   supervise        W 202 1   xvda1        8      32   0.68
+1878   supervise        W 202 1   xvda1        8      32   0.90
+1886   supervise        W 202 1   xvda1        8      32   0.57
+1894   supervise        W 202 1   xvda1        8      32   0.97
+1869   supervise        W 202 1   xvda1        8      32   0.69
+1888   supervise        W 202 1   xvda1        8      32   0.67
+
+This shows another "dd" command reading from xvda1. On this system, various
+"supervise" processes do 8 disk writes per second, every second (they are
+creating and updating "status" files).
+
+
+USAGE message:
+
+# ./biotop.py -h
+usage: biotop.py [-h] [-C] [-r MAXROWS] [interval] [count]
+
+Block device (disk) I/O by process
+
+positional arguments:
+  interval              output interval, in seconds
+  count                 number of outputs
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -C, --noclear         don't clear the screen
+  -r MAXROWS, --maxrows MAXROWS
+                        maximum rows to print, default 20
+
+examples:
+    ./biotop            # block device I/O top, 1 second refresh
+    ./biotop -C         # don't clear the screen
+    ./biotop 5          # 5 second summaries
+    ./biotop 5 10       # 5 second summaries, 10 times only
