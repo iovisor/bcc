@@ -4,6 +4,8 @@ from bcc import BPF
 from time import sleep
 import argparse
 import subprocess
+import ctypes
+import os
 
 examples = """
 EXAMPLES:
@@ -32,6 +34,7 @@ parser.add_argument("-p", "--pid", help="the PID to trace; if not specified, tra
 parser.add_argument("-t", "--trace", action="store_true", help="print trace messages for each alloc/free call")
 parser.add_argument("-i", "--interval", default=5, help="interval in seconds to print outstanding allocations")
 parser.add_argument("-a", "--show-allocs", default=False, action="store_true", help="show allocation addresses and sizes as well as call stacks")
+parser.add_argument("-o", "--older", default=500, help="prune allocations younger than this age in milliseconds")
 
 args = parser.parse_args()
 
@@ -39,6 +42,7 @@ pid = -1 if args.pid is None else int(args.pid)
 kernel_trace = (pid == -1)
 trace_all = args.trace
 interval = int(args.interval)
+min_age_ns = 1e6*int(args.older)
 
 bpf_source = open("memleak.c").read()
 bpf_source = bpf_source.replace("SHOULD_PRINT", "1" if trace_all else "0")
@@ -117,11 +121,32 @@ def decode_stack(info):
 			stack += " %s (%x) ;" % (decode_addr(code_ranges, addr), addr)
 	return stack
 
+CLOCK_MONOTONIC_RAW = 4 # see <linux/time.h>
+
+class timespec(ctypes.Structure):
+    _fields_ = [
+        ('tv_sec', ctypes.c_long),
+        ('tv_nsec', ctypes.c_long)
+    ]
+
+librt = ctypes.CDLL('librt.so.1', use_errno=True)
+clock_gettime = librt.clock_gettime
+clock_gettime.argtypes = [ctypes.c_int, ctypes.POINTER(timespec)]
+
+def monotonic_time():
+    t = timespec()
+    if clock_gettime(CLOCK_MONOTONIC_RAW , ctypes.pointer(t)) != 0:
+        errno_ = ctypes.get_errno()
+        raise OSError(errno_, os.strerror(errno_))
+    return t.tv_sec*1e9 + t.tv_nsec
+
 def print_outstanding():
 	stacks = {}
 	print("*** Outstanding allocations:")
 	allocs = bpf_program.get_table("allocs")
 	for address, info in sorted(allocs.items(), key=lambda a: -a[1].size):
+		if monotonic_time() - min_age_ns < info.timestamp_ns:
+			continue
 		stack = decode_stack(info)
 		if stack in stacks: stacks[stack] += info.size
 		else:               stacks[stack] = info.size

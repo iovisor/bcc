@@ -4,6 +4,7 @@
 
 struct alloc_info_t {
 	u64 size;
+	u64 timestamp_ns;
 	int num_frames;
 	u64 callstack[MAX_STACK_SIZE];
 };
@@ -65,6 +66,7 @@ int alloc_exit(struct pt_regs *ctx)
 	info.size = *size64;
 	sizes.delete(&pid);
 
+	info.timestamp_ns = bpf_ktime_get_ns();
 	info.num_frames = grab_stack(ctx, &info) - 2;
 	allocs.update(&address, &info);
 	
