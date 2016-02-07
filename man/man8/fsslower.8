@@ -87,6 +87,13 @@ instrumented events using the bcc funccount tool, eg:
 # ./funccount.py -i 1 -r '^__vfs_(read|write)$'
 .PP
 This also costs overhead, but is somewhat less than fsslower.
+.PP
+If the overhead is prohibitive for your workload, I'd recommend moving
+down-stack a little from VFS into the file system functions (ext4, xfs, etc).
+Look for updates to bcc for specific file system tools that do this. The
+advantage of a per-file system approach is that we can trace post-cache,
+greatly reducing events and overhead.  The disadvantage is needing custom
+tracing approaches for each different file system (whereas VFS is generic).
 .SH SOURCE
 This is from bcc.
 .IP

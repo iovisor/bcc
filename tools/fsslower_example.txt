@@ -97,7 +97,7 @@ TIME(s)  COMM           PID    D BYTES   LAT(ms) FILENAME
 2.977    supervise      1876   W 18         4.23 status.new
 
 This caught an individual I/O reaching 163.12 ms, for the "preconv" file. While
-the file system cache was flush, causing these to need to be read from disk,
+the file system cache was flushed, causing these to need to be read from disk,
 the duration here may not be entirely disk I/O: it can include file system
 locks, run queue latency, etc. These can be explored using other commands.
 
