@@ -59,12 +59,13 @@ b = BPF(text="""
 #include <uapi/linux/ptrace.h>
 #include <linux/blkdev.h>
 
-// a value of one map, and a key for another:
+// for saving process info by request
 struct who_t {
     u32 pid;
     char name[TASK_COMM_LEN];
 };
 
+// the key for the output summary
 struct info_t {
     u32 pid;
     int type;
@@ -73,6 +74,7 @@ struct info_t {
     char name[TASK_COMM_LEN];
 };
 
+// the value of the output summary
 struct val_t {
     u64 bytes;
     u64 us;
