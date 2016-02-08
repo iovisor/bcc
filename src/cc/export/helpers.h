@@ -122,6 +122,8 @@ static int (*bpf_probe_read)(void *dst, u64 size, void *unsafe_ptr) =
   (void *) BPF_FUNC_probe_read;
 static u64 (*bpf_ktime_get_ns)(void) =
   (void *) BPF_FUNC_ktime_get_ns;
+static u32 (*bpf_get_prandom_u32) =
+  (void *) BPF_FUNC_get_prandom_u32;
 static int (*bpf_trace_printk_)(const char *fmt, u64 fmt_size, ...) =
   (void *) BPF_FUNC_trace_printk;
 int bpf_trace_printk(const char *fmt, ...) asm("llvm.bpf.extra");
