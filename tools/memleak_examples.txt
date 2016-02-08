@@ -19,6 +19,10 @@ Attaching to malloc and free in pid 5193, Ctrl+C to quit.
                  __libc_start_main+0xf0 [/usr/lib64/libc-2.21.so] (7fd460ac2790) 
 
 
+Each entry printed is a set of allocations that originate from the same call
+stack, and that weren't freed yet. The number of bytes and number of allocs
+are followed by the call stack, top to bottom, of the allocation site.
+
 As time goes on, it becomes apparent that the main function in the allocs
 process is leaking memory, 16 bytes at a time. Fortunately, you don't have to
 inspect each allocation individually -- you get a nice summary of which stack
