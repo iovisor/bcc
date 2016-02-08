@@ -117,7 +117,7 @@ USAGE message:
 
 # ./memleak.py -h
 usage: memleak.py [-h] [-p PID] [-t] [-i INTERVAL] [-a] [-o OLDER]                                                                              
-                  [-c COMMAND]
+                  [-c COMMAND] [-s SAMPLE_RATE]
 
 Trace outstanding memory allocations that weren't freed.
 Supports both user-mode allocations made with malloc/free and kernel-mode
@@ -137,6 +137,8 @@ optional arguments:
                         milliseconds
   -c COMMAND, --command COMMAND
                         execute and trace the specified command
+  -s SAMPLE_RATE, --sample-rate SAMPLE_RATE
+                        sample every N-th allocation to decrease the overhead
 
 EXAMPLES:
 
@@ -146,4 +148,6 @@ EXAMPLES:
 ./memleak.py -p $(pidof allocs) -t
         Trace allocations and display each individual call to malloc/free
 ./memleak.py -p $(pidof allocs) -a -i 10                                                                                                                Trace allocations and display allocated addresses, sizes, and stacks                                                                            every 10 seconds for outstanding allocations                                                                                            ./memleak.py -c "./allocs"                                                                                                                              Run the specified command and trace its allocations                                                                                     ./memleak.py                                                                                                                                            Trace allocations in kernel mode and display a summary of outstanding                                                                           allocations every 5 seconds                                                                                                             ./memleak.py -o 60000                                                                                                                                   Trace allocations in kernel mode and display a summary of outstanding                                                                           allocations that are at least one minute (60 seconds) old  
+./memleak.py -s 5
+        Trace roughly every 5th allocation, to reduce overhead
 

@@ -47,7 +47,7 @@ class StackDecoder(object):
         @staticmethod
         def _is_binary_segment(parts):
                 return len(parts) == 6 and \
-                        parts[5][0] == '[' and 'x' in parts[1]
+                        parts[5][0] != '[' and 'x' in parts[1]
 
         def _get_code_ranges(self):
                 ranges = {}
@@ -161,6 +161,8 @@ EXAMPLES:
 ./memleak.py -o 60000
         Trace allocations in kernel mode and display a summary of outstanding
         allocations that are at least one minute (60 seconds) old
+./memleak.py -s 5
+        Trace roughly every 5th allocation, to reduce overhead
 """
 
 description = """
@@ -184,6 +186,8 @@ parser.add_argument("-o", "--older", default=500,
         help="prune allocations younger than this age in milliseconds")
 parser.add_argument("-c", "--command",
         help="execute and trace the specified command")
+parser.add_argument("-s", "--sample-rate", default=1,
+        help="sample every N-th allocation to decrease the overhead")
 
 args = parser.parse_args()
 
@@ -193,6 +197,7 @@ kernel_trace = (pid == -1 and command is None)
 trace_all = args.trace
 interval = int(args.interval)
 min_age_ns = 1e6 * int(args.older)
+sample_every_n = args.sample_rate
 
 if command is not None:
         print("Executing '%s' and tracing the resulting process." % command)
@@ -200,6 +205,7 @@ if command is not None:
 
 bpf_source = open("memleak.c").read()
 bpf_source = bpf_source.replace("SHOULD_PRINT", "1" if trace_all else "0")
+bpf_source = bpf_source.replace("SAMPLE_EVERY_N", str(sample_every_n))
 
 bpf_program = BPF(text=bpf_source)
 

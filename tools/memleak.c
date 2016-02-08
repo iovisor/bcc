@@ -44,6 +44,15 @@ static int grab_stack(struct pt_regs *ctx, struct alloc_info_t *info)
 
 int alloc_enter(struct pt_regs *ctx, size_t size)
 {
+        // Ideally, this should use a random number source, such as 
+        // BPF_FUNC_get_prandom_u32, but that's currently not supported
+        // by the bcc front-end.
+        if (SAMPLE_EVERY_N > 1) {
+                u64 ts = bpf_ktime_get_ns();
+                if (ts % SAMPLE_EVERY_N != 0)
+                        return 0;
+        }
+
         u64 pid = bpf_get_current_pid_tgid();
         u64 size64 = size;
         sizes.update(&pid, &size64);

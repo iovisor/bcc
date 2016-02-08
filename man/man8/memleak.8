@@ -2,7 +2,7 @@
 .SH NAME
 memleak \- Print a summary of outstanding allocations and their call stacks to detect memory leaks. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B memleak [-h] [-p PID] [-t] [-i INTERVAL] [-a] [-o OLDER] [-c COMMAND]
+.B memleak [-h] [-p PID] [-t] [-i INTERVAL] [-a] [-o OLDER] [-c COMMAND] [-s SAMPLE_RATE]
 .SH DESCRIPTION
 memleak traces and matches memory allocation and deallocation requests, and
 collects call stacks for each allocation. memleak can then print a summary
@@ -40,6 +40,9 @@ The default value is 500 milliseconds.
 .TP
 \-c COMMAND
 Run the specified command and trace its allocations only. This traces malloc and free from libc.
+.TP
+\-s SAMPLE_RATE
+Record roughly every SAMPLE_RATE-th allocation to reduce overhead.
 .SH EXAMPLES
 .TP
 Print outstanding kernel allocation stacks every 3 seconds:
@@ -57,7 +60,8 @@ Run ./allocs and print outstanding allocation stacks for that process:
 memleak can have significant overhead if the target process or kernel performs
 allocations at a very high rate. Pathological cases may exhibit up to 100x
 degradation in running time. Most of the time, however, memleak shouldn't cause
-a significant slowdown.
+a significant slowdown. You can also use the \-s switch to reduce the overhead
+further by capturing only every N-th allocation.
 
 To determine the rate at which your application is calling malloc/free, or the
 rate at which your kernel is calling kmalloc/kfree, place a probe with perf and
