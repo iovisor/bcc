@@ -1,19 +1,19 @@
-.TH fsslower 8  "2016-02-07" "USER COMMANDS"
+.TH fileslower 8  "2016-02-07" "USER COMMANDS"
 .SH NAME
-fsslower \- Summarize block device I/O latency as a histogram.
+fileslower \- Trace slow synchronous file reads and writes.
 .SH SYNOPSIS
-.B fsslower [\-h] [\-p PID] [min_ms]
+.B fileslower [\-h] [\-p PID] [min_ms]
 .SH DESCRIPTION
 This script uses kernel dynamic tracing of synchronous reads and writes
-at the VFS interface, to identify slow file system I/O for any file system.
+at the VFS interface, to identify slow file reads and writes for any file
+system.
 
 This version traces __vfs_read() and __vfs_write() and only showing
 synchronous I/O (the path to new_sync_read() and new_sync_write()), and
 I/O with filenames. This approach provides a view of just two file
-system request types: reads and writes. There are typically many others:
+system request types: file reads and writes. There are typically many others:
 asynchronous I/O, directory operations, file handle operations, file open()s,
-fflush(), etc, that this tool does not currently instrument. This
-implementation is a work around until we have suitable fs tracepoints.
+fflush(), etc.
 
 WARNING: See the OVERHEAD section.
 
@@ -34,17 +34,17 @@ min_ms
 Minimum I/O latency (duration) to trace, in milliseconds. Default is 10 ms.
 .SH EXAMPLES
 .TP
-Trace synchronous file system reads and writes slower than 10 ms:
+Trace synchronous file reads and writes slower than 10 ms:
 #
-.B fsslower
+.B fileslower
 .TP
 Trace slower than 1 ms:
 #
-.B fsslower 1
+.B fileslower 1
 .TP
 Trace slower than 1 ms, for PID 181 only:
 #
-.B fsslower \-p 181 1
+.B fileslower \-p 181 1
 .SH FIELDS
 .TP
 TIME(s)
@@ -86,13 +86,13 @@ instrumented events using the bcc funccount tool, eg:
 .PP
 # ./funccount.py -i 1 -r '^__vfs_(read|write)$'
 .PP
-This also costs overhead, but is somewhat less than fsslower.
+This also costs overhead, but is somewhat less than fileslower.
 .PP
 If the overhead is prohibitive for your workload, I'd recommend moving
 down-stack a little from VFS into the file system functions (ext4, xfs, etc).
 Look for updates to bcc for specific file system tools that do this. The
 advantage of a per-file system approach is that we can trace post-cache,
-greatly reducing events and overhead.  The disadvantage is needing custom
+greatly reducing events and overhead. The disadvantage is needing custom
 tracing approaches for each different file system (whereas VFS is generic).
 .SH SOURCE
 This is from bcc.

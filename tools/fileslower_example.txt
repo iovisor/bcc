@@ -1,10 +1,10 @@
-Demonstrations of fsslower, the Linux eBPF/bcc version.
+Demonstrations of fileslower, the Linux eBPF/bcc version.
 
 
-fsslower shows file-based synchronous reads and writes slower than a threshold.
-For example:
+fileslower shows file-based synchronous reads and writes slower than a
+threshold. For example:
 
-# ./fsslower 
+# ./fileslower 
 Tracing sync read/writes slower than 10 ms
 TIME(s)  COMM           PID    D BYTES   LAT(ms) FILENAME
 0.000    randread.pl    4762   R 8192      12.70 data1
@@ -20,13 +20,13 @@ I/O), file system CPU cycles, file system locks, run queue latency, etc. This
 is a better measure of the latency suffered by applications reading from the
 file system than measuring this down at the block device interface.
 
-Note that this only traces reads and writes: other file system operations
-(eg, directory operations, open(), fflush()) are not currently traced.
+Note that this only traces file reads and writes: other file system operations
+(eg, directory operations, open(), fflush()) are not traced.
 
 
 The threshold can be provided as an argument. Eg, I/O slower than 1 ms:
 
-# ./fsslower 1
+# ./fileslower 1
 Tracing sync read/writes slower than 1 ms
 TIME(s)  COMM           PID    D BYTES   LAT(ms) FILENAME
 0.000    randread.pl    6925   R 8192       1.06 data1
@@ -62,10 +62,10 @@ spanned 12 seconds), and the lower threshold is catching more I/O.
 
 
 In the following example, the file system caches were dropped before running
-fsslower, and then in another session a "man ls" was executed. The command
+fileslower, and then in another session a "man ls" was executed. The command
 and files read from disk can be seen:
 
-# echo 3 > /proc/sys/vm/drop_caches; ./fsslower 1
+# echo 3 > /proc/sys/vm/drop_caches; ./fileslower 1
 Tracing sync read/writes slower than 1 ms
 TIME(s)  COMM           PID    D BYTES   LAT(ms) FILENAME
 0.000    bash           9647   R 128        5.83 man
@@ -104,10 +104,10 @@ locks, run queue latency, etc. These can be explored using other commands.
 
 USAGE message:
 
-# ./fsslower -h
-usage: fsslower [-h] [-p PID] [min_ms]
+# ./fileslower -h
+usage: fileslower [-h] [-p PID] [min_ms]
 
-Trace slow file system sync reads and writes
+Trace slow synchronous file reads and writes
 
 positional arguments:
   min_ms             minimum I/O duration to trace, in ms (default 10)
@@ -117,6 +117,6 @@ optional arguments:
   -p PID, --pid PID  trace this PID only
 
 examples:
-    ./fsslower             # trace sync I/O slower than 10 ms (default)
-    ./fsslower 1           # trace sync I/O slower than 1 ms
-    ./fsslower -p 185      # trace PID 185 only
+    ./fileslower             # trace sync file I/O slower than 10 ms (default)
+    ./fileslower 1           # trace sync file I/O slower than 1 ms
+    ./fileslower -p 185      # trace PID 185 only

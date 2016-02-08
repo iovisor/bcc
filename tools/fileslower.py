@@ -1,21 +1,21 @@
 #!/usr/bin/python
 # @lint-avoid-python-3-compatibility-imports
 #
-# fsslower  Trace slow file system synchronous reads and writes.
-#           For Linux, uses BCC, eBPF.
+# fileslower  Trace slow synchronous file reads and writes.
+#             For Linux, uses BCC, eBPF.
 #
-# USAGE: fsslower [-h] [-p PID] [min_ms]
+# USAGE: fileslower [-h] [-p PID] [min_ms]
 #
 # This script uses kernel dynamic tracing of synchronous reads and writes
-# at the VFS interface, to identify slow file system I/O for any file system.
+# at the VFS interface, to identify slow file reads and writes for any file
+# system.
 #
 # This works by tracing __vfs_read() and __vfs_write(), and filtering for
 # synchronous I/O (the path to new_sync_read() and new_sync_write()), and
 # for I/O with filenames. This approach provides a view of just two file
 # system request types. There are typically many others: asynchronous I/O,
 # directory operations, file handle operations, etc, that this tool does not
-# instrument. This implementation is a work around until we have suitable fs
-# tracepoints.
+# instrument.
 #
 # WARNING: This traces VFS reads and writes, which can be extremely frequent,
 # and so the overhead of this tool can become severe depending on the
@@ -35,12 +35,12 @@ import signal
 
 # arguments
 examples = """examples:
-    ./fsslower             # trace sync I/O slower than 10 ms (default)
-    ./fsslower 1           # trace sync I/O slower than 1 ms
-    ./fsslower -p 185      # trace PID 185 only
+    ./fileslower             # trace sync file I/O slower than 10 ms (default)
+    ./fileslower 1           # trace sync file I/O slower than 1 ms
+    ./fileslower -p 185      # trace PID 185 only
 """
 parser = argparse.ArgumentParser(
-    description="Trace slow file system sync reads and writes",
+    description="Trace slow synchronous file reads and writes",
     formatter_class=argparse.RawDescriptionHelpFormatter,
     epilog=examples)
 parser.add_argument("-p", "--pid",
