@@ -19,6 +19,42 @@ Attaching to malloc and free in pid 5193, Ctrl+C to quit.
                  __libc_start_main+0xf0 [/usr/lib64/libc-2.21.so] (7fd460ac2790) 
 
 
+As time goes on, it becomes apparent that the main function in the allocs
+process is leaking memory, 16 bytes at a time. Fortunately, you don't have to
+inspect each allocation individually -- you get a nice summary of which stack
+is responsible for a large leak.
+
+Occasionally, you do want the individual allocation details. Perhaps the same
+stack is allocating various sizes and you want to confirm which sizes are 
+prevalent. Use the -a switch:
+
+# ./memleak.py -p $(pidof allocs) -a
+Attaching to malloc and free in pid 5193, Ctrl+C to quit.
+*** Outstanding allocations:
+        addr = 948cd0 size = 16
+        addr = 948d10 size = 16
+        addr = 948d30 size = 16
+        addr = 948cf0 size = 16
+        64 bytes in 4 allocations from stack
+                 main+0x6d [/home/vagrant/allocs] (400862) 
+                 __libc_start_main+0xf0 [/usr/lib64/libc-2.21.so] (7fd460ac2790) 
+
+*** Outstanding allocations:
+        addr = 948d50 size = 16
+        addr = 948cd0 size = 16
+        addr = 948d10 size = 16
+        addr = 948d30 size = 16
+        addr = 948cf0 size = 16
+        addr = 948dd0 size = 16
+        addr = 948d90 size = 16
+        addr = 948db0 size = 16
+        addr = 948d70 size = 16
+        addr = 948df0 size = 16
+        160 bytes in 10 allocations from stack
+                 main+0x6d [/home/vagrant/allocs] (400862) 
+                 __libc_start_main+0xf0 [/usr/lib64/libc-2.21.so] (7fd460ac2790) 
+
+
 When using the -p switch, memleak traces the allocations of a particular
 process. Without this switch, kernel allocations (kmalloc) are traced instead.
 For example:
@@ -57,6 +93,10 @@ Attaching to kmalloc and kfree, Ctrl+C to quit.
                  perf_trace_init [kernel] (ffffffff8117c4e0) 
                  perf_tp_event_init [kernel] (ffffffff81192479) 
 
+
+Here you can see that arming the kprobe to which our eBPF program is attached
+consumed 8KB of memory. Loading the BPF program also consumed a couple hundred
+bytes (in bpf_prog_load).
 
 memleak stores each allocated block along with its size, timestamp, and the
 stack that allocated it. When the block is deleted, this information is freed
