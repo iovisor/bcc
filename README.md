@@ -71,7 +71,7 @@ Tools:
 - tools/[biosnoop](tools/biosnoop.py): Trace block device I/O with PID and latency. [Examples](tools/biosnoop_example.txt).
 - tools/[bitesize](tools/bitesize.py): Show per process I/O size histogram. [Examples](tools/bitesize_example.txt).
 - tools/[cachestat](tools/cachestat.py): Trace page cache hit/miss ratio. [Examples](tools/cachestat_example.txt).
-- tools/[execsnoop](tools/execsnoop.py): Trace new processes via exec() syscalls.. [Examples](tools/execsnoop_example.txt).
+- tools/[execsnoop](tools/execsnoop.py): Trace new processes via exec() syscalls. [Examples](tools/execsnoop_example.txt).
 - tools/[fsslower](tools/fsslower.py): Trace slow file system synchronous reads and writes. [Examples](tools/fsslower_example.txt).
 - tools/[funccount](tools/funccount.py): Count kernel function calls. [Examples](tools/funccount_example.txt).
 - tools/[funclatency](tools/funclatency.py): Time kernel functions and show their latency distribution. [Examples](tools/funclatency_example.txt).
