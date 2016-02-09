@@ -72,6 +72,7 @@ Tools:
 - tools/[bitesize](tools/bitesize.py): Show per process I/O size histogram. [Examples](tools/bitesize_example.txt).
 - tools/[cachestat](tools/cachestat.py): Trace page cache hit/miss ratio. [Examples](tools/cachestat_example.txt).
 - tools/[execsnoop](tools/execsnoop.py): Trace new processes via exec() syscalls. [Examples](tools/execsnoop_example.txt).
+- tools/[filelife](tools/filelife.py): Trace the lifespan of short-lived files. [Examples](tools/filelife_example.txt).
 - tools/[fileslower](tools/fileslower.py): Trace slow synchronous file reads and writes. [Examples](tools/fileslower_example.txt).
 - tools/[funccount](tools/funccount.py): Count kernel function calls. [Examples](tools/funccount_example.txt).
 - tools/[funclatency](tools/funclatency.py): Time kernel functions and show their latency distribution. [Examples](tools/funclatency_example.txt).
