@@ -1,0 +1,157 @@
+Demonstrations of filetop, the Linux eBPF/bcc version.
+
+
+filetop shows reads and writes by file, with process details. For example:
+
+# ./filetop -C
+Tracing... Output every 1 secs. Hit Ctrl-C to end
+
+08:00:23 loadavg: 0.91 0.33 0.23 3/286 26635
+
+PID    COMM             READS  WRITES R_Kb    W_Kb    T FILE
+26628  ld               161    186    643     152     R built-in.o
+26634  cc1              1      0      200     0       R autoconf.h
+26618  cc1              1      0      200     0       R autoconf.h
+26634  cc1              12     0      192     0       R tracepoint.h
+26584  cc1              2      0      143     0       R mm.h
+26634  cc1              2      0      143     0       R mm.h
+26631  make             34     0      136     0       R auto.conf
+26634  cc1              1      0      98      0       R fs.h
+26584  cc1              1      0      98      0       R fs.h
+26634  cc1              1      0      91      0       R sched.h
+26634  cc1              1      0      78      0       R printk.c
+26634  cc1              3      0      73      0       R mmzone.h
+26628  ld               18     0      72      0       R hibernate.o
+26628  ld               16     0      64      0       R suspend.o
+26628  ld               16     0      64      0       R snapshot.o
+26630  cat              1      0      64      0       O null
+26628  ld               16     0      64      0       R qos.o
+26628  ld               13     0      52      0       R main.o
+26628  ld               12     0      52      0       R swap.o
+12421  sshd             3      0      48      0       O ptmx
+[...]
+
+This shows various files read and written during a Linux kernel build. The
+output is sorted by the total read size in Kbytes (R_Kb). This is instrumenting
+at the VFS interface, so this is reads and writes that may return entirely
+from the file system cache (page cache).
+
+While not printed, the average read and write size can be calculated by
+dividing R_Kb by READS, and the same for writes.
+
+The "T" column indicates the type of the file: "R" for regular files, "S" for
+sockets, and "O" for other (including pipes).
+
+This script works by tracing the vfs_read() and vfs_write() functions using
+kernel dynamic tracing, which instruments explicit read and write calls. If
+files are read or written using another means (eg, via mmap()), then they
+will not be visible using this tool.
+
+This should be useful for file system workload characterization when analyzing
+the performance of applications.
+
+Note that tracing VFS level reads and writes can be a frequent activity, and
+this tool can begin to cost measurable overhead at high I/O rates.
+
+
+A -C option will stop clearing the screen, and -r with a number will restrict
+the output to that many rows (20 by default). For example, not clearing
+the screen and showing the top 5 only:
+
+# ./filetop -Cr 5
+Tracing... Output every 1 secs. Hit Ctrl-C to end
+
+08:05:11 loadavg: 0.75 0.35 0.25 3/285 822
+
+PID    COMM             READS  WRITES R_Kb    W_Kb    T FILE
+32672  cksum            5006   0      320384  0       R data1
+12296  sshd             2      0      32      0       O ptmx
+809    run              2      0      8       0       R nsswitch.conf
+811    run              2      0      8       0       R nsswitch.conf
+804    chown            2      0      8       0       R nsswitch.conf
+
+08:05:12 loadavg: 0.75 0.35 0.25 3/285 845
+
+PID    COMM             READS  WRITES R_Kb    W_Kb    T FILE
+32672  cksum            4986   0      319104  0       R data1
+845    chown            2      0      8       0       R nsswitch.conf
+828    run              2      0      8       0       R nsswitch.conf
+835    run              2      0      8       0       R nsswitch.conf
+830    run              2      0      8       0       R nsswitch.conf
+
+08:05:13 loadavg: 0.75 0.35 0.25 3/285 868
+
+PID    COMM             READS  WRITES R_Kb    W_Kb    T FILE
+32672  cksum            4985   0      319040  0       R data1
+857    run              2      0      8       0       R nsswitch.conf
+858    run              2      0      8       0       R nsswitch.conf
+859    run              2      0      8       0       R nsswitch.conf
+848    run              2      0      8       0       R nsswitch.conf
+[...]
+
+This output shows a cksum command reading data1. Note that 
+
+
+An optional interval and optional count can also be added to the end of the
+command line. For example, for 1 second interval, and 3 summaries in total:
+
+# ./filetop -Cr 5 1 3
+Tracing... Output every 1 secs. Hit Ctrl-C to end
+
+08:08:20 loadavg: 0.30 0.42 0.31 3/282 5187
+
+PID    COMM             READS  WRITES R_Kb    W_Kb    T FILE
+12421  sshd             14101  0      225616  0       O ptmx
+12296  sshd             4      0      64      0       O ptmx
+12421  sshd             3      14104  48      778     S TCP
+5178   run              2      0      8       0       R nsswitch.conf
+5165   run              2      0      8       0       R nsswitch.conf
+
+08:08:21 loadavg: 0.30 0.42 0.31 5/282 5210
+
+PID    COMM             READS  WRITES R_Kb    W_Kb    T FILE
+12421  sshd             9159   0      146544  0       O ptmx
+12421  sshd             3      9161   48      534     S TCP
+12296  sshd             1      0      16      0       S TCP
+5188   run              2      0      8       0       R nsswitch.conf
+5203   run              2      0      8       0       R nsswitch.conf
+
+08:08:22 loadavg: 0.30 0.42 0.31 2/282 5233
+
+PID    COMM             READS  WRITES R_Kb    W_Kb    T FILE
+12421  sshd             26166  0      418656  0       O ptmx
+12421  sshd             4      26171  64      1385    S TCP
+12296  sshd             1      0      16      0       O ptmx
+5214   run              2      0      8       0       R nsswitch.conf
+5227   run              2      0      8       0       R nsswitch.conf
+Detaching...
+
+This example has caught heavy socket I/O from an sshd process, showing up as
+non-regular file types (the "O" for other, and "S" for socket, in the type
+column: "T"). 
+
+
+USAGE message:
+
+# ./filetop -h
+usage: filetop [-h] [-C] [-r MAXROWS] [-p PID] [interval] [count]
+
+File reads and writes by process
+
+positional arguments:
+  interval              output interval, in seconds
+  count                 number of outputs
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -C, --noclear         don't clear the screen
+  -r MAXROWS, --maxrows MAXROWS
+                        maximum rows to print, default 20
+  -p PID, --pid PID     trace this PID only
+
+examples:
+    ./filetop            # file I/O top, 1 second refresh
+    ./filetop -C         # don't clear the screen
+    ./filetop -p 181     # PID 181 only
+    ./filetop 5          # 5 second summaries
+    ./filetop 5 10       # 5 second summaries, 10 times only

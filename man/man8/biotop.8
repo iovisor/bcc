@@ -22,6 +22,22 @@ and will need updating to match any changes to these functions.
 Since this uses BPF, only the root user can use this tool.
 .SH REQUIREMENTS
 CONFIG_BPF and bcc.
+.SH OPTIONS
+.TP
+\-C
+Don't clear the screen.
+.TP
+\-r MAXROWS
+Maximum number of rows to print. Default is 20.
+.TP
+\-p PID
+Trace this PID only.
+.TP
+interval
+Interval between updates, seconds.
+.TP
+count
+Number of interval summaries.
 .SH EXAMPLES
 .TP
 Summarize block device I/O by process, 1 second screen refresh:
@@ -86,5 +102,7 @@ Linux
 Unstable - in development.
 .SH AUTHOR
 Brendan Gregg
+.SH INSPIRATION
+top(1) by William LeFebvre
 .SH SEE ALSO
 biosnoop(8), biolatency(8), iostat(1)
