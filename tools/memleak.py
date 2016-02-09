@@ -2,6 +2,7 @@
 
 from bcc import BPF
 from time import sleep
+from datetime import datetime
 import argparse
 import subprocess
 import ctypes
@@ -192,6 +193,8 @@ parser.add_argument("-s", "--sample-rate", default=1, type=int,
         help="sample every N-th allocation to decrease the overhead")
 parser.add_argument("-d", "--stack-depth", default=10, type=int,
         help="maximum stack depth to capture")
+parser.add_argument("-T", "--top", type=int, default=10,
+        help="display only this many top allocating stacks (by size)")
 
 args = parser.parse_args()
 
@@ -204,6 +207,7 @@ min_age_ns = 1e6 * args.older
 sample_every_n = args.sample_rate
 num_prints = args.count
 max_stack_size = args.stack_depth + 2
+top_stacks = args.top
 
 if command is not None:
         print("Executing '%s' and tracing the resulting process." % command)
@@ -235,7 +239,8 @@ decoder = StackDecoder(pid, bpf_program)
 
 def print_outstanding():
         stacks = {}
-        print("*** Outstanding allocations:")
+        print("[%s] Top %d stacks with outstanding allocations:" %
+              (datetime.now().strftime("%H:%M:%S"), top_stacks))
         allocs = bpf_program.get_table("allocs")
         for address, info in sorted(allocs.items(), key=lambda a: a[1].size):
                 if Time.monotonic_time() - min_age_ns < info.timestamp_ns:
@@ -249,8 +254,8 @@ def print_outstanding():
                 if args.show_allocs:
                         print("\taddr = %x size = %s" %
                               (address.value, info.size))
-        for stack, (count, size) in sorted(stacks.items(),
-                                           key=lambda s: s[1][1]):
+        to_show = sorted(stacks.items(), key=lambda s: s[1][1])[-top_stacks:]
+        for stack, (count, size) in to_show:
                 print("\t%d bytes in %d allocations from stack\n\t\t%s" %
                       (size, count, stack.replace(";", "\n\t\t")))
 

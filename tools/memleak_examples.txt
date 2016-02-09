@@ -151,7 +151,7 @@ USAGE message:
 
 # ./memleak.py -h
 usage: memleak.py [-h] [-p PID] [-t] [-a] [-o OLDER] [-c COMMAND]
-                  [-s SAMPLE_RATE] [-d STACK_DEPTH]
+                  [-s SAMPLE_RATE] [-d STACK_DEPTH] [-T TOP]
                   [interval] [count]
 
 Trace outstanding memory allocations that weren't freed.
@@ -177,6 +177,7 @@ optional arguments:
                         sample every N-th allocation to decrease the overhead
   -d STACK_DEPTH, --stack_depth STACK_DEPTH
                         maximum stack depth to capture
+  -T TOP, --top TOP     display only this many top allocating stacks (by size)
 
 EXAMPLES:
 

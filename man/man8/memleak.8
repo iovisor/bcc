@@ -2,7 +2,7 @@
 .SH NAME
 memleak \- Print a summary of outstanding allocations and their call stacks to detect memory leaks. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B memleak [-h] [-p PID] [-t] [-a] [-o OLDER] [-c COMMAND] [-s SAMPLE_RATE] [-d STACK_DEPTH] [INTERVAL] [COUNT]
+.B memleak [-h] [-p PID] [-t] [-a] [-o OLDER] [-c COMMAND] [-s SAMPLE_RATE] [-d STACK_DEPTH] [-T TOP] [INTERVAL] [COUNT]
 .SH DESCRIPTION
 memleak traces and matches memory allocation and deallocation requests, and
 collects call stacks for each allocation. memleak can then print a summary
@@ -10,6 +10,9 @@ of which call stacks performed allocations that weren't subsequently freed.
 
 When tracing a specific process, memleak instruments malloc and free from libc.
 When tracing all processes, memleak instruments kmalloc and kfree.
+
+memleak may introduce significant overhead when tracing processes that allocate
+and free many blocks very quickly. See the OVERHEAD section below.
 
 The stack depth is limited to 10 by default (+1 for the current instruction pointer),
 but it can be controlled using the \-d switch if deeper stacks are required.
@@ -45,6 +48,10 @@ Record roughly every SAMPLE_RATE-th allocation to reduce overhead.
 Capture STACK_DEPTH frames (or less) when obtaining allocation call stacks.
 The default value is 10.
 .TP
+\-t TOP
+Print only the top TOP stacks (sorted by size).
+The default value is 10.
+.TP
 INTERVAL
 Print a summary of oustanding allocations and their call stacks every INTERVAL seconds.
 The default interval is 5 seconds.
@@ -60,6 +67,11 @@ Print outstanding kernel allocation stacks every 3 seconds:
 Print user outstanding allocation stacks and allocation details for the process 1005:
 #
 .B memleak -p 1005 -a
+.TP
+Sample roughly every 5th allocation (~20%) of the call stacks and print the top 5
+stacks 10 times before quitting.
+#
+.B memleak -s 5 --top=5 10
 .TP
 Run ./allocs and print outstanding allocation stacks for that process: 
 #
