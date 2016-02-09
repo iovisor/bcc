@@ -17,7 +17,10 @@ import sys
 
 prog = """
   #include <bcc/proto.h>
-
+  #include <uapi/linux/if_ether.h>
+  #include <uapi/linux/in.h>
+  #include <uapi/linux/icmp.h>
+ 
   #define IP_SRC_OFF 26
   #define IP_DST_OFF 30
   #define IP_CKSUM_OFF 24
@@ -49,24 +52,24 @@ prog = """
         struct ethernet_t * ethernet = cursor_advance(cursor,
                 sizeof(*ethernet));
         // If packet type is not IP, return
-        if (ethernet->type != 0x800)
+        if (ethernet->type != ETH_P_IP)
                 return 0;
 
         struct ip_t * ip = cursor_advance(cursor, sizeof(*ip));
         // If next protocol is not ICMP, return
-        if (ip->nextp != 0x01)
+        if (ip->nextp != IPPROTO_ICMP)
                 return 0;
 
         struct icmp_t * icmp = cursor_advance(cursor, sizeof(*icmp));
         // If ICMP packet is not echo, return
-        if (icmp->type != 8 || icmp->code != 0)
+        if (icmp->type != ICMP_ECHO)
                 return 0;
 
         /*
         Converting ICMP echo into ICMP reply by changing the type to 0
         Since we're changing packet contents, we need to update the checksum
         */
-        unsigned short type = 0;
+        unsigned short type = ICMP_ECHOREPLY;
         bpf_l4_csum_replace(skb,36,icmp->type, type,sizeof(type));
         bpf_skb_store_bytes(skb, 34, &type, sizeof(type),0);
 
