@@ -1,0 +1,73 @@
+Demonstrations of statsnoop, the Linux eBPF/bcc version.
+
+
+statsnoop traces the different stat() syscalls system-wide, and prints various
+details. Example output:
+
+# ./statsnoop 
+PID    COMM               FD ERR PATH
+31126  bash                0   0 .
+31126  bash               -1   2 /usr/local/sbin/iconfig
+31126  bash               -1   2 /usr/local/bin/iconfig
+31126  bash               -1   2 /usr/sbin/iconfig
+31126  bash               -1   2 /usr/bin/iconfig
+31126  bash               -1   2 /sbin/iconfig
+31126  bash               -1   2 /bin/iconfig
+31126  bash               -1   2 /usr/games/iconfig
+31126  bash               -1   2 /usr/local/games/iconfig
+31126  bash               -1   2 /apps/python/bin/iconfig
+31126  bash               -1   2 /mnt/src/llvm/build/bin/iconfig
+8902   command-not-fou    -1   2 /usr/bin/Modules/Setup
+8902   command-not-fou    -1   2 /usr/bin/lib/python3.4/os.py
+8902   command-not-fou    -1   2 /usr/bin/lib/python3.4/os.pyc
+8902   command-not-fou     0   0 /usr/lib/python3.4/os.py
+8902   command-not-fou    -1   2 /usr/bin/pybuilddir.txt
+8902   command-not-fou    -1   2 /usr/bin/lib/python3.4/lib-dynload
+8902   command-not-fou     0   0 /usr/lib/python3.4/lib-dynload
+8902   command-not-fou     0   0 /apps/python/lib/python2.7/site-packages
+8902   command-not-fou     0   0 /apps/python/lib/python2.7/site-packages
+8902   command-not-fou     0   0 /apps/python/lib/python2.7/site-packages
+8902   command-not-fou     0   0 /usr/lib/python3.4/
+8902   command-not-fou     0   0 /usr/lib/python3.4/
+[...]
+
+This output has caught me mistyping a command in another shell, "iconfig"
+instead of "ifconfig". The first several lines show the bash shell searching
+the $PATH, and failing to find it (ERR == 2 is file not found). Then, a
+"command-not-found" program executes (the name is truncated to 16 characters
+in the COMM field), which begins the process of searching for and suggesting
+a package. ie, this:
+
+# iconfig
+No command 'iconfig' found, did you mean:
+ Command 'vconfig' from package 'vlan' (main)
+ Command 'fconfig' from package 'redboot-tools' (universe)
+ Command 'mconfig' from package 'mono-devel' (main)
+ Command 'iwconfig' from package 'wireless-tools' (main)
+ Command 'zconfig' from package 'python-zconfig' (universe)
+ Command 'ifconfig' from package 'net-tools' (main)
+iconfig: command not found
+
+statsnoop can be used for general debugging, to see what file information has
+been requested, and whether those files exist. It can be used as a companion
+to opensnoop, which shows what files were actually opened.
+
+
+USAGE message:
+
+# ./statsnoop -h
+usage: statsnoop [-h] [-t] [-x] [-p PID]
+
+Trace stat() syscalls
+
+optional arguments:
+  -h, --help         show this help message and exit
+  -t, --timestamp    include timestamp on output
+  -x, --failed       only show failed stats
+  -p PID, --pid PID  trace this PID only
+
+examples:
+    ./statsnoop           # trace all stat() syscalls
+    ./statsnoop -t        # include timestamps
+    ./statsnoop -x        # only show failed stats
+    ./statsnoop -p 181    # only trace PID 181

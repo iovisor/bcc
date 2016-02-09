@@ -1,0 +1,52 @@
+Demonstrations of filelife, the Linux eBPF/bcc version.
+
+
+filelife traces short-lived files: those that have been created and then
+deleted while tracing. For example:
+
+# ./filelife 
+TIME     PID    COMM             AGE(s)  FILE
+05:57:59 8556   gcc              0.04    ccCB5EDe.s
+05:57:59 8560   rm               0.02    .entry_64.o.d
+05:57:59 8563   gcc              0.02    cc5UFHXf.s
+05:57:59 8567   rm               0.01    .thunk_64.o.d
+05:57:59 8578   rm               0.02    .syscall_64.o.d
+05:58:00 8589   rm               0.03    .common.o.d
+05:58:00 8596   rm               0.01    .8592.tmp
+05:58:00 8601   rm               0.01    .8597.tmp
+05:58:00 8606   rm               0.01    .8602.tmp
+05:58:00 8639   rm               0.02    .vma.o.d
+05:58:00 8650   rm               0.02    .vdso32-setup.o.d
+05:58:00 8656   rm               0.00    .vdso.lds.d
+05:58:00 8659   gcc              0.01    ccveeJAz.s
+05:58:00 8663   rm               0.01    .vdso-note.o.d
+05:58:00 8674   rm               0.02    .vclock_gettime.o.d
+05:58:01 8684   rm               0.01    .vgetcpu.o.d
+05:58:01 8690   collect2         0.00    ccvKMxdm.ld
+
+This has caught short-lived files that were created during a Linux kernel
+build. The PID shows the process ID that finally deleted the file, and COMM
+is its process name. The AGE(s) column shows the age of the file, in seconds,
+when it was deleted. These are all short-lived, and existed for less than
+one tenth of a second.
+
+Creating, populating, and then deleting files as part of another process can
+be an inefficient method of inter-process communication. It can cause disk I/O
+as files are closed and their file descriptors flushed, only later to be
+deleted. As such, short-lived files can be a target of performance
+optimizations.
+
+USAGE message:
+
+# ./filelife -h
+usage: filelife [-h] [-p PID]
+
+Trace stat() syscalls
+
+optional arguments:
+  -h, --help         show this help message and exit
+  -p PID, --pid PID  trace this PID only
+
+examples:
+    ./filelife           # trace all stat() syscalls
+    ./filelife -p 181    # only trace PID 181
