@@ -174,7 +174,7 @@ allocations made with kmalloc/kfree.
 parser = argparse.ArgumentParser(description=description,
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=examples)
-parser.add_argument("-p", "--pid", type=int,
+parser.add_argument("-p", "--pid", type=int, default=-1,
         help="the PID to trace; if not specified, trace kernel allocs")
 parser.add_argument("-t", "--trace", action="store_true",
         help="print trace messages for each alloc/free call")
@@ -190,10 +190,12 @@ parser.add_argument("-c", "--command",
         help="execute and trace the specified command")
 parser.add_argument("-s", "--sample-rate", default=1, type=int,
         help="sample every N-th allocation to decrease the overhead")
+parser.add_argument("-d", "--stack_depth", default=10, type=int,
+        help="maximum stack depth to capture")
 
 args = parser.parse_args()
 
-pid = -1 if args.pid is None else args.pid
+pid = args.pid
 command = args.command
 kernel_trace = (pid == -1 and command is None)
 trace_all = args.trace
@@ -201,6 +203,7 @@ interval = args.interval
 min_age_ns = 1e6 * args.older
 sample_every_n = args.sample_rate
 num_prints = args.count
+max_stack_size = args.stack_depth + 2
 
 if command is not None:
         print("Executing '%s' and tracing the resulting process." % command)
@@ -209,7 +212,9 @@ if command is not None:
 bpf_source = open("memleak.c").read()
 bpf_source = bpf_source.replace("SHOULD_PRINT", "1" if trace_all else "0")
 bpf_source = bpf_source.replace("SAMPLE_EVERY_N", str(sample_every_n))
-
+bpf_source = bpf_source.replace("GRAB_ONE_FRAME", max_stack_size *
+        "\tif (!(info->callstack[depth++] = get_frame(&bp))) return depth;\n")
+bpf_source = bpf_source.replace("MAX_STACK_SIZE", str(max_stack_size))
 bpf_program = BPF(text=bpf_source)
 
 if not kernel_trace:

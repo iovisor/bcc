@@ -2,7 +2,7 @@
 .SH NAME
 memleak \- Print a summary of outstanding allocations and their call stacks to detect memory leaks. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B memleak [-h] [-p PID] [-t] [-a] [-o OLDER] [-c COMMAND] [-s SAMPLE_RATE] [INTERVAL] [COUNT]
+.B memleak [-h] [-p PID] [-t] [-a] [-o OLDER] [-c COMMAND] [-s SAMPLE_RATE] [-d STACK_DEPTH] [INTERVAL] [COUNT]
 .SH DESCRIPTION
 memleak traces and matches memory allocation and deallocation requests, and
 collects call stacks for each allocation. memleak can then print a summary
@@ -11,7 +11,8 @@ of which call stacks performed allocations that weren't subsequently freed.
 When tracing a specific process, memleak instruments malloc and free from libc.
 When tracing all processes, memleak instruments kmalloc and kfree.
 
-The stack depth is currently limited to 10 (+1 for the current instruction pointer).
+The stack depth is limited to 10 by default (+1 for the current instruction pointer),
+but it can be controlled using the \-d switch if deeper stacks are required.
 
 This currently only works on x86_64. Check for future versions.
 .SH REQUIREMENTS
@@ -27,13 +28,6 @@ Trace this process ID only (filtered in-kernel). This traces malloc and free fro
 \-t
 Print a trace of all allocation and free requests and results.
 .TP
-INTERVAL
-Print a summary of oustanding allocations and their call stacks every INTERVAL seconds.
-The default interval is 5 seconds.
-.TP
-COUNT
-Print the outstanding allocations summary COUNT times and then exit.
-.TP
 \-a
 Print a list of allocations that weren't freed (and their sizes) in addition to their call stacks.
 .TP
@@ -46,6 +40,17 @@ Run the specified command and trace its allocations only. This traces malloc and
 .TP
 \-s SAMPLE_RATE
 Record roughly every SAMPLE_RATE-th allocation to reduce overhead.
+.TP
+\-d STACK_DEPTH
+Capture STACK_DEPTH frames (or less) when obtaining allocation call stacks.
+The default value is 10.
+.TP
+INTERVAL
+Print a summary of oustanding allocations and their call stacks every INTERVAL seconds.
+The default interval is 5 seconds.
+.TP
+COUNT
+Print the outstanding allocations summary COUNT times and then exit.
 .SH EXAMPLES
 .TP
 Print outstanding kernel allocation stacks every 3 seconds:
@@ -76,6 +81,10 @@ placed in a typical period of 10 seconds:
 
 #
 .B perf stat -a -e 'probe:__kmalloc' -- sleep 10
+
+Another setting that may help reduce overhead is lowering the number of stack
+frames captured and parsed by memleak for each allocation, using the \-d switch.
+
 .SH SOURCE
 This is from bcc.
 .IP

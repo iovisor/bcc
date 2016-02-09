@@ -119,12 +119,39 @@ For example:
 ... will print the outstanding allocation statistics every second, for ten
 times, and then exit. 
 
+memleak may introduce considerable overhead if your application or kernel is
+allocating and freeing memory at a very high rate. In that case, you can 
+control the overhead by sampling every N-th allocation. For example, to sample
+roughly 10% of the allocations and print the outstanding allocations every 5
+seconds, 3 times before quitting:
+
+# ./memleak.py -p $(pidof allocs) -s 10 5 3
+Attaching to malloc and free in pid 2614, Ctrl+C to quit.
+*** Outstanding allocations:
+        16 bytes in 1 allocations from stack
+                 main+0x6d [/home/vagrant/allocs] (400862) 
+                 __libc_start_main+0xf0 [/usr/lib64/libc-2.21.so] (7fdc11ce8790) 
+
+*** Outstanding allocations:
+        16 bytes in 1 allocations from stack
+                 main+0x6d [/home/vagrant/allocs] (400862) 
+                 __libc_start_main+0xf0 [/usr/lib64/libc-2.21.so] (7fdc11ce8790) 
+
+*** Outstanding allocations:
+        32 bytes in 2 allocations from stack
+                 main+0x6d [/home/vagrant/allocs] (400862) 
+                 __libc_start_main+0xf0 [/usr/lib64/libc-2.21.so] (7fdc11ce8790) 
+
+Note that even though the application leaks 16 bytes of memory every second, 
+the report (printed every 5 seconds) doesn't "see" all the allocations because
+of the sampling rate applied. 
+
 
 USAGE message:
 
 # ./memleak.py -h
 usage: memleak.py [-h] [-p PID] [-t] [-a] [-o OLDER] [-c COMMAND]
-                  [-s SAMPLE_RATE]  
+                  [-s SAMPLE_RATE] [-d STACK_DEPTH]
                   [interval] [count]
 
 Trace outstanding memory allocations that weren't freed.
@@ -148,6 +175,8 @@ optional arguments:
                         execute and trace the specified command
   -s SAMPLE_RATE, --sample-rate SAMPLE_RATE
                         sample every N-th allocation to decrease the overhead
+  -d STACK_DEPTH, --stack_depth STACK_DEPTH
+                        maximum stack depth to capture
 
 EXAMPLES:
 

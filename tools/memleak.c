@@ -1,7 +1,5 @@
 #include <uapi/linux/ptrace.h>
 
-#define MAX_STACK_SIZE 10
-
 struct alloc_info_t {
         u64 size;
         u64 timestamp_ns;
@@ -29,16 +27,7 @@ static int grab_stack(struct pt_regs *ctx, struct alloc_info_t *info)
 {
         int depth = 0;
         u64 bp = ctx->bp;
-        if (!(info->callstack[depth++] = get_frame(&bp))) return depth;
-        if (!(info->callstack[depth++] = get_frame(&bp))) return depth;
-        if (!(info->callstack[depth++] = get_frame(&bp))) return depth;
-        if (!(info->callstack[depth++] = get_frame(&bp))) return depth;
-        if (!(info->callstack[depth++] = get_frame(&bp))) return depth;
-        if (!(info->callstack[depth++] = get_frame(&bp))) return depth;
-        if (!(info->callstack[depth++] = get_frame(&bp))) return depth;
-        if (!(info->callstack[depth++] = get_frame(&bp))) return depth;
-        if (!(info->callstack[depth++] = get_frame(&bp))) return depth;
-        if (!(info->callstack[depth++] = get_frame(&bp))) return depth;
+        GRAB_ONE_FRAME
         return depth;
 }
 
