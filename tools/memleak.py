@@ -174,30 +174,33 @@ allocations made with kmalloc/kfree.
 parser = argparse.ArgumentParser(description=description,
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=examples)
-parser.add_argument("-p", "--pid",
+parser.add_argument("-p", "--pid", type=int,
         help="the PID to trace; if not specified, trace kernel allocs")
 parser.add_argument("-t", "--trace", action="store_true",
         help="print trace messages for each alloc/free call")
-parser.add_argument("-i", "--interval", default=5,
+parser.add_argument("interval", nargs="?", default=5, type=int,
         help="interval in seconds to print outstanding allocations")
+parser.add_argument("count", nargs="?", type=int,
+        help="number of times to print the report before exiting")
 parser.add_argument("-a", "--show-allocs", default=False, action="store_true",
         help="show allocation addresses and sizes as well as call stacks")
-parser.add_argument("-o", "--older", default=500,
+parser.add_argument("-o", "--older", default=500, type=int,
         help="prune allocations younger than this age in milliseconds")
 parser.add_argument("-c", "--command",
         help="execute and trace the specified command")
-parser.add_argument("-s", "--sample-rate", default=1,
+parser.add_argument("-s", "--sample-rate", default=1, type=int,
         help="sample every N-th allocation to decrease the overhead")
 
 args = parser.parse_args()
 
-pid = -1 if args.pid is None else int(args.pid)
+pid = -1 if args.pid is None else args.pid
 command = args.command
 kernel_trace = (pid == -1 and command is None)
 trace_all = args.trace
-interval = int(args.interval)
-min_age_ns = 1e6 * int(args.older)
+interval = args.interval
+min_age_ns = 1e6 * args.older
 sample_every_n = args.sample_rate
+num_prints = args.count
 
 if command is not None:
         print("Executing '%s' and tracing the resulting process." % command)
@@ -246,6 +249,7 @@ def print_outstanding():
                 print("\t%d bytes in %d allocations from stack\n\t\t%s" %
                       (size, count, stack.replace(";", "\n\t\t")))
 
+count_so_far = 0
 while True:
         if trace_all:
                 print bpf_program.trace_fields()
@@ -256,3 +260,6 @@ while True:
                         exit()
                 decoder.refresh_code_ranges()
                 print_outstanding()
+                count_so_far += 1
+                if num_prints is not None and count_so_far >= num_prints:
+                        exit()
