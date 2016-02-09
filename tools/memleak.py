@@ -190,7 +190,7 @@ parser.add_argument("-c", "--command",
         help="execute and trace the specified command")
 parser.add_argument("-s", "--sample-rate", default=1, type=int,
         help="sample every N-th allocation to decrease the overhead")
-parser.add_argument("-d", "--stack_depth", default=10, type=int,
+parser.add_argument("-d", "--stack-depth", default=10, type=int,
         help="maximum stack depth to capture")
 
 args = parser.parse_args()
