@@ -2,10 +2,10 @@
 .SH NAME
 execsnoop \- Trace new processes via exec() syscalls. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B execsnoop [\-h] [\-t] [\-X] [\-n NAME]
+.B execsnoop [\-h] [\-t] [\-x] [\-n NAME]
 .SH DESCRIPTION
-execsnoop traces new processes, showing the filename executed, argument
-list, and return value (0 for success).
+execsnoop traces new processes, showing the filename executed and argument
+list.
 
 It works by traces the execve() system call (commonly used exec() variant).
 This catches new processes that follow the fork->exec sequence, as well as
@@ -27,8 +27,8 @@ Print usage message.
 \-t
 Include a timestamp column.
 .TP
-\-X
-Exclude failed exec()s
+\-x
+Include failed exec()s
 .TP
 \-n NAME
 Only print command lines matching this name (regex), matched anywhere
@@ -42,9 +42,9 @@ Trace all exec() syscalls, and include timestamps:
 #
 .B execsnoop \-t
 .TP
-Only trace successful exec()s:
+Include failed exec()s:
 #
-.B execsnoop \-X
+.B execsnoop \-x
 .TP
 Only trace exec()s where the filename or arguments contain "mount":
 #
@@ -61,7 +61,8 @@ PID
 Process ID
 .TP
 RET
-Return value of exec(). 0 == successs.
+Return value of exec(). 0 == successs. Failures are only shown when using the
+\-x option.
 .TP
 ARGS
 Filename for the exec(), followed be up to 19 arguments. An ellipsis "..." is
