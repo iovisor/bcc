@@ -150,7 +150,7 @@ EXAMPLES:
         allocations every 5 seconds
 ./memleak.py -p $(pidof allocs) -t
         Trace allocations and display each individual call to malloc/free
-./memleak.py -p $(pidof allocs) -a -i 10
+./memleak.py -ap $(pidof allocs) 10
         Trace allocations and display allocated addresses, sizes, and stacks
         every 10 seconds for outstanding allocations
 ./memleak.py -c "./allocs"
