@@ -1,0 +1,61 @@
+.TH dcstat 8  "2016-02-09" "USER COMMANDS"
+.SH NAME
+dcstat \- Directory entry cache (dcache) stats. Uses Linux eBPF/bcc.
+.SH SYNOPSIS
+.B dcstat
+[interval [count]]
+.SH DESCRIPTION
+The Linux directory entry cache (dcache) improves the performance of file and
+directory name lookups. This tool provides per-second summary statistics of
+dcache performance.
+
+This uses kernel dynamic tracing of kernel functions, lookup_fast() and
+d_lookup(), which will need to be modified to match kernel changes.
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH EXAMPLES
+.TP
+Print summaries each second:
+#
+.B dcstat
+.TP
+Print output every five seconds, three times:
+#
+.B dcstat 5 3
+.SH FIELDS
+.TP
+REFS/s
+Number dcache lookups (references) per second.
+.TP
+SLOW/s
+Number of dcache lookups that failed the lookup_fast() path and executed the
+lookup_slow() path instead.
+.TP
+MISS/s
+Number of dcache misses (failed both fast and slow lookups).
+.TP
+HIT%
+Percentage of dcache hits over total references.
+.SH OVERHEAD
+The overhead depends on the frequency of file and directory name lookups.
+While the per-event overhead is low, some applications may make over 100k
+lookups per second, and the low per-event overhead will begin to add up, and
+could begin to be measurable (over 10% CPU usage). Measure in a test
+environment.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Brendan Gregg
+.SH SEE ALSO
+dcsnoop(8)
