@@ -178,6 +178,10 @@ optional arguments:
   -d STACK_DEPTH, --stack_depth STACK_DEPTH
                         maximum stack depth to capture
   -T TOP, --top TOP     display only this many top allocating stacks (by size)
+  -z MIN_SIZE, --min-size MIN_SIZE
+                        capture only allocations larger than this size
+  -Z MAX_SIZE, --max-size MAX_SIZE
+                        capture only allocations smaller than this size
 
 EXAMPLES:
 

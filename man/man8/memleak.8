@@ -2,7 +2,8 @@
 .SH NAME
 memleak \- Print a summary of outstanding allocations and their call stacks to detect memory leaks. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B memleak [-h] [-p PID] [-t] [-a] [-o OLDER] [-c COMMAND] [-s SAMPLE_RATE] [-d STACK_DEPTH] [-T TOP] [INTERVAL] [COUNT]
+.B memleak [-h] [-p PID] [-t] [-a] [-o OLDER] [-c COMMAND] [-s SAMPLE_RATE]
+[-d STACK_DEPTH] [-T TOP] [-z MIN_SIZE] [-Z MAX_SIZE] [INTERVAL] [COUNT]
 .SH DESCRIPTION
 memleak traces and matches memory allocation and deallocation requests, and
 collects call stacks for each allocation. memleak can then print a summary
@@ -52,6 +53,12 @@ The default value is 10.
 Print only the top TOP stacks (sorted by size).
 The default value is 10.
 .TP
+\-z MIN_SIZE
+Capture only allocations that are larger than or equal to MIN_SIZE bytes.
+.TP
+\-Z MAX_SIZE
+Capture only allocations that are smaller than or equal to MAX_SIZE bytes.
+.TP
 INTERVAL
 Print a summary of oustanding allocations and their call stacks every INTERVAL seconds.
 The default interval is 5 seconds.
@@ -76,12 +83,17 @@ stacks 10 times before quitting.
 Run ./allocs and print outstanding allocation stacks for that process: 
 #
 .B memleak -c "./allocs"
+.TP
+Capture only allocations between 16 and 32 bytes in size:
+#
+.B memleak -z 16 -Z 32
 .SH OVERHEAD
 memleak can have significant overhead if the target process or kernel performs
 allocations at a very high rate. Pathological cases may exhibit up to 100x
 degradation in running time. Most of the time, however, memleak shouldn't cause
-a significant slowdown. You can also use the \-s switch to reduce the overhead
-further by capturing only every N-th allocation.
+a significant slowdown. You can use the \-s switch to reduce the overhead
+further by capturing only every N-th allocation. The \-z and \-Z switches can
+also reduce overhead by capturing only allocations of specific sizes.
 
 To determine the rate at which your application is calling malloc/free, or the
 rate at which your kernel is calling kmalloc/kfree, place a probe with perf and

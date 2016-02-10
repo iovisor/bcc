@@ -1,4 +1,14 @@
 #!/usr/bin/env python
+#
+# memleak.py   Trace and display outstanding allocations to detect 
+#              memory leaks in user-mode processes and the kernel.
+#
+# USAGE: memleak.py [-h] [-p PID] [-t] [-a] [-o OLDER] [-c COMMAND]
+#                   [-s SAMPLE_RATE] [-d STACK_DEPTH] [-T TOP] [-z MIN_SIZE]
+#                   [-Z MAX_SIZE]
+#                   [interval] [count]
+#
+# Copyright (C) 2016 Sasha Goldshtein.
 
 from bcc import BPF
 from time import sleep
@@ -195,6 +205,10 @@ parser.add_argument("-d", "--stack-depth", default=10, type=int,
         help="maximum stack depth to capture")
 parser.add_argument("-T", "--top", type=int, default=10,
         help="display only this many top allocating stacks (by size)")
+parser.add_argument("-z", "--min-size", type=int,
+        help="capture only allocations larger than this size")
+parser.add_argument("-Z", "--max-size", type=int,
+        help="capture only allocations smaller than this size")
 
 args = parser.parse_args()
 
@@ -208,6 +222,12 @@ sample_every_n = args.sample_rate
 num_prints = args.count
 max_stack_size = args.stack_depth + 2
 top_stacks = args.top
+min_size = args.min_size
+max_size = args.max_size
+
+if min_size is not None and max_size is not None and min_size > max_size:
+        print("min_size (-z) can't be greater than max_size (-Z)")
+        exit(1)
 
 if command is not None:
         print("Executing '%s' and tracing the resulting process." % command)
@@ -219,6 +239,17 @@ bpf_source = bpf_source.replace("SAMPLE_EVERY_N", str(sample_every_n))
 bpf_source = bpf_source.replace("GRAB_ONE_FRAME", max_stack_size *
         "\tif (!(info->callstack[depth++] = get_frame(&bp))) return depth;\n")
 bpf_source = bpf_source.replace("MAX_STACK_SIZE", str(max_stack_size))
+
+size_filter = ""
+if min_size is not None and max_size is not None:
+        size_filter = "if (size < %d || size > %d) return 0;" % \
+                      (min_size, max_size)
+elif min_size is not None:
+        size_filter = "if (size < %d) return 0;" % min_size
+elif max_size is not None:
+        size_filter = "if (size > %d) return 0;" % max_size
+bpf_source = bpf_source.replace("SIZE_FILTER", size_filter)
+
 bpf_program = BPF(text=bpf_source)
 
 if not kernel_trace:
