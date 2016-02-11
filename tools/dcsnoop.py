@@ -70,8 +70,9 @@ int kprobe__d_lookup(struct pt_regs *ctx, const struct dentry *parent,
 {
     u32 pid = bpf_get_current_pid_tgid();
     struct entry_t entry = {};
-    if (name->name) {
-        bpf_probe_read(&entry.name, sizeof(entry.name), (void *)name->name);
+    const char *fname = name->name;
+    if (fname) {
+        bpf_probe_read(&entry.name, sizeof(entry.name), (void *)fname);
     }
     entrybypid.update(&pid, &entry);
     return 0;
