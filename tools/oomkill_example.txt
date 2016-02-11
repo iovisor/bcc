@@ -1,0 +1,39 @@
+Demonstrations of oomkill, the Linux eBPF/bcc version.
+
+
+oomkill is a simple program that traces the Linux out-of-memory (OOM) killer,
+and shows basic details on one line per OOM kill:
+
+# ./oomkill
+Tracing oom_kill_process()... Ctrl-C to end.
+21:03:39 Triggered by PID 3297 ("ntpd"), OOM kill of PID 22516 ("perl"), 3850642 pages, loadavg: 0.99 0.39 0.30 3/282 22724
+21:03:48 Triggered by PID 22517 ("perl"), OOM kill of PID 22517 ("perl"), 3850642 pages, loadavg: 0.99 0.41 0.30 2/282 22932
+
+The first line shows that PID 22516, with process name "perl", was OOM killed
+when it reached 3850642 pages (usually 4 Kbytes per page). This OOM kill
+happened to be triggered by PID 3297, process name "ntpd", doing some memory
+allocation.
+
+The system log (dmesg) shows pages of details and system context about an OOM
+kill. What it currently lacks, however, is context on how the system had been
+changing over time. I've seen OOM kills where I wanted to know if the system
+was at steady state at the time, or if there had been a recent increase in
+workload that triggered the OOM event. oomkill provides some context: at the
+end of the line is the load average information from /proc/loadavg. For both
+of the oomkills here, we can see that the system was getting busier at the
+time (a higher 1 minute "average" of 0.99, compared to the 15 minute "average"
+of 0.30).
+
+oomkill can also be the basis of other tools and customizations. For example,
+you can edit it to include other task_struct details from the target PID at
+the time of the OOM kill.
+
+
+The following commands can be used to test this program, and invoke a memory
+consuming process that exhausts system memory and is OOM killed:
+
+sysctl -w vm.overcommit_memory=1              # always overcommit
+perl -e 'while (1) { $a .= "A" x 1024; }'     # eat all memory
+
+WARNING: This exhausts system memory after disabling some overcommit checks.
+Only test in a lab environment.

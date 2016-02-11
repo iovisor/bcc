@@ -1,0 +1,55 @@
+.TH oomkill 8  "2016-02-09" "USER COMMANDS"
+.SH NAME
+oomkill \- Trace oom_kill_process(). Uses Linux eBPF/bcc.
+.SH SYNOPSIS
+.B oomkill
+.SH DESCRIPTION
+This traces the kernel out-of-memory killer, and prints basic details,
+including the system load averages at the time of the OOM kill. This can
+provide more context on the system state at the time: was it getting busier
+or steady, based on the load averages? This tool may also be useful to
+customize for investigations; for example, by adding other task_struct
+details at the time of OOM.
+
+This program is also a basic example of eBPF/bcc.
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH EXAMPLES
+.TP
+Trace OOM kill events:
+#
+.B oomkill
+.SH FIELDS
+.TP
+Triggered by ...
+The process ID and process name of the task that was running when another task was OOM
+killed.
+.TP
+OOM kill of ...
+The process ID and name of the target process that was OOM killed.
+.TP
+loadavg
+Contents of /proc/loadavg. The first three numbers are 1, 5, and 15 minute
+load averages (where the average is an exponentially damped moving sum, and
+those numbers are constants in the equation); then there is the number of
+running tasks, a slash, and the total number of tasks; and then the last number
+is the last PID to be created.
+.SH OVERHEAD
+Negligible.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Brendan Gregg
+.SH SEE ALSO
+memleak(8)

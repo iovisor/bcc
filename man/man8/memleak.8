@@ -2,7 +2,8 @@
 .SH NAME
 memleak \- Print a summary of outstanding allocations and their call stacks to detect memory leaks. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B memleak [-h] [-p PID] [-t] [-i INTERVAL] [-a] [-o OLDER] [-c COMMAND] [-s SAMPLE_RATE]
+.B memleak [-h] [-p PID] [-t] [-a] [-o OLDER] [-c COMMAND] [-s SAMPLE_RATE]
+[-d STACK_DEPTH] [-T TOP] [-z MIN_SIZE] [-Z MAX_SIZE] [INTERVAL] [COUNT]
 .SH DESCRIPTION
 memleak traces and matches memory allocation and deallocation requests, and
 collects call stacks for each allocation. memleak can then print a summary
@@ -11,7 +12,11 @@ of which call stacks performed allocations that weren't subsequently freed.
 When tracing a specific process, memleak instruments malloc and free from libc.
 When tracing all processes, memleak instruments kmalloc and kfree.
 
-The stack depth is currently limited to 10 (+1 for the current instruction pointer).
+memleak may introduce significant overhead when tracing processes that allocate
+and free many blocks very quickly. See the OVERHEAD section below.
+
+The stack depth is limited to 10 by default (+1 for the current instruction pointer),
+but it can be controlled using the \-d switch if deeper stacks are required.
 
 This currently only works on x86_64. Check for future versions.
 .SH REQUIREMENTS
@@ -27,10 +32,6 @@ Trace this process ID only (filtered in-kernel). This traces malloc and free fro
 \-t
 Print a trace of all allocation and free requests and results.
 .TP
-\-i INTERVAL
-Print a summary of oustanding allocations and their call stacks every INTERVAL seconds.
-The default interval is 5 seconds.
-.TP
 \-a
 Print a list of allocations that weren't freed (and their sizes) in addition to their call stacks.
 .TP
@@ -43,25 +44,56 @@ Run the specified command and trace its allocations only. This traces malloc and
 .TP
 \-s SAMPLE_RATE
 Record roughly every SAMPLE_RATE-th allocation to reduce overhead.
+.TP
+\-d STACK_DEPTH
+Capture STACK_DEPTH frames (or less) when obtaining allocation call stacks.
+The default value is 10.
+.TP
+\-t TOP
+Print only the top TOP stacks (sorted by size).
+The default value is 10.
+.TP
+\-z MIN_SIZE
+Capture only allocations that are larger than or equal to MIN_SIZE bytes.
+.TP
+\-Z MAX_SIZE
+Capture only allocations that are smaller than or equal to MAX_SIZE bytes.
+.TP
+INTERVAL
+Print a summary of oustanding allocations and their call stacks every INTERVAL seconds.
+The default interval is 5 seconds.
+.TP
+COUNT
+Print the outstanding allocations summary COUNT times and then exit.
 .SH EXAMPLES
 .TP
 Print outstanding kernel allocation stacks every 3 seconds:
 #
-.B memleak -i 3
+.B memleak 3
 .TP
 Print user outstanding allocation stacks and allocation details for the process 1005:
 #
 .B memleak -p 1005 -a
 .TP
+Sample roughly every 5th allocation (~20%) of the call stacks and print the top 5
+stacks 10 times before quitting.
+#
+.B memleak -s 5 --top=5 10
+.TP
 Run ./allocs and print outstanding allocation stacks for that process: 
 #
 .B memleak -c "./allocs"
+.TP
+Capture only allocations between 16 and 32 bytes in size:
+#
+.B memleak -z 16 -Z 32
 .SH OVERHEAD
 memleak can have significant overhead if the target process or kernel performs
 allocations at a very high rate. Pathological cases may exhibit up to 100x
 degradation in running time. Most of the time, however, memleak shouldn't cause
-a significant slowdown. You can also use the \-s switch to reduce the overhead
-further by capturing only every N-th allocation.
+a significant slowdown. You can use the \-s switch to reduce the overhead
+further by capturing only every N-th allocation. The \-z and \-Z switches can
+also reduce overhead by capturing only allocations of specific sizes.
 
 To determine the rate at which your application is calling malloc/free, or the
 rate at which your kernel is calling kmalloc/kfree, place a probe with perf and
@@ -73,6 +105,10 @@ placed in a typical period of 10 seconds:
 
 #
 .B perf stat -a -e 'probe:__kmalloc' -- sleep 10
+
+Another setting that may help reduce overhead is lowering the number of stack
+frames captured and parsed by memleak for each allocation, using the \-d switch.
+
 .SH SOURCE
 This is from bcc.
 .IP
