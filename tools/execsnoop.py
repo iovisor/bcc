@@ -4,7 +4,7 @@
 # execsnoop Trace new processes via exec() syscalls.
 #           For Linux, uses BCC, eBPF. Embedded C.
 #
-# USAGE: execsnoop [-h] [-t] [-X] [-n NAME]
+# USAGE: execsnoop [-h] [-t] [-x] [-n NAME]
 #
 # This currently will print up to a maximum of 19 arguments, plus the process
 # name, so 20 fields in total (MAXARG).
@@ -24,7 +24,7 @@ import re
 # arguments
 examples = """examples:
     ./execsnoop           # trace all exec() syscalls
-    ./execsnoop -X        # only show successful exec()s
+    ./execsnoop -x        # include failed exec()s
     ./execsnoop -t        # include timestamps
     ./execsnoop -n main   # only print command lines containing "main"
 """
@@ -34,8 +34,8 @@ parser = argparse.ArgumentParser(
     epilog=examples)
 parser.add_argument("-t", "--timestamp", action="store_true",
     help="include timestamp on output")
-parser.add_argument("-X", "--excludefails", action="store_true",
-    help="exclude failed exec()s")
+parser.add_argument("-x", "--fails", action="store_true",
+    help="include failed exec()s")
 parser.add_argument("-n", "--name",
     help="only print commands matching this name (regex), any arg")
 args = parser.parse_args()
@@ -125,17 +125,25 @@ pcomm = {}
 # format output
 while 1:
     (task, pid, cpu, flags, ts, msg) = b.trace_fields()
-    (type, arg) = msg.split(" ", 1)
+    try:
+        (type, arg) = msg.split(" ", 1)
+    except ValueError:
+        continue
 
     if start_ts == 0:
         start_ts = ts
 
     if type == "RET":
+        if pid not in cmd:
+            # zero args
+            cmd[pid] = ""
+            pcomm[pid] = ""
+
         skip = 0
         if args.name:
             if not re.search(args.name, cmd[pid]):
                 skip = 1
-        if args.excludefails and int(arg) < 0:
+        if not args.fails and int(arg) < 0:
             skip = 1
         if skip:
             del cmd[pid]
