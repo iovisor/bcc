@@ -97,7 +97,7 @@ start_ts = 0
 # format output
 while 1:
     (task, pid, cpu, flags, ts, msg) = b.trace_fields()
-    (delta, filename) = msg.split(" ")
+    (delta, filename) = msg.split(" ", 1)
 
     # print columns
     print("%-8s %-6d %-16s %-7.2f %s" % (strftime("%H:%M:%S"), pid, task,
