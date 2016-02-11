@@ -6,6 +6,7 @@
 # USAGE: gentrace.py [-h] [-p PID] [-z STRING_SIZE] [-i INTERVAL]
 #                    [-c COUNT] specifier [specifier ...]
 #
+# Licensed under the Apache License, Version 2.0 (the "License")
 # Copyright (C) 2016 Sasha Goldshtein.
 
 from bcc import BPF
