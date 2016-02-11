@@ -10,7 +10,7 @@ various functions.
 For example, suppose you want to find what allocation sizes are common in
 your application:
 
-# ./gentrace.py -p 2420 -s "raw:c:malloc(size_t size):size_t:size"
+# ./gentrace.py -p 2420 "raw:c:malloc(size_t size):size_t:size"
 [01:42:29]
 raw:c:malloc(size_t size):size_t:size
         COUNT      EVENT
@@ -43,7 +43,7 @@ probed and its value was 16, repeatedly.
 Now, suppose you wanted a histogram of buffer sizes passed to the write()
 function across the system:
 
-# ./gentrace.py -s "hist:c:write(int fd, void *buf, size_t len):size_t:len"
+# ./gentrace.py "hist:c:write(int fd, void *buf, size_t len):size_t:len"
 [01:45:22]
 hist:c:write(int fd, void *buf, size_t len):size_t:len
      len                 : count     distribution
@@ -81,7 +81,7 @@ bytes, medium writes of 32-63 bytes, and larger writes of 64-127 bytes.
 But these are writes across the board -- what if you wanted to focus on writes
 to STDOUT?
 
-# ./gentrace.py -s "hist:c:write(int fd, void *buf, size_t len):size_t:len:fd==1" 
+# ./gentrace.py "hist:c:write(int fd, void *buf, size_t len):size_t:len:fd==1" 
 [01:47:17]
 hist:c:write(int fd, void *buf, size_t len):size_t:len:fd==1
      len                 : count     distribution
@@ -120,7 +120,7 @@ You can also use gentrace to trace kernel functions. For example, suppose you
 wanted a histogram of kernel allocation (kmalloc) sizes across the system,
 printed twice with 3 second intervals:
 
-# ./gentrace.py 3 2 -s "hist::__kmalloc(size_t size):size_t:size"
+# ./gentrace.py -i 3 -c 2 "hist::__kmalloc(size_t size):size_t:size"
 [01:50:00]
 hist::__kmalloc(size_t size):size_t:size
      size                : count     distribution
@@ -143,7 +143,7 @@ hist::__kmalloc(size_t size):size_t:size
 Occasionally, numeric information isn't enough and you want to capture strings.
 What are the strings printed by puts() across the system?
 
-# ./gentrace.py 10 1 -s "raw:c:puts(char *str):char*:str"
+# ./gentrace.py -i 10 -c 1 "raw:c:puts(char *str):char*:str"
 [01:53:54]
 raw:c:puts(char *str):char*:str
         COUNT      EVENT
@@ -155,7 +155,7 @@ It looks like the message "Press ENTER to start." was printed twice during the
 What about reads? You could trace gets() across the system and print the 
 strings input by the user:
 
-# ./gentrace.py 10 1 -s "raw-ret:c:gets():char*:@retval"
+# ./gentrace.py -i 10 -c 1 "raw-ret:c:gets():char*:@retval"
 [02:12:23]
 raw-ret:c:gets():char*:@retval
         COUNT      EVENT
@@ -165,7 +165,7 @@ raw-ret:c:gets():char*:@retval
 
 Similarly, we could get a histogram of the error codes returned by read():
 
-# ./gentrace.py 10 1 -s "hist-ret:c:read()"
+# ./gentrace.py -i 10 -c 1 "hist-ret:c:read()"
 [02:15:36]
 hist-ret:c:read()
      (int)ctx->ax        : count     distribution
@@ -186,23 +186,23 @@ hist-ret:c:read()
 USAGE message:
 
 # ./gentrace.py -h
-usage: gentrace.py [-h] [-p PID] [-z STRING_SIZE]
-                   [-s SPECIFIERS [SPECIFIERS ...]]
-                   [interval] [count]
+usage: gentrace.py [-h] [-p PID] [-z STRING_SIZE] [-i INTERVAL] [-c COUNT]
+                   specifier [specifier ...]
 
 Trace a function and display a summary of its parameter values.
 
 positional arguments:
-  interval              output interval, in seconds
-  count                 number of outputs
+  specifier             the probe specifiers (see examples below)
 
 optional arguments:
   -h, --help            show this help message and exit
   -p PID, --pid PID     id of the process to trace (optional)
   -z STRING_SIZE, --string-size STRING_SIZE
                         maximum string size to read from char* arguments
-  -s SPECIFIERS [SPECIFIERS ...], --specifier SPECIFIERS [SPECIFIERS ...]
-                        the probe specifiers (see examples below)
+  -i INTERVAL, --interval INTERVAL
+                        output interval, in seconds
+  -c COUNT, --count COUNT
+                        number of outputs
 
 Probe specifier syntax:
         <raw|hist>[-ret]:[library]:function(signature)[:type:expr[:filter]]
@@ -219,37 +219,37 @@ Where:
 
 EXAMPLES:
 
-gentrace.py -s "hist::__kmalloc(u64 size):u64:size"
+gentrace.py "hist::__kmalloc(u64 size):u64:size"
         Print a histogram of allocation sizes passed to kmalloc
 
-gentrace.py -p 1005 -s "raw:c:malloc(size_t size):size_t:size:size==16"
+gentrace.py -p 1005 "raw:c:malloc(size_t size):size_t:size:size==16"
         Print a raw count of how many times process 1005 called malloc with
         an allocation size of 16 bytes
 
-gentrace.py -s "raw-ret:c:gets():char*:@retval"
+gentrace.py "raw-ret:c:gets():char*:@retval"
         Snoop on all strings returned by gets()
 
-gentrace.py -p 1005 -s "raw:c:write(int fd):int:fd"
+gentrace.py -p 1005 "raw:c:write(int fd):int:fd"
         Print raw counts of how many times writes were issued to a particular
         file descriptor number, in process 1005
 
-gentrace.py -p 1005 -s "hist-ret:c:read()"
+gentrace.py -p 1005 "hist-ret:c:read()"
         Print a histogram of error codes returned by read() in process 1005
 
-gentrace.py -s "hist:c:write(int fd, const void *buf, size_t count):size_t:count:fd==1"
+gentrace.py "hist:c:write(int fd, const void *buf, size_t count):size_t:count:fd==1"
         Print a histogram of buffer sizes passed to write() across all
         processes, where the file descriptor was 1 (STDOUT)
 
-gentrace.py -s "raw:c:fork"
+gentrace.py "raw:c:fork"
         Count fork() calls in libc across all processes
         Can also use funccount.py, which is easier and more flexible
 
-gentrace.py -s \
+gentrace.py \
         "hist:c:sleep(u32 seconds):u32:seconds" \
         "hist:c:nanosleep(struct timespec { time_t tv_sec; long tv_nsec; } *req):long:req->tv_nsec"
         Print histograms of sleep() and nanosleep() parameter values
 
-gentrace.py -p 2780 -s -z 120 "raw:c:write(int fd, char* buf, size_t len):char*:buf:fd==1"
+gentrace.py -p 2780 -z 120 "raw:c:write(int fd, char* buf, size_t len):char*:buf:fd==1"
         Spy on writes to STDOUT performed by process 2780, up to a string size
         of 120 characters
 

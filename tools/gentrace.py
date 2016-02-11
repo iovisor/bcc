@@ -3,9 +3,8 @@
 # gentrace.py   Trace a function and display a histogram or summary of its
 #               parameter values. 
 #
-# USAGE: gentrace.py [-h] [-p PID] [-z STRING_SIZE]
-#                    [-s SPECIFIER [SPECIFIER ...]]
-#                    [interval] [count]
+# USAGE: gentrace.py [-h] [-p PID] [-z STRING_SIZE] [-i INTERVAL]
+#                    [-c COUNT] specifier [specifier ...]
 #
 # Copyright (C) 2016 Sasha Goldshtein.
 
@@ -26,7 +25,6 @@ int PROBENAME(struct pt_regs *ctx SIGNATURE)
 }
 """
 
-        # <raw|hist>:lib:function(signature)[:type:expr[:filter]]
         def __init__(self, specifier, pid):
                 self.raw_spec = specifier 
                 parts = specifier.strip().split(':')
@@ -151,37 +149,37 @@ Where:
 
 EXAMPLES:
 
-gentrace.py -s "hist::__kmalloc(u64 size):u64:size"
+gentrace.py "hist::__kmalloc(u64 size):u64:size"
         Print a histogram of allocation sizes passed to kmalloc
 
-gentrace.py -p 1005 -s "raw:c:malloc(size_t size):size_t:size:size==16"
+gentrace.py -p 1005 "raw:c:malloc(size_t size):size_t:size:size==16"
         Print a raw count of how many times process 1005 called malloc with
         an allocation size of 16 bytes
 
-gentrace.py -s "raw-ret:c:gets():char*:@retval"
+gentrace.py "raw-ret:c:gets():char*:@retval"
         Snoop on all strings returned by gets()
 
-gentrace.py -p 1005 -s "raw:c:write(int fd):int:fd"
+gentrace.py -p 1005 "raw:c:write(int fd):int:fd"
         Print raw counts of how many times writes were issued to a particular
         file descriptor number, in process 1005
 
-gentrace.py -p 1005 -s "hist-ret:c:read()"
+gentrace.py -p 1005 "hist-ret:c:read()"
         Print a histogram of error codes returned by read() in process 1005
 
-gentrace.py -s "hist:c:write(int fd, const void *buf, size_t count):size_t:count:fd==1"
+gentrace.py "hist:c:write(int fd, const void *buf, size_t count):size_t:count:fd==1"
         Print a histogram of buffer sizes passed to write() across all
         processes, where the file descriptor was 1 (STDOUT)
 
-gentrace.py -s "raw:c:fork"
+gentrace.py "raw:c:fork"
         Count fork() calls in libc across all processes
         Can also use funccount.py, which is easier and more flexible 
 
-gentrace.py -s \\
+gentrace.py \\
         "hist:c:sleep(u32 seconds):u32:seconds" \\
         "hist:c:nanosleep(struct timespec { time_t tv_sec; long tv_nsec; } *req):long:req->tv_nsec"
         Print histograms of sleep() and nanosleep() parameter values
 
-gentrace.py -p 2780 -s -z 120 "raw:c:write(int fd, char* buf, size_t len):char*:buf:fd==1"
+gentrace.py -p 2780 -z 120 "raw:c:write(int fd, char* buf, size_t len):char*:buf:fd==1"
         Spy on writes to STDOUT performed by process 2780, up to a string size
         of 120 characters 
 """
@@ -194,16 +192,16 @@ parser.add_argument("-p", "--pid", type=int,
         help="id of the process to trace (optional)")
 parser.add_argument("-z", "--string-size", default=80, type=int,
         help="maximum string size to read from char* arguments")
-parser.add_argument("interval", nargs="?", default=1, type=int,
+parser.add_argument("-i", "--interval", default=1, type=int,
         help="output interval, in seconds")
-parser.add_argument("count", nargs="?", type=int,
+parser.add_argument("-c", "--count", type=int,
         help="number of outputs")
-parser.add_argument("-s", "--specifier", nargs="+", dest="specifiers",
+parser.add_argument("specifier", nargs="+",
         help="the probe specifiers (see examples below)")
 args = parser.parse_args()
 
 specifiers = []
-for specifier in args.specifiers:
+for specifier in args.specifier:
         specifiers.append(Specifier(specifier, args.pid))
 
 bpf_source = "#include <uapi/linux/ptrace.h>\n"
