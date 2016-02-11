@@ -16,27 +16,63 @@
 
 from bcc import BPF
 from time import strftime
+import ctypes as ct
 
 # linux stats
 loadavg = "/proc/loadavg"
 
-# initialize BPF
-b = BPF(text="""
+# define BPF program
+bpf_text = """
 #include <uapi/linux/ptrace.h>
 #include <linux/oom.h>
+
+struct data_t {
+    u64 fpid;
+    u64 tpid;
+    u64 pages;
+    char fcomm[TASK_COMM_LEN];
+    char tcomm[TASK_COMM_LEN];
+};
+
+BPF_PERF_OUTPUT(events);
+
 void kprobe__oom_kill_process(struct pt_regs *ctx, struct oom_control *oc,
     struct task_struct *p, unsigned int points, unsigned long totalpages)
 {
-    bpf_trace_printk("OOM kill of PID %d (\\"%s\\"), %d pages\\n", p->pid,
-        p->comm, totalpages);
+    struct data_t data = {};
+    u32 pid = bpf_get_current_pid_tgid();
+    data.fpid = pid;
+    data.tpid = p->pid;
+    data.pages = totalpages;
+    bpf_get_current_comm(&data.fcomm, sizeof(data.fcomm));
+    bpf_probe_read(&data.tcomm, sizeof(data.tcomm), p->comm);
+    events.perf_submit(ctx, &data, sizeof(data));
 }
-""")
+"""
 
-# print output
-print("Tracing oom_kill_process()... Ctrl-C to end.")
-while 1:
-    (task, pid, cpu, flags, ts, msg) = b.trace_fields()
+# kernel->user event data: struct data_t
+TASK_COMM_LEN = 16  # linux/sched.h
+class Data(ct.Structure):
+    _fields_ = [
+        ("fpid", ct.c_ulonglong),
+        ("tpid", ct.c_ulonglong),
+        ("pages", ct.c_ulonglong),
+        ("fcomm", ct.c_char * TASK_COMM_LEN),
+        ("tcomm", ct.c_char * TASK_COMM_LEN)
+    ]
+
+# process event
+def print_event(cpu, data, size):
+    event = ct.cast(data, ct.POINTER(Data)).contents
     with open(loadavg) as stats:
         avgline = stats.read().rstrip()
-    print("%s Triggered by PID %d (\"%s\"), %s, loadavg: %s" % (
-        strftime("%H:%M:%S"), pid, task, msg, avgline))
+    print(("%s Triggered by PID %d (\"%s\"), OOM kill of PID %d (\"%s\")"
+        ", %d pages, loadavg: %s") % (strftime("%H:%M:%S"), event.fpid,
+        event.fcomm, event.tpid, event.tcomm, event.pages, avgline))
+
+# initialize BPF
+b = BPF(text=bpf_text)
+print("Tracing OOM kills... Ctrl-C to stop.")
+b["events"].open_perf_buffer(print_event)
+while 1:
+    b.kprobe_poll()
