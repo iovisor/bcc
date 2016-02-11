@@ -33,6 +33,9 @@ int PROBENAME(struct pt_regs *ctx SIGNATURE)
                 if len(parts) < 3 or len(parts) > 6:
                         raise ValueError("invalid specifier format")
                 self.type = parts[0]    # hist or raw
+                self.is_ret_probe = self.type.endswith("-ret")
+                if self.is_ret_probe:
+                        self.type = self.type[:-len("-ret")]
                 if self.type != "hist" and self.type != "raw":
                         raise ValueError("unrecognized probe type")
                 self.library = parts[1]
@@ -45,8 +48,11 @@ int PROBENAME(struct pt_regs *ctx SIGNATURE)
                         self.expr_type = parts[3]
                         self.expr = parts[4]
                 else:
-                        self.expr_type = "u64"
-                        self.expr = "1"
+                        self.expr_type = \
+                                "u64" if not self.is_ret_probe else "int"
+                        self.expr = "1" if not self.is_ret_probe else "@retval"
+                self.expr = self.expr.replace("@retval",
+                                              "(%s)ctx->ax" % self.expr_type)
                 self.filter = None if len(parts) != 6 else parts[5]
                 self.pid = pid
                 self.probe_func_name = self.function + "_probe"
@@ -95,13 +101,23 @@ bpf_probe_read(&__key.key, sizeof(__key.key), %s);
         def attach(self, bpf):
                 self.bpf = bpf
                 if len(self.library) > 0:
-                        bpf.attach_uprobe(name=self.library,
-                                          sym=self.function,
-                                          fn_name=self.probe_func_name,
-                                          pid=self.pid or -1)
+                        if self.is_ret_probe:
+                                bpf.attach_uretprobe(name=self.library,
+                                                  sym=self.function,
+                                                  fn_name=self.probe_func_name,
+                                                  pid=self.pid or -1)
+                        else:
+                                bpf.attach_uprobe(name=self.library,
+                                                  sym=self.function,
+                                                  fn_name=self.probe_func_name,
+                                                  pid=self.pid or -1)
                 else:
-                        bpf.attach_kprobe(event=self.function,
-                                          fn_name=self.probe_func_name)
+                        if self.is_ret_probe:
+                                bpf.attach_kretprobe(event=self.function,
+                                                  fn_name=self.probe_func_name)
+                        else:
+                                bpf.attach_kprobe(event=self.function,
+                                                  fn_name=self.probe_func_name)
 
         def display(self):
                 print(self.raw_spec)
@@ -121,9 +137,10 @@ bpf_probe_read(&__key.key, sizeof(__key.key), %s);
 
 examples = """
 Probe specifier syntax:
-        <raw|hist>:[library]:function(signature)[:type:expr[:filter]]
+        <raw|hist>[-ret]:[library]:function(signature)[:type:expr[:filter]]
 Where:
         <raw|hist> -- collect raw data or a histogram of values
+        ret        -- probe at function exit, only @retval is accessible
         library    -- the library that contains the function
                       (leave empty for kernel functions)
         function   -- the function name to trace
@@ -141,9 +158,15 @@ gentrace.py -p 1005 -s "raw:c:malloc(size_t size):size_t:size:size==16"
         Print a raw count of how many times process 1005 called malloc with
         an allocation size of 16 bytes
 
+gentrace.py -s "raw-ret:c:gets():char*:@retval"
+        Snoop on all strings returned by gets()
+
 gentrace.py -p 1005 -s "raw:c:write(int fd):int:fd"
         Print raw counts of how many times writes were issued to a particular
         file descriptor number, in process 1005
+
+gentrace.py -p 1005 -s "hist-ret:c:read()"
+        Print a histogram of error codes returned by read() in process 1005
 
 gentrace.py -s "hist:c:write(int fd, const void *buf, size_t count):size_t:count:fd==1"
         Print a histogram of buffer sizes passed to write() across all

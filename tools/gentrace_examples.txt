@@ -152,11 +152,40 @@ raw:c:puts(char *str):char*:str
 It looks like the message "Press ENTER to start." was printed twice during the
 10 seconds we were tracing.
 
+What about reads? You could trace gets() across the system and print the 
+strings input by the user:
+
+# ./gentrace.py 10 1 -s "raw-ret:c:gets():char*:@retval"
+[02:12:23]
+raw-ret:c:gets():char*:@retval
+        COUNT      EVENT
+        1          (char*)ctx->ax = hi there
+        1          (char*)ctx->ax = sasha
+        1          (char*)ctx->ax = hello
+
+Similarly, we could get a histogram of the error codes returned by read():
+
+# ./gentrace.py 10 1 -s "hist-ret:c:read()"
+[02:15:36]
+hist-ret:c:read()
+     (int)ctx->ax        : count     distribution
+         0 -> 1          : 29       |****************************************|
+         2 -> 3          : 11       |***************                         |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 3        |****                                    |
+        16 -> 31         : 2        |**                                      |
+        32 -> 63         : 22       |******************************          |
+        64 -> 127        : 5        |******                                  |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 1        |*                                       |
+       512 -> 1023       : 1        |*                                       |
+      1024 -> 2047       : 0        |                                        |
+      2048 -> 4095       : 2        |**                                      |
+
 
 USAGE message:
 
 # ./gentrace.py -h
-
 usage: gentrace.py [-h] [-p PID] [-z STRING_SIZE]
                    [-s SPECIFIERS [SPECIFIERS ...]]
                    [interval] [count]
@@ -176,9 +205,10 @@ optional arguments:
                         the probe specifiers (see examples below)
 
 Probe specifier syntax:
-        <raw|hist>:[library]:function(signature)[:type:expr[:filter]]
-Where:  
+        <raw|hist>[-ret]:[library]:function(signature)[:type:expr[:filter]]
+Where:
         <raw|hist> -- collect raw data or a histogram of values
+        ret        -- probe at function exit, only @retval is accessible
         library    -- the library that contains the function
                       (leave empty for kernel functions)
         function   -- the function name to trace
@@ -196,9 +226,15 @@ gentrace.py -p 1005 -s "raw:c:malloc(size_t size):size_t:size:size==16"
         Print a raw count of how many times process 1005 called malloc with
         an allocation size of 16 bytes
 
+gentrace.py -s "raw-ret:c:gets():char*:@retval"
+        Snoop on all strings returned by gets()
+
 gentrace.py -p 1005 -s "raw:c:write(int fd):int:fd"
         Print raw counts of how many times writes were issued to a particular
         file descriptor number, in process 1005
+
+gentrace.py -p 1005 -s "hist-ret:c:read()"
+        Print a histogram of error codes returned by read() in process 1005
 
 gentrace.py -s "hist:c:write(int fd, const void *buf, size_t count):size_t:count:fd==1"
         Print a histogram of buffer sizes passed to write() across all
