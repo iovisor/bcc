@@ -60,7 +60,7 @@ net_rx_action                    15656
 This can be useful for quantifying where CPU cycles are spent among the soft
 interrupts (summarized as the %softirq column from mpstat(1), and shown as
 event counts in /proc/softirqs). The output above shows that most time was spent
-processing net_rx_action(), which was around 15 milleconds per second (total
+processing net_rx_action(), which was around 15 milliseconds per second (total
 time across all CPUs).
 
 

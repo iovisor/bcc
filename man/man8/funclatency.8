@@ -1,6 +1,6 @@
 .TH funclatency 8  "2015-08-18" "USER COMMANDS"
 .SH NAME
-funclatency \- Time kernel funcitons and print latency as a histogram.
+funclatency \- Time kernel functions and print latency as a histogram.
 .SH SYNOPSIS
 .B funclatency [\-h] [\-p PID] [\-i INTERVAL] [\-T] [\-u] [\-m] [\-r] [\-F] pattern
 .SH DESCRIPTION
@@ -88,7 +88,7 @@ Nanosecond range
 usecs
 Microsecond range
 .TP
-mecs
+msecs
 Millisecond range
 .TP
 count
@@ -97,7 +97,7 @@ How many calls fell into this range
 distribution
 An ASCII bar chart to visualize the distribution (count column)
 .SH OVERHEAD
-This traces kernel functions and maintains in-kernel timestamps and a histgroam,
+This traces kernel functions and maintains in-kernel timestamps and a histogram,
 which are asynchronously copied to user-space. While this method is very
 efficient, the rate of kernel functions can also be very high (>1M/sec), at
 which point the overhead is expected to be measurable. Measure in a test

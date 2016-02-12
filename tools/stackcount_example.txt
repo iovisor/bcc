@@ -376,7 +376,7 @@ Tracing 1 functions for "tcp_sendmsg"... Hit Ctrl-C to end.
 Detaching...
 
 If it wasn't clear how one function called another, knowing the instruction
-offset can help you locate the lines of code from a dissassembly dump.
+offset can help you locate the lines of code from a disassembly dump.
 
 
 A wildcard can also be used. Eg, all functions beginning with "tcp_send":

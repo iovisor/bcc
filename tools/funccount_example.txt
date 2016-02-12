@@ -166,7 +166,7 @@ The current implementation can take many seconds to detach from tracing, after
 Ctrl-C has been hit.
 
 
-Couting all vfs functions for process ID 5276 only:
+Counting all vfs functions for process ID 5276 only:
 
 # ./funccount -p 5276 'vfs_*'
 Tracing... Ctrl-C to end.

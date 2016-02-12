@@ -3,6 +3,7 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 
 from bcc import BPF
+import ctypes
 from unittest import main, TestCase
 
 class TestClang(TestCase):
@@ -88,6 +89,22 @@ int foo(void *ctx) {
         self.assertEqual(l.d, 1)
         self.assertEqual(l.s.a, 5)
         self.assertEqual(l.s.b, 6)
+
+    def test_sscanf_array(self):
+        text = """
+BPF_TABLE("hash", int, struct { u32 a[3]; u32 b; }, stats, 10);
+"""
+        b = BPF(text=text, debug=0)
+        t = b.get_table("stats")
+        s1 = t.key_sprintf(t.Key(2))
+        self.assertEqual(s1, b"0x2")
+        s2 = t.leaf_sprintf(t.Leaf((ctypes.c_uint * 3)(1,2,3), 4))
+        self.assertEqual(s2, b"{ [ 0x1 0x2 0x3 ] 0x4 }")
+        l = t.leaf_scanf(s2)
+        self.assertEqual(l.a[0], 1)
+        self.assertEqual(l.a[1], 2)
+        self.assertEqual(l.a[2], 3)
+        self.assertEqual(l.b, 4)
 
     def test_iosnoop(self):
         text = """

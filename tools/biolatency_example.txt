@@ -41,7 +41,7 @@ the last row printed, for which there were 2 I/O.
 For efficiency, biolatency uses an in-kernel eBPF map to store timestamps
 with requests, and another in-kernel map to store the histogram (the "count")
 column, which is copied to user-space only when output is printed. These
-methods lower the perormance overhead when tracing is performed.
+methods lower the performance overhead when tracing is performed.
 
 
 In the following example, the -m option is used to print a histogram using

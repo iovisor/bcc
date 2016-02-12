@@ -4,8 +4,8 @@
 #               For Linux, uses BCC, eBPF. See .c file.
 #
 # USAGE: bitesize
-# Ctrl-C will print the partially gathered histogram then exit.
 #
+# Ctrl-C will print the partially gathered histogram then exit.
 #
 # Copyright (c) 2016 Allan McAleavy
 # Licensed under the Apache License, Version 2.0 (the "License")
@@ -19,7 +19,7 @@ bpf_text = """
 #include <uapi/linux/ptrace.h>
 #include <linux/blkdev.h>
 
-struct proc_key_t  {
+struct proc_key_t {
     char name[TASK_COMM_LEN];
     u64 slot;
 };
@@ -41,12 +41,12 @@ int trace_pid_start(struct pt_regs *ctx, struct request *req)
     return 0;
 }
 
-int do_count (struct pt_regs *ctx, struct request *req)
+int do_count(struct pt_regs *ctx, struct request *req)
 {
     struct val_t *valp;
 
     valp = commbyreq.lookup(&req);
-    if ( valp ==  0) {
+    if (valp == 0) {
        return 0;
     }
 
@@ -55,7 +55,7 @@ int do_count (struct pt_regs *ctx, struct request *req)
         bpf_probe_read(&key.name, sizeof(key.name),valp->name);
         dist.increment(key);
     }
-       return 0;
+    return 0;
 }
 """
 
@@ -72,4 +72,4 @@ dist = b.get_table("dist")
 try:
     sleep(99999999)
 except KeyboardInterrupt:
-    dist.print_log2_hist("Kbytes", "Process Name:")
+    dist.print_log2_hist("Kbytes", "Process Name")

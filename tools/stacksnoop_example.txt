@@ -3,7 +3,7 @@ Demonstrations of stacksnoop, the Linux eBPF/bcc version.
 
 This program traces the given kernel function and prints the kernel stack trace
 for every call. This tool is useful for studying low frequency kernel functions,
-to see how they were invoked. For exmaple, tracing the ext4_sync_fs() call:
+to see how they were invoked. For example, tracing the ext4_sync_fs() call:
 
 # ./stacksnoop ext4_sync_fs
 TIME(s)            STACK

@@ -1,0 +1,96 @@
+Demonstrations of dcsnoop, the Linux eBPF/bcc version.
+
+
+dcsnoop traces directory entry cache (dcache) lookups, and can be used for
+further investigation beyond dcstat(8). The output is likely verbose, as
+dcache lookups are likely frequent. By default, only failed lookups are shown.
+For example:
+
+# ./dcsnoop.py 
+TIME(s)     PID    COMM             T FILE
+0.002837    1643   snmpd            M net/dev
+0.002852    1643   snmpd            M 1643
+0.002856    1643   snmpd            M net
+0.002863    1643   snmpd            M dev
+0.002952    1643   snmpd            M net/if_inet6
+0.002964    1643   snmpd            M if_inet6
+0.003180    1643   snmpd            M net/ipv4/neigh/eth0/retrans_time_ms
+0.003192    1643   snmpd            M ipv4/neigh/eth0/retrans_time_ms
+0.003197    1643   snmpd            M neigh/eth0/retrans_time_ms
+0.003203    1643   snmpd            M eth0/retrans_time_ms
+0.003206    1643   snmpd            M retrans_time_ms
+0.003245    1643   snmpd            M ipv6/neigh/eth0/retrans_time_ms
+0.003249    1643   snmpd            M neigh/eth0/retrans_time_ms
+0.003252    1643   snmpd            M eth0/retrans_time_ms
+0.003255    1643   snmpd            M retrans_time_ms
+0.003287    1643   snmpd            M conf/eth0/forwarding
+0.003292    1643   snmpd            M eth0/forwarding
+0.003295    1643   snmpd            M forwarding
+0.003326    1643   snmpd            M base_reachable_time_ms
+[...]
+
+I ran a drop caches at the same time as executing this tool. The output shows
+the processes, the type of event ("T" column: M == miss, R == reference),
+and the filename for the dcache lookup.
+
+The way the dcache is currently implemented, each component of a path is
+checked in turn. The first line, showing "net/dev" from snmp, will be a lookup
+for "net" in a directory (that isn't shown here). If it finds "net", it will
+then lookup "dev" inside net. You can see this sequence a little later,
+starting at time 0.003180, where a pathname is being searched
+directory by directory.
+
+
+The -a option will show all lookups, although be warned, the output will be
+very verbose. For example:
+
+# ./dcsnoop
+TIME(s)     PID    COMM             T FILE
+0.000000    20279  dcsnoop.py       M p_lookup_fast
+0.000010    20279  dcsnoop.py       M enable
+0.000013    20279  dcsnoop.py       M id
+0.000015    20279  dcsnoop.py       M filter
+0.000017    20279  dcsnoop.py       M trigger
+0.000019    20279  dcsnoop.py       M format
+0.006148    20279  dcsnoop.py       R sys/kernel/debug/tracing/trace_pipe
+0.006158    20279  dcsnoop.py       R kernel/debug/tracing/trace_pipe
+0.006161    20279  dcsnoop.py       R debug/tracing/trace_pipe
+0.006164    20279  dcsnoop.py       R tracing/trace_pipe
+0.006166    20279  dcsnoop.py       R trace_pipe
+0.015900    1643   snmpd            R proc/sys/net/ipv6/conf/lo/forwarding
+0.015901    1643   snmpd            R sys/net/ipv6/conf/lo/forwarding
+0.015901    1643   snmpd            R net/ipv6/conf/lo/forwarding
+0.015902    1643   snmpd            R ipv6/conf/lo/forwarding
+0.015903    1643   snmpd            R conf/lo/forwarding
+0.015904    1643   snmpd            R lo/forwarding
+0.015905    1643   snmpd            M lo/forwarding
+0.015908    1643   snmpd            R forwarding
+0.015909    1643   snmpd            M forwarding
+0.015937    1643   snmpd            R proc/sys/net/ipv6/neigh/lo/base_reachable_time_ms
+0.015937    1643   snmpd            R sys/net/ipv6/neigh/lo/base_reachable_time_ms
+0.015938    1643   snmpd            R net/ipv6/neigh/lo/base_reachable_time_ms
+0.015939    1643   snmpd            R ipv6/neigh/lo/base_reachable_time_ms
+0.015940    1643   snmpd            R neigh/lo/base_reachable_time_ms
+0.015941    1643   snmpd            R lo/base_reachable_time_ms
+0.015941    1643   snmpd            R base_reachable_time_ms
+0.015943    1643   snmpd            M base_reachable_time_ms
+0.043569    1876   supervise        M 20281
+0.043573    1886   supervise        M 20280
+0.043582    1886   supervise        R supervise/status.new
+[...]
+
+
+USAGE message:
+
+# ./dcsnoop.py -h
+usage: dcsnoop.py [-h] [-a]
+
+Trace directory entry cache (dcache) lookups
+
+optional arguments:
+  -h, --help  show this help message and exit
+  -a, --all   trace all lookups (default is fails only)
+
+examples:
+    ./dcsnoop           # trace failed dcache lookups
+    ./dcsnoop -a        # trace all dcache lookups

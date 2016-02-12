@@ -65,7 +65,7 @@ Show a latency histogram for each disk device separately:
 usecs
 Microsecond range
 .TP
-mecs
+msecs
 Millisecond range
 .TP
 count
@@ -74,7 +74,7 @@ How many I/O fell into this range
 distribution
 An ASCII bar chart to visualize the distribution (count column)
 .SH OVERHEAD
-This traces kernel functions and maintains in-kernel timestamps and a histgroam,
+This traces kernel functions and maintains in-kernel timestamps and a histogram,
 which are asynchronously copied to user-space. This method is very efficient,
 and the overhead for most storage I/O rates (< 10k IOPS) should be negligible.
 If you have a higher IOPS storage environment, test and quantify the overhead

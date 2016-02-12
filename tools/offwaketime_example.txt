@@ -165,7 +165,7 @@ via vfs_read() and the other doing a link_path_walk(). There is also a vmstat(8)
 stack showing it sleeping between intervals, and an sshd(8) stack showing it
 waiting on a file descriptor for input.
 
-The stack shown at the bottom is the off-CPU stack beloning to the task name
+The stack shown at the bottom is the off-CPU stack belonging to the task name
 shown after "target:". Then there is a separator, "-", and above it the waker
 stack and the waker task name after "waker:". The wakeup stack is printed
 in reverse order.
