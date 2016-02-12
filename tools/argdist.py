@@ -4,7 +4,8 @@
 #              parameter values as a histogram or frequency count.
 #
 # USAGE: argdist.py [-h] [-p PID] [-z STRING_SIZE] [-i INTERVAL]
-#                   [-n COUNT] [-C specifier [specifier ...]]
+#                   [-n COUNT] [-v] [-T TOP]
+#                   [-C specifier [specifier ...]]
 #                   [-H specifier [specifier ...]]
 #
 # Licensed under the Apache License, Version 2.0 (the "License")
@@ -13,13 +14,15 @@
 from bcc import BPF
 from time import sleep, strftime
 import argparse
+import re
 
 class Specifier(object):
-        text = """
+        probe_text = """
 DATA_DECL
 
 int PROBENAME(struct pt_regs *ctx SIGNATURE)
 {
+        PREFIX
         PID_FILTER
         KEY_EXPR
         if (!(FILTER)) return 0;
@@ -37,11 +40,113 @@ int PROBENAME(struct pt_regs *ctx SIGNATURE)
                         expr = expr.replace(alias, subst)
                 return expr
 
+        def _parse_signature(self):
+                params = map(str.strip, self.signature.split(','))
+                self.param_types = {}
+                for param in params:
+                        # If the type is a pointer, the * can be next to the
+                        # param name. Other complex types like arrays are not
+                        # supported right now.
+                        index = param.rfind('*')
+                        index = index if index != -1 else param.rfind(' ')
+                        param_type = param[0:index+1].strip()
+                        param_name = param[index+1:].strip()
+                        self.param_types[param_name] = param_type
+
+        entry_probe_text = """
+int PROBENAME(struct pt_regs *ctx SIGNATURE)
+{
+        u32 pid = bpf_get_current_pid_tgid();
+        PID_FILTER
+        COLLECT
+        return 0;
+}
+"""
+
+        def _generate_entry(self):
+                self.entry_probe_func = self.probe_func_name + "_entry"
+                text = self.entry_probe_text
+                text = text.replace("PROBENAME", self.entry_probe_func)
+                text = text.replace("SIGNATURE",
+                     "" if len(self.signature) == 0 else ", " + self.signature)
+                pid_filter = "" if self.is_user or self.pid is None \
+                                else "if (pid != %d) { return 0; }" % self.pid
+                text = text.replace("PID_FILTER", pid_filter)
+                collect = ""
+                for pname in self.args_to_probe:
+                        collect += "%s.update(&pid, &%s);\n" % \
+                                   (self.hashname_prefix + pname, pname)
+                text = text.replace("COLLECT", collect)
+                return text
+
+        def _generate_entry_probe(self):
+                # TODO $latency as a special keyword that should be traced
+                # Any $entry(name) expressions result in saving that argument
+                # when entering the function.
+                self.args_to_probe = set()
+                regex = r"\$entry\((\w+)\)"
+                for arg in re.finditer(regex, self.expr or ""):
+                        self.args_to_probe.add(arg.group(1))
+                for arg in re.finditer(regex, self.filter or ""):
+                        self.args_to_probe.add(arg.group(1))
+
+                for pname in self.args_to_probe:
+                        if pname not in self.param_types:
+                                raise ValueError("$entry(%s): no such param" \
+                                                % arg)
+
+                self.hashname_prefix = "%s_param_" % self.probe_hash_name
+                text = ""
+                for pname in self.args_to_probe:
+                        # Each argument is stored in a separate hash that is
+                        # keyed by pid.
+                        text += "BPF_HASH(%s, u32, %s);\n" % \
+                             (self.hashname_prefix + pname,
+                              self.param_types[pname])
+                text += self._generate_entry()
+                return text
+
+        def _generate_retprobe_prefix(self):
+                # After we're done here, there are __%s_val variables for each
+                # argument we needed to probe using $entry(name), and they all
+                # have values (which isn't necessarily the case if we missed
+                # the method entry probe).
+                text = "u32 __pid = bpf_get_current_pid_tgid();\n"
+                self.param_val_names = {}
+                for pname in self.args_to_probe:
+                        val_name = "__%s_val" % pname
+                        text += "%s *%s = %s.lookup(&__pid);\n" % \
+                                (self.param_types[pname], val_name,
+                                 self.hashname_prefix + pname)
+                        text += "if (%s == 0) { return 0 ; }\n" % val_name
+                        self.param_val_names[pname] = val_name
+                return text
+
+        def _replace_entry_exprs(self):
+                for pname, vname in self.param_val_names.items():
+                        entry_expr = "$entry(%s)" % pname
+                        val_expr = "*" + vname   # dereference the pointer
+                        self.expr = self.expr.replace(entry_expr, val_expr)
+                        if self.filter is not None:
+                                self.filter = self.filter.replace(entry_expr,
+                                                                  val_expr)
+
+        def _attach_entry_probe(self):
+                if self.is_user:
+                        self.bpf.attach_uprobe(name=self.library,
+                                               sym=self.function,
+                                               fn_name=self.entry_probe_func,
+                                               pid=self.pid or -1)
+                else:
+                        self.bpf.attach_kprobe(event=self.function,
+                                               fn_name=self.entry_probe_func)
+
         def __init__(self, type, specifier, pid):
                 self.raw_spec = specifier 
                 spec_and_label = specifier.split(';')
                 self.label = spec_and_label[1] \
                              if len(spec_and_label) == 2 else None
+
                 parts = spec_and_label[0].strip().split(':')
                 if len(parts) < 3 or len(parts) > 6:
                         raise ValueError("invalid specifier format")
@@ -58,6 +163,10 @@ int PROBENAME(struct pt_regs *ctx SIGNATURE)
                         raise ValueError("invalid specifier format")
                 self.function = fparts[0]
                 self.signature = fparts[1][:-1]
+                self._parse_signature()
+
+                # If the user didn't specify an expression to probe, we probe
+                # the retval in a ret probe, or simply the value "1" otherwise.
                 self.is_default_expr = len(parts) < 5
                 if not self.is_default_expr:
                         self.expr_type = parts[3]
@@ -68,31 +177,60 @@ int PROBENAME(struct pt_regs *ctx SIGNATURE)
                         self.expr_type = \
                                 "u64" if not self.is_ret_probe else "int"
                         self.expr = "1" if not self.is_ret_probe else "$retval"
-                self.expr = self.expr.replace("$retval",
-                                              "(%s)ctx->ax" % self.expr_type)
                 self.filter = None if len(parts) != 6 else parts[5]
-                if self.filter is not None:
-                        self.filter = self.filter.replace("$retval",
-                                "(%s)ctx->ax" % self.expr_type)
-                self.expr = self._substitute_aliases(self.expr)
-                self.filter = self._substitute_aliases(self.filter)
+                self._substitute_exprs()
+
+                # Do we need to attach an entry probe so that we can collect an 
+                # argument that is required for an exit (return) probe?
+                self.entry_probe_required = self.is_ret_probe and \
+                       ("$entry" in self.expr or \
+                        "$entry" in (self.filter or ""))
+
                 self.pid = pid
+                # Generating unique names for probes means we can attach
+                # many times to the same function.
                 self.probe_func_name = "%s_probe%d" % \
                         (self.function, Specifier.next_probe_index)
                 self.probe_hash_name = "%s_hash%d" % \
                         (self.function, Specifier.next_probe_index)
                 Specifier.next_probe_index += 1
 
+        def _substitute_exprs(self):
+                self.expr = self.expr.replace("$retval",
+                                              "(%s)ctx->ax" % self.expr_type)
+                if self.filter is not None:
+                        self.filter = self.filter.replace("$retval",
+                                "(%s)ctx->ax" % self.expr_type)
+                self.expr = self._substitute_aliases(self.expr)
+                self.filter = self._substitute_aliases(self.filter)
+
         def _is_string_probe(self):
                 return self.expr_type == "char*" or self.expr_type == "char *"
 
         def generate_text(self, string_size):
-                program = self.text.replace("PROBENAME", self.probe_func_name)
+                # We don't like tools writing tools (Brendan Gregg), but this
+                # is an exception because we're letting the user fully
+                # customize the values we probe. As a rule of thumb though,
+                # try to build a custom tool for a specific purpose.
+
+                program = ""
+
+                # If any entry arguments are probed in a ret probe, we need
+                # to generate an entry probe to collect them
+                prefix = ""
+                if self.entry_probe_required:
+                        program = self._generate_entry_probe()
+                        prefix = self._generate_retprobe_prefix()                                         
+                        self._replace_entry_exprs()
+
+                program += self.probe_text.replace("PROBENAME",
+                                                   self.probe_func_name)
                 signature = "" if len(self.signature) == 0 \
-                               else "," + self.signature
+                                  or self.is_ret_probe \
+                               else ", " + self.signature
                 program = program.replace("SIGNATURE", signature)
                 if self.pid is not None and not self.is_user:
-                        # kernel probes need to explicitly filter pid
+                        # Kernel probes need to explicitly filter pid
                         program = program.replace("PID_FILTER",
                                 "u32 pid = bpf_get_current_pid_tgid();\n" + \
                                 "if (pid != %d) { return 0; }" % self.pid)
@@ -128,6 +266,7 @@ bpf_probe_read(&__key.key, sizeof(__key.key), %s);
                 program = program.replace("KEY_EXPR", key_expr) 
                 program = program.replace("FILTER", self.filter or "1") 
                 program = program.replace("COLLECT", collect)
+                program = program.replace("PREFIX", prefix)
                 return program
 
         def attach(self, bpf):
@@ -150,16 +289,22 @@ bpf_probe_read(&__key.key, sizeof(__key.key), %s);
                         else:
                                 bpf.attach_kprobe(event=self.function,
                                                   fn_name=self.probe_func_name)
+                if self.entry_probe_required:
+                        self._attach_entry_probe()
 
-        def display(self):
+        def display(self, top):
                 print(self.label or self.raw_spec)
                 data = self.bpf.get_table(self.probe_hash_name)
                 if self.type == "freq":
                         print("\t%-10s %s" % ("COUNT", "EVENT"))
-                        for key, value in sorted(data.items(),
-                                                 key=lambda kv: kv[1].value):
+                        data = sorted(data.items(), key=lambda kv: kv[1].value)
+                        if top is not None:
+                                data = data[-top:]
+                        for key, value in data: 
                                 key_val = key.key if self._is_string_probe() \
                                                   else str(key.value)
+                                # Print some nice values if the user didn't
+                                # specify an expression to probe
                                 if self.is_default_expr:
                                         if not self.is_ret_probe:
                                                 key_str = "total calls"
@@ -203,9 +348,10 @@ argdist.py -p 1005 -C 'p:c:malloc(size_t size):size_t:size:size==16'
 argdist.py -C 'r:c:gets():char*:$retval;snooped strings'
         Snoop on all strings returned by gets()
 
-argdist.py -p 1005 -C 'p:c:write(int fd):int:fd'
+argdist.py -p 1005 -C 'p:c:write(int fd):int:fd' -T 5
         Print frequency counts of how many times writes were issued to a
-        particular file descriptor number, in process 1005
+        particular file descriptor number, in process 1005, but only show
+        the top 5 busiest fds
 
 argdist.py -p 1005 -H 'r:c:read()'
         Print a histogram of error codes returned by read() in process 1005
@@ -219,9 +365,9 @@ argdist.py -C 'p:c:fork();fork calls'
         Count fork() calls in libc across all processes
         Can also use funccount.py, which is easier and more flexible 
 
-argdist.py \\
-        -H 'p:c:sleep(u32 seconds):u32:seconds' \\
-        -H 'p:c:nanosleep(struct timespec { time_t tv_sec; long tv_nsec; } *req):long:req->tv_nsec'
+argdist.py -H \\
+        'p:c:sleep(u32 seconds):u32:seconds' \\
+        'p:c:nanosleep(struct timespec { time_t tv_sec; long tv_nsec; } *req):long:req->tv_nsec'
         Print histograms of sleep() and nanosleep() parameter values
 
 argdist.py -p 2780 -z 120 \\
@@ -242,12 +388,14 @@ parser.add_argument("-i", "--interval", default=1, type=int,
         help="output interval, in seconds")
 parser.add_argument("-n", "--number", type=int, dest="count",
         help="number of outputs")
+parser.add_argument("-v", "--verbose", action="store_true",
+        help="print resulting BPF program code before executing")
+parser.add_argument("-T", "--top", type=int,
+        help="number of top results to show (not applicable to histograms)")
 parser.add_argument("-H", "--histogram", nargs="*", dest="histspecifier",
         help="probe specifier to capture histogram of (see examples below)")
 parser.add_argument("-C", "--count", nargs="*", dest="countspecifier",
         help="probe specifier to capture count of (see examples below)")
-parser.add_argument("-v", "--verbose", action="store_true",
-        help="print resulting BPF program code before executing")
 args = parser.parse_args()
 
 specifiers = []
@@ -279,7 +427,7 @@ while True:
                 exit()
         print("[%s]" % strftime("%H:%M:%S"))
         for specifier in specifiers:
-                specifier.display()
+                specifier.display(args.top)
         count_so_far += 1
         if args.count is not None and count_so_far >= args.count:
                 exit()
