@@ -1,10 +1,11 @@
 #!/usr/bin/env python
 #
-# gentrace.py   Trace a function and display a histogram or summary of its
-#               parameter values. 
+# argdist.py   Trace a function and display a distribution of its
+#              parameter values as a histogram or frequency count.
 #
-# USAGE: gentrace.py [-h] [-p PID] [-z STRING_SIZE] [-i INTERVAL]
-#                    [-c COUNT] specifier [specifier ...]
+# USAGE: argdist.py [-h] [-p PID] [-z STRING_SIZE] [-i INTERVAL]
+#                   [-n COUNT] [-C specifier [specifier ...]]
+#                   [-H specifier [specifier ...]]
 #
 # Licensed under the Apache License, Version 2.0 (the "License")
 # Copyright (C) 2016 Sasha Goldshtein.
@@ -19,43 +20,55 @@ DATA_DECL
 
 int PROBENAME(struct pt_regs *ctx SIGNATURE)
 {
+        PID_FILTER
         KEY_EXPR
         if (!(FILTER)) return 0;
         COLLECT
         return 0;
 }
 """
+        next_probe_index = 0
 
-        def __init__(self, specifier, pid):
+        def __init__(self, type, specifier, pid):
                 self.raw_spec = specifier 
                 parts = specifier.strip().split(':')
                 if len(parts) < 3 or len(parts) > 6:
                         raise ValueError("invalid specifier format")
-                self.type = parts[0]    # hist or raw
-                self.is_ret_probe = self.type.endswith("-ret")
-                if self.is_ret_probe:
-                        self.type = self.type[:-len("-ret")]
-                if self.type != "hist" and self.type != "raw":
+                self.type = type    # hist or freq
+                self.is_ret_probe = parts[0] == "r"
+                if self.type != "hist" and self.type != "freq":
+                        raise ValueError("unrecognized probe type")
+                if parts[0] not in ["r", "p"]:
                         raise ValueError("unrecognized probe type")
                 self.library = parts[1]
+                self.is_user = len(self.library) > 0
                 fparts = parts[2].split('(')
                 if len(fparts) != 2:
                         raise ValueError("invalid specifier format")
                 self.function = fparts[0]
                 self.signature = fparts[1][:-1]
-                if len(parts) >= 5:
+                self.is_default_expr = len(parts) < 5
+                if not self.is_default_expr:
                         self.expr_type = parts[3]
                         self.expr = parts[4]
                 else:
+                        if not self.is_ret_probe and self.type == "hist":
+                                raise ValueError("dist probes must have expr")
                         self.expr_type = \
                                 "u64" if not self.is_ret_probe else "int"
-                        self.expr = "1" if not self.is_ret_probe else "@retval"
-                self.expr = self.expr.replace("@retval",
+                        self.expr = "1" if not self.is_ret_probe else "$retval"
+                self.expr = self.expr.replace("$retval",
                                               "(%s)ctx->ax" % self.expr_type)
                 self.filter = None if len(parts) != 6 else parts[5]
+                if self.filter is not None:
+                        self.filter = self.filter.replace("$retval",
+                                "(%s)ctx->ax" % self.expr_type)
                 self.pid = pid
-                self.probe_func_name = self.function + "_probe"
-                self.probe_hash_name = self.function + "_hash"
+                self.probe_func_name = "%s_probe%d" % \
+                        (self.function, Specifier.next_probe_index)
+                self.probe_hash_name = "%s_hash%d" % \
+                        (self.function, Specifier.next_probe_index)
+                Specifier.next_probe_index += 1
 
         def _is_string_probe(self):
                 return self.expr_type == "char*" or self.expr_type == "char *"
@@ -65,6 +78,13 @@ int PROBENAME(struct pt_regs *ctx SIGNATURE)
                 signature = "" if len(self.signature) == 0 \
                                else "," + self.signature
                 program = program.replace("SIGNATURE", signature)
+                if self.pid is not None and not self.is_user:
+                        # kernel probes need to explicitly filter pid
+                        program = program.replace("PID_FILTER",
+                                "u32 pid = bpf_get_current_pid_tgid();\n" + \
+                                "if (pid != %d) { return 0; }" % self.pid)
+                else:
+                        program = program.replace("PID_FILTER", "")
                 if self._is_string_probe():
                         decl = """
 struct %s_key_t { char key[%d]; };
@@ -78,7 +98,7 @@ struct %s_key_t __key = {0};
 bpf_probe_read(&__key.key, sizeof(__key.key), %s);
 """ \
                         % (self.function, self.expr)
-                elif self.type == "raw":
+                elif self.type == "freq":
                         decl = "BPF_HASH(%s, %s, u64);" % \
                                 (self.probe_hash_name, self.expr_type)
                         collect = "%s.increment(__key);" % self.probe_hash_name
@@ -99,7 +119,7 @@ bpf_probe_read(&__key.key, sizeof(__key.key), %s);
 
         def attach(self, bpf):
                 self.bpf = bpf
-                if len(self.library) > 0:
+                if self.is_user:
                         if self.is_ret_probe:
                                 bpf.attach_uretprobe(name=self.library,
                                                   sym=self.function,
@@ -121,25 +141,34 @@ bpf_probe_read(&__key.key, sizeof(__key.key), %s);
         def display(self):
                 print(self.raw_spec)
                 data = self.bpf.get_table(self.probe_hash_name)
-                if self.type == "raw":
+                if self.type == "freq":
                         print("\t%-10s %s" % ("COUNT", "EVENT"))
                         for key, value in sorted(data.items(),
                                                  key=lambda kv: kv[1].value):
-                                if self._is_string_probe():
-                                        key_str = key.key
+                                key_val = key.key if self._is_string_probe() \
+                                                  else str(key.value)
+                                if self.is_default_expr:
+                                        if not self.is_ret_probe:
+                                                key_str = "total calls"
+                                        else:
+                                                key_str = "retval = %s" % \
+                                                          key_val
                                 else:
-                                        key_str = str(key.value)
-                                print("\t%-10s %s = %s" %
-                                      (str(value.value), self.expr, key_str))
+                                        key_str = "%s = %s" % \
+                                                  (self.expr, key_val)
+                                print("\t%-10s %s" % \
+                                      (str(value.value), key_str))
                 elif self.type == "hist":
-                        data.print_log2_hist(val_type=self.expr)
+                        label = self.expr if not self.is_default_expr \
+                                          else "retval"
+                        data.print_log2_hist(val_type=label)
 
 examples = """
 Probe specifier syntax:
-        <raw|hist>[-ret]:[library]:function(signature)[:type:expr[:filter]]
+        {p,r}:[library]:function(signature)[:type:expr[:filter]]
 Where:
-        <raw|hist> -- collect raw data or a histogram of values
-        ret        -- probe at function exit, only @retval is accessible
+        p,r        -- probe at function entry or at function exit
+                      in exit probes, only $retval is accessible
         library    -- the library that contains the function
                       (leave empty for kernel functions)
         function   -- the function name to trace
@@ -150,37 +179,39 @@ Where:
 
 EXAMPLES:
 
-gentrace.py "hist::__kmalloc(u64 size):u64:size"
+argdist.py -H "p::__kmalloc(u64 size):u64:size"
         Print a histogram of allocation sizes passed to kmalloc
 
-gentrace.py -p 1005 "raw:c:malloc(size_t size):size_t:size:size==16"
-        Print a raw count of how many times process 1005 called malloc with
-        an allocation size of 16 bytes
+argdist.py -p 1005 -C "p:c:malloc(size_t size):size_t:size:size==16"
+        Print a frequency count of how many times process 1005 called malloc
+        with an allocation size of 16 bytes
 
-gentrace.py "raw-ret:c:gets():char*:@retval"
+argdist.py -C "r:c:gets():char*:@retval"
         Snoop on all strings returned by gets()
 
-gentrace.py -p 1005 "raw:c:write(int fd):int:fd"
-        Print raw counts of how many times writes were issued to a particular
-        file descriptor number, in process 1005
+argdist.py -p 1005 -C "p:c:write(int fd):int:fd"
+        Print frequency counts of how many times writes were issued to a
+        particular file descriptor number, in process 1005
 
-gentrace.py -p 1005 "hist-ret:c:read()"
+argdist.py -p 1005 -H "r:c:read()"
         Print a histogram of error codes returned by read() in process 1005
 
-gentrace.py "hist:c:write(int fd, const void *buf, size_t count):size_t:count:fd==1"
+argdist.py -H \\
+        "p:c:write(int fd, const void *buf, size_t count):size_t:count:fd==1"
         Print a histogram of buffer sizes passed to write() across all
         processes, where the file descriptor was 1 (STDOUT)
 
-gentrace.py "raw:c:fork"
+argdist.py -C "p:c:fork()"
         Count fork() calls in libc across all processes
         Can also use funccount.py, which is easier and more flexible 
 
-gentrace.py \\
-        "hist:c:sleep(u32 seconds):u32:seconds" \\
-        "hist:c:nanosleep(struct timespec { time_t tv_sec; long tv_nsec; } *req):long:req->tv_nsec"
+argdist.py \\
+        -H "p:c:sleep(u32 seconds):u32:seconds" \\
+        -H "p:c:nanosleep(struct timespec { time_t tv_sec; long tv_nsec; } *req):long:req->tv_nsec"
         Print histograms of sleep() and nanosleep() parameter values
 
-gentrace.py -p 2780 -z 120 "raw:c:write(int fd, char* buf, size_t len):char*:buf:fd==1"
+argdist.py -p 2780 -z 120 \\
+        -C "p:c:write(int fd, char* buf, size_t len):char*:buf:fd==1"
         Spy on writes to STDOUT performed by process 2780, up to a string size
         of 120 characters 
 """
@@ -195,19 +226,31 @@ parser.add_argument("-z", "--string-size", default=80, type=int,
         help="maximum string size to read from char* arguments")
 parser.add_argument("-i", "--interval", default=1, type=int,
         help="output interval, in seconds")
-parser.add_argument("-c", "--count", type=int,
+parser.add_argument("-n", "--number", type=int, dest="count",
         help="number of outputs")
-parser.add_argument("specifier", nargs="+",
-        help="the probe specifiers (see examples below)")
+parser.add_argument("-H", "--histogram", nargs="*", dest="histspecifier",
+        help="probe specifier to capture histogram of (see examples below)")
+parser.add_argument("-C", "--count", nargs="*", dest="countspecifier",
+        help="probe specifier to capture count of (see examples below)")
+parser.add_argument("-v", "--verbose", action="store_true",
+        help="print resulting BPF program code before executing")
 args = parser.parse_args()
 
 specifiers = []
-for specifier in args.specifier:
-        specifiers.append(Specifier(specifier, args.pid))
+for specifier in (args.countspecifier or []):
+        specifiers.append(Specifier("freq", specifier, args.pid))
+for histspecifier in (args.histspecifier or []):
+        specifiers.append(Specifier("hist", histspecifier, args.pid))
+if len(specifiers) == 0:
+        print("at least one specifier is required")
+        exit(1)
 
 bpf_source = "#include <uapi/linux/ptrace.h>\n"
 for specifier in specifiers:
         bpf_source += specifier.generate_text(args.string_size)
+
+if args.verbose:
+        print(bpf_source)
 
 bpf = BPF(text=bpf_source)
 
