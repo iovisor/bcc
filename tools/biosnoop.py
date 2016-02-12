@@ -138,6 +138,7 @@ rwflg = ""
 start_ts = 0
 prev_ts = 0
 delta = 0
+
 # process event
 def print_event(cpu, data, size):
     event = ct.cast(data, ct.POINTER(Data)).contents
@@ -169,6 +170,7 @@ def print_event(cpu, data, size):
     prev_ts = event.ts
     start_ts = 1
 
+# loop with callback to print_event
 b["events"].open_perf_buffer(print_event)
 while 1:
     b.kprobe_poll()
