@@ -13,7 +13,6 @@
 # 16-Sep-2015   Brendan Gregg   Created this.
 # 11-Feb-2016   Allan McAleavy  updated for BPF_PERF_OUTPUT
 
-
 from __future__ import print_function
 from bcc import BPF
 import ctypes as ct
@@ -39,7 +38,6 @@ struct key_t {
     char disk_name[DISK_NAME_LEN];
     char name[TASK_COMM_LEN];
 };
-
 
 BPF_HASH(start, struct request *);
 BPF_HASH(infobyreq, struct request *, struct val_t);
@@ -118,7 +116,6 @@ b.attach_kprobe(event="blk_mq_start_request", fn_name="trace_req_start")
 b.attach_kprobe(event="blk_account_io_completion",
     fn_name="trace_req_completion")
 
-
 TASK_COMM_LEN = 16  # linux/sched.h
 DISK_NAME_LEN = 32  # linux/genhd.h
 
@@ -144,25 +141,34 @@ delta = 0
 # process event
 def print_event(cpu, data, size):
     event = ct.cast(data, ct.POINTER(Data)).contents
+
     val = -1
     global start_ts
     global prev_ts
     global delta
+
     if event.rwflag == 1:
         rwflg = "W"
+
     if event.rwflag == 0:
         rwflg = "R"
+
     if not re.match('\?', event.name):
         val = event.sector
+
     if start_ts == 0:
         prev_ts = start_ts
+
     if start_ts == 1:
         delta = float(delta) + (event.ts - prev_ts)
+
     print("%-14.9f %-14.14s %-6s %-7s %-2s %-9s %-7s %7.2f" % (
         delta / 1000000, event.name, event.pid, event.disk_name, rwflg, val,
         event.len, float(event.delta) / 1000000))
+
     prev_ts = event.ts
     start_ts = 1
+
 b["events"].open_perf_buffer(print_event)
 while 1:
     b.kprobe_poll()
