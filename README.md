@@ -99,6 +99,7 @@ Tools:
 - tools/[vfscount](tools/vfscount.py) tools/[vfscount.c](tools/vfscount.c): Count VFS calls. [Examples](tools/vfscount_example.txt).
 - tools/[vfsstat](tools/vfsstat.py) tools/[vfsstat.c](tools/vfsstat.c): Count some VFS calls, with column output. [Examples](tools/vfsstat_example.txt).
 - tools/[wakeuptime](tools/wakeuptime.py): Summarize sleep to wakeup time by waker kernel stack. [Examples](tools/wakeuptime_example.txt).
+- tools/[xfsslower](tools/xfsslower.py): Trace slow XFS operations: read, write, open, fsync. [Examples](tools/xfsslower_example.txt).
 
 ### Networking
 

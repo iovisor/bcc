@@ -1,0 +1,148 @@
+Demonstrations of xfsslower, the Linux eBPF/bcc version.
+
+
+xfsslower shows XFS reads, writes, opens, and fsyncs, slower than a threshold.
+For example:
+
+# ./xfsslower
+Tracing XFS operations slower than 10 ms
+TIME     COMM           PID    T BYTES   OFF_KB   LAT(ms) FILENAME
+06:23:06 randread.pl    32497  R 8192    24938024   17.93 data1
+06:23:06 randread.pl    32521  R 8192    13431528   18.27 data1
+06:23:08 randread.pl    32497  R 8192    5070904    16.37 data1
+06:23:08 randread.pl    32521  R 8192    12693016   16.06 data1
+06:23:18 randread.pl    32521  R 8192    27049136   21.68 data1
+06:23:18 randread.pl    32497  R 8192    257864     21.74 data1
+06:23:20 randread.pl    32497  R 8192    17797208   13.37 data1
+06:23:20 randread.pl    32497  R 8192    6088224    19.74 data1
+
+This shows several reads from a "randread.pl" program, each 8 Kbytes in size,
+and from a "data1" file. These all had over 10 ms latency.
+
+This "latency" is measured from when the operation was issued from the VFS
+interface to the file system, to when it completed. This spans everything:
+block device I/O (disk I/O), file system CPU cycles, file system locks, run
+queue latency, etc. This is a better measure of the latency suffered by
+applications reading from the file system than measuring this down at the
+block device interface.
+
+Note that this only traces the common file system operations previously
+listed: other file system operations (eg, inode operations including
+getattr()) are not traced.
+
+
+The threshold can be provided as an argument. Eg, I/O slower than 1 ms:
+
+# ./xfsslower 1
+Tracing XFS operations slower than 1 ms
+TIME     COMM           PID    T BYTES   OFF_KB   LAT(ms) FILENAME
+06:26:59 randread.pl    5394   R 8192    9045728     1.24 data1
+06:26:59 randread.pl    5394   R 8192    23532136    1.17 data1
+06:26:59 randread.pl    5442   R 8192    2192376     2.06 data1
+06:27:00 randread.pl    5394   R 8192    3535176     1.27 data1
+06:27:00 randread.pl    5442   R 8192    21361784    3.18 data1
+06:27:00 randread.pl    5394   R 8192    2556336     3.23 data1
+06:27:00 randread.pl    5394   R 8192    20020880    2.87 data1
+06:27:00 randread.pl    5442   R 8192    20708888    3.32 data1
+06:27:00 randread.pl    5394   R 8192    4654680     2.00 data1
+06:27:00 randread.pl    5442   R 8192    5591744     1.98 data1
+06:27:00 randread.pl    5394   R 8192    2431056     1.22 data1
+06:27:00 randread.pl    5394   R 8192    384288      2.95 data1
+06:27:00 randread.pl    5442   R 8192    29277672    3.07 data1
+06:27:00 randread.pl    5442   R 8192    29508216    3.23 data1
+06:27:00 randread.pl    5394   R 8192    17200008    2.86 data1
+06:27:00 randread.pl    5442   R 8192    20693088    1.06 data1
+06:27:00 randread.pl    5394   R 8192    28124192    1.38 data1
+06:27:00 randread.pl    5442   R 8192    23821184    1.28 data1
+06:27:00 randread.pl    5394   R 8192    1623200     1.47 data1
+[...]
+
+There's now much more output (this spans only 2 seconds, the previous output
+spanned 14 seconds), as the lower threshold is catching more I/O.
+
+
+A threshold of 0 will trace all operations. Warning: the output will be
+verbose, as it will include all file system cache hits.
+
+# ./xfsslower 0
+Tracing XFS operations
+TIME     COMM           PID    T BYTES   OFF_KB   LAT(ms) FILENAME
+06:29:43 ls             9291   O 0       0           0.00 bench
+06:29:47 cat            9361   O 0       0           0.00 date.txt
+06:29:47 cat            9361   R 29      0           0.01 date.txt
+06:29:47 cat            9361   R 0       0           0.00 date.txt
+06:29:50 bash           20500  O 0       0           0.00 bench
+06:29:50 bash           20500  O 0       0           0.00 bench
+06:29:50 bash           20500  O 0       0           0.00 bench
+06:29:50 bash           9431   O 0       0           0.00 bench
+06:29:50 bash           9432   O 0       0           0.00 bench
+06:29:50 bash           9456   O 0       0           0.00 newdate.txt
+06:29:50 date           9456   W 29      0           0.01 newdate.txt
+06:29:53 cksum          9503   O 0       0           0.00 data1
+06:29:53 cksum          9503   R 65536   0           0.06 data1
+06:29:53 cksum          9503   R 65536   64          0.01 data1
+06:29:53 cksum          9503   R 65536   128         0.02 data1
+06:29:53 cksum          9503   R 65536   192         0.01 data1
+06:29:53 cksum          9503   R 65536   256         0.01 data1
+06:29:53 cksum          9503   R 65536   320         0.01 data1
+06:29:53 cksum          9503   R 65536   384         0.01 data1
+06:29:53 cksum          9503   R 65536   448         0.04 data1
+06:29:53 cksum          9503   R 65536   512         0.01 data1
+06:29:53 cksum          9503   R 65536   576         0.02 data1
+06:29:53 cksum          9503   R 65536   640         0.01 data1
+06:29:53 cksum          9503   R 65536   704         0.01 data1
+06:29:53 cksum          9503   R 65536   768         0.01 data1
+06:29:53 cksum          9503   R 65536   832         0.01 data1
+06:29:53 cksum          9503   R 65536   896         0.01 data1
+06:29:53 cksum          9503   R 65536   960         0.01 data1
+06:29:53 cksum          9503   R 65536   1024        0.01 data1
+06:29:53 cksum          9503   R 65536   1088        0.02 data1
+06:29:53 cksum          9503   R 65536   1152        0.01 data1
+06:29:53 cksum          9503   R 65536   1216        0.01 data1
+[...]
+
+The output now includes open operations ("O"), and writes ("W"). A cksum(1)
+command can be seen reading from a data1 file, from progressively increasing
+offsets: a sequential workload.
+
+
+A -j option will print just the fields (parsable output, csv):
+
+# ./xfsslower -j 1 
+ENDTIME_us,TASK,PID,TYPE,BYTES,OFFSET_b,LATENCY_us,FILE
+125563830632,randread.pl,12155,R,8192,27824193536,1057,data1
+125565050578,randread.pl,12155,R,8192,16908525568,1969,data1
+125566331140,randread.pl,12202,R,8192,16310689792,1738,data1
+125566427955,randread.pl,12155,R,8192,11127439360,1058,data1
+125567223494,randread.pl,12202,R,8192,8422031360,1131,data1
+125567331145,randread.pl,12155,R,8192,9233088512,1230,data1
+125567331220,randread.pl,12202,R,8192,12716326912,1148,data1
+125567334983,randread.pl,12155,R,8192,24545206272,2182,data1
+[...]
+
+This may be useful for visualizing with another tool, for example, for
+producing a scatter plot of ENDTIME vs LATENCY, to look for time-based
+patterns.
+
+
+USAGE message:
+
+# ./xfsslower -h
+usage: xfsslower [-h] [-j] [-p PID] [min_ms]
+
+Trace common XFS file operations slower than a threshold
+
+positional arguments:
+  min_ms             minimum I/O duration to trace, in ms (default 10)
+
+optional arguments:
+  -h, --help         show this help message and exit
+  -j, --csv          just print fields: comma-separated values
+  -p PID, --pid PID  trace this PID only
+
+examples:
+    ./xfsslower             # trace operations slower than 10 ms (default)
+    ./xfsslower 1           # trace operations slower than 1 ms
+    ./xfsslower -j 1        # ... 1 ms, parsable output (csv)
+    ./xfsslower 0           # trace all operations (warning: verbose)
+    ./xfsslower -p 185      # trace PID 185 only
