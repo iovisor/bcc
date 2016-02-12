@@ -28,7 +28,7 @@ struct val_t {
     char name[TASK_COMM_LEN];
 };
 
-struct key_t {
+struct data_t {
     u32 pid;
     u64 rwflag;
     u64 delta;
@@ -72,7 +72,7 @@ int trace_req_completion(struct pt_regs *ctx, struct request *req)
     u64 *tsp, delta;
     u32 *pidp = 0;
     struct val_t *valp;
-    struct key_t key ={};
+    struct data_t data ={};
     u64 ts;
 
     // fetch timestamp and calculate delta
@@ -82,28 +82,28 @@ int trace_req_completion(struct pt_regs *ctx, struct request *req)
         return 0;
     }
     ts =  bpf_ktime_get_ns();
-    key.delta = ts - *tsp;
-    key.ts = ts / 1000;
+    data.delta = ts - *tsp;
+    data.ts = ts / 1000;
 
     valp = infobyreq.lookup(&req);
     if (valp == 0) {
-        key.len = req->__data_len;
-        strcpy(key.name,"?");
+        data.len = req->__data_len;
+        strcpy(data.name,"?");
     } else {
-        key.pid = valp->pid;
-        key.len = req->__data_len;
-        key.sector = req->__sector;
-        bpf_probe_read(&key.name, sizeof(key.name), valp->name);
-        bpf_probe_read(&key.disk_name, sizeof(key.disk_name),
+        data.pid = valp->pid;
+        data.len = req->__data_len;
+        data.sector = req->__sector;
+        bpf_probe_read(&data.name, sizeof(data.name), valp->name);
+        bpf_probe_read(&data.disk_name, sizeof(data.disk_name),
                        req->rq_disk->disk_name);
     }
 
     if (req->cmd_flags & REQ_WRITE) {
-        key.rwflag=1;
+        data.rwflag=1;
     } else {
-        key.rwflag=0;
+        data.rwflag=0;
     }
-    events.perf_submit(ctx,&key,sizeof(key));
+    events.perf_submit(ctx,&data,sizeof(data));
     start.delete(&req);
     infobyreq.delete(&req);
 
