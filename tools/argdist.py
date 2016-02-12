@@ -31,7 +31,10 @@ int PROBENAME(struct pt_regs *ctx SIGNATURE)
 
         def __init__(self, type, specifier, pid):
                 self.raw_spec = specifier 
-                parts = specifier.strip().split(':')
+                spec_and_label = specifier.split(';')
+                self.label = spec_and_label[1] \
+                             if len(spec_and_label) == 2 else None
+                parts = spec_and_label[0].strip().split(':')
                 if len(parts) < 3 or len(parts) > 6:
                         raise ValueError("invalid specifier format")
                 self.type = type    # hist or freq
@@ -139,7 +142,7 @@ bpf_probe_read(&__key.key, sizeof(__key.key), %s);
                                                   fn_name=self.probe_func_name)
 
         def display(self):
-                print(self.raw_spec)
+                print(self.label or self.raw_spec)
                 data = self.bpf.get_table(self.probe_hash_name)
                 if self.type == "freq":
                         print("\t%-10s %s" % ("COUNT", "EVENT"))
@@ -165,7 +168,7 @@ bpf_probe_read(&__key.key, sizeof(__key.key), %s);
 
 examples = """
 Probe specifier syntax:
-        {p,r}:[library]:function(signature)[:type:expr[:filter]]
+        {p,r}:[library]:function(signature)[:type:expr[:filter]][;label]
 Where:
         p,r        -- probe at function entry or at function exit
                       in exit probes, only $retval is accessible
@@ -175,43 +178,44 @@ Where:
         signature  -- the function's parameters, as in the C header
         type       -- the type of the expression to collect
         expr       -- the expression to collect
-        filter     -- a filter that is applied to collected values
+        filter     -- the filter that is applied to collected values
+        label      -- the label for this probe in the resulting output
 
 EXAMPLES:
 
-argdist.py -H "p::__kmalloc(u64 size):u64:size"
+argdist.py -H 'p::__kmalloc(u64 size):u64:size'
         Print a histogram of allocation sizes passed to kmalloc
 
-argdist.py -p 1005 -C "p:c:malloc(size_t size):size_t:size:size==16"
+argdist.py -p 1005 -C 'p:c:malloc(size_t size):size_t:size:size==16'
         Print a frequency count of how many times process 1005 called malloc
         with an allocation size of 16 bytes
 
-argdist.py -C "r:c:gets():char*:@retval"
+argdist.py -C 'r:c:gets():char*:$retval;snooped strings'
         Snoop on all strings returned by gets()
 
-argdist.py -p 1005 -C "p:c:write(int fd):int:fd"
+argdist.py -p 1005 -C 'p:c:write(int fd):int:fd'
         Print frequency counts of how many times writes were issued to a
         particular file descriptor number, in process 1005
 
-argdist.py -p 1005 -H "r:c:read()"
+argdist.py -p 1005 -H 'r:c:read()'
         Print a histogram of error codes returned by read() in process 1005
 
 argdist.py -H \\
-        "p:c:write(int fd, const void *buf, size_t count):size_t:count:fd==1"
+        'p:c:write(int fd, const void *buf, size_t count):size_t:count:fd==1'
         Print a histogram of buffer sizes passed to write() across all
         processes, where the file descriptor was 1 (STDOUT)
 
-argdist.py -C "p:c:fork()"
+argdist.py -C 'p:c:fork();fork calls'
         Count fork() calls in libc across all processes
         Can also use funccount.py, which is easier and more flexible 
 
 argdist.py \\
-        -H "p:c:sleep(u32 seconds):u32:seconds" \\
-        -H "p:c:nanosleep(struct timespec { time_t tv_sec; long tv_nsec; } *req):long:req->tv_nsec"
+        -H 'p:c:sleep(u32 seconds):u32:seconds' \\
+        -H 'p:c:nanosleep(struct timespec { time_t tv_sec; long tv_nsec; } *req):long:req->tv_nsec'
         Print histograms of sleep() and nanosleep() parameter values
 
 argdist.py -p 2780 -z 120 \\
-        -C "p:c:write(int fd, char* buf, size_t len):char*:buf:fd==1"
+        -C 'p:c:write(int fd, char* buf, size_t len):char*:buf:fd==1'
         Spy on writes to STDOUT performed by process 2780, up to a string size
         of 120 characters 
 """
