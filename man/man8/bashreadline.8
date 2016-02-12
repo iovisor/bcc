@@ -10,6 +10,10 @@ entered command may fail: this is just showing what was entered.
 
 This program is also a basic example of eBPF/bcc and uprobes.
 
+This makes use of a Linux 4.5 feature (bpf_perf_event_output()); 
+for kernels older than 4.5, see the version under tools/old,
+which uses an older mechanism
+
 Since this uses BPF, only the root user can use this tool.
 .SH REQUIREMENTS
 CONFIG_BPF and bcc.

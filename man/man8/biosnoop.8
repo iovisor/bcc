@@ -12,8 +12,9 @@ the I/O was first created (which usually identifies the responsible process).
 This uses in-kernel eBPF maps to cache process details (PID and comm) by I/O
 request, as well as a starting timestamp for calculating I/O latency.
 
-This works by tracing various kernel blk_*() functions using dynamic tracing,
-and will need updating to match any changes to these functions.
+This makes use of a Linux 4.5 feature (bpf_perf_event_output());
+for kernels older than 4.5, see the version under tools/old,
+which uses an older mechanism
 
 Since this uses BPF, only the root user can use this tool.
 .SH REQUIREMENTS
