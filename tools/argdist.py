@@ -28,6 +28,14 @@ int PROBENAME(struct pt_regs *ctx SIGNATURE)
 }
 """
         next_probe_index = 0
+        aliases = { "$PID": "bpf_get_current_pid_tgid()" }
+
+        def _substitute_aliases(self, expr):
+                if expr is None:
+                        return expr
+                for alias, subst in Specifier.aliases.items():
+                        expr = expr.replace(alias, subst)
+                return expr
 
         def __init__(self, type, specifier, pid):
                 self.raw_spec = specifier 
@@ -66,6 +74,8 @@ int PROBENAME(struct pt_regs *ctx SIGNATURE)
                 if self.filter is not None:
                         self.filter = self.filter.replace("$retval",
                                 "(%s)ctx->ax" % self.expr_type)
+                self.expr = self._substitute_aliases(self.expr)
+                self.filter = self._substitute_aliases(self.filter)
                 self.pid = pid
                 self.probe_func_name = "%s_probe%d" % \
                         (self.function, Specifier.next_probe_index)

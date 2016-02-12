@@ -1,11 +1,11 @@
-.TH gentrace 8  "2016-02-11" "USER COMMANDS"
+.TH argdist 8  "2016-02-11" "USER COMMANDS"
 .SH NAME
-gentrace \- Trace a function and display a histogram or summary of its parameter values. Uses Linux eBPF/bcc.
+argdist \- Trace a function and display a histogram or frequency count of its parameter values. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B gentrace [-h] [-p PID] [-z STRING_SIZE] [-i INTERVAL] [-c COUNT] specifier [specifier ...]
+.B argdist [-h] [-p PID] [-z STRING_SIZE] [-i INTERVAL] [-n COUNT] [-H specifier [specifier ...]] [-C specifier [specifier ...]]
 .SH DESCRIPTION
-gentrace attaches to function entry and exit points, collects specified parameter
-values, and stores them in a histogram or a raw counting collection that counts
+argdist attaches to function entry and exit points, collects specified parameter
+values, and stores them in a histogram or a frequency collection that counts
 the number of times a parameter value occurred. It can also filter parameter
 values and instrument multiple entry points at once.
 
@@ -18,8 +18,7 @@ CONFIG_BPF and bcc.
 Print usage message.
 .TP
 \-p PID
-Trace only functions in the process PID. This filter will only apply to user-space
-functions. If you only provide kernel-space probes, the filter is ignored.
+Trace only functions in the process PID.
 .TP
 \-z STRING_SIZE
 When collecting string arguments (of type char*), collect up to STRING_SIZE 
@@ -28,88 +27,98 @@ characters. Longer strings will be truncated.
 -i INTERVAL
 Print the collected data every INTERVAL seconds. The default is 1 second.
 .TP
--c COUNT
+-n NUMBER
 Print the collected data COUNT times and then exit.
 .TP
-SPECIFIER
-One or more probe specifications that instruct gentrace which functions to
+-H SPECIFIER, -C SPECIFIER
+One or more probe specifications that instruct argdist which functions to
 probe, which parameters to collect, how to aggregate them, and whether to perform
 any filtering. See SPECIFIER SYNTAX below.
 .SH SPECIFIER SYNTAX
 The general specifier syntax is as follows:
 
-.B <raw|hist>[-ret]:[library]:function(signature)[:type:expr[:filter]]
+.B {p,r}:[library]:function(signature)[:type:expr[:filter]][;label]
 .TP
-Probe type \- "raw", "hist", "raw-ret", "hist-ret".
-Indicates where to place the probe and whether the probe should collect raw
-event information, or aggregate the collected values into a histogram. Raw 
+.B {p,r}
+Probe type \- "p" for function entry, "r" for function return;
+\-H for histogram collection, \-C for frequency count.
+Indicates where to place the probe and whether the probe should collect frequency
+count information, or aggregate the collected values into a histogram. Counting 
 probes will collect the number of times every parameter value was observed,
 whereas histogram probes will collect the parameter values into a histogram.
 Only integral types can be used with histogram probes; there is no such limitation
-for raw probes. Suffix with \-ret to indicate that the probe should be placed
-at function return. This probe can only use the pseudo-variable @retval, which
+for counting probes. Return probes can only use the pseudo-variable $retval, which
 is an alias for the function's return value.
 .TP
+.B [library]
 Library containing the probe.
 Specify the full path to the .so or executable file where the function to probe
 resides. Alternatively, you can specify just the lib name: for example, "c"
 refers to libc. If no library name is specified, the kernel is assumed.
 .TP
+.B function(signature)
 The function to probe, and its signature.
 The function name must match exactly for the probe to be placed. The signature,
 on the other hand, is only required if you plan to collect parameter values 
 based on that signature. For example, if you only want to collect the first
 parameter, you don't have to specify the rest of the parameters in the signature.
 .TP
+.B [type]
 The type of the expression to capture.
 This is the type of the keys in the histogram or raw event collection that are
 collected by the probes.
 .TP
+.B [expr]
 The expression to capture.
 These are the values that are assigned to the histogram or raw event collection.
 You may use the parameters directly, or valid C expressions that involve the
 parameters, such as "size % 10".
 .TP
-A filter applied to the captured data.
+.B [filter]
+The filter applied to the captured data.
 Only parameter values that pass the filter will be collected. This is any valid
 C expression that refers to the parameter values, such as "fd == 1 && length > 16".
+.TP
+.B [label]
+The label that will be displayed when printing the probed values. By default,
+this is the probe specifier. 
 .SH EXAMPLES
 .TP
 Print a histogram of allocation sizes passed to kmalloc:
 #
-.B gentrace.py 'hist::__kmalloc(u64 size):u64:size'
+.B argdist.py -H 'p::__kmalloc(u64 size):u64:size'
 .TP
-Print a raw count of how many times process 1005 called malloc with an allocation size of 16 bytes:
+Print a count of how many times process 1005 called malloc with an allocation size of 16 bytes:
 #
-.B gentrace.py -p 1005 'raw:c:malloc(size_t size):size_t:size:size==16'
+.B argdist.py -p 1005 -C 'p:c:malloc(size_t size):size_t:size:size==16'
 .TP
 Snoop on all strings returned by gets():
 #
-.B gentrace.py 'raw-ret:c:gets():char*:@retval'
+.B argdist.py -C 'r:c:gets():char*:$retval'
 .TP
-Print raw counts of how many times writes were issued to a particular file descriptor number, in process 1005:
+Print frequency counts of how many times writes were issued to a particular file descriptor number, in process 1005:
 #
-.B gentrace.py -p 1005 'raw:c:write(int fd):int:fd'
+.B argdist.py -p 1005 -C 'p:c:write(int fd):int:fd'
 .TP
 Print a histogram of error codes returned by read() in process 1005:
 #
-.B gentrace.py -p 1005 'hist-ret:c:read()'
+.B argdist.py -p 1005 -H 'r:c:read()'
 .TP
 Print a histogram of buffer sizes passed to write() across all processes, where the file descriptor was 1 (STDOUT):
 #
-.B gentrace.py 'hist:c:write(int fd, const void *buf, size_t count):size_t:count:fd==1'
+.B argdist.py -H 'p:c:write(int fd, const void *buf, size_t count):size_t:count:fd==1'
 .TP
-Count fork() calls in libc across all processes:
+Count fork() calls in libc across all processes, grouped by pid:
 #
-.B gentrace.py 'raw:c:fork'
+.B argdist.py -C 'p:c:fork():int:$PID;fork per process'
 .TP
 Print histograms of sleep() and nanosleep() parameter values:
 #
-.B gentrace.py 'hist:c:sleep(u32 seconds):u32:seconds' 'hist:c:nanosleep(struct timespec { time_t tv_sec; long tv_nsec; } *req):long:req->tv_nsec'
+.B argdist.py -H 'p:c:sleep(u32 seconds):u32:seconds' -H 'p:c:nanosleep(struct timespec { time_t tv_sec; long tv_nsec; } *req):long:req->tv_nsec'
 .TP
 Spy on writes to STDOUT performed by process 2780, up to a string size of 120 characters:
 #
-.B gentrace.py -p 2780 -z 120 'raw:c:write(int fd, char* buf, size_t len):char*:buf:fd==1'
+.B argdist.py -p 2780 -z 120 -C 'p:c:write(int fd, char* buf, size_t len):char*:buf:fd==1'
 .SH SOURCE
 This is from bcc.
 .IP
