@@ -12,7 +12,7 @@ USAGE: sudo python ping_reply.py
 """
 
 from bcc import BPF
-from pyroute2 import IPRoute, IPDB
+from pyroute2 import IPRoute, IPDB, protocols
 import sys
 
 prog = """
@@ -20,14 +20,7 @@ prog = """
   #include <uapi/linux/if_ether.h>
   #include <uapi/linux/in.h>
   #include <uapi/linux/icmp.h>
- 
-  #define IP_SRC_OFF 26
-  #define IP_DST_OFF 30
-  #define IP_CKSUM_OFF 24
-  /*
-  There are better ways to get OFFSETs for e.g. by using macros from .h
-  files of other networking subsytems
-  */
+  #include <uapi/linux/pkt_cls.h>
 
   /*
   struct icmp_t would come in handy for parsing ICMP packets,
@@ -55,7 +48,10 @@ prog = """
         if (ethernet->type != ETH_P_IP)
                 return 0;
 
-        struct ip_t * ip = cursor_advance(cursor, sizeof(*ip));
+        struct ip_t * ip = (struct ip_t *) cursor;
+        u32 len = ip->hlen << 2;
+        cursor_advance(cursor, len);
+
         // If next protocol is not ICMP, return
         if (ip->nextp != IPPROTO_ICMP)
                 return 0;
@@ -70,8 +66,9 @@ prog = """
         Since we're changing packet contents, we need to update the checksum
         */
         unsigned short type = ICMP_ECHOREPLY;
+        //incr_cksum_l4(&icmp->cksum, icmp->type, type, 1);
         bpf_l4_csum_replace(skb,36,icmp->type, type,sizeof(type));
-        bpf_skb_store_bytes(skb, 34, &type, sizeof(type),0);
+        icmp->type = type;
 
         /*
         Swapping Source and Destination in IP header
@@ -79,42 +76,31 @@ prog = """
         However to demonstrate the use of bpf_l3_csum_replace, the checksum
         is recomputed after each change
         */
-        unsigned int old_src = bpf_ntohl(ip->src);
-        unsigned int old_dst = bpf_ntohl(ip->dst);
+        u32 old_src = ip->src;
+        u32 old_dst = ip->dst;
 
-        bpf_l3_csum_replace(skb, IP_CKSUM_OFF, old_src, old_dst,
-                sizeof(old_dst));
-
-        /*
-        Demonstrating the use of bpf_skb_store_bytes(...)
-        There are other easier ways to swap ip->src and ip->dst, one of which
-        follows while swapping mac addresses
-        */
-        bpf_skb_store_bytes(skb, IP_SRC_OFF, &old_dst,
-                sizeof(old_dst), 0);
-
-        bpf_l3_csum_replace(skb, IP_CKSUM_OFF, old_dst, old_src,
-                sizeof(old_src));
-        bpf_skb_store_bytes(skb, IP_DST_OFF, &old_src, sizeof(old_src), 0);
+        incr_cksum_l3(&ip->hchecksum, old_src, old_dst);
+        ip->src = old_dst;
+        incr_cksum_l3(&ip->hchecksum, old_dst, old_src);
+        ip->dst = old_src;
 
         /* Swapping Mac Addresses
         Using two temp variables since assigning one memory location
         to another directly causes a compilation error.
         */
-        unsigned long long old_src_mac = ethernet->src;
-        unsigned long long old_dst_mac = ethernet->dst;
+        u64 old_src_mac = ethernet->src;
+        u64 old_dst_mac = ethernet->dst;
 
         ethernet->src = old_dst_mac;
         ethernet->dst = old_src_mac;
 
-        u64 ret = bpf_clone_redirect(skb, skb->ifindex,0 /*For Egress */);
+        u64 ret = bpf_redirect(skb->ifindex, 0 /*For Egress */);
         /*
         This output to the kernel trace_pipe which can also be read by:
         cat /sys/kernel/debug/tracing/trace_pipe
         */
-        bpf_trace_printk("Replying to ICMP echo: Result=%u\\n", ret);
-
-        return 1;
+        bpf_trace_printk("ICMP_SEQ: %u\\n", icmp->seq);
+        return TC_ACT_REDIRECT;
 }
 """
 ipr = IPRoute()
@@ -122,10 +108,11 @@ ipdb = IPDB(nl=ipr)
 ifc = ipdb.interfaces.eth0
 
 b = BPF(text=prog)
-pbr = b.load_func("ping_reply", BPF.SCHED_CLS)
+pr = b.load_func("ping_reply", BPF.SCHED_ACT)
 ipr.tc("add", "ingress", ifc.index, "ffff:")
-ipr.tc("add-filter", "bpf", ifc.index, ":1", fd=pbr.fd,
-       name=pbr.name, parent="ffff:", action="drop", classid=1)
+action = {"kind": "bpf", "fd": pr.fd, "name": pr.name, "action": "ok"}
+ipr.tc("add-filter", "u32", ifc.index, ":1", parent="ffff:", action=[action],
+    protocol=protocols.ETH_P_ALL, classid=1, target=0x10000, keys=['0x0/0x0+0'])
 
 try:
     print "All Ready..."
