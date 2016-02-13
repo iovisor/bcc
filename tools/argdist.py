@@ -74,22 +74,30 @@ int PROBENAME(struct pt_regs *ctx SIGNATURE)
                 text = text.replace("PID_FILTER", pid_filter)
                 collect = ""
                 for pname in self.args_to_probe:
-                        collect += "%s.update(&pid, &%s);\n" % \
-                                   (self.hashname_prefix + pname, pname)
+                        param_hash = self.hashname_prefix + pname
+                        if pname == "__latency":
+                                collect += """
+u64 __time = bpf_ktime_get_ns();
+%s.update(&pid, &__time);
+"""                             % param_hash
+                        else:
+                                collect += "%s.update(&pid, &%s);\n" % \
+                                           (param_hash, pname)
                 text = text.replace("COLLECT", collect)
                 return text
 
         def _generate_entry_probe(self):
-                # TODO $latency as a special keyword that should be traced
                 # Any $entry(name) expressions result in saving that argument
                 # when entering the function.
                 self.args_to_probe = set()
                 regex = r"\$entry\((\w+)\)"
-                for arg in re.finditer(regex, self.expr or ""):
+                for arg in re.finditer(regex, self.expr):
                         self.args_to_probe.add(arg.group(1))
-                for arg in re.finditer(regex, self.filter or ""):
+                for arg in re.finditer(regex, self.filter):
                         self.args_to_probe.add(arg.group(1))
-
+                if "$latency" in self.expr or "$latency" in self.filter:
+                        self.args_to_probe.add("__latency")
+                        self.param_types["__latency"] = "u64"    # nanoseconds
                 for pname in self.args_to_probe:
                         if pname not in self.param_types:
                                 raise ValueError("$entry(%s): no such param" \
@@ -124,12 +132,15 @@ int PROBENAME(struct pt_regs *ctx SIGNATURE)
 
         def _replace_entry_exprs(self):
                 for pname, vname in self.param_val_names.items():
-                        entry_expr = "$entry(%s)" % pname
-                        val_expr = "*" + vname   # dereference the pointer
+                        if pname == "__latency":
+                                entry_expr = "$latency"
+                                val_expr = "(bpf_ktime_get_ns() - *%s)" % vname
+                        else:
+                                entry_expr = "$entry(%s)" % pname
+                                val_expr = "(*%s)" % vname
                         self.expr = self.expr.replace(entry_expr, val_expr)
-                        if self.filter is not None:
-                                self.filter = self.filter.replace(entry_expr,
-                                                                  val_expr)
+                        self.filter = self.filter.replace(entry_expr,
+                                                          val_expr)
 
         def _attach_entry_probe(self):
                 if self.is_user:
@@ -177,14 +188,14 @@ int PROBENAME(struct pt_regs *ctx SIGNATURE)
                         self.expr_type = \
                                 "u64" if not self.is_ret_probe else "int"
                         self.expr = "1" if not self.is_ret_probe else "$retval"
-                self.filter = None if len(parts) != 6 else parts[5]
+                self.filter = "" if len(parts) != 6 else parts[5]
                 self._substitute_exprs()
 
                 # Do we need to attach an entry probe so that we can collect an 
                 # argument that is required for an exit (return) probe?
                 self.entry_probe_required = self.is_ret_probe and \
-                       ("$entry" in self.expr or \
-                        "$entry" in (self.filter or ""))
+                       ("$entry" in self.expr or "$entry" in self.filter or
+                        "$latency" in self.expr or "$latency" in self.filter)
 
                 self.pid = pid
                 # Generating unique names for probes means we can attach
@@ -198,9 +209,8 @@ int PROBENAME(struct pt_regs *ctx SIGNATURE)
         def _substitute_exprs(self):
                 self.expr = self.expr.replace("$retval",
                                               "(%s)ctx->ax" % self.expr_type)
-                if self.filter is not None:
-                        self.filter = self.filter.replace("$retval",
-                                "(%s)ctx->ax" % self.expr_type)
+                self.filter = self.filter.replace("$retval",
+                                              "(%s)ctx->ax" % self.expr_type)
                 self.expr = self._substitute_aliases(self.expr)
                 self.filter = self._substitute_aliases(self.filter)
 
@@ -264,7 +274,8 @@ bpf_probe_read(&__key.key, sizeof(__key.key), %s);
                                    (self.expr_type, self.expr)
                 program = program.replace("DATA_DECL", decl)
                 program = program.replace("KEY_EXPR", key_expr) 
-                program = program.replace("FILTER", self.filter or "1") 
+                program = program.replace("FILTER",
+                        "1" if len(self.filter) == 0 else self.filter) 
                 program = program.replace("COLLECT", collect)
                 program = program.replace("PREFIX", prefix)
                 return program
@@ -293,9 +304,9 @@ bpf_probe_read(&__key.key, sizeof(__key.key), %s);
                         self._attach_entry_probe()
 
         def display(self, top):
-                print(self.label or self.raw_spec)
                 data = self.bpf.get_table(self.probe_hash_name)
                 if self.type == "freq":
+                        print(self.label or self.raw_spec)
                         print("\t%-10s %s" % ("COUNT", "EVENT"))
                         data = sorted(data.items(), key=lambda kv: kv[1].value)
                         if top is not None:
@@ -317,8 +328,9 @@ bpf_probe_read(&__key.key, sizeof(__key.key), %s);
                                 print("\t%-10s %s" % \
                                       (str(value.value), key_str))
                 elif self.type == "hist":
-                        label = self.expr if not self.is_default_expr \
-                                          else "retval"
+                        label = self.label or \
+                                (self.expr if not self.is_default_expr \
+                                           else "retval")
                         data.print_log2_hist(val_type=label)
 
 examples = """
@@ -326,7 +338,7 @@ Probe specifier syntax:
         {p,r}:[library]:function(signature)[:type:expr[:filter]][;label]
 Where:
         p,r        -- probe at function entry or at function exit
-                      in exit probes, only $retval is accessible
+                      in exit probes: can use $retval, $entry(param), $latency
         library    -- the library that contains the function
                       (leave empty for kernel functions)
         function   -- the function name to trace
@@ -348,6 +360,9 @@ argdist.py -p 1005 -C 'p:c:malloc(size_t size):size_t:size:size==16'
 argdist.py -C 'r:c:gets():char*:$retval;snooped strings'
         Snoop on all strings returned by gets()
 
+argdist.py -H 'r::__kmalloc(size_t size):u64:$latency/$entry(size);ns per byte'
+        Print a histogram of nanoseconds per byte from kmalloc allocations
+
 argdist.py -p 1005 -C 'p:c:write(int fd):int:fd' -T 5
         Print frequency counts of how many times writes were issued to a
         particular file descriptor number, in process 1005, but only show
@@ -355,6 +370,12 @@ argdist.py -p 1005 -C 'p:c:write(int fd):int:fd' -T 5
 
 argdist.py -p 1005 -H 'r:c:read()'
         Print a histogram of error codes returned by read() in process 1005
+
+argdist.py -C 'r::__vfs_read():u32:$PID:$latency > 100000'
+        Print frequency of reads by process where the latency was >0.1ms
+
+argdist.py -H 'r::__vfs_read(void *file, void *buf, size_t count):size_t:$entry(count):$latency > 1000000' 
+        Print a histogram of read sizes that were longer than 1ms
 
 argdist.py -H \\
         'p:c:write(int fd, const void *buf, size_t count):size_t:count:fd==1'
