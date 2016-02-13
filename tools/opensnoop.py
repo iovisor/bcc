@@ -63,7 +63,7 @@ int kretprobe__sys_open(struct pt_regs *ctx)
         return 0;
     }
 
-    bpf_trace_printk("%s %d\\n", *filenamep, ret);
+    bpf_trace_printk("%d %s\\n", ret, *filenamep);
     args_filename.delete(&pid);
 
     return 0;
@@ -90,7 +90,7 @@ start_ts = 0
 # format output
 while 1:
     (task, pid, cpu, flags, ts, msg) = b.trace_fields()
-    (filename, ret_s) = msg.split(" ")
+    (ret_s, filename) = msg.split(" ", 1)
 
     ret = int(ret_s)
     if (args.failed and (ret >= 0)):

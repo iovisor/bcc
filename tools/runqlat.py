@@ -59,7 +59,7 @@ debug = 0
 # define BPF program
 bpf_text = """
 #include <uapi/linux/ptrace.h>
-#include "kernel/sched/sched.h"
+#include <linux/sched.h>
 
 typedef struct pid_key {
     u64 pid;    // work around
@@ -67,6 +67,8 @@ typedef struct pid_key {
 } pid_key_t;
 BPF_HASH(start, u32);
 STORAGE
+
+struct rq;
 
 // record enqueue timestamp
 int trace_enqueue(struct pt_regs *ctx, struct rq *rq, struct task_struct *p,
