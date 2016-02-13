@@ -1,0 +1,283 @@
+Demonstrations of argdist.
+
+
+argdist probes functions you specify and collects parameter values into a
+histogram or a frequency count. This can be used to understand the distribution
+of values a certain parameter takes, filter and print interesting parameters
+without attaching a debugger, and obtain general execution statistics on
+various functions.
+
+For example, suppose you want to find what allocation sizes are common in
+your application:
+
+# ./argdist.py -p 2420 -C 'p:c:malloc(size_t size):size_t:size'
+[01:42:29]
+p:c:malloc(size_t size):size_t:size
+        COUNT      EVENT
+[01:42:30]
+p:c:malloc(size_t size):size_t:size
+        COUNT      EVENT
+[01:42:31]
+p:c:malloc(size_t size):size_t:size
+        COUNT      EVENT
+        1          size = 16
+[01:42:32]
+p:c:malloc(size_t size):size_t:size
+        COUNT      EVENT
+        2          size = 16
+[01:42:33]
+p:c:malloc(size_t size):size_t:size
+        COUNT      EVENT
+        3          size = 16
+[01:42:34]
+p:c:malloc(size_t size):size_t:size
+        COUNT      EVENT
+        4          size = 16
+^C
+
+It seems that the application is allocating blocks of size 16. The COUNT
+column contains the number of occurrences of a particular event, and the
+EVENT column describes the event. In this case, the "size" parameter was 
+probed and its value was 16, repeatedly.
+
+Now, suppose you wanted a histogram of buffer sizes passed to the write()
+function across the system:
+
+# ./argdist.py -H 'p:c:write(int fd, void *buf, size_t len):size_t:len'
+[01:45:22]
+p:c:write(int fd, void *buf, size_t len):size_t:len
+     len                 : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 2        |*************                           |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 2        |*************                           |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 6        |****************************************|
+[01:45:23]
+p:c:write(int fd, void *buf, size_t len):size_t:len
+     len                 : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 11       |***************                         |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 4        |*****                                   |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 28       |****************************************|
+        64 -> 127        : 12       |*****************                       |
+[01:45:24]
+p:c:write(int fd, void *buf, size_t len):size_t:len
+     len                 : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 21       |****************                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 6        |****                                    |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 52       |****************************************|
+        64 -> 127        : 26       |********************                    |
+^C
+
+It seems that most writes fall into three buckets: very small writes of 2-3
+bytes, medium writes of 32-63 bytes, and larger writes of 64-127 bytes.
+
+But these are writes across the board -- what if you wanted to focus on writes
+to STDOUT?
+
+# ./argdist.py -H 'p:c:write(int fd, void *buf, size_t len):size_t:len:fd==1'
+[01:47:17]
+p:c:write(int fd, void *buf, size_t len):size_t:len:fd==1
+     len                 : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 1        |****************************************|
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 1        |****************************************|
+[01:47:18]
+p:c:write(int fd, void *buf, size_t len):size_t:len:fd==1
+     len                 : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 2        |*************                           |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 3        |********************                    |
+        64 -> 127        : 6        |****************************************|
+[01:47:19]
+p:c:write(int fd, void *buf, size_t len):size_t:len:fd==1
+     len                 : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 3        |*********                               |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 5        |***************                         |
+        64 -> 127        : 13       |****************************************|
+^C
+
+The "fd==1" part is a filter that is applied to every invocation of write().
+Only if the filter condition is true, the value is recorded.
+
+You can also use argdist to trace kernel functions. For example, suppose you
+wanted a histogram of kernel allocation (kmalloc) sizes across the system,
+printed twice with 3 second intervals:
+
+# ./argdist.py -i 3 -n 2 -H 'p::__kmalloc(size_t size):size_t:size'
+[01:50:00]
+p::__kmalloc(size_t size):size_t:size
+     size                : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 6        |****************************************|
+[01:50:03]
+p::__kmalloc(size_t size):size_t:size
+     size                : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 22       |****************************************|
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 5        |*********                               |
+       128 -> 255        : 2        |***                                     |
+
+Occasionally, numeric information isn't enough and you want to capture strings.
+What are the strings printed by puts() across the system?
+
+# ./argdist.py -i 10 -n 1 -C 'p:c:puts(char *str):char*:str'
+[01:53:54]
+p:c:puts(char *str):char*:str
+        COUNT      EVENT
+        2          str = Press ENTER to start.
+
+It looks like the message "Press ENTER to start." was printed twice during the
+10 seconds we were tracing.
+
+What about reads? You could trace gets() across the system and print the 
+strings input by the user (note how "r" is used instead of "p" to attach a
+probe to the function's return):
+
+# ./argdist.py -i 10 -n 1 -C 'r:c:gets():char*:$retval:$retval!=0'
+[02:12:23]
+r:c:gets():char*:$retval:$retval!=0
+        COUNT      EVENT
+        1          (char*)ctx->ax = hi there
+        3          (char*)ctx->ax = sasha
+        8          (char*)ctx->ax = hello
+
+Similarly, we could get a histogram of the error codes returned by read():
+
+# ./argdist.py -i 10 -c 1 -H 'r:c:read()'
+[02:15:36]
+r:c:read()
+     retval              : count     distribution
+         0 -> 1          : 29       |****************************************|
+         2 -> 3          : 11       |***************                         |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 3        |****                                    |
+        16 -> 31         : 2        |**                                      |
+        32 -> 63         : 22       |******************************          |
+        64 -> 127        : 5        |******                                  |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 1        |*                                       |
+       512 -> 1023       : 1        |*                                       |
+      1024 -> 2047       : 0        |                                        |
+      2048 -> 4095       : 2        |**                                      |
+
+Here's a final example that finds how many write() system calls are performed
+by each process on the system:
+
+# argdist.py -C 'p:c:write():int:$PID;write per process' -n 2
+[06:47:18]
+write by process
+        COUNT      EVENT
+        3          bpf_get_current_pid_tgid() = 8889
+        7          bpf_get_current_pid_tgid() = 7615
+        7          bpf_get_current_pid_tgid() = 2480
+[06:47:19]
+write by process
+        COUNT      EVENT
+        9          bpf_get_current_pid_tgid() = 8889
+        23         bpf_get_current_pid_tgid() = 7615
+        23         bpf_get_current_pid_tgid() = 2480
+
+As you see, the $PID alias is expanded to the BPF function bpf_get_current_pid_tgid(),
+which returns the current process' pid.
+
+
+USAGE message:
+
+usage: argdist.py [-h] [-p PID] [-z STRING_SIZE] [-i INTERVAL] [-n COUNT]
+                  [-H [HISTSPECIFIER [HISTSPECIFIER ...]]]
+                  [-C [COUNTSPECIFIER [COUNTSPECIFIER ...]]] [-v]
+
+Trace a function and display a summary of its parameter values.
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -p PID, --pid PID     id of the process to trace (optional)
+  -z STRING_SIZE, --string-size STRING_SIZE
+                        maximum string size to read from char* arguments
+  -i INTERVAL, --interval INTERVAL
+                        output interval, in seconds
+  -n COUNT, --number COUNT
+                        number of outputs
+  -H [HISTSPECIFIER [HISTSPECIFIER ...]], --histogram [HISTSPECIFIER [HISTSPECIFIER ...]]
+                        probe specifier to capture histogram of (see examples
+                        below)
+  -C [COUNTSPECIFIER [COUNTSPECIFIER ...]], --count [COUNTSPECIFIER [COUNTSPECIFIER ...]]
+                        probe specifier to capture count of (see examples
+                        below)
+  -v, --verbose         print resulting BPF program code before executing
+
+Probe specifier syntax:
+        {p,r}:[library]:function(signature)[:type:expr[:filter]][;label]
+Where:
+        p,r        -- probe at function entry or at function exit
+                      in exit probes, only $retval is accessible
+        library    -- the library that contains the function
+                      (leave empty for kernel functions)
+        function   -- the function name to trace
+        signature  -- the function's parameters, as in the C header
+        type       -- the type of the expression to collect
+        expr       -- the expression to collect
+        filter     -- the filter that is applied to collected values
+        label      -- the label for this probe in the resulting output
+
+EXAMPLES:
+
+argdist.py -H 'p::__kmalloc(u64 size):u64:size'
+        Print a histogram of allocation sizes passed to kmalloc
+
+argdist.py -p 1005 -C 'p:c:malloc(size_t size):size_t:size:size==16'
+        Print a frequency count of how many times process 1005 called malloc
+        with an allocation size of 16 bytes
+
+argdist.py -C 'r:c:gets():char*:$retval;snooped strings'
+        Snoop on all strings returned by gets()
+
+argdist.py -p 1005 -C 'p:c:write(int fd):int:fd'
+        Print frequency counts of how many times writes were issued to a
+        particular file descriptor number, in process 1005
+
+argdist.py -p 1005 -H 'r:c:read()'
+        Print a histogram of error codes returned by read() in process 1005
+
+argdist.py -H \
+        'p:c:write(int fd, const void *buf, size_t count):size_t:count:fd==1'
+        Print a histogram of buffer sizes passed to write() across all
+        processes, where the file descriptor was 1 (STDOUT)
+
+argdist.py -C 'p:c:fork();fork calls'
+        Count fork() calls in libc across all processes
+        Can also use funccount.py, which is easier and more flexible
+
+argdist.py \
+        -H 'p:c:sleep(u32 seconds):u32:seconds' \
+        -H 'p:c:nanosleep(struct timespec { time_t tv_sec; long tv_nsec; } *req):long:req->tv_nsec'
+        Print histograms of sleep() and nanosleep() parameter values
+
+argdist.py -p 2780 -z 120 \
+        -C 'p:c:write(int fd, char* buf, size_t len):char*:buf:fd==1'
+        Spy on writes to STDOUT performed by process 2780, up to a string size
+        of 120 characters
+

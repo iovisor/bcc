@@ -1,0 +1,108 @@
+Demonstrations of dcstat, the Linux eBPF/bcc version.
+
+
+dcstat shows directory entry cache (dcache) statistics. For example:
+
+# ./dcstat 
+TIME         REFS/s   SLOW/s   MISS/s     HIT%
+08:11:47:      2059      141       97    95.29
+08:11:48:     79974      151      106    99.87
+08:11:49:    192874      146      102    99.95
+08:11:50:      2051      144      100    95.12
+08:11:51:     73373    17239    17194    76.57
+08:11:52:     54685    25431    25387    53.58
+08:11:53:     18127     8182     8137    55.12
+08:11:54:     22517    10345    10301    54.25
+08:11:55:      7524     2881     2836    62.31
+08:11:56:      2067      141       97    95.31
+08:11:57:      2115      145      101    95.22
+
+The output shows the total references per second ("REFS/s"), the number that
+took a slower code path to be processed ("SLOW/s"), the number of dcache misses
+("MISS/s"), and the hit ratio as a percentage. By default, an interval of 1
+second is used.
+
+At 08:11:49, there were 192 thousand references, which almost entirely hit
+from the dcache, with a hit ration of 99.95%. A little later, starting at
+08:11:51, a workload began that walked many uncached files, reducing the hit
+ratio to 53%, and more importantly, a miss rate of over 10 thousand per second.
+
+
+Here's an interesting workload:
+
+# ./dcstat 
+TIME         REFS/s   SLOW/s   MISS/s     HIT%
+08:15:53:    250683      141       97    99.96
+08:15:54:    266115      145      101    99.96
+08:15:55:    268428      141       97    99.96
+08:15:56:    260389      143       99    99.96
+
+It's a 99.96% hit ratio, and these are all negative hits: accessing a file that
+does not exist. Here's the C program that generated the workload:
+
+# cat -n badopen.c
+     1	#include <sys/types.h>
+     2	#include <sys/stat.h>
+     3	#include <fcntl.h>
+     4	
+     5	int
+     6	main(int argc, char *argv[])
+     7	{
+     8	    int fd;
+     9	    while (1) {
+    10	        fd = open("bad", O_RDONLY);
+    11	    }
+    12	    return 0;
+    13	}
+
+This is a simple workload generator than tries to open a missing file ("bad")
+as quickly as possible.
+
+
+Lets see what happens if the workload attempts to open a different filename
+each time (which is also a missing file), using the following C code:
+
+# cat -n badopen2.c
+     1	#include <sys/types.h>
+     2	#include <sys/stat.h>
+     3	#include <fcntl.h>
+     4	#include <stdio.h>
+     5	
+     6	int
+     7	main(int argc, char *argv[])
+     8	{
+     9	    int fd, i = 0;
+    10	    char buf[128] = {};
+    11	
+    12	    while (1) {
+    13	        sprintf(buf, "bad%d", i++);
+    14	        fd = open(buf, O_RDONLY);
+    15	    }
+    16	    return 0;
+    17	}
+
+Here's dcstat:
+
+# ./dcstat 
+TIME         REFS/s   SLOW/s   MISS/s     HIT%
+08:18:52:    241131   237544   237505     1.51
+08:18:53:    238210   236323   236278     0.82
+08:18:54:    235259   233307   233261     0.85
+08:18:55:    233144   231256   231214     0.83
+08:18:56:    231981   230097   230053     0.83
+
+
+dcstat also supports an optional interval and optional count. For example,
+printing 5 second summaries 3 times:
+
+# ./dcstat 5 3
+TIME         REFS/s   SLOW/s   MISS/s     HIT%
+08:20:03:      2085      143       99    95.23
+08:20:08:      2077      143       98    95.24
+08:20:14:      2071      144      100    95.15
+
+
+USAGE message:
+
+# ./dcstat -h
+USAGE: ./dcstat [interval [count]]

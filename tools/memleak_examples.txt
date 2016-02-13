@@ -8,12 +8,12 @@ For example:
 
 # ./memleak.py -p $(pidof allocs)
 Attaching to malloc and free in pid 5193, Ctrl+C to quit.
-*** Outstanding allocations:
+[11:16:33] Top 2 stacks with outstanding allocations:
         80 bytes in 5 allocations from stack
                  main+0x6d [/home/vagrant/allocs] (400862) 
                  __libc_start_main+0xf0 [/usr/lib64/libc-2.21.so] (7fd460ac2790) 
 
-*** Outstanding allocations:
+[11:16:34] Top 2 stacks with outstanding allocations:
         160 bytes in 10 allocations from stack
                  main+0x6d [/home/vagrant/allocs] (400862) 
                  __libc_start_main+0xf0 [/usr/lib64/libc-2.21.so] (7fd460ac2790) 
@@ -34,7 +34,7 @@ prevalent. Use the -a switch:
 
 # ./memleak.py -p $(pidof allocs) -a
 Attaching to malloc and free in pid 5193, Ctrl+C to quit.
-*** Outstanding allocations:
+[11:16:33] Top 2 stacks with outstanding allocations:
         addr = 948cd0 size = 16
         addr = 948d10 size = 16
         addr = 948d30 size = 16
@@ -43,7 +43,7 @@ Attaching to malloc and free in pid 5193, Ctrl+C to quit.
                  main+0x6d [/home/vagrant/allocs] (400862) 
                  __libc_start_main+0xf0 [/usr/lib64/libc-2.21.so] (7fd460ac2790) 
 
-*** Outstanding allocations:
+[11:16:34] Top 2 stacks with outstanding allocations:
         addr = 948d50 size = 16
         addr = 948cd0 size = 16
         addr = 948d10 size = 16
@@ -110,26 +110,62 @@ To avoid false positives, allocations younger than a certain age (500ms by
 default) are not printed. To change this threshold, use the -o switch.
 
 By default, memleak prints its output every 5 seconds. To change this 
-interval, use the -i switch. 
+interval, pass the interval as a positional parameter to memleak. You can 
+also control the number of times the output will be printed before exiting.
+For example:
+
+# ./memleak.py 1 10
+
+... will print the outstanding allocation statistics every second, for ten
+times, and then exit. 
+
+memleak may introduce considerable overhead if your application or kernel is
+allocating and freeing memory at a very high rate. In that case, you can 
+control the overhead by sampling every N-th allocation. For example, to sample
+roughly 10% of the allocations and print the outstanding allocations every 5
+seconds, 3 times before quitting:
+
+# ./memleak.py -p $(pidof allocs) -s 10 5 3
+Attaching to malloc and free in pid 2614, Ctrl+C to quit.
+[11:16:33] Top 2 stacks with outstanding allocations:
+        16 bytes in 1 allocations from stack
+                 main+0x6d [/home/vagrant/allocs] (400862) 
+                 __libc_start_main+0xf0 [/usr/lib64/libc-2.21.so] (7fdc11ce8790) 
+
+[11:16:38] Top 2 stacks with outstanding allocations:
+        16 bytes in 1 allocations from stack
+                 main+0x6d [/home/vagrant/allocs] (400862) 
+                 __libc_start_main+0xf0 [/usr/lib64/libc-2.21.so] (7fdc11ce8790) 
+
+[11:16:43] Top 2 stacks with outstanding allocations:
+        32 bytes in 2 allocations from stack
+                 main+0x6d [/home/vagrant/allocs] (400862) 
+                 __libc_start_main+0xf0 [/usr/lib64/libc-2.21.so] (7fdc11ce8790) 
+
+Note that even though the application leaks 16 bytes of memory every second, 
+the report (printed every 5 seconds) doesn't "see" all the allocations because
+of the sampling rate applied. 
 
 
 USAGE message:
 
 # ./memleak.py -h
-usage: memleak.py [-h] [-p PID] [-t] [-i INTERVAL] [-a] [-o OLDER]                                                                              
-                  [-c COMMAND] [-s SAMPLE_RATE]
+usage: memleak.py [-h] [-p PID] [-t] [-a] [-o OLDER] [-c COMMAND]
+                  [-s SAMPLE_RATE] [-d STACK_DEPTH] [-T TOP]
+                  [interval] [count]
 
 Trace outstanding memory allocations that weren't freed.
 Supports both user-mode allocations made with malloc/free and kernel-mode
 allocations made with kmalloc/kfree.
+
+  interval              interval in seconds to print outstanding allocations
+  count                 number of times to print the report before exiting
 
 optional arguments:
   -h, --help            show this help message and exit
   -p PID, --pid PID     the PID to trace; if not specified, trace kernel
                         allocs
   -t, --trace           print trace messages for each alloc/free call
-  -i INTERVAL, --interval INTERVAL
-                        interval in seconds to print outstanding allocations
   -a, --show-allocs     show allocation addresses and sizes as well as call
                         stacks
   -o OLDER, --older OLDER
@@ -139,6 +175,13 @@ optional arguments:
                         execute and trace the specified command
   -s SAMPLE_RATE, --sample-rate SAMPLE_RATE
                         sample every N-th allocation to decrease the overhead
+  -d STACK_DEPTH, --stack_depth STACK_DEPTH
+                        maximum stack depth to capture
+  -T TOP, --top TOP     display only this many top allocating stacks (by size)
+  -z MIN_SIZE, --min-size MIN_SIZE
+                        capture only allocations larger than this size
+  -Z MAX_SIZE, --max-size MAX_SIZE
+                        capture only allocations smaller than this size
 
 EXAMPLES:
 
@@ -147,7 +190,16 @@ EXAMPLES:
         allocations every 5 seconds
 ./memleak.py -p $(pidof allocs) -t
         Trace allocations and display each individual call to malloc/free
-./memleak.py -p $(pidof allocs) -a -i 10                                                                                                                Trace allocations and display allocated addresses, sizes, and stacks                                                                            every 10 seconds for outstanding allocations                                                                                            ./memleak.py -c "./allocs"                                                                                                                              Run the specified command and trace its allocations                                                                                     ./memleak.py                                                                                                                                            Trace allocations in kernel mode and display a summary of outstanding                                                                           allocations every 5 seconds                                                                                                             ./memleak.py -o 60000                                                                                                                                   Trace allocations in kernel mode and display a summary of outstanding                                                                           allocations that are at least one minute (60 seconds) old  
+./memleak.py -ap $(pidof allocs) 10
+        Trace allocations and display allocated addresses, sizes, and stacks
+        every 10 seconds for outstanding allocations
+./memleak.py -c "./allocs"
+        Run the specified command and trace its allocations
+./memleak.py
+        Trace allocations in kernel mode and display a summary of outstanding
+        allocations every 5 seconds
+./memleak.py -o 60000
+        Trace allocations in kernel mode and display a summary of outstanding
+        allocations that are at least one minute (60 seconds) old
 ./memleak.py -s 5
         Trace roughly every 5th allocation, to reduce overhead
-

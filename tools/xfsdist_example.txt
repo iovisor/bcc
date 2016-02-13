@@ -1,0 +1,155 @@
+Demonstrations of xfsdist, the Linux eBPF/bcc version.
+
+
+xfsdist traces XFS reads, writes, opens, and fsyncs, and summarizes their
+latency as a power-of-2 histogram. For example:
+
+# ./xfsdist 
+Tracing XFS operation latency... Hit Ctrl-C to end.
+^C
+
+operation = 'read'
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 362      |                                        |
+         4 -> 7          : 807      |*                                       |
+         8 -> 15         : 20686    |****************************************|
+        16 -> 31         : 512      |                                        |
+        32 -> 63         : 4        |                                        |
+        64 -> 127        : 2744     |*****                                   |
+       128 -> 255        : 7127     |*************                           |
+       256 -> 511        : 2483     |****                                    |
+       512 -> 1023       : 1281     |**                                      |
+      1024 -> 2047       : 39       |                                        |
+      2048 -> 4095       : 5        |                                        |
+      4096 -> 8191       : 1        |                                        |
+
+operation = 'open'
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 3        |****************************************|
+
+This output shows a bi-modal distribution for read latency, with a faster
+mode of 20,686 reads that took between 8 and 15 microseconds, and a slower
+mode of over 10,000 reads that took between 64 and 1023 microseconds. It's
+likely that the faster mode was a hit from the in-memory file system cache,
+and the slower mode is a read from a storage device (disk).
+
+This "latency" is measured from when the operation was issued from the VFS
+interface to the file system, to when it completed. This spans everything:
+block device I/O (disk I/O), file system CPU cycles, file system locks, run
+queue latency, etc. This is a better measure of the latency suffered by
+applications reading from the file system than measuring this down at the
+block device interface.
+
+Note that this only traces the common file system operations previously
+listed: other file system operations (eg, inode operations including
+getattr()) are not traced.
+
+
+An optional interval and a count can be provided, as well as -m to show the
+distributions in milliseconds. For example:
+
+# ./xfsdist -m 1 5
+Tracing XFS operation latency... Hit Ctrl-C to end.
+
+10:14:15:
+
+operation = 'read'
+     msecs               : count     distribution
+         0 -> 1          : 1366     |****************************************|
+         2 -> 3          : 86       |**                                      |
+         4 -> 7          : 95       |**                                      |
+         8 -> 15         : 132      |***                                     |
+        16 -> 31         : 72       |**                                      |
+
+operation = 'write'
+     msecs               : count     distribution
+         0 -> 1          : 685      |****************************************|
+
+10:14:16:
+
+operation = 'read'
+     msecs               : count     distribution
+         0 -> 1          : 984      |****************************************|
+         2 -> 3          : 66       |**                                      |
+         4 -> 7          : 67       |**                                      |
+         8 -> 15         : 104      |****                                    |
+        16 -> 31         : 70       |**                                      |
+        32 -> 63         : 12       |                                        |
+
+operation = 'write'
+     msecs               : count     distribution
+         0 -> 1          : 536      |****************************************|
+
+10:14:17:
+
+operation = 'read'
+     msecs               : count     distribution
+         0 -> 1          : 1262     |****************************************|
+         2 -> 3          : 75       |**                                      |
+         4 -> 7          : 80       |**                                      |
+         8 -> 15         : 119      |***                                     |
+        16 -> 31         : 75       |**                                      |
+        32 -> 63         : 3        |                                        |
+
+operation = 'write'
+     msecs               : count     distribution
+         0 -> 1          : 639      |****************************************|
+
+10:14:18:
+
+operation = 'read'
+     msecs               : count     distribution
+         0 -> 1          : 1070     |****************************************|
+         2 -> 3          : 58       |**                                      |
+         4 -> 7          : 74       |**                                      |
+         8 -> 15         : 140      |*****                                   |
+        16 -> 31         : 60       |**                                      |
+        32 -> 63         : 5        |                                        |
+
+operation = 'write'
+     msecs               : count     distribution
+         0 -> 1          : 556      |****************************************|
+
+10:14:19:
+
+operation = 'read'
+     msecs               : count     distribution
+         0 -> 1          : 1176     |****************************************|
+         2 -> 3          : 53       |*                                       |
+         4 -> 7          : 94       |***                                     |
+         8 -> 15         : 112      |***                                     |
+        16 -> 31         : 77       |**                                      |
+        32 -> 63         : 3        |                                        |
+
+operation = 'write'
+     msecs               : count     distribution
+         0 -> 1          : 613      |****************************************|
+
+This shows a mixed read/write workload, where the slower read mode was around
+10 ms.
+
+
+USAGE message:
+
+# ./xfsdist -h
+usage: xfsdist [-h] [-T] [-m] [-p PID] [interval] [count]
+
+Summarize XFS operation latency
+
+positional arguments:
+  interval            output interval, in seconds
+  count               number of outputs
+
+optional arguments:
+  -h, --help          show this help message and exit
+  -T, --notimestamp   don't include timestamp on interval output
+  -m, --milliseconds  output in milliseconds
+  -p PID, --pid PID   trace this PID only
+
+examples:
+    ./xfsdist            # show operation latency as a histogram
+    ./xfsdist -p 181     # trace PID 181 only
+    ./xfsdist 1 10       # print 1 second summaries, 10 times
+    ./xfsdist -m 5       # 5s summaries, milliseconds
