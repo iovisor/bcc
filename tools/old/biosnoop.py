@@ -11,12 +11,9 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
 # 16-Sep-2015   Brendan Gregg   Created this.
-# 11-Feb-2016   Allan McAleavy  updated for BPF_PERF_OUTPUT
 
 from __future__ import print_function
 from bcc import BPF
-import ctypes as ct
-import re
 
 # load BPF program
 b = BPF(text="""
@@ -28,20 +25,8 @@ struct val_t {
     char name[TASK_COMM_LEN];
 };
 
-struct data_t {
-    u32 pid;
-    u64 rwflag;
-    u64 delta;
-    u64 sector;
-    u64 len;
-    u64 ts;
-    char disk_name[DISK_NAME_LEN];
-    char name[TASK_COMM_LEN];
-};
-
 BPF_HASH(start, struct request *);
 BPF_HASH(infobyreq, struct request *, struct val_t);
-BPF_PERF_OUTPUT(events);
 
 // cache PID and comm by-req
 int trace_pid_start(struct pt_regs *ctx, struct request *req)
@@ -52,6 +37,7 @@ int trace_pid_start(struct pt_regs *ctx, struct request *req)
         val.pid = bpf_get_current_pid_tgid();
         infobyreq.update(&req, &val);
     }
+
     return 0;
 }
 
@@ -72,8 +58,6 @@ int trace_req_completion(struct pt_regs *ctx, struct request *req)
     u64 *tsp, delta;
     u32 *pidp = 0;
     struct val_t *valp;
-    struct data_t data ={};
-    u64 ts;
 
     // fetch timestamp and calculate delta
     tsp = start.lookup(&req);
@@ -81,29 +65,30 @@ int trace_req_completion(struct pt_regs *ctx, struct request *req)
         // missed tracing issue
         return 0;
     }
-    ts =  bpf_ktime_get_ns();
-    data.delta = ts - *tsp;
-    data.ts = ts / 1000;
+    delta = bpf_ktime_get_ns() - *tsp;
 
+    //
+    // Fetch and output issuing pid and comm.
+    // As bpf_trace_prink() is limited to a maximum of 1 string and 2
+    // integers, we'll use more than one to output the data.
+    //
     valp = infobyreq.lookup(&req);
     if (valp == 0) {
-        data.len = req->__data_len;
-        strcpy(data.name,"?");
+        bpf_trace_printk("0 0 ? %d\\n", req->__data_len);
     } else {
-        data.pid = valp->pid;
-        data.len = req->__data_len;
-        data.sector = req->__sector;
-        bpf_probe_read(&data.name, sizeof(data.name), valp->name);
-        bpf_probe_read(&data.disk_name, sizeof(data.disk_name),
-                       req->rq_disk->disk_name);
+        bpf_trace_printk("0 %d %s %d\\n", valp->pid, valp->name,
+            req->__data_len);
     }
 
+    // output remaining details
     if (req->cmd_flags & REQ_WRITE) {
-        data.rwflag=1;
+        bpf_trace_printk("1 W %s %d %d ?\\n", req->rq_disk->disk_name,
+            req->__sector, delta / 1000);
     } else {
-        data.rwflag=0;
+        bpf_trace_printk("1 R %s %d %d ?\\n", req->rq_disk->disk_name,
+            req->__sector, delta / 1000);
     }
-    events.perf_submit(ctx,&data,sizeof(data));
+
     start.delete(&req);
     infobyreq.delete(&req);
 
@@ -116,61 +101,29 @@ b.attach_kprobe(event="blk_mq_start_request", fn_name="trace_req_start")
 b.attach_kprobe(event="blk_account_io_completion",
     fn_name="trace_req_completion")
 
-TASK_COMM_LEN = 16  # linux/sched.h
-DISK_NAME_LEN = 32  # linux/genhd.h
-
-class Data(ct.Structure):
-    _fields_ = [
-        ("pid", ct.c_ulonglong),
-        ("rwflag", ct.c_ulonglong),
-        ("delta", ct.c_ulonglong),
-        ("sector", ct.c_ulonglong),
-        ("len", ct.c_ulonglong),
-        ("ts", ct.c_ulonglong),
-        ("disk_name", ct.c_char * DISK_NAME_LEN),
-        ("name", ct.c_char * TASK_COMM_LEN)
-    ]
 # header
 print("%-14s %-14s %-6s %-7s %-2s %-9s %-7s %7s" % ("TIME(s)", "COMM", "PID",
     "DISK", "T", "SECTOR", "BYTES", "LAT(ms)"))
 
-rwflg = ""
 start_ts = 0
-prev_ts = 0
-delta = 0
 
-# process event
-def print_event(cpu, data, size):
-    event = ct.cast(data, ct.POINTER(Data)).contents
-
-    val = -1
-    global start_ts
-    global prev_ts
-    global delta
-
-    if event.rwflag == 1:
-        rwflg = "W"
-
-    if event.rwflag == 0:
-        rwflg = "R"
-
-    if not re.match('\?', event.name):
-        val = event.sector
+# format output
+while 1:
+    (task, pid, cpu, flags, ts, msg) = b.trace_fields()
+    args = msg.split(" ")
 
     if start_ts == 0:
-        prev_ts = start_ts
+        start_ts = ts
 
-    if start_ts == 1:
-        delta = float(delta) + (event.ts - prev_ts)
+    if args[0] == "0":
+        (real_pid, real_comm, bytes_s) = (args[1], args[2], args[3])
+        continue
+    else:
+        (type_s, disk_s, sector_s, us_s) = (args[1], args[2], args[3],
+            args[4])
+
+    ms = float(int(us_s, 10)) / 1000
 
     print("%-14.9f %-14.14s %-6s %-7s %-2s %-9s %-7s %7.2f" % (
-        delta / 1000000, event.name, event.pid, event.disk_name, rwflg, val,
-        event.len, float(event.delta) / 1000000))
-
-    prev_ts = event.ts
-    start_ts = 1
-
-# loop with callback to print_event
-b["events"].open_perf_buffer(print_event)
-while 1:
-    b.kprobe_poll()
+        ts - start_ts, real_comm, real_pid, disk_s, type_s, sector_s,
+        bytes_s, ms))

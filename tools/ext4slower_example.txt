@@ -1,0 +1,209 @@
+Demonstrations of ext4slower, the Linux eBPF/bcc version.
+
+
+ext4slower shows ext4 reads, writes, opens, and fsyncs, slower than a threshold.
+For example:
+
+# ./ext4slower
+Tracing ext4 operations slower than 10 ms
+TIME     COMM           PID    T BYTES   OFF_KB   LAT(ms) FILENAME
+06:35:01 cron           16464  R 1249    0          16.05 common-auth
+06:35:01 cron           16463  R 1249    0          16.04 common-auth
+06:35:01 cron           16465  R 1249    0          16.03 common-auth
+06:35:01 cron           16465  R 4096    0          10.62 login.defs
+06:35:01 cron           16464  R 4096    0          10.61 login.defs
+06:35:01 cron           16463  R 4096    0          10.63 login.defs
+06:35:01 cron           16465  R 2972    0          18.52 pam_env.conf
+06:35:01 cron           16464  R 2972    0          18.51 pam_env.conf
+06:35:01 cron           16463  R 2972    0          18.49 pam_env.conf
+06:35:01 dumpsystemstat 16473  R 128     0          12.58 date
+06:35:01 debian-sa1     16474  R 283     0          12.66 sysstat
+06:35:01 debian-sa1     16474  R 128     0          10.39 sa1
+06:35:01 dumpsystemstat 16491  R 128     0          13.22 ifconfig
+06:35:01 DumpThreads    16534  R 128     0          12.78 cut
+06:35:01 cron           16545  R 128     0          14.76 sendmail
+06:35:01 sendmail       16545  R 274     0          10.88 dynamicmaps.cf
+06:35:02 postdrop       16546  R 118     0          32.94 Universal
+06:35:02 pickup         9574   R 118     0          21.02 localtime
+[...]
+
+This shows various system tasks reading from ext4. The high latency here is
+due to disk I/O, as I had just evicted the file system cache for this example.
+
+This "latency" is measured from when the operation was issued from the VFS
+interface to the file system, to when it completed. This spans everything:
+block device I/O (disk I/O), file system CPU cycles, file system locks, run
+queue latency, etc. This is a better measure of the latency suffered by
+applications reading from the file system than measuring this down at the
+block device interface.
+
+Note that this only traces the common file system operations previously
+listed: other file system operations (eg, inode operations including
+getattr()) are not traced.
+
+
+The threshold can be provided as an argument. Eg, I/O slower than 1 ms:
+
+# ./ext4slower 1
+Tracing ext4 operations slower than 1 ms
+TIME     COMM           PID    T BYTES   OFF_KB   LAT(ms) FILENAME
+06:49:17 bash           3616   R 128     0           7.75 cksum
+06:49:17 cksum          3616   R 39552   0           1.34 [
+06:49:17 cksum          3616   R 96      0           5.36 2to3-2.7
+06:49:17 cksum          3616   R 96      0          14.94 2to3-3.4
+06:49:17 cksum          3616   R 10320   0           6.82 411toppm
+06:49:17 cksum          3616   R 65536   0           4.01 a2p
+06:49:17 cksum          3616   R 55400   0           8.77 ab
+06:49:17 cksum          3616   R 36792   0          16.34 aclocal-1.14
+06:49:17 cksum          3616   R 15008   0          19.31 acpi_listen
+06:49:17 cksum          3616   R 6123    0          17.23 add-apt-repository
+06:49:17 cksum          3616   R 6280    0          18.40 addpart
+06:49:17 cksum          3616   R 27696   0           2.16 addr2line
+06:49:17 cksum          3616   R 58080   0          10.11 ag
+06:49:17 cksum          3616   R 906     0           6.30 ec2-meta-data
+06:49:17 cksum          3616   R 6320    0          10.00 animate.im6
+06:49:17 cksum          3616   R 5680    0          18.69 anytopnm
+06:49:17 cksum          3616   R 2671    0          20.27 apport-bug
+06:49:17 cksum          3616   R 12566   0          16.72 apport-cli
+06:49:17 cksum          3616   R 1622    0           7.95 apport-unpack
+06:49:17 cksum          3616   R 10440   0           2.37 appres
+06:49:17 cksum          3616   R 48112   0           5.42 whatis
+06:49:17 cksum          3616   R 14832   0           6.24 apt
+06:49:17 cksum          3616   R 65536   0          24.74 apt-cache
+06:49:17 cksum          3616   R 27264   0           1.68 apt-cdrom
+06:49:17 cksum          3616   R 23224   0           5.31 apt-extracttemplates
+06:49:17 cksum          3616   R 65536   0           8.08 apt-ftparchive
+06:49:17 cksum          3616   R 65536   128         2.92 apt-ftparchive
+06:49:17 cksum          3616   R 65536   0           9.58 aptitude-curses
+06:49:17 cksum          3616   R 65536   128        44.25 aptitude-curses
+06:49:17 cksum          3616   R 65536   384         1.69 aptitude-curses
+[...]
+
+This time a cksum(1) command can be seen reading various files (from /usr/bin).
+
+
+A threshold of 0 will trace all operations. Warning: the output will be
+verbose, as it will include all file system cache hits.
+
+# ./ext4slower 0
+Tracing ext4 operations
+TIME     COMM           PID    T BYTES   OFF_KB   LAT(ms) FILENAME
+06:58:05 supervise      1884   O 0       0           0.00 status.new
+06:58:05 supervise      1884   W 18      0           0.02 status.new
+06:58:05 supervise      1884   O 0       0           0.00 status.new
+06:58:05 supervise      1884   W 18      0           0.01 status.new
+06:58:05 supervise      15817  O 0       0           0.00 run
+06:58:05 supervise      15817  R 92      0           0.00 run
+06:58:05 supervise      15817  O 0       0           0.00 bash
+06:58:05 supervise      15817  R 128     0           0.00 bash
+06:58:05 supervise      15817  R 504     0           0.00 bash
+06:58:05 supervise      15817  R 28      0           0.00 bash
+06:58:05 supervise      15817  O 0       0           0.00 ld-2.19.so
+06:58:05 supervise      15817  R 64      0           0.00 ld-2.19.so
+06:58:05 supervise      15817  R 392     0           0.00 ld-2.19.so
+06:58:05 run            15817  O 0       0           0.00 ld.so.cache
+06:58:05 run            15817  O 0       0           0.00 libtinfo.so.5.9
+06:58:05 run            15817  R 832     0           0.00 libtinfo.so.5.9
+06:58:05 run            15817  O 0       0           0.00 libdl-2.19.so
+06:58:05 run            15817  R 832     0           0.00 libdl-2.19.so
+06:58:05 run            15817  O 0       0           0.00 libc-2.19.so
+06:58:05 run            15817  R 832     0           0.00 libc-2.19.so
+06:58:05 supervise      1876   O 0       0           0.00 status.new
+06:58:05 supervise      1876   W 18      0           0.01 status.new
+06:58:05 supervise      1895   O 0       0           0.00 status.new
+06:58:05 supervise      1895   W 18      0           0.02 status.new
+06:58:05 supervise      1876   O 0       0           0.00 status.new
+06:58:05 supervise      1876   W 18      0           0.01 status.new
+06:58:05 supervise      1872   O 0       0           0.00 status.new
+06:58:05 supervise      1872   W 18      0           0.02 status.new
+06:58:05 supervise      1895   O 0       0           0.00 status.new
+06:58:05 supervise      1895   W 18      0           0.01 status.new
+06:58:05 supervise      15818  R 92      0           0.00 run
+06:58:05 supervise      15818  O 0       0           0.00 bash
+06:58:05 supervise      15818  R 128     0           0.00 bash
+06:58:05 supervise      15818  R 504     0           0.00 bash
+06:58:05 supervise      15818  R 28      0           0.00 bash
+06:58:05 supervise      15818  O 0       0           0.00 ld-2.19.so
+06:58:05 supervise      15818  R 64      0           0.00 ld-2.19.so
+06:58:05 supervise      15818  R 392     0           0.00 ld-2.19.so
+06:58:05 supervise      15818  O 0       0           0.00 run
+06:58:05 supervise      1888   O 0       0           0.00 status.new
+06:58:05 supervise      1888   W 18      0           0.01 status.new
+06:58:05 supervise      1888   O 0       0           0.00 status.new
+06:58:05 supervise      1888   W 18      0           0.02 status.new
+06:58:05 supervise      15822  R 119     0           0.00 run
+06:58:05 supervise      15822  O 0       0           0.00 bash
+06:58:05 supervise      15822  R 128     0           0.00 bash
+06:58:05 supervise      15822  R 504     0           0.00 bash
+06:58:05 supervise      15822  R 28      0           0.00 bash
+06:58:05 supervise      15822  O 0       0           0.00 ld-2.19.so
+06:58:05 supervise      15822  R 64      0           0.00 ld-2.19.so
+06:58:05 supervise      15822  R 392     0           0.00 ld-2.19.so
+06:58:05 supervise      1892   O 0       0           0.00 status.new
+06:58:05 supervise      1892   W 18      0           0.02 status.new
+06:58:05 supervise      1892   O 0       0           0.00 status.new
+06:58:05 supervise      1892   W 18      0           0.02 status.new
+06:58:05 supervise      15820  O 0       0           0.00 run
+[...]
+
+The output now includes open operations ("O"), and writes ("W").
+
+
+A -j option will print just the fields (parsable output, csv):
+
+# ./ext4slower -j 1
+ENDTIME_us,TASK,PID,TYPE,BYTES,OFFSET_b,LATENCY_us,FILE
+127200712278,bash,17225,R,128,0,14329,cksum
+127200722986,cksum,17225,R,3274,0,8368,command-not-found
+127200735581,cksum,17225,R,65536,0,10903,libbfd-2.24-system.so
+127200738482,cksum,17225,R,65536,131072,2419,libbfd-2.24-system.so
+127200749226,cksum,17225,R,65536,655360,8995,libbfd-2.24-system.so
+127200776273,cksum,17225,R,55080,0,25297,libbind9.so.90.0.9
+127200784688,cksum,17225,R,65536,0,7873,libblas.so.3.0
+127200787551,cksum,17225,R,65536,131072,2386,libblas.so.3.0
+127200795524,cksum,17225,R,18624,0,4947,libcpupower.so.3.13.0-49
+127200802073,cksum,17225,R,65536,0,6410,libcwidget.so.3.0.0
+127200808718,cksum,17225,R,65536,131072,6181,libcwidget.so.3.0.0
+127200829518,cksum,17225,R,65536,0,14213,libdns.so.100.2.2
+127200832916,cksum,17225,R,65536,131072,2911,libdns.so.100.2.2
+127200841044,cksum,17225,R,65536,655360,6376,libdns.so.100.2.2
+127200853646,cksum,17225,R,956,0,1022,libdumbnet.la
+127200857814,cksum,17225,R,61096,0,4111,libdumbnet.so.1.0.1
+127200869655,cksum,17225,R,65536,0,11252,libgettextlib-0.18.3.so
+127200872985,cksum,17225,R,65536,131072,2882,libgettextlib-0.18.3.so
+127200883063,cksum,17225,R,65536,0,9661,libgettextsrc-0.18.3.so
+127200884767,cksum,17225,R,65536,131072,1251,libgettextsrc-0.18.3.so
+127200904830,cksum,17225,R,65536,0,19571,libgirepository-1.0.so.1.0.0
+127200906354,cksum,17225,R,65536,131072,1080,libgirepository-1.0.so.1.0.0
+127200936047,cksum,17225,R,65536,0,28674,libGraphicsMagick.a
+127200939091,cksum,17225,R,65536,131072,2576,libGraphicsMagick.a
+127200947295,cksum,17225,R,65536,655360,6463,libGraphicsMagick.a
+127200958793,cksum,17225,R,65536,1966080,7034,libGraphicsMagick.a
+[...]
+
+This may be useful for visualizing with another tool, for example, for
+producing a scatter plot of ENDTIME vs LATENCY, to look for time-based
+patterns.
+
+
+USAGE message:
+
+# ./ext4slower -h
+usage: ext4slower [-h] [-j] [-p PID] [min_ms]
+
+Trace common ext4 file operations slower than a threshold
+
+positional arguments:
+  min_ms             minimum I/O duration to trace, in ms (default 10)
+
+optional arguments:
+  -h, --help         show this help message and exit
+  -j, --csv          just print fields: comma-separated values
+  -p PID, --pid PID  trace this PID only
+
+examples:
+    ./ext4slower             # trace operations slower than 10 ms (default)
+    ./ext4slower 1           # trace operations slower than 1 ms
+    ./ext4slower -j 1        # ... 1 ms, parsable output (csv)
+    ./ext4slower 0           # trace all operations (warning: verbose)
+    ./ext4slower -p 185      # trace PID 185 only

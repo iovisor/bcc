@@ -1,0 +1,193 @@
+Demonstrations of ext4dist, the Linux eBPF/bcc version.
+
+
+ext4dist traces ext4 reads, writes, opens, and fsyncs, and summarizes their
+latency as a power-of-2 histogram. For example:
+
+# ./ext4dist 
+Tracing ext4 operation latency... Hit Ctrl-C to end.
+^C
+
+operation = 'read'
+     usecs               : count     distribution
+         0 -> 1          : 1210     |****************************************|
+         2 -> 3          : 126      |****                                    |
+         4 -> 7          : 376      |************                            |
+         8 -> 15         : 86       |**                                      |
+        16 -> 31         : 9        |                                        |
+        32 -> 63         : 47       |*                                       |
+        64 -> 127        : 6        |                                        |
+       128 -> 255        : 24       |                                        |
+       256 -> 511        : 137      |****                                    |
+       512 -> 1023       : 66       |**                                      |
+      1024 -> 2047       : 13       |                                        |
+      2048 -> 4095       : 7        |                                        |
+      4096 -> 8191       : 13       |                                        |
+      8192 -> 16383      : 3        |                                        |
+
+operation = 'write'
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 75       |****************************************|
+        16 -> 31         : 5        |**                                      |
+
+operation = 'open'
+     usecs               : count     distribution
+         0 -> 1          : 1278     |****************************************|
+         2 -> 3          : 40       |*                                       |
+         4 -> 7          : 4        |                                        |
+         8 -> 15         : 1        |                                        |
+        16 -> 31         : 1        |                                        |
+
+This output shows a bi-modal distribution for read latency, with a faster
+mode of less than 7 microseconds, and a slower mode of between 256 and 1023
+microseconds. The count column shows how many events fell into that latency
+range. It's likely that the faster mode was a hit from the in-memory file
+system cache, and the slower mode is a read from a storage device (disk).
+
+This "latency" is measured from when the operation was issued from the VFS
+interface to the file system, to when it completed. This spans everything:
+block device I/O (disk I/O), file system CPU cycles, file system locks, run
+queue latency, etc. This is a better measure of the latency suffered by
+applications reading from the file system than measuring this down at the
+block device interface.
+
+Note that this only traces the common file system operations previously
+listed: other file system operations (eg, inode operations including
+getattr()) are not traced.
+
+
+An optional interval and a count can be provided, as well as -m to show the
+distributions in milliseconds. For example:
+
+# ./ext4dist -m 1 5
+Tracing ext4 operation latency... Hit Ctrl-C to end.
+
+10:19:00:
+
+operation = 'read'
+     msecs               : count     distribution
+         0 -> 1          : 576      |****************************************|
+         2 -> 3          : 5        |                                        |
+         4 -> 7          : 6        |                                        |
+         8 -> 15         : 13       |                                        |
+        16 -> 31         : 17       |*                                       |
+        32 -> 63         : 5        |                                        |
+        64 -> 127        : 1        |                                        |
+
+operation = 'write'
+     msecs               : count     distribution
+         0 -> 1          : 20       |****************************************|
+
+operation = 'open'
+     msecs               : count     distribution
+         0 -> 1          : 346      |****************************************|
+
+10:19:01:
+
+operation = 'read'
+     msecs               : count     distribution
+         0 -> 1          : 584      |****************************************|
+         2 -> 3          : 10       |                                        |
+         4 -> 7          : 11       |                                        |
+         8 -> 15         : 16       |*                                       |
+        16 -> 31         : 6        |                                        |
+        32 -> 63         : 4        |                                        |
+        64 -> 127        : 2        |                                        |
+       128 -> 255        : 1        |                                        |
+
+operation = 'write'
+     msecs               : count     distribution
+         0 -> 1          : 20       |****************************************|
+
+operation = 'open'
+     msecs               : count     distribution
+         0 -> 1          : 336      |****************************************|
+
+10:19:02:
+
+operation = 'read'
+     msecs               : count     distribution
+         0 -> 1          : 678      |****************************************|
+         2 -> 3          : 7        |                                        |
+         4 -> 7          : 9        |                                        |
+         8 -> 15         : 25       |*                                       |
+        16 -> 31         : 10       |                                        |
+        32 -> 63         : 3        |                                        |
+
+operation = 'write'
+     msecs               : count     distribution
+         0 -> 1          : 19       |****************************************|
+         2 -> 3          : 1        |**                                      |
+
+operation = 'open'
+     msecs               : count     distribution
+         0 -> 1          : 390      |****************************************|
+
+10:19:03:
+
+operation = 'read'
+     msecs               : count     distribution
+         0 -> 1          : 567      |****************************************|
+         2 -> 3          : 7        |                                        |
+         4 -> 7          : 9        |                                        |
+         8 -> 15         : 20       |*                                       |
+        16 -> 31         : 15       |*                                       |
+        32 -> 63         : 5        |                                        |
+        64 -> 127        : 2        |                                        |
+
+operation = 'write'
+     msecs               : count     distribution
+         0 -> 1          : 20       |****************************************|
+
+operation = 'open'
+     msecs               : count     distribution
+         0 -> 1          : 417      |****************************************|
+
+10:19:04:
+
+operation = 'read'
+     msecs               : count     distribution
+         0 -> 1          : 762      |****************************************|
+         2 -> 3          : 9        |                                        |
+         4 -> 7          : 9        |                                        |
+         8 -> 15         : 11       |                                        |
+        16 -> 31         : 20       |*                                       |
+        32 -> 63         : 4        |                                        |
+        64 -> 127        : 1        |                                        |
+
+operation = 'write'
+     msecs               : count     distribution
+         0 -> 1          : 20       |****************************************|
+
+operation = 'open'
+     msecs               : count     distribution
+         0 -> 1          : 427      |****************************************|
+
+This shows a mixed read/write workload.
+
+
+USAGE message:
+
+# ./ext4dist -h
+usage: ext4dist [-h] [-T] [-m] [-p PID] [interval] [count]
+
+Summarize ext4 operation latency
+
+positional arguments:
+  interval            output interval, in seconds
+  count               number of outputs
+
+optional arguments:
+  -h, --help          show this help message and exit
+  -T, --notimestamp   don't include timestamp on interval output
+  -m, --milliseconds  output in milliseconds
+  -p PID, --pid PID   trace this PID only
+
+examples:
+    ./ext4dist            # show operation latency as a histogram
+    ./ext4dist -p 181     # trace PID 181 only
+    ./ext4dist 1 10       # print 1 second summaries, 10 times
+    ./ext4dist -m 5       # 5s summaries, milliseconds
