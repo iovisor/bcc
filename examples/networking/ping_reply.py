@@ -73,7 +73,7 @@ prog = """
         /*
         Swapping Source and Destination in IP header
         We don't need to update checksum since we're just swapping.
-        However to demonstrate the use of bpf_l3_csum_replace, the checksum
+        However to demonstrate the use of incr_cksum_l3, the checksum
         is recomputed after each change
         */
         u32 old_src = ip->src;
