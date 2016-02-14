@@ -2,14 +2,14 @@
 .SH NAME
 argdist \- Trace a function and display a histogram or frequency count of its parameter values. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B argdist [-h] [-p PID] [-z STRING_SIZE] [-i INTERVAL] [-n COUNT] [-H specifier [specifier ...]] [-C specifier [specifier ...]]
+.B argdist [-h] [-p PID] [-z STRING_SIZE] [-i INTERVAL] [-n COUNT] [-v] [-T TOP] [-H specifier [specifier ...]] [-C specifier [specifier ...]] [-I header [header ...]]
 .SH DESCRIPTION
 argdist attaches to function entry and exit points, collects specified parameter
 values, and stores them in a histogram or a frequency collection that counts
 the number of times a parameter value occurred. It can also filter parameter
 values and instrument multiple entry points at once.
 
-This currently only works on x86_64. Check for future versions.
+Since this uses BPF, only the root user can use this tool.
 .SH REQUIREMENTS
 CONFIG_BPF and bcc.
 .SH OPTIONS
@@ -24,20 +24,32 @@ Trace only functions in the process PID.
 When collecting string arguments (of type char*), collect up to STRING_SIZE 
 characters. Longer strings will be truncated.
 .TP
--i INTERVAL
+\-i INTERVAL
 Print the collected data every INTERVAL seconds. The default is 1 second.
 .TP
--n NUMBER
+\-n NUMBER
 Print the collected data COUNT times and then exit.
 .TP
--H SPECIFIER, -C SPECIFIER
+\-v
+Display the generated BPF program, for debugging purposes.
+.TP
+\-T TOP
+When collecting frequency counts, display only the top TOP entries.
+.TP
+\-H SPECIFIER, \-C SPECIFIER
 One or more probe specifications that instruct argdist which functions to
 probe, which parameters to collect, how to aggregate them, and whether to perform
 any filtering. See SPECIFIER SYNTAX below.
+.TP
+\-I HEADER
+One or more header files that should be included in the BPF program. This 
+enables the use of structure definitions, enumerations, and constants that
+are available in these headers. You should provide the same path you would
+include in the BPF program, e.g. 'linux/blkdev.h' or 'linux/time.h'.
 .SH SPECIFIER SYNTAX
 The general specifier syntax is as follows:
 
-.B {p,r}:[library]:function(signature)[:type:expr[:filter]][;label]
+.B {p,r}:[library]:function(signature)[:type:expr[:filter]][#label]
 .TP
 .B {p,r}
 Probe type \- "p" for function entry, "r" for function return;
@@ -47,8 +59,7 @@ count information, or aggregate the collected values into a histogram. Counting
 probes will collect the number of times every parameter value was observed,
 whereas histogram probes will collect the parameter values into a histogram.
 Only integral types can be used with histogram probes; there is no such limitation
-for counting probes. Return probes can only use the pseudo-variable $retval, which
-is an alias for the function's return value.
+for counting probes.
 .TP
 .B [library]
 Library containing the probe.
@@ -73,11 +84,20 @@ The expression to capture.
 These are the values that are assigned to the histogram or raw event collection.
 You may use the parameters directly, or valid C expressions that involve the
 parameters, such as "size % 10".
+Return probes can use the argument values received by the
+function when it was entered, through the $entry(paramname) special variable.
+Return probes can also access the function's return value in $retval, and the
+function's execution time in nanoseconds in $latency. Note that adding the
+$latency or $entry(paramname) variables to the expression will introduce an
+additional probe at the function's entry to collect this data, and therefore
+introduce additional overhead.
 .TP
 .B [filter]
 The filter applied to the captured data.
 Only parameter values that pass the filter will be collected. This is any valid
 C expression that refers to the parameter values, such as "fd == 1 && length > 16".
+The $entry, $retval, and $latency variables can be used here as well, in return
+probes.
 .TP
 .B [label]
 The label that will be displayed when printing the probed values. By default,
@@ -95,6 +115,10 @@ Print a count of how many times process 1005 called malloc with an allocation si
 Snoop on all strings returned by gets():
 #
 .B argdist.py -C 'r:c:gets():char*:$retval'
+.TP
+Print a histogram of read sizes that were longer than 1ms:
+#
+.B argdist.py -H 'r::__vfs_read(void *file, void *buf, size_t count):size_t:$entry(count):$latency > 1000000'
 .TP
 Print frequency counts of how many times writes were issued to a particular file descriptor number, in process 1005:
 #
@@ -114,7 +138,7 @@ Count fork() calls in libc across all processes, grouped by pid:
 .TP
 Print histograms of sleep() and nanosleep() parameter values:
 #
-.B argdist.py -H 'p:c:sleep(u32 seconds):u32:seconds' -H 'p:c:nanosleep(struct timespec { time_t tv_sec; long tv_nsec; } *req):long:req->tv_nsec'
+.B argdist.py -I 'linux/time.h' -H 'p:c:sleep(u32 seconds):u32:seconds' 'p:c:nanosleep(struct timespec *req):long:req->tv_nsec'
 .TP
 Spy on writes to STDOUT performed by process 2780, up to a string size of 120 characters:
 #
