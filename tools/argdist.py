@@ -7,6 +7,7 @@
 #                   [-n COUNT] [-v] [-T TOP]
 #                   [-C specifier [specifier ...]]
 #                   [-H specifier [specifier ...]]
+#                   [-I header [header ...]]
 #
 # Licensed under the Apache License, Version 2.0 (the "License")
 # Copyright (C) 2016 Sasha Goldshtein.
@@ -152,28 +153,42 @@ u64 __time = bpf_ktime_get_ns();
                         self.bpf.attach_kprobe(event=self.function,
                                                fn_name=self.entry_probe_func)
 
+        def _bail(self, error):
+                raise ValueError("error parsing probe '%s': %s" %
+                                 (self.raw_spec, error))
+
+        def _validate_specifier(self):
+                # Everything after '#' is the probe label, ignore it
+                spec = self.raw_spec.split('#')[0]
+                parts = spec.strip().split(':')
+                if len(parts) < 3:
+                        self._bail("at least the probe type, library, and " +
+                                   "function signature must be specified")
+                if len(parts) > 6:
+                        self._bail("extraneous ':'-separated parts detected")
+                if parts[0] not in ["r", "p"]:
+                        self._bail("probe type must be either 'p' or 'r', " +
+                                   "but got '%s'" % parts[0])
+                if re.match(r"\w+\(.*\)", parts[2]) is None:
+                        self._bail(("function signature '%s' has an invalid " +
+                                   "format") % parts[2])
+
         def __init__(self, type, specifier, pid):
-                self.raw_spec = specifier 
-                spec_and_label = specifier.split(';')
+                self.raw_spec = specifier
+                self._validate_specifier()
+ 
+                spec_and_label = specifier.split('#')
                 self.label = spec_and_label[1] \
                              if len(spec_and_label) == 2 else None
 
                 parts = spec_and_label[0].strip().split(':')
-                if len(parts) < 3 or len(parts) > 6:
-                        raise ValueError("invalid specifier format")
                 self.type = type    # hist or freq
                 self.is_ret_probe = parts[0] == "r"
-                if self.type != "hist" and self.type != "freq":
-                        raise ValueError("unrecognized probe type")
-                if parts[0] not in ["r", "p"]:
-                        raise ValueError("unrecognized probe type")
                 self.library = parts[1]
                 self.is_user = len(self.library) > 0
                 fparts = parts[2].split('(')
-                if len(fparts) != 2:
-                        raise ValueError("invalid specifier format")
-                self.function = fparts[0]
-                self.signature = fparts[1][:-1]
+                self.function = fparts[0].strip()
+                self.signature = fparts[1].strip()[:-1]
                 self._parse_signature()
 
                 # If the user didn't specify an expression to probe, we probe
@@ -335,7 +350,7 @@ bpf_probe_read(&__key.key, sizeof(__key.key), %s);
 
 examples = """
 Probe specifier syntax:
-        {p,r}:[library]:function(signature)[:type:expr[:filter]][;label]
+        {p,r}:[library]:function(signature)[:type:expr[:filter]][#label]
 Where:
         p,r        -- probe at function entry or at function exit
                       in exit probes: can use $retval, $entry(param), $latency
@@ -357,11 +372,15 @@ argdist.py -p 1005 -C 'p:c:malloc(size_t size):size_t:size:size==16'
         Print a frequency count of how many times process 1005 called malloc
         with an allocation size of 16 bytes
 
-argdist.py -C 'r:c:gets():char*:$retval;snooped strings'
+argdist.py -C 'r:c:gets():char*:$retval#snooped strings'
         Snoop on all strings returned by gets()
 
-argdist.py -H 'r::__kmalloc(size_t size):u64:$latency/$entry(size);ns per byte'
+argdist.py -H 'r::__kmalloc(size_t size):u64:$latency/$entry(size)#ns per byte'
         Print a histogram of nanoseconds per byte from kmalloc allocations
+
+argdist.py -I 'linux/slab.h' \\
+        -C 'p::__kmalloc(size_t size, gfp_t flags):size_t:size:flags&GFP_ATOMIC'
+        Print frequency count of kmalloc allocation sizes that have GFP_ATOMIC
 
 argdist.py -p 1005 -C 'p:c:write(int fd):int:fd' -T 5
         Print frequency counts of how many times writes were issued to a
@@ -382,13 +401,13 @@ argdist.py -H \\
         Print a histogram of buffer sizes passed to write() across all
         processes, where the file descriptor was 1 (STDOUT)
 
-argdist.py -C 'p:c:fork();fork calls'
+argdist.py -C 'p:c:fork()#fork calls'
         Count fork() calls in libc across all processes
         Can also use funccount.py, which is easier and more flexible 
 
-argdist.py -H \\
+argdist.py -I 'linux/time.h' -H \\
         'p:c:sleep(u32 seconds):u32:seconds' \\
-        'p:c:nanosleep(struct timespec { time_t tv_sec; long tv_nsec; } *req):long:req->tv_nsec'
+        'p:c:nanosleep(struct timespec *req):long:req->tv_nsec'
         Print histograms of sleep() and nanosleep() parameter values
 
 argdist.py -p 2780 -z 120 \\
@@ -414,9 +433,13 @@ parser.add_argument("-v", "--verbose", action="store_true",
 parser.add_argument("-T", "--top", type=int,
         help="number of top results to show (not applicable to histograms)")
 parser.add_argument("-H", "--histogram", nargs="*", dest="histspecifier",
+        metavar="specifier",
         help="probe specifier to capture histogram of (see examples below)")
 parser.add_argument("-C", "--count", nargs="*", dest="countspecifier",
+        metavar="specifier",
         help="probe specifier to capture count of (see examples below)")
+parser.add_argument("-I", "--include", nargs="*", metavar="header",
+        help="additional header files to include in the BPF program")
 args = parser.parse_args()
 
 specifiers = []
@@ -429,6 +452,8 @@ if len(specifiers) == 0:
         exit(1)
 
 bpf_source = "#include <uapi/linux/ptrace.h>\n"
+for include in (args.include or []):
+        bpf_source += "#include <%s>\n" % include
 for specifier in specifiers:
         bpf_source += specifier.generate_text(args.string_size)
 

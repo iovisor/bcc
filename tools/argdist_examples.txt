@@ -253,8 +253,8 @@ USAGE message:
 
 # argdist.py -h
 usage: argdist.py [-h] [-p PID] [-z STRING_SIZE] [-i INTERVAL] [-n COUNT] [-v]
-                  [-T TOP] [-H [HISTSPECIFIER [HISTSPECIFIER ...]]]
-                  [-C [COUNTSPECIFIER [COUNTSPECIFIER ...]]]
+                  [-T TOP] [-H [specifier [specifier ...]]]
+                  [-C [specifier [specifier ...]]] [-I [header [header ...]]]
 
 Trace a function and display a summary of its parameter values.
 
@@ -270,15 +270,17 @@ optional arguments:
   -v, --verbose         print resulting BPF program code before executing
   -T TOP, --top TOP     number of top results to show (not applicable to
                         histograms)
-  -H [HISTSPECIFIER [HISTSPECIFIER ...]], --histogram [HISTSPECIFIER [HISTSPECIFIER ...]]
+  -H [specifier [specifier ...]], --histogram [specifier [specifier ...]]
                         probe specifier to capture histogram of (see examples
                         below)
-  -C [COUNTSPECIFIER [COUNTSPECIFIER ...]], --count [COUNTSPECIFIER [COUNTSPECIFIER ...]]
+  -C [specifier [specifier ...]], --count [specifier [specifier ...]]
                         probe specifier to capture count of (see examples
                         below)
+  -I [header [header ...]], --include [header [header ...]]
+                        additional header files to include in the BPF program
 
 Probe specifier syntax:
-        {p,r}:[library]:function(signature)[:type:expr[:filter]][;label]
+        {p,r}:[library]:function(signature)[:type:expr[:filter]][#label]
 Where:
         p,r        -- probe at function entry or at function exit
                       in exit probes: can use $retval, $entry(param), $latency
@@ -300,11 +302,15 @@ argdist.py -p 1005 -C 'p:c:malloc(size_t size):size_t:size:size==16'
         Print a frequency count of how many times process 1005 called malloc
         with an allocation size of 16 bytes
 
-argdist.py -C 'r:c:gets():char*:$retval;snooped strings'
+argdist.py -C 'r:c:gets():char*:$retval#snooped strings'
         Snoop on all strings returned by gets()
 
-argdist.py -H 'r::__kmalloc(size_t size):u64:$latency/$entry(size);ns per byte'
+argdist.py -H 'r::__kmalloc(size_t size):u64:$latency/$entry(size)#ns per byte'
         Print a histogram of nanoseconds per byte from kmalloc allocations
+
+argdist.py -I 'linux/slab.h' \
+        -C 'p::__kmalloc(size_t size, gfp_t flags):size_t:size:flags&GFP_ATOMIC'
+        Print frequency count of kmalloc allocation sizes that have GFP_ATOMIC
 
 argdist.py -p 1005 -C 'p:c:write(int fd):int:fd' -T 5
         Print frequency counts of how many times writes were issued to a
@@ -325,17 +331,16 @@ argdist.py -H \
         Print a histogram of buffer sizes passed to write() across all
         processes, where the file descriptor was 1 (STDOUT)
 
-argdist.py -C 'p:c:fork();fork calls'
+argdist.py -C 'p:c:fork()#fork calls'
         Count fork() calls in libc across all processes
         Can also use funccount.py, which is easier and more flexible 
 
-argdist.py -H \
+argdist.py -I 'linux/time.h' -H \
         'p:c:sleep(u32 seconds):u32:seconds' \
-        'p:c:nanosleep(struct timespec { time_t tv_sec; long tv_nsec; } *req):long:req->tv_nsec'
+        'p:c:nanosleep(struct timespec *req):long:req->tv_nsec'
         Print histograms of sleep() and nanosleep() parameter values
 
 argdist.py -p 2780 -z 120 \
         -C 'p:c:write(int fd, char* buf, size_t len):char*:buf:fd==1'
         Spy on writes to STDOUT performed by process 2780, up to a string size
         of 120 characters 
-
