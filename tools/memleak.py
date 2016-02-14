@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 #
-# memleak.py   Trace and display outstanding allocations to detect 
+# memleak   Trace and display outstanding allocations to detect 
 #              memory leaks in user-mode processes and the kernel.
 #
-# USAGE: memleak.py [-h] [-p PID] [-t] [-a] [-o OLDER] [-c COMMAND]
+# USAGE: memleak [-h] [-p PID] [-t] [-a] [-o OLDER] [-c COMMAND]
 #                   [-s SAMPLE_RATE] [-d STACK_DEPTH] [-T TOP] [-z MIN_SIZE]
 #                   [-Z MAX_SIZE]
 #                   [interval] [count]
@@ -157,23 +157,23 @@ def run_command_get_pid(command):
 examples = """
 EXAMPLES:
 
-./memleak.py -p $(pidof allocs)
+./memleak -p $(pidof allocs)
         Trace allocations and display a summary of "leaked" (outstanding)
         allocations every 5 seconds
-./memleak.py -p $(pidof allocs) -t
+./memleak -p $(pidof allocs) -t
         Trace allocations and display each individual call to malloc/free
-./memleak.py -ap $(pidof allocs) 10
+./memleak -ap $(pidof allocs) 10
         Trace allocations and display allocated addresses, sizes, and stacks
         every 10 seconds for outstanding allocations
-./memleak.py -c "./allocs"
+./memleak -c "./allocs"
         Run the specified command and trace its allocations
-./memleak.py
+./memleak
         Trace allocations in kernel mode and display a summary of outstanding
         allocations every 5 seconds
-./memleak.py -o 60000
+./memleak -o 60000
         Trace allocations in kernel mode and display a summary of outstanding
         allocations that are at least one minute (60 seconds) old
-./memleak.py -s 5
+./memleak -s 5
         Trace roughly every 5th allocation, to reduce overhead
 """
 
