@@ -49,7 +49,7 @@ include in the BPF program, e.g. 'linux/blkdev.h' or 'linux/time.h'.
 .SH SPECIFIER SYNTAX
 The general specifier syntax is as follows:
 
-.B {p,r}:[library]:function(signature)[:type:expr[:filter]][#label]
+.B {p,r}:[library]:function(signature)[:type[,type...]:expr[,expr...][:filter]][#label]
 .TP
 .B {p,r}
 Probe type \- "p" for function entry, "r" for function return;
@@ -74,13 +74,13 @@ on the other hand, is only required if you plan to collect parameter values
 based on that signature. For example, if you only want to collect the first
 parameter, you don't have to specify the rest of the parameters in the signature.
 .TP
-.B [type]
-The type of the expression to capture.
+.B [type[,type...]]
+The type(s) of the expression(s) to capture.
 This is the type of the keys in the histogram or raw event collection that are
 collected by the probes.
 .TP
-.B [expr]
-The expression to capture.
+.B [expr[,expr...]]
+The expression(s) to capture.
 These are the values that are assigned to the histogram or raw event collection.
 You may use the parameters directly, or valid C expressions that involve the
 parameters, such as "size % 10".
@@ -143,6 +143,10 @@ Print histograms of sleep() and nanosleep() parameter values:
 Spy on writes to STDOUT performed by process 2780, up to a string size of 120 characters:
 #
 .B argdist.py -p 2780 -z 120 -C 'p:c:write(int fd, char* buf, size_t len):char*:buf:fd==1'
+.TP
+Group files being read from and the read sizes from __vfs_read:
+#
+.B argdist.py -I 'linux/fs.h' -C 'p::__vfs_read(struct file *file, void *buf, size_t count):char*,size_t:file->f_path.dentry->d_iname,count:file->f_path.dentry->d_iname[0]!=0'
 .SH SOURCE
 This is from bcc.
 .IP

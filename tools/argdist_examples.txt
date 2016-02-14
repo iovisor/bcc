@@ -156,13 +156,13 @@ What about reads? You could trace gets() across the system and print the
 strings input by the user (note how "r" is used instead of "p" to attach a
 probe to the function's return):
 
-# ./argdist.py -i 10 -n 1 -C 'r:c:gets():char*:$retval:$retval!=0'
+# ./argdist.py -i 10 -n 1 -C 'r:c:gets():char*:(char*)$retval:$retval!=0'
 [02:12:23]
 r:c:gets():char*:$retval:$retval!=0
         COUNT      EVENT
-        1          (char*)ctx->ax = hi there
-        3          (char*)ctx->ax = sasha
-        8          (char*)ctx->ax = hello
+        1          (char*)$retval = hi there
+        3          (char*)$retval = sasha
+        8          (char*)$retval = hello
 
 Similarly, we could get a histogram of the error codes returned by read():
 
@@ -192,18 +192,16 @@ longer than 0.1ms (100,000ns):
 [01:08:48]
 r::__vfs_read():u32:$PID:$latency > 100000
         COUNT      EVENT
-        1          bpf_get_current_pid_tgid() = 10457
-        21         bpf_get_current_pid_tgid() = 2780
+        1          $PID = 10457
+        21         $PID = 2780
 [01:08:49]
 r::__vfs_read():u32:$PID:$latency > 100000
         COUNT      EVENT
-        1          bpf_get_current_pid_tgid() = 10457
-        21         bpf_get_current_pid_tgid() = 2780
+        1          $PID = 10457
+        21         $PID = 2780
 ^C
 
-As you see, the $PID alias is expanded to the BPF function bpf_get_current_pid_tgid(),
-which returns the current process' pid. It looks like process 2780 performed
-21 slow reads.
+It looks like process 2780 performed 21 slow reads.
 
 Occasionally, entry parameter values are also interesting. For example, you
 might be curious how long it takes malloc() to allocate memory -- nanoseconds
@@ -231,6 +229,39 @@ and take 2-15 nanoseconds per byte. Other allocations are slower, and take
 64-127 nanoseconds per byte. And some allocations are slower still, and take
 multiple microseconds per byte.
 
+You could also group results by more than one field. For example, __kmalloc
+takes an additional flags parameter that describes how to allocate memory:
+
+# ./argdist.py -I 'linux/slab.h' -C 'p::__kmalloc(size_t size, gfp_t flags):gfp_t,size_t:flags,size'
+[03:42:29]
+p::__kmalloc(size_t size, gfp_t flags):gfp_t,size_t:flags,size
+        COUNT      EVENT
+        1          flags = 16, size = 152
+        2          flags = 131280, size = 8
+        7          flags = 131280, size = 16
+[03:42:30]
+p::__kmalloc(size_t size, gfp_t flags):gfp_t,size_t:flags,size
+        COUNT      EVENT
+        1          flags = 16, size = 152
+        6          flags = 131280, size = 8
+        19         flags = 131280, size = 16
+[03:42:31]
+p::__kmalloc(size_t size, gfp_t flags):gfp_t,size_t:flags,size
+        COUNT      EVENT
+        2          flags = 16, size = 152
+        10         flags = 131280, size = 8
+        31         flags = 131280, size = 16
+[03:42:32]
+p::__kmalloc(size_t size, gfp_t flags):gfp_t,size_t:flags,size
+        COUNT      EVENT
+        2          flags = 16, size = 152
+        14         flags = 131280, size = 8
+        43         flags = 131280, size = 16
+^C
+
+The flags value must be expanded by hand, but it's still helpful to eliminate
+certain kinds of allocations or visually group them together.
+
 Here's a final example that finds how many write() system calls are performed
 by each process on the system:
 
@@ -238,15 +269,15 @@ by each process on the system:
 [06:47:18]
 write by process
         COUNT      EVENT
-        3          bpf_get_current_pid_tgid() = 8889
-        7          bpf_get_current_pid_tgid() = 7615
-        7          bpf_get_current_pid_tgid() = 2480
+        3          $PID = 8889
+        7          $PID = 7615
+        7          $PID = 2480
 [06:47:19]
 write by process
         COUNT      EVENT
-        9          bpf_get_current_pid_tgid() = 8889
-        23         bpf_get_current_pid_tgid() = 7615
-        23         bpf_get_current_pid_tgid() = 2480
+        9          $PID = 8889
+        23         $PID = 7615
+        23         $PID = 2480
 
 
 USAGE message:
@@ -280,7 +311,7 @@ optional arguments:
                         additional header files to include in the BPF program
 
 Probe specifier syntax:
-        {p,r}:[library]:function(signature)[:type:expr[:filter]][#label]
+        {p,r}:[library]:function(signature)[:type[,type...]:expr[,expr...][:filter]][#label]
 Where:
         p,r        -- probe at function entry or at function exit
                       in exit probes: can use $retval, $entry(param), $latency
@@ -288,8 +319,8 @@ Where:
                       (leave empty for kernel functions)
         function   -- the function name to trace
         signature  -- the function's parameters, as in the C header
-        type       -- the type of the expression to collect
-        expr       -- the expression to collect
+        type       -- the type of the expression to collect (supports multiple)
+        expr       -- the expression to collect (supports multiple)
         filter     -- the filter that is applied to collected values
         label      -- the label for this probe in the resulting output
 
