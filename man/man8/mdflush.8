@@ -1,0 +1,57 @@
+.TH pidpersec 8  "2016-02-13" "USER COMMANDS"
+.SH NAME
+mdflush \- Trace md flush events. Uses Linux eBPF/bcc.
+.SH SYNOPSIS
+.B mdflush
+.SH DESCRIPTION
+This tool traces flush events by md, the Linux multiple device driver
+(software RAID). The timestamp and md device for the flush are printed.
+Knowing when these flushes happen can be useful for correlation with
+unexplained spikes in disk latency.
+
+This works by tracing the kernel md_flush_request() function using dynamic
+tracing, and will need updating to match any changes to this function.
+
+Note that the flushes themselves are likely to originate from higher in the
+I/O stack, such as from the file systems.
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH EXAMPLES
+.TP
+Trace md flush events:
+#
+.B mdflush
+.SH FIELDS
+.TP
+TIME
+Time of the flush event (HH:MM:SS).
+.TP
+PID
+The process ID that was on-CPU when the event was issued. This may identify
+the cause of the flush (eg, the "sync" command), but will often identify a
+kernel worker thread that was managing I/O.
+.TP
+COMM
+The command name for the PID.
+.TP
+DEVICE
+The md device name.
+.SH OVERHEAD
+Expected to be negligible.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Brendan Gregg
+.SH SEE ALSO
+biosnoop(8)
