@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 #
-# argdist.py   Trace a function and display a distribution of its
+# argdist   Trace a function and display a distribution of its
 #              parameter values as a histogram or frequency count.
 #
-# USAGE: argdist.py [-h] [-p PID] [-z STRING_SIZE] [-i INTERVAL]
+# USAGE: argdist [-h] [-p PID] [-z STRING_SIZE] [-i INTERVAL]
 #                   [-n COUNT] [-v] [-T TOP]
 #                   [-C specifier [specifier ...]]
 #                   [-H specifier [specifier ...]]
@@ -33,6 +33,23 @@ int PROBENAME(struct pt_regs *ctx SIGNATURE)
 """
         next_probe_index = 0
         aliases = { "$PID": "bpf_get_current_pid_tgid()" }
+        auto_includes = {
+                "linux/time.h"    : ["time"],
+                "linux/fs.h"      : ["fs", "file"],
+                "linux/blkdev.h"  : ["bio", "request"],
+                "linux/slab.h"    : ["alloc"]
+        }
+
+        @staticmethod
+        def generate_auto_includes(specifiers):
+                headers = ""
+                for header, keywords in Specifier.auto_includes.items():
+                        for keyword in keywords:
+                                for specifier in specifiers:                            
+                                        if keyword in specifier:
+                                                headers += "#include <%s>\n" \
+                                                           % header
+                return headers
 
         def _substitute_aliases(self, expr):
                 if expr is None:
@@ -443,52 +460,51 @@ Where:
 
 EXAMPLES:
 
-argdist.py -H 'p::__kmalloc(u64 size):u64:size'
+argdist -H 'p::__kmalloc(u64 size):u64:size'
         Print a histogram of allocation sizes passed to kmalloc
 
-argdist.py -p 1005 -C 'p:c:malloc(size_t size):size_t:size:size==16'
+argdist -p 1005 -C 'p:c:malloc(size_t size):size_t:size:size==16'
         Print a frequency count of how many times process 1005 called malloc
         with an allocation size of 16 bytes
 
-argdist.py -C 'r:c:gets():char*:(char*)$retval#snooped strings'
+argdist -C 'r:c:gets():char*:(char*)$retval#snooped strings'
         Snoop on all strings returned by gets()
 
-argdist.py -H 'r::__kmalloc(size_t size):u64:$latency/$entry(size)#ns per byte'
+argdist -H 'r::__kmalloc(size_t size):u64:$latency/$entry(size)#ns per byte'
         Print a histogram of nanoseconds per byte from kmalloc allocations
 
-argdist.py -I 'linux/slab.h' \\
-        -C 'p::__kmalloc(size_t size, gfp_t flags):size_t:size:flags&GFP_ATOMIC'
+argdist -C 'p::__kmalloc(size_t size, gfp_t flags):size_t:size:flags&GFP_ATOMIC'
         Print frequency count of kmalloc allocation sizes that have GFP_ATOMIC
 
-argdist.py -p 1005 -C 'p:c:write(int fd):int:fd' -T 5
+argdist -p 1005 -C 'p:c:write(int fd):int:fd' -T 5
         Print frequency counts of how many times writes were issued to a
         particular file descriptor number, in process 1005, but only show
         the top 5 busiest fds
 
-argdist.py -p 1005 -H 'r:c:read()'
+argdist -p 1005 -H 'r:c:read()'
         Print a histogram of results (sizes) returned by read() in process 1005
 
-argdist.py -C 'r::__vfs_read():u32:$PID:$latency > 100000'
+argdist -C 'r::__vfs_read():u32:$PID:$latency > 100000'
         Print frequency of reads by process where the latency was >0.1ms
 
-argdist.py -H 'r::__vfs_read(void *file, void *buf, size_t count):size_t:$entry(count):$latency > 1000000' 
+argdist -H 'r::__vfs_read(void *file, void *buf, size_t count):size_t:$entry(count):$latency > 1000000' 
         Print a histogram of read sizes that were longer than 1ms
 
-argdist.py -H \\
+argdist -H \\
         'p:c:write(int fd, const void *buf, size_t count):size_t:count:fd==1'
         Print a histogram of buffer sizes passed to write() across all
         processes, where the file descriptor was 1 (STDOUT)
 
-argdist.py -C 'p:c:fork()#fork calls'
+argdist -C 'p:c:fork()#fork calls'
         Count fork() calls in libc across all processes
         Can also use funccount.py, which is easier and more flexible 
 
-argdist.py -I 'linux/time.h' -H \\
+argdist  -H \\
         'p:c:sleep(u32 seconds):u32:seconds' \\
         'p:c:nanosleep(struct timespec *req):long:req->tv_nsec'
         Print histograms of sleep() and nanosleep() parameter values
 
-argdist.py -p 2780 -z 120 \\
+argdist -p 2780 -z 120 \\
         -C 'p:c:write(int fd, char* buf, size_t len):char*:buf:fd==1'
         Spy on writes to STDOUT performed by process 2780, up to a string size
         of 120 characters 
@@ -536,6 +552,7 @@ struct __string_t { char s[%d]; };
 """ % args.string_size
 for include in (args.include or []):
         bpf_source += "#include <%s>\n" % include
+bpf_source += Specifier.generate_auto_includes(map(lambda s: s.raw_spec, specifiers))
 for specifier in specifiers:
         bpf_source += specifier.generate_text()
 
