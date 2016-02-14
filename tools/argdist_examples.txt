@@ -10,7 +10,7 @@ various functions.
 For example, suppose you want to find what allocation sizes are common in
 your application:
 
-# ./argdist.py -p 2420 -C 'p:c:malloc(size_t size):size_t:size'
+# ./argdist -p 2420 -C 'p:c:malloc(size_t size):size_t:size'
 [01:42:29]
 p:c:malloc(size_t size):size_t:size
         COUNT      EVENT
@@ -43,7 +43,7 @@ probed and its value was 16, repeatedly.
 Now, suppose you wanted a histogram of buffer sizes passed to the write()
 function across the system:
 
-# ./argdist.py -H 'p:c:write(int fd, void *buf, size_t len):size_t:len'
+# ./argdist -H 'p:c:write(int fd, void *buf, size_t len):size_t:len'
 [01:45:22]
 p:c:write(int fd, void *buf, size_t len):size_t:len
      len                 : count     distribution
@@ -81,7 +81,7 @@ bytes, medium writes of 32-63 bytes, and larger writes of 64-127 bytes.
 But these are writes across the board -- what if you wanted to focus on writes
 to STDOUT?
 
-# ./argdist.py -H 'p:c:write(int fd, void *buf, size_t len):size_t:len:fd==1'
+# ./argdist -H 'p:c:write(int fd, void *buf, size_t len):size_t:len:fd==1'
 [01:47:17]
 p:c:write(int fd, void *buf, size_t len):size_t:len:fd==1
      len                 : count     distribution
@@ -120,7 +120,7 @@ You can also use argdist to trace kernel functions. For example, suppose you
 wanted a histogram of kernel allocation (kmalloc) sizes across the system,
 printed twice with 3 second intervals:
 
-# ./argdist.py -i 3 -n 2 -H 'p::__kmalloc(size_t size):size_t:size'
+# ./argdist -i 3 -n 2 -H 'p::__kmalloc(size_t size):size_t:size'
 [01:50:00]
 p::__kmalloc(size_t size):size_t:size
      size                : count     distribution
@@ -143,7 +143,7 @@ p::__kmalloc(size_t size):size_t:size
 Occasionally, numeric information isn't enough and you want to capture strings.
 What are the strings printed by puts() across the system?
 
-# ./argdist.py -i 10 -n 1 -C 'p:c:puts(char *str):char*:str'
+# ./argdist -i 10 -n 1 -C 'p:c:puts(char *str):char*:str'
 [01:53:54]
 p:c:puts(char *str):char*:str
         COUNT      EVENT
@@ -156,17 +156,17 @@ What about reads? You could trace gets() across the system and print the
 strings input by the user (note how "r" is used instead of "p" to attach a
 probe to the function's return):
 
-# ./argdist.py -i 10 -n 1 -C 'r:c:gets():char*:$retval:$retval!=0'
+# ./argdist -i 10 -n 1 -C 'r:c:gets():char*:(char*)$retval:$retval!=0'
 [02:12:23]
 r:c:gets():char*:$retval:$retval!=0
         COUNT      EVENT
-        1          (char*)ctx->ax = hi there
-        3          (char*)ctx->ax = sasha
-        8          (char*)ctx->ax = hello
+        1          (char*)$retval = hi there
+        3          (char*)$retval = sasha
+        8          (char*)$retval = hello
 
 Similarly, we could get a histogram of the error codes returned by read():
 
-# ./argdist.py -i 10 -c 1 -H 'r:c:read()'
+# ./argdist -i 10 -c 1 -H 'r:c:read()'
 [02:15:36]
 r:c:read()
      retval              : count     distribution
@@ -183,32 +183,109 @@ r:c:read()
       1024 -> 2047       : 0        |                                        |
       2048 -> 4095       : 2        |**                                      |
 
+In return probes, you can also trace the latency of the function (unless it is
+recursive) and the parameters it had on entry. For example, we can identify
+which processes are performing slow synchronous filesystem reads -- say,
+longer than 0.1ms (100,000ns):
+
+# ./argdist -C 'r::__vfs_read():u32:$PID:$latency > 100000'
+[01:08:48]
+r::__vfs_read():u32:$PID:$latency > 100000
+        COUNT      EVENT
+        1          $PID = 10457
+        21         $PID = 2780
+[01:08:49]
+r::__vfs_read():u32:$PID:$latency > 100000
+        COUNT      EVENT
+        1          $PID = 10457
+        21         $PID = 2780
+^C
+
+It looks like process 2780 performed 21 slow reads.
+
+Occasionally, entry parameter values are also interesting. For example, you
+might be curious how long it takes malloc() to allocate memory -- nanoseconds
+per byte allocated. Let's go:
+
+# ./argdist -H 'r:c:malloc(size_t size):u64:$latency/$entry(size);ns per byte' -n 1 -i 10
+[01:11:13]
+     ns per byte         : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 4        |*****************                       |
+         4 -> 7          : 3        |*************                           |
+         8 -> 15         : 2        |********                                |
+        16 -> 31         : 1        |****                                    |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 7        |*******************************         |
+       128 -> 255        : 1        |****                                    |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 1        |****                                    |
+      1024 -> 2047       : 1        |****                                    |
+      2048 -> 4095       : 9        |****************************************|
+      4096 -> 8191       : 1        |****                                    | 
+
+It looks like a tri-modal distribution. Some allocations are extremely cheap,
+and take 2-15 nanoseconds per byte. Other allocations are slower, and take
+64-127 nanoseconds per byte. And some allocations are slower still, and take
+multiple microseconds per byte.
+
+You could also group results by more than one field. For example, __kmalloc
+takes an additional flags parameter that describes how to allocate memory:
+
+# ./argdist -C 'p::__kmalloc(size_t size, gfp_t flags):gfp_t,size_t:flags,size'
+[03:42:29]
+p::__kmalloc(size_t size, gfp_t flags):gfp_t,size_t:flags,size
+        COUNT      EVENT
+        1          flags = 16, size = 152
+        2          flags = 131280, size = 8
+        7          flags = 131280, size = 16
+[03:42:30]
+p::__kmalloc(size_t size, gfp_t flags):gfp_t,size_t:flags,size
+        COUNT      EVENT
+        1          flags = 16, size = 152
+        6          flags = 131280, size = 8
+        19         flags = 131280, size = 16
+[03:42:31]
+p::__kmalloc(size_t size, gfp_t flags):gfp_t,size_t:flags,size
+        COUNT      EVENT
+        2          flags = 16, size = 152
+        10         flags = 131280, size = 8
+        31         flags = 131280, size = 16
+[03:42:32]
+p::__kmalloc(size_t size, gfp_t flags):gfp_t,size_t:flags,size
+        COUNT      EVENT
+        2          flags = 16, size = 152
+        14         flags = 131280, size = 8
+        43         flags = 131280, size = 16
+^C
+
+The flags value must be expanded by hand, but it's still helpful to eliminate
+certain kinds of allocations or visually group them together.
+
 Here's a final example that finds how many write() system calls are performed
 by each process on the system:
 
-# argdist.py -C 'p:c:write():int:$PID;write per process' -n 2
+# argdist -C 'p:c:write():int:$PID;write per process' -n 2
 [06:47:18]
 write by process
         COUNT      EVENT
-        3          bpf_get_current_pid_tgid() = 8889
-        7          bpf_get_current_pid_tgid() = 7615
-        7          bpf_get_current_pid_tgid() = 2480
+        3          $PID = 8889
+        7          $PID = 7615
+        7          $PID = 2480
 [06:47:19]
 write by process
         COUNT      EVENT
-        9          bpf_get_current_pid_tgid() = 8889
-        23         bpf_get_current_pid_tgid() = 7615
-        23         bpf_get_current_pid_tgid() = 2480
-
-As you see, the $PID alias is expanded to the BPF function bpf_get_current_pid_tgid(),
-which returns the current process' pid.
+        9          $PID = 8889
+        23         $PID = 7615
+        23         $PID = 2480
 
 
 USAGE message:
 
-usage: argdist.py [-h] [-p PID] [-z STRING_SIZE] [-i INTERVAL] [-n COUNT]
-                  [-H [HISTSPECIFIER [HISTSPECIFIER ...]]]
-                  [-C [COUNTSPECIFIER [COUNTSPECIFIER ...]]] [-v]
+# argdist -h
+usage: argdist [-h] [-p PID] [-z STRING_SIZE] [-i INTERVAL] [-n COUNT] [-v]
+                  [-T TOP] [-H [specifier [specifier ...]]]
+                  [-C [specifier [specifier ...]]] [-I [header [header ...]]]
 
 Trace a function and display a summary of its parameter values.
 
@@ -221,63 +298,79 @@ optional arguments:
                         output interval, in seconds
   -n COUNT, --number COUNT
                         number of outputs
-  -H [HISTSPECIFIER [HISTSPECIFIER ...]], --histogram [HISTSPECIFIER [HISTSPECIFIER ...]]
+  -v, --verbose         print resulting BPF program code before executing
+  -T TOP, --top TOP     number of top results to show (not applicable to
+                        histograms)
+  -H [specifier [specifier ...]], --histogram [specifier [specifier ...]]
                         probe specifier to capture histogram of (see examples
                         below)
-  -C [COUNTSPECIFIER [COUNTSPECIFIER ...]], --count [COUNTSPECIFIER [COUNTSPECIFIER ...]]
+  -C [specifier [specifier ...]], --count [specifier [specifier ...]]
                         probe specifier to capture count of (see examples
                         below)
-  -v, --verbose         print resulting BPF program code before executing
+  -I [header [header ...]], --include [header [header ...]]
+                        additional header files to include in the BPF program
 
 Probe specifier syntax:
-        {p,r}:[library]:function(signature)[:type:expr[:filter]][;label]
+        {p,r}:[library]:function(signature)[:type[,type...]:expr[,expr...][:filter]][#label]
 Where:
         p,r        -- probe at function entry or at function exit
-                      in exit probes, only $retval is accessible
+                      in exit probes: can use $retval, $entry(param), $latency
         library    -- the library that contains the function
                       (leave empty for kernel functions)
         function   -- the function name to trace
         signature  -- the function's parameters, as in the C header
-        type       -- the type of the expression to collect
-        expr       -- the expression to collect
+        type       -- the type of the expression to collect (supports multiple)
+        expr       -- the expression to collect (supports multiple)
         filter     -- the filter that is applied to collected values
         label      -- the label for this probe in the resulting output
 
 EXAMPLES:
 
-argdist.py -H 'p::__kmalloc(u64 size):u64:size'
+argdist -H 'p::__kmalloc(u64 size):u64:size'
         Print a histogram of allocation sizes passed to kmalloc
 
-argdist.py -p 1005 -C 'p:c:malloc(size_t size):size_t:size:size==16'
+argdist -p 1005 -C 'p:c:malloc(size_t size):size_t:size:size==16'
         Print a frequency count of how many times process 1005 called malloc
         with an allocation size of 16 bytes
 
-argdist.py -C 'r:c:gets():char*:$retval;snooped strings'
+argdist -C 'r:c:gets():char*:$retval#snooped strings'
         Snoop on all strings returned by gets()
 
-argdist.py -p 1005 -C 'p:c:write(int fd):int:fd'
-        Print frequency counts of how many times writes were issued to a
-        particular file descriptor number, in process 1005
+argdist -H 'r::__kmalloc(size_t size):u64:$latency/$entry(size)#ns per byte'
+        Print a histogram of nanoseconds per byte from kmalloc allocations
 
-argdist.py -p 1005 -H 'r:c:read()'
+argdist -C 'p::__kmalloc(size_t size, gfp_t flags):size_t:size:flags&GFP_ATOMIC'
+        Print frequency count of kmalloc allocation sizes that have GFP_ATOMIC
+
+argdist -p 1005 -C 'p:c:write(int fd):int:fd' -T 5
+        Print frequency counts of how many times writes were issued to a
+        particular file descriptor number, in process 1005, but only show
+        the top 5 busiest fds
+
+argdist -p 1005 -H 'r:c:read()'
         Print a histogram of error codes returned by read() in process 1005
 
-argdist.py -H \
+argdist -C 'r::__vfs_read():u32:$PID:$latency > 100000'
+        Print frequency of reads by process where the latency was >0.1ms
+
+argdist -H 'r::__vfs_read(void *file, void *buf, size_t count):size_t:$entry(count):$latency > 1000000' 
+        Print a histogram of read sizes that were longer than 1ms
+
+argdist -H \
         'p:c:write(int fd, const void *buf, size_t count):size_t:count:fd==1'
         Print a histogram of buffer sizes passed to write() across all
         processes, where the file descriptor was 1 (STDOUT)
 
-argdist.py -C 'p:c:fork();fork calls'
+argdist -C 'p:c:fork()#fork calls'
         Count fork() calls in libc across all processes
-        Can also use funccount.py, which is easier and more flexible
+        Can also use funccount.py, which is easier and more flexible 
 
-argdist.py \
-        -H 'p:c:sleep(u32 seconds):u32:seconds' \
-        -H 'p:c:nanosleep(struct timespec { time_t tv_sec; long tv_nsec; } *req):long:req->tv_nsec'
+argdist  -H \
+        'p:c:sleep(u32 seconds):u32:seconds' \
+        'p:c:nanosleep(struct timespec *req):long:req->tv_nsec'
         Print histograms of sleep() and nanosleep() parameter values
 
-argdist.py -p 2780 -z 120 \
+argdist -p 2780 -z 120 \
         -C 'p:c:write(int fd, char* buf, size_t len):char*:buf:fd==1'
         Spy on writes to STDOUT performed by process 2780, up to a string size
-        of 120 characters
-
+        of 120 characters 
