@@ -1,0 +1,85 @@
+.TH tcpaccept 8  "2016-02-14" "USER COMMANDS"
+.SH NAME
+tcpaccept \- Trace TCP retransmits and TLPs. Uses Linux eBPF/bcc.
+.SH SYNOPSIS
+.B tcpaccept [\-h] [\-l]
+.SH DESCRIPTION
+This traces TCP retransmits, showing address, port, and TCP state information,
+and sometimes the PID (although usually not, since retransmits are usually
+sent by the kernel on timeouts). To keep overhead very low, only
+the TCP retransmit functions are traced. This does not trace every packet
+(like tcpdump(8) or a packet sniffer).
+
+This uses dynamic tracing of the kernel tcp_retransmit_skb() and
+tcp_send_loss_probe() functions, and will need to be updated to
+match kernel changes to these functions.
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH OPTIONS
+.TP
+\-h
+Print usage message.
+.TP
+\-l
+Include tail loss probe attempts (in some cases the kernel may not
+complete the TLP send).
+.SH EXAMPLES
+.TP
+Trace TCP retransmits:
+#
+.B tcpretrans
+.TP
+Trace TCP retransmits and TLP attempts:
+#
+.B tcpconnect \-l
+.SH FIELDS
+.TP
+TIME
+Time of the retransmit.
+.TP
+PID
+Process ID that was on-CPU. This is less useful than it might sound, as it
+may usually be 0, for the kernel, for timer-based retransmits.
+.TP
+IP
+IP address family (4 or 6).
+.TP
+LADDR
+Local IP address. IPv4 as a dotted quad, IPv6 shows "..." then the last 4
+bytes (check for newer versions of this tool for the full address).
+.TP
+LPORT
+Local port.
+.TP
+T>
+Type of event: R> == retransmit, L> == tail loss probe.
+.TP
+RADDR
+Remote IP address. IPv4 as a dotted quad, IPv6 shows "..." then the last 4
+bytes (check for newer versions of this tool for the full address).
+.TP
+RPORT
+Remote port.
+.TP
+STATE
+TCP session state.
+.SH OVERHEAD
+Should be negligible: TCP retransmit events should be low (<1000/s), and the
+low overhead this tool adds to each event should make the cost negligible.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Brendan Gregg
+.SH SEE ALSO
+tcpconnect(8), tcpaccept(8)
