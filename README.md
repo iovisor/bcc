@@ -106,6 +106,7 @@ Tools:
 - tools/[wakeuptime](tools/wakeuptime.py): Summarize sleep to wakeup time by waker kernel stack. [Examples](tools/wakeuptime_example.txt).
 - tools/[xfsdist](tools/xfsdist.py): Summarize XFS operation latency. [Examples](tools/xfsdist_example.txt).
 - tools/[xfsslower](tools/xfsslower.py): Trace slow XFS operations. [Examples](tools/xfsslower_example.txt).
+- tools/[zfsslower](tools/zfsslower.py): Trace slow ZFS operations. [Examples](tools/zfsslower_example.txt).
 
 ### Networking
 
