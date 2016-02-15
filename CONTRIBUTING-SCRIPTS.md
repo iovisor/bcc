@@ -15,7 +15,7 @@ More detail for each below.
 
 ## Examples
 
-These are grouped into subdirectories (networking, tracing). Your example can either be a Python program with embedded C (eg, tracing/strlen_count.py), or separate Python and C files (eg, tracing/bitehist.*}).
+These are grouped into subdirectories (networking, tracing). Your example can either be a Python program with embedded C (eg, tracing/strlen_count.py), or separate Python and C files (eg, tracing/bitehist.*).
 
 As said earlier: keep it short, neat, and documented (code comments).
 
@@ -24,7 +24,7 @@ As said earlier: keep it short, neat, and documented (code comments).
 A checklist for bcc tool development:
 
 1. **Research the topic landscape**. Learn the existing tools and metrics (incl. from /proc). Determine what real world problems exist and need solving. We have too many tools and metrics as it is, we don't need more "I guess that's useful" tools, we need more "ah-hah! I couldn't do this before!" tools. Consider asking other developers about your idea. Many of us can be found in IRC, in the #iovisor channel on irc.oftc.net. There's also the mailing list (see the README.md), and github for issues.
-1. **Create a known workload for testing**. This might involving writing a 10 line C program, using a micro-benchmark, or just improvising at the shell. If you don't know how to create a workload, learn! Figuring this out will provide invaluable context and details that you may have otherwise overlooked. Sometimes it's easy, and I'm able to just use dd(1) from /dev/urandom or a disk device to /dev/null. It lets me set the I/O size, count, and provides throughput statistics for cross-checking checking my tool output. But other times I need a micro-benchmark, or some C.
+1. **Create a known workload for testing**. This might involving writing a 10 line C program, using a micro-benchmark, or just improvising at the shell. If you don't know how to create a workload, learn! Figuring this out will provide invaluable context and details that you may have otherwise overlooked. Sometimes it's easy, and I'm able to just use dd(1) from /dev/urandom or a disk device to /dev/null. It lets me set the I/O size, count, and provides throughput statistics for cross-checking my tool output. But other times I need a micro-benchmark, or some C.
 1. **Write the tool to solve the problem and no more**. Unix philosophy: do one thing and do it well. netstat doesn't have an option to dump packets, tcpdump-style. They are two different tools.
 1. **Check your tool correctly measures your known workload**. If possible, run a prime number of events (eg, 23) and check that the numbers match. Try other workload variations.
 1. **Use other observability tools to perform a cross-check or sanity check**. Eg, imagine you write a PCI bus tool that shows current throughput is 28 Gbytes/sec. How could you sanity test that? Well, what PCI devices are there? Disks and network cards? Measure their throughput (iostat, nicstat, sar), and check if is in the ballpark of 28 Gbytes/sec (which would include PCI frame overheads). Ideally, your numbers match.
