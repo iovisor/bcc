@@ -1,0 +1,183 @@
+Demonstrations of zfsdist, the Linux eBPF/bcc version.
+
+
+zfsdist traces ZFS reads, writes, opens, and fsyncs, and summarizes their
+latency as a power-of-2 histogram. It has been written to work on ZFS on Linux
+(http://zfsonlinux.org). For example:
+
+# ./zfsdist 
+Tracing ZFS operation latency... Hit Ctrl-C to end.
+^C
+
+operation = 'read'
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 4479     |****************************************|
+         8 -> 15         : 1028     |*********                               |
+        16 -> 31         : 14       |                                        |
+        32 -> 63         : 1        |                                        |
+        64 -> 127        : 2        |                                        |
+       128 -> 255        : 6        |                                        |
+       256 -> 511        : 1        |                                        |
+       512 -> 1023       : 1256     |***********                             |
+      1024 -> 2047       : 9        |                                        |
+      2048 -> 4095       : 1        |                                        |
+      4096 -> 8191       : 2        |                                        |
+
+operation = 'write'
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 75       |****************************************|
+       256 -> 511        : 11       |*****                                   |
+       512 -> 1023       : 0        |                                        |
+      1024 -> 2047       : 0        |                                        |
+      2048 -> 4095       : 0        |                                        |
+      4096 -> 8191       : 0        |                                        |
+      8192 -> 16383      : 0        |                                        |
+     16384 -> 32767      : 0        |                                        |
+     32768 -> 65535      : 0        |                                        |
+     65536 -> 131071     : 13       |******                                  |
+    131072 -> 262143     : 1        |                                        |
+
+operation = 'open'
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 2        |****************************************|
+
+This output shows a bimodal distribution for read latency, with a faster
+mode of around 5 thousand reads that took between 4 and 15 microseconds, and a
+slower mode of 1256 reads that took between 512 and 1023 microseconds. It's
+likely that the faster mode was a hit from the in-memory file system cache,
+and the slower mode is a read from a storage device (disk).
+
+The write latency is also bimodal, with a faster mode between 128 and 511 us,
+and the slower mode between 65 and 131 ms.
+
+This "latency" is measured from when the operation was issued from the VFS
+interface to the file system (via the ZFS POSIX layer), to when it completed.
+This spans everything: block device I/O (disk I/O), file system CPU cycles,
+file system locks, run queue latency, etc. This is a better measure of the
+latency suffered by applications reading from the file system than measuring
+this down at the block device interface.
+
+Note that this only traces the common file system operations previously
+listed: other file system operations (eg, inode operations including
+getattr()) are not traced.
+
+
+An optional interval and a count can be provided, as well as -m to show the
+distributions in milliseconds. For example:
+
+# ./zfsdist 1 5
+Tracing ZFS operation latency... Hit Ctrl-C to end.
+
+06:55:41:
+
+operation = 'read'
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 3976     |****************************************|
+         8 -> 15         : 1181     |***********                             |
+        16 -> 31         : 18       |                                        |
+        32 -> 63         : 4        |                                        |
+        64 -> 127        : 17       |                                        |
+       128 -> 255        : 16       |                                        |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 1275     |************                            |
+      1024 -> 2047       : 36       |                                        |
+      2048 -> 4095       : 3        |                                        |
+      4096 -> 8191       : 0        |                                        |
+      8192 -> 16383      : 1        |                                        |
+     16384 -> 32767      : 1        |                                        |
+
+06:55:42:
+
+operation = 'read'
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 12751    |****************************************|
+         8 -> 15         : 1190     |***                                     |
+        16 -> 31         : 38       |                                        |
+        32 -> 63         : 7        |                                        |
+        64 -> 127        : 85       |                                        |
+       128 -> 255        : 47       |                                        |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 1010     |***                                     |
+      1024 -> 2047       : 49       |                                        |
+      2048 -> 4095       : 12       |                                        |
+
+06:55:43:
+
+operation = 'read'
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 80925    |****************************************|
+         8 -> 15         : 1645     |                                        |
+        16 -> 31         : 251      |                                        |
+        32 -> 63         : 24       |                                        |
+        64 -> 127        : 16       |                                        |
+       128 -> 255        : 12       |                                        |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 80       |                                        |
+      1024 -> 2047       : 1        |                                        |
+
+06:55:44:
+
+operation = 'read'
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 81207    |****************************************|
+         8 -> 15         : 2075     |*                                       |
+        16 -> 31         : 2005     |                                        |
+        32 -> 63         : 177      |                                        |
+        64 -> 127        : 3        |                                        |
+
+06:55:45:
+
+operation = 'read'
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 74364    |****************************************|
+         8 -> 15         : 865      |                                        |
+        16 -> 31         : 4960     |**                                      |
+        32 -> 63         : 625      |                                        |
+        64 -> 127        : 2        |                                        |
+
+This workload was randomly reading from a file that became cached. The slower
+mode can be seen to disappear by the final summaries.
+
+
+USAGE message:
+
+# ./zfsdist -h
+usage: zfsdist [-h] [-T] [-m] [-p PID] [interval] [count]
+
+Summarize ZFS operation latency
+
+positional arguments:
+  interval            output interval, in seconds
+  count               number of outputs
+
+optional arguments:
+  -h, --help          show this help message and exit
+  -T, --notimestamp   don't include timestamp on interval output
+  -m, --milliseconds  output in milliseconds
+  -p PID, --pid PID   trace this PID only
+
+examples:
+    ./zfsdist            # show operation latency as a histogram
+    ./zfsdist -p 181     # trace PID 181 only
+    ./zfsdist 1 10       # print 1 second summaries, 10 times
+    ./zfsdist -m 5       # 5s summaries, milliseconds
