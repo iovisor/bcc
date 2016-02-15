@@ -8,23 +8,14 @@
 #
 # All connection attempts are traced, even if they ultimately fail.
 #
-# This uses dynamic tracing of kernel functions, and will need to be updated
-# to match kernel changes.
-#
-# IPv4 addresses are printed as dotted quads. For IPv6 addresses, the last four
-# bytes are printed after "..."; check for future versions with better IPv6
-# support.
-#
 # Copyright (c) 2015 Brendan Gregg.
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
 # 25-Sep-2015   Brendan Gregg   Created this.
-# 14-Feb-2016      "      "     Switch to bpf_perf_output.
 
 from __future__ import print_function
 from bcc import BPF
 import argparse
-import ctypes as ct
 
 # arguments
 examples = """examples:
@@ -50,31 +41,6 @@ bpf_text = """
 #include <bcc/proto.h>
 
 BPF_HASH(currsock, u32, struct sock *);
-
-// separate data structs for ipv4 and ipv6
-struct ipv4_data_t {
-    // XXX: switch some to u32's when supported
-    u64 ts_us;
-    u64 pid;
-    u64 ip;
-    u64 saddr;
-    u64 daddr;
-    u64 dport;
-    char task[TASK_COMM_LEN];
-};
-BPF_PERF_OUTPUT(ipv4_events);
-
-struct ipv6_data_t {
-    // XXX: update to transfer full ipv6 addrs
-    u64 ts_us;
-    u64 pid;
-    u64 ip;
-    u64 saddr;
-    u64 daddr;
-    u64 dport;
-    char task[TASK_COMM_LEN];
-};
-BPF_PERF_OUTPUT(ipv6_events);
 
 int trace_connect_entry(struct pt_regs *ctx, struct sock *sk)
 {
@@ -107,34 +73,27 @@ static int trace_connect_return(struct pt_regs *ctx, short ipver)
 
     // pull in details
     struct sock *skp = *skpp;
+    u32 saddr = 0, daddr = 0;
     u16 dport = 0;
     bpf_probe_read(&dport, sizeof(dport), &skp->__sk_common.skc_dport);
-
     if (ipver == 4) {
-        struct ipv4_data_t data4 = {.pid = pid, .ip = ipver};
-        data4.ts_us = bpf_ktime_get_ns() / 1000;
-        bpf_probe_read(&data4.saddr, sizeof(u32),
+        bpf_probe_read(&saddr, sizeof(saddr),
             &skp->__sk_common.skc_rcv_saddr);
-        bpf_probe_read(&data4.daddr, sizeof(u32),
+        bpf_probe_read(&daddr, sizeof(daddr),
             &skp->__sk_common.skc_daddr);
-        data4.dport = ntohs(dport);
-        bpf_get_current_comm(&data4.task, sizeof(data4.task));
-        ipv4_events.perf_submit(ctx, &data4, sizeof(data4));
 
+        // output
+        bpf_trace_printk("4 %x %x %d\\n", saddr, daddr, ntohs(dport));
     } else /* 6 */ {
-        struct ipv6_data_t data6 = {.pid = pid, .ip = ipver};
-        data6.ts_us = bpf_ktime_get_ns() / 1000;
         // just grab the last 4 bytes for now
-        u32 saddr = 0, daddr = 0;
         bpf_probe_read(&saddr, sizeof(saddr),
             &skp->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32[3]);
         bpf_probe_read(&daddr, sizeof(daddr),
             &skp->__sk_common.skc_v6_daddr.in6_u.u6_addr32[3]);
-        data6.saddr = bpf_ntohl(saddr);
-        data6.daddr = bpf_ntohl(daddr);
-        data6.dport = ntohs(dport);
-        bpf_get_current_comm(&data6.task, sizeof(data6.task));
-        ipv6_events.perf_submit(ctx, &data6, sizeof(data6));
+
+        // output and flip byte order of addresses
+        bpf_trace_printk("6 %x %x %d\\n", bpf_ntohl(saddr),
+            bpf_ntohl(daddr), ntohs(dport));
     }
 
     currsock.delete(&pid);
@@ -162,48 +121,6 @@ else:
 if debug:
     print(bpf_text)
 
-# event data
-TASK_COMM_LEN = 16      # linux/sched.h
-class Data_ipv4(ct.Structure):
-    _fields_ = [
-        ("ts_us", ct.c_ulonglong),
-        ("pid", ct.c_ulonglong),
-        ("ip", ct.c_ulonglong),
-        ("saddr", ct.c_ulonglong),
-        ("daddr", ct.c_ulonglong),
-        ("dport", ct.c_ulonglong),
-        ("task", ct.c_char * TASK_COMM_LEN)
-    ]
-class Data_ipv6(ct.Structure):
-    _fields_ = [
-        ("ts_us", ct.c_ulonglong),
-        ("pid", ct.c_ulonglong),
-        ("ip", ct.c_ulonglong),
-        ("saddr", ct.c_ulonglong),
-        ("daddr", ct.c_ulonglong),
-        ("dport", ct.c_ulonglong),
-        ("task", ct.c_char * TASK_COMM_LEN)
-    ]
-
-# process event
-def print_ipv4_event(cpu, data, size):
-    event = ct.cast(data, ct.POINTER(Data_ipv4)).contents
-    if args.timestamp:
-        if start_ts == 0:
-            start_ts = event.ts_us
-        print("%-9.3f" % ((event.ts_us - start_ts) / 100000), end="")
-    print("%-6d %-12.12s %-2d %-16s %-16s %-4d" % (event.pid, event.task,
-        event.ip, inet_ntoa(event.saddr), inet_ntoa(event.daddr),
-        event.dport))
-def print_ipv6_event(cpu, data, size):
-    event = ct.cast(data, ct.POINTER(Data_ipv6)).contents
-    if args.timestamp:
-        if start_ts == 0:
-            start_ts = event.ts_us
-        print("%-9.3f" % ((event.ts_us - start_ts) / 100000), end="")
-    print("%-6d %-12.12s %-2d ...%-13x ...%-13x %-4d" % (event.pid,
-        event.task, event.ip, event.saddr, event.daddr, event.dport))
-
 # initialize BPF
 b = BPF(text=bpf_text)
 b.attach_kprobe(event="tcp_v4_connect", fn_name="trace_connect_entry")
@@ -228,8 +145,16 @@ def inet_ntoa(addr):
         addr = addr >> 8
     return dq
 
-# read events
-b["ipv4_events"].open_perf_buffer(print_ipv4_event)
-b["ipv6_events"].open_perf_buffer(print_ipv6_event)
+# format output
 while 1:
-    b.kprobe_poll()
+    (task, pid, cpu, flags, ts, msg) = b.trace_fields()
+    (ip_s, saddr_hs, daddr_hs, dport_s) = msg.split(" ")
+
+    if args.timestamp:
+        if start_ts == 0:
+            start_ts = ts
+        print("%-9.3f" % (ts - start_ts), end="")
+    print("%-6d %-12.12s %-2s %-16s %-16s %-4s" % (pid, task, ip_s,
+        inet_ntoa(int(saddr_hs, 16)) if ip_s == "4" else "..." + saddr_hs,
+        inet_ntoa(int(daddr_hs, 16)) if ip_s == "4" else "..." + daddr_hs,
+        dport_s))
