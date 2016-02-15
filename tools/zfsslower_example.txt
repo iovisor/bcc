@@ -1,0 +1,157 @@
+Demonstrations of zfsslower, the Linux eBPF/bcc version.
+
+
+zfsslower shows ZFS reads, writes, opens, and fsyncs, slower than a threshold.
+It has been written to work on ZFS on Linux (http://zfsonlinux.org). For
+example:
+
+# ./zfsslower 
+Tracing ZFS operations slower than 10 ms
+TIME     COMM           PID    T BYTES   OFF_KB   LAT(ms) FILENAME
+06:31:28 dd             25570  W 131072  38784     303.92 data1
+06:31:34 dd             25686  W 131072  38784     388.28 data1
+06:31:35 dd             25686  W 131072  78720     519.66 data1
+06:31:35 dd             25686  W 131072  116992    405.94 data1
+06:31:35 dd             25686  W 131072  153600    433.52 data1
+06:31:36 dd             25686  W 131072  188672    314.37 data1
+06:31:36 dd             25686  W 131072  222336    372.33 data1
+06:31:36 dd             25686  W 131072  254592    309.59 data1
+06:31:37 dd             25686  W 131072  285440    304.52 data1
+06:31:37 dd             25686  W 131072  315008    236.45 data1
+06:31:37 dd             25686  W 131072  343424    193.54 data1
+06:31:38 dd             25686  W 131072  370560    286.07 data1
+06:31:38 dd             25686  W 131072  396672    251.92 data1
+[...]
+
+This shows writes to a "data1" file, each taking well over the 10 ms threshold.
+the slowest, on the 3rd line of output, reached 519.66 ms for a 128 Kbyte
+write by the "dd" command.
+
+This "latency" is measured from when the operation was issued from the VFS
+interface to the file system (via the ZFS POSIX layer), to when it completed.
+This spans everything: block device I/O (disk I/O), file system CPU cycles,
+file system locks, run queue latency, etc. This is a better measure of the
+latency suffered by applications reading from the file system than measuring
+this down at the block device interface.
+
+Note that this only traces the common file system operations previously
+listed: other file system operations (eg, inode operations including
+getattr()) are not traced.
+
+
+A threshold of 0 will trace all operations. Warning: the output will be
+verbose, as it will include all file system cache hits.
+
+# ./zfsslower 0
+Tracing ZFS operations
+TIME     COMM           PID    T BYTES   OFF_KB   LAT(ms) FILENAME
+06:36:07 dd             32242  O 0       0           0.01 data1
+06:36:07 dd             32242  W 131072  0           0.25 data1
+06:36:07 dd             32242  W 131072  128         0.03 data1
+06:36:07 dd             32242  W 131072  256         0.04 data1
+06:36:07 dd             32242  W 131072  384         0.04 data1
+06:36:07 dd             32242  W 131072  512         0.04 data1
+06:36:07 dd             32242  W 131072  640         0.03 data1
+06:36:07 dd             32242  W 131072  768         0.03 data1
+06:36:07 dd             32242  W 131072  896         0.04 data1
+06:36:07 dd             32242  W 131072  1024        0.28 data1
+06:36:07 dd             32242  W 131072  1152        0.04 data1
+06:36:07 dd             32242  W 131072  1280        0.03 data1
+[...]
+06:36:07 dd             32242  W 131072  13824       0.04 data1
+06:36:07 dd             32242  W 131072  13952       0.04 data1
+06:36:07 dd             32242  W 131072  14080       0.04 data1
+06:36:07 dd             32242  W 131072  14208     398.92 data1
+06:36:07 dd             32242  W 131072  14336       0.04 data1
+06:36:07 dd             32242  W 131072  14464       0.04 data1
+06:36:07 dd             32242  W 131072  15104       0.03 data1
+[...]
+
+The output now includes the open operation for this file ("O"), and then the
+writes. Most of the writes are very fast, with only an occasional outlier that
+is in the hundreds of milliseconds.
+
+Fortunately this is not a real world environment: I setup a zpool on top of a
+XFS file system for testing purposes. More debugging using other tools will
+explain these outliers: possibly XFS flushing.
+
+
+Here's a random read workload, and showing operations slower than 1 ms:
+
+# ./zfsslower 1
+Tracing ZFS operations slower than 1 ms
+TIME     COMM           PID    T BYTES   OFF_KB   LAT(ms) FILENAME
+06:47:30 randread.pl    15431  R 8192    97840       1.03 data1
+06:47:30 randread.pl    15431  R 8192    416744      1.12 data1
+06:47:31 randread.pl    15431  R 8192    228856      1.96 data1
+06:47:31 randread.pl    15431  R 8192    452248      1.02 data1
+06:47:31 randread.pl    15431  R 8192    315288      5.90 data1
+06:47:31 randread.pl    15431  R 8192    752696      1.20 data1
+06:47:31 randread.pl    15431  R 8192    481832      1.39 data1
+06:47:31 randread.pl    15431  R 8192    673752      1.39 data1
+06:47:31 randread.pl    15431  R 8192    691736      1.01 data1
+06:47:31 randread.pl    15431  R 8192    694776      1.78 data1
+06:47:31 randread.pl    15431  R 8192    403328      3.75 data1
+06:47:31 randread.pl    15431  R 8192    567688      1.08 data1
+06:47:31 randread.pl    15431  R 8192    694280      1.31 data1
+06:47:31 randread.pl    15431  R 8192    669280      1.06 data1
+06:47:31 randread.pl    15431  R 8192    426608      1.56 data1
+06:47:31 randread.pl    15431  R 8192    42512       1.01 data1
+06:47:31 randread.pl    15431  R 8192    22944       1.33 data1
+06:47:31 randread.pl    15431  R 8192    427432      1.48 data1
+06:47:31 randread.pl    15431  R 8192    261320      1.28 data1
+06:47:31 randread.pl    15431  R 8192    132248      1.23 data1
+06:47:31 randread.pl    15431  R 8192    96936       1.04 data1
+06:47:31 randread.pl    15431  R 8192    482800      2.63 data1
+[...]
+
+
+A -j option will print just the fields (parsable output, csv):
+
+# ./zfsslower -j 1
+ENDTIME_us,TASK,PID,TYPE,BYTES,OFFSET_b,LATENCY_us,FILE
+252305490911,randread.pl,17922,R,8192,163446784,1156,data1
+252305493852,randread.pl,17922,R,8192,321437696,1129,data1
+252305498839,randread.pl,17922,R,8192,475152384,1154,data1
+252305505515,randread.pl,17922,R,8192,49094656,1082,data1
+252305506774,randread.pl,17922,R,8192,470401024,1245,data1
+252305509265,randread.pl,17922,R,8192,553246720,2412,data1
+252305512365,randread.pl,17922,R,8192,20963328,1093,data1
+252305513755,randread.pl,17922,R,8192,304111616,1350,data1
+252305583330,randread.pl,17922,R,8192,166174720,1154,data1
+252305593913,randread.pl,17922,R,8192,175079424,1241,data1
+252305602833,randread.pl,17922,R,8192,305340416,3307,data1
+252305608663,randread.pl,17922,R,8192,655958016,2704,data1
+252305611212,randread.pl,17922,R,8192,40951808,1033,data1
+252305614609,randread.pl,17922,R,8192,318922752,2687,data1
+252305623800,randread.pl,17922,R,8192,246734848,2983,data1
+252305711125,randread.pl,17922,R,8192,581795840,1091,data1
+252305728694,randread.pl,17922,R,8192,710483968,1034,data1
+252305762046,randread.pl,17922,R,8192,329367552,1405,data1
+252305798215,randread.pl,17922,R,8192,44482560,1030,data1
+252305806748,randread.pl,17922,R,8192,660602880,1069,data1
+252305826360,randread.pl,17922,R,8192,616144896,2327,data1
+[...]
+
+
+USAGE message:
+
+# ./zfsslower -h
+usage: zfsslower [-h] [-j] [-p PID] [min_ms]
+
+Trace common ZFS file operations slower than a threshold
+
+positional arguments:
+  min_ms             minimum I/O duration to trace, in ms (default 10)
+
+optional arguments:
+  -h, --help         show this help message and exit
+  -j, --csv          just print fields: comma-separated values
+  -p PID, --pid PID  trace this PID only
+
+examples:
+    ./zfsslower             # trace operations slower than 10 ms (default)
+    ./zfsslower 1           # trace operations slower than 1 ms
+    ./zfsslower -j 1        # ... 1 ms, parsable output (csv)
+    ./zfsslower 0           # trace all operations (warning: verbose)
+    ./zfsslower -p 185      # trace PID 185 only
