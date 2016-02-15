@@ -18,7 +18,23 @@ from ctypes import c_int
 from time import sleep, strftime
 
 # load BPF program
-b = BPF(src_file="pidpersec.c")
+b = BPF(text="""
+#include <uapi/linux/ptrace.h>
+
+enum stat_types {
+    S_COUNT = 1,
+    S_MAXSTAT
+};
+
+BPF_TABLE("array", int, u64, stats, S_MAXSTAT + 1);
+
+void stats_increment(int key) {
+    u64 *leaf = stats.lookup(&key);
+    if (leaf) (*leaf)++;
+}
+
+void do_count(struct pt_regs *ctx) { stats_increment(S_COUNT); }
+""")
 b.attach_kprobe(event="sched_fork", fn_name="do_count")
 
 # stat indexes
