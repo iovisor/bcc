@@ -17,13 +17,77 @@ import ctypes as ct
 
 from .libbcc import lib, _RAW_CB_TYPE
 
+BPF_MAP_TYPE_HASH = 1
+BPF_MAP_TYPE_ARRAY = 2
+BPF_MAP_TYPE_PROG_ARRAY = 3
+BPF_MAP_TYPE_PERF_EVENT_ARRAY = 4
+
 stars_max = 40
 
-class BPFTable(MutableMapping):
-    HASH = 1
-    ARRAY = 2
-    PROG_ARRAY = 3
-    PERF_EVENT_ARRAY = 4
+# helper functions, consider moving these to a utils module
+def _stars(val, val_max, width):
+    i = 0
+    text = ""
+    while (1):
+        if (i > (width * val / val_max) - 1) or (i > width - 1):
+            break
+        text += "*"
+        i += 1
+    if val > val_max:
+        text = text[:-1] + "+"
+    return text
+
+def _print_log2_hist(vals, val_type):
+    global stars_max
+    log2_dist_max = 64
+    idx_max = -1
+    val_max = 0
+
+    for i, v in enumerate(vals):
+        if v > 0: idx_max = i
+        if v > val_max: val_max = v
+
+    if idx_max <= 32:
+        header = "     %-19s : count     distribution"
+        body = "%10d -> %-10d : %-8d |%-*s|"
+        stars = stars_max
+    else:
+        header = "               %-29s : count     distribution"
+        body = "%20d -> %-20d : %-8d |%-*s|"
+        stars = int(stars_max / 2)
+
+    if idx_max > 0:
+        print(header % val_type);
+    for i in range(1, idx_max + 1):
+        low = (1 << i) >> 1
+        high = (1 << i) - 1
+        if (low == high):
+            low -= 1
+        val = vals[i]
+        print(body % (low, high, val, stars,
+                      _stars(val, val_max, stars)))
+
+
+def Table(bpf, map_id, map_fd, keytype, leaftype):
+    """Table(bpf, map_id, map_fd, keytype, leaftype)
+
+    Create a python object out of a reference to a bpf table handle"""
+
+    ttype = lib.bpf_table_type_id(bpf.module, map_id)
+    t = None
+    if ttype == BPF_MAP_TYPE_HASH:
+        t = HashTable(bpf, map_id, map_fd, keytype, leaftype)
+    elif ttype == BPF_MAP_TYPE_ARRAY:
+        t = Array(bpf, map_id, map_fd, keytype, leaftype)
+    elif ttype == BPF_MAP_TYPE_PROG_ARRAY:
+        t = ProgArray(bpf, map_id, map_fd, keytype, leaftype)
+    elif ttype == BPF_MAP_TYPE_PERF_EVENT_ARRAY:
+        t = PerfEventArray(bpf, map_id, map_fd, keytype, leaftype)
+    if t == None:
+        raise Exception("Unknown table type %d" % ttype)
+    return t
+
+class TableBase(MutableMapping):
 
     def __init__(self, bpf, map_id, map_fd, keytype, leaftype):
         self.bpf = bpf
@@ -70,35 +134,6 @@ class BPFTable(MutableMapping):
             raise Exception("Could not scanf leaf")
         return leaf
 
-    def open_perf_buffer(self, callback):
-        """open_perf_buffers(callback)
-
-        Opens a set of per-cpu ring buffer to receive custom perf event
-        data from the bpf program. The callback will be invoked for each
-        event submitted from the kernel, up to millions per second.
-        """
-
-        for i in range(0, multiprocessing.cpu_count()):
-            self._open_perf_buffer(i, callback)
-
-    def _open_perf_buffer(self, cpu, callback):
-        fn = _RAW_CB_TYPE(lambda _, data, size: callback(cpu, data, size))
-        reader = lib.bpf_open_perf_buffer(fn, None, -1, cpu)
-        if not reader:
-            raise Exception("Could not open perf buffer")
-        fd = lib.perf_reader_fd(reader)
-        self[self.Key(cpu)] = self.Leaf(fd)
-        open_kprobes[(id(self), cpu)] = reader
-        # keep a refcnt
-        self._cbs[cpu] = fn
-
-    def close_perf_buffer(self, key):
-        reader = open_kprobes.get((id(self), key))
-        if reader:
-            lib.perf_reader_free(reader)
-            del(open_kprobes[(id(self), key)])
-        del self._cbs[key]
-
     def __getitem__(self, key):
         key_p = ct.pointer(key)
         leaf = self.Leaf()
@@ -125,25 +160,7 @@ class BPFTable(MutableMapping):
         return i
 
     def __delitem__(self, key):
-        key_p = ct.pointer(key)
-        ttype = lib.bpf_table_type_id(self.bpf.module, self.map_id)
-        # Deleting from array type maps does not have an effect, so
-        # zero out the entry instead.
-        if ttype in (self.ARRAY, self.PROG_ARRAY, self.PERF_EVENT_ARRAY):
-            leaf = self.Leaf()
-            leaf_p = ct.pointer(leaf)
-            res = lib.bpf_update_elem(self.map_fd,
-                    ct.cast(key_p, ct.c_void_p),
-                    ct.cast(leaf_p, ct.c_void_p), 0)
-            if res < 0:
-                raise Exception("Could not clear item")
-            if ttype == self.PERF_EVENT_ARRAY:
-                self.close_perf_buffer(key)
-        else:
-            res = lib.bpf_delete_elem(self.map_fd,
-                    ct.cast(key_p, ct.c_void_p))
-            if res < 0:
-                raise KeyError
+        raise Exception("__delitem__ not implemented, abstract base class")
 
     # override the MutableMapping's implementation of these since they
     # don't handle KeyError nicely
@@ -174,85 +191,9 @@ class BPFTable(MutableMapping):
         for k in self.keys():
             self.__delitem__(k)
 
-    @staticmethod
-    def _stars(val, val_max, width):
-        i = 0
-        text = ""
-        while (1):
-            if (i > (width * val / val_max) - 1) or (i > width - 1):
-                break
-            text += "*"
-            i += 1
-        if val > val_max:
-            text = text[:-1] + "+"
-        return text
-
-    def print_log2_hist(self, val_type="value", section_header="Bucket ptr",
-            section_print_fn=None):
-        """print_log2_hist(val_type="value", section_header="Bucket ptr",
-                           section_print_fn=None)
-
-        Prints a table as a log2 histogram. The table must be stored as
-        log2. The val_type argument is optional, and is a column header.
-        If the histogram has a secondary key, multiple tables will print
-        and section_header can be used as a header description for each.
-        If section_print_fn is not None, it will be passed the bucket value
-        to format into a string as it sees fit.
-        """
-        if isinstance(self.Key(), ct.Structure):
-            tmp = {}
-            f1 = self.Key._fields_[0][0]
-            f2 = self.Key._fields_[1][0]
-            for k, v in self.items():
-                bucket = getattr(k, f1)
-                vals = tmp[bucket] = tmp.get(bucket, [0] * 65)
-                slot = getattr(k, f2)
-                vals[slot] = v.value
-            for bucket, vals in tmp.items():
-                if section_print_fn:
-                    print("\n%s = %s" % (section_header,
-                        section_print_fn(bucket)))
-                else:
-                    print("\n%s = %r" % (section_header, bucket))
-                self._print_log2_hist(vals, val_type, 0)
-        else:
-            vals = [0] * 65
-            for k, v in self.items():
-                vals[k.value] = v.value
-            self._print_log2_hist(vals, val_type, 0)
-
-    def _print_log2_hist(self, vals, val_type, val_max):
-        global stars_max
-        log2_dist_max = 64
-        idx_max = -1
-
-        for i, v in enumerate(vals):
-            if v > 0: idx_max = i
-            if v > val_max: val_max = v
-
-        if idx_max <= 32:
-            header = "     %-19s : count     distribution"
-            body = "%10d -> %-10d : %-8d |%-*s|"
-            stars = stars_max
-        else:
-            header = "               %-29s : count     distribution"
-            body = "%20d -> %-20d : %-8d |%-*s|"
-            stars = int(stars_max / 2)
-
-        if idx_max > 0:
-            print(header % val_type);
-        for i in range(1, idx_max + 1):
-            low = (1 << i) >> 1
-            high = (1 << i) - 1
-            if (low == high):
-                low -= 1
-            val = vals[i]
-            print(body % (low, high, val, stars,
-                          self._stars(val, val_max, stars)))
-
 
     def __iter__(self):
-        return BPFTable.Iter(self, self.Key)
+        return TableBase.Iter(self, self.Key)
 
     def iter(self): return self.__iter__()
     def keys(self): return self.__iter__()
@@ -289,3 +230,111 @@ class BPFTable(MutableMapping):
         if res < 0:
             raise StopIteration()
         return next_key
+
+    def print_log2_hist(self, val_type="value", section_header="Bucket ptr",
+            section_print_fn=None):
+        """print_log2_hist(val_type="value", section_header="Bucket ptr",
+                           section_print_fn=None)
+
+        Prints a table as a log2 histogram. The table must be stored as
+        log2. The val_type argument is optional, and is a column header.
+        If the histogram has a secondary key, multiple tables will print
+        and section_header can be used as a header description for each.
+        If section_print_fn is not None, it will be passed the bucket value
+        to format into a string as it sees fit.
+        """
+        if isinstance(self.Key(), ct.Structure):
+            tmp = {}
+            f1 = self.Key._fields_[0][0]
+            f2 = self.Key._fields_[1][0]
+            for k, v in self.items():
+                bucket = getattr(k, f1)
+                vals = tmp[bucket] = tmp.get(bucket, [0] * 65)
+                slot = getattr(k, f2)
+                vals[slot] = v.value
+            for bucket, vals in tmp.items():
+                if section_print_fn:
+                    print("\n%s = %s" % (section_header,
+                        section_print_fn(bucket)))
+                else:
+                    print("\n%s = %r" % (section_header, bucket))
+                _print_log2_hist(vals, val_type)
+        else:
+            vals = [0] * 65
+            for k, v in self.items():
+                vals[k.value] = v.value
+            _print_log2_hist(vals, val_type)
+
+
+class HashTable(TableBase):
+    def __init__(self, *args, **kwargs):
+        super(HashTable, self).__init__(*args, **kwargs)
+
+    def __delitem__(self, key):
+        key_p = ct.pointer(key)
+        res = lib.bpf_delete_elem(self.map_fd, ct.cast(key_p, ct.c_void_p))
+        if res < 0:
+            raise KeyError
+
+class ArrayBase(TableBase):
+    def __init__(self, *args, **kwargs):
+        super(ArrayBase, self).__init__(*args, **kwargs)
+
+    def __delitem__(self, key):
+        key_p = ct.pointer(key)
+
+        # Deleting from array type maps does not have an effect, so
+        # zero out the entry instead.
+        leaf = self.Leaf()
+        leaf_p = ct.pointer(leaf)
+        res = lib.bpf_update_elem(self.map_fd, ct.cast(key_p, ct.c_void_p),
+                ct.cast(leaf_p, ct.c_void_p), 0)
+        if res < 0:
+            raise Exception("Could not clear item")
+
+class Array(ArrayBase):
+    def __init__(self, *args, **kwargs):
+        super(Array, self).__init__(*args, **kwargs)
+
+
+
+class ProgArray(ArrayBase):
+    def __init__(self, *args, **kwargs):
+        super(ProgArray, self).__init__(*args, **kwargs)
+
+class PerfEventArray(ArrayBase):
+    def __init__(self, *args, **kwargs):
+        super(PerfEventArray, self).__init__(*args, **kwargs)
+
+    def __delitem__(self, key):
+        super(PerfEventArray, self).__init__(key)
+        self.close_perf_buffer(key)
+
+    def open_perf_buffer(self, callback):
+        """open_perf_buffers(callback)
+
+        Opens a set of per-cpu ring buffer to receive custom perf event
+        data from the bpf program. The callback will be invoked for each
+        event submitted from the kernel, up to millions per second.
+        """
+
+        for i in range(0, multiprocessing.cpu_count()):
+            self._open_perf_buffer(i, callback)
+
+    def _open_perf_buffer(self, cpu, callback):
+        fn = _RAW_CB_TYPE(lambda _, data, size: callback(cpu, data, size))
+        reader = lib.bpf_open_perf_buffer(fn, None, -1, cpu)
+        if not reader:
+            raise Exception("Could not open perf buffer")
+        fd = lib.perf_reader_fd(reader)
+        self[self.Key(cpu)] = self.Leaf(fd)
+        open_kprobes[(id(self), cpu)] = reader
+        # keep a refcnt
+        self._cbs[cpu] = fn
+
+    def close_perf_buffer(self, key):
+        reader = open_kprobes.get((id(self), key))
+        if reader:
+            lib.perf_reader_free(reader)
+            del(open_kprobes[(id(self), key)])
+        del self._cbs[key]

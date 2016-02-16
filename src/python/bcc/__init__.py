@@ -26,7 +26,7 @@ import sys
 basestring = (unicode if sys.version_info[0] < 3 else str)
 
 from .libbcc import lib, _CB_TYPE
-from .table import BPFTable
+from .table import Table
 
 open_kprobes = {}
 open_uprobes = {}
@@ -64,7 +64,9 @@ class BPF(object):
     _libsearch_cache = {}
     _lib_load_address_cache = {}
     _lib_symbol_cache = {}
-    Table = BPFTable
+
+    # defined for compatibility reasons, to be removed
+    Table = Table
 
     class Function(object):
         def __init__(self, bpf, name, fd):
@@ -234,7 +236,7 @@ class BPF(object):
             if not leaf_desc:
                 raise Exception("Failed to load BPF Table %s leaf desc" % name)
             leaftype = BPF._decode_table_type(json.loads(leaf_desc.decode()))
-        return BPF.Table(self, map_id, map_fd, keytype, leaftype)
+        return Table(self, map_id, map_fd, keytype, leaftype)
 
     def __getitem__(self, key):
         if key not in self.tables:
