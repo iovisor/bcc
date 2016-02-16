@@ -522,6 +522,15 @@ int BPFModule::table_type(size_t id) const {
   return (*tables_)[id].type;
 }
 
+size_t BPFModule::table_max_entries(const string &name) const {
+  return table_max_entries(table_id(name));
+}
+
+size_t BPFModule::table_max_entries(size_t id) const {
+  if (id >= tables_->size()) return 0;
+  return (*tables_)[id].max_entries;
+}
+
 const char * BPFModule::table_name(size_t id) const {
   if (id >= tables_->size()) return nullptr;
   return (*tables_)[id].name.c_str();

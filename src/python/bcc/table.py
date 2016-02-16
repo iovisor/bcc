@@ -37,6 +37,7 @@ def _stars(val, val_max, width):
         text = text[:-1] + "+"
     return text
 
+
 def _print_log2_hist(vals, val_type):
     global stars_max
     log2_dist_max = 64
@@ -86,6 +87,7 @@ def Table(bpf, map_id, map_fd, keytype, leaftype):
     if t == None:
         raise Exception("Unknown table type %d" % ttype)
     return t
+
 
 class TableBase(MutableMapping):
 
@@ -154,14 +156,6 @@ class TableBase(MutableMapping):
         if res < 0:
             raise Exception("Could not update table")
 
-    def __len__(self):
-        i = 0
-        for k in self: i += 1
-        return i
-
-    def __delitem__(self, key):
-        raise Exception("__delitem__ not implemented, abstract base class")
-
     # override the MutableMapping's implementation of these since they
     # don't handle KeyError nicely
     def itervalues(self):
@@ -190,7 +184,6 @@ class TableBase(MutableMapping):
         # default clear uses popitem, which can race with the bpf prog
         for k in self.keys():
             self.__delitem__(k)
-
 
     def __iter__(self):
         return TableBase.Iter(self, self.Key)
@@ -270,17 +263,48 @@ class HashTable(TableBase):
     def __init__(self, *args, **kwargs):
         super(HashTable, self).__init__(*args, **kwargs)
 
+    def __len__(self):
+        i = 0
+        for k in self: i += 1
+        return i
+
     def __delitem__(self, key):
         key_p = ct.pointer(key)
         res = lib.bpf_delete_elem(self.map_fd, ct.cast(key_p, ct.c_void_p))
         if res < 0:
             raise KeyError
 
+
 class ArrayBase(TableBase):
     def __init__(self, *args, **kwargs):
         super(ArrayBase, self).__init__(*args, **kwargs)
+        self.max_entries = int(lib.bpf_table_max_entries_id(self.bpf.module,
+                self.map_id))
+
+    def _normalize_key(self, key):
+        if isinstance(key, int):
+            if key < 0:
+                key = len(self) + key
+            key = self.Key(key)
+        if not isinstance(key, ct._SimpleCData):
+            raise IndexError("Array index must be an integer type")
+        if key.value >= len(self):
+            raise IndexError("Array index out of range")
+        return key
+
+    def __len__(self):
+        return self.max_entries
+
+    def __getitem__(self, key):
+        key = self._normalize_key(key)
+        return super(ArrayBase, self).__getitem__(key)
+
+    def __setitem__(self, key, leaf):
+        key = self._normalize_key(key)
+        super(ArrayBase, self).__setitem__(key, leaf)
 
     def __delitem__(self, key):
+        key = self._normalize_key(key)
         key_p = ct.pointer(key)
 
         # Deleting from array type maps does not have an effect, so
@@ -292,15 +316,41 @@ class ArrayBase(TableBase):
         if res < 0:
             raise Exception("Could not clear item")
 
+    def __iter__(self):
+        return ArrayBase.Iter(self, self.Key)
+
+    class Iter(object):
+        def __init__(self, table, keytype):
+            self.Key = keytype
+            self.table = table
+            self.i = -1
+
+        def __iter__(self):
+            return self
+        def __next__(self):
+            return self.next()
+        def next(self):
+            self.i += 1
+            if self.i == len(self.table):
+                raise StopIteration()
+            return self.Key(self.i)
+
 class Array(ArrayBase):
     def __init__(self, *args, **kwargs):
         super(Array, self).__init__(*args, **kwargs)
 
 
-
 class ProgArray(ArrayBase):
     def __init__(self, *args, **kwargs):
         super(ProgArray, self).__init__(*args, **kwargs)
+
+    def __setitem__(self, key, leaf):
+        if isinstance(leaf, int):
+            leaf = self.Leaf(leaf)
+        if isinstance(leaf, self.bpf.Function):
+            leaf = self.Leaf(leaf.fd)
+        super(ProgArray, self).__setitem__(key, leaf)
+
 
 class PerfEventArray(ArrayBase):
     def __init__(self, *args, **kwargs):

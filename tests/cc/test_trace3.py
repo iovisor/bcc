@@ -35,6 +35,7 @@ class TestBlkRequest(TestCase):
         for key, leaf in self.latency.items():
             print("latency %u:" % key.value, "count %u" % leaf.value)
         sys.stdout.flush()
+        self.assertEqual(len(list(self.latency.keys())), len(self.latency))
 
 if __name__ == "__main__":
     main()
