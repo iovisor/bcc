@@ -1,0 +1,146 @@
+Demonstrations of btrfsslower, the Linux eBPF/bcc version.
+
+
+btrfsslower shows btrfs reads, writes, opens, and fsyncs, slower than a
+threshold. For example:
+
+# ./btrfsslower
+Tracing btrfs operations slower than 10 ms
+TIME     COMM           PID    T BYTES   OFF_KB   LAT(ms) FILENAME
+01:22:03 randread.pl    13602  R 8192    391384     10.40 data1
+01:22:03 randread.pl    13602  R 8192    92632      10.41 data1
+01:22:06 randread.pl    13602  R 8192    199800     17.33 data1
+01:22:06 randread.pl    13602  R 8192    415160     17.21 data1
+01:22:07 randread.pl    13602  R 8192    729984     11.93 data1
+01:22:09 randread.pl    13602  R 8192    342784     11.90 data1
+[...]
+
+This shows several reads from a "randread.pl" program, each 8 Kbytes in size,
+and from a "data1" file. These all had over 10 ms latency.
+
+This "latency" is measured from when the operation was issued from the VFS
+interface to the file system, to when it completed. This spans everything:
+block device I/O (disk I/O), file system CPU cycles, file system locks, run
+queue latency, etc. This is a better measure of the latency suffered by
+applications reading from the file system than measuring this down at the
+block device interface.
+
+Note that this only traces the common file system operations previously
+listed: other file system operations (eg, inode operations including
+getattr()) are not traced.
+
+
+The threshold can be provided as an argument. Eg, I/O slower than 1 ms:
+
+# ./btrfsslower 1
+Tracing btrfs operations slower than 1 ms
+TIME     COMM           PID    T BYTES   OFF_KB   LAT(ms) FILENAME
+03:26:54 randread.pl    30578  R 8192    214864      1.87 data1
+03:26:54 randread.pl    30578  R 8192    267600      1.48 data1
+03:26:54 randread.pl    30578  R 8192    704200      1.30 data1
+03:26:54 randread.pl    30578  R 8192    492352      3.09 data1
+03:26:55 randread.pl    30578  R 8192    319448      1.34 data1
+03:26:55 randread.pl    30578  R 8192    676032      1.88 data1
+03:26:55 randread.pl    30578  R 8192    646712      2.24 data1
+03:26:55 randread.pl    30578  R 8192    124376      1.02 data1
+03:26:55 randread.pl    30578  R 8192    223064      2.64 data1
+03:26:55 randread.pl    30578  R 8192    521280      1.55 data1
+03:26:55 randread.pl    30578  R 8192    272992      2.48 data1
+03:26:55 randread.pl    30578  R 8192    450112      2.67 data1
+03:26:55 randread.pl    30578  R 8192    361808      1.78 data1
+03:26:55 randread.pl    30578  R 8192    41088       1.46 data1
+03:26:55 randread.pl    30578  R 8192    756576      1.67 data1
+03:26:55 randread.pl    30578  R 8192    711776      2.74 data1
+03:26:55 randread.pl    30578  R 8192    129472      1.34 data1
+03:26:55 randread.pl    30578  R 8192    526928      1.82 data1
+03:26:56 randread.pl    30578  R 8192    312768      1.44 data1
+03:26:56 randread.pl    30578  R 8192    34720       1.14 data1
+03:26:56 randread.pl    30578  R 8192    258376      1.13 data1
+03:26:56 randread.pl    30578  R 8192    308456      1.44 data1
+03:26:56 randread.pl    30578  R 8192    759656      1.27 data1
+03:26:56 randread.pl    30578  R 8192    387424      3.24 data1
+03:26:56 randread.pl    30578  R 8192    168864      3.38 data1
+03:26:56 randread.pl    30578  R 8192    699296      1.38 data1
+03:26:56 randread.pl    30578  R 8192    405688      2.37 data1
+03:26:56 randread.pl    30578  R 8192    559064      1.18 data1
+03:26:56 randread.pl    30578  R 8192    264808      1.13 data1
+03:26:56 randread.pl    30578  R 8192    369240      2.20 data1
+[...]
+
+There's now much more output (this spans less than 3 seconds, the previous output
+spanned 6 seconds), as the lower threshold is catching more I/O.
+
+
+A threshold of 0 will trace all operations. Warning: the output will be
+verbose, as it will include all file system cache hits.
+
+# ./btrfsslower 0
+Tracing btrfs operations
+TIME     COMM           PID    T BYTES   OFF_KB   LAT(ms) FILENAME
+03:28:17 bash           32597  O 0       0           0.00 date.txt
+03:28:17 date           32597  W 29      0           0.02 date.txt
+03:28:23 cksum          32743  O 0       0           0.00 date.txt
+03:28:23 cksum          32743  R 29      0           0.01 date.txt
+03:28:23 cksum          32743  R 0       0           0.00 date.txt
+
+While tracing, the following commands were run in another window:
+
+# date > date.txt
+# cksum date.txt 
+
+The output of btrfsslower now includes open operations ("O"), and writes ("W").
+The first read from cksum(1) returned 29 bytes, and the second returned 0:
+causing cksum(1) to stop reading.
+
+
+A -j option will print just the fields (parsable output, csv):
+
+# ./btrfsslower -j 1
+ENDTIME_us,TASK,PID,TYPE,BYTES,OFFSET_b,LATENCY_us,FILE
+8930665366,randread.pl,2717,R,8192,230391808,4312,data1
+8930670746,randread.pl,2717,R,8192,347832320,1296,data1
+8930675995,randread.pl,2717,R,8192,409812992,4207,data1
+8930680213,randread.pl,2717,R,8192,498204672,3104,data1
+8930685970,randread.pl,2717,R,8192,553164800,1843,data1
+8930687568,randread.pl,2717,R,8192,339492864,1475,data1
+8930694108,randread.pl,2717,R,8192,500711424,6276,data1
+8930697139,randread.pl,2717,R,8192,485801984,2180,data1
+8930705755,randread.pl,2717,R,8192,376922112,7535,data1
+8930711340,randread.pl,2717,R,8192,380084224,3314,data1
+8930740964,randread.pl,2717,R,8192,226091008,24762,data1
+8930743169,randread.pl,2717,R,8192,361570304,1809,data1
+8930748789,randread.pl,2717,R,8192,346931200,1530,data1
+8930763514,randread.pl,2717,R,8192,59719680,13938,data1
+8930764870,randread.pl,2717,R,8192,406511616,1313,data1
+8930774327,randread.pl,2717,R,8192,661430272,7361,data1
+8930780360,randread.pl,2717,R,8192,406904832,2220,data1
+8930785736,randread.pl,2717,R,8192,523419648,2005,data1
+8930794560,randread.pl,2717,R,8192,342974464,8388,data1
+[...]
+
+This may be useful for visualizing with another tool, for example, for
+producing a scatter plot of ENDTIME vs LATENCY, to look for time-based
+patterns.
+
+
+USAGE message:
+
+# ./btrfsslower -h
+usage: btrfsslower [-h] [-j] [-p PID] [min_ms]
+
+Trace common btrfs file operations slower than a threshold
+
+positional arguments:
+  min_ms             minimum I/O duration to trace, in ms (default 10)
+
+optional arguments:
+  -h, --help         show this help message and exit
+  -j, --csv          just print fields: comma-separated values
+  -p PID, --pid PID  trace this PID only
+
+examples:
+    ./btrfsslower             # trace operations slower than 10 ms (default)
+    ./btrfsslower 1           # trace operations slower than 1 ms
+    ./btrfsslower -j 1        # ... 1 ms, parsable output (csv)
+    ./btrfsslower 0           # trace all operations (warning: verbose)
+    ./btrfsslower -p 185      # trace PID 185 only

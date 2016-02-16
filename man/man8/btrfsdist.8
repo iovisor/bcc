@@ -1,0 +1,82 @@
+.TH btrfsdist 8  "2016-02-15" "USER COMMANDS"
+.SH NAME
+btrfsdist \- Summarize btrfs operation latency. Uses Linux eBPF/bcc.
+.SH SYNOPSIS
+.B btrfsdist [\-h] [\-T] [\-N] [\-d] [interval] [count]
+.SH DESCRIPTION
+This tool summarizes time (latency) spent in common btrfs file operations:
+reads, writes, opens, and syncs, and presents it as a power-of-2 histogram. It
+uses an in-kernel eBPF map to store the histogram for efficiency.
+
+Since this works by tracing the btrfs_file_operations interface functions, it
+will need updating to match any changes to these functions.
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH OPTIONS
+.TP
+\-h
+Print usage message.
+.TP
+\-T
+Don't include timestamps on interval output.
+.TP
+\-m
+Output in milliseconds.
+.TP
+\-p PID
+Trace this PID only.
+.SH EXAMPLES
+.TP
+Trace btrfs operation time, and print a summary on Ctrl-C:
+#
+.B btrfsdist
+.TP
+Trace PID 181 only:
+#
+.B btrfsdist -p 181
+.TP
+Print 1 second summaries, 10 times:
+#
+.B btrfsdist 1 10
+.TP
+1 second summaries, printed in milliseconds
+#
+.B btrfsdist \-m 1
+.SH FIELDS
+.TP
+msecs
+Range of milliseconds for this bucket.
+.TP
+usecs
+Range of microseconds for this bucket.
+.TP
+count
+Number of operations in this time range.
+.TP
+distribution
+ASCII representation of the distribution (the count column).
+.SH OVERHEAD
+This adds low-overhead instrumentation to btrfs writes and fsyncs, as well
+as all system reads and opens (due to the current implementation of the
+btrfs_file_operations interface). Particularly, all reads and writes from
+the file system cache will incur extra overhead while tracing. Such reads and
+writes can be very frequent (depending on the workload; eg, 1M/sec), at which
+point the overhead of this tool may become noticeable.
+Measure and quantify before use.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Brendan Gregg
+.SH SEE ALSO
+btrfsslower(8)
