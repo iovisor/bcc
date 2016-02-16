@@ -1,0 +1,179 @@
+Demonstrations of btrfsdist, the Linux eBPF/bcc version.
+
+
+btrfsdist traces btrfs reads, writes, opens, and fsyncs, and summarizes their
+latency as a power-of-2 histogram. For example:
+
+# ./btrfsdist 
+Tracing btrfs operation latency... Hit Ctrl-C to end.
+^C
+
+operation = 'read'
+     usecs               : count     distribution
+         0 -> 1          : 15       |                                        |
+         2 -> 3          : 1308     |*******                                 |
+         4 -> 7          : 198      |*                                       |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 11       |                                        |
+        32 -> 63         : 361      |*                                       |
+        64 -> 127        : 55       |                                        |
+       128 -> 255        : 104      |                                        |
+       256 -> 511        : 7312     |****************************************|
+       512 -> 1023       : 387      |**                                      |
+      1024 -> 2047       : 10       |                                        |
+      2048 -> 4095       : 4        |                                        |
+
+operation = 'write'
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 4        |****************************************|
+
+operation = 'open'
+     usecs               : count     distribution
+         0 -> 1          : 1        |**********                              |
+         2 -> 3          : 4        |****************************************|
+
+This output shows a bi-modal distribution for read latency, with a faster
+mode of 1,308 reads that took between 2 and 3 microseconds, and a slower
+mode of over 7,312 reads that took between 256 and 511 microseconds. It's
+likely that the faster mode was a hit from the in-memory file system cache,
+and the slower mode is a read from a storage device (disk).
+
+This "latency" is measured from when the operation was issued from the VFS
+interface to the file system, to when it completed. This spans everything:
+block device I/O (disk I/O), file system CPU cycles, file system locks, run
+queue latency, etc. This is a better measure of the latency suffered by
+applications reading from the file system than measuring this down at the
+block device interface.
+
+Note that this only traces the common file system operations previously
+listed: other file system operations (eg, inode operations including
+getattr()) are not traced.
+
+
+An optional interval and a count can be provided, as well as -m to show the
+distributions in milliseconds. For example, two second summaries, five times:
+
+# ./btrfsdist 2 5
+Tracing btrfs operation latency... Hit Ctrl-C to end.
+
+03:40:49:
+
+operation = 'read'
+     usecs               : count     distribution
+         0 -> 1          : 15       |                                        |
+         2 -> 3          : 833      |********                                |
+         4 -> 7          : 127      |*                                       |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 8        |                                        |
+        32 -> 63         : 907      |********                                |
+        64 -> 127        : 91       |                                        |
+       128 -> 255        : 246      |**                                      |
+       256 -> 511        : 4164     |****************************************|
+       512 -> 1023       : 193      |*                                       |
+      1024 -> 2047       : 4        |                                        |
+      2048 -> 4095       : 6        |                                        |
+      4096 -> 8191       : 2        |                                        |
+
+03:40:51:
+
+operation = 'read'
+     usecs               : count     distribution
+         0 -> 1          : 25       |                                        |
+         2 -> 3          : 1491     |***************                         |
+         4 -> 7          : 218      |**                                      |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 16       |                                        |
+        32 -> 63         : 1527     |***************                         |
+        64 -> 127        : 319      |***                                     |
+       128 -> 255        : 429      |****                                    |
+       256 -> 511        : 3841     |****************************************|
+       512 -> 1023       : 232      |**                                      |
+      1024 -> 2047       : 3        |                                        |
+      2048 -> 4095       : 6        |                                        |
+      4096 -> 8191       : 1        |                                        |
+      8192 -> 16383      : 1        |                                        |
+
+03:40:53:
+
+operation = 'read'
+     usecs               : count     distribution
+         0 -> 1          : 27       |                                        |
+         2 -> 3          : 2999     |*********************************       |
+         4 -> 7          : 407      |****                                    |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 46       |                                        |
+        32 -> 63         : 3538     |****************************************|
+        64 -> 127        : 595      |******                                  |
+       128 -> 255        : 621      |*******                                 |
+       256 -> 511        : 3532     |*************************************** |
+       512 -> 1023       : 212      |**                                      |
+      1024 -> 2047       : 1        |                                        |
+      2048 -> 4095       : 0        |                                        |
+      4096 -> 8191       : 0        |                                        |
+      8192 -> 16383      : 0        |                                        |
+     16384 -> 32767      : 1        |                                        |
+
+03:40:55:
+
+operation = 'read'
+     usecs               : count     distribution
+         0 -> 1          : 221      |                                        |
+         2 -> 3          : 12580    |****************************************|
+         4 -> 7          : 1366     |****                                    |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 289      |                                        |
+        32 -> 63         : 10782    |**********************************      |
+        64 -> 127        : 1232     |***                                     |
+       128 -> 255        : 807      |**                                      |
+       256 -> 511        : 2299     |*******                                 |
+       512 -> 1023       : 135      |                                        |
+      1024 -> 2047       : 5        |                                        |
+      2048 -> 4095       : 2        |                                        |
+
+03:40:57:
+
+operation = 'read'
+     usecs               : count     distribution
+         0 -> 1          : 73951    |*************************               |
+         2 -> 3          : 117639   |****************************************|
+         4 -> 7          : 7943     |**                                      |
+         8 -> 15         : 1841     |                                        |
+        16 -> 31         : 1143     |                                        |
+        32 -> 63         : 5006     |*                                       |
+        64 -> 127        : 483      |                                        |
+       128 -> 255        : 242      |                                        |
+       256 -> 511        : 253      |                                        |
+       512 -> 1023       : 84       |                                        |
+      1024 -> 2047       : 23       |                                        |
+
+This shows a read workload that begins bimodal, and eventually the second
+mode disappears. The reason for this is that the workload cached during
+tracing. Note that the rate also increased, with over 200k reads for the
+final two second sample.
+
+
+USAGE message:
+
+# ./btrfsdist -h
+usage: btrfsdist [-h] [-T] [-m] [-p PID] [interval] [count]
+
+Summarize btrfs operation latency
+
+positional arguments:
+  interval            output interval, in seconds
+  count               number of outputs
+
+optional arguments:
+  -h, --help          show this help message and exit
+  -T, --notimestamp   don't include timestamp on interval output
+  -m, --milliseconds  output in milliseconds
+  -p PID, --pid PID   trace this PID only
+
+examples:
+    ./btrfsdist            # show operation latency as a histogram
+    ./btrfsdist -p 181     # trace PID 181 only
+    ./btrfsdist 1 10       # print 1 second summaries, 10 times
+    ./btrfsdist -m 5       # 5s summaries, milliseconds
