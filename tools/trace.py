@@ -102,6 +102,7 @@ class Probe(object):
         def _parse_action(self, action):
                 self.values = []
                 self.types = []
+                self.python_format = ""
                 if len(action) == 0:
                         return
 
