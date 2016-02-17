@@ -25,7 +25,7 @@ class Probe(object):
         def __str__(self):
                 return "%s:%s`%s FLT=%s ACT=%s" % (self.probe_type,
                         self.library, self.function, self.filter,
-                        self.action)
+                        "TODO")
 
         def _bail(self, error):
                 raise ValueError("error parsing probe %s: %s" %
@@ -83,8 +83,18 @@ class Probe(object):
         def _parse_filter(self, filt):
                 self.filter = self._replace_args(filt.strip("(").strip(")"))
 
+        def _parse_types(self, fmt):
+                self.types = []
+                for match in re.finditer(r'[^%]%(s|u|d|llu|lld|hu|hd|c)', fmt):
+                        self.types.append(match.group(1))
+
         def _parse_action(self, action):
-                self.action = self._replace_args(action)
+                parts = action.split(',')
+                self._parse_types(parts[0])
+                self.values = []
+                for part in parts[1:]:
+                        part = self._replace_args(part)
+                        self.values.append(part)
 
         def _replace_args(self, expr):
                 expr = expr.replace("retval", "ctx->ax")
@@ -95,7 +105,31 @@ class Probe(object):
                 # TODO More args? Don't replace inside format string?
                 return expr
 
+        def _generate_python_data_decl(self):
+                pass    # TODO class %s_Data(ct.Structure): ...
+
+        def _generate_data_decl(self):
+                # TODO Read the format specifiers from the format string
+                # The BPF program will populate values into the struct
+                # according to the format string, and the Python program will
+                # construct the final display string.
+                self.events_name = "%s_events" % self.probe_name
+                self.struct_name = "%s_data_t" % self.probe_name
+                data_fields = ""   # TODO
+                text = """
+struct %s
+{
+        u64 timestamp_ns;
+        u64 pid;        /* TODO Replace with u32 when it works */
+        %s
+};
+
+BPF_PERF_OUTPUT(%s);
+"""
+                return text % (self.struct_name, data_fields, self.events_name)
+
         def generate_program(self, pid):
+                data_decl = self._generate_data_decl()
                 self.pid = pid
                 if len(self.library) == 0 and pid is not None:
                         pid_filter = """
@@ -105,24 +139,39 @@ class Probe(object):
                 else:
                         pid_filter = ""
 
+                data_fields = ""        # TODO
                 text = """
 int %s(struct pt_regs *ctx)
 {
         %s
         if (!(%s)) return 0;
-        bpf_trace_printk(%s);   /* TODO Replace with BPF_PERF    */
-        return 0;               /* TODO Add PID, COMM, TIME etc. */
+        struct %s data = {};
+        data.pid = bpf_get_current_pid_tgid();
+        data.timestamp_ns = bpf_ktime_get_ns();         /* Necessary? */
+        %s
+        %s.perf_submit(ctx, &data, sizeof(data));
+        return 0;
 }
 """
                 text = text % (self.probe_name, pid_filter,
-                               self.filter, self.action)
-                return text
+                               self.filter, self.struct_name,
+                               data_fields, self.events_name)
+
+                return data_decl + "\n" + text
+
+        def print_event(self, cpu, data, size):
+                # TODO Cast as the generated structure type and display
+                # according to the format string in the probe.
+                msg = "PLACEHOLDER"        # TODO
+                print("CPU%d %s" % (cpu, msg))
+                pass
 
         def attach(self, bpf):
                 if len(self.library) == 0:
                         self._attach_k(bpf)
                 else:
                         self._attach_u(bpf)
+                bpf[self.events_name].open_perf_buffer(self.print_event)
 
         def _attach_k(self, bpf):
                 if self.probe_type == "r":
@@ -179,7 +228,10 @@ for probe_spec in args.probes:
 for probe in probes:
         print(probe)
 
-program = "#include <linux/ptrace.h>\n"
+program = """
+#include <linux/ptrace.h>
+
+"""
 for probe in probes:
         program += probe.generate_program(args.pid or -1)
 
@@ -192,9 +244,4 @@ for probe in probes:
         probe.attach(bpf)
 
 while True:
-        # TODO read events from BPF_PERF
-        try:
-                (task, pid, cpu, flags, ts, msg) = bpf.trace_fields()
-        except ValueError:
-                continue
-        print(msg)
+        bpf.kprobe_poll()
