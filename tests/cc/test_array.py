@@ -21,5 +21,20 @@ class TestArray(TestCase):
                 self.assertEqual(v.value, 1000)
         self.assertEqual(len(t1), 128)
 
+    def test_native_type(self):
+        b = BPF(text="""BPF_TABLE("array", int, u64, table1, 128);""")
+        t1 = b["table1"]
+        t1[0] = c_ulonglong(100)
+        t1[-2] = c_ulonglong(37)
+        t1[127] = c_ulonglong(1000)
+        for i, v in t1.items():
+            if i.value == 0:
+                self.assertEqual(v.value, 100)
+            if i.value == 127:
+                self.assertEqual(v.value, 1000)
+        self.assertEqual(len(t1), 128)
+        self.assertEqual(t1[-2].value, 37)
+        self.assertEqual(t1[-1].value, t1[127].value)
+
 if __name__ == "__main__":
     main()
