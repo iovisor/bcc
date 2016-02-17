@@ -14,7 +14,7 @@ import argparse
 import re
 import ctypes as ct
 
-MAX_STRING_SIZE = 100   # TODO Make this configurable
+MAX_STRING_SIZE = 64   # TODO Make this configurable
 
 class Probe(object):
         probe_count = 0
@@ -59,7 +59,7 @@ class Probe(object):
                                 if text[i] == ")":
                                         balance -= 1
                                 if balance == 0:
-                                        self._parse_filter(text[1:i])
+                                        self._parse_filter(text[:i+1])
                                         text = text[i+1:]
                                         break
                         if self.filter is None:
@@ -90,7 +90,7 @@ class Probe(object):
                         self.function = parts[1]
 
         def _parse_filter(self, filt):
-                self.filter = self._replace_args(filt.strip("(").strip(")"))
+                self.filter = self._replace_args(filt)
 
         def _parse_types(self, fmt):
                 for match in re.finditer(r'[^%]%(s|u|d|llu|lld|hu|hd|c)', fmt):
@@ -142,7 +142,7 @@ class Probe(object):
 class %s(ct.Structure):
         _fields_ = [
                 ("timestamp_ns", ct.c_ulonglong),
-                ("pid", ct.c_ulonglong),        # Should be u_long when fixed
+                ("pid", ct.c_uint),
 %s
         ]
 """
@@ -182,7 +182,7 @@ class %s(ct.Structure):
 struct %s
 {
         u64 timestamp_ns;
-        u64 pid;                /* Replace with u32 when possible */
+        u32 pid;
 %s
 };
 
@@ -211,7 +211,7 @@ BPF_PERF_OUTPUT(%s);
         def generate_program(self, pid):
                 data_decl = self._generate_data_decl()
                 self.pid = pid
-                if len(self.library) == 0 and pid is not None:
+                if len(self.library) == 0 and pid != -1:
                         pid_filter = """
         u32 __pid = bpf_get_current_pid_tgid();
         if (__pid != %d) { return 0; }
@@ -245,7 +245,7 @@ int %s(struct pt_regs *ctx)
         def _comm(self, pid):
                 try:
                         with open("/proc/%d/comm" % pid) as c:
-                                return c.read()
+                                return c.read().strip()
                 except IOError:
                         return "<unknown>"
 
@@ -258,9 +258,9 @@ int %s(struct pt_regs *ctx)
                 fields = ",".join(map(lambda i: "event.v%d" % i,
                                       range(0, len(self.values))))
                 msg = eval("self.python_format % (" + fields + ")")
-                print("%-10s %-6d %-12s %-20s %s" % \
+                print("%-10s %-6d %-12s %-12s %s" % \
                         (strftime("%H:%M:%S"), event.pid,
-                         self._comm(event.pid)[:12], self.function[:20], msg))
+                         self._comm(event.pid)[:12], self.function[:12], msg))
 
         def attach(self, bpf, verbose):
                 if len(self.library) == 0:
@@ -325,9 +325,6 @@ probes = []
 for probe_spec in args.probes:
         probes.append(Probe(probe_spec))
 
-for probe in probes:
-        print(probe)
-
 program = """
 #include <linux/ptrace.h>
 
@@ -340,11 +337,12 @@ if args.verbose:
 
 bpf = BPF(text=program)
 
-# Print header
-print("%-10s %-6s %-12s %-20s %s" % ("TIME", "PID", "COMM", "FUNC", "MSG"))
-
 for probe in probes:
+        print(probe)
         probe.attach(bpf, args.verbose)
+
+# Print header
+print("%-10s %-6s %-12s %-12s %s" % ("TIME", "PID", "COMM", "FUNC", "MSG"))
 
 while True:
         bpf.kprobe_poll()
