@@ -12,20 +12,25 @@ from bcc import BPF
 from time import sleep, strftime
 import argparse
 import re
+import ctypes as ct
+
+MAX_STRING_SIZE = 100   # TODO Make this configurable
 
 class Probe(object):
         probe_count = 0
 
         def __init__(self, probe):
                 self.raw_probe = probe
-                self.probe_name = "probe_%d" % Probe.probe_count
                 Probe.probe_count += 1
                 self._parse_probe()
+                self.probe_num = Probe.probe_count
+                self.probe_name = "probe_%s_%d" % \
+                                (self.function, self.probe_num)
 
         def __str__(self):
-                return "%s:%s`%s FLT=%s ACT=%s" % (self.probe_type,
+                return "%s:%s`%s FLT=%s ACT=%s/%s" % (self.probe_type,
                         self.library, self.function, self.filter,
-                        "TODO")
+                        self.types, self.values)
 
         def _bail(self, error):
                 raise ValueError("error parsing probe %s: %s" %
@@ -36,13 +41,17 @@ class Probe(object):
 
                 # Everything until the first space is the probe specifier
                 first_space = text.find(' ')
-                self._parse_spec(text[:first_space])
-                text = text[first_space:].lstrip()
+                spec = text[:first_space] if first_space >= 0 else text
+                self._parse_spec(spec)
+                if first_space >= 0:
+                        text = text[first_space:].lstrip()
+                else:
+                        text = ""
 
                 # If we now have a (, wait for the balanced closing ) and that
                 # will be the predicate
                 self.filter = None
-                if text[0] == "(":
+                if len(text) > 0 and text[0] == "(":
                         balance = 1
                         for i in range(1, len(text)):
                                 if text[i] == "(":
@@ -84,14 +93,21 @@ class Probe(object):
                 self.filter = self._replace_args(filt.strip("(").strip(")"))
 
         def _parse_types(self, fmt):
-                self.types = []
                 for match in re.finditer(r'[^%]%(s|u|d|llu|lld|hu|hd|c)', fmt):
                         self.types.append(match.group(1))
+                self.python_format = re.sub(
+                                r'([^%]%)(u|d|llu|lld|hu|hd)', r'\1d', fmt)
+                self.python_format = self.python_format.strip('"')
 
         def _parse_action(self, action):
-                parts = action.split(',')
-                self._parse_types(parts[0])
                 self.values = []
+                self.types = []
+                if len(action) == 0:
+                        return
+
+                parts = action.split(',')
+                self.raw_format = parts[0]
+                self._parse_types(self.raw_format)
                 for part in parts[1:]:
                         part = self._replace_args(part)
                         self.values.append(part)
@@ -105,28 +121,91 @@ class Probe(object):
                 # TODO More args? Don't replace inside format string?
                 return expr
 
+        p_type = { "u": "ct.c_uint", "d": "ct.c_int",
+                   "llu": "ct.c_ulonglong", "lld": "ct.c_longlong",
+                   "hu": "ct.c_ushort", "hd": "ct.c_short",
+                   "c": "ct.c_ubyte" }
+
+        def _generate_python_field_decl(self, idx):
+                field_type = self.types[idx]
+                if field_type == "s":
+                        ptype = "ct.c_char * %d" % MAX_STRING_SIZE
+                else:
+                        ptype = Probe.p_type[field_type]
+                return "(\"v%d\", %s)" % (idx, ptype)
+
         def _generate_python_data_decl(self):
-                pass    # TODO class %s_Data(ct.Structure): ...
+                self.python_struct_name = "%s_%d_Data" % \
+                                (self.function, self.probe_num)
+                text = """
+class %s(ct.Structure):
+        _fields_ = [
+                ("timestamp_ns", ct.c_ulonglong),
+                ("pid", ct.c_ulonglong),        # Should be u_long when fixed
+%s
+        ]
+"""
+                custom_fields = ""
+                for i, field_type in enumerate(self.types):
+                        custom_fields += "                %s," % \
+                                         self._generate_python_field_decl(i)
+                return text % (self.python_struct_name, custom_fields)
+
+        c_type = { "u": "unsigned int", "d": "int",
+                   "llu": "unsigned long long", "lld": "long long",
+                   "hu": "unsigned short", "hd": "short",
+                   "c": "char" }
+        fmt_types = c_type.keys()
+
+        def _generate_field_decl(self, idx):
+                field_type = self.types[idx]
+                if field_type == "s":
+                        return "char v%d[%d];\n" % (idx, MAX_STRING_SIZE)
+                if field_type in Probe.fmt_types:
+                        return "%s v%d;\n" % (Probe.c_type[field_type], idx)
+                self._bail("unrecognized format specifier %s" % field_type)
 
         def _generate_data_decl(self):
-                # TODO Read the format specifiers from the format string
                 # The BPF program will populate values into the struct
                 # according to the format string, and the Python program will
                 # construct the final display string.
                 self.events_name = "%s_events" % self.probe_name
                 self.struct_name = "%s_data_t" % self.probe_name
-                data_fields = ""   # TODO
+
+                data_fields = ""
+                for i, field_type in enumerate(self.types):
+                        data_fields += "        " + \
+                                       self._generate_field_decl(i)
+
                 text = """
 struct %s
 {
         u64 timestamp_ns;
-        u64 pid;        /* TODO Replace with u32 when it works */
-        %s
+        u64 pid;                /* Replace with u32 when possible */
+%s
 };
 
 BPF_PERF_OUTPUT(%s);
 """
                 return text % (self.struct_name, data_fields, self.events_name)
+
+        def _generate_field_assign(self, idx):
+                field_type = self.types[idx]
+                expr = self.values[idx]
+                if field_type == "s":
+                        return """
+        if (%s != 0) {
+                bpf_probe_read(&__data.v%d, sizeof(__data.v%d), (void *)%s);
+        }
+"""                     % (expr, idx, idx, expr)
+                        # return ("bpf_probe_read(&__data.v%d, " + \
+                        # "sizeof(__data.v%d), (char*)%s);\n") % (idx, idx, expr)
+                        # return ("__builtin_memcpy(&__data.v%d, (void *)%s, " + \
+                        #        "sizeof(__data.v%d));\n") % (idx, expr, idx)
+                if field_type in Probe.fmt_types:
+                        return "__data.v%d = (%s)%s;\n" % \
+                                        (idx, Probe.c_type[field_type], expr)
+                self._bail("unrecognized field type %s" % field_type)
 
         def generate_program(self, pid):
                 data_decl = self._generate_data_decl()
@@ -139,17 +218,20 @@ BPF_PERF_OUTPUT(%s);
                 else:
                         pid_filter = ""
 
-                data_fields = ""        # TODO
+                data_fields = ""
+                for i, expr in enumerate(self.values):
+                        data_fields += self._generate_field_assign(i)
+
                 text = """
 int %s(struct pt_regs *ctx)
 {
         %s
         if (!(%s)) return 0;
-        struct %s data = {};
-        data.pid = bpf_get_current_pid_tgid();
-        data.timestamp_ns = bpf_ktime_get_ns();         /* Necessary? */
+        struct %s __data = {0};
+        __data.timestamp_ns = bpf_ktime_get_ns();         /* Necessary? */
+        __data.pid = bpf_get_current_pid_tgid();
         %s
-        %s.perf_submit(ctx, &data, sizeof(data));
+        %s.perf_submit(ctx, &__data, sizeof(__data));
         return 0;
 }
 """
@@ -159,18 +241,35 @@ int %s(struct pt_regs *ctx)
 
                 return data_decl + "\n" + text
 
-        def print_event(self, cpu, data, size):
-                # TODO Cast as the generated structure type and display
-                # according to the format string in the probe.
-                msg = "PLACEHOLDER"        # TODO
-                print("CPU%d %s" % (cpu, msg))
-                pass
+        def _comm(self, pid):
+                try:
+                        with open("/proc/%d/comm" % pid) as c:
+                                return c.read()
+                except IOError:
+                        return "<unknown>"
 
-        def attach(self, bpf):
+        def print_event(self, cpu, data, size):
+                # Cast as the generated structure type and display
+                # according to the format string in the probe.
+
+                event = eval("ct.cast(data, ct.POINTER(%s)).contents" % \
+                                self.python_struct_name)
+                fields = ",".join(map(lambda i: "event.v%d" % i,
+                                      range(0, len(self.values))))
+                msg = eval("self.python_format % (" + fields + ")")
+                print("%-10s %-6d %-12s %-20s %s" % \
+                        (strftime("%H:%M:%S"), event.pid,
+                         self._comm(event.pid)[:12], self.function[:20], msg))
+
+        def attach(self, bpf, verbose):
                 if len(self.library) == 0:
                         self._attach_k(bpf)
                 else:
                         self._attach_u(bpf)
+                python_decl = self._generate_python_data_decl()
+                if verbose:
+                        print(python_decl)
+                exec(self._generate_python_data_decl(), globals(), globals())
                 bpf[self.events_name].open_perf_buffer(self.print_event)
 
         def _attach_k(self, bpf):
@@ -240,8 +339,11 @@ if args.verbose:
 
 bpf = BPF(text=program)
 
+# Print header
+print("%-10s %-6s %-12s %-20s %s" % ("TIME", "PID", "COMM", "FUNC", "MSG"))
+
 for probe in probes:
-        probe.attach(bpf)
+        probe.attach(bpf, args.verbose)
 
 while True:
         bpf.kprobe_poll()
