@@ -349,7 +349,6 @@ int bpf_detach_uprobe(const char *event_desc) {
 }
 
 void * bpf_open_perf_buffer(perf_reader_raw_cb raw_cb, void *cb_cookie, int pid, int cpu) {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,4,0)
   int pfd;
   struct perf_event_attr attr = {};
   struct perf_reader *reader = NULL;
@@ -358,14 +357,15 @@ void * bpf_open_perf_buffer(perf_reader_raw_cb raw_cb, void *cb_cookie, int pid,
   if (!reader)
     goto error;
 
-  attr.config = PERF_COUNT_SW_BPF_OUTPUT;
+  attr.config = 10;//PERF_COUNT_SW_BPF_OUTPUT;
   attr.type = PERF_TYPE_SOFTWARE;
   attr.sample_type = PERF_SAMPLE_RAW;
   attr.sample_period = 1;
   attr.wakeup_events = 1;
   pfd = syscall(__NR_perf_event_open, &attr, pid, cpu, -1, PERF_FLAG_FD_CLOEXEC);
   if (pfd < 0) {
-    perror("perf_event_open");
+    fprintf(stderr, "perf_event_open: %s\n", strerror(errno));
+    fprintf(stderr, "   (check your kernel for PERF_COUNT_SW_BPF_OUTPUT support, 4.4 or newer)\n");
     goto error;
   }
   perf_reader_set_fd(reader, pfd);
@@ -385,8 +385,4 @@ error:
     perf_reader_free(reader);
 
   return NULL;
-#else
-  fprintf(stderr, "PERF_COUNT_SW_BPF_OUTPUT feature unsupported\n");
-  return NULL;
-#endif
 }
