@@ -50,7 +50,7 @@ class Probe(object):
                                 if text[i] == ")":
                                         balance -= 1
                                 if balance == 0:
-                                        self._parse_filter(text[1:i-1])
+                                        self._parse_filter(text[1:i])
                                         text = text[i+1:]
                                         break
                         if self.filter is None:
