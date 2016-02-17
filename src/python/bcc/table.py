@@ -14,6 +14,7 @@
 
 from collections import MutableMapping
 import ctypes as ct
+import multiprocessing
 
 from .libbcc import lib, _RAW_CB_TYPE
 
@@ -378,13 +379,13 @@ class PerfEventArray(ArrayBase):
             raise Exception("Could not open perf buffer")
         fd = lib.perf_reader_fd(reader)
         self[self.Key(cpu)] = self.Leaf(fd)
-        open_kprobes[(id(self), cpu)] = reader
+        self.bpf.open_kprobes()[(id(self), cpu)] = reader
         # keep a refcnt
         self._cbs[cpu] = fn
 
     def close_perf_buffer(self, key):
-        reader = open_kprobes.get((id(self), key))
+        reader = self.bpf.open_kprobes().get((id(self), key))
         if reader:
             lib.perf_reader_free(reader)
-            del(open_kprobes[(id(self), key)])
+            del(self.bpf.open_kprobes()[(id(self), key)])
         del self._cbs[key]
