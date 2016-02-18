@@ -76,8 +76,8 @@ def cleanup():
 #-----FUNCTIONS-END-------------------------#
 
 
-# initialize BPF - load source code from http-parse.c
-bpf = BPF(src_file = "http-parse-v2.c",debug = 0)
+# initialize BPF - load source code from http-parse-complete.c
+bpf = BPF(src_file = "http-parse-complete.c",debug = 0)
 
 #load eBPF program http_filter of type SOCKET_FILTER into the kernel eBPF vm
 #more info about eBPF program types
