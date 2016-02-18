@@ -3,7 +3,8 @@
 # trace         Trace a function and print a trace message based on its
 #               parameters, with an optional filter.
 #
-# USAGE: trace [-h] [-p PID] [-v] probe [probe ...]
+# USAGE: trace [-h] [-p PID] [-v] [-Z STRING_SIZE] [-S] [-M MAX_EVENTS] [-o]
+#              probe [probe ...]
 #
 # Licensed under the Apache License, Version 2.0 (the "License")
 # Copyright (C) 2016 Sasha Goldshtein.
