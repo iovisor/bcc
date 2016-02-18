@@ -99,11 +99,12 @@ class Probe(object):
                 self.filter = self._replace_args(filt)
 
         def _parse_types(self, fmt):
-                for match in re.finditer(r'[^%]%(s|u|d|llu|lld|hu|hd|c)', fmt):
+                for match in re.finditer(
+                                r'[^%]%(s|u|d|llu|lld|hu|hd|x|llx|c)', fmt):
                         self.types.append(match.group(1))
-                self.python_format = re.sub(
-                                r'([^%]%)(u|d|llu|lld|hu|hd)', r'\1d', fmt)
-                self.python_format = self.python_format.strip('"')
+                fmt = re.sub(r'([^%]%)(u|d|llu|lld|hu|hd)', r'\1d', fmt)
+                fmt = re.sub(r'([^%]%)(x|llx)', r'\1x', fmt)
+                self.python_format = fmt.strip('"')
 
         def _parse_action(self, action):
                 self.values = []
@@ -131,6 +132,7 @@ class Probe(object):
         p_type = { "u": "ct.c_uint", "d": "ct.c_int",
                    "llu": "ct.c_ulonglong", "lld": "ct.c_longlong",
                    "hu": "ct.c_ushort", "hd": "ct.c_short",
+                   "x": "ct.c_uint", "llx": "ct.c_ulonglong",
                    "c": "ct.c_ubyte" }
 
         def _generate_python_field_decl(self, idx):
@@ -162,6 +164,7 @@ class %s(ct.Structure):
         c_type = { "u": "unsigned int", "d": "int",
                    "llu": "unsigned long long", "lld": "long long",
                    "hu": "unsigned short", "hd": "short",
+                   "x": "unsigned int", "llx": "unsigned long long",
                    "c": "char" }
         fmt_types = c_type.keys()
 
