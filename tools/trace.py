@@ -129,38 +129,32 @@ class Probe(object):
                 # kernel source for inspiration.
                 return expr
 
-        p_type = { "u": "ct.c_uint", "d": "ct.c_int",
-                   "llu": "ct.c_ulonglong", "lld": "ct.c_longlong",
-                   "hu": "ct.c_ushort", "hd": "ct.c_short",
-                   "x": "ct.c_uint", "llx": "ct.c_ulonglong",
-                   "c": "ct.c_ubyte" }
+        p_type = { "u": ct.c_uint, "d": ct.c_int,
+                   "llu": ct.c_ulonglong, "lld": ct.c_longlong,
+                   "hu": ct.c_ushort, "hd": ct.c_short,
+                   "x": ct.c_uint, "llx": ct.c_ulonglong,
+                   "c": ct.c_ubyte }
 
-        def _generate_python_field_decl(self, idx):
+        def _generate_python_field_decl(self, idx, fields):
                 field_type = self.types[idx]
                 if field_type == "s":
-                        ptype = "ct.c_char * %d" % self.string_size
+                        ptype = ct.c_char * self.string_size
                 else:
                         ptype = Probe.p_type[field_type]
-                return "(\"v%d\", %s)" % (idx, ptype)
+                fields.append(("v%d" % idx, ptype))
 
         def _generate_python_data_decl(self):
                 self.python_struct_name = "%s_%d_Data" % \
                                 (self.function, self.probe_num)
-                text = """
-class %s(ct.Structure):
-        _fields_ = [
-                ("timestamp_ns", ct.c_ulonglong),
-                ("pid", ct.c_uint),
-                ("comm", ct.c_char * 16),       # TASK_COMM_LEN
-%s
-        ]
-"""
-                custom_fields = ""
-                for i, field_type in enumerate(self.types):
-                        custom_fields += "                %s," % \
-                                         self._generate_python_field_decl(i)
-                return text % (self.python_struct_name, custom_fields)
-                # TODO Generate the class using type() and not exec()
+                fields = [
+                        ("timestamp_ns", ct.c_ulonglong),
+                        ("pid", ct.c_uint),
+                        ("comm", ct.c_char * 16)       # TASK_COMM_LEN
+                ]
+                for i in range(0, len(self.types)):
+                        self._generate_python_field_decl(i, fields)
+                return type(self.python_struct_name, (ct.Structure,),
+                            dict(_fields_=fields))
 
         c_type = { "u": "unsigned int", "d": "int",
                    "llu": "unsigned long long", "lld": "long long",
@@ -263,11 +257,10 @@ int %s(struct pt_regs *ctx)
         def print_event(self, cpu, data, size):
                 # Cast as the generated structure type and display
                 # according to the format string in the probe.
-                event = eval("ct.cast(data, ct.POINTER(%s)).contents" % \
-                                self.python_struct_name)
-                fields = ",".join(map(lambda i: "event.v%d" % i,
-                                      range(0, len(self.values))))
-                msg = eval("self.python_format % (" + fields + ")")
+                event = ct.cast(data, ct.POINTER(self.python_struct)).contents
+                values = map(lambda i: getattr(event, "v%d" % i),
+                             range(0, len(self.values)))
+                msg = self.python_format % tuple(values)
                 print("%-8s %-6d %-12s %-16s %s" % \
                         (strftime("%H:%M:%S"), event.pid,
                          event.comm[:12], self.function, msg))
@@ -283,10 +276,7 @@ int %s(struct pt_regs *ctx)
                         self._attach_k(bpf)
                 else:
                         self._attach_u(bpf)
-                python_decl = self._generate_python_data_decl()
-                if verbose:
-                        print(python_decl)
-                exec(self._generate_python_data_decl(), globals(), globals())
+                self.python_struct = self._generate_python_data_decl()
                 bpf[self.events_name].open_perf_buffer(self.print_event)
 
         def _attach_k(self, bpf):
