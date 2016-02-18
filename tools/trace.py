@@ -15,10 +15,43 @@ import re
 import ctypes as ct
 import os
 
+class Time(object):
+        # BPF timestamps come from the monotonic clock. To be able to filter
+        # and compare them from Python, we need to invoke clock_gettime.
+        # Adapted from http://stackoverflow.com/a/1205762
+        CLOCK_MONOTONIC_RAW = 4         # see <linux/time.h>
+
+        class timespec(ct.Structure):
+                _fields_ = [
+                        ('tv_sec', ct.c_long),
+                        ('tv_nsec', ct.c_long)
+                ]
+
+        librt = ct.CDLL('librt.so.1', use_errno=True)
+        clock_gettime = librt.clock_gettime
+        clock_gettime.argtypes = [ct.c_int, ct.POINTER(timespec)]
+
+        @staticmethod
+        def monotonic_time():
+                t = Time.timespec()
+                if Time.clock_gettime(
+                        Time.CLOCK_MONOTONIC_RAW, ct.pointer(t)) != 0:
+                        errno_ = ct.get_errno()
+                        raise OSError(errno_, os.strerror(errno_))
+                return t.tv_sec * 1e9 + t.tv_nsec
+
 class Probe(object):
         probe_count = 0
         max_events = None
         event_count = 0
+        first_ts = 0
+        use_localtime = True
+
+        @classmethod
+        def configure(cls, args):
+                cls.max_events = args.max_events
+                cls.use_localtime = not args.offset
+                cls.first_ts = Time.monotonic_time()
 
         def __init__(self, probe, string_size):
                 self.raw_probe = probe
@@ -210,14 +243,16 @@ BPF_PERF_OUTPUT(%s);
                         # return ("__builtin_memcpy(&__data.v%d, (void *)%s, " + \
                         #        "sizeof(__data.v%d));\n") % (idx, expr, idx)
                 if field_type in Probe.fmt_types:
-                        return "__data.v%d = (%s)%s;\n" % \
+                        return "        __data.v%d = (%s)%s;\n" % \
                                         (idx, Probe.c_type[field_type], expr)
                 self._bail("unrecognized field type %s" % field_type)
 
         def generate_program(self, pid, include_self):
                 data_decl = self._generate_data_decl()
                 self.pid = pid
-                if len(self.library) > 0 and pid != -1:
+                # kprobes don't have built-in pid filters, so we have to add
+                # it to the function body:
+                if len(self.library) == 0 and pid != -1:
                         pid_filter = """
         u32 __pid = bpf_get_current_pid_tgid();
         if (__pid != %d) { return 0; }
@@ -239,11 +274,12 @@ int %s(struct pt_regs *ctx)
 {
         %s
         if (!(%s)) return 0;
+
         struct %s __data = {0};
-        __data.timestamp_ns = bpf_ktime_get_ns();         /* Necessary? */
+        __data.timestamp_ns = bpf_ktime_get_ns();
         __data.pid = bpf_get_current_pid_tgid();
         bpf_get_current_comm(&__data.comm, sizeof(__data.comm));
-        %s
+%s
         %s.perf_submit(ctx, &__data, sizeof(__data));
         return 0;
 }
@@ -254,6 +290,10 @@ int %s(struct pt_regs *ctx)
 
                 return data_decl + "\n" + text
 
+        @classmethod
+        def _time_off_str(cls, timestamp_ns):
+                return "%.6f" % (1e-9 * (timestamp_ns - cls.first_ts))
+
         def print_event(self, cpu, data, size):
                 # Cast as the generated structure type and display
                 # according to the format string in the probe.
@@ -261,10 +301,10 @@ int %s(struct pt_regs *ctx)
                 values = map(lambda i: getattr(event, "v%d" % i),
                              range(0, len(self.values)))
                 msg = self.python_format % tuple(values)
+                time = strftime("%H:%M:%S") if Probe.use_localtime else \
+                       Probe._time_off_str(event.timestamp_ns)
                 print("%-8s %-6d %-12s %-16s %s" % \
-                        (strftime("%H:%M:%S"), event.pid,
-                         event.comm[:12], self.function, msg))
-                # TODO Use event.timestamp_ns to format the time
+                    (time[:8], event.pid, event.comm[:12], self.function, msg))
 
                 Probe.event_count += 1
                 if Probe.max_events is not None and \
@@ -341,11 +381,13 @@ parser.add_argument("-S", "--include-self", action="store_true",
         help="do not filter trace's own pid from the trace")
 parser.add_argument("-M", "--max-events", type=int,
         help="number of events to print before quitting")
+parser.add_argument("-o", "--offset", action="store_true",
+        help="use relative time from first traced message")
 parser.add_argument(metavar="probe", dest="probes", nargs="+",
         help="probe specifier (see examples)")
 args = parser.parse_args()
 
-Probe.max_events = args.max_events
+Probe.configure(args)
 
 probes = []
 for probe_spec in args.probes:
