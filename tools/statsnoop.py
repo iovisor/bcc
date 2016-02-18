@@ -60,7 +60,7 @@ struct data_t {
 };
 
 BPF_HASH(args_filename, u32, const char *);
-BPF_HASH(infotmp, u32,struct val_t);
+BPF_HASH(infotmp, u32, struct val_t);
 BPF_PERF_OUTPUT(events);
 
 int trace_entry(struct pt_regs *ctx, const char __user *filename)
@@ -92,14 +92,14 @@ int trace_return(struct pt_regs *ctx)
         // missed entry
         return 0;
     }
-    bpf_probe_read(&data.comm,sizeof(data.comm), valp->comm);
-    bpf_probe_read(&data.fname,sizeof(data.fname),(void *)valp->fname);
+    bpf_probe_read(&data.comm, sizeof(data.comm), valp->comm);
+    bpf_probe_read(&data.fname, sizeof(data.fname), (void *)valp->fname);
     data.pid = valp->pid;
     data.delta = tsp - valp->ts;
-    data.ts = tsp /1000;
+    data.ts = tsp / 1000;
     data.ret = ctx->ax;
 
-    events.perf_submit(ctx,&data,sizeof(data));
+    events.perf_submit(ctx, &data, sizeof(data));
     infotmp.delete(&pid);
     args_filename.delete(&pid);
 
