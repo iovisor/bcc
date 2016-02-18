@@ -10,12 +10,10 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
 # 08-Feb-2016   Brendan Gregg   Created this.
-# 17-Feb-2016   Allan McAleavy updated for BPF_PERF_OUTPUT
 
 from __future__ import print_function
 from bcc import BPF
 import argparse
-import ctypes as ct
 
 # arguments
 examples = """examples:
@@ -40,67 +38,32 @@ debug = 0
 # define BPF program
 bpf_text = """
 #include <uapi/linux/ptrace.h>
-#include <uapi/linux/limits.h>
-#include <linux/sched.h>
-
-struct val_t {
-    u32 pid;
-    u64 ts;
-    char comm[TASK_COMM_LEN];
-    const char *fname;
-};
-
-struct data_t {
-    u32 pid;
-    u64 ts;
-    u64 delta;
-    int ret;
-    char comm[TASK_COMM_LEN];
-    char fname[NAME_MAX];
-};
 
 BPF_HASH(args_filename, u32, const char *);
-BPF_HASH(infotmp, u32, struct val_t);
-BPF_PERF_OUTPUT(events);
 
 int trace_entry(struct pt_regs *ctx, const char __user *filename)
 {
-    struct val_t val = {};
     u32 pid = bpf_get_current_pid_tgid();
 
     FILTER
-    if (bpf_get_current_comm(&val.comm, sizeof(val.comm)) == 0) {
-        val.pid = bpf_get_current_pid_tgid();
-        val.ts = bpf_ktime_get_ns();
-        val.fname = filename;
-        infotmp.update(&pid, &val);
-    }
+    args_filename.update(&pid, &filename);
 
     return 0;
 };
 
 int trace_return(struct pt_regs *ctx)
 {
+    const char **filenamep;
+    int ret = ctx->ax;
     u32 pid = bpf_get_current_pid_tgid();
-    struct val_t *valp;
-    struct data_t data = {};
 
-    u64 tsp = bpf_ktime_get_ns();
-
-    valp = infotmp.lookup(&pid);
-    if (valp == 0) {
+    filenamep = args_filename.lookup(&pid);
+    if (filenamep == 0) {
         // missed entry
         return 0;
     }
-    bpf_probe_read(&data.comm, sizeof(data.comm), valp->comm);
-    bpf_probe_read(&data.fname, sizeof(data.fname), (void *)valp->fname);
-    data.pid = valp->pid;
-    data.delta = tsp - valp->ts;
-    data.ts = tsp / 1000;
-    data.ret = ctx->ax;
 
-    events.perf_submit(ctx, &data, sizeof(data));
-    infotmp.delete(&pid);
+    bpf_trace_printk("%d %s\\n", ret, *filenamep);
     args_filename.delete(&pid);
 
     return 0;
@@ -123,65 +86,33 @@ b.attach_kretprobe(event="sys_stat", fn_name="trace_return")
 b.attach_kretprobe(event="sys_statfs", fn_name="trace_return")
 b.attach_kretprobe(event="sys_newstat", fn_name="trace_return")
 
-TASK_COMM_LEN = 16    # linux/sched.h
-NAME_MAX = 255        # linux/limits.h
-
-class Data(ct.Structure):
-    _fields_ = [
-        ("pid", ct.c_ulonglong),
-        ("ts", ct.c_ulonglong),
-        ("delta", ct.c_ulonglong),
-        ("ret", ct.c_int),
-        ("comm", ct.c_char * TASK_COMM_LEN),
-        ("fname", ct.c_char * NAME_MAX)
-    ]
-
-start_ts = 0
-prev_ts = 0
-delta = 0
-
 # header
 if args.timestamp:
     print("%-14s" % ("TIME(s)"), end="")
 print("%-6s %-16s %4s %3s %s" % ("PID", "COMM", "FD", "ERR", "PATH"))
 
-# process event
-def print_event(cpu, data, size):
-    event = ct.cast(data, ct.POINTER(Data)).contents
-    global start_ts
-    global prev_ts
-    global delta
-    global cont
+start_ts = 0
+
+# format output
+while 1:
+    (task, pid, cpu, flags, ts, msg) = b.trace_fields()
+    (ret_s, filename) = msg.split(" ", 1)
+
+    ret = int(ret_s)
+    if (args.failed and (ret >= 0)):
+        continue
 
     # split return value into FD and errno columns
-    if event.ret >= 0:
-        fd_s = event.ret
+    if ret >= 0:
+        fd_s = ret
         err = 0
     else:
-        fd_s = -1
-        err = - event.ret
+        fd_s = "-1"
+        err = - ret
 
-    if start_ts == 0:
-        prev_ts = start_ts
-
-    if start_ts == 1:
-        delta = float(delta) + (event.ts - prev_ts)
-
-    if (args.failed and (event.ret >= 0)):
-        start_ts = 1
-        prev_ts = event.ts
-        return
-
+    # print columns
     if args.timestamp:
-        print("%-14.9f" % (delta / 1000000), end="")
-
-    print("%-6d %-16s %4d %3d %s" % (event.pid, event.comm,
-        fd_s, err, event.fname))
-
-    prev_ts = event.ts
-    start_ts = 1
-
-# loop with callback to print_event
-b["events"].open_perf_buffer(print_event)
-while 1:
-    b.kprobe_poll()
+        if start_ts == 0:
+            start_ts = ts
+        print("%-14.9f" % (ts - start_ts), end="")
+    print("%-6d %-16s %4s %3s %s" % (pid, task, fd_s, err, filename))
