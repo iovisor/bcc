@@ -15,15 +15,14 @@ import re
 import ctypes as ct
 import os
 
-MAX_STRING_SIZE = 64   # TODO Make this configurable
-
 class Probe(object):
         probe_count = 0
         max_events = None
         event_count = 0
 
-        def __init__(self, probe):
+        def __init__(self, probe, string_size):
                 self.raw_probe = probe
+                self.string_size = string_size
                 Probe.probe_count += 1
                 self._parse_probe()
                 self.probe_num = Probe.probe_count
@@ -79,21 +78,18 @@ class Probe(object):
 
         def _parse_spec(self, spec):
                 parts = spec.split(":")
-                if len(parts) == 1:
+                if len(parts) != 3:
+                        self._bail("expected three parts separated " +
+                                   "by :, got %s" % spec)
+                if len(parts[0]) == 0:
                         self.probe_type = "p"
-                        self._parse_func(parts[0])
-                else:
+                elif parts[0] in ["p", "r"]:
                         self.probe_type = parts[0]
-                        self._parse_func(parts[1])
-
-        def _parse_func(self, func):
-                parts = func.split("`")
-                if len(parts) == 1:
-                        self.library = ""
-                        self.function = parts[0]
                 else:
-                        self.library = parts[0]
-                        self.function = parts[1]
+                        self._bail("expected '', 'p', or 'r', got %s" %
+                                   parts[0])
+                self.library = parts[1]
+                self.function = parts[2]
 
         def _parse_filter(self, filt):
                 self.filter = self._replace_args(filt)
@@ -126,7 +122,11 @@ class Probe(object):
                 expr = expr.replace("arg2", "ctx->si")
                 expr = expr.replace("arg3", "ctx->dx")
                 expr = expr.replace("arg4", "ctx->cx")
-                # TODO More args? Don't replace inside format string?
+                expr = expr.replace("arg5", "ctx->r8")
+                expr = expr.replace("arg6", "ctx->r9")
+                # TODO Replace special keywords like uid, gid with the
+                # appropriate bpf_* invocations. See bpf_helpers.c in the
+                # kernel source for inspiration.
                 return expr
 
         p_type = { "u": "ct.c_uint", "d": "ct.c_int",
@@ -138,7 +138,7 @@ class Probe(object):
         def _generate_python_field_decl(self, idx):
                 field_type = self.types[idx]
                 if field_type == "s":
-                        ptype = "ct.c_char * %d" % MAX_STRING_SIZE
+                        ptype = "ct.c_char * %d" % self.string_size
                 else:
                         ptype = Probe.p_type[field_type]
                 return "(\"v%d\", %s)" % (idx, ptype)
@@ -160,6 +160,7 @@ class %s(ct.Structure):
                         custom_fields += "                %s," % \
                                          self._generate_python_field_decl(i)
                 return text % (self.python_struct_name, custom_fields)
+                # TODO Generate the class using type() and not exec()
 
         c_type = { "u": "unsigned int", "d": "int",
                    "llu": "unsigned long long", "lld": "long long",
@@ -171,7 +172,7 @@ class %s(ct.Structure):
         def _generate_field_decl(self, idx):
                 field_type = self.types[idx]
                 if field_type == "s":
-                        return "char v%d[%d];\n" % (idx, MAX_STRING_SIZE)
+                        return "char v%d[%d];\n" % (idx, self.string_size)
                 if field_type in Probe.fmt_types:
                         return "%s v%d;\n" % (Probe.c_type[field_type], idx)
                 self._bail("unrecognized format specifier %s" % field_type)
@@ -270,6 +271,7 @@ int %s(struct pt_regs *ctx)
                 print("%-8s %-6d %-12s %-16s %s" % \
                         (strftime("%H:%M:%S"), event.pid,
                          event.comm[:12], self.function, msg))
+                # TODO Use event.timestamp_ns to format the time
 
                 Probe.event_count += 1
                 if Probe.max_events is not None and \
@@ -317,31 +319,36 @@ int %s(struct pt_regs *ctx)
                                           pid=self.pid)
 
 examples = """
-TODO NEED OBVIOUSLY BETTER EXAMPLES
-trace do_sys_open
+EXAMPLES:
+
+trace ::do_sys_open
         Trace the open syscall and print a default trace message when entered
-trace 'do_sys_open "%s", arg1'
+trace '::do_sys_open "%s", arg2'
         Trace the open syscall and print the filename being opened
-trace r:do_sys_return
+trace '::sys_read (arg3 > 20000) "read %d bytes", arg3'
+        Trace the read syscall and print a message for reads >20000 bytes
+trace r::do_sys_return
         Trace the return from the open syscall
-trace 'do_sys_open (arg2 == 42) "%s %d", arg1, arg2'
-        Trace the open syscall only if the flags (arg2) argument is 42
-trace 'c`malloc "size = %d", arg1'
+trace ':c:open (arg2 == 42) "%s %d", arg1, arg2'
+        Trace the open() call from libc only if the flags (arg2) argument is 42
+trace ':c:malloc "size = %d", arg1'
         Trace malloc calls and print the size being allocated
-trace 'r:c`malloc (retval) "allocated = %p", retval
+trace 'r:c:malloc (retval) "allocated = %p", retval
         Trace returns from malloc and print non-NULL allocated buffers
 """
 
 parser = argparse.ArgumentParser(description=
-        "Trace a function and print trace messages",
+        "Attach to functions and print trace messages.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=examples)
 parser.add_argument("-p", "--pid", type=int,
         help="id of the process to trace (optional)")
 parser.add_argument("-v", "--verbose", action="store_true",
-        help="print the BPF program")
+        help="print resulting BPF program code before executing")
+parser.add_argument("-Z", "--string-size", type=int, default=80,
+        help="maximum size to read from strings")
 parser.add_argument("-S", "--include-self", action="store_true",
-        help="do not filter trace's pid from the trace")
+        help="do not filter trace's own pid from the trace")
 parser.add_argument("-M", "--max-events", type=int,
         help="number of events to print before quitting")
 parser.add_argument(metavar="probe", dest="probes", nargs="+",
@@ -352,7 +359,7 @@ Probe.max_events = args.max_events
 
 probes = []
 for probe_spec in args.probes:
-        probes.append(Probe(probe_spec))
+        probes.append(Probe(probe_spec, args.string_size))
 
 program = """
 #include <linux/ptrace.h>
