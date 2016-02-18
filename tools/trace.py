@@ -13,11 +13,14 @@ from time import sleep, strftime
 import argparse
 import re
 import ctypes as ct
+import os
 
 MAX_STRING_SIZE = 64   # TODO Make this configurable
 
 class Probe(object):
         probe_count = 0
+        max_events = None
+        event_count = 0
 
         def __init__(self, probe):
                 self.raw_probe = probe
@@ -31,6 +34,9 @@ class Probe(object):
                 return "%s:%s`%s FLT=%s ACT=%s/%s" % (self.probe_type,
                         self.library, self.function, self.filter,
                         self.types, self.values)
+
+        def is_default_action(self):
+                return self.python_format == ""
 
         def _bail(self, error):
                 raise ValueError("error parsing probe %s: %s" %
@@ -143,6 +149,7 @@ class %s(ct.Structure):
         _fields_ = [
                 ("timestamp_ns", ct.c_ulonglong),
                 ("pid", ct.c_uint),
+                ("comm", ct.c_char * 16),       # TASK_COMM_LEN
 %s
         ]
 """
@@ -183,6 +190,7 @@ struct %s
 {
         u64 timestamp_ns;
         u32 pid;
+        char comm[TASK_COMM_LEN];
 %s
 };
 
@@ -208,14 +216,19 @@ BPF_PERF_OUTPUT(%s);
                                         (idx, Probe.c_type[field_type], expr)
                 self._bail("unrecognized field type %s" % field_type)
 
-        def generate_program(self, pid):
+        def generate_program(self, pid, include_self):
                 data_decl = self._generate_data_decl()
                 self.pid = pid
-                if len(self.library) == 0 and pid != -1:
+                if len(self.library) > 0 and pid != -1:
                         pid_filter = """
         u32 __pid = bpf_get_current_pid_tgid();
         if (__pid != %d) { return 0; }
 """             % pid
+                elif not include_self:
+                        pid_filter = """
+        u32 __pid = bpf_get_current_pid_tgid();
+        if (__pid == %d) { return 0; }
+"""             % os.getpid()
                 else:
                         pid_filter = ""
 
@@ -231,6 +244,7 @@ int %s(struct pt_regs *ctx)
         struct %s __data = {0};
         __data.timestamp_ns = bpf_ktime_get_ns();         /* Necessary? */
         __data.pid = bpf_get_current_pid_tgid();
+        bpf_get_current_comm(&__data.comm, sizeof(__data.comm));
         %s
         %s.perf_submit(ctx, &__data, sizeof(__data));
         return 0;
@@ -242,25 +256,22 @@ int %s(struct pt_regs *ctx)
 
                 return data_decl + "\n" + text
 
-        def _comm(self, pid):
-                try:
-                        with open("/proc/%d/comm" % pid) as c:
-                                return c.read().strip()
-                except IOError:
-                        return "<unknown>"
-
         def print_event(self, cpu, data, size):
                 # Cast as the generated structure type and display
                 # according to the format string in the probe.
-
                 event = eval("ct.cast(data, ct.POINTER(%s)).contents" % \
                                 self.python_struct_name)
                 fields = ",".join(map(lambda i: "event.v%d" % i,
                                       range(0, len(self.values))))
                 msg = eval("self.python_format % (" + fields + ")")
-                print("%-10s %-6d %-12s %-12s %s" % \
+                print("%-8s %-6d %-12s %-16s %s" % \
                         (strftime("%H:%M:%S"), event.pid,
-                         self._comm(event.pid)[:12], self.function[:12], msg))
+                         event.comm[:12], self.function, msg))
+
+                Probe.event_count += 1
+                if Probe.max_events is not None and \
+                   Probe.event_count >= Probe.max_events:
+                        exit()
 
         def attach(self, bpf, verbose):
                 if len(self.library) == 0:
@@ -282,13 +293,22 @@ int %s(struct pt_regs *ctx)
                                           fn_name=self.probe_name)
 
         def _attach_u(self, bpf):
+                libpath = BPF.find_library(self.library)
+                if libpath is None:
+                        # This might be an executable (e.g. 'bash')
+                        with os.popen("/usr/bin/which %s 2>/dev/null" %
+                                      self.library) as w:
+                                libpath = w.read().strip()
+                if libpath is None or len(libpath) == 0:
+                        self._bail("unable to find library %s" % self.library)
+
                 if self.probe_type == "r":
-                        bpf.attach_uretprobe(name=self.library,
+                        bpf.attach_uretprobe(name=libpath,
                                              sym=self.function,
                                              fn_name=self.probe_name,
                                              pid=self.pid)
                 else:
-                        bpf.attach_uprobe(name=self.library,
+                        bpf.attach_uprobe(name=libpath,
                                           sym=self.function,
                                           fn_name=self.probe_name,
                                           pid=self.pid)
@@ -317,9 +337,15 @@ parser.add_argument("-p", "--pid", type=int,
         help="id of the process to trace (optional)")
 parser.add_argument("-v", "--verbose", action="store_true",
         help="print the BPF program")
+parser.add_argument("-S", "--include-self", action="store_true",
+        help="do not filter trace's pid from the trace")
+parser.add_argument("-M", "--max-events", type=int,
+        help="number of events to print before quitting")
 parser.add_argument(metavar="probe", dest="probes", nargs="+",
         help="probe specifier (see examples)")
 args = parser.parse_args()
+
+Probe.max_events = args.max_events
 
 probes = []
 for probe_spec in args.probes:
@@ -327,10 +353,11 @@ for probe_spec in args.probes:
 
 program = """
 #include <linux/ptrace.h>
+#include <linux/sched.h>        /* For TASK_COMM_LEN */
 
 """
 for probe in probes:
-        program += probe.generate_program(args.pid or -1)
+        program += probe.generate_program(args.pid or -1, args.include_self)
 
 if args.verbose:
         print(program)
@@ -338,11 +365,16 @@ if args.verbose:
 bpf = BPF(text=program)
 
 for probe in probes:
-        print(probe)
+        if args.verbose:
+                print(probe)
         probe.attach(bpf, args.verbose)
 
+all_probes_trivial = all(map(Probe.is_default_action, probes))
+
 # Print header
-print("%-10s %-6s %-12s %-12s %s" % ("TIME", "PID", "COMM", "FUNC", "MSG"))
+print("%-8s %-6s %-12s %-16s %s" % ("TIME", "PID", "COMM", "FUNC",
+      "-" if not all_probes_trivial else ""))
 
 while True:
         bpf.kprobe_poll()
+
