@@ -47,7 +47,7 @@ class BPFModule {
   llvm::Function * make_writer(llvm::Module *mod, llvm::Type *type);
   void dump_ir(llvm::Module &mod);
   int load_file_module(std::unique_ptr<llvm::Module> *mod, const std::string &file, bool in_memory);
-  int load_includes(const std::string &tmpfile);
+  int load_includes(const std::string &text);
   int load_cfile(const std::string &file, bool in_memory, const char *cflags[], int ncflags);
   int kbuild_flags(const char *uname_release, std::vector<std::string> *cflags);
   int run_pass_manager(llvm::Module &mod);

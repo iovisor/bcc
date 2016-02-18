@@ -1,3 +1,4 @@
+R"********(
 /*
  * Copyright (c) 2015 PLUMgrid, Inc.
  *
@@ -392,3 +393,4 @@ int bpf_num_cpus() asm("llvm.bpf.extra");
 #define lock_xadd(ptr, val) ((void)__sync_fetch_and_add(ptr, val))
 
 #endif
+)********"

@@ -32,10 +32,7 @@ if (CMAKE_COMPILER_IS_GNUCC)
   endif()
 endif()
 
-# tell the shared library where it is being installed so it can find shared header files
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBCC_INSTALL_PREFIX='\"${CMAKE_INSTALL_PREFIX}\"'")
-
-add_library(bcc SHARED bpf_common.cc bpf_module.cc libbpf.c perf_reader.c shared_table.cc)
+add_library(bcc SHARED bpf_common.cc bpf_module.cc libbpf.c perf_reader.c shared_table.cc exported_files.cc)
 set_target_properties(bcc PROPERTIES VERSION ${REVISION_LAST} SOVERSION 0)
 
 # BPF is still experimental otherwise it should be available
@@ -52,9 +49,6 @@ target_link_libraries(bcc b_frontend clang_frontend ${clang_libs} ${llvm_libs} L
 
 install(TARGETS bcc LIBRARY COMPONENT libbcc
   DESTINATION ${CMAKE_INSTALL_LIBDIR})
-install(DIRECTORY export/ COMPONENT libbcc
-  DESTINATION share/bcc/include/bcc
-  FILES_MATCHING PATTERN "*.h")
 install(FILES bpf_common.h bpf_module.h ../libbpf.h COMPONENT libbcc
   DESTINATION include/bcc)
 install(DIRECTORY compat/linux/ COMPONENT libbcc
@@ -62,8 +56,5 @@ install(DIRECTORY compat/linux/ COMPONENT libbcc
   FILES_MATCHING PATTERN "*.h")
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libbcc.pc COMPONENT libbcc
   DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
-install(DIRECTORY clang COMPONENT libbcc
-  DESTINATION share/bcc/lib
-  FILES_MATCHING PATTERN "*.h")
 
 add_subdirectory(frontends)

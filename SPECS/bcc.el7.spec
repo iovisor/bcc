@@ -76,8 +76,6 @@ Python bindings for BPF Compiler Collection (BCC)
 
 %files -n libbcc
 /usr/lib64/*
-/usr/share/bcc/include/*
-/usr/share/bcc/lib/*
 /usr/include/bcc/*
 
 %files -n libbcc-examples

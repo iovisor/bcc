@@ -23,6 +23,7 @@
 namespace llvm {
 class Module;
 class LLVMContext;
+class MemoryBuffer;
 }
 
 namespace ebpf {
@@ -41,6 +42,7 @@ class ClangLoader {
   int parse(std::unique_ptr<llvm::Module> *mod, std::unique_ptr<std::vector<TableDesc>> *tables,
             const std::string &file, bool in_memory, const char *cflags[], int ncflags);
  private:
+  static std::map<std::string, std::unique_ptr<llvm::MemoryBuffer>> remapped_files_;
   llvm::LLVMContext *ctx_;
   unsigned flags_;
 };

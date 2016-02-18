@@ -1,4 +1,2 @@
 usr/include/bcc/*
 usr/lib/x86_64-linux-gnu/libbcc*
-usr/share/bcc/include/*
-usr/share/bcc/lib/*
