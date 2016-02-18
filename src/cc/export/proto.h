@@ -1,3 +1,4 @@
+R"********(
 /*
  * Copyright (c) 2015 PLUMgrid, Inc.
  *
@@ -95,3 +96,4 @@ struct vxlan_t {
   unsigned int key:24;
   unsigned int rsv4:8;
 } BPF_PACKET_HEADER;
+)********"
