@@ -149,17 +149,25 @@ class Probe(object):
                         part = self._replace_args(part)
                         self.values.append(part)
 
+        aliases = {
+                "retval": "ctx->ax",
+                "arg1": "ctx->di",
+                "arg2": "ctx->si",
+                "arg3": "ctx->dx",
+                "arg4": "ctx->cx",
+                "arg5": "ctx->r8",
+                "arg6": "ctx->r9",
+                "$uid": "(unsigned)(bpf_get_current_uid_gid() & 0xffffffff)",
+                "$gid": "(unsigned)(bpf_get_current_uid_gid() >> 32)",
+                "$pid": "(unsigned)(bpf_get_current_pid_tgid() & 0xffffffff)",
+                "$tgid": "(unsigned)(bpf_get_current_pid_tgid() >> 32)",
+                "$cpu": "bpf_get_smp_processor_id()",
+                "$random": "bpf_get_prandom_u32()"
+        }
+
         def _replace_args(self, expr):
-                expr = expr.replace("retval", "ctx->ax")
-                expr = expr.replace("arg1", "ctx->di")
-                expr = expr.replace("arg2", "ctx->si")
-                expr = expr.replace("arg3", "ctx->dx")
-                expr = expr.replace("arg4", "ctx->cx")
-                expr = expr.replace("arg5", "ctx->r8")
-                expr = expr.replace("arg6", "ctx->r9")
-                # TODO Replace special keywords like uid, gid with the
-                # appropriate bpf_* invocations. See bpf_helpers.c in the
-                # kernel source for inspiration.
+                for alias, replacement in Probe.aliases.items():
+                        expr = expr.replace(alias, replacement)
                 return expr
 
         p_type = { "u": ct.c_uint, "d": ct.c_int,
