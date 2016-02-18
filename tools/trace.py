@@ -365,8 +365,8 @@ trace '::do_sys_open "%s", arg2'
         Trace the open syscall and print the filename being opened
 trace '::sys_read (arg3 > 20000) "read %d bytes", arg3'
         Trace the read syscall and print a message for reads >20000 bytes
-trace r::do_sys_return
-        Trace the return from the open syscall
+trace 'r::do_sys_return "%llx", retval'
+        Trace the return from the open syscall and print the return value
 trace ':c:open (arg2 == 42) "%s %d", arg1, arg2'
         Trace the open() call from libc only if the flags (arg2) argument is 42
 trace ':c:malloc "size = %d", arg1'
