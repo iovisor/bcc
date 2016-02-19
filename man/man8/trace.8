@@ -84,10 +84,7 @@ same special keywords as in the predicate (arg1, arg2, etc.).
 The predicate expression and the format specifier replacements for printing
 may also use the following special keywords: $pid, $tgid to refer to the 
 current process' pid and tgid; $uid, $gid to refer to the current user's
-uid and gid; $cpu to refer to the current processor number; and $random to
-obtain a random 32-bit value. For example, you could use $random to sample 
-every 8th invocation of a function, by using the predicate:
-($random & 0x7 == 0)
+uid and gid; $cpu to refer to the current processor number.
 .SH EXAMPLES
 .TP
 Trace all invocations of the open system call with the name of the file being opened:
