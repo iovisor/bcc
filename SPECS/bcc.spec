@@ -1,8 +1,8 @@
 %define debug_package %{nil}
 
 Name:           bcc
-Version:        0.1.7
-Release:        1%{?dist}
+Version:        @REVISION@
+Release:        @GIT_REV_COUNT@
 Summary:        BPF Compiler Collection (BCC)
 
 Group:          Development/Languages
@@ -26,7 +26,7 @@ userspace.
 mkdir build
 pushd build
 cmake .. -DREVISION_LAST=%{version} -DREVISION=%{version} -DCMAKE_INSTALL_PREFIX=/usr
-make -j`grep -c ^process /proc/cpuinfo`
+make %{?_smp_mflags}
 popd
 
 %install
