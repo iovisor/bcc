@@ -27,8 +27,7 @@ BPF_PERF_OUTPUT(events);
 
 void kprobe__sys_sync(void *ctx) {
     struct data_t data = {};
-    data.ts = bpf_ktime_get_ns();
-    data.ts = data.ts / 1000;
+    data.ts = bpf_ktime_get_ns() / 1000;
     events.perf_submit(ctx, &data, sizeof(data));
 };
 """)
