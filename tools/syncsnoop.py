@@ -11,21 +11,47 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
 # 13-Aug-2015   Brendan Gregg   Created this.
+# 19-Feb-2016   Allan McAleavy migrated to BPF_PERF_OUTPUT
 
 from __future__ import print_function
 from bcc import BPF
+import ctypes as ct
 
 # load BPF program
 b = BPF(text="""
+#include <linux/string.h>
+
+struct data_t {
+    u64 ts;
+    char msg[6];
+};
+
+BPF_PERF_OUTPUT(events);
+
 void kprobe__sys_sync(void *ctx) {
-    bpf_trace_printk("sync()\\n");
+    struct data_t data = {};
+    data.ts = bpf_ktime_get_ns();
+    data.ts = data.ts / 1000;
+    strcpy(data.msg,"Sync()");
+    events.perf_submit(ctx, &data, sizeof(data));
 };
 """)
+
+class Data(ct.Structure):
+    _fields_ = [
+        ("ts", ct.c_ulonglong),
+        ("msg", ct.c_char * 6)
+    ]
 
 # header
 print("%-18s %s" % ("TIME(s)", "CALL"))
 
-# format output
+# process event
+def print_event(cpu, data, size):
+    event = ct.cast(data, ct.POINTER(Data)).contents
+    print("%-18.9f %s" % (float(event.ts) / 1000000, event.msg))
+
+# loop with callback to print_event
+b["events"].open_perf_buffer(print_event)
 while 1:
-    (task, pid, cpu, flags, ts, msg) = b.trace_fields()
-    print("%-18.9f %s" % (ts, msg))
+    b.kprobe_poll()
