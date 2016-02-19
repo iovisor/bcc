@@ -15,13 +15,11 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
 # 08-Feb-2015   Brendan Gregg   Created this.
-# 17-Feb-2016   Allan McAleavy updated for BPF_PERF_OUTPUT
 
 from __future__ import print_function
 from bcc import BPF
 import argparse
 from time import strftime
-import ctypes as ct
 
 # arguments
 examples = """examples:
@@ -41,17 +39,8 @@ debug = 0
 bpf_text = """
 #include <uapi/linux/ptrace.h>
 #include <linux/fs.h>
-#include <linux/sched.h>
-
-struct data_t {
-    u32 pid;
-    u64 delta;
-    char comm[TASK_COMM_LEN];
-    char fname[DNAME_INLINE_LEN];
-};
 
 BPF_HASH(birth, struct dentry *);
-BPF_PERF_OUTPUT(events);
 
 // trace file creation time
 int trace_create(struct pt_regs *ctx, struct inode *dir, struct dentry *dentry)
@@ -68,9 +57,7 @@ int trace_create(struct pt_regs *ctx, struct inode *dir, struct dentry *dentry)
 // trace file deletion and output details
 int trace_unlink(struct pt_regs *ctx, struct inode *dir, struct dentry *dentry)
 {
-    struct data_t data = {};
     u32 pid = bpf_get_current_pid_tgid();
-
     FILTER
 
     u64 *tsp, delta;
@@ -78,36 +65,17 @@ int trace_unlink(struct pt_regs *ctx, struct inode *dir, struct dentry *dentry)
     if (tsp == 0) {
         return 0;   // missed create
     }
-
     delta = (bpf_ktime_get_ns() - *tsp) / 1000000;
     birth.delete(&dentry);
 
     if (dentry->d_iname[0] == 0)
         return 0;
 
-    if (bpf_get_current_comm(&data.comm, sizeof(data.comm)) == 0) {
-        data.pid = pid;
-        data.delta = delta;
-        bpf_probe_read(&data.fname, sizeof(data.fname), dentry->d_iname);
-    }
-
-    events.perf_submit(ctx, &data, sizeof(data));
+    bpf_trace_printk("%d %s\\n", delta, dentry->d_iname);
 
     return 0;
 }
 """
-
-TASK_COMM_LEN = 16            # linux/sched.h
-DNAME_INLINE_LEN = 255        # linux/dcache.h
-
-class Data(ct.Structure):
-    _fields_ = [
-        ("pid", ct.c_ulonglong),
-        ("delta", ct.c_ulonglong),
-        ("comm", ct.c_char * TASK_COMM_LEN),
-        ("fname", ct.c_char * DNAME_INLINE_LEN)
-    ]
-
 if args.pid:
     bpf_text = bpf_text.replace('FILTER',
         'if (pid != %s) { return 0; }' % args.pid)
@@ -124,12 +92,13 @@ b.attach_kprobe(event="vfs_unlink", fn_name="trace_unlink")
 # header
 print("%-8s %-6s %-16s %-7s %s" % ("TIME", "PID", "COMM", "AGE(s)", "FILE"))
 
-# process event
-def print_event(cpu, data, size):
-    event = ct.cast(data, ct.POINTER(Data)).contents
-    print("%-8s %-6d %-16s %-7.2f %s" % (strftime("%H:%M:%S"), event.pid,
-        event.comm, float(event.delta) / 1000, event.fname))
+start_ts = 0
 
-b["events"].open_perf_buffer(print_event)
+# format output
 while 1:
-    b.kprobe_poll()
+    (task, pid, cpu, flags, ts, msg) = b.trace_fields()
+    (delta, filename) = msg.split(" ", 1)
+
+    # print columns
+    print("%-8s %-6d %-16s %-7.2f %s" % (strftime("%H:%M:%S"), pid, task,
+        float(delta) / 1000, filename))
