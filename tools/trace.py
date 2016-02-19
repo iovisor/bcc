@@ -5,7 +5,6 @@
 #
 # USAGE: trace [-h] [-p PID] [-v] [-Z STRING_SIZE] [-S] [-M MAX_EVENTS] [-o]
 #              probe [probe ...]
-a
 # Licensed under the Apache License, Version 2.0 (the "License")
 # Copyright (C) 2016 Sasha Goldshtein.
 
@@ -112,9 +111,14 @@ class Probe(object):
 
         def _parse_spec(self, spec):
                 parts = spec.split(":")
-                if len(parts) != 3:
-                        self._bail("expected three parts separated " +
-                                   "by :, got %s" % spec)
+                # Two special cases: 'func' means 'p::func', 'lib:func' means
+                # 'p:lib:func'. Other combinations need to provide an empty
+                # value between delimiters, e.g. 'r::func' for a kretprobe on
+                # the function func.
+                if len(parts) == 1:
+                        parts = ["p", "", parts[0]]
+                elif len(parts) == 2:
+                        parts = ["p", parts[0], parts[1]]
                 if len(parts[0]) == 0:
                         self.probe_type = "p"
                 elif parts[0] in ["p", "r"]:
