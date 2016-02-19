@@ -45,6 +45,8 @@ bpf_text = """
 struct val_t {
    u64 pid;
    u64 ts;
+   int sig;
+   int tpid;
    char comm[TASK_COMM_LEN];
 };
 
@@ -58,8 +60,6 @@ struct data_t {
    char comm[TASK_COMM_LEN];
 };
 
-BPF_HASH(args_pid, u32, int);
-BPF_HASH(args_sig, u32, int);
 BPF_HASH(infotmp, u32, struct val_t);
 BPF_PERF_OUTPUT(events);
 
@@ -72,10 +72,10 @@ int kprobe__sys_kill(struct pt_regs *ctx, int tpid, int sig)
     if (bpf_get_current_comm(&val.comm, sizeof(val.comm)) == 0) {
         val.pid = bpf_get_current_pid_tgid();
         val.ts = bpf_ktime_get_ns();
+        val.tpid = tpid;
+        val.sig = sig;
         infotmp.update(&pid, &val);
     }
-    args_pid.update(&pid, &tpid);
-    args_sig.update(&pid, &sig);
 
     return 0;
 };
@@ -84,15 +84,8 @@ int kretprobe__sys_kill(struct pt_regs *ctx)
 {
     struct data_t data = {};
     struct val_t *valp;
-    int *tpidp, *sigp;
     u32 pid = bpf_get_current_pid_tgid();
     u64 tsp = bpf_ktime_get_ns();
-
-    tpidp = args_pid.lookup(&pid);
-    sigp = args_sig.lookup(&pid);
-    if (tpidp == 0 || sigp == 0) {
-        return 0;   // missed entry
-    }
 
     valp = infotmp.lookup(&pid);
     if (valp == 0) {
@@ -104,14 +97,12 @@ int kretprobe__sys_kill(struct pt_regs *ctx)
     data.pid = pid;
     data.delta = tsp - valp->ts;
     data.ts = tsp / 1000;
-    data.tpid = *tpidp;
+    data.tpid = valp->tpid;
     data.ret = ctx->ax;
-    data.sig = *sigp;
+    data.sig = valp->sig;
 
     events.perf_submit(ctx, &data, sizeof(data));
     infotmp.delete(&pid);
-    args_pid.delete(&pid);
-    args_sig.delete(&pid);
 
     return 0;
 }
