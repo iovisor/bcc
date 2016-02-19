@@ -23,7 +23,6 @@ b = BPF(text="""
 
 struct data_t {
     u64 ts;
-    char msg[6];
 };
 
 BPF_PERF_OUTPUT(events);
@@ -32,15 +31,13 @@ void kprobe__sys_sync(void *ctx) {
     struct data_t data = {};
     data.ts = bpf_ktime_get_ns();
     data.ts = data.ts / 1000;
-    strcpy(data.msg,"Sync()");
     events.perf_submit(ctx, &data, sizeof(data));
 };
 """)
 
 class Data(ct.Structure):
     _fields_ = [
-        ("ts", ct.c_ulonglong),
-        ("msg", ct.c_char * 6)
+        ("ts", ct.c_ulonglong)
     ]
 
 # header
@@ -49,7 +46,7 @@ print("%-18s %s" % ("TIME(s)", "CALL"))
 # process event
 def print_event(cpu, data, size):
     event = ct.cast(data, ct.POINTER(Data)).contents
-    print("%-18.9f %s" % (float(event.ts) / 1000000, event.msg))
+    print("%-18.9f sync()" % (float(event.ts) / 1000000))
 
 # loop with callback to print_event
 b["events"].open_perf_buffer(print_event)
