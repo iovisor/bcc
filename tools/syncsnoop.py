@@ -19,8 +19,6 @@ import ctypes as ct
 
 # load BPF program
 b = BPF(text="""
-#include <linux/string.h>
-
 struct data_t {
     u64 ts;
 };
