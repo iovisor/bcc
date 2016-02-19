@@ -5,7 +5,7 @@
 #
 # USAGE: trace [-h] [-p PID] [-v] [-Z STRING_SIZE] [-S] [-M MAX_EVENTS] [-o]
 #              probe [probe ...]
-#
+a
 # Licensed under the Apache License, Version 2.0 (the "License")
 # Copyright (C) 2016 Sasha Goldshtein.
 
@@ -162,8 +162,7 @@ class Probe(object):
                 "$gid": "(unsigned)(bpf_get_current_uid_gid() >> 32)",
                 "$pid": "(unsigned)(bpf_get_current_pid_tgid() & 0xffffffff)",
                 "$tgid": "(unsigned)(bpf_get_current_pid_tgid() >> 32)",
-                "$cpu": "bpf_get_smp_processor_id()",
-                "$random": "bpf_get_prandom_u32()"
+                "$cpu": "bpf_get_smp_processor_id()"
         }
 
         def _replace_args(self, expr):
