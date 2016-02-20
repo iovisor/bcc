@@ -1,0 +1,97 @@
+.TH tcpconnect 8  "2016-02-19" "USER COMMANDS"
+.SH NAME
+tcpconnect \- Trace TCP active connection latency. Uses Linux eBPF/bcc.
+.SH SYNOPSIS
+.B tcpconnect [\-h] [\-t] [\-p PID]
+.SH DESCRIPTION
+This tool traces active TCP connections
+(eg, via a connect() syscall), and shows the latency (time) for the connection
+as measured locally: the time from SYN sent to the response packet.
+This is a useful performance metric that typically spans kernel TCP/IP
+processing and the network round trip time (not application runtime).
+
+All connection attempts are traced, even if they ultimately fail (RST packet
+in response).
+
+This tool works by use of kernel dynamic tracing of TCP/IP functions, and will
+need updating to match any changes to these functions. This tool should be
+updated in the future to use static tracepoints, once they are available.
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH OPTIONS
+.TP
+\-h
+Print usage message.
+.TP
+\-t
+Include a timestamp column.
+.TP
+\-p PID
+Trace this process ID only (filtered in-kernel).
+.SH EXAMPLES
+.TP
+Trace all active TCP connections, and show connection latency (SYN->response round trip):
+#
+.B tcpconnect
+.TP
+Include timestamps:
+#
+.B tcpconnect \-t
+.TP
+Trace PID 181 only:
+#
+.B tcpconnect \-p 181
+.SH FIELDS
+.TP
+TIME(s)
+Time of the response packet, in seconds.
+.TP
+PID
+Process ID that initiated the connection.
+.TP
+COMM
+Process name that initiated the connection.
+.TP
+IP
+IP address family (4 or 6).
+.TP
+SADDR
+Source IP address. IPv4 as a dotted quad, IPv6 shows "..." then the last 4
+bytes (check for newer versions of this tool for the full address).
+.TP
+DADDR
+Destination IP address. IPv4 as a dotted quad, IPv6 shows "..." then the last 4
+bytes (check for newer versions of this tool for the full address).
+.TP
+DPORT
+Destination port
+.TP
+LAT(ms)
+The time from when a TCP connect was issued (measured in-kernel) to when a
+response packet was received for this connection (can be SYN,ACK, or RST, etc).
+This time spans kernel to kernel latency, involving kernel TCP/IP processing
+and the network round trip in between. This typically does not include
+time spent by the application processing the new connection.
+.SH OVERHEAD
+This traces the kernel tcp_v[46]_connect functions and prints output for each
+event. As the rate of this is generally expected to be low (< 1000/s), the
+overhead is also expected to be negligible. If you have an application that
+is calling a high rate of connects()s, such as a proxy server, then test and
+understand this overhead before use.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Brendan Gregg
+.SH SEE ALSO
+tcpconnect(8), tcpaccept(8), funccount(8), tcpdump(8)

@@ -1,0 +1,47 @@
+Demonstrations of tcpconnlat, the Linux eBPF/bcc version.
+
+
+This tool traces the kernel function performing active TCP connections
+(eg, via a connect() syscall), and shows the latency (time) for the connection
+as measured locally: the time from SYN sent to the response packet.
+For example:
+
+# ./tcpconnlat
+PID    COMM         IP SADDR            DADDR            DPORT LAT(ms)
+1201   wget         4  10.153.223.157   23.23.100.231    80    1.65
+1201   wget         4  10.153.223.157   23.23.100.231    443   1.60
+1433   curl         4  10.153.223.157   104.20.25.153    80    0.75
+1690   wget         4  10.153.223.157   66.220.156.68    80    1.10
+1690   wget         4  10.153.223.157   66.220.156.68    443   0.95
+1690   wget         4  10.153.223.157   66.220.156.68    443   0.99
+2852   curl         4  10.153.223.157   23.101.17.61     80    250.86
+[...]
+
+The first line shows a connection from the "wget" process to the IPv4
+destination address 23.23.100.231, port 80. This took 1.65 milliseconds: the
+time from the SYN to the response.
+
+TCP connection latency is a useful performance measure showing the time taken
+to establish a connection. This typically involves kernel TCP/IP processing
+and the network round trip time, and not application runtime.
+
+tcpconnlat measures the time from any connection to the response packet, even
+if the response is a RST (port closed).
+
+
+USAGE message:
+
+# ./tcpconnlat -h
+usage: tcpconnlat [-h] [-t] [-p PID]
+
+Trace TCP connects and show connection latency
+
+optional arguments:
+  -h, --help         show this help message and exit
+  -t, --timestamp    include timestamp on output
+  -p PID, --pid PID  trace this PID only
+
+examples:
+    ./tcpconnlat           # trace all TCP connect()s
+    ./tcpconnlat -t        # include timestamps
+    ./tcpconnlat -p 181    # only trace PID 181
