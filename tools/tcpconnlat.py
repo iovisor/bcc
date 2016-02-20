@@ -97,7 +97,9 @@ int trace_connect(struct pt_regs *ctx, struct sock *sk)
 // This should all be switched to static tracepoints when available.
 int trace_tcp_rcv_state_process(struct pt_regs *ctx, struct sock *sk)
 {
-    u32 pid = bpf_get_current_pid_tgid();
+    // will be in TCP_SYN_SENT for handshake
+    if (sk->__sk_common.skc_state != TCP_SYN_SENT)
+        return 0;
 
     // check start and calculate delta
     struct info_t *infop = start.lookup(&sk);
