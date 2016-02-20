@@ -93,7 +93,8 @@ int trace_connect(struct pt_regs *ctx, struct sock *sk)
 
 // See tcp_v4_do_rcv() and tcp_v6_do_rcv(). So TCP_ESTBALISHED and TCP_LISTEN
 // are fast path and processed elsewhere, and leftovers are processed by
-// tcp_rcv_state_process(). We can trace this for handshack completion.
+// tcp_rcv_state_process(). We can trace this for handshake completion.
+// This should all be switched to static tracepoints when available.
 int trace_tcp_rcv_state_process(struct pt_regs *ctx, struct sock *sk)
 {
     u32 pid = bpf_get_current_pid_tgid();
