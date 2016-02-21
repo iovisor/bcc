@@ -1,3 +1,4 @@
+R"********(
 /*===---- stdarg.h - Variable argument handling ----------------------------===
  *
  * Copyright (c) 2008 Eli Friedman
@@ -50,3 +51,4 @@ typedef __builtin_va_list va_list;
 typedef __builtin_va_list __gnuc_va_list;
 
 #endif /* __STDARG_H */
+)********"

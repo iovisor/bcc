@@ -47,6 +47,7 @@
 
 #include "common.h"
 #include "exception.h"
+#include "exported_files.h"
 #include "kbuild_helper.h"
 #include "b_frontend_action.h"
 #include "loader.h"
@@ -58,9 +59,16 @@ using std::vector;
 
 namespace ebpf {
 
+map<string, unique_ptr<llvm::MemoryBuffer>> ClangLoader::remapped_files_;
+
 ClangLoader::ClangLoader(llvm::LLVMContext *ctx, unsigned flags)
     : ctx_(ctx), flags_(flags)
-{}
+{
+  if (remapped_files_.empty()) {
+    for (auto f : ExportedFiles::headers())
+      remapped_files_[f.first] = llvm::MemoryBuffer::getMemBuffer(f.second);
+  }
+}
 
 ClangLoader::~ClangLoader() {}
 
@@ -68,6 +76,10 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, unique_ptr<vector<TableDes
                        const string &file, bool in_memory, const char *cflags[], int ncflags) {
   using namespace clang;
 
+  string main_path = "/virtual/main.c";
+  string proto_path = "/virtual/include/bcc/proto.h";
+  string helpers_path = "/virtual/include/bcc/helpers.h";
+  unique_ptr<llvm::MemoryBuffer> main_buf;
   struct utsname un;
   uname(&un);
   char kdir[256];
@@ -80,7 +92,8 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, unique_ptr<vector<TableDes
 
   string abs_file;
   if (in_memory) {
-    abs_file = "<bcc-memory-buffer>";
+    abs_file = main_path;
+    main_buf = llvm::MemoryBuffer::getMemBuffer(file);
   } else {
     if (file.substr(0, 1) == "/")
       abs_file = file;
@@ -98,9 +111,9 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, unique_ptr<vector<TableDes
   if (kbuild_helper.get_flags(un.machine, &kflags))
     return -1;
   kflags.push_back("-include");
-  kflags.push_back(BCC_INSTALL_PREFIX "/share/bcc/include/bcc/helpers.h");
-  kflags.push_back("-I");
-  kflags.push_back(BCC_INSTALL_PREFIX "/share/bcc/include");
+  kflags.push_back("/virtual/include/bcc/helpers.h");
+  kflags.push_back("-isystem");
+  kflags.push_back("/virtual/include");
   for (auto it = kflags.begin(); it != kflags.end(); ++it)
     flags_cstr.push_back(it->c_str());
   if (cflags) {
@@ -156,11 +169,17 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, unique_ptr<vector<TableDes
                                           const_cast<const char **>(ccargs.data()) + ccargs.size(), diags))
     return -1;
 
+  // This option instructs clang whether or not to free the file buffers that we
+  // give to it. Since the embedded header files should be copied fewer times
+  // and reused if possible, set this flag to true.
+  invocation1->getPreprocessorOpts().RetainRemappedFileBuffers = true;
+  for (const auto &f : remapped_files_)
+    invocation1->getPreprocessorOpts().addRemappedFile(f.first, &*f.second);
+
   if (in_memory) {
-    invocation1->getPreprocessorOpts().addRemappedFile("<bcc-memory-buffer>",
-                                                       llvm::MemoryBuffer::getMemBuffer(file).release());
+    invocation1->getPreprocessorOpts().addRemappedFile(main_path, &*main_buf);
     invocation1->getFrontendOpts().Inputs.clear();
-    invocation1->getFrontendOpts().Inputs.push_back(FrontendInputFile("<bcc-memory-buffer>", IK_C));
+    invocation1->getFrontendOpts().Inputs.push_back(FrontendInputFile(main_path, IK_C));
   }
   invocation1->getFrontendOpts().DisableFree = false;
 
@@ -174,6 +193,7 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, unique_ptr<vector<TableDes
   BFrontendAction bact(os, flags_);
   if (!compiler1.ExecuteAction(bact))
     return -1;
+  unique_ptr<llvm::MemoryBuffer> out_buf = llvm::MemoryBuffer::getMemBuffer(out_str);
   // this contains the open FDs
   *tables = bact.take_tables();
 
@@ -183,10 +203,12 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, unique_ptr<vector<TableDes
                                           const_cast<const char **>(ccargs.data()) + ccargs.size(), diags))
     return -1;
   CompilerInstance compiler2;
-  invocation2->getPreprocessorOpts().addRemappedFile("<bcc-memory-buffer>",
-                                                     llvm::MemoryBuffer::getMemBuffer(out_str).release());
+  invocation2->getPreprocessorOpts().RetainRemappedFileBuffers = true;
+  for (const auto &f : remapped_files_)
+    invocation2->getPreprocessorOpts().addRemappedFile(f.first, &*f.second);
+  invocation2->getPreprocessorOpts().addRemappedFile(main_path, &*out_buf);
   invocation2->getFrontendOpts().Inputs.clear();
-  invocation2->getFrontendOpts().Inputs.push_back(FrontendInputFile("<bcc-memory-buffer>", IK_C));
+  invocation2->getFrontendOpts().Inputs.push_back(FrontendInputFile(main_path, IK_C));
   invocation2->getFrontendOpts().DisableFree = false;
   // suppress warnings in the 2nd pass, but bail out on errors (our fault)
   invocation2->getDiagnosticOpts().IgnoreWarnings = true;

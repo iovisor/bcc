@@ -48,6 +48,7 @@
 #include "frontends/clang/loader.h"
 #include "frontends/clang/b_frontend_action.h"
 #include "bpf_module.h"
+#include "exported_files.h"
 #include "kbuild_helper.h"
 #include "shared_table.h"
 #include "libbpf.h"
@@ -331,9 +332,9 @@ int BPFModule::load_cfile(const string &file, bool in_memory, const char *cflags
 
 // Load in a pre-built list of functions into the initial Module object, then
 // build an ExecutionEngine.
-int BPFModule::load_includes(const string &tmpfile) {
+int BPFModule::load_includes(const string &text) {
   clang_loader_ = make_unique<ClangLoader>(&*ctx_, flags_);
-  if (clang_loader_->parse(&mod_, &tables_, tmpfile, false, nullptr, 0))
+  if (clang_loader_->parse(&mod_, &tables_, text, true, nullptr, 0))
     return -1;
   return 0;
 }
@@ -683,7 +684,12 @@ int BPFModule::load_b(const string &filename, const string &proto_filename) {
 
   // Helpers are inlined in the following file (C). Load the definitions and
   // pass the partially compiled module to the B frontend to continue with.
-  if (int rc = load_includes(BCC_INSTALL_PREFIX "/share/bcc/include/bcc/helpers.h"))
+  auto helpers_h = ExportedFiles::headers().find("/virtual/include/bcc/helpers.h");
+  if (helpers_h == ExportedFiles::headers().end()) {
+    fprintf(stderr, "Internal error: missing bcc/helpers.h");
+    return -1;
+  }
+  if (int rc = load_includes(helpers_h->second))
     return rc;
 
   b_loader_.reset(new BLoader(flags_));

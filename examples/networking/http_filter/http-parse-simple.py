@@ -19,8 +19,8 @@ import sys
 import socket
 import os
 
-# initialize BPF - load source code from http-parse.c
-bpf = BPF(src_file = "http-parse.c",debug = 0)
+# initialize BPF - load source code from http-parse-simple.c
+bpf = BPF(src_file = "http-parse-simple.c",debug = 0)
 
 #load eBPF program http_filter of type SOCKET_FILTER into the kernel eBPF vm
 #more info about eBPF program types

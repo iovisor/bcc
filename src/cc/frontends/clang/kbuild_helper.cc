@@ -57,7 +57,7 @@ int KBuildHelper::get_flags(const char *uname_machine, vector<string> *cflags) {
 
   cflags->push_back("-nostdinc");
   cflags->push_back("-isystem");
-  cflags->push_back(BCC_INSTALL_PREFIX "/share/bcc/lib/clang/include");
+  cflags->push_back("/virtual/lib/clang/include");
   cflags->push_back("-I./arch/"+arch+"/include");
   cflags->push_back("-Iarch/"+arch+"/include/generated/uapi");
   cflags->push_back("-Iarch/"+arch+"/include/generated");
