@@ -14,6 +14,8 @@ import argparse
 import re
 import ctypes as ct
 import os
+import traceback
+import sys
 
 class Time(object):
         # BPF timestamps come from the monotonic clock. To be able to filter
@@ -71,7 +73,7 @@ class Probe(object):
                 return self.python_format == ""
 
         def _bail(self, error):
-                raise ValueError("error parsing probe %s: %s" %
+                raise ValueError("error parsing probe '%s': %s" %
                                  (self.raw_probe, error))
 
         def _parse_probe(self):
@@ -124,7 +126,7 @@ class Probe(object):
                 elif parts[0] in ["p", "r"]:
                         self.probe_type = parts[0]
                 else:
-                        self._bail("expected '', 'p', or 'r', got %s" %
+                        self._bail("expected '', 'p', or 'r', got '%s'" %
                                    parts[0])
                 self.library = parts[1]
                 self.function = parts[2]
@@ -360,7 +362,8 @@ int %s(struct pt_regs *ctx)
                                           fn_name=self.probe_name,
                                           pid=self.pid)
 
-examples = """
+class Tool(object):
+        examples = """
 EXAMPLES:
 
 trace ::do_sys_open
@@ -379,56 +382,77 @@ trace 'r:c:malloc (retval) "allocated = %p", retval
         Trace returns from malloc and print non-NULL allocated buffers
 """
 
-parser = argparse.ArgumentParser(description=
-        "Attach to functions and print trace messages.",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=examples)
-parser.add_argument("-p", "--pid", type=int,
-        help="id of the process to trace (optional)")
-parser.add_argument("-v", "--verbose", action="store_true",
-        help="print resulting BPF program code before executing")
-parser.add_argument("-Z", "--string-size", type=int, default=80,
-        help="maximum size to read from strings")
-parser.add_argument("-S", "--include-self", action="store_true",
-        help="do not filter trace's own pid from the trace")
-parser.add_argument("-M", "--max-events", type=int,
-        help="number of events to print before quitting")
-parser.add_argument("-o", "--offset", action="store_true",
-        help="use relative time from first traced message")
-parser.add_argument(metavar="probe", dest="probes", nargs="+",
-        help="probe specifier (see examples)")
-args = parser.parse_args()
+        def __init__(self):
+                parser = argparse.ArgumentParser(description=
+                        "Attach to functions and print trace messages.",
+                        formatter_class=argparse.RawDescriptionHelpFormatter,
+                        epilog=Tool.examples)
+                parser.add_argument("-p", "--pid", type=int,
+                  help="id of the process to trace (optional)")
+                parser.add_argument("-v", "--verbose", action="store_true",
+                  help="print resulting BPF program code before executing")
+                parser.add_argument("-Z", "--string-size", type=int,
+                  default=80, help="maximum size to read from strings")
+                parser.add_argument("-S", "--include-self", action="store_true",
+                  help="do not filter trace's own pid from the trace")
+                parser.add_argument("-M", "--max-events", type=int,
+                  help="number of events to print before quitting")
+                parser.add_argument("-o", "--offset", action="store_true",
+                  help="use relative time from first traced message")
+                parser.add_argument(metavar="probe", dest="probes", nargs="+",
+                  help="probe specifier (see examples)")
+                self.args = parser.parse_args()
 
-Probe.configure(args)
+        def _create_probes(self):
+                Probe.configure(self.args)
+                self.probes = []
+                for probe_spec in self.args.probes:
+                        self.probes.append(Probe(
+                                probe_spec, self.args.string_size))
 
-probes = []
-for probe_spec in args.probes:
-        probes.append(Probe(probe_spec, args.string_size))
-
-program = """
+        def _generate_program(self):
+                self.program = """
 #include <linux/ptrace.h>
 #include <linux/sched.h>        /* For TASK_COMM_LEN */
 
 """
-for probe in probes:
-        program += probe.generate_program(args.pid or -1, args.include_self)
+                for probe in self.probes:
+                        self.program += probe.generate_program(
+                                self.args.pid or -1, self.args.include_self)
 
-if args.verbose:
-        print(program)
+                if self.args.verbose:
+                        print(self.program)
 
-bpf = BPF(text=program)
+        def _attach_probes(self):
+                self.bpf = BPF(text=self.program)
+                for probe in self.probes:
+                        if self.args.verbose:
+                                print(probe)
+                        probe.attach(self.bpf, self.args.verbose)
 
-for probe in probes:
-        if args.verbose:
-                print(probe)
-        probe.attach(bpf, args.verbose)
+        def _main_loop(self):
+                all_probes_trivial = all(map(Probe.is_default_action,
+                                             self.probes))
 
-all_probes_trivial = all(map(Probe.is_default_action, probes))
+                # Print header
+                print("%-8s %-6s %-12s %-16s %s" % \
+                      ("TIME", "PID", "COMM", "FUNC",
+                      "-" if not all_probes_trivial else ""))
 
-# Print header
-print("%-8s %-6s %-12s %-16s %s" % ("TIME", "PID", "COMM", "FUNC",
-      "-" if not all_probes_trivial else ""))
+                while True:
+                        self.bpf.kprobe_poll()
 
-while True:
-        bpf.kprobe_poll()
+        def run(self):
+                try:
+                        self._create_probes()
+                        self._generate_program()
+                        self._attach_probes()
+                        self._main_loop()
+                except:
+                        if self.args.verbose:
+                                traceback.print_exc()
+                        else:
+                                print(sys.exc_value)
 
+if __name__ == "__main__":
+       Tool().run()
