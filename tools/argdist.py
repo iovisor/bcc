@@ -16,6 +16,8 @@ from bcc import BPF
 from time import sleep, strftime
 import argparse
 import re
+import traceback
+import sys
 
 class Specifier(object):
         probe_text = """
@@ -45,7 +47,7 @@ int PROBENAME(struct pt_regs *ctx SIGNATURE)
                 headers = ""
                 for header, keywords in Specifier.auto_includes.items():
                         for keyword in keywords:
-                                for specifier in specifiers:                            
+                                for specifier in specifiers:
                                         if keyword in specifier:
                                                 headers += "#include <%s>\n" \
                                                            % header
@@ -207,7 +209,7 @@ u64 __time = bpf_ktime_get_ns();
         def __init__(self, type, specifier, pid):
                 self.raw_spec = specifier
                 self._validate_specifier()
- 
+
                 spec_and_label = specifier.split('#')
                 self.label = spec_and_label[1] \
                              if len(spec_and_label) == 2 else None
@@ -242,7 +244,7 @@ u64 __time = bpf_ktime_get_ns();
                 self.filter = "" if len(parts) != 6 else parts[5]
                 self._substitute_exprs()
 
-                # Do we need to attach an entry probe so that we can collect an 
+                # Do we need to attach an entry probe so that we can collect an
                 # argument that is required for an exit (return) probe?
                 def check(expr):
                         keywords = ["$entry", "$latency"]
@@ -303,13 +305,13 @@ u64 __time = bpf_ktime_get_ns();
                         text = "struct %s_key_t __key = {};\n" % \
                                 self.probe_hash_name
                         for i in range(0, len(self.exprs)):
-                                text += self._generate_field_assignment(i) 
+                                text += self._generate_field_assignment(i)
                         return text
 
         def _generate_hash_update(self):
                 if self.type == "hist":
                         return "%s.increment(bpf_log2l(__key));" % \
-                                self.probe_hash_name 
+                                self.probe_hash_name
                 else:
                         return "%s.increment(__key);" % self.probe_hash_name
 
@@ -335,7 +337,7 @@ u64 __time = bpf_ktime_get_ns();
                 prefix = ""
                 if self.entry_probe_required:
                         program = self._generate_entry_probe()
-                        prefix = self._generate_retprobe_prefix()                                         
+                        prefix = self._generate_retprobe_prefix()
                         # Replace $entry(paramname) with a reference to the
                         # value we collected when entering the function:
                         self._replace_entry_exprs()
@@ -353,9 +355,9 @@ u64 __time = bpf_ktime_get_ns();
                 key_expr = self._generate_key_assignment()
                 collect = self._generate_hash_update()
                 program = program.replace("DATA_DECL", decl)
-                program = program.replace("KEY_EXPR", key_expr) 
+                program = program.replace("KEY_EXPR", key_expr)
                 program = program.replace("FILTER",
-                        "1" if len(self.filter) == 0 else self.filter) 
+                        "1" if len(self.filter) == 0 else self.filter)
                 program = program.replace("COLLECT", collect)
                 program = program.replace("PREFIX", prefix)
                 return program
@@ -396,7 +398,7 @@ u64 __time = bpf_ktime_get_ns();
                         "(bpf_ktime_get_ns() - *____latency_val)", "$latency")
                 # Replace alias values back with the alias name
                 for alias, subst in Specifier.aliases.items():
-                        expr = expr.replace(subst, alias) 
+                        expr = expr.replace(subst, alias)
                 # Replace retval expression with $retval
                 expr = expr.replace("ctx->ax", "$retval")
                 # Replace ugly (*__param_val) expressions with param name
@@ -425,7 +427,7 @@ u64 __time = bpf_ktime_get_ns();
                         data = sorted(data.items(), key=lambda kv: kv[1].value)
                         if top is not None:
                                 data = data[-top:]
-                        for key, value in data: 
+                        for key, value in data:
                                 # Print some nice values if the user didn't
                                 # specify an expression to probe
                                 if self.is_default_expr:
@@ -435,7 +437,7 @@ u64 __time = bpf_ktime_get_ns();
                                                 key_str = "retval = %s" % \
                                                           self._v2s(key.v0)
                                 else:
-                                        key_str = self._display_key(key) 
+                                        key_str = self._display_key(key)
                                 print("\t%-10s %s" % \
                                       (str(value.value), key_str))
                 elif self.type == "hist":
@@ -443,7 +445,8 @@ u64 __time = bpf_ktime_get_ns();
                                 if not self.is_default_expr  else "retval")
                         data.print_log2_hist(val_type=label)
 
-examples = """
+class Tool(object):
+        examples = """
 Probe specifier syntax:
         {p,r}:[library]:function(signature)[:type[,type...]:expr[,expr...][:filter]][#label]
 Where:
@@ -487,7 +490,7 @@ argdist -p 1005 -H 'r:c:read()'
 argdist -C 'r::__vfs_read():u32:$PID:$latency > 100000'
         Print frequency of reads by process where the latency was >0.1ms
 
-argdist -H 'r::__vfs_read(void *file, void *buf, size_t count):size_t:$entry(count):$latency > 1000000' 
+argdist -H 'r::__vfs_read(void *file, void *buf, size_t count):size_t:$entry(count):$latency > 1000000'
         Print a histogram of read sizes that were longer than 1ms
 
 argdist -H \\
@@ -497,7 +500,7 @@ argdist -H \\
 
 argdist -C 'p:c:fork()#fork calls'
         Count fork() calls in libc across all processes
-        Can also use funccount.py, which is easier and more flexible 
+        Can also use funccount.py, which is easier and more flexible
 
 argdist  -H \\
         'p:c:sleep(u32 seconds):u32:seconds' \\
@@ -507,72 +510,99 @@ argdist  -H \\
 argdist -p 2780 -z 120 \\
         -C 'p:c:write(int fd, char* buf, size_t len):char*:buf:fd==1'
         Spy on writes to STDOUT performed by process 2780, up to a string size
-        of 120 characters 
+        of 120 characters
 """
 
-parser = argparse.ArgumentParser(description=
-        "Trace a function and display a summary of its parameter values.",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=examples)
-parser.add_argument("-p", "--pid", type=int,
-        help="id of the process to trace (optional)")
-parser.add_argument("-z", "--string-size", default=80, type=int,
-        help="maximum string size to read from char* arguments")
-parser.add_argument("-i", "--interval", default=1, type=int,
-        help="output interval, in seconds")
-parser.add_argument("-n", "--number", type=int, dest="count",
-        help="number of outputs")
-parser.add_argument("-v", "--verbose", action="store_true",
-        help="print resulting BPF program code before executing")
-parser.add_argument("-T", "--top", type=int,
-        help="number of top results to show (not applicable to histograms)")
-parser.add_argument("-H", "--histogram", nargs="*", dest="histspecifier",
-        metavar="specifier",
-        help="probe specifier to capture histogram of (see examples below)")
-parser.add_argument("-C", "--count", nargs="*", dest="countspecifier",
-        metavar="specifier",
-        help="probe specifier to capture count of (see examples below)")
-parser.add_argument("-I", "--include", nargs="*", metavar="header",
-        help="additional header files to include in the BPF program")
-args = parser.parse_args()
+        def __init__(self):
+                parser = argparse.ArgumentParser(description="Trace a " +
+                  "function and display a summary of its parameter values.",
+                  formatter_class=argparse.RawDescriptionHelpFormatter,
+                  epilog=Tool.examples)
+                parser.add_argument("-p", "--pid", type=int,
+                  help="id of the process to trace (optional)")
+                parser.add_argument("-z", "--string-size", default=80,
+                  type=int,
+                  help="maximum string size to read from char* arguments")
+                parser.add_argument("-i", "--interval", default=1, type=int,
+                  help="output interval, in seconds")
+                parser.add_argument("-n", "--number", type=int, dest="count",
+                  help="number of outputs")
+                parser.add_argument("-v", "--verbose", action="store_true",
+                  help="print resulting BPF program code before executing")
+                parser.add_argument("-T", "--top", type=int,
+                  help="number of top results to show (not applicable to " +
+                  "histograms)")
+                parser.add_argument("-H", "--histogram", nargs="*",
+                  dest="histspecifier", metavar="specifier",
+                  help="probe specifier to capture histogram of " +
+                  "(see examples below)")
+                parser.add_argument("-C", "--count", nargs="*",
+                  dest="countspecifier", metavar="specifier",
+                  help="probe specifier to capture count of " +
+                  "(see examples below)")
+                parser.add_argument("-I", "--include", nargs="*",
+                  metavar="header",
+                  help="additional header files to include in the BPF program")
+                self.args = parser.parse_args()
 
-specifiers = []
-for specifier in (args.countspecifier or []):
-        specifiers.append(Specifier("freq", specifier, args.pid))
-for histspecifier in (args.histspecifier or []):
-        specifiers.append(Specifier("hist", histspecifier, args.pid))
-if len(specifiers) == 0:
-        print("at least one specifier is required")
-        exit(1)
+        def _create_specifiers(self):
+                self.specifiers = []
+                for specifier in (self.args.countspecifier or []):
+                        self.specifiers.append(Specifier(
+                                "freq", specifier, self.args.pid))
+                for histspecifier in (self.args.histspecifier or []):
+                        self.specifiers.append(
+                                Specifier("hist", histspecifier, self.args.pid))
+                if len(self.specifiers) == 0:
+                        print("at least one specifier is required")
+                        exit(1)
 
-bpf_source = """
+        def _generate_program(self):
+                bpf_source = """
 struct __string_t { char s[%d]; };
 
 #include <uapi/linux/ptrace.h>
-""" % args.string_size
-for include in (args.include or []):
-        bpf_source += "#include <%s>\n" % include
-bpf_source += Specifier.generate_auto_includes(map(lambda s: s.raw_spec, specifiers))
-for specifier in specifiers:
-        bpf_source += specifier.generate_text()
+                """ % self.args.string_size
+                for include in (self.args.include or []):
+                        bpf_source += "#include <%s>\n" % include
+                bpf_source += Specifier.generate_auto_includes(
+                                map(lambda s: s.raw_spec, self.specifiers))
+                for specifier in self.specifiers:
+                        bpf_source += specifier.generate_text()
+                if self.args.verbose:
+                        print(bpf_source)
+                self.bpf = BPF(text=bpf_source)
 
-if args.verbose:
-        print(bpf_source)
+        def _attach(self):
+                for specifier in self.specifiers:
+                        specifier.attach(self.bpf)
 
-bpf = BPF(text=bpf_source)
+        def _main_loop(self):
+                count_so_far = 0
+                while True:
+                        try:
+                                sleep(self.args.interval)
+                        except KeyboardInterrupt:
+                                exit()
+                        print("[%s]" % strftime("%H:%M:%S"))
+                        for specifier in self.specifiers:
+                                specifier.display(self.args.top)
+                        count_so_far += 1
+                        if self.args.count is not None and \
+                           count_so_far >= self.args.count:
+                                exit()
 
-for specifier in specifiers:
-        specifier.attach(bpf)
+        def run(self):
+                try:
+                        self._create_specifiers()
+                        self._generate_program()
+                        self._attach()
+                        self._main_loop()
+                except:
+                        if self.args.verbose:
+                                traceback.print_exc()
+                        else:
+                                print(sys.exc_value)
 
-count_so_far = 0
-while True:
-        try:
-                sleep(args.interval)
-        except KeyboardInterrupt:
-                exit()
-        print("[%s]" % strftime("%H:%M:%S"))
-        for specifier in specifiers:
-                specifier.display(args.top)
-        count_so_far += 1
-        if args.count is not None and count_so_far >= args.count:
-                exit()
+if __name__ == "__main__":
+        Tool().run()
