@@ -112,12 +112,15 @@ To build the toolchain from source, one needs:
 
 ### Install build dependencies
 ```
+# Trusty and older
 VER=trusty
 echo "deb http://llvm.org/apt/$VER/ llvm-toolchain-$VER-3.7 main
 deb-src http://llvm.org/apt/$VER/ llvm-toolchain-$VER-3.7 main" | \
   sudo tee /etc/apt/sources.list.d/llvm.list
 wget -O - http://llvm.org/apt/llvm-snapshot.gpg.key | sudo apt-key add -
 sudo apt-get update
+
+# All versions
 sudo apt-get -y install bison build-essential cmake flex git libedit-dev \
   libllvm3.7 llvm-3.7-dev libclang-3.7-dev python zlib1g-dev
 ```
