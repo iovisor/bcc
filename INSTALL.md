@@ -36,9 +36,9 @@ Install a 4.3+ kernel from http://kernel.ubuntu.com/~kernel-ppa/mainline,
 for example:
 
 ```bash
-VER=4.3.0-040300
+VER=4.4.2-040402
 PREFIX=http://kernel.ubuntu.com/~kernel-ppa/mainline/v4.3-wily/
-REL=201511020949
+REL=201602171633
 wget ${PREFIX}/linux-headers-${VER}-generic_${VER}.${REL}_amd64.deb
 wget ${PREFIX}/linux-headers-${VER}_${VER}.${REL}_all.deb
 wget ${PREFIX}/linux-image-${VER}-generic_${VER}.${REL}_amd64.deb
@@ -48,8 +48,8 @@ sudo dpkg -i linux-*${VER}.${REL}*.deb
 
 Update PREFIX to the latest date, and you can browse the files in the PREFIX url to find the REL number.
 
-Tagged bcc binary packages are built for Ubuntu Trusty (14.04) and hosted at
-http://52.8.15.63/apt/.
+Tagged and signed bcc binary packages are built for Ubuntu Trusty (14.04) and
+hosted at http://52.8.15.63/apt/.
 
 To install:
 ```bash
@@ -76,18 +76,18 @@ Install a 4.2+ kernel from
 http://alt.fedoraproject.org/pub/alt/rawhide-kernel-nodebug, for example:
 
 ```bash
-sudo wget http://alt.fedoraproject.org/pub/alt/rawhide-kernel-nodebug/fedora-rawhide-kernel-nodebug.repo -O /etc/yum.repos.d/fedora-rawhide-kernel-nodebug.repo
-sudo dnf install -y kernel-core-4.2.0-1.fc24.x86_64 kernel-4.2.0-1.fc24.x86_64 kernel-devel-4.2.0-1.fc24.x86_64 kernel-modules-4.2.0-1.fc24.x86_64 kernel-headers-4.2.0-1.fc24.x86_64
+sudo dnf config-manager --add-repo=http://alt.fedoraproject.org/pub/alt/rawhide-kernel-nodebug/fedora-rawhide-kernel-nodebug.repo
+sudo dnf update
 # reboot
 ```
 
-Tagged bcc binary packages are built for Fedora 22 and hosted at
-http://52.8.15.63/yum/.
+Nightly bcc binary packages are built for Fedora 23 and 24, hosted at
+`http://52.8.15.63/yum/nightly/f{23,24}`.
 
-To install:
+To install (change 'f23' to 'f24' for rawhide):
 ```bash
-sudo wget http://52.8.15.63/yum/main/f22/iovisor.repo -O /etc/yum.repos.d/iovisor.repo
-sudo dnf install -y libbcc libbcc-examples python-bcc
+echo -e '[iovisor]\nbaseurl=http://52.8.15.63/yum/nightly/f23/$basearch\nenabled=1\ngpgcheck=0' | sudo tee /etc/yum.repos.d/iovisor.repo
+sudo dnf install bcc-tools
 ```
 
 ## Arch - AUR
@@ -157,8 +157,6 @@ sudo tar xf clang+llvm-3.7.0-x86_64-fedora22.tar.xz -C /usr/local --strip 1
 ```
 git clone https://github.com/iovisor/bcc.git
 mkdir bcc/build; cd bcc/build
-# optional
-export CC=/usr/local/bin/clang CXX=/usr/local/bin/clang++
 cmake .. -DCMAKE_INSTALL_PREFIX=/usr
 make
 sudo make install
@@ -174,7 +172,7 @@ cd llvm/tools; git clone http://llvm.org/git/clang.git
 cd ..; mkdir -p build/install; cd build
 cmake -G "Unix Makefiles" -DLLVM_TARGETS_TO_BUILD="BPF;X86" \
   -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$PWD/install ..
-make -j4
+make
 make install
 export PATH=$PWD/install/bin:$PATH
 ```
