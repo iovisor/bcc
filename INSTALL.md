@@ -37,7 +37,7 @@ for example:
 
 ```bash
 VER=4.4.2-040402
-PREFIX=http://kernel.ubuntu.com/~kernel-ppa/mainline/v4.3-wily/
+PREFIX=http://kernel.ubuntu.com/~kernel-ppa/mainline/v4.4.2-wily/
 REL=201602171633
 wget ${PREFIX}/linux-headers-${VER}-generic_${VER}.${REL}_amd64.deb
 wget ${PREFIX}/linux-headers-${VER}_${VER}.${REL}_all.deb
