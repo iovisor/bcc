@@ -47,6 +47,10 @@ many possible capabilities.
 
 See [INSTALL.md](INSTALL.md) for installation steps on your platform.
 
+## FAQ
+
+See [FAQ.txt](FAQ.txt) for the most common troubleshoot questions.
+
 ## Contents
 
 Some of these are single files that contain both C and Python, others have a
