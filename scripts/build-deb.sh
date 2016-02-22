@@ -11,11 +11,22 @@ function cleanup() {
 }
 trap cleanup EXIT
 
-mkdir $TMP/bcc
-cp -a * $TMP/bcc
+git_tag_latest=$(git describe --abbrev=0)
+git_rev_count=$(git rev-list $git_tag_latest.. --count)
+git_rev_count=$[$git_rev_count+1]
+git_subject=$(git log --pretty="%s" -n 1)
+release=$git_rev_count
+if [[ "$release" != "1" ]]; then
+  release="${release}.git.$(git log --pretty='%h' -n 1)"
+fi
+revision=${git_tag_latest:1}
+
+git archive HEAD --prefix=bcc/ --format=tar.gz -o $TMP/bcc_$revision.orig.tar.gz
+
 pushd $TMP
-tar zcf bcc_0.1.7.orig.tar.gz bcc/
+tar xf bcc_$revision.orig.tar.gz
 cd bcc
+dch -v $revision-$release "$git_subject"
 DEB_BUILD_OPTIONS="nocheck parallel=${PARALLEL}" debuild -us -uc
 popd
 
