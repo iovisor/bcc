@@ -366,18 +366,22 @@ class Tool(object):
         examples = """
 EXAMPLES:
 
-trace ::do_sys_open
+trace do_sys_open
         Trace the open syscall and print a default trace message when entered
-trace '::do_sys_open "%s", arg2'
+trace 'do_sys_open "%s", arg2'
         Trace the open syscall and print the filename being opened
-trace '::sys_read (arg3 > 20000) "read %d bytes", arg3'
+trace 'sys_read (arg3 > 20000) "read %d bytes", arg3'
         Trace the read syscall and print a message for reads >20000 bytes
 trace 'r::do_sys_return "%llx", retval'
         Trace the return from the open syscall and print the return value
-trace ':c:open (arg2 == 42) "%s %d", arg1, arg2'
+trace 'c:open (arg2 == 42) "%s %d", arg1, arg2'
         Trace the open() call from libc only if the flags (arg2) argument is 42
-trace ':c:malloc "size = %d", arg1'
+trace 'c:malloc "size = %d", arg1'
         Trace malloc calls and print the size being allocated
+trace 'p:c:write (arg1 == 1) "writing %d bytes to STDOUT", arg3'
+        Trace the write() call from libc to monitor writes to STDOUT
+trace 'r::__kmalloc (retval == 0) "kmalloc failed!"
+        Trace returns from __kmalloc which returned a null pointer
 trace 'r:c:malloc (retval) "allocated = %p", retval
         Trace returns from malloc and print non-NULL allocated buffers
 """

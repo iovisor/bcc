@@ -8,7 +8,7 @@ arguments and return values.
 For example, suppose you want to trace all commands being exec'd across the
 system:
 
-# trace '::sys_execve "%s", arg1'
+# trace 'sys_execve "%s", arg1'
 TIME     PID    COMM         FUNC             -
 05:11:51 4402   bash         sys_execve       /usr/bin/man
 05:11:51 4411   man          sys_execve       /usr/local/bin/less
@@ -37,7 +37,7 @@ Next, suppose you are looking for large reads across the system. Let's trace
 the read system call and inspect the third argument, which is the number of
 bytes to be read:
 
-# trace '::sys_read (arg3 > 20000) "read %d bytes", arg3'
+# trace 'sys_read (arg3 > 20000) "read %d bytes", arg3'
 TIME     PID    COMM         FUNC             -
 05:18:23 4490   dd           sys_read         read 1048576 bytes
 05:18:23 4490   dd           sys_read         read 1048576 bytes
@@ -83,7 +83,7 @@ integer, which can never be smaller than 0.
 As a final example, let's trace open syscalls for a specific process. By 
 default, tracing is system-wide, but the -p switch overrides this:
 
-# trace -p 2740 '::do_sys_open "%s", arg2'
+# trace -p 2740 'do_sys_open "%s", arg2'
 TIME     PID    COMM         FUNC             -
 05:36:16 15872  ls           do_sys_open      /etc/ld.so.cache
 05:36:16 15872  ls           do_sys_open      /lib64/libselinux.so.1
@@ -126,18 +126,22 @@ optional arguments:
 
 EXAMPLES:
 
-trace ::do_sys_open
+trace do_sys_open
         Trace the open syscall and print a default trace message when entered
-trace '::do_sys_open "%s", arg2'
+trace 'do_sys_open "%s", arg2'
         Trace the open syscall and print the filename being opened
-trace '::sys_read (arg3 > 20000) "read %d bytes", arg3'
+trace 'sys_read (arg3 > 20000) "read %d bytes", arg3'
         Trace the read syscall and print a message for reads >20000 bytes
 trace r::do_sys_return
         Trace the return from the open syscall
-trace ':c:open (arg2 == 42) "%s %d", arg1, arg2'
+trace 'c:open (arg2 == 42) "%s %d", arg1, arg2'
         Trace the open() call from libc only if the flags (arg2) argument is 42
-trace ':c:malloc "size = %d", arg1'
+trace 'c:malloc "size = %d", arg1'
         Trace malloc calls and print the size being allocated
+trace 'p:c:write (arg1 == 1) "writing %d bytes to STDOUT", arg3'
+        Trace the write() call from libc to monitor writes to STDOUT
+trace 'r::__kmalloc (retval == 0) "kmalloc failed!"
+        Trace returns from __kmalloc which returned a null pointer
 trace 'r:c:malloc (retval) "allocated = %p", retval
         Trace returns from malloc and print non-NULL allocated buffers
 
