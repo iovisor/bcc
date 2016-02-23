@@ -186,6 +186,10 @@ class TableBase(MutableMapping):
         for k in self.keys():
             self.__delitem__(k)
 
+    def zero(self):
+        for k in self.keys():
+            self[k] = self.Leaf()
+
     def __iter__(self):
         return TableBase.Iter(self, self.Key)
 
