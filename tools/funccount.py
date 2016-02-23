@@ -57,18 +57,25 @@ def signal_ignore(signal, frame):
 bpf_text = """
 #include <uapi/linux/ptrace.h>
 
-struct key_t {
+#define MAP_SIZE 10000
+
+struct val_t {
     u64 ip;
+    u64 value;
 };
-BPF_HASH(counts, struct key_t);
+BPF_TABLE("array", int, struct val_t, counts, MAP_SIZE);
 
 int trace_count(struct pt_regs *ctx) {
     FILTER
-    struct key_t key = {};
-    u64 zero = 0, *val;
-    key.ip = ctx->ip;
-    val = counts.lookup_or_init(&key, &zero);
-    (*val)++;
+    struct val_t *val;
+    u64 zero = 0;
+    u32 key = ctx->ip % MAP_SIZE;
+    val = counts.lookup(&key);
+    if (!val || (val->ip != 0 && val->ip != ctx->ip))
+        return 0;
+    if (val->ip == 0)
+            val->ip = ctx->ip;
+    val->value++;
     return 0;
 }
 """
@@ -108,7 +115,8 @@ while (1):
     print("%-16s %-26s %8s" % ("ADDR", "FUNC", "COUNT"))
     counts = b.get_table("counts")
     for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
-        print("%-16x %-26s %8d" % (k.ip, b.ksym(k.ip), v.value))
+        if v.ip:
+            print("%-16x %-26s %8d" % (v.ip, b.ksym(v.ip), v.value))
     counts.clear()
 
     if exiting:
