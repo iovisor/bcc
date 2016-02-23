@@ -1,3 +1,14 @@
+bcc (0.1.8-1) unstable; urgency=low
+
+  * Add many new utilities in tools/
+   * wakeuptime, offwaketime, argdist, {xfs,zfs,ext4}{slower,dist}, others
+  * Support for bpf_perf_event()
+  * Support for public tables shared between programs
+  * Support for up to 4.4 features
+  * Remove external file dependencies from clang lib
+
+ -- Brenden Blanco <bblanco@plumgrid.com>  Mon, 23 Feb 2016 00:41:00 +0000
+
 bcc (0.1.7-1) unstable; urgency=low
 
   * Tracing features and bugfixes

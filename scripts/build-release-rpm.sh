@@ -13,16 +13,8 @@ trap cleanup EXIT
 mkdir $TMP/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
 
 llvmver=3.7.1
-# only the most recent tag
-git_tag_latest=$(git describe --abbrev=0)
-git_rev_count=$(git rev-list $git_tag_latest.. --count)
-git_rev_count=$[$git_rev_count+1]
-git_subject=$(git log --pretty="%s" -n 1)
-release=$git_rev_count
-if [[ "$git_rev_count" != "1" ]]; then
-  release="${release}.git.$(git log --pretty='%h' -n 1)"
-fi
-revision=${git_tag_latest:1}
+
+. scripts/git-tag.sh
 
 git archive HEAD --prefix=bcc/ --format=tar.gz -o $TMP/SOURCES/$git_tag_latest.tar.gz
 wget -P $TMP/SOURCES http://llvm.org/releases/$llvmver/{cfe,llvm}-$llvmver.src.tar.xz
