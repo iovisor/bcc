@@ -33,8 +33,8 @@ open_uprobes = {}
 tracefile = None
 TRACEFS = "/sys/kernel/debug/tracing"
 KALLSYMS = "/proc/kallsyms"
-ksym_addrs = []
-ksym_names = []
+ksyms = []
+ksym_names = {}
 ksym_loaded = 0
 
 @atexit.register
@@ -629,7 +629,7 @@ class BPF(object):
 
     @staticmethod
     def _load_kallsyms():
-        global ksym_loaded, ksym_addrs, ksym_names
+        global ksym_loaded, ksyms, ksym_names
         if ksym_loaded:
             return
         try:
@@ -641,19 +641,20 @@ class BPF(object):
             cols = line.split()
             name = cols[2]
             addr = int(cols[0], 16)
-            ksym_addrs.append(addr)
-            ksym_names.append(name)
+            # keep a mapping of names to ksyms index
+            ksym_names[name] = len(ksyms)
+            ksyms.append((name, addr))
         syms.close()
         ksym_loaded = 1
 
     @staticmethod
     def _ksym_addr2index(addr):
-        global ksym_addrs
+        global ksyms
         start = -1
-        end = len(ksym_addrs)
+        end = len(ksyms)
         while end != start + 1:
             mid = int((start + end) / 2)
-            if addr < ksym_addrs[mid]:
+            if addr < ksyms[mid][1]:
                 end = mid
             else:
                 start = mid
@@ -666,12 +667,12 @@ class BPF(object):
         Translate a kernel memory address into a kernel function name, which is
         returned. This is a simple translator that uses /proc/kallsyms.
         """
-        global ksym_names
+        global ksyms
         BPF._load_kallsyms()
         idx = BPF._ksym_addr2index(addr)
         if idx == -1:
             return "[unknown]"
-        return ksym_names[idx]
+        return ksyms[idx][0]
 
     @staticmethod
     def ksymaddr(addr):
@@ -681,13 +682,27 @@ class BPF(object):
         instruction offset as a hexidecimal number, which is returned as a
         string. This is a simple translator that uses /proc/kallsyms.
         """
-        global ksym_addrs, ksym_names
+        global ksyms
         BPF._load_kallsyms()
         idx = BPF._ksym_addr2index(addr)
         if idx == -1:
             return "[unknown]"
-        offset = int(addr - ksym_addrs[idx])
-        return ksym_names[idx] + hex(offset)
+        offset = int(addr - ksyms[idx][1])
+        return ksyms[idx][0] + hex(offset)
+
+    @staticmethod
+    def ksymname(name):
+        """ksymname(name)
+
+        Translate a kernel name into an address. This is the reverse of
+        ksymaddr. Returns -1 when the function name is unknown."""
+
+        global ksyms, ksym_names
+        BPF._load_kallsyms()
+        idx = ksym_names.get(name, -1)
+        if idx == -1:
+            return 0
+        return ksyms[idx][1]
 
     @staticmethod
     def num_open_kprobes():
