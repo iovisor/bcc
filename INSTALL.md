@@ -13,7 +13,8 @@
 ## Kernel Configuration
 
 In general, to use these features, a Linux kernel version 4.1 or newer is
-required. In addition, the following flags should be set:
+required. In addition, the kernel should have been compiled with the following
+flags set:
 
 ```
 CONFIG_BPF=y
@@ -27,6 +28,9 @@ CONFIG_HAVE_BPF_JIT=y
 # [optional, for kprobes]
 CONFIG_BPF_EVENTS=y
 ```
+
+Kernel compile flags can usually be checked by looking at `/proc/config.gz` or
+`/boot/config-<kernel-version>`.
 
 # Packages
 
@@ -61,7 +65,7 @@ sudo apt-get install libbcc libbcc-examples python-bcc
 
 Test it:
 `sudo python /usr/share/bcc/examples/hello_world.py`
-`sudo python /usr/share/bcc/examples/task_switch.py`
+`sudo python /usr/share/bcc/examples/tracing/task_switch.py`
 
 (Optional) Install pyroute2 for additional networking features
 ```bash
