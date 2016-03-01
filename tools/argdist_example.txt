@@ -262,6 +262,27 @@ p::__kmalloc(size_t size, gfp_t flags):gfp_t,size_t:flags,size
 The flags value must be expanded by hand, but it's still helpful to eliminate
 certain kinds of allocations or visually group them together.
 
+argdist also has basic support for kernel tracepoints. It is sometimes more
+convenient to use tracepoints because they are documented and don't vary a lot
+between kernel versions like function signatures tend to. For example, let's
+trace the net:net_dev_start_xmit tracepoint and print the interface name that
+is transmitting:
+
+# argdist -C 't:net:net_dev_start_xmit(void *a, void *b, struct net_device *c):char*:c->name' -n 2
+[05:01:10]
+t:net:net_dev_start_xmit(void *a, void *b, struct net_device *c):char*:c->name
+        COUNT      EVENT
+        4          c->name = eth0
+[05:01:11]
+t:net:net_dev_start_xmit(void *a, void *b, struct net_device *c):char*:c->name
+        COUNT      EVENT
+        6          c->name = lo
+        92         c->name = eth0
+
+Note that to determine the necessary function signature you need to look at the
+TP_PROTO declaration in the kernel headers. For example, the net_dev_start_xmit
+tracepoint is defined in the include/trace/events/net.h header file.
+
 Here's a final example that finds how many write() system calls are performed
 by each process on the system:
 
@@ -311,13 +332,13 @@ optional arguments:
                         additional header files to include in the BPF program
 
 Probe specifier syntax:
-        {p,r}:[library]:function(signature)[:type[,type...]:expr[,expr...][:filter]][#label]
+        {p,r,t}:{[library],category}:function(signature)[:type[,type...]:expr[,expr...][:filter]][#label]
 Where:
-        p,r        -- probe at function entry or at function exit
+        p,r,t      -- probe at function entry, function exit, or kernel tracepoint
                       in exit probes: can use $retval, $entry(param), $latency
         library    -- the library that contains the function
                       (leave empty for kernel functions)
-        function   -- the function name to trace
+        category   -- the category of the kernel tracepoint (e.g. net, sched)
         signature  -- the function's parameters, as in the C header
         type       -- the type of the expression to collect (supports multiple)
         expr       -- the expression to collect (supports multiple)
@@ -365,7 +386,13 @@ argdist -C 'p:c:fork()#fork calls'
         Count fork() calls in libc across all processes
         Can also use funccount.py, which is easier and more flexible 
 
-argdist  -H \
+argdist -H 't:block:block_rq_complete():u32:tp.nr_sector'
+        Print histogram of number of sectors in completing block I/O requests
+
+argdist -C 't:irq:irq_handler_entry():int:tp.irq'
+        Aggregate interrupts by interrupt request (IRQ)
+
+argdist -H \
         'p:c:sleep(u32 seconds):u32:seconds' \
         'p:c:nanosleep(struct timespec *req):long:req->tv_nsec'
         Print histograms of sleep() and nanosleep() parameter values

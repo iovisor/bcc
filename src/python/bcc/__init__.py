@@ -326,6 +326,11 @@ class BPF(object):
         return open_kprobes
 
     @staticmethod
+    def open_uprobes():
+            global open_uprobes
+            return open_uprobes
+
+    @staticmethod
     def detach_kprobe(event):
         ev_name = "p_" + event.replace("+", "_").replace(".", "_")
         if ev_name not in open_kprobes:

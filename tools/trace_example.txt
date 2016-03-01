@@ -80,6 +80,31 @@ Note that the retval variable must be cast to int before comparing to zero.
 The reason is that the default type for argN and retval is an unsigned 64-bit
 integer, which can never be smaller than 0.
 
+trace has also some basic support for kernel tracepoints. For example, let's
+trace the block:block_rq_complete tracepoint and print out the number of sectors
+transferred:
+
+# trace 't:block:block_rq_complete "sectors=%d", tp.nr_sector'
+TIME     PID    COMM         FUNC             -
+01:23:51 0      swapper/0    block_rq_complete sectors=8
+01:23:55 10017  kworker/u64: block_rq_complete sectors=1
+01:23:55 0      swapper/0    block_rq_complete sectors=8
+^C
+
+To discover the tracepoint structure format (which you can refer to as the "tp"
+variable), use the tplist tool. For example:
+
+# tplist -v block:block_rq_complete
+block:block_rq_complete
+    dev_t dev;
+    sector_t sector;
+    unsigned int nr_sector;
+    int errors;
+    char rwbs[8];
+
+This output tells you that you can use "tp.dev", "tp.sector", etc. in your
+predicate and trace arguments.
+
 As a final example, let's trace open syscalls for a specific process. By 
 default, tracing is system-wide, but the -p switch overrides this:
 
@@ -144,4 +169,6 @@ trace 'r::__kmalloc (retval == 0) "kmalloc failed!"
         Trace returns from __kmalloc which returned a null pointer
 trace 'r:c:malloc (retval) "allocated = %p", retval
         Trace returns from malloc and print non-NULL allocated buffers
+trace 't:block:block_rq_complete "sectors=%d", tp.nr_sector'
+        Trace the block_rq_complete kernel tracepoint and print # of tx sectors
 
