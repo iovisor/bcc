@@ -165,6 +165,16 @@ static u32 (*bpf_get_route_realm)(void *ctx) =
 static int (*bpf_perf_event_output)(void *ctx, void *map, u32 index, void *data, u32 size) =
   (void *) BPF_FUNC_perf_event_output;
 #endif
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,5,0)
+static int (*bpf_skb_load_bytes)(void *ctx, int offset, void *to, u32 len) =
+  (void *) BPF_FUNC_skb_load_bytes;
+#endif
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,6,0)
+static int (*bpf_get_stackid)(void *ctx, void *map) =
+  (void *) BPF_FUNC_get_stackid;
+static int (*bpf_csum_diff)(void *from, u64 from_size, void *to, u64 to_size, u64 seed) =
+  (void *) BPF_FUNC_csum_diff;
+#endif
 
 /* llvm builtin functions that eBPF C program may use to
  * emit BPF_LD_ABS and BPF_LD_IND instructions
