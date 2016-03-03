@@ -32,8 +32,13 @@ if (CMAKE_COMPILER_IS_GNUCC)
   endif()
 endif()
 
-add_library(bcc SHARED bpf_common.cc bpf_module.cc libbpf.c perf_reader.c shared_table.cc exported_files.cc)
-set_target_properties(bcc PROPERTIES VERSION ${REVISION_LAST} SOVERSION 0)
+add_library(bcc-shared SHARED bpf_common.cc bpf_module.cc libbpf.c perf_reader.c shared_table.cc exported_files.cc)
+set_target_properties(bcc-shared PROPERTIES VERSION ${REVISION_LAST} SOVERSION 0)
+set_target_properties(bcc-shared PROPERTIES OUTPUT_NAME bcc)
+
+add_library(bcc-loader-static libbpf.c perf_reader.c)
+add_library(bcc-static STATIC bpf_common.cc bpf_module.cc shared_table.cc exported_files.cc)
+set_target_properties(bcc-static PROPERTIES OUTPUT_NAME bcc)
 
 # BPF is still experimental otherwise it should be available
 #llvm_map_components_to_libnames(llvm_libs bpf mcjit irreader passes)
@@ -45,9 +50,10 @@ set(clang_libs ${libclangFrontend} ${libclangSerialization} ${libclangDriver} ${
   ${libclangAST} ${libclangLex} ${libclangBasic})
 
 # Link against LLVM libraries
-target_link_libraries(bcc b_frontend clang_frontend ${clang_libs} ${llvm_libs} LLVMBPFCodeGen)
+target_link_libraries(bcc-shared b_frontend clang_frontend ${clang_libs} ${llvm_libs} LLVMBPFCodeGen)
+target_link_libraries(bcc-static b_frontend clang_frontend bcc-loader-static ${clang_libs} ${llvm_libs} LLVMBPFCodeGen)
 
-install(TARGETS bcc LIBRARY COMPONENT libbcc
+install(TARGETS bcc-shared LIBRARY COMPONENT libbcc
   DESTINATION ${CMAKE_INSTALL_LIBDIR})
 install(FILES bpf_common.h bpf_module.h ../libbpf.h COMPONENT libbcc
   DESTINATION include/bcc)
