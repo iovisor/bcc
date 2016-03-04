@@ -354,8 +354,14 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
           txt += ", bpf_get_smp_processor_id(), " + args_other + ")";
         } else {
           if (memb_name == "lookup") {
-            prefix = "bpf_map_lookup_elem";
-            suffix = ")";
+            if (table_it->type == BPF_MAP_TYPE_STACK_TRACE) {
+              prefix = "bpf_get_stackid";
+              // TODO: expose the different flags, how?
+              suffix = ", 0)";
+            } else {
+              prefix = "bpf_map_lookup_elem";
+              suffix = ")";
+            }
           } else if (memb_name == "update") {
             prefix = "bpf_map_update_elem";
             suffix = ", " + map_update_policy + ")";
@@ -578,6 +584,8 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
     } else if (A->getName() == "maps/perf_array") {
       if (KERNEL_VERSION(major,minor,0) >= KERNEL_VERSION(4,3,0))
         map_type = BPF_MAP_TYPE_PERF_EVENT_ARRAY;
+    } else if (A->getName() == "maps/stacktrace") {
+      map_type = BPF_MAP_TYPE_STACK_TRACE;
     } else if (A->getName() == "maps/extern") {
       is_extern = true;
       table.fd = SharedTables::instance()->lookup_fd(table.name);

@@ -22,6 +22,9 @@ BPF_MAP_TYPE_HASH = 1
 BPF_MAP_TYPE_ARRAY = 2
 BPF_MAP_TYPE_PROG_ARRAY = 3
 BPF_MAP_TYPE_PERF_EVENT_ARRAY = 4
+BPF_MAP_TYPE_PERCPU_HASH = 5
+BPF_MAP_TYPE_PERCPU_ARRAY = 6
+BPF_MAP_TYPE_STACK_TRACE = 7
 
 stars_max = 40
 
@@ -85,6 +88,12 @@ def Table(bpf, map_id, map_fd, keytype, leaftype):
         t = ProgArray(bpf, map_id, map_fd, keytype, leaftype)
     elif ttype == BPF_MAP_TYPE_PERF_EVENT_ARRAY:
         t = PerfEventArray(bpf, map_id, map_fd, keytype, leaftype)
+    elif ttype == BPF_MAP_TYPE_PERCPU_HASH:
+        t = PerCpuHashTable(bpf, map_id, map_fd, keytype, leaftype)
+    elif ttype == BPF_MAP_TYPE_PERCPU_ARRAY:
+        t = PerCpuArray(bpf, map_id, map_fd, keytype, leaftype)
+    elif ttype == BPF_MAP_TYPE_STACK_TRACE:
+        t = StackTrace(bpf, map_id, map_fd, keytype, leaftype)
     if t == None:
         raise Exception("Unknown table type %d" % ttype)
     return t
@@ -393,3 +402,30 @@ class PerfEventArray(ArrayBase):
             lib.perf_reader_free(reader)
             del(self.bpf.open_kprobes()[(id(self), key)])
         del self._cbs[key]
+
+class PerCpuHashTable(TableBase):
+    def __init__(self, *args, **kwargs):
+        raise Exception("Unsupported")
+
+class PerCpuArray(ArrayBase):
+    def __init__(self, *args, **kwargs):
+        raise Exception("Unsupported")
+
+class StackTrace(TableBase):
+    def __init__(self, *args, **kwargs):
+        super(StackTrace, self).__init__(*args, **kwargs)
+
+    def __len__(self):
+        i = 0
+        for k in self: i += 1
+        return i
+
+    def __delitem__(self, key):
+        key_p = ct.pointer(key)
+        res = lib.bpf_delete_elem(self.map_fd, ct.cast(key_p, ct.c_void_p))
+        if res < 0:
+            raise KeyError
+
+    def clear(self):
+        pass
+
