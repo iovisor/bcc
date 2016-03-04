@@ -93,7 +93,7 @@ void trace_stack(struct pt_regs *ctx) {
 if args.pid:
     bpf_text = bpf_text.replace('FILTER',
         ('u32 pid; pid = bpf_get_current_pid_tgid(); ' +
-        'if (pid != %s) { return 0; }') % (args.pid))
+        'if (pid != %s) { return; }') % (args.pid))
 else:
     bpf_text = bpf_text.replace('FILTER', '')
 if debug:
