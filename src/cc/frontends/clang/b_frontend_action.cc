@@ -352,16 +352,20 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
                                                                      Call->getArg(2)->getLocEnd()));
           txt = "bpf_perf_event_output(" + arg0 + ", bpf_pseudo_fd(1, " + fd + ")";
           txt += ", bpf_get_smp_processor_id(), " + args_other + ")";
+        } else if (memb_name == "get_stackid") {
+            if (table_it->type == BPF_MAP_TYPE_STACK_TRACE) {
+              txt = "bpf_get_stackid(";
+              txt += "bpf_pseudo_fd(1, " + fd + "), " + args + ")";
+            } else {
+              unsigned diag_id = C.getDiagnostics().getCustomDiagID(DiagnosticsEngine::Error,
+                                                                    "get_stackid only available on stacktrace maps");
+              C.getDiagnostics().Report(Call->getLocStart(), diag_id);
+              return false;
+            }
         } else {
           if (memb_name == "lookup") {
-            if (table_it->type == BPF_MAP_TYPE_STACK_TRACE) {
-              prefix = "bpf_get_stackid";
-              // TODO: expose the different flags, how?
-              suffix = ", 0)";
-            } else {
-              prefix = "bpf_map_lookup_elem";
-              suffix = ")";
-            }
+            prefix = "bpf_map_lookup_elem";
+            suffix = ")";
           } else if (memb_name == "update") {
             prefix = "bpf_map_update_elem";
             suffix = ", " + map_update_policy + ")";

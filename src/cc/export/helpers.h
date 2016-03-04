@@ -48,6 +48,7 @@ struct _name##_table_t { \
   int (*delete) (_key_type *); \
   void (*call) (void *, int index); \
   void (*increment) (_key_type); \
+  int (*get_stackid) (void *, u64); \
   _leaf_type data[_max_entries]; \
 }; \
 __attribute__((section("maps/" _table_type))) \
@@ -110,15 +111,12 @@ struct _name##_table_t _name
 #define BPF_HISTOGRAM(...) \
   BPF_HISTX(__VA_ARGS__, BPF_HIST3, BPF_HIST2, BPF_HIST1)(__VA_ARGS__)
 
+struct bpf_stacktrace {
+  u64 ip[BPF_MAX_STACK_DEPTH];
+};
+
 #define BPF_STACK_TRACE(_name, _max_entries) \
-struct _name##_table_t { \
-  int key; \
-  struct { u64 data[BPF_MAX_STACK_DEPTH]; } leaf; \
-  int (*lookup) (void *); \
-  struct { u64 data[BPF_MAX_STACK_DEPTH]; } data[_max_entries]; \
-}; \
-__attribute__((section("maps/stacktrace"))) \
-struct _name##_table_t _name
+  BPF_TABLE("stacktrace", int, struct bpf_stacktrace, _name, _max_entries);
 
 // packet parsing state machine helpers
 #define cursor_advance(_cursor, _len) \

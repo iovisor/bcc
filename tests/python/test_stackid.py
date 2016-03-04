@@ -14,7 +14,9 @@ BPF_STACK_TRACE(stack_traces, 10240);
 BPF_HASH(stack_entries, int, int);
 BPF_HASH(stub);
 int kprobe__htab_map_delete_elem(struct pt_regs *ctx, struct bpf_map *map, u64 *k) {
-    int id = stack_traces.lookup(ctx);
+    int id = stack_traces.get_stackid(ctx, (BPF_F_REUSE_STACKID));
+    if (id < 0)
+        return 0;
     int key = 1;
     stack_entries.update(&key, &id);
     return 0;
@@ -29,7 +31,7 @@ int kprobe__htab_map_delete_elem(struct pt_regs *ctx, struct bpf_map *map, u64 *
         self.assertIn(k, stack_entries)
         stackid = stack_entries[k]
         self.assertIsNotNone(stackid)
-        stack = stack_traces[stackid].data
+        stack = stack_traces[stackid].ip
         self.assertEqual(b.ksym(stack[0]), "htab_map_delete_elem")
 
 
