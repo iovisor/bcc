@@ -315,6 +315,8 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
         string prefix, suffix;
         string map_update_policy = "BPF_ANY";
         string txt;
+        auto rewrite_start = Call->getLocStart();
+        auto rewrite_end = Call->getLocEnd();
         if (memb_name == "lookup_or_init") {
           map_update_policy = "BPF_NOEXIST";
           string name = Ref->getDecl()->getName();
@@ -352,6 +354,19 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
                                                                      Call->getArg(2)->getLocEnd()));
           txt = "bpf_perf_event_output(" + arg0 + ", bpf_pseudo_fd(1, " + fd + ")";
           txt += ", bpf_get_smp_processor_id(), " + args_other + ")";
+        } else if (memb_name == "get_stackid") {
+            if (table_it->type == BPF_MAP_TYPE_STACK_TRACE) {
+              string arg0 = rewriter_.getRewrittenText(SourceRange(Call->getArg(0)->getLocStart(),
+                                                                   Call->getArg(0)->getLocEnd()));
+              txt = "bpf_get_stackid(";
+              txt += "bpf_pseudo_fd(1, " + fd + "), " + arg0;
+              rewrite_end = Call->getArg(0)->getLocEnd();
+            } else {
+              unsigned diag_id = C.getDiagnostics().getCustomDiagID(DiagnosticsEngine::Error,
+                                                                    "get_stackid only available on stacktrace maps");
+              C.getDiagnostics().Report(Call->getLocStart(), diag_id);
+              return false;
+            }
         } else {
           if (memb_name == "lookup") {
             prefix = "bpf_map_lookup_elem";
@@ -377,12 +392,12 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
 
           txt = prefix + args + suffix;
         }
-        if (!rewriter_.isRewritable(Call->getLocStart())) {
+        if (!rewriter_.isRewritable(rewrite_start) || !rewriter_.isRewritable(rewrite_end)) {
           C.getDiagnostics().Report(Call->getLocStart(), diag::err_expected)
               << "use of map function not in a macro";
           return false;
         }
-        rewriter_.ReplaceText(SourceRange(Call->getLocStart(), Call->getLocEnd()), txt);
+        rewriter_.ReplaceText(SourceRange(rewrite_start, rewrite_end), txt);
         return true;
       }
     }
@@ -578,6 +593,8 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
     } else if (A->getName() == "maps/perf_array") {
       if (KERNEL_VERSION(major,minor,0) >= KERNEL_VERSION(4,3,0))
         map_type = BPF_MAP_TYPE_PERF_EVENT_ARRAY;
+    } else if (A->getName() == "maps/stacktrace") {
+      map_type = BPF_MAP_TYPE_STACK_TRACE;
     } else if (A->getName() == "maps/extern") {
       is_extern = true;
       table.fd = SharedTables::instance()->lookup_fd(table.name);

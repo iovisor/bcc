@@ -25,6 +25,12 @@ R"********(
 #error "CONFIG_BPF_SYSCALL is undefined, please check your .config or ask your Linux distro to enable this feature"
 #endif
 
+#ifdef PERF_MAX_STACK_DEPTH
+#define BPF_MAX_STACK_DEPTH PERF_MAX_STACK_DEPTH
+#else
+#define BPF_MAX_STACK_DEPTH 127
+#endif
+
 /* helper macro to place programs, maps, license in
  * different sections in elf_bpf file. Section names
  * are interpreted by elf_bpf loader
@@ -42,6 +48,7 @@ struct _name##_table_t { \
   int (*delete) (_key_type *); \
   void (*call) (void *, int index); \
   void (*increment) (_key_type); \
+  int (*get_stackid) (void *, u64); \
   _leaf_type data[_max_entries]; \
 }; \
 __attribute__((section("maps/" _table_type))) \
@@ -103,6 +110,13 @@ struct _name##_table_t _name
 // BPF_HISTOGRAM(name, key_type=int, size=64)
 #define BPF_HISTOGRAM(...) \
   BPF_HISTX(__VA_ARGS__, BPF_HIST3, BPF_HIST2, BPF_HIST1)(__VA_ARGS__)
+
+struct bpf_stacktrace {
+  u64 ip[BPF_MAX_STACK_DEPTH];
+};
+
+#define BPF_STACK_TRACE(_name, _max_entries) \
+  BPF_TABLE("stacktrace", int, struct bpf_stacktrace, _name, _max_entries);
 
 // packet parsing state machine helpers
 #define cursor_advance(_cursor, _len) \
@@ -170,7 +184,7 @@ static int (*bpf_skb_load_bytes)(void *ctx, int offset, void *to, u32 len) =
   (void *) BPF_FUNC_skb_load_bytes;
 #endif
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4,6,0)
-static int (*bpf_get_stackid)(void *ctx, void *map) =
+static int (*bpf_get_stackid_)(void *ctx, void *map, u64 flags) =
   (void *) BPF_FUNC_get_stackid;
 static int (*bpf_csum_diff)(void *from, u64 from_size, void *to, u64 to_size, u64 seed) =
   (void *) BPF_FUNC_csum_diff;
@@ -362,6 +376,11 @@ static inline __attribute__((always_inline))
 SEC("helpers")
 int bpf_map_delete_elem_(uintptr_t map, void *key) {
   return bpf_map_delete_elem((void *)map, key);
+}
+
+static inline __attribute__((always_inline))
+int bpf_get_stackid(uintptr_t map, void *ctx, u64 flags) {
+  return bpf_get_stackid_(ctx, (void *)map, flags);
 }
 
 static inline __attribute__((always_inline))
