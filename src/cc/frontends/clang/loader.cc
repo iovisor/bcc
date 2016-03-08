@@ -82,11 +82,10 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, unique_ptr<vector<TableDes
   unique_ptr<llvm::MemoryBuffer> main_buf;
   struct utsname un;
   uname(&un);
-  char kdir[256];
-  snprintf(kdir, sizeof(kdir), "%s/%s/%s", KERNEL_MODULES_DIR, un.release, KERNEL_MODULES_SUFFIX);
+  string kdir = string(KERNEL_MODULES_DIR) + "/" + un.release;
 
   // clang needs to run inside the kernel dir
-  DirStack dstack(kdir);
+  DirStack dstack(kdir + "/" + KERNEL_MODULES_SUFFIX);
   if (!dstack.ok())
     return -1;
 
@@ -106,17 +105,10 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, unique_ptr<vector<TableDes
                                    "-Wno-gnu-variable-sized-type-not-at-end",
                                    "-x", "c", "-c", abs_file.c_str()});
 
-  KBuildHelper kbuild_helper;
+  KBuildHelper kbuild_helper(kdir);
   vector<string> kflags;
   if (kbuild_helper.get_flags(un.machine, &kflags))
     return -1;
-  // some module build directories split headers between source/ and build/
-  if (KERNEL_HAS_SOURCE_DIR) {
-    kflags.push_back("-isystem");
-    kflags.push_back(string(KERNEL_MODULES_DIR "/") + un.release + "/build/include");
-    kflags.push_back("-isystem");
-    kflags.push_back(string(KERNEL_MODULES_DIR "/") + un.release + "/build/include/generated/uapi");
-  }
   kflags.push_back("-include");
   kflags.push_back("/virtual/include/bcc/helpers.h");
   kflags.push_back("-isystem");
