@@ -22,7 +22,7 @@ namespace ebpf {
 using std::string;
 using std::vector;
 
-KBuildHelper::KBuildHelper() {
+KBuildHelper::KBuildHelper(const std::string &kdir) : kdir_(kdir) {
 }
 
 // read the flags from cache or learn
@@ -58,6 +58,19 @@ int KBuildHelper::get_flags(const char *uname_machine, vector<string> *cflags) {
   cflags->push_back("-nostdinc");
   cflags->push_back("-isystem");
   cflags->push_back("/virtual/lib/clang/include");
+
+  // some module build directories split headers between source/ and build/
+  if (KERNEL_HAS_SOURCE_DIR) {
+    cflags->push_back("-I" + kdir_ + "/build/arch/"+arch+"/include");
+    cflags->push_back("-I" + kdir_ + "/build/arch/"+arch+"/include/generated/uapi");
+    cflags->push_back("-I" + kdir_ + "/build/arch/"+arch+"/include/generated");
+    cflags->push_back("-I" + kdir_ + "/build/include");
+    cflags->push_back("-I" + kdir_ + "/build/./arch/"+arch+"/include/uapi");
+    cflags->push_back("-I" + kdir_ + "/build/arch/"+arch+"/include/generated/uapi");
+    cflags->push_back("-I" + kdir_ + "/build/include/uapi");
+    cflags->push_back("-I" + kdir_ + "/build/include/generated/uapi");
+  }
+
   cflags->push_back("-I./arch/"+arch+"/include");
   cflags->push_back("-Iarch/"+arch+"/include/generated/uapi");
   cflags->push_back("-Iarch/"+arch+"/include/generated");
@@ -71,6 +84,7 @@ int KBuildHelper::get_flags(const char *uname_machine, vector<string> *cflags) {
   cflags->push_back("-D__KERNEL__");
   cflags->push_back("-Wno-unused-value");
   cflags->push_back("-Wno-pointer-sign");
+
   return 0;
 }
 

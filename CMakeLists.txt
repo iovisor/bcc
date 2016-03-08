@@ -39,6 +39,22 @@ FOREACH(DIR ${LLVM_INCLUDE_DIRS})
   include_directories("${DIR}/../tools/clang/include")
 ENDFOREACH()
 
+# Set to non-zero if system installs kernel headers with split source and build
+# directories in /lib/modules/`uname -r`/. This is the case for debian and
+# suse, to the best of my knowledge.
+if(BCC_KERNEL_HAS_SOURCE_DIR)
+  set(BCC_KERNEL_HAS_SOURCE_DIR 1)
+  set(BCC_KERNEL_MODULES_SUFFIX "source")
+else()
+  set(BCC_KERNEL_HAS_SOURCE_DIR 0)
+endif()
+
+# Similar to above, set to custom value if kernel headers in
+# /lib/modules/`uname -r` sit in a different location than build/.
+if(NOT DEFINED BCC_KERNEL_MODULES_SUFFIX)
+  set(BCC_KERNEL_MODULES_SUFFIX "build")
+endif()
+
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall")
 endif()

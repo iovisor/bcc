@@ -33,13 +33,13 @@ typedef std::unique_ptr<FILE, FileDeleter> FILEPtr;
 // Helper with pushd/popd semantics
 class DirStack {
  public:
-  explicit DirStack(const char *dst) : ok_(false) {
+  explicit DirStack(const std::string &dst) : ok_(false) {
     if (getcwd(cwd_, sizeof(cwd_)) == NULL) {
       ::perror("getcwd");
       return;
     }
-    if (::chdir(dst)) {
-      fprintf(stderr, "chdir(%s): %s\n", dst, strerror(errno));
+    if (::chdir(dst.c_str())) {
+      fprintf(stderr, "chdir(%s): %s\n", dst.c_str(), strerror(errno));
       return;
     }
     ok_ = true;
@@ -94,8 +94,10 @@ class TmpDir {
 //  case we eventually support non-root user programs, cache in $HOME.
 class KBuildHelper {
  public:
-  KBuildHelper();
+  explicit KBuildHelper(const std::string &kdir);
   int get_flags(const char *uname_machine, std::vector<std::string> *cflags);
+ private:
+  std::string kdir_;
 };
 
 }  // namespace ebpf
