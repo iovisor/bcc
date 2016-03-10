@@ -154,7 +154,7 @@ def print_event(cpu, data, size):
     if event.rwflag == 0:
         rwflg = "R"
 
-    if not re.match('\?', event.name):
+    if not re.match(b'\?', event.name):
         val = event.sector
 
     if start_ts == 0:
