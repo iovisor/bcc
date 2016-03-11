@@ -103,7 +103,7 @@ stats = {
 
 # header
 print("%-8s  " % "TIME", end="")
-for stype, idx in sorted(stats.iteritems(), key=lambda (k, v): (v, k)):
+for stype, idx in sorted(stats.items(), key=lambda k_v: (k_v[1], k_v[0])):
     print(" %8s" % (stype + "/s"), end="")
 print(" %8s" % "HIT%")
 
@@ -123,7 +123,7 @@ while (1):
     print("%-8s: " % strftime("%H:%M:%S"), end="")
 
     # print each statistic as a column
-    for stype, idx in sorted(stats.iteritems(), key=lambda (k, v): (v, k)):
+    for stype, idx in sorted(stats.items(), key=lambda k_v: (k_v[1], k_v[0])):
         try:
             val = b["stats"][c_int(idx)].value / interval
             print(" %8d" % val, end="")
