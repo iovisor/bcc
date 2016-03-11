@@ -385,7 +385,7 @@ def print_outstanding():
 count_so_far = 0
 while True:
         if trace_all:
-                print bpf_program.trace_fields()
+                print(bpf_program.trace_fields())
         else:
                 try:
                         sleep(interval)
