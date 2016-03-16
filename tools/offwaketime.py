@@ -129,12 +129,11 @@ out:
 }
 
 int oncpu(struct pt_regs *ctx, struct task_struct *p) {
-    u32 pid;
+    u32 pid = p->pid;
     u64 ts, *tsp;
 
     // record previous thread sleep time
     if (FILTER) {
-        pid = p->pid;
         ts = bpf_ktime_get_ns();
         start.update(&pid, &ts);
     }
