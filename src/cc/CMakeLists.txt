@@ -42,8 +42,8 @@ set_target_properties(bcc-static PROPERTIES OUTPUT_NAME bcc)
 
 # BPF is still experimental otherwise it should be available
 #llvm_map_components_to_libnames(llvm_libs bpf mcjit irreader passes)
-llvm_map_components_to_libnames(llvm_libs mcjit irreader passes linker
-  instrumentation objcarcopts bitwriter option x86codegen)
+llvm_map_components_to_libnames(llvm_libs bpfinfo bpfdesc core executionengine mcjit ipo irreader passes linker
+  instrumentation objcarcopts runtimedyld support bitwriter option x86codegen x86desc x86info)
 # order is important
 set(clang_libs ${libclangFrontend} ${libclangSerialization} ${libclangDriver} ${libclangParse}
   ${libclangSema} ${libclangCodeGen} ${libclangAnalysis} ${libclangRewrite} ${libclangEdit}
