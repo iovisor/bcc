@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 #
-# memleak   Trace and display outstanding allocations to detect 
-#              memory leaks in user-mode processes and the kernel.
+# memleak   Trace and display outstanding allocations to detect
+#           memory leaks in user-mode processes and the kernel.
 #
 # USAGE: memleak [-h] [-p PID] [-t] [-a] [-o OLDER] [-c COMMAND]
-#                   [-s SAMPLE_RATE] [-d STACK_DEPTH] [-T TOP] [-z MIN_SIZE]
-#                   [-Z MAX_SIZE]
-#                   [interval] [count]
+#                [-s SAMPLE_RATE] [-d STACK_DEPTH] [-T TOP] [-z MIN_SIZE]
+#                [-Z MAX_SIZE]
+#                [interval] [count]
 #
 # Licensed under the Apache License, Version 2.0 (the "License")
 # Copyright (C) 2016 Sasha Goldshtein.
@@ -45,88 +45,14 @@ class Time(object):
                 return t.tv_sec * 1e9 + t.tv_nsec
 
 class StackDecoder(object):
-        def __init__(self, pid, bpf):
+        def __init__(self, pid):
                 self.pid = pid
-                self.bpf = bpf
-                self.ranges_cache = {}
-                self.refresh_code_ranges()
+                if pid != -1:
+                        self.proc_sym = BPF.ProcessSymbols(pid)
 
-        def refresh_code_ranges(self):
-                if self.pid == -1:
-                        return
-                self.code_ranges = self._get_code_ranges()
-
-        @staticmethod
-        def _is_binary_segment(parts):
-                return len(parts) == 6 and \
-                        parts[5][0] != '[' and 'x' in parts[1]
-
-        def _get_code_ranges(self):
-                ranges = {}
-                raw_ranges = open("/proc/%d/maps" % self.pid).readlines()
-                # A typical line from /proc/PID/maps looks like this:
-                # 7f21b6635000-7f21b67eb000 r-xp ... /usr/lib64/libc-2.21.so
-                # We are looking for executable segments that have a .so file
-                # or the main executable. The first two lines are the range of
-                # that memory segment, which we index by binary name.
-                for raw_range in raw_ranges:
-                        parts = raw_range.split()
-                        if not StackDecoder._is_binary_segment(parts):
-                                continue
-                        binary = parts[5]
-                        range_parts = parts[0].split('-')
-                        addr_range = (int(range_parts[0], 16),
-                                      int(range_parts[1], 16))
-                        ranges[binary] = addr_range
-                return ranges
-
-        @staticmethod
-        def _is_function_symbol(parts):
-                return len(parts) == 6 and parts[3] == ".text" \
-                        and parts[2] == "F"
-
-        def _get_sym_ranges(self, binary):
-                if binary in self.ranges_cache:
-                        return self.ranges_cache[binary]
-                sym_ranges = {}
-                raw_symbols = run_command_get_output("objdump -t %s" % binary)
-                for raw_symbol in raw_symbols:
-                        # A typical line from objdump -t looks like this:
-                        # 00000000004007f5 g F .text 000000000000010e main
-                        # We only care about functions in the .text segment.
-                        # The first number is the start address, and the second
-                        # number is the length.
-                        parts = raw_symbol.split()
-                        if not StackDecoder._is_function_symbol(parts):
-                                continue
-                        sym_start = int(parts[0], 16)
-                        sym_len = int(parts[4], 16)
-                        sym_name = parts[5]
-                        sym_ranges[sym_name] = (sym_start, sym_len)
-                self.ranges_cache[binary] = sym_ranges
-                return sym_ranges
-
-        def _decode_sym(self, binary, offset):
-                sym_ranges = self._get_sym_ranges(binary)
-                # Find the symbol that contains the specified offset.
-                # There might not be one.
-                for name, (start, length) in sym_ranges.items():
-                        if offset >= start and offset <= (start + length):
-                                return "%s+0x%x" % (name, offset - start)
-                return "%x" % offset
-
-        def _decode_addr(self, addr):
-                code_ranges = self._get_code_ranges()
-                # Find the binary that contains the specified address.
-                # For .so files, look at the relative address; for the main
-                # executable, look at the absolute address.
-                for binary, (start, end) in code_ranges.items():
-                        if addr >= start and addr <= end:
-                                offset = addr - start \
-                                        if binary.endswith(".so") else addr
-                                return "%s [%s]" % (self._decode_sym(binary,
-                                        offset), binary)
-                return "%x" % addr
+        def refresh(self):
+                if self.pid != -1:
+                        self.proc_sym.refresh_code_ranges()
 
         def decode_stack(self, info, is_kernel_trace):
                 stack = ""
@@ -136,13 +62,10 @@ class StackDecoder(object):
                         addr = info.callstack[i]
                         if is_kernel_trace:
                                 stack += " %s [kernel] (%x) ;" % \
-                                        (self.bpf.ksym(addr), addr)
+                                        (BPF.ksym(addr), addr)
                         else:
-                                # At some point, we hope to have native BPF
-                                # user-mode symbol decoding, but for now we
-                                # have to use our own.
                                 stack += " %s (%x) ;" % \
-                                        (self._decode_addr(addr), addr)
+                                        (self.proc_sym.decode_addr(addr), addr)
                 return stack
 
 def run_command_get_output(command):
@@ -302,7 +225,7 @@ int alloc_exit(struct pt_regs *ctx)
         info.timestamp_ns = bpf_ktime_get_ns();
         info.num_frames = grab_stack(ctx, &info) - 2;
         allocs.update(&address, &info);
-        
+
         if (SHOULD_PRINT) {
                 bpf_trace_printk("alloc exited, size = %lu, result = %lx, frames = %d\\n",
                                  info.size, address, info.num_frames);
@@ -325,7 +248,7 @@ int free_enter(struct pt_regs *ctx, void *address)
         }
         return 0;
 }
-""" 
+"""
 bpf_source = bpf_source.replace("SHOULD_PRINT", "1" if trace_all else "0")
 bpf_source = bpf_source.replace("SAMPLE_EVERY_N", str(sample_every_n))
 bpf_source = bpf_source.replace("GRAB_ONE_FRAME", max_stack_size *
@@ -358,7 +281,7 @@ else:
         bpf_program.attach_kretprobe(event="__kmalloc", fn_name="alloc_exit")
         bpf_program.attach_kprobe(event="kfree", fn_name="free_enter")
 
-decoder = StackDecoder(pid, bpf_program)
+decoder = StackDecoder(pid)
 
 def print_outstanding():
         stacks = {}
@@ -391,7 +314,7 @@ while True:
                         sleep(interval)
                 except KeyboardInterrupt:
                         exit()
-                decoder.refresh_code_ranges()
+                decoder.refresh()
                 print_outstanding()
                 count_so_far += 1
                 if num_prints is not None and count_so_far >= num_prints:
