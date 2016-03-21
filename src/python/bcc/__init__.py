@@ -20,7 +20,7 @@ import json
 import multiprocessing
 import os
 import re
-from subprocess import Popen, PIPE
+from subprocess import Popen, PIPE, STDOUT
 import struct
 import sys
 basestring = (unicode if sys.version_info[0] < 3 else str)
@@ -28,6 +28,7 @@ basestring = (unicode if sys.version_info[0] < 3 else str)
 from .libbcc import lib, _CB_TYPE
 from .table import Table
 from .tracepoint import Perf, Tracepoint
+from .usyms import ProcessSymbols
 
 open_kprobes = {}
 open_uprobes = {}
@@ -746,6 +747,28 @@ class BPF(object):
         if idx == -1:
             return 0
         return ksyms[idx][1]
+
+    @classmethod
+    def usymaddr(cls, pid, addr, refresh_symbols=False):
+        """usymaddr(pid, addr, refresh_symbols=False)
+
+        Decode the specified address in the specified process to a symbolic
+        representation that includes the symbol name, offset within the symbol,
+        and the module name. See the ProcessSymbols class for more details.
+
+        Specify refresh_symbols=True if you suspect the set of loaded modules
+        or their load addresses has changed since the last time you called
+        usymaddr() on this pid.
+        """
+        proc_sym = None
+        if pid in cls._process_symbols:
+            proc_sym = cls._process_symbols[pid]
+            if refresh_symbols:
+                proc_sym.refresh_code_ranges()
+        else:
+            proc_sym = ProcessSymbols(pid)
+            cls._process_symbols[pid] = proc_sym
+        return proc_sym.decode_addr(addr)
 
     @staticmethod
     def num_open_kprobes():
