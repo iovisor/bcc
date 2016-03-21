@@ -27,6 +27,7 @@ basestring = (unicode if sys.version_info[0] < 3 else str)
 
 from .libbcc import lib, _CB_TYPE
 from .table import Table
+from .tracepoint import Perf, Tracepoint
 
 open_kprobes = {}
 open_uprobes = {}
@@ -71,6 +72,30 @@ class BPF(object):
     _libsearch_cache = {}
     _lib_load_address_cache = {}
     _lib_symbol_cache = {}
+
+    _auto_includes = {
+        "linux/time.h"      : ["time"],
+        "linux/fs.h"        : ["fs", "file"],
+        "linux/blkdev.h"    : ["bio", "request"],
+        "linux/slab.h"      : ["alloc"],
+        "linux/netdevice.h" : ["sk_buff", "net_device"]
+    }
+
+    @classmethod
+    def generate_auto_includes(cls, program_words):
+        """
+        Generates #include statements automatically based on a set of
+        recognized types such as sk_buff and bio. The input is all the words
+        that appear in the BPF program, and the output is a (possibly empty)
+        string of #include statements, such as "#include <linux/fs.h>".
+        """
+        headers = ""
+        for header, keywords in cls._auto_includes.items():
+            for keyword in keywords:
+                for word in program_words:
+                    if keyword in word and header not in headers:
+                        headers += "#include <%s>\n" % header
+        return headers
 
     # defined for compatibility reasons, to be removed
     Table = Table
@@ -324,6 +349,11 @@ class BPF(object):
     def open_kprobes():
         global open_kprobes
         return open_kprobes
+
+    @staticmethod
+    def open_uprobes():
+            global open_uprobes
+            return open_uprobes
 
     @staticmethod
     def detach_kprobe(event):

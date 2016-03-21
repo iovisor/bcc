@@ -1,0 +1,39 @@
+.TH tplist 8  "2016-03-20" "USER COMMANDS"
+.SH NAME
+tplist \- Display kernel tracepoints and their format.
+.SH SYNOPSIS
+.B tplist [-v] [tracepoint]
+.SH DESCRIPTION
+tplist lists all kernel tracepoints, and can optionally print out the tracepoint
+format; namely, the variables that you can trace when the tracepoint is hit. This
+is usually used in conjunction with the argdist and/or trace tools.
+
+On a typical system, accessing the tracepoint list and format requires root.
+.SH OPTIONS
+.TP
+\-v
+Display the variables associated with the tracepoint or tracepoints.
+.TP
+[tracepoint]
+A wildcard expression that specifies which tracepoints to print. For example,
+block:* will print all block tracepoints (block:block_rq_complete, etc.).
+Regular expressions are not supported.
+.SH EXAMPLES
+.TP
+Print all kernel tracepoints:
+#
+.B tplist
+.TP
+Print all net tracepoints with their format:
+#
+.B tplist -v 'net:*'
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Sasha Goldshtein

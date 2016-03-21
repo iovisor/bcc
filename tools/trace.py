@@ -5,10 +5,11 @@
 #
 # USAGE: trace [-h] [-p PID] [-v] [-Z STRING_SIZE] [-S] [-M MAX_EVENTS] [-o]
 #              probe [probe ...]
+#
 # Licensed under the Apache License, Version 2.0 (the "License")
 # Copyright (C) 2016 Sasha Goldshtein.
 
-from bcc import BPF
+from bcc import BPF, Tracepoint, Perf
 from time import sleep, strftime
 import argparse
 import re
@@ -123,13 +124,21 @@ class Probe(object):
                         parts = ["p", parts[0], parts[1]]
                 if len(parts[0]) == 0:
                         self.probe_type = "p"
-                elif parts[0] in ["p", "r"]:
+                elif parts[0] in ["p", "r", "t"]:
                         self.probe_type = parts[0]
                 else:
-                        self._bail("expected '', 'p', or 'r', got '%s'" %
+                        self._bail("expected '', 'p', 't', or 'r', got '%s'" %
                                    parts[0])
-                self.library = parts[1]
-                self.function = parts[2]
+                if self.probe_type == "t":
+                        self.tp_category = parts[1]
+                        self.tp_event = parts[2]
+                        self.tp = Tracepoint.enable_tracepoint(
+                                        self.tp_category, self.tp_event)
+                        self.library = ""       # kernel
+                        self.function = "perf_trace_%s" % self.tp_event
+                else:
+                        self.library = parts[1]
+                        self.function = parts[2]
 
         def _parse_filter(self, filt):
                 self.filter = self._replace_args(filt)
@@ -149,12 +158,17 @@ class Probe(object):
                 if len(action) == 0:
                         return
 
-                parts = action.split(',')
-                self.raw_format = parts[0]
+                action = action.strip()
+                match = re.search(r'(\".*\"),?(.*)', action)
+                if match is None:
+                        self._bail("expected format string in \"s")
+
+                self.raw_format = match.group(1)
                 self._parse_types(self.raw_format)
-                for part in parts[1:]:
+                for part in match.group(2).split(','):
                         part = self._replace_args(part)
-                        self.values.append(part)
+                        if len(part) > 0:
+                                self.values.append(part)
 
         aliases = {
                 "retval": "ctx->ax",
@@ -283,9 +297,15 @@ BPF_PERF_OUTPUT(%s);
                 for i, expr in enumerate(self.values):
                         data_fields += self._generate_field_assign(i)
 
+                prefix = ""
+                if self.probe_type == "t":
+                        data_decl += self.tp.generate_struct()
+                        prefix = self.tp.generate_get_struct()
+
                 text = """
 int %s(struct pt_regs *ctx)
 {
+        %s
         %s
         if (!(%s)) return 0;
 
@@ -298,7 +318,7 @@ int %s(struct pt_regs *ctx)
         return 0;
 }
 """
-                text = text % (self.probe_name, pid_filter,
+                text = text % (self.probe_name, pid_filter, prefix,
                                self.filter, self.struct_name,
                                data_fields, self.events_name)
 
@@ -307,6 +327,12 @@ int %s(struct pt_regs *ctx)
         @classmethod
         def _time_off_str(cls, timestamp_ns):
                 return "%.6f" % (1e-9 * (timestamp_ns - cls.first_ts))
+
+        def _display_function(self):
+                if self.probe_type != 't':
+                        return self.function
+                else:
+                        return self.function.replace("perf_trace_", "")
 
         def print_event(self, cpu, data, size):
                 # Cast as the generated structure type and display
@@ -318,7 +344,8 @@ int %s(struct pt_regs *ctx)
                 time = strftime("%H:%M:%S") if Probe.use_localtime else \
                        Probe._time_off_str(event.timestamp_ns)
                 print("%-8s %-6d %-12s %-16s %s" % \
-                    (time[:8], event.pid, event.comm[:12], self.function, msg))
+                    (time[:8], event.pid, event.comm[:12],
+                     self._display_function(), msg))
 
                 Probe.event_count += 1
                 if Probe.max_events is not None and \
@@ -337,7 +364,7 @@ int %s(struct pt_regs *ctx)
                 if self.probe_type == "r":
                         bpf.attach_kretprobe(event=self.function,
                                              fn_name=self.probe_name)
-                elif self.probe_type == "p":
+                elif self.probe_type == "p" or self.probe_type == "t":
                         bpf.attach_kprobe(event=self.function,
                                           fn_name=self.probe_name)
 
@@ -384,6 +411,8 @@ trace 'r::__kmalloc (retval == 0) "kmalloc failed!"
         Trace returns from __kmalloc which returned a null pointer
 trace 'r:c:malloc (retval) "allocated = %p", retval
         Trace returns from malloc and print non-NULL allocated buffers
+trace 't:block:block_rq_complete "sectors=%d", tp.nr_sector'
+        Trace the block_rq_complete kernel tracepoint and print # of tx sectors
 """
 
         def __init__(self):
@@ -420,6 +449,10 @@ trace 'r:c:malloc (retval) "allocated = %p", retval
 #include <linux/sched.h>        /* For TASK_COMM_LEN */
 
 """
+                self.program += BPF.generate_auto_includes(
+                        map(lambda p: p.raw_probe, self.probes))
+                self.program += Tracepoint.generate_decl()
+                self.program += Tracepoint.generate_entry_probe()
                 for probe in self.probes:
                         self.program += probe.generate_program(
                                 self.args.pid or -1, self.args.include_self)
@@ -429,6 +462,7 @@ trace 'r:c:malloc (retval) "allocated = %p", retval
 
         def _attach_probes(self):
                 self.bpf = BPF(text=self.program)
+                Tracepoint.attach(self.bpf)
                 for probe in self.probes:
                         if self.args.verbose:
                                 print(probe)
@@ -455,7 +489,7 @@ trace 'r:c:malloc (retval) "allocated = %p", retval
                 except:
                         if self.args.verbose:
                                 traceback.print_exc()
-                        else:
+                        elif sys.exc_type is not SystemExit:
                                 print(sys.exc_value)
 
 if __name__ == "__main__":
