@@ -28,6 +28,7 @@ basestring = (unicode if sys.version_info[0] < 3 else str)
 from .libbcc import lib, _CB_TYPE
 from .table import Table
 from .tracepoint import Perf, Tracepoint
+from .usyms import ProcessSymbols
 
 open_kprobes = {}
 open_uprobes = {}
@@ -746,102 +747,6 @@ class BPF(object):
         if idx == -1:
             return 0
         return ksyms[idx][1]
-
-    class ProcessSymbols(object):
-        def __init__(self, pid):
-            """
-            Initializes the process symbols store for the specified pid.
-            Call refresh_code_ranges() periodically if you anticipate changes
-            in the set of loaded libraries or their addresses.
-            """
-            self.pid = pid
-            self.ranges_cache = {}
-            self.refresh_code_ranges()
-
-        def refresh_code_ranges(self):
-            self.code_ranges = self._get_code_ranges()
-
-        @staticmethod
-        def _is_binary_segment(parts):
-            return len(parts) == 6 and parts[5][0] != '[' and 'x' in parts[1]
-
-        def _get_code_ranges(self):
-            ranges = {}
-            raw_ranges = open("/proc/%d/maps" % self.pid).readlines()
-            # A typical line from /proc/PID/maps looks like this:
-            # 7f21b6635000-7f21b67eb000 r-xp ... /usr/lib64/libc-2.21.so
-            # We are looking for executable segments that have a .so file
-            # or the main executable. The first two lines are the range of
-            # that memory segment, which we index by binary name.
-            for raw_range in raw_ranges:
-                parts = raw_range.split()
-                if not BPF.ProcessSymbols._is_binary_segment(parts):
-                    continue
-                binary = parts[5]
-                range_parts = parts[0].split('-')
-                addr_range = (int(range_parts[0], 16), int(range_parts[1], 16))
-                ranges[binary] = addr_range
-            return ranges
-
-        @staticmethod
-        def _is_function_symbol(parts):
-            return len(parts) == 6 and parts[3] == ".text" and parts[2] == "F"
-
-        @staticmethod
-        def _run_command_get_output(command):
-            p = Popen(command.split(), stdout=PIPE, stderr=STDOUT)
-            return iter(p.stdout.readline, b'')
-
-        def _get_sym_ranges(self, binary):
-            if binary in self.ranges_cache:
-                return self.ranges_cache[binary]
-            sym_ranges = {}
-            raw_symbols = BPF.ProcessSymbols._run_command_get_output(
-                    "objdump -t %s" % binary)
-            for raw_symbol in raw_symbols:
-                # A typical line from objdump -t looks like this:
-                # 00000000004007f5 g F .text 000000000000010e main
-                # We only care about functions in the .text segment.
-                # The first number is the start address, and the second
-                # number is the length.
-                parts = raw_symbol.split()
-                if not BPF.ProcessSymbols._is_function_symbol(parts):
-                    continue
-                sym_start = int(parts[0], 16)
-                sym_len = int(parts[4], 16)
-                sym_name = parts[5]
-                sym_ranges[sym_name] = (sym_start, sym_len)
-                self.ranges_cache[binary] = sym_ranges
-            return sym_ranges
-
-        def _decode_sym(self, binary, offset):
-            sym_ranges = self._get_sym_ranges(binary)
-            # Find the symbol that contains the specified offset.
-            # There might not be one.
-            for name, (start, length) in sym_ranges.items():
-                if offset >= start and offset <= (start + length):
-                    return "%s+0x%x" % (name, offset - start)
-            return "%x" % offset
-
-        def decode_addr(self, addr):
-            """
-            Given an address, return the best symbolic representation of it.
-            If it doesn't fall in any module, return its hex string. If it
-            falls within a module but we don't have a symbol for it, return
-            the hex string and the module. If we do have a symbol for it,
-            return the symbol and the module, e.g. "readline+0x10 [bash]".
-            """
-            code_ranges = self._get_code_ranges()
-            # Find the binary that contains the specified address.
-            # For .so files, look at the relative address; for the main
-            # executable, look at the absolute address.
-            for binary, (start, end) in code_ranges.items():
-                if addr >= start and addr <= end:
-                    offset = addr - start \
-                             if binary.endswith(".so") else addr
-                    return "%s [%s]" % (self._decode_sym(binary, offset),
-                                        binary)
-            return "%x" % addr
 
     @classmethod
     def usymaddr(cls, pid, addr, refresh_symbols=False):

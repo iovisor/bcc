@@ -11,7 +11,7 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 # Copyright (C) 2016 Sasha Goldshtein.
 
-from bcc import BPF
+from bcc import BPF, ProcessSymbols
 from time import sleep
 from datetime import datetime
 import argparse
@@ -48,7 +48,7 @@ class StackDecoder(object):
         def __init__(self, pid):
                 self.pid = pid
                 if pid != -1:
-                        self.proc_sym = BPF.ProcessSymbols(pid)
+                        self.proc_sym = ProcessSymbols(pid)
 
         def refresh(self):
                 if self.pid != -1:
