@@ -27,6 +27,7 @@ basestring = (unicode if sys.version_info[0] < 3 else str)
 
 from .libbcc import lib, _CB_TYPE
 from .table import Table
+from .tracepoint import Perf, Tracepoint
 
 open_kprobes = {}
 open_uprobes = {}
