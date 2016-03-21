@@ -73,6 +73,30 @@ class BPF(object):
     _lib_load_address_cache = {}
     _lib_symbol_cache = {}
 
+    _auto_includes = {
+        "linux/time.h"      : ["time"],
+        "linux/fs.h"        : ["fs", "file"],
+        "linux/blkdev.h"    : ["bio", "request"],
+        "linux/slab.h"      : ["alloc"],
+        "linux/netdevice.h" : ["sk_buff", "net_device"]
+    }
+
+    @classmethod
+    def generate_auto_includes(cls, program_words):
+        """
+        Generates #include statements automatically based on a set of
+        recognized types such as sk_buff and bio. The input is all the words
+        that appear in the BPF program, and the output is a (possibly empty)
+        string of #include statements, such as "#include <linux/fs.h>".
+        """
+        headers = ""
+        for header, keywords in cls._auto_includes.items():
+            for keyword in keywords:
+                for word in program_words:
+                    if keyword in word and header not in headers:
+                        headers += "#include <%s>\n" % header
+        return headers
+
     # defined for compatibility reasons, to be removed
     Table = Table
 

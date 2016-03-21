@@ -36,24 +36,6 @@ int PROBENAME(struct pt_regs *ctx SIGNATURE)
 """
         next_probe_index = 0
         aliases = { "$PID": "bpf_get_current_pid_tgid()" }
-        auto_includes = {
-                "linux/time.h"      : ["time"],
-                "linux/fs.h"        : ["fs", "file"],
-                "linux/blkdev.h"    : ["bio", "request"],
-                "linux/slab.h"      : ["alloc"],
-                "linux/netdevice.h" : ["sk_buff", "net_device"]
-        }
-
-        @staticmethod
-        def generate_auto_includes(specifiers):
-                headers = ""
-                for header, keywords in Specifier.auto_includes.items():
-                        for keyword in keywords:
-                                for specifier in specifiers:
-                                        if keyword in specifier:
-                                                headers += "#include <%s>\n" \
-                                                           % header
-                return headers
 
         def _substitute_aliases(self, expr):
                 if expr is None:
@@ -590,7 +572,7 @@ struct __string_t { char s[%d]; };
                 """ % self.args.string_size
                 for include in (self.args.include or []):
                         bpf_source += "#include <%s>\n" % include
-                bpf_source += Specifier.generate_auto_includes(
+                bpf_source += BPF.generate_auto_includes(
                                 map(lambda s: s.raw_spec, self.specifiers))
                 bpf_source += Tracepoint.generate_decl()
                 bpf_source += Tracepoint.generate_entry_probe()

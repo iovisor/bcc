@@ -328,25 +328,6 @@ int %s(struct pt_regs *ctx)
         def _time_off_str(cls, timestamp_ns):
                 return "%.6f" % (1e-9 * (timestamp_ns - cls.first_ts))
 
-        auto_includes = {
-                "linux/time.h"      : ["time"],
-                "linux/fs.h"        : ["fs", "file"],
-                "linux/blkdev.h"    : ["bio", "request"],
-                "linux/slab.h"      : ["alloc"],
-                "linux/netdevice.h" : ["sk_buff"]
-        }
-
-        @classmethod
-        def generate_auto_includes(cls, probes):
-                headers = ""
-                for header, keywords in cls.auto_includes.items():
-                        for keyword in keywords:
-                                for probe in probes:
-                                        if keyword in probe:
-                                                headers += "#include <%s>\n" \
-                                                           % header
-                return headers
-
         def _display_function(self):
                 if self.probe_type != 't':
                         return self.function
@@ -468,7 +449,7 @@ trace 't:block:block_rq_complete "sectors=%d", tp.nr_sector'
 #include <linux/sched.h>        /* For TASK_COMM_LEN */
 
 """
-                self.program += Probe.generate_auto_includes(
+                self.program += BPF.generate_auto_includes(
                         map(lambda p: p.raw_probe, self.probes))
                 self.program += Tracepoint.generate_decl()
                 self.program += Tracepoint.generate_entry_probe()
