@@ -42,16 +42,18 @@ set_target_properties(bcc-static PROPERTIES OUTPUT_NAME bcc)
 
 # BPF is still experimental otherwise it should be available
 #llvm_map_components_to_libnames(llvm_libs bpf mcjit irreader passes)
-llvm_map_components_to_libnames(llvm_libs mcjit irreader passes linker
-  instrumentation objcarcopts bitwriter option x86codegen)
+llvm_map_components_to_libnames(llvm_libs bitwriter bpfcodegen irreader linker
+  mcjit objcarcopts option passes x86codegen)
+llvm_expand_dependencies(expanded_libs ${llvm_libs})
+
 # order is important
 set(clang_libs ${libclangFrontend} ${libclangSerialization} ${libclangDriver} ${libclangParse}
   ${libclangSema} ${libclangCodeGen} ${libclangAnalysis} ${libclangRewrite} ${libclangEdit}
   ${libclangAST} ${libclangLex} ${libclangBasic})
 
 # Link against LLVM libraries
-target_link_libraries(bcc-shared b_frontend clang_frontend ${clang_libs} ${llvm_libs} LLVMBPFCodeGen)
-target_link_libraries(bcc-static b_frontend clang_frontend bcc-loader-static ${clang_libs} ${llvm_libs} LLVMBPFCodeGen)
+target_link_libraries(bcc-shared b_frontend clang_frontend ${clang_libs} ${expanded_libs})
+target_link_libraries(bcc-static b_frontend clang_frontend bcc-loader-static ${clang_libs} ${expanded_libs})
 
 install(TARGETS bcc-shared LIBRARY COMPONENT libbcc
   DESTINATION ${CMAKE_INSTALL_LIBDIR})
