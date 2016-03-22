@@ -341,7 +341,7 @@ class BPF(object):
                 desc.encode("ascii"), pid, cpu, group_fd,
                 self._reader_cb_impl, ct.cast(id(self), ct.py_object))
         res = ct.cast(res, ct.c_void_p)
-        if res == None:
+        if res.value is None:
             raise Exception("Failed to attach BPF to kprobe")
         open_kprobes[ev_name] = res
         return self
@@ -389,7 +389,7 @@ class BPF(object):
                 desc.encode("ascii"), pid, cpu, group_fd,
                 self._reader_cb_impl, ct.cast(id(self), ct.py_object))
         res = ct.cast(res, ct.c_void_p)
-        if res == None:
+        if res.value is None:
             raise Exception("Failed to attach BPF to kprobe")
         open_kprobes[ev_name] = res
         return self
@@ -513,7 +513,7 @@ class BPF(object):
                 desc.encode("ascii"), pid, cpu, group_fd,
                 self._reader_cb_impl, ct.cast(id(self), ct.py_object))
         res = ct.cast(res, ct.c_void_p)
-        if res == None:
+        if res.value is None:
             raise Exception("Failed to attach BPF to uprobe")
         open_uprobes[ev_name] = res
         return self
@@ -557,7 +557,7 @@ class BPF(object):
                 desc.encode("ascii"), pid, cpu, group_fd,
                 self._reader_cb_impl, ct.cast(id(self), ct.py_object))
         res = ct.cast(res, ct.c_void_p)
-        if res == None:
+        if res.value is None:
             raise Exception("Failed to attach BPF to uprobe")
         open_uprobes[ev_name] = res
         return self

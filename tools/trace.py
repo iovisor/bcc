@@ -361,12 +361,15 @@ int %s(struct pt_regs *ctx)
                 bpf[self.events_name].open_perf_buffer(self.print_event)
 
         def _attach_k(self, bpf):
+                kprobes_start = len(BPF.open_kprobes())
                 if self.probe_type == "r":
                         bpf.attach_kretprobe(event=self.function,
                                              fn_name=self.probe_name)
                 elif self.probe_type == "p" or self.probe_type == "t":
                         bpf.attach_kprobe(event=self.function,
                                           fn_name=self.probe_name)
+                if len(BPF.open_kprobes()) != kprobes_start + 1:
+                        self._bail("error attaching probe")
 
         def _attach_u(self, bpf):
                 libpath = BPF.find_library(self.library)
@@ -378,6 +381,7 @@ int %s(struct pt_regs *ctx)
                 if libpath is None or len(libpath) == 0:
                         self._bail("unable to find library %s" % self.library)
 
+                uprobes_start = len(BPF.open_uprobes())
                 if self.probe_type == "r":
                         bpf.attach_uretprobe(name=libpath,
                                              sym=self.function,
@@ -388,6 +392,8 @@ int %s(struct pt_regs *ctx)
                                           sym=self.function,
                                           fn_name=self.probe_name,
                                           pid=self.pid)
+                if len(BPF.open_uprobes()) != uprobes_start + 1:
+                        self._bail("error attaching probe")
 
 class Tool(object):
         examples = """
