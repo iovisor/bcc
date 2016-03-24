@@ -92,7 +92,9 @@ same special keywords as in the predicate (arg1, arg2, etc.).
 In tracepoints, both the predicate and the arguments may refer to the tracepoint
 format structure, which is stored in the special "tp" variable. For example, the
 block:block_rq_complete tracepoint can print or filter by tp.nr_sector. To 
-discover the format of your tracepoint, use the tplist tool.
+discover the format of your tracepoint, use the tplist tool. Note that you can
+also use the members of the "tp" struct directly, e.g "nr_sector" instead of
+"tp.nr_sector".
 
 The predicate expression and the format specifier replacements for printing
 may also use the following special keywords: $pid, $tgid to refer to the 
@@ -118,7 +120,7 @@ Trace returns from the readline function in bash and print the return value as a
 .TP
 Trace the block:block_rq_complete tracepoint and print the number of sectors completed:
 #
-.B trace 't:block:block_rq_complete """%d sectors"", tp.nr_sector'
+.B trace 't:block:block_rq_complete """%d sectors"", nr_sector'
 .SH SOURCE
 This is from bcc.
 .IP

@@ -109,11 +109,12 @@ int __trace_entry_update(struct pt_regs *ctx)
                 self.category = category
                 self.event = event
                 self.tp_id = tp_id
+                self._retrieve_struct_fields()
 
-        def _generate_struct_fields(self):
+        def _retrieve_struct_fields(self):
+                self.struct_fields = []
                 format_lines = Tracepoint.get_tpoint_format(self.category,
                                                             self.event)
-                text = ""
                 for line in format_lines:
                         match = re.search(r'field:([^;]*);.*size:(\d+);', line)
                         if match is None:
@@ -126,6 +127,11 @@ int __trace_entry_update(struct pt_regs *ctx)
                                 continue
                         if field_name.startswith("common_"):
                                 continue
+                        self.struct_fields.append((field_type, field_name))
+
+        def _generate_struct_fields(self):
+                text = ""
+                for field_type, field_name in self.struct_fields:
                         text += "        %s %s;\n" % (field_type, field_name)
                 return text
 
@@ -134,9 +140,16 @@ int __trace_entry_update(struct pt_regs *ctx)
                 return """
 struct %s {
         u64 __do_not_use__;
-        %s
+%s
 };
                 """ % (self.struct_name, self._generate_struct_fields())
+
+        def _generate_struct_locals(self):
+                text = ""
+                for field_type, field_name in self.struct_fields:
+                        text += "        %s %s = tp.%s;\n" % (
+                                        field_type, field_name, field_name)
+                return text
 
         def generate_get_struct(self):
                 return """
@@ -145,7 +158,8 @@ struct %s {
         if (di == 0) { return 0; }
         struct %s tp = {};
         bpf_probe_read(&tp, sizeof(tp), (void *)*di);
-                """ % self.struct_name
+%s
+                """ % (self.struct_name, self._generate_struct_locals())
 
         @classmethod
         def enable_tracepoint(cls, category, event):

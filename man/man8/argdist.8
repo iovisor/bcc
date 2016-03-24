@@ -92,7 +92,8 @@ You may use the parameters directly, or valid C expressions that involve the
 parameters, such as "size % 10".
 Tracepoints may access a special structure called "tp" that is formatted according
 to the tracepoint format (which you can obtain using tplist). For example, the
-block:block_rq_complete tracepoint can access tp.nr_sector.
+block:block_rq_complete tracepoint can access tp.nr_sector. You may also use the
+members of the "tp" struct directly, e.g. "nr_sector" instead of "tp.nr_sector".
 Return probes can use the argument values received by the
 function when it was entered, through the $entry(paramname) special variable.
 Return probes can also access the function's return value in $retval, and the
@@ -147,11 +148,11 @@ Count fork() calls in libc across all processes, grouped by pid:
 .TP
 Print histogram of number of sectors in completing block I/O requests:
 #
-.B argdist -H 't:block:block_rq_complete():u32:tp.nr_sector'
+.B argdist -H 't:block:block_rq_complete():u32:nr_sector'
 .TP
 Aggregate interrupts by interrupt request (IRQ):
 #
-.B argdist -C 't:irq:irq_handler_entry():int:tp.irq'
+.B argdist -C 't:irq:irq_handler_entry():int:irq'
 .TP
 Print histograms of sleep() and nanosleep() parameter values:
 #
