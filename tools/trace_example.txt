@@ -171,4 +171,6 @@ trace 'r:c:malloc (retval) "allocated = %p", retval
         Trace returns from malloc and print non-NULL allocated buffers
 trace 't:block:block_rq_complete "sectors=%d", tp.nr_sector'
         Trace the block_rq_complete kernel tracepoint and print # of tx sectors
+trace 'u:pthread:pthread_create (arg4 != 0)'
+        Trace the USDT probe pthread_create when its 4th argument is non-zero
 
