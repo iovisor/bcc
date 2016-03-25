@@ -17,6 +17,7 @@ import ctypes as ct
 import multiprocessing
 
 from .libbcc import lib, _RAW_CB_TYPE
+from subprocess import check_output
 
 BPF_MAP_TYPE_HASH = 1
 BPF_MAP_TYPE_ARRAY = 2
@@ -73,8 +74,8 @@ def _print_log2_hist(vals, val_type):
                       _stars(val, val_max, stars)))
 
 
-def Table(bpf, map_id, map_fd, keytype, leaftype):
-    """Table(bpf, map_id, map_fd, keytype, leaftype)
+def Table(bpf, map_id, map_fd, keytype, leaftype, func_reducer):
+    """Table(bpf, map_id, map_fd, keytype, leaftype, func_reducer)
 
     Create a python object out of a reference to a bpf table handle"""
 
@@ -89,9 +90,11 @@ def Table(bpf, map_id, map_fd, keytype, leaftype):
     elif ttype == BPF_MAP_TYPE_PERF_EVENT_ARRAY:
         t = PerfEventArray(bpf, map_id, map_fd, keytype, leaftype)
     elif ttype == BPF_MAP_TYPE_PERCPU_HASH:
-        t = PerCpuHashTable(bpf, map_id, map_fd, keytype, leaftype)
+        t = PerCpuHash(bpf, map_id, map_fd, keytype,
+                            leaftype, func=func_reducer)
     elif ttype == BPF_MAP_TYPE_PERCPU_ARRAY:
-        t = PerCpuArray(bpf, map_id, map_fd, keytype, leaftype)
+        t = PerCpuArray(bpf, map_id, map_fd, keytype,
+                            leaftype, func=func_reducer)
     elif ttype == BPF_MAP_TYPE_STACK_TRACE:
         t = StackTrace(bpf, map_id, map_fd, keytype, leaftype)
     if t == None:
@@ -146,9 +149,9 @@ class TableBase(MutableMapping):
             raise Exception("Could not scanf leaf")
         return leaf
 
-    def __getitem__(self, key):
+    def __getitem__(self, key, leaf=None):
         key_p = ct.pointer(key)
-        leaf = self.Leaf()
+        if not leaf: leaf = self.Leaf()
         leaf_p = ct.pointer(leaf)
         res = lib.bpf_lookup_elem(self.map_fd,
                 ct.cast(key_p, ct.c_void_p),
@@ -309,9 +312,9 @@ class ArrayBase(TableBase):
     def __len__(self):
         return self.max_entries
 
-    def __getitem__(self, key):
+    def __getitem__(self, key, leaf=None):
         key = self._normalize_key(key)
-        return super(ArrayBase, self).__getitem__(key)
+        return super(ArrayBase, self).__getitem__(key, leaf)
 
     def __setitem__(self, key, leaf):
         key = self._normalize_key(key)
@@ -403,13 +406,129 @@ class PerfEventArray(ArrayBase):
             del(self.bpf.open_kprobes()[(id(self), key)])
         del self._cbs[key]
 
-class PerCpuHashTable(TableBase):
+class PerCpuHash(HashTable):
     def __init__(self, *args, **kwargs):
-        raise Exception("Unsupported")
+        self.func_reducer = kwargs['func']
+        del kwargs['func']
+        self.total_cpu = multiprocessing.cpu_count()
+        self.alignment = int(check_output(["grep", "-m", "1", "cache_alignment", "/proc/cpuinfo"]).split(' ', 2)[1])/8
+        super(PerCpuHash, self).__init__(*args, **kwargs)
+        self.leafsize = ct.sizeof(self.Leaf)
+        if isinstance(self.Leaf(), ct.Structure) and self.leafsize % self.alignment is not 0:
+            # Struct that are not aligned to cache.
+            raise IndexError("Struct must be aligned to %s, please add some padding" % self.alignment)
+
+    def __getitem__(self, key):
+        if self.leafsize % self.alignment is 0:
+            # Struct/DataTypes that are aligned to cache
+            leaf_arr = (self.Leaf * self.total_cpu)()
+        else:
+            # DataTypes that are not aligned to cache
+            leaf_arr = (ct.c_uint64 * self.total_cpu)()
+
+        if (self.func_reducer):
+            super(PerCpuHash, self).__getitem__(key, leaf_arr)
+            leaf_ret = (self.Leaf * self.total_cpu)()
+            for i in range(0, self.total_cpu):
+                leaf_ret[i] = leaf_arr[i]
+            return reduce(self.func_reducer, leaf_ret)
+        else:
+            super(PerCpuHash,self).__getitem__(key,leaf_arr)
+            leaf_ret = (self.Leaf * self.total_cpu)()
+            for i in range(0, self.total_cpu):
+                leaf_ret[i] = leaf_arr[i]
+            return leaf_ret
+
+    def __setitem__(self, key, leaf):
+        if self.leafsize % self.alignment is 0:
+            leaf_arr = (self.Leaf * self.total_cpu)()
+            for i in range(0, self.total_cpu):
+                leaf_arr[i] = leaf
+        else:
+            leaf_arr = (ct.c_uint64 * self.total_cpu)()
+            for i in range(0, self.total_cpu):
+                leaf_arr[i] = leaf.value
+        super(PerCpuHash, self).__setitem__(key, leaf_arr)
+
+    def sum(self, key):
+        if isinstance(self.Leaf(), ct.Structure):
+            raise IndexError("Leaf must be an integer type for default sum functions")
+        leaf_arr = (ct.c_uint64 * self.total_cpu)()
+        return self.Leaf(reduce(lambda x,y: x+y, super(PerCpuHash, self).__getitem__(key, leaf_arr)))
+
+    def max(self, key):
+        if isinstance(self.Leaf(), ct.Structure):
+            raise IndexError("Leaf must be an integer type for default sum functions")
+        leaf_arr = (ct.c_uint64 * self.total_cpu)()
+        return self.Leaf(max(super(PerCpuHash, self).__getitem__(key, leaf_arr)))
+
+    def average(self, key):
+        if isinstance(self.Leaf(), ct.Structure):
+            raise IndexError("Leaf must be an integer type for default sum functions")
+        leaf_arr = (ct.c_uint64 * self.total_cpu)()
+        return self.Leaf(reduce(lambda x,y: x+y, super(PerCpuHash, self).__getitem__(key, leaf_arr))/self.total_cpu)
 
 class PerCpuArray(ArrayBase):
     def __init__(self, *args, **kwargs):
-        raise Exception("Unsupported")
+        self.func_reducer = kwargs['func']
+        del kwargs['func']
+        self.total_cpu = multiprocessing.cpu_count()
+        self.alignment = int(check_output(["grep", "-m", "1", "cache_alignment", "/proc/cpuinfo"]).split(' ', 2)[1])/8
+        super(PerCpuArray, self).__init__(*args, **kwargs)
+        self.leafsize = ct.sizeof(self.Leaf)
+        if isinstance(self.Leaf(), ct.Structure) and self.leafsize % self.alignment is not 0:
+            # Struct that are not aligned to cache.
+            raise IndexError("Struct must be aligned to %s, please add some padding" % self.alignment)
+
+    def __getitem__(self, key):
+        if self.leafsize % self.alignment is 0:
+            # Struct/DataTypes that are aligned to cache
+            leaf_arr = (self.Leaf * self.total_cpu)()
+        else:
+            # DataTypes that are not aligned to cache
+            leaf_arr = (ct.c_uint64 * self.total_cpu)()
+
+        if (self.func_reducer):
+            super(PerCpuArray, self).__getitem__(key, leaf_arr)
+            leaf_ret = (self.Leaf * self.total_cpu)()
+            for i in range(0, self.total_cpu):
+                leaf_ret[i] = leaf_arr[i]
+            return reduce(self.func_reducer, leaf_ret)
+        else:
+            super(PerCpuArray,self).__getitem__(key,leaf_arr)
+            leaf_ret = (self.Leaf * self.total_cpu)()
+            for i in range(0, self.total_cpu):
+                leaf_ret[i] = leaf_arr[i]
+            return leaf_ret
+
+    def __setitem__(self, key, leaf):
+        if self.leafsize % self.alignment is 0:
+            leaf_arr = (self.Leaf * self.total_cpu)()
+            for i in range(0, self.total_cpu):
+                leaf_arr[i] = leaf
+        else:
+            leaf_arr = (ct.c_uint64 * self.total_cpu)()
+            for i in range(0, self.total_cpu):
+                leaf_arr[i] = leaf.value
+        super(PerCpuArray, self).__setitem__(key, leaf_arr)
+
+    def sum(self, key):
+        if isinstance(self.Leaf(), ct.Structure):
+            raise IndexError("Leaf must be an integer type for default sum functions")
+        leaf_arr = (ct.c_uint64 * self.total_cpu)()
+        return self.Leaf(reduce(lambda x,y: x+y, super(PerCpuArray, self).__getitem__(key, leaf_arr)))
+
+    def max(self, key):
+        if isinstance(self.Leaf(), ct.Structure):
+            raise IndexError("Leaf must be an integer type for default sum functions")
+        leaf_arr = (ct.c_uint64 * self.total_cpu)()
+        return self.Leaf(max(super(PerCpuArray, self).__getitem__(key, leaf_arr)))
+
+    def average(self, key):
+        if isinstance(self.Leaf(), ct.Structure):
+            raise IndexError("Leaf must be an integer type for default sum functions")
+        leaf_arr = (ct.c_uint64 * self.total_cpu)()
+        return self.Leaf(reduce(lambda x,y: x+y, super(PerCpuArray, self).__getitem__(key, leaf_arr))/self.total_cpu)
 
 class StackTrace(TableBase):
     def __init__(self, *args, **kwargs):
