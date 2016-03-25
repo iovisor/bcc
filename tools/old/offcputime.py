@@ -9,6 +9,8 @@
 # as a proof of concept. This implementation should be replaced in the future
 # with an appropriate bpf_ call, when available.
 #
+# Currently limited to a stack trace depth of 21 (maxdepth + 1).
+#
 # Copyright 2016 Netflix, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
@@ -46,6 +48,7 @@ args = parser.parse_args()
 folded = args.folded
 duration = int(args.duration)
 debug = 0
+maxdepth = 20    # and MAXDEPTH
 if args.pid and args.useronly:
     print("ERROR: use either -p or -u.")
     exit()
@@ -59,15 +62,31 @@ bpf_text = """
 #include <uapi/linux/ptrace.h>
 #include <linux/sched.h>
 
+#define MAXDEPTH	20
 #define MINBLOCK_US	1
 
 struct key_t {
     char name[TASK_COMM_LEN];
-    int stack_id;
+    // Skip saving the ip
+    u64 ret[MAXDEPTH];
 };
 BPF_HASH(counts, struct key_t);
 BPF_HASH(start, u32);
-BPF_STACK_TRACE(stack_traces, 1024)
+
+static u64 get_frame(u64 *bp) {
+    if (*bp) {
+        // The following stack walker is x86_64 specific
+        u64 ret = 0;
+        if (bpf_probe_read(&ret, sizeof(ret), (void *)(*bp+8)))
+            return 0;
+        if (bpf_probe_read(bp, sizeof(*bp), (void *)*bp))
+            *bp = 0;
+        if (ret < __START_KERNEL_map)
+            return 0;
+        return ret;
+    }
+    return 0;
+}
 
 int oncpu(struct pt_regs *ctx, struct task_struct *prev) {
     u32 pid;
@@ -92,12 +111,36 @@ int oncpu(struct pt_regs *ctx, struct task_struct *prev) {
         return 0;
 
     // create map key
-    u64 zero = 0, *val;
+    u64 zero = 0, *val, bp = 0;
+    int depth = 0;
     struct key_t key = {};
-
     bpf_get_current_comm(&key.name, sizeof(key.name));
-    key.stack_id = stack_traces.get_stackid(ctx, BPF_F_REUSE_STACKID);
+    bp = ctx->bp;
 
+    // unrolled loop (MAXDEPTH):
+    if (!(key.ret[depth++] = get_frame(&bp))) goto out;
+    if (!(key.ret[depth++] = get_frame(&bp))) goto out;
+    if (!(key.ret[depth++] = get_frame(&bp))) goto out;
+    if (!(key.ret[depth++] = get_frame(&bp))) goto out;
+    if (!(key.ret[depth++] = get_frame(&bp))) goto out;
+    if (!(key.ret[depth++] = get_frame(&bp))) goto out;
+    if (!(key.ret[depth++] = get_frame(&bp))) goto out;
+    if (!(key.ret[depth++] = get_frame(&bp))) goto out;
+    if (!(key.ret[depth++] = get_frame(&bp))) goto out;
+    if (!(key.ret[depth++] = get_frame(&bp))) goto out;
+
+    if (!(key.ret[depth++] = get_frame(&bp))) goto out;
+    if (!(key.ret[depth++] = get_frame(&bp))) goto out;
+    if (!(key.ret[depth++] = get_frame(&bp))) goto out;
+    if (!(key.ret[depth++] = get_frame(&bp))) goto out;
+    if (!(key.ret[depth++] = get_frame(&bp))) goto out;
+    if (!(key.ret[depth++] = get_frame(&bp))) goto out;
+    if (!(key.ret[depth++] = get_frame(&bp))) goto out;
+    if (!(key.ret[depth++] = get_frame(&bp))) goto out;
+    if (!(key.ret[depth++] = get_frame(&bp))) goto out;
+    if (!(key.ret[depth++] = get_frame(&bp))) goto out;
+
+out:
     val = counts.lookup_or_init(&key, &zero);
     (*val) += delta;
     return 0;
@@ -140,17 +183,24 @@ while (1):
     if not folded:
         print()
     counts = b.get_table("counts")
-    stack_traces = b.get_table("stack_traces")
     for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
         if folded:
             # print folded stack output
-            stack = list(stack_traces.walk(k.stack_id))[1:]
-            line = [k.name.decode()] + [b.ksym(addr) for addr in reversed(stack)]
-            print("%s %d" % (";".join(line), v.value))
+            line = k.name.decode() + ";"
+            for i in reversed(range(0, maxdepth)):
+                if k.ret[i] == 0:
+                    continue
+                line = line + b.ksym(k.ret[i])
+                if i != 0:
+                    line = line + ";"
+            print("%s %d" % (line, v.value))
         else:
             # print default multi-line stack output
-            for addr in stack_traces.walk(k.stack_id):
-                print("    %-16x %s" % (addr, b.ksym(addr)))
+            for i in range(0, maxdepth):
+                if k.ret[i] == 0:
+                    break
+                print("    %-16x %s" % (k.ret[i],
+                    b.ksym(k.ret[i])))
             print("    %-16s %s" % ("-", k.name))
             print("        %d\n" % v.value)
     counts.clear()
