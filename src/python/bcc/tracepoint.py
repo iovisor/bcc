@@ -147,6 +147,11 @@ struct %s {
         def _generate_struct_locals(self):
                 text = ""
                 for field_type, field_name in self.struct_fields:
+                        if field_type == "char" and field_name.endswith(']'):
+                                # Special case for 'char whatever[N]', should
+                                # be assigned to a 'char *'
+                                field_type = "char *"
+                                field_name = re.sub(r'\[\d+\]$', '', field_name)
                         text += "        %s %s = tp.%s;\n" % (
                                         field_type, field_name, field_name)
                 return text
