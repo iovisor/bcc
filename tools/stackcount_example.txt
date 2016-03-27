@@ -82,9 +82,6 @@ tracing.
 It can be useful to trace the path to submit_bio to explain unusual rates of
 disk IOPS. These could have in-kernel origins (eg, background scrub).
 
-This version of stackcount truncates stacks to 10 levels deep (plus 1 for
-the traced function, so 11).
-
 
 As another example, here are the code paths that led to ip_output(), which
 sends a packet at the IP level:

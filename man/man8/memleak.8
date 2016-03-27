@@ -3,7 +3,7 @@
 memleak \- Print a summary of outstanding allocations and their call stacks to detect memory leaks. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
 .B memleak [-h] [-p PID] [-t] [-a] [-o OLDER] [-c COMMAND] [-s SAMPLE_RATE]
-[-d STACK_DEPTH] [-T TOP] [-z MIN_SIZE] [-Z MAX_SIZE] [INTERVAL] [COUNT]
+[-T TOP] [-z MIN_SIZE] [-Z MAX_SIZE] [INTERVAL] [COUNT]
 .SH DESCRIPTION
 memleak traces and matches memory allocation and deallocation requests, and
 collects call stacks for each allocation. memleak can then print a summary
@@ -15,10 +15,7 @@ When tracing all processes, memleak instruments kmalloc and kfree.
 memleak may introduce significant overhead when tracing processes that allocate
 and free many blocks very quickly. See the OVERHEAD section below.
 
-The stack depth is limited to 10 by default (+1 for the current instruction pointer),
-but it can be controlled using the \-d switch if deeper stacks are required.
-
-This currently only works on x86_64. Check for future versions.
+This tool only works on Linux 4.6+. Stack traces are obtained using the new BPF_STACK_TRACE` APIs.
 .SH REQUIREMENTS
 CONFIG_BPF and bcc.
 .SH OPTIONS
@@ -44,10 +41,6 @@ Run the specified command and trace its allocations only. This traces malloc and
 .TP
 \-s SAMPLE_RATE
 Record roughly every SAMPLE_RATE-th allocation to reduce overhead.
-.TP
-\-d STACK_DEPTH
-Capture STACK_DEPTH frames (or less) when obtaining allocation call stacks.
-The default value is 10.
 .TP
 \-t TOP
 Print only the top TOP stacks (sorted by size).
@@ -105,9 +98,6 @@ placed in a typical period of 10 seconds:
 
 #
 .B perf stat -a -e 'probe:__kmalloc' -- sleep 10
-
-Another setting that may help reduce overhead is lowering the number of stack
-frames captured and parsed by memleak for each allocation, using the \-d switch.
 
 .SH SOURCE
 This is from bcc.

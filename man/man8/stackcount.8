@@ -12,10 +12,8 @@ and their occurrence counts.
 The pattern is a string with optional '*' wildcards, similar to file globbing.
 If you'd prefer to use regular expressions, use the \-r option.
 
-The stack depth is currently limited to 10 (+1 for the current instruction
-pointer).
+This tool only works on Linux 4.6+. Stack traces are obtained using the new `BPF_STACK_TRACE` APIs.
 
-This currently only works on x86_64. Check for future versions.
 .SH REQUIREMENTS
 CONFIG_BPF and bcc.
 .SH OPTIONS
@@ -82,13 +80,12 @@ Only count stacks when PID 185 is on-CPU:
 This summarizes unique stack traces in-kernel for efficiency, allowing it to
 trace a higher rate of function calls than methods that post-process in user
 space. The stack trace data is only copied to user space when the output is
-printed, which usually only happens once. Given these techniques, I'd suspect
-that call rates of < 10,000/sec would incur negligible overhead (for this
-current version; future versions may improve this). Beyond that,
-there will be a point where the overhead is measurable, as this does add
-a number of instructions to each function call to walk and save stacks.
-Test before production use. You can also use funccount to get a handle on
-function call rates first.
+printed, which usually only happens once. The stack walking also happens in an
+optimized code path in the kernel thanks to the new BPF_STACK_TRACE table APIs,
+which should be more efficient than the manual walker in the eBPF tracer which
+older versions of this script used. With this in mind, call rates of <
+10,000/sec would incur negligible overhead. Test before production use. You can
+also use funccount to get a handle on function call rates first.
 .SH SOURCE
 This is from bcc.
 .IP
