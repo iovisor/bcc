@@ -9,10 +9,7 @@ kernel stack back trace for that call. This shows the ancestry of function
 calls, and is a quick way to investigate low frequency kernel functions and
 their cause. For high frequency kernel functions, see stackcount.
 
-The stack depth is currently limited to 10 (+1 for the current instruction
-pointer).
-
-This currently only works on x86_64. Check for future versions.
+This tool only works on Linux 4.6+. Stack traces are obtained using the new BPF_STACK_TRACE` APIs.
 .SH REQUIREMENTS
 CONFIG_BPF and bcc.
 .SH OPTIONS

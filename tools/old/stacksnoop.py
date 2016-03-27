@@ -20,7 +20,6 @@
 from __future__ import print_function
 from bcc import BPF
 import argparse
-import re
 
 # arguments
 examples = """examples:
@@ -51,14 +50,45 @@ debug = 0
 bpf_text = """
 #include <uapi/linux/ptrace.h>
 
-BPF_STACK_TRACE(stack_traces, 128)
+static int print_frame(u64 *bp, int *depth) {
+    if (*bp) {
+        // The following stack walker is x86_64 specific
+        u64 ret = 0;
+        if (bpf_probe_read(&ret, sizeof(ret), (void *)(*bp+8)))
+            return 0;
+        if (ret < __START_KERNEL_map)
+            return 0;
+        bpf_trace_printk("r%d: %llx\\n", *depth, ret);
+        if (bpf_probe_read(bp, sizeof(*bp), (void *)*bp))
+            return 0;
+        *depth += 1;
+        return 1;
+    }
+    return 0;
+}
 
 void trace_stack(struct pt_regs *ctx) {
     FILTER
-    int stack_id = stack_traces.get_stackid(ctx, BPF_F_REUSE_STACKID);
-    if (stack_id >= 0)
-        bpf_trace_printk("stack_id=%d\\n", stack_id);
-}
+    u64 bp = 0;
+    int depth = 0;
+
+    bpf_trace_printk("\\n");
+    if (ctx->ip)
+        bpf_trace_printk("ip: %llx\\n", ctx->ip);
+    bp = ctx->bp;
+
+    // unrolled loop, 10 frames deep:
+    if (!print_frame(&bp, &depth)) return;
+    if (!print_frame(&bp, &depth)) return;
+    if (!print_frame(&bp, &depth)) return;
+    if (!print_frame(&bp, &depth)) return;
+    if (!print_frame(&bp, &depth)) return;
+    if (!print_frame(&bp, &depth)) return;
+    if (!print_frame(&bp, &depth)) return;
+    if (!print_frame(&bp, &depth)) return;
+    if (!print_frame(&bp, &depth)) return;
+    if (!print_frame(&bp, &depth)) return;
+};
 """
 if args.pid:
     bpf_text = bpf_text.replace('FILTER',
@@ -77,28 +107,24 @@ if matched == 0:
     print("Function \"%s\" not found. Exiting." % function)
     exit()
 
-stack_traces = b.get_table("stack_traces")
-msg_regexp = re.compile("stack_id=(\d+)")
-
 # header
 if verbose:
-    print("%-18s %-12s %-6s %-3s %s" % ("TIME(s)", "COMM", "PID", "CPU", "SYSCALL"))
+    print("%-18s %-12s %-6s %-3s %s" % ("TIME(s)", "COMM", "PID", "CPU",
+        "STACK"))
 else:
-    print("%-18s %s" % ("TIME(s)", "SYSCALL"))
+    print("%-18s %s" % ("TIME(s)", "STACK"))
 
 # format output
 while 1:
     (task, pid, cpu, flags, ts, msg) = b.trace_fields()
-    m = msg_regexp.match(msg)
-    if m:
-        if verbose:
-            print("%-18.9f %-12.12s %-6d %-3d %s" % (ts, task, pid, cpu, function))
+    if msg != "":
+        (reg, addr) = msg.split(" ")
+        if offset:
+            ip = b.ksymaddr(int(addr, 16))
         else:
-            print("%-18.9f %s" % (ts, function))
-
-        stack_id = int(m.group(1))
-        for addr in stack_traces.walk(stack_id):
-            sym = b.ksymaddr(addr) if offset else b.ksym(addr)
-            print("\t%016x %s" % (addr, sym))
-
-        print()
+            ip = b.ksym(int(addr, 16))
+        msg = msg + " " + ip
+    if verbose:
+        print("%-18.9f %-12.12s %-6d %-3d %s" % (ts, task, pid, cpu, msg))
+    else:
+        print("%-18.9f %s" % (ts, msg))
