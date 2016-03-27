@@ -732,7 +732,7 @@ class BPF(object):
         if idx == -1:
             return "[unknown]"
         offset = int(addr - ksyms[idx][1])
-        return ksyms[idx][0] + hex(offset)
+        return "%s+0x%x" % (ksyms[idx][0], offset)
 
     @staticmethod
     def ksymname(name):
