@@ -412,8 +412,36 @@ class PerCpuArray(ArrayBase):
         raise Exception("Unsupported")
 
 class StackTrace(TableBase):
+    MAX_DEPTH = 127
+
     def __init__(self, *args, **kwargs):
         super(StackTrace, self).__init__(*args, **kwargs)
+
+    class StackWalker(object):
+        def __init__(self, stack, resolve=None):
+            self.stack = stack
+            self.n = -1
+            self.resolve = resolve
+
+        def __iter__(self):
+            return self
+
+        def __next__(self):
+            return self.next()
+
+        def next(self):
+            self.n += 1
+            if self.n == StackTrace.MAX_DEPTH:
+                raise StopIteration()
+
+            addr = self.stack.ip[self.n]
+            if addr == 0 :
+                raise StopIteration()
+
+            return self.resolve(addr) if self.resolve else addr
+
+    def walk(self, stack_id, resolve=None):
+        return StackTrace.StackWalker(self[self.Key(stack_id)], resolve)
 
     def __len__(self):
         i = 0
