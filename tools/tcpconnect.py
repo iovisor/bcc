@@ -24,6 +24,7 @@
 from __future__ import print_function
 from bcc import BPF
 import argparse
+import re
 import ctypes as ct
 
 # arguments
@@ -65,12 +66,11 @@ struct ipv4_data_t {
 BPF_PERF_OUTPUT(ipv4_events);
 
 struct ipv6_data_t {
-    // XXX: update to transfer full ipv6 addrs
     u64 ts_us;
     u64 pid;
     u64 ip;
-    u64 saddr;
-    u64 daddr;
+    u64 saddr[2];
+    u64 daddr[2];
     u64 dport;
     char task[TASK_COMM_LEN];
 };
@@ -125,13 +125,14 @@ static int trace_connect_return(struct pt_regs *ctx, short ipver)
         struct ipv6_data_t data6 = {.pid = pid, .ip = ipver};
         data6.ts_us = bpf_ktime_get_ns() / 1000;
         // just grab the last 4 bytes for now
-        u32 saddr = 0, daddr = 0;
-        bpf_probe_read(&saddr, sizeof(saddr),
-            &skp->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32[3]);
-        bpf_probe_read(&daddr, sizeof(daddr),
-            &skp->__sk_common.skc_v6_daddr.in6_u.u6_addr32[3]);
-        data6.saddr = bpf_ntohl(saddr);
-        data6.daddr = bpf_ntohl(daddr);
+        bpf_probe_read(&data6.saddr[0], sizeof(data6.saddr[0]),
+            &skp->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32[0]);
+        bpf_probe_read(&data6.saddr[1], sizeof(data6.saddr[1]),
+            &skp->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32[2]);
+        bpf_probe_read(&data6.daddr[0], sizeof(data6.daddr[0]),
+            &skp->__sk_common.skc_v6_daddr.in6_u.u6_addr32[0]);
+        bpf_probe_read(&data6.daddr[1], sizeof(data6.daddr[1]),
+            &skp->__sk_common.skc_v6_daddr.in6_u.u6_addr32[2]);
         data6.dport = ntohs(dport);
         bpf_get_current_comm(&data6.task, sizeof(data6.task));
         ipv6_events.perf_submit(ctx, &data6, sizeof(data6));
@@ -179,8 +180,8 @@ class Data_ipv6(ct.Structure):
         ("ts_us", ct.c_ulonglong),
         ("pid", ct.c_ulonglong),
         ("ip", ct.c_ulonglong),
-        ("saddr", ct.c_ulonglong),
-        ("daddr", ct.c_ulonglong),
+        ("saddr", ct.c_ulonglong * 2),
+        ("daddr", ct.c_ulonglong * 2),
         ("dport", ct.c_ulonglong),
         ("task", ct.c_char * TASK_COMM_LEN)
     ]
@@ -195,14 +196,18 @@ def print_ipv4_event(cpu, data, size):
     print("%-6d %-12.12s %-2d %-16s %-16s %-4d" % (event.pid, event.task,
         event.ip, inet_ntoa(event.saddr), inet_ntoa(event.daddr),
         event.dport))
+
 def print_ipv6_event(cpu, data, size):
     event = ct.cast(data, ct.POINTER(Data_ipv6)).contents
     if args.timestamp:
         if start_ts == 0:
             start_ts = event.ts_us
         print("%-9.3f" % ((event.ts_us - start_ts) / 100000), end="")
-    print("%-6d %-12.12s %-2d ...%-13x ...%-13x %-4d" % (event.pid,
-        event.task, event.ip, event.saddr, event.daddr, event.dport))
+    print("%-6d %-12.12s %-2d %-16s %-16s %-4d" % (event.pid,
+        event.task, event.ip,
+        inet6_ntoa(event.saddr[1] << 64 | event.saddr[0]),
+        inet6_ntoa(event.daddr[1] << 64 | event.daddr[0]),
+        event.dport))
 
 # initialize BPF
 b = BPF(text=bpf_text)
@@ -220,6 +225,7 @@ print("%-6s %-12s %-2s %-16s %-16s %-4s" % ("PID", "COMM", "IP", "SADDR",
 start_ts = 0
 
 def inet_ntoa(addr):
+    # u32 to dotted quad string
     dq = ''
     for i in range(0, 4):
         dq = dq + str(addr & 0xff)
@@ -227,6 +233,35 @@ def inet_ntoa(addr):
             dq = dq + '.'
         addr = addr >> 8
     return dq
+
+def inet6_ntoa(addr):
+    # see RFC4291 summary in RFC5952 section 2
+    s = ''
+    for i in range(0, 16):
+        if ((i % 2) == 0):
+            zerorun = 1
+            if (i != 0):
+                s = s + ':'
+
+        v = addr & 0xff
+        if ((i % 2) == 0):
+            # if first byte in field is zero, skip it:
+            if v != 0:
+                # don't zero pad first byte in field:
+                s = s + "%x" % v
+                zerorun = 0
+        else:
+            if zerorun:
+                # previous byte was zero, don't zero pad this one:
+                s = s + "%x" % v
+            else:
+                # previous byte was non-zero, need a zero pad:
+                s = s + "%02x" % v
+        addr = addr >> 8
+
+    # compress left-most zero run only (change to most for RFC5952):
+    s = re.sub(r'(^|:)0:(0:)+', r'::', s, 1)
+    return s
 
 # read events
 b["ipv4_events"].open_perf_buffer(print_ipv4_event)
