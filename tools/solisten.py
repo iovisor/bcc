@@ -51,18 +51,6 @@ bpf_text = """
 #include <net/net_namespace.h>
 #include <bcc/proto.h>
 
-// Endian conversion. We can't use kernel version here as it uses inline
-// assembly, neither libc version as we can't import it here. Adapted from both.
-#if defined(__LITTLE_ENDIAN)
-#define bcc_be32_to_cpu(x) ((u32)(__builtin_bswap32)((x)))
-#define bcc_be64_to_cpu(x) ((u64)(__builtin_bswap64)((x)))
-#elif defined(__BIG_ENDIAN)
-#define bcc_be32_to_cpu(x) (x)
-#define bcc_be64_to_cpu(x) (x)
-#else
-#error Host endianness not defined
-#endif
-
 // Common structure for UDP/TCP IPv4/IPv6
 struct listen_evt_t {
     u64 ts_us;
@@ -117,11 +105,11 @@ int kprobe__inet_listen(struct pt_regs *ctx, struct socket *sock, int backlog)
         // Get IP
         if (family == AF_INET) {
             bpf_probe_read(evt.laddr, sizeof(u32), &(inet->inet_rcv_saddr));
-            evt.laddr[0] = bcc_be32_to_cpu(evt.laddr[0]);
+            evt.laddr[0] = be32_to_cpu(evt.laddr[0]);
         } else if (family == AF_INET6) {
             bpf_probe_read(evt.laddr, sizeof(evt.laddr), sk->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
-            evt.laddr[0] = bcc_be64_to_cpu(evt.laddr[0]);
-            evt.laddr[1] = bcc_be64_to_cpu(evt.laddr[1]);
+            evt.laddr[0] = be64_to_cpu(evt.laddr[0]);
+            evt.laddr[1] = be64_to_cpu(evt.laddr[1]);
         }
 
         // Send event to userland
