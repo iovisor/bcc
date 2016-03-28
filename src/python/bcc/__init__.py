@@ -39,6 +39,11 @@ ksyms = []
 ksym_names = {}
 ksym_loaded = 0
 _kprobe_limit = 1000
+BASE_CFLAGS = [
+    '-D__HAVE_BUILTIN_BSWAP16__',
+    '-D__HAVE_BUILTIN_BSWAP32__',
+    '-D__HAVE_BUILTIN_BSWAP64__',
+]
 
 @atexit.register
 def cleanup_kprobes():
@@ -140,6 +145,7 @@ class BPF(object):
         self.debug = debug
         self.funcs = {}
         self.tables = {}
+        cflags = BASE_CFLAGS + cflags
         cflags_array = (ct.c_char_p * len(cflags))()
         for i, s in enumerate(cflags): cflags_array[i] = s.encode("ascii")
         if text:
