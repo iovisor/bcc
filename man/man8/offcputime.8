@@ -22,10 +22,8 @@ especially the -f format, can be used to generate an "off-CPU time flame graph".
 
 See http://www.brendangregg.com/FlameGraphs/offcpuflamegraphs.html
 
-The stack depth is currently limited to 20, and the stack traces are kernel
-mode only. Check for newer versions where either may be improved.
-
-This currently only works on x86_64. Check for future versions.
+This tool only works on Linux 4.6+. It uses the new `BPF_STACK_TRACE` table
+APIs to generate the in-kernel stack traces.
 .SH REQUIREMENTS
 CONFIG_BPF and bcc.
 .SH OPTIONS

@@ -20,13 +20,16 @@ import json
 import multiprocessing
 import os
 import re
-from subprocess import Popen, PIPE
+from subprocess import Popen, PIPE, STDOUT
 import struct
 import sys
 basestring = (unicode if sys.version_info[0] < 3 else str)
 
 from .libbcc import lib, _CB_TYPE
+from .procstat import ProcStat
 from .table import Table
+from .tracepoint import Perf, Tracepoint
+from .usyms import ProcessSymbols
 
 open_kprobes = {}
 open_uprobes = {}
@@ -37,6 +40,10 @@ ksyms = []
 ksym_names = {}
 ksym_loaded = 0
 _kprobe_limit = 1000
+
+DEBUG_LLVM_IR = 0x1
+DEBUG_BPF = 0x2
+DEBUG_PREPROCESSOR = 0x4
 
 @atexit.register
 def cleanup_kprobes():
@@ -72,6 +79,30 @@ class BPF(object):
     _lib_load_address_cache = {}
     _lib_symbol_cache = {}
 
+    _auto_includes = {
+        "linux/time.h"      : ["time"],
+        "linux/fs.h"        : ["fs", "file"],
+        "linux/blkdev.h"    : ["bio", "request"],
+        "linux/slab.h"      : ["alloc"],
+        "linux/netdevice.h" : ["sk_buff", "net_device"]
+    }
+
+    @classmethod
+    def generate_auto_includes(cls, program_words):
+        """
+        Generates #include statements automatically based on a set of
+        recognized types such as sk_buff and bio. The input is all the words
+        that appear in the BPF program, and the output is a (possibly empty)
+        string of #include statements, such as "#include <linux/fs.h>".
+        """
+        headers = ""
+        for header, keywords in cls._auto_includes.items():
+            for keyword in keywords:
+                for word in program_words:
+                    if keyword in word and header not in headers:
+                        headers += "#include <%s>\n" % header
+        return headers
+
     # defined for compatibility reasons, to be removed
     Table = Table
 
@@ -105,8 +136,9 @@ class BPF(object):
             hdr_file (Optional[str]): Path to a helper header file for the `src_file`
             text (Optional[str]): Contents of a source file for the module
             debug (Optional[int]): Flags used for debug prints, can be |'d together
-                0x1: print LLVM IR to stderr
-                0x2: print BPF bytecode to stderr
+                DEBUG_LLVM_IR: print LLVM IR to stderr
+                DEBUG_BPF: print BPF bytecode to stderr
+                DEBUG_PREPROCESSOR: print Preprocessed C file to stderr
         """
 
         self._reader_cb_impl = _CB_TYPE(BPF._reader_cb)
@@ -165,7 +197,7 @@ class BPF(object):
                 lib.bpf_module_kern_version(self.module),
                 log_buf, ct.sizeof(log_buf) if log_buf else 0)
 
-        if self.debug & 0x2:
+        if self.debug & DEBUG_BPF:
             print(log_buf.value.decode(), file=sys.stderr)
 
         if fd < 0:
@@ -324,6 +356,11 @@ class BPF(object):
     def open_kprobes():
         global open_kprobes
         return open_kprobes
+
+    @staticmethod
+    def open_uprobes():
+            global open_uprobes
+            return open_uprobes
 
     @staticmethod
     def detach_kprobe(event):
@@ -701,7 +738,7 @@ class BPF(object):
         if idx == -1:
             return "[unknown]"
         offset = int(addr - ksyms[idx][1])
-        return ksyms[idx][0] + hex(offset)
+        return "%s+0x%x" % (ksyms[idx][0], offset)
 
     @staticmethod
     def ksymname(name):
@@ -716,6 +753,28 @@ class BPF(object):
         if idx == -1:
             return 0
         return ksyms[idx][1]
+
+    @classmethod
+    def usymaddr(cls, pid, addr, refresh_symbols=False):
+        """usymaddr(pid, addr, refresh_symbols=False)
+
+        Decode the specified address in the specified process to a symbolic
+        representation that includes the symbol name, offset within the symbol,
+        and the module name. See the ProcessSymbols class for more details.
+
+        Specify refresh_symbols=True if you suspect the set of loaded modules
+        or their load addresses has changed since the last time you called
+        usymaddr() on this pid.
+        """
+        proc_sym = None
+        if pid in cls._process_symbols:
+            proc_sym = cls._process_symbols[pid]
+            if refresh_symbols:
+                proc_sym.refresh_code_ranges()
+        else:
+            proc_sym = ProcessSymbols(pid)
+            cls._process_symbols[pid] = proc_sym
+        return proc_sym.decode_addr(addr)
 
     @staticmethod
     def num_open_kprobes():
@@ -739,4 +798,6 @@ class BPF(object):
             lib.perf_reader_poll(len(open_kprobes), readers, timeout)
         except KeyboardInterrupt:
             exit()
+
+from .usdt import USDTReader
 

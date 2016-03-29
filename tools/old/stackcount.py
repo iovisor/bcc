@@ -72,14 +72,52 @@ def signal_ignore(signal, frame):
 bpf_text = """
 #include <uapi/linux/ptrace.h>
 
-BPF_HASH(counts, int);
-BPF_STACK_TRACE(stack_traces, 1024);
+#define MAXDEPTH	10
+
+struct key_t {
+    u64 ip;
+    u64 ret[MAXDEPTH];
+};
+BPF_HASH(counts, struct key_t);
+
+static u64 get_frame(u64 *bp) {
+    if (*bp) {
+        // The following stack walker is x86_64 specific
+        u64 ret = 0;
+        if (bpf_probe_read(&ret, sizeof(ret), (void *)(*bp+8)))
+            return 0;
+        if (bpf_probe_read(bp, sizeof(*bp), (void *)*bp))
+            *bp = 0;
+        if (ret < __START_KERNEL_map)
+            return 0;
+        return ret;
+    }
+    return 0;
+}
 
 int trace_count(struct pt_regs *ctx) {
     FILTER
-    int key = stack_traces.get_stackid(ctx, BPF_F_REUSE_STACKID);
-    u64 zero = 0;
-    u64 *val = counts.lookup_or_init(&key, &zero);
+    struct key_t key = {};
+    u64 zero = 0, *val, bp = 0;
+    int depth = 0;
+
+    key.ip = ctx->ip;
+    bp = ctx->bp;
+
+    // unrolled loop, 10 (MAXDEPTH) frames deep:
+    if (!(key.ret[depth++] = get_frame(&bp))) goto out;
+    if (!(key.ret[depth++] = get_frame(&bp))) goto out;
+    if (!(key.ret[depth++] = get_frame(&bp))) goto out;
+    if (!(key.ret[depth++] = get_frame(&bp))) goto out;
+    if (!(key.ret[depth++] = get_frame(&bp))) goto out;
+    if (!(key.ret[depth++] = get_frame(&bp))) goto out;
+    if (!(key.ret[depth++] = get_frame(&bp))) goto out;
+    if (!(key.ret[depth++] = get_frame(&bp))) goto out;
+    if (!(key.ret[depth++] = get_frame(&bp))) goto out;
+    if (!(key.ret[depth++] = get_frame(&bp))) goto out;
+
+out:
+    val = counts.lookup_or_init(&key, &zero);
     (*val)++;
     return 0;
 }
@@ -126,11 +164,13 @@ while (1):
     if args.timestamp:
         print("%-8s\n" % strftime("%H:%M:%S"), end="")
 
-    counts = b["counts"]
-    stack_traces = b["stack_traces"]
+    counts = b.get_table("counts")
     for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
-        for addr in stack_traces.walk(k.value):
-            print_frame(addr)
+        print_frame(k.ip)
+        for i in range(0, maxdepth):
+            if k.ret[i] == 0:
+                break
+            print_frame(k.ret[i])
         print("    %d\n" % v.value)
     counts.clear()
 

@@ -155,7 +155,7 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, unique_ptr<vector<TableDes
   // Initialize a compiler invocation object from the clang (-cc1) arguments.
   const driver::ArgStringList &ccargs = cmd.getArguments();
 
-  if (flags_ & 0x4) {
+  if (flags_ & DEBUG_PREPROCESSOR) {
     llvm::errs() << "clang";
     for (auto arg : ccargs)
       llvm::errs() << " " << arg;

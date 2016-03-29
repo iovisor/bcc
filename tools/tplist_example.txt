@@ -1,0 +1,113 @@
+Demonstrations of tplist.
+
+
+tplist displays kernel tracepoints and USDT probes, including their
+format. It can be used to discover probe points for use with the trace
+and argdist tools. Kernel tracepoints are scattered around the kernel
+and provide valuable static tracing on block and network I/O, scheduling,
+power events, and many other subjects. USDT probes are placed in libraries
+(such as libc) and executables (such as node) and provide static tracing
+information that can (optionally) be turned on and off at runtime.
+
+For example, suppose you want to discover which USDT probes a particular
+executable contains. Just run tplist on that executable (or library):
+
+$ tplist -l basic_usdt
+/home/vagrant/basic_usdt basic_usdt:start_main
+/home/vagrant/basic_usdt basic_usdt:loop_iter
+/home/vagrant/basic_usdt basic_usdt:end_main
+
+The loop_iter probe sounds interesting. What are the locations of that
+probe, and which variables are available?
+
+$ tplist '*loop_iter' -l basic_usdt -v
+/home/vagrant/basic_usdt basic_usdt:loop_iter [sema 0x601036]
+  location 0x400550 raw args: -4@$42 8@%rax
+    4   signed bytes @ constant 42
+    8 unsigned bytes @ register %rax
+  location 0x40056f raw args: 8@-8(%rbp) 8@%rax
+    8 unsigned bytes @ -8(%rbp)
+    8 unsigned bytes @ register %rax
+
+This output indicates that the loop_iter probe is used in two locations
+in the basic_usdt executable. The first location passes a constant value,
+42, to the probe. The second location passes a variable value located at
+an offset from the %rbp register. Don't worry -- you don't have to trace
+the register values yourself. The argdist and trace tools understand the
+probe format and can print out the arguments automatically -- you can
+refer to them as arg1, arg2, and so on.
+
+Try to explore with some common libraries on your system and see if they
+contain UDST probes. Here are two examples you might find interesting:
+
+$ tplist -l pthread     # list probes in libpthread
+/lib64/libpthread.so.0 libpthread:pthread_start
+/lib64/libpthread.so.0 libpthread:pthread_create
+/lib64/libpthread.so.0 libpthread:pthread_join
+/lib64/libpthread.so.0 libpthread:pthread_join_ret
+/lib64/libpthread.so.0 libpthread:mutex_init
+... more output truncated
+
+$ tplist -l c           # list probes in libc
+/lib64/libc.so.6 libc:setjmp
+/lib64/libc.so.6 libc:longjmp
+/lib64/libc.so.6 libc:longjmp_target
+/lib64/libc.so.6 libc:memory_arena_reuse_free_list
+/lib64/libc.so.6 libc:memory_heap_new
+... more output truncated
+
+tplist also understands kernel tracepoints, and can list their format
+as well. For example, let's look for all block I/O-related tracepoints:
+
+# tplist 'block*'
+block:block_touch_buffer
+block:block_dirty_buffer
+block:block_rq_abort
+block:block_rq_requeue
+block:block_rq_complete
+block:block_rq_insert
+block:block_rq_issue
+block:block_bio_bounce
+block:block_bio_complete
+block:block_bio_backmerge
+block:block_bio_frontmerge
+block:block_bio_queue
+block:block_getrq
+block:block_sleeprq
+block:block_plug
+block:block_unplug
+block:block_split
+block:block_bio_remap
+block:block_rq_remap
+
+The block:block_rq_complete tracepoints sounds interesting. Let's print
+its format to see what we can trace with argdist and trace:
+
+$ tplist -v block:block_rq_complete
+block:block_rq_complete
+    dev_t dev;
+    sector_t sector;
+    unsigned int nr_sector;
+    int errors;
+    char rwbs[8];
+
+The dev, sector, nr_sector, etc. variables can now all be used in probes
+you specify with argdist or trace.
+
+
+USAGE message:
+
+$ tplist -h
+usage: tplist.py [-h] [-p PID] [-l LIB] [-v] [filter]
+
+Display kernel tracepoints or USDT probes and their formats.
+
+positional arguments:
+  filter             A filter that specifies which probes/tracepoints to print
+
+optional arguments:
+  -h, --help         show this help message and exit
+  -p PID, --pid PID  List USDT probes in the specified process
+  -l LIB, --lib LIB  List USDT probes in the specified library or executable
+  -v                 Print the format (available variables)
+

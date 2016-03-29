@@ -50,11 +50,11 @@ many cases, argdist will deduce the necessary header files automatically.
 .SH SPECIFIER SYNTAX
 The general specifier syntax is as follows:
 
-.B {p,r}:[library]:function(signature)[:type[,type...]:expr[,expr...][:filter]][#label]
+.B {p,r,t,u}:{[library],category}:function(signature)[:type[,type...]:expr[,expr...][:filter]][#label]
 .TP
-.B {p,r}
-Probe type \- "p" for function entry, "r" for function return;
-\-H for histogram collection, \-C for frequency count.
+.B {p,r,t,u}
+Probe type \- "p" for function entry, "r" for function return, "t" for kernel
+tracepoint, "u" for USDT probe; \-H for histogram collection, \-C for frequency count.
 Indicates where to place the probe and whether the probe should collect frequency
 count information, or aggregate the collected values into a histogram. Counting 
 probes will collect the number of times every parameter value was observed,
@@ -68,12 +68,19 @@ Specify the full path to the .so or executable file where the function to probe
 resides. Alternatively, you can specify just the lib name: for example, "c"
 refers to libc. If no library name is specified, the kernel is assumed.
 .TP
+.B category
+The category of the kernel tracepoint. For example: net, sched, block.
+.TP
 .B function(signature)
 The function to probe, and its signature.
 The function name must match exactly for the probe to be placed. The signature,
 on the other hand, is only required if you plan to collect parameter values 
 based on that signature. For example, if you only want to collect the first
 parameter, you don't have to specify the rest of the parameters in the signature.
+When capturing kernel tracepoints, this should be the name of the event, e.g.
+net_dev_start_xmit. The signature for kernel tracepoints should be empty. When
+capturing USDT probes, this should be the name of the probe, e.g. reloc_complete.
+The signature for USDT probes should be empty.
 .TP
 .B [type[,type...]]
 The type(s) of the expression(s) to capture.
@@ -85,6 +92,12 @@ The expression(s) to capture.
 These are the values that are assigned to the histogram or raw event collection.
 You may use the parameters directly, or valid C expressions that involve the
 parameters, such as "size % 10".
+Tracepoints may access a special structure called "tp" that is formatted according
+to the tracepoint format (which you can obtain using tplist). For example, the
+block:block_rq_complete tracepoint can access tp.nr_sector. You may also use the
+members of the "tp" struct directly, e.g. "nr_sector" instead of "tp.nr_sector".
+USDT probes may access the arguments defined by the tracing program in the 
+special arg1, arg2, ... variables. To obtain their types, use the tplist tool.
 Return probes can use the argument values received by the
 function when it was entered, through the $entry(paramname) special variable.
 Return probes can also access the function's return value in $retval, and the
@@ -136,6 +149,18 @@ Print a histogram of buffer sizes passed to write() across all processes, where 
 Count fork() calls in libc across all processes, grouped by pid:
 #
 .B argdist -C 'p:c:fork():int:$PID;fork per process'
+.TP
+Print histogram of number of sectors in completing block I/O requests:
+#
+.B argdist -H 't:block:block_rq_complete():u32:nr_sector'
+.TP
+Aggregate interrupts by interrupt request (IRQ):
+#
+.B argdist -C 't:irq:irq_handler_entry():int:irq'
+.TP
+Print the functions used as thread entry points and how common they are:
+#
+.B argdist -C 'u:pthread:pthread_start():u64:arg2' -p 1337
 .TP
 Print histograms of sleep() and nanosleep() parameter values:
 #

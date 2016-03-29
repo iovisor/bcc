@@ -1,0 +1,40 @@
+Demonstrations of solisten.py, the Linux eBPF/bcc version.
+
+
+This tool traces the kernel function called when a program wants to listen
+for TCP connections. It will not see UDP neither UNIX domain sockets.
+
+It can be used to dynamically update a load balancer as a program is actually
+ready to accept connexion, hence avoiding the "downtime" while it is initializing.
+
+# ./solisten.py --show-netns
+PID    COMM         NETNS        PROTO  BACKLOG  ADDR                                    PORT
+3643   nc           4026531957   TCPv4  1        0.0.0.0                                 4242
+3659   nc           4026531957   TCPv6  1        2001:f0d0:1002:51::4                    4242
+4221   redis-server 4026532165   TCPv6  128      ::                                      6379
+4221   redis-server 4026532165   TCPv4  128      0.0.0.0                                 6379
+6067   nginx        4026531957   TCPv4  128      0.0.0.0                                 80
+6067   nginx        4026531957   TCPv6  128      ::                                      80
+6069   nginx        4026531957   TCPv4  128      0.0.0.0                                 80
+6069   nginx        4026531957   TCPv6  128      ::                                      80
+6069   nginx        4026531957   TCPv4  128      0.0.0.0                                 80
+6069   nginx        4026531957   TCPv6  128      ::                                      80
+
+This output show the listen event from 3 programs. Netcat was started twice as
+shown by the 2 different PIDs. The first time on the wilcard IPv4, the second
+time on an IPv6. Netcat being a "one shot" program. It can accept a single
+connection, hence the backlog of "1".
+
+The next program is redis-server. As the netns column shows, it is in a
+different network namespace than netcat and nginx. In this specific case
+it was launched in a docker container. It listens both on IPv4 and IPv4
+with up to 128 pending connections.
+
+Determining the actual container is out if the scope of this tool. It could
+be derived by scrapping /proc/<PID>/cgroup. Note that this is racy.
+
+The overhead of this tool is negligeable as it traces listen() calls which are
+invoked in the initialization path of a program. The operation part will remain
+unaffected. In particular, accept() calls will not be affected. Neither
+individual read() and write().
+

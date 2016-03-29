@@ -44,33 +44,29 @@ class Time(object):
                         raise OSError(errno_, os.strerror(errno_))
                 return t.tv_sec * 1e9 + t.tv_nsec
 
-class KStackDecoder(object):
-        def refresh(self):
-                pass
-
-        def __call__(self, addr):
-                return "%s [kernel] (%x)" % (BPF.ksym(addr), addr)
-
-class UStackDecoder(object):
+class StackDecoder(object):
         def __init__(self, pid):
                 self.pid = pid
-                self.proc_sym = ProcessSymbols(pid)
+                if pid != -1:
+                        self.proc_sym = ProcessSymbols(pid)
 
         def refresh(self):
-                self.proc_sym.refresh_code_ranges()
+                if self.pid != -1:
+                        self.proc_sym.refresh_code_ranges()
 
-        def __call__(self, addr):
-                return "%s (%x)" % (self.proc_sym.decode_addr(addr), addr)
-
-class Allocation(object):
-    def __init__(self, stack, size):
-        self.stack = stack
-        self.count = 1
-        self.size = size
-
-    def update(self, size):
-        self.count += 1
-        self.size += size
+        def decode_stack(self, info, is_kernel_trace):
+                stack = ""
+                if info.num_frames <= 0:
+                        return "???"
+                for i in range(0, info.num_frames):
+                        addr = info.callstack[i]
+                        if is_kernel_trace:
+                                stack += " %s [kernel] (%x) ;" % \
+                                        (BPF.ksym(addr), addr)
+                        else:
+                                stack += " %s (%x) ;" % \
+                                        (self.proc_sym.decode_addr(addr), addr)
+                return stack
 
 def run_command_get_output(command):
         p = subprocess.Popen(command.split(),
@@ -129,6 +125,8 @@ parser.add_argument("-c", "--command",
         help="execute and trace the specified command")
 parser.add_argument("-s", "--sample-rate", default=1, type=int,
         help="sample every N-th allocation to decrease the overhead")
+parser.add_argument("-d", "--stack-depth", default=10, type=int,
+        help="maximum stack depth to capture")
 parser.add_argument("-T", "--top", type=int, default=10,
         help="display only this many top allocating stacks (by size)")
 parser.add_argument("-z", "--min-size", type=int,
@@ -146,6 +144,7 @@ interval = args.interval
 min_age_ns = 1e6 * args.older
 sample_every_n = args.sample_rate
 num_prints = args.count
+max_stack_size = args.stack_depth + 2
 top_stacks = args.top
 min_size = args.min_size
 max_size = args.max_size
@@ -164,12 +163,33 @@ bpf_source = """
 struct alloc_info_t {
         u64 size;
         u64 timestamp_ns;
-        int stack_id;
+        int num_frames;
+        u64 callstack[MAX_STACK_SIZE];
 };
 
 BPF_HASH(sizes, u64);
 BPF_HASH(allocs, u64, struct alloc_info_t);
-BPF_STACK_TRACE(stack_traces, 1024)
+
+// Adapted from https://github.com/iovisor/bcc/tools/offcputime.py
+static u64 get_frame(u64 *bp) {
+        if (*bp) {
+                // The following stack walker is x86_64 specific
+                u64 ret = 0;
+                if (bpf_probe_read(&ret, sizeof(ret), (void *)(*bp+8)))
+                        return 0;
+                if (bpf_probe_read(bp, sizeof(*bp), (void *)*bp))
+                        *bp = 0;
+                return ret;
+        }
+        return 0;
+}
+static int grab_stack(struct pt_regs *ctx, struct alloc_info_t *info)
+{
+        int depth = 0;
+        u64 bp = ctx->bp;
+        GRAB_ONE_FRAME
+        return depth;
+}
 
 int alloc_enter(struct pt_regs *ctx, size_t size)
 {
@@ -203,12 +223,12 @@ int alloc_exit(struct pt_regs *ctx)
         sizes.delete(&pid);
 
         info.timestamp_ns = bpf_ktime_get_ns();
-        info.stack_id = stack_traces.get_stackid(ctx, STACK_FLAGS);
+        info.num_frames = grab_stack(ctx, &info) - 2;
         allocs.update(&address, &info);
 
         if (SHOULD_PRINT) {
-                bpf_trace_printk("alloc exited, size = %lu, result = %lx\\n",
-                                 info.size, address);
+                bpf_trace_printk("alloc exited, size = %lu, result = %lx, frames = %d\\n",
+                                 info.size, address, info.num_frames);
         }
         return 0;
 }
@@ -231,6 +251,9 @@ int free_enter(struct pt_regs *ctx, void *address)
 """
 bpf_source = bpf_source.replace("SHOULD_PRINT", "1" if trace_all else "0")
 bpf_source = bpf_source.replace("SAMPLE_EVERY_N", str(sample_every_n))
+bpf_source = bpf_source.replace("GRAB_ONE_FRAME", max_stack_size *
+        "\tif (!(info->callstack[depth++] = get_frame(&bp))) return depth;\n")
+bpf_source = bpf_source.replace("MAX_STACK_SIZE", str(max_stack_size))
 
 size_filter = ""
 if min_size is not None and max_size is not None:
@@ -241,11 +264,6 @@ elif min_size is not None:
 elif max_size is not None:
         size_filter = "if (size > %d) return 0;" % max_size
 bpf_source = bpf_source.replace("SIZE_FILTER", size_filter)
-
-stack_flags = "BPF_F_REUSE_STACKID"
-if not kernel_trace:
-        stack_flags += "|BPF_F_USER_STACK"
-bpf_source = bpf_source.replace("STACK_FLAGS", stack_flags)
 
 bpf_program = BPF(text=bpf_source)
 
@@ -263,31 +281,29 @@ else:
         bpf_program.attach_kretprobe(event="__kmalloc", fn_name="alloc_exit")
         bpf_program.attach_kprobe(event="kfree", fn_name="free_enter")
 
-decoder = KStackDecoder() if kernel_trace else UStackDecoder(pid)
+decoder = StackDecoder(pid)
 
 def print_outstanding():
+        stacks = {}
         print("[%s] Top %d stacks with outstanding allocations:" %
               (datetime.now().strftime("%H:%M:%S"), top_stacks))
-        alloc_info = {}
-        allocs = bpf_program["allocs"]
-        stack_traces = bpf_program["stack_traces"]
+        allocs = bpf_program.get_table("allocs")
         for address, info in sorted(allocs.items(), key=lambda a: a[1].size):
                 if Time.monotonic_time() - min_age_ns < info.timestamp_ns:
                         continue
-                if info.stack_id < 0:
-                        continue
-                if info.stack_id in alloc_info:
-                        alloc_info[info.stack_id].update(info.size)
+                stack = decoder.decode_stack(info, kernel_trace)
+                if stack in stacks:
+                        stacks[stack] = (stacks[stack][0] + 1,
+                                         stacks[stack][1] + info.size)
                 else:
-                        stack = list(stack_traces.walk(info.stack_id, decoder))
-                        alloc_info[info.stack_id] = Allocation(stack, info.size)
+                        stacks[stack] = (1, info.size)
                 if args.show_allocs:
                         print("\taddr = %x size = %s" %
                               (address.value, info.size))
-        to_show = sorted(alloc_info.values(), key=lambda a: a.size)[-top_stacks:]
-        for alloc in to_show:
+        to_show = sorted(stacks.items(), key=lambda s: s[1][1])[-top_stacks:]
+        for stack, (count, size) in to_show:
                 print("\t%d bytes in %d allocations from stack\n\t\t%s" %
-                      (alloc.size, alloc.count, "\n\t\t".join(alloc.stack)))
+                      (size, count, stack.replace(";", "\n\t\t")))
 
 count_so_far = 0
 while True:

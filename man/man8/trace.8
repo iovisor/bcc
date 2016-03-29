@@ -45,10 +45,12 @@ information. See PROBE SYNTAX below.
 The general probe syntax is as follows:
 
 .B [{p,r}]:[library]:function [(predicate)] ["format string"[, arguments]]
+
+.B {t:category:event,u:library:probe} [(predicate)] ["format string"[, arguments]]
 .TP
-.B [{p,r}]
-Probe type \- "p" for function entry, "r" for function return. The default
-probe type is "p".
+.B {[{p,r}],t,u}
+Probe type \- "p" for function entry, "r" for function return, "t" for kernel
+tracepoint, "u" for USDT probe. The default probe type is "p".
 .TP
 .B [library]
 Library containing the probe.
@@ -58,8 +60,17 @@ refers to libc. If no library name is specified, the kernel is assumed. Also,
 you can specify an executable name (without a full path) if it is in the PATH.
 For example, "bash".
 .TP
+.B category
+The tracepoint category. For example, "sched" or "irq".
+.TP
 .B function
 The function to probe.
+.TP
+.B event
+The tracepoint event. For example, "block_rq_complete".
+.TP
+.B probe
+The USDT probe name. For example, "pthread_create".
 .TP
 .B [(predicate)]
 The filter applied to the captured data. Only if the filter evaluates as true,
@@ -80,6 +91,16 @@ use the following format specifiers: %s, %d, %u, %lld, %llu, %hd, %hu, %c,
 number of arguments as there are placeholders in the format string. The
 format specifier replacements may be any C expressions, and may refer to the
 same special keywords as in the predicate (arg1, arg2, etc.).
+
+In tracepoints, both the predicate and the arguments may refer to the tracepoint
+format structure, which is stored in the special "tp" variable. For example, the
+block:block_rq_complete tracepoint can print or filter by tp.nr_sector. To 
+discover the format of your tracepoint, use the tplist tool. Note that you can
+also use the members of the "tp" struct directly, e.g "nr_sector" instead of
+"tp.nr_sector".
+
+In USDT probes, the arg1, ..., argN variables refer to the probe's arguments.
+To determine which arguments your probe has, use the tplist tool.
 
 The predicate expression and the format specifier replacements for printing
 may also use the following special keywords: $pid, $tgid to refer to the 
@@ -102,6 +123,14 @@ Trace all malloc calls and print the size of the requested allocation:
 Trace returns from the readline function in bash and print the return value as a string:
 #
 .B trace 'r:bash:readline """%s"", retval' 
+.TP
+Trace the block:block_rq_complete tracepoint and print the number of sectors completed:
+#
+.B trace 't:block:block_rq_complete """%d sectors"", nr_sector'
+.TP
+Trace the pthread_create USDT probe from the pthread library and print the address of the thread's start function:
+#
+.B trace 'u:pthread:pthread_create """start addr = %llx"", arg3'
 .SH SOURCE
 This is from bcc.
 .IP
