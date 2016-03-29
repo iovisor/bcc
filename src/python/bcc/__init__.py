@@ -26,6 +26,7 @@ import sys
 basestring = (unicode if sys.version_info[0] < 3 else str)
 
 from .libbcc import lib, _CB_TYPE
+from .procstat import ProcStat
 from .table import Table
 from .tracepoint import Perf, Tracepoint
 from .usyms import ProcessSymbols
@@ -347,7 +348,7 @@ class BPF(object):
                 desc.encode("ascii"), pid, cpu, group_fd,
                 self._reader_cb_impl, ct.cast(id(self), ct.py_object))
         res = ct.cast(res, ct.c_void_p)
-        if res.value is None:
+        if res == None:
             raise Exception("Failed to attach BPF to kprobe")
         open_kprobes[ev_name] = res
         return self
@@ -395,7 +396,7 @@ class BPF(object):
                 desc.encode("ascii"), pid, cpu, group_fd,
                 self._reader_cb_impl, ct.cast(id(self), ct.py_object))
         res = ct.cast(res, ct.c_void_p)
-        if res.value is None:
+        if res == None:
             raise Exception("Failed to attach BPF to kprobe")
         open_kprobes[ev_name] = res
         return self
@@ -519,7 +520,7 @@ class BPF(object):
                 desc.encode("ascii"), pid, cpu, group_fd,
                 self._reader_cb_impl, ct.cast(id(self), ct.py_object))
         res = ct.cast(res, ct.c_void_p)
-        if res.value is None:
+        if res == None:
             raise Exception("Failed to attach BPF to uprobe")
         open_uprobes[ev_name] = res
         return self
@@ -563,7 +564,7 @@ class BPF(object):
                 desc.encode("ascii"), pid, cpu, group_fd,
                 self._reader_cb_impl, ct.cast(id(self), ct.py_object))
         res = ct.cast(res, ct.c_void_p)
-        if res.value is None:
+        if res == None:
             raise Exception("Failed to attach BPF to uprobe")
         open_uprobes[ev_name] = res
         return self
@@ -798,4 +799,6 @@ class BPF(object):
             lib.perf_reader_poll(len(open_kprobes), readers, timeout)
         except KeyboardInterrupt:
             exit()
+
+from .usdt import USDTReader
 

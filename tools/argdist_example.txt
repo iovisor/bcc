@@ -332,9 +332,10 @@ optional arguments:
                         additional header files to include in the BPF program
 
 Probe specifier syntax:
-        {p,r,t}:{[library],category}:function(signature)[:type[,type...]:expr[,expr...][:filter]][#label]
+        {p,r,t,u}:{[library],category}:function(signature)[:type[,type...]:expr[,expr...][:filter]][#label]
 Where:
-        p,r,t      -- probe at function entry, function exit, or kernel tracepoint
+        p,r,t,u    -- probe at function entry, function exit, kernel tracepoint,
+                      or USDT probe
                       in exit probes: can use $retval, $entry(param), $latency
         library    -- the library that contains the function
                       (leave empty for kernel functions)
@@ -391,6 +392,10 @@ argdist -H 't:block:block_rq_complete():u32:tp.nr_sector'
 
 argdist -C 't:irq:irq_handler_entry():int:tp.irq'
         Aggregate interrupts by interrupt request (IRQ)
+
+argdist -C 'u:pthread:pthread_start():u64:arg2' -p 1337
+        Print frequency of function addresses used as a pthread start function,
+        relying on the USDT pthread_start probe in process 1337
 
 argdist -H \
         'p:c:sleep(u32 seconds):u32:seconds' \

@@ -46,11 +46,11 @@ The general probe syntax is as follows:
 
 .B [{p,r}]:[library]:function [(predicate)] ["format string"[, arguments]]
 
-.B t:category:event [(predicate)] ["format string"[, arguments]]
+.B {t:category:event,u:library:probe} [(predicate)] ["format string"[, arguments]]
 .TP
-.B {[{p,r}],t}
+.B {[{p,r}],t,u}
 Probe type \- "p" for function entry, "r" for function return, "t" for kernel
-tracepoint. The default probe type is "p".
+tracepoint, "u" for USDT probe. The default probe type is "p".
 .TP
 .B [library]
 Library containing the probe.
@@ -68,6 +68,9 @@ The function to probe.
 .TP
 .B event
 The tracepoint event. For example, "block_rq_complete".
+.TP
+.B probe
+The USDT probe name. For example, "pthread_create".
 .TP
 .B [(predicate)]
 The filter applied to the captured data. Only if the filter evaluates as true,
@@ -96,6 +99,9 @@ discover the format of your tracepoint, use the tplist tool. Note that you can
 also use the members of the "tp" struct directly, e.g "nr_sector" instead of
 "tp.nr_sector".
 
+In USDT probes, the arg1, ..., argN variables refer to the probe's arguments.
+To determine which arguments your probe has, use the tplist tool.
+
 The predicate expression and the format specifier replacements for printing
 may also use the following special keywords: $pid, $tgid to refer to the 
 current process' pid and tgid; $uid, $gid to refer to the current user's
@@ -121,6 +127,10 @@ Trace returns from the readline function in bash and print the return value as a
 Trace the block:block_rq_complete tracepoint and print the number of sectors completed:
 #
 .B trace 't:block:block_rq_complete """%d sectors"", nr_sector'
+.TP
+Trace the pthread_create USDT probe from the pthread library and print the address of the thread's start function:
+#
+.B trace 'u:pthread:pthread_create """start addr = %llx"", arg3'
 .SH SOURCE
 This is from bcc.
 .IP

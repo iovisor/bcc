@@ -27,16 +27,7 @@ class ProcessSymbols(object):
     def refresh_code_ranges(self):
         self.code_ranges = self._get_code_ranges()
         self.ranges_cache = {}
-        self.exe = self._get_exe()
-        self.start_time = self._get_start_time()
-
-    def _get_exe(self):
-        return ProcessSymbols._run_command_get_output(
-                "readlink -f /proc/%d/exe" % self.pid)
-
-    def _get_start_time(self):
-        return ProcessSymbols._run_command_get_output(
-                "cut -d' ' -f 22 /proc/%d/stat" % self.pid)
+        self.procstat = ProcStat(self.pid)
 
     @staticmethod
     def _is_binary_segment(parts):
@@ -101,10 +92,7 @@ class ProcessSymbols(object):
         return "%x" % offset
 
     def _check_pid_wrap(self):
-        # If the pid wrapped, our exe name and start time must have changed.
-        # Detect this and get rid of the cached ranges.
-        if self.exe != self._get_exe() or \
-           self.start_time != self._get_start_time():
+        if self.procstat.is_stale():
             self.refresh_code_ranges()
 
     def decode_addr(self, addr):
@@ -127,3 +115,4 @@ class ProcessSymbols(object):
                                     binary)
         return "%x" % addr
 
+from . import ProcStat
