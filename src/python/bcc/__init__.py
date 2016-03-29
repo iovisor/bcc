@@ -40,11 +40,10 @@ ksyms = []
 ksym_names = {}
 ksym_loaded = 0
 _kprobe_limit = 1000
-BASE_CFLAGS = [
-    '-D__HAVE_BUILTIN_BSWAP16__',
-    '-D__HAVE_BUILTIN_BSWAP32__',
-    '-D__HAVE_BUILTIN_BSWAP64__',
-]
+
+DEBUG_LLVM_IR = 0x1
+DEBUG_BPF = 0x2
+DEBUG_PREPROCESSOR = 0x4
 
 @atexit.register
 def cleanup_kprobes():
@@ -137,8 +136,9 @@ class BPF(object):
             hdr_file (Optional[str]): Path to a helper header file for the `src_file`
             text (Optional[str]): Contents of a source file for the module
             debug (Optional[int]): Flags used for debug prints, can be |'d together
-                0x1: print LLVM IR to stderr
-                0x2: print BPF bytecode to stderr
+                DEBUG_LLVM_IR: print LLVM IR to stderr
+                DEBUG_BPF: print BPF bytecode to stderr
+                DEBUG_PREPROCESSOR: print Preprocessed C file to stderr
         """
 
         self._reader_cb_impl = _CB_TYPE(BPF._reader_cb)
@@ -146,7 +146,6 @@ class BPF(object):
         self.debug = debug
         self.funcs = {}
         self.tables = {}
-        cflags = BASE_CFLAGS + cflags
         cflags_array = (ct.c_char_p * len(cflags))()
         for i, s in enumerate(cflags): cflags_array[i] = s.encode("ascii")
         if text:
@@ -198,7 +197,7 @@ class BPF(object):
                 lib.bpf_module_kern_version(self.module),
                 log_buf, ct.sizeof(log_buf) if log_buf else 0)
 
-        if self.debug & 0x2:
+        if self.debug & DEBUG_BPF:
             print(log_buf.value.decode(), file=sys.stderr)
 
         if fd < 0:

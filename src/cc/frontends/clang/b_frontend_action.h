@@ -26,6 +26,8 @@
 
 #include "table_desc.h"
 
+#define DEBUG_PREPROCESSOR 0x4
+
 namespace clang {
 class ASTConsumer;
 class ASTContext;

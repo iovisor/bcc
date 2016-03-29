@@ -82,6 +82,9 @@ int KBuildHelper::get_flags(const char *uname_machine, vector<string> *cflags) {
   cflags->push_back("-include");
   cflags->push_back("./include/linux/kconfig.h");
   cflags->push_back("-D__KERNEL__");
+  cflags->push_back("-D__HAVE_BUILTIN_BSWAP16__");
+  cflags->push_back("-D__HAVE_BUILTIN_BSWAP32__");
+  cflags->push_back("-D__HAVE_BUILTIN_BSWAP64__");
   cflags->push_back("-Wno-unused-value");
   cflags->push_back("-Wno-pointer-sign");
 

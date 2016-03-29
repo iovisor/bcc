@@ -688,7 +688,7 @@ BFrontendAction::BFrontendAction(llvm::raw_ostream &os, unsigned flags)
 }
 
 void BFrontendAction::EndSourceFileAction() {
-  if (flags_ & 0x4)
+  if (flags_ & DEBUG_PREPROCESSOR)
     rewriter_->getEditBuffer(rewriter_->getSourceMgr().getMainFileID()).write(llvm::errs());
   rewriter_->getEditBuffer(rewriter_->getSourceMgr().getMainFileID()).write(os_);
   os_.flush();
