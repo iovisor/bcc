@@ -1,4 +1,3 @@
-#!/usr/bin/env luajit
 --[[
 Copyright 2016 GitHub, Inc
 
@@ -14,8 +13,27 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ]]
-local str = require("debug").getinfo(1, "S").source:sub(2)
-local script_path = str:match("(.*/)").."/?.lua;"
-package.path = script_path..package.path
-rawset(_G, "BCC_STANDALONE", false)
-require("bcc.run")()
+
+return function()
+  local BCC = require("bcc.init")
+  local BPF = BCC.BPF
+
+  BPF.script_root(arg[1])
+
+  local utils = {
+    argparse = require("bcc.vendor.argparse"),
+    posix = require("bcc.vendor.posix"),
+    sym = BCC.sym
+  }
+
+  local tracefile = table.remove(arg, 1)
+  local command = dofile(tracefile)
+  local res, err = pcall(command, BPF, utils)
+
+  if not res then
+    io.stderr:write("[ERROR] "..err.."\n")
+  end
+
+  BPF.cleanup_probes()
+  return res, err
+end

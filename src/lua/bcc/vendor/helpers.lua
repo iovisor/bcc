@@ -156,4 +156,14 @@ local function logline(...)
       os.date("%H:%M:%S"), c_clear, line, msg))
 end
 
-log = { info = logline, enabled = true }
+setmetatable(_G, {
+  __newindex = function (_, n)
+    error("attempt to write to undeclared variable "..n, 2)
+  end,
+  __index = function (_, n)
+    error("attempt to read undeclared variable "..n, 2)
+  end,
+})
+
+rawset(_G, "log", { info = logline, enabled = true })
+rawset(_G, "class", require("bcc.vendor.middleclass"))

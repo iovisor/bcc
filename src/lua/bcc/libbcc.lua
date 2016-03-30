@@ -98,5 +98,4 @@ int perf_reader_fd(struct perf_reader *reader);
 void perf_reader_set_fd(struct perf_reader *reader, int fd);
 ]]
 
-local libbcc = ffi.load("bcc")
-return libbcc
+return rawget(_G, "BCC_STANDALONE") and ffi.C or ffi.load("bcc")
