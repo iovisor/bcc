@@ -28,7 +28,7 @@ local utils = {
 }
 
 local tracefile = table.remove(arg, 1)
-local command = require(tracefile:gsub("%.lua", ""))
+local command = dofile(tracefile)
 local res, err = pcall(command, BPF, utils)
 
 if not res then
