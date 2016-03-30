@@ -60,6 +60,7 @@ local function _find_load_address(path)
     path)
 
   if addr then
+    addr = tonumber(addr, 16)
     _find_load_address_cache[path] = addr
   end
 
@@ -84,6 +85,7 @@ local function _find_symbol(path, sym)
     path, sym)
 
   if addr then
+    addr = tonumber(addr, 16)
     symbols[sym] = addr
   end
 
