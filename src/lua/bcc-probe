@@ -14,9 +14,14 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ]]
-package.path = "./?/init.lua;"..package.path
+function setup_path()
+  local str = require("debug").getinfo(2, "S").source:sub(2)
+  local script_path = str:match("(.*/)").."/?.lua;"
+  package.path = script_path..package.path
+end
 
-local BCC = require("bcc")
+setup_path()
+local BCC = require("bcc.init")
 local BPF = BCC.BPF
 
 BPF.script_root(arg[1])
