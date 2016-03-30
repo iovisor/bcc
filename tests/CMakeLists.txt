@@ -6,3 +6,4 @@ set(TEST_WRAPPER ${CMAKE_CURRENT_BINARY_DIR}/wrapper.sh)
 
 add_subdirectory(cc)
 add_subdirectory(python)
+add_subdirectory(lua)
