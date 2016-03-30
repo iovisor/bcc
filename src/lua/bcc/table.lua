@@ -38,6 +38,46 @@ function BaseTable:initialize(t_type, bpf, map_id, map_fd, key_type, leaf_type)
   self.c_leaf = ffi.typeof(leaf_type.."[1]")
 end
 
+function BaseTable:key_sprintf(key)
+  local pkey = self.c_key(key)
+  local buf_len = ffi.sizeof(self.c_key) * 8
+  local pbuf = ffi.new("char[?]", buf_len)
+
+  local res = libbcc.bpf_table_key_snprintf(
+    self.bpf.module, self.map_id, pbuf, buf_len, pkey)
+  assert(res == 0, "could not print key")
+
+  return ffi.string(pbuf)
+end
+
+function BaseTable:leaf_sprintf(leaf)
+  local pleaf = self.c_leaf(leaf)
+  local buf_len = ffi.sizeof(self.c_leaf) * 8
+  local pbuf = ffi.new("char[?]", buf_len)
+
+  local res = libbcc.bpf_table_leaf_snprintf(
+    self.bpf.module, self.map_id, pbuf, buf_len, pleaf)
+  assert(res == 0, "could not print leaf")
+
+  return ffi.string(pbuf)
+end
+
+function BaseTable:key_scanf(key_str)
+  local pkey = self.c_key()
+  local res = libbcc.bpf_table_key_sscanf(
+    self.bpf.module, self.map_id, key_str, pkey)
+  assert(res == 0, "could not scanf key")
+  return pkey[0]
+end
+
+function BaseTable:leaf_scanf(leaf_str)
+  local pleaf = self.c_leaf()
+  local res = libbcc.bpf_table_leaf_sscanf(
+    self.bpf.module, self.map_id, leaf_str, pleaf)
+  assert(res == 0, "could not scanf leaf")
+  return pleaf[0]
+end
+
 function BaseTable:get(key)
   local pkey = self.c_key(key)
   local pvalue = self.c_leaf()
