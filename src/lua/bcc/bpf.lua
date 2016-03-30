@@ -129,6 +129,20 @@ function Bpf:initialize(args)
   assert(self.module ~= nil, "failed to compile BPF module")
 end
 
+function Bpf:load_funcs(prog_type)
+  prog_type = prog_type or "BPF_PROG_TYPE_KPROBE"
+
+  local result = {}
+  local fn_count = tonumber(libbcc.bpf_num_functions(self.module))
+
+  for i = 0,fn_count-1 do
+    local name = ffi.string(libbcc.bpf_function_name(self.module, i))
+    table.insert(result, self:load_func(name, prog_type))
+  end
+
+  return result
+end
+
 function Bpf:load_func(fn_name, prog_type)
   if self.funcs[fn_name] ~= nil then
     return self.funcs[fn_name]
