@@ -128,15 +128,15 @@ return function(BPF, utils)
   local min_age_ns = args.older * 1e6
 
   if args.pid then
-        print("Attaching to malloc and free in pid %d, Ctrl+C to quit." % args.pid)
-        bpf:attach_uprobe{name="c", sym="malloc", fn_name="alloc_enter", pid=args.pid}
-        bpf:attach_uprobe{name="c", sym="malloc", fn_name="alloc_exit", pid=args.pid, retprobe=true}
-        bpf:attach_uprobe{name="c", sym="free", fn_name="free_enter", pid=args.pid}
+    print("Attaching to malloc and free in pid %d, Ctrl+C to quit." % args.pid)
+    bpf:attach_uprobe{name="c", sym="malloc", fn_name="alloc_enter", pid=args.pid}
+    bpf:attach_uprobe{name="c", sym="malloc", fn_name="alloc_exit", pid=args.pid, retprobe=true}
+    bpf:attach_uprobe{name="c", sym="free", fn_name="free_enter", pid=args.pid}
   else
-        print("Attaching to kmalloc and kfree, Ctrl+C to quit.")
-        bpf:attach_kprobe{event="__kmalloc", fn_name="alloc_enter"}
-        bpf:attach_kprobe{event="__kmalloc", fn_name="alloc_exit", retprobe=true} -- TODO
-        bpf:attach_kprobe{event="kfree", fn_name="free_enter"}
+    print("Attaching to kmalloc and kfree, Ctrl+C to quit.")
+    bpf:attach_kprobe{event="__kmalloc", fn_name="alloc_enter"}
+    bpf:attach_kprobe{event="__kmalloc", fn_name="alloc_exit", retprobe=true} -- TODO
+    bpf:attach_kprobe{event="kfree", fn_name="free_enter"}
   end
 
   local syms = args.pid and utils.sym.ProcSymbols:new(args.pid) or utils.sym.KSymbols:new()
