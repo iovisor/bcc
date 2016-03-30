@@ -16,7 +16,7 @@ limitations under the License.
 local ffi = require("ffi")
 
 return function(BPF)
-  local b = BPF:new{src_file="bashreadline.c", debug=true}
+  local b = BPF:new{src_file="bashreadline.c", debug=0}
   b:attach_uprobe{name="/bin/bash", sym="readline", fn_name="printret", retprobe=true}
 
   local function print_readline(cpu, event)

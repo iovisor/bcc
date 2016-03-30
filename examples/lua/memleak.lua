@@ -123,7 +123,7 @@ return function(BPF, utils)
   text = text:gsub("SHOULD_PRINT", args.trace and "1" or "0")
   text = text:gsub("SAMPLE_EVERY_N", tostring(args.sample_rate))
 
-  local bpf = BPF:new{text=text, debug=true}
+  local bpf = BPF:new{text=text, debug=0}
   local syms = nil
   local min_age_ns = args.older * 1e6
 

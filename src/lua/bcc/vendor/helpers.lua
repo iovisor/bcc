@@ -65,6 +65,22 @@ function table.bsearch(list, value, mkval)
   return nil
 end
 
+function table.join(a, b)
+  assert(a)
+  if b == nil or #b == 0 then
+    return a
+  end
+
+  local res = {}
+  for _, v in ipairs(a) do
+    table.insert(res, v)
+  end
+  for _, v in ipairs(b) do
+    table.insert(res, v)
+  end
+  return res
+end
+
 function table.build(iterator_fn, build_fn)
   build_fn = (build_fn or function(arg) return arg end)
   local res = {}

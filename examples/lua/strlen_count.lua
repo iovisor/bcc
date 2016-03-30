@@ -32,7 +32,7 @@ int printarg(struct pt_regs *ctx) {
 ]], "PID", arg[1])
 
 return function(BPF)
-  local b = BPF:new{text=program, debug=true}
+  local b = BPF:new{text=program, debug=0}
   b:attach_uprobe{name="c", sym="strlen", fn_name="printarg"}
 
   local pipe = b:pipe()

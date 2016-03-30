@@ -27,6 +27,11 @@ Bpf.static.open_uprobes = {}
 Bpf.static.process_symbols = {}
 Bpf.static.KPROBE_LIMIT = 1000
 Bpf.static.tracer_pipe = nil
+Bpf.static.DEFAULT_CFLAGS = {
+  '-D__HAVE_BUILTIN_BSWAP16__',
+  '-D__HAVE_BUILTIN_BSWAP32__',
+  '-D__HAVE_BUILTIN_BSWAP64__',
+}
 
 function Bpf.static.check_probe_quota(n)
   local cur = table.count(Bpf.static.open_kprobes) + table.count(Bpf.static.open_uprobes)
@@ -101,17 +106,23 @@ function Bpf:initialize(args)
   self.funcs = {}
   self.tables = {}
 
+  local cflags = table.join(Bpf.DEFAULT_CFLAGS, args.cflags)
+  local cflags_ary = ffi.new("const char *[?]", #cflags, cflags)
+
+  local llvm_debug = args.debug or 0
+  assert(type(llvm_debug) == "number")
+
   if args.text then
     log.info("\n%s\n", args.text)
-    self.module = libbcc.bpf_module_create_c_from_string(args.text, args.llvm_debug or 0, nil, 0)
+    self.module = libbcc.bpf_module_create_c_from_string(args.text, llvm_debug, cflags_ary, #cflags)
   elseif args.src_file then
     local src = _find_file(Bpf.SCRIPT_ROOT, args.src_file)
 
     if src:ends(".b") then
       local hdr = _find_file(Bpf.SCRIPT_ROOT, args.hdr_file)
-      self.module = libbcc.bpf_module_create_b(src, hdr, args.llvm_debug or 0)
+      self.module = libbcc.bpf_module_create_b(src, hdr, llvm_debug)
     else
-      self.module = libbcc.bpf_module_create_c(src, args.llvm_debug or 0, nil, 0)
+      self.module = libbcc.bpf_module_create_c(src, llvm_debug, cflags_ary, #cflags)
     end
   end
 

@@ -38,7 +38,7 @@ int count_sched(struct pt_regs *ctx, struct task_struct *prev) {
 ]]
 
 return function(BPF)
-  local b = BPF:new{text=program, debug=true}
+  local b = BPF:new{text=program, debug=0}
   b:attach_kprobe{event="finish_task_switch", fn_name="count_sched"}
 
   print("Press any key...")
