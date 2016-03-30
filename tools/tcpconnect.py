@@ -25,6 +25,7 @@ from __future__ import print_function
 from bcc import BPF
 import argparse
 import re
+from struct import pack, unpack_from
 import ctypes as ct
 
 # arguments
@@ -236,28 +237,8 @@ def inet_ntoa(addr):
 
 def inet6_ntoa(addr):
     # see RFC4291 summary in RFC5952 section 2
-    s = ''
-    for i in range(0, 16):
-        if ((i % 2) == 0):
-            zerorun = 1
-            if (i != 0):
-                s = s + ':'
-
-        v = addr & 0xff
-        if ((i % 2) == 0):
-            # if first byte in field is zero, skip it:
-            if v != 0:
-                # don't zero pad first byte in field:
-                s = s + "%x" % v
-                zerorun = 0
-        else:
-            if zerorun:
-                # previous byte was zero, don't zero pad this one:
-                s = s + "%x" % v
-            else:
-                # previous byte was non-zero, need a zero pad:
-                s = s + "%02x" % v
-        addr = addr >> 8
+    s = ":".join(["%x" % x for x in unpack_from(">HHHHHHHH",
+        pack("QQ", addr & 0xffffffff, addr >> 64))])
 
     # compress left-most zero run only (change to most for RFC5952):
     s = re.sub(r'(^|:)0:(0:)+', r'::', s, 1)
