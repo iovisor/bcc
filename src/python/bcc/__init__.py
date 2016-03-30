@@ -260,7 +260,7 @@ class BPF(object):
         cls = type(str(desc[0]), (base,), dict(_fields_=fields))
         return cls
 
-    def get_table(self, name, keytype=None, leaftype=None):
+    def get_table(self, name, keytype=None, leaftype=None, reducer=None):
         map_id = lib.bpf_table_id(self.module, name.encode("ascii"))
         map_fd = lib.bpf_table_fd(self.module, name.encode("ascii"))
         if map_fd < 0:
@@ -275,7 +275,7 @@ class BPF(object):
             if not leaf_desc:
                 raise Exception("Failed to load BPF Table %s leaf desc" % name)
             leaftype = BPF._decode_table_type(json.loads(leaf_desc.decode()))
-        return Table(self, map_id, map_fd, keytype, leaftype)
+        return Table(self, map_id, map_fd, keytype, leaftype, reducer=reducer)
 
     def __getitem__(self, key):
         if key not in self.tables:

@@ -17,6 +17,7 @@ import ctypes as ct
 import multiprocessing
 
 from .libbcc import lib, _RAW_CB_TYPE
+from subprocess import check_output
 
 BPF_MAP_TYPE_HASH = 1
 BPF_MAP_TYPE_ARRAY = 2
@@ -73,8 +74,8 @@ def _print_log2_hist(vals, val_type):
                       _stars(val, val_max, stars)))
 
 
-def Table(bpf, map_id, map_fd, keytype, leaftype):
-    """Table(bpf, map_id, map_fd, keytype, leaftype)
+def Table(bpf, map_id, map_fd, keytype, leaftype, **kwargs):
+    """Table(bpf, map_id, map_fd, keytype, leaftype, **kwargs)
 
     Create a python object out of a reference to a bpf table handle"""
 
@@ -89,9 +90,9 @@ def Table(bpf, map_id, map_fd, keytype, leaftype):
     elif ttype == BPF_MAP_TYPE_PERF_EVENT_ARRAY:
         t = PerfEventArray(bpf, map_id, map_fd, keytype, leaftype)
     elif ttype == BPF_MAP_TYPE_PERCPU_HASH:
-        t = PerCpuHashTable(bpf, map_id, map_fd, keytype, leaftype)
+        t = PerCpuHash(bpf, map_id, map_fd, keytype, leaftype, **kwargs)
     elif ttype == BPF_MAP_TYPE_PERCPU_ARRAY:
-        t = PerCpuArray(bpf, map_id, map_fd, keytype, leaftype)
+        t = PerCpuArray(bpf, map_id, map_fd, keytype, leaftype, **kwargs)
     elif ttype == BPF_MAP_TYPE_STACK_TRACE:
         t = StackTrace(bpf, map_id, map_fd, keytype, leaftype)
     if t == None:
@@ -403,13 +404,111 @@ class PerfEventArray(ArrayBase):
             del(self.bpf.open_kprobes()[(id(self), key)])
         del self._cbs[key]
 
-class PerCpuHashTable(TableBase):
+class PerCpuHash(HashTable):
     def __init__(self, *args, **kwargs):
-        raise Exception("Unsupported")
+        self.reducer = kwargs.pop("reducer", None)
+        super(PerCpuHash, self).__init__(*args, **kwargs)
+        self.sLeaf = self.Leaf
+        self.total_cpu = multiprocessing.cpu_count()
+        # This needs to be 8 as hard coded into the linux kernel.
+        self.alignment = ct.sizeof(self.sLeaf) % 8
+        if self.alignment is 0:
+            self.Leaf = self.sLeaf * self.total_cpu
+        else:
+            # Currently Float, Char, un-aligned structs are not supported
+            if self.sLeaf == ct.c_uint:
+                self.Leaf = ct.c_uint64 * self.total_cpu
+            elif self.sLeaf == ct.c_int:
+                self.Leaf = ct.c_int64 * self.total_cpu
+            else:
+                raise IndexError("Leaf must be aligned to 8 bytes")
+
+    def getvalue(self, key):
+        result = super(PerCpuHash, self).__getitem__(key)
+        if self.alignment is 0:
+            ret = result
+        else:
+            ret = (self.sLeaf * self.total_cpu)()
+            for i in range(0, self.total_cpu):
+                ret[i] = result[i]
+        return ret
+
+    def __getitem__(self, key):
+        if self.reducer:
+            return reduce(self.reducer, self.getvalue(key))
+        else:
+            return self.getvalue(key)
+
+    def __setitem__(self, key, leaf):
+        super(PerCpuHash, self).__setitem__(key, leaf)
+
+    def sum(self, key):
+        if isinstance(self.Leaf(), ct.Structure):
+            raise IndexError("Leaf must be an integer type for default sum functions")
+        return self.sLeaf(reduce(lambda x,y: x+y, self.getvalue(key)))
+
+    def max(self, key):
+        if isinstance(self.Leaf(), ct.Structure):
+            raise IndexError("Leaf must be an integer type for default max functions")
+        return self.sLeaf(max(self.getvalue(key)))
+
+    def average(self, key):
+        result = self.sum(key)
+        result.value/=self.total_cpu
+        return result
 
 class PerCpuArray(ArrayBase):
     def __init__(self, *args, **kwargs):
-        raise Exception("Unsupported")
+        self.reducer = kwargs.pop("reducer", None)
+        super(PerCpuArray, self).__init__(*args, **kwargs)
+        self.sLeaf = self.Leaf
+        self.total_cpu = multiprocessing.cpu_count()
+        # This needs to be 8 as hard coded into the linux kernel.
+        self.alignment = ct.sizeof(self.sLeaf) % 8
+        if self.alignment is 0:
+            self.Leaf = self.sLeaf * self.total_cpu
+        else:
+            # Currently Float, Char, un-aligned structs are not supported
+            if self.sLeaf == ct.c_uint:
+                self.Leaf = ct.c_uint64 * self.total_cpu
+            elif self.sLeaf == ct.c_int:
+                self.Leaf = ct.c_int64 * self.total_cpu
+            else:
+                raise IndexError("Leaf must be aligned to 8 bytes")
+
+    def getvalue(self, key):
+        result = super(PerCpuArray, self).__getitem__(key)
+        if self.alignment is 0:
+            ret = result
+        else:
+            ret = (self.sLeaf * self.total_cpu)()
+            for i in range(0, self.total_cpu):
+                ret[i] = result[i]
+        return ret
+
+    def __getitem__(self, key):
+        if (self.reducer):
+            return reduce(self.reducer, self.getvalue(key))
+        else:
+            return self.getvalue(key)
+
+    def __setitem__(self, key, leaf):
+        super(PerCpuArray, self).__setitem__(key, leaf)
+
+    def sum(self, key):
+        if isinstance(self.Leaf(), ct.Structure):
+            raise IndexError("Leaf must be an integer type for default sum functions")
+        return self.sLeaf(reduce(lambda x,y: x+y, self.getvalue(key)))
+
+    def max(self, key):
+        if isinstance(self.Leaf(), ct.Structure):
+            raise IndexError("Leaf must be an integer type for default max functions")
+        return self.sLeaf(max(self.getvalue(key)))
+
+    def average(self, key):
+        result = self.sum(key)
+        result.value/=self.total_cpu
+        return result
 
 class StackTrace(TableBase):
     MAX_DEPTH = 127
