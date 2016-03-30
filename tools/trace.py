@@ -331,7 +331,8 @@ BPF_PERF_OUTPUT(%s);
                         prefix = self.tp.generate_get_struct()
                 elif self.probe_type == "u":
                         signature += ", int __loc_id"
-                        prefix = self.usdt.generate_usdt_cases()
+                        prefix = self.usdt.generate_usdt_cases(
+                                pid=Probe.pid if Probe.pid != -1 else None)
                         qualifier = "static inline"
 
                 data_fields = ""

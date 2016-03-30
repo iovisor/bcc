@@ -17,13 +17,15 @@ import struct
 import re
 
 from . import BPF
-from . import ProcStat
+from . import ProcStat, ProcUtils
 
 class USDTArgument(object):
-        def __init__(self, size, is_signed, register=None, constant=None,
-                     deref_offset=None, deref_name=None):
+        def __init__(self, size, is_signed, location,
+                     register=None, constant=None, deref_offset=None,
+                     deref_name=None):
                 self.size = size
                 self.is_signed = is_signed
+                self.location = location
                 self.register = register
                 self.constant = constant
                 self.deref_offset = deref_offset
@@ -48,9 +50,9 @@ class USDTArgument(object):
                 "cl": "cx", "dl": "dx"
                         }
 
-        def generate_assign_to_local(self, local_name):
+        def generate_assign_to_local(self, local_name, pid=None):
                 """
-                generate_assign_to_local(local_name)
+                generate_assign_to_local(local_name, pid=None)
 
                 Generates an assignment statement that initializes a local
                 variable with the value of this argument. Assumes that the
@@ -58,6 +60,13 @@ class USDTArgument(object):
                 from that pointer. The local variable must already be declared
                 by the caller. Use get_type() to get the proper type for that
                 declaration.
+
+                The pid parameter is intended for use when the argument depends
+                on an address that is process-specific. This only happens for
+                arguments that are offsets from globals -- the load address for
+                the global depends on the process. If no pid is specified and
+                the argument depends on an address that is process-specific,
+                an error is raised.
 
                 Example output:
                         local1 = (u64)ctx->di;
@@ -93,10 +102,41 @@ class USDTArgument(object):
 
                 # Final case: dereference global, need to find address of global
                 # with the provided name and then potentially add deref_offset
-                # and bpf_probe_read the result. None of this will work with BPF
-                # because we can't just access arbitrary addresses.
-                return "%s = 0;      /* UNSUPPORTED CASE, SEE SOURCE */" % \
-                        local_name
+                # and bpf_probe_read the result.
+                return \
+"""{
+        u64 __temp = 0x%x + %d;
+        bpf_probe_read(&%s, sizeof(%s), (void *)__temp);
+}              """ % (self._get_global_address(pid), self.deref_offset,
+                      local_name, local_name)
+
+        def _get_global_address(self, pid=None):
+                # If this is a library, we need to find its load address in the
+                # specified process and then add the global symbol's offset.
+                # If this is an executable, the global symbol's address doesn't
+                # depend on the pid.
+                bin_path = self.location.probe.bin_path
+                offset = self._get_global_offset(bin_path)
+                if ProcUtils.is_shared_object(self.location.probe.bin_path):
+                        if pid is None:
+                                raise ValueError("pid is required for " +
+                                                 "argument '%s'" % str(self))
+                        load_address = ProcUtils.get_load_address(pid, bin_path)
+                        return load_address + offset
+                else:
+                        return offset
+
+        def _get_global_offset(self, bin_path):
+                with os.popen("objdump -tT %s | grep '\\s%s$'" %
+                        (bin_path, self.deref_name)) as f:
+                        lines = f.readlines()
+                for line in lines:
+                        parts = line.split()
+                        if parts[5] != self.deref_name:
+                                continue
+                        return int(parts[0], 16)
+                raise ValueError("can't find global symbol %s" %
+                                 self.deref_name)
 
         def get_type(self):
                 result_type = None
@@ -132,18 +172,19 @@ class USDTArgument(object):
                                                        self.deref_name)
 
 class USDTProbeLocation(object):
-        def __init__(self, address, args):
+        def __init__(self, address, args, probe):
                 self.address = address
                 self.raw_args = args
+                self.probe = probe
                 self.args = []
                 self._parse_args()
 
-        def generate_usdt_assignments(self, prefix="arg"):
+        def generate_usdt_assignments(self, prefix="arg", pid=None):
                 text = ""
                 for i, arg in enumerate(self.args, 1):
                         text += (" "*16) + \
                                 arg.generate_assign_to_local(
-                                                "%s%d" % (prefix, i)) + "\n"
+                                        "%s%d" % (prefix, i), pid) + "\n"
                 return text
 
         def _parse_args(self):
@@ -168,6 +209,7 @@ class USDTProbeLocation(object):
                         self.args.append(USDTArgument(
                                 int(m.group(2)),
                                 m.group(1) == '-',
+                                self,
                                 constant=int(m.group(3))
                                 ))
                         return
@@ -184,7 +226,7 @@ class USDTProbeLocation(object):
                         elif arg in bregs:
                                 size = 1
                         self.args.append(USDTArgument(
-                                size, False, register=arg
+                                size, False, self, register=arg
                                 ))
                         return
 
@@ -194,6 +236,7 @@ class USDTProbeLocation(object):
                         self.args.append(USDTArgument(
                                 int(m.group(2)),       # Size (in bytes)
                                 m.group(1) == '-',     # Signed
+                                self,
                                 register=m.group(3)
                                 ))
                         return
@@ -201,11 +244,12 @@ class USDTProbeLocation(object):
                 # 8@-8(%rbp), 4@(%rax)
                 m = re.match(r'(\-?)(\d+)@(\-?)(\d*)\(' + any_reg + r'\)', arg)
                 if m is not None:
-                        deref_offset = int(m.group(4))
+                        deref_offset = int(m.group(4)) if len(m.group(4)) > 0 \
+                                                       else 0
                         if m.group(3) == '-':
                                 deref_offset = -deref_offset
                         self.args.append(USDTArgument(
-                                int(m.group(2)), m.group(1) == '-',
+                                int(m.group(2)), m.group(1) == '-', self,
                                 register=m.group(5), deref_offset=deref_offset
                                 ))
                         return
@@ -214,7 +258,7 @@ class USDTProbeLocation(object):
                 m = re.match(r'(\-?)(\d+)@(\w+)\(%rip\)', arg)
                 if m is not None:
                         self.args.append(USDTArgument(
-                                int(m.group(2)), m.group(1) == '-',
+                                int(m.group(2)), m.group(1) == '-', self,
                                 register="%rip", deref_name=m.group(3),
                                 deref_offset=0
                                 ))
@@ -227,7 +271,7 @@ class USDTProbeLocation(object):
                         if m.group(3) == '-':
                                 deref_offset = -deref_offset
                         self.args.append(USDTArgument(
-                                int(m.group(2)), m.group(1) == '-',
+                                int(m.group(2)), m.group(1) == '-', self,
                                 register="%rip", deref_offset=deref_offset,
                                 deref_name=m.group(5)
                                 ))
@@ -247,7 +291,8 @@ class USDTProbe(object):
                 self.locations = []
 
         def add_location(self, location, arguments):
-                self.locations.append(USDTProbeLocation(location, arguments))
+                self.locations.append(USDTProbeLocation(
+                        location, arguments, self))
 
         def need_enable(self):
                 """
@@ -299,12 +344,13 @@ int %s(struct pt_regs *ctx) {
 }                       """ % (thunk_name, name_prefix, i)
                 return text
 
-        def generate_usdt_cases(self):
+        def generate_usdt_cases(self, pid=None):
                 text = ""
                 for i, arg_type in enumerate(self.get_arg_types(), 1):
                         text += "        %s arg%d = 0;\n" % (arg_type, i)
                 for i, location in enumerate(self.locations):
-                        assignments = location.generate_usdt_assignments()
+                        assignments = location.generate_usdt_assignments(
+                                                                pid=pid)
                         text += \
 """
         if (__loc_id == %d) {
@@ -316,18 +362,11 @@ int %s(struct pt_regs *ctx) {
                 if pid in self.proc_semas:
                         return self.proc_semas[pid]
 
-                if self.bin_path.endswith(".so"):
+                if ProcUtils.is_shared_object(self.bin_path):
                         # Semaphores declared in shared objects are relative
                         # to that shared object's load address
-                        with open("/proc/%d/maps" % pid) as m:
-                                maps = m.readlines()
-                        addrs = map(lambda l: l.split('-')[0],
-                                    filter(lambda l: self.bin_path in l, maps)
-                                    )
-                        if len(addrs) == 0:
-                                raise ValueError("lib %s not loaded in pid %d"
-                                                % (self.bin_path, pid))
-                        sema_addr = int(addrs[0], 16) + self.semaphore
+                        sema_addr = ProcUtils.get_load_address(
+                                        pid, self.bin_path) + self.semaphore
                 else:
                         sema_addr = self.semaphore      # executable, absolute
                 self.proc_semas[pid] = sema_addr
@@ -365,32 +404,16 @@ class USDTReader(object):
                 """
                 self.probes = []
                 if pid != -1:
-                        for mod in USDTReader._get_modules(pid):
+                        for mod in ProcUtils.get_modules(pid):
                                 self._add_probes(mod)
                 elif len(bin_path) != 0:
                         self._add_probes(bin_path)
                 else:
                         raise ValueError("pid or bin_path is required")
 
-        @staticmethod
-        def _get_modules(pid):
-                with open("/proc/%d/maps" % pid) as f:
-                        maps = f.readlines()
-                modules = []
-                for line in maps:
-                        parts = line.strip().split()
-                        if len(parts) < 6:
-                                continue
-                        if parts[5][0] == '[' or not 'x' in parts[1]:
-                                continue
-                        modules.append(parts[5])
-                return modules
-
         def _add_probes(self, bin_path):
                 if not os.path.isfile(bin_path):
-                        attempt1 = os.popen(
-                                "which --skip-alias %s 2>/dev/null"
-                                % bin_path).read().strip()
+                        attempt1 = ProcUtils.which(bin_path)
                         if attempt1 is None or not os.path.isfile(attempt1):
                                 attempt2 = BPF.find_library(bin_path)
                                 if attempt2 is None or \
@@ -401,6 +424,7 @@ class USDTReader(object):
                                         bin_path = attempt2
                         else:
                                 bin_path = attempt1
+                bin_path = ProcUtils.traverse_symlink(bin_path)
 
                 with os.popen("readelf -n %s 2>/dev/null" % bin_path) as child:
                         notes = child.read()
