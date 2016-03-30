@@ -273,25 +273,31 @@ local function _decode_table_type(desc)
       return t
     end
 
-    local fields = ""
+    local fields = {}
     local struct = t[3] or "struct"
 
     for _, value in ipairs(t[2]) do
+      local f = nil
+
       if #value == 2 then
-        fields = fields .. string.format("%s %s; ", _dec(value[2]), value[1])
+        f = string.format("%s %s;", _dec(value[2]), value[1])
       elseif #value == 3 then
         if type(value[3]) == "table" then
-          fields = fields .. string.format("%s %s[%d]; ", _dec(value[2]), value[1], value[3][1])
-        else
-          error("not implemented: "..json_desc)
+          f = string.format("%s %s[%d];", _dec(value[2]), value[1], value[3][1])
+        elseif type(value[3]) == "number" then
+          local t = _dec(value[2])
+          assert(t == "int" or t == "unsigned int",
+            "bitfields can only appear in [unsigned] int types")
+          f = string.format("%s %s:%d;", t, value[1], value[3])
         end
-      else
-        error("failed to decode type "..json_desc)
       end
+
+      assert(f ~= nil, "failed to decode type "..json_desc)
+      table.insert(fields, f)
     end
 
     assert(struct == "struct" or struct == "union", "unknown complex type: "..struct)
-    return string.format("%s { %s}", struct, fields)
+    return string.format("%s { %s }", struct, table.concat(fields, " "))
   end
   return _dec(json.parse(json_desc))
 end
