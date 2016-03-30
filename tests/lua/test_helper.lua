@@ -12,6 +12,12 @@ USE_EXPECTED_ACTUAL_IN_ASSERT_EQUALS = false
 EXPORT_ASSERT_TO_GLOBALS = true
 require("luaunit")
 
-BCC = require("bcc.init")
-BPF = BCC.BPF
+rawset(_G, "BCC", require("bcc.init"))
+rawset(_G, "BPF", BCC.BPF)
+
 log.enabled = false
+
+return function (name, f)
+  rawset(_G, name, f)
+  os.exit(LuaUnit.run())
+end

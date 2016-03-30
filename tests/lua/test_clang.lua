@@ -1,6 +1,5 @@
-require("test_helper")
-
-TestClang = {}
+local suite = require("test_helper")
+local TestClang = {}
 
 function TestClang:test_probe_read1()
   local text = [[
@@ -329,4 +328,4 @@ function TestClang:test_syntax_error()
     BPF, {text=[[int failure(void *ctx) { if (); return 0; }]]})
 end
 
-os.exit(LuaUnit.run())
+suite("TestClang", TestClang)
