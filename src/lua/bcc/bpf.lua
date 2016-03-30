@@ -253,7 +253,7 @@ function Bpf:_kprobe_array()
     n = n + 1
   end
 
-  assert(n == kprobe_count, "wtf")
+  assert(n == kprobe_count)
   return readers, n
 end
 
