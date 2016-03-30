@@ -157,7 +157,8 @@ function Bpf:load_func(fn_name, prog_type)
     return self.funcs[fn_name]
   end
 
-  assert(libbcc.bpf_function_start(self.module, fn_name), "unknown program: "..fn_name)
+  assert(libbcc.bpf_function_start(self.module, fn_name) ~= nil,
+    "unknown program: "..fn_name)
 
   local fd = libbcc.bpf_prog_load(prog_type,
     libbcc.bpf_function_start(self.module, fn_name),
@@ -171,6 +172,14 @@ function Bpf:load_func(fn_name, prog_type)
   local fn = {bpf=self, name=fn_name, fd=fd}
   self.funcs[fn_name] = fn
   return fn
+end
+
+function Bpf:dump_func(fn_name)
+  local start = libbcc.bpf_function_start(self.module, fn_name)
+  assert(start ~= nil, "unknown program")
+
+  local len = libbcc.bpf_function_size(self.module, fn_name)
+  return ffi.string(start, tonumber(len))
 end
 
 function Bpf:attach_uprobe(args)
