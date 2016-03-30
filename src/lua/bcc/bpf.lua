@@ -44,8 +44,13 @@ function Bpf.static.cleanup_probes()
       libbcc.perf_reader_free(probe)
       if type(key) == "string" then
         local desc = string.format("-:%s/%s", probe_type, key)
-        -- TODO: why so noisy?
-        --libbcc.bpf_detach_kprobe(desc)
+        log.info("detaching %s", desc)
+
+        if probe_type == "kprobes" then
+          libbcc.bpf_detach_kprobe(desc)
+        elseif probe_type == "uprobes" then
+          libbcc.bpf_detach_uprobe(desc)
+        end
       end
       all_probes[key] = nil
     end
@@ -56,6 +61,10 @@ function Bpf.static.cleanup_probes()
   if Bpf.static.tracer_pipe ~= nil then
     Bpf.static.tracer_pipe:close()
   end
+end
+
+function Bpf.static.num_open_uprobes()
+  return table.count(Bpf.static.open_uprobes)
 end
 
 function Bpf.static.num_open_kprobes()
