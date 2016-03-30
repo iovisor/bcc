@@ -12,7 +12,7 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 # Copyright (C) 2016 Sasha Goldshtein.
 
-from bcc import BPF, Tracepoint, Perf, USDTReader
+from bcc import BPF, Tracepoint, Perf, ProcUtils, USDTReader
 from time import sleep, strftime
 import argparse
 import re
@@ -392,12 +392,9 @@ QUALIFIER int PROBENAME(struct pt_regs *ctx SIGNATURE)
         def _attach_u(self):
                 libpath = BPF.find_library(self.library)
                 if libpath is None:
-                        with os.popen(("which --skip-alias %s " +
-                                "2>/dev/null") % self.library) as w:
-                                libpath = w.read().strip()
+                        libpath = ProcUtils.which(self.library)
                 if libpath is None or len(libpath) == 0:
-                        self._bail("unable to find library %s" %
-                                   self.library)
+                        self._bail("unable to find library %s" % self.library)
 
                 if self.probe_type == "u":
                         for i, location in enumerate(self.usdt.locations):

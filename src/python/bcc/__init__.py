@@ -26,7 +26,7 @@ import sys
 basestring = (unicode if sys.version_info[0] < 3 else str)
 
 from .libbcc import lib, _CB_TYPE
-from .procstat import ProcStat
+from .procstat import ProcStat, ProcUtils
 from .table import Table
 from .tracepoint import Perf, Tracepoint
 from .usyms import ProcessSymbols
