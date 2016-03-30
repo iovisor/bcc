@@ -2,15 +2,16 @@
 # Copyright (c) PLUMgrid, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
 
+import os
+import unittest
 from bcc import BPF
-from time import sleep
-import unittest as ut
+import multiprocessing
 
-class TestPercpu(ut.TestCase):
+class TestPercpu(unittest.TestCase):
 
     def test_u64(self):
         test_prog1 = """
-        BPF_TABLE("pc_hash", u32, u64, stats, 1);
+        BPF_TABLE("percpu_hash", u32, u64, stats, 1);
         int hello_world(void *ctx) {
             u32 key=0;
             u64 value = 0, *val;
@@ -23,23 +24,23 @@ class TestPercpu(ut.TestCase):
         bpf_code = BPF(text=test_prog1)
         stats_map = bpf_code.get_table("stats")
         bpf_code.attach_kprobe(event="sys_clone", fn_name="hello_world")
-        sleep(1)
+        ini = stats_map.Leaf()
+        for i in range(0, multiprocessing.cpu_count()):
+            ini[i] = 0
+        stats_map[ stats_map.Key(0) ] = ini
+        f = os.popen("hostname")
+        f.close()
         self.assertEqual(len(stats_map),1)
-        for x in range(0, 10):
-            ini = stats_map.Leaf(0,0,0,0,0,0,0,0)
-            stats_map[ stats_map.Key(0) ] = ini
-            sleep(1)
-            k = stats_map[ stats_map.Key(0) ]
-            x = stats_map.sum(stats_map.Key(0))
-            y = stats_map.average(stats_map.Key(0))
-            z = stats_map.max(stats_map.Key(0))
-            print (x.value)
-            self.assertGreater(x.value, 1L)
-            self.assertGreater(z.value, 1L)
+        val = stats_map[ stats_map.Key(0) ]
+        sum = stats_map.sum(stats_map.Key(0))
+        avg = stats_map.average(stats_map.Key(0))
+        max = stats_map.max(stats_map.Key(0))
+        self.assertGreater(sum.value, 0L)
+        self.assertGreater(max.value, 0L)
 
     def test_u32(self):
         test_prog1 = """
-        BPF_TABLE("pc_array", u32, u32, stats, 1);
+        BPF_TABLE("percpu_array", u32, u32, stats, 1);
         int hello_world(void *ctx) {
             u32 key=0;
             u32 value = 0, *val;
@@ -52,18 +53,19 @@ class TestPercpu(ut.TestCase):
         bpf_code = BPF(text=test_prog1)
         stats_map = bpf_code.get_table("stats")
         bpf_code.attach_kprobe(event="sys_clone", fn_name="hello_world")
-        sleep(1)
+        ini = stats_map.Leaf()
+        for i in range(0, multiprocessing.cpu_count()):
+            ini[i] = 0
+        stats_map[ stats_map.Key(0) ] = ini
+        f = os.popen("hostname")
+        f.close()
         self.assertEqual(len(stats_map),1)
-        for x in range(0, 10):
-            ini = stats_map.Leaf(0,0,0,0,0,0,0,0)
-            stats_map[ stats_map.Key(0) ] = ini
-            sleep(1)
-            k = stats_map[ stats_map.Key(0) ]
-            x = stats_map.sum(stats_map.Key(0))
-            y = stats_map.average(stats_map.Key(0))
-            z = stats_map.max(stats_map.Key(0))
-            self.assertGreater(x.value, 1L)
-            self.assertGreater(z.value, 1L)
+        val = stats_map[ stats_map.Key(0) ]
+        sum = stats_map.sum(stats_map.Key(0))
+        avg = stats_map.average(stats_map.Key(0))
+        max = stats_map.max(stats_map.Key(0))
+        self.assertGreater(sum.value, 0L)
+        self.assertGreater(max.value, 0L)
 
     def test_struct_custom_func(self):
         test_prog2 = """
@@ -71,7 +73,7 @@ class TestPercpu(ut.TestCase):
         u32 c1;
         u32 c2;
         } counter;
-        BPF_TABLE("pc_hash", u32, counter, stats, 1);
+        BPF_TABLE("percpu_hash", u32, counter, stats, 1);
         int hello_world(void *ctx) {
             u32 key=0;
             counter value = {0,0}, *val;
@@ -86,20 +88,19 @@ class TestPercpu(ut.TestCase):
         stats_map = bpf_code.get_table("stats",
                 reducer=lambda x,y: stats_map.sLeaf(x.c1+y.c1))
         bpf_code.attach_kprobe(event="sys_clone", fn_name="hello_world")
-        sleep(1)
+        ini = stats_map.Leaf()
+        for i in ini:
+            i = stats_map.sLeaf(0,0)
+        stats_map[ stats_map.Key(0) ] = ini
+        f = os.popen("hostname")
+        f.close()
         self.assertEqual(len(stats_map),1)
-        for x in range(0, 10):
-            ini = stats_map.Leaf()
-            for i in ini:
-                i = stats_map.sLeaf(0,0)
-            stats_map[ stats_map.Key(0) ] = ini
-            sleep(1)
-            k = stats_map[ stats_map.Key(0) ]
-            self.assertGreater(k.c1, 1L)
+        k = stats_map[ stats_map.Key(0) ]
+        self.assertGreater(k.c1, 0L)
 
     def cleanup(self):
         BPF.detach_kprobe("sys_clone")
 
 
 if __name__ == "__main__":
-    ut.main()
+    unittest.main()

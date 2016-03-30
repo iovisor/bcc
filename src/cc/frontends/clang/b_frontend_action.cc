@@ -570,9 +570,9 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
       map_type = BPF_MAP_TYPE_HASH;
     } else if (A->getName() == "maps/array") {
       map_type = BPF_MAP_TYPE_ARRAY;
-    } else if (A->getName() == "maps/pc_hash") {
+    } else if (A->getName() == "maps/percpu_hash") {
       map_type = BPF_MAP_TYPE_PERCPU_HASH;
-    } else if (A->getName() == "maps/pc_array") {
+    } else if (A->getName() == "maps/percpu_array") {
       map_type = BPF_MAP_TYPE_PERCPU_ARRAY;
     } else if (A->getName() == "maps/histogram") {
       if (table.key_desc == "\"int\"")

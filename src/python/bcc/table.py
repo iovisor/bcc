@@ -406,8 +406,7 @@ class PerfEventArray(ArrayBase):
 
 class PerCpuHash(HashTable):
     def __init__(self, *args, **kwargs):
-        self.reducer = kwargs["reducer"]
-        del kwargs["reducer"]
+        self.reducer = kwargs.pop("reducer", None)
         super(PerCpuHash, self).__init__(*args, **kwargs)
         self.sLeaf = self.Leaf
         self.total_cpu = multiprocessing.cpu_count()
@@ -424,7 +423,7 @@ class PerCpuHash(HashTable):
             else:
                 raise IndexError("Leaf must be aligned to 8 bytes")
 
-    def __getitem__(self, key):
+    def getvalue(self, key):
         result = super(PerCpuHash, self).__getitem__(key)
         if self.alignment is 0:
             ret = result
@@ -432,10 +431,13 @@ class PerCpuHash(HashTable):
             ret = (self.sLeaf * self.total_cpu)()
             for i in range(0, self.total_cpu):
                 ret[i] = result[i]
-        if (self.reducer):
-            return reduce(self.reducer, ret)
+        return ret
+
+    def __getitem__(self, key):
+        if self.reducer:
+            return reduce(self.reducer, self.getvalue(key))
         else:
-            return ret
+            return self.getvalue(key)
 
     def __setitem__(self, key, leaf):
         super(PerCpuHash, self).__setitem__(key, leaf)
@@ -443,20 +445,12 @@ class PerCpuHash(HashTable):
     def sum(self, key):
         if isinstance(self.Leaf(), ct.Structure):
             raise IndexError("Leaf must be an integer type for default sum functions")
-        temp = self.reducer
-        self.reducer = None
-        result = self.__getitem__(key)
-        self.reducer = temp
-        return self.sLeaf(reduce(lambda x,y: x+y, result))
+        return self.sLeaf(reduce(lambda x,y: x+y, self.getvalue(key)))
 
     def max(self, key):
         if isinstance(self.Leaf(), ct.Structure):
             raise IndexError("Leaf must be an integer type for default max functions")
-        temp = self.reducer
-        self.reducer = None
-        result = self.__getitem__(key)
-        self.reducer = temp
-        return self.sLeaf(max(result))
+        return self.sLeaf(max(self.getvalue(key)))
 
     def average(self, key):
         result = self.sum(key)
@@ -465,8 +459,7 @@ class PerCpuHash(HashTable):
 
 class PerCpuArray(ArrayBase):
     def __init__(self, *args, **kwargs):
-        self.reducer = kwargs["reducer"]
-        del kwargs["reducer"]
+        self.reducer = kwargs.pop("reducer", None)
         super(PerCpuArray, self).__init__(*args, **kwargs)
         self.sLeaf = self.Leaf
         self.total_cpu = multiprocessing.cpu_count()
@@ -483,7 +476,7 @@ class PerCpuArray(ArrayBase):
             else:
                 raise IndexError("Leaf must be aligned to 8 bytes")
 
-    def __getitem__(self, key):
+    def getvalue(self, key):
         result = super(PerCpuArray, self).__getitem__(key)
         if self.alignment is 0:
             ret = result
@@ -491,10 +484,13 @@ class PerCpuArray(ArrayBase):
             ret = (self.sLeaf * self.total_cpu)()
             for i in range(0, self.total_cpu):
                 ret[i] = result[i]
+        return ret
+
+    def __getitem__(self, key):
         if (self.reducer):
-            return reduce(self.reducer, ret)
+            return reduce(self.reducer, self.getvalue(key))
         else:
-            return ret
+            return self.getvalue(key)
 
     def __setitem__(self, key, leaf):
         super(PerCpuArray, self).__setitem__(key, leaf)
@@ -502,20 +498,12 @@ class PerCpuArray(ArrayBase):
     def sum(self, key):
         if isinstance(self.Leaf(), ct.Structure):
             raise IndexError("Leaf must be an integer type for default sum functions")
-        temp = self.reducer
-        self.reducer = None
-        result = self.__getitem__(key)
-        self.reducer = temp
-        return self.sLeaf(reduce(lambda x,y: x+y, result))
+        return self.sLeaf(reduce(lambda x,y: x+y, self.getvalue(key)))
 
     def max(self, key):
         if isinstance(self.Leaf(), ct.Structure):
             raise IndexError("Leaf must be an integer type for default max functions")
-        temp = self.reducer
-        self.reducer = None
-        result = self.__getitem__(key)
-        self.reducer = temp
-        return self.sLeaf(max(result))
+        return self.sLeaf(max(self.getvalue(key)))
 
     def average(self, key):
         result = self.sum(key)
