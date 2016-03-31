@@ -77,8 +77,6 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, unique_ptr<vector<TableDes
   using namespace clang;
 
   string main_path = "/virtual/main.c";
-  string proto_path = "/virtual/include/bcc/proto.h";
-  string helpers_path = "/virtual/include/bcc/helpers.h";
   unique_ptr<llvm::MemoryBuffer> main_buf;
   struct utsname un;
   uname(&un);
@@ -109,6 +107,8 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, unique_ptr<vector<TableDes
   vector<string> kflags;
   if (kbuild_helper.get_flags(un.machine, &kflags))
     return -1;
+  kflags.push_back("-include");
+  kflags.push_back("/virtual/include/bcc/bpf.h");
   kflags.push_back("-include");
   kflags.push_back("/virtual/include/bcc/helpers.h");
   kflags.push_back("-isystem");

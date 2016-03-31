@@ -585,18 +585,15 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
         diag_.Report(Decl->getLocStart(), diag_id) << table.leaf_desc;
       }
     } else if (A->getName() == "maps/prog") {
-      if (KERNEL_VERSION(major,minor,0) >= KERNEL_VERSION(4,2,0))
-        map_type = BPF_MAP_TYPE_PROG_ARRAY;
+      map_type = BPF_MAP_TYPE_PROG_ARRAY;
     } else if (A->getName() == "maps/perf_output") {
-      if (KERNEL_VERSION(major,minor,0) >= KERNEL_VERSION(4,3,0))
-        map_type = BPF_MAP_TYPE_PERF_EVENT_ARRAY;
+      map_type = BPF_MAP_TYPE_PERF_EVENT_ARRAY;
       int numcpu = sysconf(_SC_NPROCESSORS_ONLN);
       if (numcpu <= 0)
         numcpu = 1;
       table.max_entries = numcpu;
     } else if (A->getName() == "maps/perf_array") {
-      if (KERNEL_VERSION(major,minor,0) >= KERNEL_VERSION(4,3,0))
-        map_type = BPF_MAP_TYPE_PERF_EVENT_ARRAY;
+      map_type = BPF_MAP_TYPE_PERF_EVENT_ARRAY;
     } else if (A->getName() == "maps/stacktrace") {
       map_type = BPF_MAP_TYPE_STACK_TRACE;
     } else if (A->getName() == "maps/extern") {

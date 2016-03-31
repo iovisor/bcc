@@ -26,6 +26,10 @@ namespace ebpf {
 
 map<string, const char *> ExportedFiles::headers_ = {
   {
+    "/virtual/include/bcc/bpf.h",
+    #include "compat/linux/virtual_bpf.h"
+  },
+  {
     "/virtual/include/bcc/proto.h",
     #include "export/proto.h"
   },

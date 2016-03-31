@@ -1,3 +1,4 @@
+R"********(
 /* Copyright (c) 2011-2014 PLUMgrid, http://plumgrid.com
  *
  * This program is free software; you can redistribute it and/or
@@ -380,3 +381,4 @@ struct bpf_tunnel_key {
 };
 
 #endif /* _UAPI__LINUX_BPF_H__ */
+)********"
