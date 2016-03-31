@@ -204,13 +204,14 @@ class USDTProbeLocation(object):
                 any_reg = "(" + "|".join(qregs + dregs + wregs + bregs) + ")"
 
                 # -4@$0, 8@$1234
-                m = re.match(r'(\-?)(\d+)@\$(\d+)', arg)
+                m = re.match(r'(\-?)(\d+)@\$(\-?)(\d+)', arg)
                 if m is not None:
+                        sign = -1 if len(m.group(3)) > 0 else 1
                         self.args.append(USDTArgument(
                                 int(m.group(2)),
                                 m.group(1) == '-',
                                 self,
-                                constant=int(m.group(3))
+                                constant=sign*int(m.group(4))
                                 ))
                         return
 
