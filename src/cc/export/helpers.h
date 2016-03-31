@@ -142,7 +142,6 @@ static u32 (*bpf_get_prandom_u32)(void) =
 static int (*bpf_trace_printk_)(const char *fmt, u64 fmt_size, ...) =
   (void *) BPF_FUNC_trace_printk;
 int bpf_trace_printk(const char *fmt, ...) asm("llvm.bpf.extra");
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,2,0)
 static void bpf_tail_call_(u64 map_fd, void *ctx, int index) {
   ((void (*)(void *, u64, int))BPF_FUNC_tail_call)(ctx, map_fd, index);
 }
@@ -156,8 +155,6 @@ static u64 (*bpf_get_current_uid_gid)(void) =
   (void *) BPF_FUNC_get_current_uid_gid;
 static int (*bpf_get_current_comm)(void *buf, int buf_size) =
   (void *) BPF_FUNC_get_current_comm;
-#endif
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,3,0)
 static u64 (*bpf_get_cgroup_classid)(void *ctx) =
   (void *) BPF_FUNC_get_cgroup_classid;
 static u64 (*bpf_skb_vlan_push)(void *ctx, u16 proto, u16 vlan_tci) =
@@ -170,20 +167,14 @@ static int (*bpf_skb_set_tunnel_key)(void *ctx, void *from, u32 size, u64 flags)
   (void *) BPF_FUNC_skb_set_tunnel_key;
 static int (*bpf_perf_event_read)(void *map, u32 index) =
   (void *) BPF_FUNC_perf_event_read;
-#endif
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,4,0)
 static int (*bpf_redirect)(int ifindex, u32 flags) =
   (void *) BPF_FUNC_redirect;
 static u32 (*bpf_get_route_realm)(void *ctx) =
   (void *) BPF_FUNC_get_route_realm;
 static int (*bpf_perf_event_output)(void *ctx, void *map, u32 index, void *data, u32 size) =
   (void *) BPF_FUNC_perf_event_output;
-#endif
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,5,0)
 static int (*bpf_skb_load_bytes)(void *ctx, int offset, void *to, u32 len) =
   (void *) BPF_FUNC_skb_load_bytes;
-#endif
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,6,0)
 static int (*bpf_get_stackid_)(void *ctx, void *map, u64 flags) =
   (void *) BPF_FUNC_get_stackid;
 static inline __attribute__((always_inline))
@@ -192,7 +183,6 @@ int bpf_get_stackid(uintptr_t map, void *ctx, u64 flags) {
 }
 static int (*bpf_csum_diff)(void *from, u64 from_size, void *to, u64 to_size, u64 seed) =
   (void *) BPF_FUNC_csum_diff;
-#endif
 
 /* llvm builtin functions that eBPF C program may use to
  * emit BPF_LD_ABS and BPF_LD_IND instructions
