@@ -98,4 +98,4 @@ int perf_reader_fd(struct perf_reader *reader);
 void perf_reader_set_fd(struct perf_reader *reader, int fd);
 ]]
 
-return ffi.load(rawget(_G, "LIBBCC_SO_PATH") or "bcc")
+return ffi.load(os.getenv("LIBBCC_SO_PATH") or rawget(_G, "LIBBCC_SO_PATH") or "bcc")
