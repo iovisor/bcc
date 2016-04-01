@@ -63,7 +63,7 @@ return function()
   }
 
   local command = dofile(tracefile)
-  local res, err = pcall(command, BPF, utils)
+  local res, err = xpcall(command, debug.traceback, BPF, utils)
 
   if not res then
     io.stderr:write("[ERROR] "..err.."\n")
