@@ -1,9 +1,13 @@
-function string.starts(String,Start)
-  return string.sub(String,1,string.len(Start))==Start
+function string.starts(s, p)
+  return string.sub(s, 1, string.len(p)) == p
 end
 
-function string.ends(String,End)
-  return End=='' or string.sub(String,-string.len(End))==End
+function string.lstrip(s, p)
+  return string.sub(s, string.len(p) + 1)
+end
+
+function string.ends(s, e)
+  return e == '' or string.sub(s, -string.len(e))==e
 end
 
 function string.escape(s)

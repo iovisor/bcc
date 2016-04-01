@@ -125,31 +125,25 @@ static void pushargv(lua_State *L, char **argv, int argc, int offset)
 	}
 }
 
-static int find_libbcc(lua_State *L)
+static void find_local_libbcc(lua_State *L)
 {
-	const char *libbcc = getenv("LIBBCC_SO_PATH");
 	char buffer[4096];
+	char *dirname;
 
-	if (libbcc == NULL) {
-		char *dirname;
+	if (readlink("/proc/self/exe", buffer, sizeof(buffer)) < 0)
+		return;
 
-		if (readlink("/proc/self/exe", buffer, sizeof(buffer)) < 0)
-			return -1;
+	dirname = strrchr(buffer, '/');
+	if (dirname == NULL)
+		return;
 
-		dirname = strrchr(buffer, '/');
-		if (dirname == NULL)
-			return -1;
+	strcpy(dirname + 1, "libbcc.so");
 
-		strcpy(dirname + 1, "libbcc.so");
-		libbcc = buffer;
-	}
+	if (access(buffer, F_OK|R_OK|X_OK) != 0)
+		return;
 
-	if (access(libbcc, F_OK|R_OK|X_OK) != 0)
-		return -1;
-
-	lua_pushstring(L, libbcc);
+	lua_pushstring(L, buffer);
 	lua_setglobal(L, "LIBBCC_SO_PATH");
-	return 0;
 }
 
 static int pmain(lua_State *L)
@@ -160,19 +154,14 @@ static int pmain(lua_State *L)
 	lua_gc(L, LUA_GCSTOP, 0);
 	luaL_openlibs(L);
 	lua_gc(L, LUA_GCRESTART, 0);
-
-	if (find_libbcc(L) < 0) {
-		s->status = 1;
-		l_message(progname, "failed to find libbcc.so");
-		return 0;
-	}
+	find_local_libbcc(L);
 
 	s->status = dolibrary(L, "bcc", 0);
 	if (s->status)
 		return 0;
 
-	lua_pushboolean(L, 1);
-	lua_setglobal(L, "BCC_STANDALONE");
+	lua_pushstring(L, progname);
+	lua_setglobal(L, "BCC_STANDALONE_NAME");
 
 	pushargv(L, s->argv, s->argc, 1);
 	lua_setglobal(L, "arg");
@@ -192,13 +181,7 @@ int main(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 
-	if (argc < 2) {
-		fprintf(stderr, "usage: %s path_to_probe.lua [...]\n", argv[0]);
-		return EXIT_FAILURE;
-	}
-
 	progname = argv[0];
-
 	s.argc = argc;
 	s.argv = argv;
 	s.status = 0;

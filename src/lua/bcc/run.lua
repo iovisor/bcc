@@ -14,38 +14,37 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ]]
 
-local function print_usage()
-  io.stderr:write(
-  "usage: bcc-probe [[--so-path=PATH|--version|--quiet] --] path_to_script.lua [...]\n")
-  os.exit(1)
-end
-
-local function has_prefix(s,p)
-  return string.sub(s,1,string.len(p))==p
-end
-
-local function strip_prefix(s,p)
-  return string.sub(s, string.len(p) + 1)
-end
-
 return function()
-  local logging = true
+  require("bcc.vendor.helpers")
+  local progname = rawget(_G, "BCC_STANDALONE_NAME") or "bcc-lua"
 
-  while arg[1] and has_prefix(arg[1], "-") do
-    local k = table.remove(arg, 1) 
+  local function print_usage()
+    io.stderr:write(string.format(
+      "usage: %s [[--so-path=PATH|--version|--quiet] --] path_to_script.lua [...]\n",
+      progname))
+    os.exit(1)
+  end
 
+  local function print_version()
+    local jit = require("jit")
+    print(string.format("%s %s -- Running on %s (%s/%s)",
+      progname, rawget(_G, "BCC_VERSION") or "HEAD",
+      jit.version, jit.os, jit.arch))
+    os.exit(0)
+  end
+
+  while arg[1] and string.starts(arg[1], "-") do
+    local k = table.remove(arg, 1)
     if k == "--" then
       break
-    elseif has_prefix(k, "--so-path=") then
-      rawset(_G, "LIBBCC_SO_PATH", strip_prefix(k, "--so-path="))
+    elseif string.starts(k, "--so-path=") then
+      rawset(_G, "LIBBCC_SO_PATH", string.lstrip(k, "--so-path="))
+    elseif k == "--llvm-debug" then
+      rawset(_G, "LIBBCC_LLVM_DEBUG", 1)
     elseif k == "-q" or k == "--quiet" then
-      logging = false
+      log.enabled = false
     elseif k == "-v" or k == "--version" then
-      local jit = require("jit")
-      print(string.format("bcc-probe %s -- Running on %s (%s/%s)",
-        rawget(_G, "BCC_VERSION") or "HEAD",
-        jit.version, jit.os, jit.arch))
-      return true
+      print_version()
     else
       print_usage()
     end
@@ -54,16 +53,13 @@ return function()
   local tracefile = table.remove(arg, 1)
   if not tracefile then print_usage() end
 
-  local BCC = require("bcc.init")
-  local BPF = BCC.BPF
-
+  local BPF = require("bcc.bpf")
   BPF.script_root(tracefile)
-  log.enabled = logging
 
   local utils = {
     argparse = require("bcc.vendor.argparse"),
     posix = require("bcc.vendor.posix"),
-    sym = BCC.sym
+    sym = require("bcc.sym"),
   }
 
   local command = dofile(tracefile)
