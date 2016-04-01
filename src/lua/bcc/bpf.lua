@@ -118,7 +118,7 @@ function Bpf:initialize(args)
   local cflags = table.join(Bpf.DEFAULT_CFLAGS, args.cflags)
   local cflags_ary = ffi.new("const char *[?]", #cflags, cflags)
 
-  local llvm_debug = args.debug or 0
+  local llvm_debug = rawget(_G, "LIBBCC_LLVM_DEBUG") or args.debug or 0
   assert(type(llvm_debug) == "number")
 
   if args.text then
