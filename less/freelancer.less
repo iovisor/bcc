@@ -1,0 +1,452 @@
+@import "variables.less";
+@import "mixins.less";
+
+body {
+	overflow-x: hidden;
+}
+
+p {
+	font-size: 20px;
+}
+
+p.small {
+	font-size: 16px;
+}
+
+a,
+a:hover,
+a:focus,
+a:active,
+a.active {
+	color: @brand-success;
+	outline: none;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-family: "Montserrat", "Helvetica Neue", Helvetica, Arial, sans-serif;
+	text-transform: uppercase;
+	font-weight: 700;
+}
+
+hr.star-light,
+hr.star-primary {
+    padding: 0;
+    border: none;
+    border-top: solid 5px;
+    text-align: center;
+    max-width: 250px;
+    margin: 25px auto 30px;
+}
+
+hr.star-light:after,
+hr.star-primary:after {
+    content: "\f005";
+    font-family: FontAwesome;
+    display: inline-block;
+    position: relative;
+    top: -0.8em;
+    font-size: 2em;
+    padding: 0 0.25em;
+}
+
+hr.star-light {
+    border-color: white;
+}
+
+hr.star-light:after {
+    background-color: @brand-success;
+    color: white;
+}
+
+hr.star-primary {
+    border-color: @brand-primary;
+}
+
+hr.star-primary:after {
+    background-color: white;
+    color: @brand-primary;
+}
+
+.img-centered {
+	margin: 0 auto;
+}
+
+header {
+	text-align: center;
+	background: @brand-success;
+	color: white;
+	.container {
+		padding-top: 100px;
+		padding-bottom: 50px;
+	}
+	img {
+		display: block;
+		margin: 0 auto 20px;
+	}
+	.intro-text {
+		.name {
+			display: block;
+			font-family: "Montserrat", "Helvetica Neue", Helvetica, Arial, sans-serif;
+			text-transform: uppercase;
+			font-weight: 700;
+			font-size: 2em;
+		}
+		.skills {
+			font-size: 1.25em;
+			font-weight: 300;
+		}
+	}
+}
+
+@media(min-width:768px) {
+	header {
+		.container {
+			padding-top: 200px;
+			padding-bottom: 100px;
+		}
+		.intro-text {
+			.name {
+				font-size: 4.75em;
+			}
+			.skills {
+				font-size: 1.75em;
+			}
+		}
+	}
+}
+
+@media(min-width:768px) {
+    .navbar-fixed-top {
+        padding: 25px 0;
+        -webkit-transition: padding 0.3s;
+        -moz-transition: padding 0.3s;
+        transition: padding 0.3s;
+	    .navbar-brand {
+	        font-size: 2em;
+	        -webkit-transition: all 0.3s;
+	        -moz-transition: all 0.3s;
+	        transition: all 0.3s;
+	    }
+    }
+    .navbar-fixed-top.navbar-shrink {
+        padding: 10px 0;
+		.navbar-brand {
+	        font-size: 1.5em;
+	    }
+	}
+}
+
+.navbar {
+	background: @brand-primary;
+	font-family: "Montserrat", "Helvetica Neue", Helvetica, Arial, sans-serif;
+	text-transform: uppercase;
+	font-weight: 700;
+	a:focus {
+		outline: none;
+	}
+	.navbar-nav {
+		letter-spacing: 1px;
+		li {
+			a:focus {
+				outline: none;
+			}
+		}
+	}
+}
+
+.navbar-default,
+.navbar-inverse {
+	border: none;
+}
+
+section {
+    padding: 100px 0;
+    h2 {
+    	margin: 0;
+    	font-size: 3em;
+    }
+}
+
+section.success {
+	background: @brand-success;
+	color: white;
+
+    a,
+    a:hover,
+    a:focus,
+    a:active,
+    a.active {
+      color: @brand-primary;
+      outline: none;
+    }
+}
+
+@media(max-width:767px) {
+	section {
+		padding: 75px 0;
+	}
+	section.first {
+		padding-top: 75px;
+	}
+}
+
+#portfolio {
+    .portfolio-item {
+        margin: 0 0 15px;
+        right: 0;
+        .portfolio-link {
+            display: block;
+            position: relative;
+            max-width: 400px;
+            margin: 0 auto;
+            .caption {
+                background: fade(@brand-success, 90%);
+                position: absolute;
+                width: 100%;
+                height: 100%;
+                opacity: 0;
+                transition: all ease 0.5s;
+                -webkit-transition: all ease 0.5s;
+                -moz-transition: all ease 0.5s;
+                &:hover {
+                    opacity: 1;
+                }
+                .caption-content {
+                    position: absolute;
+                    width: 100%;
+                    height: 20px;
+                    font-size: 20px;
+                    text-align: center;
+                    top: 50%;
+                    margin-top: -12px;
+                    color: white;
+                    i {
+                        margin-top: -12px;
+                    }
+                    h3,
+                    h4 {
+                        margin: 0;
+                    }
+                }
+            }
+        }
+    }
+    * {
+        z-index: 2;
+    }
+}
+
+@media(min-width:767px) {
+    #portfolio {
+        .portfolio-item {
+            margin: 0 0 30px;
+        }
+    }
+}
+
+.btn-outline {
+	color: white;
+	font-size: 20px;
+	border: solid 2px white;
+	background: transparent;
+	transition: all 0.3s ease-in-out;
+	margin-top: 15px;
+	&:hover,
+	&:focus,
+	&:active,
+	&.active {
+		color: @brand-success;
+		background: white;
+		border: solid 2px white;
+	}
+}
+
+.btn-outline-success {
+	color: @brand-success;
+	font-size: 20px;
+	border: solid 2px @brand-success;
+	background: transparent;
+	transition: all 0.3s ease-in-out;
+	margin-top: 15px;
+	&:hover,
+	&:focus,
+	&:active,
+	&.active {
+		color: white;
+		background: @brand-success;
+		border: solid 2px white;
+	}
+}
+
+.floating-label-form-group {
+    position: relative;
+    margin-bottom: 0;
+    padding-bottom: 0.5em;
+    border-bottom: 1px solid @gray-lighter;
+    input,
+    textarea {
+	    z-index: 1;
+	    position: relative;
+	    padding-right: 0;
+	    padding-left: 0;
+	    border: none;
+	    border-radius: 0;
+	    font-size: 1.5em;
+	    background: none;
+	    box-shadow: none !important;
+	    resize: none;
+    }
+    label {
+	    display: block;
+	    z-index: 0;
+	    position: relative;
+	    top: 2em;
+	    margin: 0;
+	    font-size: 0.85em;
+	    line-height: 1.764705882em;
+	    vertical-align: middle;
+	    vertical-align: baseline;
+	    opacity: 0;
+	    -webkit-transition: top 0.3s ease,opacity 0.3s ease;
+	    -moz-transition: top 0.3s ease,opacity 0.3s ease;
+	    -ms-transition: top 0.3s ease,opacity 0.3s ease;
+	    transition: top 0.3s ease,opacity 0.3s ease;
+    }
+    &::not(:first-child) {
+	    padding-left: 14px;
+	    border-left: 1px solid @gray-lighter;
+    }
+}
+
+.floating-label-form-group-with-value {
+	label {
+	    top: 0;
+	    opacity: 1;
+	}
+}
+
+.floating-label-form-group-with-focus {
+	label {
+	    color: @brand-success;
+	}
+}
+
+form .row:first-child .floating-label-form-group {
+    border-top: 1px solid @gray-lighter;
+}
+
+footer {
+	color: white;
+	h3 {
+		margin-bottom: 30px;
+	}
+	.footer-above {
+		padding-top: 50px;
+		background-color: @brand-primary;
+	}
+	.footer-col {
+		margin-bottom: 50px;
+	}
+	.footer-below {
+		padding: 25px 0;
+		background-color: darken(@brand-primary, 5%);
+	}
+}
+
+.btn-social {
+	display: inline-block;
+	height: 50px;
+	width: 50px;
+	border: 2px solid white;
+	border-radius: 100%;
+	text-align: center;
+	font-size: 20px;
+	line-height: 45px;
+}
+
+.btn:focus,
+.btn:active,
+.btn.active {
+	outline: none;
+}
+
+.scroll-top {
+    position: fixed;
+    right: 2%;
+    bottom: 2%;
+    width: 50px;
+    height: 50px;
+    z-index: 1049;
+    .btn {
+    	font-size: 20px;
+	    width: 50px;
+	    height: 50px;
+	    border-radius: 100%;
+	    line-height: 28px;
+	    &:focus {
+	    	outline: none;
+	    }
+    }
+}
+
+.portfolio-modal {
+	.modal-content {
+	    border-radius: 0;
+	    background-clip: border-box;
+	    -webkit-box-shadow: none;
+	    box-shadow: none;
+	    border: none;
+	    min-height: 100%;
+	    padding: 100px 0;
+	    text-align: center;
+		h2 {
+	    	margin: 0;
+	    	font-size: 3em;
+		}
+		img {
+			margin-bottom: 30px;
+		}
+		.item-details {
+			margin: 30px 0;
+		}
+	}
+    .close-modal {
+        position: absolute;
+        width:75px;
+        height:75px;
+        background-color:transparent;
+        top: 25px;
+        right: 25px;
+        cursor: pointer;
+        &:hover {
+            opacity: 0.3;
+        }
+        .lr {
+            height:75px;
+            width:1px;
+            margin-left:35px;
+            background-color:@brand-primary;
+            transform: rotate(45deg);
+            -ms-transform: rotate(45deg);
+            /* IE 9 */
+            -webkit-transform: rotate(45deg);
+            /* Safari and Chrome */
+            z-index:1051;
+            .rl {
+                height:75px;
+                width:1px;
+                background-color:@brand-primary;
+                transform: rotate(90deg);
+                -ms-transform: rotate(90deg);
+                /* IE 9 */
+                -webkit-transform: rotate(90deg);
+                /* Safari and Chrome */
+                z-index:1052;
+            }
+        }
+    }
+    .modal-backdrop {
+    	opacity: 0;
+    	display: none;
+    }
+}

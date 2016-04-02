@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="">
+    <meta name="author" content="">
+
+    <title>bcc</title>
+
+    <!-- Bootstrap Core CSS - Uses Bootswatch Flatly Theme: http://bootswatch.com/flatly/ -->
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Custom CSS -->
+    <link href="css/freelancer.css" rel="stylesheet">
+
+    <!-- Custom Fonts -->
+    <link href="font-awesome/css/font-awesome.min.css" rel="stylesheet" type="text/css">
+    <link href="http://fonts.googleapis.com/css?family=Montserrat:400,700" rel="stylesheet" type="text/css">
+    <link href="http://fonts.googleapis.com/css?family=Lato:400,700,400italic,700italic" rel="stylesheet" type="text/css">
+
+    <!-- HTML5 Shim and Respond.js IE8 support of HTML5 elements and media queries -->
+    <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
+    <!--[if lt IE 9]>
+        <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+        <script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
+    <![endif]-->
+
+</head>
+
+<body id="page-top" class="index">
+    <header>
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-12">
+                    <img class="img-responsive" src="img/bccpony-512.png" width=256 height=256 alt="">
+                    <div class="intro-text">
+                        <span class="name">bcc</span>
+                        <hr class="star-light">
+                        <span class="skills">Dynamic Tracing Tools for Linux</span>
+                    </div>
+                </div>
+            </div>
+	    <div class="row">
+                <div class="text-center">
+                    <a href="https://github.com/iovisor/bcc" class="btn btn-lg btn-outline">
+                        <i class="fa fa-github"></i> Fork on Github
+                    </a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <section id="Highlights">
+        <div class="container">
+            <div class="row">
+                <div class="col-sm-4 text-center">
+		  <i class="fa fa-heart fa-3x"></i>
+		  <h3>Built In</h3>
+		  <p class="text-justify">
+		    No 3rd party kernel module required. These tools get their
+		    superpowers from BPF: an in-kernel virtual machine that can
+		    run tracing programs safely and efficiently
+		    (JIT &amp; in-kernel aggregations). BPF is built into the
+		    Linux kernel, and bcc uses features added in the 4.x series.
+		  </p>
+                </div>
+
+                <div class="col-sm-4 text-center">
+		  <i class="fa fa-rocket fa-3x"></i>
+		  <h3>Powerful</h3>
+		  <p class="text-justify">
+		    Observe the execution of any software. These tools use
+		    static and dynamic tracing of both user- and kernel-level
+		    code (via kprobes, uprobes, tracepoints,
+		    and USDT). Trace block device I/O, TCP functions, file
+		    system operations, syscalls, Node.js probes, and lots more.
+		  </p>
+                </div>
+
+                <div class="col-sm-4 text-center">
+		  <i class="fa fa-terminal fa-3x"></i>
+		  <h3>Easy</h3>
+		  <p class="text-justify">
+		    Dozens of performance analysis tools are included with
+		    example files and man pages. Classics like bitesize,
+		    execsnoop, opensnoop, and zfsslower, as well as
+		    new tools including offcputime and memleak.
+		    Write you own tools using bcc's Python or lua front
+		    ends.
+		  </p>
+                </div>
+	    </div>
+        </div>
+    </section>
+
+    <section class="success" id="examples">
+      <div class="container">
+        <div class="row">
+          <div class="col-lg-12 text-center">
+            <h2>What Can You Do With it?</h2>
+            <hr class="star-light">
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="" id="examples">
+        <div class="container">
+
+	    <div class="row text-center">
+	      <h3>Disk I/O Latency Histogram</h3>
+	    </div>
+	    <div class="container">
+	    <div class="col-lg-8 col-lg-offset-2">
+<pre>
+# biolatency
+Tracing block device I/O... Hit Ctrl-C to end.
+^C
+     usecs           : count     distribution
+       0 -> 1        : 0        |                                      |
+       2 -> 3        : 0        |                                      |
+       4 -> 7        : 0        |                                      |
+       8 -> 15       : 0        |                                      |
+      16 -> 31       : 0        |                                      |
+      32 -> 63       : 0        |                                      |
+      64 -> 127      : 1        |                                      |
+     128 -> 255      : 12       |********                              |
+     256 -> 511      : 15       |**********                            |
+     512 -> 1023     : 43       |*******************************       |
+    1024 -> 2047     : 52       |**************************************|
+    2048 -> 4095     : 47       |**********************************    |
+    4096 -> 8191     : 52       |**************************************|
+    8192 -> 16383    : 36       |**************************            |
+   16384 -> 32767    : 15       |**********                            |
+   32768 -> 65535    : 2        |*                                     |
+   65536 -> 131071   : 2        |*                                     |
+</pre>
+<p>This shows the latency distribution of disk I/O. Latency is measured and recorded in histogram buckets all in kernel context for efficiency. Only the summary (the "count" column) is passed to user-level for printing.</p>
+	    </div>
+	    </div>
+
+	    <div class="row text-center">
+	      <h3>New Processes</h3>
+	    </div>
+	    <div class="container">
+	    <div class="col-lg-8 col-lg-offset-2">
+<pre>
+# execsnoop
+PCOMM        PID    RET ARGS
+bash         15887    0 /usr/bin/man ls
+preconv      15894    0 /usr/bin/preconv -e UTF-8
+man          15896    0 /usr/bin/tbl
+man          15897    0 /usr/bin/nroff -mandoc -rLL=169n -rLT=169n -Tutf8
+man          15898    0 /usr/bin/pager -s
+nroff        15900    0 /usr/bin/locale charmap
+nroff        15901    0 /usr/bin/groff -mtty-char -Tutf8 -mandoc -rLL=169n -rLT=169n
+groff        15902    0 /usr/bin/troff -mtty-char -mandoc -rLL=169n -rLT=169n -Tutf8
+groff        15903    0 /usr/bin/grotty
+</pre>
+<p>Discover what processes are executing. Only process execution is traced (not all syscalls). This output has one line per event.</p>
+	    </div>
+	    </div>
+
+	    <div class="row text-center">
+	      <h3>VFS Statistics</h3>
+	    </div>
+	    <div class="container">
+	    <div class="col-lg-8 col-lg-offset-2">
+<pre>
+# vfsstat
+TIME         READ/s  WRITE/s CREATE/s   OPEN/s  FSYNC/s
+18:35:32:       231       12        4       98        0
+18:35:33:       274       13        4      106        0
+18:35:34:       586       86        4      251        0
+18:35:35:       241       15        4       99        0
+18:35:36:       232       10        4       98        0
+18:35:37:       244       10        4      107        0
+18:35:38:       235       13        4       97        0
+18:35:39:      6749     2633        4     1446        0
+18:35:40:       277       31        4      115        0
+</pre>
+<p>bcc tools can also produce per-interval summaries, for example, VFS statistics.</p>
+	    </div>
+	    </div>
+
+	    <div class="row text-center">
+	      <h3>Slow ext4 Operations</h3>
+	    </div>
+	    <div class="container">
+	    <div class="col-lg-8 col-lg-offset-2">
+<pre>
+# ext4slower 1
+Tracing ext4 operations slower than 1 ms
+TIME     COMM           PID    T BYTES   OFF_KB   LAT(ms) FILENAME
+06:49:17 bash           3616   R 128     0           7.75 cksum
+06:49:17 cksum          3616   R 39552   0           1.34 [
+06:49:17 cksum          3616   R 96      0           5.36 2to3-2.7
+06:49:17 cksum          3616   R 96      0          14.94 2to3-3.4
+06:49:17 cksum          3616   R 10320   0           6.82 411toppm
+06:49:17 cksum          3616   R 65536   0           4.01 a2p
+06:49:17 cksum          3616   R 55400   0           8.77 ab
+06:49:17 cksum          3616   R 36792   0          16.34 aclocal-1.14
+06:49:17 cksum          3616   R 15008   0          19.31 acpi_listen
+06:49:17 cksum          3616   R 6123    0          17.23 add-apt-repository
+06:49:17 cksum          3616   R 6280    0          18.40 addpart
+06:49:17 cksum          3616   R 27696   0           2.16 addr2line
+06:49:17 cksum          3616   R 58080   0          10.11 ag
+06:49:17 cksum          3616   R 906     0           6.30 ec2-meta-data
+</pre>
+<p>This traces common ext4 file system operations, times them in kernel context, and only prints events slower than a configurable threshold. In this example, only operations &gt; 1 ms were printed. This is great for analyzing outliers, or quickly exonerating the storage subsystem as a source of latency. bcc includes tools for other file system types as well: btrfs, XFS, and ZFS.</p>
+	    </div>
+	    </div>
+
+	    <div class="row text-center">
+	      <h3>Run Queue Latency</h3>
+	    </div>
+	    <div class="container">
+	    <div class="col-lg-8 col-lg-offset-2">
+<pre>
+# runqlat -m 5
+Tracing run queue latency... Hit Ctrl-C to end.
+
+     msecs               : count     distribution
+         0 -> 1          : 3818     |****************************************|
+         2 -> 3          : 39       |                                        |
+         4 -> 7          : 39       |                                        |
+         8 -> 15         : 62       |                                        |
+        16 -> 31         : 2214     |***********************                 |
+        32 -> 63         : 226      |**                                      |
+
+     msecs               : count     distribution
+         0 -> 1          : 3775     |****************************************|
+         2 -> 3          : 52       |                                        |
+         4 -> 7          : 37       |                                        |
+         8 -> 15         : 65       |                                        |
+        16 -> 31         : 2230     |***********************                 |
+        32 -> 63         : 212      |**                                      |
+^C
+</pre>
+<p>Run queue latency as a distribution, printed every 5 seconds.</p>
+	    </div>
+	    </div>
+
+	    <div class="row text-center">
+	      <h3>TCP Connections</h3>
+	    </div>
+	    <div class="container">
+	    <div class="col-lg-8 col-lg-offset-2">
+<pre>
+# tcpconnect
+PID    COMM         IP SADDR            DADDR            DPORT
+1479   telnet       4  127.0.0.1        127.0.0.1        23
+1469   curl         4  10.201.219.236   54.245.105.25    80
+1469   curl         4  10.201.219.236   54.67.101.145    80
+1991   telnet       6  ::1              ::1              23
+2015   ssh          6  fe80::2000:bff:fe82:3ac fe80::2000:bff:fe82:3ac 22
+</pre>
+<p>Trace active TCP connections. For efficiency, only the TCP connect functions are traced. This does not trace every send and receive, like how a tcpdump- or libpcap-based solution.</p>
+	    </div>
+	    </div>
+
+	    <div class="row text-center">
+	      <h3>Stack Profiling</h3>
+	    </div>
+	    <div class="container">
+	    <div class="col-lg-8 col-lg-offset-2">
+<pre>
+# stackcount submit_bio
+Tracing 1 functions for "submit_bio"... Hit Ctrl-C to end.
+^C
+[...]
+  submit_bio
+  submit_bh
+  jbd2_journal_commit_transaction
+  kjournald2
+  kthread
+  ret_from_fork
+  mb_cache_list
+    38
+
+  submit_bio
+  ext4_writepages
+  do_writepages
+  __filemap_fdatawrite_range
+  filemap_flush
+  ext4_alloc_da_blocks
+  ext4_rename
+  ext4_rename2
+  vfs_rename
+  sys_rename
+  entry_SYSCALL_64_fastpath
+    79
+
+Detaching...
+</pre>
+<p>This frequency counts kernel stacks that led to the given kernel function, in this case, submit_bio(). This provides a different perspective on what caused disk I/O. The stacks are frequency counted in kernel context for efficiency.</p>
+	    </div>
+	    </div>
+
+	    <div class="row text-center">
+	      <h3>Custom Tracing</h3>
+	    </div>
+	    <div class="container">
+	    <div class="col-lg-8 col-lg-offset-2">
+<pre>
+# trace -p 2740 'do_sys_open "%s", arg2'
+TIME     PID    COMM         FUNC             -
+05:36:16 15872  ls           do_sys_open      /etc/ld.so.cache
+05:36:16 15872  ls           do_sys_open      /lib64/libselinux.so.1
+05:36:16 15872  ls           do_sys_open      /lib64/libcap.so.2
+05:36:16 15872  ls           do_sys_open      /lib64/libacl.so.1
+05:36:16 15872  ls           do_sys_open      /lib64/libc.so.6
+05:36:16 15872  ls           do_sys_open      /lib64/libpcre.so.1
+05:36:16 15872  ls           do_sys_open      /lib64/libdl.so.2
+05:36:16 15872  ls           do_sys_open      /lib64/libattr.so.1
+05:36:16 15872  ls           do_sys_open      /lib64/libpthread.so.0
+05:36:16 15872  ls           do_sys_open      /usr/lib/locale/locale-archive
+05:36:16 15872  ls           do_sys_open      /home/vagrant
+</pre>
+<p>The trace command allows some powerful one-liners to be developed. Here, the do_sys_open() kernel function is dynamically traced, along with its second argument as a string.</p>
+	    </div>
+	    </div>
+
+	    <div class="row text-center">
+	      <h3>USDT</h3>
+	    </div>
+	    <div class="container">
+	    <div class="col-lg-8 col-lg-offset-2">
+<pre>
+# tplist -p $(pidof node)
+/mnt/src/node-v0.11.0/out/Release/node node:gc__start
+/mnt/src/node-v0.11.0/out/Release/node node:gc__done
+/mnt/src/node-v0.11.0/out/Release/node node:net__server__connection
+/mnt/src/node-v0.11.0/out/Release/node node:net__stream__end
+/mnt/src/node-v0.11.0/out/Release/node node:net__socket__read
+/mnt/src/node-v0.11.0/out/Release/node node:net__socket__write
+/mnt/src/node-v0.11.0/out/Release/node node:http__server__response
+/mnt/src/node-v0.11.0/out/Release/node node:http__client__request
+/mnt/src/node-v0.11.0/out/Release/node node:http__client__response
+/mnt/src/node-v0.11.0/out/Release/node node:http__server__request
+# trace -p $(pidof node) 'u:/home/vagrant/node/node:http__server__request "%s %s (from %s:%d)" arg5, arg6, arg3, arg4'
+TIME     PID    COMM         FUNC             -
+04:50:44 22185  node         http__server__request GET /foofoo (from ::1:51056)
+</pre>
+<p>This shows tracing of Node.js USDT probes. User-level statically defined tracing probes are also built into Java, MySQL, libc, and other applications.</p>
+	    </div>
+	    </div>
+
+        </div>
+    </section>
+
+    <section class="success" id="examples">
+      <div class="container">
+        <div class="row">
+          <div class="col-lg-12 text-center">
+            <h2>What Else Can I Do?</h2>
+            <hr class="star-light">
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="" id="examples">
+      <div class="container">
+        <div class="col-lg-4 col-lg-offset-2">
+          <p>
+	    A lot: bcc is more than just tools.
+	  </p>
+          <p>
+	    The BPF enhancements that bcc uses were originally intended
+	    for software defined networking (SDN). In bcc, there are examples of
+	    this with distributed bridges, HTTP filters, fast packet droppers,
+	    and tunnel monitors.
+	  </p>
+          <p>
+	    BPF was enhanced to support more than just networking, and
+	    has general tracing support in the Linux 4.x series.
+	  </p>
+        </div>
+        <div class="col-lg-4">
+          <p>
+	    bcc is really a compiler for BPF, that comes with many sample tools.
+	    So far bcc has both Python and lua front ends.
+	  </p>
+	  <p>
+	    bcc/BPF, or just BPF, should become an standard resource for
+	    performance monitoring and analysis tools, to provide
+	    detailed metrics beyond /proc.
+	  </p>
+	  <p>
+	    Latency heat maps, flame graphs, and
+	    more should become commonplace in performance GUIs, powered by BPF.
+        </div>
+      </div>
+    </section>	
+
+    <section class="success" id="examples">
+      <div class="container">
+        <div class="row">
+          <div class="col-lg-12 text-center">
+            <h2>Using BPF Superpowers</h2>
+            <hr class="star-light">
+          </div>
+        </div>
+      </div>
+    </section>
+    <section class="" id="examples">
+      <div class="container">
+<p style="margin-left:20px;margin-right:20px"><center><div id="fb-root"></div><script>(function(d, s, id) {  var js, fjs = d.getElementsByTagName(s)[0];  if (d.getElementById(id)) return;  js = d.createElement(s); js.id = id;  js.src = "//connect.facebook.net/en_US/sdk.js#xfbml=1&version=v2.3";  fjs.parentNode.insertBefore(js, fjs);}(document, 'script', 'facebook-jssdk'));</script><div class="fb-video" data-allowfullscreen="1" data-href="/atscaleevents/videos/vb.1576488989290866/1693888610884236/?type=3" style="max-width:600px !important"><div class="fb-xfbml-parse-ignore"><blockquote cite="https://www.facebook.com/atscaleevents/videos/1693888610884236/"><a href="https://www.facebook.com/atscaleevents/videos/1693888610884236/">Linux 4.x Performance: Using BPF Superpowers (Brendan Gregg)</a><p></p>Posted by <a href="https://www.facebook.com/atscaleevents/">At Scale</a> on Friday, February 26, 2016</blockquote></div></div></center></p>
+      </div>
+    </section>
+
+    <section class="success" id="examples">
+      <div class="container">
+        <div class="row">
+          <div class="col-lg-12 text-center">
+            <h2>What Can't You Do With it?</h2>
+            <hr class="star-light">
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="" id="examples">
+      <div class="container">
+        <div class="col-lg-4 col-lg-offset-2">
+	  <p>
+	    The biggest problem with bcc is that it requires at least Linux
+	    4.1, and some tools need 4.4 or 4.6. This is because it uses
+	    kernel BPF features added in these versions.
+	  </p>
+	  <p>
+	    You also can't install bcc only and then write custom tools: 
+	    compilation usually requires kernel
+	    headers and llvm/clang, and other setup steps. However,
+	    installation of compiled
+	    tools should not have such dependencies.
+	  </p>
+        </div>
+        <div class="col-lg-4">
+	  <p>
+	    A related project, ply, is designed as a light-weight dynamic
+	    tracer, and is suitable for embedded systems. It does not have
+	    such dependencies for creating your own custom tools.
+	    It also uses BPF as a backend.
+	  </p>
+	  <p>
+	    <a href="https://github.com/iovisor/ply" class="btn btn-lg btn-outline-success">
+              <i class="fa fa-github"></i> ply on Github
+            </a>
+	  </p>
+        </div>
+      </div>
+    </section>	
+
+    <!-- Footer -->
+    <footer class="text-center">
+        <div class="footer-below">
+            <div class="container">
+                <div class="row">
+                    <div class="col-lg-12">
+                      <p>
+			<small>
+			  Homepage based on ply by Tobias Waldekranz.
+			</small>
+		      </p>
+		      <p>
+			<small>
+			  The Linux BPF Pony was created by Deirdré
+			  Straughan using General Zoi's pony creator.
+			</small>
+		      </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- jQuery -->
+    <script src="js/jquery.js"></script>
+
+    <!-- Bootstrap Core JavaScript -->
+    <script src="js/bootstrap.min.js"></script>
+
+    <!-- Plugin JavaScript -->
+    <script src="http://cdnjs.cloudflare.com/ajax/libs/jquery-easing/1.3/jquery.easing.min.js"></script>
+    <script src="js/classie.js"></script>
+    <script src="js/cbpAnimatedHeader.js"></script>
+
+    <!-- Contact Form JavaScript -->
+    <script src="js/jqBootstrapValidation.js"></script>
+    <script src="js/contact_me.js"></script>
+
+    <!-- Custom Theme JavaScript -->
+    <script src="js/freelancer.js"></script>
+
+</body>
+
+</html>
