@@ -27,3 +27,8 @@ Package: bcc-tools
 Architecture: all
 Depends: python-bcc
 Description: Command line tools for BPF Compiler Collection (BCC)
+
+Package: bcc-lua
+Architecture: all
+Depends: libbcc
+Description: Standalone tool to run BCC tracers written in Lua
