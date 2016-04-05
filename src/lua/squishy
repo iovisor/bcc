@@ -1,0 +1,17 @@
+Module "bcc.vendor.argparse" "bcc/vendor/argparse.lua"
+Module "bcc.vendor.posix" "bcc/vendor/posix.lua"
+Module "bcc.vendor.middleclass" "bcc/vendor/middleclass.lua"
+Module "bcc.vendor.json" "bcc/vendor/json.lua"
+Module "bcc.vendor.helpers" "bcc/vendor/helpers.lua"
+
+Module "bcc.init" "bcc/init.lua"
+Module "bcc.run" "bcc/run.lua"
+Module "bcc.bpf" "bcc/bpf.lua"
+Module "bcc.sym" "bcc/sym.lua"
+Module "bcc.libbcc" "bcc/libbcc.lua"
+Module "bcc.tracerpipe" "bcc/tracerpipe.lua"
+Module "bcc.table" "bcc/table.lua"
+Module "bcc.ld" "bcc/ld.lua"
+
+Main "bcc/run.lua"
+Output "src/bcc.lua"

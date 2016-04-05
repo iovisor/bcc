@@ -14,30 +14,8 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ]]
-function setup_path()
-  local str = require("debug").getinfo(2, "S").source:sub(2)
-  local script_path = str:match("(.*/)").."/?.lua;"
-  package.path = script_path..package.path
-end
-
-setup_path()
-local BCC = require("bcc.init")
-local BPF = BCC.BPF
-
-BPF.script_root(arg[1])
-
-local utils = {
-  argparse = require("bcc.vendor.argparse"),
-  posix = require("bcc.vendor.posix"),
-  sym = BCC.sym
-}
-
-local tracefile = table.remove(arg, 1)
-local command = dofile(tracefile)
-local res, err = pcall(command, BPF, utils)
-
-if not res then
-  io.stderr:write("[ERROR] "..err.."\n")
-end
-
-BPF.cleanup_probes()
+local str = require("debug").getinfo(1, "S").source:sub(2)
+local script_path = str:match("(.*/)").."/?.lua;"
+package.path = script_path..package.path
+rawset(_G, "BCC_STANDALONE_NAME", "bcc-probe")
+require("bcc.run")()

@@ -1,12 +1,11 @@
-require("test_helper")
+local suite = require("test_helper")
 local ffi = require("ffi")
+local TestUprobes = {}
 
 ffi.cdef[[
   int getpid(void);
   void malloc_stats(void);
 ]]
-
-TestUprobes = {}
 
 function TestUprobes:test_simple_library()
   local text = [[
@@ -68,4 +67,4 @@ function TestUprobes:teardown()
   BPF.cleanup_probes()
 end
 
-os.exit(LuaUnit.run())
+suite("TestUprobes", TestUprobes)

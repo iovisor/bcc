@@ -34,6 +34,9 @@ pushd build
 make install/strip DESTDIR=%{buildroot}
 
 %changelog
+* Mon Apr 04 2016 Vicent Marti <vicent@github.com> - 0.1.4-1
+- Add bcc-lua package
+
 * Sun Nov 29 2015 Brenden Blanco <bblanco@plumgrid.com> - 0.1.3-1
 - Add bcc-tools package
 
@@ -66,6 +69,12 @@ Requires: python-bcc
 %description -n bcc-tools
 Command line tools for BPF Compiler Collection (BCC)
 
+%package -n bcc-lua
+Summary: Standalone tool to run BCC tracers written in Lua
+Requires: libbcc
+%description -n bcc-lua
+Standalone tool to run BCC tracers written in Lua
+
 %files -n python-bcc
 %{python_sitelib}/bcc*
 
@@ -85,3 +94,6 @@ Command line tools for BPF Compiler Collection (BCC)
 %files -n bcc-tools
 /usr/share/bcc/tools/*
 /usr/share/bcc/man/*
+
+%files -n bcc-lua
+/usr/bin/bcc-lua

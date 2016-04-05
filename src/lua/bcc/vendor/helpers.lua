@@ -1,9 +1,13 @@
-function string.starts(String,Start)
-  return string.sub(String,1,string.len(Start))==Start
+function string.starts(s, p)
+  return string.sub(s, 1, string.len(p)) == p
 end
 
-function string.ends(String,End)
-  return End=='' or string.sub(String,-string.len(End))==End
+function string.lstrip(s, p)
+  return string.sub(s, string.len(p) + 1)
+end
+
+function string.ends(s, e)
+  return e == '' or string.sub(s, -string.len(e))==e
 end
 
 function string.escape(s)
@@ -156,4 +160,14 @@ local function logline(...)
       os.date("%H:%M:%S"), c_clear, line, msg))
 end
 
-log = { info = logline, enabled = true }
+setmetatable(_G, {
+  __newindex = function (_, n)
+    error("attempt to write to undeclared variable "..n, 2)
+  end,
+  __index = function (_, n)
+    error("attempt to read undeclared variable "..n, 2)
+  end,
+})
+
+rawset(_G, "log", { info = logline, enabled = true })
+rawset(_G, "class", require("bcc.vendor.middleclass"))
