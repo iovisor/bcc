@@ -19,8 +19,6 @@
 #include <vector>
 #include <unistd.h>
 
-#define KERNEL_MODULES_DIR "/lib/modules"
-
 namespace ebpf {
 
 struct FileDeleter {
