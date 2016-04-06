@@ -68,6 +68,7 @@ int KBuildHelper::get_flags(const char *uname_machine, vector<string> *cflags) {
     cflags->push_back("-I" + kdir_ + "/build/./arch/"+arch+"/include/uapi");
     cflags->push_back("-I" + kdir_ + "/build/arch/"+arch+"/include/generated/uapi");
     cflags->push_back("-I" + kdir_ + "/build/include/uapi");
+    cflags->push_back("-I" + kdir_ + "/build/include/generated");
     cflags->push_back("-I" + kdir_ + "/build/include/generated/uapi");
   }
 

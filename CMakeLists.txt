@@ -39,6 +39,12 @@ FOREACH(DIR ${LLVM_INCLUDE_DIRS})
   include_directories("${DIR}/../tools/clang/include")
 ENDFOREACH()
 
+# Set to a string path if system places kernel lib directory in
+# non-default location.
+if(NOT DEFINED BCC_KERNEL_MODULES_DIR)
+  set(BCC_KERNEL_MODULES_DIR "/lib/modules")
+endif()
+
 # Set to non-zero if system installs kernel headers with split source and build
 # directories in /lib/modules/`uname -r`/. This is the case for debian and
 # suse, to the best of my knowledge.
