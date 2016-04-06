@@ -464,7 +464,8 @@ class BPF(object):
             return symbols[sym]
 
         with os.popen("""/usr/bin/objdump -tT %s | \
-                awk -v sym=%s '$NF == sym && $4 == ".text"  \
+                awk -v sym=%s '$NF == sym && ($4 == ".text" \
+                || $4 == "text.hot" || $4 == "text.unlikely") \
                 { print $1; exit }'""" % (path, sym)) as f:
             data = f.read().rstrip()
         if not data:
