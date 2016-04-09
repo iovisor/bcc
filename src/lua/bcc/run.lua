@@ -20,7 +20,7 @@ return function()
 
   local function print_usage()
     io.stderr:write(string.format(
-      "usage: %s [[--so-path=PATH|--version|--quiet] --] path_to_script.lua [...]\n",
+      "usage: %s [[--so-path=PATH|--version|--verbose] --] path_to_script.lua [...]\n",
       progname))
     os.exit(1)
   end
@@ -41,8 +41,8 @@ return function()
       rawset(_G, "LIBBCC_SO_PATH", string.lstrip(k, "--so-path="))
     elseif k == "--llvm-debug" then
       rawset(_G, "LIBBCC_LLVM_DEBUG", 1)
-    elseif k == "-q" or k == "--quiet" then
-      log.enabled = false
+    elseif k == "-V" or k == "--verbose" then
+      log.enabled = true
     elseif k == "-v" or k == "--version" then
       print_version()
     else

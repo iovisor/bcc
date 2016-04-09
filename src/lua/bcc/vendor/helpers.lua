@@ -169,5 +169,5 @@ setmetatable(_G, {
   end,
 })
 
-rawset(_G, "log", { info = logline, enabled = true })
+rawset(_G, "log", { info = logline, enabled = false })
 rawset(_G, "class", require("bcc.vendor.middleclass"))
