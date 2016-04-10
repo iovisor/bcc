@@ -73,6 +73,9 @@ class BTypeVisitor : public clang::RecursiveASTVisitor<BTypeVisitor> {
   bool VisitImplicitCastExpr(clang::ImplicitCastExpr *E);
 
  private:
+  template <unsigned N>
+  clang::DiagnosticBuilder error(clang::SourceLocation loc, const char (&fmt)[N]);
+
   clang::ASTContext &C;
   clang::DiagnosticsEngine &diag_;
   clang::Rewriter &rewriter_;  /// modifications to the source go into this class

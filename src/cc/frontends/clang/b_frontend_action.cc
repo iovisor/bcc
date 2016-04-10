@@ -248,8 +248,7 @@ bool BTypeVisitor::VisitFunctionDecl(FunctionDecl *D) {
     string preamble = "{";
     for (auto arg : D->params()) {
       if (arg->getName() == "") {
-        C.getDiagnostics().Report(arg->getLocEnd(), diag::err_expected)
-            << "named arguments in BPF program definition";
+        error(arg->getLocEnd(), "arguments to BPF program definition must be named");
         return false;
       }
       fn_args_.push_back(arg);
@@ -307,8 +306,7 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
         for (; table_it != tables_.end(); ++table_it)
           if (table_it->name == Ref->getDecl()->getName()) break;
         if (table_it == tables_.end()) {
-          C.getDiagnostics().Report(Ref->getLocEnd(), diag::err_expected)
-              << "initialized handle for bpf_table";
+          error(Ref->getLocEnd(), "bpf_table %s failed to open") << Ref->getDecl()->getName();
           return false;
         }
         string fd = to_string(table_it->fd);
@@ -362,9 +360,7 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
               txt += "bpf_pseudo_fd(1, " + fd + "), " + arg0;
               rewrite_end = Call->getArg(0)->getLocEnd();
             } else {
-              unsigned diag_id = C.getDiagnostics().getCustomDiagID(DiagnosticsEngine::Error,
-                                                                    "get_stackid only available on stacktrace maps");
-              C.getDiagnostics().Report(Call->getLocStart(), diag_id);
+              error(Call->getLocStart(), "get_stackid only available on stacktrace maps");
               return false;
             }
         } else {
@@ -384,8 +380,7 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
             prefix = "bpf_perf_event_read";
             suffix = ")";
           } else {
-            C.getDiagnostics().Report(Call->getLocStart(), diag::err_expected)
-                << "valid bpf_table operation";
+            error(Call->getLocStart(), "invalid bpf_table operation %s") << memb_name;
             return false;
           }
           prefix += "((void *)bpf_pseudo_fd(1, " + fd + "), ";
@@ -393,8 +388,7 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
           txt = prefix + args + suffix;
         }
         if (!rewriter_.isRewritable(rewrite_start) || !rewriter_.isRewritable(rewrite_end)) {
-          C.getDiagnostics().Report(Call->getLocStart(), diag::err_expected)
-              << "use of map function not in a macro";
+          error(Call->getLocStart(), "cannot use map function inside a macro");
           return false;
         }
         rewriter_.ReplaceText(SourceRange(rewrite_start, rewrite_end), txt);
@@ -411,8 +405,7 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
       // unless one preprocesses the entire source file.
       if (A->getLabel() == "llvm.bpf.extra") {
         if (!rewriter_.isRewritable(Call->getLocStart())) {
-          C.getDiagnostics().Report(Call->getLocStart(), diag::err_expected)
-              << "use of extra builtin not in a macro";
+          error(Call->getLocStart(), "cannot use builtin inside a macro");
           return false;
         }
 
@@ -465,8 +458,7 @@ bool BTypeVisitor::VisitBinaryOperator(BinaryOperator *E) {
         if (A->getMessage() == "packet") {
           if (FieldDecl *F = dyn_cast<FieldDecl>(Memb->getMemberDecl())) {
             if (!rewriter_.isRewritable(E->getLocStart())) {
-              C.getDiagnostics().Report(E->getLocStart(), diag::err_expected)
-                  << "use of \"packet\" header type not in a macro";
+              error(E->getLocStart(), "cannot use \"packet\" header type inside a macro");
               return false;
             }
             uint64_t ofs = C.getFieldOffset(F);
@@ -496,8 +488,7 @@ bool BTypeVisitor::VisitImplicitCastExpr(ImplicitCastExpr *E) {
       if (A->getMessage() == "packet") {
         if (FieldDecl *F = dyn_cast<FieldDecl>(Memb->getMemberDecl())) {
           if (!rewriter_.isRewritable(E->getLocStart())) {
-            C.getDiagnostics().Report(E->getLocStart(), diag::err_expected)
-                << "use of \"packet\" header type not in a macro";
+            error(E->getLocStart(), "cannot use \"packet\" header type inside a macro");
             return false;
           }
           uint64_t ofs = C.getFieldOffset(F);
@@ -512,6 +503,12 @@ bool BTypeVisitor::VisitImplicitCastExpr(ImplicitCastExpr *E) {
   return true;
 }
 
+template <unsigned N>
+DiagnosticBuilder BTypeVisitor::error(SourceLocation loc, const char (&fmt)[N]) {
+  unsigned int diag_id = C.getDiagnostics().getCustomDiagID(DiagnosticsEngine::Error, fmt);
+  return C.getDiagnostics().Report(loc, diag_id);
+}
+
 // Open table FDs when bpf tables (as denoted by section("maps*") attribute)
 // are declared.
 bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
@@ -520,8 +517,7 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
     if (!A->getName().startswith("maps"))
       return true;
     if (!R) {
-      C.getDiagnostics().Report(Decl->getLocEnd(), diag::err_expected)
-          << "struct type for bpf_table";
+      error(Decl->getLocEnd(), "invalid type for bpf_table, expect struct");
       return false;
     }
     const RecordDecl *RD = R->getDecl()->getDefinition();
@@ -541,9 +537,7 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
       size_t sz = C.getTypeSize(F->getType()) >> 3;
       if (F->getName() == "key") {
         if (sz == 0) {
-          unsigned diag_id = C.getDiagnostics().getCustomDiagID(DiagnosticsEngine::Error,
-                                                                "invalid zero-sized leaf");
-          C.getDiagnostics().Report(F->getLocStart(), diag_id);
+          error(F->getLocStart(), "invalid zero-sized leaf");
           return false;
         }
         table.key_size = sz;
@@ -551,9 +545,7 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
         visitor.TraverseType(F->getType());
       } else if (F->getName() == "leaf") {
         if (sz == 0) {
-          unsigned diag_id = C.getDiagnostics().getCustomDiagID(DiagnosticsEngine::Error,
-                                                                "invalid zero-sized leaf");
-          C.getDiagnostics().Report(F->getLocStart(), diag_id);
+          error(F->getLocStart(), "invalid zero-sized leaf");
           return false;
         }
         table.leaf_size = sz;
@@ -580,9 +572,7 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
       else
         map_type = BPF_MAP_TYPE_HASH;
       if (table.leaf_desc != "\"unsigned long long\"") {
-        unsigned diag_id = diag_.getCustomDiagID(DiagnosticsEngine::Error,
-                                                 "histogram leaf type must be u64, got %0");
-        diag_.Report(Decl->getLocStart(), diag_id) << table.leaf_desc;
+        error(Decl->getLocStart(), "histogram leaf type must be u64, got %0") << table.leaf_desc;
       }
     } else if (A->getName() == "maps/prog") {
       map_type = BPF_MAP_TYPE_PROG_ARRAY;
@@ -606,15 +596,11 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
       for (; table_it != tables_.end(); ++table_it)
         if (table_it->name == table.name) break;
       if (table_it == tables_.end()) {
-        unsigned diag_id = C.getDiagnostics().getCustomDiagID(DiagnosticsEngine::Error,
-                                                              "reference to undefined table");
-        C.getDiagnostics().Report(Decl->getLocStart(), diag_id);
+        error(Decl->getLocStart(), "reference to undefined table");
         return false;
       }
       if (!SharedTables::instance()->insert_fd(table.name, table_it->fd)) {
-        unsigned diag_id = C.getDiagnostics().getCustomDiagID(DiagnosticsEngine::Error,
-                                                              "could not export bpf map %0: %1");
-        C.getDiagnostics().Report(Decl->getLocStart(), diag_id) << table.name << "already in use";
+        error(Decl->getLocStart(), "could not export bpf map %0: %1") << table.name << "already in use";
         return false;
       }
       table_it->is_shared = true;
@@ -623,9 +609,7 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
 
     if (!is_extern) {
       if (map_type == BPF_MAP_TYPE_UNSPEC) {
-        unsigned diag_id = C.getDiagnostics().getCustomDiagID(DiagnosticsEngine::Error,
-                                                              "unsupported map type: %0");
-        C.getDiagnostics().Report(Decl->getLocStart(), diag_id) << A->getName();
+        error(Decl->getLocStart(), "unsupported map type: %0") << A->getName();
         return false;
       }
 
@@ -633,9 +617,8 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
       table.fd = bpf_create_map(map_type, table.key_size, table.leaf_size, table.max_entries);
     }
     if (table.fd < 0) {
-      unsigned diag_id = C.getDiagnostics().getCustomDiagID(DiagnosticsEngine::Error,
-                                                            "could not open bpf map: %0");
-      C.getDiagnostics().Report(Decl->getLocStart(), diag_id) << strerror(errno);
+      error(Decl->getLocStart(), "could not open bpf map: %0\nis %s map type enabled in your kernel?") <<
+          strerror(errno) << A->getName();
       return false;
     }
 
