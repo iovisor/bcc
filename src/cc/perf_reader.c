@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-#include <linux/perf_event.h>
 #include <poll.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -22,6 +21,7 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <unistd.h>
+#include <linux/perf_event.h>
 
 #include "libbpf.h"
 #include "perf_reader.h"
