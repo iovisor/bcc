@@ -14,4 +14,4 @@ Module "bcc.table" "bcc/table.lua"
 Module "bcc.ld" "bcc/ld.lua"
 
 Main "bcc/run.lua"
-Output "src/bcc.lua"
+Output "bcc.lua"
