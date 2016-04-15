@@ -13,6 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ]]
+local posix = require("bcc.vendor.posix")
 local ProcSymbols = class("ProcSymbols")
 
 function ProcSymbols:initialize(pid)
@@ -46,7 +47,7 @@ function ProcSymbols:_get_code_ranges()
       local range = parts[1]:split("-", true)
       assert(#range == 2)
 
-      ranges[binary] = {tonumber(range[1], 16), tonumber(range[2], 16)}
+      ranges[binary] = {posix.tonumber64(range[1], 16), posix.tonumber64(range[2], 16)}
     end
   end
 
@@ -83,8 +84,8 @@ function ProcSymbols:_get_sym_ranges(binary)
   for line in proc:lines() do
     local parts = line:split()
     if is_function_sym(parts) then
-      local sym_start = tonumber(parts[1], 16)
-      local sym_len = tonumber(parts[5], 16)
+      local sym_start = posix.tonumber64(parts[1], 16)
+      local sym_len = posix.tonumber64(parts[5], 16)
       local sym_name = parts[6]
       sym_ranges[sym_name] = {sym_start, sym_len}
     end
@@ -102,10 +103,10 @@ function ProcSymbols:_decode_sym(binary, offset)
     local start = range[1]
     local length = range[2]
     if offset >= start and offset <= (start + length) then
-      return string.format("%s+0x%x", name, offset - start)
+      return string.format("%s+0x%p", name, offset - start)
     end
   end
-  return string.format("%x", offset)
+  return string.format("%p", offset)
 end
 
 function ProcSymbols:lookup(addr)
@@ -121,7 +122,7 @@ function ProcSymbols:lookup(addr)
     end
   end
 
-  return string.format("%x", addr)
+  return string.format("%p", addr)
 end
 
 local KSymbols = class("KSymbols")
@@ -142,7 +143,7 @@ function KSymbols:_load()
     if not first_line then
       local cols = line:split()
       local name = cols[3]
-      local addr = tonumber(cols[1], 16)
+      local addr = posix.tonumber64(cols[1], 16)
       table.insert(self.ksyms, {name, addr})
       self.ksym_names[name] = #self.ksyms
     end
@@ -164,7 +165,7 @@ function KSymbols:lookup(addr, with_offset)
 
   if with_offset then
     local offset = addr - self.ksyms[idx][2]
-    return "%s %x" % {self.ksyms[idx][1], offset}
+    return "%s %p" % {self.ksyms[idx][1], offset}
   else
     return self.ksyms[idx][1]
   end

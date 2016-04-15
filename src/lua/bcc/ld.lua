@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ]]
 local ffi = require("ffi")
+local posix = require("bcc.vendor.posix")
 
 local _find_library_cache = {}
 local function _find_library(name)
@@ -60,7 +61,7 @@ local function _find_load_address(path)
     path)
 
   if addr then
-    addr = tonumber(addr, 16)
+    addr = posix.tonumber64(addr, 16)
     _find_load_address_cache[path] = addr
   end
 
@@ -85,7 +86,7 @@ local function _find_symbol(path, sym)
     path, sym)
 
   if addr then
-    addr = tonumber(addr, 16)
+    addr = posix.tonumber64(addr, 16)
     symbols[sym] = addr
   end
 

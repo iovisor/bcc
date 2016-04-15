@@ -107,7 +107,7 @@ return function(BPF, utils)
 
   for k, v in counts:items() do
     for addr in stack_traces:walk(tonumber(k.stack_id)) do
-      print("    %-16x %s" % {addr, ksym:lookup(addr)})
+      print("    %-16p %s" % {addr, ksym:lookup(addr)})
     end
     print("    %-16s %s" % {"-", ffi.string(k.name)})
     print("        %d\n" % tonumber(v))

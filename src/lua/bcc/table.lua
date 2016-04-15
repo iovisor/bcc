@@ -286,7 +286,7 @@ function StackTrace:walk(id)
       return nil
     end
 
-    local addr = tonumber(pstack[0].ip[i])
+    local addr = pstack[0].ip[i]
     if addr == 0 then
       return nil
     end
