@@ -429,7 +429,7 @@ class BPF(object):
             "ia64-64": "libc6,IA-64",
         }
         abi_type = mach_map.get(machine, "libc6")
-        expr = r"\s+lib%s\.[^\s]+\s+\(%s, [^)]+[^/]+([^\s]+)" % (name, abi_type)
+        expr = r"\s+lib%s\.[^\s]+\s+\(%s[^)]*[^/]+([^\s]+)" % (name, abi_type)
         with os.popen("/sbin/ldconfig -p 2>/dev/null") as f:
             data = f.read()
         res = re.search(expr, data)
