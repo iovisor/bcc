@@ -148,7 +148,7 @@ return function(BPF, utils)
     if args.pid == nil then
       sym = sym .. " [kernel]"
     end
-    return string.format("%s (%x)", sym, addr)
+    return string.format("%s (%p)", sym, addr)
   end
 
   local function print_outstanding()
@@ -174,7 +174,7 @@ return function(BPF, utils)
         end
 
         if args.show_allocs then
-          print("\taddr = %x size = %s" % {tonumber(address), tonumber(info.size)})
+          print("\taddr = %p size = %s" % {address, tonumber(info.size)})
         end
       end
     end

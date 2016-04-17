@@ -188,8 +188,8 @@ function Bpf:attach_uprobe(args)
   local path, addr = LD.check_path_symbol(args.name, args.sym, args.addr)
   local fn = self:load_func(args.fn_name, 'BPF_PROG_TYPE_KPROBE')
   local ptype = args.retprobe and "r" or "p"
-  local ev_name = string.format("%s_%s_0x%x", ptype, path:gsub("[^%a%d]", "_"), addr)
-  local desc = string.format("%s:uprobes/%s %s:0x%x", ptype, ev_name, path, addr)
+  local ev_name = string.format("%s_%s_0x%p", ptype, path:gsub("[^%a%d]", "_"), addr)
+  local desc = string.format("%s:uprobes/%s %s:0x%p", ptype, ev_name, path, addr)
 
   log.info(desc)
 

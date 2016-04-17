@@ -29,6 +29,8 @@ int clock_nanosleep(clockid_t clock_id, int flags,
   const struct timespec *request, struct timespec *remain);
 
 int get_nprocs(void);
+
+uint64_t strtoull(const char *nptr, char **endptr, int base);
 ]]
 
 local CLOCK = {
@@ -62,9 +64,15 @@ local function cpu_count()
   return tonumber(ffi.C.get_nprocs())
 end
 
+local function tonumber64(n, base)
+  assert(type(n) == "string")
+  return ffi.C.strtoull(n, nil, base or 10)
+end
+
 return {
   time_ns=time_ns,
   sleep=sleep,
   CLOCK=CLOCK,
   cpu_count=cpu_count,
+  tonumber64=tonumber64,
 }

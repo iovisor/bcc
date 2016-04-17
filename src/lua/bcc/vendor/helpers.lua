@@ -1,3 +1,29 @@
+do
+  local ffi = require("ffi")
+  local ptrtype = ffi.typeof("uint64_t")
+  local strformat = string.format
+  function string.format(format, ...)
+    local args = {...}
+    local match_no = 1
+    local newfmt, count = string.gsub(format, "()%%(.-)(%a)",
+      function(_, mods, t)
+        local n = match_no
+        match_no = match_no + 1
+        if t == 'p' and ffi.istype(ptrtype, args[n]) then
+          local lo = tonumber(args[n] % 4294967296ULL)
+          local hi = tonumber(args[n] / 4294967296ULL)
+          args[n] = (hi == 0) and strformat("%x", lo) or strformat("%x%08x", hi, lo)
+          return "%"..mods.."s"
+        end
+      end)
+    if count == 0 then
+      return strformat(format, ...)
+    else
+      return strformat(newfmt, unpack(args,1,select('#',...)))
+    end
+  end
+end
+
 function string.starts(s, p)
   return string.sub(s, 1, string.len(p)) == p
 end
@@ -66,7 +92,7 @@ function table.bsearch(list, value, mkval)
       return mid
     end
   end
-  return nil
+  return low - 1
 end
 
 function table.join(a, b)
