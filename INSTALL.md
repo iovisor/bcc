@@ -60,7 +60,7 @@ To install:
 sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys D4284CDD
 echo "deb http://52.8.15.63/apt trusty main" | sudo tee /etc/apt/sources.list.d/iovisor.list
 sudo apt-get update
-sudo apt-get install libbcc libbcc-examples python-bcc
+sudo apt-get install binutils bcc bcc-tools libbcc-examples python-bcc
 ```
 
 Test it:
@@ -180,4 +180,3 @@ make
 make install
 export PATH=$PWD/install/bin:$PATH
 ```
-
