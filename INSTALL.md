@@ -34,15 +34,27 @@ Kernel compile flags can usually be checked by looking at `/proc/config.gz` or
 
 # Packages
 
-## Ubuntu - Binary
+## Ubuntu Xenial - Binary
+
+Only the nightly packages are built for Ubuntu 16.04, but the steps are very straightforward. No need to upgrade the kernel or compile from source!
+
+```bash
+echo "deb [trusted=yes] http://52.8.15.63/apt/xenial xenial-nightly main" | sudo tee /etc/apt/sources.list.d/iovisor.list
+sudo apt-get update
+sudo apt-get install bcc-tools
+```
+
+## Ubuntu Trusty - Binary
+
+**Kernel**
 
 Install a 4.3+ kernel from http://kernel.ubuntu.com/~kernel-ppa/mainline,
 for example:
 
 ```bash
-VER=4.4.2-040402
-PREFIX=http://kernel.ubuntu.com/~kernel-ppa/mainline/v4.4.2-wily/
-REL=201602171633
+VER=4.5.1-040501
+PREFIX=http://kernel.ubuntu.com/~kernel-ppa/mainline/v4.5.1-wily/
+REL=201604121331
 wget ${PREFIX}/linux-headers-${VER}-generic_${VER}.${REL}_amd64.deb
 wget ${PREFIX}/linux-headers-${VER}_${VER}.${REL}_all.deb
 wget ${PREFIX}/linux-image-${VER}-generic_${VER}.${REL}_amd64.deb
@@ -51,6 +63,8 @@ sudo dpkg -i linux-*${VER}.${REL}*.deb
 ```
 
 Update PREFIX to the latest date, and you can browse the files in the PREFIX url to find the REL number.
+
+**Signed Packages**
 
 Tagged and signed bcc binary packages are built for Ubuntu Trusty (14.04) and
 hosted at http://52.8.15.63/apt/.
@@ -63,9 +77,19 @@ sudo apt-get update
 sudo apt-get install binutils bcc bcc-tools libbcc-examples python-bcc
 ```
 
+**Nightly Packages**
+
+```bash
+echo "deb [trusted=yes] http://52.8.15.63/apt/trusty trusty-nightly main" | sudo tee /etc/apt/sources.list.d/iovisor.list
+sudo apt-get update
+sudo apt-get install bcc-tools
+```
+
 Test it:
-`sudo python /usr/share/bcc/examples/hello_world.py`
-`sudo python /usr/share/bcc/examples/tracing/task_switch.py`
+```
+sudo python /usr/share/bcc/examples/hello_world.py
+sudo python /usr/share/bcc/examples/tracing/task_switch.py
+```
 
 (Optional) Install pyroute2 for additional networking features
 ```bash
