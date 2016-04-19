@@ -14,12 +14,10 @@ if ! hash $CLANG_FORMAT 2> /dev/null; then
   exit 1
 fi
 
-n=$(git clang-format $GITREF --binary $CLANG_FORMAT --style llvm --diff --quiet | wc -l)
+cmd="git clang-format $GITREF --binary $CLANG_FORMAT --diff --extensions h,c,cc"
+
+n=$($cmd --quiet | wc -l)
 if [ $n -gt 0 ]; then
-  echo "git clang-format $GITREF --binary $CLANG_FORMAT --style llvm --diff"
-  echo
-  git clang-format $GITREF --binary $CLANG_FORMAT --style llvm --diff
-  echo
-  echo "clang-format returned non-empty diff, please fixup the style" 1>&2
+  $cmd -v
   exit 1
 fi
