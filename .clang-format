@@ -1,0 +1,4 @@
+---
+BasedOnStyle: Google
+AllowShortIfStatementsOnASingleLine: false
+IndentCaseLabels: false
