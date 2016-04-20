@@ -79,7 +79,7 @@ return function(BPF, utils)
   parser:option("-d --duration", "duration to trace for", 9999999):convert(tonumber)
 
   local args = parser:parse()
-  local ksym = utils.sym.KSymbols:new()
+  local ksym = BPF.SymbolCache()
   local filter = "1"
   local MAXDEPTH = 20
 
@@ -107,7 +107,7 @@ return function(BPF, utils)
 
   for k, v in counts:items() do
     for addr in stack_traces:walk(tonumber(k.stack_id)) do
-      print("    %-16p %s" % {addr, ksym:lookup(addr)})
+      print("    %-16p %s" % {addr, ksym:resolve(addr)})
     end
     print("    %-16s %s" % {"-", ffi.string(k.name)})
     print("        %d\n" % tonumber(v))

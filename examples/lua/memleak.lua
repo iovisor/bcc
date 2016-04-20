@@ -139,12 +139,12 @@ return function(BPF, utils)
     bpf:attach_kprobe{event="kfree", fn_name="free_enter"}
   end
 
-  local syms = args.pid and utils.sym.ProcSymbols:new(args.pid) or utils.sym.KSymbols:new()
+  local syms = BPF.SymbolCache(args.pid)
   local allocs = bpf:get_table("allocs")
   local stack_traces = bpf:get_table("stack_traces")
 
   local function resolve(addr)
-    local sym = syms:lookup(addr)
+    local sym = syms:resolve(addr)
     if args.pid == nil then
       sym = sym .. " [kernel]"
     end
