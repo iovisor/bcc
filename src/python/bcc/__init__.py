@@ -25,7 +25,7 @@ import struct
 import sys
 basestring = (unicode if sys.version_info[0] < 3 else str)
 
-from .libbcc import lib, _CB_TYPE
+from .libbcc import lib, _CB_TYPE, bcc_symbol
 from .procstat import ProcStat, ProcUtils
 from .table import Table
 from .tracepoint import Perf, Tracepoint
@@ -35,10 +35,6 @@ open_kprobes = {}
 open_uprobes = {}
 tracefile = None
 TRACEFS = "/sys/kernel/debug/tracing"
-KALLSYMS = "/proc/kallsyms"
-ksyms = []
-ksym_names = {}
-ksym_loaded = 0
 _kprobe_limit = 1000
 
 DEBUG_LLVM_IR = 0x1
@@ -67,6 +63,22 @@ def _check_probe_quota(num_new_probes):
     if len(open_kprobes) + len(open_uprobes) + num_new_probes > _kprobe_limit:
         raise Exception("Number of open probes would exceed quota")
 
+class KernelSymbolCache(object):
+    def __init__(self):
+        self.cache = lib.bcc_symcache_new(-1)
+
+    def resolve(self, addr):
+        sym = bcc_symbol()
+        psym = ct.pointer(sym)
+        if lib.bcc_symcache_resolve(self.cache, addr, psym) < 0:
+            return "[unknown]", 0
+        return sym.name, sym.offset
+
+    def resolve_name(self, name):
+        addr = ct.c_ulonglong()
+        if lib.bcc_symcache_resolve_name(self.cache, name, ct.pointer(addr)) < 0:
+            return -1
+        return addr.value
 
 class BPF(object):
     SOCKET_FILTER = 1
@@ -75,9 +87,7 @@ class BPF(object):
     SCHED_ACT = 4
 
     _probe_repl = re.compile("[^a-zA-Z0-9_]")
-    _libsearch_cache = {}
-    _lib_load_address_cache = {}
-    _lib_symbol_cache = {}
+    _ksym_cache = KernelSymbolCache()
 
     _auto_includes = {
         "linux/time.h"      : ["time"],
@@ -413,84 +423,14 @@ class BPF(object):
         del open_kprobes[ev_name]
 
     @classmethod
-    def find_library(cls, name):
-        if name in cls._libsearch_cache:
-            return cls._libsearch_cache[name]
-
-        if struct.calcsize("l") == 4:
-            machine = os.uname()[4] + "-32"
-        else:
-            machine = os.uname()[4] + "-64"
-        mach_map = {
-            "x86_64-64": "libc6,x86-64",
-            "ppc64-64": "libc6,64bit",
-            "sparc64-64": "libc6,64bit",
-            "s390x-64": "libc6,64bit",
-            "ia64-64": "libc6,IA-64",
-        }
-        abi_type = mach_map.get(machine, "libc6")
-        expr = r"\s+lib%s\.[^\s]+\s+\(%s[^)]*[^/]+([^\s]+)" % (name, abi_type)
-        with os.popen("/sbin/ldconfig -p 2>/dev/null") as f:
-            data = f.read()
-        res = re.search(expr, data)
-        if not res:
-            return None
-        path = res.group(1)
-        cls._libsearch_cache[name] = path
-        return path
-
-    @classmethod
-    def find_load_address(cls, path):
-        if path in cls._lib_load_address_cache:
-            return cls._lib_load_address_cache[path]
-
-        # "LOAD off    0x0000000000000000 vaddr 0x0000000000400000 paddr 0x..."
-        with os.popen("""/usr/bin/objdump -x %s | \
-                awk '$1 == "LOAD" && $3 ~ /^[0x]*$/ \
-                { print $5 }'""" % path) as f:
-            data = f.read().rstrip()
-        if not data:
-            return None
-        addr = int(data, 16)
-        cls._lib_load_address_cache[path] = addr
-        cls._lib_symbol_cache[path] = {}
-        return addr
-
-    @classmethod
-    def find_symbol(cls, path, sym):
-        # initialized in find_load_address
-        symbols = cls._lib_symbol_cache[path]
-        if sym in symbols:
-            return symbols[sym]
-
-        with os.popen("""/usr/bin/objdump -tT %s | \
-                awk -v sym=%s '$NF == sym && ($4 == ".text" \
-                || $4 == "text.hot" || $4 == "text.unlikely") \
-                { print $1; exit }'""" % (path, sym)) as f:
-            data = f.read().rstrip()
-        if not data:
-            return None
-        addr = int(data, 16)
-        symbols[sym] = addr
-        return addr
-
-    @classmethod
-    def _check_path_symbol(cls, name, sym, addr):
-        if name.startswith("/"):
-            path = name
-        else:
-            path = BPF.find_library(name)
-        if not path:
-            raise Exception("could not find library %s" % name)
-        path = os.path.realpath(path)
-        load_addr = BPF.find_load_address(path)
-
-        if not addr and sym:
-            addr = BPF.find_symbol(path, sym)
-        if not addr:
-            raise Exception("could not determine address of symbol %s" % sym)
-
-        return (path, addr-load_addr)
+    def _check_path_symbol(cls, module, symname, addr):
+        sym = bcc_symbol()
+        psym = ct.pointer(sym)
+        if lib.bcc_resolve_symname(module, symname, addr or 0x0, psym) < 0:
+            if not sym.module:
+                raise Exception("could not find library %s" % module)
+            raise Exception("could not determine address of symbol %s" % symname)
+        return sym.module, sym.offset
 
     def attach_uprobe(self, name="", sym="", addr=None,
             fn_name="", pid=-1, cpu=0, group_fd=-1):
@@ -679,51 +619,14 @@ class BPF(object):
             exit()
 
     @staticmethod
-    def _load_kallsyms():
-        global ksym_loaded, ksyms, ksym_names
-        if ksym_loaded:
-            return
-        try:
-            syms = open(KALLSYMS, "r")
-        except:
-            raise Exception("Could not read %s" % KALLSYMS)
-        line = syms.readline()
-        for line in iter(syms):
-            cols = line.split()
-            name = cols[2]
-            addr = int(cols[0], 16)
-            # keep a mapping of names to ksyms index
-            ksym_names[name] = len(ksyms)
-            ksyms.append((name, addr))
-        syms.close()
-        ksym_loaded = 1
-
-    @staticmethod
-    def _ksym_addr2index(addr):
-        global ksyms
-        start = -1
-        end = len(ksyms)
-        while end != start + 1:
-            mid = int((start + end) / 2)
-            if addr < ksyms[mid][1]:
-                end = mid
-            else:
-                start = mid
-        return start
-
-    @staticmethod
     def ksym(addr):
         """ksym(addr)
 
         Translate a kernel memory address into a kernel function name, which is
-        returned. This is a simple translator that uses /proc/kallsyms.
+        returned.
         """
-        global ksyms
-        BPF._load_kallsyms()
-        idx = BPF._ksym_addr2index(addr)
-        if idx == -1:
-            return "[unknown]"
-        return ksyms[idx][0]
+        name, _ = BPF._ksym_cache.resolve(addr)
+        return name
 
     @staticmethod
     def ksymaddr(addr):
@@ -731,15 +634,10 @@ class BPF(object):
 
         Translate a kernel memory address into a kernel function name plus the
         instruction offset as a hexidecimal number, which is returned as a
-        string. This is a simple translator that uses /proc/kallsyms.
+        string.
         """
-        global ksyms
-        BPF._load_kallsyms()
-        idx = BPF._ksym_addr2index(addr)
-        if idx == -1:
-            return "[unknown]"
-        offset = int(addr - ksyms[idx][1])
-        return "%s+0x%x" % (ksyms[idx][0], offset)
+        name, offset = BPF._ksym_cache.resolve(addr)
+        return "%s+0x%x" % (name, offset)
 
     @staticmethod
     def ksymname(name):
@@ -747,35 +645,7 @@ class BPF(object):
 
         Translate a kernel name into an address. This is the reverse of
         ksymaddr. Returns -1 when the function name is unknown."""
-
-        global ksyms, ksym_names
-        BPF._load_kallsyms()
-        idx = ksym_names.get(name, -1)
-        if idx == -1:
-            return 0
-        return ksyms[idx][1]
-
-    @classmethod
-    def usymaddr(cls, pid, addr, refresh_symbols=False):
-        """usymaddr(pid, addr, refresh_symbols=False)
-
-        Decode the specified address in the specified process to a symbolic
-        representation that includes the symbol name, offset within the symbol,
-        and the module name. See the ProcessSymbols class for more details.
-
-        Specify refresh_symbols=True if you suspect the set of loaded modules
-        or their load addresses has changed since the last time you called
-        usymaddr() on this pid.
-        """
-        proc_sym = None
-        if pid in cls._process_symbols:
-            proc_sym = cls._process_symbols[pid]
-            if refresh_symbols:
-                proc_sym.refresh_code_ranges()
-        else:
-            proc_sym = ProcessSymbols(pid)
-            cls._process_symbols[pid] = proc_sym
-        return proc_sym.decode_addr(addr)
+        return BPF._ksym_cache.resolve_name(name)
 
     @staticmethod
     def num_open_kprobes():
