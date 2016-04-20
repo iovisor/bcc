@@ -102,3 +102,28 @@ lib.perf_reader_free.restype = None
 lib.perf_reader_free.argtypes = [ct.c_void_p]
 lib.perf_reader_fd.restype = int
 lib.perf_reader_fd.argtypes = [ct.c_void_p]
+
+# bcc symbol helpers
+class bcc_symbol(ct.Structure):
+    _fields_ = [
+            ('name', ct.c_char_p),
+            ('module', ct.c_char_p),
+            ('offset', ct.c_ulonglong),
+        ]
+
+lib.bcc_resolve_symname.restype = ct.c_int
+lib.bcc_resolve_symname.argtypes = [
+    ct.c_char_p, ct.c_char_p, ct.c_ulonglong, ct.POINTER(bcc_symbol)]
+
+lib.bcc_symcache_new.restype = ct.c_void_p
+lib.bcc_symcache_new.argtypes = [ct.c_int]
+
+lib.bcc_symcache_resolve.restype = ct.c_int
+lib.bcc_symcache_resolve.argtypes = [ct.c_void_p, ct.c_ulonglong, ct.POINTER(bcc_symbol)]
+
+lib.bcc_symcache_resolve_name.restype = ct.c_int
+lib.bcc_symcache_resolve_name.argtypes = [
+    ct.c_void_p, ct.c_char_p, ct.POINTER(ct.c_ulonglong)]
+
+lib.bcc_symcache_refresh.restype = None
+lib.bcc_symcache_refresh.argtypes = [ct.c_void_p]
