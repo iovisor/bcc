@@ -286,12 +286,12 @@ static bool match_so_flags(int flags) {
     return false;
 
   switch (flags & FLAG_ABI_MASK) {
-    case ABI_SPARC_LIB64:
-    case ABI_IA64_LIB64:
-    case ABI_X8664_LIB64:
-    case ABI_S390_LIB64:
-    case ABI_POWERPC_LIB64:
-      return (sizeof(void *) == 8);
+  case ABI_SPARC_LIB64:
+  case ABI_IA64_LIB64:
+  case ABI_X8664_LIB64:
+  case ABI_S390_LIB64:
+  case ABI_POWERPC_LIB64:
+    return (sizeof(void *) == 8);
   }
 
   return true;
