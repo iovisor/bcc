@@ -118,11 +118,6 @@ class ProcStat {
   void reset() { inode_ = getinode_(); }
 };
 
-static bool has_suffix(const std::string &str, const std::string &suffix) {
-  return str.size() >= suffix.size() &&
-         str.compare(str.size() - suffix.size(), suffix.size(), suffix) == 0;
-}
-
 class ProcSyms : SymbolCache {
   struct Symbol {
     Symbol(const char *name, uint64_t start, uint64_t size, int flags = 0)
@@ -143,7 +138,7 @@ class ProcSyms : SymbolCache {
 
     void load_sym_table();
     bool decode_sym(uint64_t addr, struct bcc_symbol *sym);
-    bool is_so() { return has_suffix(name_, ".so"); }
+    bool is_so() { return strstr(name_.c_str(), ".so") != nullptr; }
 
     static int _add_symbol(const char *symname, uint64_t start, uint64_t end,
                            int flags, void *p);
