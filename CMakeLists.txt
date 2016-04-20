@@ -11,6 +11,8 @@ include(cmake/GetGitRevisionDescription.cmake)
 include(cmake/version.cmake)
 include(GNUInstallDirs)
 
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+
 if(NOT PYTHON_ONLY)
 find_package(BISON)
 find_package(FLEX)

@@ -1,4 +1,4 @@
-include(cmake/FindLuaJIT.cmake)
+find_package(LuaJIT)
 
 if (LUAJIT_LIBRARIES)
 	find_program(LUAJIT luajit)
