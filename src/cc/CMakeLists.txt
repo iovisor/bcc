@@ -8,6 +8,7 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR}/frontends/b)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/frontends/b)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/frontends/clang)
 include_directories(${LLVM_INCLUDE_DIRS})
+include_directories(${LIBELF_INCLUDE_DIRS})
 # todo: if check for kernel version
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/compat)
 add_definitions(${LLVM_DEFINITIONS})
@@ -52,8 +53,8 @@ set(clang_libs ${libclangFrontend} ${libclangSerialization} ${libclangDriver} ${
   ${libclangAST} ${libclangLex} ${libclangBasic})
 
 # Link against LLVM libraries
-target_link_libraries(bcc-shared b_frontend clang_frontend ${clang_libs} ${expanded_libs})
-target_link_libraries(bcc-static b_frontend clang_frontend bcc-loader-static ${clang_libs} ${expanded_libs})
+target_link_libraries(bcc-shared b_frontend clang_frontend ${clang_libs} ${expanded_libs} ${LIBELF_LIBRARIES})
+target_link_libraries(bcc-static b_frontend clang_frontend bcc-loader-static ${clang_libs} ${expanded_libs} ${LIBELF_LIBRARIES})
 
 install(TARGETS bcc-shared LIBRARY COMPONENT libbcc
   DESTINATION ${CMAKE_INSTALL_LIBDIR})
