@@ -11,6 +11,8 @@ include(cmake/GetGitRevisionDescription.cmake)
 include(cmake/version.cmake)
 include(GNUInstallDirs)
 
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+
 if(NOT PYTHON_ONLY)
 find_package(BISON)
 find_package(FLEX)
@@ -44,6 +46,8 @@ ENDFOREACH()
 if(NOT DEFINED BCC_KERNEL_MODULES_DIR)
   set(BCC_KERNEL_MODULES_DIR "/lib/modules")
 endif()
+
+find_package(LibElf REQUIRED)
 
 # Set to non-zero if system installs kernel headers with split source and build
 # directories in /lib/modules/`uname -r`/. This is the case for debian and

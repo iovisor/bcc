@@ -18,13 +18,12 @@ local libbcc = require("bcc.libbcc")
 
 local TracerPipe = require("bcc.tracerpipe")
 local Table = require("bcc.table")
-local LD = require("bcc.ld")
+local Sym = require("bcc.sym")
 
 local Bpf = class("BPF")
 
 Bpf.static.open_kprobes = {}
 Bpf.static.open_uprobes = {}
-Bpf.static.process_symbols = {}
 Bpf.static.KPROBE_LIMIT = 1000
 Bpf.static.tracer_pipe = nil
 Bpf.static.DEFAULT_CFLAGS = {
@@ -63,25 +62,16 @@ function Bpf.static.cleanup_probes()
   end
 end
 
+function Bpf.static.SymbolCache(pid)
+  return Sym.create_cache(pid)
+end
+
 function Bpf.static.num_open_uprobes()
   return table.count(Bpf.static.open_uprobes)
 end
 
 function Bpf.static.num_open_kprobes()
   return table.count(Bpf.static.open_kprobes)
-end
-
-function Bpf.static.usymaddr(pid, addr, refresh)
-  local proc_sym = Bpf.static.process_symbols[pid]
-
-  if proc_sym == nil then
-    proc_sym = ProcSymbols(pid)
-    Bpf.static.process_symbols[pid] = proc_sym
-  elseif refresh then
-    proc_sym.refresh()
-  end
-
-  return proc_sym.decode_addr(addr)
 end
 
 Bpf.static.SCRIPT_ROOT = "./"
@@ -185,7 +175,7 @@ end
 function Bpf:attach_uprobe(args)
   Bpf.check_probe_quota(1)
 
-  local path, addr = LD.check_path_symbol(args.name, args.sym, args.addr)
+  local path, addr = Sym.check_path_symbol(args.name, args.sym, args.addr)
   local fn = self:load_func(args.fn_name, 'BPF_PROG_TYPE_KPROBE')
   local ptype = args.retprobe and "r" or "p"
   local ev_name = string.format("%s_%s_0x%p", ptype, path:gsub("[^%a%d]", "_"), addr)

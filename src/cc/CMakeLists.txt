@@ -8,6 +8,7 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR}/frontends/b)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/frontends/b)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/frontends/clang)
 include_directories(${LLVM_INCLUDE_DIRS})
+include_directories(${LIBELF_INCLUDE_DIRS})
 # todo: if check for kernel version
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/compat)
 add_definitions(${LLVM_DEFINITIONS})
@@ -32,12 +33,12 @@ if (CMAKE_COMPILER_IS_GNUCC)
   endif()
 endif()
 
-add_library(bcc-shared SHARED bpf_common.cc bpf_module.cc libbpf.c perf_reader.c shared_table.cc exported_files.cc)
+add_library(bcc-shared SHARED bpf_common.cc bpf_module.cc libbpf.c perf_reader.c shared_table.cc exported_files.cc bcc_elf.c bcc_proc.c bcc_syms.cc)
 set_target_properties(bcc-shared PROPERTIES VERSION ${REVISION_LAST} SOVERSION 0)
 set_target_properties(bcc-shared PROPERTIES OUTPUT_NAME bcc)
 
-add_library(bcc-loader-static libbpf.c perf_reader.c)
-add_library(bcc-static STATIC bpf_common.cc bpf_module.cc shared_table.cc exported_files.cc)
+add_library(bcc-loader-static libbpf.c perf_reader.c bcc_elf.c bcc_proc.c)
+add_library(bcc-static STATIC bpf_common.cc bpf_module.cc shared_table.cc exported_files.cc bcc_syms.cc)
 set_target_properties(bcc-static PROPERTIES OUTPUT_NAME bcc)
 
 # BPF is still experimental otherwise it should be available
@@ -52,8 +53,8 @@ set(clang_libs ${libclangFrontend} ${libclangSerialization} ${libclangDriver} ${
   ${libclangAST} ${libclangLex} ${libclangBasic})
 
 # Link against LLVM libraries
-target_link_libraries(bcc-shared b_frontend clang_frontend ${clang_libs} ${expanded_libs})
-target_link_libraries(bcc-static b_frontend clang_frontend bcc-loader-static ${clang_libs} ${expanded_libs})
+target_link_libraries(bcc-shared b_frontend clang_frontend ${clang_libs} ${expanded_libs} ${LIBELF_LIBRARIES})
+target_link_libraries(bcc-static b_frontend clang_frontend bcc-loader-static ${clang_libs} ${expanded_libs} ${LIBELF_LIBRARIES})
 
 install(TARGETS bcc-shared LIBRARY COMPONENT libbcc
   DESTINATION ${CMAKE_INSTALL_LIBDIR})

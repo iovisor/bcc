@@ -98,4 +98,18 @@ int perf_reader_fd(struct perf_reader *reader);
 void perf_reader_set_fd(struct perf_reader *reader, int fd);
 ]]
 
+ffi.cdef[[
+struct bcc_symbol {
+	const char *name;
+	const char *module;
+	uint64_t offset;
+};
+
+int bcc_resolve_symname(const char *module, const char *symname, const uint64_t addr,
+		struct bcc_symbol *sym);
+void *bcc_symcache_new(int pid);
+int bcc_symcache_resolve(void *symcache, uint64_t addr, struct bcc_symbol *sym);
+void bcc_symcache_refresh(void *resolver);
+]]
+
 return ffi.load(os.getenv("LIBBCC_SO_PATH") or rawget(_G, "LIBBCC_SO_PATH") or "bcc")

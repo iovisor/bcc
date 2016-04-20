@@ -14,7 +14,4 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ]]
 require("bcc.vendor.helpers")
-return {
-  BPF = require("bcc.bpf"),
-  sym = require("bcc.sym"),
-}
+return { BPF = require("bcc.bpf") }
