@@ -111,8 +111,13 @@ int bcc_procutils_each_module(int pid, bcc_procutils_modulecb callback,
 
 int bcc_procutils_each_ksym(bcc_procutils_ksymcb callback, void *payload) {
   char line[2048];
-  FILE *kallsyms = fopen("/proc/kallsyms", "r");
+  FILE *kallsyms;
 
+  /* root is needed to list ksym addresses */
+  if (geteuid() != 0)
+    return -1;
+
+  kallsyms = fopen("/proc/kallsyms", "r");
   if (!kallsyms)
     return -1;
 
