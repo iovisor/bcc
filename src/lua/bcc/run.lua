@@ -59,7 +59,6 @@ return function()
   local utils = {
     argparse = require("bcc.vendor.argparse"),
     posix = require("bcc.vendor.posix"),
-    sym = require("bcc.sym"),
   }
 
   local command = dofile(tracefile)
