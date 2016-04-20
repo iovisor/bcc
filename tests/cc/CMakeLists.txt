@@ -8,6 +8,6 @@ target_link_libraries(test_static bcc-static)
 
 add_test(NAME c_test_static COMMAND ${TEST_WRAPPER} c_test_static sudo ${CMAKE_CURRENT_BINARY_DIR}/test_static)
 
-add_executable(test_libbcc test_libbcc.cc test_c_api.cc)
+add_executable(test_libbcc test_libbcc.cc test_c_api.cc test_usdt_args.cc)
 target_link_libraries(test_libbcc bcc-shared dl)
 add_test(NAME test_libbcc COMMAND ${TEST_WRAPPER} c_test_all sudo ${CMAKE_CURRENT_BINARY_DIR}/test_libbcc)
