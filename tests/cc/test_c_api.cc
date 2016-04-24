@@ -1,7 +1,7 @@
-#include <stdint.h>
-#include <unistd.h>
 #include <dlfcn.h>
+#include <stdint.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "bcc_elf.h"
 #include "bcc_proc.h"

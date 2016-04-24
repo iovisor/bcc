@@ -6,12 +6,12 @@ static void verify_register(USDT::ArgumentParser_x64 &parser, int arg_size,
                             const std::string &register_name, int constant,
                             int deref_offset, const std::string &deref_ident) {
   USDT::Argument arg;
-  REQUIRE(parser.parse(arg));
-  REQUIRE(arg.arg_size == arg_size);
-  REQUIRE(arg.register_name == register_name);
-  REQUIRE(arg.constant == constant);
-  REQUIRE(arg.deref_offset == deref_offset);
-  REQUIRE(arg.deref_ident == deref_ident);
+  REQUIRE(parser.parse(&arg));
+  REQUIRE(arg.arg_size() == arg_size);
+  REQUIRE(arg.register_name() == register_name);
+  REQUIRE(arg.constant() == constant);
+  REQUIRE(arg.deref_offset() == deref_offset);
+  REQUIRE(arg.deref_ident() == deref_ident);
 }
 
 TEST_CASE("test usdt argument parsing", "[usdt]") {
