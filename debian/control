@@ -3,7 +3,7 @@ Maintainer: Brenden Blanco <bblanco@plumgrid.com>
 Section: misc
 Priority: optional
 Standards-Version: 3.9.5
-Build-Depends: debhelper (>= 9), cmake, libllvm3.7 | libllvm3.8, llvm-3.7-dev | llvm-3.8-dev, libclang-3.7-dev | libclang-3.8-dev, libelf-dev
+Build-Depends: debhelper (>= 9), cmake, libllvm3.7 | libllvm3.8, llvm-3.7-dev | llvm-3.8-dev, libclang-3.7-dev | libclang-3.8-dev
 Homepage: https://github.com/iovisor/bcc
 
 Package: libbcc
