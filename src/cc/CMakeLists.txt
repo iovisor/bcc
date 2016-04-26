@@ -1,6 +1,8 @@
 # Copyright (c) PLUMgrid, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
 
+include(BuildLibElf)
+
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 # to be removed
@@ -36,10 +38,14 @@ endif()
 add_library(bcc-shared SHARED bpf_common.cc bpf_module.cc libbpf.c perf_reader.c shared_table.cc exported_files.cc bcc_elf.c bcc_proc.c bcc_syms.cc)
 set_target_properties(bcc-shared PROPERTIES VERSION ${REVISION_LAST} SOVERSION 0)
 set_target_properties(bcc-shared PROPERTIES OUTPUT_NAME bcc)
+add_dependencies(bcc-shared libelf)
 
 add_library(bcc-loader-static libbpf.c perf_reader.c bcc_elf.c bcc_proc.c)
+add_dependencies(bcc-loader-static libelf)
+
 add_library(bcc-static STATIC bpf_common.cc bpf_module.cc shared_table.cc exported_files.cc bcc_syms.cc)
 set_target_properties(bcc-static PROPERTIES OUTPUT_NAME bcc)
+add_dependencies(bcc-static libelf)
 
 # BPF is still experimental otherwise it should be available
 #llvm_map_components_to_libnames(llvm_libs bpf mcjit irreader passes)

@@ -11,7 +11,7 @@ URL:            https://github.com/iovisor/bcc
 Source0:        bcc.tar.gz
 
 BuildArch:      x86_64
-BuildRequires:  bison, cmake >= 2.8.7, flex, gcc, gcc-c++, python2-devel, elfutils-libelf-devel-static
+BuildRequires:  bison, cmake >= 2.8.7, flex, gcc, gcc-c++, python2-devel
 
 %description
 Python bindings for BPF Compiler Collection (BCC). Control a BPF program from
