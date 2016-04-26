@@ -48,6 +48,7 @@ make install/strip DESTDIR=%{buildroot}
 
 %package -n libbcc
 Summary: Shared Library for BPF Compiler Collection (BCC)
+Requires: elfutils-libelf
 %description -n libbcc
 Shared Library for BPF Compiler Collection (BCC)
 
