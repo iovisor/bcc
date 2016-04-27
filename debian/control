@@ -8,7 +8,7 @@ Homepage: https://github.com/iovisor/bcc
 
 Package: libbcc
 Architecture: amd64
-Depends: libc6, libstdc++6
+Depends: libc6, libstdc++6, libelf1
 Description: Shared Library for BPF Compiler Collection (BCC)
  Shared Library for BPF Compiler Collection to control BPF programs
  from userspace.

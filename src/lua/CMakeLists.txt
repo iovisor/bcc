@@ -1,7 +1,7 @@
 find_package(LuaJIT)
+find_program(LUAJIT luajit)
 
-if (LUAJIT_LIBRARIES)
-	find_program(LUAJIT luajit)
+if (LUAJIT_LIBRARIES AND LUAJIT)
 	FILE(GLOB_RECURSE SRC_LUA ${CMAKE_CURRENT_SOURCE_DIR}/bcc/*/*.lua)
 
 	ADD_CUSTOM_COMMAND(
