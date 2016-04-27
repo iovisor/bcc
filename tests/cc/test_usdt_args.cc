@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 #include <string>
+#include <iostream>
 #include "catch.hpp"
 #include "usdt.h"
 

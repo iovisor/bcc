@@ -15,11 +15,81 @@
  */
 #include "usdt.h"
 #include <unordered_map>
+#include "vendor/tinyformat.hpp"
 
 namespace USDT {
 
 Argument::Argument() {}
 Argument::~Argument() {}
+
+const std::unordered_map<std::string, std::string> Argument::translations_ = {
+  {"rax", "ax"}, {"rbx", "bx"}, {"rcx", "cx"}, {"rdx", "dx"},
+  {"rdi", "di"}, {"rsi", "si"}, {"rbp", "bp"}, {"rsp", "sp"},
+  {"rip", "ip"}, {"eax", "ax"}, {"ebx", "bx"}, {"ecx", "cx"},
+  {"edx", "dx"}, {"edi", "di"}, {"esi", "si"}, {"ebp", "bp"},
+  {"esp", "sp"}, {"eip", "ip"},
+
+  {"al", "ax"}, {"bl", "bx"}, {"cl", "cx"}, {"dl", "dx"}
+};
+
+std::string Argument::ctype() const {
+  const int s = arg_size() * 8;
+  return (s < 0) ?
+    tfm::format("int%d_t", -s) :
+    tfm::format("uint%d_t", s);
+}
+
+void Argument::normalize_register_name(std::string *normalized) const {
+  if (!register_name_)
+    return;
+
+  normalized->assign(*register_name_);
+  if ((*normalized)[0] == '%')
+    normalized->erase(0, 1);
+
+  auto it = translations_.find(*normalized);
+  if (it != translations_.end())
+    normalized->assign(it->second);
+}
+
+uint64_t Argument::get_global_address(int pid) const {
+  return 0x0;
+}
+
+void Argument::assign_to_local(std::ostream &stream,
+    const std::string &local_name, optional<int> pid) const {
+
+  std::string regname;
+  normalize_register_name(&regname);
+
+  if (constant_) {
+    tfm::format(stream, "%s = %d;", local_name, *constant_);
+    return;
+  }
+
+  if (!deref_offset_) {
+    tfm::format(stream, "%s = (%s)ctx->%s;", local_name, ctype(), regname);
+    return;
+  }
+
+  if (deref_offset_ && !deref_ident_) {
+    tfm::format(stream,
+      "{\n"
+      "    u64 __temp = ctx->%s + (%d);\n"
+      "    bpf_probe_read(&%s, sizeof(%s), (void *)__temp);\n"
+      "}\n",
+      regname, *deref_offset_, local_name, local_name);
+    return;
+  }
+
+  tfm::format(stream,
+    "{\n"
+    "    u64 __temp = 0x%xull + %d;\n"
+    "    bpf_probe_read(&%s, sizeof(%s), (void *)__temp);\n"
+    "}\n",
+    get_global_address(pid.value_or(-1)),
+    *deref_offset_, local_name, local_name);
+}
 
 ssize_t ArgumentParser::parse_number(ssize_t pos, optional<int> *result) {
   char *endp;

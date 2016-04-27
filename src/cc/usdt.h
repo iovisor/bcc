@@ -33,11 +33,19 @@ class Argument {
   optional<std::string> deref_ident_;
   optional<std::string> register_name_;
 
+  uint64_t get_global_address(int pid) const;
+  static const std::unordered_map<std::string, std::string> translations_;
+
  public:
   Argument();
   ~Argument();
 
+  void assign_to_local(std::ostream &stream,
+    const std::string &local_name, optional<int> pid = nullopt) const;
+
   int arg_size() const { return arg_size_.value_or(sizeof(void *)); }
+  std::string ctype() const;
+  void normalize_register_name(std::string *normalized) const;
 
   const optional<std::string> &deref_ident() const { return deref_ident_; }
   const optional<std::string> &register_name() const { return register_name_; }
