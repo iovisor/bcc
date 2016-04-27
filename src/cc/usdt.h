@@ -17,28 +17,33 @@
 
 #include <string>
 #include <unordered_map>
+#include "vendor/optional.hpp"
 
 namespace USDT {
 
+using std::experimental::optional;
+using std::experimental::nullopt;
 class ArgumentParser;
 
 class Argument {
  private:
-  int arg_size_;
-  int constant_;
-  int deref_offset_;
-  std::string deref_ident_;
-  std::string register_name_;
+  optional<int> arg_size_;
+  optional<int> constant_;
+  optional<int> deref_offset_;
+  optional<std::string> deref_ident_;
+  optional<std::string> register_name_;
 
  public:
   Argument();
   ~Argument();
 
-  const std::string &deref_ident() const { return deref_ident_; }
-  const std::string &register_name() const { return register_name_; }
-  int arg_size() const { return arg_size_; }
-  int constant() const { return constant_; }
-  int deref_offset() const { return deref_offset_; }
+  int arg_size() const { return arg_size_.value_or(sizeof(void *)); }
+
+  const optional<std::string> &deref_ident() const { return deref_ident_; }
+  const optional<std::string> &register_name() const { return register_name_; }
+  const optional<int> constant() const { return constant_; }
+  const optional<int> deref_offset() const { return deref_offset_; }
+
   friend class ArgumentParser;
 };
 
@@ -49,8 +54,8 @@ class ArgumentParser {
  protected:
   virtual bool validate_register(const std::string &reg, int *reg_size) = 0;
 
-  ssize_t parse_number(ssize_t pos, int *number);
-  ssize_t parse_identifier(ssize_t pos, std::string *ident);
+  ssize_t parse_number(ssize_t pos, optional<int> *number);
+  ssize_t parse_identifier(ssize_t pos, optional<std::string> *ident);
   ssize_t parse_register(ssize_t pos, Argument *dest);
   ssize_t parse_expr(ssize_t pos, Argument *dest);
   ssize_t parse_1(ssize_t pos, Argument *dest);

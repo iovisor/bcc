@@ -13,26 +13,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include <unordered_map>
 #include "usdt.h"
+#include <unordered_map>
 
 namespace USDT {
 
-Argument::Argument() : arg_size_(0), constant_(0), deref_offset_(0) {}
-
+Argument::Argument() {}
 Argument::~Argument() {}
 
-ssize_t ArgumentParser::parse_number(ssize_t pos, int *number) {
+ssize_t ArgumentParser::parse_number(ssize_t pos, optional<int> *result) {
   char *endp;
-  *number = strtol(arg_ + pos, &endp, 0);
+  int number = strtol(arg_ + pos, &endp, 0);
+  if (endp > arg_ + pos)
+    *result = number;
   return endp - arg_;
 }
 
-ssize_t ArgumentParser::parse_identifier(ssize_t pos, std::string *ident) {
+ssize_t ArgumentParser::parse_identifier(ssize_t pos,
+                                         optional<std::string> *result) {
   if (isalpha(arg_[pos]) || arg_[pos] == '_') {
     ssize_t start = pos++;
     while (isalnum(arg_[pos]) || arg_[pos] == '_') pos++;
-    ident->assign(arg_ + start, pos - start);
+    if (pos - start)
+      result->emplace(arg_ + start, pos - start);
   }
   return pos;
 }
@@ -42,9 +45,17 @@ ssize_t ArgumentParser::parse_register(ssize_t pos, Argument *dest) {
   if (arg_[start] != '%')
     return -start;
   while (isalnum(arg_[pos])) pos++;
-  dest->register_name_.assign(arg_ + start, pos - start);
-  if (!validate_register(dest->register_name(), &dest->arg_size_))
+
+  std::string regname(arg_ + start, pos - start);
+  int regsize = 0;
+
+  if (!validate_register(regname, &regsize))
     return -start;
+
+  dest->register_name_ = regname;
+  if (!dest->arg_size_)
+    dest->arg_size_ = regsize;
+
   return pos;
 }
 
@@ -59,10 +70,11 @@ ssize_t ArgumentParser::parse_expr(ssize_t pos, Argument *dest) {
     pos = parse_number(pos, &dest->deref_offset_);
     if (arg_[pos] == '+') {
       pos = parse_identifier(pos + 1, &dest->deref_ident_);
-      if (dest->deref_ident().empty())
+      if (!dest->deref_ident_)
         return -pos;
     }
   } else {
+    dest->deref_offset_ = 0;
     pos = parse_identifier(pos, &dest->deref_ident_);
   }
 
@@ -78,9 +90,9 @@ ssize_t ArgumentParser::parse_expr(ssize_t pos, Argument *dest) {
 
 ssize_t ArgumentParser::parse_1(ssize_t pos, Argument *dest) {
   if (isdigit(arg_[pos]) || arg_[pos] == '-') {
-    int asize;
+    optional<int> asize;
     ssize_t m = parse_number(pos, &asize);
-    if (arg_[m] == '@') {
+    if (arg_[m] == '@' && asize) {
       dest->arg_size_ = asize;
       return parse_expr(m + 1, dest);
     }
@@ -132,8 +144,7 @@ bool ArgumentParser_x64::validate_register(const std::string &reg,
   auto it = registers_.find(reg);
   if (it == registers_.end())
     return false;
-  if (*reg_size == 0)
-    *reg_size = it->second;
+  *reg_size = it->second;
   return true;
 }
 }
