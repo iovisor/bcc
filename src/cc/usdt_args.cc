@@ -13,8 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "usdt.h"
 #include <unordered_map>
+
+#include "usdt.h"
 #include "vendor/tinyformat.hpp"
 
 namespace USDT {
@@ -23,20 +24,16 @@ Argument::Argument() {}
 Argument::~Argument() {}
 
 const std::unordered_map<std::string, std::string> Argument::translations_ = {
-  {"rax", "ax"}, {"rbx", "bx"}, {"rcx", "cx"}, {"rdx", "dx"},
-  {"rdi", "di"}, {"rsi", "si"}, {"rbp", "bp"}, {"rsp", "sp"},
-  {"rip", "ip"}, {"eax", "ax"}, {"ebx", "bx"}, {"ecx", "cx"},
-  {"edx", "dx"}, {"edi", "di"}, {"esi", "si"}, {"ebp", "bp"},
-  {"esp", "sp"}, {"eip", "ip"},
+    {"rax", "ax"}, {"rbx", "bx"}, {"rcx", "cx"}, {"rdx", "dx"}, {"rdi", "di"},
+    {"rsi", "si"}, {"rbp", "bp"}, {"rsp", "sp"}, {"rip", "ip"}, {"eax", "ax"},
+    {"ebx", "bx"}, {"ecx", "cx"}, {"edx", "dx"}, {"edi", "di"}, {"esi", "si"},
+    {"ebp", "bp"}, {"esp", "sp"}, {"eip", "ip"},
 
-  {"al", "ax"}, {"bl", "bx"}, {"cl", "cx"}, {"dl", "dx"}
-};
+    {"al", "ax"},  {"bl", "bx"},  {"cl", "cx"},  {"dl", "dx"}};
 
 std::string Argument::ctype() const {
   const int s = arg_size() * 8;
-  return (s < 0) ?
-    tfm::format("int%d_t", -s) :
-    tfm::format("uint%d_t", s);
+  return (s < 0) ? tfm::format("int%d_t", -s) : tfm::format("uint%d_t", s);
 }
 
 void Argument::normalize_register_name(std::string *normalized) const {
@@ -52,43 +49,45 @@ void Argument::normalize_register_name(std::string *normalized) const {
     normalized->assign(it->second);
 }
 
-uint64_t Argument::get_global_address(int pid) const {
+uint64_t Argument::get_global_address(const std::string &binpath,
+                                      const optional<int> &pid) const {
   return 0x0;
 }
 
 void Argument::assign_to_local(std::ostream &stream,
-    const std::string &local_name, optional<int> pid) const {
-
+                               const std::string &local_name,
+                               const std::string &binpath,
+                               const optional<int> &pid) const {
   std::string regname;
   normalize_register_name(&regname);
 
   if (constant_) {
-    tfm::format(stream, "%s = %d;", local_name, *constant_);
+    tfm::format(stream, "%s = %d;\n", local_name, *constant_);
     return;
   }
 
   if (!deref_offset_) {
-    tfm::format(stream, "%s = (%s)ctx->%s;", local_name, ctype(), regname);
+    tfm::format(stream, "%s = (%s)ctx->%s;\n", local_name, ctype(), regname);
     return;
   }
 
   if (deref_offset_ && !deref_ident_) {
     tfm::format(stream,
-      "{\n"
-      "    u64 __temp = ctx->%s + (%d);\n"
-      "    bpf_probe_read(&%s, sizeof(%s), (void *)__temp);\n"
-      "}\n",
-      regname, *deref_offset_, local_name, local_name);
+                "{\n"
+                "    u64 __temp = ctx->%s + (%d);\n"
+                "    bpf_probe_read(&%s, sizeof(%s), (void *)__temp);\n"
+                "}\n",
+                regname, *deref_offset_, local_name, local_name);
     return;
   }
 
   tfm::format(stream,
-    "{\n"
-    "    u64 __temp = 0x%xull + %d;\n"
-    "    bpf_probe_read(&%s, sizeof(%s), (void *)__temp);\n"
-    "}\n",
-    get_global_address(pid.value_or(-1)),
-    *deref_offset_, local_name, local_name);
+              "{\n"
+              "    u64 __temp = 0x%xull + %d;\n"
+              "    bpf_probe_read(&%s, sizeof(%s), (void *)__temp);\n"
+              "}\n",
+              get_global_address(binpath, pid), *deref_offset_, local_name,
+              local_name);
 }
 
 ssize_t ArgumentParser::parse_number(ssize_t pos, optional<int> *result) {

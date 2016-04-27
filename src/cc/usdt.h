@@ -17,6 +17,8 @@
 
 #include <string>
 #include <unordered_map>
+#include <vector>
+
 #include "vendor/optional.hpp"
 
 namespace USDT {
@@ -26,22 +28,24 @@ using std::experimental::nullopt;
 class ArgumentParser;
 
 class Argument {
- private:
+private:
   optional<int> arg_size_;
   optional<int> constant_;
   optional<int> deref_offset_;
   optional<std::string> deref_ident_;
   optional<std::string> register_name_;
 
-  uint64_t get_global_address(int pid) const;
+  uint64_t get_global_address(const std::string &binpath,
+                              const optional<int> &pid) const;
   static const std::unordered_map<std::string, std::string> translations_;
 
- public:
+public:
   Argument();
   ~Argument();
 
-  void assign_to_local(std::ostream &stream,
-    const std::string &local_name, optional<int> pid = nullopt) const;
+  void assign_to_local(std::ostream &stream, const std::string &local_name,
+                       const std::string &binpath,
+                       const optional<int> &pid = nullopt) const;
 
   int arg_size() const { return arg_size_.value_or(sizeof(void *)); }
   std::string ctype() const;
@@ -59,7 +63,7 @@ class ArgumentParser {
   const char *arg_;
   ssize_t cur_pos_;
 
- protected:
+protected:
   virtual bool validate_register(const std::string &reg, int *reg_size) = 0;
 
   ssize_t parse_number(ssize_t pos, optional<int> *number);
@@ -70,7 +74,7 @@ class ArgumentParser {
 
   void print_error(ssize_t pos);
 
- public:
+public:
   bool parse(Argument *dest);
   bool done() { return arg_[cur_pos_] == '\0'; }
 
@@ -81,21 +85,51 @@ class ArgumentParser_x64 : public ArgumentParser {
   static const std::unordered_map<std::string, int> registers_;
   bool validate_register(const std::string &reg, int *reg_size);
 
- public:
+public:
   ArgumentParser_x64(const char *arg) : ArgumentParser(arg) {}
 };
 
-struct Probe {
-  std::string _bin_path;
-  std::string _provider;
-  std::string _name;
-  uint64_t _semaphore;
+class Probe {
+  std::string bin_path_;
+  std::string provider_;
+  std::string name_;
+  uint64_t semaphore_;
 
+  struct Location {
+    uint64_t address_;
+    std::vector<Argument *> arguments_;
+    Location(uint64_t addr, const char *arg_fmt);
+  };
+
+  std::vector<Location> locations_;
+
+  std::string gen_thunks_;
+  std::string gen_cases_;
+
+public:
   Probe(const char *bin_path, const char *provider, const char *name,
-        uint64_t semaphore)
-      : _bin_path(bin_path),
-        _provider(provider),
-        _name(name),
-        _semaphore(semaphore) {}
+        uint64_t semaphore);
+
+  void add_location(uint64_t addr, const char *fmt);
+  bool need_enable() const { return semaphore_ != 0x0; }
+  size_t location_count() const { return locations_.size(); }
+
+  const std::string &usdt_thunks(const std::string &prefix);
+  const std::string &usdt_cases(const optional<int> &pid);
+
+  friend class Context;
+};
+
+class Context {
+  std::vector<Probe *> probes_;
+
+  static void _each_probe(const char *binpath, const struct bcc_elf_usdt *probe,
+                          void *p);
+  void add_probe(const char *binpath, const struct bcc_elf_usdt *probe);
+  void add_probes(const std::string &bin_path);
+
+public:
+  Context(const std::string &bin_path);
+  Context(int pid);
 };
 }
