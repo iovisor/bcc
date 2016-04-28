@@ -432,6 +432,10 @@ class BPF(object):
             raise Exception("could not determine address of symbol %s" % symname)
         return sym.module, sym.offset
 
+    @staticmethod
+    def find_library(libname):
+        return lib.bcc_procutils_which_so(libname)
+
     def attach_uprobe(self, name="", sym="", addr=None,
             fn_name="", pid=-1, cpu=0, group_fd=-1):
         """attach_uprobe(name="", sym="", addr=None, fn_name=""

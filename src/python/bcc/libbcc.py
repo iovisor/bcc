@@ -111,6 +111,9 @@ class bcc_symbol(ct.Structure):
             ('offset', ct.c_ulonglong),
         ]
 
+lib.bcc_procutils_which_so.restype = ct.c_char_p
+lib.bcc_procutils_which_so.argtypes = [ct.c_char_p]
+
 lib.bcc_resolve_symname.restype = ct.c_int
 lib.bcc_resolve_symname.argtypes = [
     ct.c_char_p, ct.c_char_p, ct.c_ulonglong, ct.POINTER(bcc_symbol)]
