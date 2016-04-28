@@ -27,37 +27,16 @@ namespace USDT {
 Argument::Argument() {}
 Argument::~Argument() {}
 
-const std::unordered_map<std::string, std::string> Argument::translations_ = {
-    {"rax", "ax"}, {"rbx", "bx"}, {"rcx", "cx"}, {"rdx", "dx"}, {"rdi", "di"},
-    {"rsi", "si"}, {"rbp", "bp"}, {"rsp", "sp"}, {"rip", "ip"}, {"eax", "ax"},
-    {"ebx", "bx"}, {"ecx", "cx"}, {"edx", "dx"}, {"edi", "di"}, {"esi", "si"},
-    {"ebp", "bp"}, {"esp", "sp"}, {"eip", "ip"},
-
-    {"al", "ax"},  {"bl", "bx"},  {"cl", "cx"},  {"dl", "dx"}};
-
 std::string Argument::ctype() const {
   const int s = arg_size() * 8;
   return (s < 0) ? tfm::format("int%d_t", -s) : tfm::format("uint%d_t", s);
 }
 
-void Argument::normalize_register_name(std::string *normalized) const {
-  if (!register_name_)
-    return;
-
-  normalized->assign(*register_name_);
-  if ((*normalized)[0] == '%')
-    normalized->erase(0, 1);
-
-  auto it = translations_.find(*normalized);
-  if (it != translations_.end())
-    normalized->assign(it->second);
-}
-
 bool Argument::get_global_address(uint64_t *address, const std::string &binpath,
                                   const optional<int> &pid) const {
   if (pid) {
-    return ProcSyms(*pid).resolve_name(binpath.c_str(), deref_ident_->c_str(),
-                                       address);
+    return ProcSyms(*pid)
+        .resolve_name(binpath.c_str(), deref_ident_->c_str(), address);
   }
 
   if (bcc_elf_is_shared_obj(binpath.c_str()) == 0) {
@@ -75,16 +54,14 @@ bool Argument::assign_to_local(std::ostream &stream,
                                const std::string &local_name,
                                const std::string &binpath,
                                const optional<int> &pid) const {
-  std::string regname;
-  normalize_register_name(&regname);
-
   if (constant_) {
     tfm::format(stream, "%s = %d;\n", local_name, *constant_);
     return true;
   }
 
   if (!deref_offset_) {
-    tfm::format(stream, "%s = (%s)ctx->%s;\n", local_name, ctype(), regname);
+    tfm::format(stream, "%s = (%s)ctx->%s;\n", local_name, ctype(),
+                *register_name_);
     return true;
   }
 
@@ -94,7 +71,7 @@ bool Argument::assign_to_local(std::ostream &stream,
                 "    u64 __temp = ctx->%s + (%d);\n"
                 "    bpf_probe_read(&%s, sizeof(%s), (void *)__temp);\n"
                 "}\n",
-                regname, *deref_offset_, local_name, local_name);
+                *register_name_, *deref_offset_, local_name, local_name);
     return true;
   }
 
@@ -135,15 +112,16 @@ ssize_t ArgumentParser::parse_identifier(ssize_t pos,
 }
 
 ssize_t ArgumentParser::parse_register(ssize_t pos, Argument *dest) {
-  ssize_t start = pos++;
-  if (arg_[start] != '%')
+  ssize_t start = ++pos;
+  if (arg_[start - 1] != '%')
     return -start;
+
   while (isalnum(arg_[pos])) pos++;
 
   std::string regname(arg_ + start, pos - start);
   int regsize = 0;
 
-  if (!validate_register(regname, &regsize))
+  if (!normalize_register(&regname, &regsize))
     return -start;
 
   dest->register_name_ = regname;
@@ -219,26 +197,125 @@ bool ArgumentParser::parse(Argument *dest) {
   return true;
 }
 
-const std::unordered_map<std::string, int> ArgumentParser_x64::registers_ = {
-    {"%rax", 8}, {"%rbx", 8}, {"%rcx", 8}, {"%rdx", 8}, {"%rdi", 8},
-    {"%rsi", 8}, {"%rbp", 8}, {"%rsp", 8}, {"%rip", 8}, {"%r8", 8},
-    {"%r9", 8},  {"%r10", 8}, {"%r11", 8}, {"%r12", 8}, {"%r13", 8},
-    {"%r14", 8}, {"%r15", 8},
+const std::unordered_map<std::string, ArgumentParser_x64::RegInfo>
+    ArgumentParser_x64::registers_ = {
+        {"rax", {REG_A, 8}},   {"eax", {REG_A, 4}},
+        {"ax", {REG_A, 2}},    {"al", {REG_A, 1}},
 
-    {"%eax", 4}, {"%ebx", 4}, {"%ecx", 4}, {"%edx", 4}, {"%edi", 4},
-    {"%esi", 4}, {"%ebp", 4}, {"%esp", 4}, {"%eip", 4},
+        {"rbx", {REG_B, 8}},   {"ebx", {REG_B, 4}},
+        {"bx", {REG_B, 2}},    {"bl", {REG_B, 1}},
 
-    {"%ax", 2},  {"%bx", 2},  {"%cx", 2},  {"%dx", 2},  {"%di", 2},
-    {"%si", 2},  {"%bp", 2},  {"%sp", 2},  {"%ip", 2},
+        {"rcx", {REG_C, 8}},   {"ecx", {REG_C, 4}},
+        {"cx", {REG_C, 2}},    {"cl", {REG_C, 1}},
 
-    {"%al", 1},  {"%bl", 1},  {"%cl", 1},  {"%dl", 1}};
+        {"rdx", {REG_D, 8}},   {"edx", {REG_D, 4}},
+        {"dx", {REG_D, 2}},    {"dl", {REG_D, 1}},
 
-bool ArgumentParser_x64::validate_register(const std::string &reg,
-                                           int *reg_size) {
-  auto it = registers_.find(reg);
+        {"rsi", {REG_SI, 8}},  {"esi", {REG_SI, 4}},
+        {"si", {REG_SI, 2}},   {"sil", {REG_SI, 1}},
+
+        {"rdi", {REG_DI, 8}},  {"edi", {REG_DI, 4}},
+        {"di", {REG_DI, 2}},   {"dil", {REG_DI, 1}},
+
+        {"rbp", {REG_BP, 8}},  {"ebp", {REG_BP, 4}},
+        {"bp", {REG_BP, 2}},   {"bpl", {REG_BP, 1}},
+
+        {"rsp", {REG_SP, 8}},  {"esp", {REG_SP, 4}},
+        {"sp", {REG_SP, 2}},   {"spl", {REG_SP, 1}},
+
+        {"r8", {REG_8, 8}},    {"r8d", {REG_8, 4}},
+        {"r8w", {REG_8, 2}},   {"r8b", {REG_8, 1}},
+
+        {"r9", {REG_9, 8}},    {"r9d", {REG_9, 4}},
+        {"r9w", {REG_9, 2}},   {"r9b", {REG_9, 1}},
+
+        {"r10", {REG_10, 8}},  {"r10d", {REG_10, 4}},
+        {"r10w", {REG_10, 2}}, {"r10b", {REG_10, 1}},
+
+        {"r11", {REG_11, 8}},  {"r11d", {REG_11, 4}},
+        {"r11w", {REG_11, 2}}, {"r11b", {REG_11, 1}},
+
+        {"r12", {REG_12, 8}},  {"r12d", {REG_12, 4}},
+        {"r12w", {REG_12, 2}}, {"r12b", {REG_12, 1}},
+
+        {"r13", {REG_13, 8}},  {"r13d", {REG_13, 4}},
+        {"r13w", {REG_13, 2}}, {"r13b", {REG_13, 1}},
+
+        {"r14", {REG_14, 8}},  {"r14d", {REG_14, 4}},
+        {"r14w", {REG_14, 2}}, {"r14b", {REG_14, 1}},
+
+        {"r15", {REG_15, 8}},  {"r15d", {REG_15, 4}},
+        {"r15w", {REG_15, 2}}, {"r15b", {REG_15, 1}},
+
+        {"rip", {REG_RIP, 8}},
+};
+
+void ArgumentParser_x64::reg_to_name(std::string *norm, Register reg) {
+  switch (reg) {
+  case REG_A:
+    *norm = "ax";
+    break;
+  case REG_B:
+    *norm = "bx";
+    break;
+  case REG_C:
+    *norm = "cx";
+    break;
+  case REG_D:
+    *norm = "dx";
+    break;
+
+  case REG_SI:
+    *norm = "si";
+    break;
+  case REG_DI:
+    *norm = "di";
+    break;
+  case REG_BP:
+    *norm = "bp";
+    break;
+  case REG_SP:
+    *norm = "sp";
+    break;
+
+  case REG_8:
+    *norm = "r8";
+    break;
+  case REG_9:
+    *norm = "r9";
+    break;
+  case REG_10:
+    *norm = "r10";
+    break;
+  case REG_11:
+    *norm = "r11";
+    break;
+  case REG_12:
+    *norm = "r12";
+    break;
+  case REG_13:
+    *norm = "r13";
+    break;
+  case REG_14:
+    *norm = "r14";
+    break;
+  case REG_15:
+    *norm = "r15";
+    break;
+
+  case REG_RIP:
+    *norm = "ip";
+    break;
+  }
+}
+
+bool ArgumentParser_x64::normalize_register(std::string *reg, int *reg_size) {
+  auto it = registers_.find(*reg);
   if (it == registers_.end())
     return false;
-  *reg_size = it->second;
+
+  *reg_size = it->second.size;
+  reg_to_name(reg, it->second.reg);
   return true;
 }
 }

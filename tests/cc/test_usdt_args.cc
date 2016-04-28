@@ -58,17 +58,17 @@ TEST_CASE("test usdt argument parsing", "[usdt]") {
     verify_register(parser, -4, 0);
     verify_register(parser, 8, 1234);
 
-    verify_register(parser, 8, "%rdi");
-    verify_register(parser, 8, "%rax");
-    verify_register(parser, 8, "%rsi");
-    verify_register(parser, -8, "%rbx");
-    verify_register(parser, 4, "%r12");
+    verify_register(parser, 8, "di");
+    verify_register(parser, 8, "ax");
+    verify_register(parser, 8, "si");
+    verify_register(parser, -8, "bx");
+    verify_register(parser, 4, "r12");
 
-    verify_register(parser, 8, "%rbp", -8);
-    verify_register(parser, 4, "%rax", 0);
+    verify_register(parser, 8, "bp", -8);
+    verify_register(parser, 4, "ax", 0);
 
-    verify_register(parser, -4, "%rip", 0, std::string("global_max_action"));
-    verify_register(parser, 8, "%rip", 24, std::string("mp_"));
+    verify_register(parser, -4, "ip", 0, std::string("global_max_action"));
+    verify_register(parser, 8, "ip", 24, std::string("mp_"));
 
     REQUIRE(parser.done());
   }
