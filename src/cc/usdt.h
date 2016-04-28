@@ -35,15 +35,15 @@ private:
   optional<std::string> deref_ident_;
   optional<std::string> register_name_;
 
-  uint64_t get_global_address(const std::string &binpath,
-                              const optional<int> &pid) const;
+  bool get_global_address(uint64_t *address, const std::string &binpath,
+                          const optional<int> &pid) const;
   static const std::unordered_map<std::string, std::string> translations_;
 
 public:
   Argument();
   ~Argument();
 
-  void assign_to_local(std::ostream &stream, const std::string &local_name,
+  bool assign_to_local(std::ostream &stream, const std::string &local_name,
                        const std::string &binpath,
                        const optional<int> &pid = nullopt) const;
 
@@ -103,19 +103,16 @@ class Probe {
 
   std::vector<Location> locations_;
 
-  std::string gen_thunks_;
-  std::string gen_cases_;
-
 public:
   Probe(const char *bin_path, const char *provider, const char *name,
         uint64_t semaphore);
 
   void add_location(uint64_t addr, const char *fmt);
   bool need_enable() const { return semaphore_ != 0x0; }
-  size_t location_count() const { return locations_.size(); }
+  size_t num_locations() const { return locations_.size(); }
 
-  const std::string &usdt_thunks(const std::string &prefix);
-  const std::string &usdt_cases(const optional<int> &pid);
+  bool usdt_thunks(std::ostream &stream, const std::string &prefix);
+  bool usdt_cases(std::ostream &stream, const optional<int> &pid = nullopt);
 
   friend class Context;
 };
@@ -131,5 +128,7 @@ class Context {
 public:
   Context(const std::string &bin_path);
   Context(int pid);
+
+  size_t num_probes() const { return probes_.size(); }
 };
 }

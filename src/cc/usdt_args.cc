@@ -15,8 +15,12 @@
  */
 #include <unordered_map>
 
+#include "syms.h"
 #include "usdt.h"
 #include "vendor/tinyformat.hpp"
+
+#include "bcc_elf.h"
+#include "bcc_syms.h"
 
 namespace USDT {
 
@@ -49,12 +53,25 @@ void Argument::normalize_register_name(std::string *normalized) const {
     normalized->assign(it->second);
 }
 
-uint64_t Argument::get_global_address(const std::string &binpath,
-                                      const optional<int> &pid) const {
-  return 0x0;
+bool Argument::get_global_address(uint64_t *address, const std::string &binpath,
+                                  const optional<int> &pid) const {
+  if (pid) {
+    return ProcSyms(*pid).resolve_name(binpath.c_str(), deref_ident_->c_str(),
+                                       address);
+  }
+
+  if (bcc_elf_is_shared_obj(binpath.c_str()) == 0) {
+    struct bcc_symbol sym = {deref_ident_->c_str(), binpath.c_str(), 0x0};
+    if (!bcc_find_symbol_addr(&sym) && sym.offset) {
+      *address = sym.offset;
+      return true;
+    }
+  }
+
+  return false;
 }
 
-void Argument::assign_to_local(std::ostream &stream,
+bool Argument::assign_to_local(std::ostream &stream,
                                const std::string &local_name,
                                const std::string &binpath,
                                const optional<int> &pid) const {
@@ -63,12 +80,12 @@ void Argument::assign_to_local(std::ostream &stream,
 
   if (constant_) {
     tfm::format(stream, "%s = %d;\n", local_name, *constant_);
-    return;
+    return true;
   }
 
   if (!deref_offset_) {
     tfm::format(stream, "%s = (%s)ctx->%s;\n", local_name, ctype(), regname);
-    return;
+    return true;
   }
 
   if (deref_offset_ && !deref_ident_) {
@@ -78,16 +95,24 @@ void Argument::assign_to_local(std::ostream &stream,
                 "    bpf_probe_read(&%s, sizeof(%s), (void *)__temp);\n"
                 "}\n",
                 regname, *deref_offset_, local_name, local_name);
-    return;
+    return true;
   }
 
-  tfm::format(stream,
-              "{\n"
-              "    u64 __temp = 0x%xull + %d;\n"
-              "    bpf_probe_read(&%s, sizeof(%s), (void *)__temp);\n"
-              "}\n",
-              get_global_address(binpath, pid), *deref_offset_, local_name,
-              local_name);
+  if (deref_offset_ && deref_ident_) {
+    uint64_t global_address;
+    if (!get_global_address(&global_address, binpath, pid))
+      return false;
+
+    tfm::format(stream,
+                "{\n"
+                "    u64 __temp = 0x%xull + %d;\n"
+                "    bpf_probe_read(&%s, sizeof(%s), (void *)__temp);\n"
+                "}\n",
+                global_address, *deref_offset_, local_name, local_name);
+    return true;
+  }
+
+  return false;
 }
 
 ssize_t ArgumentParser::parse_number(ssize_t pos, optional<int> *result) {

@@ -40,28 +40,18 @@ Probe::Probe(const char *bin_path, const char *provider, const char *name,
       name_(name),
       semaphore_(semaphore) {}
 
-const std::string &Probe::usdt_thunks(const std::string &prefix) {
-  if (!gen_thunks_.empty())
-    return gen_thunks_;
-
-  std::ostringstream stream;
+bool Probe::usdt_thunks(std::ostream &stream, const std::string &prefix) {
   for (size_t i = 0; i < locations_.size(); ++i) {
     tfm::format(
         stream,
         "int %s_thunk_%d(struct pt_regs *ctx) { return %s(ctx, %d); }\n",
         prefix, i, prefix, i);
   }
-
-  gen_thunks_ = stream.str();
-  return gen_thunks_;
+  return true;
 }
 
-const std::string &Probe::usdt_cases(const optional<int> &pid) {
-  if (!gen_cases_.empty())
-    return gen_cases_;
-
-  std::ostringstream stream;
-  size_t arg_count = locations_[0].arguments_.size();
+bool Probe::usdt_cases(std::ostream &stream, const optional<int> &pid) {
+  const size_t arg_count = locations_[0].arguments_.size();
 
   for (size_t arg_n = 0; arg_n < arg_count; ++arg_n) {
     Argument *largest = nullptr;
@@ -80,14 +70,13 @@ const std::string &Probe::usdt_cases(const optional<int> &pid) {
 
     for (size_t arg_n = 0; arg_n < location.arguments_.size(); ++arg_n) {
       Argument *arg = location.arguments_[arg_n];
-      arg->assign_to_local(stream, tfm::format("arg%d", arg_n + 1), bin_path_,
-                           pid);
+      if (!arg->assign_to_local(stream, tfm::format("arg%d", arg_n + 1),
+                                bin_path_, pid))
+        return false;
     }
     stream << "}\n";
   }
-
-  gen_cases_ = stream.str();
-  return gen_cases_;
+  return true;
 }
 
 void Probe::add_location(uint64_t addr, const char *fmt) {
