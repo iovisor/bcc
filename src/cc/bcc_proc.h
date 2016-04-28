@@ -22,8 +22,9 @@
 extern "C" {
 #endif
 
-typedef void (*bcc_procutils_modulecb)(const char *, uint64_t, uint64_t,
-                                       void *);
+#include <stdint.h>
+
+typedef int (*bcc_procutils_modulecb)(const char *, uint64_t, uint64_t, void *);
 typedef void (*bcc_procutils_ksymcb)(const char *, uint64_t, void *);
 
 const char *bcc_procutils_which_so(const char *libname);
