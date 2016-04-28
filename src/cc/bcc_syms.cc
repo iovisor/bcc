@@ -13,54 +13,39 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include <vector>
-#include <string>
-#include <algorithm>
-#include <unordered_map>
 
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <unistd.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 
-#include "bcc_syms.h"
-#include "bcc_proc.h"
 #include "bcc_elf.h"
+#include "bcc_proc.h"
+#include "bcc_syms.h"
 
-class SymbolCache {
- public:
-  virtual void refresh() = 0;
-  virtual bool resolve_addr(uint64_t addr, struct bcc_symbol *sym) = 0;
-  virtual bool resolve_name(const char *name, uint64_t *addr) = 0;
-};
+#include "syms.h"
 
-class KSyms : SymbolCache {
-  struct Symbol {
-    Symbol(const char *name, uint64_t addr) : name(name), addr(addr) {}
-    std::string name;
-    uint64_t addr;
+ino_t ProcStat::getinode_() {
+  struct stat s;
+  return (!stat(procfs_.c_str(), &s)) ? s.st_ino : -1;
+}
 
-    bool operator<(const Symbol &rhs) const { return addr < rhs.addr; }
-  };
-
-  std::vector<Symbol> syms_;
-  std::unordered_map<std::string, uint64_t> symnames_;
-  static void _add_symbol(const char *, uint64_t, void *);
-
- public:
-  virtual bool resolve_addr(uint64_t addr, struct bcc_symbol *sym);
-  virtual bool resolve_name(const char *name, uint64_t *addr);
-  virtual void refresh() {
-    if (syms_.empty()) {
-      bcc_procutils_each_ksym(_add_symbol, this);
-      std::sort(syms_.begin(), syms_.end());
-    }
-  }
-};
+ProcStat::ProcStat(int pid) : inode_(-1) {
+  char buffer[128];
+  snprintf(buffer, sizeof(buffer), "/proc/%d/exe", pid);
+  procfs_ = buffer;
+}
 
 void KSyms::_add_symbol(const char *symname, uint64_t addr, void *p) {
   KSyms *ks = static_cast<KSyms *>(p);
   ks->syms_.emplace_back(symname, addr);
+}
+
+void KSyms::refresh() {
+  if (syms_.empty()) {
+    bcc_procutils_each_ksym(_add_symbol, this);
+    std::sort(syms_.begin(), syms_.end());
+  }
 }
 
 bool KSyms::resolve_addr(uint64_t addr, struct bcc_symbol *sym) {
@@ -80,7 +65,8 @@ bool KSyms::resolve_addr(uint64_t addr, struct bcc_symbol *sym) {
   return true;
 }
 
-bool KSyms::resolve_name(const char *name, uint64_t *addr) {
+bool KSyms::resolve_name(const char *_unused, const char *name,
+                         uint64_t *addr) {
   refresh();
 
   if (syms_.size() != symnames_.size()) {
@@ -98,65 +84,6 @@ bool KSyms::resolve_name(const char *name, uint64_t *addr) {
   return true;
 }
 
-class ProcStat {
-  std::string procfs_;
-  ino_t inode_;
-
-  ino_t getinode_() {
-    struct stat s;
-    return (!stat(procfs_.c_str(), &s)) ? s.st_ino : -1;
-  }
-
- public:
-  ProcStat(int pid) : inode_(-1) {
-    char buffer[128];
-    snprintf(buffer, sizeof(buffer), "/proc/%d/exe", pid);
-    procfs_ = buffer;
-  }
-
-  bool is_stale() { return inode_ != getinode_(); }
-  void reset() { inode_ = getinode_(); }
-};
-
-class ProcSyms : SymbolCache {
-  struct Symbol {
-    Symbol(const char *name, uint64_t start, uint64_t size, int flags = 0)
-        : name(name), start(start), size(size), flags(flags) {}
-    std::string name;
-    uint64_t start;
-    uint64_t size;
-    int flags;
-  };
-
-  struct Module {
-    Module(const char *name, uint64_t start, uint64_t end)
-        : name_(name), start_(start), end_(end) {}
-    std::string name_;
-    uint64_t start_;
-    uint64_t end_;
-    std::vector<Symbol> syms_;
-
-    void load_sym_table();
-    bool decode_sym(uint64_t addr, struct bcc_symbol *sym);
-    bool is_so() { return strstr(name_.c_str(), ".so") != nullptr; }
-
-    static int _add_symbol(const char *symname, uint64_t start, uint64_t end,
-                           int flags, void *p);
-  };
-
-  int pid_;
-  std::vector<Module> modules_;
-  ProcStat procstat_;
-
-  static void _add_module(const char *, uint64_t, uint64_t, void *);
-
- public:
-  ProcSyms(int pid);
-  virtual void refresh();
-  virtual bool resolve_addr(uint64_t addr, struct bcc_symbol *sym);
-  virtual bool resolve_name(const char *name, uint64_t *addr);
-};
-
 ProcSyms::ProcSyms(int pid) : pid_(pid), procstat_(pid) { refresh(); }
 
 void ProcSyms::refresh() {
@@ -165,10 +92,11 @@ void ProcSyms::refresh() {
   procstat_.reset();
 }
 
-void ProcSyms::_add_module(const char *modname, uint64_t start, uint64_t end,
-                           void *payload) {
+int ProcSyms::_add_module(const char *modname, uint64_t start, uint64_t end,
+                          void *payload) {
   ProcSyms *ps = static_cast<ProcSyms *>(payload);
   ps->modules_.emplace_back(modname, start, end);
+  return 0;
 }
 
 bool ProcSyms::resolve_addr(uint64_t addr, struct bcc_symbol *sym) {
@@ -181,13 +109,20 @@ bool ProcSyms::resolve_addr(uint64_t addr, struct bcc_symbol *sym) {
 
   for (Module &mod : modules_) {
     if (addr >= mod.start_ && addr <= mod.end_)
-      return mod.decode_sym(addr, sym);
+      return mod.find_addr(addr, sym);
   }
   return false;
 }
 
-bool ProcSyms::resolve_name(const char *name, uint64_t *addr) {
-  *addr = 0x0;
+bool ProcSyms::resolve_name(const char *module, const char *name,
+                            uint64_t *addr) {
+  if (procstat_.is_stale())
+    refresh();
+
+  for (Module &mod : modules_) {
+    if (mod.name_ == module)
+      return mod.find_name(name, addr);
+  }
   return false;
 }
 
@@ -198,6 +133,10 @@ int ProcSyms::Module::_add_symbol(const char *symname, uint64_t start,
   return 0;
 }
 
+bool ProcSyms::Module::is_so() const {
+  return strstr(name_.c_str(), ".so") != nullptr;
+}
+
 void ProcSyms::Module::load_sym_table() {
   if (syms_.size())
     return;
@@ -205,7 +144,19 @@ void ProcSyms::Module::load_sym_table() {
   bcc_elf_foreach_sym(name_.c_str(), _add_symbol, this);
 }
 
-bool ProcSyms::Module::decode_sym(uint64_t addr, struct bcc_symbol *sym) {
+bool ProcSyms::Module::find_name(const char *symname, uint64_t *addr) {
+  load_sym_table();
+
+  for (Symbol &s : syms_) {
+    if (s.name == symname) {
+      *addr = is_so() ? start_ + s.start : s.start;
+      return true;
+    }
+  }
+  return false;
+}
+
+bool ProcSyms::Module::find_addr(uint64_t addr, struct bcc_symbol *sym) {
   uint64_t offset = is_so() ? (addr - start_) : addr;
 
   load_sym_table();
@@ -240,7 +191,7 @@ int bcc_symcache_resolve(void *resolver, uint64_t addr,
 int bcc_symcache_resolve_name(void *resolver, const char *name,
                               uint64_t *addr) {
   SymbolCache *cache = static_cast<SymbolCache *>(resolver);
-  return cache->resolve_name(name, addr) ? 0 : -1;
+  return cache->resolve_name(nullptr, name, addr) ? 0 : -1;
 }
 
 void bcc_symcache_refresh(void *resolver) {
@@ -251,11 +202,16 @@ void bcc_symcache_refresh(void *resolver) {
 static int _find_sym(const char *symname, uint64_t addr, uint64_t end,
                      int flags, void *payload) {
   struct bcc_symbol *sym = (struct bcc_symbol *)payload;
+  // TODO: check for actual function symbol in flags
   if (!strcmp(sym->name, symname)) {
     sym->offset = addr;
     return -1;
   }
   return 0;
+}
+
+int bcc_find_symbol_addr(struct bcc_symbol *sym) {
+  return bcc_elf_foreach_sym(sym->module, _find_sym, sym);
 }
 
 int bcc_resolve_symname(const char *module, const char *symname,
@@ -286,8 +242,10 @@ int bcc_resolve_symname(const char *module, const char *symname,
   sym->name = symname;
   sym->offset = addr;
 
-  if (sym->name && sym->offset == 0x0)
-    bcc_elf_foreach_sym(sym->module, _find_sym, sym);
+  if (sym->name && sym->offset == 0x0) {
+    if (bcc_find_symbol_addr(sym) < 0)
+      return -1;
+  }
 
   if (sym->offset == 0x0)
     return -1;
