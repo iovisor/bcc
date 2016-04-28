@@ -100,8 +100,10 @@ int bcc_procutils_each_module(int pid, bcc_procutils_modulecb callback,
 
       while (isspace(mapname[0])) mapname++;
 
-      if (strchr(perm, 'x') && mapname[0] && mapname[0] != '[')
-        callback(mapname, (uint64_t)begin, (uint64_t)end, payload);
+      if (strchr(perm, 'x') && mapname[0] && mapname[0] != '[') {
+        if (callback(mapname, (uint64_t)begin, (uint64_t)end, payload) < 0)
+          break;
+      }
     }
   } while (ret && ret != EOF);
 

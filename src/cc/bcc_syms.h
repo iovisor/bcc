@@ -20,6 +20,8 @@
 extern "C" {
 #endif
 
+#include <stdint.h>
+
 struct bcc_symbol {
   const char *name;
   const char *module;
@@ -31,6 +33,7 @@ int bcc_symcache_resolve(void *symcache, uint64_t addr, struct bcc_symbol *sym);
 int bcc_symcache_resolve_name(void *resolver, const char *name, uint64_t *addr);
 void bcc_symcache_refresh(void *resolver);
 
+int bcc_find_symbol_addr(struct bcc_symbol *sym);
 int bcc_resolve_symname(const char *module, const char *symname,
                         const uint64_t addr, struct bcc_symbol *sym);
 #ifdef __cplusplus

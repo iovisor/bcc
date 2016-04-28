@@ -8,7 +8,16 @@ target_link_libraries(test_static bcc-static)
 
 add_test(NAME c_test_static COMMAND ${TEST_WRAPPER} c_test_static sudo ${CMAKE_CURRENT_BINARY_DIR}/test_static)
 
-add_executable(test_c_api test_c_api.c)
-target_link_libraries(test_c_api bcc-shared dl)
+add_executable(test_libbcc
+	test_libbcc.cc
+	test_c_api.cc
+	test_usdt_args.cc
+	test_usdt_probes.cc)
 
-add_test(NAME test_c_api COMMAND ${TEST_WRAPPER} c_test_api sudo ${CMAKE_CURRENT_BINARY_DIR}/test_c_api)
+target_link_libraries(test_libbcc bcc-shared dl)
+add_test(NAME test_libbcc COMMAND ${TEST_WRAPPER} c_test_all sudo ${CMAKE_CURRENT_BINARY_DIR}/test_libbcc)
+
+find_path(SDT_HEADER NAMES "sys/sdt.h")
+if (SDT_HEADER)
+	target_compile_definitions(test_libbcc PRIVATE HAVE_SDT_HEADER=1)
+endif()
