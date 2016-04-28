@@ -20,6 +20,8 @@
 extern "C" {
 #endif
 
+#include <stdint.h>
+
 struct bcc_elf_usdt {
   uint64_t pc;
   uint64_t base_addr;
