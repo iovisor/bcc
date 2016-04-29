@@ -28,14 +28,22 @@ static u32 log2l(u64 v) {
 }
 
 int probe_blk_start_request(struct pt_regs *ctx) {
+#if defined(__powerpc__)
+  struct Request rq = {.rq = ctx->gpr[3]};
+#else
   struct Request rq = {.rq = ctx->di};
+#endif
   struct Time tm = {.start = bpf_ktime_get_ns()};
   requests.update(&rq, &tm);
   return 0;
 }
 
 int probe_blk_update_request(struct pt_regs *ctx) {
+#if defined(__powerpc__)
+  struct Request rq = {.rq = ctx->gpr[3]};
+#else
   struct Request rq = {.rq = ctx->di};
+#endif
   struct Time *tm = requests.lookup(&rq);
   if (!tm) return 0;
   u64 delta = bpf_ktime_get_ns() - tm->start;

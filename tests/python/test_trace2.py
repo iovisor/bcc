@@ -15,7 +15,11 @@ struct Counters { u64 stat1; };
 BPF_TABLE("hash", struct Ptr, struct Counters, stats, 1024);
 
 int count_sched(struct pt_regs *ctx) {
+#if defined(__powerpc__)
+  struct Ptr key = {.ptr=ctx->gpr[3]};
+#else
   struct Ptr key = {.ptr=ctx->bx};
+#endif
   struct Counters zleaf = {0};
   stats.lookup_or_init(&key, &zleaf)->stat1++;
   return 0;
