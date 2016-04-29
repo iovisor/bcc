@@ -44,7 +44,7 @@ set_target_properties(bcc-static PROPERTIES OUTPUT_NAME bcc)
 # BPF is still experimental otherwise it should be available
 #llvm_map_components_to_libnames(llvm_libs bpf mcjit irreader passes)
 llvm_map_components_to_libnames(llvm_libs bitwriter bpfcodegen irreader linker
-  mcjit objcarcopts option passes x86codegen)
+  mcjit objcarcopts option passes x86codegen powerpccodegen)
 llvm_expand_dependencies(expanded_libs ${llvm_libs})
 
 # order is important

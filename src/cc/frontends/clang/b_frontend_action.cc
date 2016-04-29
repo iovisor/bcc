@@ -35,8 +35,14 @@ namespace ebpf {
 const char *calling_conv_regs_x86[] = {
   "di", "si", "dx", "cx", "r8", "r9"
 };
+const char *calling_conv_regs_ppc[] = {"gpr[3]", "gpr[4]", "gpr[5]",
+                                       "gpr[6]", "gpr[7]", "gpr[8]"};
 // todo: support more archs
+#if defined(__powerpc__)
+const char **calling_conv_regs = calling_conv_regs_ppc;
+#else
 const char **calling_conv_regs = calling_conv_regs_x86;
+#endif
 
 using std::map;
 using std::set;

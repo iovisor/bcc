@@ -39,7 +39,11 @@
 // TODO: remove these defines when linux-libc-dev exports them properly
 
 #ifndef __NR_bpf
+#if defined(__powerpc64__)
+#define __NR_bpf 361
+#else
 #define __NR_bpf 321
+#endif
 #endif
 
 #ifndef SO_ATTACH_BPF
