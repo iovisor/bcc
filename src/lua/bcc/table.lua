@@ -236,7 +236,7 @@ function PerfEventArray:initialize(bpf, map_id, map_fd, key_type, leaf_type)
 end
 
 local function _perf_id(id, cpu)
-  return string.format("perf_event_array:%d:%d", tonumber(id), cpu or 0)
+  return string.format("bcc:perf_event_array:%d:%d", tonumber(id), cpu or 0)
 end
 
 function PerfEventArray:_open_perf_buffer(cpu, callback, ctype)

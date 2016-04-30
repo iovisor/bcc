@@ -41,7 +41,8 @@ function Bpf.static.cleanup_probes()
   local function detach_all(probe_type, all_probes)
     for key, probe in pairs(all_probes) do
       libbcc.perf_reader_free(probe)
-      if type(key) == "string" then
+      -- skip bcc-specific kprobes
+      if not key:starts("bcc:") then
         local desc = string.format("-:%s/%s", probe_type, key)
         log.info("detaching %s", desc)
 
