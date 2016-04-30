@@ -372,7 +372,7 @@ class PerfEventArray(ArrayBase):
         super(PerfEventArray, self).__init__(*args, **kwargs)
 
     def __delitem__(self, key):
-        super(PerfEventArray, self).__init__(key)
+        super(PerfEventArray, self).__delitem__(key)
         self.close_perf_buffer(key)
 
     def open_perf_buffer(self, callback):
