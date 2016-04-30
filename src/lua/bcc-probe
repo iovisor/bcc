@@ -17,5 +17,4 @@ limitations under the License.
 local str = require("debug").getinfo(1, "S").source:sub(2)
 local script_path = str:match("(.*/)").."/?.lua;"
 package.path = script_path..package.path
-rawset(_G, "BCC_STANDALONE_NAME", "bcc-probe")
 require("bcc.run")()

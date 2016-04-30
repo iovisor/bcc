@@ -112,4 +112,11 @@ int bcc_symcache_resolve(void *symcache, uint64_t addr, struct bcc_symbol *sym);
 void bcc_symcache_refresh(void *resolver);
 ]]
 
-return ffi.load(os.getenv("LIBBCC_SO_PATH") or rawget(_G, "LIBBCC_SO_PATH") or "bcc")
+if rawget(_G, "BCC_STANDALONE") then
+  return ffi.C
+else
+  return ffi.load(
+    os.getenv("LIBBCC_SO_PATH") or
+    rawget(_G, "LIBBCC_SO_PATH") or
+    "bcc")
+end
