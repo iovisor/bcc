@@ -306,7 +306,7 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
         for (; table_it != tables_.end(); ++table_it)
           if (table_it->name == Ref->getDecl()->getName()) break;
         if (table_it == tables_.end()) {
-          error(Ref->getLocEnd(), "bpf_table %s failed to open") << Ref->getDecl()->getName();
+          error(Ref->getLocEnd(), "bpf_table %0 failed to open") << Ref->getDecl()->getName();
           return false;
         }
         string fd = to_string(table_it->fd);
@@ -380,7 +380,7 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
             prefix = "bpf_perf_event_read";
             suffix = ")";
           } else {
-            error(Call->getLocStart(), "invalid bpf_table operation %s") << memb_name;
+            error(Call->getLocStart(), "invalid bpf_table operation %0") << memb_name;
             return false;
           }
           prefix += "((void *)bpf_pseudo_fd(1, " + fd + "), ";
@@ -617,7 +617,7 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
       table.fd = bpf_create_map(map_type, table.key_size, table.leaf_size, table.max_entries);
     }
     if (table.fd < 0) {
-      error(Decl->getLocStart(), "could not open bpf map: %0\nis %s map type enabled in your kernel?") <<
+      error(Decl->getLocStart(), "could not open bpf map: %0\nis %1 map type enabled in your kernel?") <<
           strerror(errno) << A->getName();
       return false;
     }
