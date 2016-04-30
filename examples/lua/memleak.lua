@@ -1,3 +1,4 @@
+#!/usr/bin/env bcc-lua
 --[[
 Copyright 2016 GitHub, Inc
 
