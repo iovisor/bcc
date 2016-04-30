@@ -19,6 +19,7 @@ if (LUAJIT_LIBRARIES AND LUAJIT)
 	include_directories(${LUAJIT_INCLUDE_DIR})
 	add_executable(bcc-lua src/main.c bcc.o)
 	target_link_libraries(bcc-lua ${LUAJIT_LIBRARIES})
+	target_link_libraries(bcc-lua -Wl,--whole-archive bcc-static -Wl,--no-whole-archive)
 
 	install(TARGETS bcc-lua RUNTIME DESTINATION bin)
 endif()

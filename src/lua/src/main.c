@@ -125,27 +125,6 @@ static void pushargv(lua_State *L, char **argv, int argc, int offset)
 	}
 }
 
-static void find_local_libbcc(lua_State *L)
-{
-	char buffer[4096];
-	char *dirname;
-
-	if (readlink("/proc/self/exe", buffer, sizeof(buffer)) < 0)
-		return;
-
-	dirname = strrchr(buffer, '/');
-	if (dirname == NULL)
-		return;
-
-	strcpy(dirname + 1, "libbcc.so");
-
-	if (access(buffer, F_OK|R_OK|X_OK) != 0)
-		return;
-
-	lua_pushstring(L, buffer);
-	lua_setglobal(L, "LIBBCC_SO_PATH");
-}
-
 static int pmain(lua_State *L)
 {
 	struct Smain *s = (struct Smain *)lua_touserdata(L, 1);
@@ -154,14 +133,13 @@ static int pmain(lua_State *L)
 	lua_gc(L, LUA_GCSTOP, 0);
 	luaL_openlibs(L);
 	lua_gc(L, LUA_GCRESTART, 0);
-	find_local_libbcc(L);
 
 	s->status = dolibrary(L, "bcc", 0);
 	if (s->status)
 		return 0;
 
 	lua_pushstring(L, progname);
-	lua_setglobal(L, "BCC_STANDALONE_NAME");
+	lua_setglobal(L, "BCC_STANDALONE");
 
 	pushargv(L, s->argv, s->argc, 1);
 	lua_setglobal(L, "arg");
@@ -178,6 +156,11 @@ int main(int argc, char **argv)
 
 	if (L == NULL) {
 		l_message(argv[0], "cannot create state: not enough memory");
+		return EXIT_FAILURE;
+	}
+
+	if (geteuid() != 0) {
+		l_message(argv[0], "bcc-lua must be ran as root");
 		return EXIT_FAILURE;
 	}
 

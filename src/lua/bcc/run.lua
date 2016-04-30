@@ -16,11 +16,12 @@ limitations under the License.
 
 return function()
   require("bcc.vendor.helpers")
-  local progname = rawget(_G, "BCC_STANDALONE_NAME") or "bcc-lua"
+  local standalone = rawget(_G, "BCC_STANDALONE")
+  local progname = standalone or "bcc-probe"
 
   local function print_usage()
     io.stderr:write(string.format(
-      "usage: %s [[--so-path=PATH|--version|--verbose] --] path_to_script.lua [...]\n",
+      "usage: %s [[--version|--verbose] --] path_to_script.lua [...]\n",
       progname))
     os.exit(1)
   end
@@ -37,7 +38,7 @@ return function()
     local k = table.remove(arg, 1)
     if k == "--" then
       break
-    elseif string.starts(k, "--so-path=") then
+    elseif standalone == nil and string.starts(k, "--so-path=") then
       rawset(_G, "LIBBCC_SO_PATH", string.lstrip(k, "--so-path="))
     elseif k == "--llvm-debug" then
       rawset(_G, "LIBBCC_LLVM_DEBUG", 1)
