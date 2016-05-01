@@ -64,7 +64,7 @@ int count(struct pt_regs *ctx) {
 end
 
 function TestUprobes:teardown()
-  BPF.cleanup_probes()
+  BPF.cleanup()
 end
 
 suite("TestUprobes", TestUprobes)
