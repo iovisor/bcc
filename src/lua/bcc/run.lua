@@ -57,18 +57,21 @@ return function()
   local BPF = require("bcc.bpf")
   BPF.script_root(tracefile)
 
+  local USDT = require("bcc.usdt")
   local utils = {
     argparse = require("bcc.vendor.argparse"),
     posix = require("bcc.vendor.posix"),
+    USDT = USDT,
   }
 
   local command = dofile(tracefile)
   local res, err = xpcall(command, debug.traceback, BPF, utils)
 
-  if not res then
+  if not res and err ~= "interrupted!" then
     io.stderr:write("[ERROR] "..err.."\n")
   end
 
-  BPF.cleanup_probes()
+  BPF.cleanup()
+  USDT.cleanup()
   return res, err
 end
