@@ -69,7 +69,7 @@ bool Argument::assign_to_local(std::ostream &stream,
     tfm::format(stream,
                 "{ u64 __addr = ctx->%s + (%d); %s __res = 0x0; "
                 "bpf_probe_read(&__res, sizeof(__res), (void *)__addr); "
-				"%s = __res; }",
+                "%s = __res; }",
                 *register_name_, *deref_offset_, ctype(), local_name);
     return true;
   }
@@ -82,7 +82,7 @@ bool Argument::assign_to_local(std::ostream &stream,
     tfm::format(stream,
                 "{ u64 __addr = 0x%xull + %d; %s __res = 0x0; "
                 "bpf_probe_read(&__res, sizeof(__res), (void *)__addr); "
-				"%s = __res; }",
+                "%s = __res; }",
                 global_address, *deref_offset_, ctype(), local_name);
     return true;
   }

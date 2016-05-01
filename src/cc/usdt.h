@@ -134,7 +134,8 @@ class Probe {
   std::string largest_arg_type(size_t arg_n);
 
   bool add_to_semaphore(int pid, int16_t val);
-  bool resolve_global_address(uint64_t *global, const uint64_t addr, optional<int> pid);
+  bool resolve_global_address(uint64_t *global, const uint64_t addr,
+                              optional<int> pid);
   bool lookup_semaphore_addr(uint64_t *address, int pid);
   void add_location(uint64_t addr, const char *fmt);
 
@@ -155,7 +156,6 @@ public:
   bool enable(int pid);
   bool disable(int pid);
   bool enabled() const { return !enabled_semaphores_.empty(); }
-
 
   bool in_shared_object();
   const std::string &name() { return name_; }
