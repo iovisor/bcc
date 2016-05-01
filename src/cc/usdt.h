@@ -122,7 +122,7 @@ class Probe {
 
   struct Location {
     uint64_t address_;
-    std::vector<Argument *> arguments_;
+    std::vector<Argument> arguments_;
     Location(uint64_t addr, const char *arg_fmt);
   };
 
@@ -131,7 +131,10 @@ class Probe {
   std::unordered_map<int, ProcStat> enabled_semaphores_;
   optional<bool> in_shared_object_;
 
+  std::string largest_arg_type(size_t arg_n);
+
   bool add_to_semaphore(int pid, int16_t val);
+  bool resolve_global_address(uint64_t *global, const uint64_t addr, optional<int> pid);
   bool lookup_semaphore_addr(uint64_t *address, int pid);
   void add_location(uint64_t addr, const char *fmt);
 
@@ -142,12 +145,17 @@ public:
   size_t num_locations() const { return locations_.size(); }
   size_t num_arguments() const { return locations_.front().arguments_.size(); }
 
+  uint64_t address(size_t n = 0) const { return locations_[n].address_; }
+
   bool usdt_thunks(std::ostream &stream, const std::string &prefix);
   bool usdt_cases(std::ostream &stream, const optional<int> &pid = nullopt);
+  bool usdt_getarg(std::ostream &stream, const optional<int> &pid = nullopt);
 
   bool need_enable() const { return semaphore_ != 0x0; }
   bool enable(int pid);
   bool disable(int pid);
+  bool enabled() const { return !enabled_semaphores_.empty(); }
+
 
   bool in_shared_object();
   const std::string &name() { return name_; }
@@ -159,6 +167,8 @@ public:
 
 class Context {
   std::vector<Probe *> probes_;
+  std::vector<std::pair<Probe *, std::string>> uprobes_;
+  optional<int> pid_;
   bool loaded_;
 
   static void _each_probe(const char *binpath, const struct bcc_elf_usdt *probe,
@@ -171,9 +181,19 @@ class Context {
 public:
   Context(const std::string &bin_path);
   Context(int pid);
+  ~Context();
 
+  optional<int> pid() const { return pid_; }
   bool loaded() const { return loaded_; }
   size_t num_probes() const { return probes_.size(); }
-  Probe *find_probe(const std::string &probe_name);
+
+  Probe *get(const std::string &probe_name) const;
+  Probe *get(int pos) const { return probes_[pos]; }
+
+  bool enable_probe(const std::string &probe_name, const std::string &fn_name);
+  bool generate_usdt_args(std::ostream &stream);
+
+  typedef void (*each_uprobe_cb)(const char *, const char *, uint64_t, int);
+  void each_uprobe(each_uprobe_cb callback);
 };
 }

@@ -39,7 +39,7 @@ TEST_CASE("test finding a probe in our own process", "[usdt]") {
   REQUIRE(ctx.num_probes() >= 1);
 
   SECTION("our test probe") {
-    USDT::Probe *probe = ctx.find_probe("sample_probe_1");
+    USDT::Probe *probe = ctx.get("sample_probe_1");
     REQUIRE(probe != nullptr);
 
     REQUIRE(probe->in_shared_object() == false);
@@ -115,7 +115,7 @@ TEST_CASE("test listing all USDT probes in Ruby/MRI", "[usdt]") {
     mri_probe_count = ctx.num_probes();
 
     SECTION("GC static probe") {
-      USDT::Probe *probe = ctx.find_probe("gc__mark__begin");
+      USDT::Probe *probe = ctx.get("gc__mark__begin");
       REQUIRE(probe != nullptr);
 
       REQUIRE(probe->in_shared_object() == true);
@@ -129,7 +129,7 @@ TEST_CASE("test listing all USDT probes in Ruby/MRI", "[usdt]") {
     }
 
     SECTION("object creation probe") {
-      USDT::Probe *probe = ctx.find_probe("object__create");
+      USDT::Probe *probe = ctx.get("object__create");
       REQUIRE(probe != nullptr);
 
       REQUIRE(probe->in_shared_object() == true);
@@ -161,7 +161,7 @@ TEST_CASE("test listing all USDT probes in Ruby/MRI", "[usdt]") {
     }
 
     SECTION("array creation probe") {
-      USDT::Probe *probe = ctx.find_probe("array__create");
+      USDT::Probe *probe = ctx.get("array__create");
       REQUIRE(probe != nullptr);
       REQUIRE(probe->name() == "array__create");
 
@@ -203,7 +203,7 @@ TEST_CASE("test listing all USDT probes in Ruby/MRI", "[usdt]") {
     REQUIRE(ctx.num_probes() >= mri_probe_count);
 
     SECTION("get probe in running process") {
-      USDT::Probe *probe = ctx.find_probe("gc__mark__begin");
+      USDT::Probe *probe = ctx.get("gc__mark__begin");
       REQUIRE(probe != nullptr);
 
       REQUIRE(probe->in_shared_object() == true);

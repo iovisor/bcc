@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 #include <sstream>
+#include <cstring>
 
 #include <fcntl.h>
 #include <sys/types.h>
@@ -29,12 +30,10 @@ namespace USDT {
 Probe::Location::Location(uint64_t addr, const char *arg_fmt) : address_(addr) {
   ArgumentParser_x64 parser(arg_fmt);
   while (!parser.done()) {
-    Argument *arg = new Argument();
-    if (!parser.parse(arg)) {
-      delete arg;  // TODO: report error
+    Argument arg;
+    if (!parser.parse(&arg))
       continue;
-    }
-    arguments_.push_back(arg);
+    arguments_.push_back(std::move(arg));
   }
 }
 
@@ -51,6 +50,16 @@ bool Probe::in_shared_object() {
   return in_shared_object_.value();
 }
 
+bool Probe::resolve_global_address(uint64_t *global, const uint64_t addr, optional<int> pid) {
+  if (in_shared_object()) {
+    return (pid &&
+	bcc_resolve_global_addr(*pid, bin_path_.c_str(), addr, global) == 0);
+  }
+
+  *global = addr;
+  return true;
+}
+
 bool Probe::lookup_semaphore_addr(uint64_t *address, int pid) {
   auto it = semaphores_.find(pid);
   if (it != semaphores_.end()) {
@@ -58,12 +67,8 @@ bool Probe::lookup_semaphore_addr(uint64_t *address, int pid) {
     return true;
   }
 
-  if (in_shared_object()) {
-    uint64_t load_address = 0x0;  // TODO
-    *address = load_address + semaphore_;
-  } else {
-    *address = semaphore_;
-  }
+  if (!resolve_global_address(address, semaphore_, pid))
+    return false;
 
   semaphores_[pid] = *address;
   return true;
@@ -100,10 +105,12 @@ bool Probe::add_to_semaphore(int pid, int16_t val) {
 }
 
 bool Probe::enable(int pid) {
+  if (enabled_semaphores_.find(pid) != enabled_semaphores_.end())
+    return true;
+
   if (!add_to_semaphore(pid, +1))
     return false;
 
-  // TODO: what happens if we enable this twice?
   enabled_semaphores_.emplace(pid, std::move(ProcStat(pid)));
   return true;
 }
@@ -137,15 +144,8 @@ bool Probe::usdt_cases(std::ostream &stream, const optional<int> &pid) {
   const size_t arg_count = locations_[0].arguments_.size();
 
   for (size_t arg_n = 0; arg_n < arg_count; ++arg_n) {
-    Argument *largest = nullptr;
-    for (Location &location : locations_) {
-      Argument *candidate = location.arguments_[arg_n];
-      if (!largest ||
-          std::abs(candidate->arg_size()) > std::abs(largest->arg_size()))
-        largest = candidate;
-    }
-
-    tfm::format(stream, "%s arg%d = 0;\n", largest->ctype(), arg_n + 1);
+    tfm::format(stream, "%s arg%d = 0;\n",
+	largest_arg_type(arg_n), arg_n + 1);
   }
 
   for (size_t loc_n = 0; loc_n < locations_.size(); ++loc_n) {
@@ -153,12 +153,67 @@ bool Probe::usdt_cases(std::ostream &stream, const optional<int> &pid) {
     tfm::format(stream, "if (__loc_id == %d) {\n", loc_n);
 
     for (size_t arg_n = 0; arg_n < location.arguments_.size(); ++arg_n) {
-      Argument *arg = location.arguments_[arg_n];
-      if (!arg->assign_to_local(stream, tfm::format("arg%d", arg_n + 1),
+      Argument &arg = location.arguments_[arg_n];
+      if (!arg.assign_to_local(stream, tfm::format("arg%d", arg_n + 1),
                                 bin_path_, pid))
         return false;
     }
     stream << "}\n";
+  }
+  return true;
+}
+
+std::string Probe::largest_arg_type(size_t arg_n) {
+  Argument *largest = nullptr;
+  for (Location &location : locations_) {
+    Argument *candidate = &location.arguments_[arg_n];
+    if (!largest ||
+	std::abs(candidate->arg_size()) > std::abs(largest->arg_size()))
+      largest = candidate;
+  }
+
+  assert(largest);
+  return largest->ctype();
+}
+
+bool Probe::usdt_getarg(std::ostream &stream, const optional<int> &pid) {
+  const size_t arg_count = locations_[0].arguments_.size();
+
+  if (arg_count == 0)
+    return true;
+
+  for (size_t arg_n = 0; arg_n < arg_count; ++arg_n) {
+    std::string ctype = largest_arg_type(arg_n);
+    tfm::format(stream,
+      "static inline %s _bpf_readarg_%s_%d(struct pt_regs *ctx) {\n"
+      "  %s result = 0x0;\n",
+      ctype, name_, arg_n + 1, ctype);
+
+    if (locations_.size() == 1) {
+      Location &location = locations_.front();
+      stream << "  ";
+      if (!location.arguments_[arg_n].assign_to_local(
+	  stream, "result", bin_path_, pid))
+	return false;
+      stream << "\n";
+    } else {
+      stream << "  switch(ctx->ip) {\n";
+      for (Location &location : locations_) {
+	uint64_t global_address;
+
+	if (!resolve_global_address(&global_address, location.address_, pid))
+	  return false;
+
+	tfm::format(stream, "  case 0x%xULL: ", global_address);
+	if (!location.arguments_[arg_n].assign_to_local(
+	    stream, "result", bin_path_, pid))
+	  return false;
+
+	stream << " break;\n";
+      }
+      stream << "  }\n";
+    }
+    stream << "  return result;\n}\n";
   }
   return true;
 }
@@ -210,12 +265,47 @@ std::string Context::resolve_bin_path(const std::string &bin_path) {
   return result;
 }
 
-Probe *Context::find_probe(const std::string &probe_name) {
+Probe *Context::get(const std::string &probe_name) const {
   for (Probe *p : probes_) {
     if (p->name_ == probe_name)
       return p;
   }
   return nullptr;
+}
+
+bool Context::generate_usdt_args(std::ostream &stream) {
+  stream << "#include <uapi/linux/ptrace.h>\n";
+  for (auto &p : uprobes_) {
+    if (!p.first->usdt_getarg(stream, pid_))
+      return false;
+  }
+  return true;
+}
+
+bool Context::enable_probe(const std::string &probe_name, const std::string &fn_name) {
+  Probe *p = get(probe_name);
+  if (!p)
+    return false;
+
+  if (p->need_enable()) {
+    if (!pid_ || !p->enable(pid_.value()))
+      return false;
+  }
+
+  uprobes_.emplace_back(p, fn_name);
+  return true;
+}
+
+void Context::each_uprobe(each_uprobe_cb callback) {
+  for (auto &p : uprobes_) {
+    for (Probe::Location &loc : p.first->locations_) {
+      callback(
+	  p.first->bin_path_.c_str(),
+	  p.second.c_str(),
+	  loc.address_,
+	  pid_.value_or(-1));
+    }
+  }
 }
 
 Context::Context(const std::string &bin_path) : loaded_(false) {
@@ -226,8 +316,63 @@ Context::Context(const std::string &bin_path) : loaded_(false) {
   }
 }
 
-Context::Context(int pid) : loaded_(false) {
+Context::Context(int pid) : pid_(pid), loaded_(false) {
   if (bcc_procutils_each_module(pid, _each_module, this) == 0)
     loaded_ = true;
 }
+
+Context::~Context() {
+  for (Probe *p : probes_) {
+    if (pid_ && p->enabled())
+      p->disable(pid_.value());
+    delete p;
+  }
+}
+
+}
+
+extern "C" {
+#include "bcc_usdt.h"
+
+void *bcc_usdt_new_frompid(int pid) {
+  USDT::Context *ctx = new USDT::Context(pid);
+  if (!ctx->loaded()) {
+    delete ctx;
+    return nullptr;
+  }
+  return static_cast<void *>(ctx);
+}
+
+void *bcc_usdt_new_frompath(const char *path) {
+  USDT::Context *ctx = new USDT::Context(path);
+  if (!ctx->loaded()) {
+    delete ctx;
+    return nullptr;
+  }
+  return static_cast<void *>(ctx);
+}
+
+void bcc_usdt_close(void *usdt) {
+  USDT::Context *ctx = static_cast<USDT::Context *>(usdt);
+  delete ctx;
+}
+
+int bcc_usdt_enable_probe(void *usdt, const char *probe_name, const char *fn_name) {
+  USDT::Context *ctx = static_cast<USDT::Context *>(usdt);
+  return ctx->enable_probe(probe_name, fn_name) ? 0 : -1;
+}
+
+char *bcc_usdt_genargs(void *usdt) {
+  USDT::Context *ctx = static_cast<USDT::Context *>(usdt);
+  std::ostringstream stream;
+  if (!ctx->generate_usdt_args(stream))
+    return nullptr;
+  return strdup(stream.str().c_str());
+}
+
+void bcc_usdt_foreach_uprobe(void *usdt, bcc_usdt_uprobe_cb callback) {
+  USDT::Context *ctx = static_cast<USDT::Context *>(usdt);
+  ctx->each_uprobe(callback);
+}
+
 }

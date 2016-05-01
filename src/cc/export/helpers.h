@@ -434,5 +434,10 @@ int bpf_num_cpus() asm("llvm.bpf.extra");
 #error "bcc does not support this platform yet"
 #endif
 
+#define bpf_usdt_readarg(probearg, ctx) _bpf_readarg_##probearg(ctx)
+#define bpf_usdt_readarg_p(probearg, ctx, buf, len) {\
+  u64 __addr = bpf_usdt_readarg(probearg, ctx); \
+  bpf_probe_read(buf, len, (void *)__addr); }
+
 #endif
 )********"
