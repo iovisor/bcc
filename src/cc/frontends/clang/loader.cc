@@ -128,7 +128,11 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, unique_ptr<vector<TableDes
   DiagnosticsEngine diags(DiagID, &*diag_opts, diag_client);
 
   // set up the command line argument wrapper
+#if defined(__powerpc64__)
+  driver::Driver drv("", "ppc64le-unknown-linux-gnu", diags);
+#else
   driver::Driver drv("", "x86_64-unknown-linux-gnu", diags);
+#endif
   drv.setTitle("bcc-clang-driver");
   drv.setCheckInputsExist(false);
 
