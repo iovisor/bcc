@@ -320,5 +320,13 @@ BPF_TABLE("array", int, union emptyu, t3, 1);
         with self.assertRaises(Exception):
             b = BPF(text="""int failure(void *ctx) { if (); return 0; }""")
 
+    def test_nested_union(self):
+        text = """
+BPF_TABLE("hash", struct bpf_tunnel_key, int, t1, 1);
+"""
+        b = BPF(text=text)
+        t1 = b["t1"]
+        print(t1.Key().remote_ipv4)
+
 if __name__ == "__main__":
     main()

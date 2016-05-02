@@ -73,6 +73,12 @@ bool BMapDeclVisitor::VisitRecordDecl(RecordDecl *D) {
   result_ += D->getName();
   result_ += "\", [";
   for (auto F : D->getDefinition()->fields()) {
+    if (F->isAnonymousStructOrUnion()) {
+      if (const RecordType *R = dyn_cast<RecordType>(F->getType()))
+        TraverseDecl(R->getDecl());
+      result_ += ", ";
+      continue;
+    }
     result_ += "[";
     TraverseDecl(F);
     if (const ConstantArrayType *T = dyn_cast<ConstantArrayType>(F->getType()))

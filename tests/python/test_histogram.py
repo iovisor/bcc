@@ -12,7 +12,7 @@ class TestHistogram(TestCase):
     def test_simple(self):
         b = BPF(text="""
 #include <uapi/linux/ptrace.h>
-#include <linux/bpf.h>
+struct bpf_map;
 BPF_HISTOGRAM(hist1);
 BPF_HASH(stub);
 int kprobe__htab_map_delete_elem(struct pt_regs *ctx, struct bpf_map *map, u64 *k) {
@@ -35,7 +35,7 @@ int kprobe__htab_map_delete_elem(struct pt_regs *ctx, struct bpf_map *map, u64 *
     def test_struct(self):
         b = BPF(text="""
 #include <uapi/linux/ptrace.h>
-#include <linux/bpf.h>
+struct bpf_map;
 typedef struct { void *map; u64 slot; } Key;
 BPF_HISTOGRAM(hist1, Key, 1024);
 BPF_HASH(stub1);
