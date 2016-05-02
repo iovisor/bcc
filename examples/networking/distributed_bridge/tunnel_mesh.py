@@ -47,7 +47,7 @@ def run():
             ifc_gc.append(vx.ifname)
     else:
         with ipdb.create(ifname="vxlan0", kind="vxlan", vxlan_id=0,
-                         vxlan_link=ifc, vxlan_port=htons(4789),
+                         vxlan_link=ifc, vxlan_port=4789,
                          vxlan_collect_metadata=True,
                          vxlan_learning=False) as vx:
             vx.up()
@@ -66,12 +66,14 @@ def run():
                 if i != host_id:
                     v = ipdb.create(ifname="dummy%d%d" % (j , i), kind="dummy").up().commit()
                     ipaddr = "172.16.1.%d" % (100 + i)
-                    tunkey2if_key = tunkey2if.Key(vni, IPAddress(ipaddr))
+                    tunkey2if_key = tunkey2if.Key(vni)
+                    tunkey2if_key.remote_ipv4 = IPAddress(ipaddr)
                     tunkey2if_leaf = tunkey2if.Leaf(v.index)
                     tunkey2if[tunkey2if_key] = tunkey2if_leaf
 
                     if2tunkey_key = if2tunkey.Key(v.index)
-                    if2tunkey_leaf = if2tunkey.Leaf(vni, IPAddress(ipaddr))
+                    if2tunkey_leaf = if2tunkey.Leaf(vni)
+                    if2tunkey_leaf.remote_ipv4 = IPAddress(ipaddr)
                     if2tunkey[if2tunkey_key] = if2tunkey_leaf
 
                     ipr.tc("add", "sfq", v.index, "1:")
@@ -124,7 +126,7 @@ def run():
             while retry < 0:
                 check = Popen(["ip", "addr", "show", "br%d" % j], stdout=PIPE, stderr=PIPE)
                 out = check.stdout.read()
-                checkip = "99.1.%d" % j
+                checkip = b"99.1.%d" % j
                 retry = out.find(checkip)
 
 try:
