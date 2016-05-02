@@ -72,7 +72,7 @@ class KernelSymbolCache(object):
         psym = ct.pointer(sym)
         if lib.bcc_symcache_resolve(self.cache, addr, psym) < 0:
             return "[unknown]", 0
-        return sym.name, sym.offset
+        return sym.name.decode(), sym.offset
 
     def resolve_name(self, name):
         addr = ct.c_ulonglong()
@@ -437,11 +437,12 @@ class BPF(object):
     def _check_path_symbol(cls, module, symname, addr):
         sym = bcc_symbol()
         psym = ct.pointer(sym)
-        if lib.bcc_resolve_symname(module, symname, addr or 0x0, psym) < 0:
+        if lib.bcc_resolve_symname(module.encode("ascii"),
+                symname.encode("ascii"), addr or 0x0, psym) < 0:
             if not sym.module:
                 raise Exception("could not find library %s" % module)
             raise Exception("could not determine address of symbol %s" % symname)
-        return sym.module, sym.offset
+        return sym.module.decode(), sym.offset
 
     @staticmethod
     def find_library(libname):
