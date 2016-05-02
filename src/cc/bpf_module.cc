@@ -156,7 +156,7 @@ static void parse_type(IRBuilder<> &B, vector<Value *> *args, string *fmt,
       *fmt += " ";
     }
     *fmt += "]";
-  } else if (PointerType *pt = dyn_cast<PointerType>(type)) {
+  } else if (isa<PointerType>(type)) {
     *fmt += "0xl";
     if (is_writer)
       *fmt += "x";
