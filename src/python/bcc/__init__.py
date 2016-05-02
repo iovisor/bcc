@@ -250,6 +250,7 @@ class BPF(object):
     def _decode_table_type(desc):
         if isinstance(desc, basestring):
             return BPF.str2ctype[desc]
+        anon = []
         fields = []
         for t in desc[1]:
             if len(t) == 2:
@@ -257,8 +258,17 @@ class BPF(object):
             elif len(t) == 3:
                 if isinstance(t[2], list):
                     fields.append((t[0], BPF._decode_table_type(t[1]) * t[2][0]))
-                else:
+                elif isinstance(t[2], int):
                     fields.append((t[0], BPF._decode_table_type(t[1]), t[2]))
+                elif isinstance(t[2], basestring) and (
+                        t[2] == u"union" or t[2] == u"struct"):
+                    name = t[0]
+                    if name == "":
+                        name = "__anon%d" % len(anon)
+                        anon.append(name)
+                    fields.append((name, BPF._decode_table_type(t)))
+                else:
+                    raise Exception("Failed to decode type %s" % str(t))
             else:
                 raise Exception("Failed to decode type %s" % str(t))
         base = ct.Structure
@@ -267,7 +277,8 @@ class BPF(object):
                 base = ct.Union
             elif desc[2] == u"struct":
                 base = ct.Structure
-        cls = type(str(desc[0]), (base,), dict(_fields_=fields))
+        cls = type(str(desc[0]), (base,), dict(_anonymous_=anon,
+            _fields_=fields))
         return cls
 
     def get_table(self, name, keytype=None, leaftype=None, reducer=None):
