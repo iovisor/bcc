@@ -43,8 +43,8 @@ TEST_CASE("binary resolution with `which`", "[c_api]") {
 static void _test_ksym(const char *sym, uint64_t addr, void *_) {
   if (!strcmp(sym, "startup_64")) {
     REQUIRE(addr == 0xffffffff81000000ull);
-  } else if (!strcmp(sym, "__per_cpu_start"))
-    REQUIRE(addr == 0x0);
+  } else if (!strcmp(sym, "system_reset_pSeries"))
+    REQUIRE(addr == 0xc000000000000100ull);
 }
 
 TEST_CASE("list all kernel symbols", "[c_api]") {
