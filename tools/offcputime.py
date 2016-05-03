@@ -16,6 +16,7 @@
 
 from __future__ import print_function
 from bcc import BPF
+from sys import stderr
 from time import sleep, strftime
 import argparse
 import signal
@@ -129,32 +130,46 @@ if not folded:
     else:
         print("... Hit Ctrl-C to end.")
 
-# output
-while (1):
-    try:
-        sleep(duration)
-    except KeyboardInterrupt:
-        # as cleanup can take many seconds, trap Ctrl-C:
-        signal.signal(signal.SIGINT, signal_ignore)
+try:
+    sleep(duration)
+except KeyboardInterrupt:
+    # as cleanup can take many seconds, trap Ctrl-C:
+    signal.signal(signal.SIGINT, signal_ignore)
 
-    if not folded:
-        print()
-    counts = b.get_table("counts")
-    stack_traces = b.get_table("stack_traces")
-    for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
-        if folded:
-            # print folded stack output
-            stack = list(stack_traces.walk(k.stack_id))[1:]
-            line = [k.name.decode()] + [b.ksym(addr) for addr in reversed(stack)]
-            print("%s %d" % (";".join(line), v.value))
-        else:
-            # print default multi-line stack output
-            for addr in stack_traces.walk(k.stack_id):
-                print("    %-16x %s" % (addr, b.ksym(addr)))
-            print("    %-16s %s" % ("-", k.name))
-            print("        %d\n" % v.value)
-    counts.clear()
+if not folded:
+    print()
 
-    if not folded:
-        print("Detaching...")
-    exit()
+missing_stacks = 0
+counts = b.get_table("counts")
+stack_traces = b.get_table("stack_traces")
+for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
+    """
+    bpf_get_stackid will return a negative value in the case of an error
+
+    BPF_STACK_TRACE(_name, _size) will allocate space for _size stack traces
+    on each CPU. -ENOMEM will be returned when this limit is reached within a
+    single CPU.
+    """
+    if k.stack_id < 0:
+        missing_stacks += 1
+        continue
+
+    stack = stack_traces.walk(k.stack_id)
+
+    if folded:
+        # print folded stack output
+        stack = list(stack)[1:]
+        line = [k.name.decode()] + [b.ksym(addr) for addr in reversed(stack)]
+        print("%s %d" % (";".join(line), v.value))
+    else:
+        # print default multi-line stack output
+        for addr in stack:
+            print("    %-16x %s" % (addr, b.ksym(addr)))
+        print("    %-16s %s" % ("-", k.name))
+        print("        %d\n" % v.value)
+
+if missing_stacks > 0:
+    print(("WARNING: %d stack traces could not be displayed. "
+        "You may be running out of storage space for stack traces.") %
+        missing_stacks,
+        file=stderr)

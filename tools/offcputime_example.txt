@@ -586,8 +586,6 @@ Tracing off-CPU time (us) by kernel stack... Hit Ctrl-C to end.
     supervise
         81670888
 
-Detaching...
-
 The last few stack traces aren't very interesting, since they are threads that
 are ofter blocked off-CPU waiting for work.
 
@@ -619,8 +617,6 @@ Tracing off-CPU time (us) by kernel stack... Hit Ctrl-C to end.
     dd
         2405710
 
-Detaching...
-
 The stack trace shows "dd" is blocked waiting on disk I/O, as expected, for a
 total of 2.4 seconds during tracing.
 
@@ -644,8 +640,6 @@ Tracing off-CPU time (us) by kernel stack for 5 secs.
     entry_SYSCALL_64_fastpath
     dd
         4413909
-
-Detaching...
 
 Here, dd was blocked for 4.4 seconds out of 5. Or put differently, likely
 on-CPU for about 12% of the time. Which matches the ratio seen by time(1):
