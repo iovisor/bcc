@@ -460,10 +460,36 @@ pid = 12927
          4 -> 7          : 1        |****************************************|
 
 
+A -L option will print a distribution for each TID:
+
+# ./runqlat -L
+Tracing run queue latency... Hit Ctrl-C to end.
+^C
+
+tid = 0
+     usecs               : count     distribution
+         0 -> 1          : 593      |****************************            |
+         2 -> 3          : 829      |****************************************|
+         4 -> 7          : 300      |**************                          |
+         8 -> 15         : 321      |***************                         |
+        16 -> 31         : 132      |******                                  |
+        32 -> 63         : 58       |**                                      |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 13       |                                        |
+
+tid = 7
+     usecs               : count     distribution
+         0 -> 1          : 8        |********                                |
+         2 -> 3          : 19       |********************                    |
+         4 -> 7          : 37       |****************************************|
+[...]
+
+
 USAGE message:
 
 # ./runqlat -h
-usage: runqlat [-h] [-T] [-m] [-P] [-p PID] [interval] [count]
+usage: runqlat [-h] [-T] [-m] [-P] [-L] [-p PID] [interval] [count]
 
 Summarize run queue (schedular) latency as a histogram
 
@@ -476,6 +502,7 @@ optional arguments:
   -T, --timestamp     include timestamp on output
   -m, --milliseconds  millisecond histogram
   -P, --pids          print a histogram per process ID
+  -L, --tids          print a histogram per thread ID
   -p PID, --pid PID   trace this PID only
 
 examples:
