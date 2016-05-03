@@ -4,7 +4,7 @@
 # runqlat   Run queue (scheduler) latency as a histogram.
 #           For Linux, uses BCC, eBPF.
 #
-# USAGE: runqlat [-h] [-T] [-m] [-P] [-p PID] [interval] [count]
+# USAGE: runqlat [-h] [-T] [-m] [-P] [-L] [-p PID] [interval] [count]
 #
 # This measures the time a task spends waiting on a run queue for a turn
 # on-CPU, and shows this time as a histogram. This time should be small, but a
@@ -46,6 +46,8 @@ parser.add_argument("-m", "--milliseconds", action="store_true",
     help="millisecond histogram")
 parser.add_argument("-P", "--pids", action="store_true",
     help="print a histogram per process ID")
+parser.add_argument("-L", "--tids", action="store_true",
+    help="print a histogram per thread ID")
 parser.add_argument("-p", "--pid",
     help="trace this PID only")
 parser.add_argument("interval", nargs="?", default=99999999,
@@ -62,7 +64,7 @@ bpf_text = """
 #include <linux/sched.h>
 
 typedef struct pid_key {
-    u64 pid;    // work around
+    u64 id;    // work around
     u64 slot;
 } pid_key_t;
 BPF_HASH(start, u32);
@@ -74,6 +76,7 @@ struct rq;
 int trace_enqueue(struct pt_regs *ctx, struct rq *rq, struct task_struct *p,
     int flags)
 {
+    u32 tgid = p->tgid;
     u32 pid = p->pid;
     if (FILTER)
         return 0;
@@ -85,10 +88,11 @@ int trace_enqueue(struct pt_regs *ctx, struct rq *rq, struct task_struct *p,
 // calculate latency
 int trace_run(struct pt_regs *ctx, struct task_struct *prev)
 {
-    u32 pid;
+    u32 pid, tgid;
 
     // ivcsw: treat like an enqueue event and store timestamp
     if (prev->state == TASK_RUNNING) {
+        tgid = prev->tgid;
         pid = prev->pid;
         if (!(FILTER)) {
             u64 ts = bpf_ktime_get_ns();
@@ -96,6 +100,7 @@ int trace_run(struct pt_regs *ctx, struct task_struct *prev)
         }
     }
 
+    tgid = bpf_get_current_pid_tgid() >> 32;
     pid = bpf_get_current_pid_tgid();
     if (FILTER)
         return 0;
@@ -119,7 +124,8 @@ int trace_run(struct pt_regs *ctx, struct task_struct *prev)
 
 # code substitutions
 if args.pid:
-    bpf_text = bpf_text.replace('FILTER', 'pid != %s' % args.pid)
+    # pid from userspace point of view is thread group from kernel pov
+    bpf_text = bpf_text.replace('FILTER', 'tgid != %s' % args.pid)
 else:
     bpf_text = bpf_text.replace('FILTER', '0')
 if args.milliseconds:
@@ -128,13 +134,19 @@ if args.milliseconds:
 else:
     bpf_text = bpf_text.replace('FACTOR', 'delta /= 1000;')
     label = "usecs"
-if args.pids:
+if args.pids or args.tids:
+    section = "pid"
+    pid = "tgid"
+    if args.tids:
+        pid = "pid"
+        section = "tid"
     bpf_text = bpf_text.replace('STORAGE',
         'BPF_HISTOGRAM(dist, pid_key_t);')
     bpf_text = bpf_text.replace('STORE',
-        'pid_key_t key = {.pid = pid, .slot = bpf_log2l(delta)}; ' +
+        'pid_key_t key = {.id = ' + pid + ', .slot = bpf_log2l(delta)}; ' +
         'dist.increment(key);')
 else:
+    section = ""
     bpf_text = bpf_text.replace('STORAGE', 'BPF_HISTOGRAM(dist);')
     bpf_text = bpf_text.replace('STORE',
         'dist.increment(bpf_log2l(delta));')
@@ -161,7 +173,7 @@ while (1):
     if args.timestamp:
         print("%-8s\n" % strftime("%H:%M:%S"), end="")
 
-    dist.print_log2_hist(label, "pid", section_print_fn=int)
+    dist.print_log2_hist(label, section, section_print_fn=int)
     dist.clear()
 
     countdown -= 1
