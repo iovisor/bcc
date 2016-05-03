@@ -37,7 +37,7 @@ text = """
 #include <uapi/linux/ptrace.h>
 BPF_HISTOGRAM(dist);
 int count(struct pt_regs *ctx) {
-    dist.increment(bpf_log2l(ctx->ax));
+    dist.increment(bpf_log2l(ctx->PT_REGS_RC));
     return 0;
 }
 """

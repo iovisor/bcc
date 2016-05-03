@@ -68,7 +68,7 @@ int trace_count(struct pt_regs *ctx) {
     u64 *val;
     // the kprobe pc is slightly after the function starting address, align
     // back to the start (4 byte alignment) in order to match /proc/kallsyms
-    key.ip = ctx->ip & ~3ull;
+    key.ip = ctx->PT_REGS_IP & ~3ull;
     val = counts.lookup(&key);
     if (!val)
         return 0;

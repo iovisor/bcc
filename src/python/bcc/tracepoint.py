@@ -99,7 +99,7 @@ class Tracepoint(object):
 int __trace_entry_update(struct pt_regs *ctx)
 {
         u64 tid = bpf_get_current_pid_tgid();
-        u64 val = ctx->di;
+        u64 val = ctx->PT_REGS_PARM1;
         __trace_di.update(&tid, &val);
         return 0;
 }

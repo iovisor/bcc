@@ -63,7 +63,7 @@ BPF_HISTOGRAM(dist, irq_key_t);
 int trace_start(struct pt_regs *ctx)
 {
     u32 pid = bpf_get_current_pid_tgid();
-    u64 ip = ctx->ip, ts = bpf_ktime_get_ns();
+    u64 ip = ctx->PT_REGS_IP, ts = bpf_ktime_get_ns();
     start.update(&pid, &ts);
     iptr.update(&pid, &ip);
     return 0;

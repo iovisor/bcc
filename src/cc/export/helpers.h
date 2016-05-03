@@ -410,5 +410,27 @@ int bpf_num_cpus() asm("llvm.bpf.extra");
 
 #define lock_xadd(ptr, val) ((void)__sync_fetch_and_add(ptr, val))
 
+#ifdef __powerpc__
+#define PT_REGS_PARM1	gpr[3]
+#define PT_REGS_PARM2	gpr[4]
+#define PT_REGS_PARM3	gpr[5]
+#define PT_REGS_PARM4	gpr[6]
+#define PT_REGS_PARM5	gpr[7]
+#define PT_REGS_PARM6	gpr[8]
+#define PT_REGS_RC	gpr[3]
+#define PT_REGS_IP	nip
+#define PT_REGS_SP	sp
+#else
+#define PT_REGS_PARM1	di
+#define PT_REGS_PARM2	si
+#define PT_REGS_PARM3	dx
+#define PT_REGS_PARM4	cx
+#define PT_REGS_PARM5	r8
+#define PT_REGS_PARM6	r9
+#define PT_REGS_RC	ax
+#define PT_REGS_IP	ip
+#define PT_REGS_SP	sp
+#endif
+
 #endif
 )********"
