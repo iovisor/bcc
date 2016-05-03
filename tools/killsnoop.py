@@ -98,7 +98,7 @@ int kretprobe__sys_kill(struct pt_regs *ctx)
     data.delta = tsp - valp->ts;
     data.ts = tsp / 1000;
     data.tpid = valp->tpid;
-    data.ret = ctx->ax;
+    data.ret = PT_REGS_RC(ctx);
     data.sig = valp->sig;
 
     events.perf_submit(ctx, &data, sizeof(data));

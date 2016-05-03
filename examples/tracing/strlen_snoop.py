@@ -26,7 +26,7 @@ pid = sys.argv[1]
 bpf_text = """
 #include <uapi/linux/ptrace.h>
 int printarg(struct pt_regs *ctx) {
-    if (!ctx->si)
+    if (!PT_REGS_PARM2(ctx))
         return 0;
 
     u32 pid = bpf_get_current_pid_tgid();
@@ -34,7 +34,7 @@ int printarg(struct pt_regs *ctx) {
         return 0;
 
     char str[80] = {};
-    bpf_probe_read(&str, sizeof(str), (void *)ctx->si);
+    bpf_probe_read(&str, sizeof(str), (void *)PT_REGS_PARM2(ctx));
     bpf_trace_printk("%s\\n", &str);
 
     return 0;

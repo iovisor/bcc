@@ -81,7 +81,7 @@ void count_lookup(struct pt_regs *ctx) {
     int key = S_SLOW;
     u64 *leaf = stats.lookup(&key);
     if (leaf) (*leaf)++;
-    if (ctx->ax == 0) {
+    if (PT_REGS_RC(ctx) == 0) {
         key = S_MISS;
         leaf = stats.lookup(&key);
         if (leaf) (*leaf)++;
