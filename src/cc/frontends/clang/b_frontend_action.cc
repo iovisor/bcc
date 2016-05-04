@@ -472,20 +472,20 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
           text = to_string(numcpu);
           rewriter_.ReplaceText(SourceRange(Call->getLocStart(), Call->getLocEnd()), text);
         } else if (Decl->getName() == "bpf_usdt_readarg_p") {
-	 text = "({ u64 __addr = 0x0; ";
-	 text += "_bpf_readarg_" + current_fn_ + "_" + args[0] + "(" +
-	  args[1] + ", &__addr, sizeof(__addr));";
-	 text += "bpf_probe_read(" + args[2] + ", " + args[3] +
-	  ", (void *)__addr);";
-	 text += "})";
-	 rewriter_.ReplaceText(
-	   SourceRange(Call->getLocStart(), Call->getLocEnd()), text);
+          text = "({ u64 __addr = 0x0; ";
+          text += "_bpf_readarg_" + current_fn_ + "_" + args[0] + "(" +
+                  args[1] + ", &__addr, sizeof(__addr));";
+          text += "bpf_probe_read(" + args[2] + ", " + args[3] +
+                  ", (void *)__addr);";
+          text += "})";
+          rewriter_.ReplaceText(
+              SourceRange(Call->getLocStart(), Call->getLocEnd()), text);
         } else if (Decl->getName() == "bpf_usdt_readarg") {
-	 text = "_bpf_readarg_" + current_fn_ + "_" + args[0] + "(" +
-	  args[1] + ", " + args[2] + ", sizeof(*(" + args[2] + ")))";
-	 rewriter_.ReplaceText(
-	   SourceRange(Call->getLocStart(), Call->getLocEnd()), text);
-	}
+          text = "_bpf_readarg_" + current_fn_ + "_" + args[0] + "(" + args[1] +
+                 ", " + args[2] + ", sizeof(*(" + args[2] + ")))";
+          rewriter_.ReplaceText(
+              SourceRange(Call->getLocStart(), Call->getLocEnd()), text);
+        }
       }
     }
   }

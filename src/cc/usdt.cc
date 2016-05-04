@@ -53,8 +53,8 @@ bool Probe::in_shared_object() {
 
 bool Probe::resolve_global_address(uint64_t *global, const uint64_t addr) {
   if (in_shared_object()) {
-    return (pid_ && !bcc_resolve_global_addr(
-          *pid_, bin_path_.c_str(), addr, global));
+    return (pid_ &&
+            !bcc_resolve_global_addr(*pid_, bin_path_.c_str(), addr, global));
   }
 
   *global = addr;
@@ -154,16 +154,16 @@ bool Probe::usdt_getarg(std::ostream &stream) {
     std::string cptr = tfm::format("*((%s *)dest)", ctype);
 
     tfm::format(stream,
-        "static inline int _bpf_readarg_%s_%d("
-        "struct pt_regs *ctx, void *dest, size_t len) {\n"
-        "  if (len != sizeof(%s)) return -1;\n",
-        attached_to_.value(), arg_n + 1, ctype);
+                "static inline int _bpf_readarg_%s_%d("
+                "struct pt_regs *ctx, void *dest, size_t len) {\n"
+                "  if (len != sizeof(%s)) return -1;\n",
+                attached_to_.value(), arg_n + 1, ctype);
 
     if (locations_.size() == 1) {
       Location &location = locations_.front();
       stream << "  ";
-      if (!location.arguments_[arg_n].assign_to_local(stream, cptr,
-                                                      bin_path_, pid_))
+      if (!location.arguments_[arg_n].assign_to_local(stream, cptr, bin_path_,
+                                                      pid_))
         return false;
       stream << "\n  return 0;\n}\n";
     } else {
@@ -175,8 +175,8 @@ bool Probe::usdt_getarg(std::ostream &stream) {
           return false;
 
         tfm::format(stream, "  case 0x%xULL: ", global_address);
-        if (!location.arguments_[arg_n].assign_to_local(stream, cptr,
-                                                        bin_path_, pid_))
+        if (!location.arguments_[arg_n].assign_to_local(stream, cptr, bin_path_,
+                                                        pid_))
           return false;
 
         stream << " return 0;\n";
@@ -211,8 +211,8 @@ void Context::add_probe(const char *binpath, const struct bcc_elf_usdt *probe) {
     }
   }
 
-  probes_.emplace_back(new Probe(binpath, probe->provider,
-        probe->name, probe->semaphore, pid_));
+  probes_.emplace_back(
+      new Probe(binpath, probe->provider, probe->name, probe->semaphore, pid_));
   probes_.back()->add_location(probe->pc, probe->arg_fmt);
 }
 
@@ -282,8 +282,7 @@ Context::Context(int pid) : pid_(pid), pid_stat_(pid), loaded_(false) {
 
 Context::~Context() {
   if (pid_stat_ && !pid_stat_->is_stale()) {
-    for (auto &p : probes_)
-      p->disable();
+    for (auto &p : probes_) p->disable();
   }
 }
 }

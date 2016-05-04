@@ -31,9 +31,8 @@ ino_t ProcStat::getinode_() {
   return (!stat(procfs_.c_str(), &s)) ? s.st_ino : -1;
 }
 
-ProcStat::ProcStat(int pid) :
-  procfs_(tfm::format("/proc/%d/exe", pid)),
-  inode_(getinode_()) {}
+ProcStat::ProcStat(int pid)
+    : procfs_(tfm::format("/proc/%d/exe", pid)), inode_(getinode_()) {}
 
 void KSyms::_add_symbol(const char *symname, uint64_t addr, void *p) {
   KSyms *ks = static_cast<KSyms *>(p);

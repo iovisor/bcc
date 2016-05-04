@@ -39,7 +39,7 @@ TEST_CASE("test finding a probe in our own process", "[usdt]") {
   REQUIRE(ctx.num_probes() >= 1);
 
   SECTION("our test probe") {
-	auto probe = ctx.get("sample_probe_1");
+    auto probe = ctx.get("sample_probe_1");
     REQUIRE(probe);
 
     REQUIRE(probe->in_shared_object() == false);
