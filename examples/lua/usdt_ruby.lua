@@ -18,10 +18,14 @@ limitations under the License.
 local program = [[
 #include <uapi/linux/ptrace.h>
 int trace_method(struct pt_regs *ctx) {
-    char fn_name[128] = {};
-    bpf_usdt_readarg_p(method__entry_2, ctx, &fn_name, sizeof(fn_name));
-    bpf_trace_printk("%s(...)\n", &fn_name);
-    return 0;
+  uint64_t addr;
+  bpf_usdt_readarg(2, ctx, &addr);
+
+  char fn_name[128] = {};
+  bpf_probe_read(&fn_name, sizeof(fn_name), (void *)addr);
+
+  bpf_trace_printk("%s(...)\n", fn_name);
+  return 0;
 };
 ]]
 

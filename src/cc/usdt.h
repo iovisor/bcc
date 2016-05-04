@@ -147,10 +147,7 @@ public:
   size_t num_arguments() const { return locations_.front().arguments_.size(); }
 
   uint64_t address(size_t n = 0) const { return locations_[n].address_; }
-
-  bool usdt_thunks(std::ostream &stream, const std::string &prefix);
-  bool usdt_cases(std::ostream &stream, const optional<int> &pid = nullopt);
-  bool usdt_getarg(std::ostream &stream, const optional<int> &pid = nullopt);
+  bool usdt_getarg(std::ostream &stream, const std::string &fn_name, const optional<int> &pid = nullopt);
 
   bool need_enable() const { return semaphore_ != 0x0; }
   bool enable(int pid);

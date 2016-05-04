@@ -130,40 +130,6 @@ bool Probe::disable(int pid) {
   return result;
 }
 
-bool Probe::usdt_thunks(std::ostream &stream, const std::string &prefix) {
-  assert(!locations_.empty());
-  for (size_t i = 0; i < locations_.size(); ++i) {
-    tfm::format(
-        stream,
-        "int %s_thunk_%d(struct pt_regs *ctx) { return %s(ctx, %d); }\n",
-        prefix, i, prefix, i);
-  }
-  return true;
-}
-
-bool Probe::usdt_cases(std::ostream &stream, const optional<int> &pid) {
-  assert(!locations_.empty());
-  const size_t arg_count = locations_[0].arguments_.size();
-
-  for (size_t arg_n = 0; arg_n < arg_count; ++arg_n) {
-    tfm::format(stream, "%s arg%d = 0;\n", largest_arg_type(arg_n), arg_n + 1);
-  }
-
-  for (size_t loc_n = 0; loc_n < locations_.size(); ++loc_n) {
-    Location &location = locations_[loc_n];
-    tfm::format(stream, "if (__loc_id == %d) {\n", loc_n);
-
-    for (size_t arg_n = 0; arg_n < location.arguments_.size(); ++arg_n) {
-      Argument &arg = location.arguments_[arg_n];
-      if (!arg.assign_to_local(stream, tfm::format("arg%d", arg_n + 1),
-                               bin_path_, pid))
-        return false;
-    }
-    stream << "}\n";
-  }
-  return true;
-}
-
 std::string Probe::largest_arg_type(size_t arg_n) {
   Argument *largest = nullptr;
   for (Location &location : locations_) {
@@ -177,7 +143,8 @@ std::string Probe::largest_arg_type(size_t arg_n) {
   return largest->ctype();
 }
 
-bool Probe::usdt_getarg(std::ostream &stream, const optional<int> &pid) {
+bool Probe::usdt_getarg(std::ostream &stream,
+    const std::string &fn_name, const optional<int> &pid) {
   const size_t arg_count = locations_[0].arguments_.size();
 
   if (arg_count == 0)
@@ -185,18 +152,21 @@ bool Probe::usdt_getarg(std::ostream &stream, const optional<int> &pid) {
 
   for (size_t arg_n = 0; arg_n < arg_count; ++arg_n) {
     std::string ctype = largest_arg_type(arg_n);
+    std::string cptr = tfm::format("*((%s *)dest)", ctype);
+
     tfm::format(stream,
-                "static inline %s _bpf_readarg_%s_%d(struct pt_regs *ctx) {\n"
-                "  %s result = 0x0;\n",
-                ctype, name_, arg_n + 1, ctype);
+        "static inline int _bpf_readarg_%s_%d("
+        "struct pt_regs *ctx, void *dest, size_t len) {\n"
+        "  if (len != sizeof(%s)) return -1;\n",
+        fn_name, arg_n + 1, ctype);
 
     if (locations_.size() == 1) {
       Location &location = locations_.front();
       stream << "  ";
-      if (!location.arguments_[arg_n].assign_to_local(stream, "result",
+      if (!location.arguments_[arg_n].assign_to_local(stream, cptr,
                                                       bin_path_, pid))
         return false;
-      stream << "\n";
+      stream << "\n  return 0;\n}\n";
     } else {
       stream << "  switch(ctx->ip) {\n";
       for (Location &location : locations_) {
@@ -206,15 +176,15 @@ bool Probe::usdt_getarg(std::ostream &stream, const optional<int> &pid) {
           return false;
 
         tfm::format(stream, "  case 0x%xULL: ", global_address);
-        if (!location.arguments_[arg_n].assign_to_local(stream, "result",
+        if (!location.arguments_[arg_n].assign_to_local(stream, cptr,
                                                         bin_path_, pid))
           return false;
 
-        stream << " break;\n";
+        stream << " return 0;\n";
       }
       stream << "  }\n";
+      stream << "  return -1;\n}\n";
     }
-    stream << "  return result;\n}\n";
   }
   return true;
 }
@@ -277,7 +247,7 @@ Probe *Context::get(const std::string &probe_name) const {
 bool Context::generate_usdt_args(std::ostream &stream) {
   stream << "#include <uapi/linux/ptrace.h>\n";
   for (auto &p : uprobes_) {
-    if (!p.first->usdt_getarg(stream, pid_))
+    if (!p.first->usdt_getarg(stream, p.second, pid_))
       return false;
   }
   return true;
