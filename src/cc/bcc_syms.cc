@@ -24,17 +24,16 @@
 #include "bcc_syms.h"
 
 #include "syms.h"
+#include "vendor/tinyformat.hpp"
 
 ino_t ProcStat::getinode_() {
   struct stat s;
   return (!stat(procfs_.c_str(), &s)) ? s.st_ino : -1;
 }
 
-ProcStat::ProcStat(int pid) : inode_(-1) {
-  char buffer[128];
-  snprintf(buffer, sizeof(buffer), "/proc/%d/exe", pid);
-  procfs_ = buffer;
-}
+ProcStat::ProcStat(int pid) :
+  procfs_(tfm::format("/proc/%d/exe", pid)),
+  inode_(getinode_()) {}
 
 void KSyms::_add_symbol(const char *symname, uint64_t addr, void *p) {
   KSyms *ks = static_cast<KSyms *>(p);
@@ -84,11 +83,15 @@ bool KSyms::resolve_name(const char *_unused, const char *name,
   return true;
 }
 
-ProcSyms::ProcSyms(int pid) : pid_(pid), procstat_(pid) { refresh(); }
+ProcSyms::ProcSyms(int pid) : pid_(pid), procstat_(pid) { load_modules(); }
+
+bool ProcSyms::load_modules() {
+  return bcc_procutils_each_module(pid_, _add_module, this) == 0;
+}
 
 void ProcSyms::refresh() {
   modules_.clear();
-  bcc_procutils_each_module(pid_, _add_module, this);
+  load_modules();
   procstat_.reset();
 }
 

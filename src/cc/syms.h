@@ -93,6 +93,7 @@ class ProcSyms : SymbolCache {
   ProcStat procstat_;
 
   static int _add_module(const char *, uint64_t, uint64_t, void *);
+  bool load_modules();
 
 public:
   ProcSyms(int pid);
