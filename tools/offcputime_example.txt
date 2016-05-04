@@ -718,7 +718,7 @@ creating your "off-CPU time flame graphs".
 USAGE message:
 
 # ./offcputime -h
-usage: offcputime.py [-h] [-u | -p PID] [-v] [-f]
+usage: offcputime.py [-h] [-p PID | -k | -u] [-f]
                      [--stack-storage-size STACK_STORAGE_SIZE]
                      [duration]
 
@@ -729,9 +729,11 @@ positional arguments:
 
 optional arguments:
   -h, --help            show this help message and exit
-  -u, --useronly        user threads only (no kernel threads)
   -p PID, --pid PID     trace this PID only
-  -v, --verbose         show raw addresses
+  -k, --kernel-threads-only
+                        kernel threads only (no user threads)
+  -u, --user-threads-only
+                        user threads only (no kernel threads)
   -f, --folded          output folded format
   --stack-storage-size STACK_STORAGE_SIZE
                         the number of unique stack traces that can be stored
@@ -741,5 +743,6 @@ examples:
     ./offcputime             # trace off-CPU stack time until Ctrl-C
     ./offcputime 5           # trace for 5 seconds only
     ./offcputime -f 5        # 5 seconds, and output in folded format
-    ./offcputime -u          # don't include kernel threads (user only)
-    ./offcputime -p 185      # trace for PID 185 only
+    ./offcputime -p 185      # only trace threads for PID 185
+    ./offcputime -u          # only trace user threads (no kernel)
+    ./offcputime -k          # only trace kernel threads (no user)

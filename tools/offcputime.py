@@ -3,11 +3,7 @@
 # offcputime    Summarize off-CPU time by kernel stack trace
 #               For Linux, uses BCC, eBPF.
 #
-# USAGE: offcputime [-h] [-u] [-p PID] [-v] [-f] [duration]
-#
-# The current implementation uses an unrolled loop for x86_64, and was written
-# as a proof of concept. This implementation should be replaced in the future
-# with an appropriate bpf_ call, when available.
+# USAGE: offcputime [-h] [-p PID | -u | -k] [-f] [duration]
 #
 # Copyright 2016 Netflix, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
@@ -43,20 +39,21 @@ examples = """examples:
     ./offcputime             # trace off-CPU stack time until Ctrl-C
     ./offcputime 5           # trace for 5 seconds only
     ./offcputime -f 5        # 5 seconds, and output in folded format
-    ./offcputime -u          # don't include kernel threads (user only)
-    ./offcputime -p 185      # trace for PID 185 only
+    ./offcputime -p 185      # only trace threads for PID 185
+    ./offcputime -u          # only trace user threads (no kernel)
+    ./offcputime -k          # only trace kernel threads (no user)
 """
 parser = argparse.ArgumentParser(
     description="Summarize off-CPU time by kernel stack trace",
     formatter_class=argparse.RawDescriptionHelpFormatter,
     epilog=examples)
 thread_group = parser.add_mutually_exclusive_group()
-thread_group.add_argument("-u", "--useronly", action="store_true",
-    help="user threads only (no kernel threads)")
 thread_group.add_argument("-p", "--pid", type=positive_int,
     help="trace this PID only")
-parser.add_argument("-v", "--verbose", action="store_true",
-    help="show raw addresses")
+thread_group.add_argument("-k", "--kernel-threads-only", action="store_true",
+    help="kernel threads only (no user threads)")
+thread_group.add_argument("-u", "--user-threads-only", action="store_true",
+    help="user threads only (no kernel threads)")
 parser.add_argument("-f", "--folded", action="store_true",
     help="output folded format")
 parser.add_argument("--stack-storage-size", default=1024,
@@ -94,7 +91,7 @@ int oncpu(struct pt_regs *ctx, struct task_struct *prev) {
     u64 ts, *tsp;
 
     // record previous thread sleep time
-    if (FILTER) {
+    if (THREAD_FILTER) {
         pid = prev->pid;
         ts = bpf_ktime_get_ns();
         start.update(&pid, &ts);
@@ -125,13 +122,20 @@ int oncpu(struct pt_regs *ctx, struct task_struct *prev) {
 """
 
 # set thread filter
+thread_context = ""
 if args.pid is not None:
-    filter = 'pid == %s' % args.pid
-elif args.useronly:
-    filter = '!(prev->flags & PF_KTHREAD)'
+    thread_context = "PID %s" % args.pid
+    thread_filter = 'pid == %s' % args.pid
+elif args.user_threads_only:
+    thread_context = "user threads"
+    thread_filter = '!(prev->flags & PF_KTHREAD)'
+elif args.kernel_threads_only:
+    thread_context = "kernel threads"
+    thread_filter = 'prev->flags & PF_KTHREAD'
 else:
-    filter = '1'
-bpf_text = bpf_text.replace('FILTER', filter)
+    thread_context = "all threads"
+    thread_filter = '1'
+bpf_text = bpf_text.replace('THREAD_FILTER', thread_filter)
 
 # set stack storage size
 bpf_text = bpf_text.replace('STACK_STORAGE_SIZE', str(args.stack_storage_size))
@@ -146,7 +150,8 @@ if matched == 0:
 
 # header
 if not folded:
-    print("Tracing off-CPU time (us) by kernel stack", end="")
+    print("Tracing off-CPU time (us) of %s by kernel stack" %
+        thread_context, end="")
     if duration < 99999999:
         print(" for %d secs." % duration)
     else:
