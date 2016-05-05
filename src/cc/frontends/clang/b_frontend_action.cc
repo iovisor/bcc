@@ -32,6 +32,7 @@
 
 namespace ebpf {
 
+constexpr int MAX_CALLING_CONV_REGS = 6;
 const char *calling_conv_regs_x86[] = {
   "di", "si", "dx", "cx", "r8", "r9"
 };
@@ -255,6 +256,11 @@ bool BTypeVisitor::VisitFunctionDecl(FunctionDecl *D) {
   if (D->isExternallyVisible() && D->hasBody()) {
     string attr = string("__attribute__((section(\"") + BPF_FN_PREFIX + D->getName().str() + "\")))\n";
     rewriter_.InsertText(D->getLocStart(), attr);
+    if (D->param_size() > MAX_CALLING_CONV_REGS + 1) {
+      error(D->getParamDecl(MAX_CALLING_CONV_REGS + 1)->getLocStart(),
+            "too many arguments, bcc only supports in-register parameters");
+      return false;
+    }
     // remember the arg names of the current function...first one is the ctx
     fn_args_.clear();
     string preamble = "{";
@@ -265,11 +271,23 @@ bool BTypeVisitor::VisitFunctionDecl(FunctionDecl *D) {
       }
       fn_args_.push_back(arg);
       if (fn_args_.size() > 1) {
+        // Move the args into a preamble section where the same params are
+        // declared and initialized from pt_regs.
+        // Todo: this init should be done only when the program requests it.
+        string text = rewriter_.getRewrittenText(
+            SourceRange(arg->getLocStart(), arg->getLocEnd()));
         arg->addAttr(UnavailableAttr::CreateImplicit(C, "ptregs"));
         size_t d = fn_args_.size() - 2;
         const char *reg = calling_conv_regs[d];
-        preamble += arg->getName().str() + " = " + fn_args_[0]->getName().str() + "->" + string(reg) + ";";
+        preamble += " " + text + " = " + fn_args_[0]->getName().str() + "->" +
+                    string(reg) + ";";
       }
+    }
+    if (D->param_size() > 1) {
+      rewriter_.ReplaceText(
+          SourceRange(D->getParamDecl(0)->getLocEnd(),
+                      D->getParamDecl(D->getNumParams() - 1)->getLocEnd()),
+          fn_args_[0]->getName());
     }
     // for each trace argument, convert the variable from ptregs to something on stack
     if (CompoundStmt *S = dyn_cast<CompoundStmt>(D->getBody()))

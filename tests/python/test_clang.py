@@ -328,5 +328,15 @@ BPF_TABLE("hash", struct bpf_tunnel_key, int, t1, 1);
         t1 = b["t1"]
         print(t1.Key().remote_ipv4)
 
+    def test_too_many_args(self):
+        text = """
+#include <uapi/linux/ptrace.h>
+int many(struct pt_regs *ctx, int a, int b, int c, int d, int e, int f, int g) {
+    return 0;
+}
+"""
+        with self.assertRaises(Exception):
+            b = BPF(text=text)
+
 if __name__ == "__main__":
     main()
