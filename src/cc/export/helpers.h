@@ -180,6 +180,12 @@ static int (*bpf_skb_load_bytes)(void *ctx, int offset, void *to, u32 len) =
  *
  * BPF_STACK_TRACE(_name, _size) will allocate space for _size stack traces.
  *  -ENOMEM will be returned when this limit is reached.
+ *
+ * -EFAULT is typically returned when requesting user-space stack straces (using
+ * BPF_F_USER_STACK) for kernel threads. However, a valid stackid may be
+ * returned in some cases; consider a tracepoint or kprobe executing in the
+ * kernel context. Given this you can typically ignore -EFAULT errors when
+ * retrieving user-space stack traces.
  */
 static int (*bpf_get_stackid_)(void *ctx, void *map, u64 flags) =
   (void *) BPF_FUNC_get_stackid;

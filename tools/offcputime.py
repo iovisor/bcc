@@ -1,9 +1,9 @@
 #!/usr/bin/python
 #
-# offcputime    Summarize off-CPU time by kernel stack trace
+# offcputime    Summarize off-CPU time by stack trace
 #               For Linux, uses BCC, eBPF.
 #
-# USAGE: offcputime [-h] [-p PID | -u | -k] [-f] [duration]
+# USAGE: offcputime [-h] [-p PID | -u | -k] [-U | -K] [-f] [duration]
 #
 # Copyright 2016 Netflix, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
@@ -54,6 +54,11 @@ thread_group.add_argument("-k", "--kernel-threads-only", action="store_true",
     help="kernel threads only (no user threads)")
 thread_group.add_argument("-u", "--user-threads-only", action="store_true",
     help="user threads only (no kernel threads)")
+stack_group = parser.add_mutually_exclusive_group()
+stack_group.add_argument("-U", "--user-stacks-only", action="store_true",
+    help="show stack from user space only (no kernel space stacks)")
+stack_group.add_argument("-K", "--kernel-stacks-only", action="store_true",
+    help="show stack from kernel space only (no user space stacks)")
 parser.add_argument("-f", "--folded", action="store_true",
     help="output folded format")
 parser.add_argument("--stack-storage-size", default=1024,
@@ -79,8 +84,10 @@ bpf_text = """
 #define MINBLOCK_US	1
 
 struct key_t {
+    u32 pid;
+    int user_stack_id;
+    int kernel_stack_id;
     char name[TASK_COMM_LEN];
-    int stack_id;
 };
 BPF_HASH(counts, struct key_t);
 BPF_HASH(start, u32);
@@ -97,23 +104,29 @@ int oncpu(struct pt_regs *ctx, struct task_struct *prev) {
         start.update(&pid, &ts);
     }
 
-    // calculate current thread's delta time
+    // get the current thread's start time
     pid = bpf_get_current_pid_tgid();
     tsp = start.lookup(&pid);
-    if (tsp == 0)
+    if (tsp == 0) {
         return 0;        // missed start or filtered
+    }
+
+    // calculate current thread's delta time
     u64 delta = bpf_ktime_get_ns() - *tsp;
     start.delete(&pid);
     delta = delta / 1000;
-    if (delta < MINBLOCK_US)
+    if (delta < MINBLOCK_US) {
         return 0;
+    }
 
     // create map key
     u64 zero = 0, *val;
     struct key_t key = {};
 
+    key.pid = pid;
+    key.user_stack_id = USER_STACK_GET;
+    key.kernel_stack_id = KERNEL_STACK_GET;
     bpf_get_current_comm(&key.name, sizeof(key.name));
-    key.stack_id = stack_traces.get_stackid(ctx, BPF_F_REUSE_STACKID);
 
     val = counts.lookup_or_init(&key, &zero);
     (*val) += delta;
@@ -140,6 +153,29 @@ bpf_text = bpf_text.replace('THREAD_FILTER', thread_filter)
 # set stack storage size
 bpf_text = bpf_text.replace('STACK_STORAGE_SIZE', str(args.stack_storage_size))
 
+# handle stack args
+kernel_stack_get = "stack_traces.get_stackid(ctx, BPF_F_REUSE_STACKID)"
+user_stack_get = \
+    "stack_traces.get_stackid(ctx, BPF_F_REUSE_STACKID | BPF_F_USER_STACK)"
+stack_context = ""
+if args.user_stacks_only:
+    stack_context = "user"
+    kernel_stack_get = "-1"
+elif args.kernel_stacks_only:
+    stack_context = "kernel"
+    user_stack_get = "-1"
+else:
+    stack_context = "user + kernel"
+bpf_text = bpf_text.replace('USER_STACK_GET', user_stack_get)
+bpf_text = bpf_text.replace('KERNEL_STACK_GET', kernel_stack_get)
+
+# check for an edge case; the code below will handle this case correctly
+# but ultimately nothing will be displayed
+if args.kernel_threads_only and args.user_stacks_only:
+    print("ERROR: Displaying user stacks for kernel threads " \
+        "doesn't make sense.", file=stderr)
+    exit(1)
+
 # initialize BPF
 b = BPF(text=bpf_text)
 b.attach_kprobe(event="finish_task_switch", fn_name="oncpu")
@@ -150,8 +186,8 @@ if matched == 0:
 
 # header
 if not folded:
-    print("Tracing off-CPU time (us) of %s by kernel stack" %
-        thread_context, end="")
+    print("Tracing off-CPU time (us) of %s by %s stack" %
+        (thread_context, stack_context), end="")
     if duration < 99999999:
         print(" for %d secs." % duration)
     else:
@@ -172,25 +208,35 @@ counts = b.get_table("counts")
 stack_traces = b.get_table("stack_traces")
 for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
     # handle get_stackid erorrs
-    if k.stack_id < 0:
+    if (not args.user_stacks_only and k.kernel_stack_id < 0) or \
+            (not args.kernel_stacks_only and k.user_stack_id < 0 and \
+                k.user_stack_id != -14):
         missing_stacks += 1
         # check for an ENOMEM error
-        if k.stack_id == -12:
+        if k.kernel_stack_id == -12 or k.user_stack_id == -12:
             has_enomem = True
         continue
 
-    stack = stack_traces.walk(k.stack_id)
+    user_stack = [] if k.user_stack_id < 0 else \
+        stack_traces.walk(k.user_stack_id)
+    kernel_stack = [] if k.kernel_stack_id < 0 else \
+        stack_traces.walk(k.kernel_stack_id)
 
     if folded:
         # print folded stack output
-        stack = list(stack)[1:]
-        line = [k.name.decode()] + [b.ksym(addr) for addr in reversed(stack)]
+        user_stack = list(user_stack)[1:]
+        kernel_stack = list(kernel_stack)[1:]
+        line = [k.name.decode()] + \
+            [b.ksym(addr) for addr in reversed(kernel_stack)] + \
+            [b.sym(addr, k.pid) for addr in reversed(user_stack)]
         print("%s %d" % (";".join(line), v.value))
     else:
         # print default multi-line stack output
-        for addr in stack:
-            print("    %-16x %s" % (addr, b.ksym(addr)))
-        print("    %-16s %s" % ("-", k.name))
+        for addr in user_stack:
+            print("    %016x %s" % (addr, b.sym(addr, k.pid)))
+        for addr in kernel_stack:
+            print("    %016x %s" % (addr, b.ksym(addr)))
+        print("    %-16s %s (%d)" % ("-", k.name, k.pid))
         print("        %d\n" % v.value)
 
 if missing_stacks > 0:
