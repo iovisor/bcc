@@ -673,8 +673,8 @@ struct __string_t { char s[%d]; };
                 except:
                         if self.args.verbose:
                                 traceback.print_exc()
-                        elif sys.exc_type is not SystemExit:
-                                print(sys.exc_value)
+                        elif sys.exc_info()[0] is not SystemExit:
+                                print(sys.exc_info()[1])
                 self._close_probes()
 
 if __name__ == "__main__":

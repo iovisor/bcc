@@ -86,6 +86,6 @@ if __name__ == "__main__":
                 else:
                         print_tracepoints()
         except:
-                if sys.exc_type is not SystemExit:
-                        print(sys.exc_value)
+                if sys.exc_info()[0] is not SystemExit:
+                        print(sys.exc_info()[1])
 

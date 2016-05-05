@@ -446,7 +446,7 @@ class BPF(object):
 
     @staticmethod
     def find_library(libname):
-        return lib.bcc_procutils_which_so(libname)
+        return lib.bcc_procutils_which_so(libname.encode("ascii")).decode()
 
     def attach_uprobe(self, name="", sym="", addr=None,
             fn_name="", pid=-1, cpu=0, group_fd=-1):
