@@ -698,7 +698,8 @@ StatusTuple CodegenLLVM::emit_atomic_add(MethodCallExprNode *n) {
   Value *lhs = B.CreateBitCast(pop_expr(), Type::getInt64PtrTy(ctx()));
   TRY2(n->args_[1]->accept(this));
   Value *rhs = B.CreateSExt(pop_expr(), B.getInt64Ty());
-  AtomicRMWInst *atomic_inst = B.CreateAtomicRMW(AtomicRMWInst::Add, lhs, rhs, SequentiallyConsistent);
+  AtomicRMWInst *atomic_inst = B.CreateAtomicRMW(
+      AtomicRMWInst::Add, lhs, rhs, AtomicOrdering::SequentiallyConsistent);
   atomic_inst->setVolatile(false);
   return mkstatus(0);
 }

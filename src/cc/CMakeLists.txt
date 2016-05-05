@@ -41,10 +41,13 @@ add_library(bcc-loader-static libbpf.c perf_reader.c bcc_elf.c bcc_proc.c)
 add_library(bcc-static STATIC bpf_common.cc bpf_module.cc shared_table.cc exported_files.cc bcc_syms.cc usdt_args.cc usdt.cc)
 set_target_properties(bcc-static PROPERTIES OUTPUT_NAME bcc)
 
-# BPF is still experimental otherwise it should be available
-#llvm_map_components_to_libnames(llvm_libs bpf mcjit irreader passes)
-llvm_map_components_to_libnames(llvm_libs bitwriter bpfcodegen irreader linker
+set(llvm_raw_libs bitwriter bpfcodegen irreader linker
   mcjit objcarcopts option passes nativecodegen)
+list(FIND LLVM_AVAILABLE_LIBS "LLVMCoverage" _llvm_coverage)
+if (${_llvm_coverage} GREATER -1)
+  list(APPEND llvm_raw_libs coverage)
+endif()
+llvm_map_components_to_libnames(llvm_libs ${llvm_raw_libs})
 llvm_expand_dependencies(expanded_libs ${llvm_libs})
 
 # order is important
