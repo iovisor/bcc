@@ -86,7 +86,7 @@ int kretprobe__d_lookup(struct pt_regs *ctx)
     if (ep == 0) {
         return 0;   // missed entry
     }
-    if (ctx->ax == 0) {
+    if (ctx->PT_REGS_RC == 0) {
         bpf_trace_printk("M %s\\n", ep->name);
     }
     entrybypid.delete(&pid);

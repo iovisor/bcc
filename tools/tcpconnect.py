@@ -90,7 +90,7 @@ int trace_connect_entry(struct pt_regs *ctx, struct sock *sk)
 
 static int trace_connect_return(struct pt_regs *ctx, short ipver)
 {
-    int ret = ctx->ax;
+    int ret = ctx->PT_REGS_RC;
     u32 pid = bpf_get_current_pid_tgid();
 
     struct sock **skpp;

@@ -97,7 +97,7 @@ int trace_return(struct pt_regs *ctx)
     data.pid = valp->pid;
     data.delta = tsp - valp->ts;
     data.ts = tsp / 1000;
-    data.ret = ctx->ax;
+    data.ret = ctx->PT_REGS_RC;
 
     events.perf_submit(ctx, &data, sizeof(data));
     infotmp.delete(&pid);

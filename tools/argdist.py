@@ -264,7 +264,7 @@ u64 __time = bpf_ktime_get_ns();
         def _substitute_exprs(self):
                 def repl(expr):
                         expr = self._substitute_aliases(expr)
-                        return expr.replace("$retval", "ctx->ax")
+                        return expr.replace("$retval", "ctx->PT_REGS_RC")
                 for i in range(0, len(self.exprs)):
                         self.exprs[i] = repl(self.exprs[i])
                 self.filter = repl(self.filter)
@@ -445,7 +445,7 @@ QUALIFIER int PROBENAME(struct pt_regs *ctx SIGNATURE)
                 for alias, subst in Probe.aliases.items():
                         expr = expr.replace(subst, alias)
                 # Replace retval expression with $retval
-                expr = expr.replace("ctx->ax", "$retval")
+                expr = expr.replace("ctx->PT_REGS_RC", "$retval")
                 # Replace ugly (*__param_val) expressions with param name
                 return re.sub(r"\(\*__(\w+)_val\)", r"\1", expr)
 

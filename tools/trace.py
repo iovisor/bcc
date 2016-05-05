@@ -202,13 +202,13 @@ class Probe(object):
                                 self.values.append(part)
 
         aliases = {
-                "retval": "ctx->ax",
-                "arg1": "ctx->di",
-                "arg2": "ctx->si",
-                "arg3": "ctx->dx",
-                "arg4": "ctx->cx",
-                "arg5": "ctx->r8",
-                "arg6": "ctx->r9",
+                "retval": "ctx->PT_REGS_RC",
+                "arg1": "ctx->PT_REGS_PARM1",
+                "arg2": "ctx->PT_REGS_PARM2",
+                "arg3": "ctx->PT_REGS_PARM3",
+                "arg4": "ctx->PT_REGS_PARM4",
+                "arg5": "ctx->PT_REGS_PARM5",
+                "arg6": "ctx->PT_REGS_PARM6",
                 "$uid": "(unsigned)(bpf_get_current_uid_gid() & 0xffffffff)",
                 "$gid": "(unsigned)(bpf_get_current_uid_gid() >> 32)",
                 "$pid": "(unsigned)(bpf_get_current_pid_tgid() & 0xffffffff)",

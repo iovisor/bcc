@@ -20,13 +20,13 @@ assert(arg[1], "usage: strlen_count PID")
 local program = string.gsub([[
 #include <uapi/linux/ptrace.h>
 int printarg(struct pt_regs *ctx) {
-  if (!ctx->di)
+  if (!ctx->PT_REGS_PARM1)
     return 0;
   u32 pid = bpf_get_current_pid_tgid();
   if (pid != PID)
     return 0;
   char str[128] = {};
-  bpf_probe_read(&str, sizeof(str), (void *)ctx->di);
+  bpf_probe_read(&str, sizeof(str), (void *)ctx->PT_REGS_PARM1);
   bpf_trace_printk("strlen(\"%s\")\n", &str);
   return 0;
 };

@@ -44,14 +44,14 @@ BPF_HASH(start, u32, struct val_t);
 BPF_PERF_OUTPUT(events);
 
 int do_entry(struct pt_regs *ctx) {
-    if (!ctx->di)
+    if (!ctx->PT_REGS_PARM1)
         return 0;
 
     struct val_t val = {};
     u32 pid = bpf_get_current_pid_tgid();
 
     if (bpf_get_current_comm(&val.comm, sizeof(val.comm)) == 0) {
-        bpf_probe_read(&val.host, sizeof(val.host), (void *)ctx->di);
+        bpf_probe_read(&val.host, sizeof(val.host), (void *)ctx->PT_REGS_PARM1);
         val.pid = bpf_get_current_pid_tgid();
         val.ts = bpf_ktime_get_ns();
         start.update(&pid, &val);

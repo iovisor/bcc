@@ -210,7 +210,7 @@ static int trace_return(struct pt_regs *ctx, int type)
     bpf_probe_read(&de, sizeof(de), &valp->fp->f_path.dentry);
 
     // populate output struct
-    u32 size = ctx->ax;
+    u32 size = ctx->PT_REGS_RC;
     struct data_t data = {.type = type, .size = size, .delta_us = delta_us,
         .pid = pid};
     data.ts_us = ts / 1000;

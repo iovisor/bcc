@@ -28,7 +28,7 @@ BPF_TABLE("hash", struct key_t, u64, counts, 256);
     int do_count(struct pt_regs *ctx) {
     struct key_t key = {};
     u64 zero = 0, *val;
-    key.ip = ctx->ip;
+    key.ip = ctx->PT_REGS_IP;
     val = counts.lookup_or_init(&key, &zero);
     (*val)++;
     return 0;
