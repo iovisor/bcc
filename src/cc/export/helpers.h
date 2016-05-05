@@ -410,5 +410,29 @@ int bpf_num_cpus() asm("llvm.bpf.extra");
 
 #define lock_xadd(ptr, val) ((void)__sync_fetch_and_add(ptr, val))
 
+#ifdef __powerpc__
+#define PT_REGS_PARM1(ctx)	((ctx)->gpr[3])
+#define PT_REGS_PARM2(ctx)	((ctx)->gpr[4])
+#define PT_REGS_PARM3(ctx)	((ctx)->gpr[5])
+#define PT_REGS_PARM4(ctx)	((ctx)->gpr[6])
+#define PT_REGS_PARM5(ctx)	((ctx)->gpr[7])
+#define PT_REGS_PARM6(ctx)	((ctx)->gpr[8])
+#define PT_REGS_RC(ctx)		((ctx)->gpr[3])
+#define PT_REGS_IP(ctx)		((ctx)->nip)
+#define PT_REGS_SP(ctx)		((ctx)->sp)
+#elif defined(__x86_64__)
+#define PT_REGS_PARM1(ctx)	((ctx)->di)
+#define PT_REGS_PARM2(ctx)	((ctx)->si)
+#define PT_REGS_PARM3(ctx)	((ctx)->dx)
+#define PT_REGS_PARM4(ctx)	((ctx)->cx)
+#define PT_REGS_PARM5(ctx)	((ctx)->r8)
+#define PT_REGS_PARM6(ctx)	((ctx)->r9)
+#define PT_REGS_RC(ctx)		((ctx)->ax)
+#define PT_REGS_IP(ctx)		((ctx)->ip)
+#define PT_REGS_SP(ctx)		((ctx)->sp)
+#else
+#error "bcc does not support this platform yet"
+#endif
+
 #endif
 )********"

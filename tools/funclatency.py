@@ -132,7 +132,7 @@ if args.function:
         'BPF_HISTOGRAM(dist, ip_key_t);')
     # stash the IP on entry, as on return it's kretprobe_trampoline:
     bpf_text = bpf_text.replace('ENTRYSTORE',
-        'u64 ip = ctx->ip; ipaddr.update(&pid, &ip);')
+        'u64 ip = PT_REGS_IP(ctx); ipaddr.update(&pid, &ip);')
     bpf_text = bpf_text.replace('STORE',
         'u64 ip, *ipp = ipaddr.lookup(&pid); if (ipp) { ip = *ipp; ' +
         'dist.increment((ip_key_t){ip, bpf_log2l(delta)}); ' +

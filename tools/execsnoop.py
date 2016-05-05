@@ -105,7 +105,7 @@ out:
 
 int kretprobe__sys_execve(struct pt_regs *ctx)
 {
-    bpf_trace_printk("RET %d\\n", ctx->ax);
+    bpf_trace_printk("RET %d\\n", PT_REGS_RC(ctx));
     return 0;
 }
 """

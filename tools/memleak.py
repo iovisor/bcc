@@ -191,7 +191,7 @@ int alloc_enter(struct pt_regs *ctx, size_t size)
 
 int alloc_exit(struct pt_regs *ctx)
 {
-        u64 address = ctx->ax;
+        u64 address = PT_REGS_RC(ctx);
         u64 pid = bpf_get_current_pid_tgid();
         u64* size64 = sizes.lookup(&pid);
         struct alloc_info_t info = {0};

@@ -24,13 +24,13 @@ struct key_t {
 BPF_HASH(counts, struct key_t);
 
 int count(struct pt_regs *ctx) {
-    if (!ctx->si)
+    if (!PT_REGS_PARM2(ctx))
         return 0;
 
     struct key_t key = {};
     u64 zero = 0, *val;
 
-    bpf_probe_read(&key.c, sizeof(key.c), (void *)ctx->si);
+    bpf_probe_read(&key.c, sizeof(key.c), (void *)PT_REGS_PARM2(ctx));
     val = counts.lookup_or_init(&key, &zero);
     (*val)++;
     return 0;

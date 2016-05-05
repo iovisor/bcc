@@ -74,7 +74,7 @@ BPF_PERF_OUTPUT(ipv6_events);
 
 int kretprobe__inet_csk_accept(struct pt_regs *ctx)
 {
-    struct sock *newsk = (struct sock *)ctx->ax;
+    struct sock *newsk = (struct sock *)PT_REGS_RC(ctx);
     u32 pid = bpf_get_current_pid_tgid();
 
     if (newsk == NULL)
