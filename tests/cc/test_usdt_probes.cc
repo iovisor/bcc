@@ -39,8 +39,8 @@ TEST_CASE("test finding a probe in our own process", "[usdt]") {
   REQUIRE(ctx.num_probes() >= 1);
 
   SECTION("our test probe") {
-    USDT::Probe *probe = ctx.find_probe("sample_probe_1");
-    REQUIRE(probe != nullptr);
+    auto probe = ctx.get("sample_probe_1");
+    REQUIRE(probe);
 
     REQUIRE(probe->in_shared_object() == false);
     REQUIRE(probe->name() == "sample_probe_1");
@@ -52,13 +52,6 @@ TEST_CASE("test finding a probe in our own process", "[usdt]") {
     REQUIRE(probe->need_enable() == false);
 
     REQUIRE(a_probed_function() != 0);
-
-    std::ostringstream case_stream;
-    REQUIRE(probe->usdt_cases(case_stream));
-
-    std::string cases = case_stream.str();
-    REQUIRE(cases.find("int32_t arg1") != std::string::npos);
-    REQUIRE(cases.find("uint64_t arg2") != std::string::npos);
   }
 }
 #endif  // HAVE_SDT_HEADER
@@ -115,8 +108,8 @@ TEST_CASE("test listing all USDT probes in Ruby/MRI", "[usdt]") {
     mri_probe_count = ctx.num_probes();
 
     SECTION("GC static probe") {
-      USDT::Probe *probe = ctx.find_probe("gc__mark__begin");
-      REQUIRE(probe != nullptr);
+      auto probe = ctx.get("gc__mark__begin");
+      REQUIRE(probe);
 
       REQUIRE(probe->in_shared_object() == true);
       REQUIRE(probe->name() == "gc__mark__begin");
@@ -129,8 +122,8 @@ TEST_CASE("test listing all USDT probes in Ruby/MRI", "[usdt]") {
     }
 
     SECTION("object creation probe") {
-      USDT::Probe *probe = ctx.find_probe("object__create");
-      REQUIRE(probe != nullptr);
+      auto probe = ctx.get("object__create");
+      REQUIRE(probe);
 
       REQUIRE(probe->in_shared_object() == true);
       REQUIRE(probe->name() == "object__create");
@@ -140,54 +133,16 @@ TEST_CASE("test listing all USDT probes in Ruby/MRI", "[usdt]") {
       REQUIRE(probe->num_locations() == 1);
       REQUIRE(probe->num_arguments() == 3);
       REQUIRE(probe->need_enable() == true);
-
-      std::ostringstream thunks_stream;
-      REQUIRE(probe->usdt_thunks(thunks_stream, "ruby_usdt"));
-
-      std::string thunks = thunks_stream.str();
-      REQUIRE(std::count(thunks.begin(), thunks.end(), '\n') == 1);
-      REQUIRE(thunks.find("ruby_usdt_thunk_0") != std::string::npos);
-
-      std::ostringstream case_stream;
-      REQUIRE(probe->usdt_cases(case_stream));
-
-      std::string cases = case_stream.str();
-      REQUIRE(countsubs(cases, "arg1") == 2);
-      REQUIRE(countsubs(cases, "arg2") == 2);
-      REQUIRE(countsubs(cases, "arg3") == 2);
-
-      REQUIRE(countsubs(cases, "uint64_t") == 4);
-      REQUIRE(countsubs(cases, "int32_t") == 2);
     }
 
     SECTION("array creation probe") {
-      USDT::Probe *probe = ctx.find_probe("array__create");
-      REQUIRE(probe != nullptr);
+      auto probe = ctx.get("array__create");
+      REQUIRE(probe);
       REQUIRE(probe->name() == "array__create");
 
       REQUIRE(probe->num_locations() == 7);
       REQUIRE(probe->num_arguments() == 3);
       REQUIRE(probe->need_enable() == true);
-
-      std::ostringstream thunks_stream;
-      REQUIRE(probe->usdt_thunks(thunks_stream, "ruby_usdt"));
-
-      std::string thunks = thunks_stream.str();
-      REQUIRE(std::count(thunks.begin(), thunks.end(), '\n') == 7);
-      REQUIRE(thunks.find("ruby_usdt_thunk_0") != std::string::npos);
-      REQUIRE(thunks.find("ruby_usdt_thunk_6") != std::string::npos);
-      REQUIRE(thunks.find("ruby_usdt_thunk_7") == std::string::npos);
-
-      std::ostringstream case_stream;
-      REQUIRE(probe->usdt_cases(case_stream));
-
-      std::string cases = case_stream.str();
-      REQUIRE(countsubs(cases, "arg1") == 8);
-      REQUIRE(countsubs(cases, "arg2") == 8);
-      REQUIRE(countsubs(cases, "arg3") == 8);
-
-      REQUIRE(countsubs(cases, "__loc_id") == 7);
-      REQUIRE(cases.find("int64_t arg1 =") != std::string::npos);
     }
   }
 
@@ -203,8 +158,8 @@ TEST_CASE("test listing all USDT probes in Ruby/MRI", "[usdt]") {
     REQUIRE(ctx.num_probes() >= mri_probe_count);
 
     SECTION("get probe in running process") {
-      USDT::Probe *probe = ctx.find_probe("gc__mark__begin");
-      REQUIRE(probe != nullptr);
+      auto probe = ctx.get("gc__mark__begin");
+      REQUIRE(probe);
 
       REQUIRE(probe->in_shared_object() == true);
       REQUIRE(probe->name() == "gc__mark__begin");

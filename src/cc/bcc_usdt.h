@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#ifndef LIBBCC_SYMS_H
-#define LIBBCC_SYMS_H
+#ifndef LIBBCC_USDT_H
+#define LIBBCC_USDT_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -22,22 +22,16 @@ extern "C" {
 
 #include <stdint.h>
 
-struct bcc_symbol {
-  const char *name;
-  const char *module;
-  uint64_t offset;
-};
+void *bcc_usdt_new_frompid(int pid);
+void *bcc_usdt_new_frompath(const char *path);
+void bcc_usdt_close(void *usdt);
 
-void *bcc_symcache_new(int pid);
-int bcc_symcache_resolve(void *symcache, uint64_t addr, struct bcc_symbol *sym);
-int bcc_symcache_resolve_name(void *resolver, const char *name, uint64_t *addr);
-void bcc_symcache_refresh(void *resolver);
+int bcc_usdt_enable_probe(void *, const char *, const char *);
+char *bcc_usdt_genargs(void *);
 
-int bcc_resolve_global_addr(int pid, const char *module, const uint64_t address,
-                            uint64_t *global);
-int bcc_find_symbol_addr(struct bcc_symbol *sym);
-int bcc_resolve_symname(const char *module, const char *symname,
-                        const uint64_t addr, struct bcc_symbol *sym);
+typedef void (*bcc_usdt_uprobe_cb)(const char *, const char *, uint64_t, int);
+void bcc_usdt_foreach_uprobe(void *usdt, bcc_usdt_uprobe_cb callback);
+
 #ifdef __cplusplus
 }
 #endif

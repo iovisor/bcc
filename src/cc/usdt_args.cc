@@ -55,37 +55,35 @@ bool Argument::assign_to_local(std::ostream &stream,
                                const std::string &binpath,
                                const optional<int> &pid) const {
   if (constant_) {
-    tfm::format(stream, "%s = %d;\n", local_name, *constant_);
+    tfm::format(stream, "%s = %d;", local_name, *constant_);
     return true;
   }
 
   if (!deref_offset_) {
-    tfm::format(stream, "%s = (%s)ctx->%s;\n", local_name, ctype(),
+    tfm::format(stream, "%s = (%s)ctx->%s;", local_name, ctype(),
                 *register_name_);
     return true;
   }
 
   if (deref_offset_ && !deref_ident_) {
     tfm::format(stream,
-                "{\n"
-                "    u64 __temp = ctx->%s + (%d);\n"
-                "    bpf_probe_read(&%s, sizeof(%s), (void *)__temp);\n"
-                "}\n",
-                *register_name_, *deref_offset_, local_name, local_name);
+                "{ u64 __addr = ctx->%s + (%d); %s __res = 0x0; "
+                "bpf_probe_read(&__res, sizeof(__res), (void *)__addr); "
+                "%s = __res; }",
+                *register_name_, *deref_offset_, ctype(), local_name);
     return true;
   }
 
-  if (deref_offset_ && deref_ident_) {
+  if (deref_offset_ && deref_ident_ && *register_name_ == "ip") {
     uint64_t global_address;
     if (!get_global_address(&global_address, binpath, pid))
       return false;
 
     tfm::format(stream,
-                "{\n"
-                "    u64 __temp = 0x%xull + %d;\n"
-                "    bpf_probe_read(&%s, sizeof(%s), (void *)__temp);\n"
-                "}\n",
-                global_address, *deref_offset_, local_name, local_name);
+                "{ u64 __addr = 0x%xull + %d; %s __res = 0x0; "
+                "bpf_probe_read(&__res, sizeof(__res), (void *)__addr); "
+                "%s = __res; }",
+                global_address, *deref_offset_, ctype(), local_name);
     return true;
   }
 

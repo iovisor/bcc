@@ -254,6 +254,7 @@ bool BTypeVisitor::VisitFunctionDecl(FunctionDecl *D) {
   // put each non-static non-inline function decl in its own section, to be
   // extracted by the MemoryManager
   if (D->isExternallyVisible() && D->hasBody()) {
+    current_fn_ = D->getName();
     string attr = string("__attribute__((section(\"") + BPF_FN_PREFIX + D->getName().str() + "\")))\n";
     rewriter_.InsertText(D->getLocStart(), attr);
     if (D->param_size() > MAX_CALLING_CONV_REGS + 1) {
@@ -470,6 +471,20 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
             numcpu = 1;
           text = to_string(numcpu);
           rewriter_.ReplaceText(SourceRange(Call->getLocStart(), Call->getLocEnd()), text);
+        } else if (Decl->getName() == "bpf_usdt_readarg_p") {
+          text = "({ u64 __addr = 0x0; ";
+          text += "_bpf_readarg_" + current_fn_ + "_" + args[0] + "(" +
+                  args[1] + ", &__addr, sizeof(__addr));";
+          text += "bpf_probe_read(" + args[2] + ", " + args[3] +
+                  ", (void *)__addr);";
+          text += "})";
+          rewriter_.ReplaceText(
+              SourceRange(Call->getLocStart(), Call->getLocEnd()), text);
+        } else if (Decl->getName() == "bpf_usdt_readarg") {
+          text = "_bpf_readarg_" + current_fn_ + "_" + args[0] + "(" + args[1] +
+                 ", " + args[2] + ", sizeof(*(" + args[2] + ")))";
+          rewriter_.ReplaceText(
+              SourceRange(Call->getLocStart(), Call->getLocEnd()), text);
         }
       }
     }

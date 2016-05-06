@@ -408,7 +408,9 @@ int incr_cksum_l3(void *off, u64 oldval, u64 newval) asm("llvm.bpf.extra");
 int incr_cksum_l4(void *off, u64 oldval, u64 newval, u64 flags) asm("llvm.bpf.extra");
 int bpf_num_cpus() asm("llvm.bpf.extra");
 
-#define lock_xadd(ptr, val) ((void)__sync_fetch_and_add(ptr, val))
+struct pt_regs;
+int bpf_usdt_readarg(int argc, struct pt_regs *ctx, void *arg) asm("llvm.bpf.extra");
+int bpf_usdt_readarg_p(int argc, struct pt_regs *ctx, void *buf, u64 len) asm("llvm.bpf.extra");
 
 #ifdef __powerpc__
 #define PT_REGS_PARM1(ctx)	((ctx)->gpr[3])
@@ -433,6 +435,8 @@ int bpf_num_cpus() asm("llvm.bpf.extra");
 #else
 #error "bcc does not support this platform yet"
 #endif
+
+#define lock_xadd(ptr, val) ((void)__sync_fetch_and_add(ptr, val))
 
 #endif
 )********"

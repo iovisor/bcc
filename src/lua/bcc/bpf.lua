@@ -37,7 +37,7 @@ function Bpf.static.check_probe_quota(n)
   assert(cur + n <= Bpf.static.KPROBE_LIMIT, "number of open probes would exceed quota")
 end
 
-function Bpf.static.cleanup_probes()
+function Bpf.static.cleanup()
   local function detach_all(probe_type, all_probes)
     for key, probe in pairs(all_probes) do
       libbcc.perf_reader_free(probe)
@@ -102,9 +102,12 @@ local function _find_file(script_root, filename)
 end
 
 function Bpf:initialize(args)
-  self.do_debug = args.debug or false
   self.funcs = {}
   self.tables = {}
+
+  if args.usdt and args.text then
+    args.text = args.usdt:_get_text() .. args.text
+  end
 
   local cflags = table.join(Bpf.DEFAULT_CFLAGS, args.cflags)
   local cflags_ary = ffi.new("const char *[?]", #cflags, cflags)
@@ -127,6 +130,10 @@ function Bpf:initialize(args)
   end
 
   assert(self.module ~= nil, "failed to compile BPF module")
+
+  if args.usdt then
+    args.usdt:_attach_uprobes(self)
+  end
 end
 
 function Bpf:load_funcs(prog_type)

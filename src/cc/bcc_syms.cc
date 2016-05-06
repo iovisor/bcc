@@ -24,17 +24,15 @@
 #include "bcc_syms.h"
 
 #include "syms.h"
+#include "vendor/tinyformat.hpp"
 
 ino_t ProcStat::getinode_() {
   struct stat s;
   return (!stat(procfs_.c_str(), &s)) ? s.st_ino : -1;
 }
 
-ProcStat::ProcStat(int pid) : inode_(-1) {
-  char buffer[128];
-  snprintf(buffer, sizeof(buffer), "/proc/%d/exe", pid);
-  procfs_ = buffer;
-}
+ProcStat::ProcStat(int pid)
+    : procfs_(tfm::format("/proc/%d/exe", pid)), inode_(getinode_()) {}
 
 void KSyms::_add_symbol(const char *symname, uint64_t addr, void *p) {
   KSyms *ks = static_cast<KSyms *>(p);
@@ -84,11 +82,15 @@ bool KSyms::resolve_name(const char *_unused, const char *name,
   return true;
 }
 
-ProcSyms::ProcSyms(int pid) : pid_(pid), procstat_(pid) { refresh(); }
+ProcSyms::ProcSyms(int pid) : pid_(pid), procstat_(pid) { load_modules(); }
+
+bool ProcSyms::load_modules() {
+  return bcc_procutils_each_module(pid_, _add_module, this) == 0;
+}
 
 void ProcSyms::refresh() {
   modules_.clear();
-  bcc_procutils_each_module(pid_, _add_module, this);
+  load_modules();
   procstat_.reset();
 }
 
@@ -197,6 +199,32 @@ int bcc_symcache_resolve_name(void *resolver, const char *name,
 void bcc_symcache_refresh(void *resolver) {
   SymbolCache *cache = static_cast<SymbolCache *>(resolver);
   cache->refresh();
+}
+
+struct mod_st {
+  const char *name;
+  uint64_t start;
+};
+
+static int _find_module(const char *modname, uint64_t start, uint64_t end,
+                        void *p) {
+  struct mod_st *mod = (struct mod_st *)p;
+  if (!strcmp(modname, mod->name)) {
+    mod->start = start;
+    return -1;
+  }
+  return 0;
+}
+
+int bcc_resolve_global_addr(int pid, const char *module, const uint64_t address,
+                            uint64_t *global) {
+  struct mod_st mod = {module, 0x0};
+  if (bcc_procutils_each_module(pid, _find_module, &mod) < 0 ||
+      mod.start == 0x0)
+    return -1;
+
+  *global = mod.start + address;
+  return 0;
 }
 
 static int _find_sym(const char *symname, uint64_t addr, uint64_t end,

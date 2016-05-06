@@ -11,6 +11,7 @@ Module "bcc.sym" "bcc/sym.lua"
 Module "bcc.libbcc" "bcc/libbcc.lua"
 Module "bcc.tracerpipe" "bcc/tracerpipe.lua"
 Module "bcc.table" "bcc/table.lua"
+Module "bcc.usdt" "bcc/usdt.lua"
 
 Main "bcc/run.lua"
 Output "bcc.lua"

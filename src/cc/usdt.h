@@ -15,6 +15,7 @@
  */
 #pragma once
 
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -122,32 +123,39 @@ class Probe {
 
   struct Location {
     uint64_t address_;
-    std::vector<Argument *> arguments_;
+    std::vector<Argument> arguments_;
     Location(uint64_t addr, const char *arg_fmt);
   };
 
   std::vector<Location> locations_;
-  std::unordered_map<int, uint64_t> semaphores_;
-  std::unordered_map<int, ProcStat> enabled_semaphores_;
+
+  optional<int> pid_;
   optional<bool> in_shared_object_;
 
-  bool add_to_semaphore(int pid, int16_t val);
-  bool lookup_semaphore_addr(uint64_t *address, int pid);
+  optional<std::string> attached_to_;
+  optional<uint64_t> attached_semaphore_;
+
+  std::string largest_arg_type(size_t arg_n);
+
+  bool add_to_semaphore(int16_t val);
+  bool resolve_global_address(uint64_t *global, const uint64_t addr);
+  bool lookup_semaphore_addr(uint64_t *address);
   void add_location(uint64_t addr, const char *fmt);
 
 public:
   Probe(const char *bin_path, const char *provider, const char *name,
-        uint64_t semaphore);
+        uint64_t semaphore, const optional<int> &pid);
 
   size_t num_locations() const { return locations_.size(); }
   size_t num_arguments() const { return locations_.front().arguments_.size(); }
 
-  bool usdt_thunks(std::ostream &stream, const std::string &prefix);
-  bool usdt_cases(std::ostream &stream, const optional<int> &pid = nullopt);
+  uint64_t address(size_t n = 0) const { return locations_[n].address_; }
+  bool usdt_getarg(std::ostream &stream);
 
   bool need_enable() const { return semaphore_ != 0x0; }
-  bool enable(int pid);
-  bool disable(int pid);
+  bool enable(const std::string &fn_name);
+  bool disable();
+  bool enabled() const { return !!attached_to_; }
 
   bool in_shared_object();
   const std::string &name() { return name_; }
@@ -158,7 +166,10 @@ public:
 };
 
 class Context {
-  std::vector<Probe *> probes_;
+  std::vector<std::unique_ptr<Probe>> probes_;
+
+  optional<int> pid_;
+  optional<ProcStat> pid_stat_;
   bool loaded_;
 
   static void _each_probe(const char *binpath, const struct bcc_elf_usdt *probe,
@@ -171,9 +182,19 @@ class Context {
 public:
   Context(const std::string &bin_path);
   Context(int pid);
+  ~Context();
 
+  optional<int> pid() const { return pid_; }
   bool loaded() const { return loaded_; }
   size_t num_probes() const { return probes_.size(); }
-  Probe *find_probe(const std::string &probe_name);
+
+  Probe *get(const std::string &probe_name);
+  Probe *get(int pos) { return probes_[pos].get(); }
+
+  bool enable_probe(const std::string &probe_name, const std::string &fn_name);
+  bool generate_usdt_args(std::ostream &stream);
+
+  typedef void (*each_uprobe_cb)(const char *, const char *, uint64_t, int);
+  void each_uprobe(each_uprobe_cb callback);
 };
 }
