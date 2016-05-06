@@ -166,7 +166,7 @@ public:
 };
 
 class Context {
-  std::vector<std::shared_ptr<Probe>> probes_;
+  std::vector<std::unique_ptr<Probe>> probes_;
 
   optional<int> pid_;
   optional<ProcStat> pid_stat_;
@@ -188,8 +188,8 @@ public:
   bool loaded() const { return loaded_; }
   size_t num_probes() const { return probes_.size(); }
 
-  std::shared_ptr<Probe> get(const std::string &probe_name);
-  std::shared_ptr<Probe> get(int pos) { return probes_[pos]; }
+  Probe *get(const std::string &probe_name);
+  Probe *get(int pos) { return probes_[pos].get(); }
 
   bool enable_probe(const std::string &probe_name, const std::string &fn_name);
   bool generate_usdt_args(std::ostream &stream);

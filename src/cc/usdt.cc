@@ -229,10 +229,10 @@ std::string Context::resolve_bin_path(const std::string &bin_path) {
   return result;
 }
 
-std::shared_ptr<Probe> Context::get(const std::string &probe_name) {
+Probe *Context::get(const std::string &probe_name) {
   for (auto &p : probes_) {
     if (p->name_ == probe_name)
-      return p;
+      return p.get();
   }
   return nullptr;
 }
