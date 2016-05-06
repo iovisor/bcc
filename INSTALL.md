@@ -137,6 +137,7 @@ To build the toolchain from source, one needs:
 * LLVM 3.7 or newer, compiled with BPF support (default=on)
 * Clang 3.7, built from the same tree as LLVM
 * cmake, gcc (>=4.7), flex, bison
+* LuaJIT, if you want Lua support
 
 ### Install build dependencies
 ```
@@ -151,6 +152,9 @@ sudo apt-get update
 # All versions
 sudo apt-get -y install bison build-essential cmake flex git libedit-dev \
   libllvm3.7 llvm-3.7-dev libclang-3.7-dev python zlib1g-dev libelf-dev
+
+# For Lua support
+sudo apt-get -y install luajit luajit-5.1-dev
 ```
 
 ### Install and compile BCC
@@ -169,6 +173,7 @@ sudo make install
 ```
 sudo dnf install -y bison cmake ethtool flex git iperf libstdc++-static \
   python-netaddr python-pip gcc gcc-c++ make zlib-devel
+sudo dnf install -y luajit luajit-devel  # for Lua support
 sudo dnf install -y \
   http://pkgs.repoforge.org/netperf/netperf-2.6.0-1.el6.rf.x86_64.rpm
 sudo pip install pyroute2
