@@ -29,9 +29,9 @@
 #include <string.h>
 #include <unistd.h>
 
-#include <luajit-2.0/lauxlib.h>
-#include <luajit-2.0/lua.h>
-#include <luajit-2.0/lualib.h>
+#include "lauxlib.h"
+#include "lua.h"
+#include "lualib.h"
 
 static lua_State *globalL = NULL;
 static const char *progname = NULL;
