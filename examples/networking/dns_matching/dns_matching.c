@@ -53,7 +53,7 @@ struct Leaf {
 
 BPF_TABLE("hash", struct Key, struct Leaf, cache, 128);
 
-int dns_test(struct __sk_buff *skb)
+int dns_matching(struct __sk_buff *skb)
 {
   u8 *cursor = 0;
   struct Key key = {};
