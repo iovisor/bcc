@@ -175,12 +175,19 @@ static int (*bpf_perf_event_output)(void *ctx, void *map, u32 index, void *data,
   (void *) BPF_FUNC_perf_event_output;
 static int (*bpf_skb_load_bytes)(void *ctx, int offset, void *to, u32 len) =
   (void *) BPF_FUNC_skb_load_bytes;
+
+/* bpf_get_stackid will return a negative value in the case of an error
+ *
+ * BPF_STACK_TRACE(_name, _size) will allocate space for _size stack traces.
+ *  -ENOMEM will be returned when this limit is reached.
+ */
 static int (*bpf_get_stackid_)(void *ctx, void *map, u64 flags) =
   (void *) BPF_FUNC_get_stackid;
 static inline __attribute__((always_inline))
 int bpf_get_stackid(uintptr_t map, void *ctx, u64 flags) {
   return bpf_get_stackid_(ctx, (void *)map, flags);
 }
+
 static int (*bpf_csum_diff)(void *from, u64 from_size, void *to, u64 to_size, u64 seed) =
   (void *) BPF_FUNC_csum_diff;
 

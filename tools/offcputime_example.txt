@@ -11,7 +11,7 @@ Here is some example output. To explain what we are seeing: the very first
 stack trace looks like a page fault (do_page_fault() etc) from the "chmod"
 command, and in total was off-CPU for 13 microseconds.
 
-# ./offcputime 
+# ./offcputime
 Tracing off-CPU time (us) by kernel stack... Hit Ctrl-C to end.
 ^C
     schedule
@@ -644,7 +644,7 @@ Tracing off-CPU time (us) by kernel stack for 5 secs.
 Here, dd was blocked for 4.4 seconds out of 5. Or put differently, likely
 on-CPU for about 12% of the time. Which matches the ratio seen by time(1):
 
-# time dd if=/dev/md0 iflag=direct of=/dev/null bs=1k 
+# time dd if=/dev/md0 iflag=direct of=/dev/null bs=1k
 ^C108115+0 records in
 108114+0 records out
 110708736 bytes (111 MB) copied, 13.7565 s, 8.0 MB/s
@@ -718,19 +718,24 @@ creating your "off-CPU time flame graphs".
 USAGE message:
 
 # ./offcputime -h
-usage: offcputime [-h] [-u] [-p PID] [-v] [-f] [duration]
+usage: offcputime.py [-h] [-u | -p PID] [-v] [-f]
+                     [--stack-storage-size STACK_STORAGE_SIZE]
+                     [duration]
 
 Summarize off-CPU time by kernel stack trace
 
 positional arguments:
-  duration           duration of trace, in seconds
+  duration              duration of trace, in seconds
 
 optional arguments:
-  -h, --help         show this help message and exit
-  -u, --useronly     user threads only (no kernel threads)
-  -p PID, --pid PID  trace this PID only
-  -v, --verbose      show raw addresses
-  -f, --folded       output folded format
+  -h, --help            show this help message and exit
+  -u, --useronly        user threads only (no kernel threads)
+  -p PID, --pid PID     trace this PID only
+  -v, --verbose         show raw addresses
+  -f, --folded          output folded format
+  --stack-storage-size STACK_STORAGE_SIZE
+                        the number of unique stack traces that can be stored
+                        and displayed (default 1024)
 
 examples:
     ./offcputime             # trace off-CPU stack time until Ctrl-C
