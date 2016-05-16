@@ -54,7 +54,7 @@ int http_filter(struct __sk_buff *skb) {
 	u32  payload_offset = 0;
 	u32  payload_length = 0;
 	struct Key 	key;
-	struct Leaf leaf;
+	struct Leaf zero = {0};
 
 	struct tcp_t *tcp = cursor_advance(cursor, sizeof(*tcp));
 
@@ -135,10 +135,8 @@ int http_filter(struct __sk_buff *skb) {
 	//keep the packet and send it to userspace retruning -1
 	HTTP_MATCH:
 	//if not already present, insert into map <Key, Leaf>
-	leaf.timestamp = 0;
-	sessions.lookup_or_init(&key, &leaf);
-	sessions.update(&key,&leaf);
-	
+	sessions.lookup_or_init(&key,&zero);
+
 	//send packet to userspace returning -1
 	KEEP:
 	return -1;

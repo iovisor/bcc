@@ -14,10 +14,51 @@
 
 from __future__ import print_function
 from bcc import BPF
+from sys import argv
 
 import sys
 import socket
 import os
+
+#args
+def usage():
+    print("USAGE: %s [-i <if_name>]" % argv[0])
+    print("")
+    print("Try '%s -h' for more options." % argv[0])
+    exit()
+
+#help
+def help():
+    print("USAGE: %s [-i <if_name>]" % argv[0])
+    print("")
+    print("optional arguments:")
+    print("   -h                       print this help")
+    print("   -i if_name               select interface if_name. Default is eth0")
+    print("")
+    print("examples:")
+    print("    http-parse              # bind socket to eth0")
+    print("    http-parse -i wlan0     # bind socket to wlan0")
+    exit()
+
+#arguments
+interface="eth0"
+
+if len(argv) == 2:
+  if str(argv[1]) == '-h':
+    help()
+  else:
+    usage()
+
+if len(argv) == 3:
+  if str(argv[1]) == '-i':
+    interface = argv[2]
+  else:
+    usage()
+
+if len(argv) > 3:
+  usage()
+
+print ("binding socket to '%s'" % interface)
 
 # initialize BPF - load source code from http-parse-simple.c
 bpf = BPF(src_file = "http-parse-simple.c",debug = 0)
@@ -27,9 +68,9 @@ bpf = BPF(src_file = "http-parse-simple.c",debug = 0)
 #http://man7.org/linux/man-pages/man2/bpf.2.html
 function_http_filter = bpf.load_func("http_filter", BPF.SOCKET_FILTER)
 
-#create raw socket, bind it to eth0
+#create raw socket, bind it to interface
 #attach bpf program to socket created
-BPF.attach_raw_socket(function_http_filter, "eth0")
+BPF.attach_raw_socket(function_http_filter, interface)
 
 #get file descriptor of the socket previously created inside BPF.attach_raw_socket
 socket_fd = function_http_filter.sock
