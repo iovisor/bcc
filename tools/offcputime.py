@@ -16,9 +16,27 @@
 
 from __future__ import print_function
 from bcc import BPF
+from sys import stderr
 from time import sleep, strftime
 import argparse
 import signal
+
+# arg validation
+def positive_int(val):
+    try:
+        ival = int(val)
+    except ValueError:
+        raise argparse.ArgumentTypeError("must be an integer")
+
+    if ival < 0:
+        raise argparse.ArgumentTypeError("must be positive")
+    return ival
+
+def positive_nonzero_int(val):
+    ival = positive_int(val)
+    if ival == 0:
+        raise argparse.ArgumentTypeError("must be nonzero")
+    return ival
 
 # arguments
 examples = """examples:
@@ -26,29 +44,31 @@ examples = """examples:
     ./offcputime 5           # trace for 5 seconds only
     ./offcputime -f 5        # 5 seconds, and output in folded format
     ./offcputime -u          # don't include kernel threads (user only)
-    ./offcputime -p 185      # trace fo PID 185 only
+    ./offcputime -p 185      # trace for PID 185 only
 """
 parser = argparse.ArgumentParser(
     description="Summarize off-CPU time by kernel stack trace",
     formatter_class=argparse.RawDescriptionHelpFormatter,
     epilog=examples)
-parser.add_argument("-u", "--useronly", action="store_true",
+thread_group = parser.add_mutually_exclusive_group()
+thread_group.add_argument("-u", "--useronly", action="store_true",
     help="user threads only (no kernel threads)")
-parser.add_argument("-p", "--pid",
+thread_group.add_argument("-p", "--pid", type=positive_int,
     help="trace this PID only")
 parser.add_argument("-v", "--verbose", action="store_true",
     help="show raw addresses")
 parser.add_argument("-f", "--folded", action="store_true",
     help="output folded format")
+parser.add_argument("--stack-storage-size", default=1024,
+    type=positive_nonzero_int,
+    help="the number of unique stack traces that can be stored and " \
+        "displayed (default 1024)")
 parser.add_argument("duration", nargs="?", default=99999999,
+    type=positive_nonzero_int,
     help="duration of trace, in seconds")
 args = parser.parse_args()
 folded = args.folded
 duration = int(args.duration)
-debug = 0
-if args.pid and args.useronly:
-    print("ERROR: use either -p or -u.")
-    exit()
 
 # signal handler
 def signal_ignore(signal, frame):
@@ -67,7 +87,7 @@ struct key_t {
 };
 BPF_HASH(counts, struct key_t);
 BPF_HASH(start, u32);
-BPF_STACK_TRACE(stack_traces, 1024)
+BPF_STACK_TRACE(stack_traces, STACK_STORAGE_SIZE)
 
 int oncpu(struct pt_regs *ctx, struct task_struct *prev) {
     u32 pid;
@@ -103,23 +123,26 @@ int oncpu(struct pt_regs *ctx, struct task_struct *prev) {
     return 0;
 }
 """
-if args.pid:
+
+# set thread filter
+if args.pid is not None:
     filter = 'pid == %s' % args.pid
 elif args.useronly:
     filter = '!(prev->flags & PF_KTHREAD)'
 else:
     filter = '1'
 bpf_text = bpf_text.replace('FILTER', filter)
-if debug:
-    print(bpf_text)
+
+# set stack storage size
+bpf_text = bpf_text.replace('STACK_STORAGE_SIZE', str(args.stack_storage_size))
 
 # initialize BPF
 b = BPF(text=bpf_text)
 b.attach_kprobe(event="finish_task_switch", fn_name="oncpu")
 matched = b.num_open_kprobes()
 if matched == 0:
-    print("0 functions traced. Exiting.")
-    exit()
+    print("error: 0 functions traced. Exiting.", file=stderr)
+    exit(1)
 
 # header
 if not folded:
@@ -129,32 +152,45 @@ if not folded:
     else:
         print("... Hit Ctrl-C to end.")
 
-# output
-while (1):
-    try:
-        sleep(duration)
-    except KeyboardInterrupt:
-        # as cleanup can take many seconds, trap Ctrl-C:
-        signal.signal(signal.SIGINT, signal_ignore)
+try:
+    sleep(duration)
+except KeyboardInterrupt:
+    # as cleanup can take many seconds, trap Ctrl-C:
+    signal.signal(signal.SIGINT, signal_ignore)
 
-    if not folded:
-        print()
-    counts = b.get_table("counts")
-    stack_traces = b.get_table("stack_traces")
-    for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
-        if folded:
-            # print folded stack output
-            stack = list(stack_traces.walk(k.stack_id))[1:]
-            line = [k.name.decode()] + [b.ksym(addr) for addr in reversed(stack)]
-            print("%s %d" % (";".join(line), v.value))
-        else:
-            # print default multi-line stack output
-            for addr in stack_traces.walk(k.stack_id):
-                print("    %-16x %s" % (addr, b.ksym(addr)))
-            print("    %-16s %s" % ("-", k.name))
-            print("        %d\n" % v.value)
-    counts.clear()
+if not folded:
+    print()
 
-    if not folded:
-        print("Detaching...")
-    exit()
+missing_stacks = 0
+has_enomem = False
+counts = b.get_table("counts")
+stack_traces = b.get_table("stack_traces")
+for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
+    # handle get_stackid erorrs
+    if k.stack_id < 0:
+        missing_stacks += 1
+        # check for an ENOMEM error
+        if k.stack_id == -12:
+            has_enomem = True
+        continue
+
+    stack = stack_traces.walk(k.stack_id)
+
+    if folded:
+        # print folded stack output
+        stack = list(stack)[1:]
+        line = [k.name.decode()] + [b.ksym(addr) for addr in reversed(stack)]
+        print("%s %d" % (";".join(line), v.value))
+    else:
+        # print default multi-line stack output
+        for addr in stack:
+            print("    %-16x %s" % (addr, b.ksym(addr)))
+        print("    %-16s %s" % ("-", k.name))
+        print("        %d\n" % v.value)
+
+if missing_stacks > 0:
+    enomem_str = "" if not has_enomem else \
+        " Consider increasing --stack-storage-size."
+    print("WARNING: %d stack traces could not be displayed.%s" %
+        (missing_stacks, enomem_str),
+        file=stderr)
