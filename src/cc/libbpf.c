@@ -213,7 +213,7 @@ int bpf_attach_socket(int sock, int prog) {
 
 static int bpf_attach_tracing_event(int progfd, const char *event_path,
     struct perf_reader *reader, int pid, int cpu, int group_fd) {
-  int efd = -1, pfd;
+  int efd, pfd;
   ssize_t bytes;
   char buf[256];
   struct perf_event_attr attr = {};
@@ -222,14 +222,16 @@ static int bpf_attach_tracing_event(int progfd, const char *event_path,
   efd = open(buf, O_RDONLY, 0);
   if (efd < 0) {
     fprintf(stderr, "open(%s): %s\n", buf, strerror(errno));
-    goto error;
+    return -1;
   }
 
   bytes = read(efd, buf, sizeof(buf));
   if (bytes <= 0 || bytes >= sizeof(buf)) {
     fprintf(stderr, "read(%s): %s\n", buf, strerror(errno));
-    goto error;
+    close(efd);
+    return -1;
   }
+  close(efd);
   buf[bytes] = '\0';
   attr.config = strtol(buf, NULL, 0);
   attr.type = PERF_TYPE_TRACEPOINT;
@@ -239,36 +241,30 @@ static int bpf_attach_tracing_event(int progfd, const char *event_path,
   pfd = syscall(__NR_perf_event_open, &attr, pid, cpu, group_fd, PERF_FLAG_FD_CLOEXEC);
   if (pfd < 0) {
     fprintf(stderr, "perf_event_open(%s/id): %s\n", event_path, strerror(errno));
-    goto error;
+    return -1;
   }
   perf_reader_set_fd(reader, pfd);
 
   if (perf_reader_mmap(reader, attr.type, attr.sample_type) < 0)
-    goto error;
+    return -1;
 
   if (ioctl(pfd, PERF_EVENT_IOC_SET_BPF, progfd) < 0) {
     perror("ioctl(PERF_EVENT_IOC_SET_BPF)");
-    goto error;
+    return -1;
   }
   if (ioctl(pfd, PERF_EVENT_IOC_ENABLE, 0) < 0) {
     perror("ioctl(PERF_EVENT_IOC_ENABLE)");
-    goto error;
+    return -1;
   }
 
   return 0;
-
-error:
-  if (efd >= 0)
-    close(efd);
-
-  return -1;
 }
 
 static void * bpf_attach_probe(int progfd, const char *event,
                                const char *event_desc, const char *event_type,
                                pid_t pid, int cpu, int group_fd,
                                perf_reader_cb cb, void *cb_cookie) {
-  int kfd = -1;
+  int kfd;
   char buf[256];
   struct perf_reader *reader = NULL;
 
@@ -287,8 +283,10 @@ static void * bpf_attach_probe(int progfd, const char *event,
     fprintf(stderr, "write(%s, \"%s\") failed: %s\n", buf, event_desc, strerror(errno));
     if (errno == EINVAL)
       fprintf(stderr, "check dmesg output for possible cause\n");
+    close(kfd);
     goto error;
   }
+  close(kfd);
 
   snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/events/%ss/%s", event_type, event);
   if (bpf_attach_tracing_event(progfd, buf, reader, pid, cpu, group_fd) < 0)
@@ -297,11 +295,7 @@ static void * bpf_attach_probe(int progfd, const char *event,
   return reader;
 
 error:
-  if (kfd >= 0)
-    close(kfd);
-  if (reader)
-    perf_reader_free(reader);
-
+  perf_reader_free(reader);
   return NULL;
 }
 
@@ -320,28 +314,24 @@ void * bpf_attach_uprobe(int progfd, const char *event,
 }
 
 static int bpf_detach_probe(const char *event_desc, const char *event_type) {
-  int kfd = -1;
+  int kfd;
 
   char buf[256];
   snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/%s_events", event_type);
   kfd = open(buf, O_WRONLY | O_APPEND, 0);
   if (kfd < 0) {
     fprintf(stderr, "open(%s): %s\n", buf, strerror(errno));
-    goto error;
+    return -1;
   }
 
   if (write(kfd, event_desc, strlen(event_desc)) < 0) {
     fprintf(stderr, "write(%s): %s\n", buf, strerror(errno));
-    goto error;
+    close(kfd);
+    return -1;
   }
+  close(kfd);
 
   return 0;
-
-error:
-  if (kfd >= 0)
-    close(kfd);
-
-  return -1;
 }
 
 int bpf_detach_kprobe(const char *event_desc) {
