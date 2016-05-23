@@ -35,7 +35,7 @@ ifc_gc = []
 def run():
     ipdb.routes.add({"dst": "224.0.0.0/4", "oif": ifc.index}).commit()
     with ipdb.create(ifname="vxlan0", kind="vxlan", vxlan_id=0,
-                     vxlan_link=ifc, vxlan_port=htons(4789),
+                     vxlan_link=ifc, vxlan_port=4789,
                      vxlan_group=str(mcast), vxlan_flowbased=True,
                      vxlan_collect_metadata=True,
                      vxlan_learning=False) as vx:

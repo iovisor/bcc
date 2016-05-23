@@ -45,7 +45,7 @@ class TunnelSimulation(Simulation):
                 with host[0].create(ifname="vxlan%d" % i, kind="vxlan",
                                     vxlan_id=10000 + i,
                                     vxlan_link=host[0].interfaces.eth0,
-                                    vxlan_port=htons(4789),
+                                    vxlan_port=4789,
                                     vxlan_group="239.1.1.%d" % (1 + i)) as vx:
                     vx.up()
                 with host[0].create(ifname="br%d" % i, kind="bridge") as br:
