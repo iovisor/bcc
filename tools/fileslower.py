@@ -31,7 +31,9 @@
 from __future__ import print_function
 from bcc import BPF
 import argparse
+import ctypes as ct
 import signal
+import time
 
 # arguments
 examples = """examples:
@@ -60,17 +62,31 @@ def signal_ignore(signal, frame):
 bpf_text = """
 #include <uapi/linux/ptrace.h>
 #include <linux/fs.h>
+#include <linux/sched.h>
 
-#define TRACE_READ	0
-#define TRACE_WRITE	1
+enum trace_mode {
+    MODE_READ,
+    MODE_WRITE
+};
 
 struct val_t {
     u32 sz;
     u64 ts;
     char name[DNAME_INLINE_LEN];
+    char comm[TASK_COMM_LEN];
+};
+
+struct data_t {
+    enum trace_mode mode;
+    u32 pid;
+    u32 sz;
+    u64 delta_us;
+    char name[DNAME_INLINE_LEN];
+    char comm[TASK_COMM_LEN];
 };
 
 BPF_HASH(entryinfo, pid_t, struct val_t);
+BPF_PERF_OUTPUT(events);
 
 // store timestamp and size on entry
 static int trace_rw_entry(struct pt_regs *ctx, struct file *file,
@@ -92,6 +108,7 @@ static int trace_rw_entry(struct pt_regs *ctx, struct file *file,
     val.sz = count;
     val.ts = bpf_ktime_get_ns();
     __builtin_memcpy(&val.name, de->d_iname, sizeof(val.name));
+    bpf_get_current_comm(&val.comm, sizeof(val.comm));
     entryinfo.update(&pid, &val);
 
     return 0;
@@ -131,23 +148,26 @@ static int trace_rw_return(struct pt_regs *ctx, int type)
     if (delta_us < MIN_US)
         return 0;
 
-    if (type == TRACE_READ) {
-        bpf_trace_printk("R %d %d %s\\n", valp->sz, delta_us, valp->name);
-    } else {
-        bpf_trace_printk("W %d %d %s\\n", valp->sz, delta_us, valp->name);
-    }
+    struct data_t data = {};
+    data.mode = type;
+    data.pid = pid;
+    data.sz = valp->sz;
+    data.delta_us = delta_us;
+    bpf_probe_read(&data.name, sizeof(data.name), valp->name);
+    bpf_probe_read(&data.comm, sizeof(data.comm), valp->comm);
+    events.perf_submit(ctx, &data, sizeof(data));
 
     return 0;
 }
 
 int trace_read_return(struct pt_regs *ctx)
 {
-    return trace_rw_return(ctx, TRACE_READ);
+    return trace_rw_return(ctx, MODE_READ);
 }
 
 int trace_write_return(struct pt_regs *ctx)
 {
-    return trace_rw_return(ctx, TRACE_WRITE);
+    return trace_rw_return(ctx, MODE_WRITE);
 }
 
 """
@@ -171,26 +191,40 @@ b.attach_kprobe(event="__vfs_write", fn_name="trace_write_entry")
 b.attach_kretprobe(event="__vfs_read", fn_name="trace_read_return")
 b.attach_kretprobe(event="__vfs_write", fn_name="trace_write_return")
 
+TASK_COMM_LEN = 16  # linux/sched.h
+DNAME_INLINE_LEN = 32  # linux/dcache.h
+
+class Data(ct.Structure):
+    _fields_ = [
+        ("mode", ct.c_int),
+        ("pid", ct.c_uint),
+        ("sz", ct.c_uint),
+        ("delta_us", ct.c_ulonglong),
+        ("name", ct.c_char * DNAME_INLINE_LEN),
+        ("comm", ct.c_char * TASK_COMM_LEN),
+    ]
+
+mode_s = {
+    0: 'R',
+    1: 'W',
+}
+
 # header
 print("Tracing sync read/writes slower than %d ms" % min_ms)
 print("%-8s %-14s %-6s %1s %-7s %7s %s" % ("TIME(s)", "COMM", "PID", "D",
     "BYTES", "LAT(ms)", "FILENAME"))
 
-start_ts = 0
+start_ts = time.time()
 
-# format output
-while 1:
-    (task, pid, cpu, flags, ts, msg) = b.trace_fields()
-    args = msg.split(" ", 3)
-    (type_s, sz, delta_us_s) = (args[0], args[1], args[2])
-    try:
-        filename = args[3]
-    except:
-        filename = "?"
-    if start_ts == 0:
-        start_ts = ts
+def print_event(cpu, data, size):
+    event = ct.cast(data, ct.POINTER(Data)).contents
 
-    ms = float(int(delta_us_s, 10)) / 1000
+    ms = float(event.delta_us) / 1000
 
     print("%-8.3f %-14.14s %-6s %1s %-7s %7.2f %s" % (
-        ts - start_ts, task, pid, type_s, sz, ms, filename))
+        time.time() - start_ts, event.comm, event.pid, mode_s[event.mode],
+        event.sz, ms, event.name))
+
+b["events"].open_perf_buffer(print_event)
+while 1:
+    b.kprobe_poll()

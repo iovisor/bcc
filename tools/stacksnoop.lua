@@ -17,16 +17,29 @@ limitations under the License.
 
 local program = [[
 #include <uapi/linux/ptrace.h>
+#include <linux/sched.h>
+
+struct data_t {
+    u64 stack_id;
+    u32 pid;
+    char comm[TASK_COMM_LEN];
+};
 
 BPF_STACK_TRACE(stack_traces, 128)
+BPF_PERF_OUTPUT(events);
 
 void trace_stack(struct pt_regs *ctx) {
+    u32 pid = bpf_get_current_pid_tgid();
     FILTER
-    int stack_id = stack_traces.get_stackid(ctx, BPF_F_REUSE_STACKID);
-    if (stack_id >= 0)
-        bpf_trace_printk("stack_id=%d\n", stack_id);
+    struct data_t data = {};
+    data.stack_id = stack_traces.get_stackid(ctx, BPF_F_REUSE_STACKID),
+    data.pid = pid;
+    bpf_get_current_comm(&data.comm, sizeof(data.comm));
+    events.perf_submit(ctx, &data, sizeof(data));
 }
 ]]
+
+local ffi = require("ffi")
 
 return function(BPF, utils)
   local parser = utils.argparse("stacksnoop",
@@ -41,11 +54,7 @@ return function(BPF, utils)
   local filter = ""
 
   if args.pid then
-    filter = [[
-      u32 pid;
-      pid = bpf_get_current_pid_tgid();
-      if (pid != %d) { return; }
-    ]] % args.pid
+    filter = "if (pid != %d) { return; }" % args.pid
   end
 
   local text = program:gsub("FILTER", filter)
@@ -53,40 +62,50 @@ return function(BPF, utils)
   bpf:attach_kprobe{event=args.fn, fn_name="trace_stack"}
 
   if BPF.num_open_kprobes() == 0 then
-    print("Function \"%s\" not found. Exiting." % args.fn)
+    print("Function \"%s\" not found. Exiting." % {args.fn})
     return
   end
 
   if args.verbose then
     print("%-18s %-12s %-6s %-3s %s" %
-        {"TIME(s)", "COMM", "PID", "CPU", "SYSCALL"})
+        {"TIME(s)", "COMM", "PID", "CPU", "FUNCTION"})
   else
-    print("%-18s %s" % {"TIME(s)", "SYSCALL"})
+    print("%-18s %s" % {"TIME(s)", "FUNCTION"})
   end
 
   local stack_traces = bpf:get_table("stack_traces")
-  local pipe = bpf:pipe()
+  local start_ts = utils.posix.time_ns()
 
-  while true do
-    local task, pid, cpu, flags, ts, msg = pipe:trace_fields()
-    local stack_id = string.match(msg, "stack_id=(%d+)")
+  local function print_event(cpu, event)
+    local ts = (utils.posix.time_ns() - start_ts) / 1e9
 
-    if stack_id then
-      if args.verbose then
-        print("%-18.9f %-12.12s %-6d %-3d %s" % {ts, task, pid, cpu, args.fn})
+    if args.verbose then
+      print("%-18.9f %-12.12s %-6d %-3d %s" %
+          {ts, ffi.string(event.comm), event.pid, cpu, args.fn})
+    else
+      print("%-18.9f %s" % {ts, args.fn})
+    end
+
+    for addr in stack_traces:walk(tonumber(event.stack_id)) do
+      local sym, offset = ksym:resolve(addr)
+      if args.offset then
+        print("\t%-16p %s+0x%x" % {addr, sym, tonumber(offset)})
       else
-        print("%-18.9f %s" % {ts, args.fn})
-      end
-
-      for addr in stack_traces:walk(tonumber(stack_id)) do
-        local sym, offset = ksym:resolve(addr)
-        if args.offset then
-          print("\t%-16p %s+0x%x" % {addr, sym, tonumber(offset)})
-        else
-          print("\t%-16p %s" % {addr, sym})
-        end
+        print("\t%-16p %s" % {addr, sym})
       end
     end
+
     print()
   end
+
+  local TASK_COMM_LEN = 16 -- linux/sched.h
+
+  bpf:get_table("events"):open_perf_buffer(print_event, [[
+    struct {
+      uint64_t stack_id;
+      uint32_t pid;
+      char comm[%d];
+    }
+  ]] % {TASK_COMM_LEN})
+  bpf:kprobe_poll_loop()
 end

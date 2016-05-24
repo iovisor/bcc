@@ -20,7 +20,8 @@
 from __future__ import print_function
 from bcc import BPF
 import argparse
-import re
+import ctypes as ct
+import time
 
 # arguments
 examples = """examples:
@@ -50,20 +51,30 @@ debug = 0
 # define BPF program
 bpf_text = """
 #include <uapi/linux/ptrace.h>
+#include <linux/sched.h>
+
+struct data_t {
+    u64 stack_id;
+    u32 pid;
+    char comm[TASK_COMM_LEN];
+};
 
 BPF_STACK_TRACE(stack_traces, 128)
+BPF_PERF_OUTPUT(events);
 
 void trace_stack(struct pt_regs *ctx) {
+    u32 pid = bpf_get_current_pid_tgid();
     FILTER
-    int stack_id = stack_traces.get_stackid(ctx, BPF_F_REUSE_STACKID);
-    if (stack_id >= 0)
-        bpf_trace_printk("stack_id=%d\\n", stack_id);
+    struct data_t data = {};
+    data.stack_id = stack_traces.get_stackid(ctx, BPF_F_REUSE_STACKID),
+    data.pid = pid;
+    bpf_get_current_comm(&data.comm, sizeof(data.comm));
+    events.perf_submit(ctx, &data, sizeof(data));
 }
 """
 if args.pid:
     bpf_text = bpf_text.replace('FILTER',
-        ('u32 pid; pid = bpf_get_current_pid_tgid(); ' +
-        'if (pid != %s) { return; }') % (args.pid))
+        'if (pid != %s) { return; }' % args.pid)
 else:
     bpf_text = bpf_text.replace('FILTER', '')
 if debug:
@@ -72,33 +83,48 @@ if debug:
 # initialize BPF
 b = BPF(text=bpf_text)
 b.attach_kprobe(event=function, fn_name="trace_stack")
+
+TASK_COMM_LEN = 16  # linux/sched.h
+
+class Data(ct.Structure):
+    _fields_ = [
+        ("stack_id", ct.c_ulonglong),
+        ("pid", ct.c_uint),
+        ("comm", ct.c_char * TASK_COMM_LEN),
+    ]
+
 matched = b.num_open_kprobes()
 if matched == 0:
     print("Function \"%s\" not found. Exiting." % function)
     exit()
 
 stack_traces = b.get_table("stack_traces")
-msg_regexp = re.compile("stack_id=(\d+)")
+start_ts = time.time()
 
 # header
 if verbose:
-    print("%-18s %-12s %-6s %-3s %s" % ("TIME(s)", "COMM", "PID", "CPU", "SYSCALL"))
+    print("%-18s %-12s %-6s %-3s %s" %
+            ("TIME(s)", "COMM", "PID", "CPU", "FUNCTION"))
 else:
-    print("%-18s %s" % ("TIME(s)", "SYSCALL"))
+    print("%-18s %s" % ("TIME(s)", "FUNCTION"))
 
-# format output
+def print_event(cpu, data, size):
+    event = ct.cast(data, ct.POINTER(Data)).contents
+
+    ts = time.time() - start_ts
+
+    if verbose:
+        print("%-18.9f %-12.12s %-6d %-3d %s" % (ts, event.comm, event.pid, cpu,
+                function))
+    else:
+        print("%-18.9f %s" % (ts, function))
+
+    for addr in stack_traces.walk(event.stack_id):
+        sym = b.ksymaddr(addr) if offset else b.ksym(addr)
+        print("\t%016x %s" % (addr, sym))
+
+    print()
+
+b["events"].open_perf_buffer(print_event)
 while 1:
-    (task, pid, cpu, flags, ts, msg) = b.trace_fields()
-    m = msg_regexp.match(msg)
-    if m:
-        if verbose:
-            print("%-18.9f %-12.12s %-6d %-3d %s" % (ts, task, pid, cpu, function))
-        else:
-            print("%-18.9f %s" % (ts, function))
-
-        stack_id = int(m.group(1))
-        for addr in stack_traces.walk(stack_id):
-            sym = b.ksymaddr(addr) if offset else b.ksym(addr)
-            print("\t%016x %s" % (addr, sym))
-
-        print()
+    b.kprobe_poll()
