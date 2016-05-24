@@ -4,17 +4,17 @@ offcputime \- Summarize off-CPU time by kernel stack trace. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
 .B offcputime [\-h] [\-u] [\-p PID] [\-v] [\-f] [duration]
 .SH DESCRIPTION
-This program shows kernel stack traces and task names that were blocked and
-"off-CPU", and the total duration they were not running: their "off-CPU time".
+This program shows stack traces and task names that were blocked and "off-CPU",
+and the total duration they were not running: their "off-CPU time".
 It works by tracing when threads block and when they return to CPU, measuring
-both the time they were off-CPU and the blocked kernel stack trace and the
-task name. This data is summarized in the kernel using an eBPF map, and by
-summing the off-CPU time by unique stack trace and task name.
+both the time they were off-CPU and the blocked stack trace and the task name.
+This data is summarized in the kernel using an eBPF map, and by summing the
+off-CPU time by unique stack trace and task name.
 
-The output summary will help you identify reasons why threads
-were blocking, and quantify the time they were off-CPU. This spans all types
-of blocking activity: disk I/O, network I/O, locks, page faults, involuntary
-context switches, etc.
+The output summary will help you identify reasons why threads were blocking,
+and quantify the time they were off-CPU. This spans all types of blocking
+activity: disk I/O, network I/O, locks, page faults, involuntary context
+switches, etc.
 
 This is complementary to CPU profiling (e.g., CPU flame graphs) which shows
 the time spent on-CPU. This shows the time spent off-CPU, and the output,
@@ -34,14 +34,20 @@ Print usage message.
 \-f
 Print output in folded stack format.
 .TP
-\-u
-Only trace user threads (not kernel threads).
-.TP
-\-v
-Show raw addresses (for non-folded output).
-.TP
 \-p PID
 Trace this process ID only (filtered in-kernel).
+.TP
+\-u
+Only trace user threads (no kernel threads).
+.TP
+\-k
+Only trace kernel threads (no user threads).
+.TP
+\-U
+Show stacks from user space only (no kernel space stacks).
+.TP
+\-K
+Show stacks from kernel space only (no user space stacks).
 .TP
 duration
 Duration to trace, in seconds.

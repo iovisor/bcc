@@ -42,23 +42,25 @@ examples = """examples:
     ./offcputime -p 185      # only trace threads for PID 185
     ./offcputime -u          # only trace user threads (no kernel)
     ./offcputime -k          # only trace kernel threads (no user)
+    ./offcputime -U          # only show user space stacks (no kernel)
+    ./offcputime -K          # only show kernel space stacks (no user)
 """
 parser = argparse.ArgumentParser(
-    description="Summarize off-CPU time by kernel stack trace",
+    description="Summarize off-CPU time by stack trace",
     formatter_class=argparse.RawDescriptionHelpFormatter,
     epilog=examples)
 thread_group = parser.add_mutually_exclusive_group()
 thread_group.add_argument("-p", "--pid", type=positive_int,
     help="trace this PID only")
-thread_group.add_argument("-k", "--kernel-threads-only", action="store_true",
-    help="kernel threads only (no user threads)")
 thread_group.add_argument("-u", "--user-threads-only", action="store_true",
     help="user threads only (no kernel threads)")
+thread_group.add_argument("-k", "--kernel-threads-only", action="store_true",
+    help="kernel threads only (no user threads)")
 stack_group = parser.add_mutually_exclusive_group()
 stack_group.add_argument("-U", "--user-stacks-only", action="store_true",
-    help="show stack from user space only (no kernel space stacks)")
+    help="show stacks from user space only (no kernel space stacks)")
 stack_group.add_argument("-K", "--kernel-stacks-only", action="store_true",
-    help="show stack from kernel space only (no user space stacks)")
+    help="show stacks from kernel space only (no user space stacks)")
 parser.add_argument("-f", "--folded", action="store_true",
     help="output folded format")
 parser.add_argument("--stack-storage-size", default=1024,
