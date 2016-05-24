@@ -254,9 +254,9 @@ function PerfEventArray:_open_perf_buffer(cpu, callback, ctype)
   self._callbacks[cpu] = _cb
 end
 
-function PerfEventArray:open_perf_buffer(callback, data_type)
+function PerfEventArray:open_perf_buffer(callback, data_type, ...)
   assert(data_type, "a data type is needed for callback conversion")
-  local ctype = ffi.typeof(data_type.."*")
+  local ctype = ffi.typeof(data_type.."*", ...)
   for i = 0, Posix.cpu_count() - 1 do
     self:_open_perf_buffer(i, callback, ctype)
   end
