@@ -13,6 +13,7 @@ The pattern is a string with optional '*' wildcards, similar to file globbing.
 If you'd prefer to use regular expressions, use the \-r option.
 
 This tool only works on Linux 4.6+. Stack traces are obtained using the new `BPF_STACK_TRACE` APIs.
+For kernels older than 4.6, see the version under tools/old.
 
 .SH REQUIREMENTS
 CONFIG_BPF and bcc.

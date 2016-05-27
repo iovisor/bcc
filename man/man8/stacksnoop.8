@@ -10,6 +10,7 @@ calls, and is a quick way to investigate low frequency kernel functions and
 their cause. For high frequency kernel functions, see stackcount.
 
 This tool only works on Linux 4.6+. Stack traces are obtained using the new BPF_STACK_TRACE` APIs.
+For kernels older than 4.6, see the version under tools/old.
 .SH REQUIREMENTS
 CONFIG_BPF and bcc.
 .SH OPTIONS

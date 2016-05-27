@@ -16,6 +16,7 @@ memleak may introduce significant overhead when tracing processes that allocate
 and free many blocks very quickly. See the OVERHEAD section below.
 
 This tool only works on Linux 4.6+. Stack traces are obtained using the new BPF_STACK_TRACE` APIs.
+For kernels older than 4.6, see the version under tools/old.
 .SH REQUIREMENTS
 CONFIG_BPF and bcc.
 .SH OPTIONS
