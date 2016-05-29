@@ -14,7 +14,7 @@
 
 import ctypes as ct
 
-lib = ct.CDLL("libbcc.so.0")
+lib = ct.CDLL("libbcc.so.0", use_errno=True)
 
 # keep in sync with bpf_common.h
 lib.bpf_module_create_b.restype = ct.c_void_p
