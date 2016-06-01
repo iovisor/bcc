@@ -4,15 +4,16 @@ Demonstrations of offcputime, the Linux eBPF/bcc version.
 This program shows stack traces that were blocked, and the total duration they
 were blocked. It works by tracing when threads block and when they return to
 CPU, measuring both the time they were blocked (aka the "off-CPU time") and the
-blocked kernel stack trace and the task name. This data is summarized in kernel
-by summing the blocked time by unique stack trace and task name.
+blocked stack trace and the task name. This data is summarized in kernel by
+summing the blocked time by unique stack trace and task name.
 
-Here is some example output. To explain what we are seeing: the very first
-stack trace looks like a page fault (do_page_fault() etc) from the "chmod"
-command, and in total was off-CPU for 13 microseconds.
+Here is some example output. The -K option was used to only match kernel stacks.
+To explain what we are seeing: the very first stack trace looks like a page
+fault (do_page_fault() etc) from the "chmod" command, and in total was off-CPU
+for 13 microseconds.
 
-# ./offcputime
-Tracing off-CPU time (us) by kernel stack... Hit Ctrl-C to end.
+# ./offcputime -K
+Tracing off-CPU time (us) of all threads by kernel stack... Hit Ctrl-C to end.
 ^C
     schedule
     schedule_timeout
@@ -587,7 +588,7 @@ Tracing off-CPU time (us) by kernel stack... Hit Ctrl-C to end.
         81670888
 
 The last few stack traces aren't very interesting, since they are threads that
-are ofter blocked off-CPU waiting for work.
+are often blocked off-CPU waiting for work.
 
 Do be somewhat careful with overhead: this is tracing scheduler functions, which
 can be called very frequently. While this uses in-kernel summaries for
@@ -599,8 +600,8 @@ the overhead will be measurable.
 A -p option can be used to filter (in-kernel) on a single process ID. For
 example, only matching PID 26651, which is a running "dd" command:
 
-# ./offcputime -p 26651
-Tracing off-CPU time (us) by kernel stack... Hit Ctrl-C to end.
+# ./offcputime -K -p 26651
+Tracing off-CPU time (us) of all threads by kernel stack... Hit Ctrl-C to end.
 ^C
     schedule
     schedule_timeout
@@ -623,8 +624,8 @@ total of 2.4 seconds during tracing.
 
 A duration can be added, for example, tracing for 5 seconds only:
 
-# ./offcputime -p 26651 5
-Tracing off-CPU time (us) by kernel stack for 5 secs.
+# ./offcputime -K -p 26651 5
+Tracing off-CPU time (us) of all threads by kernel stack for 5 secs.
 
     schedule
     schedule_timeout
@@ -658,7 +659,7 @@ A -f option will emit output using the "folded stacks" format, which can be
 read directly by flamegraph.pl from the FlameGraph open source software
 (https://github.com/brendangregg/FlameGraph). Eg:
 
-# ./offcputime -f 5
+# ./offcputime -K -f 5
 bash;entry_SYSCALL_64_fastpath;sys_read;vfs_read;__vfs_read;tty_read;n_tty_read;call_rwsem_down_read_failed;rwsem_down_read_failed;schedule 8
 yes;entry_SYSCALL_64_fastpath;sys_write;vfs_write;__vfs_write;tty_write;n_tty_write;call_rwsem_down_read_failed;rwsem_down_read_failed;schedule 14
 run;page_fault;do_page_fault;__do_page_fault;handle_mm_fault;__do_fault;filemap_fault;__lock_page_or_retry;wait_on_page_bit_killable;__wait_on_bit;bit_wait_io;io_schedule_timeout;schedule_timeout;schedule 33
@@ -718,11 +719,11 @@ creating your "off-CPU time flame graphs".
 USAGE message:
 
 # ./offcputime -h
-usage: offcputime.py [-h] [-p PID | -k | -u] [-f]
+usage: offcputime.py [-h] [-p PID | -k | -u] [-K | -U] [-f]
                      [--stack-storage-size STACK_STORAGE_SIZE]
                      [duration]
 
-Summarize off-CPU time by kernel stack trace
+Summarize off-CPU time by stack trace
 
 positional arguments:
   duration              duration of trace, in seconds
@@ -730,10 +731,16 @@ positional arguments:
 optional arguments:
   -h, --help            show this help message and exit
   -p PID, --pid PID     trace this PID only
-  -k, --kernel-threads-only
-                        kernel threads only (no user threads)
   -u, --user-threads-only
                         user threads only (no kernel threads)
+  -k, --kernel-threads-only
+                        kernel threads only (no user threads)
+  -U, --user-stacks-only
+                        show stacks from user space only (no kernel space
+                        stacks)
+  -K, --kernel-stacks-only
+                        show stacks from kernel space only (no user space
+                        stacks)
   -f, --folded          output folded format
   --stack-storage-size STACK_STORAGE_SIZE
                         the number of unique stack traces that can be stored
@@ -746,3 +753,5 @@ examples:
     ./offcputime -p 185      # only trace threads for PID 185
     ./offcputime -u          # only trace user threads (no kernel)
     ./offcputime -k          # only trace kernel threads (no user)
+    ./offcputime -U          # only show user space stacks (no kernel)
+    ./offcputime -K          # only show kernel space stacks (no user)

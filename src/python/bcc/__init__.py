@@ -63,9 +63,9 @@ def _check_probe_quota(num_new_probes):
     if len(open_kprobes) + len(open_uprobes) + num_new_probes > _kprobe_limit:
         raise Exception("Number of open probes would exceed quota")
 
-class KernelSymbolCache(object):
-    def __init__(self):
-        self.cache = lib.bcc_symcache_new(-1)
+class SymbolCache(object):
+    def __init__(self, pid):
+        self.cache = lib.bcc_symcache_new(pid)
 
     def resolve(self, addr):
         sym = bcc_symbol()
@@ -87,14 +87,14 @@ class BPF(object):
     SCHED_ACT = 4
 
     _probe_repl = re.compile("[^a-zA-Z0-9_]")
-    _ksym_cache = KernelSymbolCache()
+    _sym_caches = {}
 
     _auto_includes = {
-        "linux/time.h"      : ["time"],
-        "linux/fs.h"        : ["fs", "file"],
-        "linux/blkdev.h"    : ["bio", "request"],
-        "linux/slab.h"      : ["alloc"],
-        "linux/netdevice.h" : ["sk_buff", "net_device"]
+        "linux/time.h": ["time"],
+        "linux/fs.h": ["fs", "file"],
+        "linux/blkdev.h": ["bio", "request"],
+        "linux/slab.h": ["alloc"],
+        "linux/netdevice.h": ["sk_buff", "net_device"]
     }
 
     @classmethod
@@ -635,14 +635,37 @@ class BPF(object):
             exit()
 
     @staticmethod
+    def _sym_cache(pid):
+        """_sym_cache(pid)
+
+        Returns a symbol cache for the specified PID.
+        The kernel symbol cache is accessed by providing any PID less than zero.
+        """
+        if pid < 0 and pid != -1:
+            pid = -1
+        if not pid in BPF._sym_caches:
+            BPF._sym_caches[pid] = SymbolCache(pid)
+        return BPF._sym_caches[pid]
+
+    @staticmethod
+    def sym(addr, pid):
+        """sym(addr, pid)
+
+        Translate a memory address into a function name for a pid, which is
+        returned.
+        A pid of less than zero will access the kernel symbol cache.
+        """
+        name, _ = BPF._sym_cache(pid).resolve(addr)
+        return name
+
+    @staticmethod
     def ksym(addr):
         """ksym(addr)
 
         Translate a kernel memory address into a kernel function name, which is
         returned.
         """
-        name, _ = BPF._ksym_cache.resolve(addr)
-        return name
+        return BPF.sym(addr, -1)
 
     @staticmethod
     def ksymaddr(addr):
@@ -652,7 +675,7 @@ class BPF(object):
         instruction offset as a hexidecimal number, which is returned as a
         string.
         """
-        name, offset = BPF._ksym_cache.resolve(addr)
+        name, offset = BPF._sym_cache(-1).resolve(addr)
         return "%s+0x%x" % (name, offset)
 
     @staticmethod
@@ -661,7 +684,7 @@ class BPF(object):
 
         Translate a kernel name into an address. This is the reverse of
         ksymaddr. Returns -1 when the function name is unknown."""
-        return BPF._ksym_cache.resolve_name(name)
+        return BPF._sym_cache(-1).resolve_name(name)
 
     @staticmethod
     def num_open_kprobes():
