@@ -145,7 +145,7 @@ b = BPF(text=bpf_text)
 # header
 if args.timestamp:
     print("%-8s" % ("TIME(s)"), end="")
-print("%-16s %-6s %3s %s" % ("PCOMM", "PID", "RET", "ARGS"))
+print("%-16s %-6s %-6s %3s %s" % ("PCOMM", "PID", "PPID", "RET", "ARGS"))
 
 TASK_COMM_LEN = 16      # linux/sched.h
 ARGSIZE = 128           # should match #define in C above
@@ -166,6 +166,19 @@ class EventType(object):
 start_ts = time.time()
 argv = defaultdict(list)
 
+# TODO: This is best-effort PPID matching. Short-lived processes may exit
+# before we get a chance to read the PPID. This should be replaced with fetching
+# PPID via C when available (#364).
+def get_ppid(pid):
+    try:
+        with open("/proc/%d/status" % pid) as status:
+            for line in status:
+                if line.startswith("PPid:"):
+                    return int(line.split()[1])
+    except IOError:
+        pass
+    return 0
+
 # process event
 def print_event(cpu, data, size):
     event = ct.cast(data, ct.POINTER(Data)).contents
@@ -183,7 +196,9 @@ def print_event(cpu, data, size):
         if not skip:
             if args.timestamp:
                 print("%-8.3f" % (time.time() - start_ts), end="")
-            print("%-16s %-6s %3s %s" % (event.comm, event.pid, event.retval,
+            ppid = get_ppid(event.pid)
+            print("%-16s %-6s %-6s %3s %s" % (event.comm, event.pid,
+                    ppid if ppid > 0 else "?", event.retval,
                     ' '.join(argv[event.pid])))
 
         del(argv[event.pid])
