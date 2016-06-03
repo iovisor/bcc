@@ -19,7 +19,10 @@
 from __future__ import print_function
 from bcc import BPF
 import argparse
+import ctypes as ct
 import re
+import time
+from collections import defaultdict
 
 # arguments
 examples = """examples:
@@ -47,65 +50,91 @@ bpf_text = """
 #include <linux/fs.h>
 
 #define MAXARG   20
-#define ARGSIZE  64
+#define ARGSIZE  128
 
-static int print_arg(void *ptr) {
-    // Fetch an argument, and print using bpf_trace_printk(). This is a work
-    // around until we have a binary trace interface for passing event data to
-    // bcc. Since exec()s should be low frequency, the additional overhead in
-    // this case should not be a problem.
-    const char *argp = NULL;
-    char buf[ARGSIZE] = {};
+enum event_type {
+    EVENT_ARG,
+    EVENT_RET,
+};
 
-    bpf_probe_read(&argp, sizeof(argp), ptr);
-    if (argp == NULL) return 0;
+struct data_t {
+    u32 pid;  // PID as in the userspace term (i.e. task->tgid in kernel)
+    char comm[TASK_COMM_LEN];
+    enum event_type type;
+    char argv[ARGSIZE];
+    int retval;
+};
 
-    bpf_probe_read(&buf, sizeof(buf), (void *)(argp));
-    bpf_trace_printk("ARG %s\\n", buf);
+BPF_PERF_OUTPUT(events);
 
+static int __submit_arg(struct pt_regs *ctx, void *ptr, struct data_t *data)
+{
+    bpf_probe_read(data->argv, sizeof(data->argv), ptr);
+    events.perf_submit(ctx, data, sizeof(struct data_t));
     return 1;
+}
+
+static int submit_arg(struct pt_regs *ctx, void *ptr, struct data_t *data)
+{
+    const char *argp = NULL;
+    bpf_probe_read(&argp, sizeof(argp), ptr);
+    if (argp) {
+        return __submit_arg(ctx, (void *)(argp), data);
+    }
+    return 0;
 }
 
 int kprobe__sys_execve(struct pt_regs *ctx, struct filename *filename,
     const char __user *const __user *__argv,
     const char __user *const __user *__envp)
 {
-    char fname[ARGSIZE] = {};
-    bpf_probe_read(&fname, sizeof(fname), (void *)(filename));
-    bpf_trace_printk("ARG %s\\n", fname);
+    // create data here and pass to submit_arg to save space on the stack (#555)
+    struct data_t data = {};
+    data.pid = bpf_get_current_pid_tgid() >> 32;
+    bpf_get_current_comm(&data.comm, sizeof(data.comm));
+    data.type = EVENT_ARG;
 
-    int i = 1;  // skip first arg, as we printed fname
+    __submit_arg(ctx, (void *)filename, &data);
+
+    int i = 1;  // skip first arg, as we submitted filename
 
     // unrolled loop to walk argv[] (MAXARG)
-    if (print_arg((void *)&__argv[i]) == 0) goto out; i++;
-    if (print_arg((void *)&__argv[i]) == 0) goto out; i++;
-    if (print_arg((void *)&__argv[i]) == 0) goto out; i++;
-    if (print_arg((void *)&__argv[i]) == 0) goto out; i++;
-    if (print_arg((void *)&__argv[i]) == 0) goto out; i++;
-    if (print_arg((void *)&__argv[i]) == 0) goto out; i++;
-    if (print_arg((void *)&__argv[i]) == 0) goto out; i++;
-    if (print_arg((void *)&__argv[i]) == 0) goto out; i++;
-    if (print_arg((void *)&__argv[i]) == 0) goto out; i++;
-    if (print_arg((void *)&__argv[i]) == 0) goto out; i++; // X
-    if (print_arg((void *)&__argv[i]) == 0) goto out; i++;
-    if (print_arg((void *)&__argv[i]) == 0) goto out; i++;
-    if (print_arg((void *)&__argv[i]) == 0) goto out; i++;
-    if (print_arg((void *)&__argv[i]) == 0) goto out; i++;
-    if (print_arg((void *)&__argv[i]) == 0) goto out; i++;
-    if (print_arg((void *)&__argv[i]) == 0) goto out; i++;
-    if (print_arg((void *)&__argv[i]) == 0) goto out; i++;
-    if (print_arg((void *)&__argv[i]) == 0) goto out; i++;
-    if (print_arg((void *)&__argv[i]) == 0) goto out; i++;
-    if (print_arg((void *)&__argv[i]) == 0) goto out; i++; // XX
-    bpf_trace_printk("ARG ...\\n");    // truncated
+    if (submit_arg(ctx, (void *)&__argv[i], &data) == 0) goto out; i++;
+    if (submit_arg(ctx, (void *)&__argv[i], &data) == 0) goto out; i++;
+    if (submit_arg(ctx, (void *)&__argv[i], &data) == 0) goto out; i++;
+    if (submit_arg(ctx, (void *)&__argv[i], &data) == 0) goto out; i++;
+    if (submit_arg(ctx, (void *)&__argv[i], &data) == 0) goto out; i++;
+    if (submit_arg(ctx, (void *)&__argv[i], &data) == 0) goto out; i++;
+    if (submit_arg(ctx, (void *)&__argv[i], &data) == 0) goto out; i++;
+    if (submit_arg(ctx, (void *)&__argv[i], &data) == 0) goto out; i++;
+    if (submit_arg(ctx, (void *)&__argv[i], &data) == 0) goto out; i++; // X
+    if (submit_arg(ctx, (void *)&__argv[i], &data) == 0) goto out; i++;
+    if (submit_arg(ctx, (void *)&__argv[i], &data) == 0) goto out; i++;
+    if (submit_arg(ctx, (void *)&__argv[i], &data) == 0) goto out; i++;
+    if (submit_arg(ctx, (void *)&__argv[i], &data) == 0) goto out; i++;
+    if (submit_arg(ctx, (void *)&__argv[i], &data) == 0) goto out; i++;
+    if (submit_arg(ctx, (void *)&__argv[i], &data) == 0) goto out; i++;
+    if (submit_arg(ctx, (void *)&__argv[i], &data) == 0) goto out; i++;
+    if (submit_arg(ctx, (void *)&__argv[i], &data) == 0) goto out; i++;
+    if (submit_arg(ctx, (void *)&__argv[i], &data) == 0) goto out; i++;
+    if (submit_arg(ctx, (void *)&__argv[i], &data) == 0) goto out; i++; // XX
 
+    // handle truncated argument list
+    char ellipsis[] = "...";
+    __submit_arg(ctx, (void *)ellipsis, &data);
 out:
     return 0;
 }
 
 int kretprobe__sys_execve(struct pt_regs *ctx)
 {
-    bpf_trace_printk("RET %d\\n", PT_REGS_RC(ctx));
+    struct data_t data = {};
+    data.pid = bpf_get_current_pid_tgid() >> 32;
+    bpf_get_current_comm(&data.comm, sizeof(data.comm));
+    data.type = EVENT_RET;
+    data.retval = PT_REGS_RC(ctx);
+    events.perf_submit(ctx, &data, sizeof(data));
+
     return 0;
 }
 """
@@ -116,51 +145,65 @@ b = BPF(text=bpf_text)
 # header
 if args.timestamp:
     print("%-8s" % ("TIME(s)"), end="")
-print("%-16s %-6s %3s %s" % ("PCOMM", "PID", "RET", "ARGS"))
+print("%-16s %-6s %-6s %3s %s" % ("PCOMM", "PID", "PPID", "RET", "ARGS"))
 
-start_ts = 0
-cmd = {}
-pcomm = {}
+TASK_COMM_LEN = 16      # linux/sched.h
+ARGSIZE = 128           # should match #define in C above
 
-# format output
-while 1:
-    (task, pid, cpu, flags, ts, msg) = b.trace_fields()
+class Data(ct.Structure):
+    _fields_ = [
+        ("pid", ct.c_uint),
+        ("comm", ct.c_char * TASK_COMM_LEN),
+        ("type", ct.c_int),
+        ("argv", ct.c_char * ARGSIZE),
+        ("retval", ct.c_int),
+    ]
+
+class EventType(object):
+    EVENT_ARG = 0
+    EVENT_RET = 1
+
+start_ts = time.time()
+argv = defaultdict(list)
+
+# TODO: This is best-effort PPID matching. Short-lived processes may exit
+# before we get a chance to read the PPID. This should be replaced with fetching
+# PPID via C when available (#364).
+def get_ppid(pid):
     try:
-        (type, arg) = msg.split(" ", 1)
-    except ValueError:
-        continue
+        with open("/proc/%d/status" % pid) as status:
+            for line in status:
+                if line.startswith("PPid:"):
+                    return int(line.split()[1])
+    except IOError:
+        pass
+    return 0
 
-    if start_ts == 0:
-        start_ts = ts
+# process event
+def print_event(cpu, data, size):
+    event = ct.cast(data, ct.POINTER(Data)).contents
 
-    if type == "RET":
-        if pid not in cmd:
-            # zero args
-            cmd[pid] = ""
-            pcomm[pid] = ""
+    skip = False
 
-        skip = 0
-        if args.name:
-            if not re.search(args.name, cmd[pid]):
-                skip = 1
-        if not args.fails and int(arg) < 0:
-            skip = 1
-        if skip:
-            del cmd[pid]
-            del pcomm[pid]
-            continue
+    if event.type == EventType.EVENT_ARG:
+        argv[event.pid].append(event.argv)
+    elif event.type == EventType.EVENT_RET:
+        if args.fails and event.retval == 0:
+            skip = True
+        if args.name and not re.search(args.name, event.comm):
+            skip = True
 
-        # output
-        if args.timestamp:
-            print("%-8.3f" % (ts - start_ts), end="")
-        print("%-16s %-6s %3s %s" % (pcomm[pid], pid, arg, cmd[pid]))
-        del cmd[pid]
-        del pcomm[pid]
-    else:
-        # build command line string
-        if pid in cmd:
-            cmd[pid] = cmd[pid] + " " + arg
-        else:
-            cmd[pid] = arg
-        if pid not in pcomm:
-            pcomm[pid] = task
+        if not skip:
+            if args.timestamp:
+                print("%-8.3f" % (time.time() - start_ts), end="")
+            ppid = get_ppid(event.pid)
+            print("%-16s %-6s %-6s %3s %s" % (event.comm, event.pid,
+                    ppid if ppid > 0 else "?", event.retval,
+                    ' '.join(argv[event.pid])))
+
+        del(argv[event.pid])
+
+# loop with callback to print_event
+b["events"].open_perf_buffer(print_event)
+while 1:
+    b.kprobe_poll()
