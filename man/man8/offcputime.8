@@ -25,6 +25,8 @@ See http://www.brendangregg.com/FlameGraphs/offcpuflamegraphs.html
 This tool only works on Linux 4.6+. It uses the new `BPF_STACK_TRACE` table
 APIs to generate the in-kernel stack traces.
 For kernels older than 4.6, see the version under tools/old.
+
+Note: this tool only traces off-CPU times that began and ended while tracing.
 .SH REQUIREMENTS
 CONFIG_BPF and bcc.
 .SH OPTIONS
