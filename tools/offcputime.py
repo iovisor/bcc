@@ -96,12 +96,11 @@ BPF_HASH(start, u32);
 BPF_STACK_TRACE(stack_traces, STACK_STORAGE_SIZE)
 
 int oncpu(struct pt_regs *ctx, struct task_struct *prev) {
-    u32 pid;
+    u32 pid = prev->pid;
     u64 ts, *tsp;
 
     // record previous thread sleep time
     if (THREAD_FILTER) {
-        pid = prev->pid;
         ts = bpf_ktime_get_ns();
         start.update(&pid, &ts);
     }

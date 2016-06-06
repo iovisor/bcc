@@ -89,12 +89,11 @@ static u64 get_frame(u64 *bp) {
 }
 
 int oncpu(struct pt_regs *ctx, struct task_struct *prev) {
-    u32 pid;
+    u32 pid = prev->pid;
     u64 ts, *tsp;
 
     // record previous thread sleep time
     if (FILTER) {
-        pid = prev->pid;
         ts = bpf_ktime_get_ns();
         start.update(&pid, &ts);
     }
