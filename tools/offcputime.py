@@ -228,15 +228,15 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
         user_stack = list(user_stack)
         kernel_stack = list(kernel_stack)
         line = [k.name.decode()] + \
-            [b.ksym(addr) for addr in reversed(kernel_stack)] + \
-            [b.sym(addr, k.pid) for addr in reversed(user_stack)]
+            [b.sym(addr, k.pid) for addr in reversed(user_stack)] + \
+            [b.ksym(addr) for addr in reversed(kernel_stack)]
         print("%s %d" % (";".join(line), v.value))
     else:
         # print default multi-line stack output
-        for addr in user_stack:
-            print("    %016x %s" % (addr, b.sym(addr, k.pid)))
         for addr in kernel_stack:
             print("    %016x %s" % (addr, b.ksym(addr)))
+        for addr in user_stack:
+            print("    %016x %s" % (addr, b.sym(addr, k.pid)))
         print("    %-16s %s (%d)" % ("-", k.name, k.pid))
         print("        %d\n" % v.value)
 
