@@ -225,8 +225,8 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
 
     if folded:
         # print folded stack output
-        user_stack = list(user_stack)[1:]
-        kernel_stack = list(kernel_stack)[1:]
+        user_stack = list(user_stack)
+        kernel_stack = list(kernel_stack)
         line = [k.name.decode()] + \
             [b.ksym(addr) for addr in reversed(kernel_stack)] + \
             [b.sym(addr, k.pid) for addr in reversed(user_stack)]
