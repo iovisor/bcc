@@ -61,6 +61,8 @@ stack_group.add_argument("-U", "--user-stacks-only", action="store_true",
     help="show stacks from user space only (no kernel space stacks)")
 stack_group.add_argument("-K", "--kernel-stacks-only", action="store_true",
     help="show stacks from kernel space only (no user space stacks)")
+parser.add_argument("-d", "--delimited", action="store_true",
+    help="insert delimiter between kernel/user stacks")
 parser.add_argument("-f", "--folded", action="store_true",
     help="output folded format")
 parser.add_argument("--stack-storage-size", default=1024,
@@ -170,6 +172,8 @@ else:
 bpf_text = bpf_text.replace('USER_STACK_GET', user_stack_get)
 bpf_text = bpf_text.replace('KERNEL_STACK_GET', kernel_stack_get)
 
+need_delimiter = args.delimited and not (args.kernel_stacks_only or args.user_stacks_only)
+
 # check for an edge case; the code below will handle this case correctly
 # but ultimately nothing will be displayed
 if args.kernel_threads_only and args.user_stacks_only:
@@ -228,15 +232,18 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
         user_stack = list(user_stack)
         kernel_stack = list(kernel_stack)
         line = [k.name.decode()] + \
-            [b.ksym(addr) for addr in reversed(kernel_stack)] + \
-            [b.sym(addr, k.pid) for addr in reversed(user_stack)]
+            [b.sym(addr, k.pid) for addr in reversed(user_stack)] + \
+            (need_delimiter and ["-"] or []) + \
+            [b.ksym(addr) for addr in reversed(kernel_stack)]
         print("%s %d" % (";".join(line), v.value))
     else:
         # print default multi-line stack output
-        for addr in user_stack:
-            print("    %016x %s" % (addr, b.sym(addr, k.pid)))
         for addr in kernel_stack:
             print("    %016x %s" % (addr, b.ksym(addr)))
+        if need_delimiter:
+            print("    --")
+        for addr in user_stack:
+            print("    %016x %s" % (addr, b.sym(addr, k.pid)))
         print("    %-16s %s (%d)" % ("-", k.name, k.pid))
         print("        %d\n" % v.value)
 
