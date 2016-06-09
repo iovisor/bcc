@@ -211,7 +211,7 @@ class BPF(object):
             print(log_buf.value.decode(), file=sys.stderr)
 
         if fd < 0:
-            if self.debug & DEBUG_BPF and not log_buf.value:
+            if self.debug & DEBUG_BPF:
                 errstr = os.strerror(ct.get_errno())
                 raise Exception("Failed to load BPF program %s: %s" %
                                 (func_name, errstr))
