@@ -207,11 +207,16 @@ class BPF(object):
                 lib.bpf_module_kern_version(self.module),
                 log_buf, ct.sizeof(log_buf) if log_buf else 0)
 
-        if self.debug & DEBUG_BPF:
+        if self.debug & DEBUG_BPF and log_buf.value:
             print(log_buf.value.decode(), file=sys.stderr)
 
         if fd < 0:
-            raise Exception("Failed to load BPF program %s" % func_name)
+            if self.debug & DEBUG_BPF:
+                errstr = os.strerror(ct.get_errno())
+                raise Exception("Failed to load BPF program %s: %s" %
+                                (func_name, errstr))
+            else:
+                raise Exception("Failed to load BPF program %s" % func_name)
 
         fn = BPF.Function(self, func_name, fd)
         self.funcs[func_name] = fn
