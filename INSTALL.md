@@ -134,8 +134,8 @@ All build and install dependencies are listed [in the PKGBUILD](https://aur.arch
 ## Ubuntu - Source
 
 To build the toolchain from source, one needs:
-* LLVM 3.7 or newer, compiled with BPF support (default=on)
-* Clang 3.7, built from the same tree as LLVM
+* LLVM 3.7.1 or newer, compiled with BPF support (default=on)
+* Clang, built from the same tree as LLVM
 * cmake, gcc (>=4.7), flex, bison
 * LuaJIT, if you want Lua support
 
