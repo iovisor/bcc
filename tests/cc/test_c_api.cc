@@ -16,11 +16,14 @@
 #include <dlfcn.h>
 #include <stdint.h>
 #include <string.h>
+#include <sys/mman.h>
 #include <unistd.h>
 
 #include "bcc_elf.h"
+#include "bcc_perf_map.h"
 #include "bcc_proc.h"
 #include "bcc_syms.h"
+#include "vendor/tinyformat.hpp"
 
 #include "catch.hpp"
 
@@ -108,4 +111,83 @@ TEST_CASE("resolve symbol addresses for a given PID", "[c_api]") {
     REQUIRE(string(sym.module).find("libc") != string::npos);
     REQUIRE(string("strtok") == sym.name);
   }
+}
+
+#define STACK_SIZE (1024 * 1024)
+static char child_stack[STACK_SIZE];
+
+static string perf_map_path(pid_t pid) {
+  return tfm::format("/tmp/perf-%d.map", pid);
+}
+
+static int child_func(void *arg) {
+  unsigned long long map_addr = (unsigned long long)arg;
+
+  const char *path = perf_map_path(getpid()).c_str();
+  FILE *file = fopen(path, "w");
+  if (file == NULL) {
+    return -1;
+  }
+  fprintf(file, "%llx 10 dummy_fn\n", map_addr);
+  fclose(file);
+
+  sleep(5);
+
+  unlink(path);
+  return 0;
+}
+
+static pid_t spawn_child(void *map_addr, bool own_pidns) {
+  int flags = 0;
+  if (own_pidns)
+    flags |= CLONE_NEWPID;
+
+  pid_t child = clone(child_func, /* stack grows down */ child_stack + STACK_SIZE,
+      flags, (void*)map_addr);
+  if (child < 0)
+    return -1;
+
+  sleep(1); // let the child get set up
+  return child;
+}
+
+TEST_CASE("resolve symbols using /tmp/perf-pid.map", "[c_api]") {
+  const int map_sz = 4096;
+  void *map_addr = mmap(NULL, map_sz, PROT_READ | PROT_EXEC,
+    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  REQUIRE(map_addr != MAP_FAILED);
+
+  struct bcc_symbol sym;
+  pid_t child = -1;
+
+  SECTION("same namespace") {
+    child = spawn_child(map_addr, /* own_pidns */ false);
+    REQUIRE(child > 0);
+
+    void *resolver = bcc_symcache_new(child);
+    REQUIRE(resolver);
+
+    REQUIRE(bcc_symcache_resolve(resolver, (unsigned long long)map_addr,
+        &sym) == 0);
+    REQUIRE(sym.module);
+    REQUIRE(string(sym.module) == perf_map_path(child));
+    REQUIRE(string("dummy_fn") == sym.name);
+  }
+
+  SECTION("separate namespace") {
+    child = spawn_child(map_addr, /* own_pidns */ true);
+    REQUIRE(child > 0);
+
+    void *resolver = bcc_symcache_new(child);
+    REQUIRE(resolver);
+
+    REQUIRE(bcc_symcache_resolve(resolver, (unsigned long long)map_addr,
+        &sym) == 0);
+    REQUIRE(sym.module);
+    // child is PID 1 in its namespace
+    REQUIRE(string(sym.module) == perf_map_path(1));
+    REQUIRE(string("dummy_fn") == sym.name);
+  }
+
+  munmap(map_addr, map_sz);
 }

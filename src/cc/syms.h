@@ -83,6 +83,7 @@ class ProcSyms : SymbolCache {
     bool find_addr(uint64_t addr, struct bcc_symbol *sym);
     bool find_name(const char *symname, uint64_t *addr);
     bool is_so() const;
+    bool is_perf_map() const;
 
     static int _add_symbol(const char *symname, uint64_t start, uint64_t end,
                            int flags, void *p);

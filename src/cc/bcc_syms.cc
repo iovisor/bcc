@@ -20,6 +20,7 @@
 #include <unistd.h>
 
 #include "bcc_elf.h"
+#include "bcc_perf_map.h"
 #include "bcc_proc.h"
 #include "bcc_syms.h"
 
@@ -139,11 +140,18 @@ bool ProcSyms::Module::is_so() const {
   return strstr(name_.c_str(), ".so") != nullptr;
 }
 
+bool ProcSyms::Module::is_perf_map() const {
+  return strstr(name_.c_str(), ".map") != nullptr;
+}
+
 void ProcSyms::Module::load_sym_table() {
   if (syms_.size())
     return;
 
-  bcc_elf_foreach_sym(name_.c_str(), _add_symbol, this);
+  if (is_perf_map())
+    bcc_perf_map_foreach_sym(name_.c_str(), _add_symbol, this);
+  else
+    bcc_elf_foreach_sym(name_.c_str(), _add_symbol, this);
 }
 
 bool ProcSyms::Module::find_name(const char *symname, uint64_t *addr) {
