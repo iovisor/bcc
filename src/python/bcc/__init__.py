@@ -171,7 +171,7 @@ class BPF(object):
                 self.module = lib.bpf_module_create_c(src_file.encode("ascii"),
                         self.debug, cflags_array, len(cflags_array))
 
-        if self.module == None:
+        if not self.module:
             raise Exception("Failed to compile BPF module %s" % src_file)
 
         # If any "kprobe__" prefixed functions were defined, they will be
@@ -195,7 +195,7 @@ class BPF(object):
         if func_name in self.funcs:
             return self.funcs[func_name]
 
-        if lib.bpf_function_start(self.module, func_name.encode("ascii")) == None:
+        if not lib.bpf_function_start(self.module, func_name.encode("ascii")):
             raise Exception("Unknown program %s" % func_name)
 
         log_buf = ct.create_string_buffer(65536) if self.debug else None
@@ -227,7 +227,7 @@ class BPF(object):
         """
         Return the eBPF bytecodes for the specified function as a string
         """
-        if lib.bpf_function_start(self.module, func_name.encode("ascii")) == None:
+        if not lib.bpf_function_start(self.module, func_name.encode("ascii")):
             raise Exception("Unknown program %s" % func_name)
 
         start, = lib.bpf_function_start(self.module, func_name.encode("ascii")),
@@ -373,7 +373,7 @@ class BPF(object):
                 desc.encode("ascii"), pid, cpu, group_fd,
                 self._reader_cb_impl, ct.cast(id(self), ct.py_object))
         res = ct.cast(res, ct.c_void_p)
-        if res == None:
+        if not res:
             raise Exception("Failed to attach BPF to kprobe")
         open_kprobes[ev_name] = res
         return self
@@ -421,7 +421,7 @@ class BPF(object):
                 desc.encode("ascii"), pid, cpu, group_fd,
                 self._reader_cb_impl, ct.cast(id(self), ct.py_object))
         res = ct.cast(res, ct.c_void_p)
-        if res == None:
+        if not res:
             raise Exception("Failed to attach BPF to kprobe")
         open_kprobes[ev_name] = res
         return self
@@ -481,7 +481,7 @@ class BPF(object):
                 desc.encode("ascii"), pid, cpu, group_fd,
                 self._reader_cb_impl, ct.cast(id(self), ct.py_object))
         res = ct.cast(res, ct.c_void_p)
-        if res == None:
+        if not res:
             raise Exception("Failed to attach BPF to uprobe")
         open_uprobes[ev_name] = res
         return self
@@ -525,7 +525,7 @@ class BPF(object):
                 desc.encode("ascii"), pid, cpu, group_fd,
                 self._reader_cb_impl, ct.cast(id(self), ct.py_object))
         res = ct.cast(res, ct.c_void_p)
-        if res == None:
+        if not res:
             raise Exception("Failed to attach BPF to uprobe")
         open_uprobes[ev_name] = res
         return self

@@ -34,6 +34,14 @@ class TestProbeQuota(TestCase):
         with self.assertRaises(Exception):
             self.b.attach_kprobe(event_re=".*", fn_name="count")
 
+class TestProbeNotExist(TestCase):
+    def setUp(self):
+        self.b = BPF(text="""int count(void *ctx) { return 0; }""")
+
+    def test_not_exist(self):
+        with self.assertRaises(Exception):
+            b.attach_kprobe(event="___doesnotexist", fn_name="count")
+
 
 if __name__ == "__main__":
     main()
