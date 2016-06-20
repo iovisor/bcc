@@ -25,6 +25,7 @@
 #include <ctype.h>
 #include <stdio.h>
 
+#include "bcc_perf_map.h"
 #include "bcc_proc.h"
 #include "bcc_elf.h"
 
@@ -85,7 +86,7 @@ int bcc_procutils_each_module(int pid, bcc_procutils_modulecb callback,
     char perm[8], dev[8];
     long long begin, end, size, inode;
 
-    ret = fscanf(procmap, "%llx-%llx %s %llx %s %llx", &begin, &end, perm,
+    ret = fscanf(procmap, "%llx-%llx %s %llx %s %lld", &begin, &end, perm,
                  &size, dev, &inode);
 
     if (!fgets(endline, sizeof(endline), procmap))
@@ -108,6 +109,13 @@ int bcc_procutils_each_module(int pid, bcc_procutils_modulecb callback,
   } while (ret && ret != EOF);
 
   fclose(procmap);
+
+  // Add a mapping to /tmp/perf-pid.map for the entire address space. This will
+  // be used if symbols aren't resolved in an earlier mapping.
+  char map_path[4096];
+  if (bcc_perf_map_path(map_path, sizeof(map_path), pid))
+    callback(map_path, 0, -1, payload);
+
   return 0;
 }
 
