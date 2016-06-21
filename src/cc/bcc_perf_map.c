@@ -33,12 +33,13 @@ int bcc_perf_map_nspid(int pid) {
   // return the original PID if the NSpid line is missing
   int nspid = pid;
 
-  size_t size;
+  size_t size = 0;
   char *line = NULL;
-  while (getline(&line, &size, status) != -1)
+  while (getline(&line, &size, status) != -1) {
     if (strstr(line, "NSpid:") != NULL)
       // PID namespaces can be nested -- last number is innermost PID
       nspid = (int)strtol(strrchr(line, '\t'), NULL, 10);
+  }
   free(line);
 
   return nspid;
@@ -70,7 +71,7 @@ int bcc_perf_map_foreach_sym(const char *path, bcc_perf_map_symcb callback,
     return -1;
 
   char *line = NULL;
-  size_t size;
+  size_t size = 0;
   long long begin, len;
   while (getline(&line, &size, file) != -1) {
     char *cursor = line;
