@@ -21,7 +21,7 @@ Major milestone releases: 4.1, 4.4.
 ## 4.4
 
 - bpf_perf_event_output: used by many tools that print per-event output. Eg, opensnoop.
-- unprivileged BPF: non-root usage.
+- unprivileged BPF for sockets: non-root usage for socket-based programs.
 
 ## 4.6
 
