@@ -9,14 +9,11 @@ addresses changed to protect the innocent):
 PID    COMM         IP RADDR            LADDR            LPORT
 907    sshd         4  192.168.56.1     192.168.56.102   22
 907    sshd         4  127.0.0.1        127.0.0.1        22
-5389   perl         6  ...fec0ae21      ...fec0ae21      7001
+5389   perl         6  1234:ab12:2040:5020:2299:0:5:0 1234:ab12:2040:5020:2299:0:5:0 7001
 
-This output shows three connections, two to PID 907, an "sshd" process listening
-on port 22, and one to a "perl" process listening on port 7001.
-
-The sshd connections were IPv4, and the addresses are printed as dotted quads.
-The perl connection was IPv6, and the last 4 bytes of each address is printed
-(for now; check for updated versions).
+This output shows three connections, two IPv4 connections to PID 907, an "sshd"
+process listening on port 22, and one IPv6 connection to a "perl" process
+listening on port 7001.
 
 The overhead of this tool should be negligible, since it is only tracing the
 kernel function performing accept. It is not tracing every packet and then
@@ -31,6 +28,7 @@ The -t option prints a timestamp column:
 # ./tcpaccept -t
 TIME(s)  PID    COMM         IP RADDR            LADDR            LPORT
 0.000    907    sshd         4  127.0.0.1        127.0.0.1        22
+0.010    5389   perl         6  1234:ab12:2040:5020:2299:0:5:0 1234:ab12:2040:5020:2299:0:5:0 7001
 0.992    907    sshd         4  127.0.0.1        127.0.0.1        22
 1.984    907    sshd         4  127.0.0.1        127.0.0.1        22
 
