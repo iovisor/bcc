@@ -15,6 +15,8 @@ PID    COMM         IP SADDR            DADDR            DPORT LAT(ms)
 1690   wget         4  10.153.223.157   66.220.156.68    443   0.95
 1690   wget         4  10.153.223.157   66.220.156.68    443   0.99
 2852   curl         4  10.153.223.157   23.101.17.61     80    250.86
+20337  python2.7    6  1234:ab12:2040:5020:2299:0:5:0 1234:ab12:20:9f1d:2299:dde9:0:f5 7001  62.20
+21588  nc           6  ::1              ::1              80    0.05
 [...]
 
 The first line shows a connection from the "wget" process to the IPv4
