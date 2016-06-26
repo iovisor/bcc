@@ -172,7 +172,8 @@ sudo make install
 
 ```
 sudo dnf install -y bison cmake ethtool flex git iperf libstdc++-static \
-  python-netaddr python-pip gcc gcc-c++ make zlib-devel
+  python-netaddr python-pip gcc gcc-c++ make zlib-devel \
+  elfutils-libelf-devel
 sudo dnf install -y luajit luajit-devel  # for Lua support
 sudo dnf install -y \
   http://pkgs.repoforge.org/netperf/netperf-2.6.0-1.el6.rf.x86_64.rpm
@@ -182,8 +183,8 @@ sudo pip install pyroute2
 ### Install binary clang
 
 ```
-wget http://llvm.org/releases/3.7.0/clang+llvm-3.7.0-x86_64-fedora22.tar.xz
-sudo tar xf clang+llvm-3.7.0-x86_64-fedora22.tar.xz -C /usr/local --strip 1
+wget http://llvm.org/releases/3.7.1/clang+llvm-3.7.1-x86_64-fedora22.tar.xz
+sudo tar xf clang+llvm-3.7.1-x86_64-fedora22.tar.xz -C /usr/local --strip 1
 ```
 
 ### Install and compile BCC
