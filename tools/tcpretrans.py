@@ -198,7 +198,7 @@ def print_ipv4_event(cpu, data, size):
         tcpstate[event.state]))
 def print_ipv6_event(cpu, data, size):
     event = ct.cast(data, ct.POINTER(Data_ipv6)).contents
-    print("%%-8s -6d %-2d %-20s %1s> %-20s %s" % (
+    print("%-8s %-6d %-2d %-20s %1s> %-20s %s" % (
         strftime("%H:%M:%S"), event.pid, event.ip,
         "...%x:%d" % (event.saddr, event.lport),
         type[event.type],
