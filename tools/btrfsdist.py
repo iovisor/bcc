@@ -169,6 +169,7 @@ with open(kallsyms) as syms:
     for line in syms:
         a = line.rstrip().split()
         (addr, name) = (a[0], a[2])
+        name = name.split("\t")[0]
         if name == "btrfs_file_operations":
             ops = "0x" + addr
             break
