@@ -245,6 +245,7 @@ with open(kallsyms) as syms:
     ops = ''
     for line in syms:
         (addr, size, name) = line.rstrip().split(" ", 2)
+        name = name.split("\t")[0]
         if name == "ext4_file_operations":
             ops = "0x" + addr
             break
