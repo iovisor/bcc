@@ -6,6 +6,10 @@ that can indicate oversubscription (too many tasks for too few processors),
 overhead due to excessive context switching (e.g. a common shared lock for
 multiple threads), uneven workload distribution, too-granular tasks, and more.
 
+Alternatively, the same options are available for summarizing task off-CPU
+time, which helps understand how often threads are being descheduled and how
+long they spend waiting for I/O, locks, timers, and other causes of suspension.
+
 # ./cpudist.py
 Tracing on-CPU time... Hit Ctrl-C to end.
 ^C
@@ -155,6 +159,47 @@ pid = 5068
 This histogram was obtained while executing `dd if=/dev/zero of=/dev/null` with
 fairly large block sizes.
 
+You could also ask for an off-CPU report using the -O switch. Here's a
+histogram of task block times while the system is heavily loaded:
+
+# ./cpudist -O -p $(parprimes)
+Tracing off-CPU time... Hit Ctrl-C to end.
+^C
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 1        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 3        |                                        |
+        64 -> 127        : 1        |                                        |
+       128 -> 255        : 1        |                                        |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 2        |                                        |
+      1024 -> 2047       : 4        |                                        |
+      2048 -> 4095       : 3        |                                        |
+      4096 -> 8191       : 70       |***                                     |
+      8192 -> 16383      : 867      |****************************************|
+     16384 -> 32767      : 141      |******                                  |
+     32768 -> 65535      : 8        |                                        |
+     65536 -> 131071     : 0        |                                        |
+    131072 -> 262143     : 1        |                                        |
+    262144 -> 524287     : 2        |                                        |
+    524288 -> 1048575    : 3        |                                        |
+
+As you can see, threads are switching out for relatively long intervals, even
+though we know the workload doesn't have any significant blocking. This can be
+a result of over-subscription -- too many threads contending over too few CPUs.
+Indeed, there are four available CPUs and more than four runnable threads:
+
+# nproc
+4
+# cat /proc/loadavg
+0.04 0.11 0.06 9/147 7494
+
+(This shows we have 9 threads runnable out of 147 total. This is more than 4,
+the number of available CPUs.)
+
 Finally, let's ask for a per-thread report and values in milliseconds instead
 of microseconds:
 
@@ -235,7 +280,7 @@ USAGE message:
 
 # ./cpudist.py -h
 
-usage: cpudist.py [-h] [-T] [-m] [-P] [-L] [-p PID] [interval] [count]
+usage: cpudist.py [-h] [-O] [-T] [-m] [-P] [-L] [-p PID] [interval] [count]
 
 Summarize on-CPU time per task as a histogram.
 
@@ -245,6 +290,7 @@ positional arguments:
 
 optional arguments:
   -h, --help          show this help message and exit
+  -O, --offcpu        measure off-CPU time
   -T, --timestamp     include timestamp on output
   -m, --milliseconds  millisecond histogram
   -P, --pids          print a histogram per process ID
@@ -253,6 +299,7 @@ optional arguments:
 
 examples:
     cpudist              # summarize on-CPU time as a histogram
+    cpudist -O           # summarize off-CPU time as a histogram
     cpudist 1 10         # print 1 second summaries, 10 times
     cpudist -mT 1        # 1s summaries, milliseconds, and timestamps
     cpudist -P           # show each PID separately
