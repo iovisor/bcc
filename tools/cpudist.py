@@ -192,7 +192,14 @@ while (1):
     if args.timestamp:
         print("%-8s\n" % strftime("%H:%M:%S"), end="")
 
-    dist.print_log2_hist(label, section, section_print_fn=int)
+    def pid_to_comm(pid):
+        try:
+            comm = open("/proc/%d/comm" % pid, "r").read()
+            return "%d %s" % (pid, comm)
+        except IOError:
+            return str(pid)
+
+    dist.print_log2_hist(label, section, section_print_fn=pid_to_comm)
     dist.clear()
 
     countdown -= 1
