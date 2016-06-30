@@ -54,6 +54,11 @@ void * bpf_attach_uprobe(int progfd, const char *event, const char *event_desc,
                          void *cb_cookie);
 int bpf_detach_uprobe(const char *event_desc);
 
+void * bpf_attach_tracepoint(int progfd, const char *tp_category,
+                             const char *tp_name, int pid, int cpu,
+                             int group_fd, perf_reader_cb cb, void *cb_cookie);
+int bpf_detach_tracepoint(const char *tp_category, const char *tp_name);
+
 void * bpf_open_perf_buffer(perf_reader_raw_cb raw_cb, void *cb_cookie, int pid, int cpu);
 
 #define LOG_BUF_SIZE 65536
