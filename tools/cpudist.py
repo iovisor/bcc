@@ -69,22 +69,16 @@ BPF_HASH(start, u32, u64);
 BPF_HASH(tgid_for_pid, u32, u32);
 STORAGE
 
-#define INVALID_TGID 0xffffffff
-
-static inline u32 get_tgid_if_missing(u32 tgid, u32 pid)
+static inline u32 get_tgid(u32 pid)
 {
-    if (tgid == INVALID_TGID) {
-        u32 *stored_tgid = tgid_for_pid.lookup(&pid);
-        if (stored_tgid != 0)
-            return *stored_tgid;
-    }
-    return tgid;
+    u32 *stored_tgid = tgid_for_pid.lookup(&pid);
+    if (stored_tgid != 0)
+        return *stored_tgid;
+    return 0xffffffff;
 }
 
 static inline void store_start(u32 tgid, u32 pid, u64 ts)
 {
-    tgid = get_tgid_if_missing(tgid, pid);
-
     if (FILTER)
         return;
 
@@ -93,8 +87,6 @@ static inline void store_start(u32 tgid, u32 pid, u64 ts)
 
 static inline void update_hist(u32 tgid, u32 pid, u64 ts)
 {
-    tgid = get_tgid_if_missing(tgid, pid);
-
     if (FILTER)
         return;
 
@@ -123,17 +115,24 @@ int sched_switch(struct pt_regs *ctx)
 
     struct sched_switch_trace_entry args = {};
     bpf_probe_read(&args, sizeof(args), (void *)*di);
-    // TODO: Store the comm as well
 
-    if (args.prev_state == TASK_RUNNING) {
-        u32 prev_pid = args.prev_pid;
 #ifdef ONCPU
-        update_hist(INVALID_TGID, prev_pid, ts);
+    if (args.prev_state == TASK_RUNNING) {
 #else
-        store_start(INVALID_TGID, prev_pid, ts);
+    if (1) {
+#endif
+        u32 prev_pid = args.prev_pid;
+        u32 prev_tgid = get_tgid(prev_pid);
+        if (prev_tgid == 0xffffffff)
+            goto BAIL;
+#ifdef ONCPU
+        update_hist(prev_tgid, prev_pid, ts);
+#else
+        store_start(prev_tgid, prev_pid, ts);
 #endif
     }
 
+BAIL:
 #ifdef ONCPU
     store_start(tgid, pid, ts);
 #else
