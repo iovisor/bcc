@@ -314,7 +314,7 @@ BPF_PERF_OUTPUT(%s);
                         pid_filter = """
         u32 __pid = bpf_get_current_pid_tgid();
         if (__pid != %d) { return 0; }
-"""             % pid
+"""             % Probe.pid
                 elif not include_self:
                         pid_filter = """
         u32 __pid = bpf_get_current_pid_tgid();
