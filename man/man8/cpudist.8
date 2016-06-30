@@ -1,8 +1,8 @@
 .TH cpudist 8  "2016-06-28" "USER COMMANDS"
 .SH NAME
-cpudist \- On-CPU task time as a histogram.
+cpudist \- On- and off-CPU task time as a histogram.
 .SH SYNOPSIS
-.B cpudist [\-h] [\-T] [\-m] [\-P] [\-L] [\-p PID] [interval] [count]
+.B cpudist [\-h] [-O] [\-T] [\-m] [\-P] [\-L] [\-p PID] [interval] [count]
 .SH DESCRIPTION
 This measures the time a task spends on the CPU before being descheduled, and
 shows the times as a histogram. Tasks that spend a very short time on the CPU
@@ -10,14 +10,14 @@ can be indicative of excessive context-switches and poor workload distribution,
 and possibly point to a shared source of contention that keeps tasks switching
 in and out as it becomes available (such as a mutex).
 
+Similarly, the tool can also measure the time a task spends off-CPU before it
+is scheduled again. This can be helpful in identifying long blocking and I/O
+operations, or alternatively very short descheduling times due to short-lived
+locks or timers.
+
 This tool uses in-kernel eBPF maps for storing timestamps and the histogram,
 for efficiency. Despite this, the overhead of this tool may become significant
 for some workloads: see the OVERHEAD section.
-
-This tool uses the sched:sched_switch kernel tracepoint to determine when a
-task is scheduled and descheduled. If the tracepoint arguments change in the 
-future, this tool will have to be updated. Still, it is more reliable than
-using kprobes on the respective kernel functions directly.
 
 Since this uses BPF, only the root user can use this tool.
 .SH REQUIREMENTS
@@ -26,6 +26,9 @@ CONFIG_BPF and bcc.
 .TP
 \-h
 Print usage message.
+.TP
+\-O
+Measure off-CPU time instead of on-CPU time.
 .TP
 \-T
 Include timestamps on output.
@@ -52,6 +55,10 @@ Number of outputs.
 Summarize task on-CPU time as a histogram:
 #
 .B cpudist
+.TP
+Summarize task off-CPU time as a histogram:
+#
+.B cpudist -O
 .TP
 Print 1 second summaries, 10 times:
 #

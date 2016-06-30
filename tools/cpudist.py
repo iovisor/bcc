@@ -1,12 +1,12 @@
 #!/usr/bin/python
 # @lint-avoid-python-3-compatibility-imports
 #
-# cpudist   Summarize on-CPU time per task as a histogram.
+# cpudist   Summarize on- and off-CPU time per task as a histogram.
 #
-# USAGE: cpudist [-h] [-T] [-m] [-P] [-L] [-p PID] [interval] [count]
+# USAGE: cpudist [-h] [-O] [-T] [-m] [-P] [-L] [-p PID] [interval] [count]
 #
-# This measures the time a task spends on the CPU, and shows this time as a
-# histogram, optionally per-process.
+# This measures the time a task spends on or off the CPU, and shows this time
+# as a histogram, optionally per-process.
 #
 # Copyright 2016 Sasha Goldshtein
 # Licensed under the Apache License, Version 2.0 (the "License")
@@ -18,6 +18,7 @@ import argparse
 
 examples = """examples:
     cpudist              # summarize on-CPU time as a histogram
+    cpudist -O           # summarize off-CPU time as a histogram
     cpudist 1 10         # print 1 second summaries, 10 times
     cpudist -mT 1        # 1s summaries, milliseconds, and timestamps
     cpudist -P           # show each PID separately
@@ -27,6 +28,8 @@ parser = argparse.ArgumentParser(
     description="Summarize on-CPU time per task as a histogram.",
     formatter_class=argparse.RawDescriptionHelpFormatter,
     epilog=examples)
+parser.add_argument("-O", "--offcpu", action="store_true",
+    help="measure off-CPU time")
 parser.add_argument("-T", "--timestamp", action="store_true",
     help="include timestamp on output")
 parser.add_argument("-m", "--milliseconds", action="store_true",
@@ -45,12 +48,12 @@ args = parser.parse_args()
 countdown = int(args.count)
 debug = 0
 
-tp = Tracepoint.enable_tracepoint("sched", "sched_switch")
-bpf_text = "#include <uapi/linux/ptrace.h>\n"
-bpf_text += "#include <linux/sched.h>\n"
-bpf_text += tp.generate_decl()
-bpf_text += tp.generate_entry_probe()
-bpf_text += tp.generate_struct()
+bpf_text = """#include <uapi/linux/ptrace.h>
+#include <linux/sched.h>
+"""
+
+if not args.offcpu:
+    bpf_text += "#define ONCPU\n"
 
 bpf_text += """
 typedef struct pid_key {
@@ -58,54 +61,63 @@ typedef struct pid_key {
     u64 slot;
 } pid_key_t;
 
-// We need to store the start time, which is when the thread got switched in,
-// and the tgid for the pid because the sched_switch tracepoint doesn't provide
-// that information.
+
 BPF_HASH(start, u32, u64);
-BPF_HASH(tgid_for_pid, u32, u32);
 STORAGE
 
-int sched_switch(struct pt_regs *ctx)
+static inline void store_start(u32 tgid, u32 pid, u64 ts)
 {
-    u64 pid_tgid = bpf_get_current_pid_tgid();
-    u64 *di = __trace_di.lookup(&pid_tgid);
-    if (di == 0)
-        return 0;
+    if (FILTER)
+        return;
 
-    struct sched_switch_trace_entry args = {};
-    bpf_probe_read(&args, sizeof(args), (void *)*di);
+    start.update(&pid, &ts);
+}
 
-    u32 tgid, pid;
+static inline void update_hist(u32 tgid, u32 pid, u64 ts)
+{
+    if (FILTER)
+        return;
+
+    u64 *tsp = start.lookup(&pid);
+    if (tsp == 0)
+        return;
+
+    if (ts < *tsp) {
+        // Probably a clock issue where the recorded on-CPU event had a
+        // timestamp later than the recorded off-CPU event, or vice versa.
+        return;
+    }
+    u64 delta = ts - *tsp;
+    FACTOR
+    STORE
+}
+
+int sched_switch(struct pt_regs *ctx, struct task_struct *prev)
+{
     u64 ts = bpf_ktime_get_ns();
+    u64 pid_tgid = bpf_get_current_pid_tgid();
+    u32 tgid = pid_tgid >> 32, pid = pid_tgid;
 
-    if (args.prev_state == TASK_RUNNING) {
-        pid = args.prev_pid;
-
-        u32 *stored_tgid = tgid_for_pid.lookup(&pid);
-        if (stored_tgid == 0)
-            goto BAIL;
-        tgid = *stored_tgid;
-
-        if (FILTER)
-            goto BAIL;
-
-        u64 *tsp = start.lookup(&pid);
-        if (tsp == 0)
-            goto BAIL;
-
-        u64 delta = ts - *tsp;
-        FACTOR
-        STORE
+#ifdef ONCPU
+    if (prev->state == TASK_RUNNING) {
+#else
+    if (1) {
+#endif
+        u32 prev_pid = prev->pid;
+        u32 prev_tgid = prev->tgid;
+#ifdef ONCPU
+        update_hist(prev_tgid, prev_pid, ts);
+#else
+        store_start(prev_tgid, prev_pid, ts);
+#endif
     }
 
 BAIL:
-    tgid = pid_tgid >> 32;
-    pid = pid_tgid;
-    if (FILTER)
-        return 0;
-
-    start.update(&pid, &ts);
-    tgid_for_pid.update(&pid, &tgid);
+#ifdef ONCPU
+    store_start(tgid, pid, ts);
+#else
+    update_hist(tgid, pid, ts);
+#endif
 
     return 0;
 }
@@ -141,10 +153,10 @@ if debug:
     print(bpf_text)
 
 b = BPF(text=bpf_text)
-Tracepoint.attach(b)
-b.attach_kprobe(event="perf_trace_sched_switch", fn_name="sched_switch")
+b.attach_kprobe(event="finish_task_switch", fn_name="sched_switch")
 
-print("Tracing on-CPU time... Hit Ctrl-C to end.")
+print("Tracing %s-CPU time... Hit Ctrl-C to end." %
+      ("off" if args.offcpu else "on"))
 
 exiting = 0 if args.interval else 1
 dist = b.get_table("dist")
@@ -158,7 +170,14 @@ while (1):
     if args.timestamp:
         print("%-8s\n" % strftime("%H:%M:%S"), end="")
 
-    dist.print_log2_hist(label, section, section_print_fn=int)
+    def pid_to_comm(pid):
+        try:
+            comm = open("/proc/%d/comm" % pid, "r").read()
+            return "%d %s" % (pid, comm)
+        except IOError:
+            return str(pid)
+
+    dist.print_log2_hist(label, section, section_print_fn=pid_to_comm)
     dist.clear()
 
     countdown -= 1
