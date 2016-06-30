@@ -48,12 +48,9 @@ args = parser.parse_args()
 countdown = int(args.count)
 debug = 0
 
-tp = Tracepoint.enable_tracepoint("sched", "sched_switch")
-bpf_text = "#include <uapi/linux/ptrace.h>\n"
-bpf_text += "#include <linux/sched.h>\n"
-bpf_text += tp.generate_decl()
-bpf_text += tp.generate_entry_probe()
-bpf_text += tp.generate_struct()
+bpf_text = """#include <uapi/linux/ptrace.h>
+#include <linux/sched.h>
+"""
 
 if not args.offcpu:
     bpf_text += "#define ONCPU\n"
@@ -66,16 +63,7 @@ typedef struct pid_key {
 
 
 BPF_HASH(start, u32, u64);
-BPF_HASH(tgid_for_pid, u32, u32);
 STORAGE
-
-static inline u32 get_tgid(u32 pid)
-{
-    u32 *stored_tgid = tgid_for_pid.lookup(&pid);
-    if (stored_tgid != 0)
-        return *stored_tgid;
-    return 0xffffffff;
-}
 
 static inline void store_start(u32 tgid, u32 pid, u64 ts)
 {
@@ -99,32 +87,19 @@ static inline void update_hist(u32 tgid, u32 pid, u64 ts)
     STORE
 }
 
-int sched_switch(struct pt_regs *ctx)
+int sched_switch(struct pt_regs *ctx, struct task_struct *prev)
 {
     u64 ts = bpf_ktime_get_ns();
     u64 pid_tgid = bpf_get_current_pid_tgid();
     u32 tgid = pid_tgid >> 32, pid = pid_tgid;
-    // Keep a mapping of tgid for pid because when sched_switch hits,
-    // we only have the tgid information for the *current* pid, but not
-    // for the previous one.
-    tgid_for_pid.update(&pid, &tgid);
-
-    u64 *di = __trace_di.lookup(&pid_tgid);
-    if (di == 0)
-        return 0;
-
-    struct sched_switch_trace_entry args = {};
-    bpf_probe_read(&args, sizeof(args), (void *)*di);
 
 #ifdef ONCPU
-    if (args.prev_state == TASK_RUNNING) {
+    if (prev->state == TASK_RUNNING) {
 #else
     if (1) {
 #endif
-        u32 prev_pid = args.prev_pid;
-        u32 prev_tgid = get_tgid(prev_pid);
-        if (prev_tgid == 0xffffffff)
-            goto BAIL;
+        u32 prev_pid = prev->pid;
+        u32 prev_tgid = prev->tgid;
 #ifdef ONCPU
         update_hist(prev_tgid, prev_pid, ts);
 #else
@@ -173,8 +148,7 @@ if debug:
     print(bpf_text)
 
 b = BPF(text=bpf_text)
-Tracepoint.attach(b)
-b.attach_kprobe(event="perf_trace_sched_switch", fn_name="sched_switch")
+b.attach_kprobe(event="finish_task_switch", fn_name="sched_switch")
 
 print("Tracing %s-CPU time... Hit Ctrl-C to end." %
       ("off" if args.offcpu else "on"))

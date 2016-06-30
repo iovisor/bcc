@@ -19,11 +19,6 @@ This tool uses in-kernel eBPF maps for storing timestamps and the histogram,
 for efficiency. Despite this, the overhead of this tool may become significant
 for some workloads: see the OVERHEAD section.
 
-This tool uses the sched:sched_switch kernel tracepoint to determine when a
-task is scheduled and descheduled. If the tracepoint arguments change in the 
-future, this tool will have to be updated. Still, it is more reliable than
-using kprobes on the respective kernel functions directly.
-
 Since this uses BPF, only the root user can use this tool.
 .SH REQUIREMENTS
 CONFIG_BPF and bcc.
