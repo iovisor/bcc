@@ -33,6 +33,7 @@ from .usyms import ProcessSymbols
 
 open_kprobes = {}
 open_uprobes = {}
+open_tracepoints = {}
 tracefile = None
 TRACEFS = "/sys/kernel/debug/tracing"
 _kprobe_limit = 1000
@@ -53,8 +54,14 @@ def cleanup_kprobes():
         if isinstance(k, str):
             desc = "-:uprobes/%s" % k
             lib.bpf_detach_uprobe(desc.encode("ascii"))
+    for k, v in open_tracepoints.items():
+        lib.perf_reader_free(v)
+        if isinstance(k, str):
+            (tp_category, tp_name) = k.split(':')
+            lib.bpf_detach_tracepoint(tp_category, tp_name)
     open_kprobes.clear()
     open_uprobes.clear()
+    open_tracepoints.clear()
     if tracefile:
         tracefile.close()
 
@@ -85,6 +92,7 @@ class BPF(object):
     KPROBE = 2
     SCHED_CLS = 3
     SCHED_ACT = 4
+    TRACEPOINT = 5
 
     _probe_repl = re.compile("[^a-zA-Z0-9_]")
     _sym_caches = {}
@@ -385,8 +393,13 @@ class BPF(object):
 
     @staticmethod
     def open_uprobes():
-            global open_uprobes
-            return open_uprobes
+        global open_uprobes
+        return open_uprobes
+
+    @staticmethod
+    def open_tracepoints():
+        global open_tracepoints
+        return open_tracepoints
 
     @staticmethod
     def detach_kprobe(event):
@@ -452,6 +465,51 @@ class BPF(object):
     @staticmethod
     def find_library(libname):
         return lib.bcc_procutils_which_so(libname.encode("ascii")).decode()
+
+    def attach_tracepoint(self, tp="", fn_name="", pid=-1, cpu=0, group_fd=-1):
+        """attach_tracepoint(tp="", fn_name="", pid=-1, cpu=0, group_fd=-1)
+
+        Run the bpf function denoted by fn_name every time the kernel tracepoint
+        specified by 'tp' is hit. The optional parameters pid, cpu, and group_fd
+        can be used to filter the probe. The tracepoint specification is simply
+        the tracepoint category and the tracepoint name, separated by a colon.
+        For example: sched:sched_switch, syscalls:sys_enter_bind, etc.
+
+        To obtain a list of kernel tracepoints, use the tplist tool or cat the
+        file /sys/kernel/debug/tracing/available_events.
+
+        Example: BPF(text).attach_tracepoint("sched:sched_switch", "on_switch")
+        """
+
+        fn = self.load_func(fn_name, BPF.TRACEPOINT)
+        (tp_category, tp_name) = tp.split(':')
+        res = lib.bpf_attach_tracepoint(fn.fd, tp_category.encode("ascii"),
+                tp_name.encode("ascii"), pid, cpu, group_fd,
+                self._reader_cb_impl, ct.cast(id(self), ct.py_object))
+        res = ct.cast(res, ct.c_void_p)
+        if not res:
+            raise Exception("Failed to attach BPF to tracepoint")
+        open_tracepoints[tp] = res
+        return self
+
+    def detach_tracepoint(self, tp=""):
+        """detach_tracepoint(tp="")
+
+        Stop running a bpf function that is attached to the kernel tracepoint
+        specified by 'tp'.
+
+        Example: bpf.detach_tracepoint("sched:sched_switch")
+        """
+
+        if tp not in open_tracepoints:
+            raise Exception("Tracepoint %s is not attached" % tp)
+        lib.perf_reader_free(open_tracepoints[tp])
+        (tp_category, tp_name) = tp.split(':')
+        res = lib.bpf_detach_tracepoint(tp_category.encode("ascii"),
+                                        tp_name.encode("ascii"))
+        if res < 0:
+            raise Exception("Failed to detach BPF from tracepoint")
+        del open_tracepoints[tp]
 
     def attach_uprobe(self, name="", sym="", addr=None,
             fn_name="", pid=-1, cpu=0, group_fd=-1):

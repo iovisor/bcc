@@ -342,6 +342,34 @@ int bpf_detach_uprobe(const char *event_desc) {
   return bpf_detach_probe(event_desc, "uprobe");
 }
 
+void * bpf_attach_tracepoint(int progfd, const char *tp_category,
+                             const char *tp_name, int pid, int cpu,
+                             int group_fd, perf_reader_cb cb, void *cb_cookie) {
+  char buf[256];
+  struct perf_reader *reader = NULL;
+
+  reader = perf_reader_new(cb, NULL, cb_cookie);
+  if (!reader)
+    goto error;
+
+  snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/events/%s/%s",
+           tp_category, tp_name);
+  if (bpf_attach_tracing_event(progfd, buf, reader, pid, cpu, group_fd) < 0)
+    goto error;
+
+  return reader;
+
+error:
+  perf_reader_free(reader);
+  return NULL;
+}
+
+int bpf_detach_tracepoint(const char *tp_category, const char *tp_name) {
+  // Right now, there is nothing to do, but it's a good idea to encourage
+  // callers to detach anything they attach.
+  return 0;
+}
+
 void * bpf_open_perf_buffer(perf_reader_raw_cb raw_cb, void *cb_cookie, int pid, int cpu) {
   int pfd;
   struct perf_event_attr attr = {};
