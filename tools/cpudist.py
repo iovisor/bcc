@@ -82,6 +82,11 @@ static inline void update_hist(u32 tgid, u32 pid, u64 ts)
     if (tsp == 0)
         return;
 
+    if (ts < *tsp) {
+        // Probably a clock issue where the recorded on-CPU event had a
+        // timestamp later than the recorded off-CPU event, or vice versa.
+        return;
+    }
     u64 delta = ts - *tsp;
     FACTOR
     STORE
