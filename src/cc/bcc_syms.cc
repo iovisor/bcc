@@ -111,7 +111,7 @@ bool ProcSyms::resolve_addr(uint64_t addr, struct bcc_symbol *sym) {
   sym->offset = 0x0;
 
   for (Module &mod : modules_) {
-    if (addr >= mod.start_ && addr <= mod.end_)
+    if (addr >= mod.start_ && addr < mod.end_)
       return mod.find_addr(addr, sym);
   }
   return false;
@@ -175,7 +175,7 @@ bool ProcSyms::Module::find_addr(uint64_t addr, struct bcc_symbol *sym) {
   sym->offset = offset;
 
   for (Symbol &s : syms_) {
-    if (offset >= s.start && offset <= (s.start + s.size)) {
+    if (offset >= s.start && offset < (s.start + s.size)) {
       sym->name = s.name.c_str();
       sym->offset = (offset - s.start);
       return true;

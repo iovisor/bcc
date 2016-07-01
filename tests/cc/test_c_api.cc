@@ -129,6 +129,7 @@ static int child_func(void *arg) {
     return -1;
   }
   fprintf(file, "%llx 10 dummy_fn\n", map_addr);
+  fprintf(file, "%llx 10 right_next_door_fn\n", map_addr + 0x10);
   fclose(file);
 
   sleep(5);
@@ -172,6 +173,12 @@ TEST_CASE("resolve symbols using /tmp/perf-pid.map", "[c_api]") {
     REQUIRE(sym.module);
     REQUIRE(string(sym.module) == perf_map_path(child));
     REQUIRE(string("dummy_fn") == sym.name);
+
+    REQUIRE(bcc_symcache_resolve(resolver, (unsigned long long)map_addr + 0x10,
+        &sym) == 0);
+    REQUIRE(sym.module);
+    REQUIRE(string(sym.module) == perf_map_path(child));
+    REQUIRE(string("right_next_door_fn") == sym.name);
   }
 
   SECTION("separate namespace") {
