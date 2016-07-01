@@ -69,6 +69,10 @@ class ProcSyms : SymbolCache {
     uint64_t start;
     uint64_t size;
     int flags;
+
+    bool operator<(const struct Symbol& rhs) const {
+      return start < rhs.start;
+    }
   };
 
   struct Module {

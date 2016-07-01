@@ -111,7 +111,7 @@ bool ProcSyms::resolve_addr(uint64_t addr, struct bcc_symbol *sym) {
   sym->offset = 0x0;
 
   for (Module &mod : modules_) {
-    if (addr >= mod.start_ && addr <= mod.end_)
+    if (addr >= mod.start_ && addr < mod.end_)
       return mod.find_addr(addr, sym);
   }
   return false;
@@ -152,6 +152,8 @@ void ProcSyms::Module::load_sym_table() {
     bcc_perf_map_foreach_sym(name_.c_str(), _add_symbol, this);
   else
     bcc_elf_foreach_sym(name_.c_str(), _add_symbol, this);
+
+  std::sort(syms_.begin(), syms_.end());
 }
 
 bool ProcSyms::Module::find_name(const char *symname, uint64_t *addr) {
@@ -174,13 +176,19 @@ bool ProcSyms::Module::find_addr(uint64_t addr, struct bcc_symbol *sym) {
   sym->module = name_.c_str();
   sym->offset = offset;
 
-  for (Symbol &s : syms_) {
-    if (offset >= s.start && offset <= (s.start + s.size)) {
-      sym->name = s.name.c_str();
-      sym->offset = (offset - s.start);
-      return true;
-    }
+  auto it = std::upper_bound(syms_.begin(), syms_.end(), Symbol("", offset, 0));
+  if (it != syms_.begin())
+    --it;
+  else
+    it = syms_.end();
+
+  if (it != syms_.end()
+      && offset >= it->start && offset < it->start + it->size) {
+    sym->name = it->name.c_str();
+    sym->offset = (offset - it->start);
+    return true;
   }
+
   return false;
 }
 
