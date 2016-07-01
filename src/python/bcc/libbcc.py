@@ -94,6 +94,11 @@ lib.bpf_attach_uprobe.argtypes = [ct.c_int, ct.c_char_p, ct.c_char_p, ct.c_int,
         ct.c_int, ct.c_int, _CB_TYPE, ct.py_object]
 lib.bpf_detach_uprobe.restype = ct.c_int
 lib.bpf_detach_uprobe.argtypes = [ct.c_char_p]
+lib.bpf_attach_tracepoint.restype = ct.c_void_p
+lib.bpf_attach_tracepoint.argtypes = [ct.c_int, ct.c_char_p, ct.c_char_p, ct.c_int,
+        ct.c_int, ct.c_int, _CB_TYPE, ct.py_object]
+lib.bpf_detach_tracepoint.restype = ct.c_int
+lib.bpf_detach_tracepoint.argtypes = [ct.c_char_p, ct.c_char_p]
 lib.bpf_open_perf_buffer.restype = ct.c_void_p
 lib.bpf_open_perf_buffer.argtypes = [_RAW_CB_TYPE, ct.py_object, ct.c_int, ct.c_int]
 lib.perf_reader_poll.restype = ct.c_int
