@@ -182,8 +182,8 @@ class BPF(object):
         if not self.module:
             raise Exception("Failed to compile BPF module %s" % src_file)
 
-        # If any "kprobe__" prefixed functions were defined, they will be
-        # loaded and attached here.
+        # If any "kprobe__" or "tracepoint__" prefixed functions were defined,
+        # they will be loaded and attached here.
         self._trace_autoload()
 
     def load_funcs(self, prog_type=KPROBE):
@@ -620,9 +620,6 @@ class BPF(object):
                 fn = self.load_func(func_name, BPF.TRACEPOINT)
                 tp = fn.name[len("tracepoint__"):].replace("__", ":")
                 self.attach_tracepoint(tp=tp, fn_name=fn.name)
-        # It would be nice to automatically generate the tracepont
-        # structure here, but once we passed the load of the BPF program,
-        # we can't do that anymore. It will have to go in the clang rewriter.
 
     def trace_open(self, nonblocking=False):
         """trace_open(nonblocking=False)

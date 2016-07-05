@@ -451,5 +451,8 @@ int bpf_usdt_readarg_p(int argc, struct pt_regs *ctx, void *buf, u64 len) asm("l
 
 #define lock_xadd(ptr, val) ((void)__sync_fetch_and_add(ptr, val))
 
+#define TRACEPOINT_PROBE(category, event) \
+int tracepoint__##category##__##event(struct tracepoint__##category##__##event *args)
+
 #endif
 )********"

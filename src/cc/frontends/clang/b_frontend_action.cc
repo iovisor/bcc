@@ -253,10 +253,11 @@ BTypeVisitor::BTypeVisitor(ASTContext &C, Rewriter &rewriter, vector<TableDesc> 
 bool BTypeVisitor::VisitFunctionDecl(FunctionDecl *D) {
   // put each non-static non-inline function decl in its own section, to be
   // extracted by the MemoryManager
+  auto real_start_loc = rewriter_.getSourceMgr().getFileLoc(D->getLocStart());
   if (D->isExternallyVisible() && D->hasBody()) {
     current_fn_ = D->getName();
     string attr = string("__attribute__((section(\"") + BPF_FN_PREFIX + D->getName().str() + "\")))\n";
-    rewriter_.InsertText(D->getLocStart(), attr);
+    rewriter_.InsertText(real_start_loc, attr);
     if (D->param_size() > MAX_CALLING_CONV_REGS + 1) {
       error(D->getParamDecl(MAX_CALLING_CONV_REGS + 1)->getLocStart(),
             "too many arguments, bcc only supports in-register parameters");
@@ -295,10 +296,10 @@ bool BTypeVisitor::VisitFunctionDecl(FunctionDecl *D) {
     if (CompoundStmt *S = dyn_cast<CompoundStmt>(D->getBody()))
       rewriter_.ReplaceText(S->getLBracLoc(), 1, preamble);
   } else if (D->hasBody() &&
-             rewriter_.getSourceMgr().getFileID(D->getLocStart())
+             rewriter_.getSourceMgr().getFileID(real_start_loc)
                == rewriter_.getSourceMgr().getMainFileID()) {
     // rewritable functions that are static should be always treated as helper
-    rewriter_.InsertText(D->getLocStart(), "__attribute__((always_inline))\n");
+    rewriter_.InsertText(real_start_loc, "__attribute__((always_inline))\n");
   }
   return true;
 }
