@@ -123,8 +123,8 @@ static string perf_map_path(pid_t pid) {
 static int child_func(void *arg) {
   unsigned long long map_addr = (unsigned long long)arg;
 
-  const char *path = perf_map_path(getpid()).c_str();
-  FILE *file = fopen(path, "w");
+  string path = perf_map_path(getpid());
+  FILE *file = fopen(path.c_str(), "w");
   if (file == NULL) {
     return -1;
   }
@@ -134,7 +134,7 @@ static int child_func(void *arg) {
 
   sleep(5);
 
-  unlink(path);
+  unlink(path.c_str());
   return 0;
 }
 
