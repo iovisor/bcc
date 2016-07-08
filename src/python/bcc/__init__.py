@@ -610,10 +610,10 @@ class BPF(object):
     def _trace_autoload(self):
         for i in range(0, lib.bpf_num_functions(self.module)):
             func_name = lib.bpf_function_name(self.module, i).decode()
-            if func_name.startswith("kprobe__"):
+            if len(open_kprobes) == 0 and func_name.startswith("kprobe__"):
                 fn = self.load_func(func_name, BPF.KPROBE)
                 self.attach_kprobe(event=fn.name[8:], fn_name=fn.name)
-            elif func_name.startswith("kretprobe__"):
+            elif len(open_kprobes) == 0 and func_name.startswith("kretprobe__"):
                 fn = self.load_func(func_name, BPF.KPROBE)
                 self.attach_kretprobe(event=fn.name[11:], fn_name=fn.name)
             elif func_name.startswith("tracepoint__"):
