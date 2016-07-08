@@ -265,7 +265,8 @@ bool BTypeVisitor::VisitFunctionDecl(FunctionDecl *D) {
     // remember the arg names of the current function...first one is the ctx
     fn_args_.clear();
     string preamble = "{";
-    for (auto arg : D->params()) {
+    for (auto arg_it = D->param_begin(); arg_it != D->param_end(); arg_it++) {
+      auto arg = *arg_it;
       if (arg->getName() == "") {
         error(arg->getLocEnd(), "arguments to BPF program definition must be named");
         return false;
