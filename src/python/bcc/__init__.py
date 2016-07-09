@@ -799,6 +799,17 @@ class BPF(object):
         return name
 
     @staticmethod
+    def symaddr(addr, pid):
+        """symaddr(addr, pid)
+
+        Translate a memory address into a function name plus the instruction
+        offset as a hexadecimal number, which is returned as a string.
+        A pid of less than zero will access the kernel symbol cache.
+        """
+        name, offset = BPF._sym_cache(pid).resolve(addr)
+        return "%s+0x%x" % (name, offset)
+
+    @staticmethod
     def ksym(addr):
         """ksym(addr)
 
@@ -815,8 +826,7 @@ class BPF(object):
         instruction offset as a hexidecimal number, which is returned as a
         string.
         """
-        name, offset = BPF._sym_cache(-1).resolve(addr)
-        return "%s+0x%x" % (name, offset)
+        return BPF.symaddr(addr, -1)
 
     @staticmethod
     def ksymname(name):
@@ -834,6 +844,14 @@ class BPF(object):
         perf_events readers.
         """
         return len([k for k in self.open_kprobes.keys() if isinstance(k, str)])
+
+    @staticmethod
+    def num_open_uprobes():
+        """num_open_uprobes()
+
+        Get the number of open U[ret]probes.
+        """
+        return len(open_uprobes)
 
     def kprobe_poll(self, timeout = -1):
         """kprobe_poll(self)

@@ -1,11 +1,12 @@
 .TH stackcount 8  "2016-01-14" "USER COMMANDS"
 .SH NAME
-stackcount \- Count kernel function calls and their stack traces. Uses Linux eBPF/bcc.
+stackcount \- Count function calls and their stack traces. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B stackcount [\-h] [\-p PID] [\-i INTERVAL] [\-T] [\-r] pattern
+.B stackcount [\-h] [\-p PID] [\-i INTERVAL] [\-T] [\-r] [\-s]
+              [\-l LIBRARY] pattern
 .SH DESCRIPTION
-stackcount traces kernel functions and frequency counts them with their entire
-kernel stack trace, summarized in-kernel for efficiency. This allows higher
+stackcount traces functions and frequency counts them with their entire
+stack trace, summarized in-kernel for efficiency. This allows higher
 frequency events to be studied. The output consists of unique stack traces,
 and their occurrence counts.
 
@@ -41,8 +42,11 @@ Summary interval, in seconds.
 \-p PID
 Trace this process ID only (filtered in-kernel).
 .TP
+\-l LIBRARY
+Trace user-space functions in this library or executable.
+.TP
 pattern
-A kernel function name, or a search pattern. Can include wildcards ("*"). If the
+A function name, or a search pattern. Can include wildcards ("*"). If the
 \-r option is used, can include regular expressions.
 .SH EXAMPLES
 .TP
@@ -77,6 +81,10 @@ Output every 5 seconds, with timestamps:
 Only count stacks when PID 185 is on-CPU:
 #
 .B stackcount -p 185 ip_output
+.TP
+Count user stacks for dynamic heap allocations with malloc in PID 185:
+#
+.B stackcount -l c -p 185 malloc
 .SH OVERHEAD
 This summarizes unique stack traces in-kernel for efficiency, allowing it to
 trace a higher rate of function calls than methods that post-process in user
