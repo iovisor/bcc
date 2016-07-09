@@ -48,9 +48,39 @@ TracepointTypeVisitor::TracepointTypeVisitor(ASTContext &C, Rewriter &rewriter)
     : C(C), diag_(C.getDiagnostics()), rewriter_(rewriter), out_(llvm::errs()) {
 }
 
+static inline bool _is_valid_field(string const& line,
+                                   string& field_type,
+                                   string& field_name) {
+  auto field_pos = line.find("field:");
+  if (field_pos == string::npos)
+    return false;
+
+  auto semi_pos = line.find(';', field_pos);
+  if (semi_pos == string::npos)
+    return false;
+
+  auto size_pos = line.find("size:", semi_pos);
+  if (size_pos == string::npos)
+    return false;
+
+  auto field = line.substr(field_pos + 6/*"field:"*/,
+                           semi_pos - field_pos - 6);
+  auto pos = field.find_last_of("\t ");
+  if (pos == string::npos)
+    return false;
+
+  field_type = field.substr(0, pos);
+  field_name = field.substr(pos + 1);
+  if (field_type.find("__data_loc") != string::npos)
+    return false;
+  if (field_name.find("common_") == 0)
+    return false;
+
+  return true;
+}
+
 string TracepointTypeVisitor::GenerateTracepointStruct(
     SourceLocation loc, string const& category, string const& event) {
-  static regex field_regex("field:([^;]*);.*size:\\d+;");
   string format_file = "/sys/kernel/debug/tracing/events/" +
     category + "/" + event + "/format";
   ifstream input(format_file.c_str());
@@ -60,22 +90,9 @@ string TracepointTypeVisitor::GenerateTracepointStruct(
   string tp_struct = "struct tracepoint__" + category + "__" + event + " {\n";
   tp_struct += "\tu64 __do_not_use__;\n";
   for (string line; getline(input, line); ) {
-    smatch field_match;
-    if (!regex_search(line, field_match, field_regex))
+    string field_type, field_name;
+    if (!_is_valid_field(line, field_type, field_name))
       continue;
-
-    string field = field_match[1];
-    auto pos = field.find_last_of("\t ");
-    if (pos == string::npos)
-      continue;
-
-    string field_type = field.substr(0, pos);
-    string field_name = field.substr(pos + 1);
-    if (field_type.find("__data_loc") != string::npos)
-      continue;
-    if (field_name.find("common_") == 0)
-      continue;
-
     tp_struct += "\t" + field_type + " " + field_name + ";\n";
   }
 
@@ -83,22 +100,56 @@ string TracepointTypeVisitor::GenerateTracepointStruct(
   return tp_struct;
 }
 
+static inline bool _is_tracepoint_struct_type(string const& type_name,
+                                              string& tp_category,
+                                              string& tp_event) {
+  // We are looking to roughly match the regex:
+  //    (?:struct|class)\s+tracepoint__(\S+)__(\S+)
+  // Not using std::regex because older versions of GCC don't support it yet.
+  // E.g., the libstdc++ that ships with Ubuntu 14.04.
+  
+  auto first_space_pos = type_name.find_first_of("\t ");
+  if (first_space_pos == string::npos)
+    return false;
+  auto first_tok = type_name.substr(0, first_space_pos);
+  if (first_tok != "struct" && first_tok != "class")
+    return false;
+
+  auto non_space_pos = type_name.find_first_not_of("\t ", first_space_pos);
+  auto second_space_pos = type_name.find_first_of("\t ", non_space_pos);
+  auto second_tok = type_name.substr(non_space_pos,
+                                     second_space_pos - non_space_pos);
+  if (second_tok.find("tracepoint__") != 0)
+    return false;
+
+  auto tp_event_pos = second_tok.rfind("__");
+  if (tp_event_pos == string::npos)
+    return false;
+  tp_event = second_tok.substr(tp_event_pos + 2);
+
+  auto tp_category_pos = second_tok.find("__");
+  if (tp_category_pos == tp_event_pos)
+    return false;
+  tp_category = second_tok.substr(tp_category_pos + 2,
+                                  tp_event_pos - tp_category_pos - 2);
+  return true;
+}
+
+
 bool TracepointTypeVisitor::VisitFunctionDecl(FunctionDecl *D) {
-  static regex type_regex("(?:struct|class)\\s+tracepoint__(\\S+)__(\\S+)");
   if (D->isExternallyVisible() && D->hasBody()) {
     // If this function has a tracepoint structure as an argument,
     // add that structure declaration based on the structure name.
-    for (auto arg : D->params()) {
+    for (auto it = D->param_begin(); it != D->param_end(); ++it) {
+      auto arg = *it;
       auto type = arg->getType();
       if (type->isPointerType() &&
           type->getPointeeType()->isStructureOrClassType()) {
         auto type_name = QualType::getAsString(type.split());
-        smatch type_match;
-        if (regex_search(type_name, type_match, type_regex)) {
-          string tp_cat = type_match[1], tp_evt = type_match[2]; 
+        string tp_cat, tp_evt;
+        if (_is_tracepoint_struct_type(type_name, tp_cat, tp_evt)) {
           string tp_struct = GenerateTracepointStruct(
               D->getLocStart(), tp_cat, tp_evt);
-
           // Get the actual function declaration point (the macro instantiation
           // point if using the TRACEPOINT_PROBE macro instead of the macro
           // declaration point in bpf_helpers.h).
