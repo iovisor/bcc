@@ -182,8 +182,8 @@ class BPF(object):
         if not self.module:
             raise Exception("Failed to compile BPF module %s" % src_file)
 
-        # If any "kprobe__" prefixed functions were defined, they will be
-        # loaded and attached here.
+        # If any "kprobe__" or "tracepoint__" prefixed functions were defined,
+        # they will be loaded and attached here.
         self._trace_autoload()
 
     def load_funcs(self, prog_type=KPROBE):
@@ -608,17 +608,18 @@ class BPF(object):
         del open_uprobes[ev_name]
 
     def _trace_autoload(self):
-        # Cater to one-liner case where attach_kprobe is omitted and C function
-        # name matches that of the kprobe.
-        if len(open_kprobes) == 0:
-            for i in range(0, lib.bpf_num_functions(self.module)):
-                func_name = lib.bpf_function_name(self.module, i).decode()
-                if func_name.startswith("kprobe__"):
-                    fn = self.load_func(func_name, BPF.KPROBE)
-                    self.attach_kprobe(event=fn.name[8:], fn_name=fn.name)
-                elif func_name.startswith("kretprobe__"):
-                    fn = self.load_func(func_name, BPF.KPROBE)
-                    self.attach_kretprobe(event=fn.name[11:], fn_name=fn.name)
+        for i in range(0, lib.bpf_num_functions(self.module)):
+            func_name = lib.bpf_function_name(self.module, i).decode()
+            if len(open_kprobes) == 0 and func_name.startswith("kprobe__"):
+                fn = self.load_func(func_name, BPF.KPROBE)
+                self.attach_kprobe(event=fn.name[8:], fn_name=fn.name)
+            elif len(open_kprobes) == 0 and func_name.startswith("kretprobe__"):
+                fn = self.load_func(func_name, BPF.KPROBE)
+                self.attach_kretprobe(event=fn.name[11:], fn_name=fn.name)
+            elif func_name.startswith("tracepoint__"):
+                fn = self.load_func(func_name, BPF.TRACEPOINT)
+                tp = fn.name[len("tracepoint__"):].replace("__", ":")
+                self.attach_tracepoint(tp=tp, fn_name=fn.name)
 
     def trace_open(self, nonblocking=False):
         """trace_open(nonblocking=False)

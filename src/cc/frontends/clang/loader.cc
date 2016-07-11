@@ -50,6 +50,7 @@
 #include "exported_files.h"
 #include "kbuild_helper.h"
 #include "b_frontend_action.h"
+#include "tp_frontend_action.h"
 #include "loader.h"
 
 using std::map;
@@ -166,6 +167,34 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, unique_ptr<vector<TableDes
     llvm::errs() << "\n";
   }
 
+  // pre-compilation pass for generating tracepoint structures
+  auto invocation0 = make_unique<CompilerInvocation>();
+  if (!CompilerInvocation::CreateFromArgs(*invocation0, const_cast<const char **>(ccargs.data()),
+                                          const_cast<const char **>(ccargs.data()) + ccargs.size(), diags))
+    return -1;
+
+  invocation0->getPreprocessorOpts().RetainRemappedFileBuffers = true;
+  for (const auto &f : remapped_files_)
+    invocation0->getPreprocessorOpts().addRemappedFile(f.first, &*f.second);
+
+  if (in_memory) {
+    invocation0->getPreprocessorOpts().addRemappedFile(main_path, &*main_buf);
+    invocation0->getFrontendOpts().Inputs.clear();
+    invocation0->getFrontendOpts().Inputs.push_back(FrontendInputFile(main_path, IK_C));
+  }
+  invocation0->getFrontendOpts().DisableFree = false;
+
+  CompilerInstance compiler0;
+  compiler0.setInvocation(invocation0.release());
+  compiler0.createDiagnostics(new IgnoringDiagConsumer());
+
+  // capture the rewritten c file
+  string out_str;
+  llvm::raw_string_ostream os(out_str);
+  TracepointFrontendAction tpact(os);
+  compiler0.ExecuteAction(tpact); // ignore errors, they will be reported later
+  unique_ptr<llvm::MemoryBuffer> out_buf = llvm::MemoryBuffer::getMemBuffer(out_str);
+
   // first pass
   auto invocation1 = make_unique<CompilerInvocation>();
   if (!CompilerInvocation::CreateFromArgs(*invocation1, const_cast<const char **>(ccargs.data()),
@@ -178,12 +207,9 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, unique_ptr<vector<TableDes
   invocation1->getPreprocessorOpts().RetainRemappedFileBuffers = true;
   for (const auto &f : remapped_files_)
     invocation1->getPreprocessorOpts().addRemappedFile(f.first, &*f.second);
-
-  if (in_memory) {
-    invocation1->getPreprocessorOpts().addRemappedFile(main_path, &*main_buf);
-    invocation1->getFrontendOpts().Inputs.clear();
-    invocation1->getFrontendOpts().Inputs.push_back(FrontendInputFile(main_path, IK_C));
-  }
+  invocation1->getPreprocessorOpts().addRemappedFile(main_path, &*out_buf);
+  invocation1->getFrontendOpts().Inputs.clear();
+  invocation1->getFrontendOpts().Inputs.push_back(FrontendInputFile(main_path, IK_C));
   invocation1->getFrontendOpts().DisableFree = false;
 
   CompilerInstance compiler1;
@@ -191,12 +217,12 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, unique_ptr<vector<TableDes
   compiler1.createDiagnostics();
 
   // capture the rewritten c file
-  string out_str;
-  llvm::raw_string_ostream os(out_str);
-  BFrontendAction bact(os, flags_);
+  string out_str1;
+  llvm::raw_string_ostream os1(out_str1);
+  BFrontendAction bact(os1, flags_);
   if (!compiler1.ExecuteAction(bact))
     return -1;
-  unique_ptr<llvm::MemoryBuffer> out_buf = llvm::MemoryBuffer::getMemBuffer(out_str);
+  unique_ptr<llvm::MemoryBuffer> out_buf1 = llvm::MemoryBuffer::getMemBuffer(out_str1);
   // this contains the open FDs
   *tables = bact.take_tables();
 
@@ -209,7 +235,7 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, unique_ptr<vector<TableDes
   invocation2->getPreprocessorOpts().RetainRemappedFileBuffers = true;
   for (const auto &f : remapped_files_)
     invocation2->getPreprocessorOpts().addRemappedFile(f.first, &*f.second);
-  invocation2->getPreprocessorOpts().addRemappedFile(main_path, &*out_buf);
+  invocation2->getPreprocessorOpts().addRemappedFile(main_path, &*out_buf1);
   invocation2->getFrontendOpts().Inputs.clear();
   invocation2->getFrontendOpts().Inputs.push_back(FrontendInputFile(main_path, IK_C));
   invocation2->getFrontendOpts().DisableFree = false;

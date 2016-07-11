@@ -22,21 +22,9 @@ def kernel_version_ge(major, minor):
 @unittest.skipUnless(kernel_version_ge(4,7), "requires kernel >= 4.7")
 class TestTracepoint(unittest.TestCase):
     def test_tracepoint(self):
-        text = """#include <linux/ptrace.h>
-        struct tp_args {
-            unsigned long long __unused__;
-            char prev_comm[16];
-            pid_t prev_pid;
-            int prev_prio;
-            long prev_state;
-            char next_comm[16];
-            pid_t next_pid;
-            int next_prio;
-        };
+        text = """
         BPF_HASH(switches, u32, u64);
-        int probe_switch(struct tp_args *args) {
-            if (args == 0)
-                return 0;
+        TRACEPOINT_PROBE(sched, sched_switch) {
             u64 val = 0;
             u32 pid = args->next_pid;
             u64 *existing = switches.lookup_or_init(&pid, &val);
@@ -45,13 +33,11 @@ class TestTracepoint(unittest.TestCase):
         }
         """
         b = bcc.BPF(text=text)
-        b.attach_tracepoint("sched:sched_switch", "probe_switch")
         sleep(1)
         total_switches = 0
         for k, v in b["switches"].items():
             total_switches += v.value
         self.assertNotEqual(0, total_switches)
-        b.detach_tracepoint("sched:sched_switch")
 
 if __name__ == "__main__":
     unittest.main()
