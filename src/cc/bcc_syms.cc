@@ -282,26 +282,28 @@ struct sym_search_t {
 
 static int _list_sym(const char *symname, uint64_t addr, uint64_t end,
                      int flags, void *payload) {
-  if (!ELF_TYPE_IS_FUNCTION(flags))
+  if (!ELF_TYPE_IS_FUNCTION(flags) || addr == 0)
     return 0;
 
   struct sym_search_t *sym_search = (struct sym_search_t *)payload;
-  sym_search->start -= 1;
-  if (sym_search->start > 0)
+  if (sym_search->start > 0) {
+    sym_search->start -= 1;
     return 0;   // skipping the first 'start' symbols
+  }
 
   struct bcc_symbol *sym = &sym_search->syms[*sym_search->actual];
   sym->name = symname;
   sym->offset = addr;  
   *sym_search->actual += 1;
-  if (sym_search->requested == *sym_search->actual)
+  if (sym_search->requested == *sym_search->actual) {
     return -1;  // stop the enumeration, we're done
+  }
   return 0;
 }
 
 int bcc_list_symbols(const char *module, struct bcc_symbol *syms,
                      int start, int requested, int *actual) {
-  if (syms == 0)
+  if (syms == 0 || actual == 0)
     return -1;
   if (requested == 0)
     return 0;
