@@ -129,6 +129,11 @@ lib.bcc_resolve_symname.restype = ct.c_int
 lib.bcc_resolve_symname.argtypes = [
     ct.c_char_p, ct.c_char_p, ct.c_ulonglong, ct.POINTER(bcc_symbol)]
 
+lib.bcc_list_symbols.restype = ct.c_int
+lib.bcc_list_symbols.argtypes = [
+    ct.c_char_p, ct.POINTER(bcc_symbol), ct.c_int, ct.c_int,
+    ct.POINTER(ct.c_int)]
+
 lib.bcc_symcache_new.restype = ct.c_void_p
 lib.bcc_symcache_new.argtypes = [ct.c_int]
 

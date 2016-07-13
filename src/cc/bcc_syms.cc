@@ -270,6 +270,54 @@ int bcc_find_symbol_addr(struct bcc_symbol *sym) {
   return bcc_elf_foreach_sym(sym->module, _find_sym, sym);
 }
 
+struct sym_search_t {
+  struct bcc_symbol *syms;
+  int start;
+  int requested;
+  int *actual;
+};
+
+// see <elf.h>
+#define ELF_TYPE_IS_FUNCTION(flags) (((flags) & 0xf) == 2)
+
+static int _list_sym(const char *symname, uint64_t addr, uint64_t end,
+                     int flags, void *payload) {
+  if (!ELF_TYPE_IS_FUNCTION(flags))
+    return 0;
+
+  struct sym_search_t *sym_search = (struct sym_search_t *)payload;
+  sym_search->start -= 1;
+  if (sym_search->start > 0)
+    return 0;   // skipping the first 'start' symbols
+
+  struct bcc_symbol *sym = &sym_search->syms[*sym_search->actual];
+  sym->name = symname;
+  sym->offset = addr;  
+  *sym_search->actual += 1;
+  if (sym_search->requested == *sym_search->actual)
+    return -1;  // stop the enumeration, we're done
+  return 0;
+}
+
+int bcc_list_symbols(const char *module, struct bcc_symbol *syms,
+                     int start, int requested, int *actual) {
+  if (syms == 0)
+    return -1;
+  if (requested == 0)
+    return 0;
+
+  *actual = 0;
+  struct sym_search_t sym_search = { .syms = syms, .start = start,
+                                     .requested = requested, .actual = actual };
+  int rc = bcc_elf_foreach_sym(module, _list_sym, &sym_search);
+  if (rc == 0) {
+    for (int i = 0; i < *actual; ++i) {
+      syms[i].module = module;
+    }
+  }
+  return rc;
+}
+
 int bcc_resolve_symname(const char *module, const char *symname,
                         const uint64_t addr, struct bcc_symbol *sym) {
   uint64_t load_addr;

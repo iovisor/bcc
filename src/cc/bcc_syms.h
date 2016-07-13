@@ -36,6 +36,8 @@ void bcc_symcache_refresh(void *resolver);
 
 int bcc_resolve_global_addr(int pid, const char *module, const uint64_t address,
                             uint64_t *global);
+int bcc_list_symbols(const char *module, struct bcc_symbol *syms,
+                     int start, int requested, int *actual);
 int bcc_find_symbol_addr(struct bcc_symbol *sym);
 int bcc_resolve_symname(const char *module, const char *symname,
                         const uint64_t addr, struct bcc_symbol *sym);

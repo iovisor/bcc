@@ -586,15 +586,36 @@ class BPF(object):
         del self.open_uprobes[name]
         _num_open_probes -= 1
 
-    def attach_uprobe(self, name="", sym="", addr=None,
+    def _get_user_functions(self, name, sym_re):
+        results = []
+        start, requested, actual = (0, 50, ct.c_int(0))
+        symbols = (bcc_symbol * requested)()
+        while True:
+            res = lib.bcc_list_symbols(name, symbols, start, requested, actual)
+            if res < 0:
+                raise Exception("Failed to list symbols in %s" % name)
+            if actual.value == 0:
+                break
+            for i in xrange(0, actual.value):
+                sym_name = symbols[i].name
+                if re.match(sym_re, sym_name):
+                    results.append(sym_name)
+            start += requested
+        return results
+
+    def attach_uprobe(self, name="", sym="", sym_re="", addr=None,
             fn_name="", pid=-1, cpu=0, group_fd=-1):
-        """attach_uprobe(name="", sym="", addr=None, fn_name=""
+        """attach_uprobe(name="", sym="", sym_re="", addr=None, fn_name=""
                          pid=-1, cpu=0, group_fd=-1)
 
         Run the bpf function denoted by fn_name every time the symbol sym in
         the library or binary 'name' is encountered. The real address addr may
         be supplied in place of sym. Optional parameters pid, cpu, and group_fd
         can be used to filter the probe.
+
+        Instead of a symbol name, a regular expression can be provided in
+        sym_re. The uprobe will then attach to symbols that match the provided
+        regular expression.
 
         Libraries can be given in the name argument without the lib prefix, or
         with the full path (/usr/lib/...). Binaries can be given only with the
@@ -605,6 +626,14 @@ class BPF(object):
         """
 
         name = str(name)
+
+        if sym_re:
+            for sym_name in self._get_user_functions(name, sym_re):
+                self.attach_uprobe(name=name, sym=sym_name, addr=addr,
+                                   fn_name=fn_name, pid=pid, cpu=cpu,
+                                   group_fd=group_fd)
+            return
+
         (path, addr) = BPF._check_path_symbol(name, sym, addr)
 
         self._check_probe_quota(1)
