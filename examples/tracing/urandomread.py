@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
-# tracepoint  Example of instrumenting a kernel tracepoint.
-#             For Linux, uses BCC, BPF. Embedded C.
+# urandomread  Example of instrumenting a kernel tracepoint.
+#              For Linux, uses BCC, BPF. Embedded C.
 #
 # REQUIRES: Linux 4.7+ (BPF_PROG_TYPE_TRACEPOINT support).
 #
@@ -14,28 +14,14 @@
 from __future__ import print_function
 from bcc import BPF
 
-# define BPF program
-bpf_text = """
-#include <uapi/linux/ptrace.h>
-
-struct urandom_read_args {
-    // from /sys/kernel/debug/tracing/events/random/urandom_read/format
-    // this may be automatically generated in a future bcc version
-    u64 __unused__;
-    u32 got_bits;
-    u32 pool_left;
-    u32 input_left;
-};
-
-int printarg(struct urandom_read_args *args) {
+# load BPF program
+b = BPF(text="""
+TRACEPOINT_PROBE(random, urandom_read) {
+    // args is from /sys/kernel/debug/tracing/events/random/urandom_read/format
     bpf_trace_printk("%d\\n", args->got_bits);
     return 0;
 };
-"""
-
-# load BPF program
-b = BPF(text=bpf_text)
-b.attach_tracepoint("random:urandom_read", "printarg")
+""")
 
 # header
 print("%-18s %-16s %-6s %s" % ("TIME(s)", "COMM", "PID", "GOTBITS"))

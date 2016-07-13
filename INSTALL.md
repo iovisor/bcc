@@ -2,7 +2,7 @@
 
 * [Kernel Configuration](#kernel-configuration)
 * [Packages](#packages)
-  - [Ubuntu](#ubuntu---binary)
+  - [Ubuntu](#ubuntu-xenial---binary)
   - [Fedora](#fedora---binary)
   - [Arch](#arch---aur)
 * [Source](#source)
