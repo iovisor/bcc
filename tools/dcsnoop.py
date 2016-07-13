@@ -23,7 +23,9 @@
 from __future__ import print_function
 from bcc import BPF
 import argparse
+import ctypes as ct
 import re
+import time
 
 # arguments
 examples = """examples:
@@ -46,11 +48,25 @@ bpf_text = """
 
 #define MAX_FILE_LEN  64
 
+enum lookup_type {
+    LOOKUP_MISS,
+    LOOKUP_REFERENCE,
+};
+
 struct entry_t {
     char name[MAX_FILE_LEN];
 };
 
 BPF_HASH(entrybypid, u32, struct entry_t);
+
+struct data_t {
+    u32 pid;
+    enum lookup_type type;
+    char comm[TASK_COMM_LEN];
+    char filename[MAX_FILE_LEN];
+};
+
+BPF_PERF_OUTPUT(events);
 
 /* from fs/namei.c: */
 struct nameidata {
@@ -59,9 +75,22 @@ struct nameidata {
         // [...]
 };
 
+static inline
+void submit_event(struct pt_regs *ctx, void *name, int type, u32 pid)
+{
+    struct data_t data = {
+        .pid = pid,
+        .type = type,
+    };
+    bpf_get_current_comm(&data.comm, sizeof(data.comm));
+    bpf_probe_read(&data.filename, sizeof(data.filename), name);
+    events.perf_submit(ctx, &data, sizeof(data));
+}
+
 int trace_fast(struct pt_regs *ctx, struct nameidata *nd, struct path *path)
 {
-    bpf_trace_printk("R %s\\n", nd->last.name);
+    u32 pid = bpf_get_current_pid_tgid();
+    submit_event(ctx, (void *)nd->last.name, LOOKUP_REFERENCE, pid);
     return 1;
 }
 
@@ -83,36 +112,47 @@ int kretprobe__d_lookup(struct pt_regs *ctx)
     u32 pid = bpf_get_current_pid_tgid();
     struct entry_t *ep;
     ep = entrybypid.lookup(&pid);
-    if (ep == 0) {
-        return 0;   // missed entry
+    if (ep == 0 || PT_REGS_RC(ctx) != 0) {
+        return 0;   // missed entry or lookup didn't fail
     }
-    if (PT_REGS_RC(ctx) == 0) {
-        bpf_trace_printk("M %s\\n", ep->name);
-    }
+    submit_event(ctx, (void *)ep->name, LOOKUP_MISS, pid);
     entrybypid.delete(&pid);
     return 0;
 }
 """
+
+TASK_COMM_LEN = 16  # linux/sched.h
+MAX_FILE_LEN = 64  # see inline C
+
+class Data(ct.Structure):
+    _fields_ = [
+        ("pid", ct.c_uint),
+        ("type", ct.c_int),
+        ("comm", ct.c_char * TASK_COMM_LEN),
+        ("filename", ct.c_char * MAX_FILE_LEN),
+    ]
 
 # initialize BPF
 b = BPF(text=bpf_text)
 if args.all:
     b.attach_kprobe(event="lookup_fast", fn_name="trace_fast")
 
+mode_s = {
+    0: 'M',
+    1: 'R',
+}
+
+start_ts = time.time()
+
+def print_event(cpu, data, size):
+    event = ct.cast(data, ct.POINTER(Data)).contents
+    print("%-11.6f %-6d %-16s %1s %s" % (
+            time.time() - start_ts, event.pid, event.comm, mode_s[event.type],
+            event.filename))
+
 # header
 print("%-11s %-6s %-16s %1s %s" % ("TIME(s)", "PID", "COMM", "T", "FILE"))
 
-start_ts = 0
-
-# format output
+b["events"].open_perf_buffer(print_event)
 while 1:
-    (task, pid, cpu, flags, ts, msg) = b.trace_fields()
-    try:
-        (type, file) = msg.split(" ", 1)
-    except ValueError:
-        continue
-
-    if start_ts == 0:
-        start_ts = ts
-
-    print("%-11.6f %-6s %-16s %1s %s" % (ts - start_ts, pid, task, type, file))
+    b.kprobe_poll()
