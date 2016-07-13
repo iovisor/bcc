@@ -187,9 +187,14 @@ b = BPF(text=bpf_text)
 # the parent functions, at the cost of more overhead, instead.
 # Ultimately, we should be using [V]FS tracepoints.
 b.attach_kprobe(event="__vfs_read", fn_name="trace_read_entry")
-b.attach_kprobe(event="__vfs_write", fn_name="trace_write_entry")
 b.attach_kretprobe(event="__vfs_read", fn_name="trace_read_return")
-b.attach_kretprobe(event="__vfs_write", fn_name="trace_write_return")
+try:
+    b.attach_kprobe(event="__vfs_write", fn_name="trace_write_entry")
+    b.attach_kretprobe(event="__vfs_write", fn_name="trace_write_return")
+except:
+    # older kernels don't have __vfs_write so try vfs_write instead
+    b.attach_kprobe(event="vfs_write", fn_name="trace_write_entry")
+    b.attach_kretprobe(event="vfs_write", fn_name="trace_write_return")
 
 TASK_COMM_LEN = 16  # linux/sched.h
 DNAME_INLINE_LEN = 32  # linux/dcache.h
