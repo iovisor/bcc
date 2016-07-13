@@ -531,8 +531,26 @@ class BPF(object):
         res = lib.bcc_procutils_which_so(libname.encode("ascii"))
         return res if res is None else res.decode()
 
-    def attach_tracepoint(self, tp="", fn_name="", pid=-1, cpu=0, group_fd=-1):
-        """attach_tracepoint(tp="", fn_name="", pid=-1, cpu=0, group_fd=-1)
+
+    def _get_tracepoints(self, tp_re):
+        results = []
+        events_dir = os.path.join(TRACEFS, "events")
+        for category in os.listdir(events_dir):
+            cat_dir = os.path.join(events_dir, category)
+            if not os.path.isdir(cat_dir):
+                continue
+            for event in os.listdir(cat_dir):
+                evt_dir = os.path.join(cat_dir, event)
+                if os.path.isdir(evt_dir):
+                    tp = ("%s:%s" % (category, event))
+                    if re.match(tp_re, tp):
+                        results.append(tp)
+        return results
+
+    def attach_tracepoint(self, tp="", tp_re="", fn_name="", pid=-1,
+                          cpu=0, group_fd=-1):
+        """attach_tracepoint(tp="", tp_re="", fn_name="", pid=-1,
+                             cpu=0, group_fd=-1)
 
         Run the bpf function denoted by fn_name every time the kernel tracepoint
         specified by 'tp' is hit. The optional parameters pid, cpu, and group_fd
@@ -540,11 +558,23 @@ class BPF(object):
         the tracepoint category and the tracepoint name, separated by a colon.
         For example: sched:sched_switch, syscalls:sys_enter_bind, etc.
 
+        Instead of a tracepoint name, a regular expression can be provided in
+        tp_re. The program will then attach to tracepoints that match the
+        provided regular expression.
+
         To obtain a list of kernel tracepoints, use the tplist tool or cat the
         file /sys/kernel/debug/tracing/available_events.
 
-        Example: BPF(text).attach_tracepoint("sched:sched_switch", "on_switch")
+        Examples:
+            BPF(text).attach_tracepoint(tp="sched:sched_switch", fn_name="on_switch")
+            BPF(text).attach_tracepoint(tp_re="sched:.*", fn_name="on_switch")
         """
+
+        if tp_re:
+            for tp in self._get_tracepoints(tp_re):
+                self.attach_tracepoint(tp=tp, fn_name=fn_name, pid=pid,
+                                       cpu=cpu, group_fd=group_fd)
+            return
 
         fn = self.load_func(fn_name, BPF.TRACEPOINT)
         (tp_category, tp_name) = tp.split(':')
@@ -881,6 +911,14 @@ class BPF(object):
         Get the number of open U[ret]probes.
         """
         return len(open_uprobes)
+
+    @staticmethod
+    def num_open_tracepoints():
+        """num_open_tracepoints()
+
+        Get the number of open tracepoints.
+        """
+        return len(open_tracepoints)
 
     def kprobe_poll(self, timeout = -1):
         """kprobe_poll(self)
