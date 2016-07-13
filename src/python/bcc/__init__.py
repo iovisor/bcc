@@ -531,7 +531,6 @@ class BPF(object):
         res = lib.bcc_procutils_which_so(libname.encode("ascii"))
         return res if res is None else res.decode()
 
-
     def _get_tracepoints(self, tp_re):
         results = []
         events_dir = os.path.join(TRACEFS, "events")
@@ -617,8 +616,16 @@ class BPF(object):
         _num_open_probes -= 1
 
     def _get_user_functions(self, name, sym_re):
-        results = []
-        start, requested, actual = (0, 50, ct.c_int(0))
+        """
+        We are returning addresses here instead of symbol names because it
+        turns out that the same name may appear multiple times with different
+        addresses, and the same address may appear multiple times with the same
+        name. We can't attach a uprobe to the same address more than once, so
+        it makes sense to return the unique set of addresses that are mapped to
+        a symbol that matches the provided regular expression.
+        """
+        addresses = []
+        start, requested, actual = (0, 200, ct.c_int(0))
         symbols = (bcc_symbol * requested)()
         while True:
             res = lib.bcc_list_symbols(name, symbols, start, requested, actual)
@@ -627,11 +634,11 @@ class BPF(object):
             if actual.value == 0:
                 break
             for i in xrange(0, actual.value):
-                sym_name = symbols[i].name
-                if re.match(sym_re, sym_name):
-                    results.append(sym_name)
+                sym_name, addr = (symbols[i].name, symbols[i].offset)
+                if re.match(sym_re, sym_name) and addr not in addresses:
+                    addresses.append(addr)
             start += requested
-        return results
+        return addresses
 
     def attach_uprobe(self, name="", sym="", sym_re="", addr=None,
             fn_name="", pid=-1, cpu=0, group_fd=-1):
@@ -658,8 +665,8 @@ class BPF(object):
         name = str(name)
 
         if sym_re:
-            for sym_name in self._get_user_functions(name, sym_re):
-                self.attach_uprobe(name=name, sym=sym_name, addr=addr,
+            for sym_addr in self._get_user_functions(name, sym_re):
+                self.attach_uprobe(name=name, addr=sym_addr,
                                    fn_name=fn_name, pid=pid, cpu=cpu,
                                    group_fd=group_fd)
             return
