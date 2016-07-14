@@ -31,7 +31,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument("-t", "--timestamp", action="store_true",
     help="include timestamp on output")
 parser.add_argument("-x", "--failed", action="store_true",
-    help="only show failed opens")
+    help="only show failed kill syscalls")
 parser.add_argument("-p", "--pid",
     help="trace this PID only")
 args = parser.parse_args()

@@ -26,7 +26,7 @@ Trace signals issued by the kill() syscall
 optional arguments:
   -h, --help         show this help message and exit
   -t, --timestamp    include timestamp on output
-  -x, --failed       only show failed opens
+  -x, --failed       only show failed kill syscalls
   -p PID, --pid PID  trace this PID only
 
 examples:
