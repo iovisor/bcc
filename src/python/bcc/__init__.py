@@ -25,7 +25,7 @@ import errno
 import sys
 basestring = (unicode if sys.version_info[0] < 3 else str)
 
-from .libbcc import lib, _CB_TYPE, bcc_symbol
+from .libbcc import lib, _CB_TYPE, bcc_symbol, _SYM_CB_TYPE
 from .table import Table
 from .perf import Perf
 from .usyms import ProcessSymbols
@@ -625,19 +625,14 @@ class BPF(object):
         a symbol that matches the provided regular expression.
         """
         addresses = []
-        start, requested, actual = (0, 200, ct.c_int(0))
-        symbols = (bcc_symbol * requested)()
-        while True:
-            res = lib.bcc_list_symbols(name, symbols, start, requested, actual)
-            if res < 0:
-                raise Exception("Failed to list symbols in %s" % name)
-            if actual.value == 0:
-                break
-            for i in xrange(0, actual.value):
-                sym_name, addr = (symbols[i].name, symbols[i].offset)
-                if re.match(sym_re, sym_name) and addr not in addresses:
-                    addresses.append(addr)
-            start += requested
+        def sym_cb(sym_name, addr):
+            if re.match(sym_re, sym_name) and addr not in addresses:
+                addresses.append(addr)
+            return 0
+
+        res = lib.bcc_foreach_symbol(name, _SYM_CB_TYPE(sym_cb))
+        if res < 0:
+            raise Exception("Error %d enumerating symbols in %s" % (res, name))
         return addresses
 
     def attach_uprobe(self, name="", sym="", sym_re="", addr=None,
