@@ -4,7 +4,7 @@
 #               For Linux, uses BCC, eBPF.
 #
 # USAGE: stackcount [-h] [-p PID] [-i INTERVAL] [-T] [-r] [-s]
-#                   [-v] pattern
+#                   [-P] [-v] pattern
 #
 # The pattern is a string with optional '*' wildcards, similar to file
 # globbing. If you'd prefer to use regular expressions, use the -r option.
@@ -26,7 +26,7 @@ import sys
 debug = True
 
 class Probe(object):
-    def __init__(self, pattern, use_regex, pid):
+    def __init__(self, pattern, use_regex=False, pid=None, per_pid=False):
         """Init a new probe.
 
         Init the probe from the pattern provided by the user. The supported
@@ -63,15 +63,7 @@ class Probe(object):
             self.library = BPF.find_library(self.library)
 
         self.pid = pid
-        # TODO Remove this limitation, which is only there because we need the
-        # pid to resolve symbols. If we maintain a stack cache per pid, we can
-        # resolve the right symbols on the fly. We will need to merge the stacks
-        # in user-space, however -- we could have the same functions called with
-        # the same stacks across multiple processes. Maybe print the pids in
-        # that case, or make it an option to join pids or print each pid's stack
-        # separately.
-        if not self.pid and not self.is_kernel_probe():
-            raise Exception("pid must be specified when tracing user-space")
+        self.per_pid = per_pid
 
     def is_kernel_probe(self):
         return self.type == "t" or (self.type == "p" and self.library == "")
@@ -79,16 +71,20 @@ class Probe(object):
     def attach(self):
         if self.type == "p":
             if self.library:
-                self.bpf.attach_uprobe(name=self.library, sym_re=self.pattern,
-                                       fn_name="trace_count", pid=self.pid)
+                self.bpf.attach_uprobe(name=self.library,
+                                       sym_re=self.pattern,
+                                       fn_name="trace_count",
+                                       pid=self.pid or -1)
                 self.matched = self.bpf.num_open_uprobes()
             else:
-                self.bpf.attach_kprobe(event_re=pattern, fn_name="trace_count",
-                                       pid=self.pid)
+                self.bpf.attach_kprobe(event_re=pattern,
+                                       fn_name="trace_count",
+                                       pid=self.pid or -1)
                 self.matched = self.bpf.num_open_kprobes()
         elif self.type == "t":
             self.bpf.attach_tracepoint(tp_re=self.pattern,
-                                       fn_name="trace_count", pid=self.pid)
+                                       fn_name="trace_count",
+                                       pid=self.pid or -1)
             self.matched = self.bpf.num_open_tracepoints()
 
         if self.matched == 0:
@@ -97,12 +93,19 @@ class Probe(object):
     def load(self):
         bpf_text = """#include <uapi/linux/ptrace.h>
 
-BPF_HASH(counts, int);
+struct key_t {
+    u32 pid;
+    int stackid;
+};
+
+BPF_HASH(counts, struct key_t);
 BPF_STACK_TRACE(stack_traces, 1024);
 
 int trace_count(void *ctx) {
     FILTER
-    int key = stack_traces.get_stackid(ctx, STACK_FLAGS);
+    struct key_t key = {};
+    key.pid = GET_PID;
+    key.stackid = stack_traces.get_stackid(ctx, STACK_FLAGS);
     u64 zero = 0;
     u64 *val = counts.lookup_or_init(&key, &zero);
     (*val)++;
@@ -121,6 +124,16 @@ int trace_count(void *ctx) {
                 'if (pid != %d) { return 0; }') % (self.pid))
         else:
             bpf_text = bpf_text.replace('FILTER', '')
+
+        # We need per-pid statistics when tracing a user-space process, because
+        # the meaning of the symbols depends on the pid. We also need them if
+        # per-pid statistics were requested with -P. But we don't need them in
+        # any case if a specific pid (-p) was requested.
+        if not self.pid and (self.per_pid or not self.is_kernel_probe()):
+            bpf_text = bpf_text.replace('GET_PID',
+                                        'bpf_get_current_pid_tgid() >> 32')
+        else:
+            bpf_text = bpf_text.replace('GET_PID', '0xffffffff')
 
         stack_flags = 'BPF_F_REUSE_STACKID'
         if not self.is_kernel_probe():
@@ -159,26 +172,41 @@ class Tool(object):
             help="use regular expressions. Default is \"*\" wildcards only.")
         parser.add_argument("-s", "--offset", action="store_true",
             help="show address offsets")
+        parser.add_argument("-P", "--perpid", action="store_true",
+            help="display stacks separately for each process")
         parser.add_argument("-v", "--verbose", action="store_true",
             help="show raw addresses")
         parser.add_argument("pattern",
             help="search expression for events")
         self.args = parser.parse_args()
-        self.probe = Probe(self.args.pattern, self.args.regexp, self.args.pid)
+        self.probe = Probe(self.args.pattern, self.args.regexp,
+                           self.args.pid, self.args.perpid)
 
-    def _print_frame(self, addr):
-        pid_for_syms = None if self.probe.is_kernel_probe() else self.args.pid
+    def _print_frame(self, addr, pid):
         print("  ", end="")
         if self.args.verbose:
             print("%-16x " % addr, end="")
         if self.args.offset:
-            print("%s" % self.probe.bpf.symaddr(addr, pid_for_syms))
+            print("%s" % self.probe.bpf.symaddr(addr, pid))
         else:
-            print("%s" % self.probe.bpf.sym(addr, pid_for_syms))
+            print("%s" % self.probe.bpf.sym(addr, pid))
 
     @staticmethod
     def _signal_ignore(signal, frame):
         print()
+
+    def _comm_for_pid(self, pid):
+        if pid in self.comm_cache:
+            return self.comm_cache[pid]
+
+        try:
+            comm = "    %s [%d]" % (
+                    open("/proc/%d/comm" % pid).read().strip(),
+                    pid)
+            self.comm_cache[pid] = comm
+            return comm
+        except:
+            return "    PID %d" % pid
 
     def run(self):
         self.probe.load()
@@ -200,10 +228,12 @@ class Tool(object):
 
             counts = self.probe.bpf["counts"]
             stack_traces = self.probe.bpf["stack_traces"]
+            self.comm_cache = {}
             for k, v in sorted(counts.items(),
                                key=lambda counts: counts[1].value):
-                for addr in stack_traces.walk(k.value):
-                    self._print_frame(addr)
+                print(self._comm_for_pid(k.pid))
+                for addr in stack_traces.walk(k.stackid):
+                    self._print_frame(addr, k.pid)
                 print("    %d\n" % v.value)
             counts.clear()
 
