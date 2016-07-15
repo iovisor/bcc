@@ -20,7 +20,6 @@ import json
 import multiprocessing
 import os
 import re
-from subprocess import Popen, PIPE, STDOUT
 import struct
 import sys
 basestring = (unicode if sys.version_info[0] < 3 else str)
@@ -46,19 +45,18 @@ DEBUG_PREPROCESSOR = 0x4
 def cleanup_kprobes():
     for k, v in open_kprobes.items():
         lib.perf_reader_free(v)
+        # non-string keys here include the perf_events reader
         if isinstance(k, str):
             desc = "-:kprobes/%s" % k
             lib.bpf_detach_kprobe(desc.encode("ascii"))
     for k, v in open_uprobes.items():
         lib.perf_reader_free(v)
-        if isinstance(k, str):
-            desc = "-:uprobes/%s" % k
-            lib.bpf_detach_uprobe(desc.encode("ascii"))
+        desc = "-:uprobes/%s" % k
+        lib.bpf_detach_uprobe(desc.encode("ascii"))
     for k, v in open_tracepoints.items():
         lib.perf_reader_free(v)
-        if isinstance(k, str):
-            (tp_category, tp_name) = k.split(':')
-            lib.bpf_detach_tracepoint(tp_category, tp_name)
+        (tp_category, tp_name) = k.split(':')
+        lib.bpf_detach_tracepoint(tp_category, tp_name)
     open_kprobes.clear()
     open_uprobes.clear()
     open_tracepoints.clear()
@@ -350,19 +348,21 @@ class BPF(object):
 
     @staticmethod
     def _get_kprobe_functions(event_re):
-        p = Popen(["awk", "$1 ~ /%s/ { print $1 }" % event_re,
-            "%s/available_filter_functions" % TRACEFS], stdout=PIPE)
-        lines = p.communicate()[0].decode().split()
-        with open("%s/../kprobes/blacklist" % TRACEFS) as f:
-            blacklist = [line.split()[1] for line in f.readlines()]
-        fns = [line.rstrip() for line in lines if
-                (line != "\n" and line not in blacklist)]
+        blacklist = set([line.rstrip().split()[1] for line in
+                open("%s/../kprobes/blacklist" % TRACEFS)])
+        fns = []
+        with open("%s/available_filter_functions" % TRACEFS) as f:
+            for line in f:
+                fn = line.rstrip().split()[0]
+                if re.match(event_re, fn) and fn not in blacklist:
+                    fns.append(fn)
         _check_probe_quota(len(fns))
         return fns
 
     def attach_kprobe(self, event="", fn_name="", event_re="",
             pid=-1, cpu=0, group_fd=-1):
 
+        assert isinstance(event, str), "event must be a string"
         # allow the caller to glob multiple functions together
         if event_re:
             for line in BPF._get_kprobe_functions(event_re):
@@ -403,6 +403,7 @@ class BPF(object):
 
     @staticmethod
     def detach_kprobe(event):
+        assert isinstance(event, str), "event must be a string"
         ev_name = "p_" + event.replace("+", "_").replace(".", "_")
         if ev_name not in open_kprobes:
             raise Exception("Kprobe %s is not attached" % event)
@@ -416,6 +417,7 @@ class BPF(object):
     def attach_kretprobe(self, event="", fn_name="", event_re="",
             pid=-1, cpu=0, group_fd=-1):
 
+        assert isinstance(event, str), "event must be a string"
         # allow the caller to glob multiple functions together
         if event_re:
             for line in BPF._get_kprobe_functions(event_re):
@@ -441,6 +443,7 @@ class BPF(object):
 
     @staticmethod
     def detach_kretprobe(event):
+        assert isinstance(event, str), "event must be a string"
         ev_name = "r_" + event.replace("+", "_").replace(".", "_")
         if ev_name not in open_kprobes:
             raise Exception("Kretprobe %s is not attached" % event)
@@ -609,7 +612,7 @@ class BPF(object):
 
     def _trace_autoload(self):
         for i in range(0, lib.bpf_num_functions(self.module)):
-            func_name = lib.bpf_function_name(self.module, i).decode()
+            func_name = lib.bpf_function_name(self.module, i)
             if len(open_kprobes) == 0 and func_name.startswith("kprobe__"):
                 fn = self.load_func(func_name, BPF.KPROBE)
                 self.attach_kprobe(event=fn.name[8:], fn_name=fn.name)
@@ -755,9 +758,10 @@ class BPF(object):
         """num_open_kprobes()
 
         Get the number of open K[ret]probes. Can be useful for scenarios where
-        event_re is used while attaching and detaching probes
+        event_re is used while attaching and detaching probes. Excludes
+        perf_events readers.
         """
-        return len(open_kprobes)
+        return len([k for k in open_kprobes.keys() if isinstance(k, str)])
 
     def kprobe_poll(self, timeout = -1):
         """kprobe_poll(self)
