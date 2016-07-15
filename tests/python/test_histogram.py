@@ -31,6 +31,7 @@ int kprobe__htab_map_delete_elem(struct pt_regs *ctx, struct bpf_map *map, u64 *
                 try: del b["stub"][c_ulonglong(1 << i)]
                 except: pass
         b["hist1"].print_log2_hist()
+        b.cleanup()
 
     def test_struct(self):
         b = BPF(text="""
@@ -52,6 +53,7 @@ int kprobe__htab_map_delete_elem(struct pt_regs *ctx, struct bpf_map *map, u64 *
                 try: del b["stub2"][c_ulonglong(1 << i)]
                 except: pass
         b["hist1"].print_log2_hist()
+        b.cleanup()
 
     def test_chars(self):
         b = BPF(text="""
@@ -68,6 +70,7 @@ int kprobe__finish_task_switch(struct pt_regs *ctx, struct task_struct *prev) {
 """)
         for i in range(0, 100): time.sleep(0.01)
         b["hist1"].print_log2_hist()
+        b.cleanup()
 
 
 if __name__ == "__main__":
