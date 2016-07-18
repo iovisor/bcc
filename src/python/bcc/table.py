@@ -393,15 +393,15 @@ class PerfEventArray(ArrayBase):
             raise Exception("Could not open perf buffer")
         fd = lib.perf_reader_fd(reader)
         self[self.Key(cpu)] = self.Leaf(fd)
-        self.bpf.open_kprobes()[(id(self), cpu)] = reader
+        self.bpf._add_kprobe((id(self), cpu), reader)
         # keep a refcnt
         self._cbs[cpu] = fn
 
     def close_perf_buffer(self, key):
-        reader = self.bpf.open_kprobes().get((id(self), key))
+        reader = self.bpf.open_kprobes.get((id(self), key))
         if reader:
             lib.perf_reader_free(reader)
-            del(self.bpf.open_kprobes()[(id(self), key)])
+            self.bpf._del_kprobe((id(self), key))
         del self._cbs[key]
 
 class PerCpuHash(HashTable):

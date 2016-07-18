@@ -640,8 +640,8 @@ struct __string_t { char s[%d]; };
                 for probe in self.probes:
                         probe.attach(self.bpf)
                 if self.args.verbose:
-                        print("open uprobes: %s" % BPF.open_uprobes())
-                        print("open kprobes: %s" % BPF.open_kprobes())
+                        print("open uprobes: %s" % self.bpf.open_uprobes)
+                        print("open kprobes: %s" % self.bpf.open_kprobes)
 
         def _main_loop(self):
                 count_so_far = 0
