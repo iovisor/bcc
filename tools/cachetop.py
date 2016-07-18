@@ -225,7 +225,7 @@ def handle_loop(stdscr, args):
         for i, stat in enumerate(process_stats):
             stdscr.addstr(
                 i + 2, 0,
-                "{0:8} {username:8} {2:16} {3:8} {4:8} "
+                "{0:8} {username:8.8} {2:16} {3:8} {4:8} "
                 "{5:8} {6:9.1f}% {7:9.1f}%".format(
                     *stat, username=pwd.getpwuid(int(stat[1]))[0]
                 )
@@ -239,9 +239,12 @@ def handle_loop(stdscr, args):
 
 
 def parse_arguments():
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        description='show Linux page cache hit/miss statistics including read '
+                    'and write hit % per processes in a UI like top.'
+    )
     parser.add_argument(
-        '--interval', '-i', type=int, default=5, nargs='?',
+        'interval', type=int, default=5, nargs='?',
         help='Interval between probes.'
     )
 
