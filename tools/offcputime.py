@@ -15,6 +15,7 @@ from bcc import BPF
 from sys import stderr
 from time import sleep, strftime
 import argparse
+import errno
 import signal
 
 # arg validation
@@ -215,10 +216,11 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
     # handle get_stackid erorrs
     if (not args.user_stacks_only and k.kernel_stack_id < 0) or \
             (not args.kernel_stacks_only and k.user_stack_id < 0 and \
-                k.user_stack_id != -14):
+                k.user_stack_id != -errno.EFAULT):
         missing_stacks += 1
         # check for an ENOMEM error
-        if k.kernel_stack_id == -12 or k.user_stack_id == -12:
+        if k.kernel_stack_id == -errno.ENOMEM or \
+           k.user_stack_id == -errno.ENOMEM:
             has_enomem = True
         continue
 
