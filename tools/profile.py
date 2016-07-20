@@ -37,7 +37,7 @@
 # 15-Jul-2016   Brendan Gregg   Created this.
 
 from __future__ import print_function
-from bcc import BPF
+from bcc import BPF, Perf
 from sys import stderr
 from time import sleep
 import argparse
@@ -259,72 +259,9 @@ def signal_ignore(signal, frame):
 #
 
 # use perf_events to sample
-class Perf(object):
-        class perf_event_attr(ct.Structure):
-                _fields_ = [
-                        ('type', ct.c_uint),
-                        ('size', ct.c_uint),
-                        ('config', ct.c_ulong),
-                        ('sample_period', ct.c_ulong),
-                        ('sample_type', ct.c_ulong),
-                        ('read_format', ct.c_ulong),
-                        ('flags', ct.c_ulong),
-                        ('wakeup_events', ct.c_uint),
-                        ('IGNORE3', ct.c_uint),
-                        ('IGNORE4', ct.c_ulong),
-                        ('IGNORE5', ct.c_ulong),
-                        ('IGNORE6', ct.c_ulong),
-                        ('IGNORE7', ct.c_uint),
-                        ('IGNORE8', ct.c_int),
-                        ('IGNORE9', ct.c_ulong),
-                        ('IGNORE10', ct.c_uint),
-                        ('IGNORE11', ct.c_uint)
-                ]
-
-        # see include/uapi/linux/perf_event.h
-        NR_PERF_EVENT_OPEN = 298
-        PERF_TYPE_SOFTWARE = 1
-        PERF_SAMPLE_RAW = 1024
-        PERF_ATTR_FLAG_FREQ = 1024
-        PERF_FLAG_FD_CLOEXEC = 8
-        PERF_EVENT_IOC_ENABLE = 9216
-
-        libc = ct.CDLL('libc.so.6', use_errno=True)
-        syscall = libc.syscall          # not declaring vararg types
-        ioctl = libc.ioctl              # not declaring vararg types
-
-        @staticmethod
-        def _open_for_cpu(cpu, attr):
-                if debug:
-                    print("enabling sampling on CPU %d" % cpu)
-                pfd = Perf.syscall(Perf.NR_PERF_EVENT_OPEN, ct.byref(attr),
-                                   pid, cpu, -1, Perf.PERF_FLAG_FD_CLOEXEC)
-                if pfd < 0:
-                        errno_ = ct.get_errno()
-                        raise OSError(errno_, os.strerror(errno_))
-                # We didn't need to set PERF_EVENT_IOC_SET_FILTER for args.pid,
-                # as pid was already set above. We also won't setup the perf
-                # ring buffer mmaps, since we won't be reading them. Just
-                # enable the events.
-                if Perf.ioctl(pfd, Perf.PERF_EVENT_IOC_ENABLE, 0) < 0:
-                        errno_ = ct.get_errno()
-                        raise OSError(errno_, os.strerror(errno_))
-
-        @staticmethod
-        def perf_event_open(tpoint_id):
-                attr = Perf.perf_event_attr()
-                attr.config = tpoint_id
-                attr.type = Perf.PERF_TYPE_SOFTWARE
-                attr.sample_type = Perf.PERF_SAMPLE_RAW   # u32; or use zero
-                attr.sample_period = args.frequency
-                attr.flags = Perf.PERF_ATTR_FLAG_FREQ     # no mmap or comm
-                attr.wakeup_events = 9999999              # don't wake up
-                for cpu in range(0, multiprocessing.cpu_count()):
-                        Perf._open_for_cpu(cpu, attr)
-
-# begin sampling
 try:
-    Perf.perf_event_open(0)
+    Perf.perf_event_open(0, pid=-1, ptype=Perf.PERF_TYPE_SOFTWARE,
+        freq=args.frequency)
 except:
     print("ERROR: initializing perf_events for sampling.\n"
         "To debug this, try running the following command:\n"
