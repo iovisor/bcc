@@ -1,0 +1,148 @@
+.TH profile 8  "2016-07-17" "USER COMMANDS"
+.SH NAME
+profile \- Profile CPU usage by sampling stack traces. Uses Linux eBPF/bcc.
+.SH SYNOPSIS
+.B profile [\-adfh] [\-p PID] [\-U | \-k] [\-F FREQUENCY]
+.B [\-\-stack\-storage\-size COUNT] [\-S FRAMES] [duration]
+.SH DESCRIPTION
+This is a CPU profiler. It works by taking samples of stack traces at timed
+intervals. It will help you understand and quantify CPU usage: which code is
+executing, and by how much, including both user-level and kernel code.
+
+By default this samples at 49 Hertz (samples per second), across all CPUs.
+This frequency can be tuned using a command line option. The reason for 49, and
+not 50, is to avoid lock-step sampling.
+
+This is also an efficient profiler, as stack traces are frequency counted in
+kernel context, rather than passing each stack to user space for frequency
+counting there. Only the unique stacks and counts are passed to user space
+at the end of the profile, greatly reducing the kernel<->user transfer.
+
+Note: if another perf-based sampling session is active, the output may become
+polluted with their events. On older kernels, the ouptut may also become
+polluted with tracing sessions (when the kprobe is used instead of the
+tracepoint). This may be filtered in a future version if it becomes a problem.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+
+This also requires Linux 4.6+ (BPF_MAP_TYPE_STACK_TRACE support), and the
+perf:perf_hrtimer tracepoint (currently a kernel patch). If the latter is
+unavailable, this will try to use kprobes as a fallback (of perf_misc_flags()),
+which may work or
+may not, depending on your kernel build. If the kprobe doesn't work, this tool
+will either error on instrumentation, or, instrument successfully but
+generate no output.
+.SH OPTIONS
+.TP
+\-h
+Print usage message.
+.TP
+\-p PID
+Trace this process ID only (filtered in-kernel). Without this, all CPUs are
+profiled.
+.TP
+\-F frequency
+Frequency to sample stacks (default 49).
+.TP
+\-f
+Print output in folded stack format.
+.TP
+\-d
+Include an output delimiter between kernel and user stacks (either "--", or,
+in folded mode, "-").
+.TP
+\-U
+Show stacks from user space only (no kernel space stacks).
+.TP
+\-K
+Show stacks from kernel space only (no user space stacks).
+.TP
+\-\-stack-storage-size COUNT
+The maximum number of unique stack traces that the kernel will count (default
+2048). If the sampled count exceeds this, a warning will be printed.
+.TP
+\-S FRAMES
+A fixed number of kernel frames to skip. By default, extra registers are
+recorded so that the interrupt framework stack can be identified and excluded
+from the output. If this isn't working on your architecture, or, if you'd
+like to improve performance a tiny amount, then you can specify a fixed count
+to skip. Note for debugging that the IP address is printed as the first frame,
+followed by the captured stack.
+.TP
+duration
+Duration to trace, in seconds.
+.SH EXAMPLES
+.TP
+Profile (sample) stack traces system-wide at 49 Hertz (samples per second) until Ctrl-C:
+#
+.B profile
+.TP
+Profile for 5 seconds only:
+#
+.B profile 5
+.TP
+Profile at 99 Hertz for 5 seconds only:
+#
+.B profile -F 99 5
+.TP
+Profile PID 181 only:
+#
+.B profile -p 181
+.TP
+Profile for 5 seconds and output in folded stack format (suitable as input for flame graphs), including a delimiter between kernel and user stacks:
+#
+.B profile -df 5
+.TP
+Profile kernel stacks only:
+#
+.B profile -K
+.SH DEBUGGING
+See "[unknown]" frames with bogus addresses? This can happen for different
+reasons. Your best approach is to get Linux perf to work first, and then to
+try this tool. Eg, "perf record \-F 49 \-a \-g \-\- sleep 1; perf script", and
+to check for unknown frames there.
+
+The most common reason for "[unknown]" frames is that the target software has
+not been compiled
+with frame pointers, and so we can't use that simple method for walking the
+stack. The fix in that case is to use software that does have frame pointers,
+eg, gcc -fno-omit-frame-pointer, or Java's -XX:+PreserveFramePointer.
+
+Another reason for "[unknown]" frames is JIT compilers, which don't use a
+traditional symbol table. The fix in that case is to populate a
+/tmp/perf-PID.map file with the symbols, which this tool should read. How you
+do this depends on the runtime (Java, Node.js).
+
+If you seem to have unrelated samples in the output, check for other
+sampling or tracing tools that may be running. The current version of this
+tool can include their events if profiling happened concurrently. Those
+samples may be filtered in a future version.
+.SH OVERHEAD
+This is an efficient profiler, as stack traces are frequency counted in
+kernel context, and only the unique stacks and their counts are passed to
+user space. Contrast this with the current "perf record -F 99 -a" method
+of profiling, which writes each sample to user space (via a ring buffer),
+and then to the file system (perf.data), which must be post-processed.
+
+This uses perf_event_open to setup a timer which is instrumented by BPF,
+and for efficiency it does not initialize the perf ring buffer, so the
+redundant perf samples are not collected.
+
+It's expected that the overhead while sampling at 49 Hertz (the default),
+across all CPUs, should be negligible. If you increase the sample rate, the
+overhead might begin to be measurable.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Brendan Gregg
+.SH SEE ALSO
+offcputime(8)

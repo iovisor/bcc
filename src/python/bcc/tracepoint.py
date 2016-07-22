@@ -17,65 +17,6 @@ import multiprocessing
 import os
 import re
 
-class Perf(object):
-        class perf_event_attr(ct.Structure):
-                _fields_ = [
-                        ('type', ct.c_uint),
-                        ('size', ct.c_uint),
-                        ('config', ct.c_ulong),
-                        ('sample_period', ct.c_ulong),
-                        ('sample_type', ct.c_ulong),
-                        ('IGNORE1', ct.c_ulong),
-                        ('IGNORE2', ct.c_ulong),
-                        ('wakeup_events', ct.c_uint),
-                        ('IGNORE3', ct.c_uint),
-                        ('IGNORE4', ct.c_ulong),
-                        ('IGNORE5', ct.c_ulong),
-                        ('IGNORE6', ct.c_ulong),
-                        ('IGNORE7', ct.c_uint),
-                        ('IGNORE8', ct.c_int),
-                        ('IGNORE9', ct.c_ulong),
-                        ('IGNORE10', ct.c_uint),
-                        ('IGNORE11', ct.c_uint)
-                ]
-
-        NR_PERF_EVENT_OPEN = 298
-        PERF_TYPE_TRACEPOINT = 2
-        PERF_SAMPLE_RAW = 1024
-        PERF_FLAG_FD_CLOEXEC = 8
-        PERF_EVENT_IOC_SET_FILTER = 1074275334
-        PERF_EVENT_IOC_ENABLE = 9216
-
-        libc = ct.CDLL('libc.so.6', use_errno=True)
-        syscall = libc.syscall          # not declaring vararg types
-        ioctl = libc.ioctl              # not declaring vararg types
-
-        @staticmethod
-        def _open_for_cpu(cpu, attr):
-                pfd = Perf.syscall(Perf.NR_PERF_EVENT_OPEN, ct.byref(attr),
-                                   -1, cpu, -1, Perf.PERF_FLAG_FD_CLOEXEC)
-                if pfd < 0:
-                        errno_ = ct.get_errno()
-                        raise OSError(errno_, os.strerror(errno_))
-                if Perf.ioctl(pfd, Perf.PERF_EVENT_IOC_SET_FILTER,
-                              "common_pid == -17") < 0:
-                        errno_ = ct.get_errno()
-                        raise OSError(errno_, os.strerror(errno_))
-                if Perf.ioctl(pfd, Perf.PERF_EVENT_IOC_ENABLE, 0) < 0:
-                        errno_ = ct.get_errno()
-                        raise OSError(errno_, os.strerror(errno_))
-
-        @staticmethod
-        def perf_event_open(tpoint_id):
-                attr = Perf.perf_event_attr()
-                attr.config = tpoint_id
-                attr.type = Perf.PERF_TYPE_TRACEPOINT
-                attr.sample_type = Perf.PERF_SAMPLE_RAW
-                attr.sample_period = 1
-                attr.wakeup_events = 1
-                for cpu in range(0, multiprocessing.cpu_count()):
-                        Perf._open_for_cpu(cpu, attr)
-
 class Tracepoint(object):
         enabled_tracepoints = []
         trace_root = "/sys/kernel/debug/tracing"
@@ -172,7 +113,7 @@ struct %s {
                 if tp_id == -1:
                         raise ValueError("no such tracepoint found: %s:%s" %
                                          (category, event))
-                Perf.perf_event_open(tp_id)
+                Perf.perf_event_open(tp_id, ptype=Perf.PERF_TYPE_TRACEPOINT)
                 new_tp = Tracepoint(category, event, tp_id)
                 cls.enabled_tracepoints.append(new_tp)
                 return new_tp
@@ -199,4 +140,3 @@ struct %s {
                 if cls._any_tracepoints_enabled():
                         bpf.attach_kprobe(event="tracing_generic_entry_update",
                                           fn_name="__trace_entry_update")
-
