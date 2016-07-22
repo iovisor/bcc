@@ -319,12 +319,16 @@ int bcc_usdt_enable_probe(void *usdt, const char *probe_name,
   return ctx->enable_probe(probe_name, fn_name) ? 0 : -1;
 }
 
-char *bcc_usdt_genargs(void *usdt) {
+const char *bcc_usdt_genargs(void *usdt) {
+  static std::string storage_;
+
   USDT::Context *ctx = static_cast<USDT::Context *>(usdt);
   std::ostringstream stream;
   if (!ctx->generate_usdt_args(stream))
     return nullptr;
-  return strdup(stream.str().c_str());
+
+  storage_ = stream.str();
+  return storage_.c_str();
 }
 
 void bcc_usdt_foreach_uprobe(void *usdt, bcc_usdt_uprobe_cb callback) {

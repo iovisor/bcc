@@ -135,3 +135,23 @@ lib.bcc_symcache_resolve_name.argtypes = [
 
 lib.bcc_symcache_refresh.restype = None
 lib.bcc_symcache_refresh.argtypes = [ct.c_void_p]
+
+lib.bcc_usdt_new_frompid.restype = ct.c_void_p
+lib.bcc_usdt_new_frompid.argtypes = [ct.c_int]
+
+lib.bcc_usdt_new_frompath.restype = ct.c_void_p
+lib.bcc_usdt_new_frompath.argtypes = [ct.c_char_p]
+
+lib.bcc_usdt_close.restype = None
+lib.bcc_usdt_close.argtypes = [ct.c_void_p]
+
+lib.bcc_usdt_enable_probe.restype = ct.c_int
+lib.bcc_usdt_enable_probe.argtypes = [ct.c_void_p, ct.c_char_p, ct.c_char_p]
+
+lib.bcc_usdt_genargs.restype = ct.c_char_p
+lib.bcc_usdt_genargs.argtypes = [ct.c_void_p]
+
+_USDT_CB = ct.CFUNCTYPE(None, ct.c_char_p, ct.c_char_p, ct.c_ulonglong, ct.c_int)
+
+lib.bcc_usdt_foreach_uprobe.restype = None
+lib.bcc_usdt_foreach_uprobe.argtypes = [ct.c_void_p, _USDT_CB]

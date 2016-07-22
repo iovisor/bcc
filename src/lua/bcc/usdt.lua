@@ -14,8 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ]]
 local ffi = require("ffi")
-ffi.cdef "void free(void *ptr);"
-
 local libbcc = require("bcc.libbcc")
 local Usdt = class("USDT")
 
@@ -56,10 +54,7 @@ end
 function Usdt:_get_text()
   local argc = libbcc.bcc_usdt_genargs(self.context)
   assert(argc ~= nil)
-
-  local text = ffi.string(argc)
-  ffi.C.free(argc)
-  return text
+  return ffi.string(argc)
 end
 
 function Usdt:_attach_uprobes(bpf)
