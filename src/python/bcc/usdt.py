@@ -19,16 +19,17 @@ class USDT(object):
         if pid:
             self.pid = pid
             self.context = lib.bcc_usdt_new_frompid(pid)
+            if self.context == None:
+                raise Exception("USDT failed to instrument PID %d" % pid) 
         elif path:
             self.path = path
             self.context = lib.bcc_usdt_new_frompath(path)
-
-        if self.context == None:
-            raise Exception("failed to create USDT context") 
+            if self.context == None:
+                raise Exception("USDT failed to instrument path %s" % path) 
 
     def enable_probe(self, probe, fn_name):
         if lib.bcc_usdt_enable_probe(self.context, probe, fn_name) != 0:
-            raise Exception("failed to enable probe '%s'", probe)
+            raise Exception("failed to enable probe '%s'" % probe)
 
     def get_text(self):
         return lib.bcc_usdt_genargs(self.context)
