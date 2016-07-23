@@ -116,6 +116,35 @@ class BPF(object):
                     raise Exception("Could not find file %s" % filename)
         return filename
 
+    @staticmethod
+    def _find_exe(cls, bin_path):
+        """
+        _find_exe(bin_path)
+
+        Traverses the PATH environment variable, looking for the first
+        directory that contains an executable file named bin_path, and
+        returns the full path to that file, or None if no such file
+        can be found. This is meant to replace invocations of the
+        "which" shell utility, which doesn't have portable semantics
+        for skipping aliases.
+        """
+        # Source: http://stackoverflow.com/a/377028
+        def is_exe(fpath):
+            return os.path.isfile(fpath) and \
+                os.access(fpath, os.X_OK)
+
+        fpath, fname = os.path.split(bin_path)
+        if fpath:
+            if is_exe(bin_path):
+                return bin_path
+        else:
+            for path in os.environ["PATH"].split(os.pathsep):
+                path = path.strip('"')
+                exe_file = os.path.join(path, bin_path)
+                if is_exe(exe_file):
+                    return exe_file
+        return None
+
     def __init__(self, src_file="", hdr_file="", text=None, cb=None, debug=0,
             cflags=[], usdt=None):
         """Create a a new BPF module with the given source code.
@@ -451,7 +480,8 @@ class BPF(object):
 
     @staticmethod
     def find_library(libname):
-        return lib.bcc_procutils_which_so(libname.encode("ascii")).decode()
+        res = lib.bcc_procutils_which_so(libname.encode("ascii"))
+        return res if res is None else res.decode()
 
     def attach_tracepoint(self, tp="", fn_name="", pid=-1, cpu=0, group_fd=-1):
         """attach_tracepoint(tp="", fn_name="", pid=-1, cpu=0, group_fd=-1)

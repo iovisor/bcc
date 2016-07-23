@@ -371,7 +371,7 @@ int PROBENAME(struct pt_regs *ctx SIGNATURE)
         def _attach_u(self):
                 libpath = BPF.find_library(self.library)
                 if libpath is None:
-                        libpath = ProcUtils.which(self.library)
+                        libpath = BPF._find_exe(self.library)
                 if libpath is None or len(libpath) == 0:
                         self._bail("unable to find library %s" % self.library)
 

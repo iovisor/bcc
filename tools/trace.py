@@ -9,7 +9,7 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 # Copyright (C) 2016 Sasha Goldshtein.
 
-from bcc import BPF, Tracepoint, Perf, ProcUtils, USDT
+from bcc import BPF, Tracepoint, Perf, USDT
 from time import sleep, strftime
 import argparse
 import re
@@ -416,7 +416,7 @@ BPF_PERF_OUTPUT(%s);
                 libpath = BPF.find_library(self.library)
                 if libpath is None:
                         # This might be an executable (e.g. 'bash')
-                        libpath = ProcUtils.which(self.library)
+                        libpath = BPF._find_exe(self.library)
                 if libpath is None or len(libpath) == 0:
                         self._bail("unable to find library %s" % self.library)
 
