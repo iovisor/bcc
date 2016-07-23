@@ -7,13 +7,28 @@ cachetop \- Statistics for linux page cache hit/miss ratios per processes. Uses 
 .SH DESCRIPTION
 This traces four kernel functions and prints per-processes summaries every
 \fBinterval\fR seconds. This can be useful for processes workload characterization,
-and looking for patterns in operation usage over time.
+and looking for patterns in operation usage over time. It provides a \fBtop\fR-like interface
+which by default sorts by \fBHITS\fR in ascending order.
 
 This works by tracing kernel page cache functions using dynamic tracing, and will
 need updating to match any changes to these functions. Edit the script to
 customize which functions are traced.
 
 Since this uses BPF, only the root user can use this tool.
+.SH KEYBINDINGS
+The following keybindings can be used to control the output of \fBcachetop\fR.
+.TP
+.B <
+Use the previous column for sorting.
+.TP
+.B >
+Use the next column for sorting.
+.TP
+.B r
+Toggle sorting order (default ascending).
+.TP
+.B q
+Quit cachetop.
 .SH REQUIREMENTS
 CONFIG_BPF and bcc.
 .SH EXAMPLES

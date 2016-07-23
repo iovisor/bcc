@@ -14,10 +14,13 @@
 
 from __future__ import absolute_import
 from __future__ import division
-from __future__ import unicode_literals
+# Do not import unicode_literals until #623 is fixed
+# from __future__ import unicode_literals
 from __future__ import print_function
-from collections import defaultdict
+
 from bcc import BPF
+from collections import defaultdict
+from time import strftime
 
 import argparse
 import curses
@@ -210,7 +213,9 @@ def handle_loop(stdscr, args):
         stdscr.clear()
         stdscr.addstr(
             0, 0,
-            "Buffers MB: %.0f / Cached MB: %.0f" % (buff, cached)
+            "%-8s Buffers MB: %.0f / Cached MB: %.0f" % (
+                strftime("%H:%M:%S"), buff, cached
+            )
         )
 
         # header
