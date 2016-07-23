@@ -27,7 +27,7 @@ void *bcc_usdt_new_frompath(const char *path);
 void bcc_usdt_close(void *usdt);
 
 int bcc_usdt_enable_probe(void *, const char *, const char *);
-char *bcc_usdt_genargs(void *);
+const char *bcc_usdt_genargs(void *);
 
 typedef void (*bcc_usdt_uprobe_cb)(const char *, const char *, uint64_t, int);
 void bcc_usdt_foreach_uprobe(void *usdt, bcc_usdt_uprobe_cb callback);

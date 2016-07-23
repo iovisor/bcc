@@ -9,7 +9,7 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 # Copyright (C) 2016 Sasha Goldshtein.
 
-from bcc import BPF, Tracepoint, Perf, ProcUtils, USDTReader
+from bcc import BPF, Tracepoint, Perf, ProcUtils, USDT
 from time import sleep, strftime
 import argparse
 import re

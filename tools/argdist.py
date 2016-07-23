@@ -12,7 +12,7 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 # Copyright (C) 2016 Sasha Goldshtein.
 
-from bcc import BPF, Tracepoint, Perf, ProcUtils, USDTReader
+from bcc import BPF, Tracepoint, Perf, USDT
 from time import sleep, strftime
 import argparse
 import re
@@ -175,8 +175,8 @@ u64 __time = bpf_ktime_get_ns();
                         self._bail("no exprs specified")
                 self.exprs = exprs.split(',')
 
-        def __init__(self, type, specifier, pid):
-                self.pid = pid
+        def __init__(self, bpf, type, specifier):
+                self.pid = bpf.args.pid
                 self.raw_spec = specifier
                 self._validate_specifier()
 
@@ -198,8 +198,10 @@ u64 __time = bpf_ktime_get_ns();
                         self.function = "perf_trace_" + self.function
                 elif self.probe_type == "u":
                         self.library = parts[1]
-                        self._find_usdt_probe()
-                        self._enable_usdt_probe()
+                        self.probe_func_name = "%s_probe%d" % \
+                                (self.function, Probe.next_probe_index)
+                        bpf.enable_usdt_probe(self.function,
+                                        fn_name=self.probe_func_name)
                 else:
                         self.library = parts[1]
                 self.is_user = len(self.library) > 0
@@ -240,26 +242,8 @@ u64 __time = bpf_ktime_get_ns();
                         (self.function, Probe.next_probe_index)
                 Probe.next_probe_index += 1
 
-        def _enable_usdt_probe(self):
-                if self.usdt.need_enable():
-                        if self.pid is None:
-                                self._bail("probe needs pid to enable")
-                        self.usdt.enable(self.pid)
-
-        def _disable_usdt_probe(self):
-                if self.probe_type == "u" and self.usdt.need_enable():
-                        self.usdt.disable(self.pid)
-
         def close(self):
-                self._disable_usdt_probe()
-
-        def _find_usdt_probe(self):
-                reader = USDTReader(bin_path=self.library)
-                for probe in reader.probes:
-                        if probe.name == self.function:
-                                self.usdt = probe
-                                return
-                self._bail("unrecognized USDT probe %s" % self.function)
+                pass
 
         def _substitute_exprs(self):
                 def repl(expr):
@@ -279,12 +263,18 @@ u64 __time = bpf_ktime_get_ns();
                         return "%s v%d;\n" % (self.expr_types[i], i)
 
         def _generate_field_assignment(self, i):
+                text = ""
+                if self.probe_type == "u" and self.exprs[i][0:3] == "arg":
+                    text = ("        u64 %s;\n" + 
+                           "        bpf_usdt_readarg(%s, ctx, &%s);\n") % \
+                           (self.exprs[i], self.exprs[i][3], self.exprs[i])
                 if self._is_string(self.expr_types[i]):
-                        return ("        bpf_probe_read(&__key.v%d.s," +
+                        return (text + "        bpf_probe_read(&__key.v%d.s," +
                                 " sizeof(__key.v%d.s), (void *)%s);\n") % \
                                 (i, i, self.exprs[i])
                 else:
-                        return "        __key.v%d = %s;\n" % (i, self.exprs[i])
+                        return text + "        __key.v%d = %s;\n" % \
+                               (i, self.exprs[i])
 
         def _generate_hash_decl(self):
                 if self.type == "hist":
@@ -331,7 +321,7 @@ u64 __time = bpf_ktime_get_ns();
                 probe_text = """
 DATA_DECL
 
-QUALIFIER int PROBENAME(struct pt_regs *ctx SIGNATURE)
+int PROBENAME(struct pt_regs *ctx SIGNATURE)
 {
         PID_FILTER
         PREFIX
@@ -342,7 +332,6 @@ QUALIFIER int PROBENAME(struct pt_regs *ctx SIGNATURE)
 }
 """
                 prefix = ""
-                qualifier = ""
                 signature = ""
 
                 # If any entry arguments are probed in a ret probe, we need
@@ -357,10 +346,6 @@ QUALIFIER int PROBENAME(struct pt_regs *ctx SIGNATURE)
                 if self.probe_type == "t":
                         program += self.tp.generate_struct()
                         prefix += self.tp.generate_get_struct()
-                elif self.probe_type == "u":
-                        qualifier = "static inline"
-                        signature = ", int __loc_id"
-                        prefix += self.usdt.generate_usdt_cases()
                 elif self.probe_type == "p" and len(self.signature) > 0:
                         # Only entry uprobes/kprobes can have user-specified
                         # signatures. Other probes force it to ().
@@ -380,12 +365,6 @@ QUALIFIER int PROBENAME(struct pt_regs *ctx SIGNATURE)
                         "1" if len(self.filter) == 0 else self.filter)
                 program = program.replace("COLLECT", collect)
                 program = program.replace("PREFIX", prefix)
-                program = program.replace("QUALIFIER", qualifier)
-
-                if self.probe_type == "u":
-                        self.usdt_thunk_names = []
-                        program += self.usdt.generate_usdt_thunks(
-                                self.probe_func_name, self.usdt_thunk_names)
 
                 return program
 
@@ -396,13 +375,7 @@ QUALIFIER int PROBENAME(struct pt_regs *ctx SIGNATURE)
                 if libpath is None or len(libpath) == 0:
                         self._bail("unable to find library %s" % self.library)
 
-                if self.probe_type == "u":
-                        for i, location in enumerate(self.usdt.locations):
-                                self.bpf.attach_uprobe(name=libpath,
-                                        addr=location.address,
-                                        fn_name=self.usdt_thunk_names[i],
-                                        pid=self.pid or -1)
-                elif self.probe_type == "r":
+                if self.probe_type == "r":
                         self.bpf.attach_uretprobe(name=libpath,
                                                   sym=self.function,
                                                   fn_name=self.probe_func_name,
@@ -423,6 +396,7 @@ QUALIFIER int PROBENAME(struct pt_regs *ctx SIGNATURE)
 
         def attach(self, bpf):
                 self.bpf = bpf
+                if self.probe_type == "u": return;
                 if self.is_user:
                         self._attach_u()
                 else:
@@ -604,18 +578,22 @@ argdist -p 2780 -z 120 \\
                   metavar="header",
                   help="additional header files to include in the BPF program")
                 self.args = parser.parse_args()
+                self.usdt_ctx = None
 
         def _create_probes(self):
                 self.probes = []
                 for specifier in (self.args.countspecifier or []):
-                        self.probes.append(Probe(
-                                "freq", specifier, self.args.pid))
+                        self.probes.append(Probe(self, "freq", specifier))
                 for histspecifier in (self.args.histspecifier or []):
-                        self.probes.append(
-                                Probe("hist", histspecifier, self.args.pid))
+                        self.probes.append(Probe(self, "hist", histspecifier))
                 if len(self.probes) == 0:
                         print("at least one specifier is required")
                         exit()
+
+        def enable_usdt_probe(self, probe_name, fn_name):
+                if not self.usdt_ctx:
+                        self.usdt_ctx = USDT(pid=self.args.pid)
+                self.usdt_ctx.enable_probe(probe_name, fn_name)
 
         def _generate_program(self):
                 bpf_source = """
@@ -632,8 +610,9 @@ struct __string_t { char s[%d]; };
                 for probe in self.probes:
                         bpf_source += probe.generate_text()
                 if self.args.verbose:
+                        if self.usdt_ctx: print(self.usdt_ctx.get_text())
                         print(bpf_source)
-                self.bpf = BPF(text=bpf_source)
+                self.bpf = BPF(text=bpf_source, usdt=self.usdt_ctx)
 
         def _attach(self):
                 Tracepoint.attach(self.bpf)
