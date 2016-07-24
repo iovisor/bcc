@@ -99,9 +99,12 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, unique_ptr<vector<TableDes
       abs_file = string(dstack.cwd()) + "/" + file;
   }
 
+  // -fno-color-diagnostics: this is a workaround for a bug in llvm terminalHasColors() as of
+  // 22 Jul 2016. Also see bcc #615.
   vector<const char *> flags_cstr({"-O0", "-emit-llvm", "-I", dstack.cwd(),
                                    "-Wno-deprecated-declarations",
                                    "-Wno-gnu-variable-sized-type-not-at-end",
+                                   "-fno-color-diagnostics",
                                    "-x", "c", "-c", abs_file.c_str()});
 
   KBuildHelper kbuild_helper(kdir);
