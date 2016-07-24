@@ -38,10 +38,9 @@ Tracing... Hit Ctrl-C to end.
 The above output shows a bimodal distribution, where the largest mode of
 800 I/O was between 128 and 255 Kbytes in size.
 
-See the source: [bitehist.c](examples/tracing/bitehist.c) and
-[bitehist.py](examples/tracing/bitehist.py). What this traces, what this stores, and how
-the data is presented, can be entirely customized. This shows only some of
-many possible capabilities.
+See the source: [bitehist.py](examples/tracing/bitehist.py). What this traces,
+what this stores, and how the data is presented, can be entirely customized.
+This shows only some of many possible capabilities.
 
 ## Installing
 
@@ -60,7 +59,7 @@ pair of .c and .py files, and some are directories of files.
 
 Examples:
 
-- examples/tracing/[bitehist.py](examples/tracing/bitehist.py) examples/tracing/[bitehist.c](examples/tracing/bitehist.c): Block I/O size histogram. [Examples](examples/tracing/bitehist_example.txt).
+- examples/tracing/[bitehist.py](examples/tracing/bitehist.py): Block I/O size histogram. [Examples](examples/tracing/bitehist_example.txt).
 - examples/tracing/[disksnoop.py](examples/tracing/disksnoop.py) examples/tracing/[disksnoop.c](examples/tracing/disksnoop.c): Trace block device I/O latency. [Examples](examples/tracing/disksnoop_example.txt).
 - examples/[hello_world.py](examples/hello_world.py): Prints "Hello, World!" for new processes.
 - examples/tracing/[tcpv4connect.py](examples/tracing/tcpv4connect.py): Trace TCP IPv4 active connections. [Examples](examples/tracing/tcpv4connect_example.txt).
