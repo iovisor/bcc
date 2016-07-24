@@ -189,7 +189,7 @@ The BPF program always takes at least one argument, which is a pointer to the
 context for this type of program. Different program types have different calling
 conventions, but for this one we don't care so `void *` is fine.
 ```python
-BPF(text='void kprobe__sys_clone(void *ctx) { bpf_trace_printk("Hello, World!\\n"); }').trace_print()
+BPF(text='int kprobe__sys_clone(void *ctx) { bpf_trace_printk("Hello, World!\\n"); return 0; }').trace_print()
 ```
 
 For this example, we will call the program every time `fork()` is called by a
