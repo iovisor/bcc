@@ -38,10 +38,9 @@ Tracing... Hit Ctrl-C to end.
 The above output shows a bimodal distribution, where the largest mode of
 800 I/O was between 128 and 255 Kbytes in size.
 
-See the source: [bitehist.c](examples/tracing/bitehist.c) and
-[bitehist.py](examples/tracing/bitehist.py). What this traces, what this stores, and how
-the data is presented, can be entirely customized. This shows only some of
-many possible capabilities.
+See the source: [bitehist.py](examples/tracing/bitehist.py). What this traces,
+what this stores, and how the data is presented, can be entirely customized.
+This shows only some of many possible capabilities.
 
 ## Installing
 
@@ -60,9 +59,11 @@ pair of .c and .py files, and some are directories of files.
 
 Examples:
 
-- examples/tracing/[bitehist.py](examples/tracing/bitehist.py) examples/tracing/[bitehist.c](examples/tracing/bitehist.c): Block I/O size histogram. [Examples](examples/tracing/bitehist_example.txt).
-- examples/tracing/[disksnoop.py](examples/tracing/disksnoop.py) examples/tracing/[disksnoop.c](examples/tracing/disksnoop.c): Trace block device I/O latency. [Examples](examples/tracing/disksnoop_example.txt).
+- examples/tracing/[bitehist.py](examples/tracing/bitehist.py): Block I/O size histogram. [Examples](examples/tracing/bitehist_example.txt).
+- examples/tracing/[disksnoop.py](examples/tracing/disksnoop.py): Trace block device I/O latency. [Examples](examples/tracing/disksnoop_example.txt).
 - examples/[hello_world.py](examples/hello_world.py): Prints "Hello, World!" for new processes.
+- examples/tracing/[nodejs_http_server.py](examples/tracing/nodejs_http_server.py): Trace Node.js HTTP server requests using USDT probes.
+- examples/tracing/[task_switch.py](examples/tracing/task_switch.py): Count task switches with from and to PIDs.
 - examples/tracing/[tcpv4connect.py](examples/tracing/tcpv4connect.py): Trace TCP IPv4 active connections. [Examples](examples/tracing/tcpv4connect_example.txt).
 - examples/tracing/[trace_fields.py](examples/tracing/trace_fields.py): Simple example of printing fields from traced events.
 - examples/tracing/[urandomread.py](examples/tracing/urandomread.py): A kernel tracepoint example, which traces random:urandom_read. [Examples](examples/tracing/urandomread_example.txt).
@@ -188,7 +189,7 @@ The BPF program always takes at least one argument, which is a pointer to the
 context for this type of program. Different program types have different calling
 conventions, but for this one we don't care so `void *` is fine.
 ```python
-BPF(text='void kprobe__sys_clone(void *ctx) { bpf_trace_printk("Hello, World!\\n"); }').trace_print()
+BPF(text='int kprobe__sys_clone(void *ctx) { bpf_trace_printk("Hello, World!\\n"); return 0; }').trace_print()
 ```
 
 For this example, we will call the program every time `fork()` is called by a

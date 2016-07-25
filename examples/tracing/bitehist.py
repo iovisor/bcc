@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # bitehist.py	Block I/O size histogram.
-#		For Linux, uses BCC, eBPF. See .c file.
+#		For Linux, uses BCC, eBPF. Embedded C.
 #
 # Written as a basic example of using a histogram to show a distribution.
 #
@@ -17,7 +17,18 @@ from bcc import BPF
 from time import sleep
 
 # load BPF program
-b = BPF(src_file = "bitehist.c")
+b = BPF(text="""
+#include <uapi/linux/ptrace.h>
+#include <linux/blkdev.h>
+
+BPF_HISTOGRAM(dist);
+
+int kprobe__blk_account_io_completion(struct pt_regs *ctx, struct request *req)
+{
+	dist.increment(bpf_log2l(req->__data_len / 1024));
+	return 0;
+}
+""")
 
 # header
 print("Tracing... Hit Ctrl-C to end.")
