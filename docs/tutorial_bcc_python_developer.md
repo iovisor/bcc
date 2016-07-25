@@ -6,7 +6,7 @@ There is also a lua interface for bcc, and a tutorial for end-users of tools: [t
 
 ## Observability
 
-This observability tutorial contains 16 lessons, and 44 enumerated things to learn.
+This observability tutorial contains 17 lessons, and 46 enumerated things to learn.
 
 ### Lesson 1. Hello World
 
@@ -514,7 +514,86 @@ In this case, we were printing the ```got_bits``` member.
 
 Convert disksnoop.py from a previous lesson to use the ```block:block_rq_issue``` and ```block:block_rq_complete``` tracepoints.
 
-### Lesson 14. nodejs_http_server.py
+### Lesson 14. strlen_count.py
+
+This program instruments a user-level function, the ```strlen()``` library function, and frequency counts its string argument. Example output:
+
+```
+# ./strlen_count.py 
+Tracing strlen()... Hit Ctrl-C to end.
+^C     COUNT STRING
+         1 " "
+         1 "/bin/ls"
+         1 "."
+         1 "cpudist.py.1"
+         1 ".bashrc"
+         1 "ls --color=auto"
+         1 "key_t"
+[...]
+        10 "a7:~# "
+        10 "/root"
+        12 "LC_ALL"
+        12 "en_US.UTF-8"
+        13 "en_US.UTF-8"
+        20 "~"
+        70 "#%^,~:-=?+/}"
+       340 "\x01\x1b]0;root@bgregg-test: ~\x07\x02root@bgregg-test:~# "
+```
+
+These are various strings that are being processed by this library function while tracing, along with their frequency counts. ```strlen()``` was called on "LC_ALL" 12 times, for example.
+
+Code is [examples/tracing/strlen_count.py](../examples/tracing/strlen_count.py):
+
+```Python
+from bcc import BPF
+from time import sleep
+
+# load BPF program
+b = BPF(text="""
+#include <uapi/linux/ptrace.h>
+
+struct key_t {
+    char c[80];
+};
+BPF_HASH(counts, struct key_t);
+
+int count(struct pt_regs *ctx) {
+    if (!PT_REGS_PARM1(ctx))
+        return 0;
+
+    struct key_t key = {};
+    u64 zero = 0, *val;
+
+    bpf_probe_read(&key.c, sizeof(key.c), (void *)PT_REGS_PARM1(ctx));
+    val = counts.lookup_or_init(&key, &zero);
+    (*val)++;
+    return 0;
+};
+""")
+b.attach_uprobe(name="c", sym="strlen", fn_name="count")
+
+# header
+print("Tracing strlen()... Hit Ctrl-C to end.")
+
+# sleep until Ctrl-C
+try:
+    sleep(99999999)
+except KeyboardInterrupt:
+    pass
+
+# print output
+print("%10s %s" % ("COUNT", "STRING"))
+counts = b.get_table("counts")
+for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
+    print("%10d \"%s\"" % (v.value, k.c.encode('string-escape')))
+```
+
+Things to learn:
+
+1. ```PT_REGS_PARM1(ctx)```: This fetches the first argument to ```strlen()```, which is the string.
+1. ```b.attach_uprobe(name="c", sym="strlen", fn_name="count")```: Attach to library "c" (if this is the main program, use its pathname), instrument the user-level function ```strlen()```, and on execution call our C function ```count()```.
+
+### Lesson 15. nodejs_http_server.py
 
 This program instruments a user-defined static tracing (USDT) probe, which is the user-level version of a kernel tracepoint. Sample output:
 
@@ -563,7 +642,7 @@ Things to learn:
 1. ```u.enable_probe(probe="http__server__request", fn_name="do_trace")```: Attach our ```do_trace()``` BPF C function to the Node.js ```http__server__request``` USDT probe.
 1. ```b = BPF(text=bpf_text, usdt=u)```: Need to pass in our USDT object, ```u```, to BPF object creation.
 
-### Lesson 15. task_switch.c
+### Lesson 16. task_switch.c
 
 This is an older tutorial included as a bonus lesson. Use this for recap and to reinforce what you've already learned.
 
@@ -631,7 +710,7 @@ for k, v in b["stats"].items():
 
 These programs have now been merged, and are both in [examples/tracing/task_switch.py](examples/tracing/task_switch.py).
 
-### Lesson 16. Further Study
+### Lesson 17. Further Study
 
 For further study, see Sasha Goldshtein's [linux-tracing-workshop](https://github.com/goldshtn/linux-tracing-workshop), which contains additional labs. There are also many tools in bcc /tools to study.
 
