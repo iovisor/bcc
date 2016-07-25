@@ -256,7 +256,6 @@ prog = """
 #include <linux/sched.h>
 
 // define output data structure in C
-#define MSG_MAX 32
 struct data_t {
     u32 pid;
     u64 ts;
@@ -283,7 +282,6 @@ b.attach_kprobe(event="sys_clone", fn_name="hello")
 
 # define output data structure in Python
 TASK_COMM_LEN = 16    # linux/sched.h
-MSG_MAX = 32
 class Data(ct.Structure):
     _fields_ = [("pid", ct.c_ulonglong),
                 ("ts", ct.c_ulonglong),
