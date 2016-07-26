@@ -2,17 +2,19 @@
 # BPF Compiler Collection (BCC)
 
 BCC is a toolkit for creating efficient kernel tracing and manipulation
-programs, and includes several useful tools and examples. It makes use of eBPF
-(Extended Berkeley Packet Filters), a new feature that was first added to
-Linux 3.15. Much of what BCC uses requires Linux 4.1 and above.
+programs, and includes several useful tools and examples. It makes use of 
+extended BPF (Berkeley Packet Filters), formally known as eBPF, a new feature
+that was first added to Linux 3.15. Much of what BCC uses requires Linux 4.1
+and above.
 
 eBPF was [described by](https://lkml.org/lkml/2015/4/14/232) Ingo Molnár as:
 
 > One of the more interesting features in this cycle is the ability to attach eBPF programs (user-defined, sandboxed bytecode executed by the kernel) to kprobes. This allows user-defined instrumentation on a live kernel image that can never crash, hang or interfere with the kernel negatively.
 
-BCC makes eBPF programs easier to write, with kernel instrumentation in C
-and a front-end in Python. It is suited for many tasks, including performance
-analysis and network traffic control.
+BCC makes BPF programs easier to write, with kernel instrumentation in C
+(and includes a C wrapper around LLVM), and front-ends in Python and lua.
+It is suited for many tasks, including performance analysis and network
+traffic control.
 
 ## Screenshot
 
@@ -170,46 +172,10 @@ The features of this toolkit include:
 In the future, more bindings besides python will likely be supported. Feel free
 to add support for the language of your choice and send a pull request!
 
-## Tutorial
+## Tutorials
 
-The BCC toolchain is currently composed of two parts: a C wrapper around LLVM,
-and a Python API to interact with the running program. Later, we will go into
-more detail of how this all works.
-
-### Hello, World
-
-First, we should include the BPF class from the bpf module:
-```python
-from bcc import BPF
-```
-
-Since the C code is so short, we will embed it inside the python script.
-
-The BPF program always takes at least one argument, which is a pointer to the
-context for this type of program. Different program types have different calling
-conventions, but for this one we don't care so `void *` is fine.
-```python
-BPF(text='int kprobe__sys_clone(void *ctx) { bpf_trace_printk("Hello, World!\\n"); return 0; }').trace_print()
-```
-
-For this example, we will call the program every time `fork()` is called by a
-userspace process. Underneath the hood, fork translates to the `clone` syscall.
-BCC recognizes prefix `kprobe__`, and will auto attach our program to the kernel symbol `sys_clone`.
-
-The python process will then print the trace printk circular buffer until ctrl-c
-is pressed. The BPF program is removed from the kernel when the userspace
-process that loaded it closes the fd (or exits).
-
-Output:
-```
-bcc/examples$ sudo python hello_world.py
-          python-7282  [002] d...  3757.488508: : Hello, World!
-```
-
-For an explanation of the meaning of the printed fields, see the trace_pipe
-section of the [kernel ftrace doc](https://www.kernel.org/doc/Documentation/trace/ftrace.txt).
-
-[Source code listing](examples/hello_world.py)
+- [docs/tutorial.md](docs/tutorial.md): Using bcc tools to solve performance, troubleshooting, and networking issues.
+- [docs/tutorial_bcc_python_developer.md](docs/tutorial_bcc_python_developer.md): Developing new bcc programs using the Python interface.
 
 ### Networking
 
@@ -221,75 +187,6 @@ turns those statistics into a graph showing the traffic distribution at
 multiple granularities. See the code [here](examples/networking/tunnel_monitor).
 
 [![Screenshot](http://img.youtube.com/vi/yYy3Cwce02k/0.jpg)](https://youtu.be/yYy3Cwce02k)
-
-### Tracing
-
-Here is a slightly more complex tracing example than Hello World. This program
-will be invoked for every task change in the kernel, and record in a BPF map
-the new and old pids.
-
-The C program below introduces two new concepts.
-The first is the macro `BPF_TABLE`. This defines a table (type="hash"), with key
-type `key_t` and leaf type `u64` (a single counter). The table name is `stats`,
-containing 1024 entries maximum. One can `lookup`, `lookup_or_init`, `update`,
-and `delete` entries from the table.
-The second concept is the prev argument. This argument is treated specially by
-the BCC frontend, such that accesses to this variable are read from the saved
-context that is passed by the kprobe infrastructure. The prototype of the args
-starting from position 1 should match the prototype of the kernel function being
-kprobed. If done so, the program will have seamless access to the function
-parameters.
-```c
-#include <uapi/linux/ptrace.h>
-#include <linux/sched.h>
-
-struct key_t {
-  u32 prev_pid;
-  u32 curr_pid;
-};
-// map_type, key_type, leaf_type, table_name, num_entry
-BPF_TABLE("hash", struct key_t, u64, stats, 1024);
-// attach to finish_task_switch in kernel/sched/core.c, which has the following
-// prototype:
-//   struct rq *finish_task_switch(struct task_struct *prev)
-int count_sched(struct pt_regs *ctx, struct task_struct *prev) {
-  struct key_t key = {};
-  u64 zero = 0, *val;
-
-  key.curr_pid = bpf_get_current_pid_tgid();
-  key.prev_pid = prev->pid;
-
-  val = stats.lookup_or_init(&key, &zero);
-  (*val)++;
-  return 0;
-}
-```
-[Source code listing](examples/tracing/task_switch.c)
-
-The userspace component loads the file shown above, and attaches it to the
-`finish_task_switch` kernel function.
-The [] operator of the BPF object gives access to each BPF_TABLE in the
-program, allowing pass-through access to the values residing in the kernel. Use
-the object as you would any other python dict object: read, update, and deletes
-are all allowed.
-```python
-from bcc import BPF
-from time import sleep
-
-b = BPF(src_file="task_switch.c")
-b.attach_kprobe(event="finish_task_switch", fn_name="count_sched")
-
-# generate many schedule events
-for i in range(0, 100): sleep(0.01)
-
-for k, v in b["stats"].items():
-    print("task_switch[%5d->%5d]=%u" % (k.prev_pid, k.curr_pid, v.value))
-```
-[Source code listing](examples/tracing/task_switch.py)
-
-## Getting started
-
-See [INSTALL.md](INSTALL.md) for installation steps on your platform.
 
 ## Contributing
 
