@@ -42,11 +42,11 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
         - [1. BPF](#1-bpf)
         - [2. USDT](#2-usdt)
     - [Events](#events)
-        - [1. attach_kprobe](#1-attach_kprobe)
-        - [2. attach_kretprobe](#2-attach_kretprobe)
-        - [3. attach_tracepoint](#3-attach_tracepoint)
-        - [4. attach_uprobe](#4-attach_uprobe)
-        - [5. attach_uretprobe](#5-attach_uretprobe)
+        - [1. attach_kprobe()](#1-attach_kprobe)
+        - [2. attach_kretprobe()](#2-attach_kretprobe)
+        - [3. attach_tracepoint()](#3-attach_tracepoint)
+        - [4. attach_uprobe()](#4-attach_uprobe)
+        - [5. attach_uretprobe()](#5-attach_uretprobe)
         - [6. USDT.enable_probe()](#6-usdtenable_probe)
     - [Debug Output](#debug-output)
         - [1. trace_print()](#1-trace_print)
@@ -154,7 +154,7 @@ Examples in situ:
 
 ### 4. uprobes
 
-These are instrumented by declaring a normal funciton in C, then associating it as a uprobe probe in Python via ```BPF.attach_uprobe()``` (covered later).
+These are instrumented by declaring a normal function in C, then associating it as a uprobe probe in Python via ```BPF.attach_uprobe()``` (covered later).
 
 Arguments can be examined using ```PT_REGS_PARM``` macros.
 
@@ -176,7 +176,7 @@ Examples in situ:
 
 ### 5. uretprobes
 
-These are instrumented by declaring a normal funciton in C, then associating it as a uretprobe probe in Python via ```BPF.attach_uretprobe()``` (covered later).
+These are instrumented by declaring a normal function in C, then associating it as a uretprobe probe in Python via ```BPF.attach_uretprobe()``` (covered later).
 
 Return value is available as ```PT_REGS_RC(ctx)```, given a function declaration of: *function_name*(struct pt_regs *ctx)
 
@@ -198,7 +198,7 @@ Examples in situ:
 
 ### 6. USDT probes
 
-These are instrumented by declaring a normal funciton in C, then associating it as a USDT probe in Python via ```USDT.enable_probe()```.
+These are User Statically-Defined Tracing (USDT) probes, which may be placed in some applications or libraries to provide a user-level equivalent of tracepoints. The primary BPF method provided for USDT support method is ```enable_probe()```. USDT probes are instrumented by declaring a normal function in C, then associating it as a USDT probe in Python via ```USDT.enable_probe()```.
 
 Arguments can be read via: bpf_usdt_readarg(*index*, ctx, &addr)
 
@@ -230,7 +230,7 @@ Syntax: ```int bpf_probe_read(void *dst, int size, void *src)```
 
 Return: 0 on success
 
-This copies a memory location to the BPF stack, so that BPF can later operate on it. For safety, all memory reads must pass through bpf_probe_read(). This happens automatically in some cases, such as dereferencing kernel varibles, as bcc will rewrite the BPF program to include the necessary bpf_probe_reads().
+This copies a memory location to the BPF stack, so that BPF can later operate on it. For safety, all memory reads must pass through bpf_probe_read(). This happens automatically in some cases, such as dereferencing kernel variables, as bcc will rewrite the BPF program to include the necessary bpf_probe_reads().
 
 Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=bpf_probe_read+path%3Aexamples&type=Code),
@@ -568,7 +568,7 @@ Examples in situ:
 
 ## Events
 
-### 1. attach_kprobe
+### 1. attach_kprobe()
 
 Syntax: ```BPF.attach_kprobe(event="event", fn_name="name")```
 
@@ -590,7 +590,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=attach_kprobe+path%3Aexamples+language%3Apython&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=attach_kprobe+path%3Atools+language%3Apython&type=Code)
 
-### 2. attach_kretprobe
+### 2. attach_kretprobe()
 
 Syntax: ```BPF.attach_kretprobe(event="event", fn_name="name")```
 
@@ -612,7 +612,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=attach_kretprobe+path%3Aexamples+language%3Apython&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=attach_kretprobe+path%3Atools+language%3Apython&type=Code)
 
-### 3. attach_tracepoint
+### 3. attach_tracepoint()
 
 Syntax: ```BPF.attach_tracepoint(tp="tracepoint", fn_name="name")```
 
@@ -651,7 +651,7 @@ Notice how the first argument to ```printarg()``` is now our defined struct.
 Examples in situ:
 [code](https://github.com/iovisor/bcc/blob/a4159da8c4ea8a05a3c6e402451f530d6e5a8b41/examples/tracing/urandomread-explicit.py#L41)
 
-### 4. attach_uprobe
+### 4. attach_uprobe()
 
 Syntax: ```BPF.attach_uprobe(name="location", sym="symbol", fn_name="name")```
 
@@ -682,7 +682,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=attach_uprobe+path%3Aexamples+language%3Apython&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=attach_uprobe+path%3Atools+language%3Apython&type=Code)
 
-### 5. attach_uretprobe
+### 5. attach_uretprobe()
 
 Syntax: ```BPF.attach_uretprobe(name="location", sym="symbol", fn_name="name")```
 
@@ -725,7 +725,7 @@ u = USDT(pid=int(pid))
 u.enable_probe(probe="http__server__request", fn_name="do_trace")
 ```
 
-To check if your binary has USDT probes, and what they are, you can run ``readelf -n binary``` and check the stap debug section.
+To check if your binary has USDT probes, and what they are, you can run ```readelf -n binary``` and check the stap debug section.
 
 Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=enable_probe+path%3Aexamples+language%3Apython&type=Code),
