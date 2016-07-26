@@ -17,38 +17,12 @@
 # 13-Jan-2016   Allan McAleavy  run pep8 against program
 
 from __future__ import print_function
-from bcc import BPF
 from time import sleep, strftime
-import signal
-import re
+from libs import cache, utils
 from sys import argv
 
-# signal handler
-def signal_ignore(signal, frame):
-    print()
-
-# Function to gather data from /proc/meminfo
-# return dictionary for quicker lookup of both values
-def get_meminfo():
-    result = dict()
-
-    for line in open('/proc/meminfo'):
-        k = line.split(':', 3)
-        v = k[1].split()
-        result[k[0]] = int(v[0])
-    return result
 
 # set global variables
-rtaccess = 0
-wtaccess = 0
-mpa = 0
-mbd = 0
-apcl = 0
-apd = 0
-access = 0
-misses = 0
-rhits = 0
-whits = 0
 debug = 0
 
 # args
@@ -107,11 +81,7 @@ int do_count(struct pt_regs *ctx) {
 }
 
 """
-b = BPF(text=bpf_text)
-b.attach_kprobe(event="add_to_page_cache_lru", fn_name="do_count")
-b.attach_kprobe(event="mark_page_accessed", fn_name="do_count")
-b.attach_kprobe(event="account_page_dirtied", fn_name="do_count")
-b.attach_kprobe(event="mark_buffer_dirty", fn_name="do_count")
+b = cache.bpf_start(bpf_text)
 
 # header
 if tstamp:
@@ -132,79 +102,22 @@ while 1:
         sleep(interval)
     except KeyboardInterrupt:
         exiting = 1
-        # as cleanup can take many seconds, trap Ctrl-C:
-        signal.signal(signal.SIGINT, signal_ignore)
+        utils.handle_sigint()
 
     counts = b.get_table("counts")
-    for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
-
-        if re.match('mark_page_accessed', b.ksym(k.ip)) is not None:
-            mpa = v.value
-            if mpa < 0:
-                mpa = 0
-
-        if re.match('mark_buffer_dirty', b.ksym(k.ip)) is not None:
-            mbd = v.value
-            if mbd < 0:
-                mbd = 0
-
-        if re.match('add_to_page_cache_lru', b.ksym(k.ip)) is not None:
-            apcl = v.value
-            if apcl < 0:
-                apcl = 0
-
-        if re.match('account_page_dirtied', b.ksym(k.ip)) is not None:
-            apd = v.value
-            if apd < 0:
-                apd = 0
-
-        # access = total cache access incl. reads(mpa) and writes(mbd)
-        # misses = total of add to lru which we do when we write(mbd)
-        # and also the mark the page dirty(same as mbd)
-        access = (mpa + mbd)
-        misses = (apcl + apd)
-
-        # rtaccess is the read hit % during the sample period.
-        # wtaccess is the write hit % during the smaple period.
-        if mpa > 0:
-            rtaccess = float(mpa) / (access + misses)
-        if apcl > 0:
-            wtaccess = float(apcl) / (access + misses)
-
-        if wtaccess != 0:
-            whits = 100 * wtaccess
-        if rtaccess != 0:
-            rhits = 100 * rtaccess
-
-    if debug:
-        print("%d %d %d %d %d %d %f %f %d %d\n" %
-        (mpa, mbd, apcl, apd, access, misses,
-        rtaccess, wtaccess, rhits, whits))
-
+    (access, misses, mbd, rhits, whits) = cache.compute_cache_stats(
+        counts, debug=debug)
     counts.clear()
 
     # Get memory info
-    mem = get_meminfo()
+    mem = utils.get_meminfo()
     cached = int(mem["Cached"]) / 1024
     buff = int(mem["Buffers"]) / 1024
 
     if tstamp == 1:
         print("%-8s " % strftime("%H:%M:%S"), end="")
-    print("%8d %8d %8d %9.1f%% %9.1f%% %12.0f %10.0f" %
-    (access, misses, mbd, rhits, whits, buff, cached))
-
-    mpa = 0
-    mbd = 0
-    apcl = 0
-    apd = 0
-    access = 0
-    misses = 0
-    rhits = 0
-    cached = 0
-    buff = 0
-    whits = 0
-    rtaccess = 0
-    wtaccess = 0
+    print("%8d %8d %8d %9.1f%% %9.1f%% %12.0f %10.0f" % (
+            access, misses, mbd, rhits, whits, buff, cached))
 
     if exiting:
         print("Detaching...")

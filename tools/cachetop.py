@@ -18,16 +18,15 @@ from __future__ import division
 # from __future__ import unicode_literals
 from __future__ import print_function
 
-from bcc import BPF
 from collections import defaultdict
 from time import strftime
 
 import argparse
 import curses
 import pwd
-import re
-import signal
 from time import sleep
+from libs import utils
+from libs import cache
 
 FIELDS = (
     "PID",
@@ -42,23 +41,6 @@ FIELDS = (
 DEFAULT_FIELD = "HITS"
 
 
-# signal handler
-def signal_ignore(signal, frame):
-    print()
-
-
-# Function to gather data from /proc/meminfo
-# return dictionary for quicker lookup of both values
-def get_meminfo():
-    result = {}
-
-    for line in open('/proc/meminfo'):
-        k = line.split(':', 3)
-        v = k[1].split()
-        result[k[0]] = int(v[0])
-    return result
-
-
 def get_processes_stats(
         bpf,
         sort_field=FIELDS.index(DEFAULT_FIELD),
@@ -69,63 +51,14 @@ def get_processes_stats(
     cached
     list of tuple with per process cache stats
     '''
-    rtaccess = 0
-    wtaccess = 0
-    mpa = 0
-    mbd = 0
-    apcl = 0
-    apd = 0
-    access = 0
-    misses = 0
-    rhits = 0
-    whits = 0
-
     counts = bpf.get_table("counts")
     stats = defaultdict(lambda: defaultdict(int))
     for k, v in counts.items():
-        stats["%d-%d-%s" % (k.pid, k.uid, k.comm)][k.ip] = v.value
+        stats["%d-%d-%s" % (k.pid, k.uid, k.comm)][k.ip] = v
     stats_list = []
 
     for pid, count in sorted(stats.items(), key=lambda stat: stat[0]):
-        for k, v in count.items():
-            if re.match('mark_page_accessed', bpf.ksym(k)) is not None:
-                mpa = v
-                if mpa < 0:
-                    mpa = 0
-
-            if re.match('mark_buffer_dirty', bpf.ksym(k)) is not None:
-                mbd = v
-                if mbd < 0:
-                    mbd = 0
-
-            if re.match('add_to_page_cache_lru', bpf.ksym(k)) is not None:
-                apcl = v
-                if apcl < 0:
-                    apcl = 0
-
-            if re.match('account_page_dirtied', bpf.ksym(k)) is not None:
-                apd = v
-                if apd < 0:
-                    apd = 0
-
-            # access = total cache access incl. reads(mpa) and writes(mbd)
-            # misses = total of add to lru which we do when we write(mbd)
-            # and also the mark the page dirty(same as mbd)
-            access = (mpa + mbd)
-            misses = (apcl + apd)
-
-            # rtaccess is the read hit % during the sample period.
-            # wtaccess is the write hit % during the smaple period.
-            if mpa > 0:
-                rtaccess = float(mpa) / (access + misses)
-            if apcl > 0:
-                wtaccess = float(apcl) / (access + misses)
-
-            if wtaccess != 0:
-                whits = 100 * wtaccess
-            if rtaccess != 0:
-                rhits = 100 * rtaccess
-
+        (access, misses, mbd, rhits, whits) = cache.compute_cache_stats(count)
         _pid, uid, comm = pid.split('-', 2)
         stats_list.append(
             (int(_pid), uid, comm,
@@ -176,11 +109,7 @@ def handle_loop(stdscr, args):
     }
 
     """
-    b = BPF(text=bpf_text)
-    b.attach_kprobe(event="add_to_page_cache_lru", fn_name="do_count")
-    b.attach_kprobe(event="mark_page_accessed", fn_name="do_count")
-    b.attach_kprobe(event="account_page_dirtied", fn_name="do_count")
-    b.attach_kprobe(event="mark_buffer_dirty", fn_name="do_count")
+    b = cache.bpf_start(bpf_text)
 
     exiting = 0
 
@@ -194,15 +123,9 @@ def handle_loop(stdscr, args):
             sort_field = max(0, sort_field - 1)
         elif s == ord('>'):
             sort_field = min(len(FIELDS) - 1, sort_field + 1)
-        try:
-            sleep(args.interval)
-        except KeyboardInterrupt:
-            exiting = 1
-            # as cleanup can take many seconds, trap Ctrl-C:
-            signal.signal(signal.SIGINT, signal_ignore)
 
         # Get memory info
-        mem = get_meminfo()
+        mem = utils.get_meminfo()
         cached = int(mem["Cached"]) / 1024
         buff = int(mem["Buffers"]) / 1024
 
@@ -238,6 +161,13 @@ def handle_loop(stdscr, args):
             if i > height - 4:
                 break
         stdscr.refresh()
+
+        try:
+            sleep(args.interval)
+        except KeyboardInterrupt:
+            exiting = 1
+            utils.handle_sigint()
+
         if exiting:
             print("Detaching...")
             return
