@@ -176,6 +176,7 @@ to add support for the language of your choice and send a pull request!
 
 - [docs/tutorial.md](docs/tutorial.md): Using bcc tools to solve performance, troubleshooting, and networking issues.
 - [docs/tutorial_bcc_python_developer.md](docs/tutorial_bcc_python_developer.md): Developing new bcc programs using the Python interface.
+- [docs/reference_guide.md](docs/reference_guide.md): Reference guide to the bcc and bcc/BPF APIs.
 
 ### Networking
 
