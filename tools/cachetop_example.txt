@@ -15,7 +15,7 @@ examples:
     ./cachetop 1           # print every second hit/miss stats
 
 # ./cachetop 5
-13:01:01 Buffers MB: 76 / Cached MB: 114
+13:01:01 Buffers MB: 76 / Cached MB: 114 / Sort: HITS / Order: ascending
 PID      UID      CMD              HITS     MISSES   DIRTIES  READ_HIT%  WRITE_HIT%
        1 root     systemd                 2        0        0     100.0%       0.0%
      680 root     vminfo                  3        4        2      14.3%      42.9%
@@ -43,7 +43,7 @@ Command used to generate the activity
 Below shows the hit rate increases as we run find a second time and it gets it
 its pages from the cache.
 # ./cachetop.py
-13:01:01 Buffers MB: 76 / Cached MB: 115
+13:01:01 Buffers MB: 76 / Cached MB: 115 / Sort: HITS / Order: ascending
 PID      UID      CMD              HITS     MISSES   DIRTIES  READ_HIT%  WRITE_HIT%
      544 messageb dbus-daemon             2        2        1      25.0%      50.0%
      680 root     vminfo                  2        2        1      25.0%      50.0%
@@ -57,7 +57,7 @@ Below shows that the dirty pages increases as a file of 80M is created running
 # dd if=/dev/urandom of=/tmp/c bs=8192 count=10000
 
 # ./cachetop.py 10
-13:01:01 Buffers MB: 77 / Cached MB: 193
+13:01:01 Buffers MB: 77 / Cached MB: 193 / Sort: HITS / Order: ascending
 PID      UID      CMD              HITS     MISSES   DIRTIES  READ_HIT%  WRITE_HIT%
      544 messageb dbus-daemon             9       10        7      10.5%      15.8%
      680 root     vminfo                  9       10        7      10.5%      15.8%
