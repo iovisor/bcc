@@ -17,6 +17,7 @@
 #include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <linux/bpf.h>
 #include <linux/if_packet.h>
 #include <linux/pkt_cls.h>
@@ -409,7 +410,28 @@ error:
   return NULL;
 }
 
+int bpf_open_perf_event(uint32_t type, uint64_t config, int pid, int cpu) {
+  int fd;
+  struct perf_event_attr attr = {};
 
+  attr.sample_period = LONG_MAX;
+  attr.type = type;
+  attr.config = config;
+
+  fd = syscall(__NR_perf_event_open, &attr, pid, cpu, -1, PERF_FLAG_FD_CLOEXEC);
+  if (fd < 0) {
+    fprintf(stderr, "perf_event_open: %s\n", strerror(errno));
+    return -1;
+  }
+
+  if (ioctl(fd, PERF_EVENT_IOC_ENABLE, 0) < 0) {
+    perror("ioctl(PERF_EVENT_IOC_ENABLE)");
+    close(fd);
+    return -1;
+  }
+
+  return fd;
+}
 
 int bpf_attach_xdp(const char *dev_name, int progfd) {
     struct sockaddr_nl sa;
