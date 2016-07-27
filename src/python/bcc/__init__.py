@@ -364,7 +364,6 @@ class BPF(object):
     def attach_kprobe(self, event="", fn_name="", event_re="",
             pid=-1, cpu=0, group_fd=-1):
 
-        assert isinstance(event, str), "event must be a string"
         # allow the caller to glob multiple functions together
         if event_re:
             for line in self._get_kprobe_functions(event_re):
@@ -375,6 +374,7 @@ class BPF(object):
                     pass
             return
 
+        event = str(event)
         self._check_probe_quota(1)
         fn = self.load_func(fn_name, BPF.KPROBE)
         ev_name = "p_" + event.replace("+", "_").replace(".", "_")
@@ -389,7 +389,7 @@ class BPF(object):
         return self
 
     def detach_kprobe(self, event):
-        assert isinstance(event, str), "event must be a string"
+        event = str(event)
         ev_name = "p_" + event.replace("+", "_").replace(".", "_")
         if ev_name not in self.open_kprobes:
             raise Exception("Kprobe %s is not attached" % event)
@@ -403,7 +403,6 @@ class BPF(object):
     def attach_kretprobe(self, event="", fn_name="", event_re="",
             pid=-1, cpu=0, group_fd=-1):
 
-        assert isinstance(event, str), "event must be a string"
         # allow the caller to glob multiple functions together
         if event_re:
             for line in self._get_kprobe_functions(event_re):
@@ -414,6 +413,7 @@ class BPF(object):
                     pass
             return
 
+        event = str(event)
         self._check_probe_quota(1)
         fn = self.load_func(fn_name, BPF.KPROBE)
         ev_name = "r_" + event.replace("+", "_").replace(".", "_")
@@ -428,7 +428,7 @@ class BPF(object):
         return self
 
     def detach_kretprobe(self, event):
-        assert isinstance(event, str), "event must be a string"
+        event = str(event)
         ev_name = "r_" + event.replace("+", "_").replace(".", "_")
         if ev_name not in self.open_kprobes:
             raise Exception("Kretprobe %s is not attached" % event)
@@ -527,6 +527,7 @@ class BPF(object):
                  BPF(text).attach_uprobe("/usr/bin/python", "main")
         """
 
+        name = str(name)
         (path, addr) = BPF._check_path_symbol(name, sym, addr)
 
         self._check_probe_quota(1)
@@ -549,6 +550,7 @@ class BPF(object):
         or binary 'name'.
         """
 
+        name = str(name)
         (path, addr) = BPF._check_path_symbol(name, sym, addr)
         ev_name = "p_%s_0x%x" % (self._probe_repl.sub("_", path), addr)
         if ev_name not in self.open_uprobes:
@@ -570,6 +572,7 @@ class BPF(object):
         meaning of additional parameters.
         """
 
+        name = str(name)
         (path, addr) = BPF._check_path_symbol(name, sym, addr)
 
         self._check_probe_quota(1)
@@ -592,6 +595,7 @@ class BPF(object):
         or binary 'name'.
         """
 
+        name = str(name)
         (path, addr) = BPF._check_path_symbol(name, sym, addr)
         ev_name = "r_%s_0x%x" % (self._probe_repl.sub("_", path), addr)
         if ev_name not in self.open_uprobes:
