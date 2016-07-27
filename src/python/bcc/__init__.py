@@ -334,11 +334,12 @@ class BPF(object):
         fn.sock = sock
 
     def _get_kprobe_functions(self, event_re):
-        blacklist = set([line.rstrip().split()[1] for line in
-                open("%s/../kprobes/blacklist" % TRACEFS)])
+        with open("%s/../kprobes/blacklist" % TRACEFS) as blacklist_file:
+            blacklist = set([line.rstrip().split()[1] for line in
+                    blacklist_file])
         fns = []
-        with open("%s/available_filter_functions" % TRACEFS) as f:
-            for line in f:
+        with open("%s/available_filter_functions" % TRACEFS) as avail_file:
+            for line in avail_file:
                 fn = line.rstrip().split()[0]
                 if re.match(event_re, fn) and fn not in blacklist:
                     fns.append(fn)
@@ -604,7 +605,7 @@ class BPF(object):
 
     def _trace_autoload(self):
         for i in range(0, lib.bpf_num_functions(self.module)):
-            func_name = lib.bpf_function_name(self.module, i)
+            func_name = str(lib.bpf_function_name(self.module, i).decode())
             if func_name.startswith("kprobe__"):
                 fn = self.load_func(func_name, BPF.KPROBE)
                 self.attach_kprobe(event=fn.name[8:], fn_name=fn.name)
@@ -768,14 +769,14 @@ class BPF(object):
             exit()
 
     def cleanup(self):
-        for k, v in self.open_kprobes.items():
+        for k, v in list(self.open_kprobes.items()):
             lib.perf_reader_free(v)
             # non-string keys here include the perf_events reader
             if isinstance(k, str):
                 desc = "-:kprobes/%s" % k
                 lib.bpf_detach_kprobe(desc.encode("ascii"))
             self._del_kprobe(k)
-        for k, v in self.open_uprobes.items():
+        for k, v in list(self.open_uprobes.items()):
             lib.perf_reader_free(v)
             desc = "-:uprobes/%s" % k
             lib.bpf_detach_uprobe(desc.encode("ascii"))
