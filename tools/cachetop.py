@@ -213,8 +213,10 @@ def handle_loop(stdscr, args):
         stdscr.clear()
         stdscr.addstr(
             0, 0,
-            "%-8s Buffers MB: %.0f / Cached MB: %.0f" % (
-                strftime("%H:%M:%S"), buff, cached
+            "%-8s Buffers MB: %.0f / Cached MB: %.0f "
+            "/ Sort: %s / Order: %s" % (
+                strftime("%H:%M:%S"), buff, cached, FIELDS[sort_field],
+                sort_reverse and "descending" or "ascending"
             )
         )
 
