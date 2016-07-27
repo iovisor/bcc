@@ -2,7 +2,7 @@
 
 This tutorial is about developing [bcc](https://github.com/iovisor/bcc) tools and programs using the Python interface. There are two parts: observability then networking. Snippits are taken from various programs in bcc: see their files for licences.
 
-There is also a lua interface for bcc, and a tutorial for end-users of tools: [tutorial.md](tutorial.md).
+Also see the bcc developer's [reference_guide.md](reference_guide.md), and a tutorial for end-users of tools: [tutorial.md](tutorial.md). There is also a lua interface for bcc.
 
 ## Observability
 
