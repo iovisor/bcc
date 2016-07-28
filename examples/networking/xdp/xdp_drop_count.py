@@ -8,14 +8,25 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 
 from bcc import BPF
+import pyroute2
 import time
 import sys
 
-if (len(sys.argv) != 2):
+if len(sys.argv) != 2:
     print("Usage: {0} <ifdev>\n\ne.g.: {0} eth0".format(sys.argv[0]))
     exit(1)
 
 device = sys.argv[1]
+
+mode = BPF.XDP
+#mode = BPF.SCHED_CLS
+
+if mode == BPF.XDP:
+    ret = "XDP_DROP"
+    ctxtype = "xdp_md"
+else:
+    ret = "TC_ACT_SHOT"
+    ctxtype = "__sk_buff"
 
 # load BPF program
 b = BPF(text = """
@@ -47,7 +58,7 @@ static inline int parse_ipv6(void *data, u64 nh_off, void *data_end) {
     return ip6h->nexthdr;
 }
 
-int xdp_prog1(struct xdp_md *ctx) {
+int xdp_prog1(struct CTXTYPE *ctx) {
 
     void* data_end = (void*)(long)ctx->data_end;
     void* data = (void*)(long)ctx->data;
@@ -55,7 +66,7 @@ int xdp_prog1(struct xdp_md *ctx) {
     struct ethhdr *eth = data;
 
     // drop packets
-    int rc = XDP_DROP; // let pass XDP_PASS or redirect to tx via XDP_TX
+    int rc = RETURNCODE; // let pass XDP_PASS or redirect to tx via XDP_TX
     long *value;
     uint16_t h_proto;
     uint64_t nh_off = 0;
@@ -100,12 +111,21 @@ int xdp_prog1(struct xdp_md *ctx) {
 
     return rc;
 }
-""", cflags=["-w"])
+""", cflags=["-w", "-DRETURNCODE=%s" % ret, "-DCTXTYPE=%s" % ctxtype])
 
-xdp_func = b.load_func("xdp_prog1", BPF.XDP)
-b.attach_xdp(device, xdp_func)
+fn = b.load_func("xdp_prog1", mode)
+
+if mode == BPF.XDP:
+    b.attach_xdp(device, fn)
+else:
+    ip = pyroute2.IPRoute()
+    ipdb = pyroute2.IPDB(nl=ip)
+    idx = ipdb.interfaces[device].index
+    ip.tc("add", "clsact", idx)
+    ip.tc("add-filter", "bpf", idx, ":1", fd=fn.fd, name=fn.name,
+          parent="ffff:fff2", classid=1, direct_action=True)
+
 dropcnt = b.get_table("dropcnt")
-
 prev = [0] * 256
 print("Printing drops per IP protocol-number, hit CTRL+C to stop")
 while 1:
@@ -122,4 +142,8 @@ while 1:
         print("Removing filter from device")
         break;
 
-b.remove_xdp(device)
+if mode == BPF.XDP:
+    b.remove_xdp(device)
+else:
+    ip.tc("del", "clsact", idx)
+    ipdb.release()
