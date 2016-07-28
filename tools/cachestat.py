@@ -139,24 +139,16 @@ while 1:
     for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
 
         if re.match('mark_page_accessed', b.ksym(k.ip)) is not None:
-            mpa = v.value
-            if mpa < 0:
-                mpa = 0
+            mpa = max(0, v.value)
 
         if re.match('mark_buffer_dirty', b.ksym(k.ip)) is not None:
-            mbd = v.value
-            if mbd < 0:
-                mbd = 0
+            mbd = max(0, v.value)
 
         if re.match('add_to_page_cache_lru', b.ksym(k.ip)) is not None:
-            apcl = v.value
-            if apcl < 0:
-                apcl = 0
+            apcl = max(0, v.value)
 
         if re.match('account_page_dirtied', b.ksym(k.ip)) is not None:
-            apd = v.value
-            if apd < 0:
-                apd = 0
+            apd = max(0, v.value)
 
         # access = total cache access incl. reads(mpa) and writes(mbd)
         # misses = total of add to lru which we do when we write(mbd)

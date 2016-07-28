@@ -69,17 +69,6 @@ def get_processes_stats(
     cached
     list of tuple with per process cache stats
     '''
-    rtaccess = 0
-    wtaccess = 0
-    mpa = 0
-    mbd = 0
-    apcl = 0
-    apd = 0
-    access = 0
-    misses = 0
-    rhits = 0
-    whits = 0
-
     counts = bpf.get_table("counts")
     stats = defaultdict(lambda: defaultdict(int))
     for k, v in counts.items():
@@ -87,26 +76,29 @@ def get_processes_stats(
     stats_list = []
 
     for pid, count in sorted(stats.items(), key=lambda stat: stat[0]):
+        rtaccess = 0
+        wtaccess = 0
+        mpa = 0
+        mbd = 0
+        apcl = 0
+        apd = 0
+        access = 0
+        misses = 0
+        rhits = 0
+        whits = 0
+
         for k, v in count.items():
             if re.match('mark_page_accessed', bpf.ksym(k)) is not None:
-                mpa = v
-                if mpa < 0:
-                    mpa = 0
+                mpa = max(0, v)
 
             if re.match('mark_buffer_dirty', bpf.ksym(k)) is not None:
-                mbd = v
-                if mbd < 0:
-                    mbd = 0
+                mbd = max(0, v)
 
             if re.match('add_to_page_cache_lru', bpf.ksym(k)) is not None:
-                apcl = v
-                if apcl < 0:
-                    apcl = 0
+                apcl = max(0, v)
 
             if re.match('account_page_dirtied', bpf.ksym(k)) is not None:
-                apd = v
-                if apd < 0:
-                    apd = 0
+                apd = max(0, v)
 
             # access = total cache access incl. reads(mpa) and writes(mbd)
             # misses = total of add to lru which we do when we write(mbd)
