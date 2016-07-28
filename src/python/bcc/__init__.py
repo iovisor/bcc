@@ -21,6 +21,7 @@ import multiprocessing
 import os
 import re
 import struct
+import errno
 import sys
 basestring = (unicode if sys.version_info[0] < 3 else str)
 
@@ -67,6 +68,7 @@ class BPF(object):
     SCHED_CLS = 3
     SCHED_ACT = 4
     TRACEPOINT = 5
+    XDP = 6
 
     _probe_repl = re.compile("[^a-zA-Z0-9_]")
     _sym_caches = {}
@@ -438,6 +440,39 @@ class BPF(object):
         if res < 0:
             raise Exception("Failed to detach BPF from kprobe")
         self._del_kprobe(ev_name)
+
+    @staticmethod
+    def attach_xdp(dev, fn):
+        '''
+            This function attaches a BPF function to a device on the device
+            driver level (XDP)
+        '''
+        if not isinstance(fn, BPF.Function):
+            raise Exception("arg 1 must be of type BPF.Function")
+        res = lib.bpf_attach_xdp(dev.encode("ascii"), fn.fd)
+        if res < 0:
+            err_no = ct.get_errno()
+            if err_no == errno.EBADMSG:
+                raise Exception("Internal error while attaching BFP to device,"+
+                    " try increasing the debug level!")
+            else:
+                errstr = os.strerror(err_no)
+                raise Exception("Failed to attach BPF to device %s: %s"
+                            % (dev, errstr))
+
+    @staticmethod
+    def remove_xdp(dev):
+        '''
+            This function removes any BPF function from a device on the 
+            device driver level (XDP)
+        '''
+        res = lib.bpf_attach_xdp(dev.encode("ascii"), -1)
+        if res < 0:
+            errstr = os.strerror(ct.get_errno())
+            raise Exception("Failed to detach BPF from device %s: %s"
+                            % (dev, errstr))
+
+
 
     @classmethod
     def _check_path_symbol(cls, module, symname, addr):
