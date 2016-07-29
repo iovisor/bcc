@@ -288,8 +288,8 @@ int do_trace(struct pt_regs *ctx) {
 ```
 
 Examples in situ:
-[search /examples](https://github.com/iovisor/bcc/search?q=bpf_get_current_uid_gid+path%3Aexamples&type=Code),
-[search /tools](https://github.com/iovisor/bcc/search?q=bpf_get_current_uid_gid+path%3Atools&type=Code)
+[search /examples](https://github.com/iovisor/bcc/search?q=bpf_get_current_comm+path%3Aexamples&type=Code),
+[search /tools](https://github.com/iovisor/bcc/search?q=bpf_get_current_comm+path%3Atools&type=Code)
 
 ### 6. bpf_log2l()
 
