@@ -101,6 +101,7 @@ void perf_reader_set_fd(struct perf_reader *reader, int fd);
 ffi.cdef[[
 struct bcc_symbol {
 	const char *name;
+	const char *demangle_name;
 	const char *module;
 	uint64_t offset;
 };

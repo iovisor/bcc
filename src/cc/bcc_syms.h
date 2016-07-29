@@ -24,6 +24,7 @@ extern "C" {
 
 struct bcc_symbol {
   const char *name;
+  const char *demangle_name;
   const char *module;
   uint64_t offset;
 };

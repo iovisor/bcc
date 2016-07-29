@@ -25,7 +25,7 @@ local function create_cache(pid)
       if libbcc.bcc_symcache_resolve(self._CACHE, addr, sym) < 0 then
         return "[unknown]", 0x0
       end
-      return ffi.string(sym[0].name), sym[0].offset
+      return ffi.string(sym[0].demangle_name), sym[0].offset
     end
   }
 end
