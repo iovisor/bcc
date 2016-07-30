@@ -175,8 +175,8 @@ u64 __time = bpf_ktime_get_ns();
                         self._bail("no exprs specified")
                 self.exprs = exprs.split(',')
 
-        def __init__(self, bpf, type, specifier):
-                self.pid = bpf.args.pid
+        def __init__(self, tool, type, specifier):
+                self.pid = tool.args.pid
                 self.raw_spec = specifier
                 self._validate_specifier()
 
@@ -200,8 +200,8 @@ u64 __time = bpf_ktime_get_ns();
                         self.library = parts[1]
                         self.probe_func_name = "%s_probe%d" % \
                                 (self.function, Probe.next_probe_index)
-                        bpf.enable_usdt_probe(self.function,
-                                        fn_name=self.probe_func_name)
+                        tool.enable_usdt_probe(self.library, self.function,
+                                               self.probe_func_name)
                 else:
                         self.library = parts[1]
                 self.is_user = len(self.library) > 0
@@ -265,7 +265,7 @@ u64 __time = bpf_ktime_get_ns();
         def _generate_field_assignment(self, i):
                 text = ""
                 if self.probe_type == "u" and self.exprs[i][0:3] == "arg":
-                    text = ("        u64 %s;\n" + 
+                    text = ("        u64 %s;\n" +
                            "        bpf_usdt_readarg(%s, ctx, &%s);\n") % \
                            (self.exprs[i], self.exprs[i][3], self.exprs[i])
                 if self._is_string(self.expr_types[i]):
@@ -590,9 +590,9 @@ argdist -p 2780 -z 120 \\
                         print("at least one specifier is required")
                         exit()
 
-        def enable_usdt_probe(self, probe_name, fn_name):
+        def enable_usdt_probe(self, library, probe_name, fn_name):
                 if not self.usdt_ctx:
-                        self.usdt_ctx = USDT(pid=self.args.pid)
+                        self.usdt_ctx = USDT(path=library, pid=self.args.pid)
                 self.usdt_ctx.enable_probe(probe_name, fn_name)
 
         def _generate_program(self):
