@@ -92,8 +92,9 @@ static int trace_event(struct pt_regs *ctx, struct sock *sk, int type)
             &skp->__sk_common.skc_rcv_saddr);
         bpf_probe_read(&data4.daddr, sizeof(u32),
             &skp->__sk_common.skc_daddr);
+        // lport is host order
         data4.lport = lport;
-        data4.dport = dport;
+        data4.dport = ntohs(dport);
         data4.state = state;
         ipv4_events.perf_submit(ctx, &data4, sizeof(data4));
 
@@ -103,8 +104,9 @@ static int trace_event(struct pt_regs *ctx, struct sock *sk, int type)
             &skp->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
         bpf_probe_read(&data6.daddr, sizeof(data6.daddr),
             &skp->__sk_common.skc_v6_daddr.in6_u.u6_addr32);
+        // lport is host order
         data6.lport = lport;
-        data6.dport = dport;
+        data6.dport = ntohs(dport);
         data6.state = state;
         ipv6_events.perf_submit(ctx, &data6, sizeof(data6));
     }
