@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <cxxabi.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -52,6 +53,7 @@ bool KSyms::resolve_addr(uint64_t addr, struct bcc_symbol *sym) {
 
   if (syms_.empty()) {
     sym->name = nullptr;
+    sym->demangle_name = nullptr;
     sym->module = nullptr;
     sym->offset = 0x0;
     return false;
@@ -59,6 +61,7 @@ bool KSyms::resolve_addr(uint64_t addr, struct bcc_symbol *sym) {
 
   auto it = std::upper_bound(syms_.begin(), syms_.end(), Symbol("", addr)) - 1;
   sym->name = (*it).name.c_str();
+  sym->demangle_name = sym->name;
   sym->module = "[kernel]";
   sym->offset = addr - (*it).addr;
   return true;
@@ -108,11 +111,19 @@ bool ProcSyms::resolve_addr(uint64_t addr, struct bcc_symbol *sym) {
 
   sym->module = nullptr;
   sym->name = nullptr;
+  sym->demangle_name = nullptr;
   sym->offset = 0x0;
 
   for (Module &mod : modules_) {
-    if (addr >= mod.start_ && addr < mod.end_)
-      return mod.find_addr(addr, sym);
+    if (addr >= mod.start_ && addr < mod.end_) {
+      bool res = mod.find_addr(addr, sym);
+      if (sym->name) {
+        sym->demangle_name = abi::__cxa_demangle(sym->name, nullptr, nullptr, nullptr);
+        if (!sym->demangle_name)
+          sym->demangle_name = sym->name;
+      }
+      return res;
+    }
   }
   return false;
 }

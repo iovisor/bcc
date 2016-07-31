@@ -115,6 +115,7 @@ lib.bpf_attach_xdp.argtypes = [ct.c_char_p, ct.c_int]
 class bcc_symbol(ct.Structure):
     _fields_ = [
             ('name', ct.c_char_p),
+            ('demangle_name', ct.c_char_p),
             ('module', ct.c_char_p),
             ('offset', ct.c_ulonglong),
         ]

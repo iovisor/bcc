@@ -54,7 +54,7 @@ class SymbolCache(object):
         psym = ct.pointer(sym)
         if lib.bcc_symcache_resolve(self.cache, addr, psym) < 0:
             return "[unknown]", 0
-        return sym.name.decode(), sym.offset
+        return sym.demangle_name.decode(), sym.offset
 
     def resolve_name(self, name):
         addr = ct.c_ulonglong()
