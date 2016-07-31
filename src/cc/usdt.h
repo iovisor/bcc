@@ -23,6 +23,8 @@
 #include "syms.h"
 #include "vendor/optional.hpp"
 
+struct bcc_usdt;
+
 namespace USDT {
 
 using std::experimental::optional;
@@ -148,6 +150,7 @@ public:
 
   size_t num_locations() const { return locations_.size(); }
   size_t num_arguments() const { return locations_.front().arguments_.size(); }
+  uint64_t semaphore()   const { return semaphore_; }
 
   uint64_t address(size_t n = 0) const { return locations_[n].address_; }
   bool usdt_getarg(std::ostream &stream);
@@ -193,6 +196,9 @@ public:
 
   bool enable_probe(const std::string &probe_name, const std::string &fn_name);
   bool generate_usdt_args(std::ostream &stream);
+
+  typedef void (*each_cb)(struct bcc_usdt *);
+  void each(each_cb callback);
 
   typedef void (*each_uprobe_cb)(const char *, const char *, uint64_t, int);
   void each_uprobe(each_uprobe_cb callback);

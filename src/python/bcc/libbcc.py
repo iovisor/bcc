@@ -157,7 +157,23 @@ lib.bcc_usdt_enable_probe.argtypes = [ct.c_void_p, ct.c_char_p, ct.c_char_p]
 lib.bcc_usdt_genargs.restype = ct.c_char_p
 lib.bcc_usdt_genargs.argtypes = [ct.c_void_p]
 
-_USDT_CB = ct.CFUNCTYPE(None, ct.c_char_p, ct.c_char_p, ct.c_ulonglong, ct.c_int)
+class bcc_usdt(ct.Structure):
+    _fields_ = [
+            ('provider', ct.c_char_p),
+            ('name', ct.c_char_p),
+            ('bin_path', ct.c_char_p),
+            ('semaphore', ct.c_ulonglong),
+            ('num_locations', ct.c_int),
+            ('num_arguments', ct.c_int),
+        ]
+
+_USDT_CB = ct.CFUNCTYPE(None, ct.POINTER(bcc_usdt))
+
+lib.bcc_usdt_foreach.restype = None
+lib.bcc_usdt_foreach.argtypes = [ct.c_void_p, _USDT_CB]
+
+_USDT_PROBE_CB = ct.CFUNCTYPE(None, ct.c_char_p, ct.c_char_p,
+                              ct.c_ulonglong, ct.c_int)
 
 lib.bcc_usdt_foreach_uprobe.restype = None
-lib.bcc_usdt_foreach_uprobe.argtypes = [ct.c_void_p, _USDT_CB]
+lib.bcc_usdt_foreach_uprobe.argtypes = [ct.c_void_p, _USDT_PROBE_CB]

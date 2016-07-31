@@ -13,7 +13,7 @@ import os
 import re
 import sys
 
-from bcc import USDTReader
+from bcc import USDT
 
 trace_root = "/sys/kernel/debug/tracing"
 event_root = os.path.join(trace_root, "events")
@@ -21,7 +21,7 @@ event_root = os.path.join(trace_root, "events")
 parser = argparse.ArgumentParser(description=
                 "Display kernel tracepoints or USDT probes and their formats.",
                 formatter_class=argparse.RawDescriptionHelpFormatter)
-parser.add_argument("-p", "--pid", type=int, default=-1, help=
+parser.add_argument("-p", "--pid", type=int, default=None, help=
                 "List USDT probes in the specified process")
 parser.add_argument("-l", "--lib", default="", help=
                 "List USDT probes in the specified library or executable")
@@ -65,23 +65,23 @@ def print_tracepoints():
                                 print_tpoint(category, event)
 
 def print_usdt(pid, lib):
-        reader = USDTReader(bin_path=lib, pid=pid)
+        reader = USDT(path=lib, pid=pid)
         probes_seen = []
-        for probe in reader.probes:
+        for probe in reader.enumerate_probes():
                 probe_name = "%s:%s" % (probe.provider, probe.name)
                 if not args.filter or fnmatch.fnmatch(probe_name, args.filter):
                         if probe_name in probes_seen:
                                 continue
                         probes_seen.append(probe_name)
                         if args.variables:
-                                print(probe.display_verbose())
+                                print(probe)
                         else:
                                 print("%s %s:%s" % (probe.bin_path,
-                                        probe.provider, probe.name))
+                                                    probe.provider, probe.name))
 
 if __name__ == "__main__":
         try:
-                if args.pid != -1 or args.lib != "":
+                if args.pid or args.lib != "":
                         print_usdt(args.pid, args.lib)
                 else:
                         print_tracepoints()
