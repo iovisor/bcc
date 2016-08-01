@@ -23,7 +23,7 @@ Here's the code for hello_world.py:
 
 ```Python
 from bcc import BPF
-BPF(text='int kprobe__sys_clone(void *ctx) { bpf_trace_printk("Hello, World!\\n"); }').trace_print()
+BPF(text='int kprobe__sys_clone(void *ctx) { bpf_trace_printk("Hello, World!\\n"); return 0; }').trace_print()
 ```
 
 There are six things to learn from this:
