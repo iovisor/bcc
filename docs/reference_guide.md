@@ -1014,7 +1014,7 @@ Examples in situ:
 
 ### 3. ksymname()
 
-Syntax: ```BPF.ksymname(addr)```
+Syntax: ```BPF.ksymname(name)```
 
 Translate a kernel name into an address. This is the reverse of ksymaddr. Returns -1 when the function name is unknown.
 
