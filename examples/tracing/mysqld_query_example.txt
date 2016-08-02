@@ -1,0 +1,8 @@
+# ./mysqld_query.py `pgrep -n mysqld`
+TIME(s)            COMM             PID    QUERY
+17450459.549910001 mysqld           18608  select @@version_comment limit 1
+17450463.822668001 mysqld           18608  SELECT DATABASE()
+17450463.824042998 mysqld           18608  show databases
+17450463.824570000 mysqld           18608  show tables
+17450465.602717999 mysqld           18608  SELECT COUNT(*) FROM words
+17450479.944897000 mysqld           18608  SELECT * FROM words WHERE word REGEXP '^bre.*n$'

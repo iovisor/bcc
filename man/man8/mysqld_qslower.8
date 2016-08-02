@@ -1,0 +1,66 @@
+.TH mysqld_qslower 8  "2016-08-01" "USER COMMANDS"
+.SH NAME
+mysqld_qslower \- Trace MySQL server queries slower than a threshold.
+.SH SYNOPSIS
+.B mysqld_qslower PID [min_ms]
+.SH DESCRIPTION
+This traces queries served by a MySQL server, and prints those that exceed a
+custom latency (query duration) threshold. By default, a minimum threshold of 1
+millisecond is used. If a threshold of 0 is used, all queries are printed.
+
+This uses User Statically-Defined Tracing (USDT) probes, a feature added to
+MySQL for DTrace support, but which may not be enabled on a given MySQL
+installation. See requirements.
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF, bcc, and MySQL server with USDT probe support (when configuring
+the build: \-DENABLE_DTRACE=1).
+.SH OPTIONS
+PID
+Trace this mysqld PID.
+.TP
+min_ms
+Minimum query latency (duration) to trace, in milliseconds. Default is 1 ms.
+.SH EXAMPLES
+.TP
+Trace MySQL server queries slower than 1 ms for PID 1981:
+#
+.B mysqld_qslower 1981
+.TP
+Trace slower than 10 ms for PID 1981:
+#
+.B mysqld_qslower 1981 10
+.SH FIELDS
+.TP
+TIME(s)
+Time of query start, in seconds.
+.TP
+PID
+Process ID of the traced server.
+.TP
+MS
+Milliseconds for the query, from start to end.
+.TP
+QUERY
+Query string, truncated to 128 characters.
+.SH OVERHEAD
+This adds low-overhead instrumentation to MySQL queries, and only emits output
+data from kernel to user-level if they query exceeds the threshold. If the
+server query rate is less than 1,000/sec, the overhead is expected to be
+negligible. If the query rate is higher, test to gauge overhead.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Brendan Gregg
+.SH SEE ALSO
+biosnoop(8)

@@ -1,0 +1,5 @@
+# ./nodejs_http_server.py 24728
+TIME(s)            COMM             PID    ARGS
+24653324.561322998 node             24728  path:/index.html
+24653335.343401998 node             24728  path:/images/welcome.png
+24653340.510164998 node             24728  path:/images/favicon.png
