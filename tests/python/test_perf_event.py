@@ -3,6 +3,7 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 
 import bcc
+import ctypes
 import multiprocessing
 import os
 import time
@@ -32,7 +33,12 @@ int kretprobe__sys_getuid(void *ctx) {
         b = bcc.BPF(text=text, debug=0,
                 cflags=["-DNUM_CPUS=%d" % multiprocessing.cpu_count()])
         cnt1 = b["cnt1"]
-        cnt1.open_perf_event(cnt1.HW_CPU_CYCLES)
+        try:
+            cnt1.open_perf_event(cnt1.HW_CPU_CYCLES)
+        except:
+            if ctypes.get_errno() == 2:
+                raise self.skipTest("hardware events unsupported")
+            raise
         for i in range(0, 100):
             os.getuid()
         b["dist"].print_log2_hist()
