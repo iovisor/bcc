@@ -30,12 +30,14 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
         - [2. BPF_HASH](#2-bpf_hash)
         - [3. BPF_HISTOGRAM](#3-bpf_histogram)
         - [4. BPF_STACK_TRACE](#4-bpf_stack_trace)
-        - [5. map.lookup()](#5-maplookup)
-        - [6. map.lookup_or_init()](#6-maplookup_or_init)
-        - [7. map.delete()](#7-mapdelete)
-        - [8. map.update()](#8-mapupdate)
-        - [9. map.increment()](#9-mapincrement)
-        - [10. map.get_stackid()](#10-mapget_stackid)
+        - [5. BPF_PERF_ARRAY](#5-bpf_perf_array)
+        - [6. map.lookup()](#6-maplookup)
+        - [7. map.lookup_or_init()](#7-maplookup_or_init)
+        - [8. map.delete()](#8-mapdelete)
+        - [9. map.update()](#9-mapupdate)
+        - [10. map.increment()](#10-mapincrement)
+        - [11. map.get_stackid()](#11-mapget_stackid)
+        - [12. map.perf_read()](#12-mapperf_read)
 
 - [bcc Python](#bcc-python)
     - [Initialization](#initialization)
@@ -442,7 +444,30 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=BPF_STACK_TRACE+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=BPF_STACK_TRACE+path%3Atools&type=Code)
 
-### 5. map.lookup()
+### 5. BPF_PERF_ARRAY
+
+Syntax: ```BPF_PERF_ARRAY(name, max_entries)```
+
+Creates perf array named ```name```, with a maximum entry count provided, which must be equal to the number of system cpus. These maps are used to fetch hardware performance counters.
+
+For example:
+
+```C
+text="""
+BPF_PERF_ARRAY(cpu_cycles, NUM_CPUS);
+"""
+b = bcc.BPF(text=text, cflags=["-DNUM_CPUS=%d" % multiprocessing.cpu_count()])
+b["cpu_cycles"].open_perf_event(b["cpu_cycles"].HW_CPU_CYCLES)
+```
+
+This creates a perf array named ```cpu_cycles```, with number of entries equal to the number of cpus/cores. The array is configured so that later calling map.perf_read() will return a hardware-calculated counter of the number of cycles elapsed from some point in the past. Only one type of hardware counter may be configured per table at a time.
+
+Methods (covered later): map.perf_read().
+
+Examples in situ:
+[search /tests](https://github.com/iovisor/bcc/search?q=BPF_PERF_ARRAY+path%3Atests&type=Code)
+
+### 6. map.lookup()
 
 Syntax: ```*val map.lookup(&key)```
 
@@ -452,7 +477,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=lookup+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=lookup+path%3Atools&type=Code)
 
-### 6. map.lookup_or_init()
+### 7. map.lookup_or_init()
 
 Syntax: ```*val map.lookup_or_init(&key, &zero)```
 
@@ -462,7 +487,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=lookup_or_init+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=lookup_or_init+path%3Atools&type=Code)
 
-### 7. map.delete()
+### 8. map.delete()
 
 Syntax: ```map.delete(&key)```
 
@@ -472,7 +497,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=delete+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=delete+path%3Atools&type=Code)
 
-### 8. map.update()
+### 9. map.update()
 
 Syntax: ```map.update(&key, &val)```
 
@@ -482,7 +507,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=update+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=update+path%3Atools&type=Code)
 
-### 9. map.increment()
+### 10. map.increment()
 
 Syntax: ```map.increment(&key)```
 
@@ -492,7 +517,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=increment+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=increment+path%3Atools&type=Code)
 
-### 10. map.get_stackid()
+### 11. map.get_stackid()
 
 Syntax: ```int map.get_stackid(void *ctx, u64 flags)```
 
@@ -501,6 +526,15 @@ This walks the stack found via the struct pt_regs in ```ctx```, saves it in the 
 Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=get_stackid+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=get_stackid+path%3Atools&type=Code)
+
+### 12. map.perf_read()
+
+Syntax: ```u64 map.perf_read(u32 cpu)```
+
+This returns the hardware performance counter as configured in [5. BPF_PERF_ARRAY](#5-bpf_perf_array)
+
+Examples in situ:
+[search /tests](https://github.com/iovisor/bcc/search?q=perf_read+path%3Atests&type=Code)
 
 # bcc Python
 

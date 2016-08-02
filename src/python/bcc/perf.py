@@ -50,6 +50,7 @@ class Perf(object):
         PERF_TYPE_HARDWARE = 0
         PERF_TYPE_SOFTWARE = 1
         PERF_TYPE_TRACEPOINT = 2
+        PERF_TYPE_HW_CACHE = 3
 
         # perf_event_sample_format
         PERF_SAMPLE_RAW = 1024      # it's a u32; could also try zero args
