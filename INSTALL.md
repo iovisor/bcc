@@ -39,7 +39,7 @@ Kernel compile flags can usually be checked by looking at `/proc/config.gz` or
 Only the nightly packages are built for Ubuntu 16.04, but the steps are very straightforward. No need to upgrade the kernel or compile from source!
 
 ```bash
-echo "deb [trusted=yes] http://52.8.15.63/apt/xenial xenial-nightly main" | sudo tee /etc/apt/sources.list.d/iovisor.list
+echo "deb [trusted=yes] https://repo.iovisor.org/apt/xenial xenial-nightly main" | sudo tee /etc/apt/sources.list.d/iovisor.list
 sudo apt-get update
 sudo apt-get install bcc-tools
 ```
@@ -67,12 +67,12 @@ Update PREFIX to the latest date, and you can browse the files in the PREFIX url
 **Signed Packages**
 
 Tagged and signed bcc binary packages are built for Ubuntu Trusty (14.04) and
-hosted at http://52.8.15.63/apt/.
+hosted at https://repo.iovisor.org/apt/.
 
 To install:
 ```bash
 sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys D4284CDD
-echo "deb http://52.8.15.63/apt trusty main" | sudo tee /etc/apt/sources.list.d/iovisor.list
+echo "deb https://repo.iovisor.org/apt trusty main" | sudo tee /etc/apt/sources.list.d/iovisor.list
 sudo apt-get update
 sudo apt-get install binutils bcc bcc-tools libbcc-examples python-bcc
 ```
@@ -80,7 +80,7 @@ sudo apt-get install binutils bcc bcc-tools libbcc-examples python-bcc
 **Nightly Packages**
 
 ```bash
-echo "deb [trusted=yes] http://52.8.15.63/apt/trusty trusty-nightly main" | sudo tee /etc/apt/sources.list.d/iovisor.list
+echo "deb [trusted=yes] https://repo.iovisor.org/apt/trusty trusty-nightly main" | sudo tee /etc/apt/sources.list.d/iovisor.list
 sudo apt-get update
 sudo apt-get install bcc-tools
 ```
@@ -110,11 +110,11 @@ sudo dnf update
 ```
 
 Nightly bcc binary packages are built for Fedora 23 and 24, hosted at
-`http://52.8.15.63/yum/nightly/f{23,24}`.
+`https://repo.iovisor.org/yum/nightly/f{23,24}`.
 
 To install (change 'f23' to 'f24' for rawhide):
 ```bash
-echo -e '[iovisor]\nbaseurl=http://52.8.15.63/yum/nightly/f23/$basearch\nenabled=1\ngpgcheck=0' | sudo tee /etc/yum.repos.d/iovisor.repo
+echo -e '[iovisor]\nbaseurl=https://repo.iovisor.org/yum/nightly/f23/$basearch\nenabled=1\ngpgcheck=0' | sudo tee /etc/yum.repos.d/iovisor.repo
 sudo dnf install bcc-tools
 ```
 

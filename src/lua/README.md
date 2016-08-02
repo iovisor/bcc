@@ -42,7 +42,7 @@ The following instructions assume Ubuntu 14.04 LTS.
 
     ```
     sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys D4284CDD
-    echo "deb http://52.8.15.63/apt trusty main" | sudo tee /etc/apt/sources.list.d/iovisor.list
+    echo "deb https://repo.iovisor.org/apt trusty main" | sudo tee /etc/apt/sources.list.d/iovisor.list
     sudo apt-get update
     sudo apt-get install libbcc luajit
     ```
