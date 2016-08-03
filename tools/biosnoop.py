@@ -72,7 +72,7 @@ int trace_req_completion(struct pt_regs *ctx, struct request *req)
     u64 *tsp, delta;
     u32 *pidp = 0;
     struct val_t *valp;
-    struct data_t data ={};
+    struct data_t data = {};
     u64 ts;
 
     // fetch timestamp and calculate delta
@@ -81,14 +81,14 @@ int trace_req_completion(struct pt_regs *ctx, struct request *req)
         // missed tracing issue
         return 0;
     }
-    ts =  bpf_ktime_get_ns();
+    ts = bpf_ktime_get_ns();
     data.delta = ts - *tsp;
     data.ts = ts / 1000;
 
     valp = infobyreq.lookup(&req);
     if (valp == 0) {
         data.len = req->__data_len;
-        strcpy(data.name,"?");
+        strcpy(data.name, "?");
     } else {
         data.pid = valp->pid;
         data.len = req->__data_len;
@@ -99,11 +99,11 @@ int trace_req_completion(struct pt_regs *ctx, struct request *req)
     }
 
     if (req->cmd_flags & REQ_WRITE) {
-        data.rwflag=1;
+        data.rwflag = 1;
     } else {
-        data.rwflag=0;
+        data.rwflag = 0;
     }
-    events.perf_submit(ctx,&data,sizeof(data));
+    events.perf_submit(ctx, &data, sizeof(data));
     start.delete(&req);
     infobyreq.delete(&req);
 
@@ -130,6 +130,7 @@ class Data(ct.Structure):
         ("disk_name", ct.c_char * DISK_NAME_LEN),
         ("name", ct.c_char * TASK_COMM_LEN)
     ]
+
 # header
 print("%-14s %-14s %-6s %-7s %-2s %-9s %-7s %7s" % ("TIME(s)", "COMM", "PID",
     "DISK", "T", "SECTOR", "BYTES", "LAT(ms)"))
