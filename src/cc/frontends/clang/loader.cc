@@ -42,6 +42,7 @@
 #include <clang/Frontend/FrontendDiagnostic.h>
 #include <clang/Frontend/TextDiagnosticPrinter.h>
 #include <clang/FrontendTool/Utils.h>
+#include <clang/Lex/PreprocessorOptions.h>
 
 #include <llvm/IR/Module.h>
 
