@@ -19,6 +19,7 @@ from bcc import BPF
 from time import sleep, strftime
 import argparse
 import signal
+import os
 
 # arguments
 examples = """examples:
@@ -76,12 +77,12 @@ int trace_count(struct pt_regs *ctx) {
     return 0;
 }
 """
+filter_text = "u32 pid; pid = bpf_get_current_pid_tgid(); "
 if args.pid:
-    bpf_text = bpf_text.replace('FILTER',
-        ('u32 pid; pid = bpf_get_current_pid_tgid(); ' +
-        'if (pid != %s) { return 0; }') % (args.pid))
+    filter_text += "if (pid != %s) { return 0; }" % args.pid
 else:
-    bpf_text = bpf_text.replace('FILTER', '')
+    filter_text += "if (pid == %s) { return 0; }" % os.getpid()
+bpf_text = bpf_text.replace('FILTER', filter_text)
 if debug:
     print(bpf_text)
 b = BPF(text=bpf_text)
