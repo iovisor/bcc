@@ -175,6 +175,8 @@ static int (*bpf_perf_event_output)(void *ctx, void *map, u32 index, void *data,
   (void *) BPF_FUNC_perf_event_output;
 static int (*bpf_skb_load_bytes)(void *ctx, int offset, void *to, u32 len) =
   (void *) BPF_FUNC_skb_load_bytes;
+static u64 (*bpf_get_current_task)(void) =
+  (void *) BPF_FUNC_get_current_task;
 
 /* bpf_get_stackid will return a negative value in the case of an error
  *
