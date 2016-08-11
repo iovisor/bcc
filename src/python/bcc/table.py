@@ -243,16 +243,17 @@ class TableBase(MutableMapping):
         return next_key
 
     def print_log2_hist(self, val_type="value", section_header="Bucket ptr",
-            section_print_fn=None):
+            section_print_fn=None, bucket_fn=None):
         """print_log2_hist(val_type="value", section_header="Bucket ptr",
-                           section_print_fn=None)
+                           section_print_fn=None, bucket_fn=None)
 
         Prints a table as a log2 histogram. The table must be stored as
         log2. The val_type argument is optional, and is a column header.
         If the histogram has a secondary key, multiple tables will print
         and section_header can be used as a header description for each.
         If section_print_fn is not None, it will be passed the bucket value
-        to format into a string as it sees fit.
+        to format into a string as it sees fit. If bucket_fn is not None,
+        it will be used to produce a bucket value for the histogram keys.
         """
         if isinstance(self.Key(), ct.Structure):
             tmp = {}
@@ -260,6 +261,8 @@ class TableBase(MutableMapping):
             f2 = self.Key._fields_[1][0]
             for k, v in self.items():
                 bucket = getattr(k, f1)
+                if bucket_fn:
+                    bucket = bucket_fn(bucket)
                 vals = tmp[bucket] = tmp.get(bucket, [0] * 65)
                 slot = getattr(k, f2)
                 vals[slot] = v.value
