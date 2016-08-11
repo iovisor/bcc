@@ -183,8 +183,13 @@ sudo pip install pyroute2
 ### Install binary clang
 
 ```
+# FC22
 wget http://llvm.org/releases/3.7.1/clang+llvm-3.7.1-x86_64-fedora22.tar.xz
 sudo tar xf clang+llvm-3.7.1-x86_64-fedora22.tar.xz -C /usr/local --strip 1
+
+# FC23 and FC24
+wget http://llvm.org/releases/3.9.0/clang+llvm-3.9.0-x86_64-fedora23.tar.xz
+sudo tar xf clang+llvm-3.9.0-x86_64-fedora23.tar.xz -C /usr/local --strip 1
 ```
 
 ### Install and compile BCC
