@@ -482,7 +482,7 @@ class BPF(object):
         if res < 0:
             err_no = ct.get_errno()
             if err_no == errno.EBADMSG:
-                raise Exception("Internal error while attaching BFP to device,"+
+                raise Exception("Internal error while attaching BPF to device,"+
                     " try increasing the debug level!")
             else:
                 errstr = os.strerror(err_no)
@@ -492,7 +492,7 @@ class BPF(object):
     @staticmethod
     def remove_xdp(dev):
         '''
-            This function removes any BPF function from a device on the 
+            This function removes any BPF function from a device on the
             device driver level (XDP)
         '''
         res = lib.bpf_attach_xdp(dev.encode("ascii"), -1)
