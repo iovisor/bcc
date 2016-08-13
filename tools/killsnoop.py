@@ -4,7 +4,7 @@
 # killsnoop Trace signals issued by the kill() syscall.
 #           For Linux, uses BCC, eBPF. Embedded C.
 #
-# USAGE: killsnoop [-h] [-t] [-x] [-p PID]
+# USAGE: killsnoop [-h] [-x] [-p PID]
 #
 # Copyright (c) 2015 Brendan Gregg.
 # Licensed under the Apache License, Version 2.0 (the "License")
@@ -15,12 +15,12 @@
 from __future__ import print_function
 from bcc import BPF
 import argparse
+from time import strftime
 import ctypes as ct
 
 # arguments
 examples = """examples:
     ./killsnoop           # trace all kill() signals
-    ./killsnoop -t        # include timestamps
     ./killsnoop -x        # only show failed kills
     ./killsnoop -p 181    # only trace PID 181
 """
@@ -28,8 +28,6 @@ parser = argparse.ArgumentParser(
     description="Trace signals issued by the kill() syscall",
     formatter_class=argparse.RawDescriptionHelpFormatter,
     epilog=examples)
-parser.add_argument("-t", "--timestamp", action="store_true",
-    help="include timestamp on output")
 parser.add_argument("-x", "--failed", action="store_true",
     help="only show failed kill syscalls")
 parser.add_argument("-p", "--pid",
@@ -44,7 +42,6 @@ bpf_text = """
 
 struct val_t {
    u64 pid;
-   u64 ts;
    int sig;
    int tpid;
    char comm[TASK_COMM_LEN];
@@ -55,8 +52,6 @@ struct data_t {
    u64 tpid;
    int sig;
    int ret;
-   u64 ts;
-   u64 delta;
    char comm[TASK_COMM_LEN];
 };
 
@@ -71,7 +66,6 @@ int kprobe__sys_kill(struct pt_regs *ctx, int tpid, int sig)
     FILTER
     if (bpf_get_current_comm(&val.comm, sizeof(val.comm)) == 0) {
         val.pid = bpf_get_current_pid_tgid();
-        val.ts = bpf_ktime_get_ns();
         val.tpid = tpid;
         val.sig = sig;
         infotmp.update(&pid, &val);
@@ -85,7 +79,6 @@ int kretprobe__sys_kill(struct pt_regs *ctx)
     struct data_t data = {};
     struct val_t *valp;
     u32 pid = bpf_get_current_pid_tgid();
-    u64 tsp = bpf_ktime_get_ns();
 
     valp = infotmp.lookup(&pid);
     if (valp == 0) {
@@ -95,8 +88,6 @@ int kretprobe__sys_kill(struct pt_regs *ctx)
 
     bpf_probe_read(&data.comm, sizeof(data.comm), valp->comm);
     data.pid = pid;
-    data.delta = tsp - valp->ts;
-    data.ts = tsp / 1000;
     data.tpid = valp->tpid;
     data.ret = PT_REGS_RC(ctx);
     data.sig = valp->sig;
@@ -126,47 +117,21 @@ class Data(ct.Structure):
         ("tpid", ct.c_ulonglong),
         ("sig", ct.c_int),
         ("ret", ct.c_int),
-        ("ts", ct.c_ulonglong),
-        ("delta", ct.c_ulonglong),
         ("comm", ct.c_char * TASK_COMM_LEN)
     ]
 
-start_ts = 0
-prev_ts = 0
-delta = 0
-
 # header
-if args.timestamp:
-    print("%-14s" % ("TIME(s)"), end="")
-print("%-6s %-16s %-4s %-6s %s" % ("PID", "COMM", "SIG", "TPID", "RESULT"))
+print("%-9s %-6s %-16s %-4s %-6s %s" % (
+    "TIME", "PID", "COMM", "SIG", "TPID", "RESULT"))
 
 # process event
 def print_event(cpu, data, size):
     event = ct.cast(data, ct.POINTER(Data)).contents
-    global start_ts
-    global prev_ts
-    global delta
 
-    if start_ts == 0:
-        prev_ts = start_ts
+    if (args.failed and (event.ret >= 0)): return
 
-    if start_ts == 1:
-        delta = float(delta) + (event.ts - prev_ts)
-
-    if (args.failed and (event.ret >= 0)):
-        start_ts = 1
-        prev_ts = event.ts
-        return
-
-    # print columns
-    if args.timestamp:
-        print("%-14.9f" % (delta / 1000000), end="")
-
-    print("%-6d %-16s %-4d %-6d %d" % (event.pid, event.comm, event.sig,
-        event.tpid, event.ret))
-
-    prev_ts = event.ts
-    start_ts = 1
+    print("%-9s %-6d %-16s %-4d %-6d %d" % (strftime("%H:%M:%S"),
+        event.pid, event.comm, event.sig, event.tpid, event.ret))
 
 # loop with callback to print_event
 b["events"].open_perf_buffer(print_event)
