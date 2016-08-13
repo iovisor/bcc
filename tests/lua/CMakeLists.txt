@@ -1,4 +1,5 @@
 find_program(LUAJIT luajit)
+find_program(BUSTED busted)
 
 if(LUAJIT)
 	add_test(NAME lua_test_clang WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
@@ -12,4 +13,9 @@ if(LUAJIT)
 
 	add_test(NAME lua_test_standalone WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 		COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/test_standalone.sh)
+
+	if(BUSTED)
+		add_test(NAME lua_test_busted WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+			COMMAND busted --lua=${LUAJIT} -m "${CMAKE_CURRENT_SOURCE_DIR}/../../src/lua/?.lua" -m "${CMAKE_CURRENT_SOURCE_DIR}/../../src/lua/?/init.lua;")
+	endif()
 endif()
