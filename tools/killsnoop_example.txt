@@ -4,13 +4,13 @@ Demonstrations of killsnoop, the Linux eBPF/bcc version.
 This traces signals sent via the kill() syscall. For example:
 
 # ./killsnoop
-PID    COMM             SIG  TPID   RESULT
-17064  bash             9    27682  0
-17064  bash             9    27682  -3
-17064  bash             0    17064  0
+TIME      PID    COMM             SIG  TPID   RESULT
+12:10:51  13967  bash             9    13885  0
+12:11:34  13967  bash             9    1024   -3
+12:11:41  815    systemd-udevd    15   14076  0
 
-The first line showed a SIGKILL (9) sent from PID 17064 (a bash shell) to
-PID 27682. The result, 0, means success.
+The first line showed a SIGKILL (9) sent from PID 13967 (a bash shell) to
+PID 13885. The result, 0, means success.
 
 The second line showed the same signal sent, this time resulting in a -3
 (ESRCH: no such process).
@@ -19,18 +19,16 @@ The second line showed the same signal sent, this time resulting in a -3
 USAGE message:
 
 # ./killsnoop -h
-usage: killsnoop [-h] [-t] [-x] [-p PID]
+usage: killsnoop [-h] [-x] [-p PID]
 
 Trace signals issued by the kill() syscall
 
 optional arguments:
   -h, --help         show this help message and exit
-  -t, --timestamp    include timestamp on output
   -x, --failed       only show failed kill syscalls
   -p PID, --pid PID  trace this PID only
 
 examples:
     ./killsnoop           # trace all kill() signals
-    ./killsnoop -t        # include timestamps
     ./killsnoop -x        # only show failed kills
     ./killsnoop -p 181    # only trace PID 181

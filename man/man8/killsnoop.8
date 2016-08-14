@@ -2,7 +2,7 @@
 .SH NAME
 killsnoop \- Trace signals issued by the kill() syscall. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B killsnoop [\-h] [\-t] [\-x] [-p PID]
+.B killsnoop [\-h] [\-x] [-p PID]
 .SH DESCRIPTION
 killsnoop traces the kill() syscall, to show signals sent via this method. This
 may be useful to troubleshoot failing applications, where an unknown mechanism
@@ -23,9 +23,6 @@ CONFIG_BPF and bcc.
 \-h
 Print usage message.
 .TP
-\-t
-Include a timestamp column.
-.TP
 \-x
 Only print failed kill() syscalls.
 .TP
@@ -37,10 +34,6 @@ Trace all kill() syscalls:
 #
 .B killsnoop
 .TP
-Trace all kill() syscalls, and include timestamps:
-#
-.B killsnoop \-t
-.TP
 Trace only kill() syscalls that failed:
 #
 .B killsnoop \-x
@@ -50,8 +43,8 @@ Trace PID 181 only:
 .B killsnoop \-p 181
 .SH FIELDS
 .TP
-TIME(s)
-Time of the call, in seconds.
+TIME
+Time of the kill call.
 .TP
 PID
 Source process ID
