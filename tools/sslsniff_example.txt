@@ -59,3 +59,27 @@ SSL_READ     0.129967972        curl             12915  1270
     div {
         w
 ----- END DATA (TRUNCATED, 798 bytes lost) -----
+
+
+
+
+USAGE message:
+
+usage: sslsniff.py [-h] [-p PID] [-c COMM] [-o] [-g] [-d]
+
+Sniff SSL data
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -p PID, --pid PID     sniff this PID only.
+  -c COMM, --comm COMM  sniff only commands matching string.
+  -o, --no-openssl      do not show OpenSSL calls.
+  -g, --no-gnutls       do not show GnuTLS calls.
+  -d, --debug           debug mode.
+
+examples:
+    ./sslsniff              # sniff OpenSSL and GnuTLS functions
+    ./sslsniff -p 181       # sniff PID 181 only
+    ./sslsniff -c curl      # sniff curl command only
+    ./sslsniff --no-openssl # don't show OpenSSL calls
+    ./sslsniff --no-gnutls  # don't show GnuTLS calls
