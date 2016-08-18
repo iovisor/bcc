@@ -212,6 +212,20 @@ int trace_entry2(struct pt_regs *ctx, int unused, struct file *file) {
         fn = b.load_func("trace_entry1", BPF.KPROBE)
         fn = b.load_func("trace_entry2", BPF.KPROBE)
 
+    def test_probe_unnamed_union_deref(self):
+        text = """
+#include <linux/mm_types.h>
+int trace(struct pt_regs *ctx, struct page *page) {
+    void *p = page->mapping;
+    return p != NULL;
+}
+"""
+        # depending on llvm, compile may pass/fail, but at least shouldn't crash
+        try:
+            b = BPF(text=text)
+        except:
+            pass
+
     def test_probe_struct_assign(self):
         b = BPF(text = """
 #include <uapi/linux/ptrace.h>

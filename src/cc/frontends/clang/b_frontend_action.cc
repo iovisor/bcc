@@ -158,7 +158,7 @@ class ProbeSetter : public RecursiveASTVisitor<ProbeSetter> {
   set<Decl *> *ptregs_;
 };
 
-ProbeVisitor::ProbeVisitor(Rewriter &rewriter) : rewriter_(rewriter) {}
+ProbeVisitor::ProbeVisitor(ASTContext &C, Rewriter &rewriter) : C(C), rewriter_(rewriter) {}
 
 bool ProbeVisitor::VisitVarDecl(VarDecl *Decl) {
   if (Expr *E = Decl->getInit()) {
@@ -234,6 +234,10 @@ bool ProbeVisitor::VisitMemberExpr(MemberExpr *E) {
   }
   if (!found)
     return true;
+  if (op.isInvalid()) {
+    error(base->getLocEnd(), "internal error: opLoc is invalid while preparing probe rewrite");
+    return false;
+  }
   string rhs = rewriter_.getRewrittenText(SourceRange(rhs_start, E->getLocEnd()));
   string base_type = base->getType()->getPointeeType().getAsString();
   string pre, post;
@@ -245,6 +249,13 @@ bool ProbeVisitor::VisitMemberExpr(MemberExpr *E) {
   rewriter_.ReplaceText(SourceRange(op, E->getLocEnd()), post);
   return true;
 }
+
+template <unsigned N>
+DiagnosticBuilder ProbeVisitor::error(SourceLocation loc, const char (&fmt)[N]) {
+  unsigned int diag_id = C.getDiagnostics().getCustomDiagID(DiagnosticsEngine::Error, fmt);
+  return C.getDiagnostics().Report(loc, diag_id);
+}
+
 
 BTypeVisitor::BTypeVisitor(ASTContext &C, Rewriter &rewriter, vector<TableDesc> &tables)
     : C(C), diag_(C.getDiagnostics()), rewriter_(rewriter), out_(llvm::errs()), tables_(tables) {
@@ -697,7 +708,7 @@ bool BTypeConsumer::HandleTopLevelDecl(DeclGroupRef Group) {
 }
 
 ProbeConsumer::ProbeConsumer(ASTContext &C, Rewriter &rewriter)
-    : visitor_(rewriter) {}
+    : visitor_(C, rewriter) {}
 
 bool ProbeConsumer::HandleTopLevelDecl(DeclGroupRef Group) {
   for (auto D : Group) {
