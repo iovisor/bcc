@@ -89,7 +89,7 @@ class BTypeVisitor : public clang::RecursiveASTVisitor<BTypeVisitor> {
 // Do a depth-first search to rewrite all pointers that need to be probed
 class ProbeVisitor : public clang::RecursiveASTVisitor<ProbeVisitor> {
  public:
-  explicit ProbeVisitor(clang::Rewriter &rewriter);
+  explicit ProbeVisitor(clang::ASTContext &C, clang::Rewriter &rewriter);
   bool VisitVarDecl(clang::VarDecl *Decl);
   bool VisitCallExpr(clang::CallExpr *Call);
   bool VisitBinaryOperator(clang::BinaryOperator *E);
@@ -97,6 +97,10 @@ class ProbeVisitor : public clang::RecursiveASTVisitor<ProbeVisitor> {
   bool VisitMemberExpr(clang::MemberExpr *E);
   void set_ptreg(clang::Decl *D) { ptregs_.insert(D); }
  private:
+  template <unsigned N>
+  clang::DiagnosticBuilder error(clang::SourceLocation loc, const char (&fmt)[N]);
+
+  clang::ASTContext &C;
   clang::Rewriter &rewriter_;
   std::set<clang::Decl *> fn_visited_;
   std::set<clang::Expr *> memb_visited_;
