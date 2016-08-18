@@ -1,0 +1,51 @@
+.TH sslsniff 8  "2016-08-16" "USER COMMANDS"
+.SH NAME
+sslsniff \- Print data passed to OpenSSL. Uses Linux eBPF/bcc.
+.SH SYNOPSIS
+.B sslsniff
+.SH DESCRIPTION
+sslsniff prints data sent to SSL_write and SSL_read OpenSSL functions, allowing
+us to read plain text content before encryption (when writing) and after
+decryption (when reading).
+
+This works reading the second parameter of both functions (*buf).
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH EXAMPLES
+.TP
+Print all calls to SSL_write and SSL_read system-wide:
+#
+.B sslsniff
+.SH FIELDS
+.TP
+FUNC
+Which function is being called (SSL_write or SSL_read)
+.TP
+TIME
+Time of the command, in seconds.
+.TP
+COMM
+Entered command.
+.TP
+PID
+Process ID calling OpenSSL.
+.TP
+LEN
+Bytes written or read by OpenSSL functions.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHORS
+Adrian Lopez and Mark Drayton
+.SH SEE ALSO
+trace(8)
