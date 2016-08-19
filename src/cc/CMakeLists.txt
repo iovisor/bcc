@@ -44,7 +44,7 @@ add_library(bcc-static STATIC bpf_common.cc bpf_module.cc shared_table.cc export
 set_target_properties(bcc-static PROPERTIES OUTPUT_NAME bcc)
 
 set(llvm_raw_libs bitwriter bpfcodegen irreader linker
-  mcjit objcarcopts option passes nativecodegen)
+  mcjit objcarcopts option passes nativecodegen lto)
 list(FIND LLVM_AVAILABLE_LIBS "LLVMCoverage" _llvm_coverage)
 if (${_llvm_coverage} GREATER -1)
   list(APPEND llvm_raw_libs coverage)
