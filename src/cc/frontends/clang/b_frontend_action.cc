@@ -396,6 +396,21 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
                                                                      Call->getArg(2)->getLocEnd()));
           txt = "bpf_perf_event_output(" + arg0 + ", bpf_pseudo_fd(1, " + fd + ")";
           txt += ", bpf_get_smp_processor_id(), " + args_other + ")";
+        } else if (memb_name == "perf_submit_skb") {
+          string skb = rewriter_.getRewrittenText(SourceRange(Call->getArg(0)->getLocStart(),
+                                                               Call->getArg(0)->getLocEnd()));
+          string skb_len = rewriter_.getRewrittenText(SourceRange(Call->getArg(1)->getLocStart(),
+                                                                  Call->getArg(1)->getLocEnd()));
+          string meta = rewriter_.getRewrittenText(SourceRange(Call->getArg(2)->getLocStart(),
+                                                               Call->getArg(2)->getLocEnd()));
+          string meta_len = rewriter_.getRewrittenText(SourceRange(Call->getArg(3)->getLocStart(),
+                                                                   Call->getArg(3)->getLocEnd()));
+          txt = "bpf_perf_event_output(" +
+            skb + ", " +
+            "bpf_pseudo_fd(1, " + fd + "), " +
+            "((__u64)" + skb_len + " << 32) | BPF_F_CURRENT_CPU, " +
+            meta + ", " +
+            meta_len + ");";
         } else if (memb_name == "get_stackid") {
             if (table_it->type == BPF_MAP_TYPE_STACK_TRACE) {
               string arg0 = rewriter_.getRewrittenText(SourceRange(Call->getArg(0)->getLocStart(),
