@@ -486,7 +486,7 @@ while 1:
 
 Things to learn:
 
-1. ```TRACEPOINT_PROBE(random, urandom_read)```: Instrument the kernel tracepoint ```random:urandom_read```. These have a stable API, and thus are recommend to use instead of kprobes, wherever possible. You can run ```perf list``` for a list of tracepoints.
+1. ```TRACEPOINT_PROBE(random, urandom_read)```: Instrument the kernel tracepoint ```random:urandom_read```. These have a stable API, and thus are recommend to use instead of kprobes, wherever possible. You can run ```perf list``` for a list of tracepoints. Linux >= 4.7 is required to attach BPF programs to tracepoints.
 1. ```args->got_bits```: ```args``` is auto-populated to be a structure of the tracepoint arguments. The comment above says where you can see that structure. Eg:
 
 ```
