@@ -36,7 +36,7 @@ There are six things to learn from this:
 
 1. ```bpf_trace_printk()```: A simple kernel facility for printf() to the common trace_pipe (/sys/kernel/debug/tracing/trace_pipe). This is ok for some quick examples, but has limitations: 3 args max, 1 %s only, and trace_pipe is globally shared, so concurrent programs will have clashing output. A better interface is via BPF_PERF_OUTPUT(), covered later.
 
-1. ```return 0;```: Necessary formality (if you want to know why, see #139).
+1. ```return 0;```: Necessary formality (if you want to know why, see [#139](https://github.com/iovisor/bcc/issues/139)).
 
 1. ```.trace_print()```: A bcc routine that reads trace_pipe and prints the output.
 
@@ -88,7 +88,7 @@ while 1:
     print("%-18.9f %-16s %-6d %s" % (ts, task, pid, msg))
 ```
 
-This is simalar to hello_world.py, and traces new processes via sys_clone() again, but has a few more things to learn:
+This is similar to hello_world.py, and traces new processes via sys_clone() again, but has a few more things to learn:
 
 1. ```prog =```: This time we declare the C program as a variable, and later refer to it. This is useful if you want to add some string substitutions based on command line arguments.
 
@@ -163,7 +163,7 @@ Things to learn:
 1. ```key = 0```: We'll only store one key/value pair in this hash, where the key is hardwired to zero.
 1. ```last.lookup(&key)```: Lookup the key in the hash, and return a pointer to its value if it exists, else NULL. We pass the key in as an address to a pointer.
 1. ```last.delete(&key)```: Delete the key from the hash. This is currently required because of [a kernel bug in `.update()`](https://git.kernel.org/cgit/linux/kernel/git/davem/net.git/commit/?id=a6ed3ea65d9868fdf9eff84e6fe4f666b8d14b02).
-1. ```last.update(&key)```: Set the key to equal the value in the 2nd argument. This records the timestamp.
+1. ```last.update(&key, &ts)```: Associate the value in the 2nd argument to the key, overwriting any previous value. This records the timestamp.
 
 ### Lesson 5. sync_count.py
 
@@ -183,7 +183,7 @@ TIME(s)            T  BYTES    LAT(ms)
 [...]
 ```
 
-And a code snippit:
+And a code snippet:
 
 ```Python
 [...]
