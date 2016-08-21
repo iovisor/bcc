@@ -7,7 +7,7 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
 ## Contents
 
 - [BPF C](#bpf-c)
-    - [Events & Arguments](#events-arguments)
+    - [Events & Arguments](#events--arguments)
         - [1. kprobes](#1-kprobes)
         - [2. kretprobes](#2-kretprobes)
         - [3. Tracepoints](#3-tracepoints)
@@ -501,7 +501,7 @@ Examples in situ:
 
 Syntax: ```map.update(&key, &val)```
 
-Set the key to equal the value in the second argument.
+Associate the value in the second argument to the key, overwriting any previous value.
 
 Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=update+path%3Aexamples&type=Code),
