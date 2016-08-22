@@ -99,7 +99,7 @@ This instruments the tcp_v4_connect() kernel function using a kprobe, with the f
 - ```struct pt_regs *ctx```: Registers and BPF context.
 - ```struct sock *sk```: First argument to tcp_v4_connect().
 
-The first argument is always ```struct pt_regs *```, the remainder are the arguments to the function (they don't need to be specified, if you don't intend to use them).
+The first argument is always ```struct pt_regs *```, the remainder are the arguments to the function (they don't need to be specified, if you don't intend to use them). Limitations: maximum of 4 args including ctx.
 
 Examples in situ:
 [code](https://github.com/iovisor/bcc/blob/4afa96a71c5dbfc4c507c3355e20baa6c184a3a8/examples/tracing/tcpv4connect.py#L28) ([output](https://github.com/iovisor/bcc/blob/5bd0eb21fd148927b078deb8ac29fff2fb044b66/examples/tracing/tcpv4connect_example.txt#L8)),
