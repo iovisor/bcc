@@ -42,6 +42,7 @@
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Transforms/IPO.h>
 #include <llvm/Transforms/IPO/PassManagerBuilder.h>
+#include <llvm-c/Transforms/IPO.h>
 
 #include "exception.h"
 #include "frontends/b/loader.h"
@@ -396,7 +397,14 @@ int BPFModule::run_pass_manager(Module &mod) {
   PassManagerBuilder PMB;
   PMB.OptLevel = 3;
   PM.add(createFunctionInliningPass());
-  PM.add(createAlwaysInlinerPass());
+  /*
+   * llvm < 4.0 needs
+   * PM.add(createAlwaysInlinerPass());
+   * llvm >= 4.0 needs
+   * PM.add(createAlwaysInlinerLegacyPass());
+   * use below 'stable' workaround
+   */
+  LLVMAddAlwaysInlinerPass(reinterpret_cast<LLVMPassManagerRef>(&PM));
   PMB.populateModulePassManager(PM);
   if (flags_ & 1)
     PM.add(createPrintModulePass(outs()));
