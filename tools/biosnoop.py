@@ -98,11 +98,23 @@ int trace_req_completion(struct pt_regs *ctx, struct request *req)
                        req->rq_disk->disk_name);
     }
 
-    if (req->cmd_flags & REQ_WRITE) {
+/*
+ * The following deals with a kernel version change (in mainline 4.7, although
+ * it may be backported to earlier kernels) with how block request write flags
+ * are tested. We handle both pre- and post-change versions here. Please avoid
+ * kernel version tests like this as much as possible: they inflate the code,
+ * test, and maintenance burden.
+ */
+#ifdef REQ_WRITE
+if (req->cmd_flags & REQ_WRITE) {
+#else
+if ((req->cmd_flags >> REQ_OP_SHIFT) == REQ_OP_WRITE) {
+#endif
         data.rwflag = 1;
     } else {
         data.rwflag = 0;
     }
+
     events.perf_submit(ctx, &data, sizeof(data));
     start.delete(&req);
     infobyreq.delete(&req);
