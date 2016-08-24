@@ -67,6 +67,7 @@ struct _name##_table_t { \
   u32 leaf; \
   /* map.perf_submit(ctx, data, data_size) */ \
   int (*perf_submit) (void *, void *, u32); \
+  int (*perf_submit_skb) (void *, u32, void *, u32); \
   u32 data[0]; \
 }; \
 __attribute__((section("maps/perf_output"))) \
@@ -171,7 +172,7 @@ static int (*bpf_redirect)(int ifindex, u32 flags) =
   (void *) BPF_FUNC_redirect;
 static u32 (*bpf_get_route_realm)(void *ctx) =
   (void *) BPF_FUNC_get_route_realm;
-static int (*bpf_perf_event_output)(void *ctx, void *map, u32 index, void *data, u32 size) =
+static int (*bpf_perf_event_output)(void *ctx, void *map, u64 index, void *data, u32 size) =
   (void *) BPF_FUNC_perf_event_output;
 static int (*bpf_skb_load_bytes)(void *ctx, int offset, void *to, u32 len) =
   (void *) BPF_FUNC_skb_load_bytes;
