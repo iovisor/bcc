@@ -188,11 +188,21 @@ class TableBase(MutableMapping):
             except KeyError:
                 pass
 
+    def iterkeys(self):
+        for key in self:
+            try:
+                yield key
+            except KeyError:
+                pass
+
     def items(self):
         return [item for item in self.iteritems()]
 
     def values(self):
         return [value for value in self.itervalues()]
+
+    def keys(self):
+        return [key for key in self.iterkeys()]
 
     def clear(self):
         # default clear uses popitem, which can race with the bpf prog
@@ -207,7 +217,6 @@ class TableBase(MutableMapping):
         return TableBase.Iter(self, self.Key)
 
     def iter(self): return self.__iter__()
-    def keys(self): return self.__iter__()
 
     class Iter(object):
         def __init__(self, table, keytype):
