@@ -4,7 +4,7 @@
 # fileslower  Trace slow synchronous file reads and writes.
 #             For Linux, uses BCC, eBPF.
 #
-# USAGE: fileslower [-h] [-p PID] [min_ms]
+# USAGE: fileslower [-h] [-p PID] [-a] [min_ms]
 #
 # This script uses kernel dynamic tracing of synchronous reads and writes
 # at the VFS interface, to identify slow file reads and writes for any file
@@ -32,7 +32,6 @@ from __future__ import print_function
 from bcc import BPF
 import argparse
 import ctypes as ct
-import signal
 import time
 
 # arguments
@@ -45,18 +44,16 @@ parser = argparse.ArgumentParser(
     description="Trace slow synchronous file reads and writes",
     formatter_class=argparse.RawDescriptionHelpFormatter,
     epilog=examples)
-parser.add_argument("-p", "--pid",
+parser.add_argument("-p", "--pid", type=int, metavar="PID", dest="tgid",
     help="trace this PID only")
+parser.add_argument("-a", "--all-files", action="store_true",
+    help="include non-regular file types (sockets, FIFOs, etc)")
 parser.add_argument("min_ms", nargs="?", default='10',
     help="minimum I/O duration to trace, in ms (default 10)")
 args = parser.parse_args()
 min_ms = int(args.min_ms)
-pid = args.pid
+tgid = args.tgid
 debug = 0
-
-# signal handler
-def signal_ignore(signal, frame):
-    print()
 
 # define BPF program
 bpf_text = """
@@ -72,6 +69,8 @@ enum trace_mode {
 struct val_t {
     u32 sz;
     u64 ts;
+    u32 name_len;
+    // de->d_name.name may point to de->d_iname so limit len accordingly
     char name[DNAME_INLINE_LEN];
     char comm[TASK_COMM_LEN];
 };
@@ -81,6 +80,7 @@ struct data_t {
     u32 pid;
     u32 sz;
     u64 delta_us;
+    u32 name_len;
     char name[DNAME_INLINE_LEN];
     char comm[TASK_COMM_LEN];
 };
@@ -92,22 +92,25 @@ BPF_PERF_OUTPUT(events);
 static int trace_rw_entry(struct pt_regs *ctx, struct file *file,
     char __user *buf, size_t count)
 {
-    u32 pid;
-
-    pid = bpf_get_current_pid_tgid();
-    if (FILTER)
+    u32 tgid = bpf_get_current_pid_tgid() >> 32;
+    if (TGID_FILTER)
         return 0;
+
+    u32 pid = bpf_get_current_pid_tgid();
 
     // skip I/O lacking a filename
     struct dentry *de = file->f_path.dentry;
-    if (de->d_iname[0] == 0)
+    int mode = file->f_inode->i_mode;
+    if (de->d_name.len == 0 || TYPE_FILTER)
         return 0;
 
     // store size and timestamp by pid
     struct val_t val = {};
     val.sz = count;
     val.ts = bpf_ktime_get_ns();
-    __builtin_memcpy(&val.name, de->d_iname, sizeof(val.name));
+
+    val.name_len = de->d_name.len;
+    bpf_probe_read(&val.name, sizeof(val.name), (void *)de->d_name.name);
     bpf_get_current_comm(&val.comm, sizeof(val.comm));
     entryinfo.update(&pid, &val);
 
@@ -153,6 +156,7 @@ static int trace_rw_return(struct pt_regs *ctx, int type)
     data.pid = pid;
     data.sz = valp->sz;
     data.delta_us = delta_us;
+    data.name_len = valp->name_len;
     bpf_probe_read(&data.name, sizeof(data.name), valp->name);
     bpf_probe_read(&data.comm, sizeof(data.comm), valp->comm);
     events.perf_submit(ctx, &data, sizeof(data));
@@ -172,15 +176,20 @@ int trace_write_return(struct pt_regs *ctx)
 
 """
 bpf_text = bpf_text.replace('MIN_US', str(min_ms * 1000))
-if args.pid:
-    bpf_text = bpf_text.replace('FILTER', 'pid != %s' % pid)
+if args.tgid:
+    bpf_text = bpf_text.replace('TGID_FILTER', 'tgid != %d' % tgid)
 else:
-    bpf_text = bpf_text.replace('FILTER', '0')
+    bpf_text = bpf_text.replace('TGID_FILTER', '0')
+if args.all_files:
+    bpf_text = bpf_text.replace('TYPE_FILTER', '0')
+else:
+    bpf_text = bpf_text.replace('TYPE_FILTER', '!S_ISREG(mode)')
+
 if debug:
     print(bpf_text)
 
 # initialize BPF
-b = BPF(text=bpf_text)
+b = BPF(text=bpf_text,)
 
 # I'd rather trace these via new_sync_read/new_sync_write (which used to be
 # do_sync_read/do_sync_write), but those became static. So trace these from
@@ -205,6 +214,7 @@ class Data(ct.Structure):
         ("pid", ct.c_uint),
         ("sz", ct.c_uint),
         ("delta_us", ct.c_ulonglong),
+        ("name_len", ct.c_uint),
         ("name", ct.c_char * DNAME_INLINE_LEN),
         ("comm", ct.c_char * TASK_COMM_LEN),
     ]
@@ -216,7 +226,7 @@ mode_s = {
 
 # header
 print("Tracing sync read/writes slower than %d ms" % min_ms)
-print("%-8s %-14s %-6s %1s %-7s %7s %s" % ("TIME(s)", "COMM", "PID", "D",
+print("%-8s %-14s %-6s %1s %-7s %7s %s" % ("TIME(s)", "COMM", "TID", "D",
     "BYTES", "LAT(ms)", "FILENAME"))
 
 start_ts = time.time()
@@ -225,10 +235,13 @@ def print_event(cpu, data, size):
     event = ct.cast(data, ct.POINTER(Data)).contents
 
     ms = float(event.delta_us) / 1000
+    name = event.name
+    if event.name_len > DNAME_INLINE_LEN:
+        name = name[:-3] + "..."
 
     print("%-8.3f %-14.14s %-6s %1s %-7s %7.2f %s" % (
         time.time() - start_ts, event.comm, event.pid, mode_s[event.mode],
-        event.sz, ms, event.name))
+        event.sz, ms, name))
 
 b["events"].open_perf_buffer(print_event)
 while 1:

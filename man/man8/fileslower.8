@@ -2,7 +2,7 @@
 .SH NAME
 fileslower \- Trace slow synchronous file reads and writes.
 .SH SYNOPSIS
-.B fileslower [\-h] [\-p PID] [min_ms]
+.B fileslower [\-h] [\-p PID] [-a] [min_ms]
 .SH DESCRIPTION
 This script uses kernel dynamic tracing of synchronous reads and writes
 at the VFS interface, to identify slow file reads and writes for any file
@@ -29,6 +29,9 @@ CONFIG_BPF and bcc.
 .SH OPTIONS
 \-p PID
 Trace this PID only.
+.TP
+\-a
+Include non-regular file types in output (sockets, FIFOs, etc).
 .TP
 min_ms
 Minimum I/O latency (duration) to trace, in milliseconds. Default is 10 ms.
