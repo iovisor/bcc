@@ -26,6 +26,7 @@
 #include <linux/bpf.h>
 
 #include <llvm/ADT/STLExtras.h>
+#include <llvm/Analysis/Passes.h>
 #include <llvm/ExecutionEngine/MCJIT.h>
 #include <llvm/ExecutionEngine/SectionMemoryManager.h>
 #include <llvm/IRReader/IRReader.h>
@@ -41,6 +42,7 @@
 #include <llvm/Support/SourceMgr.h>
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Transforms/IPO.h>
+#include <llvm/Transforms/IPO/AlwaysInliner.h>
 #include <llvm/Transforms/IPO/PassManagerBuilder.h>
 #include <llvm-c/Transforms/IPO.h>
 
@@ -50,6 +52,7 @@
 #include "frontends/b/loader.h"
 #include "frontends/clang/loader.h"
 #include "frontends/clang/b_frontend_action.h"
+#include "frontends/clang/passes/probe/pass.h"
 #include "bpf_module.h"
 #include "exported_files.h"
 #include "kbuild_helper.h"
@@ -570,6 +573,8 @@ int BPFModule::run_pass_manager(Module &mod) {
   legacy::PassManager PM;
   PassManagerBuilder PMB;
   PMB.OptLevel = 3;
+  PM.add(create_probe_pass());
+  PM.add(createMemDepPrinter());
   PM.add(createFunctionInliningPass());
   /*
    * llvm < 4.0 needs
@@ -583,11 +588,14 @@ int BPFModule::run_pass_manager(Module &mod) {
   if (flags_ & DEBUG_LLVM_IR)
     PM.add(createPrintModulePass(outs()));
   PM.run(mod);
+
   return 0;
 }
 
 int BPFModule::finalize() {
   Module *mod = &*mod_;
+  if (flags_ & 8)
+    dump_ir(*mod);
 
   mod->setDataLayout("e-m:e-p:64:64-i64:64-n32:64-S128");
   mod->setTargetTriple("bpf-pc-linux");

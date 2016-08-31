@@ -79,8 +79,8 @@ endif()
 add_subdirectory(frontends)
 
 # Link against LLVM libraries
-target_link_libraries(bcc-shared ${bcc_common_libs_for_s})
-target_link_libraries(bcc-static ${bcc_common_libs_for_a} bcc-loader-static)
+target_link_libraries(bcc-shared ${bcc_common_libs_for_s} pass_probe-static)
+target_link_libraries(bcc-static ${bcc_common_libs_for_a} bcc-loader-static pass_probe-static)
 
 install(TARGETS bcc-shared LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
 install(FILES ${bcc_table_headers} DESTINATION include/bcc)
