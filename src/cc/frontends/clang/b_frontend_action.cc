@@ -251,14 +251,14 @@ bool ProbeVisitor::VisitMemberExpr(MemberExpr *E) {
     error(base->getLocEnd(), "internal error: MemberLoc is invalid while preparing probe rewrite");
     return false;
   }
-  string rhs = rewriter_.getRewrittenText(expansionRange(SourceRange(rhs_start, E->getLocEnd())));
-  string base_type = base->getType()->getPointeeType().getAsString();
-  string pre, post;
-  pre = "({ typeof(" + E->getType().getAsString() + ") _val; __builtin_memset(&_val, 0, sizeof(_val));";
-  pre += " bpf_probe_read(&_val, sizeof(_val), (u64)&";
-  post = rhs + "); _val; })";
-  rewriter_.InsertText(E->getLocStart(), pre);
-  rewriter_.ReplaceText(expansionRange(SourceRange(member, E->getLocEnd())), post);
+  //string rhs = rewriter_.getRewrittenText(expansionRange(SourceRange(rhs_start, E->getLocEnd())));
+  //string base_type = base->getType()->getPointeeType().getAsString();
+  //string pre, post;
+  //pre = "({ typeof(" + E->getType().getAsString() + ") _val; __builtin_memset(&_val, 0, sizeof(_val));";
+  //pre += " bpf_probe_read(&_val, sizeof(_val), (u64)&";
+  //post = rhs + "); _val; })";
+  //rewriter_.InsertText(E->getLocStart(), pre);
+  //rewriter_.ReplaceText(expansionRange(SourceRange(member, E->getLocEnd())), post);
   return true;
 }
 

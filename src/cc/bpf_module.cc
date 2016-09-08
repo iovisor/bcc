@@ -570,10 +570,20 @@ int BPFModule::run_pass_manager(Module &mod) {
     return -1;
   }
 
+  {
+    legacy::PassManager PM;
+    PM.add(create_probe_pass());
+    PM.run(mod);
+  }
+  {
+    legacy::PassManager PM;
+    PM.add(createPrintModulePass(outs()));
+    PM.run(mod);
+  }
+
   legacy::PassManager PM;
   PassManagerBuilder PMB;
   PMB.OptLevel = 3;
-  PM.add(create_probe_pass());
   PM.add(createMemDepPrinter());
   PM.add(createFunctionInliningPass());
   /*

@@ -156,6 +156,7 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, TableStorage &ts,
                                    "-fno-color-diagnostics",
                                    "-fno-unwind-tables",
                                    "-fno-asynchronous-unwind-tables",
+                                   "-fno-builtin",
                                    "-x", "c", "-c", abs_file.c_str()});
 
   KBuildHelper kbuild_helper(kpath_env ? kpath : kdir, has_kpath_source);

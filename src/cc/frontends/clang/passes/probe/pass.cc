@@ -43,13 +43,36 @@ void initializeProbeConverterPass(PassRegistry&);
 
 namespace {
 
+static bool is_onstack(const AliasSet &AS) {
+  bool onstack = false;
+  for (auto &I : AS)
+    onstack |= isa<AllocaInst>(I.getValue());
+  return onstack;
+}
+
 class ProbeConverter : public FunctionPass {
+ private:
+  IRBuilder<TargetFolder> *builder;
  public:
   static char ID;
-  ProbeConverter() : FunctionPass(ID) {
+  ProbeConverter() : FunctionPass(ID), builder(nullptr) {
     initializeProbeConverterPass(*PassRegistry::getPassRegistry());
   }
   ~ProbeConverter() override {}
+  Value *create_probe(Value *dst, Value *src, Value *sz) {
+    FunctionType *probe_fn_ty = FunctionType::get(builder->getVoidTy(),
+                                                  vector<Type *>({builder->getInt8PtrTy(),
+                                                                 builder->getInt64Ty(),
+                                                                 builder->getInt8PtrTy()}),
+                                                  false);
+    Value *probe_fn = builder->CreateIntToPtr(builder->getInt64(BPF_FUNC_probe_read),
+                                              PointerType::getUnqual(probe_fn_ty));
+    vector<Value *> args({builder->CreateBitCast(dst, builder->getInt8PtrTy()), sz,
+                         builder->CreateBitCast(src, builder->getInt8PtrTy())});
+    CallInst *call = builder->CreateCall(probe_fn, args);
+    errs() << "\tnew call: ("; call->print(errs()); errs() << "  )\n";
+    return call;
+  }
   bool runOnFunction(Function &F) override {
     //const TargetLibraryInfo *TLI = &getAnalysis<TargetLibraryInfoWrapperPass>().getTLI();
     DominatorTree *DT = &getAnalysis<DominatorTreeWrapperPass>().getDomTree();
@@ -58,7 +81,8 @@ class ProbeConverter : public FunctionPass {
     BasicBlock *entry = &F.getEntryBlock();
     Module *mod = entry->getModule();
     const DataLayout &DL = mod->getDataLayout();
-    IRBuilder<TargetFolder> Builder(entry->getContext(), TargetFolder(mod->getDataLayout()));
+    IRBuilder<TargetFolder> TheBuilder(entry->getContext(), TargetFolder(mod->getDataLayout()));
+    builder = &TheBuilder;
 
     AliasSetTracker tracker(*AA);
     for (BasicBlock &BB: F)
@@ -66,21 +90,30 @@ class ProbeConverter : public FunctionPass {
         tracker.add(&I);
 
     errs() << "ProbeConverter: "; errs().write_escaped(F.getName()) << "\n";
-    if (F.getName() != "do_request")
-      return false;
 
-    DenseMap<Value *, bool> values;
+    DenseMap<Value *, bool> is_unknown;
     errs() << " Alias Sets:\n";
     for (const AliasSet &AS : tracker) {
-      AS.print(errs());
-      bool onstack = false;
-      for (auto &I : AS)
-        onstack |= isa<AllocaInst>(I.getValue());
-      if (!onstack) {
-        for (auto &I : AS)
-          values[I.getValue()] = true;
+      bool onstack = is_onstack(AS);
+      errs() << "onstack:" << onstack << " forward:" << AS.isForwardingAliasSet(); AS.print(errs());
+      for (auto &I : AS) {
+        is_unknown[I.getValue()] = !onstack;
+        if (AS.isForwardingAliasSet())
+          errs() << " forwarding: " << I.getValue() << "\n";
+        errs() << "\t" << &I;
       }
+      if (!AS.empty())
+        errs() << "\n";
     }
+
+    //Function *probe_fn = mod->getFunction("bpf_probe_read");
+    //if (!probe_fn)
+    //  probe_fn = Function::Create(probe_fn_ty, GlobalValue::ExternalLinkage, "bpf_probe_read", mod);
+    //probe_fn->onlyAccessesArgMemory();
+    //probe_fn->setDoesNotCapture(0);
+    //probe_fn->setDoesNotCapture(2);
+    //probe_fn->setOnlyReadsMemory(2);
+    vector<Instruction *> dead_inst;
 
     errs() << " Basic Blocks: \n";
     //if (!F.isDeclaration() && F.hasFnAttribute(Attribute::AlwaysInline))
@@ -90,48 +123,46 @@ class ProbeConverter : public FunctionPass {
         continue;
       for (Instruction &I : BB) {
         I.dump();
-        if (!I.mayReadFromMemory())
-          continue;
-        if (auto LD = dyn_cast<LoadInst>(&I)) {
-          Value *V = LD->getPointerOperand();
-          if (values.find(V) == values.end())
+        //if (!I.mayReadFromMemory())
+        //  continue;
+        Value *V = nullptr;
+        if (auto MT = dyn_cast<MemTransferInst>(&I)) {
+          V = MT->getRawSource();
+          auto val = is_unknown.find(V);
+          if (val != is_unknown.end() && !val->getSecond())
             continue;
-          FunctionType *probe_fn_ty = FunctionType::get(Builder.getInt32Ty(),
-                                                        vector<Type *>({Builder.getInt8PtrTy(),
-                                                                       Builder.getInt64Ty(),
-                                                                       Builder.getInt8PtrTy()}),
-                                                        false);
-          //Function *probe_fn = mod->getFunction("bpf_probe_read");
-          //if (!probe_fn)
-          //  probe_fn = Function::Create(probe_fn_ty, GlobalValue::ExternalLinkage, "bpf_probe_read", mod);
-          //probe_fn->onlyAccessesArgMemory();
-          //probe_fn->setDoesNotCapture(0);
-          //probe_fn->setDoesNotCapture(2);
-          //probe_fn->setOnlyReadsMemory(2);
+          errs() << "\tbuiltin_memxxx: " << tracker.containsUnknown(cast<Instruction>(MT)) << " (";
+          V->print(errs());
+          errs() << "  ) (";
+          MT->getDest()->print(errs());
+          errs() << "  )\n";
+          builder->SetInsertPoint(&I);
+          //I.replaceAllUsesWith(create_probe(MT->getRawDest(), MT->getRawSource(), MT->getLength()));
+          create_probe(MT->getDest(), MT->getRawSource(), MT->getLength());
+          dead_inst.push_back(&I);
+        } else if (auto LD = dyn_cast<LoadInst>(&I)) {
+          V = LD->getPointerOperand();
+          auto val = is_unknown.find(V);
+          if (val == is_unknown.end() || !val->getSecond())
+            continue;
 
-          Builder.SetInsertPoint(&entry->front());
-          AllocaInst *dst = Builder.CreateAlloca(LD->getType(), nullptr, "");
-          Builder.SetInsertPoint(LD);
-          Value *probe_fn = Builder.CreateIntToPtr(Builder.getInt64(BPF_FUNC_probe_read),
-                                                   PointerType::getUnqual(probe_fn_ty));
-          errs() << "dst = "; dst->print(errs()); errs() << "\n";
-          Value *dst_sizeof = Builder.getInt64(DL.getTypeSizeInBits(LD->getType()) >> 3);
-          errs() << "sizeof(dst) = "; dst_sizeof->print(errs()); errs() << "\n";
-          errs() << "V = "; V->print(errs()); errs() << "\n";
-          vector<Value *> args({Builder.CreateBitCast(dst, Builder.getInt8PtrTy()),
-                               dst_sizeof,
-                               Builder.CreateBitCast(V, Builder.getInt8PtrTy())});
-          Builder.CreateCall(probe_fn, args);
-          LoadInst *dst_load = Builder.CreateLoad(dst);
-          errs() << dst_load << " "; dst_load->print(errs()); errs() << "\n";
-          LD->replaceAllUsesWith(dst_load);
+          builder->SetInsertPoint(&entry->front());
+          AllocaInst *dst = builder->CreateAlloca(I.getType(), nullptr, "");
+          builder->SetInsertPoint(&I);
+          errs() << "\tnew dst: ("; dst->print(errs()); errs() << "  )\n";
+          Value *dst_sizeof = builder->getInt64(DL.getTypeSizeInBits(I.getType()) >> 3);
+          create_probe(dst, V, dst_sizeof);
+          LoadInst *dst_load = builder->CreateLoad(dst);
+          I.replaceAllUsesWith(dst_load);
         }
       }
       errs() << "\n";
     }
+    for (auto I : dead_inst)
+      I->eraseFromParent();
     return true;
   }
-  void getAnalysisUsage(AnalysisUsage &AU) const {
+  void getAnalysisUsage(AnalysisUsage &AU) const override {
     //AU.setPreservesCFG();
     AU.addRequired<DominatorTreeWrapperPass>();
     AU.addRequired<AAResultsWrapperPass>();
