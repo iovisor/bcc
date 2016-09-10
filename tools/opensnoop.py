@@ -53,7 +53,6 @@ struct val_t {
 struct data_t {
     u32 pid;
     u64 ts;
-    u64 delta;
     int ret;
     char comm[TASK_COMM_LEN];
     char fname[NAME_MAX];
@@ -95,7 +94,6 @@ int trace_return(struct pt_regs *ctx)
     bpf_probe_read(&data.comm, sizeof(data.comm), valp->comm);
     bpf_probe_read(&data.fname, sizeof(data.fname), (void *)valp->fname);
     data.pid = valp->pid;
-    data.delta = tsp - valp->ts;
     data.ts = tsp / 1000;
     data.ret = PT_REGS_RC(ctx);
 
@@ -126,7 +124,6 @@ class Data(ct.Structure):
     _fields_ = [
         ("pid", ct.c_ulonglong),
         ("ts", ct.c_ulonglong),
-        ("delta", ct.c_ulonglong),
         ("ret", ct.c_int),
         ("comm", ct.c_char * TASK_COMM_LEN),
         ("fname", ct.c_char * NAME_MAX)
@@ -147,7 +144,6 @@ def print_event(cpu, data, size):
     global start_ts
     global prev_ts
     global delta
-    global cont
 
     # split return value into FD and errno columns
     if event.ret >= 0:
