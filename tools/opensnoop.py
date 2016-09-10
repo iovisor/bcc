@@ -129,9 +129,7 @@ class Data(ct.Structure):
         ("fname", ct.c_char * NAME_MAX)
     ]
 
-start_ts = 0
-prev_ts = 0
-delta = 0
+initial_ts = 0
 
 # header
 if args.timestamp:
@@ -141,9 +139,7 @@ print("%-6s %-16s %4s %3s %s" % ("PID", "COMM", "FD", "ERR", "PATH"))
 # process event
 def print_event(cpu, data, size):
     event = ct.cast(data, ct.POINTER(Data)).contents
-    global start_ts
-    global prev_ts
-    global delta
+    global initial_ts
 
     # split return value into FD and errno columns
     if event.ret >= 0:
@@ -153,25 +149,18 @@ def print_event(cpu, data, size):
         fd_s = -1
         err = - event.ret
 
-    if start_ts == 0:
-        prev_ts = start_ts
+    if not initial_ts:
+        initial_ts = event.ts
 
-    if start_ts == 1:
-        delta = float(delta) + (event.ts - prev_ts)
-
-    if (args.failed and (event.ret >= 0)):
-        start_ts = 1
-        prev_ts = event.ts
+    if args.failed and (event.ret >= 0):
         return
 
     if args.timestamp:
-        print("%-14.9f" % (delta / 1000000), end="")
+        delta = event.ts - initial_ts
+        print("%-14.9f" % (float(delta) / 1000000), end="")
 
     print("%-6d %-16s %4d %3d %s" % (event.pid, event.comm,
-        fd_s, err, event.fname))
-
-    prev_ts = event.ts
-    start_ts = 1
+          fd_s, err, event.fname))
 
 # loop with callback to print_event
 b["events"].open_perf_buffer(print_event)
