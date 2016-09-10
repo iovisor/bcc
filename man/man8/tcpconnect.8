@@ -2,7 +2,7 @@
 .SH NAME
 tcpconnect \- Trace TCP active connections (connect()). Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B tcpconnect [\-h] [\-t] [\-x] [\-p PID]
+.B tcpconnect [\-h] [\-t] [\-x] [\-p PID] [-P PORT]
 .SH DESCRIPTION
 This tool traces active TCP connections (eg, via a connect() syscall;
 accept() are passive connections). This can be useful for general
@@ -27,6 +27,9 @@ Include a timestamp column.
 .TP
 \-p PID
 Trace this process ID only (filtered in-kernel).
+.TP
+\-P PORT
+Comma-separated list of destination ports to trace (filtered in-kernel).
 .SH EXAMPLES
 .TP
 Trace all active TCP connections:
@@ -40,6 +43,10 @@ Trace all TCP connects, and include timestamps:
 Trace PID 181 only:
 #
 .B tcpconnect \-p 181
+.TP
+Trace ports 80 and 81 only:
+#
+.B tcpconnect \-P 80,81
 .SH FIELDS
 .TP
 TIME(s)
