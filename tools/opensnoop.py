@@ -23,6 +23,7 @@ examples = """examples:
     ./opensnoop -t        # include timestamps
     ./opensnoop -x        # only show failed opens
     ./opensnoop -p 181    # only trace PID 181
+    ./opensnoop -n main   # only print process names containing "main"
 """
 parser = argparse.ArgumentParser(
     description="Trace open() syscalls",
@@ -34,6 +35,8 @@ parser.add_argument("-x", "--failed", action="store_true",
     help="only show failed opens")
 parser.add_argument("-p", "--pid",
     help="trace this PID only")
+parser.add_argument("-n", "--name",
+    help="only print process names containing this name")
 args = parser.parse_args()
 debug = 0
 
@@ -153,6 +156,9 @@ def print_event(cpu, data, size):
         initial_ts = event.ts
 
     if args.failed and (event.ret >= 0):
+        return
+
+    if args.name and args.name not in event.comm:
         return
 
     if args.timestamp:
