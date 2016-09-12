@@ -65,7 +65,6 @@ void * bpf_open_perf_buffer(perf_reader_raw_cb raw_cb, void *cb_cookie, int pid,
 int bpf_attach_xdp(const char *dev_name, int progfd);
 
 #define LOG_BUF_SIZE 65536
-extern char bpf_log_buf[LOG_BUF_SIZE];
 
 // Put non-static/inline functions in their own section with this prefix +
 // fn_name to enable discovery by the bcc library.

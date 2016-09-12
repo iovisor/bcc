@@ -25,6 +25,7 @@
 #include <linux/rtnetlink.h>
 #include <linux/unistd.h>
 #include <linux/version.h>
+#include <linux/bpf_common.h>
 #include <net/ethernet.h>
 #include <net/if.h>
 #include <stdio.h>
@@ -33,6 +34,7 @@
 #include <sys/ioctl.h>
 #include <sys/resource.h>
 #include <unistd.h>
+#include <stdbool.h>
 
 #include "libbpf.h"
 #include "perf_reader.h"
@@ -134,14 +136,16 @@ int bpf_get_next_key(int fd, void *key, void *next_key)
 
 #define ROUND_UP(x, n) (((x) + (n) - 1u) & ~((n) - 1u))
 
-char bpf_log_buf[LOG_BUF_SIZE];
-
 int bpf_prog_load(enum bpf_prog_type prog_type,
                   const struct bpf_insn *insns, int prog_len,
                   const char *license, unsigned kern_version,
                   char *log_buf, unsigned log_buf_size)
 {
   union bpf_attr attr;
+  char *bpf_log_buffer = NULL;
+  unsigned buffer_size = 0;
+  int ret = 0;
+
   memset(&attr, 0, sizeof(attr));
   attr.prog_type = prog_type;
   attr.insns = ptr_to_u64((void *) insns);
@@ -155,7 +159,17 @@ int bpf_prog_load(enum bpf_prog_type prog_type,
   if (log_buf)
     log_buf[0] = 0;
 
-  int ret = syscall(__NR_bpf, BPF_PROG_LOAD, &attr, sizeof(attr));
+  if (attr.insn_cnt > BPF_MAXINSNS) {
+    ret = -1;
+    errno = EINVAL;
+    fprintf(stderr,
+            "bpf: %s. Program too large (%d insns), at most %d insns\n\n",
+            strerror(errno), attr.insn_cnt, BPF_MAXINSNS);
+    return ret;
+  }
+
+  ret = syscall(__NR_bpf, BPF_PROG_LOAD, &attr, sizeof(attr));
+   
   if (ret < 0 && errno == EPERM) {
     // When EPERM is returned, two reasons are possible:
     //  1. user has no permissions for bpf()
@@ -175,11 +189,36 @@ int bpf_prog_load(enum bpf_prog_type prog_type,
   }
 
   if (ret < 0 && !log_buf) {
+
+    buffer_size = LOG_BUF_SIZE;
     // caller did not specify log_buf but failure should be printed,
-    // so call recursively and print the result to stderr
-    bpf_prog_load(prog_type, insns, prog_len, license, kern_version,
-        bpf_log_buf, LOG_BUF_SIZE);
-    fprintf(stderr, "bpf: %s\n%s\n", strerror(errno), bpf_log_buf);
+    // so repeat the syscall and print the result to stderr
+    for (;;) {
+         bpf_log_buffer = malloc(buffer_size);
+         if (!bpf_log_buffer) {
+             fprintf(stderr,
+                     "bpf: buffer log memory allocation failed for error %s\n\n",
+                     strerror(errno));
+             return ret;
+         }
+
+         attr.log_buf = ptr_to_u64(bpf_log_buffer);
+         attr.log_size = buffer_size;
+         attr.log_level = bpf_log_buffer ? 1 : 0;
+
+         ret = syscall(__NR_bpf, BPF_PROG_LOAD, &attr, sizeof(attr));
+         if (ret < 0 && errno == ENOSPC) {
+             free(bpf_log_buffer);
+             bpf_log_buffer = NULL;
+             buffer_size <<= 1;
+         } else {
+             break;
+         }
+    }
+
+    fprintf(stderr, "bpf: %s\n%s\n", strerror(errno), bpf_log_buffer);
+
+    free(bpf_log_buffer); 
   }
   return ret;
 }

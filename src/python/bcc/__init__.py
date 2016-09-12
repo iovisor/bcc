@@ -44,6 +44,7 @@ TRACEFS = "/sys/kernel/debug/tracing"
 DEBUG_LLVM_IR = 0x1
 DEBUG_BPF = 0x2
 DEBUG_PREPROCESSOR = 0x4
+LOG_BUFFER_SIZE = 65536
 
 class SymbolCache(object):
     def __init__(self, pid):
@@ -218,29 +219,32 @@ class BPF(object):
     def load_func(self, func_name, prog_type):
         if func_name in self.funcs:
             return self.funcs[func_name]
-
         if not lib.bpf_function_start(self.module, func_name.encode("ascii")):
             raise Exception("Unknown program %s" % func_name)
-
-        log_buf = ct.create_string_buffer(65536) if self.debug else None
-
-        fd = lib.bpf_prog_load(prog_type,
-                lib.bpf_function_start(self.module, func_name.encode("ascii")),
-                lib.bpf_function_size(self.module, func_name.encode("ascii")),
-                lib.bpf_module_license(self.module),
-                lib.bpf_module_kern_version(self.module),
-                log_buf, ct.sizeof(log_buf) if log_buf else 0)
+        buffer_len = LOG_BUFFER_SIZE
+        while True:
+            log_buf = ct.create_string_buffer(buffer_len) if self.debug else None
+            fd = lib.bpf_prog_load(prog_type,
+                    lib.bpf_function_start(self.module, func_name.encode("ascii")),
+                    lib.bpf_function_size(self.module, func_name.encode("ascii")),
+                    lib.bpf_module_license(self.module),
+                    lib.bpf_module_kern_version(self.module),
+                    log_buf, ct.sizeof(log_buf) if log_buf else 0)
+            if fd < 0 and ct.get_errno() == errno.ENOSPC and self.debug:
+                buffer_len <<= 1
+            else:
+                break
 
         if self.debug & DEBUG_BPF and log_buf.value:
             print(log_buf.value.decode(), file=sys.stderr)
 
         if fd < 0:
+            errstr = os.strerror(ct.get_errno())
             if self.debug & DEBUG_BPF:
-                errstr = os.strerror(ct.get_errno())
                 raise Exception("Failed to load BPF program %s: %s" %
                                 (func_name, errstr))
             else:
-                raise Exception("Failed to load BPF program %s" % func_name)
+                raise Exception("Failed to load BPF program %s: %s" % (func_name, errstr))
 
         fn = BPF.Function(self, func_name, fd)
         self.funcs[func_name] = fn
