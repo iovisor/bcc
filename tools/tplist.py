@@ -13,7 +13,7 @@ import os
 import re
 import sys
 
-from bcc import USDTReader
+from bcc import USDT
 
 trace_root = "/sys/kernel/debug/tracing"
 event_root = os.path.join(trace_root, "events")
@@ -65,7 +65,7 @@ def print_tracepoints():
                                 print_tpoint(category, event)
 
 def print_usdt(pid, lib):
-        reader = USDTReader(bin_path=lib, pid=pid)
+        reader = USDT(path=lib, pid=pid)
         probes_seen = []
         for probe in reader.probes:
                 probe_name = "%s:%s" % (probe.provider, probe.name)
