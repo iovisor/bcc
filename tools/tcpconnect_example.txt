@@ -41,7 +41,7 @@ process to various other addresses. A few connections occur every minute.
 USAGE message:
 
 # ./tcpconnect -h
-usage: tcpconnect [-h] [-t] [-p PID]
+usage: tcpconnect [-h] [-t] [-p PID] [-P PORT]
 
 Trace TCP connects
 
@@ -49,8 +49,12 @@ optional arguments:
   -h, --help         show this help message and exit
   -t, --timestamp    include timestamp on output
   -p PID, --pid PID  trace this PID only
+  -P PORT, --port PORT
+                     comma-separated list of destination ports to trace.
 
 examples:
     ./tcpconnect           # trace all TCP connect()s
     ./tcpconnect -t        # include timestamps
     ./tcpconnect -p 181    # only trace PID 181
+    ./tcpconnect -P 80     # only trace port 80
+    ./tcpconnect -P 80,81  # only trace port 80 and 81

@@ -4,7 +4,7 @@
 # tcpconnect    Trace TCP connect()s.
 #               For Linux, uses BCC, eBPF. Embedded C.
 #
-# USAGE: tcpconnect [-h] [-t] [-p PID]
+# USAGE: tcpconnect [-h] [-t] [-p PID] [-P PORT [PORT ...]]
 #
 # All connection attempts are traced, even if they ultimately fail.
 #
@@ -20,7 +20,7 @@
 from __future__ import print_function
 from bcc import BPF
 import argparse
-from socket import inet_ntop, AF_INET, AF_INET6
+from socket import inet_ntop, ntohs, AF_INET, AF_INET6
 from struct import pack
 import ctypes as ct
 
@@ -29,6 +29,8 @@ examples = """examples:
     ./tcpconnect           # trace all TCP connect()s
     ./tcpconnect -t        # include timestamps
     ./tcpconnect -p 181    # only trace PID 181
+    ./tcpconnect -P 80     # only trace port 80
+    ./tcpconnect -P 80,81  # only trace port 80 and 81
 """
 parser = argparse.ArgumentParser(
     description="Trace TCP connects",
@@ -38,6 +40,8 @@ parser.add_argument("-t", "--timestamp", action="store_true",
     help="include timestamp on output")
 parser.add_argument("-p", "--pid",
     help="trace this PID only")
+parser.add_argument("-P", "--port",
+    help="comma-separated list of destination ports to trace.")
 args = parser.parse_args()
 debug = 0
 
@@ -76,7 +80,7 @@ BPF_PERF_OUTPUT(ipv6_events);
 int trace_connect_entry(struct pt_regs *ctx, struct sock *sk)
 {
     u32 pid = bpf_get_current_pid_tgid();
-    FILTER
+    FILTER_PID
 
     // stash the sock ptr for lookup on return
     currsock.update(&pid, &sk);
@@ -106,6 +110,8 @@ static int trace_connect_return(struct pt_regs *ctx, short ipver)
     struct sock *skp = *skpp;
     u16 dport = 0;
     bpf_probe_read(&dport, sizeof(dport), &skp->__sk_common.skc_dport);
+
+    FILTER_PORT
 
     if (ipver == 4) {
         struct ipv4_data_t data4 = {.pid = pid, .ip = ipver};
@@ -148,10 +154,17 @@ int trace_connect_v6_return(struct pt_regs *ctx)
 
 # code substitutions
 if args.pid:
-    bpf_text = bpf_text.replace('FILTER',
+    bpf_text = bpf_text.replace('FILTER_PID',
         'if (pid != %s) { return 0; }' % args.pid)
-else:
-    bpf_text = bpf_text.replace('FILTER', '')
+if args.port:
+    dports = [int(dport) for dport in args.port.split(',')]
+    dports_if = ' && '.join(['dport != %d' % ntohs(dport) for dport in dports])
+    bpf_text = bpf_text.replace('FILTER_PORT',
+        'if (%s) { currsock.delete(&pid); return 0; }' % dports_if)
+
+bpf_text = bpf_text.replace('FILTER_PID', '')
+bpf_text = bpf_text.replace('FILTER_PORT', '')
+
 if debug:
     print(bpf_text)
 
