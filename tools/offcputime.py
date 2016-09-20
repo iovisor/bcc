@@ -78,6 +78,9 @@ parser.add_argument("--stack-storage-size", default=1024,
 parser.add_argument("duration", nargs="?", default=99999999,
     type=positive_nonzero_int,
     help="duration of trace, in seconds")
+parser.add_argument("--min-block-time", default=1,
+    type=positive_nonzero_int,
+    help="the amount of time in microseconds over which we store traces (default 1)")
 args = parser.parse_args()
 if args.pid and args.tgid:
     parser.error("specify only one of -p and -t")
@@ -93,7 +96,7 @@ bpf_text = """
 #include <uapi/linux/ptrace.h>
 #include <linux/sched.h>
 
-#define MINBLOCK_US	1
+#define MINBLOCK_US    MINBLOCK_US_VALUE
 
 struct key_t {
     u32 pid;
@@ -170,6 +173,7 @@ bpf_text = bpf_text.replace('THREAD_FILTER', thread_filter)
 
 # set stack storage size
 bpf_text = bpf_text.replace('STACK_STORAGE_SIZE', str(args.stack_storage_size))
+bpf_text = bpf_text.replace('MINBLOCK_US_VALUE', str(args.min_block_time))
 
 # handle stack args
 kernel_stack_get = "stack_traces.get_stackid(ctx, BPF_F_REUSE_STACKID)"
