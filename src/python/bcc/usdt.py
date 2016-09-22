@@ -48,7 +48,9 @@ class USDT(object):
 
     def enable_probe(self, probe, fn_name):
         if lib.bcc_usdt_enable_probe(self.context, probe, fn_name) != 0:
-            raise Exception("failed to enable probe '%s'" % probe)
+            raise Exception(("failed to enable probe '%s'; a possible cause " +
+                            "can be that the probe requires a pid to enable") %
+                            probe)
 
     def get_text(self):
         return lib.bcc_usdt_genargs(self.context)

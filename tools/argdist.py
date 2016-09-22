@@ -176,6 +176,7 @@ u64 __time = bpf_ktime_get_ns();
                 self.exprs = exprs.split(',')
 
         def __init__(self, tool, type, specifier):
+                self.usdt_ctx = None
                 self.pid = tool.args.pid
                 self.raw_spec = specifier
                 self._validate_specifier()
@@ -200,8 +201,7 @@ u64 __time = bpf_ktime_get_ns();
                         self.library = parts[1]
                         self.probe_func_name = "%s_probe%d" % \
                                 (self.function, Probe.next_probe_index)
-                        tool.enable_usdt_probe(self.library, self.function,
-                                               self.probe_func_name)
+                        self._enable_usdt_probe()
                 else:
                         self.library = parts[1]
                 self.is_user = len(self.library) > 0
@@ -242,8 +242,10 @@ u64 __time = bpf_ktime_get_ns();
                         (self.function, Probe.next_probe_index)
                 Probe.next_probe_index += 1
 
-        def close(self):
-                pass
+        def _enable_usdt_probe(self):
+                self.usdt_ctx = USDT(path=self.library, pid=self.pid)
+                self.usdt_ctx.enable_probe(
+                        self.function, self.probe_func_name)
 
         def _substitute_exprs(self):
                 def repl(expr):
@@ -262,12 +264,17 @@ u64 __time = bpf_ktime_get_ns();
                 else:
                         return "%s v%d;\n" % (self.expr_types[i], i)
 
+        def _generate_usdt_arg_assignment(self, i):
+                expr = self.exprs[i]
+                if self.probe_type == "u" and expr[0:3] == "arg":
+                        return ("        u64 %s = 0;\n" +
+                                "        bpf_usdt_readarg(%s, ctx, &%s);\n") % \
+                                (expr, expr[3], expr)
+                else:
+                        return ""
+
         def _generate_field_assignment(self, i):
-                text = ""
-                if self.probe_type == "u" and self.exprs[i][0:3] == "arg":
-                    text = ("        u64 %s;\n" +
-                           "        bpf_usdt_readarg(%s, ctx, &%s);\n") % \
-                           (self.exprs[i], self.exprs[i][3], self.exprs[i])
+                text = self._generate_usdt_arg_assignment(i)
                 if self._is_string(self.expr_types[i]):
                         return (text + "        bpf_probe_read(&__key.v%d.s," +
                                 " sizeof(__key.v%d.s), (void *)%s);\n") % \
@@ -291,8 +298,9 @@ u64 __time = bpf_ktime_get_ns();
 
         def _generate_key_assignment(self):
                 if self.type == "hist":
-                        return "%s __key = %s;\n" % \
-                                (self.expr_types[0], self.exprs[0])
+                        return self._generate_usdt_arg_assignment(0) + \
+                               ("%s __key = %s;\n" % \
+                                (self.expr_types[0], self.exprs[0]))
                 else:
                         text = "struct %s_key_t __key = {};\n" % \
                                 self.probe_hash_name
@@ -590,11 +598,6 @@ argdist -p 2780 -z 120 \\
                         print("at least one specifier is required")
                         exit()
 
-        def enable_usdt_probe(self, library, probe_name, fn_name):
-                if not self.usdt_ctx:
-                        self.usdt_ctx = USDT(path=library, pid=self.args.pid)
-                self.usdt_ctx.enable_probe(probe_name, fn_name)
-
         def _generate_program(self):
                 bpf_source = """
 struct __string_t { char s[%d]; };
@@ -610,10 +613,13 @@ struct __string_t { char s[%d]; };
                 for probe in self.probes:
                         bpf_source += probe.generate_text()
                 if self.args.verbose:
-                        if self.usdt_ctx: print(self.usdt_ctx.get_text())
+                        for text in [probe.usdt_ctx.get_text() \
+                                     for probe in self.probes if probe.usdt_ctx]:
+                            print(text)
                         print(bpf_source)
-                # TODO Support multiple USDT probes!!!
-                self.bpf = BPF(text=bpf_source, usdt_contexts=[self.usdt_ctx])
+                usdt_contexts = [probe.usdt_ctx
+                                 for probe in self.probes if probe.usdt_ctx]
+                self.bpf = BPF(text=bpf_source, usdt_contexts=usdt_contexts)
 
         def _attach(self):
                 Tracepoint.attach(self.bpf)
@@ -638,12 +644,6 @@ struct __string_t { char s[%d]; };
                            count_so_far >= self.args.count:
                                 exit()
 
-        def _close_probes(self):
-                for probe in self.probes:
-                        probe.close()
-                        if self.args.verbose:
-                                print("closed probe: " + str(probe))
-
         def run(self):
                 try:
                         self._create_probes()
@@ -655,7 +655,6 @@ struct __string_t { char s[%d]; };
                                 traceback.print_exc()
                         elif sys.exc_info()[0] is not SystemExit:
                                 print(sys.exc_info()[1])
-                self._close_probes()
 
 if __name__ == "__main__":
         Tool().run()
