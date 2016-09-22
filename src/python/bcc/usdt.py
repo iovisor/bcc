@@ -28,9 +28,12 @@ class USDTProbe(object):
                (self.bin_path, self.provider, self.name, self.semaphore,
                 self.num_locations, self.num_arguments)
 
+    def short_name(self):
+        return "%s:%s" % (self.provider, self.name)
+
 class USDT(object):
     def __init__(self, pid=None, path=None):
-        if pid:
+        if pid and pid != -1:
             self.pid = pid
             self.context = lib.bcc_usdt_new_frompid(pid)
             if self.context == None:

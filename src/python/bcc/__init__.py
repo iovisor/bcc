@@ -149,7 +149,7 @@ class BPF(object):
         return None
 
     def __init__(self, src_file="", hdr_file="", text=None, cb=None, debug=0,
-            cflags=[], usdt=None):
+            cflags=[], usdt_contexts=[]):
         """Create a a new BPF module with the given source code.
 
         Note:
@@ -179,7 +179,15 @@ class BPF(object):
         self.tables = {}
         cflags_array = (ct.c_char_p * len(cflags))()
         for i, s in enumerate(cflags): cflags_array[i] = s.encode("ascii")
-        if usdt and text: text = usdt.get_text() + text
+        if text:
+            for usdt_context in usdt_contexts:
+                usdt_text = usdt_context.get_text()
+                if usdt_text is None:
+                    raise Exception("can't generate USDT probe arguments; " +
+                                    "possible cause is missing pid when a " +
+                                    "probe in a shared object has multiple " +
+                                    "locations")
+                text = usdt_context.get_text() + text
 
         if text:
             self.module = lib.bpf_module_create_c_from_string(text.encode("ascii"),
@@ -197,7 +205,8 @@ class BPF(object):
         if not self.module:
             raise Exception("Failed to compile BPF module %s" % src_file)
 
-        if usdt: usdt.attach_uprobes(self)
+        for usdt_context in usdt_contexts:
+            usdt_context.attach_uprobes(self)
 
         # If any "kprobe__" or "tracepoint__" prefixed functions were defined,
         # they will be loaded and attached here.

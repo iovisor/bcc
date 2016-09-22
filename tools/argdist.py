@@ -612,7 +612,8 @@ struct __string_t { char s[%d]; };
                 if self.args.verbose:
                         if self.usdt_ctx: print(self.usdt_ctx.get_text())
                         print(bpf_source)
-                self.bpf = BPF(text=bpf_source, usdt=self.usdt_ctx)
+                # TODO Support multiple USDT probes!!!
+                self.bpf = BPF(text=bpf_source, usdt_contexts=[self.usdt_ctx])
 
         def _attach(self):
                 Tracepoint.attach(self.bpf)

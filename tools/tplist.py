@@ -68,7 +68,7 @@ def print_usdt(pid, lib):
         reader = USDT(path=lib, pid=pid)
         probes_seen = []
         for probe in reader.enumerate_probes():
-                probe_name = "%s:%s" % (probe.provider, probe.name)
+                probe_name = probe.short_name()
                 if not args.filter or fnmatch.fnmatch(probe_name, args.filter):
                         if probe_name in probes_seen:
                                 continue
