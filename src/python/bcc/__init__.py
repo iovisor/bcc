@@ -251,6 +251,22 @@ class BPF(object):
 
         return fn
 
+    def set_obj_pin(self, name, fd, path):
+        ret = lib.bpf_obj_pin(fd, path)
+        if ret != 0:
+            errstr = os.strerror(ct.get_errno())
+            raise Exception("Failed to save BPF program %s: %s"
+                            % (name, errstr))
+        return ret
+
+    def get_obj_pin(self, name, path):
+        fd = lib.bpf_obj_get(path)
+        if fd < 0:
+            errstr = os.strerror(ct.get_errno())
+            raise Exception("Failed to locate BPF program %s: %s"
+                             % (name, errstr))
+        return fd
+
     def dump_func(self, func_name):
         """
         Return the eBPF bytecodes for the specified function as a string

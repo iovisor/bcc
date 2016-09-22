@@ -35,6 +35,9 @@ int bpf_prog_load(enum bpf_prog_type prog_type,
 		  const struct bpf_insn *insns, int insn_len,
 		  const char *license, unsigned kern_version,
 		  char *log_buf, unsigned log_buf_size);
+int bpf_obj_pin(int fd, const char *pathname);
+int bpf_obj_get(const char *pathname);
+
 int bpf_attach_socket(int sockfd, int progfd);
 
 /* create RAW socket and bind to interface 'name' */
