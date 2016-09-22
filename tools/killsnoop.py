@@ -49,7 +49,7 @@ struct val_t {
 
 struct data_t {
    u64 pid;
-   u64 tpid;
+   int tpid;
    int sig;
    int ret;
    char comm[TASK_COMM_LEN];
@@ -60,12 +60,11 @@ BPF_PERF_OUTPUT(events);
 
 int kprobe__sys_kill(struct pt_regs *ctx, int tpid, int sig)
 {
-    struct val_t val = {};
     u32 pid = bpf_get_current_pid_tgid();
-
     FILTER
+
+    struct val_t val = {.pid = pid};
     if (bpf_get_current_comm(&val.comm, sizeof(val.comm)) == 0) {
-        val.pid = bpf_get_current_pid_tgid();
         val.tpid = tpid;
         val.sig = sig;
         infotmp.update(&pid, &val);
@@ -114,7 +113,7 @@ TASK_COMM_LEN = 16    # linux/sched.h
 class Data(ct.Structure):
     _fields_ = [
         ("pid", ct.c_ulonglong),
-        ("tpid", ct.c_ulonglong),
+        ("tpid", ct.c_int),
         ("sig", ct.c_int),
         ("ret", ct.c_int),
         ("comm", ct.c_char * TASK_COMM_LEN)
@@ -128,7 +127,8 @@ print("%-9s %-6s %-16s %-4s %-6s %s" % (
 def print_event(cpu, data, size):
     event = ct.cast(data, ct.POINTER(Data)).contents
 
-    if (args.failed and (event.ret >= 0)): return
+    if (args.failed and (event.ret >= 0)):
+        return
 
     print("%-9s %-6d %-16s %-4d %-6d %d" % (strftime("%H:%M:%S"),
         event.pid, event.comm, event.sig, event.tpid, event.ret))

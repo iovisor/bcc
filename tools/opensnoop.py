@@ -23,6 +23,7 @@ examples = """examples:
     ./opensnoop -t        # include timestamps
     ./opensnoop -x        # only show failed opens
     ./opensnoop -p 181    # only trace PID 181
+    ./opensnoop -n main   # only print process names containing "main"
 """
 parser = argparse.ArgumentParser(
     description="Trace open() syscalls",
@@ -34,6 +35,8 @@ parser.add_argument("-x", "--failed", action="store_true",
     help="only show failed opens")
 parser.add_argument("-p", "--pid",
     help="trace this PID only")
+parser.add_argument("-n", "--name",
+    help="only print process names containing this name")
 args = parser.parse_args()
 debug = 0
 
@@ -53,7 +56,6 @@ struct val_t {
 struct data_t {
     u32 pid;
     u64 ts;
-    u64 delta;
     int ret;
     char comm[TASK_COMM_LEN];
     char fname[NAME_MAX];
@@ -95,7 +97,6 @@ int trace_return(struct pt_regs *ctx)
     bpf_probe_read(&data.comm, sizeof(data.comm), valp->comm);
     bpf_probe_read(&data.fname, sizeof(data.fname), (void *)valp->fname);
     data.pid = valp->pid;
-    data.delta = tsp - valp->ts;
     data.ts = tsp / 1000;
     data.ret = PT_REGS_RC(ctx);
 
@@ -126,15 +127,12 @@ class Data(ct.Structure):
     _fields_ = [
         ("pid", ct.c_ulonglong),
         ("ts", ct.c_ulonglong),
-        ("delta", ct.c_ulonglong),
         ("ret", ct.c_int),
         ("comm", ct.c_char * TASK_COMM_LEN),
         ("fname", ct.c_char * NAME_MAX)
     ]
 
-start_ts = 0
-prev_ts = 0
-delta = 0
+initial_ts = 0
 
 # header
 if args.timestamp:
@@ -144,10 +142,7 @@ print("%-6s %-16s %4s %3s %s" % ("PID", "COMM", "FD", "ERR", "PATH"))
 # process event
 def print_event(cpu, data, size):
     event = ct.cast(data, ct.POINTER(Data)).contents
-    global start_ts
-    global prev_ts
-    global delta
-    global cont
+    global initial_ts
 
     # split return value into FD and errno columns
     if event.ret >= 0:
@@ -157,25 +152,21 @@ def print_event(cpu, data, size):
         fd_s = -1
         err = - event.ret
 
-    if start_ts == 0:
-        prev_ts = start_ts
+    if not initial_ts:
+        initial_ts = event.ts
 
-    if start_ts == 1:
-        delta = float(delta) + (event.ts - prev_ts)
+    if args.failed and (event.ret >= 0):
+        return
 
-    if (args.failed and (event.ret >= 0)):
-        start_ts = 1
-        prev_ts = event.ts
+    if args.name and args.name not in event.comm:
         return
 
     if args.timestamp:
-        print("%-14.9f" % (delta / 1000000), end="")
+        delta = event.ts - initial_ts
+        print("%-14.9f" % (float(delta) / 1000000), end="")
 
     print("%-6d %-16s %4d %3d %s" % (event.pid, event.comm,
-        fd_s, err, event.fname))
-
-    prev_ts = event.ts
-    start_ts = 1
+          fd_s, err, event.fname))
 
 # loop with callback to print_event
 b["events"].open_perf_buffer(print_event)

@@ -1,0 +1,69 @@
+.TH capable 8  "2016-09-13" "USER COMMANDS"
+.SH NAME
+capable \- Trace security capability checks (cap_capable()).
+.SH SYNOPSIS
+.B capable [\-h] [\-v] [\-p PID]
+.SH DESCRIPTION
+This traces security capability checks in the kernel, and prints details for
+each call. This can be useful for general debugging, and also security
+enforcement: determining a white list of capabilities an application needs.
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF, bcc.
+.SH OPTIONS
+\-h
+USAGE message.
+.TP
+\-v
+Include non-audit capability checks. These are those deemed not interesting and
+not necessary to audit, such as CAP_SYS_ADMIN checks on memory allocation to
+affect the behavior of overcommit.
+.SH EXAMPLES
+.TP
+Trace all capability checks system-wide:
+#
+.B capable
+.TP
+Trace capability checks for PID 181:
+#
+.B capable \-p 181
+.SH FIELDS
+.TP
+TIME(s)
+Time of capability check: HH:MM:SS.
+.TP
+UID
+User ID.
+.TP
+PID
+Process ID.
+.TP
+COMM
+Process name.
+CAP
+Capability number.
+NAME
+Capability name. See capabilities(7) for descriptions.
+.TP
+AUDIT
+Whether this was an audit event. Use \-v to include non-audit events.
+.SH OVERHEAD
+This adds low-overhead instrumentation to capability checks, which are expected
+to be low frequency, however, that depends on the application. Test in a lab
+environment before use.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Brendan Gregg
+.SH SEE ALSO
+capabilities(7)
