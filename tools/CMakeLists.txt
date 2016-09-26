@@ -1,6 +1,7 @@
 file(GLOB C_FILES *.c)
 file(GLOB PY_FILES *.py)
 file(GLOB TXT_FILES *.txt)
+list(REMOVE_ITEM TXT_FILES "CMakeLists.txt")
 foreach(FIL ${PY_FILES})
   get_filename_component(FIL_WE ${FIL} NAME_WE)
   install(PROGRAMS ${FIL} DESTINATION share/bcc/tools RENAME ${FIL_WE})
