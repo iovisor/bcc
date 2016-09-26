@@ -15,7 +15,7 @@ More detail for each below.
 
 ## Examples
 
-These are grouped into subdirectories (networking, tracing). Your example can either be a Python program with embedded C (eg, tracing/strlen_count.py), or separate Python and C files (eg, tracing/bitehist.*).
+These are grouped into subdirectories (networking, tracing). Your example can either be a Python program with embedded C (eg, tracing/strlen_count.py), or separate Python and C files (eg, tracing/vfsreadlat.*).
 
 As said earlier: keep it short, neat, and documented (code comments).
 
