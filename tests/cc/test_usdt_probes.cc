@@ -56,15 +56,6 @@ TEST_CASE("test finding a probe in our own process", "[usdt]") {
 }
 #endif  // HAVE_SDT_HEADER
 
-static size_t countsubs(const std::string &str, const std::string &sub) {
-  size_t count = 0;
-  for (size_t offset = str.find(sub); offset != std::string::npos;
-       offset = str.find(sub, offset + sub.length())) {
-    ++count;
-  }
-  return count;
-}
-
 class ChildProcess {
   pid_t pid_;
 
