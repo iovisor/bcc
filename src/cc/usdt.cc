@@ -24,6 +24,7 @@
 #include "bcc_proc.h"
 #include "usdt.h"
 #include "vendor/tinyformat.hpp"
+#include "bcc_usdt.h"
 
 namespace USDT {
 
@@ -255,6 +256,19 @@ bool Context::enable_probe(const std::string &probe_name,
   return p && p->enable(fn_name);
 }
 
+void Context::each(each_cb callback) {
+  for (const auto &probe : probes_) {
+    struct bcc_usdt info = {0};
+    info.provider = probe->provider().c_str();
+    info.bin_path = probe->bin_path().c_str();
+    info.name = probe->name().c_str();
+    info.semaphore = probe->semaphore();
+    info.num_locations = probe->num_locations();
+    info.num_arguments = probe->num_arguments();
+    callback(&info);
+  }
+}
+
 void Context::each_uprobe(each_uprobe_cb callback) {
   for (auto &p : probes_) {
     if (!p->enabled())
@@ -288,7 +302,6 @@ Context::~Context() {
 }
 
 extern "C" {
-#include "bcc_usdt.h"
 
 void *bcc_usdt_new_frompid(int pid) {
   USDT::Context *ctx = new USDT::Context(pid);
@@ -329,6 +342,11 @@ const char *bcc_usdt_genargs(void *usdt) {
 
   storage_ = stream.str();
   return storage_.c_str();
+}
+
+void bcc_usdt_foreach(void *usdt, bcc_usdt_cb callback) {
+  USDT::Context *ctx = static_cast<USDT::Context *>(usdt);
+  ctx->each(callback);
 }
 
 void bcc_usdt_foreach_uprobe(void *usdt, bcc_usdt_uprobe_cb callback) {

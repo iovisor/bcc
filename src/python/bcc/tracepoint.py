@@ -16,6 +16,7 @@ import ctypes as ct
 import multiprocessing
 import os
 import re
+from .perf import Perf
 
 class Tracepoint(object):
         enabled_tracepoints = []

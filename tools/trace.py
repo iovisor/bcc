@@ -59,6 +59,7 @@ class Probe(object):
                 cls.pid = args.pid or -1
 
         def __init__(self, probe, string_size):
+                self.usdt = None
                 self.raw_probe = probe
                 self.string_size = string_size
                 Probe.probe_count += 1
@@ -145,30 +146,15 @@ class Probe(object):
                         # We will discover the USDT provider by matching on
                         # the USDT name in the specified library
                         self._find_usdt_probe()
-                        self._enable_usdt_probe()
                 else:
                         self.library = parts[1]
                         self.function = parts[2]
 
-        def _enable_usdt_probe(self):
-                if self.usdt.need_enable():
-                        if Probe.pid == -1:
-                                self._bail("probe needs pid to enable")
-                        self.usdt.enable(Probe.pid)
-
-        def _disable_usdt_probe(self):
-                if self.probe_type == "u" and self.usdt.need_enable():
-                        self.usdt.disable(Probe.pid)
-
-        def close(self):
-                self._disable_usdt_probe()
-
         def _find_usdt_probe(self):
-                reader = USDTReader(bin_path=self.library)
-                for probe in reader.probes:
+                self.usdt = USDT(path=self.library, pid=Probe.pid)
+                for probe in self.usdt.enumerate_probes():
                         if probe.name == self.usdt_name:
-                                self.usdt = probe
-                                return
+                                return # Found it, will enable later
                 self._bail("unrecognized USDT probe %s" % self.usdt_name)
 
         def _parse_filter(self, filt):
@@ -219,7 +205,8 @@ class Probe(object):
         def _replace_args(self, expr):
                 for alias, replacement in Probe.aliases.items():
                         # For USDT probes, we replace argN values with the
-                        # actual arguments for that probe.
+                        # actual arguments for that probe obtained using special
+                        # bpf_readarg_N macros emitted at BPF construction.
                         if alias.startswith("arg") and self.probe_type == "u":
                                 continue
                         expr = expr.replace(alias, replacement)
@@ -294,15 +281,21 @@ BPF_PERF_OUTPUT(%s);
 
         def _generate_field_assign(self, idx):
                 field_type = self.types[idx]
-                expr = self.values[idx]
+                expr = self.values[idx].strip()
+                text = ""
+                if self.probe_type == "u" and expr[0:3] == "arg":
+                        text = ("        u64 %s;\n" +
+                                "        bpf_usdt_readarg(%s, ctx, &%s);\n") % \
+                                (expr, expr[3], expr)
+
                 if field_type == "s":
-                        return """
+                        return text + """
         if (%s != 0) {
                 bpf_probe_read(&__data.v%d, sizeof(__data.v%d), (void *)%s);
         }
 """                     % (expr, idx, idx, expr)
                 if field_type in Probe.fmt_types:
-                        return "        __data.v%d = (%s)%s;\n" % \
+                        return text + "        __data.v%d = (%s)%s;\n" % \
                                         (idx, Probe.c_type[field_type], expr)
                 self._bail("unrecognized field type %s" % field_type)
 
@@ -324,23 +317,17 @@ BPF_PERF_OUTPUT(%s);
                         pid_filter = ""
 
                 prefix = ""
-                qualifier = ""
                 signature = "struct pt_regs *ctx"
                 if self.probe_type == "t":
                         data_decl += self.tp.generate_struct()
                         prefix = self.tp.generate_get_struct()
-                elif self.probe_type == "u":
-                        signature += ", int __loc_id"
-                        prefix = self.usdt.generate_usdt_cases(
-                                pid=Probe.pid if Probe.pid != -1 else None)
-                        qualifier = "static inline"
 
                 data_fields = ""
                 for i, expr in enumerate(self.values):
                         data_fields += self._generate_field_assign(i)
 
                 text = """
-%s int %s(%s)
+int %s(%s)
 {
         %s
         %s
@@ -355,14 +342,9 @@ BPF_PERF_OUTPUT(%s);
         return 0;
 }
 """
-                text = text % (qualifier, self.probe_name, signature,
+                text = text % (self.probe_name, signature,
                                pid_filter, prefix, self.filter,
                                self.struct_name, data_fields, self.events_name)
-
-                if self.probe_type == "u":
-                        self.usdt_thunk_names = []
-                        text += self.usdt.generate_usdt_thunks(
-                                        self.probe_name, self.usdt_thunk_names)
 
                 return data_decl + "\n" + text
 
@@ -421,11 +403,7 @@ BPF_PERF_OUTPUT(%s);
                         self._bail("unable to find library %s" % self.library)
 
                 if self.probe_type == "u":
-                        for i, location in enumerate(self.usdt.locations):
-                                bpf.attach_uprobe(name=libpath,
-                                        addr=location.address,
-                                        fn_name=self.usdt_thunk_names[i],
-                                        pid=Probe.pid)
+                        pass # Was already enabled by the BPF constructor
                 elif self.probe_type == "r":
                         bpf.attach_uretprobe(name=libpath,
                                              sym=self.function,
@@ -511,7 +489,16 @@ trace 'u:pthread:pthread_create (arg4 != 0)'
                         print(self.program)
 
         def _attach_probes(self):
-                self.bpf = BPF(text=self.program)
+                usdt_contexts = []
+                for probe in self.probes:
+                    if probe.usdt:
+                        # USDT probes must be enabled before the BPF object
+                        # is initialized, because that's where the actual
+                        # uprobe is being attached.
+                        probe.usdt.enable_probe(
+                                probe.usdt_name, probe.probe_name)
+                        usdt_contexts.append(probe.usdt)
+                self.bpf = BPF(text=self.program, usdt_contexts=usdt_contexts)
                 Tracepoint.attach(self.bpf)
                 for probe in self.probes:
                         if self.args.verbose:
@@ -530,12 +517,6 @@ trace 'u:pthread:pthread_create (arg4 != 0)'
                 while True:
                         self.bpf.kprobe_poll()
 
-        def _close_probes(self):
-                for probe in self.probes:
-                        probe.close()
-                        if self.args.verbose:
-                                print("closed probe: " + str(probe))
-
         def run(self):
                 try:
                         self._create_probes()
@@ -547,7 +528,6 @@ trace 'u:pthread:pthread_create (arg4 != 0)'
                                 traceback.print_exc()
                         elif sys.exc_info()[0] is not SystemExit:
                                 print(sys.exc_info()[1])
-                self._close_probes()
 
 if __name__ == "__main__":
        Tool().run()

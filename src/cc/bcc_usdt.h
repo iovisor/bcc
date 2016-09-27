@@ -26,6 +26,18 @@ void *bcc_usdt_new_frompid(int pid);
 void *bcc_usdt_new_frompath(const char *path);
 void bcc_usdt_close(void *usdt);
 
+struct bcc_usdt {
+    const char *provider;
+    const char *name;
+    const char *bin_path;
+    uint64_t semaphore;
+    int num_locations;
+    int num_arguments;
+};
+
+typedef void (*bcc_usdt_cb)(struct bcc_usdt *);
+void bcc_usdt_foreach(void *usdt, bcc_usdt_cb callback);
+
 int bcc_usdt_enable_probe(void *, const char *, const char *);
 const char *bcc_usdt_genargs(void *);
 
