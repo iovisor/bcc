@@ -91,12 +91,6 @@ sudo python /usr/share/bcc/examples/hello_world.py
 sudo python /usr/share/bcc/examples/tracing/task_switch.py
 ```
 
-(Optional) Install pyroute2 for additional networking features
-```bash
-git clone https://github.com/svinota/pyroute2
-cd pyroute2; sudo make install
-```
-
 ## Fedora - Binary
 
 Install a 4.2+ kernel from
@@ -154,6 +148,13 @@ sudo apt-get -y install bison build-essential cmake flex git libedit-dev \
 
 # For Lua support
 sudo apt-get -y install luajit luajit-5.1-dev
+```
+
+(Optional) Install pyroute2 for additional networking features
+```bash
+git clone https://github.com/svinota/pyroute2
+cd pyroute2; sudo make install
+sudo python bcc/examples/networking/simple_tc.py
 ```
 
 ### Install and compile BCC
