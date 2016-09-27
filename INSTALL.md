@@ -150,13 +150,6 @@ sudo apt-get -y install bison build-essential cmake flex git libedit-dev \
 sudo apt-get -y install luajit luajit-5.1-dev
 ```
 
-(Optional) Install pyroute2 for additional networking features
-```bash
-git clone https://github.com/svinota/pyroute2
-cd pyroute2; sudo make install
-sudo python bcc/examples/networking/simple_tc.py
-```
-
 ### Install and compile BCC
 ```
 git clone https://github.com/iovisor/bcc.git
@@ -164,6 +157,13 @@ mkdir bcc/build; cd bcc/build
 cmake .. -DCMAKE_INSTALL_PREFIX=/usr
 make
 sudo make install
+```
+
+(Optional) Install pyroute2 for additional networking features
+```bash
+git clone https://github.com/svinota/pyroute2
+cd pyroute2; sudo make install
+sudo python bcc/examples/networking/simple_tc.py
 ```
 
 ## Fedora - Source
