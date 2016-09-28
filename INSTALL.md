@@ -91,13 +91,6 @@ sudo python /usr/share/bcc/examples/hello_world.py
 sudo python /usr/share/bcc/examples/tracing/task_switch.py
 ```
 
-(Optional) Install pyroute2 for additional networking features
-```bash
-git clone https://github.com/svinota/pyroute2
-cd pyroute2; sudo make install
-sudo python /usr/share/bcc/examples/simple_tc.py
-```
-
 ## Fedora - Binary
 
 Install a 4.2+ kernel from
@@ -164,6 +157,13 @@ mkdir bcc/build; cd bcc/build
 cmake .. -DCMAKE_INSTALL_PREFIX=/usr
 make
 sudo make install
+```
+
+(Optional) Install pyroute2 for additional networking features
+```bash
+git clone https://github.com/svinota/pyroute2
+cd pyroute2; sudo make install
+sudo python ./bcc/examples/networking/simple_tc.py
 ```
 
 ## Fedora - Source
