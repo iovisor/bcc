@@ -55,6 +55,10 @@ class USDT(object):
     def get_text(self):
         return lib.bcc_usdt_genargs(self.context)
 
+    def get_probe_arg_ctype(self, probe_name, arg_index):
+        return lib.bcc_usdt_get_probe_argctype(
+            self.context, probe_name, arg_index)
+
     def enumerate_probes(self):
         probes = []
         def _add_probe(probe):

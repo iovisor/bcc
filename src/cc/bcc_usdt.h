@@ -40,6 +40,9 @@ void bcc_usdt_foreach(void *usdt, bcc_usdt_cb callback);
 
 int bcc_usdt_enable_probe(void *, const char *, const char *);
 const char *bcc_usdt_genargs(void *);
+const char *bcc_usdt_get_probe_argctype(
+  void *ctx, const char* probe_name, const int arg_index
+);
 
 typedef void (*bcc_usdt_uprobe_cb)(const char *, const char *, uint64_t, int);
 void bcc_usdt_foreach_uprobe(void *usdt, bcc_usdt_uprobe_cb callback);
