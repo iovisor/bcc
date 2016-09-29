@@ -344,6 +344,14 @@ const char *bcc_usdt_genargs(void *usdt) {
   return storage_.c_str();
 }
 
+const char *bcc_usdt_get_probe_argctype(
+  void *ctx, const char* probe_name, const int arg_index
+) {
+  USDT::Probe *p = static_cast<USDT::Context *>(ctx)->get(probe_name);
+  std::string res = p ? p->get_arg_ctype(arg_index) : "";
+  return res.c_str();
+}
+
 void bcc_usdt_foreach(void *usdt, bcc_usdt_cb callback) {
   USDT::Context *ctx = static_cast<USDT::Context *>(usdt);
   ctx->each(callback);

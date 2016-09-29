@@ -154,6 +154,9 @@ public:
 
   uint64_t address(size_t n = 0) const { return locations_[n].address_; }
   bool usdt_getarg(std::ostream &stream);
+  std::string get_arg_ctype(int arg_index) {
+    return largest_arg_type(arg_index);
+  }
 
   bool need_enable() const { return semaphore_ != 0x0; }
   bool enable(const std::string &fn_name);

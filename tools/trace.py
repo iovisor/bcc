@@ -299,6 +299,26 @@ BPF_PERF_OUTPUT(%s);
                                         (idx, Probe.c_type[field_type], expr)
                 self._bail("unrecognized field type %s" % field_type)
 
+        def _generate_usdt_filter_read(self):
+            text = ""
+            if self.probe_type == "u":
+                    for arg, _ in Probe.aliases.items():
+                        if not (arg.startswith("arg") and (arg in self.filter)):
+                                continue
+                        arg_index = int(arg.replace("arg", ""))
+                        arg_ctype = self.usdt.get_probe_arg_ctype(
+                                self.usdt_name, arg_index)
+                        if not arg_ctype:
+                                self._bail("Unable to determine type of {} "
+                                           "in the filter".format(arg))
+                        text += """
+        {} {}_filter;
+        bpf_usdt_readarg({}, ctx, &{}_filter);
+                        """.format(arg_ctype, arg, arg_index, arg)
+                        self.filter = self.filter.replace(
+                                arg, "{}_filter".format(arg))
+            return text
+
         def generate_program(self, include_self):
                 data_decl = self._generate_data_decl()
                 # kprobes don't have built-in pid filters, so we have to add
@@ -331,6 +351,7 @@ int %s(%s)
 {
         %s
         %s
+        %s
         if (!(%s)) return 0;
 
         struct %s __data = {0};
@@ -343,7 +364,8 @@ int %s(%s)
 }
 """
                 text = text % (self.probe_name, signature,
-                               pid_filter, prefix, self.filter,
+                               pid_filter, prefix,
+                               self._generate_usdt_filter_read(), self.filter,
                                self.struct_name, data_fields, self.events_name)
 
                 return data_decl + "\n" + text
