@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "cc/bpf_module.h"
-#include "cc/bpf_common.h"
+#include "bpf_common.h"
+#include "bpf_module.h"
 
 extern "C" {
 void * bpf_module_create_b(const char *filename, const char *proto_filename, unsigned flags) {
