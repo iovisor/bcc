@@ -19,7 +19,8 @@ BPF_TABLE("hash", int, struct tunnel_key, if2tunkey, 1024);
 int handle_ingress(struct __sk_buff *skb) {
   struct bpf_tunnel_key tkey = {};
   struct tunnel_key key;
-  bpf_skb_get_tunnel_key(skb, &tkey, sizeof(tkey), 0);
+  bpf_skb_get_tunnel_key(skb, &tkey,
+      offsetof(struct bpf_tunnel_key, remote_ipv6[1]), 0);
 
   key.tunnel_id = tkey.tunnel_id;
   key.remote_ipv4 = tkey.remote_ipv4;
@@ -57,7 +58,8 @@ int handle_egress(struct __sk_buff *skb) {
   if (key_p) {
     tkey.tunnel_id = key_p->tunnel_id;
     tkey.remote_ipv4 = key_p->remote_ipv4;
-    bpf_skb_set_tunnel_key(skb, &tkey, sizeof(tkey), 0);
+    bpf_skb_set_tunnel_key(skb, &tkey,
+        offsetof(struct bpf_tunnel_key, remote_ipv6[1]), 0);
     bpf_clone_redirect(skb, cfg->tunnel_ifindex, 0/*egress*/);
   }
   return 1;
