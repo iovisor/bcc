@@ -12,7 +12,7 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 # Copyright (C) 2016 Sasha Goldshtein.
 
-from bcc import BPF, Tracepoint, Perf, USDT
+from bcc import BPF, USDT
 from time import sleep, strftime
 import argparse
 import re
@@ -195,9 +195,6 @@ u64 __time = bpf_ktime_get_ns();
                         self.library = ""       # kernel
                         self.tp_category = parts[1]
                         self.tp_event = self.function
-                        self.tp = Tracepoint.enable_tracepoint(
-                                        self.tp_category, self.tp_event)
-                        self.function = "perf_trace_" + self.function
                 elif self.probe_type == "u":
                         self.library = parts[1]
                         self.probe_func_name = "%s_probe%d" % \
@@ -329,8 +326,10 @@ u64 __time = bpf_ktime_get_ns();
                 program = ""
                 probe_text = """
 DATA_DECL
-
-int PROBENAME(struct pt_regs *ctx SIGNATURE)
+""" + (
+                "TRACEPOINT_PROBE(%s, %s)" % (self.tp_category, self.tp_event) \
+                        if self.probe_type == "t" \
+                        else "int PROBENAME(struct pt_regs *ctx SIGNATURE)") + """
 {
         PID_FILTER
         PREFIX
@@ -352,10 +351,7 @@ int PROBENAME(struct pt_regs *ctx SIGNATURE)
                         # value we collected when entering the function:
                         self._replace_entry_exprs()
 
-                if self.probe_type == "t":
-                        program += self.tp.generate_struct()
-                        prefix += self.tp.generate_get_struct()
-                elif self.probe_type == "p" and len(self.signature) > 0:
+                if self.probe_type == "p" and len(self.signature) > 0:
                         # Only entry uprobes/kprobes can have user-specified
                         # signatures. Other probes force it to ().
                         signature = ", " + self.signature
@@ -396,7 +392,9 @@ int PROBENAME(struct pt_regs *ctx SIGNATURE)
                                                pid=self.pid or -1)
 
         def _attach_k(self):
-                if self.probe_type == "r" or self.probe_type == "t":
+                if self.probe_type == "t":
+                        pass    # Nothing to do for tracepoints
+                elif self.probe_type == "r":
                         self.bpf.attach_kretprobe(event=self.function,
                                              fn_name=self.probe_func_name)
                 else:
@@ -537,10 +535,10 @@ argdist -C 'p:c:fork()#fork calls'
         Count fork() calls in libc across all processes
         Can also use funccount.py, which is easier and more flexible
 
-argdist -H 't:block:block_rq_complete():u32:tp.nr_sector'
+argdist -H 't:block:block_rq_complete():u32:args->nr_sector'
         Print histogram of number of sectors in completing block I/O requests
 
-argdist -C 't:irq:irq_handler_entry():int:tp.irq'
+argdist -C 't:irq:irq_handler_entry():int:args->irq'
         Aggregate interrupts by interrupt request (IRQ)
 
 argdist -C 'u:pthread:pthread_start():u64:arg2' -p 1337
@@ -613,8 +611,6 @@ struct __string_t { char s[%d]; };
                         bpf_source += "#include <%s>\n" % include
                 bpf_source += BPF.generate_auto_includes(
                                 map(lambda p: p.raw_spec, self.probes))
-                bpf_source += Tracepoint.generate_decl()
-                bpf_source += Tracepoint.generate_entry_probe()
                 for probe in self.probes:
                         bpf_source += probe.generate_text()
                 if self.args.verbose:
@@ -627,7 +623,6 @@ struct __string_t { char s[%d]; };
                 self.bpf = BPF(text=bpf_source, usdt_contexts=usdt_contexts)
 
         def _attach(self):
-                Tracepoint.attach(self.bpf)
                 for probe in self.probes:
                         probe.attach(self.bpf)
                 if self.args.verbose:
