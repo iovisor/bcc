@@ -303,7 +303,7 @@ BPF_PERF_OUTPUT(%s);
                 expr = self.values[idx].strip()
                 text = ""
                 if self.probe_type == "u" and expr[0:3] == "arg":
-                        text = ("        u64 %s;\n" +
+                        text = ("        u64 %s = 0;\n" +
                                 "        bpf_usdt_readarg(%s, ctx, &%s);\n") % \
                                 (expr, expr[3], expr)
 
