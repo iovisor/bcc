@@ -27,7 +27,6 @@ basestring = (unicode if sys.version_info[0] < 3 else str)
 
 from .libbcc import lib, _CB_TYPE, bcc_symbol
 from .table import Table
-from .tracepoint import Tracepoint
 from .perf import Perf
 from .usyms import ProcessSymbols
 
