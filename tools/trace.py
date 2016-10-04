@@ -472,7 +472,7 @@ int %s(%s)
                 libpath = BPF.find_library(self.library)
                 if libpath is None:
                         # This might be an executable (e.g. 'bash')
-                        libpath = BPF._find_exe(self.library)
+                        libpath = BPF.find_exe(self.library)
                 if libpath is None or len(libpath) == 0:
                         self._bail("unable to find library %s" % self.library)
 

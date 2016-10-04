@@ -120,9 +120,9 @@ class BPF(object):
         return filename
 
     @staticmethod
-    def _find_exe(cls, bin_path):
+    def find_exe(bin_path):
         """
-        _find_exe(bin_path)
+        find_exe(bin_path)
 
         Traverses the PATH environment variable, looking for the first
         directory that contains an executable file named bin_path, and
