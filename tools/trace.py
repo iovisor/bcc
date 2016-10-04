@@ -9,7 +9,7 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 # Copyright (C) 2016 Sasha Goldshtein.
 
-from bcc import BPF, Tracepoint, Perf, USDT
+from bcc import BPF, USDT
 from functools import partial
 from time import sleep, strftime
 import argparse
@@ -138,10 +138,8 @@ class Probe(object):
                 if self.probe_type == "t":
                         self.tp_category = parts[1]
                         self.tp_event = parts[2]
-                        self.tp = Tracepoint.enable_tracepoint(
-                                        self.tp_category, self.tp_event)
                         self.library = ""       # kernel
-                        self.function = "perf_trace_%s" % self.tp_event
+                        self.function = ""      # generated from TRACEPOINT_PROBE
                 elif self.probe_type == "u":
                         self.library = parts[1]
                         self.usdt_name = parts[2]
@@ -357,9 +355,6 @@ BPF_PERF_OUTPUT(%s);
 
                 prefix = ""
                 signature = "struct pt_regs *ctx"
-                if self.probe_type == "t":
-                        data_decl += self.tp.generate_struct()
-                        prefix = self.tp.generate_get_struct()
 
                 data_fields = ""
                 for i, expr in enumerate(self.values):
@@ -377,8 +372,14 @@ BPF_PERF_OUTPUT(%s);
           ctx, BPF_F_REUSE_STACKID
         );""" % self.stacks_name
 
-                text = """
-int %s(%s)
+                if self.probe_type == "t":
+                        heading = "TRACEPOINT_PROBE(%s, %s)" % \
+                                  (self.tp_category, self.tp_event)
+                        ctx_name = "args"
+                else:
+                        heading = "int %s(%s)" % (self.probe_name, signature)
+                        ctx_name = "ctx"
+                text = heading + """
 {
         %s
         %s
@@ -391,15 +392,14 @@ int %s(%s)
         bpf_get_current_comm(&__data.comm, sizeof(__data.comm));
 %s
 %s
-        %s.perf_submit(ctx, &__data, sizeof(__data));
+        %s.perf_submit(%s, &__data, sizeof(__data));
         return 0;
 }
 """
-                text = text % (self.probe_name, signature,
-                               pid_filter, prefix,
+                text = text % (pid_filter, prefix,
                                self._generate_usdt_filter_read(), self.filter,
                                self.struct_name, data_fields,
-                               stack_trace, self.events_name)
+                               stack_trace, self.events_name, ctx_name)
 
                 return data_decl + "\n" + text
 
@@ -464,9 +464,10 @@ int %s(%s)
                 if self.probe_type == "r":
                         bpf.attach_kretprobe(event=self.function,
                                              fn_name=self.probe_name)
-                elif self.probe_type == "p" or self.probe_type == "t":
+                elif self.probe_type == "p":
                         bpf.attach_kprobe(event=self.function,
                                           fn_name=self.probe_name)
+                # Note that tracepoints don't need an explicit attach
 
         def _attach_u(self, bpf):
                 libpath = BPF.find_library(self.library)
@@ -511,7 +512,7 @@ trace 'r::__kmalloc (retval == 0) "kmalloc failed!"
         Trace returns from __kmalloc which returned a null pointer
 trace 'r:c:malloc (retval) "allocated = %p", retval
         Trace returns from malloc and print non-NULL allocated buffers
-trace 't:block:block_rq_complete "sectors=%d", tp.nr_sector'
+trace 't:block:block_rq_complete "sectors=%d", args->nr_sector'
         Trace the block_rq_complete kernel tracepoint and print # of tx sectors
 trace 'u:pthread:pthread_create (arg4 != 0)'
         Trace the USDT probe pthread_create when its 4th argument is non-zero
@@ -558,8 +559,6 @@ trace 'u:pthread:pthread_create (arg4 != 0)'
 """
                 self.program += BPF.generate_auto_includes(
                         map(lambda p: p.raw_probe, self.probes))
-                self.program += Tracepoint.generate_decl()
-                self.program += Tracepoint.generate_entry_probe()
                 for probe in self.probes:
                         self.program += probe.generate_program(
                                         self.args.include_self)
@@ -580,7 +579,6 @@ trace 'u:pthread:pthread_create (arg4 != 0)'
                                 print(probe.usdt.get_text())
                         usdt_contexts.append(probe.usdt)
                 self.bpf = BPF(text=self.program, usdt_contexts=usdt_contexts)
-                Tracepoint.attach(self.bpf)
                 for probe in self.probes:
                         if self.args.verbose:
                                 print(probe)
