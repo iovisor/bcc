@@ -60,7 +60,13 @@ class Probe(object):
             self.pattern = '^' + self.pattern + '$'
 
         if self.type == "p" and self.library:
-            self.library = BPF.find_library(self.library)
+            libpath = BPF.find_library(self.library)
+            if libpath is None:
+                # This might be an executable (e.g. 'bash')
+                libpath = BPF.find_exe(self.library)
+            if libpath is None or len(libpath) == 0:
+                raise Exception("unable to find library %s" % self.library)
+            self.library = libpath
 
         self.pid = pid
         self.per_pid = per_pid
@@ -77,7 +83,7 @@ class Probe(object):
                                        pid=self.pid or -1)
                 self.matched = self.bpf.num_open_uprobes()
             else:
-                self.bpf.attach_kprobe(event_re=pattern,
+                self.bpf.attach_kprobe(event_re=self.pattern,
                                        fn_name="trace_count",
                                        pid=self.pid or -1)
                 self.matched = self.bpf.num_open_kprobes()
@@ -231,7 +237,8 @@ class Tool(object):
             self.comm_cache = {}
             for k, v in sorted(counts.items(),
                                key=lambda counts: counts[1].value):
-                print(self._comm_for_pid(k.pid))
+                if k.pid != 0xffffffff:
+                    print(self._comm_for_pid(k.pid))
                 for addr in stack_traces.walk(k.stackid):
                     self._print_frame(addr, k.pid)
                 print("    %d\n" % v.value)

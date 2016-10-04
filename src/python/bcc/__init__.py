@@ -906,21 +906,19 @@ class BPF(object):
         """
         return len([k for k in self.open_kprobes.keys() if isinstance(k, str)])
 
-    @staticmethod
-    def num_open_uprobes():
+    def num_open_uprobes(self):
         """num_open_uprobes()
 
         Get the number of open U[ret]probes.
         """
-        return len(open_uprobes)
+        return len(self.open_uprobes)
 
-    @staticmethod
-    def num_open_tracepoints():
+    def num_open_tracepoints(self):
         """num_open_tracepoints()
 
         Get the number of open tracepoints.
         """
-        return len(open_tracepoints)
+        return len(self.open_tracepoints)
 
     def kprobe_poll(self, timeout = -1):
         """kprobe_poll(self)
