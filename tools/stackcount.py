@@ -242,7 +242,7 @@ class Tool(object):
             self.comm_cache[pid] = comm
             return comm
         except:
-            return "    PID %d" % pid
+            return "    unknown process [%d]" % pid
 
     def run(self):
         self.probe.load()
@@ -267,10 +267,11 @@ class Tool(object):
             self.comm_cache = {}
             for k, v in sorted(counts.items(),
                                key=lambda counts: counts[1].value):
-                if k.pid != 0xffffffff:
-                    print(self._comm_for_pid(k.pid))
                 for addr in stack_traces.walk(k.stackid):
-                    self._print_frame(addr, k.pid)
+                    pid = -1 if self.probe.is_kernel_probe() else k.pid
+                    self._print_frame(addr, pid)
+                if not self.args.pid and k.pid != 0xffffffff:
+                    print(self._comm_for_pid(k.pid))
                 print("    %d\n" % v.value)
             counts.clear()
 
