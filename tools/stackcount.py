@@ -16,14 +16,15 @@
 # 09-Jul-2016   Sasha Goldshtein    Generalized for uprobes and tracepoints.
 
 from __future__ import print_function
-from bcc import BPF
+from bcc import BPF, USDT
 from time import sleep, strftime
 import argparse
+import re
 import signal
-import traceback
 import sys
+import traceback
 
-debug = True
+debug = False
 
 class Probe(object):
     def __init__(self, pattern, use_regex=False, pid=None, per_pid=False):
@@ -38,6 +39,7 @@ class Probe(object):
             p::func         -- same thing as 'func'
             p:lib:func      -- same thing as 'lib:func'
             t:cat:event     -- probe a kernel tracepoint
+            u:lib:probe     -- probe a USDT tracepoint
         """
         parts = pattern.split(':')
         if len(parts) == 1:
@@ -47,8 +49,8 @@ class Probe(object):
         elif len(parts) == 3:
             if parts[0] == "t":
                 parts = ["t", "", "%s:%s" % tuple(parts[1:])]
-            if parts[0] not in ["p", "t"]:
-                raise Exception("Type must be 'p' or 't', but got %s" %
+            if parts[0] not in ["p", "t", "u"]:
+                raise Exception("Type must be 'p', 't', or 'u', but got %s" %
                                 parts[0])
         else:
             raise Exception("Too many ':'-separated components in pattern %s" %
@@ -59,7 +61,7 @@ class Probe(object):
             self.pattern = self.pattern.replace('*', '.*')
             self.pattern = '^' + self.pattern + '$'
 
-        if self.type == "p" and self.library:
+        if (self.type == "p" and self.library) or self.type == "u":
             libpath = BPF.find_library(self.library)
             if libpath is None:
                 # This might be an executable (e.g. 'bash')
@@ -70,6 +72,7 @@ class Probe(object):
 
         self.pid = pid
         self.per_pid = per_pid
+        self.matched = 0
 
     def is_kernel_probe(self):
         return self.type == "t" or (self.type == "p" and self.library == "")
@@ -92,21 +95,14 @@ class Probe(object):
                                        fn_name="trace_count",
                                        pid=self.pid or -1)
             self.matched = self.bpf.num_open_tracepoints()
+        elif self.type == "u":
+            pass # Nothing to do -- attach already happened in `load`
 
         if self.matched == 0:
             raise Exception("No functions matched by pattern %s" % self.pattern)
 
     def load(self):
-        bpf_text = """#include <uapi/linux/ptrace.h>
-
-struct key_t {
-    u32 pid;
-    int stackid;
-};
-
-BPF_HASH(counts, struct key_t);
-BPF_STACK_TRACE(stack_traces, 1024);
-
+        trace_count_text = """
 int trace_count(void *ctx) {
     FILTER
     struct key_t key = {};
@@ -118,37 +114,67 @@ int trace_count(void *ctx) {
     return 0;
 }
         """
+        bpf_text = """#include <uapi/linux/ptrace.h>
+
+struct key_t {
+    u32 pid;
+    int stackid;
+};
+
+BPF_HASH(counts, struct key_t);
+BPF_STACK_TRACE(stack_traces, 1024);
+
+        """
 
         # We really mean the tgid from the kernel's perspective, which is in
         # the top 32 bits of bpf_get_current_pid_tgid().
-        # TODO Why do we even need this when we call attach_nnn with the pid,
-        # which eventually calls perf_event_open with that pid? Is it ignored?
-        # It works for uprobes, why not for kprobes/tracepoints?
         if self.is_kernel_probe() and self.pid:
-            bpf_text = bpf_text.replace('FILTER',
+            trace_count_text = trace_count_text.replace('FILTER',
                 ('u32 pid; pid = bpf_get_current_pid_tgid() >> 32; ' +
                 'if (pid != %d) { return 0; }') % (self.pid))
         else:
-            bpf_text = bpf_text.replace('FILTER', '')
+            trace_count_text = trace_count_text.replace('FILTER', '')
 
         # We need per-pid statistics when tracing a user-space process, because
         # the meaning of the symbols depends on the pid. We also need them if
-        # per-pid statistics were requested with -P. But we don't need them in
-        # any case if a specific pid (-p) was requested.
-        if not self.pid and (self.per_pid or not self.is_kernel_probe()):
-            bpf_text = bpf_text.replace('GET_PID',
+        # per-pid statistics were requested with -P.
+        if self.per_pid or not self.is_kernel_probe():
+            trace_count_text = trace_count_text.replace('GET_PID',
                                         'bpf_get_current_pid_tgid() >> 32')
         else:
-            bpf_text = bpf_text.replace('GET_PID', '0xffffffff')
+            trace_count_text = trace_count_text.replace('GET_PID', '0xffffffff')
 
         stack_flags = 'BPF_F_REUSE_STACKID'
         if not self.is_kernel_probe():
             stack_flags += '| BPF_F_USER_STACK' # can't do both U *and* K
-        bpf_text = bpf_text.replace('STACK_FLAGS', stack_flags)
+        trace_count_text = trace_count_text.replace('STACK_FLAGS', stack_flags)
+
+        self.usdt = None
+        if self.type == "u":
+            self.usdt = USDT(path=self.library, pid=self.pid)
+            for probe in self.usdt.enumerate_probes():
+                if not self.pid and (probe.bin_path != self.library):
+                    continue
+                if re.match(self.pattern, probe.name):
+                    # This hack is required because the bpf_usdt_readarg
+                    # functions generated need different function names for
+                    # each attached probe. If we just stick to trace_count,
+                    # we'd get multiple bpf_usdt_readarg helpers with the same
+                    # name when enabling more than one USDT probe.
+                    new_func = "trace_count_%d" % self.matched
+                    bpf_text += trace_count_text.replace(
+                                            "trace_count", new_func)
+                    self.usdt.enable_probe(probe.name, new_func)
+                    self.matched += 1
+            if debug:
+                print(self.usdt.get_text())
+        else:
+            bpf_text += trace_count_text
 
         if debug:
             print(bpf_text)
-        self.bpf = BPF(text=bpf_text)
+        self.bpf = BPF(text=bpf_text, usdt_contexts=
+                      [self.usdt] if self.usdt else [])
 
 class Tool(object):
     def __init__(self):
@@ -182,9 +208,13 @@ class Tool(object):
             help="display stacks separately for each process")
         parser.add_argument("-v", "--verbose", action="store_true",
             help="show raw addresses")
+        parser.add_argument("-d", "--debug", action="store_true",
+            help="print BPF program before starting (for debugging purposes)")
         parser.add_argument("pattern",
             help="search expression for events")
         self.args = parser.parse_args()
+        global debug
+        debug = self.args.debug
         self.probe = Probe(self.args.pattern, self.args.regexp,
                            self.args.pid, self.args.perpid)
 
