@@ -4,7 +4,7 @@
 #           parameter values as a histogram or frequency count.
 #
 # USAGE: argdist [-h] [-p PID] [-z STRING_SIZE] [-i INTERVAL]
-#                [-n COUNT] [-v] [-T TOP]
+#                [-n COUNT] [-v] [-c] [-T TOP]
 #                [-C specifier [specifier ...]]
 #                [-H specifier [specifier ...]]
 #                [-I header [header ...]]
@@ -178,6 +178,7 @@ u64 __time = bpf_ktime_get_ns();
         def __init__(self, tool, type, specifier):
                 self.usdt_ctx = None
                 self.pid = tool.args.pid
+                self.cumulative = tool.args.cumulative or False
                 self.raw_spec = specifier
                 self._validate_specifier()
 
@@ -451,10 +452,10 @@ int PROBENAME(struct pt_regs *ctx SIGNATURE)
                 if self.type == "freq":
                         print(self.label or self.raw_spec)
                         print("\t%-10s %s" % ("COUNT", "EVENT"))
-                        data = sorted(data.items(), key=lambda kv: kv[1].value)
+                        sdata = sorted(data.items(), key=lambda kv: kv[1].value)
                         if top is not None:
-                                data = data[-top:]
-                        for key, value in data:
+                                sdata = sdata[-top:]
+                        for key, value in sdata:
                                 # Print some nice values if the user didn't
                                 # specify an expression to probe
                                 if self.is_default_expr:
@@ -471,6 +472,8 @@ int PROBENAME(struct pt_regs *ctx SIGNATURE)
                         label = self.label or (self._display_expr(0)
                                 if not self.is_default_expr  else "retval")
                         data.print_log2_hist(val_type=label)
+                if not self.cumulative:
+                        data.clear()
 
         def __str__(self):
                 return self.label or self.raw_spec
@@ -571,6 +574,8 @@ argdist -p 2780 -z 120 \\
                   help="number of outputs")
                 parser.add_argument("-v", "--verbose", action="store_true",
                   help="print resulting BPF program code before executing")
+                parser.add_argument("-c", "--cumulative", action="store_true",
+                  help="do not clear histograms and freq counts at each interval")
                 parser.add_argument("-T", "--top", type=int,
                   help="number of top results to show (not applicable to " +
                   "histograms)")
