@@ -1,0 +1,116 @@
+Demonstrations of tcptop, the Linux eBPF/bcc version.
+
+
+tcptop summarizes throughput by host and port. Eg:
+
+# tcptop
+Tracing... Output every 1 secs. Hit Ctrl-C to end
+<screen clears>
+19:46:24 loadavg: 1.86 2.67 2.91 3/362 16681
+
+PID    COMM         LADDR                 RADDR                  RX_KB  TX_KB
+16648  16648        100.66.3.172:22       100.127.69.165:6684        1      0
+16647  sshd         100.66.3.172:22       100.127.69.165:6684        0   2149
+14374  sshd         100.66.3.172:22       100.127.69.165:25219       0      0
+14458  sshd         100.66.3.172:22       100.127.69.165:7165        0      0
+
+PID    COMM         LADDR6                           RADDR6                            RX_KB  TX_KB
+16681  sshd         fe80::8a3:9dff:fed5:6b19:22      fe80::8a3:9dff:fed5:6b19:16606        1      1
+16679  ssh          fe80::8a3:9dff:fed5:6b19:16606   fe80::8a3:9dff:fed5:6b19:22           1      1
+16680  sshd         fe80::8a3:9dff:fed5:6b19:22      fe80::8a3:9dff:fed5:6b19:16606        0      0
+
+This example output shows two listings of TCP connections, for IPv4 and IPv6.
+If there is only traffic for one of these, then only one group is shown.
+
+The output in each listing is sorted by total throughput (send then receive),
+and when printed it is rounded (floor) to the nearest Kbyte. The example output
+shows PID 16647, sshd, transmitted 2149 Kbytes during the tracing interval.
+The other IPv4 sessions had such low throughput they rounded to zero.
+
+All TCP sessions, including over loopback, are included.
+
+The session with the process name (COMM) of 16648 is really a short-lived
+process with PID 16648 where we didn't catch the process name when printing
+the output. If this behavior is a serious issue for you, you can modify the
+tool's code to include bpf_get_current_comm() in the key structs, so that it's
+fetched during the event and will always be seen. I did it this way to start
+with, but it was measurably increasing the overhead of this tool, so I switched
+to the asynchronous model.
+
+The overhead is relative to TCP event rate (the rate of tcp_sendmsg() and
+tcp_recvmsg() or tcp_cleanup_rbuf()). Due to buffering, this should be lower
+than the packet rate. You can measure the rate of these using funccount.
+Some sample production servers tested found total rates of 4k to 15k per
+second. The CPU overhead at these rates ranged from 0.5% to 2.0% of one CPU.
+Maybe your workloads have higher rates and therefore higher overhead, or,
+lower rates.
+
+
+I much prefer not clearing the screen, so that historic output is in the
+scroll-back buffer, and patterns or intermittent issues can be better seen.
+You can do this with -C:
+
+# tcptop -C
+Tracing... Output every 1 secs. Hit Ctrl-C to end
+
+20:27:12 loadavg: 0.08 0.02 0.17 2/367 17342
+
+PID    COMM         LADDR                 RADDR                  RX_KB  TX_KB
+17287  17287        100.66.3.172:22       100.127.69.165:57585       3      1
+17286  sshd         100.66.3.172:22       100.127.69.165:57585       0      1
+14374  sshd         100.66.3.172:22       100.127.69.165:25219       0      0
+
+20:27:13 loadavg: 0.08 0.02 0.17 1/367 17342
+
+PID    COMM         LADDR                 RADDR                  RX_KB  TX_KB
+17286  sshd         100.66.3.172:22       100.127.69.165:57585       1   7761
+14374  sshd         100.66.3.172:22       100.127.69.165:25219       0      0
+
+20:27:14 loadavg: 0.08 0.02 0.17 2/365 17347
+
+PID    COMM         LADDR                 RADDR                  RX_KB  TX_KB
+17286  17286        100.66.3.172:22       100.127.69.165:57585       1   2501
+14374  sshd         100.66.3.172:22       100.127.69.165:25219       0      0
+
+20:27:15 loadavg: 0.07 0.02 0.17 2/367 17403
+
+PID    COMM         LADDR                 RADDR                  RX_KB  TX_KB
+17349  17349        100.66.3.172:22       100.127.69.165:10161       3      1
+17348  sshd         100.66.3.172:22       100.127.69.165:10161       0      1
+14374  sshd         100.66.3.172:22       100.127.69.165:25219       0      0
+
+20:27:16 loadavg: 0.07 0.02 0.17 1/367 17403
+
+PID    COMM         LADDR                 RADDR                  RX_KB  TX_KB
+17348  sshd         100.66.3.172:22       100.127.69.165:10161    3333      0
+14374  sshd         100.66.3.172:22       100.127.69.165:25219       0      0
+
+20:27:17 loadavg: 0.07 0.02 0.17 2/366 17409
+
+PID    COMM         LADDR                 RADDR                  RX_KB  TX_KB
+17348  17348        100.66.3.172:22       100.127.69.165:10161    6909      2
+
+You can disable the loadavg summary line with -S if needed.
+
+
+USAGE:
+
+# tcptop -h
+usage: tcptop.py [-h] [-C] [-S] [-p PID] [interval] [count]
+
+Summarize TCP send/recv throughput by host
+
+positional arguments:
+  interval           output interval, in seconds (default 1)
+  count              number of outputs
+
+optional arguments:
+  -h, --help         show this help message and exit
+  -C, --noclear      don't clear the screen
+  -S, --nosummary    skip system summary line
+  -p PID, --pid PID  trace this PID only
+
+examples:
+    ./tcptop           # trace TCP send/recv by host
+    ./tcptop -C        # don't clear the screen
+    ./tcptop -p 181    # only trace PID 181
