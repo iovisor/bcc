@@ -264,24 +264,18 @@ certain kinds of allocations or visually group them together.
 
 argdist also has basic support for kernel tracepoints. It is sometimes more
 convenient to use tracepoints because they are documented and don't vary a lot
-between kernel versions like function signatures tend to. For example, let's
-trace the net:net_dev_start_xmit tracepoint and print the interface name that
-is transmitting:
+between kernel versions. For example, let's trace the net:net_dev_start_xmit
+tracepoint and print out the protocol field from the tracepoint structure:
 
-# argdist -c -C 't:net:net_dev_start_xmit(void *a, void *b, struct net_device *c):char*:c->name' -n 2
-[05:01:10]
-t:net:net_dev_start_xmit(void *a, void *b, struct net_device *c):char*:c->name
+# argdist -C 't:net:net_dev_start_xmit():u16:args->protocol'
+[13:01:49]
+t:net:net_dev_start_xmit():u16:args->protocol
         COUNT      EVENT
-        4          c->name = eth0
-[05:01:11]
-t:net:net_dev_start_xmit(void *a, void *b, struct net_device *c):char*:c->name
-        COUNT      EVENT
-        6          c->name = lo
-        92         c->name = eth0
+        8          args->protocol = 2048
+^C
 
-Note that to determine the necessary function signature you need to look at the
-TP_PROTO declaration in the kernel headers. For example, the net_dev_start_xmit
-tracepoint is defined in the include/trace/events/net.h header file.
+Note that to discover the format of the net:net_dev_start_xmit tracepoint, you
+use the tplist tool (tplist -v net:net_dev_start_xmit).
 
 Here's a final example that finds how many write() system calls are performed
 by each process on the system:
@@ -388,10 +382,10 @@ argdist -C 'p:c:fork()#fork calls'
         Count fork() calls in libc across all processes
         Can also use funccount.py, which is easier and more flexible 
 
-argdist -H 't:block:block_rq_complete():u32:tp.nr_sector'
+argdist -H 't:block:block_rq_complete():u32:args->nr_sector'
         Print histogram of number of sectors in completing block I/O requests
 
-argdist -C 't:irq:irq_handler_entry():int:tp.irq'
+argdist -C 't:irq:irq_handler_entry():int:args->irq'
         Aggregate interrupts by interrupt request (IRQ)
 
 argdist -C 'u:pthread:pthread_start():u64:arg2' -p 1337
