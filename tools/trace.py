@@ -576,6 +576,8 @@ trace 'u:pthread:pthread_create (arg4 != 0)'
                         # uprobe is being attached.
                         probe.usdt.enable_probe(
                                 probe.usdt_name, probe.probe_name)
+                        if self.args.verbose:
+                                print(probe.usdt.get_text())
                         usdt_contexts.append(probe.usdt)
                 self.bpf = BPF(text=self.program, usdt_contexts=usdt_contexts)
                 Tracepoint.attach(self.bpf)
