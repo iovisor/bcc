@@ -92,6 +92,12 @@ number of arguments as there are placeholders in the format string. The
 format specifier replacements may be any C expressions, and may refer to the
 same special keywords as in the predicate (arg1, arg2, etc.).
 
+In addition to the above format specifiers, you can also use %K and %U when
+the expression is an address that potentially points to executable code (i.e.,
+a symbol). trace will resolve %K specifiers to a kernel symbol, such as
+vfs__read, and will resolve %U specifiers to a user-space symbol in that
+process, such as sprintf.
+
 In tracepoints, both the predicate and the arguments may refer to the tracepoint
 format structure, which is stored in the special "args" variable. For example, the
 block:block_rq_complete tracepoint can print or filter by args->nr_sector. To 
