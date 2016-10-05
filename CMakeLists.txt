@@ -68,7 +68,12 @@ if(NOT DEFINED BCC_KERNEL_MODULES_SUFFIX)
 endif()
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall")
+# iterate over all available directories in LLVM_INCLUDE_DIRS to
+# generate a correctly tokenized list of parameters
+foreach(ONE_LLVM_INCLUDE_DIR ${LLVM_INCLUDE_DIRS})
+  set(CXX_ISYSTEM_DIRS "${CXX_ISYSTEM_DIRS} -isystem ${ONE_LLVM_INCLUDE_DIR}")
+endforeach()
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall ${CXX_ISYSTEM_DIRS}")
 endif()
 
 add_subdirectory(examples)

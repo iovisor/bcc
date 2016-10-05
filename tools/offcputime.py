@@ -40,6 +40,8 @@ examples = """examples:
     ./offcputime             # trace off-CPU stack time until Ctrl-C
     ./offcputime 5           # trace for 5 seconds only
     ./offcputime -f 5        # 5 seconds, and output in folded format
+    ./offcputime -m 1000     # trace only events that last more than 1000 usec.
+    ./offcputime -M 10000    # trace only events that last less than 10000 usec.
     ./offcputime -p 185      # only trace threads for PID 185
     ./offcputime -t 188      # only trace thread 188
     ./offcputime -u          # only trace user threads (no kernel)
@@ -78,6 +80,12 @@ parser.add_argument("--stack-storage-size", default=1024,
 parser.add_argument("duration", nargs="?", default=99999999,
     type=positive_nonzero_int,
     help="duration of trace, in seconds")
+parser.add_argument("-m", "--min-block-time", default=1,
+    type=positive_nonzero_int,
+    help="the amount of time in microseconds over which we store traces (default 1)")
+parser.add_argument("-M", "--max-block-time", default=(1<<64)-1,
+    type=positive_nonzero_int,
+    help="the amount of time in microseconds under which we store traces (default U64_MAX)")
 args = parser.parse_args()
 if args.pid and args.tgid:
     parser.error("specify only one of -p and -t")
@@ -93,7 +101,8 @@ bpf_text = """
 #include <uapi/linux/ptrace.h>
 #include <linux/sched.h>
 
-#define MINBLOCK_US	1
+#define MINBLOCK_US    MINBLOCK_US_VALUEULL
+#define MAXBLOCK_US    MAXBLOCK_US_VALUEULL
 
 struct key_t {
     u32 pid;
@@ -129,7 +138,7 @@ int oncpu(struct pt_regs *ctx, struct task_struct *prev) {
     u64 delta = bpf_ktime_get_ns() - *tsp;
     start.delete(&pid);
     delta = delta / 1000;
-    if (delta < MINBLOCK_US) {
+    if ((delta < MINBLOCK_US) || (delta > MAXBLOCK_US)) {
         return 0;
     }
 
@@ -170,6 +179,8 @@ bpf_text = bpf_text.replace('THREAD_FILTER', thread_filter)
 
 # set stack storage size
 bpf_text = bpf_text.replace('STACK_STORAGE_SIZE', str(args.stack_storage_size))
+bpf_text = bpf_text.replace('MINBLOCK_US_VALUE', str(args.min_block_time))
+bpf_text = bpf_text.replace('MAXBLOCK_US_VALUE', str(args.max_block_time))
 
 # handle stack args
 kernel_stack_get = "stack_traces.get_stackid(ctx, BPF_F_REUSE_STACKID)"

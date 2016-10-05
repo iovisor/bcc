@@ -1,0 +1,112 @@
+.TH tcptop 8  "2016-09-13" "USER COMMANDS"
+.SH NAME
+tcptop \- Summarize TCP send/recv throughput by host. Top for TCP.
+.SH SYNOPSIS
+.B tcptop [\-h] [\-C] [\-S] [\-p PID] [interval] [count]
+.SH DESCRIPTION
+This is top for TCP sessions.
+
+This summarizes TCP send/receive Kbytes by host, and prints a summary that
+refreshes, along other system-wide metrics.
+
+This uses dynamic tracing of kernel TCP send/receive functions, and will
+need to be updated to match kernel changes.
+
+The traced TCP functions are usually called at a lower rate than
+per-packet functions, and therefore have lower overhead. The traced data is
+summarized in-kernel using a BPF map to further reduce overhead. At very high
+TCP event rates, the overhead may still be measurable. See the OVERHEAD
+section for more details.
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH OPTIONS
+.TP
+\-h
+Print USAGE message.
+.TP
+\-C
+Don't clear the screen.
+.TP
+\-S
+Don't print the system summary line (load averages).
+.TP
+\-p PID
+Trace this PID only.
+.TP
+interval
+Interval between updates, seconds (default 1).
+.TP
+count
+Number of interval summaries (default is many).
+.SH EXAMPLES
+.TP
+Summarize TCP throughput by active sessions, 1 second refresh:
+#
+.B tcptop
+.TP
+Don't clear the screen (rolling output), and 5 second summaries:
+#
+.B tcptop \-C 5
+.TP
+Trace PID 181 only, and don't clear the screen:
+#
+.B tcptop \-Cp 181
+.SH FIELDS
+.TP
+loadavg:
+The contents of /proc/loadavg
+.TP
+PID
+Process ID.
+.TP
+COMM
+Process name.
+.TP
+LADDR
+Local address (IPv4), and TCP port
+.TP
+RADDR
+Remote address (IPv4), and TCP port
+.TP
+LADDR6
+Source address (IPv6), and TCP port
+.TP
+RADDR6
+Destination address (IPv6), and TCP port
+.TP
+RX_KB
+Received Kbytes
+.TP
+TX_KB
+Transmitted Kbytes
+.SH OVERHEAD
+This traces all send/receives in TCP, high in the TCP/IP stack (close to the
+application) which are usually called at a lower rate than per-packet
+functions, lowering overhead. It also summarizes data in-kernel to further
+reduce overhead. These techniques help, but there may still be measurable
+overhead at high send/receive rates, eg, ~13% of one CPU at 100k events/sec.
+use funccount to count the kprobes in the tool to find out this rate, as the
+overhead is relative to the rate. Some sample production servers tested found
+total TCP event rates of 4k to 15k per second, and the CPU overhead at these
+rates ranged from 0.5% to 2.0% of one CPU. If your send/receive rate is low
+(eg, <1000/sec) then the overhead is expected to be negligible; Test in a lab
+environment first.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Brendan Gregg
+.SH INSPIRATION
+top(1) by William LeFebvre
+.SH SEE ALSO
+tcpconnect(8), tcpaccept(8)

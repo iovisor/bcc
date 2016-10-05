@@ -4,7 +4,7 @@
 #           parameter values as a histogram or frequency count.
 #
 # USAGE: argdist [-h] [-p PID] [-z STRING_SIZE] [-i INTERVAL]
-#                [-n COUNT] [-v] [-T TOP]
+#                [-n COUNT] [-v] [-c] [-T TOP]
 #                [-C specifier [specifier ...]]
 #                [-H specifier [specifier ...]]
 #                [-I header [header ...]]
@@ -12,7 +12,7 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 # Copyright (C) 2016 Sasha Goldshtein.
 
-from bcc import BPF, Tracepoint, Perf, USDT
+from bcc import BPF, USDT
 from time import sleep, strftime
 import argparse
 import re
@@ -175,8 +175,10 @@ u64 __time = bpf_ktime_get_ns();
                         self._bail("no exprs specified")
                 self.exprs = exprs.split(',')
 
-        def __init__(self, bpf, type, specifier):
-                self.pid = bpf.args.pid
+        def __init__(self, tool, type, specifier):
+                self.usdt_ctx = None
+                self.pid = tool.args.pid
+                self.cumulative = tool.args.cumulative or False
                 self.raw_spec = specifier
                 self._validate_specifier()
 
@@ -193,15 +195,11 @@ u64 __time = bpf_ktime_get_ns();
                         self.library = ""       # kernel
                         self.tp_category = parts[1]
                         self.tp_event = self.function
-                        self.tp = Tracepoint.enable_tracepoint(
-                                        self.tp_category, self.tp_event)
-                        self.function = "perf_trace_" + self.function
                 elif self.probe_type == "u":
                         self.library = parts[1]
                         self.probe_func_name = "%s_probe%d" % \
                                 (self.function, Probe.next_probe_index)
-                        bpf.enable_usdt_probe(self.function,
-                                        fn_name=self.probe_func_name)
+                        self._enable_usdt_probe()
                 else:
                         self.library = parts[1]
                 self.is_user = len(self.library) > 0
@@ -242,8 +240,10 @@ u64 __time = bpf_ktime_get_ns();
                         (self.function, Probe.next_probe_index)
                 Probe.next_probe_index += 1
 
-        def close(self):
-                pass
+        def _enable_usdt_probe(self):
+                self.usdt_ctx = USDT(path=self.library, pid=self.pid)
+                self.usdt_ctx.enable_probe(
+                        self.function, self.probe_func_name)
 
         def _substitute_exprs(self):
                 def repl(expr):
@@ -262,12 +262,17 @@ u64 __time = bpf_ktime_get_ns();
                 else:
                         return "%s v%d;\n" % (self.expr_types[i], i)
 
+        def _generate_usdt_arg_assignment(self, i):
+                expr = self.exprs[i]
+                if self.probe_type == "u" and expr[0:3] == "arg":
+                        return ("        u64 %s = 0;\n" +
+                                "        bpf_usdt_readarg(%s, ctx, &%s);\n") % \
+                                (expr, expr[3], expr)
+                else:
+                        return ""
+
         def _generate_field_assignment(self, i):
-                text = ""
-                if self.probe_type == "u" and self.exprs[i][0:3] == "arg":
-                    text = ("        u64 %s;\n" + 
-                           "        bpf_usdt_readarg(%s, ctx, &%s);\n") % \
-                           (self.exprs[i], self.exprs[i][3], self.exprs[i])
+                text = self._generate_usdt_arg_assignment(i)
                 if self._is_string(self.expr_types[i]):
                         return (text + "        bpf_probe_read(&__key.v%d.s," +
                                 " sizeof(__key.v%d.s), (void *)%s);\n") % \
@@ -291,8 +296,9 @@ u64 __time = bpf_ktime_get_ns();
 
         def _generate_key_assignment(self):
                 if self.type == "hist":
-                        return "%s __key = %s;\n" % \
-                                (self.expr_types[0], self.exprs[0])
+                        return self._generate_usdt_arg_assignment(0) + \
+                               ("%s __key = %s;\n" % \
+                                (self.expr_types[0], self.exprs[0]))
                 else:
                         text = "struct %s_key_t __key = {};\n" % \
                                 self.probe_hash_name
@@ -320,8 +326,10 @@ u64 __time = bpf_ktime_get_ns();
                 program = ""
                 probe_text = """
 DATA_DECL
-
-int PROBENAME(struct pt_regs *ctx SIGNATURE)
+""" + (
+                "TRACEPOINT_PROBE(%s, %s)" % (self.tp_category, self.tp_event) \
+                        if self.probe_type == "t" \
+                        else "int PROBENAME(struct pt_regs *ctx SIGNATURE)") + """
 {
         PID_FILTER
         PREFIX
@@ -343,10 +351,7 @@ int PROBENAME(struct pt_regs *ctx SIGNATURE)
                         # value we collected when entering the function:
                         self._replace_entry_exprs()
 
-                if self.probe_type == "t":
-                        program += self.tp.generate_struct()
-                        prefix += self.tp.generate_get_struct()
-                elif self.probe_type == "p" and len(self.signature) > 0:
+                if self.probe_type == "p" and len(self.signature) > 0:
                         # Only entry uprobes/kprobes can have user-specified
                         # signatures. Other probes force it to ().
                         signature = ", " + self.signature
@@ -371,7 +376,7 @@ int PROBENAME(struct pt_regs *ctx SIGNATURE)
         def _attach_u(self):
                 libpath = BPF.find_library(self.library)
                 if libpath is None:
-                        libpath = BPF._find_exe(self.library)
+                        libpath = BPF.find_exe(self.library)
                 if libpath is None or len(libpath) == 0:
                         self._bail("unable to find library %s" % self.library)
 
@@ -387,7 +392,9 @@ int PROBENAME(struct pt_regs *ctx SIGNATURE)
                                                pid=self.pid or -1)
 
         def _attach_k(self):
-                if self.probe_type == "r" or self.probe_type == "t":
+                if self.probe_type == "t":
+                        pass    # Nothing to do for tracepoints
+                elif self.probe_type == "r":
                         self.bpf.attach_kretprobe(event=self.function,
                                              fn_name=self.probe_func_name)
                 else:
@@ -443,10 +450,10 @@ int PROBENAME(struct pt_regs *ctx SIGNATURE)
                 if self.type == "freq":
                         print(self.label or self.raw_spec)
                         print("\t%-10s %s" % ("COUNT", "EVENT"))
-                        data = sorted(data.items(), key=lambda kv: kv[1].value)
+                        sdata = sorted(data.items(), key=lambda kv: kv[1].value)
                         if top is not None:
-                                data = data[-top:]
-                        for key, value in data:
+                                sdata = sdata[-top:]
+                        for key, value in sdata:
                                 # Print some nice values if the user didn't
                                 # specify an expression to probe
                                 if self.is_default_expr:
@@ -463,6 +470,8 @@ int PROBENAME(struct pt_regs *ctx SIGNATURE)
                         label = self.label or (self._display_expr(0)
                                 if not self.is_default_expr  else "retval")
                         data.print_log2_hist(val_type=label)
+                if not self.cumulative:
+                        data.clear()
 
         def __str__(self):
                 return self.label or self.raw_spec
@@ -526,10 +535,10 @@ argdist -C 'p:c:fork()#fork calls'
         Count fork() calls in libc across all processes
         Can also use funccount.py, which is easier and more flexible
 
-argdist -H 't:block:block_rq_complete():u32:tp.nr_sector'
+argdist -H 't:block:block_rq_complete():u32:args->nr_sector'
         Print histogram of number of sectors in completing block I/O requests
 
-argdist -C 't:irq:irq_handler_entry():int:tp.irq'
+argdist -C 't:irq:irq_handler_entry():int:args->irq'
         Aggregate interrupts by interrupt request (IRQ)
 
 argdist -C 'u:pthread:pthread_start():u64:arg2' -p 1337
@@ -563,6 +572,8 @@ argdist -p 2780 -z 120 \\
                   help="number of outputs")
                 parser.add_argument("-v", "--verbose", action="store_true",
                   help="print resulting BPF program code before executing")
+                parser.add_argument("-c", "--cumulative", action="store_true",
+                  help="do not clear histograms and freq counts at each interval")
                 parser.add_argument("-T", "--top", type=int,
                   help="number of top results to show (not applicable to " +
                   "histograms)")
@@ -590,11 +601,6 @@ argdist -p 2780 -z 120 \\
                         print("at least one specifier is required")
                         exit()
 
-        def enable_usdt_probe(self, probe_name, fn_name):
-                if not self.usdt_ctx:
-                        self.usdt_ctx = USDT(pid=self.args.pid)
-                self.usdt_ctx.enable_probe(probe_name, fn_name)
-
         def _generate_program(self):
                 bpf_source = """
 struct __string_t { char s[%d]; };
@@ -605,17 +611,18 @@ struct __string_t { char s[%d]; };
                         bpf_source += "#include <%s>\n" % include
                 bpf_source += BPF.generate_auto_includes(
                                 map(lambda p: p.raw_spec, self.probes))
-                bpf_source += Tracepoint.generate_decl()
-                bpf_source += Tracepoint.generate_entry_probe()
                 for probe in self.probes:
                         bpf_source += probe.generate_text()
                 if self.args.verbose:
-                        if self.usdt_ctx: print(self.usdt_ctx.get_text())
+                        for text in [probe.usdt_ctx.get_text() \
+                                     for probe in self.probes if probe.usdt_ctx]:
+                            print(text)
                         print(bpf_source)
-                self.bpf = BPF(text=bpf_source, usdt=self.usdt_ctx)
+                usdt_contexts = [probe.usdt_ctx
+                                 for probe in self.probes if probe.usdt_ctx]
+                self.bpf = BPF(text=bpf_source, usdt_contexts=usdt_contexts)
 
         def _attach(self):
-                Tracepoint.attach(self.bpf)
                 for probe in self.probes:
                         probe.attach(self.bpf)
                 if self.args.verbose:
@@ -637,12 +644,6 @@ struct __string_t { char s[%d]; };
                            count_so_far >= self.args.count:
                                 exit()
 
-        def _close_probes(self):
-                for probe in self.probes:
-                        probe.close()
-                        if self.args.verbose:
-                                print("closed probe: " + str(probe))
-
         def run(self):
                 try:
                         self._create_probes()
@@ -654,7 +655,6 @@ struct __string_t { char s[%d]; };
                                 traceback.print_exc()
                         elif sys.exc_info()[0] is not SystemExit:
                                 print(sys.exc_info()[1])
-                self._close_probes()
 
 if __name__ == "__main__":
         Tool().run()

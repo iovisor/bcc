@@ -29,7 +29,8 @@ int handle_ingress(struct __sk_buff *skb) {
   struct ethernet_t *ethernet = cursor_advance(cursor, sizeof(*ethernet));
 
   struct bpf_tunnel_key tkey = {};
-  bpf_skb_get_tunnel_key(skb, &tkey, sizeof(tkey), 0);
+  bpf_skb_get_tunnel_key(skb, &tkey,
+      offsetof(struct bpf_tunnel_key, remote_ipv6[1]), 0);
 
   int *ifindex = vni2if.lookup(&tkey.tunnel_id);
   if (ifindex) {
@@ -63,7 +64,8 @@ int handle_egress(struct __sk_buff *skb) {
     u32 zero = 0;
     tkey.tunnel_id = dst_host->tunnel_id;
     tkey.remote_ipv4 = dst_host->remote_ipv4;
-    bpf_skb_set_tunnel_key(skb, &tkey, sizeof(tkey), 0);
+    bpf_skb_set_tunnel_key(skb, &tkey,
+        offsetof(struct bpf_tunnel_key, remote_ipv6[1]), 0);
     lock_xadd(&dst_host->tx_pkts, 1);
   } else {
     struct bpf_tunnel_key tkey = {};
@@ -73,7 +75,8 @@ int handle_egress(struct __sk_buff *skb) {
       return 1;
     tkey.tunnel_id = dst_host->tunnel_id;
     tkey.remote_ipv4 = dst_host->remote_ipv4;
-    bpf_skb_set_tunnel_key(skb, &tkey, sizeof(tkey), 0);
+    bpf_skb_set_tunnel_key(skb, &tkey,
+        offsetof(struct bpf_tunnel_key, remote_ipv6[1]), 0);
   }
   bpf_clone_redirect(skb, cfg->tunnel_ifindex, 0/*egress*/);
   return 1;

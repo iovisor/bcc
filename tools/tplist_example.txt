@@ -17,25 +17,18 @@ $ tplist -l basic_usdt
 /home/vagrant/basic_usdt basic_usdt:loop_iter
 /home/vagrant/basic_usdt basic_usdt:end_main
 
-The loop_iter probe sounds interesting. What are the locations of that
-probe, and which variables are available?
+The loop_iter probe sounds interesting. How many arguments are available?
 
 $ tplist '*loop_iter' -l basic_usdt -v
 /home/vagrant/basic_usdt basic_usdt:loop_iter [sema 0x601036]
-  location 0x400550 raw args: -4@$42 8@%rax
-    4   signed bytes @ constant 42
-    8 unsigned bytes @ register %rax
-  location 0x40056f raw args: 8@-8(%rbp) 8@%rax
-    8 unsigned bytes @ -8(%rbp)
-    8 unsigned bytes @ register %rax
+  2 location(s)
+  2 argument(s)
 
 This output indicates that the loop_iter probe is used in two locations
-in the basic_usdt executable. The first location passes a constant value,
-42, to the probe. The second location passes a variable value located at
-an offset from the %rbp register. Don't worry -- you don't have to trace
-the register values yourself. The argdist and trace tools understand the
-probe format and can print out the arguments automatically -- you can
-refer to them as arg1, arg2, and so on.
+in the basic_usdt executable, and that it has two arguments. Fortunately,
+the argdist and trace tools understand the probe format and can print out
+the arguments automatically -- you can refer to them as arg1, arg2, and
+so on.
 
 Try to explore with some common libraries on your system and see if they
 contain UDST probes. Here are two examples you might find interesting:

@@ -92,10 +92,9 @@ The expression(s) to capture.
 These are the values that are assigned to the histogram or raw event collection.
 You may use the parameters directly, or valid C expressions that involve the
 parameters, such as "size % 10".
-Tracepoints may access a special structure called "tp" that is formatted according
-to the tracepoint format (which you can obtain using tplist). For example, the
-block:block_rq_complete tracepoint can access tp.nr_sector. You may also use the
-members of the "tp" struct directly, e.g. "nr_sector" instead of "tp.nr_sector".
+Tracepoints may access a special structure called "args" that is formatted
+according to the tracepoint format (which you can obtain using tplist).
+For example, the block:block_rq_complete tracepoint can access args->nr_sector.
 USDT probes may access the arguments defined by the tracing program in the 
 special arg1, arg2, ... variables. To obtain their types, use the tplist tool.
 Return probes can use the argument values received by the

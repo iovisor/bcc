@@ -26,8 +26,23 @@ void *bcc_usdt_new_frompid(int pid);
 void *bcc_usdt_new_frompath(const char *path);
 void bcc_usdt_close(void *usdt);
 
+struct bcc_usdt {
+    const char *provider;
+    const char *name;
+    const char *bin_path;
+    uint64_t semaphore;
+    int num_locations;
+    int num_arguments;
+};
+
+typedef void (*bcc_usdt_cb)(struct bcc_usdt *);
+void bcc_usdt_foreach(void *usdt, bcc_usdt_cb callback);
+
 int bcc_usdt_enable_probe(void *, const char *, const char *);
 const char *bcc_usdt_genargs(void *);
+const char *bcc_usdt_get_probe_argctype(
+  void *ctx, const char* probe_name, const int arg_index
+);
 
 typedef void (*bcc_usdt_uprobe_cb)(const char *, const char *, uint64_t, int);
 void bcc_usdt_foreach_uprobe(void *usdt, bcc_usdt_uprobe_cb callback);

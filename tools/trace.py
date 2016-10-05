@@ -9,7 +9,8 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 # Copyright (C) 2016 Sasha Goldshtein.
 
-from bcc import BPF, Tracepoint, Perf, USDT
+from bcc import BPF, USDT
+from functools import partial
 from time import sleep, strftime
 import argparse
 import re
@@ -58,9 +59,12 @@ class Probe(object):
                 cls.first_ts = Time.monotonic_time()
                 cls.pid = args.pid or -1
 
-        def __init__(self, probe, string_size):
+        def __init__(self, probe, string_size, kernel_stack, user_stack):
+                self.usdt = None
                 self.raw_probe = probe
                 self.string_size = string_size
+                self.kernel_stack = kernel_stack
+                self.user_stack = user_stack
                 Probe.probe_count += 1
                 self._parse_probe()
                 self.probe_num = Probe.probe_count
@@ -134,10 +138,8 @@ class Probe(object):
                 if self.probe_type == "t":
                         self.tp_category = parts[1]
                         self.tp_event = parts[2]
-                        self.tp = Tracepoint.enable_tracepoint(
-                                        self.tp_category, self.tp_event)
                         self.library = ""       # kernel
-                        self.function = "perf_trace_%s" % self.tp_event
+                        self.function = ""      # generated from TRACEPOINT_PROBE
                 elif self.probe_type == "u":
                         self.library = parts[1]
                         self.usdt_name = parts[2]
@@ -145,30 +147,15 @@ class Probe(object):
                         # We will discover the USDT provider by matching on
                         # the USDT name in the specified library
                         self._find_usdt_probe()
-                        self._enable_usdt_probe()
                 else:
                         self.library = parts[1]
                         self.function = parts[2]
 
-        def _enable_usdt_probe(self):
-                if self.usdt.need_enable():
-                        if Probe.pid == -1:
-                                self._bail("probe needs pid to enable")
-                        self.usdt.enable(Probe.pid)
-
-        def _disable_usdt_probe(self):
-                if self.probe_type == "u" and self.usdt.need_enable():
-                        self.usdt.disable(Probe.pid)
-
-        def close(self):
-                self._disable_usdt_probe()
-
         def _find_usdt_probe(self):
-                reader = USDTReader(bin_path=self.library)
-                for probe in reader.probes:
+                self.usdt = USDT(path=self.library, pid=Probe.pid)
+                for probe in self.usdt.enumerate_probes():
                         if probe.name == self.usdt_name:
-                                self.usdt = probe
-                                return
+                                return # Found it, will enable later
                 self._bail("unrecognized USDT probe %s" % self.usdt_name)
 
         def _parse_filter(self, filt):
@@ -219,7 +206,8 @@ class Probe(object):
         def _replace_args(self, expr):
                 for alias, replacement in Probe.aliases.items():
                         # For USDT probes, we replace argN values with the
-                        # actual arguments for that probe.
+                        # actual arguments for that probe obtained using special
+                        # bpf_readarg_N macros emitted at BPF construction.
                         if alias.startswith("arg") and self.probe_type == "u":
                                 continue
                         expr = expr.replace(alias, replacement)
@@ -249,6 +237,10 @@ class Probe(object):
                 ]
                 for i in range(0, len(self.types)):
                         self._generate_python_field_decl(i, fields)
+                if self.kernel_stack:
+                        fields.append(("kernel_stack_id", ct.c_int))
+                if self.user_stack:
+                        fields.append(("user_stack_id", ct.c_int))
                 return type(self.python_struct_name, (ct.Structure,),
                             dict(_fields_=fields))
 
@@ -273,11 +265,18 @@ class Probe(object):
                 # construct the final display string.
                 self.events_name = "%s_events" % self.probe_name
                 self.struct_name = "%s_data_t" % self.probe_name
-
+                self.stacks_name = "%s_stacks" % self.probe_name
+                stack_table = "BPF_STACK_TRACE(%s, 1024);" % self.stacks_name \
+                              if (self.kernel_stack or self.user_stack) else ""
                 data_fields = ""
                 for i, field_type in enumerate(self.types):
                         data_fields += "        " + \
                                        self._generate_field_decl(i)
+
+                kernel_stack_str = "       int kernel_stack_id;" \
+                                   if self.kernel_stack else ""
+                user_stack_str = "       int user_stack_id;" \
+                                 if self.user_stack else ""
 
                 text = """
 struct %s
@@ -286,25 +285,56 @@ struct %s
         u32 pid;
         char comm[TASK_COMM_LEN];
 %s
+%s
+%s
 };
 
 BPF_PERF_OUTPUT(%s);
+%s
 """
-                return text % (self.struct_name, data_fields, self.events_name)
+                return text % (self.struct_name, data_fields,
+                               kernel_stack_str, user_stack_str,
+                               self.events_name, stack_table)
 
         def _generate_field_assign(self, idx):
                 field_type = self.types[idx]
-                expr = self.values[idx]
+                expr = self.values[idx].strip()
+                text = ""
+                if self.probe_type == "u" and expr[0:3] == "arg":
+                        text = ("        u64 %s = 0;\n" +
+                                "        bpf_usdt_readarg(%s, ctx, &%s);\n") % \
+                                (expr, expr[3], expr)
+
                 if field_type == "s":
-                        return """
+                        return text + """
         if (%s != 0) {
                 bpf_probe_read(&__data.v%d, sizeof(__data.v%d), (void *)%s);
         }
 """                     % (expr, idx, idx, expr)
                 if field_type in Probe.fmt_types:
-                        return "        __data.v%d = (%s)%s;\n" % \
+                        return text + "        __data.v%d = (%s)%s;\n" % \
                                         (idx, Probe.c_type[field_type], expr)
                 self._bail("unrecognized field type %s" % field_type)
+
+        def _generate_usdt_filter_read(self):
+            text = ""
+            if self.probe_type == "u":
+                    for arg, _ in Probe.aliases.items():
+                        if not (arg.startswith("arg") and (arg in self.filter)):
+                                continue
+                        arg_index = int(arg.replace("arg", ""))
+                        arg_ctype = self.usdt.get_probe_arg_ctype(
+                                self.usdt_name, arg_index)
+                        if not arg_ctype:
+                                self._bail("Unable to determine type of {} "
+                                           "in the filter".format(arg))
+                        text += """
+        {} {}_filter;
+        bpf_usdt_readarg({}, ctx, &{}_filter);
+                        """.format(arg_ctype, arg, arg_index, arg)
+                        self.filter = self.filter.replace(
+                                arg, "{}_filter".format(arg))
+            return text
 
         def generate_program(self, include_self):
                 data_decl = self._generate_data_decl()
@@ -324,24 +354,34 @@ BPF_PERF_OUTPUT(%s);
                         pid_filter = ""
 
                 prefix = ""
-                qualifier = ""
                 signature = "struct pt_regs *ctx"
-                if self.probe_type == "t":
-                        data_decl += self.tp.generate_struct()
-                        prefix = self.tp.generate_get_struct()
-                elif self.probe_type == "u":
-                        signature += ", int __loc_id"
-                        prefix = self.usdt.generate_usdt_cases(
-                                pid=Probe.pid if Probe.pid != -1 else None)
-                        qualifier = "static inline"
 
                 data_fields = ""
                 for i, expr in enumerate(self.values):
                         data_fields += self._generate_field_assign(i)
 
-                text = """
-%s int %s(%s)
+                stack_trace = ""
+                if self.user_stack:
+                        stack_trace += """
+        __data.user_stack_id = %s.get_stackid(
+          ctx, BPF_F_REUSE_STACKID | BPF_F_USER_STACK
+        );""" % self.stacks_name
+                if self.kernel_stack:
+                        stack_trace += """
+        __data.kernel_stack_id = %s.get_stackid(
+          ctx, BPF_F_REUSE_STACKID
+        );""" % self.stacks_name
+
+                if self.probe_type == "t":
+                        heading = "TRACEPOINT_PROBE(%s, %s)" % \
+                                  (self.tp_category, self.tp_event)
+                        ctx_name = "args"
+                else:
+                        heading = "int %s(%s)" % (self.probe_name, signature)
+                        ctx_name = "ctx"
+                text = heading + """
 {
+        %s
         %s
         %s
         if (!(%s)) return 0;
@@ -351,18 +391,15 @@ BPF_PERF_OUTPUT(%s);
         __data.pid = bpf_get_current_pid_tgid();
         bpf_get_current_comm(&__data.comm, sizeof(__data.comm));
 %s
-        %s.perf_submit(ctx, &__data, sizeof(__data));
+%s
+        %s.perf_submit(%s, &__data, sizeof(__data));
         return 0;
 }
 """
-                text = text % (qualifier, self.probe_name, signature,
-                               pid_filter, prefix, self.filter,
-                               self.struct_name, data_fields, self.events_name)
-
-                if self.probe_type == "u":
-                        self.usdt_thunk_names = []
-                        text += self.usdt.generate_usdt_thunks(
-                                        self.probe_name, self.usdt_thunk_names)
+                text = text % (pid_filter, prefix,
+                               self._generate_usdt_filter_read(), self.filter,
+                               self.struct_name, data_fields,
+                               stack_trace, self.events_name, ctx_name)
 
                 return data_decl + "\n" + text
 
@@ -378,7 +415,16 @@ BPF_PERF_OUTPUT(%s);
                 else:   # self.probe_type == 't'
                         return self.tp_event
 
-        def print_event(self, cpu, data, size):
+        def print_stack(self, bpf, stack_id, pid):
+            if stack_id < 0:
+                print("        %d" % stack_id)
+                return
+
+            stack = list(bpf.get_table(self.stacks_name).walk(stack_id))
+            for addr in stack:
+                print("        %016x %s" % (addr, bpf.sym(addr, pid)))
+
+        def print_event(self, bpf, cpu, data, size):
                 # Cast as the generated structure type and display
                 # according to the format string in the probe.
                 event = ct.cast(data, ct.POINTER(self.python_struct)).contents
@@ -391,6 +437,15 @@ BPF_PERF_OUTPUT(%s);
                     (time[:8], event.pid, event.comm[:12],
                      self._display_function(), msg))
 
+                if self.user_stack:
+                    print("    User Stack Trace:")
+                    self.print_stack(bpf, event.user_stack_id, event.pid)
+                if self.kernel_stack:
+                    print("    Kernel Stack Trace:")
+                    self.print_stack(bpf, event.kernel_stack_id, -1)
+                if self.user_stack or self.kernel_stack:
+                    print("")
+
                 Probe.event_count += 1
                 if Probe.max_events is not None and \
                    Probe.event_count >= Probe.max_events:
@@ -402,30 +457,28 @@ BPF_PERF_OUTPUT(%s);
                 else:
                         self._attach_u(bpf)
                 self.python_struct = self._generate_python_data_decl()
-                bpf[self.events_name].open_perf_buffer(self.print_event)
+                callback = partial(self.print_event, bpf)
+                bpf[self.events_name].open_perf_buffer(callback)
 
         def _attach_k(self, bpf):
                 if self.probe_type == "r":
                         bpf.attach_kretprobe(event=self.function,
                                              fn_name=self.probe_name)
-                elif self.probe_type == "p" or self.probe_type == "t":
+                elif self.probe_type == "p":
                         bpf.attach_kprobe(event=self.function,
                                           fn_name=self.probe_name)
+                # Note that tracepoints don't need an explicit attach
 
         def _attach_u(self, bpf):
                 libpath = BPF.find_library(self.library)
                 if libpath is None:
                         # This might be an executable (e.g. 'bash')
-                        libpath = BPF._find_exe(self.library)
+                        libpath = BPF.find_exe(self.library)
                 if libpath is None or len(libpath) == 0:
                         self._bail("unable to find library %s" % self.library)
 
                 if self.probe_type == "u":
-                        for i, location in enumerate(self.usdt.locations):
-                                bpf.attach_uprobe(name=libpath,
-                                        addr=location.address,
-                                        fn_name=self.usdt_thunk_names[i],
-                                        pid=Probe.pid)
+                        pass # Was already enabled by the BPF constructor
                 elif self.probe_type == "r":
                         bpf.attach_uretprobe(name=libpath,
                                              sym=self.function,
@@ -459,7 +512,7 @@ trace 'r::__kmalloc (retval == 0) "kmalloc failed!"
         Trace returns from __kmalloc which returned a null pointer
 trace 'r:c:malloc (retval) "allocated = %p", retval
         Trace returns from malloc and print non-NULL allocated buffers
-trace 't:block:block_rq_complete "sectors=%d", tp.nr_sector'
+trace 't:block:block_rq_complete "sectors=%d", args->nr_sector'
         Trace the block_rq_complete kernel tracepoint and print # of tx sectors
 trace 'u:pthread:pthread_create (arg4 != 0)'
         Trace the USDT probe pthread_create when its 4th argument is non-zero
@@ -482,6 +535,10 @@ trace 'u:pthread:pthread_create (arg4 != 0)'
                   help="number of events to print before quitting")
                 parser.add_argument("-o", "--offset", action="store_true",
                   help="use relative time from first traced message")
+                parser.add_argument("-K", "--kernel-stack", action="store_true",
+                  help="output kernel stack trace")
+                parser.add_argument("-U", "--user_stack", action="store_true",
+                  help="output user stack trace")
                 parser.add_argument(metavar="probe", dest="probes", nargs="+",
                   help="probe specifier (see examples)")
                 self.args = parser.parse_args()
@@ -491,7 +548,8 @@ trace 'u:pthread:pthread_create (arg4 != 0)'
                 self.probes = []
                 for probe_spec in self.args.probes:
                         self.probes.append(Probe(
-                                probe_spec, self.args.string_size))
+                                probe_spec, self.args.string_size,
+                                self.args.kernel_stack, self.args.user_stack))
 
         def _generate_program(self):
                 self.program = """
@@ -501,8 +559,6 @@ trace 'u:pthread:pthread_create (arg4 != 0)'
 """
                 self.program += BPF.generate_auto_includes(
                         map(lambda p: p.raw_probe, self.probes))
-                self.program += Tracepoint.generate_decl()
-                self.program += Tracepoint.generate_entry_probe()
                 for probe in self.probes:
                         self.program += probe.generate_program(
                                         self.args.include_self)
@@ -511,8 +567,18 @@ trace 'u:pthread:pthread_create (arg4 != 0)'
                         print(self.program)
 
         def _attach_probes(self):
-                self.bpf = BPF(text=self.program)
-                Tracepoint.attach(self.bpf)
+                usdt_contexts = []
+                for probe in self.probes:
+                    if probe.usdt:
+                        # USDT probes must be enabled before the BPF object
+                        # is initialized, because that's where the actual
+                        # uprobe is being attached.
+                        probe.usdt.enable_probe(
+                                probe.usdt_name, probe.probe_name)
+                        if self.args.verbose:
+                                print(probe.usdt.get_text())
+                        usdt_contexts.append(probe.usdt)
+                self.bpf = BPF(text=self.program, usdt_contexts=usdt_contexts)
                 for probe in self.probes:
                         if self.args.verbose:
                                 print(probe)
@@ -530,12 +596,6 @@ trace 'u:pthread:pthread_create (arg4 != 0)'
                 while True:
                         self.bpf.kprobe_poll()
 
-        def _close_probes(self):
-                for probe in self.probes:
-                        probe.close()
-                        if self.args.verbose:
-                                print("closed probe: " + str(probe))
-
         def run(self):
                 try:
                         self._create_probes()
@@ -547,7 +607,6 @@ trace 'u:pthread:pthread_create (arg4 != 0)'
                                 traceback.print_exc()
                         elif sys.exc_info()[0] is not SystemExit:
                                 print(sys.exc_info()[1])
-                self._close_probes()
 
 if __name__ == "__main__":
        Tool().run()
