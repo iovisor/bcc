@@ -165,7 +165,7 @@ static int list_in_scn(Elf *e, Elf_Scn *section, size_t stridx, size_t symsize,
         continue;
 
       if (callback(name, sym.st_value, sym.st_size, sym.st_info, payload) < 0)
-        break;
+        return 1;      // signal termination to caller
     }
   }
 
@@ -184,9 +184,13 @@ static int listsymbols(Elf *e, bcc_elf_symcb callback, void *payload) {
     if (header.sh_type != SHT_SYMTAB && header.sh_type != SHT_DYNSYM)
       continue;
 
-    if (list_in_scn(e, section, header.sh_link, header.sh_entsize, callback,
-                    payload) < 0)
-      return -1;
+    int rc = list_in_scn(e, section, header.sh_link, header.sh_entsize,
+                         callback, payload);
+    if (rc == 1)
+      break;    // callback signaled termination
+
+    if (rc < 0)
+      return rc;
   }
 
   return 0;

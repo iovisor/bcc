@@ -25,7 +25,7 @@ import errno
 import sys
 basestring = (unicode if sys.version_info[0] < 3 else str)
 
-from .libbcc import lib, _CB_TYPE, bcc_symbol
+from .libbcc import lib, _CB_TYPE, bcc_symbol, _SYM_CB_TYPE
 from .table import Table
 from .perf import Perf
 from .usyms import ProcessSymbols
@@ -531,8 +531,25 @@ class BPF(object):
         res = lib.bcc_procutils_which_so(libname.encode("ascii"))
         return res if res is None else res.decode()
 
-    def attach_tracepoint(self, tp="", fn_name="", pid=-1, cpu=0, group_fd=-1):
-        """attach_tracepoint(tp="", fn_name="", pid=-1, cpu=0, group_fd=-1)
+    def _get_tracepoints(self, tp_re):
+        results = []
+        events_dir = os.path.join(TRACEFS, "events")
+        for category in os.listdir(events_dir):
+            cat_dir = os.path.join(events_dir, category)
+            if not os.path.isdir(cat_dir):
+                continue
+            for event in os.listdir(cat_dir):
+                evt_dir = os.path.join(cat_dir, event)
+                if os.path.isdir(evt_dir):
+                    tp = ("%s:%s" % (category, event))
+                    if re.match(tp_re, tp):
+                        results.append(tp)
+        return results
+
+    def attach_tracepoint(self, tp="", tp_re="", fn_name="", pid=-1,
+                          cpu=0, group_fd=-1):
+        """attach_tracepoint(tp="", tp_re="", fn_name="", pid=-1,
+                             cpu=0, group_fd=-1)
 
         Run the bpf function denoted by fn_name every time the kernel tracepoint
         specified by 'tp' is hit. The optional parameters pid, cpu, and group_fd
@@ -540,11 +557,23 @@ class BPF(object):
         the tracepoint category and the tracepoint name, separated by a colon.
         For example: sched:sched_switch, syscalls:sys_enter_bind, etc.
 
+        Instead of a tracepoint name, a regular expression can be provided in
+        tp_re. The program will then attach to tracepoints that match the
+        provided regular expression.
+
         To obtain a list of kernel tracepoints, use the tplist tool or cat the
         file /sys/kernel/debug/tracing/available_events.
 
-        Example: BPF(text).attach_tracepoint("sched:sched_switch", "on_switch")
+        Examples:
+            BPF(text).attach_tracepoint(tp="sched:sched_switch", fn_name="on_switch")
+            BPF(text).attach_tracepoint(tp_re="sched:.*", fn_name="on_switch")
         """
+
+        if tp_re:
+            for tp in self._get_tracepoints(tp_re):
+                self.attach_tracepoint(tp=tp, fn_name=fn_name, pid=pid,
+                                       cpu=cpu, group_fd=group_fd)
+            return
 
         fn = self.load_func(fn_name, BPF.TRACEPOINT)
         (tp_category, tp_name) = tp.split(':')
@@ -586,15 +615,39 @@ class BPF(object):
         del self.open_uprobes[name]
         _num_open_probes -= 1
 
-    def attach_uprobe(self, name="", sym="", addr=None,
+    def _get_user_functions(self, name, sym_re):
+        """
+        We are returning addresses here instead of symbol names because it
+        turns out that the same name may appear multiple times with different
+        addresses, and the same address may appear multiple times with the same
+        name. We can't attach a uprobe to the same address more than once, so
+        it makes sense to return the unique set of addresses that are mapped to
+        a symbol that matches the provided regular expression.
+        """
+        addresses = []
+        def sym_cb(sym_name, addr):
+            if re.match(sym_re, sym_name) and addr not in addresses:
+                addresses.append(addr)
+            return 0
+
+        res = lib.bcc_foreach_symbol(name, _SYM_CB_TYPE(sym_cb))
+        if res < 0:
+            raise Exception("Error %d enumerating symbols in %s" % (res, name))
+        return addresses
+
+    def attach_uprobe(self, name="", sym="", sym_re="", addr=None,
             fn_name="", pid=-1, cpu=0, group_fd=-1):
-        """attach_uprobe(name="", sym="", addr=None, fn_name=""
+        """attach_uprobe(name="", sym="", sym_re="", addr=None, fn_name=""
                          pid=-1, cpu=0, group_fd=-1)
 
         Run the bpf function denoted by fn_name every time the symbol sym in
         the library or binary 'name' is encountered. The real address addr may
         be supplied in place of sym. Optional parameters pid, cpu, and group_fd
         can be used to filter the probe.
+
+        Instead of a symbol name, a regular expression can be provided in
+        sym_re. The uprobe will then attach to symbols that match the provided
+        regular expression.
 
         Libraries can be given in the name argument without the lib prefix, or
         with the full path (/usr/lib/...). Binaries can be given only with the
@@ -605,6 +658,14 @@ class BPF(object):
         """
 
         name = str(name)
+
+        if sym_re:
+            for sym_addr in self._get_user_functions(name, sym_re):
+                self.attach_uprobe(name=name, addr=sym_addr,
+                                   fn_name=fn_name, pid=pid, cpu=cpu,
+                                   group_fd=group_fd)
+            return
+
         (path, addr) = BPF._check_path_symbol(name, sym, addr)
 
         self._check_probe_quota(1)
@@ -799,6 +860,17 @@ class BPF(object):
         return name
 
     @staticmethod
+    def symaddr(addr, pid):
+        """symaddr(addr, pid)
+
+        Translate a memory address into a function name plus the instruction
+        offset as a hexadecimal number, which is returned as a string.
+        A pid of less than zero will access the kernel symbol cache.
+        """
+        name, offset = BPF._sym_cache(pid).resolve(addr)
+        return "%s+0x%x" % (name, offset)
+
+    @staticmethod
     def ksym(addr):
         """ksym(addr)
 
@@ -815,8 +887,7 @@ class BPF(object):
         instruction offset as a hexidecimal number, which is returned as a
         string.
         """
-        name, offset = BPF._sym_cache(-1).resolve(addr)
-        return "%s+0x%x" % (name, offset)
+        return BPF.symaddr(addr, -1)
 
     @staticmethod
     def ksymname(name):
@@ -834,6 +905,20 @@ class BPF(object):
         perf_events readers.
         """
         return len([k for k in self.open_kprobes.keys() if isinstance(k, str)])
+
+    def num_open_uprobes(self):
+        """num_open_uprobes()
+
+        Get the number of open U[ret]probes.
+        """
+        return len(self.open_uprobes)
+
+    def num_open_tracepoints(self):
+        """num_open_tracepoints()
+
+        Get the number of open tracepoints.
+        """
+        return len(self.open_tracepoints)
 
     def kprobe_poll(self, timeout = -1):
         """kprobe_poll(self)

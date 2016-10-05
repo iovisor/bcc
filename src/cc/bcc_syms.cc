@@ -270,6 +270,32 @@ int bcc_find_symbol_addr(struct bcc_symbol *sym) {
   return bcc_elf_foreach_sym(sym->module, _find_sym, sym);
 }
 
+struct sym_search_t {
+  struct bcc_symbol *syms;
+  int start;
+  int requested;
+  int *actual;
+};
+
+// see <elf.h>
+#define ELF_TYPE_IS_FUNCTION(flags) (((flags) & 0xf) == 2)
+
+static int _list_sym(const char *symname, uint64_t addr, uint64_t end,
+                     int flags, void *payload) {
+  if (!ELF_TYPE_IS_FUNCTION(flags) || addr == 0)
+    return 0;
+
+  SYM_CB cb = (SYM_CB) payload;
+  return cb(symname, addr); 
+}
+
+int bcc_foreach_symbol(const char *module, SYM_CB cb) {
+  if (module == 0 || cb == 0)
+    return -1;
+
+  return bcc_elf_foreach_sym(module, _list_sym, (void *)cb);
+}
+
 int bcc_resolve_symname(const char *module, const char *symname,
                         const uint64_t addr, struct bcc_symbol *sym) {
   uint64_t load_addr;
