@@ -120,6 +120,9 @@ if debug:
 # initialize BPF
 b = BPF(text=bpf_text)
 b.attach_kprobe(event="vfs_create", fn_name="trace_create")
+# newer kernels (say, 4.8) may don't fire vfs_create, so record (or overwrite)
+# the timestamp in security_inode_create():
+b.attach_kprobe(event="security_inode_create", fn_name="trace_create")
 b.attach_kprobe(event="vfs_unlink", fn_name="trace_unlink")
 
 # header

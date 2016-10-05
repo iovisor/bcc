@@ -9,9 +9,9 @@ on who deleted the file, the file age, and the file name. The intent is to
 provide information on short-lived files, for debugging or performance
 analysis.
 
-This works by tracing the kernel vfs_create() and vfs_delete() functions using
-dynamic tracing, and will need updating to match any changes to these
-functions.
+This works by tracing the kernel vfs_create() and vfs_delete() functions (and
+maybe more, see the source) using dynamic tracing, and will need updating to
+match any changes to these functions.
 
 This makes use of a Linux 4.5 feature (bpf_perf_event_output());
 for kernels older than 4.5, see the version under tools/old,
