@@ -1,0 +1,8 @@
+-- Configuration for unit tests
+-- See: http://olivinelabs.com/busted/ 
+return {
+	default = {
+		lpath = "./?.lua",
+		["auto-insulate"] = false,
+	}
+}

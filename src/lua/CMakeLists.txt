@@ -4,7 +4,8 @@ find_program(LUAJIT luajit)
 if (LUAJIT_LIBRARIES AND LUAJIT)
 	FILE(GLOB_RECURSE SRC_LUA
 		${CMAKE_CURRENT_SOURCE_DIR}/bcc/*.lua
-		${CMAKE_CURRENT_SOURCE_DIR}/bcc/vendor/*.lua)
+		${CMAKE_CURRENT_SOURCE_DIR}/bcc/vendor/*.lua
+		${CMAKE_CURRENT_SOURCE_DIR}/bpf/*.lua)
 
 	ADD_CUSTOM_COMMAND(
 		OUTPUT bcc.lua
