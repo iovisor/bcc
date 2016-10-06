@@ -66,11 +66,19 @@ if(NOT DEFINED BCC_KERNEL_MODULES_SUFFIX)
 endif()
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
-# iterate over all available directories in LLVM_INCLUDE_DIRS to
-# generate a correctly tokenized list of parameters
-foreach(ONE_LLVM_INCLUDE_DIR ${LLVM_INCLUDE_DIRS})
-  set(CXX_ISYSTEM_DIRS "${CXX_ISYSTEM_DIRS} -isystem ${ONE_LLVM_INCLUDE_DIR}")
-endforeach()
+
+# As reported in issue #735, GCC 6 has some behavioral problems when
+# dealing with -isystem. Hence, skip the warning optimization
+# altogether on that compiler.
+execute_process(COMMAND ${CMAKE_C_COMPILER} -dumpversion OUTPUT_VARIABLE GCC_VERSION)
+if (GCC_VERSION VERSION_LESS 6.0)
+  # iterate over all available directories in LLVM_INCLUDE_DIRS to
+  # generate a correctly tokenized list of parameters
+  foreach(ONE_LLVM_INCLUDE_DIR ${LLVM_INCLUDE_DIRS})
+    set(CXX_ISYSTEM_DIRS "${CXX_ISYSTEM_DIRS} -isystem ${ONE_LLVM_INCLUDE_DIR}")
+  endforeach()
+endif()
+
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall ${CXX_ISYSTEM_DIRS}")
 endif()
 
