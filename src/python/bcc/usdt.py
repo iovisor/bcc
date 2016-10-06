@@ -12,24 +12,99 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .libbcc import lib, _USDT_CB, _USDT_PROBE_CB
+import ctypes as ct
+from .libbcc import lib, _USDT_CB, _USDT_PROBE_CB, \
+                    bcc_usdt_location, bcc_usdt_argument, \
+                    BCC_USDT_ARGUMENT_FLAGS
 
-class USDTProbe(object):
-    def __init__(self, usdt):
-        self.provider = usdt.provider
-        self.name = usdt.name
-        self.bin_path = usdt.bin_path
-        self.semaphore = usdt.semaphore
-        self.num_locations = usdt.num_locations
-        self.num_arguments = usdt.num_arguments
+class USDTProbeArgument(object):
+    def __init__(self, argument):
+        self.signed = argument.size < 0
+        self.size = abs(argument.size)
+        self.valid = argument.valid
+        if self.valid & BCC_USDT_ARGUMENT_FLAGS.CONSTANT != 0:
+            self.constant = argument.constant
+        if self.valid & BCC_USDT_ARGUMENT_FLAGS.DEREF_OFFSET != 0:
+            self.deref_offset = argument.deref_offset
+        if self.valid & BCC_USDT_ARGUMENT_FLAGS.DEREF_IDENT != 0:
+            self.deref_ident = argument.deref_ident
+        if self.valid & BCC_USDT_ARGUMENT_FLAGS.REGISTER_NAME != 0:
+            self.register_name = argument.register_name
+
+    def _size_prefix(self):
+        return "%d %s bytes" % \
+                (self.size, "signed  " if self.signed else "unsigned")
+
+    def _format(self):
+        # This mimics the logic in cc/usdt_args.cc that gives meaning to the
+        # various argument settings. A change there will require a change here.
+        if self.valid & BCC_USDT_ARGUMENT_FLAGS.CONSTANT != 0:
+            return "%d" % self.constant
+        if self.valid & BCC_USDT_ARGUMENT_FLAGS.DEREF_OFFSET == 0:
+            return "%s" % self.register_name
+        if self.valid & BCC_USDT_ARGUMENT_FLAGS.DEREF_OFFSET != 0 and \
+           self.valid & BCC_USDT_ARGUMENT_FLAGS.DEREF_IDENT == 0:
+            sign = '+' if self.deref_offset >= 0 else '-'
+            return "*(%s %s %d)" % (self.register_name,
+                                    sign, abs(self.deref_offset))
+        if self.valid & BCC_USDT_ARGUMENT_FLAGS.DEREF_OFFSET != 0 and \
+           self.valid & BCC_USDT_ARGUMENT_FLAGS.DEREF_IDENT != 0 and \
+           self.valid & BCC_USDT_ARGUMENT_FLAGS.REGISTER_NAME != 0 and \
+           self.register_name == "ip":
+            sign = '+' if self.deref_offset >= 0 else '-'
+            return "*(&%s %s %d)" % (self.deref_ident,
+                                     sign, abs(self.deref_offset))
+        # If we got here, this is an unrecognized case. Doesn't mean it's
+        # necessarily bad, so just provide the raw data. It just means that
+        # other tools won't be able to work with this argument.
+        return "unrecognized argument format, flags %d" % self.valid
 
     def __str__(self):
-        return "%s %s:%s [sema 0x%x]\n  %d location(s)\n  %d argument(s)" % \
-               (self.bin_path, self.provider, self.name, self.semaphore,
-                self.num_locations, self.num_arguments)
+        return "%s @ %s" % (self._size_prefix(), self._format())
+
+class USDTProbeLocation(object):
+    def __init__(self, probe, index, location):
+        self.probe = probe
+        self.index = index
+        self.num_arguments = probe.num_arguments
+        self.address = location.address
+
+    def __str__(self):
+        return "0x%x" % self.address
+
+    def get_argument(self, index):
+        arg = bcc_usdt_argument()
+        res = lib.bcc_usdt_get_argument(self.probe.context, self.probe.name,
+                                        self.index, index, ct.pointer(arg))
+        if res != 0:
+            raise Exception("error retrieving probe argument %d location %d" %
+                            (index, self.index))
+        return USDTProbeArgument(arg)
+
+class USDTProbe(object):
+    def __init__(self, context, probe):
+        self.context = context
+        self.provider = probe.provider
+        self.name = probe.name
+        self.bin_path = probe.bin_path
+        self.semaphore = probe.semaphore
+        self.num_locations = probe.num_locations
+        self.num_arguments = probe.num_arguments
+
+    def __str__(self):
+        return "%s %s:%s [sema 0x%x]" % \
+               (self.bin_path, self.provider, self.name, self.semaphore)
 
     def short_name(self):
         return "%s:%s" % (self.provider, self.name)
+
+    def get_location(self, index):
+        loc = bcc_usdt_location()
+        res = lib.bcc_usdt_get_location(self.context, self.name,
+                                        index, ct.pointer(loc))
+        if res != 0:
+            raise Exception("error retrieving probe location %d" % index)
+        return USDTProbeLocation(self, index, loc)
 
 class USDT(object):
     def __init__(self, pid=None, path=None):
@@ -62,7 +137,7 @@ class USDT(object):
     def enumerate_probes(self):
         probes = []
         def _add_probe(probe):
-            probes.append(USDTProbe(probe.contents))
+            probes.append(USDTProbe(self.context, probe.contents))
 
         lib.bcc_usdt_foreach(self.context, _USDT_CB(_add_probe))
         return probes

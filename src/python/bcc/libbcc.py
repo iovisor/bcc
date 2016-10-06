@@ -174,10 +174,40 @@ class bcc_usdt(ct.Structure):
             ('num_arguments', ct.c_int),
         ]
 
+class bcc_usdt_location(ct.Structure):
+    _fields_ = [
+            ('address', ct.c_ulonglong)
+        ]
+
+class BCC_USDT_ARGUMENT_FLAGS(object):
+    NONE = 0x0
+    CONSTANT = 0x1
+    DEREF_OFFSET = 0x2
+    DEREF_IDENT = 0x4
+    REGISTER_NAME = 0x8
+
+class bcc_usdt_argument(ct.Structure):
+    _fields_ = [
+            ('size', ct.c_int),
+            ('valid', ct.c_int),
+            ('constant', ct.c_int),
+            ('deref_offset', ct.c_int),
+            ('deref_ident', ct.c_char_p),
+            ('register_name', ct.c_char_p)
+        ]
+
 _USDT_CB = ct.CFUNCTYPE(None, ct.POINTER(bcc_usdt))
 
 lib.bcc_usdt_foreach.restype = None
 lib.bcc_usdt_foreach.argtypes = [ct.c_void_p, _USDT_CB]
+
+lib.bcc_usdt_get_location.restype = ct.c_int
+lib.bcc_usdt_get_location.argtypes = [ct.c_void_p, ct.c_char_p, ct.c_int,
+                                      ct.POINTER(bcc_usdt_location)]
+
+lib.bcc_usdt_get_argument.restype = ct.c_int
+lib.bcc_usdt_get_argument.argtypes = [ct.c_void_p, ct.c_char_p, ct.c_int,
+                                      ct.c_int, ct.POINTER(bcc_usdt_argument)]
 
 _USDT_PROBE_CB = ct.CFUNCTYPE(None, ct.c_char_p, ct.c_char_p,
                               ct.c_ulonglong, ct.c_int)
