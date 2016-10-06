@@ -28,7 +28,7 @@
 
 namespace USDT {
 
-Probe::Location::Location(uint64_t addr, const char *arg_fmt) : address_(addr) {
+Location::Location(uint64_t addr, const char *arg_fmt) : address_(addr) {
   ArgumentParser_x64 parser(arg_fmt);
   while (!parser.done()) {
     Argument arg;
@@ -274,7 +274,7 @@ void Context::each_uprobe(each_uprobe_cb callback) {
     if (!p->enabled())
       continue;
 
-    for (Probe::Location &loc : p->locations_) {
+    for (Location &loc : p->locations_) {
       callback(p->bin_path_.c_str(), p->attached_to_->c_str(), loc.address_,
                pid_.value_or(-1));
     }
@@ -355,6 +355,52 @@ const char *bcc_usdt_get_probe_argctype(
 void bcc_usdt_foreach(void *usdt, bcc_usdt_cb callback) {
   USDT::Context *ctx = static_cast<USDT::Context *>(usdt);
   ctx->each(callback);
+}
+
+int bcc_usdt_get_location(void *usdt, const char *probe_name,
+                          int index, struct bcc_usdt_location *location) {
+    USDT::Context *ctx = static_cast<USDT::Context *>(usdt);
+    USDT::Probe *probe = ctx->get(probe_name);
+    if (!probe)
+        return -1;
+    if (index < 0 || (size_t)index >= probe->num_locations())
+        return -1;
+    location->address = probe->address(index);
+    return 0;
+}
+
+int bcc_usdt_get_argument(void *usdt, const char *probe_name,
+                          int location_index, int argument_index,
+                          struct bcc_usdt_argument *argument) {
+    USDT::Context *ctx = static_cast<USDT::Context *>(usdt);
+    USDT::Probe *probe = ctx->get(probe_name);
+    if (!probe)
+        return -1;
+    if (argument_index < 0 || (size_t)argument_index >= probe->num_arguments())
+        return -1;
+    if (location_index < 0 || (size_t)location_index >= probe->num_locations())
+        return -1;
+    auto const &location = probe->location(location_index);
+    auto const &arg = location.arguments_[argument_index];
+    argument->size = arg.arg_size();
+    argument->valid = BCC_USDT_ARGUMENT_NONE;
+    if (arg.constant()) {
+        argument->valid |= BCC_USDT_ARGUMENT_CONSTANT;
+        argument->constant = *(arg.constant());
+    }
+    if (arg.deref_offset()) {
+        argument->valid |= BCC_USDT_ARGUMENT_DEREF_OFFSET;
+        argument->deref_offset = *(arg.deref_offset());
+    }
+    if (arg.deref_ident()) {
+        argument->valid |= BCC_USDT_ARGUMENT_DEREF_IDENT;
+        argument->deref_ident = arg.deref_ident()->c_str();
+    }
+    if (arg.register_name()) {
+        argument->valid |= BCC_USDT_ARGUMENT_REGISTER_NAME;
+        argument->register_name = arg.register_name()->c_str();
+    }
+    return 0;
 }
 
 void bcc_usdt_foreach_uprobe(void *usdt, bcc_usdt_uprobe_cb callback) {
