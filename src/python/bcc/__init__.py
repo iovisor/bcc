@@ -700,15 +700,22 @@ class BPF(object):
             raise Exception("Failed to detach BPF from uprobe")
         self._del_uprobe(ev_name)
 
-    def attach_uretprobe(self, name="", sym="", addr=None,
+    def attach_uretprobe(self, name="", sym="", sym_re="", addr=None,
             fn_name="", pid=-1, cpu=0, group_fd=-1):
-        """attach_uretprobe(name="", sym="", addr=None, fn_name=""
+        """attach_uretprobe(name="", sym="", sym_re="", addr=None, fn_name=""
                             pid=-1, cpu=0, group_fd=-1)
 
         Run the bpf function denoted by fn_name every time the symbol sym in
         the library or binary 'name' finishes execution. See attach_uprobe for
         meaning of additional parameters.
         """
+
+        if sym_re:
+            for sym_addr in self._get_user_functions(name, sym_re):
+                self.attach_uretprobe(name=name, addr=sym_addr,
+                                      fn_name=fn_name, pid=pid, cpu=cpu,
+                                      group_fd=group_fd)
+            return
 
         name = str(name)
         (path, addr) = BPF._check_path_symbol(name, sym, addr)

@@ -47,6 +47,98 @@ decoration. Only the count column is copied to user-level on output. This is an
 efficient way to time kernel functions and examine their latency distribution.
 
 
+Now trace a user function, pthread_mutex_lock in libpthread, to determine if
+there is considerable lock contention:
+
+# ./funclatency pthread:pthread_mutex_lock -p $(pidof contentions)
+Tracing 1 function for "pthread:pthread_mutex_lock"... Hit Ctrl-C to end.
+     nsecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 0        |                                        |
+      1024 -> 2047       : 0        |                                        |
+      2048 -> 4095       : 508967   |****************************************|
+      4096 -> 8191       : 70072    |*****                                   |
+      8192 -> 16383      : 27686    |**                                      |
+     16384 -> 32767      : 5075     |                                        |
+     32768 -> 65535      : 2318     |                                        |
+     65536 -> 131071     : 581      |                                        |
+    131072 -> 262143     : 38       |                                        |
+    262144 -> 524287     : 5        |                                        |
+    524288 -> 1048575    : 1        |                                        |
+   1048576 -> 2097151    : 9        |                                        |
+Detaching...
+
+It seems that most calls to pthread_mutex_lock completed rather quickly (in 
+under 4us), but there were some cases of considerable contention, sometimes
+over a full millisecond.
+
+
+Run a quick-and-dirty profiler over all the functions in an executable:
+# ./funclatency /home/user/primes:* -p $(pidof primes) -F
+Tracing 15 functions for "/home/user/primes:*"... Hit Ctrl-C to end.
+^C
+
+Function = is_prime [6556]
+     nsecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 0        |                                        |
+      1024 -> 2047       : 0        |                                        |
+      2048 -> 4095       : 1495322  |****************************************|
+      4096 -> 8191       : 95744    |**                                      |
+      8192 -> 16383      : 9926     |                                        |
+     16384 -> 32767      : 3070     |                                        |
+     32768 -> 65535      : 1415     |                                        |
+     65536 -> 131071     : 112      |                                        |
+    131072 -> 262143     : 9        |                                        |
+    262144 -> 524287     : 3        |                                        |
+    524288 -> 1048575    : 0        |                                        |
+   1048576 -> 2097151    : 8        |                                        |
+
+Function = insert_result [6556]
+     nsecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 0        |                                        |
+      1024 -> 2047       : 0        |                                        |
+      2048 -> 4095       : 111047   |****************************************|
+      4096 -> 8191       : 3998     |*                                       |
+      8192 -> 16383      : 720      |                                        |
+     16384 -> 32767      : 238      |                                        |
+     32768 -> 65535      : 106      |                                        |
+     65536 -> 131071     : 5        |                                        |
+    131072 -> 262143     : 4        |                                        |
+Detaching...
+
+From the results, we can see that the is_prime function has something resembling
+an exponential distribution -- very few primes take a very long time to test,
+while most numbers are verified as prime or composite in less than 4us. The
+insert_result function exhibits a similar phenomenon, likely due to contention
+over a shared results container.
+
+
 Now vfs_read() is traced, and a microseconds histogram printed:
 
 # ./funclatency -u vfs_read
@@ -239,13 +331,13 @@ Detaching...
 USAGE message:
 
 # ./funclatency -h
-usage: funclatency [-h] [-p PID] [-i INTERVAL] [-T] [-u] [-m] [-F] [-r]
+usage: funclatency [-h] [-p PID] [-i INTERVAL] [-T] [-u] [-m] [-F] [-r] [-v]
                    pattern
 
-Time kernel functions and print latency as a histogram
+Time functions and print latency as a histogram
 
 positional arguments:
-  pattern               search expression for kernel functions
+  pattern               search expression for functions
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -258,12 +350,15 @@ optional arguments:
   -F, --function        show a separate histogram per function
   -r, --regexp          use regular expressions. Default is "*" wildcards
                         only.
+  -v, --verbose         print the BPF program (for debugging purposes)
 
 examples:
     ./funclatency do_sys_open       # time the do_sys_open() kernel function
+    ./funclatency c:read            # time the read() C library function
     ./funclatency -u vfs_read       # time vfs_read(), in microseconds
     ./funclatency -m do_nanosleep   # time do_nanosleep(), in milliseconds
     ./funclatency -mTi 5 vfs_read   # output every 5 seconds, with timestamps
     ./funclatency -p 181 vfs_read   # time process 181 only
     ./funclatency 'vfs_fstat*'      # time both vfs_fstat() and vfs_fstatat()
+    ./funclatency 'c:*printf'       # time the *printf family of functions
     ./funclatency -F 'vfs_r*'       # show one histogram per matched function

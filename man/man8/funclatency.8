@@ -1,10 +1,10 @@
 .TH funclatency 8  "2015-08-18" "USER COMMANDS"
 .SH NAME
-funclatency \- Time kernel functions and print latency as a histogram.
+funclatency \- Time functions and print latency as a histogram.
 .SH SYNOPSIS
-.B funclatency [\-h] [\-p PID] [\-i INTERVAL] [\-T] [\-u] [\-m] [\-r] [\-F] pattern
+.B funclatency [\-h] [\-p PID] [\-i INTERVAL] [\-T] [\-u] [\-m] [\-F] [\-r] [\-v] pattern
 .SH DESCRIPTION
-This tool traces kernel function calls and times their duration (latency), and
+This tool traces function calls and times their duration (latency), and
 shows the latency distribution as a histogram. The time is measured from when
 the function is called to when it returns, and is inclusive of both on-CPU
 time and time spent blocked.
@@ -17,7 +17,7 @@ timestamps will be overwritten, creating dubious output. Try to match single
 functions, or groups of functions that run at the same stack layer, and
 don't ultimately call each other.
 
-WARNING: This uses dynamic tracing of (what can be many) kernel functions, an
+WARNING: This uses dynamic tracing of (what can be many) functions, an
 activity that has had issues on some kernel versions (risk of panics or
 freezes). Test, and know what you are doing, before use.
 
@@ -51,11 +51,18 @@ Print a separate histogram per function matched.
 .TP
 \-r
 Use regular expressions for the search pattern.
+.TP
+\-v
+Print the BPF program (for debugging purposes).
 .SH EXAMPLES
 .TP
 Time the do_sys_open() kernel function, and print the distribution as a histogram:
 #
 .B funclatency do_sys_open
+.TP
+Time the read() function in libc across all processes on the system:
+#
+.B funclatency c:read
 .TP
 Time vfs_read(), and print the histogram in units of microseconds:
 #
@@ -116,6 +123,6 @@ Linux
 .SH STABILITY
 Unstable - in development.
 .SH AUTHOR
-Brendan Gregg
+Brendan Gregg, Sasha Goldshtein
 .SH SEE ALSO
 funccount(8)
