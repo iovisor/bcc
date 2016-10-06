@@ -88,6 +88,31 @@ The dev, sector, nr_sector, etc. variables can now all be used in probes
 you specify with argdist or trace.
 
 
+For debugging USDT probes, it is sometimes useful to see the exact locations
+and arguments of the probes, including the registers or global variables from
+which their values are coming from. In super-verbose mode, tplist will print
+this information (note the -vv):
+
+$ tplist -vv -l c *alloc*
+/lib64/libc.so.6 libc:memory_malloc_retry [sema 0x0]
+  location #0 0x835c0
+    argument #0 8 unsigned bytes @ bp
+  location #1 0x83778
+    argument #0 8 unsigned bytes @ bp
+  location #2 0x85a50
+    argument #0 8 unsigned bytes @ bp
+/lib64/libc.so.6 libc:memory_realloc_retry [sema 0x0]
+  location #0 0x84b90
+    argument #0 8 unsigned bytes @ r13
+    argument #1 8 unsigned bytes @ bp
+  location #1 0x85cf0
+    argument #0 8 unsigned bytes @ r13
+    argument #1 8 unsigned bytes @ bp
+/lib64/libc.so.6 libc:memory_calloc_retry [sema 0x0]
+  location #0 0x850f0
+    argument #0 8 unsigned bytes @ bp
+
+
 USAGE message:
 
 $ tplist -h
@@ -102,5 +127,5 @@ optional arguments:
   -h, --help         show this help message and exit
   -p PID, --pid PID  List USDT probes in the specified process
   -l LIB, --lib LIB  List USDT probes in the specified library or executable
-  -v                 Print the format (available variables)
+  -v                 Increase verbosity level (print variables, arguments, etc.)
 
