@@ -117,17 +117,17 @@ public:
   ArgumentParser_x64(const char *arg) : ArgumentParser(arg) {}
 };
 
+struct Location {
+  uint64_t address_;
+  std::vector<Argument> arguments_;
+  Location(uint64_t addr, const char *arg_fmt);
+};
+
 class Probe {
   std::string bin_path_;
   std::string provider_;
   std::string name_;
   uint64_t semaphore_;
-
-  struct Location {
-    uint64_t address_;
-    std::vector<Argument> arguments_;
-    Location(uint64_t addr, const char *arg_fmt);
-  };
 
   std::vector<Location> locations_;
 
@@ -153,6 +153,7 @@ public:
   uint64_t semaphore()   const { return semaphore_; }
 
   uint64_t address(size_t n = 0) const { return locations_[n].address_; }
+  const Location &location(size_t n) const { return locations_[n]; }
   bool usdt_getarg(std::ostream &stream);
   std::string get_arg_ctype(int arg_index) {
     return largest_arg_type(arg_index);
