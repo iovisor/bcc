@@ -111,8 +111,8 @@ int trace_return(struct pt_regs *ctx)
     return 0;
 }
 """
-if args.tid: # TID trumps PID
-    bpf_text = bpf_text.replace('FILTER', 
+if args.tid:  # TID trumps PID
+    bpf_text = bpf_text.replace('FILTER',
         'if (tid != %s) { return 0; }' % args.tid)
 elif args.pid:
     bpf_text = bpf_text.replace('FILTER',
@@ -144,7 +144,8 @@ initial_ts = 0
 # header
 if args.timestamp:
     print("%-14s" % ("TIME(s)"), end="")
-print("%-6s %-16s %4s %3s %s" % ("TID" if args.tid else "PID", "COMM", "FD", "ERR", "PATH"))
+print("%-6s %-16s %4s %3s %s" %
+      ("TID" if args.tid else "PID", "COMM", "FD", "ERR", "PATH"))
 
 # process event
 def print_event(cpu, data, size):
@@ -172,8 +173,8 @@ def print_event(cpu, data, size):
         delta = event.ts - initial_ts
         print("%-14.9f" % (float(delta) / 1000000), end="")
 
-    print("%-6d %-16s %4d %3d %s" % 
-          (event.id & 0xffffffff if args.tid else event.id >> 32, 
+    print("%-6d %-16s %4d %3d %s" %
+          (event.id & 0xffffffff if args.tid else event.id >> 32,
            event.comm, fd_s, err, event.fname))
 
 # loop with callback to print_event
