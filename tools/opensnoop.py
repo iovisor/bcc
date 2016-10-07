@@ -24,6 +24,7 @@ examples = """examples:
     ./opensnoop -T        # include timestamps
     ./opensnoop -x        # only show failed opens
     ./opensnoop -p 181    # only trace PID 181
+    ./opensnoop -t 123    # only trace TID 123
     ./opensnoop -n main   # only print process names containing "main"
 """
 parser = argparse.ArgumentParser(
@@ -36,6 +37,8 @@ parser.add_argument("-x", "--failed", action="store_true",
     help="only show failed opens")
 parser.add_argument("-p", "--pid",
     help="trace this PID only")
+parser.add_argument("-t", "--tid",
+    help="trace this TID only")
 parser.add_argument("-n", "--name",
     help="only print process names containing this name")
 args = parser.parse_args()
@@ -108,7 +111,10 @@ int trace_return(struct pt_regs *ctx)
     return 0;
 }
 """
-if args.pid:
+if args.tid: # TID trumps PID
+    bpf_text = bpf_text.replace('FILTER', 
+        'if (tid != %s) { return 0; }' % args.tid)
+elif args.pid:
     bpf_text = bpf_text.replace('FILTER',
         'if (pid != %s) { return 0; }' % args.pid)
 else:
@@ -138,7 +144,7 @@ initial_ts = 0
 # header
 if args.timestamp:
     print("%-14s" % ("TIME(s)"), end="")
-print("%-6s %-16s %4s %3s %s" % ("PID", "COMM", "FD", "ERR", "PATH"))
+print("%-6s %-16s %4s %3s %s" % ("TID" if args.tid else "PID", "COMM", "FD", "ERR", "PATH"))
 
 # process event
 def print_event(cpu, data, size):
@@ -166,8 +172,9 @@ def print_event(cpu, data, size):
         delta = event.ts - initial_ts
         print("%-14.9f" % (float(delta) / 1000000), end="")
 
-    print("%-6d %-16s %4d %3d %s" % (event.id >> 32, event.comm,
-          fd_s, err, event.fname))
+    print("%-6d %-16s %4d %3d %s" % 
+          (event.id & 0xffffffff if args.tid else event.id >> 32, 
+           event.comm, fd_s, err, event.fname))
 
 # loop with callback to print_event
 b["events"].open_perf_buffer(print_event)
