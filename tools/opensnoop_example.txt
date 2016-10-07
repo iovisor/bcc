@@ -123,16 +123,17 @@ to the '-n' option.
 USAGE message:
 
 # ./opensnoop -h
-usage: opensnoop [-h] [-T] [-x] [-p PID] [-t TID]
+usage: opensnoop [-h] [-T] [-x] [-p PID] [-t TID] [-n NAME]
 
 Trace open() syscalls
 
 optional arguments:
-  -h, --help         show this help message and exit
-  -T, --timestamp    include timestamp on output
-  -x, --failed       only show failed opens
-  -p PID, --pid PID  trace this PID only
-  -t TID, --tid TID  trace this TID only
+  -h, --help            show this help message and exit
+  -T, --timestamp       include timestamp on output
+  -x, --failed          only show failed opens
+  -p PID, --pid PID     trace this PID only
+  -t TID, --tid TID     trace this TID only
+  -n NAME, --name NAME  only print process names containing this name
 
 examples:
     ./opensnoop           # trace all open() syscalls
@@ -140,3 +141,4 @@ examples:
     ./opensnoop -x        # only show failed opens
     ./opensnoop -p 181    # only trace PID 181
     ./opensnoop -t 123    # only trace TID 123
+    ./opensnoop -n main   # only print process names containing "main"

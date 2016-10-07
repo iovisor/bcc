@@ -4,7 +4,7 @@
 # opensnoop Trace open() syscalls.
 #           For Linux, uses BCC, eBPF. Embedded C.
 #
-# USAGE: opensnoop [-h] [-T] [-x] [-p PID] [-t TID]
+# USAGE: opensnoop [-h] [-T] [-x] [-p PID] [-t TID] [-n NAME]
 #
 # Copyright (c) 2015 Brendan Gregg.
 # Licensed under the Apache License, Version 2.0 (the "License")
