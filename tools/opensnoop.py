@@ -4,13 +4,14 @@
 # opensnoop Trace open() syscalls.
 #           For Linux, uses BCC, eBPF. Embedded C.
 #
-# USAGE: opensnoop [-h] [-t] [-x] [-p PID] [-t TID]
+# USAGE: opensnoop [-h] [-T] [-x] [-p PID] [-t TID]
 #
 # Copyright (c) 2015 Brendan Gregg.
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
 # 17-Sep-2015   Brendan Gregg   Created this.
-# 29-Apr-2016   Allan McAleavy updated for BPF_PERF_OUTPUT
+# 29-Apr-2016   Allan McAleavy  Updated for BPF_PERF_OUTPUT.
+# 08-Oct-2016   Dina Goldshtein Support filtering by PID and TID.
 
 from __future__ import print_function
 from bcc import BPF
@@ -20,7 +21,7 @@ import ctypes as ct
 # arguments
 examples = """examples:
     ./opensnoop           # trace all open() syscalls
-    ./opensnoop -t        # include timestamps
+    ./opensnoop -T        # include timestamps
     ./opensnoop -x        # only show failed opens
     ./opensnoop -p 181    # only trace PID 181
     ./opensnoop -n main   # only print process names containing "main"
@@ -29,7 +30,7 @@ parser = argparse.ArgumentParser(
     description="Trace open() syscalls",
     formatter_class=argparse.RawDescriptionHelpFormatter,
     epilog=examples)
-parser.add_argument("-t", "--timestamp", action="store_true",
+parser.add_argument("-T", "--timestamp", action="store_true",
     help="include timestamp on output")
 parser.add_argument("-x", "--failed", action="store_true",
     help="only show failed opens")
