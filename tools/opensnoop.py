@@ -4,7 +4,7 @@
 # opensnoop Trace open() syscalls.
 #           For Linux, uses BCC, eBPF. Embedded C.
 #
-# USAGE: opensnoop [-h] [-t] [-x] [-p PID]
+# USAGE: opensnoop [-h] [-t] [-x] [-p PID] [-t TID]
 #
 # Copyright (c) 2015 Brendan Gregg.
 # Licensed under the Apache License, Version 2.0 (the "License")
@@ -47,35 +47,36 @@ bpf_text = """
 #include <linux/sched.h>
 
 struct val_t {
-    u32 pid;
+    u64 id;
     u64 ts;
     char comm[TASK_COMM_LEN];
     const char *fname;
 };
 
 struct data_t {
-    u32 pid;
+    u64 id;
     u64 ts;
     int ret;
     char comm[TASK_COMM_LEN];
     char fname[NAME_MAX];
 };
 
-BPF_HASH(args_filename, u32, const char *);
-BPF_HASH(infotmp, u32, struct val_t);
+BPF_HASH(infotmp, u64, struct val_t);
 BPF_PERF_OUTPUT(events);
 
 int trace_entry(struct pt_regs *ctx, const char __user *filename)
 {
     struct val_t val = {};
-    u32 pid = bpf_get_current_pid_tgid();
+    u64 id = bpf_get_current_pid_tgid();
+    u32 pid = id >> 32; // PID is higher part
+    u32 tid = id;       // Cast and get the lower part
 
     FILTER
     if (bpf_get_current_comm(&val.comm, sizeof(val.comm)) == 0) {
-        val.pid = bpf_get_current_pid_tgid();
+        val.id = id;
         val.ts = bpf_ktime_get_ns();
         val.fname = filename;
-        infotmp.update(&pid, &val);
+        infotmp.update(&id, &val);
     }
 
     return 0;
@@ -83,26 +84,25 @@ int trace_entry(struct pt_regs *ctx, const char __user *filename)
 
 int trace_return(struct pt_regs *ctx)
 {
-    u32 pid = bpf_get_current_pid_tgid();
+    u64 id = bpf_get_current_pid_tgid();
     struct val_t *valp;
     struct data_t data = {};
 
     u64 tsp = bpf_ktime_get_ns();
 
-    valp = infotmp.lookup(&pid);
+    valp = infotmp.lookup(&id);
     if (valp == 0) {
         // missed entry
         return 0;
     }
     bpf_probe_read(&data.comm, sizeof(data.comm), valp->comm);
     bpf_probe_read(&data.fname, sizeof(data.fname), (void *)valp->fname);
-    data.pid = valp->pid;
+    data.id = valp->id;
     data.ts = tsp / 1000;
     data.ret = PT_REGS_RC(ctx);
 
     events.perf_submit(ctx, &data, sizeof(data));
-    infotmp.delete(&pid);
-    args_filename.delete(&pid);
+    infotmp.delete(&id);
 
     return 0;
 }
@@ -125,7 +125,7 @@ NAME_MAX = 255        # linux/limits.h
 
 class Data(ct.Structure):
     _fields_ = [
-        ("pid", ct.c_ulonglong),
+        ("id", ct.c_ulonglong),
         ("ts", ct.c_ulonglong),
         ("ret", ct.c_int),
         ("comm", ct.c_char * TASK_COMM_LEN),
@@ -165,7 +165,7 @@ def print_event(cpu, data, size):
         delta = event.ts - initial_ts
         print("%-14.9f" % (float(delta) / 1000000), end="")
 
-    print("%-6d %-16s %4d %3d %s" % (event.pid, event.comm,
+    print("%-6d %-16s %4d %3d %s" % (event.id >> 32, event.comm,
           fd_s, err, event.fname))
 
 # loop with callback to print_event
