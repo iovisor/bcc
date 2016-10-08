@@ -300,7 +300,7 @@ USAGE message:
 # argdist -h
 usage: argdist [-h] [-p PID] [-z STRING_SIZE] [-i INTERVAL] [-n COUNT] [-v]
                [-c] [-T TOP] [-H [specifier [specifier ...]]]
-               [-C [specifier [specifier ...]]] [-I [header [header ...]]]
+               [-C [specifier [specifier ...]]] [-I header]
 
 Trace a function and display a summary of its parameter values.
 
@@ -323,7 +323,7 @@ optional arguments:
   -C [specifier [specifier ...]], --count [specifier [specifier ...]]
                         probe specifier to capture count of (see examples
                         below)
-  -I [header [header ...]], --include [header [header ...]]
+  -I header, --include header
                         additional header files to include in the BPF program
 
 Probe specifier syntax:

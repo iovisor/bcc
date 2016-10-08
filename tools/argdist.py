@@ -7,7 +7,7 @@
 #                [-n COUNT] [-v] [-c] [-T TOP]
 #                [-C specifier [specifier ...]]
 #                [-H specifier [specifier ...]]
-#                [-I header [header ...]]
+#                [-I header]
 #
 # Licensed under the Apache License, Version 2.0 (the "License")
 # Copyright (C) 2016 Sasha Goldshtein.
@@ -585,7 +585,7 @@ argdist -p 2780 -z 120 \\
                   dest="countspecifier", metavar="specifier",
                   help="probe specifier to capture count of " +
                   "(see examples below)")
-                parser.add_argument("-I", "--include", nargs="*",
+                parser.add_argument("-I", "--include", action="append",
                   metavar="header",
                   help="additional header files to include in the BPF program")
                 self.args = parser.parse_args()
