@@ -299,8 +299,7 @@ USAGE message:
 
 # argdist -h
 usage: argdist [-h] [-p PID] [-z STRING_SIZE] [-i INTERVAL] [-n COUNT] [-v]
-               [-c] [-T TOP] [-H [specifier [specifier ...]]]
-               [-C [specifier [specifier ...]]] [-I header]
+               [-c] [-T TOP] [-H specifier] [-C[specifier] [-I header]
 
 Trace a function and display a summary of its parameter values.
 
@@ -317,10 +316,10 @@ optional arguments:
   -c, --cumulative      do not clear histograms and freq counts at each interval
   -T TOP, --top TOP     number of top results to show (not applicable to
                         histograms)
-  -H [specifier [specifier ...]], --histogram [specifier [specifier ...]]
+  -H specifier, --histogram specifier
                         probe specifier to capture histogram of (see examples
                         below)
-  -C [specifier [specifier ...]], --count [specifier [specifier ...]]
+  -C specifier, --count specifier
                         probe specifier to capture count of (see examples
                         below)
   -I header, --include header
@@ -392,9 +391,8 @@ argdist -C 'u:pthread:pthread_start():u64:arg2' -p 1337
         Print frequency of function addresses used as a pthread start function,
         relying on the USDT pthread_start probe in process 1337
 
-argdist -H \
-        'p:c:sleep(u32 seconds):u32:seconds' \
-        'p:c:nanosleep(struct timespec *req):long:req->tv_nsec'
+argdist -H 'p:c:sleep(u32 seconds):u32:seconds' \
+        -H 'p:c:nanosleep(struct timespec *req):long:req->tv_nsec'
         Print histograms of sleep() and nanosleep() parameter values
 
 argdist -p 2780 -z 120 \

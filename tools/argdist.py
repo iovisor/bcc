@@ -3,11 +3,8 @@
 # argdist   Trace a function and display a distribution of its
 #           parameter values as a histogram or frequency count.
 #
-# USAGE: argdist [-h] [-p PID] [-z STRING_SIZE] [-i INTERVAL]
-#                [-n COUNT] [-v] [-c] [-T TOP]
-#                [-C specifier [specifier ...]]
-#                [-H specifier [specifier ...]]
-#                [-I header]
+# USAGE: argdist [-h] [-p PID] [-z STRING_SIZE] [-i INTERVAL] [-n COUNT] [-v]
+#                [-c] [-T TOP] [-C specifier] [-H specifier] [-I header]
 #
 # Licensed under the Apache License, Version 2.0 (the "License")
 # Copyright (C) 2016 Sasha Goldshtein.
@@ -545,9 +542,8 @@ argdist -C 'u:pthread:pthread_start():u64:arg2' -p 1337
         Print frequency of function addresses used as a pthread start function,
         relying on the USDT pthread_start probe in process 1337
 
-argdist  -H \\
-        'p:c:sleep(u32 seconds):u32:seconds' \\
-        'p:c:nanosleep(struct timespec *req):long:req->tv_nsec'
+argdist -H 'p:c:sleep(u32 seconds):u32:seconds' \\
+        -H 'p:c:nanosleep(struct timespec *req):long:req->tv_nsec'
         Print histograms of sleep() and nanosleep() parameter values
 
 argdist -p 2780 -z 120 \\
@@ -577,11 +573,11 @@ argdist -p 2780 -z 120 \\
                 parser.add_argument("-T", "--top", type=int,
                   help="number of top results to show (not applicable to " +
                   "histograms)")
-                parser.add_argument("-H", "--histogram", nargs="*",
+                parser.add_argument("-H", "--histogram", action="append",
                   dest="histspecifier", metavar="specifier",
                   help="probe specifier to capture histogram of " +
                   "(see examples below)")
-                parser.add_argument("-C", "--count", nargs="*",
+                parser.add_argument("-C", "--count", action="append",
                   dest="countspecifier", metavar="specifier",
                   help="probe specifier to capture count of " +
                   "(see examples below)")
