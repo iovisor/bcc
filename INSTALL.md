@@ -82,7 +82,7 @@ sudo apt-get install binutils bcc bcc-tools libbcc-examples python-bcc
 ```bash
 echo "deb [trusted=yes] https://repo.iovisor.org/apt/trusty trusty-nightly main" | sudo tee /etc/apt/sources.list.d/iovisor.list
 sudo apt-get update
-sudo apt-get install bcc-tools
+sudo apt-get install bcc-tools libbcc-examples
 ```
 
 Test it:
