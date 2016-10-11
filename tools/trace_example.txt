@@ -105,6 +105,37 @@ block:block_rq_complete
 This output tells you that you can use "args->dev", "args->sector", etc. in your
 predicate and trace arguments.
 
+
+More and more high-level libraries are instrumented with USDT probe support.
+These probes can be traced by trace just like kernel tracepoints. For example,
+trace new threads being created and their function name:
+
+# trace 'u:pthread:pthread_create "%U", arg3'
+TIME     PID    COMM         FUNC             -
+02:07:29 4051   contentions  pthread_create   primes_thread+0x0
+02:07:29 4051   contentions  pthread_create   primes_thread+0x0
+02:07:29 4051   contentions  pthread_create   primes_thread+0x0
+02:07:29 4051   contentions  pthread_create   primes_thread+0x0
+^C
+
+The "%U" format specifier tells trace to resolve arg3 as a user-space symbol,
+if possible. Similarly, use "%K" for kernel symbols.
+
+Ruby, Node, and OpenJDK are also instrumented with USDT. For example, let's
+trace Ruby methods being called (this requires a version of Ruby built with 
+the --enable-dtrace configure flag):
+
+# trace 'u:ruby:method__entry "%s.%s", arg1, arg2' -p $(pidof irb)
+TIME     PID    COMM         FUNC             -
+12:08:43 18420  irb          method__entry    IRB::Context.verbose?
+12:08:43 18420  irb          method__entry    RubyLex.ungetc
+12:08:43 18420  irb          method__entry    RuxyLex.debug?
+^C
+
+In the previous invocation, arg1 and arg2 are the class name and method name
+for the Ruby method being invoked.
+
+
 As a final example, let's trace open syscalls for a specific process. By 
 default, tracing is system-wide, but the -p switch overrides this:
 

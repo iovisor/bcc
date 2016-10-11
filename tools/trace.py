@@ -163,10 +163,11 @@ class Probe(object):
 
         def _parse_types(self, fmt):
                 for match in re.finditer(
-                                r'[^%]%(s|u|d|llu|lld|hu|hd|x|llx|c)', fmt):
+                                r'[^%]%(s|u|d|llu|lld|hu|hd|x|llx|c|K|U)', fmt):
                         self.types.append(match.group(1))
                 fmt = re.sub(r'([^%]%)(u|d|llu|lld|hu|hd)', r'\1d', fmt)
                 fmt = re.sub(r'([^%]%)(x|llx)', r'\1x', fmt)
+                fmt = re.sub('%K|%U', '%s', fmt)
                 self.python_format = fmt.strip('"')
 
         def _parse_action(self, action):
@@ -216,8 +217,8 @@ class Probe(object):
         p_type = { "u": ct.c_uint, "d": ct.c_int,
                    "llu": ct.c_ulonglong, "lld": ct.c_longlong,
                    "hu": ct.c_ushort, "hd": ct.c_short,
-                   "x": ct.c_uint, "llx": ct.c_ulonglong,
-                   "c": ct.c_ubyte }
+                   "x": ct.c_uint, "llx": ct.c_ulonglong, "c": ct.c_ubyte,
+                   "K": ct.c_ulonglong, "U": ct.c_ulonglong }
 
         def _generate_python_field_decl(self, idx, fields):
                 field_type = self.types[idx]
@@ -248,7 +249,8 @@ class Probe(object):
                    "llu": "unsigned long long", "lld": "long long",
                    "hu": "unsigned short", "hd": "short",
                    "x": "unsigned int", "llx": "unsigned long long",
-                   "c": "char" }
+                   "c": "char", "K": "unsigned long long",
+                   "U": "unsigned long long" }
         fmt_types = c_type.keys()
 
         def _generate_field_decl(self, idx):
@@ -417,12 +419,24 @@ BPF_PERF_OUTPUT(%s);
 
         def print_stack(self, bpf, stack_id, pid):
             if stack_id < 0:
-                print("        %d" % stack_id)
-                return
+                    print("        %d" % stack_id)
+                    return
 
             stack = list(bpf.get_table(self.stacks_name).walk(stack_id))
             for addr in stack:
-                print("        %016x %s" % (addr, bpf.sym(addr, pid)))
+                    print("        %016x %s" % (addr, bpf.sym(addr, pid)))
+
+        def _format_message(self, bpf, pid, values):
+                # Replace each %K with kernel sym and %U with user sym in pid
+                kernel_placeholders = [i for i in xrange(0, len(self.types))
+                                       if self.types[i] == 'K']
+                user_placeholders   = [i for i in xrange(0, len(self.types))
+                                       if self.types[i] == 'U']
+                for kp in kernel_placeholders:
+                        values[kp] = bpf.ksymaddr(values[kp])
+                for up in user_placeholders:
+                        values[up] = bpf.symaddr(values[up], pid)
+                return self.python_format % tuple(values)
 
         def print_event(self, bpf, cpu, data, size):
                 # Cast as the generated structure type and display
@@ -430,7 +444,7 @@ BPF_PERF_OUTPUT(%s);
                 event = ct.cast(data, ct.POINTER(self.python_struct)).contents
                 values = map(lambda i: getattr(event, "v%d" % i),
                              range(0, len(self.values)))
-                msg = self.python_format % tuple(values)
+                msg = self._format_message(bpf, event.pid, values)
                 time = strftime("%H:%M:%S") if Probe.use_localtime else \
                        Probe._time_off_str(event.timestamp_ns)
                 print("%-8s %-6d %-12s %-16s %s" % \
@@ -438,13 +452,13 @@ BPF_PERF_OUTPUT(%s);
                      self._display_function(), msg))
 
                 if self.user_stack:
-                    print("    User Stack Trace:")
-                    self.print_stack(bpf, event.user_stack_id, event.pid)
+                        print("    User Stack Trace:")
+                        self.print_stack(bpf, event.user_stack_id, event.pid)
                 if self.kernel_stack:
-                    print("    Kernel Stack Trace:")
-                    self.print_stack(bpf, event.kernel_stack_id, -1)
+                        print("    Kernel Stack Trace:")
+                        self.print_stack(bpf, event.kernel_stack_id, -1)
                 if self.user_stack or self.kernel_stack:
-                    print("")
+                        print("")
 
                 Probe.event_count += 1
                 if Probe.max_events is not None and \
