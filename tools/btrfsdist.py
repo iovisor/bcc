@@ -119,15 +119,17 @@ int trace_open_entry(struct pt_regs *ctx, struct inode *inode,
 
 static int trace_return(struct pt_regs *ctx, const char *op)
 {
-    u64 *tsp;
+    u64 *tsp, ts;
     u32 pid = bpf_get_current_pid_tgid();
 
     // fetch timestamp and calculate delta
     tsp = start.lookup(&pid);
-    if (tsp == 0) {
+    ts = bpf_ktime_get_ns();
+
+    if (tsp == 0 || ts < *tsp) {
         return 0;   // missed start or filtered
     }
-    u64 delta = (bpf_ktime_get_ns() - *tsp) / FACTOR;
+    u64 delta = (ts - *tsp) / FACTOR;
 
     // store as histogram
     dist_key_t key = {.slot = bpf_log2l(delta)};

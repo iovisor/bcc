@@ -202,7 +202,7 @@ static int trace_return(struct pt_regs *ctx, int type)
     u64 ts = bpf_ktime_get_ns();
     u64 delta_us = (ts - valp->ts) / 1000;
     entryinfo.delete(&pid);
-    if (FILTER_US)
+    if (FILTER_US || ts < valp->ts)
         return 0;
 
     // workaround (rewriter should handle file to d_iname in one step):
