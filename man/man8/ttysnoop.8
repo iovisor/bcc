@@ -1,0 +1,60 @@
+.TH ttysnoop 8  "2016-02-08" "USER COMMANDS"
+.SH NAME
+ttysnoop \- Watch output from a tty or pts device. Uses Linux eBPF/bcc.
+.SH SYNOPSIS
+.B ttysnoop [\-h] [\-C] device
+.SH DESCRIPTION
+ttysnoop watches a tty or pts device, and prints the same output that is
+appearing on that device. It can be used to mirror the output from a shell
+session, or the system console.
+
+This works by use of kernel dynamic tracing of the tty_write() function.
+This tool will need updating in case that kernel function changes in a future
+kernel version.
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH OPTIONS
+.TP
+\-C
+Don't clear the screen.
+.TP
+device
+Either a path to a tty device (eg, /dev/tty0) or a pts number (eg, the "3"
+from /dev/pts/3).
+.SH EXAMPLES
+.TP
+Snoop output from /dev/pts/2
+#
+.B ttysnoop /dev/pts/2
+.TP
+Snoop output from /dev/pts/2 (shortcut)
+#
+.B ttysnoop 2
+.TP
+Snoop output from the system console
+#
+.B ttysnoop /dev/console
+.TP
+Snoop output from /dev/tty0
+#
+.B ttysnoop /dev/tty0
+.SH OVERHEAD
+As the rate of tty_write() is expected to be very low (<100/s), the overhead
+of this tool is expected to be negligible.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Brendan Gregg
+.SH SEE ALSO
+opensnoop(1)
