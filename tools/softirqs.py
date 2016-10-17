@@ -16,7 +16,7 @@ from bcc import BPF
 from time import sleep, strftime
 import argparse
 
-### arguments
+# arguments
 examples = """examples:
     ./softirqs            # sum soft irq event time
     ./softirqs -d         # show soft irq event time as histograms
@@ -47,7 +47,7 @@ else:
     label = "usecs"
 debug = 0
 
-### define BPF program
+# define BPF program
 bpf_text = """
 #include <uapi/linux/ptrace.h>
 
@@ -92,7 +92,7 @@ int trace_completion(struct pt_regs *ctx)
 }
 """
 
-### code substitutions
+# code substitutions
 if args.dist:
     bpf_text = bpf_text.replace('STORE',
         'irq_key_t key = {.ip = ip, .slot = bpf_log2l(delta)};' +
@@ -105,22 +105,22 @@ else:
 if debug:
     print(bpf_text)
 
-### load BPF program
+# load BPF program
 b = BPF(text=bpf_text)
 
 # this should really use irq:softirq_entry/exit tracepoints; for now the
 # soft irq functions are individually traced (search your kernel for
 # open_softirq() calls, and adjust the following list as needed).
 for softirqfunc in ("blk_iopoll_softirq", "blk_done_softirq",
-    "rcu_process_callbacks", "run_rebalance_domains", "tasklet_action",
-    "tasklet_hi_action", "run_timer_softirq", "net_tx_action",
-    "net_rx_action"):
+        "rcu_process_callbacks", "run_rebalance_domains", "tasklet_action",
+        "tasklet_hi_action", "run_timer_softirq", "net_tx_action",
+        "net_rx_action"):
     b.attach_kprobe(event=softirqfunc, fn_name="trace_start")
     b.attach_kretprobe(event=softirqfunc, fn_name="trace_completion")
 
 print("Tracing soft irq event time... Hit Ctrl-C to end.")
 
-### output
+# output
 exiting = 0 if args.interval else 1
 dist = b.get_table("dist")
 while (1):
