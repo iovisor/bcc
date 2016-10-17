@@ -88,7 +88,7 @@ int kprobe__sys_execve(struct pt_regs *ctx, struct filename *filename,
     const char __user *const __user *__argv,
     const char __user *const __user *__envp)
 {
-    // create data here and pass to submit_arg to save space on the stack (#555)
+    // create data here and pass to submit_arg to save stack space (#555)
     struct data_t data = {};
     data.pid = bpf_get_current_pid_tgid() >> 32;
     bpf_get_current_comm(&data.comm, sizeof(data.comm));
@@ -167,8 +167,8 @@ start_ts = time.time()
 argv = defaultdict(list)
 
 # TODO: This is best-effort PPID matching. Short-lived processes may exit
-# before we get a chance to read the PPID. This should be replaced with fetching
-# PPID via C when available (#364).
+# before we get a chance to read the PPID. This should be replaced with
+# fetching PPID via C when available (#364).
 def get_ppid(pid):
     try:
         with open("/proc/%d/status" % pid) as status:
