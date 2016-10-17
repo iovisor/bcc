@@ -280,11 +280,13 @@ def print_outstanding():
                         alloc_info[info.stack_id].update(info.size)
                 else:
                         stack = list(stack_traces.walk(info.stack_id, decoder))
-                        alloc_info[info.stack_id] = Allocation(stack, info.size)
+                        alloc_info[info.stack_id] = Allocation(stack,
+                                                               info.size)
                 if args.show_allocs:
                         print("\taddr = %x size = %s" %
                               (address.value, info.size))
-        to_show = sorted(alloc_info.values(), key=lambda a: a.size)[-top_stacks:]
+        to_show = sorted(alloc_info.values(),
+                         key=lambda a: a.size)[-top_stacks:]
         for alloc in to_show:
                 print("\t%d bytes in %d allocations from stack\n\t\t%s" %
                       (alloc.size, alloc.count, "\n\t\t".join(alloc.stack)))
