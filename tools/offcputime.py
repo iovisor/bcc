@@ -40,8 +40,8 @@ examples = """examples:
     ./offcputime             # trace off-CPU stack time until Ctrl-C
     ./offcputime 5           # trace for 5 seconds only
     ./offcputime -f 5        # 5 seconds, and output in folded format
-    ./offcputime -m 1000     # trace only events that last more than 1000 usec.
-    ./offcputime -M 10000    # trace only events that last less than 10000 usec.
+    ./offcputime -m 1000     # trace only events that last more than 1000 usec
+    ./offcputime -M 10000    # trace only events that last less than 10000 usec
     ./offcputime -p 185      # only trace threads for PID 185
     ./offcputime -t 188      # only trace thread 188
     ./offcputime -u          # only trace user threads (no kernel)
@@ -82,10 +82,12 @@ parser.add_argument("duration", nargs="?", default=99999999,
     help="duration of trace, in seconds")
 parser.add_argument("-m", "--min-block-time", default=1,
     type=positive_nonzero_int,
-    help="the amount of time in microseconds over which we store traces (default 1)")
-parser.add_argument("-M", "--max-block-time", default=(1<<64)-1,
+    help="the amount of time in microseconds over which we " +
+         "store traces (default 1)")
+parser.add_argument("-M", "--max-block-time", default=(1 << 64) - 1,
     type=positive_nonzero_int,
-    help="the amount of time in microseconds under which we store traces (default U64_MAX)")
+    help="the amount of time in microseconds under which we " +
+         "store traces (default U64_MAX)")
 args = parser.parse_args()
 if args.pid and args.tgid:
     parser.error("specify only one of -p and -t")
@@ -198,13 +200,14 @@ else:
 bpf_text = bpf_text.replace('USER_STACK_GET', user_stack_get)
 bpf_text = bpf_text.replace('KERNEL_STACK_GET', kernel_stack_get)
 
-need_delimiter = args.delimited and not (args.kernel_stacks_only or args.user_stacks_only)
+need_delimiter = args.delimited and not (args.kernel_stacks_only or
+                                         args.user_stacks_only)
 
 # check for an edge case; the code below will handle this case correctly
 # but ultimately nothing will be displayed
 if args.kernel_threads_only and args.user_stacks_only:
-    print("ERROR: Displaying user stacks for kernel threads " \
-        "doesn't make sense.", file=stderr)
+    print("ERROR: Displaying user stacks for kernel threads " +
+          "doesn't make sense.", file=stderr)
     exit(1)
 
 # initialize BPF
@@ -240,8 +243,8 @@ stack_traces = b.get_table("stack_traces")
 for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
     # handle get_stackid erorrs
     if (not args.user_stacks_only and k.kernel_stack_id < 0) or \
-            (not args.kernel_stacks_only and k.user_stack_id < 0 and \
-                k.user_stack_id != -errno.EFAULT):
+            (not args.kernel_stacks_only and k.user_stack_id < 0 and
+                 k.user_stack_id != -errno.EFAULT):
         missing_stacks += 1
         # check for an ENOMEM error
         if k.kernel_stack_id == -errno.ENOMEM or \
