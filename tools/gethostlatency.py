@@ -51,7 +51,8 @@ int do_entry(struct pt_regs *ctx) {
     u32 pid = bpf_get_current_pid_tgid();
 
     if (bpf_get_current_comm(&val.comm, sizeof(val.comm)) == 0) {
-        bpf_probe_read(&val.host, sizeof(val.host), (void *)PT_REGS_PARM1(ctx));
+        bpf_probe_read(&val.host, sizeof(val.host),
+                       (void *)PT_REGS_PARM1(ctx));
         val.pid = bpf_get_current_pid_tgid();
         val.ts = bpf_ktime_get_ns();
         start.update(&pid, &val);
