@@ -183,4 +183,3 @@ while (1):
     countdown -= 1
     if exiting or countdown == 0:
         exit()
-
