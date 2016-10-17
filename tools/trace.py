@@ -46,6 +46,7 @@ class Time(object):
 
 class Probe(object):
         probe_count = 0
+        streq_index = 0
         max_events = None
         event_count = 0
         first_ts = 0
@@ -61,6 +62,7 @@ class Probe(object):
 
         def __init__(self, probe, string_size, kernel_stack, user_stack):
                 self.usdt = None
+                self.streq_functions = ""
                 self.raw_probe = probe
                 self.string_size = string_size
                 self.kernel_stack = kernel_stack
@@ -159,7 +161,7 @@ class Probe(object):
                 self._bail("unrecognized USDT probe %s" % self.usdt_name)
 
         def _parse_filter(self, filt):
-                self.filter = self._replace_args(filt)
+                self.filter = self._rewrite_expr(filt)
 
         def _parse_types(self, fmt):
                 for match in re.finditer(
@@ -178,14 +180,14 @@ class Probe(object):
                         return
 
                 action = action.strip()
-                match = re.search(r'(\".*\"),?(.*)', action)
+                match = re.search(r'(\".*?\"),?(.*)', action)
                 if match is None:
                         self._bail("expected format string in \"s")
 
                 self.raw_format = match.group(1)
                 self._parse_types(self.raw_format)
-                for part in match.group(2).split(','):
-                        part = self._replace_args(part)
+                for part in re.split('(?<!"),', match.group(2)):
+                        part = self._rewrite_expr(part)
                         if len(part) > 0:
                                 self.values.append(part)
 
@@ -204,7 +206,25 @@ class Probe(object):
                 "$cpu": "bpf_get_smp_processor_id()"
         }
 
-        def _replace_args(self, expr):
+        def _generate_streq_function(self, string):
+                fname = "streq_%d" % Probe.streq_index
+                Probe.streq_index += 1
+                self.streq_functions += """
+static inline bool %s(char const *ignored, unsigned long str) {
+        char needle[] = %s;
+        char haystack[sizeof(needle)];
+        bpf_probe_read(&haystack, sizeof(haystack), (void *)str);
+        for (int i = 0; i < sizeof(needle); ++i) {
+                if (needle[i] != haystack[i]) {
+                        return false;
+                }
+        }
+        return true;
+}
+                """ % (fname, string)
+                return fname
+
+        def _rewrite_expr(self, expr):
                 for alias, replacement in Probe.aliases.items():
                         # For USDT probes, we replace argN values with the
                         # actual arguments for that probe obtained using
@@ -212,6 +232,11 @@ class Probe(object):
                         if alias.startswith("arg") and self.probe_type == "u":
                                 continue
                         expr = expr.replace(alias, replacement)
+                matches = re.finditer('STRCMP\\(("[^"]+\\")', expr)
+                for match in matches:
+                        string = match.group(1)
+                        fname = self._generate_streq_function(string)
+                        expr = expr.replace("STRCMP", fname, 1)
                 return expr
 
         p_type = {"u": ct.c_uint, "d": ct.c_int,
@@ -405,7 +430,7 @@ BPF_PERF_OUTPUT(%s);
                                self.struct_name, data_fields,
                                stack_trace, self.events_name, ctx_name)
 
-                return data_decl + "\n" + text
+                return self.streq_functions + data_decl + "\n" + text
 
         @classmethod
         def _time_off_str(cls, timestamp_ns):
@@ -526,7 +551,7 @@ trace 'p:c:write (arg1 == 1) "writing %d bytes to STDOUT", arg3'
         Trace the write() call from libc to monitor writes to STDOUT
 trace 'r::__kmalloc (retval == 0) "kmalloc failed!"
         Trace returns from __kmalloc which returned a null pointer
-trace 'r:c:malloc (retval) "allocated = %p", retval
+trace 'r:c:malloc (retval) "allocated = %x", retval
         Trace returns from malloc and print non-NULL allocated buffers
 trace 't:block:block_rq_complete "sectors=%d", args->nr_sector'
         Trace the block_rq_complete kernel tracepoint and print # of tx sectors
