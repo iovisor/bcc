@@ -114,8 +114,8 @@ def print_event(cpu, data, size):
     ts = time.time() - start_ts
 
     if verbose:
-        print("%-18.9f %-12.12s %-6d %-3d %s" % (ts, event.comm, event.pid, cpu,
-                function))
+        print("%-18.9f %-12.12s %-6d %-3d %s" %
+              (ts, event.comm, event.pid, cpu, function))
     else:
         print("%-18.9f %s" % (ts, function))
 
