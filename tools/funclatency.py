@@ -9,8 +9,8 @@
 #
 # Run "funclatency -h" for full usage.
 #
-# The pattern is a string with optional '*' wildcards, similar to file globbing.
-# If you'd prefer to use regular expressions, use the -r option.
+# The pattern is a string with optional '*' wildcards, similar to file
+# globbing. If you'd prefer to use regular expressions, use the -r option.
 #
 # Currently nested or recursive functions are not supported properly, and
 # timestamps will be overwritten, creating dubious output. Try to match single
@@ -202,7 +202,8 @@ if not library:
     matched = b.num_open_kprobes()
 else:
     b.attach_uprobe(name=library, sym_re=pattern, fn_name="trace_func_entry")
-    b.attach_uretprobe(name=library, sym_re=pattern, fn_name="trace_func_return")
+    b.attach_uretprobe(name=library, sym_re=pattern,
+                       fn_name="trace_func_return")
     matched = b.num_open_uprobes()
 
 if matched == 0:
