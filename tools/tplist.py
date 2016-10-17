@@ -18,22 +18,23 @@ from bcc import USDT
 trace_root = "/sys/kernel/debug/tracing"
 event_root = os.path.join(trace_root, "events")
 
-parser = argparse.ArgumentParser(description=
-                "Display kernel tracepoints or USDT probes and their formats.",
-                formatter_class=argparse.RawDescriptionHelpFormatter)
-parser.add_argument("-p", "--pid", type=int, default=None, help=
-                "List USDT probes in the specified process")
-parser.add_argument("-l", "--lib", default="", help=
-                "List USDT probes in the specified library or executable")
-parser.add_argument("-v", dest="verbosity", action="count", help=
-                "Increase verbosity level (print variables, arguments, etc.)")
-parser.add_argument(dest="filter", nargs="?", help=
-                "A filter that specifies which probes/tracepoints to print")
+parser = argparse.ArgumentParser(
+        description="Display kernel tracepoints or USDT probes " +
+                    "and their formats.",
+        formatter_class=argparse.RawDescriptionHelpFormatter)
+parser.add_argument("-p", "--pid", type=int, default=None,
+        help="List USDT probes in the specified process")
+parser.add_argument("-l", "--lib", default="",
+        help="List USDT probes in the specified library or executable")
+parser.add_argument("-v", dest="verbosity", action="count",
+        help="Increase verbosity level (print variables, arguments, etc.)")
+parser.add_argument(dest="filter", nargs="?",
+        help="A filter that specifies which probes/tracepoints to print")
 args = parser.parse_args()
 
 def print_tpoint_format(category, event):
-        fmt = open(os.path.join(event_root, category, event, "format")
-                  ).readlines()
+        fmt = open(os.path.join(event_root, category, event, "format")) \
+              .readlines()
         for line in fmt:
                 match = re.search(r'field:([^;]*);', line)
                 if match is None:
@@ -81,7 +82,8 @@ def print_usdt_details(probe):
                         print("  %d location(s)" % probe.num_locations)
                         print("  %d argument(s)" % probe.num_arguments)
         else:
-                print("%s %s:%s" % (probe.bin_path, probe.provider, probe.name))
+                print("%s %s:%s" %
+                      (probe.bin_path, probe.provider, probe.name))
 
 def print_usdt(pid, lib):
         reader = USDT(path=lib, pid=pid)
@@ -103,4 +105,3 @@ if __name__ == "__main__":
         except:
                 if sys.exc_info()[0] is not SystemExit:
                         print(sys.exc_info()[1])
-
