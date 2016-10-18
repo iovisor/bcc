@@ -629,7 +629,7 @@ u = USDT(pid=int(pid))
 u.enable_probe(probe="http__server__request", fn_name="do_trace")
 
 # initialize BPF
-b = BPF(text=bpf_text, usdt=u)
+b = BPF(text=bpf_text, usdt_contexts=[u])
 ```
 
 Things to learn:
@@ -638,7 +638,7 @@ Things to learn:
 1. ```bpf_probe_read(&path, sizeof(path), (void *)addr)```: Now the string ```addr``` points to into our ```path``` variable.
 1. ```u = USDT(pid=int(pid))```: Initialize USDT tracing for the given PID.
 1. ```u.enable_probe(probe="http__server__request", fn_name="do_trace")```: Attach our ```do_trace()``` BPF C function to the Node.js ```http__server__request``` USDT probe.
-1. ```b = BPF(text=bpf_text, usdt=u)```: Need to pass in our USDT object, ```u```, to BPF object creation.
+1. ```b = BPF(text=bpf_text, usdt_contexts=[u])```: Need to pass in our USDT object, ```u```, to BPF object creation.
 
 ### Lesson 16. task_switch.c
 

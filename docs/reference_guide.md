@@ -544,7 +544,7 @@ Constructors.
 
 ### 1. BPF
 
-Syntax: ```BPF({text=BPF_program | src_file=filename} [, usdt=USDT_object])```
+Syntax: ```BPF({text=BPF_program | src_file=filename} [, usdt_contexts=[USDT_object, ...]])```
 
 Creates a BPF object. This is the main object for defining a BPF program, and interacting with its output.
 
@@ -569,7 +569,7 @@ b = BPF(src_file = "vfsreadlat.c")
 # include a USDT object:
 u = USDT(pid=int(pid))
 [...]
-b = BPF(text=bpf_text, usdt=u)
+b = BPF(text=bpf_text, usdt_contexts=[u])
 ```
 
 Examples in situ:
@@ -593,7 +593,7 @@ Examples:
 # include a USDT object:
 u = USDT(pid=int(pid))
 [...]
-b = BPF(text=bpf_text, usdt=u)
+b = BPF(text=bpf_text, usdt_contexts=[u])
 ```
 
 Examples in situ:

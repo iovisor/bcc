@@ -102,7 +102,7 @@ if debug:
     print(bpf_text)
 
 # initialize BPF
-b = BPF(text=bpf_text, usdt=u)
+b = BPF(text=bpf_text, usdt_contexts=[u])
 
 # header
 print("Tracing MySQL server queries for PID %d slower than %s ms..." % (pid,
