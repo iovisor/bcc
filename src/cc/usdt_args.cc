@@ -146,6 +146,9 @@ ssize_t ArgumentParser::parse_expr(ssize_t pos, Argument *dest) {
   } else {
     dest->deref_offset_ = 0;
     pos = parse_identifier(pos, &dest->deref_ident_);
+    if (arg_[pos] == '+' || arg_[pos] == '-') {
+      pos = parse_number(pos, &dest->deref_offset_);
+    }
   }
 
   if (arg_[pos] != '(')
@@ -184,10 +187,12 @@ bool ArgumentParser::parse(Argument *dest) {
   ssize_t res = parse_1(cur_pos_, dest);
   if (res < 0) {
     print_error(-res);
+    cur_pos_ = -res;
     return false;
   }
   if (!isspace(arg_[res]) && arg_[res] != '\0') {
     print_error(res);
+    cur_pos_ = res;
     return false;
   }
   while (isspace(arg_[res])) res++;

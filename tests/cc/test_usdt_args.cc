@@ -48,12 +48,25 @@ static void verify_register(USDT::ArgumentParser_x64 &parser, int arg_size,
 }
 
 TEST_CASE("test usdt argument parsing", "[usdt]") {
+  SECTION("parse failure") {
+    USDT::ArgumentParser_x64 parser("4@i%ra+1r");
+    USDT::Argument arg;
+    REQUIRE(!parser.parse(&arg));
+    int i;
+    for (i = 0; i < 10 && !parser.done(); ++i) {
+      parser.parse(&arg);
+    }
+    // Make sure we reach termination
+    REQUIRE(i < 10);
+  }
   SECTION("argument examples from the Python implementation") {
     USDT::ArgumentParser_x64 parser(
         "-4@$0 8@$1234 %rdi %rax %rsi "
         "-8@%rbx 4@%r12 8@-8(%rbp) 4@(%rax) "
         "-4@global_max_action(%rip) "
-        "8@24+mp_(%rip) ");
+        "8@24+mp_(%rip) "
+        "-4@CheckpointStats+40(%rip) "
+        "4@glob-2(%rip) ");
 
     verify_register(parser, -4, 0);
     verify_register(parser, 8, 1234);
@@ -69,6 +82,8 @@ TEST_CASE("test usdt argument parsing", "[usdt]") {
 
     verify_register(parser, -4, "ip", 0, std::string("global_max_action"));
     verify_register(parser, 8, "ip", 24, std::string("mp_"));
+    verify_register(parser, -4, "ip", 40, std::string("CheckpointStats"));
+    verify_register(parser, 4, "ip", -2, std::string("glob"));
 
     REQUIRE(parser.done());
   }
