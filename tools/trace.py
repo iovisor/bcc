@@ -106,8 +106,8 @@ class Probe(object):
                                 if text[i] == ")":
                                         balance -= 1
                                 if balance == 0:
-                                        self._parse_filter(text[:i+1])
-                                        text = text[i+1:]
+                                        self._parse_filter(text[:i + 1])
+                                        text = text[i + 1:]
                                         break
                         if self.filter is None:
                                 self._bail("unmatched end of predicate")
@@ -139,7 +139,7 @@ class Probe(object):
                         self.tp_category = parts[1]
                         self.tp_event = parts[2]
                         self.library = ""       # kernel
-                        self.function = ""      # generated from TRACEPOINT_PROBE
+                        self.function = ""      # from TRACEPOINT_PROBE
                 elif self.probe_type == "u":
                         self.library = parts[1]
                         self.usdt_name = parts[2]
@@ -155,7 +155,7 @@ class Probe(object):
                 self.usdt = USDT(path=self.library, pid=Probe.pid)
                 for probe in self.usdt.enumerate_probes():
                         if probe.name == self.usdt_name:
-                                return # Found it, will enable later
+                                return  # Found it, will enable later
                 self._bail("unrecognized USDT probe %s" % self.usdt_name)
 
         def _parse_filter(self, filt):
@@ -163,7 +163,7 @@ class Probe(object):
 
         def _parse_types(self, fmt):
                 for match in re.finditer(
-                                r'[^%]%(s|u|d|llu|lld|hu|hd|x|llx|c|K|U)', fmt):
+                            r'[^%]%(s|u|d|llu|lld|hu|hd|x|llx|c|K|U)', fmt):
                         self.types.append(match.group(1))
                 fmt = re.sub(r'([^%]%)(u|d|llu|lld|hu|hd)', r'\1d', fmt)
                 fmt = re.sub(r'([^%]%)(x|llx)', r'\1x', fmt)
@@ -207,18 +207,18 @@ class Probe(object):
         def _replace_args(self, expr):
                 for alias, replacement in Probe.aliases.items():
                         # For USDT probes, we replace argN values with the
-                        # actual arguments for that probe obtained using special
+                        # actual arguments for that probe obtained using
                         # bpf_readarg_N macros emitted at BPF construction.
                         if alias.startswith("arg") and self.probe_type == "u":
                                 continue
                         expr = expr.replace(alias, replacement)
                 return expr
 
-        p_type = { "u": ct.c_uint, "d": ct.c_int,
-                   "llu": ct.c_ulonglong, "lld": ct.c_longlong,
-                   "hu": ct.c_ushort, "hd": ct.c_short,
-                   "x": ct.c_uint, "llx": ct.c_ulonglong, "c": ct.c_ubyte,
-                   "K": ct.c_ulonglong, "U": ct.c_ulonglong }
+        p_type = {"u": ct.c_uint, "d": ct.c_int,
+                  "llu": ct.c_ulonglong, "lld": ct.c_longlong,
+                  "hu": ct.c_ushort, "hd": ct.c_short,
+                  "x": ct.c_uint, "llx": ct.c_ulonglong, "c": ct.c_ubyte,
+                  "K": ct.c_ulonglong, "U": ct.c_ulonglong}
 
         def _generate_python_field_decl(self, idx, fields):
                 field_type = self.types[idx]
@@ -245,12 +245,12 @@ class Probe(object):
                 return type(self.python_struct_name, (ct.Structure,),
                             dict(_fields_=fields))
 
-        c_type = { "u": "unsigned int", "d": "int",
-                   "llu": "unsigned long long", "lld": "long long",
-                   "hu": "unsigned short", "hd": "short",
-                   "x": "unsigned int", "llx": "unsigned long long",
-                   "c": "char", "K": "unsigned long long",
-                   "U": "unsigned long long" }
+        c_type = {"u": "unsigned int", "d": "int",
+                  "llu": "unsigned long long", "lld": "long long",
+                  "hu": "unsigned short", "hd": "short",
+                  "x": "unsigned int", "llx": "unsigned long long",
+                  "c": "char", "K": "unsigned long long",
+                  "U": "unsigned long long"}
         fmt_types = c_type.keys()
 
         def _generate_field_decl(self, idx):
@@ -304,15 +304,15 @@ BPF_PERF_OUTPUT(%s);
                 text = ""
                 if self.probe_type == "u" and expr[0:3] == "arg":
                         text = ("        u64 %s = 0;\n" +
-                                "        bpf_usdt_readarg(%s, ctx, &%s);\n") % \
-                                (expr, expr[3], expr)
+                                "        bpf_usdt_readarg(%s, ctx, &%s);\n") \
+                                % (expr, expr[3], expr)
 
                 if field_type == "s":
                         return text + """
         if (%s != 0) {
                 bpf_probe_read(&__data.v%d, sizeof(__data.v%d), (void *)%s);
         }
-"""                     % (expr, idx, idx, expr)
+                """ % (expr, idx, idx, expr)
                 if field_type in Probe.fmt_types:
                         return text + "        __data.v%d = (%s)%s;\n" % \
                                         (idx, Probe.c_type[field_type], expr)
@@ -322,7 +322,8 @@ BPF_PERF_OUTPUT(%s);
             text = ""
             if self.probe_type == "u":
                     for arg, _ in Probe.aliases.items():
-                        if not (arg.startswith("arg") and (arg in self.filter)):
+                        if not (arg.startswith("arg") and
+                                (arg in self.filter)):
                                 continue
                         arg_index = int(arg.replace("arg", ""))
                         arg_ctype = self.usdt.get_probe_arg_ctype(
@@ -346,12 +347,12 @@ BPF_PERF_OUTPUT(%s);
                         pid_filter = """
         u32 __pid = bpf_get_current_pid_tgid();
         if (__pid != %d) { return 0; }
-"""             % Probe.pid
+                """ % Probe.pid
                 elif not include_self:
                         pid_filter = """
         u32 __pid = bpf_get_current_pid_tgid();
         if (__pid == %d) { return 0; }
-"""             % os.getpid()
+                """ % os.getpid()
                 else:
                         pid_filter = ""
 
@@ -431,8 +432,8 @@ BPF_PERF_OUTPUT(%s);
                 # Replace each %K with kernel sym and %U with user sym in pid
                 kernel_placeholders = [i for i in xrange(0, len(self.types))
                                        if self.types[i] == 'K']
-                user_placeholders   = [i for i in xrange(0, len(self.types))
-                                       if self.types[i] == 'U']
+                user_placeholders = [i for i in xrange(0, len(self.types))
+                                     if self.types[i] == 'U']
                 for kp in kernel_placeholders:
                         values[kp] = bpf.ksymaddr(values[kp])
                 for up in user_placeholders:
@@ -448,7 +449,7 @@ BPF_PERF_OUTPUT(%s);
                 msg = self._format_message(bpf, event.pid, values)
                 time = strftime("%H:%M:%S") if Probe.use_localtime else \
                        Probe._time_off_str(event.timestamp_ns)
-                print("%-8s %-6d %-12s %-16s %s" % \
+                print("%-8s %-6d %-12s %-16s %s" %
                     (time[:8], event.pid, event.comm[:12],
                      self._display_function(), msg))
 
@@ -493,7 +494,7 @@ BPF_PERF_OUTPUT(%s);
                         self._bail("unable to find library %s" % self.library)
 
                 if self.probe_type == "u":
-                        pass # Was already enabled by the BPF constructor
+                        pass    # Was already enabled by the BPF constructor
                 elif self.probe_type == "r":
                         bpf.attach_uretprobe(name=libpath,
                                              sym=self.function,
@@ -534,26 +535,27 @@ trace 'u:pthread:pthread_create (arg4 != 0)'
 """
 
         def __init__(self):
-                parser = argparse.ArgumentParser(description=
-                        "Attach to functions and print trace messages.",
-                        formatter_class=argparse.RawDescriptionHelpFormatter,
-                        epilog=Tool.examples)
+                parser = argparse.ArgumentParser(description="Attach to " +
+                  "functions and print trace messages.",
+                  formatter_class=argparse.RawDescriptionHelpFormatter,
+                  epilog=Tool.examples)
                 parser.add_argument("-p", "--pid", type=int,
                   help="id of the process to trace (optional)")
                 parser.add_argument("-v", "--verbose", action="store_true",
                   help="print resulting BPF program code before executing")
                 parser.add_argument("-Z", "--string-size", type=int,
                   default=80, help="maximum size to read from strings")
-                parser.add_argument("-S", "--include-self", action="store_true",
+                parser.add_argument("-S", "--include-self",
+                  action="store_true",
                   help="do not filter trace's own pid from the trace")
                 parser.add_argument("-M", "--max-events", type=int,
                   help="number of events to print before quitting")
                 parser.add_argument("-o", "--offset", action="store_true",
                   help="use relative time from first traced message")
-                parser.add_argument("-K", "--kernel-stack", action="store_true",
-                  help="output kernel stack trace")
-                parser.add_argument("-U", "--user-stack", action="store_true",
-                  help="output user stack trace")
+                parser.add_argument("-K", "--kernel-stack",
+                  action="store_true", help="output kernel stack trace")
+                parser.add_argument("-U", "--user-stack",
+                  action="store_true", help="output user stack trace")
                 parser.add_argument(metavar="probe", dest="probes", nargs="+",
                   help="probe specifier (see examples)")
                 parser.add_argument("-I", "--include", action="append",
@@ -609,7 +611,7 @@ trace 'u:pthread:pthread_create (arg4 != 0)'
                                              self.probes))
 
                 # Print header
-                print("%-8s %-6s %-12s %-16s %s" % \
+                print("%-8s %-6s %-12s %-16s %s" %
                       ("TIME", "PID", "COMM", "FUNC",
                       "-" if not all_probes_trivial else ""))
 
@@ -629,4 +631,4 @@ trace 'u:pthread:pthread_create (arg4 != 0)'
                                 print(sys.exc_info()[1])
 
 if __name__ == "__main__":
-       Tool().run()
+        Tool().run()

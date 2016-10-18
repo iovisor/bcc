@@ -19,7 +19,7 @@ import sys
 
 class Probe(object):
         next_probe_index = 0
-        aliases = { "$PID": "bpf_get_current_pid_tgid()" }
+        aliases = {"$PID": "bpf_get_current_pid_tgid()"}
 
         def _substitute_aliases(self, expr):
                 if expr is None:
@@ -37,8 +37,8 @@ class Probe(object):
                         # supported right now.
                         index = param.rfind('*')
                         index = index if index != -1 else param.rfind(' ')
-                        param_type = param[0:index+1].strip()
-                        param_name = param[index+1:].strip()
+                        param_type = param[0:index + 1].strip()
+                        param_name = param[index + 1:].strip()
                         self.param_types[param_name] = param_type
 
         def _generate_entry(self):
@@ -65,7 +65,7 @@ int PROBENAME(struct pt_regs *ctx SIGNATURE)
                                 collect += """
 u64 __time = bpf_ktime_get_ns();
 %s.update(&pid, &__time);
-"""                             % param_hash
+                        """ % param_hash
                         else:
                                 collect += "%s.update(&pid, &%s);\n" % \
                                            (param_hash, pname)
@@ -88,8 +88,8 @@ u64 __time = bpf_ktime_get_ns();
                         self.param_types["__latency"] = "u64"    # nanoseconds
                 for pname in self.args_to_probe:
                         if pname not in self.param_types:
-                                raise ValueError("$entry(%s): no such param" \
-                                                % arg)
+                                raise ValueError("$entry(%s): no such param" %
+                                                 arg)
 
                 self.hashname_prefix = "%s_param_" % self.probe_hash_name
                 text = ""
@@ -156,8 +156,8 @@ u64 __time = bpf_ktime_get_ns();
                 if len(parts) > 6:
                         self._bail("extraneous ':'-separated parts detected")
                 if parts[0] not in ["r", "p", "t", "u"]:
-                        self._bail("probe type must be 'p', 'r', 't', or 'u' " +
-                                   "but got '%s'" % parts[0])
+                        self._bail("probe type must be 'p', 'r', 't', or 'u'" +
+                                   " but got '%s'" % parts[0])
                 if re.match(r"\w+\(.*\)", parts[2]) is None:
                         self._bail(("function signature '%s' has an invalid " +
                                     "format") % parts[2])
@@ -263,8 +263,8 @@ u64 __time = bpf_ktime_get_ns();
                 expr = self.exprs[i]
                 if self.probe_type == "u" and expr[0:3] == "arg":
                         return ("        u64 %s = 0;\n" +
-                                "        bpf_usdt_readarg(%s, ctx, &%s);\n") % \
-                                (expr, expr[3], expr)
+                                "        bpf_usdt_readarg(%s, ctx, &%s);\n") \
+                                % (expr, expr[3], expr)
                 else:
                         return ""
 
@@ -294,7 +294,7 @@ u64 __time = bpf_ktime_get_ns();
         def _generate_key_assignment(self):
                 if self.type == "hist":
                         return self._generate_usdt_arg_assignment(0) + \
-                               ("%s __key = %s;\n" % \
+                               ("%s __key = %s;\n" %
                                 (self.expr_types[0], self.exprs[0]))
                 else:
                         text = "struct %s_key_t __key = {};\n" % \
@@ -323,10 +323,11 @@ u64 __time = bpf_ktime_get_ns();
                 program = ""
                 probe_text = """
 DATA_DECL
-""" + (
-                "TRACEPOINT_PROBE(%s, %s)" % (self.tp_category, self.tp_event) \
-                        if self.probe_type == "t" \
-                        else "int PROBENAME(struct pt_regs *ctx SIGNATURE)") + """
+                """ + (
+                    "TRACEPOINT_PROBE(%s, %s)" %
+                    (self.tp_category, self.tp_event)
+                    if self.probe_type == "t"
+                    else "int PROBENAME(struct pt_regs *ctx SIGNATURE)") + """
 {
         PID_FILTER
         PREFIX
@@ -353,7 +354,8 @@ DATA_DECL
                         # signatures. Other probes force it to ().
                         signature = ", " + self.signature
 
-                program += probe_text.replace("PROBENAME", self.probe_func_name)
+                program += probe_text.replace("PROBENAME",
+                                              self.probe_func_name)
                 program = program.replace("SIGNATURE", signature)
                 program = program.replace("PID_FILTER",
                                           self._generate_pid_filter())
@@ -400,7 +402,8 @@ DATA_DECL
 
         def attach(self, bpf):
                 self.bpf = bpf
-                if self.probe_type == "u": return;
+                if self.probe_type == "u":
+                        return
                 if self.is_user:
                         self._attach_u()
                 else:
@@ -447,7 +450,7 @@ DATA_DECL
                 if self.type == "freq":
                         print(self.label or self.raw_spec)
                         print("\t%-10s %s" % ("COUNT", "EVENT"))
-                        sdata = sorted(data.items(), key=lambda kv: kv[1].value)
+                        sdata = sorted(data.items(), key=lambda p: p[1].value)
                         if top is not None:
                                 sdata = sdata[-top:]
                         for key, value in sdata:
@@ -461,11 +464,11 @@ DATA_DECL
                                                           self._v2s(key.v0)
                                 else:
                                         key_str = self._display_key(key)
-                                print("\t%-10s %s" % \
+                                print("\t%-10s %s" %
                                       (str(value.value), key_str))
                 elif self.type == "hist":
                         label = self.label or (self._display_expr(0)
-                                if not self.is_default_expr  else "retval")
+                                if not self.is_default_expr else "retval")
                         data.print_log2_hist(val_type=label)
                 if not self.cumulative:
                         data.clear()
@@ -478,8 +481,8 @@ class Tool(object):
 Probe specifier syntax:
         {p,r,t,u}:{[library],category}:function(signature)[:type[,type...]:expr[,expr...][:filter]][#label]
 Where:
-        p,r,t,u    -- probe at function entry, function exit, kernel tracepoint,
-                      or USDT probe
+        p,r,t,u    -- probe at function entry, function exit, kernel
+                      tracepoint, or USDT probe
                       in exit probes: can use $retval, $entry(param), $latency
         library    -- the library that contains the function
                       (leave empty for kernel functions)
@@ -506,7 +509,7 @@ argdist -C 'r:c:gets():char*:(char*)$retval#snooped strings'
 argdist -H 'r::__kmalloc(size_t size):u64:$latency/$entry(size)#ns per byte'
         Print a histogram of nanoseconds per byte from kmalloc allocations
 
-argdist -C 'p::__kmalloc(size_t size, gfp_t flags):size_t:size:flags&GFP_ATOMIC'
+argdist -C 'p::__kmalloc(size_t sz, gfp_t flags):size_t:sz:flags&GFP_ATOMIC'
         Print frequency count of kmalloc allocation sizes that have GFP_ATOMIC
 
 argdist -p 1005 -C 'p:c:write(int fd):int:fd' -T 5
@@ -520,7 +523,8 @@ argdist -p 1005 -H 'r:c:read()'
 argdist -C 'r::__vfs_read():u32:$PID:$latency > 100000'
         Print frequency of reads by process where the latency was >0.1ms
 
-argdist -H 'r::__vfs_read(void *file, void *buf, size_t count):size_t:$entry(count):$latency > 1000000'
+argdist -H 'r::__vfs_read(void *file, void *buf, size_t count):size_t
+            $entry(count):$latency > 1000000'
         Print a histogram of read sizes that were longer than 1ms
 
 argdist -H \\
@@ -569,7 +573,8 @@ argdist -p 2780 -z 120 \\
                 parser.add_argument("-v", "--verbose", action="store_true",
                   help="print resulting BPF program code before executing")
                 parser.add_argument("-c", "--cumulative", action="store_true",
-                  help="do not clear histograms and freq counts at each interval")
+                  help="do not clear histograms and freq counts at " +
+                       "each interval")
                 parser.add_argument("-T", "--top", type=int,
                   help="number of top results to show (not applicable to " +
                   "histograms)")
@@ -610,8 +615,9 @@ struct __string_t { char s[%d]; };
                 for probe in self.probes:
                         bpf_source += probe.generate_text()
                 if self.args.verbose:
-                        for text in [probe.usdt_ctx.get_text() \
-                                     for probe in self.probes if probe.usdt_ctx]:
+                        for text in [probe.usdt_ctx.get_text()
+                                     for probe in self.probes
+                                     if probe.usdt_ctx]:
                             print(text)
                         print(bpf_source)
                 usdt_contexts = [probe.usdt_ctx

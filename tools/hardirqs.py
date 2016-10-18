@@ -18,7 +18,7 @@ from bcc import BPF
 from time import sleep, strftime
 import argparse
 
-### arguments
+# arguments
 examples = """examples:
     ./hardirqs            # sum hard irq event time
     ./hardirqs -d         # show hard irq event time as histograms
@@ -49,7 +49,7 @@ else:
     label = "usecs"
 debug = 0
 
-### define BPF program
+# define BPF program
 bpf_text = """
 #include <uapi/linux/ptrace.h>
 #include <linux/irq.h>
@@ -106,7 +106,7 @@ int trace_completion(struct pt_regs *ctx)
 }
 """
 
-### code substitutions
+# code substitutions
 if args.dist:
     bpf_text = bpf_text.replace('STORE',
         'irq_key_t key = {.slot = bpf_log2l(delta)};' +
@@ -121,7 +121,7 @@ else:
 if debug:
     print(bpf_text)
 
-### load BPF program
+# load BPF program
 b = BPF(text=bpf_text)
 
 # these should really use irq:irq_handler_entry/exit tracepoints:
@@ -130,7 +130,7 @@ b.attach_kretprobe(event="handle_irq_event_percpu", fn_name="trace_completion")
 
 print("Tracing hard irq event time... Hit Ctrl-C to end.")
 
-### output
+# output
 exiting = 0 if args.interval else 1
 dist = b.get_table("dist")
 while (1):

@@ -369,7 +369,8 @@ def print_event(mounts, umounts, cpu, data, size):
               event.type == EventType.EVENT_UMOUNT_RET):
             if event.type == EventType.EVENT_MOUNT_RET:
                 syscall = mounts.pop(event.pid)
-                call = 'mount({source}, {target}, {type}, {flags}, {data}) = {retval}'.format(
+                call = ('mount({source}, {target}, {type}, {flags}, {data}) ' +
+                        '= {retval}').format(
                     source=decode_mount_string(syscall['source']),
                     target=decode_mount_string(syscall['target']),
                     type=decode_mount_string(syscall['type']),
