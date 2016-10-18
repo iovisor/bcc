@@ -4,7 +4,7 @@
 #               parameters, with an optional filter.
 #
 # USAGE: trace [-h] [-p PID] [-v] [-Z STRING_SIZE] [-S] [-M MAX_EVENTS] [-o]
-#              probe [probe ...]
+#              [-K] [-U] [-I header] probe [probe ...]
 #
 # Licensed under the Apache License, Version 2.0 (the "License")
 # Copyright (C) 2016 Sasha Goldshtein.
@@ -362,18 +362,6 @@ BPF_PERF_OUTPUT(%s);
                 for i, expr in enumerate(self.values):
                         data_fields += self._generate_field_assign(i)
 
-                stack_trace = ""
-                if self.user_stack:
-                        stack_trace += """
-        __data.user_stack_id = %s.get_stackid(
-          ctx, BPF_F_REUSE_STACKID | BPF_F_USER_STACK
-        );""" % self.stacks_name
-                if self.kernel_stack:
-                        stack_trace += """
-        __data.kernel_stack_id = %s.get_stackid(
-          ctx, BPF_F_REUSE_STACKID
-        );""" % self.stacks_name
-
                 if self.probe_type == "t":
                         heading = "TRACEPOINT_PROBE(%s, %s)" % \
                                   (self.tp_category, self.tp_event)
@@ -381,6 +369,19 @@ BPF_PERF_OUTPUT(%s);
                 else:
                         heading = "int %s(%s)" % (self.probe_name, signature)
                         ctx_name = "ctx"
+
+                stack_trace = ""
+                if self.user_stack:
+                        stack_trace += """
+        __data.user_stack_id = %s.get_stackid(
+          %s, BPF_F_REUSE_STACKID | BPF_F_USER_STACK
+        );""" % (self.stacks_name, ctx_name)
+                if self.kernel_stack:
+                        stack_trace += """
+        __data.kernel_stack_id = %s.get_stackid(
+          %s, BPF_F_REUSE_STACKID
+        );""" % (self.stacks_name, ctx_name)
+
                 text = heading + """
 {
         %s
@@ -551,10 +552,13 @@ trace 'u:pthread:pthread_create (arg4 != 0)'
                   help="use relative time from first traced message")
                 parser.add_argument("-K", "--kernel-stack", action="store_true",
                   help="output kernel stack trace")
-                parser.add_argument("-U", "--user_stack", action="store_true",
+                parser.add_argument("-U", "--user-stack", action="store_true",
                   help="output user stack trace")
                 parser.add_argument(metavar="probe", dest="probes", nargs="+",
                   help="probe specifier (see examples)")
+                parser.add_argument("-I", "--include", action="append",
+                  metavar="header",
+                  help="additional header files to include in the BPF program")
                 self.args = parser.parse_args()
 
         def _create_probes(self):
@@ -571,6 +575,8 @@ trace 'u:pthread:pthread_create (arg4 != 0)'
 #include <linux/sched.h>        /* For TASK_COMM_LEN */
 
 """
+                for include in (self.args.include or []):
+                        self.program += "#include <%s>\n" % include
                 self.program += BPF.generate_auto_includes(
                         map(lambda p: p.raw_probe, self.probes))
                 for probe in self.probes:

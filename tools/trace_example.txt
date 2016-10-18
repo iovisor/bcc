@@ -179,6 +179,10 @@ optional arguments:
   -M MAX_EVENTS, --max-events MAX_EVENTS
                         number of events to print before quitting
   -o, --offset          use relative time from first traced message
+  -K, --kernel-stack    output kernel stack trace
+  -U, --user-stack      output user stack trace
+  -I header, --include header
+                        additional header files to include in the BPF program
 
 EXAMPLES:
 
