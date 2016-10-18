@@ -25,6 +25,7 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
 # 14-Feb-2016   Brendan Gregg   Created this.
+# 16-Oct-2016   Dina Goldshtein -p to filter by process ID.
 
 from __future__ import print_function
 from bcc import BPF
@@ -87,7 +88,7 @@ struct data_t {
     char file[DNAME_INLINE_LEN];
 };
 
-BPF_HASH(entryinfo, pid_t, struct val_t);
+BPF_HASH(entryinfo, u64, struct val_t);
 BPF_PERF_OUTPUT(events);
 
 //
@@ -98,18 +99,19 @@ BPF_PERF_OUTPUT(events);
 int trace_rw_entry(struct pt_regs *ctx, struct file *filp, char __user *buf,
     size_t len, loff_t *ppos)
 {
-    u32 pid;
-    pid = bpf_get_current_pid_tgid();
+    u64 id = bpf_get_current_pid_tgid();
+    u32 pid = id >> 32; // PID is higher part
+
     if (FILTER_PID)
         return 0;
 
-    // store filep and timestamp by pid
+    // store filep and timestamp by id
     struct val_t val = {};
     val.ts = bpf_ktime_get_ns();
     val.fp = filp;
     val.offset = *ppos;
     if (val.fp)
-        entryinfo.update(&pid, &val);
+        entryinfo.update(&id, &val);
 
     return 0;
 }
@@ -118,18 +120,19 @@ int trace_rw_entry(struct pt_regs *ctx, struct file *filp, char __user *buf,
 int trace_open_entry(struct pt_regs *ctx, struct inode *inode,
     struct file *filp)
 {
-    u32 pid;
-    pid = bpf_get_current_pid_tgid();
+    u64 id = bpf_get_current_pid_tgid();
+    u32 pid = id >> 32; // PID is higher part
+
     if (FILTER_PID)
         return 0;
 
-    // store filep and timestamp by pid
+    // store filep and timestamp by id
     struct val_t val = {};
     val.ts = bpf_ktime_get_ns();
     val.fp = filp;
     val.offset = 0;
     if (val.fp)
-        entryinfo.update(&pid, &val);
+        entryinfo.update(&id, &val);
 
     return 0;
 }
@@ -137,18 +140,19 @@ int trace_open_entry(struct pt_regs *ctx, struct inode *inode,
 // zpl_fsync():
 int trace_fsync_entry(struct pt_regs *ctx, struct file *filp)
 {
-    u32 pid;
-    pid = bpf_get_current_pid_tgid();
+    u64 id = bpf_get_current_pid_tgid();
+    u32 pid = id >> 32; // PID is higher part
+
     if (FILTER_PID)
         return 0;
 
-    // store filp and timestamp by pid
+    // store filp and timestamp by id
     struct val_t val = {};
     val.ts = bpf_ktime_get_ns();
     val.fp = filp;
     val.offset = 0;
     if (val.fp)
-        entryinfo.update(&pid, &val);
+        entryinfo.update(&id, &val);
 
     return 0;
 }
@@ -160,9 +164,10 @@ int trace_fsync_entry(struct pt_regs *ctx, struct file *filp)
 static int trace_return(struct pt_regs *ctx, int type)
 {
     struct val_t *valp;
-    u32 pid = bpf_get_current_pid_tgid();
+    u64 id = bpf_get_current_pid_tgid();
+    u32 pid = id >> 32; // PID is higher part
 
-    valp = entryinfo.lookup(&pid);
+    valp = entryinfo.lookup(&id);
     if (valp == 0) {
         // missed tracing issue or filtered
         return 0;
@@ -171,7 +176,7 @@ static int trace_return(struct pt_regs *ctx, int type)
     // calculate delta
     u64 ts = bpf_ktime_get_ns();
     u64 delta_us = (ts - valp->ts) / 1000;
-    entryinfo.delete(&pid);
+    entryinfo.delete(&id);
     if (FILTER_US)
         return 0;
 
