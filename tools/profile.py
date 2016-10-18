@@ -24,9 +24,9 @@
 # tracepoint). If this becomes a problem, logic can be added to filter events.
 #
 # REQUIRES: Linux 4.6+ (BPF_MAP_TYPE_STACK_TRACE support), and the
-# perf:perf_hrtimer tracepoint (currently a kernel patch). If the latter is
-# unavailable, this will try to use kprobes as a fallback, which may work or
-# may instrument nothing, depending on your kernel build.
+# perf_misc_flags() function symbol to exist. The latter may or may not
+# exist depending on your kernel build. Linux 4.9 provides a proper solution
+# to this (this tool will be updated).
 #
 # Copyright 2016 Netflix, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
@@ -162,8 +162,13 @@ PERF_TRACE_EVENT {
         struct pt_regs regs = {};
         bpf_probe_read(&regs, sizeof(regs), (void *)REGS_LOCATION);
         u64 ip = PT_REGS_IP(&regs);
+
         // if ip isn't sane, leave key ips as zero for later checking
+#ifdef CONFIG_RANDOMIZE_MEMORY
+        if (ip > __PAGE_OFFSET_BASE) {
+#else
         if (ip > PAGE_OFFSET) {
+#endif
             key.kernel_ip = ip;
             if (DO_KERNEL_RIP) {
                 /*
@@ -232,23 +237,21 @@ if not args.folded:
     else:
         print("... Hit Ctrl-C to end.")
 
-# use perf tracepoint if it exists, else kprobe
-if os.path.exists("/sys/kernel/debug/tracing/events/perf/perf_hrtimer"):
-    bpf_text = bpf_text.replace('PERF_TRACE_EVENT',
-        'TRACEPOINT_PROBE(perf, perf_hrtimer)')
-    bpf_text = bpf_text.replace('REGS_LOCATION', 'args->regs')
-else:
-    if not args.folded:
-        print("Tracepoint perf:perf_hrtimer missing. "
-              "Trying kprobe of perf_misc_flags()...")
-    bpf_text = bpf_text.replace('PERF_TRACE_EVENT',
-        'int kprobe__perf_misc_flags(struct pt_regs *args)')
-    bpf_text = bpf_text.replace('REGS_LOCATION', 'PT_REGS_PARM1(args)')
+# kprobe perf_misc_flags()
+bpf_text = bpf_text.replace('PERF_TRACE_EVENT',
+    'int kprobe__perf_misc_flags(struct pt_regs *args)')
+bpf_text = bpf_text.replace('REGS_LOCATION', 'PT_REGS_PARM1(args)')
 if debug:
     print(bpf_text)
 
 # initialize BPF
-b = BPF(text=bpf_text)
+try:
+    b = BPF(text=bpf_text)
+except:
+    print("BPF initialization failed. perf_misc_flags() may be inlined in " +
+        "your kernel build.\nThis tool will be updated in the future to " +
+        "support Linux 4.9, which has reliable profiling support. Exiting.")
+    exit()
 
 # signal handler
 def signal_ignore(signal, frame):

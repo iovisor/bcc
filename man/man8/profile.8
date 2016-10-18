@@ -18,20 +18,16 @@ kernel context, rather than passing each stack to user space for frequency
 counting there. Only the unique stacks and counts are passed to user space
 at the end of the profile, greatly reducing the kernel<->user transfer.
 
-Note: if another perf-based sampling session is active, the output may become
-polluted with their events. On older kernels, the ouptut may also become
-polluted with tracing sessions (when the kprobe is used instead of the
-tracepoint). This may be filtered in a future version if it becomes a problem.
+Note: if another perf-based sampling or tracing session is active, the output
+may become polluted with their events. This will be fixed for Linux 4.9.
 .SH REQUIREMENTS
 CONFIG_BPF and bcc.
 
 This also requires Linux 4.6+ (BPF_MAP_TYPE_STACK_TRACE support), and the
-perf:perf_hrtimer tracepoint (currently a kernel patch). If the latter is
-unavailable, this will try to use kprobes as a fallback (of perf_misc_flags()),
-which may work or
-may not, depending on your kernel build. If the kprobe doesn't work, this tool
-will either error on instrumentation, or, instrument successfully but
-generate no output.
+perf_misc_flags() function symbol to exist. The latter may or may not
+exist depending on your kernel build, and if it doesn't exist, this tool
+will not work. Linux 4.9 provides a proper solution to this (this tool will
+be updated).
 .SH OPTIONS
 .TP
 \-h
