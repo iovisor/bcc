@@ -52,7 +52,9 @@ find_package(LibElf REQUIRED)
 # Set to non-zero if system installs kernel headers with split source and build
 # directories in /lib/modules/`uname -r`/. This is the case for debian and
 # suse, to the best of my knowledge.
-if(BCC_KERNEL_HAS_SOURCE_DIR)
+
+if(EXISTS "${ROOT}/lib/modules/${CMAKE_SYSTEM_VERSION}/build" AND EXISTS "${ROOT}/lib/modules/${CMAKE_SYSTEM_VERSION}/source")
+  message("Building for a split build/source kernel headers package")
   set(BCC_KERNEL_HAS_SOURCE_DIR 1)
   set(BCC_KERNEL_MODULES_SUFFIX "source")
 else()
