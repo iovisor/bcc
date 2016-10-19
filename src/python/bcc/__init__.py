@@ -409,7 +409,9 @@ class BPF(object):
 
         # allow the caller to glob multiple functions together
         if event_re:
-            for line in BPF.get_kprobe_functions(event_re):
+            matches = BPF.get_kprobe_functions(event_re)
+            self._check_probe_quota(len(matches))
+            for line in matches:
                 try:
                     self.attach_kprobe(event=line, fn_name=fn_name, pid=pid,
                             cpu=cpu, group_fd=group_fd)
@@ -672,7 +674,9 @@ class BPF(object):
         name = str(name)
 
         if sym_re:
-            for sym_addr in BPF.get_user_adddresses(name, sym_re):
+            addresses = BPF.get_user_addresses(name, sym_re)
+            self._check_probe_quota(len(addresses))
+            for sym_addr in addresses:
                 self.attach_uprobe(name=name, addr=sym_addr,
                                    fn_name=fn_name, pid=pid, cpu=cpu,
                                    group_fd=group_fd)
