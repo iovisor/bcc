@@ -96,10 +96,11 @@ class Probe(object):
                                        pid=self.pid or -1)
             self.matched = self.bpf.num_open_tracepoints()
         elif self.type == "u":
-            pass # Nothing to do -- attach already happened in `load`
+            pass    # Nothing to do -- attach already happened in `load`
 
         if self.matched == 0:
-            raise Exception("No functions matched by pattern %s" % self.pattern)
+            raise Exception("No functions matched by pattern %s" %
+                            self.pattern)
 
     def load(self):
         trace_count_text = """
@@ -142,11 +143,12 @@ BPF_STACK_TRACE(stack_traces, 1024);
             trace_count_text = trace_count_text.replace('GET_PID',
                                         'bpf_get_current_pid_tgid() >> 32')
         else:
-            trace_count_text = trace_count_text.replace('GET_PID', '0xffffffff')
+            trace_count_text = trace_count_text.replace(
+                                    'GET_PID', '0xffffffff')
 
         stack_flags = 'BPF_F_REUSE_STACKID'
         if not self.is_kernel_probe():
-            stack_flags += '| BPF_F_USER_STACK' # can't do both U *and* K
+            stack_flags += '| BPF_F_USER_STACK'     # can't do both U *and* K
         trace_count_text = trace_count_text.replace('STACK_FLAGS', stack_flags)
 
         self.usdt = None
@@ -173,22 +175,22 @@ BPF_STACK_TRACE(stack_traces, 1024);
 
         if debug:
             print(bpf_text)
-        self.bpf = BPF(text=bpf_text, usdt_contexts=
-                      [self.usdt] if self.usdt else [])
+        self.bpf = BPF(text=bpf_text,
+                       usdt_contexts=[self.usdt] if self.usdt else [])
 
 class Tool(object):
     def __init__(self):
         examples = """examples:
-    ./stackcount submit_bio          # count kernel stack traces for submit_bio
-    ./stackcount -s ip_output        # show symbol offsets
-    ./stackcount -sv ip_output       # show offsets and raw addresses (verbose)
-    ./stackcount 'tcp_send*'         # count stacks for funcs matching tcp_send*
-    ./stackcount -r '^tcp_send.*'    # same as above, using regular expressions
-    ./stackcount -Ti 5 ip_output     # output every 5 seconds, with timestamps
-    ./stackcount -p 185 ip_output    # count ip_output stacks for PID 185 only
-    ./stackcount -p 185 c:malloc     # count stacks for malloc in PID 185
-    ./stackcount t:sched:sched_fork  # count stacks for the sched_fork tracepoint
-    ./stackcount -p 185 u:node:*     # count stacks for all USDT probes in node
+    ./stackcount submit_bio         # count kernel stack traces for submit_bio
+    ./stackcount -s ip_output       # show symbol offsets
+    ./stackcount -sv ip_output      # show offsets and raw addresses (verbose)
+    ./stackcount 'tcp_send*'        # count stacks for funcs matching tcp_send*
+    ./stackcount -r '^tcp_send.*'   # same as above, using regular expressions
+    ./stackcount -Ti 5 ip_output    # output every 5 seconds, with timestamps
+    ./stackcount -p 185 ip_output   # count ip_output stacks for PID 185 only
+    ./stackcount -p 185 c:malloc    # count stacks for malloc in PID 185
+    ./stackcount t:sched:sched_fork # count stacks for sched_fork tracepoint
+    ./stackcount -p 185 u:node:*    # count stacks for all USDT probes in node
         """
         parser = argparse.ArgumentParser(
             description="Count events and their stack traces",
@@ -287,4 +289,3 @@ if __name__ == "__main__":
             traceback.print_exc()
         elif sys.exc_info()[0] is not SystemExit:
             print(sys.exc_info()[1])
-

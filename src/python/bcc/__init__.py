@@ -376,7 +376,8 @@ class BPF(object):
                     % (dev, errstr))
         fn.sock = sock
 
-    def _get_kprobe_functions(self, event_re):
+    @staticmethod
+    def get_kprobe_functions(event_re):
         with open("%s/../kprobes/blacklist" % TRACEFS) as blacklist_file:
             blacklist = set([line.rstrip().split()[1] for line in
                     blacklist_file])
@@ -386,7 +387,6 @@ class BPF(object):
                 fn = line.rstrip().split()[0]
                 if re.match(event_re, fn) and fn not in blacklist:
                     fns.append(fn)
-        self._check_probe_quota(len(fns))
         return fns
 
     def _check_probe_quota(self, num_new_probes):
@@ -409,7 +409,9 @@ class BPF(object):
 
         # allow the caller to glob multiple functions together
         if event_re:
-            for line in self._get_kprobe_functions(event_re):
+            matches = BPF.get_kprobe_functions(event_re)
+            self._check_probe_quota(len(matches))
+            for line in matches:
                 try:
                     self.attach_kprobe(event=line, fn_name=fn_name, pid=pid,
                             cpu=cpu, group_fd=group_fd)
@@ -448,7 +450,7 @@ class BPF(object):
 
         # allow the caller to glob multiple functions together
         if event_re:
-            for line in self._get_kprobe_functions(event_re):
+            for line in BPF.get_kprobe_functions(event_re):
                 try:
                     self.attach_kretprobe(event=line, fn_name=fn_name, pid=pid,
                             cpu=cpu, group_fd=group_fd)
@@ -531,7 +533,8 @@ class BPF(object):
         res = lib.bcc_procutils_which_so(libname.encode("ascii"))
         return res if res is None else res.decode()
 
-    def _get_tracepoints(self, tp_re):
+    @staticmethod
+    def get_tracepoints(tp_re):
         results = []
         events_dir = os.path.join(TRACEFS, "events")
         for category in os.listdir(events_dir):
@@ -570,7 +573,7 @@ class BPF(object):
         """
 
         if tp_re:
-            for tp in self._get_tracepoints(tp_re):
+            for tp in BPF.get_tracepoints(tp_re):
                 self.attach_tracepoint(tp=tp, fn_name=fn_name, pid=pid,
                                        cpu=cpu, group_fd=group_fd)
             return
@@ -615,7 +618,13 @@ class BPF(object):
         del self.open_uprobes[name]
         _num_open_probes -= 1
 
-    def _get_user_functions(self, name, sym_re):
+    @staticmethod
+    def get_user_functions(name, sym_re):
+        return set([name for (name, _) in
+                    BPF.get_user_functions_and_addresses(name, sym_re)])
+
+    @staticmethod
+    def get_user_addresses(name, sym_re):
         """
         We are returning addresses here instead of symbol names because it
         turns out that the same name may appear multiple times with different
@@ -624,10 +633,15 @@ class BPF(object):
         it makes sense to return the unique set of addresses that are mapped to
         a symbol that matches the provided regular expression.
         """
+        return set([address for (_, address) in
+                    BPF.get_user_functions_and_addresses(name, sym_re)])
+
+    @staticmethod
+    def get_user_functions_and_addresses(name, sym_re):
         addresses = []
         def sym_cb(sym_name, addr):
-            if re.match(sym_re, sym_name) and addr not in addresses:
-                addresses.append(addr)
+            if re.match(sym_re, sym_name):
+                addresses.append((sym_name, addr))
             return 0
 
         res = lib.bcc_foreach_symbol(name, _SYM_CB_TYPE(sym_cb))
@@ -660,7 +674,9 @@ class BPF(object):
         name = str(name)
 
         if sym_re:
-            for sym_addr in self._get_user_functions(name, sym_re):
+            addresses = BPF.get_user_addresses(name, sym_re)
+            self._check_probe_quota(len(addresses))
+            for sym_addr in addresses:
                 self.attach_uprobe(name=name, addr=sym_addr,
                                    fn_name=fn_name, pid=pid, cpu=cpu,
                                    group_fd=group_fd)
@@ -711,7 +727,7 @@ class BPF(object):
         """
 
         if sym_re:
-            for sym_addr in self._get_user_functions(name, sym_re):
+            for sym_addr in BPF.get_user_addresses(name, sym_re):
                 self.attach_uretprobe(name=name, addr=sym_addr,
                                       fn_name=fn_name, pid=pid, cpu=cpu,
                                       group_fd=group_fd)

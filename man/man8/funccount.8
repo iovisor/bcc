@@ -1,13 +1,13 @@
 .TH funccount 8  "2015-08-18" "USER COMMANDS"
 .SH NAME
-funccount \- Count kernel function calls matching a pattern. Uses Linux eBPF/bcc.
+funccount \- Count function, tracepoint, and USDT probe calls matching a pattern. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B funccount [\-h] [\-p PID] [\-i INTERVAL] [\-T] [\-r] pattern
+.B funccount [\-h] [\-p PID] [\-i INTERVAL] [\-T] [\-r] [\-d] pattern
 .SH DESCRIPTION
-This tool is a quick way to determine which kernel functions are being called,
+This tool is a quick way to determine which functions are being called,
 and at what rate. It uses in-kernel eBPF maps to count function calls.
 
-WARNING: This uses dynamic tracing of (what can be many) kernel functions, an
+WARNING: This uses dynamic tracing of (what can be many) functions, an
 activity that has had issues on some kernel versions (risk of panics or
 freezes). Test, and know what you are doing, before use.
 
@@ -32,6 +32,9 @@ Include timestamps on output.
 .TP
 \-r
 Use regular expressions for the search pattern.
+.TP
+\-d
+Print the BPF program before starting (for debugging purposes).
 .SH EXAMPLES
 .TP
 Count kernel functions beginning with "vfs_", until Ctrl-C is hit:
@@ -53,19 +56,28 @@ Match kernel functions beginning with "vfs_", using regular expressions:
 Count vfs calls for process ID 181 only:
 #
 .B funccount \-p 181 'vfs_*'
+.TP
+Count calls to the sched_fork tracepoint, indicating a fork() performed:
+#
+.B funccount t:sched:sched_fork
+.TP
+Count all GC USDT probes in the Node process:
+#
+.B funccount -p 185 u:node:gc*
+.TP
+Count all malloc() calls in libc:
+#
+.B funccount c:malloc
 .SH FIELDS
 .TP
-ADDR
-Address of the instruction pointer that was traced (only useful if the FUNC column is suspicious and you would like to double check the translation).
-.TP
 FUNC
-Kernel function name
+Function name
 .TP
 COUNT
 Number of calls while tracing
 .SH OVERHEAD
-This traces kernel functions and maintains in-kernel counts, which
-are asynchronously copied to user-space. While the rate of kernel calls
+This traces functions and maintains in-kernel counts, which
+are asynchronously copied to user-space. While the rate of calls
 be very high (>1M/sec), this is a relatively efficient way to trace these
 events, and so the overhead is expected to be small for normal workloads.
 Measure in a test environment before use.
@@ -81,6 +93,8 @@ Linux
 .SH STABILITY
 Unstable - in development.
 .SH AUTHOR
-Brendan Gregg
+Brendan Gregg, Sasha Goldshtein
 .SH SEE ALSO
+stackcount(8)
+funclatency(8)
 vfscount(8)
