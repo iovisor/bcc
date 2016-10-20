@@ -11,6 +11,8 @@
 #
 # 19-Oct-2016   Sasha Goldshtein   Created this.
 
+# TODO Add Node: gc__start, gc__done (with arguments)
+
 from __future__ import print_function
 import argparse
 from bcc import BPF, USDT
@@ -38,68 +40,118 @@ usdt = USDT(pid=args.pid)
 
 program = """
 struct gc_event_t {
+    u64 probe_index;
     u64 elapsed_ns;
-    char description[80];
+    u64 field1;
+    u64 field2;
+    u64 field3;
+    u64 field4;
+    char string1[32];
+    char string2[32];
+};
+struct entry_t {
+    u64 start_ns;
+    u64 field1;
+    u64 field2;
 };
 
 BPF_PERF_OUTPUT(gcs);
-BPF_HASH(entry, u64, u64);  // pid to start timestamp
+BPF_HASH(entry, u64, struct entry_t);
 """
 
 class Probe(object):
-    def __init__(self, begin, end, description):
+    def __init__(self, begin, end, begin_save, end_save, formatter):
         self.begin = begin
         self.end = end
-        self.description = description
+        self.begin_save = begin_save
+        self.end_save = end_save
+        self.formatter = formatter
 
     def generate(self):
         text = """
 int trace_%s(struct pt_regs *ctx) {
     u64 pid = bpf_get_current_pid_tgid();
-    u64 timestamp = bpf_ktime_get_ns();
-    entry.update(&pid, &timestamp);
+    struct entry_t e = {};
+    e.start_ns = bpf_ktime_get_ns();
+    %s
+    entry.update(&pid, &e);
     return 0;
 }
 int trace_%s(struct pt_regs *ctx) {
-    u64 *start, elapsed;
-    char description[] = "%s";
+    u64 elapsed;
+    struct entry_t *e;
     struct gc_event_t event = {};
     u64 pid = bpf_get_current_pid_tgid();
-    start = entry.lookup(&pid);
-    if (!start) {
+    e = entry.lookup(&pid);
+    if (!e) {
         return 0;   // missed the entry event on this thread
     }
-    elapsed = bpf_ktime_get_ns() - *start;
-    __builtin_memcpy(&event.description, description, sizeof(description));
+    elapsed = bpf_ktime_get_ns() - e->start_ns;
     event.elapsed_ns = elapsed;
+    %s
     gcs.perf_submit(ctx, &event, sizeof(event));
     return 0;
 }
-        """ % (self.begin, self.end, self.description)
+        """ % (self.begin, self.begin_save, self.end, self.end_save)
         return text
 
     def attach(self):
         usdt.enable_probe(self.begin, "trace_%s" % self.begin)
         usdt.enable_probe(self.end, "trace_%s" % self.end)
 
+    def format(self, data):
+        return self.formatter(data)
+
 probes = []
 
 if args.language == "java":
-    # TODO Extract additional info like mark/sweep/compact/generation etc.
-    #      Oddly, the gc__begin/gc__end probes don't really have any useful
-    #      information, while the mem__pool* ones do. There's also a bunch of
-    #      probes described in the hotspot_gc*.stp file which aren't there
-    #      when looking at a live Java process.
-    probes.append(Probe("mem__pool__gc__begin", "mem__pool__gc__end", "TODO"))
-    probes.append(Probe("gc__begin", "gc__end", "TODO"))
+    # Oddly, the gc__begin/gc__end probes don't really have any useful
+    # information, while the mem__pool* ones do. There's also a bunch of
+    # probes described in the hotspot_gc*.stp file which aren't there
+    # when looking at a live Java process.
+    begin_save = """
+    bpf_usdt_readarg(6, ctx, &e.field1);    // used bytes
+    bpf_usdt_readarg(8, ctx, &e.field2);    // max bytes
+    """
+    end_save = """
+    event.field1 = e->field1;                  // used bytes at start
+    event.field2 = e->field2;                  // max bytes at start
+    bpf_usdt_readarg(6, ctx, &event.field3);   // used bytes at end
+    bpf_usdt_readarg(8, ctx, &event.field4);   // max bytes at end
+    u64 manager = 0, pool = 0;
+    bpf_usdt_readarg(1, ctx, &manager);        // ptr to manager name
+    bpf_usdt_readarg(3, ctx, &pool);           // ptr to pool name
+    bpf_probe_read(&event.string1, sizeof(event.string1), (void *)manager);
+    bpf_probe_read(&event.string2, sizeof(event.string2), (void *)pool);
+    """
+    formatter = lambda e: "%s %s used=%d->%d max=%d->%d" % \
+                (e.string1, e.string2, e.field1, e.field3, e.field2, e.field4)
+    probes.append(Probe("mem__pool__gc__begin", "mem__pool__gc__end",
+                        begin_save, end_save, formatter))
+    probes.append(Probe("gc__begin", "gc__end",
+                        "", "", lambda _: "no additional info available"))
 elif args.language == "python":
-    # TODO In gc__start, arg1 is the generation to collect. In gc__end,
-    #      arg1 is the number of collected objects.
-    probes.append(Probe("gc__start", "gc__done", "GC"))
+    begin_save = """
+    int gen = 0;
+    bpf_usdt_readarg(1, ctx, &gen);
+    e.field1 = gen;
+    """
+    end_save = """
+    long objs = 0;
+    bpf_usdt_readarg(1, ctx, &objs);
+    event.field1 = e->field1;
+    event.field2 = objs;
+    """
+    formatter = lambda event: "gen %d GC collected %d objects" % \
+                              (event.field1, event.field2)
+    probes.append(Probe("gc__start", "gc__done",
+                        begin_save, end_save, formatter))
 elif args.language == "ruby":
     # Ruby GC probes do not have any additional information available.
-    probes.append(Probe("gc__mark__begin", "gc__mark__end", "mark"))
-    probes.append(Probe("gc__sweep__begin", "gc__sweep__end", "sweep"))
+    probes.append(Probe("gc__mark__begin", "gc__mark__end",
+                        "", "", lambda _: "GC mark stage"))
+    probes.append(Probe("gc__sweep__begin", "gc__sweep__end",
+                        "", "", lambda _: "GC sweep stage"))
 
 for probe in probes:
     program += probe.generate()
@@ -113,22 +165,29 @@ bpf = BPF(text=program, usdt_contexts=[usdt])
 print("Tracing garbage collections in %s process %d... Ctrl-C to quit." %
       (args.language, args.pid))
 time_col = "TIME (ms)" if args.milliseconds else "TIME (us)"
-print("%-8s %-30s %-8s" % ("START", "DESCRIPTION", time_col))
+print("%-8s %-40s %-8s" % ("START", "DESCRIPTION", time_col))
 
-class Data(ct.Structure):
+class GCEvent(ct.Structure):
     _fields_ = [
+        ("probe_index", ct.c_ulonglong),
         ("elapsed_ns", ct.c_ulonglong),
-        ("description", ct.c_char * 80)
+        ("field1", ct.c_ulonglong),
+        ("field2", ct.c_ulonglong),
+        ("field3", ct.c_ulonglong),
+        ("field4", ct.c_ulonglong),
+        ("string1", ct.c_char * 32),
+        ("string2", ct.c_char * 32)
         ]
 
 start_ts = time.time()
 
 def print_event(cpu, data, size):
-    event = ct.cast(data, ct.POINTER(Data)).contents
+    event = ct.cast(data, ct.POINTER(GCEvent)).contents
     elapsed = event.elapsed_ns/1000000 if args.milliseconds else \
               event.elapsed_ns/1000
-    print("%-8.3f %-30s %-8.2f" % (time.time() - start_ts,
-                                   event.description, elapsed))
+    print("%-8.3f %-40s %-8.2f" % (time.time() - start_ts,
+                                   probes[event.probe_index].format(event),
+                                   elapsed))
 
 bpf["gcs"].open_perf_buffer(print_event)
 while 1:
