@@ -19,6 +19,7 @@ import sys
 
 class Probe(object):
         next_probe_index = 0
+        streq_index = 0
         aliases = {"$PID": "bpf_get_current_pid_tgid()"}
 
         def _substitute_aliases(self, expr):
@@ -174,6 +175,7 @@ u64 __time = bpf_ktime_get_ns();
 
         def __init__(self, tool, type, specifier):
                 self.usdt_ctx = None
+                self.streq_functions = ""
                 self.pid = tool.args.pid
                 self.cumulative = tool.args.cumulative or False
                 self.raw_spec = specifier
@@ -242,9 +244,32 @@ u64 __time = bpf_ktime_get_ns();
                 self.usdt_ctx.enable_probe(
                         self.function, self.probe_func_name)
 
+        def _generate_streq_function(self, string):
+                fname = "streq_%d" % Probe.streq_index
+                Probe.streq_index += 1
+                self.streq_functions += """
+static inline bool %s(char const *ignored, char const *str) {
+        char needle[] = %s;
+        char haystack[sizeof(needle)];
+        bpf_probe_read(&haystack, sizeof(haystack), (void *)str);
+        for (int i = 0; i < sizeof(needle); ++i) {
+                if (needle[i] != haystack[i]) {
+                        return false;
+                }
+        }
+        return true;
+}
+                """ % (fname, string)
+                return fname
+
         def _substitute_exprs(self):
                 def repl(expr):
                         expr = self._substitute_aliases(expr)
+                        matches = re.finditer('STRCMP\\(("[^"]+\\")', expr)
+                        for match in matches:
+                                string = match.group(1)
+                                fname = self._generate_streq_function(string)
+                                expr = expr.replace("STRCMP", fname, 1)
                         return expr.replace("$retval", "PT_REGS_RC(ctx)")
                 for i in range(0, len(self.exprs)):
                         self.exprs[i] = repl(self.exprs[i])
@@ -370,7 +395,7 @@ DATA_DECL
                 program = program.replace("COLLECT", collect)
                 program = program.replace("PREFIX", prefix)
 
-                return program
+                return self.streq_functions + program
 
         def _attach_u(self):
                 libpath = BPF.find_library(self.library)

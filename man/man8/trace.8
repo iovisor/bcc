@@ -94,6 +94,12 @@ Note that only arg1-arg6 are supported, and only if the function is using the
 standard x86_64 convention where the first six arguments are in the RDI, RSI, 
 RDX, RCX, R8, R9 registers. If no predicate is specified, all function 
 invocations are traced.
+
+The predicate expression may also use the STRCMP pseudo-function to compare
+a predefined string to a string argument. For example: STRCMP("test", arg1).
+The order of arguments is important: the first argument MUST be a quoted
+literal string, and the second argument can be a runtime string, most typically
+an argument. 
 .TP
 .B ["format string"[, arguments]]
 A printf-style format string that will be used for the trace message. You can

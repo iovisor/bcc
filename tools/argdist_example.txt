@@ -277,6 +277,45 @@ t:net:net_dev_start_xmit():u16:args->protocol
 Note that to discover the format of the net:net_dev_start_xmit tracepoint, you
 use the tplist tool (tplist -v net:net_dev_start_xmit).
 
+
+Occasionally, it is useful to filter certain expressions by string. This is not
+trivially supported by BPF, but argdist provides a STRCMP helper you can use in
+filter expressions. For example, to get a histogram of latencies opening a
+specific file, run this:
+
+# argdist -c -H 'r:c:open(char *file):u64:$latency/1000:STRCMP("test.txt",$entry(file))'
+[02:16:38]
+[02:16:39]
+[02:16:40]
+     $latency/1000       : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 2        |****************************************|
+[02:16:41]
+     $latency/1000       : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 1        |**********                              |
+        16 -> 31         : 4        |****************************************|
+[02:16:42]
+     $latency/1000       : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 1        |********                                |
+        16 -> 31         : 5        |****************************************|
+[02:16:43]
+     $latency/1000       : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 1        |********                                |
+        16 -> 31         : 5        |****************************************|
+
+
 Here's a final example that finds how many write() system calls are performed
 by each process on the system:
 

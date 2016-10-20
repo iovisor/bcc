@@ -136,6 +136,16 @@ In the previous invocation, arg1 and arg2 are the class name and method name
 for the Ruby method being invoked.
 
 
+Occasionally, it can be useful to filter specific strings. For example, you
+might be interested in open() calls that open a specific file:
+
+# trace 'p:c:open (STRCMP("test.txt", arg1)) "opening %s", arg1'
+TIME     PID    COMM         FUNC             -
+01:43:15 10938  cat          open             opening test.txt
+01:43:20 10939  cat          open             opening test.txt
+^C
+
+
 As a final example, let's trace open syscalls for a specific process. By 
 default, tracing is system-wide, but the -p switch overrides this:
 
@@ -202,7 +212,7 @@ trace 'p:c:write (arg1 == 1) "writing %d bytes to STDOUT", arg3'
         Trace the write() call from libc to monitor writes to STDOUT
 trace 'r::__kmalloc (retval == 0) "kmalloc failed!"
         Trace returns from __kmalloc which returned a null pointer
-trace 'r:c:malloc (retval) "allocated = %p", retval
+trace 'r:c:malloc (retval) "allocated = %x", retval
         Trace returns from malloc and print non-NULL allocated buffers
 trace 't:block:block_rq_complete "sectors=%d", args->nr_sector'
         Trace the block_rq_complete kernel tracepoint and print # of tx sectors
