@@ -170,11 +170,9 @@ class Probe(object):
         trace_count_text = """
 int PROBE_FUNCTION(void *ctx) {
     FILTER
-    u64 loc = LOCATION;
-    u64 *val = counts.lookup(&loc);     // prepopulated on Python side
-    if (val) {
-        (*val)++;
-    }
+    u64 loc = LOCATION, zero = 0;
+    u64 *val = counts.lookup_or_init(&loc, &zero);
+    (*val)++;
     return 0;
 }
         """
@@ -199,11 +197,6 @@ BPF_HASH(counts, u64, u64);     // map location number to number of calls
 
         self.bpf = BPF(text=bpf_text,
                        usdt_contexts=[self.usdt] if self.usdt else [])
-
-        # Initialize all map entries to zero
-        counts = self.bpf["counts"]
-        for location, function in self.trace_functions.items():
-            counts[counts.Key(location)] = counts.Leaf()
 
 class Tool(object):
     def __init__(self):
@@ -267,7 +260,7 @@ class Tool(object):
                     continue
                 print("%-36s %8d" %
                       (self.probe.trace_functions[k.value], v.value))
-            counts.zero()
+            counts.clear()
 
             if exiting:
                 print("Detaching...")
