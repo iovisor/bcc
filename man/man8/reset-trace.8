@@ -1,0 +1,59 @@
+.TH reset-trace 8  "2016-10-18" "USER COMMANDS"
+.SH NAME
+reset-trace \- reset the state of tracing.
+.SH SYNOPSIS
+.B reset-trace [\-F] [\-h] [\-q] [\-v]
+.SH DESCRIPTION
+You will probably never need this tool. If you kill \-9 a bcc tool (plus other
+signals, like SIGTERM), or if a bcc tool crashes, then kernel tracing can be
+left in a semi-enabled state. It's not as bad as it sounds: there may just be
+overhead for writing to ring buffers that are never read. This tool can be
+used to clean up the tracing state, and reset and disable active tracing.
+
+Make sure no other tracing sessions are active. This tool might stop them from
+functioning (perhaps ungracefully).
+
+This specifically clears the state in at least the following files in
+/sys/kernel/debug/tracing: kprobe_events, uprobe_events, trace_pipe.
+Other tracing facilities (ftrace) are checked, and if not in an expected state,
+a note is printed. All tracing files can be reset with \-F for force, but this
+will interfere with any other running tracing sessions (eg, ftrace).
+.SH REQUIREMENTS
+/sys/kernel/debug mounted as debugfs
+.SH OPTIONS
+.TP
+\-F
+Force. Will reset all tracing facilities, including those not used by bcc
+(ftrace). You shouldn't need to use this.
+.TP
+\-h
+USAGE message.
+.TP
+\-q
+Quiet. No output while working.
+.TP
+\-v
+Verbose: print what it is doing.
+.SH EXAMPLES
+.TP
+Reset the state of tracing:
+#
+.B reset-trace
+.TP
+Verbose:
+#
+.B reset-trace \-v
+.TP
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Brendan Gregg
