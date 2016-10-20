@@ -11,6 +11,10 @@
 #
 # 19-Oct-2016   Sasha Goldshtein   Created this.
 
+# TODO Add node!
+# TODO Add shell wrappers: javacalls, pythoncalls, etc.
+# TODO Add syscalls information from sys_* and SyS_* kprobes
+
 from __future__ import print_function
 import argparse
 from bcc import BPF, USDT
