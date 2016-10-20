@@ -27,6 +27,12 @@ import traceback
 
 debug = False
 
+def verify_limit(num):
+    probe_limit = 1000
+    if num > probe_limit:
+        raise Exception("maximum of %d probes allowed, attempted %d" %
+                        (probe_limit, num))
+
 class Probe(object):
     def __init__(self, pattern, use_regex=False, pid=None):
         """Init a new probe.
@@ -117,7 +123,9 @@ class Probe(object):
         self.usdt = None
         text = ""
         if self.type == "p" and not self.library:
-            for function in BPF.get_kprobe_functions(self.pattern):
+            functions = BPF.get_kprobe_functions(self.pattern)
+            verify_limit(len(functions))
+            for function in functions:
                 text += self._add_function(template, function)
         elif self.type == "p" and self.library:
             # uprobes are tricky because the same function may have multiple
@@ -127,25 +135,33 @@ class Probe(object):
             # map to an address that we've already seen. Also ignore functions
             # that may repeat multiple times with different addresses.
             addresses, functions = (set(), set())
-            for function, address in BPF.get_user_functions_and_addresses(
-                                        self.library, self.pattern):
+            functions_and_addresses = BPF.get_user_functions_and_addresses(
+                                        self.library, self.pattern)
+            verify_limit(len(functions_and_addresses))
+            for function, address in functions_and_addresses:
                 if address in addresses or function in functions:
                     continue
                 addresses.add(address)
                 functions.add(function)
                 text += self._add_function(template, function)
         elif self.type == "t":
-            for tracepoint in BPF.get_tracepoints(self.pattern):
+            tracepoints = BPF.get_tracepoints(self.pattern)
+            verify_limit(len(tracepoints))
+            for tracepoint in tracepoints:
                 text += self._add_function(template, tracepoint)
         elif self.type == "u":
             self.usdt = USDT(path=self.library, pid=self.pid)
+            matches = []
             for probe in self.usdt.enumerate_probes():
                 if not self.pid and (probe.bin_path != self.library):
                     continue
                 if re.match(self.pattern, probe.name):
-                    new_func = "trace_count_%d" % self.matched
-                    text += self._add_function(template, probe.name)
-                    self.usdt.enable_probe(probe.name, new_func)
+                    matches.append(probe.name)
+            verify_limit(len(matches))
+            for match in matches:
+                new_func = "trace_count_%d" % self.matched
+                text += self._add_function(template, match)
+                self.usdt.enable_probe(match, new_func)
             if debug:
                 print(self.usdt.get_text())
         return text

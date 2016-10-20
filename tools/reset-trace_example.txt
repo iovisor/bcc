@@ -1,0 +1,241 @@
+Demonstrations of reset-trace, for Linux bcc/BPF.
+
+
+You will probably never need this tool. If you kill -9 a bcc tool (plus other
+signals, like SIGTERM), or if a bcc tool crashes, then kernel tracing can be
+left in a semi-enabled state. It's not as bad as it sounds: there may just be
+overhead for writing to ring buffers that are never read. This tool can be
+used to clean up the tracing state, and reset and disable active tracing.
+
+WARNING: Make sure no other tracing sessions are active, as it will likely
+stop them from functioning (perhaps ungracefully).
+
+This specifically clears the state in at least the following files in
+/sys/kernel/debug/tracing: kprobe_events, uprobe_events, trace_pipe.
+Other tracing facilities (ftrace) are checked, and if not in an expected state,
+a note is printed. All tracing files can be reset with -F for force, but this
+will interfere with any other running tracing sessions (eg, ftrace).
+
+Here's an example:
+
+# ./reset-trace.sh
+#
+
+That's it.
+
+
+You can use -v to see what it does:
+
+# ./reset-trace.sh -v
+Reseting tracing state...
+
+Checking /sys/kernel/debug/tracing/kprobe_events
+Checking /sys/kernel/debug/tracing/uprobe_events
+Checking /sys/kernel/debug/tracing/trace
+Checking /sys/kernel/debug/tracing/current_tracer
+Checking /sys/kernel/debug/tracing/set_ftrace_filter
+Checking /sys/kernel/debug/tracing/set_graph_function
+Checking /sys/kernel/debug/tracing/set_ftrace_pid
+Checking /sys/kernel/debug/tracing/events/enable
+Checking /sys/kernel/debug/tracing/tracing_thresh
+Checking /sys/kernel/debug/tracing/tracing_on
+
+Done.
+
+In this example, no resetting was necessary.
+
+
+Here's an example of actually needing it:
+
+# ./funccount 'bash:r*'
+Tracing 317 functions for "bash:r*"... Hit Ctrl-C to end.
+^C
+FUNC                                    COUNT
+rl_free_undo_list                           1
+rl_deprep_terminal                          1
+readline_internal_teardown                  1
+rl_on_new_line                              1
+rl_crlf                                     1
+rl_clear_signals                            1
+rl_prep_terminal                            1
+rl_reset_line_state                         1
+rl_initialize                               1
+rl_newline                                  1
+readline_internal_setup                     1
+rl_set_screen_size                          1
+readline                                    1
+rl_set_signals                              1
+rl_expand_prompt                            1
+replace_history_data                        1
+rl_set_prompt                               1
+rl_add_undo                                 1
+rl_insert_text                              2
+rl_insert                                   2
+rl_redisplay                                3
+rl_read_key                                 3
+rl_getc                                     3
+readline_internal_char                      3
+restore_parser_state                        6
+reap_dead_jobs                              6
+reset_parser                                6
+restore_input_line_state                    6
+realloc                                     7
+read_octal                                 10
+read_tty_modified                          13
+run_exit_trap                              13
+redirection_expand                         13
+restore_pipestatus_array                   18
+reader_loop                                20
+run_return_trap                            21
+remember_args                              25
+reset_signal_handlers                      30
+remove_quoted_escapes                      60
+run_unwind_frame                          102
+reset_terminating_signals                 125
+restore_original_signals                  139
+reset_internal_getopt                     405
+run_debug_trap                            719
+read_command                              940
+remove_quoted_nulls                      1830
+run_pending_traps                        3207
+^C
+^C
+^C
+
+I've traced 317 functions using funccount, and when I hit Ctrl-C, funccount is
+not exiting (it can normally take many seconds, but this really looks stuck):
+
+# pidstat 1
+Linux 4.9.0-rc1-virtual (bgregg-xenial-bpf-i-xxx) 	10/18/2016 	_x86_64_	(8 CPU)
+
+10:00:33 PM   UID       PID    %usr %system  %guest    %CPU   CPU  Command
+10:00:34 PM 60004      3277    0.00    0.98    0.00    0.98     0  redis-server
+10:00:34 PM     0     27980   87.25   10.78    0.00   98.04     3  funccount.py
+10:00:34 PM     0     29965    0.00    0.98    0.00    0.98     6  pidstat
+
+10:00:34 PM   UID       PID    %usr %system  %guest    %CPU   CPU  Command
+10:00:35 PM 65534      3276    0.00    1.00    0.00    1.00     2  multilog
+10:00:35 PM     0     27980   77.00   23.00    0.00  100.00     3  funccount.py
+10:00:35 PM     0     29965    0.00    1.00    0.00    1.00     6  pidstat
+10:00:35 PM 60004     29990    0.00    1.00    0.00    1.00     6  catalina.sh
+
+funccount looks a lot like it's in an infinite loop (I can use a stack-sampling
+profiler to confirm). This is a known bug (#665) and may be fixed by the time
+you read this. But right now it's a good example of needing reset-trace.
+
+I'll send a SIGTERM, before resorting to a SIGKILL:
+
+# kill 27980
+Terminated
+
+Ok, so the process is now gone, but it did leave tracing in a semi-enabled
+state. Using reset-trace:
+
+# ./reset-trace.sh -v
+Reseting tracing state...
+
+Checking /sys/kernel/debug/tracing/kprobe_events
+Checking /sys/kernel/debug/tracing/uprobe_events
+Needed to reset /sys/kernel/debug/tracing/uprobe_events
+uprobe_events, before (line enumerated):
+     1	p:uprobes/p__bin_bash_0xa2540 /bin/bash:0x00000000000a2540
+     2	p:uprobes/p__bin_bash_0x21220 /bin/bash:0x0000000000021220
+     3	p:uprobes/p__bin_bash_0x78530 /bin/bash:0x0000000000078530
+     4	p:uprobes/p__bin_bash_0xa3840 /bin/bash:0x00000000000a3840
+     5	p:uprobes/p__bin_bash_0x9c550 /bin/bash:0x000000000009c550
+     6	p:uprobes/p__bin_bash_0x5e360 /bin/bash:0x000000000005e360
+     7	p:uprobes/p__bin_bash_0xb2630 /bin/bash:0x00000000000b2630
+     8	p:uprobes/p__bin_bash_0xb1e70 /bin/bash:0x00000000000b1e70
+     9	p:uprobes/p__bin_bash_0xb2540 /bin/bash:0x00000000000b2540
+    10	p:uprobes/p__bin_bash_0xb16e0 /bin/bash:0x00000000000b16e0
+[...]
+   312	p:uprobes/p__bin_bash_0xa80b0 /bin/bash:0x00000000000a80b0
+   313	p:uprobes/p__bin_bash_0x9e280 /bin/bash:0x000000000009e280
+   314	p:uprobes/p__bin_bash_0x9e100 /bin/bash:0x000000000009e100
+   315	p:uprobes/p__bin_bash_0xb2bd0 /bin/bash:0x00000000000b2bd0
+   316	p:uprobes/p__bin_bash_0x9d9c0 /bin/bash:0x000000000009d9c0
+   317	p:uprobes/p__bin_bash_0x4a930 /bin/bash:0x000000000004a930
+uprobe_events, after (line enumerated):
+
+Checking /sys/kernel/debug/tracing/trace
+Checking /sys/kernel/debug/tracing/current_tracer
+Checking /sys/kernel/debug/tracing/set_ftrace_filter
+Checking /sys/kernel/debug/tracing/set_graph_function
+Checking /sys/kernel/debug/tracing/set_ftrace_pid
+Checking /sys/kernel/debug/tracing/events/enable
+Checking /sys/kernel/debug/tracing/tracing_thresh
+Checking /sys/kernel/debug/tracing/tracing_on
+
+Done.
+
+Now looks clean. I did truncate the output here: there were a few hundred lines
+from uprobe_events.
+
+Here's the same situation, but without the verbose option:
+
+# ./reset-trace.sh
+Needed to reset /sys/kernel/debug/tracing/uprobe_events
+#
+
+And again with quiet:
+
+# ./reset-trace.sh -q
+#
+
+
+Here is an example of reset-trace detecting an unrelated tracing session:
+
+# ./reset-trace.sh 
+Noticed unrelated tracing file /sys/kernel/debug/tracing/set_ftrace_filter isn't set as expected. Not reseting (-F to force, -v for verbose).
+
+And verbose:
+
+# ./reset-trace.sh -v
+Reseting tracing state...
+
+Checking /sys/kernel/debug/tracing/kprobe_events
+Checking /sys/kernel/debug/tracing/uprobe_events
+Checking /sys/kernel/debug/tracing/trace
+Checking /sys/kernel/debug/tracing/current_tracer
+Checking /sys/kernel/debug/tracing/set_ftrace_filter
+Noticed unrelated tracing file /sys/kernel/debug/tracing/set_ftrace_filter isn't set as expected. Not reseting (-F to force, -v for verbose).
+Contents of set_ftrace_filter is (line enumerated):
+     1	tcp_send_mss
+     2	tcp_sendpage
+     3	tcp_sendmsg
+     4	tcp_send_dupack
+     5	tcp_send_challenge_ack.isra.53
+     6	tcp_send_rcvq
+     7	tcp_send_ack
+     8	tcp_send_loss_probe
+     9	tcp_send_fin
+    10	tcp_send_active_reset
+    11	tcp_send_synack
+    12	tcp_send_delayed_ack
+    13	tcp_send_window_probe
+    14	tcp_send_probe0
+Expected "".
+Checking /sys/kernel/debug/tracing/set_graph_function
+Checking /sys/kernel/debug/tracing/set_ftrace_pid
+Checking /sys/kernel/debug/tracing/events/enable
+Checking /sys/kernel/debug/tracing/tracing_thresh
+Checking /sys/kernel/debug/tracing/tracing_on
+
+Done.
+
+So this file is not currently used by bcc, but it may be useful to know that
+it's not in the default state -- something is either using it or has left it
+enabled. These files can be reset with -F, but that may break other tools that
+are currently using them.
+
+
+Use -h to print the USAGE message:
+
+# ./reset-trace.sh -h
+USAGE: reset-trace [-Fhqv]
+                 -F             # force: reset all tracing files
+                 -v             # verbose: print details while working
+                 -h             # this usage message
+                 -q             # quiet: no output
+  eg,
+       reset-trace              # disable semi-enabled tracing
