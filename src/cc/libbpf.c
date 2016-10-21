@@ -570,3 +570,60 @@ cleanup:
     close(sock);
     return ret;
 }
+
+int bpf_attach_perf_event(int progfd, uint32_t ev_type, uint32_t ev_config,
+                          uint64_t sample_period, uint64_t sample_freq,
+                          pid_t pid, int cpu, int group_fd) {
+  if (ev_type != PERF_TYPE_HARDWARE && ev_type != PERF_TYPE_SOFTWARE) {
+    fprintf(stderr, "Unsupported perf event type\n");
+    return -1;
+  }
+  if ((ev_type == PERF_TYPE_HARDWARE && ev_config >= PERF_COUNT_HW_MAX) ||
+      (ev_type == PERF_TYPE_SOFTWARE && ev_config >= PERF_COUNT_SW_MAX)) {
+    fprintf(stderr, "Invalid perf event config\n");
+    return -1;
+  }
+  if (!((sample_period > 0) ^ (sample_freq > 0))) {
+    fprintf(
+      stderr, "Exactly one of sample_period / sample_freq should be set\n"
+    );
+    return -1;
+  }
+
+  struct perf_event_attr attr = {};
+  attr.type = ev_type;
+  attr.config = ev_config;
+  attr.inherit = 1;
+  if (sample_freq > 0) {
+    attr.freq = 1;
+    attr.sample_freq = sample_freq;
+  } else {
+    attr.sample_period = sample_period;
+  }
+
+  int fd = syscall(
+    __NR_perf_event_open, &attr, pid, cpu, group_fd, PERF_FLAG_FD_CLOEXEC
+  );
+  if (fd < 0) {
+    perror("perf_event_open failed");
+    return -1;
+  }
+  if (ioctl(fd, PERF_EVENT_IOC_SET_BPF, progfd) != 0) {
+    perror("ioctl(PERF_EVENT_IOC_SET_BPF) failed");
+    close(fd);
+    return -1;
+  }
+  if (ioctl(fd, PERF_EVENT_IOC_ENABLE, 0) != 0) {
+    perror("ioctl(PERF_EVENT_IOC_ENABLE) failed");
+    close(fd);
+    return -1;
+  }
+
+  return fd;
+}
+
+int bpf_detach_perf_event(uint32_t ev_type, uint32_t ev_config) {
+  // Right now, there is nothing to do, but it's a good idea to encourage
+  // callers to detach anything they attach.
+  return 0;
+}

@@ -64,6 +64,13 @@ void * bpf_open_perf_buffer(perf_reader_raw_cb raw_cb, void *cb_cookie, int pid,
 /* attached a prog expressed by progfd to the device specified in dev_name */
 int bpf_attach_xdp(const char *dev_name, int progfd);
 
+// attach a prog expressed by progfd to run on a specific perf event, with
+// certain sample period or sample frequency
+int bpf_attach_perf_event(int progfd, uint32_t ev_type, uint32_t ev_config,
+                          uint64_t sample_period, uint64_t sample_freq,
+                          pid_t pid, int cpu, int group_fd);
+int bpf_detach_perf_event(uint32_t ev_type, uint32_t ev_config);
+
 #define LOG_BUF_SIZE 65536
 
 // Put non-static/inline functions in their own section with this prefix +

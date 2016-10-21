@@ -62,13 +62,47 @@ class SymbolCache(object):
             return -1
         return addr.value
 
+class PerfType:
+    # From perf_type_id in uapi/linux/perf_event.h
+    HARDWARE = 0
+    SOFTWARE = 1
+
+class PerfHWConfig:
+    # From perf_hw_id in uapi/linux/perf_event.h
+    CPU_CYCLES = 0
+    INSTRUCTIONS = 1
+    CACHE_REFERENCES = 2
+    CACHE_MISSES = 3
+    BRANCH_INSTRUCTIONS = 4
+    BRANCH_MISSES = 5
+    BUS_CYCLES = 6
+    STALLED_CYCLES_FRONTEND = 7
+    STALLED_CYCLES_BACKEND = 8
+    REF_CPU_CYCLES = 9
+
+class PerfSWConfig:
+    # From perf_sw_id in uapi/linux/perf_event.h
+    CPU_CLOCK = 0
+    TASK_CLOCK = 1
+    PAGE_FAULTS = 2
+    CONTEXT_SWITCHES = 3
+    CPU_MIGRATIONS = 4
+    PAGE_FAULTS_MIN = 5
+    PAGE_FAULTS_MAJ = 6
+    ALIGNMENT_FAULTS = 7
+    EMULATION_FAULTS = 8
+    DUMMY = 9
+    BPF_OUTPUT = 10
+
 class BPF(object):
+    # From bpf_prog_type in uapi/linux/bpf.h
     SOCKET_FILTER = 1
     KPROBE = 2
     SCHED_CLS = 3
     SCHED_ACT = 4
     TRACEPOINT = 5
     XDP = 6
+    PERF_EVENT = 7
 
     _probe_repl = re.compile("[^a-zA-Z0-9_]")
     _sym_caches = {}
@@ -168,6 +202,7 @@ class BPF(object):
         self.open_kprobes = {}
         self.open_uprobes = {}
         self.open_tracepoints = {}
+        self.open_perf_events = {}
         self.tracefile = None
         atexit.register(self.cleanup)
 
@@ -608,6 +643,41 @@ class BPF(object):
             raise Exception("Failed to detach BPF from tracepoint")
         del self.open_tracepoints[tp]
 
+    def _attach_perf_event(self, progfd, ev_type, ev_config,
+            sample_period, sample_freq, pid, cpu, group_fd):
+        res = lib.bpf_attach_perf_event(progfd, ev_type, ev_config,
+                sample_period, sample_freq, pid, cpu, group_fd)
+        if res < 0:
+            raise Exception("Failed to attach BPF to perf event")
+        return res
+
+    def attach_perf_event(self, ev_type=-1, ev_config=-1, fn_name="",
+            sample_period=0, sample_freq=0, pid=-1, cpu=-1, group_fd=-1):
+        fn = self.load_func(fn_name, BPF.PERF_EVENT)
+        res = {}
+        if cpu >= 0:
+            res[cpu] = self._attach_perf_event(fn.fd, ev_type, ev_config,
+                    sample_period, sample_freq, pid, cpu, group_fd)
+        else:
+            for i in range(0, multiprocessing.cpu_count()):
+                res[i] = self._attach_perf_event(fn.fd, ev_type, ev_config,
+                        sample_period, sample_freq, pid, i, group_fd)
+        self.open_perf_events[(ev_type, ev_config)] = res
+
+    def detach_perf_event(self, ev_type=-1, ev_config=-1):
+        try:
+            fds = self.open_perf_events[(ev_type, ev_config)]
+        except KeyError:
+            raise Exception("Perf event type {} config {} not attached".format(
+                ev_type, ev_config))
+        for fd in fds.values():
+            os.close(fd)
+        res = lib.bpf_detach_perf_event(ev_type, ev_config)
+        if res < 0:
+            raise Exception("Failed to detach BPF from perf event")
+        del self.open_perf_events[(ev_type, ev_config)]
+        return res
+
     def _add_uprobe(self, name, probe):
         global _num_open_probes
         self.open_uprobes[name] = probe
@@ -975,6 +1045,8 @@ class BPF(object):
             (tp_category, tp_name) = k.split(':')
             lib.bpf_detach_tracepoint(tp_category, tp_name)
         self.open_tracepoints.clear()
+        for (ev_type, ev_config) in list(self.open_perf_events.keys()):
+            self.detach_perf_event(ev_type, ev_config)
         if self.tracefile:
             self.tracefile.close()
 
