@@ -1,12 +1,12 @@
 .TH llcstat 8  "2015-08-18" "USER COMMANDS"
 .SH NAME
-llcstat \- Trace cache references and cache misses. Uses Linux eBPF/bcc.
+llcstat \- Summarize CPU cache references and misses by process. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
 .B llcstat [\-h] [\-c SAMPLE_PERIOD] [duration]
 .SH DESCRIPTION
-llcstat traces cache references and cache misses system-side, and summarizes
-them by PID and CPU. These events have different meanings on different
-architecture. For x86-64, they mean misses and references to LLC.
+llcstat instruments CPU cache references and cache misses system-side, and
+summarizes them by PID and CPU. These events have different meanings on
+different architecture. For x86-64, they mean misses and references to LLC.
 This can be useful to locate and debug performance issues
 caused by cache hit rate.
 
