@@ -13,22 +13,31 @@
 # and for efficiency it does not initialize the perf ring buffer, so the
 # redundant perf samples are not collected.
 #
-# REQUIRES: Linux 4.9+ (BPF_PROG_TYPE_PERF_EVENT support). Under tools/old is
-# a version of this tool that may work on Linux 4.6 - 4.8.
+# Kernel stacks are post-process in user-land to skip the interrupt framework
+# frames. You can improve efficiency a little by specifying the exact number
+# of frames to skip with -s, provided you know what that is. If you get -s
+# wrong, note that the first line is the IP, and then the (skipped) stack.
+#
+# Note: if another perf-based sampling session is active, the output may become
+# polluted with their events. On older kernels, the ouptut may also become
+# polluted with tracing sessions (when the kprobe is used instead of the
+# tracepoint). If this becomes a problem, logic can be added to filter events.
+#
+# REQUIRES: Linux 4.6+ (BPF_MAP_TYPE_STACK_TRACE support), and the
+# perf_misc_flags() function symbol to exist. The latter may or may not
+# exist depending on your kernel build. Linux 4.9 provides a proper solution
+# to this (this tool will be updated).
 #
 # Copyright 2016 Netflix, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
-# THANKS: Alexei Starovoitov, who added proper BPF profiling support to Linux;
-# Sasha Goldshtein, Andrew Birchall, and Evgeny Vereshchagin, who wrote much
-# of the code here, borrowed from tracepoint.py and offcputime.py; and
-# Teng Qin, who added perf support in bcc.
+# THANKS: Sasha Goldshtein, Andrew Birchall, and Evgeny Vereshchagin, who wrote
+# much of the code here, borrowed from tracepoint.py and offcputime.py.
 #
 # 15-Jul-2016   Brendan Gregg   Created this.
-# 20-Oct-2016      "      "     Switched to use the new 4.9 support.
 
 from __future__ import print_function
-from bcc import BPF, PerfType, PerfSWConfig
+from bcc import BPF, Perf
 from sys import stderr
 from time import sleep
 import argparse
@@ -68,6 +77,7 @@ examples = """examples:
     ./profile -p 185      # only profile threads for PID 185
     ./profile -U          # only show user space stacks (no kernel)
     ./profile -K          # only show kernel space stacks (no user)
+    ./profile -S 11       # always skip 11 frames of kernel stack
 """
 parser = argparse.ArgumentParser(
     description="Profile CPU stack traces at a timed interval",
@@ -94,12 +104,15 @@ parser.add_argument("--stack-storage-size", default=2048,
     type=positive_nonzero_int,
     help="the number of unique stack traces that can be stored and "
         "displayed (default 2048)")
+parser.add_argument("-S", "--kernel-skip", type=positive_int, default=0,
+    help="skip this many kernel frames (default 3)")
 parser.add_argument("duration", nargs="?", default=99999999,
     type=positive_nonzero_int,
     help="duration of trace, in seconds")
 
 # option logic
 args = parser.parse_args()
+skip = args.kernel_skip
 pid = int(args.pid) if args.pid is not None else -1
 duration = int(args.duration)
 debug = 0
@@ -114,7 +127,6 @@ need_delimiter = args.delimited and not (args.kernel_stacks_only or
 # define BPF program
 bpf_text = """
 #include <uapi/linux/ptrace.h>
-#include <uapi/linux/bpf_perf_event.h>
 #include <linux/sched.h>
 
 struct key_t {
@@ -131,7 +143,7 @@ BPF_STACK_TRACE(stack_traces, STACK_STORAGE_SIZE)
 
 // This code gets a bit complex. Probably not suitable for casual hacking.
 
-int do_perf_event(struct bpf_perf_event_data *ctx) {
+PERF_TRACE_EVENT {
     u32 pid = bpf_get_current_pid_tgid();
     if (!(THREAD_FILTER))
         return 0;
@@ -148,7 +160,7 @@ int do_perf_event(struct bpf_perf_event_data *ctx) {
     if (key.kernel_stack_id >= 0) {
         // populate extras to fix the kernel stack
         struct pt_regs regs = {};
-        bpf_probe_read(&regs, sizeof(regs), (void *)&ctx->regs);
+        bpf_probe_read(&regs, sizeof(regs), (void *)REGS_LOCATION);
         u64 ip = PT_REGS_IP(&regs);
 
         // if ip isn't sane, leave key ips as zero for later checking
@@ -158,6 +170,17 @@ int do_perf_event(struct bpf_perf_event_data *ctx) {
         if (ip > PAGE_OFFSET) {
 #endif
             key.kernel_ip = ip;
+            if (DO_KERNEL_RIP) {
+                /*
+                 * User didn't specify a skip value (-s), so we will figure
+                 * out how many interrupt framework frames to skip by recording
+                 * the kernel rip, then later scanning for it on the stack.
+                 * This is likely x86_64 specific; can use -s as a workaround
+                 * until this supports your architecture.
+                 */
+                bpf_probe_read(&key.kernel_ret_ip, sizeof(key.kernel_ret_ip),
+                (void *)(regs.bp + 8));
+            }
         }
     }
 
@@ -183,11 +206,10 @@ bpf_text = bpf_text.replace('THREAD_FILTER', thread_filter)
 bpf_text = bpf_text.replace('STACK_STORAGE_SIZE', str(args.stack_storage_size))
 
 # handle stack args
-kernel_stack_get = \
-    "stack_traces.get_stackid(&ctx->regs, 0 | BPF_F_REUSE_STACKID)"
+kernel_stack_get = "stack_traces.get_stackid(args, " \
+    "%d | BPF_F_REUSE_STACKID)" % skip
 user_stack_get = \
-    "stack_traces.get_stackid(&ctx->regs, 0 | BPF_F_REUSE_STACKID | " \
-    "BPF_F_USER_STACK)"
+    "stack_traces.get_stackid(args, BPF_F_REUSE_STACKID | BPF_F_USER_STACK)"
 stack_context = ""
 if args.user_stacks_only:
     stack_context = "user"
@@ -199,6 +221,12 @@ else:
     stack_context = "user + kernel"
 bpf_text = bpf_text.replace('USER_STACK_GET', user_stack_get)
 bpf_text = bpf_text.replace('KERNEL_STACK_GET', kernel_stack_get)
+if skip:
+    # don't record the rip, as we won't use it
+    bpf_text = bpf_text.replace('DO_KERNEL_RIP', '0')
+else:
+    # rip is used to skip interrupt infrastructure frames
+    bpf_text = bpf_text.replace('DO_KERNEL_RIP', '1')
 
 # header
 if not args.folded:
@@ -209,18 +237,40 @@ if not args.folded:
     else:
         print("... Hit Ctrl-C to end.")
 
+# kprobe perf_misc_flags()
+bpf_text = bpf_text.replace('PERF_TRACE_EVENT',
+    'int kprobe__perf_misc_flags(struct pt_regs *args)')
+bpf_text = bpf_text.replace('REGS_LOCATION', 'PT_REGS_PARM1(args)')
 if debug:
     print(bpf_text)
 
-# initialize BPF & perf_events
-b = BPF(text=bpf_text)
-b.attach_perf_event(ev_type=PerfType.SOFTWARE,
-    ev_config=PerfSWConfig.CPU_CLOCK, fn_name="do_perf_event",
-    sample_period=0, sample_freq=args.frequency)
+# initialize BPF
+try:
+    b = BPF(text=bpf_text)
+except:
+    print("BPF initialization failed. perf_misc_flags() may be inlined in " +
+        "your kernel build.\nThis tool will be updated in the future to " +
+        "support Linux 4.9, which has reliable profiling support. Exiting.")
+    exit()
 
 # signal handler
 def signal_ignore(signal, frame):
     print()
+
+#
+# Setup perf_events
+#
+
+# use perf_events to sample
+try:
+    Perf.perf_event_open(0, pid=-1, ptype=Perf.PERF_TYPE_SOFTWARE,
+        freq=args.frequency)
+except:
+    print("ERROR: initializing perf_events for sampling.\n"
+        "To debug this, try running the following command:\n"
+        "    perf record -F 49 -e cpu-clock %s -- sleep 1\n"
+        "If that also doesn't work, fix it first." % perf_filter, file=stderr)
+    exit(0)
 
 #
 # Output Report
@@ -267,9 +317,19 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
     # fix kernel stack
     kernel_stack = []
     if k.kernel_stack_id >= 0:
-        for addr in kernel_tmp:
-            kernel_stack.append(addr)
-        # the later IP checking
+        if skip:
+            # fixed skip
+            for addr in kernel_tmp:
+                kernel_stack.append(addr)
+            kernel_stack = kernel_stack[skip:]
+        else:
+            # skip the interrupt framework stack by searching for our RIP
+            skipping = 1
+            for addr in kernel_tmp:
+                if k.kernel_ret_ip == addr:
+                    skipping = 0
+                if not skipping:
+                    kernel_stack.append(addr)
         if k.kernel_ip:
             kernel_stack.insert(0, k.kernel_ip)
 
