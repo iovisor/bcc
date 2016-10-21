@@ -180,19 +180,24 @@ static int trace_return(struct pt_regs *ctx, int type)
     if (FILTER_US)
         return 0;
 
-    // workaround (rewriter should handle file to d_iname in one step):
-    struct dentry *de = NULL;
-    bpf_probe_read(&de, sizeof(de), &valp->fp->f_path.dentry);
-
     // populate output struct
     u32 size = PT_REGS_RC(ctx);
     struct data_t data = {.type = type, .size = size, .delta_us = delta_us,
         .pid = pid};
     data.ts_us = ts / 1000;
     data.offset = valp->offset;
-    bpf_probe_read(&data.file, sizeof(data.file), de->d_iname);
     bpf_get_current_comm(&data.task, sizeof(data.task));
 
+    // workaround (rewriter should handle file to d_name in one step):
+    struct dentry *de = NULL;
+    struct qstr qs = {};
+    bpf_probe_read(&de, sizeof(de), &valp->fp->f_path.dentry);
+    bpf_probe_read(&qs, sizeof(qs), (void *)&de->d_name);
+    if (qs.len == 0)
+        return 0;
+    bpf_probe_read(&data.file, sizeof(data.file), (void *)qs.name);
+
+    // output
     events.perf_submit(ctx, &data, sizeof(data));
 
     return 0;
