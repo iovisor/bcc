@@ -235,6 +235,7 @@ class Tool(object):
         self.args = parser.parse_args()
         global debug
         debug = self.args.debug
+        self.prev = {}
         self.probe = Probe(self.args.pattern, self.args.regexp, self.args.pid)
 
     @staticmethod
@@ -262,12 +263,20 @@ class Tool(object):
             print("%-36s %8s" % ("FUNC", "COUNT"))
             counts = self.probe.bpf["counts"]
             for k, v in sorted(counts.items(),
-                               key=lambda counts: counts[1].value):
+                               key=lambda counts: counts[1].value -
+                               (self.prev[counts[0].value] if
+                               counts[0].value in self.prev else 0)):
                 if v.value == 0:
                     continue
-                print("%-36s %8d" %
-                      (self.probe.trace_functions[k.value], v.value))
-            counts.zero()
+                val = v.value
+                # for intervals, calculate delta from prev[] measurement
+                if self.args.interval:
+                    if k.value in self.prev:
+                        val = val - self.prev[k.value]
+                    self.prev[k.value] = v.value
+                if val == 0:
+                    continue
+                print("%-36s %8d" % (self.probe.trace_functions[k.value], val))
 
             if exiting:
                 print("Detaching...")
