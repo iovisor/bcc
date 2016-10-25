@@ -5,6 +5,7 @@
   - [Ubuntu](#ubuntu-xenial---binary)
   - [Fedora](#fedora---binary)
   - [Arch](#arch---aur)
+  - [Gentoo](#gentoo---portage)
 * [Source](#source)
   - [Ubuntu](#ubuntu---source)
   - [Fedora](#fedora---source)
@@ -127,6 +128,27 @@ Install these packages using any AUR helper such as [pacaur](https://aur.archlin
 bcc bcc-tools python-bcc python2-bcc
 ```
 All build and install dependencies are listed [in the PKGBUILD](https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=bcc) and should install automatically.
+
+## Gentoo - Portage
+
+First of all, upgrade the kernel of your choice to a recent version. For example:
+```
+emerge sys-kernel/gentoo-sources
+```
+Then, configure the kernel enabling the features you need. Please consider the following as a starting point:
+```
+CONFIG_BPF=y
+CONFIG_BPF_SYSCALL=y
+CONFIG_NET_CLS_BPF=m
+CONFIG_NET_ACT_BPF=m
+CONFIG_BPF_JIT=y
+CONFIG_BPF_EVENTS=y
+```
+Finally, you can install bcc with:
+```
+emerge dev-util/bcc
+```
+The appropriate dependencies (e.g., ```clang```, ```llvm``` with BPF backend) will be pulled automatically.
 
 
 # Source
