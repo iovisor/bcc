@@ -1,19 +1,16 @@
 #!/usr/bin/python
 # @lint-avoid-python-3-compatibility-imports
 #
-# ucalls  Summarize method calls in high-level languages.
+# ucalls  Summarize method calls in high-level languages and/or system calls.
 #         For Linux, uses BCC, eBPF.
 #
-# USAGE: ucalls {java,python,ruby} PID [interval] [-T TOP] [-L] [-v] [-m]
+# USAGE: ucalls [-l {java,python,ruby}] [-h] [-T TOP] [-L] [-S] [-v] [-m]
+#        pid [interval]
 #
 # Copyright 2016 Sasha Goldshtein
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
 # 19-Oct-2016   Sasha Goldshtein   Created this.
-
-# TODO Add node!
-# TODO Add shell wrappers: javacalls, pythoncalls, etc.
-# TODO Add syscalls information from sys_* and SyS_* kprobes
 
 from __future__ import print_function
 import argparse
@@ -21,25 +18,30 @@ from bcc import BPF, USDT
 from time import sleep
 
 examples = """examples:
-    ./ucalls java 185           # trace Java calls and print statistics on ^C
-    ./ucalls python 2020 1      # trace Python calls and print every second
-    ./ucalls ruby 1344 -T 10    # trace top 10 Ruby method calls
-    ./ucalls ruby 1344 -L       # trace Ruby calls including latency
-    ./ucalls python 2020 -mL    # trace Python calls including latency in ms
+    ./ucalls -l java 185        # trace Java calls and print statistics on ^C
+    ./ucalls -l python 2020 1   # trace Python calls and print every second
+    ./ucalls -l java 185 -S     # trace Java calls and syscalls
+    ./ucalls 6712 -S            # trace only syscall counts
+    ./ucalls -l ruby 1344 -T 10 # trace top 10 Ruby method calls
+    ./ucalls -l ruby 1344 -L    # trace Ruby calls including latency
+    ./ucalls -l ruby 1344 -LS   # trace Ruby calls and syscalls with latency
+    ./ucalls -l python 2020 -mL # trace Python calls including latency in ms
 """
 parser = argparse.ArgumentParser(
     description="Summarize method calls in high-level languages.",
     formatter_class=argparse.RawDescriptionHelpFormatter,
     epilog=examples)
-parser.add_argument("language", choices=["java", "python", "ruby"],
-    help="language to trace")
 parser.add_argument("pid", type=int, help="process id to attach to")
 parser.add_argument("interval", type=int, nargs='?',
     help="print every specified number of seconds")
+parser.add_argument("-l", "--language", choices=["java", "python", "ruby"],
+    help="language to trace (if none, trace syscalls only)")
 parser.add_argument("-T", "--top", type=int,
     help="number of most frequent/slow calls to print")
 parser.add_argument("-L", "--latency", action="store_true",
     help="record method latency from enter to exit (except recursive calls)")
+parser.add_argument("-S", "--syscalls", action="store_true",
+    help="record syscall latency (adds overhead)")
 parser.add_argument("-v", "--verbose", action="store_true",
     help="verbose mode: print the BPF program (for debugging purposes)")
 parser.add_argument("-m", "--milliseconds", action="store_true",
@@ -51,7 +53,8 @@ args = parser.parse_args()
 # case, we will need to build a custom correlator from entry to exit.
 if args.language == "java":
     # TODO for JVM entries, we actually have the real length of the class
-    #      and method strings in arg3 and arg5 respectively...
+    #      and method strings in arg3 and arg5 respectively, so we can insert
+    #      the null terminator in its proper position.
     entry_probe = "method__entry"
     return_probe = "method__return"
     read_class = "bpf_usdt_readarg(2, ctx, &clazz);"
@@ -66,13 +69,19 @@ elif args.language == "ruby":
     return_probe = "method__return"
     read_class = "bpf_usdt_readarg(1, ctx, &clazz);"
     read_method = "bpf_usdt_readarg(2, ctx, &method);"
+elif not args.language:
+    if not args.syscalls:
+        print("Nothing to do; use -S to trace syscalls.")
+        exit(1)
+    entry_probe, return_probe, read_class, read_method = ("", "", "", "")
 
-# TODO The whole string reading here reads beyond the null terminator, which
-#      might lead to problems if we consider past the end of the string as
-#      part of the class or method name. Think what to do with this.
 program = """
+#include <linux/ptrace.h>
+
 #define MAX_STRING_LENGTH 80
+DEFINE_NOLANG
 DEFINE_LATENCY
+DEFINE_SYSCALLS
 
 struct method_t {
     char clazz[MAX_STRING_LENGTH];
@@ -86,14 +95,26 @@ struct info_t {
     u64 num_calls;
     u64 total_ns;
 };
+struct syscall_entry_t {
+    u64 timestamp;
+    u64 ip;
+};
 
 #ifndef LATENCY
-BPF_HASH(counts, struct method_t, u64); // number of calls
+  BPF_HASH(counts, struct method_t, u64);            // number of calls
+  #ifdef SYSCALLS
+    BPF_HASH(syscounts, u64, u64);                   // number of calls per IP
+  #endif  // SYSCALLS
 #else
-BPF_HASH(times, struct method_t, struct info_t);
-BPF_HASH(entry, struct entry_t, u64);   // timestamp at entry
+  BPF_HASH(times, struct method_t, struct info_t);
+  BPF_HASH(entry, struct entry_t, u64);              // timestamp at entry
+  #ifdef SYSCALLS
+    BPF_HASH(systimes, u64, struct info_t);          // latency per IP
+    BPF_HASH(sysentry, u64, struct syscall_entry_t); // ts + IP at entry
+  #endif  // SYSCALLS
 #endif
 
+#ifndef NOLANG
 int trace_entry(struct pt_regs *ctx) {
     u64 clazz = 0, method = 0, val = 0;
     u64 *valp;
@@ -140,46 +161,139 @@ int trace_return(struct pt_regs *ctx) {
     entry.delete(&data);
     return 0;
 }
+#endif  // LATENCY
+#endif  // NOLANG
+
+#ifdef SYSCALLS
+int syscall_entry(struct pt_regs *ctx) {
+    u64 pid = bpf_get_current_pid_tgid();
+    u64 *valp, ip = ctx->ip, val = 0;
+    PID_FILTER
+#ifdef LATENCY
+    struct syscall_entry_t data = {};
+    data.timestamp = bpf_ktime_get_ns();
+    data.ip = ip;
 #endif
+#ifndef LATENCY
+    valp = syscounts.lookup_or_init(&ip, &val);
+    ++(*valp);
+#endif
+#ifdef LATENCY
+    sysentry.update(&pid, &data);
+#endif
+    return 0;
+}
+
+#ifdef LATENCY
+int syscall_return(struct pt_regs *ctx) {
+    struct syscall_entry_t *e;
+    struct info_t *info, zero = {};
+    u64 pid = bpf_get_current_pid_tgid(), ip;
+    PID_FILTER
+    e = sysentry.lookup(&pid);
+    if (!e) {
+        return 0;   // missed the entry event
+    }
+    ip = e->ip;
+    info = systimes.lookup_or_init(&ip, &zero);
+    info->num_calls += 1;
+    info->total_ns += bpf_ktime_get_ns() - e->timestamp;
+    sysentry.delete(&pid);
+    return 0;
+}
+#endif  // LATENCY
+#endif  // SYSCALLS
 """.replace("READ_CLASS", read_class) \
    .replace("READ_METHOD", read_method) \
-   .replace("DEFINE_LATENCY", "#define LATENCY" if args.latency else "")
-usdt = USDT(pid=args.pid)
-usdt.enable_probe(entry_probe, "trace_entry")
-if args.latency:
-    usdt.enable_probe(return_probe, "trace_return")
+   .replace("PID_FILTER", "if ((pid >> 32) != %d) { return 0; }" % args.pid) \
+   .replace("DEFINE_NOLANG", "#define NOLANG" if not args.language else "") \
+   .replace("DEFINE_LATENCY", "#define LATENCY" if args.latency else "") \
+   .replace("DEFINE_SYSCALLS", "#define SYSCALLS" if args.syscalls else "")
+
+if args.language:
+    usdt = USDT(pid=args.pid)
+    usdt.enable_probe(entry_probe, "trace_entry")
+    if args.latency:
+        usdt.enable_probe(return_probe, "trace_return")
+else:
+    usdt = None
 
 if args.verbose:
-    print(usdt.get_text())
+    if usdt:
+        print(usdt.get_text())
     print(program)
 
-bpf = BPF(text=program, usdt_contexts=[usdt])
-print("Tracing method calls in %s process %d... Ctrl-C to quit." %
-      (args.language, args.pid))
+bpf = BPF(text=program, usdt_contexts=[usdt] if usdt else [])
+if args.syscalls:
+    syscall_regex = "^[Ss]y[Ss]_.*"
+    bpf.attach_kprobe(event_re=syscall_regex, fn_name="syscall_entry")
+    if args.latency:
+        bpf.attach_kretprobe(event_re=syscall_regex, fn_name="syscall_return")
+    print("Attached %d kernel probes for syscall tracing." %
+          bpf.num_open_kprobes())
+
+def get_data():
+    # Will be empty when no language was specified for tracing
+    if args.latency:
+        data = map(lambda (k, v): (k.clazz + "." + k.method,
+                                   (v.num_calls, v.total_ns)),
+                   bpf["times"].items())
+    else:
+        data = map(lambda (k, v): (k.clazz + "." + k.method, (v.value, 0)),
+                   bpf["counts"].items())
+
+    if args.syscalls:
+        if args.latency:
+            syscalls = map(lambda (k, v): (bpf.ksym(k.value),
+                                           (v.num_calls, v.total_ns)),
+                           bpf["systimes"].items())
+            data.extend(syscalls)
+        else:
+            syscalls = map(lambda (k, v): (bpf.ksym(k.value), (v.value, 0)),
+                           bpf["syscounts"].items())
+            data.extend(syscalls)
+
+    return sorted(data, key=lambda (k, v): v[1 if args.latency else 0])
+
+def clear_data():
+    if args.latency:
+        bpf["times"].clear()
+    else:
+        bpf["counts"].clear()
+
+    if args.syscalls:
+        if args.latency:
+            bpf["systimes"].clear()
+        else:
+            bpf["syscounts"].clear()
+
+exit_signaled = False
+print("Tracing calls in process %d (language: %s)... Ctrl-C to quit." %
+      (args.pid, args.language or "none"))
 while True:
     try:
         sleep(args.interval or 99999999)
     except KeyboardInterrupt:
-        pass
+        exit_signaled = True
     print()
+    data = get_data()   # [(function, (num calls, latency in ns))]
     if args.latency:
-        data = bpf["times"]
-        data = sorted(data.items(), key=lambda (k, v): v.total_ns)
         time_col = "TIME (ms)" if args.milliseconds else "TIME (us)"
         print("%-50s %8s %8s" % ("METHOD", "# CALLS", time_col))
     else:
-        data = bpf["counts"]
-        data = sorted(data.items(), key=lambda (k, v): v.value)
         print("%-50s %8s" % ("METHOD", "# CALLS"))
     if args.top:
         data = data[-args.top:]
     for key, value in data:
         if args.latency:
-            time = value.total_ns/1000000.0 if args.milliseconds else \
-                   value.total_ns/1000.0
-            print("%-50s %8d %6.2f" % (key.clazz + "." + key.method,
-                                       value.num_calls, time))
+            time = value[1]/1000000.0 if args.milliseconds else \
+                   value[1]/1000.0
+            print("%-50s %8d %6.2f" % (key, value[0], time))
         else:
-            print("%-50s %8d" % (key.clazz + "." + key.method, value.value))
-    if not args.interval:
+            print("%-50s %8d" % (key, value[0]))
+    if args.interval and not exit_signaled:
+        clear_data()
+    else:
+        if args.syscalls:
+            print("Detaching kernel probes, please wait...")
         exit()
