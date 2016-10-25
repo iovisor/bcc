@@ -200,7 +200,11 @@ class TableBase(MutableMapping):
             self.__delitem__(k)
 
     def zero(self):
-        for k in self.keys():
+        # Even though this is not very efficient, we grab the entire list of
+        # keys before enumerating it. This helps avoid a potential race where
+        # the leaf assignment changes a hash table bucket that is being
+        # enumerated by the same loop, and may lead to a hang.
+        for k in list(self.keys()):
             self[k] = self.Leaf()
 
     def __iter__(self):
