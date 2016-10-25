@@ -4,7 +4,7 @@
 # ugc  Summarize garbage collection events in high-level languages.
 #      For Linux, uses BCC, eBPF.
 #
-# USAGE: ugc {java,python,ruby,node} PID [-v] [-m]
+# USAGE: ugc [-v] [-m] {java,python,ruby,node} pid
 #
 # Copyright 2016 Sasha Goldshtein
 # Licensed under the Apache License, Version 2.0 (the "License")
