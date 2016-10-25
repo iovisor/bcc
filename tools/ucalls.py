@@ -65,6 +65,7 @@ elif args.language == "python":
     read_class = "bpf_usdt_readarg(1, ctx, &clazz);"    # filename really
     read_method = "bpf_usdt_readarg(2, ctx, &method);"
 elif args.language == "ruby":
+    # TODO Also probe cmethod__entry and cmethod__return with same arguments
     entry_probe = "method__entry"
     return_probe = "method__return"
     read_class = "bpf_usdt_readarg(1, ctx, &clazz);"
