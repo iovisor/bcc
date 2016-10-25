@@ -4,14 +4,12 @@
 # ugc  Summarize garbage collection events in high-level languages.
 #      For Linux, uses BCC, eBPF.
 #
-# USAGE: ugc {java,python,ruby} PID [-v] [-m]
+# USAGE: ugc {java,python,ruby,node} PID [-v] [-m]
 #
 # Copyright 2016 Sasha Goldshtein
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
 # 19-Oct-2016   Sasha Goldshtein   Created this.
-
-# TODO Add Node: gc__start, gc__done (with arguments)
 
 from __future__ import print_function
 import argparse
@@ -27,7 +25,7 @@ parser = argparse.ArgumentParser(
     description="Summarize garbage collection events in high-level languages.",
     formatter_class=argparse.RawDescriptionHelpFormatter,
     epilog=examples)
-parser.add_argument("language", choices=["java", "python", "ruby"],
+parser.add_argument("language", choices=["java", "python", "ruby", "node"],
     help="language to trace")
 parser.add_argument("pid", type=int, help="process id to attach to")
 parser.add_argument("-v", "--verbose", action="store_true",
@@ -152,6 +150,18 @@ elif args.language == "ruby":
                         "", "", lambda _: "GC mark stage"))
     probes.append(Probe("gc__sweep__begin", "gc__sweep__end",
                         "", "", lambda _: "GC sweep stage"))
+elif args.language == "node":
+    end_save = """
+    u32 gc_type = 0;
+    bpf_usdt_readarg(1, ctx, &gc_type);
+    event.field1 = gc_type;
+    """
+    descs = {"GC scavenge": 1, "GC mark-sweep-compact": 2,
+             "GC incremental mark": 4, "GC weak callbacks": 8}
+    probes.append(Probe("gc__start", "gc__done", "", end_save,
+                  lambda e: str.join(", ",
+                                     [desc for desc, val in descs.items()
+                                      if e.field1 & val != 0])))
 
 for probe in probes:
     program += probe.generate()
