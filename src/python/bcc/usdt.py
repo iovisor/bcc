@@ -145,13 +145,15 @@ class USDT(object):
     # This is called by the BPF module's __init__ when it realizes that there
     # is a USDT context and probes need to be attached.
     def attach_uprobes(self, bpf):
+        probes = self.enumerate_active_probes()
+        for (binpath, fn_name, addr, pid) in probes:
+            bpf.attach_uprobe(name=binpath, fn_name=fn_name,
+                              addr=addr, pid=pid)
+
+    def enumerate_active_probes(self):
         probes = []
         def _add_probe(binpath, fn_name, addr, pid):
             probes.append((binpath, fn_name, addr, pid))
 
         lib.bcc_usdt_foreach_uprobe(self.context, _USDT_PROBE_CB(_add_probe))
-
-        for (binpath, fn_name, addr, pid) in probes:
-            bpf.attach_uprobe(name=binpath, fn_name=fn_name,
-                              addr=addr, pid=pid)
-
+        return probes
