@@ -4,7 +4,7 @@
 # uthreads  Trace thread creation/destruction events in high-level languages.
 #           For Linux, uses BCC, eBPF.
 #
-# USAGE: uthreads {java} PID [-v]
+# USAGE: uthreads [-l {java}] [-v] pid
 #
 # Copyright 2016 Sasha Goldshtein
 # Licensed under the Apache License, Version 2.0 (the "License")
@@ -18,15 +18,16 @@ import ctypes as ct
 import time
 
 examples = """examples:
-    ./uthreads java 185   # trace Java threads in process 185
+    ./uthreads -l java 185   # trace Java threads in process 185
+    ./uthreads 12245         # trace only pthreads in process 12245
 """
 parser = argparse.ArgumentParser(
     description="Trace thread creation/destruction events in " +
                 "high-level languages.",
     formatter_class=argparse.RawDescriptionHelpFormatter,
     epilog=examples)
-parser.add_argument("language", choices=["java"],
-    help="language to trace")
+parser.add_argument("-l", "--language", choices=["java"],
+    help="language to trace (none for pthreads only)")
 parser.add_argument("pid", type=int, help="process id to attach to")
 parser.add_argument("-v", "--verbose", action="store_true",
     help="verbose mode: print the BPF program (for debugging purposes)")
@@ -43,12 +44,25 @@ struct thread_event_t {
 };
 
 BPF_PERF_OUTPUT(threads);
+
+int trace_pthread(struct pt_regs *ctx) {
+    struct thread_event_t te = {};
+    u64 start_routine = 0;
+    char type[] = "pthread";
+    te.native_id = bpf_get_current_pid_tgid() & 0xFFFFFFFF;
+    bpf_usdt_readarg(2, ctx, &start_routine);
+    te.runtime_id = start_routine;  // This is really a function pointer
+    __builtin_memcpy(&te.type, type, sizeof(te.type));
+    threads.perf_submit(ctx, &te, sizeof(te));
+    return 0;
+}
 """
+usdt.enable_probe("pthread_start", "trace_pthread")
 
 if args.language == "java":
     template = """
 int %s(struct pt_regs *ctx) {
-    char description[] = "%s";
+    char type[] = "%s";
     struct thread_event_t te = {};
     u64 nameptr = 0, id = 0, native_id = 0;
     bpf_usdt_readarg(1, ctx, &nameptr);
@@ -57,7 +71,7 @@ int %s(struct pt_regs *ctx) {
     bpf_probe_read(&te.name, sizeof(te.name), (void *)nameptr);
     te.runtime_id = id;
     te.native_id = native_id;
-    __builtin_memcpy(&te.type, description, sizeof(te.type));
+    __builtin_memcpy(&te.type, type, sizeof(te.type));
     threads.perf_submit(ctx, &te, sizeof(te));
     return 0;
 }
@@ -72,8 +86,8 @@ if args.verbose:
     print(program)
 
 bpf = BPF(text=program, usdt_contexts=[usdt])
-print("Tracing thread events in %s process %d... Ctrl-C to quit." %
-      (args.language, args.pid))
+print("Tracing thread events in process %d (language: %s)... Ctrl-C to quit." %
+      (args.pid, args.language or "none"))
 print("%-8s %-16s %-8s %-30s" % ("TIME", "ID", "TYPE", "DESCRIPTION"))
 
 class ThreadEvent(ct.Structure):
@@ -88,9 +102,14 @@ start_ts = time.time()
 
 def print_event(cpu, data, size):
     event = ct.cast(data, ct.POINTER(ThreadEvent)).contents
+    name = event.name
+    if event.type == "pthread":
+        name = bpf.sym(event.runtime_id, args.pid)
+        tid = event.native_id
+    else:
+        tid = "R=%s/N=%s" % (event.runtime_id, event.native_id)
     print("%-8.3f %-16s %-8s %-30s" % (
-        time.time() - start_ts, "%s/%s" % (event.runtime_id, event.native_id),
-        event.type, event.name))
+        time.time() - start_ts, tid, event.type, name))
 
 bpf["threads"].open_perf_buffer(print_event)
 while 1:
