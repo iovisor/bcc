@@ -137,7 +137,7 @@ class Tool(object):
             help="Print the resulting BPF program (for debugging purposes)")
         parser.add_argument("interval", nargs="?", default=1, type=int,
             help="output interval, in seconds")
-        parser.add_argument("count", nargs="?", default=99999999,
+        parser.add_argument("count", nargs="?", default=99999999, type=int,
             help="number of outputs")
         self.args = parser.parse_args()
 
