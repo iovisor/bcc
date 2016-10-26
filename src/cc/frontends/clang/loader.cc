@@ -20,11 +20,14 @@
 #include <fcntl.h>
 #include <ftw.h>
 #include <map>
+#include <stdlib.h>
 #include <stdio.h>
 #include <string>
 #include <sys/stat.h>
+#include <sys/types.h>
 #include <sys/utsname.h>
 #include <unistd.h>
+#include <utility>
 #include <vector>
 #include <linux/bpf.h>
 
@@ -74,6 +77,33 @@ ClangLoader::ClangLoader(llvm::LLVMContext *ctx, unsigned flags)
 
 ClangLoader::~ClangLoader() {}
 
+namespace
+{
+
+bool is_dir(const string& path)
+{
+  struct stat buf;
+
+  if (::stat (path.c_str (), &buf) < 0)
+    return false;
+
+  return S_ISDIR(buf.st_mode);
+}
+
+std::pair<bool, string> get_kernel_path_info(const string kdir)
+{
+  if (is_dir(kdir + "/build") && is_dir(kdir + "/source"))
+    return std::make_pair (true, "source");
+
+  const char* suffix_from_env = ::getenv("BCC_KERNEL_MODULES_SUFFIX");
+  if (suffix_from_env)
+    return std::make_pair(false, string(suffix_from_env));
+
+  return std::make_pair(false, "build");
+}
+
+}
+
 int ClangLoader::parse(unique_ptr<llvm::Module> *mod, unique_ptr<vector<TableDesc>> *tables,
                        const string &file, bool in_memory, const char *cflags[], int ncflags) {
   using namespace clang;
@@ -83,9 +113,10 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, unique_ptr<vector<TableDes
   struct utsname un;
   uname(&un);
   string kdir = string(KERNEL_MODULES_DIR) + "/" + un.release;
+  auto kernel_path_info = get_kernel_path_info (kdir);
 
   // clang needs to run inside the kernel dir
-  DirStack dstack(kdir + "/" + KERNEL_MODULES_SUFFIX);
+  DirStack dstack(kdir + "/" + kernel_path_info.second);
   if (!dstack.ok())
     return -1;
 
@@ -108,7 +139,7 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, unique_ptr<vector<TableDes
                                    "-fno-color-diagnostics",
                                    "-x", "c", "-c", abs_file.c_str()});
 
-  KBuildHelper kbuild_helper(kdir);
+  KBuildHelper kbuild_helper(kdir, kernel_path_info.first);
   vector<string> kflags;
   if (kbuild_helper.get_flags(un.machine, &kflags))
     return -1;

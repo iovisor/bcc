@@ -92,10 +92,11 @@ class TmpDir {
 //  case we eventually support non-root user programs, cache in $HOME.
 class KBuildHelper {
  public:
-  explicit KBuildHelper(const std::string &kdir);
+  explicit KBuildHelper(const std::string &kdir, bool has_source_dir);
   int get_flags(const char *uname_machine, std::vector<std::string> *cflags);
  private:
   std::string kdir_;
+  bool has_source_dir_;
 };
 
 }  // namespace ebpf
