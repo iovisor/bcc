@@ -232,6 +232,8 @@ class Tool(object):
         if self.args.sort:
             counts = sorted(counts.items(), key=lambda (_, v):
                             -v.get(self.args.sort.upper(), 0))
+        else:
+            counts = sorted(counts.items(), key=lambda (k, _): k)
         for pid, stats in counts:
             print("%-6s %-16s %-10d %-6d %-10d %-8d %-8d %-10d" % (
                 pid, targets[pid][0:16],
@@ -262,4 +264,7 @@ class Tool(object):
                 exit()
 
 if __name__ == "__main__":
-    Tool().run()
+    try:
+        Tool().run()
+    except KeyboardInterrupt:
+        pass
