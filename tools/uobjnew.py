@@ -60,6 +60,9 @@ BPF_HASH(allocs, struct key_t, struct val_t);
 
 usdt = USDT(pid=args.pid)
 
+#
+# Java
+#
 if args.language == "java":
     program += """
 int alloc_entry(struct pt_regs *ctx) {
@@ -76,6 +79,9 @@ int alloc_entry(struct pt_regs *ctx) {
 }
     """
     usdt.enable_probe("object__alloc", "alloc_entry")
+#
+# Ruby
+#
 elif args.language == "ruby":
     create_template = """
 int THETHING_alloc_entry(struct pt_regs *ctx) {
@@ -105,6 +111,9 @@ int object_alloc_entry(struct pt_regs *ctx) {
     for thing in ["string", "hash", "array"]:
         program += create_template.replace("THETHING", thing)
         usdt.enable_probe("%s__create" % thing, "%s_alloc_entry" % thing)
+#
+# C
+#
 elif args.language == "c":
     program += """
 int alloc_entry(struct pt_regs *ctx, size_t size) {

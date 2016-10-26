@@ -102,6 +102,9 @@ int trace_%s(struct pt_regs *ctx) {
 
 probes = []
 
+#
+# Java
+#
 if args.language == "java":
     # Oddly, the gc__begin/gc__end probes don't really have any useful
     # information, while the mem__pool* ones do. There's also a bunch of
@@ -128,6 +131,9 @@ if args.language == "java":
                         begin_save, end_save, formatter))
     probes.append(Probe("gc__begin", "gc__end",
                         "", "", lambda _: "no additional info available"))
+#
+# Python
+#
 elif args.language == "python":
     begin_save = """
     int gen = 0;
@@ -144,12 +150,18 @@ elif args.language == "python":
                               (event.field1, event.field2)
     probes.append(Probe("gc__start", "gc__done",
                         begin_save, end_save, formatter))
+#
+# Ruby
+#
 elif args.language == "ruby":
     # Ruby GC probes do not have any additional information available.
     probes.append(Probe("gc__mark__begin", "gc__mark__end",
                         "", "", lambda _: "GC mark stage"))
     probes.append(Probe("gc__sweep__begin", "gc__sweep__end",
                         "", "", lambda _: "GC sweep stage"))
+#
+# Node
+#
 elif args.language == "node":
     end_save = """
     u32 gc_type = 0;
