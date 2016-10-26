@@ -422,7 +422,7 @@ class BPF(object):
                 fn = line.rstrip().split()[0]
                 if re.match(event_re, fn) and fn not in blacklist:
                     fns.append(fn)
-        return fns
+        return set(fns)     # Some functions may appear more than once
 
     def _check_probe_quota(self, num_new_probes):
         global _num_open_probes

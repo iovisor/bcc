@@ -170,18 +170,18 @@ class Probe(object):
         trace_count_text = """
 int PROBE_FUNCTION(void *ctx) {
     FILTER
-    u64 loc = LOCATION;
-    u64 *val = counts.lookup(&loc);     // prepopulated on Python side
-    if (val) {
-        (*val)++;
+    int loc = LOCATION;
+    u64 *val = counts.lookup(&loc);
+    if (!val) {
+        return 0;   // Should never happen, # of locations is known
     }
+    (*val)++;
     return 0;
 }
         """
         bpf_text = """#include <uapi/linux/ptrace.h>
 
-BPF_HASH(counts, u64, u64);     // map location number to number of calls
-
+BPF_TABLE("array", int, u64, counts, NUMLOCATIONS);
         """
 
         # We really mean the tgid from the kernel's perspective, which is in
@@ -194,15 +194,21 @@ BPF_HASH(counts, u64, u64);     // map location number to number of calls
             trace_count_text = trace_count_text.replace('FILTER', '')
 
         bpf_text += self._generate_functions(trace_count_text)
+        bpf_text = bpf_text.replace("NUMLOCATIONS",
+                                    str(len(self.trace_functions)))
         if debug:
             print(bpf_text)
 
         self.bpf = BPF(text=bpf_text,
                        usdt_contexts=[self.usdt] if self.usdt else [])
+        self.clear()    # Initialize all array items to zero
 
-        # Initialize all map entries to zero
+    def counts(self):
+        return self.bpf["counts"]
+
+    def clear(self):
         counts = self.bpf["counts"]
-        for location, function in self.trace_functions.items():
+        for location, _ in list(self.trace_functions.items()):
             counts[counts.Key(location)] = counts.Leaf()
 
 class Tool(object):
@@ -260,18 +266,19 @@ class Tool(object):
                 print("%-8s\n" % strftime("%H:%M:%S"), end="")
 
             print("%-36s %8s" % ("FUNC", "COUNT"))
-            counts = self.probe.bpf["counts"]
+            counts = self.probe.counts()
             for k, v in sorted(counts.items(),
                                key=lambda counts: counts[1].value):
                 if v.value == 0:
                     continue
                 print("%-36s %8d" %
                       (self.probe.trace_functions[k.value], v.value))
-            counts.zero()
 
             if exiting:
                 print("Detaching...")
                 exit()
+            else:
+                self.probe.clear()
 
 if __name__ == "__main__":
     try:
