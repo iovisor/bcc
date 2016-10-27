@@ -64,7 +64,15 @@ class Probe(object):
         for pid in self.targets:
             usdt = USDT(pid=pid)
             for event in self.events:
-                usdt.enable_probe(event, "%s_%s" % (self.language, event))
+                try:
+                    usdt.enable_probe(event, "%s_%s" % (self.language, event))
+                except Exception:
+                    # This process might not have a recent version of the USDT
+                    # probes enabled, or might have been compiled without USDT
+                    # probes at all. The process could even have been shut down
+                    # and the pid been recycled. We have to gracefully handle
+                    # the possibility that we can't attach probes to it at all.
+                    pass
             self.usdts.append(usdt)
 
     def _generate_tables(self):
@@ -175,7 +183,7 @@ class Tool(object):
                 }
 
         if self.args.language:
-            self.probes = [probes_by_lang[args.language]]
+            self.probes = [probes_by_lang[self.args.language]]
         else:
             self.probes = probes_by_lang.values()
 
