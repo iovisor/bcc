@@ -55,7 +55,7 @@ class Probe(object):
                 comm = open('/proc/%d/comm' % pid).read().strip()
                 if comm in self.procnames:
                     cmdline = open('/proc/%d/cmdline' % pid).read()
-                    self.targets[pid] = cmdline
+                    self.targets[pid] = cmdline.replace('\0', ' ')
             except IOError:
                 continue    # process may already have terminated
 
@@ -220,8 +220,9 @@ class Tool(object):
             print()
         with open("/proc/loadavg") as stats:
             print("%-8s loadavg: %s" % (strftime("%H:%M:%S"), stats.read()))
-        print("%-6s %-16s %-10s %-6s %-10s %-8s %-8s %-10s" % ("PID", "CMDLINE",
-            "METHOD/s", "GC/s", "OBJNEW/s", "CLOAD/s", "EXCP/s", "THREAD/s"))
+        print("%-6s %-20s %-10s %-6s %-10s %-8s %-6s %-6s" % (
+            "PID", "CMDLINE", "METHOD/s", "GC/s", "OBJNEW/s",
+            "CLOAD/s", "EXC/s", "THR/s"))
 
         line = 0
         counts = {}
@@ -235,8 +236,8 @@ class Tool(object):
         else:
             counts = sorted(counts.items(), key=lambda (k, _): k)
         for pid, stats in counts:
-            print("%-6s %-16s %-10d %-6d %-10d %-8d %-8d %-10d" % (
-                pid, targets[pid][0:16],
+            print("%-6d %-20s %-10d %-6d %-10d %-8d %-6d %-6d" % (
+                  pid, targets[pid][:20],
                   stats.get(Category.METHOD, 0) / self.args.interval,
                   stats.get(Category.GC, 0) / self.args.interval,
                   stats.get(Category.OBJNEW, 0) / self.args.interval,
