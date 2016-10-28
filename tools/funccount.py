@@ -107,10 +107,6 @@ class Probe(object):
         elif self.type == "u":
             pass    # Nothing to do -- attach already happened in `load`
 
-        if self.matched == 0:
-            raise Exception("No functions matched by pattern %s" %
-                            self.pattern)
-
     def _add_function(self, template, probe_name):
         new_func = "trace_count_%d" % self.matched
         text = template.replace("PROBE_FUNCTION", new_func)
@@ -198,6 +194,10 @@ BPF_TABLE("array", int, u64, counts, NUMLOCATIONS);
                                     str(len(self.trace_functions)))
         if debug:
             print(bpf_text)
+
+        if self.matched == 0:
+            raise Exception("No functions matched by pattern %s" %
+                            self.pattern)
 
         self.bpf = BPF(text=bpf_text,
                        usdt_contexts=[self.usdt] if self.usdt else [])
