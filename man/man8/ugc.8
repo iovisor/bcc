@@ -1,0 +1,71 @@
+.TH ugc 8  "2016-11-07" "USER COMMANDS"
+.SH NAME
+ugc \- Trace garbage collection events in high-level languages.
+.SH SYNOPSIS
+.B ugc [-h] [-v] [-m] {java,python,ruby,node} pid
+.SH DESCRIPTION
+This traces garbage collection events as they occur, including their duration
+and any additional information (such as generation collected or type of GC)
+provided by the respective language's runtime.
+
+This tool relies on USDT probes embedded in many high-level languages, such as
+Node, Java, Python, and Ruby. It requires a runtime instrumented with these 
+probes, which in some cases requires building from source with a USDT-specific
+flag, such as "--enable-dtrace" or "--with-dtrace".
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH OPTIONS
+.TP
+\-v
+Print the resulting BPF program, for debugging purposes.
+.TP
+\-m
+Print times in milliseconds. The default is microseconds.
+.TP
+{java,python,ruby,node}
+The language to trace.
+.TP
+pid
+The process id to trace.
+.SH EXAMPLES
+.TP
+Trace garbage collections in a specific Node process:
+#
+.B ugc node 148
+.TP
+Trace garbage collections in a specific Java process, and print GC times in
+milliseconds:
+#
+.B ugc -m java 6004
+.SH FIELDS
+.TP
+START
+The start time of the GC, in seconds from the beginning of the trace.
+.TP
+DESCRIPTION
+The runtime-provided description of this garbage collection event.
+.TP
+TIME
+The duration of the garbage collection event.
+.SH OVERHEAD
+Garbage collection events, even if frequent, should not produce a considerable
+overhead when traced because they are still not very common. Even hundreds of 
+GCs per second (which is a very high rate) will still produce a fairly 
+negligible overhead.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _example.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Sasha Goldshtein
+.SH SEE ALSO
+trace(8), ustat(8), uobjnew(8)
