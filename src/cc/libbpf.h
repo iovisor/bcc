@@ -18,7 +18,7 @@
 #ifndef LIBBPF_H
 #define LIBBPF_H
 
-#include <linux/bpf.h>
+#include "compat/linux/bpf.h"
 
 #ifdef __cplusplus
 extern "C" {
