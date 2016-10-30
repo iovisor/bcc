@@ -14,6 +14,15 @@
  * limitations under the License.
  */
 
+#ifndef PERF_READER_H
+#define PERF_READER_H
+
+#include "libbpf.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 struct perf_reader;
 
 struct perf_reader * perf_reader_new(perf_reader_cb cb, perf_reader_raw_cb raw_cb, void *cb_cookie);
@@ -22,3 +31,9 @@ int perf_reader_mmap(struct perf_reader *reader, unsigned type, unsigned long sa
 int perf_reader_poll(int num_readers, struct perf_reader **readers, int timeout);
 int perf_reader_fd(struct perf_reader *reader);
 void perf_reader_set_fd(struct perf_reader *reader, int fd);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif
