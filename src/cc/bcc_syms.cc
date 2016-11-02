@@ -212,6 +212,13 @@ void *bcc_symcache_new(int pid) {
   return static_cast<void *>(new ProcSyms(pid));
 }
 
+void bcc_free_symcache(void *symcache, int pid) {
+  if (pid < 0)
+    delete static_cast<KSyms*>(symcache);
+  else
+    delete static_cast<ProcSyms*>(symcache);
+}
+
 int bcc_symcache_resolve(void *resolver, uint64_t addr,
                          struct bcc_symbol *sym) {
   SymbolCache *cache = static_cast<SymbolCache *>(resolver);
@@ -286,7 +293,7 @@ static int _list_sym(const char *symname, uint64_t addr, uint64_t end,
     return 0;
 
   SYM_CB cb = (SYM_CB) payload;
-  return cb(symname, addr); 
+  return cb(symname, addr);
 }
 
 int bcc_foreach_symbol(const char *module, SYM_CB cb) {

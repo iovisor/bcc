@@ -32,6 +32,8 @@ struct bcc_symbol {
 typedef int(* SYM_CB)(const char *symname, uint64_t addr);
 
 void *bcc_symcache_new(int pid);
+void bcc_free_symcache(void *symcache, int pid);
+
 int bcc_symcache_resolve(void *symcache, uint64_t addr, struct bcc_symbol *sym);
 int bcc_symcache_resolve_name(void *resolver, const char *name, uint64_t *addr);
 void bcc_symcache_refresh(void *resolver);

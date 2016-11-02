@@ -142,6 +142,9 @@ lib.bcc_foreach_symbol.argtypes = [ct.c_char_p, _SYM_CB_TYPE]
 lib.bcc_symcache_new.restype = ct.c_void_p
 lib.bcc_symcache_new.argtypes = [ct.c_int]
 
+lib.bcc_free_symcache.restype = ct.c_void_p
+lib.bcc_free_symcache.argtypes = [ct.c_void_p, ct.c_int]
+
 lib.bcc_symcache_resolve.restype = ct.c_int
 lib.bcc_symcache_resolve.argtypes = [ct.c_void_p, ct.c_ulonglong, ct.POINTER(bcc_symbol)]
 
