@@ -2,7 +2,9 @@
 .SH NAME
 trace \- Trace a function and print its arguments or return value, optionally evaluating a filter. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B trace [-h] [-p PID] [-v] [-Z STRING_SIZE] [-S] [-M MAX_EVENTS] [-o] [-K] [-U] [-I header] probe [probe ...]
+.B trace [-h] [-p PID] [-t TID] [-v] [-Z STRING_SIZE] [-S]
+         [-M MAX_EVENTS] [-o] [-K] [-U] [-I header]
+         probe [probe ...]
 .SH DESCRIPTION
 trace probes functions you specify and displays trace messages if a particular
 condition is met. You can control the message format to display function 
@@ -18,6 +20,9 @@ Print usage message.
 .TP
 \-p PID
 Trace only functions in the process PID.
+.TP
+\-t TID
+Trace only functions in the thread TID.
 .TP
 \-v
 Display the generated BPF program, for debugging purposes.

@@ -171,8 +171,9 @@ libraries and then accessing the /home/vagrant directory listing.
 USAGE message:
 
 # trace -h
-usage: trace.py [-h] [-p PID] [-v] [-Z STRING_SIZE] [-S] [-M MAX_EVENTS] [-o]
-                probe [probe ...]
+usage: trace [-h] [-p PID] [-t TID] [-v] [-Z STRING_SIZE] [-S]
+             [-M MAX_EVENTS] [-o] [-K] [-U] [-I header]
+             probe [probe ...]
 
 Attach to functions and print trace messages.
 
@@ -182,6 +183,7 @@ positional arguments:
 optional arguments:
   -h, --help            show this help message and exit
   -p PID, --pid PID     id of the process to trace (optional)
+  -t TID, --tid TID     id of the thread to trace (optional)
   -v, --verbose         print resulting BPF program code before executing
   -Z STRING_SIZE, --string-size STRING_SIZE
                         maximum size to read from strings
@@ -202,8 +204,8 @@ trace 'do_sys_open "%s", arg2'
         Trace the open syscall and print the filename being opened
 trace 'sys_read (arg3 > 20000) "read %d bytes", arg3'
         Trace the read syscall and print a message for reads >20000 bytes
-trace r::do_sys_return
-        Trace the return from the open syscall
+trace 'r::do_sys_return "%llx", retval'
+        Trace the return from the open syscall and print the return value
 trace 'c:open (arg2 == 42) "%s %d", arg1, arg2'
         Trace the open() call from libc only if the flags (arg2) argument is 42
 trace 'c:malloc "size = %d", arg1'
@@ -218,4 +220,3 @@ trace 't:block:block_rq_complete "sectors=%d", args->nr_sector'
         Trace the block_rq_complete kernel tracepoint and print # of tx sectors
 trace 'u:pthread:pthread_create (arg4 != 0)'
         Trace the USDT probe pthread_create when its 4th argument is non-zero
-
