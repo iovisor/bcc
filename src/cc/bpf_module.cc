@@ -570,18 +570,7 @@ int BPFModule::run_pass_manager(Module &mod) {
     return -1;
   }
 
-  {
-    legacy::PassManager PM;
-    PM.add(create_probe_pass());
-    PM.run(mod);
-  }
-  {
-    legacy::PassManager PM;
-    PM.add(createPrintModulePass(outs()));
-    PM.run(mod);
-  }
-
-  legacy::PassManager PM;
+  legacy::PassManager PM, PM2, PM3;
   PassManagerBuilder PMB;
   PMB.OptLevel = 3;
   PM.add(createMemDepPrinter());
@@ -598,6 +587,14 @@ int BPFModule::run_pass_manager(Module &mod) {
   if (flags_ & DEBUG_LLVM_IR)
     PM.add(createPrintModulePass(outs()));
   PM.run(mod);
+
+  PM2.add(create_probe_pass());
+  PM2.run(mod);
+
+  if (flags_ & 1) {
+    PM3.add(createPrintModulePass(outs()));
+    PM3.run(mod);
+  }
 
   return 0;
 }
