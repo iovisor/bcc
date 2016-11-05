@@ -372,7 +372,7 @@ Maps are BPF data stores, and are the basis for higher level object types includ
 
 Syntax: ```BPF_TABLE(_table_type, _key_type, _leaf_type, _name, _max_entries)```
 
-Creates a map named ```_name```. Most of the time this well be used via higher-level macros, like BPF_HASH, BPF_HIST, etc.
+Creates a map named ```_name```. Most of the time this will be used via higher-level macros, like BPF_HASH, BPF_HIST, etc.
 
 Methods (covered later): map.lookup(), map.lookup_or_init(), map.delete(), map.update(), map.increment().
 
