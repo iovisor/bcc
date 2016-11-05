@@ -509,7 +509,7 @@ Examples in situ:
 
 ### 10. map.increment()
 
-Syntax: ```map.increment(&key)```
+Syntax: ```map.increment(key)```
 
 Increments the key's value by one. Used for histograms.
 
