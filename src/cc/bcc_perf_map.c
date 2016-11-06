@@ -20,7 +20,7 @@
 
 #include "bcc_perf_map.h"
 
-int bcc_perf_map_nspid(int pid) {
+int bcc_perf_map_nstgid(int pid) {
   char status_path[64];
   FILE *status;
 
@@ -30,19 +30,22 @@ int bcc_perf_map_nspid(int pid) {
   if (!status)
     return -1;
 
-  // return the original PID if the NSpid line is missing
-  int nspid = pid;
+  // return the original PID if we fail to work out the TGID
+  int nstgid = pid;
 
   size_t size = 0;
   char *line = NULL;
   while (getline(&line, &size, status) != -1) {
-    if (strstr(line, "NSpid:") != NULL)
+    // check Tgid line first in case CONFIG_PID_NS is off
+    if (strstr(line, "Tgid:") != NULL)
+      nstgid = (int)strtol(strrchr(line, '\t'), NULL, 10);
+    if (strstr(line, "NStgid:") != NULL)
       // PID namespaces can be nested -- last number is innermost PID
-      nspid = (int)strtol(strrchr(line, '\t'), NULL, 10);
+      nstgid = (int)strtol(strrchr(line, '\t'), NULL, 10);
   }
   free(line);
 
-  return nspid;
+  return nstgid;
 }
 
 bool bcc_perf_map_path(char *map_path, size_t map_len, int pid) {
@@ -58,9 +61,9 @@ bool bcc_perf_map_path(char *map_path, size_t map_len, int pid) {
   if (strcmp(target, "/") == 0)
     target[0] = '\0';
 
-  int nspid = bcc_perf_map_nspid(pid);
+  int nstgid = bcc_perf_map_nstgid(pid);
 
-  snprintf(map_path, map_len, "%s/tmp/perf-%d.map", target, nspid);
+  snprintf(map_path, map_len, "%s/tmp/perf-%d.map", target, nstgid);
   return true;
 }
 

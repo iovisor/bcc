@@ -27,7 +27,7 @@ extern "C" {
 typedef int (*bcc_perf_map_symcb)(const char *, uint64_t, uint64_t, int,
                                   void *);
 
-int bcc_perf_map_nspid(int pid);
+int bcc_perf_map_nstgid(int pid);
 bool bcc_perf_map_path(char *map_path, size_t map_len, int pid);
 int bcc_perf_map_foreach_sym(const char *path, bcc_perf_map_symcb callback,
                              void* payload);
