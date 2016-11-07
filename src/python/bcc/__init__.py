@@ -183,7 +183,7 @@ class BPF(object):
 
     def __init__(self, src_file="", hdr_file="", text=None, cb=None, debug=0,
             cflags=[], usdt_contexts=[]):
-        """Create a a new BPF module with the given source code.
+        """Create a new BPF module with the given source code.
 
         Note:
             All fields are marked as optional, but either `src_file` or `text`
