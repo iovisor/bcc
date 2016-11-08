@@ -36,6 +36,8 @@ public:
 
 class SymbolCache {
 public:
+  virtual ~SymbolCache() = default;
+
   virtual void refresh() = 0;
   virtual bool resolve_addr(uint64_t addr, struct bcc_symbol *sym) = 0;
   virtual bool resolve_name(const char *module, const char *name,
