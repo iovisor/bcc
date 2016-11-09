@@ -1049,6 +1049,10 @@ class BPF(object):
             self.detach_perf_event(ev_type, ev_config)
         if self.tracefile:
             self.tracefile.close()
+            self.tracefile = None
+        if self.module:
+            lib.bpf_module_destroy(self.module)
+            self.module = None
 
 
 from .usdt import USDT
