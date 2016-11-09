@@ -120,6 +120,8 @@ BPFModule::~BPFModule() {
     for (auto table : *tables_) {
       if (table.is_shared)
         SharedTables::instance()->remove_fd(table.name);
+      else
+        close(table.fd);
     }
   }
 }
