@@ -58,7 +58,7 @@ int http_filter(struct __sk_buff *skb) {
 		goto DROP;
 	}
 
-	//load firt 7 byte of payload into p (payload_array)
+	//load first 7 byte of payload into p (payload_array)
 	//direct access to skb not allowed
 	unsigned long p[7];
 	int i = 0;
