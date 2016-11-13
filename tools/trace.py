@@ -157,7 +157,8 @@ class Probe(object):
                         self.function = parts[2]
 
         def _find_usdt_probe(self):
-                target = Probe.pid if Probe.pid else Probe.tgid
+                target = Probe.pid if Probe.pid and Probe.pid != -1 \
+                                   else Probe.tgid
                 self.usdt = USDT(path=self.library, pid=target)
                 for probe in self.usdt.enumerate_probes():
                         if probe.name == self.usdt_name:
