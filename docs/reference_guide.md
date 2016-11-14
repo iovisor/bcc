@@ -384,7 +384,7 @@ Examples in situ:
 
 Syntax: ```BPF_HASH(name [, key_type [, leaf_type [, size]]])```
 
-Creates a hash map (associative array) named ```name```, with optional paramaters.
+Creates a hash map (associative array) named ```name```, with optional parameters.
 
 Defaults: ```BPF_HASH(name, key_type=u64, leaf_type=u64, size=10240)```
 
@@ -406,7 +406,7 @@ Examples in situ:
 
 Syntax: ```BPF_HISTOGRAM(name [, key_type [, size ]])```
 
-Creates a histogram map named ```name```, with optional paramaters.
+Creates a histogram map named ```name```, with optional parameters.
 
 Defaults: ```BPF_HISTOGRAM(name, key_type=int, size=64)```
 
@@ -1034,7 +1034,7 @@ Examples in situ:
 
 Syntax: ```BPF.ksymaddr(addr)```
 
-Translate a kernel memory address into a kernel function name plus the instruction offset as a hexidecimal number, which is returned as a string.
+Translate a kernel memory address into a kernel function name plus the instruction offset as a hexadecimal number, which is returned as a string.
 
 Example:
 

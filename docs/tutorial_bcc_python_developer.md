@@ -1,6 +1,6 @@
 # bcc Python Developer Tutorial
 
-This tutorial is about developing [bcc](https://github.com/iovisor/bcc) tools and programs using the Python interface. There are two parts: observability then networking. Snippits are taken from various programs in bcc: see their files for licences.
+This tutorial is about developing [bcc](https://github.com/iovisor/bcc) tools and programs using the Python interface. There are two parts: observability then networking. Snippets are taken from various programs in bcc: see their files for licences.
 
 Also see the bcc developer's [reference_guide.md](reference_guide.md), and a tutorial for end-users of tools: [tutorial.md](tutorial.md). There is also a lua interface for bcc.
 
@@ -100,7 +100,7 @@ This is similar to hello_world.py, and traces new processes via sys_clone() agai
 
 ### Lesson 4. sync_timing.py
 
-Remember the days of sysadmins typing ```sync``` three times on a slow console before ```reboot```, to give the first asynchrosous sync time to complete? Then someone thought ```sync;sync;sync``` was clever, to run them all on one line, which became industry practice despite defeating the original purpose! And then sync became synchronous, so more reasons it was silly. Anyway.
+Remember the days of sysadmins typing ```sync``` three times on a slow console before ```reboot```, to give the first asynchronous sync time to complete? Then someone thought ```sync;sync;sync``` was clever, to run them all on one line, which became industry practice despite defeating the original purpose! And then sync became synchronous, so more reasons it was silly. Anyway.
 
 The following example times how quickly the ```do_sync``` function is called, and prints output if it has been called more recently than one second ago. A ```sync;sync;sync``` will print output for the 2nd and 3rd sync's:
 
@@ -167,7 +167,7 @@ Things to learn:
 
 ### Lesson 5. sync_count.py
 
-Modify the sync_timing.py program (prior lession) to store the count of all sys_sync() calls (both fast and slow), and print it with the output. This count can be recorded in the BPF program by adding a new key index to the existing hash.
+Modify the sync_timing.py program (prior lesson) to store the count of all sys_sync() calls (both fast and slow), and print it with the output. This count can be recorded in the BPF program by adding a new key index to the existing hash.
 
 ### Lesson 6. disksnoop.py
 
@@ -378,7 +378,7 @@ except KeyboardInterrupt:
 b["dist"].print_log2_hist("kbytes")
 ```
 
-A recap from earlier lessions:
+A recap from earlier lessons:
 
 - ```kprobe__```: This prefix means the rest will be treated as a kernel function name that will be instrumented using kprobe.
 - ```struct pt_regs *ctx, struct request *req```: Arguments to kprobe. The ```ctx``` is registers and BPF context, the ```req``` is the first argument to the instrumented function: ```blk_account_io_completion()```.
@@ -603,7 +603,7 @@ TIME(s)            COMM             PID    ARGS
 24653340.510164998 node             24728  path:/images/favicon.png
 ```
 
-Relevent code from [examples/tracing/nodejs_http_server.py](../examples/tracing/nodejs_http_server.py):
+Relevant code from [examples/tracing/nodejs_http_server.py](../examples/tracing/nodejs_http_server.py):
 
 ```Python
 if len(sys.argv) < 2:
