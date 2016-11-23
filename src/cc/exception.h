@@ -37,6 +37,12 @@ static inline std::tuple<int, std::string> mkstatus(int ret, const char *msg) {
   return std::make_tuple(ret, std::string(msg));
 }
 
+static inline std::tuple<int, std::string> mkstatus(
+  int ret, const std::string& msg
+) {
+  return std::make_tuple(ret, msg);
+}
+
 static inline std::tuple<int, std::string> mkstatus(int ret) {
   return std::make_tuple(ret, std::string());
 }
