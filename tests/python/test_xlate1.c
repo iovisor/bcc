@@ -18,7 +18,7 @@ int on_packet(struct __sk_buff *skb) {
 
   u32 orig_dip = 0;
   u32 orig_sip = 0;
-  struct IPLeaf *xleaf;
+  struct IPLeaf xleaf = {};
 
   ethernet: {
     struct ethernet_t *ethernet = cursor_advance(cursor, sizeof(*ethernet));
@@ -44,11 +44,12 @@ int on_packet(struct __sk_buff *skb) {
     orig_dip = arp->tpa;
     orig_sip = arp->spa;
     struct IPKey key = {.dip=orig_dip, .sip=orig_sip};
-    xleaf = xlate.lookup(&key);
-    if (xleaf) {
-      arp->tpa = xleaf->xdip;
-      arp->spa = xleaf->xsip;
-      lock_xadd(&xleaf->arp_xlated_pkts, 1);
+    struct IPLeaf *xleafp = xlate.lookup(&key);
+    if (xleafp) {
+      xleaf = *xleafp;
+      arp->tpa = xleaf.xdip;
+      arp->spa = xleaf.xsip;
+      lock_xadd(&xleafp->arp_xlated_pkts, 1);
     }
     goto EOP;
   }
@@ -58,13 +59,14 @@ int on_packet(struct __sk_buff *skb) {
     orig_dip = ip->dst;
     orig_sip = ip->src;
     struct IPKey key = {.dip=orig_dip, .sip=orig_sip};
-    xleaf = xlate.lookup(&key);
-    if (xleaf) {
-      ip->dst = xleaf->xdip;
-      incr_cksum_l3(&ip->hchecksum, orig_dip, xleaf->xdip);
-      ip->src = xleaf->xsip;
-      incr_cksum_l3(&ip->hchecksum, orig_sip, xleaf->xsip);
-      lock_xadd(&xleaf->ip_xlated_pkts, 1);
+    struct IPLeaf *xleafp = xlate.lookup(&key);
+    if (xleafp) {
+      xleaf = *xleafp;
+      ip->dst = xleaf.xdip;
+      incr_cksum_l3(&ip->hchecksum, orig_dip, xleaf.xdip);
+      ip->src = xleaf.xsip;
+      incr_cksum_l3(&ip->hchecksum, orig_sip, xleaf.xsip);
+      lock_xadd(&xleafp->ip_xlated_pkts, 1);
     }
     switch (ip->nextp) {
       case 6: goto tcp;
@@ -75,18 +77,18 @@ int on_packet(struct __sk_buff *skb) {
 
   udp: {
     struct udp_t *udp = cursor_advance(cursor, sizeof(*udp));
-    if (xleaf) {
-      incr_cksum_l4(&udp->crc, orig_dip, xleaf->xdip, 1);
-      incr_cksum_l4(&udp->crc, orig_sip, xleaf->xsip, 1);
+    if (xleaf.xdip) {
+      incr_cksum_l4(&udp->crc, orig_dip, xleaf.xdip, 1);
+      incr_cksum_l4(&udp->crc, orig_sip, xleaf.xsip, 1);
     }
     goto EOP;
   }
 
   tcp: {
     struct tcp_t *tcp = cursor_advance(cursor, sizeof(*tcp));
-    if (xleaf) {
-      incr_cksum_l4(&tcp->cksum, orig_dip, xleaf->xdip, 1);
-      incr_cksum_l4(&tcp->cksum, orig_sip, xleaf->xsip, 1);
+    if (xleaf.xdip) {
+      incr_cksum_l4(&tcp->cksum, orig_dip, xleaf.xdip, 1);
+      incr_cksum_l4(&tcp->cksum, orig_sip, xleaf.xsip, 1);
     }
     goto EOP;
   }
