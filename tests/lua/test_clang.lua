@@ -269,9 +269,9 @@ function TestClang:test_unop_probe_read()
   local text = [[
 #include <linux/blkdev.h>
 int trace_entry(struct pt_regs *ctx, struct request *req) {
-    if (!(req->bio->bi_rw & 1))
+    if (!(req->bio->bi_flags & 1))
         return 1;
-    if (((req->bio->bi_rw)))
+    if (((req->bio->bi_flags)))
         return 1;
     return 0;
 }
