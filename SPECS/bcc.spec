@@ -1,3 +1,4 @@
+%bcond_with local_clang_static
 %define debug_package %{nil}
 
 Name:           bcc
@@ -11,12 +12,14 @@ URL:            https://github.com/iovisor/bcc
 Source0:        bcc.tar.gz
 
 ExclusiveArch: x86_64
-BuildRequires: bison cmake >= 2.8.7 flex
+BuildRequires: bison cmake >= 2.8.7 flex make
 BuildRequires: gcc gcc-c++ python2-devel elfutils-libelf-devel-static
 BuildRequires: luajit luajit-devel
+%if %{without local_clang_static}
 BuildRequires: llvm-devel llvm-static
 BuildRequires: clang-devel
-BuildRequires: pkgconfig
+%endif
+BuildRequires: pkgconfig ncurses-devel
 
 %description
 Python bindings for BPF Compiler Collection (BCC). Control a BPF program from
@@ -47,33 +50,40 @@ Requires: elfutils-libelf
 %description -n libbcc
 Shared Library for BPF Compiler Collection (BCC)
 
-%package -n libbcc-examples
-Summary: Examples for BPF Compiler Collection (BCC)
-%description -n libbcc-examples
-Examples for BPF Compiler Collection (BCC)
-
 %package -n python-bcc
 Summary: Python bindings for BPF Compiler Collection (BCC)
+Requires: libbcc = %{version}-%{release}
 %description -n python-bcc
 Python bindings for BPF Compiler Collection (BCC)
 
-%package -n bcc-tools
-Summary: Command line tools for BPF Compiler Collection (BCC)
-Requires: python-bcc
-%description -n bcc-tools
-Command line tools for BPF Compiler Collection (BCC)
-
 %package -n bcc-lua
 Summary: Standalone tool to run BCC tracers written in Lua
+Requires: libbcc = %{version}-%{release}
 %description -n bcc-lua
 Standalone tool to run BCC tracers written in Lua
 
-%files -n python-bcc
-%{python_sitelib}/bcc*
+%package -n libbcc-examples
+Summary: Examples for BPF Compiler Collection (BCC)
+Requires: python-bcc = %{version}-%{release}
+Requires: bcc-lua = %{version}-%{release}
+%description -n libbcc-examples
+Examples for BPF Compiler Collection (BCC)
+
+%package -n bcc-tools
+Summary: Command line tools for BPF Compiler Collection (BCC)
+Requires: python-bcc = %{version}-%{release}
+%description -n bcc-tools
+Command line tools for BPF Compiler Collection (BCC)
 
 %files -n libbcc
 /usr/lib64/*
 /usr/include/bcc/*
+
+%files -n python-bcc
+%{python_sitelib}/bcc*
+
+%files -n bcc-lua
+/usr/bin/bcc-lua
 
 %files -n libbcc-examples
 /usr/share/bcc/examples/*
@@ -87,9 +97,6 @@ Standalone tool to run BCC tracers written in Lua
 %files -n bcc-tools
 /usr/share/bcc/tools/*
 /usr/share/bcc/man/*
-
-%files -n bcc-lua
-/usr/bin/bcc-lua
 
 %post -n libbcc -p /sbin/ldconfig
 
