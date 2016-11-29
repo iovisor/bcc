@@ -23,6 +23,7 @@
 #include <utility>
 #include <vector>
 
+#include "bcc_exception.h"
 #include "bpf_module.h"
 #include "libbpf.h"
 #include "perf_reader.h"

@@ -16,7 +16,7 @@
 
 #include <set>
 #include <algorithm>
-#include "exception.h"
+#include "bcc_exception.h"
 #include "type_check.h"
 #include "lexer.h"
 

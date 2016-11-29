@@ -21,6 +21,7 @@
 #include <string>
 
 #include "BPFTable.h"
+#include "bcc_exception.h"
 #include "bcc_syms.h"
 #include "bpf_module.h"
 #include "compat/linux/bpf.h"
