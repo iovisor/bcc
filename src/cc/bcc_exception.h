@@ -16,12 +16,9 @@
 
 #pragma once
 
-#include <exception>
+#include <cstdio>
 #include <string>
 #include <tuple>
-#include <cstring>
-#include <cerrno>
-#include <cstdlib>
 #undef NDEBUG
 
 namespace ebpf {
@@ -48,14 +45,6 @@ static inline StatusTuple mkstatus(
 static inline StatusTuple mkstatus(int ret) {
   return std::make_tuple(ret, std::string());
 }
-
-#define TRY(CMD) \
-  do { \
-    int __status = (CMD); \
-    if (__status != 0) { \
-      return __status; \
-    } \
-  } while (0)
 
 #define TRY2(CMD) \
   do { \
