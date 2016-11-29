@@ -26,24 +26,26 @@
 
 namespace ebpf {
 
+typedef std::tuple<int, std::string> StatusTuple;
+
 template <typename... Args>
-std::tuple<int, std::string> mkstatus(int ret, const char *fmt, Args... args) {
+StatusTuple mkstatus(int ret, const char *fmt, Args... args) {
   char buf[1024];
   snprintf(buf, sizeof(buf), fmt, args...);
   return std::make_tuple(ret, std::string(buf));
 }
 
-static inline std::tuple<int, std::string> mkstatus(int ret, const char *msg) {
+static inline StatusTuple mkstatus(int ret, const char *msg) {
   return std::make_tuple(ret, std::string(msg));
 }
 
-static inline std::tuple<int, std::string> mkstatus(
+static inline StatusTuple mkstatus(
   int ret, const std::string& msg
 ) {
   return std::make_tuple(ret, msg);
 }
 
-static inline std::tuple<int, std::string> mkstatus(int ret) {
+static inline StatusTuple mkstatus(int ret) {
   return std::make_tuple(ret, std::string());
 }
 
@@ -57,7 +59,7 @@ static inline std::tuple<int, std::string> mkstatus(int ret) {
 
 #define TRY2(CMD) \
   do { \
-    std::tuple<int, std::string> __stp = (CMD); \
+    StatusTuple __stp = (CMD); \
     if (std::get<0>(__stp) != 0) { \
       return __stp; \
     } \

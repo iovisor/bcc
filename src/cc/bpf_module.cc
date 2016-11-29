@@ -44,7 +44,7 @@
 #include <llvm/Transforms/IPO/PassManagerBuilder.h>
 #include <llvm-c/Transforms/IPO.h>
 
-#include "exception.h"
+#include "bcc_exception.h"
 #include "frontends/b/loader.h"
 #include "frontends/clang/loader.h"
 #include "frontends/clang/b_frontend_action.h"

@@ -23,10 +23,9 @@
 #include <sstream>
 #include <vector>
 
+#include "bcc_exception.h"
 #include "bcc_syms.h"
 #include "bpf_module.h"
-#include "common.h"
-#include "exception.h"
 #include "libbpf.h"
 #include "perf_reader.h"
 

@@ -16,7 +16,7 @@
 
 #include "printer.h"
 #include "lexer.h"
-#include "exception.h"
+#include "bcc_exception.h"
 
 namespace ebpf {
 namespace cc {

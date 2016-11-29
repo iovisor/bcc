@@ -33,7 +33,7 @@
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
 
-#include "exception.h"
+#include "bcc_exception.h"
 #include "codegen_llvm.h"
 #include "lexer.h"
 #include "table_desc.h"
