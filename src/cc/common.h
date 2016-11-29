@@ -28,6 +28,4 @@ make_unique(Args &&... args) {
   return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
 }
 
-typedef std::tuple<int, std::string> StatusTuple;
-
 }  // namespace ebpf

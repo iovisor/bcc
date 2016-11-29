@@ -24,6 +24,7 @@
 #include <stdint.h>
 
 #include "common.h"
+#include "exception.h"
 #include "scope.h"
 
 #define REVISION_MASK 0xfff

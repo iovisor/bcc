@@ -24,7 +24,6 @@
 #include <vector>
 
 #include "bpf_module.h"
-#include "common.h"
 #include "libbpf.h"
 #include "perf_reader.h"
 

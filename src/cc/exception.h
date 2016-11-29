@@ -26,6 +26,8 @@
 
 namespace ebpf {
 
+typedef std::tuple<int, std::string> StatusTuple;
+
 template <typename... Args>
 std::tuple<int, std::string> mkstatus(int ret, const char *fmt, Args... args) {
   char buf[1024];
