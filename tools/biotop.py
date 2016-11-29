@@ -68,7 +68,7 @@ struct who_t {
 // the key for the output summary
 struct info_t {
     u32 pid;
-    int type;
+    int rwflag;
     int major;
     int minor;
     char name[TASK_COMM_LEN];
@@ -128,7 +128,19 @@ int trace_req_completion(struct pt_regs *ctx, struct request *req)
     struct info_t info = {};
     info.major = req->rq_disk->major;
     info.minor = req->rq_disk->first_minor;
-    info.type = req->cmd_flags & REQ_WRITE;
+/*
+ * The following deals with a kernel version change (in mainline 4.7, although
+ * it may be backported to earlier kernels) with how block request write flags
+ * are tested. We handle both pre- and post-change versions here. Please avoid
+ * kernel version tests like this as much as possible: they inflate the code,
+ * test, and maintenance burden.
+ */
+#ifdef REQ_WRITE
+    info.rwflag = !!(req->cmd_flags & REQ_WRITE);
+#else
+    info.rwflag = !!((req->cmd_flags >> REQ_OP_SHIFT) == REQ_OP_WRITE);
+#endif
+
     whop = whobyreq.lookup(&req);
     if (whop == 0) {
         // missed pid who, save stats as pid 0
@@ -199,7 +211,7 @@ while 1:
         # print line
         avg_ms = (float(v.us) / 1000) / v.io
         print("%-6d %-16s %1s %-3d %-3d %-8s %5s %7s %6.2f" % (k.pid, k.name,
-            "W" if k.type else "R", k.major, k.minor, diskname, v.io,
+            "W" if k.rwflag else "R", k.major, k.minor, diskname, v.io,
             v.bytes / 1024, avg_ms))
 
         line += 1
