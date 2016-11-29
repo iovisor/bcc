@@ -119,12 +119,16 @@ int kprobe__tcp_set_state(struct pt_regs *ctx, struct sock *sk, int state)
     /*
      * This tool includes PID and comm context. It's best effort, and may
      * be wrong in some situations. It currently works like this:
-     * - active connections: cache PID & comm on TCP_SYN_SENT
-     * - passive connections: read PID & comm on TCP_LAST_ACK
-    */
+     * - record timestamp on any state < TCP_FIN_WAIT1
+     * - cache task context on:
+     *       TCP_SYN_SENT: tracing from client
+     *       TCP_LAST_ACK: client-closed from server
+     * - do output on TCP_CLOSE:
+     *       fetch task context if cached, or use current task
+     */
 
     // record PID & comm on SYN_SENT
-    if (state == TCP_SYN_SENT) {
+    if (state == TCP_SYN_SENT || state == TCP_LAST_ACK) {
         FILTER_PID
         struct id_t me = {.pid = pid};
         bpf_get_current_comm(&me.task, sizeof(me.task));
@@ -139,18 +143,18 @@ int kprobe__tcp_set_state(struct pt_regs *ctx, struct sock *sk, int state)
         // timestamp is set.
         u64 ts = bpf_ktime_get_ns();
         birth.update(&sk, &ts);
-        return 0;
     }
+
+    if (state != TCP_CLOSE)
+        return 0;
 
     // fetch possible cached data
     struct id_t *mep;
     mep = whoami.lookup(&sk);
 
-    // passive connection closing; wait until TCP_LAST_ACK
-    if (mep == 0 && state != TCP_LAST_ACK)
-        return 0;
-
-    if (state == TCP_LAST_ACK) {
+    // fetch PID and filter
+    if (mep == 0) {
+        pid = mep->pid;
         FILTER_PID
     }
 
@@ -177,14 +181,11 @@ int kprobe__tcp_set_state(struct pt_regs *ctx, struct sock *sk, int state)
         data4.saddr = sk->__sk_common.skc_rcv_saddr;
         data4.daddr = sk->__sk_common.skc_daddr;
         // a workaround until data4 compiles with separate lport/dport
+        data4.pid = pid;
         data4.ports = ntohs(dport) + ((0ULL + lport) << 32);
         if (mep == 0) {
-            data4.pid = pid;
             bpf_get_current_comm(&data4.task, sizeof(data4.task));
-            bpf_trace_printk("state %d 0pid %d\\n", state, pid);
         } else {
-            data4.pid = mep->pid;
-            bpf_trace_printk("state %d mpid %d\\n", state, mep->pid);
             bpf_probe_read(&data4.task, sizeof(data4.task), (void *)mep->task);
         }
         ipv4_events.perf_submit(ctx, &data4, sizeof(data4));
@@ -199,11 +200,10 @@ int kprobe__tcp_set_state(struct pt_regs *ctx, struct sock *sk, int state)
             sk->__sk_common.skc_v6_daddr.in6_u.u6_addr32);
         // a workaround until data6 compiles with separate lport/dport
         data6.ports = ntohs(dport) + ((0ULL + lport) << 32);
+        data6.pid = pid;
         if (mep == 0) {
-            data6.pid = pid;
             bpf_get_current_comm(&data6.task, sizeof(data6.task));
         } else {
-            data6.pid = mep->pid;
             bpf_probe_read(&data6.task, sizeof(data6.task), (void *)mep->task);
         }
         ipv6_events.perf_submit(ctx, &data6, sizeof(data6));
