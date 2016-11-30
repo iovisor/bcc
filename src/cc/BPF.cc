@@ -54,15 +54,15 @@ StatusTuple BPF::init(const std::string& bpf_program,
   for (size_t i = 0; i < flags_len; i++)
     flags[i] = cflags[i].c_str();
   if (bpf_module_->load_string(bpf_program, flags, flags_len) != 0)
-    return mkstatus(-1, "Unable to initialize BPF program");
-  return mkstatus(0);
+    return StatusTuple(-1, "Unable to initialize BPF program");
+  return StatusTuple(0);
 };
 
 BPF::~BPF() {
   auto res = detach_all();
-  if (std::get<0>(res) != 0)
+  if (res.code() != 0)
     std::cerr << "Failed to detach all probes on destruction: " << std::endl
-              << std::get<1>(res) << std::endl;
+              << res.msg() << std::endl;
 }
 
 StatusTuple BPF::detach_all() {
@@ -71,45 +71,45 @@ StatusTuple BPF::detach_all() {
 
   for (auto it : kprobes_) {
     auto res = detach_kprobe_event(it.first, it.second);
-    if (std::get<0>(res) != 0) {
+    if (res.code() != 0) {
       error_msg += "Failed to detach kprobe event " + it.first + ": ";
-      error_msg += std::get<1>(res) + "\n";
+      error_msg += res.msg() + "\n";
       has_error = true;
     }
   }
 
   for (auto it : uprobes_) {
     auto res = detach_uprobe_event(it.first, it.second);
-    if (std::get<0>(res) != 0) {
+    if (res.code() != 0) {
       error_msg += "Failed to detach uprobe event " + it.first + ": ";
-      error_msg += std::get<1>(res) + "\n";
+      error_msg += res.msg() + "\n";
       has_error = true;
     }
   }
 
   for (auto it : tracepoints_) {
     auto res = detach_tracepoint_event(it.first, it.second);
-    if (std::get<0>(res) != 0) {
+    if (res.code() != 0) {
       error_msg += "Failed to detach Tracepoint " + it.first + ": ";
-      error_msg += std::get<1>(res) + "\n";
+      error_msg += res.msg() + "\n";
       has_error = true;
     }
   }
 
   for (auto it : perf_buffers_) {
     auto res = it.second->close();
-    if (std::get<0>(res) != 0) {
+    if (res.code() != 0) {
       error_msg += "Failed to close perf buffer " + it.first + ": ";
-      error_msg += std::get<1>(res) + "\n";
+      error_msg += res.msg() + "\n";
       has_error = true;
     }
     delete it.second;
   }
 
   if (has_error)
-    return mkstatus(-1, error_msg);
+    return StatusTuple(-1, error_msg);
   else
-    return mkstatus(0);
+    return StatusTuple(0);
 }
 
 StatusTuple BPF::attach_kprobe(const std::string& kernel_func,
@@ -123,7 +123,7 @@ StatusTuple BPF::attach_kprobe(const std::string& kernel_func,
   std::string probe_event = get_kprobe_event(kernel_func, attach_type);
   if (kprobes_.find(probe_event) != kprobes_.end()) {
     TRY2(unload_func(probe_func));
-    return mkstatus(-1, "kprobe %s already attached", probe_event.c_str());
+    return StatusTuple(-1, "kprobe %s already attached", probe_event.c_str());
   }
 
   std::string probe_event_desc = attach_type_prefix(attach_type);
@@ -135,16 +135,16 @@ StatusTuple BPF::attach_kprobe(const std::string& kernel_func,
 
   if (!res) {
     TRY2(unload_func(probe_func));
-    return mkstatus(-1, "Unable to attach %skprobe for %s using %s",
-                    attach_type_debug(attach_type).c_str(), kernel_func.c_str(),
-                    probe_func.c_str());
+    return StatusTuple(-1, "Unable to attach %skprobe for %s using %s",
+                       attach_type_debug(attach_type).c_str(),
+                       kernel_func.c_str(), probe_func.c_str());
   }
 
   open_probe_t p = {};
   p.reader_ptr = res;
   p.func = probe_func;
   kprobes_[probe_event] = std::move(p);
-  return mkstatus(0);
+  return StatusTuple(0);
 }
 
 StatusTuple BPF::attach_uprobe(const std::string& binary_path,
@@ -164,7 +164,7 @@ StatusTuple BPF::attach_uprobe(const std::string& binary_path,
       get_uprobe_event(sym.module, sym.offset, attach_type);
   if (uprobes_.find(probe_event) != uprobes_.end()) {
     TRY2(unload_func(probe_func));
-    return mkstatus(-1, "uprobe %s already attached", probe_event.c_str());
+    return StatusTuple(-1, "uprobe %s already attached", probe_event.c_str());
   }
 
   std::string probe_event_desc = attach_type_prefix(attach_type);
@@ -177,7 +177,7 @@ StatusTuple BPF::attach_uprobe(const std::string& binary_path,
 
   if (!res) {
     TRY2(unload_func(probe_func));
-    return mkstatus(
+    return StatusTuple(
         -1,
         "Unable to attach %suprobe for binary %s symbol %s addr %lx using %s\n",
         attach_type_debug(attach_type).c_str(), binary_path.c_str(),
@@ -188,7 +188,7 @@ StatusTuple BPF::attach_uprobe(const std::string& binary_path,
   p.reader_ptr = res;
   p.func = probe_func;
   uprobes_[probe_event] = std::move(p);
-  return mkstatus(0);
+  return StatusTuple(0);
 }
 
 StatusTuple BPF::attach_tracepoint(const std::string& tracepoint,
@@ -199,11 +199,12 @@ StatusTuple BPF::attach_tracepoint(const std::string& tracepoint,
   TRY2(load_func(probe_func, BPF_PROG_TYPE_TRACEPOINT, probe_fd));
 
   if (tracepoints_.find(tracepoint) != tracepoints_.end())
-    return mkstatus(-1, "Tracepoint %s already attached", tracepoint.c_str());
+    return StatusTuple(-1, "Tracepoint %s already attached",
+                       tracepoint.c_str());
 
   auto pos = tracepoint.find(":");
   if ((pos == std::string::npos) || (pos != tracepoint.rfind(":")))
-    return mkstatus(-1, "Unable to parse Tracepoint %s", tracepoint.c_str());
+    return StatusTuple(-1, "Unable to parse Tracepoint %s", tracepoint.c_str());
   std::string tp_category = tracepoint.substr(0, pos);
   std::string tp_name = tracepoint.substr(pos + 1);
 
@@ -213,15 +214,15 @@ StatusTuple BPF::attach_tracepoint(const std::string& tracepoint,
 
   if (!res) {
     TRY2(unload_func(probe_func));
-    return mkstatus(-1, "Unable to attach Tracepoint %s using %s",
-                    tracepoint.c_str(), probe_func.c_str());
+    return StatusTuple(-1, "Unable to attach Tracepoint %s using %s",
+                       tracepoint.c_str(), probe_func.c_str());
   }
 
   open_probe_t p = {};
   p.reader_ptr = res;
   p.func = probe_func;
   tracepoints_[tracepoint] = std::move(p);
-  return mkstatus(0);
+  return StatusTuple(0);
 }
 
 StatusTuple BPF::detach_kprobe(const std::string& kernel_func,
@@ -230,13 +231,13 @@ StatusTuple BPF::detach_kprobe(const std::string& kernel_func,
 
   auto it = kprobes_.find(event);
   if (it == kprobes_.end())
-    return mkstatus(-1, "No open %skprobe for %s",
-                    attach_type_debug(attach_type).c_str(),
-                    kernel_func.c_str());
+    return StatusTuple(-1, "No open %skprobe for %s",
+                       attach_type_debug(attach_type).c_str(),
+                       kernel_func.c_str());
 
   TRY2(detach_kprobe_event(it->first, it->second));
   kprobes_.erase(it);
-  return mkstatus(0);
+  return StatusTuple(0);
 }
 
 StatusTuple BPF::detach_uprobe(const std::string& binary_path,
@@ -248,23 +249,23 @@ StatusTuple BPF::detach_uprobe(const std::string& binary_path,
   std::string event = get_uprobe_event(sym.module, sym.offset, attach_type);
   auto it = uprobes_.find(event);
   if (it == uprobes_.end())
-    return mkstatus(-1, "No open %suprobe for binary %s symbol %s addr %lx",
-                    attach_type_debug(attach_type).c_str(), binary_path.c_str(),
-                    symbol.c_str(), symbol_addr);
+    return StatusTuple(-1, "No open %suprobe for binary %s symbol %s addr %lx",
+                       attach_type_debug(attach_type).c_str(),
+                       binary_path.c_str(), symbol.c_str(), symbol_addr);
 
   TRY2(detach_uprobe_event(it->first, it->second));
   uprobes_.erase(it);
-  return mkstatus(0);
+  return StatusTuple(0);
 }
 
 StatusTuple BPF::detach_tracepoint(const std::string& tracepoint) {
   auto it = tracepoints_.find(tracepoint);
   if (it == tracepoints_.end())
-    return mkstatus(-1, "No open Tracepoint %s", tracepoint.c_str());
+    return StatusTuple(-1, "No open Tracepoint %s", tracepoint.c_str());
 
   TRY2(detach_tracepoint_event(it->first, it->second));
   tracepoints_.erase(it);
-  return mkstatus(0);
+  return StatusTuple(0);
 }
 
 StatusTuple BPF::open_perf_buffer(const std::string& name,
@@ -273,15 +274,15 @@ StatusTuple BPF::open_perf_buffer(const std::string& name,
     perf_buffers_[name] = new BPFPerfBuffer(bpf_module_.get(), name);
   auto table = perf_buffers_[name];
   TRY2(table->open(cb, cb_cookie));
-  return mkstatus(0);
+  return StatusTuple(0);
 }
 
 StatusTuple BPF::close_perf_buffer(const std::string& name) {
   auto it = perf_buffers_.find(name);
   if (it == perf_buffers_.end())
-    return mkstatus(-1, "Perf buffer for %s not open", name.c_str());
+    return StatusTuple(-1, "Perf buffer for %s not open", name.c_str());
   TRY2(it->second->close());
-  return mkstatus(0);
+  return StatusTuple(0);
 }
 
 void BPF::poll_perf_buffer(const std::string& name, int timeout) {
@@ -295,12 +296,13 @@ StatusTuple BPF::load_func(const std::string& func_name,
                            enum bpf_prog_type type, int& fd) {
   if (funcs_.find(func_name) != funcs_.end()) {
     fd = funcs_[func_name];
-    return mkstatus(0);
+    return StatusTuple(0);
   }
 
   uint8_t* func_start = bpf_module_->function_start(func_name);
   if (!func_start)
-    return mkstatus(-1, "Can't find start of function %s", func_name.c_str());
+    return StatusTuple(-1, "Can't find start of function %s",
+                       func_name.c_str());
   size_t func_size = bpf_module_->function_size(func_name);
 
   fd = bpf_prog_load(type, reinterpret_cast<struct bpf_insn*>(func_start),
@@ -310,22 +312,22 @@ StatusTuple BPF::load_func(const std::string& func_name,
                      );
 
   if (fd < 0)
-    return mkstatus(-1, "Failed to load %s: %d", func_name.c_str(), fd);
+    return StatusTuple(-1, "Failed to load %s: %d", func_name.c_str(), fd);
   funcs_[func_name] = fd;
-  return mkstatus(0);
+  return StatusTuple(0);
 }
 
 StatusTuple BPF::unload_func(const std::string& func_name) {
   auto it = funcs_.find(func_name);
   if (it == funcs_.end())
-    return mkstatus(-1, "Probe function %s not loaded", func_name.c_str());
+    return StatusTuple(-1, "Probe function %s not loaded", func_name.c_str());
 
   int res = close(it->second);
   if (res != 0)
-    return mkstatus(-1, "Can't close FD for %s: %d", it->first.c_str(), res);
+    return StatusTuple(-1, "Can't close FD for %s: %d", it->first.c_str(), res);
 
   funcs_.erase(it);
-  return mkstatus(0);
+  return StatusTuple(0);
 }
 
 StatusTuple BPF::check_binary_symbol(const std::string& binary_path,
@@ -334,10 +336,10 @@ StatusTuple BPF::check_binary_symbol(const std::string& binary_path,
   int res = bcc_resolve_symname(binary_path.c_str(), symbol.c_str(),
                                 symbol_addr, output);
   if (res < 0)
-    return mkstatus(-1,
-                    "Unable to find offset for binary %s symbol %s address %lx",
-                    binary_path.c_str(), symbol.c_str(), symbol_addr);
-  return mkstatus(0);
+    return StatusTuple(
+        -1, "Unable to find offset for binary %s symbol %s address %lx",
+        binary_path.c_str(), symbol.c_str(), symbol_addr);
+  return StatusTuple(0);
 }
 
 std::string BPF::get_kprobe_event(const std::string& kernel_func,
@@ -364,8 +366,8 @@ StatusTuple BPF::detach_kprobe_event(const std::string& event,
   TRY2(unload_func(attr.func));
   std::string detach_event = "-:kprobes/" + event;
   if (bpf_detach_kprobe(detach_event.c_str()) < 0)
-    return mkstatus(-1, "Unable to detach kprobe %s", event.c_str());
-  return mkstatus(0);
+    return StatusTuple(-1, "Unable to detach kprobe %s", event.c_str());
+  return StatusTuple(0);
 }
 
 StatusTuple BPF::detach_uprobe_event(const std::string& event,
@@ -377,8 +379,8 @@ StatusTuple BPF::detach_uprobe_event(const std::string& event,
   TRY2(unload_func(attr.func));
   std::string detach_event = "-:uprobes/" + event;
   if (bpf_detach_uprobe(detach_event.c_str()) < 0)
-    return mkstatus(-1, "Unable to detach uprobe %s", event.c_str());
-  return mkstatus(0);
+    return StatusTuple(-1, "Unable to detach uprobe %s", event.c_str());
+  return StatusTuple(0);
 }
 
 StatusTuple BPF::detach_tracepoint_event(const std::string& tracepoint,
@@ -390,7 +392,7 @@ StatusTuple BPF::detach_tracepoint_event(const std::string& tracepoint,
   TRY2(unload_func(attr.func));
 
   // TODO: bpf_detach_tracepoint currently does nothing.
-  return mkstatus(0);
+  return StatusTuple(0);
 }
 
 }  // namespace ebpf

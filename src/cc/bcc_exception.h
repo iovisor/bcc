@@ -18,40 +18,40 @@
 
 #include <cstdio>
 #include <string>
-#include <tuple>
 #undef NDEBUG
 
 namespace ebpf {
 
-typedef std::tuple<int, std::string> StatusTuple;
+class StatusTuple {
+public:
+  StatusTuple(int ret) : ret_(ret) {}
 
-template <typename... Args>
-StatusTuple mkstatus(int ret, const char *fmt, Args... args) {
-  char buf[1024];
-  snprintf(buf, sizeof(buf), fmt, args...);
-  return std::make_tuple(ret, std::string(buf));
-}
+  StatusTuple(int ret, const char *msg) : ret_(ret), msg_(msg) {}
 
-static inline StatusTuple mkstatus(int ret, const char *msg) {
-  return std::make_tuple(ret, std::string(msg));
-}
+  StatusTuple(int ret, const std::string &msg) : ret_(ret), msg_(msg) {}
 
-static inline StatusTuple mkstatus(
-  int ret, const std::string& msg
-) {
-  return std::make_tuple(ret, msg);
-}
+  template <typename... Args>
+  StatusTuple(int ret, const char *fmt, Args... args) : ret_(ret) {
+    char buf[2048];
+    snprintf(buf, sizeof(buf), fmt, args...);
+    msg_ = std::string(buf);
+  }
 
-static inline StatusTuple mkstatus(int ret) {
-  return std::make_tuple(ret, std::string());
-}
+  int code() { return ret_; }
 
-#define TRY2(CMD) \
-  do { \
+  std::string msg() { return msg_; }
+
+private:
+  int ret_;
+  std::string msg_;
+};
+
+#define TRY2(CMD)              \
+  do {                         \
     StatusTuple __stp = (CMD); \
-    if (std::get<0>(__stp) != 0) { \
-      return __stp; \
-    } \
+    if (__stp.code() != 0) {   \
+      return __stp;            \
+    }                          \
   } while (0)
 
 }  // namespace ebpf

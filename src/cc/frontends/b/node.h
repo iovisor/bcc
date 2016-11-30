@@ -114,20 +114,20 @@ class Node {
 };
 
 template <typename... Args>
-std::tuple<int, std::string> mkstatus_(Node *n, const char *fmt, Args... args) {
-  char buf[1024];
+StatusTuple mkstatus_(Node *n, const char *fmt, Args... args) {
+  char buf[2048];
   snprintf(buf, sizeof(buf), fmt, args...);
   string out_msg(buf);
   if (n->line_ > 0)
     out_msg += "\n" + n->text_;
-  return std::make_tuple(n->line_ ? n->line_ : -1, out_msg);
+  return StatusTuple(n->line_ ? n->line_ : -1, out_msg);
 }
 
-static inline std::tuple<int, std::string> mkstatus_(Node *n, const char *msg) {
+static inline StatusTuple mkstatus_(Node *n, const char *msg) {
   string out_msg(msg);
   if (n->line_ > 0)
     out_msg += "\n" + n->text_;
-  return std::make_tuple(n->line_ ? n->line_ : -1, out_msg);
+  return StatusTuple(n->line_ ? n->line_ : -1, out_msg);
 }
 
 class StmtNode : public Node {
