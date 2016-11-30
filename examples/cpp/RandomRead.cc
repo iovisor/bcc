@@ -70,21 +70,21 @@ void signal_handler(int s) {
 int main(int argc, char** argv) {
   bpf = new ebpf::BPF();
   auto init_res = bpf->init(BPF_PROGRAM);
-  if (std::get<0>(init_res) != 0) {
-    std::cerr << std::get<1>(init_res) << std::endl;
+  if (init_res.code() != 0) {
+    std::cerr << init_res.msg() << std::endl;
     return 1;
   }
 
   auto attach_res =
       bpf->attach_tracepoint("random:urandom_read", "on_urandom_read");
-  if (std::get<0>(attach_res) != 0) {
-    std::cerr << std::get<1>(attach_res) << std::endl;
+  if (attach_res.code() != 0) {
+    std::cerr << attach_res.msg() << std::endl;
     return 1;
   }
 
   auto open_res = bpf->open_perf_buffer("events", &handle_output);
-  if (std::get<0>(open_res) != 0) {
-    std::cerr << std::get<1>(open_res) << std::endl;
+  if (open_res.code() != 0) {
+    std::cerr << open_res.msg() << std::endl;
     return 1;
   }
 

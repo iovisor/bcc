@@ -68,36 +68,36 @@ std::vector<std::string> BPFStackTable::get_stack_symbol(int stack_id,
 StatusTuple BPFPerfBuffer::open_on_cpu(perf_reader_raw_cb cb, int cpu,
                                        void* cb_cookie) {
   if (cpu_readers_.find(cpu) != cpu_readers_.end())
-    return mkstatus(-1, "Perf buffer already open on CPU %d", cpu);
+    return StatusTuple(-1, "Perf buffer already open on CPU %d", cpu);
   auto reader =
       static_cast<perf_reader*>(bpf_open_perf_buffer(cb, cb_cookie, -1, cpu));
   if (reader == nullptr)
-    return mkstatus(-1, "Unable to construct perf reader");
+    return StatusTuple(-1, "Unable to construct perf reader");
   int reader_fd = perf_reader_fd(reader);
   if (!update(&cpu, &reader_fd)) {
     perf_reader_free(static_cast<void*>(reader));
-    return mkstatus(-1, "Unable to open perf buffer on CPU %d: %s", cpu,
-                    strerror(errno));
+    return StatusTuple(-1, "Unable to open perf buffer on CPU %d: %s", cpu,
+                       strerror(errno));
   }
   cpu_readers_[cpu] = static_cast<perf_reader*>(reader);
-  return mkstatus(0);
+  return StatusTuple(0);
 }
 
 StatusTuple BPFPerfBuffer::open(perf_reader_raw_cb cb, void* cb_cookie) {
   for (int i = 0; i < sysconf(_SC_NPROCESSORS_ONLN); i++)
     TRY2(open_on_cpu(cb, i, cb_cookie));
-  return mkstatus(0);
+  return StatusTuple(0);
 }
 
 StatusTuple BPFPerfBuffer::close_on_cpu(int cpu) {
   auto it = cpu_readers_.find(cpu);
   if (it == cpu_readers_.end())
-    return mkstatus(0);
+    return StatusTuple(0);
   perf_reader_free(static_cast<void*>(it->second));
   if (!remove(const_cast<int*>(&(it->first))))
-    return mkstatus(-1, "Unable to close perf buffer on CPU %d", it->first);
+    return StatusTuple(-1, "Unable to close perf buffer on CPU %d", it->first);
   cpu_readers_.erase(it);
-  return mkstatus(0);
+  return StatusTuple(0);
 }
 
 StatusTuple BPFPerfBuffer::close() {
@@ -105,15 +105,15 @@ StatusTuple BPFPerfBuffer::close() {
   bool has_error = false;
   for (int i = 0; i < sysconf(_SC_NPROCESSORS_ONLN); i++) {
     auto res = close_on_cpu(i);
-    if (std::get<0>(res) != 0) {
+    if (res.code() != 0) {
       errors += "Failed to close CPU" + std::to_string(i) + " perf buffer: ";
-      errors += std::get<1>(res) + "\n";
+      errors += res.msg() + "\n";
       has_error = true;
     }
   }
   if (has_error)
-    return mkstatus(-1, errors);
-  return mkstatus(0);
+    return StatusTuple(-1, errors);
+  return StatusTuple(0);
 }
 
 void BPFPerfBuffer::poll(int timeout) {
@@ -126,9 +126,9 @@ void BPFPerfBuffer::poll(int timeout) {
 
 BPFPerfBuffer::~BPFPerfBuffer() {
   auto res = close();
-  if (std::get<0>(res) != 0)
+  if (res.code() != 0)
     std::cerr << "Failed to close all perf buffer on destruction: "
-              << std::get<1>(res) << std::endl;
+              << res.msg() << std::endl;
 }
 
 }  // namespace ebpf
