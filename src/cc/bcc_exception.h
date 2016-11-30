@@ -18,7 +18,6 @@
 
 #include <cstdio>
 #include <string>
-#undef NDEBUG
 
 namespace ebpf {
 
