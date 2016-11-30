@@ -17,7 +17,6 @@
 #include <set>
 #include <algorithm>
 #include <sstream>
-#include <assert.h>
 
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/CallingConv.h>
