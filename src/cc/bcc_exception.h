@@ -37,6 +37,10 @@ public:
     msg_ = std::string(buf);
   }
 
+  void append_msg(const std::string& msg) {
+    msg_ += msg;
+  }
+
   int code() { return ret_; }
 
   std::string msg() { return msg_; }
