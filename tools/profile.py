@@ -132,7 +132,7 @@ BPF_STACK_TRACE(stack_traces, STACK_STORAGE_SIZE)
 // This code gets a bit complex. Probably not suitable for casual hacking.
 
 int do_perf_event(struct bpf_perf_event_data *ctx) {
-    u32 pid = bpf_get_current_pid_tgid();
+    u32 pid = bpf_get_current_pid_tgid() >> 32;
     if (!(THREAD_FILTER))
         return 0;
 
