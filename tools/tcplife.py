@@ -127,44 +127,49 @@ int kprobe__tcp_set_state(struct pt_regs *ctx, struct sock *sk, int state)
      *       fetch task context if cached, or use current task
      */
 
+    // capture birth time
+    if (state < TCP_FIN_WAIT1) {
+        /*
+         * Matching just ESTABLISHED may be sufficient, provided no code-path
+         * sets ESTABLISHED without a tcp_set_state() call. Until we know
+         * that for sure, match all early states to increase chances a
+         * timestamp is set.
+         * Note that this needs to be set before the PID filter later on,
+         * since the PID isn't reliable for these early stages, so we must
+         * save all timestamps and do the PID filter later when we can.
+         */
+        u64 ts = bpf_ktime_get_ns();
+        birth.update(&sk, &ts);
+    }
+
     // record PID & comm on SYN_SENT
     if (state == TCP_SYN_SENT || state == TCP_LAST_ACK) {
+        // now we can PID filter, both here and a little later on for CLOSE
         FILTER_PID
         struct id_t me = {.pid = pid};
         bpf_get_current_comm(&me.task, sizeof(me.task));
         whoami.update(&sk, &me);
     }
 
-    // capture birth time
-    if (state < TCP_FIN_WAIT1) {
-        // matching just ESTABLISHED may be sufficient, provided no code-path
-        // sets ESTABLISHED without a tcp_set_state() call. Until we know
-        // that for sure, match all early states to increase chances a
-        // timestamp is set.
-        u64 ts = bpf_ktime_get_ns();
-        birth.update(&sk, &ts);
-    }
-
     if (state != TCP_CLOSE)
         return 0;
-
-    // fetch possible cached data
-    struct id_t *mep;
-    mep = whoami.lookup(&sk);
-
-    // fetch PID and filter
-    if (mep == 0) {
-        pid = mep->pid;
-        FILTER_PID
-    }
 
     // calculate lifespan
     u64 *tsp, delta_us;
     tsp = birth.lookup(&sk);
     if (tsp == 0) {
-        return 0;   // missed create
+        whoami.delete(&sk);     // may not exist
+        return 0;               // missed create
     }
     delta_us = (bpf_ktime_get_ns() - *tsp) / 1000;
+    birth.delete(&sk);
+
+    // fetch possible cached data, and filter
+    struct id_t *mep;
+    mep = whoami.lookup(&sk);
+    if (mep != 0)
+        pid = mep->pid;
+    FILTER_PID
 
     // get throughput stats. see tcp_get_info().
     u64 rx_b = 0, tx_b = 0, sport = 0;
@@ -209,7 +214,6 @@ int kprobe__tcp_set_state(struct pt_regs *ctx, struct sock *sk, int state)
         ipv6_events.perf_submit(ctx, &data6, sizeof(data6));
     }
 
-    birth.delete(&sk);
     if (mep != 0)
         whoami.delete(&sk);
 
