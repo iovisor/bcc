@@ -28,6 +28,9 @@ BPF_MAP_TYPE_PERF_EVENT_ARRAY = 4
 BPF_MAP_TYPE_PERCPU_HASH = 5
 BPF_MAP_TYPE_PERCPU_ARRAY = 6
 BPF_MAP_TYPE_STACK_TRACE = 7
+BPF_MAP_TYPE_CGROUP_ARRAY = 8
+BPF_MAP_TYPE_LRU_HASH = 9
+BPF_MAP_TYPE_LRU_PERCPU_HASH = 10
 
 stars_max = 40
 
@@ -97,6 +100,10 @@ def Table(bpf, map_id, map_fd, keytype, leaftype, **kwargs):
         t = PerCpuArray(bpf, map_id, map_fd, keytype, leaftype, **kwargs)
     elif ttype == BPF_MAP_TYPE_STACK_TRACE:
         t = StackTrace(bpf, map_id, map_fd, keytype, leaftype)
+    elif ttype == BPF_MAP_TYPE_LRU_HASH:
+        t = LruHash(bpf, map_id, map_fd, keytype, leaftype)
+    elif ttype == BPF_MAP_TYPE_LRU_PERCPU_HASH:
+        t = LruPerCpuHash(bpf, map_id, map_fd, keytype, leaftype)
     if t == None:
         raise Exception("Unknown table type %d" % ttype)
     return t
@@ -299,6 +306,9 @@ class HashTable(TableBase):
         if res < 0:
             raise KeyError
 
+class LruHash(HashTable):
+    def __init__(self, *args, **kwargs):
+        super(LruHash, self).__init__(*args, **kwargs)
 
 class ArrayBase(TableBase):
     def __init__(self, *args, **kwargs):
@@ -525,6 +535,10 @@ class PerCpuHash(HashTable):
         result = self.sum(key)
         result.value/=self.total_cpu
         return result
+
+class LruPerCpuHash(PerCpuHash):
+    def __init__(self, *args, **kwargs):
+        super(LruPerCpuHash, self).__init__(*args, **kwargs)
 
 class PerCpuArray(ArrayBase):
     def __init__(self, *args, **kwargs):

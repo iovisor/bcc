@@ -20,7 +20,6 @@ class TestPercpu(unittest.TestCase):
             return 0;
         }
         """
-        self.addCleanup(self.cleanup)
         bpf_code = BPF(text=test_prog1)
         stats_map = bpf_code.get_table("stats")
         bpf_code.attach_kprobe(event="sys_clone", fn_name="hello_world")
@@ -37,6 +36,7 @@ class TestPercpu(unittest.TestCase):
         max = stats_map.max(stats_map.Key(0))
         self.assertGreater(sum.value, 0L)
         self.assertGreater(max.value, 0L)
+        bpf_code.detach_kprobe("sys_clone")
 
     def test_u32(self):
         test_prog1 = """
@@ -49,7 +49,6 @@ class TestPercpu(unittest.TestCase):
             return 0;
         }
         """
-        self.addCleanup(self.cleanup)
         bpf_code = BPF(text=test_prog1)
         stats_map = bpf_code.get_table("stats")
         bpf_code.attach_kprobe(event="sys_clone", fn_name="hello_world")
@@ -66,6 +65,7 @@ class TestPercpu(unittest.TestCase):
         max = stats_map.max(stats_map.Key(0))
         self.assertGreater(sum.value, 0L)
         self.assertGreater(max.value, 0L)
+        bpf_code.detach_kprobe("sys_clone")
 
     def test_struct_custom_func(self):
         test_prog2 = """
@@ -83,7 +83,6 @@ class TestPercpu(unittest.TestCase):
             return 0;
         }
         """
-        self.addCleanup(self.cleanup)
         bpf_code = BPF(text=test_prog2)
         stats_map = bpf_code.get_table("stats",
                 reducer=lambda x,y: stats_map.sLeaf(x.c1+y.c1))
@@ -97,9 +96,7 @@ class TestPercpu(unittest.TestCase):
         self.assertEqual(len(stats_map),1)
         k = stats_map[ stats_map.Key(0) ]
         self.assertGreater(k.c1, 0L)
-
-    def cleanup(self):
-        BPF.detach_kprobe("sys_clone")
+        bpf_code.detach_kprobe("sys_clone")
 
 
 if __name__ == "__main__":

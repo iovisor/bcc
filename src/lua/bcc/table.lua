@@ -26,6 +26,9 @@ BaseTable.static.BPF_MAP_TYPE_PERF_EVENT_ARRAY = 4
 BaseTable.static.BPF_MAP_TYPE_PERCPU_HASH = 5
 BaseTable.static.BPF_MAP_TYPE_PERCPU_ARRAY = 6
 BaseTable.static.BPF_MAP_TYPE_STACK_TRACE = 7
+BaseTable.static.BPF_MAP_TYPE_CGROUP_ARRAY = 8
+BaseTable.static.BPF_MAP_TYPE_LRU_HASH = 9
+BaseTable.static.BPF_MAP_TYPE_LRU_PERCPU_HASH = 10
 
 function BaseTable:initialize(t_type, bpf, map_id, map_fd, key_type, leaf_type)
   assert(t_type == libbcc.bpf_table_type_id(bpf.module, map_id))

@@ -138,9 +138,13 @@ else
 		S.c.BPF_MAP.PERCPU_ARRAY = 6
 		S.c.BPF_MAP.STACK_TRACE  = 7
 		S.c.BPF_MAP.CGROUP_ARRAY = 8
+		S.c.BPF_MAP.LRU_HASH     = 9
+		S.c.BPF_MAP.LRU_PERCPU_HASH = 10
 	end
 	if not S.c.BPF_PROG.TRACEPOINT then
 		S.c.BPF_PROG.TRACEPOINT  = 5
+		S.c.BPF_PROG.XDP         = 6
+		S.c.BPF_PROG.PERF_EVENT  = 7
 	end
 end
 
