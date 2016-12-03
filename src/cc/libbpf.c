@@ -201,6 +201,7 @@ int bpf_prog_load(enum bpf_prog_type prog_type,
                      strerror(errno));
              return ret;
          }
+         bpf_log_buffer[0] = 0;
 
          attr.log_buf = ptr_to_u64(bpf_log_buffer);
          attr.log_size = buffer_size;
