@@ -38,9 +38,13 @@ const char *calling_conv_regs_x86[] = {
 };
 const char *calling_conv_regs_ppc[] = {"gpr[3]", "gpr[4]", "gpr[5]",
                                        "gpr[6]", "gpr[7]", "gpr[8]"};
+const char *calling_conv_regs_arm64[] = {"regs[0]", "regs[1]", "regs[2]",
+                                       "regs[3]", "regs[4]", "regs[5]"};
 // todo: support more archs
 #if defined(__powerpc__)
 const char **calling_conv_regs = calling_conv_regs_ppc;
+#elif defined(__aarch64__)
+const char **calling_conv_regs = calling_conv_regs_arm64;
 #else
 const char **calling_conv_regs = calling_conv_regs_x86;
 #endif

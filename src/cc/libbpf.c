@@ -44,6 +44,8 @@
 #ifndef __NR_bpf
 #if defined(__powerpc64__)
 #define __NR_bpf 361
+#elif defined(__aarch64__)
+#define __NR_bpf 280
 #else
 #define __NR_bpf 321
 #endif
