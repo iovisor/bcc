@@ -448,6 +448,18 @@ int bpf_usdt_readarg_p(int argc, struct pt_regs *ctx, void *buf, u64 len) asm("l
 #define PT_REGS_RC(ctx)		((ctx)->ax)
 #define PT_REGS_IP(ctx)		((ctx)->ip)
 #define PT_REGS_SP(ctx)		((ctx)->sp)
+#elif defined(__aarch64__)
+#define PT_REGS_PARM1(x)	((x)->regs[0])
+#define PT_REGS_PARM2(x)	((x)->regs[1])
+#define PT_REGS_PARM3(x)	((x)->regs[2])
+#define PT_REGS_PARM4(x)	((x)->regs[3])
+#define PT_REGS_PARM5(x)	((x)->regs[4])
+#define PT_REGS_PARM6(x)	((x)->regs[5])
+#define PT_REGS_RET(x)		((x)->regs[30])
+#define PT_REGS_FP(x)		((x)->regs[29]) /*  Works only with CONFIG_FRAME_POINTER */
+#define PT_REGS_RC(x)		((x)->regs[0])
+#define PT_REGS_SP(x)		((x)->sp)
+#define PT_REGS_IP(x)		((x)->pc)
 #else
 #error "bcc does not support this platform yet"
 #endif
