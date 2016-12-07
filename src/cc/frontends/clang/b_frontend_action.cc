@@ -599,13 +599,6 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
     }
     const RecordDecl *RD = R->getDecl()->getDefinition();
 
-    int major = 0, minor = 0;
-    struct utsname un;
-    if (uname(&un) == 0) {
-      // release format: <major>.<minor>.<revision>[-<othertag>]
-      sscanf(un.release, "%d.%d.", &major, &minor);
-    }
-
     TableDesc table = {};
     table.name = Decl->getName();
 
@@ -630,9 +623,18 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
         visitor.TraverseType(F->getType());
       } else if (F->getName() == "data") {
         table.max_entries = sz / table.leaf_size;
+      } else if (F->getName() == "flags") {
+        unsigned idx = F->getFieldIndex();
+        if (auto I = dyn_cast_or_null<InitListExpr>(Decl->getInit())) {
+          llvm::APSInt res;
+          if (I->getInit(idx)->EvaluateAsInt(res, C)) {
+            table.flags = res.getExtValue();
+          }
+        }
       }
       ++i;
     }
+
     bool is_extern = false;
     bpf_map_type map_type = BPF_MAP_TYPE_UNSPEC;
     if (A->getName() == "maps/hash") {
@@ -695,7 +697,7 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
       }
 
       table.type = map_type;
-      table.fd = bpf_create_map(map_type, table.key_size, table.leaf_size, table.max_entries);
+      table.fd = bpf_create_map(map_type, table.key_size, table.leaf_size, table.max_entries, table.flags);
     }
     if (table.fd < 0) {
       error(Decl->getLocStart(), "could not open bpf map: %0\nis %1 map type enabled in your kernel?") <<

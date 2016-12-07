@@ -38,7 +38,7 @@ R"********(
 #define SEC(NAME) __attribute__((section(NAME), used))
 
 // Changes to the macro require changes in BFrontendAction classes
-#define BPF_TABLE(_table_type, _key_type, _leaf_type, _name, _max_entries) \
+#define BPF_F_TABLE(_table_type, _key_type, _leaf_type, _name, _max_entries, _flags) \
 struct _name##_table_t { \
   _key_type key; \
   _leaf_type leaf; \
@@ -50,9 +50,13 @@ struct _name##_table_t { \
   void (*increment) (_key_type); \
   int (*get_stackid) (void *, u64); \
   _leaf_type data[_max_entries]; \
+  int flags; \
 }; \
 __attribute__((section("maps/" _table_type))) \
-struct _name##_table_t _name
+struct _name##_table_t _name = { .flags = (_flags) }
+
+#define BPF_TABLE(_table_type, _key_type, _leaf_type, _name, _max_entries) \
+BPF_F_TABLE(_table_type, _key_type, _leaf_type, _name, _max_entries, 0);
 
 // define a table same as above but allow it to be referenced by other modules
 #define BPF_TABLE_PUBLIC(_table_type, _key_type, _leaf_type, _name, _max_entries) \

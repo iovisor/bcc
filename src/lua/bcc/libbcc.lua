@@ -24,7 +24,7 @@ enum bpf_prog_type {
   BPF_PROG_TYPE_SCHED_ACT,
 };
 
-int bpf_create_map(enum bpf_map_type map_type, int key_size, int value_size, int max_entries);
+int bpf_create_map(enum bpf_map_type map_type, int key_size, int value_size, int max_entries, int map_flags);
 int bpf_update_elem(int fd, void *key, void *value, unsigned long long flags);
 int bpf_lookup_elem(int fd, void *key, void *value);
 int bpf_delete_elem(int fd, void *key);
@@ -72,6 +72,8 @@ int bpf_table_type(void *program, const char *table_name);
 int bpf_table_type_id(void *program, size_t id);
 size_t bpf_table_max_entries(void *program, const char *table_name);
 size_t bpf_table_max_entries_id(void *program, size_t id);
+int bpf_table_flags(void *program, const char *table_name);
+int bpf_table_flags_id(void *program, size_t id);
 const char * bpf_table_name(void *program, size_t id);
 const char * bpf_table_key_desc(void *program, const char *table_name);
 const char * bpf_table_key_desc_id(void *program, size_t id);

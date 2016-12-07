@@ -146,6 +146,18 @@ size_t bpf_table_max_entries_id(void *program, size_t id) {
   return mod->table_max_entries(id);
 }
 
+int bpf_table_flags(void *program, const char *table_name) {
+  auto mod = static_cast<ebpf::BPFModule *>(program);
+  if (!mod) return -1;
+  return mod->table_flags(table_name);
+}
+
+int bpf_table_flags_id(void *program, size_t id) {
+  auto mod = static_cast<ebpf::BPFModule *>(program);
+  if (!mod) return -1;
+  return mod->table_flags(id);
+}
+
 const char * bpf_table_name(void *program, size_t id) {
   auto mod = static_cast<ebpf::BPFModule *>(program);
   if (!mod) return nullptr;

@@ -68,7 +68,7 @@ static __u64 ptr_to_u64(void *ptr)
   return (__u64) (unsigned long) ptr;
 }
 
-int bpf_create_map(enum bpf_map_type map_type, int key_size, int value_size, int max_entries)
+int bpf_create_map(enum bpf_map_type map_type, int key_size, int value_size, int max_entries, int map_flags)
 {
   union bpf_attr attr;
   memset(&attr, 0, sizeof(attr));
@@ -76,6 +76,7 @@ int bpf_create_map(enum bpf_map_type map_type, int key_size, int value_size, int
   attr.key_size = key_size;
   attr.value_size = value_size;
   attr.max_entries = max_entries;
+  attr.map_flags = map_flags;
 
   int ret = syscall(__NR_bpf, BPF_MAP_CREATE, &attr, sizeof(attr));
   if (ret < 0 && errno == EPERM) {
@@ -171,7 +172,7 @@ int bpf_prog_load(enum bpf_prog_type prog_type,
   }
 
   ret = syscall(__NR_bpf, BPF_PROG_LOAD, &attr, sizeof(attr));
-   
+
   if (ret < 0 && errno == EPERM) {
     // When EPERM is returned, two reasons are possible:
     //  1. user has no permissions for bpf()
@@ -221,7 +222,7 @@ int bpf_prog_load(enum bpf_prog_type prog_type,
 
     fprintf(stderr, "bpf: %s\n%s\n", strerror(errno), bpf_log_buffer);
 
-    free(bpf_log_buffer); 
+    free(bpf_log_buffer);
   }
   return ret;
 }

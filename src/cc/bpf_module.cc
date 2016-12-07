@@ -542,6 +542,15 @@ size_t BPFModule::table_max_entries(size_t id) const {
   return (*tables_)[id].max_entries;
 }
 
+int BPFModule::table_flags(const string &name) const {
+  return table_flags(table_id(name));
+}
+
+int BPFModule::table_flags(size_t id) const {
+  if (id >= tables_->size()) return -1;
+  return (*tables_)[id].flags;
+}
+
 const char * BPFModule::table_name(size_t id) const {
   if (id >= tables_->size()) return nullptr;
   return (*tables_)[id].name.c_str();
