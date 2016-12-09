@@ -30,6 +30,7 @@ struct urandom_read_args {
 struct event_t {
   int pid;
   char comm[16];
+  int cpu;
   int got_bits;
 };
 
@@ -39,6 +40,7 @@ int on_urandom_read(struct urandom_read_args* attr) {
   struct event_t event = {};
   event.pid = bpf_get_current_pid_tgid();
   bpf_get_current_comm(&event.comm, sizeof(event.comm));
+  event.cpu = bpf_get_smp_processor_id();
   event.got_bits = attr->got_bits;
 
   events.perf_submit(attr, &event, sizeof(event));
@@ -50,13 +52,15 @@ int on_urandom_read(struct urandom_read_args* attr) {
 struct event_t {
   int pid;
   char comm[16];
+  int cpu;
   int got_bits;
 };
 
 void handle_output(void* cb_cookie, void* data, int data_size) {
   auto event = static_cast<event_t*>(data);
-  std::cout << "PID: " << event->pid << " (" << event->comm << ") "
-            << "Read " << event->got_bits << " bits" << std::endl;
+  std::cout << "PID: " << event->pid << " (" << event->comm << ") on CPU "
+            << event->cpu << " read " << event->got_bits << " bits"
+            << std::endl;
 }
 
 ebpf::BPF* bpf;
