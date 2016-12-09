@@ -603,7 +603,7 @@ TIME(s)            COMM             PID    ARGS
 24653340.510164998 node             24728  path:/images/favicon.png
 ```
 
-Relevant code from [examples/tracing/nodejs_http_server.py](../examples/tracing/nodejs_http_server.py):
+Relevant code from [examples/tracing/nodejs_http_server.py](../examples/tracing/nodes_http_server.py):
 
 ```Python
 if len(sys.argv) < 2:
@@ -616,7 +616,7 @@ bpf_text = """
 #include <uapi/linux/ptrace.h>
 int do_trace(struct pt_regs *ctx) {
     uint64_t addr;
-    char path[128];
+    char path[128]={0};
     bpf_usdt_readarg(6, ctx, &addr);
     bpf_probe_read(&path, sizeof(path), (void *)addr);
     bpf_trace_printk("path:%s\\n", path);
