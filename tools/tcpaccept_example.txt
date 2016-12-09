@@ -1,0 +1,51 @@
+Demonstrations of tcpaccept, the Linux eBPF/bcc version.
+
+
+This tool traces the kernel function accepting TCP socket connections (eg, a
+passive connection via accept(); not connect()). Some example output (IP
+addresses changed to protect the innocent):
+
+# ./tcpaccept
+PID    COMM         IP RADDR            LADDR            LPORT
+907    sshd         4  192.168.56.1     192.168.56.102   22
+907    sshd         4  127.0.0.1        127.0.0.1        22
+5389   perl         6  1234:ab12:2040:5020:2299:0:5:0 1234:ab12:2040:5020:2299:0:5:0 7001
+
+This output shows three connections, two IPv4 connections to PID 907, an "sshd"
+process listening on port 22, and one IPv6 connection to a "perl" process
+listening on port 7001.
+
+The overhead of this tool should be negligible, since it is only tracing the
+kernel function performing accept. It is not tracing every packet and then
+filtering.
+
+This tool only traces successful TCP accept()s. Connection attempts to closed
+ports will not be shown (those can be traced via other functions).
+
+
+The -t option prints a timestamp column:
+
+# ./tcpaccept -t
+TIME(s)  PID    COMM         IP RADDR            LADDR            LPORT
+0.000    907    sshd         4  127.0.0.1        127.0.0.1        22
+0.010    5389   perl         6  1234:ab12:2040:5020:2299:0:5:0 1234:ab12:2040:5020:2299:0:5:0 7001
+0.992    907    sshd         4  127.0.0.1        127.0.0.1        22
+1.984    907    sshd         4  127.0.0.1        127.0.0.1        22
+
+
+USAGE message:
+
+# ./tcpaccept -h
+usage: tcpaccept [-h] [-t] [-p PID]
+
+Trace TCP accepts
+
+optional arguments:
+  -h, --help         show this help message and exit
+  -t, --timestamp    include timestamp on output
+  -p PID, --pid PID  trace this PID only
+
+examples:
+    ./tcpaccept           # trace all TCP accept()s
+    ./tcpaccept -t        # include timestamps
+    ./tcpaccept -p 181    # only trace PID 181

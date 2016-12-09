@@ -1,0 +1,93 @@
+.TH softirqs 8  "2015-10-20" "USER COMMANDS"
+.SH NAME
+softirqs \- Measure soft IRQ (soft interrupt) event time. Uses Linux eBPF/bcc.
+.SH SYNOPSIS
+.B softirqs [\-h] [\-T] [\-N] [\-d] [interval] [count]
+.SH DESCRIPTION
+This summarizes the time spent servicing soft IRQs (soft interrupts), and can
+show this time as either totals or histogram distributions. A system-wide
+summary of this time is shown by the %soft column of mpstat(1), and soft IRQ
+event counts (but not times) are available in /proc/softirqs.
+
+WARNING: This currently uses dynamic tracing of various soft interrupt
+functions, and can easily not work with different kernel versions. Check and
+adjust the code as necessary. Also try in a test environment and ensure this
+tool is safe before use. Future versions should switch to tracepoints.
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH OPTIONS
+.TP
+\-h
+Print usage message.
+.TP
+\-T
+Include timestamps on output.
+.TP
+\-N
+Output in nanoseconds
+.TP
+\-d
+Show IRQ time distribution as histograms
+.SH EXAMPLES
+.TP
+Sum soft IRQ event time until Ctrl-C:
+#
+.B softirqs
+.TP
+Show soft IRQ event time as histograms:
+#
+.B softirqs \-d
+.TP
+Print 1 second summaries, 10 times:
+#
+.B softirqs 1 10
+.TP
+1 second summaries, printed in nanoseconds, with timestamps:
+#
+.B softirqs \-NT 1
+.SH FIELDS
+.TP
+SOFTIRQ
+The kernel function name that performs the soft IRQ action.
+.TP
+TOTAL_usecs
+Total time spent in this soft IRQ function in microseconds.
+.TP
+TOTAL_nsecs
+Total time spent in this soft IRQ function in nanoseconds.
+.TP
+usecs
+Range of microseconds for this bucket.
+.TP
+nsecs
+Range of nanoseconds for this bucket.
+.TP
+count
+Number of soft IRQs in this time range.
+.TP
+distribution
+ASCII representation of the distribution (the count column).
+.SH OVERHEAD
+This traces kernel functions and maintains in-kernel counts, which
+are asynchronously copied to user-space. While the rate of interrupts
+be very high (>1M/sec), this is a relatively efficient way to trace these
+events, and so the overhead is expected to be small for normal workloads, but
+could become noticeable for heavy workloads. Measure in a test environment
+before use.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Brendan Gregg
+.SH SEE ALSO
+hardirqs(8)

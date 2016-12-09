@@ -1,0 +1,20 @@
+Examples of urandomread.py, the Linux eBPF/bcc version.
+
+
+To demonstrate this, the following workload was issued:
+
+# dd if=/dev/urandom of=/dev/null bs=1k count=5
+
+While urandomread.py was tracing in another session:
+
+# ./urandomread.py
+TIME(s)            COMM             PID    GOTBITS
+22592556.392825000 dd               14228  8192
+22592556.392949000 dd               14228  8192
+22592556.393068999 dd               14228  8192
+22592556.393183999 dd               14228  8192
+22592556.393298000 dd               14228  8192
+
+The GOTBITS of 8192 matches the workload of 1 Kbyte (8 Kbit) reads.
+
+This program was really written as a simple example of tracing a tracepoint.

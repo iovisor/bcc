@@ -1,0 +1,224 @@
+Demonstrations of biolatency, the Linux eBPF/bcc version.
+
+
+biolatency traces block device I/O (disk I/O), and records the distribution
+of I/O latency (time), printing this as a histogram when Ctrl-C is hit.
+For example:
+
+# ./biolatency
+Tracing block device I/O... Hit Ctrl-C to end.
+^C
+     usecs           : count     distribution
+       0 -> 1        : 0        |                                      |
+       2 -> 3        : 0        |                                      |
+       4 -> 7        : 0        |                                      |
+       8 -> 15       : 0        |                                      |
+      16 -> 31       : 0        |                                      |
+      32 -> 63       : 0        |                                      |
+      64 -> 127      : 1        |                                      |
+     128 -> 255      : 12       |********                              |
+     256 -> 511      : 15       |**********                            |
+     512 -> 1023     : 43       |*******************************       |
+    1024 -> 2047     : 52       |**************************************|
+    2048 -> 4095     : 47       |**********************************    |
+    4096 -> 8191     : 52       |**************************************|
+    8192 -> 16383    : 36       |**************************            |
+   16384 -> 32767    : 15       |**********                            |
+   32768 -> 65535    : 2        |*                                     |
+   65536 -> 131071   : 2        |*                                     |
+
+The latency of the disk I/O is measured from the issue to the device to its
+completion. A -Q option can be used to include time queued in the kernel.
+
+This example output shows a large mode of latency from about 128 microseconds
+to about 32767 microseconds (33 milliseconds). The bulk of the I/O was
+between 1 and 8 ms, which is the expected block device latency for
+rotational storage devices.
+
+The highest latency seen while tracing was between 65 and 131 milliseconds:
+the last row printed, for which there were 2 I/O.
+
+For efficiency, biolatency uses an in-kernel eBPF map to store timestamps
+with requests, and another in-kernel map to store the histogram (the "count")
+column, which is copied to user-space only when output is printed. These
+methods lower the performance overhead when tracing is performed.
+
+
+In the following example, the -m option is used to print a histogram using
+milliseconds as the units (which eliminates the first several rows), -T to
+print timestamps with the output, and to print 1 second summaries 5 times:
+
+# ./biolatency -mT 1 5
+Tracing block device I/O... Hit Ctrl-C to end.
+
+06:20:16
+     msecs           : count     distribution
+       0 -> 1        : 36       |**************************************|
+       2 -> 3        : 1        |*                                     |
+       4 -> 7        : 3        |***                                   |
+       8 -> 15       : 17       |*****************                     |
+      16 -> 31       : 33       |**********************************    |
+      32 -> 63       : 7        |*******                               |
+      64 -> 127      : 6        |******                                |
+
+06:20:17
+     msecs           : count     distribution
+       0 -> 1        : 96       |************************************  |
+       2 -> 3        : 25       |*********                             |
+       4 -> 7        : 29       |***********                           |
+       8 -> 15       : 62       |***********************               |
+      16 -> 31       : 100      |**************************************|
+      32 -> 63       : 62       |***********************               |
+      64 -> 127      : 18       |******                                |
+
+06:20:18
+     msecs           : count     distribution
+       0 -> 1        : 68       |*************************             |
+       2 -> 3        : 76       |****************************          |
+       4 -> 7        : 20       |*******                               |
+       8 -> 15       : 48       |*****************                     |
+      16 -> 31       : 103      |**************************************|
+      32 -> 63       : 49       |******************                    |
+      64 -> 127      : 17       |******                                |
+
+06:20:19
+     msecs           : count     distribution
+       0 -> 1        : 522      |*************************************+|
+       2 -> 3        : 225      |****************                      |
+       4 -> 7        : 38       |**                                    |
+       8 -> 15       : 8        |                                      |
+      16 -> 31       : 1        |                                      |
+
+06:20:20
+     msecs           : count     distribution
+       0 -> 1        : 436      |**************************************|
+       2 -> 3        : 106      |*********                             |
+       4 -> 7        : 34       |**                                    |
+       8 -> 15       : 19       |*                                     |
+      16 -> 31       : 1        |                                      |
+
+How the I/O latency distribution changes over time can be seen.
+
+
+
+The -Q option begins measuring I/O latency from when the request was first
+queued in the kernel, and includes queuing latency:
+
+# ./biolatency -Q
+Tracing block device I/O... Hit Ctrl-C to end.
+^C
+     usecs           : count     distribution
+       0 -> 1        : 0        |                                      |
+       2 -> 3        : 0        |                                      |
+       4 -> 7        : 0        |                                      |
+       8 -> 15       : 0        |                                      |
+      16 -> 31       : 0        |                                      |
+      32 -> 63       : 0        |                                      |
+      64 -> 127      : 0        |                                      |
+     128 -> 255      : 3        |*                                     |
+     256 -> 511      : 37       |**************                        |
+     512 -> 1023     : 30       |***********                           |
+    1024 -> 2047     : 18       |*******                               |
+    2048 -> 4095     : 22       |********                              |
+    4096 -> 8191     : 14       |*****                                 |
+    8192 -> 16383    : 48       |*******************                   |
+   16384 -> 32767    : 96       |**************************************|
+   32768 -> 65535    : 31       |************                          |
+   65536 -> 131071   : 26       |**********                            |
+  131072 -> 262143   : 12       |****                                  |
+
+This better reflects the latency suffered by the application (if it is
+synchronous I/O), whereas the default mode without kernel queueing better
+reflects the performance of the device.
+
+Note that the storage device (and storage device controller) usually have
+queues of their own, which are always included in the latency, with or
+without -Q.
+
+
+The -D option will print a histogram per disk. Eg:
+
+# ./biolatency -D
+Tracing block device I/O... Hit Ctrl-C to end.
+^C
+
+Bucket disk = 'xvdb'
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 1        |                                        |
+       256 -> 511        : 33       |**********************                  |
+       512 -> 1023       : 36       |************************                |
+      1024 -> 2047       : 58       |****************************************|
+      2048 -> 4095       : 51       |***********************************     |
+      4096 -> 8191       : 21       |**************                          |
+      8192 -> 16383      : 2        |*                                       |
+
+Bucket disk = 'xvdc'
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 1        |                                        |
+       256 -> 511        : 38       |***********************                 |
+       512 -> 1023       : 42       |*************************               |
+      1024 -> 2047       : 66       |****************************************|
+      2048 -> 4095       : 40       |************************                |
+      4096 -> 8191       : 14       |********                                |
+
+Bucket disk = 'xvda1'
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 18       |**********                              |
+       512 -> 1023       : 67       |*************************************   |
+      1024 -> 2047       : 35       |*******************                     |
+      2048 -> 4095       : 71       |****************************************|
+      4096 -> 8191       : 65       |************************************    |
+      8192 -> 16383      : 65       |************************************    |
+     16384 -> 32767      : 20       |***********                             |
+     32768 -> 65535      : 7        |***                                     |
+
+This output sows that xvda1 has much higher latency, usually between 0.5 ms
+and 32 ms, whereas xvdc is usually between 0.2 ms and 4 ms.
+
+
+USAGE message:
+
+# ./biolatency -h
+usage: biolatency [-h] [-T] [-Q] [-m] [-D] [interval] [count]
+
+Summarize block device I/O latency as a histogram
+
+positional arguments:
+  interval            output interval, in seconds
+  count               number of outputs
+
+optional arguments:
+  -h, --help          show this help message and exit
+  -T, --timestamp     include timestamp on output
+  -Q, --queued        include OS queued time in I/O time
+  -m, --milliseconds  millisecond histogram
+  -D, --disks         print a histogram per disk device
+
+examples:
+    ./biolatency            # summarize block I/O latency as a histogram
+    ./biolatency 1 10       # print 1 second summaries, 10 times
+    ./biolatency -mT 1      # 1s summaries, milliseconds, and timestamps
+    ./biolatency -Q         # include OS queued time in I/O time
+    ./biolatency -D         # show each disk device separately

@@ -1,0 +1,107 @@
+.TH cpudist 8  "2016-06-28" "USER COMMANDS"
+.SH NAME
+cpudist \- On- and off-CPU task time as a histogram.
+.SH SYNOPSIS
+.B cpudist [\-h] [-O] [\-T] [\-m] [\-P] [\-L] [\-p PID] [interval] [count]
+.SH DESCRIPTION
+This measures the time a task spends on the CPU before being descheduled, and
+shows the times as a histogram. Tasks that spend a very short time on the CPU
+can be indicative of excessive context-switches and poor workload distribution,
+and possibly point to a shared source of contention that keeps tasks switching
+in and out as it becomes available (such as a mutex).
+
+Similarly, the tool can also measure the time a task spends off-CPU before it
+is scheduled again. This can be helpful in identifying long blocking and I/O
+operations, or alternatively very short descheduling times due to short-lived
+locks or timers.
+
+This tool uses in-kernel eBPF maps for storing timestamps and the histogram,
+for efficiency. Despite this, the overhead of this tool may become significant
+for some workloads: see the OVERHEAD section.
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH OPTIONS
+.TP
+\-h
+Print usage message.
+.TP
+\-O
+Measure off-CPU time instead of on-CPU time.
+.TP
+\-T
+Include timestamps on output.
+.TP
+\-m
+Output histogram in milliseconds.
+.TP
+\-P
+Print a histogram for each PID (tgid from the kernel's perspective).
+.TP
+\-L
+Print a histogram for each TID (pid from the kernel's perspective).
+.TP
+\-p PID
+Only show this PID (filtered in kernel for efficiency).
+.TP
+interval
+Output interval, in seconds.
+.TP
+count
+Number of outputs.
+.SH EXAMPLES
+.TP
+Summarize task on-CPU time as a histogram:
+#
+.B cpudist
+.TP
+Summarize task off-CPU time as a histogram:
+#
+.B cpudist -O
+.TP
+Print 1 second summaries, 10 times:
+#
+.B cpudist 1 10
+.TP
+Print 1 second summaries, using milliseconds as units for the histogram, and include timestamps on output:
+#
+.B cpudist \-mT 1
+.TP
+Trace PID 186 only, 1 second summaries:
+#
+.B cpudist -P 185 1
+.SH FIELDS
+.TP
+usecs
+Microsecond range
+.TP
+msecs
+Millisecond range
+.TP
+count
+How many times a task event fell into this range
+.TP
+distribution
+An ASCII bar chart to visualize the distribution (count column)
+.SH OVERHEAD
+This traces scheduler tracepoints, which can become very frequent. While eBPF
+has very low overhead, and this tool uses in-kernel maps for efficiency, the
+frequency of scheduler events for some workloads may be high enough that the
+overhead of this tool becomes significant. Measure in a lab environment
+to quantify the overhead before use.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _example.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Sasha Goldshtein
+.SH SEE ALSO
+pidstat(1), runqlat(8)

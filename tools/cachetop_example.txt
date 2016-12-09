@@ -1,0 +1,70 @@
+# ./cachetop -h
+usage: cachetop.py [-h] [interval]
+
+show Linux page cache hit/miss statistics including read and write hit % per
+processes in a UI like top.
+
+positional arguments:
+  interval    Interval between probes.
+
+optional arguments:
+  -h, --help  show this help message and exit
+
+examples:
+    ./cachetop             # run with default option of 5 seconds delay
+    ./cachetop 1           # print every second hit/miss stats
+
+# ./cachetop 5
+13:01:01 Buffers MB: 76 / Cached MB: 114 / Sort: HITS / Order: ascending
+PID      UID      CMD              HITS     MISSES   DIRTIES  READ_HIT%  WRITE_HIT%
+       1 root     systemd                 2        0        0     100.0%       0.0%
+     680 root     vminfo                  3        4        2      14.3%      42.9%
+     567 syslog   rs:main Q:Reg          10        4        2      57.1%      21.4%
+     986 root     kworker/u2:2           10     2457        4       0.2%      99.5%
+     988 root     kworker/u2:2           10        9        4      31.6%      36.8%
+     877 vagrant  systemd                18        4        2      72.7%      13.6%
+     983 root     python                148        3      143       3.3%       1.3%
+     981 root     strace                419        3      143      65.4%       0.5%
+     544 messageb dbus-daemon           455      371      454       0.1%       0.4%
+     243 root     jbd2/dm-0-8           457      371      454       0.4%       0.4%
+     985 root     (mount)               560     2457        4      18.4%      81.4%
+     987 root     systemd-udevd         566        9        4      97.7%       1.2%
+     988 root     systemd-cgroups       569        9        4      97.8%       1.2%
+     986 root     modprobe              578        9        4      97.8%       1.2%
+     287 root     systemd-journal       598      371      454      14.9%       0.3%
+     985 root     mount                 692     2457        4      21.8%      78.0%
+     984 vagrant  find                 9529     2457        4      79.5%      20.5%
+
+Above shows the run of `find /` on a newly booted system.
+
+Command used to generate the activity
+# find /
+
+Below shows the hit rate increases as we run find a second time and it gets it
+its pages from the cache.
+# ./cachetop.py
+13:01:01 Buffers MB: 76 / Cached MB: 115 / Sort: HITS / Order: ascending
+PID      UID      CMD              HITS     MISSES   DIRTIES  READ_HIT%  WRITE_HIT%
+     544 messageb dbus-daemon             2        2        1      25.0%      50.0%
+     680 root     vminfo                  2        2        1      25.0%      50.0%
+     243 root     jbd2/dm-0-8             3        2        1      40.0%      40.0%
+    1068 root     python                  5        0        0     100.0%       0.0%
+    1071 vagrant  bash                  350        0        0     100.0%       0.0%
+    1071 vagrant  find                12959        0        0     100.0%       0.0%
+
+
+Below shows that the dirty pages increases as a file of 80M is created running
+# dd if=/dev/urandom of=/tmp/c bs=8192 count=10000
+
+# ./cachetop.py 10
+13:01:01 Buffers MB: 77 / Cached MB: 193 / Sort: HITS / Order: ascending
+PID      UID      CMD              HITS     MISSES   DIRTIES  READ_HIT%  WRITE_HIT%
+     544 messageb dbus-daemon             9       10        7      10.5%      15.8%
+     680 root     vminfo                  9       10        7      10.5%      15.8%
+    1109 root     python                 22        0        0     100.0%       0.0%
+     243 root     jbd2/dm-0-8            25       10        7      51.4%       8.6%
+    1070 root     kworker/u2:2           85        0        0     100.0%       0.0%
+    1110 vagrant  bash                  366        0        0     100.0%       0.0%
+    1110 vagrant  dd                  42183    40000    20000      27.0%      24.3%
+
+The file copied into page cache was named /tmp/c with a size of 81920000 (81920000/4096) = 20000

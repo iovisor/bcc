@@ -1,11 +1,11 @@
 # Copyright (c) PLUMgrid, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
-get_git_head_revision(GIT_REFSPEC GIT_SHA1)
-string(SUBSTRING "${GIT_SHA1}" 0 8 GIT_SHA1_SHORT)
-git_describe(GIT_DESCRIPTION)
-git_describe(GIT_TAG_LAST "--abbrev=0")
-git_get_exact_tag(GIT_TAG_EXACT)
 if(NOT REVISION)
+  get_git_head_revision(GIT_REFSPEC GIT_SHA1)
+  string(SUBSTRING "${GIT_SHA1}" 0 8 GIT_SHA1_SHORT)
+  git_describe(GIT_DESCRIPTION)
+  git_describe(GIT_TAG_LAST "--abbrev=0")
+  git_get_exact_tag(GIT_TAG_EXACT)
   string(SUBSTRING "${GIT_TAG_LAST}-${GIT_SHA1_SHORT}" 1 -1 REVISION)
   if(GIT_TAG_EXACT)
     string(SUBSTRING "${GIT_TAG_EXACT}" 1 -1 REVISION)
@@ -15,9 +15,13 @@ if(NOT REVISION)
     set(GIT_TAG_EXACT "")
   endif()
   message(STATUS "Git HEAD is ${GIT_SHA1}")
+  # rpm/deb packaging uses this, only works on whole tag numbers
+  if(NOT REVISION_LAST)
+    string(SUBSTRING "${GIT_TAG_LAST}" 1 -1 REVISION_LAST)
+  endif()
+else()
+  set(REVISION_LAST "${REVISION}")
 endif()
 
 # strip leading 'v', and make unique for the tag
 message(STATUS "Revision is ${REVISION}")
-# rpm/deb packaging uses this, only works on whole tag numbers
-string(SUBSTRING "${GIT_TAG_LAST}" 1 -1 REVISION_LAST)

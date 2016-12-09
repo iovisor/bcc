@@ -1,0 +1,123 @@
+Demonstrations of fileslower, the Linux eBPF/bcc version.
+
+
+fileslower shows file-based synchronous reads and writes slower than a
+threshold. For example:
+
+# ./fileslower 
+Tracing sync read/writes slower than 10 ms
+TIME(s)  COMM           PID    D BYTES   LAT(ms) FILENAME
+0.000    randread.pl    4762   R 8192      12.70 data1
+8.850    randread.pl    4762   R 8192      11.26 data1
+12.852   randread.pl    4762   R 8192      10.43 data1
+
+This showed a few reads from a "randread.pl" program, each 8 Kbytes in size,
+and from a "data1" file. These all had over 10 ms latency.
+
+This "latency" is measured from when the read or write was issued at the VFS
+interface, to when it completed. This spans everything: block device I/O (disk
+I/O), file system CPU cycles, file system locks, run queue latency, etc. This
+is a better measure of the latency suffered by applications reading from the
+file system than measuring this down at the block device interface.
+
+Note that this only traces file reads and writes: other file system operations
+(eg, directory operations, open(), fflush()) are not traced.
+
+
+The threshold can be provided as an argument. Eg, I/O slower than 1 ms:
+
+# ./fileslower 1
+Tracing sync read/writes slower than 1 ms
+TIME(s)  COMM           PID    D BYTES   LAT(ms) FILENAME
+0.000    randread.pl    6925   R 8192       1.06 data1
+0.082    randread.pl    6925   R 8192       2.42 data1
+0.116    randread.pl    6925   R 8192       1.78 data1
+0.153    randread.pl    6925   R 8192       2.31 data1
+0.330    randread.pl    6925   R 8192       1.14 data1
+0.345    randread.pl    6925   R 8192       1.52 data1
+0.359    randread.pl    6925   R 8192       1.04 data1
+0.532    randread.pl    6925   R 8192       2.56 data1
+0.609    supervise      1892   W 18         3.65 status.new
+0.610    randread.pl    6925   R 8192       1.37 data1
+0.614    randread.pl    6925   R 8192       3.04 data1
+0.729    randread.pl    6925   R 8192       2.90 data1
+0.755    randread.pl    6925   R 8192       1.12 data1
+0.762    randread.pl    6925   R 8192       2.62 data1
+0.771    randread.pl    6925   R 8192       1.07 data1
+0.816    randread.pl    6925   R 8192      10.50 data1
+0.983    randread.pl    6925   R 8192       1.73 data1
+0.989    randread.pl    6925   R 8192       2.12 data1
+0.992    randread.pl    6925   R 8192       2.17 data1
+1.001    randread.pl    6925   R 8192       1.93 data1
+1.007    randread.pl    6925   R 8192       2.03 data1
+1.210    randread.pl    6925   R 8192       1.82 data1
+1.213    randread.pl    6925   R 8192       2.58 data1
+1.219    randread.pl    6925   R 8192       2.20 data1
+1.430    randread.pl    6925   R 8192       1.01 data1
+1.448    randread.pl    6925   R 8192       2.22 data1
+[...]
+
+There's now much more output (this spans only 1.4 seconds, the previous output
+spanned 12 seconds), and the lower threshold is catching more I/O.
+
+
+In the following example, the file system caches were dropped before running
+fileslower, and then in another session a "man ls" was executed. The command
+and files read from disk can be seen:
+
+# echo 3 > /proc/sys/vm/drop_caches; ./fileslower 1
+Tracing sync read/writes slower than 1 ms
+TIME(s)  COMM           PID    D BYTES   LAT(ms) FILENAME
+0.000    bash           9647   R 128        5.83 man
+0.050    man            9647   R 832       19.52 libmandb-2.6.7.1.so
+0.066    man            9647   R 832       15.79 libman-2.6.7.1.so
+0.123    man            9647   R 832       56.36 libpipeline.so.1.3.0
+0.135    man            9647   R 832        9.79 libgdbm.so.3.0.0
+0.323    man            9647   R 4096      59.52 locale.alias
+0.540    man            9648   R 8192      11.11 ls.1.gz
+0.558    man            9647   R 72         6.97 index.db
+0.563    man            9647   R 4096       5.12 index.db
+0.723    man            9658   R 128       12.06 less
+0.725    man            9656   R 128       14.52 nroff
+0.779    man            9655   R 128       68.86 tbl
+0.814    nroff          9660   R 128       14.55 locale
+0.830    pager          9658   R 4096      28.27 .lesshst
+0.866    man            9654   R 128      163.12 preconv
+0.980    nroff          9684   R 128       13.80 groff
+0.999    groff          9684   R 4096      14.29 DESC
+1.036    groff          9685   R 128        5.94 troff
+1.038    groff          9686   R 128        7.76 grotty
+1.065    troff          9685   R 4096       6.33 R
+1.082    troff          9685   R 4096      10.52 BI
+1.096    troff          9685   R 4096       8.70 troffrc
+1.176    troff          9685   R 4096      80.12 composite.tmac
+1.195    troff          9685   R 4096      19.20 fallbacks.tmac
+1.202    troff          9685   R 4096       6.79 tty.tmac
+1.221    troff          9685   R 4096       7.87 man.local
+2.977    supervise      1876   W 18         4.23 status.new
+
+This caught an individual I/O reaching 163.12 ms, for the "preconv" file. While
+the file system cache was flushed, causing these to need to be read from disk,
+the duration here may not be entirely disk I/O: it can include file system
+locks, run queue latency, etc. These can be explored using other commands.
+
+
+USAGE message:
+
+# ./fileslower -h
+usage: fileslower.py [-h] [-p PID] [-a] [min_ms]
+
+Trace slow synchronous file reads and writes
+
+positional arguments:
+  min_ms             minimum I/O duration to trace, in ms (default 10)
+
+optional arguments:
+  -h, --help         show this help message and exit
+  -p PID, --pid PID  trace this PID only
+  -a, --all-files    include non-regular file types
+
+examples:
+    ./fileslower             # trace sync file I/O slower than 10 ms (default)
+    ./fileslower 1           # trace sync file I/O slower than 1 ms
+    ./fileslower -p 185      # trace PID 185 only

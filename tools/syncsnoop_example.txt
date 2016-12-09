@@ -3,7 +3,7 @@ Demonstrations of syncsnoop, the Linux eBPF/bcc version.
 
 This program traces calls to the kernel sync() routine, with basic timestamps:
 
-# ./syncsnoop 
+# ./syncsnoop
 TIME(s)            CALL
 16458148.611952    sync()
 16458151.533709    sync()

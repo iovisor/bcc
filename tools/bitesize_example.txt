@@ -1,0 +1,89 @@
+Examples of bitesize.py, the Linux bcc/eBPF version.
+
+
+The aim of this tool is to show I/O distribution for requested block sizes, by process name.
+
+# ./bitesize.py
+Tracing... Hit Ctrl-C to end.
+^C
+
+Process Name = 'kworker/u128:1'
+     Kbytes              : count     distribution
+         0 -> 1          : 1        |********************                    |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 2        |****************************************|
+
+Process Name = 'bitesize.py'
+     Kbytes              : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 1        |****************************************|
+
+Process Name = 'dd'
+     Kbytes              : count     distribution
+         0 -> 1          : 3        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 6        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 1        |                                        |
+        32 -> 63         : 1        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 1        |                                        |
+       512 -> 1023       : 0        |                                        |
+      1024 -> 2047       : 488      |****************************************|
+
+Process Name = 'jbd2/dm-1-8'
+     Kbytes              : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 1        |****************************************|
+
+Process Name = 'cat'
+     Kbytes              : count     distribution
+         0 -> 1          : 1        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 1        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 1924     |****************************************|
+
+Process Name = 'ntpd'
+     Kbytes              : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 104      |****************************************|
+
+Process Name = 'vmtoolsd'
+     Kbytes              : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 1        |****************************************|
+
+Process Name = 'bash'
+     Kbytes              : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 2        |****************************************|
+
+Process Name = 'jbd2/sdb-8'
+     Kbytes              : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 1        |****************************************|
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 1        |****************************************|
+
+We can see from above that there was a dd command being run which generated 488 IOPS between 1MB and 2MB, we can also see the
+cat command generating 1924 IOPS between 256Kb and 512Kb.

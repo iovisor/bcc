@@ -1,0 +1,327 @@
+Demonstrations of offwaketime, the Linux eBPF/bcc version.
+
+
+This program shows kernel stack traces and task names that were blocked and
+"off-CPU", along with the stack traces and task names for the threads that woke
+them, and the total elapsed time from when they blocked to when they were woken
+up.  This combines the summaries from both the offcputime and wakeuptime tools.
+The time measurement will be very similar to off-CPU time, however, off-CPU time
+may include a little extra time spent waiting on a run queue to be scheduled.
+The combined stacks, task names, and total time is summarized in kernel context
+for efficiency, using an eBPF map.
+
+The output summary will further help you identify reasons why threads
+were blocking, and quantify the time from when they were blocked to woken up.
+This spans all types of blocking activity: disk I/O, network I/O, locks, page
+faults, swapping, sleeping, involuntary context switches, etc.
+
+Here is some sample output from a 5 second trace, truncated to highlight several
+stack pairs:
+
+# ./offwaketime 5
+Tracing blocked time (us) by kernel off-CPU and waker stack for 5 secs.
+
+[...]
+
+    waker:           swapper/0
+    ffffffff8137897c blk_mq_complete_request
+    ffffffff81378930 __blk_mq_complete_request
+    ffffffff81378793 blk_mq_end_request
+    ffffffff813778b9 blk_mq_free_request
+    ffffffff8137782d __blk_mq_free_request
+    ffffffff8137bc57 blk_mq_put_tag
+    ffffffff8137b2c7 bt_clear_tag
+    ffffffff810b54d9 __wake_up
+    ffffffff810b5462 __wake_up_common
+    ffffffff810b5b12 autoremove_wake_function
+    -                -
+    ffffffff81785085 schedule
+    ffffffff81787e16 schedule_timeout
+    ffffffff81784634 __sched_text_start
+    ffffffff8137b839 bt_get
+    ffffffff8137bbf7 blk_mq_get_tag
+    ffffffff8137761b __blk_mq_alloc_request
+    ffffffff81379442 blk_mq_map_request
+    ffffffff8137a445 blk_sq_make_request
+    ffffffff8136ebc3 generic_make_request
+    ffffffff8136ed07 submit_bio
+    ffffffff81225adf submit_bh_wbc
+    ffffffff81225b42 submit_bh
+    ffffffff812721e0 __ext4_get_inode_loc
+    ffffffff812751dd ext4_iget
+    ffffffff81275c90 ext4_iget_normal
+    ffffffff8127f45b ext4_lookup
+    ffffffff811f94ed lookup_real
+    ffffffff811fad43 __lookup_hash
+    ffffffff811fc3fb walk_component
+    ffffffff811fd050 link_path_walk
+    target:          cksum
+        56529
+
+[...]
+
+    waker:           swapper/1
+    ffffffff81475cf0 xen_evtchn_do_upcall
+    ffffffff81473e83 __xen_evtchn_do_upcall
+    ffffffff814766f7 evtchn_2l_handle_events
+    ffffffff810cb0c2 generic_handle_irq
+    ffffffff810cf1ca handle_percpu_irq
+    ffffffff810cb9c8 handle_irq_event_percpu
+    ffffffff8100b9e1 xen_timer_interrupt
+    ffffffff810dfba8 hrtimer_interrupt
+    ffffffff810df494 __hrtimer_run_queues
+    ffffffff810df082 hrtimer_wakeup
+    -                -
+    ffffffff81785085 schedule
+    ffffffff817880bf do_nanosleep
+    ffffffff810e003d hrtimer_nanosleep
+    ffffffff810e018c sys_nanosleep
+    ffffffff81789076 entry_SYSCALL_64_fastpath
+    target:          vmstat
+        3000331
+
+[...]
+
+    waker:           swapper/0
+    ffffffff81378930 __blk_mq_complete_request
+    ffffffff8137875a blk_mq_end_request
+    ffffffff8136f157 blk_update_request
+    ffffffff8136836f bio_endio
+    ffffffff812ba709 mpage_end_io
+    ffffffff81176af9 unlock_page
+    ffffffff810b5781 __wake_up_bit
+    ffffffff810b54d9 __wake_up
+    ffffffff810b5462 __wake_up_common
+    ffffffff810b5b7e wake_bit_function
+    -                -
+    ffffffff81785085 schedule
+    ffffffff81787e16 schedule_timeout
+    ffffffff81784634 __sched_text_start
+    ffffffff8178586b bit_wait_io
+    ffffffff8178563e __wait_on_bit_lock
+    ffffffff8117616e __lock_page_killable
+    ffffffff81177fce generic_file_read_iter
+    ffffffff811ef9c7 __vfs_read
+    ffffffff811f0206 vfs_read
+    ffffffff811f0eb6 sys_read
+    ffffffff81789076 entry_SYSCALL_64_fastpath
+    target:          cksum
+        4334521
+
+[...]
+
+    waker:           kworker/u16:2
+    ffffffff8178940f ret_from_fork
+    ffffffff81092979 kthread
+    ffffffff8108caeb worker_thread
+    ffffffff8108c80a process_one_work
+    ffffffff81496df5 flush_to_ldisc
+    ffffffff81494424 n_tty_receive_buf2
+    ffffffff814939fd n_tty_receive_buf_common
+    ffffffff810b54d9 __wake_up
+    ffffffff810b5462 __wake_up_common
+    ffffffff812037b6 pollwake
+    -                -
+    ffffffff81785085 schedule
+    ffffffff81788234 schedule_hrtimeout_range_clock
+    ffffffff81788253 schedule_hrtimeout_range
+    ffffffff812035d4 poll_schedule_timeout
+    ffffffff8120402a do_select
+    ffffffff812042f0 core_sys_select
+    ffffffff8120449b sys_select
+    ffffffff81789076 entry_SYSCALL_64_fastpath
+    target:          sshd
+        6530897
+
+[...]
+
+    waker:           swapper/0
+    ffffffff81475cf0 xen_evtchn_do_upcall
+    ffffffff81473e83 __xen_evtchn_do_upcall
+    ffffffff814766f7 evtchn_2l_handle_events
+    ffffffff810cb0c2 generic_handle_irq
+    ffffffff810cf1ca handle_percpu_irq
+    ffffffff810cb9c8 handle_irq_event_percpu
+    ffffffff8100b9e1 xen_timer_interrupt
+    ffffffff810dfba8 hrtimer_interrupt
+    ffffffff810df494 __hrtimer_run_queues
+    ffffffff810df082 hrtimer_wakeup
+    -                -
+    ffffffff81785085 schedule
+    ffffffff81787fc3 schedule_hrtimeout_range_clock.part.23
+    ffffffff81788219 schedule_hrtimeout_range_clock
+    ffffffff81788253 schedule_hrtimeout_range
+    ffffffff812035d4 poll_schedule_timeout
+    ffffffff81204b6d do_sys_poll
+    ffffffff81204cf2 sys_poll
+    ffffffff81789076 entry_SYSCALL_64_fastpath
+    target:          supervise
+        16332240
+
+Detaching...
+
+The output includes two paths from the cksum(1) command, one for reading files
+via vfs_read() and the other doing a link_path_walk(). There is also a vmstat(8)
+stack showing it sleeping between intervals, and an sshd(8) stack showing it
+waiting on a file descriptor for input.
+
+The stack shown at the bottom is the off-CPU stack belonging to the task name
+shown after "target:". Then there is a separator, "-", and above it the waker
+stack and the waker task name after "waker:". The wakeup stack is printed
+in reverse order.
+
+The number beneath the stacks is the total time spent from the blocking event
+to the wakeup event. This is summed for all occurances with the same stack
+pairs.
+
+
+The -u option will print user-mode target threads only, and the -f option will
+show the stacks in "folded stacks" format. Eg:
+
+# ./offwaketime -fu 5
+supervise;entry_SYSCALL_64_fastpath;sys_rename;dput;__dentry_kill;iput;evict;ext4_evict_inode;ext4_truncate;ext4_ext_truncate;ext4_ext_remove_space;ext4_free_blocks;__ext4_handle_dirty_metadata;_cond_resched;preempt_schedule_common;-; 2
+sshd;entry_SYSCALL_64_fastpath;sys_read;vfs_read;__vfs_read;tty_read;n_tty_read;down_read;_cond_resched;preempt_schedule_common;-; 2
+cksum;entry_SYSCALL_64_fastpath;sys_open;do_sys_open;do_filp_open;path_openat;lookup_real;ext4_lookup;ext4_iget_normal;ext4_iget;iget_locked;alloc_inode;ext4_alloc_inode;kmem_cache_alloc;_cond_resched;preempt_schedule_common;-; 3
+mkdir;page_fault;do_page_fault;__do_page_fault;handle_mm_fault;anon_vma_prepare;_cond_resched;preempt_schedule_common;-; 3
+cksum;entry_SYSCALL_64_fastpath;sys_open;do_sys_open;do_filp_open;path_openat;link_path_walk;walk_component;__lookup_hash;lookup_real;ext4_lookup;ext4_iget_normal;ext4_iget;__ext4_get_inode_loc;__breadahead;ll_rw_block;submit_bh_wbc;bio_alloc_bioset;mempool_alloc;_cond_resched;preempt_schedule_common;-; 3
+cksum;entry_SYSCALL_64_fastpath;sys_read;vfs_read;__vfs_read;generic_file_read_iter;page_cache_sync_readahead;ondemand_readahead;__do_page_cache_readahead;ext4_readpages;ext4_mpage_readpages;ext4_map_blocks;down_read;_cond_resched;preempt_schedule_common;-; 3
+cksum;entry_SYSCALL_64_fastpath;sys_open;do_sys_open;fd_install;__fd_install;_cond_resched;preempt_schedule_common;-; 3
+run;return_from_execve;sys_execve;do_execveat_common.isra.33;search_binary_handler;load_script;search_binary_handler;load_elf_binary;elf_map;vm_munmap;down_write;_cond_resched;preempt_schedule_common;-; 3
+svscan;entry_SYSCALL_64_fastpath;sys_getdents;iterate_dir;ext4_readdir;ext4_htree_fill_tree;htree_dirblock_to_tree;ext4_htree_store_dirent;__kmalloc;_cond_resched;preempt_schedule_common;-; 4
+cksum;entry_SYSCALL_64_fastpath;sys_open;do_sys_open;do_filp_open;path_openat;mutex_lock;_cond_resched;preempt_schedule_common;-; 4
+run;entry_SYSCALL_64_fastpath;sys_mprotect;down_write;_cond_resched;preempt_schedule_common;-; 5
+sshd;entry_SYSCALL_64_fastpath;sys_select;core_sys_select;do_select;_cond_resched;preempt_schedule_common;-; 5
+run;return_from_execve;sys_execve;do_execveat_common.isra.33;search_binary_handler;load_script;search_binary_handler;load_elf_binary;set_brk;vm_brk;down_write;_cond_resched;preempt_schedule_common;-; 5
+supervise;entry_SYSCALL_64_fastpath;sys_clone;_do_fork;copy_process;anon_vma_fork;anon_vma_clone;down_write;_cond_resched;preempt_schedule_common;-; 6
+svscan;retint_user;prepare_exit_to_usermode;exit_to_usermode_loop;schedule;-;hrtimer_wakeup;__hrtimer_run_queues;hrtimer_interrupt;xen_timer_interrupt;handle_irq_event_percpu;handle_percpu_irq;generic_handle_irq;evtchn_2l_handle_events;__xen_evtchn_do_upcall;xen_evtchn_do_upcall;swapper/0 11
+supervise;return_from_execve;sys_execve;do_execveat_common.isra.33;search_binary_handler;load_script;search_binary_handler;load_elf_binary;flush_old_exec;mmput;exit_mmap;free_pgtables;unlink_anon_vmas;down_write;_cond_resched;preempt_schedule_common;-; 12
+run;return_from_execve;sys_execve;do_execveat_common.isra.33;search_binary_handler;load_elf_binary;flush_old_exec;mmput;_cond_resched;preempt_schedule_common;-; 13
+sshd;entry_SYSCALL_64_fastpath;sys_write;vfs_write;__vfs_write;sock_write_iter;sock_sendmsg;inet_sendmsg;tcp_sendmsg;lock_sock_nested;_cond_resched;preempt_schedule_common;-; 14
+cksum;entry_SYSCALL_64_fastpath;sys_write;vfs_write;__vfs_write;tty_write;n_tty_write;mutex_lock;_cond_resched;preempt_schedule_common;-; 19
+sshd;retint_user;prepare_exit_to_usermode;exit_to_usermode_loop;schedule;-; 24
+run;return_from_execve;sys_execve;do_execveat_common.isra.33;search_binary_handler;load_script;search_binary_handler;load_elf_binary;vm_brk;down_write;_cond_resched;preempt_schedule_common;-; 31
+sshd;entry_SYSCALL_64_fastpath;sys_write;vfs_write;__vfs_write;sock_write_iter;sock_sendmsg;inet_sendmsg;tcp_sendmsg;sk_stream_alloc_skb;__alloc_skb;kmem_cache_alloc_node;_cond_resched;preempt_schedule_common;-; 32
+run;page_fault;do_page_fault;__do_page_fault;_cond_resched;preempt_schedule_common;-; 33
+run;page_fault;do_page_fault;__do_page_fault;handle_mm_fault;anon_vma_prepare;_cond_resched;preempt_schedule_common;-; 33
+run;entry_SYSCALL_64_fastpath;sys_clone;_do_fork;copy_process;down_write;_cond_resched;preempt_schedule_common;-; 35
+run;page_fault;do_page_fault;__do_page_fault;handle_mm_fault;__do_fault;filemap_fault;_cond_resched;preempt_schedule_common;-; 36
+run;return_from_execve;sys_execve;do_execveat_common.isra.33;search_binary_handler;load_script;search_binary_handler;load_elf_binary;elf_map;vm_mmap;vm_mmap_pgoff;down_write;_cond_resched;preempt_schedule_common;-; 38
+cksum;entry_SYSCALL_64_fastpath;sys_open;do_sys_open;do_filp_open;path_openat;lookup_real;ext4_lookup;ext4_iget_normal;ext4_iget;__ext4_get_inode_loc;__getblk_gfp;_cond_resched;preempt_schedule_common;-; 38
+chmod;int_ret_from_sys_call;syscall_return_slowpath;exit_to_usermode_loop;schedule;-; 39
+run;entry_SYSCALL_64_fastpath;sys_munmap;vm_munmap;do_munmap;unmap_region;unmap_vmas;unmap_single_vma;_cond_resched;preempt_schedule_common;-; 41
+readproctitle;entry_SYSCALL_64_fastpath;sys_read;vfs_read;__vfs_read;pipe_read;mutex_lock;_cond_resched;preempt_schedule_common;-; 44
+run;entry_SYSCALL_64_fastpath;sys_clone;_do_fork;copy_process;kmem_cache_alloc;_cond_resched;preempt_schedule_common;-; 48
+run;return_from_execve;sys_execve;do_execveat_common.isra.33;search_binary_handler;load_elf_binary;flush_old_exec;mmput;exit_mmap;unmap_vmas;unmap_single_vma;_cond_resched;preempt_schedule_common;-; 49
+sshd;entry_SYSCALL_64_fastpath;sys_select;core_sys_select;do_select;tty_poll;tty_ldisc_ref_wait;ldsem_down_read;_cond_resched;preempt_schedule_common;-; 50
+supervise;return_from_execve;sys_execve;do_execveat_common.isra.33;search_binary_handler;load_script;remove_arg_zero;get_user_pages;__get_user_pages;_cond_resched;preempt_schedule_common;-; 50
+readproctitle;int_ret_from_sys_call;syscall_return_slowpath;exit_to_usermode_loop;schedule;-; 51
+mkdir;int_ret_from_sys_call;syscall_return_slowpath;exit_to_usermode_loop;schedule;-; 53
+supervise;entry_SYSCALL_64_fastpath;sys_clone;_do_fork;copy_process;copy_creds;prepare_creds;kmem_cache_alloc;_cond_resched;preempt_schedule_common;-; 66
+cksum;entry_SYSCALL_64_fastpath;sys_open;do_sys_open;do_filp_open;path_openat;lookup_real;ext4_lookup;ext4_find_entry;__ext4_read_dirblock;ext4_bread;ext4_getblk;__getblk_gfp;_cond_resched;preempt_schedule_common;-; 76
+run;return_from_execve;sys_execve;do_execveat_common.isra.33;search_binary_handler;load_elf_binary;kernel_read;vfs_read;__vfs_read;generic_file_read_iter;_cond_resched;preempt_schedule_common;-; 96
+chmod;entry_SYSCALL_64_fastpath;sys_exit_group;do_group_exit;do_exit;mmput;exit_mmap;unmap_vmas;unmap_single_vma;_cond_resched;preempt_schedule_common;-; 100
+run;page_fault;do_page_fault;__do_page_fault;handle_mm_fault;__do_fault;filemap_fault;__lock_page_or_retry;wait_on_page_bit_killable;__wait_on_bit;bit_wait_io;__sched_text_start;schedule_timeout;schedule;-;wake_bit_function;__wake_up_common;__wake_up;__wake_up_bit;unlock_page;handle_mm_fault;__do_page_fault;do_page_fault;page_fault;;run 117
+run;entry_SYSCALL_64_fastpath;sys_clone;_do_fork;copy_process;copy_page_range;_cond_resched;preempt_schedule_common;-; 117
+cksum;entry_SYSCALL_64_fastpath;sys_read;vfs_read;__vfs_read;generic_file_read_iter;_cond_resched;preempt_schedule_common;-; 121
+chown;entry_SYSCALL_64_fastpath;sys_mmap;sys_mmap_pgoff;vm_mmap_pgoff;down_write;_cond_resched;preempt_schedule_common;-; 137
+chown;entry_SYSCALL_64_fastpath;sys_mmap;sys_mmap_pgoff;vm_mmap_pgoff;do_mmap;mmap_region;kmem_cache_alloc;_cond_resched;preempt_schedule_common;-; 138
+run;return_from_execve;sys_execve;do_execveat_common.isra.33;count.isra.21.constprop.38;_cond_resched;preempt_schedule_common;-; 145
+supervise;entry_SYSCALL_64_fastpath;sys_rename;dput;__dentry_kill;iput;evict;ext4_evict_inode;truncate_inode_pages_final;truncate_inode_pages_range;wait_on_page_bit;__wait_on_bit;bit_wait_io;__sched_text_start;schedule_timeout;schedule;-;wake_bit_function;__wake_up_common;__wake_up;__wake_up_bit;end_page_writeback;ext4_finish_bio;ext4_end_bio;bio_endio;blk_update_request;blk_mq_end_request;mkdir 147
+chmod;return_from_execve;sys_execve;do_execveat_common.isra.33;search_binary_handler;load_elf_binary;clear_user;page_fault;do_page_fault;__do_page_fault;_cond_resched;preempt_schedule_common;-; 159
+chown;return_from_execve;sys_execve;do_execveat_common.isra.33;search_binary_handler;load_elf_binary;setup_arg_pages;shift_arg_pages;vma_adjust;down_write;_cond_resched;preempt_schedule_common;-; 173
+chown;retint_user;prepare_exit_to_usermode;exit_to_usermode_loop;schedule;-; 176
+chmod;retint_user;prepare_exit_to_usermode;exit_to_usermode_loop;schedule;-; 191
+chmod;entry_SYSCALL_64_fastpath;sys_fchmodat;chmod_common;notify_change;ext4_setattr;__mark_inode_dirty;ext4_dirty_inode;ext4_mark_inode_dirty;ext4_reserve_inode_write;__ext4_get_inode_loc;__getblk_gfp;_cond_resched;preempt_schedule_common;-; 221
+cksum;entry_SYSCALL_64_fastpath;sys_open;do_sys_open;do_filp_open;path_openat;trailing_symlink;page_follow_link_light;page_getlink.isra.34.constprop.38;read_cache_page;do_read_cache_page;wait_on_page_read;wait_on_page_bit;__wait_on_bit;bit_wait_io;__sched_text_start;schedule_timeout;schedule;-;wake_bit_function;__wake_up_common;__wake_up;__wake_up_bit;unlock_page;mpage_end_io;bio_endio;blk_update_request;blk_mq_end_request;__blk_mq_complete_request;swapper/0 230
+cksum;entry_SYSCALL_64_fastpath;sys_open;do_sys_open;do_filp_open;path_openat;lookup_real;ext4_lookup;ext4_find_entry;__ext4_read_dirblock;ext4_bread;__wait_on_buffer;out_of_line_wait_on_bit;__wait_on_bit;bit_wait_io;__sched_text_start;schedule_timeout;schedule;-;wake_bit_function;__wake_up_common;__wake_up;__wake_up_bit;wake_up_bit;unlock_buffer;__end_buffer_read_notouch;end_buffer_read_sync;end_bio_bh_io_sync;bio_endio;rcu_sched 231
+supervise;return_from_execve;sys_execve;do_execveat_common.isra.33;search_binary_handler;load_script;search_binary_handler;load_elf_binary;flush_old_exec;mmput;_cond_resched;preempt_schedule_common;-; 234
+chown;int_ret_from_sys_call;syscall_return_slowpath;exit_to_usermode_loop;schedule;-; 249
+cksum;entry_SYSCALL_64_fastpath;sys_read;vfs_read;__vfs_read;generic_file_read_iter;__lock_page_killable;__wait_on_bit_lock;bit_wait_io;__sched_text_start;schedule_timeout;schedule;-;wake_bit_function;__wake_up_common;__wake_up;__wake_up_bit;unlock_page;mpage_end_io;bio_endio;blk_update_request;blk_mq_end_request;__blk_mq_complete_request;svscan 273
+mkdir;entry_SYSCALL_64_fastpath;sys_exit_group;do_group_exit;do_exit;mmput;exit_mmap;unmap_vmas;unmap_single_vma;_cond_resched;preempt_schedule_common;-; 382
+supervise;return_from_execve;sys_execve;do_execveat_common.isra.33;search_binary_handler;load_script;search_binary_handler;load_elf_binary;flush_old_exec;mmput;exit_mmap;unmap_vmas;unmap_single_vma;_cond_resched;preempt_schedule_common;-; 389
+run;page_fault;do_page_fault;__do_page_fault;handle_mm_fault;do_wp_page;wp_page_copy.isra.57;anon_vma_prepare;_cond_resched;preempt_schedule_common;-; 390
+supervise;return_from_execve;sys_execve;do_execveat_common.isra.33;sched_exec;stop_one_cpu;wait_for_completion;_cond_resched;preempt_schedule_common;-; 409
+run;return_from_execve;sys_execve;do_execveat_common.isra.33;sched_exec;stop_one_cpu;wait_for_completion;_cond_resched;preempt_schedule_common;-; 419
+mkdir;retint_user;prepare_exit_to_usermode;exit_to_usermode_loop;schedule;-; 457
+cksum;entry_SYSCALL_64_fastpath;sys_read;vfs_read;__vfs_read;generic_file_read_iter;__lock_page_killable;__wait_on_bit_lock;bit_wait_io;__sched_text_start;schedule_timeout;schedule;-;wake_bit_function;__wake_up_common;__wake_up;__wake_up_bit;unlock_page;mpage_end_io;bio_endio;blk_update_request;blk_mq_end_request;__blk_mq_complete_request;rcuos/0 460
+run;entry_SYSCALL_64_fastpath;sys_exit_group;do_group_exit;do_exit;mmput;exit_mmap;unmap_vmas;unmap_single_vma;_cond_resched;preempt_schedule_common;-; 481
+sshd;int_ret_from_sys_call;syscall_return_slowpath;exit_to_usermode_loop;schedule;-; 495
+cksum;do_filp_open;path_openat;lookup_real;ext4_lookup;ext4_find_entry;dx_probe;__ext4_read_dirblock;ext4_bread;ext4_getblk;ext4_map_blocks;ext4_ext_map_blocks;ext4_find_extent;__read_extent_tree_block;bh_submit_read;out_of_line_wait_on_bit;__wait_on_bit;bit_wait_io;__sched_text_start;schedule_timeout;schedule;-;wake_bit_function;__wake_up_common;__wake_up;__wake_up_bit;wake_up_bit;unlock_buffer;__end_buffer_read_notouch;end_buffer_read_sync;end_bio_bh_io_sync;bio_endio;swapper/0 495
+cksum;entry_SYSCALL_64_fastpath;sys_open;do_sys_open;do_filp_open;path_openat;lookup_real;ext4_lookup;ext4_find_entry;dx_probe;__ext4_read_dirblock;ext4_bread;__wait_on_buffer;out_of_line_wait_on_bit;__wait_on_bit;bit_wait_io;__sched_text_start;schedule_timeout;schedule;-;wake_bit_function;__wake_up_common;__wake_up;__wake_up_bit;wake_up_bit;unlock_buffer;__end_buffer_read_notouch;end_buffer_read_sync;end_bio_bh_io_sync;bio_endio;swapper/0 514
+run;entry_SYSCALL_64_fastpath;sys_clone;_do_fork;copy_process;alloc_pid;kmem_cache_alloc;_cond_resched;preempt_schedule_common;-; 572
+run;return_from_execve;sys_execve;do_execveat_common.isra.33;search_binary_handler;load_script;search_binary_handler;load_elf_binary;clear_user;page_fault;do_page_fault;__do_page_fault;handle_mm_fault;__pte_alloc;pte_alloc_one;alloc_pages_current;__alloc_pages_nodemask;_cond_resched;preempt_schedule_common;-; 579
+supervise;entry_SYSCALL_64_fastpath;sys_clone;_do_fork;copy_process;copy_page_range;_cond_resched;preempt_schedule_common;-; 590
+cksum;int_ret_from_sys_call;syscall_return_slowpath;exit_to_usermode_loop;schedule;-; 592
+chmod;return_from_execve;sys_execve;do_execveat_common.isra.33;search_binary_handler;load_elf_binary;setup_arg_pages;shift_arg_pages;vma_adjust;down_write;_cond_resched;preempt_schedule_common;-; 697
+cksum;entry_SYSCALL_64_fastpath;sys_open;do_sys_open;do_filp_open;path_openat;lookup_real;ext4_lookup;ext4_find_entry;__ext4_read_dirblock;ext4_bread;__wait_on_buffer;out_of_line_wait_on_bit;__wait_on_bit;bit_wait_io;__sched_text_start;schedule_timeout;schedule;-;wake_bit_function;__wake_up_common;__wake_up;__wake_up_bit;wake_up_bit;unlock_buffer;__end_buffer_read_notouch;end_buffer_read_sync;end_bio_bh_io_sync;bio_endio;swapper/0 706
+cksum;entry_SYSCALL_64_fastpath;sys_write;vfs_write;__vfs_write;tty_write;n_tty_write;mutex_lock;_cond_resched;preempt_schedule_common;-;woken_wake_function;__wake_up_common;__wake_up;n_tty_read;tty_read;__vfs_read;vfs_read;sys_read;entry_SYSCALL_64_fastpath;;sshd 804
+supervise;retint_user;prepare_exit_to_usermode;exit_to_usermode_loop;schedule;-; 1101
+run;return_from_execve;sys_execve;do_execveat_common.isra.33;search_binary_handler;load_elf_binary;flush_old_exec;mmput;exit_mmap;free_pgtables;unlink_anon_vmas;__put_anon_vma;_cond_resched;preempt_schedule_common;-; 1122
+cksum;entry_SYSCALL_64_fastpath;sys_read;vfs_read;__vfs_read;generic_file_read_iter;__lock_page_killable;__wait_on_bit_lock;bit_wait_io;__sched_text_start;schedule_timeout;schedule;-;wake_bit_function;__wake_up_common;__wake_up;__wake_up_bit;unlock_page;mpage_end_io;bio_endio;blk_update_request;blk_mq_end_request;__blk_mq_complete_request;readproctitle 1319
+run;int_ret_from_sys_call;syscall_return_slowpath;exit_to_usermode_loop;schedule;-; 1902
+cksum;entry_SYSCALL_64_fastpath;sys_read;vfs_read;__vfs_read;generic_file_read_iter;__lock_page_killable;__wait_on_bit_lock;bit_wait_io;__sched_text_start;schedule_timeout;schedule;-;wake_bit_function;__wake_up_common;__wake_up;__wake_up_bit;unlock_page;mpage_end_io;bio_endio;blk_update_request;blk_mq_end_request;__blk_mq_complete_request;chown 1925
+supervise;entry_SYSCALL_64_fastpath;sys_rename;dput;__dentry_kill;iput;evict;ext4_evict_inode;truncate_inode_pages_final;truncate_inode_pages_range;wait_on_page_bit;__wait_on_bit;bit_wait_io;__sched_text_start;schedule_timeout;schedule;-;wake_bit_function;__wake_up_common;__wake_up;__wake_up_bit;end_page_writeback;ext4_finish_bio;ext4_end_bio;bio_endio;blk_update_request;blk_mq_end_request;cksum 2181
+cksum;entry_SYSCALL_64_fastpath;sys_open;do_sys_open;do_filp_open;path_openat;link_path_walk;walk_component;__lookup_hash;lookup_real;ext4_lookup;ext4_find_entry;__wait_on_buffer;out_of_line_wait_on_bit;__wait_on_bit;bit_wait_io;__sched_text_start;schedule_timeout;schedule;-;wake_bit_function;__wake_up_common;__wake_up;__wake_up_bit;wake_up_bit;unlock_buffer;__end_buffer_read_notouch;end_buffer_read_sync;end_bio_bh_io_sync;bio_endio;swapper/0 2599
+cksum;retint_user;prepare_exit_to_usermode;exit_to_usermode_loop;schedule;-; 2816
+supervise;ext4_rename2;ext4_rename;ext4_alloc_da_blocks;filemap_flush;__filemap_fdatawrite_range;do_writepages;ext4_writepages;ext4_map_blocks;ext4_ext_map_blocks;ext4_mb_new_blocks;ext4_mb_mark_diskspace_used;__ext4_journal_get_write_access;jbd2_journal_get_write_access;do_get_write_access;out_of_line_wait_on_bit;__wait_on_bit;bit_wait_io;__sched_text_start;schedule_timeout;schedule;-;wake_bit_function;__wake_up_common;__wake_up;__wake_up_bit;wake_up_bit;journal_end_buffer_io_sync;end_bio_bh_io_sync;bio_endio;blk_update_request;blk_mq_end_request;swapper/0 3393
+supervise;entry_SYSCALL_64_fastpath;sys_rename;dput;__dentry_kill;iput;evict;ext4_evict_inode;truncate_inode_pages_final;truncate_inode_pages_range;wait_on_page_bit;__wait_on_bit;bit_wait_io;__sched_text_start;schedule_timeout;schedule;-;wake_bit_function;__wake_up_common;__wake_up;__wake_up_bit;end_page_writeback;ext4_finish_bio;ext4_end_bio;bio_endio;blk_update_request;blk_mq_end_request;supervise 5398
+sshd;entry_SYSCALL_64_fastpath;sys_select;core_sys_select;do_select;poll_schedule_timeout;schedule_hrtimeout_range;schedule_hrtimeout_range_clock;schedule;-;pollwake;__wake_up_common;__wake_up_sync_key;sock_def_readable;tcp_data_queue;tcp_rcv_established;tcp_v4_do_rcv;tcp_v4_rcv;ip_local_deliver_finish;ip_local_deliver;mkdir 6582
+cksum;entry_SYSCALL_64_fastpath;sys_read;vfs_read;__vfs_read;generic_file_read_iter;__lock_page_killable;__wait_on_bit_lock;bit_wait_io;__sched_text_start;schedule_timeout;schedule;-;wake_bit_function;__wake_up_common;__wake_up;__wake_up_bit;unlock_page;mpage_end_io;bio_endio;blk_update_request;blk_mq_end_request;__blk_mq_complete_request;chmod 8310
+run;retint_user;prepare_exit_to_usermode;exit_to_usermode_loop;schedule;-; 8444
+supervise;entry_SYSCALL_64_fastpath;sys_rename;dput;__dentry_kill;iput;evict;ext4_evict_inode;truncate_inode_pages_final;truncate_inode_pages_range;wait_on_page_bit;__wait_on_bit;bit_wait_io;__sched_text_start;schedule_timeout;schedule;-;wake_bit_function;__wake_up_common;__wake_up;__wake_up_bit;end_page_writeback;ext4_finish_bio;ext4_end_bio;bio_endio;blk_update_request;blk_mq_end_request;readproctitle 9768
+supervise;entry_SYSCALL_64_fastpath;sys_rename;dput;__dentry_kill;iput;evict;ext4_evict_inode;truncate_inode_pages_final;truncate_inode_pages_range;wait_on_page_bit;__wait_on_bit;bit_wait_io;__sched_text_start;schedule_timeout;schedule;-;wake_bit_function;__wake_up_common;__wake_up;__wake_up_bit;end_page_writeback;ext4_finish_bio;ext4_end_bio;bio_endio;blk_update_request;blk_mq_end_request;run 9945
+cksum;entry_SYSCALL_64_fastpath;sys_read;vfs_read;__vfs_read;generic_file_read_iter;__lock_page_killable;__wait_on_bit_lock;bit_wait_io;__sched_text_start;schedule_timeout;schedule;-;wake_bit_function;__wake_up_common;__wake_up;__wake_up_bit;unlock_page;mpage_end_io;bio_endio;blk_update_request;blk_mq_end_request;__blk_mq_complete_request;mkdir 11978
+cksum;entry_SYSCALL_64_fastpath;sys_open;do_sys_open;do_filp_open;path_openat;link_path_walk;walk_component;__lookup_hash;lookup_real;ext4_lookup;ext4_iget_normal;ext4_iget;__ext4_get_inode_loc;__wait_on_buffer;out_of_line_wait_on_bit;__wait_on_bit;bit_wait_io;__sched_text_start;schedule_timeout;schedule;-;wake_bit_function;__wake_up_common;__wake_up;__wake_up_bit;wake_up_bit;unlock_buffer;__end_buffer_read_notouch;end_buffer_read_sync;end_bio_bh_io_sync;bio_endio;swapper/0 12120
+cksum;link_path_walk;walk_component;__lookup_hash;lookup_real;ext4_lookup;ext4_iget_normal;ext4_iget;__ext4_get_inode_loc;submit_bh;submit_bh_wbc;submit_bio;generic_make_request;blk_sq_make_request;blk_mq_map_request;__blk_mq_alloc_request;blk_mq_get_tag;bt_get;__sched_text_start;schedule_timeout;schedule;-;autoremove_wake_function;__wake_up_common;__wake_up;bt_clear_tag;blk_mq_put_tag;__blk_mq_free_request;blk_mq_free_request;blk_mq_end_request;__blk_mq_complete_request;blk_mq_complete_request;swapper/0 23243
+cksum;entry_SYSCALL_64_fastpath;sys_open;do_sys_open;do_filp_open;path_openat;lookup_real;ext4_lookup;ext4_find_entry;__wait_on_buffer;out_of_line_wait_on_bit;__wait_on_bit;bit_wait_io;__sched_text_start;schedule_timeout;schedule;-;wake_bit_function;__wake_up_common;__wake_up;__wake_up_bit;wake_up_bit;unlock_buffer;__end_buffer_read_notouch;end_buffer_read_sync;end_bio_bh_io_sync;bio_endio;swapper/0 24767
+run;entry_SYSCALL_64_fastpath;sys_wait4;do_wait;schedule;-;child_wait_callback;__wake_up_common;__wake_up_sync_key;__wake_up_parent;do_notify_parent;do_exit;do_group_exit;sys_exit_group;entry_SYSCALL_64_fastpath;;chmod 33289
+run;entry_SYSCALL_64_fastpath;sys_wait4;do_wait;schedule;-;child_wait_callback;__wake_up_common;__wake_up_sync_key;__wake_up_parent;do_notify_parent;do_exit;do_group_exit;sys_exit_group;entry_SYSCALL_64_fastpath;;mkdir 34991
+cksum;entry_SYSCALL_64_fastpath;sys_read;vfs_read;__vfs_read;generic_file_read_iter;__lock_page_killable;__wait_on_bit_lock;bit_wait_io;__sched_text_start;schedule_timeout;schedule;-;wake_bit_function;__wake_up_common;__wake_up;__wake_up_bit;unlock_page;mpage_end_io;bio_endio;blk_update_request;blk_mq_end_request;__blk_mq_complete_request;supervise 35746
+run;entry_SYSCALL_64_fastpath;sys_wait4;do_wait;schedule;-;child_wait_callback;__wake_up_common;__wake_up_sync_key;__wake_up_parent;do_notify_parent;do_exit;do_group_exit;sys_exit_group;entry_SYSCALL_64_fastpath;;chown 36942
+supervise;entry_SYSCALL_64_fastpath;sys_rename;dput;__dentry_kill;iput;evict;ext4_evict_inode;truncate_inode_pages_final;truncate_inode_pages_range;wait_on_page_bit;__wait_on_bit;bit_wait_io;__sched_text_start;schedule_timeout;schedule;-;wake_bit_function;__wake_up_common;__wake_up;__wake_up_bit;end_page_writeback;ext4_finish_bio;ext4_end_bio;bio_endio;blk_update_request;blk_mq_end_request;swapper/0 42993
+cksum;entry_SYSCALL_64_fastpath;sys_open;do_sys_open;do_filp_open;path_openat;lookup_real;ext4_lookup;ext4_iget_normal;ext4_iget;__ext4_get_inode_loc;__wait_on_buffer;out_of_line_wait_on_bit;__wait_on_bit;bit_wait_io;__sched_text_start;schedule_timeout;schedule;-;wake_bit_function;__wake_up_common;__wake_up;__wake_up_bit;wake_up_bit;unlock_buffer;__end_buffer_read_notouch;end_buffer_read_sync;end_bio_bh_io_sync;bio_endio;swapper/0 53348
+sshd;entry_SYSCALL_64_fastpath;sys_select;core_sys_select;do_select;poll_schedule_timeout;schedule_hrtimeout_range;schedule_hrtimeout_range_clock;schedule;-;pollwake;__wake_up_common;__wake_up;n_tty_receive_buf_common;n_tty_receive_buf2;flush_to_ldisc;process_one_work;worker_thread;kthread;ret_from_fork;kworker/u16:2 86256
+cksum;entry_SYSCALL_64_fastpath;sys_read;vfs_read;__vfs_read;generic_file_read_iter;__lock_page_killable;__wait_on_bit_lock;bit_wait_io;__sched_text_start;schedule_timeout;schedule;-;wake_bit_function;__wake_up_common;__wake_up;__wake_up_bit;unlock_page;mpage_end_io;bio_endio;blk_update_request;blk_mq_end_request;__blk_mq_complete_request;run 109480
+ntpd;entry_SYSCALL_64_fastpath;sys_select;core_sys_select;do_select;poll_schedule_timeout;schedule_hrtimeout_range;schedule_hrtimeout_range_clock;schedule;-;signal_wake_up_state;complete_signal;__send_signal;send_signal;do_send_sig_info;group_send_sig_info;kill_pid_info;it_real_fn;__hrtimer_run_queues;hrtimer_interrupt;cksum 999975
+ntpd;entry_SYSCALL_64_fastpath;sys_select;core_sys_select;do_select;poll_schedule_timeout;schedule_hrtimeout_range;schedule_hrtimeout_range_clock;schedule;-;signal_wake_up_state;complete_signal;__send_signal;send_signal;do_send_sig_info;group_send_sig_info;kill_pid_info;it_real_fn;__hrtimer_run_queues;hrtimer_interrupt;swapper/0 999976
+supervise;entry_SYSCALL_64_fastpath;sys_poll;do_sys_poll;poll_schedule_timeout;schedule_hrtimeout_range;schedule_hrtimeout_range_clock;schedule_hrtimeout_range_clock.part.23;schedule;-;hrtimer_wakeup;__hrtimer_run_queues;hrtimer_interrupt;xen_timer_interrupt;handle_irq_event_percpu;handle_percpu_irq;generic_handle_irq;evtchn_2l_handle_events;__xen_evtchn_do_upcall;xen_evtchn_do_upcall;chmod 1021082
+snmpd;entry_SYSCALL_64_fastpath;sys_select;core_sys_select;do_select;poll_schedule_timeout;schedule_hrtimeout_range;schedule_hrtimeout_range_clock;schedule_hrtimeout_range_clock.part.23;schedule;-;hrtimer_wakeup;__hrtimer_run_queues;hrtimer_interrupt;xen_timer_interrupt;handle_irq_event_percpu;handle_percpu_irq;generic_handle_irq;evtchn_2l_handle_events;__xen_evtchn_do_upcall;xen_evtchn_do_upcall;swapper/0 1726275
+ntpd;entry_SYSCALL_64_fastpath;sys_select;core_sys_select;do_select;poll_schedule_timeout;schedule_hrtimeout_range;schedule_hrtimeout_range_clock;schedule;-;signal_wake_up_state;complete_signal;__send_signal;send_signal;do_send_sig_info;group_send_sig_info;kill_pid_info;it_real_fn;__hrtimer_run_queues;hrtimer_interrupt;swapper/1 1999944
+supervise;entry_SYSCALL_64_fastpath;sys_poll;do_sys_poll;poll_schedule_timeout;schedule_hrtimeout_range;schedule_hrtimeout_range_clock;schedule_hrtimeout_range_clock.part.23;schedule;-;hrtimer_wakeup;__hrtimer_run_queues;hrtimer_interrupt;xen_timer_interrupt;handle_irq_event_percpu;handle_percpu_irq;generic_handle_irq;evtchn_2l_handle_events;__xen_evtchn_do_upcall;xen_evtchn_do_upcall;cksum 2041945
+cksum;entry_SYSCALL_64_fastpath;sys_read;vfs_read;__vfs_read;generic_file_read_iter;__lock_page_killable;__wait_on_bit_lock;bit_wait_io;__sched_text_start;schedule_timeout;schedule;-;wake_bit_function;__wake_up_common;__wake_up;__wake_up_bit;unlock_page;mpage_end_io;bio_endio;blk_update_request;blk_mq_end_request;__blk_mq_complete_request;swapper/0 3720413
+vmstat;entry_SYSCALL_64_fastpath;sys_nanosleep;hrtimer_nanosleep;do_nanosleep;schedule;-;hrtimer_wakeup;__hrtimer_run_queues;hrtimer_interrupt;xen_timer_interrupt;handle_irq_event_percpu;handle_percpu_irq;generic_handle_irq;evtchn_2l_handle_events;__xen_evtchn_do_upcall;xen_evtchn_do_upcall;swapper/0 4000402
+tail;entry_SYSCALL_64_fastpath;sys_nanosleep;hrtimer_nanosleep;do_nanosleep;schedule;-;hrtimer_wakeup;__hrtimer_run_queues;hrtimer_interrupt;xen_timer_interrupt;handle_irq_event_percpu;handle_percpu_irq;generic_handle_irq;evtchn_2l_handle_events;__xen_evtchn_do_upcall;xen_evtchn_do_upcall;swapper/0 4000447
+readproctitle;entry_SYSCALL_64_fastpath;sys_read;vfs_read;__vfs_read;pipe_read;pipe_wait;schedule;-;autoremove_wake_function;__wake_up_common;__wake_up_sync_key;pipe_write;__vfs_write;vfs_write;sys_write;entry_SYSCALL_64_fastpath;;run 4149862
+offwaketime.py;entry_SYSCALL_64_fastpath;sys_select;core_sys_select;do_select;poll_schedule_timeout;schedule_hrtimeout_range;schedule_hrtimeout_range_clock;schedule_hrtimeout_range_clock.part.23;schedule;-;hrtimer_wakeup;__hrtimer_run_queues;hrtimer_interrupt;xen_timer_interrupt;handle_irq_event_percpu;handle_percpu_irq;generic_handle_irq;evtchn_2l_handle_events;__xen_evtchn_do_upcall;xen_evtchn_do_upcall;swapper/1 5005058
+supervise;entry_SYSCALL_64_fastpath;sys_poll;do_sys_poll;poll_schedule_timeout;schedule_hrtimeout_range;schedule_hrtimeout_range_clock;schedule_hrtimeout_range_clock.part.23;schedule;-;hrtimer_wakeup;__hrtimer_run_queues;hrtimer_interrupt;xen_timer_interrupt;handle_irq_event_percpu;handle_percpu_irq;generic_handle_irq;evtchn_2l_handle_events;__xen_evtchn_do_upcall;xen_evtchn_do_upcall;swapper/1 8168600
+sshd;entry_SYSCALL_64_fastpath;sys_select;core_sys_select;do_select;poll_schedule_timeout;schedule_hrtimeout_range;schedule_hrtimeout_range_clock;schedule;-;pollwake;__wake_up_common;__wake_up;n_tty_receive_buf_common;n_tty_receive_buf2;flush_to_ldisc;process_one_work;worker_thread;kthread;ret_from_fork;kworker/u16:1 8821767
+supervise;entry_SYSCALL_64_fastpath;sys_poll;do_sys_poll;poll_schedule_timeout;schedule_hrtimeout_range;schedule_hrtimeout_range_clock;schedule_hrtimeout_range_clock.part.23;schedule;-;hrtimer_wakeup;__hrtimer_run_queues;hrtimer_interrupt;xen_timer_interrupt;handle_irq_event_percpu;handle_percpu_irq;generic_handle_irq;evtchn_2l_handle_events;__xen_evtchn_do_upcall;xen_evtchn_do_upcall;run 9186846
+supervise;entry_SYSCALL_64_fastpath;sys_poll;do_sys_poll;poll_schedule_timeout;schedule_hrtimeout_range;schedule_hrtimeout_range_clock;schedule_hrtimeout_range_clock.part.23;schedule;-;hrtimer_wakeup;__hrtimer_run_queues;hrtimer_interrupt;xen_timer_interrupt;handle_irq_event_percpu;handle_percpu_irq;generic_handle_irq;evtchn_2l_handle_events;__xen_evtchn_do_upcall;xen_evtchn_do_upcall;swapper/0 20415299
+
+This output format is suitable for feeding into the open source FlameGraph
+software, which visualizes these.
+
+
+USAGE message:
+
+# ./offwaketime -h
+usage: offwaketime [-h] [-u] [-p PID] [-v] [-f] [duration]
+
+Summarize blocked time by kernel off-CPU stack + waker stack
+
+positional arguments:
+  duration           duration of trace, in seconds
+
+optional arguments:
+  -h, --help         show this help message and exit
+  -u, --useronly     user threads only (no kernel threads)
+  -p PID, --pid PID  trace this PID only
+  -v, --verbose      show raw addresses
+  -f, --folded       output folded format
+
+examples:
+    ./offwaketime             # trace off-CPU + waker stack time until Ctrl-C
+    ./offwaketime 5           # trace for 5 seconds only
+    ./offwaketime -f 5        # 5 seconds, and output in folded format
+    ./offwaketime -u          # don't include kernel threads (user only)
+    ./offwaketime -p 185      # trace fo PID 185 only

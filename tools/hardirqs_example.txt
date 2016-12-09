@@ -1,0 +1,638 @@
+Demonstrations of hardirqs, the Linux eBPF/bcc version.
+
+
+This program traces hard interrupts (irqs), and stores timing statistics
+in-kernel for efficiency. For example:
+
+# ./hardirqs
+Tracing hard irq event time... Hit Ctrl-C to end.
+^C
+HARDIRQ                    TOTAL_usecs
+callfuncsingle0                      2
+callfuncsingle5                      5
+callfuncsingle6                      5
+callfuncsingle7                     21
+blkif                               66
+timer7                              84
+resched5                            94
+resched0                            97
+resched3                           102
+resched7                           111
+resched6                           255
+timer3                             362
+resched4                           367
+timer5                             474
+timer1                             529
+timer6                             679
+timer2                             746
+timer4                             943
+resched1                          1048
+timer0                            1558
+resched2                          1750
+eth0                             11441
+
+The HARDIRQ column prints the interrupt action name. While tracing, the eth0
+hard irq action ran for 11441 microseconds (11 milliseconds) in total.
+
+Many other interrupts are visible in the output: this is an 8 CPU system, and
+some of these interrupts have a separate action per-CPU (eg, "timer",
+"resched").
+
+
+An interval can be provided, and also optionally a count. Eg, printing output
+every 1 second, and including timestamps (-T):
+
+# ./hardirqs -T 1 3
+Tracing hard irq event time... Hit Ctrl-C to end.
+
+22:16:14
+HARDIRQ                    TOTAL_usecs
+callfuncsingle0                      2
+callfuncsingle7                      5
+callfuncsingle3                      5
+callfuncsingle2                      5
+callfuncsingle6                      6
+callfuncsingle1                     11
+resched0                            32
+blkif                               51
+resched5                            71
+resched7                            71
+resched4                            72
+resched6                            82
+timer7                             172
+resched1                           187
+resched2                           236
+timer3                             252
+resched3                           282
+timer1                             320
+timer2                             374
+timer6                             396
+timer5                             427
+timer4                             470
+timer0                            1430
+eth0                              7498
+
+22:16:15
+HARDIRQ                    TOTAL_usecs
+callfuncsingle7                      6
+callfuncsingle5                     11
+callfuncsingle4                     13
+timer2                              17
+callfuncsingle6                     18
+resched0                            21
+blkif                               33
+resched3                            40
+resched5                            60
+resched4                            69
+resched6                            70
+resched7                            74
+timer7                              86
+resched2                            91
+timer3                             134
+resched1                           293
+timer5                             354
+timer1                             433
+timer6                             497
+timer4                            1112
+timer0                            1768
+eth0                              6972
+
+22:16:16
+HARDIRQ                    TOTAL_usecs
+callfuncsingle7                      5
+callfuncsingle3                      5
+callfuncsingle2                      6
+timer3                              10
+resched0                            18
+callfuncsingle4                     22
+resched5                            27
+resched6                            44
+blkif                               45
+resched7                            65
+resched4                            69
+timer4                              77
+resched2                            97
+timer7                              98
+resched3                           103
+timer2                             169
+resched1                           226
+timer5                             525
+timer1                             691
+timer6                             697
+timer0                            1415
+eth0                              7152
+
+This can be useful for quantifying where CPU cycles are spent among the hard
+interrupts (summarized as the %irq column from mpstat(1)). The output above
+shows that most time was spent processing for eth0 (network interface), which
+was around 7 milliseconds per second (total across all CPUs).
+
+Note that the time spent among the "timer" interrupts was low, and usually less
+than one microsecond per second. Here's the hardirq per-second output when the
+perf tool is performing a 999 Hertz CPU profile ("perf record -F 999 -a ..."):
+
+22:13:59
+HARDIRQ                    TOTAL_usecs
+callfuncsingle7                      5
+callfuncsingle5                      5
+callfuncsingle3                      6
+callfuncsingle4                      7
+callfuncsingle6                     19
+blkif                               66
+resched0                            66
+resched2                            82
+resched7                            87
+resched3                            96
+resched4                           118
+resched5                           120
+resched6                           130
+resched1                           230
+timer3                             946
+timer1                            1981
+timer7                            2618
+timer5                            3063
+timer6                            3141
+timer4                            3511
+timer2                            3554
+timer0                            5044
+eth0                             16015
+
+This sheds some light into the CPU overhead of the perf profiler, which cost
+around 3 milliseconds per second. Note that I'm usually profiling at a much
+lower rate, 99 Hertz, which looks like this:
+
+22:22:12
+HARDIRQ                    TOTAL_usecs
+callfuncsingle3                      5
+callfuncsingle6                      5
+callfuncsingle5                     22
+blkif                               46
+resched6                            47
+resched5                            57
+resched4                            66
+resched7                            78
+resched2                            97
+resched0                           214
+timer2                             326
+timer0                             498
+timer5                             536
+timer6                             576
+timer1                             600
+timer4                             982
+resched1                          1315
+timer7                            1364
+timer3                            1825
+resched3                          5708
+eth0                              9743
+
+Much lower (and remember to compare this to the baseline). Note that perf has
+other overheads (non-irq CPU cycles, file system storage).
+
+
+The distribution of interrupt run time can be printed as a histogram with the -d
+option. Eg:
+
+# ./hardirqs -d
+Tracing hard irq event time... Hit Ctrl-C to end.
+^C
+
+hardirq = 'callfuncsingle1'
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 0        |                                        |
+      1024 -> 2047       : 0        |                                        |
+      2048 -> 4095       : 0        |                                        |
+      4096 -> 8191       : 0        |                                        |
+      8192 -> 16383      : 1        |****************************************|
+
+hardirq = 'callfuncsingle0'
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 0        |                                        |
+      1024 -> 2047       : 0        |                                        |
+      2048 -> 4095       : 1        |****************************************|
+
+hardirq = 'callfuncsingle3'
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 0        |                                        |
+      1024 -> 2047       : 0        |                                        |
+      2048 -> 4095       : 0        |                                        |
+      4096 -> 8191       : 3        |****************************************|
+
+hardirq = 'callfuncsingle2'
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 0        |                                        |
+      1024 -> 2047       : 0        |                                        |
+      2048 -> 4095       : 0        |                                        |
+      4096 -> 8191       : 2        |****************************************|
+
+hardirq = 'callfuncsingle5'
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 0        |                                        |
+      1024 -> 2047       : 0        |                                        |
+      2048 -> 4095       : 0        |                                        |
+      4096 -> 8191       : 5        |****************************************|
+
+hardirq = 'callfuncsingle4'
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 0        |                                        |
+      1024 -> 2047       : 0        |                                        |
+      2048 -> 4095       : 0        |                                        |
+      4096 -> 8191       : 6        |****************************************|
+
+hardirq = 'callfuncsingle7'
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 0        |                                        |
+      1024 -> 2047       : 0        |                                        |
+      2048 -> 4095       : 0        |                                        |
+      4096 -> 8191       : 4        |****************************************|
+
+hardirq = 'callfuncsingle6'
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 0        |                                        |
+      1024 -> 2047       : 0        |                                        |
+      2048 -> 4095       : 0        |                                        |
+      4096 -> 8191       : 4        |****************************************|
+
+hardirq = 'eth0'
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 5102     |*********                               |
+      1024 -> 2047       : 20617    |****************************************|
+      2048 -> 4095       : 4832     |*********                               |
+      4096 -> 8191       : 12       |                                        |
+
+hardirq = 'timer7'
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 0        |                                        |
+      1024 -> 2047       : 9        |***                                     |
+      2048 -> 4095       : 70       |*****************************           |
+      4096 -> 8191       : 94       |****************************************|
+
+hardirq = 'timer6'
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 0        |                                        |
+      1024 -> 2047       : 1        |                                        |
+      2048 -> 4095       : 86       |***********                             |
+      4096 -> 8191       : 295      |****************************************|
+      8192 -> 16383      : 28       |***                                     |
+
+hardirq = 'timer5'
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 1        |                                        |
+      1024 -> 2047       : 0        |                                        |
+      2048 -> 4095       : 137      |****************************************|
+      4096 -> 8191       : 123      |***********************************     |
+      8192 -> 16383      : 8        |**                                      |
+
+hardirq = 'timer4'
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 0        |                                        |
+      1024 -> 2047       : 0        |                                        |
+      2048 -> 4095       : 46       |*********                               |
+      4096 -> 8191       : 198      |****************************************|
+      8192 -> 16383      : 49       |*********                               |
+
+hardirq = 'timer3'
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 0        |                                        |
+      1024 -> 2047       : 4        |                                        |
+      2048 -> 4095       : 210      |****************************************|
+      4096 -> 8191       : 186      |***********************************     |
+
+hardirq = 'timer2'
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 0        |                                        |
+      1024 -> 2047       : 0        |                                        |
+      2048 -> 4095       : 245      |****************************************|
+      4096 -> 8191       : 227      |*************************************   |
+      8192 -> 16383      : 6        |                                        |
+
+hardirq = 'timer1'
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 0        |                                        |
+      1024 -> 2047       : 6        |*                                       |
+      2048 -> 4095       : 112      |************************                |
+      4096 -> 8191       : 181      |****************************************|
+      8192 -> 16383      : 7        |*                                       |
+
+hardirq = 'timer0'
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 0        |                                        |
+      1024 -> 2047       : 0        |                                        |
+      2048 -> 4095       : 0        |                                        |
+      4096 -> 8191       : 887      |****************************************|
+      8192 -> 16383      : 92       |****                                    |
+
+hardirq = 'blkif'
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 0        |                                        |
+      1024 -> 2047       : 0        |                                        |
+      2048 -> 4095       : 0        |                                        |
+      4096 -> 8191       : 9        |****************************************|
+      8192 -> 16383      : 7        |*******************************         |
+     16384 -> 32767      : 2        |********                                |
+
+hardirq = 'resched4'
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 0        |                                        |
+      1024 -> 2047       : 104      |****************************************|
+      2048 -> 4095       : 80       |******************************          |
+
+hardirq = 'resched5'
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 27       |*****                                   |
+      1024 -> 2047       : 216      |****************************************|
+      2048 -> 4095       : 27       |*****                                   |
+      4096 -> 8191       : 1        |                                        |
+
+hardirq = 'resched6'
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 480      |*******************                     |
+      1024 -> 2047       : 1003     |****************************************|
+      2048 -> 4095       : 64       |**                                      |
+
+hardirq = 'resched7'
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 46       |*********                               |
+      1024 -> 2047       : 190      |****************************************|
+      2048 -> 4095       : 42       |********                                |
+
+hardirq = 'resched0'
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 11       |****                                    |
+      1024 -> 2047       : 100      |****************************************|
+      2048 -> 4095       : 23       |*********                               |
+
+hardirq = 'resched1'
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 96       |********                                |
+      1024 -> 2047       : 462      |****************************************|
+      2048 -> 4095       : 36       |***                                     |
+
+hardirq = 'resched2'
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 120      |**************************              |
+      1024 -> 2047       : 183      |****************************************|
+      2048 -> 4095       : 41       |********                                |
+
+hardirq = 'resched3'
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 0        |                                        |
+      1024 -> 2047       : 789      |****************************************|
+      2048 -> 4095       : 39       |*                                       |
+
+
+USAGE message:
+
+# ./hardirqs -h
+usage: hardirqs [-h] [-T] [-N] [-d] [interval] [count]
+
+Summarize hard irq event time as histograms
+
+positional arguments:
+  interval           output interval, in seconds
+  count              number of outputs
+
+optional arguments:
+  -h, --help         show this help message and exit
+  -T, --timestamp    include timestamp on output
+  -N, --nanoseconds  output in nanoseconds
+  -d, --dist         show distributions as histograms
+
+examples:
+    ./hardirqs            # sum hard irq event time
+    ./hardirqs -d         # show hard irq event time as histograms
+    ./hardirqs 1 10       # print 1 second summaries, 10 times
+    ./hardirqs -NT 1      # 1s summaries, nanoseconds, and timestamps

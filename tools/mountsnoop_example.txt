@@ -1,0 +1,28 @@
+Demonstrations of mountsnoop.
+
+mountsnoop traces the mount() and umount syscalls system-wide. For example,
+running the following series of commands produces this output:
+
+# mount --bind /mnt /mnt
+# umount /mnt
+# unshare -m
+# mount --bind /mnt /mnt
+# umount /mnt
+
+# ./mountsnoop.py
+COMM             PID     TID     MNT_NS      CALL
+mount            710     710     4026531840  mount("/mnt", "/mnt", "", MS_MGC_VAL|MS_BIND, "") = 0
+umount           714     714     4026531840  umount("/mnt", 0x0) = 0
+unshare          717     717     4026532160  mount("none", "/", "", MS_REC|MS_PRIVATE, "") = 0
+mount            725     725     4026532160  mount("/mnt", "/mnt", "", MS_MGC_VAL|MS_BIND, "") = 0
+umount           728     728     4026532160  umount("/mnt", 0x0) = 0
+
+The output shows the calling command, its process ID and thread ID, the mount
+namespace the call was made in, and the call itself.
+
+The mount namespace number is an inode number that uniquely identifies the
+namespace in the running system. This can also be obtained from readlink
+/proc/$PID/ns/mnt.
+
+Note that because of restrictions in BPF, the string arguments to either
+syscall may be truncated.

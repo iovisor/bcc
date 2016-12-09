@@ -1,0 +1,134 @@
+Demonstrations of slabratetop, the Linux eBPF/bcc version.
+
+
+slabratetop shows the rate of allocations and total bytes from the kernel
+memory allocation caches (SLAB or SLUB), in a top-like display that refreshes.
+For example:
+
+# ./slabratetop
+<screen clears>
+07:01:35 loadavg: 0.38 0.21 0.12 1/342 13297
+
+CACHE                            ALLOCS      BYTES
+kmalloc-4096                       3554   14557184
+kmalloc-256                        2382     609536
+cred_jar                           2568     493056
+anon_vma_chain                     2007     128448
+anon_vma                            972      77760
+sighand_cache                        24      50688
+mm_struct                            49      50176
+RAW                                  52      49920
+proc_inode_cache                     59      38232
+signal_cache                         24      26112
+dentry                              135      25920
+sock_inode_cache                     29      18560
+files_cache                          24      16896
+inode_cache                          13       7696
+TCP                                   2       3840
+pid                                  24       3072
+sigqueue                             17       2720
+ext4_inode_cache                      2       2160
+buffer_head                          16       1664
+xfs_trans                             5       1160
+
+By default the screen refreshes every one second, and only the top 20 caches
+are shown. These can be tuned with options: see USAGE (-h).
+
+The output above showed that the kmalloc-4096 cache allocated the most, about
+14 Mbytes during this interval. This is a generic cache; other caches have
+more meaningful names ("dentry", "TCP", "pid", etc).
+
+slabtop(1) is a similar tool that shows the current static volume and usage
+of the caches. slabratetop shows the active call rates and total size of the
+allocations.
+
+
+Since "kmalloc-4096" isn't very descriptive, I'm interested in seeing the
+kernel stacks that led to this allocation. In the future (maybe by now) the
+bcc trace tool could do this. As I'm writing this, it can't, so I'll use my
+older ftrace-based kprobe tool as a workarond. This is from my perf-tools
+collection: https://github.com/brendangregg/perf-tools.
+
+# ./perf-tools/bin/kprobe -s 'p:kmem_cache_alloc name=+0(+96(%di)):string' 'name == "kmalloc-4096' | head -100
+Tracing kprobe kmem_cache_alloc. Ctrl-C to end.
+          kprobe-3892  [002] d... 7888274.478331: kmem_cache_alloc: (kmem_cache_alloc+0x0/0x1b0) name="kmalloc-4096"
+          kprobe-3892  [002] d... 7888274.478333: <stack trace>
+ => kmem_cache_alloc
+ => user_path_at_empty
+ => vfs_fstatat
+ => SYSC_newstat
+ => SyS_newstat
+ => entry_SYSCALL_64_fastpath
+          kprobe-3892  [002] d... 7888274.478340: kmem_cache_alloc: (kmem_cache_alloc+0x0/0x1b0) name="kmalloc-4096"
+          kprobe-3892  [002] d... 7888274.478341: <stack trace>
+ => kmem_cache_alloc
+ => user_path_at_empty
+ => vfs_fstatat
+ => SYSC_newstat
+ => SyS_newstat
+ => entry_SYSCALL_64_fastpath
+          kprobe-3892  [002] d... 7888274.478345: kmem_cache_alloc: (kmem_cache_alloc+0x0/0x1b0) name="kmalloc-4096"
+          kprobe-3892  [002] d... 7888274.478346: <stack trace>
+ => kmem_cache_alloc
+ => user_path_at_empty
+ => vfs_fstatat
+ => SYSC_newstat
+ => SyS_newstat
+ => entry_SYSCALL_64_fastpath
+          kprobe-3892  [002] d... 7888274.478350: kmem_cache_alloc: (kmem_cache_alloc+0x0/0x1b0) name="kmalloc-4096"
+          kprobe-3892  [002] d... 7888274.478351: <stack trace>
+ => kmem_cache_alloc
+ => user_path_at_empty
+ => vfs_fstatat
+ => SYSC_newstat
+ => SyS_newstat
+ => entry_SYSCALL_64_fastpath
+          kprobe-3892  [002] d... 7888274.478355: kmem_cache_alloc: (kmem_cache_alloc+0x0/0x1b0) name="kmalloc-4096"
+          kprobe-3892  [002] d... 7888274.478355: <stack trace>
+ => kmem_cache_alloc
+ => user_path_at_empty
+ => vfs_fstatat
+ => SYSC_newstat
+ => SyS_newstat
+ => entry_SYSCALL_64_fastpath
+          kprobe-3892  [002] d... 7888274.478359: kmem_cache_alloc: (kmem_cache_alloc+0x0/0x1b0) name="kmalloc-4096"
+          kprobe-3892  [002] d... 7888274.478359: <stack trace>
+ => kmem_cache_alloc
+ => user_path_at_empty
+ => vfs_fstatat
+ => SYSC_newstat
+ => SyS_newstat
+ => entry_SYSCALL_64_fastpath
+[...]
+
+This is just an example so that you can see it's possible to dig further.
+Please don't copy-n-paste that kprobe command, as it's unlikely to work (the
+"+0(+96(%di))" text is specific to a kernel version and architecture).
+
+So these allocations are coming from user_path_at_empty(), which calls other
+functions (not seen in the stack: I suspect it's a tail-call compiler
+optimization).
+
+
+USAGE:
+
+# ./slabratetop -h
+usage: slabratetop [-h] [-C] [-r MAXROWS] [interval] [count]
+
+Kernel SLAB/SLUB memory cache allocation rate top
+
+positional arguments:
+  interval              output interval, in seconds
+  count                 number of outputs
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -C, --noclear         don't clear the screen
+  -r MAXROWS, --maxrows MAXROWS
+                        maximum rows to print, default 20
+
+examples:
+    ./slabratetop            # kmem_cache_alloc() top, 1 second refresh
+    ./slabratetop -C         # don't clear the screen
+    ./slabratetop 5          # 5 second summaries
+    ./slabratetop 5 10       # 5 second summaries, 10 times only

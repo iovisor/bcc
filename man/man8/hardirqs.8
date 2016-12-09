@@ -1,0 +1,92 @@
+.TH hardirqs 8  "2015-10-20" "USER COMMANDS"
+.SH NAME
+hardirqs \- Measure hard IRQ (hard interrupt) event time. Uses Linux eBPF/bcc.
+.SH SYNOPSIS
+.B hardirqs [\-h] [\-T] [\-N] [\-d] [interval] [count]
+.SH DESCRIPTION
+This summarizes the time spent servicing hard IRQs (hard interrupts), and can
+show this time as either totals or histogram distributions. A system-wide
+summary of this time is shown by the %irq column of mpstat(1), and event
+counts (but not times) are shown by /proc/interrupts.
+
+WARNING: This currently uses dynamic tracing of hard interrupts. You should
+understand what this means before use. Try in a test environment. Future
+versions should switch to tracepoints.
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH OPTIONS
+.TP
+\-h
+Print usage message.
+.TP
+\-T
+Include timestamps on output.
+.TP
+\-N
+Output in nanoseconds
+.TP
+\-d
+Show IRQ time distribution as histograms
+.SH EXAMPLES
+.TP
+Sum hard IRQ event time until Ctrl-C:
+#
+.B hardirqs
+.TP
+Show hard IRQ event time as histograms:
+#
+.B hardirqs \-d
+.TP
+Print 1 second summaries, 10 times:
+#
+.B hardirqs 1 10
+.TP
+1 second summaries, printed in nanoseconds, with timestamps:
+#
+.B hardirqs \-NT 1
+.SH FIELDS
+.TP
+HARDIRQ
+The irq action name for this hard IRQ.
+.TP
+TOTAL_usecs
+Total time spent in this hard IRQ in microseconds.
+.TP
+TOTAL_nsecs
+Total time spent in this hard IRQ in nanoseconds.
+.TP
+usecs
+Range of microseconds for this bucket.
+.TP
+nsecs
+Range of nanoseconds for this bucket.
+.TP
+count
+Number of hard IRQs in this time range.
+.TP
+distribution
+ASCII representation of the distribution (the count column).
+.SH OVERHEAD
+This traces kernel functions and maintains in-kernel counts, which
+are asynchronously copied to user-space. While the rate of interrupts
+be very high (>1M/sec), this is a relatively efficient way to trace these
+events, and so the overhead is expected to be small for normal workloads, but
+could become noticeable for heavy workloads. Measure in a test environment
+before use.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Brendan Gregg
+.SH SEE ALSO
+softirqs(8)

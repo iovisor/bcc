@@ -1,0 +1,203 @@
+Demonstrations of softirqs, the Linux eBPF/bcc version.
+
+
+This program traces soft interrupts (irqs), and stores timing statistics
+in-kernel for efficiency. For example:
+
+# ./softirqs
+Tracing soft irq event time... Hit Ctrl-C to end.
+^C
+SOFTIRQ                    TOTAL_usecs
+rcu_process_callbacks              974
+run_rebalance_domains             1809
+run_timer_softirq                 2615
+net_tx_action                    14605
+tasklet_action                   38692
+net_rx_action                    88188
+
+The SOFTIRQ column prints the interrupt action function name. While tracing,
+the net_rx_action() soft interrupt ran for 20199 microseconds (20 milliseconds)
+in total.
+
+This tool works by dynamic tracing the individual softirq functions, and will
+need to be adjusted to match kernel/module changes. Future versions should
+use the softirq tracepoints instead.
+
+
+An interval can be provided, and also optionally a count. Eg, printing output
+every 1 second, and including timestamps (-T):
+
+# ./softirqs -T 1 3
+Tracing soft irq event time... Hit Ctrl-C to end.
+
+22:29:16
+SOFTIRQ                    TOTAL_usecs
+rcu_process_callbacks              456
+run_rebalance_domains             1005
+run_timer_softirq                 1196
+net_tx_action                     2796
+tasklet_action                    5534
+net_rx_action                    15075
+
+22:29:17
+SOFTIRQ                    TOTAL_usecs
+rcu_process_callbacks              456
+run_rebalance_domains              839
+run_timer_softirq                 1142
+net_tx_action                     1912
+tasklet_action                    4428
+net_rx_action                    14652
+
+22:29:18
+SOFTIRQ                    TOTAL_usecs
+rcu_process_callbacks              502
+run_rebalance_domains              840
+run_timer_softirq                 1192
+net_tx_action                     2341
+tasklet_action                    5496
+net_rx_action                    15656
+
+This can be useful for quantifying where CPU cycles are spent among the soft
+interrupts (summarized as the %softirq column from mpstat(1), and shown as
+event counts in /proc/softirqs). The output above shows that most time was spent
+processing net_rx_action(), which was around 15 milliseconds per second (total
+time across all CPUs).
+
+
+The distribution of interrupt run time can be printed as a histogram with the -d
+option. Eg:
+
+# ./softirqs -d
+Tracing soft irq event time... Hit Ctrl-C to end.
+^C
+
+softirq = net_tx_action
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 440      |                                        |
+       512 -> 1023       : 27613    |****************************************|
+      1024 -> 2047       : 5728     |********                                |
+      2048 -> 4095       : 439      |                                        |
+      4096 -> 8191       : 53       |                                        |
+      8192 -> 16383      : 2        |                                        |
+
+softirq = net_rx_action
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 6        |                                        |
+      1024 -> 2047       : 35       |                                        |
+      2048 -> 4095       : 3562     |****************                        |
+      4096 -> 8191       : 7023     |********************************        |
+      8192 -> 16383      : 8770     |****************************************|
+     16384 -> 32767      : 1780     |********                                |
+     32768 -> 65535      : 216      |                                        |
+     65536 -> 131071     : 4        |                                        |
+
+softirq = tasklet_action
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 95       |                                        |
+       512 -> 1023       : 12521    |****************************************|
+      1024 -> 2047       : 1068     |***                                     |
+      2048 -> 4095       : 1077     |***                                     |
+      4096 -> 8191       : 12349    |*************************************** |
+      8192 -> 16383      : 464      |*                                       |
+     16384 -> 32767      : 1        |                                        |
+
+softirq = rcu_process_callbacks
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 708      |****************************************|
+      1024 -> 2047       : 495      |***************************             |
+      2048 -> 4095       : 98       |*****                                   |
+      4096 -> 8191       : 62       |***                                     |
+      8192 -> 16383      : 4        |                                        |
+
+softirq = run_timer_softirq
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 2        |                                        |
+       512 -> 1023       : 366      |*********                               |
+      1024 -> 2047       : 1525     |****************************************|
+      2048 -> 4095       : 629      |****************                        |
+      4096 -> 8191       : 87       |**                                      |
+      8192 -> 16383      : 1        |                                        |
+
+softirq = run_rebalance_domains
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 3        |                                        |
+       512 -> 1023       : 18       |*                                       |
+      1024 -> 2047       : 80       |********                                |
+      2048 -> 4095       : 374      |****************************************|
+      4096 -> 8191       : 257      |***************************             |
+      8192 -> 16383      : 50       |*****                                   |
+     16384 -> 32767      : 24       |**                                      |
+
+
+USAGE message:
+
+# ./softirqs -h
+usage: softirqs [-h] [-T] [-N] [-d] [interval] [count]
+
+Summarize soft irq event time as histograms
+
+positional arguments:
+  interval           output interval, in seconds
+  count              number of outputs
+
+optional arguments:
+  -h, --help         show this help message and exit
+  -T, --timestamp    include timestamp on output
+  -N, --nanoseconds  output in nanoseconds
+  -d, --dist         show distributions as histograms
+
+examples:
+    ./softirqs            # sum soft irq event time
+    ./softirqs -d         # show soft irq event time as histograms
+    ./softirqs 1 10       # print 1 second summaries, 10 times
+    ./softirqs -NT 1      # 1s summaries, nanoseconds, and timestamps

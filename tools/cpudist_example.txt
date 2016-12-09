@@ -1,0 +1,306 @@
+Demonstrations of cpudist.
+
+This program summarizes task on-CPU time as a histogram, showing how long tasks
+spent on the CPU before being descheduled. This provides valuable information
+that can indicate oversubscription (too many tasks for too few processors),
+overhead due to excessive context switching (e.g. a common shared lock for
+multiple threads), uneven workload distribution, too-granular tasks, and more.
+
+Alternatively, the same options are available for summarizing task off-CPU
+time, which helps understand how often threads are being descheduled and how
+long they spend waiting for I/O, locks, timers, and other causes of suspension.
+
+# ./cpudist.py
+Tracing on-CPU time... Hit Ctrl-C to end.
+^C
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 1        |                                        |
+         4 -> 7          : 1        |                                        |
+         8 -> 15         : 13       |**                                      |
+        16 -> 31         : 187      |****************************************|
+        32 -> 63         : 89       |*******************                     |
+        64 -> 127        : 26       |*****                                   |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 1        |                                        |
+
+This is from a mostly idle system. Tasks wake up occasionally and run for only
+a few dozen microseconds, and then get descheduled.
+
+Here's some output from a system that is heavily loaded by threads that perform
+computation but also compete for a lock:
+
+# ./cpudist.py
+Tracing on-CPU time... Hit Ctrl-C to end.
+^C
+     usecs               : count     distribution
+         0 -> 1          : 51       |*                                       |
+         2 -> 3          : 395      |***********                             |
+         4 -> 7          : 259      |*******                                 |
+         8 -> 15         : 61       |*                                       |
+        16 -> 31         : 75       |**                                      |
+        32 -> 63         : 31       |                                        |
+        64 -> 127        : 7        |                                        |
+       128 -> 255        : 5        |                                        |
+       256 -> 511        : 3        |                                        |
+       512 -> 1023       : 5        |                                        |
+      1024 -> 2047       : 6        |                                        |
+      2048 -> 4095       : 4        |                                        |
+      4096 -> 8191       : 1361     |****************************************|
+      8192 -> 16383      : 523      |***************                         |
+     16384 -> 32767      : 3        |                                        |
+
+A bimodal distribution is now clearly visible. Most of the time, tasks were
+able to run for 4-16ms before being descheduled (this is likely the quantum
+length). Occasionally, tasks had to be descheduled a lot earlier -- possibly
+because they competed for a shared lock.
+
+If necessary, you can restrict the output to include only threads from a 
+particular process -- this helps reduce noise:
+
+# ./cpudist.py -p $(pidof parprimes)
+Tracing on-CPU time... Hit Ctrl-C to end.
+^C
+     usecs               : count     distribution
+         0 -> 1          : 3        |                                        |
+         2 -> 3          : 17       |                                        |
+         4 -> 7          : 39       |                                        |
+         8 -> 15         : 52       |*                                       |
+        16 -> 31         : 43       |                                        |
+        32 -> 63         : 12       |                                        |
+        64 -> 127        : 13       |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 1        |                                        |
+       512 -> 1023       : 11       |                                        |
+      1024 -> 2047       : 15       |                                        |
+      2048 -> 4095       : 41       |                                        |
+      4096 -> 8191       : 1134     |************************                |
+      8192 -> 16383      : 1883     |****************************************|
+     16384 -> 32767      : 65       |*                                       |
+
+You can also ask for output at predefined intervals, and include timestamps for
+easier interpretation. While we're at it, the -P switch will print a histogram
+separately for each process:
+
+# ./cpudist.py -TP 5 3
+Tracing on-CPU time... Hit Ctrl-C to end.
+
+03:46:51
+
+pid = 0
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 1        |**                                      |
+         4 -> 7          : 17       |**********************************      |
+         8 -> 15         : 11       |**********************                  |
+        16 -> 31         : 20       |****************************************|
+        32 -> 63         : 15       |******************************          |
+        64 -> 127        : 9        |******************                      |
+       128 -> 255        : 6        |************                            |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 0        |                                        |
+      1024 -> 2047       : 0        |                                        |
+      2048 -> 4095       : 1        |**                                      |
+
+pid = 5068
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 1        |*************                           |
+         4 -> 7          : 3        |****************************************|
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 1        |*************                           |
+
+03:46:56
+
+pid = 0
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 1        |**                                      |
+         4 -> 7          : 19       |****************************************|
+         8 -> 15         : 11       |***********************                 |
+        16 -> 31         : 9        |******************                      |
+        32 -> 63         : 3        |******                                  |
+        64 -> 127        : 1        |**                                      |
+       128 -> 255        : 3        |******                                  |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 1        |**                                      |
+
+pid = 5068
+     usecs               : count     distribution
+         0 -> 1          : 1        |********************                    |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 2        |****************************************|
+
+03:47:01
+
+pid = 0
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 12       |********************************        |
+         8 -> 15         : 15       |****************************************|
+        16 -> 31         : 15       |****************************************|
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 3        |********                                |
+       128 -> 255        : 1        |**                                      |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 1        |**                                      |
+
+pid = 5068
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 1        |******                                  |
+         4 -> 7          : 6        |****************************************|
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 2        |*************                           |
+
+This histogram was obtained while executing `dd if=/dev/zero of=/dev/null` with
+fairly large block sizes.
+
+You could also ask for an off-CPU report using the -O switch. Here's a
+histogram of task block times while the system is heavily loaded:
+
+# ./cpudist -O -p $(parprimes)
+Tracing off-CPU time... Hit Ctrl-C to end.
+^C
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 1        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 3        |                                        |
+        64 -> 127        : 1        |                                        |
+       128 -> 255        : 1        |                                        |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 2        |                                        |
+      1024 -> 2047       : 4        |                                        |
+      2048 -> 4095       : 3        |                                        |
+      4096 -> 8191       : 70       |***                                     |
+      8192 -> 16383      : 867      |****************************************|
+     16384 -> 32767      : 141      |******                                  |
+     32768 -> 65535      : 8        |                                        |
+     65536 -> 131071     : 0        |                                        |
+    131072 -> 262143     : 1        |                                        |
+    262144 -> 524287     : 2        |                                        |
+    524288 -> 1048575    : 3        |                                        |
+
+As you can see, threads are switching out for relatively long intervals, even
+though we know the workload doesn't have any significant blocking. This can be
+a result of over-subscription -- too many threads contending over too few CPUs.
+Indeed, there are four available CPUs and more than four runnable threads:
+
+# nproc
+4
+# cat /proc/loadavg
+0.04 0.11 0.06 9/147 7494
+
+(This shows we have 9 threads runnable out of 147 total. This is more than 4,
+the number of available CPUs.)
+
+Finally, let's ask for a per-thread report and values in milliseconds instead
+of microseconds:
+
+# ./cpudist.py -p $(pidof parprimes) -mL
+Tracing on-CPU time... Hit Ctrl-C to end.
+
+
+tid = 5092
+     msecs               : count     distribution
+         0 -> 1          : 3        |                                        |
+         2 -> 3          : 4        |                                        |
+         4 -> 7          : 4        |                                        |
+         8 -> 15         : 535      |****************************************|
+        16 -> 31         : 14       |*                                       |
+
+tid = 5093
+     msecs               : count     distribution
+         0 -> 1          : 8        |                                        |
+         2 -> 3          : 6        |                                        |
+         4 -> 7          : 4        |                                        |
+         8 -> 15         : 534      |****************************************|
+        16 -> 31         : 12       |                                        |
+
+tid = 5094
+     msecs               : count     distribution
+         0 -> 1          : 38       |***                                     |
+         2 -> 3          : 5        |                                        |
+         4 -> 7          : 5        |                                        |
+         8 -> 15         : 476      |****************************************|
+        16 -> 31         : 25       |**                                      |
+
+tid = 5095
+     msecs               : count     distribution
+         0 -> 1          : 31       |**                                      |
+         2 -> 3          : 6        |                                        |
+         4 -> 7          : 10       |                                        |
+         8 -> 15         : 478      |****************************************|
+        16 -> 31         : 20       |*                                       |
+
+tid = 5096
+     msecs               : count     distribution
+         0 -> 1          : 21       |*                                       |
+         2 -> 3          : 5        |                                        |
+         4 -> 7          : 4        |                                        |
+         8 -> 15         : 523      |****************************************|
+        16 -> 31         : 16       |*                                       |
+
+tid = 5097
+     msecs               : count     distribution
+         0 -> 1          : 11       |                                        |
+         2 -> 3          : 7        |                                        |
+         4 -> 7          : 7        |                                        |
+         8 -> 15         : 502      |****************************************|
+        16 -> 31         : 23       |*                                       |
+
+tid = 5098
+     msecs               : count     distribution
+         0 -> 1          : 21       |*                                       |
+         2 -> 3          : 5        |                                        |
+         4 -> 7          : 3        |                                        |
+         8 -> 15         : 494      |****************************************|
+        16 -> 31         : 28       |**                                      |
+
+tid = 5099
+     msecs               : count     distribution
+         0 -> 1          : 15       |*                                       |
+         2 -> 3          : 4        |                                        |
+         4 -> 7          : 6        |                                        |
+         8 -> 15         : 521      |****************************************|
+        16 -> 31         : 12       |                                        |
+
+It looks like all threads are more-or-less equally busy, and are typically
+switched out after running for 8-15 milliseconds (again, this is the typical
+quantum length).
+
+
+USAGE message:
+
+# ./cpudist.py -h
+
+usage: cpudist.py [-h] [-O] [-T] [-m] [-P] [-L] [-p PID] [interval] [count]
+
+Summarize on-CPU time per task as a histogram.
+
+positional arguments:
+  interval            output interval, in seconds
+  count               number of outputs
+
+optional arguments:
+  -h, --help          show this help message and exit
+  -O, --offcpu        measure off-CPU time
+  -T, --timestamp     include timestamp on output
+  -m, --milliseconds  millisecond histogram
+  -P, --pids          print a histogram per process ID
+  -L, --tids          print a histogram per thread ID
+  -p PID, --pid PID   trace this PID only
+
+examples:
+    cpudist              # summarize on-CPU time as a histogram
+    cpudist -O           # summarize off-CPU time as a histogram
+    cpudist 1 10         # print 1 second summaries, 10 times
+    cpudist -mT 1        # 1s summaries, milliseconds, and timestamps
+    cpudist -P           # show each PID separately
+    cpudist -p 185       # trace PID 185 only

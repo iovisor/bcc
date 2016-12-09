@@ -1,0 +1,59 @@
+.TH gethostlatency 8  "2016-01-28" "USER COMMANDS"
+.SH NAME
+gethostlatency \- Show latency for getaddrinfo/gethostbyname[2] calls. Uses Linux eBPF/bcc.
+.SH SYNOPSIS
+.B gethostlatency
+.SH DESCRIPTION
+This traces and prints when getaddrinfo(), gethostbyname(), and gethostbyname2()
+are called, system wide, and shows the responsible PID and command name,
+latency of the call (duration) in milliseconds, and the host string.
+
+This tool can be useful for identifying DNS latency, by identifying which
+remote host name lookups were slow, and by how much.
+
+This makes use of a Linux 4.5 feature (bpf_perf_event_output());
+for kernels older than 4.5, see the version under tools/old,
+which uses an older mechanism
+
+This tool currently uses dynamic tracing of user-level functions and registers,
+and may need modifications to match your software and processor architecture.
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH EXAMPLES
+.TP
+Trace host lookups (getaddrinfo/gethostbyname[2]) system wide:
+#
+.B gethostlatency
+.SH FIELDS
+.TP
+TIME
+Time of the command (HH:MM:SS).
+.TP
+PID
+Process ID of the client performing the call.
+.TP
+COMM
+Process (command) name of the client performing the call.
+.TP
+HOST
+Host name string: the target of the lookup.
+.SH OVERHEAD
+The rate of lookups should be relatively low, so the overhead is not expected
+to be a problem.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Brendan Gregg
+.SH SEE ALSO
+tcpdump(8)

@@ -9,10 +9,9 @@ enable_testing()
 
 include(cmake/GetGitRevisionDescription.cmake)
 include(cmake/version.cmake)
-get_property(LIB64 GLOBAL PROPERTY FIND_LIBRARY_USE_LIB64_PATHS)
-if(LIB64)
-  set(LIBSUFFIX 64)
-endif()
+include(GNUInstallDirs)
+
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 if(NOT PYTHON_ONLY)
 find_package(BISON)
@@ -42,10 +41,33 @@ FOREACH(DIR ${LLVM_INCLUDE_DIRS})
   include_directories("${DIR}/../tools/clang/include")
 ENDFOREACH()
 
-set(CMAKE_C_FLAGS "-Wall")
-set(CMAKE_CXX_FLAGS "-std=c++11 -Wall")
+# Set to a string path if system places kernel lib directory in
+# non-default location.
+if(NOT DEFINED BCC_KERNEL_MODULES_DIR)
+  set(BCC_KERNEL_MODULES_DIR "/lib/modules")
+endif()
+
+find_package(LibElf REQUIRED)
+
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
+
+# As reported in issue #735, GCC 6 has some behavioral problems when
+# dealing with -isystem. Hence, skip the warning optimization
+# altogether on that compiler.
+execute_process(COMMAND ${CMAKE_C_COMPILER} -dumpversion OUTPUT_VARIABLE GCC_VERSION)
+if (GCC_VERSION VERSION_LESS 6.0)
+  # iterate over all available directories in LLVM_INCLUDE_DIRS to
+  # generate a correctly tokenized list of parameters
+  foreach(ONE_LLVM_INCLUDE_DIR ${LLVM_INCLUDE_DIRS})
+    set(CXX_ISYSTEM_DIRS "${CXX_ISYSTEM_DIRS} -isystem ${ONE_LLVM_INCLUDE_DIR}")
+  endforeach()
+endif()
+
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall ${CXX_ISYSTEM_DIRS}")
 endif()
 
 add_subdirectory(examples)
+add_subdirectory(man)
 add_subdirectory(src)
 add_subdirectory(tests)
+add_subdirectory(tools)

@@ -3,12 +3,12 @@ Maintainer: Brenden Blanco <bblanco@plumgrid.com>
 Section: misc
 Priority: optional
 Standards-Version: 3.9.5
-Build-Depends: debhelper (>= 9), cmake, libllvm3.8, llvm-3.8-dev, libclang-3.8-dev
+Build-Depends: debhelper (>= 9), cmake, libllvm3.7 | libllvm3.8, llvm-3.7-dev | llvm-3.8-dev, libclang-3.7-dev | libclang-3.8-dev, libelf-dev, bison, flex, libedit-dev, clang-format | clang-format-3.7, python-netaddr, python-pyroute2, luajit, libluajit-5.1-dev
 Homepage: https://github.com/iovisor/bcc
 
 Package: libbcc
 Architecture: amd64
-Depends: libc6, libstdc++6, make, gcc
+Depends: libc6, libstdc++6, libelf1
 Description: Shared Library for BPF Compiler Collection (BCC)
  Shared Library for BPF Compiler Collection to control BPF programs
  from userspace.
@@ -20,5 +20,15 @@ Description: Shared Library for BPF Compiler Collection (BCC)
 
 Package: python-bcc
 Architecture: all
-Depends: libbcc, python
+Depends: libbcc, python, binutils
 Description: Python wrappers for BPF Compiler Collection (BCC)
+
+Package: bcc-tools
+Architecture: all
+Depends: python-bcc
+Description: Command line tools for BPF Compiler Collection (BCC)
+
+Package: bcc-lua
+Architecture: all
+Depends: libbcc
+Description: Standalone tool to run BCC tracers written in Lua

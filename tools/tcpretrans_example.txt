@@ -1,0 +1,61 @@
+Demonstrations of tcpretrans, the Linux eBPF/bcc version.
+
+
+This tool traces the kernel TCP retransmit function to show details of these
+retransmits. For example:
+
+# ./tcpretrans 
+TIME     PID    IP LADDR:LPORT          T> RADDR:RPORT          STATE
+01:55:05 0      4  10.153.223.157:22    R> 69.53.245.40:34619   ESTABLISHED
+01:55:05 0      4  10.153.223.157:22    R> 69.53.245.40:34619   ESTABLISHED
+01:55:17 0      4  10.153.223.157:22    R> 69.53.245.40:22957   ESTABLISHED
+[...]
+
+This output shows three TCP retransmits, the first two were for an IPv4
+connection from 10.153.223.157 port 22 to 69.53.245.40 port 34619. The TCP
+state was "ESTABLISHED" at the time of the retransmit. The on-CPU PID at the
+time of the retransmit is printed, in this case 0 (the kernel, which will
+be the case most of the time).
+
+Retransmits are usually a sign of poor network health, and this tool is
+useful for their investigation. Unlike using tcpdump, this tool has very
+low overhead, as it only traces the retransmit function. It also prints
+additional kernel details: the state of the TCP session at the time of the
+retransmit.
+
+
+A -l option will include TCP tail loss probe attempts:
+
+# ./tcpretrans -l
+TIME     PID    IP LADDR:LPORT          T> RADDR:RPORT          STATE
+01:55:45 0      4  10.153.223.157:22    R> 69.53.245.40:51601   ESTABLISHED
+01:55:46 0      4  10.153.223.157:22    R> 69.53.245.40:51601   ESTABLISHED
+01:55:46 0      4  10.153.223.157:22    R> 69.53.245.40:51601   ESTABLISHED
+01:55:53 0      4  10.153.223.157:22    L> 69.53.245.40:46444   ESTABLISHED
+01:56:06 0      4  10.153.223.157:22    R> 69.53.245.40:46444   ESTABLISHED
+01:56:06 0      4  10.153.223.157:22    R> 69.53.245.40:46444   ESTABLISHED
+01:56:08 0      4  10.153.223.157:22    R> 69.53.245.40:46444   ESTABLISHED
+01:56:08 0      4  10.153.223.157:22    R> 69.53.245.40:46444   ESTABLISHED
+01:56:08 1938   4  10.153.223.157:22    R> 69.53.245.40:46444   ESTABLISHED
+01:56:08 0      4  10.153.223.157:22    R> 69.53.245.40:46444   ESTABLISHED
+01:56:08 0      4  10.153.223.157:22    R> 69.53.245.40:46444   ESTABLISHED
+[...]
+
+See the "L>" in the "T>" column. These are attempts: the kernel probably
+sent a TLP, but in some cases it might not have been ultimately sent.
+
+
+USAGE message:
+
+# ./tcpretrans -h
+usage: tcpretrans [-h] [-l]
+
+Trace TCP retransmits
+
+optional arguments:
+  -h, --help       show this help message and exit
+  -l, --lossprobe  include tail loss probe attempts
+
+examples:
+    ./tcpretrans           # trace TCP retransmits
+    ./tcpretrans -l        # include TLP attempts

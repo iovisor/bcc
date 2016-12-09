@@ -1,0 +1,86 @@
+.TH tcpaccept 8  "2015-08-25" "USER COMMANDS"
+.SH NAME
+tcpaccept \- Trace TCP passive connections (accept()). Uses Linux eBPF/bcc.
+.SH SYNOPSIS
+.B tcpaccept [\-h] [\-t] [\-x] [\-p PID]
+.SH DESCRIPTION
+This tool traces passive TCP connections (eg, via an accept() syscall;
+connect() are active connections). This can be useful for general
+troubleshooting to see what new connections the local server is accepting.
+
+This uses dynamic tracing of the kernel inet_csk_accept() socket function (from
+tcp_prot.accept), and will need to be modified to match kernel changes.
+
+This tool only traces successful TCP accept()s. Connection attempts to closed
+ports will not be shown (those can be traced via other functions).
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH OPTIONS
+.TP
+\-h
+Print usage message.
+.TP
+\-t
+Include a timestamp column.
+.TP
+\-p PID
+Trace this process ID only (filtered in-kernel).
+.SH EXAMPLES
+.TP
+Trace all passive TCP connections (accept()s):
+#
+.B tcpaccept
+.TP
+Trace all TCP accepts, and include timestamps:
+#
+.B tcpconnect \-t
+.TP
+Trace PID 181 only:
+#
+.B tcpconnect \-p 181
+.SH FIELDS
+.TP
+TIME(s)
+Time of the event, in seconds.
+.TP
+PID
+Process ID
+.TP
+COMM
+Process name
+.TP
+IP
+IP address family (4 or 6)
+.TP
+RADDR
+Remote IP address.
+.TP
+LADDR
+Local IP address.
+.TP
+LPORT
+Local port
+.SH OVERHEAD
+This traces the kernel inet_csk_accept function and prints output for each event.
+The rate of this depends on your server application. If it is a web or proxy server
+accepting many tens of thousands of connections per second, then the overhead
+of this tool may be measurable (although, still a lot better than tracing
+every packet). If it is less than a thousand a second, then the overhead is
+expected to be negligible. Test and understand this overhead before use.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Brendan Gregg
+.SH SEE ALSO
+tcpconnect(8), funccount(8), tcpdump(8)

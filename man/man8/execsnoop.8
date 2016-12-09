@@ -1,0 +1,89 @@
+.TH execsnoop 8  "2016-02-07" "USER COMMANDS"
+.SH NAME
+execsnoop \- Trace new processes via exec() syscalls. Uses Linux eBPF/bcc.
+.SH SYNOPSIS
+.B execsnoop [\-h] [\-t] [\-x] [\-n NAME]
+.SH DESCRIPTION
+execsnoop traces new processes, showing the filename executed and argument
+list.
+
+It works by traces the execve() system call (commonly used exec() variant).
+This catches new processes that follow the fork->exec sequence, as well as
+processes that re-exec() themselves. Some applications fork() but do not
+exec(), eg, for worker processes, which won't be included in the execsnoop
+output.
+
+This works by tracing the kernel sys_execve() function using dynamic tracing,
+and will need updating to match any changes to this function.
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH OPTIONS
+.TP
+\-h
+Print usage message.
+.TP
+\-t
+Include a timestamp column.
+.TP
+\-x
+Include failed exec()s
+.TP
+\-n NAME
+Only print command lines matching this name (regex), matched anywhere
+.SH EXAMPLES
+.TP
+Trace all exec() syscalls:
+#
+.B execsnoop
+.TP
+Trace all exec() syscalls, and include timestamps:
+#
+.B execsnoop \-t
+.TP
+Include failed exec()s:
+#
+.B execsnoop \-x
+.TP
+Only trace exec()s where the filename or arguments contain "mount":
+#
+.B opensnoop \-n mount
+.SH FIELDS
+.TP
+TIME(s)
+Time of exec() return, in seconds.
+.TP
+PCOMM
+Parent process/command name.
+.TP
+PID
+Process ID
+.TP
+RET
+Return value of exec(). 0 == successs. Failures are only shown when using the
+\-x option.
+.TP
+ARGS
+Filename for the exec(), followed be up to 19 arguments. An ellipsis "..." is
+shown if the argument list is known to be truncated.
+.SH OVERHEAD
+This traces the kernel execve function and prints output for each event. As the
+rate of this is generally expected to be low (< 1000/s), the overhead is also
+expected to be negligible. If you have an application that is calling a high
+rate of exec()s, then test and understand overhead before use.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Brendan Gregg
+.SH SEE ALSO
+opensnoop(1)

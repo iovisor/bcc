@@ -19,8 +19,6 @@
 #include <vector>
 #include <unistd.h>
 
-#define KERNEL_MODULES_DIR "/lib/modules"
-
 namespace ebpf {
 
 struct FileDeleter {
@@ -33,13 +31,13 @@ typedef std::unique_ptr<FILE, FileDeleter> FILEPtr;
 // Helper with pushd/popd semantics
 class DirStack {
  public:
-  explicit DirStack(const char *dst) : ok_(false) {
+  explicit DirStack(const std::string &dst) : ok_(false) {
     if (getcwd(cwd_, sizeof(cwd_)) == NULL) {
       ::perror("getcwd");
       return;
     }
-    if (::chdir(dst)) {
-      fprintf(stderr, "chdir(%s): %s\n", dst, strerror(errno));
+    if (::chdir(dst.c_str())) {
+      fprintf(stderr, "chdir(%s): %s\n", dst.c_str(), strerror(errno));
       return;
     }
     ok_ = true;
@@ -93,13 +91,12 @@ class TmpDir {
 //  Note: Depending on environment, different cache locations may be desired. In
 //  case we eventually support non-root user programs, cache in $HOME.
 class KBuildHelper {
- private:
-  int learn_flags(const std::string &tmpdir, const char *uname_release, const char *cachefile);
  public:
-  KBuildHelper();
-  int get_flags(const char *uname_release, std::vector<std::string> *cflags);
+  explicit KBuildHelper(const std::string &kdir, bool has_source_dir);
+  int get_flags(const char *uname_machine, std::vector<std::string> *cflags);
  private:
-  std::string cache_dir_;
+  std::string kdir_;
+  bool has_source_dir_;
 };
 
 }  // namespace ebpf

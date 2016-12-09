@@ -1,0 +1,25 @@
+Demonstrations of bitehist.py, the Linux eBPF/bcc version.
+
+This prints a power-of-2 histogram to show the block I/O size distribution.
+A summary is printed after Ctrl-C is hit.
+
+# ./bitehist.py
+Tracing... Hit Ctrl-C to end.
+^C
+     kbytes          : count     distribution
+       0 -> 1        : 3        |                                      |
+       2 -> 3        : 0        |                                      |
+       4 -> 7        : 211      |**********                            |
+       8 -> 15       : 0        |                                      |
+      16 -> 31       : 0        |                                      |
+      32 -> 63       : 0        |                                      |
+      64 -> 127      : 1        |                                      |
+     128 -> 255      : 800      |**************************************|
+
+This output shows a bimodal distribution. The largest mod of 800 I/O were
+between 128 and 255 Kbytes in size, and another mode of 211 I/O were between
+4 and 7 Kbytes in size.
+
+Understanding this distribution is useful for characterizing workloads and
+understanding performance. The existence of this distribution is not visible
+from averages alone.

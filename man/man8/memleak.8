@@ -1,0 +1,115 @@
+.TH memleak 8  "2016-01-14" "USER COMMANDS"
+.SH NAME
+memleak \- Print a summary of outstanding allocations and their call stacks to detect memory leaks. Uses Linux eBPF/bcc.
+.SH SYNOPSIS
+.B memleak [-h] [-p PID] [-t] [-a] [-o OLDER] [-c COMMAND] [-s SAMPLE_RATE]
+[-T TOP] [-z MIN_SIZE] [-Z MAX_SIZE] [INTERVAL] [COUNT]
+.SH DESCRIPTION
+memleak traces and matches memory allocation and deallocation requests, and
+collects call stacks for each allocation. memleak can then print a summary
+of which call stacks performed allocations that weren't subsequently freed.
+
+When tracing a specific process, memleak instruments malloc and free from libc.
+When tracing all processes, memleak instruments kmalloc and kfree.
+
+memleak may introduce significant overhead when tracing processes that allocate
+and free many blocks very quickly. See the OVERHEAD section below.
+
+This tool only works on Linux 4.6+. Stack traces are obtained using the new BPF_STACK_TRACE` APIs.
+For kernels older than 4.6, see the version under tools/old.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH OPTIONS
+.TP
+\-h
+Print usage message.
+.TP
+\-p PID
+Trace this process ID only (filtered in-kernel). This traces malloc and free from libc.
+.TP
+\-t
+Print a trace of all allocation and free requests and results.
+.TP
+\-a
+Print a list of allocations that weren't freed (and their sizes) in addition to their call stacks.
+.TP
+\-o OLDER
+Print only allocations older than OLDER milliseconds. Useful to remove false positives.
+The default value is 500 milliseconds.
+.TP
+\-c COMMAND
+Run the specified command and trace its allocations only. This traces malloc and free from libc.
+.TP
+\-s SAMPLE_RATE
+Record roughly every SAMPLE_RATE-th allocation to reduce overhead.
+.TP
+\-t TOP
+Print only the top TOP stacks (sorted by size).
+The default value is 10.
+.TP
+\-z MIN_SIZE
+Capture only allocations that are larger than or equal to MIN_SIZE bytes.
+.TP
+\-Z MAX_SIZE
+Capture only allocations that are smaller than or equal to MAX_SIZE bytes.
+.TP
+INTERVAL
+Print a summary of oustanding allocations and their call stacks every INTERVAL seconds.
+The default interval is 5 seconds.
+.TP
+COUNT
+Print the outstanding allocations summary COUNT times and then exit.
+.SH EXAMPLES
+.TP
+Print outstanding kernel allocation stacks every 3 seconds:
+#
+.B memleak 3
+.TP
+Print user outstanding allocation stacks and allocation details for the process 1005:
+#
+.B memleak -p 1005 -a
+.TP
+Sample roughly every 5th allocation (~20%) of the call stacks and print the top 5
+stacks 10 times before quitting.
+#
+.B memleak -s 5 --top=5 10
+.TP
+Run ./allocs and print outstanding allocation stacks for that process: 
+#
+.B memleak -c "./allocs"
+.TP
+Capture only allocations between 16 and 32 bytes in size:
+#
+.B memleak -z 16 -Z 32
+.SH OVERHEAD
+memleak can have significant overhead if the target process or kernel performs
+allocations at a very high rate. Pathological cases may exhibit up to 100x
+degradation in running time. Most of the time, however, memleak shouldn't cause
+a significant slowdown. You can use the \-s switch to reduce the overhead
+further by capturing only every N-th allocation. The \-z and \-Z switches can
+also reduce overhead by capturing only allocations of specific sizes.
+
+To determine the rate at which your application is calling malloc/free, or the
+rate at which your kernel is calling kmalloc/kfree, place a probe with perf and
+collect statistics. For example, to determine how many calls to __kmalloc are
+placed in a typical period of 10 seconds:
+
+#
+.B perf probe '__kmalloc'
+
+#
+.B perf stat -a -e 'probe:__kmalloc' -- sleep 10
+
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Sasha Goldshtein

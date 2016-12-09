@@ -16,6 +16,7 @@
 
 #include <map>
 #include <memory>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -24,6 +25,8 @@
 #include <clang/Rewrite/Core/Rewriter.h>
 
 #include "table_desc.h"
+
+#define DEBUG_PREPROCESSOR 0x4
 
 namespace clang {
 class ASTConsumer;
@@ -48,6 +51,7 @@ class BMapDeclVisitor : public clang::RecursiveASTVisitor<BMapDeclVisitor> {
   bool VisitBuiltinType(const clang::BuiltinType *T);
   bool VisitTypedefType(const clang::TypedefType *T);
   bool VisitTagType(const clang::TagType *T);
+  bool VisitPointerType(const clang::PointerType *T);
  private:
   clang::ASTContext &C;
   std::string &result_;
@@ -62,20 +66,45 @@ class BTypeVisitor : public clang::RecursiveASTVisitor<BTypeVisitor> {
   explicit BTypeVisitor(clang::ASTContext &C, clang::Rewriter &rewriter,
                         std::vector<TableDesc> &tables);
   bool TraverseCallExpr(clang::CallExpr *Call);
-  bool TraverseMemberExpr(clang::MemberExpr *E);
   bool VisitFunctionDecl(clang::FunctionDecl *D);
   bool VisitCallExpr(clang::CallExpr *Call);
   bool VisitVarDecl(clang::VarDecl *Decl);
-  bool VisitMemberExpr(clang::MemberExpr *E);
   bool VisitBinaryOperator(clang::BinaryOperator *E);
   bool VisitImplicitCastExpr(clang::ImplicitCastExpr *E);
 
  private:
+  template <unsigned N>
+  clang::DiagnosticBuilder error(clang::SourceLocation loc, const char (&fmt)[N]);
+
   clang::ASTContext &C;
+  clang::DiagnosticsEngine &diag_;
   clang::Rewriter &rewriter_;  /// modifications to the source go into this class
   llvm::raw_ostream &out_;  /// for debugging
   std::vector<TableDesc> &tables_;  /// store the open FDs
   std::vector<clang::ParmVarDecl *> fn_args_;
+  std::set<clang::Expr *> visited_;
+  std::string current_fn_;
+};
+
+// Do a depth-first search to rewrite all pointers that need to be probed
+class ProbeVisitor : public clang::RecursiveASTVisitor<ProbeVisitor> {
+ public:
+  explicit ProbeVisitor(clang::ASTContext &C, clang::Rewriter &rewriter);
+  bool VisitVarDecl(clang::VarDecl *Decl);
+  bool VisitCallExpr(clang::CallExpr *Call);
+  bool VisitBinaryOperator(clang::BinaryOperator *E);
+  bool VisitUnaryOperator(clang::UnaryOperator *E);
+  bool VisitMemberExpr(clang::MemberExpr *E);
+  void set_ptreg(clang::Decl *D) { ptregs_.insert(D); }
+ private:
+  template <unsigned N>
+  clang::DiagnosticBuilder error(clang::SourceLocation loc, const char (&fmt)[N]);
+
+  clang::ASTContext &C;
+  clang::Rewriter &rewriter_;
+  std::set<clang::Decl *> fn_visited_;
+  std::set<clang::Expr *> memb_visited_;
+  std::set<clang::Decl *> ptregs_;
 };
 
 // A helper class to the frontend action, walks the decls
@@ -83,9 +112,18 @@ class BTypeConsumer : public clang::ASTConsumer {
  public:
   explicit BTypeConsumer(clang::ASTContext &C, clang::Rewriter &rewriter,
                          std::vector<TableDesc> &tables);
-  bool HandleTopLevelDecl(clang::DeclGroupRef D) override;
+  bool HandleTopLevelDecl(clang::DeclGroupRef Group) override;
  private:
   BTypeVisitor visitor_;
+};
+
+// A helper class to the frontend action, walks the decls
+class ProbeConsumer : public clang::ASTConsumer {
+ public:
+  ProbeConsumer(clang::ASTContext &C, clang::Rewriter &rewriter);
+  bool HandleTopLevelDecl(clang::DeclGroupRef Group) override;
+ private:
+  ProbeVisitor visitor_;
 };
 
 // Create a B program in 2 phases (everything else is normal C frontend):

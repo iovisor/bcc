@@ -1,0 +1,92 @@
+.TH tcpconnect 8  "2015-08-25" "USER COMMANDS"
+.SH NAME
+tcpconnect \- Trace TCP active connections (connect()). Uses Linux eBPF/bcc.
+.SH SYNOPSIS
+.B tcpconnect [\-h] [\-t] [\-x] [\-p PID] [-P PORT]
+.SH DESCRIPTION
+This tool traces active TCP connections (eg, via a connect() syscall;
+accept() are passive connections). This can be useful for general
+troubleshooting to see what connections are initiated by the local server.
+
+All connection attempts are traced, even if they ultimately fail.
+
+This works by tracing the kernel tcp_v4_connect() and tcp_v6_connect() functions
+using dynamic tracing, and will need updating to match any changes to these
+functions.
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH OPTIONS
+.TP
+\-h
+Print usage message.
+.TP
+\-t
+Include a timestamp column.
+.TP
+\-p PID
+Trace this process ID only (filtered in-kernel).
+.TP
+\-P PORT
+Comma-separated list of destination ports to trace (filtered in-kernel).
+.SH EXAMPLES
+.TP
+Trace all active TCP connections:
+#
+.B tcpconnect
+.TP
+Trace all TCP connects, and include timestamps:
+#
+.B tcpconnect \-t
+.TP
+Trace PID 181 only:
+#
+.B tcpconnect \-p 181
+.TP
+Trace ports 80 and 81 only:
+#
+.B tcpconnect \-P 80,81
+.SH FIELDS
+.TP
+TIME(s)
+Time of the call, in seconds.
+.TP
+PID
+Process ID
+.TP
+COMM
+Process name
+.TP
+IP
+IP address family (4 or 6)
+.TP
+SADDR
+Source IP address.
+.TP
+DADDR
+Destination IP address.
+.TP
+DPORT
+Destination port
+.SH OVERHEAD
+This traces the kernel tcp_v[46]_connect functions and prints output for each
+event. As the rate of this is generally expected to be low (< 1000/s), the
+overhead is also expected to be negligible. If you have an application that
+is calling a high rate of connects()s, such as a proxy server, then test and
+understand this overhead before use.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Brendan Gregg
+.SH SEE ALSO
+tcpaccept(8), funccount(8), tcpdump(8)

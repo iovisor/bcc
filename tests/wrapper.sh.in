@@ -39,6 +39,10 @@ function sudo_run() {
   sudo bash -c "PYTHONPATH=$PYTHONPATH LD_LIBRARY_PATH=$LD_LIBRARY_PATH $cmd $1 $2"
   return $?
 }
+function simple_run() {
+  PYTHONPATH=$PYTHONPATH LD_LIBRARY_PATH=$LD_LIBRARY_PATH $cmd $1 $2
+  return $?
+}
 
 case $kind in
   namespace)
@@ -46,6 +50,9 @@ case $kind in
     ;;
   sudo)
     sudo_run $@
+    ;;
+  simple)
+    simple_run $@
     ;;
   *)
     echo "Invalid kind $kind"

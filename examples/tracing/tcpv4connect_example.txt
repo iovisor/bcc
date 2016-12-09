@@ -1,0 +1,23 @@
+Demonstrations of tcpv4connect.py, the Linux eBPF/bcc version.
+
+
+This example traces the kernel function performing active TCP IPv4 connections
+(eg, via a connect() syscall; accept() are passive connections). Some example
+output (IP addresses changed to protect the innocent):
+
+# ./tcpv4connect.py
+PID    COMM         SADDR            DADDR            DPORT
+1479   telnet       127.0.0.1        127.0.0.1        23  
+1469   curl         10.201.219.236   54.245.105.25    80  
+1469   curl         10.201.219.236   54.67.101.145    80  
+
+This output shows three connections, one from a "telnet" process and two from
+"curl". The output details shows the source address, destination address,
+and destination port. This traces attempted connections: these may have failed.
+
+The overhead of this tool should be negligible, since it is only tracing the
+kernel function performing a connect. It is not tracing every packet and then
+filtering.
+
+This is provided as a basic example of TCP tracing. See tools/tcpconnect for a
+more featured version of this example (a tool).

@@ -1,0 +1,78 @@
+.TH stacksnoop 8  "2016-01-14" "USER COMMANDS"
+.SH NAME
+stacksnoop \- Print kernel stack traces for kernel functions. Uses Linux eBPF/bcc.
+.SH SYNOPSIS
+.B stacksnoop [\-h] [\-p PID] [\-s] [\-v] function
+.SH DESCRIPTION
+stacksnoop traces a given kernel function and for each call, prints the
+kernel stack back trace for that call. This shows the ancestry of function
+calls, and is a quick way to investigate low frequency kernel functions and
+their cause. For high frequency kernel functions, see stackcount.
+
+This tool only works on Linux 4.6+. Stack traces are obtained using the new BPF_STACK_TRACE` APIs.
+For kernels older than 4.6, see the version under tools/old.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH OPTIONS
+.TP
+\-h
+Print usage message.
+.TP
+\-s
+Show address offsets.
+.TP
+\-v
+Print more fields.
+.TP
+\-p PID
+Trace this process ID only (filtered in-kernel).
+.TP
+function
+Kernel function name.
+.SH EXAMPLES
+.TP
+Print kernel stack traces for each call to ext4_sync_fs:
+#
+.B stacksnoop ext4_sync_fs
+.TP
+Also show the symbol offsets:
+#
+.B stacksnoop -s ext4_sync_fs
+.TP
+Show extra columns:
+#
+.B stacksnoop -v ext4_sync_fs
+.TP
+Only trace when PID 185 is on-CPU:
+#
+.B stacksnoop -p 185 ext4_sync_fs
+.SH FIELDS
+.TP
+TIME(s)
+Time of the call, in seconds.
+.TP
+STACK
+Kernel stack trace. The first column shows "ip" for instruction pointer, and
+"r#" for each return pointer in the stack. The second column is the stack trace
+as hexadecimal. The third column is the translated kernel symbol names.
+.SH OVERHEAD
+This can have significant overhead if frequently called functions (> 1000/s) are
+traced, and is only intended for low frequency function calls. This is because
+details including the stack trace for every call is passed to user space and
+processed. See stackcount for higher frequency calls, which performs in-kernel
+summaries.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Brendan Gregg
+.SH SEE ALSO
+stackcount(8)

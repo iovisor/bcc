@@ -1,0 +1,21 @@
+Demonstrations of bashreadline, the Linux eBPF/bcc version.
+
+
+This prints bash commands from all running bash shells on the system. For
+example:
+
+# ./bashreadline
+TIME      PID    COMMAND
+05:28:25  21176  ls -l
+05:28:28  21176  date
+05:28:35  21176  echo hello world
+05:28:43  21176  foo this command failed
+05:28:45  21176  df -h
+05:29:04  3059   echo another shell
+05:29:13  21176  echo first shell again
+
+The entered command may fail. This is just showing what command lines were
+entered interactively for bash to process.
+
+It works by tracing the return of the readline() function using uprobes
+(specifically a uretprobe).

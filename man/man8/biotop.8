@@ -1,0 +1,108 @@
+.TH biotop 8  "2016-02-06" "USER COMMANDS"
+.SH NAME
+biotop \- Block device (disk) I/O by process top.
+.SH SYNOPSIS
+.B biotop [\-h] [\-C] [\-r MAXROWS] [interval] [count]
+.SH DESCRIPTION
+This is top for disks. 
+
+This traces block device I/O (disk I/O), and prints a per-process summary every
+interval (by default, 1 second). The summary is sorted on the top disk
+consumers by throughput (Kbytes). The PID and process name shown are measured
+from when the I/O was first created, which usually identifies the responsible
+process.
+
+For efficiency, this uses in-kernel eBPF maps to cache process details (PID and
+comm) by I/O request, as well as a starting timestamp for calculating I/O
+latency, and the final summary.
+
+This works by tracing various kernel blk_*() functions using dynamic tracing,
+and will need updating to match any changes to these functions.
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH OPTIONS
+.TP
+\-C
+Don't clear the screen.
+.TP
+\-r MAXROWS
+Maximum number of rows to print. Default is 20.
+.TP
+\-p PID
+Trace this PID only.
+.TP
+interval
+Interval between updates, seconds.
+.TP
+count
+Number of interval summaries.
+.SH EXAMPLES
+.TP
+Summarize block device I/O by process, 1 second screen refresh:
+#
+.B biotop
+.TP
+Don't clear the screen:
+#
+.B biotop -C
+.TP
+5 second summaries, 10 times only:
+#
+.B biotop 5 10
+.SH FIELDS
+.TP
+loadavg:
+The contents of /proc/loadavg
+.TP
+PID
+Cached process ID, if present. This usually (but isn't guaranteed) to identify
+the responsible process for the I/O.
+.TP
+COMM
+Cached process name, if present. This usually (but isn't guaranteed) to identify
+the responsible process for the I/O.
+.TP
+D
+Direction: R == read, W == write. This is a simplification.
+.TP
+MAJ
+Major device number.
+.TP
+MIN
+Minor device number.
+.TP
+DISK
+Disk device name.
+.TP
+I/O
+Number of I/O during the interval.
+.TP
+Kbytes
+Total Kbytes for these I/O, during the interval.
+.TP
+AVGms
+Average time for the I/O (latency) from the issue to the device, to its
+completion, in milliseconds.
+.SH OVERHEAD
+Since block device I/O usually has a relatively low frequency (< 10,000/s),
+the overhead for this tool is expected to be low or negligible. For high IOPS
+storage systems, test and quantify before use.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Brendan Gregg
+.SH INSPIRATION
+top(1) by William LeFebvre
+.SH SEE ALSO
+biosnoop(8), biolatency(8), iostat(1)

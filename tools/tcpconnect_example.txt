@@ -1,0 +1,60 @@
+Demonstrations of tcpconnect, the Linux eBPF/bcc version.
+
+
+This tool traces the kernel function performing active TCP connections
+(eg, via a connect() syscall; accept() are passive connections). Some example
+output (IP addresses changed to protect the innocent):
+
+# ./tcpconnect
+PID    COMM         IP SADDR            DADDR            DPORT
+1479   telnet       4  127.0.0.1        127.0.0.1        23
+1469   curl         4  10.201.219.236   54.245.105.25    80
+1469   curl         4  10.201.219.236   54.67.101.145    80
+1991   telnet       6  ::1              ::1              23
+2015   ssh          6  fe80::2000:bff:fe82:3ac fe80::2000:bff:fe82:3ac 22
+
+This output shows four connections, one from a "telnet" process, two from
+"curl", and one from "ssh". The output details shows the IP version, source
+address, destination address, and destination port. This traces attempted
+connections: these may have failed.
+
+The overhead of this tool should be negligible, since it is only tracing the
+kernel functions performing connect. It is not tracing every packet and then
+filtering.
+
+
+The -t option prints a timestamp column:
+
+# ./tcpconnect -t
+TIME(s)  PID    COMM         IP SADDR            DADDR            DPORT
+31.871   2482   local_agent  4  10.103.219.236   10.251.148.38    7001
+31.874   2482   local_agent  4  10.103.219.236   10.101.3.132     7001
+31.878   2482   local_agent  4  10.103.219.236   10.171.133.98    7101
+90.917   2482   local_agent  4  10.103.219.236   10.251.148.38    7001
+90.928   2482   local_agent  4  10.103.219.236   10.102.64.230    7001
+90.938   2482   local_agent  4  10.103.219.236   10.115.167.169   7101
+
+The output shows some periodic connections (or attempts) from a "local_agent"
+process to various other addresses. A few connections occur every minute.
+
+
+USAGE message:
+
+# ./tcpconnect -h
+usage: tcpconnect [-h] [-t] [-p PID] [-P PORT]
+
+Trace TCP connects
+
+optional arguments:
+  -h, --help         show this help message and exit
+  -t, --timestamp    include timestamp on output
+  -p PID, --pid PID  trace this PID only
+  -P PORT, --port PORT
+                     comma-separated list of destination ports to trace.
+
+examples:
+    ./tcpconnect           # trace all TCP connect()s
+    ./tcpconnect -t        # include timestamps
+    ./tcpconnect -p 181    # only trace PID 181
+    ./tcpconnect -P 80     # only trace port 80
+    ./tcpconnect -P 80,81  # only trace port 80 and 81

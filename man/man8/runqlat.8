@@ -1,0 +1,105 @@
+.TH runqlat 8  "2016-02-07" "USER COMMANDS"
+.SH NAME
+runqlat \- Run queue (scheduler) latency as a histogram.
+.SH SYNOPSIS
+.B runqlat [\-h] [\-T] [\-m] [\-P] [\-p PID] [interval] [count]
+.SH DESCRIPTION
+This measures the time a task spends waiting on a run queue (or equivalent
+scheduler data structure) for a turn on-CPU, and shows this time as a
+histogram. This time should be small, but a task may need to wait its turn due
+to CPU load. The higher the CPU load, the longer a task will generally need to
+wait its turn.
+
+This tool measures two types of run queue latency:
+
+1. The time from a task being enqueued on a run queue to its context switch
+and execution. This traces enqueue_task_*() -> finish_task_switch(),
+and instruments the run queue latency after a voluntary context switch.
+
+2. The time from when a task was involuntary context switched and still
+in the runnable state, to when it next executed. This is instrumented
+from finish_task_switch() alone.
+
+This tool uses in-kernel eBPF maps for storing timestamps and the histogram,
+for efficiency. Despite this, the overhead of this tool may become significant
+for some workloads: see the OVERHEAD section.
+
+This works by tracing various kernel scheduler functions using dynamic tracing,
+and will need updating to match any changes to these functions.
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH OPTIONS
+.TP
+\-h
+Print usage message.
+.TP
+\-T
+Include timestamps on output.
+.TP
+\-m
+Output histogram in milliseconds.
+.TP
+\-P
+Print a histogram for each PID.
+.TP
+\-p PID
+Only show this PID (filtered in kernel for efficiency).
+.TP
+interval
+Output interval, in seconds.
+.TP
+count
+Number of outputs.
+.SH EXAMPLES
+.TP
+Summarize run queue latency as a histogram:
+#
+.B runqlat
+.TP
+Print 1 second summaries, 10 times:
+#
+.B runqlat 1 10
+.TP
+Print 1 second summaries, using milliseconds as units for the histogram, and include timestamps on output:
+#
+.B runqlat \-mT 1
+.TP
+Trace PID 186 only, 1 second summaries:
+#
+.B runqlat -P 185 1
+.SH FIELDS
+.TP
+usecs
+Microsecond range
+.TP
+msecs
+Millisecond range
+.TP
+count
+How many times a task event fell into this range
+.TP
+distribution
+An ASCII bar chart to visualize the distribution (count column)
+.SH OVERHEAD
+This traces scheduler functions, which can become very frequent. While eBPF
+has very low overhead, and this tool uses in-kernel maps for efficiency, the
+frequency of scheduler events for some workloads may be high enough that the
+overhead of this tool becomes significant. Measure in a lab environment
+to quantify the overhead before use.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Brendan Gregg
+.SH SEE ALSO
+pidstat(1)

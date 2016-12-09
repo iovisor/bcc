@@ -42,13 +42,16 @@
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Transforms/IPO.h>
 #include <llvm/Transforms/IPO/PassManagerBuilder.h>
+#include <llvm-c/Transforms/IPO.h>
 
-#include "exception.h"
+#include "bcc_exception.h"
 #include "frontends/b/loader.h"
 #include "frontends/clang/loader.h"
 #include "frontends/clang/b_frontend_action.h"
 #include "bpf_module.h"
+#include "exported_files.h"
 #include "kbuild_helper.h"
+#include "shared_table.h"
 #include "libbpf.h"
 
 namespace ebpf {
@@ -113,6 +116,14 @@ BPFModule::~BPFModule() {
   engine_.reset();
   rw_engine_.reset();
   ctx_.reset();
+  if (tables_) {
+    for (auto table : *tables_) {
+      if (table.is_shared)
+        SharedTables::instance()->remove_fd(table.name);
+      else
+        close(table.fd);
+    }
+  }
 }
 
 static void debug_printf(Module *mod, IRBuilder<> &B, const string &fmt, vector<Value *> args) {
@@ -141,6 +152,19 @@ static void parse_type(IRBuilder<> &B, vector<Value *> *args, string *fmt,
       *fmt += " ";
     }
     *fmt += "}";
+  } else if (ArrayType *at = dyn_cast<ArrayType>(type)) {
+    *fmt += "[ ";
+    for (size_t i = 0; i < at->getNumElements(); ++i) {
+      parse_type(B, args, fmt, at->getElementType(), B.CreateStructGEP(type, out, i), is_writer);
+      *fmt += " ";
+    }
+    *fmt += "]";
+  } else if (isa<PointerType>(type)) {
+    *fmt += "0xl";
+    if (is_writer)
+      *fmt += "x";
+    else
+      *fmt += "i";
   } else if (IntegerType *it = dyn_cast<IntegerType>(type)) {
     if (is_writer)
       *fmt += "0x";
@@ -178,9 +202,11 @@ Function * BPFModule::make_reader(Module *mod, Type *type) {
   Function *fn = Function::Create(fn_type, GlobalValue::ExternalLinkage,
                                   "reader" + std::to_string(readers_.size()), mod);
   auto arg_it = fn->arg_begin();
-  Argument *arg_in = arg_it++;
+  Argument *arg_in = &*arg_it;
+  ++arg_it;
   arg_in->setName("in");
-  Argument *arg_out = arg_it++;
+  Argument *arg_out = &*arg_it;
+  ++arg_it;
   arg_out->setName("out");
 
   BasicBlock *label_entry = BasicBlock::Create(*ctx_, "entry", fn);
@@ -240,11 +266,14 @@ Function * BPFModule::make_writer(Module *mod, Type *type) {
   Function *fn = Function::Create(fn_type, GlobalValue::ExternalLinkage,
                                   "writer" + std::to_string(writers_.size()), mod);
   auto arg_it = fn->arg_begin();
-  Argument *arg_out = arg_it++;
+  Argument *arg_out = &*arg_it;
+  ++arg_it;
   arg_out->setName("out");
-  Argument *arg_len = arg_it++;
+  Argument *arg_len = &*arg_it;
+  ++arg_it;
   arg_len->setName("len");
-  Argument *arg_in = arg_it++;
+  Argument *arg_in = &*arg_it;
+  ++arg_it;
   arg_in->setName("in");
 
   BasicBlock *label_entry = BasicBlock::Create(*ctx_, "entry", fn);
@@ -294,9 +323,9 @@ unique_ptr<ExecutionEngine> BPFModule::finalize_rw(unique_ptr<Module> m) {
 }
 
 // load an entire c file as a module
-int BPFModule::load_cfile(const string &file, bool in_memory) {
+int BPFModule::load_cfile(const string &file, bool in_memory, const char *cflags[], int ncflags) {
   clang_loader_ = make_unique<ClangLoader>(&*ctx_, flags_);
-  if (clang_loader_->parse(&mod_, &tables_, file, in_memory))
+  if (clang_loader_->parse(&mod_, &tables_, file, in_memory, cflags, ncflags))
     return -1;
   return 0;
 }
@@ -306,9 +335,9 @@ int BPFModule::load_cfile(const string &file, bool in_memory) {
 
 // Load in a pre-built list of functions into the initial Module object, then
 // build an ExecutionEngine.
-int BPFModule::load_includes(const string &tmpfile) {
+int BPFModule::load_includes(const string &text) {
   clang_loader_ = make_unique<ClangLoader>(&*ctx_, flags_);
-  if (clang_loader_->parse(&mod_, &tables_, tmpfile, false))
+  if (clang_loader_->parse(&mod_, &tables_, text, true, nullptr, 0))
     return -1;
   return 0;
 }
@@ -370,7 +399,14 @@ int BPFModule::run_pass_manager(Module &mod) {
   PassManagerBuilder PMB;
   PMB.OptLevel = 3;
   PM.add(createFunctionInliningPass());
-  PM.add(createAlwaysInlinerPass());
+  /*
+   * llvm < 4.0 needs
+   * PM.add(createAlwaysInlinerPass());
+   * llvm >= 4.0 needs
+   * PM.add(createAlwaysInlinerLegacyPass());
+   * use below 'stable' workaround
+   */
+  LLVMAddAlwaysInlinerPass(reinterpret_cast<LLVMPassManagerRef>(&PM));
   PMB.populateModulePassManager(PM);
   if (flags_ & 1)
     PM.add(createPrintModulePass(outs()));
@@ -495,6 +531,15 @@ int BPFModule::table_type(const string &name) const {
 int BPFModule::table_type(size_t id) const {
   if (id >= tables_->size()) return -1;
   return (*tables_)[id].type;
+}
+
+size_t BPFModule::table_max_entries(const string &name) const {
+  return table_max_entries(table_id(name));
+}
+
+size_t BPFModule::table_max_entries(size_t id) const {
+  if (id >= tables_->size()) return 0;
+  return (*tables_)[id].max_entries;
 }
 
 const char * BPFModule::table_name(size_t id) const {
@@ -649,7 +694,12 @@ int BPFModule::load_b(const string &filename, const string &proto_filename) {
 
   // Helpers are inlined in the following file (C). Load the definitions and
   // pass the partially compiled module to the B frontend to continue with.
-  if (int rc = load_includes(BCC_INSTALL_PREFIX "/share/bcc/include/bcc/helpers.h"))
+  auto helpers_h = ExportedFiles::headers().find("/virtual/include/bcc/helpers.h");
+  if (helpers_h == ExportedFiles::headers().end()) {
+    fprintf(stderr, "Internal error: missing bcc/helpers.h");
+    return -1;
+  }
+  if (int rc = load_includes(helpers_h->second))
     return rc;
 
   b_loader_.reset(new BLoader(flags_));
@@ -663,7 +713,7 @@ int BPFModule::load_b(const string &filename, const string &proto_filename) {
 }
 
 // load a C file
-int BPFModule::load_c(const string &filename) {
+int BPFModule::load_c(const string &filename, const char *cflags[], int ncflags) {
   if (!sections_.empty()) {
     fprintf(stderr, "Program already initialized\n");
     return -1;
@@ -672,7 +722,7 @@ int BPFModule::load_c(const string &filename) {
     fprintf(stderr, "Invalid filename\n");
     return -1;
   }
-  if (int rc = load_cfile(filename, false))
+  if (int rc = load_cfile(filename, false, cflags, ncflags))
     return rc;
   if (int rc = annotate())
     return rc;
@@ -682,12 +732,12 @@ int BPFModule::load_c(const string &filename) {
 }
 
 // load a C text string
-int BPFModule::load_string(const string &text) {
+int BPFModule::load_string(const string &text, const char *cflags[], int ncflags) {
   if (!sections_.empty()) {
     fprintf(stderr, "Program already initialized\n");
     return -1;
   }
-  if (int rc = load_cfile(text, true))
+  if (int rc = load_cfile(text, true, cflags, ncflags))
     return rc;
   if (int rc = annotate())
     return rc;

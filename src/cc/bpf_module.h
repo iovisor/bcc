@@ -47,16 +47,16 @@ class BPFModule {
   llvm::Function * make_writer(llvm::Module *mod, llvm::Type *type);
   void dump_ir(llvm::Module &mod);
   int load_file_module(std::unique_ptr<llvm::Module> *mod, const std::string &file, bool in_memory);
-  int load_includes(const std::string &tmpfile);
-  int load_cfile(const std::string &file, bool in_memory);
+  int load_includes(const std::string &text);
+  int load_cfile(const std::string &file, bool in_memory, const char *cflags[], int ncflags);
   int kbuild_flags(const char *uname_release, std::vector<std::string> *cflags);
   int run_pass_manager(llvm::Module &mod);
  public:
   BPFModule(unsigned flags);
   ~BPFModule();
   int load_b(const std::string &filename, const std::string &proto_filename);
-  int load_c(const std::string &filename);
-  int load_string(const std::string &text);
+  int load_c(const std::string &filename, const char *cflags[], int ncflags);
+  int load_string(const std::string &text, const char *cflags[], int ncflags);
   size_t num_functions() const;
   uint8_t * function_start(size_t id) const;
   uint8_t * function_start(const std::string &name) const;
@@ -70,6 +70,8 @@ class BPFModule {
   const char * table_name(size_t id) const;
   int table_type(const std::string &name) const;
   int table_type(size_t id) const;
+  size_t table_max_entries(const std::string &name) const;
+  size_t table_max_entries(size_t id) const;
   const char * table_key_desc(size_t id) const;
   const char * table_key_desc(const std::string &name) const;
   size_t table_key_size(size_t id) const;

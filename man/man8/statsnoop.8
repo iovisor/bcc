@@ -1,0 +1,90 @@
+.TH statsnoop 8  "2016-02-08" "USER COMMANDS"
+.SH NAME
+statsnoop \- Trace stat() syscalls. Uses Linux eBPF/bcc.
+.SH SYNOPSIS
+.B statsnoop [\-h] [\-t] [\-x] [\-p PID]
+.SH DESCRIPTION
+statsnoop traces the different stat() syscalls, showing which processes are
+attempting to read information about which files. This can be useful for
+determining the location of config and log files, or for troubleshooting
+applications that are failing, especially on startup.
+
+This works by tracing various kernel sys_stat() functions using dynamic
+tracing, and will need updating to match any changes to these functions.
+
+This makes use of a Linux 4.5 feature (bpf_perf_event_output());
+for kernels older than 4.5, see the version under tools/old,
+which uses an older mechanism.
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH OPTIONS
+.TP
+\-h
+Print usage message.
+.TP
+\-t
+Include a timestamp column.
+.TP
+\-x
+Only print failed stats.
+.TP
+\-p PID
+Trace this process ID only (filtered in-kernel).
+.SH EXAMPLES
+.TP
+Trace all stat() syscalls:
+#
+.B statsnoop
+.TP
+Trace all stat() syscalls, and include timestamps:
+#
+.B statsnoop \-t
+.TP
+Trace only stat() syscalls that failed:
+#
+.B statsnoop \-x
+.TP
+Trace PID 181 only:
+#
+.B statsnoop \-p 181
+.SH FIELDS
+.TP
+TIME(s)
+Time of the call, in seconds.
+.TP
+PID
+Process ID
+.TP
+COMM
+Process name
+.TP
+FD
+File descriptor (if success), or -1 (if failed)
+.TP
+ERR
+Error number (see the system's errno.h)
+.TP
+PATH
+Open path
+.SH OVERHEAD
+This traces the kernel stat function and prints output for each event. As the
+rate of this is generally expected to be low (< 1000/s), the overhead is also
+expected to be negligible. If you have an application that is calling a high
+rate of stat()s, then test and understand overhead before use.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Brendan Gregg
+.SH SEE ALSO
+opensnoop(1)

@@ -1,0 +1,96 @@
+.TH biolatency 8  "2015-08-20" "USER COMMANDS"
+.SH NAME
+biolatency \- Summarize block device I/O latency as a histogram.
+.SH SYNOPSIS
+.B biolatency [\-h] [\-T] [\-Q] [\-m] [\-D] [interval [count]]
+.SH DESCRIPTION
+biolatency traces block device I/O (disk I/O), and records the distribution
+of I/O latency (time). This is printed as a histogram either on Ctrl-C, or
+after a given interval in seconds.
+
+The latency of the disk I/O is measured from the issue to the device to its
+completion. A \-Q option can be used to include time queued in the kernel.
+
+This tool uses in-kernel eBPF maps for storing timestamps and the histogram,
+for efficiency.
+
+This works by tracing various kernel blk_*() functions using dynamic tracing,
+and will need updating to match any changes to these functions.
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH OPTIONS
+\-h
+Print usage message.
+.TP
+\-T
+Include timestamps on output.
+.TP
+\-m
+Output histogram in milliseconds.
+.TP
+\-D
+Print a histogram per disk device.
+.TP
+interval
+Output interval, in seconds.
+.TP
+count
+Number of outputs.
+.SH EXAMPLES
+.TP
+Summarize block device I/O latency as a histogram:
+#
+.B biolatency
+.TP
+Print 1 second summaries, 10 times:
+#
+.B biolatency 1 10
+.TP
+Print 1 second summaries, using milliseconds as units for the histogram, and
+include timestamps on output:
+#
+.B biolatency \-mT 1
+.TP
+Include OS queued time in I/O time:
+#
+.B biolatency \-Q
+.TP
+Show a latency histogram for each disk device separately:
+#
+.B biolatency \-D
+.SH FIELDS
+.TP
+usecs
+Microsecond range
+.TP
+msecs
+Millisecond range
+.TP
+count
+How many I/O fell into this range
+.TP
+distribution
+An ASCII bar chart to visualize the distribution (count column)
+.SH OVERHEAD
+This traces kernel functions and maintains in-kernel timestamps and a histogram,
+which are asynchronously copied to user-space. This method is very efficient,
+and the overhead for most storage I/O rates (< 10k IOPS) should be negligible.
+If you have a higher IOPS storage environment, test and quantify the overhead
+before use.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Brendan Gregg
+.SH SEE ALSO
+biosnoop(8)

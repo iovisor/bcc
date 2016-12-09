@@ -1,0 +1,81 @@
+Demonstrations of execsnoop, the Linux eBPF/bcc version.
+
+
+execsnoop traces new processes. For example, tracing the commands invoked when
+running "man ls":
+
+# ./execsnoop
+PCOMM            PID    RET ARGS
+bash             15887    0 /usr/bin/man ls
+preconv          15894    0 /usr/bin/preconv -e UTF-8
+man              15896    0 /usr/bin/tbl
+man              15897    0 /usr/bin/nroff -mandoc -rLL=169n -rLT=169n -Tutf8
+man              15898    0 /usr/bin/pager -s
+nroff            15900    0 /usr/bin/locale charmap
+nroff            15901    0 /usr/bin/groff -mtty-char -Tutf8 -mandoc -rLL=169n -rLT=169n
+groff            15902    0 /usr/bin/troff -mtty-char -mandoc -rLL=169n -rLT=169n -Tutf8
+groff            15903    0 /usr/bin/grotty
+
+The output shows the parent process/command name (PCOMM), the PID, the return
+value of the exec() (RET), and the filename with arguments (ARGS). 
+
+This works by traces the execve() system call (commonly used exec() variant),
+and shows details of the arguments and return value. This catches new processes
+that follow the fork->exec sequence, as well as processes that re-exec()
+themselves. Some applications fork() but do not exec(), eg, for worker
+processes, which won't be included in the execsnoop output.
+
+
+The -x option can be used to include failed exec()s. For example:
+
+# ./execsnoop -x
+PCOMM            PID    RET ARGS
+supervise        9660     0 ./run
+supervise        9661     0 ./run
+mkdir            9662     0 /bin/mkdir -p ./main
+run              9663     0 ./run
+chown            9664     0 /bin/chown nobody:nobody ./main
+run              9665     0 /bin/mkdir -p ./main
+supervise        9667     0 ./run
+run              9660    -2 /usr/local/bin/setuidgid nobody /command/multilog t ./main
+chown            9668     0 /bin/chown nobody:nobody ./main
+run              9666     0 /bin/chmod 0777 main
+run              9663    -2 /usr/local/bin/setuidgid nobody /command/multilog t ./main
+run              9669     0 /bin/mkdir -p ./main
+run              9661    -2 /usr/local/bin/setuidgid nobody /command/multilog t ./main
+supervise        9670     0 ./run
+[...]
+
+This example shows various regular system daemon activity, including some
+failures (trying to execute a /usr/local/bin/setuidgid, which I just noticed
+doesn't exist).
+
+
+A -t option can be used to include a timestamp column, and a -n option to match
+on a name or substring from the full command line (filename + args). Regular
+expressions are allowed. For example, matching commands containing "mount":
+
+# ./execsnoop -tn mount
+TIME(s) PCOMM            PID    RET ARGS
+2.849   bash             18049    0 /bin/mount -p
+
+
+USAGE message:
+
+# ./execsnoop -h
+usage: execsnoop [-h] [-t] [-x] [-n NAME]
+
+Trace exec() syscalls
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -t, --timestamp       include timestamp on output
+  -x, --fails           include failed exec()s
+  -n NAME, --name NAME  only print commands matching this name (regex), any
+                        arg
+
+examples:
+    ./execsnoop           # trace all exec() syscalls
+    ./execsnoop -x        # include failed exec()s 
+    ./execsnoop -t        # include timestamps
+    ./execsnoop -n main   # only print command lines containing "main"

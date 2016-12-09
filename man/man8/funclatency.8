@@ -1,0 +1,128 @@
+.TH funclatency 8  "2015-08-18" "USER COMMANDS"
+.SH NAME
+funclatency \- Time functions and print latency as a histogram.
+.SH SYNOPSIS
+.B funclatency [\-h] [\-p PID] [\-i INTERVAL] [\-T] [\-u] [\-m] [\-F] [\-r] [\-v] pattern
+.SH DESCRIPTION
+This tool traces function calls and times their duration (latency), and
+shows the latency distribution as a histogram. The time is measured from when
+the function is called to when it returns, and is inclusive of both on-CPU
+time and time spent blocked.
+
+This tool uses in-kernel eBPF maps for storing timestamps and the histogram,
+for efficiency.
+
+Currently nested or recursive functions are not supported properly, and
+timestamps will be overwritten, creating dubious output. Try to match single
+functions, or groups of functions that run at the same stack layer, and
+don't ultimately call each other.
+
+WARNING: This uses dynamic tracing of (what can be many) functions, an
+activity that has had issues on some kernel versions (risk of panics or
+freezes). Test, and know what you are doing, before use.
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH OPTIONS
+pattern
+Function name or search pattern. Supports "*" wildcards. See EXAMPLES.
+You can also use \-r for regular expressions.
+\-h
+Print usage message.
+.TP
+\-p PID
+Trace this process ID only.
+.TP
+\-i INTERVAL
+Print output every interval seconds.
+.TP
+\-T
+Include timestamps on output.
+.TP
+\-u
+Output histogram in microseconds.
+.TP
+\-m
+Output histogram in milliseconds.
+.TP
+\-F
+Print a separate histogram per function matched.
+.TP
+\-r
+Use regular expressions for the search pattern.
+.TP
+\-v
+Print the BPF program (for debugging purposes).
+.SH EXAMPLES
+.TP
+Time the do_sys_open() kernel function, and print the distribution as a histogram:
+#
+.B funclatency do_sys_open
+.TP
+Time the read() function in libc across all processes on the system:
+#
+.B funclatency c:read
+.TP
+Time vfs_read(), and print the histogram in units of microseconds:
+#
+.B funclatency \-u vfs_read
+.TP
+Time do_nanosleep(), and print the histogram in units of milliseconds:
+#
+.B funclatency \-m do_nanosleep
+.TP
+Time vfs_read(), and print output every 5 seconds, with timestamps:
+#
+.B funclatency \-mTi 5 vfs_read
+.TP
+Time vfs_read() for process ID 181 only:
+#
+.B funclatency \-p 181 vfs_read:
+.TP
+Time both vfs_fstat() and vfs_fstatat() calls, by use of a wildcard:
+#
+.B funclatency 'vfs_fstat*'
+.TP
+Time both vfs_fstat* calls, and print a separate histogram for each:
+#
+.B funclatency -F 'vfs_fstat*'
+.SH FIELDS
+.TP
+necs
+Nanosecond range
+.TP
+usecs
+Microsecond range
+.TP
+msecs
+Millisecond range
+.TP
+count
+How many calls fell into this range
+.TP
+distribution
+An ASCII bar chart to visualize the distribution (count column)
+.SH OVERHEAD
+This traces kernel functions and maintains in-kernel timestamps and a histogram,
+which are asynchronously copied to user-space. While this method is very
+efficient, the rate of kernel functions can also be very high (>1M/sec), at
+which point the overhead is expected to be measurable. Measure in a test
+environment and understand overheads before use. You can also use funccount
+to measure the rate of kernel functions over a short duration, to set some
+expectations before use.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Brendan Gregg, Sasha Goldshtein
+.SH SEE ALSO
+funccount(8)

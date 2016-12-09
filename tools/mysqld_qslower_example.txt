@@ -1,0 +1,58 @@
+Demonstrations of mysqld_qslower, the Linux eBPF/bcc version.
+
+
+mysqld_qslower traces queries served by a MySQL server, and prints those that
+exceed a latency (query time) threshold. By default a threshold of 1 ms is
+used. For example:
+
+# ./mysqld_qslower.py `pgrep -n mysqld`
+Tracing MySQL server queries for PID 14371 slower than 1 ms...
+TIME(s)        PID          MS QUERY
+0.000000       18608   130.751 SELECT * FROM words WHERE word REGEXP '^bre.*n$'
+2.921535       18608   130.590 SELECT * FROM words WHERE word REGEXP '^alex.*$'
+4.603549       18608    24.164 SELECT COUNT(*) FROM words
+9.733847       18608   130.936 SELECT count(*) AS count FROM words WHERE word REGEXP '^bre.*n$'
+17.864776      18608   130.298 SELECT * FROM words WHERE word REGEXP '^bre.*n$' ORDER BY word
+
+This traced 5 queries, 4 of which took about 130 milliseconds.
+
+A pgrep command was used to specify the PID of mysqld.
+
+
+In this example, a lower threshold is used of 0.1 ms:
+
+# ./mysqld_qslower.py `pgrep -n mysqld` 0.1
+Tracing MySQL server queries for PID 14371 slower than 0.1 ms...
+TIME(s)        PID          MS QUERY
+0.000000       18608    24.201 SELECT COUNT(*) FROM words
+13.242390      18608   130.378 SELECT * FROM words WHERE word REGEXP '^bre.*n$'
+23.601751      18608   119.198 SELECT * FROM words WHERE word REGEXP '^zzzzzzzz$'
+
+It worked, but I'm not catching any faster queries in this example. Notice I
+added a query that searched for "zzzzzzzz": it returned an empty set, and ran
+11 ms faster.
+
+
+A 0 ms threshold can be specified to trace all queries:
+
+# ./mysqld_qslower.py `pgrep -n mysqld` 0
+Tracing MySQL server queries for PID 14371 slower than 0 ms...
+TIME(s)        PID          MS QUERY
+0.000000       18608     0.105 select @@version_comment limit 1
+2.049312       18608     0.099 SELECT DATABASE()
+2.050666       18608     0.274 show databases
+2.051040       18608     0.176 show tables
+5.730044       18608   130.365 SELECT count(*) AS count FROM words WHERE word REGEXP '^bre.*n$'
+9.273837       18608     0.096 select 1
+9.553742       18608     0.059 select 1
+9.986087       18608     0.080 select 1
+
+This includes an initialization of a mysql client command, and selecting the
+database. I also added some "select 1;" queries, which do no work and return
+quickly.
+
+
+USAGE:
+
+# ./mysqld_qslower.py -h
+USAGE: mysqld_latency PID [min_ms]

@@ -1,0 +1,122 @@
+.TH stackcount 8  "2016-01-14" "USER COMMANDS"
+.SH NAME
+stackcount \- Count function calls and their stack traces. Uses Linux eBPF/bcc.
+.SH SYNOPSIS
+.B stackcount [\-h] [\-p PID] [\-i INTERVAL] [\-T] [\-r] [\-s]
+              [\-P] [\-v] [\-d] pattern
+.SH DESCRIPTION
+stackcount traces functions and frequency counts them with their entire
+stack trace, summarized in-kernel for efficiency. This allows higher
+frequency events to be studied. The output consists of unique stack traces,
+and their occurrence counts. In addition to kernel and user functions, kernel
+tracepoints and USDT tracepoint are also supported.
+
+The pattern is a string with optional '*' wildcards, similar to file globbing.
+If you'd prefer to use regular expressions, use the \-r option.
+
+This tool only works on Linux 4.6+. Stack traces are obtained using the new `BPF_STACK_TRACE` APIs.
+For kernels older than 4.6, see the version under tools/old.
+
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH OPTIONS
+.TP
+\-h
+Print usage message.
+.TP
+\-r
+Allow regular expressions for the search pattern. The default allows "*"
+wildcards only.
+.TP
+\-s
+Show address offsets.
+.TP
+\-T
+Include a timestamp with interval output.
+.TP
+\-v
+Show raw addresses.
+.TP
+\-d
+Print the source of the BPF program when loading it (for debugging purposes).
+.TP
+\-i interval
+Summary interval, in seconds.
+.TP
+\-p PID
+Trace this process ID only (filtered in-kernel).
+.TP
+.TP
+pattern
+A function name, or a search pattern. Can include wildcards ("*"). If the
+\-r option is used, can include regular expressions.
+.SH EXAMPLES
+.TP
+Count kernel stack traces for submit_bio():
+#
+.B stackcount submit_bio
+.TP
+Count kernel stack traces for ip_output():
+#
+.B stackcount ip_output
+.TP
+Show symbol offsets:
+#
+.B stackcount -s ip_output
+.TP
+Show offsets and raw addresses (verbose):
+#
+.B stackcount -sv ip_output
+.TP
+Count kernel stacks for kernel functions matching tcp_send*:
+#
+.B stackcount 'tcp_send*'
+.TP
+Same as previous, but using regular expressions:
+#
+.B stackcount -r '^tcp_send.*'
+.TP
+Output every 5 seconds, with timestamps:
+#
+.B stackcount -Ti 5 ip_output
+.TP
+Only count stacks when PID 185 is on-CPU:
+#
+.B stackcount -p 185 ip_output
+.TP
+Count user stacks for dynamic heap allocations with malloc in PID 185:
+#
+.B stackcount -p 185 c:malloc
+.TP
+Count user stacks for thread creation (USDT tracepoint) in PID 185:
+#
+.B stackcount -p 185 u:pthread:pthread_create
+.TP
+Count kernel stacks for context switch events using a kernel tracepoint:
+#
+.B stackcount t:sched:sched_switch
+.SH OVERHEAD
+This summarizes unique stack traces in-kernel for efficiency, allowing it to
+trace a higher rate of function calls than methods that post-process in user
+space. The stack trace data is only copied to user space when the output is
+printed, which usually only happens once. The stack walking also happens in an
+optimized code path in the kernel thanks to the new BPF_STACK_TRACE table APIs,
+which should be more efficient than the manual walker in the eBPF tracer which
+older versions of this script used. With this in mind, call rates of <
+10,000/sec would incur negligible overhead. Test before production use. You can
+also use funccount to get a handle on function call rates first.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Brendan Gregg, Sasha Goldshtein
+.SH SEE ALSO
+stacksnoop(8), funccount(8)

@@ -1,3 +1,4 @@
+R"********(
 /*
  * Copyright (c) 2015 PLUMgrid, Inc.
  *
@@ -20,6 +21,16 @@
 #include <uapi/linux/if_packet.h>
 #include <linux/version.h>
 
+#ifndef CONFIG_BPF_SYSCALL
+#error "CONFIG_BPF_SYSCALL is undefined, please check your .config or ask your Linux distro to enable this feature"
+#endif
+
+#ifdef PERF_MAX_STACK_DEPTH
+#define BPF_MAX_STACK_DEPTH PERF_MAX_STACK_DEPTH
+#else
+#define BPF_MAX_STACK_DEPTH 127
+#endif
+
 /* helper macro to place programs, maps, license in
  * different sections in elf_bpf file. Section names
  * are interpreted by elf_bpf loader
@@ -36,9 +47,42 @@ struct _name##_table_t { \
   int (*update) (_key_type *, _leaf_type *); \
   int (*delete) (_key_type *); \
   void (*call) (void *, int index); \
+  void (*increment) (_key_type); \
+  int (*get_stackid) (void *, u64); \
   _leaf_type data[_max_entries]; \
 }; \
 __attribute__((section("maps/" _table_type))) \
+struct _name##_table_t _name
+
+// define a table same as above but allow it to be referenced by other modules
+#define BPF_TABLE_PUBLIC(_table_type, _key_type, _leaf_type, _name, _max_entries) \
+BPF_TABLE(_table_type, _key_type, _leaf_type, _name, _max_entries); \
+__attribute__((section("maps/export"))) \
+struct _name##_table_t __##_name
+
+// Table for pushing custom events to userspace via ring buffer
+#define BPF_PERF_OUTPUT(_name) \
+struct _name##_table_t { \
+  int key; \
+  u32 leaf; \
+  /* map.perf_submit(ctx, data, data_size) */ \
+  int (*perf_submit) (void *, void *, u32); \
+  int (*perf_submit_skb) (void *, u32, void *, u32); \
+  u32 data[0]; \
+}; \
+__attribute__((section("maps/perf_output"))) \
+struct _name##_table_t _name
+
+// Table for reading hw perf cpu counters
+#define BPF_PERF_ARRAY(_name, _max_entries) \
+struct _name##_table_t { \
+  int key; \
+  u32 leaf; \
+  /* counter = map.perf_read(index) */ \
+  u64 (*perf_read) (int); \
+  u32 data[_max_entries]; \
+}; \
+__attribute__((section("maps/perf_array"))) \
 struct _name##_table_t _name
 
 #define BPF_HASH1(_name) \
@@ -55,6 +99,26 @@ struct _name##_table_t _name
 #define BPF_HASH(...) \
   BPF_HASHX(__VA_ARGS__, BPF_HASH3, BPF_HASH2, BPF_HASH1)(__VA_ARGS__)
 
+#define BPF_HIST1(_name) \
+  BPF_TABLE("histogram", int, u64, _name, 64)
+#define BPF_HIST2(_name, _key_type) \
+  BPF_TABLE("histogram", _key_type, u64, _name, 64)
+#define BPF_HIST3(_name, _key_type, _size) \
+  BPF_TABLE("histogram", _key_type, u64, _name, _size)
+#define BPF_HISTX(_1, _2, _3, NAME, ...) NAME
+
+// Define a histogram, some arguments optional
+// BPF_HISTOGRAM(name, key_type=int, size=64)
+#define BPF_HISTOGRAM(...) \
+  BPF_HISTX(__VA_ARGS__, BPF_HIST3, BPF_HIST2, BPF_HIST1)(__VA_ARGS__)
+
+struct bpf_stacktrace {
+  u64 ip[BPF_MAX_STACK_DEPTH];
+};
+
+#define BPF_STACK_TRACE(_name, _max_entries) \
+  BPF_TABLE("stacktrace", int, struct bpf_stacktrace, _name, _max_entries);
+
 // packet parsing state machine helpers
 #define cursor_advance(_cursor, _len) \
   ({ void *_tmp = _cursor; _cursor += _len; _tmp; })
@@ -65,76 +129,107 @@ unsigned _version SEC("version") = LINUX_VERSION_CODE;
 
 /* helper functions called from eBPF programs written in C */
 static void *(*bpf_map_lookup_elem)(void *map, void *key) =
-	(void *) BPF_FUNC_map_lookup_elem;
+  (void *) BPF_FUNC_map_lookup_elem;
 static int (*bpf_map_update_elem)(void *map, void *key, void *value, u64 flags) =
-	(void *) BPF_FUNC_map_update_elem;
+  (void *) BPF_FUNC_map_update_elem;
 static int (*bpf_map_delete_elem)(void *map, void *key) =
-	(void *) BPF_FUNC_map_delete_elem;
+  (void *) BPF_FUNC_map_delete_elem;
 static int (*bpf_probe_read)(void *dst, u64 size, void *unsafe_ptr) =
-	(void *) BPF_FUNC_probe_read;
+  (void *) BPF_FUNC_probe_read;
 static u64 (*bpf_ktime_get_ns)(void) =
-	(void *) BPF_FUNC_ktime_get_ns;
+  (void *) BPF_FUNC_ktime_get_ns;
+static u32 (*bpf_get_prandom_u32)(void) =
+  (void *) BPF_FUNC_get_prandom_u32;
 static int (*bpf_trace_printk_)(const char *fmt, u64 fmt_size, ...) =
-	(void *) BPF_FUNC_trace_printk;
+  (void *) BPF_FUNC_trace_printk;
 int bpf_trace_printk(const char *fmt, ...) asm("llvm.bpf.extra");
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,2,0)
 static void bpf_tail_call_(u64 map_fd, void *ctx, int index) {
   ((void (*)(void *, u64, int))BPF_FUNC_tail_call)(ctx, map_fd, index);
 }
-static int (*bpf_clone_redirect)(void *ctx, u64 ifindex, u64 flags) =
-	(void *) BPF_FUNC_clone_redirect;
+static int (*bpf_clone_redirect)(void *ctx, int ifindex, u32 flags) =
+  (void *) BPF_FUNC_clone_redirect;
 static u64 (*bpf_get_smp_processor_id)(void) =
-	(void *) BPF_FUNC_get_smp_processor_id;
+  (void *) BPF_FUNC_get_smp_processor_id;
 static u64 (*bpf_get_current_pid_tgid)(void) =
-	(void *) BPF_FUNC_get_current_pid_tgid;
+  (void *) BPF_FUNC_get_current_pid_tgid;
 static u64 (*bpf_get_current_uid_gid)(void) =
-	(void *) BPF_FUNC_get_current_uid_gid;
+  (void *) BPF_FUNC_get_current_uid_gid;
 static int (*bpf_get_current_comm)(void *buf, int buf_size) =
-	(void *) BPF_FUNC_get_current_comm;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,3,0)
+  (void *) BPF_FUNC_get_current_comm;
 static u64 (*bpf_get_cgroup_classid)(void *ctx) =
-        (void *) BPF_FUNC_get_cgroup_classid;
+  (void *) BPF_FUNC_get_cgroup_classid;
 static u64 (*bpf_skb_vlan_push)(void *ctx, u16 proto, u16 vlan_tci) =
-        (void *) BPF_FUNC_skb_vlan_push;
+  (void *) BPF_FUNC_skb_vlan_push;
 static u64 (*bpf_skb_vlan_pop)(void *ctx) =
-        (void *) BPF_FUNC_skb_vlan_pop;
+  (void *) BPF_FUNC_skb_vlan_pop;
 static int (*bpf_skb_get_tunnel_key)(void *ctx, void *to, u32 size, u64 flags) =
   (void *) BPF_FUNC_skb_get_tunnel_key;
 static int (*bpf_skb_set_tunnel_key)(void *ctx, void *from, u32 size, u64 flags) =
   (void *) BPF_FUNC_skb_set_tunnel_key;
-#endif
-#endif
+static int (*bpf_perf_event_read)(void *map, u32 index) =
+  (void *) BPF_FUNC_perf_event_read;
+static int (*bpf_redirect)(int ifindex, u32 flags) =
+  (void *) BPF_FUNC_redirect;
+static u32 (*bpf_get_route_realm)(void *ctx) =
+  (void *) BPF_FUNC_get_route_realm;
+static int (*bpf_perf_event_output)(void *ctx, void *map, u64 index, void *data, u32 size) =
+  (void *) BPF_FUNC_perf_event_output;
+static int (*bpf_skb_load_bytes)(void *ctx, int offset, void *to, u32 len) =
+  (void *) BPF_FUNC_skb_load_bytes;
+static u64 (*bpf_get_current_task)(void) =
+  (void *) BPF_FUNC_get_current_task;
+
+/* bpf_get_stackid will return a negative value in the case of an error
+ *
+ * BPF_STACK_TRACE(_name, _size) will allocate space for _size stack traces.
+ *  -ENOMEM will be returned when this limit is reached.
+ *
+ * -EFAULT is typically returned when requesting user-space stack straces (using
+ * BPF_F_USER_STACK) for kernel threads. However, a valid stackid may be
+ * returned in some cases; consider a tracepoint or kprobe executing in the
+ * kernel context. Given this you can typically ignore -EFAULT errors when
+ * retrieving user-space stack traces.
+ */
+static int (*bpf_get_stackid_)(void *ctx, void *map, u64 flags) =
+  (void *) BPF_FUNC_get_stackid;
+static inline __attribute__((always_inline))
+int bpf_get_stackid(uintptr_t map, void *ctx, u64 flags) {
+  return bpf_get_stackid_(ctx, (void *)map, flags);
+}
+
+static int (*bpf_csum_diff)(void *from, u64 from_size, void *to, u64 to_size, u64 seed) =
+  (void *) BPF_FUNC_csum_diff;
 
 /* llvm builtin functions that eBPF C program may use to
  * emit BPF_LD_ABS and BPF_LD_IND instructions
  */
 struct sk_buff;
 unsigned long long load_byte(void *skb,
-			     unsigned long long off) asm("llvm.bpf.load.byte");
+  unsigned long long off) asm("llvm.bpf.load.byte");
 unsigned long long load_half(void *skb,
-			     unsigned long long off) asm("llvm.bpf.load.half");
+  unsigned long long off) asm("llvm.bpf.load.half");
 unsigned long long load_word(void *skb,
-			     unsigned long long off) asm("llvm.bpf.load.word");
+  unsigned long long off) asm("llvm.bpf.load.word");
 
 /* a helper structure used by eBPF C program
  * to describe map attributes to elf_bpf loader
  */
 struct bpf_map_def {
-	unsigned int type;
-	unsigned int key_size;
-	unsigned int value_size;
-	unsigned int max_entries;
+  unsigned int type;
+  unsigned int key_size;
+  unsigned int value_size;
+  unsigned int max_entries;
 };
 
 static int (*bpf_skb_store_bytes)(void *ctx, unsigned long long off, void *from,
-				  unsigned long long len, unsigned long long flags) =
-	(void *) BPF_FUNC_skb_store_bytes;
+                                  unsigned long long len, unsigned long long flags) =
+  (void *) BPF_FUNC_skb_store_bytes;
 static int (*bpf_l3_csum_replace)(void *ctx, unsigned long long off, unsigned long long from,
-				  unsigned long long to, unsigned long long flags) =
-	(void *) BPF_FUNC_l3_csum_replace;
+                                  unsigned long long to, unsigned long long flags) =
+  (void *) BPF_FUNC_l3_csum_replace;
 static int (*bpf_l4_csum_replace)(void *ctx, unsigned long long off, unsigned long long from,
-				  unsigned long long to, unsigned long long flags) =
-	(void *) BPF_FUNC_l4_csum_replace;
+                                  unsigned long long to, unsigned long long flags) =
+  (void *) BPF_FUNC_l4_csum_replace;
 
 static inline u16 bpf_ntohs(u16 val) {
   /* will be recognized by gcc into rotate insn and eventually rolw 8 */
@@ -184,6 +279,28 @@ static inline void bpf_store_dword(void *skb, u64 off, u64 val) {
 
 #define MASK(_n) ((_n) < 64 ? (1ull << (_n)) - 1 : ((u64)-1LL))
 #define MASK128(_n) ((_n) < 128 ? ((unsigned __int128)1 << (_n)) - 1 : ((unsigned __int128)-1))
+
+static unsigned int bpf_log2(unsigned int v)
+{
+  unsigned int r;
+  unsigned int shift;
+
+  r = (v > 0xFFFF) << 4; v >>= r;
+  shift = (v > 0xFF) << 3; v >>= shift; r |= shift;
+  shift = (v > 0xF) << 2; v >>= shift; r |= shift;
+  shift = (v > 0x3) << 1; v >>= shift; r |= shift;
+  r |= (v >> 1);
+  return r;
+}
+
+static unsigned int bpf_log2l(unsigned long v)
+{
+  unsigned int hi = v >> 32;
+  if (hi)
+    return bpf_log2(hi) + 32 + 1;
+  else
+    return bpf_log2(v) + 1;
+}
 
 struct bpf_context;
 
@@ -305,7 +422,52 @@ int bpf_l4_csum_replace_(void *ctx, u64 off, u64 from, u64 to, u64 flags) {
 
 int incr_cksum_l3(void *off, u64 oldval, u64 newval) asm("llvm.bpf.extra");
 int incr_cksum_l4(void *off, u64 oldval, u64 newval, u64 flags) asm("llvm.bpf.extra");
+int bpf_num_cpus() asm("llvm.bpf.extra");
+
+struct pt_regs;
+int bpf_usdt_readarg(int argc, struct pt_regs *ctx, void *arg) asm("llvm.bpf.extra");
+int bpf_usdt_readarg_p(int argc, struct pt_regs *ctx, void *buf, u64 len) asm("llvm.bpf.extra");
+
+#ifdef __powerpc__
+#define PT_REGS_PARM1(ctx)	((ctx)->gpr[3])
+#define PT_REGS_PARM2(ctx)	((ctx)->gpr[4])
+#define PT_REGS_PARM3(ctx)	((ctx)->gpr[5])
+#define PT_REGS_PARM4(ctx)	((ctx)->gpr[6])
+#define PT_REGS_PARM5(ctx)	((ctx)->gpr[7])
+#define PT_REGS_PARM6(ctx)	((ctx)->gpr[8])
+#define PT_REGS_RC(ctx)		((ctx)->gpr[3])
+#define PT_REGS_IP(ctx)		((ctx)->nip)
+#define PT_REGS_SP(ctx)		((ctx)->sp)
+#elif defined(__x86_64__)
+#define PT_REGS_PARM1(ctx)	((ctx)->di)
+#define PT_REGS_PARM2(ctx)	((ctx)->si)
+#define PT_REGS_PARM3(ctx)	((ctx)->dx)
+#define PT_REGS_PARM4(ctx)	((ctx)->cx)
+#define PT_REGS_PARM5(ctx)	((ctx)->r8)
+#define PT_REGS_PARM6(ctx)	((ctx)->r9)
+#define PT_REGS_RC(ctx)		((ctx)->ax)
+#define PT_REGS_IP(ctx)		((ctx)->ip)
+#define PT_REGS_SP(ctx)		((ctx)->sp)
+#elif defined(__aarch64__)
+#define PT_REGS_PARM1(x)	((x)->regs[0])
+#define PT_REGS_PARM2(x)	((x)->regs[1])
+#define PT_REGS_PARM3(x)	((x)->regs[2])
+#define PT_REGS_PARM4(x)	((x)->regs[3])
+#define PT_REGS_PARM5(x)	((x)->regs[4])
+#define PT_REGS_PARM6(x)	((x)->regs[5])
+#define PT_REGS_RET(x)		((x)->regs[30])
+#define PT_REGS_FP(x)		((x)->regs[29]) /*  Works only with CONFIG_FRAME_POINTER */
+#define PT_REGS_RC(x)		((x)->regs[0])
+#define PT_REGS_SP(x)		((x)->sp)
+#define PT_REGS_IP(x)		((x)->pc)
+#else
+#error "bcc does not support this platform yet"
+#endif
 
 #define lock_xadd(ptr, val) ((void)__sync_fetch_and_add(ptr, val))
 
+#define TRACEPOINT_PROBE(category, event) \
+int tracepoint__##category##__##event(struct tracepoint__##category##__##event *args)
+
 #endif
+)********"

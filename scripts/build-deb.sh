@@ -1,5 +1,10 @@
 #!/bin/bash
 
+# helper script to be invoked by jenkins/buildbot
+
+# $1 [optional]: the build type - release | nightly | test
+buildtype=${1:-test}
+
 set -x
 set -e
 
@@ -11,11 +16,21 @@ function cleanup() {
 }
 trap cleanup EXIT
 
-mkdir $TMP/bcc
-cp -a * $TMP/bcc
+. scripts/git-tag.sh
+
+git archive HEAD --prefix=bcc/ --format=tar.gz -o $TMP/bcc_$revision.orig.tar.gz
+
 pushd $TMP
-tar zcf bcc_0.1.6.orig.tar.gz bcc/
+tar xf bcc_$revision.orig.tar.gz
 cd bcc
+
+if [[ "$buildtype" = "test" ]]; then
+  dch -b -v $revision-$release "$git_subject"
+fi
+if [[ "$buildtype" = "nightly" ]]; then
+  dch -v $revision-$release "$git_subject"
+fi
+
 DEB_BUILD_OPTIONS="nocheck parallel=${PARALLEL}" debuild -us -uc
 popd
 

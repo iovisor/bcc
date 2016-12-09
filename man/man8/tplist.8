@@ -1,0 +1,62 @@
+.TH tplist 8  "2016-03-20" "USER COMMANDS"
+.SH NAME
+tplist \- Display kernel tracepoints or USDT probes and their formats.
+.SH SYNOPSIS
+.B tplist [-p PID] [-l LIB] [-v] [filter]
+.SH DESCRIPTION
+tplist lists all kernel tracepoints, and can optionally print out the tracepoint
+format; namely, the variables that you can trace when the tracepoint is hit. 
+tplist can also list USDT probes embedded in a specific library or executable,
+and can list USDT probes for all the libraries loaded by a specific process.
+These features are usually used in conjunction with the argdist and/or trace tools.
+
+On a typical system, accessing the tracepoint list and format requires root.
+However, accessing USDT probes does not require root.
+.SH OPTIONS
+.TP
+\-p PID
+Display the USDT probes from all the libraries loaded by the specified process.
+.TP
+\-l LIB
+Display the USDT probes from the specified library or executable. If the librar
+or executable can be found in the standard paths, a full path is not required.
+.TP
+\-v
+Increase the verbosity level. Can be used to display the variables, locations,
+and arguments of tracepoints and USDT probes.
+.TP
+[filter]
+A wildcard expression that specifies which tracepoints or probes to print.
+For example, block:* will print all block tracepoints (block:block_rq_complete,
+etc.). Regular expressions are not supported.
+.SH EXAMPLES
+.TP
+Print all kernel tracepoints:
+#
+.B tplist
+.TP
+Print all net tracepoints with their format:
+#
+.B tplist -v 'net:*'
+.TP
+Print all USDT probes in libpthread:
+$ 
+.B tplist -l pthread
+.TP
+Print all USDT probes in process 4717 from the libc provider:
+$
+.B tplist -p 4717 'libc:*'
+.TP
+Print all the USDT probes in the node executable:
+$
+.B tplist -l node
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Sasha Goldshtein

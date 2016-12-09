@@ -1,0 +1,5 @@
+file(GLOB PY_FILES *.py)
+foreach(FIL ${PY_FILES})
+  get_filename_component(FIL_WE ${FIL} NAME_WE)
+  install(PROGRAMS ${FIL} DESTINATION share/bcc/tools/old RENAME ${FIL_WE})
+endforeach()

@@ -1,0 +1,111 @@
+.TH offcputime 8  "2016-01-14" "USER COMMANDS"
+.SH NAME
+offcputime \- Summarize off-CPU time by kernel stack trace. Uses Linux eBPF/bcc.
+.SH SYNOPSIS
+.B offcputime [\-h] [\-u] [\-p PID] [\-v] [\-f] [duration]
+.SH DESCRIPTION
+This program shows stack traces and task names that were blocked and "off-CPU",
+and the total duration they were not running: their "off-CPU time".
+It works by tracing when threads block and when they return to CPU, measuring
+both the time they were off-CPU and the blocked stack trace and the task name.
+This data is summarized in the kernel using an eBPF map, and by summing the
+off-CPU time by unique stack trace and task name.
+
+The output summary will help you identify reasons why threads were blocking,
+and quantify the time they were off-CPU. This spans all types of blocking
+activity: disk I/O, network I/O, locks, page faults, involuntary context
+switches, etc.
+
+This is complementary to CPU profiling (e.g., CPU flame graphs) which shows
+the time spent on-CPU. This shows the time spent off-CPU, and the output,
+especially the -f format, can be used to generate an "off-CPU time flame graph".
+
+See http://www.brendangregg.com/FlameGraphs/offcpuflamegraphs.html
+
+This tool only works on Linux 4.6+. It uses the new `BPF_STACK_TRACE` table
+APIs to generate the in-kernel stack traces.
+For kernels older than 4.6, see the version under tools/old.
+
+Note: this tool only traces off-CPU times that began and ended while tracing.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH OPTIONS
+.TP
+\-h
+Print usage message.
+.TP
+\-f
+Print output in folded stack format.
+.TP
+\-p PID
+Trace this process ID only (filtered in-kernel).
+.TP
+\-t TID
+Trace this thread ID only (filtered in-kernel).
+.TP
+\-u
+Only trace user threads (no kernel threads).
+.TP
+\-k
+Only trace kernel threads (no user threads).
+.TP
+\-U
+Show stacks from user space only (no kernel space stacks).
+.TP
+\-K
+Show stacks from kernel space only (no user space stacks).
+.TP
+\-d
+Insert delimiter between kernel/user stacks.
+.TP
+\-f
+Output folded format.
+.TP
+\-\-stack-storage-size STACK_STORAGE_SIZE
+Change the number of unique stack traces that can be stored and displayed.
+.TP
+duration
+Duration to trace, in seconds.
+.SH EXAMPLES
+.TP
+Trace all thread blocking events, and summarize (in-kernel) by kernel stack trace and total off-CPU time:
+#
+.B offcputime
+.TP
+Trace for 5 seconds only:
+#
+.B offcputime 5
+.TP
+Trace for 5 seconds, and emit output in folded stack format (suitable for flame graphs):
+#
+.B offcputime -f 5
+.TP
+Trace PID 185 only:
+#
+.B offcputime -p 185
+.SH OVERHEAD
+This summarizes unique stack traces in-kernel for efficiency, allowing it to
+trace a higher rate of events than methods that post-process in user space. The
+stack trace and time data is only copied to user space once, when the output is
+printed. While these techniques greatly lower overhead, scheduler events are
+still a high frequency event, as they can exceed 1 million events per second,
+and so caution should still be used. Test before production use.
+
+If the overhead is still a problem, take a look at the MINBLOCK_US tunable in
+the code. If your aim is to chase down longer blocking events, then this could
+be increased to filter shorter blocking events, further lowering overhead.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Brendan Gregg
+.SH SEE ALSO
+stackcount(8)

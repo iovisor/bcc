@@ -1,0 +1,49 @@
+Demonstrations of biosnoop, the Linux eBPF/bcc version.
+
+
+biosnoop traces block device I/O (disk I/O), and prints a line of output
+per I/O. Example:
+
+# ./biosnoop
+TIME(s)        COMM           PID    DISK    T  SECTOR    BYTES   LAT(ms)
+0.000004001    supervise      1950   xvda1   W  13092560  4096       0.74
+0.000178002    supervise      1950   xvda1   W  13092432  4096       0.61
+0.001469001    supervise      1956   xvda1   W  13092440  4096       1.24
+0.001588002    supervise      1956   xvda1   W  13115128  4096       1.09
+1.022346001    supervise      1950   xvda1   W  13115272  4096       0.98
+1.022568002    supervise      1950   xvda1   W  13188496  4096       0.93
+1.023534000    supervise      1956   xvda1   W  13188520  4096       0.79
+1.023585003    supervise      1956   xvda1   W  13189512  4096       0.60
+2.003920000    xfsaild/md0    456    xvdc    W  62901512  8192       0.23
+2.003931001    xfsaild/md0    456    xvdb    W  62901513  512        0.25
+2.004034001    xfsaild/md0    456    xvdb    W  62901520  8192       0.35
+2.004042000    xfsaild/md0    456    xvdb    W  63542016  4096       0.36
+2.004204001    kworker/0:3    26040  xvdb    W  41950344  65536      0.34
+2.044352002    supervise      1950   xvda1   W  13192672  4096       0.65
+2.044574000    supervise      1950   xvda1   W  13189072  4096       0.58
+
+This includes the PID and comm (process name) that were on-CPU at the time of
+issue (which usually means the process responsible).
+
+The latency of the disk I/O, measured from the issue to the device to its
+completion, is included as the last column.
+
+This example output is from what should be an idle system, however, the
+following is visible in iostat:
+
+$ iostat -x 1
+[...]
+avg-cpu:  %user   %nice %system %iowait  %steal   %idle
+           0.12    0.00    0.12    0.00    0.00   99.75
+
+Device: rrqm/s  wrqm/s    r/s    w/s  rkB/s  wkB/s  await  svctm  %util
+xvda      0.00    0.00   0.00   4.00   0.00  16.00   0.00   0.00   0.00
+xvdb      0.00    0.00   0.00   0.00   0.00   0.00   0.00   0.00   0.00
+xvdc      0.00    0.00   0.00   0.00   0.00   0.00   0.00   0.00   0.00
+md0       0.00    0.00   0.00   0.00   0.00   0.00   0.00   0.00   0.00
+
+There are 4 write IOPS.
+
+The output of biosnoop identifies the reason: multiple supervise processes are
+issuing writes to the xvda1 disk. I can now drill down on supervise using other
+tools to understand its file system workload.

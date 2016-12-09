@@ -1,0 +1,760 @@
+Demonstrations of offcputime, the Linux eBPF/bcc version.
+
+
+This program shows stack traces that were blocked, and the total duration they
+were blocked. It works by tracing when threads block and when they return to
+CPU, measuring both the time they were blocked (aka the "off-CPU time") and the
+blocked stack trace and the task name. This data is summarized in kernel by
+summing the blocked time by unique stack trace and task name.
+
+Here is some example output. The -K option was used to only match kernel stacks.
+To explain what we are seeing: the very first stack trace looks like a page
+fault (do_page_fault() etc) from the "chmod" command, and in total was off-CPU
+for 13 microseconds.
+
+# ./offcputime -K
+Tracing off-CPU time (us) of all threads by kernel stack... Hit Ctrl-C to end.
+^C
+    schedule
+    schedule_timeout
+    io_schedule_timeout
+    bit_wait_io
+    __wait_on_bit
+    wait_on_page_bit_killable
+    __lock_page_or_retry
+    filemap_fault
+    __do_fault
+    handle_mm_fault
+    __do_page_fault
+    do_page_fault
+    page_fault
+    chmod
+        13
+
+    schedule
+    rcu_nocb_kthread
+    kthread
+    ret_from_fork
+    ddebug_tables
+    rcuos/0
+        22
+
+    schedule
+    schedule_timeout
+    io_schedule_timeout
+    bit_wait_io
+    __wait_on_bit_lock
+    __lock_page
+    lock_page
+    __do_fault
+    handle_mm_fault
+    __do_page_fault
+    do_page_fault
+    page_fault
+    run
+        27
+
+    schedule
+    schedule_timeout
+    io_schedule_timeout
+    bit_wait_io
+    __wait_on_bit
+    wait_on_page_bit_killable
+    __lock_page_or_retry
+    filemap_fault
+    __do_fault
+    handle_mm_fault
+    __do_page_fault
+    do_page_fault
+    page_fault
+    clear_user
+    padzero
+    load_elf_binary
+    search_binary_handler
+    load_script
+    search_binary_handler
+    do_execveat_common.isra.27
+    run
+        28
+
+    schedule
+    schedule_timeout
+    io_schedule_timeout
+    bit_wait_io
+    __wait_on_bit
+    wait_on_page_bit_killable
+    __lock_page_or_retry
+    filemap_fault
+    __do_fault
+    handle_mm_fault
+    __do_page_fault
+    do_page_fault
+    page_fault
+    run
+        82
+
+    schedule
+    pipe_wait
+    pipe_read
+    __vfs_read
+    vfs_read
+    sys_read
+    entry_SYSCALL_64_fastpath
+    bash
+        94
+
+    schedule
+    rcu_gp_kthread
+    kthread
+    ret_from_fork
+    ddebug_tables
+    rcu_sched
+        104
+
+    schedule
+    schedule_timeout
+    io_schedule_timeout
+    bit_wait_io
+    __wait_on_bit
+    out_of_line_wait_on_bit
+    __wait_on_buffer
+    jbd2_journal_commit_transaction
+    kjournald2
+    kthread
+    ret_from_fork
+    mb_cache_list
+    jbd2/xvda1-8
+        986
+
+    schedule
+    schedule_timeout
+    io_schedule_timeout
+    bit_wait_io
+    __wait_on_bit
+    out_of_line_wait_on_bit
+    __wait_on_buffer
+    jbd2_journal_commit_transaction
+    kjournald2
+    kthread
+    ret_from_fork
+    mb_cache_list
+    jbd2/xvda1-8
+        6630
+
+    schedule
+    schedule_timeout
+    io_schedule_timeout
+    bit_wait_io
+    __wait_on_bit
+    out_of_line_wait_on_bit
+    do_get_write_access
+    jbd2_journal_get_write_access
+    __ext4_journal_get_write_access
+    ext4_mb_mark_diskspace_used
+    ext4_mb_new_blocks
+    ext4_ext_map_blocks
+    ext4_map_blocks
+    ext4_writepages
+    do_writepages
+    __filemap_fdatawrite_range
+    filemap_flush
+    ext4_alloc_da_blocks
+    ext4_rename
+    ext4_rename2
+    supervise
+        6645
+
+    schedule
+    schedule_timeout
+    io_schedule_timeout
+    bit_wait_io
+    __wait_on_bit
+    out_of_line_wait_on_bit
+    do_get_write_access
+    jbd2_journal_get_write_access
+    __ext4_journal_get_write_access
+    __ext4_new_inode
+    ext4_create
+    vfs_create
+    path_openat
+    do_filp_open
+    do_sys_open
+    sys_open
+    entry_SYSCALL_64_fastpath
+    supervise
+        12702
+
+    schedule
+    rcu_nocb_kthread
+    kthread
+    ret_from_fork
+    rcuos/2
+        16036
+
+    schedule
+    rcu_nocb_kthread
+    kthread
+    ret_from_fork
+    rcuos/4
+        24085
+
+    schedule
+    do_wait
+    sys_wait4
+    entry_SYSCALL_64_fastpath
+    run
+        233055
+
+    schedule
+    schedule_timeout
+    io_schedule_timeout
+    bit_wait_io
+    __wait_on_bit
+    wait_on_page_bit
+    truncate_inode_pages_range
+    truncate_inode_pages_final
+    ext4_evict_inode
+    evict
+    iput
+    __dentry_kill
+    dput
+    sys_rename
+    entry_SYSCALL_64_fastpath
+    supervise
+        297113
+
+    schedule
+    schedule_timeout
+    wait_woken
+    n_tty_read
+    tty_read
+    __vfs_read
+    vfs_read
+    sys_read
+    entry_SYSCALL_64_fastpath
+    bash
+        1789866
+
+    schedule
+    schedule_timeout
+    io_schedule_timeout
+    do_blockdev_direct_IO
+    __blockdev_direct_IO
+    blkdev_direct_IO
+    generic_file_read_iter
+    blkdev_read_iter
+    __vfs_read
+    vfs_read
+    sys_read
+    entry_SYSCALL_64_fastpath
+    dd
+        3310763
+
+    schedule
+    smpboot_thread_fn
+    kthread
+    ret_from_fork
+    watchdog/1
+        3999989
+
+    schedule
+    smpboot_thread_fn
+    kthread
+    ret_from_fork
+    watchdog/5
+        3999995
+
+    schedule
+    smpboot_thread_fn
+    kthread
+    ret_from_fork
+    watchdog/4
+        3999996
+
+    schedule
+    smpboot_thread_fn
+    kthread
+    ret_from_fork
+    watchdog/0
+        3999996
+
+    schedule
+    smpboot_thread_fn
+    kthread
+    ret_from_fork
+    watchdog/3
+        3999998
+
+    schedule
+    smpboot_thread_fn
+    kthread
+    ret_from_fork
+    watchdog/7
+        3999999
+
+    schedule
+    smpboot_thread_fn
+    kthread
+    ret_from_fork
+    watchdog/2
+        4000001
+
+    schedule
+    smpboot_thread_fn
+    kthread
+    ret_from_fork
+    watchdog/6
+        4000001
+
+    schedule
+    do_wait
+    sys_wait4
+    entry_SYSCALL_64_fastpath
+    bash
+        4039675
+
+    schedule
+    do_nanosleep
+    hrtimer_nanosleep
+    sys_nanosleep
+    entry_SYSCALL_64_fastpath
+    svscan
+        5000112
+
+    schedule
+    schedule_hrtimeout_range_clock
+    schedule_hrtimeout_range
+    poll_schedule_timeout
+    do_select
+    core_sys_select
+    sys_select
+    entry_SYSCALL_64_fastpath
+    snmpd
+        5998761
+
+    schedule
+    smpboot_thread_fn
+    kthread
+    ret_from_fork
+    migration/3
+        6149779
+
+    schedule
+    schedule_hrtimeout_range_clock
+    schedule_hrtimeout_range
+    poll_schedule_timeout
+    do_select
+    core_sys_select
+    sys_select
+    entry_SYSCALL_64_fastpath
+    ntpd
+        6999832
+
+    schedule
+    worker_thread
+    kthread
+    ret_from_fork
+    kworker/u16:2
+        7131941
+
+    schedule
+    worker_thread
+    kthread
+    ret_from_fork
+    kworker/3:0
+        7999844
+
+    schedule
+    worker_thread
+    kthread
+    ret_from_fork
+    kworker/1:1
+        7999872
+
+    schedule
+    worker_thread
+    kthread
+    ret_from_fork
+    kworker/2:1
+        7999889
+
+    schedule
+    worker_thread
+    kthread
+    ret_from_fork
+    kworker/5:1
+        7999936
+
+    schedule
+    worker_thread
+    kthread
+    ret_from_fork
+    kworker/7:1
+        7999938
+
+    schedule
+    worker_thread
+    kthread
+    ret_from_fork
+    kworker/6:1
+        7999940
+
+    schedule
+    do_nanosleep
+    hrtimer_nanosleep
+    sys_nanosleep
+    entry_SYSCALL_64_fastpath
+    tail
+        8000905
+
+    schedule
+    smpboot_thread_fn
+    kthread
+    ret_from_fork
+    migration/7
+        8197046
+
+    schedule
+    pipe_wait
+    pipe_read
+    __vfs_read
+    vfs_read
+    sys_read
+    entry_SYSCALL_64_fastpath
+    readproctitle
+        8197835
+
+    schedule
+    smpboot_thread_fn
+    kthread
+    ret_from_fork
+    migration/4
+        8201851
+
+    schedule
+    smpboot_thread_fn
+    kthread
+    ret_from_fork
+    migration/2
+        8203375
+
+    schedule
+    smpboot_thread_fn
+    kthread
+    ret_from_fork
+    migration/6
+        8208664
+
+    schedule
+    smpboot_thread_fn
+    kthread
+    ret_from_fork
+    migration/5
+        8209819
+
+    schedule
+    smpboot_thread_fn
+    kthread
+    ret_from_fork
+    ddebug_tables
+    migration/0
+        8211292
+
+    schedule
+    smpboot_thread_fn
+    kthread
+    ret_from_fork
+    migration/1
+        8212100
+
+    schedule
+    worker_thread
+    kthread
+    ret_from_fork
+    kworker/0:2
+        8270305
+
+    schedule
+    rcu_nocb_kthread
+    kthread
+    ret_from_fork
+    rcuos/3
+        8349697
+
+    schedule
+    rcu_nocb_kthread
+    kthread
+    ret_from_fork
+    rcuos/2
+        8363357
+
+    schedule
+    rcu_nocb_kthread
+    kthread
+    ret_from_fork
+    rcuos/1
+        8365338
+
+    schedule
+    schedule_timeout
+    xfs_buf_terminate
+    kthread
+    ret_from_fork
+    xfsaild/md0
+        8371514
+
+    schedule
+    rcu_nocb_kthread
+    kthread
+    ret_from_fork
+    rcuos/4
+        8384013
+
+    schedule
+    rcu_nocb_kthread
+    kthread
+    ret_from_fork
+    rcuos/5
+        8390016
+
+    schedule
+    rcu_nocb_kthread
+    kthread
+    ret_from_fork
+    ddebug_tables
+    rcuos/0
+        8405428
+
+    schedule
+    schedule_timeout
+    rcu_gp_kthread
+    kthread
+    ret_from_fork
+    ddebug_tables
+    rcu_sched
+        8406930
+
+    schedule
+    rcu_nocb_kthread
+    kthread
+    ret_from_fork
+    rcuos/7
+        8409575
+
+    schedule
+    rcu_nocb_kthread
+    kthread
+    ret_from_fork
+    rcuos/6
+        8415062
+
+    schedule
+    schedule_hrtimeout_range_clock
+    schedule_hrtimeout_range
+    poll_schedule_timeout
+    do_select
+    core_sys_select
+    sys_select
+    entry_SYSCALL_64_fastpath
+    offcputime
+        8421478
+
+    schedule
+    worker_thread
+    kthread
+    ret_from_fork
+    kworker/4:0
+        8421492
+
+    schedule
+    schedule_hrtimeout_range_clock
+    schedule_hrtimeout_range
+    poll_schedule_timeout
+    do_select
+    core_sys_select
+    sys_select
+    entry_SYSCALL_64_fastpath
+    sshd
+        14249005
+
+    schedule
+    schedule_hrtimeout_range_clock
+    schedule_hrtimeout_range
+    poll_schedule_timeout
+    do_sys_poll
+    sys_poll
+    entry_SYSCALL_64_fastpath
+    supervise
+        81670888
+
+The last few stack traces aren't very interesting, since they are threads that
+are often blocked off-CPU waiting for work.
+
+Do be somewhat careful with overhead: this is tracing scheduler functions, which
+can be called very frequently. While this uses in-kernel summaries for
+efficiency, the rate of scheduler functions can be very high (> 1,000,000/sec),
+and this is performing stack walks when threads return to CPU. At some point
+the overhead will be measurable.
+
+
+A -p option can be used to filter (in-kernel) on a single process ID. For
+example, only matching PID 26651, which is a running "dd" command:
+
+# ./offcputime -K -p 26651
+Tracing off-CPU time (us) of all threads by kernel stack... Hit Ctrl-C to end.
+^C
+    schedule
+    schedule_timeout
+    io_schedule_timeout
+    do_blockdev_direct_IO
+    __blockdev_direct_IO
+    blkdev_direct_IO
+    generic_file_read_iter
+    blkdev_read_iter
+    __vfs_read
+    vfs_read
+    sys_read
+    entry_SYSCALL_64_fastpath
+    dd
+        2405710
+
+The stack trace shows "dd" is blocked waiting on disk I/O, as expected, for a
+total of 2.4 seconds during tracing.
+
+
+A duration can be added, for example, tracing for 5 seconds only:
+
+# ./offcputime -K -p 26651 5
+Tracing off-CPU time (us) of all threads by kernel stack for 5 secs.
+
+    schedule
+    schedule_timeout
+    io_schedule_timeout
+    do_blockdev_direct_IO
+    __blockdev_direct_IO
+    blkdev_direct_IO
+    generic_file_read_iter
+    blkdev_read_iter
+    __vfs_read
+    vfs_read
+    sys_read
+    entry_SYSCALL_64_fastpath
+    dd
+        4413909
+
+Here, dd was blocked for 4.4 seconds out of 5. Or put differently, likely
+on-CPU for about 12% of the time. Which matches the ratio seen by time(1):
+
+# time dd if=/dev/md0 iflag=direct of=/dev/null bs=1k
+^C108115+0 records in
+108114+0 records out
+110708736 bytes (111 MB) copied, 13.7565 s, 8.0 MB/s
+
+real	0m13.760s
+user	0m0.000s
+sys	0m1.739s
+
+
+A -f option will emit output using the "folded stacks" format, which can be
+read directly by flamegraph.pl from the FlameGraph open source software
+(https://github.com/brendangregg/FlameGraph). Eg:
+
+# ./offcputime -K -f 5
+bash;entry_SYSCALL_64_fastpath;sys_read;vfs_read;__vfs_read;tty_read;n_tty_read;call_rwsem_down_read_failed;rwsem_down_read_failed;schedule 8
+yes;entry_SYSCALL_64_fastpath;sys_write;vfs_write;__vfs_write;tty_write;n_tty_write;call_rwsem_down_read_failed;rwsem_down_read_failed;schedule 14
+run;page_fault;do_page_fault;__do_page_fault;handle_mm_fault;__do_fault;filemap_fault;__lock_page_or_retry;wait_on_page_bit_killable;__wait_on_bit;bit_wait_io;io_schedule_timeout;schedule_timeout;schedule 33
+rcuos/4;ret_from_fork;kthread;rcu_nocb_kthread;schedule 45
+bash;entry_SYSCALL_64_fastpath;sys_read;vfs_read;__vfs_read;pipe_read;pipe_wait;schedule 88
+run;page_fault;do_page_fault;__do_page_fault;handle_mm_fault;__do_fault;filemap_fault;__lock_page_or_retry;wait_on_page_bit_killable;__wait_on_bit;bit_wait_io;io_schedule_timeout;schedule_timeout;schedule 108
+jbd2/xvda1-8;mb_cache_list;ret_from_fork;kthread;kjournald2;jbd2_journal_commit_transaction;__wait_on_buffer;out_of_line_wait_on_bit;__wait_on_bit;bit_wait_io;io_schedule_timeout;schedule_timeout;schedule 828
+jbd2/xvda1-8;mb_cache_list;ret_from_fork;kthread;kjournald2;jbd2_journal_commit_transaction;__wait_on_buffer;out_of_line_wait_on_bit;__wait_on_bit;bit_wait_io;io_schedule_timeout;schedule_timeout;schedule 6201
+supervise;entry_SYSCALL_64_fastpath;sys_rename;dput;__dentry_kill;iput;evict;ext4_evict_inode;truncate_inode_pages_final;truncate_inode_pages_range;wait_on_page_bit;__wait_on_bit;bit_wait_io;io_schedule_timeout;schedule_timeout;schedule 41049
+run;entry_SYSCALL_64_fastpath;sys_wait4;do_wait;schedule 120709
+bash;entry_SYSCALL_64_fastpath;sys_wait4;do_wait;schedule 699320
+ksoftirqd/0;ret_from_fork;kthread;smpboot_thread_fn;schedule 1077529
+bash;entry_SYSCALL_64_fastpath;sys_read;vfs_read;__vfs_read;tty_read;n_tty_read;wait_woken;schedule_timeout;schedule 1362045
+sshd;entry_SYSCALL_64_fastpath;sys_select;core_sys_select;do_select;poll_schedule_timeout;schedule_hrtimeout_range;schedule_hrtimeout_range_clock;schedule 1377627
+migration/0;ddebug_tables;ret_from_fork;kthread;smpboot_thread_fn;schedule 2040753
+snmpd;entry_SYSCALL_64_fastpath;sys_select;core_sys_select;do_select;poll_schedule_timeout;schedule_hrtimeout_range;schedule_hrtimeout_range_clock;schedule 2197568
+migration/5;ret_from_fork;kthread;smpboot_thread_fn;schedule 3079426
+migration/7;ret_from_fork;kthread;smpboot_thread_fn;schedule 3084746
+kworker/6:2;ret_from_fork;kthread;worker_thread;schedule 3940583
+kworker/5:1;ret_from_fork;kthread;worker_thread;schedule 3944892
+kworker/1:2;ret_from_fork;kthread;worker_thread;schedule 3999646
+ntpd;entry_SYSCALL_64_fastpath;sys_select;core_sys_select;do_select;poll_schedule_timeout;schedule_hrtimeout_range;schedule_hrtimeout_range_clock;schedule 3999904
+kworker/u16:0;ret_from_fork;kthread;worker_thread;schedule 3999967
+kworker/7:0;ret_from_fork;kthread;worker_thread;schedule 3999987
+tail;entry_SYSCALL_64_fastpath;sys_nanosleep;hrtimer_nanosleep;do_nanosleep;schedule 4000473
+migration/1;ret_from_fork;kthread;smpboot_thread_fn;schedule 4091150
+migration/4;ret_from_fork;kthread;smpboot_thread_fn;schedule 4095217
+readproctitle;entry_SYSCALL_64_fastpath;sys_read;vfs_read;__vfs_read;pipe_read;pipe_wait;schedule 4108470
+migration/3;ret_from_fork;kthread;smpboot_thread_fn;schedule 4109264
+migration/2;ret_from_fork;kthread;smpboot_thread_fn;schedule 4109280
+migration/6;ret_from_fork;kthread;smpboot_thread_fn;schedule 4111143
+kworker/4:0;ret_from_fork;kthread;worker_thread;schedule 4402350
+kworker/3:0;ret_from_fork;kthread;worker_thread;schedule 4433988
+kworker/2:1;ret_from_fork;kthread;worker_thread;schedule 4636142
+kworker/0:2;ret_from_fork;kthread;worker_thread;schedule 4832023
+rcuos/1;ret_from_fork;kthread;rcu_nocb_kthread;schedule 4974186
+rcuos/5;ret_from_fork;kthread;rcu_nocb_kthread;schedule 4977137
+rcuos/6;ret_from_fork;kthread;rcu_nocb_kthread;schedule 4987769
+rcuos/3;ret_from_fork;kthread;rcu_nocb_kthread;schedule 4992282
+rcuos/4;ret_from_fork;kthread;rcu_nocb_kthread;schedule 4992364
+rcuos/2;ret_from_fork;kthread;rcu_nocb_kthread;schedule 4992714
+rcuos/0;ddebug_tables;ret_from_fork;kthread;rcu_nocb_kthread;schedule 4996504
+rcuos/7;ret_from_fork;kthread;rcu_nocb_kthread;schedule 4998497
+rcu_sched;ddebug_tables;ret_from_fork;kthread;rcu_gp_kthread;schedule_timeout;schedule 5000686
+offcputime;entry_SYSCALL_64_fastpath;sys_select;core_sys_select;do_select;poll_schedule_timeout;schedule_hrtimeout_range;schedule_hrtimeout_range_clock;schedule 5005063
+dd;entry_SYSCALL_64_fastpath;sys_read;vfs_read;__vfs_read;blkdev_read_iter;generic_file_read_iter;blkdev_direct_IO;__blockdev_direct_IO;do_blockdev_direct_IO;io_schedule_timeout;schedule_timeout;schedule 8025599
+supervise;entry_SYSCALL_64_fastpath;sys_poll;do_sys_poll;poll_schedule_timeout;schedule_hrtimeout_range;schedule_hrtimeout_range_clock;schedule 40835611
+
+The stack traces are shown as single lines, with functions separated by
+semicolons. The first entry is the task name. The 2nd column is the total
+off-CPU time.
+
+I'd save this output to a file, then move it to the system where you'll be
+creating your "off-CPU time flame graphs".
+
+
+USAGE message:
+
+# ./offcputime -h
+usage: offcputime.py [-h] [-p PID | -t TID | -u | -k] [-U | -K] [-d] [-f]
+                     [--stack-storage-size STACK_STORAGE_SIZE]
+                     [duration]
+
+Summarize off-CPU time by stack trace
+
+positional arguments:
+  duration              duration of trace, in seconds
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -p PID, --pid PID     trace this PID only
+  -t TID, --tid TID     trace this TID only
+  -u, --user-threads-only
+                        user threads only (no kernel threads)
+  -k, --kernel-threads-only
+                        kernel threads only (no user threads)
+  -U, --user-stacks-only
+                        show stacks from user space only (no kernel space
+                        stacks)
+  -K, --kernel-stacks-only
+                        show stacks from kernel space only (no user space
+                        stacks)
+  -d, --delimited       insert delimiter between kernel/user stacks
+  -f, --folded          output folded format
+  --stack-storage-size STACK_STORAGE_SIZE
+                        the number of unique stack traces that can be stored
+                        and displayed (default 1024)
+
+examples:
+    ./offcputime             # trace off-CPU stack time until Ctrl-C
+    ./offcputime 5           # trace for 5 seconds only
+    ./offcputime -f 5        # 5 seconds, and output in folded format
+    ./offcputime -p 185      # only trace threads for PID 185
+    ./offcputime -t 188      # only trace thread 188
+    ./offcputime -u          # only trace user threads (no kernel)
+    ./offcputime -k          # only trace kernel threads (no user)
+    ./offcputime -U          # only show user space stacks (no kernel)
+    ./offcputime -K          # only show kernel space stacks (no user)

@@ -1,0 +1,470 @@
+Demonstrations of wakeuptime, the Linux eBPF/bcc version.
+
+
+This program measures when threads block, and shows the stack traces for the
+threads that performed the wakeup, along with the process names of the waker
+and target processes, and the total blocked time. This blocked time is measured
+from when a thread blocks, to when the wakeup signal is sent. Note that this
+time excludes some run queue latency from the target thread, which may not
+immediately execute if it needs to wait its turn on-CPU. All the data shown,
+stack traces, process names, and times, are summarized in-kernel using an eBPF
+map for efficiency.
+
+This tool is intended to be used after offcputime, which shows the directly
+blocked stacks. wakeuptime can then be used to show the stacks that performed
+the wakeups.
+
+Here is some example (truncated) output. To explain what we are seeing: the
+first stack trace shown is for a "vmstat" thread, which was woken up by
+"swapper/1". The stack trace is for swapper/1, which shows a timer interrupt.
+The total time is 4.0 seconds: this actually corresponds to a "vmstat 1"
+printing 4 x 1 second summaries -- we're seeing the interrupt stack that
+wakes up vmstat:
+
+# ./wakeuptime
+Tracing blocked time (us) by kernel stack... Hit Ctrl-C to end.
+^C
+[...truncated...]
+
+    target:          vmstat
+    ffffffff810df082 hrtimer_wakeup
+    ffffffff810df494 __hrtimer_run_queues
+    ffffffff810dfba8 hrtimer_interrupt
+    ffffffff8100b9e1 xen_timer_interrupt
+    ffffffff810cb9c8 handle_irq_event_percpu
+    ffffffff810cf1ca handle_percpu_irq
+    ffffffff810cb0c2 generic_handle_irq
+    ffffffff814766f7 evtchn_2l_handle_events
+    ffffffff81473e83 __xen_evtchn_do_upcall
+    ffffffff81475cf0 xen_evtchn_do_upcall
+    ffffffff8178adee xen_do_hypervisor_callback
+    waker:           swapper/1
+        4000415
+
+    target:          sshd
+    ffffffff812037b6 pollwake
+    ffffffff810b5462 __wake_up_common
+    ffffffff810b54d9 __wake_up
+    ffffffff814939fd n_tty_receive_buf_common
+    ffffffff81494424 n_tty_receive_buf2
+    ffffffff81496df5 flush_to_ldisc
+    ffffffff8108c80a process_one_work
+    ffffffff8108caeb worker_thread
+    ffffffff81092979 kthread
+    ffffffff8178940f ret_from_fork
+    waker:           kworker/u16:2
+        4001028
+
+    target:          rcuos/0
+    ffffffff810b5b12 autoremove_wake_function
+    ffffffff810b5462 __wake_up_common
+    ffffffff810b54d9 __wake_up
+    ffffffff810d8043 rcu_gp_kthread
+    ffffffff81092979 kthread
+    ffffffff8178940f ret_from_fork
+    ffffffff81ca9420 ddebug_tables
+    waker:           rcu_sched
+        4009976
+
+    target:          rcuos/7
+    ffffffff810b5b12 autoremove_wake_function
+    ffffffff810b5462 __wake_up_common
+    ffffffff810b54d9 __wake_up
+    ffffffff810d6f28 rcu_nocb_kthread
+    ffffffff81092979 kthread
+    ffffffff8178940f ret_from_fork
+    waker:           rcuos/6
+        4095781
+
+    target:          rcuos/6
+    ffffffff810b5b12 autoremove_wake_function
+    ffffffff810b5462 __wake_up_common
+    ffffffff810b54d9 __wake_up
+    ffffffff810d8043 rcu_gp_kthread
+    ffffffff81092979 kthread
+    ffffffff8178940f ret_from_fork
+    ffffffff81ca9420 ddebug_tables
+    waker:           rcu_sched
+        4101075
+
+    target:          rcuos/5
+    ffffffff810b5b12 autoremove_wake_function
+    ffffffff810b5462 __wake_up_common
+    ffffffff810b54d9 __wake_up
+    ffffffff810d6f28 rcu_nocb_kthread
+    ffffffff81092979 kthread
+    ffffffff8178940f ret_from_fork
+    waker:           rcuos/4
+        4103492
+
+    target:          rcuos/3
+    ffffffff810b5b12 autoremove_wake_function
+    ffffffff810b5462 __wake_up_common
+    ffffffff810b54d9 __wake_up
+    ffffffff810d6f28 rcu_nocb_kthread
+    ffffffff81092979 kthread
+    ffffffff8178940f ret_from_fork
+    waker:           rcuos/2
+        4107785
+
+    target:          rcuos/2
+    ffffffff810b5b12 autoremove_wake_function
+    ffffffff810b5462 __wake_up_common
+    ffffffff810b54d9 __wake_up
+    ffffffff810d8043 rcu_gp_kthread
+    ffffffff81092979 kthread
+    ffffffff8178940f ret_from_fork
+    ffffffff81ca9420 ddebug_tables
+    waker:           rcu_sched
+        4113308
+
+    target:          wakeuptime
+    ffffffff8108109e signal_wake_up_state
+    ffffffff810811e6 complete_signal
+    ffffffff8108186b __send_signal
+    ffffffff81081b0e send_signal
+    ffffffff810824e3 do_send_sig_info
+    ffffffff81082955 group_send_sig_info
+    ffffffff810829b4 __kill_pgrp_info
+    ffffffff81082a15 kill_pgrp
+    ffffffff8149081f __isig
+    ffffffff814912b4 isig
+    ffffffff81491f7c n_tty_receive_signal_char
+    ffffffff81493528 n_tty_receive_char_special
+    ffffffff8149419f n_tty_receive_buf_common
+    ffffffff81494424 n_tty_receive_buf2
+    ffffffff81496df5 flush_to_ldisc
+    ffffffff8108c80a process_one_work
+    ffffffff8108caeb worker_thread
+    ffffffff81092979 kthread
+    ffffffff8178940f ret_from_fork
+    waker:           kworker/u16:2
+        4125162
+
+    target:          sshd
+    ffffffff812037b6 pollwake
+    ffffffff810b5462 __wake_up_common
+    ffffffff810b58d5 __wake_up_sync_key
+    ffffffff816707ba sock_def_readable
+    ffffffff816d9f87 tcp_data_queue
+    ffffffff816dd465 tcp_rcv_established
+    ffffffff816e7ec5 tcp_v4_do_rcv
+    ffffffff816e8ff7 tcp_v4_rcv
+    ffffffff816c3a84 ip_local_deliver_finish
+    ffffffff816c3d80 ip_local_deliver
+    ffffffff816c3762 ip_rcv_finish
+    ffffffff816c4062 ip_rcv
+    ffffffff816885be __netif_receive_skb_core
+    ffffffff81688928 __netif_receive_skb
+    ffffffff81688993 netif_receive_skb_internal
+    ffffffff816894c5 napi_gro_receive
+    ffffffff81593111 xennet_poll
+    ffffffff81688e0e net_rx_action
+    ffffffff8107932b __do_softirq
+    ffffffff810796b2 irq_exit
+    waker:           swapper/0
+        4515762
+
+    target:          supervise
+    ffffffff810df082 hrtimer_wakeup
+    ffffffff810df494 __hrtimer_run_queues
+    ffffffff810dfba8 hrtimer_interrupt
+    ffffffff8100b9e1 xen_timer_interrupt
+    ffffffff810cb9c8 handle_irq_event_percpu
+    ffffffff810cf1ca handle_percpu_irq
+    ffffffff810cb0c2 generic_handle_irq
+    ffffffff814766f7 evtchn_2l_handle_events
+    ffffffff81473e83 __xen_evtchn_do_upcall
+    ffffffff81475cf0 xen_evtchn_do_upcall
+    ffffffff8178adee xen_do_hypervisor_callback
+    waker:           swapper/0
+        25523344
+
+Detaching...
+
+The second last stack trace shows sshd being woken up by packets being received.
+Near the bottom of the stack is driver processing, then IP, TCP, and finally
+socket processing as we work up the stack. The total time sshd (all sshd's)
+were blocked and woken up in this way was 4.5 seconds.
+
+Do be somewhat careful with overhead: this is tracing scheduler functions, which
+can be called very frequently. While this uses in-kernel summaries for
+efficiency, the rate of scheduler functions can be very high (> 1,000,000/sec),
+and this is performing stack walks when threads return to CPU. At some point
+the overhead will be measurable.
+
+
+A -p option can be used to filter (in-kernel) on a single process ID. For
+example, only matching PID 19169, which is a bash shell:
+
+# ./wakeuptime -p 19169
+Tracing blocked time (us) by kernel stack... Hit Ctrl-C to end.
+^C
+    target:          bash
+    ffffffff81075eb8 child_wait_callback
+    ffffffff810b5462 __wake_up_common
+    ffffffff810b58d5 __wake_up_sync_key
+    ffffffff81078046 __wake_up_parent
+    ffffffff810831b3 do_notify_parent
+    ffffffff81077eaf do_exit
+    ffffffff81077f93 do_group_exit
+    ffffffff81078014 sys_exit_group
+    ffffffff81789076 entry_SYSCALL_64_fastpath
+    waker:           ls
+        2015
+
+    target:          bash
+    ffffffff81075eb8 child_wait_callback
+    ffffffff810b5462 __wake_up_common
+    ffffffff810b58d5 __wake_up_sync_key
+    ffffffff81078046 __wake_up_parent
+    ffffffff810831b3 do_notify_parent
+    ffffffff81077eaf do_exit
+    ffffffff81077f93 do_group_exit
+    ffffffff81078014 sys_exit_group
+    ffffffff81789076 entry_SYSCALL_64_fastpath
+    waker:           sleep
+        1001347
+
+    target:          bash
+    ffffffff810b5921 woken_wake_function
+    ffffffff810b5462 __wake_up_common
+    ffffffff810b54d9 __wake_up
+    ffffffff814939fd n_tty_receive_buf_common
+    ffffffff81494424 n_tty_receive_buf2
+    ffffffff81496df5 flush_to_ldisc
+    ffffffff8108c80a process_one_work
+    ffffffff8108caeb worker_thread
+    ffffffff81092979 kthread
+    ffffffff8178940f ret_from_fork
+    waker:           kworker/u16:0
+        1871024
+
+    target:          bash
+    ffffffff810b5921 woken_wake_function
+    ffffffff810b5462 __wake_up_common
+    ffffffff810b54d9 __wake_up
+    ffffffff814939fd n_tty_receive_buf_common
+    ffffffff81494424 n_tty_receive_buf2
+    ffffffff81496df5 flush_to_ldisc
+    ffffffff8108c80a process_one_work
+    ffffffff8108caeb worker_thread
+    ffffffff81092979 kthread
+    ffffffff8178940f ret_from_fork
+    waker:           kworker/u16:2
+        3019839
+
+Detaching...
+
+These stack traces are fascinating! The first two shows bash waiting on child
+processes, an "ls" and a "sleep". The sleep stack was responsible for 1.0
+seconds of blocked time: I'd run a "sleep 1".
+
+The last two stacks show bash waking up to service tty input (keystrokes).
+
+
+A duration can be added, for example, tracing PID 19097 (sshd) for 5 seconds
+only:
+
+# ./wakeuptime -p 19097 5
+Tracing blocked time (us) by kernel stack for 5 secs.
+
+    target:          sshd
+    ffffffff812037b6 pollwake
+    ffffffff810b5462 __wake_up_common
+    ffffffff810b54d9 __wake_up
+    ffffffff814939fd n_tty_receive_buf_common
+    ffffffff81494424 n_tty_receive_buf2
+    ffffffff81496df5 flush_to_ldisc
+    ffffffff8108c80a process_one_work
+    ffffffff8108caeb worker_thread
+    ffffffff81092979 kthread
+    ffffffff8178940f ret_from_fork
+    waker:           kworker/u16:1
+        785
+
+    target:          sshd
+    ffffffff812037b6 pollwake
+    ffffffff810b5462 __wake_up_common
+    ffffffff810b54d9 __wake_up
+    ffffffff814939fd n_tty_receive_buf_common
+    ffffffff81494424 n_tty_receive_buf2
+    ffffffff81496df5 flush_to_ldisc
+    ffffffff8108c80a process_one_work
+    ffffffff8108caeb worker_thread
+    ffffffff81092979 kthread
+    ffffffff8178940f ret_from_fork
+    waker:           kworker/u16:2
+        2843
+
+    target:          sshd
+    ffffffff812037b6 pollwake
+    ffffffff810b5462 __wake_up_common
+    ffffffff810b58d5 __wake_up_sync_key
+    ffffffff816707ba sock_def_readable
+    ffffffff816d9f87 tcp_data_queue
+    ffffffff816dd465 tcp_rcv_established
+    ffffffff816e7ec5 tcp_v4_do_rcv
+    ffffffff816e8ff7 tcp_v4_rcv
+    ffffffff816c3a84 ip_local_deliver_finish
+    ffffffff816c3d80 ip_local_deliver
+    ffffffff816c3762 ip_rcv_finish
+    ffffffff816c4062 ip_rcv
+    ffffffff816884be __netif_receive_skb_core
+    ffffffff81688928 __netif_receive_skb
+    ffffffff81688993 netif_receive_skb_internal
+    ffffffff816894c5 napi_gro_receive
+    ffffffff81593111 xennet_poll
+    ffffffff81688e0e net_rx_action
+    ffffffff8107932b __do_softirq
+    ffffffff810796b2 irq_exit
+    waker:           swapper/0
+        276103
+
+Detaching...
+
+
+A -f option will emit output using the "folded stacks" format, which can be
+read directly by flamegraph.pl from the FlameGraph open source software
+(https://github.com/brendangregg/FlameGraph). Eg:
+
+# ./wakeuptime -f 5
+run;entry_SYSCALL_64_fastpath;sys_mmap;sys_mmap_pgoff;vm_mmap_pgoff;do_mmap;mmap_region;do_munmap;__split_vma.isra.35;vma_adjust;call_rwsem_wake;rwsem_wake;__rwsem_do_wake;run 1
+run;page_fault;do_page_fault;__do_page_fault;handle_mm_fault;unlock_page;__wake_up_bit;__wake_up;__wake_up_common;wake_bit_function;run 1
+chmod;page_fault;do_page_fault;__do_page_fault;handle_mm_fault;unlock_page;__wake_up_bit;__wake_up;__wake_up_common;wake_bit_function;mkdir 2
+supervise;return_from_execve;sys_execve;do_execveat_common.isra.33;search_binary_handler;load_script;search_binary_handler;load_elf_binary;flush_old_exec;mmput;exit_mmap;free_pgtables;unlink_file_vma;call_rwsem_wake;rwsem_wake;__rwsem_do_wake;supervise 2
+run;return_from_execve;sys_execve;do_execveat_common.isra.33;search_binary_handler;load_script;search_binary_handler;load_elf_binary;clear_user;page_fault;do_page_fault;__do_page_fault;handle_mm_fault;unlock_page;__wake_up_bit;__wake_up;__wake_up_common;wake_bit_function;run 2
+run;return_from_execve;sys_execve;do_execveat_common.isra.33;search_binary_handler;load_elf_binary;flush_old_exec;mmput;exit_mmap;free_pgtables;unlink_file_vma;call_rwsem_wake;rwsem_wake;__rwsem_do_wake;run 3
+mkdir;return_from_execve;sys_execve;do_execveat_common.isra.33;search_binary_handler;load_elf_binary;clear_user;page_fault;do_page_fault;__do_page_fault;handle_mm_fault;unlock_page;__wake_up_bit;__wake_up;__wake_up_common;wake_bit_function;mkdir 3
+mkdir;page_fault;do_page_fault;__do_page_fault;handle_mm_fault;unlock_page;__wake_up_bit;__wake_up;__wake_up_common;wake_bit_function;mkdir 4
+run;page_fault;do_page_fault;__do_page_fault;handle_mm_fault;unlock_page;__wake_up_bit;__wake_up;__wake_up_common;wake_bit_function;mkdir 4
+supervise;entry_SYSCALL_64_fastpath;sys_clone;_do_fork;copy_process;call_rwsem_wake;rwsem_wake;__rwsem_do_wake;supervise 5
+rcuos/0;ddebug_tables;ret_from_fork;kthread;rcu_nocb_kthread;rcu_gp_kthread_wake;__wake_up;__wake_up_common;autoremove_wake_function;rcu_sched 10
+swapper/7;cpu_bringup_and_idle;cpu_startup_entry;rcu_idle_enter;rcu_eqs_enter;rcu_eqs_enter_common;wake_nocb_leader;__wake_up;__wake_up_common;autoremove_wake_function;rcuos/6 12
+swapper/0;xen_start_kernel;x86_64_start_reservations;start_kernel;rest_init;cpu_startup_entry;rcu_idle_enter;rcu_eqs_enter;rcu_eqs_enter_common;wake_nocb_leader;__wake_up;__wake_up_common;autoremove_wake_function;rcuos/0 16
+rcuos/6;ret_from_fork;kthread;rcu_nocb_kthread;rcu_gp_kthread_wake;__wake_up;__wake_up_common;autoremove_wake_function;rcu_sched 19
+run;page_fault;do_page_fault;__do_page_fault;handle_mm_fault;unlock_page;__wake_up_bit;__wake_up;__wake_up_common;wake_bit_function;run 25
+bash;entry_SYSCALL_64_fastpath;sys_write;vfs_write;__vfs_write;tty_write;n_tty_write;do_output_char;pty_write;tty_flip_buffer_push;queue_work_on;__queue_work;insert_work;kworker/u16:2 26
+swapper/4;cpu_bringup_and_idle;cpu_startup_entry;rcu_idle_enter;rcu_eqs_enter;rcu_eqs_enter_common;wake_nocb_leader;__wake_up;__wake_up_common;autoremove_wake_function;rcuos/4 30
+pickup;entry_SYSCALL_64_fastpath;sys_write;vfs_write;__vfs_write;sock_write_iter;sock_sendmsg;unix_stream_sendmsg;sock_def_readable;__wake_up_sync_key;__wake_up_common;ep_poll_callback;__wake_up_locked;__wake_up_common;master 36
+swapper/1;cpu_bringup_and_idle;cpu_startup_entry;rcu_idle_enter;rcu_eqs_enter;rcu_eqs_enter_common;wake_nocb_leader;__wake_up;__wake_up_common;autoremove_wake_function;rcuos/0 52
+chown;xen_evtchn_do_upcall;__xen_evtchn_do_upcall;evtchn_2l_handle_events;generic_handle_irq;handle_edge_irq;handle_irq_event;handle_irq_event_percpu;blkif_interrupt;blk_mq_complete_request;__blk_mq_complete_request;blk_mq_end_request;blk_update_request;bio_endio;ext4_end_bio;ext4_finish_bio;end_page_writeback;__wake_up_bit;__wake_up;__wake_up_common;wake_bit_function;supervise 189
+supervise;xen_evtchn_do_upcall;__xen_evtchn_do_upcall;evtchn_2l_handle_events;generic_handle_irq;handle_edge_irq;handle_irq_event;handle_irq_event_percpu;blkif_interrupt;blk_mq_complete_request;__blk_mq_complete_request;blk_mq_end_request;blk_update_request;bio_endio;end_bio_bh_io_sync;journal_end_buffer_io_sync;wake_up_bit;__wake_up_bit;__wake_up;__wake_up_common;wake_bit_function;supervise 371
+supervise;xen_evtchn_do_upcall;__xen_evtchn_do_upcall;evtchn_2l_handle_events;generic_handle_irq;handle_edge_irq;handle_irq_event;handle_irq_event_percpu;blkif_interrupt;blk_mq_complete_request;__blk_mq_complete_request;blk_mq_end_request;blk_update_request;bio_endio;ext4_end_bio;ext4_finish_bio;end_page_writeback;__wake_up_bit;__wake_up;__wake_up_common;wake_bit_function;supervise 3093
+chown;xen_do_hypervisor_callback;xen_evtchn_do_upcall;irq_exit;__do_softirq;run_timer_softirq;call_timer_fn;process_timeout;rcu_sched 3985
+supervise;xen_do_hypervisor_callback;xen_evtchn_do_upcall;irq_exit;__do_softirq;run_timer_softirq;call_timer_fn;process_timeout;rcu_sched 3997
+supervise;__xen_evtchn_do_upcall;evtchn_2l_handle_events;generic_handle_irq;handle_edge_irq;handle_irq_event;handle_irq_event_percpu;blkif_interrupt;blk_mq_complete_request;__blk_mq_complete_request;blk_mq_end_request;blk_update_request;bio_endio;end_bio_bh_io_sync;journal_end_buffer_io_sync;unlock_buffer;wake_up_bit;__wake_up_bit;__wake_up;__wake_up_common;wake_bit_function;jbd2/xvda1-8 4511
+chmod;xen_evtchn_do_upcall;__xen_evtchn_do_upcall;evtchn_2l_handle_events;generic_handle_irq;handle_edge_irq;handle_irq_event;handle_irq_event_percpu;blkif_interrupt;blk_mq_complete_request;__blk_mq_complete_request;blk_mq_end_request;blk_update_request;bio_endio;ext4_end_bio;ext4_finish_bio;end_page_writeback;__wake_up_bit;__wake_up;__wake_up_common;wake_bit_function;supervise 4646
+swapper/4;xen_do_hypervisor_callback;xen_evtchn_do_upcall;irq_exit;__do_softirq;run_timer_softirq;call_timer_fn;process_timeout;rcu_sched 7971
+readproctitle;__xen_evtchn_do_upcall;evtchn_2l_handle_events;generic_handle_irq;handle_edge_irq;handle_irq_event;handle_irq_event_percpu;blkif_interrupt;blk_mq_complete_request;__blk_mq_complete_request;blk_mq_end_request;blk_update_request;bio_endio;end_bio_bh_io_sync;journal_end_buffer_io_sync;unlock_buffer;wake_up_bit;__wake_up_bit;__wake_up;__wake_up_common;wake_bit_function;jbd2/xvda1-8 8249
+swapper/2;cpu_bringup_and_idle;cpu_startup_entry;rcu_idle_enter;rcu_eqs_enter;rcu_eqs_enter_common;wake_nocb_leader;__wake_up;__wake_up_common;autoremove_wake_function;rcuos/2 12016
+run;xen_evtchn_do_upcall;__xen_evtchn_do_upcall;evtchn_2l_handle_events;generic_handle_irq;handle_edge_irq;handle_irq_event;handle_irq_event_percpu;blkif_interrupt;blk_mq_complete_request;__blk_mq_complete_request;blk_mq_end_request;blk_update_request;bio_endio;ext4_end_bio;ext4_finish_bio;end_page_writeback;__wake_up_bit;__wake_up;__wake_up_common;wake_bit_function;supervise 13973
+swapper/0;xen_evtchn_do_upcall;__xen_evtchn_do_upcall;evtchn_2l_handle_events;generic_handle_irq;handle_edge_irq;handle_irq_event;handle_irq_event_percpu;blkif_interrupt;blk_mq_complete_request;__blk_mq_complete_request;blk_mq_end_request;blk_update_request;bio_endio;end_bio_bh_io_sync;journal_end_buffer_io_sync;wake_up_bit;__wake_up_bit;__wake_up;__wake_up_common;wake_bit_function;supervise 15736
+run;xen_do_hypervisor_callback;xen_evtchn_do_upcall;irq_exit;__do_softirq;run_timer_softirq;call_timer_fn;process_timeout;rcu_sched 19916
+swapper/1;xen_do_hypervisor_callback;xen_evtchn_do_upcall;irq_exit;__do_softirq;run_timer_softirq;call_timer_fn;process_timeout;rcu_sched 31877
+mkdir;entry_SYSCALL_64_fastpath;sys_exit_group;do_group_exit;do_exit;do_notify_parent;__wake_up_parent;__wake_up_sync_key;__wake_up_common;child_wait_callback;run 39619
+swapper/5;xen_do_hypervisor_callback;xen_evtchn_do_upcall;irq_exit;__do_softirq;run_timer_softirq;call_timer_fn;process_timeout;rcu_sched 39837
+chown;entry_SYSCALL_64_fastpath;sys_exit_group;do_group_exit;do_exit;do_notify_parent;__wake_up_parent;__wake_up_sync_key;__wake_up_common;child_wait_callback;run 42190
+chmod;entry_SYSCALL_64_fastpath;sys_exit_group;do_group_exit;do_exit;do_notify_parent;__wake_up_parent;__wake_up_sync_key;__wake_up_common;child_wait_callback;run 43486
+swapper/0;xen_evtchn_do_upcall;__xen_evtchn_do_upcall;evtchn_2l_handle_events;generic_handle_irq;handle_edge_irq;handle_irq_event;handle_irq_event_percpu;blkif_interrupt;blk_mq_complete_request;__blk_mq_complete_request;blk_mq_end_request;blk_update_request;bio_endio;ext4_end_bio;ext4_finish_bio;end_page_writeback;__wake_up_bit;__wake_up;__wake_up_common;wake_bit_function;supervise 47810
+bash;entry_SYSCALL_64_fastpath;sys_write;vfs_write;__vfs_write;tty_write;n_tty_write;pty_write;tty_flip_buffer_push;queue_work_on;__queue_work;insert_work;kworker/u16:2 86794
+vmstat;entry_SYSCALL_64_fastpath;sys_write;vfs_write;__vfs_write;tty_write;n_tty_write;pty_write;tty_flip_buffer_push;queue_work_on;__queue_work;insert_work;kworker/u16:2 210848
+swapper/0;irq_exit;__do_softirq;net_rx_action;xennet_poll;napi_gro_receive;netif_receive_skb_internal;__netif_receive_skb;__netif_receive_skb_core;ip_rcv;ip_rcv_finish;ip_local_deliver;ip_local_deliver_finish;tcp_v4_rcv;tcp_v4_do_rcv;tcp_rcv_established;tcp_data_queue;sock_def_readable;__wake_up_sync_key;__wake_up_common;pollwake;sshd 543295
+kworker/u16:2;ret_from_fork;kthread;worker_thread;process_one_work;flush_to_ldisc;n_tty_receive_buf2;n_tty_receive_buf_common;__wake_up;__wake_up_common;woken_wake_function;bash 543570
+swapper/7;xen_do_hypervisor_callback;xen_evtchn_do_upcall;irq_exit;__do_softirq;run_timer_softirq;call_timer_fn;delayed_work_timer_fn;__queue_work;insert_work;kworker/u16:2 741234
+sshd;entry_SYSCALL_64_fastpath;sys_write;vfs_write;__vfs_write;tty_write;n_tty_write;pty_write;tty_flip_buffer_push;queue_work_on;__queue_work;insert_work;kworker/u16:2 855436
+bash;return_from_execve;sys_execve;do_execveat_common.isra.33;sched_exec;stop_one_cpu;cpu_stop_queue_work;migration/7 942685
+swapper/0;xen_do_hypervisor_callback;xen_evtchn_do_upcall;irq_exit;__do_softirq;run_timer_softirq;call_timer_fn;process_timeout;rcu_sched 969059
+swapper/4;xen_do_hypervisor_callback;xen_evtchn_do_upcall;__xen_evtchn_do_upcall;evtchn_2l_handle_events;generic_handle_irq;handle_percpu_irq;handle_irq_event_percpu;add_interrupt_randomness;credit_entropy_bits;queue_work_on;__queue_work;insert_work;kworker/4:0 999981
+swapper/0;xen_do_hypervisor_callback;xen_evtchn_do_upcall;__xen_evtchn_do_upcall;evtchn_2l_handle_events;generic_handle_irq;handle_percpu_irq;handle_irq_event_percpu;xen_timer_interrupt;hrtimer_interrupt;__hrtimer_run_queues;hrtimer_wakeup;sleep 1000103
+sleep;entry_SYSCALL_64_fastpath;sys_exit_group;do_group_exit;do_exit;do_notify_parent;__wake_up_parent;__wake_up_sync_key;__wake_up_common;child_wait_callback;bash 1001564
+swapper/3;xen_do_hypervisor_callback;xen_evtchn_do_upcall;irq_exit;__do_softirq;run_timer_softirq;call_timer_fn;process_timeout;rcu_sched 1016980
+mkdir;xen_do_hypervisor_callback;xen_evtchn_do_upcall;__xen_evtchn_do_upcall;evtchn_2l_handle_events;generic_handle_irq;handle_percpu_irq;handle_irq_event_percpu;xen_timer_interrupt;hrtimer_interrupt;__hrtimer_run_queues;hrtimer_wakeup;supervise 1019302
+chown;xen_do_hypervisor_callback;xen_evtchn_do_upcall;__xen_evtchn_do_upcall;evtchn_2l_handle_events;generic_handle_irq;handle_percpu_irq;handle_irq_event_percpu;xen_timer_interrupt;hrtimer_interrupt;__hrtimer_run_queues;hrtimer_wakeup;supervise 1019908
+swapper/7;xen_do_hypervisor_callback;xen_evtchn_do_upcall;__xen_evtchn_do_upcall;evtchn_2l_handle_events;generic_handle_irq;handle_percpu_irq;handle_irq_event_percpu;xen_timer_interrupt;hrtimer_interrupt;__hrtimer_run_queues;hrtimer_wakeup;supervise 1021074
+swapper/4;xen_do_hypervisor_callback;xen_evtchn_do_upcall;__xen_evtchn_do_upcall;evtchn_2l_handle_events;generic_handle_irq;handle_percpu_irq;handle_irq_event_percpu;xen_timer_interrupt;hrtimer_interrupt;__hrtimer_run_queues;hrtimer_wakeup;supervise 1021075
+run;return_from_execve;sys_execve;do_execveat_common.isra.33;sched_exec;stop_one_cpu;cpu_stop_queue_work;migration/6 1030506
+run;return_from_execve;sys_execve;do_execveat_common.isra.33;sched_exec;stop_one_cpu;cpu_stop_queue_work;migration/4 1032424
+swapper/6;xen_do_hypervisor_callback;xen_evtchn_do_upcall;irq_exit;__do_softirq;run_timer_softirq;call_timer_fn;process_timeout;rcu_sched 1036908
+run;return_from_execve;sys_execve;do_execveat_common.isra.33;sched_exec;stop_one_cpu;cpu_stop_queue_work;migration/1 1040207
+run;return_from_execve;sys_execve;do_execveat_common.isra.33;sched_exec;stop_one_cpu;cpu_stop_queue_work;migration/5 1044756
+run;return_from_execve;sys_execve;do_execveat_common.isra.33;sched_exec;stop_one_cpu;cpu_stop_queue_work;migration/3 1044986
+run;return_from_execve;sys_execve;do_execveat_common.isra.33;sched_exec;stop_one_cpu;cpu_stop_queue_work;migration/2 1046347
+supervise;return_from_execve;sys_execve;do_execveat_common.isra.33;sched_exec;stop_one_cpu;cpu_stop_queue_work;migration/7 1093598
+swapper/7;xen_do_hypervisor_callback;xen_evtchn_do_upcall;irq_exit;__do_softirq;run_timer_softirq;call_timer_fn;process_timeout;rcu_sched 1858510
+supervise;xen_do_hypervisor_callback;xen_evtchn_do_upcall;__xen_evtchn_do_upcall;evtchn_2l_handle_events;generic_handle_irq;handle_percpu_irq;handle_irq_event_percpu;xen_timer_interrupt;hrtimer_interrupt;__hrtimer_run_queues;hrtimer_wakeup;supervise 2041736
+swapper/6;xen_do_hypervisor_callback;xen_evtchn_do_upcall;__xen_evtchn_do_upcall;evtchn_2l_handle_events;generic_handle_irq;handle_percpu_irq;handle_irq_event_percpu;xen_timer_interrupt;hrtimer_interrupt;__hrtimer_run_queues;hrtimer_wakeup;supervise 2042028
+swapper/1;xen_do_hypervisor_callback;xen_evtchn_do_upcall;__xen_evtchn_do_upcall;evtchn_2l_handle_events;generic_handle_irq;handle_percpu_irq;handle_irq_event_percpu;xen_timer_interrupt;hrtimer_interrupt;__hrtimer_run_queues;hrtimer_wakeup;supervise 2042149
+swapper/2;xen_do_hypervisor_callback;xen_evtchn_do_upcall;__xen_evtchn_do_upcall;evtchn_2l_handle_events;generic_handle_irq;handle_percpu_irq;handle_irq_event_percpu;xen_timer_interrupt;hrtimer_interrupt;__hrtimer_run_queues;hrtimer_wakeup;supervise 2042152
+supervise;return_from_execve;sys_execve;do_execveat_common.isra.33;sched_exec;stop_one_cpu;cpu_stop_queue_work;migration/6 2042698
+supervise;return_from_execve;sys_execve;do_execveat_common.isra.33;sched_exec;stop_one_cpu;cpu_stop_queue_work;migration/0 2044085
+run;return_from_execve;sys_execve;do_execveat_common.isra.33;sched_exec;stop_one_cpu;cpu_stop_queue_work;migration/0 2047386
+run;return_from_execve;sys_execve;do_execveat_common.isra.33;sched_exec;stop_one_cpu;cpu_stop_queue_work;migration/7 2065637
+swapper/4;xen_do_hypervisor_callback;xen_evtchn_do_upcall;irq_exit;__do_softirq;run_timer_softirq;call_timer_fn;delayed_work_timer_fn;__queue_work;insert_work;kworker/4:0 2999930
+swapper/6;xen_do_hypervisor_callback;xen_evtchn_do_upcall;__xen_evtchn_do_upcall;evtchn_2l_handle_events;generic_handle_irq;handle_percpu_irq;handle_irq_event_percpu;xen_timer_interrupt;hrtimer_interrupt;__hrtimer_run_queues;hrtimer_wakeup;snmpd 2999999
+swapper/1;xen_do_hypervisor_callback;xen_evtchn_do_upcall;irq_exit;__do_softirq;run_timer_softirq;call_timer_fn;delayed_work_timer_fn;__queue_work;insert_work;kworker/u16:2 3010848
+supervise;return_from_execve;sys_execve;do_execveat_common.isra.33;sched_exec;stop_one_cpu;cpu_stop_queue_work;migration/5 3050881
+supervise;return_from_execve;sys_execve;do_execveat_common.isra.33;sched_exec;stop_one_cpu;cpu_stop_queue_work;migration/1 3051454
+supervise;return_from_execve;sys_execve;do_execveat_common.isra.33;sched_exec;stop_one_cpu;cpu_stop_queue_work;migration/3 3054844
+supervise;return_from_execve;sys_execve;do_execveat_common.isra.33;sched_exec;stop_one_cpu;cpu_stop_queue_work;migration/2 3059548
+supervise;return_from_execve;sys_execve;do_execveat_common.isra.33;sched_exec;stop_one_cpu;cpu_stop_queue_work;migration/4 3061480
+swapper/3;xen_do_hypervisor_callback;xen_evtchn_do_upcall;__xen_evtchn_do_upcall;evtchn_2l_handle_events;generic_handle_irq;handle_percpu_irq;handle_irq_event_percpu;xen_timer_interrupt;hrtimer_interrupt;__hrtimer_run_queues;hrtimer_wakeup;supervise 3062666
+swapper/5;xen_do_hypervisor_callback;xen_evtchn_do_upcall;__xen_evtchn_do_upcall;evtchn_2l_handle_events;generic_handle_irq;handle_percpu_irq;handle_irq_event_percpu;xen_timer_interrupt;hrtimer_interrupt;__hrtimer_run_queues;hrtimer_wakeup;supervise 3063222
+swapper/7;xen_do_hypervisor_callback;xen_evtchn_do_upcall;__xen_evtchn_do_upcall;evtchn_2l_handle_events;generic_handle_irq;handle_percpu_irq;handle_irq_event_percpu;xen_timer_interrupt;hrtimer_interrupt;__hrtimer_run_queues;it_real_fn;kill_pid_info;group_send_sig_info;do_send_sig_info;send_signal;__send_signal;complete_signal;signal_wake_up_state;ntpd 3999835
+swapper/1;xen_do_hypervisor_callback;xen_evtchn_do_upcall;irq_exit;__do_softirq;run_timer_softirq;call_timer_fn;delayed_work_timer_fn;__queue_work;insert_work;kworker/1:0 3999933
+swapper/6;xen_do_hypervisor_callback;xen_evtchn_do_upcall;irq_exit;__do_softirq;run_timer_softirq;call_timer_fn;delayed_work_timer_fn;__queue_work;insert_work;kworker/6:0 3999938
+swapper/3;xen_do_hypervisor_callback;xen_evtchn_do_upcall;irq_exit;__do_softirq;run_timer_softirq;call_timer_fn;delayed_work_timer_fn;__queue_work;insert_work;kworker/3:0 3999938
+swapper/7;xen_do_hypervisor_callback;xen_evtchn_do_upcall;irq_exit;__do_softirq;run_timer_softirq;call_timer_fn;delayed_work_timer_fn;__queue_work;insert_work;kworker/7:2 3999939
+swapper/5;xen_do_hypervisor_callback;xen_evtchn_do_upcall;irq_exit;__do_softirq;run_timer_softirq;call_timer_fn;delayed_work_timer_fn;__queue_work;insert_work;kworker/5:3 3999942
+swapper/2;xen_do_hypervisor_callback;xen_evtchn_do_upcall;irq_exit;__do_softirq;run_timer_softirq;call_timer_fn;delayed_work_timer_fn;__queue_work;insert_work;kworker/2:1 3999946
+swapper/0;xen_do_hypervisor_callback;xen_evtchn_do_upcall;irq_exit;__do_softirq;run_timer_softirq;call_timer_fn;delayed_work_timer_fn;__queue_work;insert_work;kworker/0:1 3999953
+swapper/0;xen_do_hypervisor_callback;xen_evtchn_do_upcall;__xen_evtchn_do_upcall;evtchn_2l_handle_events;generic_handle_irq;handle_percpu_irq;handle_irq_event_percpu;xen_timer_interrupt;hrtimer_interrupt;__hrtimer_run_queues;hrtimer_wakeup;tail 4000414
+swapper/4;xen_do_hypervisor_callback;xen_evtchn_do_upcall;__xen_evtchn_do_upcall;evtchn_2l_handle_events;generic_handle_irq;handle_percpu_irq;handle_irq_event_percpu;xen_timer_interrupt;hrtimer_interrupt;__hrtimer_run_queues;hrtimer_wakeup;vmstat 4000417
+chmod;xen_do_hypervisor_callback;xen_evtchn_do_upcall;__xen_evtchn_do_upcall;evtchn_2l_handle_events;generic_handle_irq;handle_percpu_irq;handle_irq_event_percpu;xen_timer_interrupt;hrtimer_interrupt;__hrtimer_run_queues;hrtimer_wakeup;supervise 4083231
+run;entry_SYSCALL_64_fastpath;sys_write;vfs_write;__vfs_write;pipe_write;__wake_up_sync_key;__wake_up_common;autoremove_wake_function;readproctitle 4096457
+rcuos/4;ret_from_fork;kthread;rcu_nocb_kthread;__wake_up;__wake_up_common;autoremove_wake_function;rcuos/5 4973072
+rcuos/0;ddebug_tables;ret_from_fork;kthread;rcu_nocb_kthread;__wake_up;__wake_up_common;autoremove_wake_function;rcuos/1 4973898
+rcu_sched;ddebug_tables;ret_from_fork;kthread;rcu_gp_kthread;__wake_up;__wake_up_common;autoremove_wake_function;rcuos/0 4976731
+rcu_sched;ddebug_tables;ret_from_fork;kthread;rcu_gp_kthread;__wake_up;__wake_up_common;autoremove_wake_function;rcuos/4 4976755
+rcuos/2;ret_from_fork;kthread;rcu_nocb_kthread;__wake_up;__wake_up_common;autoremove_wake_function;rcuos/3 4980207
+rcu_sched;ddebug_tables;ret_from_fork;kthread;rcu_gp_kthread;__wake_up;__wake_up_common;autoremove_wake_function;rcuos/2 4980502
+rcuos/6;ret_from_fork;kthread;rcu_nocb_kthread;__wake_up;__wake_up_common;autoremove_wake_function;rcuos/7 4981025
+rcu_sched;ddebug_tables;ret_from_fork;kthread;rcu_gp_kthread;__wake_up;__wake_up_common;autoremove_wake_function;rcuos/6 4983110
+kworker/u16:2;ret_from_fork;kthread;worker_thread;process_one_work;flush_to_ldisc;n_tty_receive_buf2;n_tty_receive_buf_common;__wake_up;__wake_up_common;pollwake;sshd 5004430
+swapper/6;xen_do_hypervisor_callback;xen_evtchn_do_upcall;__xen_evtchn_do_upcall;evtchn_2l_handle_events;generic_handle_irq;handle_percpu_irq;handle_irq_event_percpu;xen_timer_interrupt;hrtimer_interrupt;__hrtimer_run_queues;hrtimer_wakeup;wakeuptime 5005051
+run;xen_do_hypervisor_callback;xen_evtchn_do_upcall;__xen_evtchn_do_upcall;evtchn_2l_handle_events;generic_handle_irq;handle_percpu_irq;handle_irq_event_percpu;xen_timer_interrupt;hrtimer_interrupt;__hrtimer_run_queues;hrtimer_wakeup;supervise 7144088
+swapper/0;xen_do_hypervisor_callback;xen_evtchn_do_upcall;__xen_evtchn_do_upcall;evtchn_2l_handle_events;generic_handle_irq;handle_percpu_irq;handle_irq_event_percpu;xen_timer_interrupt;hrtimer_interrupt;__hrtimer_run_queues;hrtimer_wakeup;supervise 11229310
+
+The stack traces are shown as single lines, with functions separated by
+semicolons. The first entry is the waker task name, followed by the waker stack,
+and then last entry is the target task name. As a flame graph, this puts the
+waker name on the bottom, followed by the waker stack, and then the target
+task name on top. The 2nd column is the total blocked time.
+
+I'd save this output to a file, then move it to the system where you'll be
+creating your "wakeup time flame graphs".
+
+
+USAGE message:
+
+# ./wakeuptime -h
+usage: wakeuptime [-h] [-u] [-p PID] [-v] [-f] [duration]
+
+Summarize sleep to wakeup time by waker kernel stack
+
+positional arguments:
+  duration           duration of trace, in seconds
+
+optional arguments:
+  -h, --help         show this help message and exit
+  -u, --useronly     user threads only (no kernel threads)
+  -p PID, --pid PID  trace this PID only
+  -v, --verbose      show raw addresses
+  -f, --folded       output folded format
+
+examples:
+    ./wakeuptime             # trace blocked time with waker stacks
+    ./wakeuptime 5           # trace for 5 seconds only
+    ./wakeuptime -f 5        # 5 seconds, and output in folded format
+    ./wakeuptime -u          # don't include kernel threads (user only)
+    ./wakeuptime -p 185      # trace for PID 185 only

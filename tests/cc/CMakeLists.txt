@@ -1,40 +1,23 @@
 # Copyright (c) PLUMgrid, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
 
-find_program(ARPING arping)
-if(ARPING STREQUAL "ARPING-NOTFOUND")
-  message(WARNING "Recommended test program 'arping' not found")
-endif()
-find_program(NETPERF netperf)
-if(NETPERF STREQUAL "NETPERF-NOTFOUND")
-  message(WARNING "Recommended test program 'netperf' not found")
-endif()
-find_program(IPERF iperf)
-if(IPERF STREQUAL "IPERF-NOTFOUND")
-  message(WARNING "Recommended test program 'iperf' not found")
-endif()
+include_directories(${CMAKE_SOURCE_DIR}/src/cc)
 
-add_test(NAME py_test_stat1_b WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-  COMMAND ${TEST_WRAPPER} py_stat1_b namespace ${CMAKE_CURRENT_SOURCE_DIR}/test_stat1.py test_stat1.b proto.b)
-add_test(NAME py_test_stat1_c WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-  COMMAND ${TEST_WRAPPER} py_stat1_c namespace ${CMAKE_CURRENT_SOURCE_DIR}/test_stat1.py test_stat1.c)
-#add_test(NAME py_test_xlate1_b WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-#  COMMAND ${TEST_WRAPPER} py_xlate1_b namespace ${CMAKE_CURRENT_SOURCE_DIR}/test_xlate1.py test_xlate1.b proto.b)
-add_test(NAME py_test_xlate1_c WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-  COMMAND ${TEST_WRAPPER} py_xlate1_c namespace ${CMAKE_CURRENT_SOURCE_DIR}/test_xlate1.py test_xlate1.c)
-add_test(NAME py_test_call1 WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-  COMMAND ${TEST_WRAPPER} py_call1_c namespace ${CMAKE_CURRENT_SOURCE_DIR}/test_call1.py test_call1.c)
-add_test(NAME py_test_trace1 WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-  COMMAND ${TEST_WRAPPER} py_trace1 sudo ${CMAKE_CURRENT_SOURCE_DIR}/test_trace1.py test_trace1.b kprobe.b)
-add_test(NAME py_test_trace2 WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-  COMMAND ${TEST_WRAPPER} py_trace2 sudo ${CMAKE_CURRENT_SOURCE_DIR}/test_trace2.py)
-add_test(NAME py_test_trace3_c WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-  COMMAND ${TEST_WRAPPER} py_trace3_c sudo ${CMAKE_CURRENT_SOURCE_DIR}/test_trace3.py test_trace3.c)
-add_test(NAME py_test_trace4 WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-  COMMAND ${TEST_WRAPPER} py_trace4 sudo ${CMAKE_CURRENT_SOURCE_DIR}/test_trace4.py)
-add_test(NAME py_test_brb WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-  COMMAND ${TEST_WRAPPER} py_brb_c sudo ${CMAKE_CURRENT_SOURCE_DIR}/test_brb.py test_brb.c)
-add_test(NAME py_test_brb2 WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-  COMMAND ${TEST_WRAPPER} py_brb2_c sudo ${CMAKE_CURRENT_SOURCE_DIR}/test_brb2.py test_brb2.c)
-add_test(NAME py_test_clang WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-  COMMAND ${TEST_WRAPPER} py_clang sudo ${CMAKE_CURRENT_SOURCE_DIR}/test_clang.py)
+add_executable(test_static test_static.c)
+target_link_libraries(test_static bcc-static)
+
+add_test(NAME c_test_static COMMAND ${TEST_WRAPPER} c_test_static sudo ${CMAKE_CURRENT_BINARY_DIR}/test_static)
+
+add_executable(test_libbcc
+	test_libbcc.cc
+	test_c_api.cc
+	test_usdt_args.cc
+	test_usdt_probes.cc)
+
+target_link_libraries(test_libbcc bcc-shared dl)
+add_test(NAME test_libbcc COMMAND ${TEST_WRAPPER} c_test_all sudo ${CMAKE_CURRENT_BINARY_DIR}/test_libbcc)
+
+find_path(SDT_HEADER NAMES "sys/sdt.h")
+if (SDT_HEADER)
+	target_compile_definitions(test_libbcc PRIVATE HAVE_SDT_HEADER=1)
+endif()

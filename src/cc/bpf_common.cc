@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "cc/bpf_module.h"
-#include "cc/bpf_common.h"
+#include "bpf_common.h"
+#include "bpf_module.h"
 
 extern "C" {
 void * bpf_module_create_b(const char *filename, const char *proto_filename, unsigned flags) {
@@ -26,18 +26,18 @@ void * bpf_module_create_b(const char *filename, const char *proto_filename, uns
   return mod;
 }
 
-void * bpf_module_create_c(const char *filename, unsigned flags) {
+void * bpf_module_create_c(const char *filename, unsigned flags, const char *cflags[], int ncflags) {
   auto mod = new ebpf::BPFModule(flags);
-  if (mod->load_c(filename) != 0) {
+  if (mod->load_c(filename, cflags, ncflags) != 0) {
     delete mod;
     return nullptr;
   }
   return mod;
 }
 
-void * bpf_module_create_c_from_string(const char *text, unsigned flags) {
+void * bpf_module_create_c_from_string(const char *text, unsigned flags, const char *cflags[], int ncflags) {
   auto mod = new ebpf::BPFModule(flags);
-  if (mod->load_string(text) != 0) {
+  if (mod->load_string(text, cflags, ncflags) != 0) {
     delete mod;
     return nullptr;
   }
@@ -132,6 +132,18 @@ int bpf_table_type_id(void *program, size_t id) {
   auto mod = static_cast<ebpf::BPFModule *>(program);
   if (!mod) return -1;
   return mod->table_type(id);
+}
+
+size_t bpf_table_max_entries(void *program, const char *table_name) {
+  auto mod = static_cast<ebpf::BPFModule *>(program);
+  if (!mod) return 0;
+  return mod->table_max_entries(table_name);
+}
+
+size_t bpf_table_max_entries_id(void *program, size_t id) {
+  auto mod = static_cast<ebpf::BPFModule *>(program);
+  if (!mod) return 0;
+  return mod->table_max_entries(id);
 }
 
 const char * bpf_table_name(void *program, size_t id) {

@@ -25,8 +25,8 @@ extern "C" {
 #endif
 
 void * bpf_module_create_b(const char *filename, const char *proto_filename, unsigned flags);
-void * bpf_module_create_c(const char *filename, unsigned flags);
-void * bpf_module_create_c_from_string(const char *text, unsigned flags);
+void * bpf_module_create_c(const char *filename, unsigned flags, const char *cflags[], int ncflags);
+void * bpf_module_create_c_from_string(const char *text, unsigned flags, const char *cflags[], int ncflags);
 void bpf_module_destroy(void *program);
 char * bpf_module_license(void *program);
 unsigned bpf_module_kern_version(void *program);
@@ -42,6 +42,8 @@ int bpf_table_fd(void *program, const char *table_name);
 int bpf_table_fd_id(void *program, size_t id);
 int bpf_table_type(void *program, const char *table_name);
 int bpf_table_type_id(void *program, size_t id);
+size_t bpf_table_max_entries(void *program, const char *table_name);
+size_t bpf_table_max_entries_id(void *program, size_t id);
 const char * bpf_table_name(void *program, size_t id);
 const char * bpf_table_key_desc(void *program, const char *table_name);
 const char * bpf_table_key_desc_id(void *program, size_t id);

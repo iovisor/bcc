@@ -1,0 +1,205 @@
+Demonstrations of memleak.
+
+
+memleak traces and matches memory allocation and deallocation requests, and
+collects call stacks for each allocation. memleak can then print a summary
+of which call stacks performed allocations that weren't subsequently freed.
+For example:
+
+# ./memleak -p $(pidof allocs)
+Attaching to malloc and free in pid 5193, Ctrl+C to quit.
+[11:16:33] Top 2 stacks with outstanding allocations:
+        80 bytes in 5 allocations from stack
+                 main+0x6d [/home/vagrant/allocs] (400862) 
+                 __libc_start_main+0xf0 [/usr/lib64/libc-2.21.so] (7fd460ac2790) 
+
+[11:16:34] Top 2 stacks with outstanding allocations:
+        160 bytes in 10 allocations from stack
+                 main+0x6d [/home/vagrant/allocs] (400862) 
+                 __libc_start_main+0xf0 [/usr/lib64/libc-2.21.so] (7fd460ac2790) 
+
+
+Each entry printed is a set of allocations that originate from the same call
+stack, and that weren't freed yet. The number of bytes and number of allocs
+are followed by the call stack, top to bottom, of the allocation site.
+
+As time goes on, it becomes apparent that the main function in the allocs
+process is leaking memory, 16 bytes at a time. Fortunately, you don't have to
+inspect each allocation individually -- you get a nice summary of which stack
+is responsible for a large leak.
+
+Occasionally, you do want the individual allocation details. Perhaps the same
+stack is allocating various sizes and you want to confirm which sizes are 
+prevalent. Use the -a switch:
+
+# ./memleak -p $(pidof allocs) -a
+Attaching to malloc and free in pid 5193, Ctrl+C to quit.
+[11:16:33] Top 2 stacks with outstanding allocations:
+        addr = 948cd0 size = 16
+        addr = 948d10 size = 16
+        addr = 948d30 size = 16
+        addr = 948cf0 size = 16
+        64 bytes in 4 allocations from stack
+                 main+0x6d [/home/vagrant/allocs] (400862) 
+                 __libc_start_main+0xf0 [/usr/lib64/libc-2.21.so] (7fd460ac2790) 
+
+[11:16:34] Top 2 stacks with outstanding allocations:
+        addr = 948d50 size = 16
+        addr = 948cd0 size = 16
+        addr = 948d10 size = 16
+        addr = 948d30 size = 16
+        addr = 948cf0 size = 16
+        addr = 948dd0 size = 16
+        addr = 948d90 size = 16
+        addr = 948db0 size = 16
+        addr = 948d70 size = 16
+        addr = 948df0 size = 16
+        160 bytes in 10 allocations from stack
+                 main+0x6d [/home/vagrant/allocs] (400862) 
+                 __libc_start_main+0xf0 [/usr/lib64/libc-2.21.so] (7fd460ac2790) 
+
+
+When using the -p switch, memleak traces the allocations of a particular
+process. Without this switch, kernel allocations (kmalloc) are traced instead.
+For example:
+
+# ./memleak
+Attaching to kmalloc and kfree, Ctrl+C to quit.
+...
+        248 bytes in 4 allocations from stack
+                 bpf_prog_load [kernel] (ffffffff8118c471) 
+                 sys_bpf [kernel] (ffffffff8118c8b5) 
+
+        328 bytes in 1 allocations from stack
+                 perf_mmap [kernel] (ffffffff811990fd) 
+                 mmap_region [kernel] (ffffffff811df5d4) 
+                 do_mmap [kernel] (ffffffff811dfb83) 
+                 vm_mmap_pgoff [kernel] (ffffffff811c494f) 
+                 sys_mmap_pgoff [kernel] (ffffffff811ddf02) 
+                 sys_mmap [kernel] (ffffffff8101b0ab) 
+
+        464 bytes in 1 allocations from stack
+                 traceprobe_command [kernel] (ffffffff81187cf2) 
+                 traceprobe_probes_write [kernel] (ffffffff81187d86) 
+                 probes_write [kernel] (ffffffff81181580) 
+                 __vfs_write [kernel] (ffffffff812237b7) 
+                 vfs_write [kernel] (ffffffff81223ec6) 
+                 sys_write [kernel] (ffffffff81224b85) 
+                 entry_SYSCALL_64_fastpath [kernel] (ffffffff8178182e) 
+
+        8192 bytes in 1 allocations from stack
+                 alloc_and_copy_ftrace_hash.constprop.59 [kernel] (ffffffff8115d17e) 
+                 ftrace_set_hash [kernel] (ffffffff8115e767) 
+                 ftrace_set_filter_ip [kernel] (ffffffff8115e9a8) 
+                 arm_kprobe [kernel] (ffffffff81148600) 
+                 enable_kprobe [kernel] (ffffffff811486f6) 
+                 kprobe_register [kernel] (ffffffff81182399) 
+                 perf_trace_init [kernel] (ffffffff8117c4e0) 
+                 perf_tp_event_init [kernel] (ffffffff81192479) 
+
+
+Here you can see that arming the kprobe to which our eBPF program is attached
+consumed 8KB of memory. Loading the BPF program also consumed a couple hundred
+bytes (in bpf_prog_load).
+
+memleak stores each allocated block along with its size, timestamp, and the
+stack that allocated it. When the block is deleted, this information is freed
+to reduce the memory overhead.
+
+To avoid false positives, allocations younger than a certain age (500ms by
+default) are not printed. To change this threshold, use the -o switch.
+
+By default, memleak prints its output every 5 seconds. To change this 
+interval, pass the interval as a positional parameter to memleak. You can 
+also control the number of times the output will be printed before exiting.
+For example:
+
+# ./memleak 1 10
+
+... will print the outstanding allocation statistics every second, for ten
+times, and then exit. 
+
+memleak may introduce considerable overhead if your application or kernel is
+allocating and freeing memory at a very high rate. In that case, you can 
+control the overhead by sampling every N-th allocation. For example, to sample
+roughly 10% of the allocations and print the outstanding allocations every 5
+seconds, 3 times before quitting:
+
+# ./memleak -p $(pidof allocs) -s 10 5 3
+Attaching to malloc and free in pid 2614, Ctrl+C to quit.
+[11:16:33] Top 2 stacks with outstanding allocations:
+        16 bytes in 1 allocations from stack
+                 main+0x6d [/home/vagrant/allocs] (400862) 
+                 __libc_start_main+0xf0 [/usr/lib64/libc-2.21.so] (7fdc11ce8790) 
+
+[11:16:38] Top 2 stacks with outstanding allocations:
+        16 bytes in 1 allocations from stack
+                 main+0x6d [/home/vagrant/allocs] (400862) 
+                 __libc_start_main+0xf0 [/usr/lib64/libc-2.21.so] (7fdc11ce8790) 
+
+[11:16:43] Top 2 stacks with outstanding allocations:
+        32 bytes in 2 allocations from stack
+                 main+0x6d [/home/vagrant/allocs] (400862) 
+                 __libc_start_main+0xf0 [/usr/lib64/libc-2.21.so] (7fdc11ce8790) 
+
+Note that even though the application leaks 16 bytes of memory every second, 
+the report (printed every 5 seconds) doesn't "see" all the allocations because
+of the sampling rate applied. 
+
+
+USAGE message:
+
+# ./memleak -h
+usage: memleak [-h] [-p PID] [-t] [-a] [-o OLDER] [-c COMMAND]
+                  [-s SAMPLE_RATE] [-d STACK_DEPTH] [-T TOP]
+                  [interval] [count]
+
+Trace outstanding memory allocations that weren't freed.
+Supports both user-mode allocations made with malloc/free and kernel-mode
+allocations made with kmalloc/kfree.
+
+  interval              interval in seconds to print outstanding allocations
+  count                 number of times to print the report before exiting
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -p PID, --pid PID     the PID to trace; if not specified, trace kernel
+                        allocs
+  -t, --trace           print trace messages for each alloc/free call
+  -a, --show-allocs     show allocation addresses and sizes as well as call
+                        stacks
+  -o OLDER, --older OLDER
+                        prune allocations younger than this age in
+                        milliseconds
+  -c COMMAND, --command COMMAND
+                        execute and trace the specified command
+  -s SAMPLE_RATE, --sample-rate SAMPLE_RATE
+                        sample every N-th allocation to decrease the overhead
+  -d STACK_DEPTH, --stack_depth STACK_DEPTH
+                        maximum stack depth to capture
+  -T TOP, --top TOP     display only this many top allocating stacks (by size)
+  -z MIN_SIZE, --min-size MIN_SIZE
+                        capture only allocations larger than this size
+  -Z MAX_SIZE, --max-size MAX_SIZE
+                        capture only allocations smaller than this size
+
+EXAMPLES:
+
+./memleak -p $(pidof allocs)
+        Trace allocations and display a summary of "leaked" (outstanding)
+        allocations every 5 seconds
+./memleak -p $(pidof allocs) -t
+        Trace allocations and display each individual call to malloc/free
+./memleak -ap $(pidof allocs) 10
+        Trace allocations and display allocated addresses, sizes, and stacks
+        every 10 seconds for outstanding allocations
+./memleak -c "./allocs"
+        Run the specified command and trace its allocations
+./memleak
+        Trace allocations in kernel mode and display a summary of outstanding
+        allocations every 5 seconds
+./memleak -o 60000
+        Trace allocations in kernel mode and display a summary of outstanding
+        allocations that are at least one minute (60 seconds) old
+./memleak -s 5
+        Trace roughly every 5th allocation, to reduce overhead

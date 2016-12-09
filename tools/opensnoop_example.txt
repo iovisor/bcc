@@ -1,0 +1,144 @@
+Demonstrations of opensnoop, the Linux eBPF/bcc version.
+
+
+opensnoop traces the open() syscall system-wide, and prints various details.
+Example output:
+
+# ./opensnoop
+PID    COMM      FD ERR PATH
+17326  <...>      7   0 /sys/kernel/debug/tracing/trace_pipe
+1576   snmpd      9   0 /proc/net/dev
+1576   snmpd     11   0 /proc/net/if_inet6
+1576   snmpd     11   0 /proc/sys/net/ipv4/neigh/eth0/retrans_time_ms
+1576   snmpd     11   0 /proc/sys/net/ipv6/neigh/eth0/retrans_time_ms
+1576   snmpd     11   0 /proc/sys/net/ipv6/conf/eth0/forwarding
+1576   snmpd     11   0 /proc/sys/net/ipv6/neigh/eth0/base_reachable_time_ms
+1576   snmpd     11   0 /proc/sys/net/ipv4/neigh/lo/retrans_time_ms
+1576   snmpd     11   0 /proc/sys/net/ipv6/neigh/lo/retrans_time_ms
+1576   snmpd     11   0 /proc/sys/net/ipv6/conf/lo/forwarding
+1576   snmpd     11   0 /proc/sys/net/ipv6/neigh/lo/base_reachable_time_ms
+1576   snmpd      9   0 /proc/diskstats
+1576   snmpd      9   0 /proc/stat
+1576   snmpd      9   0 /proc/vmstat
+1956   supervise  9   0 supervise/status.new
+1956   supervise  9   0 supervise/status.new
+17358  run        3   0 /etc/ld.so.cache
+17358  run        3   0 /lib/x86_64-linux-gnu/libtinfo.so.5
+17358  run        3   0 /lib/x86_64-linux-gnu/libdl.so.2
+17358  run        3   0 /lib/x86_64-linux-gnu/libc.so.6
+17358  run       -1   6 /dev/tty
+17358  run        3   0 /proc/meminfo
+17358  run        3   0 /etc/nsswitch.conf
+17358  run        3   0 /etc/ld.so.cache
+17358  run        3   0 /lib/x86_64-linux-gnu/libnss_compat.so.2
+17358  run        3   0 /lib/x86_64-linux-gnu/libnsl.so.1
+17358  run        3   0 /etc/ld.so.cache
+17358  run        3   0 /lib/x86_64-linux-gnu/libnss_nis.so.2
+17358  run        3   0 /lib/x86_64-linux-gnu/libnss_files.so.2
+17358  run        3   0 /etc/passwd
+17358  run        3   0 ./run
+^C
+
+While tracing, the snmpd process opened various /proc files (reading metrics),
+and a "run" process read various libraries and config files (looks like it
+was starting up: a new process).
+
+opensnoop can be useful for discovering configuration and log files, if used
+during application startup.
+
+
+The -p option can be used to filter on a PID, which is filtered in-kernel. Here
+I've used it with -T to print timestamps:
+
+ ./opensnoop -Tp 1956
+TIME(s)       PID    COMM               FD ERR PATH
+0.000000000   1956   supervise           9   0 supervise/status.new
+0.000289999   1956   supervise           9   0 supervise/status.new
+1.023068000   1956   supervise           9   0 supervise/status.new
+1.023381997   1956   supervise           9   0 supervise/status.new
+2.046030000   1956   supervise           9   0 supervise/status.new
+2.046363000   1956   supervise           9   0 supervise/status.new
+3.068203997   1956   supervise           9   0 supervise/status.new
+3.068544999   1956   supervise           9   0 supervise/status.new
+
+This shows the supervise process is opening the status.new file twice every
+second.
+
+
+The -x option only prints failed opens:
+
+# ./opensnoop -x
+PID    COMM      FD ERR PATH
+18372  run       -1   6 /dev/tty
+18373  run       -1   6 /dev/tty
+18373  multilog  -1  13 lock
+18372  multilog  -1  13 lock
+18384  df        -1   2 /usr/share/locale/en_US.UTF-8/LC_MESSAGES/coreutils.mo
+18384  df        -1   2 /usr/share/locale/en_US.utf8/LC_MESSAGES/coreutils.mo
+18384  df        -1   2 /usr/share/locale/en_US/LC_MESSAGES/coreutils.mo
+18384  df        -1   2 /usr/share/locale/en.UTF-8/LC_MESSAGES/coreutils.mo
+18384  df        -1   2 /usr/share/locale/en.utf8/LC_MESSAGES/coreutils.mo
+18384  df        -1   2 /usr/share/locale/en/LC_MESSAGES/coreutils.mo
+18385  run       -1   6 /dev/tty
+18386  run       -1   6 /dev/tty
+
+This caught a df command failing to open a coreutils.mo file, and trying from
+different directories.
+
+The ERR column is the system error number. Error number 2 is ENOENT: no such
+file or directory.
+
+
+The -n option can be used to filter on process name using partial matches:
+
+# ./opensnoop -n ed
+
+PID    COMM               FD ERR PATH
+2679   sed                 3   0 /etc/ld.so.cache
+2679   sed                 3   0 /lib/x86_64-linux-gnu/libselinux.so.1
+2679   sed                 3   0 /lib/x86_64-linux-gnu/libc.so.6
+2679   sed                 3   0 /lib/x86_64-linux-gnu/libpcre.so.3
+2679   sed                 3   0 /lib/x86_64-linux-gnu/libdl.so.2
+2679   sed                 3   0 /lib/x86_64-linux-gnu/libpthread.so.0
+2679   sed                 3   0 /proc/filesystems
+2679   sed                 3   0 /usr/lib/locale/locale-archive
+2679   sed                -1   2
+2679   sed                 3   0 /usr/lib/x86_64-linux-gnu/gconv/gconv-modules.cache
+2679   sed                 3   0 /dev/null
+2680   sed                 3   0 /etc/ld.so.cache
+2680   sed                 3   0 /lib/x86_64-linux-gnu/libselinux.so.1
+2680   sed                 3   0 /lib/x86_64-linux-gnu/libc.so.6
+2680   sed                 3   0 /lib/x86_64-linux-gnu/libpcre.so.3
+2680   sed                 3   0 /lib/x86_64-linux-gnu/libdl.so.2
+2680   sed                 3   0 /lib/x86_64-linux-gnu/libpthread.so.0
+2680   sed                 3   0 /proc/filesystems
+2680   sed                 3   0 /usr/lib/locale/locale-archive
+2680   sed                -1   2
+^C
+
+This caught the 'sed' command because it partially matches 'ed' that's passed
+to the '-n' option.
+
+
+USAGE message:
+
+# ./opensnoop -h
+usage: opensnoop [-h] [-T] [-x] [-p PID] [-t TID] [-n NAME]
+
+Trace open() syscalls
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -T, --timestamp       include timestamp on output
+  -x, --failed          only show failed opens
+  -p PID, --pid PID     trace this PID only
+  -t TID, --tid TID     trace this TID only
+  -n NAME, --name NAME  only print process names containing this name
+
+examples:
+    ./opensnoop           # trace all open() syscalls
+    ./opensnoop -T        # include timestamps
+    ./opensnoop -x        # only show failed opens
+    ./opensnoop -p 181    # only trace PID 181
+    ./opensnoop -t 123    # only trace TID 123
+    ./opensnoop -n main   # only print process names containing "main"

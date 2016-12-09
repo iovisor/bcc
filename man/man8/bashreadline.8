@@ -1,0 +1,52 @@
+.TH bashreadline 8  "2016-01-28" "USER COMMANDS"
+.SH NAME
+bashreadline \- Print entered bash commands system wide. Uses Linux eBPF/bcc.
+.SH SYNOPSIS
+.B bashreadline
+.SH DESCRIPTION
+bashreadline traces the return of the readline() function using uprobes, to
+show the bash commands that were entered interactively, system wide. The
+entered command may fail: this is just showing what was entered.
+
+This program is also a basic example of eBPF/bcc and uprobes.
+
+This makes use of a Linux 4.5 feature (bpf_perf_event_output()); 
+for kernels older than 4.5, see the version under tools/old,
+which uses an older mechanism
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH EXAMPLES
+.TP
+Trace bash commands system wide:
+#
+.B bashreadline
+.SH FIELDS
+.TP
+TIME
+Time of the command (HH:MM:SS).
+.TP
+PID
+Process ID of the bash shell.
+.TP
+COMMAND
+Entered command.
+.SH OVERHEAD
+As the rate of interactive bash commands is expected to be very low (<<100/s),
+the overhead of this program is expected to be negligible.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Brendan Gregg
+.SH SEE ALSO
+opensnoop(8)

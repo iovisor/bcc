@@ -11,8 +11,18 @@ function cleanup() {
 trap cleanup EXIT
 
 mkdir $TMP/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+
+llvmver=3.7.1
+
+. scripts/git-tag.sh
+
 git archive HEAD --prefix=bcc/ --format=tar.gz -o $TMP/SOURCES/bcc.tar.gz
-cp SPECS/bcc.spec $TMP/SPECS/
+
+sed \
+  -e "s/^\(Version:\s*\)@REVISION@/\1$revision/" \
+  -e "s/^\(Release:\s*\)@GIT_REV_COUNT@/\1$release/" \
+  SPECS/bcc.spec > $TMP/SPECS/bcc.spec
+
 pushd $TMP
 rpmbuild --define "_topdir `pwd`" -ba SPECS/bcc.spec
 popd

@@ -1,0 +1,788 @@
+Demonstrations of profile, the Linux eBPF/bcc version.
+
+
+This is a CPU profiler. It works by taking samples of stack traces at timed
+intervals, and frequency counting them in kernel context for efficiency.
+
+Example output:
+
+# ./profile
+Sampling at 49 Hertz of all threads by user + kernel stack... Hit Ctrl-C to end.
+^C
+    ffffffff81189249 filemap_map_pages
+    ffffffff811bd3f5 handle_mm_fault
+    ffffffff81065990 __do_page_fault
+    ffffffff81065caf do_page_fault
+    ffffffff817ce228 page_fault
+    00007fed989afcc0 [unknown]
+    -                cp (9036)
+        1
+
+    00007f31d76c3251 [unknown]
+    47a2c1e752bf47f7 [unknown]
+    -                sign-file (8877)
+        1
+
+    ffffffff813d0af8 __clear_user
+    ffffffff813d5277 iov_iter_zero
+    ffffffff814ec5f2 read_iter_zero
+    ffffffff8120be9d __vfs_read
+    ffffffff8120c385 vfs_read
+    ffffffff8120d786 sys_read
+    ffffffff817cc076 entry_SYSCALL_64_fastpath
+    00007fc5652ad9b0 read
+    -                dd (25036)
+        4
+
+    0000000000400542 func_a
+    0000000000400598 main
+    00007f12a133e830 __libc_start_main
+    083e258d4c544155 [unknown]
+    -                func_ab (13549)
+        5
+
+[...]
+
+    ffffffff8105eb66 native_safe_halt
+    ffffffff8103659e default_idle
+    ffffffff81036d1f arch_cpu_idle
+    ffffffff810bba5a default_idle_call
+    ffffffff810bbd07 cpu_startup_entry
+    ffffffff817bf4a7 rest_init
+    ffffffff81d65f58 start_kernel
+    ffffffff81d652db x86_64_start_reservations
+    ffffffff81d65418 x86_64_start_kernel
+    -                swapper/0 (0)
+        72
+
+    ffffffff8105eb66 native_safe_halt
+    ffffffff8103659e default_idle
+    ffffffff81036d1f arch_cpu_idle
+    ffffffff810bba5a default_idle_call
+    ffffffff810bbd07 cpu_startup_entry
+    ffffffff8104df55 start_secondary
+    -                swapper/1 (0)
+        75
+
+The output was long; I truncated some lines ("[...]").
+
+This default output prints stack traces as two columns (raw addresses, and
+then translated symbol names), followed by a line to describe the process (a
+dash, the process name, and a PID in parenthesis), and then an integer count
+of how many times this stack trace was sampled.
+
+The output above shows the most frequent stack was from the "swapper/1"
+process (PID 0), running the native_safe_halt() function, which was called
+by default_idle(), which was called by arch_cpu_idle(), and so on. This is
+the idle thread. Stacks can be read top-down, to follow ancestry: child,
+parent, grandparent, etc.
+
+The func_ab process is running the func_a() function, called by main(),
+called by __libc_start_main(), and called by "[unknown]" with what looks
+like a bogus address (1st column). That's evidence of a broken stack trace.
+It's common for user-level software that hasn't been compiled with frame
+pointers (in this case, libc).
+
+The dd process has called read(), and then enters the kernel via
+entry_SYSCALL_64_fastpath(), calling sys_read(), and so on. Yes, I'm now
+reading it bottom up. That way follows the code flow.
+
+
+The dd process is actually "dd if=/dev/zero of=/dev/null": it's a simple
+workload to analyze that just moves bytes from /dev/zero to /dev/null.
+Profiling just that process:
+
+# ./profile -p 25036
+Sampling at 49 Hertz of PID 25036 by user + kernel stack... Hit Ctrl-C to end.
+^C
+    0000000000402748 [unknown]
+    00007fc56561422c [unknown]
+    -                dd (25036)
+        1
+
+    00007fc5652ada0e __write
+    -                dd (25036)
+        1
+
+    00007fc5652ad9b0 read
+    -                dd (25036)
+        1
+
+[...]
+
+    00000000004047b2 [unknown]
+    00007fc56561422c [unknown]
+    -                dd (25036)
+        2
+
+    ffffffff817cc060 entry_SYSCALL_64_fastpath
+    00007fc5652ada10 __write
+    00007fc56561422c [unknown]
+    -                dd (25036)
+        3
+
+    ffffffff817cc060 entry_SYSCALL_64_fastpath
+    00007fc5652ad9b0 read
+    -                dd (25036)
+        3
+
+    ffffffff813d0af8 __clear_user
+    ffffffff813d5277 iov_iter_zero
+    ffffffff814ec5f2 read_iter_zero
+    ffffffff8120be9d __vfs_read
+    ffffffff8120c385 vfs_read
+    ffffffff8120d786 sys_read
+    ffffffff817cc076 entry_SYSCALL_64_fastpath
+    00007fc5652ad9b0 read
+    00007fc56561422c [unknown]
+    -                dd (25036)
+        3
+
+    ffffffff813d0af8 __clear_user
+    ffffffff813d5277 iov_iter_zero
+    ffffffff814ec5f2 read_iter_zero
+    ffffffff8120be9d __vfs_read
+    ffffffff8120c385 vfs_read
+    ffffffff8120d786 sys_read
+    ffffffff817cc076 entry_SYSCALL_64_fastpath
+    00007fc5652ad9b0 read
+    -                dd (25036)
+        7
+
+Again, I've truncated some lines. Now we're just analyzing the dd process.
+The filtering is performed in kernel context, for efficiency.
+
+This output has some "[unknown]" frames that probably have valid addresses,
+but we're lacking the symbol translation. This is a common for all profilers
+on Linux, and is usually fixable. See the DEBUGGING section of the profile(8)
+man page.
+
+
+Lets add delimiters between the user and kernel stacks, using -d:
+
+# ./profile -p 25036 -d
+^C
+    ffffffff8120b385 __vfs_write
+    ffffffff8120d826 sys_write
+    ffffffff817cc076 entry_SYSCALL_64_fastpath
+    --
+    00007fc5652ada10 __write
+    -                dd (25036)
+        1
+
+    --
+    00007fc565255ef3 [unknown]
+    00007fc56561422c [unknown]
+    -                dd (25036)
+        1
+
+    ffffffff813d4569 iov_iter_init
+    ffffffff8120be8e __vfs_read
+    ffffffff8120c385 vfs_read
+    ffffffff8120d786 sys_read
+    ffffffff817cc076 entry_SYSCALL_64_fastpath
+    --
+    00007fc5652ad9b0 read
+    -                dd (25036)
+        1
+
+[...]
+
+    ffffffff813d0af8 __clear_user
+    ffffffff813d5277 iov_iter_zero
+    ffffffff814ec5f2 read_iter_zero
+    ffffffff8120be9d __vfs_read
+    ffffffff8120c385 vfs_read
+    ffffffff8120d786 sys_read
+    ffffffff817cc076 entry_SYSCALL_64_fastpath
+    --
+    00007fc5652ad9b0 read
+    -                dd (25036)
+        9
+
+In this mode, the delimiters are "--".
+
+
+
+Here's another example, a func_ab program that runs two functions, func_a() and
+func_b(). Profiling it for 5 seconds:
+
+# ./profile -p `pgrep -n func_ab` 5
+Sampling at 49 Hertz of PID 2930 by user + kernel stack for 5 secs.
+
+    000000000040053e func_a
+    0000000000400598 main
+    00007f0458819830 __libc_start_main
+    083e258d4c544155 [unknown]
+    -                func_ab (2930)
+        2
+
+    0000000000400566 func_b
+    00000000004005ac main
+    00007f0458819830 __libc_start_main
+    083e258d4c544155 [unknown]
+    -                func_ab (2930)
+        3
+
+    000000000040053a func_a
+    0000000000400598 main
+    00007f0458819830 __libc_start_main
+    083e258d4c544155 [unknown]
+    -                func_ab (2930)
+        5
+
+    0000000000400562 func_b
+    00000000004005ac main
+    00007f0458819830 __libc_start_main
+    083e258d4c544155 [unknown]
+    -                func_ab (2930)
+        12
+
+    000000000040056a func_b
+    00000000004005ac main
+    00007f0458819830 __libc_start_main
+    083e258d4c544155 [unknown]
+    -                func_ab (2930)
+        19
+
+    0000000000400542 func_a
+    0000000000400598 main
+    00007f0458819830 __libc_start_main
+    083e258d4c544155 [unknown]
+    -                func_ab (2930)
+        22
+
+    0000000000400571 func_b
+    00000000004005ac main
+    00007f0458819830 __libc_start_main
+    083e258d4c544155 [unknown]
+    -                func_ab (2930)
+        64
+
+    0000000000400549 func_a
+    0000000000400598 main
+    00007f0458819830 __libc_start_main
+    083e258d4c544155 [unknown]
+    -                func_ab (2930)
+        72
+
+Note that the same stack (2nd column) seems to be repeated. Weren't we doing
+frequency counting and only printing unique stacks? We are, but in terms of
+the raw addresses, not the symbols. See the 1st column: those stacks are
+all unique.
+
+
+We can output in "folded format", which puts the stack trace on one line,
+separating frames with semi-colons. Eg:
+
+# ./profile -f -p `pgrep -n func_ab` 5
+func_ab;[unknown];__libc_start_main;main;func_a 2
+func_ab;[unknown];__libc_start_main;main;func_b 2
+func_ab;[unknown];__libc_start_main;main;func_a 11
+func_ab;[unknown];__libc_start_main;main;func_b 12
+func_ab;[unknown];__libc_start_main;main;func_a 23
+func_ab;[unknown];__libc_start_main;main;func_b 28
+func_ab;[unknown];__libc_start_main;main;func_b 57
+func_ab;[unknown];__libc_start_main;main;func_a 64
+
+I find this pretty useful for writing to files and later grepping.
+
+
+Folded format can also be used by flame graph stack visualizers, including
+the original implementation:
+
+	https://github.com/brendangregg/FlameGraph
+
+I'd include delimiters, -d. For example:
+
+# ./profile -df -p `pgrep -n func_ab` 5 > out.profile
+# git clone https://github.com/brendangregg/FlameGraph
+# ./FlameGraph/flamegraph.pl < out.profile > out.svg
+
+(Yes, I could pipe profile directly into flamegraph.pl, however, I like to
+keep the raw folded profiles around: can be useful for regenerating flamegraphs
+with different options, and, for differential flame graphs.)
+
+
+Some flamegraph.pl palettes recognize kernel annotations, which can be added
+with -a. It simply adds a "_[k]" at the end of kernel function names.
+For example:
+
+# ./profile -adf -p `pgrep -n dd` 10
+dd;[unknown] 1
+dd;[unknown];[unknown] 1
+dd;[unknown];[unknown] 1
+dd;[unknown];read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];rw_verify_area_[k];security_file_permission_[k];__fsnotify_parent_[k] 1
+dd;[unknown];__write;-;entry_SYSCALL_64_fastpath_[k];sys_write_[k];vfs_write_[k];__fsnotify_parent_[k] 1
+dd;[unknown];read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];__fdget_pos_[k] 1
+dd;read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];rw_verify_area_[k];apparmor_file_permission_[k] 1
+dd;[unknown] 1
+dd;[unknown];[unknown] 1
+dd;__write;-;entry_SYSCALL_64_fastpath_[k];sys_write_[k];vfs_write_[k] 1
+dd;[unknown] 1
+dd;read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];__fget_light_[k] 1
+dd;read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];rw_verify_area_[k];__fsnotify_parent_[k] 1
+dd;read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];__vfs_read_[k];read_iter_zero_[k];iov_iter_zero_[k] 1
+dd;[unknown];__write;-;entry_SYSCALL_64_fastpath_[k];sys_write_[k];__fget_light_[k] 1
+dd;[unknown];[unknown] 1
+dd;read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k] 1
+dd;[unknown];[unknown] 1
+dd;read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];__vfs_read_[k];read_iter_zero_[k];iov_iter_zero_[k] 1
+dd;[unknown];read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];__vfs_read_[k];read_iter_zero_[k];iov_iter_zero_[k] 1
+dd;read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];read_iter_zero_[k] 1
+dd;[unknown];read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];__fsnotify_parent_[k] 1
+dd;[unknown];[unknown] 1
+dd;read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];rw_verify_area_[k];security_file_permission_[k];apparmor_file_permission_[k];common_file_perm_[k] 1
+dd;read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];__fsnotify_parent_[k] 1
+dd;__write;-;entry_SYSCALL_64_fastpath_[k];sys_write_[k];vfs_write_[k];fsnotify_[k] 1
+dd;__write;-;entry_SYSCALL_64_fastpath_[k];sys_write_[k];vfs_write_[k];rw_verify_area_[k];security_file_permission_[k] 1
+dd;[unknown];__write;-;entry_SYSCALL_64_fastpath_[k];sys_write_[k];__fdget_pos_[k] 1
+dd;[unknown];__write;-;entry_SYSCALL_64_fastpath_[k] 1
+dd;[unknown];[unknown] 1
+dd;read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];rw_verify_area_[k];security_file_permission_[k] 1
+dd;__write;-;entry_SYSCALL_64_fastpath_[k];sys_write_[k];vfs_write_[k] 1
+dd;[unknown];read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];__fget_light_[k] 1
+dd;[unknown] 1
+dd;[unknown];__write;-;entry_SYSCALL_64_fastpath_[k];sys_write_[k];vfs_write_[k] 1
+dd;read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];rw_verify_area_[k];security_file_permission_[k];apparmor_file_permission_[k] 1
+dd;[unknown];[unknown] 1
+dd;read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];rw_verify_area_[k];security_file_permission_[k] 1
+dd;[unknown];read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];rw_verify_area_[k];__fsnotify_parent_[k] 1
+dd;read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];__vfs_read_[k];read_iter_zero_[k];iov_iter_zero_[k] 1
+dd;__write;-;entry_SYSCALL_64_fastpath_[k];sys_write_[k];vfs_write_[k];rw_verify_area_[k];security_file_permission_[k] 1
+dd;read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];__vfs_read_[k];read_iter_zero_[k];iov_iter_zero_[k];__clear_user_[k] 1
+dd;[unknown];[unknown] 1
+dd;__write;-;entry_SYSCALL_64_fastpath_[k];sys_write_[k];vfs_write_[k] 1
+dd;[unknown];[unknown] 1
+dd;read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];rw_verify_area_[k];security_file_permission_[k];apparmor_file_permission_[k];common_file_perm_[k] 1
+dd;read 1
+dd;__write;-;entry_SYSCALL_64_fastpath_[k];sys_write_[k];vfs_write_[k];security_file_permission_[k] 1
+dd;read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];fsnotify_[k] 1
+dd;read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];fsnotify_[k] 1
+dd;__write;-;entry_SYSCALL_64_fastpath_[k];sys_write_[k];vfs_write_[k];rw_verify_area_[k];apparmor_file_permission_[k] 1
+dd;[unknown];__write;-;entry_SYSCALL_64_fastpath_[k];sys_write_[k];vfs_write_[k];__fsnotify_parent_[k] 1
+dd;[unknown];__write;-;entry_SYSCALL_64_fastpath_[k];sys_write_[k];vfs_write_[k];rw_verify_area_[k];apparmor_file_permission_[k] 1
+dd;[unknown];read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k] 1
+dd;read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];__vfs_read_[k];iov_iter_init_[k] 1
+dd;[unknown];read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];rw_verify_area_[k];security_file_permission_[k];__fsnotify_parent_[k] 1
+dd;[unknown];__write;-;entry_SYSCALL_64_fastpath_[k];sys_write_[k];vfs_write_[k];__vfs_write_[k];write_null_[k] 1
+dd;[unknown];read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];__vfs_read_[k];read_iter_zero_[k];__clear_user_[k] 1
+dd;[unknown];read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];security_file_permission_[k] 1
+dd;read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];rw_verify_area_[k];security_file_permission_[k];apparmor_file_permission_[k];common_file_perm_[k] 1
+dd;read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];__vfs_read_[k];read_iter_zero_[k] 1
+dd;[unknown];__write;-;entry_SYSCALL_64_fastpath_[k];sys_write_[k];vfs_write_[k] 1
+dd;__write;-;entry_SYSCALL_64_fastpath_[k];sys_write_[k];vfs_write_[k] 1
+dd;[unknown];read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];rw_verify_area_[k] 1
+dd;read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];__fget_light_[k] 1
+dd;[unknown];__write;-;entry_SYSCALL_64_fastpath_[k];sys_write_[k];vfs_write_[k];rw_verify_area_[k] 1
+dd;read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];__vfs_read_[k] 1
+dd;[unknown];read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];__vfs_read_[k] 1
+dd;[unknown];__write;-;entry_SYSCALL_64_fastpath_[k];sys_write_[k];vfs_write_[k];__vfs_write_[k] 1
+dd;[unknown] 1
+dd;[unknown];read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];__vfs_read_[k];read_iter_zero_[k];iov_iter_zero_[k] 1
+dd;[unknown] 1
+dd;read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];__vfs_read_[k] 1
+dd;__write;-;entry_SYSCALL_64_fastpath_[k];sys_write_[k];__fsnotify_parent_[k] 1
+dd;__write;-;entry_SYSCALL_64_fastpath_[k];sys_write_[k];vfs_write_[k] 1
+dd;[unknown];[unknown] 1
+dd;read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];__vfs_read_[k];read_iter_zero_[k];iov_iter_zero_[k] 1
+dd;read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];__vfs_read_[k];read_iter_zero_[k];iov_iter_zero_[k] 1
+dd;[unknown];__write;-;sys_write_[k] 1
+dd;read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];__fsnotify_parent_[k] 1
+dd;read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];rw_verify_area_[k];security_file_permission_[k];common_file_perm_[k] 1
+dd;[unknown];read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];__vfs_read_[k];read_iter_zero_[k];iov_iter_zero_[k] 1
+dd;[unknown];[unknown] 1
+dd;read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];__vfs_read_[k];read_iter_zero_[k];iov_iter_zero_[k];__clear_user_[k] 1
+dd;__write;-;entry_SYSCALL_64_fastpath_[k];sys_write_[k];vfs_write_[k];rw_verify_area_[k];security_file_permission_[k];apparmor_file_permission_[k] 1
+dd;__write;-;entry_SYSCALL_64_fastpath_[k];sys_write_[k];__fget_light_[k] 1
+dd;read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k] 1
+dd;read;-;entry_SYSCALL_64_fastpath_[k];vfs_read_[k] 1
+dd;__write 1
+dd;read;-;entry_SYSCALL_64_fastpath_[k];vfs_read_[k] 1
+dd;__write;-;entry_SYSCALL_64_fastpath_[k];sys_write_[k];vfs_write_[k];rw_verify_area_[k];security_file_permission_[k];apparmor_file_permission_[k];common_file_perm_[k] 1
+dd;read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];__vfs_read_[k];read_iter_zero_[k];iov_iter_zero_[k] 1
+dd;[unknown];__write;-;entry_SYSCALL_64_fastpath_[k];sys_write_[k];__fget_light_[k] 1
+dd;[unknown];[unknown] 1
+dd;[unknown] 1
+dd;[unknown];read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];__vfs_read_[k];read_iter_zero_[k];iov_iter_zero_[k] 1
+dd;[unknown] 1
+dd;[unknown] 1
+dd;[unknown];[unknown] 1
+dd;__write;-;entry_SYSCALL_64_fastpath_[k];sys_write_[k];vfs_write_[k] 1
+dd;[unknown];read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];__vfs_read_[k];read_iter_zero_[k];iov_iter_zero_[k] 1
+dd;read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k] 1
+dd;[unknown];read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];__vfs_read_[k];read_iter_zero_[k] 1
+dd;read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k] 1
+dd;__write;-;entry_SYSCALL_64_fastpath_[k];sys_write_[k];vfs_write_[k];rw_verify_area_[k];security_file_permission_[k];apparmor_file_permission_[k];common_file_perm_[k] 1
+dd;__write 1
+dd;[unknown];read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];__fget_light_[k] 1
+dd;read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];rw_verify_area_[k];security_file_permission_[k] 1
+dd;__write;-;entry_SYSCALL_64_fastpath_[k];sys_write_[k] 1
+dd;[unknown] 1
+dd;[unknown];read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];__fget_light_[k] 1
+dd;read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];__vfs_read_[k];read_iter_zero_[k] 1
+dd;[unknown];[unknown] 1
+dd;__write;-;entry_SYSCALL_64_fastpath_[k];sys_write_[k];__fdget_pos_[k] 1
+dd;read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];__vfs_read_[k];read_iter_zero_[k] 1
+dd;[unknown];read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];__vfs_read_[k];read_iter_zero_[k] 1
+dd;read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];__vfs_read_[k];_cond_resched_[k] 1
+dd;[unknown];read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];iov_iter_init_[k] 1
+dd;read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];rw_verify_area_[k];security_file_permission_[k];__fsnotify_parent_[k] 1
+dd;[unknown];read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];__vfs_read_[k] 1
+dd;__write;-;entry_SYSCALL_64_fastpath_[k];sys_write_[k];rw_verify_area_[k] 1
+dd;[unknown];read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];rw_verify_area_[k];apparmor_file_permission_[k] 1
+dd;[unknown];read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];__vfs_read_[k];read_iter_zero_[k];iov_iter_zero_[k] 1
+dd;read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k] 1
+dd;[unknown] 1
+dd;[unknown];read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];rw_verify_area_[k];security_file_permission_[k];fsnotify_[k] 1
+dd;read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];__vfs_read_[k] 1
+dd;__write;-;entry_SYSCALL_64_fastpath_[k];sys_write_[k];__fdget_pos_[k] 1
+dd;[unknown];read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];rw_verify_area_[k];security_file_permission_[k] 1
+dd;__write;-;entry_SYSCALL_64_fastpath_[k];sys_write_[k];vfs_write_[k] 1
+dd;[unknown];__write;-;entry_SYSCALL_64_fastpath_[k];sys_write_[k];vfs_write_[k];__vfs_write_[k] 1
+dd;__write;-;entry_SYSCALL_64_fastpath_[k];sys_write_[k];vfs_write_[k];rw_verify_area_[k];apparmor_file_permission_[k] 1
+dd;read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];rw_verify_area_[k];security_file_permission_[k] 1
+dd;__write;-;entry_SYSCALL_64_fastpath_[k];sys_write_[k];vfs_write_[k];rw_verify_area_[k];security_file_permission_[k];apparmor_file_permission_[k];common_file_perm_[k] 1
+dd;__write;-;entry_SYSCALL_64_fastpath_[k];sys_write_[k];vfs_write_[k] 1
+dd;__write;-;entry_SYSCALL_64_fastpath_[k];sys_write_[k];vfs_write_[k] 1
+dd;read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];__fget_light_[k] 1
+dd;[unknown] 1
+dd;[unknown];__write;-;entry_SYSCALL_64_fastpath_[k];sys_write_[k];vfs_write_[k];fsnotify_[k] 1
+dd;[unknown];__write;-;entry_SYSCALL_64_fastpath_[k];sys_write_[k];vfs_write_[k];rw_verify_area_[k];security_file_permission_[k];apparmor_file_permission_[k];common_file_perm_[k] 1
+dd;__write;-;entry_SYSCALL_64_fastpath_[k];sys_write_[k];vfs_write_[k];rw_verify_area_[k] 1
+dd;[unknown];read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];__vfs_read_[k];read_iter_zero_[k];iov_iter_zero_[k] 1
+dd;read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];fsnotify_[k] 1
+dd;[unknown];__write;-;entry_SYSCALL_64_fastpath_[k];sys_write_[k];vfs_write_[k] 1
+dd;__write;-;entry_SYSCALL_64_fastpath_[k];vfs_write_[k] 1
+dd;[unknown];read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];rw_verify_area_[k] 1
+dd;read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];__vfs_read_[k] 1
+dd;read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];rw_verify_area_[k];security_file_permission_[k];apparmor_file_permission_[k];common_file_perm_[k] 1
+dd;[unknown];read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];__vfs_read_[k];read_iter_zero_[k] 1
+dd;[unknown];read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];rw_verify_area_[k];fsnotify_[k] 1
+dd;[unknown];__write;-;entry_SYSCALL_64_fastpath_[k];sys_write_[k];vfs_write_[k];rw_verify_area_[k];apparmor_file_permission_[k] 2
+dd;read;-;entry_SYSCALL_64_fastpath_[k];__fdget_pos_[k] 2
+dd;[unknown];[unknown] 2
+dd;read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];__fdget_pos_[k] 2
+dd;[unknown];read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];rw_verify_area_[k];security_file_permission_[k];apparmor_file_permission_[k];common_file_perm_[k] 2
+dd;[unknown];[unknown] 2
+dd;[unknown];[unknown] 2
+dd;[unknown];[unknown] 2
+dd;[unknown];read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k] 2
+dd;[unknown];[unknown] 2
+dd;read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];__vfs_read_[k];read_iter_zero_[k];__clear_user_[k] 2
+dd;__write;-;entry_SYSCALL_64_fastpath_[k];__fdget_pos_[k] 2
+dd;[unknown];read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];__vfs_read_[k] 2
+dd;[unknown];read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];__vfs_read_[k] 2
+dd;[unknown];read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];__vfs_read_[k];read_iter_zero_[k];iov_iter_zero_[k];__clear_user_[k] 2
+dd;[unknown];read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];__vfs_read_[k];read_iter_zero_[k];iov_iter_zero_[k];__clear_user_[k] 2
+dd;[unknown];[unknown] 2
+dd;__write;-;entry_SYSCALL_64_fastpath_[k];sys_write_[k];__fget_light_[k] 2
+dd;read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];rw_verify_area_[k];security_file_permission_[k];fsnotify_[k] 2
+dd;__write;-;sys_write_[k] 2
+dd;[unknown];read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];fsnotify_[k] 2
+dd;[unknown];[unknown] 2
+dd;[unknown];read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];__vfs_read_[k] 2
+dd;read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];__vfs_read_[k];read_iter_zero_[k];iov_iter_zero_[k] 2
+dd;read;-;SyS_read_[k] 2
+dd;[unknown] 2
+dd;__write;-;entry_SYSCALL_64_fastpath_[k];sys_write_[k];vfs_write_[k];rw_verify_area_[k] 2
+dd;[unknown];__write;-;entry_SYSCALL_64_fastpath_[k];sys_write_[k];__fget_light_[k] 2
+dd;read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];__vfs_read_[k] 2
+dd;__write;-;entry_SYSCALL_64_fastpath_[k];sys_write_[k];vfs_write_[k];rw_verify_area_[k];security_file_permission_[k];apparmor_file_permission_[k] 2
+dd;read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];__vfs_read_[k];read_iter_zero_[k];__clear_user_[k] 2
+dd;[unknown];__write;-;entry_SYSCALL_64_fastpath_[k];sys_write_[k];rw_verify_area_[k] 2
+dd;[unknown];[unknown] 3
+dd;[unknown];read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];rw_verify_area_[k] 3
+dd;[unknown];[unknown] 3
+dd;read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];__vfs_read_[k];read_iter_zero_[k];iov_iter_zero_[k];__clear_user_[k] 3
+dd;read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];__vfs_read_[k];read_iter_zero_[k];iov_iter_zero_[k] 3
+dd;[unknown];[unknown] 3
+dd;read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];__vfs_read_[k];read_iter_zero_[k];iov_iter_zero_[k] 3
+dd;[unknown];[unknown] 3
+dd;[unknown];[unknown] 3
+dd;__write;-;entry_SYSCALL_64_fastpath_[k];sys_write_[k];vfs_write_[k] 3
+dd;[unknown];read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k] 3
+dd;[unknown];read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];__vfs_read_[k];read_iter_zero_[k];iov_iter_zero_[k];__clear_user_[k] 3
+dd;[unknown] 4
+dd;[unknown];read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k] 4
+dd;[unknown];[unknown] 4
+dd;read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k] 4
+dd;[unknown] 4
+dd;[unknown];[unknown] 4
+dd;[unknown];read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k] 4
+dd;read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];__vfs_read_[k];read_iter_zero_[k];iov_iter_zero_[k];__clear_user_[k] 5
+dd;[unknown];__write;-;entry_SYSCALL_64_fastpath_[k];sys_write_[k];vfs_write_[k] 5
+dd;[unknown];[unknown] 5
+dd;[unknown];[unknown] 5
+dd;[unknown];read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];__vfs_read_[k];read_iter_zero_[k];iov_iter_zero_[k] 6
+dd;read 15
+dd;[unknown];read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];__vfs_read_[k];read_iter_zero_[k];iov_iter_zero_[k];__clear_user_[k] 19
+dd;[unknown];__write;-;entry_SYSCALL_64_fastpath_[k] 20
+dd;read;-;entry_SYSCALL_64_fastpath_[k] 23
+dd;read;-;entry_SYSCALL_64_fastpath_[k];SyS_read_[k];vfs_read_[k];__vfs_read_[k];read_iter_zero_[k];iov_iter_zero_[k];__clear_user_[k] 24
+dd;__write;-;entry_SYSCALL_64_fastpath_[k] 25
+dd;__write 29
+dd;[unknown];read;-;entry_SYSCALL_64_fastpath_[k] 31
+
+This can be made into a flamegraph. Eg:
+
+# ./profile -adf -p `pgrep -n func_ab` 10 > out.profile
+# git clone https://github.com/brendangregg/FlameGraph
+# ./FlameGraph/flamegraph.pl --color=java < out.profile > out.svg
+
+It will highlight the kernel frames in orange, and user-level in red (and Java
+in green, and C++ in yellow). If you copy-n-paste the above output into a
+out.profile file, you can try it out.
+
+
+You can increase or decrease the sample frequency. Eg, sampling at 9 Hertz:
+
+# ./profile -F 9
+Sampling at 9 Hertz of all threads by user + kernel stack... Hit Ctrl-C to end.
+^C
+    000000000040056a func_b
+    00000000004005ac main
+    00007f0458819830 __libc_start_main
+    083e258d4c544155 [unknown]
+    -                func_ab (2930)
+        1
+
+[...]
+
+    ffffffff8105eb66 native_safe_halt
+    ffffffff8103659e default_idle
+    ffffffff81036d1f arch_cpu_idle
+    ffffffff810bba5a default_idle_call
+    ffffffff810bbd07 cpu_startup_entry
+    ffffffff8104df55 start_secondary
+    -                swapper/3 (0)
+        8
+
+    ffffffff8105eb66 native_safe_halt
+    ffffffff8103659e default_idle
+    ffffffff81036d1f arch_cpu_idle
+    ffffffff810bba5a default_idle_call
+    ffffffff810bbd07 cpu_startup_entry
+    ffffffff817bf497 rest_init
+    ffffffff81d65f58 start_kernel
+    ffffffff81d652db x86_64_start_reservations
+    ffffffff81d65418 x86_64_start_kernel
+    -                swapper/0 (0)
+        8
+
+
+You can also restrict profiling to just kernel stacks (-K) or user stacks (-U).
+For example, just user stacks:
+
+# ./profile -U
+Sampling at 49 Hertz of all threads by user stack... Hit Ctrl-C to end.
+^C
+    0000000000402ccc [unknown]
+    00007f45a624422c [unknown]
+    -                dd (2931)
+        1
+
+    0000000000404b80 [unknown]
+    00007f45a624422c [unknown]
+    -                dd (2931)
+        1
+
+    0000000000404d77 [unknown]
+    00007f45a624422c [unknown]
+    -                dd (2931)
+        1
+
+    00007f45a5e85e5e [unknown]
+    00007f45a624422c [unknown]
+    -                dd (2931)
+        1
+
+    0000000000402d12 [unknown]
+    00007f45a624422c [unknown]
+    -                dd (2931)
+        1
+
+    0000000000400562 func_b
+    00000000004005ac main
+    00007f0458819830 __libc_start_main
+    083e258d4c544155 [unknown]
+    -                func_ab (2930)
+        1
+
+    0000000000404805 [unknown]
+    -                dd (2931)
+        1
+
+    00000000004047de [unknown]
+    -                dd (2931)
+        1
+
+    0000000000400542 func_a
+    0000000000400598 main
+    00007f0458819830 __libc_start_main
+    083e258d4c544155 [unknown]
+    -                func_ab (2930)
+        3
+
+    00007f45a5edda10 __write
+    00007f45a624422c [unknown]
+    -                dd (2931)
+        3
+
+    000000000040053a func_a
+    0000000000400598 main
+    00007f0458819830 __libc_start_main
+    083e258d4c544155 [unknown]
+    -                func_ab (2930)
+        4
+
+    000000000040056a func_b
+    00000000004005ac main
+    00007f0458819830 __libc_start_main
+    083e258d4c544155 [unknown]
+    -                func_ab (2930)
+        7
+
+    -                swapper/6 (0)
+        10
+
+    0000000000400571 func_b
+    00000000004005ac main
+    00007f0458819830 __libc_start_main
+    083e258d4c544155 [unknown]
+    -                func_ab (2930)
+        10
+
+    00007f45a5edda10 __write
+    -                dd (2931)
+        10
+
+    0000000000400549 func_a
+    0000000000400598 main
+    00007f0458819830 __libc_start_main
+    083e258d4c544155 [unknown]
+    -                func_ab (2930)
+        11
+
+    00007f45a5edd9b0 read
+    -                dd (2931)
+        12
+
+    00007f45a5edd9b0 read
+    00007f45a624422c [unknown]
+    -                dd (2931)
+        14
+
+    -                swapper/7 (0)
+        46
+
+    -                swapper/0 (0)
+        46
+
+    -                swapper/2 (0)
+        46
+
+    -                swapper/1 (0)
+        46
+
+    -                swapper/3 (0)
+        46
+
+    -                swapper/4 (0)
+        46
+
+
+If there are too many unique stack traces for the kernel to save, a warning
+will be printed. Eg:
+
+# ./profile
+[...]
+WARNING: 8 stack traces could not be displayed. Consider increasing --stack-storage-size.
+
+Run ./profile -h to see the default.
+
+
+There is a -S option to skip kernel frames. You probably don't need to mess
+with this. Here's why it exists: consider the following kernel stack trace,
+and IP:
+
+    ffffffff81174e78 perf_swevent_hrtimer
+    ffffffff810e6984 __hrtimer_run_queues
+    ffffffff810e70f8 hrtimer_interrupt
+    ffffffff81022c69 xen_timer_interrupt
+    ffffffff810d2942 handle_irq_event_percpu
+    ffffffff810d62da handle_percpu_irq
+    ffffffff810d1f52 generic_handle_irq
+    ffffffff814a5137 evtchn_2l_handle_events
+    ffffffff814a2853 __xen_evtchn_do_upcall
+    ffffffff814a4740 xen_evtchn_do_upcall
+    ffffffff817cd50c xen_hvm_callback_vector
+    ffffffff8103663e default_idle
+    ffffffff81036dbf arch_cpu_idle
+    ffffffff810bb8ea default_idle_call
+    ffffffff810bbb97 cpu_startup_entry
+    ffffffff8104df85 start_secondary
+
+IP: ffffffff8105eb66 native_safe_halt
+
+This is the idle thread. The first function is native_safe_halt(), and its
+parent is default_idle(). But what you see there is really what we are
+profiling. All that stuff above default_idle()? Interrupt framework stack.
+
+So we have to exclude those interrupt frames. I do this by fetching the ret IP
+from the kernel stack, and then scanning for it in user-level: in this case
+it would be default_idle(). Ok.
+
+If this doesn't work on your architecture (and your kernel stacks are a
+single line, the IP), then you might consider setting a fixed skip count,
+which avoids this ret IP logic. For the above stack, I'd set "-S 11", and
+it would slice off those 11 interrupt frames nicely. It also does this in
+kernel context for efficiency.
+
+So how do you figure out what number to use? 11? 14? 5? Well.. Try "-S 1",
+and then see how much higher you need to set it. Remember on the real
+profile output that the IP line is printed on top of the sliced stack.
+
+
+USAGE message:
+
+# ./profile -h
+usage: profile [-h] [-p PID] [-U | -K] [-F FREQUENCY] [-d] [-a] [-f]
+                  [--stack-storage-size STACK_STORAGE_SIZE] [-S KERNEL_SKIP]
+                  [duration]
+
+Profile CPU stack traces at a timed interval
+
+positional arguments:
+  duration              duration of trace, in seconds
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -p PID, --pid PID     profile this PID only
+  -U, --user-stacks-only
+                        show stacks from user space only (no kernel space
+                        stacks)
+  -K, --kernel-stacks-only
+                        show stacks from kernel space only (no user space
+                        stacks)
+  -F FREQUENCY, --frequency FREQUENCY
+                        sample frequency, Hertz (default 49)
+  -d, --delimited       insert delimiter between kernel/user stacks
+  -a, --annotations     add _[k] annotations to kernel frames
+  -f, --folded          output folded format, one line per stack (for flame
+                        graphs)
+  --stack-storage-size STACK_STORAGE_SIZE
+                        the number of unique stack traces that can be stored
+                        and displayed (default 2048)
+  -S KERNEL_SKIP, --kernel-skip KERNEL_SKIP
+                        skip this many kernel frames (default 3)
+
+examples:
+    ./profile             # profile stack traces at 49 Hertz until Ctrl-C
+    ./profile -F 99       # profile stack traces at 99 Hertz
+    ./profile 5           # profile at 49 Hertz for 5 seconds only
+    ./profile -f 5        # output in folded format for flame graphs
+    ./profile -p 185      # only profile threads for PID 185
+    ./profile -U          # only show user space stacks (no kernel)
+    ./profile -K          # only show kernel space stacks (no user)
+    ./profile -S 11       # always skip 11 frames of kernel stack
