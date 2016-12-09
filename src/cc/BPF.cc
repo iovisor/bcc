@@ -98,7 +98,7 @@ StatusTuple BPF::detach_all() {
   }
 
   for (auto it : perf_buffers_) {
-    auto res = it.second->close();
+    auto res = it.second->close_all_cpu();
     if (res.code() != 0) {
       error_msg += "Failed to close perf buffer " + it.first + ": ";
       error_msg += res.msg() + "\n";
@@ -279,7 +279,7 @@ StatusTuple BPF::open_perf_buffer(const std::string& name,
   if (perf_buffers_.find(name) == perf_buffers_.end())
     perf_buffers_[name] = new BPFPerfBuffer(bpf_module_.get(), name);
   auto table = perf_buffers_[name];
-  TRY2(table->open(cb, cb_cookie));
+  TRY2(table->open_all_cpu(cb, cb_cookie));
   return StatusTuple(0);
 }
 
@@ -287,7 +287,7 @@ StatusTuple BPF::close_perf_buffer(const std::string& name) {
   auto it = perf_buffers_.find(name);
   if (it == perf_buffers_.end())
     return StatusTuple(-1, "Perf buffer for %s not open", name.c_str());
-  TRY2(it->second->close());
+  TRY2(it->second->close_all_cpu());
   return StatusTuple(0);
 }
 
