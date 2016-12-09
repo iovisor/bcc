@@ -17,6 +17,7 @@
 #include <linux/bpf.h>
 #include <unistd.h>
 #include <cstdio>
+#include <cstring>
 #include <exception>
 #include <iostream>
 #include <memory>
@@ -106,6 +107,15 @@ StatusTuple BPF::detach_all() {
     delete it.second;
   }
 
+  for (auto it : funcs_) {
+    int res = close(it.second);
+    if (res != 0) {
+      error_msg += "Failed to unload BPF program for " + it.first + ": ";
+      error_msg += std::string(std::strerror(res)) + "\n";
+      has_error = true;
+    }
+  }
+
   if (has_error)
     return StatusTuple(-1, error_msg);
   else
@@ -117,14 +127,12 @@ StatusTuple BPF::attach_kprobe(const std::string& kernel_func,
                                bpf_attach_type attach_type,
                                pid_t pid, int cpu, int group_fd,
                                perf_reader_cb cb, void* cb_cookie) {
+  std::string probe_event = get_kprobe_event(kernel_func, attach_type);
+  if (kprobes_.find(probe_event) != kprobes_.end())
+    return StatusTuple(-1, "kprobe %s already attached", probe_event.c_str());
+
   int probe_fd;
   TRY2(load_func(probe_func, BPF_PROG_TYPE_KPROBE, probe_fd));
-
-  std::string probe_event = get_kprobe_event(kernel_func, attach_type);
-  if (kprobes_.find(probe_event) != kprobes_.end()) {
-    TRY2(unload_func(probe_func));
-    return StatusTuple(-1, "kprobe %s already attached", probe_event.c_str());
-  }
 
   std::string probe_event_desc = attach_type_prefix(attach_type);
   probe_event_desc += ":kprobes/" + probe_event + " " + kernel_func;
@@ -154,18 +162,16 @@ StatusTuple BPF::attach_uprobe(const std::string& binary_path,
                                bpf_attach_type attach_type,
                                pid_t pid, int cpu, int group_fd,
                                perf_reader_cb cb, void* cb_cookie) {
-  int probe_fd;
-  TRY2(load_func(probe_func, BPF_PROG_TYPE_KPROBE, probe_fd));
-
   bcc_symbol sym = bcc_symbol();
   TRY2(check_binary_symbol(binary_path, symbol, symbol_addr, &sym));
 
   std::string probe_event =
       get_uprobe_event(sym.module, sym.offset, attach_type);
-  if (uprobes_.find(probe_event) != uprobes_.end()) {
-    TRY2(unload_func(probe_func));
+  if (uprobes_.find(probe_event) != uprobes_.end())
     return StatusTuple(-1, "uprobe %s already attached", probe_event.c_str());
-  }
+
+  int probe_fd;
+  TRY2(load_func(probe_func, BPF_PROG_TYPE_KPROBE, probe_fd));
 
   std::string probe_event_desc = attach_type_prefix(attach_type);
   probe_event_desc += ":uprobes/" + probe_event + " ";
@@ -195,9 +201,6 @@ StatusTuple BPF::attach_tracepoint(const std::string& tracepoint,
                                    const std::string& probe_func,
                                    pid_t pid, int cpu, int group_fd,
                                    perf_reader_cb cb, void* cb_cookie) {
-  int probe_fd;
-  TRY2(load_func(probe_func, BPF_PROG_TYPE_TRACEPOINT, probe_fd));
-
   if (tracepoints_.find(tracepoint) != tracepoints_.end())
     return StatusTuple(-1, "Tracepoint %s already attached",
                        tracepoint.c_str());
@@ -207,6 +210,9 @@ StatusTuple BPF::attach_tracepoint(const std::string& tracepoint,
     return StatusTuple(-1, "Unable to parse Tracepoint %s", tracepoint.c_str());
   std::string tp_category = tracepoint.substr(0, pos);
   std::string tp_name = tracepoint.substr(pos + 1);
+
+  int probe_fd;
+  TRY2(load_func(probe_func, BPF_PROG_TYPE_TRACEPOINT, probe_fd));
 
   void* res =
       bpf_attach_tracepoint(probe_fd, tp_category.c_str(), tp_name.c_str(), pid,
