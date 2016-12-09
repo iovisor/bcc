@@ -72,6 +72,8 @@ class BPFModule {
   int table_type(size_t id) const;
   size_t table_max_entries(const std::string &name) const;
   size_t table_max_entries(size_t id) const;
+  int table_flags(const std::string &name) const;
+  int table_flags(size_t id) const;
   const char * table_key_desc(size_t id) const;
   const char * table_key_desc(const std::string &name) const;
   size_t table_key_size(size_t id) const;

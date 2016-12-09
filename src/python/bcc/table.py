@@ -118,6 +118,7 @@ class TableBase(MutableMapping):
         self.Key = keytype
         self.Leaf = leaftype
         self.ttype = lib.bpf_table_type_id(self.bpf.module, self.map_id)
+        self.flags = lib.bpf_table_flags_id(self.bpf.module, self.map_id)
         self._cbs = {}
 
     def key_sprintf(self, key):
