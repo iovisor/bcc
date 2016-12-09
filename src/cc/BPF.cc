@@ -22,6 +22,7 @@
 #include <iostream>
 #include <memory>
 #include <sstream>
+#include <utility>
 #include <vector>
 
 #include "bcc_exception.h"
@@ -107,11 +108,19 @@ StatusTuple BPF::detach_all() {
     delete it.second;
   }
 
+  for (auto it : perf_events_) {
+    auto res = detach_perf_event_all_cpu(it.second);
+    if (res.code() != 0) {
+      error_msg += res.msg() + "\n";
+      has_error = true;
+    }
+  }
+
   for (auto it : funcs_) {
     int res = close(it.second);
     if (res != 0) {
       error_msg += "Failed to unload BPF program for " + it.first + ": ";
-      error_msg += std::string(std::strerror(res)) + "\n";
+      error_msg += std::string(std::strerror(errno)) + "\n";
       has_error = true;
     }
   }
@@ -231,6 +240,44 @@ StatusTuple BPF::attach_tracepoint(const std::string& tracepoint,
   return StatusTuple(0);
 }
 
+StatusTuple BPF::attach_perf_event(uint32_t ev_type, uint32_t ev_config,
+                                   const std::string& probe_func,
+                                   uint64_t sample_period, uint64_t sample_freq,
+                                   pid_t pid, int cpu, int group_fd) {
+  auto ev_pair = std::make_pair(ev_type, ev_config);
+  if (perf_events_.find(ev_pair) != perf_events_.end())
+    return StatusTuple(-1, "Perf event type %d config %d already attached",
+                       ev_type, ev_config);
+
+  int probe_fd;
+  TRY2(load_func(probe_func, BPF_PROG_TYPE_PERF_EVENT, probe_fd));
+
+  auto fds = new std::map<int, int>();
+  int cpu_st = 0;
+  int cpu_en = sysconf(_SC_NPROCESSORS_ONLN) - 1;
+  if (cpu >= 0)
+    cpu_st = cpu_en = cpu;
+  for (int i = cpu_st; i <= cpu_en; i++) {
+    int fd = bpf_attach_perf_event(probe_fd, ev_type, ev_config, sample_period,
+                                   sample_freq, pid, i, group_fd);
+    if (fd < 0) {
+      for (auto it : *fds)
+        close(it.second);
+      delete fds;
+      TRY2(unload_func(probe_func));
+      return StatusTuple(-1, "Failed to attach perf event type %d config %d",
+                         ev_type, ev_config);
+    }
+    fds->emplace(i, fd);
+  }
+
+  open_probe_t p = {};
+  p.func = probe_func;
+  p.per_cpu_fd = fds;
+  perf_events_[ev_pair] = std::move(p);
+  return StatusTuple(0);
+}
+
 StatusTuple BPF::detach_kprobe(const std::string& kernel_func,
                                bpf_attach_type attach_type) {
   std::string event = get_kprobe_event(kernel_func, attach_type);
@@ -271,6 +318,16 @@ StatusTuple BPF::detach_tracepoint(const std::string& tracepoint) {
 
   TRY2(detach_tracepoint_event(it->first, it->second));
   tracepoints_.erase(it);
+  return StatusTuple(0);
+}
+
+StatusTuple BPF::detach_perf_event(uint32_t ev_type, uint32_t ev_config) {
+  auto it = perf_events_.find(std::make_pair(ev_type, ev_config));
+  if (it == perf_events_.end())
+    return StatusTuple(-1, "Perf Event type %d config %d not attached",
+                       ev_type, ev_config);
+  TRY2(detach_perf_event_all_cpu(it->second));
+  perf_events_.erase(it);
   return StatusTuple(0);
 }
 
@@ -398,6 +455,26 @@ StatusTuple BPF::detach_tracepoint_event(const std::string& tracepoint,
   TRY2(unload_func(attr.func));
 
   // TODO: bpf_detach_tracepoint currently does nothing.
+  return StatusTuple(0);
+}
+
+StatusTuple BPF::detach_perf_event_all_cpu(open_probe_t& attr) {
+  bool has_error = false;
+  std::string err_msg;
+  for (auto it : *attr.per_cpu_fd) {
+    int res = close(it.second);
+    if (res < 0) {
+      has_error = true;
+      err_msg += "Failed to close perf event FD " + std::to_string(it.second) +
+                 " For CPU " + std::to_string(it.first) + ": ";
+      err_msg += std::string(std::strerror(errno)) + "\n";
+    }
+  }
+  delete attr.per_cpu_fd;
+  TRY2(unload_func(attr.func));
+
+  if (has_error)
+    return StatusTuple(-1, err_msg);
   return StatusTuple(0);
 }
 

@@ -37,6 +37,7 @@ enum class bpf_attach_type {
 struct open_probe_t {
   void* reader_ptr;
   std::string func;
+  std::map<int, int>* per_cpu_fd;
 };
 
 class BPF {
@@ -77,6 +78,13 @@ public:
                                 void* cb_cookie = nullptr);
   StatusTuple detach_tracepoint(const std::string& tracepoint);
 
+  StatusTuple attach_perf_event(uint32_t ev_type, uint32_t ev_config,
+                                const std::string& probe_func,
+                                uint64_t sample_period, uint64_t sample_freq,
+                                pid_t pid = -1, int cpu = -1,
+                                int group_fd = -1);
+  StatusTuple detach_perf_event(uint32_t ev_type, uint32_t ev_config);
+
   template <class KeyType, class ValueType>
   BPFHashTable<KeyType, ValueType> get_hash_table(const std::string& name) {
     return BPFHashTable<KeyType, ValueType>(bpf_module_.get(), name);
@@ -105,6 +113,7 @@ private:
   StatusTuple detach_uprobe_event(const std::string& event, open_probe_t& attr);
   StatusTuple detach_tracepoint_event(const std::string& tracepoint,
                                       open_probe_t& attr);
+  StatusTuple detach_perf_event_all_cpu(open_probe_t& attr);
 
   std::string attach_type_debug(bpf_attach_type type) {
     switch (type) {
@@ -146,6 +155,7 @@ private:
   std::map<std::string, open_probe_t> uprobes_;
   std::map<std::string, open_probe_t> tracepoints_;
   std::map<std::string, BPFPerfBuffer*> perf_buffers_;
+  std::map<std::pair<uint32_t, uint32_t>, open_probe_t> perf_events_;
 };
 
 }  // namespace ebpf
