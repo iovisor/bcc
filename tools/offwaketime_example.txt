@@ -305,23 +305,51 @@ software, which visualizes these.
 USAGE message:
 
 # ./offwaketime -h
-usage: offwaketime [-h] [-u] [-p PID] [-v] [-f] [duration]
+usage: offwaketime [-h] [-p PID | -t TID | -u | -k] [-U | -K] [-d] [-f]
+                   [--stack-storage-size STACK_STORAGE_SIZE]
+                   [-m MIN_BLOCK_TIME] [-M MAX_BLOCK_TIME]
+                   [duration]
 
-Summarize blocked time by kernel off-CPU stack + waker stack
+Summarize blocked time by kernel stack trace + waker stack
 
 positional arguments:
-  duration           duration of trace, in seconds
+  duration              duration of trace, in seconds
 
 optional arguments:
-  -h, --help         show this help message and exit
-  -u, --useronly     user threads only (no kernel threads)
-  -p PID, --pid PID  trace this PID only
-  -v, --verbose      show raw addresses
-  -f, --folded       output folded format
+  -h, --help            show this help message and exit
+  -p PID, --pid PID     trace this PID only
+  -t TID, --tid TID     trace this TID only
+  -u, --user-threads-only
+                        user threads only (no kernel threads)
+  -k, --kernel-threads-only
+                        kernel threads only (no user threads)
+  -U, --user-stacks-only
+                        show stacks from user space only (no kernel space
+                        stacks)
+  -K, --kernel-stacks-only
+                        show stacks from kernel space only (no user space
+                        stacks)
+  -d, --delimited       insert delimiter between kernel/user stacks
+  -f, --folded          output folded format
+  --stack-storage-size STACK_STORAGE_SIZE
+                        the number of unique stack traces that can be stored
+                        and displayed (default 1024)
+  -m MIN_BLOCK_TIME, --min-block-time MIN_BLOCK_TIME
+                        the amount of time in microseconds over which we store
+                        traces (default 1)
+  -M MAX_BLOCK_TIME, --max-block-time MAX_BLOCK_TIME
+                        the amount of time in microseconds under which we
+                        store traces (default U64_MAX)
 
 examples:
     ./offwaketime             # trace off-CPU + waker stack time until Ctrl-C
-    ./offwaketime 5           # trace for 5 seconds only
-    ./offwaketime -f 5        # 5 seconds, and output in folded format
-    ./offwaketime -u          # don't include kernel threads (user only)
-    ./offwaketime -p 185      # trace fo PID 185 only
+    ./offcputime 5           # trace for 5 seconds only
+    ./offcputime -f 5        # 5 seconds, and output in folded format
+    ./offcputime -m 1000     # trace only events that last more than 1000 usec
+    ./offcputime -M 10000    # trace only events that last less than 10000 usec
+    ./offcputime -p 185      # only trace threads for PID 185
+    ./offcputime -t 188      # only trace thread 188
+    ./offcputime -u          # only trace user threads (no kernel)
+    ./offcputime -k          # only trace kernel threads (no user)
+    ./offcputime -U          # only show user space stacks (no kernel)
+    ./offcputime -K          # only show kernel space stacks (no user)
