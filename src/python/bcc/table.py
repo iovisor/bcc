@@ -78,6 +78,27 @@ def _print_log2_hist(vals, val_type):
         print(body % (low, high, val, stars,
                       _stars(val, val_max, stars)))
 
+def _print_linear_hist(vals, val_type):
+    global stars_max
+    log2_dist_max = 64
+    idx_max = -1
+    val_max = 0
+
+    for i, v in enumerate(vals):
+        if v > 0: idx_max = i
+        if v > val_max: val_max = v
+
+    header = "     %-13s : count     distribution"
+    body = "        %-10d : %-8d |%-*s|"
+    stars = stars_max
+
+    if idx_max >= 0:
+        print(header % val_type);
+    for i in range(0, idx_max + 1):
+        val = vals[i]
+        print(body % (i, val, stars,
+                      _stars(val, val_max, stars)))
+
 
 def Table(bpf, map_id, map_fd, keytype, leaftype, **kwargs):
     """Table(bpf, map_id, map_fd, keytype, leaftype, **kwargs)
@@ -290,6 +311,43 @@ class TableBase(MutableMapping):
             for k, v in self.items():
                 vals[k.value] = v.value
             _print_log2_hist(vals, val_type)
+
+    def print_linear_hist(self, val_type="value", section_header="Bucket ptr",
+            section_print_fn=None, bucket_fn=None):
+        """print_linear_hist(val_type="value", section_header="Bucket ptr",
+                           section_print_fn=None, bucket_fn=None)
+
+        Prints a table as a linear histogram. This is intended to span integer
+	ranges, eg, from 0 to 100. The val_type argument is optional, and is a
+	column header.  If the histogram has a secondary key, multiple tables
+	will print and section_header can be used as a header description for
+	each.  If section_print_fn is not None, it will be passed the bucket
+	value to format into a string as it sees fit. If bucket_fn is not None,
+        it will be used to produce a bucket value for the histogram keys.
+        """
+        if isinstance(self.Key(), ct.Structure):
+            tmp = {}
+            f1 = self.Key._fields_[0][0]
+            f2 = self.Key._fields_[1][0]
+            for k, v in self.items():
+                bucket = getattr(k, f1)
+                if bucket_fn:
+                    bucket = bucket_fn(bucket)
+                vals = tmp[bucket] = tmp.get(bucket, [0] * 65)
+                slot = getattr(k, f2)
+                vals[slot] = v.value
+            for bucket, vals in tmp.items():
+                if section_print_fn:
+                    print("\n%s = %s" % (section_header,
+                        section_print_fn(bucket)))
+                else:
+                    print("\n%s = %r" % (section_header, bucket))
+                _print_linear_hist(vals, val_type)
+        else:
+            vals = [0] * 65
+            for k, v in self.items():
+                vals[k.value] = v.value
+            _print_linear_hist(vals, val_type)
 
 
 class HashTable(TableBase):
