@@ -1,0 +1,86 @@
+.TH runqlen 8  "2016-12-12" "USER COMMANDS"
+.SH NAME
+runqlen \- Scheduler run queue length as a histogram.
+.SH SYNOPSIS
+.B runqlen [\-h] [\-T] [\-O] [\-C] [interval] [count]
+.SH DESCRIPTION
+This program summarizes scheduler queue length as a histogram, and can also
+show run queue occupancy. It works by sampling the run queue length on all
+CPUs at 99 Hertz.
+
+This tool can be used to identify imbalances, eg, when processes are bound
+to CPUs causing queueing, or interrupt mappings causing the same.
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH OPTIONS
+.TP
+\-h
+Print usage message.
+.TP
+\-T
+Include timestamps on output.
+.TP
+\-O
+Report run queue occupancy.
+.TP
+\-C
+Report for each CPU.
+.TP
+interval
+Output interval, in seconds.
+.TP
+count
+Number of outputs.
+.SH EXAMPLES
+.TP
+Summarize run queue length as a histogram:
+#
+.B runqlen
+.TP
+Print 1 second summaries, 10 times:
+#
+.B runqlen 1 10
+.TP
+Print output every second, with timestamps, and show each CPU separately:
+#
+.B runqlen \-CT 1
+.TP
+Print run queue occupancy every second:
+#
+.B runqlen \-O 1
+.TP
+Print run queue occupancy, with timetamps, for each CPU:
+#
+.B runqlen \-COT 1
+.SH FIELDS
+.TP
+runqlen
+Scheduler run queue length: the number of threads (tasks) waiting to run,
+(excluding including the currently running task).
+.TP
+count
+Number of samples at this queue length.
+.TP
+distribution
+An ASCII bar chart to visualize the distribution (count column)
+.SH OVERHEAD
+This uses sampling at 99 Hertz (on all CPUs), and in-kernel summaries, which
+should make overhead negligible. This does not trace scheduler events, like
+runqlen does, which comes at a much higher overhead cost.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Brendan Gregg
+.SH SEE ALSO
+runqlat(8), pidstat(1)
