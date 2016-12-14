@@ -99,7 +99,7 @@ if args.cpus:
     bpf_text = bpf_text.replace('STORAGE',
         'BPF_HISTOGRAM(dist, cpu_key_t);')
     bpf_text = bpf_text.replace('STORE', 'cpu_key_t key = {.slot = len}; ' +
-        'bpf_probe_read(&key.cpu, sizeof(key.cpu), &task->wake_cpu);' +
+        'key.cpu = bpf_get_smp_processor_id(); ' +
         'dist.increment(key);')
 else:
     bpf_text = bpf_text.replace('STORAGE',
