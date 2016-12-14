@@ -33,6 +33,8 @@ BPF_MAP_TYPE_LRU_HASH = 9
 BPF_MAP_TYPE_LRU_PERCPU_HASH = 10
 
 stars_max = 40
+log2_index_max = 65
+linear_index_max = 1025
 
 # helper functions, consider moving these to a utils module
 def _stars(val, val_max, width):
@@ -287,6 +289,8 @@ class TableBase(MutableMapping):
         If section_print_fn is not None, it will be passed the bucket value
         to format into a string as it sees fit. If bucket_fn is not None,
         it will be used to produce a bucket value for the histogram keys.
+        The maximum index allowed is log2_index_max (65), which will
+        accomodate any 64-bit integer in the histogram.
         """
         if isinstance(self.Key(), ct.Structure):
             tmp = {}
@@ -296,7 +300,7 @@ class TableBase(MutableMapping):
                 bucket = getattr(k, f1)
                 if bucket_fn:
                     bucket = bucket_fn(bucket)
-                vals = tmp[bucket] = tmp.get(bucket, [0] * 65)
+                vals = tmp[bucket] = tmp.get(bucket, [0] * log2_index_max)
                 slot = getattr(k, f2)
                 vals[slot] = v.value
             for bucket, vals in tmp.items():
@@ -307,7 +311,7 @@ class TableBase(MutableMapping):
                     print("\n%s = %r" % (section_header, bucket))
                 _print_log2_hist(vals, val_type)
         else:
-            vals = [0] * 65
+            vals = [0] * log2_index_max
             for k, v in self.items():
                 vals[k.value] = v.value
             _print_log2_hist(vals, val_type)
@@ -318,12 +322,14 @@ class TableBase(MutableMapping):
                            section_print_fn=None, bucket_fn=None)
 
         Prints a table as a linear histogram. This is intended to span integer
-	ranges, eg, from 0 to 100. The val_type argument is optional, and is a
-	column header.  If the histogram has a secondary key, multiple tables
-	will print and section_header can be used as a header description for
-	each.  If section_print_fn is not None, it will be passed the bucket
-	value to format into a string as it sees fit. If bucket_fn is not None,
+        ranges, eg, from 0 to 100. The val_type argument is optional, and is a
+        column header.  If the histogram has a secondary key, multiple tables
+        will print and section_header can be used as a header description for
+        each.  If section_print_fn is not None, it will be passed the bucket
+        value to format into a string as it sees fit. If bucket_fn is not None,
         it will be used to produce a bucket value for the histogram keys.
+        The maximum index allowed is linear_index_max (1025), which is hoped
+        to be sufficient for integer ranges spanned.
         """
         if isinstance(self.Key(), ct.Structure):
             tmp = {}
@@ -333,7 +339,7 @@ class TableBase(MutableMapping):
                 bucket = getattr(k, f1)
                 if bucket_fn:
                     bucket = bucket_fn(bucket)
-                vals = tmp[bucket] = tmp.get(bucket, [0] * 65)
+                vals = tmp[bucket] = tmp.get(bucket, [0] * linear_index_max)
                 slot = getattr(k, f2)
                 vals[slot] = v.value
             for bucket, vals in tmp.items():
@@ -344,9 +350,15 @@ class TableBase(MutableMapping):
                     print("\n%s = %r" % (section_header, bucket))
                 _print_linear_hist(vals, val_type)
         else:
-            vals = [0] * 65
+            vals = [0] * linear_index_max
             for k, v in self.items():
-                vals[k.value] = v.value
+                try:
+                    vals[k.value] = v.value
+                except IndexError:
+                    # Improve error text. If the limit proves a nusiance, this
+                    # function be rewritten to avoid having one.
+                    raise IndexError(("Index in print_linear_hist() of %d " +
+                        "exceeds max of %d.") % (k.value, linear_index_max))
             _print_linear_hist(vals, val_type)
 
 
