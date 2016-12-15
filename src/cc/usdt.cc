@@ -239,7 +239,7 @@ Probe *Context::get(const std::string &probe_name) {
 }
 
 bool Context::generate_usdt_args(std::ostream &stream) {
-  stream << "#include <uapi/linux/ptrace.h>\n";
+  stream << USDT_PROGRAM_HEADER;
   for (auto &p : probes_) {
     if (p->enabled() && !p->usdt_getarg(stream))
       return false;
