@@ -30,6 +30,7 @@
 #include "bpf_module.h"
 #include "libbpf.h"
 #include "perf_reader.h"
+#include "usdt.h"
 
 #include "BPF.h"
 
@@ -50,13 +51,25 @@ std::string sanitize_str(std::string str, bool (*validator)(char),
 }
 
 StatusTuple BPF::init(const std::string& bpf_program,
-                      std::vector<std::string> cflags) {
+                      std::vector<std::string> cflags, std::vector<USDT> usdt) {
+  std::string all_bpf_program;
+
+  for (auto u : usdt) {
+    if (!u.initialized_)
+      TRY2(u.init());
+    all_bpf_program += u.program_text_;
+    usdt_.push_back(std::move(u));
+  }
+
   auto flags_len = cflags.size();
   const char* flags[flags_len];
   for (size_t i = 0; i < flags_len; i++)
     flags[i] = cflags[i].c_str();
-  if (bpf_module_->load_string(bpf_program, flags, flags_len) != 0)
+
+  all_bpf_program += bpf_program;
+  if (bpf_module_->load_string(all_bpf_program, flags, flags_len) != 0)
     return StatusTuple(-1, "Unable to initialize BPF program");
+
   return StatusTuple(0);
 };
 
@@ -206,6 +219,37 @@ StatusTuple BPF::attach_uprobe(const std::string& binary_path,
   return StatusTuple(0);
 }
 
+StatusTuple BPF::attach_usdt(const USDT& usdt, pid_t pid, int cpu,
+                             int group_fd) {
+  for (auto& u : usdt_)
+    if (u == usdt) {
+      bool failed = false;
+      std::string err_msg;
+      int cnt = 0;
+      for (auto addr : u.addresses_) {
+        auto res =
+            attach_uprobe(u.binary_path_, std::string(), u.probe_func_, addr);
+        if (res.code() != 0) {
+          failed = true;
+          err_msg += "USDT " + u.print_name() + " at " + std::to_string(addr);
+          err_msg += ": " + res.msg() + "\n";
+          break;
+        }
+        cnt++;
+      }
+      if (failed) {
+        for (int i = 0; i < cnt; i++) {
+          auto res =
+              detach_uprobe(u.binary_path_, std::string(), u.addresses_[i]);
+          err_msg += "During clean up: " + res.msg() + "\n";
+        }
+        return StatusTuple(-1, err_msg);
+      } else
+        return StatusTuple(0);
+    }
+  return StatusTuple(-1, "USDT %s not found", usdt.print_name().c_str());
+}
+
 StatusTuple BPF::attach_tracepoint(const std::string& tracepoint,
                                    const std::string& probe_func,
                                    pid_t pid, int cpu, int group_fd,
@@ -311,6 +355,27 @@ StatusTuple BPF::detach_uprobe(const std::string& binary_path,
   return StatusTuple(0);
 }
 
+StatusTuple BPF::detach_usdt(const USDT& usdt) {
+  for (auto& u : usdt_)
+    if (u == usdt) {
+      bool failed = false;
+      std::string err_msg;
+      for (auto addr : u.addresses_) {
+        auto res = detach_uprobe(u.binary_path_, std::string(), addr);
+        if (res.code() != 0) {
+          failed = true;
+          err_msg += "USDT " + u.print_name() + " at " + std::to_string(addr);
+          err_msg += ": " + res.msg() + "\n";
+        }
+      }
+      if (failed)
+        return StatusTuple(-1, err_msg);
+      else
+        return StatusTuple(0);
+    }
+  return StatusTuple(-1, "USDT %s not found", usdt.print_name().c_str());
+}
+
 StatusTuple BPF::detach_tracepoint(const std::string& tracepoint) {
   auto it = tracepoints_.find(tracepoint);
   if (it == tracepoints_.end())
@@ -383,7 +448,7 @@ StatusTuple BPF::load_func(const std::string& func_name,
 StatusTuple BPF::unload_func(const std::string& func_name) {
   auto it = funcs_.find(func_name);
   if (it == funcs_.end())
-    return StatusTuple(-1, "Probe function %s not loaded", func_name.c_str());
+    return StatusTuple(0);
 
   int res = close(it->second);
   if (res != 0)
@@ -475,6 +540,30 @@ StatusTuple BPF::detach_perf_event_all_cpu(open_probe_t& attr) {
 
   if (has_error)
     return StatusTuple(-1, err_msg);
+  return StatusTuple(0);
+}
+
+StatusTuple USDT::init() {
+  auto ctx =
+      std::unique_ptr<::USDT::Context>(new ::USDT::Context(binary_path_));
+  if (!ctx->loaded())
+    return StatusTuple(-1, "Unable to load USDT " + print_name());
+  auto probe = ctx->get(name_);
+  if (probe == nullptr)
+    return StatusTuple(-1, "Unable to find USDT " + print_name());
+
+  if (!probe->enable(probe_func_))
+    return StatusTuple(-1, "Failed to enable USDT " + print_name());
+  std::ostringstream stream;
+  if (!probe->usdt_getarg(stream))
+    return StatusTuple(
+        -1, "Unable to generate program text for USDT " + print_name());
+  program_text_ = ::USDT::USDT_PROGRAM_HEADER + stream.str();
+
+  for (size_t i = 0; i < probe->num_locations(); i++)
+    addresses_.push_back(probe->address(i));
+
+  initialized_ = true;
   return StatusTuple(0);
 }
 
