@@ -32,6 +32,7 @@ struct TableDesc {
   size_t key_size;  // sizes are in bytes
   size_t leaf_size;
   size_t max_entries;
+  int flags;
   std::string key_desc;
   std::string leaf_desc;
   llvm::Function *key_sscanf;

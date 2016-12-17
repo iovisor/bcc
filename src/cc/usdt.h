@@ -31,6 +31,9 @@ using std::experimental::optional;
 using std::experimental::nullopt;
 class ArgumentParser;
 
+static const std::string USDT_PROGRAM_HEADER =
+    "#include <uapi/linux/ptrace.h>\n";
+
 class Argument {
 private:
   optional<int> arg_size_;

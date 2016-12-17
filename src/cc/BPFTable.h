@@ -126,8 +126,8 @@ public:
       : BPFTableBase<int, int>(bpf_module, name) {}
   ~BPFPerfBuffer();
 
-  StatusTuple open(perf_reader_raw_cb cb, void* cb_cookie);
-  StatusTuple close();
+  StatusTuple open_all_cpu(perf_reader_raw_cb cb, void* cb_cookie);
+  StatusTuple close_all_cpu();
   void poll(int timeout);
 
 private:
@@ -135,6 +135,7 @@ private:
   StatusTuple close_on_cpu(int cpu);
 
   std::map<int, perf_reader*> cpu_readers_;
+  std::vector<perf_reader*> readers_;
 };
 
 }  // namespace ebpf

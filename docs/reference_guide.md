@@ -62,6 +62,7 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
         - [4. values()](#4-values)
         - [5. clear()](#5-clear)
         - [6. print_log2_hist()](#6-print_log2_hist)
+        - [7. print_linear_hist()](#6-print_linear_hist)
     - [Helpers](#helpers)
         - [1. ksym()](#1-ksym)
         - [2. ksymaddr()](#2-ksymaddr)
@@ -1009,6 +1010,65 @@ This is an efficient way to summarize data, as the summarization is performed in
 Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=print_log2_hist+path%3Aexamples+language%3Apython&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=print_log2_hist+path%3Atools+language%3Apython&type=Code)
+
+### 6. print_linear_hist()
+
+Syntax: ```table.print_linear_hist(val_type="value", section_header="Bucket ptr", section_print_fn=None)```
+
+Prints a table as a linear histogram in ASCII. This is intended to visualize small integer ranges, eg, 0 to 100.
+
+Arguments:
+
+- val_type: optional, column header.
+- section_header: if the histogram has a secondary key, multiple tables will print and section_header can be used as a header description for each.
+- section_print_fn: if section_print_fn is not None, it will be passed the bucket value.
+
+Example:
+
+```Python
+b = BPF(text="""
+BPF_HISTOGRAM(dist);
+
+int kprobe__blk_account_io_completion(struct pt_regs *ctx, struct request *req)
+{
+	dist.increment(req->__data_len / 1024);
+	return 0;
+}
+""")
+[...]
+
+b["dist"].print_linear_hist("kbytes")
+```
+
+Output:
+
+```
+     kbytes        : count     distribution
+        0          : 3        |******                                  |
+        1          : 0        |                                        |
+        2          : 0        |                                        |
+        3          : 0        |                                        |
+        4          : 19       |****************************************|
+        5          : 0        |                                        |
+        6          : 0        |                                        |
+        7          : 0        |                                        |
+        8          : 4        |********                                |
+        9          : 0        |                                        |
+        10         : 0        |                                        |
+        11         : 0        |                                        |
+        12         : 0        |                                        |
+        13         : 0        |                                        |
+        14         : 0        |                                        |
+        15         : 0        |                                        |
+        16         : 2        |****                                    |
+[...]
+```
+
+This is an efficient way to summarize data, as the summarization is performed in-kernel, and only the values in the count column are passed to user space.
+
+Examples in situ:
+[search /examples](https://github.com/iovisor/bcc/search?q=print_linear_hist+path%3Aexamples+language%3Apython&type=Code),
+[search /tools](https://github.com/iovisor/bcc/search?q=print_linear_hist+path%3Atools+language%3Apython&type=Code)
 
 ## Helpers
 

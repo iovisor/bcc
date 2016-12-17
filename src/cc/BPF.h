@@ -37,7 +37,10 @@ enum class bpf_attach_type {
 struct open_probe_t {
   void* reader_ptr;
   std::string func;
+  std::map<int, int>* per_cpu_fd;
 };
+
+class USDT;
 
 class BPF {
 public:
@@ -45,7 +48,8 @@ public:
 
   explicit BPF(unsigned int flag = 0) : bpf_module_(new BPFModule(flag)) {}
   StatusTuple init(const std::string& bpf_program,
-                   std::vector<std::string> cflags = {});
+                   std::vector<std::string> cflags = {},
+                   std::vector<USDT> usdt = {});
 
   ~BPF();
   StatusTuple detach_all();
@@ -69,6 +73,9 @@ public:
       const std::string& binary_path, const std::string& symbol,
       uint64_t symbol_addr = 0,
       bpf_attach_type attach_type = bpf_attach_type::probe_entry);
+  StatusTuple attach_usdt(const USDT& usdt, pid_t pid = -1, int cpu = 0,
+                          int group_fd = -1);
+  StatusTuple detach_usdt(const USDT& usdt);
 
   StatusTuple attach_tracepoint(const std::string& tracepoint,
                                 const std::string& probe_func,
@@ -76,6 +83,13 @@ public:
                                 perf_reader_cb cb = nullptr,
                                 void* cb_cookie = nullptr);
   StatusTuple detach_tracepoint(const std::string& tracepoint);
+
+  StatusTuple attach_perf_event(uint32_t ev_type, uint32_t ev_config,
+                                const std::string& probe_func,
+                                uint64_t sample_period, uint64_t sample_freq,
+                                pid_t pid = -1, int cpu = -1,
+                                int group_fd = -1);
+  StatusTuple detach_perf_event(uint32_t ev_type, uint32_t ev_config);
 
   template <class KeyType, class ValueType>
   BPFHashTable<KeyType, ValueType> get_hash_table(const std::string& name) {
@@ -105,6 +119,7 @@ private:
   StatusTuple detach_uprobe_event(const std::string& event, open_probe_t& attr);
   StatusTuple detach_tracepoint_event(const std::string& tracepoint,
                                       open_probe_t& attr);
+  StatusTuple detach_perf_event_all_cpu(open_probe_t& attr);
 
   std::string attach_type_debug(bpf_attach_type type) {
     switch (type) {
@@ -142,10 +157,49 @@ private:
 
   std::map<std::string, int> funcs_;
 
+  std::vector<USDT> usdt_;
+
   std::map<std::string, open_probe_t> kprobes_;
   std::map<std::string, open_probe_t> uprobes_;
   std::map<std::string, open_probe_t> tracepoints_;
   std::map<std::string, BPFPerfBuffer*> perf_buffers_;
+  std::map<std::pair<uint32_t, uint32_t>, open_probe_t> perf_events_;
+};
+
+class USDT {
+public:
+  USDT(const std::string& binary_path, const std::string& provider,
+       const std::string& name, const std::string& probe_func)
+      : initialized_(false),
+        binary_path_(binary_path),
+        provider_(provider),
+        name_(name),
+        probe_func_(probe_func) {}
+
+  bool operator==(const USDT& other) const {
+    return (provider_ == other.provider_) && (name_ == other.name_) &&
+           (binary_path_ == other.binary_path_) &&
+           (probe_func_ == other.probe_func_);
+  }
+
+  std::string print_name() const {
+    return provider_ + ":" + name_ + " from " + binary_path_;
+  }
+
+private:
+  StatusTuple init();
+  bool initialized_;
+
+  std::string binary_path_;
+  std::string provider_;
+  std::string name_;
+  std::string probe_func_;
+
+  std::vector<intptr_t> addresses_;
+
+  std::string program_text_;
+
+  friend class BPF;
 };
 
 }  // namespace ebpf

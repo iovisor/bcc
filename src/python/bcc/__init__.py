@@ -282,12 +282,13 @@ class BPF(object):
             print(log_buf.value.decode(), file=sys.stderr)
 
         if fd < 0:
+            atexit.register(self.donothing)
+            if ct.get_errno() == errno.EPERM:
+                raise Exception("Need super-user privilges to run")
+
             errstr = os.strerror(ct.get_errno())
-            if self.debug & DEBUG_BPF:
-                raise Exception("Failed to load BPF program %s: %s" %
-                                (func_name, errstr))
-            else:
-                raise Exception("Failed to load BPF program %s: %s" % (func_name, errstr))
+            raise Exception("Failed to load BPF program %s: %s" %
+                            (func_name, errstr))
 
         fn = BPF.Function(self, func_name, fd)
         self.funcs[func_name] = fn
@@ -1026,6 +1027,9 @@ class BPF(object):
             lib.perf_reader_poll(len(self.open_kprobes), readers, timeout)
         except KeyboardInterrupt:
             exit()
+
+    def donothing(self):
+        """the do nothing exit handler"""
 
     def cleanup(self):
         for k, v in list(self.open_kprobes.items()):

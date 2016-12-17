@@ -22,3 +22,11 @@ install (TARGETS TCPSendStack DESTINATION share/bcc/examples/cpp)
 add_executable(RandomRead RandomRead.cc)
 target_link_libraries(RandomRead bcc-static)
 install (TARGETS RandomRead DESTINATION share/bcc/examples/cpp)
+
+add_executable(LLCStat LLCStat.cc)
+target_link_libraries(LLCStat bcc-static)
+install (TARGETS LLCStat DESTINATION share/bcc/examples/cpp)
+
+add_executable(FollyRequestContextSwitch FollyRequestContextSwitch.cc)
+target_link_libraries(FollyRequestContextSwitch bcc-static)
+install (TARGETS FollyRequestContextSwitch DESTINATION share/bcc/examples/cpp)

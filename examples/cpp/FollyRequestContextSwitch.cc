@@ -1,10 +1,11 @@
 /*
- * RandomRead Monitor random number read events.
- *            For Linux, uses BCC, eBPF. Embedded C.
+ * FollyRequestContextSwitch Monitor RequestContext switch events for any binary
+ *                           uses the class from [folly](http://bit.ly/2h6S1yx).
+ *                           For Linux, uses BCC, eBPF. Embedded C.
  *
- * Basic example of BCC Tracepoint and perf buffer.
+ * Basic example of using USDT with BCC.
  *
- * USAGE: RandomRead
+ * USAGE: FollyRequestContextSwitch PATH_TO_BINARY
  *
  * Copyright (c) Facebook, Inc.
  * Licensed under the Apache License, Version 2.0 (the "License")
@@ -12,6 +13,7 @@
 
 #include <signal.h>
 #include <iostream>
+#include <vector>
 
 #include "BPF.h"
 
@@ -19,31 +21,25 @@ const std::string BPF_PROGRAM = R"(
 #include <linux/sched.h>
 #include <uapi/linux/ptrace.h>
 
-struct urandom_read_args {
-  // See /sys/kernel/debug/tracing/events/random/urandom_read/format
-  uint64_t common__unused;
-  int got_bits;
-  int pool_left;
-  int input_left;
-};
-
 struct event_t {
   int pid;
-  char comm[16];
-  int cpu;
-  int got_bits;
+  char name[16];
+  uint64_t old_addr;
+  uint64_t new_addr;
 };
 
 BPF_PERF_OUTPUT(events);
 
-int on_urandom_read(struct urandom_read_args* attr) {
+int on_context_switch(struct pt_regs *ctx) {
   struct event_t event = {};
-  event.pid = bpf_get_current_pid_tgid();
-  bpf_get_current_comm(&event.comm, sizeof(event.comm));
-  event.cpu = bpf_get_smp_processor_id();
-  event.got_bits = attr->got_bits;
 
-  events.perf_submit(attr, &event, sizeof(event));
+  event.pid = bpf_get_current_pid_tgid();
+  bpf_get_current_comm(&event.name, sizeof(event.name));
+  
+  bpf_usdt_readarg(1, ctx, &event.old_addr);
+  bpf_usdt_readarg(2, ctx, &event.new_addr);
+
+  events.perf_submit(ctx, &event, sizeof(event));
   return 0;
 }
 )";
@@ -51,16 +47,16 @@ int on_urandom_read(struct urandom_read_args* attr) {
 // Define the same struct to use in user space.
 struct event_t {
   int pid;
-  char comm[16];
-  int cpu;
-  int got_bits;
+  char name[16];
+  uint64_t old_addr;
+  uint64_t new_addr;
 };
 
 void handle_output(void* cb_cookie, void* data, int data_size) {
   auto event = static_cast<event_t*>(data);
-  std::cout << "PID: " << event->pid << " (" << event->comm << ") on CPU "
-            << event->cpu << " read " << event->got_bits << " bits"
-            << std::endl;
+  std::cout << "PID " << event->pid << " (" << event->name << ") ";
+  std::cout << "folly::RequestContext switch from " << event->old_addr << " to "
+            << event->new_addr << std::endl;
 }
 
 ebpf::BPF* bpf;
@@ -72,15 +68,23 @@ void signal_handler(int s) {
 }
 
 int main(int argc, char** argv) {
+  if (argc != 2) {
+    std::cout << "USAGE: FollyRequestContextSwitch PATH_TO_BINARY" << std::endl;
+    exit(1);
+  }
+  std::string binary_path(argv[1]);
+
   bpf = new ebpf::BPF();
-  auto init_res = bpf->init(BPF_PROGRAM);
+  std::vector<ebpf::USDT> u;
+  u.emplace_back(binary_path, "folly", "request_context_switch_before",
+                 "on_context_switch");
+  auto init_res = bpf->init(BPF_PROGRAM, {}, u);
   if (init_res.code() != 0) {
     std::cerr << init_res.msg() << std::endl;
     return 1;
   }
 
-  auto attach_res =
-      bpf->attach_tracepoint("random:urandom_read", "on_urandom_read");
+  auto attach_res = bpf->attach_usdt(u[0]);
   if (attach_res.code() != 0) {
     std::cerr << attach_res.msg() << std::endl;
     return 1;

@@ -79,13 +79,23 @@ StatusTuple BPFPerfBuffer::open_on_cpu(perf_reader_raw_cb cb, int cpu,
     return StatusTuple(-1, "Unable to open perf buffer on CPU %d: %s", cpu,
                        strerror(errno));
   }
-  cpu_readers_[cpu] = static_cast<perf_reader*>(reader);
+  cpu_readers_[cpu] = reader;
+  readers_.push_back(reader);
   return StatusTuple(0);
 }
 
-StatusTuple BPFPerfBuffer::open(perf_reader_raw_cb cb, void* cb_cookie) {
-  for (int i = 0; i < sysconf(_SC_NPROCESSORS_ONLN); i++)
-    TRY2(open_on_cpu(cb, i, cb_cookie));
+StatusTuple BPFPerfBuffer::open_all_cpu(perf_reader_raw_cb cb,
+                                        void* cb_cookie) {
+  if (cpu_readers_.size() != 0 || readers_.size() != 0)
+    return StatusTuple(-1, "Previously opened perf buffer not cleaned");
+
+  for (int i = 0; i < sysconf(_SC_NPROCESSORS_ONLN); i++) {
+    auto res = open_on_cpu(cb, i, cb_cookie);
+    if (res.code() != 0) {
+      TRY2(close_all_cpu());
+      return res;
+    }
+  }
   return StatusTuple(0);
 }
 
@@ -100,7 +110,7 @@ StatusTuple BPFPerfBuffer::close_on_cpu(int cpu) {
   return StatusTuple(0);
 }
 
-StatusTuple BPFPerfBuffer::close() {
+StatusTuple BPFPerfBuffer::close_all_cpu() {
   std::string errors;
   bool has_error = false;
   for (int i = 0; i < sysconf(_SC_NPROCESSORS_ONLN); i++) {
@@ -111,21 +121,20 @@ StatusTuple BPFPerfBuffer::close() {
       has_error = true;
     }
   }
+  readers_.clear();
   if (has_error)
     return StatusTuple(-1, errors);
   return StatusTuple(0);
 }
 
 void BPFPerfBuffer::poll(int timeout) {
-  perf_reader* readers[cpu_readers_.size()];
-  int i = 0;
-  for (auto it : cpu_readers_)
-    readers[i++] = it.second;
-  perf_reader_poll(cpu_readers_.size(), readers, timeout);
+  if (readers_.empty())
+    return;
+  perf_reader_poll(readers_.size(), readers_.data(), timeout);
 }
 
 BPFPerfBuffer::~BPFPerfBuffer() {
-  auto res = close();
+  auto res = close_all_cpu();
   if (res.code() != 0)
     std::cerr << "Failed to close all perf buffer on destruction: "
               << res.msg() << std::endl;

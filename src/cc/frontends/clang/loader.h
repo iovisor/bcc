@@ -30,11 +30,6 @@ namespace ebpf {
 
 struct TableDesc;
 
-namespace cc {
-class Parser;
-class CodegenLLVM;
-}
-
 class ClangLoader {
  public:
   explicit ClangLoader(llvm::LLVMContext *ctx, unsigned flags);

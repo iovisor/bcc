@@ -1,0 +1,295 @@
+Demonstrations of runqlen, the Linux eBPF/bcc version.
+
+
+This program summarizes scheduler queue length as a histogram, and can also
+show run queue occupancy. It works by sampling the run queue length on all
+CPUs at 99 Hertz.
+
+As an example, here is an idle system:
+
+# ./runqlen.py
+Sampling run queue length... Hit Ctrl-C to end.
+^C
+     runqlen       : count     distribution
+        0          : 1776     |****************************************|
+
+This shows a zero run queue length each time it was sampled.
+
+And now a heavily loaded system:
+
+# ./runqlen.py
+Sampling run queue length... Hit Ctrl-C to end.
+^C
+     runqlen       : count     distribution
+        0          : 1068     |****************************************|
+        1          : 642      |************************                |
+        2          : 369      |*************                           |
+        3          : 183      |******                                  |
+        4          : 104      |***                                     |
+        5          : 42       |*                                       |
+        6          : 13       |                                        |
+        7          : 2        |                                        |
+        8          : 1        |                                        |
+
+Now there is often threads queued, with one sample reaching a queue length
+of 8. This will cause run queue latency, which can be measured by the bcc
+runqlat tool.
+
+
+Here's an example of an issue that runqlen can indentify. Starting with the
+system-wide summary:
+
+# ./runqlen.py 
+Sampling run queue length... Hit Ctrl-C to end.
+^C
+     runqlen       : count     distribution
+        0          : 1209     |****************************************|
+        1          : 372      |************                            |
+        2          : 73       |**                                      |
+        3          : 3        |                                        |
+        4          : 1        |                                        |
+        5          : 0        |                                        |
+        6          : 0        |                                        |
+        7          : 237      |*******                                 |
+
+This shows there is often a run queue length of 7. Now using the -C option to
+see per-CPU histograms:
+
+# ./runqlen.py -C
+Sampling run queue length... Hit Ctrl-C to end.
+^C
+
+cpu = 0
+     runqlen       : count     distribution
+        0          : 257      |****************************************|
+        1          : 64       |*********                               |
+        2          : 5        |                                        |
+        3          : 0        |                                        |
+        4          : 0        |                                        |
+        5          : 0        |                                        |
+        6          : 1        |                                        |
+
+cpu = 1
+     runqlen       : count     distribution
+        0          : 226      |****************************************|
+        1          : 90       |***************                         |
+        2          : 11       |*                                       |
+
+cpu = 2
+     runqlen       : count     distribution
+        0          : 264      |****************************************|
+        1          : 52       |*******                                 |
+        2          : 8        |*                                       |
+        3          : 1        |                                        |
+        4          : 0        |                                        |
+        5          : 0        |                                        |
+        6          : 1        |                                        |
+        7          : 0        |                                        |
+        8          : 1        |                                        |
+
+cpu = 3
+     runqlen       : count     distribution
+        0          : 0        |                                        |
+        1          : 0        |                                        |
+        2          : 0        |                                        |
+        3          : 0        |                                        |
+        4          : 0        |                                        |
+        5          : 0        |                                        |
+        6          : 0        |                                        |
+        7          : 327      |****************************************|
+
+cpu = 4
+     runqlen       : count     distribution
+        0          : 255      |****************************************|
+        1          : 63       |*********                               |
+        2          : 9        |*                                       |
+
+cpu = 5
+     runqlen       : count     distribution
+        0          : 244      |****************************************|
+        1          : 78       |************                            |
+        2          : 3        |                                        |
+        3          : 2        |                                        |
+
+cpu = 6
+     runqlen       : count     distribution
+        0          : 253      |****************************************|
+        1          : 66       |**********                              |
+        2          : 6        |                                        |
+        3          : 1        |                                        |
+        4          : 1        |                                        |
+
+cpu = 7
+     runqlen       : count     distribution
+        0          : 243      |****************************************|
+        1          : 74       |************                            |
+        2          : 6        |                                        |
+        3          : 1        |                                        |
+        4          : 0        |                                        |
+        5          : 1        |                                        |
+        6          : 2        |                                        |
+
+The run queue length of 7 is isolated to CPU 3. It was caused by CPU binding
+(taskset). This can sometimes happen by applications that try to auto-bind
+to CPUs, leaving other CPUs idle while work is queued.
+
+
+runqlat accepts an interval and a count. For example, with -T for timestamps:
+
+# ./runqlen.py -T 1 5
+Sampling run queue length... Hit Ctrl-C to end.
+
+19:51:34
+     runqlen       : count     distribution
+        0          : 635      |****************************************|
+        1          : 142      |********                                |
+        2          : 13       |                                        |
+        3          : 0        |                                        |
+        4          : 1        |                                        |
+
+19:51:35
+     runqlen       : count     distribution
+        0          : 640      |****************************************|
+        1          : 136      |********                                |
+        2          : 13       |                                        |
+        3          : 1        |                                        |
+        4          : 0        |                                        |
+        5          : 0        |                                        |
+        6          : 0        |                                        |
+        7          : 0        |                                        |
+        8          : 0        |                                        |
+        9          : 0        |                                        |
+        10         : 1        |                                        |
+
+19:51:36
+     runqlen       : count     distribution
+        0          : 603      |****************************************|
+        1          : 170      |***********                             |
+        2          : 16       |*                                       |
+        3          : 1        |                                        |
+        4          : 0        |                                        |
+        5          : 0        |                                        |
+        6          : 0        |                                        |
+        7          : 0        |                                        |
+        8          : 0        |                                        |
+        9          : 1        |                                        |
+
+19:51:37
+     runqlen       : count     distribution
+        0          : 617      |****************************************|
+        1          : 154      |*********                               |
+        2          : 20       |*                                       |
+        3          : 0        |                                        |
+        4          : 0        |                                        |
+        5          : 0        |                                        |
+        6          : 0        |                                        |
+        7          : 0        |                                        |
+        8          : 0        |                                        |
+        9          : 0        |                                        |
+        10         : 0        |                                        |
+        11         : 1        |                                        |
+
+19:51:38
+     runqlen       : count     distribution
+        0          : 603      |****************************************|
+        1          : 161      |**********                              |
+        2          : 24       |*                                       |
+        3          : 4        |                                        |
+
+The spikes in run queue length of 11 are likely threads waking up at the same
+time (a thundering herd), and then are scheduled and complete their execution
+quickly.
+
+
+The -O option prints run queue occupancy: the percentage of time that there
+was work queued waiting its turn. Eg:
+
+# ./runqlen.py -OT 1 
+Sampling run queue length... Hit Ctrl-C to end.
+
+19:54:53
+runqocc: 41.09%
+
+19:54:54
+runqocc: 41.85%
+
+19:54:55
+runqocc: 41.47%
+
+19:54:56
+runqocc: 42.35%
+
+19:54:57
+runqocc: 40.83%
+[...]
+
+This can also be examined per-CPU:
+
+# ./runqlen.py -COT 1 
+Sampling run queue length... Hit Ctrl-C to end.
+
+19:55:03
+runqocc, CPU 0    32.32%
+runqocc, CPU 1    26.26%
+runqocc, CPU 2    38.38%
+runqocc, CPU 3   100.00%
+runqocc, CPU 4    26.26%
+runqocc, CPU 5    32.32%
+runqocc, CPU 6    39.39%
+runqocc, CPU 7    46.46%
+
+19:55:04
+runqocc, CPU 0    35.00%
+runqocc, CPU 1    32.32%
+runqocc, CPU 2    37.00%
+runqocc, CPU 3   100.00%
+runqocc, CPU 4    43.43%
+runqocc, CPU 5    31.31%
+runqocc, CPU 6    28.00%
+runqocc, CPU 7    31.31%
+
+19:55:05
+runqocc, CPU 0    43.43%
+runqocc, CPU 1    32.32%
+runqocc, CPU 2    45.45%
+runqocc, CPU 3   100.00%
+runqocc, CPU 4    29.29%
+runqocc, CPU 5    36.36%
+runqocc, CPU 6    36.36%
+runqocc, CPU 7    30.30%
+
+19:55:06
+runqocc, CPU 0    40.00%
+runqocc, CPU 1    38.00%
+runqocc, CPU 2    31.31%
+runqocc, CPU 3   100.00%
+runqocc, CPU 4    31.31%
+runqocc, CPU 5    28.28%
+runqocc, CPU 6    31.00%
+runqocc, CPU 7    29.29%
+[...]
+
+
+USAGE message:
+
+# ./runqlen -h
+usage: runqlen [-h] [-T] [-O] [-C] [interval] [count]
+
+Summarize scheduler run queue length as a histogram
+
+positional arguments:
+  interval         output interval, in seconds
+  count            number of outputs
+
+optional arguments:
+  -h, --help       show this help message and exit
+  -T, --timestamp  include timestamp on output
+  -O, --runqocc    report run queue occupancy
+  -C, --cpus       print output for each CPU separately
+
+examples:
+    ./runqlen            # summarize run queue length as a histogram
+    ./runqlen 1 10       # print 1 second summaries, 10 times
+    ./runqlen -T 1       # 1s summaries and timestamps
+    ./runqlen -O         # report run queue occupancy
+    ./runqlen -C         # show each CPU separately
