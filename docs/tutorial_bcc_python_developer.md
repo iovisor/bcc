@@ -603,7 +603,7 @@ TIME(s)            COMM             PID    ARGS
 24653340.510164998 node             24728  path:/images/favicon.png
 ```
 
-Relevant code from [examples/tracing/nodejs_http_server.py](../examples/tracing/nodes_http_server.py):
+Relevant code from [examples/tracing/nodejs_http_server.py](../examples/tracing/nodejs_http_server.py):
 
 ```Python
 if len(sys.argv) < 2:
