@@ -336,6 +336,12 @@ bool BTypeVisitor::TraverseCallExpr(CallExpr *Call) {
 // to:
 //  bpf_table_foo_elem(bpf_pseudo_fd(table), &key [,&leaf])
 bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
+  // Get rewritten text given a source range, w/ expansion range applied
+  auto getRewrittenText = [this] (SourceRange R) {
+    auto r = rewriter_.getSourceMgr().getExpansionRange(R);
+    return rewriter_.getRewrittenText(r);
+  };
+
   // make sure node is a reference to a bpf table, which is assured by the
   // presence of the section("maps/<typename>") GNU __attribute__
   if (MemberExpr *Memb = dyn_cast<MemberExpr>(Call->getCallee()->IgnoreImplicit())) {
@@ -345,9 +351,8 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
         if (!A->getName().startswith("maps"))
           return true;
 
-        SourceRange argRange(Call->getArg(0)->getLocStart(),
-                             Call->getArg(Call->getNumArgs()-1)->getLocEnd());
-        string args = rewriter_.getRewrittenText(argRange);
+        string args = getRewrittenText(SourceRange(Call->getArg(0)->getLocStart(),
+                                                   Call->getArg(Call->getNumArgs() - 1)->getLocEnd()));
 
         // find the table fd, which was opened at declaration time
         auto table_it = tables_.begin();
@@ -366,10 +371,8 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
         if (memb_name == "lookup_or_init") {
           map_update_policy = "BPF_NOEXIST";
           string name = Ref->getDecl()->getName();
-          string arg0 = rewriter_.getRewrittenText(SourceRange(Call->getArg(0)->getLocStart(),
-                                                               Call->getArg(0)->getLocEnd()));
-          string arg1 = rewriter_.getRewrittenText(SourceRange(Call->getArg(1)->getLocStart(),
-                                                               Call->getArg(1)->getLocEnd()));
+          string arg0 = getRewrittenText(Call->getArg(0)->getSourceRange());
+          string arg1 = getRewrittenText(Call->getArg(1)->getSourceRange());
           string lookup = "bpf_map_lookup_elem_(bpf_pseudo_fd(1, " + fd + ")";
           string update = "bpf_map_update_elem_(bpf_pseudo_fd(1, " + fd + ")";
           txt  = "({typeof(" + name + ".leaf) *leaf = " + lookup + ", " + arg0 + "); ";
@@ -381,8 +384,7 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
           txt += "leaf;})";
         } else if (memb_name == "increment") {
           string name = Ref->getDecl()->getName();
-          string arg0 = rewriter_.getRewrittenText(SourceRange(Call->getArg(0)->getLocStart(),
-                                                               Call->getArg(0)->getLocEnd()));
+          string arg0 = getRewrittenText(Call->getArg(0)->getSourceRange());
           string lookup = "bpf_map_lookup_elem_(bpf_pseudo_fd(1, " + fd + ")";
           string update = "bpf_map_update_elem_(bpf_pseudo_fd(1, " + fd + ")";
           txt  = "({ typeof(" + name + ".key) _key = " + arg0 + "; ";
@@ -394,21 +396,16 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
           txt += "if (_leaf) (*_leaf)++; })";
         } else if (memb_name == "perf_submit") {
           string name = Ref->getDecl()->getName();
-          string arg0 = rewriter_.getRewrittenText(SourceRange(Call->getArg(0)->getLocStart(),
-                                                               Call->getArg(0)->getLocEnd()));
-          string args_other = rewriter_.getRewrittenText(SourceRange(Call->getArg(1)->getLocStart(),
-                                                                     Call->getArg(2)->getLocEnd()));
+          string arg0 = getRewrittenText(Call->getArg(0)->getSourceRange());
+          string args_other = getRewrittenText(SourceRange(Call->getArg(1)->getLocStart(),
+                                                           Call->getArg(2)->getLocEnd()));
           txt = "bpf_perf_event_output(" + arg0 + ", bpf_pseudo_fd(1, " + fd + ")";
           txt += ", bpf_get_smp_processor_id(), " + args_other + ")";
         } else if (memb_name == "perf_submit_skb") {
-          string skb = rewriter_.getRewrittenText(SourceRange(Call->getArg(0)->getLocStart(),
-                                                               Call->getArg(0)->getLocEnd()));
-          string skb_len = rewriter_.getRewrittenText(SourceRange(Call->getArg(1)->getLocStart(),
-                                                                  Call->getArg(1)->getLocEnd()));
-          string meta = rewriter_.getRewrittenText(SourceRange(Call->getArg(2)->getLocStart(),
-                                                               Call->getArg(2)->getLocEnd()));
-          string meta_len = rewriter_.getRewrittenText(SourceRange(Call->getArg(3)->getLocStart(),
-                                                                   Call->getArg(3)->getLocEnd()));
+          string skb = getRewrittenText(Call->getArg(0)->getSourceRange());
+          string skb_len = getRewrittenText(Call->getArg(1)->getSourceRange());
+          string meta = getRewrittenText(Call->getArg(2)->getSourceRange());
+          string meta_len = getRewrittenText(Call->getArg(3)->getSourceRange());
           txt = "bpf_perf_event_output(" +
             skb + ", " +
             "bpf_pseudo_fd(1, " + fd + "), " +
@@ -417,8 +414,7 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
             meta_len + ");";
         } else if (memb_name == "get_stackid") {
             if (table_it->type == BPF_MAP_TYPE_STACK_TRACE) {
-              string arg0 = rewriter_.getRewrittenText(SourceRange(Call->getArg(0)->getLocStart(),
-                                                                   Call->getArg(0)->getLocEnd()));
+              string arg0 = getRewrittenText(Call->getArg(0)->getSourceRange());
               txt = "bpf_get_stackid(";
               txt += "bpf_pseudo_fd(1, " + fd + "), " + arg0;
               rewrite_end = Call->getArg(0)->getLocEnd();
@@ -474,7 +470,7 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
 
         vector<string> args;
         for (auto arg : Call->arguments())
-          args.push_back(rewriter_.getRewrittenText(SourceRange(arg->getLocStart(), arg->getLocEnd())));
+          args.push_back(getRewrittenText(arg->getSourceRange()));
 
         string text;
         if (Decl->getName() == "incr_cksum_l3") {

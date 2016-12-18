@@ -352,5 +352,45 @@ int many(struct pt_regs *ctx, int a, int b, int c, int d, int e, int f, int g) {
         with self.assertRaises(Exception):
             b = BPF(text=text)
 
+    def test_call_macro_arg(self):
+        text = """
+BPF_TABLE("prog", u32, u32, jmp, 32);
+
+#define JMP_IDX_PIPE (1U << 1)
+
+enum action {
+    ACTION_PASS
+};
+
+int process(struct xdp_md *ctx) {
+    jmp.call((void *)ctx, ACTION_PASS);
+    jmp.call((void *)ctx, JMP_IDX_PIPE);
+    return XDP_PASS;
+}
+        """
+        b = BPF(text=text)
+        t = b["jmp"]
+        self.assertEquals(len(t), 32);
+
+    def test_update_macro_arg(self):
+        text = """
+BPF_TABLE("array", u32, u32, act, 32);
+
+#define JMP_IDX_PIPE (1U << 1)
+
+enum action {
+    ACTION_PASS
+};
+
+int process(struct xdp_md *ctx) {
+    act.increment(ACTION_PASS);
+    act.increment(JMP_IDX_PIPE);
+    return XDP_PASS;
+}
+        """
+        b = BPF(text=text)
+        t = b["act"]
+        self.assertEquals(len(t), 32);
+
 if __name__ == "__main__":
     main()
