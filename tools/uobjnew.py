@@ -17,10 +17,10 @@ from bcc import BPF, USDT
 from time import sleep
 
 examples = """examples:
-    ./uobjnew -l java 145         # summarize Java allocations in process 145
-    ./uobjnew -l c 2020 1         # grab malloc() sizes and print every second
-    ./uobjnew -l ruby 6712 -C 10  # top 10 Ruby types by number of allocations
-    ./uobjnew -l ruby 6712 -S 10  # top 10 Ruby types by total size
+    ./uobjnew java 145         # summarize Java allocations in process 145
+    ./uobjnew c 2020 1         # grab malloc() sizes and print every second
+    ./uobjnew ruby 6712 -C 10  # top 10 Ruby types by number of allocations
+    ./uobjnew ruby 6712 -S 10  # top 10 Ruby types by total size
 """
 parser = argparse.ArgumentParser(
     description="Summarize object allocations in high-level languages.",
