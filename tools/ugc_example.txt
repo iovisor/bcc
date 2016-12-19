@@ -1,0 +1,66 @@
+Demonstrations of ugc.
+
+
+ugc traces garbage collection events in high-level languages, including Java,
+Python, Ruby, and Node. Each GC event is printed with some additional 
+information provided by that language's runtime, if available. The duration of
+the GC event is also provided.
+
+For example, to trace all garbage collection events in a specific Node process:
+
+# ./ugc node $(pidof node)
+Tracing garbage collections in node process 3018... Ctrl-C to quit.
+START    DESCRIPTION                              TIME (us)
+3.864    GC mark-sweep-compact                    3189.00 
+4.937    GC scavenge                              1254.00 
+4.940    GC scavenge                              1657.00 
+4.943    GC scavenge                              1171.00 
+4.949    GC scavenge                              2216.00 
+4.954    GC scavenge                              2515.00 
+4.960    GC scavenge                              2243.00 
+4.966    GC scavenge                              2410.00 
+4.976    GC scavenge                              3003.00 
+4.986    GC scavenge                              4174.00 
+4.994    GC scavenge                              1508.00 
+5.003    GC scavenge                              1966.00 
+5.010    GC scavenge                              1636.00 
+5.022    GC scavenge                              3564.00 
+5.035    GC scavenge                              3275.00 
+5.045    GC incremental mark                      157.00  
+5.049    GC mark-sweep-compact                    3248.00 
+5.060    GC scavenge                              4785.00 
+5.081    GC scavenge                              6616.00 
+5.094    GC scavenge                              8570.00 
+5.144    GC scavenge                              456.00  
+7.188    GC scavenge                              2345.00 
+7.227    GC scavenge                              12054.00
+7.253    GC scavenge                              15626.00
+7.304    GC scavenge                              15329.00
+7.384    GC scavenge                              7168.00 
+7.411    GC scavenge                              3794.00 
+7.414    GC incremental mark                      123.00  
+7.430    GC mark-sweep-compact                    7110.00 
+^C
+
+
+USAGE message:
+
+# ./ugc -h
+usage: ugc.py [-h] [-v] [-m] {java,python,ruby,node} pid
+
+Summarize garbage collection events in high-level languages.
+
+positional arguments:
+  {java,python,ruby,node}
+                        language to trace
+  pid                   process id to attach to
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -v, --verbose         verbose mode: print the BPF program (for debugging
+                        purposes)
+  -m, --milliseconds    report times in milliseconds (default is microseconds)
+
+examples:
+    ./ugc java 185           # trace Java GCs in process 185
+    ./ugc ruby 1344 -m       # trace Ruby GCs reporting in ms

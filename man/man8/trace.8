@@ -2,8 +2,8 @@
 .SH NAME
 trace \- Trace a function and print its arguments or return value, optionally evaluating a filter. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B trace [-h] [-p PID] [-t TID] [-v] [-Z STRING_SIZE] [-S]
-         [-M MAX_EVENTS] [-o] [-K] [-U] [-I header]
+.B trace [-h] [-p PID] [-L TID] [-v] [-Z STRING_SIZE] [-S]
+         [-M MAX_EVENTS] [-t] [-T] [-K] [-U] [-I header]
          probe [probe ...]
 .SH DESCRIPTION
 trace probes functions you specify and displays trace messages if a particular
@@ -21,7 +21,7 @@ Print usage message.
 \-p PID
 Trace only functions in the process PID.
 .TP
-\-t TID
+\-L TID
 Trace only functions in the thread TID.
 .TP
 \-v
@@ -39,9 +39,11 @@ consider that trace is writing to the standard output.
 \-M MAX_EVENTS
 Print up to MAX_EVENTS trace messages and then exit.
 .TP
-\-o
-Print times relative to the beginning of the trace (offsets), in seconds. The
-default is to print absolute time.
+\-t
+Print times relative to the beginning of the trace (offsets), in seconds.
+.TP
+\-T
+Print the time column.
 .TP
 \-K
 Print the kernel stack for each event.

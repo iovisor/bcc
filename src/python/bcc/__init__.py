@@ -221,7 +221,7 @@ class BPF(object):
                                     "possible cause is missing pid when a " +
                                     "probe in a shared object has multiple " +
                                     "locations")
-                text = usdt_context.get_text() + text
+                text = usdt_text + text
 
         if text:
             self.module = lib.bpf_module_create_c_from_string(text.encode("ascii"),

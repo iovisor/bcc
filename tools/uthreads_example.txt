@@ -1,0 +1,58 @@
+Demonstrations of uthreads.
+
+
+uthreads traces thread creation events in Java or raw pthreads, and prints
+details about the newly created thread. For Java threads, the thread name is
+printed; for pthreads, the thread's start function is printed, if there is
+symbol information to resolve it.
+
+For example, trace all Java thread creation events:
+
+# ./uthreads -l java 27420
+Tracing thread events in process 27420 (language: java)... Ctrl-C to quit.
+TIME     ID               TYPE     DESCRIPTION                   
+18.596   R=9/N=0          start    SIGINT handler                
+18.596   R=4/N=0          stop     Signal Dispatcher             
+^C
+
+The ID column in the preceding output shows the thread's runtime ID and native
+ID, when available. The accuracy of this information depends on the Java 
+runtime.
+
+
+Next, trace only pthread creation events in some native application:
+
+# ./uthreads 27450
+Tracing thread events in process 27450 (language: none)... Ctrl-C to quit.
+TIME     ID               TYPE     DESCRIPTION                   
+0.924    27462            pthread  primes_thread                 
+0.927    27463            pthread  primes_thread                 
+0.928    27464            pthread  primes_thread                 
+0.928    27465            pthread  primes_thread                 
+^C
+
+The thread name ("primes_thread" in this example) is resolved from debuginfo.
+If symbol information is not present, the thread's start address is printed
+instead.
+
+
+USAGE message:
+
+# ./uthreads -h
+usage: uthreads.py [-h] [-l {java}] [-v] pid
+
+Trace thread creation/destruction events in high-level languages.
+
+positional arguments:
+  pid                   process id to attach to
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -l {java}, --language {java}
+                        language to trace (none for pthreads only)
+  -v, --verbose         verbose mode: print the BPF program (for debugging
+                        purposes)
+
+examples:
+    ./uthreads -l java 185   # trace Java threads in process 185
+    ./uthreads 12245         # trace only pthreads in process 12245

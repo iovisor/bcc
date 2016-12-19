@@ -1,0 +1,64 @@
+.TH uthreads 8  "2016-11-07" "USER COMMANDS"
+.SH NAME
+uthreads \- Trace thread creation events in Java or pthreads.
+.SH SYNOPSIS
+.B uthreads [-h] [-l {java}] [-v] pid
+.SH DESCRIPTION
+This traces thread creation events in Java processes, or pthread creation
+events in any process. When a thread is created, its name or start address
+is printed.
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH OPTIONS
+.TP
+\-l {java}
+The language to trace (currently only Java is supported). When no language is
+specified, only pthread creations are traced.
+.TP
+\-v
+Print the resulting BPF program, for debugging purposes.
+.TP
+pid
+The process id to trace.
+.SH EXAMPLES
+.TP
+Trace Java thread creations:
+#
+.B uthreads -l java 148
+.TP
+Trace pthread creations:
+#
+.B uthreads 1802
+.SH FIELDS
+.TP
+TIME
+The event's time in seconds from the beginning of the trace.
+.TP
+ID
+The thread's ID. The information in this column depends on the runtime.
+.TP
+TYPE
+Event type -- thread start, stop, or pthread event.
+.TP
+DESCRIPTION
+The thread's name or start address function name.
+.SH OVERHEAD
+Thread start and stop events are usually not very frequent, which makes this
+tool's overhead negligible.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _example.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Sasha Goldshtein
+.SH SEE ALSO
+ustat(8), trace(8)
