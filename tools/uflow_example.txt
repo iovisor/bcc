@@ -1,0 +1,112 @@
+Demonstrations of uflow.
+
+
+uflow traces method entry and exit events and prints a visual flow graph that
+shows how methods are entered and exited, similar to a tracing debugger with
+breakpoints. This can be useful for understanding program flow in high-level
+languages such as Java, Python, and Ruby, which provide USDT probes for method
+invocations.
+
+
+For example, trace all Ruby method calls in a specific process:
+
+# ./uflow ruby 27245
+Tracing method calls in ruby process 27245... Ctrl-C to quit.
+CPU PID    TID    TIME(us) METHOD
+3   27245  27245  4.536    <- IO.gets                              
+3   27245  27245  4.536    <- IRB::StdioInputMethod.gets           
+3   27245  27245  4.536    -> IRB::Context.verbose?                
+3   27245  27245  4.536      -> NilClass.nil?                      
+3   27245  27245  4.536      <- NilClass.nil?                      
+3   27245  27245  4.536      -> IO.tty?                            
+3   27245  27245  4.536      <- IO.tty?                            
+3   27245  27245  4.536      -> Kernel.kind_of?                    
+3   27245  27245  4.536      <- Kernel.kind_of?                    
+3   27245  27245  4.536    <- IRB::Context.verbose?                
+3   27245  27245  4.536    <- IRB::Irb.signal_status               
+3   27245  27245  4.536    -> String.chars                         
+3   27245  27245  4.536    <- String.chars                         
+^C
+
+In the preceding output, indentation indicates the depth of the flow graph,
+and the <- and -> arrows indicate the direction of the event (exit or entry).
+
+Often, the amount of output can be overwhelming. You can filter specific 
+classes or methods. For example, trace only methods from the Thread class:
+
+# ./uflow -C java/lang/Thread java $(pidof java)
+Tracing method calls in java process 27722... Ctrl-C to quit.
+CPU PID    TID    TIME(us) METHOD
+3   27722  27731  3.144    -> java/lang/Thread.<init>              
+3   27722  27731  3.144      -> java/lang/Thread.init              
+3   27722  27731  3.144        -> java/lang/Thread.init            
+3   27722  27731  3.144          -> java/lang/Thread.currentThread 
+3   27722  27731  3.144          <- java/lang/Thread.currentThread 
+3   27722  27731  3.144          -> java/lang/Thread.getThreadGroup
+3   27722  27731  3.144          <- java/lang/Thread.getThreadGroup
+3   27722  27731  3.144          -> java/lang/ThreadGroup.checkAccess
+3   27722  27731  3.144          <- java/lang/ThreadGroup.checkAccess
+3   27722  27731  3.144          -> java/lang/ThreadGroup.addUnstarted
+3   27722  27731  3.144          <- java/lang/ThreadGroup.addUnstarted
+3   27722  27731  3.145          -> java/lang/Thread.isDaemon     
+3   27722  27731  3.145          <- java/lang/Thread.isDaemon     
+3   27722  27731  3.145          -> java/lang/Thread.getPriority   
+3   27722  27731  3.145          <- java/lang/Thread.getPriority   
+3   27722  27731  3.145          -> java/lang/Thread.getContextClassLoader
+3   27722  27731  3.145          <- java/lang/Thread.getContextClassLoader
+3   27722  27731  3.145          -> java/lang/Thread.setPriority   
+3   27722  27731  3.145            -> java/lang/Thread.checkAccess 
+3   27722  27731  3.145            <- java/lang/Thread.checkAccess 
+3   27722  27731  3.145            -> java/lang/Thread.getThreadGroup
+3   27722  27731  3.145            <- java/lang/Thread.getThreadGroup
+3   27722  27731  3.145            -> java/lang/ThreadGroup.getMaxPriority
+3   27722  27731  3.145            <- java/lang/ThreadGroup.getMaxPriority
+3   27722  27731  3.145            -> java/lang/Thread.setPriority0
+3   27722  27731  3.145            <- java/lang/Thread.setPriority0
+3   27722  27731  3.145          <- java/lang/Thread.setPriority   
+3   27722  27731  3.145          -> java/lang/Thread.nextThreadID  
+3   27722  27731  3.145          <- java/lang/Thread.nextThreadID  
+3   27722  27731  3.145        <- java/lang/Thread.init            
+3   27722  27731  3.145      <- java/lang/Thread.init              
+3   27722  27731  3.145    <- java/lang/Thread.<init>              
+3   27722  27731  3.145    -> java/lang/Thread.start               
+3   27722  27731  3.145      -> java/lang/ThreadGroup.add          
+3   27722  27731  3.145      <- java/lang/ThreadGroup.add          
+3   27722  27731  3.145      -> java/lang/Thread.start0            
+3   27722  27731  3.145      <- java/lang/Thread.start0            
+3   27722  27731  3.146    <- java/lang/Thread.start               
+2   27722  27742  3.146    -> java/lang/Thread.run                 
+^C
+
+The reason that the CPU number is printed in the first column is that events
+from different threads can be reordered when running on different CPUs, and
+produce non-sensible output. By looking for changes in the CPU column, you can
+easily see if the events you're following make sense and belong to the same
+thread running on the same CPU.
+
+
+USAGE message:
+
+# ./uflow -h
+usage: uflow.py [-h] [-M METHOD] [-C CLAZZ] [-v] {java,python,ruby} pid
+
+Trace method execution flow in high-level languages.
+
+positional arguments:
+  {java,python,ruby}    language to trace
+  pid                   process id to attach to
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -M METHOD, --method METHOD
+                        trace only calls to methods starting with this prefix
+  -C CLAZZ, --class CLAZZ
+                        trace only calls to classes starting with this prefix
+  -v, --verbose         verbose mode: print the BPF program (for debugging
+                        purposes)
+
+examples:
+    ./uflow java 185                # trace Java method calls in process 185
+    ./uflow ruby 1344               # trace Ruby method calls in process 1344
+    ./uflow -M indexOf java 185     # trace only 'indexOf'-prefixed methods
+    ./uflow -C '<stdin>' python 180 # trace only REPL-defined methods

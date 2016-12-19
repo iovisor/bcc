@@ -1,0 +1,79 @@
+.TH uobjnew 8  "2016-11-07" "USER COMMANDS"
+.SH NAME
+uobjnew \- Summarize object allocations in high-level languages.
+.SH SYNOPSIS
+.B uobjnew [-h] [-C TOP_COUNT] [-S TOP_SIZE] [-v] {java,ruby,c} pid [interval]
+.SH DESCRIPTION
+uobjnew traces object allocations in high-level languages (including "malloc")
+and prints summaries of the most frequently allocated types by number of 
+objects or number of bytes.
+
+This tool relies on USDT probes embedded in many high-level languages, such as
+Node, Java, Python, and Ruby. It requires a runtime instrumented with these 
+probes, which in some cases requires building from source with a USDT-specific
+flag, such as "--enable-dtrace" or "--with-dtrace". For Java, the Java process
+must be started with the "-XX:+ExtendedDTraceProbes" flag.
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH OPTIONS
+.TP
+\-C TOP_COUNT
+Print the top object types sorted by number of instances.
+.TP
+\-S TOP_SIZE
+Print the top object types sorted by size.
+.TP
+\-v
+Print the resulting BPF program, for debugging purposes.
+.TP
+{java,ruby,c}
+The language to trace.
+.TP
+pid
+The process id to trace.
+.TP
+interval
+Wait this many seconds and then print the summary and exit. By default, wait
+for Ctrl+C to exit.
+.SH EXAMPLES
+.TP
+Trace object allocations in a Ruby process:
+#
+.B uobjnew ruby 148
+.TP
+Trace object allocations from "malloc" and print the top 10 by total size:
+#
+.B uobjnew -S 10 c 1788
+.SH FIELDS
+.TP
+TYPE
+The object type being allocated. For C (malloc), this is the block size.
+.TP
+ALLOCS
+The number of objects allocated.
+.TP
+BYTES
+The number of bytes allocated.
+.SH OVERHEAD
+Object allocation events are quite frequent, and therefore the overhead from
+running this tool can be considerable. Use with caution and make sure to 
+test before using in a production environment. Nonetheless, even thousands of
+allocations per second will likely produce a reasonable overhead when 
+investigating a problem.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _example.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Sasha Goldshtein
+.SH SEE ALSO
+ustat(8), ugc(8), memleak(8)

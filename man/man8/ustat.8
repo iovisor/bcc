@@ -1,0 +1,116 @@
+.TH ustat 8  "2016-11-07" "USER COMMANDS"
+.SH NAME
+ustat \- Activity stats from high-level languages.
+.SH SYNOPSIS
+.B ustat [-l {java,python,ruby,node}] [-C] [-S {cload,excp,gc,method,objnew,thread}] [-r MAXROWS] [-d] [interval [count]]
+.SH DESCRIPTION
+This is "top" for high-level language events, such as garbage collections,
+exceptions, thread creations, object allocations, method calls, and more. The
+events are aggregated for each process and printed in a top-like table, which
+can be sorted by various fields.
+
+This uses in-kernel eBPF maps to store per process summaries for efficiency.
+
+This tool relies on USDT probes embedded in many high-level languages, such as
+Node, Java, Python, and Ruby. It requires a runtime instrumented with these 
+probes, which in some cases requires building from source with a USDT-specific
+flag, such as "--enable-dtrace" or "--with-dtrace". For Java, some probes are
+not enabled by default, and can be turned on by running the Java process with
+the "-XX:+ExtendedDTraceProbes" flag.
+
+Newly-created processes will only be traced at the next interval. If you run
+this tool with a short interval (say, 1-5 seconds), this should be virtually
+unnoticeable. For longer intervals, you might miss processes that were started
+and terminated during the interval window.
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH OPTIONS
+.TP
+\-l {java,python,ruby,node}
+The language to trace. By default, all languages are traced.
+.TP
+\-C
+Do not clear the screen between updates.
+.TP
+\-S {cload,excp,gc,method,objnew,thread}
+Sort the output by the specified field.
+.TP
+\-r MAXROWS
+Do not print more than this number of rows.
+.TP
+\-d
+Print the resulting BPF program, for debugging purposes.
+.TP
+interval
+Interval between updates, seconds.
+.TP
+count
+Number of interval summaries.
+.SH EXAMPLES
+.TP
+Summarize activity in high-level languages, 1 second refresh:
+#
+.B ustat
+.TP
+Don't clear the screen, and top 8 rows only:
+#
+.B ustat -Cr 8
+.TP
+5 second summaries, 10 times only:
+#
+.B ustat 5 10
+.SH FIELDS
+.TP
+loadavg
+The contents of /proc/loadavg
+.TP
+PID
+Process ID.
+.TP
+CMDLINE
+Process command line (often the second and following arguments will give you a
+hint as to which application is being run.
+.TP
+METHOD/s
+Count of method invocations during interval.
+.TP
+GC/s
+Count of garbage collections during interval.
+.TP
+OBJNEW/s
+Count of objects allocated during interval.
+.TP
+CLOAD/s
+Count of classes loaded during interval.
+.TP
+EXC/s
+Count of exceptions thrown during interval.
+.TP
+THR/s
+Count of threads created during interval.
+.SH OVERHEAD
+When using this tool with high-frequency events, such as method calls, a very
+significant slow-down can be expected. However, many of the high-level 
+languages covered by this tool already have a fairly high per-method invocation
+cost, especially when running in interpreted mode. For the lower-frequency 
+events, such as garbage collections or thread creations, the overhead should 
+not be significant. Specifically, when probing Java processes and not using the
+"-XX:+ExtendedDTraceProbes" flag, the most expensive probes are not emitted,
+and the overhead should be acceptable.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _example.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Sasha Goldshtein
+.SH SEE ALSO
+trace(8), argdist(8), tplist(8)

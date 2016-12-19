@@ -1,0 +1,78 @@
+Demonstrations of ustat.
+
+
+ustat is a "top"-like tool for monitoring events in high-level languages. It 
+prints statistics about garbage collections, method calls, object allocations,
+and various other events for every process that it recognizes with a Java,
+Python, Ruby, or Node runtime.
+
+For example:
+
+# ./ustat.py
+Tracing... Output every 10 secs. Hit Ctrl-C to end
+12:17:17 loadavg: 0.33 0.08 0.02 5/211 26284
+
+PID    CMDLINE              METHOD/s   GC/s   OBJNEW/s   CLOAD/s  EXC/s  THR/s 
+3018   node/node            0          3      0          0        0      0     
+^C
+Detaching...
+
+
+If desired, you can instruct ustat to print a certain number of entries and 
+exit, which can be useful to get a quick picture on what's happening on the 
+system over a short time interval. Here, we ask ustat to print 5-second 
+summaries 12 times (for a total time of 1 minute):
+
+# ./ustat.py -C 5 12
+Tracing... Output every 5 secs. Hit Ctrl-C to end
+12:18:26 loadavg: 0.27 0.11 0.04 2/336 26455
+
+PID    CMDLINE              METHOD/s   GC/s   OBJNEW/s   CLOAD/s  EXC/s  THR/s 
+3018   node/node            0          1      0          0        0      0     
+
+12:18:31 loadavg: 0.33 0.12 0.04 2/336 26456
+
+PID    CMDLINE              METHOD/s   GC/s   OBJNEW/s   CLOAD/s  EXC/s  THR/s 
+3018   node/node            0          0      0          0        0      0     
+26439  java -XX:+ExtendedDT 2776045    0      0          0        0      0     
+
+12:18:37 loadavg: 0.38 0.14 0.05 2/336 26457
+
+PID    CMDLINE              METHOD/s   GC/s   OBJNEW/s   CLOAD/s  EXC/s  THR/s 
+3018   node/node            0          0      0          0        0      0     
+26439  java -XX:+ExtendedDT 2804378    0      0          0        0      0     
+
+(...more output omitted for brevity)
+
+
+USAGE message:
+
+# ./ustat.py -h
+usage: ustat.py [-h] [-l {java,python,ruby,node}] [-C]
+                [-S {cload,excp,gc,method,objnew,thread}] [-r MAXROWS] [-d]
+                [interval] [count]
+
+Activity stats from high-level languages.
+
+positional arguments:
+  interval              output interval, in seconds
+  count                 number of outputs
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -l {java,python,ruby,node}, --language {java,python,ruby,node}
+                        language to trace (default: all languages)
+  -C, --noclear         don't clear the screen
+  -S {cload,excp,gc,method,objnew,thread}, --sort {cload,excp,gc,method,objnew,thread}
+                        sort by this field (descending order)
+  -r MAXROWS, --maxrows MAXROWS
+                        maximum rows to print, default 20
+  -d, --debug           Print the resulting BPF program (for debugging
+                        purposes)
+
+examples:
+  ./ustat              # stats for all languages, 1 second refresh
+  ./ustat -C           # don't clear the screen
+  ./ustat -l java      # Java processes only
+  ./ustat 5            # 5 second summaries
+  ./ustat 5 10         # 5 second summaries, 10 times only 

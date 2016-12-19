@@ -1,0 +1,92 @@
+Demonstrations of ucalls.
+
+
+ucalls summarizes method calls in various high-level languages, including Java,
+Python, Ruby, and Linux system calls. It displays statistics on the most 
+frequently called methods, as well as the latency (duration) of these methods.
+
+Through the syscalls support, ucalls can provide basic information on a 
+process' interaction with the system including syscall counts and latencies. 
+This can then be used for further exploration with other BCC tools like trace,
+argdist, biotop, fileslower, and others.
+
+For example, to trace method call latency in a Java application:
+
+# ucalls -L -l java $(pidof java)
+Tracing calls in process 26877 (language: java)... Ctrl-C to quit.
+
+METHOD                                              # CALLS TIME (us)
+java/io/BufferedInputStream.getBufIfOpen                  1 7.00
+slowy/App.isSimplePrime                                8970 8858.35
+slowy/App.isDivisible                               3228196 3076985.12
+slowy/App.isPrime                                      8969 4841017.64
+^C
+
+
+To trace only syscalls in a particular process and print the top 10 most 
+frequently-invoked ones:
+
+# ucalls -ST 10 3018
+Attached 375 kernel probes for syscall tracing.
+Tracing calls in process 3018 (language: none)... Ctrl-C to quit.
+
+METHOD                                              # CALLS
+sys_rt_sigaction                                          4
+SyS_rt_sigprocmask                                        4
+sys_mprotect                                              5
+sys_read                                                 22
+SyS_write                                                39
+SyS_epoll_wait                                           42
+sys_futex                                               177
+SyS_mmap                                                180
+sys_mmap_pgoff                                          181
+sys_munmap                                              817
+^C
+Detaching kernel probes, please wait...
+
+
+To print only the top 5 methods and report times in milliseconds (the default
+is microseconds):
+
+# ucalls -l python -mT 5 $(pidof python)
+Tracing calls in process 26914 (language: python)... Ctrl-C to quit.
+
+METHOD                                              # CALLS
+<stdin>.<module>                                          1
+<stdin>.fibo                                       14190928
+^C
+
+
+USAGE message:
+
+# ./ucalls.py -h
+usage: ucalls.py [-h] [-l {java,python,ruby}] [-T TOP] [-L] [-S] [-v] [-m]
+                 pid [interval]
+
+Summarize method calls in high-level languages.
+
+positional arguments:
+  pid                   process id to attach to
+  interval              print every specified number of seconds
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -l {java,python,ruby}, --language {java,python,ruby}
+                        language to trace (if none, trace syscalls only)
+  -T TOP, --top TOP     number of most frequent/slow calls to print
+  -L, --latency         record method latency from enter to exit (except
+                        recursive calls)
+  -S, --syscalls        record syscall latency (adds overhead)
+  -v, --verbose         verbose mode: print the BPF program (for debugging
+                        purposes)
+  -m, --milliseconds    report times in milliseconds (default is microseconds)
+
+examples:
+    ./ucalls -l java 185        # trace Java calls and print statistics on ^C
+    ./ucalls -l python 2020 1   # trace Python calls and print every second
+    ./ucalls -l java 185 -S     # trace Java calls and syscalls
+    ./ucalls 6712 -S            # trace only syscall counts
+    ./ucalls -l ruby 1344 -T 10 # trace top 10 Ruby method calls
+    ./ucalls -l ruby 1344 -L    # trace Ruby calls including latency
+    ./ucalls -l ruby 1344 -LS   # trace Ruby calls and syscalls with latency
+    ./ucalls -l python 2020 -mL # trace Python calls including latency in ms
