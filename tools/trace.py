@@ -3,8 +3,8 @@
 # trace         Trace a function and print a trace message based on its
 #               parameters, with an optional filter.
 #
-# usage: trace [-h] [-p PID] [-t TID] [-v] [-Z STRING_SIZE] [-S]
-#              [-M MAX_EVENTS] [-o] [-K] [-U] [-I header]
+# usage: trace [-h] [-p PID] [-L TID] [-v] [-Z STRING_SIZE] [-S]
+#              [-M MAX_EVENTS] [-T] [-t] [-K] [-U] [-I header]
 #              probe [probe ...]
 #
 # Licensed under the Apache License, Version 2.0 (the "License")
@@ -58,7 +58,8 @@ class Probe(object):
         @classmethod
         def configure(cls, args):
                 cls.max_events = args.max_events
-                cls.use_localtime = not args.offset
+                cls.print_time = args.timestamp or args.time
+                cls.use_localtime = not args.timestamp
                 cls.first_ts = Time.monotonic_time()
                 cls.tgid = args.tgid or -1
                 cls.pid = args.pid or -1
@@ -485,11 +486,16 @@ BPF_PERF_OUTPUT(%s);
                 values = map(lambda i: getattr(event, "v%d" % i),
                              range(0, len(self.values)))
                 msg = self._format_message(bpf, event.tgid, values)
-                time = strftime("%H:%M:%S") if Probe.use_localtime else \
-                       Probe._time_off_str(event.timestamp_ns)
-                print("%-8s %-6d %-6d %-12s %-16s %s" %
-                    (time[:8], event.tgid, event.pid, event.comm,
-                     self._display_function(), msg))
+                if not Probe.print_time:
+                    print("%-6d %-6d %-12s %-16s %s" %
+                          (event.tgid, event.pid, event.comm,
+                           self._display_function(), msg))
+                else:
+                    time = strftime("%H:%M:%S") if Probe.use_localtime else \
+                           Probe._time_off_str(event.timestamp_ns)
+                    print("%-8s %-6d %-6d %-12s %-16s %s" %
+                          (time[:8], event.tgid, event.pid, event.comm,
+                           self._display_function(), msg))
 
                 if self.kernel_stack:
                         self.print_stack(bpf, event.kernel_stack_id, -1)
@@ -579,7 +585,7 @@ trace 'u:pthread:pthread_create (arg4 != 0)'
                 # their kernel names -- tgid and pid -- inside the script
                 parser.add_argument("-p", "--pid", type=int, metavar="PID",
                   dest="tgid", help="id of the process to trace (optional)")
-                parser.add_argument("-t", "--tid", type=int, metavar="TID",
+                parser.add_argument("-L", "--tid", type=int, metavar="TID",
                   dest="pid", help="id of the thread to trace (optional)")
                 parser.add_argument("-v", "--verbose", action="store_true",
                   help="print resulting BPF program code before executing")
@@ -590,8 +596,10 @@ trace 'u:pthread:pthread_create (arg4 != 0)'
                   help="do not filter trace's own pid from the trace")
                 parser.add_argument("-M", "--max-events", type=int,
                   help="number of events to print before quitting")
-                parser.add_argument("-o", "--offset", action="store_true",
-                  help="use relative time from first traced message")
+                parser.add_argument("-t", "--timestamp", action="store_true",
+                  help="print timestamp column (offset from trace start)")
+                parser.add_argument("-T", "--time", action="store_true",
+                  help="print time column")
                 parser.add_argument("-K", "--kernel-stack",
                   action="store_true", help="output kernel stack trace")
                 parser.add_argument("-U", "--user-stack",
@@ -653,9 +661,14 @@ trace 'u:pthread:pthread_create (arg4 != 0)'
                                              self.probes))
 
                 # Print header
-                print("%-8s %-6s %-6s %-12s %-16s %s" %
-                      ("TIME", "PID", "TID", "COMM", "FUNC",
-                      "-" if not all_probes_trivial else ""))
+                if self.args.timestamp or self.args.time:
+                    print("%-8s %-6s %-6s %-12s %-16s %s" %
+                          ("TIME", "PID", "TID", "COMM", "FUNC",
+                          "-" if not all_probes_trivial else ""))
+                else:
+                    print("%-6s %-6s %-12s %-16s %s" %
+                          ("PID", "TID", "COMM", "FUNC",
+                          "-" if not all_probes_trivial else ""))
 
                 while True:
                         self.bpf.kprobe_poll()
