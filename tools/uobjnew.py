@@ -133,7 +133,8 @@ if args.verbose:
 
 bpf = BPF(text=program, usdt_contexts=[usdt])
 if args.language == "c":
-    bpf.attach_uprobe(name="c", sym="malloc", fn_name="alloc_entry")
+    bpf.attach_uprobe(name="c", sym="malloc", fn_name="alloc_entry",
+                      pid=args.pid)
 
 exit_signaled = False
 print("Tracing allocations in process %d (language: %s)... Ctrl-C to quit." %
