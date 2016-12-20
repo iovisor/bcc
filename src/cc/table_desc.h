@@ -40,6 +40,7 @@ struct TableDesc {
   llvm::Function *key_snprintf;
   llvm::Function *leaf_snprintf;
   bool is_shared;
+  bool is_extern;
 };
 
 }  // namespace ebpf

@@ -118,10 +118,11 @@ BPFModule::~BPFModule() {
   ctx_.reset();
   if (tables_) {
     for (auto table : *tables_) {
-      if (table.is_shared)
+      if (table.is_shared) {
         SharedTables::instance()->remove_fd(table.name);
-      else
+      } else if (!table.is_extern) {
         close(table.fd);
+      }
     }
   }
 }
