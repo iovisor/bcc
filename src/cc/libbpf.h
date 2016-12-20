@@ -71,6 +71,9 @@ int bpf_attach_perf_event(int progfd, uint32_t ev_type, uint32_t ev_config,
                           pid_t pid, int cpu, int group_fd);
 int bpf_detach_perf_event(uint32_t ev_type, uint32_t ev_config);
 
+int bpf_obj_pin(int fd, const char *pathname);
+int bpf_obj_get(const char *pathname);
+
 #define LOG_BUF_SIZE 65536
 
 // Put non-static/inline functions in their own section with this prefix +
