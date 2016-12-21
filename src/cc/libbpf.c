@@ -631,3 +631,22 @@ int bpf_detach_perf_event(uint32_t ev_type, uint32_t ev_config) {
   // callers to detach anything they attach.
   return 0;
 }
+
+int bpf_obj_pin(int fd, const char *pathname)
+{
+  union bpf_attr attr = {
+    .pathname = ptr_to_u64((void *)pathname),
+    .bpf_fd = fd,
+  };
+
+  return syscall(__NR_bpf, BPF_OBJ_PIN, &attr, sizeof(attr));
+}
+
+int bpf_obj_get(const char *pathname)
+{
+  union bpf_attr attr = {
+    .pathname = ptr_to_u64((void *)pathname),
+  };
+
+  return syscall(__NR_bpf, BPF_OBJ_GET, &attr, sizeof(attr));
+}
