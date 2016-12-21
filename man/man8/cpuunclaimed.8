@@ -1,0 +1,106 @@
+.TH cpuunclaimed 8  "2016-12-21" "USER COMMANDS"
+.SH NAME
+cpuunclaimed \- Sample CPU run queues and calculate unclaimed idle CPU. Uses Linux eBPF/bcc.
+.SH SYNOPSIS
+.B cpuunclaimed
+[\-T] [\-j] [\-J] [interval [count]]
+.SH DESCRIPTION
+This tool samples the length of the run queues and determine when there are idle
+CPUs, yet queued threads waiting their turn. It reports the amount of idle
+(yet unclaimed by waiting threads) CPU as a system-wide percentage.
+
+This situation can happen for a number of reasons:
+.IP -
+An application has been bound to some, but not all, CPUs, and has runnable
+threads that cannot migrate to other CPUs due to this configuration.
+.IP -
+CPU affinity: an optimization that leaves threads on CPUs where the CPU
+caches are warm, even if this means short periods of waiting while other
+CPUs are idle. The wait period is tunale (see sysctl, kernel.sched*).
+.IP -
+Scheduler bugs.
+.P
+An unclaimed idle of < 1% is likely to be CPU affinity, and not usually a
+cause for concern. By leaving the CPU idle, overall throughput of the system
+may be improved. This tool is best for identifying larger issues, > 2%, due
+to the coarseness of its 99 Hertz samples.
+
+This is an experimental tool that currently works by use of sampling to
+keep overheads low. Tool assumptions:
+.IP -
+CPU samples consistently fire around the same offset. There will sometimes
+be a lag as a sample is delayed by higher-priority interrupts, but it is
+assumed the subsequent samples will catch up to the expected offsets (as
+is seen in practice). You can use -J to inspect sample offsets. Some
+systems can power down CPUs when idle, and when they wake up again they
+may begin firing at a skewed offset: this tool will detect the skew, print
+an error, and exit.
+.IP -
+All CPUs are online (see ncpu).
+.P
+If this identifies unclaimed CPU, you can double check it by dumping raw
+samples (-j), as well as using other tracing tools to instrument scheduler
+events (although this latter approach has much higher overhead).
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH EXAMPLES
+.TP
+Sample and calculate unclaimed idle CPUs, output every 1 second (default:
+#
+.B cpuunclaimed
+.TP
+Print 5 second summaries, 10 times:
+#
+.B cpuunclaimed 5 10
+.TP
+Print 1 second summaries with timestamps:
+#
+.B cpuunclaimed \-T 1
+.TP
+Raw dump of all samples (verbose), as comma-separated values:
+#
+.B cpuunclaimed \-j
+.SH FIELDS
+.TP
+%CPU
+CPU utilization as a system-wide percentage.
+.TP
+unclaimed idle
+Percentage of CPU resources that were idle when work was queued on other CPUs,
+as a system-wide percentage.
+.TP
+TIME
+Time (HH:MM:SS)
+.TP
+TIMESTAMP_ns
+Timestamp, nanoseconds.
+.TP
+CPU#
+CPU ID.
+.TP
+OFFSET_ns_CPU#
+Time offset that a sample fired within a sample group for this CPU.
+.SH OVERHEAD
+The overhead is expected to be low/negligible as this tool uses sampling at
+99 Hertz (on all CPUs), which has a fixed and low cost, rather than sampling
+every scheduler event as many other approaches use (which can involve
+instrumenting millions of events per second). Sampled CPUs, run queue lengths,
+and timestamps are written to ring buffers that are periodically read by
+user space for reporting. Measure overhead in a test environment.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Brendan Gregg
+.SH SEE ALSO
+runqlen(8)
