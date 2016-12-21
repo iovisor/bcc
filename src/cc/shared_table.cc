@@ -17,6 +17,7 @@
 #include <unistd.h>
 
 #include "shared_table.h"
+#include "compat/linux/bpf.h"
 
 namespace ebpf {
 
@@ -35,13 +36,20 @@ int SharedTables::lookup_fd(const string &name) const {
   auto table = tables_.find(name);
   if (table == tables_.end())
     return -1;
-  return table->second;
+  return table->second.first;
 }
 
-bool SharedTables::insert_fd(const string &name, int fd) {
+int SharedTables::lookup_type(const string &name) const {
+  auto table = tables_.find(name);
+  if (table == tables_.end())
+    return BPF_MAP_TYPE_UNSPEC;
+  return table->second.second;
+}
+
+bool SharedTables::insert_fd(const string &name, int fd, int type) {
   if (tables_.find(name) != tables_.end())
     return false;
-  tables_[name] = fd;
+  tables_[name] = std::make_pair(fd, type);
   return true;
 }
 
@@ -49,7 +57,7 @@ bool SharedTables::remove_fd(const string &name) {
   auto table = tables_.find(name);
   if (table == tables_.end())
     return false;
-  close(table->second);
+  close(table->second.first);
   tables_.erase(table);
   return true;
 }

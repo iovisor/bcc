@@ -1058,5 +1058,11 @@ class BPF(object):
             lib.bpf_module_destroy(self.module)
             self.module = None
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.cleanup()
+
 
 from .usdt import USDT

@@ -27,14 +27,16 @@ class SharedTables {
  public:
   static SharedTables * instance();
   // add an fd to the shared table, return true if successfully inserted
-  bool insert_fd(const std::string &name, int fd);
+  bool insert_fd(const std::string &name, int fd, int type);
   // lookup an fd in the shared table, or -1 if not found
   int lookup_fd(const std::string &name) const;
+  // lookup on map type in the shared table, or BPF_MAP_TYPE_UNSPEC if not found
+  int lookup_type(const std::string &name) const;
   // close and remove a shared fd. return true if the value was found
   bool remove_fd(const std::string &name);
  private:
   static SharedTables *instance_;
-  std::map<std::string, int> tables_;
+  std::map<std::string, std::pair<int, int>> tables_;
 };
 
 }

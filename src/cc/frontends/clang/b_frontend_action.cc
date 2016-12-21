@@ -631,7 +631,6 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
       ++i;
     }
 
-    bool is_extern = false;
     bpf_map_type map_type = BPF_MAP_TYPE_UNSPEC;
     if (A->getName() == "maps/hash") {
       map_type = BPF_MAP_TYPE_HASH;
@@ -666,8 +665,9 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
     } else if (A->getName() == "maps/stacktrace") {
       map_type = BPF_MAP_TYPE_STACK_TRACE;
     } else if (A->getName() == "maps/extern") {
-      is_extern = true;
+      table.is_extern = true;
       table.fd = SharedTables::instance()->lookup_fd(table.name);
+      table.type = SharedTables::instance()->lookup_type(table.name);
     } else if (A->getName() == "maps/export") {
       if (table.name.substr(0, 2) == "__")
         table.name = table.name.substr(2);
@@ -678,7 +678,7 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
         error(Decl->getLocStart(), "reference to undefined table");
         return false;
       }
-      if (!SharedTables::instance()->insert_fd(table.name, table_it->fd)) {
+      if (!SharedTables::instance()->insert_fd(table.name, table_it->fd, table_it->type)) {
         error(Decl->getLocStart(), "could not export bpf map %0: %1") << table.name << "already in use";
         return false;
       }
@@ -686,7 +686,7 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
       return true;
     }
 
-    if (!is_extern) {
+    if (!table.is_extern) {
       if (map_type == BPF_MAP_TYPE_UNSPEC) {
         error(Decl->getLocStart(), "unsupported map type: %0") << A->getName();
         return false;
