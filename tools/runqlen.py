@@ -84,8 +84,8 @@ int do_perf_event()
     bpf_probe_read(&my_q, sizeof(my_q), &task->se.cfs_rq);
     bpf_probe_read(&len, sizeof(len), &my_q->nr_running);
 
-    // Decrement idle thread by dropping the run queue by one. We could do
-    // this other ways if needed, like matching on task->pid.
+    // Calculate run queue length by subtracting the currently running task,
+    // if present. len 0 == idle, len 1 == one running task.
     if (len > 0)
         len--;
 
