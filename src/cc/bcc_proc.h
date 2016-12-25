@@ -27,7 +27,7 @@ extern "C" {
 typedef int (*bcc_procutils_modulecb)(const char *, uint64_t, uint64_t, void *);
 typedef void (*bcc_procutils_ksymcb)(const char *, uint64_t, void *);
 
-const char *bcc_procutils_which_so(const char *libname);
+const char *bcc_procutils_which_so(const char *libname, int pid);
 char *bcc_procutils_which(const char *binpath);
 int bcc_procutils_each_module(int pid, bcc_procutils_modulecb callback,
                               void *payload);

@@ -109,7 +109,7 @@ struct bcc_symbol {
 };
 
 int bcc_resolve_symname(const char *module, const char *symname, const uint64_t addr,
-		struct bcc_symbol *sym);
+		int pid, struct bcc_symbol *sym);
 void *bcc_symcache_new(int pid);
 int bcc_symcache_resolve(void *symcache, uint64_t addr, struct bcc_symbol *sym);
 void bcc_symcache_refresh(void *resolver);

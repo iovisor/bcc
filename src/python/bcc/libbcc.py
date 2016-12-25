@@ -131,11 +131,11 @@ class bcc_symbol(ct.Structure):
         ]
 
 lib.bcc_procutils_which_so.restype = ct.c_char_p
-lib.bcc_procutils_which_so.argtypes = [ct.c_char_p]
+lib.bcc_procutils_which_so.argtypes = [ct.c_char_p, ct.c_int]
 
 lib.bcc_resolve_symname.restype = ct.c_int
 lib.bcc_resolve_symname.argtypes = [
-    ct.c_char_p, ct.c_char_p, ct.c_ulonglong, ct.POINTER(bcc_symbol)]
+    ct.c_char_p, ct.c_char_p, ct.c_ulonglong, ct.c_int, ct.POINTER(bcc_symbol)]
 
 _SYM_CB_TYPE = ct.CFUNCTYPE(ct.c_int, ct.c_char_p, ct.c_ulonglong)
 lib.bcc_foreach_symbol.restype = ct.c_int

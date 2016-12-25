@@ -304,7 +304,7 @@ int bcc_foreach_symbol(const char *module, SYM_CB cb) {
 }
 
 int bcc_resolve_symname(const char *module, const char *symname,
-                        const uint64_t addr, struct bcc_symbol *sym) {
+                        const uint64_t addr, int pid, struct bcc_symbol *sym) {
   uint64_t load_addr;
 
   sym->module = NULL;
@@ -317,7 +317,7 @@ int bcc_resolve_symname(const char *module, const char *symname,
   if (strchr(module, '/')) {
     sym->module = module;
   } else {
-    sym->module = bcc_procutils_which_so(module);
+    sym->module = bcc_procutils_which_so(module, pid);
   }
 
   if (sym->module == NULL)

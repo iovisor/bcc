@@ -554,11 +554,12 @@ class BPF(object):
 
 
     @classmethod
-    def _check_path_symbol(cls, module, symname, addr):
+    def _check_path_symbol(cls, module, symname, addr, pid):
         sym = bcc_symbol()
         psym = ct.pointer(sym)
+        c_pid = 0 if pid == -1 else pid
         if lib.bcc_resolve_symname(module.encode("ascii"),
-                symname.encode("ascii"), addr or 0x0, psym) < 0:
+                symname.encode("ascii"), addr or 0x0, c_pid, psym) < 0:
             if not sym.module:
                 raise Exception("could not find library %s" % module)
             raise Exception("could not determine address of symbol %s" % symname)
@@ -566,7 +567,7 @@ class BPF(object):
 
     @staticmethod
     def find_library(libname):
-        res = lib.bcc_procutils_which_so(libname.encode("ascii"))
+        res = lib.bcc_procutils_which_so(libname.encode("ascii"), 0)
         return res if res is None else res.decode()
 
     @staticmethod
@@ -736,7 +737,8 @@ class BPF(object):
 
         Libraries can be given in the name argument without the lib prefix, or
         with the full path (/usr/lib/...). Binaries can be given only with the
-        full path (/bin/sh).
+        full path (/bin/sh). If a PID is given, the uprobe will attach to the
+        version of the library used by the process.
 
         Example: BPF(text).attach_uprobe("c", "malloc")
                  BPF(text).attach_uprobe("/usr/bin/python", "main")
@@ -753,7 +755,7 @@ class BPF(object):
                                    group_fd=group_fd)
             return
 
-        (path, addr) = BPF._check_path_symbol(name, sym, addr)
+        (path, addr) = BPF._check_path_symbol(name, sym, addr, pid)
 
         self._check_probe_quota(1)
         fn = self.load_func(fn_name, BPF.KPROBE)
@@ -776,7 +778,7 @@ class BPF(object):
         """
 
         name = str(name)
-        (path, addr) = BPF._check_path_symbol(name, sym, addr)
+        (path, addr) = BPF._check_path_symbol(name, sym, addr, -1)
         ev_name = "p_%s_0x%x" % (self._probe_repl.sub("_", path), addr)
         if ev_name not in self.open_uprobes:
             raise Exception("Uprobe %s is not attached" % ev_name)
@@ -805,7 +807,7 @@ class BPF(object):
             return
 
         name = str(name)
-        (path, addr) = BPF._check_path_symbol(name, sym, addr)
+        (path, addr) = BPF._check_path_symbol(name, sym, addr, pid)
 
         self._check_probe_quota(1)
         fn = self.load_func(fn_name, BPF.KPROBE)
@@ -828,7 +830,7 @@ class BPF(object):
         """
 
         name = str(name)
-        (path, addr) = BPF._check_path_symbol(name, sym, addr)
+        (path, addr) = BPF._check_path_symbol(name, sym, addr, -1)
         ev_name = "r_%s_0x%x" % (self._probe_repl.sub("_", path), addr)
         if ev_name not in self.open_uprobes:
             raise Exception("Uretprobe %s is not attached" % ev_name)
