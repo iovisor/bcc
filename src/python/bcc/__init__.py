@@ -779,7 +779,7 @@ class BPF(object):
         (path, addr) = BPF._check_path_symbol(name, sym, addr)
         ev_name = "p_%s_0x%x" % (self._probe_repl.sub("_", path), addr)
         if ev_name not in self.open_uprobes:
-            raise Exception("Uprobe %s is not attached" % event)
+            raise Exception("Uprobe %s is not attached" % ev_name)
         lib.perf_reader_free(self.open_uprobes[ev_name])
         desc = "-:uprobes/%s" % ev_name
         res = lib.bpf_detach_uprobe(desc.encode("ascii"))
@@ -831,7 +831,7 @@ class BPF(object):
         (path, addr) = BPF._check_path_symbol(name, sym, addr)
         ev_name = "r_%s_0x%x" % (self._probe_repl.sub("_", path), addr)
         if ev_name not in self.open_uprobes:
-            raise Exception("Kretprobe %s is not attached" % event)
+            raise Exception("Uretprobe %s is not attached" % ev_name)
         lib.perf_reader_free(self.open_uprobes[ev_name])
         desc = "-:uprobes/%s" % ev_name
         res = lib.bpf_detach_uprobe(desc.encode("ascii"))
