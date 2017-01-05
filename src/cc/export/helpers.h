@@ -284,7 +284,7 @@ static inline void bpf_store_dword(void *skb, u64 off, u64 val) {
 #define MASK(_n) ((_n) < 64 ? (1ull << (_n)) - 1 : ((u64)-1LL))
 #define MASK128(_n) ((_n) < 128 ? ((unsigned __int128)1 << (_n)) - 1 : ((unsigned __int128)-1))
 
-static unsigned int bpf_log2(unsigned int v)
+static inline unsigned int bpf_log2(unsigned int v)
 {
   unsigned int r;
   unsigned int shift;
@@ -297,7 +297,7 @@ static unsigned int bpf_log2(unsigned int v)
   return r;
 }
 
-static unsigned int bpf_log2l(unsigned long v)
+static inline unsigned int bpf_log2l(unsigned long v)
 {
   unsigned int hi = v >> 32;
   if (hi)
