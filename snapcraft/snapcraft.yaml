@@ -48,6 +48,8 @@ apps:
         command: wrapper cachetop
     cpudist:
         command: wrapper cpudist
+    cpuunclaimed:
+        command: wrapper cpuunclaimed
     dcsnoop:
         command: wrapper dcsnoop
     dcstat:
