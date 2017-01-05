@@ -119,7 +119,7 @@ apps:
     tcptop:
         command: wrapper tcptop
     ttysnoop:
-        command: wrapper ttysnop
+        command: wrapper ttysnoop
     trace:
         command: wrapper trace
     vfscount:
