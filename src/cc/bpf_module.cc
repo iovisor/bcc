@@ -345,7 +345,8 @@ int BPFModule::load_includes(const string &text) {
 
 int BPFModule::annotate() {
   for (auto fn = mod_->getFunctionList().begin(); fn != mod_->getFunctionList().end(); ++fn)
-    fn->addFnAttr(Attribute::AlwaysInline);
+    if (!fn->hasFnAttribute(Attribute::NoInline))
+      fn->addFnAttr(Attribute::AlwaysInline);
 
   // separate module to hold the reader functions
   auto m = make_unique<Module>("sscanf", *ctx_);
