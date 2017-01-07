@@ -106,14 +106,12 @@ int trace_req_completion(struct pt_regs *ctx, struct request *req)
  * test, and maintenance burden.
  */
 #ifdef REQ_WRITE
-if (req->cmd_flags & REQ_WRITE) {
+    data.rwflag = !!(req->cmd_flags & REQ_WRITE);
+#elif defined(REQ_OP_SHIFT)
+    data.rwflag = !!((req->cmd_flags >> REQ_OP_SHIFT) == REQ_OP_WRITE);
 #else
-if ((req->cmd_flags >> REQ_OP_SHIFT) == REQ_OP_WRITE) {
+    data.rwflag = !!((req->cmd_flags & REQ_OP_MASK) == REQ_OP_WRITE);
 #endif
-        data.rwflag = 1;
-    } else {
-        data.rwflag = 0;
-    }
 
     events.perf_submit(ctx, &data, sizeof(data));
     start.delete(&req);
