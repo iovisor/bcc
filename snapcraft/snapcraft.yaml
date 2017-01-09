@@ -48,6 +48,8 @@ apps:
         command: wrapper cachetop
     cpudist:
         command: wrapper cpudist
+    cpuunclaimed:
+        command: wrapper cpuunclaimed
     dcsnoop:
         command: wrapper dcsnoop
     dcstat:
@@ -117,7 +119,7 @@ apps:
     tcptop:
         command: wrapper tcptop
     ttysnoop:
-        command: wrapper ttysnop
+        command: wrapper ttysnoop
     trace:
         command: wrapper trace
     vfscount:
