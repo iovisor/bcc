@@ -137,8 +137,10 @@ int trace_req_completion(struct pt_regs *ctx, struct request *req)
  */
 #ifdef REQ_WRITE
     info.rwflag = !!(req->cmd_flags & REQ_WRITE);
-#else
+#elif defined(REQ_OP_SHIFT)
     info.rwflag = !!((req->cmd_flags >> REQ_OP_SHIFT) == REQ_OP_WRITE);
+#else
+    info.rwflag = !!((req->cmd_flags & REQ_OP_MASK) == REQ_OP_WRITE);
 #endif
 
     whop = whobyreq.lookup(&req);
