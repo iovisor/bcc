@@ -43,6 +43,7 @@ class Probe(object):
 
             func            -- probe a kernel function
             lib:func        -- probe a user-space function in the library 'lib'
+            /path:func      -- probe a user-space function in binary '/path'
             p::func         -- same thing as 'func'
             p:lib:func      -- same thing as 'lib:func'
             t:cat:event     -- probe a kernel tracepoint
@@ -219,8 +220,11 @@ class Tool(object):
     ./funccount -Ti 5 'vfs_*'       # output every 5 seconds, with timestamps
     ./funccount -p 185 'vfs_*'      # count vfs calls for PID 181 only
     ./funccount t:sched:sched_fork  # count calls to the sched_fork tracepoint
-    ./funccount -p 185 u:node:gc*   # count all GC USDT probes in node
+    ./funccount -p 185 u:node:gc*   # count all GC USDT probes in node, PID 185
     ./funccount c:malloc            # count all malloc() calls in libc
+    ./funccount go:os.*             # count all "os.*" calls in libgo
+    ./funccount -p 185 go:os.*      # count all "os.*" calls in libgo, PID 185
+    ./funccount ./test:read*        # count "read*" calls in the ./test binary
     """
         parser = argparse.ArgumentParser(
             description="Count functions, tracepoints, and USDT probes",
