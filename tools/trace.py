@@ -76,6 +76,8 @@ class Probe(object):
                 self.probe_num = Probe.probe_count
                 self.probe_name = "probe_%s_%d" % \
                                 (self._display_function(), self.probe_num)
+                if self.probe_name.find(".") > 0:   # for golang
+                    self.probe_name = self.probe_name.replace(".", "_DOT_")
 
         def __str__(self):
                 return "%s:%s:%s FLT=%s ACT=%s/%s" % (self.probe_type,
