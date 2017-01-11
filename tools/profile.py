@@ -90,7 +90,7 @@ parser.add_argument("-a", "--annotations", action="store_true",
     help="add _[k] annotations to kernel frames")
 parser.add_argument("-f", "--folded", action="store_true",
     help="output folded format, one line per stack (for flame graphs)")
-parser.add_argument("--stack-storage-size", default=2048,
+parser.add_argument("--stack-storage-size", default=10240,
     type=positive_nonzero_int,
     help="the number of unique stack traces that can be stored and "
         "displayed (default 2048)")
