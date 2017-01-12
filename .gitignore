@@ -2,6 +2,10 @@
 *.swp
 *.swo
 *.pyc
+.idea
 
-# Build artefacts
+# Build artifacts
 /build/
+cmake-build-debug
+debian/**/*.log
+obj-x86_64-linux-gnu

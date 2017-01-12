@@ -18,12 +18,14 @@ static void incr(int idx) {
         ++(*ptr);
 }
 int count(struct pt_regs *ctx) {
+    bpf_trace_printk("count() uprobe fired");
     u32 pid = bpf_get_current_pid_tgid();
     if (pid == PID)
         incr(0);
     return 0;
 }"""
         text = text.replace("PID", "%d" % os.getpid())
+        print text
         b = bcc.BPF(text=text)
         b.attach_uprobe(name="c", sym="malloc_stats", fn_name="count")
         b.attach_uretprobe(name="c", sym="malloc_stats", fn_name="count")

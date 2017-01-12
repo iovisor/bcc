@@ -153,6 +153,86 @@ The appropriate dependencies (e.g., ```clang```, ```llvm``` with BPF backend) wi
 
 # Source
 
+## Debian - Source
+
+```
+ROUGH NOTES:
+
+Add jessie-backports repo
+Add non-free repo to sources.list
+Install latest 4.x kernel and headers from jessie-backports
+See updated control file for all package-build dependencies
+Other required tooling: devscripts
+
+debuild -b -uc -us
+
+Re-running tests:
+cd obj-x86_64-linux-gnu/
+sudo /usr/bin/ctest --force-new-ctest-process -j1 -V
+
+20: Test command: /home/mikep/bcc/obj-x86_64-linux-gnu/tests/wrapper.sh "py_uprobes" "sudo" "/home/mikep/bcc/tests/python/test_uprobes.py"  
+20: Test timeout computed to be: 9.99988e+06
+20: Python 2.7.9   
+20: .Arena 0:
+20: system bytes     =   13803520
+20: in use bytes     =    2970096
+20: Total (incl. mmap):
+20: system bytes     =   14594048
+20: in use bytes     =    3760624
+20: max mmap regions =          4
+20: max mmap bytes   =    1589248
+20: F
+20: ======================================================================
+20: FAIL: test_simple_library (__main__.TestUprobes)
+20: ----------------------------------------------------------------------
+20: Traceback (most recent call last):
+20:   File "/home/mikep/bcc/tests/python/test_uprobes.py", line 34, in test_simple_library
+20:     self.assertEqual(b["stats"][ctypes.c_int(0)].value, 2)
+20: AssertionError: 0L != 2
+
+26: Test command: /home/mikep/bcc/obj-x86_64-linux-gnu/tests/wrapper.sh "lua_test_uprobes" "sudo" "/usr/bin/luajit" "test_uprobes.lua"
+26: Test timeout computed to be: 9.99988e+06
+26: Python 2.7.9   
+26: Arena 0:
+26: system bytes     =   12394496
+26: in use bytes     =    1561664
+26: Total (incl. mmap):
+26: system bytes     =   12394496
+26: in use bytes     =    1561664
+26: max mmap regions =          4
+26: max mmap bytes   =     999424
+26: .F
+26: Failed tests:  
+26: -------------  
+26: 1) TestUprobes.test_simple_library
+26: test_uprobes.lua:38: expected: 2, actual: 0
+26: stack traceback:
+26:     test_uprobes.lua:38: in function 'TestUprobes.test_simple_library'
+26:
+26: Ran 2 tests in 0.141 seconds, 1 successes, 1 failures
+26: Failed
+26/28 Test #26: lua_test_uprobes .................***Failed    0.27 sec
+
+test 28
+      Start 28: lua_test_standalone
+
+28: Test command: /home/mikep/bcc/tests/lua/test_standalone.sh
+28: Test timeout computed to be: 9.99988e+06  
+28: + cd src/lua
+28: + [[ ! -x bcc-lua ]]
+28: + ldd bcc-lua
+28: + grep -q luajit
+28: + rm -f libbcc.so probe.lua
+28: + echo 'return function(BPF) print("Hello world") end'
+28: + ./bcc-lua probe.lua
+28: Hello world
+28: + fail 'bcc-lua runs without libbcc.so'   
+28: + echo 'test failed: bcc-lua runs without libbcc.so'
+28: test failed: bcc-lua runs without libbcc.so
+28: + exit 1
+28/28 Test #28: lua_test_standalone ..............***Failed    0.01 sec
+```
+
 ## Ubuntu - Source
 
 To build the toolchain from source, one needs:
