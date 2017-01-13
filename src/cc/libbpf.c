@@ -137,6 +137,37 @@ int bpf_get_next_key(int fd, void *key, void *next_key)
   return syscall(__NR_bpf, BPF_MAP_GET_NEXT_KEY, &attr, sizeof(attr));
 }
 
+void bpf_print_hints(char *log)
+{
+  if (log == NULL)
+    return;
+
+  // The following error strings will need maintenance to match LLVM.
+
+  // stack busting
+  if (strstr(log, "invalid stack off=-") != NULL) {
+    fprintf(stderr, "HINT: Looks like you exceeded the BPF stack limit. "
+      "This can happen if you allocate too much local variable storage. "
+      "For example, if you allocated a 1 Kbyte struct (maybe for "
+      "BPF_PERF_OUTPUT), busting a max stack of 512 bytes.\n\n");
+  }
+
+  // didn't check NULL on map lookup
+  if (strstr(log, "invalid mem access 'map_value_or_null'") != NULL) {
+    fprintf(stderr, "HINT: The 'map_value_or_null' error can happen if "
+      "you dereference a pointer value from a map lookup without first "
+      "checking if that pointer is NULL.\n\n");
+  }
+
+  // lacking a bpf_probe_read
+  if (strstr(log, "invalid mem access 'inv'") != NULL) {
+    fprintf(stderr, "HINT: The invalid mem access 'inv' error can happen "
+      "if you try to dereference memory without first using "
+      "bpf_probe_read() to copy it to the BPF stack. Sometimes the "
+      "bpf_probe_read is automatic by the bcc rewriter, other times "
+      "you'll need to be explicit.\n\n");
+  }
+}
 #define ROUND_UP(x, n) (((x) + (n) - 1u) & ~((n) - 1u))
 
 int bpf_prog_load(enum bpf_prog_type prog_type,
@@ -221,6 +252,7 @@ int bpf_prog_load(enum bpf_prog_type prog_type,
     }
 
     fprintf(stderr, "bpf: %s\n%s\n", strerror(errno), bpf_log_buffer);
+    bpf_print_hints(bpf_log_buffer);
 
     free(bpf_log_buffer);
   }
