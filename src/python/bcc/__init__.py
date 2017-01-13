@@ -770,15 +770,15 @@ class BPF(object):
         self._add_uprobe(ev_name, res)
         return self
 
-    def detach_uprobe(self, name="", sym="", addr=None):
-        """detach_uprobe(name="", sym="", addr=None)
+    def detach_uprobe(self, name="", sym="", addr=None, pid=-1):
+        """detach_uprobe(name="", sym="", addr=None, pid=-1)
 
         Stop running a bpf function that is attached to symbol 'sym' in library
         or binary 'name'.
         """
 
         name = str(name)
-        (path, addr) = BPF._check_path_symbol(name, sym, addr, -1)
+        (path, addr) = BPF._check_path_symbol(name, sym, addr, pid)
         ev_name = "p_%s_0x%x" % (self._probe_repl.sub("_", path), addr)
         if ev_name not in self.open_uprobes:
             raise Exception("Uprobe %s is not attached" % ev_name)
@@ -822,15 +822,15 @@ class BPF(object):
         self._add_uprobe(ev_name, res)
         return self
 
-    def detach_uretprobe(self, name="", sym="", addr=None):
-        """detach_uretprobe(name="", sym="", addr=None)
+    def detach_uretprobe(self, name="", sym="", addr=None, pid=-1):
+        """detach_uretprobe(name="", sym="", addr=None, pid=-1)
 
         Stop running a bpf function that is attached to symbol 'sym' in library
         or binary 'name'.
         """
 
         name = str(name)
-        (path, addr) = BPF._check_path_symbol(name, sym, addr, -1)
+        (path, addr) = BPF._check_path_symbol(name, sym, addr, pid)
         ev_name = "r_%s_0x%x" % (self._probe_repl.sub("_", path), addr)
         if ev_name not in self.open_uprobes:
             raise Exception("Uretprobe %s is not attached" % ev_name)
