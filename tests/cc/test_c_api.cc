@@ -30,17 +30,19 @@
 using namespace std;
 
 TEST_CASE("shared object resolution", "[c_api]") {
-  const char *libm = bcc_procutils_which_so("m", 0);
+  char *libm = bcc_procutils_which_so("m", 0);
   REQUIRE(libm);
   REQUIRE(libm[0] == '/');
   REQUIRE(string(libm).find("libm.so") != string::npos);
+  free(libm);
 }
 
 TEST_CASE("shared object resolution using loaded libraries", "[c_api]") {
-  const char *libelf = bcc_procutils_which_so("elf", getpid());
+  char *libelf = bcc_procutils_which_so("elf", getpid());
   REQUIRE(libelf);
   REQUIRE(libelf[0] == '/');
   REQUIRE(string(libelf).find("libelf") != string::npos);
+  free(libelf);
 }
 
 TEST_CASE("binary resolution with `which`", "[c_api]") {
@@ -68,6 +70,7 @@ TEST_CASE("resolve symbol name in external library", "[c_api]") {
   REQUIRE(string(sym.module).find("libc.so") != string::npos);
   REQUIRE(sym.module[0] == '/');
   REQUIRE(sym.offset != 0);
+  bcc_procutils_free(sym.module);
 }
 
 TEST_CASE("resolve symbol name in external library using loaded libraries", "[c_api]") {
@@ -77,6 +80,7 @@ TEST_CASE("resolve symbol name in external library using loaded libraries", "[c_
   REQUIRE(string(sym.module).find("libbcc.so") != string::npos);
   REQUIRE(sym.module[0] == '/');
   REQUIRE(sym.offset != 0);
+  bcc_procutils_free(sym.module);
 }
 
 extern "C" int _a_test_function(const char *a_string) {

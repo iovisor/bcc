@@ -562,13 +562,20 @@ class BPF(object):
                 symname.encode("ascii"), addr or 0x0, c_pid, psym) < 0:
             if not sym.module:
                 raise Exception("could not find library %s" % module)
+            lib.bcc_procutils_free(sym.module)
             raise Exception("could not determine address of symbol %s" % symname)
-        return sym.module.decode(), sym.offset
+        module_path = ct.cast(sym.module, ct.c_char_p).value.decode()
+        lib.bcc_procutils_free(sym.module)
+        return module_path, sym.offset
 
     @staticmethod
     def find_library(libname):
         res = lib.bcc_procutils_which_so(libname.encode("ascii"), 0)
-        return res if res is None else res.decode()
+        if not res:
+            return None
+        libpath = ct.cast(res, ct.c_char_p).value.decode()
+        lib.bcc_procutils_free(res)
+        return libpath
 
     @staticmethod
     def get_tracepoints(tp_re):

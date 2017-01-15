@@ -315,7 +315,7 @@ int bcc_resolve_symname(const char *module, const char *symname,
     return -1;
 
   if (strchr(module, '/')) {
-    sym->module = module;
+    sym->module = strdup(module);
   } else {
     sym->module = bcc_procutils_which_so(module, pid);
   }

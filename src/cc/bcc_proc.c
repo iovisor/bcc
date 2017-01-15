@@ -197,8 +197,6 @@ static struct ld_lib {
   int flags;
 } * lib_cache;
 
-static char libpath[4096];
-
 static int read_cache1(const char *ld_map) {
   struct ld_cache1 *ldcache = (struct ld_cache1 *)ld_map;
   const char *ldstrings =
@@ -310,7 +308,7 @@ static bool match_so_flags(int flags) {
   return true;
 }
 
-static bool which_so_in_process(const char* libname, int pid) {
+static bool which_so_in_process(const char* libname, int pid, char* libpath) {
   int ret, found = false;
   char endline[4096], *mapname = NULL, *newline;
   char mappings_file[128];
@@ -341,7 +339,7 @@ static bool which_so_in_process(const char* libname, int pid) {
     if (strstr(mapname, ".so") && (strstr(mapname, search1) ||
                                    strstr(mapname, search2))) {
       found = true;
-      memcpy(libpath, mapname, strlen(mapname));
+      memcpy(libpath, mapname, strlen(mapname) + 1);
       break;
     }
   } while (ret != EOF);
@@ -350,16 +348,17 @@ static bool which_so_in_process(const char* libname, int pid) {
   return found;
 }
 
-const char *bcc_procutils_which_so(const char *libname, int pid) {
+char *bcc_procutils_which_so(const char *libname, int pid) {
   const size_t soname_len = strlen(libname) + strlen("lib.so");
   char soname[soname_len + 1];
+  char libpath[4096];
   int i;
 
   if (strchr(libname, '/'))
-    return libname;
+    return strdup(libname);
 
-  if (pid && which_so_in_process(libname, pid))
-    return libpath;
+  if (pid && which_so_in_process(libname, pid, libpath))
+    return strdup(libpath);
 
   if (lib_cache_count < 0)
     return NULL;
@@ -374,8 +373,12 @@ const char *bcc_procutils_which_so(const char *libname, int pid) {
   for (i = 0; i < lib_cache_count; ++i) {
     if (!strncmp(lib_cache[i].libname, soname, soname_len) &&
         match_so_flags(lib_cache[i].flags)) {
-      return lib_cache[i].path;
+      return strdup(lib_cache[i].path);
     }
   }
   return NULL;
+}
+
+void bcc_procutils_free(const char *ptr) {
+  free((void *)ptr);
 }
