@@ -354,33 +354,35 @@ BPF_PERF_OUTPUT(%s);
 
         def _generate_usdt_filter_read(self):
             text = ""
-            if self.probe_type == "u":
-                    for arg, _ in Probe.aliases.items():
-                        if not (arg.startswith("arg") and
-                                (arg in self.filter)):
-                                continue
-                        arg_index = int(arg.replace("arg", ""))
-                        arg_ctype = self.usdt.get_probe_arg_ctype(
-                                self.usdt_name, arg_index)
-                        if not arg_ctype:
-                                self._bail("Unable to determine type of {} "
-                                           "in the filter".format(arg))
-                        text += """
+            if self.probe_type != "u":
+                    return text
+            for arg, _ in Probe.aliases.items():
+                    if not (arg.startswith("arg") and
+                            (arg in self.filter)):
+                            continue
+                    arg_index = int(arg.replace("arg", ""))
+                    arg_ctype = self.usdt.get_probe_arg_ctype(
+                            self.usdt_name, arg_index-1)
+                    if not arg_ctype:
+                            self._bail("Unable to determine type of {} "
+                                       "in the filter".format(arg))
+                    text += """
         {} {}_filter;
         bpf_usdt_readarg({}, ctx, &{}_filter);
-                        """.format(arg_ctype, arg, arg_index, arg)
-                        self.filter = self.filter.replace(
-                                arg, "{}_filter".format(arg))
+                    """.format(arg_ctype, arg, arg_index, arg)
+                    self.filter = self.filter.replace(
+                            arg, "{}_filter".format(arg))
             return text
 
         def generate_program(self, include_self):
                 data_decl = self._generate_data_decl()
-                # kprobes don't have built-in pid filters, so we have to add
-                # it to the function body:
-                if len(self.library) == 0 and Probe.pid != -1:
+                if Probe.pid != -1:
                         pid_filter = """
         if (__pid != %d) { return 0; }
                 """ % Probe.pid
+                # uprobes can have a built-in tgid filter passed to
+                # attach_uprobe, hence the check here -- for kprobes, we
+                # need to do the tgid test by hand:
                 elif len(self.library) == 0 and Probe.tgid != -1:
                         pid_filter = """
         if (__tgid != %d) { return 0; }
@@ -542,12 +544,12 @@ BPF_PERF_OUTPUT(%s);
                         bpf.attach_uretprobe(name=libpath,
                                              sym=self.function,
                                              fn_name=self.probe_name,
-                                             pid=Probe.pid)
+                                             pid=Probe.tgid)
                 else:
                         bpf.attach_uprobe(name=libpath,
                                           sym=self.function,
                                           fn_name=self.probe_name,
-                                          pid=Probe.pid)
+                                          pid=Probe.tgid)
 
 class Tool(object):
         examples = """
