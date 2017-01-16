@@ -23,6 +23,7 @@
 #include "bcc_perf_map.h"
 #include "bcc_proc.h"
 #include "bcc_syms.h"
+#include "common.h"
 #include "vendor/tinyformat.hpp"
 
 #include "catch.hpp"
@@ -195,4 +196,11 @@ TEST_CASE("resolve symbols using /tmp/perf-pid.map", "[c_api]") {
   }
 
   munmap(map_addr, map_sz);
+}
+
+
+TEST_CASE("get online CPUs", "[c_api]") {
+	std::vector<int> cpus = ebpf::get_online_cpus();
+	int num_cpus = sysconf(_SC_NPROCESSORS_ONLN);
+	REQUIRE(cpus.size() == num_cpus);
 }

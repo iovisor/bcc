@@ -27,6 +27,7 @@
 
 #include "b_frontend_action.h"
 #include "shared_table.h"
+#include "common.h"
 
 #include "libbpf.h"
 
@@ -656,7 +657,7 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
       map_type = BPF_MAP_TYPE_PROG_ARRAY;
     } else if (A->getName() == "maps/perf_output") {
       map_type = BPF_MAP_TYPE_PERF_EVENT_ARRAY;
-      int numcpu = sysconf(_SC_NPROCESSORS_ONLN);
+      int numcpu = get_possible_cpus().size();
       if (numcpu <= 0)
         numcpu = 1;
       table.max_entries = numcpu;

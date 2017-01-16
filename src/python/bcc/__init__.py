@@ -17,7 +17,6 @@ import atexit
 import ctypes as ct
 import fcntl
 import json
-import multiprocessing
 import os
 import re
 import struct
@@ -29,6 +28,7 @@ from .libbcc import lib, _CB_TYPE, bcc_symbol, _SYM_CB_TYPE
 from .table import Table
 from .perf import Perf
 from .usyms import ProcessSymbols
+from .utils import get_online_cpus
 
 _kprobe_limit = 1000
 _num_open_probes = 0
@@ -660,7 +660,7 @@ class BPF(object):
             res[cpu] = self._attach_perf_event(fn.fd, ev_type, ev_config,
                     sample_period, sample_freq, pid, cpu, group_fd)
         else:
-            for i in range(0, multiprocessing.cpu_count()):
+            for i in get_online_cpus():
                 res[i] = self._attach_perf_event(fn.fd, ev_type, ev_config,
                         sample_period, sample_freq, pid, i, group_fd)
         self.open_perf_events[(ev_type, ev_config)] = res

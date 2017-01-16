@@ -19,6 +19,7 @@
 #include <memory>
 #include <string>
 #include <tuple>
+#include <vector>
 
 namespace ebpf {
 
@@ -27,5 +28,9 @@ typename std::enable_if<!std::is_array<T>::value, std::unique_ptr<T>>::type
 make_unique(Args &&... args) {
   return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
 }
+
+std::vector<int> get_online_cpus();
+
+std::vector<int> get_possible_cpus();
 
 }  // namespace ebpf
