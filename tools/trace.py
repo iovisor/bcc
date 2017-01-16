@@ -217,11 +217,11 @@ class Probe(object):
                 fname = "streq_%d" % Probe.streq_index
                 Probe.streq_index += 1
                 self.streq_functions += """
-static inline bool %s(char const *ignored, unsigned long str) {
+static inline bool %s(char const *ignored, uintptr_t str) {
         char needle[] = %s;
         char haystack[sizeof(needle)];
         bpf_probe_read(&haystack, sizeof(haystack), (void *)str);
-        for (int i = 0; i < sizeof(needle); ++i) {
+        for (int i = 0; i < sizeof(needle)-1; ++i) {
                 if (needle[i] != haystack[i]) {
                         return false;
                 }
