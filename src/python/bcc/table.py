@@ -19,6 +19,7 @@ import os
 
 from .libbcc import lib, _RAW_CB_TYPE
 from .perf import Perf
+from .utils import get_online_cpus
 from subprocess import check_output
 
 BPF_MAP_TYPE_HASH = 1
@@ -509,7 +510,7 @@ class PerfEventArray(ArrayBase):
         event submitted from the kernel, up to millions per second.
         """
 
-        for i in range(0, multiprocessing.cpu_count()):
+        for i in get_online_cpus():
             self._open_perf_buffer(i, callback)
 
     def _open_perf_buffer(self, cpu, callback):
@@ -550,7 +551,7 @@ class PerfEventArray(ArrayBase):
         if not isinstance(ev, self.Event):
             raise Exception("argument must be an Event, got %s", type(ev))
 
-        for i in range(0, multiprocessing.cpu_count()):
+        for i in get_online_cpus():
             self._open_perf_event(i, ev.typ, ev.config)
 
 
