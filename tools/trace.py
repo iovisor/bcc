@@ -221,7 +221,7 @@ static inline bool %s(char const *ignored, uintptr_t str) {
         char needle[] = %s;
         char haystack[sizeof(needle)];
         bpf_probe_read(&haystack, sizeof(haystack), (void *)str);
-        for (int i = 0; i < sizeof(needle)-1; ++i) {
+        for (int i = 0; i < sizeof(needle) - 1; ++i) {
                 if (needle[i] != haystack[i]) {
                         return false;
                 }
@@ -362,7 +362,7 @@ BPF_PERF_OUTPUT(%s);
                             continue
                     arg_index = int(arg.replace("arg", ""))
                     arg_ctype = self.usdt.get_probe_arg_ctype(
-                            self.usdt_name, arg_index-1)
+                            self.usdt_name, arg_index - 1)
                     if not arg_ctype:
                             self._bail("Unable to determine type of {} "
                                        "in the filter".format(arg))

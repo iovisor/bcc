@@ -258,7 +258,7 @@ static inline bool %s(char const *ignored, char const *str) {
         char needle[] = %s;
         char haystack[sizeof(needle)];
         bpf_probe_read(&haystack, sizeof(haystack), (void *)str);
-        for (int i = 0; i < sizeof(needle)-1; ++i) {
+        for (int i = 0; i < sizeof(needle) - 1; ++i) {
                 if (needle[i] != haystack[i]) {
                         return false;
                 }
