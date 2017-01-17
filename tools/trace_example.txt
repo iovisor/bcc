@@ -146,6 +146,25 @@ TIME     PID    COMM         FUNC             -
 ^C
 
 
+In the preceding example, as well as in many others, readability may be
+improved by providing the function's signature, which names the arguments and
+lets you access structure sub-fields, which is hard with the "arg1", "arg2"
+convention. For example:
+
+# trace 'p:c:open(char *filename) "opening %s", filename'
+PID    TID    COMM         FUNC             -
+17507  17507  cat          open             opening FAQ.txt
+^C
+
+# trace 'p::SyS_nanosleep(struct timespec *ts) "sleep for %lld ns", ts->tv_nsec'
+PID    TID    COMM         FUNC             -
+777    785    automount    SyS_nanosleep    sleep for 500000000 ns
+777    785    automount    SyS_nanosleep    sleep for 500000000 ns
+777    785    automount    SyS_nanosleep    sleep for 500000000 ns
+777    785    automount    SyS_nanosleep    sleep for 500000000 ns
+^C
+
+
 As a final example, let's trace open syscalls for a specific process. By 
 default, tracing is system-wide, but the -p switch overrides this:
 
@@ -205,7 +224,7 @@ trace 'do_sys_open "%s", arg2'
         Trace the open syscall and print the filename being opened
 trace 'sys_read (arg3 > 20000) "read %d bytes", arg3'
         Trace the read syscall and print a message for reads >20000 bytes
-trace 'r::do_sys_return "%llx", retval'
+trace 'r::do_sys_open "%llx", retval'
         Trace the return from the open syscall and print the return value
 trace 'c:open (arg2 == 42) "%s %d", arg1, arg2'
         Trace the open() call from libc only if the flags (arg2) argument is 42
@@ -221,3 +240,5 @@ trace 't:block:block_rq_complete "sectors=%d", args->nr_sector'
         Trace the block_rq_complete kernel tracepoint and print # of tx sectors
 trace 'u:pthread:pthread_create (arg4 != 0)'
         Trace the USDT probe pthread_create when its 4th argument is non-zero
+trace 'p::SyS_nanosleep(struct timespec *ts) "sleep for %lld ns", ts->tv_nsec'
+        Trace the nanosleep syscall and print the sleep duration in ns
