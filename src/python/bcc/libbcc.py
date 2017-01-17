@@ -126,16 +126,18 @@ class bcc_symbol(ct.Structure):
     _fields_ = [
             ('name', ct.c_char_p),
             ('demangle_name', ct.c_char_p),
-            ('module', ct.c_char_p),
+            ('module', ct.POINTER(ct.c_char)),
             ('offset', ct.c_ulonglong),
         ]
 
-lib.bcc_procutils_which_so.restype = ct.c_char_p
-lib.bcc_procutils_which_so.argtypes = [ct.c_char_p]
+lib.bcc_procutils_which_so.restype = ct.POINTER(ct.c_char)
+lib.bcc_procutils_which_so.argtypes = [ct.c_char_p, ct.c_int]
+lib.bcc_procutils_free.restype = None
+lib.bcc_procutils_free.argtypes = [ct.c_void_p]
 
 lib.bcc_resolve_symname.restype = ct.c_int
 lib.bcc_resolve_symname.argtypes = [
-    ct.c_char_p, ct.c_char_p, ct.c_ulonglong, ct.POINTER(bcc_symbol)]
+    ct.c_char_p, ct.c_char_p, ct.c_ulonglong, ct.c_int, ct.POINTER(bcc_symbol)]
 
 _SYM_CB_TYPE = ct.CFUNCTYPE(ct.c_int, ct.c_char_p, ct.c_ulonglong)
 lib.bcc_foreach_symbol.restype = ct.c_int

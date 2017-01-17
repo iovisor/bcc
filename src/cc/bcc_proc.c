@@ -24,6 +24,7 @@
 #include <stdint.h>
 #include <ctype.h>
 #include <stdio.h>
+#include <math.h>
 
 #include "bcc_perf_map.h"
 #include "bcc_proc.h"
@@ -307,13 +308,57 @@ static bool match_so_flags(int flags) {
   return true;
 }
 
-const char *bcc_procutils_which_so(const char *libname) {
+static bool which_so_in_process(const char* libname, int pid, char* libpath) {
+  int ret, found = false;
+  char endline[4096], *mapname = NULL, *newline;
+  char mappings_file[128];
+  const size_t search_len = strlen(libname) + strlen("/lib.");
+  char search1[search_len + 1];
+  char search2[search_len + 1];
+
+  sprintf(mappings_file, "/proc/%ld/maps", (long)pid);
+  FILE *fp = fopen(mappings_file, "r");
+  if (!fp)
+    return NULL;
+
+  snprintf(search1, search_len + 1, "/lib%s.", libname);
+  snprintf(search2, search_len + 1, "/lib%s-", libname);
+
+  do {
+    ret = fscanf(fp, "%*x-%*x %*s %*x %*s %*d");
+    if (!fgets(endline, sizeof(endline), fp))
+      break;
+
+    mapname = endline;
+    newline = strchr(endline, '\n');
+    if (newline)
+      newline[0] = '\0';
+
+    while (isspace(mapname[0])) mapname++;
+
+    if (strstr(mapname, ".so") && (strstr(mapname, search1) ||
+                                   strstr(mapname, search2))) {
+      found = true;
+      memcpy(libpath, mapname, strlen(mapname) + 1);
+      break;
+    }
+  } while (ret != EOF);
+
+  fclose(fp);
+  return found;
+}
+
+char *bcc_procutils_which_so(const char *libname, int pid) {
   const size_t soname_len = strlen(libname) + strlen("lib.so");
   char soname[soname_len + 1];
+  char libpath[4096];
   int i;
 
   if (strchr(libname, '/'))
-    return libname;
+    return strdup(libname);
+
+  if (pid && which_so_in_process(libname, pid, libpath))
+    return strdup(libpath);
 
   if (lib_cache_count < 0)
     return NULL;
@@ -327,8 +372,13 @@ const char *bcc_procutils_which_so(const char *libname) {
 
   for (i = 0; i < lib_cache_count; ++i) {
     if (!strncmp(lib_cache[i].libname, soname, soname_len) &&
-        match_so_flags(lib_cache[i].flags))
-      return lib_cache[i].path;
+        match_so_flags(lib_cache[i].flags)) {
+      return strdup(lib_cache[i].path);
+    }
   }
   return NULL;
+}
+
+void bcc_procutils_free(const char *ptr) {
+  free((void *)ptr);
 }

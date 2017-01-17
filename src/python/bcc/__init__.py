@@ -554,20 +554,28 @@ class BPF(object):
 
 
     @classmethod
-    def _check_path_symbol(cls, module, symname, addr):
+    def _check_path_symbol(cls, module, symname, addr, pid):
         sym = bcc_symbol()
         psym = ct.pointer(sym)
+        c_pid = 0 if pid == -1 else pid
         if lib.bcc_resolve_symname(module.encode("ascii"),
-                symname.encode("ascii"), addr or 0x0, psym) < 0:
+                symname.encode("ascii"), addr or 0x0, c_pid, psym) < 0:
             if not sym.module:
                 raise Exception("could not find library %s" % module)
+            lib.bcc_procutils_free(sym.module)
             raise Exception("could not determine address of symbol %s" % symname)
-        return sym.module.decode(), sym.offset
+        module_path = ct.cast(sym.module, ct.c_char_p).value.decode()
+        lib.bcc_procutils_free(sym.module)
+        return module_path, sym.offset
 
     @staticmethod
     def find_library(libname):
-        res = lib.bcc_procutils_which_so(libname.encode("ascii"))
-        return res if res is None else res.decode()
+        res = lib.bcc_procutils_which_so(libname.encode("ascii"), 0)
+        if not res:
+            return None
+        libpath = ct.cast(res, ct.c_char_p).value.decode()
+        lib.bcc_procutils_free(res)
+        return libpath
 
     @staticmethod
     def get_tracepoints(tp_re):
@@ -736,7 +744,8 @@ class BPF(object):
 
         Libraries can be given in the name argument without the lib prefix, or
         with the full path (/usr/lib/...). Binaries can be given only with the
-        full path (/bin/sh).
+        full path (/bin/sh). If a PID is given, the uprobe will attach to the
+        version of the library used by the process.
 
         Example: BPF(text).attach_uprobe("c", "malloc")
                  BPF(text).attach_uprobe("/usr/bin/python", "main")
@@ -753,7 +762,7 @@ class BPF(object):
                                    group_fd=group_fd)
             return
 
-        (path, addr) = BPF._check_path_symbol(name, sym, addr)
+        (path, addr) = BPF._check_path_symbol(name, sym, addr, pid)
 
         self._check_probe_quota(1)
         fn = self.load_func(fn_name, BPF.KPROBE)
@@ -768,15 +777,15 @@ class BPF(object):
         self._add_uprobe(ev_name, res)
         return self
 
-    def detach_uprobe(self, name="", sym="", addr=None):
-        """detach_uprobe(name="", sym="", addr=None)
+    def detach_uprobe(self, name="", sym="", addr=None, pid=-1):
+        """detach_uprobe(name="", sym="", addr=None, pid=-1)
 
         Stop running a bpf function that is attached to symbol 'sym' in library
         or binary 'name'.
         """
 
         name = str(name)
-        (path, addr) = BPF._check_path_symbol(name, sym, addr)
+        (path, addr) = BPF._check_path_symbol(name, sym, addr, pid)
         ev_name = "p_%s_0x%x" % (self._probe_repl.sub("_", path), addr)
         if ev_name not in self.open_uprobes:
             raise Exception("Uprobe %s is not attached" % ev_name)
@@ -805,7 +814,7 @@ class BPF(object):
             return
 
         name = str(name)
-        (path, addr) = BPF._check_path_symbol(name, sym, addr)
+        (path, addr) = BPF._check_path_symbol(name, sym, addr, pid)
 
         self._check_probe_quota(1)
         fn = self.load_func(fn_name, BPF.KPROBE)
@@ -820,15 +829,15 @@ class BPF(object):
         self._add_uprobe(ev_name, res)
         return self
 
-    def detach_uretprobe(self, name="", sym="", addr=None):
-        """detach_uretprobe(name="", sym="", addr=None)
+    def detach_uretprobe(self, name="", sym="", addr=None, pid=-1):
+        """detach_uretprobe(name="", sym="", addr=None, pid=-1)
 
         Stop running a bpf function that is attached to symbol 'sym' in library
         or binary 'name'.
         """
 
         name = str(name)
-        (path, addr) = BPF._check_path_symbol(name, sym, addr)
+        (path, addr) = BPF._check_path_symbol(name, sym, addr, pid)
         ev_name = "r_%s_0x%x" % (self._probe_repl.sub("_", path), addr)
         if ev_name not in self.open_uprobes:
             raise Exception("Uretprobe %s is not attached" % ev_name)
