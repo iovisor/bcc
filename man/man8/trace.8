@@ -62,7 +62,7 @@ information. See PROBE SYNTAX below.
 .SH PROBE SYNTAX
 The general probe syntax is as follows:
 
-.B [{p,r}]:[library]:function [(predicate)] ["format string"[, arguments]]
+.B [{p,r}]:[library]:function[(signature)] [(predicate)] ["format string"[, arguments]]
 
 .B {t:category:event,u:library:probe} [(predicate)] ["format string"[, arguments]]
 .TP
@@ -83,6 +83,12 @@ The tracepoint category. For example, "sched" or "irq".
 .TP
 .B function
 The function to probe.
+.TP
+.B signature
+The optional signature of the function to probe. This can make it easier to
+access the function's arguments, instead of using the "arg1", "arg2" etc.
+argument specifiers. For example, "(struct timespec *ts)" in the signature
+position lets you use "ts" in the filter or print expressions.
 .TP
 .B event
 The tracepoint event. For example, "block_rq_complete".
@@ -159,6 +165,10 @@ Trace the block:block_rq_complete tracepoint and print the number of sectors com
 Trace the pthread_create USDT probe from the pthread library and print the address of the thread's start function:
 #
 .B trace 'u:pthread:pthread_create """start addr = %llx"", arg3'
+.TP
+Trace the nanosleep system call and print the sleep duration in nanoseconds:
+#
+.B trace 'p::SyS_nanosleep(struct timespec *ts) "sleep for %lld ns", ts->tv_nsec'
 .SH SOURCE
 This is from bcc.
 .IP

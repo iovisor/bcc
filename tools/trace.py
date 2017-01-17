@@ -93,15 +93,24 @@ class Probe(object):
         def _parse_probe(self):
                 text = self.raw_probe
 
-                # Everything until the first space is the probe specifier
-                first_space = text.find(' ')
-                spec = text[:first_space] if first_space >= 0 else text
-                self._parse_spec(spec)
-                if first_space >= 0:
-                        text = text[first_space:].lstrip()
-                else:
-                        text = ""
+                # There might be a function signature preceding the actual
+                # filter/print part, or not. Find the probe specifier first --
+                # it ends with either a space or an open paren ( for the
+                # function signature part.
+                #                                          opt. signature
+                #                               probespec       |      rest
+                #                               ---------  ----------   --
+                (spec, sig, rest) = re.match(r'([^ \t\(]+)(\([^\(]*\))?(.*)',
+                                             text).groups()
 
+                self._parse_spec(spec)
+                self.signature = sig[1:-1] if sig else None # remove the parens
+                if self.signature and self.probe_type in ['u', 't']:
+                        self._bail("USDT and tracepoint probes can't have " +
+                                   "a function signature; use arg1, arg2, " +
+                                   "... instead")
+
+                text = rest.lstrip()
                 # If we now have a (, wait for the balanced closing ) and that
                 # will be the predicate
                 self.filter = None
@@ -394,6 +403,8 @@ BPF_PERF_OUTPUT(%s);
 
                 prefix = ""
                 signature = "struct pt_regs *ctx"
+                if self.signature:
+                        signature += ", " + self.signature
 
                 data_fields = ""
                 for i, expr in enumerate(self.values):
@@ -559,7 +570,7 @@ trace 'do_sys_open "%s", arg2'
         Trace the open syscall and print the filename being opened
 trace 'sys_read (arg3 > 20000) "read %d bytes", arg3'
         Trace the read syscall and print a message for reads >20000 bytes
-trace 'r::do_sys_return "%llx", retval'
+trace 'r::do_sys_open "%llx", retval'
         Trace the return from the open syscall and print the return value
 trace 'c:open (arg2 == 42) "%s %d", arg1, arg2'
         Trace the open() call from libc only if the flags (arg2) argument is 42
@@ -575,6 +586,8 @@ trace 't:block:block_rq_complete "sectors=%d", args->nr_sector'
         Trace the block_rq_complete kernel tracepoint and print # of tx sectors
 trace 'u:pthread:pthread_create (arg4 != 0)'
         Trace the USDT probe pthread_create when its 4th argument is non-zero
+trace 'p::SyS_nanosleep(struct timespec *ts) "sleep for %lld ns", ts->tv_nsec'
+        Trace the nanosleep syscall and print the sleep duration in ns
 """
 
         def __init__(self):
