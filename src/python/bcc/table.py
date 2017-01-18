@@ -14,6 +14,7 @@
 
 from collections import MutableMapping
 import ctypes as ct
+from functools import reduce
 import multiprocessing
 import os
 
@@ -596,7 +597,7 @@ class PerCpuHash(HashTable):
     def sum(self, key):
         if isinstance(self.Leaf(), ct.Structure):
             raise IndexError("Leaf must be an integer type for default sum functions")
-        return self.sLeaf(reduce(lambda x,y: x+y, self.getvalue(key)))
+        return self.sLeaf(sum(self.getvalue(key)))
 
     def max(self, key):
         if isinstance(self.Leaf(), ct.Structure):
@@ -605,8 +606,7 @@ class PerCpuHash(HashTable):
 
     def average(self, key):
         result = self.sum(key)
-        result.value/=self.total_cpu
-        return result
+        return result.value / self.total_cpu
 
 class LruPerCpuHash(PerCpuHash):
     def __init__(self, *args, **kwargs):
@@ -653,7 +653,7 @@ class PerCpuArray(ArrayBase):
     def sum(self, key):
         if isinstance(self.Leaf(), ct.Structure):
             raise IndexError("Leaf must be an integer type for default sum functions")
-        return self.sLeaf(reduce(lambda x,y: x+y, self.getvalue(key)))
+        return self.sLeaf(sum(self.getvalue(key)))
 
     def max(self, key):
         if isinstance(self.Leaf(), ct.Structure):
@@ -662,8 +662,7 @@ class PerCpuArray(ArrayBase):
 
     def average(self, key):
         result = self.sum(key)
-        result.value/=self.total_cpu
-        return result
+        return result.value / self.total_cpu
 
 class StackTrace(TableBase):
     MAX_DEPTH = 127

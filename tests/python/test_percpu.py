@@ -34,8 +34,8 @@ class TestPercpu(unittest.TestCase):
         sum = stats_map.sum(stats_map.Key(0))
         avg = stats_map.average(stats_map.Key(0))
         max = stats_map.max(stats_map.Key(0))
-        self.assertGreater(sum.value, 0L)
-        self.assertGreater(max.value, 0L)
+        self.assertGreater(sum.value, int(0))
+        self.assertGreater(max.value, int(0))
         bpf_code.detach_kprobe("sys_clone")
 
     def test_u32(self):
@@ -63,8 +63,8 @@ class TestPercpu(unittest.TestCase):
         sum = stats_map.sum(stats_map.Key(0))
         avg = stats_map.average(stats_map.Key(0))
         max = stats_map.max(stats_map.Key(0))
-        self.assertGreater(sum.value, 0L)
-        self.assertGreater(max.value, 0L)
+        self.assertGreater(sum.value, int(0))
+        self.assertGreater(max.value, int(0))
         bpf_code.detach_kprobe("sys_clone")
 
     def test_struct_custom_func(self):
@@ -95,7 +95,7 @@ class TestPercpu(unittest.TestCase):
         f.close()
         self.assertEqual(len(stats_map),1)
         k = stats_map[ stats_map.Key(0) ]
-        self.assertGreater(k.c1, 0L)
+        self.assertGreater(k.c1, int(0))
         bpf_code.detach_kprobe("sys_clone")
 
 
