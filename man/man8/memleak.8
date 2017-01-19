@@ -3,7 +3,7 @@
 memleak \- Print a summary of outstanding allocations and their call stacks to detect memory leaks. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
 .B memleak [-h] [-p PID] [-t] [-a] [-o OLDER] [-c COMMAND] [-s SAMPLE_RATE]
-[-T TOP] [-z MIN_SIZE] [-Z MAX_SIZE] [INTERVAL] [COUNT]
+[-T TOP] [-z MIN_SIZE] [-Z MAX_SIZE] [-O OBJ] [INTERVAL] [COUNT]
 .SH DESCRIPTION
 memleak traces and matches memory allocation and deallocation requests, and
 collects call stacks for each allocation. memleak can then print a summary
@@ -52,6 +52,9 @@ Capture only allocations that are larger than or equal to MIN_SIZE bytes.
 .TP
 \-Z MAX_SIZE
 Capture only allocations that are smaller than or equal to MAX_SIZE bytes.
+.TP
+\-O OBJ
+Attach to malloc and free in specified object instead of resolving libc. Ignored when kernel allocations are profiled.
 .TP
 INTERVAL
 Print a summary of oustanding allocations and their call stacks every INTERVAL seconds.

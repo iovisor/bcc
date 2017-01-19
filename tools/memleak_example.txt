@@ -150,14 +150,16 @@ of the sampling rate applied.
 USAGE message:
 
 # ./memleak -h
-usage: memleak [-h] [-p PID] [-t] [-a] [-o OLDER] [-c COMMAND]
-                  [-s SAMPLE_RATE] [-d STACK_DEPTH] [-T TOP]
+usage: memleak.py [-h] [-p PID] [-t] [-a] [-o OLDER] [-c COMMAND]
+                  [-s SAMPLE_RATE] [-T TOP] [-z MIN_SIZE] [-Z MAX_SIZE]
+                  [-O OBJ]
                   [interval] [count]
 
 Trace outstanding memory allocations that weren't freed.
 Supports both user-mode allocations made with malloc/free and kernel-mode
 allocations made with kmalloc/kfree.
 
+positional arguments:
   interval              interval in seconds to print outstanding allocations
   count                 number of times to print the report before exiting
 
@@ -175,13 +177,12 @@ optional arguments:
                         execute and trace the specified command
   -s SAMPLE_RATE, --sample-rate SAMPLE_RATE
                         sample every N-th allocation to decrease the overhead
-  -d STACK_DEPTH, --stack_depth STACK_DEPTH
-                        maximum stack depth to capture
   -T TOP, --top TOP     display only this many top allocating stacks (by size)
   -z MIN_SIZE, --min-size MIN_SIZE
                         capture only allocations larger than this size
   -Z MAX_SIZE, --max-size MAX_SIZE
                         capture only allocations smaller than this size
+  -O OBJ, --obj OBJ     attach to malloc & free in the specified object
 
 EXAMPLES:
 
