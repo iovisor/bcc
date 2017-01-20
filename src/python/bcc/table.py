@@ -21,6 +21,7 @@ import os
 from .libbcc import lib, _RAW_CB_TYPE
 from .perf import Perf
 from .utils import get_online_cpus
+from .utils import get_possible_cpus
 from subprocess import check_output
 
 BPF_MAP_TYPE_HASH = 1
@@ -561,7 +562,7 @@ class PerCpuHash(HashTable):
         self.reducer = kwargs.pop("reducer", None)
         super(PerCpuHash, self).__init__(*args, **kwargs)
         self.sLeaf = self.Leaf
-        self.total_cpu = multiprocessing.cpu_count()
+        self.total_cpu = len(get_possible_cpus())
         # This needs to be 8 as hard coded into the linux kernel.
         self.alignment = ct.sizeof(self.sLeaf) % 8
         if self.alignment is 0:
@@ -617,7 +618,7 @@ class PerCpuArray(ArrayBase):
         self.reducer = kwargs.pop("reducer", None)
         super(PerCpuArray, self).__init__(*args, **kwargs)
         self.sLeaf = self.Leaf
-        self.total_cpu = multiprocessing.cpu_count()
+        self.total_cpu = len(get_possible_cpus())
         # This needs to be 8 as hard coded into the linux kernel.
         self.alignment = ct.sizeof(self.sLeaf) % 8
         if self.alignment is 0:
