@@ -135,6 +135,8 @@ parser.add_argument("-z", "--min-size", type=int,
         help="capture only allocations larger than this size")
 parser.add_argument("-Z", "--max-size", type=int,
         help="capture only allocations smaller than this size")
+parser.add_argument("-O", "--obj", type=str, default="c",
+        help="attach to malloc & free in the specified object")
 
 args = parser.parse_args()
 
@@ -149,6 +151,7 @@ num_prints = args.count
 top_stacks = args.top
 min_size = args.min_size
 max_size = args.max_size
+obj = args.obj
 
 if min_size is not None and max_size is not None and min_size > max_size:
         print("min_size (-z) can't be greater than max_size (-Z)")
@@ -251,11 +254,11 @@ bpf_program = BPF(text=bpf_source)
 
 if not kernel_trace:
         print("Attaching to malloc and free in pid %d, Ctrl+C to quit." % pid)
-        bpf_program.attach_uprobe(name="c", sym="malloc",
+        bpf_program.attach_uprobe(name=obj, sym="malloc",
                                   fn_name="alloc_enter", pid=pid)
-        bpf_program.attach_uretprobe(name="c", sym="malloc",
+        bpf_program.attach_uretprobe(name=obj, sym="malloc",
                                      fn_name="alloc_exit", pid=pid)
-        bpf_program.attach_uprobe(name="c", sym="free",
+        bpf_program.attach_uprobe(name=obj, sym="free",
                                   fn_name="free_enter", pid=pid)
 else:
         print("Attaching to kmalloc and kfree, Ctrl+C to quit.")
