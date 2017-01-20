@@ -9,6 +9,12 @@ import multiprocessing
 
 class TestPercpu(unittest.TestCase):
 
+    def setUp(self):
+        try:
+            b = BPF(text='BPF_TABLE("percpu_array", u32, u32, stub, 1);')
+        except:
+            raise unittest.SkipTest("PerCpu unsupported on this kernel")
+
     def test_u64(self):
         test_prog1 = """
         BPF_TABLE("percpu_hash", u32, u64, stats, 1);
