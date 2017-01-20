@@ -7,7 +7,7 @@
   - [Arch](#arch---aur)
   - [Gentoo](#gentoo---portage)
 * [Source](#source)
-  - [Debian](#Debian)
+  - [Debian](#debian)
   - [Ubuntu](#ubuntu---source)
   - [Fedora](#fedora---source)
 * [Older Instructions](#older-instructions)
