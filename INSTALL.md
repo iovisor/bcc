@@ -7,6 +7,7 @@
   - [Arch](#arch---aur)
   - [Gentoo](#gentoo---portage)
 * [Source](#source)
+  - [Debian](#Debian)
   - [Ubuntu](#ubuntu---source)
   - [Fedora](#fedora---source)
 * [Older Instructions](#older-instructions)
@@ -154,83 +155,87 @@ The appropriate dependencies (e.g., ```clang```, ```llvm``` with BPF backend) wi
 # Source
 
 ## Debian - Source
+### Jessie
+#### Repositories
+
+The automated tests that run as part of the build process require `netperf`.  Since netperf's license is not "certified"
+as an open-source license, it is in Debian's `non-free` repository.
+
+`/etc/apt/sources.list` should include the `non-free` repository and look something like this:
 
 ```
-ROUGH NOTES:
+deb http://httpredir.debian.org/debian/ jessie main non-free
+deb-src http://httpredir.debian.org/debian/ jessie main non-free
 
-Add jessie-backports repo
-Add non-free repo to sources.list
-Install latest 4.x kernel and headers from jessie-backports
-See updated control file for all package-build dependencies
-Other required tooling: devscripts
+deb http://security.debian.org/ jessie/updates main non-free
+deb-src http://security.debian.org/ jessie/updates main non-free
 
+# wheezy-updates, previously known as 'volatile'
+deb http://ftp.us.debian.org/debian/ jessie-updates main non-free
+deb-src http://ftp.us.debian.org/debian/ jessie-updates main non-free
+```
+
+BCC also requires kernel version 4.1 or above.  Those kernels are available in the `jessie-backports` repository.  To
+add the `jessie-backports` repository to your system create the file `/etc/apt/sources.list.d/jessie-backports.list`
+with the following contents:
+
+```
+deb http://httpredir.debian.org/debian jessie-backports main
+deb-src http://httpredir.debian.org/debian jessie-backports main
+```
+
+#### Install Build Dependencies
+
+Note, check for the latest `linux-image-4.x` version in `jessie-backports` before proceeding.  Also, have a look at the
+`Build-Depends:` section in `debian/control` file.
+
+```
+# Before you begin
+apt-get update
+
+# Update kernel and linux-base package
+apt-get -t jessie-backports install linux-base linux-image-4.8.0-0.bpo.2-amd64
+
+# BCC build dependencies:
+apt-get install debhelper cmake libllvm3.8 llvm-3.8-dev libclang-3.8-dev \
+  libelf-dev bison flex libedit-dev clang-format-3.8 python python-netaddr \
+  python-pyroute2 luajit libluajit-5.1-dev arping iperf netperf ethtool \
+  devscripts
+```
+
+#### Sudo
+
+Adding eBPF probes to the kernel and removing probes from it requires root privileges.  For the build to complete
+successfully, you must build from an account with `sudo` access.  (You may also build as root, but it is bad style.)
+
+`/etc/sudoers` or `/etc/sudoers.d/build-user` should contain
+
+```
+build-user ALL = (ALL) NOPASSWD: ALL
+```
+
+or
+
+```
+build-user ALL = (ALL) ALL
+```
+
+If using the latter sudoers configuration, please keep an eye out for sudo's password prompt while the build is running.
+
+#### Build
+
+```
+cd <preferred development directory>
+git clone https://github.com/iovisor/bcc.git
+cd bcc
 debuild -b -uc -us
+```
 
-Re-running tests:
-cd obj-x86_64-linux-gnu/
-sudo /usr/bin/ctest --force-new-ctest-process -j1 -V
+#### Install
 
-20: Test command: /home/mikep/bcc/obj-x86_64-linux-gnu/tests/wrapper.sh "py_uprobes" "sudo" "/home/mikep/bcc/tests/python/test_uprobes.py"  
-20: Test timeout computed to be: 9.99988e+06
-20: Python 2.7.9   
-20: .Arena 0:
-20: system bytes     =   13803520
-20: in use bytes     =    2970096
-20: Total (incl. mmap):
-20: system bytes     =   14594048
-20: in use bytes     =    3760624
-20: max mmap regions =          4
-20: max mmap bytes   =    1589248
-20: F
-20: ======================================================================
-20: FAIL: test_simple_library (__main__.TestUprobes)
-20: ----------------------------------------------------------------------
-20: Traceback (most recent call last):
-20:   File "/home/mikep/bcc/tests/python/test_uprobes.py", line 34, in test_simple_library
-20:     self.assertEqual(b["stats"][ctypes.c_int(0)].value, 2)
-20: AssertionError: 0L != 2
-
-26: Test command: /home/mikep/bcc/obj-x86_64-linux-gnu/tests/wrapper.sh "lua_test_uprobes" "sudo" "/usr/bin/luajit" "test_uprobes.lua"
-26: Test timeout computed to be: 9.99988e+06
-26: Python 2.7.9   
-26: Arena 0:
-26: system bytes     =   12394496
-26: in use bytes     =    1561664
-26: Total (incl. mmap):
-26: system bytes     =   12394496
-26: in use bytes     =    1561664
-26: max mmap regions =          4
-26: max mmap bytes   =     999424
-26: .F
-26: Failed tests:  
-26: -------------  
-26: 1) TestUprobes.test_simple_library
-26: test_uprobes.lua:38: expected: 2, actual: 0
-26: stack traceback:
-26:     test_uprobes.lua:38: in function 'TestUprobes.test_simple_library'
-26:
-26: Ran 2 tests in 0.141 seconds, 1 successes, 1 failures
-26: Failed
-26/28 Test #26: lua_test_uprobes .................***Failed    0.27 sec
-
-test 28
-      Start 28: lua_test_standalone
-
-28: Test command: /home/mikep/bcc/tests/lua/test_standalone.sh
-28: Test timeout computed to be: 9.99988e+06  
-28: + cd src/lua
-28: + [[ ! -x bcc-lua ]]
-28: + ldd bcc-lua
-28: + grep -q luajit
-28: + rm -f libbcc.so probe.lua
-28: + echo 'return function(BPF) print("Hello world") end'
-28: + ./bcc-lua probe.lua
-28: Hello world
-28: + fail 'bcc-lua runs without libbcc.so'   
-28: + echo 'test failed: bcc-lua runs without libbcc.so'
-28: test failed: bcc-lua runs without libbcc.so
-28: + exit 1
-28/28 Test #28: lua_test_standalone ..............***Failed    0.01 sec
+```
+cd ..
+sudo dpkg -i *bcc*.deb
 ```
 
 ## Ubuntu - Source

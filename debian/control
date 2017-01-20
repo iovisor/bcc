@@ -8,7 +8,7 @@ Build-Depends: debhelper (>= 9), cmake, libllvm3.7 | libllvm3.8,
     libelf-dev, bison, flex, libedit-dev,
     clang-format | clang-format-3.7 | clang-format-3.8, python (>= 2.7),
     python-netaddr, python-pyroute2, luajit, libluajit-5.1-dev, arping,
-    inetutils-ping | iputils-ping, iperf, netperf, ethtool
+    inetutils-ping | iputils-ping, iperf, netperf, ethtool, devscripts
 Homepage: https://github.com/iovisor/bcc
 
 Package: libbcc
