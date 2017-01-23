@@ -35,6 +35,8 @@
 #include <sys/resource.h>
 #include <unistd.h>
 #include <stdbool.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 #include "libbpf.h"
 #include "perf_reader.h"
@@ -364,10 +366,22 @@ static void * bpf_attach_probe(int progfd, const char *event,
   }
   close(kfd);
 
+  if (access("/sys/kernel/debug/tracing/instances", F_OK) != -1) {
+    snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/instances/%s", event);
+    if (mkdir(buf, 0755) == -1) 
+      goto retry;
+    snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/instances/%s/events/%ss/%s", event, event_type, event);
+    if (bpf_attach_tracing_event(progfd, buf, reader, pid, cpu, group_fd) == 0)
+	  goto out;
+    snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/instances/%s", event);
+    rmdir(buf);
+  }
+retry:
   snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/events/%ss/%s", event_type, event);
   if (bpf_attach_tracing_event(progfd, buf, reader, pid, cpu, group_fd) < 0)
     goto error;
 
+out:
   return reader;
 
 error:
@@ -389,7 +403,7 @@ void * bpf_attach_uprobe(int progfd, const char *event,
   return bpf_attach_probe(progfd, event, event_desc, "uprobe", pid, cpu, group_fd, cb, cb_cookie);
 }
 
-static int bpf_detach_probe(const char *event_desc, const char *event_type) {
+static int bpf_detach_probe(const char *event_desc, const char *event_type, const char *event) {
   int kfd;
 
   char buf[256];
@@ -406,16 +420,20 @@ static int bpf_detach_probe(const char *event_desc, const char *event_type) {
     return -1;
   }
   close(kfd);
+  snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/instances/%s", event);
+  if (access(buf, F_OK) != -1) {
+    rmdir(buf);
+  }
 
   return 0;
 }
 
-int bpf_detach_kprobe(const char *event_desc) {
-  return bpf_detach_probe(event_desc, "kprobe");
+int bpf_detach_kprobe(const char *event_desc, const char *event) {
+  return bpf_detach_probe(event_desc, "kprobe", event);
 }
 
-int bpf_detach_uprobe(const char *event_desc) {
-  return bpf_detach_probe(event_desc, "uprobe");
+int bpf_detach_uprobe(const char *event_desc, const char *event) {
+  return bpf_detach_probe(event_desc, "uprobe", event);
 }
 
 void * bpf_attach_tracepoint(int progfd, const char *tp_category,

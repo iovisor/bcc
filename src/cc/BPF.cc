@@ -151,6 +151,7 @@ StatusTuple BPF::attach_kprobe(const std::string& kernel_func,
                                pid_t pid, int cpu, int group_fd,
                                perf_reader_cb cb, void* cb_cookie) {
   std::string probe_event = get_kprobe_event(kernel_func, attach_type);
+  probe_event += "_bcc_" + std::to_string((long)getpid());
   if (kprobes_.find(probe_event) != kprobes_.end())
     return StatusTuple(-1, "kprobe %s already attached", probe_event.c_str());
 
@@ -495,7 +496,7 @@ StatusTuple BPF::detach_kprobe_event(const std::string& event,
   }
   TRY2(unload_func(attr.func));
   std::string detach_event = "-:kprobes/" + event;
-  if (bpf_detach_kprobe(detach_event.c_str()) < 0)
+  if (bpf_detach_kprobe(detach_event.c_str(), event.c_str()) < 0)
     return StatusTuple(-1, "Unable to detach kprobe %s", event.c_str());
   return StatusTuple(0);
 }
@@ -508,7 +509,7 @@ StatusTuple BPF::detach_uprobe_event(const std::string& event,
   }
   TRY2(unload_func(attr.func));
   std::string detach_event = "-:uprobes/" + event;
-  if (bpf_detach_uprobe(detach_event.c_str()) < 0)
+  if (bpf_detach_uprobe(detach_event.c_str(), event.c_str()) < 0)
     return StatusTuple(-1, "Unable to detach uprobe %s", event.c_str());
   return StatusTuple(0);
 }
