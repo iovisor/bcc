@@ -459,6 +459,7 @@ class BPF(object):
         self._check_probe_quota(1)
         fn = self.load_func(fn_name, BPF.KPROBE)
         ev_name = "p_" + event.replace("+", "_").replace(".", "_")
+        ev_name += "_bcc_" + str(os.getpid())
         desc = "p:kprobes/%s %s" % (ev_name, event)
         res = lib.bpf_attach_kprobe(fn.fd, ev_name.encode("ascii"),
                 desc.encode("ascii"), pid, cpu, group_fd,
@@ -476,7 +477,7 @@ class BPF(object):
             raise Exception("Kprobe %s is not attached" % event)
         lib.perf_reader_free(self.open_kprobes[ev_name])
         desc = "-:kprobes/%s" % ev_name
-        res = lib.bpf_detach_kprobe(desc.encode("ascii"))
+        res = lib.bpf_detach_kprobe(desc.encode("ascii"), ev_name.encode("ascii"))
         if res < 0:
             raise Exception("Failed to detach BPF from kprobe")
         self._del_kprobe(ev_name)
@@ -498,6 +499,7 @@ class BPF(object):
         self._check_probe_quota(1)
         fn = self.load_func(fn_name, BPF.KPROBE)
         ev_name = "r_" + event.replace("+", "_").replace(".", "_")
+        ev_name += "_bcc_" + str(os.getpid())
         desc = "r:kprobes/%s %s" % (ev_name, event)
         res = lib.bpf_attach_kprobe(fn.fd, ev_name.encode("ascii"),
                 desc.encode("ascii"), pid, cpu, group_fd,
@@ -515,7 +517,7 @@ class BPF(object):
             raise Exception("Kretprobe %s is not attached" % event)
         lib.perf_reader_free(self.open_kprobes[ev_name])
         desc = "-:kprobes/%s" % ev_name
-        res = lib.bpf_detach_kprobe(desc.encode("ascii"))
+        res = lib.bpf_detach_kprobe(desc.encode("ascii"), ev_name.encode("ascii"))
         if res < 0:
             raise Exception("Failed to detach BPF from kprobe")
         self._del_kprobe(ev_name)
@@ -1046,12 +1048,12 @@ class BPF(object):
             # non-string keys here include the perf_events reader
             if isinstance(k, str):
                 desc = "-:kprobes/%s" % k
-                lib.bpf_detach_kprobe(desc.encode("ascii"))
+                lib.bpf_detach_kprobe(desc.encode("ascii"), str(k).encode("ascii"))
             self._del_kprobe(k)
         for k, v in list(self.open_uprobes.items()):
             lib.perf_reader_free(v)
             desc = "-:uprobes/%s" % k
-            lib.bpf_detach_uprobe(desc.encode("ascii"))
+            lib.bpf_detach_uprobe(desc.encode("ascii"), str(k).encode("ascii"))
             self._del_uprobe(k)
         for k, v in self.open_tracepoints.items():
             lib.perf_reader_free(v)

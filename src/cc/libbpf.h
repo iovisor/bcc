@@ -47,12 +47,12 @@ typedef void (*perf_reader_raw_cb)(void *cb_cookie, void *raw, int raw_size);
 void * bpf_attach_kprobe(int progfd, const char *event, const char *event_desc,
                          int pid, int cpu, int group_fd, perf_reader_cb cb,
                          void *cb_cookie);
-int bpf_detach_kprobe(const char *event_desc);
+int bpf_detach_kprobe(const char *event_desc, const char *event);
 
 void * bpf_attach_uprobe(int progfd, const char *event, const char *event_desc,
                          int pid, int cpu, int group_fd, perf_reader_cb cb,
                          void *cb_cookie);
-int bpf_detach_uprobe(const char *event_desc);
+int bpf_detach_uprobe(const char *event_desc, const char *event);
 
 void * bpf_attach_tracepoint(int progfd, const char *tp_category,
                              const char *tp_name, int pid, int cpu,
