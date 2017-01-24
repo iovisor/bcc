@@ -473,6 +473,7 @@ class BPF(object):
     def detach_kprobe(self, event):
         event = str(event)
         ev_name = "p_" + event.replace("+", "_").replace(".", "_")
+        ev_name += "_bcc_" + str(os.getpid())
         if ev_name not in self.open_kprobes:
             raise Exception("Kprobe %s is not attached" % event)
         lib.perf_reader_free(self.open_kprobes[ev_name])
@@ -513,6 +514,7 @@ class BPF(object):
     def detach_kretprobe(self, event):
         event = str(event)
         ev_name = "r_" + event.replace("+", "_").replace(".", "_")
+        ev_name += "_bcc_" + str(os.getpid())
         if ev_name not in self.open_kprobes:
             raise Exception("Kretprobe %s is not attached" % event)
         lib.perf_reader_free(self.open_kprobes[ev_name])
