@@ -795,7 +795,7 @@ class BPF(object):
             raise Exception("Uprobe %s is not attached" % ev_name)
         lib.perf_reader_free(self.open_uprobes[ev_name])
         desc = "-:uprobes/%s" % ev_name
-        res = lib.bpf_detach_uprobe(desc.encode("ascii"))
+        res = lib.bpf_detach_uprobe(desc.encode("ascii"), ev_name.encode("ascii"))
         if res < 0:
             raise Exception("Failed to detach BPF from uprobe")
         self._del_uprobe(ev_name)
@@ -847,7 +847,7 @@ class BPF(object):
             raise Exception("Uretprobe %s is not attached" % ev_name)
         lib.perf_reader_free(self.open_uprobes[ev_name])
         desc = "-:uprobes/%s" % ev_name
-        res = lib.bpf_detach_uprobe(desc.encode("ascii"))
+        res = lib.bpf_detach_uprobe(desc.encode("ascii"), ev_name.encode("ascii"))
         if res < 0:
             raise Exception("Failed to detach BPF from uprobe")
         self._del_uprobe(ev_name)
