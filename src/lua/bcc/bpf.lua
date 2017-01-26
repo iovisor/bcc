@@ -14,6 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ]]
 local ffi = require("ffi")
+ffi.cdef[[
+  int getpid(void);
+]]
+
 local libbcc = require("bcc.libbcc")
 
 local TracerPipe = require("bcc.tracerpipe")
@@ -47,9 +51,9 @@ function Bpf.static.cleanup()
         log.info("detaching %s", desc)
 
         if probe_type == "kprobes" then
-          libbcc.bpf_detach_kprobe(desc)
+          libbcc.bpf_detach_kprobe(desc, key)
         elseif probe_type == "uprobes" then
-          libbcc.bpf_detach_uprobe(desc)
+          libbcc.bpf_detach_uprobe(desc, key)
         end
       end
       all_probes[key] = nil
@@ -209,6 +213,7 @@ function Bpf:attach_kprobe(args)
   local event = args.event or ""
   local ptype = args.retprobe and "r" or "p"
   local ev_name = string.format("%s_%s", ptype, event:gsub("[%+%.]", "_"))
+  local ev_name = string.format("%s_bcc_%s", ev_name, ffi.C.getpid());
   local desc = string.format("%s:kprobes/%s %s", ptype, ev_name, event)
 
   log.info(desc)
