@@ -455,10 +455,10 @@ class BPF(object):
                     pass
             return
 
+        event = str(event)
         self._check_probe_quota(1)
         fn = self.load_func(fn_name, BPF.KPROBE)
-        event = str(event).replace("+", "_").replace(".", "_")
-        ev_name = "p_" + event
+        ev_name = "p_" + event.replace("+", "_").replace(".", "_")
         res = lib.bpf_attach_kprobe(fn.fd, 0, ev_name.encode("ascii"),
                 event.encode("ascii"), pid, cpu, group_fd,
                 self._reader_cb_impl, ct.cast(id(self), ct.py_object))
@@ -492,10 +492,10 @@ class BPF(object):
                     pass
             return
 
-        event = str(event).replace("+", "_").replace(".", "_")
+        event = str(event)
         self._check_probe_quota(1)
         fn = self.load_func(fn_name, BPF.KPROBE)
-        ev_name = "r_" + event
+        ev_name = "r_" + event.replace("+", "_").replace(".", "_")
         res = lib.bpf_attach_kprobe(fn.fd, 1, ev_name.encode("ascii"),
                 event.encode("ascii"), pid, cpu, group_fd,
                 self._reader_cb_impl, ct.cast(id(self), ct.py_object))
