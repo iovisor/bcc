@@ -147,7 +147,7 @@ StatusTuple BPF::detach_all() {
 
 StatusTuple BPF::attach_kprobe(const std::string& kernel_func,
                                const std::string& probe_func,
-                               int attach_type,
+                               bpf_probe_attach_type attach_type,
                                pid_t pid, int cpu, int group_fd,
                                perf_reader_cb cb, void* cb_cookie) {
   std::string probe_event = get_kprobe_event(kernel_func, attach_type);
@@ -179,7 +179,7 @@ StatusTuple BPF::attach_uprobe(const std::string& binary_path,
                                const std::string& symbol,
                                const std::string& probe_func,
                                uint64_t symbol_addr,
-                               int attach_type,
+                               bpf_probe_attach_type attach_type,
                                pid_t pid, int cpu, int group_fd,
                                perf_reader_cb cb, void* cb_cookie) {
   bcc_symbol sym = bcc_symbol();
@@ -318,7 +318,7 @@ StatusTuple BPF::attach_perf_event(uint32_t ev_type, uint32_t ev_config,
 }
 
 StatusTuple BPF::detach_kprobe(const std::string& kernel_func,
-                               int attach_type) {
+                               bpf_probe_attach_type attach_type) {
   std::string event = get_kprobe_event(kernel_func, attach_type);
 
   auto it = kprobes_.find(event);
@@ -334,7 +334,7 @@ StatusTuple BPF::detach_kprobe(const std::string& kernel_func,
 
 StatusTuple BPF::detach_uprobe(const std::string& binary_path,
                                const std::string& symbol, uint64_t symbol_addr,
-                               int attach_type) {
+                               bpf_probe_attach_type attach_type) {
   bcc_symbol sym = bcc_symbol();
   TRY2(check_binary_symbol(binary_path, symbol, symbol_addr, &sym));
 
@@ -416,7 +416,7 @@ void BPF::poll_perf_buffer(const std::string& name, int timeout) {
 }
 
 StatusTuple BPF::load_func(const std::string& func_name,
-                           enum bpf_prog_type type, int& fd) {
+                           bpf_prog_type type, int& fd) {
   if (funcs_.find(func_name) != funcs_.end()) {
     fd = funcs_[func_name];
     return StatusTuple(0);
@@ -466,14 +466,14 @@ StatusTuple BPF::check_binary_symbol(const std::string& binary_path,
 }
 
 std::string BPF::get_kprobe_event(const std::string& kernel_func,
-                                  int type) {
+                                  bpf_probe_attach_type type) {
   std::string res = attach_type_prefix(type) + "_";
   res += sanitize_str(kernel_func, &BPF::kprobe_event_validator);
   return res;
 }
 
 std::string BPF::get_uprobe_event(const std::string& binary_path,
-                                  uint64_t offset, int type) {
+                                  uint64_t offset, bpf_probe_attach_type type) {
   std::string res = attach_type_prefix(type) + "_";
   res += sanitize_str(binary_path, &BPF::uprobe_path_validator);
   res += "_0x" + uint_to_hex(offset);

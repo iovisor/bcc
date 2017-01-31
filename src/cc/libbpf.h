@@ -24,6 +24,10 @@
 extern "C" {
 #endif
 
+enum bpf_probe_attach_type {
+	probe_entry,
+	probe_return
+};
 #define BPF_PROBE_ENTRY  0
 #define BPF_PROBE_RETURN 1
 
@@ -47,14 +51,14 @@ typedef void (*perf_reader_cb)(void *cb_cookie, int pid, uint64_t callchain_num,
                                void *callchain);
 typedef void (*perf_reader_raw_cb)(void *cb_cookie, void *raw, int raw_size);
 
-void * bpf_attach_kprobe(int progfd, int attach_type, const char *ev_name,
+void * bpf_attach_kprobe(int progfd, enum bpf_probe_attach_type attach_type, const char *ev_name,
                         const char *fn_name,
                         pid_t pid, int cpu, int group_fd,
                         perf_reader_cb cb, void *cb_cookie);
 
 int bpf_detach_kprobe(const char *ev_name);
 
-void * bpf_attach_uprobe(int progfd, int attach_type, const char *ev_name,
+void * bpf_attach_uprobe(int progfd, enum bpf_probe_attach_type attach_type, const char *ev_name,
                         const char *binary_path, uint64_t offset,
                         pid_t pid, int cpu, int group_fd,
                         perf_reader_cb cb, void *cb_cookie);

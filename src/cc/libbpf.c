@@ -338,16 +338,17 @@ static int bpf_attach_tracing_event(int progfd, const char *event_path,
   return 0;
 }
 
-void * bpf_attach_kprobe(int progfd, int attach_type, const char *ev_name,
+void * bpf_attach_kprobe(int progfd, enum bpf_probe_attach_type attach_type, const char *ev_name,
                         const char *fn_name,
                         pid_t pid, int cpu, int group_fd,
                         perf_reader_cb cb, void *cb_cookie) 
 {
   int kfd;
-  char buf[strlen(ev_name)+256];
-  char new_name[strlen(ev_name)+32];
+  char buf[256];
+  char new_name[128];
   struct perf_reader *reader = NULL;
   static char *event_type = "kprobe";
+  int n;
 
   snprintf(new_name, sizeof(new_name), "%s_bcc_%d", ev_name, getpid());
   reader = perf_reader_new(cb, NULL, cb_cookie);
@@ -375,11 +376,10 @@ void * bpf_attach_kprobe(int progfd, int attach_type, const char *ev_name,
     snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/instances/%s", new_name);
     if (mkdir(buf, 0755) == -1) 
       goto retry;
-    snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/instances/%s/events/%ss/%s", 
+    n = snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/instances/%s/events/%ss/%s", 
              new_name, event_type, new_name);
-    if (bpf_attach_tracing_event(progfd, buf, reader, pid, cpu, group_fd) == 0) {
+    if (n < sizeof(buf) && bpf_attach_tracing_event(progfd, buf, reader, pid, cpu, group_fd) == 0)
 	  goto out;
-    }
     snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/instances/%s", new_name);
     rmdir(buf);
   }
@@ -396,16 +396,17 @@ error:
 
 }
 
-void * bpf_attach_uprobe(int progfd, int attach_type, const char *ev_name,
+void * bpf_attach_uprobe(int progfd, enum bpf_probe_attach_type attach_type, const char *ev_name,
                         const char *binary_path, uint64_t offset,
                         pid_t pid, int cpu, int group_fd,
                         perf_reader_cb cb, void *cb_cookie) 
 {
   int kfd;
-  char buf[strlen(binary_path)+strlen(ev_name)+256];
-  char new_name[strlen(ev_name)+32];
+  char buf[PATH_MAX];
+  char new_name[128];
   struct perf_reader *reader = NULL;
   static char *event_type = "uprobe";
+  int n;
 
   snprintf(new_name, sizeof(new_name), "%s_bcc_%d", ev_name, getpid());
   reader = perf_reader_new(cb, NULL, cb_cookie);
@@ -419,8 +420,12 @@ void * bpf_attach_uprobe(int progfd, int attach_type, const char *ev_name,
     goto error;
   }
 
-  snprintf(buf, sizeof(buf), "%c:%ss/%s %s:0x%lx", attach_type==BPF_PROBE_ENTRY ? 'p' : 'r', 
+  n = snprintf(buf, sizeof(buf), "%c:%ss/%s %s:0x%lx", attach_type==BPF_PROBE_ENTRY ? 'p' : 'r', 
 			event_type, new_name, binary_path, offset);
+  if (n >= sizeof(buf)) {
+    close(kfd);
+    goto error;
+  }
   if (write(kfd, buf, strlen(buf)) < 0) {
     if (errno == EINVAL)
       fprintf(stderr, "check dmesg output for possible cause\n");
@@ -443,7 +448,7 @@ error:
 static int bpf_detach_probe(const char *ev_name, const char *event_type)
 {
   int kfd;
-  char buf[strlen(ev_name)+256];
+  char buf[256];
   snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/%s_events", event_type);
   kfd = open(buf, O_WRONLY | O_APPEND, 0);
   if (kfd < 0) {
@@ -464,7 +469,7 @@ static int bpf_detach_probe(const char *ev_name, const char *event_type)
 
 int bpf_detach_kprobe(const char *ev_name)
 {
-  char buf[strlen(ev_name)+256];
+  char buf[256];
   int ret = bpf_detach_probe(ev_name, "kprobe");
   snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/instances/%s_bcc_%d", ev_name, getpid());
   if (access(buf, F_OK) != -1) {

@@ -51,23 +51,23 @@ public:
 
   StatusTuple attach_kprobe(
       const std::string& kernel_func, const std::string& probe_func,
-      int attach_type = BPF_PROBE_ENTRY,
+      bpf_probe_attach_type = probe_entry,
       pid_t pid = -1, int cpu = 0, int group_fd = -1,
       perf_reader_cb cb = nullptr, void* cb_cookie = nullptr);
   StatusTuple detach_kprobe(
       const std::string& kernel_func,
-      int attach_type = BPF_PROBE_ENTRY);
+      bpf_probe_attach_type attach_type = probe_entry);
 
   StatusTuple attach_uprobe(
       const std::string& binary_path, const std::string& symbol,
       const std::string& probe_func, uint64_t symbol_addr = 0,
-      int attach_type = BPF_PROBE_ENTRY,
+      bpf_probe_attach_type attach_type = probe_entry,
       pid_t pid = -1, int cpu = 0, int group_fd = -1,
       perf_reader_cb cb = nullptr, void* cb_cookie = nullptr);
   StatusTuple detach_uprobe(
       const std::string& binary_path, const std::string& symbol,
       uint64_t symbol_addr = 0,
-      int attach_type = BPF_PROBE_ENTRY);
+      bpf_probe_attach_type attach_type = probe_entry);
   StatusTuple attach_usdt(const USDT& usdt, pid_t pid = -1, int cpu = 0,
                           int group_fd = -1);
   StatusTuple detach_usdt(const USDT& usdt);
@@ -106,9 +106,9 @@ private:
   StatusTuple unload_func(const std::string& func_name);
 
   std::string get_kprobe_event(const std::string& kernel_func,
-                               int attach_type);
+                               bpf_probe_attach_type type);
   std::string get_uprobe_event(const std::string& binary_path, uint64_t offset,
-                               int attach_type);
+                               bpf_probe_attach_type type);
 
   StatusTuple detach_kprobe_event(const std::string& event, open_probe_t& attr);
   StatusTuple detach_uprobe_event(const std::string& event, open_probe_t& attr);
@@ -116,21 +116,21 @@ private:
                                       open_probe_t& attr);
   StatusTuple detach_perf_event_all_cpu(open_probe_t& attr);
 
-  std::string attach_type_debug(int attach_type) {
-    switch (attach_type) {
-    case BPF_PROBE_ENTRY:
+  std::string attach_type_debug(bpf_probe_attach_type type) {
+    switch (type) {
+    case probe_entry:
       return "";
-    case BPF_PROBE_RETURN:
+    case probe_return:
       return "return ";
     }
     return "ERROR";
   }
 
-  std::string attach_type_prefix(int attach_type) {
-    switch (attach_type) {
-    case BPF_PROBE_ENTRY:
+  std::string attach_type_prefix(bpf_probe_attach_type type) {
+    switch (type) {
+    case probe_entry:
       return "p";
-    case BPF_PROBE_RETURN:
+    case probe_return:
       return "r";
     }
     return "ERROR";
