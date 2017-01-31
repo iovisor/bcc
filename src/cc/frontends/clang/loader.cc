@@ -167,7 +167,11 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, unique_ptr<vector<TableDes
 
   // set up the command line argument wrapper
 #if defined(__powerpc64__)
-  driver::Driver drv("", "ppc64le-unknown-linux-gnu", diags);
+#if defined(_CALL_ELF) && _CALL_ELF == 2
+  driver::Driver drv("", "powerpc64le-unknown-linux-gnu", diags);
+#else
+  driver::Driver drv("", "powerpc64-unknown-linux-gnu", diags);
+#endif
 #elif defined(__aarch64__)
   driver::Driver drv("", "aarch64-unknown-linux-gnu", diags);
 #else
