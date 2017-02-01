@@ -499,5 +499,18 @@ int bpf_usdt_readarg_p(int argc, struct pt_regs *ctx, void *buf, u64 len) asm("l
 #define TRACEPOINT_PROBE(category, event) \
 int tracepoint__##category##__##event(struct tracepoint__##category##__##event *args)
 
+#define TP_DATA_LOC_READ_CONST(dst, field, length)                        \
+        do {                                                              \
+            short __offset = args->data_loc_##field & 0xFFFF;             \
+            bpf_probe_read((void *)dst, length, (char *)args + __offset); \
+        } while (0);
+
+#define TP_DATA_LOC_READ(dst, field)                                        \
+        do {                                                                \
+            short __offset = args->data_loc_##field & 0xFFFF;               \
+            short __length = args->data_loc_##field >> 16;                  \
+            bpf_probe_read((void *)dst, __length, (char *)args + __offset); \
+        } while (0);
+
 #endif
 )********"
