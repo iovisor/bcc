@@ -25,8 +25,8 @@ extern "C" {
 #endif
 
 enum bpf_probe_attach_type {
-	probe_entry,
-	probe_return
+	BPF_PROBE_ENTRY,
+	BPF_PROBE_RETURN
 };
 
 int bpf_create_map(enum bpf_map_type map_type, int key_size, int value_size,

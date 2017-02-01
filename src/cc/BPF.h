@@ -51,23 +51,23 @@ public:
 
   StatusTuple attach_kprobe(
       const std::string& kernel_func, const std::string& probe_func,
-      bpf_probe_attach_type = probe_entry,
+      bpf_probe_attach_type = BPF_PROBE_ENTRY,
       pid_t pid = -1, int cpu = 0, int group_fd = -1,
       perf_reader_cb cb = nullptr, void* cb_cookie = nullptr);
   StatusTuple detach_kprobe(
       const std::string& kernel_func,
-      bpf_probe_attach_type attach_type = probe_entry);
+      bpf_probe_attach_type attach_type = BPF_PROBE_ENTRY);
 
   StatusTuple attach_uprobe(
       const std::string& binary_path, const std::string& symbol,
       const std::string& probe_func, uint64_t symbol_addr = 0,
-      bpf_probe_attach_type attach_type = probe_entry,
+      bpf_probe_attach_type attach_type = BPF_PROBE_ENTRY,
       pid_t pid = -1, int cpu = 0, int group_fd = -1,
       perf_reader_cb cb = nullptr, void* cb_cookie = nullptr);
   StatusTuple detach_uprobe(
       const std::string& binary_path, const std::string& symbol,
       uint64_t symbol_addr = 0,
-      bpf_probe_attach_type attach_type = probe_entry);
+      bpf_probe_attach_type attach_type = BPF_PROBE_ENTRY);
   StatusTuple attach_usdt(const USDT& usdt, pid_t pid = -1, int cpu = 0,
                           int group_fd = -1);
   StatusTuple detach_usdt(const USDT& usdt);
@@ -118,9 +118,9 @@ private:
 
   std::string attach_type_debug(bpf_probe_attach_type type) {
     switch (type) {
-    case probe_entry:
+    case BPF_PROBE_ENTRY:
       return "";
-    case probe_return:
+    case BPF_PROBE_RETURN:
       return "return ";
     }
     return "ERROR";
@@ -128,9 +128,9 @@ private:
 
   std::string attach_type_prefix(bpf_probe_attach_type type) {
     switch (type) {
-    case probe_entry:
+    case BPF_PROBE_ENTRY:
       return "p";
-    case probe_return:
+    case BPF_PROBE_RETURN:
       return "r";
     }
     return "ERROR";

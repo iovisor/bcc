@@ -362,7 +362,7 @@ void * bpf_attach_kprobe(int progfd, enum bpf_probe_attach_type attach_type, con
     goto error;
   }
 
-  snprintf(buf, sizeof(buf), "%c:%ss/%s %s", attach_type==probe_entry ? 'p' : 'r', 
+  snprintf(buf, sizeof(buf), "%c:%ss/%s %s", attach_type==BPF_PROBE_ENTRY ? 'p' : 'r', 
 			event_type, new_name, fn_name);
   if (write(kfd, buf, strlen(buf)) < 0) {
     if (errno == EINVAL)
@@ -420,7 +420,7 @@ void * bpf_attach_uprobe(int progfd, enum bpf_probe_attach_type attach_type, con
     goto error;
   }
 
-  n = snprintf(buf, sizeof(buf), "%c:%ss/%s %s:0x%lx", attach_type==probe_entry ? 'p' : 'r', 
+  n = snprintf(buf, sizeof(buf), "%c:%ss/%s %s:0x%lx", attach_type==BPF_PROBE_ENTRY ? 'p' : 'r', 
 			event_type, new_name, binary_path, offset);
   if (n >= sizeof(buf)) {
     close(kfd);
