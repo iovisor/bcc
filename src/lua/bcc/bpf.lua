@@ -43,13 +43,10 @@ function Bpf.static.cleanup()
       libbcc.perf_reader_free(probe)
       -- skip bcc-specific kprobes
       if not key:starts("bcc:") then
-        local desc = string.format("-:%s/%s", probe_type, key)
-        log.info("detaching %s", desc)
-
         if probe_type == "kprobes" then
-          libbcc.bpf_detach_kprobe(desc)
+          libbcc.bpf_detach_kprobe(key)
         elseif probe_type == "uprobes" then
-          libbcc.bpf_detach_uprobe(desc)
+          libbcc.bpf_detach_uprobe(key)
         end
       end
       all_probes[key] = nil
@@ -187,11 +184,9 @@ function Bpf:attach_uprobe(args)
   local fn = self:load_func(args.fn_name, 'BPF_PROG_TYPE_KPROBE')
   local ptype = args.retprobe and "r" or "p"
   local ev_name = string.format("%s_%s_0x%p", ptype, path:gsub("[^%a%d]", "_"), addr)
-  local desc = string.format("%s:uprobes/%s %s:0x%p", ptype, ev_name, path, addr)
+  local retprobe = args.retprobe and 1 or 0
 
-  log.info(desc)
-
-  local res = libbcc.bpf_attach_uprobe(fn.fd, ev_name, desc,
+  local res = libbcc.bpf_attach_uprobe(fn.fd, retprobe, ev_name, path, addr,
     args.pid or -1,
     args.cpu or 0,
     args.group_fd or -1, nil, nil) -- TODO; reader callback
@@ -209,11 +204,9 @@ function Bpf:attach_kprobe(args)
   local event = args.event or ""
   local ptype = args.retprobe and "r" or "p"
   local ev_name = string.format("%s_%s", ptype, event:gsub("[%+%.]", "_"))
-  local desc = string.format("%s:kprobes/%s %s", ptype, ev_name, event)
+  local retprobe = args.retprobe and 1 or 0
 
-  log.info(desc)
-
-  local res = libbcc.bpf_attach_kprobe(fn.fd, ev_name, desc,
+  local res = libbcc.bpf_attach_kprobe(fn.fd, retprobe, ev_name, event,
     args.pid or -1,
     args.cpu or 0,
     args.group_fd or -1, nil, nil) -- TODO; reader callback

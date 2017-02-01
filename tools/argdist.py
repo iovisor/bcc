@@ -20,7 +20,7 @@ import sys
 class Probe(object):
         next_probe_index = 0
         streq_index = 0
-        aliases = {"$PID": "(bpf_get_current_pid_tgid() >> 32)"}
+        aliases = {"$PID": "bpf_get_current_pid_tgid()"}
 
         def _substitute_aliases(self, expr):
                 if expr is None:
@@ -47,9 +47,7 @@ class Probe(object):
                 text = """
 int PROBENAME(struct pt_regs *ctx SIGNATURE)
 {
-        u64 __pid_tgid = bpf_get_current_pid_tgid();
-        u32 __pid      = __pid_tgid;        // lower 32 bits
-        u32 __tgid     = __pid_tgid >> 32;  // upper 32 bits
+        u32 pid = bpf_get_current_pid_tgid();
         PID_FILTER
         COLLECT
         return 0;
@@ -58,17 +56,19 @@ int PROBENAME(struct pt_regs *ctx SIGNATURE)
                 text = text.replace("PROBENAME", self.entry_probe_func)
                 text = text.replace("SIGNATURE",
                      "" if len(self.signature) == 0 else ", " + self.signature)
-                text = text.replace("PID_FILTER", self._generate_pid_filter())
+                pid_filter = "" if self.is_user or self.pid is None \
+                                else "if (pid != %d) { return 0; }" % self.pid
+                text = text.replace("PID_FILTER", pid_filter)
                 collect = ""
                 for pname in self.args_to_probe:
                         param_hash = self.hashname_prefix + pname
                         if pname == "__latency":
                                 collect += """
 u64 __time = bpf_ktime_get_ns();
-%s.update(&__pid, &__time);
+%s.update(&pid, &__time);
                         """ % param_hash
                         else:
-                                collect += "%s.update(&__pid, &%s);\n" % \
+                                collect += "%s.update(&pid, &%s);\n" % \
                                            (param_hash, pname)
                 text = text.replace("COLLECT", collect)
                 return text
@@ -108,7 +108,7 @@ u64 __time = bpf_ktime_get_ns();
                 # argument we needed to probe using $entry(name), and they all
                 # have values (which isn't necessarily the case if we missed
                 # the method entry probe).
-                text = ""
+                text = "u32 __pid = bpf_get_current_pid_tgid();\n"
                 self.param_val_names = {}
                 for pname in self.args_to_probe:
                         val_name = "__%s_val" % pname
@@ -345,7 +345,8 @@ static inline bool %s(char const *ignored, char const *str) {
                 # Kernel probes need to explicitly filter pid, because the
                 # attach interface doesn't support pid filtering
                 if self.pid is not None and not self.is_user:
-                        return "if (__tgid != %d) { return 0; }" % self.pid
+                        return "u32 pid = bpf_get_current_pid_tgid();\n" + \
+                               "if (pid != %d) { return 0; }" % self.pid
                 else:
                         return ""
 
@@ -359,9 +360,6 @@ DATA_DECL
                     if self.probe_type == "t"
                     else "int PROBENAME(struct pt_regs *ctx SIGNATURE)") + """
 {
-        u64 __pid_tgid = bpf_get_current_pid_tgid();
-        u32 __pid      = __pid_tgid;        // lower 32 bits
-        u32 __tgid     = __pid_tgid >> 32;  // upper 32 bits
         PID_FILTER
         PREFIX
         if (!(FILTER)) return 0;
