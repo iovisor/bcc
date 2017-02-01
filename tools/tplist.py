@@ -42,8 +42,6 @@ def print_tpoint_format(category, event):
                 parts = match.group(1).split()
                 field_name = parts[-1:][0]
                 field_type = " ".join(parts[:-1])
-                if "__data_loc" in field_type:
-                        continue
                 if field_name.startswith("common_"):
                         continue
                 print("    %s %s;" % (field_type, field_name))
