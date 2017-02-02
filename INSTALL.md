@@ -99,6 +99,13 @@ cd pyroute2; sudo make install
 sudo python /usr/share/bcc/examples/simple_tc.py
 ```
 
+(Optional) Install networkx for additional deadlock detector features
+```bash
+git@github.com:networkx/networkx.git
+cd networkx; sudo make install
+sudo python /usr/share/bcc/tools/deadlock_detector.py
+```
+
 ## Fedora - Binary
 
 Install a 4.2+ kernel from
@@ -200,6 +207,7 @@ sudo dnf install -y luajit luajit-devel  # for Lua support
 sudo dnf install -y \
   http://pkgs.repoforge.org/netperf/netperf-2.6.0-1.el6.rf.x86_64.rpm
 sudo pip install pyroute2
+sudo pip install networkx
 ```
 
 ### Install binary clang

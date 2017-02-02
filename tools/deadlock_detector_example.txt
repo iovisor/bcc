@@ -1,0 +1,315 @@
+Demonstrations of deadlock_detector.
+
+This program detects potential deadlocks on a running process. The program
+attaches uprobes on `pthread_mutex_lock` and `pthread_mutex_unlock` to build
+a mutex wait directed graph, and then looks for a cycle in this graph. This
+graph has the following properties:
+
+- Nodes in the graph represent mutexes.
+- Edge (A, B) exists if there exists some thread T where lock(A) was called
+  and lock(B) was called before unlock(A) was called.
+
+If there is a cycle in this graph, this indicates that there is a lock order
+inversion (potential deadlock). If the program finds a lock order inversion, the
+program will dump the cycle of mutexes, dump the stack traces where each mutex
+was acquired, and then exit.
+
+This program can only find potential deadlocks that occur while the program is
+tracing the process. It cannot find deadlocks that may have occurred before the
+program was attached to the process.
+
+Note: This tool does not work for shared mutexes or recursive mutexes.
+
+For shared (read-write) mutexes, a deadlock requires a cycle in the wait
+graph where at least one of the mutexes in the cycle is acquiring exclusive
+(write) ownership.
+
+For recursive mutexes, lock() is called multiple times on the same mutex.
+However, there is no way to determine if a mutex is a recursive mutex
+after the mutex has been created. As a result, this tool will not find
+potential deadlocks that involve only one mutex.
+
+
+# ./deadlock_detector.py /path/to/program/with/lockinversion $(pidof lockinversion)
+Tracing... Hit Ctrl-C to end.
+Nodes: 0, Edges: 0, Looking for cycle took 0.000056 seconds
+Nodes: 0, Edges: 0, Looking for cycle took 0.000062 seconds
+Nodes: 0, Edges: 0, Looking for cycle took 0.000070 seconds
+Nodes: 0, Edges: 0, Looking for cycle took 0.000071 seconds
+Nodes: 0, Edges: 0, Looking for cycle took 0.000066 seconds
+Nodes: 0, Edges: 0, Looking for cycle took 0.000066 seconds
+----------------
+Potential Deadlock Detected!
+
+Cycle in lock order graph: Mutex M0 (0x00007ffccd7ab140) => Mutex M1 (0x00007ffccd7ab0b0) => Mutex M2 (0x00007ffccd7ab0e0) => Mutex M3 (0x00007ffccd7ab110) => Mutex M0 (0x00007ffccd7ab140)
+
+Mutex M1 (0x00007ffccd7ab0b0) acquired here while holding Mutex M0 (0x00007ffccd7ab140) in Thread 3120373 (lockinversion):
+@ 00000000004024d0 [unknown]
+@ 0000000000406f4e std::mutex::lock()
+@ 0000000000407250 std::lock_guard<std::mutex>::lock_guard(std::mutex&)
+@ 0000000000402ecc main::{lambda()#4}::operator()() const
+@ 0000000000406cc4 void std::_Bind_simple<main::{lambda()#4} ()>::_M_invoke<>(std::_Index_tuple<>)
+@ 0000000000406aab std::_Bind_simple<main::{lambda()#4} ()>::operator()()
+@ 000000000040689a std::thread::_Impl<std::_Bind_simple<main::{lambda()#4} ()> >::_M_run()
+@ 00007f9f9791f4e1 execute_native_thread_routine
+@ 00007f9f9809e7f1 start_thread
+@ 00007f9f9736046d __clone
+
+Mutex M0 (0x00007ffccd7ab140) previously acquired by the same Thread 3120373 (lockinversion) here:
+@ 00000000004024d0 [unknown]
+@ 0000000000406f4e std::mutex::lock()
+@ 0000000000407250 std::lock_guard<std::mutex>::lock_guard(std::mutex&)
+@ 0000000000402eb6 main::{lambda()#4}::operator()() const
+@ 0000000000406cc4 void std::_Bind_simple<main::{lambda()#4} ()>::_M_invoke<>(std::_Index_tuple<>)
+@ 0000000000406aab std::_Bind_simple<main::{lambda()#4} ()>::operator()()
+@ 000000000040689a std::thread::_Impl<std::_Bind_simple<main::{lambda()#4} ()> >::_M_run()
+@ 00007f9f9791f4e1 execute_native_thread_routine
+@ 00007f9f9809e7f1 start_thread
+@ 00007f9f9736046d __clone
+
+Mutex M2 (0x00007ffccd7ab0e0) acquired here while holding Mutex M1 (0x00007ffccd7ab0b0) in Thread 3120370 (lockinversion):
+@ 00000000004024d0 [unknown]
+@ 0000000000406f4e std::mutex::lock()
+@ 0000000000407250 std::lock_guard<std::mutex>::lock_guard(std::mutex&)
+@ 0000000000402d6a main::{lambda()#1}::operator()() const
+@ 0000000000406dea void std::_Bind_simple<main::{lambda()#1} ()>::_M_invoke<>(std::_Index_tuple<>)
+@ 0000000000406b17 std::_Bind_simple<main::{lambda()#1} ()>::operator()()
+@ 00000000004068f4 std::thread::_Impl<std::_Bind_simple<main::{lambda()#1} ()> >::_M_run()
+@ 00007f9f9791f4e1 execute_native_thread_routine
+@ 00007f9f9809e7f1 start_thread
+@ 00007f9f9736046d __clone
+
+Mutex M1 (0x00007ffccd7ab0b0) previously acquired by the same Thread 3120370 (lockinversion) here:
+@ 00000000004024d0 [unknown]
+@ 0000000000406f4e std::mutex::lock()
+@ 0000000000407250 std::lock_guard<std::mutex>::lock_guard(std::mutex&)
+@ 0000000000402d53 main::{lambda()#1}::operator()() const
+@ 0000000000406dea void std::_Bind_simple<main::{lambda()#1} ()>::_M_invoke<>(std::_Index_tuple<>)
+@ 0000000000406b17 std::_Bind_simple<main::{lambda()#1} ()>::operator()()
+@ 00000000004068f4 std::thread::_Impl<std::_Bind_simple<main::{lambda()#1} ()> >::_M_run()
+@ 00007f9f9791f4e1 execute_native_thread_routine
+@ 00007f9f9809e7f1 start_thread
+@ 00007f9f9736046d __clone
+
+Mutex M3 (0x00007ffccd7ab110) acquired here while holding Mutex M2 (0x00007ffccd7ab0e0) in Thread 3120371 (lockinversion):
+@ 00000000004024d0 [unknown]
+@ 0000000000406f4e std::mutex::lock()
+@ 0000000000407250 std::lock_guard<std::mutex>::lock_guard(std::mutex&)
+@ 0000000000402de0 main::{lambda()#2}::operator()() const
+@ 0000000000406d88 void std::_Bind_simple<main::{lambda()#2} ()>::_M_invoke<>(std::_Index_tuple<>)
+@ 0000000000406af3 std::_Bind_simple<main::{lambda()#2} ()>::operator()()
+@ 00000000004068d6 std::thread::_Impl<std::_Bind_simple<main::{lambda()#2} ()> >::_M_run()
+@ 00007f9f9791f4e1 execute_native_thread_routine
+@ 00007f9f9809e7f1 start_thread
+@ 00007f9f9736046d __clone
+
+Mutex M2 (0x00007ffccd7ab0e0) previously acquired by the same Thread 3120371 (lockinversion) here:
+@ 00000000004024d0 [unknown]
+@ 0000000000406f4e std::mutex::lock()
+@ 0000000000407250 std::lock_guard<std::mutex>::lock_guard(std::mutex&)
+@ 0000000000402dc9 main::{lambda()#2}::operator()() const
+@ 0000000000406d88 void std::_Bind_simple<main::{lambda()#2} ()>::_M_invoke<>(std::_Index_tuple<>)
+@ 0000000000406af3 std::_Bind_simple<main::{lambda()#2} ()>::operator()()
+@ 00000000004068d6 std::thread::_Impl<std::_Bind_simple<main::{lambda()#2} ()> >::_M_run()
+@ 00007f9f9791f4e1 execute_native_thread_routine
+@ 00007f9f9809e7f1 start_thread
+@ 00007f9f9736046d __clone
+
+Mutex M0 (0x00007ffccd7ab140) acquired here while holding Mutex M3 (0x00007ffccd7ab110) in Thread 3120372 (lockinversion):
+@ 00000000004024d0 [unknown]
+@ 0000000000406f4e std::mutex::lock()
+@ 0000000000407250 std::lock_guard<std::mutex>::lock_guard(std::mutex&)
+@ 0000000000402e56 main::{lambda()#3}::operator()() const
+@ 0000000000406d26 void std::_Bind_simple<main::{lambda()#3} ()>::_M_invoke<>(std::_Index_tuple<>)
+@ 0000000000406acf std::_Bind_simple<main::{lambda()#3} ()>::operator()()
+@ 00000000004068b8 std::thread::_Impl<std::_Bind_simple<main::{lambda()#3} ()> >::_M_run()
+@ 00007f9f9791f4e1 execute_native_thread_routine
+@ 00007f9f9809e7f1 start_thread
+@ 00007f9f9736046d __clone
+
+Mutex M3 (0x00007ffccd7ab110) previously acquired by the same Thread 3120372 (lockinversion) here:
+@ 00000000004024d0 [unknown]
+@ 0000000000406f4e std::mutex::lock()
+@ 0000000000407250 std::lock_guard<std::mutex>::lock_guard(std::mutex&)
+@ 0000000000402e3f main::{lambda()#3}::operator()() const
+@ 0000000000406d26 void std::_Bind_simple<main::{lambda()#3} ()>::_M_invoke<>(std::_Index_tuple<>)
+@ 0000000000406acf std::_Bind_simple<main::{lambda()#3} ()>::operator()()
+@ 00000000004068b8 std::thread::_Impl<std::_Bind_simple<main::{lambda()#3} ()> >::_M_run()
+@ 00007f9f9791f4e1 execute_native_thread_routine
+@ 00007f9f9809e7f1 start_thread
+@ 00007f9f9736046d __clone
+
+Thread 3120370 created by Thread 3113530 (b'lockinversion') here:
+@ 00007f9f97360431 __clone
+@ 00007f9f9809eef5 pthread_create
+@ 00007f9f97921440 std::thread::_M_start_thread(std::shared_ptr<std::thread::_Impl_base>)
+@ 00000000004033e0 std::thread::thread<main::{lambda()#1}>(main::{lambda()#1}&&)
+@ 0000000000403167 main
+@ 00007f9f972730f6 __libc_start_main
+@ 0000000000402ad8 [unknown]
+
+Thread 3120371 created by Thread 3113530 (b'lockinversion') here:
+@ 00007f9f97360431 __clone
+@ 00007f9f9809eef5 pthread_create
+@ 00007f9f97921440 std::thread::_M_start_thread(std::shared_ptr<std::thread::_Impl_base>)
+@ 00000000004034e6 std::thread::thread<main::{lambda()#2}>(main::{lambda()#2}&&)
+@ 000000000040319f main
+@ 00007f9f972730f6 __libc_start_main
+@ 0000000000402ad8 [unknown]
+
+Thread 3120372 created by Thread 3113530 (b'lockinversion') here:
+@ 00007f9f97360431 __clone
+@ 00007f9f9809eef5 pthread_create
+@ 00007f9f97921440 std::thread::_M_start_thread(std::shared_ptr<std::thread::_Impl_base>)
+@ 00000000004035ec std::thread::thread<main::{lambda()#3}>(main::{lambda()#3}&&)
+@ 00000000004031da main
+@ 00007f9f972730f6 __libc_start_main
+@ 0000000000402ad8 [unknown]
+
+Thread 3120373 created by Thread 3113530 (b'lockinversion') here:
+@ 00007f9f97360431 __clone
+@ 00007f9f9809eef5 pthread_create
+@ 00007f9f97921440 std::thread::_M_start_thread(std::shared_ptr<std::thread::_Impl_base>)
+@ 00000000004036f2 std::thread::thread<main::{lambda()#4}>(main::{lambda()#4}&&)
+@ 0000000000403215 main
+@ 00007f9f972730f6 __libc_start_main
+@ 0000000000402ad8 [unknown]
+
+Nodes: 6, Edges: 5, Looking for cycle took 0.009499 seconds
+
+This is output from a process that has a potential deadlock involving 4 mutexes
+and 4 threads:
+
+- Thread 3120373 acquired M1 while holding M0 (edge M0 -> M1)
+- Thread 3120370 acquired M2 while holding M1 (edge M1 -> M2)
+- Thread 3120371 acquired M3 while holding M2 (edge M2 -> M3)
+- Thread 3120372 acquired M0 while holding M3 (edge M3 -> M0)
+
+This is the C++ program that generated the output above:
+
+```c++
+#include <sys/types.h>
+#include <unistd.h>
+#include <chrono>
+#include <iostream>
+#include <mutex>
+#include <thread>
+
+int main(void) {
+  std::mutex m1;
+  std::mutex m2;
+  std::mutex m3;
+  std::mutex m4;
+
+  std::cout << "&m1: " << (void*)&m1 << std::endl;
+  std::cout << "&m2: " << (void*)&m2 << std::endl;
+  std::cout << "&m3: " << (void*)&m3 << std::endl;
+  std::cout << "&m4: " << (void*)&m4 << std::endl;
+
+  std::cout << "pid: " << getpid() << std::endl;
+  std::cout << "sleeping for a bit to allow trace to attach..." << std::endl;
+  std::this_thread::sleep_for(std::chrono::seconds(10));
+  std::cout << "starting program..." << std::endl;
+
+  auto t1 = std::thread([&m1, &m2] {
+    std::lock_guard<std::mutex> g1(m1);
+    std::lock_guard<std::mutex> g2(m2);
+  });
+  t1.join();
+
+  auto t2 = std::thread([&m2, &m3] {
+    std::lock_guard<std::mutex> g2(m2);
+    std::lock_guard<std::mutex> g3(m3);
+  });
+  t2.join();
+
+  auto t3 = std::thread([&m3, &m4] {
+    std::lock_guard<std::mutex> g3(m3);
+    std::lock_guard<std::mutex> g4(m4);
+  });
+  t3.join();
+
+  auto t4 = std::thread([&m1, &m4] {
+    std::lock_guard<std::mutex> g4(m4);
+    std::lock_guard<std::mutex> g1(m1);
+  });
+  t4.join();
+
+  std::cout << "sleeping to allow trace to collect data..." << std::endl;
+  std::this_thread::sleep_for(std::chrono::seconds(5));
+  std::cout << "done!" << std::endl;
+}
+```
+
+Note that an actual deadlock did not occur, although this mutex lock ordering
+creates the possibility of a deadlock, and this is a hint to the programmer to
+reconsider the lock ordering.
+
+
+# ./deadlock_detector.py /path/to/program $(pidof program) --dump-graph graph.json
+
+Tracing... Hit Ctrl-C to end.
+Nodes: 0, Edges: 0, Looking for cycle took 0.000062 seconds
+Nodes: 0, Edges: 0, Looking for cycle took 0.000066 seconds
+Nodes: 0, Edges: 0, Looking for cycle took 0.000065 seconds
+Nodes: 0, Edges: 0, Looking for cycle took 0.000053 seconds
+Nodes: 102, Edges: 4936, Looking for cycle took 0.155751 seconds
+Nodes: 102, Edges: 4951, Looking for cycle took 0.141393 seconds
+Nodes: 102, Edges: 4951, Looking for cycle took 0.119585 seconds
+Nodes: 102, Edges: 4951, Looking for cycle took 0.118088 seconds
+^C
+
+If the program does not find a deadlock, it will keep running until you hit
+Ctrl-C. It will also dump statistics about the number of nodes and edges in
+the mutex wait graph. If you want to serialize the graph to analyze it later,
+you can pass the `--dump-graph FILE` flag, and the program will serialize
+the graph in json format.
+
+
+# ./deadlock_detector.py /path/to/program $(pidof program) --lock-symbols custom_mutex1_lock,custom_mutex2_lock --unlock_symbols custom_mutex1_unlock,custom_mutex2_unlock
+
+Tracing... Hit Ctrl-C to end.
+Nodes: 0, Edges: 0, Looking for cycle took 0.000062 seconds
+Nodes: 0, Edges: 0, Looking for cycle took 0.000066 seconds
+Nodes: 0, Edges: 0, Looking for cycle took 0.000065 seconds
+Nodes: 0, Edges: 0, Looking for cycle took 0.000053 seconds
+Nodes: 102, Edges: 4936, Looking for cycle took 0.155751 seconds
+Nodes: 102, Edges: 4951, Looking for cycle took 0.141393 seconds
+Nodes: 102, Edges: 4951, Looking for cycle took 0.119585 seconds
+Nodes: 102, Edges: 4951, Looking for cycle took 0.118088 seconds
+^C
+
+If your program is using custom mutexes and not pthread mutexes, you can use
+the `--lock-symbols` and `--unlock-symbols` flags to specify different mutex
+symbols to trace. The flags take a comma-separated string of symbol names.
+Note that if the symbols are inlined in the binary, then this program can result
+in false positives.
+
+
+USAGE message:
+
+# ./deadlock_detector.py -h
+
+usage: deadlock_detector.py [-h] [--dump-graph DUMP_GRAPH]
+                            [--lock-symbols LOCK_SYMBOLS]
+                            [--unlock-symbols UNLOCK_SYMBOLS]
+                            binary pid
+
+Detect potential deadlocks (lock inversions) in a running binary. Must be run
+as root.
+
+positional arguments:
+  binary                Absolute path to binary
+  pid                   Pid to trace
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --dump-graph DUMP_GRAPH
+                        If set, this will dump the mutex graph to the
+                        specified file.
+  --lock-symbols LOCK_SYMBOLS
+                        Comma-separated list of lock symbols to trace. Default
+                        is pthread_mutex_lock
+  --unlock-symbols UNLOCK_SYMBOLS
+                        Comma-separated list of unlock symbols to trace.
+                        Default is pthread_mutex_unlock
