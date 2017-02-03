@@ -367,7 +367,7 @@ def print_cycle(binary, graph, edges, thread_info, print_stack_trace_fn):
 
 def symbolize_with_objdump(binary, addr):
     '''
-    Searches the biniary for the address using objdump. Returns the symbol if
+    Searches the binary for the address using objdump. Returns the symbol if
     it is found, otherwise returns empty string.
     '''
     try:
