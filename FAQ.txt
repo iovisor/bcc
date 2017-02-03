@@ -1,10 +1,8 @@
 Q: while running 'make test' I'm seeing:
-   'ImportError: No module named pyroute2' or 'ImportError: No module named networkx'
-A: Install pyroute2 and networkx:
+   'ImportError: No module named pyroute2'
+A: Install pyroute2:
    git clone https://github.com/svinota/pyroute2.git
    cd pyroute2; sudo make install
-   git clone https://github.com/networkx/networkx.git
-   cd networkx; sudo make install
 
 Q: hello_world.py fails with:
    OSError: libbcc.so: cannot open shared object file: No such file or directory
