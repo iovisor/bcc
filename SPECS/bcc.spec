@@ -1,4 +1,10 @@
 %bcond_with local_clang_static
+#lua jit not available for some architectures
+%ifarch ppc64 aarch64 ppc64le
+%{!?with_lua: %global with_lua 0}
+%else
+%{!?with_lua: %global with_lua 1}
+%endif
 %define debug_package %{nil}
 
 Name:           bcc
@@ -11,10 +17,12 @@ License:        ASL 2.0
 URL:            https://github.com/iovisor/bcc
 Source0:        bcc.tar.gz
 
-ExclusiveArch: x86_64
+ExclusiveArch: x86_64 ppc64 aarch64 ppc64le
 BuildRequires: bison cmake >= 2.8.7 flex make
 BuildRequires: gcc gcc-c++ python2-devel elfutils-libelf-devel-static
+%if %{with_lua}
 BuildRequires: luajit luajit-devel
+%endif
 %if %{without local_clang_static}
 BuildRequires: llvm-devel llvm-static
 BuildRequires: clang-devel
@@ -25,6 +33,11 @@ BuildRequires: pkgconfig ncurses-devel
 Python bindings for BPF Compiler Collection (BCC). Control a BPF program from
 userspace.
 
+%if %{with_lua}
+%global lua_include `pkg-config --variable=includedir luajit`
+%global lua_libs `pkg-config --variable=libdir luajit`/lib`pkg-config --variable=libname luajit`.so
+%global lua_config -DLUAJIT_INCLUDE_DIR=%{lua_include} -DLUAJIT_LIBRARIES=%{lua_libs}
+%endif
 
 %prep
 %setup -q -n bcc
@@ -35,8 +48,7 @@ mkdir build
 pushd build
 cmake .. -DREVISION_LAST=%{version} -DREVISION=%{version} \
       -DCMAKE_INSTALL_PREFIX=/usr \
-      -DLUAJIT_INCLUDE_DIR=`pkg-config --variable=includedir luajit` \
-      -DLUAJIT_LIBRARIES=`pkg-config --variable=libdir luajit`/lib`pkg-config --variable=libname luajit`.so
+      %{?lua_config}
 make %{?_smp_mflags}
 popd
 
@@ -56,16 +68,20 @@ Requires: libbcc = %{version}-%{release}
 %description -n python-bcc
 Python bindings for BPF Compiler Collection (BCC)
 
+%if %{with_lua}
 %package -n bcc-lua
 Summary: Standalone tool to run BCC tracers written in Lua
 Requires: libbcc = %{version}-%{release}
 %description -n bcc-lua
 Standalone tool to run BCC tracers written in Lua
+%endif
 
 %package -n libbcc-examples
 Summary: Examples for BPF Compiler Collection (BCC)
 Requires: python-bcc = %{version}-%{release}
+%if %{with_lua}
 Requires: bcc-lua = %{version}-%{release}
+%endif
 %description -n libbcc-examples
 Examples for BPF Compiler Collection (BCC)
 
@@ -82,8 +98,10 @@ Command line tools for BPF Compiler Collection (BCC)
 %files -n python-bcc
 %{python_sitelib}/bcc*
 
+%if %{with_lua}
 %files -n bcc-lua
 /usr/bin/bcc-lua
+%endif
 
 %files -n libbcc-examples
 /usr/share/bcc/examples/*
