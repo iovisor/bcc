@@ -387,11 +387,36 @@ def strlist(s):
 
 
 def main():
+    examples = '''Examples:
+    deadlock_detector 181        # Analyze PID 181
+
+    deadlock_detector 181 --binary /lib/x86_64-linux-gnu/libpthread.so.0
+                                 # Analyze PID 181 and locks from this binary.
+                                 # If tracing a process that is running from
+                                 # a dynamically-linked binary, this argument
+                                 # is required and should be the path to the
+                                 # pthread library.
+
+    deadlock_detector 181 --verbose
+                                 # Analyze PID 181 and print statistics about
+                                 # the mutex wait graph.
+
+    deadlock_detector 181 --lock-symbols my_mutex_lock1,my_mutex_lock2 \\
+        --unlock-symbols my_mutex_unlock1,my_mutex_unlock2
+                                 # Analyze PID 181 and trace custom mutex
+                                 # symbols instead of pthread mutexes.
+
+    deadlock_detector 181 --dump-graph graph.json
+                                 # Analyze PID 181 and dump the mutex wait
+                                 # graph to graph.json.
+    '''
     parser = argparse.ArgumentParser(
         description=(
             'Detect potential deadlocks (lock inversions) in a running binary.'
-            ' Must be run as root.'
-        )
+            '\nMust be run as root.'
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=examples,
     )
     parser.add_argument('pid', type=int, help='Pid to trace')
     # Binaries with `:` in the path will fail to attach uprobes on kernels
@@ -401,7 +426,11 @@ def main():
         '--binary',
         type=str,
         default='',
-        help='If set, use this as the path to the binary for the process.',
+        help='If set, trace the mutexes from the binary at this path. '
+        'For statically-linked binaries, this argument is not required. '
+        'For dynamically-linked binaries, this argument is required and '
+        'should be the path of the pthread library the binary is using. '
+        'Example: /lib/x86_64-linux-gnu/libpthread.so.0',
     )
     parser.add_argument(
         '--dump-graph',
@@ -419,14 +448,14 @@ def main():
         type=strlist,
         default=['pthread_mutex_lock'],
         help='Comma-separated list of lock symbols to trace. Default is '
-        'pthread_mutex_lock',
+        'pthread_mutex_lock. These symbols cannot be inlined in the binary.',
     )
     parser.add_argument(
         '--unlock-symbols',
         type=strlist,
         default=['pthread_mutex_unlock'],
         help='Comma-separated list of unlock symbols to trace. Default is '
-        'pthread_mutex_unlock',
+        'pthread_mutex_unlock. These symbols cannot be inlined in the binary.',
     )
     args = parser.parse_args()
     if not args.binary:
