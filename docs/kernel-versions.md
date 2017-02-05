@@ -53,6 +53,7 @@ Perf events | 4.3 | [ea317b267e9d](https://git.kernel.org/cgit/linux/kernel/git/
 Per-CPU hash | 4.6 | [824bd0ce6c7c](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=824bd0ce6c7c43a9e1e210abf124958e54d88342)
 Per-CPU array | 4.6 | [a10423b87a7e](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=a10423b87a7eae75da79ce80a8d9475047a674ee)
 Stack trace | 4.6 | [d5a3b1f69186](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=d5a3b1f691865be576c2bffa708549b8cdccda19)
+Pre-alloc maps memory | 4.6 | [6c90598174322](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=6c90598174322b8888029e40dd84a4eb01f56afe)
 cgroup array | 4.8 | [4ed8ec521ed5](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=4ed8ec521ed57c4e207ad464ca0388776de74d4b)
 LRU hash | [4.10](https://git.kernel.org/cgit/linux/kernel/git/davem/net-next.git/commit/?id=29ba732acbeece1e34c68483d1ec1f3720fa1bb3) | [](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=29ba732acbeece1e34c68483d1ec1f3720fa1bb3)
 LRU per-CPU hash | [4.10](https://git.kernel.org/cgit/linux/kernel/git/davem/net-next.git/commit/?id=8f8449384ec364ba2a654f11f94e754e4ff719e0) | [](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=8f8449384ec364ba2a654f11f94e754e4ff719e0)
