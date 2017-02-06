@@ -24,7 +24,7 @@ Feature | Kernel version | Commit
 Kernel helpers | 3.15 | [bd4cf0ed331a](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=bd4cf0ed331a275e9bf5a49e6d0fd55dffc551b8)
 `bpf()` syscall | 3.18 | [99c55f7d47c0](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=99c55f7d47c0dc6fc64729f37bf435abf43f4c60)
 Tables (_a.k.a._ Maps; details below) | 3.18 | [99c55f7d47c0](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=99c55f7d47c0dc6fc64729f37bf435abf43f4c60)
-BPF attached to sockets | 3.19 | [89aa075832b0](89aa075832b0da4402acebd698d0411dcc82d03e)
+BPF attached to sockets | 3.19 | [89aa075832b0](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=89aa075832b0da4402acebd698d0411dcc82d03e)
 BPF attached to `kprobes` | 4.1 | [2541517c32be](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=2541517c32be2531e0da59dfd7efc1ce844644f5)
 `cls_bpf` / `act_bpf` for `tc` | 4.1 | [e2e9b6541dd4](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=e2e9b6541dd4b31848079da80fe2253daaafb549)
 Tail calls | 4.2 | [04fd61ab36ec](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=04fd61ab36ec065e194ab5e74ae34a5240d992bb)
