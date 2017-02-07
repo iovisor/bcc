@@ -15,6 +15,7 @@ ARM64 | 3.18 | [e54bcde3d69d](https://git.kernel.org/cgit/linux/kernel/git/torva
 s390 | 4.1 | [054623105728](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=054623105728b06852f077299e2bf1bf3d5f2b0b)
 Constant blinding for JIT machines | 4.7 | [4f3446bb809f](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=4f3446bb809f20ad56cadf712e6006815ae7a8f9)
 PowerPC64 | 4.8 | [156d0e290e96](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=156d0e290e969caba25f1851c52417c14d141b24)
+Constant blinding - PowerPC64 | 4.9 | [b7b7013cac55](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=b7b7013cac55d794940bd9cb7b7c55c9dececac4)
 
 ## Main features
 
