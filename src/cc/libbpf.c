@@ -373,14 +373,16 @@ void * bpf_attach_kprobe(int progfd, enum bpf_probe_attach_type attach_type, con
   close(kfd);
 
   if (access("/sys/kernel/debug/tracing/instances", F_OK) != -1) {
-    snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/instances/%s", new_name);
-    if (mkdir(buf, 0755) == -1) 
-      goto retry;
-    n = snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/instances/%s/events/%ss/%s", 
-             new_name, event_type, new_name);
+    snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/instances/bcc_%d", getpid());
+    if (access(buf, F_OK) == -1) {
+      if (mkdir(buf, 0755) == -1) 
+        goto retry;
+    }
+    n = snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/instances/bcc_%d/events/%ss/%s", 
+             getpid(), event_type, new_name);
     if (n < sizeof(buf) && bpf_attach_tracing_event(progfd, buf, reader, pid, cpu, group_fd) == 0)
 	  goto out;
-    snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/instances/%s", new_name);
+    snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/instances/bcc_%d", getpid());
     rmdir(buf);
   }
 retry:
@@ -471,7 +473,7 @@ int bpf_detach_kprobe(const char *ev_name)
 {
   char buf[256];
   int ret = bpf_detach_probe(ev_name, "kprobe");
-  snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/instances/%s_bcc_%d", ev_name, getpid());
+  snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/instances/bcc_%d", getpid());
   if (access(buf, F_OK) != -1) {
     rmdir(buf);
   }
