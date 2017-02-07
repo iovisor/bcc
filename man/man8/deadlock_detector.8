@@ -1,0 +1,142 @@
+.TH deadlock_detector 8  "2017-02-01" "USER COMMANDS"
+.SH NAME
+deadlock_detector \- Find potential deadlocks (lock order inversions)
+in a running program.
+.SH SYNOPSIS
+.B deadlock_detector [\-h] [\--binary BINARY] [\--dump-graph DUMP_GRAPH]
+.B                  [\--verbose] [\--lock-symbols LOCK_SYMBOLS]
+.B                  [\--unlock-symbols UNLOCK_SYMBOLS]
+.B                  pid
+.SH DESCRIPTION
+deadlock_detector finds potential deadlocks in a running process. The program
+attaches uprobes on `pthread_mutex_lock` and `pthread_mutex_unlock` by default
+to build a mutex wait directed graph, and then looks for a cycle in this graph.
+This graph has the following properties:
+
+- Nodes in the graph represent mutexes.
+
+- Edge (A, B) exists if there exists some thread T where lock(A) was called
+and lock(B) was called before unlock(A) was called.
+
+If there is a cycle in this graph, this indicates that there is a lock order
+inversion (potential deadlock). If the program finds a lock order inversion, the
+program will dump the cycle of mutexes, dump the stack traces where each mutex
+was acquired, and then exit.
+
+This program can only find potential deadlocks that occur while the program is
+tracing the process. It cannot find deadlocks that may have occurred before the
+program was attached to the process.
+
+This tool does not work for shared mutexes or recursive mutexes.
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc
+.SH OPTIONS
+.TP
+\-h, --help
+show this help message and exit
+.TP
+\--binary BINARY
+If set, trace the mutexes from the binary at this path. For
+statically-linked binaries, this argument is not required.
+For dynamically-linked binaries, this argument is required and should be the
+path of the pthread library the binary is using.
+Example: /lib/x86_64-linux-gnu/libpthread.so.0
+.TP
+\--dump-graph DUMP_GRAPH
+If set, this will dump the mutex graph to the specified file.
+.TP
+\--verbose
+Print statistics about the mutex wait graph.
+.TP
+\--lock-symbols LOCK_SYMBOLS
+Comma-separated list of lock symbols to trace. Default is pthread_mutex_lock.
+These symbols cannot be inlined in the binary.
+.TP
+\--unlock-symbols UNLOCK_SYMBOLS
+Comma-separated list of unlock symbols to trace. Default is
+pthread_mutex_unlock. These symbols cannot be inlined in the binary.
+.TP
+pid
+Pid to trace
+.SH EXAMPLES
+.TP
+Find potential deadlocks in PID 181. The --binary argument is not needed for \
+statically-linked binaries.
+#
+.B deadlock_detector 181
+.TP
+Find potential deadlocks in PID 181. If the process was created from a \
+dynamically-linked executable, the --binary argument is required and must be \
+the path of the pthread library:
+#
+.B deadlock_detector 181 --binary /lib/x86_64-linux-gnu/libpthread.so.0
+.TP
+Find potential deadlocks in PID 181. If the process was created from a \
+statically-linked executable, optionally pass the location of the binary. \
+On older kernels without https://lkml.org/lkml/2017/1/13/585, binaries that \
+contain `:` in the path cannot be attached with uprobes. As a workaround, we \
+can create a symlink to the binary, and provide the symlink name instead with \
+the `--binary` option:
+#
+.B deadlock_detector 181 --binary /usr/local/bin/lockinversion
+.TP
+Find potential deadlocks in PID 181 and dump the mutex wait graph to a file:
+#
+.B deadlock_detector 181 --dump-graph graph.json
+.TP
+Find potential deadlocks in PID 181 and print mutex wait graph statistics:
+#
+.B deadlock_detector 181 --verbose
+.TP
+Find potential deadlocks in PID 181 with custom mutexes:
+#
+.B deadlock_detector 181
+.B      --lock-symbols custom_mutex1_lock,custom_mutex2_lock
+.B      --unlock_symbols custom_mutex1_unlock,custom_mutex2_unlock
+.SH OUTPUT
+This program does not output any fields. Rather, it will keep running until
+it finds a potential deadlock, or the user hits Ctrl-C. If the program finds
+a potential deadlock, it will output the stack traces and lock order inversion
+in the following format and exit:
+.TP
+Potential Deadlock Detected!
+.TP
+Cycle in lock order graph: Mutex M0 => Mutex M1 => Mutex M0
+.TP
+Mutex M1 acquired here while holding Mutex M0 in Thread T:
+.B [stack trace]
+.TP
+Mutex M0 previously acquired by the same Thread T here:
+.B [stack trace]
+.TP
+Mutex M0 acquired here while holding Mutex M1 in Thread S:
+.B [stack trace]
+.TP
+Mutex M1 previously acquired by the same Thread S here:
+.B [stack trace]
+.TP
+Thread T created by Thread R here:
+.B [stack trace]
+.TP
+Thread S created by Thread Q here:
+.B [stack trace]
+.SH OVERHEAD
+This traces all mutex lock and unlock events and all thread creation events
+on the traced process. The overhead of this can be high if the process has many
+threads and mutexes. You should only run this on a process where the slowdown
+is acceptable.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Kenny Yu
