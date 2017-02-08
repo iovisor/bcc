@@ -57,7 +57,7 @@ int trace_pthread(struct pt_regs *ctx) {
     return 0;
 }
 """
-usdt.enable_probe("pthread_start", "trace_pthread")
+usdt.enable_probe_or_bail("pthread_start", "trace_pthread")
 
 if args.language == "java":
     template = """
@@ -78,8 +78,8 @@ int %s(struct pt_regs *ctx) {
     """
     program += template % ("trace_start", "start")
     program += template % ("trace_stop", "stop")
-    usdt.enable_probe("thread__start", "trace_start")
-    usdt.enable_probe("thread__stop", "trace_stop")
+    usdt.enable_probe_or_bail("thread__start", "trace_start")
+    usdt.enable_probe_or_bail("thread__stop", "trace_stop")
 
 if args.verbose:
     print(usdt.get_text())

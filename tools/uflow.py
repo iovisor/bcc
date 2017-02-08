@@ -109,7 +109,7 @@ def enable_probe(probe_name, func_name, read_class, read_method, is_return):
                              .replace("FILTER_METHOD", filter_method)   \
                              .replace("DEPTH", depth)                   \
                              .replace("UPDATE", update)
-    usdt.enable_probe(probe_name, func_name)
+    usdt.enable_probe_or_bail(probe_name, func_name)
 
 usdt = USDT(pid=args.pid)
 

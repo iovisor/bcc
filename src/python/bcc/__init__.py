@@ -1065,4 +1065,4 @@ class BPF(object):
         self.cleanup()
 
 
-from .usdt import USDT
+from .usdt import USDT, USDTException
