@@ -4,8 +4,8 @@ Demonstrations of uflow.
 uflow traces method entry and exit events and prints a visual flow graph that
 shows how methods are entered and exited, similar to a tracing debugger with
 breakpoints. This can be useful for understanding program flow in high-level
-languages such as Java, Python, and Ruby, which provide USDT probes for method
-invocations.
+languages such as Java, Python, Ruby, and PHP, which provide USDT probes for
+method invocations.
 
 
 For example, trace all Ruby method calls in a specific process:
@@ -88,12 +88,13 @@ thread running on the same CPU.
 USAGE message:
 
 # ./uflow -h
-usage: uflow.py [-h] [-M METHOD] [-C CLAZZ] [-v] {java,python,ruby} pid
+usage: uflow.py [-h] [-M METHOD] [-C CLAZZ] [-v] {java,python,ruby,php} pid
 
 Trace method execution flow in high-level languages.
 
 positional arguments:
-  {java,python,ruby}    language to trace
+  {java,python,ruby,php}
+			language to trace
   pid                   process id to attach to
 
 optional arguments:
