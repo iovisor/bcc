@@ -34,6 +34,7 @@ BPF_MAP_TYPE_STACK_TRACE = 7
 BPF_MAP_TYPE_CGROUP_ARRAY = 8
 BPF_MAP_TYPE_LRU_HASH = 9
 BPF_MAP_TYPE_LRU_PERCPU_HASH = 10
+BPF_MAP_TYPE_LPM_TRIE = 11
 
 stars_max = 40
 log2_index_max = 65
@@ -124,6 +125,8 @@ def Table(bpf, map_id, map_fd, keytype, leaftype, **kwargs):
         t = PerCpuHash(bpf, map_id, map_fd, keytype, leaftype, **kwargs)
     elif ttype == BPF_MAP_TYPE_PERCPU_ARRAY:
         t = PerCpuArray(bpf, map_id, map_fd, keytype, leaftype, **kwargs)
+    elif ttype == BPF_MAP_TYPE_LPM_TRIE:
+        t = LpmTrie(bpf, map_id, map_fd, keytype, leaftype)
     elif ttype == BPF_MAP_TYPE_STACK_TRACE:
         t = StackTrace(bpf, map_id, map_fd, keytype, leaftype)
     elif ttype == BPF_MAP_TYPE_LRU_HASH:
@@ -664,6 +667,18 @@ class PerCpuArray(ArrayBase):
     def average(self, key):
         result = self.sum(key)
         return result.value / self.total_cpu
+
+class LpmTrie(TableBase):
+    def __init__(self, *args, **kwargs):
+        super(LpmTrie, self).__init__(*args, **kwargs)
+
+    def __len__(self):
+        raise NotImplementedError
+
+    def __delitem__(self, key):
+        # Not implemented for lpm trie as of kernel commit
+        # b95a5c4db09bc7c253636cb84dc9b12c577fd5a0
+        raise NotImplementedError
 
 class StackTrace(TableBase):
     MAX_DEPTH = 127

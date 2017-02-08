@@ -140,6 +140,7 @@ else
 		S.c.BPF_MAP.CGROUP_ARRAY = 8
 		S.c.BPF_MAP.LRU_HASH     = 9
 		S.c.BPF_MAP.LRU_PERCPU_HASH = 10
+		S.c.BPF_MAP.LPM_TRIE     = 11
 	end
 	if not S.c.BPF_PROG.TRACEPOINT then
 		S.c.BPF_PROG.TRACEPOINT  = 5
