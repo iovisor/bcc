@@ -28,6 +28,7 @@ CONFIG_BPF_JIT=y
 CONFIG_HAVE_BPF_JIT=y
 # [optional, for kprobes]
 CONFIG_BPF_EVENTS=y
+CONFIG_FUNCTION_PROFILER=y
 ```
 
 Kernel compile flags can usually be checked by looking at `/proc/config.gz` or
