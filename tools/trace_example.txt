@@ -135,6 +135,16 @@ TIME     PID    COMM         FUNC             -
 In the previous invocation, arg1 and arg2 are the class name and method name
 for the Ruby method being invoked.
 
+You can also trace exported functions from shared libraries, or an imported
+function on the actual executable:
+
+# sudo ./trace.py 'r:/usr/lib64/libtinfo.so:curses_version "Version=%s", retval'
+# tput -V
+
+PID    TID    COMM         FUNC             -
+21720  21720  tput         curses_version   Version=ncurses 6.0.20160709
+^C
+
 
 Occasionally, it can be useful to filter specific strings. For example, you
 might be interested in open() calls that open a specific file:
