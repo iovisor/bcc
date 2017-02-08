@@ -363,6 +363,7 @@ optional arguments:
                         below)
   -I header, --include header
                         additional header files to include in the BPF program
+                        as either full path, or relative to '/usr/include'
 
 Probe specifier syntax:
         {p,r,t,u}:{[library],category}:function(signature)[:type[,type...]:expr[,expr...][:filter]][#label]

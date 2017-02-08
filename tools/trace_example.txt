@@ -2,8 +2,8 @@ Demonstrations of trace.
 
 
 trace probes functions you specify and displays trace messages if a particular
-condition is met. You can control the message format to display function 
-arguments and return values. 
+condition is met. You can control the message format to display function
+arguments and return values.
 
 For example, suppose you want to trace all commands being exec'd across the
 system:
@@ -174,8 +174,12 @@ PID    TID    COMM         FUNC             -
 777    785    automount    SyS_nanosleep    sleep for 500000000 ns
 ^C
 
+Remember to use the -I argument include the appropriate header file. We didn't
+need to do that here because `struct timespec` is used internally by the tool,
+so it always includes this header file.
 
-As a final example, let's trace open syscalls for a specific process. By 
+
+As a final example, let's trace open syscalls for a specific process. By
 default, tracing is system-wide, but the -p switch overrides this:
 
 # trace -p 2740 'do_sys_open "%s", arg2' -T
@@ -225,6 +229,7 @@ optional arguments:
   -U, --user-stack      output user stack trace
   -I header, --include header
                         additional header files to include in the BPF program
+                        as either full path, or relative to '/usr/include'
 
 EXAMPLES:
 
