@@ -619,7 +619,8 @@ argdist -p 2780 -z 120 \\
                   "(see examples below)")
                 parser.add_argument("-I", "--include", action="append",
                   metavar="header",
-                  help="additional header files to include in the BPF program")
+                  help="additional header files to include in the BPF program "
+                       "as either full path, or relative to '/usr/include'")
                 self.args = parser.parse_args()
                 self.usdt_ctx = None
 
@@ -640,7 +641,12 @@ struct __string_t { char s[%d]; };
 #include <uapi/linux/ptrace.h>
                 """ % self.args.string_size
                 for include in (self.args.include or []):
-                        bpf_source += "#include <%s>\n" % include
+                        if include.startswith((".", "/")):
+                                include = os.path.abspath(include)
+                                bpf_source += "#include \"%s\"\n" % include
+                        else:
+                                bpf_source += "#include <%s>\n" % include
+
                 bpf_source += BPF.generate_auto_includes(
                                 map(lambda p: p.raw_spec, self.probes))
                 for probe in self.probes:

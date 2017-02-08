@@ -624,7 +624,8 @@ trace 'p::SyS_nanosleep(struct timespec *ts) "sleep for %lld ns", ts->tv_nsec'
                   help="probe specifier (see examples)")
                 parser.add_argument("-I", "--include", action="append",
                   metavar="header",
-                  help="additional header files to include in the BPF program")
+                  help="additional header files to include in the BPF program "
+                       "as either full path, or relative to '/usr/include'")
                 self.args = parser.parse_args()
                 if self.args.tgid and self.args.pid:
                         parser.error("only one of -p and -t may be specified")
@@ -644,7 +645,11 @@ trace 'p::SyS_nanosleep(struct timespec *ts) "sleep for %lld ns", ts->tv_nsec'
 
 """
                 for include in (self.args.include or []):
-                        self.program += "#include <%s>\n" % include
+                        if include.startswith((".", "/")):
+                                include = os.path.abspath(include)
+                                self.program += "#include \"%s\"\n" % include
+                        else:
+                                self.program += "#include <%s>\n" % include
                 self.program += BPF.generate_auto_includes(
                         map(lambda p: p.raw_probe, self.probes))
                 for probe in self.probes:
