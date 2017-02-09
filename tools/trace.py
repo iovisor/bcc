@@ -483,10 +483,10 @@ BPF_PERF_OUTPUT(%s);
 
         def _format_message(self, bpf, tgid, values):
                 # Replace each %K with kernel sym and %U with user sym in tgid
-                kernel_placeholders = [i for i in xrange(0, len(self.types))
-                                       if self.types[i] == 'K']
-                user_placeholders = [i for i in xrange(0, len(self.types))
-                                     if self.types[i] == 'U']
+                kernel_placeholders = [i for i, t in enumerate(self.types)
+                                       if t == 'K']
+                user_placeholders = [i for i, t in enumerate(self.types)
+                                     if t == 'U']
                 for kp in kernel_placeholders:
                         values[kp] = bpf.ksymaddr(values[kp])
                 for up in user_placeholders:
