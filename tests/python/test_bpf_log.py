@@ -51,7 +51,7 @@ class TestBPFProgLoad(TestCase):
         except Exception:
             self.fp.flush()
             self.fp.seek(0)
-            self.assertEqual(error_msg in self.fp.read(), True)
+            self.assertEqual(error_msg in self.fp.read().decode(), True)
 
 
     def test_log_no_debug(self):
@@ -61,7 +61,7 @@ class TestBPFProgLoad(TestCase):
         except Exception:
             self.fp.flush()
             self.fp.seek(0)
-            self.assertEqual(error_msg in self.fp.read(), True)
+            self.assertEqual(error_msg in self.fp.read().decode(), True)
 
 
 if __name__ == "__main__":
