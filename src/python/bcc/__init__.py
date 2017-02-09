@@ -764,7 +764,7 @@ class BPF(object):
         fn = self.load_func(fn_name, BPF.KPROBE)
         ev_name = "p_%s_0x%x" % (self._probe_repl.sub("_", path), addr)
         res = lib.bpf_attach_uprobe(fn.fd, 0, ev_name.encode("ascii"),
-                path, addr, pid, cpu, group_fd,
+                path.encode("ascii"), addr, pid, cpu, group_fd,
                 self._reader_cb_impl, ct.cast(id(self), ct.py_object))
         res = ct.cast(res, ct.c_void_p)
         if not res:
@@ -814,7 +814,7 @@ class BPF(object):
         fn = self.load_func(fn_name, BPF.KPROBE)
         ev_name = "r_%s_0x%x" % (self._probe_repl.sub("_", path), addr)
         res = lib.bpf_attach_uprobe(fn.fd, 1, ev_name.encode("ascii"),
-                path, addr, pid, cpu, group_fd,
+                path.encode("ascii"), addr, pid, cpu, group_fd,
                 self._reader_cb_impl, ct.cast(id(self), ct.py_object))
         res = ct.cast(res, ct.c_void_p)
         if not res:
@@ -1046,7 +1046,8 @@ class BPF(object):
         for k, v in self.open_tracepoints.items():
             lib.perf_reader_free(v)
             (tp_category, tp_name) = k.split(':')
-            lib.bpf_detach_tracepoint(tp_category, tp_name)
+            lib.bpf_detach_tracepoint(tp_category.encode("ascii"),
+                    tp_name.encode("ascii"))
         self.open_tracepoints.clear()
         for (ev_type, ev_config) in list(self.open_perf_events.keys()):
             self.detach_perf_event(ev_type, ev_config)

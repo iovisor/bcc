@@ -1163,6 +1163,8 @@ StatusTuple CodegenLLVM::visit_func_decl_stmt_node(FuncDeclStmtNode *n) {
   Function *fn = mod_->getFunction(n->id_->name_);
   if (fn) return mkstatus_(n, "Function %s already defined", n->id_->c_str());
   fn = Function::Create(fn_type, GlobalValue::ExternalLinkage, n->id_->name_, mod_);
+  fn->setCallingConv(CallingConv::C);
+  fn->addFnAttr(Attribute::NoUnwind);
   fn->setSection(BPF_FN_PREFIX + n->id_->name_);
 
   BasicBlock *label_entry = BasicBlock::Create(ctx(), "entry", fn);
