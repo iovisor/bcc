@@ -240,7 +240,7 @@ def print_outstanding():
                         combined = []
                         for addr in stack:
                                 combined.append(bpf_program.sym(addr, pid,
-                                        show_module=True, show_address=True))
+                                        show_module=True, show_offset=True))
                         alloc_info[info.stack_id] = Allocation(combined,
                                                                info.size)
                 if args.show_allocs:

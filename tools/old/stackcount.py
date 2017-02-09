@@ -145,7 +145,7 @@ def print_frame(addr):
     print("  ", end="")
     if verbose:
         print("%-16x " % addr, end="")
-    print(b.ksym(addr, show_address=offset))
+    print(b.ksym(addr, show_offset=offset))
 
 # output
 exiting = 0 if args.interval else 1

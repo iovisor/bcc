@@ -11,7 +11,7 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 # Copyright (C) 2016 Sasha Goldshtein.
 
-from bcc import BPF, SymbolCache
+from bcc import BPF
 from time import sleep
 from datetime import datetime
 import argparse
@@ -24,7 +24,7 @@ def decode_stack(bpf, pid, info):
                 return "???"
         for i in range(0, info.num_frames):
                 addr = info.callstack[i]
-                stack += " %s ;" % bpf.sym(addr, pid, show_address=True)
+                stack += " %s ;" % bpf.sym(addr, pid, show_offset=True)
         return stack
 
 def run_command_get_output(command):

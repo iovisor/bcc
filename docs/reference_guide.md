@@ -1107,9 +1107,9 @@ Examples in situ:
 
 ### 3. sym()
 
-Syntax: ```BPF.sym(addr, pid, show_module=False, show_address=True)```
+Syntax: ```BPF.sym(addr, pid, show_module=False, show_offset=False)```
 
-Translate a memory address into a function name for a pid, which is returned. A pid of less than zero will access the kernel symbol cache. The `show_module` and `show_address` parameters control whether the module in which the symbol lies should be displayed, and whether the instruction offset from the beginning of the symbol should be displayed. These extra parameters default to `False`.
+Translate a memory address into a function name for a pid, which is returned. A pid of less than zero will access the kernel symbol cache. The `show_module` and `show_offset` parameters control whether the module in which the symbol lies should be displayed, and whether the instruction offset from the beginning of the symbol should be displayed. These extra parameters default to `False`.
 
 Example:
 
