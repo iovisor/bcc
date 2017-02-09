@@ -11,36 +11,21 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 # Copyright (C) 2016 Sasha Goldshtein.
 
-from bcc import BPF, ProcessSymbols
+from bcc import BPF, SymbolCache
 from time import sleep
 from datetime import datetime
 import argparse
 import subprocess
 import os
 
-class StackDecoder(object):
-        def __init__(self, pid):
-                self.pid = pid
-                if pid != -1:
-                        self.proc_sym = ProcessSymbols(pid)
-
-        def refresh(self):
-                if self.pid != -1:
-                        self.proc_sym.refresh_code_ranges()
-
-        def decode_stack(self, info, is_kernel_trace):
-                stack = ""
-                if info.num_frames <= 0:
-                        return "???"
-                for i in range(0, info.num_frames):
-                        addr = info.callstack[i]
-                        if is_kernel_trace:
-                                stack += " %s [kernel] (%x) ;" % \
-                                        (BPF.ksym(addr), addr)
-                        else:
-                                stack += " %s (%x) ;" % \
-                                        (self.proc_sym.decode_addr(addr), addr)
-                return stack
+def decode_stack(bpf, pid, info):
+        stack = ""
+        if info.num_frames <= 0:
+                return "???"
+        for i in range(0, info.num_frames):
+                addr = info.callstack[i]
+                stack += " %s ;" % bpf.sym(addr, pid, show_address=True)
+        return stack
 
 def run_command_get_output(command):
         p = subprocess.Popen(command.split(),
@@ -255,8 +240,6 @@ else:
         bpf_program.attach_kretprobe(event="__kmalloc", fn_name="alloc_exit")
         bpf_program.attach_kprobe(event="kfree", fn_name="free_enter")
 
-decoder = StackDecoder(pid)
-
 def print_outstanding():
         stacks = {}
         print("[%s] Top %d stacks with outstanding allocations:" %
@@ -265,7 +248,7 @@ def print_outstanding():
         for address, info in sorted(allocs.items(), key=lambda a: a[1].size):
                 if BPF.monotonic_time() - min_age_ns < info.timestamp_ns:
                         continue
-                stack = decoder.decode_stack(info, kernel_trace)
+                stack = decode_stack(bpf_program, pid, info)
                 if stack in stacks:
                         stacks[stack] = (stacks[stack][0] + 1,
                                          stacks[stack][1] + info.size)
@@ -288,7 +271,6 @@ while True:
                         sleep(interval)
                 except KeyboardInterrupt:
                         exit()
-                decoder.refresh()
                 print_outstanding()
                 count_so_far += 1
                 if num_prints is not None and count_so_far >= num_prints:

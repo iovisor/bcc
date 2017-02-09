@@ -11,30 +11,12 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 # Copyright (C) 2016 Sasha Goldshtein.
 
-from bcc import BPF, ProcessSymbols
+from bcc import BPF
 from time import sleep
 from datetime import datetime
 import argparse
 import subprocess
 import os
-
-class KStackDecoder(object):
-        def refresh(self):
-                pass
-
-        def __call__(self, addr):
-                return "%s [kernel] (%x)" % (BPF.ksym(addr), addr)
-
-class UStackDecoder(object):
-        def __init__(self, pid):
-                self.pid = pid
-                self.proc_sym = ProcessSymbols(pid)
-
-        def refresh(self):
-                self.proc_sym.refresh_code_ranges()
-
-        def __call__(self, addr):
-                return "%s (%x)" % (self.proc_sym.decode_addr(addr), addr)
 
 class Allocation(object):
     def __init__(self, stack, size):
@@ -240,8 +222,6 @@ else:
         bpf_program.attach_kretprobe(event="__kmalloc", fn_name="alloc_exit")
         bpf_program.attach_kprobe(event="kfree", fn_name="free_enter")
 
-decoder = KStackDecoder() if kernel_trace else UStackDecoder(pid)
-
 def print_outstanding():
         print("[%s] Top %d stacks with outstanding allocations:" %
               (datetime.now().strftime("%H:%M:%S"), top_stacks))
@@ -256,8 +236,12 @@ def print_outstanding():
                 if info.stack_id in alloc_info:
                         alloc_info[info.stack_id].update(info.size)
                 else:
-                        stack = list(stack_traces.walk(info.stack_id, decoder))
-                        alloc_info[info.stack_id] = Allocation(stack,
+                        stack = list(stack_traces.walk(info.stack_id))
+                        combined = []
+                        for addr in stack:
+                                combined.append(bpf_program.sym(addr, pid,
+                                        show_module=True, show_address=True))
+                        alloc_info[info.stack_id] = Allocation(combined,
                                                                info.size)
                 if args.show_allocs:
                         print("\taddr = %x size = %s" %
@@ -277,7 +261,6 @@ while True:
                         sleep(interval)
                 except KeyboardInterrupt:
                         exit()
-                decoder.refresh()
                 print_outstanding()
                 count_so_far += 1
                 if num_prints is not None and count_so_far >= num_prints:
