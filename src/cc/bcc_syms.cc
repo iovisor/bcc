@@ -140,16 +140,17 @@ bool ProcSyms::resolve_name(const char *module, const char *name,
   return false;
 }
 
+ProcSyms::Module::Module(const char *name, uint64_t start, uint64_t end)
+  : name_(name), start_(start), end_(end) {
+  is_so_ = bcc_elf_is_shared_obj(name) == 1;
+}
+
 int ProcSyms::Module::_add_symbol(const char *symname, uint64_t start,
                                   uint64_t end, int flags, void *p) {
   Module *m = static_cast<Module *>(p);
   auto res = m->symnames_.emplace(symname);
   m->syms_.emplace_back(&*(res.first), start, end, flags);
   return 0;
-}
-
-bool ProcSyms::Module::is_so() const {
-  return strstr(name_.c_str(), ".so") != nullptr;
 }
 
 bool ProcSyms::Module::is_perf_map() const {
