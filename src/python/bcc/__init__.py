@@ -764,7 +764,7 @@ class BPF(object):
         fn = self.load_func(fn_name, BPF.KPROBE)
         ev_name = "p_%s_0x%x" % (self._probe_repl.sub("_", path), addr)
         res = lib.bpf_attach_uprobe(fn.fd, 0, ev_name.encode("ascii"),
-                path, addr, pid, cpu, group_fd,
+                path.encode("ascii"), addr, pid, cpu, group_fd,
                 self._reader_cb_impl, ct.cast(id(self), ct.py_object))
         res = ct.cast(res, ct.c_void_p)
         if not res:
@@ -814,7 +814,7 @@ class BPF(object):
         fn = self.load_func(fn_name, BPF.KPROBE)
         ev_name = "r_%s_0x%x" % (self._probe_repl.sub("_", path), addr)
         res = lib.bpf_attach_uprobe(fn.fd, 1, ev_name.encode("ascii"),
-                path, addr, pid, cpu, group_fd,
+                path.encode("ascii"), addr, pid, cpu, group_fd,
                 self._reader_cb_impl, ct.cast(id(self), ct.py_object))
         res = ct.cast(res, ct.c_void_p)
         if not res:
