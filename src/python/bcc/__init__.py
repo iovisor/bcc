@@ -27,7 +27,6 @@ basestring = (unicode if sys.version_info[0] < 3 else str)
 from .libbcc import lib, _CB_TYPE, bcc_symbol, _SYM_CB_TYPE
 from .table import Table
 from .perf import Perf
-from .usyms import ProcessSymbols
 from .utils import get_online_cpus
 
 _kprobe_limit = 1000
@@ -50,11 +49,24 @@ class SymbolCache(object):
         self.cache = lib.bcc_symcache_new(pid)
 
     def resolve(self, addr):
+        """
+        Return a tuple of the symbol (function), its offset from the beginning
+        of the function, and the module in which it lies. For example:
+            ("start_thread", 0x202, "/usr/lib/.../libpthread-2.24.so")
+        If the symbol cannot be found but we know which module it is in,
+        return the module name and the offset from the beginning of the
+        module. If we don't even know the module, return the absolute
+        address as the offset.
+        """
         sym = bcc_symbol()
         psym = ct.pointer(sym)
         if lib.bcc_symcache_resolve(self.cache, addr, psym) < 0:
-            return "[unknown]", 0
-        return sym.demangle_name.decode(), sym.offset
+            if sym.module and sym.offset:
+                return (None, sym.offset,
+                        ct.cast(sym.module, ct.c_char_p).value.decode())
+            return (None, addr, None)
+        return (sym.demangle_name.decode(), sym.offset,
+                ct.cast(sym.module, ct.c_char_p).value.decode())
 
     def resolve_name(self, name):
         addr = ct.c_ulonglong()
@@ -968,52 +980,49 @@ class BPF(object):
         return BPF._sym_caches[pid]
 
     @staticmethod
-    def sym(addr, pid):
-        """sym(addr, pid)
+    def sym(addr, pid, show_module=False, show_address=False):
+        """sym(addr, pid, show_module=False, show_address=False)
 
         Translate a memory address into a function name for a pid, which is
-        returned.
+        returned. When show_module is True, the module name is also included.
+        When show_address is True, the instruction offset as a hexadecimal
+        number is also included in the string.
+        
         A pid of less than zero will access the kernel symbol cache.
+
+        Example output when both show_module and show_address are True:
+            "start_thread+0x202 [libpthread-2.24.so]"
+        
+        Example output when both show_module and show_address are False:
+            "start_thread"
         """
-        name, _ = BPF._sym_cache(pid).resolve(addr)
-        return name
+        name, offset, module = BPF._sym_cache(pid).resolve(addr)
+        offset = "+0x%x" % offset if show_address and name is not None else ""
+        name = name or "[unknown]"
+        name = name + offset
+        module = " [%s]" % os.path.basename(module) if show_module else ""
+        return name + module
 
     @staticmethod
-    def symaddr(addr, pid):
-        """symaddr(addr, pid)
-
-        Translate a memory address into a function name plus the instruction
-        offset as a hexadecimal number, which is returned as a string.
-        A pid of less than zero will access the kernel symbol cache.
-        """
-        name, offset = BPF._sym_cache(pid).resolve(addr)
-        return "%s+0x%x" % (name, offset)
-
-    @staticmethod
-    def ksym(addr):
+    def ksym(addr, show_module=False, show_address=False):
         """ksym(addr)
 
         Translate a kernel memory address into a kernel function name, which is
-        returned.
-        """
-        return BPF.sym(addr, -1)
+        returned. When show_module is True, the module name ("kernel") is also
+        included. When show_address is true, the instruction offset as a 
+        hexadecimal number is also included in the string.
 
-    @staticmethod
-    def ksymaddr(addr):
-        """ksymaddr(addr)
-
-        Translate a kernel memory address into a kernel function name plus the
-        instruction offset as a hexidecimal number, which is returned as a
-        string.
+        Example output when both show_module and show_address are True:
+            "default_idle+0x0 [kernel]"
         """
-        return BPF.symaddr(addr, -1)
+        return BPF.sym(addr, -1, show_module, show_address)
 
     @staticmethod
     def ksymname(name):
         """ksymname(name)
 
         Translate a kernel name into an address. This is the reverse of
-        ksymaddr. Returns -1 when the function name is unknown."""
+        ksym. Returns -1 when the function name is unknown."""
         return BPF._sym_cache(-1).resolve_name(name)
 
     def num_open_kprobes(self):

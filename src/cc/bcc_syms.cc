@@ -62,7 +62,7 @@ bool KSyms::resolve_addr(uint64_t addr, struct bcc_symbol *sym) {
   auto it = std::upper_bound(syms_.begin(), syms_.end(), Symbol("", addr)) - 1;
   sym->name = (*it).name.c_str();
   sym->demangle_name = sym->name;
-  sym->module = "[kernel]";
+  sym->module = "kernel";
   sym->offset = addr - (*it).addr;
   return true;
 }
