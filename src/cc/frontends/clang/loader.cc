@@ -213,8 +213,9 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, unique_ptr<vector<TableDes
   // pre-compilation pass for generating tracepoint structures
   CompilerInstance compiler0;
   CompilerInvocation &invocation0 = compiler0.getInvocation();
-  if (!CompilerInvocation::CreateFromArgs(invocation0, const_cast<const char **>(ccargs.data()),
-                                          const_cast<const char **>(ccargs.data()) + ccargs.size(), diags))
+  if (!CompilerInvocation::CreateFromArgs(
+          invocation0, const_cast<const char **>(ccargs.data()),
+          const_cast<const char **>(ccargs.data()) + ccargs.size(), diags))
     return -1;
 
   invocation0.getPreprocessorOpts().RetainRemappedFileBuffers = true;
@@ -224,7 +225,8 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, unique_ptr<vector<TableDes
   if (in_memory) {
     invocation0.getPreprocessorOpts().addRemappedFile(main_path, &*main_buf);
     invocation0.getFrontendOpts().Inputs.clear();
-    invocation0.getFrontendOpts().Inputs.push_back(FrontendInputFile(main_path, IK_C));
+    invocation0.getFrontendOpts().Inputs.push_back(
+        FrontendInputFile(main_path, IK_C));
   }
   invocation0.getFrontendOpts().DisableFree = false;
 
@@ -240,8 +242,9 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, unique_ptr<vector<TableDes
   // first pass
   CompilerInstance compiler1;
   CompilerInvocation &invocation1 = compiler1.getInvocation();
-  if (!CompilerInvocation::CreateFromArgs(invocation1, const_cast<const char **>(ccargs.data()),
-                                          const_cast<const char **>(ccargs.data()) + ccargs.size(), diags))
+  if (!CompilerInvocation::CreateFromArgs(
+          invocation1, const_cast<const char **>(ccargs.data()),
+          const_cast<const char **>(ccargs.data()) + ccargs.size(), diags))
     return -1;
 
   // This option instructs clang whether or not to free the file buffers that we
@@ -252,7 +255,8 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, unique_ptr<vector<TableDes
     invocation1.getPreprocessorOpts().addRemappedFile(f.first, &*f.second);
   invocation1.getPreprocessorOpts().addRemappedFile(main_path, &*out_buf);
   invocation1.getFrontendOpts().Inputs.clear();
-  invocation1.getFrontendOpts().Inputs.push_back(FrontendInputFile(main_path, IK_C));
+  invocation1.getFrontendOpts().Inputs.push_back(
+      FrontendInputFile(main_path, IK_C));
   invocation1.getFrontendOpts().DisableFree = false;
 
   compiler1.createDiagnostics();
@@ -270,15 +274,17 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, unique_ptr<vector<TableDes
   // second pass, clear input and take rewrite buffer
   CompilerInstance compiler2;
   CompilerInvocation &invocation2 = compiler2.getInvocation();
-  if (!CompilerInvocation::CreateFromArgs(invocation2, const_cast<const char **>(ccargs.data()),
-                                          const_cast<const char **>(ccargs.data()) + ccargs.size(), diags))
+  if (!CompilerInvocation::CreateFromArgs(
+          invocation2, const_cast<const char **>(ccargs.data()),
+          const_cast<const char **>(ccargs.data()) + ccargs.size(), diags))
     return -1;
   invocation2.getPreprocessorOpts().RetainRemappedFileBuffers = true;
   for (const auto &f : remapped_files_)
     invocation2.getPreprocessorOpts().addRemappedFile(f.first, &*f.second);
   invocation2.getPreprocessorOpts().addRemappedFile(main_path, &*out_buf1);
   invocation2.getFrontendOpts().Inputs.clear();
-  invocation2.getFrontendOpts().Inputs.push_back(FrontendInputFile(main_path, IK_C));
+  invocation2.getFrontendOpts().Inputs.push_back(
+      FrontendInputFile(main_path, IK_C));
   invocation2.getFrontendOpts().DisableFree = false;
   // suppress warnings in the 2nd pass, but bail out on errors (our fault)
   invocation2.getDiagnosticOpts().IgnoreWarnings = true;
