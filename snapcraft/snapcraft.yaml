@@ -16,7 +16,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 #
 name: bcc
-version: 0.2.0-20161215-1402-7151673
+version: 0.2.0-20170208-1555-3e77af5
 summary: BPF Compiler Collection (BCC)
 description: A toolkit for creating efficient kernel tracing and manipulation programs
 confinement: strict
@@ -46,6 +46,8 @@ apps:
         command: wrapper cachestat
     cachetop:
         command: wrapper cachetop
+    capable:
+        command: wrapper capable
     cpudist:
         command: wrapper cpudist
     cpuunclaimed:
@@ -54,6 +56,8 @@ apps:
         command: wrapper dcsnoop
     dcstat:
         command: wrapper dcstat
+    deadlock-detector:
+        command: wrapper deadlock_detector
     execsnoop:
         command: wrapper execsnoop
     ext4dist:
@@ -76,10 +80,14 @@ apps:
         command: wrapper hardirqs
     killsnoop:
         command: wrapper killsnoop
+    llcstat:
+        command: wrapper llcstat
     mdflush:
         command: wrapper mdflush
     memleak:
         command: wrapper memleak
+    mountsnoop:
+        command: wrapper mountsnoop
     offcputime:
         command: wrapper offcputime
     offwaketime:
@@ -90,12 +98,18 @@ apps:
         command: wrapper opensnoop
     pidpersec:
         command: wrapper pidpersec
+    profile:
+        command: wrapper profile
     runqlat:
         command: wrapper runqlat
+    runqlen:
+        command: wrapper runqlen
     slabratetop:
         command: wrapper slabratetop
     softirqs:
         command: wrapper softirqs
+    solisten:
+        command: wrapper solisten
     sslsniff:
         command: wrapper sslsniff
     stackcount:
@@ -118,10 +132,24 @@ apps:
         command: wrapper tcpretrans
     tcptop:
         command: wrapper tcptop
-    ttysnoop:
-        command: wrapper ttysnoop
+    tplist:
+        command: wrapper tplist
     trace:
         command: wrapper trace
+    ttysnoop:
+        command: wrapper ttysnoop
+    ucalls:
+        command: wrapper ucalls
+    uflow:
+        command: wrapper uflow
+    ugc:
+        command: wrapper ugc
+    uobjnew:
+        command: wrapper uobjnew
+    ustat:
+        command: wrapper ustat
+    uthreads:
+        command: wrapper uthreads
     vfscount:
         command: wrapper vfscount
     vfsstat:
