@@ -61,10 +61,8 @@ class TestTracepointDataLoc(unittest.TestCase):
         b = bcc.BPF(text=text)
         subprocess.check_output(["/bin/ls"])
         sleep(1)
-        found = False
-        for k, v in b["execs"].items():
-            found = "ls" in v.filename
-        self.assertTrue(found, "'ls' was not found in map")
+        self.assertTrue("/bin/ls" in [v.filename.decode()
+                                      for v in b["execs"].values()])
 
 if __name__ == "__main__":
     unittest.main()

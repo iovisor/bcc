@@ -1046,7 +1046,8 @@ class BPF(object):
         for k, v in self.open_tracepoints.items():
             lib.perf_reader_free(v)
             (tp_category, tp_name) = k.split(':')
-            lib.bpf_detach_tracepoint(tp_category, tp_name)
+            lib.bpf_detach_tracepoint(tp_category.encode("ascii"),
+                    tp_name.encode("ascii"))
         self.open_tracepoints.clear()
         for (ev_type, ev_config) in list(self.open_perf_events.keys()):
             self.detach_perf_event(ev_type, ev_config)
