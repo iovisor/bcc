@@ -68,9 +68,10 @@ class SymbolCache(object):
         return (sym.demangle_name.decode(), sym.offset,
                 ct.cast(sym.module, ct.c_char_p).value.decode())
 
-    def resolve_name(self, name):
+    def resolve_name(self, module, name):
         addr = ct.c_ulonglong()
-        if lib.bcc_symcache_resolve_name(self.cache, name, ct.pointer(addr)) < 0:
+        if lib.bcc_symcache_resolve_name(
+                    self.cache, module, name, ct.pointer(addr)) < 0:
             return -1
         return addr.value
 
@@ -1023,7 +1024,7 @@ class BPF(object):
 
         Translate a kernel name into an address. This is the reverse of
         ksym. Returns -1 when the function name is unknown."""
-        return BPF._sym_cache(-1).resolve_name(name)
+        return BPF._sym_cache(-1).resolve_name(None, name)
 
     def num_open_kprobes(self):
         """num_open_kprobes()

@@ -226,10 +226,10 @@ int bcc_symcache_resolve(void *resolver, uint64_t addr,
   return cache->resolve_addr(addr, sym) ? 0 : -1;
 }
 
-int bcc_symcache_resolve_name(void *resolver, const char *name,
-                              uint64_t *addr) {
+int bcc_symcache_resolve_name(void *resolver, const char *module,
+                              const char *name, uint64_t *addr) {
   SymbolCache *cache = static_cast<SymbolCache *>(resolver);
-  return cache->resolve_name(nullptr, name, addr) ? 0 : -1;
+  return cache->resolve_name(module, name, addr) ? 0 : -1;
 }
 
 void bcc_symcache_refresh(void *resolver) {

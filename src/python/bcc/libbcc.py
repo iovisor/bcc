@@ -154,7 +154,7 @@ lib.bcc_symcache_resolve.argtypes = [ct.c_void_p, ct.c_ulonglong, ct.POINTER(bcc
 
 lib.bcc_symcache_resolve_name.restype = ct.c_int
 lib.bcc_symcache_resolve_name.argtypes = [
-    ct.c_void_p, ct.c_char_p, ct.POINTER(ct.c_ulonglong)]
+    ct.c_void_p, ct.c_char_p, ct.c_char_p, ct.POINTER(ct.c_ulonglong)]
 
 lib.bcc_symcache_refresh.restype = None
 lib.bcc_symcache_refresh.argtypes = [ct.c_void_p]
