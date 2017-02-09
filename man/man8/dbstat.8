@@ -1,12 +1,12 @@
-.TH dbslower 8  "2017-02-15" "USER COMMANDS"
+.TH dbstat 8  "2017-02-15" "USER COMMANDS"
 .SH NAME
-dbslower \- Trace MySQL/PostgreSQL server queries slower than a threshold.
+dbstat \- Collect histograms of MySQL/PostgreSQL query latencies.
 .SH SYNOPSIS
-.B dbslower [-v] [-p PID [PID ...]] [-m THRESHOLD] {mysql,postgres}
+.	B dbstat [-v] [-p PID [PID ...]] [-m THRESHOLD] [-u] [-i INTERVAL] {mysql,postgres}
 .SH DESCRIPTION
-This traces queries served by a MySQL or PostgreSQL server, and prints
-those that exceed a latency (query time) threshold. By default a threshold of
-1 ms is used.
+This traces queries served by a MySQL or PostgreSQL server, and collects a
+histogram of query latencies. The histogram is printed at the end of collection,
+or at specified intervals.
 
 This uses User Statically-Defined Tracing (USDT) probes, a feature added to
 MySQL and PostgreSQL for DTrace support, but which may not be enabled on a
@@ -26,32 +26,30 @@ Trace this PID. If no PID is specified, the tool will attempt to automatically
 detect the MySQL or PostgreSQL processes running on the system.
 .TP
 \-m THRESHOLD
-Minimum query latency (duration) to trace, in milliseconds. Default is 1 ms.
+Minimum query latency (duration) to trace, in milliseconds.
+Default is all queries.
+.TP
+\-u
+Display query latencies in microseconds (default: milliseconds).
+.TP
+\-i INTERVAL
+Print summaries (histograms) at this interval, specified in seconds.
 .TP
 {mysql,postgres}
 The database engine to trace.
 .SH EXAMPLES
 .TP
-Trace MySQL server queries slower than 1 ms:
+Display histogram of MySQL query latencies:
 #
-.B dbslower mysql
+.B dbstat mysql
 .TP
-Trace slower than 10 ms for PostgreSQL in process 408:
+Display histogram of PostgreSQL query latencies slower than 10ms in pid 408:
 #
-.B dbslower postgres -p 408 -m 10
-.SH FIELDS
+.B dbstat postgres -p 408 -m 10
 .TP
-TIME(s)
-Time of query start, in seconds.
-.TP
-PID
-Process ID of the traced server.
-.TP
-MS
-Milliseconds for the query, from start to end.
-.TP
-QUERY
-Query string, truncated to 256 characters.
+Display histogram of PostgreSQL query latencies at 3-second intervals:
+#
+.B dbstat postgres -i 3
 .SH OVERHEAD
 This adds low-overhead instrumentation to queries, and only emits output
 data from kernel to user-level if they query exceeds the threshold. If the
@@ -69,6 +67,6 @@ Linux
 .SH STABILITY
 Unstable - in development.
 .SH AUTHOR
-Sasha Goldshtein, Brendan Gregg
+Sasha Goldshtein
 .SH SEE ALSO
-biosnoop(8), mysqld_qslower(8), dbstat(8)
+dbslower(8)
