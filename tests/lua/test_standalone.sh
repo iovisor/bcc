@@ -19,22 +19,8 @@ if ldd bcc-lua | grep -q luajit; then
     fail "bcc-lua depends on libluajit"
 fi
 
-rm -f libbcc.so probe.lua
+rm -f probe.lua
 echo "return function(BPF) print(\"Hello world\") end" > probe.lua
-
-if ./bcc-lua "probe.lua"; then
-    fail "bcc-lua runs without libbcc.so"
-fi
-
-if ! env LIBBCC_SO_PATH=../cc/libbcc.so ./bcc-lua "probe.lua"; then
-    fail "bcc-lua cannot load libbcc.so through the environment"
-fi
-
-ln -s ../cc/libbcc.so
-
-if ! ./bcc-lua "probe.lua"; then
-    fail "bcc-lua cannot find local libbcc.so"
-fi
 
 PROBE="../../../examples/lua/offcputime.lua"
 
