@@ -128,7 +128,7 @@ class USDT(object):
                             probe)
 
     def get_text(self):
-        return lib.bcc_usdt_genargs(self.context)
+        return lib.bcc_usdt_genargs(self.context).decode()
 
     def get_probe_arg_ctype(self, probe_name, arg_index):
         return lib.bcc_usdt_get_probe_argctype(
