@@ -147,13 +147,13 @@ while True:
     print()
     data = bpf["allocs"]
     if args.top_count:
-        data = sorted(data.items(), key=lambda (k, v): v.num_allocs)
+        data = sorted(data.items(), key=lambda k, v: v.num_allocs)
         data = data[-args.top_count:]
     elif args.top_size:
-        data = sorted(data.items(), key=lambda (k, v): v.total_size)
+        data = sorted(data.items(), key=lambda k, v: v.total_size)
         data = data[-args.top_size:]
     else:
-        data = sorted(data.items(), key=lambda (k, v): v.total_size)
+        data = sorted(data.items(), key=lambda k, v: v.total_size)
     print("%-30s %8s %12s" % ("TYPE", "# ALLOCS", "# BYTES"))
     for key, value in data:
         if args.language == "c":
