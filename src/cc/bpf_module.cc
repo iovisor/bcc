@@ -326,6 +326,7 @@ unique_ptr<ExecutionEngine> BPFModule::finalize_rw(unique_ptr<Module> m) {
 // load an entire c file as a module
 int BPFModule::load_cfile(const string &file, bool in_memory, const char *cflags[], int ncflags) {
   clang_loader_ = make_unique<ClangLoader>(&*ctx_, flags_);
+  clang_loader_->set_map_types_visitor(map_types_visitor_);
   if (clang_loader_->parse(&mod_, &tables_, file, in_memory, cflags, ncflags))
     return -1;
   return 0;
@@ -414,6 +415,14 @@ int BPFModule::run_pass_manager(Module &mod) {
     PM.add(createPrintModulePass(outs()));
   PM.run(mod);
   return 0;
+}
+
+const std::vector<TableDesc>* BPFModule::get_tables() const {
+  return tables_.get();
+}
+
+void BPFModule::set_map_types_visitor(const std::shared_ptr<MapTypesVisitor>& visitor) {
+  map_types_visitor_ = visitor;
 }
 
 int BPFModule::finalize() {

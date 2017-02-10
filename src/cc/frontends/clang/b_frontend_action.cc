@@ -262,8 +262,8 @@ DiagnosticBuilder ProbeVisitor::error(SourceLocation loc, const char (&fmt)[N]) 
 }
 
 
-BTypeVisitor::BTypeVisitor(ASTContext &C, Rewriter &rewriter, vector<TableDesc> &tables)
-    : C(C), diag_(C.getDiagnostics()), rewriter_(rewriter), out_(llvm::errs()), tables_(tables) {
+BTypeVisitor::BTypeVisitor(ASTContext &C, Rewriter &rewriter, vector<TableDesc> &tables, const std::shared_ptr<MapTypesVisitor>& map_types_visitor)
+    : C(C), diag_(C.getDiagnostics()), rewriter_(rewriter), out_(llvm::errs()), tables_(tables), map_types_visitor_(map_types_visitor) {
 }
 
 bool BTypeVisitor::VisitFunctionDecl(FunctionDecl *D) {
@@ -599,6 +599,8 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
     TableDesc table = {};
     table.name = Decl->getName();
 
+    QualType keyType, leafType;
+
     unsigned i = 0;
     for (auto F : RD->fields()) {
       size_t sz = C.getTypeSize(F->getType()) >> 3;
@@ -610,6 +612,7 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
         table.key_size = sz;
         BMapDeclVisitor visitor(C, table.key_desc);
         visitor.TraverseType(F->getType());
+        keyType = F->getType();
       } else if (F->getName() == "leaf") {
         if (sz == 0) {
           error(F->getLocStart(), "invalid zero-sized leaf");
@@ -618,6 +621,7 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
         table.leaf_size = sz;
         BMapDeclVisitor visitor(C, table.leaf_desc);
         visitor.TraverseType(F->getType());
+        leafType = F->getType();
       } else if (F->getName() == "data") {
         table.max_entries = sz / table.leaf_size;
       } else if (F->getName() == "flags") {
@@ -704,6 +708,10 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
       return false;
     }
 
+    if (map_types_visitor_) {
+      map_types_visitor_->visit(C, table.name, keyType, leafType);
+    }
+
     tables_.push_back(std::move(table));
   } else if (const PointerType *P = Decl->getType()->getAs<PointerType>()) {
     // if var is a pointer to a packet type, clone the annotation into the var
@@ -721,8 +729,8 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
   return true;
 }
 
-BTypeConsumer::BTypeConsumer(ASTContext &C, Rewriter &rewriter, vector<TableDesc> &tables)
-    : visitor_(C, rewriter, tables) {
+BTypeConsumer::BTypeConsumer(ASTContext &C, Rewriter &rewriter, vector<TableDesc> &tables, const std::shared_ptr<MapTypesVisitor>& map_types_visitor)
+    : visitor_(C, rewriter, tables, map_types_visitor) {
 }
 
 bool BTypeConsumer::HandleTopLevelDecl(DeclGroupRef Group) {
@@ -764,7 +772,7 @@ unique_ptr<ASTConsumer> BFrontendAction::CreateASTConsumer(CompilerInstance &Com
   rewriter_->setSourceMgr(Compiler.getSourceManager(), Compiler.getLangOpts());
   vector<unique_ptr<ASTConsumer>> consumers;
   consumers.push_back(unique_ptr<ASTConsumer>(new ProbeConsumer(Compiler.getASTContext(), *rewriter_)));
-  consumers.push_back(unique_ptr<ASTConsumer>(new BTypeConsumer(Compiler.getASTContext(), *rewriter_, *tables_)));
+  consumers.push_back(unique_ptr<ASTConsumer>(new BTypeConsumer(Compiler.getASTContext(), *rewriter_, *tables_, map_types_visitor_)));
   return unique_ptr<ASTConsumer>(new MultiplexConsumer(move(consumers)));
 }
 

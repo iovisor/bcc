@@ -100,6 +100,10 @@ public:
   StatusTuple close_perf_buffer(const std::string& name);
   void poll_perf_buffer(const std::string& name, int timeout = -1);
 
+  BPFModule* get_module() const {
+    return bpf_module_.get();
+  }
+
 private:
   StatusTuple load_func(const std::string& func_name, enum bpf_prog_type type,
                         int& fd);

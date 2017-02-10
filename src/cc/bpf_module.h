@@ -34,6 +34,7 @@ namespace ebpf {
 struct TableDesc;
 class BLoader;
 class ClangLoader;
+class MapTypesVisitor;
 
 class BPFModule {
  private:
@@ -88,6 +89,8 @@ class BPFModule {
   int table_leaf_scanf(size_t id, const char *buf, void *leaf);
   char * license() const;
   unsigned kern_version() const;
+  const std::vector<TableDesc>* get_tables() const;
+  void set_map_types_visitor(const std::shared_ptr<MapTypesVisitor>& visitor);
  private:
   unsigned flags_;  // 0x1 for printing
   std::string filename_;
@@ -104,6 +107,7 @@ class BPFModule {
   std::vector<std::string> function_names_;
   std::map<llvm::Type *, llvm::Function *> readers_;
   std::map<llvm::Type *, llvm::Function *> writers_;
+  std::shared_ptr<MapTypesVisitor> map_types_visitor_;
 };
 
 }  // namespace ebpf

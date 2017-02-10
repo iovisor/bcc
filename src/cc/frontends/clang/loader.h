@@ -29,6 +29,7 @@ class MemoryBuffer;
 namespace ebpf {
 
 struct TableDesc;
+class MapTypesVisitor;
 
 class ClangLoader {
  public:
@@ -36,10 +37,14 @@ class ClangLoader {
   ~ClangLoader();
   int parse(std::unique_ptr<llvm::Module> *mod, std::unique_ptr<std::vector<TableDesc>> *tables,
             const std::string &file, bool in_memory, const char *cflags[], int ncflags);
+
+  void set_map_types_visitor(const std::shared_ptr<MapTypesVisitor>& visitor);
+
  private:
   static std::map<std::string, std::unique_ptr<llvm::MemoryBuffer>> remapped_files_;
   llvm::LLVMContext *ctx_;
   unsigned flags_;
+  std::shared_ptr<MapTypesVisitor> map_types_visitor_;
 };
 
 }  // namespace ebpf

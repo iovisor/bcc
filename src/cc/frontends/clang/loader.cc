@@ -265,6 +265,7 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, unique_ptr<vector<TableDes
   string out_str1;
   llvm::raw_string_ostream os1(out_str1);
   BFrontendAction bact(os1, flags_);
+  bact.set_map_types_visitor(map_types_visitor_);
   if (!compiler1.ExecuteAction(bact))
     return -1;
   unique_ptr<llvm::MemoryBuffer> out_buf1 = llvm::MemoryBuffer::getMemBuffer(out_str1);
@@ -298,5 +299,8 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, unique_ptr<vector<TableDes
   return 0;
 }
 
+void ClangLoader::set_map_types_visitor(const std::shared_ptr<MapTypesVisitor>& visitor) {
+  map_types_visitor_ = visitor;
+}
 
 }  // namespace ebpf

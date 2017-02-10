@@ -64,7 +64,8 @@ class BMapDeclVisitor : public clang::RecursiveASTVisitor<BMapDeclVisitor> {
 class BTypeVisitor : public clang::RecursiveASTVisitor<BTypeVisitor> {
  public:
   explicit BTypeVisitor(clang::ASTContext &C, clang::Rewriter &rewriter,
-                        std::vector<TableDesc> &tables);
+                        std::vector<TableDesc> &tables,
+                        const std::shared_ptr<MapTypesVisitor>& visitor = nullptr);
   bool TraverseCallExpr(clang::CallExpr *Call);
   bool VisitFunctionDecl(clang::FunctionDecl *D);
   bool VisitCallExpr(clang::CallExpr *Call);
@@ -84,6 +85,7 @@ class BTypeVisitor : public clang::RecursiveASTVisitor<BTypeVisitor> {
   std::vector<clang::ParmVarDecl *> fn_args_;
   std::set<clang::Expr *> visited_;
   std::string current_fn_;
+  std::shared_ptr<MapTypesVisitor> map_types_visitor_;
 };
 
 // Do a depth-first search to rewrite all pointers that need to be probed
@@ -111,7 +113,8 @@ class ProbeVisitor : public clang::RecursiveASTVisitor<ProbeVisitor> {
 class BTypeConsumer : public clang::ASTConsumer {
  public:
   explicit BTypeConsumer(clang::ASTContext &C, clang::Rewriter &rewriter,
-                         std::vector<TableDesc> &tables);
+                         std::vector<TableDesc> &tables,
+                         const std::shared_ptr<MapTypesVisitor>& map_types_visitor = nullptr);
   bool HandleTopLevelDecl(clang::DeclGroupRef Group) override;
  private:
   BTypeVisitor visitor_;
@@ -144,11 +147,17 @@ class BFrontendAction : public clang::ASTFrontendAction {
 
   // take ownership of the table-to-fd mapping data structure
   std::unique_ptr<std::vector<TableDesc>> take_tables() { return move(tables_); }
+
+  void set_map_types_visitor(const std::shared_ptr<MapTypesVisitor>& visitor) {
+    map_types_visitor_ = visitor;
+  }
+
  private:
   llvm::raw_ostream &os_;
   unsigned flags_;
   std::unique_ptr<clang::Rewriter> rewriter_;
   std::unique_ptr<std::vector<TableDesc>> tables_;
+  std::shared_ptr<MapTypesVisitor> map_types_visitor_;
 };
 
 }  // namespace visitor

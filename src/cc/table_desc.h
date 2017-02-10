@@ -23,6 +23,11 @@ namespace llvm {
 class Function;
 }
 
+namespace clang {
+class ASTContext;
+class QualType;
+}
+
 namespace ebpf {
 
 struct TableDesc {
@@ -41,6 +46,17 @@ struct TableDesc {
   llvm::Function *leaf_snprintf;
   bool is_shared;
   bool is_extern;
+};
+
+class MapTypesVisitor {
+ public:
+  virtual ~MapTypesVisitor() {}
+
+  virtual void visit(
+      clang::ASTContext& C,
+      const std::string& table,
+      clang::QualType keyType,
+      clang::QualType leafType) = 0;
 };
 
 }  // namespace ebpf
