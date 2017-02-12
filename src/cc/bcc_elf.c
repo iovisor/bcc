@@ -241,7 +241,7 @@ static int find_debuglink(Elf *e, char **debug_file, unsigned int *crc) {
 
 static int find_buildid(Elf *e, char *buildid) {
   Elf_Data *data = get_section_elf_data(e, ".note.gnu.build-id");
-  if (data->d_size <= 16 || strcmp((char *)data->d_buf + 12, "GNU"))
+  if (!data || data->d_size <= 16 || strcmp((char *)data->d_buf + 12, "GNU"))
     return 0;
 
   char *buf = (char *)data->d_buf + 16;
