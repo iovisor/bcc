@@ -236,12 +236,12 @@ if args.syscalls:
 def get_data():
     # Will be empty when no language was specified for tracing
     if args.latency:
-        data = map(lambda (k, v): (k.clazz + "." + k.method,
+        data = list(map(lambda (k, v): (k.clazz + "." + k.method,
                                    (v.num_calls, v.total_ns)),
-                   bpf["times"].items())
+                   bpf["times"].items()))
     else:
-        data = map(lambda (k, v): (k.clazz + "." + k.method, (v.value, 0)),
-                   bpf["counts"].items())
+        data = list(map(lambda (k, v): (k.clazz + "." + k.method, (v.value, 0)),
+                   bpf["counts"].items()))
 
     if args.syscalls:
         if args.latency:
