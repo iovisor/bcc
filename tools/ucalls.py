@@ -219,9 +219,9 @@ int syscall_return(struct pt_regs *ctx) {
 
 if args.language:
     usdt = USDT(pid=args.pid)
-    usdt.enable_probe(entry_probe, "trace_entry")
+    usdt.enable_probe_or_bail(entry_probe, "trace_entry")
     if args.latency:
-        usdt.enable_probe(return_probe, "trace_return")
+        usdt.enable_probe_or_bail(return_probe, "trace_return")
 else:
     usdt = None
 

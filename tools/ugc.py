@@ -103,8 +103,8 @@ int trace_%s(struct pt_regs *ctx) {
         return text
 
     def attach(self):
-        usdt.enable_probe(self.begin, "trace_%s" % self.begin)
-        usdt.enable_probe(self.end, "trace_%s" % self.end)
+        usdt.enable_probe_or_bail(self.begin, "trace_%s" % self.begin)
+        usdt.enable_probe_or_bail(self.end, "trace_%s" % self.end)
 
     def format(self, data):
         return self.formatter(data)

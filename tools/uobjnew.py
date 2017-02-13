@@ -78,7 +78,7 @@ int alloc_entry(struct pt_regs *ctx) {
     return 0;
 }
     """
-    usdt.enable_probe("object__alloc", "alloc_entry")
+    usdt.enable_probe_or_bail("object__alloc", "alloc_entry")
 #
 # Ruby
 #
@@ -107,10 +107,10 @@ int object_alloc_entry(struct pt_regs *ctx) {
     return 0;
 }
     """
-    usdt.enable_probe("object__create", "object_alloc_entry")
+    usdt.enable_probe_or_bail("object__create", "object_alloc_entry")
     for thing in ["string", "hash", "array"]:
         program += create_template.replace("THETHING", thing)
-        usdt.enable_probe("%s__create" % thing, "%s_alloc_entry" % thing)
+        usdt.enable_probe_or_bail("%s__create" % thing, "%s_alloc_entry" % thing)
 #
 # C
 #
