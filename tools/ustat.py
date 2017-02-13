@@ -239,10 +239,10 @@ class Tool(object):
             counts.update(probe.get_counts(self.bpf))
             targets.update(probe.targets)
         if self.args.sort:
-            counts = sorted(counts.items(), key=lambda _, v:
-                            -v.get(self.args.sort.upper(), 0))
+            counts = sorted(counts.items(), key=lambda kv:
+                            -kv[1].get(self.args.sort.upper(), 0))
         else:
-            counts = sorted(counts.items(), key=lambda k, _: k)
+            counts = sorted(counts.items(), key=lambda kv: kv[0])
         for pid, stats in counts:
             print("%-6d %-20s %-10d %-6d %-10d %-8d %-6d %-6d" % (
                   pid, targets[pid][:20],
