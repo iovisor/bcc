@@ -2,7 +2,7 @@ Demonstrations of ucalls.
 
 
 ucalls summarizes method calls in various high-level languages, including Java,
-Python, Ruby, and Linux system calls. It displays statistics on the most 
+Python, Ruby, PHP, and Linux system calls. It displays statistics on the most 
 frequently called methods, as well as the latency (duration) of these methods.
 
 Through the syscalls support, ucalls can provide basic information on a 
@@ -60,7 +60,7 @@ METHOD                                              # CALLS
 USAGE message:
 
 # ./ucalls.py -h
-usage: ucalls.py [-h] [-l {java,python,ruby}] [-T TOP] [-L] [-S] [-v] [-m]
+usage: ucalls.py [-h] [-l {java,python,ruby,php}] [-T TOP] [-L] [-S] [-v] [-m]
                  pid [interval]
 
 Summarize method calls in high-level languages.
@@ -71,7 +71,7 @@ positional arguments:
 
 optional arguments:
   -h, --help            show this help message and exit
-  -l {java,python,ruby}, --language {java,python,ruby}
+  -l {java,python,ruby,php}, --language {java,python,ruby,php}
                         language to trace (if none, trace syscalls only)
   -T TOP, --top TOP     number of most frequent/slow calls to print
   -L, --latency         record method latency from enter to exit (except
@@ -88,5 +88,5 @@ examples:
     ./ucalls 6712 -S            # trace only syscall counts
     ./ucalls -l ruby 1344 -T 10 # trace top 10 Ruby method calls
     ./ucalls -l ruby 1344 -L    # trace Ruby calls including latency
-    ./ucalls -l ruby 1344 -LS   # trace Ruby calls and syscalls with latency
+    ./ucalls -l php 443 -LS     # trace PHP calls and syscalls with latency
     ./ucalls -l python 2020 -mL # trace Python calls including latency in ms
