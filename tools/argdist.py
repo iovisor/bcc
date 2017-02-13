@@ -637,7 +637,7 @@ argdist -p 2780 -z 120 \\
                         self.probes.append(Probe(self, "hist", histspecifier))
                 if len(self.probes) == 0:
                         print("at least one specifier is required")
-                        exit()
+                        exit(1)
 
         def _generate_program(self):
                 bpf_source = """
@@ -695,10 +695,13 @@ struct __string_t { char s[%d]; };
                         self._attach()
                         self._main_loop()
                 except:
+                        exc_info = sys.exc_info()
+                        sys_exit = exc_info[0] is SystemExit
                         if self.args.verbose:
                                 traceback.print_exc()
-                        elif sys.exc_info()[0] is not SystemExit:
-                                print(sys.exc_info()[1])
+                        elif not sys_exit:
+                                print(exc_info[1])
+                        exit(0 if sys_exit else 1)
 
 if __name__ == "__main__":
         Tool().run()
