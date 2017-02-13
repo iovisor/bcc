@@ -18,7 +18,20 @@
 from __future__ import print_function
 from bcc import BPF
 from time import strftime
+import argparse
 import ctypes as ct
+
+examples = """examples:
+    ./gethostlatency           # trace all TCP accept()s
+    ./gethostlatency -p 181    # only trace PID 181
+"""
+parser = argparse.ArgumentParser(
+    description="Show latency for getaddrinfo/gethostbyname[2] calls",
+    formatter_class=argparse.RawDescriptionHelpFormatter,
+    epilog=examples)
+parser.add_argument("-p", "--pid", help="trace this PID only", type=int,
+    default=-1)
+args = parser.parse_args()
 
 # load BPF program
 bpf_text = """
@@ -82,12 +95,17 @@ int do_return(struct pt_regs *ctx) {
 }
 """
 b = BPF(text=bpf_text)
-b.attach_uprobe(name="c", sym="getaddrinfo", fn_name="do_entry")
-b.attach_uprobe(name="c", sym="gethostbyname", fn_name="do_entry")
-b.attach_uprobe(name="c", sym="gethostbyname2", fn_name="do_entry")
-b.attach_uretprobe(name="c", sym="getaddrinfo", fn_name="do_return")
-b.attach_uretprobe(name="c", sym="gethostbyname", fn_name="do_return")
-b.attach_uretprobe(name="c", sym="gethostbyname2", fn_name="do_return")
+b.attach_uprobe(name="c", sym="getaddrinfo", fn_name="do_entry", pid=args.pid)
+b.attach_uprobe(name="c", sym="gethostbyname", fn_name="do_entry",
+                pid=args.pid)
+b.attach_uprobe(name="c", sym="gethostbyname2", fn_name="do_entry",
+                pid=args.pid)
+b.attach_uretprobe(name="c", sym="getaddrinfo", fn_name="do_return",
+                   pid=args.pid)
+b.attach_uretprobe(name="c", sym="gethostbyname", fn_name="do_return",
+                   pid=args.pid)
+b.attach_uretprobe(name="c", sym="gethostbyname2", fn_name="do_return",
+                   pid=args.pid)
 
 TASK_COMM_LEN = 16    # linux/sched.h
 
