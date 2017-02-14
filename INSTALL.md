@@ -31,6 +31,16 @@ CONFIG_HAVE_BPF_JIT=y
 CONFIG_BPF_EVENTS=y
 ```
 
+There are a few optional kernel flags needed for running bcc networking examples on vanilla kernel:
+
+```
+CONFIG_NET_SCH_SFQ=m
+CONFIG_NET_ACT_POLICE=m
+CONFIG_NET_ACT_GACT=m
+CONFIG_DUMMY=m
+CONFIG_VXLAN=m
+```
+
 Kernel compile flags can usually be checked by looking at `/proc/config.gz` or
 `/boot/config-<kernel-version>`.
 
