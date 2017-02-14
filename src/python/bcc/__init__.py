@@ -71,7 +71,7 @@ class SymbolCache(object):
     def resolve_name(self, module, name):
         addr = ct.c_ulonglong()
         if lib.bcc_symcache_resolve_name(
-                    self.cache, module.encode("ascii"),
+                    self.cache, module.encode("ascii") if module else None,
                     name.encode("ascii"), ct.pointer(addr)) < 0:
             return -1
         return addr.value
@@ -1018,7 +1018,7 @@ class BPF(object):
 
         Translate a kernel memory address into a kernel function name, which is
         returned. When show_module is True, the module name ("kernel") is also
-        included. When show_offset is true, the instruction offset as a 
+        included. When show_offset is true, the instruction offset as a
         hexadecimal number is also included in the string.
 
         Example output when both show_module and show_offset are True:

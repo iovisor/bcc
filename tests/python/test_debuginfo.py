@@ -4,8 +4,27 @@
 
 import os
 import subprocess
-from bcc import SymbolCache
+from bcc import SymbolCache, BPF
 from unittest import main, TestCase
+
+class TestKSyms(TestCase):
+    def grab_sym(self):
+        # Grab the first symbol in kallsyms that has type 't'.
+        with open("/proc/kallsyms") as f:
+            for line in f:
+                (addr, t, name) = line.strip().split()
+                if t == "t":
+                    return (addr, name)
+
+    def test_ksymname(self):
+        sym = BPF.ksymname("__kmalloc")
+        self.assertIsNotNone(sym)
+        self.assertNotEqual(sym, 0)
+
+    def test_ksym(self):
+        (addr, name) = self.grab_sym()
+        sym = BPF.ksym(int(addr, 16))
+        self.assertEqual(sym, name)
 
 class Harness(TestCase):
     def setUp(self):
