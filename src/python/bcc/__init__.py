@@ -17,7 +17,6 @@ import atexit
 import ctypes as ct
 import fcntl
 import json
-import multiprocessing
 import os
 import re
 import struct
@@ -29,6 +28,7 @@ from .libbcc import lib, _CB_TYPE, bcc_symbol, _SYM_CB_TYPE
 from .table import Table
 from .perf import Perf
 from .usyms import ProcessSymbols
+from .utils import get_online_cpus
 
 _kprobe_limit = 1000
 _num_open_probes = 0
@@ -459,9 +459,8 @@ class BPF(object):
         self._check_probe_quota(1)
         fn = self.load_func(fn_name, BPF.KPROBE)
         ev_name = "p_" + event.replace("+", "_").replace(".", "_")
-        desc = "p:kprobes/%s %s" % (ev_name, event)
-        res = lib.bpf_attach_kprobe(fn.fd, ev_name.encode("ascii"),
-                desc.encode("ascii"), pid, cpu, group_fd,
+        res = lib.bpf_attach_kprobe(fn.fd, 0, ev_name.encode("ascii"),
+                event.encode("ascii"), pid, cpu, group_fd,
                 self._reader_cb_impl, ct.cast(id(self), ct.py_object))
         res = ct.cast(res, ct.c_void_p)
         if not res:
@@ -475,8 +474,7 @@ class BPF(object):
         if ev_name not in self.open_kprobes:
             raise Exception("Kprobe %s is not attached" % event)
         lib.perf_reader_free(self.open_kprobes[ev_name])
-        desc = "-:kprobes/%s" % ev_name
-        res = lib.bpf_detach_kprobe(desc.encode("ascii"))
+        res = lib.bpf_detach_kprobe(ev_name.encode("ascii"))
         if res < 0:
             raise Exception("Failed to detach BPF from kprobe")
         self._del_kprobe(ev_name)
@@ -498,9 +496,8 @@ class BPF(object):
         self._check_probe_quota(1)
         fn = self.load_func(fn_name, BPF.KPROBE)
         ev_name = "r_" + event.replace("+", "_").replace(".", "_")
-        desc = "r:kprobes/%s %s" % (ev_name, event)
-        res = lib.bpf_attach_kprobe(fn.fd, ev_name.encode("ascii"),
-                desc.encode("ascii"), pid, cpu, group_fd,
+        res = lib.bpf_attach_kprobe(fn.fd, 1, ev_name.encode("ascii"),
+                event.encode("ascii"), pid, cpu, group_fd,
                 self._reader_cb_impl, ct.cast(id(self), ct.py_object))
         res = ct.cast(res, ct.c_void_p)
         if not res:
@@ -514,8 +511,7 @@ class BPF(object):
         if ev_name not in self.open_kprobes:
             raise Exception("Kretprobe %s is not attached" % event)
         lib.perf_reader_free(self.open_kprobes[ev_name])
-        desc = "-:kprobes/%s" % ev_name
-        res = lib.bpf_detach_kprobe(desc.encode("ascii"))
+        res = lib.bpf_detach_kprobe(ev_name.encode("ascii"))
         if res < 0:
             raise Exception("Failed to detach BPF from kprobe")
         self._del_kprobe(ev_name)
@@ -554,20 +550,28 @@ class BPF(object):
 
 
     @classmethod
-    def _check_path_symbol(cls, module, symname, addr):
+    def _check_path_symbol(cls, module, symname, addr, pid):
         sym = bcc_symbol()
         psym = ct.pointer(sym)
+        c_pid = 0 if pid == -1 else pid
         if lib.bcc_resolve_symname(module.encode("ascii"),
-                symname.encode("ascii"), addr or 0x0, psym) < 0:
+                symname.encode("ascii"), addr or 0x0, c_pid, psym) < 0:
             if not sym.module:
                 raise Exception("could not find library %s" % module)
+            lib.bcc_procutils_free(sym.module)
             raise Exception("could not determine address of symbol %s" % symname)
-        return sym.module.decode(), sym.offset
+        module_path = ct.cast(sym.module, ct.c_char_p).value.decode()
+        lib.bcc_procutils_free(sym.module)
+        return module_path, sym.offset
 
     @staticmethod
     def find_library(libname):
-        res = lib.bcc_procutils_which_so(libname.encode("ascii"))
-        return res if res is None else res.decode()
+        res = lib.bcc_procutils_which_so(libname.encode("ascii"), 0)
+        if not res:
+            return None
+        libpath = ct.cast(res, ct.c_char_p).value.decode()
+        lib.bcc_procutils_free(res)
+        return libpath
 
     @staticmethod
     def get_tracepoints(tp_re):
@@ -660,7 +664,7 @@ class BPF(object):
             res[cpu] = self._attach_perf_event(fn.fd, ev_type, ev_config,
                     sample_period, sample_freq, pid, cpu, group_fd)
         else:
-            for i in range(0, multiprocessing.cpu_count()):
+            for i in get_online_cpus():
                 res[i] = self._attach_perf_event(fn.fd, ev_type, ev_config,
                         sample_period, sample_freq, pid, i, group_fd)
         self.open_perf_events[(ev_type, ev_config)] = res
@@ -736,7 +740,8 @@ class BPF(object):
 
         Libraries can be given in the name argument without the lib prefix, or
         with the full path (/usr/lib/...). Binaries can be given only with the
-        full path (/bin/sh).
+        full path (/bin/sh). If a PID is given, the uprobe will attach to the
+        version of the library used by the process.
 
         Example: BPF(text).attach_uprobe("c", "malloc")
                  BPF(text).attach_uprobe("/usr/bin/python", "main")
@@ -753,14 +758,13 @@ class BPF(object):
                                    group_fd=group_fd)
             return
 
-        (path, addr) = BPF._check_path_symbol(name, sym, addr)
+        (path, addr) = BPF._check_path_symbol(name, sym, addr, pid)
 
         self._check_probe_quota(1)
         fn = self.load_func(fn_name, BPF.KPROBE)
         ev_name = "p_%s_0x%x" % (self._probe_repl.sub("_", path), addr)
-        desc = "p:uprobes/%s %s:0x%x" % (ev_name, path, addr)
-        res = lib.bpf_attach_uprobe(fn.fd, ev_name.encode("ascii"),
-                desc.encode("ascii"), pid, cpu, group_fd,
+        res = lib.bpf_attach_uprobe(fn.fd, 0, ev_name.encode("ascii"),
+                path.encode("ascii"), addr, pid, cpu, group_fd,
                 self._reader_cb_impl, ct.cast(id(self), ct.py_object))
         res = ct.cast(res, ct.c_void_p)
         if not res:
@@ -768,21 +772,20 @@ class BPF(object):
         self._add_uprobe(ev_name, res)
         return self
 
-    def detach_uprobe(self, name="", sym="", addr=None):
-        """detach_uprobe(name="", sym="", addr=None)
+    def detach_uprobe(self, name="", sym="", addr=None, pid=-1):
+        """detach_uprobe(name="", sym="", addr=None, pid=-1)
 
         Stop running a bpf function that is attached to symbol 'sym' in library
         or binary 'name'.
         """
 
         name = str(name)
-        (path, addr) = BPF._check_path_symbol(name, sym, addr)
+        (path, addr) = BPF._check_path_symbol(name, sym, addr, pid)
         ev_name = "p_%s_0x%x" % (self._probe_repl.sub("_", path), addr)
         if ev_name not in self.open_uprobes:
-            raise Exception("Uprobe %s is not attached" % event)
+            raise Exception("Uprobe %s is not attached" % ev_name)
         lib.perf_reader_free(self.open_uprobes[ev_name])
-        desc = "-:uprobes/%s" % ev_name
-        res = lib.bpf_detach_uprobe(desc.encode("ascii"))
+        res = lib.bpf_detach_uprobe(ev_name.encode("ascii"))
         if res < 0:
             raise Exception("Failed to detach BPF from uprobe")
         self._del_uprobe(ev_name)
@@ -805,14 +808,13 @@ class BPF(object):
             return
 
         name = str(name)
-        (path, addr) = BPF._check_path_symbol(name, sym, addr)
+        (path, addr) = BPF._check_path_symbol(name, sym, addr, pid)
 
         self._check_probe_quota(1)
         fn = self.load_func(fn_name, BPF.KPROBE)
         ev_name = "r_%s_0x%x" % (self._probe_repl.sub("_", path), addr)
-        desc = "r:uprobes/%s %s:0x%x" % (ev_name, path, addr)
-        res = lib.bpf_attach_uprobe(fn.fd, ev_name.encode("ascii"),
-                desc.encode("ascii"), pid, cpu, group_fd,
+        res = lib.bpf_attach_uprobe(fn.fd, 1, ev_name.encode("ascii"),
+                path.encode("ascii"), addr, pid, cpu, group_fd,
                 self._reader_cb_impl, ct.cast(id(self), ct.py_object))
         res = ct.cast(res, ct.c_void_p)
         if not res:
@@ -820,21 +822,20 @@ class BPF(object):
         self._add_uprobe(ev_name, res)
         return self
 
-    def detach_uretprobe(self, name="", sym="", addr=None):
-        """detach_uretprobe(name="", sym="", addr=None)
+    def detach_uretprobe(self, name="", sym="", addr=None, pid=-1):
+        """detach_uretprobe(name="", sym="", addr=None, pid=-1)
 
         Stop running a bpf function that is attached to symbol 'sym' in library
         or binary 'name'.
         """
 
         name = str(name)
-        (path, addr) = BPF._check_path_symbol(name, sym, addr)
+        (path, addr) = BPF._check_path_symbol(name, sym, addr, pid)
         ev_name = "r_%s_0x%x" % (self._probe_repl.sub("_", path), addr)
         if ev_name not in self.open_uprobes:
-            raise Exception("Kretprobe %s is not attached" % event)
+            raise Exception("Uretprobe %s is not attached" % ev_name)
         lib.perf_reader_free(self.open_uprobes[ev_name])
-        desc = "-:uprobes/%s" % ev_name
-        res = lib.bpf_detach_uprobe(desc.encode("ascii"))
+        res = lib.bpf_detach_uprobe(ev_name.encode("ascii"))
         if res < 0:
             raise Exception("Failed to detach BPF from uprobe")
         self._del_uprobe(ev_name)
@@ -1036,18 +1037,17 @@ class BPF(object):
             lib.perf_reader_free(v)
             # non-string keys here include the perf_events reader
             if isinstance(k, str):
-                desc = "-:kprobes/%s" % k
-                lib.bpf_detach_kprobe(desc.encode("ascii"))
+                lib.bpf_detach_kprobe(str(k).encode("ascii"))
             self._del_kprobe(k)
         for k, v in list(self.open_uprobes.items()):
             lib.perf_reader_free(v)
-            desc = "-:uprobes/%s" % k
-            lib.bpf_detach_uprobe(desc.encode("ascii"))
+            lib.bpf_detach_uprobe(str(k).encode("ascii"))
             self._del_uprobe(k)
         for k, v in self.open_tracepoints.items():
             lib.perf_reader_free(v)
             (tp_category, tp_name) = k.split(':')
-            lib.bpf_detach_tracepoint(tp_category, tp_name)
+            lib.bpf_detach_tracepoint(tp_category.encode("ascii"),
+                    tp_name.encode("ascii"))
         self.open_tracepoints.clear()
         for (ev_type, ev_config) in list(self.open_perf_events.keys()):
             self.detach_perf_event(ev_type, ev_config)
@@ -1065,4 +1065,4 @@ class BPF(object):
         self.cleanup()
 
 
-from .usdt import USDT
+from .usdt import USDT, USDTException

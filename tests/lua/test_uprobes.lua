@@ -27,8 +27,8 @@ int count(struct pt_regs *ctx) {
   local text = text:gsub("PID", tostring(pid))
 
   local b = BPF:new{text=text}
-  b:attach_uprobe{name="c", sym="malloc_stats", fn_name="count"}
-  b:attach_uprobe{name="c", sym="malloc_stats", fn_name="count", retprobe=true}
+  b:attach_uprobe{name="c", sym="malloc_stats", fn_name="count", pid=pid}
+  b:attach_uprobe{name="c", sym="malloc_stats", fn_name="count", pid=pid, retprobe=true}
 
   assert_equals(BPF.num_open_uprobes(), 2)
 

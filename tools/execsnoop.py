@@ -197,9 +197,9 @@ def print_event(cpu, data, size):
             if args.timestamp:
                 print("%-8.3f" % (time.time() - start_ts), end="")
             ppid = get_ppid(event.pid)
-            print("%-16s %-6s %-6s %3s %s" % (event.comm, event.pid,
+            print("%-16s %-6s %-6s %3s %s" % (event.comm.decode(), event.pid,
                     ppid if ppid > 0 else "?", event.retval,
-                    ' '.join(argv[event.pid])))
+                    b' '.join(argv[event.pid]).decode()))
 
         del(argv[event.pid])
 

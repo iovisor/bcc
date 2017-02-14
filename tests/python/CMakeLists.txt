@@ -17,7 +17,7 @@ endif()
 add_test(NAME py_test_stat1_b WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   COMMAND ${TEST_WRAPPER} py_stat1_b namespace ${CMAKE_CURRENT_SOURCE_DIR}/test_stat1.py test_stat1.b proto.b)
 add_test(NAME py_test_bpf_log WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-  COMMAND ${TEST_WRAPPER} py_bpf_prog namespace ${CMAKE_CURRENT_SOURCE_DIR}/test_bpf_log.py)
+  COMMAND ${TEST_WRAPPER} py_bpf_prog sudo ${CMAKE_CURRENT_SOURCE_DIR}/test_bpf_log.py)
 add_test(NAME py_test_stat1_c WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   COMMAND ${TEST_WRAPPER} py_stat1_c namespace ${CMAKE_CURRENT_SOURCE_DIR}/test_stat1.py test_stat1.c)
 #add_test(NAME py_test_xlate1_b WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
@@ -56,6 +56,10 @@ add_test(NAME py_test_tracepoint WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   COMMAND ${TEST_WRAPPER} py_test_tracepoint sudo ${CMAKE_CURRENT_SOURCE_DIR}/test_tracepoint.py)
 add_test(NAME py_test_perf_event WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   COMMAND ${TEST_WRAPPER} py_test_perf_event sudo ${CMAKE_CURRENT_SOURCE_DIR}/test_perf_event.py)
+add_test(NAME py_test_utils WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  COMMAND ${TEST_WRAPPER} py_test_utils sudo ${CMAKE_CURRENT_SOURCE_DIR}/test_utils.py)
+add_test(NAME py_test_percpu WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  COMMAND ${TEST_WRAPPER} py_test_percpu sudo ${CMAKE_CURRENT_SOURCE_DIR}/test_percpu.py)
 
 add_test(NAME py_test_dump_func WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   COMMAND ${TEST_WRAPPER} py_dump_func simple ${CMAKE_CURRENT_SOURCE_DIR}/test_dump_func.py)

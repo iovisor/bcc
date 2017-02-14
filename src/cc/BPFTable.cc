@@ -25,6 +25,7 @@
 #include "bcc_syms.h"
 #include "libbpf.h"
 #include "perf_reader.h"
+#include "common.h"
 
 namespace ebpf {
 
@@ -89,7 +90,7 @@ StatusTuple BPFPerfBuffer::open_all_cpu(perf_reader_raw_cb cb,
   if (cpu_readers_.size() != 0 || readers_.size() != 0)
     return StatusTuple(-1, "Previously opened perf buffer not cleaned");
 
-  for (int i = 0; i < sysconf(_SC_NPROCESSORS_ONLN); i++) {
+  for (int i: get_online_cpus()) {
     auto res = open_on_cpu(cb, i, cb_cookie);
     if (res.code() != 0) {
       TRY2(close_all_cpu());
@@ -113,7 +114,7 @@ StatusTuple BPFPerfBuffer::close_on_cpu(int cpu) {
 StatusTuple BPFPerfBuffer::close_all_cpu() {
   std::string errors;
   bool has_error = false;
-  for (int i = 0; i < sysconf(_SC_NPROCESSORS_ONLN); i++) {
+  for (int i: get_online_cpus()) {
     auto res = close_on_cpu(i);
     if (res.code() != 0) {
       errors += "Failed to close CPU" + std::to_string(i) + " perf buffer: ";

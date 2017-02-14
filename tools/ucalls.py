@@ -4,7 +4,7 @@
 # ucalls  Summarize method calls in high-level languages and/or system calls.
 #         For Linux, uses BCC, eBPF.
 #
-# USAGE: ucalls [-l {java,python,ruby}] [-h] [-T TOP] [-L] [-S] [-v] [-m]
+# USAGE: ucalls [-l {java,python,ruby,php}] [-h] [-T TOP] [-L] [-S] [-v] [-m]
 #        pid [interval]
 #
 # Copyright 2016 Sasha Goldshtein
@@ -24,7 +24,7 @@ examples = """examples:
     ./ucalls 6712 -S            # trace only syscall counts
     ./ucalls -l ruby 1344 -T 10 # trace top 10 Ruby method calls
     ./ucalls -l ruby 1344 -L    # trace Ruby calls including latency
-    ./ucalls -l ruby 1344 -LS   # trace Ruby calls and syscalls with latency
+    ./ucalls -l php 443 -LS     # trace PHP calls and syscalls with latency
     ./ucalls -l python 2020 -mL # trace Python calls including latency in ms
 """
 parser = argparse.ArgumentParser(
@@ -34,7 +34,8 @@ parser = argparse.ArgumentParser(
 parser.add_argument("pid", type=int, help="process id to attach to")
 parser.add_argument("interval", type=int, nargs='?',
     help="print every specified number of seconds")
-parser.add_argument("-l", "--language", choices=["java", "python", "ruby"],
+parser.add_argument("-l", "--language",
+    choices=["java", "python", "ruby", "php"],
     help="language to trace (if none, trace syscalls only)")
 parser.add_argument("-T", "--top", type=int,
     help="number of most frequent/slow calls to print")
@@ -49,8 +50,8 @@ parser.add_argument("-m", "--milliseconds", action="store_true",
 args = parser.parse_args()
 
 # We assume that the entry and return probes have the same arguments. This is
-# the case for Java, Python, and Ruby. If there's a language where it's not the
-# case, we will need to build a custom correlator from entry to exit.
+# the case for Java, Python, Ruby, and PHP. If there's a language where it's
+# not the case, we will need to build a custom correlator from entry to exit.
 if args.language == "java":
     # TODO for JVM entries, we actually have the real length of the class
     #      and method strings in arg3 and arg5 respectively, so we can insert
@@ -70,6 +71,11 @@ elif args.language == "ruby":
     return_probe = "method__return"
     read_class = "bpf_usdt_readarg(1, ctx, &clazz);"
     read_method = "bpf_usdt_readarg(2, ctx, &method);"
+elif args.language == "php":
+    entry_probe = "function__entry"
+    return_probe = "function__return"
+    read_class = "bpf_usdt_readarg(4, ctx, &clazz);"
+    read_method = "bpf_usdt_readarg(1, ctx, &method);"
 elif not args.language:
     if not args.syscalls:
         print("Nothing to do; use -S to trace syscalls.")
@@ -213,9 +219,9 @@ int syscall_return(struct pt_regs *ctx) {
 
 if args.language:
     usdt = USDT(pid=args.pid)
-    usdt.enable_probe(entry_probe, "trace_entry")
+    usdt.enable_probe_or_bail(entry_probe, "trace_entry")
     if args.latency:
-        usdt.enable_probe(return_probe, "trace_return")
+        usdt.enable_probe_or_bail(return_probe, "trace_return")
 else:
     usdt = None
 
@@ -236,25 +242,26 @@ if args.syscalls:
 def get_data():
     # Will be empty when no language was specified for tracing
     if args.latency:
-        data = map(lambda (k, v): (k.clazz + "." + k.method,
-                                   (v.num_calls, v.total_ns)),
-                   bpf["times"].items())
+        data = list(map(lambda kv: (kv[0].clazz + "." + kv[0].method,
+                                   (kv[1].num_calls, kv[1].total_ns)),
+                   bpf["times"].items()))
     else:
-        data = map(lambda (k, v): (k.clazz + "." + k.method, (v.value, 0)),
-                   bpf["counts"].items())
+        data = list(map(lambda kv: (kv[0].clazz + "." + kv[0].method,
+                                   (kv[1].value, 0)),
+                   bpf["counts"].items()))
 
     if args.syscalls:
         if args.latency:
-            syscalls = map(lambda (k, v): (bpf.ksym(k.value),
-                                           (v.num_calls, v.total_ns)),
+            syscalls = map(lambda kv: (bpf.ksym(kv[0].value),
+                                           (kv[1].num_calls, kv[1].total_ns)),
                            bpf["systimes"].items())
             data.extend(syscalls)
         else:
-            syscalls = map(lambda (k, v): (bpf.ksym(k.value), (v.value, 0)),
+            syscalls = map(lambda kv: (bpf.ksym(kv[0].value), (kv[1].value, 0)),
                            bpf["syscounts"].items())
             data.extend(syscalls)
 
-    return sorted(data, key=lambda (k, v): v[1 if args.latency else 0])
+    return sorted(data, key=lambda kv: kv[1][1 if args.latency else 0])
 
 def clear_data():
     if args.latency:

@@ -4,7 +4,7 @@
 # ugc  Summarize garbage collection events in high-level languages.
 #      For Linux, uses BCC, eBPF.
 #
-# USAGE: ugc [-v] [-m] {java,python,ruby,node} pid
+# USAGE: ugc [-v] [-m] [-M MSEC] [-F FILTER] {java,python,ruby,node} pid
 #
 # Copyright 2016 Sasha Goldshtein
 # Licensed under the Apache License, Version 2.0 (the "License")
@@ -20,6 +20,7 @@ import time
 examples = """examples:
     ./ugc java 185           # trace Java GCs in process 185
     ./ugc ruby 1344 -m       # trace Ruby GCs reporting in ms
+    ./ugc -M 10 java 185     # trace only Java GCs longer than 10ms
 """
 parser = argparse.ArgumentParser(
     description="Summarize garbage collection events in high-level languages.",
@@ -32,6 +33,10 @@ parser.add_argument("-v", "--verbose", action="store_true",
     help="verbose mode: print the BPF program (for debugging purposes)")
 parser.add_argument("-m", "--milliseconds", action="store_true",
     help="report times in milliseconds (default is microseconds)")
+parser.add_argument("-M", "--minimum", type=int, default=0,
+    help="display only GCs longer than this many milliseconds")
+parser.add_argument("-F", "--filter", type=str,
+    help="display only GCs whose description contains this text")
 args = parser.parse_args()
 
 usdt = USDT(pid=args.pid)
@@ -85,17 +90,21 @@ int trace_%s(struct pt_regs *ctx) {
         return 0;   // missed the entry event on this thread
     }
     elapsed = bpf_ktime_get_ns() - e->start_ns;
+    if (elapsed < %d) {
+        return 0;
+    }
     event.elapsed_ns = elapsed;
     %s
     gcs.perf_submit(ctx, &event, sizeof(event));
     return 0;
 }
-        """ % (self.begin, self.begin_save, self.end, self.end_save)
+        """ % (self.begin, self.begin_save, self.end,
+               args.minimum * 1000000, self.end_save)
         return text
 
     def attach(self):
-        usdt.enable_probe(self.begin, "trace_%s" % self.begin)
-        usdt.enable_probe(self.end, "trace_%s" % self.end)
+        usdt.enable_probe_or_bail(self.begin, "trace_%s" % self.begin)
+        usdt.enable_probe_or_bail(self.end, "trace_%s" % self.end)
 
     def format(self, data):
         return self.formatter(data)
@@ -187,7 +196,7 @@ bpf = BPF(text=program, usdt_contexts=[usdt])
 print("Tracing garbage collections in %s process %d... Ctrl-C to quit." %
       (args.language, args.pid))
 time_col = "TIME (ms)" if args.milliseconds else "TIME (us)"
-print("%-8s %-40s %-8s" % ("START", "DESCRIPTION", time_col))
+print("%-8s %-8s %-40s" % ("START", time_col, "DESCRIPTION"))
 
 class GCEvent(ct.Structure):
     _fields_ = [
@@ -207,9 +216,10 @@ def print_event(cpu, data, size):
     event = ct.cast(data, ct.POINTER(GCEvent)).contents
     elapsed = event.elapsed_ns/1000000 if args.milliseconds else \
               event.elapsed_ns/1000
-    print("%-8.3f %-40s %-8.2f" % (time.time() - start_ts,
-                                   probes[event.probe_index].format(event),
-                                   elapsed))
+    description = probes[event.probe_index].format(event)
+    if args.filter and not args.filter in description:
+        return
+    print("%-8.3f %-8.2f %s" % (time.time() - start_ts, elapsed, description))
 
 bpf["gcs"].open_perf_buffer(print_event)
 while 1:

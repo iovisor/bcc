@@ -15,6 +15,7 @@ ARM64 | 3.18 | [e54bcde3d69d](https://git.kernel.org/cgit/linux/kernel/git/torva
 s390 | 4.1 | [054623105728](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=054623105728b06852f077299e2bf1bf3d5f2b0b)
 Constant blinding for JIT machines | 4.7 | [4f3446bb809f](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=4f3446bb809f20ad56cadf712e6006815ae7a8f9)
 PowerPC64 | 4.8 | [156d0e290e96](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=156d0e290e969caba25f1851c52417c14d141b24)
+Constant blinding - PowerPC64 | 4.9 | [b7b7013cac55](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=b7b7013cac55d794940bd9cb7b7c55c9dececac4)
 
 ## Main features
 
@@ -24,7 +25,7 @@ Feature | Kernel version | Commit
 Kernel helpers | 3.15 | [bd4cf0ed331a](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=bd4cf0ed331a275e9bf5a49e6d0fd55dffc551b8)
 `bpf()` syscall | 3.18 | [99c55f7d47c0](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=99c55f7d47c0dc6fc64729f37bf435abf43f4c60)
 Tables (_a.k.a._ Maps; details below) | 3.18 | [99c55f7d47c0](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=99c55f7d47c0dc6fc64729f37bf435abf43f4c60)
-BPF attached to sockets | 3.19 | [89aa075832b0](89aa075832b0da4402acebd698d0411dcc82d03e)
+BPF attached to sockets | 3.19 | [89aa075832b0](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=89aa075832b0da4402acebd698d0411dcc82d03e)
 BPF attached to `kprobes` | 4.1 | [2541517c32be](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=2541517c32be2531e0da59dfd7efc1ce844644f5)
 `cls_bpf` / `act_bpf` for `tc` | 4.1 | [e2e9b6541dd4](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=e2e9b6541dd4b31848079da80fe2253daaafb549)
 Tail calls | 4.2 | [04fd61ab36ec](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=04fd61ab36ec065e194ab5e74ae34a5240d992bb)
@@ -53,9 +54,11 @@ Perf events | 4.3 | [ea317b267e9d](https://git.kernel.org/cgit/linux/kernel/git/
 Per-CPU hash | 4.6 | [824bd0ce6c7c](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=824bd0ce6c7c43a9e1e210abf124958e54d88342)
 Per-CPU array | 4.6 | [a10423b87a7e](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=a10423b87a7eae75da79ce80a8d9475047a674ee)
 Stack trace | 4.6 | [d5a3b1f69186](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=d5a3b1f691865be576c2bffa708549b8cdccda19)
+Pre-alloc maps memory | 4.6 | [6c9059817432](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=6c90598174322b8888029e40dd84a4eb01f56afe)
 cgroup array | 4.8 | [4ed8ec521ed5](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=4ed8ec521ed57c4e207ad464ca0388776de74d4b)
-LRU hash | [4.10](https://git.kernel.org/cgit/linux/kernel/git/davem/net-next.git/commit/?id=29ba732acbeece1e34c68483d1ec1f3720fa1bb3) | [](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=29ba732acbeece1e34c68483d1ec1f3720fa1bb3)
-LRU per-CPU hash | [4.10](https://git.kernel.org/cgit/linux/kernel/git/davem/net-next.git/commit/?id=8f8449384ec364ba2a654f11f94e754e4ff719e0) | [](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=8f8449384ec364ba2a654f11f94e754e4ff719e0)
+LRU hash | 4.10 | [29ba732acbee](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=29ba732acbeece1e34c68483d1ec1f3720fa1bb3)
+LRU per-CPU hash | 4.10 | [8f8449384ec3](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=8f8449384ec364ba2a654f11f94e754e4ff719e0)
+LPM trie | 4.11 | [b95a5c4db09b](https://git.kernel.org/cgit/linux/kernel/git/davem/net-next.git/commit/?id=b95a5c4db09bc7c253636cb84dc9b12c577fd5a0)
 Text string | _To be done?_ |
 Variable-length maps | _To be done?_ |
 

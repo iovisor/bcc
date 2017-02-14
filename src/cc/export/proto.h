@@ -15,6 +15,9 @@ R"********(
  * limitations under the License.
  */
 
+#ifndef __BCC_PROTO_H
+#define __BCC_PROTO_H
+
 #include <uapi/linux/if_ether.h>
 
 #define BPF_PACKET_HEADER __attribute__((packed)) __attribute__((deprecated("packet")))
@@ -142,4 +145,6 @@ struct vxlan_gbp_t {
   unsigned int key:24;
   unsigned int rsv6:8;
 } BPF_PACKET_HEADER;
+
+#endif
 )********"

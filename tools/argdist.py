@@ -159,7 +159,7 @@ u64 __time = bpf_ktime_get_ns();
                 if parts[0] not in ["r", "p", "t", "u"]:
                         self._bail("probe type must be 'p', 'r', 't', or 'u'" +
                                    " but got '%s'" % parts[0])
-                if re.match(r"\w+\(.*\)", parts[2]) is None:
+                if re.match(r"\S+\(.*\)", parts[2]) is None:
                         self._bail(("function signature '%s' has an invalid " +
                                     "format") % parts[2])
 
@@ -172,6 +172,9 @@ u64 __time = bpf_ktime_get_ns();
                 if len(exprs) == 0:
                         self._bail("no exprs specified")
                 self.exprs = exprs.split(',')
+
+        def _make_valid_identifier(self, ident):
+                return re.sub(r'[^A-Za-z0-9_]', '_', ident)
 
         def __init__(self, tool, type, specifier):
                 self.usdt_ctx = None
@@ -196,8 +199,9 @@ u64 __time = bpf_ktime_get_ns();
                         self.tp_event = self.function
                 elif self.probe_type == "u":
                         self.library = parts[1]
-                        self.probe_func_name = "%s_probe%d" % \
-                                (self.function, Probe.next_probe_index)
+                        self.probe_func_name = self._make_valid_identifier(
+                                "%s_probe%d" % \
+                                (self.function, Probe.next_probe_index))
                         self._enable_usdt_probe()
                 else:
                         self.library = parts[1]
@@ -233,10 +237,12 @@ u64 __time = bpf_ktime_get_ns();
                 self.entry_probe_required = self.probe_type == "r" and \
                         (any(map(check, self.exprs)) or check(self.filter))
 
-                self.probe_func_name = "%s_probe%d" % \
-                        (self.function, Probe.next_probe_index)
-                self.probe_hash_name = "%s_hash%d" % \
-                        (self.function, Probe.next_probe_index)
+                self.probe_func_name = self._make_valid_identifier(
+                        "%s_probe%d" % \
+                        (self.function, Probe.next_probe_index))
+                self.probe_hash_name = self._make_valid_identifier(
+                        "%s_hash%d" % \
+                        (self.function, Probe.next_probe_index))
                 Probe.next_probe_index += 1
 
         def _enable_usdt_probe(self):
@@ -252,7 +258,7 @@ static inline bool %s(char const *ignored, char const *str) {
         char needle[] = %s;
         char haystack[sizeof(needle)];
         bpf_probe_read(&haystack, sizeof(haystack), (void *)str);
-        for (int i = 0; i < sizeof(needle); ++i) {
+        for (int i = 0; i < sizeof(needle) - 1; ++i) {
                 if (needle[i] != haystack[i]) {
                         return false;
                 }
@@ -613,7 +619,8 @@ argdist -p 2780 -z 120 \\
                   "(see examples below)")
                 parser.add_argument("-I", "--include", action="append",
                   metavar="header",
-                  help="additional header files to include in the BPF program")
+                  help="additional header files to include in the BPF program "
+                       "as either full path, or relative to '/usr/include'")
                 self.args = parser.parse_args()
                 self.usdt_ctx = None
 
@@ -634,7 +641,12 @@ struct __string_t { char s[%d]; };
 #include <uapi/linux/ptrace.h>
                 """ % self.args.string_size
                 for include in (self.args.include or []):
-                        bpf_source += "#include <%s>\n" % include
+                        if include.startswith((".", "/")):
+                                include = os.path.abspath(include)
+                                bpf_source += "#include \"%s\"\n" % include
+                        else:
+                                bpf_source += "#include <%s>\n" % include
+
                 bpf_source += BPF.generate_auto_includes(
                                 map(lambda p: p.raw_spec, self.probes))
                 for probe in self.probes:

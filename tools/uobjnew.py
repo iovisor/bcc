@@ -78,7 +78,7 @@ int alloc_entry(struct pt_regs *ctx) {
     return 0;
 }
     """
-    usdt.enable_probe("object__alloc", "alloc_entry")
+    usdt.enable_probe_or_bail("object__alloc", "alloc_entry")
 #
 # Ruby
 #
@@ -107,10 +107,10 @@ int object_alloc_entry(struct pt_regs *ctx) {
     return 0;
 }
     """
-    usdt.enable_probe("object__create", "object_alloc_entry")
+    usdt.enable_probe_or_bail("object__create", "object_alloc_entry")
     for thing in ["string", "hash", "array"]:
         program += create_template.replace("THETHING", thing)
-        usdt.enable_probe("%s__create" % thing, "%s_alloc_entry" % thing)
+        usdt.enable_probe_or_bail("%s__create" % thing, "%s_alloc_entry" % thing)
 #
 # C
 #
@@ -147,13 +147,13 @@ while True:
     print()
     data = bpf["allocs"]
     if args.top_count:
-        data = sorted(data.items(), key=lambda (k, v): v.num_allocs)
+        data = sorted(data.items(), key=lambda kv: kv[1].num_allocs)
         data = data[-args.top_count:]
     elif args.top_size:
-        data = sorted(data.items(), key=lambda (k, v): v.total_size)
+        data = sorted(data.items(), key=lambda kv: kv[1].total_size)
         data = data[-args.top_size:]
     else:
-        data = sorted(data.items(), key=lambda (k, v): v.total_size)
+        data = sorted(data.items(), key=lambda kv: kv[1].total_size)
     print("%-30s %8s %12s" % ("TYPE", "# ALLOCS", "# BYTES"))
     for key, value in data:
         if args.language == "c":

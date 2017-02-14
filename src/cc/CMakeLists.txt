@@ -35,12 +35,12 @@ if (CMAKE_COMPILER_IS_GNUCC AND LIBCLANG_ISSTATIC)
   endif()
 endif()
 
-add_library(bcc-shared SHARED bpf_common.cc bpf_module.cc libbpf.c perf_reader.c shared_table.cc exported_files.cc bcc_elf.c bcc_perf_map.c bcc_proc.c bcc_syms.cc usdt_args.cc usdt.cc BPF.cc BPFTable.cc)
+add_library(bcc-shared SHARED bpf_common.cc bpf_module.cc libbpf.c perf_reader.c shared_table.cc exported_files.cc bcc_elf.c bcc_perf_map.c bcc_proc.c bcc_syms.cc usdt_args.cc usdt.cc common.cc BPF.cc BPFTable.cc)
 set_target_properties(bcc-shared PROPERTIES VERSION ${REVISION_LAST} SOVERSION 0)
 set_target_properties(bcc-shared PROPERTIES OUTPUT_NAME bcc)
 
 add_library(bcc-loader-static libbpf.c perf_reader.c bcc_elf.c bcc_perf_map.c bcc_proc.c)
-add_library(bcc-static STATIC bpf_common.cc bpf_module.cc shared_table.cc exported_files.cc bcc_syms.cc usdt_args.cc usdt.cc BPF.cc BPFTable.cc)
+add_library(bcc-static STATIC bpf_common.cc bpf_module.cc shared_table.cc exported_files.cc bcc_syms.cc usdt_args.cc usdt.cc common.cc BPF.cc BPFTable.cc)
 set_target_properties(bcc-static PROPERTIES OUTPUT_NAME bcc)
 
 set(llvm_raw_libs bitwriter bpfcodegen irreader linker

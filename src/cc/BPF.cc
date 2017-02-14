@@ -30,6 +30,7 @@
 #include "bpf_module.h"
 #include "libbpf.h"
 #include "perf_reader.h"
+#include "common.h"
 #include "usdt.h"
 
 #include "BPF.h"
@@ -146,7 +147,7 @@ StatusTuple BPF::detach_all() {
 
 StatusTuple BPF::attach_kprobe(const std::string& kernel_func,
                                const std::string& probe_func,
-                               bpf_attach_type attach_type,
+                               bpf_probe_attach_type attach_type,
                                pid_t pid, int cpu, int group_fd,
                                perf_reader_cb cb, void* cb_cookie) {
   std::string probe_event = get_kprobe_event(kernel_func, attach_type);
@@ -156,11 +157,8 @@ StatusTuple BPF::attach_kprobe(const std::string& kernel_func,
   int probe_fd;
   TRY2(load_func(probe_func, BPF_PROG_TYPE_KPROBE, probe_fd));
 
-  std::string probe_event_desc = attach_type_prefix(attach_type);
-  probe_event_desc += ":kprobes/" + probe_event + " " + kernel_func;
-
   void* res =
-      bpf_attach_kprobe(probe_fd, probe_event.c_str(), probe_event_desc.c_str(),
+      bpf_attach_kprobe(probe_fd, attach_type, probe_event.c_str(), kernel_func.c_str(),
                         pid, cpu, group_fd, cb, cb_cookie);
 
   if (!res) {
@@ -181,7 +179,7 @@ StatusTuple BPF::attach_uprobe(const std::string& binary_path,
                                const std::string& symbol,
                                const std::string& probe_func,
                                uint64_t symbol_addr,
-                               bpf_attach_type attach_type,
+                               bpf_probe_attach_type attach_type,
                                pid_t pid, int cpu, int group_fd,
                                perf_reader_cb cb, void* cb_cookie) {
   bcc_symbol sym = bcc_symbol();
@@ -195,13 +193,9 @@ StatusTuple BPF::attach_uprobe(const std::string& binary_path,
   int probe_fd;
   TRY2(load_func(probe_func, BPF_PROG_TYPE_KPROBE, probe_fd));
 
-  std::string probe_event_desc = attach_type_prefix(attach_type);
-  probe_event_desc += ":uprobes/" + probe_event + " ";
-  probe_event_desc += binary_path + ":0x" + uint_to_hex(sym.offset);
-
   void* res =
-      bpf_attach_uprobe(probe_fd, probe_event.c_str(), probe_event_desc.c_str(),
-                        pid, cpu, group_fd, cb, cb_cookie);
+      bpf_attach_uprobe(probe_fd, attach_type, probe_event.c_str(), binary_path.c_str(),
+                        sym.offset, pid, cpu, group_fd, cb, cb_cookie);
 
   if (!res) {
     TRY2(unload_func(probe_func));
@@ -297,11 +291,12 @@ StatusTuple BPF::attach_perf_event(uint32_t ev_type, uint32_t ev_config,
   TRY2(load_func(probe_func, BPF_PROG_TYPE_PERF_EVENT, probe_fd));
 
   auto fds = new std::map<int, int>();
-  int cpu_st = 0;
-  int cpu_en = sysconf(_SC_NPROCESSORS_ONLN) - 1;
+  std::vector<int> cpus;
   if (cpu >= 0)
-    cpu_st = cpu_en = cpu;
-  for (int i = cpu_st; i <= cpu_en; i++) {
+    cpus.push_back(cpu);
+  else
+    cpus = get_online_cpus();
+  for (int i: cpus) {
     int fd = bpf_attach_perf_event(probe_fd, ev_type, ev_config, sample_period,
                                    sample_freq, pid, i, group_fd);
     if (fd < 0) {
@@ -323,7 +318,7 @@ StatusTuple BPF::attach_perf_event(uint32_t ev_type, uint32_t ev_config,
 }
 
 StatusTuple BPF::detach_kprobe(const std::string& kernel_func,
-                               bpf_attach_type attach_type) {
+                               bpf_probe_attach_type attach_type) {
   std::string event = get_kprobe_event(kernel_func, attach_type);
 
   auto it = kprobes_.find(event);
@@ -339,7 +334,7 @@ StatusTuple BPF::detach_kprobe(const std::string& kernel_func,
 
 StatusTuple BPF::detach_uprobe(const std::string& binary_path,
                                const std::string& symbol, uint64_t symbol_addr,
-                               bpf_attach_type attach_type) {
+                               bpf_probe_attach_type attach_type) {
   bcc_symbol sym = bcc_symbol();
   TRY2(check_binary_symbol(binary_path, symbol, symbol_addr, &sym));
 
@@ -421,7 +416,7 @@ void BPF::poll_perf_buffer(const std::string& name, int timeout) {
 }
 
 StatusTuple BPF::load_func(const std::string& func_name,
-                           enum bpf_prog_type type, int& fd) {
+                           bpf_prog_type type, int& fd) {
   if (funcs_.find(func_name) != funcs_.end()) {
     fd = funcs_[func_name];
     return StatusTuple(0);
@@ -462,7 +457,7 @@ StatusTuple BPF::check_binary_symbol(const std::string& binary_path,
                                      const std::string& symbol,
                                      uint64_t symbol_addr, bcc_symbol* output) {
   int res = bcc_resolve_symname(binary_path.c_str(), symbol.c_str(),
-                                symbol_addr, output);
+                                symbol_addr, 0, output);
   if (res < 0)
     return StatusTuple(
         -1, "Unable to find offset for binary %s symbol %s address %lx",
@@ -471,14 +466,14 @@ StatusTuple BPF::check_binary_symbol(const std::string& binary_path,
 }
 
 std::string BPF::get_kprobe_event(const std::string& kernel_func,
-                                  bpf_attach_type type) {
+                                  bpf_probe_attach_type type) {
   std::string res = attach_type_prefix(type) + "_";
   res += sanitize_str(kernel_func, &BPF::kprobe_event_validator);
   return res;
 }
 
 std::string BPF::get_uprobe_event(const std::string& binary_path,
-                                  uint64_t offset, bpf_attach_type type) {
+                                  uint64_t offset, bpf_probe_attach_type type) {
   std::string res = attach_type_prefix(type) + "_";
   res += sanitize_str(binary_path, &BPF::uprobe_path_validator);
   res += "_0x" + uint_to_hex(offset);
@@ -492,8 +487,7 @@ StatusTuple BPF::detach_kprobe_event(const std::string& event,
     attr.reader_ptr = nullptr;
   }
   TRY2(unload_func(attr.func));
-  std::string detach_event = "-:kprobes/" + event;
-  if (bpf_detach_kprobe(detach_event.c_str()) < 0)
+  if (bpf_detach_kprobe(event.c_str()) < 0)
     return StatusTuple(-1, "Unable to detach kprobe %s", event.c_str());
   return StatusTuple(0);
 }
@@ -505,8 +499,7 @@ StatusTuple BPF::detach_uprobe_event(const std::string& event,
     attr.reader_ptr = nullptr;
   }
   TRY2(unload_func(attr.func));
-  std::string detach_event = "-:uprobes/" + event;
-  if (bpf_detach_uprobe(detach_event.c_str()) < 0)
+  if (bpf_detach_uprobe(event.c_str()) < 0)
     return StatusTuple(-1, "Unable to detach uprobe %s", event.c_str());
   return StatusTuple(0);
 }

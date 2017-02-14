@@ -44,16 +44,12 @@ bpf_text = """
 #include <linux/sched.h>
 
 struct val_t {
-    u32 pid;
-    u64 ts;
-    char comm[TASK_COMM_LEN];
     const char *fname;
 };
 
 struct data_t {
     u32 pid;
-    u64 ts;
-    u64 delta;
+    u64 ts_ns;
     int ret;
     char comm[TASK_COMM_LEN];
     char fname[NAME_MAX];
@@ -69,12 +65,8 @@ int trace_entry(struct pt_regs *ctx, const char __user *filename)
     u32 pid = bpf_get_current_pid_tgid();
 
     FILTER
-    if (bpf_get_current_comm(&val.comm, sizeof(val.comm)) == 0) {
-        val.pid = bpf_get_current_pid_tgid();
-        val.ts = bpf_ktime_get_ns();
-        val.fname = filename;
-        infotmp.update(&pid, &val);
-    }
+    val.fname = filename;
+    infotmp.update(&pid, &val);
 
     return 0;
 };
@@ -83,20 +75,17 @@ int trace_return(struct pt_regs *ctx)
 {
     u32 pid = bpf_get_current_pid_tgid();
     struct val_t *valp;
-    struct data_t data = {};
-
-    u64 tsp = bpf_ktime_get_ns();
 
     valp = infotmp.lookup(&pid);
     if (valp == 0) {
         // missed entry
         return 0;
     }
-    bpf_probe_read(&data.comm, sizeof(data.comm), valp->comm);
+
+    struct data_t data = {.pid = pid};
     bpf_probe_read(&data.fname, sizeof(data.fname), (void *)valp->fname);
-    data.pid = valp->pid;
-    data.delta = tsp - valp->ts;
-    data.ts = tsp / 1000;
+    bpf_get_current_comm(&data.comm, sizeof(data.comm));
+    data.ts_ns = bpf_ktime_get_ns();
     data.ret = PT_REGS_RC(ctx);
 
     events.perf_submit(ctx, &data, sizeof(data));
@@ -129,8 +118,7 @@ NAME_MAX = 255        # linux/limits.h
 class Data(ct.Structure):
     _fields_ = [
         ("pid", ct.c_ulonglong),
-        ("ts", ct.c_ulonglong),
-        ("delta", ct.c_ulonglong),
+        ("ts_ns", ct.c_ulonglong),
         ("ret", ct.c_int),
         ("comm", ct.c_char * TASK_COMM_LEN),
         ("fname", ct.c_char * NAME_MAX)
@@ -162,24 +150,13 @@ def print_event(cpu, data, size):
         err = - event.ret
 
     if start_ts == 0:
-        prev_ts = start_ts
-
-    if start_ts == 1:
-        delta = float(delta) + (event.ts - prev_ts)
-
-    if (args.failed and (event.ret >= 0)):
-        start_ts = 1
-        prev_ts = event.ts
-        return
+        start_ts = event.ts_ns
 
     if args.timestamp:
-        print("%-14.9f" % (delta / 1000000), end="")
+        print("%-14.9f" % (float(event.ts_ns - start_ts) / 1000000000), end="")
 
     print("%-6d %-16s %4d %3d %s" % (event.pid, event.comm,
         fd_s, err, event.fname))
-
-    prev_ts = event.ts
-    start_ts = 1
 
 # loop with callback to print_event
 b["events"].open_perf_buffer(print_event)

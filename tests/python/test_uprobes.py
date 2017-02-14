@@ -18,22 +18,24 @@ static void incr(int idx) {
         ++(*ptr);
 }
 int count(struct pt_regs *ctx) {
+    bpf_trace_printk("count() uprobe fired");
     u32 pid = bpf_get_current_pid_tgid();
     if (pid == PID)
         incr(0);
     return 0;
 }"""
-        text = text.replace("PID", "%d" % os.getpid())
+        test_pid = os.getpid()
+        text = text.replace("PID", "%d" % test_pid)
         b = bcc.BPF(text=text)
-        b.attach_uprobe(name="c", sym="malloc_stats", fn_name="count")
-        b.attach_uretprobe(name="c", sym="malloc_stats", fn_name="count")
+        b.attach_uprobe(name="c", sym="malloc_stats", fn_name="count", pid=test_pid)
+        b.attach_uretprobe(name="c", sym="malloc_stats", fn_name="count", pid=test_pid)
         libc = ctypes.CDLL("libc.so.6")
         libc.malloc_stats.restype = None
         libc.malloc_stats.argtypes = []
         libc.malloc_stats()
         self.assertEqual(b["stats"][ctypes.c_int(0)].value, 2)
-        b.detach_uretprobe(name="c", sym="malloc_stats")
-        b.detach_uprobe(name="c", sym="malloc_stats")
+        b.detach_uretprobe(name="c", sym="malloc_stats", pid=test_pid)
+        b.detach_uprobe(name="c", sym="malloc_stats", pid=test_pid)
 
     def test_simple_binary(self):
         text = """

@@ -13,9 +13,13 @@
 # limitations under the License.
 
 import ctypes as ct
+import sys
 from .libbcc import lib, _USDT_CB, _USDT_PROBE_CB, \
                     bcc_usdt_location, bcc_usdt_argument, \
                     BCC_USDT_ARGUMENT_FLAGS
+
+class USDTException(Exception):
+    pass
 
 class USDTProbeArgument(object):
     def __init__(self, argument):
@@ -77,8 +81,9 @@ class USDTProbeLocation(object):
         res = lib.bcc_usdt_get_argument(self.probe.context, self.probe.name,
                                         self.index, index, ct.pointer(arg))
         if res != 0:
-            raise Exception("error retrieving probe argument %d location %d" %
-                            (index, self.index))
+            raise USDTException(
+                    "error retrieving probe argument %d location %d" %
+                    (index, self.index))
         return USDTProbeArgument(arg)
 
 class USDTProbe(object):
@@ -103,7 +108,7 @@ class USDTProbe(object):
         res = lib.bcc_usdt_get_location(self.context, self.name,
                                         index, ct.pointer(loc))
         if res != 0:
-            raise Exception("error retrieving probe location %d" % index)
+            raise USDTException("error retrieving probe location %d" % index)
         return USDTProbeLocation(self, index, loc)
 
 class USDT(object):
@@ -112,23 +117,36 @@ class USDT(object):
             self.pid = pid
             self.context = lib.bcc_usdt_new_frompid(pid)
             if self.context == None:
-                raise Exception("USDT failed to instrument PID %d" % pid)
+                raise USDTException("USDT failed to instrument PID %d" % pid)
         elif path:
             self.path = path
             self.context = lib.bcc_usdt_new_frompath(path)
             if self.context == None:
-                raise Exception("USDT failed to instrument path %s" % path)
+                raise USDTException("USDT failed to instrument path %s" % path)
         else:
-            raise Exception("either a pid or a binary path must be specified")
+            raise USDTException(
+                    "either a pid or a binary path must be specified")
 
     def enable_probe(self, probe, fn_name):
         if lib.bcc_usdt_enable_probe(self.context, probe, fn_name) != 0:
-            raise Exception(("failed to enable probe '%s'; a possible cause " +
-                            "can be that the probe requires a pid to enable") %
-                            probe)
+            raise USDTException(
+                    ("failed to enable probe '%s'; a possible cause " +
+                     "can be that the probe requires a pid to enable") %
+                     probe
+                  )
+
+    def enable_probe_or_bail(self, probe, fn_name):
+        if lib.bcc_usdt_enable_probe(self.context, probe, fn_name) != 0:
+            print(
+"""Error attaching USDT probes: the specified pid might not contain the
+given language's runtime, or the runtime was not built with the required
+USDT probes. Look for a configure flag similar to --with-dtrace or
+--enable-dtrace. To check which probes are present in the process, use the
+tplist tool.""")
+            sys.exit(1)
 
     def get_text(self):
-        return lib.bcc_usdt_genargs(self.context)
+        return lib.bcc_usdt_genargs(self.context).decode()
 
     def get_probe_arg_ctype(self, probe_name, arg_index):
         return lib.bcc_usdt_get_probe_argctype(

@@ -2,16 +2,17 @@
 .SH NAME
 uflow \- Print a flow graph of method calls in high-level languages.
 .SH SYNOPSIS
-.B uflow [-h] [-M METHOD] [-C CLAZZ] [-v] {java,python,ruby} pid
+.B uflow [-h] [-M METHOD] [-C CLAZZ] [-v] {java,python,ruby,php} pid
 .SH DESCRIPTION
 uflow traces method calls and prints them in a flow graph that can facilitate
 debugging and diagnostics by following the program's execution (method flow).
 
 This tool relies on USDT probes embedded in many high-level languages, such as
-Node, Java, Python, and Ruby. It requires a runtime instrumented with these 
+Java, Python, Ruby, and PHP. It requires a runtime instrumented with these 
 probes, which in some cases requires building from source with a USDT-specific
 flag, such as "--enable-dtrace" or "--with-dtrace". For Java processes, the
-startup flag "-XX:+ExtendedDTraceProbes" is required.
+startup flag "-XX:+ExtendedDTraceProbes" is required. For PHP processes, the
+environment variable USE_ZEND_DTRACE must be set to 1.
 
 Since this uses BPF, only the root user can use this tool.
 .SH REQUIREMENTS
@@ -29,7 +30,7 @@ name interpretation strongly depends on the language. For example, in Java use
 \-v
 Print the resulting BPF program, for debugging purposes.
 .TP
-{java,python,ruby}
+{java,python,ruby,php}
 The language to trace.
 .TP
 pid

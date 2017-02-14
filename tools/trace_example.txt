@@ -2,8 +2,8 @@ Demonstrations of trace.
 
 
 trace probes functions you specify and displays trace messages if a particular
-condition is met. You can control the message format to display function 
-arguments and return values. 
+condition is met. You can control the message format to display function
+arguments and return values.
 
 For example, suppose you want to trace all commands being exec'd across the
 system:
@@ -135,6 +135,16 @@ TIME     PID    COMM         FUNC             -
 In the previous invocation, arg1 and arg2 are the class name and method name
 for the Ruby method being invoked.
 
+You can also trace exported functions from shared libraries, or an imported
+function on the actual executable:
+
+# sudo ./trace.py 'r:/usr/lib64/libtinfo.so:curses_version "Version=%s", retval'
+# tput -V
+
+PID    TID    COMM         FUNC             -
+21720  21720  tput         curses_version   Version=ncurses 6.0.20160709
+^C
+
 
 Occasionally, it can be useful to filter specific strings. For example, you
 might be interested in open() calls that open a specific file:
@@ -146,7 +156,30 @@ TIME     PID    COMM         FUNC             -
 ^C
 
 
-As a final example, let's trace open syscalls for a specific process. By 
+In the preceding example, as well as in many others, readability may be
+improved by providing the function's signature, which names the arguments and
+lets you access structure sub-fields, which is hard with the "arg1", "arg2"
+convention. For example:
+
+# trace 'p:c:open(char *filename) "opening %s", filename'
+PID    TID    COMM         FUNC             -
+17507  17507  cat          open             opening FAQ.txt
+^C
+
+# trace 'p::SyS_nanosleep(struct timespec *ts) "sleep for %lld ns", ts->tv_nsec'
+PID    TID    COMM         FUNC             -
+777    785    automount    SyS_nanosleep    sleep for 500000000 ns
+777    785    automount    SyS_nanosleep    sleep for 500000000 ns
+777    785    automount    SyS_nanosleep    sleep for 500000000 ns
+777    785    automount    SyS_nanosleep    sleep for 500000000 ns
+^C
+
+Remember to use the -I argument include the appropriate header file. We didn't
+need to do that here because `struct timespec` is used internally by the tool,
+so it always includes this header file.
+
+
+As a final example, let's trace open syscalls for a specific process. By
 default, tracing is system-wide, but the -p switch overrides this:
 
 # trace -p 2740 'do_sys_open "%s", arg2' -T
@@ -196,6 +229,7 @@ optional arguments:
   -U, --user-stack      output user stack trace
   -I header, --include header
                         additional header files to include in the BPF program
+                        as either full path, or relative to '/usr/include'
 
 EXAMPLES:
 
@@ -205,7 +239,7 @@ trace 'do_sys_open "%s", arg2'
         Trace the open syscall and print the filename being opened
 trace 'sys_read (arg3 > 20000) "read %d bytes", arg3'
         Trace the read syscall and print a message for reads >20000 bytes
-trace 'r::do_sys_return "%llx", retval'
+trace 'r::do_sys_open "%llx", retval'
         Trace the return from the open syscall and print the return value
 trace 'c:open (arg2 == 42) "%s %d", arg1, arg2'
         Trace the open() call from libc only if the flags (arg2) argument is 42
@@ -221,3 +255,5 @@ trace 't:block:block_rq_complete "sectors=%d", args->nr_sector'
         Trace the block_rq_complete kernel tracepoint and print # of tx sectors
 trace 'u:pthread:pthread_create (arg4 != 0)'
         Trace the USDT probe pthread_create when its 4th argument is non-zero
+trace 'p::SyS_nanosleep(struct timespec *ts) "sleep for %lld ns", ts->tv_nsec'
+        Trace the nanosleep syscall and print the sleep duration in ns

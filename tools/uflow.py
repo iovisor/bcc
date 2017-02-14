@@ -4,7 +4,7 @@
 # uflow  Trace method execution flow in high-level languages.
 #        For Linux, uses BCC, eBPF.
 #
-# USAGE: uflow [-C CLASS] [-M METHOD] [-v] {java,python,ruby} pid
+# USAGE: uflow [-C CLASS] [-M METHOD] [-v] {java,python,ruby,php} pid
 #
 # Copyright 2016 Sasha Goldshtein
 # Licensed under the Apache License, Version 2.0 (the "License")
@@ -27,7 +27,7 @@ parser = argparse.ArgumentParser(
     description="Trace method execution flow in high-level languages.",
     formatter_class=argparse.RawDescriptionHelpFormatter,
     epilog=examples)
-parser.add_argument("language", choices=["java", "python", "ruby"],
+parser.add_argument("language", choices=["java", "python", "ruby", "php"],
     help="language to trace")
 parser.add_argument("pid", type=int, help="process id to attach to")
 parser.add_argument("-M", "--method",
@@ -109,7 +109,7 @@ def enable_probe(probe_name, func_name, read_class, read_method, is_return):
                              .replace("FILTER_METHOD", filter_method)   \
                              .replace("DEPTH", depth)                   \
                              .replace("UPDATE", update)
-    usdt.enable_probe(probe_name, func_name)
+    usdt.enable_probe_or_bail(probe_name, func_name)
 
 usdt = USDT(pid=args.pid)
 
@@ -140,6 +140,13 @@ elif args.language == "ruby":
     enable_probe("cmethod__return", "ruby_creturn",
                  "bpf_usdt_readarg(1, ctx, &clazz);",
                  "bpf_usdt_readarg(2, ctx, &method);", is_return=True)
+elif args.language == "php":
+    enable_probe("function__entry", "php_entry",
+                 "bpf_usdt_readarg(4, ctx, &clazz);",
+                 "bpf_usdt_readarg(1, ctx, &method);", is_return=False)
+    enable_probe("function__return", "php_return",
+                 "bpf_usdt_readarg(4, ctx, &clazz);",
+                 "bpf_usdt_readarg(1, ctx, &method);", is_return=True)
 
 if args.verbose:
     print(usdt.get_text())

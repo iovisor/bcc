@@ -14,11 +14,14 @@
 
 from collections import MutableMapping
 import ctypes as ct
+from functools import reduce
 import multiprocessing
 import os
 
 from .libbcc import lib, _RAW_CB_TYPE
 from .perf import Perf
+from .utils import get_online_cpus
+from .utils import get_possible_cpus
 from subprocess import check_output
 
 BPF_MAP_TYPE_HASH = 1
@@ -31,6 +34,7 @@ BPF_MAP_TYPE_STACK_TRACE = 7
 BPF_MAP_TYPE_CGROUP_ARRAY = 8
 BPF_MAP_TYPE_LRU_HASH = 9
 BPF_MAP_TYPE_LRU_PERCPU_HASH = 10
+BPF_MAP_TYPE_LPM_TRIE = 11
 
 stars_max = 40
 log2_index_max = 65
@@ -121,6 +125,8 @@ def Table(bpf, map_id, map_fd, keytype, leaftype, **kwargs):
         t = PerCpuHash(bpf, map_id, map_fd, keytype, leaftype, **kwargs)
     elif ttype == BPF_MAP_TYPE_PERCPU_ARRAY:
         t = PerCpuArray(bpf, map_id, map_fd, keytype, leaftype, **kwargs)
+    elif ttype == BPF_MAP_TYPE_LPM_TRIE:
+        t = LpmTrie(bpf, map_id, map_fd, keytype, leaftype)
     elif ttype == BPF_MAP_TYPE_STACK_TRACE:
         t = StackTrace(bpf, map_id, map_fd, keytype, leaftype)
     elif ttype == BPF_MAP_TYPE_LRU_HASH:
@@ -509,7 +515,7 @@ class PerfEventArray(ArrayBase):
         event submitted from the kernel, up to millions per second.
         """
 
-        for i in range(0, multiprocessing.cpu_count()):
+        for i in get_online_cpus():
             self._open_perf_buffer(i, callback)
 
     def _open_perf_buffer(self, cpu, callback):
@@ -550,7 +556,7 @@ class PerfEventArray(ArrayBase):
         if not isinstance(ev, self.Event):
             raise Exception("argument must be an Event, got %s", type(ev))
 
-        for i in range(0, multiprocessing.cpu_count()):
+        for i in get_online_cpus():
             self._open_perf_event(i, ev.typ, ev.config)
 
 
@@ -559,7 +565,7 @@ class PerCpuHash(HashTable):
         self.reducer = kwargs.pop("reducer", None)
         super(PerCpuHash, self).__init__(*args, **kwargs)
         self.sLeaf = self.Leaf
-        self.total_cpu = multiprocessing.cpu_count()
+        self.total_cpu = len(get_possible_cpus())
         # This needs to be 8 as hard coded into the linux kernel.
         self.alignment = ct.sizeof(self.sLeaf) % 8
         if self.alignment is 0:
@@ -595,7 +601,7 @@ class PerCpuHash(HashTable):
     def sum(self, key):
         if isinstance(self.Leaf(), ct.Structure):
             raise IndexError("Leaf must be an integer type for default sum functions")
-        return self.sLeaf(reduce(lambda x,y: x+y, self.getvalue(key)))
+        return self.sLeaf(sum(self.getvalue(key)))
 
     def max(self, key):
         if isinstance(self.Leaf(), ct.Structure):
@@ -604,8 +610,7 @@ class PerCpuHash(HashTable):
 
     def average(self, key):
         result = self.sum(key)
-        result.value/=self.total_cpu
-        return result
+        return result.value / self.total_cpu
 
 class LruPerCpuHash(PerCpuHash):
     def __init__(self, *args, **kwargs):
@@ -616,7 +621,7 @@ class PerCpuArray(ArrayBase):
         self.reducer = kwargs.pop("reducer", None)
         super(PerCpuArray, self).__init__(*args, **kwargs)
         self.sLeaf = self.Leaf
-        self.total_cpu = multiprocessing.cpu_count()
+        self.total_cpu = len(get_possible_cpus())
         # This needs to be 8 as hard coded into the linux kernel.
         self.alignment = ct.sizeof(self.sLeaf) % 8
         if self.alignment is 0:
@@ -652,7 +657,7 @@ class PerCpuArray(ArrayBase):
     def sum(self, key):
         if isinstance(self.Leaf(), ct.Structure):
             raise IndexError("Leaf must be an integer type for default sum functions")
-        return self.sLeaf(reduce(lambda x,y: x+y, self.getvalue(key)))
+        return self.sLeaf(sum(self.getvalue(key)))
 
     def max(self, key):
         if isinstance(self.Leaf(), ct.Structure):
@@ -661,8 +666,19 @@ class PerCpuArray(ArrayBase):
 
     def average(self, key):
         result = self.sum(key)
-        result.value/=self.total_cpu
-        return result
+        return result.value / self.total_cpu
+
+class LpmTrie(TableBase):
+    def __init__(self, *args, **kwargs):
+        super(LpmTrie, self).__init__(*args, **kwargs)
+
+    def __len__(self):
+        raise NotImplementedError
+
+    def __delitem__(self, key):
+        # Not implemented for lpm trie as of kernel commit
+        # b95a5c4db09bc7c253636cb84dc9b12c577fd5a0
+        raise NotImplementedError
 
 class StackTrace(TableBase):
     MAX_DEPTH = 127

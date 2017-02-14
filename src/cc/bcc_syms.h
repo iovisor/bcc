@@ -43,7 +43,7 @@ int bcc_resolve_global_addr(int pid, const char *module, const uint64_t address,
 int bcc_foreach_symbol(const char *module, SYM_CB cb);
 int bcc_find_symbol_addr(struct bcc_symbol *sym);
 int bcc_resolve_symname(const char *module, const char *symname,
-                        const uint64_t addr, struct bcc_symbol *sym);
+                        const uint64_t addr, int pid, struct bcc_symbol *sym);
 #ifdef __cplusplus
 }
 #endif

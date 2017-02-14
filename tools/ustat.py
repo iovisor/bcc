@@ -5,7 +5,7 @@
 #        method calls, class loads, garbage collections, and more.
 #        For Linux, uses BCC, eBPF.
 #
-# USAGE: ustat [-l {java,python,ruby,node}] [-C]
+# USAGE: ustat [-l {java,python,ruby,node,php}] [-C]
 #        [-S {cload,excp,gc,method,objnew,thread}] [-r MAXROWS] [-d]
 #        [interval [count]]
 #
@@ -132,7 +132,7 @@ class Tool(object):
             formatter_class=argparse.RawDescriptionHelpFormatter,
             epilog=examples)
         parser.add_argument("-l", "--language",
-            choices=["java", "python", "ruby", "node"],
+            choices=["java", "python", "ruby", "node", "php"],
             help="language to trace (default: all languages)")
         parser.add_argument("-C", "--noclear", action="store_true",
             help="don't clear the screen")
@@ -157,6 +157,11 @@ class Tool(object):
                 "python": Probe("python", ["python"], {
                     "function__entry": Category.METHOD,
                     "gc__start": Category.GC
+                    }),
+                "php": Probe("php", ["php"], {
+                    "function__entry": Category.METHOD,
+                    "compile__file__entry": Category.CLOAD,
+                    "exception__thrown": Category.EXCP
                     }),
                 "ruby": Probe("ruby", ["ruby", "irb"], {
                     "method__entry": Category.METHOD,
@@ -239,10 +244,10 @@ class Tool(object):
             counts.update(probe.get_counts(self.bpf))
             targets.update(probe.targets)
         if self.args.sort:
-            counts = sorted(counts.items(), key=lambda (_, v):
-                            -v.get(self.args.sort.upper(), 0))
+            counts = sorted(counts.items(), key=lambda kv:
+                            -kv[1].get(self.args.sort.upper(), 0))
         else:
-            counts = sorted(counts.items(), key=lambda (k, _): k)
+            counts = sorted(counts.items(), key=lambda kv: kv[0])
         for pid, stats in counts:
             print("%-6d %-20s %-10d %-6d %-10d %-8d %-6d %-6d" % (
                   pid, targets[pid][:20],
