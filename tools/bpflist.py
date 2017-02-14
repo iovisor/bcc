@@ -15,6 +15,7 @@
 from bcc import BPF, USDT
 import argparse
 import re
+import os
 import subprocess
 
 examples = """examples:
@@ -54,16 +55,21 @@ if args.verbosity > 0:
     parse_probes("kprobe")
     parse_probes("uprobe")
 
-cmd = "ls -l /proc/*/fd/* | grep bpf"
-p = subprocess.Popen(cmd, shell=True,
-                     stderr=subprocess.PIPE, stdout=subprocess.PIPE)
-for line in p.stdout:
-   match = re.search('/proc/(\\d+)/fd/\\d+.*bpf-(\\w+)', line)
-   if match is None:
-       continue
-   pid = int(match.group(1))
-   t = match.group(2)
-   counts[(pid, t)] = counts.get((pid, t), 0) + 1
+def find_bpf_fds(pid):
+    root = '/proc/%d/fd' % pid
+    for fd in os.listdir(root):
+        try:
+            link = os.readlink(os.path.join(root, fd))
+        except OSError:
+            continue
+        match = re.match('.*bpf-(\\w+)', link)
+        if match:
+            tup = (pid, match.group(1))
+            counts[tup] = counts.get(tup, 0) + 1
+
+for pdir in os.listdir('/proc'):
+    if re.match('\\d+', pdir):
+        find_bpf_fds(int(pdir))
 
 print("%-6s %-16s %-8s %s" % ("PID", "COMM", "TYPE", "COUNT"))
 for (pid, typ), count in sorted(counts.items(), key=lambda t: t[0][0]):
