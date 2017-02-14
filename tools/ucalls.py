@@ -242,25 +242,26 @@ if args.syscalls:
 def get_data():
     # Will be empty when no language was specified for tracing
     if args.latency:
-        data = map(lambda (k, v): (k.clazz + "." + k.method,
-                                   (v.num_calls, v.total_ns)),
-                   bpf["times"].items())
+        data = list(map(lambda kv: (kv[0].clazz + "." + kv[0].method,
+                                   (kv[1].num_calls, kv[1].total_ns)),
+                   bpf["times"].items()))
     else:
-        data = map(lambda (k, v): (k.clazz + "." + k.method, (v.value, 0)),
-                   bpf["counts"].items())
+        data = list(map(lambda kv: (kv[0].clazz + "." + kv[0].method,
+                                   (kv[1].value, 0)),
+                   bpf["counts"].items()))
 
     if args.syscalls:
         if args.latency:
-            syscalls = map(lambda (k, v): (bpf.ksym(k.value),
-                                           (v.num_calls, v.total_ns)),
+            syscalls = map(lambda kv: (bpf.ksym(kv[0].value),
+                                           (kv[1].num_calls, kv[1].total_ns)),
                            bpf["systimes"].items())
             data.extend(syscalls)
         else:
-            syscalls = map(lambda (k, v): (bpf.ksym(k.value), (v.value, 0)),
+            syscalls = map(lambda kv: (bpf.ksym(kv[0].value), (kv[1].value, 0)),
                            bpf["syscounts"].items())
             data.extend(syscalls)
 
-    return sorted(data, key=lambda (k, v): v[1 if args.latency else 0])
+    return sorted(data, key=lambda kv: kv[1][1 if args.latency else 0])
 
 def clear_data():
     if args.latency:
