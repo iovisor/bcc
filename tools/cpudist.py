@@ -12,7 +12,7 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 
 from __future__ import print_function
-from bcc import BPF, Tracepoint
+from bcc import BPF
 from time import sleep, strftime
 import argparse
 
