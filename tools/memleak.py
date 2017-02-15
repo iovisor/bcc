@@ -16,33 +16,7 @@ from time import sleep
 from datetime import datetime
 import argparse
 import subprocess
-import ctypes
 import os
-
-class Time(object):
-        # BPF timestamps come from the monotonic clock. To be able to filter
-        # and compare them from Python, we need to invoke clock_gettime.
-        # Adapted from http://stackoverflow.com/a/1205762
-        CLOCK_MONOTONIC_RAW = 4         # see <linux/time.h>
-
-        class timespec(ctypes.Structure):
-                _fields_ = [
-                        ('tv_sec', ctypes.c_long),
-                        ('tv_nsec', ctypes.c_long)
-                ]
-
-        librt = ctypes.CDLL('librt.so.1', use_errno=True)
-        clock_gettime = librt.clock_gettime
-        clock_gettime.argtypes = [ctypes.c_int, ctypes.POINTER(timespec)]
-
-        @staticmethod
-        def monotonic_time():
-                t = Time.timespec()
-                if Time.clock_gettime(
-                        Time.CLOCK_MONOTONIC_RAW, ctypes.pointer(t)) != 0:
-                        errno_ = ctypes.get_errno()
-                        raise OSError(errno_, os.strerror(errno_))
-                return t.tv_sec * 1e9 + t.tv_nsec
 
 class KStackDecoder(object):
         def refresh(self):
@@ -275,7 +249,7 @@ def print_outstanding():
         allocs = bpf_program["allocs"]
         stack_traces = bpf_program["stack_traces"]
         for address, info in sorted(allocs.items(), key=lambda a: a[1].size):
-                if Time.monotonic_time() - min_age_ns < info.timestamp_ns:
+                if BPF.monotonic_time() - min_age_ns < info.timestamp_ns:
                         continue
                 if info.stack_id < 0:
                         continue

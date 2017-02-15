@@ -20,31 +20,6 @@ import os
 import traceback
 import sys
 
-class Time(object):
-        # BPF timestamps come from the monotonic clock. To be able to filter
-        # and compare them from Python, we need to invoke clock_gettime.
-        # Adapted from http://stackoverflow.com/a/1205762
-        CLOCK_MONOTONIC_RAW = 4         # see <linux/time.h>
-
-        class timespec(ct.Structure):
-                _fields_ = [
-                        ('tv_sec', ct.c_long),
-                        ('tv_nsec', ct.c_long)
-                ]
-
-        librt = ct.CDLL('librt.so.1', use_errno=True)
-        clock_gettime = librt.clock_gettime
-        clock_gettime.argtypes = [ct.c_int, ct.POINTER(timespec)]
-
-        @staticmethod
-        def monotonic_time():
-                t = Time.timespec()
-                if Time.clock_gettime(
-                        Time.CLOCK_MONOTONIC_RAW, ct.pointer(t)) != 0:
-                        errno_ = ct.get_errno()
-                        raise OSError(errno_, os.strerror(errno_))
-                return t.tv_sec * 1e9 + t.tv_nsec
-
 class Probe(object):
         probe_count = 0
         streq_index = 0
@@ -60,7 +35,7 @@ class Probe(object):
                 cls.max_events = args.max_events
                 cls.print_time = args.timestamp or args.time
                 cls.use_localtime = not args.timestamp
-                cls.first_ts = Time.monotonic_time()
+                cls.first_ts = BPF.monotonic_time()
                 cls.tgid = args.tgid or -1
                 cls.pid = args.pid or -1
 

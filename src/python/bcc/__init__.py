@@ -115,6 +115,30 @@ class BPF(object):
         "linux/netdevice.h": ["sk_buff", "net_device"]
     }
 
+    # BPF timestamps come from the monotonic clock. To be able to filter
+    # and compare them from Python, we need to invoke clock_gettime.
+    # Adapted from http://stackoverflow.com/a/1205762
+    CLOCK_MONOTONIC = 1         # see <linux/time.h>
+
+    class timespec(ct.Structure):
+        _fields_ = [('tv_sec', ct.c_long), ('tv_nsec', ct.c_long)]
+
+    _librt = ct.CDLL('librt.so.1', use_errno=True)
+    _clock_gettime = _librt.clock_gettime
+    _clock_gettime.argtypes = [ct.c_int, ct.POINTER(timespec)]
+
+    @classmethod
+    def monotonic_time(cls):
+        """monotonic_time()
+        Returns the system monotonic time from clock_gettime, using the
+        CLOCK_MONOTONIC constant. The time returned is in nanoseconds.
+        """
+        t = cls.timespec()
+        if cls._clock_gettime(cls.CLOCK_MONOTONIC, ct.pointer(t)) != 0:
+            errno = ct.get_errno()
+            raise OSError(errno, os.strerror(errno))
+        return t.tv_sec * 1e9 + t.tv_nsec
+
     @classmethod
     def generate_auto_includes(cls, program_words):
         """
