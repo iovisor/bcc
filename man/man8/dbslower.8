@@ -1,0 +1,74 @@
+.TH dbslower 8  "2017-02-15" "USER COMMANDS"
+.SH NAME
+dbslower \- Trace MySQL/PostgreSQL server queries slower than a threshold.
+.SH SYNOPSIS
+.B dbslower [-v] [-p PID [PID ...]] [-m THRESHOLD] {mysql,postgres}
+.SH DESCRIPTION
+This traces queries served by a MySQL or PostgreSQL server, and prints
+those that exceed a latency (query time) threshold. By default a threshold of
+1 ms is used.
+
+This uses User Statically-Defined Tracing (USDT) probes, a feature added to
+MySQL and PostgreSQL for DTrace support, but which may not be enabled on a
+given installation. See requirements.
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF, bcc, and MySQL server with USDT probe support (when configuring
+the build: \-DENABLE_DTRACE=1) or PostgreSQL server with USDT probe support
+(when configuring the build: \-\-enable-dtrace).
+.SH OPTIONS
+\-h
+Print usage message.
+.TP
+\-p PID
+Trace this PID. If no PID is specified, the tool will attempt to automatically
+detect the MySQL or PostgreSQL processes running on the system.
+.TP
+\-m THRESHOLD
+Minimum query latency (duration) to trace, in milliseconds. Default is 1 ms.
+.TP
+{mysql,postgres}
+The database engine to trace.
+.SH EXAMPLES
+.TP
+Trace MySQL server queries slower than 1 ms:
+#
+.B dbslower mysql
+.TP
+Trace slower than 10 ms for PostgreSQL in process 408:
+#
+.B dbslower postgres -p 408 -m 10
+.SH FIELDS
+.TP
+TIME(s)
+Time of query start, in seconds.
+.TP
+PID
+Process ID of the traced server.
+.TP
+MS
+Milliseconds for the query, from start to end.
+.TP
+QUERY
+Query string, truncated to 256 characters.
+.SH OVERHEAD
+This adds low-overhead instrumentation to queries, and only emits output
+data from kernel to user-level if they query exceeds the threshold. If the
+server query rate is less than 1,000/sec, the overhead is expected to be
+negligible. If the query rate is higher, test to gauge overhead.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Sasha Goldshtein, Brendan Gregg
+.SH SEE ALSO
+biosnoop(8), mysqld_qslower(8), dbstat(8)

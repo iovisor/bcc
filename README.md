@@ -59,7 +59,7 @@ pair of .c and .py files, and some are directories of files.
 
 ### Tracing
 
-Examples:
+#### Examples:
 
 - examples/tracing/[bitehist.py](examples/tracing/bitehist.py): Block I/O size histogram. [Examples](examples/tracing/bitehist_example.txt).
 - examples/tracing/[disksnoop.py](examples/tracing/disksnoop.py): Trace block device I/O latency. [Examples](examples/tracing/disksnoop_example.txt).
@@ -87,9 +87,11 @@ Examples:
 - tools/[cachetop](tools/cachetop.py): Trace page cache hit/miss ratio by processes. [Examples](tools/cachetop_example.txt).
 - tools/[cpudist](tools/cpudist.py): Summarize on- and off-CPU time per task as a histogram. [Examples](tools/cpudist_example.txt)
 - tools/[cpuunclaimed](tools/cpuunclaimed.py): Sample CPU run queues and calculate unclaimed idle CPU. [Examples](tools/cpuunclaimed_example.txt)
+- tools/[dbslower](tools/dbslower.py): Trace MySQL/PostgreSQL queries slower than a threshold. [Examples](tools/dbslower_example.txt).
+- tools/[dbstat](tools/dbstat.py): Summarize MySQL/PostgreSQL query latency as a histogram. [Examples](tools/dbstat_example.txt).
 - tools/[dcsnoop](tools/dcsnoop.py): Trace directory entry cache (dcache) lookups. [Examples](tools/dcsnoop_example.txt).
 - tools/[dcstat](tools/dcstat.py): Directory entry cache (dcache) stats. [Examples](tools/dcstat_example.txt).
-- tools/[deadlock_detector](tools/deadlock_detector.py): Detect potential deadlocks on a running process. [Examples](tools/deadlock_detector_example.txt)
+- tools/[deadlock_detector](tools/deadlock_detector.py): Detect potential deadlocks on a running process. [Examples](tools/deadlock_detector_example.txt).
 - tools/[execsnoop](tools/execsnoop.py): Trace new processes via exec() syscalls. [Examples](tools/execsnoop_example.txt).
 - tools/[ext4dist](tools/ext4dist.py): Summarize ext4 operation latency distribution as a histogram. [Examples](tools/ext4dist_example.txt).
 - tools/[ext4slower](tools/ext4slower.py): Trace slow ext4 operations. [Examples](tools/ext4slower_example.txt).
@@ -101,7 +103,6 @@ Examples:
 - tools/[gethostlatency](tools/gethostlatency.py): Show latency for getaddrinfo/gethostbyname[2] calls. [Examples](tools/gethostlatency_example.txt).
 - tools/[hardirqs](tools/hardirqs.py):  Measure hard IRQ (hard interrupt) event time. [Examples](tools/hardirqs_example.txt).
 - tools/[killsnoop](tools/killsnoop.py): Trace signals issued by the kill() syscall. [Examples](tools/killsnoop_example.txt).
-- tools/[slabratetop](tools/slabratetop.py): Kernel SLAB/SLUB memory cache allocation rate top. [Examples](tools/slabratetop_example.txt).
 - tools/[llcstat](tools/llcstat.py): Summarize CPU cache references and misses by process. [Examples](tools/llcstat_example.txt).
 - tools/[mdflush](tools/mdflush.py): Trace md flush events. [Examples](tools/mdflush_example.txt).
 - tools/[mysqld_qslower](tools/mysqld_qslower.py): Trace MySQL server queries slower than a threshold. [Examples](tools/mysqld_qslower_example.txt).
@@ -115,6 +116,7 @@ Examples:
 - tools/[reset-trace](tools/reset-trace.sh): Reset the state of tracing. Maintenance tool only. [Examples](tools/reset-trace_example.txt).
 - tools/[runqlat](tools/runqlat.py): Run queue (scheduler) latency as a histogram. [Examples](tools/runqlat_example.txt).
 - tools/[runqlen](tools/runqlen.py): Run queue length as a histogram. [Examples](tools/runqlen_example.txt).
+- tools/[slabratetop](tools/slabratetop.py): Kernel SLAB/SLUB memory cache allocation rate top. [Examples](tools/slabratetop_example.txt).
 - tools/[softirqs](tools/softirqs.py):  Measure soft IRQ (soft interrupt) event time. [Examples](tools/softirqs_example.txt).
 - tools/[solisten](tools/solisten.py): Trace TCP socket listen. [Examples](tools/solisten_example.txt).
 - tools/[sslsniff](tools/sslsniff.py): Sniff OpenSSL written and readed data. [Examples](tools/sslsniff_example.txt).
@@ -130,14 +132,14 @@ Examples:
 - tools/[tcpretrans](tools/tcpretrans.py): Trace TCP retransmits and TLPs. [Examples](tools/tcpretrans_example.txt).
 - tools/[tcptop](tools/tcptop.py): Summarize TCP send/recv throughput by host. Top for TCP. [Examples](tools/tcptop_example.txt).
 - tools/[tplist](tools/tplist.py): Display kernel tracepoints or USDT probes and their formats. [Examples](tools/tplist_example.txt).
-- tools/[trace](tools/trace.py): Trace arbitrary functions, with filters. [Examples](tools/trace_example.txt)
-- tools/[ttysnoop](tools/ttysnoop.py): Watch live output from a tty or pts device. [Examples](tools/ttysnoop_example.txt)
-- tools/[ucalls](tools/ucalls.py): Summarize method calls or Linux syscalls in high-level languages. [Examples](tools/ucalls_example.txt)
-- tools/[uflow](tools/uflow.py): Print a method flow graph in high-level languages. [Examples](tools/uflow_example.txt)
-- tools/[ugc](tools/ugc.py): Trace garbage collection events in high-level languages. [Examples](tools/ugc_example.txt)
-- tools/[uobjnew](tools/uobjnew.py): Summarize object allocation events by object type and number of bytes allocated. [Examples](tools/uobjnew_example.txt)
-- tools/[ustat](tools/ustat.py): Collect events such as GCs, thread creations, object allocations, exceptions and more in high-level languages. [Examples](tools/ustat_example.txt)
-- tools/[uthreads](tools/uthreads.py): Trace thread creation events in Java and raw pthreads. [Examples](tools/uthreads_example.txt)
+- tools/[trace](tools/trace.py): Trace arbitrary functions, with filters. [Examples](tools/trace_example.txt).
+- tools/[ttysnoop](tools/ttysnoop.py): Watch live output from a tty or pts device. [Examples](tools/ttysnoop_example.txt).
+- tools/[ucalls](tools/ucalls.py): Summarize method calls or Linux syscalls in high-level languages. [Examples](tools/ucalls_example.txt).
+- tools/[uflow](tools/uflow.py): Print a method flow graph in high-level languages. [Examples](tools/uflow_example.txt).
+- tools/[ugc](tools/ugc.py): Trace garbage collection events in high-level languages. [Examples](tools/ugc_example.txt).
+- tools/[uobjnew](tools/uobjnew.py): Summarize object allocation events by object type and number of bytes allocated. [Examples](tools/uobjnew_example.txt).
+- tools/[ustat](tools/ustat.py): Collect events such as GCs, thread creations, object allocations, exceptions and more in high-level languages. [Examples](tools/ustat_example.txt).
+- tools/[uthreads](tools/uthreads.py): Trace thread creation events in Java and raw pthreads. [Examples](tools/uthreads_example.txt).
 - tools/[vfscount](tools/vfscount.py) tools/[vfscount.c](tools/vfscount.c): Count VFS calls. [Examples](tools/vfscount_example.txt).
 - tools/[vfsstat](tools/vfsstat.py) tools/[vfsstat.c](tools/vfsstat.c): Count some VFS calls, with column output. [Examples](tools/vfsstat_example.txt).
 - tools/[wakeuptime](tools/wakeuptime.py): Summarize sleep to wakeup time by waker kernel stack. [Examples](tools/wakeuptime_example.txt).
