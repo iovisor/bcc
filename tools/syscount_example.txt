@@ -1,0 +1,127 @@
+Demonstrations of syscount, the Linux/eBPF version.
+
+
+syscount summarizes syscall counts across the system or a specific process,
+with optional latency information. It is very useful for general workload
+characterization, for example:
+
+# syscount
+Tracing syscalls, printing top 10... Ctrl+C to quit.
+[09:39:04]
+SYSCALL             COUNT
+write               10739
+read                10584
+wait4                1460
+nanosleep            1457
+select                795
+rt_sigprocmask        689
+clock_gettime         653
+rt_sigaction          128
+futex                  86
+ioctl                  83
+^C
+
+These are the top 10 entries; you can get more by using the -T switch. Here,
+the output indicates that the write and read syscalls were very common, followed
+immediately by wait4, nanosleep, and so on. By default, syscount counts across
+the entire system, but we can point it to a specific process of interest:
+
+# syscount -p $(pidof dd)
+Tracing syscalls, printing top 10... Ctrl+C to quit.
+[09:40:21]
+SYSCALL             COUNT
+read              7878397
+write             7878397
+^C
+
+Indeed, dd's workload is a bit easier to characterize. Occasionally, the count
+of syscalls is not enough, and you'd also want an aggregate latency:
+
+# syscount -L
+Tracing syscalls, printing top 10... Ctrl+C to quit.
+[09:41:32]
+SYSCALL                   COUNT        TIME (us)
+select                       16      3415860.022
+nanosleep                   291        12038.707
+ftruncate                     1          122.939
+write                         4           63.389
+stat                          1           23.431
+fstat                         1            5.088
+[unknown: 321]               32            4.965
+timerfd_settime               1            4.830
+ioctl                         3            4.802
+kill                          1            4.342
+^C
+
+The select and nanosleep calls are responsible for a lot of time, but remember
+these are blocking calls. This output was taken from a mostly idle system. Note
+the "unknown" entry -- syscall 321 is the bpf() syscall, which is not in the
+table used by this tool (borrowed from strace sources).
+
+Another direction would be to understand which processes are making a lot of
+syscalls, thus responsible for a lot of activity. This is what the -P switch
+does:
+
+# syscount -P
+Tracing syscalls, printing top 10... Ctrl+C to quit.
+[09:58:13]
+PID    COMM               COUNT
+13820  vim                  548
+30216  sshd                 149
+29633  bash                  72
+25188  screen                70
+25776  mysqld                30
+31285  python                10
+529    systemd-udevd          9
+1      systemd                8
+494    systemd-journal        5
+^C
+
+This is again from a mostly idle system over an interval of a few seconds.
+
+Sometimes, you'd only care about failed syscalls -- these are the ones that
+might be worth investigating with follow-up tools like opensnoop, execsnoop,
+or trace. Use the -x switch for this; the following example also demonstrates
+the -i switch, for printing at predefined intervals:
+
+# syscount -x -i 5
+Tracing failed syscalls, printing top 10... Ctrl+C to quit.
+[09:44:16]
+SYSCALL             COUNT
+futex                  13
+getxattr               10
+stat                    8
+open                    6
+wait4                   3
+access                  2
+[unknown: 321]          1
+
+[09:44:21]
+SYSCALL             COUNT
+futex                  12
+getxattr               10
+[unknown: 321]          2
+wait4                   1
+access                  1
+pause                   1
+^C
+
+USAGE:
+# syscount -h
+usage: syscount.py [-h] [-p PID] [-i INTERVAL] [-T TOP] [-x] [-L] [-m] [-P]
+                   [-l]
+
+Summarize syscall counts and latencies.
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -p PID, --pid PID     trace only this pid
+  -i INTERVAL, --interval INTERVAL
+                        print summary at this interval (seconds)
+  -T TOP, --top TOP     print only the top syscalls by count or latency
+  -x, --failures        trace only failed syscalls (return < 0)
+  -L, --latency         collect syscall latency
+  -m, --milliseconds    display latency in milliseconds (default:
+                        microseconds)
+  -P, --process         count by process and not by syscall
+  -l, --list            print list of recognized syscalls and exit
