@@ -169,10 +169,10 @@ if args.csv:
     if args.timestamp:
         print("TIME", end=",")
     print("TIMESTAMP_ns", end=",")
-    print(",".join("CPU" + str(c) for c in xrange(ncpu)), end="")
+    print(",".join("CPU" + str(c) for c in range(ncpu)), end="")
     if args.fullcsv:
         print(",", end="")
-        print(",".join("OFFSET_ns_CPU" + str(c) for c in xrange(ncpu)), end="")
+        print(",".join("OFFSET_ns_CPU" + str(c) for c in range(ncpu)), end="")
     print()
 else:
     print(("Sampling run queues... Output every %s seconds. " +
@@ -255,10 +255,10 @@ while 1:
                     if args.timestamp:
                         print("%-8s" % strftime("%H:%M:%S"), end=",")
                     print("%d" % g_time, end=",")
-                    print(",".join(str(lens[c]) for c in xrange(ncpu)), end="")
+                    print(",".join(str(lens[c]) for c in range(ncpu)), end="")
                     if args.fullcsv:
                         print(",", end="")
-                        print(",".join(str(offs[c]) for c in xrange(ncpu)))
+                        print(",".join(str(offs[c]) for c in range(ncpu)))
                     else:
                         print()
             else:
