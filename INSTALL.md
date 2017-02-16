@@ -210,7 +210,7 @@ apt-get -t jessie-backports install linux-base linux-image-4.8.0-0.bpo.2-amd64
 apt-get install debhelper cmake libllvm3.8 llvm-3.8-dev libclang-3.8-dev \
   libelf-dev bison flex libedit-dev clang-format-3.8 python python-netaddr \
   python-pyroute2 luajit libluajit-5.1-dev arping iperf netperf ethtool \
-  devscripts
+  devscripts zlib1g-dev
 ```
 
 #### Sudo
