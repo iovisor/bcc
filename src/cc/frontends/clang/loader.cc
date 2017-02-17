@@ -135,6 +135,11 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, unique_ptr<vector<TableDes
   // 22 Jul 2016. Also see bcc #615.
   vector<const char *> flags_cstr({"-O0", "-emit-llvm", "-I", dstack.cwd(),
                                    "-Wno-deprecated-declarations",
+                                   "-Wno-asm-operand-widths",
+                                   "-Wno-visibility",
+                                   "-Wno-int-to-pointer-cast",
+                                   "-Wno-implicit-function-declaration", 
+                                   "-Wno-tautological-compare",
                                    "-Wno-gnu-variable-sized-type-not-at-end",
                                    "-fno-color-diagnostics",
                                    "-fno-unwind-tables",

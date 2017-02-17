@@ -22,6 +22,8 @@ import re
 import struct
 import errno
 import sys
+import shutil
+
 basestring = (unicode if sys.version_info[0] < 3 else str)
 
 from .libbcc import lib, _CB_TYPE, bcc_symbol, _SYM_CB_TYPE
@@ -54,6 +56,10 @@ class SymbolCache(object):
         psym = ct.pointer(sym)
         if lib.bcc_symcache_resolve(self.cache, addr, psym) < 0:
             return "[unknown]", 0
+
+        if sym.demangle_name == None:
+            return "[unknown]", 0
+
         return sym.demangle_name.decode(), sym.offset
 
     def resolve_name(self, name):
@@ -114,7 +120,9 @@ class BPF(object):
         "linux/slab.h": ["alloc"],
         "linux/netdevice.h": ["sk_buff", "net_device"]
     }
-
+    
+    _revised_header_files = []
+    
     # BPF timestamps come from the monotonic clock. To be able to filter
     # and compare them from Python, we need to invoke clock_gettime.
     # Adapted from http://stackoverflow.com/a/1205762
@@ -154,6 +162,83 @@ class BPF(object):
                     if keyword in word and header not in headers:
                         headers += "#include <%s>\n" % header
         return headers
+
+    @classmethod
+    def revise_header_files(self, text):
+        """
+        As for some architectures(especially for arm64), their linux kernel headers files
+        might contain assemble codes and specific register name.
+        However, the clang compiler doesn't recoginize them, and will fail to compile them.
+        Therefore, in order to make the compiler happy, it tries to avoid including them in header files. 
+
+        """
+
+        self._revised_header_files = []
+   
+        archtype = os.popen('uname -m').read().strip()
+        if archtype == "aarch64" :
+            kernel_version=os.popen('uname -r').read().strip()
+            kernel_filelist=[ "/usr/src/kernels/"+kernel_version+"/arch/arm64/include/asm/sysreg.h",
+                              "/usr/src/kernels/"+kernel_version+"/arch/arm64/include/asm/virt.h" ]
+
+            for filename in kernel_filelist:
+                if os.path.isfile(filename):
+                    self._revised_header_files.append(filename)
+                    file_bak = filename + ".bak"
+                    shutil.copyfile(filename, file_bak)
+                    filehandle = open(filename)
+                    tmpfile = filename + ".tmp"
+                    tmpfile_handle = open(tmpfile, "w")
+       
+                    disable_assemble_flag = True
+                    cur_endif_index = 0
+                    for line in filehandle :
+                        if re.match("#if.*__ASSEMBLY__", line):
+                            tmpfile_handle.write("#if 0 \n")
+                            disable_assemble_flag = True
+                            cur_endif_index = 0
+                            tmpfile_handle.write(line) 
+                        elif re.match("#ifdef", line):
+                            if disable_assemble_flag:
+                                ++cur_endif_index
+                            tmpfile_handle.write(line)
+                        elif re.match("#endif", line):
+                            tmpfile_handle.write(line)
+                            if cur_endif_index > 0:
+                                --cur_endif_index
+                            elif disable_assemble_flag:
+                                disable_assemble_flag = False
+                                tmpfile_handle.write("#endif \n")
+                        else:
+                            tmpfile_handle.write(line)
+                    tmpfile_handle.close()
+                    shutil.move(tmpfile, filename)                    
+
+            extra_header = """
+                #define __ASM_ARCH_TIMER_H
+                #define __ASM_UACCESS_H
+                #define cntp_tval_el0 0
+                #define cntv_ctl_el0 0
+                #define sp_el0 0
+                #define VERIFY_WRITE 1
+                #define VERIFY_READ 0
+            """
+            return extra_header + text
+        else :
+            return text
+
+    @classmethod
+    def rollback_header_files_change(self):
+        """
+        As mentioned in revise_header_files, some header files might be changed in order to make clang compiler happy.
+        However it is necessary to rollback them after compiling them.
+
+        """
+        for filename in self._revised_header_files:
+            file_bak = filename + ".bak"
+            if os.path.isfile(filename) and os.path.isfile(file_bak) :
+                shutil.copy(file_bak, filename)
+                os.remove(file_bak) 
 
     # defined for compatibility reasons, to be removed
     Table = Table
@@ -248,6 +333,7 @@ class BPF(object):
                 text = usdt_text + text
 
         if text:
+            text = self.revise_header_files(text)
             self.module = lib.bpf_module_create_c_from_string(text.encode("ascii"),
                     self.debug, cflags_array, len(cflags_array))
         else:
@@ -1081,6 +1167,8 @@ class BPF(object):
         if self.module:
             lib.bpf_module_destroy(self.module)
             self.module = None
+
+        self.rollback_header_files_change()
 
     def __enter__(self):
         return self
