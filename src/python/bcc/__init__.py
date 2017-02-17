@@ -759,11 +759,12 @@ class BPF(object):
     def get_user_functions_and_addresses(name, sym_re):
         addresses = []
         def sym_cb(sym_name, addr):
-            if re.match(sym_re, sym_name):
-                addresses.append((sym_name, addr))
+            dname = sym_name.decode()
+            if re.match(sym_re, dname):
+                addresses.append((dname, addr))
             return 0
 
-        res = lib.bcc_foreach_symbol(name, _SYM_CB_TYPE(sym_cb))
+        res = lib.bcc_foreach_symbol(name.encode('ascii'), _SYM_CB_TYPE(sym_cb))
         if res < 0:
             raise Exception("Error %d enumerating symbols in %s" % (res, name))
         return addresses

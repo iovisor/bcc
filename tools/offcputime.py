@@ -276,7 +276,7 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
             print("    --")
         for addr in user_stack:
             print("    %s" % b.sym(addr, k.tgid))
-        print("    %-16s %s (%d)" % ("-", k.name, k.pid))
+        print("    %-16s %s (%d)" % ("-", k.name.decode(), k.pid))
         print("        %d\n" % v.value)
 
 if missing_stacks > 0:
