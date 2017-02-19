@@ -13,7 +13,7 @@
 #
 # Strongly inspired by Brendan Gregg's work on the mysqld_qslower script.
 #
-# Copyright 2017, Sasha Goldshtein 
+# Copyright 2017, Sasha Goldshtein
 # Licensed under the Apache License, Version 2.0
 #
 # 15-Feb-2017   Sasha Goldshtein   Created this.
@@ -27,7 +27,7 @@ examples = """examples:
     dbslower postgres            # trace PostgreSQL queries slower than 1ms
     dbslower postgres -p 188 322 # trace specific PostgreSQL processes
     dbslower mysql -p 480 -m 30  # trace MySQL queries slower than 30ms
-    dbslower mysql -p 480 -v     # trace MySQL queries and print the BPF program
+    dbslower mysql -p 480 -v     # trace MySQL queries & print the BPF program
 """
 parser = argparse.ArgumentParser(
     description="",
@@ -134,4 +134,3 @@ print("%-14s %-6s %8s %s" % ("TIME(s)", "PID", "MS", "QUERY"))
 bpf["events"].open_perf_buffer(print_event, page_cnt=64)
 while True:
     bpf.kprobe_poll()
-
