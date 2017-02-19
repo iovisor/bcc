@@ -8,7 +8,7 @@
 # This tool uses USDT probes, which means it needs MySQL and PostgreSQL built
 # with USDT (DTrace) support.
 #
-# Copyright 2017, Sasha Goldshtein 
+# Copyright 2017, Sasha Goldshtein
 # Licensed under the Apache License, Version 2.0
 #
 # 15-Feb-2017   Sasha Goldshtein   Created this.
@@ -80,7 +80,7 @@ int probe_end(struct pt_regs *ctx) {
 }
 """
 program = program.replace("SCALE", str(1000 if args.microseconds else 1000000))
-program = program.replace("FILTER", "" if args.threshold == 0 else \
+program = program.replace("FILTER", "" if args.threshold == 0 else
         "if (delta / 1000000 < %d) { return 0; }" % args.threshold)
 
 usdts = map(lambda pid: USDT(pid=pid), args.pids)
