@@ -97,7 +97,7 @@ int NAME(struct pt_regs *ctx) {
 def enable_probe(probe_name, func_name, read_class, read_method, is_return):
     global program, trace_template, usdt
     depth = "*depth + 1" if not is_return else "*depth | (1ULL << 63)"
-    update = "++(*depth);" if not is_return else  "if (*depth) --(*depth);"
+    update = "++(*depth);" if not is_return else "if (*depth) --(*depth);"
     filter_class = "if (!prefix_class(data.clazz)) { return 0; }" \
                    if args.clazz else ""
     filter_method = "if (!prefix_method(data.method)) { return 0; }" \
