@@ -22,7 +22,6 @@ import re
 import struct
 import errno
 import sys
-import shutil
 
 basestring = (unicode if sys.version_info[0] < 3 else str)
 
@@ -121,8 +120,6 @@ class BPF(object):
         "linux/netdevice.h": ["sk_buff", "net_device"]
     }
     
-    _revised_header_files = []
-    
     # BPF timestamps come from the monotonic clock. To be able to filter
     # and compare them from Python, we need to invoke clock_gettime.
     # Adapted from http://stackoverflow.com/a/1205762
@@ -173,48 +170,41 @@ class BPF(object):
 
         """
 
-        self._revised_header_files = []
-   
         archtype = os.popen('uname -m').read().strip()
         if archtype == "aarch64" :
+            extra_header = ""            
+
             kernel_version=os.popen('uname -r').read().strip()
             kernel_filelist=[ "/usr/src/kernels/"+kernel_version+"/arch/arm64/include/asm/sysreg.h",
                               "/usr/src/kernels/"+kernel_version+"/arch/arm64/include/asm/virt.h" ]
-
             for filename in kernel_filelist:
                 if os.path.isfile(filename):
-                    self._revised_header_files.append(filename)
-                    file_bak = filename + ".bak"
-                    shutil.copyfile(filename, file_bak)
                     filehandle = open(filename)
-                    tmpfile = filename + ".tmp"
-                    tmpfile_handle = open(tmpfile, "w")
        
                     disable_assemble_flag = True
                     cur_endif_index = 0
                     for line in filehandle :
                         if re.match("#if.*__ASSEMBLY__", line):
-                            tmpfile_handle.write("#if 0 \n")
+                            extra_header += "#if 0 \n" + line
                             disable_assemble_flag = True
                             cur_endif_index = 0
-                            tmpfile_handle.write(line) 
                         elif re.match("#ifdef", line):
                             if disable_assemble_flag:
                                 ++cur_endif_index
-                            tmpfile_handle.write(line)
+                            extra_header += line
                         elif re.match("#endif", line):
-                            tmpfile_handle.write(line)
+                            extra_header += line
                             if cur_endif_index > 0:
                                 --cur_endif_index
                             elif disable_assemble_flag:
                                 disable_assemble_flag = False
-                                tmpfile_handle.write("#endif \n")
+                                extra_header += "#endif \n"
                         else:
-                            tmpfile_handle.write(line)
-                    tmpfile_handle.close()
-                    shutil.move(tmpfile, filename)                    
+                            extra_header += line
 
-            extra_header = """
+            extra_header += """
+                #define __ASM_SYSREG_H
+                #define __ASM__VIRT_H
                 #define __ASM_ARCH_TIMER_H
                 #define __ASM_UACCESS_H
                 #define cntp_tval_el0 0
@@ -226,19 +216,6 @@ class BPF(object):
             return extra_header + text
         else :
             return text
-
-    @classmethod
-    def rollback_header_files_change(self):
-        """
-        As mentioned in revise_header_files, some header files might be changed in order to make clang compiler happy.
-        However it is necessary to rollback them after compiling them.
-
-        """
-        for filename in self._revised_header_files:
-            file_bak = filename + ".bak"
-            if os.path.isfile(filename) and os.path.isfile(file_bak) :
-                shutil.copy(file_bak, filename)
-                os.remove(file_bak) 
 
     # defined for compatibility reasons, to be removed
     Table = Table
@@ -1167,8 +1144,6 @@ class BPF(object):
         if self.module:
             lib.bpf_module_destroy(self.module)
             self.module = None
-
-        self.rollback_header_files_change()
 
     def __enter__(self):
         return self
