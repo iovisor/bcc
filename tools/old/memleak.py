@@ -186,8 +186,9 @@ int alloc_exit(struct pt_regs *ctx)
         allocs.update(&address, &info);
 
         if (SHOULD_PRINT) {
-                bpf_trace_printk("alloc exited, size = %lu, result = %lx, frames = %d\\n",
-                                 info.size, address, info.num_frames);
+                bpf_trace_printk("alloc exited, size = %lu, result = %lx,"
+                                 "frames = %d\\n", info.size, address,
+                                 info.num_frames);
         }
         return 0;
 }
