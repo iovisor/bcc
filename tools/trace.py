@@ -53,7 +53,8 @@ class Probe(object):
                 self.probe_num = Probe.probe_count
                 self.probe_name = "probe_%s_%d" % \
                                 (self._display_function(), self.probe_num)
-                self.probe_name = re.sub(r'[^A-Za-z0-9_]', '_', self.probe_name)
+                self.probe_name = re.sub(r'[^A-Za-z0-9_]', '_',
+                                         self.probe_name)
 
         def __str__(self):
                 return "%s:%s:%s FLT=%s ACT=%s/%s" % (self.probe_type,
@@ -81,7 +82,8 @@ class Probe(object):
                                              text).groups()
 
                 self._parse_spec(spec)
-                self.signature = sig[1:-1] if sig else None # remove the parens
+                # Remove the parens
+                self.signature = sig[1:-1] if sig else None
                 if self.signature and self.probe_type in ['u', 't']:
                         self._bail("USDT and tracepoint probes can't have " +
                                    "a function signature; use arg1, arg2, " +
