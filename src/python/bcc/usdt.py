@@ -138,7 +138,8 @@ class USDT(object):
                     "either a pid or a binary path must be specified")
 
     def enable_probe(self, probe, fn_name):
-        if lib.bcc_usdt_enable_probe(self.context, probe, fn_name) != 0:
+        if lib.bcc_usdt_enable_probe(self.context, probe.encode('ascii'),
+                fn_name.encode('ascii')) != 0:
             raise USDTException(
                     ("failed to enable probe '%s'; a possible cause " +
                      "can be that the probe requires a pid to enable") %
@@ -146,7 +147,8 @@ class USDT(object):
                   )
 
     def enable_probe_or_bail(self, probe, fn_name):
-        if lib.bcc_usdt_enable_probe(self.context, probe, fn_name) != 0:
+        if lib.bcc_usdt_enable_probe(self.context, probe.encode('ascii'),
+                fn_name.encode('ascii')) != 0:
             print(
 """Error attaching USDT probes: the specified pid might not contain the
 given language's runtime, or the runtime was not built with the required
@@ -175,7 +177,7 @@ tplist tool.""")
     def attach_uprobes(self, bpf):
         probes = self.enumerate_active_probes()
         for (binpath, fn_name, addr, pid) in probes:
-            bpf.attach_uprobe(name=binpath, fn_name=fn_name,
+            bpf.attach_uprobe(name=binpath.decode(), fn_name=fn_name.decode(),
                               addr=addr, pid=pid)
 
     def enumerate_active_probes(self):
