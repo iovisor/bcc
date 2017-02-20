@@ -4,7 +4,7 @@
 # opensnoop Trace open() syscalls.
 #           For Linux, uses BCC, eBPF. Embedded C.
 #
-# USAGE: opensnoop [-h] [-T] [-x] [-p PID] [-t TID] [-n NAME]
+# USAGE: opensnoop [-h] [-T] [-x] [-p PID] [-t TID] [-n NAME] [-f FILE] [-r REGEX]
 #
 # Copyright (c) 2015 Brendan Gregg.
 # Licensed under the Apache License, Version 2.0 (the "License")
@@ -12,11 +12,13 @@
 # 17-Sep-2015   Brendan Gregg   Created this.
 # 29-Apr-2016   Allan McAleavy  Updated for BPF_PERF_OUTPUT.
 # 08-Oct-2016   Dina Goldshtein Support filtering by PID and TID.
+# 20-Feb-2017   Martin Probst   Support filtering by filename and file regexes.
 
 from __future__ import print_function
 from bcc import BPF
 import argparse
 import ctypes as ct
+import re
 
 # arguments
 examples = """examples:
@@ -26,6 +28,8 @@ examples = """examples:
     ./opensnoop -p 181    # only trace PID 181
     ./opensnoop -t 123    # only trace TID 123
     ./opensnoop -n main   # only print process names containing "main"
+    ./opensnoop -f file   # only print processes accessing "file"
+    ./opensnoop -r regex  # only print processes matching the file pattern "regex"
 """
 parser = argparse.ArgumentParser(
     description="Trace open() syscalls",
@@ -41,6 +45,10 @@ parser.add_argument("-t", "--tid",
     help="trace this TID only")
 parser.add_argument("-n", "--name",
     help="only print process names containing this name")
+parser.add_argument("-f", "--file",
+    help="only print processes accessing this specific file")
+parser.add_argument("-r", "--regex",
+    help="only print processes matching the file pattern regex")
 args = parser.parse_args()
 debug = 0
 
@@ -140,6 +148,16 @@ class Data(ct.Structure):
     ]
 
 initial_ts = 0
+regex = None
+
+# compile regular expression
+if args.regex:
+    try:
+        regex = re.compile(r"{}".format(args.regex))
+    except Exception as e:
+        print("Unable to compile file regular expression: {}".format(e.message))
+        print("Continuing WITHOUT regular expression!!!")
+
 
 # header
 if args.timestamp:
@@ -151,6 +169,7 @@ print("%-6s %-16s %4s %3s %s" %
 def print_event(cpu, data, size):
     event = ct.cast(data, ct.POINTER(Data)).contents
     global initial_ts
+    global regex
 
     # split return value into FD and errno columns
     if event.ret >= 0:
@@ -167,6 +186,12 @@ def print_event(cpu, data, size):
         return
 
     if args.name and args.name not in event.comm:
+        return
+
+    if args.file and args.file != event.fname:
+        return
+
+    if args.regex and not regex.search(event.fname):
         return
 
     if args.timestamp:
