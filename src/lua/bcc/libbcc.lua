@@ -54,7 +54,7 @@ void * bpf_attach_uprobe(int progfd, int attach_type, const char *ev_name,
 
 int bpf_detach_uprobe(const char *ev_name);
 
-void * bpf_open_perf_buffer(perf_reader_raw_cb raw_cb, void *cb_cookie, int pid, int cpu);
+void * bpf_open_perf_buffer(perf_reader_raw_cb raw_cb, void *cb_cookie, int pid, int cpu, int page_cnt);
 ]]
 
 ffi.cdef[[

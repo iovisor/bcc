@@ -26,8 +26,6 @@
 #include "libbpf.h"
 #include "perf_reader.h"
 
-int perf_reader_page_cnt = 8;
-
 struct perf_reader {
   perf_reader_cb cb;
   perf_reader_raw_cb raw_cb;
@@ -42,7 +40,8 @@ struct perf_reader {
   uint64_t sample_type;
 };
 
-struct perf_reader * perf_reader_new(perf_reader_cb cb, perf_reader_raw_cb raw_cb, void *cb_cookie) {
+struct perf_reader * perf_reader_new(perf_reader_cb cb,
+    perf_reader_raw_cb raw_cb, void *cb_cookie, int page_cnt) {
   struct perf_reader *reader = calloc(1, sizeof(struct perf_reader));
   if (!reader)
     return NULL;
@@ -51,7 +50,7 @@ struct perf_reader * perf_reader_new(perf_reader_cb cb, perf_reader_raw_cb raw_c
   reader->cb_cookie = cb_cookie;
   reader->fd = -1;
   reader->page_size = getpagesize();
-  reader->page_cnt = perf_reader_page_cnt;
+  reader->page_cnt = page_cnt;
   return reader;
 }
 

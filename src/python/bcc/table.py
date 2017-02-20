@@ -507,20 +507,25 @@ class PerfEventArray(ArrayBase):
         super(PerfEventArray, self).__delitem__(key)
         self.close_perf_buffer(key)
 
-    def open_perf_buffer(self, callback):
+    def open_perf_buffer(self, callback, page_cnt=8):
         """open_perf_buffers(callback)
 
         Opens a set of per-cpu ring buffer to receive custom perf event
         data from the bpf program. The callback will be invoked for each
-        event submitted from the kernel, up to millions per second.
+        event submitted from the kernel, up to millions per second. Use
+        page_cnt to change the size of the per-cpu ring buffer. The value
+        must be a power of two and defaults to 8.
         """
 
-        for i in get_online_cpus():
-            self._open_perf_buffer(i, callback)
+        if page_cnt & (page_cnt - 1) != 0:
+            raise Exception("Perf buffer page_cnt must be a power of two")
 
-    def _open_perf_buffer(self, cpu, callback):
+        for i in get_online_cpus():
+            self._open_perf_buffer(i, callback, page_cnt)
+
+    def _open_perf_buffer(self, cpu, callback, page_cnt):
         fn = _RAW_CB_TYPE(lambda _, data, size: callback(cpu, data, size))
-        reader = lib.bpf_open_perf_buffer(fn, None, -1, cpu)
+        reader = lib.bpf_open_perf_buffer(fn, None, -1, cpu, page_cnt)
         if not reader:
             raise Exception("Could not open perf buffer")
         fd = lib.perf_reader_fd(reader)

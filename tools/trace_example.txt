@@ -201,11 +201,28 @@ In this example, we traced the "ls ~" command as it was opening its shared
 libraries and then accessing the /home/vagrant directory listing.
 
 
+Lastly, if a high-frequency event is traced you may overflow the perf ring
+buffer. This shows as "Lost N samples":
+
+# trace sys_open
+5087   5087   pgrep        sys_open
+5087   5087   pgrep        sys_open
+5087   5087   pgrep        sys_open
+5087   5087   pgrep        sys_open
+5087   5087   pgrep        sys_open
+Lost 764896 samples
+Lost 764896 samples
+Lost 764896 samples
+
+The perf ring buffer size can be changed with -b. The unit is size per-CPU buffer
+size and is measured in pages. The value must be a power of two and defaults to
+64 pages.
+
+
 USAGE message:
 
-# trace -h
-usage: trace [-h] [-p PID] [-L TID] [-v] [-Z STRING_SIZE] [-S]
-             [-M MAX_EVENTS] [-t] [-T] [-K] [-U] [-I header]
+usage: trace [-h] [-b BUFFER_PAGES] [-p PID] [-L TID] [-v] [-Z STRING_SIZE]
+             [-S] [-M MAX_EVENTS] [-t] [-T] [-K] [-U] [-I header]
              probe [probe ...]
 
 Attach to functions and print trace messages.
@@ -215,6 +232,9 @@ positional arguments:
 
 optional arguments:
   -h, --help            show this help message and exit
+  -b BUFFER_PAGES, --buffer-pages BUFFER_PAGES
+                        number of pages to use for perf_events ring buffer
+                        (default: 64)
   -p PID, --pid PID     id of the process to trace (optional)
   -L TID, --tid TID     id of the thread to trace (optional)
   -v, --verbose         print resulting BPF program code before executing
@@ -224,7 +244,7 @@ optional arguments:
   -M MAX_EVENTS, --max-events MAX_EVENTS
                         number of events to print before quitting
   -t, --timestamp       print timestamp column (offset from trace start)
-  -T, --time		print time column
+  -T, --time            print time column
   -K, --kernel-stack    output kernel stack trace
   -U, --user-stack      output user stack trace
   -I header, --include header
@@ -247,9 +267,9 @@ trace 'c:malloc "size = %d", arg1'
         Trace malloc calls and print the size being allocated
 trace 'p:c:write (arg1 == 1) "writing %d bytes to STDOUT", arg3'
         Trace the write() call from libc to monitor writes to STDOUT
-trace 'r::__kmalloc (retval == 0) "kmalloc failed!"
+trace 'r::__kmalloc (retval == 0) "kmalloc failed!"'
         Trace returns from __kmalloc which returned a null pointer
-trace 'r:c:malloc (retval) "allocated = %x", retval
+trace 'r:c:malloc (retval) "allocated = %x", retval'
         Trace returns from malloc and print non-NULL allocated buffers
 trace 't:block:block_rq_complete "sectors=%d", args->nr_sector'
         Trace the block_rq_complete kernel tracepoint and print # of tx sectors

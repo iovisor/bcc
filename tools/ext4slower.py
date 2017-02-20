@@ -337,6 +337,6 @@ else:
         "BYTES", "OFF_KB", "LAT(ms)", "FILENAME"))
 
 # read events
-b["events"].open_perf_buffer(print_event)
+b["events"].open_perf_buffer(print_event, page_cnt=64)
 while 1:
     b.kprobe_poll()

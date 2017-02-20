@@ -354,7 +354,7 @@ print(header_string % ("PID", "COMM",
 start_ts = 0
 
 # read events
-b["ipv4_events"].open_perf_buffer(print_ipv4_event)
-b["ipv6_events"].open_perf_buffer(print_ipv6_event)
+b["ipv4_events"].open_perf_buffer(print_ipv4_event, page_cnt=64)
+b["ipv6_events"].open_perf_buffer(print_ipv6_event, page_cnt=64)
 while 1:
     b.kprobe_poll()
