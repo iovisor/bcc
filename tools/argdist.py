@@ -293,9 +293,12 @@ static inline bool %s(char const *ignored, char const *str) {
         def _generate_usdt_arg_assignment(self, i):
                 expr = self.exprs[i]
                 if self.probe_type == "u" and expr[0:3] == "arg":
-                        return ("        u64 %s = 0;\n" +
+                        arg_index = int(expr[3])
+                        arg_ctype = self.usdt_ctx.get_probe_arg_ctype(
+                                self.function, arg_index - 1)
+                        return ("        %s %s = 0;\n" +
                                 "        bpf_usdt_readarg(%s, ctx, &%s);\n") \
-                                % (expr, expr[3], expr)
+                                % (arg_ctype, expr, expr[3], expr)
                 else:
                         return ""
 
