@@ -61,20 +61,28 @@ bool Argument::assign_to_local(std::ostream &stream,
 
   if (!deref_offset_) {
     tfm::format(stream, "%s = (%s)ctx->%s;", local_name, ctype(),
-                *register_name_);
+                *base_register_name_);
     return true;
   }
 
   if (deref_offset_ && !deref_ident_) {
+    tfm::format(stream, "{ u64 __addr = ctx->%s + (%d)",
+                *base_register_name_, *deref_offset_);
+    if (index_register_name_) {
+      int scale = scale_.value_or(1);
+      tfm::format(stream, " + (ctx->%s * %d);", *index_register_name_, scale);
+    } else {
+      tfm::format(stream, ";");
+    }
     tfm::format(stream,
-                "{ u64 __addr = ctx->%s + (%d); %s __res = 0x0; "
+                "%s __res = 0x0; "
                 "bpf_probe_read(&__res, sizeof(__res), (void *)__addr); "
                 "%s = __res; }",
-                *register_name_, *deref_offset_, ctype(), local_name);
+                ctype(), local_name);
     return true;
   }
 
-  if (deref_offset_ && deref_ident_ && *register_name_ == "ip") {
+  if (deref_offset_ && deref_ident_ && *base_register_name_ == "ip") {
     uint64_t global_address;
     if (!get_global_address(&global_address, binpath, pid))
       return false;
@@ -109,7 +117,8 @@ ssize_t ArgumentParser::parse_identifier(ssize_t pos,
   return pos;
 }
 
-ssize_t ArgumentParser::parse_register(ssize_t pos, Argument *dest) {
+ssize_t ArgumentParser::parse_register(ssize_t pos, std::string &name,
+                                       int &size) {
   ssize_t start = ++pos;
   if (arg_[start - 1] != '%')
     return -start;
@@ -117,16 +126,41 @@ ssize_t ArgumentParser::parse_register(ssize_t pos, Argument *dest) {
   while (isalnum(arg_[pos])) pos++;
 
   std::string regname(arg_ + start, pos - start);
-  int regsize = 0;
-
-  if (!normalize_register(&regname, &regsize))
+  if (!normalize_register(&regname, &size))
     return -start;
 
-  dest->register_name_ = regname;
-  if (!dest->arg_size_)
-    dest->arg_size_ = regsize;
-
+  name = regname;
   return pos;
+}
+
+ssize_t ArgumentParser::parse_base_register(ssize_t pos, Argument *dest) {
+  int size;
+  std::string name;
+  ssize_t res = parse_register(pos, name, size);
+  if (res < 0)
+      return res;
+
+  dest->base_register_name_ = name;
+  if (!dest->arg_size_)
+    dest->arg_size_ = size;
+
+  return res;
+}
+
+ssize_t ArgumentParser::parse_index_register(ssize_t pos, Argument *dest) {
+  int size;
+  std::string name;
+  ssize_t res = parse_register(pos, name, size);
+  if (res < 0)
+      return res;
+
+  dest->index_register_name_ = name;
+
+  return res;
+}
+
+ssize_t ArgumentParser::parse_scale(ssize_t pos, Argument *dest) {
+  return parse_number(pos, &dest->scale_);
 }
 
 ssize_t ArgumentParser::parse_expr(ssize_t pos, Argument *dest) {
@@ -134,7 +168,7 @@ ssize_t ArgumentParser::parse_expr(ssize_t pos, Argument *dest) {
     return parse_number(pos + 1, &dest->constant_);
 
   if (arg_[pos] == '%')
-    return parse_register(pos, dest);
+    return parse_base_register(pos, dest);
 
   if (isdigit(arg_[pos]) || arg_[pos] == '-') {
     pos = parse_number(pos, &dest->deref_offset_);
@@ -154,9 +188,21 @@ ssize_t ArgumentParser::parse_expr(ssize_t pos, Argument *dest) {
   if (arg_[pos] != '(')
     return -pos;
 
-  pos = parse_register(pos + 1, dest);
+  pos = parse_base_register(pos + 1, dest);
   if (pos < 0)
     return pos;
+
+  if (arg_[pos] == ',') {
+    pos = parse_index_register(pos + 1, dest);
+    if (pos < 0)
+      return pos;
+
+    if (arg_[pos] == ',') {
+      pos = parse_scale(pos + 1, dest);
+      if (pos < 0)
+        return pos;
+    }
+  }
 
   return (arg_[pos] == ')') ? pos + 1 : -pos;
 }
@@ -180,6 +226,17 @@ void ArgumentParser::print_error(ssize_t pos) {
   fputc('\n', stderr);
 }
 
+void ArgumentParser::skip_whitespace_from(size_t pos) {
+    while (isspace(arg_[pos])) pos++;
+    cur_pos_ = pos;
+}
+
+void ArgumentParser::skip_until_whitespace_from(size_t pos) {
+    while (arg_[pos] != '\0' && !isspace(arg_[pos]))
+        pos++;
+    cur_pos_ = pos;
+}
+
 bool ArgumentParser::parse(Argument *dest) {
   if (done())
     return false;
@@ -187,16 +244,15 @@ bool ArgumentParser::parse(Argument *dest) {
   ssize_t res = parse_1(cur_pos_, dest);
   if (res < 0) {
     print_error(-res);
-    cur_pos_ = -res;
+    skip_whitespace_from(-res + 1);
     return false;
   }
   if (!isspace(arg_[res]) && arg_[res] != '\0') {
     print_error(res);
-    cur_pos_ = res;
+    skip_until_whitespace_from(res);
     return false;
   }
-  while (isspace(arg_[res])) res++;
-  cur_pos_ = res;
+  skip_whitespace_from(res);
   return true;
 }
 

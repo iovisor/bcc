@@ -39,11 +39,13 @@ struct bcc_usdt_location {
     uint64_t address;
 };
 
-#define BCC_USDT_ARGUMENT_NONE          0x0
-#define BCC_USDT_ARGUMENT_CONSTANT      0x1
-#define BCC_USDT_ARGUMENT_DEREF_OFFSET  0x2
-#define BCC_USDT_ARGUMENT_DEREF_IDENT   0x4
-#define BCC_USDT_ARGUMENT_REGISTER_NAME 0x8
+#define BCC_USDT_ARGUMENT_NONE                0x0
+#define BCC_USDT_ARGUMENT_CONSTANT            0x1
+#define BCC_USDT_ARGUMENT_DEREF_OFFSET        0x2
+#define BCC_USDT_ARGUMENT_DEREF_IDENT         0x4
+#define BCC_USDT_ARGUMENT_BASE_REGISTER_NAME  0x8
+#define BCC_USDT_ARGUMENT_INDEX_REGISTER_NAME 0x10
+#define BCC_USDT_ARGUMENT_SCALE               0x20
 
 struct bcc_usdt_argument {
     int size;
@@ -51,7 +53,9 @@ struct bcc_usdt_argument {
     int constant;
     int deref_offset;
     const char *deref_ident;
-    const char *register_name;
+    const char *base_register_name;
+    const char *index_register_name;
+    int scale;
 };
 
 typedef void (*bcc_usdt_cb)(struct bcc_usdt *);

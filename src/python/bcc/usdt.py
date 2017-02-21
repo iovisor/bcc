@@ -32,8 +32,12 @@ class USDTProbeArgument(object):
             self.deref_offset = argument.deref_offset
         if self.valid & BCC_USDT_ARGUMENT_FLAGS.DEREF_IDENT != 0:
             self.deref_ident = argument.deref_ident
-        if self.valid & BCC_USDT_ARGUMENT_FLAGS.REGISTER_NAME != 0:
-            self.register_name = argument.register_name
+        if self.valid & BCC_USDT_ARGUMENT_FLAGS.BASE_REGISTER_NAME != 0:
+            self.base_register_name = argument.base_register_name
+        if self.valid & BCC_USDT_ARGUMENT_FLAGS.INDEX_REGISTER_NAME != 0:
+            self.index_register_name = argument.index_register_name
+        if self.valid & BCC_USDT_ARGUMENT_FLAGS.SCALE != 0:
+            self.scale = argument.scale
 
     def _size_prefix(self):
         return "%d %s bytes" % \
@@ -45,16 +49,22 @@ class USDTProbeArgument(object):
         if self.valid & BCC_USDT_ARGUMENT_FLAGS.CONSTANT != 0:
             return "%d" % self.constant
         if self.valid & BCC_USDT_ARGUMENT_FLAGS.DEREF_OFFSET == 0:
-            return "%s" % self.register_name
+            return "%s" % self.base_register_name
         if self.valid & BCC_USDT_ARGUMENT_FLAGS.DEREF_OFFSET != 0 and \
            self.valid & BCC_USDT_ARGUMENT_FLAGS.DEREF_IDENT == 0:
+            if self.valid & BCC_USDT_ARGUMENT_FLAGS.INDEX_REGISTER_NAME != 0:
+                index_offset = " + %s" % self.index_register_name
+                if self.valid & BCC_USDT_ARGUMENT_FLAGS.SCALE != 0:
+                    index_offset += " * %d" % self.scale
+            else:
+                index_offset = ""
             sign = '+' if self.deref_offset >= 0 else '-'
-            return "*(%s %s %d)" % (self.register_name,
-                                    sign, abs(self.deref_offset))
+            return "*(%s %s %d%s)" % (self.base_register_name,
+                                    sign, abs(self.deref_offset), index_offset)
         if self.valid & BCC_USDT_ARGUMENT_FLAGS.DEREF_OFFSET != 0 and \
            self.valid & BCC_USDT_ARGUMENT_FLAGS.DEREF_IDENT != 0 and \
-           self.valid & BCC_USDT_ARGUMENT_FLAGS.REGISTER_NAME != 0 and \
-           self.register_name == "ip":
+           self.valid & BCC_USDT_ARGUMENT_FLAGS.BASE_REGISTER_NAME != 0 and \
+           self.base_register_name == "ip":
             sign = '+' if self.deref_offset >= 0 else '-'
             return "*(&%s %s %d)" % (self.deref_ident,
                                      sign, abs(self.deref_offset))
