@@ -107,7 +107,7 @@ sudo python /usr/share/bcc/examples/tracing/task_switch.py
 ```bash
 git clone https://github.com/svinota/pyroute2
 cd pyroute2; sudo make install
-sudo python /usr/share/bcc/examples/simple_tc.py
+sudo python /usr/share/bcc/examples/networking/simple_tc.py
 ```
 
 ## Fedora - Binary
