@@ -246,7 +246,8 @@ static int find_buildid(Elf *e, char *buildid) {
 
   char *buf = (char *)data->d_buf + 16;
   size_t length = data->d_size - 16;
-  for (size_t i = 0; i < length; ++i) {
+  size_t i = 0;
+  for (i = 0; i < length; ++i) {
     sprintf(buildid + (i * 2), "%02hhx", buf[i]);
   }
 
