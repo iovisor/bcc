@@ -92,7 +92,7 @@ lib.bpf_attach_kprobe.argtypes = [ct.c_int, ct.c_int, ct.c_char_p, ct.c_char_p, 
 lib.bpf_detach_kprobe.restype = ct.c_int
 lib.bpf_detach_kprobe.argtypes = [ct.c_char_p]
 lib.bpf_attach_uprobe.restype = ct.c_void_p
-lib.bpf_attach_uprobe.argtypes = [ct.c_int, ct.c_int, ct.c_char_p, ct.c_char_p, 
+lib.bpf_attach_uprobe.argtypes = [ct.c_int, ct.c_int, ct.c_char_p, ct.c_char_p,
         ct.c_ulonglong, ct.c_int, ct.c_int, ct.c_int, _CB_TYPE, ct.py_object]
 lib.bpf_detach_uprobe.restype = ct.c_int
 lib.bpf_detach_uprobe.argtypes = [ct.c_char_p]
@@ -197,7 +197,9 @@ class BCC_USDT_ARGUMENT_FLAGS(object):
     CONSTANT = 0x1
     DEREF_OFFSET = 0x2
     DEREF_IDENT = 0x4
-    REGISTER_NAME = 0x8
+    BASE_REGISTER_NAME = 0x8
+    INDEX_REGISTER_NAME = 0x10
+    SCALE = 0x20
 
 class bcc_usdt_argument(ct.Structure):
     _fields_ = [
@@ -206,7 +208,9 @@ class bcc_usdt_argument(ct.Structure):
             ('constant', ct.c_int),
             ('deref_offset', ct.c_int),
             ('deref_ident', ct.c_char_p),
-            ('register_name', ct.c_char_p)
+            ('base_register_name', ct.c_char_p),
+            ('index_register_name', ct.c_char_p),
+            ('scale', ct.c_int)
         ]
 
 _USDT_CB = ct.CFUNCTYPE(None, ct.POINTER(bcc_usdt))

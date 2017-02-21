@@ -44,6 +44,7 @@ int bcc_perf_map_nstgid(int pid) {
       nstgid = (int)strtol(strrchr(line, '\t'), NULL, 10);
   }
   free(line);
+  fclose(status);
 
   return nstgid;
 }
