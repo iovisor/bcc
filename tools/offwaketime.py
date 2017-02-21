@@ -308,22 +308,22 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
         # print wakeup name then stack in reverse order
         print("    %-16s %s %s" % ("waker:", k.waker, k.t_pid))
         for addr in waker_user_stack:
-            print("    %016x %s" % (addr, b.sym(addr, k.tgid)))
+            print("    %s" % b.sym(addr, k.tgid))
         if args.delimited:
             print("    -")
         for addr in waker_kernel_stack:
-            print("    %016x %s" % (addr, b.ksym(addr)))
+            print("    %s" % b.ksym(addr))
 
         # print waker/wakee delimiter
         print("    %-16s %s" % ("--", "--"))
 
         # print default multi-line stack output
         for addr in target_kernel_stack:
-            print("    %016x %s" % (addr, b.ksym(addr)))
+            print("    %s" % b.ksym(addr))
         if args.delimited:
             print("    -")
         for addr in target_user_stack:
-            print("    %016x %s" % (addr, b.sym(addr, k.tgid)))
+            print("    %s" % b.sym(addr, k.tgid))
         print("    %-16s %s %s" % ("target:", k.target, k.w_pid))
         print("        %d\n" % v.value)
 

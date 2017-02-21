@@ -79,18 +79,18 @@ class ProcSyms : SymbolCache {
   };
 
   struct Module {
-    Module(const char *name, uint64_t start, uint64_t end)
-        : name_(name), start_(start), end_(end) {}
+    Module(const char *name, uint64_t start, uint64_t end);
     std::string name_;
     uint64_t start_;
     uint64_t end_;
+    bool is_so_;
     std::unordered_set<std::string> symnames_;
     std::vector<Symbol> syms_;
 
     void load_sym_table();
     bool find_addr(uint64_t addr, struct bcc_symbol *sym);
     bool find_name(const char *symname, uint64_t *addr);
-    bool is_so() const;
+    bool is_so() const { return is_so_; }
     bool is_perf_map() const;
 
     static int _add_symbol(const char *symname, uint64_t start, uint64_t end,

@@ -62,7 +62,7 @@ bool KSyms::resolve_addr(uint64_t addr, struct bcc_symbol *sym) {
   auto it = std::upper_bound(syms_.begin(), syms_.end(), Symbol("", addr)) - 1;
   sym->name = (*it).name.c_str();
   sym->demangle_name = sym->name;
-  sym->module = "[kernel]";
+  sym->module = "kernel";
   sym->offset = addr - (*it).addr;
   return true;
 }
@@ -140,16 +140,17 @@ bool ProcSyms::resolve_name(const char *module, const char *name,
   return false;
 }
 
+ProcSyms::Module::Module(const char *name, uint64_t start, uint64_t end)
+  : name_(name), start_(start), end_(end) {
+  is_so_ = bcc_elf_is_shared_obj(name) == 1;
+}
+
 int ProcSyms::Module::_add_symbol(const char *symname, uint64_t start,
                                   uint64_t end, int flags, void *p) {
   Module *m = static_cast<Module *>(p);
   auto res = m->symnames_.emplace(symname);
   m->syms_.emplace_back(&*(res.first), start, end, flags);
   return 0;
-}
-
-bool ProcSyms::Module::is_so() const {
-  return strstr(name_.c_str(), ".so") != nullptr;
 }
 
 bool ProcSyms::Module::is_perf_map() const {
@@ -225,10 +226,10 @@ int bcc_symcache_resolve(void *resolver, uint64_t addr,
   return cache->resolve_addr(addr, sym) ? 0 : -1;
 }
 
-int bcc_symcache_resolve_name(void *resolver, const char *name,
-                              uint64_t *addr) {
+int bcc_symcache_resolve_name(void *resolver, const char *module,
+                              const char *name, uint64_t *addr) {
   SymbolCache *cache = static_cast<SymbolCache *>(resolver);
-  return cache->resolve_name(nullptr, name, addr) ? 0 : -1;
+  return cache->resolve_name(module, name, addr) ? 0 : -1;
 }
 
 void bcc_symcache_refresh(void *resolver) {

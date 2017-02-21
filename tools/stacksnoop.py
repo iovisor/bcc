@@ -120,8 +120,8 @@ def print_event(cpu, data, size):
         print("%-18.9f %s" % (ts, function))
 
     for addr in stack_traces.walk(event.stack_id):
-        sym = b.ksymaddr(addr) if offset else b.ksym(addr)
-        print("\t%016x %s" % (addr, sym))
+        sym = b.ksym(addr, show_offset=offset)
+        print("\t%s" % sym)
 
     print()
 

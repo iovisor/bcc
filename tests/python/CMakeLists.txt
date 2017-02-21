@@ -36,6 +36,8 @@ add_test(NAME py_test_trace4 WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   COMMAND ${TEST_WRAPPER} py_trace4 sudo ${CMAKE_CURRENT_SOURCE_DIR}/test_trace4.py)
 add_test(NAME py_test_probe_count WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   COMMAND ${TEST_WRAPPER} py_probe_count sudo ${CMAKE_CURRENT_SOURCE_DIR}/test_probe_count.py)
+add_test(NAME py_test_debuginfo WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  COMMAND ${TEST_WRAPPER} py_test_debuginfo sudo ${CMAKE_CURRENT_SOURCE_DIR}/test_debuginfo.py)
 add_test(NAME py_test_brb WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   COMMAND ${TEST_WRAPPER} py_brb_c sudo ${CMAKE_CURRENT_SOURCE_DIR}/test_brb.py test_brb.c)
 add_test(NAME py_test_brb2 WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
@@ -60,6 +62,5 @@ add_test(NAME py_test_utils WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   COMMAND ${TEST_WRAPPER} py_test_utils sudo ${CMAKE_CURRENT_SOURCE_DIR}/test_utils.py)
 add_test(NAME py_test_percpu WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   COMMAND ${TEST_WRAPPER} py_test_percpu sudo ${CMAKE_CURRENT_SOURCE_DIR}/test_percpu.py)
-
 add_test(NAME py_test_dump_func WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   COMMAND ${TEST_WRAPPER} py_dump_func simple ${CMAKE_CURRENT_SOURCE_DIR}/test_dump_func.py)

@@ -457,7 +457,8 @@ BPF_PERF_OUTPUT(%s);
 
             stack = list(bpf.get_table(self.stacks_name).walk(stack_id))
             for addr in stack:
-                    print("        %016x %s" % (addr, bpf.sym(addr, tgid)))
+                    print("        %s" % (bpf.sym(addr, tgid,
+                                         show_module=True, show_offset=True)))
 
         def _format_message(self, bpf, tgid, values):
                 # Replace each %K with kernel sym and %U with user sym in tgid
@@ -466,9 +467,10 @@ BPF_PERF_OUTPUT(%s);
                 user_placeholders = [i for i, t in enumerate(self.types)
                                      if t == 'U']
                 for kp in kernel_placeholders:
-                        values[kp] = bpf.ksymaddr(values[kp])
+                        values[kp] = bpf.ksym(values[kp], show_offset=True)
                 for up in user_placeholders:
-                        values[up] = bpf.symaddr(values[up], tgid)
+                        values[up] = bpf.sym(values[up], tgid,
+                                           show_module=True, show_offset=True)
                 return self.python_format % tuple(values)
 
         def print_event(self, bpf, cpu, data, size):

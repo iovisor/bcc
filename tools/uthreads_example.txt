@@ -25,10 +25,10 @@ Next, trace only pthread creation events in some native application:
 # ./uthreads 27450
 Tracing thread events in process 27450 (language: none)... Ctrl-C to quit.
 TIME     ID               TYPE     DESCRIPTION                   
-0.924    27462            pthread  primes_thread                 
-0.927    27463            pthread  primes_thread                 
-0.928    27464            pthread  primes_thread                 
-0.928    27465            pthread  primes_thread                 
+0.924    27462            pthread  primes_thread [primes]
+0.927    27463            pthread  primes_thread [primes]     
+0.928    27464            pthread  primes_thread [primes]        
+0.928    27465            pthread  primes_thread [primes]        
 ^C
 
 The thread name ("primes_thread" in this example) is resolved from debuginfo.

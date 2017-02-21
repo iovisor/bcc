@@ -65,10 +65,9 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
         - [7. print_linear_hist()](#6-print_linear_hist)
     - [Helpers](#helpers)
         - [1. ksym()](#1-ksym)
-        - [2. ksymaddr()](#2-ksymaddr)
-        - [3. ksymname()](#3-ksymname)
-        - [4. sym()](#4-sym)
-        - [5. num_open_kprobes()](#5-num_open_kprobes)
+        - [2. ksymname()](#2-ksymname)
+        - [3. sym()](#3-sym)
+        - [4. num_open_kprobes()](#4-num_open_kprobes)
 
 - [BPF Errors](#bpf-errors)
     - [1. Invalid mem access](#1-invalid-mem-access)
@@ -1090,27 +1089,11 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=ksym+path%3Aexamples+language%3Apython&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=ksym+path%3Atools+language%3Apython&type=Code)
 
-### 2. ksymaddr()
-
-Syntax: ```BPF.ksymaddr(addr)```
-
-Translate a kernel memory address into a kernel function name plus the instruction offset as a hexadecimal number, which is returned as a string.
-
-Example:
-
-```Python
-print("kernel function+offset: " + b.ksymaddr(addr))
-```
-
-Examples in situ:
-[search /examples](https://github.com/iovisor/bcc/search?q=ksymaddr+path%3Aexamples+language%3Apython&type=Code),
-[search /tools](https://github.com/iovisor/bcc/search?q=ksymaddr+path%3Atools+language%3Apython&type=Code)
-
-### 3. ksymname()
+### 2. ksymname()
 
 Syntax: ```BPF.ksymname(name)```
 
-Translate a kernel name into an address. This is the reverse of ksymaddr. Returns -1 when the function name is unknown.
+Translate a kernel name into an address. This is the reverse of ksym. Returns -1 when the function name is unknown.
 
 Example:
 
@@ -1122,11 +1105,11 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=ksymname+path%3Aexamples+language%3Apython&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=ksymname+path%3Atools+language%3Apython&type=Code)
 
-### 4. sym()
+### 3. sym()
 
-Syntax: ```BPF.sym(addr, pid)```
+Syntax: ```BPF.sym(addr, pid, show_module=False, show_offset=False)```
 
-Translate a memory address into a function name for a pid, which is returned. A pid of less than zero will access the kernel symbol cache.
+Translate a memory address into a function name for a pid, which is returned. A pid of less than zero will access the kernel symbol cache. The `show_module` and `show_offset` parameters control whether the module in which the symbol lies should be displayed, and whether the instruction offset from the beginning of the symbol should be displayed. These extra parameters default to `False`.
 
 Example:
 
@@ -1138,9 +1121,9 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=sym+path%3Aexamples+language%3Apython&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=sym+path%3Atools+language%3Apython&type=Code)
 
-### 5. num_open_kprobes()
+### 4. num_open_kprobes()
 
-Syntax: ```BPF.num_open_probes()```
+Syntax: ```BPF.num_open_kprobes()```
 
 Returns the number of open k[ret]probes. Can be useful for scenarios where event_re is used while attaching and detaching probes. Excludes perf_events readers.
 
