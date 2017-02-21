@@ -17,6 +17,19 @@ from time import sleep, strftime
 import argparse
 import errno
 import signal
+import os
+
+def get_symbol_hash(perf_map_file):
+    symbol_hash = {}
+    if os.path.isfile(perf_map_file):
+      with open(perf_map_file, 'r') as f:
+        lines = f.readlines()
+        for line in lines: 
+          line = line.split(' ')
+          k = line[0]
+          name = line[2]
+          symbol_hash[k] = name
+    return symbol_hash
 
 # arg validation
 def positive_int(val):
@@ -97,7 +110,6 @@ duration = int(args.duration)
 # signal handler
 def signal_ignore(signal, frame):
     print()
-
 # define BPF program
 bpf_text = """
 #include <uapi/linux/ptrace.h>
@@ -269,13 +281,22 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
             [b.ksym(addr) for addr in reversed(kernel_stack)]
         print("%s %d" % (";".join(line), v.value))
     else:
+        symbol_hash = {}
+        # build filename with k.pid
+        # build symbol hash
+        if(args.pid):
+          perf_map_file = "/tmp/perf-%d.map" % args.pid
+          symbol_hash = get_symbol_hash(perf_map_file)
+
         # print default multi-line stack output
         for addr in kernel_stack:
             print("    %016x %s" % (addr, b.ksym(addr)))
         if need_delimiter:
             print("    --")
         for addr in user_stack:
-            print("    %016x %s" % (addr, b.sym(addr, k.tgid)))
+            addr_key = "%016x" % addr
+            name = symbol_hash[addr_key] if symbol_hash.has_key(addr_key) else b.sym(addr, k.tgid)
+            print("    %016x %s" % (addr, name))
         print("    %-16s %s (%d)" % ("-", k.name, k.pid))
         print("        %d\n" % v.value)
 
