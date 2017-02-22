@@ -64,6 +64,18 @@ TEST_CASE("list all kernel symbols", "[c_api]") {
   bcc_procutils_each_ksym(_test_ksym, NULL);
 }
 
+TEST_CASE("file-backed mapping identification") {
+  CHECK(bcc_mapping_is_file_backed("/bin/ls") == 1);
+  CHECK(bcc_mapping_is_file_backed("") == 0);
+  CHECK(bcc_mapping_is_file_backed("//anon") == 0);
+  CHECK(bcc_mapping_is_file_backed("/dev/zero") == 0);
+  CHECK(bcc_mapping_is_file_backed("/anon_hugepage") == 0);
+  CHECK(bcc_mapping_is_file_backed("/anon_hugepage (deleted)") == 0);
+  CHECK(bcc_mapping_is_file_backed("[stack") == 0);
+  CHECK(bcc_mapping_is_file_backed("/SYSV") == 0);
+  CHECK(bcc_mapping_is_file_backed("[heap]") == 0);
+}
+
 TEST_CASE("resolve symbol name in external library", "[c_api]") {
   struct bcc_symbol sym;
 

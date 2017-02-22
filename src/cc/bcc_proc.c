@@ -70,6 +70,16 @@ char *bcc_procutils_which(const char *binpath) {
   return 0;
 }
 
+int bcc_mapping_is_file_backed(const char *mapname) {
+  return mapname[0] &&
+    strncmp(mapname, "//anon", sizeof("//anon") - 1) &&
+    strncmp(mapname, "/dev/zero", sizeof("/dev/zero") - 1) &&
+    strncmp(mapname, "/anon_hugepage", sizeof("/anon_hugepage") - 1) &&
+    strncmp(mapname, "[stack", sizeof("[stack") - 1) &&
+    strncmp(mapname, "/SYSV", sizeof("/SYSV") - 1) &&
+    strncmp(mapname, "[heap]", sizeof("[heap]") - 1);
+}
+
 int bcc_procutils_each_module(int pid, bcc_procutils_modulecb callback,
                               void *payload) {
   char procmap_filename[128];
@@ -102,7 +112,7 @@ int bcc_procutils_each_module(int pid, bcc_procutils_modulecb callback,
 
       while (isspace(mapname[0])) mapname++;
 
-      if (strchr(perm, 'x') && mapname[0] && mapname[0] != '[') {
+      if (strchr(perm, 'x') && bcc_mapping_is_file_backed(mapname)) {
         if (callback(mapname, (uint64_t)begin, (uint64_t)end, payload) < 0)
           break;
       }
