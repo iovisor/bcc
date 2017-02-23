@@ -16,7 +16,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 #
 name: bcc
-version: 0.2.0-20170208-1555-3e77af5
+version: 0.2.0-20170223-1653-7c965b3
 summary: BPF Compiler Collection (BCC)
 description: A toolkit for creating efficient kernel tracing and manipulation programs
 confinement: strict
@@ -52,6 +52,10 @@ apps:
         command: wrapper cpudist
     cpuunclaimed:
         command: wrapper cpuunclaimed
+    dbstat:
+        command: wrapper dbstat
+    dbslower:
+        command: wrapper dbslower
     dcsnoop:
         command: wrapper dcsnoop
     dcstat:
@@ -120,6 +124,8 @@ apps:
         command: wrapper statsnoop
     syncsnoop:
         command: wrapper syncsnoop
+    syscount:
+        command: wrapper syscount
     tcpaccept:
         command: wrapper tcpaccept
     tcpconnect:
