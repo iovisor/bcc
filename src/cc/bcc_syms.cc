@@ -190,16 +190,31 @@ bool ProcSyms::Module::find_addr(uint64_t addr, struct bcc_symbol *sym) {
   sym->offset = offset;
 
   auto it = std::upper_bound(syms_.begin(), syms_.end(), Symbol(nullptr, offset, 0));
-  if (it != syms_.begin())
-    --it;
-  else
-    it = syms_.end();
+  if (it == syms_.begin())
+    return false;
 
-  if (it != syms_.end()
-      && offset >= it->start && offset < it->start + it->size) {
-    sym->name = it->name->c_str();
-    sym->offset = (offset - it->start);
-    return true;
+  // 'it' points to the symbol whose start address is strictly greater than
+  // the address we're looking for. Start stepping backwards as long as the
+  // current symbol is still below the desired address, and see if the end
+  // of the current symbol (start + size) is above the desired address. Once
+  // we have a matching symbol, return it. Note that simply looking at '--it'
+  // is not enough, because symbols can be nested. For example, we could be
+  // looking for offset 0x12 with the following symbols available:
+  // SYMBOL   START   SIZE    END
+  // goo      0x0     0x6     0x0 + 0x6 = 0x6
+  // foo      0x6     0x10    0x6 + 0x10 = 0x16
+  // bar      0x8     0x4     0x8 + 0x4 = 0xc
+  // baz      0x16    0x10    0x16 + 0x10 = 0x26
+  // The upper_bound lookup will return baz, and then going one symbol back
+  // brings us to bar, which does not contain offset 0x12 and is nested inside
+  // foo. Going back one more symbol brings us to foo, which contains 0x12
+  // and is a match.
+  for (--it; offset >= it->start; --it) {
+    if (offset < it->start + it->size) {
+      sym->name = it->name->c_str();
+      sym->offset = (offset - it->start);
+      return true;
+    }
   }
 
   return false;
