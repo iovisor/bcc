@@ -392,5 +392,24 @@ int process(struct xdp_md *ctx) {
         t = b["act"]
         self.assertEquals(len(t), 32);
 
+    def test_bpf_dins_pkt_rewrite(self):
+        text = """
+#include <bcc/proto.h>
+int dns_test(struct __sk_buff *skb) {
+    u8 *cursor = 0;
+    struct ethernet_t *ethernet = cursor_advance(cursor, sizeof(*ethernet));
+    if(ethernet->type == ETH_P_IP) {
+        struct ip_t *ip = cursor_advance(cursor, sizeof(*ip));
+        ip->src = ip->dst;
+        return 0;
+    }
+    return -1;
+}
+        """
+        b = BPF(text=text)
+
 if __name__ == "__main__":
     main()
+
+
+
