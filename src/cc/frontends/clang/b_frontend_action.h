@@ -73,6 +73,7 @@ class BTypeVisitor : public clang::RecursiveASTVisitor<BTypeVisitor> {
   bool VisitImplicitCastExpr(clang::ImplicitCastExpr *E);
 
  private:
+  clang::SourceRange expansionRange(clang::SourceRange range);
   template <unsigned N>
   clang::DiagnosticBuilder error(clang::SourceLocation loc, const char (&fmt)[N]);
 
@@ -97,6 +98,7 @@ class ProbeVisitor : public clang::RecursiveASTVisitor<ProbeVisitor> {
   bool VisitMemberExpr(clang::MemberExpr *E);
   void set_ptreg(clang::Decl *D) { ptregs_.insert(D); }
  private:
+  clang::SourceRange expansionRange(clang::SourceRange range);
   template <unsigned N>
   clang::DiagnosticBuilder error(clang::SourceLocation loc, const char (&fmt)[N]);
 
