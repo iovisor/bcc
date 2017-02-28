@@ -392,11 +392,14 @@ StatusTuple BPF::detach_perf_event(uint32_t ev_type, uint32_t ev_config) {
 }
 
 StatusTuple BPF::open_perf_buffer(const std::string& name,
-                                  perf_reader_raw_cb cb, void* cb_cookie) {
+                                  perf_reader_raw_cb cb, void* cb_cookie,
+                                  int page_cnt) {
   if (perf_buffers_.find(name) == perf_buffers_.end())
     perf_buffers_[name] = new BPFPerfBuffer(bpf_module_.get(), name);
+  if ((page_cnt & (page_cnt - 1)) != 0)
+    return StatusTuple(-1, "open_perf_buffer page_cnt must be a power of two");
   auto table = perf_buffers_[name];
-  TRY2(table->open_all_cpu(cb, cb_cookie));
+  TRY2(table->open_all_cpu(cb, cb_cookie, page_cnt));
   return StatusTuple(0);
 }
 

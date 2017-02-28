@@ -29,6 +29,7 @@ class Probe(object):
         use_localtime = True
         tgid = -1
         pid = -1
+        page_cnt = None
 
         @classmethod
         def configure(cls, args):
@@ -38,6 +39,7 @@ class Probe(object):
                 cls.first_ts = BPF.monotonic_time()
                 cls.tgid = args.tgid or -1
                 cls.pid = args.pid or -1
+                cls.page_cnt = args.buffer_pages
 
         def __init__(self, probe, string_size, kernel_stack, user_stack):
                 self.usdt = None
@@ -510,7 +512,8 @@ BPF_PERF_OUTPUT(%s);
                         self._attach_u(bpf)
                 self.python_struct = self._generate_python_data_decl()
                 callback = partial(self.print_event, bpf)
-                bpf[self.events_name].open_perf_buffer(callback)
+                bpf[self.events_name].open_perf_buffer(callback,
+                        page_cnt=self.page_cnt)
 
         def _attach_k(self, bpf):
                 if self.probe_type == "r":
@@ -543,6 +546,7 @@ BPF_PERF_OUTPUT(%s);
                                           pid=Probe.tgid)
 
 class Tool(object):
+        DEFAULT_PERF_BUFFER_PAGES = 64
         examples = """
 EXAMPLES:
 
@@ -577,6 +581,10 @@ trace 'p::SyS_nanosleep(struct timespec *ts) "sleep for %lld ns", ts->tv_nsec'
                   "functions and print trace messages.",
                   formatter_class=argparse.RawDescriptionHelpFormatter,
                   epilog=Tool.examples)
+                parser.add_argument("-b", "--buffer-pages", type=int,
+                  default=Tool.DEFAULT_PERF_BUFFER_PAGES,
+                  help="number of pages to use for perf_events ring buffer "
+                       "(default: %(default)d)")
                 # we'll refer to the userspace concepts of "pid" and "tid" by
                 # their kernel names -- tgid and pid -- inside the script
                 parser.add_argument("-p", "--pid", type=int, metavar="PID",

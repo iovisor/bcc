@@ -205,7 +205,7 @@ slept = float(0)
 trigger = int(0.8 * (1000000000 / frequency))
 
 # read events
-b["events"].open_perf_buffer(print_event)
+b["events"].open_perf_buffer(print_event, page_cnt=64)
 while 1:
     # allow some buffering by calling sleep(), to reduce the context switch
     # rate and lower overhead.

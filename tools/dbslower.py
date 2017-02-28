@@ -131,7 +131,7 @@ print("Tracing database queries for pids %s slower than %d ms..." %
       (', '.join(map(str, args.pids)), args.threshold))
 print("%-14s %-6s %8s %s" % ("TIME(s)", "PID", "MS", "QUERY"))
 
-bpf["events"].open_perf_buffer(print_event)
+bpf["events"].open_perf_buffer(print_event, page_cnt=64)
 while True:
     bpf.kprobe_poll()
 

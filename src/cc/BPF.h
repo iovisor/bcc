@@ -27,6 +27,8 @@
 #include "compat/linux/bpf.h"
 #include "libbpf.h"
 
+static const int DEFAULT_PERF_BUFFER_PAGE_CNT = 8;
+
 namespace ebpf {
 
 struct open_probe_t {
@@ -96,7 +98,8 @@ public:
   }
 
   StatusTuple open_perf_buffer(const std::string& name, perf_reader_raw_cb cb,
-                               void* cb_cookie = nullptr);
+                               void* cb_cookie = nullptr,
+                               int page_cnt = DEFAULT_PERF_BUFFER_PAGE_CNT);
   StatusTuple close_perf_buffer(const std::string& name);
   void poll_perf_buffer(const std::string& name, int timeout = -1);
 

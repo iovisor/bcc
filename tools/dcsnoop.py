@@ -153,6 +153,6 @@ def print_event(cpu, data, size):
 # header
 print("%-11s %-6s %-16s %1s %s" % ("TIME(s)", "PID", "COMM", "T", "FILE"))
 
-b["events"].open_perf_buffer(print_event)
+b["events"].open_perf_buffer(print_event, page_cnt=64)
 while 1:
     b.kprobe_poll()

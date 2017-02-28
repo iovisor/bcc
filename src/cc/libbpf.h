@@ -68,7 +68,8 @@ void * bpf_attach_tracepoint(int progfd, const char *tp_category,
                              int group_fd, perf_reader_cb cb, void *cb_cookie);
 int bpf_detach_tracepoint(const char *tp_category, const char *tp_name);
 
-void * bpf_open_perf_buffer(perf_reader_raw_cb raw_cb, void *cb_cookie, int pid, int cpu);
+void * bpf_open_perf_buffer(perf_reader_raw_cb raw_cb, void *cb_cookie, int pid,
+    int cpu, int page_cnt);
 
 /* attached a prog expressed by progfd to the device specified in dev_name */
 int bpf_attach_xdp(const char *dev_name, int progfd);

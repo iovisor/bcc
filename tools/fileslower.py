@@ -243,6 +243,6 @@ def print_event(cpu, data, size):
         time.time() - start_ts, event.comm, event.pid, mode_s[event.mode],
         event.sz, ms, name))
 
-b["events"].open_perf_buffer(print_event)
+b["events"].open_perf_buffer(print_event, page_cnt=64)
 while 1:
     b.kprobe_poll()

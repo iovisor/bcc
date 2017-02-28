@@ -24,7 +24,7 @@ return function(BPF)
     print("%-9s %-6d %s" % {os.date("%H:%M:%S"), tonumber(event.pid), ffi.string(event.str)})
   end
 
-  b:get_table("events"):open_perf_buffer(print_readline, "struct { uint64_t pid; char str[80]; }")
+  b:get_table("events"):open_perf_buffer(print_readline, "struct { uint64_t pid; char str[80]; }", nil)
 
   print("%-9s %-6s %s" % {"TIME", "PID", "COMMAND"})
   b:kprobe_poll_loop()
