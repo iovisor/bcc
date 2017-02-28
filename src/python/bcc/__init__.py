@@ -71,7 +71,8 @@ class SymbolCache(object):
     def resolve_name(self, module, name):
         addr = ct.c_ulonglong()
         if lib.bcc_symcache_resolve_name(
-                    self.cache, module, name, ct.pointer(addr)) < 0:
+                    self.cache, module.encode("ascii"),
+                    name.encode("ascii"), ct.pointer(addr)) < 0:
             return -1
         return addr.value
 

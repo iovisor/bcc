@@ -22,6 +22,7 @@ class Harness(TestCase):
 
     def tearDown(self):
         self.process.kill()
+        self.process.wait()
 
     def resolve_addr(self):
         sym, offset, module = self.syms.resolve(self.addr)
@@ -45,6 +46,7 @@ class TestDebuglink(Harness):
                                 .split())
 
     def tearDown(self):
+        super(TestDebuglink, self).tearDown()
         subprocess.check_output('rm dummy dummy.debug'.split())
 
     def test_resolve_addr(self):
@@ -65,6 +67,7 @@ class TestBuildid(Harness):
             '/12/3456789abcdef0123456789abcdef012345678.debug').split())
 
     def tearDown(self):
+        super(TestBuildid, self).tearDown()
         subprocess.check_output('rm dummy'.split())
         subprocess.check_output(('rm /usr/lib/debug/.build-id/12' +
             '/3456789abcdef0123456789abcdef012345678.debug').split())
