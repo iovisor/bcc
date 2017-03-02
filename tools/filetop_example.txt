@@ -29,10 +29,11 @@ PID    COMM             READS  WRITES R_Kb    W_Kb    T FILE
 26628  ld               12     0      52      0       R swap.o
 [...]
 
-This shows various files read and written during a Linux kernel build. The
-output is sorted by the total read size in Kbytes (R_Kb). This is instrumenting
-at the VFS interface, so this is reads and writes that may return entirely
-from the file system cache (page cache).
+This shows various files read and written during a Linux kernel build. By
+default the output is sorted by the total read size in Kbytes (R_Kb). Sorting
+order can be changed via -s option. This is instrumenting at the VFS interface,
+so this is reads and writes that may return entirely from the file system cache
+(page cache).
 
 While not printed, the average read and write size can be calculated by
 dividing R_Kb by READS, and the same for writes.
@@ -146,6 +147,8 @@ optional arguments:
   -C, --noclear         don't clear the screen
   -r MAXROWS, --maxrows MAXROWS
                         maximum rows to print, default 20
+  -s {reads,writes,rbytes,wbytes}, --sort {reads,writes,rbytes,wbytes}
+                        sort column, default rbytes
   -p PID, --pid PID     trace this PID only
 
 examples:
