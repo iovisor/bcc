@@ -114,6 +114,7 @@ bool ProcSyms::resolve_addr(uint64_t addr, struct bcc_symbol *sym) {
   sym->demangle_name = nullptr;
   sym->offset = 0x0;
 
+  const char *original_module = nullptr;
   for (Module &mod : modules_) {
     if (addr >= mod.start_ && addr < mod.end_) {
       bool res = mod.find_addr(addr, sym);
@@ -122,7 +123,21 @@ bool ProcSyms::resolve_addr(uint64_t addr, struct bcc_symbol *sym) {
         if (!sym->demangle_name)
           sym->demangle_name = sym->name;
       }
-      return res;
+      // If we have a match, return right away. But if we don't have a match in
+      // this module, we might have a match in the perf map (even though the
+      // module itself doesn't have symbols). Wait until we see the perf map if
+      // any, but keep the original module name for reporting.
+      if (res) {
+        // If we have already seen this module, report the original name rather
+        // than the perf map name:
+        if (original_module)
+          sym->module = original_module;
+        return res;
+      } else {
+        // Record the module to which this symbol belongs, so that even if it's
+        // later found using a perf map, we still report the right module name.
+        original_module = mod.name_.c_str();
+      }
     }
   }
   return false;
