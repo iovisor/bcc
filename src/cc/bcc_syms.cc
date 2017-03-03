@@ -101,7 +101,11 @@ void ProcSyms::refresh() {
 int ProcSyms::_add_module(const char *modname, uint64_t start, uint64_t end,
                           void *payload) {
   ProcSyms *ps = static_cast<ProcSyms *>(payload);
-  ps->modules_.emplace_back(modname, start, end);
+  auto it = std::find_if(ps->modules_.begin(), ps->modules_.end(),
+               [=](const ProcSyms::Module &m) { return m.name_ == modname; });
+  if (it == ps->modules_.end())
+    it = ps->modules_.insert(ps->modules_.end(), modname);
+  it->ranges_.push_back(ProcSyms::Module::Range(start, end));
   return 0;
 }
 
@@ -116,7 +120,7 @@ bool ProcSyms::resolve_addr(uint64_t addr, struct bcc_symbol *sym) {
 
   const char *original_module = nullptr;
   for (Module &mod : modules_) {
-    if (addr >= mod.start_ && addr < mod.end_) {
+    if (mod.contains(addr)) {
       bool res = mod.find_addr(addr, sym);
       if (sym->name) {
         sym->demangle_name = abi::__cxa_demangle(sym->name, nullptr, nullptr, nullptr);
@@ -155,8 +159,8 @@ bool ProcSyms::resolve_name(const char *module, const char *name,
   return false;
 }
 
-ProcSyms::Module::Module(const char *name, uint64_t start, uint64_t end)
-  : name_(name), start_(start), end_(end) {
+ProcSyms::Module::Module(const char *name)
+  : name_(name) {
   is_so_ = bcc_elf_is_shared_obj(name) == 1;
 }
 
@@ -184,12 +188,20 @@ void ProcSyms::Module::load_sym_table() {
   std::sort(syms_.begin(), syms_.end());
 }
 
+bool ProcSyms::Module::contains(uint64_t addr) const {
+  for (const auto &range : ranges_) {
+    if (addr >= range.start && addr < range.end)
+      return true;
+  }
+  return false;
+}
+
 bool ProcSyms::Module::find_name(const char *symname, uint64_t *addr) {
   load_sym_table();
 
   for (Symbol &s : syms_) {
     if (*(s.name) == symname) {
-      *addr = is_so() ? start_ + s.start : s.start;
+      *addr = is_so() ? start() + s.start : s.start;
       return true;
     }
   }
@@ -197,7 +209,7 @@ bool ProcSyms::Module::find_name(const char *symname, uint64_t *addr) {
 }
 
 bool ProcSyms::Module::find_addr(uint64_t addr, struct bcc_symbol *sym) {
-  uint64_t offset = is_so() ? (addr - start_) : addr;
+  uint64_t offset = is_so() ? (addr - start()) : addr;
 
   load_sym_table();
 
@@ -230,6 +242,9 @@ bool ProcSyms::Module::find_addr(uint64_t addr, struct bcc_symbol *sym) {
       sym->offset = (offset - it->start);
       return true;
     }
+    // But don't step beyond begin()!
+    if (it == syms_.begin())
+      break;
   }
 
   return false;
