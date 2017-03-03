@@ -96,7 +96,7 @@ This is similar to hello_world.py, and traces new processes via sys_clone() agai
 
 1. ```b.attach_kprobe(event="sys_clone", fn_name="hello")```: Creates a kprobe for the sys_clone() kernel function, which will execute our defined hello() function. You can call attach_kprobe() more than once, and attach your C function to multiple kernel functions.
 
-1. ```b.trace_fields()```: Returns a fixed set of fields from trace_pipe. Simalar to trace_print(), this is handy for hacking, but for real tooling we should switch to BPF_PERF_OUTPUT().
+1. ```b.trace_fields()```: Returns a fixed set of fields from trace_pipe. Similar to trace_print(), this is handy for hacking, but for real tooling we should switch to BPF_PERF_OUTPUT().
 
 ### Lesson 4. sync_timing.py
 
