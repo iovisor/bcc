@@ -130,7 +130,7 @@ class USDT(object):
                 raise USDTException("USDT failed to instrument PID %d" % pid)
         elif path:
             self.path = path
-            self.context = lib.bcc_usdt_new_frompath(path)
+            self.context = lib.bcc_usdt_new_frompath(path.encode('ascii'))
             if self.context == None:
                 raise USDTException("USDT failed to instrument path %s" % path)
         else:
