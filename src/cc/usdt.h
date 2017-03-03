@@ -191,6 +191,7 @@ public:
 
 class Context {
   std::vector<std::unique_ptr<Probe>> probes_;
+  std::unordered_set<std::string> modules_;
 
   optional<int> pid_;
   optional<ProcStat> pid_stat_;
