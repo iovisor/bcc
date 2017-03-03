@@ -118,6 +118,12 @@ class BPF(object):
     XDP = 6
     PERF_EVENT = 7
 
+    # from xdp_action uapi/linux/bpf.h
+    XDP_ABORTED = 0
+    XDP_DROP = 1
+    XDP_PASS = 2
+    XDP_TX = 3
+
     _probe_repl = re.compile("[^a-zA-Z0-9_]")
     _sym_caches = {}
 
