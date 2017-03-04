@@ -995,12 +995,12 @@ class BPF(object):
         returned. When show_module is True, the module name is also included.
         When show_offset is True, the instruction offset as a hexadecimal
         number is also included in the string.
-        
+
         A pid of less than zero will access the kernel symbol cache.
 
         Example output when both show_module and show_offset are True:
             "start_thread+0x202 [libpthread-2.24.so]"
-        
+
         Example output when both show_module and show_offset are False:
             "start_thread"
         """
@@ -1008,7 +1008,8 @@ class BPF(object):
         offset = "+0x%x" % offset if show_offset and name is not None else ""
         name = name or "[unknown]"
         name = name + offset
-        module = " [%s]" % os.path.basename(module) if show_module else ""
+        module = " [%s]" % os.path.basename(module) \
+            if show_module and module is not None else ""
         return name + module
 
     @staticmethod
