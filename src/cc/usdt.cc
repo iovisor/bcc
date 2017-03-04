@@ -63,7 +63,7 @@ bool Probe::resolve_global_address(uint64_t *global, const uint64_t addr) {
 }
 
 bool Probe::add_to_semaphore(int16_t val) {
-  assert(pid_ && attached_semaphore_);
+  assert(pid_);
 
   if (!attached_semaphore_) {
     uint64_t addr;
