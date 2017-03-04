@@ -134,8 +134,10 @@ if args.language == "java":
     bpf_probe_read(&event.string1, sizeof(event.string1), (void *)manager);
     bpf_probe_read(&event.string2, sizeof(event.string2), (void *)pool);
     """
-    formatter = lambda e: "%s %s used=%d->%d max=%d->%d" % \
-                (e.string1, e.string2, e.field1, e.field3, e.field2, e.field4)
+
+    def formatter(e):
+        "%s %s used=%d->%d max=%d->%d" % \
+            (e.string1, e.string2, e.field1, e.field3, e.field2, e.field4)
     probes.append(Probe("mem__pool__gc__begin", "mem__pool__gc__end",
                         begin_save, end_save, formatter))
     probes.append(Probe("gc__begin", "gc__end",
@@ -155,8 +157,10 @@ elif args.language == "python":
     event.field1 = e->field1;
     event.field2 = objs;
     """
-    formatter = lambda event: "gen %d GC collected %d objects" % \
-                              (event.field1, event.field2)
+
+    def formatter(event):
+        "gen %d GC collected %d objects" % \
+            (event.field1, event.field2)
     probes.append(Probe("gc__start", "gc__done",
                         begin_save, end_save, formatter))
 #
@@ -214,10 +218,10 @@ start_ts = time.time()
 
 def print_event(cpu, data, size):
     event = ct.cast(data, ct.POINTER(GCEvent)).contents
-    elapsed = event.elapsed_ns/1000000 if args.milliseconds else \
-              event.elapsed_ns/1000
+    elapsed = event.elapsed_ns / 1000000 if args.milliseconds else \
+              event.elapsed_ns / 1000
     description = probes[event.probe_index].format(event)
-    if args.filter and not args.filter in description:
+    if args.filter and args.filter not in description:
         return
     print("%-8.3f %-8.2f %s" % (time.time() - start_ts, elapsed, description))
 

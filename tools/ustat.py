@@ -244,8 +244,9 @@ class Tool(object):
             counts.update(probe.get_counts(self.bpf))
             targets.update(probe.targets)
         if self.args.sort:
-            counts = sorted(counts.items(), key=lambda kv:
-                            -kv[1].get(self.args.sort.upper(), 0))
+            sort_field = self.args.sort.upper()
+            counts = sorted(counts.items(),
+                            key=lambda kv: -kv[1].get(sort_field, 0))
         else:
             counts = sorted(counts.items(), key=lambda kv: kv[0])
         for pid, stats in counts:

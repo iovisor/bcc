@@ -200,7 +200,7 @@ u64 __time = bpf_ktime_get_ns();
                 elif self.probe_type == "u":
                         self.library = parts[1]
                         self.probe_func_name = self._make_valid_identifier(
-                                "%s_probe%d" % \
+                                "%s_probe%d" %
                                 (self.function, Probe.next_probe_index))
                         self._enable_usdt_probe()
                 else:
@@ -238,10 +238,10 @@ u64 __time = bpf_ktime_get_ns();
                         (any(map(check, self.exprs)) or check(self.filter))
 
                 self.probe_func_name = self._make_valid_identifier(
-                        "%s_probe%d" % \
+                        "%s_probe%d" %
                         (self.function, Probe.next_probe_index))
                 self.probe_hash_name = self._make_valid_identifier(
-                        "%s_hash%d" % \
+                        "%s_hash%d" %
                         (self.function, Probe.next_probe_index))
                 Probe.next_probe_index += 1
 

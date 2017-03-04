@@ -257,7 +257,8 @@ def get_data():
                            bpf["systimes"].items())
             data.extend(syscalls)
         else:
-            syscalls = map(lambda kv: (bpf.ksym(kv[0].value), (kv[1].value, 0)),
+            syscalls = map(lambda kv: (bpf.ksym(kv[0].value),
+                                       (kv[1].value, 0)),
                            bpf["syscounts"].items())
             data.extend(syscalls)
 
@@ -294,8 +295,8 @@ while True:
         data = data[-args.top:]
     for key, value in data:
         if args.latency:
-            time = value[1]/1000000.0 if args.milliseconds else \
-                   value[1]/1000.0
+            time = value[1] / 1000000.0 if args.milliseconds else \
+                   value[1] / 1000.0
             print("%-50s %8d %6.2f" % (key, value[0], time))
         else:
             print("%-50s %8d" % (key, value[0]))

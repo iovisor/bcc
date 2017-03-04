@@ -23,7 +23,8 @@ import sys
 #  cat syscallent.h | awk -F, '{ gsub(/[ \t"}]/, "", $4);
 #                                gsub(/[ \t/*]/, "", $5);
 #                                print "    "$5": \""$4"\","; }
-#                              BEGIN { print "syscalls = {" } END { print "}" }'
+#                              BEGIN { print "syscalls = {" }
+#                              END { print "}" }'
 #
 syscalls = {
     0: "read",
@@ -459,7 +460,7 @@ def comm_for_pid(pid):
 
 def agg_colval(key):
     if args.process:
-        return "%-6d %-15s" % (key.value, comm_for_pid(key.value)) 
+        return "%-6d %-15s" % (key.value, comm_for_pid(key.value))
     else:
         return syscalls.get(key.value, "[unknown: %d]" % key.value)
 
@@ -478,7 +479,8 @@ def print_latency_stats():
     data = bpf["data"]
     print("[%s]" % strftime("%H:%M:%S"))
     print("%-22s %8s %16s" % (agg_colname, "COUNT", time_colname))
-    for k, v in sorted(data.items(), key=lambda kv: -kv[1].total_ns)[:args.top]:
+    for k, v in sorted(data.items(),
+                       key=lambda kv: -kv[1].total_ns)[:args.top]:
         if k.value == 0xFFFFFFFF:
             continue    # happens occasionally, we don't need it
         print(("%-22s %8d " + ("%16.6f" if args.milliseconds else "%16.3f")) %
@@ -497,4 +499,3 @@ while True:
         if not args.interval:
             print_stats()
         break
-
