@@ -2,14 +2,15 @@
 .SH NAME
 filetop \- File reads and writes by filename and process. Top for files.
 .SH SYNOPSIS
-.B filetop [\-h] [\-C] [\-r MAXROWS] [\-p PID] [interval] [count]
+.B filetop [\-h] [\-C] [\-r MAXROWS] [\-s {reads,writes,rbytes,wbytes}] [\-p PID] [interval] [count]
 .SH DESCRIPTION
 This is top for files.
 
-This traces file reads and writes, and prints a per-file summary every
-interval (by default, 1 second). The summary is sorted on the highest read
-throughput (Kbytes). By default only IO on regular files is shown. The -a
-option will list all file types (sokets, FIFOs, etc).
+This traces file reads and writes, and prints a per-file summary every interval
+(by default, 1 second). By default the summary is sorted on the highest read
+throughput (Kbytes). Sorting order can be changed via -s option. By default only
+IO on regular files is shown. The -a option will list all file types (sokets,
+FIFOs, etc).
 
 This uses in-kernel eBPF maps to store per process summaries for efficiency.
 
@@ -38,6 +39,9 @@ Don't clear the screen.
 .TP
 \-r MAXROWS
 Maximum number of rows to print. Default is 20.
+.TP
+\-s {reads,writes,rbytes,wbytes}
+Sort column. Default is rbytes (read throughput).
 .TP
 \-p PID
 Trace this PID only.
