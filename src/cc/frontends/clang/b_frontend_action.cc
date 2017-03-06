@@ -521,7 +521,6 @@ bool BTypeVisitor::VisitBinaryOperator(BinaryOperator *E) {
   if (!E->isAssignmentOp())
     return true;
   Expr *LHS = E->getLHS()->IgnoreImplicit();
-  Expr *RHS = E->getRHS()->IgnoreImplicit();
   if (MemberExpr *Memb = dyn_cast<MemberExpr>(LHS)) {
     if (DeclRefExpr *Base = dyn_cast<DeclRefExpr>(Memb->getBase()->IgnoreImplicit())) {
       if (DeprecatedAttr *A = Base->getDecl()->getAttr<DeprecatedAttr>()) {
@@ -534,10 +533,10 @@ bool BTypeVisitor::VisitBinaryOperator(BinaryOperator *E) {
             uint64_t ofs = C.getFieldOffset(F);
             uint64_t sz = F->isBitField() ? F->getBitWidthValue(C) : C.getTypeSize(F->getType());
             string base = rewriter_.getRewrittenText(expansionRange(Base->getSourceRange()));
-            string rhs = rewriter_.getRewrittenText(expansionRange(RHS->getSourceRange()));
             string text = "bpf_dins_pkt(" + fn_args_[0]->getName().str() + ", (u64)" + base + "+" + to_string(ofs >> 3)
-                + ", " + to_string(ofs & 0x7) + ", " + to_string(sz) + ", " + rhs + ")";
-            rewriter_.ReplaceText(expansionRange(E->getSourceRange()), text);
+                + ", " + to_string(ofs & 0x7) + ", " + to_string(sz) + ",";
+            rewriter_.ReplaceText(expansionRange(SourceRange(E->getLocStart(), E->getOperatorLoc())), text);
+            rewriter_.InsertTextAfterToken(E->getLocEnd(), ")");
           }
         }
       }
