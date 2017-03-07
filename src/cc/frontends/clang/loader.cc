@@ -172,6 +172,8 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, unique_ptr<vector<TableDes
 #else
   driver::Driver drv("", "powerpc64-unknown-linux-gnu", diags);
 #endif
+#elif defined(__s390x__)
+  driver::Driver drv("", "s390x-ibm-linux-gnu", diags);
 #elif defined(__aarch64__)
   driver::Driver drv("", "aarch64-unknown-linux-gnu", diags);
 #else
