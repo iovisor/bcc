@@ -200,7 +200,7 @@ bool ProbeVisitor::VisitBinaryOperator(BinaryOperator *E) {
   return true;
 }
 bool ProbeVisitor::VisitUnaryOperator(UnaryOperator *E) {
-  if (E->getOpcode() == UO_AddrOf)
+  if (E->getOpcode() != UO_Deref)
     return true;
   if (memb_visited_.find(E) != memb_visited_.end())
     return true;

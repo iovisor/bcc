@@ -408,6 +408,17 @@ int dns_test(struct __sk_buff *skb) {
         """
         b = BPF(text=text)
 
+    def test_unary_operator(self):
+        text = """
+#include <linux/fs.h>
+#include <uapi/linux/ptrace.h>
+int trace_read_entry(struct pt_regs *ctx, struct file *file) {
+    return !file->f_op->read_iter;
+}
+        """
+        b = BPF(text=text)
+        b.attach_kprobe(event="__vfs_read", fn_name="trace_read_entry")
+
 if __name__ == "__main__":
     main()
 
