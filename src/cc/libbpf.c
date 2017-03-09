@@ -46,6 +46,8 @@
 #ifndef __NR_bpf
 #if defined(__powerpc64__)
 #define __NR_bpf 361
+#elif defined(__s390x__)
+#define __NR_bpf 351
 #elif defined(__aarch64__)
 #define __NR_bpf 280
 #else
