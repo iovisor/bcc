@@ -1,3 +1,16 @@
+bcc (0.3.0-1) unstable; urgency=low
+
+  * Many bugfixes
+  * Many tools converted to perf ring buffer
+  * New utilities in tools/
+   * capable, cpuunclaimed, dbslower, dbstat, deadlock_detector, llcstat,
+     mountsnoop, runqlen, slabratetop, syscount, tcplife, tcptop, ttysnoop,
+     ucalls, uflow, ugc, uobjnew, ustat, uthreads
+  * New C++ API
+  * Support for kernel up to 4.10
+
+ -- Brenden Blanco <bblanco@gmail.com>  Thu, 09 Mar 2017 19:08:08 +0000
+
 bcc (0.2.0-1) unstable; urgency=low
 
   * Add many new utilities in tools/
