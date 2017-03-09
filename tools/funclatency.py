@@ -90,7 +90,6 @@ if not args.regexp:
 # define BPF program
 bpf_text = """
 #include <uapi/linux/ptrace.h>
-#include <linux/blkdev.h>
 
 typedef struct ip_pid {
     u64 ip;
