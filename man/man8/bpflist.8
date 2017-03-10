@@ -1,0 +1,60 @@
+.TH bpflist 8  "2017-03-09" "USER COMMANDS"
+.SH NAME
+bpflist \- Display processes currently using BPF programs and maps.
+.SH SYNOPSIS
+.B bpflist [-v]
+.SH DESCRIPTION
+This tool displays processes currently using BPF programs and maps, and
+optionally also kprobes and uprobes on the system. This is useful to understand
+which BPF programs are loaded on the system.
+
+Currently, for lack of a better alternative, this tool pipes into 'ls' and
+parses its output to snoop for BPF file descriptors in all running processes.
+In the future, when BPF accounting is provided by the kernel, this tool should
+use these accounting features.
+
+Only the root user can use this tool, because it accesses debugfs.
+.SH REQUIREMENTS
+bcc, debugfs
+.SH OPTIONS
+\-h
+Print usage message.
+.TP
+\-v
+Count kprobes and uprobes as well as BPF programs. Repeating verbose mode twice
+also prints the kprobe and uprobe definitions in addition to counting them.
+.SH EXAMPLES
+.TP
+Display processes currently using BPF programs:
+#
+.B bpflist
+.TP
+Also count kprobes and uprobes:
+#
+.B bpflist -v
+.SH FIELDS
+.TP
+PID
+Process ID.
+.TP
+COMM
+Process comm.
+.TP
+TYPE
+The type of the data displayed: BPF program, BPF map, kprobe, or uprobe.
+.TP
+COUNT
+The number of items of this type that belong to the specified process.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Sasha Goldshtein
