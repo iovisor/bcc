@@ -13,6 +13,7 @@ from bcc import BPF
 from itertools import izip_longest
 from time import sleep, strftime
 import argparse
+import subprocess
 import sys
 
 #
@@ -342,6 +343,21 @@ syscalls = {
     312: "kcmp",
     313: "finit_module",
 }
+
+# Try to use ausyscall if it is available, because it can give us an up-to-date
+# list of syscalls for various architectures, rather than the x86-64 hardcoded
+# list above.
+def parse_syscall(line):
+    parts = line.split()
+    return (int(parts[0]), parts[1].strip())
+
+try:
+    # Skip the first line, which is a header. The rest of the lines are simply
+    # SYSCALL_NUM\tSYSCALL_NAME pairs.
+    out = subprocess.check_output('ausyscall --dump | tail -n +2', shell=True)
+    syscalls = dict(map(parse_syscall, out.strip().split('\n')))
+except Exception as e:
+    pass
 
 parser = argparse.ArgumentParser(
     description="Summarize syscall counts and latencies.")
