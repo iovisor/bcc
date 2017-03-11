@@ -21,6 +21,7 @@ b = BPF(text="""
 #include <uapi/linux/ptrace.h>
 #include <linux/sched.h>
 #include <linux/genhd.h>
+#include <linux/bio.h>
 
 struct data_t {
     u64 pid;
