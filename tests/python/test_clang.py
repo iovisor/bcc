@@ -5,6 +5,21 @@
 from bcc import BPF
 import ctypes
 from unittest import main, TestCase
+import os
+import sys
+from contextlib import contextmanager
+
+@contextmanager
+def redirect_stderr(to):
+    stderr_fd = sys.stderr.fileno()
+    with os.fdopen(os.dup(stderr_fd), 'wb') as copied, os.fdopen(to, 'w') as to:
+        sys.stderr.flush()
+        os.dup2(to.fileno(), stderr_fd)
+        try:
+            yield sys.stderr
+        finally:
+            sys.stderr.flush()
+            os.dup2(copied.fileno(), stderr_fd)
 
 class TestClang(TestCase):
     def test_complex(self):
@@ -419,8 +434,56 @@ int trace_read_entry(struct pt_regs *ctx, struct file *file) {
         b = BPF(text=text)
         b.attach_kprobe(event="__vfs_read", fn_name="trace_read_entry")
 
+    def test_printk_f(self):
+        text = """
+#include <uapi/linux/ptrace.h>
+int trace_entry(struct pt_regs *ctx) {
+  bpf_trace_printk("%0.2f\\n", 1);
+  return 0;
+}
+"""
+        r, w = os.pipe()
+        with redirect_stderr(to=w):
+            BPF(text=text)
+        r = os.fdopen(r)
+        output = r.read()
+        expectedWarn = "warning: only %d %u %x %ld %lu %lx %lld %llu %llx %p %s conversion specifiers allowed"
+        self.assertIn(expectedWarn, output)
+        r.close()
+
+    def test_printk_lf(self):
+        text = """
+#include <uapi/linux/ptrace.h>
+int trace_entry(struct pt_regs *ctx) {
+  bpf_trace_printk("%lf\\n", 1);
+  return 0;
+}
+"""
+        r, w = os.pipe()
+        with redirect_stderr(to=w):
+            BPF(text=text)
+        r = os.fdopen(r)
+        output = r.read()
+        expectedWarn = "warning: only %d %u %x %ld %lu %lx %lld %llu %llx %p %s conversion specifiers allowed"
+        self.assertIn(expectedWarn, output)
+        r.close()
+
+    def test_printk_2s(self):
+        text = """
+#include <uapi/linux/ptrace.h>
+int trace_entry(struct pt_regs *ctx) {
+  bpf_trace_printk("%s %s\\n", "hello", "world");
+  return 0;
+}
+"""
+        r, w = os.pipe()
+        with redirect_stderr(to=w):
+            BPF(text=text)
+        r = os.fdopen(r)
+        output = r.read()
+        expectedWarn = "warning: cannot use several %s conversion specifiers"
+        self.assertIn(expectedWarn, output)
+        r.close()
+
 if __name__ == "__main__":
     main()
-
-
-
