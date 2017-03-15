@@ -28,6 +28,7 @@ from .libbcc import lib, _CB_TYPE, bcc_symbol, _SYM_CB_TYPE
 from .table import Table
 from .perf import Perf
 from .utils import get_online_cpus
+from .ctf import CTF, CTFEvent
 
 _kprobe_limit = 1000
 _num_open_probes = 0
