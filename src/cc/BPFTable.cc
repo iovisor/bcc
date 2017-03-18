@@ -114,7 +114,10 @@ StatusTuple BPFPerfBuffer::close_on_cpu(int cpu) {
 StatusTuple BPFPerfBuffer::close_all_cpu() {
   std::string errors;
   bool has_error = false;
-  for (int i: get_online_cpus()) {
+  std::vector<int> opened_cpus;
+  for (auto it : cpu_readers_)
+    opened_cpus.push_back(it.first);
+  for (int i : opened_cpus) {
     auto res = close_on_cpu(i);
     if (res.code() != 0) {
       errors += "Failed to close CPU" + std::to_string(i) + " perf buffer: ";
