@@ -204,7 +204,7 @@ static void write_data_tail(struct perf_event_mmap_page *perf_header, uint64_t d
   perf_header->data_tail = data_tail;
 }
 
-static void event_read(struct perf_reader *reader) {
+void perf_reader_event_read(struct perf_reader *reader) {
   struct perf_event_mmap_page *perf_header = reader->base;
   uint64_t buffer_size = (uint64_t)reader->page_size * reader->page_cnt;
   uint64_t data_head;
@@ -261,7 +261,7 @@ int perf_reader_poll(int num_readers, struct perf_reader **readers, int timeout)
   if (poll(pfds, num_readers, timeout) > 0) {
     for (i = 0; i < num_readers; ++i) {
       if (pfds[i].revents & POLLIN)
-        event_read(readers[i]);
+        perf_reader_event_read(readers[i]);
     }
   }
   return 0;
