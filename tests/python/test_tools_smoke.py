@@ -76,6 +76,9 @@ class SmokeTests(TestCase):
     def test_bitesize(self):
         self.run_with_int("biotop.py")
 
+    def test_bpflist(self):
+        self.run_with_duration("bpflist.py")
+
     def test_btrfsdist(self):
         # Will attempt to do anything meaningful only when btrfs is installed.
         self.run_with_duration("btrfsdist.py 1 1")
