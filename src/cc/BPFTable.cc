@@ -14,18 +14,20 @@
  * limitations under the License.
  */
 
-#include <errno.h>
+#include <sys/epoll.h>
 #include <unistd.h>
+#include <cerrno>
 #include <cstring>
 #include <iostream>
+#include <memory>
 
 #include "BPFTable.h"
 
 #include "bcc_exception.h"
 #include "bcc_syms.h"
+#include "common.h"
 #include "libbpf.h"
 #include "perf_reader.h"
-#include "common.h"
 
 namespace ebpf {
 
@@ -70,27 +72,42 @@ StatusTuple BPFPerfBuffer::open_on_cpu(perf_reader_raw_cb cb, int cpu,
                                        void* cb_cookie, int page_cnt) {
   if (cpu_readers_.find(cpu) != cpu_readers_.end())
     return StatusTuple(-1, "Perf buffer already open on CPU %d", cpu);
-  auto reader =
-      static_cast<perf_reader*>(bpf_open_perf_buffer(cb, cb_cookie, -1, cpu, page_cnt));
+
+  auto reader = static_cast<perf_reader*>(
+      bpf_open_perf_buffer(cb, cb_cookie, -1, cpu, page_cnt));
   if (reader == nullptr)
     return StatusTuple(-1, "Unable to construct perf reader");
+
   int reader_fd = perf_reader_fd(reader);
   if (!update(&cpu, &reader_fd)) {
     perf_reader_free(static_cast<void*>(reader));
     return StatusTuple(-1, "Unable to open perf buffer on CPU %d: %s", cpu,
-                       strerror(errno));
+                       std::strerror(errno));
   }
+
+  struct epoll_event event = {};
+  event.events = EPOLLIN;
+  event.data.ptr = static_cast<void*>(reader);
+  if (epoll_ctl(epfd_, EPOLL_CTL_ADD, reader_fd, &event) != 0) {
+    perf_reader_free(static_cast<void*>(reader));
+    return StatusTuple(-1, "Unable to add perf_reader FD to epoll: %s",
+                       std::strerror(errno));
+  }
+
   cpu_readers_[cpu] = reader;
-  readers_.push_back(reader);
   return StatusTuple(0);
 }
 
-StatusTuple BPFPerfBuffer::open_all_cpu(perf_reader_raw_cb cb,
-                                        void* cb_cookie, int page_cnt) {
-  if (cpu_readers_.size() != 0 || readers_.size() != 0)
+StatusTuple BPFPerfBuffer::open_all_cpu(perf_reader_raw_cb cb, void* cb_cookie,
+                                        int page_cnt) {
+  if (cpu_readers_.size() != 0 || epfd_ != -1)
     return StatusTuple(-1, "Previously opened perf buffer not cleaned");
 
-  for (int i: get_online_cpus()) {
+  std::vector<int> cpus = get_online_cpus();
+  ep_events_.reset(new epoll_event[cpus.size()]);
+  epfd_ = epoll_create1(EPOLL_CLOEXEC);
+
+  for (int i : cpus) {
     auto res = open_on_cpu(cb, i, cb_cookie, page_cnt);
     if (res.code() != 0) {
       TRY2(close_all_cpu());
@@ -114,7 +131,19 @@ StatusTuple BPFPerfBuffer::close_on_cpu(int cpu) {
 StatusTuple BPFPerfBuffer::close_all_cpu() {
   std::string errors;
   bool has_error = false;
-  for (int i: get_online_cpus()) {
+
+  int close_res = close(epfd_);
+  epfd_ = -1;
+  ep_events_.reset();
+  if (close_res != 0) {
+    has_error = true;
+    errors += std::string(std::strerror(errno)) + "\n";
+  }
+
+  std::vector<int> opened_cpus;
+  for (auto it : cpu_readers_)
+    opened_cpus.push_back(it.first);
+  for (int i : opened_cpus) {
     auto res = close_on_cpu(i);
     if (res.code() != 0) {
       errors += "Failed to close CPU" + std::to_string(i) + " perf buffer: ";
@@ -122,23 +151,27 @@ StatusTuple BPFPerfBuffer::close_all_cpu() {
       has_error = true;
     }
   }
-  readers_.clear();
+
   if (has_error)
     return StatusTuple(-1, errors);
   return StatusTuple(0);
 }
 
 void BPFPerfBuffer::poll(int timeout) {
-  if (readers_.empty())
+  if (epfd_ < 0)
     return;
-  perf_reader_poll(readers_.size(), readers_.data(), timeout);
+  int cnt = epoll_wait(epfd_, ep_events_.get(), cpu_readers_.size(), timeout);
+  if (cnt <= 0)
+    return;
+  for (int i = 0; i < cnt; i++)
+    perf_reader_event_read(static_cast<perf_reader*>(ep_events_[i].data.ptr));
 }
 
 BPFPerfBuffer::~BPFPerfBuffer() {
   auto res = close_all_cpu();
   if (res.code() != 0)
-    std::cerr << "Failed to close all perf buffer on destruction: "
-              << res.msg() << std::endl;
+    std::cerr << "Failed to close all perf buffer on destruction: " << res.msg()
+              << std::endl;
 }
 
 }  // namespace ebpf

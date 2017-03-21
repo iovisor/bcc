@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <sys/epoll.h>
 #include <exception>
 #include <map>
 #include <memory>
@@ -123,7 +124,7 @@ private:
 class BPFPerfBuffer : protected BPFTableBase<int, int> {
 public:
   BPFPerfBuffer(BPFModule* bpf_module, const std::string& name)
-      : BPFTableBase<int, int>(bpf_module, name) {}
+      : BPFTableBase<int, int>(bpf_module, name), epfd_(-1) {}
   ~BPFPerfBuffer();
 
   StatusTuple open_all_cpu(perf_reader_raw_cb cb, void* cb_cookie,
@@ -137,7 +138,9 @@ private:
   StatusTuple close_on_cpu(int cpu);
 
   std::map<int, perf_reader*> cpu_readers_;
-  std::vector<perf_reader*> readers_;
+
+  int epfd_;
+  std::unique_ptr<epoll_event[]> ep_events_;
 };
 
 }  // namespace ebpf
