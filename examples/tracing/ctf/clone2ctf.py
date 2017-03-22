@@ -1,6 +1,17 @@
 #!/usr/bin/env python3
-#  
-# This programs creates CTF events from sys_clone using Babeltrace library
+#
+# clone2ctf.py
+#
+# Basic example of using CTF module to format and store sys_clone events
+# in Common Trace Format (CTF)
+#
+# A Ctrl-C stops the trace recording. View the trace with babeltrace
+#
+# Copyright (c) 2017 ShiftLeft Inc.
+# Licensed under the Apache License, Version 2.0 (the "License")
+#
+# Author(s):
+#   Suchakrapani Sharma <suchakra@shiftleft.io>
 
 from bcc import BPF, CTF, CTFEvent
 import ctypes as ct

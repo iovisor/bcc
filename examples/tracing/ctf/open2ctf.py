@@ -1,6 +1,17 @@
 #!/usr/bin/env python3
-#  
-# This programs creates CTF events from sys_fchownat using Babeltrace library
+#
+# open2ctf.py
+#
+# Basic example of using CTF module to format and store sys_open events
+# in Common Trace Format (CTF)
+#
+# A Ctrl-C stops the trace recording. View the trace with babeltrace
+#
+# Copyright (c) 2017 ShiftLeft Inc.
+# Licensed under the Apache License, Version 2.0 (the "License")
+#
+# Author(s):
+#   Suchakrapani Sharma <suchakra@shiftleft.io>
 
 from bcc import BPF, CTF, CTFEvent
 import ctypes as ct
@@ -24,7 +35,8 @@ int handler(struct pt_regs *ctx) {
     data.pid = bpf_get_current_pid_tgid();
     data.ts = bpf_ktime_get_ns();
     bpf_get_current_comm(&data.comm, sizeof(data.comm));
-    bpf_probe_read(&data.fname, sizeof(data.fname), (void *)PT_REGS_PARM1(ctx));
+    bpf_probe_read(&data.fname, sizeof(data.fname),
+                  (void *)PT_REGS_PARM1(ctx));
 
     events.perf_submit(ctx, &data, sizeof(data));
 
@@ -47,7 +59,8 @@ class Data(ct.Structure):
                 ("comm", ct.c_char * TASK_COMM_LEN),
                 ("fname", ct.c_char * NAME_MAX)]
 
-fields = {"pid": CTF.Type.u32, "comm": CTF.Type.string, "filename": CTF.Type.string}
+fields = {"pid": CTF.Type.u32, "comm": CTF.Type.string,
+          "filename": CTF.Type.string}
 c = CTF("sys_open", "/tmp/opentrace", fields)
 
 
