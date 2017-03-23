@@ -61,6 +61,8 @@ cgroup array | 4.8 | [4ed8ec521ed5](https://git.kernel.org/cgit/linux/kernel/git
 LRU hash | 4.10 | [29ba732acbee](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=29ba732acbeece1e34c68483d1ec1f3720fa1bb3)
 LRU per-CPU hash | 4.10 | [8f8449384ec3](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=8f8449384ec364ba2a654f11f94e754e4ff719e0)
 LPM trie (longest-prefix match) | 4.11 | [b95a5c4db09b](https://git.kernel.org/cgit/linux/kernel/git/davem/net-next.git/commit/?id=b95a5c4db09bc7c253636cb84dc9b12c577fd5a0)
+Array of maps | 4.11 | [56f668dfe00d](https://git.kernel.org/cgit/linux/kernel/git/davem/net-next.git/commit/?id=56f668dfe00dcf086734f1c42ea999398fad6572)
+Hash of maps | 4.11 | [bcc6b1b7ebf8](https://git.kernel.org/cgit/linux/kernel/git/davem/net-next.git/commit/?id=bcc6b1b7ebf857a9fe56202e2be3361131588c15)
 Text string | _To be done?_ |
 Variable-length maps | _To be done?_ |
 
