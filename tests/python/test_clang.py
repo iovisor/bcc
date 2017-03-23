@@ -438,7 +438,7 @@ int trace_read_entry(struct pt_regs *ctx, struct file *file) {
         text = """
 #include <uapi/linux/ptrace.h>
 int trace_entry(struct pt_regs *ctx) {
-  bpf_trace_printk("%0.2f\\n", 1);
+  bpf_trace_printk("%0.2f\\n", 1.0);
   return 0;
 }
 """
@@ -455,7 +455,7 @@ int trace_entry(struct pt_regs *ctx) {
         text = """
 #include <uapi/linux/ptrace.h>
 int trace_entry(struct pt_regs *ctx) {
-  bpf_trace_printk("%lf\\n", 1);
+  bpf_trace_printk("%lf\\n", 1.0);
   return 0;
 }
 """
