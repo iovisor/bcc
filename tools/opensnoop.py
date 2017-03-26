@@ -175,7 +175,7 @@ def print_event(cpu, data, size):
 
     print("%-6d %-16s %4d %3d %s" %
           (event.id & 0xffffffff if args.tid else event.id >> 32,
-           event.comm, fd_s, err, event.fname))
+           event.comm.decode(), fd_s, err, event.fname.decode()))
 
 # loop with callback to print_event
 b["events"].open_perf_buffer(print_event, page_cnt=64)

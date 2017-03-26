@@ -200,10 +200,11 @@ def print_event(cpu, data, size, rw):
                 " bytes lost) " + "-" * 5
 
     print("%-12s %-18.9f %-16s %-6d %-6d\n%s\n%s\n%s\n\n" % (rw, time_s,
-                                                             event.comm,
+                                                             event.comm.decode(),
                                                              event.pid,
                                                              event.len,
-                                                             s_mark, event.v0,
+                                                             s_mark,
+                                                             event.v0.decode(),
                                                              e_mark))
 
 b["perf_SSL_write"].open_perf_buffer(print_event_write)

@@ -159,8 +159,9 @@ def print_ipv4_event(cpu, data, size):
         if start_ts == 0:
             start_ts = event.ts_us
         print("%-9.3f" % ((float(event.ts_us) - start_ts) / 1000000), end="")
-    print("%-6d %-12.12s %-2d %-16s %-16s %-4d" % (event.pid, event.task,
-        event.ip, inet_ntop(AF_INET, pack("I", event.daddr)),
+    print("%-6d %-12.12s %-2d %-16s %-16s %-4d" % (event.pid,
+        event.task.decode(), event.ip,
+        inet_ntop(AF_INET, pack("I", event.daddr)),
         inet_ntop(AF_INET, pack("I", event.saddr)), event.lport))
 
 def print_ipv6_event(cpu, data, size):
@@ -170,8 +171,8 @@ def print_ipv6_event(cpu, data, size):
         if start_ts == 0:
             start_ts = event.ts_us
         print("%-9.3f" % ((float(event.ts_us) - start_ts) / 1000000), end="")
-    print("%-6d %-12.12s %-2d %-16s %-16s %-4d" % (event.pid, event.task,
-        event.ip, inet_ntop(AF_INET6, event.daddr),
+    print("%-6d %-12.12s %-2d %-16s %-16s %-4d" % (event.pid,
+        event.task.decode(), event.ip, inet_ntop(AF_INET6, event.daddr),
         inet_ntop(AF_INET6, event.saddr), event.lport))
 
 # initialize BPF

@@ -306,7 +306,7 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
 
     else:
         # print wakeup name then stack in reverse order
-        print("    %-16s %s %s" % ("waker:", k.waker, k.t_pid))
+        print("    %-16s %s %s" % ("waker:", k.waker.decode(), k.t_pid))
         for addr in waker_user_stack:
             print("    %s" % b.sym(addr, k.tgid))
         if args.delimited:
@@ -324,7 +324,7 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
             print("    -")
         for addr in target_user_stack:
             print("    %s" % b.sym(addr, k.tgid))
-        print("    %-16s %s %s" % ("target:", k.target, k.w_pid))
+        print("    %-16s %s %s" % ("target:", k.target.decode(), k.w_pid))
         print("        %d\n" % v.value)
 
 if missing_stacks > 0:
