@@ -10,11 +10,16 @@
 # 15-Feb-2017   Sasha Goldshtein    Created this.
 
 from bcc import BPF
-from itertools import izip_longest
 from time import sleep, strftime
 import argparse
+import itertools
 import subprocess
 import sys
+
+if sys.version_info.major < 3:
+    izip_longest = itertools.izip_longest
+else:
+    izip_longest = itertools.zip_longest
 
 #
 # Syscall table for Linux x86_64, not very recent.
