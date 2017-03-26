@@ -224,3 +224,7 @@ what you want to work on.
 * _IRC Logs:_ https://scrollback.io/iovisor/all
 * _BCC Issue Tracker:_ [Github Issues](https://github.com/iovisor/bcc/issues)
 * _A guide for contributing scripts:_ [CONTRIBUTING-SCRIPTS.md](CONTRIBUTING-SCRIPTS.md)
+
+## External links
+
+Looking for more information on BCC and how it's being used? You can find links to other BCC content on the web in [LINKS.md](LINKS.md).
