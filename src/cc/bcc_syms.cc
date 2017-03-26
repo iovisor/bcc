@@ -104,7 +104,7 @@ int ProcSyms::_add_module(const char *modname, uint64_t start, uint64_t end,
   auto it = std::find_if(ps->modules_.begin(), ps->modules_.end(),
                [=](const ProcSyms::Module &m) { return m.name_ == modname; });
   if (it == ps->modules_.end())
-    it = ps->modules_.insert(ps->modules_.end(), modname);
+    it = ps->modules_.insert(ps->modules_.end(), Module(modname, ps->pid_));
   it->ranges_.push_back(ProcSyms::Module::Range(start, end));
   return 0;
 }
@@ -159,9 +159,13 @@ bool ProcSyms::resolve_name(const char *module, const char *name,
   return false;
 }
 
-ProcSyms::Module::Module(const char *name)
-  : name_(name) {
+ProcSyms::Module::Module(const char *name, int pid)
+  : name_(name), pid_(pid) {
+  struct ns_cookie nsc = {-1, -1};
+
+  bcc_procutils_enter_mountns(pid_, &nsc);
   is_so_ = bcc_elf_is_shared_obj(name) == 1;
+  bcc_procutils_exit_mountns(&nsc);
 }
 
 int ProcSyms::Module::_add_symbol(const char *symname, uint64_t start,
@@ -177,13 +181,19 @@ bool ProcSyms::Module::is_perf_map() const {
 }
 
 void ProcSyms::Module::load_sym_table() {
-  if (syms_.size())
+  struct ns_cookie nsc = {-1, -1};
+
+   if (syms_.size())
     return;
+
+  bcc_procutils_enter_mountns(pid_, &nsc);
 
   if (is_perf_map())
     bcc_perf_map_foreach_sym(name_.c_str(), _add_symbol, this);
   else
     bcc_elf_foreach_sym(name_.c_str(), _add_symbol, this);
+
+  bcc_procutils_exit_mountns(&nsc);
 
   std::sort(syms_.begin(), syms_.end());
 }
@@ -352,6 +362,8 @@ int bcc_foreach_symbol(const char *module, SYM_CB cb) {
 int bcc_resolve_symname(const char *module, const char *symname,
                         const uint64_t addr, int pid, struct bcc_symbol *sym) {
   uint64_t load_addr;
+  struct ns_cookie nsc = {-1, -1};
+  bool success = true;
 
   sym->module = NULL;
   sym->name = NULL;
@@ -369,20 +381,29 @@ int bcc_resolve_symname(const char *module, const char *symname,
   if (sym->module == NULL)
     return -1;
 
+  bcc_procutils_enter_mountns(pid, &nsc);
+
   if (bcc_elf_loadaddr(sym->module, &load_addr) < 0) {
     sym->module = NULL;
-    return -1;
+    success = false;
+    goto exitns;
   }
 
   sym->name = symname;
   sym->offset = addr;
 
   if (sym->name && sym->offset == 0x0) {
-    if (bcc_find_symbol_addr(sym) < 0)
-      return -1;
+    if (bcc_find_symbol_addr(sym) < 0) {
+      sym->module = NULL;
+      success = false;
+      goto exitns;
+    }
   }
 
-  if (sym->offset == 0x0)
+exitns:
+  bcc_procutils_exit_mountns(&nsc);
+
+  if (!success || sym->offset == 0x0)
     return -1;
 
   sym->offset = (sym->offset - load_addr);

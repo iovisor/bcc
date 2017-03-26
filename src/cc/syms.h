@@ -85,10 +85,11 @@ class ProcSyms : SymbolCache {
       Range(uint64_t s, uint64_t e) : start(s), end(e) {}
     };
 
-    Module(const char *name);
+    Module(const char *name, int pid);
     std::string name_;
     std::vector<Range> ranges_;
     bool is_so_;
+    int pid_;
     std::unordered_set<std::string> symnames_;
     std::vector<Symbol> syms_;
 
