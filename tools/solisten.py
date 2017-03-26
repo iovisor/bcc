@@ -18,8 +18,8 @@
 # 04-Mar-2016	Jean-Tiare Le Bigot	Created this.
 
 import os
-import socket
-import netaddr
+from socket import inet_ntop, AF_INET, AF_INET6, SOCK_STREAM, SOCK_DGRAM
+from struct import pack
 import argparse
 from bcc import BPF
 import ctypes as ct
@@ -110,8 +110,6 @@ int kprobe__inet_listen(struct pt_regs *ctx, struct socket *sock, int backlog)
         } else if (family == AF_INET6) {
             bpf_probe_read(evt.laddr, sizeof(evt.laddr),
                            sk->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
-            evt.laddr[0] = be64_to_cpu(evt.laddr[0]);
-            evt.laddr[1] = be64_to_cpu(evt.laddr[1]);
         }
 
         // Send event to userland
@@ -147,20 +145,19 @@ def event_printer(show_netns):
         proto_family = event.proto & 0xff
         proto_type = event.proto >> 16 & 0xff
 
-        if proto_family == socket.SOCK_STREAM:
+        if proto_family == SOCK_STREAM:
             protocol = "TCP"
-        elif proto_family == socket.SOCK_DGRAM:
+        elif proto_family == SOCK_DGRAM:
             protocol = "UDP"
         else:
             protocol = "UNK"
 
         address = ""
-        if proto_type == socket.AF_INET:
+        if proto_type == AF_INET:
             protocol += "v4"
-            address = netaddr.IPAddress(event.laddr[0])
-        elif proto_type == socket.AF_INET6:
-            address = netaddr.IPAddress(event.laddr[0] << 64 | event.laddr[1],
-                                        version=6)
+            address = inet_ntop(AF_INET, pack("I", event.laddr[0]))
+        elif proto_type == AF_INET6:
+            address = inet_ntop(AF_INET6, event.laddr)
             protocol += "v6"
 
         # Display
