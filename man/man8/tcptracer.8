@@ -1,0 +1,98 @@
+.TH tcptracer 8  "2017-03-27" "USER COMMANDS"
+.SH NAME
+tcptracer \- Trace TCP established connections. Uses Linux eBPF/bcc.
+.SH SYNOPSIS
+.B tcptracer [\-h] [\-v] [\-p PID] [\-N NETNS]
+.SH DESCRIPTION
+This tool traces established TCP connections that open and close while tracing,
+and prints a line of output per connect, accept and close events. This includes
+the type of event, PID, IP addresses and ports.
+
+This tool works by using kernel dynamic tracing, and will need to be updated if
+the kernel implementation changes. Only established TCP connections are traced,
+so it is expected that the overhead of this tool is rather low.
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH OPTIONS
+.TP
+\-h
+Print usage message.
+.TP
+\-v
+Print full lines, with long event type names and network namespace numbers.
+.TP
+\-p PID
+Trace this process ID only (filtered in-kernel).
+.TP
+\-N NETNS
+Trace this network namespace only (filtered in-kernel).
+.TP
+.SH EXAMPLES
+.TP
+Trace all TCP established connections:
+#
+.B tcptracer
+.TP
+Trace all TCP established connections with verbose lines:
+#
+.B tcptracer \-v
+.TP
+Trace PID 181 only:
+#
+.B tcptracer \-p 181
+.TP
+Trace connections in network namespace 4026531969 only:
+#
+.B tcptracer \-N 4026531969
+.SH FIELDS
+.TP
+TYPE
+Type of event. In non-verbose mode: C for connect, A for accept, X for close.
+.TP
+PID
+Process ID
+.TP
+COMM
+Process name
+.TP
+IP
+IP address family (4 or 6)
+.TP
+SADDR
+Source IP address.
+.TP
+DADDR
+Destination IP address.
+.TP
+SPORT
+Source port.
+.TP
+DPORT
+Destination port.
+.TP
+NETNS
+Network namespace where the event originated.
+.SH OVERHEAD
+This traces the kernel inet accept function, and the TCP connect, close,
+and set state functions. However, it only prints information for connections
+that are established, so it shouldn't have a huge overhead.
+
+As always, test and understand this tools overhead for your types of workloads
+before production use.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Iago López Galeiras
+.SH SEE ALSO
+tcpaccept(8), tcpconnect(8), tcptop(8), tcplife(8)
