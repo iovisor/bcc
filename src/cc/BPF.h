@@ -103,11 +103,11 @@ public:
   StatusTuple close_perf_buffer(const std::string& name);
   void poll_perf_buffer(const std::string& name, int timeout = -1);
 
-private:
   StatusTuple load_func(const std::string& func_name, enum bpf_prog_type type,
                         int& fd);
   StatusTuple unload_func(const std::string& func_name);
 
+private:
   std::string get_kprobe_event(const std::string& kernel_func,
                                bpf_probe_attach_type type);
   std::string get_uprobe_event(const std::string& binary_path, uint64_t offset,
