@@ -47,6 +47,7 @@ namespace ebpf {
 namespace cc {
 
 using std::unique_ptr;
+using std::make_unique;
 using std::move;
 using std::string;
 using std::vector;

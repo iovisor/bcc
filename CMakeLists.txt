@@ -63,7 +63,7 @@ if (GCC_VERSION VERSION_LESS 6.0)
   endforeach()
 endif()
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall ${CXX_ISYSTEM_DIRS}")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -Wall ${CXX_ISYSTEM_DIRS}")
 endif()
 
 add_subdirectory(examples)

@@ -826,7 +826,7 @@ unique_ptr<ASTConsumer> BFrontendAction::CreateASTConsumer(CompilerInstance &Com
   vector<unique_ptr<ASTConsumer>> consumers;
   consumers.push_back(unique_ptr<ASTConsumer>(new ProbeConsumer(Compiler.getASTContext(), *rewriter_)));
   consumers.push_back(unique_ptr<ASTConsumer>(new BTypeConsumer(Compiler.getASTContext(), *rewriter_, *tables_)));
-  return unique_ptr<ASTConsumer>(new MultiplexConsumer(move(consumers)));
+  return unique_ptr<ASTConsumer>(new MultiplexConsumer(std::move(consumers)));
 }
 
 }

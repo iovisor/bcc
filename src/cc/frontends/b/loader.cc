@@ -37,14 +37,14 @@ int BLoader::parse(llvm::Module *mod, const string &filename, const string &prot
                    unique_ptr<vector<TableDesc>> *tables) {
   int rc;
 
-  proto_parser_ = make_unique<ebpf::cc::Parser>(proto_filename);
+  proto_parser_ = std::make_unique<ebpf::cc::Parser>(proto_filename);
   rc = proto_parser_->parse();
   if (rc) {
     fprintf(stderr, "In file: %s\n", filename.c_str());
     return rc;
   }
 
-  parser_ = make_unique<ebpf::cc::Parser>(filename);
+  parser_ = std::make_unique<ebpf::cc::Parser>(filename);
   rc = parser_->parse();
   if (rc) {
     fprintf(stderr, "In file: %s\n", filename.c_str());
@@ -61,9 +61,9 @@ int BLoader::parse(llvm::Module *mod, const string &filename, const string &prot
     return -1;
   }
 
-  *tables = make_unique<vector<TableDesc>>();
+  *tables = std::make_unique<vector<TableDesc>>();
 
-  codegen_ = ebpf::make_unique<ebpf::cc::CodegenLLVM>(mod, parser_->scopes_.get(), proto_parser_->scopes_.get());
+  codegen_ = std::make_unique<ebpf::cc::CodegenLLVM>(mod, parser_->scopes_.get(), proto_parser_->scopes_.get());
   ret = codegen_->visit(parser_->root_node_, **tables);
   if (ret.code() != 0 || ret.msg().size()) {
     fprintf(stderr, "Codegen error @line=%d: %s\n", ret.code(), ret.msg().c_str());
