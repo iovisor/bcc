@@ -95,13 +95,31 @@ struct _name##_table_t _name
   BPF_TABLE("hash", _key_type, u64, _name, 10240)
 #define BPF_HASH3(_name, _key_type, _leaf_type) \
   BPF_TABLE("hash", _key_type, _leaf_type, _name, 10240)
+#define BPF_HASH4(_name, _key_type, _leaf_type, _size) \
+  BPF_TABLE("hash", _key_type, _leaf_type, _name, _size)
+
 // helper for default-variable macro function
-#define BPF_HASHX(_1, _2, _3, NAME, ...) NAME
+#define BPF_HASHX(_1, _2, _3, _4, NAME, ...) NAME
 
 // Define a hash function, some arguments optional
 // BPF_HASH(name, key_type=u64, leaf_type=u64, size=10240)
 #define BPF_HASH(...) \
-  BPF_HASHX(__VA_ARGS__, BPF_HASH3, BPF_HASH2, BPF_HASH1)(__VA_ARGS__)
+  BPF_HASHX(__VA_ARGS__, BPF_HASH4, BPF_HASH3, BPF_HASH2, BPF_HASH1)(__VA_ARGS__)
+
+#define BPF_ARRAY1(_name) \
+  BPF_TABLE("array", int, u64, _name, 10240)
+#define BPF_ARRAY2(_name, _leaf_type) \
+  BPF_TABLE("array", int, _leaf_type, _name, 10240)
+#define BPF_ARRAY3(_name, _leaf_type, _size) \
+  BPF_TABLE("array", int, _leaf_type, _name, _size)
+
+// helper for default-variable macro function
+#define BPF_ARRAYX(_1, _2, _3, NAME, ...) NAME
+
+// Define an array function, some arguments optional
+// BPF_ARRAY(name, leaf_type=u64, size=10240)
+#define BPF_ARRAY(...) \
+  BPF_ARRAYX(__VA_ARGS__, BPF_ARRAY3, BPF_ARRAY2, BPF_ARRAY1)(__VA_ARGS__)
 
 #define BPF_HIST1(_name) \
   BPF_TABLE("histogram", int, u64, _name, 64)
