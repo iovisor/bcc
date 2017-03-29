@@ -106,6 +106,8 @@ public:
     return BPFHashTable<KeyType, ValueType>({});
   }
 
+  BPFProgTable get_prog_table(const std::string& name);
+
   BPFStackTable get_stack_table(const std::string& name) {
     TableStorage::iterator it;
     if (bpf_module_->table_storage().Find(Path({bpf_module_->id(), name}), it))

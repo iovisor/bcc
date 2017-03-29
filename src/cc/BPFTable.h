@@ -202,4 +202,20 @@ class BPFPerfBuffer : protected BPFTableBase<int, int> {
   std::unique_ptr<epoll_event[]> ep_events_;
 };
 
+class BPFProgTable : protected BPFTableBase<int, int> {
+public:
+  BPFProgTable(const TableDesc& desc)
+      : BPFTableBase<int, int>(desc) {
+    if (desc.type != BPF_MAP_TYPE_PROG_ARRAY)
+      throw std::invalid_argument("Table '" + desc.name + "' is not a prog table");
+  }
+
+  // updates an element
+  StatusTuple update_value(const int& index, const int& value) {
+    if (!this->update(const_cast<int*>(&index), const_cast<int*>(&value)))
+      return StatusTuple(-1, "Error updating value: %s", std::strerror(errno));
+    return StatusTuple(0);
+  }
+};
+
 }  // namespace ebpf
