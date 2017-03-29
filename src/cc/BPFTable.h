@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <cstring>
 #include <sys/epoll.h>
 #include <exception>
 #include <map>
@@ -70,16 +71,37 @@ template <class KeyType, class ValueType>
 class BPFHashTable : protected BPFTableBase<KeyType, ValueType> {
  public:
   explicit BPFHashTable(const TableDesc& desc)
-      : BPFTableBase<KeyType, ValueType>(desc) {}
-
-  ValueType get_value(const KeyType& key) {
-    ValueType res;
-    if (!this->lookup(const_cast<KeyType*>(&key), &res))
-      throw std::invalid_argument("Key does not exist in the table");
-    return res;
+      : BPFTableBase<KeyType, ValueType>(desc) {
+    if (desc.type != BPF_MAP_TYPE_HASH &&
+        desc.type != BPF_MAP_TYPE_PERCPU_HASH &&
+        desc.type != BPF_MAP_TYPE_LRU_HASH &&
+        desc.type != BPF_MAP_TYPE_LRU_PERCPU_HASH)
+      throw std::invalid_argument("Table '" + desc.name + "' is not a hash table");
   }
 
-  ValueType operator[](const KeyType& key) { return get_value(key); }
+  StatusTuple get_value(const KeyType& key, ValueType& value) {
+    if (!this->lookup(const_cast<KeyType*>(&key), &value))
+      return StatusTuple(-1, "Error getting value: %s", std::strerror(errno));
+    return StatusTuple(0);
+  }
+
+  StatusTuple update_value(const KeyType& key, const ValueType& value) {
+    if (!this->update(const_cast<KeyType*>(&key), const_cast<ValueType*>(&value)))
+      return StatusTuple(-1, "Error updating value: %s", std::strerror(errno));
+    return StatusTuple(0);
+  }
+
+  StatusTuple remove_value(const KeyType& key) {
+    if (!this->remove(const_cast<KeyType*>(&key)))
+      return StatusTuple(-1, "Error removing value: %s", std::strerror(errno));
+    return StatusTuple(0);
+  }
+
+  ValueType operator[](const KeyType& key) {
+    ValueType value;
+    get_value(key, value);
+    return value;
+  }
 
   std::vector<std::pair<KeyType, ValueType>> get_table_offline() {
     std::vector<std::pair<KeyType, ValueType>> res;
