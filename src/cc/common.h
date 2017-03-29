@@ -23,8 +23,6 @@
 
 namespace ebpf {
 
-using std::make_unique;
-
 std::vector<int> get_online_cpus();
 
 std::vector<int> get_possible_cpus();

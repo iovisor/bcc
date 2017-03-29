@@ -47,7 +47,6 @@ namespace ebpf {
 namespace cc {
 
 using std::unique_ptr;
-using std::make_unique;
 using std::move;
 using std::string;
 using std::vector;
@@ -349,7 +348,7 @@ class MethodCallExprNode : public ExprNode {
   ExprNodeList args_;
   BlockStmtNode::Ptr block_;
   MethodCallExprNode(IdentExprNode::Ptr id, ExprNodeList&& args, int lineno)
-      : id_(move(id)), args_(move(args)), block_(make_unique<BlockStmtNode>()) {
+      : id_(move(id)), args_(move(args)), block_(std::make_unique<BlockStmtNode>()) {
     line_ = lineno;
   }
 };
@@ -531,7 +530,7 @@ class StateDeclStmtNode : public StmtNode {
   vector<Sub> subs_;
   StateDeclStmtNode() {}
   StateDeclStmtNode(IdentExprNode::Ptr id, BlockStmtNode::Ptr block) : id_(move(id)) {
-    subs_.push_back(Sub(make_unique<IdentExprNode>(""), move(block), ParserStateStmtNode::Ptr(), NULL));
+    subs_.push_back(Sub(std::make_unique<IdentExprNode>(""), move(block), ParserStateStmtNode::Ptr(), NULL));
   }
   StateDeclStmtNode(IdentExprNode::Ptr id1, IdentExprNode::Ptr id2, BlockStmtNode::Ptr block)
       : id_(move(id1)) {

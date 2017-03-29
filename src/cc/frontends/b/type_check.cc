@@ -24,6 +24,7 @@ namespace ebpf {
 namespace cc {
 
 using std::for_each;
+using std::make_unique;
 using std::set;
 
 StatusTuple TypeCheck::visit_block_stmt_node(BlockStmtNode *n) {
