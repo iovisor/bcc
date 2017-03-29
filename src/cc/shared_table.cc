@@ -15,51 +15,100 @@
  */
 
 #include <unistd.h>
+#include <iostream>
 
-#include "shared_table.h"
+#include "common.h"
 #include "compat/linux/bpf.h"
+#include "table_storage.h"
+#include "table_storage_impl.h"
 
 namespace ebpf {
 
 using std::string;
+using std::unique_ptr;
 
-SharedTables * SharedTables::instance_;
+/// A process-wide singleton of shared tables
+class SharedTableStorage : public TableStorageImpl {
+ public:
+  class iterator : public TableStorageIteratorImpl {
+    std::map<string, TableDesc>::iterator it_;
 
-SharedTables * SharedTables::instance() {
-  if (!instance_) {
-    instance_ = new SharedTables;
-  }
-  return instance_;
-}
+   public:
+    explicit iterator(const std::map<string, TableDesc>::iterator &it) : it_(it) {}
+    virtual ~iterator() {}
+    virtual unique_ptr<self_type> clone() const override { return make_unique<iterator>(it_); }
+    virtual self_type &operator++() override {
+      ++it_;
+      return *this;
+    }
+    virtual value_type &operator*() const override { return *it_; }
+    virtual pointer operator->() const override { return &*it_; }
+  };
+  virtual ~SharedTableStorage() {}
+  virtual bool Find(const string &name, TableStorage::iterator &result) const override;
+  virtual bool Insert(const string &name, TableDesc &&desc) override;
+  virtual bool Delete(const string &name) override;
+  virtual unique_ptr<TableStorageIteratorImpl> begin() override;
+  virtual unique_ptr<TableStorageIteratorImpl> end() override;
+  virtual unique_ptr<TableStorageIteratorImpl> lower_bound(const string &k) override;
+  virtual unique_ptr<TableStorageIteratorImpl> upper_bound(const string &k) override;
+  virtual unique_ptr<TableStorageIteratorImpl> erase(const TableStorageIteratorImpl &it) override;
 
-int SharedTables::lookup_fd(const string &name) const {
-  auto table = tables_.find(name);
-  if (table == tables_.end())
-    return -1;
-  return table->second.first;
-}
+ private:
+  static std::map<string, TableDesc> tables_;
+};
 
-int SharedTables::lookup_type(const string &name) const {
-  auto table = tables_.find(name);
-  if (table == tables_.end())
-    return BPF_MAP_TYPE_UNSPEC;
-  return table->second.second;
-}
-
-bool SharedTables::insert_fd(const string &name, int fd, int type) {
-  if (tables_.find(name) != tables_.end())
+bool SharedTableStorage::Find(const string &name, TableStorage::iterator &result) const {
+  auto it = tables_.find(name);
+  if (it == tables_.end())
     return false;
-  tables_[name] = std::make_pair(fd, type);
+  result = TableStorage::iterator(make_unique<iterator>(it));
   return true;
 }
 
-bool SharedTables::remove_fd(const string &name) {
-  auto table = tables_.find(name);
-  if (table == tables_.end())
+bool SharedTableStorage::Insert(const string &name, TableDesc &&desc) {
+  auto it = tables_.find(name);
+  if (it != tables_.end())
     return false;
-  close(table->second.first);
-  tables_.erase(table);
+  tables_[name] = std::move(desc);
   return true;
 }
 
+bool SharedTableStorage::Delete(const string &name) {
+  auto it = tables_.find(name);
+  if (it == tables_.end())
+    return false;
+  tables_.erase(it);
+  return true;
+}
+
+unique_ptr<TableStorageIteratorImpl> SharedTableStorage::begin() {
+  return make_unique<iterator>(tables_.begin());
+}
+unique_ptr<TableStorageIteratorImpl> SharedTableStorage::end() {
+  return make_unique<iterator>(tables_.end());
+}
+
+unique_ptr<TableStorageIteratorImpl> SharedTableStorage::lower_bound(const string &k) {
+  return make_unique<iterator>(tables_.lower_bound(k));
+}
+unique_ptr<TableStorageIteratorImpl> SharedTableStorage::upper_bound(const string &k) {
+  return make_unique<iterator>(tables_.upper_bound(k));
+}
+unique_ptr<TableStorageIteratorImpl> SharedTableStorage::erase(const TableStorageIteratorImpl &it) {
+  auto i = tables_.find((*it).first);
+  if (i == tables_.end())
+    return unique_ptr<iterator>();
+  return make_unique<iterator>(tables_.erase(i));
+}
+
+// All maps for this process are kept in global static storage.
+std::map<string, TableDesc> SharedTableStorage::tables_;
+
+unique_ptr<TableStorage> createSharedTableStorage() {
+  auto t = make_unique<TableStorage>();
+  t->Init(make_unique<SharedTableStorage>());
+  t->AddMapTypesVisitor(createJsonMapTypesVisitor());
+  return t;
+}
 }

@@ -28,6 +28,7 @@
 #include "bpf_module.h"
 #include "libbpf.h"
 #include "perf_reader.h"
+#include "table_desc.h"
 
 namespace ebpf {
 
@@ -44,6 +45,10 @@ protected:
     fd_ = bpf_module->table_fd(id_);
     capacity_ = bpf_module->table_max_entries(id_);
   };
+  explicit BPFTableBase(const TableDesc& desc) {
+    fd_ = desc.fd;
+    capacity_ = desc.max_entries;
+  }
 
   bool lookup(KeyType* key, ValueType* value) {
     return bpf_lookup_elem(fd_, static_cast<void*>(key),
@@ -70,7 +75,8 @@ protected:
 
 template <class KeyType, class ValueType>
 class BPFHashTable : protected BPFTableBase<KeyType, ValueType> {
-public:
+ public:
+  explicit BPFHashTable(const TableDesc& desc) : BPFTableBase<KeyType, ValueType>(desc) {}
   BPFHashTable(BPFModule* bpf_module, const std::string& name)
       : BPFTableBase<KeyType, ValueType>(bpf_module, name) {}
 

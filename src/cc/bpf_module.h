@@ -31,7 +31,8 @@ class Type;
 }
 
 namespace ebpf {
-struct TableDesc;
+class TableDesc;
+class TableStorage;
 class BLoader;
 class ClangLoader;
 
@@ -52,7 +53,7 @@ class BPFModule {
   int kbuild_flags(const char *uname_release, std::vector<std::string> *cflags);
   int run_pass_manager(llvm::Module &mod);
  public:
-  BPFModule(unsigned flags);
+  BPFModule(unsigned flags, TableStorage *ts = nullptr);
   ~BPFModule();
   int load_b(const std::string &filename, const std::string &proto_filename);
   int load_c(const std::string &filename, const char *cflags[], int ncflags);
@@ -99,11 +100,13 @@ class BPFModule {
   std::unique_ptr<BLoader> b_loader_;
   std::unique_ptr<ClangLoader> clang_loader_;
   std::map<std::string, std::tuple<uint8_t *, uintptr_t>> sections_;
-  std::unique_ptr<std::vector<TableDesc>> tables_;
+  std::vector<TableDesc *> tables_;
   std::map<std::string, size_t> table_names_;
   std::vector<std::string> function_names_;
   std::map<llvm::Type *, llvm::Function *> readers_;
   std::map<llvm::Type *, llvm::Function *> writers_;
+  TableStorage *ts_;
+  std::unique_ptr<TableStorage> local_ts_;
 };
 
 }  // namespace ebpf

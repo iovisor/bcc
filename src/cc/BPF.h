@@ -26,6 +26,7 @@
 #include "bpf_module.h"
 #include "compat/linux/bpf.h"
 #include "libbpf.h"
+#include "table_storage.h"
 
 static const int DEFAULT_PERF_BUFFER_PAGE_CNT = 8;
 
@@ -38,12 +39,14 @@ struct open_probe_t {
 };
 
 class USDT;
+class TableStorage;
 
 class BPF {
 public:
   static const int BPF_MAX_STACK_DEPTH = 127;
 
-  explicit BPF(unsigned int flag = 0) : bpf_module_(new BPFModule(flag)) {}
+  explicit BPF(unsigned int flag = 0, TableStorage* ts = nullptr)
+      : bpf_module_(new BPFModule(flag, ts)), ts_(ts) {}
   StatusTuple init(const std::string& bpf_program,
                    std::vector<std::string> cflags = {},
                    std::vector<USDT> usdt = {});
@@ -90,6 +93,11 @@ public:
 
   template <class KeyType, class ValueType>
   BPFHashTable<KeyType, ValueType> get_hash_table(const std::string& name) {
+    if (ts_) {
+      TableStorage::iterator it;
+      if (ts_->Find(Path({name}), it))
+        return BPFHashTable<KeyType, ValueType>(it->second);
+    }
     return BPFHashTable<KeyType, ValueType>(bpf_module_.get(), name);
   }
 
@@ -152,6 +160,7 @@ private:
                                   uint64_t symbol_addr, bcc_symbol* output);
 
   std::unique_ptr<BPFModule> bpf_module_;
+  TableStorage* ts_;
 
   std::map<std::string, int> funcs_;
 

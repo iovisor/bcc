@@ -28,9 +28,10 @@
 #include "bcc_exception.h"
 #include "bcc_syms.h"
 #include "bpf_module.h"
+#include "common.h"
 #include "libbpf.h"
 #include "perf_reader.h"
-#include "common.h"
+#include "table_storage.h"
 #include "usdt.h"
 
 #include "BPF.h"
