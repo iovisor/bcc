@@ -12,7 +12,7 @@ from unittest import main, TestCase
 
 class TestArray(TestCase):
     def test_simple(self):
-        b = BPF(text="""BPF_TABLE("array", int, u64, table1, 128);""")
+        b = BPF(text="""BPF_ARRAY(table1, u64, 128);""")
         t1 = b["table1"]
         t1[ct.c_int(0)] = ct.c_ulonglong(100)
         t1[ct.c_int(127)] = ct.c_ulonglong(1000)
@@ -24,7 +24,7 @@ class TestArray(TestCase):
         self.assertEqual(len(t1), 128)
 
     def test_native_type(self):
-        b = BPF(text="""BPF_TABLE("array", int, u64, table1, 128);""")
+        b = BPF(text="""BPF_ARRAY(table1, u64, 128);""")
         t1 = b["table1"]
         t1[0] = ct.c_ulonglong(100)
         t1[-2] = ct.c_ulonglong(37)

@@ -178,7 +178,7 @@ int PROBE_FUNCTION(void *ctx) {
         """
         bpf_text = """#include <uapi/linux/ptrace.h>
 
-BPF_TABLE("array", int, u64, counts, NUMLOCATIONS);
+BPF_ARRAY(counts, u64, NUMLOCATIONS);
         """
 
         # We really mean the tgid from the kernel's perspective, which is in

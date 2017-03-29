@@ -13,7 +13,7 @@ class TestPerfCounter(unittest.TestCase):
     def test_cycles(self):
         text = """
 BPF_PERF_ARRAY(cnt1, NUM_CPUS);
-BPF_TABLE("array", u32, u64, prev, NUM_CPUS);
+BPF_ARRAY(prev, u64, NUM_CPUS);
 BPF_HISTOGRAM(dist);
 int kprobe__sys_getuid(void *ctx) {
     u32 cpu = bpf_get_smp_processor_id();

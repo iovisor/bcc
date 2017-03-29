@@ -10,7 +10,7 @@ ffi.cdef[[
 function TestUprobes:test_simple_library()
   local text = [[
 #include <uapi/linux/ptrace.h>
-BPF_TABLE("array", int, u64, stats, 1);
+BPF_ARRAY(stats, u64, 1);
 static void incr(int idx) {
     u64 *ptr = stats.lookup(&idx);
     if (ptr)
@@ -41,7 +41,7 @@ end
 function TestUprobes:test_simple_binary()
   local text = [[
 #include <uapi/linux/ptrace.h>
-BPF_TABLE("array", int, u64, stats, 1);
+BPF_ARRAY(stats, u64, 1);
 static void incr(int idx) {
     u64 *ptr = stats.lookup(&idx);
     if (ptr)

@@ -86,7 +86,7 @@ int do_completion(struct pt_regs *ctx, struct request *req) {
 
     def test_sscanf(self):
         text = """
-BPF_TABLE("hash", int, struct { u64 a; u64 b; u64 c:36; u64 d:28; struct { u32 a; u32 b; } s; }, stats, 10);
+BPF_HASH(stats, int, struct { u64 a; u64 b; u64 c:36; u64 d:28; struct { u32 a; u32 b; } s; }, 10);
 int foo(void *ctx) {
     return 0;
 }
@@ -107,7 +107,7 @@ int foo(void *ctx) {
 
     def test_sscanf_array(self):
         text = """
-BPF_TABLE("hash", int, struct { u32 a[3]; u32 b; }, stats, 10);
+BPF_HASH(stats, int, struct { u32 a[3]; u32 b; }, 10);
 """
         b = BPF(text=text, debug=0)
         t = b.get_table("stats")
@@ -130,7 +130,7 @@ struct key_t {
     struct request *req;
 };
 
-BPF_TABLE("hash", struct key_t, u64, start, 1024);
+BPF_HASH(start, struct key_t, u64, 1024);
 int do_request(struct pt_regs *ctx, struct request *req) {
     struct key_t key = {};
 
@@ -268,7 +268,7 @@ struct key_t {
   u32 prev_pid;
   u32 curr_pid;
 };
-BPF_TABLE("hash", struct key_t, u64, stats, 1024);
+BPF_HASH(stats, struct key_t, u64, 1024);
 int kprobe__finish_task_switch(struct pt_regs *ctx, struct task_struct *prev) {
   struct key_t key = {};
   u64 zero = 0, *val;
@@ -325,9 +325,9 @@ union emptyu {
   struct empty em3;
   struct empty em4;
 };
-BPF_TABLE("array", int, struct list, t1, 1);
-BPF_TABLE("array", int, struct list *, t2, 1);
-BPF_TABLE("array", int, union emptyu, t3, 1);
+BPF_ARRAY(t1, struct list, 1);
+BPF_ARRAY(t2, struct list *, 1);
+BPF_ARRAY(t3, union emptyu, 1);
 """
         b = BPF(text=text)
         import ctypes
@@ -351,7 +351,7 @@ BPF_TABLE("array", int, union emptyu, t3, 1);
 
     def test_nested_union(self):
         text = """
-BPF_TABLE("hash", struct bpf_tunnel_key, int, t1, 1);
+BPF_HASH(t1, struct bpf_tunnel_key, int, 1);
 """
         b = BPF(text=text)
         t1 = b["t1"]
@@ -389,7 +389,7 @@ int process(struct xdp_md *ctx) {
 
     def test_update_macro_arg(self):
         text = """
-BPF_TABLE("array", u32, u32, act, 32);
+BPF_ARRAY(act, u32, 32);
 
 #define JMP_IDX_PIPE (1U << 1)
 

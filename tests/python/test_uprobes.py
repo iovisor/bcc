@@ -11,7 +11,7 @@ class TestUprobes(unittest.TestCase):
     def test_simple_library(self):
         text = """
 #include <uapi/linux/ptrace.h>
-BPF_TABLE("array", int, u64, stats, 1);
+BPF_ARRAY(stats, u64, 1);
 static void incr(int idx) {
     u64 *ptr = stats.lookup(&idx);
     if (ptr)
@@ -40,7 +40,7 @@ int count(struct pt_regs *ctx) {
     def test_simple_binary(self):
         text = """
 #include <uapi/linux/ptrace.h>
-BPF_TABLE("array", int, u64, stats, 1);
+BPF_ARRAY(stats, u64, 1);
 static void incr(int idx) {
     u64 *ptr = stats.lookup(&idx);
     if (ptr)

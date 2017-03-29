@@ -5,15 +5,15 @@
 struct config {
   int tunnel_ifindex;
 };
-BPF_TABLE("hash", int, struct config, conf, 1);
+BPF_HASH(conf, int, struct config, 1);
 
 struct tunnel_key {
   u32 tunnel_id;
   u32 remote_ipv4;
 };
-BPF_TABLE("hash", struct tunnel_key, int, tunkey2if, 1024);
+BPF_HASH(tunkey2if, struct tunnel_key, int, 1024);
 
-BPF_TABLE("hash", int, struct tunnel_key, if2tunkey, 1024);
+BPF_HASH(if2tunkey, int, struct tunnel_key, 1024);
 
 // Handle packets from the encap device, demux into the dest tenant
 int handle_ingress(struct __sk_buff *skb) {

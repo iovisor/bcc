@@ -4,9 +4,9 @@
 
 // physical endpoint manager (pem) tables which connects VMs and bridges
 // <ifindex_in, ifindex_out>
-BPF_TABLE("hash", u32, u32, pem_dest, 256);
+BPF_HASH(pem_dest, u32, u32, 256);
 // <0, tx_pkts>
-BPF_TABLE("array", u32, u32, pem_stats, 1);
+BPF_ARRAY(pem_stats, u32, 1);
 
 int pem(struct __sk_buff *skb) {
     u32 ifindex_in, *ifindex_p;

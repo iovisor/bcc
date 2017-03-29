@@ -51,7 +51,7 @@ struct Leaf {
   unsigned char p[4];
 };
 
-BPF_TABLE("hash", struct Key, struct Leaf, cache, 128);
+BPF_HASH(cache, struct Key, struct Leaf, 128);
 
 int dns_matching(struct __sk_buff *skb)
 {
