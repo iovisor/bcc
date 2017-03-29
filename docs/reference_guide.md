@@ -28,16 +28,17 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
     - [Maps](#maps)
         - [1. BPF_TABLE](#1-bpf_table)
         - [2. BPF_HASH](#2-bpf_hash)
-        - [3. BPF_HISTOGRAM](#3-bpf_histogram)
-        - [4. BPF_STACK_TRACE](#4-bpf_stack_trace)
-        - [5. BPF_PERF_ARRAY](#5-bpf_perf_array)
-        - [6. map.lookup()](#6-maplookup)
-        - [7. map.lookup_or_init()](#7-maplookup_or_init)
-        - [8. map.delete()](#8-mapdelete)
-        - [9. map.update()](#9-mapupdate)
-        - [10. map.increment()](#10-mapincrement)
-        - [11. map.get_stackid()](#11-mapget_stackid)
-        - [12. map.perf_read()](#12-mapperf_read)
+        - [3. BPF_ARRAY](#2-bpf_array)
+        - [4. BPF_HISTOGRAM](#4-bpf_histogram)
+        - [5. BPF_STACK_TRACE](#5-bpf_stack_trace)
+        - [6. BPF_PERF_ARRAY](#6-bpf_perf_array)
+        - [7. map.lookup()](#7-maplookup)
+        - [8. map.lookup_or_init()](#8-maplookup_or_init)
+        - [9. map.delete()](#9-mapdelete)
+        - [10. map.update()](#10-mapupdate)
+        - [11. map.increment()](#11-mapincrement)
+        - [12. map.get_stackid()](#12-mapget_stackid)
+        - [13. map.perf_read()](#13-mapperf_read)
 
 - [bcc Python](#bcc-python)
     - [Initialization](#initialization)
@@ -402,7 +403,29 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=BPF_HASH+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=BPF_HASH+path%3Atools&type=Code)
 
-### 3. BPF_HISTOGRAM
+### 3. BPF_ARRAY
+
+Syntax: ```BPF_ARRAY(name [, leaf_type [, size]])```
+
+Creates an int-indexed array which is optimized for fastest lookup and update, named ```name```, with optional parameters.
+
+Defaults: ```BPF_ARRAY(name, leaf_type=u64, size=10240)```
+
+For example:
+
+```C
+BPF_ARRAY(counts, u64, 32);
+```
+
+This creates an array named ```counts``` where with 32 buckets and 64-bit integer values. This array is used by the funccount.py example for saving call count of each function.
+
+Methods (covered later): map.lookup(), map.update(), map.increment(). Note that all array elements are pre-allocated with zero values and can not be deleted.
+
+Examples in situ:
+[search /examples](https://github.com/iovisor/bcc/search?q=BPF_ARRAY+path%3Aexamples&type=Code),
+[search /tools](https://github.com/iovisor/bcc/search?q=BPF_ARRAY+path%3Atools&type=Code)
+
+### 4. BPF_HISTOGRAM
 
 Syntax: ```BPF_HISTOGRAM(name [, key_type [, size ]])```
 
@@ -424,7 +447,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=BPF_HISTOGRAM+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=BPF_HISTOGRAM+path%3Atools&type=Code)
 
-### 4. BPF_STACK_TRACE
+### 5. BPF_STACK_TRACE
 
 Syntax: ```BPF_STACK_TRACE(name, max_entries)```
 
@@ -444,7 +467,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=BPF_STACK_TRACE+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=BPF_STACK_TRACE+path%3Atools&type=Code)
 
-### 5. BPF_PERF_ARRAY
+### 6. BPF_PERF_ARRAY
 
 Syntax: ```BPF_PERF_ARRAY(name, max_entries)```
 
@@ -467,7 +490,7 @@ Methods (covered later): map.perf_read().
 Examples in situ:
 [search /tests](https://github.com/iovisor/bcc/search?q=BPF_PERF_ARRAY+path%3Atests&type=Code)
 
-### 6. map.lookup()
+### 7. map.lookup()
 
 Syntax: ```*val map.lookup(&key)```
 
@@ -477,7 +500,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=lookup+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=lookup+path%3Atools&type=Code)
 
-### 7. map.lookup_or_init()
+### 8. map.lookup_or_init()
 
 Syntax: ```*val map.lookup_or_init(&key, &zero)```
 
@@ -487,7 +510,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=lookup_or_init+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=lookup_or_init+path%3Atools&type=Code)
 
-### 8. map.delete()
+### 9. map.delete()
 
 Syntax: ```map.delete(&key)```
 
@@ -497,7 +520,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=delete+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=delete+path%3Atools&type=Code)
 
-### 9. map.update()
+### 10. map.update()
 
 Syntax: ```map.update(&key, &val)```
 
@@ -507,7 +530,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=update+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=update+path%3Atools&type=Code)
 
-### 10. map.increment()
+### 11. map.increment()
 
 Syntax: ```map.increment(key)```
 
@@ -517,7 +540,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=increment+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=increment+path%3Atools&type=Code)
 
-### 11. map.get_stackid()
+### 12. map.get_stackid()
 
 Syntax: ```int map.get_stackid(void *ctx, u64 flags)```
 
@@ -527,7 +550,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=get_stackid+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=get_stackid+path%3Atools&type=Code)
 
-### 12. map.perf_read()
+### 13. map.perf_read()
 
 Syntax: ```u64 map.perf_read(u32 cpu)```
 
