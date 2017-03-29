@@ -46,7 +46,7 @@ public:
   static const int BPF_MAX_STACK_DEPTH = 127;
 
   explicit BPF(unsigned int flag = 0, TableStorage* ts = nullptr)
-      : bpf_module_(new BPFModule(flag, ts)), ts_(ts) {}
+      : bpf_module_(new BPFModule(flag, ts)) {}
   StatusTuple init(const std::string& bpf_program,
                    std::vector<std::string> cflags = {},
                    std::vector<USDT> usdt = {});
@@ -93,16 +93,17 @@ public:
 
   template <class KeyType, class ValueType>
   BPFHashTable<KeyType, ValueType> get_hash_table(const std::string& name) {
-    if (ts_) {
-      TableStorage::iterator it;
-      if (ts_->Find(Path({name}), it))
-        return BPFHashTable<KeyType, ValueType>(it->second);
-    }
-    return BPFHashTable<KeyType, ValueType>(bpf_module_.get(), name);
+    TableStorage::iterator it;
+    if (bpf_module_->table_storage().Find(Path({bpf_module_->id(), name}), it))
+      return BPFHashTable<KeyType, ValueType>(it->second);
+    return BPFHashTable<KeyType, ValueType>({});
   }
 
   BPFStackTable get_stack_table(const std::string& name) {
-    return BPFStackTable(bpf_module_.get(), name);
+    TableStorage::iterator it;
+    if (bpf_module_->table_storage().Find(Path({bpf_module_->id(), name}), it))
+      return BPFStackTable(it->second);
+    return BPFStackTable({});
   }
 
   StatusTuple open_perf_buffer(const std::string& name, perf_reader_raw_cb cb,
@@ -160,7 +161,6 @@ private:
                                   uint64_t symbol_addr, bcc_symbol* output);
 
   std::unique_ptr<BPFModule> bpf_module_;
-  TableStorage* ts_;
 
   std::map<std::string, int> funcs_;
 

@@ -102,7 +102,10 @@ class MyMemoryManager : public SectionMemoryManager {
 };
 
 BPFModule::BPFModule(unsigned flags, TableStorage *ts)
-    : flags_(flags), ctx_(new LLVMContext), ts_(ts) {
+    : flags_(flags),
+      ctx_(new LLVMContext),
+      id_(std::to_string((uintptr_t)this)),
+      ts_(ts) {
   InitializeNativeTarget();
   InitializeNativeTargetAsmPrinter();
   LLVMInitializeBPFTarget();
@@ -120,7 +123,7 @@ BPFModule::~BPFModule() {
   engine_.reset();
   rw_engine_.reset();
   ctx_.reset();
-  ts_->DeletePrefix(Path({std::to_string((uintptr_t)this)}));
+  ts_->DeletePrefix(Path({id_}));
 }
 
 static void debug_printf(Module *mod, IRBuilder<> &B, const string &fmt, vector<Value *> args) {
@@ -322,8 +325,7 @@ unique_ptr<ExecutionEngine> BPFModule::finalize_rw(unique_ptr<Module> m) {
 // load an entire c file as a module
 int BPFModule::load_cfile(const string &file, bool in_memory, const char *cflags[], int ncflags) {
   clang_loader_ = make_unique<ClangLoader>(&*ctx_, flags_);
-  if (clang_loader_->parse(&mod_, *ts_, file, in_memory, cflags, ncflags,
-                           std::to_string((uintptr_t)this)))
+  if (clang_loader_->parse(&mod_, *ts_, file, in_memory, cflags, ncflags, id_))
     return -1;
   return 0;
 }
@@ -349,7 +351,7 @@ int BPFModule::annotate() {
   auto m = make_unique<Module>("sscanf", *ctx_);
 
   size_t id = 0;
-  Path path({std::to_string((uintptr_t)this)});
+  Path path({id_});
   for (auto it = ts_->lower_bound(path), up = ts_->upper_bound(path); it != up; ++it) {
     TableDesc &table = it->second;
     tables_.push_back(&it->second);
@@ -725,8 +727,7 @@ int BPFModule::load_b(const string &filename, const string &proto_filename) {
     return rc;
 
   b_loader_.reset(new BLoader(flags_));
-  if (int rc =
-          b_loader_->parse(&*mod_, filename, proto_filename, *ts_, std::to_string((uintptr_t)this)))
+  if (int rc = b_loader_->parse(&*mod_, filename, proto_filename, *ts_, id_))
     return rc;
   if (int rc = annotate())
     return rc;
