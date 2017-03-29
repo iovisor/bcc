@@ -67,6 +67,45 @@ class BPFTableBase {
   size_t capacity_;
 };
 
+template <class ValueType>
+class BPFArrayTable : protected BPFTableBase<int, ValueType> {
+public:
+  BPFArrayTable(const TableDesc& desc)
+      : BPFTableBase<int, ValueType>(desc) {
+    if (desc.type != BPF_MAP_TYPE_ARRAY &&
+        desc.type != BPF_MAP_TYPE_PERCPU_ARRAY)
+      throw std::invalid_argument("Table '" + desc.name + "' is not an array table");
+  }
+
+  StatusTuple get_value(const int& index, ValueType& value) {
+    if (!this->lookup(const_cast<int*>(&index), &value))
+      return StatusTuple(-1, "Error getting value: %s", std::strerror(errno));
+    return StatusTuple(0);
+  }
+
+  StatusTuple update_value(const int& index, const ValueType& value) {
+    if (!this->update(const_cast<int*>(&index), const_cast<ValueType*>(&value)))
+      return StatusTuple(-1, "Error updating value: %s", std::strerror(errno));
+    return StatusTuple(0);
+  }
+
+  ValueType operator[](const int& key) {
+    ValueType value;
+    get_value(key, value);
+    return value;
+  }
+
+  std::vector<ValueType> get_table_offline() {
+    std::vector<ValueType> res(this->capacity());
+
+    for (int i = 0; i < (int) this->capacity(); i++) {
+      get_value(i, res[i]);
+    }
+
+    return res;
+  }
+};
+
 template <class KeyType, class ValueType>
 class BPFHashTable : protected BPFTableBase<KeyType, ValueType> {
  public:
