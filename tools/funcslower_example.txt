@@ -1,0 +1,108 @@
+Demonstrations of funcslower, the Linux eBPF/bcc version.
+
+
+funcslower shows kernel or user function invocations slower than a threshold.
+This can be used for last-resort diagnostics when aggregation-based tools have
+failed. For example, trace the open() function in libc when it is slower than
+1 microsecond (us):
+
+# ./funcslower c:open -u 1
+Tracing function calls slower than 1 us... Ctrl+C to quit.
+COMM           PID    LAT(us)             RVAL FUNC
+less           27074    33.77                3 c:open 
+less           27074     9.96 ffffffffffffffff c:open 
+less           27074     5.92 ffffffffffffffff c:open 
+less           27074    15.88 ffffffffffffffff c:open 
+less           27074     8.89                3 c:open 
+less           27074    15.89                3 c:open 
+sh             27075    20.97                4 c:open 
+bash           27075    20.14                4 c:open 
+lesspipe.sh    27075    18.77                4 c:open 
+lesspipe.sh    27075    11.21                4 c:open 
+lesspipe.sh    27075    13.68                4 c:open 
+file           27076    14.83 ffffffffffffffff c:open 
+file           27076     8.02                4 c:open 
+file           27076    10.26                4 c:open 
+file           27076     6.55                4 c:open 
+less           27074    11.67                4 c:open 
+^C
+
+This shows several open operations performed by less and some helpers it invoked
+in the process. The latency (in microseconds) is shown, as well as the return
+value from the open() function, which helps indicate if there is a correlation
+between failures and slow invocations. Most open() calls seemed to have 
+completed successfully (returning a valid file descriptor), but some have failed
+and returned -1.
+
+You can also trace kernel functions:
+
+# ./funcslower -m 10 vfs_read
+Tracing function calls slower than 10 ms... Ctrl+C to quit.
+COMM           PID    LAT(ms)             RVAL FUNC
+bash           11527    78.97                1 vfs_read 
+bash           11527   101.26                1 vfs_read 
+bash           11527  1053.60                1 vfs_read 
+bash           11527    44.21                1 vfs_read 
+bash           11527    79.50                1 vfs_read 
+bash           11527    33.37                1 vfs_read 
+bash           11527   112.17                1 vfs_read 
+bash           11527   101.49                1 vfs_read 
+^C
+
+Occasionally, it is also useful to see the arguments passed to the functions.
+The raw hex values of the arguments are available when using the -a switch:
+
+# ./funcslower __kmalloc -a 2 -u 1
+Tracing function calls slower than 1 us... Ctrl+C to quit.
+COMM           PID    LAT(us)             RVAL FUNC ARGS
+kworker/0:2    27077     7.46 ffff90054f9f8e40 __kmalloc 0x98 0x1400000
+kworker/0:2    27077     6.84 ffff90054f9f8e40 __kmalloc 0x98 0x1400000
+bash           11527     6.87 ffff90054f9f8e40 __kmalloc 0x90 0x1408240
+bash           11527     1.15 ffff90054f9f8e40 __kmalloc 0x90 0x1408240
+bash           11527     1.15 ffff90055a1b8c00 __kmalloc 0x2c 0x1400240
+bash           11527     1.18 ffff90054b87d240 __kmalloc 0x1c 0x1400040
+bash           11527    10.59 ffff900546d60000 __kmalloc 0x10000 0x14082c0
+bash           11527     1.49 ffff90054fbd4c00 __kmalloc 0x280 0x15080c0
+bash           11527     1.00 ffff90054789b000 __kmalloc 0x800 0x15012c0
+bash           27128     3.47 ffff90057ca1a200 __kmalloc 0x150 0x1400240
+bash           27128     1.82 ffff90054fbd4c00 __kmalloc 0x230 0x14000c0
+bash           27128     1.17 ffff90054b87d5a0 __kmalloc 0x1c 0x14000c0
+perf           27128     4.81 ffff90054f9f8e40 __kmalloc 0x90 0x1408240
+perf           27128    24.71 ffff900566990000 __kmalloc 0x10000 0x14082c0
+^C
+
+This shows the first two arguments to __kmalloc -- the first one is the size
+of the requested allocation. The return value is also shown (null return values
+would indicate a failure).
+
+USAGE message:
+
+usage: funcslower.py [-h] [-p PID] [-m MIN_MS] [-u MIN_US] [-a ARGUMENTS] [-T]
+                     [-t] [-v]
+                     function [function ...]
+
+Trace slow kernel or user function calls.
+
+positional arguments:
+  function              function(s) to trace
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -p PID, --pid PID     trace this PID only
+  -m MIN_MS, --min-ms MIN_MS
+                        minimum duration to trace (ms)
+  -u MIN_US, --min-us MIN_US
+                        minimum duration to trace (us)
+  -a ARGUMENTS, --arguments ARGUMENTS
+                        print this many entry arguments, as hex
+  -T, --time            show HH:MM:SS timestamp
+  -t, --timestamp       show timestamp in seconds at us resolution
+  -v, --verbose         print the BPF program for debugging purposes
+
+examples:
+  ./funcslower vfs_write       # trace vfs_write calls slower than 1ms
+  ./funcslower -m 10 vfs_write # same, but slower than 10ms
+  ./funcslower -u 10 c:open    # trace open calls slower than 10us
+  ./funcslower -p 135 c:open   # trace pid 135 only
+  ./funcslower c:malloc c:free # trace both malloc and free slower than 1ms
+  ./funcslower -a 2 c:open     # show first two arguments to open
