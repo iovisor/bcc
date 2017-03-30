@@ -36,6 +36,12 @@ using namespace std;
 
 static pid_t spawn_child(void *, bool, bool, int (*)(void *));
 
+TEST_CASE("language detection", "[c_api]") {
+  const char *c = bcc_procutils_language(getpid());
+  REQUIRE(c);
+  REQUIRE(string(c).compare("c") == 0);
+}
+
 TEST_CASE("shared object resolution", "[c_api]") {
   char *libm = bcc_procutils_which_so("m", 0);
   REQUIRE(libm);

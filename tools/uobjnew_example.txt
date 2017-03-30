@@ -9,7 +9,7 @@ can in turn cause heavy garbage collection.
 For example, trace Ruby object allocations when running some simple commands
 in irb (the Ruby REPL):
 
-# ./uobjnew ruby 27245
+# ./uobjnew -l ruby 27245
 Tracing allocations in process 27245 (language: ruby)... Ctrl-C to quit.
 
 TYPE                           # ALLOCS      # BYTES
@@ -28,7 +28,7 @@ Plain C/C++ allocations (through "malloc") are also supported. We can't report
 the type being allocated, but we can report the object sizes at least. Also,
 print only the top 10 rows by number of bytes allocated:
 
-# ./uobjnew -S 10 c 27245
+# ./uobjnew -S 10 -l c 27245
 Tracing allocations in process 27245 (language: c)... Ctrl-C to quit.
 
 TYPE                           # ALLOCS      # BYTES
@@ -48,18 +48,19 @@ block size 80                       569        45520
 USAGE message:
 
 # ./uobjnew -h
-usage: uobjnew.py [-h] [-C TOP_COUNT] [-S TOP_SIZE] [-v]
-                  {java,ruby,c} pid [interval]
+usage: uobjnew.py [-h] [-l {java,ruby,c}] [-C TOP_COUNT] [-S TOP_SIZE] [-v]
+                  pid [interval]
 
 Summarize object allocations in high-level languages.
 
 positional arguments:
-  {java,ruby,c}         language to trace
   pid                   process id to attach to
   interval              print every specified number of seconds
 
 optional arguments:
   -h, --help            show this help message and exit
+  -l {java,ruby,c}, --language {java,ruby,c}
+                        language to trace
   -C TOP_COUNT, --top-count TOP_COUNT
                         number of most frequently allocated types to print
   -S TOP_SIZE, --top-size TOP_SIZE
@@ -68,7 +69,7 @@ optional arguments:
                         purposes)
 
 examples:
-    ./uobjnew java 145         # summarize Java allocations in process 145
-    ./uobjnew c 2020 1         # grab malloc() sizes and print every second
-    ./uobjnew ruby 6712 -C 10  # top 10 Ruby types by number of allocations
-    ./uobjnew ruby 6712 -S 10  # top 10 Ruby types by total size
+    ./uobjnew -l java 145         # summarize Java allocations in process 145
+    ./uobjnew -l c 2020 1         # grab malloc() sizes and print every second
+    ./uobjnew -l ruby 6712 -C 10  # top 10 Ruby types by number of allocations
+    ./uobjnew -l ruby 6712 -S 10  # top 10 Ruby types by total size

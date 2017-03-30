@@ -8,7 +8,7 @@ the GC event is also provided.
 
 For example, to trace all garbage collection events in a specific Node process:
 
-# ugc node $(pidof node)
+# ugc $(pidof node)
 Tracing garbage collections in node process 30012... Ctrl-C to quit.
 START    TIME (us) DESCRIPTION                             
 1.500    1181.00  GC scavenge
@@ -44,7 +44,7 @@ Occasionally, it might be useful to filter out collections that are very short,
 or display only collections that have a specific description. The -M and -F
 switches can be useful for this:
 
-# ugc -F Tenured java $(pidof java)
+# ugc -F Tenured $(pidof java)
 Tracing garbage collections in java process 29907... Ctrl-C to quit.
 START    TIME (us) DESCRIPTION                             
 0.360    4309.00  MarkSweepCompact Tenured Gen used=287528->287528 max=173408256->173408256
@@ -52,7 +52,7 @@ START    TIME (us) DESCRIPTION
 4.648    4139.00  MarkSweepCompact Tenured Gen used=287528->287528 max=173408256->173408256
 ^C
 
-# ugc -M 1 java $(pidof java)
+# ugc -M 1 $(pidof java)
 Tracing garbage collections in java process 29907... Ctrl-C to quit.
 START    TIME (us) DESCRIPTION                             
 0.160    3715.00  MarkSweepCompact Code Cache used=287528->3209472 max=173408256->251658240
@@ -68,18 +68,19 @@ START    TIME (us) DESCRIPTION
 USAGE message:
 
 # ugc -h
-usage: ugc.py [-h] [-v] [-m] [-M MINIMUM] [-F FILTER]
-              {java,python,ruby,node} pid
+usage: ugc.py [-h] [-l {java,python,ruby,node}] [-v] [-m] [-M MINIMUM]
+              [-F FILTER]
+              pid
 
 Summarize garbage collection events in high-level languages.
 
 positional arguments:
-  {java,python,ruby,node}
-                        language to trace
   pid                   process id to attach to
 
 optional arguments:
   -h, --help            show this help message and exit
+  -l {java,python,ruby,node}, --language {java,python,ruby,node}
+                        language to trace
   -v, --verbose         verbose mode: print the BPF program (for debugging
                         purposes)
   -m, --milliseconds    report times in milliseconds (default is microseconds)
@@ -89,6 +90,6 @@ optional arguments:
                         display only GCs whose description contains this text
 
 examples:
-    ./ugc java 185           # trace Java GCs in process 185
-    ./ugc ruby 1344 -m       # trace Ruby GCs reporting in ms
-    ./ugc -M 10 java 185     # trace only Java GCs longer than 10ms
+    ./ugc -l java 185        # trace Java GCs in process 185
+    ./ugc -l ruby 1344 -m    # trace Ruby GCs reporting in ms
+    ./ugc -M 10 -l java 185  # trace only Java GCs longer than 10ms

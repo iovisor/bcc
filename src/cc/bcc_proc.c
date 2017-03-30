@@ -485,3 +485,59 @@ bool bcc_procutils_exit_mountns(struct ns_cookie *nc) {
 
   return rc;
 }
+
+/* Detects the following languages + C. */
+const char *languages[] = {"java", "python", "ruby", "php", "node"};
+const char *language_c = "c";
+const int nb_languages = 5;
+
+const char *bcc_procutils_language(int pid) {
+  char procfilename[22], line[4096], pathname[32], *str;
+  FILE *procfile;
+  int i, ret;
+
+  /* Look for clues in the absolute path to the executable. */
+  sprintf(procfilename, "/proc/%ld/exe", (long)pid);
+  if (realpath(procfilename, line)) {
+    for (i = 0; i < nb_languages; i++)
+      if (strstr(line, languages[i]))
+        return languages[i];
+  }
+
+
+  sprintf(procfilename, "/proc/%ld/maps", (long)pid);
+  procfile = fopen(procfilename, "r");
+  if (!procfile)
+    return NULL;
+
+  /* Look for clues in memory mappings. */
+  bool libc = false;
+  do {
+    char perm[8], dev[8];
+    long long begin, end, size, inode;
+    ret = fscanf(procfile, "%llx-%llx %s %llx %s %lld", &begin, &end, perm,
+                 &size, dev, &inode);
+    if (!fgets(line, sizeof(line), procfile))
+      break;
+    if (ret == 6) {
+      char *mapname = line;
+      char *newline = strchr(line, '\n');
+      if (newline)
+        newline[0] = '\0';
+      while (isspace(mapname[0])) mapname++;
+      for (i = 0; i < nb_languages; i++) {
+        sprintf(pathname, "/lib%s", languages[i]);
+        if (strstr(mapname, pathname))
+          return languages[i];
+        if ((str = strstr(mapname, "libc")) &&
+            (str[4] == '-' || str[4] == '.'))
+          libc = true;
+      }
+    }
+  } while (ret && ret != EOF);
+
+  fclose(procfile);
+
+  /* Return C as the language if libc was found and nothing else. */
+  return libc ? language_c : NULL;
+}

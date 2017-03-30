@@ -13,21 +13,24 @@
 
 from __future__ import print_function
 import argparse
-from bcc import BPF, USDT
+from bcc import BPF, USDT, utils
 import ctypes as ct
 import time
+import os
+
+languages = ["java", "python", "ruby", "php"]
 
 examples = """examples:
-    ./uflow java 185                # trace Java method calls in process 185
-    ./uflow ruby 1344               # trace Ruby method calls in process 1344
-    ./uflow -M indexOf java 185     # trace only 'indexOf'-prefixed methods
-    ./uflow -C '<stdin>' python 180 # trace only REPL-defined methods
+    ./uflow -l java 185                # trace Java method calls in process 185
+    ./uflow -l ruby 134                # trace Ruby method calls in process 134
+    ./uflow -M indexOf -l java 185     # trace only 'indexOf'-prefixed methods
+    ./uflow -C '<stdin>' -l python 180 # trace only REPL-defined methods
 """
 parser = argparse.ArgumentParser(
     description="Trace method execution flow in high-level languages.",
     formatter_class=argparse.RawDescriptionHelpFormatter,
     epilog=examples)
-parser.add_argument("language", choices=["java", "python", "ruby", "php"],
+parser.add_argument("-l", "--language", choices=languages,
     help="language to trace")
 parser.add_argument("pid", type=int, help="process id to attach to")
 parser.add_argument("-M", "--method",
@@ -113,21 +116,25 @@ def enable_probe(probe_name, func_name, read_class, read_method, is_return):
 
 usdt = USDT(pid=args.pid)
 
-if args.language == "java":
+language = args.language
+if not language:
+    language = utils.detect_language(languages, args.pid)
+
+if language == "java":
     enable_probe("method__entry", "java_entry",
                  "bpf_usdt_readarg(2, ctx, &clazz);",
                  "bpf_usdt_readarg(4, ctx, &method);", is_return=False)
     enable_probe("method__return", "java_return",
                  "bpf_usdt_readarg(2, ctx, &clazz);",
                  "bpf_usdt_readarg(4, ctx, &method);", is_return=True)
-elif args.language == "python":
+elif language == "python":
     enable_probe("function__entry", "python_entry",
                  "bpf_usdt_readarg(1, ctx, &clazz);",   # filename really
                  "bpf_usdt_readarg(2, ctx, &method);", is_return=False)
     enable_probe("function__return", "python_return",
                  "bpf_usdt_readarg(1, ctx, &clazz);",   # filename really
                  "bpf_usdt_readarg(2, ctx, &method);", is_return=True)
-elif args.language == "ruby":
+elif language == "ruby":
     enable_probe("method__entry", "ruby_entry",
                  "bpf_usdt_readarg(1, ctx, &clazz);",
                  "bpf_usdt_readarg(2, ctx, &method);", is_return=False)
@@ -140,13 +147,16 @@ elif args.language == "ruby":
     enable_probe("cmethod__return", "ruby_creturn",
                  "bpf_usdt_readarg(1, ctx, &clazz);",
                  "bpf_usdt_readarg(2, ctx, &method);", is_return=True)
-elif args.language == "php":
+elif language == "php":
     enable_probe("function__entry", "php_entry",
                  "bpf_usdt_readarg(4, ctx, &clazz);",
                  "bpf_usdt_readarg(1, ctx, &method);", is_return=False)
     enable_probe("function__return", "php_return",
                  "bpf_usdt_readarg(4, ctx, &clazz);",
                  "bpf_usdt_readarg(1, ctx, &method);", is_return=True)
+else:
+    print("No language detected; use -l to trace a language.")
+    exit(1)
 
 if args.verbose:
     print(usdt.get_text())
@@ -154,7 +164,7 @@ if args.verbose:
 
 bpf = BPF(text=program, usdt_contexts=[usdt])
 print("Tracing method calls in %s process %d... Ctrl-C to quit." %
-      (args.language, args.pid))
+      (language, args.pid))
 print("%-3s %-6s %-6s %-8s %s" % ("CPU", "PID", "TID", "TIME(us)", "METHOD"))
 
 class CallEvent(ct.Structure):

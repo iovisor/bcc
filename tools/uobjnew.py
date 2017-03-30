@@ -13,20 +13,24 @@
 
 from __future__ import print_function
 import argparse
-from bcc import BPF, USDT
+from bcc import BPF, USDT, utils
 from time import sleep
+import os
+
+# C needs to be the last language.
+languages = ["java", "ruby", "c"]
 
 examples = """examples:
-    ./uobjnew java 145         # summarize Java allocations in process 145
-    ./uobjnew c 2020 1         # grab malloc() sizes and print every second
-    ./uobjnew ruby 6712 -C 10  # top 10 Ruby types by number of allocations
-    ./uobjnew ruby 6712 -S 10  # top 10 Ruby types by total size
+    ./uobjnew -l java 145         # summarize Java allocations in process 145
+    ./uobjnew -l c 2020 1         # grab malloc() sizes and print every second
+    ./uobjnew -l ruby 6712 -C 10  # top 10 Ruby types by number of allocations
+    ./uobjnew -l ruby 6712 -S 10  # top 10 Ruby types by total size
 """
 parser = argparse.ArgumentParser(
     description="Summarize object allocations in high-level languages.",
     formatter_class=argparse.RawDescriptionHelpFormatter,
     epilog=examples)
-parser.add_argument("language", choices=["java", "ruby", "c"],
+parser.add_argument("-l", "--language", choices=languages,
     help="language to trace")
 parser.add_argument("pid", type=int, help="process id to attach to")
 parser.add_argument("interval", type=int, nargs='?',
@@ -38,6 +42,10 @@ parser.add_argument("-S", "--top-size", type=int,
 parser.add_argument("-v", "--verbose", action="store_true",
     help="verbose mode: print the BPF program (for debugging purposes)")
 args = parser.parse_args()
+
+language = args.language
+if not language:
+    language = utils.detect_language(languages, args.pid)
 
 program = """
 #include <linux/ptrace.h>
@@ -56,14 +64,14 @@ struct val_t {
 };
 
 BPF_HASH(allocs, struct key_t, struct val_t);
-""".replace("MALLOC_TRACING", "1" if args.language == "c" else "0")
+""".replace("MALLOC_TRACING", "1" if language == "c" else "0")
 
 usdt = USDT(pid=args.pid)
 
 #
 # Java
 #
-if args.language == "java":
+if language == "java":
     program += """
 int alloc_entry(struct pt_regs *ctx) {
     struct key_t key = {};
@@ -82,7 +90,7 @@ int alloc_entry(struct pt_regs *ctx) {
 #
 # Ruby
 #
-elif args.language == "ruby":
+elif language == "ruby":
     create_template = """
 int THETHING_alloc_entry(struct pt_regs *ctx) {
     struct key_t key = { .name = "THETHING" };
@@ -115,7 +123,7 @@ int object_alloc_entry(struct pt_regs *ctx) {
 #
 # C
 #
-elif args.language == "c":
+elif language == "c":
     program += """
 int alloc_entry(struct pt_regs *ctx, size_t size) {
     struct key_t key = {};
@@ -128,18 +136,23 @@ int alloc_entry(struct pt_regs *ctx, size_t size) {
 }
     """
 
+else:
+    print("No language detected; use -l to trace a language.")
+    exit(1)
+
+
 if args.verbose:
     print(usdt.get_text())
     print(program)
 
 bpf = BPF(text=program, usdt_contexts=[usdt])
-if args.language == "c":
+if language == "c":
     bpf.attach_uprobe(name="c", sym="malloc", fn_name="alloc_entry",
                       pid=args.pid)
 
 exit_signaled = False
 print("Tracing allocations in process %d (language: %s)... Ctrl-C to quit." %
-      (args.pid, args.language or "none"))
+      (args.pid, language or "none"))
 while True:
     try:
         sleep(args.interval or 99999999)
@@ -157,7 +170,7 @@ while True:
         data = sorted(data.items(), key=lambda kv: kv[1].total_size)
     print("%-30s %8s %12s" % ("TYPE", "# ALLOCS", "# BYTES"))
     for key, value in data:
-        if args.language == "c":
+        if language == "c":
             obj_type = "block size %d" % key.size
         else:
             obj_type = key.name
