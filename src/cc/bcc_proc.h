@@ -24,6 +24,11 @@ extern "C" {
 
 #include <stdint.h>
 
+struct ns_cookie {
+  int nsc_oldns;
+  int nsc_newns;
+};
+
 typedef int (*bcc_procutils_modulecb)(const char *, uint64_t, uint64_t, void *);
 typedef void (*bcc_procutils_ksymcb)(const char *, uint64_t, void *);
 
@@ -34,6 +39,8 @@ int bcc_procutils_each_module(int pid, bcc_procutils_modulecb callback,
                               void *payload);
 int bcc_procutils_each_ksym(bcc_procutils_ksymcb callback, void *payload);
 void bcc_procutils_free(const char *ptr);
+bool bcc_procutils_enter_mountns(int pid, struct ns_cookie *nc);
+bool bcc_procutils_exit_mountns(struct ns_cookie *nc);
 
 #ifdef __cplusplus
 }

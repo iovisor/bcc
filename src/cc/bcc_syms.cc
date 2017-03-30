@@ -100,12 +100,38 @@ void ProcSyms::refresh() {
 
 int ProcSyms::_add_module(const char *modname, uint64_t start, uint64_t end,
                           void *payload) {
+  struct ns_cookie nsc = {-1, -1};
+  bool ns_switch = false;
+  int arc;
   ProcSyms *ps = static_cast<ProcSyms *>(payload);
   auto it = std::find_if(ps->modules_.begin(), ps->modules_.end(),
                [=](const ProcSyms::Module &m) { return m.name_ == modname; });
-  if (it == ps->modules_.end())
-    it = ps->modules_.insert(ps->modules_.end(), modname);
+  if (it == ps->modules_.end()) {
+    // If modname references a perf-map, determine if we need to enter a mount
+    // namespace in order to read symbols from it later.
+    if (strstr(modname, ".map") != nullptr) {
+      ns_switch = bcc_procutils_enter_mountns(ps->pid_, &nsc);
+      if (ns_switch) {
+        char new_modname[4096];
+        arc = access(modname, R_OK);
+        bcc_procutils_exit_mountns(&nsc);
+
+        if (arc != 0) {
+          snprintf(new_modname, sizeof (new_modname), "/tmp/perf-%d.map",
+              ps->pid_);
+
+          it = ps->modules_.insert(ps->modules_.end(), Module(new_modname,
+              ps->pid_, false));
+          it->ranges_.push_back(ProcSyms::Module::Range(start, end));
+	  return 0;
+        }
+      }
+    }
+    it = ps->modules_.insert(ps->modules_.end(), Module(modname, ps->pid_,
+        ns_switch));
+  }
   it->ranges_.push_back(ProcSyms::Module::Range(start, end));
+
   return 0;
 }
 
@@ -159,9 +185,13 @@ bool ProcSyms::resolve_name(const char *module, const char *name,
   return false;
 }
 
-ProcSyms::Module::Module(const char *name)
-  : name_(name) {
+ProcSyms::Module::Module(const char *name, int pid, bool in_ns)
+  : name_(name), pid_(pid), in_ns_(in_ns) {
+  struct ns_cookie nsc;
+
+  bcc_procutils_enter_mountns(pid_, &nsc);
   is_so_ = bcc_elf_is_shared_obj(name) == 1;
+  bcc_procutils_exit_mountns(&nsc);
 }
 
 int ProcSyms::Module::_add_symbol(const char *symname, uint64_t start,
@@ -177,13 +207,21 @@ bool ProcSyms::Module::is_perf_map() const {
 }
 
 void ProcSyms::Module::load_sym_table() {
+  struct ns_cookie nsc = {-1, -1};
+
   if (syms_.size())
     return;
 
-  if (is_perf_map())
+  if (is_perf_map()) {
+    if (in_ns_)
+      bcc_procutils_enter_mountns(pid_, &nsc);
     bcc_perf_map_foreach_sym(name_.c_str(), _add_symbol, this);
-  else
+  } else {
+    bcc_procutils_enter_mountns(pid_, &nsc);
     bcc_elf_foreach_sym(name_.c_str(), _add_symbol, this);
+  }
+
+  bcc_procutils_exit_mountns(&nsc);
 
   std::sort(syms_.begin(), syms_.end());
 }
@@ -352,6 +390,8 @@ int bcc_foreach_symbol(const char *module, SYM_CB cb) {
 int bcc_resolve_symname(const char *module, const char *symname,
                         const uint64_t addr, int pid, struct bcc_symbol *sym) {
   uint64_t load_addr;
+  struct ns_cookie nsc = {-1, -1};
+  bool success = true;
 
   sym->module = NULL;
   sym->name = NULL;
@@ -369,20 +409,29 @@ int bcc_resolve_symname(const char *module, const char *symname,
   if (sym->module == NULL)
     return -1;
 
+  bcc_procutils_enter_mountns(pid, &nsc);
+
   if (bcc_elf_loadaddr(sym->module, &load_addr) < 0) {
     sym->module = NULL;
-    return -1;
+    success = false;
+    goto exitns;
   }
 
   sym->name = symname;
   sym->offset = addr;
 
   if (sym->name && sym->offset == 0x0) {
-    if (bcc_find_symbol_addr(sym) < 0)
-      return -1;
+    if (bcc_find_symbol_addr(sym) < 0) {
+      sym->module = NULL;
+      success = false;
+      goto exitns;
+    }
   }
 
-  if (sym->offset == 0x0)
+exitns:
+  bcc_procutils_exit_mountns(&nsc);
+
+  if (!success || sym->offset == 0x0)
     return -1;
 
   sym->offset = (sym->offset - load_addr);
