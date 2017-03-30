@@ -134,6 +134,8 @@ lib.bcc_procutils_which_so.restype = ct.POINTER(ct.c_char)
 lib.bcc_procutils_which_so.argtypes = [ct.c_char_p, ct.c_int]
 lib.bcc_procutils_free.restype = None
 lib.bcc_procutils_free.argtypes = [ct.c_void_p]
+lib.bcc_procutils_language.restype = ct.POINTER(ct.c_char)
+lib.bcc_procutils_language.argtypes = [ct.c_int]
 
 lib.bcc_resolve_symname.restype = ct.c_int
 lib.bcc_resolve_symname.argtypes = [

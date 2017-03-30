@@ -2,9 +2,10 @@
 # Copyright (c) Catalysts GmbH
 # Licensed under the Apache License, Version 2.0 (the "License")
 
-from bcc.utils import get_online_cpus
+from bcc.utils import get_online_cpus, detect_language
 import multiprocessing
 import unittest
+import os
 
 class TestUtils(unittest.TestCase):
     def test_get_online_cpus(self):
@@ -13,6 +14,10 @@ class TestUtils(unittest.TestCase):
 
         self.assertEqual(len(online_cpus), num_cores)
 
+    def test_detect_language(self):
+        candidates = ["java", "ruby", "php", "node", "c", "python"]
+        language = detect_language(candidates, os.getpid())
+        self.assertEqual(language, "python")
 
 if __name__ == "__main__":
     unittest.main()

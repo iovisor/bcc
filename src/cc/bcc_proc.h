@@ -41,6 +41,7 @@ int bcc_procutils_each_ksym(bcc_procutils_ksymcb callback, void *payload);
 void bcc_procutils_free(const char *ptr);
 bool bcc_procutils_enter_mountns(int pid, struct ns_cookie *nc);
 bool bcc_procutils_exit_mountns(struct ns_cookie *nc);
+const char *bcc_procutils_language(int pid);
 
 #ifdef __cplusplus
 }

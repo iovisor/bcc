@@ -11,6 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import ctypes as ct
+
+from .libbcc import lib
 
 def _read_cpu_range(path):
     cpus = []
@@ -31,3 +34,8 @@ def get_online_cpus():
 
 def get_possible_cpus():
     return _read_cpu_range('/sys/devices/system/cpu/possible')
+
+def detect_language(candidates, pid):
+    res = lib.bcc_procutils_language(pid)
+    language = ct.cast(res, ct.c_char_p).value.decode()
+    return language if language in candidates else None
