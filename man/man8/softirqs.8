@@ -9,10 +9,10 @@ show this time as either totals or histogram distributions. A system-wide
 summary of this time is shown by the %soft column of mpstat(1), and soft IRQ
 event counts (but not times) are available in /proc/softirqs.
 
-WARNING: This currently uses dynamic tracing of various soft interrupt
-functions, and can easily not work with different kernel versions. Check and
-adjust the code as necessary. Also try in a test environment and ensure this
-tool is safe before use. Future versions should switch to tracepoints.
+This tool uses the irq:softirq_enter and irq:softirq_exit kernel tracepoints,
+which is a stable tracing mechanism. BPF programs can attach to tracepoints
+from Linux 4.7 only. An older version of this tool is available in tools/old,
+and uses kprobes instead of tracepoints.
 
 Since this uses BPF, only the root user can use this tool.
 .SH REQUIREMENTS
@@ -87,7 +87,7 @@ example usage, output, and commentary for this tool.
 Linux
 .SH STABILITY
 Unstable - in development.
-.SH AUTHOR
-Brendan Gregg
+.SH AUTHORS
+Brendan Gregg, Sasha Goldshtein
 .SH SEE ALSO
 hardirqs(8)
