@@ -7,7 +7,7 @@ struct ipkey {
   u32 client_ip;
 };
 
-BPF_TABLE("hash", struct ipkey, int, learned_ips, 1024);
+BPF_HASH(learned_ips, struct ipkey, int, 1024);
 
 // trivial action
 int pass(struct __sk_buff *skb) {

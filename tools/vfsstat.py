@@ -49,7 +49,7 @@ enum stat_types {
     S_MAXSTAT
 };
 
-BPF_TABLE("array", int, u64, stats, S_MAXSTAT + 1);
+BPF_ARRAY(stats, u64, S_MAXSTAT + 1);
 
 void stats_increment(int key) {
     u64 *leaf = stats.lookup(&key);

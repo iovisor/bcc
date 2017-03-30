@@ -51,7 +51,7 @@ end
 
 function TestClang:test_sscanf()
   local text = [[
-BPF_TABLE("hash", int, struct { u64 a; u64 b; u32 c:18; u32 d:14; struct { u32 a; u32 b; } s; }, stats, 10);
+BPF_HASH(stats, int, struct { u64 a; u64 b; u32 c:18; u32 d:14; struct { u32 a; u32 b; } s; }, 10);
 
 int foo(void *ctx) {
     return 0;
@@ -76,7 +76,7 @@ int foo(void *ctx) {
 end
 
 function TestClang:test_sscanf_array()
-  local text = [[ BPF_TABLE("hash", int, struct { u32 a[3]; u32 b; }, stats, 10); ]]
+  local text = [[ BPF_HASH(stats, int, struct { u32 a[3]; u32 b; }, 10); ]]
 
   local b = BPF:new{text=text, debug=0}
   local t = b:get_table("stats")
@@ -103,7 +103,7 @@ struct key_t {
     struct request *req;
 };
 
-BPF_TABLE("hash", struct key_t, u64, start, 1024);
+BPF_HASH(start, struct key_t, u64, 1024);
 int do_request(struct pt_regs *ctx, struct request *req) {
     struct key_t key = {};
 
@@ -236,7 +236,7 @@ struct key_t {
   u32 prev_pid;
   u32 curr_pid;
 };
-BPF_TABLE("hash", struct key_t, u64, stats, 1024);
+BPF_HASH(stats, struct key_t, u64, 1024);
 int kprobe__finish_task_switch(struct pt_regs *ctx, struct task_struct *prev) {
   struct key_t key = {};
   u64 zero = 0, *val;
@@ -296,9 +296,9 @@ union emptyu {
   struct empty em3;
   struct empty em4;
 };
-BPF_TABLE("array", int, struct list, t1, 1);
-BPF_TABLE("array", int, struct list *, t2, 1);
-BPF_TABLE("array", int, union emptyu, t3, 1);
+BPF_ARRAY(t1, struct list, 1);
+BPF_ARRAY(t2, struct list *, 1);
+BPF_ARRAY(t3, union emptyu, 1);
 ]]
   local b = BPF:new{text=text}
   local ffi = require("ffi")

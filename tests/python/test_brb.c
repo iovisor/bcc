@@ -26,33 +26,33 @@ BPF_TABLE("prog", u32, u32, jump, 16);
 
 // physical endpoint manager (pem) tables which connects to boeht bridge 1 and bridge 2
 // <port_id, bpf_dest>
-BPF_TABLE("array", u32, bpf_dest_t, pem_dest, 256);
+BPF_ARRAY(pem_dest, bpf_dest_t, 256);
 // <port_id, ifindex>
-BPF_TABLE("array", u32, u32, pem_port, 256);
+BPF_ARRAY(pem_port, u32, 256);
 // <ifindex, port_id>
-BPF_TABLE("hash", u32, u32, pem_ifindex, 256);
+BPF_HASH(pem_ifindex, u32, u32, 256);
 // <0, tx2vm_pkts>
-BPF_TABLE("array", u32, u32, pem_stats, 1);
+BPF_ARRAY(pem_stats, u32, 1);
 
 // bridge 1 (br1) tables
 // <port_id, bpf_dest>
-BPF_TABLE("array", u32, bpf_dest_t, br1_dest, 256);
+BPF_ARRAY(br1_dest, bpf_dest_t, 256);
 // <eth_addr, port_id>
-BPF_TABLE("hash", eth_addr_t, u32, br1_mac, 256);
+BPF_HASH(br1_mac, eth_addr_t, u32, 256);
 // <0, rtr_ifindex>
-BPF_TABLE("array", u32, u32, br1_rtr, 1);
+BPF_ARRAY(br1_rtr, u32, 1);
 // <mac, ifindex>
-BPF_TABLE("hash", eth_addr_t, u32, br1_mac_ifindex, 1);
+BPF_HASH(br1_mac_ifindex, eth_addr_t, u32, 1);
 
 // bridge 2 (br2) tables
 // <port_id, bpf_dest>
-BPF_TABLE("array", u32, bpf_dest_t, br2_dest, 256);
+BPF_ARRAY(br2_dest, bpf_dest_t, 256);
 // <eth_addr, port_id>
-BPF_TABLE("hash", eth_addr_t, u32, br2_mac, 256);
+BPF_HASH(br2_mac, eth_addr_t, u32, 256);
 // <0, rtr_ifindex>
-BPF_TABLE("array", u32, u32, br2_rtr, 1);
+BPF_ARRAY(br2_rtr, u32, 1);
 // <mac, ifindex>
-BPF_TABLE("hash", eth_addr_t, u32, br2_mac_ifindex, 1);
+BPF_HASH(br2_mac_ifindex, eth_addr_t, u32, 1);
 
 int pem(struct __sk_buff *skb) {
     bpf_metadata_t meta = {};

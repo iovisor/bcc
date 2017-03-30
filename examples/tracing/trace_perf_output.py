@@ -24,7 +24,7 @@ def cb(cpu, data, size):
 
 prog = """
 BPF_PERF_OUTPUT(events);
-BPF_TABLE("array", int, u64, counters, 10);
+BPF_ARRAY(counters, u64, 10);
 int kprobe__sys_clone(void *ctx) {
   struct {
     u64 ts;

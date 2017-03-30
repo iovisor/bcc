@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (the "License")
 
 BPF_TABLE("prog", int, int, jump, 64);
-BPF_TABLE("array", int, u64, stats, 64);
+BPF_ARRAY(stats, u64, 64);
 
 enum states {
   S_EOP = 1,

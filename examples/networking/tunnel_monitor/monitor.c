@@ -16,7 +16,7 @@ struct counters {
   u64 rx_bytes;
 };
 
-BPF_TABLE("hash", struct ipkey, struct counters, stats, 1024);
+BPF_HASH(stats, struct ipkey, struct counters, 1024);
 BPF_TABLE("prog", int, int, parser, 10);
 
 enum cb_index {
