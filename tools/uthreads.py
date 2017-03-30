@@ -13,9 +13,12 @@
 
 from __future__ import print_function
 import argparse
-from bcc import BPF, USDT
+from bcc import BPF, USDT, utils
 import ctypes as ct
 import time
+import os
+
+languages = ["java"]
 
 examples = """examples:
     ./uthreads -l java 185   # trace Java threads in process 185
@@ -26,7 +29,7 @@ parser = argparse.ArgumentParser(
                 "high-level languages.",
     formatter_class=argparse.RawDescriptionHelpFormatter,
     epilog=examples)
-parser.add_argument("-l", "--language", choices=["java"],
+parser.add_argument("-l", "--language", choices=languages + ["none"],
     help="language to trace (none for pthreads only)")
 parser.add_argument("pid", type=int, help="process id to attach to")
 parser.add_argument("-v", "--verbose", action="store_true",
@@ -59,7 +62,11 @@ int trace_pthread(struct pt_regs *ctx) {
 """
 usdt.enable_probe_or_bail("pthread_start", "trace_pthread")
 
-if args.language == "java":
+language = args.language
+if not language:
+    language = utils.detect_language(languages, args.pid)
+
+if language == "java":
     template = """
 int %s(struct pt_regs *ctx) {
     char type[] = "%s";
@@ -87,7 +94,7 @@ if args.verbose:
 
 bpf = BPF(text=program, usdt_contexts=[usdt])
 print("Tracing thread events in process %d (language: %s)... Ctrl-C to quit." %
-      (args.pid, args.language or "none"))
+      (args.pid, language or "none"))
 print("%-8s %-16s %-8s %-30s" % ("TIME", "ID", "TYPE", "DESCRIPTION"))
 
 class ThreadEvent(ct.Structure):

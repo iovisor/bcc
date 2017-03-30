@@ -12,7 +12,7 @@ argdist, biotop, fileslower, and others.
 
 For example, to trace method call latency in a Java application:
 
-# ucalls -L -l java $(pidof java)
+# ucalls -L $(pidof java)
 Tracing calls in process 26877 (language: java)... Ctrl-C to quit.
 
 METHOD                                              # CALLS TIME (us)
@@ -48,7 +48,7 @@ Detaching kernel probes, please wait...
 To print only the top 5 methods and report times in milliseconds (the default
 is microseconds):
 
-# ucalls -l python -mT 5 $(pidof python)
+# ucalls -mT 5 $(pidof python)
 Tracing calls in process 26914 (language: python)... Ctrl-C to quit.
 
 METHOD                                              # CALLS
@@ -60,7 +60,8 @@ METHOD                                              # CALLS
 USAGE message:
 
 # ./ucalls.py -h
-usage: ucalls.py [-h] [-l {java,python,ruby,php}] [-T TOP] [-L] [-S] [-v] [-m]
+usage: ucalls.py [-h] [-l {java,python,ruby,php,none}] [-T TOP] [-L] [-S] [-v]
+                 [-m]
                  pid [interval]
 
 Summarize method calls in high-level languages.
@@ -71,7 +72,7 @@ positional arguments:
 
 optional arguments:
   -h, --help            show this help message and exit
-  -l {java,python,ruby,php}, --language {java,python,ruby,php}
+  -l {java,python,ruby,php,none}, --language {java,python,ruby,php,none}
                         language to trace (if none, trace syscalls only)
   -T TOP, --top TOP     number of most frequent/slow calls to print
   -L, --latency         record method latency from enter to exit (except

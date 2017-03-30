@@ -14,8 +14,11 @@
 
 from __future__ import print_function
 import argparse
-from bcc import BPF, USDT
+from bcc import BPF, USDT, utils
 from time import sleep
+import os
+
+languages = ["java", "python", "ruby", "php"]
 
 examples = """examples:
     ./ucalls -l java 185        # trace Java calls and print statistics on ^C
@@ -34,8 +37,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument("pid", type=int, help="process id to attach to")
 parser.add_argument("interval", type=int, nargs='?',
     help="print every specified number of seconds")
-parser.add_argument("-l", "--language",
-    choices=["java", "python", "ruby", "php"],
+parser.add_argument("-l", "--language", choices=languages + ["none"],
     help="language to trace (if none, trace syscalls only)")
 parser.add_argument("-T", "--top", type=int,
     help="number of most frequent/slow calls to print")
@@ -49,10 +51,14 @@ parser.add_argument("-m", "--milliseconds", action="store_true",
     help="report times in milliseconds (default is microseconds)")
 args = parser.parse_args()
 
+language = args.language
+if not language:
+    language = utils.detect_language(languages, args.pid)
+
 # We assume that the entry and return probes have the same arguments. This is
 # the case for Java, Python, Ruby, and PHP. If there's a language where it's
 # not the case, we will need to build a custom correlator from entry to exit.
-if args.language == "java":
+if language == "java":
     # TODO for JVM entries, we actually have the real length of the class
     #      and method strings in arg3 and arg5 respectively, so we can insert
     #      the null terminator in its proper position.
@@ -60,27 +66,29 @@ if args.language == "java":
     return_probe = "method__return"
     read_class = "bpf_usdt_readarg(2, ctx, &clazz);"
     read_method = "bpf_usdt_readarg(4, ctx, &method);"
-elif args.language == "python":
+elif language == "python":
     entry_probe = "function__entry"
     return_probe = "function__return"
     read_class = "bpf_usdt_readarg(1, ctx, &clazz);"    # filename really
     read_method = "bpf_usdt_readarg(2, ctx, &method);"
-elif args.language == "ruby":
+elif language == "ruby":
     # TODO Also probe cmethod__entry and cmethod__return with same arguments
     entry_probe = "method__entry"
     return_probe = "method__return"
     read_class = "bpf_usdt_readarg(1, ctx, &clazz);"
     read_method = "bpf_usdt_readarg(2, ctx, &method);"
-elif args.language == "php":
+elif language == "php":
     entry_probe = "function__entry"
     return_probe = "function__return"
     read_class = "bpf_usdt_readarg(4, ctx, &clazz);"
     read_method = "bpf_usdt_readarg(1, ctx, &method);"
-elif not args.language:
+elif not language or language == "none":
     if not args.syscalls:
         print("Nothing to do; use -S to trace syscalls.")
         exit(1)
     entry_probe, return_probe, read_class, read_method = ("", "", "", "")
+    if language:
+        language = None
 
 program = """
 #include <linux/ptrace.h>
@@ -213,11 +221,11 @@ int syscall_return(struct pt_regs *ctx) {
 """.replace("READ_CLASS", read_class) \
    .replace("READ_METHOD", read_method) \
    .replace("PID_FILTER", "if ((pid >> 32) != %d) { return 0; }" % args.pid) \
-   .replace("DEFINE_NOLANG", "#define NOLANG" if not args.language else "") \
+   .replace("DEFINE_NOLANG", "#define NOLANG" if not language else "") \
    .replace("DEFINE_LATENCY", "#define LATENCY" if args.latency else "") \
    .replace("DEFINE_SYSCALLS", "#define SYSCALLS" if args.syscalls else "")
 
-if args.language:
+if language:
     usdt = USDT(pid=args.pid)
     usdt.enable_probe_or_bail(entry_probe, "trace_entry")
     if args.latency:
@@ -278,7 +286,7 @@ def clear_data():
 
 exit_signaled = False
 print("Tracing calls in process %d (language: %s)... Ctrl-C to quit." %
-      (args.pid, args.language or "none"))
+      (args.pid, language or "none"))
 while True:
     try:
         sleep(args.interval or 99999999)

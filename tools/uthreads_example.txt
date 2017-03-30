@@ -39,7 +39,7 @@ instead.
 USAGE message:
 
 # ./uthreads -h
-usage: uthreads.py [-h] [-l {java}] [-v] pid
+usage: uthreads.py [-h] [-l {java,none}] [-v] pid
 
 Trace thread creation/destruction events in high-level languages.
 
@@ -48,7 +48,7 @@ positional arguments:
 
 optional arguments:
   -h, --help            show this help message and exit
-  -l {java}, --language {java}
+  -l {java,none}, --language {java,none}
                         language to trace (none for pthreads only)
   -v, --verbose         verbose mode: print the BPF program (for debugging
                         purposes)

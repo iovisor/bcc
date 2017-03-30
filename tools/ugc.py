@@ -13,20 +13,23 @@
 
 from __future__ import print_function
 import argparse
-from bcc import BPF, USDT
+from bcc import BPF, USDT, utils
 import ctypes as ct
 import time
+import os
+
+languages = ["java", "python", "ruby", "node"]
 
 examples = """examples:
-    ./ugc java 185           # trace Java GCs in process 185
-    ./ugc ruby 1344 -m       # trace Ruby GCs reporting in ms
-    ./ugc -M 10 java 185     # trace only Java GCs longer than 10ms
+    ./ugc -l java 185        # trace Java GCs in process 185
+    ./ugc -l ruby 1344 -m    # trace Ruby GCs reporting in ms
+    ./ugc -M 10 -l java 185  # trace only Java GCs longer than 10ms
 """
 parser = argparse.ArgumentParser(
     description="Summarize garbage collection events in high-level languages.",
     formatter_class=argparse.RawDescriptionHelpFormatter,
     epilog=examples)
-parser.add_argument("language", choices=["java", "python", "ruby", "node"],
+parser.add_argument("-l", "--language", choices=languages,
     help="language to trace")
 parser.add_argument("pid", type=int, help="process id to attach to")
 parser.add_argument("-v", "--verbose", action="store_true",
@@ -111,10 +114,14 @@ int trace_%s(struct pt_regs *ctx) {
 
 probes = []
 
+language = args.language
+if not language:
+    language = utils.detect_language(languages, args.pid)
+
 #
 # Java
 #
-if args.language == "java":
+if language == "java":
     # Oddly, the gc__begin/gc__end probes don't really have any useful
     # information, while the mem__pool* ones do. There's also a bunch of
     # probes described in the hotspot_gc*.stp file which aren't there
@@ -145,7 +152,7 @@ if args.language == "java":
 #
 # Python
 #
-elif args.language == "python":
+elif language == "python":
     begin_save = """
     int gen = 0;
     bpf_usdt_readarg(1, ctx, &gen);
@@ -166,7 +173,7 @@ elif args.language == "python":
 #
 # Ruby
 #
-elif args.language == "ruby":
+elif language == "ruby":
     # Ruby GC probes do not have any additional information available.
     probes.append(Probe("gc__mark__begin", "gc__mark__end",
                         "", "", lambda _: "GC mark stage"))
@@ -175,7 +182,7 @@ elif args.language == "ruby":
 #
 # Node
 #
-elif args.language == "node":
+elif language == "node":
     end_save = """
     u32 gc_type = 0;
     bpf_usdt_readarg(1, ctx, &gc_type);
@@ -188,6 +195,11 @@ elif args.language == "node":
                                      [desc for desc, val in descs.items()
                                       if e.field1 & val != 0])))
 
+else:
+    print("No language detected; use -l to trace a language.")
+    exit(1)
+
+
 for probe in probes:
     program += probe.generate()
     probe.attach()
@@ -198,7 +210,7 @@ if args.verbose:
 
 bpf = BPF(text=program, usdt_contexts=[usdt])
 print("Tracing garbage collections in %s process %d... Ctrl-C to quit." %
-      (args.language, args.pid))
+      (language, args.pid))
 time_col = "TIME (ms)" if args.milliseconds else "TIME (us)"
 print("%-8s %-8s %-40s" % ("START", time_col, "DESCRIPTION"))
 

@@ -10,7 +10,7 @@ method invocations.
 
 For example, trace all Ruby method calls in a specific process:
 
-# ./uflow ruby 27245
+# ./uflow -l ruby 27245
 Tracing method calls in ruby process 27245... Ctrl-C to quit.
 CPU PID    TID    TIME(us) METHOD
 3   27245  27245  4.536    <- IO.gets                              
@@ -34,7 +34,7 @@ and the <- and -> arrows indicate the direction of the event (exit or entry).
 Often, the amount of output can be overwhelming. You can filter specific 
 classes or methods. For example, trace only methods from the Thread class:
 
-# ./uflow -C java/lang/Thread java $(pidof java)
+# ./uflow -C java/lang/Thread $(pidof java)
 Tracing method calls in java process 27722... Ctrl-C to quit.
 CPU PID    TID    TIME(us) METHOD
 3   27722  27731  3.144    -> java/lang/Thread.<init>              
@@ -88,17 +88,18 @@ thread running on the same CPU.
 USAGE message:
 
 # ./uflow -h
-usage: uflow.py [-h] [-M METHOD] [-C CLAZZ] [-v] {java,python,ruby,php} pid
+usage: uflow.py [-h] [-l {java,python,ruby,php}] [-M METHOD] [-C CLAZZ] [-v]
+                pid
 
 Trace method execution flow in high-level languages.
 
 positional arguments:
-  {java,python,ruby,php}
-			language to trace
   pid                   process id to attach to
 
 optional arguments:
   -h, --help            show this help message and exit
+  -l {java,python,ruby,php}, --language {java,python,ruby,php}
+                        language to trace
   -M METHOD, --method METHOD
                         trace only calls to methods starting with this prefix
   -C CLAZZ, --class CLAZZ
@@ -107,7 +108,7 @@ optional arguments:
                         purposes)
 
 examples:
-    ./uflow java 185                # trace Java method calls in process 185
-    ./uflow ruby 1344               # trace Ruby method calls in process 1344
-    ./uflow -M indexOf java 185     # trace only 'indexOf'-prefixed methods
-    ./uflow -C '<stdin>' python 180 # trace only REPL-defined methods
+    ./uflow -l java 185                # trace Java method calls in process 185
+    ./uflow -l ruby 134                # trace Ruby method calls in process 134
+    ./uflow -M indexOf -l java 185     # trace only 'indexOf'-prefixed methods
+    ./uflow -C '<stdin>' -l python 180 # trace only REPL-defined methods
