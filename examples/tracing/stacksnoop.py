@@ -5,13 +5,6 @@
 #
 # USAGE: stacksnoop [-h] [-p PID] [-s] [-v] function
 #
-# The current implementation uses an unrolled loop for x86_64, and was written
-# as a proof of concept. This implementation should be replaced in the future
-# with an appropriate bpf_ call, when available.
-#
-# The stack depth is limited to 10 (+1 for the current instruction pointer).
-# This could be tunable in a future version.
-#
 # Copyright 2016 Netflix, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
