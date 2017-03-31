@@ -54,7 +54,7 @@ if not args.pids or len(args.pids) == 0:
 threshold_ns = args.threshold * 1000000
 
 program = """
-#include <linux/ptrace.h>
+#include <uapi/linux/ptrace.h>
 
 struct temp_t {
     u64 timestamp;
