@@ -28,7 +28,7 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
     - [Maps](#maps)
         - [1. BPF_TABLE](#1-bpf_table)
         - [2. BPF_HASH](#2-bpf_hash)
-        - [3. BPF_ARRAY](#2-bpf_array)
+        - [3. BPF_ARRAY](#3-bpf_array)
         - [4. BPF_HISTOGRAM](#4-bpf_histogram)
         - [5. BPF_STACK_TRACE](#5-bpf_stack_trace)
         - [6. BPF_PERF_ARRAY](#6-bpf_perf_array)

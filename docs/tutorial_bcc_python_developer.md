@@ -669,7 +669,7 @@ struct key_t {
   u32 curr_pid;
 };
 // map_type, key_type, leaf_type, table_name, num_entry
-BPF_HASH(struct key_t, u64, stats, 1024);
+BPF_HASH(stats, struct key_t, u64, 1024);
 // attach to finish_task_switch in kernel/sched/core.c, which has the following
 // prototype:
 //   struct rq *finish_task_switch(struct task_struct *prev)
