@@ -52,7 +52,7 @@ if not args.pids or len(args.pids) == 0:
                                         "pidof postgres".split()).split())
 
 program = """
-#include <linux/ptrace.h>
+#include <uapi/linux/ptrace.h>
 
 BPF_HASH(temp, u64, u64);
 BPF_HISTOGRAM(latency);
