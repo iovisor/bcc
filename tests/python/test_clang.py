@@ -3,7 +3,7 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 
 from bcc import BPF
-import ctypes
+import ctypes as ct
 from unittest import main, TestCase
 import os
 import sys
@@ -113,7 +113,7 @@ BPF_HASH(stats, int, struct { u32 a[3]; u32 b; }, 10);
         t = b.get_table("stats")
         s1 = t.key_sprintf(t.Key(2))
         self.assertEqual(s1, b"0x2")
-        s2 = t.leaf_sprintf(t.Leaf((ctypes.c_uint * 3)(1,2,3), 4))
+        s2 = t.leaf_sprintf(t.Leaf((ct.c_uint * 3)(1,2,3), 4))
         self.assertEqual(s2, b"{ [ 0x1 0x2 0x3 ] 0x4 }")
         l = t.leaf_scanf(s2)
         self.assertEqual(l.a[0], 1)
@@ -330,8 +330,7 @@ BPF_ARRAY(t2, struct list *, 1);
 BPF_ARRAY(t3, union emptyu, 1);
 """
         b = BPF(text=text)
-        import ctypes
-        self.assertEqual(ctypes.sizeof(b["t3"].Leaf), 8)
+        self.assertEqual(ct.sizeof(b["t3"].Leaf), 8)
 
     def test_cflags(self):
         text = """
@@ -484,6 +483,26 @@ int trace_entry(struct pt_regs *ctx) {
         expectedWarn = "warning: cannot use several %s conversion specifiers"
         self.assertIn(expectedWarn, output)
         r.close()
+
+    def test_map_insert(self):
+        text = """
+BPF_HASH(dummy);
+void do_trace(struct pt_regs *ctx) {
+    u64 key = 0, val = 2;
+    dummy.insert(&key, &val);
+    key = 1;
+    dummy.update(&key, &val);
+}
+"""
+        b = BPF(text=text)
+        c_val = ct.c_ulong(1)
+        b["dummy"][ct.c_ulong(0)] = c_val
+        b["dummy"][ct.c_ulong(1)] = c_val
+        b.attach_kprobe(event="sys_sync", fn_name="do_trace")
+        libc = ct.CDLL("libc.so.6")
+        libc.sync()
+        self.assertEqual(1, b["dummy"][ct.c_ulong(0)].value)
+        self.assertEqual(2, b["dummy"][ct.c_ulong(1)].value)
 
 if __name__ == "__main__":
     main()

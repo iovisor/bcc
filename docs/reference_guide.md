@@ -375,7 +375,7 @@ Syntax: ```BPF_TABLE(_table_type, _key_type, _leaf_type, _name, _max_entries)```
 
 Creates a map named ```_name```. Most of the time this will be used via higher-level macros, like BPF_HASH, BPF_HIST, etc.
 
-Methods (covered later): map.lookup(), map.lookup_or_init(), map.delete(), map.update(), map.increment().
+Methods (covered later): map.lookup(), map.lookup_or_init(), map.delete(), map.update(), map.insert(), map.increment().
 
 Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=BPF_TABLE+path%3Aexamples&type=Code),
@@ -397,7 +397,7 @@ BPF_HASH(start, struct request *);
 
 This creates a hash named ```start``` where the key is a ```struct request *```, and the value defaults to u64. This hash is used by the disksnoop.py example for saving timestamps for each I/O request, where the key is the pointer to struct request, and the value is the timestamp.
 
-Methods (covered later): map.lookup(), map.lookup_or_init(), map.delete(), map.update(), map.increment().
+Methods (covered later): map.lookup(), map.lookup_or_init(), map.delete(), map.update(), map.insert(), map.increment().
 
 Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=BPF_HASH+path%3Aexamples&type=Code),
@@ -530,7 +530,16 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=update+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=update+path%3Atools&type=Code)
 
-### 11. map.increment()
+### 11. map.insert()
+
+Syntax: ```map.insert(&key, &val)```
+
+Associate the value in the second argument to the key, only if there was no previous value.
+
+Examples in situ:
+[search /examples](https://github.com/iovisor/bcc/search?q=insert+path%3Aexamples&type=Code)
+
+### 12. map.increment()
 
 Syntax: ```map.increment(key)```
 
@@ -540,7 +549,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=increment+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=increment+path%3Atools&type=Code)
 
-### 12. map.get_stackid()
+### 13. map.get_stackid()
 
 Syntax: ```int map.get_stackid(void *ctx, u64 flags)```
 
@@ -550,7 +559,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=get_stackid+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=get_stackid+path%3Atools&type=Code)
 
-### 13. map.perf_read()
+### 14. map.perf_read()
 
 Syntax: ```u64 map.perf_read(u32 cpu)```
 

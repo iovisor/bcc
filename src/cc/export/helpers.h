@@ -45,6 +45,7 @@ struct _name##_table_t { \
   _leaf_type * (*lookup) (_key_type *); \
   _leaf_type * (*lookup_or_init) (_key_type *, _leaf_type *); \
   int (*update) (_key_type *, _leaf_type *); \
+  int (*insert) (_key_type *, _leaf_type *); \
   int (*delete) (_key_type *); \
   void (*call) (void *, int index); \
   void (*increment) (_key_type); \
