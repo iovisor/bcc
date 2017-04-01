@@ -48,7 +48,7 @@ void KSyms::refresh() {
   }
 }
 
-bool KSyms::resolve_addr(uint64_t addr, struct bcc_symbol *sym) {
+bool KSyms::resolve_addr(uint64_t addr, struct bcc_symbol *sym, bool demangle) {
   refresh();
 
   if (syms_.empty()) {
@@ -61,7 +61,8 @@ bool KSyms::resolve_addr(uint64_t addr, struct bcc_symbol *sym) {
 
   auto it = std::upper_bound(syms_.begin(), syms_.end(), Symbol("", addr)) - 1;
   sym->name = (*it).name.c_str();
-  sym->demangle_name = sym->name;
+  if (demangle)
+    sym->demangle_name = sym->name;
   sym->module = "kernel";
   sym->offset = addr - (*it).addr;
   return true;
@@ -135,7 +136,8 @@ int ProcSyms::_add_module(const char *modname, uint64_t start, uint64_t end,
   return 0;
 }
 
-bool ProcSyms::resolve_addr(uint64_t addr, struct bcc_symbol *sym) {
+bool ProcSyms::resolve_addr(uint64_t addr, struct bcc_symbol *sym,
+                            bool demangle) {
   if (procstat_.is_stale())
     refresh();
 
@@ -148,8 +150,10 @@ bool ProcSyms::resolve_addr(uint64_t addr, struct bcc_symbol *sym) {
   for (Module &mod : modules_) {
     if (mod.contains(addr)) {
       bool res = mod.find_addr(addr, sym);
-      if (sym->name) {
-        sym->demangle_name = abi::__cxa_demangle(sym->name, nullptr, nullptr, nullptr);
+      if (demangle) {
+        if (sym->name)
+          sym->demangle_name =
+              abi::__cxa_demangle(sym->name, nullptr, nullptr, nullptr);
         if (!sym->demangle_name)
           sym->demangle_name = sym->name;
       }
@@ -307,6 +311,12 @@ int bcc_symcache_resolve(void *resolver, uint64_t addr,
                          struct bcc_symbol *sym) {
   SymbolCache *cache = static_cast<SymbolCache *>(resolver);
   return cache->resolve_addr(addr, sym) ? 0 : -1;
+}
+
+int bcc_symcache_resolve_no_demangle(void *resolver, uint64_t addr,
+                                     struct bcc_symbol *sym) {
+  SymbolCache *cache = static_cast<SymbolCache *>(resolver);
+  return cache->resolve_addr(addr, sym, false) ? 0 : -1;
 }
 
 int bcc_symcache_resolve_name(void *resolver, const char *module,

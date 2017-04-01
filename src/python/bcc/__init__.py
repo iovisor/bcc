@@ -48,7 +48,7 @@ class SymbolCache(object):
     def __init__(self, pid):
         self.cache = lib.bcc_symcache_new(pid)
 
-    def resolve(self, addr):
+    def resolve(self, addr, demangle):
         """
         Return a tuple of the symbol (function), its offset from the beginning
         of the function, and the module in which it lies. For example:
@@ -60,13 +60,18 @@ class SymbolCache(object):
         """
         sym = bcc_symbol()
         psym = ct.pointer(sym)
-        if lib.bcc_symcache_resolve(self.cache, addr, psym) < 0:
+        if demangle:
+            res = lib.bcc_symcache_resolve(self.cache, addr, psym)
+        else:
+            res = lib.bcc_symcache_resolve_no_demangle(self.cache, addr, psym)
+        if res < 0:
             if sym.module and sym.offset:
                 return (None, sym.offset,
                         ct.cast(sym.module, ct.c_char_p).value.decode())
             return (None, addr, None)
-        return (sym.demangle_name.decode(), sym.offset,
-                ct.cast(sym.module, ct.c_char_p).value.decode())
+        return (
+            sym.demangle_name.decode() if demangle else sym.name.decode(),
+            sym.offset, ct.cast(sym.module, ct.c_char_p).value.decode())
 
     def resolve_name(self, module, name):
         addr = ct.c_ulonglong()
@@ -989,7 +994,7 @@ class BPF(object):
         return BPF._sym_caches[pid]
 
     @staticmethod
-    def sym(addr, pid, show_module=False, show_offset=False):
+    def sym(addr, pid, show_module=False, show_offset=False, demangle=True):
         """sym(addr, pid, show_module=False, show_offset=False)
 
         Translate a memory address into a function name for a pid, which is
@@ -1005,7 +1010,7 @@ class BPF(object):
         Example output when both show_module and show_offset are False:
             "start_thread"
         """
-        name, offset, module = BPF._sym_cache(pid).resolve(addr)
+        name, offset, module = BPF._sym_cache(pid).resolve(addr, demangle)
         offset = "+0x%x" % offset if show_offset and name is not None else ""
         name = name or "[unknown]"
         name = name + offset
@@ -1025,7 +1030,7 @@ class BPF(object):
         Example output when both show_module and show_offset are True:
             "default_idle+0x0 [kernel]"
         """
-        return BPF.sym(addr, -1, show_module, show_offset)
+        return BPF.sym(addr, -1, show_module, show_offset, False)
 
     @staticmethod
     def ksymname(name):
