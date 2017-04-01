@@ -61,7 +61,7 @@ class TestTracepointDataLoc(unittest.TestCase):
         b = bcc.BPF(text=text)
         subprocess.check_output(["/bin/ls"])
         sleep(1)
-        self.assertTrue("/bin/ls" in [v.filename.decode()
+        self.assertTrue("/bin/ls" in [v.filename
                                       for v in b["execs"].values()])
 
 if __name__ == "__main__":

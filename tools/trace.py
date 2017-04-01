@@ -486,13 +486,13 @@ BPF_PERF_OUTPUT(%s);
                 msg = self._format_message(bpf, event.tgid, values)
                 if not Probe.print_time:
                     print("%-6d %-6d %-12s %-16s %s" %
-                          (event.tgid, event.pid, event.comm.decode(),
+                          (event.tgid, event.pid, event.comm,
                            self._display_function(), msg))
                 else:
                     time = strftime("%H:%M:%S") if Probe.use_localtime else \
                            Probe._time_off_str(event.timestamp_ns)
                     print("%-8s %-6d %-6d %-12s %-16s %s" %
-                          (time[:8], event.tgid, event.pid, event.comm.decode(),
+                          (time[:8], event.tgid, event.pid, event.comm,
                            self._display_function(), msg))
 
                 if self.kernel_stack:

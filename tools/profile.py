@@ -279,7 +279,7 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
         # print folded stack output
         user_stack = list(user_stack)
         kernel_stack = list(kernel_stack)
-        line = [k.name.decode()] + \
+        line = [k.name] + \
             [b.sym(addr, k.pid) for addr in reversed(user_stack)] + \
             (do_delimiter and ["-"] or []) + \
             [aksym(addr) for addr in reversed(kernel_stack)]
@@ -292,7 +292,7 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
             print("    --")
         for addr in user_stack:
             print("    %s" % b.sym(addr, k.pid))
-        print("    %-16s %s (%d)" % ("-", k.name.decode(), k.pid))
+        print("    %-16s %s (%d)" % ("-", k.name, k.pid))
         print("        %d\n" % v.value)
 
 # check missing

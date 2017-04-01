@@ -51,4 +51,4 @@ except KeyboardInterrupt:
 print("%10s %s" % ("COUNT", "STRING"))
 counts = b.get_table("counts")
 for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
-    print("%10d \"%s\"" % (v.value, k.c.encode('string-escape')))
+    print("%10d \"%s\"" % (v.value, k.c))

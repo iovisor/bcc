@@ -189,14 +189,14 @@ while 1:
     for k, v in reversed(sorted(counts.items(),
                                 key=lambda counts:
                                   getattr(counts[1], args.sort))):
-        name = k.name.decode()
+        name = k.name
         if k.name_len > DNAME_INLINE_LEN:
             name = name[:-3] + "..."
 
         # print line
         print("%-6d %-16s %-6d %-6d %-7d %-7d %1s %s" % (k.pid,
-            k.comm.decode(), v.reads, v.writes, v.rbytes / 1024,
-            v.wbytes / 1024, k.type.decode(), name))
+            k.comm, v.reads, v.writes, v.rbytes / 1024,
+            v.wbytes / 1024, k.type, name))
 
         line += 1
         if line >= maxrows:

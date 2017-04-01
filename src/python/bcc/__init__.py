@@ -67,21 +67,21 @@ class SymbolCache(object):
         if res < 0:
             if sym.module and sym.offset:
                 return (None, sym.offset,
-                        ct.cast(sym.module, ct.c_char_p).value.decode())
+                        ct.cast(sym.module, ct.c_char_p).value)
             return (None, addr, None)
         if demangle:
-            name_res = sym.demangle_name.decode()
+            name_res = sym.demangle_name
             lib.bcc_symbol_free_demangle_name(psym)
         else:
-            name_res = sym.name.decode()
+            name_res = sym.name
         return (name_res, sym.offset,
-                ct.cast(sym.module, ct.c_char_p).value.decode())
+                ct.cast(sym.module, ct.c_char_p).value)
 
     def resolve_name(self, module, name):
         addr = ct.c_ulonglong()
         if lib.bcc_symcache_resolve_name(
-                    self.cache, module.encode("ascii") if module else None,
-                    name.encode("ascii"), ct.pointer(addr)) < 0:
+                    self.cache, module if module else None,
+                    name, ct.pointer(addr)) < 0:
             return -1
         return addr.value
 
@@ -265,7 +265,7 @@ class BPF(object):
         self.funcs = {}
         self.tables = {}
         cflags_array = (ct.c_char_p * len(cflags))()
-        for i, s in enumerate(cflags): cflags_array[i] = s.encode("ascii")
+        for i, s in enumerate(cflags): cflags_array[i] = s
         if text:
             for usdt_context in usdt_contexts:
                 usdt_text = usdt_context.get_text()
@@ -277,16 +277,16 @@ class BPF(object):
                 text = usdt_text + text
 
         if text:
-            self.module = lib.bpf_module_create_c_from_string(text.encode("ascii"),
+            self.module = lib.bpf_module_create_c_from_string(text,
                     self.debug, cflags_array, len(cflags_array))
         else:
             src_file = BPF._find_file(src_file)
             hdr_file = BPF._find_file(hdr_file)
             if src_file.endswith(".b"):
-                self.module = lib.bpf_module_create_b(src_file.encode("ascii"),
-                        hdr_file.encode("ascii"), self.debug)
+                self.module = lib.bpf_module_create_b(src_file,
+                        hdr_file, self.debug)
             else:
-                self.module = lib.bpf_module_create_c(src_file.encode("ascii"),
+                self.module = lib.bpf_module_create_c(src_file,
                         self.debug, cflags_array, len(cflags_array))
 
         if not self.module:
@@ -307,7 +307,7 @@ class BPF(object):
 
         fns = []
         for i in range(0, lib.bpf_num_functions(self.module)):
-            func_name = lib.bpf_function_name(self.module, i).decode()
+            func_name = lib.bpf_function_name(self.module, i)
             fns.append(self.load_func(func_name, prog_type))
 
         return fns
@@ -315,14 +315,14 @@ class BPF(object):
     def load_func(self, func_name, prog_type):
         if func_name in self.funcs:
             return self.funcs[func_name]
-        if not lib.bpf_function_start(self.module, func_name.encode("ascii")):
+        if not lib.bpf_function_start(self.module, func_name):
             raise Exception("Unknown program %s" % func_name)
         buffer_len = LOG_BUFFER_SIZE
         while True:
             log_buf = ct.create_string_buffer(buffer_len) if self.debug else None
             fd = lib.bpf_prog_load(prog_type,
-                    lib.bpf_function_start(self.module, func_name.encode("ascii")),
-                    lib.bpf_function_size(self.module, func_name.encode("ascii")),
+                    lib.bpf_function_start(self.module, func_name),
+                    lib.bpf_function_size(self.module, func_name),
                     lib.bpf_module_license(self.module),
                     lib.bpf_module_kern_version(self.module),
                     log_buf, ct.sizeof(log_buf) if log_buf else 0)
@@ -332,7 +332,7 @@ class BPF(object):
                 break
 
         if self.debug & DEBUG_BPF and log_buf.value:
-            print(log_buf.value.decode(), file=sys.stderr)
+            print(log_buf.value, file=sys.stderr)
 
         if fd < 0:
             atexit.register(self.donothing)
@@ -352,11 +352,11 @@ class BPF(object):
         """
         Return the eBPF bytecodes for the specified function as a string
         """
-        if not lib.bpf_function_start(self.module, func_name.encode("ascii")):
+        if not lib.bpf_function_start(self.module, func_name):
             raise Exception("Unknown program %s" % func_name)
 
-        start, = lib.bpf_function_start(self.module, func_name.encode("ascii")),
-        size, = lib.bpf_function_size(self.module, func_name.encode("ascii")),
+        start, = lib.bpf_function_start(self.module, func_name),
+        size, = lib.bpf_function_size(self.module, func_name),
         return ct.string_at(start, size)
 
     str2ctype = {
@@ -412,20 +412,20 @@ class BPF(object):
         return cls
 
     def get_table(self, name, keytype=None, leaftype=None, reducer=None):
-        map_id = lib.bpf_table_id(self.module, name.encode("ascii"))
-        map_fd = lib.bpf_table_fd(self.module, name.encode("ascii"))
+        map_id = lib.bpf_table_id(self.module, name)
+        map_fd = lib.bpf_table_fd(self.module, name)
         if map_fd < 0:
             raise KeyError
         if not keytype:
-            key_desc = lib.bpf_table_key_desc(self.module, name.encode("ascii"))
+            key_desc = lib.bpf_table_key_desc(self.module, name)
             if not key_desc:
                 raise Exception("Failed to load BPF Table %s key desc" % name)
-            keytype = BPF._decode_table_type(json.loads(key_desc.decode()))
+            keytype = BPF._decode_table_type(json.loads(key_desc))
         if not leaftype:
-            leaf_desc = lib.bpf_table_leaf_desc(self.module, name.encode("ascii"))
+            leaf_desc = lib.bpf_table_leaf_desc(self.module, name)
             if not leaf_desc:
                 raise Exception("Failed to load BPF Table %s leaf desc" % name)
-            leaftype = BPF._decode_table_type(json.loads(leaf_desc.decode()))
+            leaftype = BPF._decode_table_type(json.loads(leaf_desc))
         return Table(self, map_id, map_fd, keytype, leaftype, reducer=reducer)
 
     def __getitem__(self, key):
@@ -454,7 +454,7 @@ class BPF(object):
     def attach_raw_socket(fn, dev):
         if not isinstance(fn, BPF.Function):
             raise Exception("arg 1 must be of type BPF.Function")
-        sock = lib.bpf_open_raw_sock(dev.encode("ascii"))
+        sock = lib.bpf_open_raw_sock(dev)
         if sock < 0:
             errstr = os.strerror(ct.get_errno())
             raise Exception("Failed to open raw device %s: %s" % (dev, errstr))
@@ -512,8 +512,8 @@ class BPF(object):
         self._check_probe_quota(1)
         fn = self.load_func(fn_name, BPF.KPROBE)
         ev_name = "p_" + event.replace("+", "_").replace(".", "_")
-        res = lib.bpf_attach_kprobe(fn.fd, 0, ev_name.encode("ascii"),
-                event.encode("ascii"), pid, cpu, group_fd,
+        res = lib.bpf_attach_kprobe(fn.fd, 0, ev_name,
+                event, pid, cpu, group_fd,
                 self._reader_cb_impl, ct.cast(id(self), ct.py_object))
         res = ct.cast(res, ct.c_void_p)
         if not res:
@@ -527,7 +527,7 @@ class BPF(object):
         if ev_name not in self.open_kprobes:
             raise Exception("Kprobe %s is not attached" % event)
         lib.perf_reader_free(self.open_kprobes[ev_name])
-        res = lib.bpf_detach_kprobe(ev_name.encode("ascii"))
+        res = lib.bpf_detach_kprobe(ev_name)
         if res < 0:
             raise Exception("Failed to detach BPF from kprobe")
         self._del_kprobe(ev_name)
@@ -549,8 +549,8 @@ class BPF(object):
         self._check_probe_quota(1)
         fn = self.load_func(fn_name, BPF.KPROBE)
         ev_name = "r_" + event.replace("+", "_").replace(".", "_")
-        res = lib.bpf_attach_kprobe(fn.fd, 1, ev_name.encode("ascii"),
-                event.encode("ascii"), pid, cpu, group_fd,
+        res = lib.bpf_attach_kprobe(fn.fd, 1, ev_name,
+                event, pid, cpu, group_fd,
                 self._reader_cb_impl, ct.cast(id(self), ct.py_object))
         res = ct.cast(res, ct.c_void_p)
         if not res:
@@ -564,7 +564,7 @@ class BPF(object):
         if ev_name not in self.open_kprobes:
             raise Exception("Kretprobe %s is not attached" % event)
         lib.perf_reader_free(self.open_kprobes[ev_name])
-        res = lib.bpf_detach_kprobe(ev_name.encode("ascii"))
+        res = lib.bpf_detach_kprobe(ev_name)
         if res < 0:
             raise Exception("Failed to detach BPF from kprobe")
         self._del_kprobe(ev_name)
@@ -577,7 +577,7 @@ class BPF(object):
         '''
         if not isinstance(fn, BPF.Function):
             raise Exception("arg 1 must be of type BPF.Function")
-        res = lib.bpf_attach_xdp(dev.encode("ascii"), fn.fd)
+        res = lib.bpf_attach_xdp(dev, fn.fd)
         if res < 0:
             err_no = ct.get_errno()
             if err_no == errno.EBADMSG:
@@ -594,7 +594,7 @@ class BPF(object):
             This function removes any BPF function from a device on the
             device driver level (XDP)
         '''
-        res = lib.bpf_attach_xdp(dev.encode("ascii"), -1)
+        res = lib.bpf_attach_xdp(dev, -1)
         if res < 0:
             errstr = os.strerror(ct.get_errno())
             raise Exception("Failed to detach BPF from device %s: %s"
@@ -607,22 +607,22 @@ class BPF(object):
         sym = bcc_symbol()
         psym = ct.pointer(sym)
         c_pid = 0 if pid == -1 else pid
-        if lib.bcc_resolve_symname(module.encode("ascii"),
-                symname.encode("ascii"), addr or 0x0, c_pid, psym) < 0:
+        if lib.bcc_resolve_symname(module,
+                symname, addr or 0x0, c_pid, psym) < 0:
             if not sym.module:
                 raise Exception("could not find library %s" % module)
             lib.bcc_procutils_free(sym.module)
             raise Exception("could not determine address of symbol %s" % symname)
-        module_path = ct.cast(sym.module, ct.c_char_p).value.decode()
+        module_path = ct.cast(sym.module, ct.c_char_p).value
         lib.bcc_procutils_free(sym.module)
         return module_path, sym.offset
 
     @staticmethod
     def find_library(libname):
-        res = lib.bcc_procutils_which_so(libname.encode("ascii"), 0)
+        res = lib.bcc_procutils_which_so(libname, 0)
         if not res:
             return None
-        libpath = ct.cast(res, ct.c_char_p).value.decode()
+        libpath = ct.cast(res, ct.c_char_p).value
         lib.bcc_procutils_free(res)
         return libpath
 
@@ -673,8 +673,8 @@ class BPF(object):
 
         fn = self.load_func(fn_name, BPF.TRACEPOINT)
         (tp_category, tp_name) = tp.split(':')
-        res = lib.bpf_attach_tracepoint(fn.fd, tp_category.encode("ascii"),
-                tp_name.encode("ascii"), pid, cpu, group_fd,
+        res = lib.bpf_attach_tracepoint(fn.fd, tp_category,
+                tp_name, pid, cpu, group_fd,
                 self._reader_cb_impl, ct.cast(id(self), ct.py_object))
         res = ct.cast(res, ct.c_void_p)
         if not res:
@@ -695,8 +695,8 @@ class BPF(object):
             raise Exception("Tracepoint %s is not attached" % tp)
         lib.perf_reader_free(self.open_tracepoints[tp])
         (tp_category, tp_name) = tp.split(':')
-        res = lib.bpf_detach_tracepoint(tp_category.encode("ascii"),
-                                        tp_name.encode("ascii"))
+        res = lib.bpf_detach_tracepoint(tp_category,
+                                        tp_name)
         if res < 0:
             raise Exception("Failed to detach BPF from tracepoint")
         del self.open_tracepoints[tp]
@@ -768,12 +768,12 @@ class BPF(object):
     def get_user_functions_and_addresses(name, sym_re):
         addresses = []
         def sym_cb(sym_name, addr):
-            dname = sym_name.decode()
+            dname = sym_name
             if re.match(sym_re, dname):
                 addresses.append((dname, addr))
             return 0
 
-        res = lib.bcc_foreach_symbol(name.encode('ascii'), _SYM_CB_TYPE(sym_cb))
+        res = lib.bcc_foreach_symbol(name, _SYM_CB_TYPE(sym_cb))
         if res < 0:
             raise Exception("Error %d enumerating symbols in %s" % (res, name))
         return addresses
@@ -817,8 +817,8 @@ class BPF(object):
         self._check_probe_quota(1)
         fn = self.load_func(fn_name, BPF.KPROBE)
         ev_name = "p_%s_0x%x" % (self._probe_repl.sub("_", path), addr)
-        res = lib.bpf_attach_uprobe(fn.fd, 0, ev_name.encode("ascii"),
-                path.encode("ascii"), addr, pid, cpu, group_fd,
+        res = lib.bpf_attach_uprobe(fn.fd, 0, ev_name,
+                path, addr, pid, cpu, group_fd,
                 self._reader_cb_impl, ct.cast(id(self), ct.py_object))
         res = ct.cast(res, ct.c_void_p)
         if not res:
@@ -839,7 +839,7 @@ class BPF(object):
         if ev_name not in self.open_uprobes:
             raise Exception("Uprobe %s is not attached" % ev_name)
         lib.perf_reader_free(self.open_uprobes[ev_name])
-        res = lib.bpf_detach_uprobe(ev_name.encode("ascii"))
+        res = lib.bpf_detach_uprobe(ev_name)
         if res < 0:
             raise Exception("Failed to detach BPF from uprobe")
         self._del_uprobe(ev_name)
@@ -867,8 +867,8 @@ class BPF(object):
         self._check_probe_quota(1)
         fn = self.load_func(fn_name, BPF.KPROBE)
         ev_name = "r_%s_0x%x" % (self._probe_repl.sub("_", path), addr)
-        res = lib.bpf_attach_uprobe(fn.fd, 1, ev_name.encode("ascii"),
-                path.encode("ascii"), addr, pid, cpu, group_fd,
+        res = lib.bpf_attach_uprobe(fn.fd, 1, ev_name,
+                path, addr, pid, cpu, group_fd,
                 self._reader_cb_impl, ct.cast(id(self), ct.py_object))
         res = ct.cast(res, ct.c_void_p)
         if not res:
@@ -889,14 +889,14 @@ class BPF(object):
         if ev_name not in self.open_uprobes:
             raise Exception("Uretprobe %s is not attached" % ev_name)
         lib.perf_reader_free(self.open_uprobes[ev_name])
-        res = lib.bpf_detach_uprobe(ev_name.encode("ascii"))
+        res = lib.bpf_detach_uprobe(ev_name)
         if res < 0:
             raise Exception("Failed to detach BPF from uprobe")
         self._del_uprobe(ev_name)
 
     def _trace_autoload(self):
         for i in range(0, lib.bpf_num_functions(self.module)):
-            func_name = str(lib.bpf_function_name(self.module, i).decode())
+            func_name = str(lib.bpf_function_name(self.module, i))
             if func_name.startswith("kprobe__"):
                 fn = self.load_func(func_name, BPF.KPROBE)
                 self.attach_kprobe(event=fn.name[8:], fn_name=fn.name)
@@ -1089,17 +1089,17 @@ class BPF(object):
             lib.perf_reader_free(v)
             # non-string keys here include the perf_events reader
             if isinstance(k, str):
-                lib.bpf_detach_kprobe(str(k).encode("ascii"))
+                lib.bpf_detach_kprobe(str(k))
             self._del_kprobe(k)
         for k, v in list(self.open_uprobes.items()):
             lib.perf_reader_free(v)
-            lib.bpf_detach_uprobe(str(k).encode("ascii"))
+            lib.bpf_detach_uprobe(str(k))
             self._del_uprobe(k)
         for k, v in self.open_tracepoints.items():
             lib.perf_reader_free(v)
             (tp_category, tp_name) = k.split(':')
-            lib.bpf_detach_tracepoint(tp_category.encode("ascii"),
-                    tp_name.encode("ascii"))
+            lib.bpf_detach_tracepoint(tp_category,
+                    tp_name)
         self.open_tracepoints.clear()
         for (ev_type, ev_config) in list(self.open_perf_events.keys()):
             self.detach_perf_event(ev_type, ev_config)
