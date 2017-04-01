@@ -369,12 +369,10 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
         }
         string fd = to_string(table_it->fd);
         string prefix, suffix;
-        string map_update_policy = "BPF_ANY";
         string txt;
         auto rewrite_start = Call->getLocStart();
         auto rewrite_end = Call->getLocEnd();
         if (memb_name == "lookup_or_init") {
-          map_update_policy = "BPF_NOEXIST";
           string name = Ref->getDecl()->getName();
           string arg0 = rewriter_.getRewrittenText(expansionRange(Call->getArg(0)->getSourceRange()));
           string arg1 = rewriter_.getRewrittenText(expansionRange(Call->getArg(1)->getSourceRange()));
@@ -382,7 +380,7 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
           string update = "bpf_map_update_elem_(bpf_pseudo_fd(1, " + fd + ")";
           txt  = "({typeof(" + name + ".leaf) *leaf = " + lookup + ", " + arg0 + "); ";
           txt += "if (!leaf) {";
-          txt += " " + update + ", " + arg0 + ", " + arg1 + ", " + map_update_policy + ");";
+          txt += " " + update + ", " + arg0 + ", " + arg1 + ", BPF_NOEXIST);";
           txt += " leaf = " + lookup + ", " + arg0 + ");";
           txt += " if (!leaf) return 0;";
           txt += "}";
@@ -433,7 +431,13 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
             suffix = ")";
           } else if (memb_name == "update") {
             prefix = "bpf_map_update_elem";
-            suffix = ", " + map_update_policy + ")";
+            suffix = ", BPF_ANY)";
+          } else if (memb_name == "insert") {
+            if (table_it->type == BPF_MAP_TYPE_ARRAY) {
+              warning(Call->getLocStart(), "all element of an array already exist; insert() will have no effect");
+            }
+            prefix = "bpf_map_update_elem";
+            suffix = ", BPF_NOEXIST)";
           } else if (memb_name == "delete") {
             prefix = "bpf_map_delete_elem";
             suffix = ")";
