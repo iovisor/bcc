@@ -165,6 +165,10 @@ class SmokeTests(TestCase):
         self.run_with_int("funclatency.py __kmalloc -i 1")
 
     @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
+    def test_funcslower(self):
+        self.run_with_int("funcslower.py __kmalloc")
+
+    @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
     def test_gethostlatency(self):
         self.run_with_int("gethostlatency.py")
 
