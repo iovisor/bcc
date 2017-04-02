@@ -257,10 +257,6 @@ class SmokeTests(TestCase):
     def test_stackcount(self):
         self.run_with_int("stackcount.py __kmalloc -i 1")
 
-    @skipUnless(kernel_version_ge(4,6), "requires kernel >= 4.6")
-    def test_stacksnoop(self):
-        self.run_with_int("stacksnoop.py SyS_open")
-
     @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
     def test_statsnoop(self):
         self.run_with_int("statsnoop.py")
