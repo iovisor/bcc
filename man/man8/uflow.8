@@ -1,8 +1,17 @@
 .TH uflow 8  "2016-11-07" "USER COMMANDS"
 .SH NAME
-uflow \- Print a flow graph of method calls in high-level languages.
+uflow, javaflow, pythonflow, rubyflow, phpflow \- Print a flow graph of method
+calls in high-level languages.
 .SH SYNOPSIS
-.B uflow [-h] [-M METHOD] [-C CLAZZ] [-v] {java,python,ruby,php} pid
+.B javaflow [-h] [-M METHOD] [-C CLAZZ] [-v] pid
+.br
+.B pythonflow [-h] [-M METHOD] [-C CLAZZ] [-v] pid
+.br
+.B rubyflow [-h] [-M METHOD] [-C CLAZZ] [-v] pid
+.br
+.B phpflow [-h] [-M METHOD] [-C CLAZZ] [-v] pid
+.br
+.B uflow [-h] [-M METHOD] [-C CLAZZ] [-v] [-l {java,python,ruby,php}] pid
 .SH DESCRIPTION
 uflow traces method calls and prints them in a flow graph that can facilitate
 debugging and diagnostics by following the program's execution (method flow).

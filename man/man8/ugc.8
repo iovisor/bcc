@@ -1,8 +1,17 @@
 .TH ugc 8  "2016-11-07" "USER COMMANDS"
 .SH NAME
-ugc \- Trace garbage collection events in high-level languages.
+ugc, javagc, pythongc, rubygc, nodegc \- Trace garbage collection events in
+high-level languages.
 .SH SYNOPSIS
-.B ugc [-h] [-v] [-m] [-M MINIMUM] [-F FILTER] {java,python,ruby,node} pid
+.B javagc [-h] [-v] [-m] [-M MINIMUM] [-F FILTER] pid
+.br
+.B pythongc [-h] [-v] [-m] [-M MINIMUM] [-F FILTER] pid
+.br
+.B rubygc [-h] [-v] [-m] [-M MINIMUM] [-F FILTER] pid
+.br
+.B nodegc [-h] [-v] [-m] [-M MINIMUM] [-F FILTER] pid
+.br
+.B ugc [-h] [-v] [-m] [-M MINIMUM] [-F FILTER] [-l {java,python,ruby,node}] pid
 .SH DESCRIPTION
 This traces garbage collection events as they occur, including their duration
 and any additional information (such as generation collected or type of GC)

@@ -1,7 +1,16 @@
 .TH ucalls 8  "2016-11-07" "USER COMMANDS"
 .SH NAME
-ucalls \- Summarize method calls from high-level languages and Linux syscalls.
+ucalls, javacalls, pythoncalls, rubycalls, phpcalls \- Summarize method calls
+from high-level languages and Linux syscalls.
 .SH SYNOPSIS
+.B javacalls [-h] [-T TOP] [-L] [-S] [-v] [-m] pid [interval]
+.br
+.B pythoncalls [-h] [-T TOP] [-L] [-S] [-v] [-m] pid [interval]
+.br
+.B rubycalls [-h] [-T TOP] [-L] [-S] [-v] [-m] pid [interval]
+.br
+.B phpcalls [-h] [-T TOP] [-L] [-S] [-v] [-m] pid [interval]
+.br
 .B ucalls [-l {java,python,ruby,php}] [-h] [-T TOP] [-L] [-S] [-v] [-m] pid [interval]
 .SH DESCRIPTION
 This tool summarizes method calls from high-level languages such as Python, 

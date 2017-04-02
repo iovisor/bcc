@@ -307,14 +307,14 @@ class SmokeTests(TestCase):
     def test_ucalls(self):
         # This attaches a large number (300+) kprobes, which can be slow,
         # so use an increased timeout value.
-        self.run_with_int("ucalls.py -l none -S %d" % os.getpid(),
+        self.run_with_int("lib/ucalls.py -l none -S %d" % os.getpid(),
                           timeout=30, kill_timeout=30)
 
     @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
     def test_uflow(self):
         # The Python installed on the Ubuntu buildbot doesn't have USDT
         # probes, so we can't run uflow.
-        # self.run_with_int("uflow.py -l python %d" % os.getpid())
+        # self.run_with_int("pythonflow.py %d" % os.getpid())
         pass
 
     @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
@@ -325,15 +325,15 @@ class SmokeTests(TestCase):
 
     @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
     def test_uobjnew(self):
-        self.run_with_int("uobjnew.py -l c %d" % os.getpid())
+        self.run_with_int("cobjnew.sh %d" % os.getpid())
 
     @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
     def test_ustat(self):
-        self.run_with_duration("ustat.py 1 1")
+        self.run_with_duration("lib/ustat.py 1 1")
 
     @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
     def test_uthreads(self):
-        self.run_with_int("uthreads.py %d" % os.getpid())
+        self.run_with_int("lib/uthreads.py %d" % os.getpid())
 
     def test_vfscount(self):
         self.run_with_int("vfscount.py")

@@ -16,7 +16,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 #
 name: bcc
-version: 0.3.0-20170322-1719-aaab74e
+version: 0.3.0-20170401-1747-c5f48c9
 summary: BPF Compiler Collection (BCC)
 description: A toolkit for creating efficient kernel tracing and manipulation programs
 confinement: strict
@@ -149,17 +149,59 @@ apps:
     ttysnoop:
         command: wrapper ttysnoop
     ucalls:
-        command: wrapper ucalls
+        command: wrapper lib/ucalls
     uflow:
-        command: wrapper uflow
+        command: wrapper lib/uflow
     ugc:
-        command: wrapper ugc
+        command: wrapper lib/ugc
     uobjnew:
-        command: wrapper uobjnew
+        command: wrapper lib/uobjnew
     ustat:
-        command: wrapper ustat
+        command: wrapper lib/ustat
     uthreads:
-        command: wrapper uthreads
+        command: wrapper lib/uthreads
+    cobjnew:
+        command: wrapper cobjnew
+    javacalls:
+        command: wrapper javacalls
+    javaflow:
+        command: wrapper javaflow
+    javagc:
+        command: wrapper javagc
+    javaobjnew:
+        command: wrapper javaobjnew
+    javastat:
+        command: wrapper javastat
+    javathreads:
+        command: wrapper javathreads
+    nodegc:
+        command: wrapper nodegc
+    nodestat:
+        command: wrapper nodestat
+    phpcalls:
+        command: wrapper phpcalls
+    phpflow:
+        command: wrapper phpflow
+    phpstat:
+        command: wrapper phpstat
+    pythoncalls:
+        command: wrapper pythoncalls
+    pythonflow:
+        command: wrapper pythonflow
+    pythongc:
+        command: wrapper pythongc
+    pythonstat:
+        command: wrapper pythonstat
+    rubycalls:
+        command: wrapper rubycalls
+    rubyflow:
+        command: wrapper rubyflow
+    rubygc:
+        command: wrapper rubygc
+    rubyobjnew:
+        command: wrapper rubyobjnew
+    rubystat:
+        command: wrapper rubystat
     vfscount:
         command: wrapper vfscount
     vfsstat:

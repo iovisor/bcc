@@ -137,12 +137,12 @@ pair of .c and .py files, and some are directories of files.
 - tools/[tplist](tools/tplist.py): Display kernel tracepoints or USDT probes and their formats. [Examples](tools/tplist_example.txt).
 - tools/[trace](tools/trace.py): Trace arbitrary functions, with filters. [Examples](tools/trace_example.txt).
 - tools/[ttysnoop](tools/ttysnoop.py): Watch live output from a tty or pts device. [Examples](tools/ttysnoop_example.txt).
-- tools/[ucalls](tools/ucalls.py): Summarize method calls or Linux syscalls in high-level languages. [Examples](tools/ucalls_example.txt).
-- tools/[uflow](tools/uflow.py): Print a method flow graph in high-level languages. [Examples](tools/uflow_example.txt).
-- tools/[ugc](tools/ugc.py): Trace garbage collection events in high-level languages. [Examples](tools/ugc_example.txt).
-- tools/[uobjnew](tools/uobjnew.py): Summarize object allocation events by object type and number of bytes allocated. [Examples](tools/uobjnew_example.txt).
-- tools/[ustat](tools/ustat.py): Collect events such as GCs, thread creations, object allocations, exceptions and more in high-level languages. [Examples](tools/ustat_example.txt).
-- tools/[uthreads](tools/uthreads.py): Trace thread creation events in Java and raw pthreads. [Examples](tools/uthreads_example.txt).
+- tools/[ucalls](tools/lib/ucalls.py): Summarize method calls or Linux syscalls in high-level languages. [Examples](tools/lib/ucalls_example.txt).
+- tools/[uflow](tools/lib/uflow.py): Print a method flow graph in high-level languages. [Examples](tools/lib/uflow_example.txt).
+- tools/[ugc](tools/lib/ugc.py): Trace garbage collection events in high-level languages. [Examples](tools/lib/ugc_example.txt).
+- tools/[uobjnew](tools/lib/uobjnew.py): Summarize object allocation events by object type and number of bytes allocated. [Examples](tools/lib/uobjnew_example.txt).
+- tools/[ustat](tools/lib/ustat.py): Collect events such as GCs, thread creations, object allocations, exceptions and more in high-level languages. [Examples](tools/lib/ustat_example.txt).
+- tools/[uthreads](tools/lib/uthreads.py): Trace thread creation events in Java and raw pthreads. [Examples](tools/lib/uthreads_example.txt).
 - tools/[vfscount](tools/vfscount.py) tools/[vfscount.c](tools/vfscount.c): Count VFS calls. [Examples](tools/vfscount_example.txt).
 - tools/[vfsstat](tools/vfsstat.py) tools/[vfsstat.c](tools/vfsstat.c): Count some VFS calls, with column output. [Examples](tools/vfsstat_example.txt).
 - tools/[wakeuptime](tools/wakeuptime.py): Summarize sleep to wakeup time by waker kernel stack. [Examples](tools/wakeuptime_example.txt).

@@ -1,8 +1,15 @@
 .TH uobjnew 8  "2016-11-07" "USER COMMANDS"
 .SH NAME
-uobjnew \- Summarize object allocations in high-level languages.
+uobjnew, javaobjnew, rubyobjnew, cobjnew \- Summarize object allocations in
+high-level languages.
 .SH SYNOPSIS
-.B uobjnew [-h] [-C TOP_COUNT] [-S TOP_SIZE] [-v] {java,ruby,c} pid [interval]
+.B javaobjnew [-h] [-C TOP_COUNT] [-S TOP_SIZE] [-v] pid [interval]
+.br
+.B rubyobjnew [-h] [-C TOP_COUNT] [-S TOP_SIZE] [-v] pid [interval]
+.br
+.B cobjnew [-h] [-C TOP_COUNT] [-S TOP_SIZE] [-v] pid [interval]
+.br
+.B uobjnew [-h] [-C TOP_COUNT] [-S TOP_SIZE] [-v] [-l {java,ruby,c}] pid [interval]
 .SH DESCRIPTION
 uobjnew traces object allocations in high-level languages (including "malloc")
 and prints summaries of the most frequently allocated types by number of 
