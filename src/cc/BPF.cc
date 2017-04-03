@@ -28,9 +28,10 @@
 #include "bcc_exception.h"
 #include "bcc_syms.h"
 #include "bpf_module.h"
+#include "common.h"
 #include "libbpf.h"
 #include "perf_reader.h"
-#include "common.h"
+#include "table_storage.h"
 #include "usdt.h"
 
 #include "BPF.h"
@@ -394,8 +395,14 @@ StatusTuple BPF::detach_perf_event(uint32_t ev_type, uint32_t ev_config) {
 StatusTuple BPF::open_perf_buffer(const std::string& name,
                                   perf_reader_raw_cb cb, void* cb_cookie,
                                   int page_cnt) {
-  if (perf_buffers_.find(name) == perf_buffers_.end())
-    perf_buffers_[name] = new BPFPerfBuffer(bpf_module_.get(), name);
+  if (perf_buffers_.find(name) == perf_buffers_.end()) {
+    TableStorage::iterator it;
+    if (!bpf_module_->table_storage().Find(Path({bpf_module_->id(), name}), it))
+      return StatusTuple(-1,
+                         "open_perf_buffer: unable to find table_storage %s",
+                         name.c_str());
+    perf_buffers_[name] = new BPFPerfBuffer(it->second);
+  }
   if ((page_cnt & (page_cnt - 1)) != 0)
     return StatusTuple(-1, "open_perf_buffer page_cnt must be a power of two");
   auto table = perf_buffers_[name];

@@ -28,22 +28,20 @@
 #include "bpf_module.h"
 #include "libbpf.h"
 #include "perf_reader.h"
+#include "table_desc.h"
 
 namespace ebpf {
 
 template <class KeyType, class ValueType>
 class BPFTableBase {
-public:
+ public:
   size_t capacity() { return capacity_; }
 
-protected:
-  BPFTableBase(BPFModule* bpf_module, const std::string& name) {
-    size_t id_ = bpf_module->table_id(name);
-    if (id_ >= bpf_module->num_tables())
-      throw std::invalid_argument("Table " + name + " does not exist");
-    fd_ = bpf_module->table_fd(id_);
-    capacity_ = bpf_module->table_max_entries(id_);
-  };
+ protected:
+  explicit BPFTableBase(const TableDesc& desc) {
+    fd_ = desc.fd;
+    capacity_ = desc.max_entries;
+  }
 
   bool lookup(KeyType* key, ValueType* value) {
     return bpf_lookup_elem(fd_, static_cast<void*>(key),
@@ -70,9 +68,9 @@ protected:
 
 template <class KeyType, class ValueType>
 class BPFHashTable : protected BPFTableBase<KeyType, ValueType> {
-public:
-  BPFHashTable(BPFModule* bpf_module, const std::string& name)
-      : BPFTableBase<KeyType, ValueType>(bpf_module, name) {}
+ public:
+  explicit BPFHashTable(const TableDesc& desc)
+      : BPFTableBase<KeyType, ValueType>(desc) {}
 
   ValueType get_value(const KeyType& key) {
     ValueType res;
@@ -109,22 +107,22 @@ struct stacktrace_t {
 };
 
 class BPFStackTable : protected BPFTableBase<int, stacktrace_t> {
-public:
-  BPFStackTable(BPFModule* bpf_module, const std::string& name)
-      : BPFTableBase<int, stacktrace_t>(bpf_module, name) {}
+ public:
+  BPFStackTable(const TableDesc& desc)
+      : BPFTableBase<int, stacktrace_t>(desc) {}
   ~BPFStackTable();
 
   std::vector<intptr_t> get_stack_addr(int stack_id);
   std::vector<std::string> get_stack_symbol(int stack_id, int pid);
 
-private:
+ private:
   std::map<int, void*> pid_sym_;
 };
 
 class BPFPerfBuffer : protected BPFTableBase<int, int> {
-public:
-  BPFPerfBuffer(BPFModule* bpf_module, const std::string& name)
-      : BPFTableBase<int, int>(bpf_module, name), epfd_(-1) {}
+ public:
+  BPFPerfBuffer(const TableDesc& desc)
+      : BPFTableBase<int, int>(desc), epfd_(-1) {}
   ~BPFPerfBuffer();
 
   StatusTuple open_all_cpu(perf_reader_raw_cb cb, void* cb_cookie,
@@ -132,7 +130,7 @@ public:
   StatusTuple close_all_cpu();
   void poll(int timeout);
 
-private:
+ private:
   StatusTuple open_on_cpu(perf_reader_raw_cb cb, int cpu, void* cb_cookie,
                           int page_cnt);
   StatusTuple close_on_cpu(int cpu);

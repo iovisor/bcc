@@ -26,8 +26,8 @@
 #include <clang/Rewrite/Core/Rewriter.h>
 
 #include "b_frontend_action.h"
-#include "shared_table.h"
 #include "common.h"
+#include "table_storage.h"
 
 #include "libbpf.h"
 
@@ -57,75 +57,13 @@ const char **calling_conv_regs = calling_conv_regs_x86;
 #endif
 
 using std::map;
+using std::move;
 using std::set;
 using std::string;
 using std::to_string;
 using std::unique_ptr;
 using std::vector;
 using namespace clang;
-
-// Encode the struct layout as a json description
-BMapDeclVisitor::BMapDeclVisitor(ASTContext &C, string &result)
-    : C(C), result_(result) {}
-bool BMapDeclVisitor::VisitFieldDecl(FieldDecl *D) {
-  result_ += "\"";
-  result_ += D->getName();
-  result_ += "\",";
-  return true;
-}
-
-bool BMapDeclVisitor::TraverseRecordDecl(RecordDecl *D) {
-  // skip children, handled in Visit...
-  if (!WalkUpFromRecordDecl(D))
-    return false;
-  return true;
-}
-bool BMapDeclVisitor::VisitRecordDecl(RecordDecl *D) {
-  result_ += "[\"";
-  result_ += D->getName();
-  result_ += "\", [";
-  for (auto F : D->getDefinition()->fields()) {
-    if (F->isAnonymousStructOrUnion()) {
-      if (const RecordType *R = dyn_cast<RecordType>(F->getType()))
-        TraverseDecl(R->getDecl());
-      result_ += ", ";
-      continue;
-    }
-    result_ += "[";
-    TraverseDecl(F);
-    if (const ConstantArrayType *T = dyn_cast<ConstantArrayType>(F->getType()))
-      result_ += ", [" + T->getSize().toString(10, false) + "]";
-    if (F->isBitField())
-      result_ += ", " + to_string(F->getBitWidthValue(C));
-    result_ += "], ";
-  }
-  if (!D->getDefinition()->field_empty())
-    result_.erase(result_.end() - 2);
-  result_ += "]";
-  if (D->isUnion())
-    result_ += ", \"union\"";
-  else if (D->isStruct())
-    result_ += ", \"struct\"";
-  result_ += "]";
-  return true;
-}
-// pointer to anything should be treated as terminal, don't recurse further
-bool BMapDeclVisitor::VisitPointerType(const PointerType *T) {
-  result_ += "\"unsigned long long\"";
-  return false;
-}
-bool BMapDeclVisitor::VisitTagType(const TagType *T) {
-  return TraverseDecl(T->getDecl()->getDefinition());
-}
-bool BMapDeclVisitor::VisitTypedefType(const TypedefType *T) {
-  return TraverseDecl(T->getDecl());
-}
-bool BMapDeclVisitor::VisitBuiltinType(const BuiltinType *T) {
-  result_ += "\"";
-  result_ += T->getName(C.getPrintingPolicy());
-  result_ += "\"";
-  return true;
-}
 
 class ProbeChecker : public RecursiveASTVisitor<ProbeChecker> {
  public:
@@ -272,10 +210,8 @@ DiagnosticBuilder ProbeVisitor::error(SourceLocation loc, const char (&fmt)[N]) 
   return C.getDiagnostics().Report(loc, diag_id);
 }
 
-
-BTypeVisitor::BTypeVisitor(ASTContext &C, Rewriter &rewriter, vector<TableDesc> &tables)
-    : C(C), diag_(C.getDiagnostics()), rewriter_(rewriter), out_(llvm::errs()), tables_(tables) {
-}
+BTypeVisitor::BTypeVisitor(ASTContext &C, BFrontendAction &fe)
+    : C(C), diag_(C.getDiagnostics()), fe_(fe), rewriter_(fe.rewriter()), out_(llvm::errs()) {}
 
 bool BTypeVisitor::VisitFunctionDecl(FunctionDecl *D) {
   // put each non-static non-inline function decl in its own section, to be
@@ -360,14 +296,16 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
                                                    Call->getArg(Call->getNumArgs() - 1)->getLocEnd())));
 
         // find the table fd, which was opened at declaration time
-        auto table_it = tables_.begin();
-        for (; table_it != tables_.end(); ++table_it)
-          if (table_it->name == Ref->getDecl()->getName()) break;
-        if (table_it == tables_.end()) {
-          error(Ref->getLocEnd(), "bpf_table %0 failed to open") << Ref->getDecl()->getName();
-          return false;
+        TableStorage::iterator desc;
+        Path local_path({fe_.id(), Ref->getDecl()->getName()});
+        Path global_path({Ref->getDecl()->getName()});
+        if (!fe_.table_storage().Find(local_path, desc)) {
+          if (!fe_.table_storage().Find(global_path, desc)) {
+            error(Ref->getLocEnd(), "bpf_table %0 failed to open") << Ref->getDecl()->getName();
+            return false;
+          }
         }
-        string fd = to_string(table_it->fd);
+        string fd = to_string(desc->second.fd);
         string prefix, suffix;
         string txt;
         auto rewrite_start = Call->getLocStart();
@@ -391,7 +329,7 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
           string lookup = "bpf_map_lookup_elem_(bpf_pseudo_fd(1, " + fd + ")";
           string update = "bpf_map_update_elem_(bpf_pseudo_fd(1, " + fd + ")";
           txt  = "({ typeof(" + name + ".key) _key = " + arg0 + "; ";
-          if (table_it->type == BPF_MAP_TYPE_HASH) {
+          if (desc->second.type == BPF_MAP_TYPE_HASH) {
             txt += "typeof(" + name + ".leaf) _zleaf; memset(&_zleaf, 0, sizeof(_zleaf)); ";
             txt += update + ", &_key, &_zleaf, BPF_NOEXIST); ";
           }
@@ -416,11 +354,12 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
             meta + ", " +
             meta_len + ");";
         } else if (memb_name == "get_stackid") {
-            if (table_it->type == BPF_MAP_TYPE_STACK_TRACE) {
-              string arg0 = rewriter_.getRewrittenText(expansionRange(Call->getArg(0)->getSourceRange()));
-              txt = "bpf_get_stackid(";
-              txt += "bpf_pseudo_fd(1, " + fd + "), " + arg0;
-              rewrite_end = Call->getArg(0)->getLocEnd();
+          if (desc->second.type == BPF_MAP_TYPE_STACK_TRACE) {
+            string arg0 =
+                rewriter_.getRewrittenText(expansionRange(Call->getArg(0)->getSourceRange()));
+            txt = "bpf_get_stackid(";
+            txt += "bpf_pseudo_fd(1, " + fd + "), " + arg0;
+            rewrite_end = Call->getArg(0)->getLocEnd();
             } else {
               error(Call->getLocStart(), "get_stackid only available on stacktrace maps");
               return false;
@@ -433,7 +372,7 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
             prefix = "bpf_map_update_elem";
             suffix = ", BPF_ANY)";
           } else if (memb_name == "insert") {
-            if (table_it->type == BPF_MAP_TYPE_ARRAY) {
+            if (desc->second.type == BPF_MAP_TYPE_ARRAY) {
               warning(Call->getLocStart(), "all element of an array already exist; insert() will have no effect");
             }
             prefix = "bpf_map_update_elem";
@@ -661,8 +600,12 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
     }
     const RecordDecl *RD = R->getDecl()->getDefinition();
 
-    TableDesc table = {};
+    TableDesc table;
+    TableStorage::iterator table_it;
     table.name = Decl->getName();
+    Path local_path({fe_.id(), table.name});
+    Path global_path({table.name});
+    QualType key_type, leaf_type;
 
     unsigned i = 0;
     for (auto F : RD->fields()) {
@@ -673,16 +616,14 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
           return false;
         }
         table.key_size = sz;
-        BMapDeclVisitor visitor(C, table.key_desc);
-        visitor.TraverseType(F->getType());
+        key_type = F->getType();
       } else if (F->getName() == "leaf") {
         if (sz == 0) {
           error(F->getLocStart(), "invalid zero-sized leaf");
           return false;
         }
         table.leaf_size = sz;
-        BMapDeclVisitor visitor(C, table.leaf_desc);
-        visitor.TraverseType(F->getType());
+        leaf_type = F->getType();
       } else if (F->getName() == "data") {
         table.max_entries = sz / table.leaf_size;
       } else if (F->getName() == "flags") {
@@ -713,13 +654,11 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
     } else if (A->getName() == "maps/lpm_trie") {
       map_type = BPF_MAP_TYPE_LPM_TRIE;
     } else if (A->getName() == "maps/histogram") {
-      if (table.key_desc == "\"int\"")
+      map_type = BPF_MAP_TYPE_HASH;
+      if (key_type->isSpecificBuiltinType(BuiltinType::Int))
         map_type = BPF_MAP_TYPE_ARRAY;
-      else
-        map_type = BPF_MAP_TYPE_HASH;
-      if (table.leaf_desc != "\"unsigned long long\"") {
-        error(Decl->getLocStart(), "histogram leaf type must be u64, got %0") << table.leaf_desc;
-      }
+      if (!leaf_type->isSpecificBuiltinType(BuiltinType::ULongLong))
+        error(Decl->getLocStart(), "histogram leaf type must be u64, got %0") << leaf_type;
     } else if (A->getName() == "maps/prog") {
       map_type = BPF_MAP_TYPE_PROG_ARRAY;
     } else if (A->getName() == "maps/perf_output") {
@@ -733,24 +672,22 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
     } else if (A->getName() == "maps/stacktrace") {
       map_type = BPF_MAP_TYPE_STACK_TRACE;
     } else if (A->getName() == "maps/extern") {
-      table.is_extern = true;
-      table.fd = SharedTables::instance()->lookup_fd(table.name);
-      table.type = SharedTables::instance()->lookup_type(table.name);
-    } else if (A->getName() == "maps/export") {
-      if (table.name.substr(0, 2) == "__")
-        table.name = table.name.substr(2);
-      auto table_it = tables_.begin();
-      for (; table_it != tables_.end(); ++table_it)
-        if (table_it->name == table.name) break;
-      if (table_it == tables_.end()) {
+      if (!fe_.table_storage().Find(global_path, table_it)) {
         error(Decl->getLocStart(), "reference to undefined table");
         return false;
       }
-      if (!SharedTables::instance()->insert_fd(table.name, table_it->fd, table_it->type)) {
-        error(Decl->getLocStart(), "could not export bpf map %0: %1") << table.name << "already in use";
+      table = table_it->second.dup();
+      table.is_extern = true;
+    } else if (A->getName() == "maps/export") {
+      if (table.name.substr(0, 2) == "__")
+        table.name = table.name.substr(2);
+      Path local_path({fe_.id(), table.name});
+      Path global_path({table.name});
+      if (!fe_.table_storage().Find(local_path, table_it)) {
+        error(Decl->getLocStart(), "reference to undefined table");
         return false;
       }
-      table_it->is_shared = true;
+      fe_.table_storage().Insert(global_path, table_it->second.dup());
       return true;
     }
 
@@ -769,7 +706,8 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
       return false;
     }
 
-    tables_.push_back(std::move(table));
+    fe_.table_storage().VisitMapType(table, C, key_type, leaf_type);
+    fe_.table_storage().Insert(local_path, move(table));
   } else if (const PointerType *P = Decl->getType()->getAs<PointerType>()) {
     // if var is a pointer to a packet type, clone the annotation into the var
     // decl so that the packet dext/dins rewriter can catch it
@@ -786,9 +724,7 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
   return true;
 }
 
-BTypeConsumer::BTypeConsumer(ASTContext &C, Rewriter &rewriter, vector<TableDesc> &tables)
-    : visitor_(C, rewriter, tables) {
-}
+BTypeConsumer::BTypeConsumer(ASTContext &C, BFrontendAction &fe) : visitor_(C, fe) {}
 
 bool BTypeConsumer::HandleTopLevelDecl(DeclGroupRef Group) {
   for (auto D : Group)
@@ -814,9 +750,9 @@ bool ProbeConsumer::HandleTopLevelDecl(DeclGroupRef Group) {
   return true;
 }
 
-BFrontendAction::BFrontendAction(llvm::raw_ostream &os, unsigned flags)
-    : os_(os), flags_(flags), rewriter_(new Rewriter), tables_(new vector<TableDesc>) {
-}
+BFrontendAction::BFrontendAction(llvm::raw_ostream &os, unsigned flags, TableStorage &ts,
+                                 const std::string &id)
+    : os_(os), flags_(flags), ts_(ts), id_(id), rewriter_(new Rewriter) {}
 
 void BFrontendAction::EndSourceFileAction() {
   if (flags_ & DEBUG_PREPROCESSOR)
@@ -829,8 +765,8 @@ unique_ptr<ASTConsumer> BFrontendAction::CreateASTConsumer(CompilerInstance &Com
   rewriter_->setSourceMgr(Compiler.getSourceManager(), Compiler.getLangOpts());
   vector<unique_ptr<ASTConsumer>> consumers;
   consumers.push_back(unique_ptr<ASTConsumer>(new ProbeConsumer(Compiler.getASTContext(), *rewriter_)));
-  consumers.push_back(unique_ptr<ASTConsumer>(new BTypeConsumer(Compiler.getASTContext(), *rewriter_, *tables_)));
-  return unique_ptr<ASTConsumer>(new MultiplexConsumer(move(consumers)));
+  consumers.push_back(unique_ptr<ASTConsumer>(new BTypeConsumer(Compiler.getASTContext(), *this)));
+  return unique_ptr<ASTConsumer>(new MultiplexConsumer(std::move(consumers)));
 }
 
 }

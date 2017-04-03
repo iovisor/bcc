@@ -104,8 +104,8 @@ std::pair<bool, string> get_kernel_path_info(const string kdir)
 
 }
 
-int ClangLoader::parse(unique_ptr<llvm::Module> *mod, unique_ptr<vector<TableDesc>> *tables,
-                       const string &file, bool in_memory, const char *cflags[], int ncflags) {
+int ClangLoader::parse(unique_ptr<llvm::Module> *mod, TableStorage &ts, const string &file,
+                       bool in_memory, const char *cflags[], int ncflags, const std::string &id) {
   using namespace clang;
 
   string main_path = "/virtual/main.c";
@@ -266,12 +266,10 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, unique_ptr<vector<TableDes
   // capture the rewritten c file
   string out_str1;
   llvm::raw_string_ostream os1(out_str1);
-  BFrontendAction bact(os1, flags_);
+  BFrontendAction bact(os1, flags_, ts, id);
   if (!compiler1.ExecuteAction(bact))
     return -1;
   unique_ptr<llvm::MemoryBuffer> out_buf1 = llvm::MemoryBuffer::getMemBuffer(out_str1);
-  // this contains the open FDs
-  *tables = bact.take_tables();
 
   // second pass, clear input and take rewrite buffer
   CompilerInstance compiler2;
