@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python2
 
 #
 # strlen_hist.py   Histogram of system-wide strlen return values

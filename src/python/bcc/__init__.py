@@ -798,7 +798,7 @@ class BPF(object):
         version of the library used by the process.
 
         Example: BPF(text).attach_uprobe("c", "malloc")
-                 BPF(text).attach_uprobe("/usr/bin/python", "main")
+                 BPF(text).attach_uprobe("/usr/bin/python2", "main")
         """
 
         name = str(name)

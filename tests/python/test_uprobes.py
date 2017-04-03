@@ -56,13 +56,13 @@ int count(struct pt_regs *ctx) {
     return 0;
 }"""
         b = bcc.BPF(text=text)
-        b.attach_uprobe(name="/usr/bin/python", sym="main", fn_name="count")
-        b.attach_uretprobe(name="/usr/bin/python", sym="main", fn_name="count")
-        with os.popen("/usr/bin/python -V") as f:
+        b.attach_uprobe(name="/usr/bin/python2", sym="main", fn_name="count")
+        b.attach_uretprobe(name="/usr/bin/python2", sym="main", fn_name="count")
+        with os.popen("/usr/bin/python2 -V") as f:
             pass
         self.assertGreater(b["stats"][ctypes.c_int(0)].value, 0)
-        b.detach_uretprobe(name="/usr/bin/python", sym="main")
-        b.detach_uprobe(name="/usr/bin/python", sym="main")
+        b.detach_uretprobe(name="/usr/bin/python2", sym="main")
+        b.detach_uprobe(name="/usr/bin/python2", sym="main")
 
     def test_mount_namespace(self):
         text = """

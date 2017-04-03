@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python2
 #
 # mysqld_query    Trace MySQL server queries. Example of USDT tracing.
 #                 For Linux, uses BCC, BPF. Embedded C.

@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python2
 #
 #Bertrone Matteo - Polytechnic of Turin
 #November 2015

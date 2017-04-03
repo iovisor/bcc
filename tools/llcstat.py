@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python2
 #
 # llcstat.py Summarize cache references and cache misses by PID.
 #            Cache reference and cache miss are corresponding events defined in
