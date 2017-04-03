@@ -39,7 +39,6 @@ struct open_probe_t {
 };
 
 class USDT;
-class TableStorage;
 
 class BPF {
 public:
