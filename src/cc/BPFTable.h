@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <cstring>
 #include <sys/epoll.h>
 #include <exception>
 #include <map>
@@ -66,20 +67,80 @@ class BPFTableBase {
   size_t capacity_;
 };
 
+template <class ValueType>
+class BPFArrayTable : protected BPFTableBase<int, ValueType> {
+public:
+  BPFArrayTable(const TableDesc& desc)
+      : BPFTableBase<int, ValueType>(desc) {
+    if (desc.type != BPF_MAP_TYPE_ARRAY &&
+        desc.type != BPF_MAP_TYPE_PERCPU_ARRAY)
+      throw std::invalid_argument("Table '" + desc.name + "' is not an array table");
+  }
+
+  StatusTuple get_value(const int& index, ValueType& value) {
+    if (!this->lookup(const_cast<int*>(&index), &value))
+      return StatusTuple(-1, "Error getting value: %s", std::strerror(errno));
+    return StatusTuple(0);
+  }
+
+  StatusTuple update_value(const int& index, const ValueType& value) {
+    if (!this->update(const_cast<int*>(&index), const_cast<ValueType*>(&value)))
+      return StatusTuple(-1, "Error updating value: %s", std::strerror(errno));
+    return StatusTuple(0);
+  }
+
+  ValueType operator[](const int& key) {
+    ValueType value;
+    get_value(key, value);
+    return value;
+  }
+
+  std::vector<ValueType> get_table_offline() {
+    std::vector<ValueType> res(this->capacity());
+
+    for (int i = 0; i < (int) this->capacity(); i++) {
+      get_value(i, res[i]);
+    }
+
+    return res;
+  }
+};
+
 template <class KeyType, class ValueType>
 class BPFHashTable : protected BPFTableBase<KeyType, ValueType> {
  public:
   explicit BPFHashTable(const TableDesc& desc)
-      : BPFTableBase<KeyType, ValueType>(desc) {}
-
-  ValueType get_value(const KeyType& key) {
-    ValueType res;
-    if (!this->lookup(const_cast<KeyType*>(&key), &res))
-      throw std::invalid_argument("Key does not exist in the table");
-    return res;
+      : BPFTableBase<KeyType, ValueType>(desc) {
+    if (desc.type != BPF_MAP_TYPE_HASH &&
+        desc.type != BPF_MAP_TYPE_PERCPU_HASH &&
+        desc.type != BPF_MAP_TYPE_LRU_HASH &&
+        desc.type != BPF_MAP_TYPE_LRU_PERCPU_HASH)
+      throw std::invalid_argument("Table '" + desc.name + "' is not a hash table");
   }
 
-  ValueType operator[](const KeyType& key) { return get_value(key); }
+  StatusTuple get_value(const KeyType& key, ValueType& value) {
+    if (!this->lookup(const_cast<KeyType*>(&key), &value))
+      return StatusTuple(-1, "Error getting value: %s", std::strerror(errno));
+    return StatusTuple(0);
+  }
+
+  StatusTuple update_value(const KeyType& key, const ValueType& value) {
+    if (!this->update(const_cast<KeyType*>(&key), const_cast<ValueType*>(&value)))
+      return StatusTuple(-1, "Error updating value: %s", std::strerror(errno));
+    return StatusTuple(0);
+  }
+
+  StatusTuple remove_value(const KeyType& key) {
+    if (!this->remove(const_cast<KeyType*>(&key)))
+      return StatusTuple(-1, "Error removing value: %s", std::strerror(errno));
+    return StatusTuple(0);
+  }
+
+  ValueType operator[](const KeyType& key) {
+    ValueType value;
+    get_value(key, value);
+    return value;
+  }
 
   std::vector<std::pair<KeyType, ValueType>> get_table_offline() {
     std::vector<std::pair<KeyType, ValueType>> res;
@@ -139,6 +200,22 @@ class BPFPerfBuffer : protected BPFTableBase<int, int> {
 
   int epfd_;
   std::unique_ptr<epoll_event[]> ep_events_;
+};
+
+class BPFProgTable : protected BPFTableBase<int, int> {
+public:
+  BPFProgTable(const TableDesc& desc)
+      : BPFTableBase<int, int>(desc) {
+    if (desc.type != BPF_MAP_TYPE_PROG_ARRAY)
+      throw std::invalid_argument("Table '" + desc.name + "' is not a prog table");
+  }
+
+  // updates an element
+  StatusTuple update_value(const int& index, const int& value) {
+    if (!this->update(const_cast<int*>(&index), const_cast<int*>(&value)))
+      return StatusTuple(-1, "Error updating value: %s", std::strerror(errno));
+    return StatusTuple(0);
+  }
 };
 
 }  // namespace ebpf

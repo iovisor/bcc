@@ -90,6 +90,14 @@ public:
                                 int group_fd = -1);
   StatusTuple detach_perf_event(uint32_t ev_type, uint32_t ev_config);
 
+  template <class ValueType>
+  BPFArrayTable<ValueType> get_array_table(const std::string& name) {
+    TableStorage::iterator it;
+    if (bpf_module_->table_storage().Find(Path({bpf_module_->id(), name}), it))
+      return BPFArrayTable<ValueType>(it->second);
+    return BPFArrayTable<ValueType>({});
+  }
+
   template <class KeyType, class ValueType>
   BPFHashTable<KeyType, ValueType> get_hash_table(const std::string& name) {
     TableStorage::iterator it;
@@ -97,6 +105,8 @@ public:
       return BPFHashTable<KeyType, ValueType>(it->second);
     return BPFHashTable<KeyType, ValueType>({});
   }
+
+  BPFProgTable get_prog_table(const std::string& name);
 
   BPFStackTable get_stack_table(const std::string& name) {
     TableStorage::iterator it;
