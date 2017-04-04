@@ -29,6 +29,7 @@
 struct perf_reader {
   perf_reader_cb cb;
   perf_reader_raw_cb raw_cb;
+  perf_reader_lost_cb lost_cb;
   void *cb_cookie; // to be returned in the cb
   void *buf; // for keeping segmented data
   size_t buf_size;
@@ -41,12 +42,15 @@ struct perf_reader {
 };
 
 struct perf_reader * perf_reader_new(perf_reader_cb cb,
-    perf_reader_raw_cb raw_cb, void *cb_cookie, int page_cnt) {
+                                     perf_reader_raw_cb raw_cb,
+                                     perf_reader_lost_cb lost_cb,
+                                     void *cb_cookie, int page_cnt) {
   struct perf_reader *reader = calloc(1, sizeof(struct perf_reader));
   if (!reader)
     return NULL;
   reader->cb = cb;
   reader->raw_cb = raw_cb;
+  reader->lost_cb = lost_cb;
   reader->cb_cookie = cb_cookie;
   reader->fd = -1;
   reader->page_size = getpagesize();
@@ -235,7 +239,12 @@ void perf_reader_event_read(struct perf_reader *reader) {
     }
 
     if (e->type == PERF_RECORD_LOST) {
-      fprintf(stderr, "Lost %lu samples\n", *(uint64_t *)(ptr + sizeof(*e)));
+      uint64_t lost = *(uint64_t *)(ptr + sizeof(*e));
+      if (reader->lost_cb) {
+        reader->lost_cb(lost);
+      } else {
+        fprintf(stderr, "Possibly lost %llu samples\n", lost);
+      }
     } else if (e->type == PERF_RECORD_SAMPLE) {
       if (reader->type == PERF_TYPE_TRACEPOINT)
         parse_tracepoint(reader, ptr, e->size);

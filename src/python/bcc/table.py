@@ -18,7 +18,7 @@ from functools import reduce
 import multiprocessing
 import os
 
-from .libbcc import lib, _RAW_CB_TYPE
+from .libbcc import lib, _RAW_CB_TYPE, _LOST_CB_TYPE
 from .perf import Perf
 from .utils import get_online_cpus
 from .utils import get_possible_cpus
@@ -507,7 +507,7 @@ class PerfEventArray(ArrayBase):
         super(PerfEventArray, self).__delitem__(key)
         self.close_perf_buffer(key)
 
-    def open_perf_buffer(self, callback, page_cnt=8):
+    def open_perf_buffer(self, callback, page_cnt=8, lost_cb=None):
         """open_perf_buffers(callback)
 
         Opens a set of per-cpu ring buffer to receive custom perf event
@@ -521,11 +521,12 @@ class PerfEventArray(ArrayBase):
             raise Exception("Perf buffer page_cnt must be a power of two")
 
         for i in get_online_cpus():
-            self._open_perf_buffer(i, callback, page_cnt)
+            self._open_perf_buffer(i, callback, page_cnt, lost_cb)
 
-    def _open_perf_buffer(self, cpu, callback, page_cnt):
+    def _open_perf_buffer(self, cpu, callback, page_cnt, lost_cb):
         fn = _RAW_CB_TYPE(lambda _, data, size: callback(cpu, data, size))
-        reader = lib.bpf_open_perf_buffer(fn, None, -1, cpu, page_cnt)
+        lost_fn = _LOST_CB_TYPE(lambda lost: lost_cb(lost) if lost_cb else -1)
+        reader = lib.bpf_open_perf_buffer(fn, lost_fn, None, -1, cpu, page_cnt)
         if not reader:
             raise Exception("Could not open perf buffer")
         fd = lib.perf_reader_fd(reader)
