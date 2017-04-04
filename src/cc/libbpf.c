@@ -356,7 +356,7 @@ void * bpf_attach_kprobe(int progfd, enum bpf_probe_attach_type attach_type, con
   int n;
 
   snprintf(new_name, sizeof(new_name), "%s_bcc_%d", ev_name, getpid());
-  reader = perf_reader_new(cb, NULL, cb_cookie, probe_perf_reader_page_cnt);
+  reader = perf_reader_new(cb, NULL, NULL, cb_cookie, probe_perf_reader_page_cnt);
   if (!reader)
     goto error;
 
@@ -417,7 +417,7 @@ void * bpf_attach_uprobe(int progfd, enum bpf_probe_attach_type attach_type, con
   int n;
 
   snprintf(new_name, sizeof(new_name), "%s_bcc_%d", ev_name, getpid());
-  reader = perf_reader_new(cb, NULL, cb_cookie, probe_perf_reader_page_cnt);
+  reader = perf_reader_new(cb, NULL, NULL, cb_cookie, probe_perf_reader_page_cnt);
   if (!reader)
     goto error;
 
@@ -503,7 +503,7 @@ void * bpf_attach_tracepoint(int progfd, const char *tp_category,
   char buf[256];
   struct perf_reader *reader = NULL;
 
-  reader = perf_reader_new(cb, NULL, cb_cookie, probe_perf_reader_page_cnt);
+  reader = perf_reader_new(cb, NULL, NULL, cb_cookie, probe_perf_reader_page_cnt);
   if (!reader)
     goto error;
 
@@ -525,13 +525,14 @@ int bpf_detach_tracepoint(const char *tp_category, const char *tp_name) {
   return 0;
 }
 
-void * bpf_open_perf_buffer(perf_reader_raw_cb raw_cb, void *cb_cookie, int pid,
-    int cpu, int page_cnt) {
+void * bpf_open_perf_buffer(perf_reader_raw_cb raw_cb,
+                            perf_reader_lost_cb lost_cb, void *cb_cookie,
+                            int pid, int cpu, int page_cnt) {
   int pfd;
   struct perf_event_attr attr = {};
   struct perf_reader *reader = NULL;
 
-  reader = perf_reader_new(NULL, raw_cb, cb_cookie, page_cnt);
+  reader = perf_reader_new(NULL, raw_cb, lost_cb, cb_cookie, page_cnt);
   if (!reader)
     goto error;
 

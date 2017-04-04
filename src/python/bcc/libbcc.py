@@ -87,6 +87,7 @@ lib.bpf_attach_kprobe.restype = ct.c_void_p
 _CB_TYPE = ct.CFUNCTYPE(None, ct.py_object, ct.c_int,
         ct.c_ulonglong, ct.POINTER(ct.c_ulonglong))
 _RAW_CB_TYPE = ct.CFUNCTYPE(None, ct.py_object, ct.c_void_p, ct.c_int)
+_LOST_CB_TYPE = ct.CFUNCTYPE(None, ct.c_ulonglong)
 lib.bpf_attach_kprobe.argtypes = [ct.c_int, ct.c_int, ct.c_char_p, ct.c_char_p, ct.c_int,
         ct.c_int, ct.c_int, _CB_TYPE, ct.py_object]
 lib.bpf_detach_kprobe.restype = ct.c_int
@@ -102,7 +103,7 @@ lib.bpf_attach_tracepoint.argtypes = [ct.c_int, ct.c_char_p, ct.c_char_p, ct.c_i
 lib.bpf_detach_tracepoint.restype = ct.c_int
 lib.bpf_detach_tracepoint.argtypes = [ct.c_char_p, ct.c_char_p]
 lib.bpf_open_perf_buffer.restype = ct.c_void_p
-lib.bpf_open_perf_buffer.argtypes = [_RAW_CB_TYPE, ct.py_object, ct.c_int, ct.c_int, ct.c_int]
+lib.bpf_open_perf_buffer.argtypes = [_RAW_CB_TYPE, _LOST_CB_TYPE, ct.py_object, ct.c_int, ct.c_int, ct.c_int]
 lib.bpf_open_perf_event.restype = ct.c_int
 lib.bpf_open_perf_event.argtypes = [ct.c_uint, ct.c_ulonglong, ct.c_int, ct.c_int]
 lib.perf_reader_poll.restype = ct.c_int

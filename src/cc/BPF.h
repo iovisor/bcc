@@ -105,7 +105,9 @@ public:
     return BPFStackTable({});
   }
 
-  StatusTuple open_perf_buffer(const std::string& name, perf_reader_raw_cb cb,
+  StatusTuple open_perf_buffer(const std::string& name,
+                               perf_reader_raw_cb cb,
+                               perf_reader_lost_cb lost_cb = nullptr,
                                void* cb_cookie = nullptr,
                                int page_cnt = DEFAULT_PERF_BUFFER_PAGE_CNT);
   StatusTuple close_perf_buffer(const std::string& name);

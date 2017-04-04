@@ -68,13 +68,14 @@ std::vector<std::string> BPFStackTable::get_stack_symbol(int stack_id,
   return res;
 }
 
-StatusTuple BPFPerfBuffer::open_on_cpu(perf_reader_raw_cb cb, int cpu,
-                                       void* cb_cookie, int page_cnt) {
+StatusTuple BPFPerfBuffer::open_on_cpu(perf_reader_raw_cb cb,
+                                       perf_reader_lost_cb lost_cb,
+                                       int cpu, void* cb_cookie, int page_cnt) {
   if (cpu_readers_.find(cpu) != cpu_readers_.end())
     return StatusTuple(-1, "Perf buffer already open on CPU %d", cpu);
 
   auto reader = static_cast<perf_reader*>(
-      bpf_open_perf_buffer(cb, cb_cookie, -1, cpu, page_cnt));
+      bpf_open_perf_buffer(cb, lost_cb, cb_cookie, -1, cpu, page_cnt));
   if (reader == nullptr)
     return StatusTuple(-1, "Unable to construct perf reader");
 
@@ -98,8 +99,9 @@ StatusTuple BPFPerfBuffer::open_on_cpu(perf_reader_raw_cb cb, int cpu,
   return StatusTuple(0);
 }
 
-StatusTuple BPFPerfBuffer::open_all_cpu(perf_reader_raw_cb cb, void* cb_cookie,
-                                        int page_cnt) {
+StatusTuple BPFPerfBuffer::open_all_cpu(perf_reader_raw_cb cb,
+                                        perf_reader_lost_cb lost_cb,
+                                        void* cb_cookie, int page_cnt) {
   if (cpu_readers_.size() != 0 || epfd_ != -1)
     return StatusTuple(-1, "Previously opened perf buffer not cleaned");
 
@@ -108,7 +110,7 @@ StatusTuple BPFPerfBuffer::open_all_cpu(perf_reader_raw_cb cb, void* cb_cookie,
   epfd_ = epoll_create1(EPOLL_CLOEXEC);
 
   for (int i : cpus) {
-    auto res = open_on_cpu(cb, i, cb_cookie, page_cnt);
+    auto res = open_on_cpu(cb, lost_cb, i, cb_cookie, page_cnt);
     if (res.code() != 0) {
       TRY2(close_all_cpu());
       return res;
