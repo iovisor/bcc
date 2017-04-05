@@ -34,6 +34,10 @@ typedef int (*SYM_CB)(const char *symname, uint64_t addr);
 void *bcc_symcache_new(int pid);
 void bcc_free_symcache(void *symcache, int pid);
 
+// The demangle_name pointer in bcc_symbol struct is returned from the
+// __cxa_demangle function call, which is supposed to be freed by caller. Call
+// this function after done using returned result of bcc_symcache_resolve.
+void bcc_symbol_free_demangle_name(struct bcc_symbol *sym);
 int bcc_symcache_resolve(void *symcache, uint64_t addr, struct bcc_symbol *sym);
 int bcc_symcache_resolve_no_demangle(void *symcache, uint64_t addr,
                                      struct bcc_symbol *sym);

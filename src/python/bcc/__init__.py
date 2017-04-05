@@ -69,9 +69,13 @@ class SymbolCache(object):
                 return (None, sym.offset,
                         ct.cast(sym.module, ct.c_char_p).value.decode())
             return (None, addr, None)
-        return (
-            sym.demangle_name.decode() if demangle else sym.name.decode(),
-            sym.offset, ct.cast(sym.module, ct.c_char_p).value.decode())
+        if demangle:
+            name_res = sym.demangle_name.decode()
+            lib.bcc_symbol_free_demangle_name(psym)
+        else:
+            name_res = sym.name.decode()
+        return (name_res, sym.offset,
+                ct.cast(sym.module, ct.c_char_p).value.decode())
 
     def resolve_name(self, module, name):
         addr = ct.c_ulonglong()

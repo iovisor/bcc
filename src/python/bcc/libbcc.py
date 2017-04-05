@@ -152,6 +152,9 @@ lib.bcc_symcache_new.argtypes = [ct.c_int]
 lib.bcc_free_symcache.restype = ct.c_void_p
 lib.bcc_free_symcache.argtypes = [ct.c_void_p, ct.c_int]
 
+lib.bcc_symbol_free_demangle_name.restype = ct.c_void_p
+lib.bcc_symbol_free_demangle_name.argtypes = [ct.POINTER(bcc_symbol)]
+
 lib.bcc_symcache_resolve.restype = ct.c_int
 lib.bcc_symcache_resolve.argtypes = [ct.c_void_p, ct.c_ulonglong, ct.POINTER(bcc_symbol)]
 

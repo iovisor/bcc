@@ -61,9 +61,11 @@ std::vector<std::string> BPFStackTable::get_stack_symbol(int stack_id,
   bcc_symbol symbol;
   for (auto addr : addresses)
     if (bcc_symcache_resolve(cache, addr, &symbol) != 0)
-      res.push_back("[UNKNOWN]");
-    else
+      res.emplace_back("[UNKNOWN]");
+    else {
       res.push_back(symbol.demangle_name);
+      bcc_symbol_free_demangle_name(&symbol);
+    }
 
   return res;
 }
