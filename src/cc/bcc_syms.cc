@@ -307,6 +307,11 @@ void bcc_free_symcache(void *symcache, int pid) {
     delete static_cast<ProcSyms*>(symcache);
 }
 
+void bcc_symbol_free_demangle_name(struct bcc_symbol *sym) {
+  if (sym->demangle_name && (sym->demangle_name != sym->name))
+    free(const_cast<char*>(sym->demangle_name));
+}
+
 int bcc_symcache_resolve(void *resolver, uint64_t addr,
                          struct bcc_symbol *sym) {
   SymbolCache *cache = static_cast<SymbolCache *>(resolver);
