@@ -879,7 +879,7 @@ local BC = {
 	CALL = function (a, b, _, d) -- A = A(A+1, ..., A+D-1)
 		CALL(a, b, d)
 	end,
-	JMP = function (a, _, c, d) -- JMP
+	JMP = function (a, _, c, _) -- JMP
 		-- Discard unused slots after jump
 		for i, _ in pairs(V) do
 			if i >= a then V[i] = {} end
@@ -958,7 +958,7 @@ end
 vset(stackslots)
 vset(stackslots+1)
 return setmetatable(BC, {
-	__index = function (t, k, v)
+	__index = function (_, k, _)
 		if type(k) == 'number' then
 			local op_str = string.sub(require('jit.vmdef').bcnames, 6*k+1, 6*k+6)
 			error(string.format("NYI: opcode '0x%02x' (%-04s)", k, op_str))
@@ -992,7 +992,9 @@ return setmetatable(BC, {
 end
 
 -- Emitted code dump
-local function dump_mem(cls, ins)
+local function dump_mem(cls, ins, _, fuse)
+	-- This is a very dense MEM instruction decoder without much explanation
+	-- Refer to https://www.kernel.org/doc/Documentation/networking/filter.txt for instruction format
 	local mode = bit.band(ins.code, 0xe0)
 	if mode == BPF.XADD then cls = 5 end -- The only mode
 	local op_1 = {'LD', 'LDX', 'ST', 'STX', '', 'XADD'}
@@ -1004,7 +1006,7 @@ local function dump_mem(cls, ins)
 	if cls == BPF.LDX then src = string.format('[R%d%+d]', ins.src_reg, off) end
 	if mode == BPF.ABS then src = string.format('[%d]', ins.imm) end
 	if mode == BPF.IND then src = string.format('[R%d%+d]', ins.src_reg, ins.imm) end
-	return string.format('%s\t%s\t%s', name, dst, src)
+	return string.format('%s\t%s\t%s', fuse and '' or name, fuse and '' or dst, src)
 end
 
 local function dump_alu(cls, ins, pc)
@@ -1017,6 +1019,8 @@ local function dump_alu(cls, ins, pc)
 					'skb_get_tunnel_key', 'skb_set_tunnel_key', 'perf_event_read', 'redirect', 'get_route_realm',
 					'perf_event_output', 'skb_load_bytes'}
 	local op = 0
+	-- This is a very dense ALU instruction decoder without much explanation
+	-- Refer to https://www.kernel.org/doc/Documentation/networking/filter.txt for instruction format
 	for i = 0,13 do if 0x10 * i == bit.band(ins.code, 0xf0) then op = i + 1 break end end
 	local name = (cls == 5) and jmp[op] or alu[op]
 	local src = (bit.band(ins.code, 0x08) == BPF.X) and 'R'..ins.src_reg or '#'..ins.imm
@@ -1032,16 +1036,19 @@ local function dump(code)
 		[0] = dump_mem, [1] = dump_mem, [2] = dump_mem, [3] = dump_mem,
 		[4] = dump_alu, [5] = dump_alu, [7] = dump_alu,
 	}
+	local fused = false
 	for i = 0, code.pc - 1 do
 		local ins = code.insn[i]
 		local cls = bit.band(ins.code, 0x07)
-		print(string.format('%04u\t%s', i, cls_map[cls](cls, ins, i)))
+		local line = cls_map[cls](cls, ins, i, fused)
+		print(string.format('%04u\t%s', i, line))
+		fused = string.find(line, 'LDDW', 1)
 	end
 end
 
 local function compile(prog, params)
 	-- Create code emitter sandbox, include caller locals
-	local env = { pkt=proto.pkt, BPF=BPF }
+	local env = { pkt=proto.pkt, BPF=BPF, ffi=ffi }
 	-- Include upvalues up to 4 nested scopes back
 	-- the narrower scope overrides broader scope
 	for k = 5, 2, -1 do
@@ -1102,7 +1109,7 @@ local bpf_map_mt = {
 						cur_key = ffi.new(ffi.typeof(t.key))
 					end
 					local ok, err = S.bpf_map_op(S.c.BPF_CMD.MAP_GET_NEXT_KEY, map.fd, cur_key, next_key)
-					if not ok then return nil end
+					if not ok then return nil, err end
 					-- Get next value
 					assert(S.bpf_map_op(S.c.BPF_CMD.MAP_LOOKUP_ELEM, map.fd, next_key, map.val))
 					return next_key[0], map.val[0]
@@ -1316,5 +1323,5 @@ return setmetatable({
 	end,
 	ntoh = builtins.ntoh, hton = builtins.hton,
 }, {
-	__call = function (t, prog) return compile(prog) end,
+	__call = function (_, prog) return compile(prog) end,
 })
