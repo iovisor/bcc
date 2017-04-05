@@ -77,6 +77,7 @@ Action: direct forwarding (on same port) | 4.8 | [6ce96ca348a9](https://git.kern
 Direct packet data write | 4.8 | [4acf6c0b84c9](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=4acf6c0b84c91243c705303cd9ff16421914150d)
 Mellanox `mlx4` driver | 4.8 | [47a38e155037](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=47a38e155037f417c5740e24ccae6482aedf4b68)
 Mellanox `mlx5` driver | 4.9 | [86994156c736](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=86994156c736978d113e7927455d4eeeb2128b9f)
+Netronome `nfp` driver | 4.10 | [ecd63a0217d5](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=ecd63a0217d5f1e8a92f7516f5586d1177b95de2)
 QLogic (Cavium) `qed*` drivers | 4.10 | [496e05170958](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=496e051709588f832d7a6a420f44f8642b308a87)
 `virtio_net` driver | 4.10 | [f600b6905015](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=f600b690501550b94e83e07295d9c8b9c4c39f4e)
 Broadcom `bnxt_en` driver | [4.11](https://git.kernel.org/cgit/linux/kernel/git/davem/net-next.git/commit/?id=c6d30e8391b85e00eb544e6cf047ee0160ee9938) | []()
