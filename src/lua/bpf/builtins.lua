@@ -80,7 +80,7 @@ if ffi.abi('be') then
 	builtins[hton] = function(a, b, w) return end
 end
 -- Other built-ins
-local function xadd(a, b) error('NYI') end
+local function xadd() error('NYI') end
 builtins.xadd = xadd
 builtins[xadd] = function (e, dst, a, b, off)
 	assert(e.V[a].const.__dissector, 'xadd(a, b) called on non-pointer')
@@ -120,7 +120,7 @@ builtins[probe_read] = function (e, ret, dst, src, vtype, ofs)
 		e.reg_alloc(e.tmpvar, 3) -- Copy from original register
 		e.emit(BPF.ALU64 + BPF.MOV + BPF.X, 3, e.V[src].reg, 0, 0)
 	else
-		local src_reg = e.vreg(src, 3)
+		e.vreg(src, 3)
 		e.reg_spill(src) -- Spill to avoid overwriting
 	end
 	if ofs and ofs > 0 then
@@ -133,6 +133,7 @@ builtins[probe_read] = function (e, ret, dst, src, vtype, ofs)
 	e.emit(BPF.JMP + BPF.CALL, 0, 0, 0, HELPER.probe_read)
 	e.V[e.tmpvar].reg = nil  -- Free temporary registers
 end
+
 builtins[ffi.cast] = function (e, dst, ct, x)
 	assert(e.V[ct].const, 'ffi.cast(ctype, x) called with bad ctype')
 	e.vcopy(dst, x)
@@ -151,6 +152,7 @@ builtins[ffi.cast] = function (e, dst, ct, x)
 		e.V[dst].source = 'probe'
 	end
 end
+
 builtins[ffi.new] = function (e, dst, ct, x)
 	if type(ct) == 'number' then
 		ct = ffi.typeof(e.V[ct].const) -- Get ctype from variable
@@ -160,7 +162,8 @@ builtins[ffi.new] = function (e, dst, ct, x)
 	e.vset(dst, nil, ct)
 	e.V[dst].const = {__base = e.valloc(ffi.sizeof(ct), true), __dissector = ct}
 end
-builtins[ffi.copy] = function (e,ret, dst, src)
+
+builtins[ffi.copy] = function (e, ret, dst, src)
 	assert(cdef.isptr(e.V[dst].type), 'ffi.copy(dst, src) - dst MUST be a pointer type')
 	assert(cdef.isptr(e.V[src].type), 'ffi.copy(dst, src) - src MUST be a pointer type')
 	-- Specific types also encode source of the data
@@ -186,7 +189,7 @@ builtins[ffi.copy] = function (e,ret, dst, src)
 			e.reg_alloc(e.tmpvar, 3) -- Copy from original register
 			e.emit(BPF.ALU64 + BPF.MOV + BPF.X, 3, e.V[src].reg, 0, 0)
 		else
-			local src_reg = e.vreg(src, 3)
+			e.vreg(src, 3)
 			e.reg_spill(src) -- Spill to avoid overwriting
 		end
 		-- Call probe read helper
@@ -265,6 +268,28 @@ local function perf_submit(e, dst, map_var, src)
 	e.V[e.tmpvar].reg = nil  -- Free temporary registers
 end
 
+-- Implements bpf_skb_load_bytes(ctx, off, var, vlen) on skb->data
+local function load_bytes(e, dst, off, var)
+	print(e.V[off].const, e.V[var].const)
+	-- Set R2 = offset
+	e.vset(e.tmpvar, nil, off)
+	e.vreg(e.tmpvar, 2, false, ffi.typeof('uint64_t'))
+	-- Set R1 = ctx
+	e.reg_alloc(e.tmpvar, 1) -- Spill anything in R1 (unnamed tmp variable)
+	e.emit(BPF.ALU64 + BPF.MOV + BPF.X, 1, 6, 0, 0) -- CTX is always in R6, copy
+	-- Set R3 = pointer to var on stack
+	assert(e.V[var].const.__base, 'NYI: load_bytes(off, var, len) - variable is not on stack')
+	e.emit(BPF.ALU64 + BPF.MOV + BPF.X, 3, 10, 0, 0)
+	e.emit(BPF.ALU64 + BPF.ADD + BPF.K, 3, 0, 0, -e.V[var].const.__base)
+	-- Set R4 = var length
+	e.emit(BPF.ALU64 + BPF.MOV + BPF.K, 4, 0, 0, ffi.sizeof(e.V[var].type))
+	-- Set R0 = ret and call
+	e.vset(dst)
+	e.vreg(dst, 0, true, ffi.typeof('int32_t')) -- Return is integer
+	e.emit(BPF.JMP + BPF.CALL, 0, 0, 0, HELPER.skb_load_bytes)
+	e.V[e.tmpvar].reg = nil  -- Free temporary registers
+end
+
 -- Implements bpf_get_stack_id()
 local function stack_id(e, ret, map_var, key)
 	-- Set R2 = map fd (indirect load)
@@ -313,7 +338,7 @@ builtins[comm] = function (e, ret, dst)
 end
 
 -- Math library built-ins
-math.log2 = function (x) error('NYI') end
+math.log2 = function () error('NYI') end
 builtins[math.log2] = function (e, dst, x)
 	-- Classic integer bits subdivison algorithm to find the position
 	-- of the highest bit set, adapted for BPF bytecode-friendly operations.
@@ -363,7 +388,7 @@ end
 -- Call-type helpers
 local function call_helper(e, dst, h)
 	e.vset(dst)
-	local dst_reg = e.vreg(dst, 0, true)
+	e.vreg(dst, 0, true)
 	e.emit(BPF.JMP + BPF.CALL, 0, 0, 0, h)
 	e.V[dst].const = nil -- Target is not a function anymore
 end
@@ -381,6 +406,7 @@ builtins.uid_gid = uid_gid
 builtins.comm = comm
 builtins.perf_submit = perf_submit
 builtins.stack_id = stack_id
+builtins.load_bytes = load_bytes
 builtins[cpu] = function (e, dst) return call_helper(e, dst, HELPER.get_smp_processor_id) end
 builtins[rand] = function (e, dst) return call_helper(e, dst, HELPER.get_prandom_u32) end
 builtins[time] = function (e, dst) return call_helper(e, dst, HELPER.ktime_get_ns) end
@@ -388,5 +414,6 @@ builtins[pid_tgid] = function (e, dst) return call_helper(e, dst, HELPER.get_cur
 builtins[uid_gid] = function (e, dst) return call_helper(e, dst, HELPER.get_current_uid_gid) end
 builtins[perf_submit] = function (e, dst, map, value) return perf_submit(e, dst, map, value) end
 builtins[stack_id] = function (e, dst, map, key) return stack_id(e, dst, map, key) end
+builtins[load_bytes] = function (e, dst, off, var, len) return load_bytes(e, dst, off, var, len) end
 
 return builtins

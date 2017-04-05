@@ -137,6 +137,7 @@ Below is a list of BPF-specific helpers:
 * `comm(var)` - write current process name (uses `bpf_get_current_comm`)
 * `perf_submit(map, var)` - submit variable to perf event array BPF map
 * `stack_id(map, flags)` - return stack trace identifier from stack trace BPF map
+* `load_bytes(off, var)` - helper for direct packet access with `skb_load_bytes()`
 
 ### Current state
 
