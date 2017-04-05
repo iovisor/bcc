@@ -78,6 +78,9 @@ struct bpf {
 	static const int F_USER_STACK     = 1 << 8;
 	static const int F_FAST_STACK_CMP = 1 << 9;
 	static const int F_REUSE_STACKID  = 1 << 10;
+	/* special offsets for ancillary data */
+	static const int NET_OFF          = -0x100000;
+	static const int LL_OFF           = -0x200000;
 };
 /* eBPF commands */
 struct bpf_cmd {
