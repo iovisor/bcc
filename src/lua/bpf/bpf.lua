@@ -615,6 +615,7 @@ local function MAP_SET(map_var, key, key_imm, src)
 	reg_alloc(stackslots, 4) -- Spill anything in R4 (unnamed tmp variable)
 	emit(BPF.ALU64 + BPF.MOV + BPF.K, 4, 0, 0, 0) -- BPF_ANY, create new element or update existing
 	-- Reserve R3 for value pointer
+	reg_alloc(stackslots, 3) -- Spill anything in R3 (unnamed tmp variable)
 	local val_size = ffi.sizeof(map.val_type)
 	local w = const_width[val_size] or BPF.DW
 	local pod_type = const_width[val_size]
@@ -627,14 +628,25 @@ local function MAP_SET(map_var, key, key_imm, src)
 		emit(BPF.MEM + BPF.ST + w, 10, 0, -sp, base)
 	-- Value is in register, spill it
 	elseif V[src].reg and pod_type then
-		emit(BPF.MEM + BPF.STX + w, 10, V[src].reg, -sp, 0)
+		-- Value is a pointer, derefernce it and spill it
+		if cdef.isptr(V[src].type) then
+			vderef(3, V[src].reg, V[src].const.__dissector)
+			emit(BPF.MEM + BPF.STX + w, 10, 3, -sp, 0)
+		else
+			emit(BPF.MEM + BPF.STX + w, 10, V[src].reg, -sp, 0)
+		end
 	-- We get a pointer to spilled register on stack
 	elseif V[src].spill then
 		-- If variable is a pointer, we can load it to R3 directly (save "LEA")
 		if cdef.isptr(V[src].type) then
 			reg_fill(src, 3)
-			emit(BPF.JMP + BPF.CALL, 0, 0, 0, HELPER.map_update_elem)
-			return
+			-- If variable is a stack pointer, we don't have to check it
+			if base.__base then
+				emit(BPF.JMP + BPF.CALL, 0, 0, 0, HELPER.map_update_elem)
+				return
+			end
+			vderef(3, V[src].reg, V[src].const.__dissector)
+			emit(BPF.MEM + BPF.STX + w, 10, 3, -sp, 0)
 		else
 			sp = V[src].spill
 		end
@@ -644,9 +656,8 @@ local function MAP_SET(map_var, key, key_imm, src)
 		sp = base.__base
 	-- Value is constant, materialize it on stack
 	else
-		error('VAR '..key..' is neither const-expr/register/stack/spilled')
+		error('VAR '.. key or key_imm ..' is neither const-expr/register/stack/spilled')
 	end
-	reg_alloc(stackslots, 3) -- Spill anything in R3 (unnamed tmp variable)
 	emit(BPF.ALU64 + BPF.MOV + BPF.X, 3, 10, 0, 0)
 	emit(BPF.ALU64 + BPF.ADD + BPF.K, 3, 0, 0, -sp)
 	emit(BPF.JMP + BPF.CALL, 0, 0, 0, HELPER.map_update_elem)
@@ -731,6 +742,12 @@ local BC = {
 		local base = V[b].const
 		if base.__map then -- BPF map read (constant)
 			MAP_GET(a, b, nil, d)
+		-- Specialise PTR[0] as dereference operator
+		elseif cdef.isptr(V[b].type) and d == 0 then
+			vcopy(a, b)
+			local dst_reg = vreg(a)
+			vderef(dst_reg, dst_reg, V[a].const.__dissector)
+			V[a].type = V[a].const.__dissector
 		else
 			LOAD(a, b, d, ffi.typeof('uint8_t'))
 		end
@@ -912,6 +929,10 @@ local BC = {
 	end,
 	RET1 = function (a, _, _, _) -- RET1
 		if V[a].reg ~= 0 then vreg(a, 0) end
+		-- Dereference pointer variables
+		if cdef.isptr(V[a].type) then
+			vderef(0, 0, V[a].const.__dissector)
+		end
 		emit(BPF.JMP + BPF.EXIT, 0, 0, 0, 0)
 		-- Free optimisation: spilled variable will not be filled again
 		for _,v in pairs(V) do if v.reg == 0 then v.reg = nil end end
