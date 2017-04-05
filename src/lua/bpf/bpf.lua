@@ -296,53 +296,6 @@ local function bb_end(Vcomp)
 	end
 end
 
-local function LD_ABS(dst, off, w)
-	local dst_reg = vreg(dst, 0, true, builtins.width_type(w)) -- Reserve R0
-	-- assert(w < 8, 'NYI: LD_ABS64 is not supported') -- IMM64 has two IMM32 insns fused together
-	emit(BPF.LD + BPF.ABS + const_width[w], dst_reg, 0, 0, off)
-end
-
-local function LD_IND(dst, src, w, off)
-	local src_reg = vreg(src) -- Must materialize first in case dst == src
-	local dst_reg = vreg(dst, 0, true, builtins.width_type(w)) -- Reserve R0
-	emit(BPF.LD + BPF.IND + const_width[w], dst_reg, src_reg, 0, off or 0)
-end
-
-local function LD_FIELD(a, d, w, imm)
-	if imm then
-		LD_ABS(a, imm, w)
-	else
-		LD_IND(a, d, w)
-	end
-end
-
--- @note: This is specific now as it expects registers reserved
-local function LD_IMM_X(dst_reg, src_type, imm, w)
-	if w == 8 then -- IMM64 must be done in two instructions with imm64 = (lo(imm32), hi(imm32))
-		emit(BPF.LD + const_width[w], dst_reg, src_type, 0, ffi.cast('uint32_t', imm))
-		-- Must shift in two steps as bit.lshift supports [0..31]
-		emit(0, 0, 0, 0, ffi.cast('uint32_t', bit.lshift(bit.lshift(imm, 16), 16)))
-	else
-		emit(BPF.LD + const_width[w], dst_reg, src_type, 0, imm)
-	end
-end
-
-local function LOAD(dst, src, off, vtype)
-	local base = V[src].const
-	assert(base.__dissector, 'NYI: load() on variable that doesnt have dissector')
-	-- Cast to different type if requested
-	vtype = vtype or base.__dissector
-	local w = ffi.sizeof(vtype)
-	assert(w <= 4, 'NYI: load() supports 1/2/4 bytes at a time only')
-	if base.off then -- Absolute address to payload
-		LD_ABS(dst, off + base.off, w)
-	else -- Indirect address to payload
-		LD_IND(dst, src, w, off)
-	end
-	V[dst].type = vtype
-	V[dst].const = nil -- Dissected value is not constant anymore
-end
-
 local function CMP_STR(a, b, op)
 	assert(op == 'JEQ' or op == 'JNE', 'NYI: only equivallence stack/string only supports == or ~=')
 	-- I have no better idea how to implement it than unrolled XOR loop, as we can fixup only one JMP
@@ -463,13 +416,77 @@ local function ALU_REG(dst, a, b, op)
 	end
 end
 
-
 local function ALU_IMM_NV(dst, a, b, op)
 	-- Do DST = IMM(a) op VAR(b) where we can't invert because
 	-- the registers are u64 but immediates are u32, so complement
 	-- arithmetics wouldn't work
 	vset(stackslots+1, nil, a)
 	ALU_REG(dst, stackslots+1, b, op)
+end
+
+local function LD_ABS(dst, off, w)
+	if w < 8 then
+		local dst_reg = vreg(dst, 0, true, builtins.width_type(w)) -- Reserve R0
+		emit(BPF.LD + BPF.ABS + const_width[w], dst_reg, 0, 0, off)
+	elseif w == 8 then
+		-- LD_ABS|IND prohibits DW, we need to do two W loads and combine them
+		local tmp_reg = vreg(stackslots, 0, true, builtins.width_type(w)) -- Reserve R0
+		emit(BPF.LD + BPF.ABS + const_width[4], tmp_reg, 0, 0, off + 4)
+		if ffi.abi('le') then -- LD_ABS has htonl() semantics, reverse
+			emit(BPF.ALU + BPF.END + BPF.TO_BE, tmp_reg, 0, 0, 32)
+		end
+		ALU_IMM(stackslots, stackslots, 32, 'LSH')
+		local dst_reg = vreg(dst, 0, true, builtins.width_type(w)) -- Reserve R0, spill tmp variable
+		emit(BPF.LD + BPF.ABS + const_width[4], dst_reg, 0, 0, off)
+		if ffi.abi('le') then -- LD_ABS has htonl() semantics, reverse
+			emit(BPF.ALU + BPF.END + BPF.TO_BE, dst_reg, 0, 0, 32)
+		end
+		ALU_REG(dst, dst, stackslots, 'OR')
+		V[stackslots].reg = nil -- Free temporary registers
+	else
+		assert(w < 8, 'NYI: only LD_ABS of 1/2/4/8 is supported')
+	end
+end
+
+local function LD_IND(dst, src, w, off)
+	local src_reg = vreg(src) -- Must materialize first in case dst == src
+	local dst_reg = vreg(dst, 0, true, builtins.width_type(w)) -- Reserve R0
+	emit(BPF.LD + BPF.IND + const_width[w], dst_reg, src_reg, 0, off or 0)
+end
+
+local function LD_FIELD(a, d, w, imm)
+	if imm then
+		LD_ABS(a, imm, w)
+	else
+		LD_IND(a, d, w)
+	end
+end
+
+-- @note: This is specific now as it expects registers reserved
+local function LD_IMM_X(dst_reg, src_type, imm, w)
+	if w == 8 then -- IMM64 must be done in two instructions with imm64 = (lo(imm32), hi(imm32))
+		emit(BPF.LD + const_width[w], dst_reg, src_type, 0, ffi.cast('uint32_t', imm))
+		-- Must shift in two steps as bit.lshift supports [0..31]
+		emit(0, 0, 0, 0, ffi.cast('uint32_t', bit.lshift(bit.lshift(imm, 16), 16)))
+	else
+		emit(BPF.LD + const_width[w], dst_reg, src_type, 0, imm)
+	end
+end
+
+local function LOAD(dst, src, off, vtype)
+	local base = V[src].const
+	assert(base.__dissector, 'NYI: load() on variable that doesnt have dissector')
+	-- Cast to different type if requested
+	vtype = vtype or base.__dissector
+	local w = ffi.sizeof(vtype)
+	assert(w <= 4, 'NYI: load() supports 1/2/4 bytes at a time only')
+	if base.off then -- Absolute address to payload
+		LD_ABS(dst, off + base.off, w)
+	else -- Indirect address to payload
+		LD_IND(dst, src, w, off)
+	end
+	V[dst].type = vtype
+	V[dst].const = nil -- Dissected value is not constant anymore
 end
 
 local function BUILTIN(func, ...)
