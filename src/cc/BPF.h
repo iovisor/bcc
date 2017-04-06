@@ -108,12 +108,7 @@ public:
 
   BPFProgTable get_prog_table(const std::string& name);
 
-  BPFStackTable get_stack_table(const std::string& name) {
-    TableStorage::iterator it;
-    if (bpf_module_->table_storage().Find(Path({bpf_module_->id(), name}), it))
-      return BPFStackTable(it->second);
-    return BPFStackTable({});
-  }
+  BPFStackTable get_stack_table(const std::string& name);
 
   StatusTuple open_perf_buffer(const std::string& name,
                                perf_reader_raw_cb cb,

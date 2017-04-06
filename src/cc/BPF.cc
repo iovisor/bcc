@@ -491,6 +491,13 @@ BPFProgTable BPF::get_prog_table(const std::string& name) {
   return BPFProgTable({});
 }
 
+BPFStackTable BPF::get_stack_table(const std::string& name) {
+  TableStorage::iterator it;
+  if (bpf_module_->table_storage().Find(Path({bpf_module_->id(), name}), it))
+    return BPFStackTable(it->second);
+  return BPFStackTable({});
+}
+
 std::string BPF::get_uprobe_event(const std::string& binary_path,
                                   uint64_t offset, bpf_probe_attach_type type) {
   std::string res = attach_type_prefix(type) + "_";
