@@ -47,8 +47,8 @@ public:
   explicit BPF(unsigned int flag = 0, TableStorage* ts = nullptr)
       : bpf_module_(new BPFModule(flag, ts)) {}
   StatusTuple init(const std::string& bpf_program,
-                   std::vector<std::string> cflags = {},
-                   std::vector<USDT> usdt = {});
+                   const std::vector<std::string>& cflags = {},
+                   const std::vector<USDT>& usdt = {});
 
   ~BPF();
   StatusTuple detach_all();

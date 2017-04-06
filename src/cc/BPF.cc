@@ -53,7 +53,8 @@ std::string sanitize_str(std::string str, bool (*validator)(char),
 }
 
 StatusTuple BPF::init(const std::string& bpf_program,
-                      std::vector<std::string> cflags, std::vector<USDT> usdt) {
+                      const std::vector<std::string>& cflags,
+                      const std::vector<USDT>& usdt) {
   std::string all_bpf_program;
 
   for (auto u : usdt) {
@@ -86,7 +87,7 @@ StatusTuple BPF::detach_all() {
   bool has_error = false;
   std::string error_msg;
 
-  for (auto it : kprobes_) {
+  for (auto& it : kprobes_) {
     auto res = detach_kprobe_event(it.first, it.second);
     if (res.code() != 0) {
       error_msg += "Failed to detach kprobe event " + it.first + ": ";
@@ -95,7 +96,7 @@ StatusTuple BPF::detach_all() {
     }
   }
 
-  for (auto it : uprobes_) {
+  for (auto& it : uprobes_) {
     auto res = detach_uprobe_event(it.first, it.second);
     if (res.code() != 0) {
       error_msg += "Failed to detach uprobe event " + it.first + ": ";
@@ -104,7 +105,7 @@ StatusTuple BPF::detach_all() {
     }
   }
 
-  for (auto it : tracepoints_) {
+  for (auto& it : tracepoints_) {
     auto res = detach_tracepoint_event(it.first, it.second);
     if (res.code() != 0) {
       error_msg += "Failed to detach Tracepoint " + it.first + ": ";
@@ -113,7 +114,7 @@ StatusTuple BPF::detach_all() {
     }
   }
 
-  for (auto it : perf_buffers_) {
+  for (auto& it : perf_buffers_) {
     auto res = it.second->close_all_cpu();
     if (res.code() != 0) {
       error_msg += "Failed to close perf buffer " + it.first + ": ";
@@ -123,7 +124,7 @@ StatusTuple BPF::detach_all() {
     delete it.second;
   }
 
-  for (auto it : perf_events_) {
+  for (auto& it : perf_events_) {
     auto res = detach_perf_event_all_cpu(it.second);
     if (res.code() != 0) {
       error_msg += res.msg() + "\n";
@@ -131,7 +132,7 @@ StatusTuple BPF::detach_all() {
     }
   }
 
-  for (auto it : funcs_) {
+  for (auto& it : funcs_) {
     int res = close(it.second);
     if (res != 0) {
       error_msg += "Failed to unload BPF program for " + it.first + ": ";
@@ -216,7 +217,7 @@ StatusTuple BPF::attach_uprobe(const std::string& binary_path,
 
 StatusTuple BPF::attach_usdt(const USDT& usdt, pid_t pid, int cpu,
                              int group_fd) {
-  for (auto& u : usdt_)
+  for (const auto& u : usdt_)
     if (u == usdt) {
       bool failed = false;
       std::string err_msg;
@@ -301,7 +302,7 @@ StatusTuple BPF::attach_perf_event(uint32_t ev_type, uint32_t ev_config,
     int fd = bpf_attach_perf_event(probe_fd, ev_type, ev_config, sample_period,
                                    sample_freq, pid, i, group_fd);
     if (fd < 0) {
-      for (auto it : *fds)
+      for (const auto& it : *fds)
         close(it.second);
       delete fds;
       TRY2(unload_func(probe_func));
@@ -352,7 +353,7 @@ StatusTuple BPF::detach_uprobe(const std::string& binary_path,
 }
 
 StatusTuple BPF::detach_usdt(const USDT& usdt) {
-  for (auto& u : usdt_)
+  for (const auto& u : usdt_)
     if (u == usdt) {
       bool failed = false;
       std::string err_msg;
@@ -545,7 +546,7 @@ StatusTuple BPF::detach_tracepoint_event(const std::string& tracepoint,
 StatusTuple BPF::detach_perf_event_all_cpu(open_probe_t& attr) {
   bool has_error = false;
   std::string err_msg;
-  for (auto it : *attr.per_cpu_fd) {
+  for (const auto& it : *attr.per_cpu_fd) {
     int res = close(it.second);
     if (res < 0) {
       has_error = true;
@@ -563,11 +564,10 @@ StatusTuple BPF::detach_perf_event_all_cpu(open_probe_t& attr) {
 }
 
 StatusTuple USDT::init() {
-  auto ctx =
-      std::unique_ptr<::USDT::Context>(new ::USDT::Context(binary_path_));
-  if (!ctx->loaded())
+  ::USDT::Context ctx(binary_path_);
+  if (!ctx.loaded())
     return StatusTuple(-1, "Unable to load USDT " + print_name());
-  auto probe = ctx->get(name_);
+  auto probe = ctx.get(name_);
   if (probe == nullptr)
     return StatusTuple(-1, "Unable to find USDT " + print_name());
 
@@ -579,8 +579,9 @@ StatusTuple USDT::init() {
         -1, "Unable to generate program text for USDT " + print_name());
   program_text_ = ::USDT::USDT_PROGRAM_HEADER + stream.str();
 
+  addresses_.reserve(probe->num_locations());
   for (size_t i = 0; i < probe->num_locations(); i++)
-    addresses_.push_back(probe->address(i));
+    addresses_.emplace_back(probe->address(i));
 
   initialized_ = true;
   return StatusTuple(0);
