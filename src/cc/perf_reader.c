@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <inttypes.h>
 #include <poll.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -243,7 +244,7 @@ void perf_reader_event_read(struct perf_reader *reader) {
       if (reader->lost_cb) {
         reader->lost_cb(lost);
       } else {
-        fprintf(stderr, "Possibly lost %llu samples\n", lost);
+        fprintf(stderr, "Possibly lost " PRIu64 " samples\n", lost);
       }
     } else if (e->type == PERF_RECORD_SAMPLE) {
       if (reader->type == PERF_TYPE_TRACEPOINT)
