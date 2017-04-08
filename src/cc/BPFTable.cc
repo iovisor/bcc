@@ -136,12 +136,14 @@ StatusTuple BPFPerfBuffer::close_all_cpu() {
   std::string errors;
   bool has_error = false;
 
-  int close_res = close(epfd_);
-  epfd_ = -1;
-  ep_events_.reset();
-  if (close_res != 0) {
-    has_error = true;
-    errors += std::string(std::strerror(errno)) + "\n";
+  if (epfd_ >= 0) {
+    int close_res = close(epfd_);
+    epfd_ = -1;
+    ep_events_.reset();
+    if (close_res != 0) {
+      has_error = true;
+      errors += std::string(std::strerror(errno)) + "\n";
+    }
   }
 
   std::vector<int> opened_cpus;
