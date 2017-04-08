@@ -242,11 +242,9 @@ class SmokeTests(TestCase):
     def test_slabratetop(self):
         self.run_with_duration("slabratetop.py 1 1")
 
+    @skipUnless(kernel_version_ge(4,7), "requires kernel >= 4.7")
     def test_softirqs(self):
-        # TODO Temporary disabled as softirqs.py doesn't work on recent
-        # kernels (can't find some of its attach targets). Need to revisit
-        # it to use the softirq tracepoints. Tracked in bcc#1031.
-        # self.run_with_duration("softirqs.py 1 1")
+        self.run_with_duration("softirqs.py 1 1")
         pass
 
     @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
