@@ -136,6 +136,7 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, TableStorage &ts, const st
   vector<const char *> flags_cstr({"-O0", "-emit-llvm", "-I", dstack.cwd(),
                                    "-Wno-deprecated-declarations",
                                    "-Wno-gnu-variable-sized-type-not-at-end",
+                                   "-Wno-pragma-once-outside-header",
                                    "-fno-color-diagnostics",
                                    "-fno-unwind-tables",
                                    "-fno-asynchronous-unwind-tables",
