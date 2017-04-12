@@ -533,7 +533,7 @@ class PerfEventArray(ArrayBase):
         self[self.Key(cpu)] = self.Leaf(fd)
         self.bpf._add_kprobe((id(self), cpu), reader)
         # keep a refcnt
-        self._cbs[cpu] = fn
+        self._cbs[cpu] = (fn, lost_fn)
 
     def close_perf_buffer(self, key):
         reader = self.bpf.open_kprobes.get((id(self), key))
