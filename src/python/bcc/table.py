@@ -525,7 +525,7 @@ class PerfEventArray(ArrayBase):
 
     def _open_perf_buffer(self, cpu, callback, page_cnt, lost_cb):
         fn = _RAW_CB_TYPE(lambda _, data, size: callback(cpu, data, size))
-        lost_fn = _LOST_CB_TYPE(lambda lost: lost_cb(lost) if lost_cb else -1)
+        lost_fn = _LOST_CB_TYPE(lambda lost: lost_cb(lost)) if lost_cb else ct.cast(None, _LOST_CB_TYPE)
         reader = lib.bpf_open_perf_buffer(fn, lost_fn, None, -1, cpu, page_cnt)
         if not reader:
             raise Exception("Could not open perf buffer")
@@ -533,7 +533,7 @@ class PerfEventArray(ArrayBase):
         self[self.Key(cpu)] = self.Leaf(fd)
         self.bpf._add_kprobe((id(self), cpu), reader)
         # keep a refcnt
-        self._cbs[cpu] = fn
+        self._cbs[cpu] = (fn, lost_fn)
 
     def close_perf_buffer(self, key):
         reader = self.bpf.open_kprobes.get((id(self), key))
