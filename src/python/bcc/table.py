@@ -463,6 +463,13 @@ class ProgArray(ArrayBase):
             leaf = self.Leaf(leaf.fd)
         super(ProgArray, self).__setitem__(key, leaf)
 
+    def __delitem__(self, key):
+        key = self._normalize_key(key)
+        key_p = ct.pointer(key)
+        res = lib.bpf_delete_elem(self.map_fd, ct.cast(key_p, ct.c_void_p))
+        if res < 0:
+            raise Exception("Could not delete item")
+
 class PerfEventArray(ArrayBase):
     class Event(object):
         def __init__(self, typ, config):
