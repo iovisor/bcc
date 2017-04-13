@@ -360,9 +360,12 @@ static char *find_debug_via_debuglink(Elf *e, const char *binpath) {
   bindir = strdup(binpath);
   bindir = dirname(bindir);
 
-  // Search for the file in 'binpath'
+  // Search for the file in 'binpath', but ignore the file we find if it
+  // matches the binary itself: the binary will always be probed later on,
+  // and it might contain poorer symbols (e.g. stripped or partial symbols)
+  // than the external debuginfo that might be available elsewhere.
   sprintf(fullpath, "%s/%s", bindir, name);
-  if (access(fullpath, F_OK) != -1) {
+  if (strcmp(fullpath, binpath) != 0 && access(fullpath, F_OK) != -1) {
     res = strdup(fullpath);
     goto DONE;
   }
