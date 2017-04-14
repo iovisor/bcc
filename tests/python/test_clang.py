@@ -504,5 +504,26 @@ void do_trace(struct pt_regs *ctx) {
         self.assertEqual(1, b["dummy"][ct.c_ulong(0)].value)
         self.assertEqual(2, b["dummy"][ct.c_ulong(1)].value)
 
+    def test_prog_array_delete(self):
+        text = """
+BPF_TABLE("prog", int, int, dummy, 256);
+"""
+        b1 = BPF(text=text)
+        text = """
+int do_next(struct pt_regs *ctx) {
+    return 0;
+}
+"""
+        b2 = BPF(text=text)
+        fn = b2.load_func("do_next", BPF.KPROBE)
+        c_key = ct.c_int(0)
+        b1["dummy"][c_key] = ct.c_int(fn.fd)
+        b1["dummy"].__delitem__(c_key);
+        with self.assertRaises(KeyError):
+            b1["dummy"][c_key]
+
+
+
+
 if __name__ == "__main__":
     main()
