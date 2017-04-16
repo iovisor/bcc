@@ -13,8 +13,8 @@
 # limitations under the License.
 
 import ctypes as ct
-import multiprocessing
 import os
+from .utils import get_online_cpus
 
 class Perf(object):
         class perf_event_attr(ct.Structure):
@@ -105,5 +105,5 @@ class Perf(object):
                     attr.sample_period = 1
                 attr.wakeup_events = 9999999                # don't wake up
 
-                for cpu in range(0, multiprocessing.cpu_count()):
+                for cpu in get_online_cpus():
                         Perf._open_for_cpu(cpu, attr)

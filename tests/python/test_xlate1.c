@@ -11,7 +11,7 @@ struct IPLeaf {
   u64 ip_xlated_pkts;
   u64 arp_xlated_pkts;
 };
-BPF_TABLE("hash", struct IPKey, struct IPLeaf, xlate, 1024);
+BPF_HASH(xlate, struct IPKey, struct IPLeaf, 1024);
 
 int on_packet(struct __sk_buff *skb) {
   u8 *cursor = 0;

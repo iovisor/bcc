@@ -195,20 +195,21 @@ def print_event(cpu, data, size):
             skip = True
         if args.name and not re.search(args.name, event.comm):
             skip = True
-        if args.line and not re.search(args.line, ' '.join(argv[event.pid])):
+        if args.line and not re.search(args.line, b' '.join(argv[event.pid])):
             skip = True
 
         if not skip:
             if args.timestamp:
                 print("%-8.3f" % (time.time() - start_ts), end="")
             ppid = get_ppid(event.pid)
-            print("%-16s %-6s %-6s %3s %s" % (event.comm, event.pid,
+            print("%-16s %-6s %-6s %3s %s" % (event.comm.decode(), event.pid,
                     ppid if ppid > 0 else "?", event.retval,
-                    ' '.join(argv[event.pid])))
+                    b' '.join(argv[event.pid])))
         try:
             del(argv[event.pid])
         except Exception:
             pass
+
 
 # loop with callback to print_event
 b["events"].open_perf_buffer(print_event)

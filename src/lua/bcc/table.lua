@@ -29,6 +29,7 @@ BaseTable.static.BPF_MAP_TYPE_STACK_TRACE = 7
 BaseTable.static.BPF_MAP_TYPE_CGROUP_ARRAY = 8
 BaseTable.static.BPF_MAP_TYPE_LRU_HASH = 9
 BaseTable.static.BPF_MAP_TYPE_LRU_PERCPU_HASH = 10
+BaseTable.static.BPF_MAP_TYPE_LPM_TRIE = 11
 
 function BaseTable:initialize(t_type, bpf, map_id, map_fd, key_type, leaf_type)
   assert(t_type == libbcc.bpf_table_type_id(bpf.module, map_id))
@@ -242,13 +243,22 @@ local function _perf_id(id, cpu)
   return string.format("bcc:perf_event_array:%d:%d", tonumber(id), cpu or 0)
 end
 
-function PerfEventArray:_open_perf_buffer(cpu, callback, ctype)
+function PerfEventArray:_open_perf_buffer(cpu, callback, ctype, page_cnt, lost_cb)
   local _cb = ffi.cast("perf_reader_raw_cb",
     function (cookie, data, size)
       callback(cpu, ctype(data)[0])
     end)
 
-  local reader = libbcc.bpf_open_perf_buffer(_cb, nil, -1, cpu)
+  local _lost_cb = nil
+  if lost_cb then
+    _lost_cb = ffi.cast("perf_reader_lost_cb",
+      function (lost)
+        lost_cb(lost)
+      end)
+  end
+
+  -- default to 8 pages per buffer
+  local reader = libbcc.bpf_open_perf_buffer(_cb, nil, _lost_cb, -1, cpu, page_cnt or 8)
   assert(reader, "failed to open perf buffer")
 
   local fd = libbcc.perf_reader_fd(reader)
@@ -257,11 +267,11 @@ function PerfEventArray:_open_perf_buffer(cpu, callback, ctype)
   self._callbacks[cpu] = _cb
 end
 
-function PerfEventArray:open_perf_buffer(callback, data_type, ...)
+function PerfEventArray:open_perf_buffer(callback, data_type, data_params, page_cnt, lost_cb)
   assert(data_type, "a data type is needed for callback conversion")
-  local ctype = ffi.typeof(data_type.."*", ...)
+  local ctype = ffi.typeof(data_type.."*", unpack(data_params or {}))
   for i = 0, Posix.cpu_count() - 1 do
-    self:_open_perf_buffer(i, callback, ctype)
+    self:_open_perf_buffer(i, callback, ctype, page_cnt, lost_cb)
   end
 end
 

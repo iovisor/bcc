@@ -39,16 +39,23 @@ int bpf_open_raw_sock(const char *name);
 
 typedef void (*perf_reader_cb)(void *cb_cookie, int pid, uint64_t callchain_num, void *callchain);
 typedef void (*perf_reader_raw_cb)(void *cb_cookie, void *raw, int raw_size);
+typedef void (*perf_reader_lost_cb)(uint64_t lost);
 
-void * bpf_attach_kprobe(int progfd, const char *event, const char *event_desc,
-  int pid, int cpu, int group_fd, perf_reader_cb cb, void *cb_cookie);
-int bpf_detach_kprobe(const char *event_desc);
+void * bpf_attach_kprobe(int progfd, int attach_type, const char *ev_name,
+                        const char *fn_name,
+                        int pid, int cpu, int group_fd,
+                        perf_reader_cb cb, void *cb_cookie);
 
-void * bpf_attach_uprobe(int progfd, const char *event, const char *event_desc,
-  int pid, int cpu, int group_fd, perf_reader_cb cb, void *cb_cookie);
-int bpf_detach_uprobe(const char *event_desc);
+int bpf_detach_kprobe(const char *ev_name);
 
-void * bpf_open_perf_buffer(perf_reader_raw_cb raw_cb, void *cb_cookie, int pid, int cpu);
+void * bpf_attach_uprobe(int progfd, int attach_type, const char *ev_name,
+                        const char *binary_path, uint64_t offset,
+                        int pid, int cpu, int group_fd,
+                        perf_reader_cb cb, void *cb_cookie);
+
+int bpf_detach_uprobe(const char *ev_name);
+
+void * bpf_open_perf_buffer(perf_reader_raw_cb raw_cb, perf_reader_lost_cb lost_cb, void *cb_cookie, int pid, int cpu, int page_cnt);
 ]]
 
 ffi.cdef[[
@@ -92,7 +99,6 @@ int bpf_table_leaf_sscanf(void *program, size_t id, const char *buf, void *leaf)
 ffi.cdef[[
 struct perf_reader;
 
-struct perf_reader * perf_reader_new(perf_reader_cb cb, perf_reader_raw_cb raw_cb, void *cb_cookie);
 void perf_reader_free(void *ptr);
 int perf_reader_mmap(struct perf_reader *reader, unsigned type, unsigned long sample_type);
 int perf_reader_poll(int num_readers, struct perf_reader **readers, int timeout);
@@ -109,8 +115,10 @@ struct bcc_symbol {
 };
 
 int bcc_resolve_symname(const char *module, const char *symname, const uint64_t addr,
-		struct bcc_symbol *sym);
+		int pid, struct bcc_symbol *sym);
+void bcc_procutils_free(const char *ptr);
 void *bcc_symcache_new(int pid);
+void bcc_symbol_free_demangle_name(struct bcc_symbol *sym);
 int bcc_symcache_resolve(void *symcache, uint64_t addr, struct bcc_symbol *sym);
 void bcc_symcache_refresh(void *resolver);
 ]]

@@ -38,6 +38,9 @@ parser.add_argument("-C", "--noclear", action="store_true",
     help="don't clear the screen")
 parser.add_argument("-r", "--maxrows", default=20,
     help="maximum rows to print, default 20")
+parser.add_argument("-s", "--sort", default="rbytes",
+    choices=["reads", "writes", "rbytes", "wbytes"],
+    help="sort column, default rbytes")
 parser.add_argument("-p", "--pid", type=int, metavar="PID", dest="tgid",
     help="trace this PID only")
 parser.add_argument("interval", nargs="?", default=1,
@@ -184,15 +187,16 @@ while 1:
     counts = b.get_table("counts")
     line = 0
     for k, v in reversed(sorted(counts.items(),
-                                key=lambda counts: counts[1].rbytes)):
-        name = k.name
+                                key=lambda counts:
+                                  getattr(counts[1], args.sort))):
+        name = k.name.decode()
         if k.name_len > DNAME_INLINE_LEN:
             name = name[:-3] + "..."
 
         # print line
-        print("%-6d %-16s %-6d %-6d %-7d %-7d %1s %s" % (k.pid, k.comm,
-            v.reads, v.writes, v.rbytes / 1024, v.wbytes / 1024, k.type,
-            name))
+        print("%-6d %-16s %-6d %-6d %-7d %-7d %1s %s" % (k.pid,
+            k.comm.decode(), v.reads, v.writes, v.rbytes / 1024,
+            v.wbytes / 1024, k.type.decode(), name))
 
         line += 1
         if line >= maxrows:

@@ -24,6 +24,11 @@
 extern "C" {
 #endif
 
+enum bpf_probe_attach_type {
+	BPF_PROBE_ENTRY,
+	BPF_PROBE_RETURN
+};
+
 int bpf_create_map(enum bpf_map_type map_type, int key_size, int value_size,
 		   int max_entries, int map_flags);
 int bpf_update_elem(int fd, void *key, void *value, unsigned long long flags);
@@ -43,23 +48,30 @@ int bpf_open_raw_sock(const char *name);
 typedef void (*perf_reader_cb)(void *cb_cookie, int pid, uint64_t callchain_num,
                                void *callchain);
 typedef void (*perf_reader_raw_cb)(void *cb_cookie, void *raw, int raw_size);
+typedef void (*perf_reader_lost_cb)(uint64_t lost);
 
-void * bpf_attach_kprobe(int progfd, const char *event, const char *event_desc,
-                         int pid, int cpu, int group_fd, perf_reader_cb cb,
-                         void *cb_cookie);
-int bpf_detach_kprobe(const char *event_desc);
+void * bpf_attach_kprobe(int progfd, enum bpf_probe_attach_type attach_type, 
+                        const char *ev_name, const char *fn_name,
+                        pid_t pid, int cpu, int group_fd,
+                        perf_reader_cb cb, void *cb_cookie);
 
-void * bpf_attach_uprobe(int progfd, const char *event, const char *event_desc,
-                         int pid, int cpu, int group_fd, perf_reader_cb cb,
-                         void *cb_cookie);
-int bpf_detach_uprobe(const char *event_desc);
+int bpf_detach_kprobe(const char *ev_name);
+
+void * bpf_attach_uprobe(int progfd, enum bpf_probe_attach_type attach_type,
+                        const char *ev_name, const char *binary_path, uint64_t offset,
+                        pid_t pid, int cpu, int group_fd,
+                        perf_reader_cb cb, void *cb_cookie);
+
+int bpf_detach_uprobe(const char *ev_name);
 
 void * bpf_attach_tracepoint(int progfd, const char *tp_category,
                              const char *tp_name, int pid, int cpu,
                              int group_fd, perf_reader_cb cb, void *cb_cookie);
 int bpf_detach_tracepoint(const char *tp_category, const char *tp_name);
 
-void * bpf_open_perf_buffer(perf_reader_raw_cb raw_cb, void *cb_cookie, int pid, int cpu);
+void * bpf_open_perf_buffer(perf_reader_raw_cb raw_cb,
+                            perf_reader_lost_cb lost_cb, void *cb_cookie,
+                            int pid, int cpu, int page_cnt);
 
 /* attached a prog expressed by progfd to the device specified in dev_name */
 int bpf_attach_xdp(const char *dev_name, int progfd);
@@ -70,6 +82,9 @@ int bpf_attach_perf_event(int progfd, uint32_t ev_type, uint32_t ev_config,
                           uint64_t sample_period, uint64_t sample_freq,
                           pid_t pid, int cpu, int group_fd);
 int bpf_detach_perf_event(uint32_t ev_type, uint32_t ev_config);
+
+int bpf_obj_pin(int fd, const char *pathname);
+int bpf_obj_get(const char *pathname);
 
 #define LOG_BUF_SIZE 65536
 

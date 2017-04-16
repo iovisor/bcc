@@ -147,12 +147,12 @@ start_ts = time.time()
 def print_event(cpu, data, size):
     event = ct.cast(data, ct.POINTER(Data)).contents
     print("%-11.6f %-6d %-16s %1s %s" % (
-            time.time() - start_ts, event.pid, event.comm, mode_s[event.type],
-            event.filename))
+            time.time() - start_ts, event.pid, event.comm.decode(),
+            mode_s[event.type], event.filename.decode()))
 
 # header
 print("%-11s %-6s %-16s %1s %s" % ("TIME(s)", "PID", "COMM", "T", "FILE"))
 
-b["events"].open_perf_buffer(print_event)
+b["events"].open_perf_buffer(print_event, page_cnt=64)
 while 1:
     b.kprobe_poll()

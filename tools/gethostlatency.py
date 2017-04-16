@@ -18,7 +18,20 @@
 from __future__ import print_function
 from bcc import BPF
 from time import strftime
+import argparse
 import ctypes as ct
+
+examples = """examples:
+    ./gethostlatency           # trace all TCP accept()s
+    ./gethostlatency -p 181    # only trace PID 181
+"""
+parser = argparse.ArgumentParser(
+    description="Show latency for getaddrinfo/gethostbyname[2] calls",
+    formatter_class=argparse.RawDescriptionHelpFormatter,
+    epilog=examples)
+parser.add_argument("-p", "--pid", help="trace this PID only", type=int,
+    default=-1)
+args = parser.parse_args()
 
 # load BPF program
 bpf_text = """
@@ -34,7 +47,6 @@ struct val_t {
 
 struct data_t {
     u32 pid;
-    u64 ts;
     u64 delta;
     char comm[TASK_COMM_LEN];
     char host[80];
@@ -77,55 +89,41 @@ int do_return(struct pt_regs *ctx) {
     bpf_probe_read(&data.host, sizeof(data.host), (void *)valp->host);
     data.pid = valp->pid;
     data.delta = tsp - valp->ts;
-    data.ts = tsp / 1000;
     events.perf_submit(ctx, &data, sizeof(data));
     start.delete(&pid);
     return 0;
 }
 """
 b = BPF(text=bpf_text)
-b.attach_uprobe(name="c", sym="getaddrinfo", fn_name="do_entry")
-b.attach_uprobe(name="c", sym="gethostbyname", fn_name="do_entry")
-b.attach_uprobe(name="c", sym="gethostbyname2", fn_name="do_entry")
-b.attach_uretprobe(name="c", sym="getaddrinfo", fn_name="do_return")
-b.attach_uretprobe(name="c", sym="gethostbyname", fn_name="do_return")
-b.attach_uretprobe(name="c", sym="gethostbyname2", fn_name="do_return")
+b.attach_uprobe(name="c", sym="getaddrinfo", fn_name="do_entry", pid=args.pid)
+b.attach_uprobe(name="c", sym="gethostbyname", fn_name="do_entry",
+                pid=args.pid)
+b.attach_uprobe(name="c", sym="gethostbyname2", fn_name="do_entry",
+                pid=args.pid)
+b.attach_uretprobe(name="c", sym="getaddrinfo", fn_name="do_return",
+                   pid=args.pid)
+b.attach_uretprobe(name="c", sym="gethostbyname", fn_name="do_return",
+                   pid=args.pid)
+b.attach_uretprobe(name="c", sym="gethostbyname2", fn_name="do_return",
+                   pid=args.pid)
 
 TASK_COMM_LEN = 16    # linux/sched.h
 
 class Data(ct.Structure):
     _fields_ = [
         ("pid", ct.c_ulonglong),
-        ("ts", ct.c_ulonglong),
         ("delta", ct.c_ulonglong),
         ("comm", ct.c_char * TASK_COMM_LEN),
         ("host", ct.c_char * 80)
     ]
-
-start_ts = 0
-prev_ts = 0
-delta = 0
 
 # header
 print("%-9s %-6s %-16s %10s %s" % ("TIME", "PID", "COMM", "LATms", "HOST"))
 
 def print_event(cpu, data, size):
     event = ct.cast(data, ct.POINTER(Data)).contents
-    global start_ts
-    global prev_ts
-    global delta
-
-    if start_ts == 0:
-        prev_ts = start_ts
-
-    if start_ts == 1:
-        delta = float(delta) + (event.ts - prev_ts)
-
     print("%-9s %-6d %-16s %10.2f %s" % (strftime("%H:%M:%S"), event.pid,
-        event.comm, (event.delta / 1000000), event.host))
-
-    prev_ts = event.ts
-    start_ts = 1
+        event.comm.decode(), (event.delta / 1000000), event.host.decode()))
 
 # loop with callback to print_event
 b["events"].open_perf_buffer(print_event)

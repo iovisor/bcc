@@ -11,6 +11,10 @@ UPSTREAM_VERSION := $(shell dpkg-parsechangelog | sed -rne "s,^Version: ([0-9.]+
 %:
 	dh $@ --buildsystem=cmake --parallel
 
+# tests cannot be run in parallel
+override_dh_auto_test:
+	dh_auto_test -O--buildsystem=cmake -O--no-parallel
+
 # FIXME: LLVM_DEFINITIONS is broken somehow in LLVM cmake upstream
 override_dh_auto_configure:
 	dh_auto_configure -- -DREVISION_LAST=$(UPSTREAM_VERSION) -DREVISION=$(UPSTREAM_VERSION) -DLLVM_DEFINITIONS="-D_GNU_SOURCE -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS"

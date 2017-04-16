@@ -119,10 +119,7 @@ while 1:
     (task, pid, cpu, flags, ts, msg) = b.trace_fields()
     if msg != "":
         (reg, addr) = msg.split(" ")
-        if offset:
-            ip = b.ksymaddr(int(addr, 16))
-        else:
-            ip = b.ksym(int(addr, 16))
+        ip = b.ksym(int(addr, 16), show_offset=offset)
         msg = msg + " " + ip
     if verbose:
         print("%-18.9f %-12.12s %-6d %-3d %s" % (ts, task, pid, cpu, msg))

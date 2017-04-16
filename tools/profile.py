@@ -90,7 +90,7 @@ parser.add_argument("-a", "--annotations", action="store_true",
     help="add _[k] annotations to kernel frames")
 parser.add_argument("-f", "--folded", action="store_true",
     help="output folded format, one line per stack (for flame graphs)")
-parser.add_argument("--stack-storage-size", default=2048,
+parser.add_argument("--stack-storage-size", default=10240,
     type=positive_nonzero_int,
     help="the number of unique stack traces that can be stored and "
         "displayed (default 2048)")
@@ -287,12 +287,12 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
     else:
         # print default multi-line stack output.
         for addr in kernel_stack:
-            print("    %016x %s" % (addr, aksym(addr)))
+            print("    %s" % aksym(addr))
         if do_delimiter:
             print("    --")
         for addr in user_stack:
-            print("    %016x %s" % (addr, b.sym(addr, k.pid)))
-        print("    %-16s %s (%d)" % ("-", k.name, k.pid))
+            print("    %s" % b.sym(addr, k.pid))
+        print("    %-16s %s (%d)" % ("-", k.name.decode(), k.pid))
         print("        %d\n" % v.value)
 
 # check missing

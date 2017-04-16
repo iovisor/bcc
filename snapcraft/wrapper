@@ -1,0 +1,14 @@
+#!/bin/sh -e
+# Snappy does not yet support CAP_SYS_ADMIN for unconfined snaps, thus sudo:
+# https://bugs.launchpad.net/snappy/+bug/1586581
+# stdout isn't set to line buffered mode:
+# https://bugs.launchpad.net/snappy/+bug/1587675
+
+cmd="$1"
+if [ `id -u` = 0 ] ; then
+	shift
+	stdbuf -oL $SNAP/usr/bin/python "$SNAP/usr/share/bcc/tools/$cmd" $@
+else
+	echo "Need to run $cmd as root (use sudo $@)"
+	exit 1
+fi

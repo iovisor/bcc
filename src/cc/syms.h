@@ -39,7 +39,7 @@ public:
   virtual ~SymbolCache() = default;
 
   virtual void refresh() = 0;
-  virtual bool resolve_addr(uint64_t addr, struct bcc_symbol *sym) = 0;
+  virtual bool resolve_addr(uint64_t addr, struct bcc_symbol *sym, bool demangle = true) = 0;
   virtual bool resolve_name(const char *module, const char *name,
                             uint64_t *addr) = 0;
 };
@@ -58,7 +58,7 @@ class KSyms : SymbolCache {
   static void _add_symbol(const char *, uint64_t, void *);
 
 public:
-  virtual bool resolve_addr(uint64_t addr, struct bcc_symbol *sym);
+  virtual bool resolve_addr(uint64_t addr, struct bcc_symbol *sym, bool demangle = true);
   virtual bool resolve_name(const char *unused, const char *name,
                             uint64_t *addr);
   virtual void refresh();
@@ -79,18 +79,27 @@ class ProcSyms : SymbolCache {
   };
 
   struct Module {
-    Module(const char *name, uint64_t start, uint64_t end)
-        : name_(name), start_(start), end_(end) {}
+    struct Range {
+      uint64_t start;
+      uint64_t end;
+      Range(uint64_t s, uint64_t e) : start(s), end(e) {}
+    };
+
+    Module(const char *name, int pid, bool in_ns);
     std::string name_;
-    uint64_t start_;
-    uint64_t end_;
+    std::vector<Range> ranges_;
+    bool is_so_;
+    int pid_;
+    bool in_ns_;
     std::unordered_set<std::string> symnames_;
     std::vector<Symbol> syms_;
 
     void load_sym_table();
+    bool contains(uint64_t addr) const;
+    uint64_t start() const { return ranges_.begin()->start; }
     bool find_addr(uint64_t addr, struct bcc_symbol *sym);
     bool find_name(const char *symname, uint64_t *addr);
-    bool is_so() const;
+    bool is_so() const { return is_so_; }
     bool is_perf_map() const;
 
     static int _add_symbol(const char *symname, uint64_t start, uint64_t end,
@@ -107,7 +116,7 @@ class ProcSyms : SymbolCache {
 public:
   ProcSyms(int pid);
   virtual void refresh();
-  virtual bool resolve_addr(uint64_t addr, struct bcc_symbol *sym);
+  virtual bool resolve_addr(uint64_t addr, struct bcc_symbol *sym, bool demangle = true);
   virtual bool resolve_name(const char *module, const char *name,
                             uint64_t *addr);
 };

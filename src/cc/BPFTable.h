@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include <cstring>
+#include <sys/epoll.h>
 #include <exception>
 #include <map>
 #include <memory>
@@ -27,22 +29,20 @@
 #include "bpf_module.h"
 #include "libbpf.h"
 #include "perf_reader.h"
+#include "table_desc.h"
 
 namespace ebpf {
 
 template <class KeyType, class ValueType>
 class BPFTableBase {
-public:
+ public:
   size_t capacity() { return capacity_; }
 
-protected:
-  BPFTableBase(BPFModule* bpf_module, const std::string& name) {
-    size_t id_ = bpf_module->table_id(name);
-    if (id_ >= bpf_module->num_tables())
-      throw std::invalid_argument("Table " + name + " does not exist");
-    fd_ = bpf_module->table_fd(id_);
-    capacity_ = bpf_module->table_max_entries(id_);
-  };
+ protected:
+  explicit BPFTableBase(const TableDesc& desc) {
+    fd_ = desc.fd;
+    capacity_ = desc.max_entries;
+  }
 
   bool lookup(KeyType* key, ValueType* value) {
     return bpf_lookup_elem(fd_, static_cast<void*>(key),
@@ -67,20 +67,80 @@ protected:
   size_t capacity_;
 };
 
-template <class KeyType, class ValueType>
-class BPFHashTable : protected BPFTableBase<KeyType, ValueType> {
+template <class ValueType>
+class BPFArrayTable : protected BPFTableBase<int, ValueType> {
 public:
-  BPFHashTable(BPFModule* bpf_module, const std::string& name)
-      : BPFTableBase<KeyType, ValueType>(bpf_module, name) {}
-
-  ValueType get_value(const KeyType& key) {
-    ValueType res;
-    if (!this->lookup(const_cast<KeyType*>(&key), &res))
-      throw std::invalid_argument("Key does not exist in the table");
-    return res;
+  BPFArrayTable(const TableDesc& desc)
+      : BPFTableBase<int, ValueType>(desc) {
+    if (desc.type != BPF_MAP_TYPE_ARRAY &&
+        desc.type != BPF_MAP_TYPE_PERCPU_ARRAY)
+      throw std::invalid_argument("Table '" + desc.name + "' is not an array table");
   }
 
-  ValueType operator[](const KeyType& key) { return get_value(key); }
+  StatusTuple get_value(const int& index, ValueType& value) {
+    if (!this->lookup(const_cast<int*>(&index), &value))
+      return StatusTuple(-1, "Error getting value: %s", std::strerror(errno));
+    return StatusTuple(0);
+  }
+
+  StatusTuple update_value(const int& index, const ValueType& value) {
+    if (!this->update(const_cast<int*>(&index), const_cast<ValueType*>(&value)))
+      return StatusTuple(-1, "Error updating value: %s", std::strerror(errno));
+    return StatusTuple(0);
+  }
+
+  ValueType operator[](const int& key) {
+    ValueType value;
+    get_value(key, value);
+    return value;
+  }
+
+  std::vector<ValueType> get_table_offline() {
+    std::vector<ValueType> res(this->capacity());
+
+    for (int i = 0; i < (int) this->capacity(); i++) {
+      get_value(i, res[i]);
+    }
+
+    return res;
+  }
+};
+
+template <class KeyType, class ValueType>
+class BPFHashTable : protected BPFTableBase<KeyType, ValueType> {
+ public:
+  explicit BPFHashTable(const TableDesc& desc)
+      : BPFTableBase<KeyType, ValueType>(desc) {
+    if (desc.type != BPF_MAP_TYPE_HASH &&
+        desc.type != BPF_MAP_TYPE_PERCPU_HASH &&
+        desc.type != BPF_MAP_TYPE_LRU_HASH &&
+        desc.type != BPF_MAP_TYPE_LRU_PERCPU_HASH)
+      throw std::invalid_argument("Table '" + desc.name + "' is not a hash table");
+  }
+
+  StatusTuple get_value(const KeyType& key, ValueType& value) {
+    if (!this->lookup(const_cast<KeyType*>(&key), &value))
+      return StatusTuple(-1, "Error getting value: %s", std::strerror(errno));
+    return StatusTuple(0);
+  }
+
+  StatusTuple update_value(const KeyType& key, const ValueType& value) {
+    if (!this->update(const_cast<KeyType*>(&key), const_cast<ValueType*>(&value)))
+      return StatusTuple(-1, "Error updating value: %s", std::strerror(errno));
+    return StatusTuple(0);
+  }
+
+  StatusTuple remove_value(const KeyType& key) {
+    if (!this->remove(const_cast<KeyType*>(&key)))
+      return StatusTuple(-1, "Error removing value: %s", std::strerror(errno));
+    return StatusTuple(0);
+  }
+
+  ValueType operator[](const KeyType& key) {
+    ValueType value;
+    get_value(key, value);
+    return value;
+  }
 
   std::vector<std::pair<KeyType, ValueType>> get_table_offline() {
     std::vector<std::pair<KeyType, ValueType>> res;
@@ -108,34 +168,54 @@ struct stacktrace_t {
 };
 
 class BPFStackTable : protected BPFTableBase<int, stacktrace_t> {
-public:
-  BPFStackTable(BPFModule* bpf_module, const std::string& name)
-      : BPFTableBase<int, stacktrace_t>(bpf_module, name) {}
+ public:
+  BPFStackTable(const TableDesc& desc)
+      : BPFTableBase<int, stacktrace_t>(desc) {}
   ~BPFStackTable();
 
   std::vector<intptr_t> get_stack_addr(int stack_id);
   std::vector<std::string> get_stack_symbol(int stack_id, int pid);
 
-private:
+ private:
   std::map<int, void*> pid_sym_;
 };
 
 class BPFPerfBuffer : protected BPFTableBase<int, int> {
-public:
-  BPFPerfBuffer(BPFModule* bpf_module, const std::string& name)
-      : BPFTableBase<int, int>(bpf_module, name) {}
+ public:
+  BPFPerfBuffer(const TableDesc& desc)
+      : BPFTableBase<int, int>(desc), epfd_(-1) {}
   ~BPFPerfBuffer();
 
-  StatusTuple open_all_cpu(perf_reader_raw_cb cb, void* cb_cookie);
+  StatusTuple open_all_cpu(perf_reader_raw_cb cb, perf_reader_lost_cb lost_cb,
+                           void* cb_cookie, int page_cnt);
   StatusTuple close_all_cpu();
   void poll(int timeout);
 
-private:
-  StatusTuple open_on_cpu(perf_reader_raw_cb cb, int cpu, void* cb_cookie);
+ private:
+  StatusTuple open_on_cpu(perf_reader_raw_cb cb, perf_reader_lost_cb lost_cb,
+                          int cpu, void* cb_cookie, int page_cnt);
   StatusTuple close_on_cpu(int cpu);
 
   std::map<int, perf_reader*> cpu_readers_;
-  std::vector<perf_reader*> readers_;
+
+  int epfd_;
+  std::unique_ptr<epoll_event[]> ep_events_;
+};
+
+class BPFProgTable : protected BPFTableBase<int, int> {
+public:
+  BPFProgTable(const TableDesc& desc)
+      : BPFTableBase<int, int>(desc) {
+    if (desc.type != BPF_MAP_TYPE_PROG_ARRAY)
+      throw std::invalid_argument("Table '" + desc.name + "' is not a prog table");
+  }
+
+  // updates an element
+  StatusTuple update_value(const int& index, const int& value) {
+    if (!this->update(const_cast<int*>(&index), const_cast<int*>(&value)))
+      return StatusTuple(-1, "Error updating value: %s", std::strerror(errno));
+    return StatusTuple(0);
+  }
 };
 
 }  // namespace ebpf

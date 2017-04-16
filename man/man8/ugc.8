@@ -1,8 +1,17 @@
 .TH ugc 8  "2016-11-07" "USER COMMANDS"
 .SH NAME
-ugc \- Trace garbage collection events in high-level languages.
+ugc, javagc, pythongc, rubygc, nodegc \- Trace garbage collection events in
+high-level languages.
 .SH SYNOPSIS
-.B ugc [-h] [-v] [-m] {java,python,ruby,node} pid
+.B javagc [-h] [-v] [-m] [-M MINIMUM] [-F FILTER] pid
+.br
+.B pythongc [-h] [-v] [-m] [-M MINIMUM] [-F FILTER] pid
+.br
+.B rubygc [-h] [-v] [-m] [-M MINIMUM] [-F FILTER] pid
+.br
+.B nodegc [-h] [-v] [-m] [-M MINIMUM] [-F FILTER] pid
+.br
+.B ugc [-h] [-v] [-m] [-M MINIMUM] [-F FILTER] [-l {java,python,ruby,node}] pid
 .SH DESCRIPTION
 This traces garbage collection events as they occur, including their duration
 and any additional information (such as generation collected or type of GC)
@@ -24,6 +33,18 @@ Print the resulting BPF program, for debugging purposes.
 \-m
 Print times in milliseconds. The default is microseconds.
 .TP
+\-M MINIMUM
+Display only collections that are longer than this threshold. The value is
+given in milliseconds. The default is to display all collections.
+.TP
+\-F FILTER
+Display only collections whose textual description matches (contains) this
+string. The default is to display all collections. Note that the filtering here
+is performed in user-space, and not as part of the BPF program. This means that
+if you have thousands of collection events, specifying this filter will not
+reduce the amount of data that has to be transferred from the BPF program to
+the user-space script.
+.TP
 {java,python,ruby,node}
 The language to trace.
 .TP
@@ -39,16 +60,22 @@ Trace garbage collections in a specific Java process, and print GC times in
 milliseconds:
 #
 .B ugc -m java 6004
+.TP
+Trace garbage collections in a specific Java process, and display them only if
+they are longer than 10ms and have the string "Tenured" in their detailed
+description:
+#
+.B ugc -M 10 -F Tenured java 6004
 .SH FIELDS
 .TP
 START
 The start time of the GC, in seconds from the beginning of the trace.
 .TP
-DESCRIPTION
-The runtime-provided description of this garbage collection event.
-.TP
 TIME
 The duration of the garbage collection event.
+.TP
+DESCRIPTION
+The runtime-provided description of this garbage collection event.
 .SH OVERHEAD
 Garbage collection events, even if frequent, should not produce a considerable
 overhead when traced because they are still not very common. Even hundreds of 

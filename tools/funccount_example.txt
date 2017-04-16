@@ -169,7 +169,7 @@ Ctrl-C has been hit.
 User functions can be traced in executables or libraries, and per-process
 filtering is allowed:
 
-# ./funccount -p 1442 contentions:*
+# ./funccount -p 1442 /home/ubuntu/contentions:*
 Tracing 15 functions for "/home/ubuntu/contentions:*"... Hit Ctrl-C to end.
 ^C
 FUNC                                           COUNT
@@ -179,6 +179,10 @@ primes_thread                                      2
 insert_result                                  87186
 is_prime                                     1252772
 Detaching...
+
+If /home/ubuntu is in the $PATH, then the following command will also work:
+
+# ./funccount -p 1442 contentions:*
 
 
 Counting libc write and read calls using regular expression syntax (-r):
@@ -314,6 +318,8 @@ examples:
     ./funccount -Ti 5 'vfs_*'       # output every 5 seconds, with timestamps
     ./funccount -p 185 'vfs_*'      # count vfs calls for PID 181 only
     ./funccount t:sched:sched_fork  # count calls to the sched_fork tracepoint
-    ./funccount -p 185 u:node:gc*   # count all GC USDT probes in node
+    ./funccount -p 185 u:node:gc*   # count all GC USDT probes in node, PID 185
     ./funccount c:malloc            # count all malloc() calls in libc
- 
+    ./funccount go:os.*             # count all "os.*" calls in libgo
+    ./funccount -p 185 go:os.*      # count all "os.*" calls in libgo, PID 185
+    ./funccount ./test:read*        # count "read*" calls in the ./test binary

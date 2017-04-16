@@ -1,8 +1,19 @@
 .TH ustat 8  "2016-11-07" "USER COMMANDS"
 .SH NAME
-ustat \- Activity stats from high-level languages.
+ustat, javastat, pythonstat, rubystat, nodestat, phpstat \- Activity stats from
+high-level languages.
 .SH SYNOPSIS
-.B ustat [-l {java,python,ruby,node}] [-C] [-S {cload,excp,gc,method,objnew,thread}] [-r MAXROWS] [-d] [interval [count]]
+.B javastat [-C] [-S {cload,excp,gc,method,objnew,thread}] [-r MAXROWS] [-d] [interval [count]]
+.br
+.B pythonstat [-C] [-S {cload,excp,gc,method,objnew,thread}] [-r MAXROWS] [-d] [interval [count]]
+.br
+.B rubystat [-C] [-S {cload,excp,gc,method,objnew,thread}] [-r MAXROWS] [-d] [interval [count]]
+.br
+.B nodestat [-C] [-S {cload,excp,gc,method,objnew,thread}] [-r MAXROWS] [-d] [interval [count]]
+.br
+.B phpstat [-C] [-S {cload,excp,gc,method,objnew,thread}] [-r MAXROWS] [-d] [interval [count]]
+.br
+.B ustat [-l {java,python,ruby,node,php}] [-C] [-S {cload,excp,gc,method,objnew,thread}] [-r MAXROWS] [-d] [interval [count]]
 .SH DESCRIPTION
 This is "top" for high-level language events, such as garbage collections,
 exceptions, thread creations, object allocations, method calls, and more. The
@@ -12,11 +23,12 @@ can be sorted by various fields.
 This uses in-kernel eBPF maps to store per process summaries for efficiency.
 
 This tool relies on USDT probes embedded in many high-level languages, such as
-Node, Java, Python, and Ruby. It requires a runtime instrumented with these 
+Node, Java, Python, Ruby, and PHP. It requires a runtime instrumented with these 
 probes, which in some cases requires building from source with a USDT-specific
 flag, such as "--enable-dtrace" or "--with-dtrace". For Java, some probes are
 not enabled by default, and can be turned on by running the Java process with
-the "-XX:+ExtendedDTraceProbes" flag.
+the "-XX:+ExtendedDTraceProbes" flag. For PHP processes, the environment
+variable USE_ZEND_DTRACE must be set to 1.
 
 Newly-created processes will only be traced at the next interval. If you run
 this tool with a short interval (say, 1-5 seconds), this should be virtually
@@ -28,7 +40,7 @@ Since this uses BPF, only the root user can use this tool.
 CONFIG_BPF and bcc.
 .SH OPTIONS
 .TP
-\-l {java,python,ruby,node}
+\-l {java,python,ruby,node,php}
 The language to trace. By default, all languages are traced.
 .TP
 \-C

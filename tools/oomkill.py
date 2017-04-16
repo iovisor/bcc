@@ -68,7 +68,8 @@ def print_event(cpu, data, size):
         avgline = stats.read().rstrip()
     print(("%s Triggered by PID %d (\"%s\"), OOM kill of PID %d (\"%s\")"
         ", %d pages, loadavg: %s") % (strftime("%H:%M:%S"), event.fpid,
-        event.fcomm, event.tpid, event.tcomm, event.pages, avgline))
+        event.fcomm.decode(), event.tpid, event.tcomm.decode(), event.pages,
+        avgline))
 
 # initialize BPF
 b = BPF(text=bpf_text)

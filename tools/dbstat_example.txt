@@ -1,0 +1,120 @@
+Demonstrations of dbstat, the Linux eBPF/bcc version.
+
+
+dbstat traces queries performed by a MySQL or PostgreSQL database process, and
+displays a histogram of query latencies. For example:
+
+# dbstat mysql
+Tracing database queries for pids 25776 slower than 0 ms...
+     query latency (ms)  : count     distribution
+         0 -> 1          : 990      |****************************************|
+         2 -> 3          : 7        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 0        |                                        |
+      1024 -> 2047       : 2        |                                        |
+^C
+
+It's immediately evident that the vast majority of queries finish very quickly,
+in under 1ms, but there are some super-slow queries occasionally, in the 1-2
+seconds bucket.
+
+We can filter out the shorter queries with the -m switch:
+
+# dbstat mysql -m 1000
+Tracing database queries for pids 25776 slower than 1000 ms...
+     query latency (ms)  : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 0        |                                        |
+      1024 -> 2047       : 8        |****************************************|
+^C
+
+By default, dbstat will try to detect mysqld and postgres processes, but if
+necessary, you can specify the process ids with the -p switch. Here, the -i
+switch is also used to request histograms at 3 second intervals:
+
+# dbstat mysql -p $(pidof mysql) -i 3
+Tracing database queries for pids 25776 slower than 0 ms...
+[06:14:36]
+     query latency (ms)  : count     distribution
+         0 -> 1          : 758      |****************************************|
+         2 -> 3          : 1        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 0        |                                        |
+      1024 -> 2047       : 1        |                                        |
+
+[06:14:39]
+     query latency (ms)  : count     distribution
+         0 -> 1          : 436      |****************************************|
+         2 -> 3          : 2        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 0        |                                        |
+      1024 -> 2047       : 1        |                                        |
+
+[06:14:42]
+     query latency (ms)  : count     distribution
+         0 -> 1          : 399      |****************************************|
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 0        |                                        |
+      1024 -> 2047       : 1        |                                        |
+^C
+
+
+USAGE:
+# dbstat -h
+usage: dbstat.py [-h] [-v] [-p [PID [PID ...]]] [-m THRESHOLD] [-u]
+                 [-i INTERVAL]
+                 {mysql,postgres}
+
+positional arguments:
+  {mysql,postgres}      the database engine to use
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -v, --verbose         print the BPF program
+  -p [PID [PID ...]], --pid [PID [PID ...]]
+                        the pid(s) to trace
+  -m THRESHOLD, --threshold THRESHOLD
+                        trace queries slower than this threshold (ms)
+  -u, --microseconds    display query latencies in microseconds (default:
+                        milliseconds)
+  -i INTERVAL, --interval INTERVAL
+                        print summary at this interval (seconds)
+
+    dbstat postgres     # display a histogram of PostgreSQL query latencies
+    dbstat mysql -v     # display MySQL latencies and print the BPF program
+    dbstat mysql -u     # display query latencies in microseconds (default: ms)
+    dbstat mysql -m 5   # trace only queries slower than 5ms
+    dbstat mysql -p 408 # trace queries in a specific process

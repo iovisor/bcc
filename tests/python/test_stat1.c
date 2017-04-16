@@ -12,7 +12,7 @@ struct IPLeaf {
   u64 tx_pkts;
 };
 
-BPF_TABLE("hash", struct IPKey, struct IPLeaf, stats, 256);
+BPF_HASH(stats, struct IPKey, struct IPLeaf, 256);
 
 int on_packet(struct __sk_buff *skb) {
   u8 *cursor = 0;

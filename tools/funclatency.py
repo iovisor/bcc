@@ -90,7 +90,6 @@ if not args.regexp:
 # define BPF program
 bpf_text = """
 #include <uapi/linux/ptrace.h>
-#include <linux/blkdev.h>
 
 typedef struct ip_pid {
     u64 ip;
@@ -201,9 +200,10 @@ if not library:
     b.attach_kretprobe(event_re=pattern, fn_name="trace_func_return")
     matched = b.num_open_kprobes()
 else:
-    b.attach_uprobe(name=library, sym_re=pattern, fn_name="trace_func_entry")
+    b.attach_uprobe(name=library, sym_re=pattern, fn_name="trace_func_entry",
+                    pid=args.pid or -1)
     b.attach_uretprobe(name=library, sym_re=pattern,
-                       fn_name="trace_func_return")
+                       fn_name="trace_func_return", pid=args.pid or -1)
     matched = b.num_open_uprobes()
 
 if matched == 0:

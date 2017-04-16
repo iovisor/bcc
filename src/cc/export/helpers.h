@@ -45,6 +45,7 @@ struct _name##_table_t { \
   _leaf_type * (*lookup) (_key_type *); \
   _leaf_type * (*lookup_or_init) (_key_type *, _leaf_type *); \
   int (*update) (_key_type *, _leaf_type *); \
+  int (*insert) (_key_type *, _leaf_type *); \
   int (*delete) (_key_type *); \
   void (*call) (void *, int index); \
   void (*increment) (_key_type); \
@@ -95,13 +96,31 @@ struct _name##_table_t _name
   BPF_TABLE("hash", _key_type, u64, _name, 10240)
 #define BPF_HASH3(_name, _key_type, _leaf_type) \
   BPF_TABLE("hash", _key_type, _leaf_type, _name, 10240)
+#define BPF_HASH4(_name, _key_type, _leaf_type, _size) \
+  BPF_TABLE("hash", _key_type, _leaf_type, _name, _size)
+
 // helper for default-variable macro function
-#define BPF_HASHX(_1, _2, _3, NAME, ...) NAME
+#define BPF_HASHX(_1, _2, _3, _4, NAME, ...) NAME
 
 // Define a hash function, some arguments optional
 // BPF_HASH(name, key_type=u64, leaf_type=u64, size=10240)
 #define BPF_HASH(...) \
-  BPF_HASHX(__VA_ARGS__, BPF_HASH3, BPF_HASH2, BPF_HASH1)(__VA_ARGS__)
+  BPF_HASHX(__VA_ARGS__, BPF_HASH4, BPF_HASH3, BPF_HASH2, BPF_HASH1)(__VA_ARGS__)
+
+#define BPF_ARRAY1(_name) \
+  BPF_TABLE("array", int, u64, _name, 10240)
+#define BPF_ARRAY2(_name, _leaf_type) \
+  BPF_TABLE("array", int, _leaf_type, _name, 10240)
+#define BPF_ARRAY3(_name, _leaf_type, _size) \
+  BPF_TABLE("array", int, _leaf_type, _name, _size)
+
+// helper for default-variable macro function
+#define BPF_ARRAYX(_1, _2, _3, NAME, ...) NAME
+
+// Define an array function, some arguments optional
+// BPF_ARRAY(name, leaf_type=u64, size=10240)
+#define BPF_ARRAY(...) \
+  BPF_ARRAYX(__VA_ARGS__, BPF_ARRAY3, BPF_ARRAY2, BPF_ARRAY1)(__VA_ARGS__)
 
 #define BPF_HIST1(_name) \
   BPF_TABLE("histogram", int, u64, _name, 64)
@@ -147,7 +166,7 @@ static u32 (*bpf_get_prandom_u32)(void) =
 static int (*bpf_trace_printk_)(const char *fmt, u64 fmt_size, ...) =
   (void *) BPF_FUNC_trace_printk;
 int bpf_trace_printk(const char *fmt, ...) asm("llvm.bpf.extra");
-static void bpf_tail_call_(u64 map_fd, void *ctx, int index) {
+static inline void bpf_tail_call_(u64 map_fd, void *ctx, int index) {
   ((void (*)(void *, u64, int))BPF_FUNC_tail_call)(ctx, map_fd, index);
 }
 static int (*bpf_clone_redirect)(void *ctx, int ifindex, u32 flags) =
@@ -180,8 +199,6 @@ static int (*bpf_perf_event_output)(void *ctx, void *map, u64 index, void *data,
   (void *) BPF_FUNC_perf_event_output;
 static int (*bpf_skb_load_bytes)(void *ctx, int offset, void *to, u32 len) =
   (void *) BPF_FUNC_skb_load_bytes;
-static u64 (*bpf_get_current_task)(void) =
-  (void *) BPF_FUNC_get_current_task;
 
 /* bpf_get_stackid will return a negative value in the case of an error
  *
@@ -203,6 +220,34 @@ int bpf_get_stackid(uintptr_t map, void *ctx, u64 flags) {
 
 static int (*bpf_csum_diff)(void *from, u64 from_size, void *to, u64 to_size, u64 seed) =
   (void *) BPF_FUNC_csum_diff;
+static int (*bpf_skb_get_tunnel_opt)(void *ctx, void *md, u32 size) =
+  (void *) BPF_FUNC_skb_get_tunnel_opt;
+static int (*bpf_skb_set_tunnel_opt)(void *ctx, void *md, u32 size) =
+  (void *) BPF_FUNC_skb_set_tunnel_opt;
+static int (*bpf_skb_change_proto)(void *ctx, u16 proto, u64 flags) =
+  (void *) BPF_FUNC_skb_change_proto;
+static int (*bpf_skb_change_type)(void *ctx, u32 type) =
+  (void *) BPF_FUNC_skb_change_type;
+static u32 (*bpf_get_hash_recalc)(void *ctx) =
+  (void *) BPF_FUNC_get_hash_recalc;
+static u64 (*bpf_get_current_task)(void) =
+  (void *) BPF_FUNC_get_current_task;
+static int (*bpf_probe_write_user)(void *dst, void *src, u32 size) =
+  (void *) BPF_FUNC_probe_write_user;
+static int (*bpf_skb_change_tail)(void *ctx, u32 new_len, u64 flags) =
+  (void *) BPF_FUNC_skb_change_tail;
+static int (*bpf_skb_pull_data)(void *ctx, u32 len) =
+  (void *) BPF_FUNC_skb_pull_data;
+static int (*bpf_csum_update)(void *ctx, u16 csum) =
+  (void *) BPF_FUNC_csum_update;
+static int (*bpf_set_hash_invalid)(void *ctx) =
+  (void *) BPF_FUNC_set_hash_invalid;
+static int (*bpf_get_numa_node_id)(void) =
+  (void *) BPF_FUNC_get_numa_node_id;
+static int (*bpf_skb_change_head)(void *ctx, u32 len, u64 flags) =
+  (void *) BPF_FUNC_skb_change_head;
+static int (*bpf_xdp_adjust_head)(void *ctx, int offset) =
+  (void *) BPF_FUNC_xdp_adjust_head;
 
 /* llvm builtin functions that eBPF C program may use to
  * emit BPF_LD_ABS and BPF_LD_IND instructions
@@ -284,7 +329,7 @@ static inline void bpf_store_dword(void *skb, u64 off, u64 val) {
 #define MASK(_n) ((_n) < 64 ? (1ull << (_n)) - 1 : ((u64)-1LL))
 #define MASK128(_n) ((_n) < 128 ? ((unsigned __int128)1 << (_n)) - 1 : ((unsigned __int128)-1))
 
-static unsigned int bpf_log2(unsigned int v)
+static inline unsigned int bpf_log2(unsigned int v)
 {
   unsigned int r;
   unsigned int shift;
@@ -297,7 +342,7 @@ static unsigned int bpf_log2(unsigned int v)
   return r;
 }
 
-static unsigned int bpf_log2l(unsigned long v)
+static inline unsigned int bpf_log2l(unsigned long v)
 {
   unsigned int hi = v >> 32;
   if (hi)
@@ -442,6 +487,17 @@ int bpf_usdt_readarg_p(int argc, struct pt_regs *ctx, void *buf, u64 len) asm("l
 #define PT_REGS_RC(ctx)		((ctx)->gpr[3])
 #define PT_REGS_IP(ctx)		((ctx)->nip)
 #define PT_REGS_SP(ctx)		((ctx)->sp)
+#elif defined(__s390x__)
+#define PT_REGS_PARM1(x) ((x)->gprs[2])
+#define PT_REGS_PARM2(x) ((x)->gprs[3])
+#define PT_REGS_PARM3(x) ((x)->gprs[4])
+#define PT_REGS_PARM4(x) ((x)->gprs[5])
+#define PT_REGS_PARM5(x) ((x)->gprs[6])
+#define PT_REGS_RET(x) ((x)->gprs[14])
+#define PT_REGS_FP(x) ((x)->gprs[11]) /* Works only with CONFIG_FRAME_POINTER */
+#define PT_REGS_RC(x) ((x)->gprs[2])
+#define PT_REGS_SP(x) ((x)->gprs[15])
+#define PT_REGS_IP(x) ((x)->psw.addr)
 #elif defined(__x86_64__)
 #define PT_REGS_PARM1(ctx)	((ctx)->di)
 #define PT_REGS_PARM2(ctx)	((ctx)->si)
@@ -472,6 +528,19 @@ int bpf_usdt_readarg_p(int argc, struct pt_regs *ctx, void *buf, u64 len) asm("l
 
 #define TRACEPOINT_PROBE(category, event) \
 int tracepoint__##category##__##event(struct tracepoint__##category##__##event *args)
+
+#define TP_DATA_LOC_READ_CONST(dst, field, length)                        \
+        do {                                                              \
+            short __offset = args->data_loc_##field & 0xFFFF;             \
+            bpf_probe_read((void *)dst, length, (char *)args + __offset); \
+        } while (0);
+
+#define TP_DATA_LOC_READ(dst, field)                                        \
+        do {                                                                \
+            short __offset = args->data_loc_##field & 0xFFFF;               \
+            short __length = args->data_loc_##field >> 16;                  \
+            bpf_probe_read((void *)dst, __length, (char *)args + __offset); \
+        } while (0);
 
 #endif
 )********"

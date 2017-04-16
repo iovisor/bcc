@@ -54,8 +54,9 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
 # As reported in issue #735, GCC 6 has some behavioral problems when
 # dealing with -isystem. Hence, skip the warning optimization
 # altogether on that compiler.
+option(USINGISYSTEM "using -isystem" ON)
 execute_process(COMMAND ${CMAKE_C_COMPILER} -dumpversion OUTPUT_VARIABLE GCC_VERSION)
-if (GCC_VERSION VERSION_LESS 6.0)
+if (USINGISYSTEM AND GCC_VERSION VERSION_LESS 6.0)
   # iterate over all available directories in LLVM_INCLUDE_DIRS to
   # generate a correctly tokenized list of parameters
   foreach(ONE_LLVM_INCLUDE_DIR ${LLVM_INCLUDE_DIRS})

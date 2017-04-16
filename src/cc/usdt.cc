@@ -63,7 +63,7 @@ bool Probe::resolve_global_address(uint64_t *global, const uint64_t addr) {
 }
 
 bool Probe::add_to_semaphore(int16_t val) {
-  assert(pid_ && attached_semaphore_);
+  assert(pid_);
 
   if (!attached_semaphore_) {
     uint64_t addr;
@@ -200,7 +200,13 @@ void Context::_each_probe(const char *binpath, const struct bcc_elf_usdt *probe,
 }
 
 int Context::_each_module(const char *modpath, uint64_t, uint64_t, void *p) {
-  bcc_elf_foreach_usdt(modpath, _each_probe, p);
+  Context *ctx = static_cast<Context *>(p);
+  // Modules may be reported multiple times if they contain more than one
+  // executable region. We are going to parse the ELF on disk anyway, so we
+  // don't need these duplicates.
+  if (ctx->modules_.insert(modpath).second /*inserted new?*/) {
+    bcc_elf_foreach_usdt(modpath, _each_probe, p);
+  }
   return 0;
 }
 
@@ -223,8 +229,9 @@ std::string Context::resolve_bin_path(const std::string &bin_path) {
   if (char *which = bcc_procutils_which(bin_path.c_str())) {
     result = which;
     ::free(which);
-  } else if (const char *which_so = bcc_procutils_which_so(bin_path.c_str())) {
+  } else if (char *which_so = bcc_procutils_which_so(bin_path.c_str(), 0)) {
     result = which_so;
+    ::free(which_so);
   }
 
   return result;
@@ -359,48 +366,56 @@ void bcc_usdt_foreach(void *usdt, bcc_usdt_cb callback) {
 
 int bcc_usdt_get_location(void *usdt, const char *probe_name,
                           int index, struct bcc_usdt_location *location) {
-    USDT::Context *ctx = static_cast<USDT::Context *>(usdt);
-    USDT::Probe *probe = ctx->get(probe_name);
-    if (!probe)
-        return -1;
-    if (index < 0 || (size_t)index >= probe->num_locations())
-        return -1;
-    location->address = probe->address(index);
-    return 0;
+  USDT::Context *ctx = static_cast<USDT::Context *>(usdt);
+  USDT::Probe *probe = ctx->get(probe_name);
+  if (!probe)
+    return -1;
+  if (index < 0 || (size_t)index >= probe->num_locations())
+    return -1;
+  location->address = probe->address(index);
+  return 0;
 }
 
 int bcc_usdt_get_argument(void *usdt, const char *probe_name,
                           int location_index, int argument_index,
                           struct bcc_usdt_argument *argument) {
-    USDT::Context *ctx = static_cast<USDT::Context *>(usdt);
-    USDT::Probe *probe = ctx->get(probe_name);
-    if (!probe)
-        return -1;
-    if (argument_index < 0 || (size_t)argument_index >= probe->num_arguments())
-        return -1;
-    if (location_index < 0 || (size_t)location_index >= probe->num_locations())
-        return -1;
-    auto const &location = probe->location(location_index);
-    auto const &arg = location.arguments_[argument_index];
-    argument->size = arg.arg_size();
-    argument->valid = BCC_USDT_ARGUMENT_NONE;
-    if (arg.constant()) {
-        argument->valid |= BCC_USDT_ARGUMENT_CONSTANT;
-        argument->constant = *(arg.constant());
-    }
-    if (arg.deref_offset()) {
-        argument->valid |= BCC_USDT_ARGUMENT_DEREF_OFFSET;
-        argument->deref_offset = *(arg.deref_offset());
-    }
-    if (arg.deref_ident()) {
-        argument->valid |= BCC_USDT_ARGUMENT_DEREF_IDENT;
-        argument->deref_ident = arg.deref_ident()->c_str();
-    }
-    if (arg.register_name()) {
-        argument->valid |= BCC_USDT_ARGUMENT_REGISTER_NAME;
-        argument->register_name = arg.register_name()->c_str();
-    }
-    return 0;
+  USDT::Context *ctx = static_cast<USDT::Context *>(usdt);
+  USDT::Probe *probe = ctx->get(probe_name);
+  if (!probe)
+    return -1;
+  if (argument_index < 0 || (size_t)argument_index >= probe->num_arguments())
+    return -1;
+  if (location_index < 0 || (size_t)location_index >= probe->num_locations())
+    return -1;
+  auto const &location = probe->location(location_index);
+  auto const &arg = location.arguments_[argument_index];
+  argument->size = arg.arg_size();
+  argument->valid = BCC_USDT_ARGUMENT_NONE;
+  if (arg.constant()) {
+    argument->valid |= BCC_USDT_ARGUMENT_CONSTANT;
+    argument->constant = *(arg.constant());
+  }
+  if (arg.deref_offset()) {
+    argument->valid |= BCC_USDT_ARGUMENT_DEREF_OFFSET;
+    argument->deref_offset = *(arg.deref_offset());
+  }
+  if (arg.deref_ident()) {
+    argument->valid |= BCC_USDT_ARGUMENT_DEREF_IDENT;
+    argument->deref_ident = arg.deref_ident()->c_str();
+  }
+  if (arg.base_register_name()) {
+    argument->valid |= BCC_USDT_ARGUMENT_BASE_REGISTER_NAME;
+    argument->base_register_name = arg.base_register_name()->c_str();
+  }
+  if (arg.index_register_name()) {
+    argument->valid |= BCC_USDT_ARGUMENT_INDEX_REGISTER_NAME;
+    argument->index_register_name = arg.index_register_name()->c_str();
+  }
+  if (arg.scale()) {
+    argument->valid |= BCC_USDT_ARGUMENT_SCALE;
+    argument->scale = *(arg.scale());
+  }
+  return 0;
 }
 
 void bcc_usdt_foreach_uprobe(void *usdt, bcc_usdt_uprobe_cb callback) {

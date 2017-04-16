@@ -26,13 +26,11 @@
 #include "bpf_module.h"
 #include "compat/linux/bpf.h"
 #include "libbpf.h"
+#include "table_storage.h"
+
+static const int DEFAULT_PERF_BUFFER_PAGE_CNT = 8;
 
 namespace ebpf {
-
-enum class bpf_attach_type {
-  probe_entry,
-  probe_return
-};
 
 struct open_probe_t {
   void* reader_ptr;
@@ -46,33 +44,34 @@ class BPF {
 public:
   static const int BPF_MAX_STACK_DEPTH = 127;
 
-  explicit BPF(unsigned int flag = 0) : bpf_module_(new BPFModule(flag)) {}
+  explicit BPF(unsigned int flag = 0, TableStorage* ts = nullptr)
+      : bpf_module_(new BPFModule(flag, ts)) {}
   StatusTuple init(const std::string& bpf_program,
-                   std::vector<std::string> cflags = {},
-                   std::vector<USDT> usdt = {});
+                   const std::vector<std::string>& cflags = {},
+                   const std::vector<USDT>& usdt = {});
 
   ~BPF();
   StatusTuple detach_all();
 
   StatusTuple attach_kprobe(
       const std::string& kernel_func, const std::string& probe_func,
-      bpf_attach_type attach_type = bpf_attach_type::probe_entry,
+      bpf_probe_attach_type = BPF_PROBE_ENTRY,
       pid_t pid = -1, int cpu = 0, int group_fd = -1,
       perf_reader_cb cb = nullptr, void* cb_cookie = nullptr);
   StatusTuple detach_kprobe(
       const std::string& kernel_func,
-      bpf_attach_type attach_type = bpf_attach_type::probe_entry);
+      bpf_probe_attach_type attach_type = BPF_PROBE_ENTRY);
 
   StatusTuple attach_uprobe(
       const std::string& binary_path, const std::string& symbol,
       const std::string& probe_func, uint64_t symbol_addr = 0,
-      bpf_attach_type attach_type = bpf_attach_type::probe_entry,
+      bpf_probe_attach_type attach_type = BPF_PROBE_ENTRY,
       pid_t pid = -1, int cpu = 0, int group_fd = -1,
       perf_reader_cb cb = nullptr, void* cb_cookie = nullptr);
   StatusTuple detach_uprobe(
       const std::string& binary_path, const std::string& symbol,
       uint64_t symbol_addr = 0,
-      bpf_attach_type attach_type = bpf_attach_type::probe_entry);
+      bpf_probe_attach_type attach_type = BPF_PROBE_ENTRY);
   StatusTuple attach_usdt(const USDT& usdt, pid_t pid = -1, int cpu = 0,
                           int group_fd = -1);
   StatusTuple detach_usdt(const USDT& usdt);
@@ -91,29 +90,43 @@ public:
                                 int group_fd = -1);
   StatusTuple detach_perf_event(uint32_t ev_type, uint32_t ev_config);
 
+  template <class ValueType>
+  BPFArrayTable<ValueType> get_array_table(const std::string& name) {
+    TableStorage::iterator it;
+    if (bpf_module_->table_storage().Find(Path({bpf_module_->id(), name}), it))
+      return BPFArrayTable<ValueType>(it->second);
+    return BPFArrayTable<ValueType>({});
+  }
+
   template <class KeyType, class ValueType>
   BPFHashTable<KeyType, ValueType> get_hash_table(const std::string& name) {
-    return BPFHashTable<KeyType, ValueType>(bpf_module_.get(), name);
+    TableStorage::iterator it;
+    if (bpf_module_->table_storage().Find(Path({bpf_module_->id(), name}), it))
+      return BPFHashTable<KeyType, ValueType>(it->second);
+    return BPFHashTable<KeyType, ValueType>({});
   }
 
-  BPFStackTable get_stack_table(const std::string& name) {
-    return BPFStackTable(bpf_module_.get(), name);
-  }
+  BPFProgTable get_prog_table(const std::string& name);
 
-  StatusTuple open_perf_buffer(const std::string& name, perf_reader_raw_cb cb,
-                               void* cb_cookie = nullptr);
+  BPFStackTable get_stack_table(const std::string& name);
+
+  StatusTuple open_perf_buffer(const std::string& name,
+                               perf_reader_raw_cb cb,
+                               perf_reader_lost_cb lost_cb = nullptr,
+                               void* cb_cookie = nullptr,
+                               int page_cnt = DEFAULT_PERF_BUFFER_PAGE_CNT);
   StatusTuple close_perf_buffer(const std::string& name);
   void poll_perf_buffer(const std::string& name, int timeout = -1);
 
-private:
   StatusTuple load_func(const std::string& func_name, enum bpf_prog_type type,
                         int& fd);
   StatusTuple unload_func(const std::string& func_name);
 
+private:
   std::string get_kprobe_event(const std::string& kernel_func,
-                               bpf_attach_type type);
+                               bpf_probe_attach_type type);
   std::string get_uprobe_event(const std::string& binary_path, uint64_t offset,
-                               bpf_attach_type type);
+                               bpf_probe_attach_type type);
 
   StatusTuple detach_kprobe_event(const std::string& event, open_probe_t& attr);
   StatusTuple detach_uprobe_event(const std::string& event, open_probe_t& attr);
@@ -121,21 +134,21 @@ private:
                                       open_probe_t& attr);
   StatusTuple detach_perf_event_all_cpu(open_probe_t& attr);
 
-  std::string attach_type_debug(bpf_attach_type type) {
+  std::string attach_type_debug(bpf_probe_attach_type type) {
     switch (type) {
-    case bpf_attach_type::probe_entry:
+    case BPF_PROBE_ENTRY:
       return "";
-    case bpf_attach_type::probe_return:
+    case BPF_PROBE_RETURN:
       return "return ";
     }
     return "ERROR";
   }
 
-  std::string attach_type_prefix(bpf_attach_type type) {
+  std::string attach_type_prefix(bpf_probe_attach_type type) {
     switch (type) {
-    case bpf_attach_type::probe_entry:
+    case BPF_PROBE_ENTRY:
       return "p";
-    case bpf_attach_type::probe_return:
+    case BPF_PROBE_RETURN:
       return "r";
     }
     return "ERROR";

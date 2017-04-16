@@ -68,6 +68,16 @@ ipr = IPRoute()
 ipdb = IPDB(nl=ipr)
 sim = Simulation(ipdb)
 
+allocated_interfaces = set(ipdb.interfaces.keys())
+
+def get_next_iface(prefix):
+    i = 0
+    while True:
+        iface = "{0}{1}".format(prefix, i)
+        if iface not in allocated_interfaces:
+            allocated_interfaces.add(iface)
+            return iface
+        i += 1
 
 class TestBPFSocket(TestCase):
     def setup_br(self, br, veth_rt_2_br, veth_pem_2_br, veth_br_2_pem):
@@ -84,15 +94,15 @@ class TestBPFSocket(TestCase):
             br1.add_port(ipdb.interfaces[veth_rt_2_br])
             br1.up()
         subprocess.call(["sysctl", "-q", "-w", "net.ipv6.conf." + br + ".disable_ipv6=1"])
-            
+
     def set_default_const(self):
         self.ns1            = "ns1"
         self.ns2            = "ns2"
         self.ns_router      = "ns_router"
-        self.br1            = "br1"
+        self.br1            = get_next_iface("br")
         self.veth_pem_2_br1 = "v20"
         self.veth_br1_2_pem = "v21"
-        self.br2            = "br2"
+        self.br2            = get_next_iface("br")
         self.veth_pem_2_br2 = "v22"
         self.veth_br2_2_pem = "v23"
 

@@ -25,9 +25,13 @@ extern "C" {
 
 struct perf_reader;
 
-struct perf_reader * perf_reader_new(perf_reader_cb cb, perf_reader_raw_cb raw_cb, void *cb_cookie);
+struct perf_reader * perf_reader_new(perf_reader_cb cb,
+                                     perf_reader_raw_cb raw_cb,
+                                     perf_reader_lost_cb lost_cb,
+                                     void *cb_cookie, int page_cnt);
 void perf_reader_free(void *ptr);
 int perf_reader_mmap(struct perf_reader *reader, unsigned type, unsigned long sample_type);
+void perf_reader_event_read(struct perf_reader *reader);
 int perf_reader_poll(int num_readers, struct perf_reader **readers, int timeout);
 int perf_reader_fd(struct perf_reader *reader);
 void perf_reader_set_fd(struct perf_reader *reader, int fd);

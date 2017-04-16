@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (the "License")
 #include <bcc/proto.h>
 
-BPF_TABLE("hash", u32, int, vni2if, 1024);
+BPF_HASH(vni2if, u32, int, 1024);
 
 struct vni_key {
   u64 mac;
@@ -15,12 +15,12 @@ struct host {
   u64 rx_pkts;
   u64 tx_pkts;
 };
-BPF_TABLE("hash", struct vni_key, struct host, mac2host, 10240);
+BPF_HASH(mac2host, struct vni_key, struct host);
 
 struct config {
   int tunnel_ifindex;
 };
-BPF_TABLE("hash", int, struct config, conf, 1);
+BPF_HASH(conf, int, struct config, 1);
 
 // Handle packets from the encap device, demux into the dest tenant
 int handle_ingress(struct __sk_buff *skb) {

@@ -2,8 +2,8 @@ Demonstrations of trace.
 
 
 trace probes functions you specify and displays trace messages if a particular
-condition is met. You can control the message format to display function 
-arguments and return values. 
+condition is met. You can control the message format to display function
+arguments and return values.
 
 For example, suppose you want to trace all commands being exec'd across the
 system:
@@ -135,6 +135,16 @@ TIME     PID    COMM         FUNC             -
 In the previous invocation, arg1 and arg2 are the class name and method name
 for the Ruby method being invoked.
 
+You can also trace exported functions from shared libraries, or an imported
+function on the actual executable:
+
+# sudo ./trace.py 'r:/usr/lib64/libtinfo.so:curses_version "Version=%s", retval'
+# tput -V
+
+PID    TID    COMM         FUNC             -
+21720  21720  tput         curses_version   Version=ncurses 6.0.20160709
+^C
+
 
 Occasionally, it can be useful to filter specific strings. For example, you
 might be interested in open() calls that open a specific file:
@@ -146,7 +156,30 @@ TIME     PID    COMM         FUNC             -
 ^C
 
 
-As a final example, let's trace open syscalls for a specific process. By 
+In the preceding example, as well as in many others, readability may be
+improved by providing the function's signature, which names the arguments and
+lets you access structure sub-fields, which is hard with the "arg1", "arg2"
+convention. For example:
+
+# trace 'p:c:open(char *filename) "opening %s", filename'
+PID    TID    COMM         FUNC             -
+17507  17507  cat          open             opening FAQ.txt
+^C
+
+# trace 'p::SyS_nanosleep(struct timespec *ts) "sleep for %lld ns", ts->tv_nsec'
+PID    TID    COMM         FUNC             -
+777    785    automount    SyS_nanosleep    sleep for 500000000 ns
+777    785    automount    SyS_nanosleep    sleep for 500000000 ns
+777    785    automount    SyS_nanosleep    sleep for 500000000 ns
+777    785    automount    SyS_nanosleep    sleep for 500000000 ns
+^C
+
+Remember to use the -I argument include the appropriate header file. We didn't
+need to do that here because `struct timespec` is used internally by the tool,
+so it always includes this header file.
+
+
+As a final example, let's trace open syscalls for a specific process. By
 default, tracing is system-wide, but the -p switch overrides this:
 
 # trace -p 2740 'do_sys_open "%s", arg2' -T
@@ -168,11 +201,28 @@ In this example, we traced the "ls ~" command as it was opening its shared
 libraries and then accessing the /home/vagrant directory listing.
 
 
+Lastly, if a high-frequency event is traced you may overflow the perf ring
+buffer. This shows as "Lost N samples":
+
+# trace sys_open
+5087   5087   pgrep        sys_open
+5087   5087   pgrep        sys_open
+5087   5087   pgrep        sys_open
+5087   5087   pgrep        sys_open
+5087   5087   pgrep        sys_open
+Lost 764896 samples
+Lost 764896 samples
+Lost 764896 samples
+
+The perf ring buffer size can be changed with -b. The unit is size per-CPU buffer
+size and is measured in pages. The value must be a power of two and defaults to
+64 pages.
+
+
 USAGE message:
 
-# trace -h
-usage: trace [-h] [-p PID] [-L TID] [-v] [-Z STRING_SIZE] [-S]
-             [-M MAX_EVENTS] [-t] [-T] [-K] [-U] [-I header]
+usage: trace [-h] [-b BUFFER_PAGES] [-p PID] [-L TID] [-v] [-Z STRING_SIZE]
+             [-S] [-M MAX_EVENTS] [-t] [-T] [-K] [-U] [-I header]
              probe [probe ...]
 
 Attach to functions and print trace messages.
@@ -182,6 +232,9 @@ positional arguments:
 
 optional arguments:
   -h, --help            show this help message and exit
+  -b BUFFER_PAGES, --buffer-pages BUFFER_PAGES
+                        number of pages to use for perf_events ring buffer
+                        (default: 64)
   -p PID, --pid PID     id of the process to trace (optional)
   -L TID, --tid TID     id of the thread to trace (optional)
   -v, --verbose         print resulting BPF program code before executing
@@ -191,11 +244,12 @@ optional arguments:
   -M MAX_EVENTS, --max-events MAX_EVENTS
                         number of events to print before quitting
   -t, --timestamp       print timestamp column (offset from trace start)
-  -T, --time		print time column
+  -T, --time            print time column
   -K, --kernel-stack    output kernel stack trace
   -U, --user-stack      output user stack trace
   -I header, --include header
                         additional header files to include in the BPF program
+                        as either full path, or relative to '/usr/include'
 
 EXAMPLES:
 
@@ -205,7 +259,7 @@ trace 'do_sys_open "%s", arg2'
         Trace the open syscall and print the filename being opened
 trace 'sys_read (arg3 > 20000) "read %d bytes", arg3'
         Trace the read syscall and print a message for reads >20000 bytes
-trace 'r::do_sys_return "%llx", retval'
+trace 'r::do_sys_open "%llx", retval'
         Trace the return from the open syscall and print the return value
 trace 'c:open (arg2 == 42) "%s %d", arg1, arg2'
         Trace the open() call from libc only if the flags (arg2) argument is 42
@@ -213,11 +267,13 @@ trace 'c:malloc "size = %d", arg1'
         Trace malloc calls and print the size being allocated
 trace 'p:c:write (arg1 == 1) "writing %d bytes to STDOUT", arg3'
         Trace the write() call from libc to monitor writes to STDOUT
-trace 'r::__kmalloc (retval == 0) "kmalloc failed!"
+trace 'r::__kmalloc (retval == 0) "kmalloc failed!"'
         Trace returns from __kmalloc which returned a null pointer
-trace 'r:c:malloc (retval) "allocated = %x", retval
+trace 'r:c:malloc (retval) "allocated = %x", retval'
         Trace returns from malloc and print non-NULL allocated buffers
 trace 't:block:block_rq_complete "sectors=%d", args->nr_sector'
         Trace the block_rq_complete kernel tracepoint and print # of tx sectors
 trace 'u:pthread:pthread_create (arg4 != 0)'
         Trace the USDT probe pthread_create when its 4th argument is non-zero
+trace 'p::SyS_nanosleep(struct timespec *ts) "sleep for %lld ns", ts->tv_nsec'
+        Trace the nanosleep syscall and print the sleep duration in ns

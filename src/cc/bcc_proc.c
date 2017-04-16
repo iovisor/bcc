@@ -13,10 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <fcntl.h>
+#include <sched.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -24,6 +29,7 @@
 #include <stdint.h>
 #include <ctype.h>
 #include <stdio.h>
+#include <math.h>
 
 #include "bcc_perf_map.h"
 #include "bcc_proc.h"
@@ -69,6 +75,16 @@ char *bcc_procutils_which(const char *binpath) {
   return 0;
 }
 
+int bcc_mapping_is_file_backed(const char *mapname) {
+  return mapname[0] &&
+    strncmp(mapname, "//anon", sizeof("//anon") - 1) &&
+    strncmp(mapname, "/dev/zero", sizeof("/dev/zero") - 1) &&
+    strncmp(mapname, "/anon_hugepage", sizeof("/anon_hugepage") - 1) &&
+    strncmp(mapname, "[stack", sizeof("[stack") - 1) &&
+    strncmp(mapname, "/SYSV", sizeof("/SYSV") - 1) &&
+    strncmp(mapname, "[heap]", sizeof("[heap]") - 1);
+}
+
 int bcc_procutils_each_module(int pid, bcc_procutils_modulecb callback,
                               void *payload) {
   char procmap_filename[128];
@@ -101,7 +117,7 @@ int bcc_procutils_each_module(int pid, bcc_procutils_modulecb callback,
 
       while (isspace(mapname[0])) mapname++;
 
-      if (strchr(perm, 'x') && mapname[0] && mapname[0] != '[') {
+      if (strchr(perm, 'x') && bcc_mapping_is_file_backed(mapname)) {
         if (callback(mapname, (uint64_t)begin, (uint64_t)end, payload) < 0)
           break;
       }
@@ -307,13 +323,57 @@ static bool match_so_flags(int flags) {
   return true;
 }
 
-const char *bcc_procutils_which_so(const char *libname) {
+static bool which_so_in_process(const char* libname, int pid, char* libpath) {
+  int ret, found = false;
+  char endline[4096], *mapname = NULL, *newline;
+  char mappings_file[128];
+  const size_t search_len = strlen(libname) + strlen("/lib.");
+  char search1[search_len + 1];
+  char search2[search_len + 1];
+
+  sprintf(mappings_file, "/proc/%ld/maps", (long)pid);
+  FILE *fp = fopen(mappings_file, "r");
+  if (!fp)
+    return NULL;
+
+  snprintf(search1, search_len + 1, "/lib%s.", libname);
+  snprintf(search2, search_len + 1, "/lib%s-", libname);
+
+  do {
+    ret = fscanf(fp, "%*x-%*x %*s %*x %*s %*d");
+    if (!fgets(endline, sizeof(endline), fp))
+      break;
+
+    mapname = endline;
+    newline = strchr(endline, '\n');
+    if (newline)
+      newline[0] = '\0';
+
+    while (isspace(mapname[0])) mapname++;
+
+    if (strstr(mapname, ".so") && (strstr(mapname, search1) ||
+                                   strstr(mapname, search2))) {
+      found = true;
+      memcpy(libpath, mapname, strlen(mapname) + 1);
+      break;
+    }
+  } while (ret != EOF);
+
+  fclose(fp);
+  return found;
+}
+
+char *bcc_procutils_which_so(const char *libname, int pid) {
   const size_t soname_len = strlen(libname) + strlen("lib.so");
   char soname[soname_len + 1];
+  char libpath[4096];
   int i;
 
   if (strchr(libname, '/'))
-    return libname;
+    return strdup(libname);
+
+  if (pid && which_so_in_process(libname, pid, libpath))
+    return strdup(libpath);
 
   if (lib_cache_count < 0)
     return NULL;
@@ -327,8 +387,160 @@ const char *bcc_procutils_which_so(const char *libname) {
 
   for (i = 0; i < lib_cache_count; ++i) {
     if (!strncmp(lib_cache[i].libname, soname, soname_len) &&
-        match_so_flags(lib_cache[i].flags))
-      return lib_cache[i].path;
+        match_so_flags(lib_cache[i].flags)) {
+      return strdup(lib_cache[i].path);
+    }
   }
   return NULL;
+}
+
+void bcc_procutils_free(const char *ptr) {
+  free((void *)ptr);
+}
+
+bool bcc_procutils_enter_mountns(int pid, struct ns_cookie *nc) {
+  char curnspath[4096];
+  char newnspath[4096];
+  int oldns = -1;
+  int newns = -1;
+  struct stat ons_stat;
+  struct stat nns_stat;
+
+  if (nc == NULL)
+    return false;
+
+  nc->nsc_oldns = -1;
+  nc->nsc_newns = -1;
+
+  if (snprintf(curnspath, 4096, "/proc/self/ns/mnt") == 4096) {
+    return false;
+  }
+
+  if (snprintf(newnspath, 4096, "/proc/%d/ns/mnt", pid) == 4096) {
+    return false;
+  }
+
+  if ((oldns = open(curnspath, O_RDONLY)) < 0) {
+    return false;
+  }
+
+  if ((newns = open(newnspath, O_RDONLY)) < 0) {
+    goto errout;
+  }
+
+  if (fstat(oldns, &ons_stat) < 0) {
+    goto errout;
+  }
+
+  if (fstat(newns, &nns_stat) < 0) {
+    goto errout;
+  }
+
+  /*
+   * Only switch to the new namespace if it doesn't match the existing
+   * namespace.  This prevents us from getting an EPERM when trying to enter an
+   * identical namespace.
+   */
+  if (ons_stat.st_ino == nns_stat.st_ino) {
+    goto errout;
+  }
+
+  if (setns(newns, CLONE_NEWNS) < 0) {
+    goto errout;
+  }
+
+  nc->nsc_oldns = oldns;
+  nc->nsc_newns = newns;
+
+  return true;
+
+errout:
+  if (oldns > -1) {
+    (void) close(oldns);
+  }
+  if (newns > -1) {
+    (void) close(newns);
+  }
+  return false;
+}
+
+bool bcc_procutils_exit_mountns(struct ns_cookie *nc) {
+  bool rc = false;
+
+  if (nc == NULL)
+    return rc;
+
+  if (nc->nsc_oldns == -1 || nc->nsc_newns == -1)
+    return rc;
+
+  if (setns(nc->nsc_oldns, CLONE_NEWNS) == 0) {
+    rc = true;
+  }
+
+  if (nc->nsc_oldns > -1) {
+    (void) close(nc->nsc_oldns);
+    nc->nsc_oldns = -1;
+  }
+  if (nc->nsc_newns > -1) {
+    (void) close(nc->nsc_newns);
+    nc->nsc_newns = -1;
+  }
+
+  return rc;
+}
+
+/* Detects the following languages + C. */
+const char *languages[] = {"java", "python", "ruby", "php", "node"};
+const char *language_c = "c";
+const int nb_languages = 5;
+
+const char *bcc_procutils_language(int pid) {
+  char procfilename[22], line[4096], pathname[32], *str;
+  FILE *procfile;
+  int i, ret;
+
+  /* Look for clues in the absolute path to the executable. */
+  sprintf(procfilename, "/proc/%ld/exe", (long)pid);
+  if (realpath(procfilename, line)) {
+    for (i = 0; i < nb_languages; i++)
+      if (strstr(line, languages[i]))
+        return languages[i];
+  }
+
+
+  sprintf(procfilename, "/proc/%ld/maps", (long)pid);
+  procfile = fopen(procfilename, "r");
+  if (!procfile)
+    return NULL;
+
+  /* Look for clues in memory mappings. */
+  bool libc = false;
+  do {
+    char perm[8], dev[8];
+    long long begin, end, size, inode;
+    ret = fscanf(procfile, "%llx-%llx %s %llx %s %lld", &begin, &end, perm,
+                 &size, dev, &inode);
+    if (!fgets(line, sizeof(line), procfile))
+      break;
+    if (ret == 6) {
+      char *mapname = line;
+      char *newline = strchr(line, '\n');
+      if (newline)
+        newline[0] = '\0';
+      while (isspace(mapname[0])) mapname++;
+      for (i = 0; i < nb_languages; i++) {
+        sprintf(pathname, "/lib%s", languages[i]);
+        if (strstr(mapname, pathname))
+          return languages[i];
+        if ((str = strstr(mapname, "libc")) &&
+            (str[4] == '-' || str[4] == '.'))
+          libc = true;
+      }
+    }
+  } while (ret && ret != EOF);
+
+  fclose(procfile);
+
+  /* Return C as the language if libc was found and nothing else. */
+  return libc ? language_c : NULL;
 }

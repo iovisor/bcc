@@ -20,13 +20,13 @@
 #include <memory>
 #include <string>
 
+#include "table_storage.h"
+
 namespace llvm {
 class Module;
 }
 
 namespace ebpf {
-
-struct TableDesc;
 
 namespace cc {
 class Parser;
@@ -38,7 +38,8 @@ class BLoader {
   explicit BLoader(unsigned flags);
   ~BLoader();
   int parse(llvm::Module *mod, const std::string &filename, const std::string &proto_filename,
-            std::unique_ptr<std::vector<TableDesc>> *tables);
+            TableStorage &ts, const std::string &id);
+
  private:
   unsigned flags_;
   std::unique_ptr<cc::Parser> parser_;

@@ -7,6 +7,7 @@
   - [Arch](#arch---aur)
   - [Gentoo](#gentoo---portage)
 * [Source](#source)
+  - [Debian](#debian---source)
   - [Ubuntu](#ubuntu---source)
   - [Fedora](#fedora---source)
 * [Older Instructions](#older-instructions)
@@ -28,6 +29,16 @@ CONFIG_BPF_JIT=y
 CONFIG_HAVE_BPF_JIT=y
 # [optional, for kprobes]
 CONFIG_BPF_EVENTS=y
+```
+
+There are a few optional kernel flags needed for running bcc networking examples on vanilla kernel:
+
+```
+CONFIG_NET_SCH_SFQ=m
+CONFIG_NET_ACT_POLICE=m
+CONFIG_NET_ACT_GACT=m
+CONFIG_DUMMY=m
+CONFIG_VXLAN=m
 ```
 
 Kernel compile flags can usually be checked by looking at `/proc/config.gz` or
@@ -96,7 +107,7 @@ sudo python /usr/share/bcc/examples/tracing/task_switch.py
 ```bash
 git clone https://github.com/svinota/pyroute2
 cd pyroute2; sudo make install
-sudo python /usr/share/bcc/examples/simple_tc.py
+sudo python /usr/share/bcc/examples/networking/simple_tc.py
 ```
 
 ## Fedora - Binary
@@ -152,6 +163,90 @@ The appropriate dependencies (e.g., ```clang```, ```llvm``` with BPF backend) wi
 
 
 # Source
+
+## Debian - Source
+### Jessie
+#### Repositories
+
+The automated tests that run as part of the build process require `netperf`.  Since netperf's license is not "certified"
+as an open-source license, it is in Debian's `non-free` repository.
+
+`/etc/apt/sources.list` should include the `non-free` repository and look something like this:
+
+```
+deb http://httpredir.debian.org/debian/ jessie main non-free
+deb-src http://httpredir.debian.org/debian/ jessie main non-free
+
+deb http://security.debian.org/ jessie/updates main non-free
+deb-src http://security.debian.org/ jessie/updates main non-free
+
+# wheezy-updates, previously known as 'volatile'
+deb http://ftp.us.debian.org/debian/ jessie-updates main non-free
+deb-src http://ftp.us.debian.org/debian/ jessie-updates main non-free
+```
+
+BCC also requires kernel version 4.1 or above.  Those kernels are available in the `jessie-backports` repository.  To
+add the `jessie-backports` repository to your system create the file `/etc/apt/sources.list.d/jessie-backports.list`
+with the following contents:
+
+```
+deb http://httpredir.debian.org/debian jessie-backports main
+deb-src http://httpredir.debian.org/debian jessie-backports main
+```
+
+#### Install Build Dependencies
+
+Note, check for the latest `linux-image-4.x` version in `jessie-backports` before proceeding.  Also, have a look at the
+`Build-Depends:` section in `debian/control` file.
+
+```
+# Before you begin
+apt-get update
+
+# Update kernel and linux-base package
+apt-get -t jessie-backports install linux-base linux-image-4.8.0-0.bpo.2-amd64
+
+# BCC build dependencies:
+apt-get install debhelper cmake libllvm3.8 llvm-3.8-dev libclang-3.8-dev \
+  libelf-dev bison flex libedit-dev clang-format-3.8 python python-netaddr \
+  python-pyroute2 luajit libluajit-5.1-dev arping iperf netperf ethtool \
+  devscripts zlib1g-dev
+```
+
+#### Sudo
+
+Adding eBPF probes to the kernel and removing probes from it requires root privileges.  For the build to complete
+successfully, you must build from an account with `sudo` access.  (You may also build as root, but it is bad style.)
+
+`/etc/sudoers` or `/etc/sudoers.d/build-user` should contain
+
+```
+build-user ALL = (ALL) NOPASSWD: ALL
+```
+
+or
+
+```
+build-user ALL = (ALL) ALL
+```
+
+If using the latter sudoers configuration, please keep an eye out for sudo's password prompt while the build is running.
+
+#### Build
+
+```
+cd <preferred development directory>
+git clone https://github.com/iovisor/bcc.git
+cd bcc
+debuild -b -uc -us
+```
+
+#### Install
+
+```
+cd ..
+sudo dpkg -i *bcc*.deb
+```
 
 ## Ubuntu - Source
 
@@ -209,9 +304,12 @@ sudo pip install pyroute2
 wget http://llvm.org/releases/3.7.1/clang+llvm-3.7.1-x86_64-fedora22.tar.xz
 sudo tar xf clang+llvm-3.7.1-x86_64-fedora22.tar.xz -C /usr/local --strip 1
 
-# FC23 and FC24
+# FC23
 wget http://llvm.org/releases/3.9.0/clang+llvm-3.9.0-x86_64-fedora23.tar.xz
 sudo tar xf clang+llvm-3.9.0-x86_64-fedora23.tar.xz -C /usr/local --strip 1
+
+# FC24 and FC25
+sudo dnf install -y clang clang-devel llvm llvm-devel llvm-static ncurses-devel
 ```
 
 ### Install and compile BCC

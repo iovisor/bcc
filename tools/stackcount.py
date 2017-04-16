@@ -225,7 +225,7 @@ class Tool(object):
         if self.args.verbose:
             print("%-16x " % addr, end="")
         if self.args.offset:
-            print("%s" % self.probe.bpf.symaddr(addr, pid))
+            print("%s" % self.probe.bpf.sym(addr, pid, show_offset=True))
         else:
             print("%s" % self.probe.bpf.sym(addr, pid))
 

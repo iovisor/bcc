@@ -14,11 +14,14 @@
 
 from collections import MutableMapping
 import ctypes as ct
+from functools import reduce
 import multiprocessing
 import os
 
-from .libbcc import lib, _RAW_CB_TYPE
+from .libbcc import lib, _RAW_CB_TYPE, _LOST_CB_TYPE
 from .perf import Perf
+from .utils import get_online_cpus
+from .utils import get_possible_cpus
 from subprocess import check_output
 
 BPF_MAP_TYPE_HASH = 1
@@ -31,6 +34,7 @@ BPF_MAP_TYPE_STACK_TRACE = 7
 BPF_MAP_TYPE_CGROUP_ARRAY = 8
 BPF_MAP_TYPE_LRU_HASH = 9
 BPF_MAP_TYPE_LRU_PERCPU_HASH = 10
+BPF_MAP_TYPE_LPM_TRIE = 11
 
 stars_max = 40
 log2_index_max = 65
@@ -121,6 +125,8 @@ def Table(bpf, map_id, map_fd, keytype, leaftype, **kwargs):
         t = PerCpuHash(bpf, map_id, map_fd, keytype, leaftype, **kwargs)
     elif ttype == BPF_MAP_TYPE_PERCPU_ARRAY:
         t = PerCpuArray(bpf, map_id, map_fd, keytype, leaftype, **kwargs)
+    elif ttype == BPF_MAP_TYPE_LPM_TRIE:
+        t = LpmTrie(bpf, map_id, map_fd, keytype, leaftype)
     elif ttype == BPF_MAP_TYPE_STACK_TRACE:
         t = StackTrace(bpf, map_id, map_fd, keytype, leaftype)
     elif ttype == BPF_MAP_TYPE_LRU_HASH:
@@ -457,6 +463,13 @@ class ProgArray(ArrayBase):
             leaf = self.Leaf(leaf.fd)
         super(ProgArray, self).__setitem__(key, leaf)
 
+    def __delitem__(self, key):
+        key = self._normalize_key(key)
+        key_p = ct.pointer(key)
+        res = lib.bpf_delete_elem(self.map_fd, ct.cast(key_p, ct.c_void_p))
+        if res < 0:
+            raise Exception("Could not delete item")
+
 class PerfEventArray(ArrayBase):
     class Event(object):
         def __init__(self, typ, config):
@@ -501,27 +514,33 @@ class PerfEventArray(ArrayBase):
         super(PerfEventArray, self).__delitem__(key)
         self.close_perf_buffer(key)
 
-    def open_perf_buffer(self, callback):
+    def open_perf_buffer(self, callback, page_cnt=8, lost_cb=None):
         """open_perf_buffers(callback)
 
         Opens a set of per-cpu ring buffer to receive custom perf event
         data from the bpf program. The callback will be invoked for each
-        event submitted from the kernel, up to millions per second.
+        event submitted from the kernel, up to millions per second. Use
+        page_cnt to change the size of the per-cpu ring buffer. The value
+        must be a power of two and defaults to 8.
         """
 
-        for i in range(0, multiprocessing.cpu_count()):
-            self._open_perf_buffer(i, callback)
+        if page_cnt & (page_cnt - 1) != 0:
+            raise Exception("Perf buffer page_cnt must be a power of two")
 
-    def _open_perf_buffer(self, cpu, callback):
+        for i in get_online_cpus():
+            self._open_perf_buffer(i, callback, page_cnt, lost_cb)
+
+    def _open_perf_buffer(self, cpu, callback, page_cnt, lost_cb):
         fn = _RAW_CB_TYPE(lambda _, data, size: callback(cpu, data, size))
-        reader = lib.bpf_open_perf_buffer(fn, None, -1, cpu)
+        lost_fn = _LOST_CB_TYPE(lambda lost: lost_cb(lost)) if lost_cb else ct.cast(None, _LOST_CB_TYPE)
+        reader = lib.bpf_open_perf_buffer(fn, lost_fn, None, -1, cpu, page_cnt)
         if not reader:
             raise Exception("Could not open perf buffer")
         fd = lib.perf_reader_fd(reader)
         self[self.Key(cpu)] = self.Leaf(fd)
         self.bpf._add_kprobe((id(self), cpu), reader)
         # keep a refcnt
-        self._cbs[cpu] = fn
+        self._cbs[cpu] = (fn, lost_fn)
 
     def close_perf_buffer(self, key):
         reader = self.bpf.open_kprobes.get((id(self), key))
@@ -550,7 +569,7 @@ class PerfEventArray(ArrayBase):
         if not isinstance(ev, self.Event):
             raise Exception("argument must be an Event, got %s", type(ev))
 
-        for i in range(0, multiprocessing.cpu_count()):
+        for i in get_online_cpus():
             self._open_perf_event(i, ev.typ, ev.config)
 
 
@@ -559,7 +578,7 @@ class PerCpuHash(HashTable):
         self.reducer = kwargs.pop("reducer", None)
         super(PerCpuHash, self).__init__(*args, **kwargs)
         self.sLeaf = self.Leaf
-        self.total_cpu = multiprocessing.cpu_count()
+        self.total_cpu = len(get_possible_cpus())
         # This needs to be 8 as hard coded into the linux kernel.
         self.alignment = ct.sizeof(self.sLeaf) % 8
         if self.alignment is 0:
@@ -595,7 +614,7 @@ class PerCpuHash(HashTable):
     def sum(self, key):
         if isinstance(self.Leaf(), ct.Structure):
             raise IndexError("Leaf must be an integer type for default sum functions")
-        return self.sLeaf(reduce(lambda x,y: x+y, self.getvalue(key)))
+        return self.sLeaf(sum(self.getvalue(key)))
 
     def max(self, key):
         if isinstance(self.Leaf(), ct.Structure):
@@ -604,8 +623,7 @@ class PerCpuHash(HashTable):
 
     def average(self, key):
         result = self.sum(key)
-        result.value/=self.total_cpu
-        return result
+        return result.value / self.total_cpu
 
 class LruPerCpuHash(PerCpuHash):
     def __init__(self, *args, **kwargs):
@@ -616,7 +634,7 @@ class PerCpuArray(ArrayBase):
         self.reducer = kwargs.pop("reducer", None)
         super(PerCpuArray, self).__init__(*args, **kwargs)
         self.sLeaf = self.Leaf
-        self.total_cpu = multiprocessing.cpu_count()
+        self.total_cpu = len(get_possible_cpus())
         # This needs to be 8 as hard coded into the linux kernel.
         self.alignment = ct.sizeof(self.sLeaf) % 8
         if self.alignment is 0:
@@ -652,7 +670,7 @@ class PerCpuArray(ArrayBase):
     def sum(self, key):
         if isinstance(self.Leaf(), ct.Structure):
             raise IndexError("Leaf must be an integer type for default sum functions")
-        return self.sLeaf(reduce(lambda x,y: x+y, self.getvalue(key)))
+        return self.sLeaf(sum(self.getvalue(key)))
 
     def max(self, key):
         if isinstance(self.Leaf(), ct.Structure):
@@ -661,8 +679,19 @@ class PerCpuArray(ArrayBase):
 
     def average(self, key):
         result = self.sum(key)
-        result.value/=self.total_cpu
-        return result
+        return result.value / self.total_cpu
+
+class LpmTrie(TableBase):
+    def __init__(self, *args, **kwargs):
+        super(LpmTrie, self).__init__(*args, **kwargs)
+
+    def __len__(self):
+        raise NotImplementedError
+
+    def __delitem__(self, key):
+        # Not implemented for lpm trie as of kernel commit
+        # b95a5c4db09bc7c253636cb84dc9b12c577fd5a0
+        raise NotImplementedError
 
 class StackTrace(TableBase):
     MAX_DEPTH = 127

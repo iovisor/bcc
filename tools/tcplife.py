@@ -305,7 +305,7 @@ def print_ipv4_event(cpu, data, size):
             print("%.6f," % delta_s, end="")
         else:
             print("%-9.6f " % delta_s, end="")
-    print(format_string % (event.pid, event.task,
+    print(format_string % (event.pid, event.task.decode(),
         "4" if args.wide or args.csv else "",
         inet_ntop(AF_INET, pack("I", event.saddr)), event.ports >> 32,
         inet_ntop(AF_INET, pack("I", event.daddr)), event.ports & 0xffffffff,
@@ -327,7 +327,7 @@ def print_ipv6_event(cpu, data, size):
             print("%.6f," % delta_s, end="")
         else:
             print("%-9.6f " % delta_s, end="")
-    print(format_string % (event.pid, event.task,
+    print(format_string % (event.pid, event.task.decode(),
         "6" if args.wide or args.csv else "",
         inet_ntop(AF_INET6, event.saddr), event.ports >> 32,
         inet_ntop(AF_INET6, event.daddr), event.ports & 0xffffffff,
@@ -354,7 +354,7 @@ print(header_string % ("PID", "COMM",
 start_ts = 0
 
 # read events
-b["ipv4_events"].open_perf_buffer(print_ipv4_event)
-b["ipv6_events"].open_perf_buffer(print_ipv6_event)
+b["ipv4_events"].open_perf_buffer(print_ipv4_event, page_cnt=64)
+b["ipv6_events"].open_perf_buffer(print_ipv6_event, page_cnt=64)
 while 1:
     b.kprobe_poll()

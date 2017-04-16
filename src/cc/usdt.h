@@ -40,7 +40,9 @@ private:
   optional<int> constant_;
   optional<int> deref_offset_;
   optional<std::string> deref_ident_;
-  optional<std::string> register_name_;
+  optional<std::string> base_register_name_;
+  optional<std::string> index_register_name_;
+  optional<int> scale_;
 
   bool get_global_address(uint64_t *address, const std::string &binpath,
                           const optional<int> &pid) const;
@@ -57,7 +59,13 @@ public:
   std::string ctype() const;
 
   const optional<std::string> &deref_ident() const { return deref_ident_; }
-  const optional<std::string> &register_name() const { return register_name_; }
+  const optional<std::string> &base_register_name() const {
+    return base_register_name_;
+  }
+  const optional<std::string> &index_register_name() const {
+    return index_register_name_;
+  }
+  const optional<int> scale() const { return scale_; }
   const optional<int> constant() const { return constant_; }
   const optional<int> deref_offset() const { return deref_offset_; }
 
@@ -68,12 +76,18 @@ class ArgumentParser {
   const char *arg_;
   ssize_t cur_pos_;
 
+  void skip_whitespace_from(size_t pos);
+  void skip_until_whitespace_from(size_t pos);
+
 protected:
   virtual bool normalize_register(std::string *reg, int *reg_size) = 0;
 
+  ssize_t parse_register(ssize_t pos, std::string &name, int &size);
   ssize_t parse_number(ssize_t pos, optional<int> *number);
   ssize_t parse_identifier(ssize_t pos, optional<std::string> *ident);
-  ssize_t parse_register(ssize_t pos, Argument *dest);
+  ssize_t parse_base_register(ssize_t pos, Argument *dest);
+  ssize_t parse_index_register(ssize_t pos, Argument *dest);
+  ssize_t parse_scale(ssize_t pos, Argument *dest);
   ssize_t parse_expr(ssize_t pos, Argument *dest);
   ssize_t parse_1(ssize_t pos, Argument *dest);
 
@@ -177,6 +191,7 @@ public:
 
 class Context {
   std::vector<std::unique_ptr<Probe>> probes_;
+  std::unordered_set<std::string> modules_;
 
   optional<int> pid_;
   optional<ProcStat> pid_stat_;

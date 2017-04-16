@@ -16,25 +16,3 @@
 
 #pragma once
 
-#include <map>
-#include <string>
-
-namespace ebpf {
-
-struct TableDesc;
-
-class SharedTables {
- public:
-  static SharedTables * instance();
-  // add an fd to the shared table, return true if successfully inserted
-  bool insert_fd(const std::string &name, int fd);
-  // lookup an fd in the shared table, or -1 if not found
-  int lookup_fd(const std::string &name) const;
-  // close and remove a shared fd. return true if the value was found
-  bool remove_fd(const std::string &name);
- private:
-  static SharedTables *instance_;
-  std::map<std::string, int> tables_;
-};
-
-}

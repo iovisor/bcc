@@ -12,7 +12,7 @@ class TestKprobeRgx(TestCase):
         self.b = BPF(text="""
         typedef struct { int idx; } Key;
         typedef struct { u64 val; } Val;
-        BPF_TABLE("hash", Key, Val, stats, 3);
+        BPF_HASH(stats, Key, Val, 3);
         int hello(void *ctx) {
           stats.lookup_or_init(&(Key){1}, &(Val){0})->val++;
           return 0;

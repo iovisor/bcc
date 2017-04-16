@@ -11,7 +11,7 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 
 from __future__ import print_function
-from bcc import BPF, ProcessSymbols
+from bcc import BPF
 from time import sleep
 import sys
 
@@ -43,8 +43,6 @@ int alloc_enter(struct pt_regs *ctx, size_t size) {
 b.attach_uprobe(name="c", sym="malloc", fn_name="alloc_enter", pid=pid)
 print("Attaching to malloc in pid %d, Ctrl+C to quit." % pid)
 
-decoder = ProcessSymbols(pid)
-
 # sleep until Ctrl-C
 try:
     sleep(99999999)
@@ -57,4 +55,4 @@ stack_traces = b.get_table("stack_traces")
 for k, v in reversed(sorted(calls.items(), key=lambda c: c[1].value)):
     print("%d bytes allocated at:" % v.value)
     for addr in stack_traces.walk(k.value):
-        print("\t%s (%x)" % (decoder.decode_addr(addr), addr))
+        print("\t%s" % b.sym(addr, pid, show_offset=True))

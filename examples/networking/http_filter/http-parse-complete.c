@@ -19,7 +19,7 @@ struct Leaf {
 //BPF_TABLE(map_type, key_type, leaf_type, table_name, num_entry) 
 //map <Key, Leaf>
 //tracing sessions having same Key(dst_ip, src_ip, dst_port,src_port)
-BPF_TABLE("hash", struct Key, struct Leaf, sessions, 1024);
+BPF_HASH(sessions, struct Key, struct Leaf, 1024);
 
 /*eBPF program.
   Filter IP and TCP packets, having payload not empty

@@ -6,11 +6,13 @@ from bcc import BPF
 import ctypes as ct
 import random
 import time
+import subprocess
+from bcc.utils import get_online_cpus
 from unittest import main, TestCase
 
 class TestArray(TestCase):
     def test_simple(self):
-        b = BPF(text="""BPF_TABLE("array", int, u64, table1, 128);""")
+        b = BPF(text="""BPF_ARRAY(table1, u64, 128);""")
         t1 = b["table1"]
         t1[ct.c_int(0)] = ct.c_ulonglong(100)
         t1[ct.c_int(127)] = ct.c_ulonglong(1000)
@@ -22,7 +24,7 @@ class TestArray(TestCase):
         self.assertEqual(len(t1), 128)
 
     def test_native_type(self):
-        b = BPF(text="""BPF_TABLE("array", int, u64, table1, 128);""")
+        b = BPF(text="""BPF_ARRAY(table1, u64, 128);""")
         t1 = b["table1"]
         t1[0] = ct.c_ulonglong(100)
         t1[-2] = ct.c_ulonglong(37)
@@ -62,6 +64,37 @@ int kprobe__sys_nanosleep(void *ctx) {
         time.sleep(0.1)
         b.kprobe_poll()
         self.assertGreater(self.counter, 0)
+        b.cleanup()
+
+    def test_perf_buffer_for_each_cpu(self):
+        self.events = []
+
+        class Data(ct.Structure):
+            _fields_ = [("cpu", ct.c_ulonglong)]
+
+        def cb(cpu, data, size):
+            self.assertGreater(size, ct.sizeof(Data))
+            event = ct.cast(data, ct.POINTER(Data)).contents
+            self.events.append(event)
+
+        text = """
+BPF_PERF_OUTPUT(events);
+int kprobe__sys_nanosleep(void *ctx) {
+    struct {
+        u64 cpu;
+    } data = {bpf_get_smp_processor_id()};
+    events.perf_submit(ctx, &data, sizeof(data));
+    return 0;
+}
+"""
+        b = BPF(text=text)
+        b["events"].open_perf_buffer(cb)
+        online_cpus = get_online_cpus()
+        for cpu in online_cpus:
+            subprocess.call(['taskset', '-c', str(cpu), 'sleep', '0.1'])
+        b.kprobe_poll()
+        b.cleanup()
+        self.assertGreaterEqual(len(self.events), len(online_cpus), 'Received only {}/{} events'.format(len(self.events), len(online_cpus)))
 
 if __name__ == "__main__":
     main()

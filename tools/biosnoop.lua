@@ -175,9 +175,9 @@ return function(BPF, utils)
       uint64_t sector;
       uint64_t len;
       uint64_t ts;
-      char disk_name[%d];
-      char name[%d];
+      char disk_name[$];
+      char name[$];
     }
-  ]] % {DISK_NAME_LEN, TASK_COMM_LEN})
+  ]], {DISK_NAME_LEN, TASK_COMM_LEN}, 64)
   bpf:kprobe_poll_loop()
 end

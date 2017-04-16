@@ -20,31 +20,6 @@ import os
 import traceback
 import sys
 
-class Time(object):
-        # BPF timestamps come from the monotonic clock. To be able to filter
-        # and compare them from Python, we need to invoke clock_gettime.
-        # Adapted from http://stackoverflow.com/a/1205762
-        CLOCK_MONOTONIC_RAW = 4         # see <linux/time.h>
-
-        class timespec(ct.Structure):
-                _fields_ = [
-                        ('tv_sec', ct.c_long),
-                        ('tv_nsec', ct.c_long)
-                ]
-
-        librt = ct.CDLL('librt.so.1', use_errno=True)
-        clock_gettime = librt.clock_gettime
-        clock_gettime.argtypes = [ct.c_int, ct.POINTER(timespec)]
-
-        @staticmethod
-        def monotonic_time():
-                t = Time.timespec()
-                if Time.clock_gettime(
-                        Time.CLOCK_MONOTONIC_RAW, ct.pointer(t)) != 0:
-                        errno_ = ct.get_errno()
-                        raise OSError(errno_, os.strerror(errno_))
-                return t.tv_sec * 1e9 + t.tv_nsec
-
 class Probe(object):
         probe_count = 0
         streq_index = 0
@@ -54,15 +29,17 @@ class Probe(object):
         use_localtime = True
         tgid = -1
         pid = -1
+        page_cnt = None
 
         @classmethod
         def configure(cls, args):
                 cls.max_events = args.max_events
                 cls.print_time = args.timestamp or args.time
                 cls.use_localtime = not args.timestamp
-                cls.first_ts = Time.monotonic_time()
+                cls.first_ts = BPF.monotonic_time()
                 cls.tgid = args.tgid or -1
                 cls.pid = args.pid or -1
+                cls.page_cnt = args.buffer_pages
 
         def __init__(self, probe, string_size, kernel_stack, user_stack):
                 self.usdt = None
@@ -76,6 +53,8 @@ class Probe(object):
                 self.probe_num = Probe.probe_count
                 self.probe_name = "probe_%s_%d" % \
                                 (self._display_function(), self.probe_num)
+                self.probe_name = re.sub(r'[^A-Za-z0-9_]', '_',
+                                         self.probe_name)
 
         def __str__(self):
                 return "%s:%s:%s FLT=%s ACT=%s/%s" % (self.probe_type,
@@ -92,15 +71,25 @@ class Probe(object):
         def _parse_probe(self):
                 text = self.raw_probe
 
-                # Everything until the first space is the probe specifier
-                first_space = text.find(' ')
-                spec = text[:first_space] if first_space >= 0 else text
-                self._parse_spec(spec)
-                if first_space >= 0:
-                        text = text[first_space:].lstrip()
-                else:
-                        text = ""
+                # There might be a function signature preceding the actual
+                # filter/print part, or not. Find the probe specifier first --
+                # it ends with either a space or an open paren ( for the
+                # function signature part.
+                #                                          opt. signature
+                #                               probespec       |      rest
+                #                               ---------  ----------   --
+                (spec, sig, rest) = re.match(r'([^ \t\(]+)(\([^\(]*\))?(.*)',
+                                             text).groups()
 
+                self._parse_spec(spec)
+                # Remove the parens
+                self.signature = sig[1:-1] if sig else None
+                if self.signature and self.probe_type in ['u', 't']:
+                        self._bail("USDT and tracepoint probes can't have " +
+                                   "a function signature; use arg1, arg2, " +
+                                   "... instead")
+
+                text = rest.lstrip()
                 # If we now have a (, wait for the balanced closing ) and that
                 # will be the predicate
                 self.filter = None
@@ -216,11 +205,11 @@ class Probe(object):
                 fname = "streq_%d" % Probe.streq_index
                 Probe.streq_index += 1
                 self.streq_functions += """
-static inline bool %s(char const *ignored, unsigned long str) {
+static inline bool %s(char const *ignored, uintptr_t str) {
         char needle[] = %s;
         char haystack[sizeof(needle)];
         bpf_probe_read(&haystack, sizeof(haystack), (void *)str);
-        for (int i = 0; i < sizeof(needle); ++i) {
+        for (int i = 0; i < sizeof(needle) - 1; ++i) {
                 if (needle[i] != haystack[i]) {
                         return false;
                 }
@@ -336,9 +325,12 @@ BPF_PERF_OUTPUT(%s);
                 expr = self.values[idx].strip()
                 text = ""
                 if self.probe_type == "u" and expr[0:3] == "arg":
-                        text = ("        u64 %s = 0;\n" +
+                        arg_index = int(expr[3])
+                        arg_ctype = self.usdt.get_probe_arg_ctype(
+                                self.usdt_name, arg_index - 1)
+                        text = ("        %s %s = 0;\n" +
                                 "        bpf_usdt_readarg(%s, ctx, &%s);\n") \
-                                % (expr, expr[3], expr)
+                                % (arg_ctype, expr, expr[3], expr)
 
                 if field_type == "s":
                         return text + """
@@ -353,33 +345,35 @@ BPF_PERF_OUTPUT(%s);
 
         def _generate_usdt_filter_read(self):
             text = ""
-            if self.probe_type == "u":
-                    for arg, _ in Probe.aliases.items():
-                        if not (arg.startswith("arg") and
-                                (arg in self.filter)):
-                                continue
-                        arg_index = int(arg.replace("arg", ""))
-                        arg_ctype = self.usdt.get_probe_arg_ctype(
-                                self.usdt_name, arg_index)
-                        if not arg_ctype:
-                                self._bail("Unable to determine type of {} "
-                                           "in the filter".format(arg))
-                        text += """
+            if self.probe_type != "u":
+                    return text
+            for arg, _ in Probe.aliases.items():
+                    if not (arg.startswith("arg") and
+                            (arg in self.filter)):
+                            continue
+                    arg_index = int(arg.replace("arg", ""))
+                    arg_ctype = self.usdt.get_probe_arg_ctype(
+                            self.usdt_name, arg_index - 1)
+                    if not arg_ctype:
+                            self._bail("Unable to determine type of {} "
+                                       "in the filter".format(arg))
+                    text += """
         {} {}_filter;
         bpf_usdt_readarg({}, ctx, &{}_filter);
-                        """.format(arg_ctype, arg, arg_index, arg)
-                        self.filter = self.filter.replace(
-                                arg, "{}_filter".format(arg))
+                    """.format(arg_ctype, arg, arg_index, arg)
+                    self.filter = self.filter.replace(
+                            arg, "{}_filter".format(arg))
             return text
 
         def generate_program(self, include_self):
                 data_decl = self._generate_data_decl()
-                # kprobes don't have built-in pid filters, so we have to add
-                # it to the function body:
-                if len(self.library) == 0 and Probe.pid != -1:
+                if Probe.pid != -1:
                         pid_filter = """
         if (__pid != %d) { return 0; }
                 """ % Probe.pid
+                # uprobes can have a built-in tgid filter passed to
+                # attach_uprobe, hence the check here -- for kprobes, we
+                # need to do the tgid test by hand:
                 elif len(self.library) == 0 and Probe.tgid != -1:
                         pid_filter = """
         if (__tgid != %d) { return 0; }
@@ -393,6 +387,8 @@ BPF_PERF_OUTPUT(%s);
 
                 prefix = ""
                 signature = "struct pt_regs *ctx"
+                if self.signature:
+                        signature += ", " + self.signature
 
                 data_fields = ""
                 for i, expr in enumerate(self.values):
@@ -465,18 +461,20 @@ BPF_PERF_OUTPUT(%s);
 
             stack = list(bpf.get_table(self.stacks_name).walk(stack_id))
             for addr in stack:
-                    print("        %016x %s" % (addr, bpf.sym(addr, tgid)))
+                    print("        %s" % (bpf.sym(addr, tgid,
+                                         show_module=True, show_offset=True)))
 
         def _format_message(self, bpf, tgid, values):
                 # Replace each %K with kernel sym and %U with user sym in tgid
-                kernel_placeholders = [i for i in xrange(0, len(self.types))
-                                       if self.types[i] == 'K']
-                user_placeholders = [i for i in xrange(0, len(self.types))
-                                     if self.types[i] == 'U']
+                kernel_placeholders = [i for i, t in enumerate(self.types)
+                                       if t == 'K']
+                user_placeholders = [i for i, t in enumerate(self.types)
+                                     if t == 'U']
                 for kp in kernel_placeholders:
-                        values[kp] = bpf.ksymaddr(values[kp])
+                        values[kp] = bpf.ksym(values[kp], show_offset=True)
                 for up in user_placeholders:
-                        values[up] = bpf.symaddr(values[up], tgid)
+                        values[up] = bpf.sym(values[up], tgid,
+                                           show_module=True, show_offset=True)
                 return self.python_format % tuple(values)
 
         def print_event(self, bpf, cpu, data, size):
@@ -488,13 +486,13 @@ BPF_PERF_OUTPUT(%s);
                 msg = self._format_message(bpf, event.tgid, values)
                 if not Probe.print_time:
                     print("%-6d %-6d %-12s %-16s %s" %
-                          (event.tgid, event.pid, event.comm,
+                          (event.tgid, event.pid, event.comm.decode(),
                            self._display_function(), msg))
                 else:
                     time = strftime("%H:%M:%S") if Probe.use_localtime else \
                            Probe._time_off_str(event.timestamp_ns)
                     print("%-8s %-6d %-6d %-12s %-16s %s" %
-                          (time[:8], event.tgid, event.pid, event.comm,
+                          (time[:8], event.tgid, event.pid, event.comm.decode(),
                            self._display_function(), msg))
 
                 if self.kernel_stack:
@@ -516,7 +514,8 @@ BPF_PERF_OUTPUT(%s);
                         self._attach_u(bpf)
                 self.python_struct = self._generate_python_data_decl()
                 callback = partial(self.print_event, bpf)
-                bpf[self.events_name].open_perf_buffer(callback)
+                bpf[self.events_name].open_perf_buffer(callback,
+                        page_cnt=self.page_cnt)
 
         def _attach_k(self, bpf):
                 if self.probe_type == "r":
@@ -541,14 +540,15 @@ BPF_PERF_OUTPUT(%s);
                         bpf.attach_uretprobe(name=libpath,
                                              sym=self.function,
                                              fn_name=self.probe_name,
-                                             pid=Probe.pid)
+                                             pid=Probe.tgid)
                 else:
                         bpf.attach_uprobe(name=libpath,
                                           sym=self.function,
                                           fn_name=self.probe_name,
-                                          pid=Probe.pid)
+                                          pid=Probe.tgid)
 
 class Tool(object):
+        DEFAULT_PERF_BUFFER_PAGES = 64
         examples = """
 EXAMPLES:
 
@@ -558,7 +558,7 @@ trace 'do_sys_open "%s", arg2'
         Trace the open syscall and print the filename being opened
 trace 'sys_read (arg3 > 20000) "read %d bytes", arg3'
         Trace the read syscall and print a message for reads >20000 bytes
-trace 'r::do_sys_return "%llx", retval'
+trace 'r::do_sys_open "%llx", retval'
         Trace the return from the open syscall and print the return value
 trace 'c:open (arg2 == 42) "%s %d", arg1, arg2'
         Trace the open() call from libc only if the flags (arg2) argument is 42
@@ -574,6 +574,8 @@ trace 't:block:block_rq_complete "sectors=%d", args->nr_sector'
         Trace the block_rq_complete kernel tracepoint and print # of tx sectors
 trace 'u:pthread:pthread_create (arg4 != 0)'
         Trace the USDT probe pthread_create when its 4th argument is non-zero
+trace 'p::SyS_nanosleep(struct timespec *ts) "sleep for %lld ns", ts->tv_nsec'
+        Trace the nanosleep syscall and print the sleep duration in ns
 """
 
         def __init__(self):
@@ -581,6 +583,10 @@ trace 'u:pthread:pthread_create (arg4 != 0)'
                   "functions and print trace messages.",
                   formatter_class=argparse.RawDescriptionHelpFormatter,
                   epilog=Tool.examples)
+                parser.add_argument("-b", "--buffer-pages", type=int,
+                  default=Tool.DEFAULT_PERF_BUFFER_PAGES,
+                  help="number of pages to use for perf_events ring buffer "
+                       "(default: %(default)d)")
                 # we'll refer to the userspace concepts of "pid" and "tid" by
                 # their kernel names -- tgid and pid -- inside the script
                 parser.add_argument("-p", "--pid", type=int, metavar="PID",
@@ -608,7 +614,8 @@ trace 'u:pthread:pthread_create (arg4 != 0)'
                   help="probe specifier (see examples)")
                 parser.add_argument("-I", "--include", action="append",
                   metavar="header",
-                  help="additional header files to include in the BPF program")
+                  help="additional header files to include in the BPF program "
+                       "as either full path, or relative to '/usr/include'")
                 self.args = parser.parse_args()
                 if self.args.tgid and self.args.pid:
                         parser.error("only one of -p and -t may be specified")
@@ -628,7 +635,11 @@ trace 'u:pthread:pthread_create (arg4 != 0)'
 
 """
                 for include in (self.args.include or []):
-                        self.program += "#include <%s>\n" % include
+                        if include.startswith((".", "/")):
+                                include = os.path.abspath(include)
+                                self.program += "#include \"%s\"\n" % include
+                        else:
+                                self.program += "#include <%s>\n" % include
                 self.program += BPF.generate_auto_includes(
                         map(lambda p: p.raw_probe, self.probes))
                 for probe in self.probes:
@@ -680,10 +691,13 @@ trace 'u:pthread:pthread_create (arg4 != 0)'
                         self._attach_probes()
                         self._main_loop()
                 except:
+                        exc_info = sys.exc_info()
+                        sys_exit = exc_info[0] is SystemExit
                         if self.args.verbose:
                                 traceback.print_exc()
-                        elif sys.exc_info()[0] is not SystemExit:
-                                print(sys.exc_info()[1])
+                        elif not sys_exit:
+                                print(exc_info[1])
+                        exit(0 if sys_exit else 1)
 
 if __name__ == "__main__":
         Tool().run()

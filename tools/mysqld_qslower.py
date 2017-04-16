@@ -128,6 +128,6 @@ def print_event(cpu, data, size):
         event.pid, float(event.delta) / 1000000, event.query))
 
 # loop with callback to print_event
-b["events"].open_perf_buffer(print_event)
+b["events"].open_perf_buffer(print_event, page_cnt=64)
 while 1:
     b.kprobe_poll()

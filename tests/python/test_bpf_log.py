@@ -15,7 +15,7 @@ error_msg = "R0 invalid mem access 'map_value_or_null'\n"
 text = """
        #include <uapi/linux/ptrace.h>
        #include <bcc/proto.h>
-       BPF_TABLE("hash", int, int, t1, 10);
+       BPF_HASH(t1, int, int, 10);
        int sim_port(struct __sk_buff *skb) {
            int x = 0, *y;
        """
@@ -51,7 +51,7 @@ class TestBPFProgLoad(TestCase):
         except Exception:
             self.fp.flush()
             self.fp.seek(0)
-            self.assertEqual(error_msg in self.fp.read(), True)
+            self.assertEqual(error_msg in self.fp.read().decode(), True)
 
 
     def test_log_no_debug(self):
@@ -61,7 +61,7 @@ class TestBPFProgLoad(TestCase):
         except Exception:
             self.fp.flush()
             self.fp.seek(0)
-            self.assertEqual(error_msg in self.fp.read(), True)
+            self.assertEqual(error_msg in self.fp.read().decode(), True)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,251 @@
+#
+# Copyright (C) 2016 Canonical
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+#
+name: bcc
+version: 0.3.0-20170401-1747-c5f48c9
+summary: BPF Compiler Collection (BCC)
+description: A toolkit for creating efficient kernel tracing and manipulation programs
+confinement: strict
+grade: stable
+plugs:
+    mount-observe: null
+    system-observe: null
+    system-trace: null
+apps:
+    argdist:
+        command: wrapper argdist
+    bashreadline:
+        command: wrapper bashreadline
+    biolatency:
+        command: wrapper biolatency
+    biosnoop:
+        command: wrapper biosnoop
+    biotop:
+        command: wrapper biotop
+    bitesize:
+        command: wrapper bitesize
+    bpflist:
+        command: wrapper bpflist
+    btrfsdist:
+        command: wrapper btrfsdist
+    btrfsslower:
+        command: wrapper btrfsslower
+    cachestat:
+        command: wrapper cachestat
+    cachetop:
+        command: wrapper cachetop
+    capable:
+        command: wrapper capable
+    cpudist:
+        command: wrapper cpudist
+    cpuunclaimed:
+        command: wrapper cpuunclaimed
+    dbslower:
+        command: wrapper dbslower
+    dbstat:
+        command: wrapper dbstat
+    dcsnoop:
+        command: wrapper dcsnoop
+    dcstat:
+        command: wrapper dcstat
+    deadlock-detector:
+        command: wrapper deadlock_detector
+    execsnoop:
+        command: wrapper execsnoop
+    ext4dist:
+        command: wrapper ext4dist
+    ext4slower:
+        command: wrapper ext4slower
+    filelife:
+        command: wrapper filelife
+    fileslower:
+        command: wrapper fileslower
+    filetop:
+        command: wrapper filetop
+    funccount:
+        command: wrapper funccount
+    funclatency:
+        command: wrapper funclatency
+    gethostlatency:
+        command: wrapper gethostlatency
+    hardirqs:
+        command: wrapper hardirqs
+    killsnoop:
+        command: wrapper killsnoop
+    llcstat:
+        command: wrapper llcstat
+    mdflush:
+        command: wrapper mdflush
+    memleak:
+        command: wrapper memleak
+    mountsnoop:
+        command: wrapper mountsnoop
+    mysqld-qslower:
+        command: wrapper mysqld_qslower
+    offcputime:
+        command: wrapper offcputime
+    offwaketime:
+        command: wrapper offwaketime
+    oomkill:
+        command: wrapper oomkill
+    opensnoop:
+        command: wrapper opensnoop
+    pidpersec:
+        command: wrapper pidpersec
+    profile:
+        command: wrapper profile
+    runqlat:
+        command: wrapper runqlat
+    runqlen:
+        command: wrapper runqlen
+    slabratetop:
+        command: wrapper slabratetop
+    softirqs:
+        command: wrapper softirqs
+    solisten:
+        command: wrapper solisten
+    sslsniff:
+        command: wrapper sslsniff
+    stackcount:
+        command: wrapper stackcount
+    stacksnoop:
+        command: wrapper stacksnoop
+    statsnoop:
+        command: wrapper statsnoop
+    syncsnoop:
+        command: wrapper syncsnoop
+    syscount:
+        command: wrapper syscount
+    tcpaccept:
+        command: wrapper tcpaccept
+    tcpconnect:
+        command: wrapper tcpconnect
+    tcpconnlat:
+        command: wrapper tcpconnlat
+    tcplife:
+        command: wrapper tcplife
+    tcpretrans:
+        command: wrapper tcpretrans
+    tcptop:
+        command: wrapper tcptop
+    tplist:
+        command: wrapper tplist
+    trace:
+        command: wrapper trace
+    ttysnoop:
+        command: wrapper ttysnoop
+    ucalls:
+        command: wrapper lib/ucalls
+    uflow:
+        command: wrapper lib/uflow
+    ugc:
+        command: wrapper lib/ugc
+    uobjnew:
+        command: wrapper lib/uobjnew
+    ustat:
+        command: wrapper lib/ustat
+    uthreads:
+        command: wrapper lib/uthreads
+    cobjnew:
+        command: wrapper cobjnew
+    javacalls:
+        command: wrapper javacalls
+    javaflow:
+        command: wrapper javaflow
+    javagc:
+        command: wrapper javagc
+    javaobjnew:
+        command: wrapper javaobjnew
+    javastat:
+        command: wrapper javastat
+    javathreads:
+        command: wrapper javathreads
+    nodegc:
+        command: wrapper nodegc
+    nodestat:
+        command: wrapper nodestat
+    phpcalls:
+        command: wrapper phpcalls
+    phpflow:
+        command: wrapper phpflow
+    phpstat:
+        command: wrapper phpstat
+    pythoncalls:
+        command: wrapper pythoncalls
+    pythonflow:
+        command: wrapper pythonflow
+    pythongc:
+        command: wrapper pythongc
+    pythonstat:
+        command: wrapper pythonstat
+    rubycalls:
+        command: wrapper rubycalls
+    rubyflow:
+        command: wrapper rubyflow
+    rubygc:
+        command: wrapper rubygc
+    rubyobjnew:
+        command: wrapper rubyobjnew
+    rubystat:
+        command: wrapper rubystat
+    vfscount:
+        command: wrapper vfscount
+    vfsstat:
+        command: wrapper vfsstat
+    wakeuptime:
+        command: wrapper wakeuptime
+    xfsdist:
+        command: wrapper xfsdist
+    xfsslower:
+        command: wrapper xfsslower
+    zfsdist:
+        command: wrapper zfsdist
+    zfsslower:
+        command: wrapper zfsslower
+parts:
+    bcc:
+        plugin: cmake
+        configflags:
+            - -DCMAKE_INSTALL_PREFIX=/usr
+        source: ..
+        build-packages:
+            - bison
+            - build-essential
+            - cmake
+            - flex
+            - libedit-dev
+            - libllvm3.7
+            - llvm-3.7-dev
+            - libclang-3.7-dev
+            - python
+            - zlib1g-dev
+            - libelf-dev
+        stage-packages:
+            - python
+        snap:
+            - usr/bin/python*
+            - usr/share/bcc/tools
+            - usr/lib/*/lib*.so*
+            - usr/lib/python2.7
+            - -usr/share/bcc/tools/doc
+    wrapper:
+        source: .
+        plugin: copy
+        files:
+            wrapper: bin/wrapper
+
+# vim: set ai et sts=4 tabstop=4 sw=4:

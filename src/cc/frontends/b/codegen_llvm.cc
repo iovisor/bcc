@@ -35,10 +35,10 @@
 #include "bcc_exception.h"
 #include "codegen_llvm.h"
 #include "lexer.h"
-#include "table_desc.h"
-#include "type_helper.h"
-#include "linux/bpf.h"
 #include "libbpf.h"
+#include "linux/bpf.h"
+#include "table_storage.h"
+#include "type_helper.h"
 
 namespace ebpf {
 namespace cc {
@@ -1163,6 +1163,8 @@ StatusTuple CodegenLLVM::visit_func_decl_stmt_node(FuncDeclStmtNode *n) {
   Function *fn = mod_->getFunction(n->id_->name_);
   if (fn) return mkstatus_(n, "Function %s already defined", n->id_->c_str());
   fn = Function::Create(fn_type, GlobalValue::ExternalLinkage, n->id_->name_, mod_);
+  fn->setCallingConv(CallingConv::C);
+  fn->addFnAttr(Attribute::NoUnwind);
   fn->setSection(BPF_FN_PREFIX + n->id_->name_);
 
   BasicBlock *label_entry = BasicBlock::Create(ctx(), "entry", fn);
@@ -1218,7 +1220,7 @@ StatusTuple CodegenLLVM::visit_func_decl_stmt_node(FuncDeclStmtNode *n) {
   return StatusTuple(0);
 }
 
-StatusTuple CodegenLLVM::visit(Node* root, vector<TableDesc> &tables) {
+StatusTuple CodegenLLVM::visit(Node *root, TableStorage &ts, const string &id) {
   scopes_->set_current(scopes_->top_state());
   scopes_->set_current(scopes_->top_var());
 
@@ -1237,16 +1239,12 @@ StatusTuple CodegenLLVM::visit(Node* root, vector<TableDesc> &tables) {
       map_type = BPF_MAP_TYPE_HASH;
     else if (table.first->type_id()->name_ == "INDEXED")
       map_type = BPF_MAP_TYPE_ARRAY;
-    tables.push_back({
-      table.first->id_->name_,
-      table_fds_[table.first],
-      map_type,
-      table.first->key_type_->bit_width_ >> 3,
-      table.first->leaf_type_->bit_width_ >> 3,
-      table.first->size_,
-      0,
-      "", "",
-    });
+    ts.Insert(Path({id, table.first->id_->name_}),
+              {
+                  table.first->id_->name_, table_fds_[table.first], map_type,
+                  table.first->key_type_->bit_width_ >> 3, table.first->leaf_type_->bit_width_ >> 3,
+                  table.first->size_, 0,
+              });
   }
   return StatusTuple(0);
 }

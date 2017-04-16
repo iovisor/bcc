@@ -20,7 +20,7 @@ import sys
 class Probe(object):
         next_probe_index = 0
         streq_index = 0
-        aliases = {"$PID": "bpf_get_current_pid_tgid()"}
+        aliases = {"$PID": "(bpf_get_current_pid_tgid() >> 32)"}
 
         def _substitute_aliases(self, expr):
                 if expr is None:
@@ -47,7 +47,9 @@ class Probe(object):
                 text = """
 int PROBENAME(struct pt_regs *ctx SIGNATURE)
 {
-        u32 pid = bpf_get_current_pid_tgid();
+        u64 __pid_tgid = bpf_get_current_pid_tgid();
+        u32 __pid      = __pid_tgid;        // lower 32 bits
+        u32 __tgid     = __pid_tgid >> 32;  // upper 32 bits
         PID_FILTER
         COLLECT
         return 0;
@@ -56,19 +58,17 @@ int PROBENAME(struct pt_regs *ctx SIGNATURE)
                 text = text.replace("PROBENAME", self.entry_probe_func)
                 text = text.replace("SIGNATURE",
                      "" if len(self.signature) == 0 else ", " + self.signature)
-                pid_filter = "" if self.is_user or self.pid is None \
-                                else "if (pid != %d) { return 0; }" % self.pid
-                text = text.replace("PID_FILTER", pid_filter)
+                text = text.replace("PID_FILTER", self._generate_pid_filter())
                 collect = ""
                 for pname in self.args_to_probe:
                         param_hash = self.hashname_prefix + pname
                         if pname == "__latency":
                                 collect += """
 u64 __time = bpf_ktime_get_ns();
-%s.update(&pid, &__time);
+%s.update(&__pid, &__time);
                         """ % param_hash
                         else:
-                                collect += "%s.update(&pid, &%s);\n" % \
+                                collect += "%s.update(&__pid, &%s);\n" % \
                                            (param_hash, pname)
                 text = text.replace("COLLECT", collect)
                 return text
@@ -108,7 +108,7 @@ u64 __time = bpf_ktime_get_ns();
                 # argument we needed to probe using $entry(name), and they all
                 # have values (which isn't necessarily the case if we missed
                 # the method entry probe).
-                text = "u32 __pid = bpf_get_current_pid_tgid();\n"
+                text = ""
                 self.param_val_names = {}
                 for pname in self.args_to_probe:
                         val_name = "__%s_val" % pname
@@ -159,7 +159,7 @@ u64 __time = bpf_ktime_get_ns();
                 if parts[0] not in ["r", "p", "t", "u"]:
                         self._bail("probe type must be 'p', 'r', 't', or 'u'" +
                                    " but got '%s'" % parts[0])
-                if re.match(r"\w+\(.*\)", parts[2]) is None:
+                if re.match(r"\S+\(.*\)", parts[2]) is None:
                         self._bail(("function signature '%s' has an invalid " +
                                     "format") % parts[2])
 
@@ -172,6 +172,9 @@ u64 __time = bpf_ktime_get_ns();
                 if len(exprs) == 0:
                         self._bail("no exprs specified")
                 self.exprs = exprs.split(',')
+
+        def _make_valid_identifier(self, ident):
+                return re.sub(r'[^A-Za-z0-9_]', '_', ident)
 
         def __init__(self, tool, type, specifier):
                 self.usdt_ctx = None
@@ -196,8 +199,9 @@ u64 __time = bpf_ktime_get_ns();
                         self.tp_event = self.function
                 elif self.probe_type == "u":
                         self.library = parts[1]
-                        self.probe_func_name = "%s_probe%d" % \
-                                (self.function, Probe.next_probe_index)
+                        self.probe_func_name = self._make_valid_identifier(
+                                "%s_probe%d" %
+                                (self.function, Probe.next_probe_index))
                         self._enable_usdt_probe()
                 else:
                         self.library = parts[1]
@@ -233,10 +237,12 @@ u64 __time = bpf_ktime_get_ns();
                 self.entry_probe_required = self.probe_type == "r" and \
                         (any(map(check, self.exprs)) or check(self.filter))
 
-                self.probe_func_name = "%s_probe%d" % \
-                        (self.function, Probe.next_probe_index)
-                self.probe_hash_name = "%s_hash%d" % \
-                        (self.function, Probe.next_probe_index)
+                self.probe_func_name = self._make_valid_identifier(
+                        "%s_probe%d" %
+                        (self.function, Probe.next_probe_index))
+                self.probe_hash_name = self._make_valid_identifier(
+                        "%s_hash%d" %
+                        (self.function, Probe.next_probe_index))
                 Probe.next_probe_index += 1
 
         def _enable_usdt_probe(self):
@@ -252,7 +258,7 @@ static inline bool %s(char const *ignored, char const *str) {
         char needle[] = %s;
         char haystack[sizeof(needle)];
         bpf_probe_read(&haystack, sizeof(haystack), (void *)str);
-        for (int i = 0; i < sizeof(needle); ++i) {
+        for (int i = 0; i < sizeof(needle) - 1; ++i) {
                 if (needle[i] != haystack[i]) {
                         return false;
                 }
@@ -287,9 +293,12 @@ static inline bool %s(char const *ignored, char const *str) {
         def _generate_usdt_arg_assignment(self, i):
                 expr = self.exprs[i]
                 if self.probe_type == "u" and expr[0:3] == "arg":
-                        return ("        u64 %s = 0;\n" +
+                        arg_index = int(expr[3])
+                        arg_ctype = self.usdt_ctx.get_probe_arg_ctype(
+                                self.function, arg_index - 1)
+                        return ("        %s %s = 0;\n" +
                                 "        bpf_usdt_readarg(%s, ctx, &%s);\n") \
-                                % (expr, expr[3], expr)
+                                % (arg_ctype, expr, expr[3], expr)
                 else:
                         return ""
 
@@ -339,8 +348,7 @@ static inline bool %s(char const *ignored, char const *str) {
                 # Kernel probes need to explicitly filter pid, because the
                 # attach interface doesn't support pid filtering
                 if self.pid is not None and not self.is_user:
-                        return "u32 pid = bpf_get_current_pid_tgid();\n" + \
-                               "if (pid != %d) { return 0; }" % self.pid
+                        return "if (__tgid != %d) { return 0; }" % self.pid
                 else:
                         return ""
 
@@ -354,6 +362,9 @@ DATA_DECL
                     if self.probe_type == "t"
                     else "int PROBENAME(struct pt_regs *ctx SIGNATURE)") + """
 {
+        u64 __pid_tgid = bpf_get_current_pid_tgid();
+        u32 __pid      = __pid_tgid;        // lower 32 bits
+        u32 __tgid     = __pid_tgid >> 32;  // upper 32 bits
         PID_FILTER
         PREFIX
         if (!(FILTER)) return 0;
@@ -613,7 +624,8 @@ argdist -p 2780 -z 120 \\
                   "(see examples below)")
                 parser.add_argument("-I", "--include", action="append",
                   metavar="header",
-                  help="additional header files to include in the BPF program")
+                  help="additional header files to include in the BPF program "
+                       "as either full path, or relative to '/usr/include'")
                 self.args = parser.parse_args()
                 self.usdt_ctx = None
 
@@ -625,7 +637,7 @@ argdist -p 2780 -z 120 \\
                         self.probes.append(Probe(self, "hist", histspecifier))
                 if len(self.probes) == 0:
                         print("at least one specifier is required")
-                        exit()
+                        exit(1)
 
         def _generate_program(self):
                 bpf_source = """
@@ -634,7 +646,12 @@ struct __string_t { char s[%d]; };
 #include <uapi/linux/ptrace.h>
                 """ % self.args.string_size
                 for include in (self.args.include or []):
-                        bpf_source += "#include <%s>\n" % include
+                        if include.startswith((".", "/")):
+                                include = os.path.abspath(include)
+                                bpf_source += "#include \"%s\"\n" % include
+                        else:
+                                bpf_source += "#include <%s>\n" % include
+
                 bpf_source += BPF.generate_auto_includes(
                                 map(lambda p: p.raw_spec, self.probes))
                 for probe in self.probes:
@@ -678,10 +695,13 @@ struct __string_t { char s[%d]; };
                         self._attach()
                         self._main_loop()
                 except:
+                        exc_info = sys.exc_info()
+                        sys_exit = exc_info[0] is SystemExit
                         if self.args.verbose:
                                 traceback.print_exc()
-                        elif sys.exc_info()[0] is not SystemExit:
-                                print(sys.exc_info()[1])
+                        elif not sys_exit:
+                                print(exc_info[1])
+                        exit(0 if sys_exit else 1)
 
 if __name__ == "__main__":
         Tool().run()
