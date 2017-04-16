@@ -195,7 +195,8 @@ def print_event(cpu, data, size):
             skip = True
         if args.name and not re.search(args.name, event.comm):
             skip = True
-        if args.line and not re.search(args.line, b' '.join(argv[event.pid])):
+        if args.line and not re.search(args.line,
+                                       b' '.join(argv[event.pid]).decode()):
             skip = True
 
         if not skip:
@@ -204,7 +205,7 @@ def print_event(cpu, data, size):
             ppid = get_ppid(event.pid)
             print("%-16s %-6s %-6s %3s %s" % (event.comm.decode(), event.pid,
                     ppid if ppid > 0 else "?", event.retval,
-                    b' '.join(argv[event.pid])))
+                    b' '.join(argv[event.pid]).decode()))
         try:
             del(argv[event.pid])
         except Exception:
