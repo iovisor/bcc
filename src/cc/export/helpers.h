@@ -166,7 +166,8 @@ static u32 (*bpf_get_prandom_u32)(void) =
 static int (*bpf_trace_printk_)(const char *fmt, u64 fmt_size, ...) =
   (void *) BPF_FUNC_trace_printk;
 int bpf_trace_printk(const char *fmt, ...) asm("llvm.bpf.extra");
-static inline void bpf_tail_call_(u64 map_fd, void *ctx, int index) {
+static inline __attribute__((always_inline))
+void bpf_tail_call_(u64 map_fd, void *ctx, int index) {
   ((void (*)(void *, u64, int))BPF_FUNC_tail_call)(ctx, map_fd, index);
 }
 static int (*bpf_clone_redirect)(void *ctx, int ifindex, u32 flags) =
@@ -280,40 +281,51 @@ static int (*bpf_l4_csum_replace)(void *ctx, unsigned long long off, unsigned lo
                                   unsigned long long to, unsigned long long flags) =
   (void *) BPF_FUNC_l4_csum_replace;
 
-static inline u16 bpf_ntohs(u16 val) {
+static inline __attribute__((always_inline))
+u16 bpf_ntohs(u16 val) {
   /* will be recognized by gcc into rotate insn and eventually rolw 8 */
   return (val << 8) | (val >> 8);
 }
 
-static inline u32 bpf_ntohl(u32 val) {
+static inline __attribute__((always_inline))
+u32 bpf_ntohl(u32 val) {
   /* gcc will use bswapsi2 insn */
   return __builtin_bswap32(val);
 }
 
-static inline u64 bpf_ntohll(u64 val) {
+static inline __attribute__((always_inline))
+u64 bpf_ntohll(u64 val) {
   /* gcc will use bswapdi2 insn */
   return __builtin_bswap64(val);
 }
 
-static inline unsigned __int128 bpf_ntoh128(unsigned __int128 val) {
+static inline __attribute__((always_inline))
+unsigned __int128 bpf_ntoh128(unsigned __int128 val) {
   return (((unsigned __int128)bpf_ntohll(val) << 64) | (u64)bpf_ntohll(val >> 64));
 }
 
-static inline u16 bpf_htons(u16 val) {
+static inline __attribute__((always_inline))
+u16 bpf_htons(u16 val) {
   return bpf_ntohs(val);
 }
 
-static inline u32 bpf_htonl(u32 val) {
+static inline __attribute__((always_inline))
+u32 bpf_htonl(u32 val) {
   return bpf_ntohl(val);
 }
-static inline u64 bpf_htonll(u64 val) {
+
+static inline __attribute__((always_inline))
+u64 bpf_htonll(u64 val) {
   return bpf_ntohll(val);
 }
-static inline unsigned __int128 bpf_hton128(unsigned __int128 val) {
+
+static inline __attribute__((always_inline))
+unsigned __int128 bpf_hton128(unsigned __int128 val) {
   return bpf_ntoh128(val);
 }
 
-static inline u64 load_dword(void *skb, u64 off) {
+static inline __attribute__((always_inline))
+u64 load_dword(void *skb, u64 off) {
   return ((u64)load_word(skb, off) << 32) | load_word(skb, off + 4);
 }
 
@@ -321,7 +333,9 @@ void bpf_store_byte(void *skb, u64 off, u64 val) asm("llvm.bpf.store.byte");
 void bpf_store_half(void *skb, u64 off, u64 val) asm("llvm.bpf.store.half");
 void bpf_store_word(void *skb, u64 off, u64 val) asm("llvm.bpf.store.word");
 u64 bpf_pseudo_fd(u64, u64) asm("llvm.bpf.pseudo");
-static inline void bpf_store_dword(void *skb, u64 off, u64 val) {
+
+static inline void __attribute__((always_inline))
+bpf_store_dword(void *skb, u64 off, u64 val) {
   bpf_store_word(skb, off, (u32)val);
   bpf_store_word(skb, off + 4, val >> 32);
 }
@@ -329,7 +343,8 @@ static inline void bpf_store_dword(void *skb, u64 off, u64 val) {
 #define MASK(_n) ((_n) < 64 ? (1ull << (_n)) - 1 : ((u64)-1LL))
 #define MASK128(_n) ((_n) < 128 ? ((unsigned __int128)1 << (_n)) - 1 : ((unsigned __int128)-1))
 
-static inline unsigned int bpf_log2(unsigned int v)
+static inline __attribute__((always_inline))
+unsigned int bpf_log2(unsigned int v)
 {
   unsigned int r;
   unsigned int shift;
@@ -342,7 +357,8 @@ static inline unsigned int bpf_log2(unsigned int v)
   return r;
 }
 
-static inline unsigned int bpf_log2l(unsigned long v)
+static inline __attribute__((always_inline))
+unsigned int bpf_log2l(unsigned long v)
 {
   unsigned int hi = v >> 32;
   if (hi)
