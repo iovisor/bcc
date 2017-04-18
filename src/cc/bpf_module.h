@@ -59,12 +59,13 @@ class BPFModule {
                        const void *val);
 
  public:
-  BPFModule(unsigned flags, TableStorage *ts = nullptr);
+  BPFModule(unsigned flags, TableStorage *ts = nullptr, const std::string &maps_ns = "");
   ~BPFModule();
   int load_b(const std::string &filename, const std::string &proto_filename);
   int load_c(const std::string &filename, const char *cflags[], int ncflags);
   int load_string(const std::string &text, const char *cflags[], int ncflags);
   std::string id() const { return id_; }
+  std::string maps_ns() const { return maps_ns_; }
   size_t num_functions() const;
   uint8_t * function_start(size_t id) const;
   uint8_t * function_start(const std::string &name) const;
@@ -115,6 +116,7 @@ class BPFModule {
   std::map<llvm::Type *, std::string> readers_;
   std::map<llvm::Type *, std::string> writers_;
   std::string id_;
+  std::string maps_ns_;
   TableStorage *ts_;
   std::unique_ptr<TableStorage> local_ts_;
 };

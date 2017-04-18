@@ -105,7 +105,8 @@ std::pair<bool, string> get_kernel_path_info(const string kdir)
 }
 
 int ClangLoader::parse(unique_ptr<llvm::Module> *mod, TableStorage &ts, const string &file,
-                       bool in_memory, const char *cflags[], int ncflags, const std::string &id) {
+                       bool in_memory, const char *cflags[], int ncflags, const std::string &id,
+                       const std::string &maps_ns) {
   using namespace clang;
 
   string main_path = "/virtual/main.c";
@@ -269,7 +270,7 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, TableStorage &ts, const st
   // capture the rewritten c file
   string out_str1;
   llvm::raw_string_ostream os1(out_str1);
-  BFrontendAction bact(os1, flags_, ts, id);
+  BFrontendAction bact(os1, flags_, ts, id, maps_ns);
   if (!compiler1.ExecuteAction(bact))
     return -1;
   unique_ptr<llvm::MemoryBuffer> out_buf1 = llvm::MemoryBuffer::getMemBuffer(out_str1);
