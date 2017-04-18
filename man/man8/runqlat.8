@@ -2,7 +2,7 @@
 .SH NAME
 runqlat \- Run queue (scheduler) latency as a histogram.
 .SH SYNOPSIS
-.B runqlat [\-h] [\-T] [\-m] [\-P] [\-p PID] [interval] [count]
+.B runqlat [\-h] [\-T] [\-m] [\-P] [\-\-pidnss] [\-L] [\-p PID] [interval] [count]
 .SH DESCRIPTION
 This measures the time a task spends waiting on a run queue (or equivalent
 scheduler data structure) for a turn on-CPU, and shows this time as a
@@ -43,6 +43,13 @@ Output histogram in milliseconds.
 .TP
 \-P
 Print a histogram for each PID.
+.TP
+\-\-pidnss
+Print a histogram for each PID namespace (short for PID namespaces). For
+container analysis.
+.TP
+\-L
+Print a histogram for each thread ID.
 .TP
 \-p PID
 Only show this PID (filtered in kernel for efficiency).
