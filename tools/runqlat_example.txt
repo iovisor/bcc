@@ -486,12 +486,75 @@ tid = 7
 [...]
 
 
+And a --pidnss option (short for PID namespaces)  will print for each PID
+namespace, for analyzing container performance:
+
+# ./runqlat --pidnss -m
+Tracing run queue latency... Hit Ctrl-C to end.
+^C
+
+pidns = 4026532870
+     msecs               : count     distribution
+         0 -> 1          : 40       |****************************************|
+         2 -> 3          : 1        |*                                       |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 2        |**                                      |
+        64 -> 127        : 5        |*****                                   |
+
+pidns = 4026532809
+     msecs               : count     distribution
+         0 -> 1          : 67       |****************************************|
+
+pidns = 4026532748
+     msecs               : count     distribution
+         0 -> 1          : 63       |****************************************|
+
+pidns = 4026532687
+     msecs               : count     distribution
+         0 -> 1          : 7        |****************************************|
+
+pidns = 4026532626
+     msecs               : count     distribution
+         0 -> 1          : 45       |****************************************|
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 3        |**                                      |
+
+pidns = 4026531836
+     msecs               : count     distribution
+         0 -> 1          : 314      |****************************************|
+         2 -> 3          : 1        |                                        |
+         4 -> 7          : 11       |*                                       |
+         8 -> 15         : 28       |***                                     |
+        16 -> 31         : 137      |*****************                       |
+        32 -> 63         : 86       |**********                              |
+        64 -> 127        : 1        |                                        |
+
+pidns = 4026532382
+     msecs               : count     distribution
+         0 -> 1          : 285      |****************************************|
+         2 -> 3          : 5        |                                        |
+         4 -> 7          : 16       |**                                      |
+         8 -> 15         : 9        |*                                       |
+        16 -> 31         : 69       |*********                               |
+        32 -> 63         : 25       |***                                     |
+
+Many of these distributions have two modes: the second, in this case, is
+caused by capping CPU usage via CPU shares.
+
+
 USAGE message:
 
 # ./runqlat -h
-usage: runqlat [-h] [-T] [-m] [-P] [-L] [-p PID] [interval] [count]
+usage: runqlat.py [-h] [-T] [-m] [-P] [--pidnss] [-L] [-p PID]
+                  [interval] [count]
 
-Summarize run queue (schedular) latency as a histogram
+Summarize run queue (scheduler) latency as a histogram
 
 positional arguments:
   interval            output interval, in seconds
@@ -502,6 +565,7 @@ optional arguments:
   -T, --timestamp     include timestamp on output
   -m, --milliseconds  millisecond histogram
   -P, --pids          print a histogram per process ID
+  --pidnss            print a histogram per PID namespace
   -L, --tids          print a histogram per thread ID
   -p PID, --pid PID   trace this PID only
 
