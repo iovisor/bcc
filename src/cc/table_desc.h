@@ -67,6 +67,9 @@ class FileDesc {
   int fd;
 };
 
+typedef int (*sscanf_fn)(const char *, void *);
+typedef int (*snprintf_fn)(char *, size_t, const void *);
+
 /// TableDesc uniquely stores all of the runtime state for an active bpf table.
 /// The copy constructor/assign operator are disabled since the file handles
 /// owned by this table are not implicitly copyable. One should call the dup()
@@ -118,10 +121,10 @@ class TableDesc {
   int flags;
   std::string key_desc;
   std::string leaf_desc;
-  llvm::Function *key_sscanf;
-  llvm::Function *leaf_sscanf;
-  llvm::Function *key_snprintf;
-  llvm::Function *leaf_snprintf;
+  sscanf_fn key_sscanf;
+  sscanf_fn leaf_sscanf;
+  snprintf_fn key_snprintf;
+  snprintf_fn leaf_snprintf;
   bool is_shared;
   bool is_extern;
 };

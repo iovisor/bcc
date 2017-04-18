@@ -31,6 +31,61 @@
 
 namespace ebpf {
 
+BPFTable::BPFTable(const TableDesc& desc) : BPFTableBase<void, void>(desc) {}
+
+StatusTuple BPFTable::get_value(const std::string& key_str,
+                                std::string& value_str) {
+  char key[desc.key_size];
+  char value[desc.leaf_size];
+
+  StatusTuple r(0);
+
+  r = string_to_key(key_str, key);
+  if (r.code() != 0)
+    return r;
+
+  if (!lookup(key, value))
+    return StatusTuple(-1, "error getting value");
+
+  return leaf_to_string(value, value_str);
+}
+
+StatusTuple BPFTable::update_value(const std::string& key_str,
+                                   const std::string& value_str) {
+  char key[desc.key_size];
+  char value[desc.leaf_size];
+
+  StatusTuple r(0);
+
+  r = string_to_key(key_str, key);
+  if (r.code() != 0)
+    return r;
+
+  r = string_to_leaf(value_str, value);
+  if (r.code() != 0)
+    return r;
+
+  if (!update(key, value))
+    return StatusTuple(-1, "error updating element");
+
+  return StatusTuple(0);
+}
+
+StatusTuple BPFTable::remove_value(const std::string& key_str) {
+  char key[desc.key_size];
+
+  StatusTuple r(0);
+
+  r = string_to_key(key_str, key);
+  if (r.code() != 0)
+    return r;
+
+  if (!remove(key))
+    return StatusTuple(-1, "error removing element");
+
+  return StatusTuple(0);
+}
+
 BPFStackTable::~BPFStackTable() {
   for (auto it : pid_sym_)
     bcc_free_symcache(it.second, it.first);

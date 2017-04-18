@@ -66,9 +66,6 @@ using std::unique_ptr;
 using std::vector;
 using namespace llvm;
 
-typedef int (* sscanf_fn) (const char *, void *);
-typedef int (* snprintf_fn) (char *, size_t, const void *);
-
 const string BPFModule::FN_PREFIX = BPF_FN_PREFIX;
 
 // Snooping class to remember the sections as the JIT creates them
@@ -123,6 +120,14 @@ BPFModule::~BPFModule() {
   engine_.reset();
   rw_engine_.reset();
   ctx_.reset();
+
+  for (auto &v : tables_) {
+    v->key_sscanf = nullptr;
+    v->leaf_sscanf = nullptr;
+    v->key_snprintf = nullptr;
+    v->leaf_snprintf = nullptr;
+  }
+
   ts_->DeletePrefix(Path({id_}));
 }
 
@@ -350,6 +355,15 @@ int BPFModule::annotate() {
   // separate module to hold the reader functions
   auto m = make_unique<Module>("sscanf", *ctx_);
 
+  struct llvmfnpointers {
+    llvm::Function *key_sscanf;
+    llvm::Function *leaf_sscanf;
+    llvm::Function *key_snprintf;
+    llvm::Function *leaf_snprintf;
+  };
+
+  std::map<TableDesc *, llvmfnpointers> ptrs_map;
+
   size_t id = 0;
   Path path({id_});
   for (auto it = ts_->lower_bound(path), up = ts_->upper_bound(path); it != up; ++it) {
@@ -363,18 +377,26 @@ int BPFModule::annotate() {
         if (st->getNumElements() < 2) continue;
         Type *key_type = st->elements()[0];
         Type *leaf_type = st->elements()[1];
-        table.key_sscanf = make_reader(&*m, key_type);
-        if (!table.key_sscanf)
+
+        llvmfnpointers fns;
+
+        fns.key_sscanf = make_reader(&*m, key_type);
+        if (!fns.key_sscanf)
           errs() << "Failed to compile sscanf for " << *key_type << "\n";
-        table.leaf_sscanf = make_reader(&*m, leaf_type);
-        if (!table.leaf_sscanf)
+
+        fns.leaf_sscanf = make_reader(&*m, leaf_type);
+        if (!fns.leaf_sscanf)
           errs() << "Failed to compile sscanf for " << *leaf_type << "\n";
-        table.key_snprintf = make_writer(&*m, key_type);
-        if (!table.key_snprintf)
+
+        fns.key_snprintf = make_writer(&*m, key_type);
+        if (!fns.key_snprintf)
           errs() << "Failed to compile snprintf for " << *key_type << "\n";
-        table.leaf_snprintf = make_writer(&*m, leaf_type);
-        if (!table.leaf_snprintf)
+
+        fns.leaf_snprintf = make_writer(&*m, leaf_type);
+        if (!fns.leaf_snprintf)
           errs() << "Failed to compile snprintf for " << *leaf_type << "\n";
+
+        ptrs_map[&it->second] = fns;
       }
     }
   }
@@ -382,6 +404,18 @@ int BPFModule::annotate() {
   rw_engine_ = finalize_rw(move(m));
   if (rw_engine_)
     rw_engine_->finalizeObject();
+
+  for (auto &it : ptrs_map) {
+    auto t = it.first;
+    auto ptr = it.second;
+    t->key_sscanf = (sscanf_fn)rw_engine_->getPointerToFunction(ptr.key_sscanf);
+    t->leaf_sscanf =
+        (sscanf_fn)rw_engine_->getPointerToFunction(ptr.leaf_sscanf);
+    t->key_snprintf =
+        (snprintf_fn)rw_engine_->getPointerToFunction(ptr.key_snprintf);
+    t->leaf_snprintf =
+        (snprintf_fn)rw_engine_->getPointerToFunction(ptr.leaf_snprintf);
+  }
 
   return 0;
 }
@@ -619,12 +653,7 @@ int BPFModule::table_key_printf(size_t id, char *buf, size_t buflen, const void 
     fprintf(stderr, "Key snprintf not available\n");
     return -1;
   }
-  snprintf_fn fn = (snprintf_fn)rw_engine_->getPointerToFunction(desc.key_snprintf);
-  if (!fn) {
-    fprintf(stderr, "Key snprintf not available in JIT Engine\n");
-    return -1;
-  }
-  int rc = (*fn)(buf, buflen, key);
+  int rc = desc.key_snprintf(buf, buflen, key);
   if (rc < 0) {
     perror("snprintf");
     return -1;
@@ -644,12 +673,7 @@ int BPFModule::table_leaf_printf(size_t id, char *buf, size_t buflen, const void
     fprintf(stderr, "Key snprintf not available\n");
     return -1;
   }
-  snprintf_fn fn = (snprintf_fn)rw_engine_->getPointerToFunction(desc.leaf_snprintf);
-  if (!fn) {
-    fprintf(stderr, "Leaf snprintf not available in JIT Engine\n");
-    return -1;
-  }
-  int rc = (*fn)(buf, buflen, leaf);
+  int rc = desc.leaf_snprintf(buf, buflen, leaf);
   if (rc < 0) {
     perror("snprintf");
     return -1;
@@ -669,13 +693,7 @@ int BPFModule::table_key_scanf(size_t id, const char *key_str, void *key) {
     fprintf(stderr, "Key sscanf not available\n");
     return -1;
   }
-
-  sscanf_fn fn = (sscanf_fn)rw_engine_->getPointerToFunction(desc.key_sscanf);
-  if (!fn) {
-    fprintf(stderr, "Key sscanf not available in JIT Engine\n");
-    return -1;
-  }
-  int rc = (*fn)(key_str, key);
+  int rc = desc.key_sscanf(key_str, key);
   if (rc != 0) {
     perror("sscanf");
     return -1;
@@ -691,13 +709,7 @@ int BPFModule::table_leaf_scanf(size_t id, const char *leaf_str, void *leaf) {
     fprintf(stderr, "Key sscanf not available\n");
     return -1;
   }
-
-  sscanf_fn fn = (sscanf_fn)rw_engine_->getPointerToFunction(desc.leaf_sscanf);
-  if (!fn) {
-    fprintf(stderr, "Leaf sscanf not available in JIT Engine\n");
-    return -1;
-  }
-  int rc = (*fn)(leaf_str, leaf);
+  int rc = desc.leaf_sscanf(leaf_str, leaf);
   if (rc != 0) {
     perror("sscanf");
     return -1;
