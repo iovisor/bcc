@@ -84,6 +84,7 @@ Broadcom `bnxt_en` driver | [4.11](https://git.kernel.org/cgit/linux/kernel/git/
 Intel `e1000` driver | | [Not upstream yet](https://git.kernel.org/pub/scm/linux/kernel/git/ast/bpf.git/commit/?h=xdp&id=0afee87cfc800bf3317f4dc8847e6f36539b820c)
 Intel `e1000e` driver | | [Not upstream yet](https://lists.iovisor.org/pipermail/iovisor-dev/2017-April/000705.html)
 Intel `i40e` driver | | [Not upstream yet](https://www.spinics.net/lists/netdev/msg409498.html)
+Generic XDP | | [Not upstream yet](https://www.spinics.net/lists/xdp-newbies/msg00054.html)
 
 ## Helpers
 
