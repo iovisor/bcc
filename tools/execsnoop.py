@@ -41,6 +41,12 @@ parser.add_argument("-x", "--fails", action="store_true",
     help="include failed exec()s")
 parser.add_argument("-n", "--name",
     help="only print commands matching this name (regex), any arg")
+parser.add_argument('--env', action='store_true',
+    help='Include the environment in the output')
+parser.add_argument('--status', action='store_true',
+    help='Include the contents of /proc/<pid>/status in the output (spammy!)')
+parser.add_argument('--ppid-tree', action='store_true',
+    help='Print every PPID up to 1 (or a loop)')
 args = parser.parse_args()
 
 # define BPF program
@@ -166,21 +172,67 @@ class EventType(object):
 start_ts = time.time()
 argv = defaultdict(list)
 
+# Not a defaultdict, to distinguish unloaded from failed-to-load
+status_cache = {}
+
 # TODO: This is best-effort PPID matching. Short-lived processes may exit
 # before we get a chance to read the PPID. This should be replaced with
 # fetching PPID via C when available (#364).
 def get_ppid(pid):
-    try:
-        with open("/proc/%d/status" % pid) as status:
-            for line in status:
-                if line.startswith("PPid:"):
-                    return int(line.split()[1])
-    except IOError:
-        pass
+    status = get_status(pid)
+    for line in status:
+        if line.startswith("PPid:"):
+            return int(line.split()[1])
     return 0
+
+def get_env(pid):
+    env = {}
+    buf = bytearray()
+    key = None
+    try:
+        with open('/proc/%d/environ' % pid, 'rb') as e:
+            while True:
+                b = e.read(1)
+                if b == '' or b is None:
+                    return env
+                if b == '\0':
+                    if len(buf) == 0 and key is None:
+                        continue
+                    assert key is not None, 'Malformed env data %s' % buf
+                    env[key.decode()] = buf.decode()
+                    key = None
+                    buf = bytearray()
+                    continue
+                if b == '=' and key is None:
+                    key = buf
+                    buf = bytearray()
+                    continue
+                buf.append(b)
+    except IOError:
+        return None
+
+def load_status(pid):
+    lines = []
+    try:
+        with open('/proc/%d/status' % pid) as status:
+            for line in status:
+                lines.append(line)
+        status_cache[pid] = lines
+    except IOError:
+        # Mark it as a failed load; if we subsequently succeed, it's probably
+        # a different process, anyway.
+        status_cache[pid] = None
+
+def get_status(pid):
+    try:
+        return status_cache[pid]
+    except KeyError:
+        load_status(pid)
+        return status_cache[pid]
 
 # process event
 def print_event(cpu, data, size):
+    global status_cache
     event = ct.cast(data, ct.POINTER(Data)).contents
 
     skip = False
@@ -197,10 +249,29 @@ def print_event(cpu, data, size):
             if args.timestamp:
                 print("%-8.3f" % (time.time() - start_ts), end="")
             ppid = get_ppid(event.pid)
+            env = get_env(event.pid)
+            proc_status = get_status(event.pid)
             print("%-16s %-6s %-6s %3s %s" % (event.comm.decode(), event.pid,
                     ppid if ppid > 0 else "?", event.retval,
                     b' '.join(argv[event.pid]).decode()))
-
+            if args.env:
+                print('  Env: %r' % env)
+            if args.status:
+                print('  Status:')
+                print(''.join(['    %s' % line for line in proc_status]))
+            if args.ppid_tree:
+                print("PID: %d" % event.pid)
+                level = 0
+                this_pid = event.pid
+                while True:
+                    this_pid = get_ppid(this_pid)
+                    if this_pid in status_cache or not this_pid:
+                        # Loop!
+                        break
+                    print('     %*s\- %d' % (level * 2, ' ', this_pid))
+                    level += 1
+            # Reset status_cache to allow for (P)PID re-use
+            status_cache = {}
         del(argv[event.pid])
 
 # loop with callback to print_event
