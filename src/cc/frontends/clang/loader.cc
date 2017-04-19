@@ -137,6 +137,8 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, TableStorage &ts, const st
                                    "-Wno-deprecated-declarations",
                                    "-Wno-gnu-variable-sized-type-not-at-end",
                                    "-Wno-pragma-once-outside-header",
+                                   "-Wno-address-of-packed-member",
+                                   "-Wno-unknown-warning-option",
                                    "-fno-color-diagnostics",
                                    "-fno-unwind-tables",
                                    "-fno-asynchronous-unwind-tables",
