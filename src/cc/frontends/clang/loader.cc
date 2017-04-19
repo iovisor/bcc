@@ -287,6 +287,9 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, TableStorage &ts, const st
   invocation2.getFrontendOpts().Inputs.push_back(
       FrontendInputFile(main_path, IK_C));
   invocation2.getFrontendOpts().DisableFree = false;
+  // Resort to normal inlining. In -O0 the default is OnlyAlwaysInlining and
+  // clang might add noinline attribute even for functions with inline hint.
+  invocation2.getCodeGenOpts().setInlining(CodeGenOptions::NormalInlining);
   // suppress warnings in the 2nd pass, but bail out on errors (our fault)
   invocation2.getDiagnosticOpts().IgnoreWarnings = true;
   compiler2.createDiagnostics();
