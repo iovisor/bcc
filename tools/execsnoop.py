@@ -30,6 +30,7 @@ examples = """examples:
     ./execsnoop -x        # include failed exec()s
     ./execsnoop -t        # include timestamps
     ./execsnoop -n main   # only print command lines containing "main"
+    ./execsnoop -l tpkg   # only print command where arguments contains "tpkg" 
 """
 parser = argparse.ArgumentParser(
     description="Trace exec() syscalls",
@@ -41,6 +42,8 @@ parser.add_argument("-x", "--fails", action="store_true",
     help="include failed exec()s")
 parser.add_argument("-n", "--name",
     help="only print commands matching this name (regex), any arg")
+parser.add_argument("-l", "--line",
+    help="only print commands where arg contains this line (regex)")
 args = parser.parse_args()
 
 # define BPF program
@@ -192,6 +195,9 @@ def print_event(cpu, data, size):
             skip = True
         if args.name and not re.search(args.name, event.comm):
             skip = True
+        if args.line and not re.search(args.line,
+                                       b' '.join(argv[event.pid]).decode()):
+            skip = True
 
         if not skip:
             if args.timestamp:
@@ -200,8 +206,11 @@ def print_event(cpu, data, size):
             print("%-16s %-6s %-6s %3s %s" % (event.comm.decode(), event.pid,
                     ppid if ppid > 0 else "?", event.retval,
                     b' '.join(argv[event.pid]).decode()))
+        try:
+            del(argv[event.pid])
+        except Exception:
+            pass
 
-        del(argv[event.pid])
 
 # loop with callback to print_event
 b["events"].open_perf_buffer(print_event)
