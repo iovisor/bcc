@@ -28,7 +28,7 @@ enum stat_types {
 
 BPF_ARRAY(stats, u64, S_MAXSTAT + 1);
 
-void stats_increment(int key) {
+static void stats_increment(int key) {
     u64 *leaf = stats.lookup(&key);
     if (leaf) (*leaf)++;
 }
