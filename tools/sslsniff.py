@@ -50,7 +50,7 @@ struct probe_SSL_data_t {
         u64 timestamp_ns;
         u32 pid;
         char comm[TASK_COMM_LEN];
-        char v0[472];
+        char v0[464];
         u32 len;
 };
 
@@ -147,7 +147,7 @@ if args.gnutls:
 
 # define output data structure in Python
 TASK_COMM_LEN = 16  # linux/sched.h
-MAX_BUF_SIZE = 472  # Limited by the BPF stack
+MAX_BUF_SIZE = 464  # Limited by the BPF stack
 
 
 # Max size of the whole struct: 512 bytes
