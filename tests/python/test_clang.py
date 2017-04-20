@@ -522,7 +522,17 @@ int do_next(struct pt_regs *ctx) {
         with self.assertRaises(KeyError):
             b1["dummy"][c_key]
 
-
+    def test_invalid_noninline_call(self):
+        text = """
+int bar(void) {
+    return 0;
+}
+int foo(struct pt_regs *ctx) {
+    return bar();
+}
+"""
+        with self.assertRaises(Exception):
+            b = BPF(text=text)
 
 
 if __name__ == "__main__":
