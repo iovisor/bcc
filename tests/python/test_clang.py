@@ -471,7 +471,8 @@ int trace_entry(struct pt_regs *ctx) {
         text = """
 #include <uapi/linux/ptrace.h>
 int trace_entry(struct pt_regs *ctx) {
-  bpf_trace_printk("%s %s\\n", "hello", "world");
+  char s1[] = "hello", s2[] = "world";
+  bpf_trace_printk("%s %s\\n", s1, s2);
   return 0;
 }
 """
