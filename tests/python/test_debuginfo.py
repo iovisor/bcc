@@ -15,14 +15,14 @@ class TestKSyms(TestCase):
         # Grab the first symbol in kallsyms that has type 't' or 'T'.
         # Also, find all aliases of this symbol which are identifiable
         # by the same address.
-        with open("/proc/kallsyms") as f:
+        with open("/proc/kallsyms", "rb") as f:
             for line in f:
 
                 # Extract the first 3 columns only. The 4th column
                 # containing the module name may not exist for all
                 # symbols.
                 (addr, t, name) = line.strip().split()[:3]
-                if t == "t" or t == "T":
+                if t == b"t" or t == b"T":
                     if not address:
                         address = addr
                     if addr == address:
@@ -32,7 +32,7 @@ class TestKSyms(TestCase):
         return (address, aliases)
 
     def test_ksymname(self):
-        sym = BPF.ksymname("__kmalloc")
+        sym = BPF.ksymname(b"__kmalloc")
         self.assertIsNotNone(sym)
         self.assertNotEqual(sym, 0)
 
@@ -58,21 +58,23 @@ class Harness(TestCase):
     def tearDown(self):
         self.process.kill()
         self.process.wait()
+        self.process.stdout.close()
+        self.process = None
 
     def resolve_addr(self):
         sym, offset, module = self.syms.resolve(self.addr, False)
         self.assertEqual(sym, self.mangled_name)
         self.assertEqual(offset, 0)
-        self.assertTrue(module[-5:] == 'dummy')
+        self.assertTrue(module[-5:] == b'dummy')
         sym, offset, module = self.syms.resolve(self.addr, True)
-        self.assertEqual(sym, 'some_namespace::some_function(int, int)')
+        self.assertEqual(sym, b'some_namespace::some_function(int, int)')
         self.assertEqual(offset, 0)
-        self.assertTrue(module[-5:] == 'dummy')
+        self.assertTrue(module[-5:] == b'dummy')
 
 
     def resolve_name(self):
-        script_dir = os.path.dirname(os.path.realpath(__file__))
-        addr = self.syms.resolve_name(os.path.join(script_dir, 'dummy'),
+        script_dir = os.path.dirname(os.path.realpath(__file__).encode("utf8"))
+        addr = self.syms.resolve_name(os.path.join(script_dir, b'dummy'),
                                       self.mangled_name)
         self.assertEqual(addr, self.addr)
         pass
@@ -82,8 +84,8 @@ class TestDebuglink(Harness):
         subprocess.check_output('g++ -o dummy dummy.cc'.split())
         lines = subprocess.check_output('nm dummy'.split()).splitlines()
         for line in lines:
-            if "some_function" in line:
-                self.mangled_name = line.split(' ')[2]
+            if b"some_function" in line:
+                self.mangled_name = line.split(b' ')[2]
                 break
         self.assertTrue(self.mangled_name)
 
@@ -108,8 +110,8 @@ class TestBuildid(Harness):
                .split())
         lines = subprocess.check_output('nm dummy'.split()).splitlines()
         for line in lines:
-            if "some_function" in line:
-                self.mangled_name = line.split(' ')[2]
+            if b"some_function" in line:
+                self.mangled_name = line.split(b' ')[2]
                 break
         self.assertTrue(self.mangled_name)
 
