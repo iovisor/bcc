@@ -46,7 +46,7 @@ Kernel compile flags can usually be checked by looking at `/proc/config.gz` or
 
 # Packages
 
-Nightly builds are provided for Ubuntu, Debian, Fedora, and any other
+Regular builds are provided for Ubuntu, Debian, Fedora, and any other
 distribution with [snapd](https://snapcraft.io/docs/core/install).
 
 ```bash
