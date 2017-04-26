@@ -46,6 +46,15 @@ Kernel compile flags can usually be checked by looking at `/proc/config.gz` or
 
 # Packages
 
+Nightly builds are provided for Ubuntu, Debian, Fedora, and any other
+distribution with [snapd](https://snapcraft.io/docs/core/install).
+
+```bash
+sudo snap install bcc --edge
+sudo snap connect bcc:system-observe
+sudo snap connect bcc:mount-observe
+```
+
 ## Ubuntu Xenial - Binary
 
 Only the nightly packages are built for Ubuntu 16.04, but the steps are very straightforward. No need to upgrade the kernel or compile from source!
