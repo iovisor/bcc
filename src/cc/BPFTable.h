@@ -36,39 +36,83 @@ namespace ebpf {
 template <class KeyType, class ValueType>
 class BPFTableBase {
  public:
-  size_t capacity() { return capacity_; }
+  size_t capacity() { return desc.max_entries; }
 
- protected:
-  explicit BPFTableBase(const TableDesc& desc) {
-    fd_ = desc.fd;
-    capacity_ = desc.max_entries;
+  StatusTuple string_to_key(const std::string& key_str, KeyType* key) {
+    if (!desc.key_sscanf)
+      return StatusTuple(-1, "Key sscanf not available");
+    if (desc.key_sscanf(key_str.c_str(), key) != 0)
+      return StatusTuple(-1, "Error on key_sscanff: %s", std::strerror(errno));
+    return StatusTuple(0);
   }
 
+  StatusTuple string_to_leaf(const std::string& value_str, ValueType* value) {
+    if (!desc.leaf_sscanf)
+      return StatusTuple(-1, "Leaf sscanf not available");
+    if (desc.leaf_sscanf(value_str.c_str(), value) != 0)
+      return StatusTuple(-1, "Error on leaf_sscanff: %s", std::strerror(errno));
+    return StatusTuple(0);
+  }
+
+  StatusTuple key_to_string(const KeyType* key, std::string& key_str) {
+    char buf[8 * desc.key_size];
+    if (!desc.key_snprintf)
+      return StatusTuple(-1, "Key snprintf not available");
+    if (desc.key_snprintf(buf, sizeof(buf), key) < 0)
+      return StatusTuple(-1, "Error on key_sprintf: %s", std::strerror(errno));
+
+    key_str.assign(buf);
+    return StatusTuple(0);
+  }
+
+  StatusTuple leaf_to_string(const ValueType* value, std::string& value_str) {
+    char buf[8 * desc.leaf_size];
+    if (!desc.leaf_snprintf)
+      return StatusTuple(-1, "Leaf snprintf not available");
+    if (desc.leaf_snprintf(buf, sizeof(buf), value) < 0)
+      return StatusTuple(-1, "Error on leaf_sprintf: %s", std::strerror(errno));
+
+    value_str.assign(buf);
+    return StatusTuple(0);
+  }
+
+ protected:
+  explicit BPFTableBase(const TableDesc& desc) : desc(desc) {}
+
   bool lookup(KeyType* key, ValueType* value) {
-    return bpf_lookup_elem(fd_, static_cast<void*>(key),
+    return bpf_lookup_elem(desc.fd, static_cast<void*>(key),
                            static_cast<void*>(value)) >= 0;
   }
 
   bool next(KeyType* key, KeyType* next_key) {
-    return bpf_get_next_key(fd_, static_cast<void*>(key),
+    return bpf_get_next_key(desc.fd, static_cast<void*>(key),
                             static_cast<void*>(next_key)) >= 0;
   }
 
   bool update(KeyType* key, ValueType* value) {
-    return bpf_update_elem(fd_, static_cast<void*>(key),
+    return bpf_update_elem(desc.fd, static_cast<void*>(key),
                            static_cast<void*>(value), 0) >= 0;
   }
 
   bool remove(KeyType* key) {
-    return bpf_delete_elem(fd_, static_cast<void*>(key)) >= 0;
+    return bpf_delete_elem(desc.fd, static_cast<void*>(key)) >= 0;
   }
 
-  int fd_;
-  size_t capacity_;
+  const TableDesc& desc;
+};
+
+class BPFTable : public BPFTableBase<void, void> {
+ public:
+  BPFTable(const TableDesc& desc);
+
+  StatusTuple get_value(const std::string& key_str, std::string& value);
+  StatusTuple update_value(const std::string& key_str,
+                           const std::string& value_str);
+  StatusTuple remove_value(const std::string& key_str);
 };
 
 template <class ValueType>
-class BPFArrayTable : protected BPFTableBase<int, ValueType> {
+class BPFArrayTable : public BPFTableBase<int, ValueType> {
 public:
   BPFArrayTable(const TableDesc& desc)
       : BPFTableBase<int, ValueType>(desc) {
@@ -107,7 +151,7 @@ public:
 };
 
 template <class KeyType, class ValueType>
-class BPFHashTable : protected BPFTableBase<KeyType, ValueType> {
+class BPFHashTable : public BPFTableBase<KeyType, ValueType> {
  public:
   explicit BPFHashTable(const TableDesc& desc)
       : BPFTableBase<KeyType, ValueType>(desc) {
@@ -167,7 +211,7 @@ struct stacktrace_t {
   intptr_t ip[BPF_MAX_STACK_DEPTH];
 };
 
-class BPFStackTable : protected BPFTableBase<int, stacktrace_t> {
+class BPFStackTable : public BPFTableBase<int, stacktrace_t> {
  public:
   BPFStackTable(const TableDesc& desc)
       : BPFTableBase<int, stacktrace_t>(desc) {}
@@ -180,7 +224,7 @@ class BPFStackTable : protected BPFTableBase<int, stacktrace_t> {
   std::map<int, void*> pid_sym_;
 };
 
-class BPFPerfBuffer : protected BPFTableBase<int, int> {
+class BPFPerfBuffer : public BPFTableBase<int, int> {
  public:
   BPFPerfBuffer(const TableDesc& desc)
       : BPFTableBase<int, int>(desc), epfd_(-1) {}
@@ -202,7 +246,7 @@ class BPFPerfBuffer : protected BPFTableBase<int, int> {
   std::unique_ptr<epoll_event[]> ep_events_;
 };
 
-class BPFProgTable : protected BPFTableBase<int, int> {
+class BPFProgTable : public BPFTableBase<int, int> {
 public:
   BPFProgTable(const TableDesc& desc)
       : BPFTableBase<int, int>(desc) {
