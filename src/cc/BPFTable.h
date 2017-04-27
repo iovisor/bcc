@@ -208,7 +208,7 @@ class BPFHashTable : public BPFTableBase<KeyType, ValueType> {
 // From src/cc/export/helpers.h
 static const int BPF_MAX_STACK_DEPTH = 127;
 struct stacktrace_t {
-  intptr_t ip[BPF_MAX_STACK_DEPTH];
+  uintptr_t ip[BPF_MAX_STACK_DEPTH];
 };
 
 class BPFStackTable : public BPFTableBase<int, stacktrace_t> {
@@ -217,7 +217,7 @@ class BPFStackTable : public BPFTableBase<int, stacktrace_t> {
       : BPFTableBase<int, stacktrace_t>(desc) {}
   ~BPFStackTable();
 
-  std::vector<intptr_t> get_stack_addr(int stack_id);
+  std::vector<uintptr_t> get_stack_addr(int stack_id);
   std::vector<std::string> get_stack_symbol(int stack_id, int pid);
 
  private:

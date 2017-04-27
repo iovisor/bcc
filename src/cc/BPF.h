@@ -215,7 +215,7 @@ private:
   std::string name_;
   std::string probe_func_;
 
-  std::vector<intptr_t> addresses_;
+  std::vector<uintptr_t> addresses_;
 
   std::string program_text_;
 

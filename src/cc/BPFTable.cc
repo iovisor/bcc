@@ -91,8 +91,8 @@ BPFStackTable::~BPFStackTable() {
     bcc_free_symcache(it.second, it.first);
 }
 
-std::vector<intptr_t> BPFStackTable::get_stack_addr(int stack_id) {
-  std::vector<intptr_t> res;
+std::vector<uintptr_t> BPFStackTable::get_stack_addr(int stack_id) {
+  std::vector<uintptr_t> res;
   stacktrace_t stack;
   if (!lookup(&stack_id, &stack))
     return res;
