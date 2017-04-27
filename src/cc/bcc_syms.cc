@@ -201,8 +201,7 @@ ProcSyms::Module::Module(const char *name, int pid, bool in_ns)
 int ProcSyms::Module::_add_symbol(const char *symname, uint64_t start,
                                   uint64_t end, int flags, void *p) {
   Module *m = static_cast<Module *>(p);
-  auto res = m->symnames_.emplace(symname);
-  m->syms_.emplace_back(&*(res.first), start, end, flags);
+  m->syms_.emplace_back(symname, start, end, flags);
   return 0;
 }
 
@@ -242,7 +241,7 @@ bool ProcSyms::Module::find_name(const char *symname, uint64_t *addr) {
   load_sym_table();
 
   for (Symbol &s : syms_) {
-    if (*(s.name) == symname) {
+    if (s.name == symname) {
       *addr = is_so() ? start() + s.start : s.start;
       return true;
     }
@@ -258,7 +257,7 @@ bool ProcSyms::Module::find_addr(uint64_t addr, struct bcc_symbol *sym) {
   sym->module = name_.c_str();
   sym->offset = offset;
 
-  auto it = std::upper_bound(syms_.begin(), syms_.end(), Symbol(nullptr, offset, 0));
+  auto it = std::upper_bound(syms_.begin(), syms_.end(), Symbol("", offset, 0));
   if (it == syms_.begin())
     return false;
 
@@ -280,7 +279,7 @@ bool ProcSyms::Module::find_addr(uint64_t addr, struct bcc_symbol *sym) {
   // and is a match.
   for (--it; offset >= it->start; --it) {
     if (offset < it->start + it->size) {
-      sym->name = it->name->c_str();
+      sym->name = it->name.c_str();
       sym->offset = (offset - it->start);
       return true;
     }
