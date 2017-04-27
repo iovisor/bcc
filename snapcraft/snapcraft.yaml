@@ -110,6 +110,9 @@ apps:
     funclatency:
         command: wrapper funclatency
         aliases: [funclatency]
+    funcslower:
+        command: wrapper funcslower
+        aliases: [funcslower]
     gethostlatency:
         command: wrapper gethostlatency
         aliases: [gethostlatency]
