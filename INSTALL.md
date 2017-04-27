@@ -52,6 +52,7 @@ distribution with [snapd](https://snapcraft.io/docs/core/install).
 ```bash
 sudo snap install bcc --edge
 sudo snap connect bcc:system-observe
+sudo snap connect bcc:system-trace
 sudo snap connect bcc:mount-observe
 ```
 
