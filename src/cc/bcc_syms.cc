@@ -15,6 +15,7 @@
  */
 
 #include <cxxabi.h>
+#include <linux/elf.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -27,6 +28,8 @@
 
 #include "syms.h"
 #include "vendor/tinyformat.hpp"
+
+#define ELF_TYPE_IS_FUNCTION(flags) (((flags)&0xf) == STT_FUNC)
 
 ino_t ProcStat::getinode_() {
   struct stat s;
@@ -205,6 +208,9 @@ ProcSyms::Module::Module(const char *name, int pid, bool in_ns)
 
 int ProcSyms::Module::_add_symbol(const char *symname, uint64_t start,
                                   uint64_t end, int flags, void *p) {
+  if (start == 0 || !ELF_TYPE_IS_FUNCTION(flags))
+    return 0;
+
   Module *m = static_cast<Module *>(p);
   auto res = m->symnames_.emplace(symname);
   m->syms_.emplace_back(&*(res.first), start, end, flags);
@@ -396,9 +402,6 @@ struct sym_search_t {
   int requested;
   int *actual;
 };
-
-// see <elf.h>
-#define ELF_TYPE_IS_FUNCTION(flags) (((flags) & 0xf) == 2)
 
 static int _list_sym(const char *symname, uint64_t addr, uint64_t end,
                      int flags, void *payload) {

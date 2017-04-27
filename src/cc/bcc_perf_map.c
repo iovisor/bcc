@@ -98,7 +98,7 @@ int bcc_perf_map_foreach_sym(const char *path, bcc_perf_map_symcb callback,
     if (newline)
         newline[0] = '\0';
 
-    callback(cursor, begin, len, len > 0 ? STT_FUNC : STT_OBJECT, payload);
+    callback(cursor, begin, len, STT_FUNC, payload);
   }
 
   free(line);
