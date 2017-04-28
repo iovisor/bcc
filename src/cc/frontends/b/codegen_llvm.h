@@ -36,6 +36,7 @@ class LLVMContext;
 class Module;
 class StructType;
 class SwitchInst;
+class Type;
 class Value;
 class GlobalVariable;
 }
@@ -91,6 +92,12 @@ class CodegenLLVM : public Visitor {
   llvm::Value * pop_expr();
   llvm::BasicBlock * resolve_label(const string &label);
   llvm::Instruction * resolve_entry_stack();
+  llvm::AllocaInst *make_alloca(llvm::Instruction *Inst, llvm::Type *Ty,
+                                const std::string &name = "",
+                                llvm::Value *ArraySize = nullptr);
+  llvm::AllocaInst *make_alloca(llvm::BasicBlock *BB, llvm::Type *Ty,
+                                const std::string &name = "",
+                                llvm::Value *ArraySize = nullptr);
   StatusTuple lookup_var(Node *n, const std::string &name, Scopes::VarScope *scope,
                          VariableDeclStmtNode **decl, llvm::Value **mem) const;
   StatusTuple lookup_struct_type(StructDeclStmtNode *decl, llvm::StructType **stype) const;
