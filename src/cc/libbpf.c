@@ -637,7 +637,7 @@ int bpf_attach_xdp(const char *dev_name, int progfd) {
 
     // we specify the FD passed over by the user
     nla_xdp->nla_type = 1/*IFLA_XDP_FD*/;
-    nla_xdp->nla_len = NLA_HDRLEN + sizeof(int);
+    nla_xdp->nla_len = NLA_HDRLEN + sizeof(progfd);
     memcpy((char *)nla_xdp + NLA_HDRLEN, &progfd, sizeof(progfd));
     nla->nla_len = NLA_HDRLEN + nla_xdp->nla_len;
 
