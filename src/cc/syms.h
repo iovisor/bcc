@@ -91,6 +91,7 @@ class ProcSyms : SymbolCache {
     bool is_so_;
     int pid_;
     bool in_ns_;
+    bool loaded_;
     std::unordered_set<std::string> symnames_;
     std::vector<Symbol> syms_;
 
