@@ -33,6 +33,11 @@ ino_t ProcStat::getinode_() {
   return (!stat(procfs_.c_str(), &s)) ? s.st_ino : -1;
 }
 
+bool ProcStat::is_stale() {
+  ino_t cur_inode = getinode_();
+  return (cur_inode > 0) &&  (cur_inode != inode_);
+}
+
 ProcStat::ProcStat(int pid)
     : procfs_(tfm::format("/proc/%d/exe", pid)), inode_(getinode_()) {}
 
