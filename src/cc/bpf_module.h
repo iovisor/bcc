@@ -19,6 +19,7 @@
 #include <stdint.h>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -38,6 +39,13 @@ class ClangLoader;
 
 class BPFModule {
  private:
+  struct llvmfnpointers {
+    llvm::Function *key_sscanf;
+    llvm::Function *leaf_sscanf;
+    llvm::Function *key_snprintf;
+    llvm::Function *leaf_snprintf;
+  };
+
   static const std::string FN_PREFIX;
   int init_engine();
   int parse(llvm::Module *mod);
@@ -91,6 +99,7 @@ class BPFModule {
   char * license() const;
   unsigned kern_version() const;
   TableStorage &table_storage() { return *ts_; }
+  int finalize_annotate();
 
  private:
   unsigned flags_;  // 0x1 for printing
@@ -111,6 +120,9 @@ class BPFModule {
   std::string id_;
   TableStorage *ts_;
   std::unique_ptr<TableStorage> local_ts_;
+  bool has_printf_scanf_;
+  std::mutex fn_ptrs_lock_;
+  std::map<TableDesc *, llvmfnpointers> fn_ptrs_map_;
 };
 
 }  // namespace ebpf

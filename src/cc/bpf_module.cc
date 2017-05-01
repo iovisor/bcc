@@ -13,17 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include <algorithm>
 #include <fcntl.h>
 #include <ftw.h>
-#include <map>
+#include <linux/bpf.h>
 #include <stdio.h>
-#include <string>
 #include <sys/stat.h>
 #include <sys/utsname.h>
 #include <unistd.h>
+#include <algorithm>
+#include <map>
+#include <mutex>
+#include <string>
 #include <vector>
-#include <linux/bpf.h>
 
 #include <llvm/ADT/STLExtras.h>
 #include <llvm/ExecutionEngine/MCJIT.h>
@@ -103,6 +104,7 @@ BPFModule::BPFModule(unsigned flags, TableStorage *ts)
       ctx_(new LLVMContext),
       id_(std::to_string((uintptr_t)this)),
       ts_(ts) {
+  has_printf_scanf_ = false;
   InitializeNativeTarget();
   InitializeNativeTargetAsmPrinter();
   LLVMInitializeBPFTarget();
@@ -355,15 +357,6 @@ int BPFModule::annotate() {
   // separate module to hold the reader functions
   auto m = make_unique<Module>("sscanf", *ctx_);
 
-  struct llvmfnpointers {
-    llvm::Function *key_sscanf;
-    llvm::Function *leaf_sscanf;
-    llvm::Function *key_snprintf;
-    llvm::Function *leaf_snprintf;
-  };
-
-  std::map<TableDesc *, llvmfnpointers> ptrs_map;
-
   size_t id = 0;
   Path path({id_});
   for (auto it = ts_->lower_bound(path), up = ts_->upper_bound(path); it != up; ++it) {
@@ -396,16 +389,27 @@ int BPFModule::annotate() {
         if (!fns.leaf_snprintf)
           errs() << "Failed to compile snprintf for " << *leaf_type << "\n";
 
-        ptrs_map[&it->second] = fns;
+        fn_ptrs_map_[&it->second] = fns;
       }
     }
   }
 
   rw_engine_ = finalize_rw(move(m));
+
+  return 0;
+}
+
+int BPFModule::finalize_annotate() {
+  fn_ptrs_lock_.lock();
+  if (has_printf_scanf_) {
+    fn_ptrs_lock_.unlock();
+    return 0;
+  }
+
   if (rw_engine_)
     rw_engine_->finalizeObject();
 
-  for (auto &it : ptrs_map) {
+  for (auto &it : fn_ptrs_map_) {
     auto t = it.first;
     auto ptr = it.second;
     t->key_sscanf = (sscanf_fn)rw_engine_->getPointerToFunction(ptr.key_sscanf);
@@ -417,6 +421,8 @@ int BPFModule::annotate() {
         (snprintf_fn)rw_engine_->getPointerToFunction(ptr.leaf_snprintf);
   }
 
+  has_printf_scanf_ = true;
+  fn_ptrs_lock_.unlock();
   return 0;
 }
 
