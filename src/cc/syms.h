@@ -30,7 +30,7 @@ class ProcStat {
 
 public:
   ProcStat(int pid);
-  bool is_stale() { return inode_ != getinode_(); }
+  bool is_stale();
   void reset() { inode_ = getinode_(); }
 };
 
@@ -91,6 +91,7 @@ class ProcSyms : SymbolCache {
     bool is_so_;
     int pid_;
     bool in_ns_;
+    bool loaded_;
     std::unordered_set<std::string> symnames_;
     std::vector<Symbol> syms_;
 

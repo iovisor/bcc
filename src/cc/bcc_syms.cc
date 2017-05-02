@@ -33,6 +33,11 @@ ino_t ProcStat::getinode_() {
   return (!stat(procfs_.c_str(), &s)) ? s.st_ino : -1;
 }
 
+bool ProcStat::is_stale() {
+  ino_t cur_inode = getinode_();
+  return (cur_inode > 0) &&  (cur_inode != inode_);
+}
+
 ProcStat::ProcStat(int pid)
     : procfs_(tfm::format("/proc/%d/exe", pid)), inode_(getinode_()) {}
 
@@ -190,7 +195,7 @@ bool ProcSyms::resolve_name(const char *module, const char *name,
 }
 
 ProcSyms::Module::Module(const char *name, int pid, bool in_ns)
-  : name_(name), pid_(pid), in_ns_(in_ns) {
+  : name_(name), pid_(pid), in_ns_(in_ns), loaded_(false) {
   struct ns_cookie nsc;
 
   bcc_procutils_enter_mountns(pid_, &nsc);
@@ -213,8 +218,9 @@ bool ProcSyms::Module::is_perf_map() const {
 void ProcSyms::Module::load_sym_table() {
   struct ns_cookie nsc = {-1, -1};
 
-  if (syms_.size())
+  if (loaded_)
     return;
+  loaded_ = true;
 
   if (is_perf_map()) {
     if (in_ns_)
