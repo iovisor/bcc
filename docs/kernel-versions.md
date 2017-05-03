@@ -84,8 +84,9 @@ QLogic (Cavium) `qed*` drivers | 4.10 | [496e05170958](https://git.kernel.org/cg
 `virtio_net` driver | 4.10 | [f600b6905015](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=f600b690501550b94e83e07295d9c8b9c4c39f4e)
 Broadcom `bnxt_en` driver | 4.11 | [c6d30e8391b8](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=c6d30e8391b85e00eb544e6cf047ee0160ee9938)
 Intel `ixgbe*` drivers | [4.12](https://git.kernel.org/cgit/linux/kernel/git/davem/net-next.git/commit/?id=9247080816297de4e31abb684939c0e53e3a8a67) | []()
-Intel `e1000` driver | | [Not upstream yet](https://git.kernel.org/pub/scm/linux/kernel/git/ast/bpf.git/commit/?h=xdp&id=0afee87cfc800bf3317f4dc8847e6f36539b820c)
-Intel `e1000e` driver | | [Not upstream yet](https://lists.iovisor.org/pipermail/iovisor-dev/2017-April/000705.html)
+Cavium `thunderx` driver | [4.12](https://git.kernel.org/cgit/linux/kernel/git/davem/net-next.git/commit/?id=05c773f52b96ef3fbc7d9bfa21caadc6247ef7a8) | []()
+Intel `e1000` driver | | [Not upstream yet](https://git.kernel.org/pub/scm/linux/kernel/git/ast/bpf.git/commit/?h=xdp&id=0afee87cfc800bf3317f4dc8847e6f36539b820c)
+Intel `e1000e` driver | | [Not planned for upstream at this time](https://github.com/adjavon/e1000e_xdp)
 Intel `i40e` driver | | [Not upstream yet](https://www.spinics.net/lists/netdev/msg409498.html)
 Generic XDP | | [Not upstream yet](https://www.spinics.net/lists/xdp-newbies/msg00054.html)
 
