@@ -284,12 +284,20 @@ bool ProcSyms::Module::find_addr(uint64_t addr, struct bcc_symbol *sym) {
   // brings us to bar, which does not contain offset 0x12 and is nested inside
   // foo. Going back one more symbol brings us to foo, which contains 0x12
   // and is a match.
-  for (--it; offset >= it->start; --it) {
+  // However, we also don't want to walk through the entire symbol list for
+  // unknown / missing symbols. So we will break if we reach a function that
+  // doesn't cover the function immediately before 'it', which means it is
+  // not possibly a nested function containing the address we're looking for.
+  --it;
+  uint64_t limit = it->start;
+  for (; offset >= it->start; --it) {
     if (offset < it->start + it->size) {
       sym->name = it->name->c_str();
       sym->offset = (offset - it->start);
       return true;
     }
+    if (limit > it->start + it->size)
+      break;
     // But don't step beyond begin()!
     if (it == syms_.begin())
       break;
