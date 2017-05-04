@@ -320,7 +320,7 @@ static bool match_so_flags(int flags) {
     return (sizeof(void *) == 8);
   }
 
-  return true;
+  return sizeof(void *) == 4;
 }
 
 static bool which_so_in_process(const char* libname, int pid, char* libpath) {
