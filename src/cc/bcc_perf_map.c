@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 #include <ctype.h>
+#include <errno.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -82,13 +84,15 @@ int bcc_perf_map_foreach_sym(const char *path, bcc_perf_map_symcb callback,
     char *newline, *sep;
 
     begin = strtoull(cursor, &sep, 16);
-    if (*sep != ' ' || (sep == cursor && begin == 0))
+    if (begin == 0 || *sep != ' ' || (begin == ULLONG_MAX && errno == ERANGE))
       continue;
     cursor = sep;
     while (*cursor && isspace(*cursor)) cursor++;
 
     len = strtoull(cursor, &sep, 16);
-    if (*sep != ' ' || (sep == cursor && begin == 0))
+    if (*sep != ' ' ||
+        (sep == cursor && len == 0) ||
+        (len == ULLONG_MAX && errno == ERANGE))
       continue;
     cursor = sep;
     while (*cursor && isspace(*cursor)) cursor++;
