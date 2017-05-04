@@ -114,6 +114,12 @@ struct bcc_symbol {
 	uint64_t offset;
 };
 
+struct bcc_symbol_option {
+  int use_debug_file;
+  int check_debug_file_crc;
+  uint32_t use_symbol_type;
+};
+
 int bcc_resolve_symname(const char *module, const char *symname, const uint64_t addr,
 		int pid, struct bcc_symbol *sym);
 void bcc_procutils_free(const char *ptr);

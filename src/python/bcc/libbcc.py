@@ -133,6 +133,13 @@ class bcc_symbol(ct.Structure):
             ('offset', ct.c_ulonglong),
         ]
 
+class bcc_symbol_option(ct.Structure):
+    _fields_ = [
+            ('use_debug_file', ct.c_int),
+            ('check_debug_file_crc', ct.c_int),
+            ('use_symbol_type', ct.c_uint),
+        ]
+
 lib.bcc_procutils_which_so.restype = ct.POINTER(ct.c_char)
 lib.bcc_procutils_which_so.argtypes = [ct.c_char_p, ct.c_int]
 lib.bcc_procutils_free.restype = None

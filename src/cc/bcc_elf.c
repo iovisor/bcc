@@ -26,7 +26,10 @@
 
 #include <gelf.h>
 #include "bcc_elf.h"
+#include "bcc_syms.h"
+
 #define NT_STAPSDT 3
+#define ELF_ST_TYPE(x) (((uint32_t) x) & 0xf)
 
 static int openelf(const char *path, Elf **elf_out, int *fd_out) {
   if (elf_version(EV_CURRENT) == EV_NONE)
@@ -150,6 +153,7 @@ int bcc_elf_foreach_usdt(const char *path, bcc_elf_probecb callback,
 }
 
 static int list_in_scn(Elf *e, Elf_Scn *section, size_t stridx, size_t symsize,
+                       struct bcc_symbol_option *option,
                        bcc_elf_symcb callback, void *payload) {
   Elf_Data *data = NULL;
 
@@ -168,6 +172,15 @@ static int list_in_scn(Elf *e, Elf_Scn *section, size_t stridx, size_t symsize,
 
       if ((name = elf_strptr(e, stridx, sym.st_name)) == NULL)
         continue;
+      if (name[0] == 0)
+        continue;
+
+      if (sym.st_value == 0)
+        continue;
+
+      uint32_t flag = 1 << ELF_ST_TYPE(sym.st_info);
+      if (!(option->use_symbol_type & flag))
+        continue;
 
       if (callback(name, sym.st_value, sym.st_size, sym.st_info, payload) < 0)
         return 1;      // signal termination to caller
@@ -177,7 +190,8 @@ static int list_in_scn(Elf *e, Elf_Scn *section, size_t stridx, size_t symsize,
   return 0;
 }
 
-static int listsymbols(Elf *e, bcc_elf_symcb callback, void *payload) {
+static int listsymbols(Elf *e, bcc_elf_symcb callback, void *payload,
+                       struct bcc_symbol_option *option) {
   Elf_Scn *section = NULL;
 
   while ((section = elf_nextscn(e, section)) != 0) {
@@ -190,7 +204,7 @@ static int listsymbols(Elf *e, bcc_elf_symcb callback, void *payload) {
       continue;
 
     int rc = list_in_scn(e, section, header.sh_link, header.sh_entsize,
-                         callback, payload);
+                         option, callback, payload);
     if (rc == 1)
       break;    // callback signaled termination
 
@@ -347,7 +361,8 @@ static int verify_checksum(const char *file, unsigned int crc) {
   return actual == crc;
 }
 
-static char *find_debug_via_debuglink(Elf *e, const char *binpath) {
+static char *find_debug_via_debuglink(Elf *e, const char *binpath,
+                                      int check_crc) {
   char fullpath[PATH_MAX];
   char *bindir = NULL;
   char *res = NULL;
@@ -386,9 +401,9 @@ static char *find_debug_via_debuglink(Elf *e, const char *binpath) {
 
 DONE:
   free(bindir);
-  if (verify_checksum(res, crc))
-    return res;
-  return NULL;
+  if (check_crc && !verify_checksum(res, crc))
+    return NULL;
+  return res;
 }
 
 static char *find_debug_via_buildid(Elf *e) {
@@ -412,10 +427,14 @@ static char *find_debug_via_buildid(Elf *e) {
 }
 
 static int foreach_sym_core(const char *path, bcc_elf_symcb callback,
-                            void *payload, int is_debug_file) {
+                            struct bcc_symbol_option *option, void *payload,
+                            int is_debug_file) {
   Elf *e;
   int fd, res;
   char *debug_file;
+
+  if (!option)
+    return -1;
 
   if (openelf(path, &e, &fd) < 0)
     return -1;
@@ -424,27 +443,29 @@ static int foreach_sym_core(const char *path, bcc_elf_symcb callback,
   // using the build-id section, then using the debuglink section. These are
   // also the rules that GDB folows.
   // See: https://sourceware.org/gdb/onlinedocs/gdb/Separate-Debug-Files.html
-  if (!is_debug_file) {
+  if (option->use_debug_file && !is_debug_file) {
     // The is_debug_file argument helps avoid infinitely resolving debuginfo
     // files for debuginfo files and so on.
     debug_file = find_debug_via_buildid(e);
     if (!debug_file)
-      debug_file = find_debug_via_debuglink(e, path);
+      debug_file = find_debug_via_debuglink(e, path,
+                                            option->check_debug_file_crc);
     if (debug_file) {
-      foreach_sym_core(debug_file, callback, payload, 1);
+      foreach_sym_core(debug_file, callback, option, payload, 1);
       free(debug_file);
     }
   }
 
-  res = listsymbols(e, callback, payload);
+  res = listsymbols(e, callback, payload, option);
   elf_end(e);
   close(fd);
   return res;
 }
 
 int bcc_elf_foreach_sym(const char *path, bcc_elf_symcb callback,
-                        void *payload) {
-  return foreach_sym_core(path, callback, payload, 0);
+                        void *option, void *payload) {
+  return foreach_sym_core(
+      path, callback, (struct bcc_symbol_option*)option, payload, 0);
 }
 
 static int loadaddr(Elf *e, uint64_t *addr) {

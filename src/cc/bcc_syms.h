@@ -31,6 +31,14 @@ struct bcc_symbol {
 
 typedef int (*SYM_CB)(const char *symname, uint64_t addr);
 
+static const uint32_t BCC_SYM_ALL_TYPES = 65535;
+struct bcc_symbol_option {
+  int use_debug_file;
+  int check_debug_file_crc;
+  // Bitmask flags indicating what types of ELF symbols to use
+  uint32_t use_symbol_type;
+};
+
 void *bcc_symcache_new(int pid);
 void bcc_free_symcache(void *symcache, int pid);
 
