@@ -329,7 +329,7 @@ unique_ptr<ExecutionEngine> BPFModule::finalize_rw(unique_ptr<Module> m) {
 
 // load an entire c file as a module
 int BPFModule::load_cfile(const string &file, bool in_memory, const char *cflags[], int ncflags) {
-  clang_loader_ = make_unique<ClangLoader>(&*ctx_, flags_);
+  clang_loader_ = ebpf::make_unique<ClangLoader>(&*ctx_, flags_);
   if (clang_loader_->parse(&mod_, *ts_, file, in_memory, cflags, ncflags, id_))
     return -1;
   return 0;
@@ -341,7 +341,7 @@ int BPFModule::load_cfile(const string &file, bool in_memory, const char *cflags
 // Load in a pre-built list of functions into the initial Module object, then
 // build an ExecutionEngine.
 int BPFModule::load_includes(const string &text) {
-  clang_loader_ = make_unique<ClangLoader>(&*ctx_, flags_);
+  clang_loader_ = ebpf::make_unique<ClangLoader>(&*ctx_, flags_);
   if (clang_loader_->parse(&mod_, *ts_, text, true, nullptr, 0, ""))
     return -1;
   return 0;
@@ -353,7 +353,7 @@ int BPFModule::annotate() {
       fn->addFnAttr(Attribute::AlwaysInline);
 
   // separate module to hold the reader functions
-  auto m = make_unique<Module>("sscanf", *ctx_);
+  auto m = ebpf::make_unique<Module>("sscanf", *ctx_);
 
   struct llvmfnpointers {
     llvm::Function *key_sscanf;
@@ -461,7 +461,7 @@ int BPFModule::finalize() {
   string err;
   EngineBuilder builder(move(mod_));
   builder.setErrorStr(&err);
-  builder.setMCJITMemoryManager(make_unique<MyMemoryManager>(&sections_));
+  builder.setMCJITMemoryManager(ebpf::make_unique<MyMemoryManager>(&sections_));
   builder.setMArch("bpf");
   builder.setUseOrcMCJITReplacement(true);
   engine_ = unique_ptr<ExecutionEngine>(builder.create());
