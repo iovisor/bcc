@@ -483,21 +483,31 @@ int bcc_elf_loadaddr(const char *path, uint64_t *address) {
   return res;
 }
 
-int bcc_elf_is_shared_obj(const char *path) {
+int bcc_elf_get_type(const char *path) {
   Elf *e;
   GElf_Ehdr hdr;
-  int fd, res = -1;
+  int fd;
+  void* res = NULL;
 
   if (openelf(path, &e, &fd) < 0)
     return -1;
 
-  if (gelf_getehdr(e, &hdr))
-    res = (hdr.e_type == ET_DYN);
-
+  res = (void*)gelf_getehdr(e, &hdr);
   elf_end(e);
   close(fd);
 
-  return res;
+  if (!res)
+    return -1;
+  else
+    return hdr.e_type;
+}
+
+int bcc_elf_is_exe(const char *path) {
+  return (bcc_elf_get_type(path) != -1) && (access(path, X_OK) == 0);
+}
+
+int bcc_elf_is_shared_obj(const char *path) {
+  return bcc_elf_get_type(path) == ET_DYN;
 }
 
 #if 0

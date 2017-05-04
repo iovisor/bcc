@@ -48,7 +48,7 @@ Probe::Probe(const char *bin_path, const char *provider, const char *name,
 
 bool Probe::in_shared_object() {
   if (!in_shared_object_)
-    in_shared_object_ = (bcc_elf_is_shared_obj(bin_path_.c_str()) == 1);
+    in_shared_object_ = bcc_elf_is_shared_obj(bin_path_.c_str());
   return in_shared_object_.value();
 }
 

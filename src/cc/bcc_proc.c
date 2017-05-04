@@ -35,23 +35,12 @@
 #include "bcc_proc.h"
 #include "bcc_elf.h"
 
-static bool is_exe(const char *path) {
-  struct stat s;
-  if (access(path, X_OK) < 0)
-    return false;
-
-  if (stat(path, &s) < 0)
-    return false;
-
-  return S_ISREG(s.st_mode);
-}
-
 char *bcc_procutils_which(const char *binpath) {
   char buffer[4096];
   const char *PATH;
 
   if (strchr(binpath, '/'))
-    return is_exe(binpath) ? strdup(binpath) : 0;
+    return bcc_elf_is_exe(binpath) ? strdup(binpath) : 0;
 
   if (!(PATH = getenv("PATH")))
     return 0;
@@ -65,7 +54,7 @@ char *bcc_procutils_which(const char *binpath) {
       buffer[path_len] = '/';
       strcpy(buffer + path_len + 1, binpath);
 
-      if (is_exe(buffer))
+      if (bcc_elf_is_exe(buffer))
         return strdup(buffer);
     }
 

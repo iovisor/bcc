@@ -41,7 +41,10 @@ int bcc_elf_foreach_usdt(const char *path, bcc_elf_probecb callback,
 int bcc_elf_loadaddr(const char *path, uint64_t *address);
 int bcc_elf_foreach_sym(const char *path, bcc_elf_symcb callback,
                         void *payload);
+
+int bcc_elf_get_type(const char *path);
 int bcc_elf_is_shared_obj(const char *path);
+int bcc_elf_is_exe(const char *path);
 
 #ifdef __cplusplus
 }
