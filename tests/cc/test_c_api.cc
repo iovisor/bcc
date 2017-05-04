@@ -21,6 +21,7 @@
 #include <sys/mount.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 #include "bcc_elf.h"
@@ -306,7 +307,7 @@ static int perf_map_func_noop(void *arg) {
 
 static pid_t spawn_child(void *map_addr, bool own_pidns, bool own_mntns,
     int (*child_func)(void *)) {
-  int flags = 0;
+  int flags = SIGCHLD;
   if (own_pidns)
     flags |= CLONE_NEWPID;
   if (own_mntns)

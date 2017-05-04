@@ -22,6 +22,14 @@
 
 #include "bcc_perf_map.h"
 
+bool bcc_is_perf_map(const char *path) {
+  char* pos = strstr(path, ".map");
+  // Path ends with ".map"
+  if (pos == NULL || *(pos + 4) != 0)
+    return false;
+  return access(path, R_OK) == 0;
+}
+
 int bcc_perf_map_nstgid(int pid) {
   char status_path[64];
   FILE *status;

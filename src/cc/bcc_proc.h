@@ -29,7 +29,9 @@ struct ns_cookie {
   int nsc_newns;
 };
 
-typedef int (*bcc_procutils_modulecb)(const char *, uint64_t, uint64_t, void *);
+// Module name, start address, end address, whether to check mount namespace, payload
+typedef int (*bcc_procutils_modulecb)(const char *, uint64_t, uint64_t, bool, void *);
+// Symbol name, address, payload
 typedef void (*bcc_procutils_ksymcb)(const char *, uint64_t, void *);
 
 char *bcc_procutils_which_so(const char *libname, int pid);

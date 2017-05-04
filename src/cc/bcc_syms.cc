@@ -15,10 +15,13 @@
  */
 
 #include <cxxabi.h>
+#include <fcntl.h>
+#include <linux/elf.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <cstdio>
 
 #include "bcc_elf.h"
 #include "bcc_perf_map.h"
@@ -35,7 +38,7 @@ ino_t ProcStat::getinode_() {
 
 bool ProcStat::is_stale() {
   ino_t cur_inode = getinode_();
-  return (cur_inode > 0) &&  (cur_inode != inode_);
+  return (cur_inode > 0) && (cur_inode != inode_);
 }
 
 ProcStat::ProcStat(int pid)
@@ -92,7 +95,70 @@ bool KSyms::resolve_name(const char *_unused, const char *name,
   return true;
 }
 
-ProcSyms::ProcSyms(int pid) : pid_(pid), procstat_(pid) { load_modules(); }
+ProcMountNS::ProcMountNS(int pid) {
+  if (pid < 0)
+    return;
+
+  ebpf::FileDesc self_fd;
+  ebpf::FileDesc target_fd;
+  char path[256];
+  int res;
+
+  res = std::snprintf(path, 256, "/proc/self/ns/mnt");
+  if (res <= 0 || res >= 256)
+    return;
+  if ((self_fd = open(path, O_RDONLY)) < 0)
+    return;
+
+  res = std::snprintf(path, 256, "/proc/%d/ns/mnt", pid);
+  if (res <= 0 || res >= 256)
+    return;
+  if ((target_fd = open(path, O_RDONLY)) < 0)
+    return;
+
+  struct stat self_stat, target_stat;
+  if (fstat(self_fd, &self_stat) != 0)
+    return;
+  if (fstat(target_fd, &target_stat) != 0)
+    return;
+
+  if (self_stat.st_ino == target_stat.st_ino)
+    // Both current and target Process are in same mount namespace
+    return;
+
+  self_fd_ = std::move(self_fd);
+  target_fd_ = std::move(target_fd);
+}
+
+ProcMountNSGuard::ProcMountNSGuard(ProcMountNS *mount_ns)
+    : mount_ns_instance_(nullptr), mount_ns_(mount_ns), entered_(false) {
+  init();
+}
+
+ProcMountNSGuard::ProcMountNSGuard(int pid)
+    : mount_ns_instance_(pid > 0 ? new ProcMountNS(pid) : nullptr),
+      mount_ns_(mount_ns_instance_.get()),
+      entered_(false) {
+  init();
+}
+
+void ProcMountNSGuard::init() {
+  if (!mount_ns_ || mount_ns_->self_fd_ < 0 || mount_ns_->target_fd_ < 0)
+    return;
+
+  if (setns(mount_ns_->target_fd_, CLONE_NEWNS) == 0)
+    entered_ = true;
+}
+
+ProcMountNSGuard::~ProcMountNSGuard() {
+  if (mount_ns_ && entered_ && mount_ns_->self_fd_ >= 0)
+    setns(mount_ns_->self_fd_, CLONE_NEWNS);
+}
+
+ProcSyms::ProcSyms(int pid)
+    : pid_(pid), procstat_(pid), mount_ns_instance_(new ProcMountNS(pid_)) {
+  load_modules();
+}
 
 bool ProcSyms::load_modules() {
   return bcc_procutils_each_module(pid_, _add_module, this) == 0;
@@ -100,43 +166,26 @@ bool ProcSyms::load_modules() {
 
 void ProcSyms::refresh() {
   modules_.clear();
+  mount_ns_instance_.reset(new ProcMountNS(pid_));
   load_modules();
   procstat_.reset();
 }
 
 int ProcSyms::_add_module(const char *modname, uint64_t start, uint64_t end,
-                          void *payload) {
-  struct ns_cookie nsc = {-1, -1};
-  bool ns_switch = false;
-  int arc;
+                          bool check_mount_ns, void *payload) {
   ProcSyms *ps = static_cast<ProcSyms *>(payload);
-  auto it = std::find_if(ps->modules_.begin(), ps->modules_.end(),
-               [=](const ProcSyms::Module &m) { return m.name_ == modname; });
+  auto it = std::find_if(
+      ps->modules_.begin(), ps->modules_.end(),
+      [=](const ProcSyms::Module &m) { return m.name_ == modname; });
   if (it == ps->modules_.end()) {
-    // If modname references a perf-map, determine if we need to enter a mount
-    // namespace in order to read symbols from it later.
-    if (strstr(modname, ".map") != nullptr) {
-      ns_switch = bcc_procutils_enter_mountns(ps->pid_, &nsc);
-      if (ns_switch) {
-        char new_modname[4096];
-        arc = access(modname, R_OK);
-        bcc_procutils_exit_mountns(&nsc);
-
-        if (arc != 0) {
-          snprintf(new_modname, sizeof (new_modname), "/tmp/perf-%d.map",
-              ps->pid_);
-
-          it = ps->modules_.insert(ps->modules_.end(), Module(new_modname,
-              ps->pid_, false));
-          it->ranges_.push_back(ProcSyms::Module::Range(start, end));
-	  return 0;
-        }
-      }
-    }
-    it = ps->modules_.insert(ps->modules_.end(), Module(modname, ps->pid_,
-        ns_switch));
+    auto module = Module(
+        modname, check_mount_ns ? ps->mount_ns_instance_.get() : nullptr);
+    if (module.init())
+      it = ps->modules_.insert(ps->modules_.end(), std::move(module));
+    else
+      return 0;
   }
-  it->ranges_.push_back(ProcSyms::Module::Range(start, end));
+  it->ranges_.emplace_back(start, end);
 
   return 0;
 }
@@ -172,7 +221,7 @@ bool ProcSyms::resolve_addr(uint64_t addr, struct bcc_symbol *sym,
         if (original_module)
           sym->module = original_module;
         return res;
-      } else {
+      } else if (mod.type_ != ModuleType::PERF_MAP) {
         // Record the module to which this symbol belongs, so that even if it's
         // later found using a perf map, we still report the right module name.
         original_module = mod.name_.c_str();
@@ -194,13 +243,33 @@ bool ProcSyms::resolve_name(const char *module, const char *name,
   return false;
 }
 
-ProcSyms::Module::Module(const char *name, int pid, bool in_ns)
-  : name_(name), pid_(pid), in_ns_(in_ns), loaded_(false) {
-  struct ns_cookie nsc;
+ProcSyms::Module::Module(const char *name, ProcMountNS *mount_ns)
+    : name_(name),
+      loaded_(false),
+      mount_ns_(mount_ns),
+      type_(ModuleType::UNKNOWN) {}
 
-  bcc_procutils_enter_mountns(pid_, &nsc);
-  is_so_ = bcc_elf_is_shared_obj(name) == 1;
-  bcc_procutils_exit_mountns(&nsc);
+bool ProcSyms::Module::init() {
+  ProcMountNSGuard g(mount_ns_);
+  int elf_type = bcc_elf_get_type(name_.c_str());
+  if (elf_type >= 0) {
+    if (elf_type == ET_EXEC) {
+      type_ = ModuleType::EXEC;
+      return true;
+    }
+    if (elf_type == ET_DYN) {
+      type_ = ModuleType::SO;
+      return true;
+    }
+    return false;
+  }
+
+  if (bcc_is_perf_map(name_.c_str()) == 1) {
+    type_ = ModuleType::PERF_MAP;
+    return true;
+  }
+
+  return false;
 }
 
 int ProcSyms::Module::_add_symbol(const char *symname, uint64_t start,
@@ -211,27 +280,17 @@ int ProcSyms::Module::_add_symbol(const char *symname, uint64_t start,
   return 0;
 }
 
-bool ProcSyms::Module::is_perf_map() const {
-  return strstr(name_.c_str(), ".map") != nullptr;
-}
-
 void ProcSyms::Module::load_sym_table() {
-  struct ns_cookie nsc = {-1, -1};
-
   if (loaded_)
     return;
   loaded_ = true;
 
-  if (is_perf_map()) {
-    if (in_ns_)
-      bcc_procutils_enter_mountns(pid_, &nsc);
-    bcc_perf_map_foreach_sym(name_.c_str(), _add_symbol, this);
-  } else {
-    bcc_procutils_enter_mountns(pid_, &nsc);
-    bcc_elf_foreach_sym(name_.c_str(), _add_symbol, this);
-  }
+  ProcMountNSGuard g(mount_ns_);
 
-  bcc_procutils_exit_mountns(&nsc);
+  if (type_ == ModuleType::PERF_MAP)
+    bcc_perf_map_foreach_sym(name_.c_str(), _add_symbol, this);
+  if (type_ == ModuleType::EXEC || type_ == ModuleType::SO)
+    bcc_elf_foreach_sym(name_.c_str(), _add_symbol, this);
 
   std::sort(syms_.begin(), syms_.end());
 }
@@ -249,7 +308,7 @@ bool ProcSyms::Module::find_name(const char *symname, uint64_t *addr) {
 
   for (Symbol &s : syms_) {
     if (*(s.name) == symname) {
-      *addr = is_so() ? start() + s.start : s.start;
+      *addr = type_ == ModuleType::SO ? start() + s.start : s.start;
       return true;
     }
   }
@@ -257,7 +316,7 @@ bool ProcSyms::Module::find_name(const char *symname, uint64_t *addr) {
 }
 
 bool ProcSyms::Module::find_addr(uint64_t addr, struct bcc_symbol *sym) {
-  uint64_t offset = is_so() ? (addr - start()) : addr;
+  uint64_t offset = type_ == ModuleType::SO ? (addr - start()) : addr;
 
   load_sym_table();
 
@@ -354,7 +413,7 @@ struct mod_st {
   uint64_t start;
 };
 
-static int _find_module(const char *modname, uint64_t start, uint64_t end,
+static int _find_module(const char *modname, uint64_t start, uint64_t end, bool,
                         void *p) {
   struct mod_st *mod = (struct mod_st *)p;
   if (!strcmp(modname, mod->name)) {
@@ -405,7 +464,7 @@ static int _list_sym(const char *symname, uint64_t addr, uint64_t end,
   if (!ELF_TYPE_IS_FUNCTION(flags) || addr == 0)
     return 0;
 
-  SYM_CB cb = (SYM_CB) payload;
+  SYM_CB cb = (SYM_CB)payload;
   return cb(symname, addr);
 }
 
@@ -419,8 +478,6 @@ int bcc_foreach_symbol(const char *module, SYM_CB cb) {
 int bcc_resolve_symname(const char *module, const char *symname,
                         const uint64_t addr, int pid, struct bcc_symbol *sym) {
   uint64_t load_addr;
-  struct ns_cookie nsc = {-1, -1};
-  bool success = true;
 
   sym->module = NULL;
   sym->name = NULL;
@@ -438,29 +495,23 @@ int bcc_resolve_symname(const char *module, const char *symname,
   if (sym->module == NULL)
     return -1;
 
-  bcc_procutils_enter_mountns(pid, &nsc);
+  ProcMountNSGuard g(pid);
 
   if (bcc_elf_loadaddr(sym->module, &load_addr) < 0) {
     sym->module = NULL;
-    success = false;
-    goto exitns;
+    return -1;
   }
 
   sym->name = symname;
   sym->offset = addr;
 
-  if (sym->name && sym->offset == 0x0) {
+  if (sym->name && sym->offset == 0x0)
     if (bcc_find_symbol_addr(sym) < 0) {
       sym->module = NULL;
-      success = false;
-      goto exitns;
+      return -1;
     }
-  }
 
-exitns:
-  bcc_procutils_exit_mountns(&nsc);
-
-  if (!success || sym->offset == 0x0)
+  if (sym->offset == 0x0)
     return -1;
 
   sym->offset = (sym->offset - load_addr);
