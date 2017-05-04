@@ -773,7 +773,8 @@ class BPF(object):
                 addresses.append((dname, addr))
             return 0
 
-        res = lib.bcc_foreach_symbol(name.encode('ascii'), _SYM_CB_TYPE(sym_cb))
+        res = lib.bcc_foreach_function_symbol(
+                name.encode('ascii'), _SYM_CB_TYPE(sym_cb))
         if res < 0:
             raise Exception("Error %d enumerating symbols in %s" % (res, name))
         return addresses

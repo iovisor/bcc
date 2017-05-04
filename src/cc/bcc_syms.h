@@ -56,7 +56,12 @@ void bcc_symcache_refresh(void *resolver);
 
 int bcc_resolve_global_addr(int pid, const char *module, const uint64_t address,
                             uint64_t *global);
-int bcc_foreach_symbol(const char *module, SYM_CB cb);
+
+// Call cb on every function symbol in the specified module. Uses simpler
+// SYM_CB callback mainly for easier to use in Python API.
+// Will prefer use debug file and check debug file CRC when reading the module.
+int bcc_foreach_function_symbol(const char *module, SYM_CB cb);
+
 int bcc_find_symbol_addr(struct bcc_symbol *sym);
 int bcc_resolve_symname(const char *module, const char *symname,
                         const uint64_t addr, int pid, struct bcc_symbol *sym);

@@ -31,6 +31,10 @@
 #include "syms.h"
 #include "vendor/tinyformat.hpp"
 
+#ifndef STT_GNU_IFUNC
+#define STT_GNU_IFUNC 10
+#endif
+
 ino_t ProcStat::getinode_() {
   struct stat s;
   return (!stat(procfs_.c_str(), &s)) ? s.st_ino : -1;
@@ -456,23 +460,24 @@ struct sym_search_t {
   int *actual;
 };
 
-// see <elf.h>
-#define ELF_TYPE_IS_FUNCTION(flags) (((flags) & 0xf) == 2)
-
-static int _list_sym(const char *symname, uint64_t addr, uint64_t end,
-                     int flags, void *payload) {
-  if (!ELF_TYPE_IS_FUNCTION(flags) || addr == 0)
-    return 0;
-
-  SYM_CB cb = (SYM_CB)payload;
+static int _sym_cb_wrapper(const char *symname, uint64_t addr, uint64_t end,
+                           int flags, void *payload) {
+  SYM_CB cb = (SYM_CB) payload;
   return cb(symname, addr);
 }
 
-int bcc_foreach_symbol(const char *module, SYM_CB cb) {
+int bcc_foreach_function_symbol(const char *module, SYM_CB cb) {
   if (module == 0 || cb == 0)
     return -1;
 
-  return bcc_elf_foreach_sym(module, _list_sym, (void *)cb);
+  static struct bcc_symbol_option default_option = {
+    .use_debug_file = 1,
+    .check_debug_file_crc = 1,
+    .use_symbol_type = (1 << STT_FUNC) | (1 << STT_GNU_IFUNC)
+  };
+
+  return bcc_elf_foreach_sym(
+      module, _sym_cb_wrapper, &default_option, (void *)cb);
 }
 
 int bcc_resolve_symname(const char *module, const char *symname,
