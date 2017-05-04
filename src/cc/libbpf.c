@@ -38,7 +38,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#include "bcc_proc.h"
+#include "bcc_syms.h"
 #include "libbpf.h"
 #include "perf_reader.h"
 
@@ -413,8 +413,8 @@ void * bpf_attach_uprobe(int progfd, enum bpf_probe_attach_type attach_type, con
   char new_name[128];
   struct perf_reader *reader = NULL;
   static char *event_type = "uprobe";
-  struct ns_cookie nsc = {-1, -1};
   int n;
+  void* mount_ns_guard = NULL;
 
   snprintf(new_name, sizeof(new_name), "%s_bcc_%d", ev_name, getpid());
   reader = perf_reader_new(cb, NULL, NULL, cb_cookie, probe_perf_reader_page_cnt);
@@ -435,15 +435,15 @@ void * bpf_attach_uprobe(int progfd, enum bpf_probe_attach_type attach_type, con
     goto error;
   }
 
-  bcc_procutils_enter_mountns(pid, &nsc);
+  mount_ns_guard = bcc_enter_mount_ns(pid);
   if (write(kfd, buf, strlen(buf)) < 0) {
     if (errno == EINVAL)
       fprintf(stderr, "check dmesg output for possible cause\n");
     close(kfd);
     goto error;
   }
-  bcc_procutils_exit_mountns(&nsc);
   close(kfd);
+  bcc_exit_mount_ns(&mount_ns_guard);
 
   snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/events/%ss/%s", event_type, new_name);
   if (bpf_attach_tracing_event(progfd, buf, reader, pid, cpu, group_fd) < 0)
@@ -452,7 +452,7 @@ void * bpf_attach_uprobe(int progfd, enum bpf_probe_attach_type attach_type, con
   return reader;
 
 error:
-  bcc_procutils_exit_mountns(&nsc);
+  bcc_exit_mount_ns(&mount_ns_guard);
   perf_reader_free(reader);
   return NULL;
 }

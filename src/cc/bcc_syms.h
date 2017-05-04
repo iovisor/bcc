@@ -52,6 +52,10 @@ int bcc_foreach_symbol(const char *module, SYM_CB cb);
 int bcc_find_symbol_addr(struct bcc_symbol *sym);
 int bcc_resolve_symname(const char *module, const char *symname,
                         const uint64_t addr, int pid, struct bcc_symbol *sym);
+
+void *bcc_enter_mount_ns(int pid);
+void bcc_exit_mount_ns(void **guard);
+
 #ifdef __cplusplus
 }
 #endif

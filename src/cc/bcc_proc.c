@@ -13,15 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#ifndef _GNU_SOURCE
-#define _GNU_SOURCE
-#endif
 
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <fcntl.h>
-#include <sched.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -391,97 +387,6 @@ char *bcc_procutils_which_so(const char *libname, int pid) {
 
 void bcc_procutils_free(const char *ptr) {
   free((void *)ptr);
-}
-
-bool bcc_procutils_enter_mountns(int pid, struct ns_cookie *nc) {
-  char curnspath[4096];
-  char newnspath[4096];
-  int oldns = -1;
-  int newns = -1;
-  struct stat ons_stat;
-  struct stat nns_stat;
-
-  if (nc == NULL)
-    return false;
-
-  nc->nsc_oldns = -1;
-  nc->nsc_newns = -1;
-
-  if (snprintf(curnspath, 4096, "/proc/self/ns/mnt") == 4096) {
-    return false;
-  }
-
-  if (snprintf(newnspath, 4096, "/proc/%d/ns/mnt", pid) == 4096) {
-    return false;
-  }
-
-  if ((oldns = open(curnspath, O_RDONLY)) < 0) {
-    return false;
-  }
-
-  if ((newns = open(newnspath, O_RDONLY)) < 0) {
-    goto errout;
-  }
-
-  if (fstat(oldns, &ons_stat) < 0) {
-    goto errout;
-  }
-
-  if (fstat(newns, &nns_stat) < 0) {
-    goto errout;
-  }
-
-  /*
-   * Only switch to the new namespace if it doesn't match the existing
-   * namespace.  This prevents us from getting an EPERM when trying to enter an
-   * identical namespace.
-   */
-  if (ons_stat.st_ino == nns_stat.st_ino) {
-    goto errout;
-  }
-
-  if (setns(newns, CLONE_NEWNS) < 0) {
-    goto errout;
-  }
-
-  nc->nsc_oldns = oldns;
-  nc->nsc_newns = newns;
-
-  return true;
-
-errout:
-  if (oldns > -1) {
-    (void) close(oldns);
-  }
-  if (newns > -1) {
-    (void) close(newns);
-  }
-  return false;
-}
-
-bool bcc_procutils_exit_mountns(struct ns_cookie *nc) {
-  bool rc = false;
-
-  if (nc == NULL)
-    return rc;
-
-  if (nc->nsc_oldns == -1 || nc->nsc_newns == -1)
-    return rc;
-
-  if (setns(nc->nsc_oldns, CLONE_NEWNS) == 0) {
-    rc = true;
-  }
-
-  if (nc->nsc_oldns > -1) {
-    (void) close(nc->nsc_oldns);
-    nc->nsc_oldns = -1;
-  }
-  if (nc->nsc_newns > -1) {
-    (void) close(nc->nsc_newns);
-    nc->nsc_newns = -1;
-  }
-
-  return rc;
 }
 
 /* Detects the following languages + C. */
