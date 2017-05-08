@@ -25,6 +25,7 @@ plugs:
     mount-observe: null
     system-observe: null
     system-trace: null
+assumes: [snapd2.23]
 apps:
     argdist:
         command: wrapper argdist
