@@ -165,6 +165,8 @@ static u32 (*bpf_get_prandom_u32)(void) =
   (void *) BPF_FUNC_get_prandom_u32;
 static int (*bpf_trace_printk_)(const char *fmt, u64 fmt_size, ...) =
   (void *) BPF_FUNC_trace_printk;
+static int (*bpf_probe_read_str)(void *dst, u64 size, void *unsafe_ptr) =
+  (void *) BPF_FUNC_probe_read_str;
 int bpf_trace_printk(const char *fmt, ...) asm("llvm.bpf.extra");
 static inline __attribute__((always_inline))
 void bpf_tail_call_(u64 map_fd, void *ctx, int index) {
