@@ -16,12 +16,14 @@
 #pragma once
 
 #include <algorithm>
+#include <memory>
 #include <string>
+#include <sys/types.h>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
-#include <sys/types.h>
+#include "common.h"
 
 class ProcStat {
   std::string procfs_;
@@ -64,6 +66,35 @@ public:
   virtual void refresh();
 };
 
+class ProcMountNSGuard;
+class ProcSyms;
+
+class ProcMountNS {
+private:
+  explicit ProcMountNS(int pid);
+
+  ebpf::FileDesc self_fd_;
+  ebpf::FileDesc target_fd_;
+
+  friend class ProcMountNSGuard;
+  friend class ProcSyms;
+};
+
+class ProcMountNSGuard {
+public:
+  explicit ProcMountNSGuard(ProcMountNS *mount_ns);
+  explicit ProcMountNSGuard(int pid);
+
+  ~ProcMountNSGuard();
+
+private:
+  void init();
+
+  std::unique_ptr<ProcMountNS> mount_ns_instance_;
+  ProcMountNS *mount_ns_;
+  bool entered_;
+};
+
 class ProcSyms : SymbolCache {
   struct Symbol {
     Symbol(const std::string *name, uint64_t start, uint64_t size, int flags = 0)
@@ -78,6 +109,13 @@ class ProcSyms : SymbolCache {
     }
   };
 
+  enum class ModuleType {
+    UNKNOWN,
+    EXEC,
+    SO,
+    PERF_MAP
+  };
+
   struct Module {
     struct Range {
       uint64_t start;
@@ -85,13 +123,15 @@ class ProcSyms : SymbolCache {
       Range(uint64_t s, uint64_t e) : start(s), end(e) {}
     };
 
-    Module(const char *name, int pid, bool in_ns);
+    Module(const char *name, ProcMountNS* mount_ns);
+    bool init();
+
     std::string name_;
     std::vector<Range> ranges_;
-    bool is_so_;
-    int pid_;
-    bool in_ns_;
     bool loaded_;
+    ProcMountNS *mount_ns_;
+    ModuleType type_;
+
     std::unordered_set<std::string> symnames_;
     std::vector<Symbol> syms_;
 
@@ -100,8 +140,6 @@ class ProcSyms : SymbolCache {
     uint64_t start() const { return ranges_.begin()->start; }
     bool find_addr(uint64_t addr, struct bcc_symbol *sym);
     bool find_name(const char *symname, uint64_t *addr);
-    bool is_so() const { return is_so_; }
-    bool is_perf_map() const;
 
     static int _add_symbol(const char *symname, uint64_t start, uint64_t end,
                            int flags, void *p);
@@ -110,8 +148,9 @@ class ProcSyms : SymbolCache {
   int pid_;
   std::vector<Module> modules_;
   ProcStat procstat_;
+  std::unique_ptr<ProcMountNS> mount_ns_instance_;
 
-  static int _add_module(const char *, uint64_t, uint64_t, void *);
+  static int _add_module(const char *, uint64_t, uint64_t, bool, void *);
   bool load_modules();
 
 public:

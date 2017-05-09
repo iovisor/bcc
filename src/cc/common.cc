@@ -15,6 +15,8 @@
  */
 #include <fstream>
 #include <sstream>
+#include <unistd.h>
+
 #include "common.h"
 
 namespace ebpf {
@@ -47,5 +49,37 @@ std::vector<int> get_possible_cpus() {
   return read_cpu_range("/sys/devices/system/cpu/possible");
 }
 
+FileDesc::FileDesc(int fd) : fd_(fd) {}
+
+FileDesc::FileDesc(FileDesc &&that) : fd_(-1) { *this = std::move(that); }
+
+FileDesc::~FileDesc() {
+  if (fd_ >= 0)
+    ::close(fd_);
+}
+
+FileDesc &FileDesc::operator=(int fd) {
+  if (fd_ >= 0)
+    ::close(fd_);
+  fd_ = fd;
+  return *this;
+}
+
+FileDesc &FileDesc::operator=(FileDesc &&that) {
+  if (fd_ >= 0)
+    ::close(fd_);
+  fd_ = that.fd_;
+  that.fd_ = -1;
+  return *this;
+}
+
+FileDesc FileDesc::dup() const {
+  int dup_fd = ::dup(fd_);
+  return FileDesc(dup_fd);
+}
+
+FileDesc::operator int() { return fd_; }
+
+FileDesc::operator int() const { return fd_; }
 
 } // namespace ebpf

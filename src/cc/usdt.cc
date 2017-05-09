@@ -48,7 +48,7 @@ Probe::Probe(const char *bin_path, const char *provider, const char *name,
 
 bool Probe::in_shared_object() {
   if (!in_shared_object_)
-    in_shared_object_ = (bcc_elf_is_shared_obj(bin_path_.c_str()) == 1);
+    in_shared_object_ = bcc_elf_is_shared_obj(bin_path_.c_str());
   return in_shared_object_.value();
 }
 
@@ -199,7 +199,7 @@ void Context::_each_probe(const char *binpath, const struct bcc_elf_usdt *probe,
   ctx->add_probe(binpath, probe);
 }
 
-int Context::_each_module(const char *modpath, uint64_t, uint64_t, void *p) {
+int Context::_each_module(const char *modpath, uint64_t, uint64_t, bool, void *p) {
   Context *ctx = static_cast<Context *>(p);
   // Modules may be reported multiple times if they contain more than one
   // executable region. We are going to parse the ELF on disk anyway, so we
