@@ -453,13 +453,6 @@ int bcc_find_symbol_addr(struct bcc_symbol *sym) {
   return bcc_elf_foreach_sym(sym->module, _find_sym, sym);
 }
 
-struct sym_search_t {
-  struct bcc_symbol *syms;
-  int start;
-  int requested;
-  int *actual;
-};
-
 static int _sym_cb_wrapper(const char *symname, uint64_t addr, uint64_t end,
                            int flags, void *payload) {
   SYM_CB cb = (SYM_CB) payload;
@@ -502,25 +495,28 @@ int bcc_resolve_symname(const char *module, const char *symname,
 
   ProcMountNSGuard g(pid);
 
-  if (bcc_elf_loadaddr(sym->module, &load_addr) < 0) {
-    sym->module = NULL;
-    return -1;
-  }
+  if (bcc_elf_loadaddr(sym->module, &load_addr) < 0)
+    goto invalid_module;
 
   sym->name = symname;
   sym->offset = addr;
 
   if (sym->name && sym->offset == 0x0)
-    if (bcc_find_symbol_addr(sym) < 0) {
-      sym->module = NULL;
-      return -1;
-    }
+    if (bcc_find_symbol_addr(sym) < 0)
+      goto invalid_module;
 
   if (sym->offset == 0x0)
-    return -1;
+    goto invalid_module;
 
   sym->offset = (sym->offset - load_addr);
   return 0;
+
+invalid_module:
+  if (sym->module) {
+    ::free(const_cast<char*>(sym->module));
+    sym->module = NULL;
+  }
+  return -1;
 }
 
 void *bcc_enter_mount_ns(int pid) {
