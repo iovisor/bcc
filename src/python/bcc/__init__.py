@@ -24,7 +24,7 @@ import errno
 import sys
 basestring = (unicode if sys.version_info[0] < 3 else str)
 
-from .libbcc import lib, _CB_TYPE, bcc_symbol, _SYM_CB_TYPE
+from .libbcc import lib, _CB_TYPE, bcc_symbol, bcc_symbol_option, _SYM_CB_TYPE
 from .table import Table
 from .perf import Perf
 from .utils import get_online_cpus
@@ -607,11 +607,12 @@ class BPF(object):
         sym = bcc_symbol()
         psym = ct.pointer(sym)
         c_pid = 0 if pid == -1 else pid
-        if lib.bcc_resolve_symname(module.encode("ascii"),
-                symname.encode("ascii"), addr or 0x0, c_pid, psym) < 0:
-            if not sym.module:
-                raise Exception("could not find library %s" % module)
-            lib.bcc_procutils_free(sym.module)
+        if lib.bcc_resolve_symname(
+            module.encode("ascii"), symname.encode("ascii"),
+            addr or 0x0, c_pid,
+            ct.cast(None, ct.POINTER(bcc_symbol_option)),
+            psym,
+        ) < 0:
             raise Exception("could not determine address of symbol %s" % symname)
         module_path = ct.cast(sym.module, ct.c_char_p).value.decode()
         lib.bcc_procutils_free(sym.module)

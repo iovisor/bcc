@@ -92,7 +92,7 @@ TEST_CASE("file-backed mapping identification") {
 TEST_CASE("resolve symbol name in external library", "[c_api]") {
   struct bcc_symbol sym;
 
-  REQUIRE(bcc_resolve_symname("c", "malloc", 0x0, 0, &sym) == 0);
+  REQUIRE(bcc_resolve_symname("c", "malloc", 0x0, 0, nullptr, &sym) == 0);
   REQUIRE(string(sym.module).find("libc.so") != string::npos);
   REQUIRE(sym.module[0] == '/');
   REQUIRE(sym.offset != 0);
@@ -102,7 +102,7 @@ TEST_CASE("resolve symbol name in external library", "[c_api]") {
 TEST_CASE("resolve symbol name in external library using loaded libraries", "[c_api]") {
   struct bcc_symbol sym;
 
-  REQUIRE(bcc_resolve_symname("bcc", "bcc_procutils_which", 0x0, getpid(), &sym) == 0);
+  REQUIRE(bcc_resolve_symname("bcc", "bcc_procutils_which", 0x0, getpid(), nullptr, &sym) == 0);
   REQUIRE(string(sym.module).find("libbcc.so") != string::npos);
   REQUIRE(sym.module[0] == '/');
   REQUIRE(sym.offset != 0);

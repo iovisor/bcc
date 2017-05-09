@@ -121,7 +121,8 @@ struct bcc_symbol_option {
 };
 
 int bcc_resolve_symname(const char *module, const char *symname, const uint64_t addr,
-		int pid, struct bcc_symbol *sym);
+                        int pid, struct bcc_symbol_option *option,
+                        struct bcc_symbol *sym);
 void bcc_procutils_free(const char *ptr);
 void *bcc_symcache_new(int pid);
 void bcc_symbol_free_demangle_name(struct bcc_symbol *sym);

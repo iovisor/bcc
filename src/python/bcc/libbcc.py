@@ -149,7 +149,7 @@ lib.bcc_procutils_language.argtypes = [ct.c_int]
 
 lib.bcc_resolve_symname.restype = ct.c_int
 lib.bcc_resolve_symname.argtypes = [
-    ct.c_char_p, ct.c_char_p, ct.c_ulonglong, ct.c_int, ct.POINTER(bcc_symbol)]
+    ct.c_char_p, ct.c_char_p, ct.c_ulonglong, ct.c_int, ct.POINTER(bcc_symbol_option), ct.POINTER(bcc_symbol)]
 
 _SYM_CB_TYPE = ct.CFUNCTYPE(ct.c_int, ct.c_char_p, ct.c_ulonglong)
 lib.bcc_foreach_function_symbol.restype = ct.c_int

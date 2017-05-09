@@ -62,9 +62,22 @@ int bcc_resolve_global_addr(int pid, const char *module, const uint64_t address,
 // Will prefer use debug file and check debug file CRC when reading the module.
 int bcc_foreach_function_symbol(const char *module, SYM_CB cb);
 
-int bcc_find_symbol_addr(struct bcc_symbol *sym);
+// Find the offset of a symbol in a module binary. If addr is not zero, will
+// calculate the offset using the provided addr and the module's load address.
+//
+// If pid is provided, will use it to help lookup the module in the Process and
+// enter the Process's mount Namespace.
+//
+// If option is not NULL, will respect the specified options for lookup.
+// Otherwise default option will apply, which is to use debug file, verify
+// checksum, and try all types of symbols.
+//
+// Return 0 on success and -1 on failure. Output will be write to sym. After
+// use, sym->module need to be freed if it's not empty.
 int bcc_resolve_symname(const char *module, const char *symname,
-                        const uint64_t addr, int pid, struct bcc_symbol *sym);
+                        const uint64_t addr, int pid,
+                        struct bcc_symbol_option* option,
+                        struct bcc_symbol *sym);
 
 void *bcc_enter_mount_ns(int pid);
 void bcc_exit_mount_ns(void **guard);

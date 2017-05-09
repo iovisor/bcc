@@ -438,21 +438,6 @@ int bcc_resolve_global_addr(int pid, const char *module, const uint64_t address,
   return 0;
 }
 
-static int _find_sym(const char *symname, uint64_t addr, uint64_t end,
-                     int flags, void *payload) {
-  struct bcc_symbol *sym = (struct bcc_symbol *)payload;
-  // TODO: check for actual function symbol in flags
-  if (!strcmp(sym->name, symname)) {
-    sym->offset = addr;
-    return -1;
-  }
-  return 0;
-}
-
-int bcc_find_symbol_addr(struct bcc_symbol *sym) {
-  return bcc_elf_foreach_sym(sym->module, _find_sym, sym);
-}
-
 static int _sym_cb_wrapper(const char *symname, uint64_t addr, uint64_t end,
                            int flags, void *payload) {
   SYM_CB cb = (SYM_CB) payload;
@@ -473,16 +458,31 @@ int bcc_foreach_function_symbol(const char *module, SYM_CB cb) {
       module, _sym_cb_wrapper, &default_option, (void *)cb);
 }
 
-int bcc_resolve_symname(const char *module, const char *symname,
-                        const uint64_t addr, int pid, struct bcc_symbol *sym) {
-  uint64_t load_addr;
+static int _find_sym(const char *symname, uint64_t addr, uint64_t end,
+                     int flags, void *payload) {
+  struct bcc_symbol *sym = (struct bcc_symbol *)payload;
+  if (!strcmp(sym->name, symname)) {
+    sym->offset = addr;
+    return -1;
+  }
+  return 0;
+}
 
-  sym->module = NULL;
-  sym->name = NULL;
-  sym->offset = 0x0;
+int bcc_resolve_symname(const char *module, const char *symname,
+                        const uint64_t addr, int pid,
+                        struct bcc_symbol_option *option,
+                        struct bcc_symbol *sym) {
+  uint64_t load_addr;
+  static struct bcc_symbol_option default_option = {
+    .use_debug_file = 1,
+    .check_debug_file_crc = 1,
+    .use_symbol_type = BCC_SYM_ALL_TYPES,
+  };
 
   if (module == NULL)
     return -1;
+
+  memset(sym, 0, sizeof(bcc_symbol));
 
   if (strchr(module, '/')) {
     sym->module = strdup(module);
@@ -501,8 +501,11 @@ int bcc_resolve_symname(const char *module, const char *symname,
   sym->name = symname;
   sym->offset = addr;
 
+  if (option == NULL)
+    option = &default_option;
+
   if (sym->name && sym->offset == 0x0)
-    if (bcc_find_symbol_addr(sym) < 0)
+    if (bcc_elf_foreach_sym(sym->module, _find_sym, option, sym) < 0)
       goto invalid_module;
 
   if (sym->offset == 0x0)
