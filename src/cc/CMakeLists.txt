@@ -67,7 +67,9 @@ target_link_libraries(bcc-static b_frontend clang_frontend bcc-loader-static ${c
 
 install(TARGETS bcc-shared LIBRARY COMPONENT libbcc
   DESTINATION ${CMAKE_INSTALL_LIBDIR})
-install(FILES bpf_common.h bpf_module.h bcc_syms.h bcc_exception.h libbpf.h perf_reader.h BPF.h BPFTable.h shared_table.h table_desc.h table_storage.h COMPONENT libbcc
+install(FILES bpf_common.h bpf_module.h bcc_syms.h bcc_exception.h file_desc.h
+              libbpf.h perf_reader.h BPF.h BPFTable.h shared_table.h
+              table_desc.h table_storage.h COMPONENT libbcc
   DESTINATION include/bcc)
 install(DIRECTORY compat/linux/ COMPONENT libbcc
   DESTINATION include/bcc/compat/linux

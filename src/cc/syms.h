@@ -23,7 +23,7 @@
 #include <unordered_set>
 #include <vector>
 
-#include "common.h"
+#include "file_desc.h"
 
 class ProcStat {
   std::string procfs_;

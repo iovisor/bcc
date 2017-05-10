@@ -33,8 +33,8 @@
 #include <llvm/IR/Module.h>
 
 #include "bcc_exception.h"
-#include "common.h"
 #include "codegen_llvm.h"
+#include "file_desc.h"
 #include "lexer.h"
 #include "libbpf.h"
 #include "linux/bpf.h"

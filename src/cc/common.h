@@ -17,8 +17,6 @@
 #pragma once
 
 #include <memory>
-#include <string>
-#include <tuple>
 #include <vector>
 
 namespace ebpf {
@@ -32,28 +30,5 @@ make_unique(Args &&... args) {
 std::vector<int> get_online_cpus();
 
 std::vector<int> get_possible_cpus();
-
-/// FileDesc is a helper class for managing open file descriptors. Copy is
-/// disallowed (call dup instead), and cleanup happens automatically.
-class FileDesc {
- public:
-  explicit FileDesc(int fd = -1);
-  FileDesc(FileDesc &&that);
-  FileDesc(const FileDesc &that) = delete;
-
-  ~FileDesc();
-
-  FileDesc &operator=(int fd);
-  FileDesc &operator=(FileDesc &&that);
-  FileDesc &operator=(const FileDesc &that) = delete;
-
-  operator int();
-  operator int() const;
-
-  FileDesc dup() const;
-
- private:
-  int fd_;
-};
 
 }  // namespace ebpf

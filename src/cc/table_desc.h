@@ -23,7 +23,7 @@
 #include <string>
 
 #include "bcc_exception.h"
-#include "common.h"
+#include "file_desc.h"
 
 namespace clang {
 class ASTContext;
