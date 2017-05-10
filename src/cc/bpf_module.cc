@@ -124,16 +124,16 @@ static StatusTuple unimplemented_snprintf(char *, size_t, const void *) {
 }
 
 BPFModule::~BPFModule() {
-  engine_.reset();
-  rw_engine_.reset();
-  ctx_.reset();
-
   for (auto &v : tables_) {
     v->key_sscanf = unimplemented_sscanf;
     v->leaf_sscanf = unimplemented_sscanf;
     v->key_snprintf = unimplemented_snprintf;
     v->leaf_snprintf = unimplemented_snprintf;
   }
+
+  engine_.reset();
+  rw_engine_.reset();
+  ctx_.reset();
 
   ts_->DeletePrefix(Path({id_}));
 }
