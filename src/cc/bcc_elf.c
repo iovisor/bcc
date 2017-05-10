@@ -182,7 +182,7 @@ static int list_in_scn(Elf *e, Elf_Scn *section, size_t stridx, size_t symsize,
       if (!(option->use_symbol_type & flag))
         continue;
 
-      if (callback(name, sym.st_value, sym.st_size, sym.st_info, payload) < 0)
+      if (callback(name, sym.st_value, sym.st_size, payload) < 0)
         return 1;      // signal termination to caller
     }
   }

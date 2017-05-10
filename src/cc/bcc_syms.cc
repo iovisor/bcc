@@ -290,10 +290,10 @@ bool ProcSyms::Module::init() {
 }
 
 int ProcSyms::Module::_add_symbol(const char *symname, uint64_t start,
-                                  uint64_t end, int flags, void *p) {
+                                  uint64_t size, void *p) {
   Module *m = static_cast<Module *>(p);
   auto res = m->symnames_.emplace(symname);
-  m->syms_.emplace_back(&*(res.first), start, end, flags);
+  m->syms_.emplace_back(&*(res.first), start, size);
   return 0;
 }
 
@@ -450,8 +450,8 @@ int bcc_resolve_global_addr(int pid, const char *module, const uint64_t address,
   return 0;
 }
 
-static int _sym_cb_wrapper(const char *symname, uint64_t addr, uint64_t end,
-                           int flags, void *payload) {
+static int _sym_cb_wrapper(const char *symname, uint64_t addr, uint64_t,
+                           void *payload) {
   SYM_CB cb = (SYM_CB) payload;
   return cb(symname, addr);
 }
@@ -470,8 +470,8 @@ int bcc_foreach_function_symbol(const char *module, SYM_CB cb) {
       module, _sym_cb_wrapper, &default_option, (void *)cb);
 }
 
-static int _find_sym(const char *symname, uint64_t addr, uint64_t end,
-                     int flags, void *payload) {
+static int _find_sym(const char *symname, uint64_t addr, uint64_t,
+                     void *payload) {
   struct bcc_symbol *sym = (struct bcc_symbol *)payload;
   if (!strcmp(sym->name, symname)) {
     sym->offset = addr;

@@ -34,7 +34,9 @@ struct bcc_elf_usdt {
 
 typedef void (*bcc_elf_probecb)(const char *, const struct bcc_elf_usdt *,
                                 void *);
-typedef int (*bcc_elf_symcb)(const char *, uint64_t, uint64_t, int, void *);
+
+// Symbol name, start address, length, payload
+typedef int (*bcc_elf_symcb)(const char *, uint64_t, uint64_t, void *);
 
 int bcc_elf_foreach_usdt(const char *path, bcc_elf_probecb callback,
                          void *payload);

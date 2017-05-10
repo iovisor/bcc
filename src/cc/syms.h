@@ -98,12 +98,11 @@ private:
 
 class ProcSyms : SymbolCache {
   struct Symbol {
-    Symbol(const std::string *name, uint64_t start, uint64_t size, int flags = 0)
-        : name(name), start(start), size(size), flags(flags) {}
+    Symbol(const std::string *name, uint64_t start, uint64_t size)
+        : name(name), start(start), size(size) {}
     const std::string *name;
     uint64_t start;
     uint64_t size;
-    int flags;
 
     bool operator<(const struct Symbol& rhs) const {
       return start < rhs.start;
@@ -144,8 +143,8 @@ class ProcSyms : SymbolCache {
     bool find_addr(uint64_t offset, struct bcc_symbol *sym);
     bool find_name(const char *symname, uint64_t *addr);
 
-    static int _add_symbol(const char *symname, uint64_t start, uint64_t end,
-                           int flags, void *p);
+    static int _add_symbol(const char *symname, uint64_t start, uint64_t size,
+                           void *p);
   };
 
   int pid_;
