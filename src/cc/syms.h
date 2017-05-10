@@ -136,9 +136,9 @@ class ProcSyms : SymbolCache {
     std::vector<Symbol> syms_;
 
     void load_sym_table();
-    bool contains(uint64_t addr) const;
+    bool contains(uint64_t addr, uint64_t &offset) const;
     uint64_t start() const { return ranges_.begin()->start; }
-    bool find_addr(uint64_t addr, struct bcc_symbol *sym);
+    bool find_addr(uint64_t offset, struct bcc_symbol *sym);
     bool find_name(const char *symname, uint64_t *addr);
 
     static int _add_symbol(const char *symname, uint64_t start, uint64_t end,
