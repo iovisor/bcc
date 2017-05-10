@@ -195,7 +195,7 @@ static int mntns_func(void *arg) {
 
 TEST_CASE("resolve symbol addresses for a given PID", "[c_api]") {
   struct bcc_symbol sym;
-  void *resolver = bcc_symcache_new(getpid());
+  void *resolver = bcc_symcache_new(getpid(), nullptr);
 
   REQUIRE(resolver);
 
@@ -240,7 +240,7 @@ TEST_CASE("resolve symbol addresses for a given PID", "[c_api]") {
     child = spawn_child(0, true, true, mntns_func);
     REQUIRE(child > 0);
 
-    void *resolver = bcc_symcache_new(child);
+    void *resolver = bcc_symcache_new(child, nullptr);
     REQUIRE(resolver);
 
     REQUIRE(bcc_symcache_resolve_name(resolver, "/tmp/libz.so.1", "zlibVersion",
@@ -335,7 +335,7 @@ TEST_CASE("resolve symbols using /tmp/perf-pid.map", "[c_api]") {
     child = spawn_child(map_addr, /* own_pidns */ false, false, perf_map_func);
     REQUIRE(child > 0);
 
-    void *resolver = bcc_symcache_new(child);
+    void *resolver = bcc_symcache_new(child, nullptr);
     REQUIRE(resolver);
 
     REQUIRE(bcc_symcache_resolve(resolver, (unsigned long long)map_addr,
@@ -355,7 +355,7 @@ TEST_CASE("resolve symbols using /tmp/perf-pid.map", "[c_api]") {
     child = spawn_child(map_addr, /* own_pidns */ true, false, perf_map_func);
     REQUIRE(child > 0);
 
-    void *resolver = bcc_symcache_new(child);
+    void *resolver = bcc_symcache_new(child, nullptr);
     REQUIRE(resolver);
 
     REQUIRE(bcc_symcache_resolve(resolver, (unsigned long long)map_addr,
@@ -372,7 +372,7 @@ TEST_CASE("resolve symbols using /tmp/perf-pid.map", "[c_api]") {
         perf_map_func_mntns);
     REQUIRE(child > 0);
 
-    void *resolver = bcc_symcache_new(child);
+    void *resolver = bcc_symcache_new(child, nullptr);
     REQUIRE(resolver);
 
     REQUIRE(bcc_symcache_resolve(resolver, (unsigned long long)map_addr,
@@ -391,7 +391,7 @@ TEST_CASE("resolve symbols using /tmp/perf-pid.map", "[c_api]") {
     string path = perf_map_path(child);
     REQUIRE(make_perf_map_file(path, (unsigned long long)map_addr) == 0);
 
-    void *resolver = bcc_symcache_new(child);
+    void *resolver = bcc_symcache_new(child, nullptr);
     REQUIRE(resolver);
 
     REQUIRE(bcc_symcache_resolve(resolver, (unsigned long long)map_addr,

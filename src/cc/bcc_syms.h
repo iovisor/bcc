@@ -39,7 +39,7 @@ struct bcc_symbol_option {
   uint32_t use_symbol_type;
 };
 
-void *bcc_symcache_new(int pid);
+void *bcc_symcache_new(int pid, struct bcc_symbol_option *option);
 void bcc_free_symcache(void *symcache, int pid);
 
 // The demangle_name pointer in bcc_symbol struct is returned from the

@@ -110,7 +110,7 @@ std::vector<std::string> BPFStackTable::get_stack_symbol(int stack_id,
   if (pid < 0)
     pid = -1;
   if (pid_sym_.find(pid) == pid_sym_.end())
-    pid_sym_[pid] = bcc_symcache_new(pid);
+    pid_sym_[pid] = bcc_symcache_new(pid, nullptr);
   void* cache = pid_sym_[pid];
 
   bcc_symbol symbol;

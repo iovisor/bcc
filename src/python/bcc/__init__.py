@@ -46,7 +46,8 @@ LOG_BUFFER_SIZE = 65536
 
 class SymbolCache(object):
     def __init__(self, pid):
-        self.cache = lib.bcc_symcache_new(pid)
+        self.cache = lib.bcc_symcache_new(
+                pid, ct.cast(None, ct.POINTER(bcc_symbol_option)))
 
     def resolve(self, addr, demangle):
         """

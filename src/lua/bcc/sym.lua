@@ -19,7 +19,7 @@ local SYM = ffi.typeof("struct bcc_symbol[1]")
 
 local function create_cache(pid)
   return {
-    _CACHE = libbcc.bcc_symcache_new(pid or -1),
+    _CACHE = libbcc.bcc_symcache_new(pid or -1, nil),
     resolve = function(self, addr)
       local sym = SYM()
       if libbcc.bcc_symcache_resolve(self._CACHE, addr, sym) < 0 then

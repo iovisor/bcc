@@ -24,6 +24,7 @@
 #include <vector>
 
 #include "file_desc.h"
+#include "bcc_syms.h"
 
 class ProcStat {
   std::string procfs_;
@@ -123,13 +124,15 @@ class ProcSyms : SymbolCache {
       Range(uint64_t s, uint64_t e) : start(s), end(e) {}
     };
 
-    Module(const char *name, ProcMountNS* mount_ns);
+    Module(const char *name, ProcMountNS* mount_ns,
+           struct bcc_symbol_option *option);
     bool init();
 
     std::string name_;
     std::vector<Range> ranges_;
     bool loaded_;
     ProcMountNS *mount_ns_;
+    bcc_symbol_option *symbol_option_;
     ModuleType type_;
 
     std::unordered_set<std::string> symnames_;
@@ -149,12 +152,13 @@ class ProcSyms : SymbolCache {
   std::vector<Module> modules_;
   ProcStat procstat_;
   std::unique_ptr<ProcMountNS> mount_ns_instance_;
+  bcc_symbol_option symbol_option_;
 
   static int _add_module(const char *, uint64_t, uint64_t, bool, void *);
   bool load_modules();
 
 public:
-  ProcSyms(int pid);
+  ProcSyms(int pid, struct bcc_symbol_option *option = nullptr);
   virtual void refresh();
   virtual bool resolve_addr(uint64_t addr, struct bcc_symbol *sym, bool demangle = true);
   virtual bool resolve_name(const char *module, const char *name,

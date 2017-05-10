@@ -124,7 +124,7 @@ int bcc_resolve_symname(const char *module, const char *symname, const uint64_t 
                         int pid, struct bcc_symbol_option *option,
                         struct bcc_symbol *sym);
 void bcc_procutils_free(const char *ptr);
-void *bcc_symcache_new(int pid);
+void *bcc_symcache_new(int pid, struct bcc_symbol_option *option);
 void bcc_symbol_free_demangle_name(struct bcc_symbol *sym);
 int bcc_symcache_resolve(void *symcache, uint64_t addr, struct bcc_symbol *sym);
 void bcc_symcache_refresh(void *resolver);

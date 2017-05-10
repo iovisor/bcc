@@ -15,6 +15,7 @@
  */
 
 #include <cxxabi.h>
+#include <cstring>
 #include <fcntl.h>
 #include <linux/elf.h>
 #include <string.h>
@@ -159,8 +160,16 @@ ProcMountNSGuard::~ProcMountNSGuard() {
     setns(mount_ns_->self_fd_, CLONE_NEWNS);
 }
 
-ProcSyms::ProcSyms(int pid)
+ProcSyms::ProcSyms(int pid, struct bcc_symbol_option *option)
     : pid_(pid), procstat_(pid), mount_ns_instance_(new ProcMountNS(pid_)) {
+  if (option)
+    std::memcpy(&symbol_option_, option, sizeof(bcc_symbol_option));
+  else
+    symbol_option_ = {
+      .use_debug_file = 1,
+      .check_debug_file_crc = 1,
+      .use_symbol_type = (1 << STT_FUNC) | (1 << STT_GNU_IFUNC)
+    };
   load_modules();
 }
 
@@ -183,7 +192,8 @@ int ProcSyms::_add_module(const char *modname, uint64_t start, uint64_t end,
       [=](const ProcSyms::Module &m) { return m.name_ == modname; });
   if (it == ps->modules_.end()) {
     auto module = Module(
-        modname, check_mount_ns ? ps->mount_ns_instance_.get() : nullptr);
+        modname, check_mount_ns ? ps->mount_ns_instance_.get() : nullptr,
+        &ps->symbol_option_);
     if (module.init())
       it = ps->modules_.insert(ps->modules_.end(), std::move(module));
     else
@@ -248,10 +258,12 @@ bool ProcSyms::resolve_name(const char *module, const char *name,
   return false;
 }
 
-ProcSyms::Module::Module(const char *name, ProcMountNS *mount_ns)
+ProcSyms::Module::Module(const char *name, ProcMountNS *mount_ns,
+                         struct bcc_symbol_option *option)
     : name_(name),
       loaded_(false),
       mount_ns_(mount_ns),
+      symbol_option_(option),
       type_(ModuleType::UNKNOWN) {}
 
 bool ProcSyms::Module::init() {
@@ -295,7 +307,7 @@ void ProcSyms::Module::load_sym_table() {
   if (type_ == ModuleType::PERF_MAP)
     bcc_perf_map_foreach_sym(name_.c_str(), _add_symbol, this);
   if (type_ == ModuleType::EXEC || type_ == ModuleType::SO)
-    bcc_elf_foreach_sym(name_.c_str(), _add_symbol, this);
+    bcc_elf_foreach_sym(name_.c_str(), _add_symbol, symbol_option_, this);
 
   std::sort(syms_.begin(), syms_.end());
 }
@@ -371,10 +383,10 @@ bool ProcSyms::Module::find_addr(uint64_t offset, struct bcc_symbol *sym) {
 
 extern "C" {
 
-void *bcc_symcache_new(int pid) {
+void *bcc_symcache_new(int pid, struct bcc_symbol_option *option) {
   if (pid < 0)
     return static_cast<void *>(new KSyms());
-  return static_cast<void *>(new ProcSyms(pid));
+  return static_cast<void *>(new ProcSyms(pid, option));
 }
 
 void bcc_free_symcache(void *symcache, int pid) {
