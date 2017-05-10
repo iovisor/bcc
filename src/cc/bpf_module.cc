@@ -420,7 +420,9 @@ StatusTuple BPFModule::snprintf(string fn_name, char *str, size_t sz,
   int rc = fn(str, sz, val);
   if (rc < 0)
     return StatusTuple(rc, "error in snprintf: %s", std::strerror(errno));
-  return StatusTuple(rc);
+  if ((size_t)rc == sz)
+    return StatusTuple(-1, "buffer of size %zd too small", sz);
+  return StatusTuple(0);
 }
 
 void BPFModule::dump_ir(Module &mod) {
@@ -657,10 +659,6 @@ int BPFModule::table_key_printf(size_t id, char *buf, size_t buflen, const void 
     fprintf(stderr, "%s\n", rc.msg().c_str());
     return -1;
   }
-  if ((size_t)rc.code() == buflen) {
-    fprintf(stderr, "snprintf ran out of buffer space\n");
-    return -1;
-  }
   return 0;
 }
 
@@ -671,10 +669,6 @@ int BPFModule::table_leaf_printf(size_t id, char *buf, size_t buflen, const void
   StatusTuple rc = desc.leaf_snprintf(buf, buflen, leaf);
   if (rc.code() < 0) {
     fprintf(stderr, "%s\n", rc.msg().c_str());
-    return -1;
-  }
-  if ((size_t)rc.code() == buflen) {
-    fprintf(stderr, "snprintf ran out of buffer space\n");
     return -1;
   }
   return 0;
