@@ -116,16 +116,23 @@ BPFModule::BPFModule(unsigned flags, TableStorage *ts)
   }
 }
 
+static StatusTuple unimplemented_sscanf(const char *, void *) {
+  return StatusTuple(-1, "sscanf unimplemented");
+}
+static StatusTuple unimplemented_snprintf(char *, size_t, const void *) {
+  return StatusTuple(-1, "snprintf unimplemented");
+}
+
 BPFModule::~BPFModule() {
   engine_.reset();
   rw_engine_.reset();
   ctx_.reset();
 
   for (auto &v : tables_) {
-    v->key_sscanf = nullptr;
-    v->leaf_sscanf = nullptr;
-    v->key_snprintf = nullptr;
-    v->leaf_snprintf = nullptr;
+    v->key_sscanf = unimplemented_sscanf;
+    v->leaf_sscanf = unimplemented_sscanf;
+    v->key_snprintf = unimplemented_snprintf;
+    v->leaf_snprintf = unimplemented_snprintf;
   }
 
   ts_->DeletePrefix(Path({id_}));
@@ -189,7 +196,7 @@ static void parse_type(IRBuilder<> &B, vector<Value *> *args, string *fmt,
   }
 }
 
-Function * BPFModule::make_reader(Module *mod, Type *type) {
+string BPFModule::make_reader(Module *mod, Type *type) {
   auto fn_it = readers_.find(type);
   if (fn_it != readers_.end())
     return fn_it->second;
@@ -202,10 +209,11 @@ Function * BPFModule::make_reader(Module *mod, Type *type) {
 
   IRBuilder<> B(*ctx_);
 
+  string name = "reader" + std::to_string(readers_.size());
   vector<Type *> fn_args({B.getInt8PtrTy(), PointerType::getUnqual(type)});
   FunctionType *fn_type = FunctionType::get(B.getInt32Ty(), fn_args, /*isVarArg=*/false);
-  Function *fn = Function::Create(fn_type, GlobalValue::ExternalLinkage,
-                                  "reader" + std::to_string(readers_.size()), mod);
+  Function *fn =
+      Function::Create(fn_type, GlobalValue::ExternalLinkage, name, mod);
   auto arg_it = fn->arg_begin();
   Argument *arg_in = &*arg_it;
   ++arg_it;
@@ -251,11 +259,11 @@ Function * BPFModule::make_reader(Module *mod, Type *type) {
   B.SetInsertPoint(label_exit);
   B.CreateRet(B.getInt32(0));
 
-  readers_[type] = fn;
-  return fn;
+  readers_[type] = name;
+  return name;
 }
 
-Function * BPFModule::make_writer(Module *mod, Type *type) {
+string BPFModule::make_writer(Module *mod, Type *type) {
   auto fn_it = writers_.find(type);
   if (fn_it != writers_.end())
     return fn_it->second;
@@ -266,10 +274,11 @@ Function * BPFModule::make_writer(Module *mod, Type *type) {
 
   IRBuilder<> B(*ctx_);
 
+  string name = "writer" + std::to_string(writers_.size());
   vector<Type *> fn_args({B.getInt8PtrTy(), B.getInt64Ty(), PointerType::getUnqual(type)});
   FunctionType *fn_type = FunctionType::get(B.getInt32Ty(), fn_args, /*isVarArg=*/false);
-  Function *fn = Function::Create(fn_type, GlobalValue::ExternalLinkage,
-                                  "writer" + std::to_string(writers_.size()), mod);
+  Function *fn =
+      Function::Create(fn_type, GlobalValue::ExternalLinkage, name, mod);
   auto arg_it = fn->arg_begin();
   Argument *arg_out = &*arg_it;
   ++arg_it;
@@ -308,8 +317,8 @@ Function * BPFModule::make_writer(Module *mod, Type *type) {
 
   B.CreateRet(call);
 
-  writers_[type] = fn;
-  return fn;
+  writers_[type] = name;
+  return name;
 }
 
 unique_ptr<ExecutionEngine> BPFModule::finalize_rw(unique_ptr<Module> m) {
@@ -355,15 +364,6 @@ int BPFModule::annotate() {
   // separate module to hold the reader functions
   auto m = ebpf::make_unique<Module>("sscanf", *ctx_);
 
-  struct llvmfnpointers {
-    llvm::Function *key_sscanf;
-    llvm::Function *leaf_sscanf;
-    llvm::Function *key_snprintf;
-    llvm::Function *leaf_snprintf;
-  };
-
-  std::map<TableDesc *, llvmfnpointers> ptrs_map;
-
   size_t id = 0;
   Path path({id_});
   for (auto it = ts_->lower_bound(path), up = ts_->upper_bound(path); it != up; ++it) {
@@ -378,46 +378,49 @@ int BPFModule::annotate() {
         Type *key_type = st->elements()[0];
         Type *leaf_type = st->elements()[1];
 
-        llvmfnpointers fns;
-
-        fns.key_sscanf = make_reader(&*m, key_type);
-        if (!fns.key_sscanf)
-          errs() << "Failed to compile sscanf for " << *key_type << "\n";
-
-        fns.leaf_sscanf = make_reader(&*m, leaf_type);
-        if (!fns.leaf_sscanf)
-          errs() << "Failed to compile sscanf for " << *leaf_type << "\n";
-
-        fns.key_snprintf = make_writer(&*m, key_type);
-        if (!fns.key_snprintf)
-          errs() << "Failed to compile snprintf for " << *key_type << "\n";
-
-        fns.leaf_snprintf = make_writer(&*m, leaf_type);
-        if (!fns.leaf_snprintf)
-          errs() << "Failed to compile snprintf for " << *leaf_type << "\n";
-
-        ptrs_map[&it->second] = fns;
+        using std::placeholders::_1;
+        using std::placeholders::_2;
+        using std::placeholders::_3;
+        table.key_sscanf = std::bind(&BPFModule::sscanf, this,
+                                     make_reader(&*m, key_type), _1, _2);
+        table.leaf_sscanf = std::bind(&BPFModule::sscanf, this,
+                                      make_reader(&*m, leaf_type), _1, _2);
+        table.key_snprintf = std::bind(&BPFModule::snprintf, this,
+                                       make_writer(&*m, key_type), _1, _2, _3);
+        table.leaf_snprintf =
+            std::bind(&BPFModule::snprintf, this, make_writer(&*m, leaf_type),
+                      _1, _2, _3);
       }
     }
   }
 
   rw_engine_ = finalize_rw(move(m));
-  if (rw_engine_)
-    rw_engine_->finalizeObject();
-
-  for (auto &it : ptrs_map) {
-    auto t = it.first;
-    auto ptr = it.second;
-    t->key_sscanf = (sscanf_fn)rw_engine_->getPointerToFunction(ptr.key_sscanf);
-    t->leaf_sscanf =
-        (sscanf_fn)rw_engine_->getPointerToFunction(ptr.leaf_sscanf);
-    t->key_snprintf =
-        (snprintf_fn)rw_engine_->getPointerToFunction(ptr.key_snprintf);
-    t->leaf_snprintf =
-        (snprintf_fn)rw_engine_->getPointerToFunction(ptr.leaf_snprintf);
-  }
-
+  if (!rw_engine_)
+    return -1;
   return 0;
+}
+
+StatusTuple BPFModule::sscanf(string fn_name, const char *str, void *val) {
+  auto fn =
+      (int (*)(const char *, void *))rw_engine_->getFunctionAddress(fn_name);
+  if (!fn)
+    return StatusTuple(-1, "sscanf not available");
+  int rc = fn(str, val);
+  if (rc < 0)
+    return StatusTuple(rc, "error in sscanf: %s", std::strerror(errno));
+  return StatusTuple(rc);
+}
+
+StatusTuple BPFModule::snprintf(string fn_name, char *str, size_t sz,
+                                const void *val) {
+  auto fn = (int (*)(char *, size_t,
+                     const void *))rw_engine_->getFunctionAddress(fn_name);
+  if (!fn)
+    return StatusTuple(-1, "snprintf not available");
+  int rc = fn(str, sz, val);
+  if (rc < 0)
+    return StatusTuple(rc, "error in snprintf: %s", std::strerror(errno));
+  return StatusTuple(rc);
 }
 
 void BPFModule::dump_ir(Module &mod) {
@@ -649,16 +652,12 @@ int BPFModule::table_key_printf(size_t id, char *buf, size_t buflen, const void 
   if (id >= tables_.size())
     return -1;
   const TableDesc &desc = *tables_[id];
-  if (!desc.key_snprintf) {
-    fprintf(stderr, "Key snprintf not available\n");
+  StatusTuple rc = desc.key_snprintf(buf, buflen, key);
+  if (rc.code() < 0) {
+    fprintf(stderr, "%s\n", rc.msg().c_str());
     return -1;
   }
-  int rc = desc.key_snprintf(buf, buflen, key);
-  if (rc < 0) {
-    perror("snprintf");
-    return -1;
-  }
-  if ((size_t)rc >= buflen) {
+  if ((size_t)rc.code() == buflen) {
     fprintf(stderr, "snprintf ran out of buffer space\n");
     return -1;
   }
@@ -669,16 +668,12 @@ int BPFModule::table_leaf_printf(size_t id, char *buf, size_t buflen, const void
   if (id >= tables_.size())
     return -1;
   const TableDesc &desc = *tables_[id];
-  if (!desc.leaf_snprintf) {
-    fprintf(stderr, "Key snprintf not available\n");
+  StatusTuple rc = desc.leaf_snprintf(buf, buflen, leaf);
+  if (rc.code() < 0) {
+    fprintf(stderr, "%s\n", rc.msg().c_str());
     return -1;
   }
-  int rc = desc.leaf_snprintf(buf, buflen, leaf);
-  if (rc < 0) {
-    perror("snprintf");
-    return -1;
-  }
-  if ((size_t)rc >= buflen) {
+  if ((size_t)rc.code() == buflen) {
     fprintf(stderr, "snprintf ran out of buffer space\n");
     return -1;
   }
@@ -689,13 +684,9 @@ int BPFModule::table_key_scanf(size_t id, const char *key_str, void *key) {
   if (id >= tables_.size())
     return -1;
   const TableDesc &desc = *tables_[id];
-  if (!desc.key_sscanf) {
-    fprintf(stderr, "Key sscanf not available\n");
-    return -1;
-  }
-  int rc = desc.key_sscanf(key_str, key);
-  if (rc != 0) {
-    perror("sscanf");
+  StatusTuple rc = desc.key_sscanf(key_str, key);
+  if (rc.code() < 0) {
+    fprintf(stderr, "%s\n", rc.msg().c_str());
     return -1;
   }
   return 0;
@@ -705,13 +696,9 @@ int BPFModule::table_leaf_scanf(size_t id, const char *leaf_str, void *leaf) {
   if (id >= tables_.size())
     return -1;
   const TableDesc &desc = *tables_[id];
-  if (!desc.leaf_sscanf) {
-    fprintf(stderr, "Key sscanf not available\n");
-    return -1;
-  }
-  int rc = desc.leaf_sscanf(leaf_str, leaf);
-  if (rc != 0) {
-    perror("sscanf");
+  StatusTuple rc = desc.leaf_sscanf(leaf_str, leaf);
+  if (rc.code() < 0) {
+    fprintf(stderr, "%s\n", rc.msg().c_str());
     return -1;
   }
   return 0;

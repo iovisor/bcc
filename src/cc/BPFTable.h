@@ -39,41 +39,27 @@ class BPFTableBase {
   size_t capacity() { return desc.max_entries; }
 
   StatusTuple string_to_key(const std::string& key_str, KeyType* key) {
-    if (!desc.key_sscanf)
-      return StatusTuple(-1, "Key sscanf not available");
-    if (desc.key_sscanf(key_str.c_str(), key) != 0)
-      return StatusTuple(-1, "Error on key_sscanff: %s", std::strerror(errno));
-    return StatusTuple(0);
+    return desc.key_sscanf(key_str.c_str(), key);
   }
 
   StatusTuple string_to_leaf(const std::string& value_str, ValueType* value) {
-    if (!desc.leaf_sscanf)
-      return StatusTuple(-1, "Leaf sscanf not available");
-    if (desc.leaf_sscanf(value_str.c_str(), value) != 0)
-      return StatusTuple(-1, "Error on leaf_sscanff: %s", std::strerror(errno));
-    return StatusTuple(0);
+    return desc.leaf_sscanf(value_str.c_str(), value);
   }
 
   StatusTuple key_to_string(const KeyType* key, std::string& key_str) {
     char buf[8 * desc.key_size];
-    if (!desc.key_snprintf)
-      return StatusTuple(-1, "Key snprintf not available");
-    if (desc.key_snprintf(buf, sizeof(buf), key) < 0)
-      return StatusTuple(-1, "Error on key_sprintf: %s", std::strerror(errno));
-
-    key_str.assign(buf);
-    return StatusTuple(0);
+    StatusTuple rc = desc.key_snprintf(buf, sizeof(buf), key);
+    if (!rc.code())
+      key_str.assign(buf);
+    return rc;
   }
 
   StatusTuple leaf_to_string(const ValueType* value, std::string& value_str) {
     char buf[8 * desc.leaf_size];
-    if (!desc.leaf_snprintf)
-      return StatusTuple(-1, "Leaf snprintf not available");
-    if (desc.leaf_snprintf(buf, sizeof(buf), value) < 0)
-      return StatusTuple(-1, "Error on leaf_sprintf: %s", std::strerror(errno));
-
-    value_str.assign(buf);
-    return StatusTuple(0);
+    StatusTuple rc = desc.leaf_snprintf(buf, sizeof(buf), value);
+    if (!rc.code())
+      value_str.assign(buf);
+    return rc;
   }
 
  protected:
