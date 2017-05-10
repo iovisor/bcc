@@ -16,11 +16,12 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
         - [6. USDT probes](#6-usdt-probes)
     - [Data](#data)
         - [1. bpf_probe_read()](#1-bpf_probe_read)
-        - [2. bpf_ktime_get_ns()](#2-bpf_ktime_get_ns)
-        - [3. bpf_get_current_pid_tgid()](#3-bpf_get_current_pid_tgid)
-        - [4. bpf_get_current_uid_gid()](#4-bpf_get_current_uid_gid)
-        - [5. bpf_get_current_comm()](#5-bpf_get_current_comm)
-        - [6. bpf_log2l()](#6-bpflog2l)
+        - [2. bpf_probe_read_str()](#2-bpf_probe_read_str)
+        - [3. bpf_ktime_get_ns()](#3-bpf_ktime_get_ns)
+        - [4. bpf_get_current_pid_tgid()](#4-bpf_get_current_pid_tgid)
+        - [5. bpf_get_current_uid_gid()](#5-bpf_get_current_uid_gid)
+        - [6. bpf_get_current_comm()](#6-bpf_get_current_comm)
+        - [7. bpf_log2l()](#7-bpflog2l)
     - [Output](#output)
         - [1. bpf_trace_printk()](#1-bpf_trace_printk)
         - [2. BPF_PERF_OUTPUT](#2-bpf_perf_output)
@@ -239,7 +240,21 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=bpf_probe_read+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=bpf_probe_read+path%3Atools&type=Code)
 
-### 2. bpf_ktime_get_ns()
+### 2. bpf_probe_read_str()
+
+Syntax: ```int bpf_probe_read_str(void *dst, int size, void *src)```
+
+Return:
+  - \> 0 length of the string including the trailing NUL on success
+  - \< 0 error
+
+This copies a `NULL` terminated string from memory location to BPF stack, so that BPF can later operate on it. In case the string length is smaller than size, the target is not padded with further `NULL` bytes. In case the string length is larger than size, just `size - 1` bytes are copied and the last byte is set to `NULL`.
+
+Examples in situ:
+[search /examples](https://github.com/iovisor/bcc/search?q=bpf_probe_read_str+path%3Aexamples&type=Code),
+[search /tools](https://github.com/iovisor/bcc/search?q=bpf_probe_read_str+path%3Atools&type=Code)
+
+### 3. bpf_ktime_get_ns()
 
 Syntax: ```u64 bpf_ktime_get_ns(void)```
 
@@ -249,7 +264,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=bpf_ktime_get_ns+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=bpf_ktime_get_ns+path%3Atools&type=Code)
 
-### 3. bpf_get_current_pid_tgid()
+### 4. bpf_get_current_pid_tgid()
 
 Syntax: ```u64 bpf_get_current_pid_tgid(void)```
 
@@ -261,7 +276,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=bpf_get_current_pid_tgid+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=bpf_get_current_pid_tgid+path%3Atools&type=Code)
 
-### 4. bpf_get_current_uid_gid()
+### 5. bpf_get_current_uid_gid()
 
 Syntax: ```u64 bpf_get_current_uid_gid(void)```
 
@@ -273,7 +288,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=bpf_get_current_uid_gid+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=bpf_get_current_uid_gid+path%3Atools&type=Code)
 
-### 5. bpf_get_current_comm()
+### 6. bpf_get_current_comm()
 
 Syntax: ```bpf_get_current_comm(char *buf, int size_of_buf)```
 
@@ -294,7 +309,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=bpf_get_current_comm+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=bpf_get_current_comm+path%3Atools&type=Code)
 
-### 6. bpf_log2l()
+### 7. bpf_log2l()
 
 Syntax: ```unsigned int bpf_log2l(unsigned long v)```
 
