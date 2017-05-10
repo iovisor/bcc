@@ -18,14 +18,12 @@
 
 #include <unistd.h>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <string>
 
+#include "bcc_exception.h"
 #include "common.h"
-
-namespace llvm {
-class Function;
-}
 
 namespace clang {
 class ASTContext;
@@ -34,8 +32,8 @@ class QualType;
 
 namespace ebpf {
 
-typedef int (*sscanf_fn)(const char *, void *);
-typedef int (*snprintf_fn)(char *, size_t, const void *);
+typedef std::function<StatusTuple(const char *, void *)> sscanf_fn;
+typedef std::function<StatusTuple(char *, size_t, const void *)> snprintf_fn;
 
 /// TableDesc uniquely stores all of the runtime state for an active bpf table.
 /// The copy constructor/assign operator are disabled since the file handles
@@ -68,10 +66,6 @@ class TableDesc {
         leaf_size(0),
         max_entries(0),
         flags(0),
-        key_sscanf(nullptr),
-        leaf_sscanf(nullptr),
-        key_snprintf(nullptr),
-        leaf_snprintf(nullptr),
         is_shared(false),
         is_extern(false) {}
   TableDesc(const std::string &name, FileDesc &&fd, int type, size_t key_size,
@@ -83,10 +77,6 @@ class TableDesc {
         leaf_size(leaf_size),
         max_entries(max_entries),
         flags(flags),
-        key_sscanf(nullptr),
-        leaf_sscanf(nullptr),
-        key_snprintf(nullptr),
-        leaf_snprintf(nullptr),
         is_shared(false),
         is_extern(false) {}
   TableDesc(TableDesc &&that) = default;

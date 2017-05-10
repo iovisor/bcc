@@ -22,6 +22,8 @@
 #include <string>
 #include <vector>
 
+#include "bcc_exception.h"
+
 namespace llvm {
 class ExecutionEngine;
 class Function;
@@ -44,14 +46,18 @@ class BPFModule {
   int finalize();
   int annotate();
   std::unique_ptr<llvm::ExecutionEngine> finalize_rw(std::unique_ptr<llvm::Module> mod);
-  llvm::Function * make_reader(llvm::Module *mod, llvm::Type *type);
-  llvm::Function * make_writer(llvm::Module *mod, llvm::Type *type);
+  std::string make_reader(llvm::Module *mod, llvm::Type *type);
+  std::string make_writer(llvm::Module *mod, llvm::Type *type);
   void dump_ir(llvm::Module &mod);
   int load_file_module(std::unique_ptr<llvm::Module> *mod, const std::string &file, bool in_memory);
   int load_includes(const std::string &text);
   int load_cfile(const std::string &file, bool in_memory, const char *cflags[], int ncflags);
   int kbuild_flags(const char *uname_release, std::vector<std::string> *cflags);
   int run_pass_manager(llvm::Module &mod);
+  StatusTuple sscanf(std::string fn_name, const char *str, void *val);
+  StatusTuple snprintf(std::string fn_name, char *str, size_t sz,
+                       const void *val);
+
  public:
   BPFModule(unsigned flags, TableStorage *ts = nullptr);
   ~BPFModule();
@@ -106,8 +112,8 @@ class BPFModule {
   std::vector<TableDesc *> tables_;
   std::map<std::string, size_t> table_names_;
   std::vector<std::string> function_names_;
-  std::map<llvm::Type *, llvm::Function *> readers_;
-  std::map<llvm::Type *, llvm::Function *> writers_;
+  std::map<llvm::Type *, std::string> readers_;
+  std::map<llvm::Type *, std::string> writers_;
   std::string id_;
   TableStorage *ts_;
   std::unique_ptr<TableStorage> local_ts_;
