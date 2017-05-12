@@ -201,9 +201,10 @@ bool ProcSyms::resolve_addr(uint64_t addr, struct bcc_symbol *sym,
   sym->offset = 0x0;
 
   const char *original_module = nullptr;
+  uint64_t offset;
   for (Module &mod : modules_) {
-    if (mod.contains(addr)) {
-      bool res = mod.find_addr(addr, sym);
+    if (mod.contains(addr, offset)) {
+      bool res = mod.find_addr(offset, sym);
       if (demangle) {
         if (sym->name)
           sym->demangle_name =
@@ -295,11 +296,12 @@ void ProcSyms::Module::load_sym_table() {
   std::sort(syms_.begin(), syms_.end());
 }
 
-bool ProcSyms::Module::contains(uint64_t addr) const {
-  for (const auto &range : ranges_) {
-    if (addr >= range.start && addr < range.end)
+bool ProcSyms::Module::contains(uint64_t addr, uint64_t &offset) const {
+  for (const auto &range : ranges_)
+    if (addr >= range.start && addr < range.end) {
+      offset = type_ == ModuleType::SO ? addr - range.start : addr;
       return true;
-  }
+    }
   return false;
 }
 
@@ -315,9 +317,7 @@ bool ProcSyms::Module::find_name(const char *symname, uint64_t *addr) {
   return false;
 }
 
-bool ProcSyms::Module::find_addr(uint64_t addr, struct bcc_symbol *sym) {
-  uint64_t offset = type_ == ModuleType::SO ? (addr - start()) : addr;
-
+bool ProcSyms::Module::find_addr(uint64_t offset, struct bcc_symbol *sym) {
   load_sym_table();
 
   sym->module = name_.c_str();
