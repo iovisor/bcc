@@ -192,7 +192,7 @@ static int (*bpf_skb_get_tunnel_key)(void *ctx, void *to, u32 size, u64 flags) =
   (void *) BPF_FUNC_skb_get_tunnel_key;
 static int (*bpf_skb_set_tunnel_key)(void *ctx, void *from, u32 size, u64 flags) =
   (void *) BPF_FUNC_skb_set_tunnel_key;
-static int (*bpf_perf_event_read)(void *map, u32 index) =
+static u64 (*bpf_perf_event_read)(void *map, u64 flags) =
   (void *) BPF_FUNC_perf_event_read;
 static int (*bpf_redirect)(int ifindex, u32 flags) =
   (void *) BPF_FUNC_redirect;
