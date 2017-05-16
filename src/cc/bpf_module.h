@@ -97,6 +97,7 @@ class BPFModule {
   char * license() const;
   unsigned kern_version() const;
   TableStorage &table_storage() { return *ts_; }
+  void free_compiler_resource(int do_trim);
 
  private:
   unsigned flags_;  // 0x1 for printing
