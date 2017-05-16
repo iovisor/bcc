@@ -245,25 +245,15 @@ class TableBase(MutableMapping):
             self[k] = self.Leaf()
 
     def __iter__(self):
-        return TableBase.Iter(self, self.Key)
+        return TableBase.Iter(self)
 
     def iter(self): return self.__iter__()
     def keys(self): return self.__iter__()
 
     class Iter(object):
-        def __init__(self, table, keytype):
-            self.Key = keytype
+        def __init__(self, table):
             self.table = table
-            k = self.Key()
-            kp = ct.pointer(k)
-            # if 0 is a valid key, try a few alternatives
-            if k in table:
-                ct.memset(kp, 0xff, ct.sizeof(k))
-                if k in table:
-                    ct.memset(kp, 0x55, ct.sizeof(k))
-                    if k in table:
-                        raise Exception("Unable to allocate iterator")
-            self.key = k
+            self.key = None
         def __iter__(self):
             return self
         def __next__(self):
@@ -275,10 +265,17 @@ class TableBase(MutableMapping):
     def next(self, key):
         next_key = self.Key()
         next_key_p = ct.pointer(next_key)
-        key_p = ct.pointer(key)
-        res = lib.bpf_get_next_key(self.map_fd,
-                ct.cast(key_p, ct.c_void_p),
-                ct.cast(next_key_p, ct.c_void_p))
+
+        if key is None:
+            res = lib.bpf_get_first_key(self.map_fd,
+                    ct.cast(next_key_p, ct.c_void_p),
+                    ct.sizeof(self.Key))
+        else:
+            key_p = ct.pointer(key)
+            res = lib.bpf_get_next_key(self.map_fd,
+                    ct.cast(key_p, ct.c_void_p),
+                    ct.cast(next_key_p, ct.c_void_p))
+
         if res < 0:
             raise StopIteration()
         return next_key
