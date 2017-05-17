@@ -214,11 +214,40 @@ static void parse_type(IRBuilder<> &B, vector<Value *> *args, string *fmt,
         *fmt += "\"%s\"";
         args->push_back(out);
       } else {
-        // Scan a single "" enclosed string. Passing multiple %[^"] arguments
-        // doesn't work because scanf stops parsing the string when an empty
-        // string is encountered, so here we individually call scanf and mask
-        // the empty string case. A scan failure (e.g. no enclosing "") should
-        // still return an error.
+        // When reading strings, scanf doesn't support empty "", so we need to
+        // break this up into multiple scanf calls. To understand it, let's take
+        // an example:
+        // struct Event {
+        //   u32 a;
+        //   struct {
+        //     char x[64];
+        //     int y;
+        //   } b[2];
+        //   u32 c;
+        // };
+        // The writer string would look like:
+        //  "{ 0x%x [ { \"%s\" 0x%x } { \"%s\" 0x%x } ] 0x%x }"
+        // But the reader string needs to restart at each \"\".
+        //  reader0(const char *s, struct Event *val) {
+        //    int nread, rc;
+        //    nread = 0;
+        //    rc = sscanf(s, "{ %i [ { \"%n", &val->a, &nread);
+        //    if (rc != 1) return -1;
+        //    s += nread; nread = 0;
+        //    rc = sscanf(s, "%[^\"]%n", &val->b[0].x, &nread);
+        //    if (rc < 0) return -1;
+        //    s += nread; nread = 0;
+        //    rc = sscanf(s, "\" %i } { \"%n", &val->b[0].y, &nread);
+        //    if (rc != 1) return -1;
+        //    s += nread; nread = 0;
+        //    rc = sscanf(s, "%[^\"]%n", &val->b[1].x, &nread);
+        //    if (rc < 0) return -1;
+        //    s += nread; nread = 0;
+        //    rc = sscanf(s, "\" %i } ] %i }%n", &val->b[1].y, &val->c, &nread);
+        //    if (rc != 2) return -1;
+        //    s += nread; nread = 0;
+        //    return 0;
+        //  }
         *fmt += "\"";
         finish_sscanf(B, args, fmt, locals, true);
 
@@ -226,7 +255,7 @@ static void parse_type(IRBuilder<> &B, vector<Value *> *args, string *fmt,
         args->push_back(out);
         finish_sscanf(B, args, fmt, locals, false);
 
-        *fmt += "\"";
+        *fmt = "\"";
       }
     } else {
       *fmt += "[ ";
@@ -262,6 +291,21 @@ static void parse_type(IRBuilder<> &B, vector<Value *> *args, string *fmt,
   }
 }
 
+// make_reader generates a dynamic function in the instruction set of the host
+// (not bpf) that is able to convert c-strings in the pretty-print format of
+// make_writer back into binary representations. The encoding of the string
+// takes the llvm ir structure format, which closely maps the c structure but
+// not exactly (no support for unions for instance).
+// The general algorithm is:
+//  pod types (u8..u64)                <= %i
+//  array types
+//   u8[]  no nested quotes :(         <= "..."
+//   !u8[]                             <= [ %i %i ... ]
+//  struct types
+//   struct { u8 a; u64 b; }           <= { %i %i }
+//  nesting is supported
+//   struct { struct { u8 a[]; }; }    <= { "" }
+//   struct { struct { u64 a[]; }; }   <= { [ %i %i .. ] }
 string BPFModule::make_reader(Module *mod, Type *type) {
   auto fn_it = readers_.find(type);
   if (fn_it != readers_.end())
@@ -320,6 +364,20 @@ string BPFModule::make_reader(Module *mod, Type *type) {
   return name;
 }
 
+// make_writer generates a dynamic function in the instruction set of the host
+// (not bpf) that is able to pretty-print key/leaf entries as a c-string. The
+// encoding of the string takes the llvm ir structure format, which closely maps
+// the c structure but not exactly (no support for unions for instance).
+// The general algorithm is:
+//  pod types (u8..u64)                => 0x%x
+//  array types
+//   u8[]                              => "..."
+//   !u8[]                             => [ 0x%x 0x%x ... ]
+//  struct types
+//   struct { u8 a; u64 b; }           => { 0x%x 0x%x }
+//  nesting is supported
+//   struct { struct { u8 a[]; }; }    => { "" }
+//   struct { struct { u64 a[]; }; }   => { [ 0x%x 0x%x .. ] }
 string BPFModule::make_writer(Module *mod, Type *type) {
   auto fn_it = writers_.find(type);
   if (fn_it != writers_.end())
