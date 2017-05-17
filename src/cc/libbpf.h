@@ -75,7 +75,7 @@ void * bpf_open_perf_buffer(perf_reader_raw_cb raw_cb,
                             int pid, int cpu, int page_cnt);
 
 /* attached a prog expressed by progfd to the device specified in dev_name */
-int bpf_attach_xdp(const char *dev_name, int progfd);
+int bpf_attach_xdp(const char *dev_name, int progfd, uint32_t flags);
 
 // attach a prog expressed by progfd to run on a specific perf event, with
 // certain sample period or sample frequency
