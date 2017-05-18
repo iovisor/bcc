@@ -27,7 +27,7 @@ class EbpfCounter(object):
 
         self.dataMapName = self.name
 
-        if ((hlircounter.binding is None) or 
+        if ((hlircounter.binding is None) or
             (hlircounter.binding[0] != P4_DIRECT)):
             raise NotSupportedException(
                 "{0}: counter which is not direct", hlircounter)

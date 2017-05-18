@@ -13,7 +13,7 @@ class EbpfTypeFactory(object):
         name = hlirType.name
         if hlirType.name in self.type_map:
             retval = self.type_map[name]
-            if ((not asMetadata and isinstance(retval, EbpfMetadataType)) or 
+            if ((not asMetadata and isinstance(retval, EbpfMetadataType)) or
                 (asMetadata and isinstance(retval, EbpfHeaderType))):
                 raise CompilationException(
                     True, "Same type used both as a header and metadata {0}",

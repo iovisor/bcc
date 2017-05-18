@@ -225,10 +225,10 @@ class EbpfAction(EbpfActionBase):
                                         dst.asString,
                                         src.asString,
                                         size / 8)
-        elif (callee.name == "add" or 
-             callee.name == "bit_and" or 
-             callee.name == "bit_or" or 
-             callee.name == "bit_xor" or 
+        elif (callee.name == "add" or
+             callee.name == "bit_and" or
+             callee.name == "bit_or" or
+             callee.name == "bit_xor" or
              callee.name == "subtract"):
             size = self.checkSize(callee,
                                   [a.widthInBits() for a in args],
@@ -247,7 +247,7 @@ class EbpfAction(EbpfActionBase):
                                     args[1].asString,
                                     op,
                                     args[2].asString)
-        elif (callee.name == "add_to_field" or 
+        elif (callee.name == "add_to_field" or
               callee.name == "subtract_from_field"):
             size = self.checkSize(callee,
                                   [a.widthInBits() for a in args],

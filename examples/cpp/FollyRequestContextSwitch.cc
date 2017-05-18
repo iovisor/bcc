@@ -35,7 +35,7 @@ int on_context_switch(struct pt_regs *ctx) {
 
   event.pid = bpf_get_current_pid_tgid();
   bpf_get_current_comm(&event.name, sizeof(event.name));
-  
+
   bpf_usdt_readarg(1, ctx, &event.old_addr);
   bpf_usdt_readarg(2, ctx, &event.new_addr);
 

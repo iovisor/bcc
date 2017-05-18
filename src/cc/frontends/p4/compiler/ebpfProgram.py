@@ -19,7 +19,7 @@ from compilationException import *
 
 class EbpfProgram(object):
     def __init__(self, name, hlir, isRouter, config):
-        """Representation of an EbpfProgram (in fact, 
+        """Representation of an EbpfProgram (in fact,
         a C program that is converted to EBPF)"""
         assert isinstance(hlir, HLIR)
         assert isinstance(isRouter, bool)

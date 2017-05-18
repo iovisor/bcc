@@ -227,7 +227,7 @@ ffi.metatype('struct Elf_object', {
 										end
 										-- Match symbol name against pattern
 										if pattern and string.match(name, k) or k == name then
-											return sym[0]	
+											return sym[0]
 										end
 									end
 								end

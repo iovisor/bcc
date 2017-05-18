@@ -10,7 +10,7 @@
 #
 # Copyright (c) PLUMgrid, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
-# 
+#
 # Example output:
 # $ sudo ./strlen_hist.py
 # 22:12:52

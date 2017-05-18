@@ -50,7 +50,7 @@ typedef void (*perf_reader_cb)(void *cb_cookie, int pid, uint64_t callchain_num,
 typedef void (*perf_reader_raw_cb)(void *cb_cookie, void *raw, int raw_size);
 typedef void (*perf_reader_lost_cb)(uint64_t lost);
 
-void * bpf_attach_kprobe(int progfd, enum bpf_probe_attach_type attach_type, 
+void * bpf_attach_kprobe(int progfd, enum bpf_probe_attach_type attach_type,
                         const char *ev_name, const char *fn_name,
                         pid_t pid, int cpu, int group_fd,
                         perf_reader_cb cb, void *cb_cookie);

@@ -34,7 +34,7 @@ local prog = bpf.socket('lo', function (skb)
 	-- Fetch 4 bytes of TCP data and compare
 	local h = data(0, 4)
 	if h == 'HTTP' or h == 'GET ' or
-	   h == 'POST' or h == 'PUT ' or 
+	   h == 'POST' or h == 'PUT ' or
 	   h == 'HEAD' or h == 'DELE' then
 	   	-- If hash key doesn't exist, create it
 	   	-- otherwise increment counter
