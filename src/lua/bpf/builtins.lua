@@ -205,7 +205,7 @@ builtins[ffi.copy] = function (e, ret, dst, src)
 		-- TODO: identify cheap register move
 		-- TODO: identify copy to/from stack
 		error('NYI: ffi.copy(dst, src) - src is neither BPF map/socket buffer or probe')
-	end	
+	end
 end
 -- print(format, ...) builtin changes semantics from Lua print(...)
 -- the first parameter has to be format and only reduced set of conversion specificers

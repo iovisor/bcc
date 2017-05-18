@@ -346,7 +346,7 @@ static int bpf_attach_tracing_event(int progfd, const char *event_path,
 void * bpf_attach_kprobe(int progfd, enum bpf_probe_attach_type attach_type, const char *ev_name,
                         const char *fn_name,
                         pid_t pid, int cpu, int group_fd,
-                        perf_reader_cb cb, void *cb_cookie) 
+                        perf_reader_cb cb, void *cb_cookie)
 {
   int kfd;
   char buf[256];
@@ -367,7 +367,7 @@ void * bpf_attach_kprobe(int progfd, enum bpf_probe_attach_type attach_type, con
     goto error;
   }
 
-  snprintf(buf, sizeof(buf), "%c:%ss/%s %s", attach_type==BPF_PROBE_ENTRY ? 'p' : 'r', 
+  snprintf(buf, sizeof(buf), "%c:%ss/%s %s", attach_type==BPF_PROBE_ENTRY ? 'p' : 'r',
 			event_type, new_name, fn_name);
   if (write(kfd, buf, strlen(buf)) < 0) {
     if (errno == EINVAL)
@@ -380,10 +380,10 @@ void * bpf_attach_kprobe(int progfd, enum bpf_probe_attach_type attach_type, con
   if (access("/sys/kernel/debug/tracing/instances", F_OK) != -1) {
     snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/instances/bcc_%d", getpid());
     if (access(buf, F_OK) == -1) {
-      if (mkdir(buf, 0755) == -1) 
+      if (mkdir(buf, 0755) == -1)
         goto retry;
     }
-    n = snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/instances/bcc_%d/events/%ss/%s", 
+    n = snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/instances/bcc_%d/events/%ss/%s",
              getpid(), event_type, new_name);
     if (n < sizeof(buf) && bpf_attach_tracing_event(progfd, buf, reader, pid, cpu, group_fd) == 0)
 	  goto out;
@@ -406,7 +406,7 @@ error:
 void * bpf_attach_uprobe(int progfd, enum bpf_probe_attach_type attach_type, const char *ev_name,
                         const char *binary_path, uint64_t offset,
                         pid_t pid, int cpu, int group_fd,
-                        perf_reader_cb cb, void *cb_cookie) 
+                        perf_reader_cb cb, void *cb_cookie)
 {
   int kfd;
   char buf[PATH_MAX];
@@ -428,7 +428,7 @@ void * bpf_attach_uprobe(int progfd, enum bpf_probe_attach_type attach_type, con
     goto error;
   }
 
-  n = snprintf(buf, sizeof(buf), "%c:%ss/%s %s:0x%lx", attach_type==BPF_PROBE_ENTRY ? 'p' : 'r', 
+  n = snprintf(buf, sizeof(buf), "%c:%ss/%s %s:0x%lx", attach_type==BPF_PROBE_ENTRY ? 'p' : 'r',
 			event_type, new_name, binary_path, offset);
   if (n >= sizeof(buf)) {
     close(kfd);

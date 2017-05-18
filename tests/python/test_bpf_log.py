@@ -27,7 +27,7 @@ repeat = """
 end = """
            y = t1.lookup(&x);
            x = *y;
-           return 0; 
+           return 0;
         }
       """
 for i in range(0,300):
@@ -42,7 +42,7 @@ class TestBPFProgLoad(TestCase):
 
     def tearDown(self):
         self.fp.close()
-        
+
 
     def test_log_debug(self):
         b = BPF(text=text, debug=2)

@@ -130,7 +130,7 @@ static int br_common(struct __sk_buff *skb, int which_br) {
                  index = 0;
                  if (which_br == 1)
                      rtrif_p = br1_rtr.lookup(&index);
-                 else 
+                 else
                      rtrif_p = br2_rtr.lookup(&index);
                  if (rtrif_p)
                      bpf_clone_redirect(skb, *rtrif_p, 0);
