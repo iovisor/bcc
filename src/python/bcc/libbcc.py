@@ -69,6 +69,8 @@ lib.bpf_table_leaf_sscanf.argtypes = [ct.c_void_p, ct.c_ulonglong,
 # keep in sync with libbpf.h
 lib.bpf_get_next_key.restype = ct.c_int
 lib.bpf_get_next_key.argtypes = [ct.c_int, ct.c_void_p, ct.c_void_p]
+lib.bpf_get_first_key.restype = ct.c_int
+lib.bpf_get_first_key.argtypes = [ct.c_int, ct.c_void_p, ct.c_uint]
 lib.bpf_lookup_elem.restype = ct.c_int
 lib.bpf_lookup_elem.argtypes = [ct.c_int, ct.c_void_p, ct.c_void_p]
 lib.bpf_update_elem.restype = ct.c_int

@@ -133,6 +133,44 @@ int bpf_delete_elem(int fd, void *key)
   return syscall(__NR_bpf, BPF_MAP_DELETE_ELEM, &attr, sizeof(attr));
 }
 
+int bpf_get_first_key(int fd, void *key, size_t key_size)
+{
+  union bpf_attr attr;
+  int i, res;
+
+  memset(&attr, 0, sizeof(attr));
+  attr.map_fd = fd;
+  attr.key = 0;
+  attr.next_key = ptr_to_u64(key);
+
+  // 4.12 and above kernel supports passing NULL to BPF_MAP_GET_NEXT_KEY
+  // to get first key of the map. For older kernels, the call will fail.
+  res = syscall(__NR_bpf, BPF_MAP_GET_NEXT_KEY, &attr, sizeof(attr));
+  if (res < 0 && errno == EFAULT) {
+    // Fall back to try to find a non-existing key.
+    static unsigned char try_values[3] = {0, 0xff, 0x55};
+    attr.key = ptr_to_u64(key);
+    for (i = 0; i < 3; i++) {
+      memset(key, try_values[i], key_size);
+      // We want to check the existence of the key but we don't know the size
+      // of map's value. So we pass an invalid pointer for value, expect
+      // the call to fail and check if the error is ENOENT indicating the
+      // key doesn't exist. If we use NULL for the invalid pointer, it might
+      // trigger a page fault in kernel and affect performence. Hence we use
+      // ~0 which will fail and return fast.
+      // This should fail since we pass an invalid pointer for value.
+      if (bpf_lookup_elem(fd, key, ~0) >= 0)
+        return -1;
+      // This means the key doesn't exist.
+      if (errno == ENOENT)
+        return syscall(__NR_bpf, BPF_MAP_GET_NEXT_KEY, &attr, sizeof(attr));
+    }
+    return -1;
+  } else {
+    return res;
+  }
+}
+
 int bpf_get_next_key(int fd, void *key, void *next_key)
 {
   union bpf_attr attr;

@@ -71,4 +71,17 @@ TEST_CASE("test hash table", "[hash_table]") {
     res = t.get_value(k, v2);
     REQUIRE(res.code() != 0);
   }
+
+  SECTION("walk table") {
+    for (int i = 1; i <= 10; i++) {
+      res = t.update_value(i * 3, i);
+      REQUIRE(res.code() == 0);
+    }
+    auto offline = t.get_table_offline();
+    REQUIRE(offline.size() == 10);
+    for (const auto &pair : offline) {
+      REQUIRE(pair.first % 3 == 0);
+      REQUIRE(pair.first / 3 == pair.second);
+    }
+  }
 }

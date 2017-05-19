@@ -70,6 +70,11 @@ class BPFTableBase {
                            static_cast<void*>(value)) >= 0;
   }
 
+  bool first(KeyType* key) {
+    return bpf_get_first_key(desc.fd, static_cast<void*>(key),
+                             desc.key_size) >= 0;
+  }
+
   bool next(KeyType* key, KeyType* next_key) {
     return bpf_get_next_key(desc.fd, static_cast<void*>(key),
                             static_cast<void*>(next_key)) >= 0;
@@ -174,17 +179,18 @@ class BPFHashTable : public BPFTableBase<KeyType, ValueType> {
 
   std::vector<std::pair<KeyType, ValueType>> get_table_offline() {
     std::vector<std::pair<KeyType, ValueType>> res;
-
-    KeyType cur, nxt;
+    KeyType cur;
     ValueType value;
 
+    if (!this->first(&cur))
+      return res;
+
     while (true) {
-      if (!this->next(&cur, &nxt))
+      if (!this->lookup(&cur, &value))
         break;
-      if (!this->lookup(&nxt, &value))
+      res.emplace_back(cur, value);
+      if (!this->next(&cur, &cur))
         break;
-      res.emplace_back(nxt, value);
-      std::swap(cur, nxt);
     }
 
     return res;
