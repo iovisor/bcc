@@ -35,14 +35,21 @@ std::string Argument::ctype() const {
 bool Argument::get_global_address(uint64_t *address, const std::string &binpath,
                                   const optional<int> &pid) const {
   if (pid) {
-    return ProcSyms(*pid)
+    static struct bcc_symbol_option default_option = {
+      .use_debug_file = 1,
+      .check_debug_file_crc = 1,
+      .use_symbol_type = BCC_SYM_ALL_TYPES
+    };
+    return ProcSyms(*pid, &default_option)
         .resolve_name(binpath.c_str(), deref_ident_->c_str(), address);
   }
 
   if (!bcc_elf_is_shared_obj(binpath.c_str())) {
-    struct bcc_symbol sym = {deref_ident_->c_str(), binpath.c_str(), 0x0};
-    if (!bcc_find_symbol_addr(&sym) && sym.offset) {
+    struct bcc_symbol sym;
+    if (bcc_resolve_symname(binpath.c_str(), deref_ident_->c_str(), 0x0, -1, nullptr, &sym) == 0) {
       *address = sym.offset;
+      if (sym.module)
+        ::free(const_cast<char*>(sym.module));
       return true;
     }
   }

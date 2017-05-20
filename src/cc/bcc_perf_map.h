@@ -24,8 +24,8 @@ extern "C" {
 #include <stdbool.h>
 #include <unistd.h>
 
-typedef int (*bcc_perf_map_symcb)(const char *, uint64_t, uint64_t, int,
-                                  void *);
+// Symbol name, start address, length, payload
+typedef int (*bcc_perf_map_symcb)(const char *, uint64_t, uint64_t, void *);
 
 bool bcc_is_perf_map(const char *path);
 

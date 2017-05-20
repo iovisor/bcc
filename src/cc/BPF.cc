@@ -469,8 +469,9 @@ StatusTuple BPF::unload_func(const std::string& func_name) {
 StatusTuple BPF::check_binary_symbol(const std::string& binary_path,
                                      const std::string& symbol,
                                      uint64_t symbol_addr, bcc_symbol* output) {
+  // TODO: Fix output.module memory leak here
   int res = bcc_resolve_symname(binary_path.c_str(), symbol.c_str(),
-                                symbol_addr, 0, output);
+                                symbol_addr, 0, nullptr, output);
   if (res < 0)
     return StatusTuple(
         -1, "Unable to find offset for binary %s symbol %s address %lx",

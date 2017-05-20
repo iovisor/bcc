@@ -109,7 +109,7 @@ int bcc_perf_map_foreach_sym(const char *path, bcc_perf_map_symcb callback,
     if (newline)
         newline[0] = '\0';
 
-    callback(cursor, begin, len, 0, payload);
+    callback(cursor, begin, len, payload);
   }
 
   free(line);

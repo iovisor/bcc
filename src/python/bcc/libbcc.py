@@ -133,6 +133,13 @@ class bcc_symbol(ct.Structure):
             ('offset', ct.c_ulonglong),
         ]
 
+class bcc_symbol_option(ct.Structure):
+    _fields_ = [
+            ('use_debug_file', ct.c_int),
+            ('check_debug_file_crc', ct.c_int),
+            ('use_symbol_type', ct.c_uint),
+        ]
+
 lib.bcc_procutils_which_so.restype = ct.POINTER(ct.c_char)
 lib.bcc_procutils_which_so.argtypes = [ct.c_char_p, ct.c_int]
 lib.bcc_procutils_free.restype = None
@@ -142,14 +149,14 @@ lib.bcc_procutils_language.argtypes = [ct.c_int]
 
 lib.bcc_resolve_symname.restype = ct.c_int
 lib.bcc_resolve_symname.argtypes = [
-    ct.c_char_p, ct.c_char_p, ct.c_ulonglong, ct.c_int, ct.POINTER(bcc_symbol)]
+    ct.c_char_p, ct.c_char_p, ct.c_ulonglong, ct.c_int, ct.POINTER(bcc_symbol_option), ct.POINTER(bcc_symbol)]
 
 _SYM_CB_TYPE = ct.CFUNCTYPE(ct.c_int, ct.c_char_p, ct.c_ulonglong)
-lib.bcc_foreach_symbol.restype = ct.c_int
-lib.bcc_foreach_symbol.argtypes = [ct.c_char_p, _SYM_CB_TYPE]
+lib.bcc_foreach_function_symbol.restype = ct.c_int
+lib.bcc_foreach_function_symbol.argtypes = [ct.c_char_p, _SYM_CB_TYPE]
 
 lib.bcc_symcache_new.restype = ct.c_void_p
-lib.bcc_symcache_new.argtypes = [ct.c_int]
+lib.bcc_symcache_new.argtypes = [ct.c_int, ct.POINTER(bcc_symbol_option)]
 
 lib.bcc_free_symcache.restype = ct.c_void_p
 lib.bcc_free_symcache.argtypes = [ct.c_void_p, ct.c_int]

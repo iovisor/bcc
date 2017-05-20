@@ -15,6 +15,7 @@
  */
 
 #include <cxxabi.h>
+#include <cstring>
 #include <fcntl.h>
 #include <linux/elf.h>
 #include <string.h>
@@ -30,6 +31,10 @@
 
 #include "syms.h"
 #include "vendor/tinyformat.hpp"
+
+#ifndef STT_GNU_IFUNC
+#define STT_GNU_IFUNC 10
+#endif
 
 ino_t ProcStat::getinode_() {
   struct stat s;
@@ -155,8 +160,16 @@ ProcMountNSGuard::~ProcMountNSGuard() {
     setns(mount_ns_->self_fd_, CLONE_NEWNS);
 }
 
-ProcSyms::ProcSyms(int pid)
+ProcSyms::ProcSyms(int pid, struct bcc_symbol_option *option)
     : pid_(pid), procstat_(pid), mount_ns_instance_(new ProcMountNS(pid_)) {
+  if (option)
+    std::memcpy(&symbol_option_, option, sizeof(bcc_symbol_option));
+  else
+    symbol_option_ = {
+      .use_debug_file = 1,
+      .check_debug_file_crc = 1,
+      .use_symbol_type = (1 << STT_FUNC) | (1 << STT_GNU_IFUNC)
+    };
   load_modules();
 }
 
@@ -179,7 +192,8 @@ int ProcSyms::_add_module(const char *modname, uint64_t start, uint64_t end,
       [=](const ProcSyms::Module &m) { return m.name_ == modname; });
   if (it == ps->modules_.end()) {
     auto module = Module(
-        modname, check_mount_ns ? ps->mount_ns_instance_.get() : nullptr);
+        modname, check_mount_ns ? ps->mount_ns_instance_.get() : nullptr,
+        &ps->symbol_option_);
     if (module.init())
       it = ps->modules_.insert(ps->modules_.end(), std::move(module));
     else
@@ -244,10 +258,12 @@ bool ProcSyms::resolve_name(const char *module, const char *name,
   return false;
 }
 
-ProcSyms::Module::Module(const char *name, ProcMountNS *mount_ns)
+ProcSyms::Module::Module(const char *name, ProcMountNS *mount_ns,
+                         struct bcc_symbol_option *option)
     : name_(name),
       loaded_(false),
       mount_ns_(mount_ns),
+      symbol_option_(option),
       type_(ModuleType::UNKNOWN) {}
 
 bool ProcSyms::Module::init() {
@@ -274,10 +290,10 @@ bool ProcSyms::Module::init() {
 }
 
 int ProcSyms::Module::_add_symbol(const char *symname, uint64_t start,
-                                  uint64_t end, int flags, void *p) {
+                                  uint64_t size, void *p) {
   Module *m = static_cast<Module *>(p);
   auto res = m->symnames_.emplace(symname);
-  m->syms_.emplace_back(&*(res.first), start, end, flags);
+  m->syms_.emplace_back(&*(res.first), start, size);
   return 0;
 }
 
@@ -291,7 +307,7 @@ void ProcSyms::Module::load_sym_table() {
   if (type_ == ModuleType::PERF_MAP)
     bcc_perf_map_foreach_sym(name_.c_str(), _add_symbol, this);
   if (type_ == ModuleType::EXEC || type_ == ModuleType::SO)
-    bcc_elf_foreach_sym(name_.c_str(), _add_symbol, this);
+    bcc_elf_foreach_sym(name_.c_str(), _add_symbol, symbol_option_, this);
 
   std::sort(syms_.begin(), syms_.end());
 }
@@ -367,10 +383,10 @@ bool ProcSyms::Module::find_addr(uint64_t offset, struct bcc_symbol *sym) {
 
 extern "C" {
 
-void *bcc_symcache_new(int pid) {
+void *bcc_symcache_new(int pid, struct bcc_symbol_option *option) {
   if (pid < 0)
     return static_cast<void *>(new KSyms());
-  return static_cast<void *>(new ProcSyms(pid));
+  return static_cast<void *>(new ProcSyms(pid, option));
 }
 
 void bcc_free_symcache(void *symcache, int pid) {
@@ -434,10 +450,29 @@ int bcc_resolve_global_addr(int pid, const char *module, const uint64_t address,
   return 0;
 }
 
-static int _find_sym(const char *symname, uint64_t addr, uint64_t end,
-                     int flags, void *payload) {
+static int _sym_cb_wrapper(const char *symname, uint64_t addr, uint64_t,
+                           void *payload) {
+  SYM_CB cb = (SYM_CB) payload;
+  return cb(symname, addr);
+}
+
+int bcc_foreach_function_symbol(const char *module, SYM_CB cb) {
+  if (module == 0 || cb == 0)
+    return -1;
+
+  static struct bcc_symbol_option default_option = {
+    .use_debug_file = 1,
+    .check_debug_file_crc = 1,
+    .use_symbol_type = (1 << STT_FUNC) | (1 << STT_GNU_IFUNC)
+  };
+
+  return bcc_elf_foreach_sym(
+      module, _sym_cb_wrapper, &default_option, (void *)cb);
+}
+
+static int _find_sym(const char *symname, uint64_t addr, uint64_t,
+                     void *payload) {
   struct bcc_symbol *sym = (struct bcc_symbol *)payload;
-  // TODO: check for actual function symbol in flags
   if (!strcmp(sym->name, symname)) {
     sym->offset = addr;
     return -1;
@@ -445,46 +480,21 @@ static int _find_sym(const char *symname, uint64_t addr, uint64_t end,
   return 0;
 }
 
-int bcc_find_symbol_addr(struct bcc_symbol *sym) {
-  return bcc_elf_foreach_sym(sym->module, _find_sym, sym);
-}
-
-struct sym_search_t {
-  struct bcc_symbol *syms;
-  int start;
-  int requested;
-  int *actual;
-};
-
-// see <elf.h>
-#define ELF_TYPE_IS_FUNCTION(flags) (((flags) & 0xf) == 2)
-
-static int _list_sym(const char *symname, uint64_t addr, uint64_t end,
-                     int flags, void *payload) {
-  if (!ELF_TYPE_IS_FUNCTION(flags) || addr == 0)
-    return 0;
-
-  SYM_CB cb = (SYM_CB)payload;
-  return cb(symname, addr);
-}
-
-int bcc_foreach_symbol(const char *module, SYM_CB cb) {
-  if (module == 0 || cb == 0)
-    return -1;
-
-  return bcc_elf_foreach_sym(module, _list_sym, (void *)cb);
-}
-
 int bcc_resolve_symname(const char *module, const char *symname,
-                        const uint64_t addr, int pid, struct bcc_symbol *sym) {
+                        const uint64_t addr, int pid,
+                        struct bcc_symbol_option *option,
+                        struct bcc_symbol *sym) {
   uint64_t load_addr;
-
-  sym->module = NULL;
-  sym->name = NULL;
-  sym->offset = 0x0;
+  static struct bcc_symbol_option default_option = {
+    .use_debug_file = 1,
+    .check_debug_file_crc = 1,
+    .use_symbol_type = BCC_SYM_ALL_TYPES,
+  };
 
   if (module == NULL)
     return -1;
+
+  memset(sym, 0, sizeof(bcc_symbol));
 
   if (strchr(module, '/')) {
     sym->module = strdup(module);
@@ -497,25 +507,31 @@ int bcc_resolve_symname(const char *module, const char *symname,
 
   ProcMountNSGuard g(pid);
 
-  if (bcc_elf_loadaddr(sym->module, &load_addr) < 0) {
-    sym->module = NULL;
-    return -1;
-  }
+  if (bcc_elf_loadaddr(sym->module, &load_addr) < 0)
+    goto invalid_module;
 
   sym->name = symname;
   sym->offset = addr;
 
+  if (option == NULL)
+    option = &default_option;
+
   if (sym->name && sym->offset == 0x0)
-    if (bcc_find_symbol_addr(sym) < 0) {
-      sym->module = NULL;
-      return -1;
-    }
+    if (bcc_elf_foreach_sym(sym->module, _find_sym, option, sym) < 0)
+      goto invalid_module;
 
   if (sym->offset == 0x0)
-    return -1;
+    goto invalid_module;
 
   sym->offset = (sym->offset - load_addr);
   return 0;
+
+invalid_module:
+  if (sym->module) {
+    ::free(const_cast<char*>(sym->module));
+    sym->module = NULL;
+  }
+  return -1;
 }
 
 void *bcc_enter_mount_ns(int pid) {
