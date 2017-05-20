@@ -604,9 +604,31 @@ error:
   return NULL;
 }
 
+int invalid_perf_config(uint32_t type, uint64_t config) {
+  switch (type) {
+    case PERF_TYPE_HARDWARE:
+      return config >= PERF_COUNT_HW_MAX;
+    case PERF_TYPE_SOFTWARE:
+      return config >= PERF_COUNT_SW_MAX;
+    case PERF_TYPE_RAW:
+      return 0;
+    default:
+      return 1;
+  }
+}
+
 int bpf_open_perf_event(uint32_t type, uint64_t config, int pid, int cpu) {
   int fd;
   struct perf_event_attr attr = {};
+
+  if (type != PERF_TYPE_HARDWARE && type != PERF_TYPE_RAW) {
+    fprintf(stderr, "Unsupported perf event type\n");
+    return -1;
+  }
+  if (invalid_perf_config(type, config)) {
+    fprintf(stderr, "Invalid perf event config\n");
+    return -1;
+  }
 
   attr.sample_period = LONG_MAX;
   attr.type = type;
@@ -733,8 +755,7 @@ int bpf_attach_perf_event(int progfd, uint32_t ev_type, uint32_t ev_config,
     fprintf(stderr, "Unsupported perf event type\n");
     return -1;
   }
-  if ((ev_type == PERF_TYPE_HARDWARE && ev_config >= PERF_COUNT_HW_MAX) ||
-      (ev_type == PERF_TYPE_SOFTWARE && ev_config >= PERF_COUNT_SW_MAX)) {
+  if (invalid_perf_config(ev_type, ev_config)) {
     fprintf(stderr, "Invalid perf event config\n");
     return -1;
   }
