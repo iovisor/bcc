@@ -32,7 +32,7 @@ BPF_HASH(counts, struct stack_key_t, uint64_t);
 
 int on_tcp_send(struct pt_regs *ctx) {
   struct stack_key_t key = {};
-  key.pid = bpf_get_current_pid_tgid();
+  key.pid = bpf_get_current_pid_tgid() >> 32;
   bpf_get_current_comm(&key.name, sizeof(key.name));
   key.kernel_stack = stack_traces.get_stackid(ctx, BPF_F_REUSE_STACKID);
   key.user_stack = stack_traces.get_stackid(
