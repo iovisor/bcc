@@ -159,7 +159,7 @@ int bpf_get_first_key(int fd, void *key, size_t key_size)
       // trigger a page fault in kernel and affect performence. Hence we use
       // ~0 which will fail and return fast.
       // This should fail since we pass an invalid pointer for value.
-      if (bpf_lookup_elem(fd, key, ~0) >= 0)
+      if (bpf_lookup_elem(fd, key, (void *)~0) >= 0)
         return -1;
       // This means the key doesn't exist.
       if (errno == ENOENT)
