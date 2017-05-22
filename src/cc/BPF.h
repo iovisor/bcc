@@ -171,7 +171,9 @@ private:
 
   StatusTuple check_binary_symbol(const std::string& binary_path,
                                   const std::string& symbol,
-                                  uint64_t symbol_addr, bcc_symbol* output);
+                                  uint64_t symbol_addr,
+                                  std::string &module_res,
+                                  uint64_t &offset_res);
 
   std::unique_ptr<BPFModule> bpf_module_;
 
