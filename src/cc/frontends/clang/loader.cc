@@ -160,6 +160,10 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, TableStorage &ts, const st
     for (auto i = 0; i < ncflags; ++i)
       flags_cstr.push_back(cflags[i]);
   }
+#ifdef CUR_CPU_IDENTIFIER
+  string cur_cpu_flag = string("-DCUR_CPU_IDENTIFIER=") + CUR_CPU_IDENTIFIER;
+  flags_cstr.push_back(cur_cpu_flag.c_str());
+#endif
 
   // set up the error reporting class
   IntrusiveRefCntPtr<DiagnosticOptions> diag_opts(new DiagnosticOptions());

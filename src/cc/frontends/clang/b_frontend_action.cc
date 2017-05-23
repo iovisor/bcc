@@ -341,7 +341,7 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
           string args_other = rewriter_.getRewrittenText(expansionRange(SourceRange(Call->getArg(1)->getLocStart(),
                                                            Call->getArg(2)->getLocEnd())));
           txt = "bpf_perf_event_output(" + arg0 + ", bpf_pseudo_fd(1, " + fd + ")";
-          txt += ", bpf_get_smp_processor_id(), " + args_other + ")";
+          txt += ", CUR_CPU_IDENTIFIER, " + args_other + ")";
         } else if (memb_name == "perf_submit_skb") {
           string skb = rewriter_.getRewrittenText(expansionRange(Call->getArg(0)->getSourceRange()));
           string skb_len = rewriter_.getRewrittenText(expansionRange(Call->getArg(1)->getSourceRange()));
