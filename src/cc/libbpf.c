@@ -649,7 +649,7 @@ int bpf_open_perf_event(uint32_t type, uint64_t config, int pid, int cpu) {
   return fd;
 }
 
-int bpf_attach_xdp(const char *dev_name, int progfd) {
+int bpf_attach_xdp(const char *dev_name, int progfd, uint32_t flags) {
     struct sockaddr_nl sa;
     int sock, seq = 0, len, ret = -1;
     char buf[4096];
@@ -694,12 +694,22 @@ int bpf_attach_xdp(const char *dev_name, int progfd) {
     nla->nla_type = NLA_F_NESTED | 43/*IFLA_XDP*/;
 
     nla_xdp = (struct nlattr *)((char *)nla + NLA_HDRLEN);
+    nla->nla_len = NLA_HDRLEN;
 
     // we specify the FD passed over by the user
     nla_xdp->nla_type = 1/*IFLA_XDP_FD*/;
     nla_xdp->nla_len = NLA_HDRLEN + sizeof(progfd);
     memcpy((char *)nla_xdp + NLA_HDRLEN, &progfd, sizeof(progfd));
-    nla->nla_len = NLA_HDRLEN + nla_xdp->nla_len;
+    nla->nla_len += nla_xdp->nla_len;
+
+    // parse flags as passed by the user
+    if (flags) {
+        nla_xdp = (struct nlattr *)((char *)nla + nla->nla_len);
+        nla_xdp->nla_type = 3/*IFLA_XDP_SKB*/;
+        nla_xdp->nla_len = NLA_HDRLEN + sizeof(flags);
+        memcpy((char *)nla_xdp + NLA_HDRLEN, &flags, sizeof(flags));
+        nla->nla_len += nla_xdp->nla_len;
+    }
 
     req.nh.nlmsg_len += NLA_ALIGN(nla->nla_len);
 

@@ -571,14 +571,14 @@ class BPF(object):
         self._del_kprobe(ev_name)
 
     @staticmethod
-    def attach_xdp(dev, fn):
+    def attach_xdp(dev, fn, flags):
         '''
             This function attaches a BPF function to a device on the device
             driver level (XDP)
         '''
         if not isinstance(fn, BPF.Function):
             raise Exception("arg 1 must be of type BPF.Function")
-        res = lib.bpf_attach_xdp(dev.encode("ascii"), fn.fd)
+        res = lib.bpf_attach_xdp(dev.encode("ascii"), fn.fd, flags)
         if res < 0:
             err_no = ct.get_errno()
             if err_no == errno.EBADMSG:
@@ -595,7 +595,7 @@ class BPF(object):
             This function removes any BPF function from a device on the
             device driver level (XDP)
         '''
-        res = lib.bpf_attach_xdp(dev.encode("ascii"), -1)
+        res = lib.bpf_attach_xdp(dev.encode("ascii"), -1, 0)
         if res < 0:
             errstr = os.strerror(ct.get_errno())
             raise Exception("Failed to detach BPF from device %s: %s"
