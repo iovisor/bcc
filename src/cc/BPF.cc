@@ -561,8 +561,8 @@ StatusTuple BPF::detach_perf_event_all_cpu(open_probe_t& attr) {
   bool has_error = false;
   std::string err_msg;
   for (const auto& it : *attr.per_cpu_fd) {
-    int res = close(it.second);
-    if (res < 0) {
+    int res = bpf_close_perf_event_fd(it.second);
+    if (res != 0) {
       has_error = true;
       err_msg += "Failed to close perf event FD " + std::to_string(it.second) +
                  " For CPU " + std::to_string(it.first) + ": ";

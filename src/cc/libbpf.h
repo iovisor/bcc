@@ -82,7 +82,8 @@ int bpf_attach_xdp(const char *dev_name, int progfd, uint32_t flags);
 int bpf_attach_perf_event(int progfd, uint32_t ev_type, uint32_t ev_config,
                           uint64_t sample_period, uint64_t sample_freq,
                           pid_t pid, int cpu, int group_fd);
-int bpf_detach_perf_event(uint32_t ev_type, uint32_t ev_config);
+
+int bpf_close_perf_event_fd(int fd);
 
 int bpf_obj_pin(int fd, const char *pathname);
 int bpf_obj_get(const char *pathname);

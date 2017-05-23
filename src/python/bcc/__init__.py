@@ -730,13 +730,13 @@ class BPF(object):
         except KeyError:
             raise Exception("Perf event type {} config {} not attached".format(
                 ev_type, ev_config))
+
+        res = 0
         for fd in fds.values():
-            os.close(fd)
-        res = lib.bpf_detach_perf_event(ev_type, ev_config)
-        if res < 0:
+            res = lib.bpf_close_perf_event_fd(fd) or res
+        if res != 0:
             raise Exception("Failed to detach BPF from perf event")
         del self.open_perf_events[(ev_type, ev_config)]
-        return res
 
     def _add_uprobe(self, name, probe):
         global _num_open_probes

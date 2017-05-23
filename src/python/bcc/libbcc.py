@@ -115,14 +115,15 @@ lib.perf_reader_free.argtypes = [ct.c_void_p]
 lib.perf_reader_fd.restype = int
 lib.perf_reader_fd.argtypes = [ct.c_void_p]
 
-lib.bpf_attach_xdp.restype = ct.c_int;
+lib.bpf_attach_xdp.restype = ct.c_int
 lib.bpf_attach_xdp.argtypes = [ct.c_char_p, ct.c_int, ct.c_uint]
 
-lib.bpf_attach_perf_event.restype = ct.c_int;
+lib.bpf_attach_perf_event.restype = ct.c_int
 lib.bpf_attach_perf_event.argtype = [ct.c_int, ct.c_uint, ct.c_uint, ct.c_ulonglong, ct.c_ulonglong,
         ct.c_int, ct.c_int, ct.c_int]
-lib.bpf_detach_perf_event.restype = ct.c_int;
-lib.bpf_detach_perf_event.argtype = [ct.c_uint, ct.c_uint]
+
+lib.bpf_close_perf_event_fd.restype = ct.c_int
+lib.bpf_close_perf_event_fd.argtype = [ct.c_int]
 
 # bcc symbol helpers
 class bcc_symbol(ct.Structure):
