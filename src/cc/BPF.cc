@@ -504,11 +504,13 @@ BPFProgTable BPF::get_prog_table(const std::string& name) {
   return BPFProgTable({});
 }
 
-BPFStackTable BPF::get_stack_table(const std::string& name) {
+BPFStackTable BPF::get_stack_table(const std::string& name,
+                                   bool use_debug_file,
+                                   bool check_debug_file_crc) {
   TableStorage::iterator it;
   if (bpf_module_->table_storage().Find(Path({bpf_module_->id(), name}), it))
-    return BPFStackTable(it->second);
-  return BPFStackTable({});
+    return BPFStackTable(it->second, use_debug_file, check_debug_file_crc);
+  return BPFStackTable({}, use_debug_file, check_debug_file_crc);
 }
 
 std::string BPF::get_uprobe_event(const std::string& binary_path,

@@ -115,7 +115,9 @@ public:
 
   BPFProgTable get_prog_table(const std::string& name);
 
-  BPFStackTable get_stack_table(const std::string& name);
+  BPFStackTable get_stack_table(const std::string& name,
+                                bool use_debug_file = true,
+                                bool check_debug_file_crc = true);
 
   StatusTuple open_perf_buffer(const std::string& name,
                                perf_reader_raw_cb cb,

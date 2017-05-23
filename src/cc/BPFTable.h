@@ -26,6 +26,7 @@
 #include <vector>
 
 #include "bcc_exception.h"
+#include "bcc_syms.h"
 #include "bpf_module.h"
 #include "libbpf.h"
 #include "perf_reader.h"
@@ -205,14 +206,16 @@ struct stacktrace_t {
 
 class BPFStackTable : public BPFTableBase<int, stacktrace_t> {
  public:
-  BPFStackTable(const TableDesc& desc)
-      : BPFTableBase<int, stacktrace_t>(desc) {}
+  BPFStackTable(const TableDesc& desc,
+                bool use_debug_file,
+                bool check_debug_file_crc);
   ~BPFStackTable();
 
   std::vector<uintptr_t> get_stack_addr(int stack_id);
   std::vector<std::string> get_stack_symbol(int stack_id, int pid);
 
  private:
+  bcc_symbol_option symbol_option_;
   std::map<int, void*> pid_sym_;
 };
 
