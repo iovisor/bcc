@@ -20,6 +20,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <unistd.h>
 #include <linux/perf_event.h>
@@ -63,8 +64,10 @@ void perf_reader_free(void *ptr) {
   if (ptr) {
     struct perf_reader *reader = ptr;
     munmap(reader->base, reader->page_size * (reader->page_cnt + 1));
-    if (reader->fd >= 0)
+    if (reader->fd >= 0) {
+      ioctl(reader->fd, PERF_EVENT_IOC_DISABLE, 0);
       close(reader->fd);
+    }
     free(reader->buf);
     free(ptr);
   }

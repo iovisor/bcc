@@ -808,10 +808,21 @@ int bpf_attach_perf_event(int progfd, uint32_t ev_type, uint32_t ev_config,
   return fd;
 }
 
-int bpf_detach_perf_event(uint32_t ev_type, uint32_t ev_config) {
-  // Right now, there is nothing to do, but it's a good idea to encourage
-  // callers to detach anything they attach.
-  return 0;
+int bpf_close_perf_event_fd(int fd) {
+  int res, error = 0;
+  if (fd >= 0) {
+    res = ioctl(fd, PERF_EVENT_IOC_DISABLE, 0);
+    if (res != 0) {
+      perror("ioctl(PERF_EVENT_IOC_DISABLE) failed");
+      error = res;
+    }
+    res = close(fd);
+    if (res != 0) {
+      perror("close perf event FD failed");
+      error = (res && !error) ? res : error;
+    }
+  }
+  return error;
 }
 
 int bpf_obj_pin(int fd, const char *pathname)
