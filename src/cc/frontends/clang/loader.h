@@ -35,7 +35,8 @@ class ClangLoader {
   explicit ClangLoader(llvm::LLVMContext *ctx, unsigned flags);
   ~ClangLoader();
   int parse(std::unique_ptr<llvm::Module> *mod, TableStorage &ts, const std::string &file,
-            bool in_memory, const char *cflags[], int ncflags, const std::string &id);
+            bool in_memory, const char *cflags[], int ncflags, const std::string &id,
+            const std::string &maps_ns);
 
  private:
   static std::map<std::string, std::unique_ptr<llvm::MemoryBuffer>> remapped_files_;

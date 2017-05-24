@@ -38,7 +38,7 @@ class BLoader {
   explicit BLoader(unsigned flags);
   ~BLoader();
   int parse(llvm::Module *mod, const std::string &filename, const std::string &proto_filename,
-            TableStorage &ts, const std::string &id);
+            TableStorage &ts, const std::string &id, const std::string &maps_ns);
 
  private:
   unsigned flags_;
