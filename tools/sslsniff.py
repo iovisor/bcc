@@ -30,7 +30,7 @@ parser = argparse.ArgumentParser(
     description="Sniff SSL data",
     formatter_class=argparse.RawDescriptionHelpFormatter,
     epilog=examples)
-parser.add_argument("-p", "--pid", help="sniff this PID only.")
+parser.add_argument("-p", "--pid", type=int, help="sniff this PID only.")
 parser.add_argument("-c", "--comm",
                     help="sniff only commands matching string.")
 parser.add_argument("-o", "--no-openssl", action="store_false", dest="openssl",
@@ -115,7 +115,7 @@ int probe_SSL_read_exit(struct pt_regs *ctx, void *ssl, void *buf, int num) {
 """
 
 if args.pid:
-    prog = prog.replace('FILTER', 'if (pid != %s) { return 0; }' % args.pid)
+    prog = prog.replace('FILTER', 'if (pid != %d) { return 0; }' % args.pid)
 else:
     prog = prog.replace('FILTER', '')
 
