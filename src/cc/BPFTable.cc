@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <linux/elf.h>
 #include <sys/epoll.h>
 #include <unistd.h>
 #include <cerrno>
@@ -86,6 +87,17 @@ StatusTuple BPFTable::remove_value(const std::string& key_str) {
   return StatusTuple(0);
 }
 
+BPFStackTable::BPFStackTable(const TableDesc& desc,
+                             bool use_debug_file,
+                             bool check_debug_file_crc)
+  : BPFTableBase<int, stacktrace_t>(desc) {
+  symbol_option_ = {
+    .use_debug_file = use_debug_file,
+    .check_debug_file_crc = check_debug_file_crc,
+    .use_symbol_type = (1 << STT_FUNC) | (1 << STT_GNU_IFUNC)
+  };
+}
+
 BPFStackTable::~BPFStackTable() {
   for (auto it : pid_sym_)
     bcc_free_symcache(it.second, it.first);
@@ -110,7 +122,7 @@ std::vector<std::string> BPFStackTable::get_stack_symbol(int stack_id,
   if (pid < 0)
     pid = -1;
   if (pid_sym_.find(pid) == pid_sym_.end())
-    pid_sym_[pid] = bcc_symcache_new(pid, nullptr);
+    pid_sym_[pid] = bcc_symcache_new(pid, &symbol_option_);
   void* cache = pid_sym_[pid];
 
   bcc_symbol symbol;

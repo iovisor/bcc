@@ -31,6 +31,9 @@ struct bcc_symbol {
 
 typedef int (*SYM_CB)(const char *symname, uint64_t addr);
 
+#ifndef STT_GNU_IFUNC
+#define STT_GNU_IFUNC 10
+#endif
 static const uint32_t BCC_SYM_ALL_TYPES = 65535;
 struct bcc_symbol_option {
   int use_debug_file;

@@ -32,10 +32,6 @@
 #include "syms.h"
 #include "vendor/tinyformat.hpp"
 
-#ifndef STT_GNU_IFUNC
-#define STT_GNU_IFUNC 10
-#endif
-
 ino_t ProcStat::getinode_() {
   struct stat s;
   return (!stat(procfs_.c_str(), &s)) ? s.st_ino : -1;
