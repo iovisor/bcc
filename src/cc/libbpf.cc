@@ -38,8 +38,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "bcc_syms.h"
 #include "libbpf.h"
+#include "ns_guard.h"
 #include "perf_reader.h"
 
 // TODO: remove these defines when linux-libc-dev exports them properly
@@ -455,7 +455,6 @@ extern "C" void *bpf_attach_uprobe(int progfd,
   struct perf_reader *reader = NULL;
   static const char *event_type = "uprobe";
   int n;
-  void *mount_ns_guard = NULL;
 
   snprintf(new_name, sizeof(new_name), "%s_bcc_%d", ev_name, getpid());
   reader =
@@ -478,15 +477,16 @@ extern "C" void *bpf_attach_uprobe(int progfd,
     goto error;
   }
 
-  mount_ns_guard = bcc_enter_mount_ns(pid);
-  if (write(kfd, buf, strlen(buf)) < 0) {
-    if (errno == EINVAL)
-      fprintf(stderr, "check dmesg output for possible cause\n");
+  {
+    ProcMountNSGuard mount_ns(pid);
+    if (write(kfd, buf, strlen(buf)) < 0) {
+      if (errno == EINVAL)
+        fprintf(stderr, "check dmesg output for possible cause\n");
+      close(kfd);
+      goto error;
+    }
     close(kfd);
-    goto error;
   }
-  close(kfd);
-  bcc_exit_mount_ns(&mount_ns_guard);
 
   snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/events/%ss/%s",
            event_type, new_name);
@@ -496,7 +496,6 @@ extern "C" void *bpf_attach_uprobe(int progfd,
   return reader;
 
 error:
-  bcc_exit_mount_ns(&mount_ns_guard);
   perf_reader_free(reader);
   return NULL;
 }
