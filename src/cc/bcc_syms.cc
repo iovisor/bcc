@@ -96,66 +96,6 @@ bool KSyms::resolve_name(const char *_unused, const char *name,
   return true;
 }
 
-ProcMountNS::ProcMountNS(int pid) {
-  if (pid < 0)
-    return;
-
-  ebpf::FileDesc self_fd;
-  ebpf::FileDesc target_fd;
-  char path[256];
-  int res;
-
-  res = std::snprintf(path, 256, "/proc/self/ns/mnt");
-  if (res <= 0 || res >= 256)
-    return;
-  if ((self_fd = open(path, O_RDONLY)) < 0)
-    return;
-
-  res = std::snprintf(path, 256, "/proc/%d/ns/mnt", pid);
-  if (res <= 0 || res >= 256)
-    return;
-  if ((target_fd = open(path, O_RDONLY)) < 0)
-    return;
-
-  struct stat self_stat, target_stat;
-  if (fstat(self_fd, &self_stat) != 0)
-    return;
-  if (fstat(target_fd, &target_stat) != 0)
-    return;
-
-  if (self_stat.st_ino == target_stat.st_ino)
-    // Both current and target Process are in same mount namespace
-    return;
-
-  self_fd_ = std::move(self_fd);
-  target_fd_ = std::move(target_fd);
-}
-
-ProcMountNSGuard::ProcMountNSGuard(ProcMountNS *mount_ns)
-    : mount_ns_instance_(nullptr), mount_ns_(mount_ns), entered_(false) {
-  init();
-}
-
-ProcMountNSGuard::ProcMountNSGuard(int pid)
-    : mount_ns_instance_(pid > 0 ? new ProcMountNS(pid) : nullptr),
-      mount_ns_(mount_ns_instance_.get()),
-      entered_(false) {
-  init();
-}
-
-void ProcMountNSGuard::init() {
-  if (!mount_ns_ || mount_ns_->self_fd_ < 0 || mount_ns_->target_fd_ < 0)
-    return;
-
-  if (setns(mount_ns_->target_fd_, CLONE_NEWNS) == 0)
-    entered_ = true;
-}
-
-ProcMountNSGuard::~ProcMountNSGuard() {
-  if (mount_ns_ && entered_ && mount_ns_->self_fd_ >= 0)
-    setns(mount_ns_->self_fd_, CLONE_NEWNS);
-}
-
 ProcSyms::ProcSyms(int pid, struct bcc_symbol_option *option)
     : pid_(pid), procstat_(pid), mount_ns_instance_(new ProcMountNS(pid_)) {
   if (option)
