@@ -17,7 +17,7 @@ BPF_ARRAY(prev, u64, NUM_CPUS);
 BPF_HISTOGRAM(dist);
 int kprobe__sys_getuid(void *ctx) {
     u32 cpu = bpf_get_smp_processor_id();
-    u64 val = cnt1.perf_read(cpu);
+    u64 val = cnt1.perf_read(CUR_CPU_IDENTIFIER);
 
     if (((s64)val < 0) && ((s64)val > -256))
         return 0;
@@ -27,7 +27,7 @@ int kprobe__sys_getuid(void *ctx) {
 }
 int kretprobe__sys_getuid(void *ctx) {
     u32 cpu = bpf_get_smp_processor_id();
-    u64 val = cnt1.perf_read(cpu);
+    u64 val = cnt1.perf_read(CUR_CPU_IDENTIFIER);
 
     if (((s64)val < 0) && ((s64)val > -256))
         return 0;

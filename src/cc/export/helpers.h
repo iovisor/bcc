@@ -65,6 +65,17 @@ BPF_TABLE(_table_type, _key_type, _leaf_type, _name, _max_entries); \
 __attribute__((section("maps/export"))) \
 struct _name##_table_t __##_name
 
+// Identifier for current CPU used in perf_submit and perf_read
+// Prefer BPF_F_CURRENT_CPU flag, falls back to call helper for older kernel
+// Can be overridden from BCC
+#ifndef CUR_CPU_IDENTIFIER
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0)
+#define CUR_CPU_IDENTIFIER BPF_F_CURRENT_CPU
+#else
+#define CUR_CPU_IDENTIFIER bpf_get_smp_processor_id()
+#endif
+#endif
+
 // Table for pushing custom events to userspace via ring buffer
 #define BPF_PERF_OUTPUT(_name) \
 struct _name##_table_t { \
