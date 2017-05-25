@@ -75,6 +75,7 @@ static __u64 ptr_to_u64(void *ptr)
   return (__u64) (unsigned long) ptr;
 }
 
+extern "C"
 int bpf_create_map(enum bpf_map_type map_type, int key_size, int value_size, int max_entries, int map_flags)
 {
   union bpf_attr attr;
@@ -100,6 +101,7 @@ int bpf_create_map(enum bpf_map_type map_type, int key_size, int value_size, int
   return ret;
 }
 
+extern "C"
 int bpf_update_elem(int fd, void *key, void *value, unsigned long long flags)
 {
   union bpf_attr attr;
@@ -112,6 +114,7 @@ int bpf_update_elem(int fd, void *key, void *value, unsigned long long flags)
   return syscall(__NR_bpf, BPF_MAP_UPDATE_ELEM, &attr, sizeof(attr));
 }
 
+extern "C"
 int bpf_lookup_elem(int fd, void *key, void *value)
 {
   union bpf_attr attr;
@@ -123,6 +126,7 @@ int bpf_lookup_elem(int fd, void *key, void *value)
   return syscall(__NR_bpf, BPF_MAP_LOOKUP_ELEM, &attr, sizeof(attr));
 }
 
+extern "C"
 int bpf_delete_elem(int fd, void *key)
 {
   union bpf_attr attr;
@@ -133,6 +137,7 @@ int bpf_delete_elem(int fd, void *key)
   return syscall(__NR_bpf, BPF_MAP_DELETE_ELEM, &attr, sizeof(attr));
 }
 
+extern "C"
 int bpf_get_first_key(int fd, void *key, size_t key_size)
 {
   union bpf_attr attr;
@@ -171,6 +176,7 @@ int bpf_get_first_key(int fd, void *key, size_t key_size)
   }
 }
 
+extern "C"
 int bpf_get_next_key(int fd, void *key, void *next_key)
 {
   union bpf_attr attr;
@@ -182,7 +188,7 @@ int bpf_get_next_key(int fd, void *key, void *next_key)
   return syscall(__NR_bpf, BPF_MAP_GET_NEXT_KEY, &attr, sizeof(attr));
 }
 
-void bpf_print_hints(char *log)
+static void bpf_print_hints(char *log)
 {
   if (log == NULL)
     return;
@@ -215,6 +221,7 @@ void bpf_print_hints(char *log)
 }
 #define ROUND_UP(x, n) (((x) + (n) - 1u) & ~((n) - 1u))
 
+extern "C"
 int bpf_prog_load(enum bpf_prog_type prog_type,
                   const struct bpf_insn *insns, int prog_len,
                   const char *license, unsigned kern_version,
@@ -273,7 +280,7 @@ int bpf_prog_load(enum bpf_prog_type prog_type,
     // caller did not specify log_buf but failure should be printed,
     // so repeat the syscall and print the result to stderr
     for (;;) {
-         bpf_log_buffer = malloc(buffer_size);
+         bpf_log_buffer = (char *)malloc(buffer_size);
          if (!bpf_log_buffer) {
              fprintf(stderr,
                      "bpf: buffer log memory allocation failed for error %s\n\n",
@@ -304,6 +311,7 @@ int bpf_prog_load(enum bpf_prog_type prog_type,
   return ret;
 }
 
+extern "C"
 int bpf_open_raw_sock(const char *name)
 {
   struct sockaddr_ll sll;
@@ -328,6 +336,7 @@ int bpf_open_raw_sock(const char *name)
   return sock;
 }
 
+extern "C"
 int bpf_attach_socket(int sock, int prog) {
   return setsockopt(sock, SOL_SOCKET, SO_ATTACH_BPF, &prog, sizeof(prog));
 }
@@ -381,6 +390,7 @@ static int bpf_attach_tracing_event(int progfd, const char *event_path,
   return 0;
 }
 
+extern "C"
 void * bpf_attach_kprobe(int progfd, enum bpf_probe_attach_type attach_type, const char *ev_name,
                         const char *fn_name,
                         pid_t pid, int cpu, int group_fd,
@@ -390,7 +400,7 @@ void * bpf_attach_kprobe(int progfd, enum bpf_probe_attach_type attach_type, con
   char buf[256];
   char new_name[128];
   struct perf_reader *reader = NULL;
-  static char *event_type = "kprobe";
+  static const char *event_type = "kprobe";
   int n;
 
   snprintf(new_name, sizeof(new_name), "%s_bcc_%d", ev_name, getpid());
@@ -441,6 +451,7 @@ error:
 
 }
 
+extern "C"
 void * bpf_attach_uprobe(int progfd, enum bpf_probe_attach_type attach_type, const char *ev_name,
                         const char *binary_path, uint64_t offset,
                         pid_t pid, int cpu, int group_fd,
@@ -450,7 +461,7 @@ void * bpf_attach_uprobe(int progfd, enum bpf_probe_attach_type attach_type, con
   char buf[PATH_MAX];
   char new_name[128];
   struct perf_reader *reader = NULL;
-  static char *event_type = "uprobe";
+  static const char *event_type = "uprobe";
   int n;
   void* mount_ns_guard = NULL;
 
@@ -517,6 +528,7 @@ static int bpf_detach_probe(const char *ev_name, const char *event_type)
   return 0;
 }
 
+extern "C"
 int bpf_detach_kprobe(const char *ev_name)
 {
   char buf[256];
@@ -529,12 +541,14 @@ int bpf_detach_kprobe(const char *ev_name)
   return ret;
 }
 
+extern "C"
 int bpf_detach_uprobe(const char *ev_name)
 {
   return bpf_detach_probe(ev_name, "uprobe");
 }
 
 
+extern "C"
 void * bpf_attach_tracepoint(int progfd, const char *tp_category,
                              const char *tp_name, int pid, int cpu,
                              int group_fd, perf_reader_cb cb, void *cb_cookie) {
@@ -557,12 +571,14 @@ error:
   return NULL;
 }
 
+extern "C"
 int bpf_detach_tracepoint(const char *tp_category, const char *tp_name) {
   // Right now, there is nothing to do, but it's a good idea to encourage
   // callers to detach anything they attach.
   return 0;
 }
 
+extern "C"
 void * bpf_open_perf_buffer(perf_reader_raw_cb raw_cb,
                             perf_reader_lost_cb lost_cb, void *cb_cookie,
                             int pid, int cpu, int page_cnt) {
@@ -604,7 +620,7 @@ error:
   return NULL;
 }
 
-int invalid_perf_config(uint32_t type, uint64_t config) {
+static int invalid_perf_config(uint32_t type, uint64_t config) {
   switch (type) {
     case PERF_TYPE_HARDWARE:
       return config >= PERF_COUNT_HW_MAX;
@@ -617,6 +633,7 @@ int invalid_perf_config(uint32_t type, uint64_t config) {
   }
 }
 
+extern "C"
 int bpf_open_perf_event(uint32_t type, uint64_t config, int pid, int cpu) {
   int fd;
   struct perf_event_attr attr = {};
@@ -649,6 +666,7 @@ int bpf_open_perf_event(uint32_t type, uint64_t config, int pid, int cpu) {
   return fd;
 }
 
+extern "C"
 int bpf_attach_xdp(const char *dev_name, int progfd, uint32_t flags) {
     struct sockaddr_nl sa;
     int sock, seq = 0, len, ret = -1;
@@ -758,6 +776,7 @@ cleanup:
     return ret;
 }
 
+extern "C"
 int bpf_attach_perf_event(int progfd, uint32_t ev_type, uint32_t ev_config,
                           uint64_t sample_period, uint64_t sample_freq,
                           pid_t pid, int cpu, int group_fd) {
@@ -808,6 +827,7 @@ int bpf_attach_perf_event(int progfd, uint32_t ev_type, uint32_t ev_config,
   return fd;
 }
 
+extern "C"
 int bpf_close_perf_event_fd(int fd) {
   int res, error = 0;
   if (fd >= 0) {
@@ -825,16 +845,18 @@ int bpf_close_perf_event_fd(int fd) {
   return error;
 }
 
+extern "C"
 int bpf_obj_pin(int fd, const char *pathname)
 {
   union bpf_attr attr = {
     .pathname = ptr_to_u64((void *)pathname),
-    .bpf_fd = fd,
+    .bpf_fd = static_cast<uint32_t>(fd),
   };
 
   return syscall(__NR_bpf, BPF_OBJ_PIN, &attr, sizeof(attr));
 }
 
+extern "C"
 int bpf_obj_get(const char *pathname)
 {
   union bpf_attr attr = {
