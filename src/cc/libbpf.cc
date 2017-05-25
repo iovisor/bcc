@@ -341,7 +341,7 @@ static int bpf_attach_tracing_event(int progfd, const char *event_path,
   }
 
   bytes = read(efd, buf, sizeof(buf));
-  if (bytes <= 0 || bytes >= sizeof(buf)) {
+  if (bytes <= 0 || (size_t)bytes >= sizeof(buf)) {
     fprintf(stderr, "read(%s): %s\n", buf, strerror(errno));
     close(efd);
     return -1;
@@ -423,7 +423,7 @@ extern "C" void *bpf_attach_kprobe(int progfd,
     n = snprintf(buf, sizeof(buf),
                  "/sys/kernel/debug/tracing/instances/bcc_%d/events/%ss/%s",
                  getpid(), event_type, new_name);
-    if (n < sizeof(buf) &&
+    if (n > 0 && (size_t)n < sizeof(buf) &&
         bpf_attach_tracing_event(progfd, buf, reader, pid, cpu, group_fd) == 0)
       goto out;
     snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/instances/bcc_%d",
@@ -472,7 +472,7 @@ extern "C" void *bpf_attach_uprobe(int progfd,
   n = snprintf(buf, sizeof(buf), "%c:%ss/%s %s:0x%lx",
                attach_type == BPF_PROBE_ENTRY ? 'p' : 'r', event_type, new_name,
                binary_path, offset);
-  if (n >= sizeof(buf)) {
+  if (n < 0 || (size_t)n >= sizeof(buf)) {
     close(kfd);
     goto error;
   }
@@ -662,7 +662,8 @@ extern "C" int bpf_open_perf_event(uint32_t type, uint64_t config, int pid,
 extern "C" int bpf_attach_xdp(const char *dev_name, int progfd,
                               uint32_t flags) {
   struct sockaddr_nl sa;
-  int sock, seq = 0, len, ret = -1;
+  int sock, len, ret = -1;
+  uint32_t seq = 0;
   char buf[4096];
   struct nlattr *nla, *nla_xdp;
   struct {
@@ -737,7 +738,7 @@ extern "C" int bpf_attach_xdp(const char *dev_name, int progfd,
 
   for (nh = (struct nlmsghdr *)buf; NLMSG_OK(nh, len);
        nh = NLMSG_NEXT(nh, len)) {
-    if (nh->nlmsg_pid != getpid()) {
+    if ((int)nh->nlmsg_pid != getpid()) {
       fprintf(stderr, "bpf: Wrong pid %d, expected %d\n", nh->nlmsg_pid,
               getpid());
       errno = EBADMSG;
@@ -835,18 +836,20 @@ extern "C" int bpf_close_perf_event_fd(int fd) {
 }
 
 extern "C" int bpf_obj_pin(int fd, const char *pathname) {
-  union bpf_attr attr = {
-      .pathname = ptr_to_u64((void *)pathname),
-      .bpf_fd = static_cast<uint32_t>(fd),
-  };
+  union bpf_attr attr;
+
+  memset(&attr, 0, sizeof(attr));
+  attr.pathname = ptr_to_u64((void *)pathname);
+  attr.bpf_fd = static_cast<uint32_t>(fd);
 
   return syscall(__NR_bpf, BPF_OBJ_PIN, &attr, sizeof(attr));
 }
 
 extern "C" int bpf_obj_get(const char *pathname) {
-  union bpf_attr attr = {
-      .pathname = ptr_to_u64((void *)pathname),
-  };
+  union bpf_attr attr;
+
+  memset(&attr, 0, sizeof(attr));
+  attr.pathname = ptr_to_u64((void *)pathname);
 
   return syscall(__NR_bpf, BPF_OBJ_GET, &attr, sizeof(attr));
 }
