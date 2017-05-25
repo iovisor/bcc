@@ -23,8 +23,9 @@
 #include <unordered_set>
 #include <vector>
 
-#include "file_desc.h"
 #include "bcc_syms.h"
+#include "file_desc.h"
+#include "ns_guard.h"
 
 class ProcStat {
   std::string procfs_;
@@ -65,35 +66,6 @@ public:
   virtual bool resolve_name(const char *unused, const char *name,
                             uint64_t *addr);
   virtual void refresh();
-};
-
-class ProcMountNSGuard;
-class ProcSyms;
-
-class ProcMountNS {
-private:
-  explicit ProcMountNS(int pid);
-
-  ebpf::FileDesc self_fd_;
-  ebpf::FileDesc target_fd_;
-
-  friend class ProcMountNSGuard;
-  friend class ProcSyms;
-};
-
-class ProcMountNSGuard {
-public:
-  explicit ProcMountNSGuard(ProcMountNS *mount_ns);
-  explicit ProcMountNSGuard(int pid);
-
-  ~ProcMountNSGuard();
-
-private:
-  void init();
-
-  std::unique_ptr<ProcMountNS> mount_ns_instance_;
-  ProcMountNS *mount_ns_;
-  bool entered_;
 };
 
 class ProcSyms : SymbolCache {
