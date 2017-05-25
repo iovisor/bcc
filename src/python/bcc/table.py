@@ -471,10 +471,30 @@ class PerfEventArray(ArrayBase):
 
     def __init__(self, *args, **kwargs):
         super(PerfEventArray, self).__init__(*args, **kwargs)
+        self._open_key_fds = {}
+
+    def __del__(self):
+        keys = list(self._open_key_fds.keys())
+        for key in keys:
+            del self[key]
 
     def __delitem__(self, key):
-        super(PerfEventArray, self).__delitem__(key)
-        self.close_perf_buffer(key)
+        if key not in self._open_key_fds:
+            return
+        # Delete entry from the array
+        c_key = self._normalize_key(key)
+        key_p = ct.pointer(c_key)
+        lib.bpf_delete_elem(self.map_fd, ct.cast(key_p, ct.c_void_p))
+        key_id = (id(self), key)
+        if key_id in self.bpf.open_kprobes:
+            # The key is opened for perf ring buffer
+            lib.perf_reader_free(self.bpf.open_kprobes[key_id])
+            self.bpf._del_kprobe(key_id)
+            del self._cbs[key]
+        else:
+            # The key is opened for perf event read
+            lib.bpf_close_perf_event_fd(self._open_key_fds[key])
+        del self._open_key_fds[key]
 
     def open_perf_buffer(self, callback, page_cnt=8, lost_cb=None):
         """open_perf_buffers(callback)
@@ -503,29 +523,21 @@ class PerfEventArray(ArrayBase):
         self.bpf._add_kprobe((id(self), cpu), reader)
         # keep a refcnt
         self._cbs[cpu] = (fn, lost_fn)
-
-    def close_perf_buffer(self, key):
-        reader = self.bpf.open_kprobes.get((id(self), key))
-        if reader:
-            lib.perf_reader_free(reader)
-            self.bpf._del_kprobe((id(self), key))
-        del self._cbs[key]
+        # The actual fd is held by the perf reader, add to track opened keys
+        self._open_key_fds[cpu] = -1
 
     def _open_perf_event(self, cpu, typ, config):
         fd = lib.bpf_open_perf_event(typ, config, -1, cpu)
         if fd < 0:
             raise Exception("bpf_open_perf_event failed")
-        try:
-            self[self.Key(cpu)] = self.Leaf(fd)
-        finally:
-            # the fd is kept open in the map itself by the kernel
-            os.close(fd)
+        self[self.Key(cpu)] = self.Leaf(fd)
+        self._open_key_fds[cpu] = fd
 
     def open_perf_event(self, typ, config):
         """open_perf_event(typ, config)
 
         Configures the table such that calls from the bpf program to
-        table.perf_read(bpf_get_smp_processor_id()) will return the hardware
+        table.perf_read(CUR_CPU_IDENTIFIER) will return the hardware
         counter denoted by event ev on the local cpu.
         """
         for i in get_online_cpus():

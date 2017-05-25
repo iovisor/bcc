@@ -25,7 +25,7 @@ import sys
 basestring = (unicode if sys.version_info[0] < 3 else str)
 
 from .libbcc import lib, _CB_TYPE, bcc_symbol, bcc_symbol_option, _SYM_CB_TYPE
-from .table import Table
+from .table import Table, PerfEventArray
 from .perf import Perf
 from .utils import get_online_cpus
 
@@ -1089,11 +1089,16 @@ class BPF(object):
 
     def cleanup(self):
         for k, v in list(self.open_kprobes.items()):
-            lib.perf_reader_free(v)
             # non-string keys here include the perf_events reader
             if isinstance(k, str):
+                lib.perf_reader_free(v)
                 lib.bpf_detach_kprobe(str(k).encode("ascii"))
-            self._del_kprobe(k)
+                self._del_kprobe(k)
+        # clean up opened perf ring buffer and perf events
+        table_keys = list(self.tables.keys())
+        for key in table_keys:
+            if isinstance(self.tables[key], PerfEventArray):
+                del self.tables[key]
         for k, v in list(self.open_uprobes.items()):
             lib.perf_reader_free(v)
             lib.bpf_detach_uprobe(str(k).encode("ascii"))
