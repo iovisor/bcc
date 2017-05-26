@@ -204,7 +204,7 @@ Note, check for the latest `linux-image-4.x` version in `jessie-backports` befor
 apt-get update
 
 # Update kernel and linux-base package
-apt-get -t jessie-backports install linux-base linux-image-4.8.0-0.bpo.2-amd64
+apt-get -t jessie-backports install linux-base linux-image-4.9.0-0.bpo.2-amd64 linux-headers-4.9.0-0.bpo.2-amd64
 
 # BCC build dependencies:
 apt-get install debhelper cmake libllvm3.8 llvm-3.8-dev libclang-3.8-dev \
