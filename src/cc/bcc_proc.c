@@ -46,8 +46,10 @@ char *bcc_procutils_which(const char *binpath) {
     const size_t path_len = next - PATH;
 
     if (path_len) {
-      snprintf(buffer, sizeof(buffer), "%.*s/%s",
-	       (int)path_len, PATH, binpath);
+      int ret = snprintf(buffer, sizeof(buffer), "%.*s/%s",
+	                  (int)path_len, PATH, binpath);
+      if (ret < 0 || ret >= sizeof(buffer))
+        return 0;
 
       if (bcc_elf_is_exe(buffer))
         return strdup(buffer);
