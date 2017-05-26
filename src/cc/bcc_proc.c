@@ -46,9 +46,8 @@ char *bcc_procutils_which(const char *binpath) {
     const size_t path_len = next - PATH;
 
     if (path_len) {
-      memcpy(buffer, PATH, path_len);
-      buffer[path_len] = '/';
-      strcpy(buffer + path_len + 1, binpath);
+      snprintf(buffer, sizeof(buffer), "%.*s/%s",
+	       (int)path_len, PATH, binpath);
 
       if (bcc_elf_is_exe(buffer))
         return strdup(buffer);
