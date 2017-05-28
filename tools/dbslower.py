@@ -54,7 +54,7 @@ if not args.pids or len(args.pids) == 0:
 threshold_ns = args.threshold * 1000000
 
 program = """
-#include <linux/ptrace.h>
+#include <uapi/linux/ptrace.h>
 
 struct temp_t {
     u64 timestamp;
@@ -106,10 +106,11 @@ for usdt in usdts:
     usdt.enable_probe("query__start", "probe_start")
     usdt.enable_probe("query__done", "probe_end")
 
-bpf = BPF(text=program, usdt_contexts=usdts)
 if args.verbose:
     print('\n'.join(map(lambda u: u.get_text(), usdts)))
     print(program)
+
+bpf = BPF(text=program, usdt_contexts=usdts)
 
 class Data(ct.Structure):
     _fields_ = [

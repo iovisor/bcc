@@ -34,6 +34,7 @@ int bpf_create_map(enum bpf_map_type map_type, int key_size, int value_size,
 int bpf_update_elem(int fd, void *key, void *value, unsigned long long flags);
 int bpf_lookup_elem(int fd, void *key, void *value);
 int bpf_delete_elem(int fd, void *key);
+int bpf_get_first_key(int fd, void *key, size_t key_size);
 int bpf_get_next_key(int fd, void *key, void *next_key);
 
 int bpf_prog_load(enum bpf_prog_type prog_type,
@@ -50,7 +51,7 @@ typedef void (*perf_reader_cb)(void *cb_cookie, int pid, uint64_t callchain_num,
 typedef void (*perf_reader_raw_cb)(void *cb_cookie, void *raw, int raw_size);
 typedef void (*perf_reader_lost_cb)(uint64_t lost);
 
-void * bpf_attach_kprobe(int progfd, enum bpf_probe_attach_type attach_type, 
+void * bpf_attach_kprobe(int progfd, enum bpf_probe_attach_type attach_type,
                         const char *ev_name, const char *fn_name,
                         pid_t pid, int cpu, int group_fd,
                         perf_reader_cb cb, void *cb_cookie);
@@ -74,14 +75,15 @@ void * bpf_open_perf_buffer(perf_reader_raw_cb raw_cb,
                             int pid, int cpu, int page_cnt);
 
 /* attached a prog expressed by progfd to the device specified in dev_name */
-int bpf_attach_xdp(const char *dev_name, int progfd);
+int bpf_attach_xdp(const char *dev_name, int progfd, uint32_t flags);
 
 // attach a prog expressed by progfd to run on a specific perf event, with
 // certain sample period or sample frequency
 int bpf_attach_perf_event(int progfd, uint32_t ev_type, uint32_t ev_config,
                           uint64_t sample_period, uint64_t sample_freq,
                           pid_t pid, int cpu, int group_fd);
-int bpf_detach_perf_event(uint32_t ev_type, uint32_t ev_config);
+
+int bpf_close_perf_event_fd(int fd);
 
 int bpf_obj_pin(int fd, const char *pathname);
 int bpf_obj_get(const char *pathname);

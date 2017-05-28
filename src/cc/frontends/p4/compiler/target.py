@@ -113,7 +113,7 @@ class KernelSamplesConfig(TargetConfig):
 #include "bpf_helpers.h"
 """
 
-    
+
 # Represents a target compiled by bcc that uses the TC
 class BccConfig(TargetConfig):
     def __init__(self):

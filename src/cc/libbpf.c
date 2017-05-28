@@ -38,7 +38,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#include "bcc_proc.h"
+#include "bcc_syms.h"
 #include "libbpf.h"
 #include "perf_reader.h"
 
@@ -131,6 +131,44 @@ int bpf_delete_elem(int fd, void *key)
   attr.key = ptr_to_u64(key);
 
   return syscall(__NR_bpf, BPF_MAP_DELETE_ELEM, &attr, sizeof(attr));
+}
+
+int bpf_get_first_key(int fd, void *key, size_t key_size)
+{
+  union bpf_attr attr;
+  int i, res;
+
+  memset(&attr, 0, sizeof(attr));
+  attr.map_fd = fd;
+  attr.key = 0;
+  attr.next_key = ptr_to_u64(key);
+
+  // 4.12 and above kernel supports passing NULL to BPF_MAP_GET_NEXT_KEY
+  // to get first key of the map. For older kernels, the call will fail.
+  res = syscall(__NR_bpf, BPF_MAP_GET_NEXT_KEY, &attr, sizeof(attr));
+  if (res < 0 && errno == EFAULT) {
+    // Fall back to try to find a non-existing key.
+    static unsigned char try_values[3] = {0, 0xff, 0x55};
+    attr.key = ptr_to_u64(key);
+    for (i = 0; i < 3; i++) {
+      memset(key, try_values[i], key_size);
+      // We want to check the existence of the key but we don't know the size
+      // of map's value. So we pass an invalid pointer for value, expect
+      // the call to fail and check if the error is ENOENT indicating the
+      // key doesn't exist. If we use NULL for the invalid pointer, it might
+      // trigger a page fault in kernel and affect performence. Hence we use
+      // ~0 which will fail and return fast.
+      // This should fail since we pass an invalid pointer for value.
+      if (bpf_lookup_elem(fd, key, (void *)~0) >= 0)
+        return -1;
+      // This means the key doesn't exist.
+      if (errno == ENOENT)
+        return syscall(__NR_bpf, BPF_MAP_GET_NEXT_KEY, &attr, sizeof(attr));
+    }
+    return -1;
+  } else {
+    return res;
+  }
 }
 
 int bpf_get_next_key(int fd, void *key, void *next_key)
@@ -346,7 +384,7 @@ static int bpf_attach_tracing_event(int progfd, const char *event_path,
 void * bpf_attach_kprobe(int progfd, enum bpf_probe_attach_type attach_type, const char *ev_name,
                         const char *fn_name,
                         pid_t pid, int cpu, int group_fd,
-                        perf_reader_cb cb, void *cb_cookie) 
+                        perf_reader_cb cb, void *cb_cookie)
 {
   int kfd;
   char buf[256];
@@ -367,7 +405,7 @@ void * bpf_attach_kprobe(int progfd, enum bpf_probe_attach_type attach_type, con
     goto error;
   }
 
-  snprintf(buf, sizeof(buf), "%c:%ss/%s %s", attach_type==BPF_PROBE_ENTRY ? 'p' : 'r', 
+  snprintf(buf, sizeof(buf), "%c:%ss/%s %s", attach_type==BPF_PROBE_ENTRY ? 'p' : 'r',
 			event_type, new_name, fn_name);
   if (write(kfd, buf, strlen(buf)) < 0) {
     if (errno == EINVAL)
@@ -380,10 +418,10 @@ void * bpf_attach_kprobe(int progfd, enum bpf_probe_attach_type attach_type, con
   if (access("/sys/kernel/debug/tracing/instances", F_OK) != -1) {
     snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/instances/bcc_%d", getpid());
     if (access(buf, F_OK) == -1) {
-      if (mkdir(buf, 0755) == -1) 
+      if (mkdir(buf, 0755) == -1)
         goto retry;
     }
-    n = snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/instances/bcc_%d/events/%ss/%s", 
+    n = snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/instances/bcc_%d/events/%ss/%s",
              getpid(), event_type, new_name);
     if (n < sizeof(buf) && bpf_attach_tracing_event(progfd, buf, reader, pid, cpu, group_fd) == 0)
 	  goto out;
@@ -406,15 +444,15 @@ error:
 void * bpf_attach_uprobe(int progfd, enum bpf_probe_attach_type attach_type, const char *ev_name,
                         const char *binary_path, uint64_t offset,
                         pid_t pid, int cpu, int group_fd,
-                        perf_reader_cb cb, void *cb_cookie) 
+                        perf_reader_cb cb, void *cb_cookie)
 {
   int kfd;
   char buf[PATH_MAX];
   char new_name[128];
   struct perf_reader *reader = NULL;
   static char *event_type = "uprobe";
-  struct ns_cookie nsc = {-1, -1};
   int n;
+  void* mount_ns_guard = NULL;
 
   snprintf(new_name, sizeof(new_name), "%s_bcc_%d", ev_name, getpid());
   reader = perf_reader_new(cb, NULL, NULL, cb_cookie, probe_perf_reader_page_cnt);
@@ -428,22 +466,22 @@ void * bpf_attach_uprobe(int progfd, enum bpf_probe_attach_type attach_type, con
     goto error;
   }
 
-  n = snprintf(buf, sizeof(buf), "%c:%ss/%s %s:0x%lx", attach_type==BPF_PROBE_ENTRY ? 'p' : 'r', 
+  n = snprintf(buf, sizeof(buf), "%c:%ss/%s %s:0x%lx", attach_type==BPF_PROBE_ENTRY ? 'p' : 'r',
 			event_type, new_name, binary_path, offset);
   if (n >= sizeof(buf)) {
     close(kfd);
     goto error;
   }
 
-  bcc_procutils_enter_mountns(pid, &nsc);
+  mount_ns_guard = bcc_enter_mount_ns(pid);
   if (write(kfd, buf, strlen(buf)) < 0) {
     if (errno == EINVAL)
       fprintf(stderr, "check dmesg output for possible cause\n");
     close(kfd);
     goto error;
   }
-  bcc_procutils_exit_mountns(&nsc);
   close(kfd);
+  bcc_exit_mount_ns(&mount_ns_guard);
 
   snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/events/%ss/%s", event_type, new_name);
   if (bpf_attach_tracing_event(progfd, buf, reader, pid, cpu, group_fd) < 0)
@@ -452,7 +490,7 @@ void * bpf_attach_uprobe(int progfd, enum bpf_probe_attach_type attach_type, con
   return reader;
 
 error:
-  bcc_procutils_exit_mountns(&nsc);
+  bcc_exit_mount_ns(&mount_ns_guard);
   perf_reader_free(reader);
   return NULL;
 }
@@ -566,9 +604,31 @@ error:
   return NULL;
 }
 
+int invalid_perf_config(uint32_t type, uint64_t config) {
+  switch (type) {
+    case PERF_TYPE_HARDWARE:
+      return config >= PERF_COUNT_HW_MAX;
+    case PERF_TYPE_SOFTWARE:
+      return config >= PERF_COUNT_SW_MAX;
+    case PERF_TYPE_RAW:
+      return 0;
+    default:
+      return 1;
+  }
+}
+
 int bpf_open_perf_event(uint32_t type, uint64_t config, int pid, int cpu) {
   int fd;
   struct perf_event_attr attr = {};
+
+  if (type != PERF_TYPE_HARDWARE && type != PERF_TYPE_RAW) {
+    fprintf(stderr, "Unsupported perf event type\n");
+    return -1;
+  }
+  if (invalid_perf_config(type, config)) {
+    fprintf(stderr, "Invalid perf event config\n");
+    return -1;
+  }
 
   attr.sample_period = LONG_MAX;
   attr.type = type;
@@ -589,7 +649,7 @@ int bpf_open_perf_event(uint32_t type, uint64_t config, int pid, int cpu) {
   return fd;
 }
 
-int bpf_attach_xdp(const char *dev_name, int progfd) {
+int bpf_attach_xdp(const char *dev_name, int progfd, uint32_t flags) {
     struct sockaddr_nl sa;
     int sock, seq = 0, len, ret = -1;
     char buf[4096];
@@ -634,12 +694,22 @@ int bpf_attach_xdp(const char *dev_name, int progfd) {
     nla->nla_type = NLA_F_NESTED | 43/*IFLA_XDP*/;
 
     nla_xdp = (struct nlattr *)((char *)nla + NLA_HDRLEN);
+    nla->nla_len = NLA_HDRLEN;
 
     // we specify the FD passed over by the user
     nla_xdp->nla_type = 1/*IFLA_XDP_FD*/;
-    nla_xdp->nla_len = NLA_HDRLEN + sizeof(int);
+    nla_xdp->nla_len = NLA_HDRLEN + sizeof(progfd);
     memcpy((char *)nla_xdp + NLA_HDRLEN, &progfd, sizeof(progfd));
-    nla->nla_len = NLA_HDRLEN + nla_xdp->nla_len;
+    nla->nla_len += nla_xdp->nla_len;
+
+    // parse flags as passed by the user
+    if (flags) {
+        nla_xdp = (struct nlattr *)((char *)nla + nla->nla_len);
+        nla_xdp->nla_type = 3/*IFLA_XDP_SKB*/;
+        nla_xdp->nla_len = NLA_HDRLEN + sizeof(flags);
+        memcpy((char *)nla_xdp + NLA_HDRLEN, &flags, sizeof(flags));
+        nla->nla_len += nla_xdp->nla_len;
+    }
 
     req.nh.nlmsg_len += NLA_ALIGN(nla->nla_len);
 
@@ -695,8 +765,7 @@ int bpf_attach_perf_event(int progfd, uint32_t ev_type, uint32_t ev_config,
     fprintf(stderr, "Unsupported perf event type\n");
     return -1;
   }
-  if ((ev_type == PERF_TYPE_HARDWARE && ev_config >= PERF_COUNT_HW_MAX) ||
-      (ev_type == PERF_TYPE_SOFTWARE && ev_config >= PERF_COUNT_SW_MAX)) {
+  if (invalid_perf_config(ev_type, ev_config)) {
     fprintf(stderr, "Invalid perf event config\n");
     return -1;
   }
@@ -739,10 +808,21 @@ int bpf_attach_perf_event(int progfd, uint32_t ev_type, uint32_t ev_config,
   return fd;
 }
 
-int bpf_detach_perf_event(uint32_t ev_type, uint32_t ev_config) {
-  // Right now, there is nothing to do, but it's a good idea to encourage
-  // callers to detach anything they attach.
-  return 0;
+int bpf_close_perf_event_fd(int fd) {
+  int res, error = 0;
+  if (fd >= 0) {
+    res = ioctl(fd, PERF_EVENT_IOC_DISABLE, 0);
+    if (res != 0) {
+      perror("ioctl(PERF_EVENT_IOC_DISABLE) failed");
+      error = res;
+    }
+    res = close(fd);
+    if (res != 0) {
+      perror("close perf event FD failed");
+      error = (res && !error) ? res : error;
+    }
+  }
+  return error;
 }
 
 int bpf_obj_pin(int fd, const char *pathname)

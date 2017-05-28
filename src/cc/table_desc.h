@@ -18,12 +18,12 @@
 
 #include <unistd.h>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <string>
 
-namespace llvm {
-class Function;
-}
+#include "bcc_exception.h"
+#include "file_desc.h"
 
 namespace clang {
 class ASTContext;
@@ -32,40 +32,8 @@ class QualType;
 
 namespace ebpf {
 
-class TableDesc;
-
-/// FileDesc is a helper class for managing open file descriptors. Copy is
-/// disallowed (call dup instead), and cleanup happens automatically.
-class FileDesc {
-  friend TableDesc;
-
- private:
-  FileDesc &operator=(const FileDesc &that) {
-    fd = ::dup(that.fd);
-    return *this;
-  }
-  FileDesc(const FileDesc &that) { *this = that; }
-
- public:
-  FileDesc(int fd = -1) : fd(fd) {}
-  FileDesc &operator=(FileDesc &&that) {
-    fd = that.fd;
-    that.fd = -1;
-    return *this;
-  }
-  FileDesc(FileDesc &&that) { *this = std::move(that); }
-  ~FileDesc() {
-    if (fd >= 0)
-      ::close(fd);
-  }
-  FileDesc dup() const { return FileDesc(*this); }
-
-  operator int() { return fd; }
-  operator int() const { return fd; }
-
- private:
-  int fd;
-};
+typedef std::function<StatusTuple(const char *, void *)> sscanf_fn;
+typedef std::function<StatusTuple(char *, size_t, const void *)> snprintf_fn;
 
 /// TableDesc uniquely stores all of the runtime state for an active bpf table.
 /// The copy constructor/assign operator are disabled since the file handles
@@ -74,8 +42,22 @@ class FileDesc {
 /// so that objects of this class can reside in stl containers.
 class TableDesc {
  private:
-  TableDesc(const TableDesc &) = default;
-  TableDesc &operator=(const TableDesc &) = default;
+  TableDesc(const TableDesc &that)
+      : name(that.name),
+        fd(that.fd.dup()),
+        type(that.type),
+        key_size(that.key_size),
+        leaf_size(that.leaf_size),
+        max_entries(that.max_entries),
+        flags(that.flags),
+        key_desc(that.key_desc),
+        leaf_desc(that.leaf_desc),
+        key_sscanf(that.key_sscanf),
+        leaf_sscanf(that.leaf_sscanf),
+        key_snprintf(that.key_snprintf),
+        leaf_snprintf(that.leaf_snprintf),
+        is_shared(that.is_shared),
+        is_extern(that.is_extern) {}
 
  public:
   TableDesc()
@@ -84,10 +66,6 @@ class TableDesc {
         leaf_size(0),
         max_entries(0),
         flags(0),
-        key_sscanf(nullptr),
-        leaf_sscanf(nullptr),
-        key_snprintf(nullptr),
-        leaf_snprintf(nullptr),
         is_shared(false),
         is_extern(false) {}
   TableDesc(const std::string &name, FileDesc &&fd, int type, size_t key_size,
@@ -99,14 +77,13 @@ class TableDesc {
         leaf_size(leaf_size),
         max_entries(max_entries),
         flags(flags),
-        key_sscanf(nullptr),
-        leaf_sscanf(nullptr),
-        key_snprintf(nullptr),
-        leaf_snprintf(nullptr),
         is_shared(false),
         is_extern(false) {}
   TableDesc(TableDesc &&that) = default;
+
   TableDesc &operator=(TableDesc &&that) = default;
+  TableDesc &operator=(const TableDesc &that) = delete;
+
   TableDesc dup() const { return TableDesc(*this); }
 
   std::string name;
@@ -118,10 +95,10 @@ class TableDesc {
   int flags;
   std::string key_desc;
   std::string leaf_desc;
-  llvm::Function *key_sscanf;
-  llvm::Function *leaf_sscanf;
-  llvm::Function *key_snprintf;
-  llvm::Function *leaf_snprintf;
+  sscanf_fn key_sscanf;
+  sscanf_fn leaf_sscanf;
+  snprintf_fn key_snprintf;
+  snprintf_fn leaf_snprintf;
   bool is_shared;
   bool is_extern;
 };

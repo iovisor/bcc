@@ -121,6 +121,38 @@ BPF_HASH(stats, int, struct { u32 a[3]; u32 b; }, 10);
         self.assertEqual(l.a[2], 3)
         self.assertEqual(l.b, 4)
 
+    def test_sscanf_string(self):
+        text = """
+struct Symbol {
+    char name[128];
+    char path[128];
+};
+struct Event {
+    uint32_t pid;
+    uint32_t tid;
+    struct Symbol stack[64];
+};
+BPF_TABLE("array", int, struct Event, comms, 1);
+"""
+        b = BPF(text=text)
+        t = b.get_table("comms")
+        s1 = t.leaf_sprintf(t[0])
+        fill = b' { "" "" }' * 63
+        self.assertEqual(s1, b'{ 0x0 0x0 [ { "" "" }%s ] }' % fill)
+        l = t.Leaf(1, 2)
+        name = b"libxyz"
+        path = b"/usr/lib/libxyz.so"
+        l.stack[0].name = name
+        l.stack[0].path = path
+        s2 = t.leaf_sprintf(l)
+        self.assertEqual(s2,
+                b'{ 0x1 0x2 [ { "%s" "%s" }%s ] }' % (name, path, fill))
+        l = t.leaf_scanf(s2)
+        self.assertEqual(l.pid, 1)
+        self.assertEqual(l.tid, 2)
+        self.assertEqual(l.stack[0].name, name)
+        self.assertEqual(l.stack[0].path, path)
+
     def test_iosnoop(self):
         text = """
 #include <linux/blkdev.h>
@@ -471,7 +503,8 @@ int trace_entry(struct pt_regs *ctx) {
         text = """
 #include <uapi/linux/ptrace.h>
 int trace_entry(struct pt_regs *ctx) {
-  bpf_trace_printk("%s %s\\n", "hello", "world");
+  char s1[] = "hello", s2[] = "world";
+  bpf_trace_printk("%s %s\\n", s1, s2);
   return 0;
 }
 """
@@ -522,7 +555,17 @@ int do_next(struct pt_regs *ctx) {
         with self.assertRaises(KeyError):
             b1["dummy"][c_key]
 
-
+    def test_invalid_noninline_call(self):
+        text = """
+int bar(void) {
+    return 0;
+}
+int foo(struct pt_regs *ctx) {
+    return bar();
+}
+"""
+        with self.assertRaises(Exception):
+            b = BPF(text=text)
 
 
 if __name__ == "__main__":

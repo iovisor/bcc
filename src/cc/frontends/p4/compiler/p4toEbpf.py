@@ -6,7 +6,7 @@
 # Compiler from P4 to EBPF
 # (See http://www.slideshare.net/PLUMgrid/ebpf-and-linux-networking).
 # This compiler in fact generates a C source file
-# which can be compiled to EBPF using the LLVM compiler 
+# which can be compiled to EBPF using the LLVM compiler
 # with the ebpf target.
 #
 # Main entry point.

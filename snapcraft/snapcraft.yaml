@@ -50,6 +50,8 @@ apps:
         command: wrapper cachetop
     capable:
         command: wrapper capable
+    cobjnew:
+        command: wrapper cobjnew
     cpudist:
         command: wrapper cpudist
     cpuunclaimed:
@@ -84,6 +86,18 @@ apps:
         command: wrapper gethostlatency
     hardirqs:
         command: wrapper hardirqs
+    javacalls:
+        command: wrapper javacalls
+    javaflow:
+        command: wrapper javaflow
+    javagc:
+        command: wrapper javagc
+    javaobjnew:
+        command: wrapper javaobjnew
+    javastat:
+        command: wrapper javastat
+    javathreads:
+        command: wrapper javathreads
     killsnoop:
         command: wrapper killsnoop
     llcstat:
@@ -96,6 +110,10 @@ apps:
         command: wrapper mountsnoop
     mysqld-qslower:
         command: wrapper mysqld_qslower
+    nodegc:
+        command: wrapper nodegc
+    nodestat:
+        command: wrapper nodestat
     offcputime:
         command: wrapper offcputime
     offwaketime:
@@ -104,10 +122,34 @@ apps:
         command: wrapper oomkill
     opensnoop:
         command: wrapper opensnoop
+    phpcalls:
+        command: wrapper phpcalls
+    phpflow:
+        command: wrapper phpflow
+    phpstat:
+        command: wrapper phpstat
     pidpersec:
         command: wrapper pidpersec
     profile:
         command: wrapper profile
+    pythoncalls:
+        command: wrapper pythoncalls
+    pythonflow:
+        command: wrapper pythonflow
+    pythongc:
+        command: wrapper pythongc
+    pythonstat:
+        command: wrapper pythonstat
+    rubycalls:
+        command: wrapper rubycalls
+    rubyflow:
+        command: wrapper rubyflow
+    rubygc:
+        command: wrapper rubygc
+    rubyobjnew:
+        command: wrapper rubyobjnew
+    rubystat:
+        command: wrapper rubystat
     runqlat:
         command: wrapper runqlat
     runqlen:
@@ -142,6 +184,8 @@ apps:
         command: wrapper tcpretrans
     tcptop:
         command: wrapper tcptop
+    tcptracer:
+        command: wrapper tcptracer
     tplist:
         command: wrapper tplist
     trace:
@@ -160,48 +204,6 @@ apps:
         command: wrapper lib/ustat
     uthreads:
         command: wrapper lib/uthreads
-    cobjnew:
-        command: wrapper cobjnew
-    javacalls:
-        command: wrapper javacalls
-    javaflow:
-        command: wrapper javaflow
-    javagc:
-        command: wrapper javagc
-    javaobjnew:
-        command: wrapper javaobjnew
-    javastat:
-        command: wrapper javastat
-    javathreads:
-        command: wrapper javathreads
-    nodegc:
-        command: wrapper nodegc
-    nodestat:
-        command: wrapper nodestat
-    phpcalls:
-        command: wrapper phpcalls
-    phpflow:
-        command: wrapper phpflow
-    phpstat:
-        command: wrapper phpstat
-    pythoncalls:
-        command: wrapper pythoncalls
-    pythonflow:
-        command: wrapper pythonflow
-    pythongc:
-        command: wrapper pythongc
-    pythonstat:
-        command: wrapper pythonstat
-    rubycalls:
-        command: wrapper rubycalls
-    rubyflow:
-        command: wrapper rubyflow
-    rubygc:
-        command: wrapper rubygc
-    rubyobjnew:
-        command: wrapper rubyobjnew
-    rubystat:
-        command: wrapper rubystat
     vfscount:
         command: wrapper vfscount
     vfsstat:

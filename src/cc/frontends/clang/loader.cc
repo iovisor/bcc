@@ -137,6 +137,8 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, TableStorage &ts, const st
                                    "-Wno-deprecated-declarations",
                                    "-Wno-gnu-variable-sized-type-not-at-end",
                                    "-Wno-pragma-once-outside-header",
+                                   "-Wno-address-of-packed-member",
+                                   "-Wno-unknown-warning-option",
                                    "-fno-color-diagnostics",
                                    "-fno-unwind-tables",
                                    "-fno-asynchronous-unwind-tables",
@@ -158,6 +160,10 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, TableStorage &ts, const st
     for (auto i = 0; i < ncflags; ++i)
       flags_cstr.push_back(cflags[i]);
   }
+#ifdef CUR_CPU_IDENTIFIER
+  string cur_cpu_flag = string("-DCUR_CPU_IDENTIFIER=") + CUR_CPU_IDENTIFIER;
+  flags_cstr.push_back(cur_cpu_flag.c_str());
+#endif
 
   // set up the error reporting class
   IntrusiveRefCntPtr<DiagnosticOptions> diag_opts(new DiagnosticOptions());
@@ -228,8 +234,8 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, TableStorage &ts, const st
   if (in_memory) {
     invocation0.getPreprocessorOpts().addRemappedFile(main_path, &*main_buf);
     invocation0.getFrontendOpts().Inputs.clear();
-    invocation0.getFrontendOpts().Inputs.push_back(
-        FrontendInputFile(main_path, IK_C));
+    invocation0.getFrontendOpts().Inputs.push_back(FrontendInputFile(
+        main_path, FrontendOptions::getInputKindForExtension("c")));
   }
   invocation0.getFrontendOpts().DisableFree = false;
 
@@ -258,8 +264,8 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, TableStorage &ts, const st
     invocation1.getPreprocessorOpts().addRemappedFile(f.first, &*f.second);
   invocation1.getPreprocessorOpts().addRemappedFile(main_path, &*out_buf);
   invocation1.getFrontendOpts().Inputs.clear();
-  invocation1.getFrontendOpts().Inputs.push_back(
-      FrontendInputFile(main_path, IK_C));
+  invocation1.getFrontendOpts().Inputs.push_back(FrontendInputFile(
+      main_path, FrontendOptions::getInputKindForExtension("c")));
   invocation1.getFrontendOpts().DisableFree = false;
 
   compiler1.createDiagnostics();
@@ -284,8 +290,8 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, TableStorage &ts, const st
     invocation2.getPreprocessorOpts().addRemappedFile(f.first, &*f.second);
   invocation2.getPreprocessorOpts().addRemappedFile(main_path, &*out_buf1);
   invocation2.getFrontendOpts().Inputs.clear();
-  invocation2.getFrontendOpts().Inputs.push_back(
-      FrontendInputFile(main_path, IK_C));
+  invocation2.getFrontendOpts().Inputs.push_back(FrontendInputFile(
+      main_path, FrontendOptions::getInputKindForExtension("c")));
   invocation2.getFrontendOpts().DisableFree = false;
   // Resort to normal inlining. In -O0 the default is OnlyAlwaysInlining and
   // clang might add noinline attribute even for functions with inline hint.

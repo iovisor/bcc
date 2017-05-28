@@ -21,6 +21,7 @@
 #include <sys/mount.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 #include "bcc_elf.h"
@@ -91,7 +92,7 @@ TEST_CASE("file-backed mapping identification") {
 TEST_CASE("resolve symbol name in external library", "[c_api]") {
   struct bcc_symbol sym;
 
-  REQUIRE(bcc_resolve_symname("c", "malloc", 0x0, 0, &sym) == 0);
+  REQUIRE(bcc_resolve_symname("c", "malloc", 0x0, 0, nullptr, &sym) == 0);
   REQUIRE(string(sym.module).find("libc.so") != string::npos);
   REQUIRE(sym.module[0] == '/');
   REQUIRE(sym.offset != 0);
@@ -101,7 +102,7 @@ TEST_CASE("resolve symbol name in external library", "[c_api]") {
 TEST_CASE("resolve symbol name in external library using loaded libraries", "[c_api]") {
   struct bcc_symbol sym;
 
-  REQUIRE(bcc_resolve_symname("bcc", "bcc_procutils_which", 0x0, getpid(), &sym) == 0);
+  REQUIRE(bcc_resolve_symname("bcc", "bcc_procutils_which", 0x0, getpid(), nullptr, &sym) == 0);
   REQUIRE(string(sym.module).find("libbcc.so") != string::npos);
   REQUIRE(sym.module[0] == '/');
   REQUIRE(sym.offset != 0);
@@ -194,7 +195,7 @@ static int mntns_func(void *arg) {
 
 TEST_CASE("resolve symbol addresses for a given PID", "[c_api]") {
   struct bcc_symbol sym;
-  void *resolver = bcc_symcache_new(getpid());
+  void *resolver = bcc_symcache_new(getpid(), nullptr);
 
   REQUIRE(resolver);
 
@@ -239,7 +240,7 @@ TEST_CASE("resolve symbol addresses for a given PID", "[c_api]") {
     child = spawn_child(0, true, true, mntns_func);
     REQUIRE(child > 0);
 
-    void *resolver = bcc_symcache_new(child);
+    void *resolver = bcc_symcache_new(child, nullptr);
     REQUIRE(resolver);
 
     REQUIRE(bcc_symcache_resolve_name(resolver, "/tmp/libz.so.1", "zlibVersion",
@@ -306,7 +307,7 @@ static int perf_map_func_noop(void *arg) {
 
 static pid_t spawn_child(void *map_addr, bool own_pidns, bool own_mntns,
     int (*child_func)(void *)) {
-  int flags = 0;
+  int flags = SIGCHLD;
   if (own_pidns)
     flags |= CLONE_NEWPID;
   if (own_mntns)
@@ -334,7 +335,7 @@ TEST_CASE("resolve symbols using /tmp/perf-pid.map", "[c_api]") {
     child = spawn_child(map_addr, /* own_pidns */ false, false, perf_map_func);
     REQUIRE(child > 0);
 
-    void *resolver = bcc_symcache_new(child);
+    void *resolver = bcc_symcache_new(child, nullptr);
     REQUIRE(resolver);
 
     REQUIRE(bcc_symcache_resolve(resolver, (unsigned long long)map_addr,
@@ -354,7 +355,7 @@ TEST_CASE("resolve symbols using /tmp/perf-pid.map", "[c_api]") {
     child = spawn_child(map_addr, /* own_pidns */ true, false, perf_map_func);
     REQUIRE(child > 0);
 
-    void *resolver = bcc_symcache_new(child);
+    void *resolver = bcc_symcache_new(child, nullptr);
     REQUIRE(resolver);
 
     REQUIRE(bcc_symcache_resolve(resolver, (unsigned long long)map_addr,
@@ -371,7 +372,7 @@ TEST_CASE("resolve symbols using /tmp/perf-pid.map", "[c_api]") {
         perf_map_func_mntns);
     REQUIRE(child > 0);
 
-    void *resolver = bcc_symcache_new(child);
+    void *resolver = bcc_symcache_new(child, nullptr);
     REQUIRE(resolver);
 
     REQUIRE(bcc_symcache_resolve(resolver, (unsigned long long)map_addr,
@@ -390,7 +391,7 @@ TEST_CASE("resolve symbols using /tmp/perf-pid.map", "[c_api]") {
     string path = perf_map_path(child);
     REQUIRE(make_perf_map_file(path, (unsigned long long)map_addr) == 0);
 
-    void *resolver = bcc_symcache_new(child);
+    void *resolver = bcc_symcache_new(child, nullptr);
     REQUIRE(resolver);
 
     REQUIRE(bcc_symcache_resolve(resolver, (unsigned long long)map_addr,

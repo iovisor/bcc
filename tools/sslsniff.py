@@ -30,7 +30,7 @@ parser = argparse.ArgumentParser(
     description="Sniff SSL data",
     formatter_class=argparse.RawDescriptionHelpFormatter,
     epilog=examples)
-parser.add_argument("-p", "--pid", help="sniff this PID only.")
+parser.add_argument("-p", "--pid", type=int, help="sniff this PID only.")
 parser.add_argument("-c", "--comm",
                     help="sniff only commands matching string.")
 parser.add_argument("-o", "--no-openssl", action="store_false", dest="openssl",
@@ -50,7 +50,7 @@ struct probe_SSL_data_t {
         u64 timestamp_ns;
         u32 pid;
         char comm[TASK_COMM_LEN];
-        char v0[472];
+        char v0[464];
         u32 len;
 };
 
@@ -115,7 +115,7 @@ int probe_SSL_read_exit(struct pt_regs *ctx, void *ssl, void *buf, int num) {
 """
 
 if args.pid:
-    prog = prog.replace('FILTER', 'if (pid != %s) { return 0; }' % args.pid)
+    prog = prog.replace('FILTER', 'if (pid != %d) { return 0; }' % args.pid)
 else:
     prog = prog.replace('FILTER', '')
 
@@ -147,7 +147,7 @@ if args.gnutls:
 
 # define output data structure in Python
 TASK_COMM_LEN = 16  # linux/sched.h
-MAX_BUF_SIZE = 472  # Limited by the BPF stack
+MAX_BUF_SIZE = 464  # Limited by the BPF stack
 
 
 # Max size of the whole struct: 512 bytes

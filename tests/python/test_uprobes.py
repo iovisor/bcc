@@ -84,7 +84,7 @@ int count(struct pt_regs *ctx) {
         libc = ctypes.CDLL("libc.so.6", use_errno=True)
 
         # Need to find path to libz.so.1
-        libz_path = None 
+        libz_path = None
         p = subprocess.Popen(["ldconfig", "-p"], stdout=subprocess.PIPE)
         for l in p.stdout:
             n = l.split()
@@ -102,7 +102,7 @@ int count(struct pt_regs *ctx) {
             if libc.unshare(0x00020000) == -1:
                 e = ctypes.get_errno()
                 raise OSError(e, errno.errorcode[e])
-        
+
             # Remount root MS_REC|MS_PRIVATE
             if libc.mount(None, "/", None, (1<<14)|(1<<18) , None) == -1:
                 e = ctypes.get_errno()
@@ -119,7 +119,7 @@ int count(struct pt_regs *ctx) {
             libz.zlibVersion()
             time.sleep(5)
             os._exit(0)
-            
+
         libname = "/tmp/libz.so.1"
         symname = "zlibVersion"
         text = text.replace("PID", "%d" % child_pid)
@@ -131,6 +131,6 @@ int count(struct pt_regs *ctx) {
         b.detach_uretprobe(name=libname, sym=symname, pid=child_pid)
         b.detach_uprobe(name=libname, sym=symname, pid=child_pid)
         os.wait()
- 
+
 if __name__ == "__main__":
     unittest.main()

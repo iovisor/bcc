@@ -90,6 +90,13 @@ public:
                                 int group_fd = -1);
   StatusTuple detach_perf_event(uint32_t ev_type, uint32_t ev_config);
 
+  BPFTable get_table(const std::string& name) {
+    TableStorage::iterator it;
+    if (bpf_module_->table_storage().Find(Path({bpf_module_->id(), name}), it))
+      return BPFTable(it->second);
+    return BPFTable({});
+  }
+
   template <class ValueType>
   BPFArrayTable<ValueType> get_array_table(const std::string& name) {
     TableStorage::iterator it;
@@ -108,7 +115,9 @@ public:
 
   BPFProgTable get_prog_table(const std::string& name);
 
-  BPFStackTable get_stack_table(const std::string& name);
+  BPFStackTable get_stack_table(const std::string& name,
+                                bool use_debug_file = true,
+                                bool check_debug_file_crc = true);
 
   StatusTuple open_perf_buffer(const std::string& name,
                                perf_reader_raw_cb cb,
@@ -164,7 +173,9 @@ private:
 
   StatusTuple check_binary_symbol(const std::string& binary_path,
                                   const std::string& symbol,
-                                  uint64_t symbol_addr, bcc_symbol* output);
+                                  uint64_t symbol_addr,
+                                  std::string &module_res,
+                                  uint64_t &offset_res);
 
   std::unique_ptr<BPFModule> bpf_module_;
 
@@ -208,7 +219,7 @@ private:
   std::string name_;
   std::string probe_func_;
 
-  std::vector<intptr_t> addresses_;
+  std::vector<uintptr_t> addresses_;
 
   std::string program_text_;
 

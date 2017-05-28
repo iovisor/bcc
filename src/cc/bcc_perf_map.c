@@ -14,11 +14,21 @@
  * limitations under the License.
  */
 #include <ctype.h>
+#include <errno.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "bcc_perf_map.h"
+
+bool bcc_is_perf_map(const char *path) {
+  char* pos = strstr(path, ".map");
+  // Path ends with ".map"
+  if (pos == NULL || *(pos + 4) != 0)
+    return false;
+  return access(path, R_OK) == 0;
+}
 
 int bcc_perf_map_nstgid(int pid) {
   char status_path[64];
@@ -82,13 +92,15 @@ int bcc_perf_map_foreach_sym(const char *path, bcc_perf_map_symcb callback,
     char *newline, *sep;
 
     begin = strtoull(cursor, &sep, 16);
-    if (*sep != ' ' || (sep == cursor && begin == 0))
+    if (begin == 0 || *sep != ' ' || (begin == ULLONG_MAX && errno == ERANGE))
       continue;
     cursor = sep;
     while (*cursor && isspace(*cursor)) cursor++;
 
     len = strtoull(cursor, &sep, 16);
-    if (*sep != ' ' || (sep == cursor && begin == 0))
+    if (*sep != ' ' ||
+        (sep == cursor && len == 0) ||
+        (len == ULLONG_MAX && errno == ERANGE))
       continue;
     cursor = sep;
     while (*cursor && isspace(*cursor)) cursor++;
@@ -97,7 +109,7 @@ int bcc_perf_map_foreach_sym(const char *path, bcc_perf_map_symcb callback,
     if (newline)
         newline[0] = '\0';
 
-    callback(cursor, begin, len, 0, payload);
+    callback(cursor, begin, len, payload);
   }
 
   free(line);

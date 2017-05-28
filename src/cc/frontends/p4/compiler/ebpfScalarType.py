@@ -51,7 +51,7 @@ class EbpfScalarType(EbpfType):
             return 4
         else:
             return 1  # Char array
-    
+
     def serialize(self, serializer):
         assert isinstance(serializer, ProgramSerializer)
         serializer.append(self.asString())

@@ -52,7 +52,7 @@ if not args.pids or len(args.pids) == 0:
                                         "pidof postgres".split()).split())
 
 program = """
-#include <linux/ptrace.h>
+#include <uapi/linux/ptrace.h>
 
 BPF_HASH(temp, u64, u64);
 BPF_HISTOGRAM(latency);
@@ -88,10 +88,11 @@ for usdt in usdts:
     usdt.enable_probe("query__start", "probe_start")
     usdt.enable_probe("query__done", "probe_end")
 
-bpf = BPF(text=program, usdt_contexts=usdts)
 if args.verbose:
     print('\n'.join(map(lambda u: u.get_text(), usdts)))
     print(program)
+
+bpf = BPF(text=program, usdt_contexts=usdts)
 
 print("Tracing database queries for pids %s slower than %d ms..." %
       (', '.join(map(str, args.pids)), args.threshold))

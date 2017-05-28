@@ -48,7 +48,7 @@ Probe::Probe(const char *bin_path, const char *provider, const char *name,
 
 bool Probe::in_shared_object() {
   if (!in_shared_object_)
-    in_shared_object_ = (bcc_elf_is_shared_obj(bin_path_.c_str()) == 1);
+    in_shared_object_ = bcc_elf_is_shared_obj(bin_path_.c_str());
   return in_shared_object_.value();
 }
 
@@ -152,10 +152,10 @@ bool Probe::usdt_getarg(std::ostream &stream) {
 
   for (size_t arg_n = 0; arg_n < arg_count; ++arg_n) {
     std::string ctype = largest_arg_type(arg_n);
-    std::string cptr = tfm::format("*((%s *)dest)", ctype);
+    std::string cptr = tfm::format("*((volatile %s *)dest)", ctype);
 
     tfm::format(stream,
-                "static inline int _bpf_readarg_%s_%d("
+                "static __always_inline int _bpf_readarg_%s_%d("
                 "struct pt_regs *ctx, void *dest, size_t len) {\n"
                 "  if (len != sizeof(%s)) return -1;\n",
                 attached_to_.value(), arg_n + 1, ctype);
@@ -199,7 +199,7 @@ void Context::_each_probe(const char *binpath, const struct bcc_elf_usdt *probe,
   ctx->add_probe(binpath, probe);
 }
 
-int Context::_each_module(const char *modpath, uint64_t, uint64_t, void *p) {
+int Context::_each_module(const char *modpath, uint64_t, uint64_t, bool, void *p) {
   Context *ctx = static_cast<Context *>(p);
   // Modules may be reported multiple times if they contain more than one
   // executable region. We are going to parse the ELF on disk anyway, so we

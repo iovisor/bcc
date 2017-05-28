@@ -65,6 +65,17 @@ BPF_TABLE(_table_type, _key_type, _leaf_type, _name, _max_entries); \
 __attribute__((section("maps/export"))) \
 struct _name##_table_t __##_name
 
+// Identifier for current CPU used in perf_submit and perf_read
+// Prefer BPF_F_CURRENT_CPU flag, falls back to call helper for older kernel
+// Can be overridden from BCC
+#ifndef CUR_CPU_IDENTIFIER
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0)
+#define CUR_CPU_IDENTIFIER BPF_F_CURRENT_CPU
+#else
+#define CUR_CPU_IDENTIFIER bpf_get_smp_processor_id()
+#endif
+#endif
+
 // Table for pushing custom events to userspace via ring buffer
 #define BPF_PERF_OUTPUT(_name) \
 struct _name##_table_t { \
@@ -165,6 +176,8 @@ static u32 (*bpf_get_prandom_u32)(void) =
   (void *) BPF_FUNC_get_prandom_u32;
 static int (*bpf_trace_printk_)(const char *fmt, u64 fmt_size, ...) =
   (void *) BPF_FUNC_trace_printk;
+static int (*bpf_probe_read_str)(void *dst, u64 size, void *unsafe_ptr) =
+  (void *) BPF_FUNC_probe_read_str;
 int bpf_trace_printk(const char *fmt, ...) asm("llvm.bpf.extra");
 static inline __attribute__((always_inline))
 void bpf_tail_call_(u64 map_fd, void *ctx, int index) {
@@ -190,7 +203,7 @@ static int (*bpf_skb_get_tunnel_key)(void *ctx, void *to, u32 size, u64 flags) =
   (void *) BPF_FUNC_skb_get_tunnel_key;
 static int (*bpf_skb_set_tunnel_key)(void *ctx, void *from, u32 size, u64 flags) =
   (void *) BPF_FUNC_skb_set_tunnel_key;
-static int (*bpf_perf_event_read)(void *map, u32 index) =
+static u64 (*bpf_perf_event_read)(void *map, u64 flags) =
   (void *) BPF_FUNC_perf_event_read;
 static int (*bpf_redirect)(int ifindex, u32 flags) =
   (void *) BPF_FUNC_redirect;

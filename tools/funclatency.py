@@ -45,7 +45,7 @@ parser = argparse.ArgumentParser(
     description="Time functions and print latency as a histogram",
     formatter_class=argparse.RawDescriptionHelpFormatter,
     epilog=examples)
-parser.add_argument("-p", "--pid",
+parser.add_argument("-p", "--pid", type=int,
     help="trace this PID only")
 parser.add_argument("-i", "--interval", default=99999999,
     help="summary interval, seconds")
@@ -147,7 +147,7 @@ need_key = args.function or (library and not args.pid)
 # code substitutions
 if args.pid:
     bpf_text = bpf_text.replace('FILTER',
-        'if (tgid != %s) { return 0; }' % args.pid)
+        'if (tgid != %d) { return 0; }' % args.pid)
 else:
     bpf_text = bpf_text.replace('FILTER', '')
 if args.milliseconds:

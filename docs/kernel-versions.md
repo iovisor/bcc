@@ -16,6 +16,7 @@ s390 | 4.1 | [054623105728](https://git.kernel.org/cgit/linux/kernel/git/torvald
 Constant blinding for JIT machines | 4.7 | [4f3446bb809f](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=4f3446bb809f20ad56cadf712e6006815ae7a8f9)
 PowerPC64 | 4.8 | [156d0e290e96](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=156d0e290e969caba25f1851c52417c14d141b24)
 Constant blinding - PowerPC64 | 4.9 | [b7b7013cac55](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=b7b7013cac55d794940bd9cb7b7c55c9dececac4)
+Sparc64 | 4.12 | [7a12b5031c6b](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=7a12b5031c6b947cc13918237ae652b536243b76)
 
 ## Main features
 
@@ -43,7 +44,8 @@ BPF attached to cgroups for socket filtering | 4.10 | [0e33661de493](https://git
 Lightweight tunnel encapsulation | 4.10 | [3a0af8fd61f9](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=3a0af8fd61f90920f6fa04e4f1e9a6a73c1b4fd2)
 **e**BPF support for `xt_bpf` module (iptables) | 4.10 | [2c16d6033264](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=2c16d60332643e90d4fa244f4a706c454b8c7569)
 BPF program tag | 4.10 | [7bd509e311f4](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=7bd509e311f408f7a5132fcdde2069af65fa05ae)
-Tracepoints to debug BPF | [4.11](https://git.kernel.org/cgit/linux/kernel/git/davem/net-next.git/commit/?id=a67edbf4fb6deadcfe57a04a134abed4a5ba3bb5) | []()
+Tracepoints to debug BPF | 4.11 | [a67edbf4fb6d](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=a67edbf4fb6deadcfe57a04a134abed4a5ba3bb5)
+Testing / benchmarking BPF programs | 4.12 | [1cf1cae963c2](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=1cf1cae963c2e6032aebe1637e995bc2f5d330f4)
 
 ## Tables (_a.k.a._ Maps)
 
@@ -60,9 +62,9 @@ Pre-alloc maps memory | 4.6 | [6c9059817432](https://git.kernel.org/cgit/linux/k
 cgroup array | 4.8 | [4ed8ec521ed5](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=4ed8ec521ed57c4e207ad464ca0388776de74d4b)
 LRU hash | 4.10 | [29ba732acbee](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=29ba732acbeece1e34c68483d1ec1f3720fa1bb3) [3a08c2fd7634](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=3a08c2fd763450a927d1130de078d6f9e74944fb)
 LRU per-CPU hash | 4.10 | [8f8449384ec3](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=8f8449384ec364ba2a654f11f94e754e4ff719e0) [961578b63474](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=961578b63474d13ad0e2f615fcc2901c5197dda6)
-LPM trie (longest-prefix match) | 4.11 | [b95a5c4db09b](https://git.kernel.org/cgit/linux/kernel/git/davem/net-next.git/commit/?id=b95a5c4db09bc7c253636cb84dc9b12c577fd5a0)
-Array of maps | 4.11 | [56f668dfe00d](https://git.kernel.org/cgit/linux/kernel/git/davem/net-next.git/commit/?id=56f668dfe00dcf086734f1c42ea999398fad6572)
-Hash of maps | 4.11 | [bcc6b1b7ebf8](https://git.kernel.org/cgit/linux/kernel/git/davem/net-next.git/commit/?id=bcc6b1b7ebf857a9fe56202e2be3361131588c15)
+LPM trie (longest-prefix match) | 4.11 | [b95a5c4db09b](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=b95a5c4db09bc7c253636cb84dc9b12c577fd5a0)
+Array of maps | 4.12 | [56f668dfe00d](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=56f668dfe00dcf086734f1c42ea999398fad6572)
+Hash of maps | 4.12 | [bcc6b1b7ebf8](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=bcc6b1b7ebf857a9fe56202e2be3361131588c15)
 Text string | _To be done?_ |
 Variable-length maps | _To be done?_ |
 
@@ -80,11 +82,13 @@ Mellanox `mlx5` driver | 4.9 | [86994156c736](https://git.kernel.org/cgit/linux/
 Netronome `nfp` driver | 4.10 | [ecd63a0217d5](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=ecd63a0217d5f1e8a92f7516f5586d1177b95de2)
 QLogic (Cavium) `qed*` drivers | 4.10 | [496e05170958](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=496e051709588f832d7a6a420f44f8642b308a87)
 `virtio_net` driver | 4.10 | [f600b6905015](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=f600b690501550b94e83e07295d9c8b9c4c39f4e)
-Broadcom `bnxt_en` driver | [4.11](https://git.kernel.org/cgit/linux/kernel/git/davem/net-next.git/commit/?id=c6d30e8391b85e00eb544e6cf047ee0160ee9938) | []()
-Intel `e1000` driver | | [Not upstream yet](https://git.kernel.org/pub/scm/linux/kernel/git/ast/bpf.git/commit/?h=xdp&id=0afee87cfc800bf3317f4dc8847e6f36539b820c)
-Intel `e1000e` driver | | [Not upstream yet](https://lists.iovisor.org/pipermail/iovisor-dev/2017-April/000705.html)
+Broadcom `bnxt_en` driver | 4.11 | [c6d30e8391b8](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=c6d30e8391b85e00eb544e6cf047ee0160ee9938)
+Intel `ixgbe*` drivers | 4.12 | [924708081629](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=9247080816297de4e31abb684939c0e53e3a8a67)
+Cavium `thunderx` driver | 4.12 | [05c773f52b96](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=05c773f52b96ef3fbc7d9bfa21caadc6247ef7a8)
+Generic XDP | 4.12 | [b5cdae3291f7](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=b5cdae3291f7be7a34e75affe4c0ec1f7f328b64)
+Intel `e1000` driver | | [Not upstream yet](https://git.kernel.org/pub/scm/linux/kernel/git/ast/bpf.git/commit/?h=xdp&id=0afee87cfc800bf3317f4dc8847e6f36539b820c)
+Intel `e1000e` driver | | [Not planned for upstream at this time](https://github.com/adjavon/e1000e_xdp)
 Intel `i40e` driver | | [Not upstream yet](https://www.spinics.net/lists/netdev/msg409498.html)
-Generic XDP | | [Not upstream yet](https://www.spinics.net/lists/xdp-newbies/msg00054.html)
 
 ## Helpers
 
@@ -106,6 +110,8 @@ Helper | Kernel version | Commit
 `BPF_FUNC_get_prandom_u32()` | 4.1 | [03e69b508b6f](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=03e69b508b6f7c51743055c9f61d1dfeadf4b635)
 `BPF_FUNC_get_route_realm()` | 4.4 | [c46646d0484f](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=c46646d0484f5d08e2bede9b45034ba5b8b489cc)
 `BPF_FUNC_get_smp_processor_id()` | 4.1 | [c04167ce2ca0](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=c04167ce2ca0ecaeaafef006cb0d65cf01b68e42)
+`BPF_FUNC_get_socket_cookie()` | 4.12 | [6acc5c291068](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=6acc5c2910689fc6ee181bf63085c5efff6a42bd)
+`BPF_FUNC_get_socket_uid()` | 4.12 | [6acc5c291068](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=6acc5c2910689fc6ee181bf63085c5efff6a42bd)
 `BPF_FUNC_get_stackid()` | 4.6 | [d5a3b1f69186](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=d5a3b1f691865be576c2bffa708549b8cdccda19)
 `BPF_FUNC_ktime_get_ns()` | 4.1 | [d9847d310ab4](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=d9847d310ab4003725e6ed1822682e24bd406908)
 `BPF_FUNC_l3_csum_replace()` | 4.1 | [91bc4822c3d6](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=91bc4822c3d61b9bb7ef66d3b77948a4f9177954)
@@ -116,7 +122,7 @@ Helper | Kernel version | Commit
 `BPF_FUNC_perf_event_output()` | 4.4 | [a43eec304259](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=a43eec304259a6c637f4014a6d4767159b6a3aa3)
 `BPF_FUNC_perf_event_read()` | 4.3 | [35578d798400](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=35578d7984003097af2b1e34502bc943d40c1804)
 `BPF_FUNC_probe_read()` | 4.1 | [2541517c32be](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=2541517c32be2531e0da59dfd7efc1ce844644f5)
-`BPF_FUNC_probe_read_str()` | [4.11](https://git.kernel.org/cgit/linux/kernel/git/davem/net-next.git/commit/?id=a5e8c07059d0f0b31737408711d44794928ac218) | []()
+`BPF_FUNC_probe_read_str()` | 4.11 | [a5e8c07059d0](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=a5e8c07059d0f0b31737408711d44794928ac218)
 `BPF_FUNC_probe_write_user()` | 4.8 | [96ae52279594](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=96ae52279594470622ff0585621a13e96b700600)
 `BPF_FUNC_redirect()` | 4.4 | [27b29f63058d](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=27b29f63058d26c6c1742f1993338280d5a41dc6)
 `BPF_FUNC_set_hash_invalid()` | 4.9 | [7a4b28c6cc9f](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=7a4b28c6cc9ffac50f791b99cc7e46106436e5d8)

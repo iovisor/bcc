@@ -341,7 +341,7 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
           string args_other = rewriter_.getRewrittenText(expansionRange(SourceRange(Call->getArg(1)->getLocStart(),
                                                            Call->getArg(2)->getLocEnd())));
           txt = "bpf_perf_event_output(" + arg0 + ", bpf_pseudo_fd(1, " + fd + ")";
-          txt += ", bpf_get_smp_processor_id(), " + args_other + ")";
+          txt += ", CUR_CPU_IDENTIFIER, " + args_other + ")";
         } else if (memb_name == "perf_submit_skb") {
           string skb = rewriter_.getRewrittenText(expansionRange(Call->getArg(0)->getSourceRange()));
           string skb_len = rewriter_.getRewrittenText(expansionRange(Call->getArg(1)->getSourceRange()));
@@ -460,6 +460,15 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
           text = "_bpf_readarg_" + current_fn_ + "_" + args[0] + "(" + args[1] +
                  ", " + args[2] + ", sizeof(*(" + args[2] + ")))";
           rewriter_.ReplaceText(expansionRange(Call->getSourceRange()), text);
+        }
+      }
+    } else if (FunctionDecl *F = dyn_cast<FunctionDecl>(Decl)) {
+      if (F->isExternallyVisible() && !F->getBuiltinID()) {
+        auto start_loc = rewriter_.getSourceMgr().getFileLoc(Decl->getLocStart());
+        if (rewriter_.getSourceMgr().getFileID(start_loc)
+            == rewriter_.getSourceMgr().getMainFileID()) {
+          error(Call->getLocStart(), "cannot call non-static helper function");
+          return false;
         }
       }
     }

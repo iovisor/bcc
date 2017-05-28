@@ -30,7 +30,7 @@ examples = """examples:
     ./execsnoop -x        # include failed exec()s
     ./execsnoop -t        # include timestamps
     ./execsnoop -n main   # only print command lines containing "main"
-    ./execsnoop -l tpkg   # only print command where arguments contains "tpkg" 
+    ./execsnoop -l tpkg   # only print command where arguments contains "tpkg"
 """
 parser = argparse.ArgumentParser(
     description="Trace exec() syscalls",

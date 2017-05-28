@@ -16,12 +16,15 @@
 #pragma once
 
 #include <algorithm>
+#include <memory>
 #include <string>
+#include <sys/types.h>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
-#include <sys/types.h>
+#include "file_desc.h"
+#include "bcc_syms.h"
 
 class ProcStat {
   std::string procfs_;
@@ -30,7 +33,7 @@ class ProcStat {
 
 public:
   ProcStat(int pid);
-  bool is_stale() { return inode_ != getinode_(); }
+  bool is_stale();
   void reset() { inode_ = getinode_(); }
 };
 
@@ -64,18 +67,53 @@ public:
   virtual void refresh();
 };
 
+class ProcMountNSGuard;
+class ProcSyms;
+
+class ProcMountNS {
+private:
+  explicit ProcMountNS(int pid);
+
+  ebpf::FileDesc self_fd_;
+  ebpf::FileDesc target_fd_;
+
+  friend class ProcMountNSGuard;
+  friend class ProcSyms;
+};
+
+class ProcMountNSGuard {
+public:
+  explicit ProcMountNSGuard(ProcMountNS *mount_ns);
+  explicit ProcMountNSGuard(int pid);
+
+  ~ProcMountNSGuard();
+
+private:
+  void init();
+
+  std::unique_ptr<ProcMountNS> mount_ns_instance_;
+  ProcMountNS *mount_ns_;
+  bool entered_;
+};
+
 class ProcSyms : SymbolCache {
   struct Symbol {
-    Symbol(const std::string *name, uint64_t start, uint64_t size, int flags = 0)
-        : name(name), start(start), size(size), flags(flags) {}
+    Symbol(const std::string *name, uint64_t start, uint64_t size)
+        : name(name), start(start), size(size) {}
     const std::string *name;
     uint64_t start;
     uint64_t size;
-    int flags;
 
     bool operator<(const struct Symbol& rhs) const {
       return start < rhs.start;
     }
+  };
+
+  enum class ModuleType {
+    UNKNOWN,
+    EXEC,
+    SO,
+    PERF_MAP
   };
 
   struct Module {
@@ -85,36 +123,41 @@ class ProcSyms : SymbolCache {
       Range(uint64_t s, uint64_t e) : start(s), end(e) {}
     };
 
-    Module(const char *name, int pid, bool in_ns);
+    Module(const char *name, ProcMountNS* mount_ns,
+           struct bcc_symbol_option *option);
+    bool init();
+
     std::string name_;
     std::vector<Range> ranges_;
-    bool is_so_;
-    int pid_;
-    bool in_ns_;
+    bool loaded_;
+    ProcMountNS *mount_ns_;
+    bcc_symbol_option *symbol_option_;
+    ModuleType type_;
+
     std::unordered_set<std::string> symnames_;
     std::vector<Symbol> syms_;
 
     void load_sym_table();
-    bool contains(uint64_t addr) const;
+    bool contains(uint64_t addr, uint64_t &offset) const;
     uint64_t start() const { return ranges_.begin()->start; }
-    bool find_addr(uint64_t addr, struct bcc_symbol *sym);
+    bool find_addr(uint64_t offset, struct bcc_symbol *sym);
     bool find_name(const char *symname, uint64_t *addr);
-    bool is_so() const { return is_so_; }
-    bool is_perf_map() const;
 
-    static int _add_symbol(const char *symname, uint64_t start, uint64_t end,
-                           int flags, void *p);
+    static int _add_symbol(const char *symname, uint64_t start, uint64_t size,
+                           void *p);
   };
 
   int pid_;
   std::vector<Module> modules_;
   ProcStat procstat_;
+  std::unique_ptr<ProcMountNS> mount_ns_instance_;
+  bcc_symbol_option symbol_option_;
 
-  static int _add_module(const char *, uint64_t, uint64_t, void *);
+  static int _add_module(const char *, uint64_t, uint64_t, bool, void *);
   bool load_modules();
 
 public:
-  ProcSyms(int pid);
+  ProcSyms(int pid, struct bcc_symbol_option *option = nullptr);
   virtual void refresh();
   virtual bool resolve_addr(uint64_t addr, struct bcc_symbol *sym, bool demangle = true);
   virtual bool resolve_name(const char *module, const char *name,

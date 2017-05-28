@@ -24,7 +24,7 @@ import errno
 import sys
 basestring = (unicode if sys.version_info[0] < 3 else str)
 
-from .libbcc import lib, _CB_TYPE, bcc_symbol, _SYM_CB_TYPE
+from .libbcc import lib, _CB_TYPE, bcc_symbol, bcc_symbol_option, _SYM_CB_TYPE
 from .table import Table
 from .perf import Perf
 from .utils import get_online_cpus
@@ -46,7 +46,8 @@ LOG_BUFFER_SIZE = 65536
 
 class SymbolCache(object):
     def __init__(self, pid):
-        self.cache = lib.bcc_symcache_new(pid)
+        self.cache = lib.bcc_symcache_new(
+                pid, ct.cast(None, ct.POINTER(bcc_symbol_option)))
 
     def resolve(self, addr, demangle):
         """
@@ -570,14 +571,14 @@ class BPF(object):
         self._del_kprobe(ev_name)
 
     @staticmethod
-    def attach_xdp(dev, fn):
+    def attach_xdp(dev, fn, flags):
         '''
             This function attaches a BPF function to a device on the device
             driver level (XDP)
         '''
         if not isinstance(fn, BPF.Function):
             raise Exception("arg 1 must be of type BPF.Function")
-        res = lib.bpf_attach_xdp(dev, fn.fd)
+        res = lib.bpf_attach_xdp(dev, fn.fd, flags)
         if res < 0:
             err_no = ct.get_errno()
             if err_no == errno.EBADMSG:
@@ -594,7 +595,7 @@ class BPF(object):
             This function removes any BPF function from a device on the
             device driver level (XDP)
         '''
-        res = lib.bpf_attach_xdp(dev, -1)
+        res = lib.bpf_attach_xdp(dev, -1, 0)
         if res < 0:
             errstr = os.strerror(ct.get_errno())
             raise Exception("Failed to detach BPF from device %s: %s"
@@ -607,11 +608,12 @@ class BPF(object):
         sym = bcc_symbol()
         psym = ct.pointer(sym)
         c_pid = 0 if pid == -1 else pid
-        if lib.bcc_resolve_symname(module,
-                symname, addr or 0x0, c_pid, psym) < 0:
-            if not sym.module:
-                raise Exception("could not find library %s" % module)
-            lib.bcc_procutils_free(sym.module)
+        if lib.bcc_resolve_symname(
+            module, symname,
+            addr or 0x0, c_pid,
+            ct.cast(None, ct.POINTER(bcc_symbol_option)),
+            psym,
+        ) < 0:
             raise Exception("could not determine address of symbol %s" % symname)
         module_path = ct.cast(sym.module, ct.c_char_p).value
         lib.bcc_procutils_free(sym.module)
@@ -728,13 +730,13 @@ class BPF(object):
         except KeyError:
             raise Exception("Perf event type {} config {} not attached".format(
                 ev_type, ev_config))
+
+        res = 0
         for fd in fds.values():
-            os.close(fd)
-        res = lib.bpf_detach_perf_event(ev_type, ev_config)
-        if res < 0:
+            res = lib.bpf_close_perf_event_fd(fd) or res
+        if res != 0:
             raise Exception("Failed to detach BPF from perf event")
         del self.open_perf_events[(ev_type, ev_config)]
-        return res
 
     def _add_uprobe(self, name, probe):
         global _num_open_probes
@@ -773,7 +775,8 @@ class BPF(object):
                 addresses.append((dname, addr))
             return 0
 
-        res = lib.bcc_foreach_symbol(name, _SYM_CB_TYPE(sym_cb))
+        res = lib.bcc_foreach_function_symbol(
+                name, _SYM_CB_TYPE(sym_cb))
         if res < 0:
             raise Exception("Error %d enumerating symbols in %s" % (res, name))
         return addresses

@@ -258,7 +258,7 @@ local function valloc(size, blank)
 	stack_top = math.ceil(stack_top/8)*8
 	-- Current kernel version doesn't support ARG_PTR_TO_RAW_STACK
 	-- so we always need to have memory initialized, remove this when supported
-	if blank then 
+	if blank then
 		if type(blank) == 'string' then
 			local sp = 0
 			while sp < size do
@@ -276,7 +276,7 @@ local function valloc(size, blank)
 				emit(BPF.MEM + BPF.STX + BPF.DW, 10, 0, -sp, 0)
 			end
 		else error('NYI: will with unknown type '..type(blank)) end
-	end 
+	end
 	return stack_top
 end
 
@@ -604,7 +604,7 @@ local function MAP_DEL(map_var, key, key_imm)
 end
 
 local function MAP_SET(map_var, key, key_imm, src)
-	local map = V[map_var].const	
+	local map = V[map_var].const
 	-- Delete when setting nil
 	if V[src].type == ffi.typeof('void') then
 		return MAP_DEL(map_var, key, key_imm)

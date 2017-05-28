@@ -3,7 +3,7 @@
 #Bertrone Matteo - Polytechnic of Turin
 #November 2015
 #
-#eBPF application that parses HTTP packets 
+#eBPF application that parses HTTP packets
 #and extracts (and prints on screen) the URL contained in the GET/POST request.
 #
 #eBPF program http_filter is used as SOCKET_FILTER attached to eth0 interface.
@@ -38,7 +38,7 @@ def toHex(s):
         if len(hv) == 1:
             hv = '0'+hv
         lst.append(hv)
-    
+
     return reduce(lambda x,y:x+y, lst)
 
 #print str until CR+LF
@@ -50,7 +50,7 @@ def printUntilCRLF(str):
           return
       print ("%c" % (str[k]), end = "")
     print("")
-    return  
+    return
 
 #cleanup function
 def cleanup():
@@ -71,7 +71,7 @@ def cleanup():
             del bpf_sessions[key]
       except:
         print("cleanup exception.")
-    return 
+    return
 
 #args
 def usage():
@@ -155,9 +155,9 @@ while 1:
 
   #convert packet into bytearray
   packet_bytearray = bytearray(packet_str)
-  
+
   #ethernet header length
-  ETH_HLEN = 14 
+  ETH_HLEN = 14
 
   #IP HEADER
   #https://tools.ietf.org/html/rfc791
@@ -166,18 +166,18 @@ while 1:
   # |Version|  IHL  |Type of Service|          Total Length         |
   # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
   #
-  #IHL : Internet Header Length is the length of the internet header 
+  #IHL : Internet Header Length is the length of the internet header
   #value to multiply * 4 byte
   #e.g. IHL = 5 ; IP Header Length = 5 * 4 byte = 20 byte
   #
-  #Total length: This 16-bit field defines the entire packet size, 
+  #Total length: This 16-bit field defines the entire packet size,
   #including header and data, in bytes.
 
   #calculate packet total length
   total_length = packet_bytearray[ETH_HLEN + 2]               #load MSB
   total_length = total_length << 8                            #shift MSB
   total_length = total_length + packet_bytearray[ETH_HLEN+3]  #add LSB
-  
+
   #calculate ip header length
   ip_header_length = packet_bytearray[ETH_HLEN]               #load Byte
   ip_header_length = ip_header_length & 0x0F                  #mask bits 0..3
@@ -189,18 +189,18 @@ while 1:
 
   ip_src = int(toHex(ip_src_str),16)
   ip_dst = int(toHex(ip_dst_str),16)
-  
-  #TCP HEADER 
+
+  #TCP HEADER
   #https://www.rfc-editor.org/rfc/rfc793.txt
-  #  12              13              14              15  
-  #  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 
+  #  12              13              14              15
+  #  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
   # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
   # |  Data |           |U|A|P|R|S|F|                               |
   # | Offset| Reserved  |R|C|S|S|Y|I|            Window             |
   # |       |           |G|K|H|T|N|N|                               |
   # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
   #
-  #Data Offset: This indicates where the data begins.  
+  #Data Offset: This indicates where the data begins.
   #The TCP header is an integral number of 32 bits long.
   #value to multiply * 4 byte
   #e.g. DataOffset = 5 ; TCP Header Length = 5 * 4 byte = 20 byte
@@ -209,17 +209,17 @@ while 1:
   tcp_header_length = packet_bytearray[ETH_HLEN + ip_header_length + 12]  #load Byte
   tcp_header_length = tcp_header_length & 0xF0                            #mask bit 4..7
   tcp_header_length = tcp_header_length >> 2                              #SHR 4 ; SHL 2 -> SHR 2
-  
+
   #retrieve port source/dest
   port_src_str = packet_str[ETH_HLEN+ip_header_length:ETH_HLEN+ip_header_length+2]
   port_dst_str = packet_str[ETH_HLEN+ip_header_length+2:ETH_HLEN+ip_header_length+4]
-  
+
   port_src = int(toHex(port_src_str),16)
   port_dst = int(toHex(port_dst_str),16)
 
   #calculate payload offset
   payload_offset = ETH_HLEN + ip_header_length + tcp_header_length
-  
+
   #payload_string contains only packet payload
   payload_string = packet_str[(payload_offset):(len(packet_bytearray))]
 
@@ -238,14 +238,14 @@ while 1:
       #url entirely contained in first packet -> print it all
       printUntilCRLF(payload_string)
 
-      #delete current_Key from bpf_sessions, url already printed. current session not useful anymore 
+      #delete current_Key from bpf_sessions, url already printed. current session not useful anymore
       try:
         del bpf_sessions[current_Key]
       except:
         print ("error during delete from bpf map ")
-    else: 
-      #url NOT entirely contained in first packet   
-      #not found \r\n in payload. 
+    else:
+      #url NOT entirely contained in first packet
+      #not found \r\n in payload.
       #save current part of the payload_string in dictionary <key(ips,ipd,ports,portd),payload_string>
       local_dictionary[binascii.hexlify(current_Key)] = payload_string
   else:
@@ -253,17 +253,17 @@ while 1:
 
     #check if the packet belong to a session saved in bpf_sessions
     if (current_Key in bpf_sessions):
-      #check id the packet belong to a session saved in local_dictionary 
+      #check id the packet belong to a session saved in local_dictionary
       #(local_dictionary mantains HTTP GET/POST url not printed yet because splitted in N packets)
       if (binascii.hexlify(current_Key) in local_dictionary):
         #first part of the HTTP GET/POST url is already present in local dictionary (prev_payload_string)
         prev_payload_string = local_dictionary[binascii.hexlify(current_Key)]
-        #looking for CR+LF in current packet. 
+        #looking for CR+LF in current packet.
         if (crlf in payload_string):
           #last packet. containing last part of HTTP GET/POST url splitted in N packets.
           #append current payload
           prev_payload_string += payload_string
-          #print HTTP GET/POST url 
+          #print HTTP GET/POST url
           printUntilCRLF(prev_payload_string)
           #clean bpf_sessions & local_dictionary
           try:
@@ -284,7 +284,7 @@ while 1:
             except:
               print ("error deleting from map or dict")
           #update dictionary
-          local_dictionary[binascii.hexlify(current_Key)] = prev_payload_string  
+          local_dictionary[binascii.hexlify(current_Key)] = prev_payload_string
       else:
         #first part of the HTTP GET/POST url is NOT present in local dictionary
         #bpf_sessions contains invalid entry -> delete it

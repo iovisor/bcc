@@ -122,7 +122,7 @@ static inline bool _is_tracepoint_struct_type(string const& type_name,
   //    (?:struct|class)\s+tracepoint__(\S+)__(\S+)
   // Not using std::regex because older versions of GCC don't support it yet.
   // E.g., the libstdc++ that ships with Ubuntu 14.04.
-  
+
   auto first_space_pos = type_name.find_first_of("\t ");
   if (first_space_pos == string::npos)
     return false;

@@ -170,7 +170,7 @@ function M.typename(v)
 	return string.match(tostring(ffi.typeof(v)), '<([^>]+)')
 end
 
--- Reflect if cdata type can be pointer (accepts array or pointer) 
+-- Reflect if cdata type can be pointer (accepts array or pointer)
 function M.isptr(v, noarray)
 	local ctname = M.typename(v)
 	if ctname then

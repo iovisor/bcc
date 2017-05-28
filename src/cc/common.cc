@@ -15,6 +15,7 @@
  */
 #include <fstream>
 #include <sstream>
+
 #include "common.h"
 
 namespace ebpf {
@@ -46,6 +47,5 @@ std::vector<int> get_online_cpus() {
 std::vector<int> get_possible_cpus() {
   return read_cpu_range("/sys/devices/system/cpu/possible");
 }
-
 
 } // namespace ebpf

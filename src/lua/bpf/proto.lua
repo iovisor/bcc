@@ -222,7 +222,7 @@ local function next_offset(e, var, type, off, mask, shift)
 	-- Finalize relative offset
 	if mask then
 		e.emit(BPF.ALU + BPF.AND + BPF.K, tmp_reg, 0, 0, mask)
-	end	
+	end
 	if shift then
 		local op = BPF.LSH
 		if shift < 0 then

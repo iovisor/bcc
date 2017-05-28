@@ -245,25 +245,15 @@ class TableBase(MutableMapping):
             self[k] = self.Leaf()
 
     def __iter__(self):
-        return TableBase.Iter(self, self.Key)
+        return TableBase.Iter(self)
 
     def iter(self): return self.__iter__()
     def keys(self): return self.__iter__()
 
     class Iter(object):
-        def __init__(self, table, keytype):
-            self.Key = keytype
+        def __init__(self, table):
             self.table = table
-            k = self.Key()
-            kp = ct.pointer(k)
-            # if 0 is a valid key, try a few alternatives
-            if k in table:
-                ct.memset(kp, 0xff, ct.sizeof(k))
-                if k in table:
-                    ct.memset(kp, 0x55, ct.sizeof(k))
-                    if k in table:
-                        raise Exception("Unable to allocate iterator")
-            self.key = k
+            self.key = None
         def __iter__(self):
             return self
         def __next__(self):
@@ -275,10 +265,17 @@ class TableBase(MutableMapping):
     def next(self, key):
         next_key = self.Key()
         next_key_p = ct.pointer(next_key)
-        key_p = ct.pointer(key)
-        res = lib.bpf_get_next_key(self.map_fd,
-                ct.cast(key_p, ct.c_void_p),
-                ct.cast(next_key_p, ct.c_void_p))
+
+        if key is None:
+            res = lib.bpf_get_first_key(self.map_fd,
+                    ct.cast(next_key_p, ct.c_void_p),
+                    ct.sizeof(self.Key))
+        else:
+            key_p = ct.pointer(key)
+            res = lib.bpf_get_next_key(self.map_fd,
+                    ct.cast(key_p, ct.c_void_p),
+                    ct.cast(next_key_p, ct.c_void_p))
+
         if res < 0:
             raise StopIteration()
         return next_key
@@ -471,41 +468,6 @@ class ProgArray(ArrayBase):
             raise Exception("Could not delete item")
 
 class PerfEventArray(ArrayBase):
-    class Event(object):
-        def __init__(self, typ, config):
-            self.typ = typ
-            self.config = config
-
-    HW_CPU_CYCLES                = Event(Perf.PERF_TYPE_HARDWARE, 0)
-    HW_INSTRUCTIONS              = Event(Perf.PERF_TYPE_HARDWARE, 1)
-    HW_CACHE_REFERENCES          = Event(Perf.PERF_TYPE_HARDWARE, 2)
-    HW_CACHE_MISSES              = Event(Perf.PERF_TYPE_HARDWARE, 3)
-    HW_BRANCH_INSTRUCTIONS       = Event(Perf.PERF_TYPE_HARDWARE, 4)
-    HW_BRANCH_MISSES             = Event(Perf.PERF_TYPE_HARDWARE, 5)
-    HW_BUS_CYCLES                = Event(Perf.PERF_TYPE_HARDWARE, 6)
-    HW_STALLED_CYCLES_FRONTEND   = Event(Perf.PERF_TYPE_HARDWARE, 7)
-    HW_STALLED_CYCLES_BACKEND    = Event(Perf.PERF_TYPE_HARDWARE, 8)
-    HW_REF_CPU_CYCLES            = Event(Perf.PERF_TYPE_HARDWARE, 9)
-
-    # not yet supported, wip
-    #HW_CACHE_L1D_READ        = Event(Perf.PERF_TYPE_HW_CACHE, 0<<0|0<<8|0<<16)
-    #HW_CACHE_L1D_READ_MISS   = Event(Perf.PERF_TYPE_HW_CACHE, 0<<0|0<<8|1<<16)
-    #HW_CACHE_L1D_WRITE       = Event(Perf.PERF_TYPE_HW_CACHE, 0<<0|1<<8|0<<16)
-    #HW_CACHE_L1D_WRITE_MISS  = Event(Perf.PERF_TYPE_HW_CACHE, 0<<0|1<<8|1<<16)
-    #HW_CACHE_L1D_PREF        = Event(Perf.PERF_TYPE_HW_CACHE, 0<<0|2<<8|0<<16)
-    #HW_CACHE_L1D_PREF_MISS   = Event(Perf.PERF_TYPE_HW_CACHE, 0<<0|2<<8|1<<16)
-    #HW_CACHE_L1I_READ        = Event(Perf.PERF_TYPE_HW_CACHE, 1<<0|0<<8|0<<16)
-    #HW_CACHE_L1I_READ_MISS   = Event(Perf.PERF_TYPE_HW_CACHE, 1<<0|0<<8|1<<16)
-    #HW_CACHE_L1I_WRITE       = Event(Perf.PERF_TYPE_HW_CACHE, 1<<0|1<<8|0<<16)
-    #HW_CACHE_L1I_WRITE_MISS  = Event(Perf.PERF_TYPE_HW_CACHE, 1<<0|1<<8|1<<16)
-    #HW_CACHE_L1I_PREF        = Event(Perf.PERF_TYPE_HW_CACHE, 1<<0|2<<8|0<<16)
-    #HW_CACHE_L1I_PREF_MISS   = Event(Perf.PERF_TYPE_HW_CACHE, 1<<0|2<<8|1<<16)
-    #HW_CACHE_LL_READ         = Event(Perf.PERF_TYPE_HW_CACHE, 2<<0|0<<8|0<<16)
-    #HW_CACHE_LL_READ_MISS    = Event(Perf.PERF_TYPE_HW_CACHE, 2<<0|0<<8|1<<16)
-    #HW_CACHE_LL_WRITE        = Event(Perf.PERF_TYPE_HW_CACHE, 2<<0|1<<8|0<<16)
-    #HW_CACHE_LL_WRITE_MISS   = Event(Perf.PERF_TYPE_HW_CACHE, 2<<0|1<<8|1<<16)
-    #HW_CACHE_LL_PREF         = Event(Perf.PERF_TYPE_HW_CACHE, 2<<0|2<<8|0<<16)
-    #HW_CACHE_LL_PREF_MISS    = Event(Perf.PERF_TYPE_HW_CACHE, 2<<0|2<<8|1<<16)
 
     def __init__(self, *args, **kwargs):
         super(PerfEventArray, self).__init__(*args, **kwargs)
@@ -559,18 +521,15 @@ class PerfEventArray(ArrayBase):
             # the fd is kept open in the map itself by the kernel
             os.close(fd)
 
-    def open_perf_event(self, ev):
-        """open_perf_event(ev)
+    def open_perf_event(self, typ, config):
+        """open_perf_event(typ, config)
 
         Configures the table such that calls from the bpf program to
         table.perf_read(bpf_get_smp_processor_id()) will return the hardware
         counter denoted by event ev on the local cpu.
         """
-        if not isinstance(ev, self.Event):
-            raise Exception("argument must be an Event, got %s", type(ev))
-
         for i in get_online_cpus():
-            self._open_perf_event(i, ev.typ, ev.config)
+            self._open_perf_event(i, typ, config)
 
 
 class PerCpuHash(HashTable):

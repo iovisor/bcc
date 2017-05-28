@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <linux/elf.h>
 #include <sys/epoll.h>
 #include <unistd.h>
 #include <cerrno>
@@ -31,13 +32,79 @@
 
 namespace ebpf {
 
+BPFTable::BPFTable(const TableDesc& desc) : BPFTableBase<void, void>(desc) {}
+
+StatusTuple BPFTable::get_value(const std::string& key_str,
+                                std::string& value_str) {
+  char key[desc.key_size];
+  char value[desc.leaf_size];
+
+  StatusTuple r(0);
+
+  r = string_to_key(key_str, key);
+  if (r.code() != 0)
+    return r;
+
+  if (!lookup(key, value))
+    return StatusTuple(-1, "error getting value");
+
+  return leaf_to_string(value, value_str);
+}
+
+StatusTuple BPFTable::update_value(const std::string& key_str,
+                                   const std::string& value_str) {
+  char key[desc.key_size];
+  char value[desc.leaf_size];
+
+  StatusTuple r(0);
+
+  r = string_to_key(key_str, key);
+  if (r.code() != 0)
+    return r;
+
+  r = string_to_leaf(value_str, value);
+  if (r.code() != 0)
+    return r;
+
+  if (!update(key, value))
+    return StatusTuple(-1, "error updating element");
+
+  return StatusTuple(0);
+}
+
+StatusTuple BPFTable::remove_value(const std::string& key_str) {
+  char key[desc.key_size];
+
+  StatusTuple r(0);
+
+  r = string_to_key(key_str, key);
+  if (r.code() != 0)
+    return r;
+
+  if (!remove(key))
+    return StatusTuple(-1, "error removing element");
+
+  return StatusTuple(0);
+}
+
+BPFStackTable::BPFStackTable(const TableDesc& desc,
+                             bool use_debug_file,
+                             bool check_debug_file_crc)
+  : BPFTableBase<int, stacktrace_t>(desc) {
+  symbol_option_ = {
+    .use_debug_file = use_debug_file,
+    .check_debug_file_crc = check_debug_file_crc,
+    .use_symbol_type = (1 << STT_FUNC) | (1 << STT_GNU_IFUNC)
+  };
+}
+
 BPFStackTable::~BPFStackTable() {
   for (auto it : pid_sym_)
     bcc_free_symcache(it.second, it.first);
 }
 
-std::vector<intptr_t> BPFStackTable::get_stack_addr(int stack_id) {
-  std::vector<intptr_t> res;
+std::vector<uintptr_t> BPFStackTable::get_stack_addr(int stack_id) {
+  std::vector<uintptr_t> res;
   stacktrace_t stack;
   if (!lookup(&stack_id, &stack))
     return res;
@@ -55,7 +122,7 @@ std::vector<std::string> BPFStackTable::get_stack_symbol(int stack_id,
   if (pid < 0)
     pid = -1;
   if (pid_sym_.find(pid) == pid_sym_.end())
-    pid_sym_[pid] = bcc_symcache_new(pid);
+    pid_sym_[pid] = bcc_symcache_new(pid, &symbol_option_);
   void* cache = pid_sym_[pid];
 
   bcc_symbol symbol;

@@ -69,6 +69,8 @@ lib.bpf_table_leaf_sscanf.argtypes = [ct.c_void_p, ct.c_ulonglong,
 # keep in sync with libbpf.h
 lib.bpf_get_next_key.restype = ct.c_int
 lib.bpf_get_next_key.argtypes = [ct.c_int, ct.c_void_p, ct.c_void_p]
+lib.bpf_get_first_key.restype = ct.c_int
+lib.bpf_get_first_key.argtypes = [ct.c_int, ct.c_void_p, ct.c_uint]
 lib.bpf_lookup_elem.restype = ct.c_int
 lib.bpf_lookup_elem.argtypes = [ct.c_int, ct.c_void_p, ct.c_void_p]
 lib.bpf_update_elem.restype = ct.c_int
@@ -113,14 +115,15 @@ lib.perf_reader_free.argtypes = [ct.c_void_p]
 lib.perf_reader_fd.restype = int
 lib.perf_reader_fd.argtypes = [ct.c_void_p]
 
-lib.bpf_attach_xdp.restype = ct.c_int;
-lib.bpf_attach_xdp.argtypes = [ct.c_char_p, ct.c_int]
+lib.bpf_attach_xdp.restype = ct.c_int
+lib.bpf_attach_xdp.argtypes = [ct.c_char_p, ct.c_int, ct.c_uint]
 
-lib.bpf_attach_perf_event.restype = ct.c_int;
+lib.bpf_attach_perf_event.restype = ct.c_int
 lib.bpf_attach_perf_event.argtype = [ct.c_int, ct.c_uint, ct.c_uint, ct.c_ulonglong, ct.c_ulonglong,
         ct.c_int, ct.c_int, ct.c_int]
-lib.bpf_detach_perf_event.restype = ct.c_int;
-lib.bpf_detach_perf_event.argtype = [ct.c_uint, ct.c_uint]
+
+lib.bpf_close_perf_event_fd.restype = ct.c_int
+lib.bpf_close_perf_event_fd.argtype = [ct.c_int]
 
 # bcc symbol helpers
 class bcc_symbol(ct.Structure):
@@ -129,6 +132,13 @@ class bcc_symbol(ct.Structure):
             ('demangle_name', ct.c_char_p),
             ('module', ct.POINTER(ct.c_char)),
             ('offset', ct.c_ulonglong),
+        ]
+
+class bcc_symbol_option(ct.Structure):
+    _fields_ = [
+            ('use_debug_file', ct.c_int),
+            ('check_debug_file_crc', ct.c_int),
+            ('use_symbol_type', ct.c_uint),
         ]
 
 lib.bcc_procutils_which_so.restype = ct.POINTER(ct.c_char)
@@ -140,14 +150,14 @@ lib.bcc_procutils_language.argtypes = [ct.c_int]
 
 lib.bcc_resolve_symname.restype = ct.c_int
 lib.bcc_resolve_symname.argtypes = [
-    ct.c_char_p, ct.c_char_p, ct.c_ulonglong, ct.c_int, ct.POINTER(bcc_symbol)]
+    ct.c_char_p, ct.c_char_p, ct.c_ulonglong, ct.c_int, ct.POINTER(bcc_symbol_option), ct.POINTER(bcc_symbol)]
 
 _SYM_CB_TYPE = ct.CFUNCTYPE(ct.c_int, ct.c_char_p, ct.c_ulonglong)
-lib.bcc_foreach_symbol.restype = ct.c_int
-lib.bcc_foreach_symbol.argtypes = [ct.c_char_p, _SYM_CB_TYPE]
+lib.bcc_foreach_function_symbol.restype = ct.c_int
+lib.bcc_foreach_function_symbol.argtypes = [ct.c_char_p, _SYM_CB_TYPE]
 
 lib.bcc_symcache_new.restype = ct.c_void_p
-lib.bcc_symcache_new.argtypes = [ct.c_int]
+lib.bcc_symcache_new.argtypes = [ct.c_int, ct.POINTER(bcc_symbol_option)]
 
 lib.bcc_free_symcache.restype = ct.c_void_p
 lib.bcc_free_symcache.argtypes = [ct.c_void_p, ct.c_int]
