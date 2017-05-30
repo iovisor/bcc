@@ -67,17 +67,17 @@ bool Argument::assign_to_local(std::ostream &stream,
   }
 
   if (!deref_offset_) {
-    tfm::format(stream, "%s = (%s)ctx->%s;", local_name, ctype(),
+    tfm::format(stream, "%s = *(volatile %s *)&ctx->%s;", local_name, ctype(),
                 *base_register_name_);
     return true;
   }
 
   if (deref_offset_ && !deref_ident_) {
-    tfm::format(stream, "{ u64 __addr = ctx->%s + (%d)",
+    tfm::format(stream, "{ u64 __addr = (*(volatile u64 *)&ctx->%s) + (%d)",
                 *base_register_name_, *deref_offset_);
     if (index_register_name_) {
       int scale = scale_.value_or(1);
-      tfm::format(stream, " + (ctx->%s * %d);", *index_register_name_, scale);
+      tfm::format(stream, " + ((*(volatile u64 *)&ctx->%s) * %d);", *index_register_name_, scale);
     } else {
       tfm::format(stream, ";");
     }
