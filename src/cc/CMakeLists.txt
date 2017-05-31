@@ -14,8 +14,6 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/compat)
 add_definitions(${LLVM_DEFINITIONS})
 configure_file(libbcc.pc.in ${CMAKE_CURRENT_BINARY_DIR}/libbcc.pc @ONLY)
 
-# prune unused llvm static library stuff when linking into the new .so
-set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--exclude-libs=ALL")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
 
@@ -35,15 +33,20 @@ if (CMAKE_COMPILER_IS_GNUCC AND LIBCLANG_ISSTATIC)
   endif()
 endif()
 
-add_library(bcc-shared SHARED bpf_common.cc bpf_module.cc libbpf.c perf_reader.c
-  table_storage.cc shared_table.cc bpffs_table.cc json_map_decl_visitor.cc
-  exported_files.cc bcc_elf.c bcc_perf_map.c bcc_proc.c bcc_syms.cc ns_guard.cc
-  usdt_args.cc usdt.cc common.cc BPF.cc BPFTable.cc)
+add_library(bpf-static STATIC libbpf.c perf_reader.c)
+set_target_properties(bpf-static PROPERTIES OUTPUT_NAME bpf)
+add_library(bpf-shared SHARED libbpf.c perf_reader.c)
+set_target_properties(bpf-shared PROPERTIES OUTPUT_NAME bpf)
+
+add_library(bcc-shared SHARED bpf_common.cc bpf_module.cc table_storage.cc
+  shared_table.cc bpffs_table.cc json_map_decl_visitor.cc exported_files.cc
+  bcc_elf.c bcc_perf_map.c bcc_proc.c bcc_syms.cc ns_guard.cc usdt_args.cc
+  usdt.cc common.cc BPF.cc BPFTable.cc)
 set_target_properties(bcc-shared PROPERTIES VERSION ${REVISION_LAST} SOVERSION 0)
 set_target_properties(bcc-shared PROPERTIES OUTPUT_NAME bcc)
 
-add_library(bcc-loader-static STATIC libbpf.c perf_reader.c bcc_elf.c
-  bcc_perf_map.c bcc_proc.c bcc_syms.cc ns_guard.cc)
+add_library(bcc-loader-static STATIC bcc_elf.c bcc_perf_map.c bcc_proc.c
+  bcc_syms.cc ns_guard.cc)
 add_library(bcc-static STATIC bpf_common.cc bpf_module.cc shared_table.cc
   bpffs_table.cc json_map_decl_visitor.cc table_storage.cc exported_files.cc
   usdt_args.cc usdt.cc common.cc BPF.cc BPFTable.cc)
@@ -67,9 +70,21 @@ set(clang_libs ${libclangFrontend} ${libclangSerialization} ${libclangDriver} ${
   ${libclangSema} ${libclangCodeGen} ${libclangAnalysis} ${libclangRewrite} ${libclangEdit}
   ${libclangAST} ${libclangLex} ${libclangBasic})
 
+# prune unused llvm static library stuff when linking into the new .so
+foreach(lib ${clang_libs})
+  get_filename_component(lib ${lib} NAME)
+  set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--exclude-libs=${lib}")
+endforeach(lib)
+foreach(lib ${expanded_libs})
+  get_filename_component(lib ${lib} NAME)
+  set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--exclude-libs=lib${lib}.a")
+endforeach(lib)
+
 # Link against LLVM libraries
-target_link_libraries(bcc-shared b_frontend clang_frontend ${clang_libs} ${expanded_libs} ${LIBELF_LIBRARIES})
-target_link_libraries(bcc-static b_frontend clang_frontend bcc-loader-static ${clang_libs} ${expanded_libs} ${LIBELF_LIBRARIES})
+target_link_libraries(bcc-shared b_frontend clang_frontend bpf-static
+  ${clang_libs} ${expanded_libs} ${LIBELF_LIBRARIES})
+target_link_libraries(bcc-static b_frontend clang_frontend bcc-loader-static
+  bpf-static ${clang_libs} ${expanded_libs} ${LIBELF_LIBRARIES})
 
 install(TARGETS bcc-shared LIBRARY COMPONENT libbcc
   DESTINATION ${CMAKE_INSTALL_LIBDIR})
