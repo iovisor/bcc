@@ -152,7 +152,7 @@ bool Probe::usdt_getarg(std::ostream &stream) {
 
   for (size_t arg_n = 0; arg_n < arg_count; ++arg_n) {
     std::string ctype = largest_arg_type(arg_n);
-    std::string cptr = tfm::format("*((volatile %s *)dest)", ctype);
+    std::string cptr = tfm::format("dest", ctype);
 
     tfm::format(stream,
                 "static __always_inline int _bpf_readarg_%s_%d("
