@@ -138,16 +138,16 @@ while 1:
     counts = b.get_table("counts")
     for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
 
-        if re.match('mark_page_accessed', b.ksym(k.ip)) is not None:
+        if re.match(b'mark_page_accessed', b.ksym(k.ip)) is not None:
             mpa = max(0, v.value)
 
-        if re.match('mark_buffer_dirty', b.ksym(k.ip)) is not None:
+        if re.match(b'mark_buffer_dirty', b.ksym(k.ip)) is not None:
             mbd = max(0, v.value)
 
-        if re.match('add_to_page_cache_lru', b.ksym(k.ip)) is not None:
+        if re.match(b'add_to_page_cache_lru', b.ksym(k.ip)) is not None:
             apcl = max(0, v.value)
 
-        if re.match('account_page_dirtied', b.ksym(k.ip)) is not None:
+        if re.match(b'account_page_dirtied', b.ksym(k.ip)) is not None:
             apd = max(0, v.value)
 
         # access = total cache access incl. reads(mpa) and writes(mbd)

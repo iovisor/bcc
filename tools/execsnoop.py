@@ -18,6 +18,8 @@
 
 from __future__ import print_function
 from bcc import BPF
+from bcc.utils import ArgString, printb
+import bcc.utils as utils
 import argparse
 import ctypes as ct
 import re
@@ -41,8 +43,10 @@ parser.add_argument("-t", "--timestamp", action="store_true",
 parser.add_argument("-x", "--fails", action="store_true",
     help="include failed exec()s")
 parser.add_argument("-n", "--name",
+    type=ArgString,
     help="only print commands matching this name (regex), any arg")
 parser.add_argument("-l", "--line",
+    type=ArgString,
     help="only print commands where arg contains this line (regex)")
 args = parser.parse_args()
 
@@ -193,19 +197,19 @@ def print_event(cpu, data, size):
     elif event.type == EventType.EVENT_RET:
         if args.fails and event.retval == 0:
             skip = True
-        if args.name and not re.search(args.name, event.comm):
+        if args.name and not re.search(bytes(args.name), event.comm):
             skip = True
-        if args.line and not re.search(args.line,
-                                       b' '.join(argv[event.pid]).decode()):
+        if args.line and not re.search(bytes(args.line),
+                                       b' '.join(argv[event.pid])):
             skip = True
 
         if not skip:
             if args.timestamp:
                 print("%-8.3f" % (time.time() - start_ts), end="")
             ppid = get_ppid(event.pid)
-            print("%-16s %-6s %-6s %3s %s" % (event.comm.decode(), event.pid,
-                    ppid if ppid > 0 else "?", event.retval,
-                    b' '.join(argv[event.pid]).decode()))
+            ppid = b"%d" % ppid if ppid > 0 else b"?"
+            printb(b"%-16s %-6d %-6s %3d %s" % (event.comm, event.pid,
+                   ppid, event.retval, b' '.join(argv[event.pid])))
         try:
             del(argv[event.pid])
         except Exception:

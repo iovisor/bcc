@@ -17,6 +17,7 @@
 
 from __future__ import print_function
 from bcc import BPF
+from bcc.utils import printb
 from time import sleep, strftime
 import argparse
 import signal
@@ -120,7 +121,7 @@ while 1:
     line = 0
     for k, v in reversed(sorted(counts.items(),
                                 key=lambda counts: counts[1].size)):
-        print("%-32s %6d %10d" % (k.name.decode(), v.count, v.size))
+        printb(b"%-32s %6d %10d" % (k.name, v.count, v.size))
 
         line += 1
         if line >= maxrows:

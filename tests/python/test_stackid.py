@@ -47,7 +47,7 @@ int kprobe__htab_map_lookup_elem(struct pt_regs *ctx, struct bpf_map *map, u64 *
         stackid = stack_entries[k]
         self.assertIsNotNone(stackid)
         stack = stack_traces[stackid].ip
-        self.assertEqual(b.ksym(stack[0]), "htab_map_lookup_elem")
+        self.assertEqual(b.ksym(stack[0]), b"htab_map_lookup_elem")
 
 
 if __name__ == "__main__":
