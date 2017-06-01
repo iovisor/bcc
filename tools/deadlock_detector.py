@@ -376,7 +376,7 @@ def symbolize_with_objdump(binary, addr):
             (binary, addr)
         )
         output = subprocess.check_output(command, shell=True)
-        return output.decode('utf-8').strip()
+        return output.strip()
     except subprocess.CalledProcessError:
         return ''
 
@@ -528,7 +528,7 @@ def main():
                     key.mutex1,
                     key.mutex2,
                     thread_pid=leaf.thread_pid,
-                    thread_comm=leaf.comm.decode('utf-8'),
+                    thread_comm=leaf.comm,
                     first_mutex_stack_id=leaf.mutex1_stack_id,
                     second_mutex_stack_id=leaf.mutex2_stack_id,
                 )

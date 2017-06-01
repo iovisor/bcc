@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python2
 # @lint-avoid-python-3-compatibility-imports
 #
 # biosnoop  Trace block device I/O and print details including issuing PID.

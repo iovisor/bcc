@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python2
 # @lint-avoid-python-3-compatibility-imports
 #
 # biolatency    Summarize block device I/O latency as a histogram.

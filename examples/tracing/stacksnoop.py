@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python2
 #
 # stacksnoop    Trace a kernel function and print all kernel stack traces.
 #               For Linux, uses BCC, eBPF, and currently x86_64 only. Inline C.
@@ -108,7 +108,7 @@ def print_event(cpu, data, size):
 
     if verbose:
         print("%-18.9f %-12.12s %-6d %-3d %s" %
-              (ts, event.comm.decode(), event.pid, cpu, function))
+              (ts, event.comm, event.pid, cpu, function))
     else:
         print("%-18.9f %s" % (ts, function))
 

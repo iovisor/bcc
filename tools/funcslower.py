@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python2
 # @lint-avoid-python-3-compatibility-imports
 #
 # funcslower  Trace slow kernel or user function calls.
@@ -219,7 +219,7 @@ def print_event(cpu, data, size):
     event = ct.cast(data, ct.POINTER(Data)).contents
     ts = float(event.duration_ns) / time_multiplier
     print((time_str(event) + "%-14.14s %-6s %7.2f %16x %s %s") %
-        (event.comm.decode(), event.tgid_pid >> 32,
+        (event.comm, event.tgid_pid >> 32,
          ts, event.retval, args.functions[event.id], args_str(event)))
 
 b["events"].open_perf_buffer(print_event, page_cnt=64)

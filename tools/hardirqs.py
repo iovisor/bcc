@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python2
 # @lint-avoid-python-3-compatibility-imports
 #
 # hardirqs  Summarize hard IRQ (interrupt) event time.
@@ -148,7 +148,7 @@ while (1):
     else:
         print("%-26s %11s" % ("HARDIRQ", "TOTAL_" + label))
         for k, v in sorted(dist.items(), key=lambda dist: dist[1].value):
-            print("%-26s %11d" % (k.name.decode(), v.value / factor))
+            print("%-26s %11d" % (k.name, v.value / factor))
     dist.clear()
 
     countdown -= 1

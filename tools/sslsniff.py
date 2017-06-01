@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python2
 #
 # sslsniff  Captures data on read/recv or write/send functions of OpenSSL and
 #           GnuTLS
@@ -200,11 +200,11 @@ def print_event(cpu, data, size, rw):
                 " bytes lost) " + "-" * 5
 
     print("%-12s %-18.9f %-16s %-6d %-6d\n%s\n%s\n%s\n\n" % (rw, time_s,
-                                                             event.comm.decode(),
+                                                             event.comm,
                                                              event.pid,
                                                              event.len,
                                                              s_mark,
-                                                             event.v0.decode(),
+                                                             event.v0,
                                                              e_mark))
 
 b["perf_SSL_write"].open_perf_buffer(print_event_write)

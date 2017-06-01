@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python2
 # @lint-avoid-python-3-compatibility-imports
 #
 # fileslower  Trace slow synchronous file reads and writes.
@@ -235,12 +235,12 @@ def print_event(cpu, data, size):
     event = ct.cast(data, ct.POINTER(Data)).contents
 
     ms = float(event.delta_us) / 1000
-    name = event.name.decode()
+    name = event.name
     if event.name_len > DNAME_INLINE_LEN:
         name = name[:-3] + "..."
 
     print("%-8.3f %-14.14s %-6s %1s %-7s %7.2f %s" % (
-        time.time() - start_ts, event.comm.decode(), event.pid,
+        time.time() - start_ts, event.comm, event.pid,
         mode_s[event.mode], event.sz, ms, name))
 
 b["events"].open_perf_buffer(print_event, page_cnt=64)

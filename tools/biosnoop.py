@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python2
 # @lint-avoid-python-3-compatibility-imports
 #
 # biosnoop  Trace block device I/O and print details including issuing PID.
@@ -175,8 +175,8 @@ def print_event(cpu, data, size):
         delta = float(delta) + (event.ts - prev_ts)
 
     print("%-14.9f %-14.14s %-6s %-7s %-2s %-9s %-7s %7.2f" % (
-        delta / 1000000, event.name.decode(), event.pid,
-        event.disk_name.decode(), rwflg, val,
+        delta / 1000000, event.name, event.pid,
+        event.disk_name, rwflg, val,
         event.len, float(event.delta) / 1000000))
 
     prev_ts = event.ts

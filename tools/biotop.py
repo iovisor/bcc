@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python2
 # @lint-avoid-python-3-compatibility-imports
 #
 # biotop  block device (disk) I/O by process.
@@ -213,7 +213,7 @@ while 1:
         # print line
         avg_ms = (float(v.us) / 1000) / v.io
         print("%-6d %-16s %1s %-3d %-3d %-8s %5s %7s %6.2f" % (k.pid,
-            k.name.decode(), "W" if k.rwflag else "R", k.major, k.minor,
+            k.name, "W" if k.rwflag else "R", k.major, k.minor,
             diskname, v.io, v.bytes / 1024, avg_ms))
 
         line += 1

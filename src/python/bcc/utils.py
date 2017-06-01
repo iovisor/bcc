@@ -37,5 +37,5 @@ def get_possible_cpus():
 
 def detect_language(candidates, pid):
     res = lib.bcc_procutils_language(pid)
-    language = ct.cast(res, ct.c_char_p).value.decode()
+    language = ct.cast(res, ct.c_char_p).value
     return language if language in candidates else None

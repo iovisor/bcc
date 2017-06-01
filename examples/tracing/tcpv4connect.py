@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python2
 #
 # tcpv4connect	Trace TCP IPv4 connect()s.
 #		For Linux, uses BCC, eBPF. Embedded C.

@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python2
 # @lint-avoid-python-3-compatibility-imports
 #
 # execsnoop Trace new processes via exec() syscalls.
@@ -203,14 +203,13 @@ def print_event(cpu, data, size):
             if args.timestamp:
                 print("%-8.3f" % (time.time() - start_ts), end="")
             ppid = get_ppid(event.pid)
-            print("%-16s %-6s %-6s %3s %s" % (event.comm.decode(), event.pid,
+            print("%-16s %-6s %-6s %3s %s" % (event.comm, event.pid,
                     ppid if ppid > 0 else "?", event.retval,
-                    b' '.join(argv[event.pid]).decode()))
+                    b' '.join(argv[event.pid])))
         try:
             del(argv[event.pid])
         except Exception:
             pass
-
 
 # loop with callback to print_event
 b["events"].open_perf_buffer(print_event)

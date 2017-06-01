@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python2
 # @lint-avoid-python-3-compatibility-imports
 #
 # killsnoop Trace signals issued by the kill() syscall.
@@ -131,7 +131,7 @@ def print_event(cpu, data, size):
         return
 
     print("%-9s %-6d %-16s %-4d %-6d %d" % (strftime("%H:%M:%S"),
-        event.pid, event.comm.decode(), event.sig, event.tpid, event.ret))
+        event.pid, event.comm, event.sig, event.tpid, event.ret))
 
 # loop with callback to print_event
 b["events"].open_perf_buffer(print_event)

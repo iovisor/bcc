@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python2
 # @lint-avoid-python-3-compatibility-imports
 #
 # slabratetop  Summarize kmem_cache_alloc() calls.
@@ -120,7 +120,7 @@ while 1:
     line = 0
     for k, v in reversed(sorted(counts.items(),
                                 key=lambda counts: counts[1].size)):
-        print("%-32s %6d %10d" % (k.name.decode(), v.count, v.size))
+        print("%-32s %6d %10d" % (k.name, v.count, v.size))
 
         line += 1
         if line >= maxrows:

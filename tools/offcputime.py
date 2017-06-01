@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python2
 #
 # offcputime    Summarize off-CPU time by stack trace
 #               For Linux, uses BCC, eBPF.
@@ -263,7 +263,7 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
         # print folded stack output
         user_stack = list(user_stack)
         kernel_stack = list(kernel_stack)
-        line = [k.name.decode()] + \
+        line = [k.name] + \
             [b.sym(addr, k.tgid) for addr in reversed(user_stack)] + \
             (need_delimiter and ["-"] or []) + \
             [b.ksym(addr) for addr in reversed(kernel_stack)]
@@ -276,7 +276,7 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
             print("    --")
         for addr in user_stack:
             print("    %s" % b.sym(addr, k.tgid))
-        print("    %-16s %s (%d)" % ("-", k.name.decode(), k.pid))
+        print("    %-16s %s (%d)" % ("-", k.name, k.pid))
         print("        %d\n" % v.value)
 
 if missing_stacks > 0:

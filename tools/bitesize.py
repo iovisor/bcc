@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python2
 #
 # bitehist.py   Block I/O size histogram.
 #               For Linux, uses BCC, eBPF. See .c file.
@@ -73,4 +73,4 @@ try:
     sleep(99999999)
 except KeyboardInterrupt:
     dist.print_log2_hist("Kbytes", "Process Name",
-            section_print_fn=bytes.decode)
+            section_print_fn=lambda x: x)

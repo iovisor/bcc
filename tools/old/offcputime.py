@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python2
 #
 # offcputime    Summarize off-CPU time by kernel stack trace
 #               For Linux, uses BCC, eBPF.
@@ -185,7 +185,7 @@ while (1):
     for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
         if folded:
             # print folded stack output
-            line = k.name.decode() + ";"
+            line = k.name + ";"
             for i in reversed(range(0, maxdepth)):
                 if k.ret[i] == 0:
                     continue

@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python2
 # @lint-avoid-python-3-compatibility-imports
 #
 # ttysnoop   Watch live output from a tty or pts device.
@@ -111,7 +111,7 @@ if not args.noclear:
 # process event
 def print_event(cpu, data, size):
     event = ct.cast(data, ct.POINTER(Data)).contents
-    print("%s" % event.buf[0:event.count].decode(), end="")
+    print("%s" % event.buf[0:event.count], end="")
     sys.stdout.flush()
 
 # loop with callback to print_event

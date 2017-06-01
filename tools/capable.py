@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python2
 # @lint-avoid-python-3-compatibility-imports
 #
 # capable   Trace security capabilitiy checks (cap_capable()).
@@ -148,7 +148,7 @@ def print_event(cpu, data, size):
     else:
         name = "?"
     print("%-9s %-6d %-6d %-16s %-4d %-20s %d" % (strftime("%H:%M:%S"),
-        event.uid, event.pid, event.comm.decode(), event.cap, name,
+        event.uid, event.pid, event.comm, event.cap, name,
         event.audit))
 
 # loop with callback to print_event
