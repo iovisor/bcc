@@ -50,6 +50,12 @@ void bpf_module_destroy(void *program) {
   delete mod;
 }
 
+void bpf_free_compiler_resource(void *program, int do_trim) {
+  auto mod = static_cast<ebpf::BPFModule *>(program);
+  if (!mod) return;
+  mod->free_compiler_resource(do_trim);
+}
+
 size_t bpf_num_functions(void *program) {
   auto mod = static_cast<ebpf::BPFModule *>(program);
   if (!mod) return 0;

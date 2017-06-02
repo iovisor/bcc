@@ -30,6 +30,7 @@ void * bpf_module_create_c_from_string(const char *text, unsigned flags, const c
 void bpf_module_destroy(void *program);
 char * bpf_module_license(void *program);
 unsigned bpf_module_kern_version(void *program);
+void bpf_free_compiler_resource(void *program, int do_trim);
 size_t bpf_num_functions(void *program);
 const char * bpf_function_name(void *program, size_t id);
 void * bpf_function_start_id(void *program, size_t id);

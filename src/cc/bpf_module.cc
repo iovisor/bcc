@@ -24,6 +24,7 @@
 #include <unistd.h>
 #include <vector>
 #include <linux/bpf.h>
+#include <malloc.h>
 
 #include <llvm/ADT/STLExtras.h>
 #include <llvm/ExecutionEngine/MCJIT.h>
@@ -123,7 +124,7 @@ static StatusTuple unimplemented_snprintf(char *, size_t, const void *) {
   return StatusTuple(-1, "snprintf unimplemented");
 }
 
-BPFModule::~BPFModule() {
+void BPFModule::free_compiler_resource(int do_trim) {
   for (auto &v : tables_) {
     v->key_sscanf = unimplemented_sscanf;
     v->leaf_sscanf = unimplemented_sscanf;
@@ -134,7 +135,14 @@ BPFModule::~BPFModule() {
   engine_.reset();
   rw_engine_.reset();
   ctx_.reset();
+  if (do_trim) {
+    // return the freed top heap memory back to the system.
+    malloc_trim(0);
+  }
+}
 
+BPFModule::~BPFModule() {
+  free_compiler_resource(0);
   ts_->DeletePrefix(Path({id_}));
 }
 

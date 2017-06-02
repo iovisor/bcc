@@ -1084,6 +1084,19 @@ class BPF(object):
         except KeyboardInterrupt:
             exit()
 
+    def free_compiler_resource(self, do_trim):
+        """free_compiler_resource(do_trim)
+
+        Free internal compilation resource. If do_trim is True, internally
+        malloc_trim(0) will be called to return the memory to the system.
+        This is useful for glic malloc. For libraries like jemalloc,
+        explicit trimming is not needed.
+        """
+        try:
+            lib.bpf_free_compiler_resource(self.module, do_trim)
+        except KeyboardInterrupt:
+            exit()
+
     def donothing(self):
         """the do nothing exit handler"""
 
