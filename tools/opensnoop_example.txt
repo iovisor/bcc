@@ -119,21 +119,74 @@ PID    COMM               FD ERR PATH
 This caught the 'sed' command because it partially matches 'ed' that's passed
 to the '-n' option.
 
+The -f option can be used to filter for processes accessing a specific file:
+
+# ./opensnoop.py -f /etc/passwd
+PID    COMM               FD ERR PATH
+28582  w                   4   0 /etc/passwd
+28582  w                   4   0 /etc/passwd
+28582  w                   4   0 /etc/passwd
+28582  w                   6   0 /etc/passwd
+28582  w                   6   0 /etc/passwd
+28582  w                   6   0 /etc/passwd
+28583  id                  3   0 /etc/passwd
+28583  id                  3   0 /etc/passwd
+28583  id                  3   0 /etc/passwd
+^C
+
+This caught the "w" and "id root" command, since both accessing /etc/passwd
+for looking up user data.
+
+The -r option can be used to filter for proccesses accessing a specific file
+pattern:
+
+# ./opensnoop.py -r '/etc/(passwd|shadow)'
+PID    COMM               FD ERR PATH
+2572   sshd                8   0 /etc/passwd
+2572   sshd                5   0 /etc/passwd
+2572   sshd                5   0 /etc/passwd
+28615  sshd                3   0 /etc/passwd
+28615  sshd                4   0 /etc/passwd
+28615  sshd                4   0 /etc/passwd
+28615  sshd                4   0 /etc/passwd
+28617  unix_chkpwd         3   0 /etc/passwd
+28617  unix_chkpwd         3   0 /etc/shadow
+28615  sshd                4   0 /etc/passwd
+28618  unix_chkpwd         3   0 /etc/passwd
+28618  unix_chkpwd         3   0 /etc/shadow
+28615  sshd                4   0 /etc/passwd
+28615  sshd                4   0 /etc/passwd
+28615  sshd                4   0 /etc/passwd
+545    systemd-logind     22   0 /etc/passwd
+28615  sshd                4   0 /etc/passwd
+28615  sshd                5   0 /etc/passwd
+28615  sshd                5   0 /etc/passwd
+28615  sshd                9   0 /etc/passwd
+28615  sshd                9   0 /etc/passwd
+28620  bash                3   0 /etc/passwd
+28622  id                  3   0 /etc/passwd
+28628  id                  3   0 /etc/passwd
+^C
+
+This caught a remote login via ssh, accessing /etc/passwd and /etc/shadow for
+looking up user credentials and data to proceed with the login.
 
 USAGE message:
 
 # ./opensnoop -h
-usage: opensnoop [-h] [-T] [-x] [-p PID] [-t TID] [-n NAME]
+usage: opensnoop [-h] [-T] [-x] [-p PID] [-t TID] [-n NAME] [-f FILE] [-r REGEX]
 
 Trace open() syscalls
 
 optional arguments:
-  -h, --help            show this help message and exit
-  -T, --timestamp       include timestamp on output
-  -x, --failed          only show failed opens
-  -p PID, --pid PID     trace this PID only
-  -t TID, --tid TID     trace this TID only
-  -n NAME, --name NAME  only print process names containing this name
+  -h, --help               show this help message and exit
+  -T, --timestamp          include timestamp on output
+  -x, --failed             only show failed opens
+  -p PID, --pid PID        trace this PID only
+  -t TID, --tid TID        trace this TID only
+  -n NAME, --name NAME     only print process names containing this name
+  -f FILE, --file FILE     only print processes accessing this file
+  -r REGEX, --regex REGEX  only print processes matching file pattern regex
 
 examples:
     ./opensnoop           # trace all open() syscalls
@@ -142,3 +195,5 @@ examples:
     ./opensnoop -p 181    # only trace PID 181
     ./opensnoop -t 123    # only trace TID 123
     ./opensnoop -n main   # only print process names containing "main"
+    ./opensnoop -f file   # only print processes accessing "file"
+    ./opensnoop -r regex  # only print processes matching file pattern "regex"
