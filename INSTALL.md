@@ -53,7 +53,7 @@ Only the nightly packages are built for Ubuntu 16.04, but the steps are very str
 ```bash
 echo "deb [trusted=yes] https://repo.iovisor.org/apt/xenial xenial-nightly main" | sudo tee /etc/apt/sources.list.d/iovisor.list
 sudo apt-get update
-sudo apt-get install bcc-tools
+sudo apt-get install bcc-tools libbcc-examples
 ```
 
 ## Ubuntu Trusty - Binary
