@@ -31,6 +31,8 @@ CONFIG_HAVE_BPF_JIT=y
 CONFIG_BPF_EVENTS=y
 ```
 
+For Linux kernel version 4.7 or newer, the flag `CONFIG_HAVE_BPF_JIT` has been replaced by `CONFIG_HAVE_EBPF_JIT` (for x86, arm64 and s390) or by `CONFIG_HAVE_CBPF_JIT` (for arm, mips, powerpc and sparc.)
+
 There are a few optional kernel flags needed for running bcc networking examples on vanilla kernel:
 
 ```
