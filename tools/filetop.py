@@ -32,11 +32,16 @@ parser = argparse.ArgumentParser(
     description="File reads and writes by process",
     formatter_class=argparse.RawDescriptionHelpFormatter,
     epilog=examples)
+parser.add_argument("-a", "--all-files", action="store_true",
+    help="include non-regular file types (sockets, FIFOs, etc)")
 parser.add_argument("-C", "--noclear", action="store_true",
     help="don't clear the screen")
 parser.add_argument("-r", "--maxrows", default=20,
     help="maximum rows to print, default 20")
-parser.add_argument("-p", "--pid",
+parser.add_argument("-s", "--sort", default="rbytes",
+    choices=["reads", "writes", "rbytes", "wbytes"],
+    help="sort column, default rbytes")
+parser.add_argument("-p", "--pid", type=int, metavar="PID", dest="tgid",
     help="trace this PID only")
 parser.add_argument("interval", nargs="?", default=1,
     help="output interval, in seconds")
@@ -61,13 +66,13 @@ bpf_text = """
 #include <uapi/linux/ptrace.h>
 #include <linux/blkdev.h>
 
-#define MAX_FILE_LEN    32
-
 // the key for the output summary
 struct info_t {
     u32 pid;
-    char name[TASK_COMM_LEN];
-    char file[MAX_FILE_LEN];
+    u32 name_len;
+    char comm[TASK_COMM_LEN];
+    // de->d_name.name may point to de->d_iname so limit len accordingly
+    char name[DNAME_INLINE_LEN];
     char type;
 };
 
@@ -84,22 +89,23 @@ BPF_HASH(counts, struct info_t, struct val_t);
 static int do_entry(struct pt_regs *ctx, struct file *file,
     char __user *buf, size_t count, int is_read)
 {
-    u32 pid;
-
-    pid = bpf_get_current_pid_tgid();
-    if (FILTER)
+    u32 tgid = bpf_get_current_pid_tgid() >> 32;
+    if (TGID_FILTER)
         return 0;
+
+    u32 pid = bpf_get_current_pid_tgid();
 
     // skip I/O lacking a filename
     struct dentry *de = file->f_path.dentry;
-    if (de->d_iname[0] == 0)
+    int mode = file->f_inode->i_mode;
+    if (de->d_name.len == 0 || TYPE_FILTER)
         return 0;
 
     // store counts and sizes by pid & file
     struct info_t info = {.pid = pid};
-    bpf_get_current_comm(&info.name, sizeof(info.name));
-    __builtin_memcpy(&info.file, de->d_iname, sizeof(info.file));
-    int mode = file->f_inode->i_mode;
+    bpf_get_current_comm(&info.comm, sizeof(info.comm));
+    info.name_len = de->d_name.len;
+    bpf_probe_read(&info.name, sizeof(info.name), (void *)de->d_name.name);
     if (S_ISREG(mode)) {
         info.type = 'R';
     } else if (S_ISSOCK(mode)) {
@@ -134,17 +140,28 @@ int trace_write_entry(struct pt_regs *ctx, struct file *file,
 }
 
 """
-if args.pid:
-    bpf_text = bpf_text.replace('FILTER', 'pid != %s' % args.pid)
+if args.tgid:
+    bpf_text = bpf_text.replace('TGID_FILTER', 'tgid != %d' % args.tgid)
 else:
-    bpf_text = bpf_text.replace('FILTER', '0')
+    bpf_text = bpf_text.replace('TGID_FILTER', '0')
+if args.all_files:
+    bpf_text = bpf_text.replace('TYPE_FILTER', '0')
+else:
+    bpf_text = bpf_text.replace('TYPE_FILTER', '!S_ISREG(mode)')
+
 if debug:
     print(bpf_text)
 
 # initialize BPF
 b = BPF(text=bpf_text)
 b.attach_kprobe(event="__vfs_read", fn_name="trace_read_entry")
-b.attach_kprobe(event="__vfs_write", fn_name="trace_write_entry")
+try:
+    b.attach_kprobe(event="__vfs_write", fn_name="trace_write_entry")
+except:
+    # older kernels don't have __vfs_write so try vfs_write instead
+    b.attach_kprobe(event="vfs_write", fn_name="trace_write_entry")
+
+DNAME_INLINE_LEN = 32  # linux/dcache.h
 
 print('Tracing... Output every %d secs. Hit Ctrl-C to end' % interval)
 
@@ -163,19 +180,23 @@ while 1:
         print()
     with open(loadavg) as stats:
         print("%-8s loadavg: %s" % (strftime("%H:%M:%S"), stats.read()))
-    print("%-6s %-16s %-6s %-6s %-7s %-7s %1s %s" % ("PID", "COMM",
+    print("%-6s %-16s %-6s %-6s %-7s %-7s %1s %s" % ("TID", "COMM",
         "READS", "WRITES", "R_Kb", "W_Kb", "T", "FILE"))
 
-    # by-PID output
+    # by-TID output
     counts = b.get_table("counts")
     line = 0
     for k, v in reversed(sorted(counts.items(),
-                                key=lambda counts: counts[1].rbytes)):
+                                key=lambda counts:
+                                  getattr(counts[1], args.sort))):
+        name = k.name.decode()
+        if k.name_len > DNAME_INLINE_LEN:
+            name = name[:-3] + "..."
 
         # print line
-        print("%-6d %-16s %-6d %-6d %-7d %-7d %1s %s" % (k.pid, k.name,
-            v.reads, v.writes, v.rbytes / 1024, v.wbytes / 1024, k.type,
-            k.file))
+        print("%-6d %-16s %-6d %-6d %-7d %-7d %1s %s" % (k.pid,
+            k.comm.decode(), v.reads, v.writes, v.rbytes / 1024,
+            v.wbytes / 1024, k.type.decode(), name))
 
         line += 1
         if line >= maxrows:

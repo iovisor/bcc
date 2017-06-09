@@ -1,0 +1,76 @@
+.TH slabratetop 8  "2016-10-17" "USER COMMANDS"
+.SH NAME
+slabratetop \- Kernel SLAB/SLUB memory cache allocation rate top.
+Uses Linux BPF/bcc.
+.SH SYNOPSIS
+.B slabratetop [\-h] [\-C] [\-r MAXROWS] [interval] [count]
+.SH DESCRIPTION
+This is top for the the rate of kernel SLAB/SLUB memory allocations.
+It works by tracing kmem_cache_alloc() calls, a commonly used interface for
+kernel memory allocation (SLAB or SLUB). It summarizes the rate and total bytes
+allocated of these calls per interval: the activity. Compare this to
+slabtop(1), which shows the current static volume of the caches.
+
+This tool uses kernel dynamic tracing of the kmem_cache_alloc() function.
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH OPTIONS
+.TP
+\-C
+Don't clear the screen.
+.TP
+\-r MAXROWS
+Maximum number of rows to print. Default is 20.
+.TP
+interval
+Interval between updates, seconds.
+.TP
+count
+Number of interval summaries.
+.SH EXAMPLES
+.TP
+Summarize active kernel SLAB/SLUB calls (kmem_cache_alloc()), showing the top 20 caches every second:
+#
+.B slabratetop
+.TP
+Don't clear the screen, and top 8 rows only:
+#
+.B slabratetop -Cr 8
+.TP
+5 second summaries, 10 times only:
+#
+.B slabratetop 5 10
+.SH FIELDS
+.TP
+loadavg:
+The contents of /proc/loadavg
+.TP
+CACHE
+Kernel cache name.
+.TP
+ALLOCS
+Allocations (number of calls).
+.TP
+BYTES
+Total bytes allocated.
+.SH OVERHEAD
+If kmem_cache_alloc() is called at a high rate (eg, >100k/second) the overhead
+of this tool might begin to be measurable. The rate can be seen in the ALLOCS
+column of the output.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Brendan Gregg
+.SH SEE ALSO
+slabtop(1)

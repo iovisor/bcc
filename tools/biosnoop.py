@@ -98,11 +98,21 @@ int trace_req_completion(struct pt_regs *ctx, struct request *req)
                        req->rq_disk->disk_name);
     }
 
-    if (req->cmd_flags & REQ_WRITE) {
-        data.rwflag = 1;
-    } else {
-        data.rwflag = 0;
-    }
+/*
+ * The following deals with a kernel version change (in mainline 4.7, although
+ * it may be backported to earlier kernels) with how block request write flags
+ * are tested. We handle both pre- and post-change versions here. Please avoid
+ * kernel version tests like this as much as possible: they inflate the code,
+ * test, and maintenance burden.
+ */
+#ifdef REQ_WRITE
+    data.rwflag = !!(req->cmd_flags & REQ_WRITE);
+#elif defined(REQ_OP_SHIFT)
+    data.rwflag = !!((req->cmd_flags >> REQ_OP_SHIFT) == REQ_OP_WRITE);
+#else
+    data.rwflag = !!((req->cmd_flags & REQ_OP_MASK) == REQ_OP_WRITE);
+#endif
+
     events.perf_submit(ctx, &data, sizeof(data));
     start.delete(&req);
     infobyreq.delete(&req);
@@ -165,13 +175,14 @@ def print_event(cpu, data, size):
         delta = float(delta) + (event.ts - prev_ts)
 
     print("%-14.9f %-14.14s %-6s %-7s %-2s %-9s %-7s %7.2f" % (
-        delta / 1000000, event.name, event.pid, event.disk_name, rwflg, val,
+        delta / 1000000, event.name.decode(), event.pid,
+        event.disk_name.decode(), rwflg, val,
         event.len, float(event.delta) / 1000000))
 
     prev_ts = event.ts
     start_ts = 1
 
 # loop with callback to print_event
-b["events"].open_perf_buffer(print_event)
+b["events"].open_perf_buffer(print_event, page_cnt=64)
 while 1:
     b.kprobe_poll()

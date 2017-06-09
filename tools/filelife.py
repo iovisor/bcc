@@ -82,13 +82,14 @@ int trace_unlink(struct pt_regs *ctx, struct inode *dir, struct dentry *dentry)
     delta = (bpf_ktime_get_ns() - *tsp) / 1000000;
     birth.delete(&dentry);
 
-    if (dentry->d_iname[0] == 0)
+    if (dentry->d_name.len == 0)
         return 0;
 
     if (bpf_get_current_comm(&data.comm, sizeof(data.comm)) == 0) {
         data.pid = pid;
         data.delta = delta;
-        bpf_probe_read(&data.fname, sizeof(data.fname), dentry->d_iname);
+        bpf_probe_read(&data.fname, sizeof(data.fname),
+            (void *)dentry->d_name.name);
     }
 
     events.perf_submit(ctx, &data, sizeof(data));
@@ -119,6 +120,9 @@ if debug:
 # initialize BPF
 b = BPF(text=bpf_text)
 b.attach_kprobe(event="vfs_create", fn_name="trace_create")
+# newer kernels (say, 4.8) may don't fire vfs_create, so record (or overwrite)
+# the timestamp in security_inode_create():
+b.attach_kprobe(event="security_inode_create", fn_name="trace_create")
 b.attach_kprobe(event="vfs_unlink", fn_name="trace_unlink")
 
 # header
@@ -128,7 +132,7 @@ print("%-8s %-6s %-16s %-7s %s" % ("TIME", "PID", "COMM", "AGE(s)", "FILE"))
 def print_event(cpu, data, size):
     event = ct.cast(data, ct.POINTER(Data)).contents
     print("%-8s %-6d %-16s %-7.2f %s" % (strftime("%H:%M:%S"), event.pid,
-        event.comm, float(event.delta) / 1000, event.fname))
+        event.comm.decode(), float(event.delta) / 1000, event.fname.decode()))
 
 b["events"].open_perf_buffer(print_event)
 while 1:

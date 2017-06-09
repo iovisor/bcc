@@ -21,6 +21,10 @@ and may need modifications to match your software and processor architecture.
 Since this uses BPF, only the root user can use this tool.
 .SH REQUIREMENTS
 CONFIG_BPF and bcc.
+.SH OPTIONS
+.TP
+\-p PID
+Trace this process ID only.
 .SH EXAMPLES
 .TP
 Trace host lookups (getaddrinfo/gethostbyname[2]) system wide:

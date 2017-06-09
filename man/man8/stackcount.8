@@ -1,13 +1,15 @@
 .TH stackcount 8  "2016-01-14" "USER COMMANDS"
 .SH NAME
-stackcount \- Count kernel function calls and their stack traces. Uses Linux eBPF/bcc.
+stackcount \- Count function calls and their stack traces. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B stackcount [\-h] [\-p PID] [\-i INTERVAL] [\-T] [\-r] pattern
+.B stackcount [\-h] [\-p PID] [\-i INTERVAL] [\-T] [\-r] [\-s]
+              [\-P] [\-v] [\-d] pattern
 .SH DESCRIPTION
-stackcount traces kernel functions and frequency counts them with their entire
-kernel stack trace, summarized in-kernel for efficiency. This allows higher
+stackcount traces functions and frequency counts them with their entire
+stack trace, summarized in-kernel for efficiency. This allows higher
 frequency events to be studied. The output consists of unique stack traces,
-and their occurrence counts.
+and their occurrence counts. In addition to kernel and user functions, kernel
+tracepoints and USDT tracepoint are also supported.
 
 The pattern is a string with optional '*' wildcards, similar to file globbing.
 If you'd prefer to use regular expressions, use the \-r option.
@@ -35,14 +37,18 @@ Include a timestamp with interval output.
 \-v
 Show raw addresses.
 .TP
+\-d
+Print the source of the BPF program when loading it (for debugging purposes).
+.TP
 \-i interval
 Summary interval, in seconds.
 .TP
 \-p PID
 Trace this process ID only (filtered in-kernel).
 .TP
+.TP
 pattern
-A kernel function name, or a search pattern. Can include wildcards ("*"). If the
+A function name, or a search pattern. Can include wildcards ("*"). If the
 \-r option is used, can include regular expressions.
 .SH EXAMPLES
 .TP
@@ -77,6 +83,18 @@ Output every 5 seconds, with timestamps:
 Only count stacks when PID 185 is on-CPU:
 #
 .B stackcount -p 185 ip_output
+.TP
+Count user stacks for dynamic heap allocations with malloc in PID 185:
+#
+.B stackcount -p 185 c:malloc
+.TP
+Count user stacks for thread creation (USDT tracepoint) in PID 185:
+#
+.B stackcount -p 185 u:pthread:pthread_create
+.TP
+Count kernel stacks for context switch events using a kernel tracepoint:
+#
+.B stackcount t:sched:sched_switch
 .SH OVERHEAD
 This summarizes unique stack traces in-kernel for efficiency, allowing it to
 trace a higher rate of function calls than methods that post-process in user
@@ -99,6 +117,6 @@ Linux
 .SH STABILITY
 Unstable - in development.
 .SH AUTHOR
-Brendan Gregg
+Brendan Gregg, Sasha Goldshtein
 .SH SEE ALSO
 stacksnoop(8), funccount(8)

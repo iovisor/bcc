@@ -1,0 +1,83 @@
+Demonstrations of ttysnoop, the Linux eBPF/bcc version.
+
+
+ttysnoop watches a tty or pts device, and prints the same output that is
+appearing on that device. It can be used to mirror the output from a shell
+session, or the system console.
+
+Let's snoop /dev/pts/2:
+
+# ./ttysnoop 2
+<screen clears>
+date
+Sun Oct 16 01:28:47 UTC 2016
+# uname -a
+Linux bgregg-xenial-bpf-i-xxx 4.8.0-rc4-virtual #1 SMP Wed Aug 31 22:54:37 UTC 2016 x86_64 x86_64 x86_64 GNU/Linux
+# df -h
+Filesystem      Size  Used Avail Use% Mounted on
+udev            7.4G     0  7.4G   0% /dev
+tmpfs           1.5G   89M  1.4G   6% /run
+/dev/xvda1      7.8G  4.5G  3.3G  59% /
+tmpfs           7.4G     0  7.4G   0% /dev/shm
+tmpfs           5.0M     0  5.0M   0% /run/lock
+tmpfs           7.4G     0  7.4G   0% /sys/fs/cgroup
+tmpfs           250M     0  250M   0% /run/shm
+/dev/md0        160G   20G  141G  13% /mnt
+tmpfs           1.5G     0  1.5G   0% /run/user/0
+# ^C
+
+What we're seeing is another shell session. The first line was "date" without
+the shell prompt ("#") because we began tracing after the prompt was printed.
+The other commands appeared, keystroke by keystroke, as the user was typing
+them. Spooky!
+
+Remember to Ctrl-C to exit ttysnoop.
+
+
+To figure out which pts device number to use, you can check your own with "ps"
+and other's with "w". For example:
+
+# ps -p $$
+  PID TTY          TIME CMD
+ 9605 pts/1    00:00:00 bash
+# w
+ 01:26:37 up 9 days, 35 min,  2 users,  load average: 0.22, 0.22, 0.15
+USER     TTY      FROM             LOGIN@   IDLE   JCPU   PCPU WHAT
+root     pts/1    100.127.65.241   00:39    2.00s  0.33s  0.33s -bash
+root     pts/2    100.127.65.241   00:40   16.00s  1.06s  1.06s -bash
+
+So I'm pts/1, and there's another session that's pts/2.
+
+
+This can also snoop tty devices using their full path. Eg, snooping the system
+console:
+
+# ./ttysnoop /dev/console
+Oct 16 01:32:06 bgregg-xenial-bpf-i-xxx kernel: [780087.407428] bash (9888): drop_caches: 1
+Oct 16 01:32:38 bgregg-xenial-bpf-i-xxx snmpd[2708]: Cannot statfs /sys/kernel/debug/tracing: Permission denied
+Oct 16 01:33:32 bgregg-xenial-bpf-i-xxx snmpd[2708]: Cannot statfs /sys/kernel/debug/tracing: Permission denied
+Oct 16 01:34:26 bgregg-xenial-bpf-i-xxx snmpd[2708]: Cannot statfs /sys/kernel/debug/tracing: Permission denied
+^C
+
+Neat!
+
+
+USAGE:
+
+# ./ttysnoop.py -h
+usage: ttysnoop.py [-h] [-C] device
+
+Snoop output from a pts or tty device, eg, a shell
+
+positional arguments:
+  device         path to a tty device (eg, /dev/tty0) or pts number
+
+optional arguments:
+  -h, --help     show this help message and exit
+  -C, --noclear  don't clear the screen
+
+examples:
+    ./ttysnoop /dev/pts/2    # snoop output from /dev/pts/2
+    ./ttysnoop 2             # snoop output from /dev/pts/2 (shortcut)
+    ./ttysnoop /dev/console  # snoop output from the system console
+    ./ttysnoop /dev/tty0     # snoop output from /dev/tty0

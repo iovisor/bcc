@@ -1,0 +1,33 @@
+Demonstrations of kvm_hypercall.py, showing eBPF/bcc based hypercall analysis
+
+This example demonstrates how we can statefully save static tracepoint
+events based on conditions being met for other events with which they are
+associated. Here, we wish to record kvm_exit and kvm_entry events which are
+linked to the kvm_hypercall event. We are interested in kvm_exit with exit
+reason as VMCALL (18). This may be useful to analyze latency caused by a
+hypercall itself.
+
+To test this, while the python script is run, induce a hypercall from a
+guest based on the following example:
+https://gist.github.com/abenbachir/344822b5ba9fc5ac384cdec3f087e018
+
+# ./kvm_hypercall.py
+TIME(s)            COMM             PID    MESSAGE
+2445.577087000     CPU 0/KVM        8896   KVM_EXIT exit_reason : 18
+2445.577122000     CPU 0/KVM        8896   HYPERCALL nr : 0
+2445.577129000     CPU 0/KVM        8896   KVM_ENTRY vcpu_id : 0
+2445.577136000     CPU 0/KVM        8896   KVM_EXIT exit_reason : 18
+2445.577145000     CPU 0/KVM        8896   HYPERCALL nr : 1
+2445.577149000     CPU 0/KVM        8896   KVM_ENTRY vcpu_id : 0
+2445.577155000     CPU 0/KVM        8896   KVM_EXIT exit_reason : 18
+2445.577160000     CPU 0/KVM        8896   HYPERCALL nr : 2
+2445.577164000     CPU 0/KVM        8896   KVM_ENTRY vcpu_id : 0
+2445.577170000     CPU 0/KVM        8896   KVM_EXIT exit_reason : 18
+2445.577175000     CPU 0/KVM        8896   HYPERCALL nr : 3
+2445.577179000     CPU 0/KVM        8896   KVM_ENTRY vcpu_id : 0
+2445.577185000     CPU 0/KVM        8896   KVM_EXIT exit_reason : 18
+2445.577190000     CPU 0/KVM        8896   HYPERCALL nr : 4
+2445.577194000     CPU 0/KVM        8896   KVM_ENTRY vcpu_id : 0
+
+This output shows a sequence of exit -> hypercall -> entry where the
+exit_reason was VMCALL.

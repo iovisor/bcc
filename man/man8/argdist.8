@@ -2,7 +2,7 @@
 .SH NAME
 argdist \- Trace a function and display a histogram or frequency count of its parameter values. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B argdist [-h] [-p PID] [-z STRING_SIZE] [-i INTERVAL] [-n COUNT] [-v] [-T TOP] [-H specifier [specifier ...]] [-C specifier [specifier ...]] [-I header [header ...]]
+.B argdist [-h] [-p PID] [-z STRING_SIZE] [-i INTERVAL] [-n COUNT] [-v] [-T TOP] [-H specifier] [-C specifier] [-I header]
 .SH DESCRIPTION
 argdist attaches to function entry and exit points, collects specified parameter
 values, and stores them in a histogram or a frequency collection that counts
@@ -36,12 +36,12 @@ Display the generated BPF program, for debugging purposes.
 \-T TOP
 When collecting frequency counts, display only the top TOP entries.
 .TP
-\-H SPECIFIER, \-C SPECIFIER
+\-H specifiers, \-C specifiers
 One or more probe specifications that instruct argdist which functions to
 probe, which parameters to collect, how to aggregate them, and whether to perform
 any filtering. See SPECIFIER SYNTAX below.
 .TP
-\-I HEADER
+\-I header
 One or more header files that should be included in the BPF program. This 
 enables the use of structure definitions, enumerations, and constants that
 are available in these headers. You should provide the same path you would
@@ -92,10 +92,9 @@ The expression(s) to capture.
 These are the values that are assigned to the histogram or raw event collection.
 You may use the parameters directly, or valid C expressions that involve the
 parameters, such as "size % 10".
-Tracepoints may access a special structure called "tp" that is formatted according
-to the tracepoint format (which you can obtain using tplist). For example, the
-block:block_rq_complete tracepoint can access tp.nr_sector. You may also use the
-members of the "tp" struct directly, e.g. "nr_sector" instead of "tp.nr_sector".
+Tracepoints may access a special structure called "args" that is formatted
+according to the tracepoint format (which you can obtain using tplist).
+For example, the block:block_rq_complete tracepoint can access args->nr_sector.
 USDT probes may access the arguments defined by the tracing program in the 
 special arg1, arg2, ... variables. To obtain their types, use the tplist tool.
 Return probes can use the argument values received by the
@@ -112,6 +111,10 @@ Only parameter values that pass the filter will be collected. This is any valid
 C expression that refers to the parameter values, such as "fd == 1 && length > 16".
 The $entry, $retval, and $latency variables can be used here as well, in return
 probes.
+The filter expression may also use the STRCMP pseudo-function to compare
+a predefined string to a string argument. For example: STRCMP("test.txt", file).
+The order of arguments is important: the first argument MUST be a quoted
+literal string, and the second argument can be a runtime string.
 .TP
 .B [label]
 The label that will be displayed when printing the probed values. By default,
@@ -164,7 +167,7 @@ Print the functions used as thread entry points and how common they are:
 .TP
 Print histograms of sleep() and nanosleep() parameter values:
 #
-.B argdist -H 'p:c:sleep(u32 seconds):u32:seconds' 'p:c:nanosleep(struct timespec *req):long:req->tv_nsec'
+.B argdist -H 'p:c:sleep(u32 seconds):u32:seconds' -H 'p:c:nanosleep(struct timespec *req):long:req->tv_nsec'
 .TP
 Spy on writes to STDOUT performed by process 2780, up to a string size of 120 characters:
 #

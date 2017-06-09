@@ -102,6 +102,6 @@ return function(BPF, utils)
 
   bpf:get_table("events"):open_perf_buffer(print_event,
     "struct { uint64_t stack_id; uint32_t pid; char comm[$]; }",
-    TASK_COMM_LEN)
+    {TASK_COMM_LEN})
   bpf:kprobe_poll_loop()
 end

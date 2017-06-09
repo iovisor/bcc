@@ -37,7 +37,7 @@ b.attach_kprobe(event="sys_clone", fn_name="hello")
 # define output data structure in Python
 TASK_COMM_LEN = 16    # linux/sched.h
 class Data(ct.Structure):
-    _fields_ = [("pid", ct.c_ulonglong),
+    _fields_ = [("pid", ct.c_uint),
                 ("ts", ct.c_ulonglong),
                 ("comm", ct.c_char * TASK_COMM_LEN)]
 

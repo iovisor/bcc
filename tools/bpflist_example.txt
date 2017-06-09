@@ -1,0 +1,66 @@
+Demonstrations of bpflist.
+
+
+bpflist displays information on running BPF programs and optionally also
+prints open kprobes and uprobes. It is used to understand which BPF programs
+are currently running on the system. For example:
+
+# bpflist
+PID    COMM             TYPE     COUNT
+4058   fileslower       prog     4   
+4058   fileslower       map      2   
+4106   bashreadline     map      1   
+4106   bashreadline     prog     1   
+
+From the output above, the fileslower and bashreadline tools are running.
+fileslower has installed 4 BPF programs (functions) and has opened 2 BPF maps
+(such as hashes, histograms, stack trace tables, and so on).
+
+In verbose mode, bpflist also counts the number of kprobes and uprobes opened
+by the process. This information is obtained heuristically: bcc-based tools
+include the process id in the name of the probe. For example:
+
+# bpflist -v
+PID    COMM             TYPE     COUNT
+4058   fileslower       prog     4   
+4058   fileslower       kprobe   4   
+4058   fileslower       map      2   
+4106   bashreadline     uprobe   1   
+4106   bashreadline     prog     1   
+4106   bashreadline     map      1   
+
+In double-verbose mode, the probe definitions are also displayed:
+
+# bpflist -vv
+open kprobes:
+p:kprobes/p___vfs_read_bcc_4058 __vfs_read
+r:kprobes/r___vfs_read_bcc_4058 __vfs_read
+p:kprobes/p___vfs_write_bcc_4058 __vfs_write
+r:kprobes/r___vfs_write_bcc_4058 __vfs_write
+
+open uprobes:
+r:uprobes/r__bin_bash_0xa4dd0_bcc_4106 /bin/bash:0x00000000000a4dd0
+
+PID    COMM             TYPE     COUNT
+4058   fileslower       prog     4   
+4058   fileslower       kprobe   4   
+4058   fileslower       map      2   
+4106   bashreadline     uprobe   1   
+4106   bashreadline     prog     1   
+4106   bashreadline     map      1   
+
+
+USAGE:
+# bpflist -h
+usage: bpflist.py [-h] [-v]
+
+Display processes currently using BPF programs and maps
+
+optional arguments:
+  -h, --help       show this help message and exit
+  -v, --verbosity  count and display kprobes/uprobes as well
+
+examples:
+    bpflist     # display all processes currently using BPF
+    bpflist -v  # also count kprobes/uprobes
+    bpflist -vv # display kprobes/uprobes and count them

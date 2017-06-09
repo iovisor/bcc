@@ -14,11 +14,13 @@
  * limitations under the License.
  */
 
+#include <inttypes.h>
 #include <poll.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <unistd.h>
 #include <linux/perf_event.h>
@@ -26,11 +28,10 @@
 #include "libbpf.h"
 #include "perf_reader.h"
 
-int perf_reader_page_cnt = 8;
-
 struct perf_reader {
   perf_reader_cb cb;
   perf_reader_raw_cb raw_cb;
+  perf_reader_lost_cb lost_cb;
   void *cb_cookie; // to be returned in the cb
   void *buf; // for keeping segmented data
   size_t buf_size;
@@ -42,16 +43,20 @@ struct perf_reader {
   uint64_t sample_type;
 };
 
-struct perf_reader * perf_reader_new(perf_reader_cb cb, perf_reader_raw_cb raw_cb, void *cb_cookie) {
+struct perf_reader * perf_reader_new(perf_reader_cb cb,
+                                     perf_reader_raw_cb raw_cb,
+                                     perf_reader_lost_cb lost_cb,
+                                     void *cb_cookie, int page_cnt) {
   struct perf_reader *reader = calloc(1, sizeof(struct perf_reader));
   if (!reader)
     return NULL;
   reader->cb = cb;
   reader->raw_cb = raw_cb;
+  reader->lost_cb = lost_cb;
   reader->cb_cookie = cb_cookie;
   reader->fd = -1;
   reader->page_size = getpagesize();
-  reader->page_cnt = perf_reader_page_cnt;
+  reader->page_cnt = page_cnt;
   return reader;
 }
 
@@ -59,8 +64,10 @@ void perf_reader_free(void *ptr) {
   if (ptr) {
     struct perf_reader *reader = ptr;
     munmap(reader->base, reader->page_size * (reader->page_cnt + 1));
-    if (reader->fd >= 0)
+    if (reader->fd >= 0) {
+      ioctl(reader->fd, PERF_EVENT_IOC_DISABLE, 0);
       close(reader->fd);
+    }
     free(reader->buf);
     free(ptr);
   }
@@ -205,7 +212,7 @@ static void write_data_tail(struct perf_event_mmap_page *perf_header, uint64_t d
   perf_header->data_tail = data_tail;
 }
 
-static void event_read(struct perf_reader *reader) {
+void perf_reader_event_read(struct perf_reader *reader) {
   struct perf_event_mmap_page *perf_header = reader->base;
   uint64_t buffer_size = (uint64_t)reader->page_size * reader->page_cnt;
   uint64_t data_head;
@@ -236,7 +243,12 @@ static void event_read(struct perf_reader *reader) {
     }
 
     if (e->type == PERF_RECORD_LOST) {
-      fprintf(stderr, "Lost %lu samples\n", *(uint64_t *)(ptr + sizeof(*e)));
+      uint64_t lost = *(uint64_t *)(ptr + sizeof(*e));
+      if (reader->lost_cb) {
+        reader->lost_cb(lost);
+      } else {
+        fprintf(stderr, "Possibly lost %" PRIu64 " samples\n", lost);
+      }
     } else if (e->type == PERF_RECORD_SAMPLE) {
       if (reader->type == PERF_TYPE_TRACEPOINT)
         parse_tracepoint(reader, ptr, e->size);
@@ -262,7 +274,7 @@ int perf_reader_poll(int num_readers, struct perf_reader **readers, int timeout)
   if (poll(pfds, num_readers, timeout) > 0) {
     for (i = 0; i < num_readers; ++i) {
       if (pfds[i].revents & POLLIN)
-        event_read(readers[i]);
+        perf_reader_event_read(readers[i]);
     }
   }
   return 0;

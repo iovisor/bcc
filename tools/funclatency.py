@@ -1,17 +1,16 @@
 #!/usr/bin/python
 # @lint-avoid-python-3-compatibility-imports
 #
-# funclatency   Time kernel funcitons and print latency as a histogram.
+# funclatency   Time functions and print latency as a histogram.
 #               For Linux, uses BCC, eBPF.
 #
-# USAGE: funclatency [-h] [-p PID] [-i INTERVAL] [-T] [-u] [-m] [-r] pattern
+# USAGE: funclatency [-h] [-p PID] [-i INTERVAL] [-T] [-u] [-m] [-F] [-r] [-v]
+#                    pattern
 #
 # Run "funclatency -h" for full usage.
 #
-# The pattern is a string with optional '*' wildcards, similar to file globbing.
-# If you'd prefer to use regular expressions, use the -r option. Matching
-# multiple functions is of limited use, since the output has one histogram for
-# everything. Future versions should split the output histogram by the function.
+# The pattern is a string with optional '*' wildcards, similar to file
+# globbing. If you'd prefer to use regular expressions, use the -r option.
 #
 # Currently nested or recursive functions are not supported properly, and
 # timestamps will be overwritten, creating dubious output. Try to match single
@@ -21,7 +20,8 @@
 # Copyright (c) 2015 Brendan Gregg.
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
-# 20-Sep-2015   Brendan Gregg   Created this.
+# 20-Sep-2015   Brendan Gregg       Created this.
+# 06-Oct-2016   Sasha Goldshtein    Added user function support.
 
 from __future__ import print_function
 from bcc import BPF
@@ -31,19 +31,21 @@ import signal
 
 # arguments
 examples = """examples:
-    ./funclatency do_sys_open       # time the do_sys_open() kenel function
+    ./funclatency do_sys_open       # time the do_sys_open() kernel function
+    ./funclatency c:read            # time the read() C library function
     ./funclatency -u vfs_read       # time vfs_read(), in microseconds
     ./funclatency -m do_nanosleep   # time do_nanosleep(), in milliseconds
     ./funclatency -mTi 5 vfs_read   # output every 5 seconds, with timestamps
     ./funclatency -p 181 vfs_read   # time process 181 only
     ./funclatency 'vfs_fstat*'      # time both vfs_fstat() and vfs_fstatat()
+    ./funclatency 'c:*printf'       # time the *printf family of functions
     ./funclatency -F 'vfs_r*'       # show one histogram per matched function
 """
 parser = argparse.ArgumentParser(
-    description="Time kernel funcitons and print latency as a histogram",
+    description="Time functions and print latency as a histogram",
     formatter_class=argparse.RawDescriptionHelpFormatter,
     epilog=examples)
-parser.add_argument("-p", "--pid",
+parser.add_argument("-p", "--pid", type=int,
     help="trace this PID only")
 parser.add_argument("-i", "--interval", default=99999999,
     help="summary interval, seconds")
@@ -57,31 +59,56 @@ parser.add_argument("-F", "--function", action="store_true",
     help="show a separate histogram per function")
 parser.add_argument("-r", "--regexp", action="store_true",
     help="use regular expressions. Default is \"*\" wildcards only.")
+parser.add_argument("-v", "--verbose", action="store_true",
+    help="print the BPF program (for debugging purposes)")
 parser.add_argument("pattern",
-    help="search expression for kernel functions")
+    help="search expression for functions")
 args = parser.parse_args()
-pattern = args.pattern
+
+def bail(error):
+    print("Error: " + error)
+    exit(1)
+
+parts = args.pattern.split(':')
+if len(parts) == 1:
+    library = None
+    pattern = args.pattern
+elif len(parts) == 2:
+    library = parts[0]
+    libpath = BPF.find_library(library) or BPF.find_exe(library)
+    if not libpath:
+        bail("can't resolve library %s" % library)
+    library = libpath
+    pattern = parts[1]
+else:
+    bail("unrecognized pattern format '%s'" % pattern)
+
 if not args.regexp:
     pattern = pattern.replace('*', '.*')
     pattern = '^' + pattern + '$'
-debug = 0
 
 # define BPF program
 bpf_text = """
 #include <uapi/linux/ptrace.h>
-#include <linux/blkdev.h>
 
-typedef struct ip_key {
+typedef struct ip_pid {
     u64 ip;
+    u64 pid;
+} ip_pid_t;
+
+typedef struct hist_key {
+    ip_pid_t key;
     u64 slot;
-} ip_key_t;
+} hist_key_t;
 
 BPF_HASH(start, u32);
 STORAGE
 
 int trace_func_entry(struct pt_regs *ctx)
 {
-    u32 pid = bpf_get_current_pid_tgid();
+    u64 pid_tgid = bpf_get_current_pid_tgid();
+    u32 pid = pid_tgid;
+    u32 tgid = pid_tgid >> 32;
     u64 ts = bpf_ktime_get_ns();
 
     FILTER
@@ -94,7 +121,9 @@ int trace_func_entry(struct pt_regs *ctx)
 int trace_func_return(struct pt_regs *ctx)
 {
     u64 *tsp, delta;
-    u32 pid = bpf_get_current_pid_tgid();
+    u64 pid_tgid = bpf_get_current_pid_tgid();
+    u32 pid = pid_tgid;
+    u32 tgid = pid_tgid >> 32;
 
     // calculate delta time
     tsp = start.lookup(&pid);
@@ -112,10 +141,13 @@ int trace_func_return(struct pt_regs *ctx)
 }
 """
 
+# do we need to store the IP and pid for each invocation?
+need_key = args.function or (library and not args.pid)
+
 # code substitutions
 if args.pid:
     bpf_text = bpf_text.replace('FILTER',
-        'if (pid != %s) { return 0; }' % args.pid)
+        'if (tgid != %d) { return 0; }' % args.pid)
 else:
     bpf_text = bpf_text.replace('FILTER', '')
 if args.milliseconds:
@@ -127,22 +159,32 @@ elif args.microseconds:
 else:
     bpf_text = bpf_text.replace('FACTOR', '')
     label = "nsecs"
-if args.function:
+if need_key:
     bpf_text = bpf_text.replace('STORAGE', 'BPF_HASH(ipaddr, u32);\n' +
-        'BPF_HISTOGRAM(dist, ip_key_t);')
+        'BPF_HISTOGRAM(dist, hist_key_t);')
     # stash the IP on entry, as on return it's kretprobe_trampoline:
     bpf_text = bpf_text.replace('ENTRYSTORE',
         'u64 ip = PT_REGS_IP(ctx); ipaddr.update(&pid, &ip);')
+    pid = '-1' if not library else 'tgid'
     bpf_text = bpf_text.replace('STORE',
-        'u64 ip, *ipp = ipaddr.lookup(&pid); if (ipp) { ip = *ipp; ' +
-        'dist.increment((ip_key_t){ip, bpf_log2l(delta)}); ' +
-        'ipaddr.delete(&pid); }')
+        """
+    u64 ip, *ipp = ipaddr.lookup(&pid);
+    if (ipp) {
+        ip = *ipp;
+        hist_key_t key;
+        key.key.ip = ip;
+        key.key.pid = %s;
+        key.slot = bpf_log2l(delta);
+        dist.increment(key);
+        ipaddr.delete(&pid);
+    }
+        """ % pid)
 else:
     bpf_text = bpf_text.replace('STORAGE', 'BPF_HISTOGRAM(dist);')
     bpf_text = bpf_text.replace('ENTRYSTORE', '')
     bpf_text = bpf_text.replace('STORE',
         'dist.increment(bpf_log2l(delta));')
-if debug:
+if args.verbose:
     print(bpf_text)
 
 # signal handler
@@ -151,9 +193,19 @@ def signal_ignore(signal, frame):
 
 # load BPF program
 b = BPF(text=bpf_text)
-b.attach_kprobe(event_re=pattern, fn_name="trace_func_entry")
-b.attach_kretprobe(event_re=pattern, fn_name="trace_func_return")
-matched = b.num_open_kprobes()
+
+# attach probes
+if not library:
+    b.attach_kprobe(event_re=pattern, fn_name="trace_func_entry")
+    b.attach_kretprobe(event_re=pattern, fn_name="trace_func_return")
+    matched = b.num_open_kprobes()
+else:
+    b.attach_uprobe(name=library, sym_re=pattern, fn_name="trace_func_entry",
+                    pid=args.pid or -1)
+    b.attach_uretprobe(name=library, sym_re=pattern,
+                       fn_name="trace_func_return", pid=args.pid or -1)
+    matched = b.num_open_uprobes()
+
 if matched == 0:
     print("0 functions matched by \"%s\". Exiting." % args.pattern)
     exit()
@@ -163,6 +215,12 @@ print("Tracing %d functions for \"%s\"... Hit Ctrl-C to end." %
     (matched / 2, args.pattern))
 
 # output
+def print_section(key):
+    if not library:
+        return BPF.sym(key[0], -1)
+    else:
+        return "%s [%d]" % (BPF.sym(key[0], key[1]), key[1])
+
 exiting = 0 if args.interval else 1
 dist = b.get_table("dist")
 while (1):
@@ -177,8 +235,9 @@ while (1):
     if args.timestamp:
         print("%-8s\n" % strftime("%H:%M:%S"), end="")
 
-    if args.function:
-        dist.print_log2_hist(label, "Function", BPF.ksym)
+    if need_key:
+        dist.print_log2_hist(label, "Function", section_print_fn=print_section,
+            bucket_fn=lambda k: (k.ip, k.pid))
     else:
         dist.print_log2_hist(label)
     dist.clear()

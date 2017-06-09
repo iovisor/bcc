@@ -9,67 +9,66 @@ Example output:
 # ./profile
 Sampling at 49 Hertz of all threads by user + kernel stack... Hit Ctrl-C to end.
 ^C
-    ffffffff81189249 filemap_map_pages
-    ffffffff811bd3f5 handle_mm_fault
-    ffffffff81065990 __do_page_fault
-    ffffffff81065caf do_page_fault
-    ffffffff817ce228 page_fault
-    00007fed989afcc0 [unknown]
+    filemap_map_pages
+    handle_mm_fault
+    __do_page_fault
+    do_page_fault
+    page_fault
+    [unknown]
     -                cp (9036)
         1
 
-    00007f31d76c3251 [unknown]
-    47a2c1e752bf47f7 [unknown]
+    [unknown]
+    [unknown]
     -                sign-file (8877)
         1
 
-    ffffffff813d0af8 __clear_user
-    ffffffff813d5277 iov_iter_zero
-    ffffffff814ec5f2 read_iter_zero
-    ffffffff8120be9d __vfs_read
-    ffffffff8120c385 vfs_read
-    ffffffff8120d786 sys_read
-    ffffffff817cc076 entry_SYSCALL_64_fastpath
-    00007fc5652ad9b0 read
+    __clear_user
+    iov_iter_zero
+    read_iter_zero
+    __vfs_read
+    vfs_read
+    sys_read
+    entry_SYSCALL_64_fastpath
+    read
     -                dd (25036)
         4
 
-    0000000000400542 func_a
-    0000000000400598 main
-    00007f12a133e830 __libc_start_main
-    083e258d4c544155 [unknown]
+    func_a
+    main
+    __libc_start_main
+    [unknown]
     -                func_ab (13549)
         5
 
 [...]
 
-    ffffffff8105eb66 native_safe_halt
-    ffffffff8103659e default_idle
-    ffffffff81036d1f arch_cpu_idle
-    ffffffff810bba5a default_idle_call
-    ffffffff810bbd07 cpu_startup_entry
-    ffffffff817bf4a7 rest_init
-    ffffffff81d65f58 start_kernel
-    ffffffff81d652db x86_64_start_reservations
-    ffffffff81d65418 x86_64_start_kernel
+    native_safe_halt
+    default_idle
+    arch_cpu_idle
+    default_idle_call
+    cpu_startup_entry
+    rest_init
+    start_kernel
+    x86_64_start_reservations
+    x86_64_start_kernel
     -                swapper/0 (0)
         72
 
-    ffffffff8105eb66 native_safe_halt
-    ffffffff8103659e default_idle
-    ffffffff81036d1f arch_cpu_idle
-    ffffffff810bba5a default_idle_call
-    ffffffff810bbd07 cpu_startup_entry
-    ffffffff8104df55 start_secondary
+    native_safe_halt
+    default_idle
+    arch_cpu_idle
+    default_idle_call
+    cpu_startup_entry
+    start_secondary
     -                swapper/1 (0)
         75
 
 The output was long; I truncated some lines ("[...]").
 
-This default output prints stack traces as two columns (raw addresses, and
-then translated symbol names), followed by a line to describe the process (a
-dash, the process name, and a PID in parenthesis), and then an integer count
-of how many times this stack trace was sampled.
+This default output prints stack traces, followed by a line to describe the
+process (a dash, the process name, and a PID in parenthesis), and then an
+integer count of how many times this stack trace was sampled.
 
 The output above shows the most frequent stack was from the "swapper/1"
 process (PID 0), running the native_safe_halt() function, which was called
@@ -95,57 +94,57 @@ Profiling just that process:
 # ./profile -p 25036
 Sampling at 49 Hertz of PID 25036 by user + kernel stack... Hit Ctrl-C to end.
 ^C
-    0000000000402748 [unknown]
-    00007fc56561422c [unknown]
+    [unknown]
+    [unknown]
     -                dd (25036)
         1
 
-    00007fc5652ada0e __write
+    __write
     -                dd (25036)
         1
 
-    00007fc5652ad9b0 read
+    read
     -                dd (25036)
         1
 
 [...]
 
-    00000000004047b2 [unknown]
-    00007fc56561422c [unknown]
+    [unknown]
+    [unknown]
     -                dd (25036)
         2
 
-    ffffffff817cc060 entry_SYSCALL_64_fastpath
-    00007fc5652ada10 __write
-    00007fc56561422c [unknown]
+    entry_SYSCALL_64_fastpath
+    __write
+    [unknown]
     -                dd (25036)
         3
 
-    ffffffff817cc060 entry_SYSCALL_64_fastpath
-    00007fc5652ad9b0 read
+    entry_SYSCALL_64_fastpath
+    read
     -                dd (25036)
         3
 
-    ffffffff813d0af8 __clear_user
-    ffffffff813d5277 iov_iter_zero
-    ffffffff814ec5f2 read_iter_zero
-    ffffffff8120be9d __vfs_read
-    ffffffff8120c385 vfs_read
-    ffffffff8120d786 sys_read
-    ffffffff817cc076 entry_SYSCALL_64_fastpath
-    00007fc5652ad9b0 read
-    00007fc56561422c [unknown]
+    __clear_user
+    iov_iter_zero
+    read_iter_zero
+    __vfs_read
+    vfs_read
+    sys_read
+    entry_SYSCALL_64_fastpath
+    read
+    [unknown]
     -                dd (25036)
         3
 
-    ffffffff813d0af8 __clear_user
-    ffffffff813d5277 iov_iter_zero
-    ffffffff814ec5f2 read_iter_zero
-    ffffffff8120be9d __vfs_read
-    ffffffff8120c385 vfs_read
-    ffffffff8120d786 sys_read
-    ffffffff817cc076 entry_SYSCALL_64_fastpath
-    00007fc5652ad9b0 read
+    __clear_user
+    iov_iter_zero
+    read_iter_zero
+    __vfs_read
+    vfs_read
+    sys_read
+    entry_SYSCALL_64_fastpath
+    read
     -                dd (25036)
         7
 
@@ -162,41 +161,41 @@ Lets add delimiters between the user and kernel stacks, using -d:
 
 # ./profile -p 25036 -d
 ^C
-    ffffffff8120b385 __vfs_write
-    ffffffff8120d826 sys_write
-    ffffffff817cc076 entry_SYSCALL_64_fastpath
+    __vfs_write
+    sys_write
+    entry_SYSCALL_64_fastpath
     --
-    00007fc5652ada10 __write
+    __write
     -                dd (25036)
         1
 
     --
-    00007fc565255ef3 [unknown]
-    00007fc56561422c [unknown]
+    [unknown]
+    [unknown]
     -                dd (25036)
         1
 
-    ffffffff813d4569 iov_iter_init
-    ffffffff8120be8e __vfs_read
-    ffffffff8120c385 vfs_read
-    ffffffff8120d786 sys_read
-    ffffffff817cc076 entry_SYSCALL_64_fastpath
+    iov_iter_init
+    __vfs_read
+    vfs_read
+    sys_read
+    entry_SYSCALL_64_fastpath
     --
-    00007fc5652ad9b0 read
+    read
     -                dd (25036)
         1
 
 [...]
 
-    ffffffff813d0af8 __clear_user
-    ffffffff813d5277 iov_iter_zero
-    ffffffff814ec5f2 read_iter_zero
-    ffffffff8120be9d __vfs_read
-    ffffffff8120c385 vfs_read
-    ffffffff8120d786 sys_read
-    ffffffff817cc076 entry_SYSCALL_64_fastpath
+    __clear_user
+    iov_iter_zero
+    read_iter_zero
+    __vfs_read
+    vfs_read
+    sys_read
+    entry_SYSCALL_64_fastpath
     --
-    00007fc5652ad9b0 read
+    read
     -                dd (25036)
         9
 
@@ -210,59 +209,59 @@ func_b(). Profiling it for 5 seconds:
 # ./profile -p `pgrep -n func_ab` 5
 Sampling at 49 Hertz of PID 2930 by user + kernel stack for 5 secs.
 
-    000000000040053e func_a
-    0000000000400598 main
-    00007f0458819830 __libc_start_main
-    083e258d4c544155 [unknown]
+    func_a
+    main
+    __libc_start_main
+    [unknown]
     -                func_ab (2930)
         2
 
-    0000000000400566 func_b
-    00000000004005ac main
-    00007f0458819830 __libc_start_main
-    083e258d4c544155 [unknown]
+    func_b
+    main
+    __libc_start_main
+    [unknown]
     -                func_ab (2930)
         3
 
-    000000000040053a func_a
-    0000000000400598 main
-    00007f0458819830 __libc_start_main
-    083e258d4c544155 [unknown]
+    func_a
+    main
+    __libc_start_main
+    [unknown]
     -                func_ab (2930)
         5
 
-    0000000000400562 func_b
-    00000000004005ac main
-    00007f0458819830 __libc_start_main
-    083e258d4c544155 [unknown]
+    func_b
+    main
+    __libc_start_main
+    [unknown]
     -                func_ab (2930)
         12
 
-    000000000040056a func_b
-    00000000004005ac main
-    00007f0458819830 __libc_start_main
-    083e258d4c544155 [unknown]
+    func_b
+    main
+    __libc_start_main
+    [unknown]
     -                func_ab (2930)
         19
 
-    0000000000400542 func_a
-    0000000000400598 main
-    00007f0458819830 __libc_start_main
-    083e258d4c544155 [unknown]
+    func_a
+    main
+    __libc_start_main
+    [unknown]
     -                func_ab (2930)
         22
 
-    0000000000400571 func_b
-    00000000004005ac main
-    00007f0458819830 __libc_start_main
-    083e258d4c544155 [unknown]
+    func_b
+    main
+    __libc_start_main
+    [unknown]
     -                func_ab (2930)
         64
 
-    0000000000400549 func_a
-    0000000000400598 main
-    00007f0458819830 __libc_start_main
-    083e258d4c544155 [unknown]
+    func_a
+    main
+    __libc_start_main
+    [unknown]
     -                func_ab (2930)
         72
 
@@ -540,33 +539,33 @@ You can increase or decrease the sample frequency. Eg, sampling at 9 Hertz:
 # ./profile -F 9
 Sampling at 9 Hertz of all threads by user + kernel stack... Hit Ctrl-C to end.
 ^C
-    000000000040056a func_b
-    00000000004005ac main
-    00007f0458819830 __libc_start_main
-    083e258d4c544155 [unknown]
+    func_b
+    main
+    __libc_start_main
+    [unknown]
     -                func_ab (2930)
         1
 
 [...]
 
-    ffffffff8105eb66 native_safe_halt
-    ffffffff8103659e default_idle
-    ffffffff81036d1f arch_cpu_idle
-    ffffffff810bba5a default_idle_call
-    ffffffff810bbd07 cpu_startup_entry
-    ffffffff8104df55 start_secondary
+    native_safe_halt
+    default_idle
+    arch_cpu_idle
+    default_idle_call
+    cpu_startup_entry
+    start_secondary
     -                swapper/3 (0)
         8
 
-    ffffffff8105eb66 native_safe_halt
-    ffffffff8103659e default_idle
-    ffffffff81036d1f arch_cpu_idle
-    ffffffff810bba5a default_idle_call
-    ffffffff810bbd07 cpu_startup_entry
-    ffffffff817bf497 rest_init
-    ffffffff81d65f58 start_kernel
-    ffffffff81d652db x86_64_start_reservations
-    ffffffff81d65418 x86_64_start_kernel
+    native_safe_halt
+    default_idle
+    arch_cpu_idle
+    default_idle_call
+    cpu_startup_entry
+    rest_init
+    start_kernel
+    x86_64_start_reservations
+    x86_64_start_kernel
     -                swapper/0 (0)
         8
 
@@ -577,99 +576,99 @@ For example, just user stacks:
 # ./profile -U
 Sampling at 49 Hertz of all threads by user stack... Hit Ctrl-C to end.
 ^C
-    0000000000402ccc [unknown]
-    00007f45a624422c [unknown]
+    [unknown]
+    [unknown]
     -                dd (2931)
         1
 
-    0000000000404b80 [unknown]
-    00007f45a624422c [unknown]
+    [unknown]
+    [unknown]
     -                dd (2931)
         1
 
-    0000000000404d77 [unknown]
-    00007f45a624422c [unknown]
+    [unknown]
+    [unknown]
     -                dd (2931)
         1
 
-    00007f45a5e85e5e [unknown]
-    00007f45a624422c [unknown]
+    [unknown]
+    [unknown]
     -                dd (2931)
         1
 
-    0000000000402d12 [unknown]
-    00007f45a624422c [unknown]
+    [unknown]
+    [unknown]
     -                dd (2931)
         1
 
-    0000000000400562 func_b
-    00000000004005ac main
-    00007f0458819830 __libc_start_main
-    083e258d4c544155 [unknown]
+    func_b
+    main
+    __libc_start_main
+    [unknown]
     -                func_ab (2930)
         1
 
-    0000000000404805 [unknown]
+    [unknown]
     -                dd (2931)
         1
 
-    00000000004047de [unknown]
+    [unknown]
     -                dd (2931)
         1
 
-    0000000000400542 func_a
-    0000000000400598 main
-    00007f0458819830 __libc_start_main
-    083e258d4c544155 [unknown]
+    func_a
+    main
+    __libc_start_main
+    [unknown]
     -                func_ab (2930)
         3
 
-    00007f45a5edda10 __write
-    00007f45a624422c [unknown]
+    __write
+    [unknown]
     -                dd (2931)
         3
 
-    000000000040053a func_a
-    0000000000400598 main
-    00007f0458819830 __libc_start_main
-    083e258d4c544155 [unknown]
+    func_a
+    main
+    __libc_start_main
+    [unknown]
     -                func_ab (2930)
         4
 
-    000000000040056a func_b
-    00000000004005ac main
-    00007f0458819830 __libc_start_main
-    083e258d4c544155 [unknown]
+    func_b
+    main
+    __libc_start_main
+    [unknown]
     -                func_ab (2930)
         7
 
     -                swapper/6 (0)
         10
 
-    0000000000400571 func_b
-    00000000004005ac main
-    00007f0458819830 __libc_start_main
-    083e258d4c544155 [unknown]
+    func_b
+    main
+    __libc_start_main
+    [unknown]
     -                func_ab (2930)
         10
 
-    00007f45a5edda10 __write
+    __write
     -                dd (2931)
         10
 
-    0000000000400549 func_a
-    0000000000400598 main
-    00007f0458819830 __libc_start_main
-    083e258d4c544155 [unknown]
+    func_a
+    main
+    __libc_start_main
+    [unknown]
     -                func_ab (2930)
         11
 
-    00007f45a5edd9b0 read
+    read
     -                dd (2931)
         12
 
-    00007f45a5edd9b0 read
-    00007f45a624422c [unknown]
+    read
+    [unknown]
     -                dd (2931)
         14
 
@@ -702,53 +701,11 @@ WARNING: 8 stack traces could not be displayed. Consider increasing --stack-stor
 Run ./profile -h to see the default.
 
 
-There is a -S option to skip kernel frames. You probably don't need to mess
-with this. Here's why it exists: consider the following kernel stack trace,
-and IP:
-
-    ffffffff81174e78 perf_swevent_hrtimer
-    ffffffff810e6984 __hrtimer_run_queues
-    ffffffff810e70f8 hrtimer_interrupt
-    ffffffff81022c69 xen_timer_interrupt
-    ffffffff810d2942 handle_irq_event_percpu
-    ffffffff810d62da handle_percpu_irq
-    ffffffff810d1f52 generic_handle_irq
-    ffffffff814a5137 evtchn_2l_handle_events
-    ffffffff814a2853 __xen_evtchn_do_upcall
-    ffffffff814a4740 xen_evtchn_do_upcall
-    ffffffff817cd50c xen_hvm_callback_vector
-    ffffffff8103663e default_idle
-    ffffffff81036dbf arch_cpu_idle
-    ffffffff810bb8ea default_idle_call
-    ffffffff810bbb97 cpu_startup_entry
-    ffffffff8104df85 start_secondary
-
-IP: ffffffff8105eb66 native_safe_halt
-
-This is the idle thread. The first function is native_safe_halt(), and its
-parent is default_idle(). But what you see there is really what we are
-profiling. All that stuff above default_idle()? Interrupt framework stack.
-
-So we have to exclude those interrupt frames. I do this by fetching the ret IP
-from the kernel stack, and then scanning for it in user-level: in this case
-it would be default_idle(). Ok.
-
-If this doesn't work on your architecture (and your kernel stacks are a
-single line, the IP), then you might consider setting a fixed skip count,
-which avoids this ret IP logic. For the above stack, I'd set "-S 11", and
-it would slice off those 11 interrupt frames nicely. It also does this in
-kernel context for efficiency.
-
-So how do you figure out what number to use? 11? 14? 5? Well.. Try "-S 1",
-and then see how much higher you need to set it. Remember on the real
-profile output that the IP line is printed on top of the sliced stack.
-
-
 USAGE message:
 
 # ./profile -h
 usage: profile [-h] [-p PID] [-U | -K] [-F FREQUENCY] [-d] [-a] [-f]
-                  [--stack-storage-size STACK_STORAGE_SIZE] [-S KERNEL_SKIP]
+                  [--stack-storage-size STACK_STORAGE_SIZE]
                   [duration]
 
 Profile CPU stack traces at a timed interval
@@ -774,8 +731,6 @@ optional arguments:
   --stack-storage-size STACK_STORAGE_SIZE
                         the number of unique stack traces that can be stored
                         and displayed (default 2048)
-  -S KERNEL_SKIP, --kernel-skip KERNEL_SKIP
-                        skip this many kernel frames (default 3)
 
 examples:
     ./profile             # profile stack traces at 49 Hertz until Ctrl-C
@@ -785,4 +740,3 @@ examples:
     ./profile -p 185      # only profile threads for PID 185
     ./profile -U          # only show user space stacks (no kernel)
     ./profile -K          # only show kernel space stacks (no user)
-    ./profile -S 11       # always skip 11 frames of kernel stack

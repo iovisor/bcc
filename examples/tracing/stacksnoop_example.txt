@@ -1,0 +1,96 @@
+Demonstrations of stacksnoop, the Linux eBPF/bcc version.
+
+
+This program traces the given kernel function and prints the kernel stack trace
+for every call. This tool is useful for studying low frequency kernel functions,
+to see how they were invoked. For example, tracing the submit_bio() call:
+
+# ./stacksnoop submit_bio
+TIME(s)            SYSCALL
+3592.838736000     submit_bio
+        submit_bio
+        submit_bh
+        jbd2_journal_commit_transaction
+        kjournald2
+        kthread
+        ret_from_fork
+
+This shows that submit_bio() was called by submit_bh(), which was called
+by jbd2_journal_commit_transaction(), and so on. 
+
+For high frequency functions, see stackcount, which summarizes in-kernel for
+efficiency. If you don't know if your function is low or high frequency, try
+funccount.
+
+
+The -v option includes more fields, including the on-CPU process (COMM and PID):
+
+# ./stacksnoop -v submit_bio
+TIME(s)            COMM         PID    CPU SYSCALL
+3734.855027000     jbd2/dm-0-8  313    0   submit_bio
+        submit_bio
+        submit_bh
+        jbd2_journal_commit_transaction
+        kjournald2
+        kthread
+        ret_from_fork
+
+This identifies the application issuing the sync syscall: the jbd2 process
+(COMM column).
+
+
+Here's another example, showing the path to second_overflow() and on-CPU
+process:
+
+# ./stacksnoop -v second_overflow
+TIME(s)            COMM         PID    CPU SYSCALL
+3837.526433000     <idle>       0      1   second_overflow
+        second_overflow
+        tick_do_update_jiffies64
+        tick_irq_enter
+        irq_enter
+        smp_apic_timer_interrupt
+        apic_timer_interrupt
+        default_idle
+        arch_cpu_idle
+        default_idle_call
+        cpu_startup_entry
+        start_secondary
+
+3838.526953000     <idle>       0      1   second_overflow
+        second_overflow
+        tick_do_update_jiffies64
+        tick_irq_enter
+        irq_enter
+        smp_apic_timer_interrupt
+        apic_timer_interrupt
+        default_idle
+        arch_cpu_idle
+        default_idle_call
+        cpu_startup_entry
+        start_secondary
+
+This fires every second (see TIME(s)), and is from tick_do_update_jiffies64().
+
+
+USAGE message:
+
+# ./stacksnoop -h
+usage: stacksnoop [-h] [-p PID] [-s] [-v] function
+
+Trace and print kernel stack traces for a kernel function
+
+positional arguments:
+  function           kernel function name
+
+optional arguments:
+  -h, --help         show this help message and exit
+  -p PID, --pid PID  trace this PID only
+  -s, --offset       show address offsets
+  -v, --verbose      print more fields
+
+examples:
+    ./stacksnoop ext4_sync_fs    # print kernel stack traces for ext4_sync_fs
+    ./stacksnoop -s ext4_sync_fs    # ... also show symbol offsets
+    ./stacksnoop -v ext4_sync_fs    # ... show extra columns
+    ./stacksnoop -p 185 ext4_sync_fs    # ... only when PID 185 is on-CPU

@@ -24,14 +24,19 @@ extern "C" {
 
 #include <stdint.h>
 
-typedef int (*bcc_procutils_modulecb)(const char *, uint64_t, uint64_t, void *);
+// Module name, start address, end address, whether to check mount namespace, payload
+typedef int (*bcc_procutils_modulecb)(const char *, uint64_t, uint64_t, bool, void *);
+// Symbol name, address, payload
 typedef void (*bcc_procutils_ksymcb)(const char *, uint64_t, void *);
 
-const char *bcc_procutils_which_so(const char *libname);
+char *bcc_procutils_which_so(const char *libname, int pid);
 char *bcc_procutils_which(const char *binpath);
+int bcc_mapping_is_file_backed(const char *mapname);
 int bcc_procutils_each_module(int pid, bcc_procutils_modulecb callback,
                               void *payload);
 int bcc_procutils_each_ksym(bcc_procutils_ksymcb callback, void *payload);
+void bcc_procutils_free(const char *ptr);
+const char *bcc_procutils_language(int pid);
 
 #ifdef __cplusplus
 }

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 #
-# solisten	Trace TCP listen events
-#		For Linux, uses BCC, eBPF. Embedded C.
+# solisten      Trace TCP listen events
+#               For Linux, uses BCC, eBPF. Embedded C.
 #
 # USAGE: solisten.py [-h] [-p PID] [--show-netns]
 #
@@ -18,8 +18,8 @@
 # 04-Mar-2016	Jean-Tiare Le Bigot	Created this.
 
 import os
-import socket
-import netaddr
+from socket import inet_ntop, AF_INET, AF_INET6, SOCK_STREAM, SOCK_DGRAM
+from struct import pack
 import argparse
 from bcc import BPF
 import ctypes as ct
@@ -28,8 +28,8 @@ import ctypes as ct
 examples = """Examples:
     ./solisten.py              # Stream socket listen
     ./solisten.py -p 1234      # Stream socket listen for specified PID only
-    ./solisten.py --netns 4242 # Stream socket listen for specified network namespace ID only
-    ./solisten.py --show-netns # Show network namespace ID. Probably usefull if you run containers
+    ./solisten.py --netns 4242 # " for the specified network namespace ID only
+    ./solisten.py --show-netns # Show network ns ID (useful for containers)
 """
 
 parser = argparse.ArgumentParser(
@@ -45,7 +45,7 @@ parser.add_argument("-n", "--netns", default=0, type=int,
 
 
 # BPF Program
-bpf_text = """ 
+bpf_text = """
 #include <net/sock.h>
 #include <net/inet_sock.h>
 #include <net/net_namespace.h>
@@ -77,7 +77,8 @@ int kprobe__inet_listen(struct pt_regs *ctx, struct socket *sock, int backlog)
             .backlog = backlog,
         };
 
-        // Get process comm. Needs LLVM >= 3.7.1 see https://github.com/iovisor/bcc/issues/393
+        // Get process comm. Needs LLVM >= 3.7.1
+        // see https://github.com/iovisor/bcc/issues/393
         bpf_get_current_comm(evt.task, TASK_COMM_LEN);
 
         // Get socket IP family
@@ -107,9 +108,8 @@ int kprobe__inet_listen(struct pt_regs *ctx, struct socket *sock, int backlog)
             bpf_probe_read(evt.laddr, sizeof(u32), &(inet->inet_rcv_saddr));
             evt.laddr[0] = be32_to_cpu(evt.laddr[0]);
         } else if (family == AF_INET6) {
-            bpf_probe_read(evt.laddr, sizeof(evt.laddr), sk->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
-            evt.laddr[0] = be64_to_cpu(evt.laddr[0]);
-            evt.laddr[1] = be64_to_cpu(evt.laddr[1]);
+            bpf_probe_read(evt.laddr, sizeof(evt.laddr),
+                           sk->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
         }
 
         // Send event to userland
@@ -145,19 +145,19 @@ def event_printer(show_netns):
         proto_family = event.proto & 0xff
         proto_type = event.proto >> 16 & 0xff
 
-        if proto_family == socket.SOCK_STREAM:
+        if proto_family == SOCK_STREAM:
             protocol = "TCP"
-        elif proto_family == socket.SOCK_DGRAM:
+        elif proto_family == SOCK_DGRAM:
             protocol = "UDP"
         else:
             protocol = "UNK"
 
         address = ""
-        if proto_type == socket.AF_INET:
+        if proto_type == AF_INET:
             protocol += "v4"
-            address = netaddr.IPAddress(event.laddr[0])
-        elif proto_type == socket.AF_INET6:
-            address = netaddr.IPAddress(event.laddr[0]<<64 | event.laddr[1], version=6)
+            address = inet_ntop(AF_INET, pack("I", event.laddr[0]))
+        elif proto_type == AF_INET6:
+            address = inet_ntop(AF_INET6, event.laddr)
             protocol += "v6"
 
         # Display
@@ -195,11 +195,12 @@ if __name__ == "__main__":
 
     # Print headers
     if args.show_netns:
-        print("%-6s %-12s %-12s %-6s %-8s %-5s %-39s" % ("PID", "COMM", "NETNS", "PROTO", "BACKLOG", "PORT", "ADDR"))
+        print("%-6s %-12s %-12s %-6s %-8s %-5s %-39s" %
+              ("PID", "COMM", "NETNS", "PROTO", "BACKLOG", "PORT", "ADDR"))
     else:
-        print("%-6s %-12s %-6s %-8s %-5s %-39s" % ("PID", "COMM", "PROTO", "BACKLOG", "PORT", "ADDR"))
+        print("%-6s %-12s %-6s %-8s %-5s %-39s" %
+              ("PID", "COMM", "PROTO", "BACKLOG", "PORT", "ADDR"))
 
     # Read events
     while 1:
         b.kprobe_poll()
-

@@ -2,11 +2,11 @@
 .SH NAME
 opensnoop \- Trace open() syscalls. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B opensnoop [\-h] [\-t] [\-x] [\-p PID]
+.B opensnoop [\-h] [\-T] [\-x] [\-p PID] [\-t TID] [\-n name]
 .SH DESCRIPTION
 opensnoop traces the open() syscall, showing which processes are attempting
 to open which files. This can be useful for determining the location of config
-and log files, or for troubleshooting applications that are failing, especially
+and log files, or for troubleshooting applications that are failing, specially
 on startup.
 
 This works by tracing the kernel sys_open() function using dynamic tracing, and
@@ -24,7 +24,7 @@ CONFIG_BPF and bcc.
 \-h
 Print usage message.
 .TP
-\-t
+\-T
 Include a timestamp column.
 .TP
 \-x
@@ -32,6 +32,12 @@ Only print failed opens.
 .TP
 \-p PID
 Trace this process ID only (filtered in-kernel).
+.TP
+\-t TID
+Trace this thread ID only (filtered in-kernel).
+.TP
+\-n name
+Only print processes where its name partially matches 'name'
 .SH EXAMPLES
 .TP
 Trace all open() syscalls:
@@ -40,7 +46,7 @@ Trace all open() syscalls:
 .TP
 Trace all open() syscalls, and include timestamps:
 #
-.B opensnoop \-t
+.B opensnoop \-T
 .TP
 Trace only open() syscalls that failed:
 #
@@ -49,6 +55,10 @@ Trace only open() syscalls that failed:
 Trace PID 181 only:
 #
 .B opensnoop \-p 181
+.TP
+Trace all open() syscalls from processes where its name partially matches 'ed':
+#
+.B opensnoop \-n ed
 .SH FIELDS
 .TP
 TIME(s)
@@ -56,6 +66,9 @@ Time of the call, in seconds.
 .TP
 PID
 Process ID
+.TP
+TID
+Thread ID
 .TP
 COMM
 Process name

@@ -15,8 +15,7 @@
  */
 
 #include <algorithm>
-#include <assert.h>
-#include "exception.h"
+#include "bcc_exception.h"
 #include "parser.h"
 #include "type_helper.h"
 

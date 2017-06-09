@@ -20,6 +20,8 @@
 #include <memory>
 #include <string>
 
+#include "table_storage.h"
+
 namespace llvm {
 class Module;
 class LLVMContext;
@@ -28,19 +30,13 @@ class MemoryBuffer;
 
 namespace ebpf {
 
-struct TableDesc;
-
-namespace cc {
-class Parser;
-class CodegenLLVM;
-}
-
 class ClangLoader {
  public:
   explicit ClangLoader(llvm::LLVMContext *ctx, unsigned flags);
   ~ClangLoader();
-  int parse(std::unique_ptr<llvm::Module> *mod, std::unique_ptr<std::vector<TableDesc>> *tables,
-            const std::string &file, bool in_memory, const char *cflags[], int ncflags);
+  int parse(std::unique_ptr<llvm::Module> *mod, TableStorage &ts, const std::string &file,
+            bool in_memory, const char *cflags[], int ncflags, const std::string &id);
+
  private:
   static std::map<std::string, std::unique_ptr<llvm::MemoryBuffer>> remapped_files_;
   llvm::LLVMContext *ctx_;

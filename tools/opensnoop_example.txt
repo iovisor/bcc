@@ -48,9 +48,9 @@ during application startup.
 
 
 The -p option can be used to filter on a PID, which is filtered in-kernel. Here
-I've used it with -t to print timestamps:
+I've used it with -T to print timestamps:
 
- ./opensnoop -tp 1956
+ ./opensnoop -Tp 1956
 TIME(s)       PID    COMM               FD ERR PATH
 0.000000000   1956   supervise           9   0 supervise/status.new
 0.000289999   1956   supervise           9   0 supervise/status.new
@@ -89,21 +89,56 @@ The ERR column is the system error number. Error number 2 is ENOENT: no such
 file or directory.
 
 
+The -n option can be used to filter on process name using partial matches:
+
+# ./opensnoop -n ed
+
+PID    COMM               FD ERR PATH
+2679   sed                 3   0 /etc/ld.so.cache
+2679   sed                 3   0 /lib/x86_64-linux-gnu/libselinux.so.1
+2679   sed                 3   0 /lib/x86_64-linux-gnu/libc.so.6
+2679   sed                 3   0 /lib/x86_64-linux-gnu/libpcre.so.3
+2679   sed                 3   0 /lib/x86_64-linux-gnu/libdl.so.2
+2679   sed                 3   0 /lib/x86_64-linux-gnu/libpthread.so.0
+2679   sed                 3   0 /proc/filesystems
+2679   sed                 3   0 /usr/lib/locale/locale-archive
+2679   sed                -1   2
+2679   sed                 3   0 /usr/lib/x86_64-linux-gnu/gconv/gconv-modules.cache
+2679   sed                 3   0 /dev/null
+2680   sed                 3   0 /etc/ld.so.cache
+2680   sed                 3   0 /lib/x86_64-linux-gnu/libselinux.so.1
+2680   sed                 3   0 /lib/x86_64-linux-gnu/libc.so.6
+2680   sed                 3   0 /lib/x86_64-linux-gnu/libpcre.so.3
+2680   sed                 3   0 /lib/x86_64-linux-gnu/libdl.so.2
+2680   sed                 3   0 /lib/x86_64-linux-gnu/libpthread.so.0
+2680   sed                 3   0 /proc/filesystems
+2680   sed                 3   0 /usr/lib/locale/locale-archive
+2680   sed                -1   2
+^C
+
+This caught the 'sed' command because it partially matches 'ed' that's passed
+to the '-n' option.
+
+
 USAGE message:
 
 # ./opensnoop -h
-usage: opensnoop [-h] [-t] [-x] [-p PID]
+usage: opensnoop [-h] [-T] [-x] [-p PID] [-t TID] [-n NAME]
 
 Trace open() syscalls
 
 optional arguments:
-  -h, --help         show this help message and exit
-  -t, --timestamp    include timestamp on output
-  -x, --failed       only show failed opens
-  -p PID, --pid PID  trace this PID only
+  -h, --help            show this help message and exit
+  -T, --timestamp       include timestamp on output
+  -x, --failed          only show failed opens
+  -p PID, --pid PID     trace this PID only
+  -t TID, --tid TID     trace this TID only
+  -n NAME, --name NAME  only print process names containing this name
 
 examples:
     ./opensnoop           # trace all open() syscalls
-    ./opensnoop -t        # include timestamps
+    ./opensnoop -T        # include timestamps
     ./opensnoop -x        # only show failed opens
     ./opensnoop -p 181    # only trace PID 181
+    ./opensnoop -t 123    # only trace TID 123
+    ./opensnoop -n main   # only print process names containing "main"

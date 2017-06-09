@@ -102,7 +102,7 @@ if debug:
     print(bpf_text)
 
 # initialize BPF
-b = BPF(text=bpf_text, usdt=u)
+b = BPF(text=bpf_text, usdt_contexts=[u])
 
 # header
 print("Tracing MySQL server queries for PID %d slower than %s ms..." % (pid,
@@ -128,6 +128,6 @@ def print_event(cpu, data, size):
         event.pid, float(event.delta) / 1000000, event.query))
 
 # loop with callback to print_event
-b["events"].open_perf_buffer(print_event)
+b["events"].open_perf_buffer(print_event, page_cnt=64)
 while 1:
     b.kprobe_poll()

@@ -14,7 +14,7 @@
 # The vm1, vm2 and router are implemented as namespaces.
 # The linux bridge device is used to provice bridge functionality.
 # pem bpf will be attached to related network devices for vm1, vm1, bridge1 and bridge2.
-# 
+#
 # vm1 and vm2 are in different subnet. For vm1 to communicate to vm2,
 # the packet will have to travel from vm1 to pem, bridge1, router, bridge2, pem, and
 # then come to vm2.
@@ -26,7 +26,7 @@
 # 9: PING 200.1.1.1 (200.1.1.1) 56(84) bytes of data.
 # 9: 64 bytes from 200.1.1.1: icmp_req=1 ttl=63 time=0.090 ms
 # 9: 64 bytes from 200.1.1.1: icmp_req=2 ttl=63 time=0.032 ms
-# 9: 
+# 9:
 # 9: --- 200.1.1.1 ping statistics ---
 # 9: 2 packets transmitted, 2 received, 0% packet loss, time 999ms
 # 9: rtt min/avg/max/mdev = 0.032/0.061/0.090/0.029 ms
@@ -34,24 +34,24 @@
 # 9: [  5]  0.0- 1.0 sec  3.80 GBytes  32.6 Gbits/sec
 # 9: Starting netserver with host 'IN(6)ADDR_ANY' port '12865' and family AF_UNSPEC
 # 9: MIGRATED TCP STREAM TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to 200.1.1.1 (200.1.1.1) port 0 AF_INET : demo
-# 9: Recv   Send    Send                          
-# 9: Socket Socket  Message  Elapsed              
-# 9: Size   Size    Size     Time     Throughput  
-# 9: bytes  bytes   bytes    secs.    10^6bits/sec  
-# 9: 
-# 9:  87380  16384  65160    1.00     39940.46   
+# 9: Recv   Send    Send
+# 9: Socket Socket  Message  Elapsed
+# 9: Size   Size    Size     Time     Throughput
+# 9: bytes  bytes   bytes    secs.    10^6bits/sec
+# 9:
+# 9:  87380  16384  65160    1.00     39940.46
 # 9: MIGRATED TCP REQUEST/RESPONSE TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to 200.1.1.1 (200.1.1.1) port 0 AF_INET : demo : first burst 0
 # 9: Local /Remote
 # 9: Socket Size   Request  Resp.   Elapsed  Trans.
-# 9: Send   Recv   Size     Size    Time     Rate         
-# 9: bytes  Bytes  bytes    bytes   secs.    per sec   
-# 9: 
-# 9: 16384  87380  1        1       1.00     46387.80   
-# 9: 16384  87380 
+# 9: Send   Recv   Size     Size    Time     Rate
+# 9: bytes  Bytes  bytes    bytes   secs.    per sec
+# 9:
+# 9: 16384  87380  1        1       1.00     46387.80
+# 9: 16384  87380
 # 9: .
 # 9: ----------------------------------------------------------------------
 # 9: Ran 1 test in 7.495s
-# 9: 
+# 9:
 # 9: OK
 
 from ctypes import c_uint
@@ -68,6 +68,16 @@ ipr = IPRoute()
 ipdb = IPDB(nl=ipr)
 sim = Simulation(ipdb)
 
+allocated_interfaces = set(ipdb.interfaces.keys())
+
+def get_next_iface(prefix):
+    i = 0
+    while True:
+        iface = "{0}{1}".format(prefix, i)
+        if iface not in allocated_interfaces:
+            allocated_interfaces.add(iface)
+            return iface
+        i += 1
 
 class TestBPFSocket(TestCase):
     def setup_br(self, br, veth_rt_2_br, veth_pem_2_br, veth_br_2_pem):
@@ -77,22 +87,22 @@ class TestBPFSocket(TestCase):
         ipdb.interfaces[veth_br_2_pem].up().commit()
         subprocess.call(["sysctl", "-q", "-w", "net.ipv6.conf." + veth_pem_2_br + ".disable_ipv6=1"])
         subprocess.call(["sysctl", "-q", "-w", "net.ipv6.conf." + veth_br_2_pem + ".disable_ipv6=1"])
-        
+
         # set up the bridge and add router interface as one of its slaves
         with ipdb.create(ifname=br, kind="bridge") as br1:
             br1.add_port(ipdb.interfaces[veth_pem_2_br])
             br1.add_port(ipdb.interfaces[veth_rt_2_br])
             br1.up()
         subprocess.call(["sysctl", "-q", "-w", "net.ipv6.conf." + br + ".disable_ipv6=1"])
-            
+
     def set_default_const(self):
         self.ns1            = "ns1"
         self.ns2            = "ns2"
         self.ns_router      = "ns_router"
-        self.br1            = "br1"
+        self.br1            = get_next_iface("br")
         self.veth_pem_2_br1 = "v20"
         self.veth_br1_2_pem = "v21"
-        self.br2            = "br2"
+        self.br2            = get_next_iface("br")
         self.veth_pem_2_br2 = "v22"
         self.veth_br2_2_pem = "v23"
 

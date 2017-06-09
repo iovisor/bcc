@@ -1,0 +1,88 @@
+Demonstrations of dbslower, the Linux eBPF/bcc version.
+
+
+dbslower traces queries served by a MySQL or PostgreSQL server, and prints
+those that exceed a latency (query time) threshold. By default a threshold of
+1 ms is used. For example:
+
+# dbslower mysql
+Tracing database queries for pids 25776 slower than 1 ms...
+TIME(s)        PID          MS QUERY
+1.315800       25776  2000.999 call getproduct(97)
+3.360380       25776     3.226 call getproduct(6)
+^C
+
+This traced two queries slower than 1ms, one of which is very slow: over 2
+seconds. We can filter out the shorter ones and keep only the really slow ones:
+
+# dbslower mysql -m 1000
+Tracing database queries for pids 25776 slower than 1000 ms...
+TIME(s)        PID          MS QUERY
+1.421264       25776  2002.183 call getproduct(97)
+3.572617       25776  2001.381 call getproduct(97)
+5.661411       25776  2001.867 call getproduct(97)
+7.748296       25776  2001.329 call getproduct(97)
+^C
+
+This looks like a pattern -- we keep making this slow query every 2 seconds
+or so, and it takes approximately 2 seconds to run.
+
+By default, dbslower will try to detect mysqld and postgres processes, but if
+necessary, you can specify the process ids with the -p switch:
+
+# dbslower mysql -p $(pidof mysql)
+Tracing database queries for pids 25776 slower than 1 ms...
+TIME(s)        PID          MS QUERY
+2.002125       25776     3.340 call getproduct(7)
+2.045006       25776  2001.558 call getproduct(97)
+4.131863       25776  2002.275 call getproduct(97)
+6.190513       25776     3.248 call getproduct(33)
+^C
+
+Specifying 0 as the threshold will print all the queries:
+
+# dbslower mysql -m 0
+Tracing database queries for pids 25776 slower than 0 ms...
+TIME(s)        PID          MS QUERY
+6.003720       25776     2.363 /* mysql-connector-java-5.1.40 ( Revision: 402933ef52cad9aa82624e80acbea46e3a701ce6 ) */SELECT  @@session.auto_increment_increment AS auto_increment_increment, @@character_set_client AS character_set_client, @@character_set_connection AS character_set_conn
+6.599219       25776     0.068 SET NAMES latin1
+6.613944       25776     0.057 SET character_set_results = NULL
+6.645228       25776     0.059 SET autocommit=1
+6.653798       25776     0.059 SET sql_mode='NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION,STRICT_TRANS_TABLES'
+6.682184       25776     2.526 select * from users where id = 0
+6.767888       25776     0.288 select id from products where userid = 0
+6.790642       25776     2.255 call getproduct(0)
+6.809865       25776     0.218 call getproduct(1)
+6.846878       25776     0.248 select * from users where id = 1
+6.847623       25776     0.166 select id from products where userid = 1
+6.867363       25776     0.244 call getproduct(2)
+6.868162       25776     0.107 call getproduct(3)
+6.874726       25776     0.208 select * from users where id = 2
+6.881722       25776     0.260 select id from products where userid = 2
+^C
+
+Here we can see the MySQL connector initialization and connection establishment,
+before the actual queries start coming in.
+
+
+USAGE:
+# dbslower -h
+usage: dbslower.py [-h] [-v] [-p [PIDS [PIDS ...]]] [-m THRESHOLD]
+                   {mysql,postgres}
+
+positional arguments:
+  {mysql,postgres}      the database engine to use
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -v, --verbose         print the BPF program
+  -p [PID [PID ...]], --pid [PID [PID ...]]
+                        the pid(s) to trace
+  -m THRESHOLD, --threshold THRESHOLD
+                        trace queries slower than this threshold (ms)
+
+examples:
+    dbslower postgres            # trace PostgreSQL queries slower than 1ms
+    dbslower postgres -p 188 322 # trace specific PostgreSQL processes
+    dbslower mysql -p 480 -m 30  # trace MySQL queries slower than 30ms
+    dbslower mysql -p 480 -v     # trace MySQL queries and print the BPF program

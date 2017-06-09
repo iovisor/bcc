@@ -1,0 +1,79 @@
+Demonstrations of capable, the Linux eBPF/bcc version.
+
+
+capable traces calls to the kernel cap_capable() function, which does security
+capability checks, and prints details for each call. For example:
+
+# ./capable.py 
+TIME      UID    PID    COMM             CAP  NAME                 AUDIT
+22:11:23  114    2676   snmpd            12   CAP_NET_ADMIN        1
+22:11:23  0      6990   run              24   CAP_SYS_RESOURCE     1
+22:11:23  0      7003   chmod            3    CAP_FOWNER           1
+22:11:23  0      7003   chmod            4    CAP_FSETID           1
+22:11:23  0      7005   chmod            4    CAP_FSETID           1
+22:11:23  0      7005   chmod            4    CAP_FSETID           1
+22:11:23  0      7006   chown            4    CAP_FSETID           1
+22:11:23  0      7006   chown            4    CAP_FSETID           1
+22:11:23  0      6990   setuidgid        6    CAP_SETGID           1
+22:11:23  0      6990   setuidgid        6    CAP_SETGID           1
+22:11:23  0      6990   setuidgid        7    CAP_SETUID           1
+22:11:24  0      7013   run              24   CAP_SYS_RESOURCE     1
+22:11:24  0      7026   chmod            3    CAP_FOWNER           1
+22:11:24  0      7026   chmod            4    CAP_FSETID           1
+22:11:24  0      7028   chmod            4    CAP_FSETID           1
+22:11:24  0      7028   chmod            4    CAP_FSETID           1
+22:11:24  0      7029   chown            4    CAP_FSETID           1
+22:11:24  0      7029   chown            4    CAP_FSETID           1
+22:11:24  0      7013   setuidgid        6    CAP_SETGID           1
+22:11:24  0      7013   setuidgid        6    CAP_SETGID           1
+22:11:24  0      7013   setuidgid        7    CAP_SETUID           1
+22:11:25  0      7036   run              24   CAP_SYS_RESOURCE     1
+22:11:25  0      7049   chmod            3    CAP_FOWNER           1
+22:11:25  0      7049   chmod            4    CAP_FSETID           1
+22:11:25  0      7051   chmod            4    CAP_FSETID           1
+22:11:25  0      7051   chmod            4    CAP_FSETID           1
+[...]
+
+This can be useful for general debugging, and also security enforcement:
+determining a whitelist of capabilities an application needs.
+
+The output above includes various capability checks: snmpd checking
+CAP_NET_ADMIN, run checking CAP_SYS_RESOURCES, then some short-lived processes
+checking CAP_FOWNER, CAP_FSETID, etc.
+
+To see what each of these capabilities does, check the capabilities(7) man
+page and the kernel source.
+
+
+Sometimes capable catches itself starting up:
+
+# ./capable.py 
+TIME      UID    PID    COMM             CAP  NAME                 AUDIT
+22:22:19  0      21949  capable.py       21   CAP_SYS_ADMIN        1
+22:22:19  0      21949  capable.py       21   CAP_SYS_ADMIN        1
+22:22:19  0      21949  capable.py       21   CAP_SYS_ADMIN        1
+22:22:19  0      21949  capable.py       21   CAP_SYS_ADMIN        1
+22:22:19  0      21949  capable.py       21   CAP_SYS_ADMIN        1
+22:22:19  0      21949  capable.py       21   CAP_SYS_ADMIN        1
+22:22:19  0      21952  run              24   CAP_SYS_RESOURCE     1
+[...]
+
+These are capability checks from BPF and perf_events syscalls.
+
+
+USAGE:
+
+# ./capable.py -h
+usage: capable.py [-h] [-v] [-p PID]
+
+Trace security capability checks
+
+optional arguments:
+  -h, --help         show this help message and exit
+  -v, --verbose      include non-audit checks
+  -p PID, --pid PID  trace this PID only
+
+examples:
+    ./capable             # trace capability checks
+    ./capable -v          # verbose: include non-audit checks
+    ./capable -p 181      # only trace PID 181

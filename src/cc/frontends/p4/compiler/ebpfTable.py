@@ -84,8 +84,8 @@ class EbpfTableKey(object):
             matchType = f[1]
             mask = f[2]
 
-            if ((matchType is p4_match_type.P4_MATCH_TERNARY) or 
-                (matchType is p4_match_type.P4_MATCH_LPM) or 
+            if ((matchType is p4_match_type.P4_MATCH_TERNARY) or
+                (matchType is p4_match_type.P4_MATCH_LPM) or
                 (matchType is p4_match_type.P4_MATCH_RANGE)):
                 raise NotSupportedException(
                     False, "Match type {0}", matchType)
@@ -126,7 +126,7 @@ class EbpfTableKey(object):
     def fieldRank(field):
         assert isinstance(field, EbpfTableKeyField)
         return field.field.type.alignment()
-            
+
     def serializeType(self, serializer, keyTypeName):
         assert isinstance(serializer, ProgramSerializer)
         serializer.emitIndent()
@@ -193,7 +193,7 @@ class EbpfTable(object):
                 assert isinstance(ctr, ebpfCounter.EbpfCounter)
                 self.counters.append(ctr)
 
-        if (len(hlirtable.attached_meters) > 0 or 
+        if (len(hlirtable.attached_meters) > 0 or
             len(hlirtable.attached_registers) > 0):
             program.emitWarning("{0}: meters/registers {1}; ignored",
                                 hlirtable, NotSupportedException.archError)

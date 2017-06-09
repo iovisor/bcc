@@ -24,10 +24,11 @@
 #include "bcc_proc.h"
 #include "usdt.h"
 #include "vendor/tinyformat.hpp"
+#include "bcc_usdt.h"
 
 namespace USDT {
 
-Probe::Location::Location(uint64_t addr, const char *arg_fmt) : address_(addr) {
+Location::Location(uint64_t addr, const char *arg_fmt) : address_(addr) {
   ArgumentParser_x64 parser(arg_fmt);
   while (!parser.done()) {
     Argument arg;
@@ -47,7 +48,7 @@ Probe::Probe(const char *bin_path, const char *provider, const char *name,
 
 bool Probe::in_shared_object() {
   if (!in_shared_object_)
-    in_shared_object_ = (bcc_elf_is_shared_obj(bin_path_.c_str()) == 1);
+    in_shared_object_ = bcc_elf_is_shared_obj(bin_path_.c_str());
   return in_shared_object_.value();
 }
 
@@ -62,7 +63,7 @@ bool Probe::resolve_global_address(uint64_t *global, const uint64_t addr) {
 }
 
 bool Probe::add_to_semaphore(int16_t val) {
-  assert(pid_ && attached_semaphore_);
+  assert(pid_);
 
   if (!attached_semaphore_) {
     uint64_t addr;
@@ -154,7 +155,7 @@ bool Probe::usdt_getarg(std::ostream &stream) {
     std::string cptr = tfm::format("*((%s *)dest)", ctype);
 
     tfm::format(stream,
-                "static inline int _bpf_readarg_%s_%d("
+                "static __always_inline int _bpf_readarg_%s_%d("
                 "struct pt_regs *ctx, void *dest, size_t len) {\n"
                 "  if (len != sizeof(%s)) return -1;\n",
                 attached_to_.value(), arg_n + 1, ctype);
@@ -198,8 +199,14 @@ void Context::_each_probe(const char *binpath, const struct bcc_elf_usdt *probe,
   ctx->add_probe(binpath, probe);
 }
 
-int Context::_each_module(const char *modpath, uint64_t, uint64_t, void *p) {
-  bcc_elf_foreach_usdt(modpath, _each_probe, p);
+int Context::_each_module(const char *modpath, uint64_t, uint64_t, bool, void *p) {
+  Context *ctx = static_cast<Context *>(p);
+  // Modules may be reported multiple times if they contain more than one
+  // executable region. We are going to parse the ELF on disk anyway, so we
+  // don't need these duplicates.
+  if (ctx->modules_.insert(modpath).second /*inserted new?*/) {
+    bcc_elf_foreach_usdt(modpath, _each_probe, p);
+  }
   return 0;
 }
 
@@ -222,8 +229,9 @@ std::string Context::resolve_bin_path(const std::string &bin_path) {
   if (char *which = bcc_procutils_which(bin_path.c_str())) {
     result = which;
     ::free(which);
-  } else if (const char *which_so = bcc_procutils_which_so(bin_path.c_str())) {
+  } else if (char *which_so = bcc_procutils_which_so(bin_path.c_str(), 0)) {
     result = which_so;
+    ::free(which_so);
   }
 
   return result;
@@ -238,7 +246,7 @@ Probe *Context::get(const std::string &probe_name) {
 }
 
 bool Context::generate_usdt_args(std::ostream &stream) {
-  stream << "#include <uapi/linux/ptrace.h>\n";
+  stream << USDT_PROGRAM_HEADER;
   for (auto &p : probes_) {
     if (p->enabled() && !p->usdt_getarg(stream))
       return false;
@@ -255,12 +263,25 @@ bool Context::enable_probe(const std::string &probe_name,
   return p && p->enable(fn_name);
 }
 
+void Context::each(each_cb callback) {
+  for (const auto &probe : probes_) {
+    struct bcc_usdt info = {0};
+    info.provider = probe->provider().c_str();
+    info.bin_path = probe->bin_path().c_str();
+    info.name = probe->name().c_str();
+    info.semaphore = probe->semaphore();
+    info.num_locations = probe->num_locations();
+    info.num_arguments = probe->num_arguments();
+    callback(&info);
+  }
+}
+
 void Context::each_uprobe(each_uprobe_cb callback) {
   for (auto &p : probes_) {
     if (!p->enabled())
       continue;
 
-    for (Probe::Location &loc : p->locations_) {
+    for (Location &loc : p->locations_) {
       callback(p->bin_path_.c_str(), p->attached_to_->c_str(), loc.address_,
                pid_.value_or(-1));
     }
@@ -288,7 +309,6 @@ Context::~Context() {
 }
 
 extern "C" {
-#include "bcc_usdt.h"
 
 void *bcc_usdt_new_frompid(int pid) {
   USDT::Context *ctx = new USDT::Context(pid);
@@ -329,6 +349,73 @@ const char *bcc_usdt_genargs(void *usdt) {
 
   storage_ = stream.str();
   return storage_.c_str();
+}
+
+const char *bcc_usdt_get_probe_argctype(
+  void *ctx, const char* probe_name, const int arg_index
+) {
+  USDT::Probe *p = static_cast<USDT::Context *>(ctx)->get(probe_name);
+  std::string res = p ? p->get_arg_ctype(arg_index) : "";
+  return res.c_str();
+}
+
+void bcc_usdt_foreach(void *usdt, bcc_usdt_cb callback) {
+  USDT::Context *ctx = static_cast<USDT::Context *>(usdt);
+  ctx->each(callback);
+}
+
+int bcc_usdt_get_location(void *usdt, const char *probe_name,
+                          int index, struct bcc_usdt_location *location) {
+  USDT::Context *ctx = static_cast<USDT::Context *>(usdt);
+  USDT::Probe *probe = ctx->get(probe_name);
+  if (!probe)
+    return -1;
+  if (index < 0 || (size_t)index >= probe->num_locations())
+    return -1;
+  location->address = probe->address(index);
+  return 0;
+}
+
+int bcc_usdt_get_argument(void *usdt, const char *probe_name,
+                          int location_index, int argument_index,
+                          struct bcc_usdt_argument *argument) {
+  USDT::Context *ctx = static_cast<USDT::Context *>(usdt);
+  USDT::Probe *probe = ctx->get(probe_name);
+  if (!probe)
+    return -1;
+  if (argument_index < 0 || (size_t)argument_index >= probe->num_arguments())
+    return -1;
+  if (location_index < 0 || (size_t)location_index >= probe->num_locations())
+    return -1;
+  auto const &location = probe->location(location_index);
+  auto const &arg = location.arguments_[argument_index];
+  argument->size = arg.arg_size();
+  argument->valid = BCC_USDT_ARGUMENT_NONE;
+  if (arg.constant()) {
+    argument->valid |= BCC_USDT_ARGUMENT_CONSTANT;
+    argument->constant = *(arg.constant());
+  }
+  if (arg.deref_offset()) {
+    argument->valid |= BCC_USDT_ARGUMENT_DEREF_OFFSET;
+    argument->deref_offset = *(arg.deref_offset());
+  }
+  if (arg.deref_ident()) {
+    argument->valid |= BCC_USDT_ARGUMENT_DEREF_IDENT;
+    argument->deref_ident = arg.deref_ident()->c_str();
+  }
+  if (arg.base_register_name()) {
+    argument->valid |= BCC_USDT_ARGUMENT_BASE_REGISTER_NAME;
+    argument->base_register_name = arg.base_register_name()->c_str();
+  }
+  if (arg.index_register_name()) {
+    argument->valid |= BCC_USDT_ARGUMENT_INDEX_REGISTER_NAME;
+    argument->index_register_name = arg.index_register_name()->c_str();
+  }
+  if (arg.scale()) {
+    argument->valid |= BCC_USDT_ARGUMENT_SCALE;
+    argument->scale = *(arg.scale());
+  }
+  return 0;
 }
 
 void bcc_usdt_foreach_uprobe(void *usdt, bcc_usdt_uprobe_cb callback) {

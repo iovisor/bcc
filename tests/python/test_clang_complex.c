@@ -10,7 +10,7 @@ struct FwdKey {
 struct FwdLeaf {
   u32 fwd_idx:32;
 };
-BPF_TABLE("hash", struct FwdKey, struct FwdLeaf, fwd_map, 1);
+BPF_HASH(fwd_map, struct FwdKey, struct FwdLeaf, 1);
 
 // array
 struct ConfigKey {
@@ -29,7 +29,7 @@ struct MacaddrKey {
 struct MacaddrLeaf {
   u64 mac;
 };
-BPF_TABLE("hash", struct MacaddrKey, struct MacaddrLeaf, macaddr_map, 11);
+BPF_HASH(macaddr_map, struct MacaddrKey, struct MacaddrLeaf, 11);
 
 // hash
 struct SlaveKey {
@@ -38,7 +38,7 @@ struct SlaveKey {
 struct SlaveLeaf {
   u32 slave_ifindex;
 };
-BPF_TABLE("hash", struct SlaveKey, struct SlaveLeaf, slave_map, 10);
+BPF_HASH(slave_map, struct SlaveKey, struct SlaveLeaf, 10);
 
 int handle_packet(struct __sk_buff *skb) {
   int ret = 0;

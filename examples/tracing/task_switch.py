@@ -14,7 +14,7 @@ struct key_t {
   u32 curr_pid;
 };
 // map_type, key_type, leaf_type, table_name, num_entry
-BPF_TABLE("hash", struct key_t, u64, stats, 1024);
+BPF_HASH(stats, struct key_t, u64, 1024);
 int count_sched(struct pt_regs *ctx, struct task_struct *prev) {
   struct key_t key = {};
   u64 zero = 0, *val;

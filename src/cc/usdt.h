@@ -23,11 +23,16 @@
 #include "syms.h"
 #include "vendor/optional.hpp"
 
+struct bcc_usdt;
+
 namespace USDT {
 
 using std::experimental::optional;
 using std::experimental::nullopt;
 class ArgumentParser;
+
+static const std::string USDT_PROGRAM_HEADER =
+    "#include <uapi/linux/ptrace.h>\n";
 
 class Argument {
 private:
@@ -35,7 +40,9 @@ private:
   optional<int> constant_;
   optional<int> deref_offset_;
   optional<std::string> deref_ident_;
-  optional<std::string> register_name_;
+  optional<std::string> base_register_name_;
+  optional<std::string> index_register_name_;
+  optional<int> scale_;
 
   bool get_global_address(uint64_t *address, const std::string &binpath,
                           const optional<int> &pid) const;
@@ -52,7 +59,13 @@ public:
   std::string ctype() const;
 
   const optional<std::string> &deref_ident() const { return deref_ident_; }
-  const optional<std::string> &register_name() const { return register_name_; }
+  const optional<std::string> &base_register_name() const {
+    return base_register_name_;
+  }
+  const optional<std::string> &index_register_name() const {
+    return index_register_name_;
+  }
+  const optional<int> scale() const { return scale_; }
   const optional<int> constant() const { return constant_; }
   const optional<int> deref_offset() const { return deref_offset_; }
 
@@ -63,12 +76,18 @@ class ArgumentParser {
   const char *arg_;
   ssize_t cur_pos_;
 
+  void skip_whitespace_from(size_t pos);
+  void skip_until_whitespace_from(size_t pos);
+
 protected:
   virtual bool normalize_register(std::string *reg, int *reg_size) = 0;
 
+  ssize_t parse_register(ssize_t pos, std::string &name, int &size);
   ssize_t parse_number(ssize_t pos, optional<int> *number);
   ssize_t parse_identifier(ssize_t pos, optional<std::string> *ident);
-  ssize_t parse_register(ssize_t pos, Argument *dest);
+  ssize_t parse_base_register(ssize_t pos, Argument *dest);
+  ssize_t parse_index_register(ssize_t pos, Argument *dest);
+  ssize_t parse_scale(ssize_t pos, Argument *dest);
   ssize_t parse_expr(ssize_t pos, Argument *dest);
   ssize_t parse_1(ssize_t pos, Argument *dest);
 
@@ -115,17 +134,17 @@ public:
   ArgumentParser_x64(const char *arg) : ArgumentParser(arg) {}
 };
 
+struct Location {
+  uint64_t address_;
+  std::vector<Argument> arguments_;
+  Location(uint64_t addr, const char *arg_fmt);
+};
+
 class Probe {
   std::string bin_path_;
   std::string provider_;
   std::string name_;
   uint64_t semaphore_;
-
-  struct Location {
-    uint64_t address_;
-    std::vector<Argument> arguments_;
-    Location(uint64_t addr, const char *arg_fmt);
-  };
 
   std::vector<Location> locations_;
 
@@ -148,9 +167,14 @@ public:
 
   size_t num_locations() const { return locations_.size(); }
   size_t num_arguments() const { return locations_.front().arguments_.size(); }
+  uint64_t semaphore()   const { return semaphore_; }
 
   uint64_t address(size_t n = 0) const { return locations_[n].address_; }
+  const Location &location(size_t n) const { return locations_[n]; }
   bool usdt_getarg(std::ostream &stream);
+  std::string get_arg_ctype(int arg_index) {
+    return largest_arg_type(arg_index);
+  }
 
   bool need_enable() const { return semaphore_ != 0x0; }
   bool enable(const std::string &fn_name);
@@ -167,6 +191,7 @@ public:
 
 class Context {
   std::vector<std::unique_ptr<Probe>> probes_;
+  std::unordered_set<std::string> modules_;
 
   optional<int> pid_;
   optional<ProcStat> pid_stat_;
@@ -174,7 +199,7 @@ class Context {
 
   static void _each_probe(const char *binpath, const struct bcc_elf_usdt *probe,
                           void *p);
-  static int _each_module(const char *modpath, uint64_t, uint64_t, void *p);
+  static int _each_module(const char *modpath, uint64_t, uint64_t, bool, void *p);
 
   void add_probe(const char *binpath, const struct bcc_elf_usdt *probe);
   std::string resolve_bin_path(const std::string &bin_path);
@@ -193,6 +218,9 @@ public:
 
   bool enable_probe(const std::string &probe_name, const std::string &fn_name);
   bool generate_usdt_args(std::ostream &stream);
+
+  typedef void (*each_cb)(struct bcc_usdt *);
+  void each(each_cb callback);
 
   typedef void (*each_uprobe_cb)(const char *, const char *, uint64_t, int);
   void each_uprobe(each_uprobe_cb callback);

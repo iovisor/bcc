@@ -1,25 +1,25 @@
 Demonstrations of funccount, the Linux eBPF/bcc version.
 
 
-This program traces kernel functions that match a specified pattern, and when
-Ctrl-C is hit prints a summary of their count while tracing. Eg, tracing all
-functions that begin with "vfs_":
+This program traces functions, tracepoints, or USDT probes that match a
+specified pattern, and when Ctrl-C is hit prints a summary of their count
+while tracing. Eg, tracing all kernel functions that begin with "vfs_":
 
 # ./funccount 'vfs_*'
 Tracing... Ctrl-C to end.
 ^C
-ADDR             FUNC                          COUNT
-ffffffff811efe81 vfs_create                        1
-ffffffff811f24a1 vfs_rename                        1
-ffffffff81215191 vfs_fsync_range                   2
-ffffffff81231df1 vfs_lock_file                    30
-ffffffff811e8dd1 vfs_fstatat                     152
-ffffffff811e8d71 vfs_fstat                       154
-ffffffff811e4381 vfs_write                       166
-ffffffff811e8c71 vfs_getattr_nosec               262
-ffffffff811e8d41 vfs_getattr                     262
-ffffffff811e3221 vfs_open                        264
-ffffffff811e4251 vfs_read                        470
+FUNC                          COUNT
+vfs_create                        1
+vfs_rename                        1
+vfs_fsync_range                   2
+vfs_lock_file                    30
+vfs_fstatat                     152
+vfs_fstat                       154
+vfs_write                       166
+vfs_getattr_nosec               262
+vfs_getattr                     262
+vfs_open                        264
+vfs_read                        470
 Detaching...
 
 The above output shows that while tracing the vfs_read() function was called 470
@@ -35,151 +35,193 @@ Tracing all tcp functions:
 # ./funccount 'tcp_*'
 Tracing... Ctrl-C to end.
 ^C
-ADDR             FUNC                          COUNT
-ffffffff816baf51 tcp_try_undo_recovery             1
-ffffffff816cc431 tcp_twsk_destructor               1
-ffffffff816bac51 tcp_enter_recovery                1
-ffffffff816c6421 tcp_xmit_retransmit_queue         1
-ffffffff816b95a1 tcp_update_scoreboard             1
-ffffffff816b8921 tcp_verify_retransmit_hint        1
-ffffffff816c4dd1 tcp_tsq_handler.part.31           1
-ffffffff816bc721 tcp_sacktag_write_queue           1
-ffffffff816b8eb1 tcp_match_skb_to_sack             1
-ffffffff816cd4b1 tcp_time_wait                     1
-ffffffff816b8c91 tcp_mark_head_lost                1
-ffffffff816b8a71 tcp_init_cwnd_reduction           1
-ffffffff816b90e1 tcp_sacktag_one                   1
-ffffffff816ba7e1 tcp_sacktag_walk                  1
-ffffffff816c6321 tcp_retransmit_skb                1
-ffffffff816c4ec1 tcp_tasklet_func                  1
-ffffffff816bed01 tcp_resume_early_retransmit        1
-ffffffff816b9351 tcp_dsack_set                     1
-ffffffff816ca181 tcp_v4_syn_recv_sock              2
-ffffffff816cd3d1 tcp_ca_openreq_child              2
-ffffffff816cfa91 tcp_try_fastopen                  2
-ffffffff816cd221 tcp_openreq_init_rwin             2
-ffffffff816c8931 tcp_v4_init_req                   2
-ffffffff816cc461 tcp_create_openreq_child          2
-ffffffff816cb841 tcp_v4_send_synack                2
-ffffffff816c8121 tcp_v4_init_sequence              2
-ffffffff816c2ab1 tcp_fragment                      2
-ffffffff816c9421 tcp_v4_conn_request               2
-ffffffff816b99e1 tcp_conn_request                  2
-ffffffff816c88f1 tcp_v4_route_req                  2
-ffffffff816c1ea1 tcp_fragment_tstamp               2
-ffffffff816b9511 tcp_try_keep_open                 2
-ffffffff816c8221 tcp_v4_reqsk_destructor           2
-ffffffff816c30e1 tcp_may_send_now                  2
-ffffffff816c24e1 tcp_make_synack                   2
-ffffffff816cc8f1 tcp_child_process                 2
-ffffffff816cc9d1 tcp_check_req                     2
-ffffffff816bbaf1 tcp_fastretrans_alert             2
-ffffffff816c8071 tcp_set_keepalive                 2
-ffffffff816c0cd1 tcp_finish_connect                3
-ffffffff816c1e11 tcp_connect_queue_skb             3
-ffffffff816c9c51 tcp_v4_connect                    3
-ffffffff816b3911 tcp_init_sock                     3
-ffffffff816c9051 tcp_v4_init_sock                  3
-ffffffff816c5111 tcp_connect                       3
-ffffffff816b94e1 tcp_any_retrans_done.part.35        3
-ffffffff816be881 tcp_clear_retrans                 3
-ffffffff816b6f21 tcp_setsockopt                    4
-ffffffff816cf321 tcp_update_metrics                5
-ffffffff816b4ee1 tcp_done                          5
-ffffffff816b8831 tcp_initialize_rcv_mss            5
-ffffffff816b8c01 tcp_sndbuf_expand                 5
-ffffffff816bb921 tcp_fin                           5
-ffffffff816c7151 tcp_init_xmit_timers              5
-ffffffff816b8301 tcp_close                         5
-ffffffff816cdd91 tcp_init_congestion_control        5
-ffffffff816cf4d1 tcp_init_metrics                  5
-ffffffff816d02b1 tcp_gro_complete                  5
-ffffffff816b81c1 tcp_free_fastopen_req             5
-ffffffff816ca4e1 tcp_v4_destroy_sock               5
-ffffffff816cddb1 tcp_cleanup_congestion_control        5
-ffffffff816c67b1 tcp_send_fin                      5
-ffffffff816bd8e1 tcp_init_buffer_space             5
-ffffffff816be801 tcp_init_cwnd                     5
-ffffffff816c1c51 tcp_select_initial_window         5
-ffffffff816b8201 tcp_check_oom                     5
-ffffffff816c2a81 tcp_default_init_rwnd             5
-ffffffff816cdc71 tcp_assign_congestion_control        5
-ffffffff816b54b1 tcp_getsockopt                    6
-ffffffff816b3b21 tcp_ioctl                         6
-ffffffff816c2fe1 tcp_mtup_init                     8
-ffffffff816b96d1 tcp_parse_options                 8
-ffffffff816c2f91 tcp_mss_to_mtu                    8
-ffffffff816bd511 tcp_try_rmem_schedule             8
-ffffffff816cf051 tcp_get_metrics                  10
-ffffffff816ba271 tcp_try_coalesce                 10
-ffffffff816c0de1 tcp_rcv_state_process            14
-ffffffff816c2941 tcp_sync_mss                     14
-ffffffff816c7e31 tcp_write_timer_handler          15
-ffffffff816c8001 tcp_write_timer                  16
-ffffffff816bb171 tcp_grow_window.isra.27          22
-ffffffff816b45b1 tcp_set_state                    23
-ffffffff816c5921 tcp_send_ack                     37
-ffffffff816c7641 tcp_delack_timer                 42
-ffffffff816c7471 tcp_delack_timer_handler         42
-ffffffff816c01f1 tcp_validate_incoming            91
-ffffffff816b44f1 tcp_prequeue_process            112
-ffffffff816cb8f1 tcp_v4_early_demux              117
-ffffffff816d08b1 tcp_gro_receive                 146
-ffffffff816bb5e1 tcp_queue_rcv                   167
-ffffffff816bdb91 tcp_data_queue                  215
-ffffffff816ba321 tcp_urg                         219
-ffffffff816c6c81 tcp_send_delayed_ack            257
-ffffffff816b3ee1 tcp_send_mss                    275
-ffffffff816b3dc1 tcp_push                        275
-ffffffff816b76c1 tcp_sendmsg                     275
-ffffffff816bb2a1 tcp_event_data_recv             275
-ffffffff816c1d61 tcp_nagle_check                 279
-ffffffff816c3f11 tcp_write_xmit                  282
-ffffffff816c2341 tcp_event_new_data_sent         282
-ffffffff816c3061 tcp_current_mss                 284
-ffffffff816c1db1 tcp_init_tso_segs               284
-ffffffff816c2871 tcp_wfree                       286
-ffffffff816c3251 tcp_schedule_loss_probe         305
-ffffffff816cb821 tcp_v4_send_check               323
-ffffffff816c3581 tcp_transmit_skb                323
-ffffffff816b54e1 tcp_recvmsg                     323
-ffffffff816c2111 tcp_options_write               325
-ffffffff816bda61 tcp_rcv_space_adjust            328
-ffffffff816bb721 tcp_check_space                 332
-ffffffff816c04a1 tcp_rcv_established             337
-ffffffff816bee61 tcp_ack                         337
-ffffffff816b9611 tcp_parse_aligned_timestamp.part.43      345
-ffffffff816cafc1 tcp_prequeue                    346
-ffffffff816cab21 tcp_v4_do_rcv                   351
-ffffffff816cba51 tcp_v4_rcv                      351
-ffffffff816b8b91 tcp_parse_md5sig_option         351
-ffffffff816b3fb1 tcp_cleanup_rbuf                436
-ffffffff816b64a1 tcp_poll                        468
-ffffffff816c1f01 tcp_established_options         604
-ffffffff816c82f1 tcp_v4_md5_lookup               615
-ffffffff816c4e11 tcp_release_cb                  736
-ffffffff816bec01 tcp_rearm_rto                   843
-ffffffff816c8261 tcp_md5_do_lookup               968
+FUNC                          COUNT
+tcp_try_undo_recovery             1
+tcp_twsk_destructor               1
+tcp_enter_recovery                1
+tcp_xmit_retransmit_queue         1
+tcp_update_scoreboard             1
+tcp_verify_retransmit_hint        1
+tcp_tsq_handler.part.31           1
+tcp_sacktag_write_queue           1
+tcp_match_skb_to_sack             1
+tcp_time_wait                     1
+tcp_mark_head_lost                1
+tcp_init_cwnd_reduction           1
+tcp_sacktag_one                   1
+tcp_sacktag_walk                  1
+tcp_retransmit_skb                1
+tcp_tasklet_func                  1
+tcp_resume_early_retransmit       1
+tcp_dsack_set                     1
+tcp_v4_syn_recv_sock              2
+tcp_ca_openreq_child              2
+tcp_try_fastopen                  2
+tcp_openreq_init_rwin             2
+tcp_v4_init_req                   2
+tcp_create_openreq_child          2
+tcp_v4_send_synack                2
+tcp_v4_init_sequence              2
+tcp_fragment                      2
+tcp_v4_conn_request               2
+tcp_conn_request                  2
+tcp_v4_route_req                  2
+tcp_fragment_tstamp               2
+tcp_try_keep_open                 2
+tcp_v4_reqsk_destructor           2
+tcp_may_send_now                  2
+tcp_make_synack                   2
+tcp_child_process                 2
+tcp_check_req                     2
+tcp_fastretrans_alert             2
+tcp_set_keepalive                 2
+tcp_finish_connect                3
+tcp_connect_queue_skb             3
+tcp_v4_connect                    3
+tcp_init_sock                     3
+tcp_v4_init_sock                  3
+tcp_connect                       3
+tcp_any_retrans_done.part.35        3
+tcp_clear_retrans                 3
+tcp_setsockopt                    4
+tcp_update_metrics                5
+tcp_done                          5
+tcp_initialize_rcv_mss            5
+tcp_sndbuf_expand                 5
+tcp_fin                           5
+tcp_init_xmit_timers              5
+tcp_close                         5
+tcp_init_congestion_control        5
+tcp_init_metrics                  5
+tcp_gro_complete                  5
+tcp_free_fastopen_req             5
+tcp_v4_destroy_sock               5
+tcp_cleanup_congestion_control        5
+tcp_send_fin                      5
+tcp_init_buffer_space             5
+tcp_init_cwnd                     5
+tcp_select_initial_window         5
+tcp_check_oom                     5
+tcp_default_init_rwnd             5
+tcp_assign_congestion_control        5
+tcp_getsockopt                    6
+tcp_ioctl                         6
+tcp_mtup_init                     8
+tcp_parse_options                 8
+tcp_mss_to_mtu                    8
+tcp_try_rmem_schedule             8
+tcp_get_metrics                  10
+tcp_try_coalesce                 10
+tcp_rcv_state_process            14
+tcp_sync_mss                     14
+tcp_write_timer_handler          15
+tcp_write_timer                  16
+tcp_grow_window.isra.27          22
+tcp_set_state                    23
+tcp_send_ack                     37
+tcp_delack_timer                 42
+tcp_delack_timer_handler         42
+tcp_validate_incoming            91
+tcp_prequeue_process            112
+tcp_v4_early_demux              117
+tcp_gro_receive                 146
+tcp_queue_rcv                   167
+tcp_data_queue                  215
+tcp_urg                         219
+tcp_send_delayed_ack            257
+tcp_send_mss                    275
+tcp_push                        275
+tcp_sendmsg                     275
+tcp_event_data_recv             275
+tcp_nagle_check                 279
+tcp_write_xmit                  282
+tcp_event_new_data_sent         282
+tcp_current_mss                 284
+tcp_init_tso_segs               284
+tcp_wfree                       286
+tcp_schedule_loss_probe         305
+tcp_v4_send_check               323
+tcp_transmit_skb                323
+tcp_recvmsg                     323
+tcp_options_write               325
+tcp_rcv_space_adjust            328
+tcp_check_space                 332
+tcp_rcv_established             337
+tcp_ack                         337
+tcp_parse_aligned_timestamp.part.43      345
+tcp_prequeue                    346
+tcp_v4_do_rcv                   351
+tcp_v4_rcv                      351
+tcp_parse_md5sig_option         351
+tcp_cleanup_rbuf                436
+tcp_poll                        468
+tcp_established_options         604
+tcp_v4_md5_lookup               615
+tcp_release_cb                  736
+tcp_rearm_rto                   843
+tcp_md5_do_lookup               968
 Detaching...
 
 The current implementation can take many seconds to detach from tracing, after
 Ctrl-C has been hit.
 
 
-Counting all vfs functions for process ID 5276 only:
+User functions can be traced in executables or libraries, and per-process
+filtering is allowed:
 
-# ./funccount -p 5276 'vfs_*'
-Tracing... Ctrl-C to end.
+# ./funccount -p 1442 /home/ubuntu/contentions:*
+Tracing 15 functions for "/home/ubuntu/contentions:*"... Hit Ctrl-C to end.
 ^C
-ADDR             FUNC                          COUNT
-ffffffff811e8c71 vfs_getattr_nosec                 7
-ffffffff811e8d41 vfs_getattr                       7
-ffffffff811e8dd1 vfs_fstatat                      11
-ffffffff811e4251 vfs_read                         12
-ffffffff811e4381 vfs_write                        16
+FUNC                                           COUNT
+main                                               1
+_start                                             1
+primes_thread                                      2
+insert_result                                  87186
+is_prime                                     1252772
 Detaching...
 
-This matches when that PID is on-CPU and the kernel function is called.
+If /home/ubuntu is in the $PATH, then the following command will also work:
+
+# ./funccount -p 1442 contentions:*
+
+
+Counting libc write and read calls using regular expression syntax (-r):
+
+# ./funccount -r 'c:(write|read)$'
+Tracing 2 functions for "c:(write|read)$"... Hit Ctrl-C to end.
+^C
+FUNC                                    COUNT
+read                                        2
+write                                       4
+Detaching...
+
+
+Kernel tracepoints are also available as targets. For example, trace common
+block I/O tracepoints and see how often they are invoked:
+
+# ./funccount t:block:*
+Tracing 19 functions for "t:block:*"... Hit Ctrl-C to end.
+^C
+FUNC                                    COUNT
+block:block_rq_complete                     7
+block:block_rq_issue                        7
+block:block_getrq                           7
+block:block_rq_insert                       7
+Detaching...
+
+
+Likewise, user-mode statically defined traces (USDT) can also be probed. For
+example, count mutex-related events in pthreads:
+
+# ./funccount u:pthread:*mutex* -p 1442
+Tracing 7 functions for "u:pthread:*mutex*"... Hit Ctrl-C to end.
+^C
+FUNC                                    COUNT
+mutex_init                                  1
+mutex_entry                            547122
+mutex_acquired                         547175
+mutex_release                          547185
+Detaching...
 
 
 An interval can be provided. Eg, printing output every 1 second for vfs calls:
@@ -187,38 +229,35 @@ An interval can be provided. Eg, printing output every 1 second for vfs calls:
 # ./funccount -i 1 'vfs_*'
 Tracing... Ctrl-C to end.
 
-ADDR             FUNC                          COUNT
-ffffffff811e8dd1 vfs_fstatat                       1
-ffffffff811e8d71 vfs_fstat                        16
-ffffffff811e8c71 vfs_getattr_nosec                17
-ffffffff811e8d41 vfs_getattr                      17
-ffffffff811e4381 vfs_write                        52
-ffffffff811e4251 vfs_read                         79
-ffffffff811e3221 vfs_open                         98
+FUNC                          COUNT
+vfs_fstatat                       1
+vfs_fstat                        16
+vfs_getattr_nosec                17
+vfs_getattr                      17
+vfs_write                        52
+vfs_read                         79
+vfs_open                         98
 
-ADDR             FUNC                          COUNT
-ffffffff811e8dd1 vfs_fstatat                      10
-ffffffff811e8d71 vfs_fstat                        10
-ffffffff811e3221 vfs_open                         13
-ffffffff811e8c71 vfs_getattr_nosec                20
-ffffffff811e8d41 vfs_getattr                      20
-ffffffff811e4381 vfs_write                        28
-ffffffff811e4251 vfs_read                         39
+FUNC                          COUNT
+vfs_fstatat                      10
+vfs_fstat                        10
+vfs_open                         13
+vfs_getattr_nosec                20
+vfs_getattr                      20
+vfs_write                        28
+vfs_read                         39
 
-ADDR             FUNC                          COUNT
-ffffffff81215191 vfs_fsync_range                   2
-ffffffff81231df1 vfs_lock_file                    30
-ffffffff811e4381 vfs_write                       107
-ffffffff811e8dd1 vfs_fstatat                     129
-ffffffff811e8d71 vfs_fstat                       130
-ffffffff811e3221 vfs_open                        154
-ffffffff811e8c71 vfs_getattr_nosec               222
-ffffffff811e8d41 vfs_getattr                     222
-ffffffff811e4251 vfs_read                        384
+FUNC                          COUNT
+vfs_fsync_range                   2
+vfs_lock_file                    30
+vfs_write                       107
+vfs_fstatat                     129
+vfs_fstat                       130
+vfs_open                        154
+vfs_getattr_nosec               222
+vfs_getattr                     222
+vfs_read                        384
 ^C
-ADDR             FUNC                          COUNT
-ffffffff811e4251 vfs_read                          4
-ffffffff811e4381 vfs_write                         5
 Detaching...
 
 This can be useful for making some ad hoc tools, exposing new counts of
@@ -233,8 +272,8 @@ the word "readdir":
 # ./funccount '*readdir*'
 Tracing... Ctrl-C to end.
 ^C
-ADDR             FUNC                          COUNT
-ffffffff81260911 ext4_readdir                      4
+FUNC                          COUNT
+ext4_readdir                      4
 Detaching...
 
 Matching "tcp" then "send":
@@ -242,36 +281,25 @@ Matching "tcp" then "send":
 # ./funccount '*tcp*send*'
 Tracing... Ctrl-C to end.
 ^C
-ADDR             FUNC                          COUNT
-ffffffff816c5921 tcp_send_ack                      4
-ffffffff816c6c81 tcp_send_delayed_ack             19
-ffffffff816b3ee1 tcp_send_mss                     26
-ffffffff816b76c1 tcp_sendmsg                      26
-ffffffff816cb821 tcp_v4_send_check                30
-ffffffff816cb731 __tcp_v4_send_check              30
-Detaching...
-
-
-Regular expressions can also be used with the -r option. Eg:
-
-# ./funccount -r '^vfs_[rw]'
-Tracing... Ctrl-C to end.
-^C
-ADDR             FUNC                          COUNT
-ffffffff811e4381 vfs_write                        26
-ffffffff811e4251 vfs_read                         42
+FUNC                          COUNT
+tcp_send_ack                      4
+tcp_send_delayed_ack             19
+tcp_send_mss                     26
+tcp_sendmsg                      26
+tcp_v4_send_check                30
+__tcp_v4_send_check              30
 Detaching...
 
 
 Full USAGE:
 
 # ./funccount  -h
-usage: funccount [-h] [-p PID] [-i INTERVAL] [-T] [-r] pattern
+usage: funccount.py [-h] [-p PID] [-i INTERVAL] [-T] [-r] [-d] pattern
 
-Count kernel function calls
+Count functions, tracepoints, and USDT probes
 
 positional arguments:
-  pattern               search expression for kernel functions
+  pattern               search expression for events
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -281,10 +309,17 @@ optional arguments:
   -T, --timestamp       include timestamp on output
   -r, --regexp          use regular expressions. Default is "*" wildcards
                         only.
+  -d, --debug           print BPF program before starting (for debugging
+                        purposes)
 
 examples:
-    ./funccount 'vfs_*'         # count kernel functions starting with "vfs"
-    ./funccount 'tcp_send*'     # count kernel funcs starting with "tcp_send"
-    ./funccount -r '^vfs.*'     # same as above, using regular expressions
-    ./funccount -Ti 5 'vfs_*'   # output every 5 seconds, with timestamps
-    ./funccount -p 185 'vfs_*'  # count vfs calls for PID 181 only
+    ./funccount 'vfs_*'             # count kernel fns starting with "vfs"
+    ./funccount -r '^vfs.*'         # same as above, using regular expressions
+    ./funccount -Ti 5 'vfs_*'       # output every 5 seconds, with timestamps
+    ./funccount -p 185 'vfs_*'      # count vfs calls for PID 181 only
+    ./funccount t:sched:sched_fork  # count calls to the sched_fork tracepoint
+    ./funccount -p 185 u:node:gc*   # count all GC USDT probes in node, PID 185
+    ./funccount c:malloc            # count all malloc() calls in libc
+    ./funccount go:os.*             # count all "os.*" calls in libgo
+    ./funccount -p 185 go:os.*      # count all "os.*" calls in libgo, PID 185
+    ./funccount ./test:read*        # count "read*" calls in the ./test binary

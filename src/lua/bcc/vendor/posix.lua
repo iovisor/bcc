@@ -15,21 +15,25 @@ limitations under the License.
 ]]
 local ffi = require("ffi")
 
-ffi.cdef[[
-typedef int clockid_t;
-typedef long time_t;
+-- Avoid duplicate declarations if syscall library is present
+local has_syscall, _ = pcall(require, "syscall")
+if not has_syscall then
+  ffi.cdef [[
+  typedef int clockid_t;
+  typedef long time_t;
 
-struct timespec {
-  time_t tv_sec;
-  long tv_nsec;
-};
+  struct timespec {
+    time_t tv_sec;
+    long tv_nsec;
+  };
 
-int clock_gettime(clockid_t clk_id, struct timespec *tp);
-int clock_nanosleep(clockid_t clock_id, int flags,
-  const struct timespec *request, struct timespec *remain);
-
+  int clock_gettime(clockid_t clk_id, struct timespec *tp);
+  int clock_nanosleep(clockid_t clock_id, int flags,
+    const struct timespec *request, struct timespec *remain);
+  ]]
+end
+ffi.cdef [[
 int get_nprocs(void);
-
 uint64_t strtoull(const char *nptr, char **endptr, int base);
 ]]
 

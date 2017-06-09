@@ -3,13 +3,16 @@
 cmake_minimum_required(VERSION 2.8.7)
 
 project(bcc)
-set(CMAKE_BUILD_TYPE Release)
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release)
+endif()
 
 enable_testing()
 
 include(cmake/GetGitRevisionDescription.cmake)
 include(cmake/version.cmake)
 include(GNUInstallDirs)
+include(CheckCXXCompilerFlag)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
@@ -49,24 +52,29 @@ endif()
 
 find_package(LibElf REQUIRED)
 
-# Set to non-zero if system installs kernel headers with split source and build
-# directories in /lib/modules/`uname -r`/. This is the case for debian and
-# suse, to the best of my knowledge.
-if(BCC_KERNEL_HAS_SOURCE_DIR)
-  set(BCC_KERNEL_HAS_SOURCE_DIR 1)
-  set(BCC_KERNEL_MODULES_SUFFIX "source")
-else()
-  set(BCC_KERNEL_HAS_SOURCE_DIR 0)
-endif()
-
-# Similar to above, set to custom value if kernel headers in
-# /lib/modules/`uname -r` sit in a different location than build/.
-if(NOT DEFINED BCC_KERNEL_MODULES_SUFFIX)
-  set(BCC_KERNEL_MODULES_SUFFIX "build")
-endif()
-
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall")
+
+# As reported in issue #735, GCC 6 has some behavioral problems when
+# dealing with -isystem. Hence, skip the warning optimization
+# altogether on that compiler.
+option(USINGISYSTEM "using -isystem" ON)
+execute_process(COMMAND ${CMAKE_C_COMPILER} -dumpversion OUTPUT_VARIABLE GCC_VERSION)
+if (USINGISYSTEM AND GCC_VERSION VERSION_LESS 6.0)
+  # iterate over all available directories in LLVM_INCLUDE_DIRS to
+  # generate a correctly tokenized list of parameters
+  foreach(ONE_LLVM_INCLUDE_DIR ${LLVM_INCLUDE_DIRS})
+    set(CXX_ISYSTEM_DIRS "${CXX_ISYSTEM_DIRS} -isystem ${ONE_LLVM_INCLUDE_DIR}")
+  endforeach()
+endif()
+
+CHECK_CXX_COMPILER_FLAG("-std=c++11" COMPILER_SUPPORTS_CXX11)
+if(COMPILER_SUPPORTS_CXX11)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+else()
+  message(FATAL_ERROR "Compiler ${CMAKE_CXX_COMPILER} has no C++11 support.")
+endif()
+
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall ${CXX_ISYSTEM_DIRS}")
 endif()
 
 add_subdirectory(examples)

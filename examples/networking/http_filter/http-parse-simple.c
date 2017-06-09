@@ -2,7 +2,7 @@
 #include <net/sock.h>
 #include <bcc/proto.h>
 
-#define IP_TCP 	6   
+#define IP_TCP 	6
 #define ETH_HLEN 14
 
 /*eBPF program.
@@ -20,7 +20,7 @@ int http_filter(struct __sk_buff *skb) {
 	struct ethernet_t *ethernet = cursor_advance(cursor, sizeof(*ethernet));
 	//filter IP packets (ethernet type = 0x0800)
 	if (!(ethernet->type == 0x0800)) {
-		goto DROP;	
+		goto DROP;
 	}
 
 	struct ip_t *ip = cursor_advance(cursor, sizeof(*ip));
@@ -40,16 +40,16 @@ int http_filter(struct __sk_buff *skb) {
 	//value to multiply * 4
 	//e.g. ip->hlen = 5 ; IP Header Length = 5 x 4 byte = 20 byte
 	ip_header_length = ip->hlen << 2;    //SHL 2 -> *4 multiply
-		
+
 	//calculate tcp header length
 	//value to multiply *4
 	//e.g. tcp->offset = 5 ; TCP Header Length = 5 x 4 byte = 20 byte
 	tcp_header_length = tcp->offset << 2; //SHL 2 -> *4 multiply
 
 	//calculate patload offset and length
-	payload_offset = ETH_HLEN + ip_header_length + tcp_header_length; 
+	payload_offset = ETH_HLEN + ip_header_length + tcp_header_length;
 	payload_length = ip->tlen - ip_header_length - tcp_header_length;
-		  
+
 	//http://stackoverflow.com/questions/25047905/http-request-minimum-size-in-bytes
 	//minimum length of http request is always geater than 7 bytes
 	//avoid invalid access memory
@@ -58,7 +58,7 @@ int http_filter(struct __sk_buff *skb) {
 		goto DROP;
 	}
 
-	//load firt 7 byte of payload into p (payload_array)
+	//load first 7 byte of payload into p (payload_array)
 	//direct access to skb not allowed
 	unsigned long p[7];
 	int i = 0;

@@ -81,7 +81,7 @@ static u64 get_frame(u64 *bp) {
         if (bpf_probe_read(&ret, sizeof(ret), (void *)(*bp+8)))
             return 0;
         if (bpf_probe_read(bp, sizeof(*bp), (void *)*bp))
-            bp = 0;
+            return 0;
         if (ret < __START_KERNEL_map)
             return 0;
         return ret;
@@ -193,23 +193,23 @@ while (1):
     for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
         if folded:
             # print folded stack output
-            line = k.waker + ";"
+            line = k.waker.decode() + ";"
             for i in reversed(range(0, maxdepth)):
                 if k.ret[i] == 0:
                     continue
                 line = line + b.ksym(k.ret[i])
                 if i != 0:
                     line = line + ";"
-            print("%s;%s %d" % (line, k.target, v.value))
+            print("%s;%s %d" % (line, k.target.decode(), v.value))
         else:
             # print default multi-line stack output
-            print("    %-16s %s" % ("target:", k.target))
+            print("    %-16s %s" % ("target:", k.target.decode()))
             for i in range(0, maxdepth):
                 if k.ret[i] == 0:
                     break
                 print("    %-16x %s" % (k.ret[i],
                     b.ksym(k.ret[i])))
-            print("    %-16s %s" % ("waker:", k.waker))
+            print("    %-16s %s" % ("waker:", k.waker.decode()))
             print("        %d\n" % v.value)
     counts.clear()
 

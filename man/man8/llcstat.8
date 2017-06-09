@@ -1,0 +1,69 @@
+.TH llcstat 8  "2015-08-18" "USER COMMANDS"
+.SH NAME
+llcstat \- Summarize CPU cache references and misses by process. Uses Linux eBPF/bcc.
+.SH SYNOPSIS
+.B llcstat [\-h] [\-c SAMPLE_PERIOD] [duration]
+.SH DESCRIPTION
+llcstat instruments CPU cache references and cache misses system-side, and
+summarizes them by PID and CPU. These events have different meanings on
+different architecture. For x86-64, they mean misses and references to LLC.
+This can be useful to locate and debug performance issues
+caused by cache hit rate.
+
+This works by sampling corresponding events defined in uapi/linux/perf_event.h,
+namely PERF_COUNT_HW_CACHE_REFERENCES and PERF_COUNT_HW_CACHE_MISSES, using
+BPF perf event tracing. Upon each sampled event, the attached BPF program
+records the PID and CPU ID on which the event happened, and stores it in table.
+
+This makes use of a Linux 4.9 feature (BPF_PROG_TYPE_PERF_EVENT).
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH OPTIONS
+.TP
+\-h
+Print usage message.
+.TP
+\-c SAMPLE_PERIOD
+Sample one in this many cache reference and cache miss events.
+.TP
+duration
+Duration to trace, in seconds.
+.SH EXAMPLES
+.TP
+Sample one in 100 events, trace for 20 seconds:
+#
+.B llcstat -c 100 20
+.SH FIELDS
+.TP
+PID
+Process ID
+.TP
+NAME
+Process name
+.TP
+CPU
+CPU ID
+.TP
+REFERENCE
+Number of cache reference events
+.TP
+MISS
+Number of cache miss events
+.TP
+HIT%
+Cache hit ratio
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Teng Qin

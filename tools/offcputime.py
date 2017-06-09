@@ -40,7 +40,10 @@ examples = """examples:
     ./offcputime             # trace off-CPU stack time until Ctrl-C
     ./offcputime 5           # trace for 5 seconds only
     ./offcputime -f 5        # 5 seconds, and output in folded format
+    ./offcputime -m 1000     # trace only events that last more than 1000 usec
+    ./offcputime -M 10000    # trace only events that last less than 10000 usec
     ./offcputime -p 185      # only trace threads for PID 185
+    ./offcputime -t 188      # only trace thread 188
     ./offcputime -u          # only trace user threads (no kernel)
     ./offcputime -k          # only trace kernel threads (no user)
     ./offcputime -U          # only show user space stacks (no kernel)
@@ -51,8 +54,12 @@ parser = argparse.ArgumentParser(
     formatter_class=argparse.RawDescriptionHelpFormatter,
     epilog=examples)
 thread_group = parser.add_mutually_exclusive_group()
-thread_group.add_argument("-p", "--pid", type=positive_int,
-    help="trace this PID only")
+# Note: this script provides --pid and --tid flags but their arguments are
+# referred to internally using kernel nomenclature: TGID and PID.
+thread_group.add_argument("-p", "--pid", metavar="PID", dest="tgid",
+    help="trace this PID only", type=positive_int)
+thread_group.add_argument("-t", "--tid", metavar="TID", dest="pid",
+    help="trace this TID only", type=positive_int)
 thread_group.add_argument("-u", "--user-threads-only", action="store_true",
     help="user threads only (no kernel threads)")
 thread_group.add_argument("-k", "--kernel-threads-only", action="store_true",
@@ -68,12 +75,22 @@ parser.add_argument("-f", "--folded", action="store_true",
     help="output folded format")
 parser.add_argument("--stack-storage-size", default=1024,
     type=positive_nonzero_int,
-    help="the number of unique stack traces that can be stored and " \
-        "displayed (default 1024)")
+    help="the number of unique stack traces that can be stored and "
+         "displayed (default 1024)")
 parser.add_argument("duration", nargs="?", default=99999999,
     type=positive_nonzero_int,
     help="duration of trace, in seconds")
+parser.add_argument("-m", "--min-block-time", default=1,
+    type=positive_nonzero_int,
+    help="the amount of time in microseconds over which we " +
+         "store traces (default 1)")
+parser.add_argument("-M", "--max-block-time", default=(1 << 64) - 1,
+    type=positive_nonzero_int,
+    help="the amount of time in microseconds under which we " +
+         "store traces (default U64_MAX)")
 args = parser.parse_args()
+if args.pid and args.tgid:
+    parser.error("specify only one of -p and -t")
 folded = args.folded
 duration = int(args.duration)
 
@@ -86,10 +103,12 @@ bpf_text = """
 #include <uapi/linux/ptrace.h>
 #include <linux/sched.h>
 
-#define MINBLOCK_US	1
+#define MINBLOCK_US    MINBLOCK_US_VALUEULL
+#define MAXBLOCK_US    MAXBLOCK_US_VALUEULL
 
 struct key_t {
     u32 pid;
+    u32 tgid;
     int user_stack_id;
     int kernel_stack_id;
     char name[TASK_COMM_LEN];
@@ -100,6 +119,7 @@ BPF_STACK_TRACE(stack_traces, STACK_STORAGE_SIZE)
 
 int oncpu(struct pt_regs *ctx, struct task_struct *prev) {
     u32 pid = prev->pid;
+    u32 tgid = prev->tgid;
     u64 ts, *tsp;
 
     // record previous thread sleep time
@@ -110,6 +130,7 @@ int oncpu(struct pt_regs *ctx, struct task_struct *prev) {
 
     // get the current thread's start time
     pid = bpf_get_current_pid_tgid();
+    tgid = bpf_get_current_pid_tgid() >> 32;
     tsp = start.lookup(&pid);
     if (tsp == 0) {
         return 0;        // missed start or filtered
@@ -119,7 +140,7 @@ int oncpu(struct pt_regs *ctx, struct task_struct *prev) {
     u64 delta = bpf_ktime_get_ns() - *tsp;
     start.delete(&pid);
     delta = delta / 1000;
-    if (delta < MINBLOCK_US) {
+    if ((delta < MINBLOCK_US) || (delta > MAXBLOCK_US)) {
         return 0;
     }
 
@@ -128,6 +149,7 @@ int oncpu(struct pt_regs *ctx, struct task_struct *prev) {
     struct key_t key = {};
 
     key.pid = pid;
+    key.tgid = tgid;
     key.user_stack_id = USER_STACK_GET;
     key.kernel_stack_id = KERNEL_STACK_GET;
     bpf_get_current_comm(&key.name, sizeof(key.name));
@@ -140,9 +162,12 @@ int oncpu(struct pt_regs *ctx, struct task_struct *prev) {
 
 # set thread filter
 thread_context = ""
-if args.pid is not None:
-    thread_context = "PID %s" % args.pid
-    thread_filter = 'pid == %s' % args.pid
+if args.tgid is not None:
+    thread_context = "PID %d" % args.tgid
+    thread_filter = 'tgid == %d' % args.tgid
+elif args.pid is not None:
+    thread_context = "TID %d" % args.pid
+    thread_filter = 'pid == %d' % args.pid
 elif args.user_threads_only:
     thread_context = "user threads"
     thread_filter = '!(prev->flags & PF_KTHREAD)'
@@ -156,6 +181,8 @@ bpf_text = bpf_text.replace('THREAD_FILTER', thread_filter)
 
 # set stack storage size
 bpf_text = bpf_text.replace('STACK_STORAGE_SIZE', str(args.stack_storage_size))
+bpf_text = bpf_text.replace('MINBLOCK_US_VALUE', str(args.min_block_time))
+bpf_text = bpf_text.replace('MAXBLOCK_US_VALUE', str(args.max_block_time))
 
 # handle stack args
 kernel_stack_get = "stack_traces.get_stackid(ctx, BPF_F_REUSE_STACKID)"
@@ -173,13 +200,14 @@ else:
 bpf_text = bpf_text.replace('USER_STACK_GET', user_stack_get)
 bpf_text = bpf_text.replace('KERNEL_STACK_GET', kernel_stack_get)
 
-need_delimiter = args.delimited and not (args.kernel_stacks_only or args.user_stacks_only)
+need_delimiter = args.delimited and not (args.kernel_stacks_only or
+                                         args.user_stacks_only)
 
 # check for an edge case; the code below will handle this case correctly
 # but ultimately nothing will be displayed
 if args.kernel_threads_only and args.user_stacks_only:
-    print("ERROR: Displaying user stacks for kernel threads " \
-        "doesn't make sense.", file=stderr)
+    print("ERROR: Displaying user stacks for kernel threads " +
+          "doesn't make sense.", file=stderr)
     exit(1)
 
 # initialize BPF
@@ -215,8 +243,8 @@ stack_traces = b.get_table("stack_traces")
 for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
     # handle get_stackid erorrs
     if (not args.user_stacks_only and k.kernel_stack_id < 0) or \
-            (not args.kernel_stacks_only and k.user_stack_id < 0 and \
-                k.user_stack_id != -errno.EFAULT):
+            (not args.kernel_stacks_only and k.user_stack_id < 0 and
+                 k.user_stack_id != -errno.EFAULT):
         missing_stacks += 1
         # check for an ENOMEM error
         if k.kernel_stack_id == -errno.ENOMEM or \
@@ -224,6 +252,8 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
             has_enomem = True
         continue
 
+    # user stacks will be symbolized by tgid, not pid, to avoid the overhead
+    # of one symbol resolver per thread
     user_stack = [] if k.user_stack_id < 0 else \
         stack_traces.walk(k.user_stack_id)
     kernel_stack = [] if k.kernel_stack_id < 0 else \
@@ -234,19 +264,19 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
         user_stack = list(user_stack)
         kernel_stack = list(kernel_stack)
         line = [k.name.decode()] + \
-            [b.sym(addr, k.pid) for addr in reversed(user_stack)] + \
+            [b.sym(addr, k.tgid) for addr in reversed(user_stack)] + \
             (need_delimiter and ["-"] or []) + \
             [b.ksym(addr) for addr in reversed(kernel_stack)]
         print("%s %d" % (";".join(line), v.value))
     else:
         # print default multi-line stack output
         for addr in kernel_stack:
-            print("    %016x %s" % (addr, b.ksym(addr)))
+            print("    %s" % b.ksym(addr))
         if need_delimiter:
             print("    --")
         for addr in user_stack:
-            print("    %016x %s" % (addr, b.sym(addr, k.pid)))
-        print("    %-16s %s (%d)" % ("-", k.name, k.pid))
+            print("    %s" % b.sym(addr, k.tgid))
+        print("    %-16s %s (%d)" % ("-", k.name.decode(), k.pid))
         print("        %d\n" % v.value)
 
 if missing_stacks > 0:

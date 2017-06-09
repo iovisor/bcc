@@ -11,62 +11,21 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 # Copyright (C) 2016 Sasha Goldshtein.
 
-from bcc import BPF, ProcessSymbols
+from bcc import BPF
 from time import sleep
 from datetime import datetime
 import argparse
 import subprocess
-import ctypes
 import os
 
-class Time(object):
-        # BPF timestamps come from the monotonic clock. To be able to filter
-        # and compare them from Python, we need to invoke clock_gettime.
-        # Adapted from http://stackoverflow.com/a/1205762
-        CLOCK_MONOTONIC_RAW = 4         # see <linux/time.h>
-
-        class timespec(ctypes.Structure):
-                _fields_ = [
-                        ('tv_sec', ctypes.c_long),
-                        ('tv_nsec', ctypes.c_long)
-                ]
-
-        librt = ctypes.CDLL('librt.so.1', use_errno=True)
-        clock_gettime = librt.clock_gettime
-        clock_gettime.argtypes = [ctypes.c_int, ctypes.POINTER(timespec)]
-
-        @staticmethod
-        def monotonic_time():
-                t = Time.timespec()
-                if Time.clock_gettime(
-                        Time.CLOCK_MONOTONIC_RAW, ctypes.pointer(t)) != 0:
-                        errno_ = ctypes.get_errno()
-                        raise OSError(errno_, os.strerror(errno_))
-                return t.tv_sec * 1e9 + t.tv_nsec
-
-class StackDecoder(object):
-        def __init__(self, pid):
-                self.pid = pid
-                if pid != -1:
-                        self.proc_sym = ProcessSymbols(pid)
-
-        def refresh(self):
-                if self.pid != -1:
-                        self.proc_sym.refresh_code_ranges()
-
-        def decode_stack(self, info, is_kernel_trace):
-                stack = ""
-                if info.num_frames <= 0:
-                        return "???"
-                for i in range(0, info.num_frames):
-                        addr = info.callstack[i]
-                        if is_kernel_trace:
-                                stack += " %s [kernel] (%x) ;" % \
-                                        (BPF.ksym(addr), addr)
-                        else:
-                                stack += " %s (%x) ;" % \
-                                        (self.proc_sym.decode_addr(addr), addr)
-                return stack
+def decode_stack(bpf, pid, info):
+        stack = ""
+        if info.num_frames <= 0:
+                return "???"
+        for i in range(0, info.num_frames):
+                addr = info.callstack[i]
+                stack += " %s ;" % bpf.sym(addr, pid, show_offset=True)
+        return stack
 
 def run_command_get_output(command):
         p = subprocess.Popen(command.split(),
@@ -227,8 +186,9 @@ int alloc_exit(struct pt_regs *ctx)
         allocs.update(&address, &info);
 
         if (SHOULD_PRINT) {
-                bpf_trace_printk("alloc exited, size = %lu, result = %lx, frames = %d\\n",
-                                 info.size, address, info.num_frames);
+                bpf_trace_printk("alloc exited, size = %lu, result = %lx,"
+                                 "frames = %d\\n", info.size, address,
+                                 info.num_frames);
         }
         return 0;
 }
@@ -281,17 +241,15 @@ else:
         bpf_program.attach_kretprobe(event="__kmalloc", fn_name="alloc_exit")
         bpf_program.attach_kprobe(event="kfree", fn_name="free_enter")
 
-decoder = StackDecoder(pid)
-
 def print_outstanding():
         stacks = {}
         print("[%s] Top %d stacks with outstanding allocations:" %
               (datetime.now().strftime("%H:%M:%S"), top_stacks))
         allocs = bpf_program.get_table("allocs")
         for address, info in sorted(allocs.items(), key=lambda a: a[1].size):
-                if Time.monotonic_time() - min_age_ns < info.timestamp_ns:
+                if BPF.monotonic_time() - min_age_ns < info.timestamp_ns:
                         continue
-                stack = decoder.decode_stack(info, kernel_trace)
+                stack = decode_stack(bpf_program, pid, info)
                 if stack in stacks:
                         stacks[stack] = (stacks[stack][0] + 1,
                                          stacks[stack][1] + info.size)
@@ -314,7 +272,6 @@ while True:
                         sleep(interval)
                 except KeyboardInterrupt:
                         exit()
-                decoder.refresh()
                 print_outstanding()
                 count_so_far += 1
                 if num_prints is not None and count_so_far >= num_prints:

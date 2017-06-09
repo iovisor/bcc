@@ -1,0 +1,95 @@
+Demonstrations of ugc.
+
+
+ugc traces garbage collection events in high-level languages, including Java,
+Python, Ruby, and Node. Each GC event is printed with some additional 
+information provided by that language's runtime, if available. The duration of
+the GC event is also provided.
+
+For example, to trace all garbage collection events in a specific Node process:
+
+# ugc $(pidof node)
+Tracing garbage collections in node process 30012... Ctrl-C to quit.
+START    TIME (us) DESCRIPTION                             
+1.500    1181.00  GC scavenge
+1.505    1704.00  GC scavenge
+1.509    1534.00  GC scavenge
+1.515    1953.00  GC scavenge
+1.519    2155.00  GC scavenge
+1.525    2055.00  GC scavenge
+1.530    2164.00  GC scavenge
+1.536    2170.00  GC scavenge
+1.541    2237.00  GC scavenge
+1.547    1982.00  GC scavenge
+1.551    2333.00  GC scavenge
+1.557    2043.00  GC scavenge
+1.561    2028.00  GC scavenge
+1.573    3650.00  GC scavenge
+1.580    4443.00  GC scavenge
+1.604    6236.00  GC scavenge
+1.615    8324.00  GC scavenge
+1.659    11249.00 GC scavenge
+1.678    16084.00 GC scavenge
+1.747    15250.00 GC scavenge
+1.937    191.00   GC incremental mark
+2.001    63120.00 GC mark-sweep-compact
+3.185    153.00   GC incremental mark
+3.207    20847.00 GC mark-sweep-compact
+^C
+
+The above output shows some fairly long GCs, notably around 2 seconds in there
+is a collection that takes over 60ms (mark-sweep-compact).
+
+Occasionally, it might be useful to filter out collections that are very short,
+or display only collections that have a specific description. The -M and -F
+switches can be useful for this:
+
+# ugc -F Tenured $(pidof java)
+Tracing garbage collections in java process 29907... Ctrl-C to quit.
+START    TIME (us) DESCRIPTION                             
+0.360    4309.00  MarkSweepCompact Tenured Gen used=287528->287528 max=173408256->173408256
+2.459    4232.00  MarkSweepCompact Tenured Gen used=287528->287528 max=173408256->173408256
+4.648    4139.00  MarkSweepCompact Tenured Gen used=287528->287528 max=173408256->173408256
+^C
+
+# ugc -M 1 $(pidof java)
+Tracing garbage collections in java process 29907... Ctrl-C to quit.
+START    TIME (us) DESCRIPTION                             
+0.160    3715.00  MarkSweepCompact Code Cache used=287528->3209472 max=173408256->251658240
+0.160    3975.00  MarkSweepCompact Metaspace used=287528->3092104 max=173408256->18446744073709551615
+0.160    4058.00  MarkSweepCompact Compressed Class Space used=287528->266840 max=173408256->1073741824
+0.160    4110.00  MarkSweepCompact Eden Space used=287528->0 max=173408256->69337088
+0.160    4159.00  MarkSweepCompact Survivor Space used=287528->0 max=173408256->8650752
+0.160    4207.00  MarkSweepCompact Tenured Gen used=287528->287528 max=173408256->173408256
+0.160    4289.00    used=0->0 max=0->0
+^C
+
+
+USAGE message:
+
+# ugc -h
+usage: ugc.py [-h] [-l {java,python,ruby,node}] [-v] [-m] [-M MINIMUM]
+              [-F FILTER]
+              pid
+
+Summarize garbage collection events in high-level languages.
+
+positional arguments:
+  pid                   process id to attach to
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -l {java,python,ruby,node}, --language {java,python,ruby,node}
+                        language to trace
+  -v, --verbose         verbose mode: print the BPF program (for debugging
+                        purposes)
+  -m, --milliseconds    report times in milliseconds (default is microseconds)
+  -M MINIMUM, --minimum MINIMUM
+                        display only GCs longer than this many milliseconds
+  -F FILTER, --filter FILTER
+                        display only GCs whose description contains this text
+
+examples:
+    ./ugc -l java 185        # trace Java GCs in process 185
+    ./ugc -l ruby 1344 -m    # trace Ruby GCs reporting in ms
+    ./ugc -M 10 -l java 185  # trace only Java GCs longer than 10ms

@@ -67,6 +67,10 @@ class TestProbeQuota(TestCase):
         with self.assertRaises(Exception):
             self.b.attach_kprobe(event_re=".*", fn_name="count")
 
+    def test_uprobe_quota(self):
+        with self.assertRaises(Exception):
+            self.b.attach_uprobe(name="c", sym_re=".*", fn_name="count")
+
     def tearDown(self):
         self.b.cleanup()
 

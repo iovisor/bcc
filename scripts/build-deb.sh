@@ -24,14 +24,20 @@ pushd $TMP
 tar xf bcc_$revision.orig.tar.gz
 cd bcc
 
+debuild=debuild
 if [[ "$buildtype" = "test" ]]; then
+  # when testing, use faster compression options
+  debuild+=" --preserve-envvar PATH"
+  echo -e '#!/bin/bash\nexec /usr/bin/dpkg-deb -z1 "$@"' \
+    | sudo tee /usr/local/bin/dpkg-deb
+  sudo chmod +x /usr/local/bin/dpkg-deb
   dch -b -v $revision-$release "$git_subject"
 fi
 if [[ "$buildtype" = "nightly" ]]; then
   dch -v $revision-$release "$git_subject"
 fi
 
-DEB_BUILD_OPTIONS="nocheck parallel=${PARALLEL}" debuild -us -uc
+DEB_BUILD_OPTIONS="nocheck parallel=${PARALLEL}" $debuild -us -uc
 popd
 
 cp $TMP/*.deb .

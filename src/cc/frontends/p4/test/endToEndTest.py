@@ -26,7 +26,7 @@ class Base(object):
     def message(self, *args):
         if self.verbose:
             print(*args)
-            
+
 
 class Endpoint(Base):
     # a network interface really
@@ -47,7 +47,7 @@ class Endpoint(Base):
     def get_ip_address(self):
         return IPAddress(self.ipaddress)
 
-    
+
 class Node(Base):
     # Used to represent one of clt, sw, srv
     # Each lives in its own namespace
@@ -67,7 +67,7 @@ class Node(Base):
 
     def get_ns_name(self):
         return self.name
-    
+
     def get_ns(self):
         nsname = self.get_ns_name()
         ns = NetNS(nsname)
@@ -100,7 +100,7 @@ class NetworkBase(Base):
         Base.__init__(self)
         self.ipr = IPRoute()
         self.nodes = []
-        
+
     def add_node(self, node):
         assert isinstance(node, Node)
         self.nodes.append(node)
@@ -123,7 +123,7 @@ class NetworkBase(Base):
         # Ask a node to set the specified interface address
         if address is None:
             return
-        
+
         assert isinstance(node, Node)
         command = ["ip", "addr", "add", str(address) + "/" + str(mask),
                    "dev", str(ifname)]
@@ -132,7 +132,7 @@ class NetworkBase(Base):
 
     def create_link(self, src, dest):
         assert isinstance(src, Endpoint)
-        assert isinstance(dest, Endpoint) 
+        assert isinstance(dest, Endpoint)
 
         ifname = self.get_interface_name(src.parent, dest.parent)
         destname = self.get_interface_name(dest.parent, src.parent)
@@ -150,7 +150,7 @@ class NetworkBase(Base):
         # lost of set prior to moving to namespace
         self.set_interface_ipaddress(
             src.parent, ifname, src.ipaddress , src.prefixlen)
-        
+
         # Sef destination endpoint information
         ix = self.get_interface(destname)
         self.ipr.link("set", index=ix, address=dest.mac_addr)
@@ -178,7 +178,7 @@ class NetworkBase(Base):
             n.remove()
         self.ipr.close()
 
-        
+
 ### Here begins the concrete instantiation of the network
 # Network setup:
 # Each of these is a separate namespace.
@@ -191,7 +191,7 @@ class NetworkBase(Base):
 #      ----------                 --------                ---------
 #       10.0.0.11                                         10.0.0.10
 #
-        
+
 class SimulatedNetwork(NetworkBase):
     def __init__(self):
         NetworkBase.__init__(self)
@@ -219,7 +219,7 @@ class SimulatedNetwork(NetworkBase):
         assert isinstance(node, Node)
         assert isinstance(args, list)
         torun = __file__
-        args.insert(0, torun) 
+        args.insert(0, torun)
         args.insert(1, method)
         return node.execute(args)  # runs the command argv[0] method args
 
@@ -240,7 +240,7 @@ class SimulatedNetwork(NetworkBase):
         self.message("Set ARP mappings")
         self.client.set_arp(self.server_endpoint)
         self.server.set_arp(self.client_endpoint)
-        
+
     def setup_switch(self):
         # This method is run in the switch namespace.
         self.message("Compiling and loading BPF program")
@@ -254,7 +254,7 @@ class SimulatedNetwork(NetworkBase):
         routing_tbl = b.get_table("routing")
         routing_miss_tbl = b.get_table("ebpf_routing_miss")
         cnt_tbl = b.get_table("cnt")
-        
+
         self.message("Hooking up BPF classifiers using TC")
 
         interfname = self.get_interface_name(self.switch, self.server)
@@ -268,7 +268,7 @@ class SimulatedNetwork(NetworkBase):
         self.ipr.tc("add", "ingress", sw_clt_idx, "ffff:")
         self.ipr.tc("add-filter", "bpf", sw_clt_idx, ":1", fd=fn.fd,
                     name=fn.name, parent="ffff:", action="ok", classid=1)
-        
+
         self.message("Populating tables from the control plane")
         cltip = self.client_endpoint.get_ip_address()
         srvip = self.server_endpoint.get_ip_address()
@@ -276,17 +276,17 @@ class SimulatedNetwork(NetworkBase):
         # BCC does not support tbl.Leaf when the type contains a union,
         # so we have to make up the value type manually.  Unfortunately
         # these sizes are not portable...
-        
+
         class Forward(ctypes.Structure):
             _fields_ = [("port", ctypes.c_ushort)]
-        
+
         class Nop(ctypes.Structure):
             _fields_ = []
-            
+
         class Union(ctypes.Union):
             _fields_ = [("nop", Nop),
                         ("forward", Forward)]
-        
+
         class Value(ctypes.Structure):
             _fields_ = [("action", ctypes.c_uint),
                         ("u", Union)]
@@ -301,14 +301,14 @@ class SimulatedNetwork(NetworkBase):
             v1 = Value()
             v1.action = 1
             v1.u.forward.port = sw_clt_idx
-            
+
             v2 = Value()
             v2.action = 1;
             v2.u.forward.port = sw_srv_idx
 
             routing_tbl[routing_tbl.Key(int(cltip))] = v1
             routing_tbl[routing_tbl.Key(int(srvip))] = v2
-            
+
         self.message("Dumping table contents")
         for key, leaf in routing_tbl.items():
             self.message(str(IPAddress(key.key_field_0)),
@@ -322,7 +322,7 @@ class SimulatedNetwork(NetworkBase):
             raise Exception("Test failed")
         else:
             print("Test succeeded!")
-        
+
     def prepare_switch(self):
         self.message("Configuring switch")
         # Re-invokes this script in the switch namespace;
@@ -331,7 +331,7 @@ class SimulatedNetwork(NetworkBase):
         # but in the switch namespace
         self.run_method_in_node(self.switch, "setup_switch", [])
 
-        
+
 def compile(source, destination):
     try:
         status = subprocess.call(
@@ -344,7 +344,7 @@ def compile(source, destination):
     except OSError as e:
         print("Execution failed:", e, file=sys.stderr)
         raise e
-        
+
 def start_simulation():
     compile("testprograms/simple.p4", "simple.c")
     network = SimulatedNetwork()

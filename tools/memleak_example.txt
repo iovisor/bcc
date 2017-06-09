@@ -10,13 +10,13 @@ For example:
 Attaching to malloc and free in pid 5193, Ctrl+C to quit.
 [11:16:33] Top 2 stacks with outstanding allocations:
         80 bytes in 5 allocations from stack
-                 main+0x6d [/home/vagrant/allocs] (400862) 
-                 __libc_start_main+0xf0 [/usr/lib64/libc-2.21.so] (7fd460ac2790) 
+                 main+0x6d [allocs]
+                 __libc_start_main+0xf0 [libc-2.21.so]
 
 [11:16:34] Top 2 stacks with outstanding allocations:
         160 bytes in 10 allocations from stack
-                 main+0x6d [/home/vagrant/allocs] (400862) 
-                 __libc_start_main+0xf0 [/usr/lib64/libc-2.21.so] (7fd460ac2790) 
+                 main+0x6d [allocs]
+                 __libc_start_main+0xf0 [libc-2.21.so]
 
 
 Each entry printed is a set of allocations that originate from the same call
@@ -40,8 +40,8 @@ Attaching to malloc and free in pid 5193, Ctrl+C to quit.
         addr = 948d30 size = 16
         addr = 948cf0 size = 16
         64 bytes in 4 allocations from stack
-                 main+0x6d [/home/vagrant/allocs] (400862) 
-                 __libc_start_main+0xf0 [/usr/lib64/libc-2.21.so] (7fd460ac2790) 
+                 main+0x6d [allocs]
+                 __libc_start_main+0xf0 [libc-2.21.so]
 
 [11:16:34] Top 2 stacks with outstanding allocations:
         addr = 948d50 size = 16
@@ -55,8 +55,8 @@ Attaching to malloc and free in pid 5193, Ctrl+C to quit.
         addr = 948d70 size = 16
         addr = 948df0 size = 16
         160 bytes in 10 allocations from stack
-                 main+0x6d [/home/vagrant/allocs] (400862) 
-                 __libc_start_main+0xf0 [/usr/lib64/libc-2.21.so] (7fd460ac2790) 
+                 main+0x6d [allocs]
+                 __libc_start_main+0xf0 [libc-2.21.so]
 
 
 When using the -p switch, memleak traces the allocations of a particular
@@ -67,35 +67,35 @@ For example:
 Attaching to kmalloc and kfree, Ctrl+C to quit.
 ...
         248 bytes in 4 allocations from stack
-                 bpf_prog_load [kernel] (ffffffff8118c471) 
-                 sys_bpf [kernel] (ffffffff8118c8b5) 
+                 bpf_prog_load [kernel]
+                 sys_bpf [kernel]
 
         328 bytes in 1 allocations from stack
-                 perf_mmap [kernel] (ffffffff811990fd) 
-                 mmap_region [kernel] (ffffffff811df5d4) 
-                 do_mmap [kernel] (ffffffff811dfb83) 
-                 vm_mmap_pgoff [kernel] (ffffffff811c494f) 
-                 sys_mmap_pgoff [kernel] (ffffffff811ddf02) 
-                 sys_mmap [kernel] (ffffffff8101b0ab) 
+                 perf_mmap [kernel]
+                 mmap_region [kernel]
+                 do_mmap [kernel]
+                 vm_mmap_pgoff [kernel]
+                 sys_mmap_pgoff [kernel]
+                 sys_mmap [kernel]
 
         464 bytes in 1 allocations from stack
-                 traceprobe_command [kernel] (ffffffff81187cf2) 
-                 traceprobe_probes_write [kernel] (ffffffff81187d86) 
-                 probes_write [kernel] (ffffffff81181580) 
-                 __vfs_write [kernel] (ffffffff812237b7) 
-                 vfs_write [kernel] (ffffffff81223ec6) 
-                 sys_write [kernel] (ffffffff81224b85) 
-                 entry_SYSCALL_64_fastpath [kernel] (ffffffff8178182e) 
+                 traceprobe_command [kernel]
+                 traceprobe_probes_write [kernel]
+                 probes_write [kernel]
+                 __vfs_write [kernel]
+                 vfs_write [kernel]
+                 sys_write [kernel]
+                 entry_SYSCALL_64_fastpath [kernel]
 
         8192 bytes in 1 allocations from stack
-                 alloc_and_copy_ftrace_hash.constprop.59 [kernel] (ffffffff8115d17e) 
-                 ftrace_set_hash [kernel] (ffffffff8115e767) 
-                 ftrace_set_filter_ip [kernel] (ffffffff8115e9a8) 
-                 arm_kprobe [kernel] (ffffffff81148600) 
-                 enable_kprobe [kernel] (ffffffff811486f6) 
-                 kprobe_register [kernel] (ffffffff81182399) 
-                 perf_trace_init [kernel] (ffffffff8117c4e0) 
-                 perf_tp_event_init [kernel] (ffffffff81192479) 
+                 alloc_and_copy_ftrace_hash.constprop.59 [kernel]
+                 ftrace_set_hash [kernel]
+                 ftrace_set_filter_ip [kernel]
+                 arm_kprobe [kernel]
+                 enable_kprobe [kernel]
+                 kprobe_register [kernel]
+                 perf_trace_init [kernel]
+                 perf_tp_event_init [kernel]
 
 
 Here you can see that arming the kprobe to which our eBPF program is attached
@@ -129,18 +129,18 @@ seconds, 3 times before quitting:
 Attaching to malloc and free in pid 2614, Ctrl+C to quit.
 [11:16:33] Top 2 stacks with outstanding allocations:
         16 bytes in 1 allocations from stack
-                 main+0x6d [/home/vagrant/allocs] (400862) 
-                 __libc_start_main+0xf0 [/usr/lib64/libc-2.21.so] (7fdc11ce8790) 
+                 main+0x6d [allocs]
+                 __libc_start_main+0xf0 [libc-2.21.so]
 
 [11:16:38] Top 2 stacks with outstanding allocations:
         16 bytes in 1 allocations from stack
-                 main+0x6d [/home/vagrant/allocs] (400862) 
-                 __libc_start_main+0xf0 [/usr/lib64/libc-2.21.so] (7fdc11ce8790) 
+                 main+0x6d [allocs]
+                 __libc_start_main+0xf0 [libc-2.21.so]
 
 [11:16:43] Top 2 stacks with outstanding allocations:
         32 bytes in 2 allocations from stack
-                 main+0x6d [/home/vagrant/allocs] (400862) 
-                 __libc_start_main+0xf0 [/usr/lib64/libc-2.21.so] (7fdc11ce8790) 
+                 main+0x6d [allocs]
+                 __libc_start_main+0xf0 [libc-2.21.so]
 
 Note that even though the application leaks 16 bytes of memory every second, 
 the report (printed every 5 seconds) doesn't "see" all the allocations because
@@ -150,14 +150,16 @@ of the sampling rate applied.
 USAGE message:
 
 # ./memleak -h
-usage: memleak [-h] [-p PID] [-t] [-a] [-o OLDER] [-c COMMAND]
-                  [-s SAMPLE_RATE] [-d STACK_DEPTH] [-T TOP]
+usage: memleak.py [-h] [-p PID] [-t] [-a] [-o OLDER] [-c COMMAND]
+                  [-s SAMPLE_RATE] [-T TOP] [-z MIN_SIZE] [-Z MAX_SIZE]
+                  [-O OBJ]
                   [interval] [count]
 
 Trace outstanding memory allocations that weren't freed.
 Supports both user-mode allocations made with malloc/free and kernel-mode
 allocations made with kmalloc/kfree.
 
+positional arguments:
   interval              interval in seconds to print outstanding allocations
   count                 number of times to print the report before exiting
 
@@ -175,13 +177,12 @@ optional arguments:
                         execute and trace the specified command
   -s SAMPLE_RATE, --sample-rate SAMPLE_RATE
                         sample every N-th allocation to decrease the overhead
-  -d STACK_DEPTH, --stack_depth STACK_DEPTH
-                        maximum stack depth to capture
   -T TOP, --top TOP     display only this many top allocating stacks (by size)
   -z MIN_SIZE, --min-size MIN_SIZE
                         capture only allocations larger than this size
   -Z MAX_SIZE, --max-size MAX_SIZE
                         capture only allocations smaller than this size
+  -O OBJ, --obj OBJ     attach to malloc & free in the specified object
 
 EXAMPLES:
 

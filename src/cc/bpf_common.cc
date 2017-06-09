@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "cc/bpf_module.h"
-#include "cc/bpf_common.h"
+#include "bpf_common.h"
+#include "bpf_module.h"
 
 extern "C" {
 void * bpf_module_create_b(const char *filename, const char *proto_filename, unsigned flags) {
@@ -144,6 +144,18 @@ size_t bpf_table_max_entries_id(void *program, size_t id) {
   auto mod = static_cast<ebpf::BPFModule *>(program);
   if (!mod) return 0;
   return mod->table_max_entries(id);
+}
+
+int bpf_table_flags(void *program, const char *table_name) {
+  auto mod = static_cast<ebpf::BPFModule *>(program);
+  if (!mod) return -1;
+  return mod->table_flags(table_name);
+}
+
+int bpf_table_flags_id(void *program, size_t id) {
+  auto mod = static_cast<ebpf::BPFModule *>(program);
+  if (!mod) return -1;
+  return mod->table_flags(id);
 }
 
 const char * bpf_table_name(void *program, size_t id) {

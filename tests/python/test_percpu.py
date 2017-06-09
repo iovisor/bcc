@@ -9,6 +9,12 @@ import multiprocessing
 
 class TestPercpu(unittest.TestCase):
 
+    def setUp(self):
+        try:
+            b = BPF(text='BPF_TABLE("percpu_array", u32, u32, stub, 1);')
+        except:
+            raise unittest.SkipTest("PerCpu unsupported on this kernel")
+
     def test_u64(self):
         test_prog1 = """
         BPF_TABLE("percpu_hash", u32, u64, stats, 1);
@@ -20,7 +26,6 @@ class TestPercpu(unittest.TestCase):
             return 0;
         }
         """
-        self.addCleanup(self.cleanup)
         bpf_code = BPF(text=test_prog1)
         stats_map = bpf_code.get_table("stats")
         bpf_code.attach_kprobe(event="sys_clone", fn_name="hello_world")
@@ -35,8 +40,9 @@ class TestPercpu(unittest.TestCase):
         sum = stats_map.sum(stats_map.Key(0))
         avg = stats_map.average(stats_map.Key(0))
         max = stats_map.max(stats_map.Key(0))
-        self.assertGreater(sum.value, 0L)
-        self.assertGreater(max.value, 0L)
+        self.assertGreater(sum.value, int(0))
+        self.assertGreater(max.value, int(0))
+        bpf_code.detach_kprobe("sys_clone")
 
     def test_u32(self):
         test_prog1 = """
@@ -49,7 +55,6 @@ class TestPercpu(unittest.TestCase):
             return 0;
         }
         """
-        self.addCleanup(self.cleanup)
         bpf_code = BPF(text=test_prog1)
         stats_map = bpf_code.get_table("stats")
         bpf_code.attach_kprobe(event="sys_clone", fn_name="hello_world")
@@ -64,8 +69,9 @@ class TestPercpu(unittest.TestCase):
         sum = stats_map.sum(stats_map.Key(0))
         avg = stats_map.average(stats_map.Key(0))
         max = stats_map.max(stats_map.Key(0))
-        self.assertGreater(sum.value, 0L)
-        self.assertGreater(max.value, 0L)
+        self.assertGreater(sum.value, int(0))
+        self.assertGreater(max.value, int(0))
+        bpf_code.detach_kprobe("sys_clone")
 
     def test_struct_custom_func(self):
         test_prog2 = """
@@ -83,7 +89,6 @@ class TestPercpu(unittest.TestCase):
             return 0;
         }
         """
-        self.addCleanup(self.cleanup)
         bpf_code = BPF(text=test_prog2)
         stats_map = bpf_code.get_table("stats",
                 reducer=lambda x,y: stats_map.sLeaf(x.c1+y.c1))
@@ -96,10 +101,8 @@ class TestPercpu(unittest.TestCase):
         f.close()
         self.assertEqual(len(stats_map),1)
         k = stats_map[ stats_map.Key(0) ]
-        self.assertGreater(k.c1, 0L)
-
-    def cleanup(self):
-        BPF.detach_kprobe("sys_clone")
+        self.assertGreater(k.c1, int(0))
+        bpf_code.detach_kprobe("sys_clone")
 
 
 if __name__ == "__main__":

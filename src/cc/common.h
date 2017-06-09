@@ -17,8 +17,7 @@
 #pragma once
 
 #include <memory>
-#include <string>
-#include <tuple>
+#include <vector>
 
 namespace ebpf {
 
@@ -28,6 +27,8 @@ make_unique(Args &&... args) {
   return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
 }
 
-typedef std::tuple<int, std::string> StatusTuple;
+std::vector<int> get_online_cpus();
+
+std::vector<int> get_possible_cpus();
 
 }  // namespace ebpf

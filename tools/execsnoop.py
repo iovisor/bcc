@@ -30,6 +30,7 @@ examples = """examples:
     ./execsnoop -x        # include failed exec()s
     ./execsnoop -t        # include timestamps
     ./execsnoop -n main   # only print command lines containing "main"
+    ./execsnoop -l tpkg   # only print command where arguments contains "tpkg"
 """
 parser = argparse.ArgumentParser(
     description="Trace exec() syscalls",
@@ -41,6 +42,8 @@ parser.add_argument("-x", "--fails", action="store_true",
     help="include failed exec()s")
 parser.add_argument("-n", "--name",
     help="only print commands matching this name (regex), any arg")
+parser.add_argument("-l", "--line",
+    help="only print commands where arg contains this line (regex)")
 args = parser.parse_args()
 
 # define BPF program
@@ -88,7 +91,7 @@ int kprobe__sys_execve(struct pt_regs *ctx, struct filename *filename,
     const char __user *const __user *__argv,
     const char __user *const __user *__envp)
 {
-    // create data here and pass to submit_arg to save space on the stack (#555)
+    // create data here and pass to submit_arg to save stack space (#555)
     struct data_t data = {};
     data.pid = bpf_get_current_pid_tgid() >> 32;
     bpf_get_current_comm(&data.comm, sizeof(data.comm));
@@ -167,8 +170,8 @@ start_ts = time.time()
 argv = defaultdict(list)
 
 # TODO: This is best-effort PPID matching. Short-lived processes may exit
-# before we get a chance to read the PPID. This should be replaced with fetching
-# PPID via C when available (#364).
+# before we get a chance to read the PPID. This should be replaced with
+# fetching PPID via C when available (#364).
 def get_ppid(pid):
     try:
         with open("/proc/%d/status" % pid) as status:
@@ -192,16 +195,22 @@ def print_event(cpu, data, size):
             skip = True
         if args.name and not re.search(args.name, event.comm):
             skip = True
+        if args.line and not re.search(args.line,
+                                       b' '.join(argv[event.pid]).decode()):
+            skip = True
 
         if not skip:
             if args.timestamp:
                 print("%-8.3f" % (time.time() - start_ts), end="")
             ppid = get_ppid(event.pid)
-            print("%-16s %-6s %-6s %3s %s" % (event.comm, event.pid,
+            print("%-16s %-6s %-6s %3s %s" % (event.comm.decode(), event.pid,
                     ppid if ppid > 0 else "?", event.retval,
-                    ' '.join(argv[event.pid])))
+                    b' '.join(argv[event.pid]).decode()))
+        try:
+            del(argv[event.pid])
+        except Exception:
+            pass
 
-        del(argv[event.pid])
 
 # loop with callback to print_event
 b["events"].open_perf_buffer(print_event)

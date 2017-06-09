@@ -88,17 +88,17 @@ def inet_ntoa(addr):
 
 # filter and format output
 while 1:
-        # Read messages from kernel pipe
-        try:
-            (task, pid, cpu, flags, ts, msg) = b.trace_fields()
-            (_tag, saddr_hs, daddr_hs, dport_s) = msg.split(" ")
-        except ValueError:
-            # Ignore messages from other tracers
-            continue
+	# Read messages from kernel pipe
+	try:
+	    (task, pid, cpu, flags, ts, msg) = b.trace_fields()
+	    (_tag, saddr_hs, daddr_hs, dport_s) = msg.split(" ")
+	except ValueError:
+	    # Ignore messages from other tracers
+	    continue
 
-        # Ignore messages from other tracers
-        if _tag != "trace_tcp4connect":
-            continue
+	# Ignore messages from other tracers
+	if _tag != "trace_tcp4connect":
+	    continue
 
 	print("%-6d %-12.12s %-16s %-16s %-4s" % (pid, task,
 	    inet_ntoa(int(saddr_hs, 16)),

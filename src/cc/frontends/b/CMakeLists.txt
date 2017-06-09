@@ -11,5 +11,5 @@ if (CMAKE_C_COMPILER_ID STREQUAL "Clang")
   set_source_files_properties(${CMAKE_CURRENT_BINARY_DIR}/lexer.ll.cc PROPERTIES COMPILE_FLAGS "-Wno-deprecated-register")
 endif()
 
-add_library(b_frontend loader.cc codegen_llvm.cc node.cc parser.cc printer.cc
+add_library(b_frontend STATIC loader.cc codegen_llvm.cc node.cc parser.cc printer.cc
   type_check.cc ${BISON_Parser_OUTPUTS} ${FLEX_Lexer_OUTPUTS})

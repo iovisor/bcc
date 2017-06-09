@@ -4,7 +4,8 @@ find_program(LUAJIT luajit)
 if (LUAJIT_LIBRARIES AND LUAJIT)
 	FILE(GLOB_RECURSE SRC_LUA
 		${CMAKE_CURRENT_SOURCE_DIR}/bcc/*.lua
-		${CMAKE_CURRENT_SOURCE_DIR}/bcc/vendor/*.lua)
+		${CMAKE_CURRENT_SOURCE_DIR}/bcc/vendor/*.lua
+		${CMAKE_CURRENT_SOURCE_DIR}/bpf/*.lua)
 
 	ADD_CUSTOM_COMMAND(
 		OUTPUT bcc.lua
@@ -23,6 +24,7 @@ if (LUAJIT_LIBRARIES AND LUAJIT)
 	set_target_properties(bcc-lua PROPERTIES LINKER_LANGUAGE C)
 	target_link_libraries(bcc-lua ${LUAJIT_LIBRARIES})
 	target_link_libraries(bcc-lua -Wl,--whole-archive bcc-static -Wl,--no-whole-archive)
+	target_link_libraries(bcc-lua -no-pie)
 
 	install(TARGETS bcc-lua RUNTIME DESTINATION bin)
 endif()

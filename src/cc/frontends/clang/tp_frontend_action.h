@@ -53,7 +53,7 @@ class TracepointTypeVisitor :
   clang::ASTContext &C;
   clang::DiagnosticsEngine &diag_;
   clang::Rewriter &rewriter_;
-  llvm::raw_ostream &out_; 
+  llvm::raw_ostream &out_;
 };
 
 class TracepointTypeConsumer : public clang::ASTConsumer {

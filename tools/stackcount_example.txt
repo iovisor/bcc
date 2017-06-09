@@ -1,8 +1,8 @@
 Demonstrations of stackcount, the Linux eBPF/bcc version.
 
 
-This program traces kernel functions and frequency counts them with their entire
-kernel stack trace, summarized in-kernel for efficiency. For example, counting
+This program traces functions and frequency counts them with their entire
+stack trace, summarized in-kernel for efficiency. For example, counting
 stack traces that led to submit_bio(), which creates block device I/O:
 
 # ./stackcount submit_bio
@@ -268,6 +268,76 @@ As may be obvious, this is a great tool for quickly understanding kernel code
 flow.
 
 
+User-space functions can also be traced if a library name is provided. For
+example, to quickly identify code locations that allocate heap memory:
+
+# ./stackcount -l c -p 4902 malloc
+Tracing 1 functions for "malloc"... Hit Ctrl-C to end.
+^C
+  malloc
+  rbtree_new
+  main
+  [unknown]
+    12
+
+  malloc
+  _rbtree_node_new_internal
+  _rbtree_node_insert
+  rbtree_insert
+  main
+  [unknown]
+    1189
+
+Detaching...
+
+Note that user-space uses of stackcount can be somewhat more limited because
+a lot of user-space libraries and binaries are compiled without debuginfo, or
+with frame-pointer omission (-fomit-frame-pointer), which makes it impossible
+to reliably obtain the stack trace.
+
+
+In addition to kernel and user-space functions, kernel tracepoints and USDT
+tracepoints are also supported. 
+
+For example, to determine where threads are being created in a particular 
+process, use the pthread_create USDT tracepoint:
+
+# ./stackcount -p $(pidof parprimes) u:pthread:pthread_create
+Tracing 1 functions for "u:pthread:pthread_create"... Hit Ctrl-C to end.
+^C
+
+    parprimes [11923]
+  pthread_create@@GLIBC_2.2.5
+  main
+  __libc_start_main
+  [unknown]
+    7
+
+Similarly, to determine where context switching is happening in the kernel, 
+use the sched:sched_switch kernel tracepoint:
+
+# ./stackcount t:sched:sched_switch
+... (omitted for brevity)
+
+  __schedule
+  schedule
+  schedule_hrtimeout_range_clock
+  schedule_hrtimeout_range
+  poll_schedule_timeout
+  do_select
+  core_sys_select
+  SyS_select
+  entry_SYSCALL_64_fastpath
+    40
+
+  __schedule
+  schedule
+  schedule_preempt_disabled
+  cpu_startup_entry
+  start_secondary
+    85
+
+
 A -i option can be used to set an output interval, and -T to include a
 timestamp. For example:
 
@@ -434,12 +504,13 @@ Use -r to allow regular expressions.
 USAGE message:
 
 # ./stackcount -h
-usage: stackcount [-h] [-p PID] [-i INTERVAL] [-T] [-r] [-s] [-v] pattern
+usage: stackcount [-h] [-p PID] [-i INTERVAL] [-T] [-r] [-s]
+                  [-l LIBRARY] [-v] [-d] pattern
 
-Count kernel function calls and their stack traces
+Count function calls and their stack traces
 
 positional arguments:
-  pattern               search expression for kernel functions
+  pattern               search expression for functions
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -450,14 +521,19 @@ optional arguments:
   -r, --regexp          use regular expressions. Default is "*" wildcards
                         only.
   -s, --offset          show address offsets
+  -l, --library         trace user-space functions from this library or executable
   -v, --verbose         show raw addresses
+  -d, --debug           print BPF program before starting (for debugging purposes)
 
 examples:
-    ./stackcount submit_bio       # count kernel stack traces for submit_bio
-    ./stackcount ip_output        # count kernel stack traces for ip_output
-    ./stackcount -s ip_output     # show symbol offsets
-    ./stackcount -sv ip_output    # show offsets and raw addresses (verbose)
-    ./stackcount 'tcp_send*'      # count stacks for funcs matching tcp_send*
-    ./stackcount -r '^tcp_send.*' # same as above, using regular expressions
-    ./stackcount -Ti 5 ip_output  # output every 5 seconds, with timestamps
-    ./stackcount -p 185 ip_output # count ip_output stacks for PID 185 only
+    ./stackcount submit_bio          # count kernel stack traces for submit_bio
+    ./stackcount ip_output           # count kernel stack traces for ip_output
+    ./stackcount -s ip_output        # show symbol offsets
+    ./stackcount -sv ip_output       # show offsets and raw addresses (verbose)
+    ./stackcount 'tcp_send*'         # count stacks for funcs matching tcp_send*
+    ./stackcount -r '^tcp_send.*'    # same as above, using regular expressions
+    ./stackcount -Ti 5 ip_output     # output every 5 seconds, with timestamps
+    ./stackcount -p 185 ip_output    # count ip_output stacks for PID 185 only
+    ./stackcount -p 185 -l c malloc  # count stacks for malloc in PID 185
+    ./stackcount t:sched:sched_fork  # count stacks for the sched_fork tracepoint
+    ./stackcount -p 185 u:node:*     # count stacks for all USDT probes in node
