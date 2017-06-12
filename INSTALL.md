@@ -6,10 +6,12 @@
   - [Fedora](#fedora---binary)
   - [Arch](#arch---aur)
   - [Gentoo](#gentoo---portage)
+  - [openSUSE](#opensuse---binary)
 * [Source](#source)
   - [Debian](#debian---source)
   - [Ubuntu](#ubuntu---source)
   - [Fedora](#fedora---source)
+  - [openSUSE](#opensuse---source)
 * [Older Instructions](#older-instructions)
 
 ## Kernel Configuration
@@ -160,6 +162,16 @@ Finally, you can install bcc with:
 emerge dev-util/bcc
 ```
 The appropriate dependencies (e.g., ```clang```, ```llvm``` with BPF backend) will be pulled automatically.
+
+## openSUSE - Binary
+
+For openSUSE Leap 42.2 (and later) and Tumbleweed, bcc is already included in the official repo. Just install
+the packages with zypper.
+
+```bash
+sudo zypper ref
+sudo zypper in bcc-tools bcc-examples
+```
 
 
 # Source
@@ -319,6 +331,34 @@ mkdir bcc/build; cd bcc/build
 cmake .. -DCMAKE_INSTALL_PREFIX=/usr
 make
 sudo make install
+```
+
+## openSUSE - Source
+
+### Install build dependencies
+
+```
+sudo zypper in bison cmake flex gcc gcc-c++ git libelf-devel libstdc++-devel \
+  llvm-devel pkg-config python-devel python-setuptools python3-devel \
+  python3-setuptools
+sudo zypper in luajit-devel       # for lua support in openSUSE Leap 42.2 or later
+sudo zypper in lua51-luajit-devel # for lua support in openSUSE Tumbleweed
+```
+
+### Install and compile BCC
+```
+git clone https://github.com/iovisor/bcc.git
+mkdir bcc/build; cd bcc/build
+cmake -DCMAKE_INSTALL_PREFIX=/usr \
+      -DLUAJIT_INCLUDE_DIR=`pkg-config --variable=includedir luajit` \ # for lua support
+      ..
+make
+sudo make install
+cmake -DPYTHON_CMD=python3 .. # build python3 binding
+pushd src/python/
+make
+sudo make install
+popd
 ```
 
 # Older Instructions
