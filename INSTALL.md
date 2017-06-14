@@ -114,7 +114,7 @@ sudo python /usr/share/bcc/examples/networking/simple_tc.py
 
 ## Fedora - Binary
 
-Install a 4.2+ kernel from
+Ensure that you are running a 4.2+ kernel with `uname -r`. If not, install a 4.2+ kernel from
 http://alt.fedoraproject.org/pub/alt/rawhide-kernel-nodebug, for example:
 
 ```bash
@@ -123,13 +123,13 @@ sudo dnf update
 # reboot
 ```
 
-Nightly bcc binary packages are built for Fedora 23 and 24, hosted at
-`https://repo.iovisor.org/yum/nightly/f{23,24}`.
+Nightly bcc binary packages for Fedora 23, 24, and 25 are hosted at
+`https://repo.iovisor.org/yum/nightly/f{23,24,25}`.
 
-To install (change 'f23' to 'f24' for rawhide):
+To install:
 ```bash
-echo -e '[iovisor]\nbaseurl=https://repo.iovisor.org/yum/nightly/f23/$basearch\nenabled=1\ngpgcheck=0' | sudo tee /etc/yum.repos.d/iovisor.repo
-sudo dnf install bcc-tools
+echo -e '[iovisor]\nbaseurl=https://repo.iovisor.org/yum/nightly/f25/$basearch\nenabled=1\ngpgcheck=0' | sudo tee /etc/yum.repos.d/iovisor.repo
+sudo dnf install bcc-tools kernel-devel-$(uname -r) kernel-headers-$(uname -r)
 ```
 
 ## Arch - AUR
