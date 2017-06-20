@@ -54,7 +54,7 @@ def _stars(val, val_max, width):
     return text
 
 
-def _print_log2_hist(vals, val_type):
+def _print_log2_hist(vals, val_type, strip_leading_zero=None):
     global stars_max
     log2_dist_max = 64
     idx_max = -1
@@ -74,15 +74,23 @@ def _print_log2_hist(vals, val_type):
         stars = int(stars_max / 2)
 
     if idx_max > 0:
-        print(header % val_type);
+        print(header % val_type)
+
     for i in range(1, idx_max + 1):
         low = (1 << i) >> 1
         high = (1 << i) - 1
         if (low == high):
             low -= 1
         val = vals[i]
-        print(body % (low, high, val, stars,
-                      _stars(val, val_max, stars)))
+
+        if strip_leading_zero:
+            if val:
+                print(body % (low, high, val, stars,
+                              _stars(val, val_max, stars)))
+                strip_leading_zero = None
+        else:
+            print(body % (low, high, val, stars,
+                          _stars(val, val_max, stars)))
 
 def _print_linear_hist(vals, val_type):
     global stars_max
@@ -281,7 +289,7 @@ class TableBase(MutableMapping):
         return next_key
 
     def print_log2_hist(self, val_type="value", section_header="Bucket ptr",
-            section_print_fn=None, bucket_fn=None):
+            section_print_fn=None, bucket_fn=None, strip_leading_zero=None):
         """print_log2_hist(val_type="value", section_header="Bucket ptr",
                            section_print_fn=None, bucket_fn=None)
 
@@ -312,12 +320,12 @@ class TableBase(MutableMapping):
                         section_print_fn(bucket)))
                 else:
                     print("\n%s = %r" % (section_header, bucket))
-                _print_log2_hist(vals, val_type)
+                _print_log2_hist(vals, val_type, strip_leading_zero)
         else:
             vals = [0] * log2_index_max
             for k, v in self.items():
                 vals[k.value] = v.value
-            _print_log2_hist(vals, val_type)
+            _print_log2_hist(vals, val_type, strip_leading_zero)
 
     def print_linear_hist(self, val_type="value", section_header="Bucket ptr",
             section_print_fn=None, bucket_fn=None):
@@ -709,4 +717,3 @@ class StackTrace(TableBase):
 
     def clear(self):
         pass
-
