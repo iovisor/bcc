@@ -76,7 +76,7 @@ Tracing 1 function for "pthread:pthread_mutex_lock"... Hit Ctrl-C to end.
    1048576 -> 2097151    : 9        |                                        |
 Detaching...
 
-It seems that most calls to pthread_mutex_lock completed rather quickly (in 
+It seems that most calls to pthread_mutex_lock completed rather quickly (in
 under 4us), but there were some cases of considerable contention, sometimes
 over a full millisecond.
 
@@ -332,7 +332,7 @@ USAGE message:
 
 # ./funclatency -h
 usage: funclatency [-h] [-p PID] [-i INTERVAL] [-T] [-u] [-m] [-F] [-r] [-v]
-                   pattern
+                   [-s] pattern
 
 Time functions and print latency as a histogram
 
@@ -351,6 +351,7 @@ optional arguments:
   -r, --regexp          use regular expressions. Default is "*" wildcards
                         only.
   -v, --verbose         print the BPF program (for debugging purposes)
+  -s, --strip           strip leading zero on output
 
 examples:
     ./funclatency do_sys_open       # time the do_sys_open() kernel function
