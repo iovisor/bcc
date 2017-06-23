@@ -201,7 +201,7 @@ and 32 ms, whereas xvdc is usually between 0.2 ms and 4 ms.
 USAGE message:
 
 # ./biolatency -h
-usage: biolatency [-h] [-T] [-Q] [-m] [-D] [-s] [interval] [count]
+usage: biolatency [-h] [-T] [-Q] [-m] [-D] [interval] [count]
 
 Summarize block device I/O latency as a histogram
 
@@ -215,7 +215,6 @@ optional arguments:
   -Q, --queued        include OS queued time in I/O time
   -m, --milliseconds  millisecond histogram
   -D, --disks         print a histogram per disk device
-  -s, --strip           strip leading zero on output
 
 examples:
     ./biolatency            # summarize block I/O latency as a histogram

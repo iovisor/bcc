@@ -4,13 +4,13 @@
 # biolatency    Summarize block device I/O latency as a histogram.
 #       For Linux, uses BCC, eBPF.
 #
-# USAGE: biolatency [-h] [-T] [-Q] [-m] [-D] [-s] [interval] [count]
+# USAGE: biolatency [-h] [-T] [-Q] [-m] [-D] [interval] [count]
 #
 # Copyright (c) 2015 Brendan Gregg.
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
 # 20-Sep-2015   Brendan Gregg   Created this.
-# 21-Jun-2017   Taekho Nam      Added strip leading zero option.
+# 23-Jun-2017   Taekho Nam      Added strip leading zero option.
 
 from __future__ import print_function
 from bcc import BPF
@@ -37,8 +37,6 @@ parser.add_argument("-m", "--milliseconds", action="store_true",
     help="millisecond histogram")
 parser.add_argument("-D", "--disks", action="store_true",
     help="print a histogram per disk device")
-parser.add_argument("-s", "--strip", action="store_true",
-    help="strip leading zero on output")
 parser.add_argument("interval", nargs="?", default=99999999,
     help="output interval, in seconds")
 parser.add_argument("count", nargs="?", default=99999999,
@@ -134,7 +132,7 @@ while (1):
     if args.timestamp:
         print("%-8s\n" % strftime("%H:%M:%S"), end="")
 
-    dist.print_log2_hist(label, "disk", strip_leading_zero=args.strip)
+    dist.print_log2_hist(label, "disk")
     dist.clear()
 
     countdown -= 1

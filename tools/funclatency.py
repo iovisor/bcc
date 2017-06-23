@@ -5,7 +5,7 @@
 #               For Linux, uses BCC, eBPF.
 #
 # USAGE: funclatency [-h] [-p PID] [-i INTERVAL] [-T] [-u] [-m] [-F] [-r] [-v]
-#                    [-s] pattern
+#                    pattern
 #
 # Run "funclatency -h" for full usage.
 #
@@ -22,7 +22,7 @@
 #
 # 20-Sep-2015   Brendan Gregg       Created this.
 # 06-Oct-2016   Sasha Goldshtein    Added user function support.
-# 21-Jun-2017   Taekho Nam          Added strip leading zero option.
+# 23-Jun-2017   Taekho Nam          Added strip leading zero option.
 
 from __future__ import print_function
 from bcc import BPF
@@ -62,8 +62,6 @@ parser.add_argument("-r", "--regexp", action="store_true",
     help="use regular expressions. Default is \"*\" wildcards only.")
 parser.add_argument("-v", "--verbose", action="store_true",
     help="print the BPF program (for debugging purposes)")
-parser.add_argument("-s", "--strip", action="store_true",
-    help="strip leading zero on output")
 parser.add_argument("pattern",
     help="search expression for functions")
 args = parser.parse_args()
@@ -240,9 +238,9 @@ while (1):
 
     if need_key:
         dist.print_log2_hist(label, "Function", section_print_fn=print_section,
-            bucket_fn=lambda k: (k.ip, k.pid), strip_leading_zero=args.strip)
+            bucket_fn=lambda k: (k.ip, k.pid))
     else:
-        dist.print_log2_hist(label, strip_leading_zero=args.strip)
+        dist.print_log2_hist(label)
     dist.clear()
 
     if exiting:
