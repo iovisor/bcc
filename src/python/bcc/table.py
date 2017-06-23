@@ -54,7 +54,7 @@ def _stars(val, val_max, width):
     return text
 
 
-def _print_log2_hist(vals, val_type, strip_leading_zero=None):
+def _print_log2_hist(vals, val_type, strip_leading_zero):
     global stars_max
     log2_dist_max = 64
     idx_max = -1
@@ -87,7 +87,7 @@ def _print_log2_hist(vals, val_type, strip_leading_zero=None):
             if val:
                 print(body % (low, high, val, stars,
                               _stars(val, val_max, stars)))
-                strip_leading_zero = None
+                strip_leading_zero = False
         else:
             print(body % (low, high, val, stars,
                           _stars(val, val_max, stars)))
@@ -300,8 +300,10 @@ class TableBase(MutableMapping):
         If section_print_fn is not None, it will be passed the bucket value
         to format into a string as it sees fit. If bucket_fn is not None,
         it will be used to produce a bucket value for the histogram keys.
-        The maximum index allowed is log2_index_max (65), which will
-        accomodate any 64-bit integer in the histogram.
+        If the value of strip_leading_zero is not False, prints a histogram
+        that is omitted leading zeros from the beginning.The maximum index
+        allowed is log2_index_max (65), which will accomodate any 64-bit
+        integer in the histogram.
         """
         if isinstance(self.Key(), ct.Structure):
             tmp = {}
