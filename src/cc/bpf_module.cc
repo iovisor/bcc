@@ -51,7 +51,6 @@
 #include "bpf_module.h"
 #include "exported_files.h"
 #include "kbuild_helper.h"
-#include "shared_table.h"
 #include "libbpf.h"
 
 namespace ebpf {
