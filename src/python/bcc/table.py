@@ -301,7 +301,7 @@ class TableBase(MutableMapping):
         to format into a string as it sees fit. If bucket_fn is not None,
         it will be used to produce a bucket value for the histogram keys.
         If the value of strip_leading_zero is not False, prints a histogram
-        that is omitted leading zeros from the beginning.The maximum index
+        that is omitted leading zeros from the beginning. The maximum index
         allowed is log2_index_max (65), which will accomodate any 64-bit
         integer in the histogram.
         """
