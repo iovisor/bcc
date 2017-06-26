@@ -133,6 +133,23 @@ struct _name##_table_t _name
 #define BPF_ARRAY(...) \
   BPF_ARRAYX(__VA_ARGS__, BPF_ARRAY3, BPF_ARRAY2, BPF_ARRAY1)(__VA_ARGS__)
 
+#define BPF_PERCPU_ARRAY1(_name)                        \
+    BPF_TABLE("percpu_array", int, u64, _name, 10240)
+#define BPF_PERCPU_ARRAY2(_name, _leaf_type) \
+    BPF_TABLE("percpu_array", int, _leaf_type, _name, 10240)
+#define BPF_PERCPU_ARRAY3(_name, _leaf_type, _size) \
+    BPF_TABLE("percpu_array", int, _leaf_type, _name, _size)
+
+// helper for default-variable macro function
+#define BPF_PERCPU_ARRAYX(_1, _2, _3, NAME, ...) NAME
+
+// Define an array function (per CPU), some arguments optional
+// BPF_PERCPU_ARRAY(name, leaf_type=u64, size=10240)
+#define BPF_PERCPU_ARRAY(...)                                           \
+  BPF_PERCPU_ARRAYX(                                                    \
+    __VA_ARGS__, BPF_PERCPU_ARRAY3, BPF_PERCPU_ARRAY2, BPF_PERCPU_ARRAY1) \
+           (__VA_ARGS__)
+
 #define BPF_HIST1(_name) \
   BPF_TABLE("histogram", int, u64, _name, 64)
 #define BPF_HIST2(_name, _key_type) \
