@@ -24,18 +24,22 @@ set_target_properties(bpf-static PROPERTIES OUTPUT_NAME bpf)
 add_library(bpf-shared SHARED libbpf.c perf_reader.c)
 set_target_properties(bpf-shared PROPERTIES OUTPUT_NAME bpf)
 
-add_library(bcc-shared SHARED bpf_common.cc bpf_module.cc table_storage.cc
-  shared_table.cc bpffs_table.cc json_map_decl_visitor.cc exported_files.cc
-  bcc_elf.c bcc_perf_map.c bcc_proc.c bcc_syms.cc ns_guard.cc common.cc BPF.cc
-  BPFTable.cc)
+set(bcc_common_sources bpf_common.cc bpf_module.cc exported_files.cc)
+set(bcc_table_sources table_storage.cc shared_table.cc bpffs_table.cc json_map_decl_visitor.cc)
+set(bcc_util_sources ns_guard.cc common.cc)
+set(bcc_sym_sources bcc_syms.cc bcc_elf.c bcc_perf_map.c bcc_proc.c)
+set(bcc_api_sources BPF.cc BPFTable.cc)
+
+add_library(bcc-shared SHARED
+  ${bcc_common_sources} ${bcc_table_sources} ${bcc_sym_sources}
+  ${bcc_util_sources} ${bcc_api_sources})
 set_target_properties(bcc-shared PROPERTIES VERSION ${REVISION_LAST} SOVERSION 0)
 set_target_properties(bcc-shared PROPERTIES OUTPUT_NAME bcc)
 
-add_library(bcc-loader-static STATIC bcc_elf.c bcc_perf_map.c bcc_proc.c
-  bcc_syms.cc ns_guard.cc)
-add_library(bcc-static STATIC bpf_common.cc bpf_module.cc shared_table.cc
-  bpffs_table.cc json_map_decl_visitor.cc table_storage.cc exported_files.cc
-  common.cc BPF.cc BPFTable.cc)
+add_library(bcc-loader-static STATIC ${bcc_sym_sources} ${bcc_util_sources})
+add_library(bcc-static STATIC
+  ${bcc_common_sources} ${bcc_table_sources}
+  ${bcc_util_sources} ${bcc_api_sources})
 set_target_properties(bcc-static PROPERTIES OUTPUT_NAME bcc)
 
 include(clang_libs)
