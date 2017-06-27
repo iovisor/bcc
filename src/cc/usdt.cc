@@ -39,16 +39,19 @@ Location::Location(uint64_t addr, const char *arg_fmt) : address_(addr) {
 }
 
 Probe::Probe(const char *bin_path, const char *provider, const char *name,
-             uint64_t semaphore, const optional<int> &pid)
+             uint64_t semaphore, const optional<int> &pid, ProcMountNS *ns)
     : bin_path_(bin_path),
       provider_(provider),
       name_(name),
       semaphore_(semaphore),
-      pid_(pid) {}
+      pid_(pid),
+      mount_ns_(ns) {}
 
 bool Probe::in_shared_object() {
-  if (!in_shared_object_)
+  if (!in_shared_object_) {
+    ProcMountNSGuard g(mount_ns_);
     in_shared_object_ = bcc_elf_is_shared_obj(bin_path_.c_str());
+  }
   return in_shared_object_.value();
 }
 
@@ -205,6 +208,7 @@ int Context::_each_module(const char *modpath, uint64_t, uint64_t, bool, void *p
   // executable region. We are going to parse the ELF on disk anyway, so we
   // don't need these duplicates.
   if (ctx->modules_.insert(modpath).second /*inserted new?*/) {
+    ProcMountNSGuard g(ctx->mount_ns_instance_.get());
     bcc_elf_foreach_usdt(modpath, _each_probe, p);
   }
   return 0;
@@ -219,7 +223,8 @@ void Context::add_probe(const char *binpath, const struct bcc_elf_usdt *probe) {
   }
 
   probes_.emplace_back(
-      new Probe(binpath, probe->provider, probe->name, probe->semaphore, pid_));
+      new Probe(binpath, probe->provider, probe->name, probe->semaphore, pid_,
+	mount_ns_instance_.get()));
   probes_.back()->add_location(probe->pc, probe->arg_fmt);
 }
 
@@ -296,7 +301,8 @@ Context::Context(const std::string &bin_path) : loaded_(false) {
   }
 }
 
-Context::Context(int pid) : pid_(pid), pid_stat_(pid), loaded_(false) {
+Context::Context(int pid) : pid_(pid), pid_stat_(pid),
+  mount_ns_instance_(new ProcMountNS(pid)), loaded_(false) {
   if (bcc_procutils_each_module(pid, _each_module, this) == 0)
     loaded_ = true;
 }

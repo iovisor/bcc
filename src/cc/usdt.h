@@ -20,6 +20,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "ns_guard.h"
 #include "syms.h"
 #include "vendor/optional.hpp"
 
@@ -149,6 +150,7 @@ class Probe {
   std::vector<Location> locations_;
 
   optional<int> pid_;
+  ProcMountNS *mount_ns_;
   optional<bool> in_shared_object_;
 
   optional<std::string> attached_to_;
@@ -163,7 +165,7 @@ class Probe {
 
 public:
   Probe(const char *bin_path, const char *provider, const char *name,
-        uint64_t semaphore, const optional<int> &pid);
+        uint64_t semaphore, const optional<int> &pid, ProcMountNS *ns);
 
   size_t num_locations() const { return locations_.size(); }
   size_t num_arguments() const { return locations_.front().arguments_.size(); }
@@ -195,6 +197,7 @@ class Context {
 
   optional<int> pid_;
   optional<ProcStat> pid_stat_;
+  std::unique_ptr<ProcMountNS> mount_ns_instance_;
   bool loaded_;
 
   static void _each_probe(const char *binpath, const struct bcc_elf_usdt *probe,
