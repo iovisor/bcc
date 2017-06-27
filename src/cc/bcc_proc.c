@@ -61,14 +61,18 @@ char *bcc_procutils_which(const char *binpath) {
   return 0;
 }
 
+#define STARTS_WITH(mapname, prefix) (!strncmp(mapname, prefix, sizeof(prefix)-1))
+
 int bcc_mapping_is_file_backed(const char *mapname) {
-  return mapname[0] &&
-    strncmp(mapname, "//anon", sizeof("//anon") - 1) &&
-    strncmp(mapname, "/dev/zero", sizeof("/dev/zero") - 1) &&
-    strncmp(mapname, "/anon_hugepage", sizeof("/anon_hugepage") - 1) &&
-    strncmp(mapname, "[stack", sizeof("[stack") - 1) &&
-    strncmp(mapname, "/SYSV", sizeof("/SYSV") - 1) &&
-    strncmp(mapname, "[heap]", sizeof("[heap]") - 1);
+  return mapname[0] && !(
+    STARTS_WITH(mapname, "//anon") ||
+    STARTS_WITH(mapname, "/dev/zero") ||
+    STARTS_WITH(mapname, "/anon_hugepage") ||
+    STARTS_WITH(mapname, "[stack") ||
+    STARTS_WITH(mapname, "/SYSV") ||
+    STARTS_WITH(mapname, "[heap]") ||
+    STARTS_WITH(mapname, "[vsyscall]") ||
+    STARTS_WITH(mapname, "[vdso]"));
 }
 
 int bcc_procutils_each_module(int pid, bcc_procutils_modulecb callback,
