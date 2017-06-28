@@ -10,7 +10,7 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
 # 20-Sep-2015   Brendan Gregg   Created this.
-# 23-Jun-2017   Taekho Nam      Added strip leading zero option.
+# 28-Jun-2017   Taekho Nam      Stripped leading zero.
 
 from __future__ import print_function
 from bcc import BPF
@@ -132,7 +132,7 @@ while (1):
     if args.timestamp:
         print("%-8s\n" % strftime("%H:%M:%S"), end="")
 
-    dist.print_log2_hist(label, "disk")
+    dist.print_log2_hist(label, "disk", strip_leading_zero=True)
     dist.clear()
 
     countdown -= 1

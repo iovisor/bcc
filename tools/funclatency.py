@@ -238,9 +238,9 @@ while (1):
 
     if need_key:
         dist.print_log2_hist(label, "Function", section_print_fn=print_section,
-            bucket_fn=lambda k: (k.ip, k.pid))
+            bucket_fn=lambda k: (k.ip, k.pid), strip_leading_zero=True)
     else:
-        dist.print_log2_hist(label)
+        dist.print_log2_hist(label, strip_leading_zero=True)
     dist.clear()
 
     if exiting:
