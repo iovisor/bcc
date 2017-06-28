@@ -22,7 +22,7 @@
 #
 # 20-Sep-2015   Brendan Gregg       Created this.
 # 06-Oct-2016   Sasha Goldshtein    Added user function support.
-# 28-Jun-2017   Taekho Nam          Stripped leading zero.
+# 28-Jun-2017   Taekho Nam          Not stripped leading zero.
 
 from __future__ import print_function
 from bcc import BPF
@@ -238,9 +238,9 @@ while (1):
 
     if need_key:
         dist.print_log2_hist(label, "Function", section_print_fn=print_section,
-            bucket_fn=lambda k: (k.ip, k.pid), strip_leading_zero=True)
+            bucket_fn=lambda k: (k.ip, k.pid), strip_leading_zero=None)
     else:
-        dist.print_log2_hist(label, strip_leading_zero=True)
+        dist.print_log2_hist(label, strip_leading_zero=None)
     dist.clear()
 
     if exiting:
