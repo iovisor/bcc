@@ -22,7 +22,7 @@
 #
 # 20-Sep-2015   Brendan Gregg       Created this.
 # 06-Oct-2016   Sasha Goldshtein    Added user function support.
-# 23-Jun-2017   Taekho Nam          Added strip leading zero option.
+# 28-Jun-2017   Taekho Nam          Stripped leading zero.
 
 from __future__ import print_function
 from bcc import BPF
