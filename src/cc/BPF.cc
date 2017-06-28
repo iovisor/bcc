@@ -15,6 +15,7 @@
  */
 
 #include <linux/bpf.h>
+#include <linux/perf_event.h>
 #include <unistd.h>
 #include <cstdio>
 #include <cstring>
@@ -118,6 +119,16 @@ StatusTuple BPF::detach_all() {
     auto res = it.second->close_all_cpu();
     if (res.code() != 0) {
       error_msg += "Failed to close perf buffer " + it.first + ": ";
+      error_msg += res.msg() + "\n";
+      has_error = true;
+    }
+    delete it.second;
+  }
+
+  for (auto& it : perf_event_arrays_) {
+    auto res = it.second->close_all_cpu();
+    if (res.code() != 0) {
+      error_msg += "Failed to close perf event array " + it.first + ": ";
       error_msg += res.msg() + "\n";
       has_error = true;
     }
@@ -391,6 +402,32 @@ StatusTuple BPF::detach_perf_event(uint32_t ev_type, uint32_t ev_config) {
                        ev_type, ev_config);
   TRY2(detach_perf_event_all_cpu(it->second));
   perf_events_.erase(it);
+  return StatusTuple(0);
+}
+
+StatusTuple BPF::open_perf_event(const std::string& name,
+                                 uint32_t type,
+                                 uint64_t config) {
+  if (perf_event_arrays_.find(name) == perf_event_arrays_.end()) {
+    TableStorage::iterator it;
+    if (!bpf_module_->table_storage().Find(Path({bpf_module_->id(), name}), it))
+      return StatusTuple(-1,
+                         "open_perf_event: unable to find table_storage %s",
+                         name.c_str());
+    perf_event_arrays_[name] = new BPFPerfEventArray(it->second);
+  }
+  if (type != PERF_TYPE_RAW && type != PERF_TYPE_HARDWARE)
+    return StatusTuple(-1, "open_perf_event unsupported type");
+  auto table = perf_event_arrays_[name];
+  TRY2(table->open_all_cpu(type, config));
+  return StatusTuple(0);
+}
+
+StatusTuple BPF::close_perf_event(const std::string& name) {
+  auto it = perf_event_arrays_.find(name);
+  if (it == perf_event_arrays_.end())
+    return StatusTuple(-1, "Perf Event for %s not open", name.c_str());
+  TRY2(it->second->close_all_cpu());
   return StatusTuple(0);
 }
 

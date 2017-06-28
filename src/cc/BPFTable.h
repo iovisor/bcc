@@ -241,6 +241,22 @@ class BPFPerfBuffer : public BPFTableBase<int, int> {
   std::unique_ptr<epoll_event[]> ep_events_;
 };
 
+class BPFPerfEventArray : public BPFTableBase<int, int> {
+ public:
+  BPFPerfEventArray(const TableDesc& desc)
+      : BPFTableBase<int, int>(desc) {}
+  ~BPFPerfEventArray();
+
+  StatusTuple open_all_cpu(uint32_t type, uint64_t config);
+  StatusTuple close_all_cpu();
+
+ private:
+  StatusTuple open_on_cpu(int cpu, uint32_t type, uint64_t config);
+  StatusTuple close_on_cpu(int cpu);
+
+  std::map<int, int> cpu_fds_;
+};
+
 class BPFProgTable : public BPFTableBase<int, int> {
 public:
   BPFProgTable(const TableDesc& desc)

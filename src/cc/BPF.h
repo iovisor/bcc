@@ -17,6 +17,7 @@
 #pragma once
 
 #include <cctype>
+#include <cstdint>
 #include <memory>
 #include <string>
 
@@ -119,6 +120,12 @@ public:
                                 bool use_debug_file = true,
                                 bool check_debug_file_crc = true);
 
+  StatusTuple open_perf_event(const std::string& name,
+                              uint32_t type,
+                              uint64_t config);
+
+  StatusTuple close_perf_event(const std::string& name);
+
   StatusTuple open_perf_buffer(const std::string& name,
                                perf_reader_raw_cb cb,
                                perf_reader_lost_cb lost_cb = nullptr,
@@ -187,6 +194,7 @@ private:
   std::map<std::string, open_probe_t> uprobes_;
   std::map<std::string, open_probe_t> tracepoints_;
   std::map<std::string, BPFPerfBuffer*> perf_buffers_;
+  std::map<std::string, BPFPerfEventArray*> perf_event_arrays_;
   std::map<std::pair<uint32_t, uint32_t>, open_probe_t> perf_events_;
 };
 

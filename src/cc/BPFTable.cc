@@ -15,9 +15,12 @@
  */
 
 #include <linux/elf.h>
+#include <linux/perf_event.h>
 #include <sys/epoll.h>
 #include <unistd.h>
 #include <cerrno>
+#include <cinttypes>
+#include <cstdint>
 #include <cstring>
 #include <iostream>
 #include <memory>
@@ -247,4 +250,76 @@ BPFPerfBuffer::~BPFPerfBuffer() {
               << std::endl;
 }
 
+StatusTuple BPFPerfEventArray::open_all_cpu(uint32_t type, uint64_t config) {
+  if (cpu_fds_.size() != 0)
+    return StatusTuple(-1, "Previously opened perf event not cleaned");
+
+  std::vector<int> cpus = get_online_cpus();
+
+  for (int i : cpus) {
+    auto res = open_on_cpu(i, type, config);
+    if (res.code() != 0) {
+      TRY2(close_all_cpu());
+      return res;
+    }
+  }
+  return StatusTuple(0);
+}
+
+StatusTuple BPFPerfEventArray::close_all_cpu() {
+  std::string errors;
+  bool has_error = false;
+
+  std::vector<int> opened_cpus;
+  for (auto it : cpu_fds_)
+    opened_cpus.push_back(it.first);
+  for (int i : opened_cpus) {
+    auto res = close_on_cpu(i);
+    if (res.code() != 0) {
+      errors += "Failed to close CPU" + std::to_string(i) + " perf event: ";
+      errors += res.msg() + "\n";
+      has_error = true;
+    }
+  }
+
+  if (has_error)
+    return StatusTuple(-1, errors);
+  return StatusTuple(0);
+}
+
+StatusTuple BPFPerfEventArray::open_on_cpu(int cpu, uint32_t type,
+                                           uint64_t config) {
+  if (cpu_fds_.find(cpu) != cpu_fds_.end())
+    return StatusTuple(-1, "Perf event already open on CPU %d", cpu);
+  int fd = bpf_open_perf_event(type, config, -1, cpu);
+  if (fd < 0) {
+    return StatusTuple(-1, "Error constructing perf event %" PRIu32 ":%" PRIu64,
+                       type, config);
+  }
+  if (!update(&cpu, &fd)) {
+    bpf_close_perf_event_fd(fd);
+    return StatusTuple(-1, "Unable to open perf event on CPU %d: %s",
+                       cpu, std::strerror(errno));
+  }
+  cpu_fds_[cpu] = fd;
+  return StatusTuple(0);
+}
+
+StatusTuple BPFPerfEventArray::close_on_cpu(int cpu) {
+  auto it = cpu_fds_.find(cpu);
+  if (it == cpu_fds_.end()) {
+    return StatusTuple(0);
+  }
+  bpf_close_perf_event_fd(it->second);
+  cpu_fds_.erase(it);
+  return StatusTuple(0);
+}
+
+BPFPerfEventArray::~BPFPerfEventArray() {
+  auto res = close_all_cpu();
+  if (res.code() != 0) {
+    std::cerr << "Failed to close all perf buffer on destruction: " << res.msg()
+              << std::endl;
+  }
+}
 }  // namespace ebpf

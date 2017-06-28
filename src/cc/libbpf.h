@@ -83,6 +83,8 @@ int bpf_attach_perf_event(int progfd, uint32_t ev_type, uint32_t ev_config,
                           uint64_t sample_period, uint64_t sample_freq,
                           pid_t pid, int cpu, int group_fd);
 
+int bpf_open_perf_event(uint32_t type, uint64_t config, int pid, int cpu);
+
 int bpf_close_perf_event_fd(int fd);
 
 int bpf_obj_pin(int fd, const char *pathname);
