@@ -15,6 +15,14 @@ class TestPercpu(unittest.TestCase):
         except:
             raise unittest.SkipTest("PerCpu unsupported on this kernel")
 
+    def test_helper(self):
+        test_prog1 = """
+        BPF_PERCPU_ARRAY(stub_default);
+        BPF_PERCPU_ARRAY(stub_type, u64);
+        BPF_PERCPU_ARRAY(stub_full, u64, 1024);
+        """
+        BPF(text=test_prog1)
+
     def test_u64(self):
         test_prog1 = """
         BPF_TABLE("percpu_hash", u32, u64, stats, 1);
