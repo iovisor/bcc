@@ -10,7 +10,6 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
 # 20-Sep-2015   Brendan Gregg   Created this.
-# 28-Jun-2017   Taekho Nam      Not stripped leading zero.
 
 from __future__ import print_function
 from bcc import BPF
