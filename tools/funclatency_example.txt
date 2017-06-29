@@ -76,7 +76,7 @@ Tracing 1 function for "pthread:pthread_mutex_lock"... Hit Ctrl-C to end.
    1048576 -> 2097151    : 9        |                                        |
 Detaching...
 
-It seems that most calls to pthread_mutex_lock completed rather quickly (in 
+It seems that most calls to pthread_mutex_lock completed rather quickly (in
 under 4us), but there were some cases of considerable contention, sometimes
 over a full millisecond.
 
