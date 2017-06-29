@@ -132,7 +132,7 @@ while (1):
     if args.timestamp:
         print("%-8s\n" % strftime("%H:%M:%S"), end="")
 
-    dist.print_log2_hist(label, "disk", strip_leading_zero=None)
+    dist.print_log2_hist(label, "disk")
     dist.clear()
 
     countdown -= 1
