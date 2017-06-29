@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 
 include_directories(${CMAKE_SOURCE_DIR}/src/cc)
+include_directories(${CMAKE_SOURCE_DIR}/src/cc/api)
 
 option(INSTALL_CPP_EXAMPLES "Install C++ examples. Those binaries are statically linked and can take plenty of disk space" OFF)
 

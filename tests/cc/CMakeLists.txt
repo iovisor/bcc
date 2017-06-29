@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 
 include_directories(${CMAKE_SOURCE_DIR}/src/cc)
+include_directories(${CMAKE_SOURCE_DIR}/src/cc/api)
 
 add_executable(test_static test_static.c)
 target_link_libraries(test_static bcc-static)
