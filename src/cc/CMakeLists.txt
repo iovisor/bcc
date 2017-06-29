@@ -28,18 +28,17 @@ set(bcc_common_sources bpf_common.cc bpf_module.cc exported_files.cc)
 set(bcc_table_sources table_storage.cc shared_table.cc bpffs_table.cc json_map_decl_visitor.cc)
 set(bcc_util_sources ns_guard.cc common.cc)
 set(bcc_sym_sources bcc_syms.cc bcc_elf.c bcc_perf_map.c bcc_proc.c)
-set(bcc_api_sources BPF.cc BPFTable.cc)
 
 add_library(bcc-shared SHARED
+  link_all.cc
   ${bcc_common_sources} ${bcc_table_sources} ${bcc_sym_sources}
-  ${bcc_util_sources} ${bcc_api_sources})
+  ${bcc_util_sources})
 set_target_properties(bcc-shared PROPERTIES VERSION ${REVISION_LAST} SOVERSION 0)
 set_target_properties(bcc-shared PROPERTIES OUTPUT_NAME bcc)
 
 add_library(bcc-loader-static STATIC ${bcc_sym_sources} ${bcc_util_sources})
 add_library(bcc-static STATIC
-  ${bcc_common_sources} ${bcc_table_sources}
-  ${bcc_util_sources} ${bcc_api_sources})
+  ${bcc_common_sources} ${bcc_table_sources} ${bcc_util_sources})
 set_target_properties(bcc-static PROPERTIES OUTPUT_NAME bcc)
 
 include(clang_libs)
@@ -50,6 +49,13 @@ set(bcc_common_libs b_frontend clang_frontend bpf-static
   ${clang_libs} ${llvm_libs} ${LIBELF_LIBRARIES})
 
 option(ENABLE_USDT "Enable User-level Statically Defined Tracing" ON)
+CMAKE_DEPENDENT_OPTION(ENABLE_CPP_API "Enable C++ API" ON "ENABLE_USDT" OFF)
+
+if(ENABLE_CPP_API)
+  add_subdirectory(api)
+  list(APPEND bcc_common_libs api-static)
+endif()
+
 if(ENABLE_USDT)
   add_subdirectory(usdt)
   list(APPEND bcc_common_libs usdt-static)
@@ -62,7 +68,7 @@ target_link_libraries(bcc-static ${bcc_common_libs} bcc-loader-static)
 install(TARGETS bcc-shared LIBRARY COMPONENT libbcc
   DESTINATION ${CMAKE_INSTALL_LIBDIR})
 install(FILES bpf_common.h bpf_module.h bcc_syms.h bcc_exception.h file_desc.h
-              libbpf.h perf_reader.h BPF.h BPFTable.h
+              libbpf.h perf_reader.h
               table_desc.h table_storage.h COMPONENT libbcc
   DESTINATION include/bcc)
 install(DIRECTORY compat/linux/ COMPONENT libbcc

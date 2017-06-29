@@ -11,6 +11,7 @@ enable_testing()
 
 include(cmake/GetGitRevisionDescription.cmake)
 include(cmake/version.cmake)
+include(CMakeDependentOption)
 include(GNUInstallDirs)
 include(CheckCXXCompilerFlag)
 include(cmake/FindCompilerFlag.cmake)
