@@ -24,7 +24,7 @@ if (LUAJIT_LIBRARIES AND LUAJIT)
 	set_target_properties(bcc-lua PROPERTIES LINKER_LANGUAGE C)
 	target_link_libraries(bcc-lua ${LUAJIT_LIBRARIES})
 	target_link_libraries(bcc-lua -Wl,--whole-archive bcc-static -Wl,--no-whole-archive)
-	target_link_libraries(bcc-lua -fno-pie)
+	target_link_libraries(bcc-lua -no-pie)
 
 	install(TARGETS bcc-lua RUNTIME DESTINATION bin)
 endif()
