@@ -1,0 +1,72 @@
+Demonstrations of flow_orifice, the Linux eBPF/bcc version.
+
+
+This traces what qdiscs flows are travesing on their travel down the network stack.
+For example:
+
+The -i option determines the interval in seconds one want to trace the network stack.
+
+# ./flow_orifice.py -i 5
+
+QDISC     CPU     FLOW
+********************************************************************************
+0
+--------------------------------------------------------------------------------
+          0
+
+                  TCP                  192.168.122.250:33785 192.168.122.1:41196  
+                  TCP                  192.168.122.250:36787 192.168.122.1:34906  
+                  TCP                  192.168.122.250:46533 192.168.122.1:34213  
+                  TCP                  192.168.122.250:34009 192.168.122.1:39924  
+                  TCP                  192.168.122.250:35761 192.168.122.1:39950  
+                  TCP                  192.168.122.250:40701 192.168.122.1:40906  
+                  TCP                  192.168.122.250:42601 192.168.122.1:43146  
+                  TCP                  192.168.122.250:45633 192.168.122.1:45892  
+                  TCP                  192.168.122.250:37915 192.168.122.1:32998  
+--------------------------------------------------------------------------------
+          1
+
+                  TCP                  192.168.122.250:36787 192.168.122.1:34906  
+                  TCP                  192.168.122.250:34009 192.168.122.1:39924  
+                  TCP                  192.168.122.250:35761 192.168.122.1:39950  
+                  TCP                  192.168.122.250:40701 192.168.122.1:40906  
+                  TCP                  192.168.122.250:42601 192.168.122.1:43146  
+                  TCP                  192.168.122.250:39477 192.168.122.1:43903  
+                  TCP                  192.168.122.250:46441 192.168.122.1:45566  
+                  TCP                  192.168.122.250:35739 192.168.122.1:46183  
+                  TCP                  192.168.122.250:38983 192.168.122.1:42120  
+                  TCP                  192.168.122.250:35545 192.168.122.1:33159  
+
+********************************************************************************
+1
+--------------------------------------------------------------------------------
+          0
+
+
+                  RAW                  0.0.0.0:1            0.0.0.0:0            
+
+--------------------------------------------------------------------------------
+          1
+
+                  UDP                  192.168.122.250:50305 212.18.3.18:123      
+
+
+In this ouptut the flows passing through qdisc 0 and 1 of a multiqueuing device
+are shown. The flows are driven down the stack by processes running on CPUs 0
+and 1. 
+
+USAGE message:
+
+# ./flow_orifice.py -h
+usage: flow_orifice.py [-h] [-i INTERVAL]
+
+Trace flows traversing down the network stack
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -i INTERVAL, --interval INTERVAL
+                        interval of run in seconds
+
+examples:
+    ./flow_orifice   -i 5      # trace flow for 5 seconds 
+

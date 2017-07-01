@@ -1,0 +1,59 @@
+.TH flow_orifice 8  "2017-04-30" "USER COMMANDS"
+.SH NAME
+flow_orifice \- Trace flows for their orifices during traversing the network stack. Uses Linux eBPF/bcc.
+.SH SYNOPSIS
+.B flow_orifice [\-h] [\-i]
+.SH DESCRIPTION
+This traces all flows regardless of their protocol, showing address, port,
+protocol, the qdisc index and the driving CPU behind the network stack
+traversal.  Overhead was of no concern of this tool, this means every packet is
+introspected. Therefore, use this with care on systems where network
+performance is of convern. This does trace every packet (like tcpdump(8) or a
+packet sniffer).
+
+This uses dynamic tracing of the kernel dev_hard_start_xmit() function, and
+will need to be updated to match kernel changes to these functions.
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH OPTIONS
+.TP
+\-h
+Print usage message.
+.TP
+\-i
+Interval of run in seconds.
+.SH EXAMPLES
+.TP
+Trace all flows for 5 seconds:
+#
+.B flow_orifice -i 5
+.TP
+.SH FIELDS
+.TP
+QDISC
+Qdisc(therefore queue of multiqueuing) used by flow.
+.TP
+CPU
+Network actions driving CPU.
+.TP
+FLOW
+Used to five tuple based flow specification.
+.SH OVERHEAD
+Can be tremendous depending on ongoing network traffic load on the system the introspection is to be performed. That is, be considerately careful in using this tool on production critical systems or alike.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Matthias Tafelmeier
+.SH SEE ALSO
+tcpretrans(8) tcpdump(8) 
