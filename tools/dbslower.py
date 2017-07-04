@@ -86,26 +86,6 @@ int mysql56_dispatch_start(struct pt_regs *ctx) {
     return 0;
 };
 
-int mysql56_dispatch_end(struct pt_regs *ctx) {
-    struct temp_t *tempp;
-    u64 pid = bpf_get_current_pid_tgid();
-    tempp = temp.lookup(&pid);
-    if (!tempp)
-        return 0;
-
-    u64 delta = bpf_ktime_get_ns() - tempp->timestamp;
-    if (delta >= """ + str(threshold_ns) + """) {
-        struct data_t data = {};
-        data.pid = pid >> 32;   // only process id
-        data.timestamp = tempp->timestamp;
-        data.duration = delta;
-        bpf_probe_read(&data.query, sizeof(data.query), tempp->query);
-        events.perf_submit(ctx, &data, sizeof(data));
-    }
-    temp.delete(&pid);
-    return 0;
-};
-
 int mysql57_dispatch_start(struct pt_regs *ctx) {
     u64 pid = bpf_get_current_pid_tgid();
     u64 command  = (u64) PT_REGS_PARM3(ctx);
@@ -124,7 +104,7 @@ int mysql57_dispatch_start(struct pt_regs *ctx) {
     return 0;
 };
 
-int mysql57_dispatch_end(struct pt_regs *ctx) {
+int dispatch_end(struct pt_regs *ctx) {
     struct temp_t *tempp;
     u64 pid = bpf_get_current_pid_tgid();
     tempp = temp.lookup(&pid);
@@ -143,6 +123,7 @@ int mysql57_dispatch_end(struct pt_regs *ctx) {
     temp.delete(&pid);
     return 0;
 };
+
 """
 
 program_udst = """
@@ -215,10 +196,10 @@ if args.path and not args.pids:
 
         if func_name.find("COM_DATA") >= 0:
             bpf.attach_uprobe(name=args.path, sym=func_name, fn_name="mysql57_dispatch_start")
-            bpf.attach_uretprobe(name=args.path, sym=func_name, fn_name="mysql57_dispatch_end")
+            bpf.attach_uretprobe(name=args.path, sym=func_name, fn_name="dispatch_end")
         else:
             bpf.attach_uprobe(name=args.path, sym=func_name, fn_name="mysql56_dispatch_start")
-            bpf.attach_uretprobe(name=args.path, sym=func_name, fn_name="mysql56_dispatch_end")
+            bpf.attach_uretprobe(name=args.path, sym=func_name, fn_name="dispatch_end")
     else:
         # Placeholder for PostrgeSQL
         # Look on functions initStringInfo, pgstat_report_activity, EndCommand, NullCommand
