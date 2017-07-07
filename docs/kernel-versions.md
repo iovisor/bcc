@@ -17,6 +17,8 @@ Constant blinding for JIT machines | 4.7 | [4f3446bb809f](https://git.kernel.org
 PowerPC64 | 4.8 | [156d0e290e96](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=156d0e290e969caba25f1851c52417c14d141b24)
 Constant blinding - PowerPC64 | 4.9 | [b7b7013cac55](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=b7b7013cac55d794940bd9cb7b7c55c9dececac4)
 Sparc64 | 4.12 | [7a12b5031c6b](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=7a12b5031c6b947cc13918237ae652b536243b76)
+MIPS | | [Patch](https://www.spinics.net/lists/netdev/msg440204.html) has been [applied](https://www.spinics.net/lists/netdev/msg440291.html)
+ARM32 | | [Work in progress](https://www.mail-archive.com/linux-kernel@vger.kernel.org/msg1405996.html)
 
 ## Main features
 
@@ -32,7 +34,7 @@ BPF attached to `kprobes` | 4.1 | [2541517c32be](https://git.kernel.org/cgit/lin
 Tail calls | 4.2 | [04fd61ab36ec](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=04fd61ab36ec065e194ab5e74ae34a5240d992bb)
 Non-root programs on sockets | 4.4 | [1be7f75d1668](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=1be7f75d1668d6296b80bf35dcf6762393530afc)
 Persistent maps and programs (virtual FS) | 4.4 | [b2197755b263](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=b2197755b2633e164a439682fb05a9b5ea48f706)
-`tc`'s `direct_action` (`da`) mode | 4.4 | [045efa82ff56](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=045efa82ff563cd4e656ca1c2e354fa5bf6bbda4)
+`tc`'s `direct-action` (`da`) mode | 4.4 | [045efa82ff56](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=045efa82ff563cd4e656ca1c2e354fa5bf6bbda4)
 `tc`'s `clsact` qdisc | 4.5 | [1f211a1b929c](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=1f211a1b929c804100e138c5d3d656992cfd5622)
 BPF attached to tracepoints | 4.7 | [98b5c2c65c29](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=98b5c2c65c2951772a8fc661f50d675e450e8bce)
 Direct packet access | 4.7 | [969bf05eb3ce](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=969bf05eb3cedd5a8d4b7c346a85c2ede87a6d6d)
@@ -46,6 +48,8 @@ Lightweight tunnel encapsulation | 4.10 | [3a0af8fd61f9](https://git.kernel.org/
 BPF program tag | 4.10 | [7bd509e311f4](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=7bd509e311f408f7a5132fcdde2069af65fa05ae)
 Tracepoints to debug BPF | 4.11 | [a67edbf4fb6d](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=a67edbf4fb6deadcfe57a04a134abed4a5ba3bb5)
 Testing / benchmarking BPF programs | 4.12 | [1cf1cae963c2](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=1cf1cae963c2e6032aebe1637e995bc2f5d330f4)
+BPF programs and maps IDs | 4.13 | [dc4bb0e23561](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=dc4bb0e2356149aee4cdae061936f3bbdd45595c)
+BPF support for `sock_ops` | 4.13 | [40304b2a1567](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=40304b2a1567fecc321f640ee4239556dd0f3ee0)
 
 ## Tables (_a.k.a._ Maps)
 
@@ -86,9 +90,9 @@ Broadcom `bnxt_en` driver | 4.11 | [c6d30e8391b8](https://git.kernel.org/cgit/li
 Intel `ixgbe*` drivers | 4.12 | [924708081629](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=9247080816297de4e31abb684939c0e53e3a8a67)
 Cavium `thunderx` driver | 4.12 | [05c773f52b96](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=05c773f52b96ef3fbc7d9bfa21caadc6247ef7a8)
 Generic XDP | 4.12 | [b5cdae3291f7](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=b5cdae3291f7be7a34e75affe4c0ec1f7f328b64)
+Intel `i40e` driver | 4.13 | [0c8493d90b6b](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?h=0c8493d90b6bb0f5c4fe9217db8f7203f24c0f28)
 Intel `e1000` driver | | [Not upstream yet](https://git.kernel.org/pub/scm/linux/kernel/git/ast/bpf.git/commit/?h=xdp&id=0afee87cfc800bf3317f4dc8847e6f36539b820c)
 Intel `e1000e` driver | | [Not planned for upstream at this time](https://github.com/adjavon/e1000e_xdp)
-Intel `i40e` driver | | [Not upstream yet](https://www.spinics.net/lists/netdev/msg409498.html)
 
 ## Helpers
 
@@ -125,7 +129,10 @@ Helper | Kernel version | Commit
 `BPF_FUNC_probe_read_str()` | 4.11 | [a5e8c07059d0](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=a5e8c07059d0f0b31737408711d44794928ac218)
 `BPF_FUNC_probe_write_user()` | 4.8 | [96ae52279594](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=96ae52279594470622ff0585621a13e96b700600)
 `BPF_FUNC_redirect()` | 4.4 | [27b29f63058d](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=27b29f63058d26c6c1742f1993338280d5a41dc6)
+`BPF_FUNC_set_hash()` | 4.13 | [8c4b4c7e9ff0](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=8c4b4c7e9ff0447995750d9329949fa082520269)
 `BPF_FUNC_set_hash_invalid()` | 4.9 | [7a4b28c6cc9f](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=7a4b28c6cc9ffac50f791b99cc7e46106436e5d8)
+`BPF_FUNC_setsockopt()` | 4.13 | [4b4c7e9ff044](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=8c4b4c7e9ff0447995750d9329949fa082520269)
+`BPF_FUNC_skb_adjust_room()` | 4.13 | [2be7e212d541](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=2be7e212d5419a400d051c84ca9fdd083e5aacac)
 `BPF_FUNC_skb_change_head()` | 4.10 | [3a0af8fd61f9](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=3a0af8fd61f90920f6fa04e4f1e9a6a73c1b4fd2)
 `BPF_FUNC_skb_change_proto()` | 4.8 | [6578171a7ff0](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=6578171a7ff0c31dc73258f93da7407510abf085)
 `BPF_FUNC_skb_change_tail()` | 4.9 | [5293efe62df8](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=5293efe62df81908f2e90c9820c7edcc8e61f5e9)
