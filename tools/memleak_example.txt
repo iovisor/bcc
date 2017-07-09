@@ -151,8 +151,8 @@ USAGE message:
 
 # ./memleak -h
 usage: memleak.py [-h] [-p PID] [-t] [-a] [-o OLDER] [-c COMMAND]
-                  [-s SAMPLE_RATE] [-T TOP] [-z MIN_SIZE] [-Z MAX_SIZE]
-                  [-O OBJ]
+                  [--combined-only] [-s SAMPLE_RATE] [-T TOP] [-z MIN_SIZE]
+                  [-Z MAX_SIZE] [-O OBJ]
                   [interval] [count]
 
 Trace outstanding memory allocations that weren't freed.
@@ -176,6 +176,7 @@ optional arguments:
                         milliseconds
   -c COMMAND, --command COMMAND
                         execute and trace the specified command
+  --combined-only       show combined allocation statistics only
   -s SAMPLE_RATE, --sample-rate SAMPLE_RATE
                         sample every N-th allocation to decrease the overhead
   -T TOP, --top TOP     display only this many top allocating stacks (by size)

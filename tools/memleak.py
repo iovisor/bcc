@@ -4,8 +4,8 @@
 #           memory leaks in user-mode processes and the kernel.
 #
 # USAGE: memleak [-h] [-p PID] [-t] [-a] [-o OLDER] [-c COMMAND]
-#                [-s SAMPLE_RATE] [-d STACK_DEPTH] [-T TOP] [-z MIN_SIZE]
-#                [-Z MAX_SIZE]
+#                [--combined-only] [-s SAMPLE_RATE] [-T TOP] [-z MIN_SIZE]
+#                [-Z MAX_SIZE] [-O OBJ]
 #                [interval] [count]
 #
 # Licensed under the Apache License, Version 2.0 (the "License")
@@ -84,6 +84,8 @@ parser.add_argument("-o", "--older", default=500, type=int,
         help="prune allocations younger than this age in milliseconds")
 parser.add_argument("-c", "--command",
         help="execute and trace the specified command")
+parser.add_argument("--combined-only", default=False, action="store_true",
+        help="show combined allocation statistics only")
 parser.add_argument("-s", "--sample-rate", default=1, type=int,
         help="sample every N-th allocation to decrease the overhead")
 parser.add_argument("-T", "--top", type=int, default=10,
@@ -127,10 +129,49 @@ struct alloc_info_t {
         int stack_id;
 };
 
+struct combined_alloc_info_t {
+        u64 total_size;
+        u64 number_of_allocs;
+};
+
 BPF_HASH(sizes, u64);
 BPF_HASH(allocs, u64, struct alloc_info_t);
 BPF_HASH(memptrs, u64, u64);
 BPF_STACK_TRACE(stack_traces, 1024)
+BPF_TABLE("hash", u64, struct combined_alloc_info_t, combined_allocs, 1024);
+
+static inline void update_statistics_add(u64 stack_id, u64 sz) {
+        struct combined_alloc_info_t *existing_cinfo;
+        struct combined_alloc_info_t cinfo = {0};
+
+        existing_cinfo = combined_allocs.lookup(&stack_id);
+        if (existing_cinfo != 0)
+                cinfo = *existing_cinfo;
+
+        cinfo.total_size += sz;
+        cinfo.number_of_allocs += 1;
+
+        combined_allocs.update(&stack_id, &cinfo);
+}
+
+static inline void update_statistics_del(u64 stack_id, u64 sz) {
+        struct combined_alloc_info_t *existing_cinfo;
+        struct combined_alloc_info_t cinfo = {0};
+
+        existing_cinfo = combined_allocs.lookup(&stack_id);
+        if (existing_cinfo != 0)
+                cinfo = *existing_cinfo;
+
+        if (sz >= cinfo.total_size)
+                cinfo.total_size = 0;
+        else
+                cinfo.total_size -= sz;
+
+        if (cinfo.number_of_allocs > 0)
+                cinfo.number_of_allocs -= 1;
+
+        combined_allocs.update(&stack_id, &cinfo);
+}
 
 static inline int gen_alloc_enter(struct pt_regs *ctx, size_t size) {
         SIZE_FILTER
@@ -163,6 +204,7 @@ static inline int gen_alloc_exit2(struct pt_regs *ctx, u64 address) {
         info.timestamp_ns = bpf_ktime_get_ns();
         info.stack_id = stack_traces.get_stackid(ctx, STACK_FLAGS);
         allocs.update(&address, &info);
+        update_statistics_add(info.stack_id, info.size);
 
         if (SHOULD_PRINT) {
                 bpf_trace_printk("alloc exited, size = %lu, result = %lx\\n",
@@ -182,6 +224,7 @@ static inline int gen_free_enter(struct pt_regs *ctx, void *address) {
                 return 0;
 
         allocs.delete(&addr);
+        update_statistics_del(info->stack_id, info->size);
 
         if (SHOULD_PRINT) {
                 bpf_trace_printk("free entered, address = %lx, size = %lu\\n",
@@ -421,6 +464,37 @@ def print_outstanding():
                 print("\t%d bytes in %d allocations from stack\n\t\t%s" %
                       (alloc.size, alloc.count, "\n\t\t".join(alloc.stack)))
 
+def print_outstanding_combined():
+        stack_traces = bpf_program["stack_traces"]
+        stacks = sorted(bpf_program["combined_allocs"].items(),
+                        key=lambda a: -a[1].total_size)
+        cnt = 1
+        entries = []
+        for stack_id, info in stacks:
+                try:
+                        trace = []
+                        for addr in stack_traces.walk(stack_id.value):
+                                sym = bpf_program.sym(addr, pid,
+                                                      show_module=True,
+                                                      show_offset=True)
+                                trace.append(sym)
+                        trace = "\n\t\t".join(trace)
+                except KeyError:
+                        trace = "stack information lost"
+
+                entry = ("\t%d bytes in %d allocations from stack\n\t\t%s" %
+                         (info.total_size, info.number_of_allocs, trace))
+                entries.append(entry)
+
+                cnt += 1
+                if cnt > top_stacks:
+                        break
+
+        print("[%s] Top %d stacks with outstanding allocations:" %
+              (datetime.now().strftime("%H:%M:%S"), top_stacks))
+
+        print('\n'.join(reversed(entries)))
+
 count_so_far = 0
 while True:
         if trace_all:
@@ -430,7 +504,10 @@ while True:
                         sleep(interval)
                 except KeyboardInterrupt:
                         exit()
-                print_outstanding()
+                if args.combined_only:
+                        print_outstanding_combined()
+                else:
+                        print_outstanding()
                 count_so_far += 1
                 if num_prints is not None and count_so_far >= num_prints:
                         exit()
