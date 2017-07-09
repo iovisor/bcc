@@ -63,7 +63,8 @@ EXAMPLES:
 description = """
 Trace outstanding memory allocations that weren't freed.
 Supports both user-mode allocations made with libc functions and kernel-mode
-allocations made with kmalloc/kfree.
+allocations made with kmalloc/kmem_cache_alloc/get_free_pages and corresponding
+memory release functions.
 """
 
 parser = argparse.ArgumentParser(description=description,
@@ -275,15 +276,51 @@ int pvalloc_enter(struct pt_regs *ctx, size_t size) {
 int pvalloc_exit(struct pt_regs *ctx) {
         return gen_alloc_exit(ctx);
 }
+"""
 
-int kmalloc_enter(struct pt_regs *ctx, size_t size, gfp_t flags) {
-        return gen_alloc_enter(ctx, size);
+bpf_source_kernel = """
+
+TRACEPOINT_PROBE(kmem, kmalloc) {
+        gen_alloc_enter((struct pt_regs *)args, args->bytes_alloc);
+        return gen_alloc_exit2((struct pt_regs *)args, (size_t)args->ptr);
 }
 
-int kmalloc_exit(struct pt_regs *ctx) {
-        return gen_alloc_exit(ctx);
+TRACEPOINT_PROBE(kmem, kmalloc_node) {
+        gen_alloc_enter((struct pt_regs *)args, args->bytes_alloc);
+        return gen_alloc_exit2((struct pt_regs *)args, (size_t)args->ptr);
+}
+
+TRACEPOINT_PROBE(kmem, kfree) {
+        return gen_free_enter((struct pt_regs *)args, (void *)args->ptr);
+}
+
+TRACEPOINT_PROBE(kmem, kmem_cache_alloc) {
+        gen_alloc_enter((struct pt_regs *)args, args->bytes_alloc);
+        return gen_alloc_exit2((struct pt_regs *)args, (size_t)args->ptr);
+}
+
+TRACEPOINT_PROBE(kmem, kmem_cache_alloc_node) {
+        gen_alloc_enter((struct pt_regs *)args, args->bytes_alloc);
+        return gen_alloc_exit2((struct pt_regs *)args, (size_t)args->ptr);
+}
+
+TRACEPOINT_PROBE(kmem, kmem_cache_free) {
+        return gen_free_enter((struct pt_regs *)args, (void *)args->ptr);
+}
+
+TRACEPOINT_PROBE(kmem, mm_page_alloc) {
+        gen_alloc_enter((struct pt_regs *)args, PAGE_SIZE << args->order);
+        return gen_alloc_exit2((struct pt_regs *)args, args->pfn);
+}
+
+TRACEPOINT_PROBE(kmem, mm_page_free) {
+        return gen_free_enter((struct pt_regs *)args, (void *)args->pfn);
 }
 """
+
+if kernel_trace:
+        bpf_source += bpf_source_kernel
+
 bpf_source = bpf_source.replace("SHOULD_PRINT", "1" if trace_all else "0")
 bpf_source = bpf_source.replace("SAMPLE_EVERY_N", str(sample_every_n))
 
@@ -336,10 +373,23 @@ if not kernel_trace:
                                   pid=pid)
 
 else:
-        print("Attaching to kmalloc and kfree, Ctrl+C to quit.")
-        bpf_program.attach_kprobe(event="__kmalloc", fn_name="kmalloc_enter")
-        bpf_program.attach_kretprobe(event="__kmalloc", fn_name="kmalloc_exit")
-        bpf_program.attach_kprobe(event="kfree", fn_name="free_enter")
+        print("Attaching to kernel allocators, Ctrl+C to quit.")
+
+        # No probe attaching here. Allocations are counted by attaching to
+        # tracepoints.
+        #
+        # Memory allocations in Linux kernel are not limited to malloc/free
+        # equivalents. It's also common to allocate a memory page or multiple
+        # pages. Page allocator have two interfaces, one working with page frame
+        # numbers (PFN), while other working with page addresses. It's possible
+        # to allocate pages with one kind of functions, and free them with
+        # another. Code in kernel can easy convert PFNs to addresses and back,
+        # but it's hard to do the same in eBPF kprobe without fragile hacks.
+        #
+        # Fortunately, Linux exposes tracepoints for memory allocations, which
+        # can be instrumented by eBPF programs. Tracepoint for page allocations
+        # gives access to PFNs for both allocator interfaces. So there is no
+        # need to guess which allocation corresponds to which free.
 
 def print_outstanding():
         print("[%s] Top %d stacks with outstanding allocations:" %

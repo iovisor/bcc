@@ -12,13 +12,18 @@ of which call stacks performed allocations that weren't subsequently freed.
 When tracing a specific process, memleak instruments a list of allocation
 functions from libc, specifically: malloc, calloc, realloc, posix_memalign,
 valloc, memalign, pvalloc, aligned_alloc, and free.
-When tracing all processes, memleak instruments kmalloc and kfree.
+When tracing all processes, memleak instruments kmalloc/kfree,
+kmem_cache_alloc/kmem_cache_free, and also page allocations made by
+get_free_pages/free_pages.
 
 memleak may introduce significant overhead when tracing processes that allocate
 and free many blocks very quickly. See the OVERHEAD section below.
 
 This tool only works on Linux 4.6+. Stack traces are obtained using the new BPF_STACK_TRACE` APIs.
 For kernels older than 4.6, see the version under tools/old.
+Kernel memory allocations are intercepted through tracepoints, which are
+available on Linux 4.7+.
+
 .SH REQUIREMENTS
 CONFIG_BPF and bcc.
 .SH OPTIONS

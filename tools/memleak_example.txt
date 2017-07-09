@@ -60,11 +60,11 @@ Attaching to pid 5193, Ctrl+C to quit.
 
 
 When using the -p switch, memleak traces the libc allocations of a particular
-process. Without this switch, kernel allocations (kmalloc) are traced instead.
+process. Without this switch, kernel allocations are traced instead.
 For example:
 
 # ./memleak
-Attaching to kmalloc and kfree, Ctrl+C to quit.
+Attaching to kernel allocators, Ctrl+C to quit.
 ...
         248 bytes in 4 allocations from stack
                  bpf_prog_load [kernel]
@@ -157,7 +157,8 @@ usage: memleak.py [-h] [-p PID] [-t] [-a] [-o OLDER] [-c COMMAND]
 
 Trace outstanding memory allocations that weren't freed.
 Supports both user-mode allocations made with libc functions and kernel-mode
-allocations made with kmalloc/kfree.
+allocations made with kmalloc/kmem_cache_alloc/get_free_pages and corresponding
+memory release functions.
 
 positional arguments:
   interval              interval in seconds to print outstanding allocations
