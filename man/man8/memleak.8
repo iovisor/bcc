@@ -9,7 +9,9 @@ memleak traces and matches memory allocation and deallocation requests, and
 collects call stacks for each allocation. memleak can then print a summary
 of which call stacks performed allocations that weren't subsequently freed.
 
-When tracing a specific process, memleak instruments malloc and free from libc.
+When tracing a specific process, memleak instruments a list of allocation
+functions from libc, specifically: malloc, calloc, realloc, posix_memalign,
+valloc, memalign, pvalloc, aligned_alloc, and free.
 When tracing all processes, memleak instruments kmalloc and kfree.
 
 memleak may introduce significant overhead when tracing processes that allocate
@@ -25,7 +27,7 @@ CONFIG_BPF and bcc.
 Print usage message.
 .TP
 \-p PID
-Trace this process ID only (filtered in-kernel). This traces malloc and free from libc.
+Trace this process ID only (filtered in-kernel). This traces libc allocator.
 .TP
 \-t
 Print a trace of all allocation and free requests and results.
@@ -38,7 +40,7 @@ Print only allocations older than OLDER milliseconds. Useful to remove false pos
 The default value is 500 milliseconds.
 .TP
 \-c COMMAND
-Run the specified command and trace its allocations only. This traces malloc and free from libc.
+Run the specified command and trace its allocations only. This traces libc allocator.
 .TP
 \-s SAMPLE_RATE
 Record roughly every SAMPLE_RATE-th allocation to reduce overhead.
@@ -54,7 +56,7 @@ Capture only allocations that are larger than or equal to MIN_SIZE bytes.
 Capture only allocations that are smaller than or equal to MAX_SIZE bytes.
 .TP
 \-O OBJ
-Attach to malloc and free in specified object instead of resolving libc. Ignored when kernel allocations are profiled.
+Attach to allocation functions in specified object instead of resolving libc. Ignored when kernel allocations are profiled.
 .TP
 INTERVAL
 Print a summary of oustanding allocations and their call stacks every INTERVAL seconds.
