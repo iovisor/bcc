@@ -11,6 +11,7 @@ from unittest import main, TestCase
 from subprocess import Popen, PIPE
 from tempfile import NamedTemporaryFile
 import ctypes as ct
+import inspect
 import os
 import signal
 
@@ -19,18 +20,36 @@ class TestUDST(TestCase):
         # Application, minimum, to define three trace points
         app_text = b"""
 #include <unistd.h>
-#include <folly/tracing/StaticTracepoint.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <string.h>
+#include "folly/tracing/StaticTracepoint.h"
 
 int main() {
   char s[100];
   int i, a = 200, b = 40;
   for (i = 0; i < 100; i++) s[i] = (i & 7) + (i & 6);
+  uint64_t j = 0;
+  char s1[64];
+  const char* str = "str";
+  size_t len = strlen(str);
   while (1) {
     FOLLY_SDT(test, probe_point_1, s[7], b);
     FOLLY_SDT(test, probe_point_3, a, b);
     FOLLY_SDT(test, probe_point_1, s[4], a);
     FOLLY_SDT(test, probe_point_2, 5, s[10]);
     FOLLY_SDT(test, probe_point_3, s[4], s[7]);
+
+    memset(&s1, '\0', sizeof(s1));
+    strncpy(s1, str, len);
+    snprintf(s1 + len, sizeof(s1) - len, "%d", j);
+    FOLLY_SDT(test, probe_point_4, j++, &s1);
+
+    memset(&s1, '\0', sizeof(s1));
+    strncpy(s1, str, len);
+    snprintf(s1 + len, sizeof(s1) - len, "%d", j);
+    FOLLY_SDT(test, probe_point_5, &s1, j++);
+
     sleep(1);
   }
   return 1;
@@ -38,6 +57,7 @@ int main() {
 """
         # BPF program
         self.bpf_text = """
+#include <linux/blkdev.h>
 #include <uapi/linux/ptrace.h>
 
 struct probe_result_t1 {
@@ -55,10 +75,23 @@ struct probe_result_t3 {
   int v2;
 };
 
+struct probe_result_t4 {
+  u64  v1;
+  char v2[8];
+};
+
+struct probe_result_t5 {
+  char v1[8];
+  u64  v2;
+};
+
 BPF_PERF_OUTPUT(event1);
 BPF_PERF_OUTPUT(event2);
 BPF_PERF_OUTPUT(event3);
-int do_trace(struct pt_regs *ctx) {
+BPF_PERF_OUTPUT(event4);
+BPF_PERF_OUTPUT(event5);
+
+int do_trace1(struct pt_regs *ctx) {
     struct probe_result_t1 result = {};
     bpf_usdt_readarg(1, ctx, &result.v1);
     bpf_usdt_readarg(2, ctx, &result.v2);
@@ -79,12 +112,26 @@ int do_trace3(struct pt_regs *ctx) {
     event3.perf_submit(ctx, &result, sizeof(result));
     return 0;
 }
+int do_trace4(struct pt_regs *ctx) {
+    struct probe_result_t4 result = {};
+    bpf_usdt_readarg(1, ctx, &result.v1);
+    bpf_usdt_readarg_p(2, ctx, &result.v2, sizeof(result.v2));
+    event4.perf_submit(ctx, &result, sizeof(result));
+    return 0;
+}
+int do_trace5(struct pt_regs *ctx) {
+    struct probe_result_t5 result = {};
+    bpf_usdt_readarg_p(1, ctx, &result.v1, sizeof(result.v1));
+    bpf_usdt_readarg(2, ctx, &result.v2);
+    event5.perf_submit(ctx, &result, sizeof(result));
+    return 0;
+}
 """
 
         # Compile and run the application
         self.ftemp = NamedTemporaryFile(delete=False)
         self.ftemp.close()
-        comp = Popen(["gcc", "-I", "%s/include" % os.getcwd(),
+        comp = Popen(["gcc", "-I", "%s/include" % os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))),
                       "-x", "c", "-o", self.ftemp.name, "-"],
                      stdin=PIPE)
         comp.stdin.write(app_text)
@@ -95,10 +142,12 @@ int do_trace3(struct pt_regs *ctx) {
     def test_attach1(self):
         # enable USDT probe from given PID and verifier generated BPF programs
         u = USDT(pid=int(self.app.pid))
-        u.enable_probe(probe="probe_point_1", fn_name="do_trace")
+        u.enable_probe(probe="probe_point_1", fn_name="do_trace1")
         u.enable_probe(probe="probe_point_2", fn_name="do_trace2")
         u.enable_probe(probe="probe_point_3", fn_name="do_trace3")
-        b = BPF(text=self.bpf_text, usdt_contexts=[u])
+        u.enable_probe(probe="probe_point_4", fn_name="do_trace4")
+        u.enable_probe(probe="probe_point_5", fn_name="do_trace5")
+        b = BPF(text=self.bpf_text, usdt_contexts=[u], debug=4)
 
         # Event states for each event:
         # 0 - probe not caught, 1 - probe caught with correct value,
@@ -120,6 +169,14 @@ int do_trace3(struct pt_regs *ctx) {
             _fields_ = [("v1", ct.c_int),
                         ("v2", ct.c_int)]
 
+        class Data4(ct.Structure):
+            _fields_ = [("v1", ct.c_ulonglong),
+                        ("v2", ct.c_char * 64)]
+
+        class Data5(ct.Structure):
+            _fields_ = [("v1", ct.c_char * 64),
+                        ("v2", ct.c_ulonglong)]
+
         def check_event_val(event, event_state, v1, v2, v3, v4):
             if ((event.v1 == v1 and event.v2 == v2) or (event.v1 == v3 and event.v2 == v4)):
                 if (event_state == 0 or event_state == 1):
@@ -139,10 +196,20 @@ int do_trace3(struct pt_regs *ctx) {
             event = ct.cast(data, ct.POINTER(Data3)).contents
             self.evt_st_3 = check_event_val(event, self.evt_st_3, 200, 40, 8, 13)
 
+        def print_event4(cpu, data, size):
+            event = ct.cast(data, ct.POINTER(Data4)).contents
+            print("%s" % event.v2)
+
+        def print_event5(cpu, data, size):
+            event = ct.cast(data, ct.POINTER(Data5)).contents
+            print("%s" % event.v1)
+
         # loop with callback to print_event
         b["event1"].open_perf_buffer(print_event1)
         b["event2"].open_perf_buffer(print_event2)
         b["event3"].open_perf_buffer(print_event3)
+        b["event4"].open_perf_buffer(print_event4)
+        b["event5"].open_perf_buffer(print_event5)
 
         # three iterations to make sure we get some probes and have time to process them
         for i in range(3):
