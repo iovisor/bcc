@@ -136,15 +136,15 @@ class Probe(object):
                         self.library = ""       # kernel
                         self.function = ""      # from TRACEPOINT_PROBE
                 elif self.probe_type == "u":
-                        self.library = parts[1]
-                        self.usdt_name = parts[2]
+                        self.library = ':'.join(parts[1:-1])
+                        self.usdt_name = parts[-1]
                         self.function = ""      # no function, just address
                         # We will discover the USDT provider by matching on
                         # the USDT name in the specified library
                         self._find_usdt_probe()
                 else:
-                        self.library = parts[1]
-                        self.function = parts[2]
+                        self.library = ':'.join(parts[1:-1])
+                        self.function = parts[-1]
 
         def _find_usdt_probe(self):
                 target = Probe.pid if Probe.pid and Probe.pid != -1 \
