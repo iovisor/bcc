@@ -7,7 +7,7 @@ of which call stacks performed allocations that weren't subsequently freed.
 For example:
 
 # ./memleak -p $(pidof allocs)
-Attaching to malloc and free in pid 5193, Ctrl+C to quit.
+Attaching to pid 5193, Ctrl+C to quit.
 [11:16:33] Top 2 stacks with outstanding allocations:
         80 bytes in 5 allocations from stack
                  main+0x6d [allocs]
@@ -33,7 +33,7 @@ stack is allocating various sizes and you want to confirm which sizes are
 prevalent. Use the -a switch:
 
 # ./memleak -p $(pidof allocs) -a
-Attaching to malloc and free in pid 5193, Ctrl+C to quit.
+Attaching to pid 5193, Ctrl+C to quit.
 [11:16:33] Top 2 stacks with outstanding allocations:
         addr = 948cd0 size = 16
         addr = 948d10 size = 16
@@ -59,12 +59,12 @@ Attaching to malloc and free in pid 5193, Ctrl+C to quit.
                  __libc_start_main+0xf0 [libc-2.21.so]
 
 
-When using the -p switch, memleak traces the allocations of a particular
-process. Without this switch, kernel allocations (kmalloc) are traced instead.
+When using the -p switch, memleak traces the libc allocations of a particular
+process. Without this switch, kernel allocations are traced instead.
 For example:
 
 # ./memleak
-Attaching to kmalloc and kfree, Ctrl+C to quit.
+Attaching to kernel allocators, Ctrl+C to quit.
 ...
         248 bytes in 4 allocations from stack
                  bpf_prog_load [kernel]
@@ -126,7 +126,7 @@ roughly 10% of the allocations and print the outstanding allocations every 5
 seconds, 3 times before quitting:
 
 # ./memleak -p $(pidof allocs) -s 10 5 3
-Attaching to malloc and free in pid 2614, Ctrl+C to quit.
+Attaching to pid 2614, Ctrl+C to quit.
 [11:16:33] Top 2 stacks with outstanding allocations:
         16 bytes in 1 allocations from stack
                  main+0x6d [allocs]
@@ -151,13 +151,14 @@ USAGE message:
 
 # ./memleak -h
 usage: memleak.py [-h] [-p PID] [-t] [-a] [-o OLDER] [-c COMMAND]
-                  [-s SAMPLE_RATE] [-T TOP] [-z MIN_SIZE] [-Z MAX_SIZE]
-                  [-O OBJ]
+                  [--combined-only] [-s SAMPLE_RATE] [-T TOP] [-z MIN_SIZE]
+                  [-Z MAX_SIZE] [-O OBJ]
                   [interval] [count]
 
 Trace outstanding memory allocations that weren't freed.
-Supports both user-mode allocations made with malloc/free and kernel-mode
-allocations made with kmalloc/kfree.
+Supports both user-mode allocations made with libc functions and kernel-mode
+allocations made with kmalloc/kmem_cache_alloc/get_free_pages and corresponding
+memory release functions.
 
 positional arguments:
   interval              interval in seconds to print outstanding allocations
@@ -175,6 +176,7 @@ optional arguments:
                         milliseconds
   -c COMMAND, --command COMMAND
                         execute and trace the specified command
+  --combined-only       show combined allocation statistics only
   -s SAMPLE_RATE, --sample-rate SAMPLE_RATE
                         sample every N-th allocation to decrease the overhead
   -T TOP, --top TOP     display only this many top allocating stacks (by size)
@@ -182,7 +184,7 @@ optional arguments:
                         capture only allocations larger than this size
   -Z MAX_SIZE, --max-size MAX_SIZE
                         capture only allocations smaller than this size
-  -O OBJ, --obj OBJ     attach to malloc & free in the specified object
+  -O OBJ, --obj OBJ     attach to allocator functions in the specified object
 
 EXAMPLES:
 
@@ -190,7 +192,7 @@ EXAMPLES:
         Trace allocations and display a summary of "leaked" (outstanding)
         allocations every 5 seconds
 ./memleak -p $(pidof allocs) -t
-        Trace allocations and display each individual call to malloc/free
+        Trace allocations and display each individual allocator function call
 ./memleak -ap $(pidof allocs) 10
         Trace allocations and display allocated addresses, sizes, and stacks
         every 10 seconds for outstanding allocations

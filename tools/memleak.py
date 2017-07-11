@@ -4,8 +4,8 @@
 #           memory leaks in user-mode processes and the kernel.
 #
 # USAGE: memleak [-h] [-p PID] [-t] [-a] [-o OLDER] [-c COMMAND]
-#                [-s SAMPLE_RATE] [-d STACK_DEPTH] [-T TOP] [-z MIN_SIZE]
-#                [-Z MAX_SIZE]
+#                [--combined-only] [-s SAMPLE_RATE] [-T TOP] [-z MIN_SIZE]
+#                [-Z MAX_SIZE] [-O OBJ]
 #                [interval] [count]
 #
 # Licensed under the Apache License, Version 2.0 (the "License")
@@ -44,7 +44,7 @@ EXAMPLES:
         Trace allocations and display a summary of "leaked" (outstanding)
         allocations every 5 seconds
 ./memleak -p $(pidof allocs) -t
-        Trace allocations and display each individual call to malloc/free
+        Trace allocations and display each individual allocator function call
 ./memleak -ap $(pidof allocs) 10
         Trace allocations and display allocated addresses, sizes, and stacks
         every 10 seconds for outstanding allocations
@@ -62,8 +62,9 @@ EXAMPLES:
 
 description = """
 Trace outstanding memory allocations that weren't freed.
-Supports both user-mode allocations made with malloc/free and kernel-mode
-allocations made with kmalloc/kfree.
+Supports both user-mode allocations made with libc functions and kernel-mode
+allocations made with kmalloc/kmem_cache_alloc/get_free_pages and corresponding
+memory release functions.
 """
 
 parser = argparse.ArgumentParser(description=description,
@@ -83,6 +84,8 @@ parser.add_argument("-o", "--older", default=500, type=int,
         help="prune allocations younger than this age in milliseconds")
 parser.add_argument("-c", "--command",
         help="execute and trace the specified command")
+parser.add_argument("--combined-only", default=False, action="store_true",
+        help="show combined allocation statistics only")
 parser.add_argument("-s", "--sample-rate", default=1, type=int,
         help="sample every N-th allocation to decrease the overhead")
 parser.add_argument("-T", "--top", type=int, default=10,
@@ -92,7 +95,7 @@ parser.add_argument("-z", "--min-size", type=int,
 parser.add_argument("-Z", "--max-size", type=int,
         help="capture only allocations smaller than this size")
 parser.add_argument("-O", "--obj", type=str, default="c",
-        help="attach to malloc & free in the specified object")
+        help="attach to allocator functions in the specified object")
 
 args = parser.parse_args()
 
@@ -126,12 +129,51 @@ struct alloc_info_t {
         int stack_id;
 };
 
-BPF_HASH(sizes, u64);
-BPF_HASH(allocs, u64, struct alloc_info_t);
-BPF_STACK_TRACE(stack_traces, 1024)
+struct combined_alloc_info_t {
+        u64 total_size;
+        u64 number_of_allocs;
+};
 
-int alloc_enter(struct pt_regs *ctx, size_t size)
-{
+BPF_HASH(sizes, u64);
+BPF_TABLE("hash", u64, struct alloc_info_t, allocs, 1000000);
+BPF_HASH(memptrs, u64, u64);
+BPF_STACK_TRACE(stack_traces, 10240)
+BPF_TABLE("hash", u64, struct combined_alloc_info_t, combined_allocs, 10240);
+
+static inline void update_statistics_add(u64 stack_id, u64 sz) {
+        struct combined_alloc_info_t *existing_cinfo;
+        struct combined_alloc_info_t cinfo = {0};
+
+        existing_cinfo = combined_allocs.lookup(&stack_id);
+        if (existing_cinfo != 0)
+                cinfo = *existing_cinfo;
+
+        cinfo.total_size += sz;
+        cinfo.number_of_allocs += 1;
+
+        combined_allocs.update(&stack_id, &cinfo);
+}
+
+static inline void update_statistics_del(u64 stack_id, u64 sz) {
+        struct combined_alloc_info_t *existing_cinfo;
+        struct combined_alloc_info_t cinfo = {0};
+
+        existing_cinfo = combined_allocs.lookup(&stack_id);
+        if (existing_cinfo != 0)
+                cinfo = *existing_cinfo;
+
+        if (sz >= cinfo.total_size)
+                cinfo.total_size = 0;
+        else
+                cinfo.total_size -= sz;
+
+        if (cinfo.number_of_allocs > 0)
+                cinfo.number_of_allocs -= 1;
+
+        combined_allocs.update(&stack_id, &cinfo);
+}
+
+static inline int gen_alloc_enter(struct pt_regs *ctx, size_t size) {
         SIZE_FILTER
         if (SAMPLE_EVERY_N > 1) {
                 u64 ts = bpf_ktime_get_ns();
@@ -148,9 +190,7 @@ int alloc_enter(struct pt_regs *ctx, size_t size)
         return 0;
 }
 
-int alloc_exit(struct pt_regs *ctx)
-{
-        u64 address = PT_REGS_RC(ctx);
+static inline int gen_alloc_exit2(struct pt_regs *ctx, u64 address) {
         u64 pid = bpf_get_current_pid_tgid();
         u64* size64 = sizes.lookup(&pid);
         struct alloc_info_t info = {0};
@@ -164,6 +204,7 @@ int alloc_exit(struct pt_regs *ctx)
         info.timestamp_ns = bpf_ktime_get_ns();
         info.stack_id = stack_traces.get_stackid(ctx, STACK_FLAGS);
         allocs.update(&address, &info);
+        update_statistics_add(info.stack_id, info.size);
 
         if (SHOULD_PRINT) {
                 bpf_trace_printk("alloc exited, size = %lu, result = %lx\\n",
@@ -172,14 +213,18 @@ int alloc_exit(struct pt_regs *ctx)
         return 0;
 }
 
-int free_enter(struct pt_regs *ctx, void *address)
-{
+static inline int gen_alloc_exit(struct pt_regs *ctx) {
+        return gen_alloc_exit2(ctx, PT_REGS_RC(ctx));
+}
+
+static inline int gen_free_enter(struct pt_regs *ctx, void *address) {
         u64 addr = (u64)address;
         struct alloc_info_t *info = allocs.lookup(&addr);
         if (info == 0)
                 return 0;
 
         allocs.delete(&addr);
+        update_statistics_del(info->stack_id, info->size);
 
         if (SHOULD_PRINT) {
                 bpf_trace_printk("free entered, address = %lx, size = %lu\\n",
@@ -187,7 +232,138 @@ int free_enter(struct pt_regs *ctx, void *address)
         }
         return 0;
 }
+
+int malloc_enter(struct pt_regs *ctx, size_t size) {
+        return gen_alloc_enter(ctx, size);
+}
+
+int malloc_exit(struct pt_regs *ctx) {
+        return gen_alloc_exit(ctx);
+}
+
+int free_enter(struct pt_regs *ctx, void *address) {
+        return gen_free_enter(ctx, address);
+}
+
+int calloc_enter(struct pt_regs *ctx, size_t nmemb, size_t size) {
+        return gen_alloc_enter(ctx, nmemb * size);
+}
+
+int calloc_exit(struct pt_regs *ctx) {
+        return gen_alloc_exit(ctx);
+}
+
+int realloc_enter(struct pt_regs *ctx, void *ptr, size_t size) {
+        gen_free_enter(ctx, ptr);
+        return gen_alloc_enter(ctx, size);
+}
+
+int realloc_exit(struct pt_regs *ctx) {
+        return gen_alloc_exit(ctx);
+}
+
+int posix_memalign_enter(struct pt_regs *ctx, void **memptr, size_t alignment,
+                         size_t size) {
+        u64 memptr64 = (u64)(size_t)memptr;
+        u64 pid = bpf_get_current_pid_tgid();
+
+        memptrs.update(&pid, &memptr64);
+        return gen_alloc_enter(ctx, size);
+}
+
+int posix_memalign_exit(struct pt_regs *ctx) {
+        u64 pid = bpf_get_current_pid_tgid();
+        u64 *memptr64 = memptrs.lookup(&pid);
+        void *addr;
+
+        if (memptr64 == 0)
+                return 0;
+
+        memptrs.delete(&pid);
+
+        if (bpf_probe_read(&addr, sizeof(void*), (void*)(size_t)*memptr64) != 0)
+                return 0;
+
+        u64 addr64 = (u64)(size_t)addr;
+        return gen_alloc_exit2(ctx, addr64);
+}
+
+int aligned_alloc_enter(struct pt_regs *ctx, size_t alignment, size_t size) {
+        return gen_alloc_enter(ctx, size);
+}
+
+int aligned_alloc_exit(struct pt_regs *ctx) {
+        return gen_alloc_exit(ctx);
+}
+
+int valloc_enter(struct pt_regs *ctx, size_t size) {
+        return gen_alloc_enter(ctx, size);
+}
+
+int valloc_exit(struct pt_regs *ctx) {
+        return gen_alloc_exit(ctx);
+}
+
+int memalign_enter(struct pt_regs *ctx, size_t alignment, size_t size) {
+        return gen_alloc_enter(ctx, size);
+}
+
+int memalign_exit(struct pt_regs *ctx) {
+        return gen_alloc_exit(ctx);
+}
+
+int pvalloc_enter(struct pt_regs *ctx, size_t size) {
+        return gen_alloc_enter(ctx, size);
+}
+
+int pvalloc_exit(struct pt_regs *ctx) {
+        return gen_alloc_exit(ctx);
+}
 """
+
+bpf_source_kernel = """
+
+TRACEPOINT_PROBE(kmem, kmalloc) {
+        gen_alloc_enter((struct pt_regs *)args, args->bytes_alloc);
+        return gen_alloc_exit2((struct pt_regs *)args, (size_t)args->ptr);
+}
+
+TRACEPOINT_PROBE(kmem, kmalloc_node) {
+        gen_alloc_enter((struct pt_regs *)args, args->bytes_alloc);
+        return gen_alloc_exit2((struct pt_regs *)args, (size_t)args->ptr);
+}
+
+TRACEPOINT_PROBE(kmem, kfree) {
+        return gen_free_enter((struct pt_regs *)args, (void *)args->ptr);
+}
+
+TRACEPOINT_PROBE(kmem, kmem_cache_alloc) {
+        gen_alloc_enter((struct pt_regs *)args, args->bytes_alloc);
+        return gen_alloc_exit2((struct pt_regs *)args, (size_t)args->ptr);
+}
+
+TRACEPOINT_PROBE(kmem, kmem_cache_alloc_node) {
+        gen_alloc_enter((struct pt_regs *)args, args->bytes_alloc);
+        return gen_alloc_exit2((struct pt_regs *)args, (size_t)args->ptr);
+}
+
+TRACEPOINT_PROBE(kmem, kmem_cache_free) {
+        return gen_free_enter((struct pt_regs *)args, (void *)args->ptr);
+}
+
+TRACEPOINT_PROBE(kmem, mm_page_alloc) {
+        gen_alloc_enter((struct pt_regs *)args, PAGE_SIZE << args->order);
+        return gen_alloc_exit2((struct pt_regs *)args, args->pfn);
+}
+
+TRACEPOINT_PROBE(kmem, mm_page_free) {
+        return gen_free_enter((struct pt_regs *)args, (void *)args->pfn);
+}
+"""
+
+if kernel_trace:
+        bpf_source += bpf_source_kernel
+
 bpf_source = bpf_source.replace("SHOULD_PRINT", "1" if trace_all else "0")
 bpf_source = bpf_source.replace("SAMPLE_EVERY_N", str(sample_every_n))
 
@@ -209,18 +385,54 @@ bpf_source = bpf_source.replace("STACK_FLAGS", stack_flags)
 bpf_program = BPF(text=bpf_source)
 
 if not kernel_trace:
-        print("Attaching to malloc and free in pid %d, Ctrl+C to quit." % pid)
-        bpf_program.attach_uprobe(name=obj, sym="malloc",
-                                  fn_name="alloc_enter", pid=pid)
-        bpf_program.attach_uretprobe(name=obj, sym="malloc",
-                                     fn_name="alloc_exit", pid=pid)
-        bpf_program.attach_uprobe(name=obj, sym="free",
-                                  fn_name="free_enter", pid=pid)
+        print("Attaching to pid %d, Ctrl+C to quit." % pid)
+
+        def attach_probes(sym, fn_prefix=None, can_fail=False):
+                if fn_prefix is None:
+                        fn_prefix = sym
+
+                try:
+                        bpf_program.attach_uprobe(name=obj, sym=sym,
+                                                  fn_name=fn_prefix+"_enter",
+                                                  pid=pid)
+                        bpf_program.attach_uretprobe(name=obj, sym=sym,
+                                                     fn_name=fn_prefix+"_exit",
+                                                     pid=pid)
+                except Exception:
+                        if can_fail:
+                                return
+                        else:
+                                raise
+
+        attach_probes("malloc")
+        attach_probes("calloc")
+        attach_probes("realloc")
+        attach_probes("posix_memalign")
+        attach_probes("valloc")
+        attach_probes("memalign")
+        attach_probes("pvalloc")
+        attach_probes("aligned_alloc", can_fail=True) # added in C11
+        bpf_program.attach_uprobe(name=obj, sym="free", fn_name="free_enter",
+                                  pid=pid)
+
 else:
-        print("Attaching to kmalloc and kfree, Ctrl+C to quit.")
-        bpf_program.attach_kprobe(event="__kmalloc", fn_name="alloc_enter")
-        bpf_program.attach_kretprobe(event="__kmalloc", fn_name="alloc_exit")
-        bpf_program.attach_kprobe(event="kfree", fn_name="free_enter")
+        print("Attaching to kernel allocators, Ctrl+C to quit.")
+
+        # No probe attaching here. Allocations are counted by attaching to
+        # tracepoints.
+        #
+        # Memory allocations in Linux kernel are not limited to malloc/free
+        # equivalents. It's also common to allocate a memory page or multiple
+        # pages. Page allocator have two interfaces, one working with page frame
+        # numbers (PFN), while other working with page addresses. It's possible
+        # to allocate pages with one kind of functions, and free them with
+        # another. Code in kernel can easy convert PFNs to addresses and back,
+        # but it's hard to do the same in eBPF kprobe without fragile hacks.
+        #
+        # Fortunately, Linux exposes tracepoints for memory allocations, which
+        # can be instrumented by eBPF programs. Tracepoint for page allocations
+        # gives access to PFNs for both allocator interfaces. So there is no
+        # need to guess which allocation corresponds to which free.
 
 def print_outstanding():
         print("[%s] Top %d stacks with outstanding allocations:" %
@@ -252,6 +464,37 @@ def print_outstanding():
                 print("\t%d bytes in %d allocations from stack\n\t\t%s" %
                       (alloc.size, alloc.count, "\n\t\t".join(alloc.stack)))
 
+def print_outstanding_combined():
+        stack_traces = bpf_program["stack_traces"]
+        stacks = sorted(bpf_program["combined_allocs"].items(),
+                        key=lambda a: -a[1].total_size)
+        cnt = 1
+        entries = []
+        for stack_id, info in stacks:
+                try:
+                        trace = []
+                        for addr in stack_traces.walk(stack_id.value):
+                                sym = bpf_program.sym(addr, pid,
+                                                      show_module=True,
+                                                      show_offset=True)
+                                trace.append(sym)
+                        trace = "\n\t\t".join(trace)
+                except KeyError:
+                        trace = "stack information lost"
+
+                entry = ("\t%d bytes in %d allocations from stack\n\t\t%s" %
+                         (info.total_size, info.number_of_allocs, trace))
+                entries.append(entry)
+
+                cnt += 1
+                if cnt > top_stacks:
+                        break
+
+        print("[%s] Top %d stacks with outstanding allocations:" %
+              (datetime.now().strftime("%H:%M:%S"), top_stacks))
+
+        print('\n'.join(reversed(entries)))
+
 count_so_far = 0
 while True:
         if trace_all:
@@ -261,7 +504,10 @@ while True:
                         sleep(interval)
                 except KeyboardInterrupt:
                         exit()
-                print_outstanding()
+                if args.combined_only:
+                        print_outstanding_combined()
+                else:
+                        print_outstanding()
                 count_so_far += 1
                 if num_prints is not None and count_so_far >= num_prints:
                         exit()
