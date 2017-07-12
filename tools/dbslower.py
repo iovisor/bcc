@@ -60,7 +60,7 @@ if args.path and not args.pids:
         symbols = BPF.get_user_functions_and_addresses(args.path, "\\w+dispatch_command\\w+")
 
         if len(symbols) == 0:
-            print("Cant find function 'dispatch_command' in %s" % (args.path))
+            print("Can't find function 'dispatch_command' in %s" % (args.path))
             exit(1)
         
         (mysql_func_name, addr) = symbols[0]
