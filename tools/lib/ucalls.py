@@ -58,6 +58,7 @@ if not language:
 # We assume that the entry and return probes have the same arguments. This is
 # the case for Java, Python, Ruby, and PHP. If there's a language where it's
 # not the case, we will need to build a custom correlator from entry to exit.
+extra_message = ""
 if language == "java":
     # TODO for JVM entries, we actually have the real length of the class
     #      and method strings in arg3 and arg5 respectively, so we can insert
@@ -66,6 +67,7 @@ if language == "java":
     return_probe = "method__return"
     read_class = "bpf_usdt_readarg(2, ctx, &clazz);"
     read_method = "bpf_usdt_readarg(4, ctx, &method);"
+    extra_message = "If you do not see any results, make sure you ran java with option -XX:+ExtendedDTraceProbes"
 elif language == "python":
     entry_probe = "function__entry"
     return_probe = "function__return"
@@ -82,6 +84,7 @@ elif language == "php":
     return_probe = "function__return"
     read_class = "bpf_usdt_readarg(4, ctx, &clazz);"
     read_method = "bpf_usdt_readarg(1, ctx, &method);"
+    extra_message = "If you do not see any results, make sure the environment variable USE_ZEND_DTRACE is set to 1"
 elif not language or language == "none":
     if not args.syscalls:
         print("Nothing to do; use -S to trace syscalls.")
@@ -287,6 +290,8 @@ def clear_data():
 exit_signaled = False
 print("Tracing calls in process %d (language: %s)... Ctrl-C to quit." %
       (args.pid, language or "none"))
+if extra_message:
+    print(extra_message)
 while True:
     try:
         sleep(args.interval or 99999999)
