@@ -67,20 +67,27 @@ bool Argument::assign_to_local(std::ostream &stream,
   }
 
   if (!deref_offset_) {
-    tfm::format(stream, "%s = *(volatile %s *)&ctx->%s;", local_name, ctype(),
-                *base_register_name_);
+    tfm::format(stream, "%s = ctx->%s;", local_name, *base_register_name_);
+    // Put a compiler barrier to prevent optimization
+    // like llvm SimplifyCFG SinkThenElseCodeToEnd
+    // Volatile marking is not sufficient to prevent such optimization.
+    tfm::format(stream, " %s", COMPILER_BARRIER);
     return true;
   }
 
   if (deref_offset_ && !deref_ident_) {
-    tfm::format(stream, "{ u64 __addr = (*(volatile u64 *)&ctx->%s) + (%d)",
+    tfm::format(stream, "{ u64 __addr = ctx->%s + %d",
                 *base_register_name_, *deref_offset_);
     if (index_register_name_) {
       int scale = scale_.value_or(1);
-      tfm::format(stream, " + ((*(volatile u64 *)&ctx->%s) * %d);", *index_register_name_, scale);
+      tfm::format(stream, " + (ctx->%s * %d);", *index_register_name_, scale);
     } else {
       tfm::format(stream, ";");
     }
+    // Theoretically, llvm SimplifyCFG SinkThenElseCodeToEnd may still
+    // sink bpf_probe_read call, so put a barrier here to prevent sinking
+    // of ctx->#fields.
+    tfm::format(stream, " %s ", COMPILER_BARRIER);
     tfm::format(stream,
                 "%s __res = 0x0; "
                 "bpf_probe_read(&__res, sizeof(__res), (void *)__addr); "
