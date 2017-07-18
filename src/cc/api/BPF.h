@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include <sys/types.h>
+
 #include <cctype>
 #include <cstdint>
 #include <memory>
@@ -207,11 +209,21 @@ public:
         binary_path_(binary_path),
         provider_(provider),
         name_(name),
-        probe_func_(probe_func) {}
+        probe_func_(probe_func),
+        pid_(0) {}
+
+  USDT(pid_t pid, const std::string& provider,
+       const std::string& name, const std::string& probe_func)
+      : initialized_(false),
+        binary_path_(),
+        provider_(provider),
+        name_(name),
+        probe_func_(probe_func),
+        pid_(pid) {}
 
   bool operator==(const USDT& other) const {
     return (provider_ == other.provider_) && (name_ == other.name_) &&
-           (binary_path_ == other.binary_path_) &&
+           (binary_path_ == other.binary_path_) && (pid_ == other.pid_) &&
            (probe_func_ == other.probe_func_);
   }
 
@@ -228,10 +240,11 @@ private:
   std::string name_;
   std::string probe_func_;
 
-  std::vector<uintptr_t> addresses_;
+  std::vector<std::pair<std::string, std::vector<uintptr_t>>> bin_addresses_;
 
   std::string program_text_;
 
+  pid_t pid_;
   friend class BPF;
 };
 

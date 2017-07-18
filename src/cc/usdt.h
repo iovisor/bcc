@@ -150,6 +150,7 @@ class Probe {
   std::string name_;
   uint64_t semaphore_;
 
+  uint64_t argfmt_;
   std::vector<Location> locations_;
 
   optional<int> pid_;
@@ -159,6 +160,7 @@ class Probe {
   optional<std::string> attached_to_;
   optional<uint64_t> attached_semaphore_;
 
+  Argument *largest_arg(size_t arg_n);
   std::string largest_arg_type(size_t arg_n);
 
   bool add_to_semaphore(int16_t val);
@@ -171,6 +173,8 @@ public:
   Probe(const char *bin_path, const char *provider, const char *name,
         uint64_t semaphore, const optional<int> &pid, ProcMountNS *ns);
 
+  static bool encloses_argfmt(uint64_t enclosing, uint64_t test);
+
   size_t num_locations() const { return locations_.size(); }
   size_t num_arguments() const { return locations_.front().arguments_.size(); }
   uint64_t semaphore()   const { return semaphore_; }
@@ -178,6 +182,7 @@ public:
   uint64_t address(size_t n = 0) const { return locations_[n].address_; }
   const Location &location(size_t n) const { return locations_[n]; }
   bool usdt_getarg(std::ostream &stream);
+  uint64_t usdt_getargfmt();
   std::string get_arg_ctype(int arg_index) {
     return largest_arg_type(arg_index);
   }
@@ -224,6 +229,9 @@ public:
   ino_t inode() const { return mount_ns_instance_->target_ino(); }
 
   Probe *get(const std::string &probe_name);
+  std::vector<Probe*> get_all(const std::string &binary,
+                              const std::string &provider,
+                              const std::string &name);
   Probe *get(int pos) { return probes_[pos].get(); }
 
   bool enable_probe(const std::string &probe_name, const std::string &fn_name);
