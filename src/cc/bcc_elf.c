@@ -101,8 +101,11 @@ static int do_note_segment(Elf_Scn *section, int elf_class,
       desc = (const char *)data->d_buf + desc_off;
       desc_end = desc + hdr.n_descsz;
 
-      if (parse_stapsdt_note(&probe, desc, elf_class) == desc_end)
-        callback(binpath, &probe, payload);
+      if (parse_stapsdt_note(&probe, desc, elf_class) == desc_end) {
+        int res = callback(binpath, &probe, payload);
+        if (res)
+          return -2;
+      }
     }
   }
   return 0;
@@ -129,8 +132,9 @@ static int listprobes(Elf *e, bcc_elf_probecb callback, const char *binpath,
 
     name = elf_strptr(e, stridx, header.sh_name);
     if (name && !strcmp(name, ".note.stapsdt")) {
-      if (do_note_segment(section, elf_class, callback, binpath, payload) < 0)
-        return -1;
+      int res = do_note_segment(section, elf_class, callback, binpath, payload);
+      if (res < 0)
+        return res;
     }
   }
 

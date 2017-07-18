@@ -370,7 +370,6 @@ static int _find_module(const char *modname, uint64_t start, uint64_t end, bool,
   struct mod_st *mod = (struct mod_st *)p;
   if (!strcmp(modname, mod->name)) {
     mod->start = start;
-    return -1;
   }
   return 0;
 }
@@ -378,8 +377,8 @@ static int _find_module(const char *modname, uint64_t start, uint64_t end, bool,
 int bcc_resolve_global_addr(int pid, const char *module, const uint64_t address,
                             uint64_t *global) {
   struct mod_st mod = {module, 0x0};
-  if (bcc_procutils_each_module(pid, _find_module, &mod) < 0 ||
-      mod.start == 0x0)
+  bcc_procutils_each_module(pid, _find_module, &mod);
+  if (mod.start == 0x0)
     return -1;
 
   *global = mod.start + address;

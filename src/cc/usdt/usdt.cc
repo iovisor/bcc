@@ -197,10 +197,17 @@ void Probe::add_location(uint64_t addr, const char *fmt) {
   locations_.emplace_back(addr, fmt);
 }
 
-void Context::_each_probe(const char *binpath, const struct bcc_elf_usdt *probe,
+bool Probe::is_compatible_format(const struct bcc_elf_usdt *other) {
+  Location t(0, other->arg_fmt);
+  if (locations_.empty())
+    return false;
+  return num_arguments() == t.arguments_.size();
+}
+
+int Context::_each_probe(const char *binpath, const struct bcc_elf_usdt *probe,
                           void *p) {
   Context *ctx = static_cast<Context *>(p);
-  ctx->add_probe(binpath, probe);
+  return ctx->add_probe(binpath, probe);
 }
 
 int Context::_each_module(const char *modpath, uint64_t, uint64_t, bool, void *p) {
@@ -208,18 +215,27 @@ int Context::_each_module(const char *modpath, uint64_t, uint64_t, bool, void *p
   // Modules may be reported multiple times if they contain more than one
   // executable region. We are going to parse the ELF on disk anyway, so we
   // don't need these duplicates.
+  int res = 0;
   if (ctx->modules_.insert(modpath).second /*inserted new?*/) {
     ProcMountNSGuard g(ctx->mount_ns_instance_.get());
-    bcc_elf_foreach_usdt(modpath, _each_probe, p);
+    res = bcc_elf_foreach_usdt(modpath, _each_probe, p);
   }
-  return 0;
+  // Only return an error if we have mismatched probes
+  // Otherwise, we ignore other errors (like files that don't exist)
+  return res == -2 ? -1 : 0;
 }
 
-void Context::add_probe(const char *binpath, const struct bcc_elf_usdt *probe) {
+int Context::add_probe(const char *binpath, const struct bcc_elf_usdt *probe) {
   for (auto &p : probes_) {
-    if (p->provider_ == probe->provider && p->name_ == probe->name) {
-      p->add_location(probe->pc, probe->arg_fmt);
-      return;
+    if (strncmp(p->bin_path_.c_str(), binpath, p->bin_path_.size()) == 0
+        && p->provider_ == probe->provider
+        && p->name_ == probe->name) {
+      if (p->is_compatible_format(probe)) {
+        p->add_location(probe->pc, probe->arg_fmt);
+        return 0;
+      } else {
+        return -1;
+      }
     }
   }
 
@@ -227,6 +243,7 @@ void Context::add_probe(const char *binpath, const struct bcc_elf_usdt *probe) {
       new Probe(binpath, probe->provider, probe->name, probe->semaphore, pid_,
 	mount_ns_instance_.get()));
   probes_.back()->add_location(probe->pc, probe->arg_fmt);
+  return 0;
 }
 
 std::string Context::resolve_bin_path(const std::string &bin_path) {

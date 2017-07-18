@@ -32,7 +32,7 @@ struct bcc_elf_usdt {
   const char *arg_fmt;
 };
 
-typedef void (*bcc_elf_probecb)(const char *, const struct bcc_elf_usdt *,
+typedef int (*bcc_elf_probecb)(const char *, const struct bcc_elf_usdt *,
                                 void *);
 
 // Symbol name, start address, length, payload

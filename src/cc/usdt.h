@@ -166,6 +166,7 @@ class Probe {
   bool lookup_semaphore_addr(uint64_t *address);
   void add_location(uint64_t addr, const char *fmt);
 
+  bool is_compatible_format(const struct bcc_elf_usdt *other);
 public:
   Probe(const char *bin_path, const char *provider, const char *name,
         uint64_t semaphore, const optional<int> &pid, ProcMountNS *ns);
@@ -204,11 +205,11 @@ class Context {
   std::string cmd_bin_path_;
   bool loaded_;
 
-  static void _each_probe(const char *binpath, const struct bcc_elf_usdt *probe,
-                          void *p);
+  static int _each_probe(const char *binpath, const struct bcc_elf_usdt *probe,
+                         void *p);
   static int _each_module(const char *modpath, uint64_t, uint64_t, bool, void *p);
 
-  void add_probe(const char *binpath, const struct bcc_elf_usdt *probe);
+  int add_probe(const char *binpath, const struct bcc_elf_usdt *probe);
   std::string resolve_bin_path(const std::string &bin_path);
 
 public:
