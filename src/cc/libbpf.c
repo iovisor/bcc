@@ -513,7 +513,7 @@ void * bpf_attach_uprobe(int progfd, enum bpf_probe_attach_type attach_type, con
 {
   int kfd;
   char buf[PATH_MAX];
-  char new_name[128];
+  char new_name[256];
   struct perf_reader *reader = NULL;
   static char *event_type = "uprobe";
   int ns_fd = -1;
@@ -534,6 +534,7 @@ void * bpf_attach_uprobe(int progfd, enum bpf_probe_attach_type attach_type, con
   n = snprintf(buf, sizeof(buf), "%c:%ss/%s %s:0x%lx", attach_type==BPF_PROBE_ENTRY ? 'p' : 'r',
 			event_type, new_name, binary_path, offset);
   if (n >= sizeof(buf)) {
+    fprintf(stderr, "Name too long for uprobe; ev_name (%s) is probably too long\n", ev_name);
     close(kfd);
     goto error;
   }
