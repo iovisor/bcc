@@ -35,6 +35,9 @@ class ArgumentParser;
 static const std::string USDT_PROGRAM_HEADER =
     "#include <uapi/linux/ptrace.h>\n";
 
+static const std::string COMPILER_BARRIER =
+    "__asm__ __volatile__(\"\": : :\"memory\");";
+
 class Argument {
 private:
   optional<int> arg_size_;
