@@ -13,7 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 
 #include <arpa/inet.h>
 #include <errno.h>
@@ -70,11 +72,61 @@
 #define PERF_FLAG_FD_CLOEXEC (1UL << 3)
 #endif
 
+#define BCC_INSTANCE_FAIL -1
+#define BCC_INSTANCE_NOT_INIT -2
+#define BCC_INSTANCE_USE_DEFAULT -3
+static int bcc_instance_probe_cnt = BCC_INSTANCE_NOT_INIT;
+
 static int probe_perf_reader_page_cnt = 8;
 
 static uint64_t ptr_to_u64(void *ptr)
 {
   return (uint64_t) (unsigned long) ptr;
+}
+
+static int bcc_get_instance(char *buf, size_t buf_size) {
+  int res;
+  // An instance has already been created.
+  if (bcc_instance_probe_cnt >= 0) {
+    res = snprintf(buf, buf_size, "/sys/kernel/debug/tracing/instances/bcc_%d/", getpid());
+    if (res <= 0 || res >= buf_size)
+      return BCC_INSTANCE_FAIL;
+    return 0;
+  }
+  // Already failed creating an instance. Don't try again and use default.
+  if (bcc_instance_probe_cnt == BCC_INSTANCE_USE_DEFAULT)
+    goto default_instance;
+  // Try create an instance.
+  if (access("/sys/kernel/debug/tracing/instances/", F_OK) != 0) {
+    // Fail if instance folder does not exist.
+    bcc_instance_probe_cnt = BCC_INSTANCE_USE_DEFAULT;
+    goto default_instance;
+  }
+  res = snprintf(buf, buf_size, "/sys/kernel/debug/tracing/instances/bcc_%d/", getpid());
+  if (res <= 0 || res >= buf_size)
+    return BCC_INSTANCE_FAIL;
+  if (mkdir(buf, 0755) != 0) {
+    bcc_instance_probe_cnt = BCC_INSTANCE_USE_DEFAULT;
+    goto default_instance;
+  }
+  // Instance for this BCC Process created.
+  bcc_instance_probe_cnt = 0;
+  return 0;
+
+default_instance:
+  res = snprintf(buf, buf_size, "/sys/kernel/debug/tracing/");
+  if (res <= 0 || res >= buf_size)
+    return BCC_INSTANCE_FAIL;
+  return BCC_INSTANCE_USE_DEFAULT;
+}
+
+static void bcc_check_clean_instance() {
+  if (bcc_instance_probe_cnt == 0) {
+    char buf[256];
+    snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/instances/bcc_%d", getpid());
+    rmdir(buf);
+    bcc_instance_probe_cnt = BCC_INSTANCE_NOT_INIT;
+  }
 }
 
 int bpf_create_map(enum bpf_map_type map_type, int key_size, int value_size, int max_entries, int map_flags)
@@ -388,59 +440,72 @@ void * bpf_attach_kprobe(int progfd, enum bpf_probe_attach_type attach_type, con
                         pid_t pid, int cpu, int group_fd,
                         perf_reader_cb cb, void *cb_cookie)
 {
-  int kfd;
+  int kfd = -1;
   char buf[256];
   char new_name[128];
   struct perf_reader *reader = NULL;
-  static char *event_type = "kprobe";
-  int n;
+  int res, instance_res;
+  size_t buf_len;
 
-  snprintf(new_name, sizeof(new_name), "%s_bcc_%d", ev_name, getpid());
   reader = perf_reader_new(cb, NULL, NULL, cb_cookie, probe_perf_reader_page_cnt);
-  if (!reader)
+  if (!reader) {
+    fprintf(stderr, "Failed to create perf reader\n");
     goto error;
+  }
 
-  snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/%s_events", event_type);
-  kfd = open(buf, O_WRONLY | O_APPEND, 0);
+  res = snprintf(new_name, sizeof(new_name), "%s_bcc_%d", ev_name, getpid());
+  if (res <= 0 || res >= sizeof(new_name)) {
+    fprintf(stderr, "Event name too long\n");
+    goto error;
+  }
+  res = snprintf(buf, sizeof(buf), "%c:kprobes/%s %s",
+                 attach_type==BPF_PROBE_ENTRY ? 'p' : 'r', new_name, fn_name);
+  if (res <= 0 || res >= sizeof(buf)) {
+    fprintf(stderr, "Event operation string too long\n");
+    goto error;
+  }
+
+  kfd = open("/sys/kernel/debug/tracing/kprobe_events", O_WRONLY | O_APPEND, 0);
   if (kfd < 0) {
     fprintf(stderr, "open(%s): %s\n", buf, strerror(errno));
     goto error;
   }
-
-  snprintf(buf, sizeof(buf), "%c:%ss/%s %s", attach_type==BPF_PROBE_ENTRY ? 'p' : 'r',
-			event_type, new_name, fn_name);
   if (write(kfd, buf, strlen(buf)) < 0) {
+    fprintf(stderr, "write(%s): %s\n", buf, strerror(errno));
     if (errno == EINVAL)
       fprintf(stderr, "check dmesg output for possible cause\n");
+    goto error;
+  }
+
+  instance_res = bcc_get_instance(buf, sizeof(buf));
+  if (instance_res == BCC_INSTANCE_FAIL) {
+    fprintf(stderr, "Failed to get an event instance\n");
+    goto clean_event_error;
+  }
+  buf_len = strlen(buf);
+  res = snprintf(&buf[buf_len], sizeof(buf) - buf_len, "events/kprobes/%s", new_name);
+  if (res <= 0 || (res + buf_len) >= sizeof(buf)) {
+    fprintf(stderr, "Event file path too long\n");
+    goto clean_event_error;
+  }
+  if (bpf_attach_tracing_event(progfd, buf, reader, pid, cpu, group_fd) == 0) {
     close(kfd);
-    goto error;
+    if (instance_res != BCC_INSTANCE_USE_DEFAULT)
+      bcc_instance_probe_cnt++;
+    return reader;
   }
-  close(kfd);
 
-  if (access("/sys/kernel/debug/tracing/instances", F_OK) != -1) {
-    snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/instances/bcc_%d", getpid());
-    if (access(buf, F_OK) == -1) {
-      if (mkdir(buf, 0755) == -1)
-        goto retry;
-    }
-    n = snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/instances/bcc_%d/events/%ss/%s",
-             getpid(), event_type, new_name);
-    if (n < sizeof(buf) && bpf_attach_tracing_event(progfd, buf, reader, pid, cpu, group_fd) == 0)
-	  goto out;
-    snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/instances/bcc_%d", getpid());
-    rmdir(buf);
+clean_event_error:
+  if (kfd >= 0) {
+    snprintf(buf, sizeof(buf), "-:kprobes/%s %s", new_name, fn_name);
+    write(kfd, buf, strlen(buf));
   }
-retry:
-  snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/events/%ss/%s", event_type, new_name);
-  if (bpf_attach_tracing_event(progfd, buf, reader, pid, cpu, group_fd) < 0)
-    goto error;
-out:
-  return reader;
-
 error:
+  if (kfd >= 0)
+    close(kfd);
   perf_reader_free(reader);
+  bcc_check_clean_instance();
   return NULL;
-
 }
 
 static int enter_mount_ns(int pid) {
@@ -583,14 +648,13 @@ static int bpf_detach_probe(const char *ev_name, const char *event_type)
 
 int bpf_detach_kprobe(const char *ev_name)
 {
-  char buf[256];
-  int ret = bpf_detach_probe(ev_name, "kprobe");
-  snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/instances/bcc_%d", getpid());
-  if (access(buf, F_OK) != -1) {
-    rmdir(buf);
-  }
+  int res = bpf_detach_probe(ev_name, "kprobe");
 
-  return ret;
+  if (bcc_instance_probe_cnt != BCC_INSTANCE_USE_DEFAULT)
+    bcc_instance_probe_cnt--;
+  bcc_check_clean_instance();
+
+  return res;
 }
 
 int bpf_detach_uprobe(const char *ev_name)
