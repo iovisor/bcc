@@ -268,14 +268,15 @@ class BPF(object):
         cflags_array = (ct.c_char_p * len(cflags))()
         for i, s in enumerate(cflags): cflags_array[i] = s.encode("ascii")
         if text:
-            for usdt_context in usdt_contexts:
-                usdt_text = usdt_context.get_text()
-                if usdt_text is None:
-                    raise Exception("can't generate USDT probe arguments; " +
-                                    "possible cause is missing pid when a " +
-                                    "probe in a shared object has multiple " +
-                                    "locations")
-                text = usdt_text + text
+            ctx_array = (ct.c_void_p * len(usdt_contexts))()
+            for i, usdt in enumerate(usdt_contexts): ctx_array[i] = ct.c_void_p(usdt.get_context())
+            usdt_text = lib.bcc_usdt_genargs(ctx_array, len(usdt_contexts)).decode()
+            if usdt_text is None:
+                raise Exception("can't generate USDT probe arguments; " +
+                                "possible cause is missing pid when a " +
+                                "probe in a shared object has multiple " +
+                                "locations")
+            text = usdt_text + text
 
         if text:
             self.module = lib.bpf_module_create_c_from_string(text.encode("ascii"),
@@ -781,6 +782,14 @@ class BPF(object):
             raise Exception("Error %d enumerating symbols in %s" % (res, name))
         return addresses
 
+    def _get_uprobe_evname(self, prefix, path, addr, pid):
+        if pid == -1:
+            return "%s_%s_0x%x" % (prefix, self._probe_repl.sub("_", path), addr)
+        else:
+            # if pid is valid, put pid in the name, so different pid
+            # can have different event names
+            return "%s_%s_0x%x_%d" % (prefix, self._probe_repl.sub("_", path), addr, pid)
+
     def attach_uprobe(self, name="", sym="", sym_re="", addr=None,
             fn_name="", pid=-1, cpu=0, group_fd=-1):
         """attach_uprobe(name="", sym="", sym_re="", addr=None, fn_name=""
@@ -819,7 +828,7 @@ class BPF(object):
 
         self._check_probe_quota(1)
         fn = self.load_func(fn_name, BPF.KPROBE)
-        ev_name = "p_%s_0x%x" % (self._probe_repl.sub("_", path), addr)
+        ev_name = self._get_uprobe_evname("p", path, addr, pid)
         res = lib.bpf_attach_uprobe(fn.fd, 0, ev_name.encode("ascii"),
                 path.encode("ascii"), addr, pid, cpu, group_fd,
                 self._reader_cb_impl, ct.cast(id(self), ct.py_object))
@@ -838,7 +847,7 @@ class BPF(object):
 
         name = str(name)
         (path, addr) = BPF._check_path_symbol(name, sym, addr, pid)
-        ev_name = "p_%s_0x%x" % (self._probe_repl.sub("_", path), addr)
+        ev_name = self._get_uprobe_evname("p", path, addr, pid)
         if ev_name not in self.open_uprobes:
             raise Exception("Uprobe %s is not attached" % ev_name)
         lib.perf_reader_free(self.open_uprobes[ev_name])

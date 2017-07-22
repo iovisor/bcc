@@ -21,7 +21,7 @@
 
 #include "ns_guard.h"
 
-ProcMountNS::ProcMountNS(int pid) {
+ProcMountNS::ProcMountNS(int pid) : target_ino_(0) {
   if (pid < 0)
     return;
 
@@ -38,6 +38,7 @@ ProcMountNS::ProcMountNS(int pid) {
   if (fstat(target_fd, &target_stat) != 0)
     return;
 
+  target_ino_ = target_stat.st_ino;
   if (self_stat.st_ino == target_stat.st_ino)
     // Both current and target Process are in same mount namespace
     return;
