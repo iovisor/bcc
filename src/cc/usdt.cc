@@ -15,6 +15,7 @@
  */
 #include <cstring>
 #include <sstream>
+#include <unordered_set>
 
 #include <fcntl.h>
 #include <sys/types.h>
@@ -250,15 +251,6 @@ Probe *Context::get(const std::string &probe_name) {
   return nullptr;
 }
 
-bool Context::generate_usdt_args(std::ostream &stream) {
-  stream << USDT_PROGRAM_HEADER;
-  for (auto &p : probes_) {
-    if (p->enabled() && !p->usdt_getarg(stream))
-      return false;
-  }
-  return true;
-}
-
 bool Context::enable_probe(const std::string &probe_name,
                            const std::string &fn_name) {
   if (pid_stat_ && pid_stat_->is_stale())
@@ -296,15 +288,30 @@ void Context::each_uprobe(each_uprobe_cb callback) {
 Context::Context(const std::string &bin_path) : loaded_(false) {
   std::string full_path = resolve_bin_path(bin_path);
   if (!full_path.empty()) {
-    if (bcc_elf_foreach_usdt(full_path.c_str(), _each_probe, this) == 0)
+    if (bcc_elf_foreach_usdt(full_path.c_str(), _each_probe, this) == 0) {
+      cmd_bin_path_ = full_path;
       loaded_ = true;
+    }
   }
 }
 
 Context::Context(int pid) : pid_(pid), pid_stat_(pid),
   mount_ns_instance_(new ProcMountNS(pid)), loaded_(false) {
-  if (bcc_procutils_each_module(pid, _each_module, this) == 0)
+  if (bcc_procutils_each_module(pid, _each_module, this) == 0) {
+    // get exe command from /proc/<pid>/exe
+    // assume the maximum path length 4096, which should be
+    // sufficiently large to cover all use cases
+    char source[64];
+    char cmd_buf[4096];
+    snprintf(source, sizeof(source), "/proc/%d/exe", pid);
+    ssize_t cmd_len = readlink(source, cmd_buf, sizeof(cmd_buf) - 1);
+    if (cmd_len == -1)
+      return;
+    cmd_buf[cmd_len] = '\0';
+    cmd_bin_path_.assign(cmd_buf, cmd_len + 1);
+
     loaded_ = true;
+  }
 }
 
 Context::~Context() {
@@ -345,13 +352,32 @@ int bcc_usdt_enable_probe(void *usdt, const char *probe_name,
   return ctx->enable_probe(probe_name, fn_name) ? 0 : -1;
 }
 
-const char *bcc_usdt_genargs(void *usdt) {
+const char *bcc_usdt_genargs(void **usdt_array, int len) {
   static std::string storage_;
-
-  USDT::Context *ctx = static_cast<USDT::Context *>(usdt);
   std::ostringstream stream;
-  if (!ctx->generate_usdt_args(stream))
-    return nullptr;
+
+  stream << USDT::USDT_PROGRAM_HEADER;
+  // Generate genargs codes for an array of USDT Contexts.
+  //
+  // Each mnt_point + cmd_bin_path + probe_provider + probe_name
+  // uniquely identifies a probe.
+  std::unordered_set<std::string> generated_probes;
+  for (int i = 0; i < len; i++) {
+    USDT::Context *ctx = static_cast<USDT::Context *>(usdt_array[i]);
+
+    for (size_t j = 0; j < ctx->num_probes(); j++) {
+      USDT::Probe *p = ctx->get(j);
+      if (p->enabled()) {
+        std::string key = std::to_string(ctx->inode()) + "*"
+          + ctx->cmd_bin_path() + "*" + p->provider() + "*" + p->name();
+        if (generated_probes.find(key) != generated_probes.end())
+          continue;
+        if (!p->usdt_getarg(stream))
+          return nullptr;
+        generated_probes.insert(key);
+      }
+    }
+  }
 
   storage_ = stream.str();
   return storage_.c_str();

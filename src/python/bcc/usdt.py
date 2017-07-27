@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import ctypes as ct
-import sys
+import os, sys
 from .libbcc import lib, _USDT_CB, _USDT_PROBE_CB, \
                     bcc_usdt_location, bcc_usdt_argument, \
                     BCC_USDT_ARGUMENT_FLAGS
@@ -157,8 +157,8 @@ USDT probes. Look for a configure flag similar to --with-dtrace or
 tplist tool.""")
             sys.exit(1)
 
-    def get_text(self):
-        return lib.bcc_usdt_genargs(self.context).decode()
+    def get_context(self):
+        return self.context
 
     def get_probe_arg_ctype(self, probe_name, arg_index):
         return lib.bcc_usdt_get_probe_argctype(

@@ -67,7 +67,7 @@ int bcc_usdt_get_argument(void *usdt, const char *probe_name,
                           struct bcc_usdt_argument *argument);
 
 int bcc_usdt_enable_probe(void *, const char *, const char *);
-const char *bcc_usdt_genargs(void *);
+const char *bcc_usdt_genargs(void **ctx_array, int len);
 const char *bcc_usdt_get_probe_argctype(
   void *ctx, const char* probe_name, const int arg_index
 );

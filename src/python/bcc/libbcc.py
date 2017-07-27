@@ -191,7 +191,7 @@ lib.bcc_usdt_enable_probe.restype = ct.c_int
 lib.bcc_usdt_enable_probe.argtypes = [ct.c_void_p, ct.c_char_p, ct.c_char_p]
 
 lib.bcc_usdt_genargs.restype = ct.c_char_p
-lib.bcc_usdt_genargs.argtypes = [ct.c_void_p]
+lib.bcc_usdt_genargs.argtypes = [ct.POINTER(ct.c_void_p), ct.c_int]
 
 lib.bcc_usdt_get_probe_argctype.restype = ct.c_char_p
 lib.bcc_usdt_get_probe_argctype.argtypes = [ct.c_void_p, ct.c_char_p, ct.c_int]

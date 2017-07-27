@@ -32,10 +32,12 @@ class ProcMountNS {
   explicit ProcMountNS(int pid);
   int self() const { return self_fd_; }
   int target() const { return target_fd_; }
+  ino_t target_ino() const { return target_ino_; }
 
  private:
   ebpf::FileDesc self_fd_;
   ebpf::FileDesc target_fd_;
+  ino_t target_ino_;
 };
 
 // ProcMountNSGuard switches to the target mount namespace and restores the
