@@ -72,7 +72,8 @@ public:
   StatusTuple detach_uprobe(
       const std::string& binary_path, const std::string& symbol,
       uint64_t symbol_addr = 0,
-      bpf_probe_attach_type attach_type = BPF_PROBE_ENTRY);
+      bpf_probe_attach_type attach_type = BPF_PROBE_ENTRY,
+      pid_t pid = -1);
   StatusTuple attach_usdt(const USDT& usdt, pid_t pid = -1, int cpu = 0,
                           int group_fd = -1);
   StatusTuple detach_usdt(const USDT& usdt);
@@ -142,7 +143,7 @@ private:
   std::string get_kprobe_event(const std::string& kernel_func,
                                bpf_probe_attach_type type);
   std::string get_uprobe_event(const std::string& binary_path, uint64_t offset,
-                               bpf_probe_attach_type type);
+                               bpf_probe_attach_type type, pid_t pid);
 
   StatusTuple detach_kprobe_event(const std::string& event, open_probe_t& attr);
   StatusTuple detach_uprobe_event(const std::string& event, open_probe_t& attr);
