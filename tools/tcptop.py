@@ -148,6 +148,9 @@ int kprobe__tcp_cleanup_rbuf(struct pt_regs *ctx, struct sock *sk, int copied)
     u16 dport = 0, family = sk->__sk_common.skc_family;
     u64 *val, zero = 0;
 
+    if (copied <= 0)
+	    return 0;
+
     if (family == AF_INET) {
         struct ipv4_key_t ipv4_key = {.pid = pid};
         ipv4_key.saddr = sk->__sk_common.skc_rcv_saddr;
