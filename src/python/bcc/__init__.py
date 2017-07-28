@@ -878,7 +878,7 @@ class BPF(object):
 
         self._check_probe_quota(1)
         fn = self.load_func(fn_name, BPF.KPROBE)
-        ev_name = "r_%s_0x%x" % (self._probe_repl.sub("_", path), addr)
+        ev_name = self._get_uprobe_evname("r", path, addr, pid)
         res = lib.bpf_attach_uprobe(fn.fd, 1, ev_name.encode("ascii"),
                 path.encode("ascii"), addr, pid, cpu, group_fd,
                 self._reader_cb_impl, ct.cast(id(self), ct.py_object))
@@ -897,7 +897,7 @@ class BPF(object):
 
         name = str(name)
         (path, addr) = BPF._check_path_symbol(name, sym, addr, pid)
-        ev_name = "r_%s_0x%x" % (self._probe_repl.sub("_", path), addr)
+        ev_name = self._get_uprobe_evname("r", path, addr, pid)
         if ev_name not in self.open_uprobes:
             raise Exception("Uretprobe %s is not attached" % ev_name)
         lib.perf_reader_free(self.open_uprobes[ev_name])
