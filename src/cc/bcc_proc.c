@@ -81,7 +81,7 @@ int bcc_procutils_each_module(int pid, bcc_procutils_modulecb callback,
   FILE *procmap;
   int ret;
 
-  sprintf(procmap_filename, "/proc/%ld/maps", (long)pid);
+  snprintf(procmap_filename, sizeof(procmap_filename), "/proc/%ld/maps", (long)pid);
   procmap = fopen(procmap_filename, "r");
 
   if (!procmap)
@@ -327,7 +327,7 @@ static bool which_so_in_process(const char* libname, int pid, char* libpath) {
   char search1[search_len + 1];
   char search2[search_len + 1];
 
-  sprintf(mappings_file, "/proc/%ld/maps", (long)pid);
+  snprintf(mappings_file, sizeof(mappings_file), "/proc/%ld/maps", (long)pid);
   FILE *fp = fopen(mappings_file, "r");
   if (!fp)
     return NULL;
@@ -400,12 +400,12 @@ const char *language_c = "c";
 const int nb_languages = 5;
 
 const char *bcc_procutils_language(int pid) {
-  char procfilename[22], line[4096], pathname[32], *str;
+  char procfilename[24], line[4096], pathname[32], *str;
   FILE *procfile;
   int i, ret;
 
   /* Look for clues in the absolute path to the executable. */
-  sprintf(procfilename, "/proc/%ld/exe", (long)pid);
+  snprintf(procfilename, sizeof(procfilename), "/proc/%ld/exe", (long)pid);
   if (realpath(procfilename, line)) {
     for (i = 0; i < nb_languages; i++)
       if (strstr(line, languages[i]))
@@ -413,7 +413,7 @@ const char *bcc_procutils_language(int pid) {
   }
 
 
-  sprintf(procfilename, "/proc/%ld/maps", (long)pid);
+  snprintf(procfilename, sizeof(procfilename), "/proc/%ld/maps", (long)pid);
   procfile = fopen(procfilename, "r");
   if (!procfile)
     return NULL;
@@ -434,7 +434,7 @@ const char *bcc_procutils_language(int pid) {
         newline[0] = '\0';
       while (isspace(mapname[0])) mapname++;
       for (i = 0; i < nb_languages; i++) {
-        sprintf(pathname, "/lib%s", languages[i]);
+        snprintf(pathname, sizeof(pathname), "/lib%s", languages[i]);
         if (strstr(mapname, pathname))
           return languages[i];
         if ((str = strstr(mapname, "libc")) &&

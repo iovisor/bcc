@@ -379,21 +379,21 @@ static char *find_debug_via_debuglink(Elf *e, const char *binpath,
   // matches the binary itself: the binary will always be probed later on,
   // and it might contain poorer symbols (e.g. stripped or partial symbols)
   // than the external debuginfo that might be available elsewhere.
-  sprintf(fullpath, "%s/%s", bindir, name);
+  snprintf(fullpath, sizeof(fullpath),"%s/%s", bindir, name);
   if (strcmp(fullpath, binpath) != 0 && access(fullpath, F_OK) != -1) {
     res = strdup(fullpath);
     goto DONE;
   }
 
   // Search for the file in 'binpath'/.debug
-  sprintf(fullpath, "%s/.debug/%s", bindir, name);
+  snprintf(fullpath, sizeof(fullpath), "%s/.debug/%s", bindir, name);
   if (access(fullpath, F_OK) != -1) {
     res = strdup(fullpath);
     goto DONE;
   }
 
   // Search for the file in the global debug directory /usr/lib/debug/'binpath'
-  sprintf(fullpath, "/usr/lib/debug%s/%s", bindir, name);
+  snprintf(fullpath, sizeof(fullpath), "/usr/lib/debug%s/%s", bindir, name);
   if (access(fullpath, F_OK) != -1) {
     res = strdup(fullpath);
     goto DONE;
@@ -417,7 +417,7 @@ static char *find_debug_via_buildid(Elf *e) {
   //    mm/nnnnnn...nnnn.debug
   // Where mm are the first two characters of the buildid, and nnnn are the
   // rest of the build id, followed by .debug.
-  sprintf(fullpath, "/usr/lib/debug/.build-id/%c%c/%s.debug",
+  snprintf(fullpath, sizeof(fullpath), "/usr/lib/debug/.build-id/%c%c/%s.debug",
           buildid[0], buildid[1], buildid + 2);
   if (access(fullpath, F_OK) != -1) {
     return strdup(fullpath);
