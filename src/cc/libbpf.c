@@ -88,9 +88,7 @@ static int bcc_get_instance(char *buf, size_t buf_size) {
   int res;
   // An instance has already been created.
   if (bcc_instance_probe_cnt >= 0) {
-    res = snprintf(buf, buf_size, "/sys/kernel/debug/tracing/instances/bcc_%d/", getpid());
-    if (res <= 0 || res >= buf_size)
-      return BCC_INSTANCE_FAIL;
+    snprintf(buf, buf_size, "/sys/kernel/debug/tracing/instances/bcc_%d/", getpid());
     return 0;
   }
   // Already failed creating an instance. Don't try again and use default.

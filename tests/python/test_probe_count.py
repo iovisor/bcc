@@ -74,6 +74,32 @@ class TestProbeQuota(TestCase):
     def tearDown(self):
         self.b.cleanup()
 
+class TestProbeInstance(TestCase):
+    def setUp(self):
+        self.b = BPF(text="""int count(void *ctx) { return 0; }""")
+
+    def test_kprobe_instance(self):
+        instance = "/sys/kernel/debug/tracing/instances/bcc_{}".format(
+            os.getpid())
+        self.assertFalse(os.path.isdir(instance))
+
+        self.b.attach_kprobe(event="sys_read", fn_name="count")
+        inode = os.stat(instance).st_ino
+        self.assertTrue(inode > 1)
+
+        self.b.attach_kprobe(event="sys_write", fn_name="count")
+        self.b.detach_kprobe("sys_read")
+        new_inode = os.stat(instance).st_ino
+        self.assertEqual(new_inode, inode)
+
+        self.b.detach_kprobe("sys_write")
+        self.assertFalse(os.path.isdir(instance))
+
+        self.b.attach_kprobe(event="sys_open", fn_name="count")
+        new_inode = os.stat(instance).st_ino
+        self.assertTrue(new_inode > 1)
+        self.assertFalse(new_inode == inode)
+
 
 class TestProbeNotExist(TestCase):
     def setUp(self):
