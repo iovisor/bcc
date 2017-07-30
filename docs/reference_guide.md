@@ -141,6 +141,8 @@ This is a macro that instruments the tracepoint defined by *category*:*event*.
 
 Arguments are available in an ```args``` struct, which are the tracepoint arguments. One way to list these is to cat the relevant format file under /sys/kernel/debug/tracing/events/*category*/*event*/format.
 
+The ```args``` struct can be used in place of ``ctx`` in each functions requiring a context as an argument. This includes notably [perf_submit()](#3-perf_submit).
+
 For example:
 
 ```C
