@@ -52,6 +52,10 @@ See [INSTALL.md](INSTALL.md) for installation steps on your platform.
 
 See [FAQ.txt](FAQ.txt) for the most common troubleshoot questions.
 
+## Reference guide
+
+See [docs/reference_guide.md](docs/reference_guide.md) for the reference guide to the bcc and bcc/BPF APIs.
+
 ## Contents
 
 Some of these are single files that contain both C and Python, others have a
@@ -203,7 +207,6 @@ to add support for the language of your choice and send a pull request!
 
 - [docs/tutorial.md](docs/tutorial.md): Using bcc tools to solve performance, troubleshooting, and networking issues.
 - [docs/tutorial_bcc_python_developer.md](docs/tutorial_bcc_python_developer.md): Developing new bcc programs using the Python interface.
-- [docs/reference_guide.md](docs/reference_guide.md): Reference guide to the bcc and bcc/BPF APIs.
 
 ### Networking
 
