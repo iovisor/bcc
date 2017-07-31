@@ -803,7 +803,7 @@ int bpf_attach_xdp(const char *dev_name, int progfd, uint32_t flags) {
     for (nh = (struct nlmsghdr *)buf; NLMSG_OK(nh, len);
          nh = NLMSG_NEXT(nh, len)) {
         if (nh->nlmsg_pid != sa.nl_pid) {
-            fprintf(stderr, "bpf: Wrong pid %d, expected %d\n",
+            fprintf(stderr, "bpf: Wrong pid %u, expected %u\n",
                    nh->nlmsg_pid, sa.nl_pid);
             errno = EBADMSG;
             goto cleanup;
