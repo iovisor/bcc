@@ -1,8 +1,8 @@
 #!/usr/bin/env bcc-py
 #
-# lockstats Trace and display lock contention stats
+# lockstat Trace and display lock contention stats
 #
-# USAGE: lockstats
+# USAGE: lockstat
 
 # Licensed under the Apache License, Version 2.0 (the "License")
 # 28-Jul-2017   Gisle Dankel   Created this.
@@ -30,24 +30,20 @@ class Lock(object):
 examples = """
 EXAMPLES:
 
-./lockstats -p $(pidof allocs)
-        Trace allocations and display a summary of "leaked" (outstanding)
-        allocations every 5 seconds
-./lockstats -p $(pidof allocs) -t
-        Trace allocations and display each individual allocator function call
-./lockstats -ap $(pidof allocs) 10
-        Trace allocations and display allocated addresses, sizes, and stacks
-        every 10 seconds for outstanding allocations
-./lockstats -c "./allocs"
-        Run the specified command and trace its allocations
-./lockstats
-        Trace allocations in kernel mode and display a summary of outstanding
-        allocations every 5 seconds
-./lockstats -o 60000
-        Trace allocations in kernel mode and display a summary of outstanding
-        allocations that are at least one minute (60 seconds) old
-./lockstats -s 5
-        Trace roughly every 5th allocation, to reduce overhead
+./lockstat
+        Trace calls to sys_futex and display contented locks every 5 seconds
+        for all processes running on the system
+./lockstat -p <pid>
+        Trace only for the specified pid and display contended locks
+        every 5 seconds
+./lockstat -p <pid> -t
+        Trace for a specified pid and print a message on each entry and exit to
+        sys_futex
+./lockstat -p <pid> 10
+        Trace the specified pid and show a message every 10 seconds
+./lockstat -c <command> 1 30
+        Run the specified command and display contended locks every 1 second
+        for a total of 30 times
 """
 
 description = """
