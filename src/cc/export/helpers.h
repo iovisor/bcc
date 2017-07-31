@@ -57,7 +57,7 @@ __attribute__((section("maps/" _table_type))) \
 struct _name##_table_t _name = { .flags = (_flags) }
 
 #define BPF_TABLE(_table_type, _key_type, _leaf_type, _name, _max_entries) \
-BPF_F_TABLE(_table_type, _key_type, _leaf_type, _name, _max_entries, 0);
+BPF_F_TABLE(_table_type, _key_type, _leaf_type, _name, _max_entries, 0)
 
 // define a table same as above but allow it to be referenced by other modules
 #define BPF_TABLE_PUBLIC(_table_type, _key_type, _leaf_type, _name, _max_entries) \
