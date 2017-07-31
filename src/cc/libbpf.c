@@ -725,6 +725,7 @@ int bpf_attach_xdp(const char *dev_name, int progfd, uint32_t flags) {
     } req;
     struct nlmsghdr *nh;
     struct nlmsgerr *err;
+    socklen_t addrlen;
 
     memset(&sa, 0, sizeof(sa));
     sa.nl_family = AF_NETLINK;
@@ -737,6 +738,17 @@ int bpf_attach_xdp(const char *dev_name, int progfd, uint32_t flags) {
 
     if (bind(sock, (struct sockaddr *)&sa, sizeof(sa)) < 0) {
         fprintf(stderr, "bpf: bind to netlink: %s\n", strerror(errno));
+        goto cleanup;
+    }
+
+    addrlen = sizeof(sa);
+    if (getsockname(sock, (struct sockaddr *)&sa, &addrlen) < 0) {
+        fprintf(stderr, "bpf: get sock name of netlink: %s\n", strerror(errno));
+        goto cleanup;
+    }
+
+    if (addrlen != sizeof(sa)) {
+        fprintf(stderr, "bpf: wrong netlink address length: %d\n", addrlen);
         goto cleanup;
     }
 
@@ -790,9 +802,9 @@ int bpf_attach_xdp(const char *dev_name, int progfd, uint32_t flags) {
 
     for (nh = (struct nlmsghdr *)buf; NLMSG_OK(nh, len);
          nh = NLMSG_NEXT(nh, len)) {
-        if (nh->nlmsg_pid != getpid()) {
+        if (nh->nlmsg_pid != sa.nl_pid) {
             fprintf(stderr, "bpf: Wrong pid %d, expected %d\n",
-                   nh->nlmsg_pid, getpid());
+                   nh->nlmsg_pid, sa.nl_pid);
             errno = EBADMSG;
             goto cleanup;
         }
