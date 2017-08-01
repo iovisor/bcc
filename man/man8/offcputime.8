@@ -2,7 +2,7 @@
 .SH NAME
 offcputime \- Summarize off-CPU time by kernel stack trace. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B offcputime [\-h] [\-u] [\-p PID] [\-v] [\-f] [duration]
+.B offcputime [\-h] [\-p PID | \-t TID | \-u | \-k] [\-U | \-K] [\-d] [\-f] [\-\-stack\-storage\-size STACK_STORAGE_SIZE] [\-m MIN_BLOCK_TIME] [\-M MAX_BLOCK_TIME] [\-\-state STATE] [duration]
 .SH DESCRIPTION
 This program shows stack traces and task names that were blocked and "off-CPU",
 and the total duration they were not running: their "off-CPU time".
@@ -63,6 +63,16 @@ Output folded format.
 .TP
 \-\-stack-storage-size STACK_STORAGE_SIZE
 Change the number of unique stack traces that can be stored and displayed.
+.TP
+\-m MIN_BLOCK_TIME
+The minimum time in microseconds over which we store traces (default 1)
+.TP
+\-M MAX_BLOCK_TIME
+The maximum time in microseconds under which we store traces (default U64_MAX)
+.TP
+\-\-state
+Filter on this thread state bitmask (eg, 2 == TASK_UNINTERRUPTIBLE).
+See include/linux/sched.h for states.
 .TP
 duration
 Duration to trace, in seconds.
