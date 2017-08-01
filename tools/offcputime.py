@@ -88,11 +88,16 @@ parser.add_argument("-M", "--max-block-time", default=(1 << 64) - 1,
     type=positive_nonzero_int,
     help="the amount of time in microseconds under which we " +
          "store traces (default U64_MAX)")
+parser.add_argument("--state", default=999,
+    type=positive_int,
+    help="filter on this thread state bitmask (eg, 2 == TASK_UNINTERRUPTIBLE" +
+         ") see include/linux/sched.h")
 args = parser.parse_args()
 if args.pid and args.tgid:
     parser.error("specify only one of -p and -t")
 folded = args.folded
 duration = int(args.duration)
+debug = 0
 
 # signal handler
 def signal_ignore(signal, frame):
@@ -123,7 +128,7 @@ int oncpu(struct pt_regs *ctx, struct task_struct *prev) {
     u64 ts, *tsp;
 
     // record previous thread sleep time
-    if (THREAD_FILTER) {
+    if ((THREAD_FILTER) && (STATE_FILTER)) {
         ts = bpf_ktime_get_ns();
         start.update(&pid, &ts);
     }
@@ -177,7 +182,15 @@ elif args.kernel_threads_only:
 else:
     thread_context = "all threads"
     thread_filter = '1'
+if args.state == 0:
+    state_filter = 'prev->state == 0'
+elif args.state != 999:
+    # these states are sometimes bitmask checked
+    state_filter = 'prev->state & %d' % args.state
+else:
+    state_filter = '1'
 bpf_text = bpf_text.replace('THREAD_FILTER', thread_filter)
+bpf_text = bpf_text.replace('STATE_FILTER', state_filter)
 
 # set stack storage size
 bpf_text = bpf_text.replace('STACK_STORAGE_SIZE', str(args.stack_storage_size))
@@ -209,6 +222,9 @@ if args.kernel_threads_only and args.user_stacks_only:
     print("ERROR: Displaying user stacks for kernel threads " +
           "doesn't make sense.", file=stderr)
     exit(1)
+
+if (debug):
+    print(bpf_text)
 
 # initialize BPF
 b = BPF(text=bpf_text)

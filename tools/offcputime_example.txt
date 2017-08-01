@@ -718,9 +718,10 @@ creating your "off-CPU time flame graphs".
 
 USAGE message:
 
-# ./offcputime -h
+# ./offcputime.py -h
 usage: offcputime.py [-h] [-p PID | -t TID | -u | -k] [-U | -K] [-d] [-f]
                      [--stack-storage-size STACK_STORAGE_SIZE]
+                     [-m MIN_BLOCK_TIME] [-M MAX_BLOCK_TIME] [--state STATE]
                      [duration]
 
 Summarize off-CPU time by stack trace
@@ -747,11 +748,21 @@ optional arguments:
   --stack-storage-size STACK_STORAGE_SIZE
                         the number of unique stack traces that can be stored
                         and displayed (default 1024)
+  -m MIN_BLOCK_TIME, --min-block-time MIN_BLOCK_TIME
+                        the amount of time in microseconds over which we store
+                        traces (default 1)
+  -M MAX_BLOCK_TIME, --max-block-time MAX_BLOCK_TIME
+                        the amount of time in microseconds under which we
+                        store traces (default U64_MAX)
+  --state STATE         filter on this thread state bitmask (eg, 2 ==
+                        TASK_UNINTERRUPTIBLE) see include/linux/sched.h
 
 examples:
     ./offcputime             # trace off-CPU stack time until Ctrl-C
     ./offcputime 5           # trace for 5 seconds only
     ./offcputime -f 5        # 5 seconds, and output in folded format
+    ./offcputime -m 1000     # trace only events that last more than 1000 usec
+    ./offcputime -M 10000    # trace only events that last less than 10000 usec
     ./offcputime -p 185      # only trace threads for PID 185
     ./offcputime -t 188      # only trace thread 188
     ./offcputime -u          # only trace user threads (no kernel)
