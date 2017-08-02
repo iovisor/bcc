@@ -26,6 +26,11 @@ class Lock(object):
         self.elapsed_blocked += block_time
         self.thread_count += 1
 
+def run_command_get_pid(command):
+        p = subprocess.Popen(command.split())
+        return p.pid
+
+
 
 examples = """
 EXAMPLES:
@@ -38,7 +43,7 @@ EXAMPLES:
         every 5 seconds
 ./lockstat -p <pid> -t
         Trace for a specified pid and print a message on each entry and exit to
-        sys_futex
+        sys_futex until interrupted or killed
 ./lockstat -p <pid> 10
         Trace the specified pid and show a message every 10 seconds
 ./lockstat -c <command> 1 30
@@ -106,13 +111,11 @@ BPF_HASH(pid_blocktime, u32, u64);
 BPF_HASH(tgid_comm, u32, struct comm_t);
 BPF_HASH(lock_stats, struct lock_key_t, struct lock_info_t, 1000000);
 
-static inline int update_stats(u64 pid_tgid, u64 uaddr, u64 block_time) {
+static inline int update_stats(u32 pid, u32 tgid, u64 uaddr, u64 block_time) {
         struct lock_key_t key = {};
         struct lock_info_t zero = {};
         struct lock_info_t *info;
 
-        u32 pid = pid_tgid;
-        u32 tgid = (pid_tgid >> 32);
         key.pid = pid;
         key.tgid = tgid;
         key.uaddr = uaddr;
@@ -136,14 +139,20 @@ int sys_futex_enter(struct pt_regs *ctx, u32 *uaddr, int op, u32 val,
         if (cmd != FUTEX_WAIT)
                 return 0;
 
-        u32 pid = bpf_get_current_pid_tgid();
+        u64 pid_tgid = bpf_get_current_pid_tgid();
+        u32 pid = pid_tgid;
+        u32 tgid = pid_tgid >> 32;
+
+        if (!(THREAD_FILTER))
+            return 0;
+
         u64 timestamp = bpf_ktime_get_ns();
         u64 uaddr64 = (u64) uaddr;
         pid_lock.update(&pid, &uaddr64);
         pid_blocktime.update(&pid, &timestamp);
 
         if (SHOULD_PRINT)
-                bpf_trace_printk("enter sys_futex, pid = %u, uaddr = %u, "
+                bpf_trace_printk("enter sys_futex, pid = %u, uaddr = %x, "
                                  "cmd = %u\\n", pid, uaddr64, cmd);
         return 0;
 }
@@ -151,6 +160,10 @@ int sys_futex_enter(struct pt_regs *ctx, u32 *uaddr, int op, u32 val,
 int sys_futex_exit(struct pt_regs *ctx) {
         u64 pid_tgid = bpf_get_current_pid_tgid();
         u32 pid = pid_tgid;
+        u32 tgid = pid_tgid >> 32;
+        if (!(THREAD_FILTER))
+            return 0;
+
         u64 *blocktime = pid_blocktime.lookup(&pid);
         u64 *uaddr = pid_lock.lookup(&pid);
         u64 timestamp = bpf_ktime_get_ns();
@@ -160,12 +173,12 @@ int sys_futex_exit(struct pt_regs *ctx) {
                 return 0; // not FUTEX_WAIT, or (less likely) missed futex_enter
 
         elapsed = timestamp - *blocktime;
-        update_stats(pid_tgid, *uaddr, elapsed);
+        update_stats(pid, tgid, *uaddr, elapsed);
         pid_lock.delete(&pid);
         pid_blocktime.delete(&pid);
 
         if (SHOULD_PRINT) {
-                bpf_trace_printk("exit sys_futex, uaddr = %u, elapsed = %uns\\n",
+                bpf_trace_printk("exit sys_futex, uaddr = %x, elapsed = %uns\\n",
                                  uaddr == 0 ? 0 : *uaddr, elapsed);
         }
         return 0;
@@ -175,12 +188,19 @@ int sys_futex_exit(struct pt_regs *ctx) {
 
 bpf_source = bpf_source.replace("SHOULD_PRINT", "1" if trace_all else "0")
 
+thread_filter = '1'
+if pid != -1:
+	print("Tracing pid %d, Ctrl+C to quit." % pid)
+	# 'tgid' in kernel space is what people thin of as 'pid' in userspace
+	thread_filter = "tgid == %d" % pid
+else:
+	print("Tracing all processes, Ctrl+C to quit.")
+
+bpf_source = bpf_source.replace("THREAD_FILTER", thread_filter)
+
 bpf_program = BPF(text=bpf_source)
-
-print("Attaching to pid %d, Ctrl+C to quit." % pid)
-
-bpf_program.attach_kprobe(event="SyS_futex", fn_name="sys_futex_enter", pid=pid)
-bpf_program.attach_kretprobe(event="SyS_futex", fn_name="sys_futex_exit", pid=pid)
+bpf_program.attach_kprobe(event="SyS_futex", fn_name="sys_futex_enter")
+bpf_program.attach_kretprobe(event="SyS_futex", fn_name="sys_futex_exit")
 
 def create_tgid_stats():
         stats = bpf_program["lock_stats"]
@@ -204,9 +224,10 @@ def print_comm_stats(stats):
                                       key=lambda x: x[1].elapsed_blocked,
                                       reverse=True)
                 for addr, stats in sorted_locks:
-                    print("    %x: %dms (%d contentions affected %d threads)" %
+                    print("    %x: %dms (%d contentions involving %d threads, avg %dus)" %
                           (addr, stats.elapsed_blocked / 1000000,
-                           stats.contention_count, stats.thread_count))
+                           stats.contention_count, stats.thread_count,
+                           stats.elapsed_blocked / stats.contention_count / 1000))
 
 count_so_far = 0
 while True:
