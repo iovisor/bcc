@@ -88,8 +88,7 @@ parser.add_argument("-M", "--max-block-time", default=(1 << 64) - 1,
     type=positive_nonzero_int,
     help="the amount of time in microseconds under which we " +
          "store traces (default U64_MAX)")
-parser.add_argument("--state", default=999,
-    type=positive_int,
+parser.add_argument("--state", type=positive_int,
     help="filter on this thread state bitmask (eg, 2 == TASK_UNINTERRUPTIBLE" +
          ") see include/linux/sched.h")
 args = parser.parse_args()
@@ -184,7 +183,7 @@ else:
     thread_filter = '1'
 if args.state == 0:
     state_filter = 'prev->state == 0'
-elif args.state != 999:
+elif args.state:
     # these states are sometimes bitmask checked
     state_filter = 'prev->state & %d' % args.state
 else:
