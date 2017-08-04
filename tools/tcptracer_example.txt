@@ -24,3 +24,14 @@ outgoing from "curl" to a local netcat, and one incoming received by the "nc"
 process. The output details show the kind of event (C for connection, X for
 close and A for accept), PID, IP version, source address, destination address,
 source port and destination port.
+
+The -t option prints a timestamp column:
+
+```
+# ./tcptracer -t
+Tracing TCP established connections. Ctrl-C to end.
+TIME(s)  T  PID    COMM             IP SADDR            DADDR            SPORT  DPORT
+0.000    C  31002  telnet           4  192.168.1.2      192.168.1.1      42590  23
+3.546    C    748  curl             6  [::1]            [::1]            42592  80
+4.294    X  31002  telnet           4  192.168.1.2      192.168.1.1      42590  23
+```
