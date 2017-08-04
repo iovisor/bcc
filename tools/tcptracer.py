@@ -24,6 +24,8 @@ from struct import pack
 
 parser = ap.ArgumentParser(description="Trace TCP connections",
                            formatter_class=ap.RawDescriptionHelpFormatter)
+parser.add_argument("-t", "--timestamp", action="store_true",
+                    help="include timestamp on output")
 parser.add_argument("-p", "--pid", default=0, type=int,
                     help="trace this PID only")
 parser.add_argument("-N", "--netns", default=0, type=int,
@@ -47,6 +49,7 @@ bpf_text = """
 #define TCP_EVENT_TYPE_CLOSE   3
 
 struct tcp_ipv4_event_t {
+    u64 ts_us;
     u32 type;
     u32 pid;
     char comm[TASK_COMM_LEN];
@@ -60,6 +63,7 @@ struct tcp_ipv4_event_t {
 BPF_PERF_OUTPUT(tcp_ipv4_event);
 
 struct tcp_ipv6_event_t {
+    u64 ts_us;
     u32 type;
     u32 pid;
     char comm[TASK_COMM_LEN];
@@ -304,6 +308,7 @@ int trace_tcp_set_state_entry(struct pt_regs *ctx, struct sock *sk, int state)
       }
 
       struct tcp_ipv4_event_t evt4 = { };
+      evt4.ts_us = bpf_ktime_get_ns() / 1000;
       evt4.type = TCP_EVENT_TYPE_CONNECT;
       evt4.pid = p->pid >> 32;
       evt4.ip = ipver;
@@ -339,6 +344,7 @@ int trace_tcp_set_state_entry(struct pt_regs *ctx, struct sock *sk, int state)
       }
 
       struct tcp_ipv6_event_t evt6 = { };
+      evt6.ts_us = bpf_ktime_get_ns() / 1000;
       evt6.type = TCP_EVENT_TYPE_CONNECT;
       evt6.pid = p->pid >> 32;
       evt6.ip = ipver;
@@ -389,6 +395,7 @@ int trace_close_entry(struct pt_regs *ctx, struct sock *sk)
       }
 
       struct tcp_ipv4_event_t evt4 = { };
+      evt4.ts_us = bpf_ktime_get_ns() / 1000;
       evt4.type = TCP_EVENT_TYPE_CLOSE;
       evt4.pid = pid >> 32;
       evt4.ip = ipver;
@@ -408,6 +415,7 @@ int trace_close_entry(struct pt_regs *ctx, struct sock *sk)
       }
 
       struct tcp_ipv6_event_t evt6 = { };
+      evt6.ts_us = bpf_ktime_get_ns() / 1000;
       evt6.type = TCP_EVENT_TYPE_CLOSE;
       evt6.pid = pid >> 32;
       evt6.ip = ipver;
@@ -460,6 +468,7 @@ int trace_accept_return(struct pt_regs *ctx)
 
       struct tcp_ipv4_event_t evt4 = { 0 };
 
+      evt4.ts_us = bpf_ktime_get_ns() / 1000;
       evt4.type = TCP_EVENT_TYPE_ACCEPT;
       evt4.netns = net_ns_inum;
       evt4.pid = pid >> 32;
@@ -484,6 +493,7 @@ int trace_accept_return(struct pt_regs *ctx)
 
       struct tcp_ipv6_event_t evt6 = { 0 };
 
+      evt6.ts_us = bpf_ktime_get_ns() / 1000;
       evt6.type = TCP_EVENT_TYPE_ACCEPT;
       evt6.netns = net_ns_inum;
       evt6.pid = pid >> 32;
@@ -515,6 +525,7 @@ TASK_COMM_LEN = 16   # linux/sched.h
 
 class TCPIPV4Evt(ctypes.Structure):
     _fields_ = [
+            ("ts_us", ctypes.c_ulonglong),
             ("type", ctypes.c_uint),
             ("pid", ctypes.c_uint),
             ("comm", ctypes.c_char * TASK_COMM_LEN),
@@ -529,6 +540,7 @@ class TCPIPV4Evt(ctypes.Structure):
 
 class TCPIPV6Evt(ctypes.Structure):
     _fields_ = [
+            ("ts_us", ctypes.c_ulonglong),
             ("type", ctypes.c_uint),
             ("pid", ctypes.c_uint),
             ("comm", ctypes.c_char * TASK_COMM_LEN),
@@ -547,6 +559,11 @@ verbose_types = {"C": "connect", "A": "accept",
 
 def print_ipv4_event(cpu, data, size):
     event = ctypes.cast(data, ctypes.POINTER(TCPIPV4Evt)).contents
+    global start_ts
+    if args.timestamp:
+        if start_ts == 0:
+            start_ts = event.ts_us
+        print("%-9.3f" % ((float(event.ts_us) - start_ts) / 1000000), end="")
     if event.type == 1:
         type_str = "C"
     elif event.type == 2:
@@ -576,6 +593,11 @@ def print_ipv4_event(cpu, data, size):
 
 def print_ipv6_event(cpu, data, size):
     event = ctypes.cast(data, ctypes.POINTER(TCPIPV6Evt)).contents
+    global start_ts
+    if args.timestamp:
+        if start_ts == 0:
+            start_ts = event.ts_us
+        print("%-9.3f" % ((float(event.ts_us) - start_ts) / 1000000), end="")
     if event.type == 1:
         type_str = "C"
     elif event.type == 2:
@@ -627,6 +649,8 @@ b.attach_kretprobe(event="inet_csk_accept", fn_name="trace_accept_return")
 print("Tracing TCP established connections. Ctrl-C to end.")
 
 # header
+if args.timestamp:
+    print("%-9s" % ("TIME(s)"), end="")
 if args.verbose:
     print("%-12s %-6s %-16s %-2s %-16s %-16s %-6s %-7s" % ("TYPE",
           "PID", "COMM", "IP", "SADDR", "DADDR", "SPORT", "DPORT"), end="")
@@ -637,6 +661,7 @@ else:
     print("%-2s %-6s %-16s %-2s %-16s %-16s %-6s %-6s" %
           ("T", "PID", "COMM", "IP", "SADDR", "DADDR", "SPORT", "DPORT"))
 
+start_ts = 0
 
 def inet_ntoa(addr):
     dq = ''
