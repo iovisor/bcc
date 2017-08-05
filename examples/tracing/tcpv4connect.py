@@ -55,11 +55,9 @@ int kretprobe__tcp_v4_connect(struct pt_regs *ctx)
 
 	// pull in details
 	struct sock *skp = *skpp;
-	u32 saddr = 0, daddr = 0;
-	u16 dport = 0;
-	bpf_probe_read(&saddr, sizeof(saddr), &skp->__sk_common.skc_rcv_saddr);
-	bpf_probe_read(&daddr, sizeof(daddr), &skp->__sk_common.skc_daddr);
-	bpf_probe_read(&dport, sizeof(dport), &skp->__sk_common.skc_dport);
+	u32 saddr = skp->__sk_common.skc_rcv_saddr;
+	u32 daddr = skp->__sk_common.skc_daddr;
+	u16 dport = skp->__sk_common.skc_dport;
 
 	// output
 	bpf_trace_printk("trace_tcp4connect %x %x %d\\n", saddr, daddr, ntohs(dport));

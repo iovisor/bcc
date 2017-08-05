@@ -108,18 +108,15 @@ static int trace_connect_return(struct pt_regs *ctx, short ipver)
 
     // pull in details
     struct sock *skp = *skpp;
-    u16 dport = 0;
-    bpf_probe_read(&dport, sizeof(dport), &skp->__sk_common.skc_dport);
+    u16 dport = skp->__sk_common.skc_dport;
 
     FILTER_PORT
 
     if (ipver == 4) {
         struct ipv4_data_t data4 = {.pid = pid, .ip = ipver};
         data4.ts_us = bpf_ktime_get_ns() / 1000;
-        bpf_probe_read(&data4.saddr, sizeof(u32),
-            &skp->__sk_common.skc_rcv_saddr);
-        bpf_probe_read(&data4.daddr, sizeof(u32),
-            &skp->__sk_common.skc_daddr);
+        data4.saddr = skp->__sk_common.skc_rcv_saddr;
+        data4.daddr = skp->__sk_common.skc_daddr;
         data4.dport = ntohs(dport);
         bpf_get_current_comm(&data4.task, sizeof(data4.task));
         ipv4_events.perf_submit(ctx, &data4, sizeof(data4));
@@ -128,9 +125,9 @@ static int trace_connect_return(struct pt_regs *ctx, short ipver)
         struct ipv6_data_t data6 = {.pid = pid, .ip = ipver};
         data6.ts_us = bpf_ktime_get_ns() / 1000;
         bpf_probe_read(&data6.saddr, sizeof(data6.saddr),
-            &skp->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
+            skp->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
         bpf_probe_read(&data6.daddr, sizeof(data6.daddr),
-            &skp->__sk_common.skc_v6_daddr.in6_u.u6_addr32);
+            skp->__sk_common.skc_v6_daddr.in6_u.u6_addr32);
         data6.dport = ntohs(dport);
         bpf_get_current_comm(&data6.task, sizeof(data6.task));
         ipv6_events.perf_submit(ctx, &data6, sizeof(data6));

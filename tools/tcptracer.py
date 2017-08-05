@@ -107,20 +107,15 @@ BPF_HASH(connectsock, u64, struct sock *);
 
 static int read_ipv4_tuple(struct ipv4_tuple_t *tuple, struct sock *skp)
 {
-  u32 saddr = 0, daddr = 0, net_ns_inum = 0;
-  u16 sport = 0, dport = 0;
-  possible_net_t skc_net;
-
-  bpf_probe_read(&saddr, sizeof(saddr), &skp->__sk_common.skc_rcv_saddr);
-  bpf_probe_read(&daddr, sizeof(daddr), &skp->__sk_common.skc_daddr);
-  bpf_probe_read(&sport, sizeof(sport),
-                 &((struct inet_sock *)skp)->inet_sport);
-  bpf_probe_read(&dport, sizeof(dport), &skp->__sk_common.skc_dport);
+  u32 net_ns_inum = 0;
+  u32 saddr = skp->__sk_common.skc_rcv_saddr;
+  u32 daddr = skp->__sk_common.skc_daddr;
+  struct inet_sock *sockp = (struct inet_sock *)skp;
+  u16 sport = sockp->inet_sport;
+  u16 dport = skp->__sk_common.skc_dport;
 #ifdef CONFIG_NET_NS
-  bpf_probe_read(&skc_net, sizeof(skc_net), &skp->__sk_common.skc_net);
+  possible_net_t skc_net = skp->__sk_common.skc_net;
   bpf_probe_read(&net_ns_inum, sizeof(net_ns_inum), &skc_net.net->ns.inum);
-#else
-  net_ns_inum = 0;
 #endif
 
   ##FILTER_NETNS##
@@ -142,23 +137,18 @@ static int read_ipv4_tuple(struct ipv4_tuple_t *tuple, struct sock *skp)
 static int read_ipv6_tuple(struct ipv6_tuple_t *tuple, struct sock *skp)
 {
   u32 net_ns_inum = 0;
-  u16 sport = 0, dport = 0;
   unsigned __int128 saddr = 0, daddr = 0;
-  possible_net_t skc_net;
-
-  bpf_probe_read(&sport, sizeof(sport),
-                 &((struct inet_sock *)skp)->inet_sport);
-  bpf_probe_read(&dport, sizeof(dport), &skp->__sk_common.skc_dport);
-  bpf_probe_read(&saddr, sizeof(saddr),
-                 &skp->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
-  bpf_probe_read(&daddr, sizeof(daddr),
-                 &skp->__sk_common.skc_v6_daddr.in6_u.u6_addr32);
+  struct inet_sock *sockp = (struct inet_sock *)skp;
+  u16 sport = sockp->inet_sport;
+  u16 dport = skp->__sk_common.skc_dport;
 #ifdef CONFIG_NET_NS
-  bpf_probe_read(&skc_net, sizeof(skc_net), &skp->__sk_common.skc_net);
+  possible_net_t skc_net = skp->__sk_common.skc_net;
   bpf_probe_read(&net_ns_inum, sizeof(net_ns_inum), &skc_net.net->ns.inum);
-#else
-  net_ns_inum = 0;
 #endif
+  bpf_probe_read(&saddr, sizeof(saddr),
+                 skp->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
+  bpf_probe_read(&daddr, sizeof(daddr),
+                 skp->__sk_common.skc_v6_daddr.in6_u.u6_addr32);
 
   ##FILTER_NETNS##
 
@@ -178,10 +168,7 @@ static int read_ipv6_tuple(struct ipv6_tuple_t *tuple, struct sock *skp)
 
 static bool check_family(struct sock *sk, u16 expected_family) {
   u64 zero = 0;
-  u16 family = 0;
-
-  bpf_probe_read(&family, sizeof(family), &sk->__sk_common.skc_family);
-
+  u16 family = sk->__sk_common.skc_family;
   return family == expected_family;
 }
 
@@ -279,14 +266,11 @@ int trace_connect_v6_return(struct pt_regs *ctx)
   return 0;
 }
 
-int trace_tcp_set_state_entry(struct pt_regs *ctx, struct sock *sk, int state)
+int trace_tcp_set_state_entry(struct pt_regs *ctx, struct sock *skp, int state)
 {
   if (state != TCP_ESTABLISHED && state != TCP_CLOSE) {
       return 0;
   }
-
-  struct sock *skp;
-  bpf_probe_read(&skp, sizeof(struct sock *), &sk);
 
   u8 ipver = 0;
   if (check_family(skp, AF_INET)) {
@@ -367,18 +351,13 @@ int trace_tcp_set_state_entry(struct pt_regs *ctx, struct sock *sk, int state)
   return 0;
 }
 
-int trace_close_entry(struct pt_regs *ctx, struct sock *sk)
+int trace_close_entry(struct pt_regs *ctx, struct sock *skp)
 {
   u64 pid = bpf_get_current_pid_tgid();
 
   ##FILTER_PID##
 
-  // pull in details
-  struct sock *skp;
-  bpf_probe_read(&skp, sizeof(struct sock *), &sk);
-
-  u8 oldstate = 0;
-  bpf_probe_read(&oldstate, sizeof(oldstate), (u8 *)&skp->sk_state);
+  u8 oldstate = skp->sk_state;
   // Don't generate close events for connections that were never
   // established in the first place.
   if (oldstate == TCP_SYN_SENT ||
@@ -500,9 +479,9 @@ int trace_accept_return(struct pt_regs *ctx)
       evt6.ip = ipver;
 
       bpf_probe_read(&evt6.saddr, sizeof(evt6.saddr),
-                     &newsk->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
+                     newsk->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
       bpf_probe_read(&evt6.daddr, sizeof(evt6.daddr),
-                     &newsk->__sk_common.skc_v6_daddr.in6_u.u6_addr32);
+                     newsk->__sk_common.skc_v6_daddr.in6_u.u6_addr32);
 
       evt6.sport = lport;
       evt6.dport = ntohs(dport);

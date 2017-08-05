@@ -77,7 +77,7 @@ class BTypeVisitor : public clang::RecursiveASTVisitor<BTypeVisitor> {
 // Do a depth-first search to rewrite all pointers that need to be probed
 class ProbeVisitor : public clang::RecursiveASTVisitor<ProbeVisitor> {
  public:
-  explicit ProbeVisitor(clang::ASTContext &C, clang::Rewriter &rewriter);
+  explicit ProbeVisitor(clang::ASTContext &C, clang::Rewriter &rewriter, std::set<clang::Decl *> &m);
   bool VisitVarDecl(clang::VarDecl *Decl);
   bool VisitCallExpr(clang::CallExpr *Call);
   bool VisitBinaryOperator(clang::BinaryOperator *E);
@@ -94,13 +94,14 @@ class ProbeVisitor : public clang::RecursiveASTVisitor<ProbeVisitor> {
   std::set<clang::Decl *> fn_visited_;
   std::set<clang::Expr *> memb_visited_;
   std::set<clang::Decl *> ptregs_;
+  std::set<clang::Decl *> &m_;
 };
 
 // A helper class to the frontend action, walks the decls
 class BTypeConsumer : public clang::ASTConsumer {
  public:
   explicit BTypeConsumer(clang::ASTContext &C, BFrontendAction &fe);
-  bool HandleTopLevelDecl(clang::DeclGroupRef Group) override;
+  void HandleTranslationUnit(clang::ASTContext &Context) override;
  private:
   BTypeVisitor visitor_;
 };
@@ -108,8 +109,8 @@ class BTypeConsumer : public clang::ASTConsumer {
 // A helper class to the frontend action, walks the decls
 class ProbeConsumer : public clang::ASTConsumer {
  public:
-  ProbeConsumer(clang::ASTContext &C, clang::Rewriter &rewriter);
-  bool HandleTopLevelDecl(clang::DeclGroupRef Group) override;
+  ProbeConsumer(clang::ASTContext &C, clang::Rewriter &rewriter, std::set<clang::Decl *> &map);
+  void HandleTranslationUnit(clang::ASTContext &Context) override;
  private:
   ProbeVisitor visitor_;
 };
@@ -146,6 +147,7 @@ class BFrontendAction : public clang::ASTFrontendAction {
   std::map<std::string, clang::SourceRange> func_range_;
   FuncSource &func_src_;
   std::string &mod_src_;
+  std::set<clang::Decl *> m_;
 };
 
 }  // namespace visitor
