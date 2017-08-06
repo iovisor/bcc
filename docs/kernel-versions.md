@@ -114,7 +114,7 @@ Helper | Kernel version | Commit
 `BPF_FUNC_get_prandom_u32()` | 4.1 | [03e69b508b6f](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=03e69b508b6f7c51743055c9f61d1dfeadf4b635)
 `BPF_FUNC_get_route_realm()` | 4.4 | [c46646d0484f](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=c46646d0484f5d08e2bede9b45034ba5b8b489cc)
 `BPF_FUNC_get_smp_processor_id()` | 4.1 | [c04167ce2ca0](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=c04167ce2ca0ecaeaafef006cb0d65cf01b68e42)
-`BPF_FUNC_get_socket_cookie()` | 4.12 | [6acc5c291068](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=6acc5c2910689fc6ee181bf63085c5efff6a42bd)
+`BPF_FUNC_get_socket_cookie()` | 4.12 | [91b8270f2a4d](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=91b8270f2a4d1d9b268de90451cdca63a70052d6)
 `BPF_FUNC_get_socket_uid()` | 4.12 | [6acc5c291068](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=6acc5c2910689fc6ee181bf63085c5efff6a42bd)
 `BPF_FUNC_get_stackid()` | 4.6 | [d5a3b1f69186](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=d5a3b1f691865be576c2bffa708549b8cdccda19)
 `BPF_FUNC_ktime_get_ns()` | 4.1 | [d9847d310ab4](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=d9847d310ab4003725e6ed1822682e24bd406908)
