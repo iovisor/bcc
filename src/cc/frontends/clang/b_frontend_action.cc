@@ -77,6 +77,9 @@ class ProbeChecker : public RecursiveASTVisitor<ProbeChecker> {
   }
   bool VisitCallExpr(CallExpr *E) {
     needs_probe_ = false;
+    if (VarDecl *V = dyn_cast<VarDecl>(E->getCalleeDecl())) {
+      needs_probe_ = V->getName() == "bpf_get_current_task";
+    }
     return false;
   }
   bool VisitParenExpr(ParenExpr *E) {
