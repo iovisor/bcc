@@ -353,6 +353,17 @@ int trace_entry(struct pt_regs *ctx, struct request *req) {
         b = BPF(text=text)
         fn = b.load_func("trace_entry", BPF.KPROBE)
 
+    def test_paren_probe_read(self):
+        text = """
+#include <net/inet_sock.h>
+int trace_entry(struct pt_regs *ctx, struct sock *sk) {
+    u16 sport = ((struct inet_sock *)sk)->inet_sport;
+    return sport;
+}
+"""
+        b = BPF(text=text)
+        fn = b.load_func("trace_entry", BPF.KPROBE)
+
     def test_complex_leaf_types(self):
         text = """
 struct list;
