@@ -19,7 +19,6 @@ from time import sleep, strftime
 
 # load BPF program
 b = BPF(text="""
-#include <uapi/linux/ptrace.h>
 
 enum stat_types {
     S_COUNT = 1,
