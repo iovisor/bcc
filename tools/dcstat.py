@@ -49,7 +49,7 @@ enum stats {
     S_MAXSTAT
 };
 
-BPF_ARRAY(stats, u64, S_MAXSTAT + 1);
+BPF_ARRAY(stats, u64, S_MAXSTAT);
 
 /*
  * How this is instrumented, and how to interpret the statistics, is very much

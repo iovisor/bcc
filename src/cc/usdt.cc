@@ -356,6 +356,9 @@ const char *bcc_usdt_genargs(void **usdt_array, int len) {
   static std::string storage_;
   std::ostringstream stream;
 
+  if (!len)
+    return "";
+
   stream << USDT::USDT_PROGRAM_HEADER;
   // Generate genargs codes for an array of USDT Contexts.
   //
