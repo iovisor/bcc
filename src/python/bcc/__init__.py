@@ -572,7 +572,7 @@ class BPF(object):
         self._del_kprobe(ev_name)
 
     @staticmethod
-    def attach_xdp(dev, fn, flags):
+    def attach_xdp(dev, fn, flags=0):
         '''
             This function attaches a BPF function to a device on the device
             driver level (XDP)
