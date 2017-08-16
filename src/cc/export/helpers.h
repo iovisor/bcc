@@ -50,11 +50,11 @@ struct _name##_table_t { \
   void (*call) (void *, int index); \
   void (*increment) (_key_type); \
   int (*get_stackid) (void *, u64); \
-  _leaf_type data[_max_entries]; \
+  u32 max_entries; \
   int flags; \
 }; \
 __attribute__((section("maps/" _table_type))) \
-struct _name##_table_t _name = { .flags = (_flags) }
+struct _name##_table_t _name = { .flags = (_flags), .max_entries = (_max_entries) }
 
 #define BPF_TABLE(_table_type, _key_type, _leaf_type, _name, _max_entries) \
 BPF_F_TABLE(_table_type, _key_type, _leaf_type, _name, _max_entries, 0)
@@ -84,10 +84,10 @@ struct _name##_table_t { \
   /* map.perf_submit(ctx, data, data_size) */ \
   int (*perf_submit) (void *, void *, u32); \
   int (*perf_submit_skb) (void *, u32, void *, u32); \
-  u32 data[0]; \
+  u32 max_entries; \
 }; \
 __attribute__((section("maps/perf_output"))) \
-struct _name##_table_t _name
+struct _name##_table_t _name = { .max_entries = 0 }
 
 // Table for reading hw perf cpu counters
 #define BPF_PERF_ARRAY(_name, _max_entries) \
@@ -96,10 +96,10 @@ struct _name##_table_t { \
   u32 leaf; \
   /* counter = map.perf_read(index) */ \
   u64 (*perf_read) (int); \
-  u32 data[_max_entries]; \
+  u32 max_entries; \
 }; \
 __attribute__((section("maps/perf_array"))) \
-struct _name##_table_t _name
+struct _name##_table_t _name = { .max_entries = (_max_entries) }
 
 #define BPF_HASH1(_name) \
   BPF_TABLE("hash", u64, u64, _name, 10240)
