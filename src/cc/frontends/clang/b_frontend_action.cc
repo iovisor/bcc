@@ -633,8 +633,14 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
         }
         table.leaf_size = sz;
         leaf_type = F->getType();
-      } else if (F->getName() == "data") {
-        table.max_entries = sz / table.leaf_size;
+      } else if (F->getName() == "max_entries") {
+        unsigned idx = F->getFieldIndex();
+        if (auto I = dyn_cast_or_null<InitListExpr>(Decl->getInit())) {
+          llvm::APSInt res;
+          if (I->getInit(idx)->EvaluateAsInt(res, C)) {
+            table.max_entries = res.getExtValue();
+          }
+        }
       } else if (F->getName() == "flags") {
         unsigned idx = F->getFieldIndex();
         if (auto I = dyn_cast_or_null<InitListExpr>(Decl->getInit())) {
