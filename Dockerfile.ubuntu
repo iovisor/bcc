@@ -1,20 +1,13 @@
-# File to be used for building an Ubuntu .deb
+FROM ubuntu:xenial
 
-FROM ubuntu:trusty
+MAINTAINER Brenden Blanco <bblanco@gmail.com>
 
-MAINTAINER Brenden Blanco <bblanco@plumgrid.com>
+RUN apt-get -qq update && \
+    apt-get -y install pbuilder aptitude
 
-RUN apt-get -y install wget
-RUN printf "deb http://llvm.org/apt/trusty/ llvm-toolchain-trusty main\ndeb-src http://llvm.org/apt/trusty/ llvm-toolchain-trusty main\n" > /etc/apt/sources.list.d/llvm.list
-RUN wget -q -O - http://llvm.org/apt/llvm-snapshot.gpg.key | apt-key add -
-RUN apt-get -y update
+COPY ./ /root/bcc
 
-RUN apt-get -y install bison build-essential cmake debhelper devscripts flex git libedit-dev python zlib1g-dev
-RUN apt-get -y install libllvm3.8 llvm-3.8-dev libclang-3.8-dev
-
-RUN mkdir -p /root/bcc/build
-COPY ./ /root/bcc/
-WORKDIR /root
-RUN tar zcf bcc_0.1.1.orig.tar.gz bcc/
 WORKDIR /root/bcc
-RUN DEB_BUILD_OPTIONS="nocheck parallel=4" debuild -us -uc
+
+RUN /usr/lib/pbuilder/pbuilder-satisfydepends && \
+    ./scripts/build-deb.sh
