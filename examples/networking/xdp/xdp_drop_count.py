@@ -160,7 +160,7 @@ while 1:
         break;
 
 if mode == BPF.XDP:
-    b.remove_xdp(device)
+    b.remove_xdp(device, flags)
 else:
     ip.tc("del", "clsact", idx)
     ipdb.release()
