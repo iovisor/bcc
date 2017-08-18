@@ -781,7 +781,7 @@ int bpf_attach_xdp(const char *dev_name, int progfd, uint32_t flags) {
     // parse flags as passed by the user
     if (flags) {
         nla_xdp = (struct nlattr *)((char *)nla + nla->nla_len);
-        nla_xdp->nla_type = 3/*IFLA_XDP_SKB*/;
+        nla_xdp->nla_type = 3/*IFLA_XDP_FLAGS*/;
         nla_xdp->nla_len = NLA_HDRLEN + sizeof(flags);
         memcpy((char *)nla_xdp + NLA_HDRLEN, &flags, sizeof(flags));
         nla->nla_len += nla_xdp->nla_len;
