@@ -27,7 +27,7 @@ if (LUAJIT_LIBRARIES AND LUAJIT)
   if (CMAKE_C_COMPILER_ID MATCHES "Clang")
     target_link_libraries(bcc-lua -nopie)
   else()
-    target_link_libraries(bcc-lua -no-pie)
+    target_link_libraries(bcc-lua --no-pie)
   endif()
 
 	install(TARGETS bcc-lua RUNTIME DESTINATION bin)
