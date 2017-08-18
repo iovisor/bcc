@@ -591,12 +591,12 @@ class BPF(object):
                             % (dev, errstr))
 
     @staticmethod
-    def remove_xdp(dev):
+    def remove_xdp(dev, flags=0):
         '''
             This function removes any BPF function from a device on the
             device driver level (XDP)
         '''
-        res = lib.bpf_attach_xdp(dev.encode("ascii"), -1, 0)
+        res = lib.bpf_attach_xdp(dev.encode("ascii"), -1, flags)
         if res < 0:
             errstr = os.strerror(ct.get_errno())
             raise Exception("Failed to detach BPF from device %s: %s"
