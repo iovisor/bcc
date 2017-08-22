@@ -16,13 +16,18 @@ include(GNUInstallDirs)
 include(CheckCXXCompilerFlag)
 include(cmake/FindCompilerFlag.cmake)
 
+option(ENABLE_CLANG_JIT "Enable Loading BPF through Clang Frontend" ON)
+option(ENABLE_USDT "Enable User-level Statically Defined Tracing" ON)
+CMAKE_DEPENDENT_OPTION(ENABLE_CPP_API "Enable C++ API" ON "ENABLE_USDT" OFF)
+
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
-if(NOT PYTHON_ONLY)
+if(NOT PYTHON_ONLY AND ENABLE_CLANG_JIT)
 find_package(BISON)
 find_package(FLEX)
 find_package(LLVM REQUIRED CONFIG)
 message(STATUS "Found LLVM: ${LLVM_INCLUDE_DIRS}")
+find_package(LibElf REQUIRED)
 
 # clang is linked as a library, but the library path searching is
 # primitively supported, unlike libLLVM
@@ -52,10 +57,6 @@ if(NOT DEFINED BCC_KERNEL_MODULES_DIR)
   set(BCC_KERNEL_MODULES_DIR "/lib/modules")
 endif()
 
-find_package(LibElf REQUIRED)
-
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
-
 # As reported in issue #735, GCC 6 has some behavioral problems when
 # dealing with -isystem. Hence, skip the warning optimization
 # altogether on that compiler.
@@ -76,11 +77,15 @@ else()
   message(FATAL_ERROR "Compiler ${CMAKE_CXX_COMPILER} has no C++11 support.")
 endif()
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall ${CXX_ISYSTEM_DIRS}")
-endif()
+endif(NOT PYTHON_ONLY AND ENABLE_CLANG_JIT)
 
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall ${CXX_ISYSTEM_DIRS}")
+
+add_subdirectory(src)
+if(ENABLE_CLANG_JIT)
 add_subdirectory(examples)
 add_subdirectory(man)
-add_subdirectory(src)
 add_subdirectory(tests)
 add_subdirectory(tools)
+endif(ENABLE_CLANG_JIT)

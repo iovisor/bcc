@@ -28,10 +28,13 @@ set(bcc_common_sources bpf_common.cc bpf_module.cc exported_files.cc)
 set(bcc_table_sources table_storage.cc shared_table.cc bpffs_table.cc json_map_decl_visitor.cc)
 set(bcc_util_sources ns_guard.cc common.cc)
 set(bcc_sym_sources bcc_syms.cc bcc_elf.c bcc_perf_map.c bcc_proc.c)
+set(bcc_common_headers libbpf.h perf_reader.h)
+set(bcc_table_headers file_desc.h table_desc.h table_storage.h)
+set(bcc_api_headers bpf_common.h bpf_module.h bcc_exception.h bcc_syms.h)
 
+if(ENABLE_CLANG_JIT)
 add_library(bcc-shared SHARED
-  link_all.cc
-  ${bcc_common_sources} ${bcc_table_sources} ${bcc_sym_sources}
+  link_all.cc ${bcc_common_sources} ${bcc_table_sources} ${bcc_sym_sources}
   ${bcc_util_sources})
 set_target_properties(bcc-shared PROPERTIES VERSION ${REVISION_LAST} SOVERSION 0)
 set_target_properties(bcc-shared PROPERTIES OUTPUT_NAME bcc)
@@ -48,9 +51,6 @@ set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${llvm_lib_exclude_f
 set(bcc_common_libs b_frontend clang_frontend bpf-static
   ${clang_libs} ${llvm_libs} ${LIBELF_LIBRARIES})
 
-option(ENABLE_USDT "Enable User-level Statically Defined Tracing" ON)
-CMAKE_DEPENDENT_OPTION(ENABLE_CPP_API "Enable C++ API" ON "ENABLE_USDT" OFF)
-
 if(ENABLE_CPP_API)
   add_subdirectory(api)
   list(APPEND bcc_common_libs api-static)
@@ -61,20 +61,17 @@ if(ENABLE_USDT)
   list(APPEND bcc_common_libs usdt-static)
 endif()
 
+add_subdirectory(frontends)
+
 # Link against LLVM libraries
 target_link_libraries(bcc-shared ${bcc_common_libs})
 target_link_libraries(bcc-static ${bcc_common_libs} bcc-loader-static)
 
-install(TARGETS bcc-shared LIBRARY COMPONENT libbcc
-  DESTINATION ${CMAKE_INSTALL_LIBDIR})
-install(FILES bpf_common.h bpf_module.h bcc_syms.h bcc_exception.h file_desc.h
-              libbpf.h perf_reader.h
-              table_desc.h table_storage.h COMPONENT libbcc
-  DESTINATION include/bcc)
-install(DIRECTORY compat/linux/ COMPONENT libbcc
-  DESTINATION include/bcc/compat/linux
-  FILES_MATCHING PATTERN "*.h")
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libbcc.pc COMPONENT libbcc
-  DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
-
-add_subdirectory(frontends)
+install(TARGETS bcc-shared LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
+install(FILES ${bcc_table_headers} DESTINATION include/bcc)
+install(FILES ${bcc_api_headers} DESTINATION include/bcc)
+install(DIRECTORY compat/linux/ DESTINATION include/bcc/compat/linux FILES_MATCHING PATTERN "*.h")
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libbcc.pc DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
+endif(ENABLE_CLANG_JIT)
+install(FILES ${bcc_common_headers} DESTINATION include/bcc)
+install(TARGETS bpf-shared LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
