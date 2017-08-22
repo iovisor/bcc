@@ -69,7 +69,7 @@ int kprobe__inet_listen(struct pt_regs *ctx, struct socket *sock, int backlog)
 {
         // cast types. Intermediate cast not needed, kept for readability
         struct sock *sk = sock->sk;
-        struct inet_sock *inet = inet_sk(sk);
+        struct inet_sock *inet = (struct inet_sock *)sk;
 
         // Built event for userland
         struct listen_evt_t evt = {
@@ -91,7 +91,7 @@ int kprobe__inet_listen(struct pt_regs *ctx, struct socket *sock, int backlog)
         ##FILTER_PID##
 
         // Get port
-        bpf_probe_read(&evt.lport, sizeof(u16), &(inet->inet_sport));
+        evt.lport = inet->inet_sport;
         evt.lport = ntohs(evt.lport);
 
         // Get network namespace id, if kernel supports it
@@ -105,7 +105,7 @@ int kprobe__inet_listen(struct pt_regs *ctx, struct socket *sock, int backlog)
 
         // Get IP
         if (family == AF_INET) {
-            bpf_probe_read(evt.laddr, sizeof(u32), &(inet->inet_rcv_saddr));
+            evt.laddr[0] = inet->inet_rcv_saddr;
             evt.laddr[0] = be32_to_cpu(evt.laddr[0]);
         } else if (family == AF_INET6) {
             bpf_probe_read(evt.laddr, sizeof(evt.laddr),
