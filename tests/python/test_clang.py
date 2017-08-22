@@ -567,6 +567,16 @@ int foo(struct pt_regs *ctx) {
         with self.assertRaises(Exception):
             b = BPF(text=text)
 
+    def test_incomplete_type(self):
+        text = """
+BPF_HASH(drops, struct key_t);
+struct key_t {
+    u64 location;
+};
+"""
+        with self.assertRaises(Exception):
+            b = BPF(text=text)
+
 
 if __name__ == "__main__":
     main()
