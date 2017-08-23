@@ -20,3 +20,6 @@
 
 # Python API
 /src/python/ @drzaeus77 @goldshtn
+
+# Tests
+/tests/ @drzaeus77 @yonghong-song
