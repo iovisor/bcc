@@ -40,6 +40,7 @@ set_target_properties(bcc-shared PROPERTIES VERSION ${REVISION_LAST} SOVERSION 0
 set_target_properties(bcc-shared PROPERTIES OUTPUT_NAME bcc)
 
 add_library(bcc-loader-static STATIC ${bcc_sym_sources} ${bcc_util_sources})
+target_link_libraries(bcc-loader-static elf)
 add_library(bcc-static STATIC
   ${bcc_common_sources} ${bcc_table_sources} ${bcc_util_sources})
 set_target_properties(bcc-static PROPERTIES OUTPUT_NAME bcc)
