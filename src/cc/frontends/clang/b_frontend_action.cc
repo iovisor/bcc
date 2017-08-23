@@ -332,12 +332,14 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
           string lookup = "bpf_map_lookup_elem_(bpf_pseudo_fd(1, " + fd + ")";
           string update = "bpf_map_update_elem_(bpf_pseudo_fd(1, " + fd + ")";
           txt  = "({ typeof(" + name + ".key) _key = " + arg0 + "; ";
-          if (desc->second.type == BPF_MAP_TYPE_HASH) {
-            txt += "typeof(" + name + ".leaf) _zleaf; memset(&_zleaf, 0, sizeof(_zleaf)); ";
-            txt += update + ", &_key, &_zleaf, BPF_NOEXIST); ";
-          }
           txt += "typeof(" + name + ".leaf) *_leaf = " + lookup + ", &_key); ";
-          txt += "if (_leaf) (*_leaf)++; })";
+          txt += "if (_leaf) (*_leaf)++; ";
+          if (desc->second.type == BPF_MAP_TYPE_HASH) {
+            txt += "else { typeof(" + name + ".leaf) _zleaf; memset(&_zleaf, 0, sizeof(_zleaf)); ";
+            txt += "_zleaf++; ";
+            txt += update + ", &_key, &_zleaf, BPF_NOEXIST); } ";
+          }
+          txt += "})";
         } else if (memb_name == "perf_submit") {
           string name = Ref->getDecl()->getName();
           string arg0 = rewriter_.getRewrittenText(expansionRange(Call->getArg(0)->getSourceRange()));
