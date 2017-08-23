@@ -326,7 +326,7 @@ This may be improved in future bcc versions. Eg, the Python data struct could be
 
 Rewrite sync_timing.py, from a prior lesson, to use ```BPF_PERF_OUTPUT```.
 
-### Lesson 9. bitesize.py
+### Lesson 9. bitehist.py
 
 The following tool records a histogram of disk I/O sizes. Sample output:
 
@@ -345,7 +345,7 @@ Tracing... Hit Ctrl-C to end.
      128 -> 255      : 800      |**************************************|
 ```
 
-Code is [examples/tracing/bitesize.py](../examples/tracing/bitesize.py):
+Code is [examples/tracing/bitehist.py](../examples/tracing/bitehist.py):
 
 ```Python
 from bcc import BPF
@@ -393,7 +393,7 @@ New things to learn:
 
 ### Lesson 10. disklatency.py
 
-Write a program that times disk I/O, and prints a histogram of their latency. Disk I/O instrumentation and timing can be found in the disksnoop.py program from a prior lesson, and histogram code can be found in bitesize.py from a prior lesson.
+Write a program that times disk I/O, and prints a histogram of their latency. Disk I/O instrumentation and timing can be found in the disksnoop.py program from a prior lesson, and histogram code can be found in bitehist.py from a prior lesson.
 
 ### Lesson 11. vfsreadlat.py
 
