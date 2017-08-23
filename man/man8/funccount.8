@@ -27,6 +27,9 @@ Trace this process ID only.
 \-i INTERVAL
 Print output every interval seconds.
 .TP
+\-d DURATION
+Total duration of trace in seconds.
+.TP
 \-T
 Include timestamps on output.
 .TP
@@ -48,6 +51,10 @@ Count kernel functions beginning with "tcp_send", until Ctrl-C is hit:
 Print kernel functions beginning with "vfs_", every second:
 #
 .B funccount \-i 1 'vfs_*'
+.TP
+Print kernel functions beginning with "vfs_", for ten seconds only:
+#
+.B funccount \-d 10 'vfs_*'
 .TP
 Match kernel functions beginning with "vfs_", using regular expressions:
 #

@@ -266,6 +266,41 @@ kernel activity that aren't visible in other metrics.
 Include -T to print timestamps on output.
 
 
+A maximum duration can be set. For example, to print 5 x 1 second summaries
+of vfs_read() calls:
+
+# ./funccount -i 1 -d 5 vfs_read
+Tracing 1 functions for "vfs_read"... Hit Ctrl-C to end.
+
+FUNC                                    COUNT
+vfs_read                                   30
+
+FUNC                                    COUNT
+vfs_read                                   26
+
+FUNC                                    COUNT
+vfs_read                                   54
+
+FUNC                                    COUNT
+vfs_read                                   25
+
+FUNC                                    COUNT
+vfs_read                                   31
+Detaching...
+
+By leaving off the "-i 1", this will print a single 5 second summary:
+
+# funccount.py -d 5 vfs_read
+Tracing 1 functions for "vfs_read"... Hit Ctrl-C to end.
+
+FUNC                                    COUNT
+vfs_read                                  167
+Detaching...
+
+This can be useful for finding out rates: trace all functions for ten seconds
+and then divide by ten for the per-second rate.
+
+
 The "*" wildcard can be used multiple times. Eg, matching functions that contain
 the word "readdir":
 
@@ -293,8 +328,9 @@ Detaching...
 
 Full USAGE:
 
-# ./funccount  -h
-usage: funccount.py [-h] [-p PID] [-i INTERVAL] [-T] [-r] [-d] pattern
+# ./funccount -h
+usage: funccount [-h] [-p PID] [-i INTERVAL] [-d DURATION] [-T] [-r] [-D]
+                    pattern
 
 Count functions, tracepoints, and USDT probes
 
@@ -306,16 +342,19 @@ optional arguments:
   -p PID, --pid PID     trace this PID only
   -i INTERVAL, --interval INTERVAL
                         summary interval, seconds
+  -d DURATION, --duration DURATION
+                        total duration of trace, seconds
   -T, --timestamp       include timestamp on output
   -r, --regexp          use regular expressions. Default is "*" wildcards
                         only.
-  -d, --debug           print BPF program before starting (for debugging
+  -D, --debug           print BPF program before starting (for debugging
                         purposes)
 
 examples:
     ./funccount 'vfs_*'             # count kernel fns starting with "vfs"
     ./funccount -r '^vfs.*'         # same as above, using regular expressions
     ./funccount -Ti 5 'vfs_*'       # output every 5 seconds, with timestamps
+    ./funccount -d 10 'vfs_*'       # trace for 10 seconds only
     ./funccount -p 185 'vfs_*'      # count vfs calls for PID 181 only
     ./funccount t:sched:sched_fork  # count calls to the sched_fork tracepoint
     ./funccount -p 185 u:node:gc*   # count all GC USDT probes in node, PID 185
