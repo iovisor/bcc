@@ -4,7 +4,7 @@
 # funccount Count functions, tracepoints, and USDT probes.
 #           For Linux, uses BCC, eBPF.
 #
-# USAGE: funccount [-h] [-p PID] [-i INTERVAL] [-T] [-r] pattern
+# USAGE: funccount [-h] [-p PID] [-i INTERVAL] [-d DURATION] [-T] [-r] pattern
 #
 # The pattern is a string with optional '*' wildcards, similar to file
 # globbing. If you'd prefer to use regular expressions, use the -r option.
@@ -218,6 +218,7 @@ class Tool(object):
     ./funccount 'vfs_*'             # count kernel fns starting with "vfs"
     ./funccount -r '^vfs.*'         # same as above, using regular expressions
     ./funccount -Ti 5 'vfs_*'       # output every 5 seconds, with timestamps
+    ./funccount -d 10 'vfs_*'       # trace for 10 seconds only
     ./funccount -p 185 'vfs_*'      # count vfs calls for PID 181 only
     ./funccount t:sched:sched_fork  # count calls to the sched_fork tracepoint
     ./funccount -p 185 u:node:gc*   # count all GC USDT probes in node, PID 185
@@ -232,13 +233,15 @@ class Tool(object):
             epilog=examples)
         parser.add_argument("-p", "--pid", type=int,
             help="trace this PID only")
-        parser.add_argument("-i", "--interval", default=99999999,
+        parser.add_argument("-i", "--interval",
             help="summary interval, seconds")
+        parser.add_argument("-d", "--duration",
+            help="total duration of trace, seconds")
         parser.add_argument("-T", "--timestamp", action="store_true",
             help="include timestamp on output")
         parser.add_argument("-r", "--regexp", action="store_true",
             help="use regular expressions. Default is \"*\" wildcards only.")
-        parser.add_argument("-d", "--debug", action="store_true",
+        parser.add_argument("-D", "--debug", action="store_true",
             help="print BPF program before starting (for debugging purposes)")
         parser.add_argument("pattern",
             help="search expression for events")
@@ -246,6 +249,10 @@ class Tool(object):
         global debug
         debug = self.args.debug
         self.probe = Probe(self.args.pattern, self.args.regexp, self.args.pid)
+        if self.args.duration and not self.args.interval:
+            self.args.interval = self.args.duration
+        if not self.args.interval:
+            self.args.interval = 99999999
 
     @staticmethod
     def _signal_ignore(signal, frame):
@@ -257,13 +264,17 @@ class Tool(object):
         print("Tracing %d functions for \"%s\"... Hit Ctrl-C to end." %
               (self.probe.matched, self.args.pattern))
         exiting = 0 if self.args.interval else 1
+        seconds = 0
         while True:
             try:
                 sleep(int(self.args.interval))
+                seconds += int(self.args.interval)
             except KeyboardInterrupt:
                 exiting = 1
                 # as cleanup can take many seconds, trap Ctrl-C:
                 signal.signal(signal.SIGINT, Tool._signal_ignore)
+            if self.args.duration and seconds >= int(self.args.duration):
+                exiting = 1
 
             print()
             if self.args.timestamp:
