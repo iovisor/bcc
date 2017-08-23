@@ -621,6 +621,11 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
 
     unsigned i = 0;
     for (auto F : RD->fields()) {
+      if (F->getType().getTypePtr()->isIncompleteType()) {
+        error(F->getLocStart(), "unknown type");
+        return false;
+      }
+
       size_t sz = C.getTypeSize(F->getType()) >> 3;
       if (F->getName() == "key") {
         if (sz == 0) {
