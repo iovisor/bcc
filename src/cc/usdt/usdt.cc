@@ -285,7 +285,8 @@ void Context::each_uprobe(each_uprobe_cb callback) {
   }
 }
 
-Context::Context(const std::string &bin_path) : loaded_(false) {
+Context::Context(const std::string &bin_path)
+    : mount_ns_instance_(new ProcMountNS(-1)), loaded_(false) {
   std::string full_path = resolve_bin_path(bin_path);
   if (!full_path.empty()) {
     if (bcc_elf_foreach_usdt(full_path.c_str(), _each_probe, this) == 0) {
