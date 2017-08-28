@@ -133,12 +133,26 @@ if debug:
 b = BPF(text=bpf_text)
 
 # common file functions
-b.attach_kprobe(event="zpl_read", fn_name="trace_entry")
-b.attach_kprobe(event="zpl_write", fn_name="trace_entry")
+if BPF.get_kprobe_functions('zpl_iter'):
+    b.attach_kprobe(event="zpl_iter_read", fn_name="trace_entry")
+    b.attach_kprobe(event="zpl_iter_write", fn_name="trace_entry")
+elif BPF.get_kprobe_functions('zpl_aio'):
+    b.attach_kprobe(event="zpl_aio_read", fn_name="trace_entry")
+    b.attach_kprobe(event="zpl_aio_write", fn_name="trace_entry")
+else:
+    b.attach_kprobe(event="zpl_read", fn_name="trace_entry")
+    b.attach_kprobe(event="zpl_write", fn_name="trace_entry")
 b.attach_kprobe(event="zpl_open", fn_name="trace_entry")
 b.attach_kprobe(event="zpl_fsync", fn_name="trace_entry")
-b.attach_kretprobe(event="zpl_read", fn_name="trace_read_return")
-b.attach_kretprobe(event="zpl_write", fn_name="trace_write_return")
+if BPF.get_kprobe_functions('zpl_iter'):
+    b.attach_kretprobe(event="zpl_iter_read", fn_name="trace_read_return")
+    b.attach_kretprobe(event="zpl_iter_write", fn_name="trace_write_return")
+elif BPF.get_kprobe_functions('zpl_aio'):
+    b.attach_kretprobe(event="zpl_aio_read", fn_name="trace_read_return")
+    b.attach_kretprobe(event="zpl_aio_write", fn_name="trace_write_return")
+else:
+    b.attach_kretprobe(event="zpl_read", fn_name="trace_read_return")
+    b.attach_kretprobe(event="zpl_write", fn_name="trace_write_return")
 b.attach_kretprobe(event="zpl_open", fn_name="trace_open_return")
 b.attach_kretprobe(event="zpl_fsync", fn_name="trace_fsync_return")
 
