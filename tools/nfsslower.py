@@ -1,0 +1,222 @@
+#!/usr/bin/python
+
+from __future__ import print_function
+from bcc import BPF
+import argparse
+from time import strftime
+import ctypes as ct
+
+parser = argparse.ArgumentParser(
+    description="""Trace READ, WRITE, OPEN \
+and GETATTR NFS calls slower than a threshold""",
+    formatter_class=argparse.RawDescriptionHelpFormatter)
+parser.add_argument("-p", "--pid", help="Trace this pid only")
+parser.add_argument("min_ms", nargs="?", default='10')
+args = parser.parse_args()
+min_ms = int(args.min_ms)
+pid = args.pid
+debug = 1
+
+bpf_text = """
+
+#include <uapi/linux/ptrace.h>
+#include <linux/fs.h>
+#include <linux/sched.h>
+#include <linux/dcache.h>
+
+#define TRACE_READ 0
+#define TRACE_WRITE 1
+#define TRACE_OPEN 2
+
+struct val_t {
+    u64 ts;
+    u64 offset;
+    struct file *fp;
+    struct nfs_fattr *ft;
+};
+
+struct data_t {
+    // XXX: switch some to u32's when supported
+    u64 ts_us;
+    u64 type;
+    u64 size;
+    u64 offset;
+    u64 delta_us;
+    u64 pid;
+    char task[TASK_COMM_LEN];
+    char file[DNAME_INLINE_LEN];
+};
+
+BPF_HASH(entryinfo, u64, struct val_t);
+BPF_PERF_OUTPUT(events);
+
+int trace_rw_entry(struct pt_regs *ctx, struct kiocb *iocb,
+                                struct iov_iter *data)
+{
+    u64 id = bpf_get_current_pid_tgid();
+    u32 pid = id >> 32; // PID is higher part
+
+    if(FILTER_PID)
+        return 0;
+
+    // store filep and timestamp by id
+    struct val_t val = {};
+    val.ts = bpf_ktime_get_ns();
+    val.fp = iocb->ki_filp;
+    val.offset = iocb->ki_pos;
+    if (val.fp)
+        entryinfo.update(&id, &val);
+    return 0;
+}
+
+int trace_file_open_entry (struct pt_regs *ctx, struct inode *inode,
+                                struct file *filp)
+{
+    u64 id = bpf_get_current_pid_tgid();
+    u32 pid = id >> 32; // PID is higher part
+
+    if(FILTER_PID)
+        return 0;
+
+    // store filep and timestamp by id
+    struct val_t val = {};
+    val.ts = bpf_ktime_get_ns();
+    val.fp = filp;
+    val.offset = 0;
+    if (val.fp)
+        entryinfo.update(&id, &val);
+
+    return 0;
+}
+
+static int trace_exit(struct pt_regs *ctx, int type)
+{
+    struct val_t *valp;
+    u64 id = bpf_get_current_pid_tgid();
+    u32 pid = id >> 32; // PID is higher part
+
+    valp = entryinfo.lookup(&id);
+    if (valp == 0) {
+        // missed tracing issue or filtered
+        return 0;
+    }
+
+    // calculate delta
+    u64 ts = bpf_ktime_get_ns();
+    u64 delta_us = (ts - valp->ts) / 1000;
+    entryinfo.delete(&id);
+    if (FILTER_US)
+        return 0;
+
+    // populate output struct
+    u32 size = PT_REGS_RC(ctx);
+    struct data_t data = {.type = type, .size = size, .delta_us = delta_us,
+        .pid = pid};
+    data.ts_us = ts / 1000;
+    data.offset = valp->offset;
+    bpf_get_current_comm(&data.task, sizeof(data.task));
+
+    // workaround (rewriter should handle file to d_name in one step):
+    struct dentry *de = NULL;
+    struct qstr qs = {};
+    bpf_probe_read(&de, sizeof(de), &valp->fp->f_path.dentry);
+    bpf_probe_read(&qs, sizeof(qs), (void *)&de->d_name);
+    if (qs.len == 0)
+        return 0;
+    bpf_probe_read(&data.file, sizeof(data.file), (void *)qs.name);
+
+    // output
+    events.perf_submit(ctx, &data, sizeof(data));
+
+    return 0;
+}
+
+int trace_file_open_return(struct pt_regs *ctx)
+{
+    return trace_exit(ctx, TRACE_OPEN);
+}
+
+int trace_read_return(struct pt_regs *ctx)
+{
+    return trace_exit(ctx, TRACE_READ);
+}
+
+int trace_write_return(struct pt_regs *ctx)
+{
+    return trace_exit(ctx, TRACE_WRITE);
+}
+
+"""
+if min_ms == 0:
+    bpf_text = bpf_text.replace('FILTER_US', '0')
+else:
+    bpf_text = bpf_text.replace('FILTER_US',
+                                'delta_us <= %s' % str(min_ms * 1000))
+if args.pid:
+    bpf_text = bpf_text.replace('FILTER_PID', 'pid != %s' % pid)
+else:
+    bpf_text = bpf_text.replace('FILTER_PID', '0')
+if debug:
+    print(bpf_text)
+
+# kernel->user event data: struct data_t
+DNAME_INLINE_LEN = 32   # linux/dcache.h
+TASK_COMM_LEN = 16      # linux/sched.h
+
+
+class Data(ct.Structure):
+    _fields_ = [
+        ("ts_us", ct.c_ulonglong),
+        ("type", ct.c_ulonglong),
+        ("size", ct.c_ulonglong),
+        ("offset", ct.c_ulonglong),
+        ("delta_us", ct.c_ulonglong),
+        ("pid", ct.c_ulonglong),
+        ("task", ct.c_char * TASK_COMM_LEN),
+        ("file", ct.c_char * DNAME_INLINE_LEN)
+    ]
+
+
+# process event
+def print_event(cpu, data, size):
+    event = ct.cast(data, ct.POINTER(Data)).contents
+
+    type = 'R'
+    if event.type == 1:
+        type = 'W'
+    elif event.type == 2:
+        type = 'O'
+
+    print("%-8s %-14.14s %-6s %1s %-7s %-8d %7.2f %s" % (strftime("%H:%M:%S"),
+                                                         event.task.decode(),
+                                                         event.pid, type,
+                                                         event.size,
+                                                         event.offset / 1024,
+                                                         float(event.delta_us) / 1000,
+                                                         event.file.decode()))
+
+
+b = BPF(text=bpf_text)
+b.attach_kprobe(event="nfs_file_read", fn_name="trace_rw_entry")
+b.attach_kprobe(event="nfs_file_write", fn_name="trace_rw_entry")
+b.attach_kprobe(event="nfs4_file_open", fn_name="trace_file_open_entry")
+b.attach_kretprobe(event="nfs_file_read", fn_name="trace_read_return")
+b.attach_kretprobe(event="nfs_file_write", fn_name="trace_write_return")
+b.attach_kretprobe(event="nfs4_file_open", fn_name="trace_file_open_return")
+
+if min_ms == 0:
+    print("Tracing nfs4 operations")
+else:
+    print("Tracing nfs4 operations that are slower than %d ms" % min_ms)
+print("%-8s %-14s %-6s %1s %-7s %-8s %7s %s" % ("TIME",
+                                                "COMM",
+                                                "PID",
+                                                "T",
+                                                "BYTES",
+                                                "OFF_KB",
+                                                "LAT(ms)",
+                                                "FILENAME"))
+
+b["events"].open_perf_buffer(print_event, page_cnt=64)
+while 1:
+        b.kprobe_poll()
