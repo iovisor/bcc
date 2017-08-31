@@ -1,4 +1,28 @@
 #!/usr/bin/python
+# @lint-avoid-python-3-compatibility-imports
+#
+# nfsslower     Trace slow NFS operations
+#               for Linux using BCC & eBPF
+#
+# Usage: nfsslower [-h] [-p PID] [min_ms]
+#
+# This script traces some common NFS operations: read, write, opens and
+# getattr. It measures the time spent in these operations, and prints details
+# for each that exceeded a threshold.
+#
+# WARNING: This adds low-overhead instrumentation to these XFS operations,
+# including reads and writes from the file system cache. Such reads and writes
+# can be very frequent (depending on the workload; eg, 1M/sec), at which
+# point the overhead of this tool (even if it prints no "slower" events) can
+# begin to become significant.
+#
+# Most of this code is copied from similar tools (ext4slower, zfsslower etc)
+#
+# By default, a minimum millisecond threshold of 10 is used.
+#
+# 31-Aug-2017   Samuel Nair created this. Currently the open trace specifically
+#               works with NFSv4. But the remaining kprobes should work with
+#               NFSv{1..3}
 
 from __future__ import print_function
 from bcc import BPF
@@ -6,16 +30,28 @@ import argparse
 from time import strftime
 import ctypes as ct
 
+examples = """
+    ./nfsslower         # trace operations slower than 10ms
+    ./nfsslower 1       # trace operations slower than 1ms
+    ./nfsslower 0       # trace all nfs operations
+    ./nfsslower -p 121  # trace pid 121 only
+"""
 parser = argparse.ArgumentParser(
     description="""Trace READ, WRITE, OPEN \
 and GETATTR NFS calls slower than a threshold""",
-    formatter_class=argparse.RawDescriptionHelpFormatter)
+    formatter_class=argparse.RawDescriptionHelpFormatter,
+    epilog=examples)
+
+parser.add_argument("-j", "--csv", action="store_true",
+                    help="just print fields: comma-separated values")
 parser.add_argument("-p", "--pid", help="Trace this pid only")
-parser.add_argument("min_ms", nargs="?", default='10')
+parser.add_argument("min_ms", nargs="?", default='10',
+                    help="Minimum IO duration to trace in ms (default=10ms)")
 args = parser.parse_args()
 min_ms = int(args.min_ms)
 pid = args.pid
-debug = 1
+csv = args.csv
+debug = 0
 
 bpf_text = """
 
@@ -27,12 +63,13 @@ bpf_text = """
 #define TRACE_READ 0
 #define TRACE_WRITE 1
 #define TRACE_OPEN 2
+#define TRACE_GETATTR 3
 
 struct val_t {
     u64 ts;
     u64 offset;
     struct file *fp;
-    struct nfs_fattr *ft;
+    struct dentry *d;
 };
 
 struct data_t {
@@ -63,6 +100,7 @@ int trace_rw_entry(struct pt_regs *ctx, struct kiocb *iocb,
     struct val_t val = {};
     val.ts = bpf_ktime_get_ns();
     val.fp = iocb->ki_filp;
+    val.d = NULL;
     val.offset = iocb->ki_pos;
     if (val.fp)
         entryinfo.update(&id, &val);
@@ -82,8 +120,28 @@ int trace_file_open_entry (struct pt_regs *ctx, struct inode *inode,
     struct val_t val = {};
     val.ts = bpf_ktime_get_ns();
     val.fp = filp;
+    val.d = NULL;
     val.offset = 0;
     if (val.fp)
+        entryinfo.update(&id, &val);
+
+    return 0;
+}
+
+int trace_getattr_entry(struct pt_regs *ctx, struct vfsmount *mnt,
+                        struct dentry *dentry, struct kstat *stat)
+{
+    u64 id = bpf_get_current_pid_tgid();
+    u32 pid = id >> 32; // PID is higher part
+
+    if(FILTER_PID)
+        return 0;
+    struct val_t val = {};
+    val.ts = bpf_ktime_get_ns();
+    val.fp = NULL;
+    val.d = dentry;
+    val.offset = 0;
+    if (val.d)
         entryinfo.update(&id, &val);
 
     return 0;
@@ -94,13 +152,11 @@ static int trace_exit(struct pt_regs *ctx, int type)
     struct val_t *valp;
     u64 id = bpf_get_current_pid_tgid();
     u32 pid = id >> 32; // PID is higher part
-
     valp = entryinfo.lookup(&id);
     if (valp == 0) {
         // missed tracing issue or filtered
         return 0;
     }
-
     // calculate delta
     u64 ts = bpf_ktime_get_ns();
     u64 delta_us = (ts - valp->ts) / 1000;
@@ -119,7 +175,16 @@ static int trace_exit(struct pt_regs *ctx, int type)
     // workaround (rewriter should handle file to d_name in one step):
     struct dentry *de = NULL;
     struct qstr qs = {};
-    bpf_probe_read(&de, sizeof(de), &valp->fp->f_path.dentry);
+
+    if(type == TRACE_GETATTR)
+    {
+        bpf_probe_read(&de,sizeof(de), &valp->d);
+    }
+    else
+    {
+        bpf_probe_read(&de, sizeof(de), &valp->fp->f_path.dentry);
+    }
+
     bpf_probe_read(&qs, sizeof(qs), (void *)&de->d_name);
     if (qs.len == 0)
         return 0;
@@ -130,6 +195,7 @@ static int trace_exit(struct pt_regs *ctx, int type)
 
     return 0;
 }
+
 
 int trace_file_open_return(struct pt_regs *ctx)
 {
@@ -144,6 +210,11 @@ int trace_read_return(struct pt_regs *ctx)
 int trace_write_return(struct pt_regs *ctx)
 {
     return trace_exit(ctx, TRACE_WRITE);
+}
+
+int trace_getattr_return(struct pt_regs *ctx)
+{
+    return trace_exit(ctx, TRACE_GETATTR);
 }
 
 """
@@ -186,10 +257,18 @@ def print_event(cpu, data, size):
         type = 'W'
     elif event.type == 2:
         type = 'O'
+    elif event.type == 3:
+        type = 'G'
 
+    if(csv):
+        print("%d,%s,%d,%s,%d,%d,%d,%s" % (
+            event.ts_us, event.task, event.pid, type, event.size,
+            event.offset, event.delta_us, event.file))
+        return
     print("%-8s %-14.14s %-6s %1s %-7s %-8d %7.2f %s" % (strftime("%H:%M:%S"),
                                                          event.task.decode(),
-                                                         event.pid, type,
+                                                         event.pid,
+                                                         type,
                                                          event.size,
                                                          event.offset / 1024,
                                                          float(event.delta_us) / 1000,
@@ -200,22 +279,28 @@ b = BPF(text=bpf_text)
 b.attach_kprobe(event="nfs_file_read", fn_name="trace_rw_entry")
 b.attach_kprobe(event="nfs_file_write", fn_name="trace_rw_entry")
 b.attach_kprobe(event="nfs4_file_open", fn_name="trace_file_open_entry")
+b.attach_kprobe(event="nfs_getattr", fn_name="trace_getattr_entry")
+
 b.attach_kretprobe(event="nfs_file_read", fn_name="trace_read_return")
 b.attach_kretprobe(event="nfs_file_write", fn_name="trace_write_return")
 b.attach_kretprobe(event="nfs4_file_open", fn_name="trace_file_open_return")
+b.attach_kretprobe(event="nfs_getattr", fn_name="trace_getattr_return")
 
-if min_ms == 0:
-    print("Tracing nfs4 operations")
+if(csv):
+    print("ENDTIME_us,TASK,PID,TYPE,BYTES,OFFSET_b,LATENCY_us,FILE")
 else:
-    print("Tracing nfs4 operations that are slower than %d ms" % min_ms)
-print("%-8s %-14s %-6s %1s %-7s %-8s %7s %s" % ("TIME",
-                                                "COMM",
-                                                "PID",
-                                                "T",
-                                                "BYTES",
-                                                "OFF_KB",
-                                                "LAT(ms)",
-                                                "FILENAME"))
+    if min_ms == 0:
+        print("Tracing nfs4 operations")
+    else:
+        print("Tracing nfs4 operations that are slower than %d ms" % min_ms)
+        print("%-8s %-14s %-6s %1s %-7s %-8s %7s %s" % ("TIME",
+                                                        "COMM",
+                                                        "PID",
+                                                        "T",
+                                                        "BYTES",
+                                                        "OFF_KB",
+                                                        "LAT(ms)",
+                                                        "FILENAME"))
 
 b["events"].open_perf_buffer(print_event, page_cnt=64)
 while 1:
