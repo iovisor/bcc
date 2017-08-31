@@ -64,5 +64,44 @@ class TestTracepointDataLoc(unittest.TestCase):
         self.assertTrue("/bin/ls" in [v.filename.decode()
                                       for v in b["execs"].values()])
 
+@unittest.skipUnless(kernel_version_ge(4,7), "requires kernel >= 4.7")
+class TestTracepointDataLoc(unittest.TestCase):
+    def test_tracepoint_data_loc(self):
+        text = """
+        #include <net/inet_sock.h>
+
+        BPF_HASH(pkts, u32, u64);
+        TRACEPOINT_PROBE(net, net_dev_queue) {
+            u64 count = 0;
+
+            // Get sk_buff fro args
+            struct sk_buff* skb = (struct sk_buff*)args->skbaddr;
+
+            // Get skb->dev
+            struct net_device *dev;
+            MEMBER_READ(&dev, skb, dev);
+
+            // Get dev->nd_net.net
+            struct net* net;
+            possible_net_t *skc_net = &dev->nd_net;
+            MEMBER_READ(&net, skc_net, net);
+
+            // Get net->ns.inum
+            u32 netns;
+            struct ns_common* ns = MEMBER_ADDR(net, ns);
+            MEMBER_READ(&netns, ns, inum);
+
+            // Increment packet count for netns
+            u64 *existing = pkts.lookup_or_init(&netns, &count);
+            (*existing)++;
+
+            return 0;
+        }
+        """
+        b = bcc.BPF(text=text)
+        subprocess.check_output(["/bin/ping", "localhost", "-c1"])
+        sleep(1)
+        self.assertNotEqual(0, len(b["pkts"]))
+
 if __name__ == "__main__":
     unittest.main()
