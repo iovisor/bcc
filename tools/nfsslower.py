@@ -20,9 +20,7 @@
 #
 # By default, a minimum millisecond threshold of 10 is used.
 #
-# 31-Aug-2017   Samuel Nair created this. Currently the open trace specifically
-#               works with NFSv4. But the remaining kprobes should work with
-#               NFSv{1..3}
+# 31-Aug-2017   Samuel Nair created this. Should work with NFSv{3,4}
 
 from __future__ import print_function
 from bcc import BPF
@@ -33,12 +31,14 @@ import ctypes as ct
 examples = """
     ./nfsslower         # trace operations slower than 10ms
     ./nfsslower 1       # trace operations slower than 1ms
+    ./nfsslower -j 1    # ... 1 ms, parsable output (csv)
     ./nfsslower 0       # trace all nfs operations
     ./nfsslower -p 121  # trace pid 121 only
 """
 parser = argparse.ArgumentParser(
     description="""Trace READ, WRITE, OPEN \
-and GETATTR NFS calls slower than a threshold""",
+and GETATTR NFS calls slower than a threshold,\
+supports NFSv{3,4}""",
     formatter_class=argparse.RawDescriptionHelpFormatter,
     epilog=examples)
 
@@ -270,29 +270,36 @@ def print_event(cpu, data, size):
                                                          event.pid,
                                                          type,
                                                          event.size,
-                                                         event.offset / 1024,
-                                                         float(event.delta_us) / 1000,
+                                                         event.offset
+                                                         / 1024,
+                                                         float(event.delta_us)
+                                                         / 1000,
                                                          event.file.decode()))
 
+
+# Currently specifically works for NFSv4, the other kprobes are generic
+# so it should work with earlier NFS versions
 
 b = BPF(text=bpf_text)
 b.attach_kprobe(event="nfs_file_read", fn_name="trace_rw_entry")
 b.attach_kprobe(event="nfs_file_write", fn_name="trace_rw_entry")
 b.attach_kprobe(event="nfs4_file_open", fn_name="trace_file_open_entry")
+b.attach_kprobe(event="nfs_file_open", fn_name="trace_file_open_entry")
 b.attach_kprobe(event="nfs_getattr", fn_name="trace_getattr_entry")
 
 b.attach_kretprobe(event="nfs_file_read", fn_name="trace_read_return")
 b.attach_kretprobe(event="nfs_file_write", fn_name="trace_write_return")
 b.attach_kretprobe(event="nfs4_file_open", fn_name="trace_file_open_return")
+b.attach_kretprobe(event="nfs_file_open", fn_name="trace_file_open_return")
 b.attach_kretprobe(event="nfs_getattr", fn_name="trace_getattr_return")
 
 if(csv):
     print("ENDTIME_us,TASK,PID,TYPE,BYTES,OFFSET_b,LATENCY_us,FILE")
 else:
     if min_ms == 0:
-        print("Tracing nfs4 operations")
+        print("Tracing NFS operations")
     else:
-        print("Tracing nfs4 operations that are slower than %d ms" % min_ms)
+        print("Tracing NFS operations that are slower than %d ms" % min_ms)
         print("%-8s %-14s %-6s %1s %-7s %-8s %7s %s" % ("TIME",
                                                         "COMM",
                                                         "PID",
