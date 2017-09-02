@@ -16,12 +16,21 @@ is used, all events are printed (warning: verbose).
 Since this works by tracing the nfs_file_operations interface functions, it
 will need updating to match any changes to these functions.
 
+This tool uses kprobes to instrument the kernel for entry and exit
+information, in the future a preferred way would be to use tracepoints.
+Currently there are'nt any tracepoints available for nfs_read_file,
+nfs_write_file and nfs_open_file, nfs_getattr does have entry and exit
+tracepoints but we chose to use kprobes for consistency
+
 Since this uses BPF, only the root user can use this tool.
 .SH REQUIREMENTS
 CONFIG_BPF and bcc.
 .SH OPTIONS
 \-p PID
 Trace this PID only.
+.TP
+\-j
+Trace output in CSV format
 .TP
 min_ms
 Minimum I/O latency (duration) to trace, in milliseconds. Default is 10 ms.

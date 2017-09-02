@@ -10,7 +10,7 @@
 # getattr. It measures the time spent in these operations, and prints details
 # for each that exceeded a threshold.
 #
-# WARNING: This adds low-overhead instrumentation to these XFS operations,
+# WARNING: This adds low-overhead instrumentation to these NFS operations,
 # including reads and writes from the file system cache. Such reads and writes
 # can be very frequent (depending on the workload; eg, 1M/sec), at which
 # point the overhead of this tool (even if it prints no "slower" events) can
@@ -19,6 +19,12 @@
 # Most of this code is copied from similar tools (ext4slower, zfsslower etc)
 #
 # By default, a minimum millisecond threshold of 10 is used.
+#
+# This tool uses kprobes to instrument the kernel for entry and exit
+# information, in the future a preferred way would be to use tracepoints.
+# Currently there are'nt any tracepoints available for nfs_read_file,
+# nfs_write_file and nfs_open_file, nfs_getattr does have entry and exit
+# tracepoints but we chose to use kprobes for consistency
 #
 # 31-Aug-2017   Samuel Nair created this. Should work with NFSv{3,4}
 
@@ -102,8 +108,10 @@ int trace_rw_entry(struct pt_regs *ctx, struct kiocb *iocb,
     val.fp = iocb->ki_filp;
     val.d = NULL;
     val.offset = iocb->ki_pos;
+
     if (val.fp)
         entryinfo.update(&id, &val);
+
     return 0;
 }
 
@@ -136,6 +144,7 @@ int trace_getattr_entry(struct pt_regs *ctx, struct vfsmount *mnt,
 
     if(FILTER_PID)
         return 0;
+
     struct val_t val = {};
     val.ts = bpf_ktime_get_ns();
     val.fp = NULL;
@@ -152,15 +161,18 @@ static int trace_exit(struct pt_regs *ctx, int type)
     struct val_t *valp;
     u64 id = bpf_get_current_pid_tgid();
     u32 pid = id >> 32; // PID is higher part
+
     valp = entryinfo.lookup(&id);
     if (valp == 0) {
         // missed tracing issue or filtered
         return 0;
     }
+
     // calculate delta
     u64 ts = bpf_ktime_get_ns();
     u64 delta_us = (ts - valp->ts) / 1000;
     entryinfo.delete(&id);
+
     if (FILTER_US)
         return 0;
 
@@ -175,7 +187,6 @@ static int trace_exit(struct pt_regs *ctx, int type)
     // workaround (rewriter should handle file to d_name in one step):
     struct dentry *de = NULL;
     struct qstr qs = {};
-
     if(type == TRACE_GETATTR)
     {
         bpf_probe_read(&de,sizeof(de), &valp->d);
@@ -188,14 +199,12 @@ static int trace_exit(struct pt_regs *ctx, int type)
     bpf_probe_read(&qs, sizeof(qs), (void *)&de->d_name);
     if (qs.len == 0)
         return 0;
-    bpf_probe_read(&data.file, sizeof(data.file), (void *)qs.name);
 
+    bpf_probe_read(&data.file, sizeof(data.file), (void *)qs.name);
     // output
     events.perf_submit(ctx, &data, sizeof(data));
-
     return 0;
 }
-
 
 int trace_file_open_return(struct pt_regs *ctx)
 {
@@ -265,16 +274,15 @@ def print_event(cpu, data, size):
             event.ts_us, event.task, event.pid, type, event.size,
             event.offset, event.delta_us, event.file))
         return
-    print("%-8s %-14.14s %-6s %1s %-7s %-8d %7.2f %s" % (strftime("%H:%M:%S"),
-                                                         event.task.decode(),
-                                                         event.pid,
-                                                         type,
-                                                         event.size,
-                                                         event.offset
-                                                         / 1024,
-                                                         float(event.delta_us)
-                                                         / 1000,
-                                                         event.file.decode()))
+    print("%-8s %-14.14s %-6s %1s %-7s %-8d %7.2f %s" %
+          (strftime("%H:%M:%S"),
+           event.task.decode(),
+           event.pid,
+           type,
+           event.size,
+           event.offset / 1024,
+           float(event.delta_us) / 1000,
+           event.file.decode()))
 
 
 # Currently specifically works for NFSv4, the other kprobes are generic
@@ -300,15 +308,15 @@ else:
         print("Tracing NFS operations")
     else:
         print("Tracing NFS operations that are slower than %d ms" % min_ms)
-        print("%-8s %-14s %-6s %1s %-7s %-8s %7s %s" % ("TIME",
-                                                        "COMM",
-                                                        "PID",
-                                                        "T",
-                                                        "BYTES",
-                                                        "OFF_KB",
-                                                        "LAT(ms)",
-                                                        "FILENAME"))
-
+    print("%-8s %-14s %-6s %1s %-7s %-8s %7s %s" % ("TIME",
+                                                    "COMM",
+                                                    "PID",
+                                                    "T",
+                                                    "BYTES",
+                                                    "OFF_KB",
+                                                    "LAT(ms)",
+                                                    "FILENAME"))
+    
 b["events"].open_perf_buffer(print_event, page_cnt=64)
 while 1:
         b.kprobe_poll()
