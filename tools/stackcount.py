@@ -4,7 +4,7 @@
 #               For Linux, uses BCC, eBPF.
 #
 # USAGE: stackcount.py [-h] [-p PID] [-i INTERVAL] [-D DURATION] [-T] [-r] [-s]
-#                      [-P] [-K] [-U] [-v] [-d] [--debug]
+#                      [-P] [-K] [-U] [-v] [-d] [-f] [--debug]
 #
 # The pattern is a string with optional '*' wildcards, similar to file
 # globbing. If you'd prefer to use regular expressions, use the -r option.
@@ -247,6 +247,8 @@ class Tool(object):
             help="show raw addresses")
         parser.add_argument("-d", "--delimited", action="store_true",
             help="insert delimiter between kernel/user stacks")
+        parser.add_argument("-f", "--folded", action="store_true",
+            help="output folded format")
         parser.add_argument("--debug", action="store_true",
             help="print BPF program before starting (for debugging purposes)")
         parser.add_argument("pattern",
@@ -305,8 +307,10 @@ class Tool(object):
     def run(self):
         self.probe.load()
         self.probe.attach()
-        print("Tracing %d functions for \"%s\"... Hit Ctrl-C to end." %
-              (self.probe.matched, self.args.pattern))
+        if not self.args.folded:
+            print("Tracing %d functions for \"%s\"... Hit Ctrl-C to end." %
+                  (self.probe.matched, self.args.pattern))
+        b = self.probe.bpf
         exiting = 0 if self.args.interval else 1
         seconds = 0
         while True:
@@ -320,7 +324,8 @@ class Tool(object):
             if self.args.duration and seconds >= int(self.args.duration):
                 exiting = 1
 
-            print()
+            if not self.args.folded:
+                print()
             if self.args.timestamp:
                 print("%-8s\n" % strftime("%H:%M:%S"), end="")
 
@@ -334,20 +339,32 @@ class Tool(object):
                 kernel_stack = [] if k.kernel_stack_id < 0 else \
                     stack_traces.walk(k.kernel_stack_id)
 
-                # print multi-line stack output
-                for addr in kernel_stack:
-                    self._print_kframe(addr)
-                if self.need_delimiter:
-                    print("    --")
-                for addr in user_stack:
-                    self._print_uframe(addr, k.tgid)
-                if not self.args.pid and k.tgid != 0xffffffff:
-                    self._print_comm(k.name, k.tgid)
-                print("    %d\n" % v.value)
+                if self.args.folded:
+                    # print folded stack output
+                    user_stack = list(user_stack)
+                    kernel_stack = list(kernel_stack)
+                    line = [k.name.decode()] + \
+                        [b.sym(addr, k.tgid) for addr in
+                        reversed(user_stack)] + \
+                        (self.need_delimiter and ["-"] or []) + \
+                        [b.ksym(addr) for addr in reversed(kernel_stack)]
+                    print("%s %d" % (";".join(line), v.value))
+                else:
+                    # print multi-line stack output
+                    for addr in kernel_stack:
+                        self._print_kframe(addr)
+                    if self.need_delimiter:
+                        print("    --")
+                    for addr in user_stack:
+                        self._print_uframe(addr, k.tgid)
+                    if not self.args.pid and k.tgid != 0xffffffff:
+                        self._print_comm(k.name, k.tgid)
+                    print("    %d\n" % v.value)
             counts.clear()
 
             if exiting:
-                print("Detaching...")
+                if not self.args.folded:
+                    print("Detaching...")
                 exit()
 
 if __name__ == "__main__":

@@ -822,11 +822,29 @@ Detaching...
 Use -r to allow regular expressions.
 
 
+The -f option will emit folded output, which can be used as input to other
+tools including flame graphs. For example, with delimiters as well:
+
+# ./stackcount.py -df t:sched:sched_switch
+^Csnmp-pass;[unknown];[unknown];[unknown];[unknown];[unknown];-;entry_SYSCALL_64_fastpath;SyS_select;core_sys_select;do_select;poll_schedule_timeout;schedule_hrtimeout_range;schedule_hrtimeout_range_clock;schedule;__schedule 1
+kworker/7:0;-;ret_from_fork;kthread;worker_thread;schedule;__schedule 1
+watchdog/0;-;ret_from_fork;kthread;smpboot_thread_fn;schedule;__schedule 1
+snmp-pass;[unknown];[unknown];[unknown];[unknown];[unknown];-;entry_SYSCALL_64_fastpath;SyS_select;core_sys_select;do_select;poll_schedule_timeout;schedule_hrtimeout_range;schedule_hrtimeout_range_clock;schedule;__schedule 1
+svscan;[unknown];-;entry_SYSCALL_64_fastpath;SyS_nanosleep;hrtimer_nanosleep;do_nanosleep;schedule;__schedule 1
+python;[unknown];__select_nocancel;-;entry_SYSCALL_64_fastpath;SyS_select;core_sys_select;do_select;poll_schedule_timeout;schedule_hrtimeout_range;schedule_hrtimeout_range_clock;schedule;__schedule 1
+kworker/2:0;-;ret_from_fork;kthread;worker_thread;schedule;__schedule 1
+[...]
+
+Flame graphs visualize stack traces. For information about them and links
+to open source software, see http://www.brendangregg.com/flamegraphs.html .
+This folded output can be piped directly into flamegraph.pl (the Perl version).
+
+
 USAGE message:
 
 # ./stackcount -h
 usage: stackcount [-h] [-p PID] [-i INTERVAL] [-D DURATION] [-T] [-r] [-s]
-                  [-P] [-K] [-U] [-v] [-d] [--debug]
+                  [-P] [-K] [-U] [-v] [-d] [-f] [--debug]
                   pattern
 
 Count events and their stack traces
@@ -852,6 +870,7 @@ optional arguments:
                         user stack only
   -v, --verbose         show raw addresses
   -d, --delimited       insert delimiter between kernel/user stacks
+  -f, --folded          output folded format
   --debug               print BPF program before starting (for debugging
                         purposes)
 
