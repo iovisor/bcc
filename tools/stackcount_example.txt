@@ -3,55 +3,118 @@ Demonstrations of stackcount, the Linux eBPF/bcc version.
 
 This program traces functions and frequency counts them with their entire
 stack trace, summarized in-kernel for efficiency. For example, counting
-stack traces that led to submit_bio(), which creates block device I/O:
+stack traces that led to the submit_bio() kernel function, which creates
+block device I/O:
 
 # ./stackcount submit_bio
 Tracing 1 functions for "submit_bio"... Hit Ctrl-C to end.
 ^C
   submit_bio
+  ext4_writepages
+  do_writepages
+  __filemap_fdatawrite_range
+  filemap_flush
+  ext4_alloc_da_blocks
+  ext4_release_file
+  __fput
+  ____fput
+  task_work_run
+  exit_to_usermode_loop
+  syscall_return_slowpath
+  entry_SYSCALL_64_fastpath
+  [unknown]
+  [unknown]
+    tar [15069]
+    5
+
+  submit_bio
+  ext4_bio_write_page
+  mpage_submit_page
+  mpage_map_and_submit_buffers
+  ext4_writepages
+  do_writepages
+  __filemap_fdatawrite_range
+  filemap_flush
+  ext4_alloc_da_blocks
+  ext4_release_file
+  __fput
+  ____fput
+  task_work_run
+  exit_to_usermode_loop
+  syscall_return_slowpath
+  entry_SYSCALL_64_fastpath
+  [unknown]
+  [unknown]
+    tar [15069]
+    15
+
+  submit_bio
+  ext4_readpages
+  __do_page_cache_readahead
+  ondemand_readahead
+  page_cache_async_readahead
+  generic_file_read_iter
+  __vfs_read
+  vfs_read
+  sys_read
+  entry_SYSCALL_64_fastpath
+  [unknown]
+    tar [15069]
+    113
+
+Detaching...
+
+The output shows unique stack traces, in order from leaf (on-CPU) to root,
+followed by their occurrence count. The last stack trace in the above output
+shows syscall handling, sys_read(), vfs_read(), and then "readahead" functions:
+looks like an application issued file read has triggered read ahead. The
+application can be seen after the stack trace, in this case, "tar [15069]"
+for the "tar" command, PID 15069.
+
+The order of printed stack traces is from least to most frequent. The most
+frequent in this case, the ext4_rename() stack, was taken 113 times during
+tracing.
+
+The "[unknown]" frames are from user-level, since this simple workload is
+the tar command, which apparently has been compiled without frame pointers.
+It's a common compiler optimization, but it breaks frame pointer-based stack
+walkers. Similar broken stacks will be seen by other profilers and debuggers
+that use frame pointers. Hopefully your application preserves them so that
+the user-level stack trace is visible. So how does one get frame pointers, if
+your application doesn't have them to start with? For the current bcc (until
+it supports other stack walkers), you need to be running a application binaries
+that preserves frame pointers, eg, using gcc's -fno-omit-frame-pointer. That's
+about all I'll say here: this is a big topic that is not bcc/BPF specific.
+
+It can be useful to trace the path to submit_bio to explain unusual rates of
+disk IOPS. These could have in-kernel origins (eg, background scrub).
+
+
+Now adding the -d option to delimit kernel and user stacks:
+
+# ./stackcount -d submit_bio
+Tracing 1 functions for "submit_bio"... Hit Ctrl-C to end.
+^C
+  submit_bio
   submit_bh
-  journal_submit_commit_record.isra.13
+  journal_submit_commit_record
   jbd2_journal_commit_transaction
   kjournald2
   kthread
   ret_from_fork
-  mb_cache_list
+    --
+    jbd2/xvda1-8 [405]
     1
 
   submit_bio
-  __block_write_full_page.constprop.39
-  block_write_full_page
-  blkdev_writepage
-  __writepage
-  write_cache_pages
-  generic_writepages
-  do_writepages
-  __writeback_single_inode
-  writeback_sb_inodes
-  __writeback_inodes_wb
-    2
-
-  submit_bio
-  __block_write_full_page.constprop.39
-  block_write_full_page
-  blkdev_writepage
-  __writepage
-  write_cache_pages
-  generic_writepages
-  do_writepages
-  __filemap_fdatawrite_range
-  filemap_fdatawrite
-  fdatawrite_one_bdev
-    36
-
-  submit_bio
   submit_bh
   jbd2_journal_commit_transaction
   kjournald2
   kthread
   ret_from_fork
-  mb_cache_list
-    38
+    --
+    jbd2/xvda1-8 [405]
+    2
 
   submit_bio
   ext4_writepages
@@ -59,152 +122,200 @@ Tracing 1 functions for "submit_bio"... Hit Ctrl-C to end.
   __filemap_fdatawrite_range
   filemap_flush
   ext4_alloc_da_blocks
-  ext4_rename
-  ext4_rename2
-  vfs_rename
-  sys_rename
+  ext4_release_file
+  __fput
+  ____fput
+  task_work_run
+  exit_to_usermode_loop
+  syscall_return_slowpath
   entry_SYSCALL_64_fastpath
+    --
+  [unknown]
+  [unknown]
+    tar [15187]
+    5
+
+  submit_bio
+  ext4_bio_write_page
+  mpage_submit_page
+  mpage_map_and_submit_buffers
+  ext4_writepages
+  do_writepages
+  __filemap_fdatawrite_range
+  filemap_flush
+  ext4_alloc_da_blocks
+  ext4_release_file
+  __fput
+  ____fput
+  task_work_run
+  exit_to_usermode_loop
+  syscall_return_slowpath
+  entry_SYSCALL_64_fastpath
+    --
+  [unknown]
+  [unknown]
+    tar [15187]
+    15
+
+  submit_bio
+  ext4_readpages
+  __do_page_cache_readahead
+  ondemand_readahead
+  page_cache_async_readahead
+  generic_file_read_iter
+  __vfs_read
+  vfs_read
+  sys_read
+  entry_SYSCALL_64_fastpath
+    --
+  [unknown]
+  [unknown]
+  [unknown]
+    tar [15187]
+    171
+
+Detaching...
+
+A "--" is printed between the kernel and user stacks.
+
+
+As a different example, here is the kernel function hrtimer_init_sleeper():
+
+# ./stackcount.py -d hrtimer_init_sleeper
+Tracing 1 functions for "hrtimer_init_sleeper"... Hit Ctrl-C to end.
+^C
+  hrtimer_init_sleeper
+  do_futex
+  SyS_futex
+  entry_SYSCALL_64_fastpath
+    --
+  [unknown]
+    containerd [16020]
+    1
+
+  hrtimer_init_sleeper
+  do_futex
+  SyS_futex
+  entry_SYSCALL_64_fastpath
+    --
+  __pthread_cond_timedwait
+  Monitor::IWait(Thread*, long)
+  Monitor::wait(bool, long, bool)
+  CompileQueue::get()
+  CompileBroker::compiler_thread_loop()
+  JavaThread::thread_main_inner()
+  JavaThread::run()
+  java_start(Thread*)
+  start_thread
+    java [4996]
+    1
+
+  hrtimer_init_sleeper
+  do_futex
+  SyS_futex
+  entry_SYSCALL_64_fastpath
+    --
+  [unknown]
+  [unknown]
+    containerd [16020]
+    1
+
+  hrtimer_init_sleeper
+  do_futex
+  SyS_futex
+  entry_SYSCALL_64_fastpath
+    --
+  __pthread_cond_timedwait
+  VMThread::loop()
+  VMThread::run()
+  java_start(Thread*)
+  start_thread
+    java [4996]
+    3
+
+  hrtimer_init_sleeper
+  do_futex
+  SyS_futex
+  entry_SYSCALL_64_fastpath
+    --
+  [unknown]
+    dockerd [16008]
+    4
+
+  hrtimer_init_sleeper
+  do_futex
+  SyS_futex
+  entry_SYSCALL_64_fastpath
+    --
+  [unknown]
+  [unknown]
+    dockerd [16008]
+    4
+
+  hrtimer_init_sleeper
+  do_futex
+  SyS_futex
+  entry_SYSCALL_64_fastpath
+    --
+  __pthread_cond_timedwait
+  Lio/netty/util/ThreadDeathWatcher$Watcher;::run
+  Interpreter
+  Interpreter
+  call_stub
+  JavaCalls::call_helper(JavaValue*, methodHandle*, JavaCallArguments*, Thread*)
+  JavaCalls::call_virtual(JavaValue*, KlassHandle, Symbol*, Symbol*, JavaCallArguments*, Thread*)
+  JavaCalls::call_virtual(JavaValue*, Handle, KlassHandle, Symbol*, Symbol*, Thread*)
+  thread_entry(JavaThread*, Thread*)
+  JavaThread::thread_main_inner()
+  JavaThread::run()
+  java_start(Thread*)
+  start_thread
+    java [4996]
+    4
+
+  hrtimer_init_sleeper
+  do_futex
+  SyS_futex
+  entry_SYSCALL_64_fastpath
+    --
+  __pthread_cond_timedwait
+  clock_gettime
+  [unknown]
+    java [4996]
     79
 
 Detaching...
 
-The output shows unique stack traces, in order from leaf (on-CPU) to root,
-followed by their occurrence count. The last stack trace in the above output
-shows syscall handling, ext4_rename(), and filemap_flush(): looks like an
-application issued file rename has caused back end disk I/O due to ext4
-block allocation and a filemap_flush(). I'd have to browse the code to those
-functions to confirm!
-
-The order of printed stack traces is from least to most frequent. The most
-frequent in this case, the ext4_rename() stack, was taken 79 times during
-tracing.
-
-It can be useful to trace the path to submit_bio to explain unusual rates of
-disk IOPS. These could have in-kernel origins (eg, background scrub).
+I was just trying to find a more interesting example. This output includes
+some Java stacks where user-level has been walked correctly (even includes a
+JIT symbol translation). dockerd and containerd don't have frame pointers
+(grumble), but Java does (which is running with -XX:+PreserveFramePointer).
 
 
-As another example, here are the code paths that led to ip_output(), which
-sends a packet at the IP level:
+Here's another kernel function, ip_output():
 
-# ./stackcount ip_output
+# ./stackcount.py -d ip_output
 Tracing 1 functions for "ip_output"... Hit Ctrl-C to end.
 ^C
   ip_output
   ip_queue_xmit
   tcp_transmit_skb
   tcp_write_xmit
-  tcp_tsq_handler.part.32
-  tcp_tasklet_func
-  tasklet_action
-  __do_softirq
-  do_softirq_own_stack
-  do_softirq
-  __local_bh_enable_ip
-    1
-
-  ip_output
-  ip_queue_xmit
-  tcp_transmit_skb
-  tcp_send_ack
-  tcp_send_delayed_ack
-  __tcp_ack_snd_check
-  tcp_rcv_established
-  tcp_v4_do_rcv
-  tcp_v4_rcv
-  ip_local_deliver_finish
-  ip_local_deliver
-    1
-
-  ip_output
-  ip_queue_xmit
-  tcp_transmit_skb
-  tcp_send_ack
-  tcp_send_delayed_ack
-  __tcp_ack_snd_check
-  tcp_rcv_established
-  tcp_v4_do_rcv
-  tcp_v4_rcv
-  ip_local_deliver_finish
-  ip_local_deliver
-    1
-
-  ip_output
-  ip_queue_xmit
-  tcp_transmit_skb
-  tcp_send_ack
-  tcp_delack_timer_handler
-  tcp_delack_timer
-  call_timer_fn
-  run_timer_softirq
-  __do_softirq
-  irq_exit
-  xen_evtchn_do_upcall
-    1
-
-  ip_output
-  ip_queue_xmit
-  tcp_transmit_skb
-  tcp_write_xmit
   __tcp_push_pending_frames
-  tcp_rcv_established
-  tcp_v4_do_rcv
-  release_sock
+  tcp_push
   tcp_sendmsg
   inet_sendmsg
   sock_sendmsg
-    3
-
-  ip_output
-  ip_queue_xmit
-  tcp_transmit_skb
-  tcp_write_xmit
-  tcp_tsq_handler.part.32
-  tcp_tasklet_func
-  tasklet_action
-  __do_softirq
-  run_ksoftirqd
-  smpboot_thread_fn
-  kthread
-    3
-
-  ip_output
-  ip_queue_xmit
-  tcp_transmit_skb
-  tcp_write_xmit
-  __tcp_push_pending_frames
-  tcp_rcv_established
-  tcp_v4_do_rcv
-  tcp_v4_rcv
-  ip_local_deliver_finish
-  ip_local_deliver
-  ip_rcv_finish
-    4
-
-  ip_output
-  ip_queue_xmit
-  tcp_transmit_skb
-  tcp_send_ack
-  tcp_cleanup_rbuf
-  tcp_recvmsg
-  inet_recvmsg
-  sock_recvmsg
-  sock_read_iter
-  __vfs_read
-  vfs_read
+  sock_write_iter
+  __vfs_write
+  vfs_write
+  SyS_write
+  entry_SYSCALL_64_fastpath
+    --
+  __write_nocancel
+  [unknown]
+    sshd [15015]
     5
-
-  ip_output
-  ip_queue_xmit
-  tcp_transmit_skb
-  tcp_write_xmit
-  __tcp_push_pending_frames
-  tcp_rcv_established
-  tcp_v4_do_rcv
-  release_sock
-  tcp_sendmsg
-  inet_sendmsg
-  sock_sendmsg
-    9
 
   ip_output
   ip_queue_xmit
@@ -217,61 +328,95 @@ Tracing 1 functions for "ip_output"... Hit Ctrl-C to end.
   sock_sendmsg
   sock_write_iter
   __vfs_write
-    51
+  vfs_write
+  SyS_write
+  entry_SYSCALL_64_fastpath
+    --
+  __write_nocancel
+  [unknown]
+  [unknown]
+    sshd [8234]
+    5
 
   ip_output
   ip_queue_xmit
   tcp_transmit_skb
   tcp_write_xmit
   __tcp_push_pending_frames
-  tcp_rcv_established
-  tcp_v4_do_rcv
-  tcp_v4_rcv
-  ip_local_deliver_finish
-  ip_local_deliver
-  ip_rcv_finish
-    171
-
-  ip_output
-  ip_queue_xmit
-  tcp_transmit_skb
-  tcp_write_xmit
-  __tcp_push_pending_frames
-  tcp_rcv_established
-  tcp_v4_do_rcv
-  tcp_v4_rcv
-  ip_local_deliver_finish
-  ip_local_deliver
-  ip_rcv_finish
-    994
-
-  ip_output
-  ip_queue_xmit
-  tcp_transmit_skb
-  tcp_write_xmit
-  tcp_tsq_handler.part.32
-  tcp_tasklet_func
-  tasklet_action
-  __do_softirq
-  irq_exit
-  xen_evtchn_do_upcall
-  xen_do_hypervisor_callback
-    1002
+  tcp_push
+  tcp_sendmsg
+  inet_sendmsg
+  sock_sendmsg
+  sock_write_iter
+  __vfs_write
+  vfs_write
+  SyS_write
+  entry_SYSCALL_64_fastpath
+    --
+  __write_nocancel
+    sshd [15015]
+    7
 
 Detaching...
 
-The last two most frequent stack traces are via tcp_transmit_skb(). Note the
-send last begins with ip_rcv_finish(), for a local receive, which then becomes
-a transmit: likely pushing more frames when processing the newly received ones.
+This time just sshd is triggering ip_output() calls.
 
-As may be obvious, this is a great tool for quickly understanding kernel code
-flow.
+
+Watch what happens if I filter on kernel stacks only (-K) for ip_output():
+
+# ./stackcount.py -K ip_output
+Tracing 1 functions for "ip_output"... Hit Ctrl-C to end.
+^C
+  ip_output
+  ip_queue_xmit
+  tcp_transmit_skb
+  tcp_write_xmit
+  __tcp_push_pending_frames
+  tcp_push
+  tcp_sendmsg
+  inet_sendmsg
+  sock_sendmsg
+  sock_write_iter
+  __vfs_write
+  vfs_write
+  SyS_write
+  entry_SYSCALL_64_fastpath
+    13
+
+Detaching...
+
+They have grouped together as a single unique stack, since the kernel part
+was the same.
+
+
+Here is just the user stacks, fetched during the kernel function ip_output():
+
+# ./stackcount.py -U ip_output
+Tracing 1 functions for "ip_output"... Hit Ctrl-C to end.
+^C
+  [unknown]
+    snmpd [1645]
+    1
+
+  __write_nocancel
+  [unknown]
+  [unknown]
+    sshd [8234]
+    3
+
+  __write_nocancel
+    sshd [15015]
+    4
+
+I should really run a custom sshd with frame pointers so we can see its
+stack trace...
 
 
 User-space functions can also be traced if a library name is provided. For
-example, to quickly identify code locations that allocate heap memory:
+example, to quickly identify code locations that allocate heap memory for
+PID 4902 (using -p), by tracing malloc from libc ("c:malloc"):
 
-# ./stackcount -l c -p 4902 malloc
+# ./stackcount -p 4902 c:malloc
 Tracing 1 functions for "malloc"... Hit Ctrl-C to end.
 ^C
   malloc
@@ -290,10 +435,12 @@ Tracing 1 functions for "malloc"... Hit Ctrl-C to end.
 
 Detaching...
 
+Kernel stacks are absent as this didn't enter kernel code.
+
 Note that user-space uses of stackcount can be somewhat more limited because
-a lot of user-space libraries and binaries are compiled without debuginfo, or
-with frame-pointer omission (-fomit-frame-pointer), which makes it impossible
-to reliably obtain the stack trace.
+a lot of user-space libraries and binaries are compiled without frame-pointers
+as discussed earlier (the -fomit-frame-pointer compiler default) or are used
+without debuginfo.
 
 
 In addition to kernel and user-space functions, kernel tracepoints and USDT
@@ -313,60 +460,185 @@ Tracing 1 functions for "u:pthread:pthread_create"... Hit Ctrl-C to end.
   [unknown]
     7
 
+You can use "readelf -n file" to see if it has USDT tracepoints.
+
+
 Similarly, to determine where context switching is happening in the kernel, 
 use the sched:sched_switch kernel tracepoint:
 
 # ./stackcount t:sched:sched_switch
-... (omitted for brevity)
+  __schedule
+  schedule
+  worker_thread
+  kthread
+  ret_from_fork
+    kworker/0:2 [25482]
+    1
 
   __schedule
   schedule
   schedule_hrtimeout_range_clock
   schedule_hrtimeout_range
-  poll_schedule_timeout
-  do_select
-  core_sys_select
-  SyS_select
+  ep_poll
+  SyS_epoll_wait
   entry_SYSCALL_64_fastpath
-    40
+  epoll_wait
+  Lsun/nio/ch/SelectorImpl;::lockAndDoSelect
+  Lsun/nio/ch/SelectorImpl;::select
+  Lio/netty/channel/nio/NioEventLoop;::select
+  Lio/netty/channel/nio/NioEventLoop;::run
+  Interpreter
+  Interpreter
+  call_stub
+  JavaCalls::call_helper(JavaValue*, methodHandle*, JavaCallArguments*, Thread*)
+  JavaCalls::call_virtual(JavaValue*, KlassHandle, Symbol*, Symbol*, JavaCallArguments*, Thread*)
+  JavaCalls::call_virtual(JavaValue*, Handle, KlassHandle, Symbol*, Symbol*, Thread*)
+  thread_entry(JavaThread*, Thread*)
+  JavaThread::thread_main_inner()
+  JavaThread::run()
+  java_start(Thread*)
+  start_thread
+    java [4996]
+    1
+
+... (omitted for brevity)
 
   __schedule
   schedule
   schedule_preempt_disabled
   cpu_startup_entry
-  start_secondary
-    85
+  xen_play_dead
+  arch_cpu_idle_dead
+  cpu_startup_entry
+  cpu_bringup_and_idle
+    swapper/1 [0]
+    289
 
 
 A -i option can be used to set an output interval, and -T to include a
 timestamp. For example:
 
-# ./stackcount -Ti 1 submit_bio
+# ./stackcount.py -Tdi 1 submit_bio
 Tracing 1 functions for "submit_bio"... Hit Ctrl-C to end.
 
-01:11:37
+06:05:13
+
+06:05:14
   submit_bio
-  submit_bh
-  journal_submit_commit_record.isra.13
-  jbd2_journal_commit_transaction
-  kjournald2
+  xfs_do_writepage
+  write_cache_pages
+  xfs_vm_writepages
+  do_writepages
+  __writeback_single_inode
+  writeback_sb_inodes
+  __writeback_inodes_wb
+  wb_writeback
+  wb_workfn
+  process_one_work
+  worker_thread
   kthread
   ret_from_fork
-  mb_cache_list
+    --
+    kworker/u16:1 [15686]
     1
 
   submit_bio
+  process_one_work
+  worker_thread
+  kthread
+  ret_from_fork
+    --
+    kworker/u16:0 [16007]
+    1
+
+  submit_bio
+  xfs_buf_submit
+  xlog_bdstrat
+  xlog_sync
+  xlog_state_release_iclog
+  _xfs_log_force
+  xfs_log_force
+  xfs_fs_sync_fs
+  sync_fs_one_sb
+  iterate_supers
+  sys_sync
+  entry_SYSCALL_64_fastpath
+    --
+  [unknown]
+    sync [16039]
+    1
+
+  submit_bio
+  submit_bh
+  journal_submit_commit_record
+  jbd2_journal_commit_transaction
+  kjournald2
+  kthread
+  ret_from_fork
+    --
+    jbd2/xvda1-8 [405]
+    1
+
+  submit_bio
+  process_one_work
+  worker_thread
+  kthread
+  ret_from_fork
+    --
+    kworker/0:2 [25482]
+    2
+
+  submit_bio
   ext4_writepages
   do_writepages
+  __writeback_single_inode
+  writeback_sb_inodes
+  __writeback_inodes_wb
+  wb_writeback
+  wb_workfn
+  process_one_work
+  worker_thread
+  kthread
+  ret_from_fork
+    --
+    kworker/u16:0 [16007]
+    4
+
+  submit_bio
+  xfs_vm_writepages
+  do_writepages
+  __writeback_single_inode
+  writeback_sb_inodes
+  __writeback_inodes_wb
+  wb_writeback
+  wb_workfn
+  process_one_work
+  worker_thread
+  kthread
+  ret_from_fork
+    --
+    kworker/u16:1 [15686]
+    5
+
+  submit_bio
+  __block_write_full_page
+  block_write_full_page
+  blkdev_writepage
+  __writepage
+  write_cache_pages
+  generic_writepages
+  blkdev_writepages
+  do_writepages
   __filemap_fdatawrite_range
-  filemap_flush
-  ext4_alloc_da_blocks
-  ext4_rename
-  ext4_rename2
-  vfs_rename
-  sys_rename
+  filemap_fdatawrite
+  fdatawrite_one_bdev
+  iterate_bdevs
+  sys_sync
   entry_SYSCALL_64_fastpath
-    20
+    --
+  [unknown]
+    sync [16039]
+    7
 
   submit_bio
   submit_bh
@@ -374,71 +646,89 @@ Tracing 1 functions for "submit_bio"... Hit Ctrl-C to end.
   kjournald2
   kthread
   ret_from_fork
-  mb_cache_list
-    39
+    --
+    jbd2/xvda1-8 [405]
+    8
 
-
-01:11:38
   submit_bio
+  ext4_bio_write_page
+  mpage_submit_page
+  mpage_map_and_submit_buffers
   ext4_writepages
   do_writepages
-  __filemap_fdatawrite_range
-  filemap_flush
-  ext4_alloc_da_blocks
-  ext4_rename
-  ext4_rename2
-  vfs_rename
-  sys_rename
-  entry_SYSCALL_64_fastpath
-    20
+  __writeback_single_inode
+  writeback_sb_inodes
+  __writeback_inodes_wb
+  wb_writeback
+  wb_workfn
+  process_one_work
+  worker_thread
+  kthread
+  ret_from_fork
+    --
+    kworker/u16:0 [16007]
+    8
 
-
-01:11:39
   submit_bio
-  ext4_writepages
+  __block_write_full_page
+  block_write_full_page
+  blkdev_writepage
+  __writepage
+  write_cache_pages
+  generic_writepages
+  blkdev_writepages
   do_writepages
-  __filemap_fdatawrite_range
-  filemap_flush
-  ext4_alloc_da_blocks
-  ext4_rename
-  ext4_rename2
-  vfs_rename
-  sys_rename
-  entry_SYSCALL_64_fastpath
-    20
+  __writeback_single_inode
+  writeback_sb_inodes
+  __writeback_inodes_wb
+  wb_writeback
+  wb_workfn
+  process_one_work
+  worker_thread
+  kthread
+  ret_from_fork
+    --
+    kworker/u16:0 [16007]
+    60
 
-^C
-01:11:39
-  submit_bio
-  ext4_writepages
-  do_writepages
-  __filemap_fdatawrite_range
-  filemap_flush
-  ext4_alloc_da_blocks
-  ext4_rename
-  ext4_rename2
-  vfs_rename
-  sys_rename
-  entry_SYSCALL_64_fastpath
-    20
+
+06:05:15
+
+06:05:16
 
 Detaching...
+
+This only included output for the 06:05:14 interval. The other internals
+did not span block device I/O.
 
 
 The -s output prints the return instruction offset for each function (aka
 symbol offset). Eg:
 
-# ./stackcount -s tcp_sendmsg
+# ./stackcount.py -s tcp_sendmsg
 Tracing 1 functions for "tcp_sendmsg"... Hit Ctrl-C to end.
 ^C
-  tcp_sendmsg0x1
-  sock_sendmsg0x38
-  sock_write_iter0x78
-  __vfs_write0xaa
-  vfs_write0xa9
-  sys_write0x46
-  entry_SYSCALL_64_fastpath0x16
-    29
+  tcp_sendmsg+0x1
+  sock_sendmsg+0x38
+  sock_write_iter+0x85
+  __vfs_write+0xe3
+  vfs_write+0xb8
+  SyS_write+0x55
+  entry_SYSCALL_64_fastpath+0x1e
+  __write_nocancel+0x7
+    sshd [15015]
+    3
+
+  tcp_sendmsg+0x1
+  sock_sendmsg+0x38
+  sock_write_iter+0x85
+  __vfs_write+0xe3
+  vfs_write+0xb8
+  SyS_write+0x55
+  entry_SYSCALL_64_fastpath+0x1e
+  __write_nocancel+0x7
+    sshd [8234]
+    3
 
 Detaching...
 
@@ -446,9 +736,40 @@ If it wasn't clear how one function called another, knowing the instruction
 offset can help you locate the lines of code from a disassembly dump.
 
 
-A wildcard can also be used. Eg, all functions beginning with "tcp_send":
+The -v output is verbose, and shows raw addresses:
 
-# ./stackcount -s 'tcp_send*'
+./stackcount.py -v tcp_sendmsg
+Tracing 1 functions for "tcp_sendmsg"... Hit Ctrl-C to end.
+^C
+  ffffffff817b05c1 tcp_sendmsg
+  ffffffff8173ea48 sock_sendmsg
+  ffffffff8173eae5 sock_write_iter
+  ffffffff81232b33 __vfs_write
+  ffffffff812331b8 vfs_write
+  ffffffff81234625 SyS_write
+  ffffffff818739bb entry_SYSCALL_64_fastpath
+  7f120511e6e0     __write_nocancel
+    sshd [8234]
+    3
+
+  ffffffff817b05c1 tcp_sendmsg
+  ffffffff8173ea48 sock_sendmsg
+  ffffffff8173eae5 sock_write_iter
+  ffffffff81232b33 __vfs_write
+  ffffffff812331b8 vfs_write
+  ffffffff81234625 SyS_write
+  ffffffff818739bb entry_SYSCALL_64_fastpath
+  7f919c5a26e0     __write_nocancel
+    sshd [15015]
+    11
+
+Detaching...
+
+
+A wildcard can also be used. Eg, all functions beginning with "tcp_send",
+kernel stacks only (-K) with offsets (-s):
+
+# ./stackcount -Ks 'tcp_send*'
 Tracing 14 functions for "tcp_send*"... Hit Ctrl-C to end.
 ^C
   tcp_send_delayed_ack0x1
@@ -501,39 +822,69 @@ Detaching...
 Use -r to allow regular expressions.
 
 
+The -f option will emit folded output, which can be used as input to other
+tools including flame graphs. For example, with delimiters as well:
+
+# ./stackcount.py -df t:sched:sched_switch
+^Csnmp-pass;[unknown];[unknown];[unknown];[unknown];[unknown];-;entry_SYSCALL_64_fastpath;SyS_select;core_sys_select;do_select;poll_schedule_timeout;schedule_hrtimeout_range;schedule_hrtimeout_range_clock;schedule;__schedule 1
+kworker/7:0;-;ret_from_fork;kthread;worker_thread;schedule;__schedule 1
+watchdog/0;-;ret_from_fork;kthread;smpboot_thread_fn;schedule;__schedule 1
+snmp-pass;[unknown];[unknown];[unknown];[unknown];[unknown];-;entry_SYSCALL_64_fastpath;SyS_select;core_sys_select;do_select;poll_schedule_timeout;schedule_hrtimeout_range;schedule_hrtimeout_range_clock;schedule;__schedule 1
+svscan;[unknown];-;entry_SYSCALL_64_fastpath;SyS_nanosleep;hrtimer_nanosleep;do_nanosleep;schedule;__schedule 1
+python;[unknown];__select_nocancel;-;entry_SYSCALL_64_fastpath;SyS_select;core_sys_select;do_select;poll_schedule_timeout;schedule_hrtimeout_range;schedule_hrtimeout_range_clock;schedule;__schedule 1
+kworker/2:0;-;ret_from_fork;kthread;worker_thread;schedule;__schedule 1
+[...]
+
+Flame graphs visualize stack traces. For information about them and links
+to open source software, see http://www.brendangregg.com/flamegraphs.html .
+This folded output can be piped directly into flamegraph.pl (the Perl version).
+
+
 USAGE message:
 
 # ./stackcount -h
-usage: stackcount [-h] [-p PID] [-i INTERVAL] [-T] [-r] [-s]
-                  [-l LIBRARY] [-v] [-d] pattern
+usage: stackcount [-h] [-p PID] [-i INTERVAL] [-D DURATION] [-T] [-r] [-s]
+                  [-P] [-K] [-U] [-v] [-d] [-f] [--debug]
+                  pattern
 
-Count function calls and their stack traces
+Count events and their stack traces
 
 positional arguments:
-  pattern               search expression for functions
+  pattern               search expression for events
 
 optional arguments:
   -h, --help            show this help message and exit
   -p PID, --pid PID     trace this PID only
   -i INTERVAL, --interval INTERVAL
                         summary interval, seconds
+  -D DURATION, --duration DURATION
+                        total duration of trace, seconds
   -T, --timestamp       include timestamp on output
   -r, --regexp          use regular expressions. Default is "*" wildcards
                         only.
   -s, --offset          show address offsets
-  -l, --library         trace user-space functions from this library or executable
+  -P, --perpid          display stacks separately for each process
+  -K, --kernel-stacks-only
+                        kernel stack only
+  -U, --user-stacks-only
+                        user stack only
   -v, --verbose         show raw addresses
-  -d, --debug           print BPF program before starting (for debugging purposes)
+  -d, --delimited       insert delimiter between kernel/user stacks
+  -f, --folded          output folded format
+  --debug               print BPF program before starting (for debugging
+                        purposes)
 
 examples:
-    ./stackcount submit_bio          # count kernel stack traces for submit_bio
-    ./stackcount ip_output           # count kernel stack traces for ip_output
-    ./stackcount -s ip_output        # show symbol offsets
-    ./stackcount -sv ip_output       # show offsets and raw addresses (verbose)
-    ./stackcount 'tcp_send*'         # count stacks for funcs matching tcp_send*
-    ./stackcount -r '^tcp_send.*'    # same as above, using regular expressions
-    ./stackcount -Ti 5 ip_output     # output every 5 seconds, with timestamps
-    ./stackcount -p 185 ip_output    # count ip_output stacks for PID 185 only
-    ./stackcount -p 185 -l c malloc  # count stacks for malloc in PID 185
-    ./stackcount t:sched:sched_fork  # count stacks for the sched_fork tracepoint
-    ./stackcount -p 185 u:node:*     # count stacks for all USDT probes in node
+    ./stackcount submit_bio         # count kernel stack traces for submit_bio
+    ./stackcount -d ip_output       # include a user/kernel stack delimiter
+    ./stackcount -s ip_output       # show symbol offsets
+    ./stackcount -sv ip_output      # show offsets and raw addresses (verbose)
+    ./stackcount 'tcp_send*'        # count stacks for funcs matching tcp_send*
+    ./stackcount -r '^tcp_send.*'   # same as above, using regular expressions
+    ./stackcount -Ti 5 ip_output    # output every 5 seconds, with timestamps
+    ./stackcount -p 185 ip_output   # count ip_output stacks for PID 185 only
+    ./stackcount -p 185 c:malloc    # count stacks for malloc in PID 185
+    ./stackcount t:sched:sched_fork # count stacks for sched_fork tracepoint
+    ./stackcount -p 185 u:node:*    # count stacks for all USDT probes in node
+    ./stackcount -K t:sched:sched_switch   # kernel stacks only
+    ./stackcount -U t:sched:sched_switch   # user stacks only

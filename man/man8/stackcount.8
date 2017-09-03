@@ -2,14 +2,14 @@
 .SH NAME
 stackcount \- Count function calls and their stack traces. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B stackcount [\-h] [\-p PID] [\-i INTERVAL] [\-T] [\-r] [\-s]
-              [\-P] [\-v] [\-d] pattern
+.B stackcount [\-h] [\-p PID] [\-i INTERVAL] [\-D DURATION] [\-T] [\-r] [\-s]
+              [\-P] [\-K] [\-U] [\-v] [\-d] [\-f] pattern
 .SH DESCRIPTION
 stackcount traces functions and frequency counts them with their entire
-stack trace, summarized in-kernel for efficiency. This allows higher
-frequency events to be studied. The output consists of unique stack traces,
-and their occurrence counts. In addition to kernel and user functions, kernel
-tracepoints and USDT tracepoint are also supported.
+stack trace, kernel stack and user stack, summarized in-kernel for efficiency.
+This allows higher frequency events to be studied. The output consists of
+unique stack traces, and their occurrence counts. In addition to kernel and
+user functions, kernel tracepoints and USDT tracepoint are also supported.
 
 The pattern is a string with optional '*' wildcards, similar to file globbing.
 If you'd prefer to use regular expressions, use the \-r option.
@@ -38,10 +38,18 @@ Include a timestamp with interval output.
 Show raw addresses.
 .TP
 \-d
+Print a delimiter ("--") in-between the kernel and user stacks.
+.TP
+\-\-debug
 Print the source of the BPF program when loading it (for debugging purposes).
 .TP
 \-i interval
 Summary interval, in seconds.
+.TP
+\-D duration
+Total duration of trace, in seconds.
+\-f
+Folded output format.
 .TP
 \-p PID
 Trace this process ID only (filtered in-kernel).
@@ -52,47 +60,59 @@ A function name, or a search pattern. Can include wildcards ("*"). If the
 \-r option is used, can include regular expressions.
 .SH EXAMPLES
 .TP
-Count kernel stack traces for submit_bio():
+Count kernel and user stack traces for submit_bio():
 #
 .B stackcount submit_bio
 .TP
-Count kernel stack traces for ip_output():
+Count stacks with a delimiter for submit_bio():
+#
+.B stackcount \-d submit_bio
+.TP
+Count kernel stack trace only for submit_bio():
+#
+.B stackcount \-K submit_bio
+.TP
+Count user stack trace only for submit_bio():
+#
+.B stackcount \-U submit_bio
+.TP
+Count stack traces for ip_output():
 #
 .B stackcount ip_output
 .TP
 Show symbol offsets:
 #
-.B stackcount -s ip_output
+.B stackcount \-s ip_output
 .TP
 Show offsets and raw addresses (verbose):
 #
-.B stackcount -sv ip_output
+.B stackcount \-sv ip_output
 .TP
-Count kernel stacks for kernel functions matching tcp_send*:
+Count stacks for kernel functions matching tcp_send*:
 #
 .B stackcount 'tcp_send*'
 .TP
 Same as previous, but using regular expressions:
 #
-.B stackcount -r '^tcp_send.*'
+.B stackcount \-r '^tcp_send.*'
 .TP
 Output every 5 seconds, with timestamps:
 #
-.B stackcount -Ti 5 ip_output
+.B stackcount \-Ti 5 ip_output
 .TP
 Only count stacks when PID 185 is on-CPU:
 #
-.B stackcount -p 185 ip_output
+.B stackcount \-p 185 ip_output
 .TP
 Count user stacks for dynamic heap allocations with malloc in PID 185:
 #
-.B stackcount -p 185 c:malloc
+.B stackcount \-p 185 c:malloc
 .TP
 Count user stacks for thread creation (USDT tracepoint) in PID 185:
 #
-.B stackcount -p 185 u:pthread:pthread_create
+.B stackcount \-p 185 u:pthread:pthread_create
 .TP
-Count kernel stacks for context switch events using a kernel tracepoint:
+Count stacks for context switch events using a kernel tracepoint:
 #
 .B stackcount t:sched:sched_switch
 .SH OVERHEAD
