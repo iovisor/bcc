@@ -825,8 +825,8 @@ Use -r to allow regular expressions.
 USAGE message:
 
 # ./stackcount -h
-usage: stackcount [-h] [-p PID] [-i INTERVAL] [-T] [-r] [-s] [-P] [-K] [-U]
-                  [-v] [-d] [--debug]
+usage: stackcount [-h] [-p PID] [-i INTERVAL] [-D DURATION] [-T] [-r] [-s]
+                  [-P] [-K] [-U] [-v] [-d] [--debug]
                   pattern
 
 Count events and their stack traces
@@ -839,6 +839,8 @@ optional arguments:
   -p PID, --pid PID     trace this PID only
   -i INTERVAL, --interval INTERVAL
                         summary interval, seconds
+  -D DURATION, --duration DURATION
+                        total duration of trace, seconds
   -T, --timestamp       include timestamp on output
   -r, --regexp          use regular expressions. Default is "*" wildcards
                         only.

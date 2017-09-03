@@ -3,8 +3,8 @@
 # stackcount    Count events and their stack traces.
 #               For Linux, uses BCC, eBPF.
 #
-# USAGE: stackcount [-h] [-p PID] [-i INTERVAL] [-T] [-r] [-s]
-#                   [-P] [-v] pattern
+# USAGE: stackcount.py [-h] [-p PID] [-i INTERVAL] [-D DURATION] [-T] [-r] [-s]
+#                      [-P] [-K] [-U] [-v] [-d] [--debug]
 #
 # The pattern is a string with optional '*' wildcards, similar to file
 # globbing. If you'd prefer to use regular expressions, use the -r option.
@@ -227,8 +227,10 @@ class Tool(object):
             epilog=examples)
         parser.add_argument("-p", "--pid", type=int,
             help="trace this PID only")
-        parser.add_argument("-i", "--interval", default=99999999,
+        parser.add_argument("-i", "--interval",
             help="summary interval, seconds")
+        parser.add_argument("-D", "--duration",
+            help="total duration of trace, seconds")
         parser.add_argument("-T", "--timestamp", action="store_true",
             help="include timestamp on output")
         parser.add_argument("-r", "--regexp", action="store_true",
@@ -252,6 +254,12 @@ class Tool(object):
         self.args = parser.parse_args()
         global debug
         debug = self.args.debug
+
+        if self.args.duration and not self.args.interval:
+            self.args.interval = self.args.duration
+        if not self.args.interval:
+            self.args.interval = 99999999
+
         if self.args.kernel_stacks_only and self.args.user_stacks_only:
             print("ERROR: -K and -U are mutually exclusive. If you want " +
                 "both stacks, that is the default.")
@@ -300,13 +308,17 @@ class Tool(object):
         print("Tracing %d functions for \"%s\"... Hit Ctrl-C to end." %
               (self.probe.matched, self.args.pattern))
         exiting = 0 if self.args.interval else 1
+        seconds = 0
         while True:
             try:
                 sleep(int(self.args.interval))
+                seconds += int(self.args.interval)
             except KeyboardInterrupt:
                 exiting = 1
                 # as cleanup can take many seconds, trap Ctrl-C:
                 signal.signal(signal.SIGINT, Tool._signal_ignore)
+            if self.args.duration and seconds >= int(self.args.duration):
+                exiting = 1
 
             print()
             if self.args.timestamp:

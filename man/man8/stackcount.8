@@ -2,7 +2,7 @@
 .SH NAME
 stackcount \- Count function calls and their stack traces. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B stackcount [\-h] [\-p PID] [\-i INTERVAL] [\-T] [\-r] [\-s]
+.B stackcount [\-h] [\-p PID] [\-i INTERVAL] [\-D DURATION] [\-T] [\-r] [\-s]
               [\-P] [\-K] [\-U] [\-v] [\-d] pattern
 .SH DESCRIPTION
 stackcount traces functions and frequency counts them with their entire
@@ -45,6 +45,9 @@ Print the source of the BPF program when loading it (for debugging purposes).
 .TP
 \-i interval
 Summary interval, in seconds.
+.TP
+\-D duration
+Total duration of trace, in seconds.
 .TP
 \-p PID
 Trace this process ID only (filtered in-kernel).
