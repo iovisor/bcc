@@ -5,6 +5,7 @@
 import distutils.version
 import subprocess
 import os
+import re
 from unittest import main, skipUnless, TestCase
 
 TOOLS_DIR = "../../tools/"
@@ -49,6 +50,14 @@ class SmokeTests(TestCase):
         #      this was what we asked for using kill=True.
         self.assertTrue((rc == 0 and allow_early) or rc == 124
                         or (rc == 137 and kill), "rc was %d" % rc)
+
+    def kmod_loaded(self, mod):
+        mods = open("/proc/modules", "r")
+        reg = re.compile("^%s\s" % mod)
+        for line in mods:
+            if reg.match(line):
+                return 1
+            return 0
 
     def setUp(self):
         pass
@@ -208,6 +217,13 @@ class SmokeTests(TestCase):
         # Deliberately left empty -- mysqld_qslower requires an instance of
         # MySQL to be running, or it fails to attach.
         pass
+
+    @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
+    def test_nfsslower(self):
+        if(self.kmod_loaded("nfs")):
+            self.run_with_int("nfsslower.py")
+        else:
+            pass
 
     @skipUnless(kernel_version_ge(4,6), "requires kernel >= 4.6")
     def test_offcputime(self):
