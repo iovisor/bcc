@@ -392,12 +392,10 @@ void * bpf_attach_kprobe(int progfd, enum bpf_probe_attach_type attach_type, con
 {
   int kfd;
   char buf[256];
-  char new_name[128];
+  char event_alias[128];
   struct perf_reader *reader = NULL;
   static char *event_type = "kprobe";
-  int n;
 
-  snprintf(new_name, sizeof(new_name), "%s_bcc_%d", ev_name, getpid());
   reader = perf_reader_new(cb, NULL, NULL, cb_cookie, probe_perf_reader_page_cnt);
   if (!reader)
     goto error;
@@ -409,8 +407,9 @@ void * bpf_attach_kprobe(int progfd, enum bpf_probe_attach_type attach_type, con
     goto error;
   }
 
+  snprintf(event_alias, sizeof(event_alias), "%s_bcc_%d", ev_name, getpid());
   snprintf(buf, sizeof(buf), "%c:%ss/%s %s", attach_type==BPF_PROBE_ENTRY ? 'p' : 'r',
-			event_type, new_name, fn_name);
+			event_type, event_alias, fn_name);
   if (write(kfd, buf, strlen(buf)) < 0) {
     if (errno == EINVAL)
       fprintf(stderr, "check dmesg output for possible cause\n");
@@ -419,24 +418,10 @@ void * bpf_attach_kprobe(int progfd, enum bpf_probe_attach_type attach_type, con
   }
   close(kfd);
 
-  if (access("/sys/kernel/debug/tracing/instances", F_OK) != -1) {
-    snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/instances/bcc_%d", getpid());
-    if (access(buf, F_OK) == -1) {
-      if (mkdir(buf, 0755) == -1)
-        goto retry;
-    }
-    n = snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/instances/bcc_%d/events/%ss/%s",
-             getpid(), event_type, new_name);
-    if (n < sizeof(buf) && bpf_attach_tracing_event(progfd, buf, reader, pid, cpu, group_fd) == 0)
-	  goto out;
-    snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/instances/bcc_%d", getpid());
-    rmdir(buf);
-  }
-retry:
-  snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/events/%ss/%s", event_type, new_name);
+  snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/events/%ss/%s", event_type, event_alias);
   if (bpf_attach_tracing_event(progfd, buf, reader, pid, cpu, group_fd) < 0)
     goto error;
-out:
+
   return reader;
 
 error:
@@ -586,14 +571,7 @@ static int bpf_detach_probe(const char *ev_name, const char *event_type)
 
 int bpf_detach_kprobe(const char *ev_name)
 {
-  char buf[256];
-  int ret = bpf_detach_probe(ev_name, "kprobe");
-  snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/instances/bcc_%d", getpid());
-  if (access(buf, F_OK) != -1) {
-    rmdir(buf);
-  }
-
-  return ret;
+  return bpf_detach_probe(ev_name, "kprobe");
 }
 
 int bpf_detach_uprobe(const char *ev_name)
