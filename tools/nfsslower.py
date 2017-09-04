@@ -305,9 +305,11 @@ if(csv):
     print("ENDTIME_us,TASK,PID,TYPE,BYTES,OFFSET_b,LATENCY_us,FILE")
 else:
     if min_ms == 0:
-        print("Tracing NFS operations")
+        print("Tracing NFS operations... Ctrl-C to quit")
     else:
-        print("Tracing NFS operations that are slower than %d ms" % min_ms)
+        print("""Tracing NFS operations that are slower than \
+%d ms... Ctrl-C to quit"""
+              % min_ms)
     print("%-8s %-14s %-6s %1s %-7s %-8s %7s %s" % ("TIME",
                                                     "COMM",
                                                     "PID",

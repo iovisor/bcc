@@ -18,11 +18,11 @@ TIME     COMM           PID    T BYTES   OFF_KB   LAT(ms) FILENAME
 11:25:16 dd             21297  W 1048576 9216       14.06 1.test.w
 
 This shows NFS writes from dd each 1MB in size to 2 different files. The
-writes all had latency higher than 10ms
+writes all had latency higher than 10ms.
 
 This "latency" is measured from when the operation was issued from the VFS
 interface to the file system, to when it completed. This spans everything:
-RPC latency, Network latency, file system CPU cycles, file system locks, run
+RPC latency, network latency, file system CPU cycles, file system locks, run
 queue latency, etc. This is a better measure of the latency suffered by
 applications reading from a NFS share and can better expose problems
 experienced by NFS clients.
@@ -30,9 +30,9 @@ experienced by NFS clients.
 Note that this only traces the common NFS operations (read,write,open and
 getattr). I chose to include getattr as a significant percentage of NFS
 traffic end up being getattr calls and are a good indicator of problems
-with an NFS server
+with an NFS server.
 
-The threshold can be provided as an argument. Eg, I/O slower than 1 ms:
+The threshold can be provided as an argument. E.g. I/O slower than 1 ms:
 
 ./nfsslower.py 1
 Tracing NFS operations that are slower than 1 ms

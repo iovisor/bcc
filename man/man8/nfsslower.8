@@ -1,6 +1,6 @@
 .TH nfsslower 8  "2017-09-01" "USER COMMANDS"
 .SH NAME
-nfsslower \- Trace slow nfs file operations, with per-event details.
+nfsslower \- Trace slow NFS file operations, with per-event details.
 .SH SYNOPSIS
 .B nfsslower [\-h] [\-j] [\-p PID] [min_ms]
 .SH DESCRIPTION
@@ -18,7 +18,7 @@ will need updating to match any changes to these functions.
 
 This tool uses kprobes to instrument the kernel for entry and exit
 information, in the future a preferred way would be to use tracepoints.
-Currently there are'nt any tracepoints available for nfs_read_file,
+Currently there aren't any tracepoints available for nfs_read_file,
 nfs_write_file and nfs_open_file, nfs_getattr does have entry and exit
 tracepoints but we chose to use kprobes for consistency
 
@@ -30,7 +30,7 @@ CONFIG_BPF and bcc.
 Trace this PID only.
 .TP
 \-j
-Trace output in CSV format
+Trace output in CSV format.
 .TP
 min_ms
 Minimum I/O latency (duration) to trace, in milliseconds. Default is 10 ms.
@@ -44,7 +44,7 @@ Trace slower than 1 ms:
 #
 .B nfsslower 1
 .TP
-Trace slower than 1 ms, and output just the fields in parsable format (csv):
+Trace slower than 1 ms, and output just the fields in parsable format (CSV):
 #
 .B nfsslower \-j 1
 .TP
@@ -78,7 +78,7 @@ Size of I/O, in bytes.
 LAT(ms)
 Latency (duration) of I/O, measured from when it was issued by VFS to the
 filesystem, to when it completed. This time is inclusive of RPC latency,
-Network latency, cache lookup, remote fileserver processing latency, etc. 
+network latency, cache lookup, remote fileserver processing latency, etc. 
 Its a more accurate measure of the latency suffered by applications performing
 NFS read/write calls to a fileserver.
 .TP
@@ -104,13 +104,13 @@ summaries only. This tool has been tested with NFSv3 & NVSv4, but it might work
 with NFSv{1,2}, since it is tracing the generic functions from nfs_file_operations.
 .PP
 Note that the overhead of this tool should be less than fileslower(8), as
-this tool targets nfs functions only, and not all file read/write paths.
+this tool targets NFS functions only, and not all file read/write paths.
 .SH SOURCE
 This is from bcc.
 .IP
 https://github.com/iovisor/bcc
 .PP
-Also look in the bcc distribution for a companion _examples.txt file containing
+Also look in the bcc distribution for a companion nfsslower_examples.txt file containing
 example usage, output, and commentary for this tool.
 .SH OS
 Linux
