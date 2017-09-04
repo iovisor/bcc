@@ -40,4 +40,5 @@ A checklist for bcc tool development:
 1. **Read your man page**. For ROFF: nroff -man filename. Like before, this exercise is like saying something out loud. Does it sound too niche or convoluted? Again, hints that you might need to go back and fix things, or abandon it.
 1. **Spell check your documentation**. Use a spell checker like aspell to check your document quality before committing.
 1. **Add an entry to README.md**.
+1. **Add a smoke test** to [test_tools_smoke.py](https://github.com/iovisor/bcc/blob/master/tests/python/test_tools_smoke.py), which serves as a basic check that your tool still works when we make changes to the core library.
 1. If you made it this far, pull request!
