@@ -15,7 +15,7 @@ struct ifindex_leaf_t {
 BPF_HASH(egress, int, struct ifindex_leaf_t, 4096);
 
 // redirect based on mac -> out_ifindex (config-driven)
-BPF_HASH(ingress, struct ifindex_leaf_t, 4096);
+BPF_HASH(ingress, u64, struct ifindex_leaf_t, 4096);
 
 int handle_phys2virt(struct __sk_buff *skb) {
   // only handle vlan packets
