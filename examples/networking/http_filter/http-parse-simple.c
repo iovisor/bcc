@@ -63,7 +63,8 @@ int http_filter(struct __sk_buff *skb) {
 	unsigned long p[7];
 	int i = 0;
 	int j = 0;
-	for (i = payload_offset ; i < (payload_offset + 7) ; i++) {
+	const int last_index = payload_offset + 7;
+	for (i = payload_offset ; i < last_index ; i++) {
 		p[j] = load_byte(skb , i);
 		j++;
 	}
