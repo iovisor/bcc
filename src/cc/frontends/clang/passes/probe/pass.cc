@@ -29,7 +29,6 @@
 #include <llvm/Analysis/AliasSetTracker.h>
 #include <llvm/IR/Dominators.h>
 #include <llvm/Transforms/IPO.h>
-#include <llvm/Transforms/IPO/InlinerPass.h>
 
 #include "frontends/clang/passes/probe/pass.h"
 #include "linux/bpf.h"
@@ -84,6 +83,7 @@ class ProbeConverter : public FunctionPass {
     IRBuilder<TargetFolder> TheBuilder(entry->getContext(), TargetFolder(mod->getDataLayout()));
     builder = &TheBuilder;
 
+    // Collect one alias set for this function
     AliasSetTracker tracker(*AA);
     for (BasicBlock &BB: F)
       for (Instruction &I : BB)
@@ -94,8 +94,10 @@ class ProbeConverter : public FunctionPass {
     DenseMap<Value *, bool> is_unknown;
     errs() << " Alias Sets:\n";
     for (const AliasSet &AS : tracker) {
+      // determine if the alias set points to memory that is on stack
       bool onstack = is_onstack(AS);
-      errs() << "onstack:" << onstack << " forward:" << AS.isForwardingAliasSet(); AS.print(errs());
+      errs() << "onstack:" << onstack << " forward:" << AS.isForwardingAliasSet() << "\n";
+      AS.print(errs());
       for (auto &I : AS) {
         is_unknown[I.getValue()] = !onstack;
         if (AS.isForwardingAliasSet())
@@ -122,7 +124,8 @@ class ProbeConverter : public FunctionPass {
       if (!DT->isReachableFromEntry(&BB))
         continue;
       for (Instruction &I : BB) {
-        I.dump();
+        errs() << I << "\n";
+        //I.dump();
         //if (!I.mayReadFromMemory())
         //  continue;
         Value *V = nullptr;

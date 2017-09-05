@@ -38,4 +38,4 @@ int do_request(struct pt_regs *ctx, struct request *req) {
 
 #if __name__ == "__main__":
 #    unittest.main()
-TestPassProbe().test_builtin_memcpy()
+TestPassProbe().test_simple_struct_deref()
