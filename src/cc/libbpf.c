@@ -42,6 +42,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <linux/if_alg.h>
 
 #include "libbpf.h"
 #include "perf_reader.h"
@@ -218,6 +219,115 @@ static void bpf_print_hints(char *log)
   }
 }
 #define ROUND_UP(x, n) (((x) + (n) - 1u) & ~((n) - 1u))
+
+int bpf_obj_get_info(int prog_map_fd, void *info, int *info_len)
+{
+  union bpf_attr attr;
+  int err;
+
+  memset(&attr, 0, sizeof(attr));
+  attr.info.bpf_fd = prog_map_fd;
+  attr.info.info_len = *info_len;
+  attr.info.info = ptr_to_u64(info);
+
+  err = syscall(__NR_bpf, BPF_OBJ_GET_INFO_BY_FD, &attr, sizeof(attr));
+  if (!err)
+          *info_len = attr.info.info_len;
+
+  return err;
+}
+
+int bpf_prog_compute_tag(const struct bpf_insn *insns, int prog_len,
+                         unsigned long long *ptag)
+{
+  struct sockaddr_alg alg = {
+    .salg_family    = AF_ALG,
+    .salg_type      = "hash",
+    .salg_name      = "sha1",
+  };
+  int shafd = socket(AF_ALG, SOCK_SEQPACKET, 0);
+  if (shafd < 0) {
+    fprintf(stderr, "sha1 socket not available %s\n", strerror(errno));
+    return -1;
+  }
+  int ret = bind(shafd, (struct sockaddr *)&alg, sizeof(alg));
+  if (ret < 0) {
+    fprintf(stderr, "sha1 bind fail %s\n", strerror(errno));
+    close(shafd);
+    return ret;
+  }
+  int shafd2 = accept(shafd, NULL, 0);
+  if (shafd2 < 0) {
+    fprintf(stderr, "sha1 accept fail %s\n", strerror(errno));
+    close(shafd);
+    return -1;
+  }
+  struct bpf_insn prog[prog_len / 8];
+  bool map_ld_seen = false;
+  int i;
+  for (i = 0; i < prog_len / 8; i++) {
+    prog[i] = insns[i];
+    if (insns[i].code == (BPF_LD | BPF_DW | BPF_IMM) &&
+        insns[i].src_reg == BPF_PSEUDO_MAP_FD &&
+        !map_ld_seen) {
+      prog[i].imm = 0;
+      map_ld_seen = true;
+    } else if (insns[i].code == 0 && map_ld_seen) {
+      prog[i].imm = 0;
+      map_ld_seen = false;
+    } else {
+      map_ld_seen = false;
+    }
+  }
+  ret = write(shafd2, prog, prog_len);
+  if (ret != prog_len) {
+    fprintf(stderr, "sha1 write fail %s\n", strerror(errno));
+    close(shafd2);
+    close(shafd);
+    return -1;
+  }
+
+  union {
+	  unsigned char sha[20];
+	  unsigned long long tag;
+  } u = {};
+  ret = read(shafd2, u.sha, 20);
+  if (ret != 20) {
+    fprintf(stderr, "sha1 read fail %s\n", strerror(errno));
+    close(shafd2);
+    close(shafd);
+    return -1;
+  }
+  *ptag = __builtin_bswap64(u.tag);
+  return 0;
+}
+
+int bpf_prog_get_tag(int fd, unsigned long long *ptag)
+{
+  char fmt[64];
+  snprintf(fmt, sizeof(fmt), "/proc/self/fdinfo/%d", fd);
+  FILE * f = fopen(fmt, "r");
+  if (!f) {
+/*    fprintf(stderr, "failed to open fdinfo %s\n", strerror(errno));*/
+    return -1;
+  }
+  fgets(fmt, sizeof(fmt), f); // pos
+  fgets(fmt, sizeof(fmt), f); // flags
+  fgets(fmt, sizeof(fmt), f); // mnt_id
+  fgets(fmt, sizeof(fmt), f); // prog_type
+  fgets(fmt, sizeof(fmt), f); // prog_jited
+  fgets(fmt, sizeof(fmt), f); // prog_tag
+  fclose(f);
+  char *p = strchr(fmt, ':');
+  if (!p) {
+/*    fprintf(stderr, "broken fdinfo %s\n", fmt);*/
+    return -2;
+  }
+  unsigned long long tag = 0;
+  sscanf(p + 1, "%llx", &tag);
+  *ptag = tag;
+  return 0;
+}
 
 int bpf_prog_load(enum bpf_prog_type prog_type,
                   const struct bpf_insn *insns, int prog_len,

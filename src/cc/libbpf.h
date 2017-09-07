@@ -89,6 +89,10 @@ int bpf_close_perf_event_fd(int fd);
 
 int bpf_obj_pin(int fd, const char *pathname);
 int bpf_obj_get(const char *pathname);
+int bpf_obj_get_info(int prog_map_fd, void *info, int *info_len);
+int bpf_prog_compute_tag(const struct bpf_insn *insns, int prog_len,
+                         unsigned long long *tag);
+int bpf_prog_get_tag(int fd, unsigned long long *tag);
 
 #define LOG_BUF_SIZE 65536
 
