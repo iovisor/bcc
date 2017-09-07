@@ -488,6 +488,10 @@ StatusTuple BPF::load_func(const std::string& func_name,
 
   if (fd < 0)
     return StatusTuple(-1, "Failed to load %s: %d", func_name.c_str(), fd);
+
+  bpf_module_->annotate_prog_tag(func_name, fd,
+                                 reinterpret_cast<struct bpf_insn*>(func_start),
+                                 func_size);
   funcs_[func_name] = fd;
   return StatusTuple(0);
 }

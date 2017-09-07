@@ -105,7 +105,8 @@ std::pair<bool, string> get_kernel_path_info(const string kdir)
 }
 
 int ClangLoader::parse(unique_ptr<llvm::Module> *mod, TableStorage &ts, const string &file,
-                       bool in_memory, const char *cflags[], int ncflags, const std::string &id) {
+                       bool in_memory, const char *cflags[], int ncflags, const std::string &id,
+                       FuncSource& func_src) {
   using namespace clang;
 
   string main_path = "/virtual/main.c";
@@ -276,7 +277,7 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, TableStorage &ts, const st
   // capture the rewritten c file
   string out_str1;
   llvm::raw_string_ostream os1(out_str1);
-  BFrontendAction bact(os1, flags_, ts, id);
+  BFrontendAction bact(os1, flags_, ts, id, func_src);
   if (!compiler1.ExecuteAction(bact))
     return -1;
   unique_ptr<llvm::MemoryBuffer> out_buf1 = llvm::MemoryBuffer::getMemBuffer(out_str1);
@@ -312,5 +313,26 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, TableStorage &ts, const st
   return 0;
 }
 
+const char * FuncSource::src(const std::string& name) {
+  auto src = funcs_.find(name);
+  if (src == funcs_.end())
+    return "";
+  return src->second.src_.data();
+}
+
+const char * FuncSource::src_rewritten(const std::string& name) {
+  auto src = funcs_.find(name);
+  if (src == funcs_.end())
+    return "";
+  return src->second.src_rewritten_.data();
+}
+
+void FuncSource::set_src(const std::string& name, const std::string& src) {
+  funcs_[name].src_ = src;
+}
+
+void FuncSource::set_src_rewritten(const std::string& name, const std::string& src) {
+  funcs_[name].src_rewritten_ = src;
+}
 
 }  // namespace ebpf

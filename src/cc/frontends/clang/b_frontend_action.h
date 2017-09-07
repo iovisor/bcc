@@ -42,6 +42,7 @@ class StringRef;
 namespace ebpf {
 
 class BFrontendAction;
+class FuncSource;
 
 // Type visitor and rewriter for B programs.
 // It will look for B-specific features and rewrite them into a valid
@@ -122,7 +123,8 @@ class BFrontendAction : public clang::ASTFrontendAction {
  public:
   // Initialize with the output stream where the new source file contents
   // should be written.
-  BFrontendAction(llvm::raw_ostream &os, unsigned flags, TableStorage &ts, const std::string &id);
+  BFrontendAction(llvm::raw_ostream &os, unsigned flags, TableStorage &ts, const std::string &id,
+                  FuncSource& func_src);
 
   // Called by clang when the AST has been completed, here the output stream
   // will be flushed.
@@ -141,6 +143,9 @@ class BFrontendAction : public clang::ASTFrontendAction {
   TableStorage &ts_;
   std::string id_;
   std::unique_ptr<clang::Rewriter> rewriter_;
+  friend class BTypeVisitor;
+  std::map<std::string, clang::SourceRange> func_range_;
+  FuncSource& func_src_;
 };
 
 }  // namespace visitor

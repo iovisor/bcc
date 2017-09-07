@@ -30,12 +30,29 @@ class MemoryBuffer;
 
 namespace ebpf {
 
+class FuncSource {
+  class SourceCode {
+   public:
+    SourceCode(const std::string& s1 = "", const std::string& s2 = ""): src_(s1), src_rewritten_(s2) {}
+    std::string src_;
+    std::string src_rewritten_;
+  };
+  std::map<std::string, SourceCode> funcs_;
+ public:
+  FuncSource() {}
+  const char * src(const std::string& name);
+  const char * src_rewritten(const std::string& name);
+  void set_src(const std::string& name, const std::string& src);
+  void set_src_rewritten(const std::string& name, const std::string& src);
+};
+
 class ClangLoader {
  public:
   explicit ClangLoader(llvm::LLVMContext *ctx, unsigned flags);
   ~ClangLoader();
   int parse(std::unique_ptr<llvm::Module> *mod, TableStorage &ts, const std::string &file,
-            bool in_memory, const char *cflags[], int ncflags, const std::string &id);
+            bool in_memory, const char *cflags[], int ncflags, const std::string &id,
+	    FuncSource& func_src);
 
  private:
   static std::map<std::string, std::unique_ptr<llvm::MemoryBuffer>> remapped_files_;

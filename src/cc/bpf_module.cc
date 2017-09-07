@@ -113,6 +113,7 @@ BPFModule::BPFModule(unsigned flags, TableStorage *ts)
     local_ts_ = createSharedTableStorage();
     ts_ = &*local_ts_;
   }
+  func_src_ = ebpf::make_unique<FuncSource>();
 }
 
 static StatusTuple unimplemented_sscanf(const char *, void *) {
@@ -133,6 +134,7 @@ BPFModule::~BPFModule() {
   engine_.reset();
   rw_engine_.reset();
   ctx_.reset();
+  func_src_.reset();
 
   ts_->DeletePrefix(Path({id_}));
 }
@@ -456,7 +458,7 @@ unique_ptr<ExecutionEngine> BPFModule::finalize_rw(unique_ptr<Module> m) {
 // load an entire c file as a module
 int BPFModule::load_cfile(const string &file, bool in_memory, const char *cflags[], int ncflags) {
   clang_loader_ = ebpf::make_unique<ClangLoader>(&*ctx_, flags_);
-  if (clang_loader_->parse(&mod_, *ts_, file, in_memory, cflags, ncflags, id_))
+  if (clang_loader_->parse(&mod_, *ts_, file, in_memory, cflags, ncflags, id_, *func_src_))
     return -1;
   return 0;
 }
@@ -468,7 +470,7 @@ int BPFModule::load_cfile(const string &file, bool in_memory, const char *cflags
 // build an ExecutionEngine.
 int BPFModule::load_includes(const string &text) {
   clang_loader_ = ebpf::make_unique<ClangLoader>(&*ctx_, flags_);
-  if (clang_loader_->parse(&mod_, *ts_, text, true, nullptr, 0, ""))
+  if (clang_loader_->parse(&mod_, *ts_, text, true, nullptr, 0, "", *func_src_))
     return -1;
   return 0;
 }
@@ -630,6 +632,68 @@ uint8_t * BPFModule::function_start(const string &name) const {
     return nullptr;
 
   return get<0>(section->second);
+}
+
+const char * BPFModule::function_source(const string &name) const {
+  return func_src_->src(name);
+}
+
+const char * BPFModule::function_source_rewritten(const string &name) const {
+  return func_src_->src_rewritten(name);
+}
+
+int BPFModule::annotate_prog_tag(const string &name, int prog_fd,
+                                 struct bpf_insn *insns, int prog_len) {
+  unsigned long long tag1, tag2;
+  int err;
+
+  err = bpf_prog_compute_tag(insns, prog_len, &tag1);
+  if (err)
+    return err;
+  err = bpf_prog_get_tag(prog_fd, &tag2);
+  if (err)
+    return err;
+  if (tag1 != tag2) {
+    fprintf(stderr, "prog tag mismatch %llx %llx\n", tag1, tag2);
+    return -1;
+  }
+
+  err = mkdir(BCC_PROG_TAG_DIR, 0777);
+  if (err && errno != EEXIST) {
+    fprintf(stderr, "cannot create " BCC_PROG_TAG_DIR "\n");
+    return -1;
+  }
+
+  char buf[128];
+  ::snprintf(buf, sizeof(buf), BCC_PROG_TAG_DIR "/bpf_prog_%llx", tag1);
+  err = mkdir(buf, 0777);
+  if (err && errno != EEXIST) {
+    fprintf(stderr, "cannot create %s\n", buf);
+    return -1;
+  }
+
+  ::snprintf(buf, sizeof(buf), BCC_PROG_TAG_DIR "/bpf_prog_%llx/%s.c",
+             tag1, name.data());
+  FileDesc fd(open(buf, O_CREAT | O_WRONLY | O_TRUNC,  0644));
+  if (fd < 0) {
+    fprintf(stderr, "cannot create %s\n", buf);
+    return -1;
+  }
+
+  const char *src = function_source(name);
+  write(fd, src, strlen(src));
+
+  ::snprintf(buf, sizeof(buf), BCC_PROG_TAG_DIR "/bpf_prog_%llx/%s.rewritten.c",
+             tag1, name.data());
+  fd = open(buf, O_CREAT | O_WRONLY | O_TRUNC,  0644);
+  if (fd < 0) {
+    fprintf(stderr, "cannot create %s\n", buf);
+    return -1;
+  }
+
+  src = function_source_rewritten(name);
+  write(fd, src, strlen(src));
+  return 0;
 }
 
 size_t BPFModule::function_size(size_t id) const {
