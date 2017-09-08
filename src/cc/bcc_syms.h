@@ -82,9 +82,6 @@ int bcc_resolve_symname(const char *module, const char *symname,
                         struct bcc_symbol_option* option,
                         struct bcc_symbol *sym);
 
-void *bcc_enter_mount_ns(int pid);
-void bcc_exit_mount_ns(void **guard);
-
 #ifdef __cplusplus
 }
 #endif

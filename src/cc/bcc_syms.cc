@@ -469,15 +469,4 @@ invalid_module:
   }
   return -1;
 }
-
-void *bcc_enter_mount_ns(int pid) {
-  return static_cast<void *>(new ProcMountNSGuard(pid));
-}
-
-void bcc_exit_mount_ns(void **guard) {
-  if (guard && *guard) {
-    delete static_cast<ProcMountNSGuard *>(*guard);
-    *guard = NULL;
-  }
-}
 }
