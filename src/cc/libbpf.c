@@ -606,15 +606,12 @@ void * bpf_attach_uprobe(int progfd, enum bpf_probe_attach_type attach_type, con
                         pid_t pid, int cpu, int group_fd,
                         perf_reader_cb cb, void *cb_cookie)
 {
-  int kfd;
   char buf[PATH_MAX];
-  char new_name[256];
+  char event_alias[PATH_MAX];
   struct perf_reader *reader = NULL;
   static char *event_type = "uprobe";
-  int ns_fd = -1;
-  int n;
+  int res, kfd = -1, ns_fd = -1;
 
-  snprintf(new_name, sizeof(new_name), "%s_bcc_%d", ev_name, getpid());
   reader = perf_reader_new(cb, NULL, NULL, cb_cookie, probe_perf_reader_page_cnt);
   if (!reader)
     goto error;
@@ -626,11 +623,15 @@ void * bpf_attach_uprobe(int progfd, enum bpf_probe_attach_type attach_type, con
     goto error;
   }
 
-  n = snprintf(buf, sizeof(buf), "%c:%ss/%s %s:0x%lx", attach_type==BPF_PROBE_ENTRY ? 'p' : 'r',
-			event_type, new_name, binary_path, offset);
-  if (n >= sizeof(buf)) {
-    fprintf(stderr, "Name too long for uprobe; ev_name (%s) is probably too long\n", ev_name);
-    close(kfd);
+  res = snprintf(event_alias, sizeof(event_alias), "%s_bcc_%d", ev_name, getpid());
+  if (res < 0 || res >= sizeof(event_alias)) {
+    fprintf(stderr, "Event name (%s) is too long for buffer\n", ev_name);
+    goto error;
+  }
+  res = snprintf(buf, sizeof(buf), "%c:%ss/%s %s:0x%lx", attach_type==BPF_PROBE_ENTRY ? 'p' : 'r',
+			event_type, event_alias, binary_path, offset);
+  if (res < 0 || res >= sizeof(buf)) {
+    fprintf(stderr, "Event alias (%s) too long for buffer\n", event_alias);
     goto error;
   }
 
@@ -638,20 +639,21 @@ void * bpf_attach_uprobe(int progfd, enum bpf_probe_attach_type attach_type, con
   if (write(kfd, buf, strlen(buf)) < 0) {
     if (errno == EINVAL)
       fprintf(stderr, "check dmesg output for possible cause\n");
-    close(kfd);
     goto error;
   }
   close(kfd);
   exit_mount_ns(ns_fd);
   ns_fd = -1;
 
-  snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/events/%ss/%s", event_type, new_name);
+  snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/events/%ss/%s", event_type, event_alias);
   if (bpf_attach_tracing_event(progfd, buf, reader, pid, cpu, group_fd) < 0)
     goto error;
 
   return reader;
 
 error:
+  if (kfd >= 0)
+    close(kfd);
   exit_mount_ns(ns_fd);
   perf_reader_free(reader);
   return NULL;
@@ -659,24 +661,32 @@ error:
 
 static int bpf_detach_probe(const char *ev_name, const char *event_type)
 {
-  int kfd;
-  char buf[256];
+  int kfd, res;
+  char buf[PATH_MAX];
   snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/%s_events", event_type);
   kfd = open(buf, O_WRONLY | O_APPEND, 0);
   if (kfd < 0) {
     fprintf(stderr, "open(%s): %s\n", buf, strerror(errno));
-    return -1;
+    goto error;
   }
 
-  snprintf(buf, sizeof(buf), "-:%ss/%s_bcc_%d", event_type, ev_name, getpid());
+  res = snprintf(buf, sizeof(buf), "-:%ss/%s_bcc_%d", event_type, ev_name, getpid());
+  if (res < 0 || res >= sizeof(buf)) {
+    fprintf(stderr, "snprintf(%s): %d\n", ev_name, res);
+    goto error;
+  }
   if (write(kfd, buf, strlen(buf)) < 0) {
     fprintf(stderr, "write(%s): %s\n", buf, strerror(errno));
-    close(kfd);
-    return -1;
+    goto error;
   }
-  close(kfd);
 
+  close(kfd);
   return 0;
+
+error:
+  if (kfd >= 0)
+    close(kfd);
+  return -1;
 }
 
 int bpf_detach_kprobe(const char *ev_name)
