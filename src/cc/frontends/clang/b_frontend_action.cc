@@ -26,6 +26,7 @@
 #include <clang/Rewrite/Core/Rewriter.h>
 
 #include "b_frontend_action.h"
+#include "loader.h"
 #include "common.h"
 #include "table_storage.h"
 
@@ -222,6 +223,9 @@ bool BTypeVisitor::VisitFunctionDecl(FunctionDecl *D) {
   auto real_start_loc = rewriter_.getSourceMgr().getFileLoc(D->getLocStart());
   if (D->isExternallyVisible() && D->hasBody()) {
     current_fn_ = D->getName();
+    string bd = rewriter_.getRewrittenText(expansionRange(D->getSourceRange()));
+    fe_.func_src_.set_src(current_fn_, bd);
+    fe_.func_range_[current_fn_] = expansionRange(D->getSourceRange());
     string attr = string("__attribute__((section(\"") + BPF_FN_PREFIX + D->getName().str() + "\")))\n";
     rewriter_.InsertText(real_start_loc, attr);
     if (D->param_size() > MAX_CALLING_CONV_REGS + 1) {
@@ -776,12 +780,18 @@ bool ProbeConsumer::HandleTopLevelDecl(DeclGroupRef Group) {
 }
 
 BFrontendAction::BFrontendAction(llvm::raw_ostream &os, unsigned flags, TableStorage &ts,
-                                 const std::string &id)
-    : os_(os), flags_(flags), ts_(ts), id_(id), rewriter_(new Rewriter) {}
+                                 const std::string &id, FuncSource& func_src)
+    : os_(os), flags_(flags), ts_(ts), id_(id), rewriter_(new Rewriter), func_src_(func_src) {}
 
 void BFrontendAction::EndSourceFileAction() {
   if (flags_ & DEBUG_PREPROCESSOR)
     rewriter_->getEditBuffer(rewriter_->getSourceMgr().getMainFileID()).write(llvm::errs());
+
+  for (auto func : func_range_) {
+    auto f = func.first;
+    string bd = rewriter_->getRewrittenText(func_range_[f]);
+    func_src_.set_src_rewritten(f, bd);
+  }
   rewriter_->getEditBuffer(rewriter_->getSourceMgr().getMainFileID()).write(os_);
   os_.flush();
 }

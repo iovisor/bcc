@@ -37,6 +37,7 @@ class TableDesc;
 class TableStorage;
 class BLoader;
 class ClangLoader;
+class FuncSource;
 
 class BPFModule {
  private:
@@ -68,6 +69,10 @@ class BPFModule {
   size_t num_functions() const;
   uint8_t * function_start(size_t id) const;
   uint8_t * function_start(const std::string &name) const;
+  const char * function_source(const std::string &name) const;
+  const char * function_source_rewritten(const std::string &name) const;
+  int annotate_prog_tag(const std::string &name, int fd,
+			struct bpf_insn *insn, int prog_len);
   const char * function_name(size_t id) const;
   size_t function_size(size_t id) const;
   size_t function_size(const std::string &name) const;
@@ -108,6 +113,7 @@ class BPFModule {
   std::unique_ptr<llvm::Module> mod_;
   std::unique_ptr<BLoader> b_loader_;
   std::unique_ptr<ClangLoader> clang_loader_;
+  std::unique_ptr<FuncSource> func_src_;
   std::map<std::string, std::tuple<uint8_t *, uintptr_t>> sections_;
   std::vector<TableDesc *> tables_;
   std::map<std::string, size_t> table_names_;

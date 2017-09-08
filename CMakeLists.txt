@@ -57,6 +57,10 @@ if(NOT DEFINED BCC_KERNEL_MODULES_DIR)
   set(BCC_KERNEL_MODULES_DIR "/lib/modules")
 endif()
 
+if(NOT DEFINED BCC_PROG_TAG_DIR)
+  set(BCC_PROG_TAG_DIR "/var/tmp/bcc")
+endif()
+
 # As reported in issue #735, GCC 6 has some behavioral problems when
 # dealing with -isystem. Hence, skip the warning optimization
 # altogether on that compiler.
