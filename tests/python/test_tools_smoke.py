@@ -225,6 +225,13 @@ class SmokeTests(TestCase):
         else:
             pass
 
+    @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
+    def test_nfsdist(self):
+        if(self.kmod_loaded("nfs")):
+            self.run_with_duration("nfsdist.py 1 1")
+        else:
+            pass
+
     @skipUnless(kernel_version_ge(4,6), "requires kernel >= 4.6")
     def test_offcputime(self):
         self.run_with_duration("offcputime.py 1")
