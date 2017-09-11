@@ -79,10 +79,10 @@ operation = open
 
 In this example you can see that the read traffic is rather bi-modal, with about
 26K reads falling within 8 - 30 usecs and about 18K reads spread between 128 -
-8191 usecs. Write traffic is largely clusstered in the 64 - 127 usecs bracket.
+8191 usecs. Write traffic is largely clustered in the 64 - 127 usecs bracket.
 The faster read traffic is probably coming from a filesystem cache and the slower
-traffic from disk. The reason why the writes are so consistenly fast is becuase
-this example test was run on a couple of VM's and i believe the hypervisor was
+traffic from disk. The reason why the writes are so consistently fast is because
+this example test was run on a couple of VM's and I believe the hypervisor was
 caching all the write traffic to memory.
 
 This "latency" is measured from when the operation was issued from the VFS
@@ -92,7 +92,7 @@ queue latency, etc. This is a better measure of the latency suffered by
 applications reading from a NFS share and can better expose problems
 experienced by NFS clients.
 
-Note that this only traces the common NFS operations (read,write,open and
+Note that this only traces the common NFS operations (read, write, open and
 getattr). I chose to include getattr as a significant percentage of NFS
 traffic end up being getattr calls and are a good indicator of problems
 with an NFS server.
@@ -133,7 +133,7 @@ operation = write
          4 -> 7          : 137      |****************************************|
          8 -> 15         : 3        |                                        |
 
-This shows a write workload, with writes hovering primarily in the 4-7ms range
+This shows a write workload, with writes hovering primarily in the 4-7ms range.
 
 USAGE message:
 
