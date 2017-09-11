@@ -82,8 +82,8 @@ In this example you can see that the read traffic is rather bi-modal, with about
 8191 usecs. Write traffic is largely clusstered in the 64 - 127 usecs bracket.
 The faster read traffic is probably coming from a filesystem cache and the slower
 traffic from disk. The reason why the writes are so consistenly fast is becuase
-this example test was run on VM's and i believe the hypervisor was caching
-all the write traffic to memory.
+this example test was run on a couple of VM's and i believe the hypervisor was
+caching all the write traffic to memory.
 
 This "latency" is measured from when the operation was issued from the VFS
 interface to the file system, to when it completed. This spans everything:
