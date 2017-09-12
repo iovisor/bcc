@@ -57,6 +57,7 @@
 from ctypes import c_uint
 from bcc import BPF
 from pyroute2 import IPRoute, NetNS, IPDB, NSPopen
+from utils import NSPopenWithCheck
 import sys
 from time import sleep
 from unittest import main, TestCase
@@ -174,15 +175,15 @@ class TestBPFSocket(TestCase):
             # one arp request/reply, 2 icmp request/reply per VM, total 6 packets per VM, 12 packets total
             self.assertEqual(self.pem_stats[c_uint(0)].value, 12)
 
-            nsp_server = NSPopen(ns2_ipdb.nl.netns, ["iperf", "-s", "-xSC"])
+            nsp_server = NSPopenWithCheck(ns2_ipdb.nl.netns, ["iperf", "-s", "-xSC"])
             sleep(1)
             nsp = NSPopen(ns1_ipdb.nl.netns, ["iperf", "-c", self.vm2_ip, "-t", "1", "-xSC"])
             nsp.wait(); nsp.release()
             nsp_server.kill(); nsp_server.wait(); nsp_server.release()
 
-            nsp_server = NSPopen(ns2_ipdb.nl.netns, ["netserver", "-D"])
+            nsp_server = NSPopenWithCheck(ns2_ipdb.nl.netns, ["netserver", "-D"])
             sleep(1)
-            nsp = NSPopen(ns1_ipdb.nl.netns, ["netperf", "-l", "1", "-H", self.vm2_ip, "--", "-m", "65160"])
+            nsp = NSPopenWithCheck(ns1_ipdb.nl.netns, ["netperf", "-l", "1", "-H", self.vm2_ip, "--", "-m", "65160"])
             nsp.wait(); nsp.release()
             nsp = NSPopen(ns1_ipdb.nl.netns, ["netperf", "-l", "1", "-H", self.vm2_ip, "-t", "TCP_RR"])
             nsp.wait(); nsp.release()
