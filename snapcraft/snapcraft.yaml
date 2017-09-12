@@ -156,6 +156,12 @@ apps:
     mysqld-qslower:
         command: wrapper mysqld_qslower
         aliases: [mysqld-qslower]
+    nfsdist:
+        command: wrapper nfsdist
+        aliases: [nfsdist]
+    nfsslower:
+        command: wrapper nfsslower
+        aliases: [nfsslower]
     nodegc:
         command: wrapper nodegc
         aliases: [nodegc]
