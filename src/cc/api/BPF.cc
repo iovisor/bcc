@@ -233,22 +233,39 @@ StatusTuple BPF::attach_usdt(const USDT& usdt, pid_t pid, int cpu,
       bool failed = false;
       std::string err_msg;
       int cnt = 0;
-      for (auto addr : u.addresses_) {
-        auto res =
-            attach_uprobe(u.binary_path_, std::string(), u.probe_func_, addr);
-        if (res.code() != 0) {
-          failed = true;
-          err_msg += "USDT " + u.print_name() + " at " + std::to_string(addr);
-          err_msg += ": " + res.msg() + "\n";
-          break;
+      for (auto bin_addr : u.bin_addresses_) {
+        bool break_out = false;
+        for (auto addr : bin_addr.second) {
+          auto res =
+              attach_uprobe(bin_addr.first, std::string(), u.probe_func_, addr);
+          if (res.code() != 0) {
+            failed = true;
+            err_msg += "USDT " + u.print_name() + " (binary " + bin_addr.first;
+            err_msg += ") at " + std::to_string(addr);
+            err_msg += ": " + res.msg() + "\n";
+            break_out = true;
+            break;
+          }
+          cnt++;
         }
-        cnt++;
+        if (break_out)
+          break;
       }
       if (failed) {
-        for (int i = 0; i < cnt; i++) {
-          auto res =
-              detach_uprobe(u.binary_path_, std::string(), u.addresses_[i]);
-          err_msg += "During clean up: " + res.msg() + "\n";
+        int i = cnt;
+        while (i) {
+          for (auto bin_addr : u.bin_addresses_) {
+            for (auto addr : bin_addr.second) {
+              if (!i)
+                break;
+              auto res =
+                  detach_uprobe(bin_addr.first, std::string(), addr);
+              err_msg += "During clean up: " + res.msg() + "\n";
+              --i;
+            }
+            if (!i)
+              break;
+          }
         }
         return StatusTuple(-1, err_msg);
       } else
@@ -370,12 +387,14 @@ StatusTuple BPF::detach_usdt(const USDT& usdt) {
     if (u == usdt) {
       bool failed = false;
       std::string err_msg;
-      for (auto addr : u.addresses_) {
-        auto res = detach_uprobe(u.binary_path_, std::string(), addr);
-        if (res.code() != 0) {
-          failed = true;
-          err_msg += "USDT " + u.print_name() + " at " + std::to_string(addr);
-          err_msg += ": " + res.msg() + "\n";
+      for (auto bin_addr : u.bin_addresses_) {
+        for (auto addr : bin_addr.second) {
+          auto res = detach_uprobe(bin_addr.first, std::string(), addr);
+          if (res.code() != 0) {
+            failed = true;
+            err_msg += "USDT " + u.print_name() + " at " + std::to_string(addr);
+            err_msg += ": " + res.msg() + "\n";
+          }
         }
       }
       if (failed)
@@ -623,24 +642,55 @@ StatusTuple BPF::detach_perf_event_all_cpu(open_probe_t& attr) {
 }
 
 StatusTuple USDT::init() {
-  ::USDT::Context ctx(binary_path_);
-  if (!ctx.loaded())
+  std::unique_ptr<::USDT::Context> ctx;
+  if (pid_) {
+    ctx.reset(new ::USDT::Context(pid_));
+  } else {
+    ctx.reset(new ::USDT::Context(binary_path_));
+  }
+  if (!ctx->loaded())
     return StatusTuple(-1, "Unable to load USDT " + print_name());
-  auto probe = ctx.get(name_);
-  if (probe == nullptr)
+
+  auto&& probes = ctx->get_all(binary_path_, provider_, name_);
+  if (probes.empty())
     return StatusTuple(-1, "Unable to find USDT " + print_name());
 
-  if (!probe->enable(probe_func_))
-    return StatusTuple(-1, "Failed to enable USDT " + print_name());
+  uint64_t argfmt = probes[0]->usdt_getargfmt();
+  int maxfmtidx = 0;
+  int count = 0;
+  for (auto probe : probes) {
+    if (!probe->enable(probe_func_))
+      return StatusTuple(-1, "Failed to enable USDT " + print_name());
+    // We check if the format is compatible between them
+    uint64_t tmpfmt = probe->usdt_getargfmt();
+    if (!::USDT::Probe::encloses_argfmt(argfmt, tmpfmt)) {
+      // Check if tmpfmt encloses argfmt
+      if (::USDT::Probe::encloses_argfmt(tmpfmt, argfmt)) {
+        maxfmtidx = count;
+        argfmt = tmpfmt;
+      } else {
+        return StatusTuple(-1, "Argument formats are not compatible for USDT "
+                           + print_name());
+      }
+    }
+    std::ostringstream stream;
+    probe->usdt_getarg(stream);
+    ++count;
+  }
   std::ostringstream stream;
-  if (!probe->usdt_getarg(stream))
+  if (!probes[maxfmtidx]->usdt_getarg(stream))
     return StatusTuple(
         -1, "Unable to generate program text for USDT " + print_name());
   program_text_ = ::USDT::USDT_PROGRAM_HEADER + stream.str();
 
-  addresses_.reserve(probe->num_locations());
-  for (size_t i = 0; i < probe->num_locations(); i++)
-    addresses_.emplace_back(probe->address(i));
+  bin_addresses_.reserve(probes.size());
+  for (auto probe: probes) {
+    std::vector<uintptr_t> taddr;
+    taddr.reserve(probe->num_locations());
+    for (size_t i = 0; i < probe->num_locations(); i++)
+      taddr.emplace_back(probe->address(i));
+    bin_addresses_.emplace_back(probe->bin_path(), std::move(taddr));
+  }
 
   initialized_ = true;
   return StatusTuple(0);

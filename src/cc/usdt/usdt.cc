@@ -45,8 +45,23 @@ Probe::Probe(const char *bin_path, const char *provider, const char *name,
       provider_(provider),
       name_(name),
       semaphore_(semaphore),
+      argfmt_(0),
       pid_(pid),
       mount_ns_(ns) {}
+
+bool Probe::encloses_argfmt(uint64_t enclosing, uint64_t test) {
+  for (int i = 0; i < 16; ++i) {
+    // Check if signed-ness matches
+    if ((test & 8) != (enclosing & 8))
+      return false;
+    // Check sizes
+    if ((enclosing & 7) < (test & 7))
+      return false;
+    enclosing >>= 4;
+    test >>= 4;
+  }
+  return true;
+}
 
 bool Probe::in_shared_object() {
   if (!in_shared_object_) {
@@ -132,7 +147,7 @@ bool Probe::disable() {
   return true;
 }
 
-std::string Probe::largest_arg_type(size_t arg_n) {
+Argument *Probe::largest_arg(size_t arg_n) {
   Argument *largest = nullptr;
   for (Location &location : locations_) {
     Argument *candidate = &location.arguments_[arg_n];
@@ -142,7 +157,11 @@ std::string Probe::largest_arg_type(size_t arg_n) {
   }
 
   assert(largest);
-  return largest->ctype();
+  return largest;
+}
+
+std::string Probe::largest_arg_type(size_t arg_n) {
+  return largest_arg(arg_n)->ctype();
 }
 
 bool Probe::usdt_getarg(std::ostream &stream) {
@@ -193,14 +212,51 @@ bool Probe::usdt_getarg(std::ostream &stream) {
   return true;
 }
 
+uint64_t Probe::usdt_getargfmt() {
+  assert(!locations_.empty());
+  if (argfmt_ == (uint64_t)-1) {
+    argfmt_ = 0;
+    const size_t arg_count = locations_[0].arguments_.size();
+
+    if (arg_count > 0) {
+      assert(arg_count <= 16);
+      int t = largest_arg(0)->arg_size();
+      assert(t > -5 && t < 5);
+      if (t < 0) {
+        argfmt_ = 1 | (-t);
+      } else {
+        argfmt_ = t;
+      }
+      for (size_t arg_n = 1; arg_n < arg_count; ++arg_n) {
+        argfmt_ <<= 4;
+        int t = largest_arg(arg_n)->arg_size();
+        assert(t > -5 && t < 5);
+        if (t < 0) {
+          argfmt_ |= (1 | (-t));
+        } else {
+          argfmt_ |= t;
+        }
+      }
+    }
+  }
+  return argfmt_;
+}
+
 void Probe::add_location(uint64_t addr, const char *fmt) {
   locations_.emplace_back(addr, fmt);
 }
 
-void Context::_each_probe(const char *binpath, const struct bcc_elf_usdt *probe,
+bool Probe::is_compatible_format(const struct bcc_elf_usdt *other) {
+  Location t(0, other->arg_fmt);
+  if (locations_.empty())
+    return false;
+  return num_arguments() == t.arguments_.size();
+}
+
+int Context::_each_probe(const char *binpath, const struct bcc_elf_usdt *probe,
                           void *p) {
   Context *ctx = static_cast<Context *>(p);
-  ctx->add_probe(binpath, probe);
+  return ctx->add_probe(binpath, probe);
 }
 
 int Context::_each_module(const char *modpath, uint64_t, uint64_t, bool, void *p) {
@@ -208,25 +264,35 @@ int Context::_each_module(const char *modpath, uint64_t, uint64_t, bool, void *p
   // Modules may be reported multiple times if they contain more than one
   // executable region. We are going to parse the ELF on disk anyway, so we
   // don't need these duplicates.
+  int res = 0;
   if (ctx->modules_.insert(modpath).second /*inserted new?*/) {
     ProcMountNSGuard g(ctx->mount_ns_instance_.get());
-    bcc_elf_foreach_usdt(modpath, _each_probe, p);
+    res = bcc_elf_foreach_usdt(modpath, _each_probe, p);
   }
-  return 0;
+  // Only return an error if we have mismatched probes
+  // Otherwise, we ignore other errors (like files that don't exist)
+  return res == -2 ? -1 : 0;
 }
 
-void Context::add_probe(const char *binpath, const struct bcc_elf_usdt *probe) {
+int Context::add_probe(const char *binpath, const struct bcc_elf_usdt *probe) {
   for (auto &p : probes_) {
-    if (p->provider_ == probe->provider && p->name_ == probe->name) {
-      p->add_location(probe->pc, probe->arg_fmt);
-      return;
+    if (strncmp(p->bin_path_.c_str(), binpath, p->bin_path_.size()) == 0
+        && p->provider_ == probe->provider
+        && p->name_ == probe->name) {
+      if (p->is_compatible_format(probe)) {
+        p->add_location(probe->pc, probe->arg_fmt);
+        return 0;
+      } else {
+        return -1;
+      }
     }
   }
 
   probes_.emplace_back(
       new Probe(binpath, probe->provider, probe->name, probe->semaphore, pid_,
-	mount_ns_instance_.get()));
+                mount_ns_instance_.get()));
   probes_.back()->add_location(probe->pc, probe->arg_fmt);
+  return 0;
 }
 
 std::string Context::resolve_bin_path(const std::string &bin_path) {
@@ -249,6 +315,22 @@ Probe *Context::get(const std::string &probe_name) {
       return p.get();
   }
   return nullptr;
+}
+
+std::vector<Probe*> Context::get_all(const std::string &binary,
+                                     const std::string &provider,
+                                     const std::string &name) {
+  std::vector<Probe*> result;
+  for (auto &p : probes_) {
+    bool match = true;
+    if (!binary.empty()) {
+      match = (p->bin_path_ == binary);
+    }
+    if (match && (p->provider_ == provider) && (p->name_ == name)) {
+      result.emplace_back(p.get());
+    }
+  }
+  return result;
 }
 
 bool Context::enable_probe(const std::string &probe_name,
