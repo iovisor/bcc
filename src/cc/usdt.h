@@ -181,6 +181,7 @@ public:
     return largest_arg_type(arg_index);
   }
 
+  void finalize_locations();
   bool need_enable() const { return semaphore_ != 0x0; }
   bool enable(const std::string &fn_name);
   bool disable();

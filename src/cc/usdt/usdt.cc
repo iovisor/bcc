@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#include <algorithm>
 #include <cstring>
 #include <sstream>
 #include <unordered_set>
@@ -197,6 +198,18 @@ void Probe::add_location(uint64_t addr, const char *fmt) {
   locations_.emplace_back(addr, fmt);
 }
 
+void Probe::finalize_locations() {
+  std::sort(locations_.begin(), locations_.end(),
+            [](const Location &a, const Location &b) {
+              return a.address_ < b.address_;
+            });
+  auto last = std::unique(locations_.begin(), locations_.end(),
+                          [](const Location &a, const Location &b) {
+                            return a.address_ == b.address_;
+                          });
+  locations_.erase(last, locations_.end());
+}
+
 void Context::_each_probe(const char *binpath, const struct bcc_elf_usdt *probe,
                           void *p) {
   Context *ctx = static_cast<Context *>(p);
@@ -294,6 +307,8 @@ Context::Context(const std::string &bin_path)
       loaded_ = true;
     }
   }
+  for (const auto &probe : probes_)
+    probe->finalize_locations();
 }
 
 Context::Context(int pid) : pid_(pid), pid_stat_(pid),
@@ -313,6 +328,8 @@ Context::Context(int pid) : pid_(pid), pid_stat_(pid),
 
     loaded_ = true;
   }
+  for (const auto &probe : probes_)
+    probe->finalize_locations();
 }
 
 Context::~Context() {
