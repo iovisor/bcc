@@ -178,8 +178,10 @@ static int list_in_scn(Elf *e, Elf_Scn *section, size_t stridx, size_t symsize,
       if (sym.st_value == 0)
         continue;
 
-      uint32_t flag = 1 << ELF_ST_TYPE(sym.st_info);
-      if (!(option->use_symbol_type & flag))
+      uint32_t st_type = ELF_ST_TYPE(sym.st_info);
+      if (sym.st_size == 0 && (st_type == STT_FUNC || st_type == STT_GNU_IFUNC))
+        continue;
+      if (!(option->use_symbol_type & (1 << st_type)))
         continue;
 
       if (callback(name, sym.st_value, sym.st_size, payload) < 0)
