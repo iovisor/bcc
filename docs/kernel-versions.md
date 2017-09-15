@@ -96,6 +96,7 @@ Generic XDP | 4.12 | [b5cdae3291f7](https://git.kernel.org/cgit/linux/kernel/git
 Intel `i40e` driver | 4.13 | [0c8493d90b6b](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?h=0c8493d90b6bb0f5c4fe9217db8f7203f24c0f28)
 Action: redirect | 4.14 | [6453073987ba](https://git.kernel.org/cgit/linux/kernel/git/davem/net-next.git/commit/?id=6453073987ba392510ab6c8b657844a9312c67f7)
 Support for tap | 4.14 | [761876c857cb](https://git.kernel.org/cgit/linux/kernel/git/davem/net-next.git/commit/?id=761876c857cb2ef8489fbee01907151da902af91)
+Support for veth | 4.14 | [d445516966dc](https://git.kernel.org/cgit/linux/kernel/git/davem/net-next.git/commit/?id=d445516966dcb2924741b13b27738b54df2af01a)
 Intel `e1000` driver | | [Not upstream yet](https://git.kernel.org/pub/scm/linux/kernel/git/ast/bpf.git/commit/?h=xdp&id=0afee87cfc800bf3317f4dc8847e6f36539b820c)
 Intel `e1000e` driver | | [Not planned for upstream at this time](https://github.com/adjavon/e1000e_xdp)
 
