@@ -24,6 +24,7 @@
 
 #include "bcc_elf.h"
 #include "bcc_proc.h"
+#include "common.h"
 #include "usdt.h"
 #include "vendor/tinyformat.hpp"
 #include "bcc_usdt.h"
@@ -314,17 +315,9 @@ Context::Context(const std::string &bin_path)
 Context::Context(int pid) : pid_(pid), pid_stat_(pid),
   mount_ns_instance_(new ProcMountNS(pid)), loaded_(false) {
   if (bcc_procutils_each_module(pid, _each_module, this) == 0) {
-    // get exe command from /proc/<pid>/exe
-    // assume the maximum path length 4096, which should be
-    // sufficiently large to cover all use cases
-    char source[64];
-    char cmd_buf[4096];
-    snprintf(source, sizeof(source), "/proc/%d/exe", pid);
-    ssize_t cmd_len = readlink(source, cmd_buf, sizeof(cmd_buf) - 1);
-    if (cmd_len == -1)
+    cmd_bin_path_ = ebpf::get_pid_exe(pid);
+    if (cmd_bin_path_.empty())
       return;
-    cmd_buf[cmd_len] = '\0';
-    cmd_bin_path_.assign(cmd_buf, cmd_len + 1);
 
     loaded_ = true;
   }
