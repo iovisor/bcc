@@ -470,6 +470,41 @@ int bcc_elf_foreach_sym(const char *path, bcc_elf_symcb callback,
       path, callback, (struct bcc_symbol_option*)option, payload, 0);
 }
 
+int bcc_elf_foreach_load_section(const char *path,
+                                 bcc_elf_load_sectioncb callback,
+                                 void *payload) {
+  Elf *e = NULL;
+  int fd = -1, err = -1, res;
+  size_t nhdrs, i;
+
+  if (openelf(path, &e, &fd) < 0)
+    goto exit;
+
+  if (elf_getphdrnum(e, &nhdrs) != 0)
+    goto exit;
+
+  GElf_Phdr header;
+  for (i = 0; i < nhdrs; i++) {
+    if (!gelf_getphdr(e, (int)i, &header))
+      continue;
+    if (header.p_type != PT_LOAD || !(header.p_flags & PF_X))
+      continue;
+    res = callback(header.p_vaddr, header.p_memsz, header.p_offset, payload);
+    if (res < 0) {
+      err = 1;
+      goto exit;
+    }
+  }
+  err = 0;
+
+exit:
+  if (e)
+    elf_end(e);
+  if (fd >= 0)
+    close(fd);
+  return err;
+}
+
 static int loadaddr(Elf *e, uint64_t *addr) {
   size_t phnum, i;
 

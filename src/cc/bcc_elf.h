@@ -39,13 +39,18 @@ typedef void (*bcc_elf_probecb)(const char *, const struct bcc_elf_usdt *,
 // Callback returning a negative value indicates to stop the iteration
 typedef int (*bcc_elf_symcb)(const char *, uint64_t, uint64_t, void *);
 // Segment virtual address, memory size, file offset, payload
-// Callback returns a negative value indicates to stop the iteration
+// Callback returning a negative value indicates to stop the iteration
 typedef int (*bcc_elf_load_sectioncb)(uint64_t, uint64_t, uint64_t, void *);
 
 // Iterate over all USDT probes noted in a binary module
 // Returns -1 on error, and 0 on success
 int bcc_elf_foreach_usdt(const char *path, bcc_elf_probecb callback,
                          void *payload);
+// Iterate over all executable load sections of an ELF
+// Returns -1 on error, 1 if stopped by callback, and 0 on success
+int bcc_elf_foreach_load_section(const char *path,
+                                 bcc_elf_load_sectioncb callback,
+                                 void *payload);
 int bcc_elf_loadaddr(const char *path, uint64_t *address);
 // Iterate over symbol table of a binary module
 // Parameter "option" points to a bcc_symbol_option struct to indicate wheather
