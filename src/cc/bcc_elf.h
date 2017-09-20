@@ -32,17 +32,27 @@ struct bcc_elf_usdt {
   const char *arg_fmt;
 };
 
+// Binary module path, bcc_elf_usdt struct, payload
 typedef void (*bcc_elf_probecb)(const char *, const struct bcc_elf_usdt *,
                                 void *);
-
 // Symbol name, start address, length, payload
+// Callback returning a negative value indicates to stop the iteration
 typedef int (*bcc_elf_symcb)(const char *, uint64_t, uint64_t, void *);
+// Segment virtual address, memory size, file offset, payload
+// Callback returns a negative value indicates to stop the iteration
+typedef int (*bcc_elf_load_sectioncb)(uint64_t, uint64_t, uint64_t, void *);
 
+// Iterate over all USDT probes noted in a binary module
+// Returns -1 on error, and 0 on success
 int bcc_elf_foreach_usdt(const char *path, bcc_elf_probecb callback,
                          void *payload);
 int bcc_elf_loadaddr(const char *path, uint64_t *address);
-int bcc_elf_foreach_sym(const char *path, bcc_elf_symcb callback,
-                        void *option, void *payload);
+// Iterate over symbol table of a binary module
+// Parameter "option" points to a bcc_symbol_option struct to indicate wheather
+// and how to use debuginfo file, and what types of symbols to load.
+// Returns -1 on error, and 0 on success or stopped by callback
+int bcc_elf_foreach_sym(const char *path, bcc_elf_symcb callback, void *option,
+                        void *payload);
 
 int bcc_elf_get_type(const char *path);
 int bcc_elf_is_shared_obj(const char *path);
