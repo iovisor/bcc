@@ -1,3 +1,6 @@
+- 2017-09-13: [Performance Analysis Superpowers with Linux BPF](https://www.slideshare.net/brendangregg/ossna-2017-performance-analysis-superpowers-with-linux-bpf)
+- 2017-07-28: [Tracing a packet journey using Linux tracepoints, perf and eBPF](https://blog.yadutaf.fr/2017/07/28/tracing-a-packet-journey-using-linux-tracepoints-perf-ebpf/)
+- 2017-07-13: [Performance Superpowers with Enhanced BPF](https://www.usenix.org/conference/atc17/program/presentation/gregg-superpowers)
 - 2017-06-28: [The BSD Packet Filter](https://speakerdeck.com/tuxology/the-bsd-packet-filter)
 - 2017-03-04: [Linux 4.x Tracing: Performance Analysis with bcc/BPF](https://www.slideshare.net/brendangregg/linux-4x-tracing-performance-analysis-with-bccbpf)
 - 2017-02-27: [Profiling a .NET Core Application on Linux](https://blogs.microsoft.co.il/sasha/2017/02/27/profiling-a-net-core-application-on-linux)
