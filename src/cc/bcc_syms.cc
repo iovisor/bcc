@@ -416,11 +416,24 @@ static int _find_sym(const char *symname, uint64_t addr, uint64_t,
   return 0;
 }
 
+struct load_addr_t {
+  uint64_t target_addr;
+  uint64_t binary_addr;
+};
+int _find_load(uint64_t v_addr, uint64_t mem_sz, uint64_t file_offset,
+                       void *payload) {
+  struct load_addr_t *addr = static_cast<load_addr_t *>(payload);
+  if (addr->target_addr >= v_addr && addr->target_addr < (v_addr + mem_sz)) {
+    addr->binary_addr = addr->target_addr - v_addr + file_offset;
+    return -1;
+  }
+  return 0;
+}
+
 int bcc_resolve_symname(const char *module, const char *symname,
                         const uint64_t addr, int pid,
                         struct bcc_symbol_option *option,
                         struct bcc_symbol *sym) {
-  uint64_t load_addr;
   static struct bcc_symbol_option default_option = {
     .use_debug_file = 1,
     .check_debug_file_crc = 1,
@@ -437,29 +450,37 @@ int bcc_resolve_symname(const char *module, const char *symname,
   } else {
     sym->module = bcc_procutils_which_so(module, pid);
   }
-
   if (sym->module == NULL)
     return -1;
 
   ProcMountNSGuard g(pid);
 
-  if (bcc_elf_loadaddr(sym->module, &load_addr) < 0)
-    goto invalid_module;
-
   sym->name = symname;
   sym->offset = addr;
-
   if (option == NULL)
     option = &default_option;
 
   if (sym->name && sym->offset == 0x0)
     if (bcc_elf_foreach_sym(sym->module, _find_sym, option, sym) < 0)
       goto invalid_module;
-
   if (sym->offset == 0x0)
     goto invalid_module;
 
-  sym->offset = (sym->offset - load_addr);
+  // For executable (ET_EXEC) binaries, translate the virtual address
+  // to physical address in the binary file.
+  // For shared object binaries (ET_DYN), the address from symbol table should
+  // already be physical address in the binary file.
+  if (bcc_elf_get_type(sym->module) == ET_EXEC) {
+    struct load_addr_t addr = {
+      .target_addr = sym->offset,
+      .binary_addr = 0x0,
+    };
+    if (bcc_elf_foreach_load_section(sym->module, &_find_load, &addr) < 0)
+      goto invalid_module;
+    if (!addr.binary_addr)
+      goto invalid_module;
+    sym->offset = addr.binary_addr;
+  }
   return 0;
 
 invalid_module:

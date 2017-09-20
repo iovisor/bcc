@@ -51,7 +51,6 @@ int bcc_elf_foreach_usdt(const char *path, bcc_elf_probecb callback,
 int bcc_elf_foreach_load_section(const char *path,
                                  bcc_elf_load_sectioncb callback,
                                  void *payload);
-int bcc_elf_loadaddr(const char *path, uint64_t *address);
 // Iterate over symbol table of a binary module
 // Parameter "option" points to a bcc_symbol_option struct to indicate wheather
 // and how to use debuginfo file, and what types of symbols to load.

@@ -505,42 +505,6 @@ exit:
   return err;
 }
 
-static int loadaddr(Elf *e, uint64_t *addr) {
-  size_t phnum, i;
-
-  if (elf_getphdrnum(e, &phnum) != 0)
-    return -1;
-
-  for (i = 0; i < phnum; ++i) {
-    GElf_Phdr header;
-
-    if (!gelf_getphdr(e, (int)i, &header))
-      continue;
-
-    if (header.p_type != PT_LOAD)
-      continue;
-
-    *addr = (uint64_t)header.p_vaddr;
-    return 0;
-  }
-
-  return -1;
-}
-
-int bcc_elf_loadaddr(const char *path, uint64_t *address) {
-  Elf *e;
-  int fd, res;
-
-  if (openelf(path, &e, &fd) < 0)
-    return -1;
-
-  res = loadaddr(e, address);
-  elf_end(e);
-  close(fd);
-
-  return res;
-}
-
 int bcc_elf_get_type(const char *path) {
   Elf *e;
   GElf_Ehdr hdr;
