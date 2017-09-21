@@ -9,12 +9,27 @@ from unittest import main, TestCase
 
 class TestKSyms(TestCase):
     def grab_sym(self):
-        # Grab the first symbol in kallsyms that has type 't'.
+        address = ""
+        aliases = []
+
+        # Grab the first symbol in kallsyms that has type 't' or 'T'.
+        # Also, find all aliases of this symbol which are identifiable
+        # by the same address.
         with open("/proc/kallsyms") as f:
             for line in f:
-                (addr, t, name) = line.strip().split()
-                if t == "t":
-                    return (addr, name)
+
+                # Extract the first 3 columns only. The 4th column
+                # containing the module name may not exist for all
+                # symbols.
+                (addr, t, name) = line.strip().split()[:3]
+                if t == "t" or t == "T":
+                    if not address:
+                        address = addr
+                    if addr == address:
+                        aliases.append(name)
+
+        # Return all aliases of the first symbol.
+        return (address, aliases)
 
     def test_ksymname(self):
         sym = BPF.ksymname("__kmalloc")
@@ -22,9 +37,10 @@ class TestKSyms(TestCase):
         self.assertNotEqual(sym, 0)
 
     def test_ksym(self):
-        (addr, name) = self.grab_sym()
+        (addr, aliases) = self.grab_sym()
         sym = BPF.ksym(int(addr, 16))
-        self.assertEqual(sym, name)
+        found = sym in aliases
+        self.assertTrue(found)
 
 class Harness(TestCase):
     def setUp(self):
