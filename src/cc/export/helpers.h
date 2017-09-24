@@ -163,6 +163,21 @@ struct _name##_table_t _name = { .max_entries = (_max_entries) }
 #define BPF_HISTOGRAM(...) \
   BPF_HISTX(__VA_ARGS__, BPF_HIST3, BPF_HIST2, BPF_HIST1)(__VA_ARGS__)
 
+#define BPF_LPM_TRIE1(_name) \
+  BPF_F_TABLE("lpm_trie", u64, u64, _name, 10240, BPF_F_NO_PREALLOC)
+#define BPF_LPM_TRIE2(_name, _key_type) \
+  BPF_F_TABLE("lpm_trie", _key_type, u64, _name, 10240, BPF_F_NO_PREALLOC)
+#define BPF_LPM_TRIE3(_name, _key_type, _leaf_type) \
+  BPF_F_TABLE("lpm_trie", _key_type, _leaf_type, _name, 10240, BPF_F_NO_PREALLOC)
+#define BPF_LPM_TRIE4(_name, _key_type, _leaf_type, _size) \
+  BPF_F_TABLE("lpm_trie", _key_type, _leaf_type, _name, _size, BPF_F_NO_PREALLOC)
+#define BPF_LPM_TRIEX(_1, _2, _3, _4, NAME, ...) NAME
+
+// Define a LPM trie function, some arguments optional
+// BPF_LPM_TRIE(name, key_type=u64, leaf_type=u64, size=10240)
+#define BPF_LPM_TRIE(...) \
+  BPF_LPM_TRIEX(__VA_ARGS__, BPF_LPM_TRIE4, BPF_LPM_TRIE3, BPF_LPM_TRIE2, BPF_LPM_TRIE1)(__VA_ARGS__)
+
 struct bpf_stacktrace {
   u64 ip[BPF_MAX_STACK_DEPTH];
 };
