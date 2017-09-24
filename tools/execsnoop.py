@@ -191,7 +191,7 @@ def print_event(cpu, data, size):
     if event.type == EventType.EVENT_ARG:
         argv[event.pid].append(event.argv)
     elif event.type == EventType.EVENT_RET:
-        if args.fails and event.retval == 0:
+        if event.retval != 0 and not args.fails:
             skip = True
         if args.name and not re.search(args.name, event.comm):
             skip = True
