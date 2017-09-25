@@ -92,10 +92,12 @@ class ProcSyms : SymbolCache {
     struct Range {
       uint64_t start;
       uint64_t end;
-      Range(uint64_t s, uint64_t e) : start(s), end(e) {}
+      uint64_t file_offset;
+      Range(uint64_t s, uint64_t e, uint64_t f)
+          : start(s), end(e), file_offset(f) {}
     };
 
-    Module(const char *name, ProcMountNS* mount_ns,
+    Module(const char *name, ProcMountNS *mount_ns,
            struct bcc_symbol_option *option);
     bool init();
 
@@ -111,7 +113,6 @@ class ProcSyms : SymbolCache {
 
     void load_sym_table();
 
-    void add_range(uint64_t st, uint64_t en);
     bool contains(uint64_t addr, uint64_t &offset) const;
     uint64_t start() const { return ranges_.begin()->start; }
 
