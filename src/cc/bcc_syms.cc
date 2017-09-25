@@ -395,6 +395,7 @@ void bcc_symcache_refresh(void *resolver) {
 struct mod_st {
   const char *name;
   uint64_t start;
+  uint64_t file_offset;
 };
 
 static int _find_module(const char *modname, uint64_t start, uint64_t end,
@@ -402,6 +403,7 @@ static int _find_module(const char *modname, uint64_t start, uint64_t end,
   struct mod_st *mod = (struct mod_st *)p;
   if (!strcmp(modname, mod->name)) {
     mod->start = start;
+    mod->file_offset = offset;
     return -1;
   }
   return 0;
@@ -414,7 +416,7 @@ int bcc_resolve_global_addr(int pid, const char *module, const uint64_t address,
       mod.start == 0x0)
     return -1;
 
-  *global = mod.start + address;
+  *global = mod.start + mod.file_offset + address;
   return 0;
 }
 
