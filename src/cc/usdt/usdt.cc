@@ -217,7 +217,8 @@ void Context::_each_probe(const char *binpath, const struct bcc_elf_usdt *probe,
   ctx->add_probe(binpath, probe);
 }
 
-int Context::_each_module(const char *modpath, uint64_t, uint64_t, bool, void *p) {
+int Context::_each_module(const char *modpath, uint64_t, uint64_t, uint64_t,
+                          bool, void *p) {
   Context *ctx = static_cast<Context *>(p);
   // Modules may be reported multiple times if they contain more than one
   // executable region. We are going to parse the ELF on disk anyway, so we

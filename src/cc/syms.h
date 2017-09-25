@@ -130,7 +130,8 @@ class ProcSyms : SymbolCache {
 
   static int _add_load_sections(uint64_t v_addr, uint64_t mem_sz,
                                 uint64_t file_offset, void *payload);
-  static int _add_module(const char *, uint64_t, uint64_t, bool, void *);
+  static int _add_module(const char *, uint64_t, uint64_t, uint64_t, bool,
+                         void *);
   void load_exe();
   void load_modules();
 

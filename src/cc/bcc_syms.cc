@@ -148,7 +148,7 @@ void ProcSyms::refresh() {
 }
 
 int ProcSyms::_add_module(const char *modname, uint64_t start, uint64_t end,
-                          bool check_mount_ns, void *payload) {
+                          uint64_t offset, bool check_mount_ns, void *payload) {
   ProcSyms *ps = static_cast<ProcSyms *>(payload);
   auto it = std::find_if(
       ps->modules_.begin(), ps->modules_.end(),
@@ -403,8 +403,8 @@ struct mod_st {
   uint64_t start;
 };
 
-static int _find_module(const char *modname, uint64_t start, uint64_t end, bool,
-                        void *p) {
+static int _find_module(const char *modname, uint64_t start, uint64_t end,
+                        uint64_t offset, bool, void *p) {
   struct mod_st *mod = (struct mod_st *)p;
   if (!strcmp(modname, mod->name)) {
     mod->start = start;
