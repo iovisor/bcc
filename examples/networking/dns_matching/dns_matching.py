@@ -8,6 +8,7 @@ import sys
 import socket
 import os
 import struct
+import dnslib
 
 
 def encode_dns(name):
@@ -55,4 +56,28 @@ cache = bpf.get_table("cache")
 add_cache_entry(cache, "foo.bar")
 add_cache_entry(cache, "another.sample.domain")
 
-bpf.trace_print()
+socket_fd = function_dns_matching.sock
+sock = socket.fromfd(socket_fd, socket.PF_PACKET, socket.SOCK_RAW, socket.IPPROTO_IP)
+sock.setblocking(True)
+
+while 1:
+  #retrieve raw packet from socket
+  packet_str = os.read(socket_fd, 2048)
+  packet_bytearray = bytearray(packet_str)
+
+  ETH_HLEN = 14
+  UDP_HLEN = 8
+
+  #IP HEADER
+  #calculate ip header length
+  ip_header_length = packet_bytearray[ETH_HLEN]               #load Byte
+  ip_header_length = ip_header_length & 0x0F                  #mask bits 0..3
+  ip_header_length = ip_header_length << 2                    #shift to obtain length
+
+  #calculate payload offset
+  payload_offset = ETH_HLEN + ip_header_length + UDP_HLEN
+
+  payload = packet_bytearray[payload_offset:]
+  # pass the payload to dnslib for parsing
+  dnsrec = dnslib.DNSRecord.parse(payload)
+  print (dnsrec.questions, "\n")

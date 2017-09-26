@@ -90,14 +90,14 @@ int dns_matching(struct __sk_buff *skb)
 
         struct Leaf * lookup_leaf = cache.lookup(&key);
 
-        // If DNS name is contained in our map, drop packet.
+        // If DNS name is contained in our map, keep the packet
         if(lookup_leaf) {
           bpf_trace_printk("Matched1\n");
-          return 0;
+          return -1;
         }
       }
     }
   }
-
-  return -1;
+  // Drop the packet
+  return 0;
 }
