@@ -84,7 +84,7 @@ int dns_matching(struct __sk_buff *skb)
 
         u16 i = 0;
         struct dns_char_t *c;
-        // This unroll worked not in latest BCC version.
+        #pragma unroll
         for(i = 0; i<255;i++){
           if (cursor == sentinel) goto end; c = cursor_advance(cursor, 1); key.p[i] = c->c;
         }
