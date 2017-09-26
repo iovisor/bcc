@@ -18,7 +18,7 @@ class KeyV6(ct.Structure):
 class TestLpmTrie(unittest.TestCase):
     def test_lpm_trie_v4(self):
         test_prog1 = """
-        BPF_F_TABLE("lpm_trie", u64, int, trie, 16, BPF_F_NO_PREALLOC);
+        BPF_LPM_TRIE(trie, u64, int, 16);
         """
         b = BPF(text=test_prog1)
         t = b["trie"]
@@ -47,7 +47,7 @@ class TestLpmTrie(unittest.TestCase):
             u32 prefixlen;
             u32 data[4];
         };
-        BPF_F_TABLE("lpm_trie", struct key_v6, int, trie, 16, BPF_F_NO_PREALLOC);
+        BPF_LPM_TRIE(trie, struct key_v6, int, 16);
         """
         b = BPF(text=test_prog1)
         t = b["trie"]

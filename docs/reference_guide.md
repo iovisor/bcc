@@ -34,14 +34,15 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
         - [5. BPF_STACK_TRACE](#5-bpf_stack_trace)
         - [6. BPF_PERF_ARRAY](#6-bpf_perf_array)
         - [7. BPF_PERCPU_ARRAY](#7-bpf_percpu_array)
-        - [8. map.lookup()](#8-maplookup)
-        - [9. map.lookup_or_init()](#9-maplookup_or_init)
-        - [10. map.delete()](#10-mapdelete)
-        - [11. map.update()](#11-mapupdate)
-        - [12. map.insert()](#12-mapinsert)
-        - [13. map.increment()](#13-mapincrement)
-        - [14. map.get_stackid()](#14-mapget_stackid)
-        - [15. map.perf_read()](#15-mapperf_read)
+        - [8. BPF_LPM_TRIE](#8-bpf_lpm_trie)
+        - [9. map.lookup()](#9-maplookup)
+        - [10. map.lookup_or_init()](#10-maplookup_or_init)
+        - [11. map.delete()](#11-mapdelete)
+        - [12. map.update()](#12-mapupdate)
+        - [13. map.insert()](#13-mapinsert)
+        - [14. map.increment()](#14-mapincrement)
+        - [15. map.get_stackid()](#15-mapget_stackid)
+        - [16. map.perf_read()](#16-mapperf_read)
 
 - [bcc Python](#bcc-python)
     - [Initialization](#initialization)
@@ -532,7 +533,29 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=BPF_PERCPU_ARRAY+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=BPF_PERCPU_ARRAY+path%3Atools&type=Code)
 
-### 8. map.lookup()
+### 8. BPF_LPM_TRIE
+
+Syntax: `BPF_LPM_TRIE(name [, key_type [, leaf_type [, size]]])`
+
+Creates a longest prefix match trie map named `name`, with optional parameters.
+
+Defaults: `BPF_LPM_TRIE(name, key_type=u64, leaf_type=u64, size=10240)`
+
+For example:
+
+```c
+BPF_LPM_TRIE(trie, struct key_v6);
+```
+
+This creates an LPM trie map named `trie` where the key is a `struct key_v6`, and the value defaults to u64.
+
+Methods (covered later): map.lookup(), map.lookup_or_init(), map.delete(), map.update(), map.insert(), map.increment().
+
+Examples in situ:
+[search /examples](https://github.com/iovisor/bcc/search?q=BPF_LPM_TRIE+path%3Aexamples&type=Code),
+[search /tools](https://github.com/iovisor/bcc/search?q=BPF_LPM_TRIE+path%3Atools&type=Code)
+
+### 9. map.lookup()
 
 Syntax: ```*val map.lookup(&key)```
 
@@ -542,7 +565,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=lookup+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=lookup+path%3Atools&type=Code)
 
-### 9. map.lookup_or_init()
+### 10. map.lookup_or_init()
 
 Syntax: ```*val map.lookup_or_init(&key, &zero)```
 
@@ -552,7 +575,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=lookup_or_init+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=lookup_or_init+path%3Atools&type=Code)
 
-### 10. map.delete()
+### 11. map.delete()
 
 Syntax: ```map.delete(&key)```
 
@@ -562,7 +585,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=delete+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=delete+path%3Atools&type=Code)
 
-### 11. map.update()
+### 12. map.update()
 
 Syntax: ```map.update(&key, &val)```
 
@@ -572,7 +595,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=update+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=update+path%3Atools&type=Code)
 
-### 12. map.insert()
+### 13. map.insert()
 
 Syntax: ```map.insert(&key, &val)```
 
@@ -581,7 +604,7 @@ Associate the value in the second argument to the key, only if there was no prev
 Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=insert+path%3Aexamples&type=Code)
 
-### 13. map.increment()
+### 14. map.increment()
 
 Syntax: ```map.increment(key)```
 
@@ -591,7 +614,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=increment+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=increment+path%3Atools&type=Code)
 
-### 14. map.get_stackid()
+### 15. map.get_stackid()
 
 Syntax: ```int map.get_stackid(void *ctx, u64 flags)```
 
@@ -601,7 +624,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=get_stackid+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=get_stackid+path%3Atools&type=Code)
 
-### 15. map.perf_read()
+### 16. map.perf_read()
 
 Syntax: ```u64 map.perf_read(u32 cpu)```
 
