@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-#include <algorithm>
 #include <cxxabi.h>
 #include <cstring>
 #include <fcntl.h>
@@ -114,7 +113,7 @@ ProcSyms::ProcSyms(int pid, struct bcc_symbol_option *option)
 int ProcSyms::_add_load_sections(uint64_t v_addr, uint64_t mem_sz,
                                  uint64_t file_offset, void *payload) {
   auto module = static_cast<Module *>(payload);
-  module->add_range(v_addr, v_addr + mem_sz);
+  module->ranges_.emplace_back(v_addr, v_addr + mem_sz, file_offset);
   return 0;
 }
 
@@ -148,7 +147,7 @@ void ProcSyms::refresh() {
 }
 
 int ProcSyms::_add_module(const char *modname, uint64_t start, uint64_t end,
-                          bool check_mount_ns, void *payload) {
+                          uint64_t offset, bool check_mount_ns, void *payload) {
   ProcSyms *ps = static_cast<ProcSyms *>(payload);
   auto it = std::find_if(
       ps->modules_.begin(), ps->modules_.end(),
@@ -162,7 +161,11 @@ int ProcSyms::_add_module(const char *modname, uint64_t start, uint64_t end,
     else
       return 0;
   }
-  it->add_range(start, end);
+  it->ranges_.emplace_back(start, end, offset);
+  // perf-PID map is added last. We try both inside the Process's mount
+  // namespace + chroot, and in global /tmp. Make sure we only add one.
+  if (it->type_ == ModuleType::PERF_MAP)
+    return -1;
 
   return 0;
 }
@@ -275,21 +278,12 @@ void ProcSyms::Module::load_sym_table() {
   std::sort(syms_.begin(), syms_.end());
 }
 
-void ProcSyms::Module::add_range(uint64_t st, uint64_t en) {
-  if (!ranges_.empty()) {
-    Range &last = ranges_.back();
-    if (st >= last.start && st <= last.end) {
-      last.end = std::max(en, last.end);
-      return;
-    }
-  }
-  ranges_.emplace_back(st, en);
-}
-
 bool ProcSyms::Module::contains(uint64_t addr, uint64_t &offset) const {
   for (const auto &range : ranges_)
     if (addr >= range.start && addr < range.end) {
-      offset = type_ == ModuleType::SO ? addr - range.start : addr;
+      offset = (type_ == ModuleType::SO)
+                   ? (addr - range.start + range.file_offset)
+                   : addr;
       return true;
     }
   return false;
@@ -401,13 +395,15 @@ void bcc_symcache_refresh(void *resolver) {
 struct mod_st {
   const char *name;
   uint64_t start;
+  uint64_t file_offset;
 };
 
-static int _find_module(const char *modname, uint64_t start, uint64_t end, bool,
-                        void *p) {
+static int _find_module(const char *modname, uint64_t start, uint64_t end,
+                        uint64_t offset, bool, void *p) {
   struct mod_st *mod = (struct mod_st *)p;
   if (!strcmp(modname, mod->name)) {
     mod->start = start;
+    mod->file_offset = offset;
     return -1;
   }
   return 0;
@@ -420,7 +416,7 @@ int bcc_resolve_global_addr(int pid, const char *module, const uint64_t address,
       mod.start == 0x0)
     return -1;
 
-  *global = mod.start + address;
+  *global = mod.start + mod.file_offset + address;
   return 0;
 }
 

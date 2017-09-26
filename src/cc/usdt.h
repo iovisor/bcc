@@ -207,7 +207,8 @@ class Context {
 
   static void _each_probe(const char *binpath, const struct bcc_elf_usdt *probe,
                           void *p);
-  static int _each_module(const char *modpath, uint64_t, uint64_t, bool, void *p);
+  static int _each_module(const char *modpath, uint64_t, uint64_t, uint64_t,
+                          bool, void *p);
 
   void add_probe(const char *binpath, const struct bcc_elf_usdt *probe);
   std::string resolve_bin_path(const std::string &bin_path);

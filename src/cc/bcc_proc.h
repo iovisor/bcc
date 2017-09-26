@@ -24,14 +24,21 @@ extern "C" {
 
 #include <stdint.h>
 
-// Module name, start address, end address, whether to check mount namespace, payload
-typedef int (*bcc_procutils_modulecb)(const char *, uint64_t, uint64_t, bool, void *);
+// Module name, start address, end address, file_offset,
+// whether to check mount namespace, payload
+// Callback returning a negative value indicates to stop the iteration
+typedef int (*bcc_procutils_modulecb)(const char *, uint64_t, uint64_t,
+                                      uint64_t, bool, void *);
 // Symbol name, address, payload
 typedef void (*bcc_procutils_ksymcb)(const char *, uint64_t, void *);
 
 char *bcc_procutils_which_so(const char *libname, int pid);
 char *bcc_procutils_which(const char *binpath);
 int bcc_mapping_is_file_backed(const char *mapname);
+// Iterate over all executable memory mapping sections of a Process.
+// All anonymous and non-file-backed mapping sections, namely those
+// listed in bcc_mapping_is_file_backed, will be ignored.
+// Returns -1 on error, and 0 on success
 int bcc_procutils_each_module(int pid, bcc_procutils_modulecb callback,
                               void *payload);
 int bcc_procutils_each_ksym(bcc_procutils_ksymcb callback, void *payload);
