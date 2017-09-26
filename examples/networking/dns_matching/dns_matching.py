@@ -27,7 +27,12 @@ def encode_dns(name):
 
   return (c_ubyte * size).from_buffer(b)
 
-
+def add_cache_entry(cache, name):
+  key = cache.Key()
+  key.p = encode_dns(name)
+  leaf = cache.Leaf()
+  leaf.p = (c_ubyte * 4).from_buffer(bytearray(4))
+  cache[key] = leaf
 
 # initialize BPF - load source code from http-parse-simple.c
 bpf = BPF(src_file = "dns_matching.c", debug=0)
@@ -46,12 +51,8 @@ BPF.attach_raw_socket(function_dns_matching, "eth1")
 # Get the table.
 cache = bpf.get_table("cache")
 
-# Create first entry for foo.bar
-key = cache.Key()
-key.p = encode_dns("foo.bar")
-
-leaf = cache.Leaf()
-leaf.p = (c_ubyte * 4).from_buffer(bytearray(4))
-cache[key] = leaf
+# Add cache entries
+add_cache_entry(cache, "foo.bar")
+add_cache_entry(cache, "another.sample.domain")
 
 bpf.trace_print()
