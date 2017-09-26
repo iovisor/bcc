@@ -11,8 +11,8 @@ import struct
 
 
 def encode_dns(name):
-  size = 32
-  if len(name) > 253:
+  size = 255
+  if len(name) > 255:
     raise Exception("DNS Name too long.")
   b = bytearray(size)
   i = 0;

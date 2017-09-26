@@ -43,7 +43,7 @@ struct dns_char_t
 } BPF_PACKET_HEADER;
 
 struct Key {
-  unsigned char p[32];
+  unsigned char p[255];
 };
 
 struct Leaf {
@@ -85,8 +85,8 @@ int dns_matching(struct __sk_buff *skb)
         u16 i = 0;
         struct dns_char_t *c;
         // This unroll worked not in latest BCC version.
-        for(u8 j = 0; i<255;i++){
-          if (cursor == sentinel) goto end; c = cursor_advance(cursor, 1); key.p[i++] = c->c;
+        for(i = 0; i<255;i++){
+          if (cursor == sentinel) goto end; c = cursor_advance(cursor, 1); key.p[i] = c->c;
         }
         end:
         {}
