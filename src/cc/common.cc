@@ -17,6 +17,7 @@
 #include <sstream>
 
 #include "common.h"
+#include "vendor/tinyformat.hpp"
 
 namespace ebpf {
 
@@ -46,6 +47,18 @@ std::vector<int> get_online_cpus() {
 
 std::vector<int> get_possible_cpus() {
   return read_cpu_range("/sys/devices/system/cpu/possible");
+}
+
+std::string get_pid_exe(pid_t pid) {
+  char exe_path[4096];
+  int res;
+
+  std::string exe_link = tfm::format("/proc/%d/exe", pid);
+  res = readlink(exe_link.c_str(), exe_path, sizeof(exe_path));
+  if (res == -1)
+    return "";
+  exe_path[res] = '\0';
+  return std::string(exe_path);
 }
 
 } // namespace ebpf

@@ -110,8 +110,11 @@ class ProcSyms : SymbolCache {
     std::vector<Symbol> syms_;
 
     void load_sym_table();
+
+    void add_range(uint64_t st, uint64_t en);
     bool contains(uint64_t addr, uint64_t &offset) const;
     uint64_t start() const { return ranges_.begin()->start; }
+
     bool find_addr(uint64_t offset, struct bcc_symbol *sym);
     bool find_name(const char *symname, uint64_t *addr);
 
@@ -125,8 +128,11 @@ class ProcSyms : SymbolCache {
   std::unique_ptr<ProcMountNS> mount_ns_instance_;
   bcc_symbol_option symbol_option_;
 
+  static int _add_load_sections(uint64_t v_addr, uint64_t mem_sz,
+                                uint64_t file_offset, void *payload);
   static int _add_module(const char *, uint64_t, uint64_t, bool, void *);
-  bool load_modules();
+  void load_exe();
+  void load_modules();
 
 public:
   ProcSyms(int pid, struct bcc_symbol_option *option = nullptr);

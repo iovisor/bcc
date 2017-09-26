@@ -17,6 +17,8 @@
 #pragma once
 
 #include <memory>
+#include <string>
+#include <unistd.h>
 #include <vector>
 
 namespace ebpf {
@@ -30,5 +32,7 @@ make_unique(Args &&... args) {
 std::vector<int> get_online_cpus();
 
 std::vector<int> get_possible_cpus();
+
+std::string get_pid_exe(pid_t pid);
 
 }  // namespace ebpf

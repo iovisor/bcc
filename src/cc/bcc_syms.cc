@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <algorithm>
 #include <cxxabi.h>
 #include <cstring>
 #include <fcntl.h>
@@ -28,9 +29,10 @@
 #include "bcc_perf_map.h"
 #include "bcc_proc.h"
 #include "bcc_syms.h"
+#include "common.h"
+#include "vendor/tinyformat.hpp"
 
 #include "syms.h"
-#include "vendor/tinyformat.hpp"
 
 ino_t ProcStat::getinode_() {
   struct stat s;
@@ -109,8 +111,33 @@ ProcSyms::ProcSyms(int pid, struct bcc_symbol_option *option)
   load_modules();
 }
 
-bool ProcSyms::load_modules() {
-  return bcc_procutils_each_module(pid_, _add_module, this) == 0;
+int ProcSyms::_add_load_sections(uint64_t v_addr, uint64_t mem_sz,
+                                 uint64_t file_offset, void *payload) {
+  auto module = static_cast<Module *>(payload);
+  module->add_range(v_addr, v_addr + mem_sz);
+  return 0;
+}
+
+void ProcSyms::load_exe() {
+  std::string exe = ebpf::get_pid_exe(pid_);
+  Module module(exe.c_str(), mount_ns_instance_.get(), &symbol_option_);
+
+  if (!module.init())
+    return;
+  if (module.type_ != ModuleType::EXEC)
+    return;
+
+  ProcMountNSGuard g(mount_ns_instance_.get());
+
+  bcc_elf_foreach_load_section(exe.c_str(), &_add_load_sections, &module);
+
+  if (!module.ranges_.empty())
+    modules_.emplace_back(std::move(module));
+}
+
+void ProcSyms::load_modules() {
+  load_exe();
+  bcc_procutils_each_module(pid_, _add_module, this);
 }
 
 void ProcSyms::refresh() {
@@ -135,7 +162,7 @@ int ProcSyms::_add_module(const char *modname, uint64_t start, uint64_t end,
     else
       return 0;
   }
-  it->ranges_.emplace_back(start, end);
+  it->add_range(start, end);
 
   return 0;
 }
@@ -246,6 +273,17 @@ void ProcSyms::Module::load_sym_table() {
     bcc_elf_foreach_sym(name_.c_str(), _add_symbol, symbol_option_, this);
 
   std::sort(syms_.begin(), syms_.end());
+}
+
+void ProcSyms::Module::add_range(uint64_t st, uint64_t en) {
+  if (!ranges_.empty()) {
+    Range &last = ranges_.back();
+    if (st >= last.start && st <= last.end) {
+      last.end = std::max(en, last.end);
+      return;
+    }
+  }
+  ranges_.emplace_back(st, en);
 }
 
 bool ProcSyms::Module::contains(uint64_t addr, uint64_t &offset) const {
