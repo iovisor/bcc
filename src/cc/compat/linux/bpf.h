@@ -244,7 +244,7 @@ union bpf_attr {
  * int bpf_map_delete_elem(&map, &key)
  *     Return: 0 on success or negative error
  *
- * int bpf_probe_read(void *dst, int size, void *src)
+ * int bpf_probe_read(void *dst, int size, const void *src)
  *     Return: 0 on success or negative error
  *
  * u64 bpf_ktime_get_ns(void)

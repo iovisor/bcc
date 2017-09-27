@@ -200,7 +200,7 @@ static int (*bpf_map_update_elem)(void *map, void *key, void *value, u64 flags) 
   (void *) BPF_FUNC_map_update_elem;
 static int (*bpf_map_delete_elem)(void *map, void *key) =
   (void *) BPF_FUNC_map_delete_elem;
-static int (*bpf_probe_read)(void *dst, u64 size, void *unsafe_ptr) =
+static int (*bpf_probe_read)(void *dst, u64 size, const void *unsafe_ptr) =
   (void *) BPF_FUNC_probe_read;
 static u64 (*bpf_ktime_get_ns)(void) =
   (void *) BPF_FUNC_ktime_get_ns;
@@ -208,7 +208,7 @@ static u32 (*bpf_get_prandom_u32)(void) =
   (void *) BPF_FUNC_get_prandom_u32;
 static int (*bpf_trace_printk_)(const char *fmt, u64 fmt_size, ...) =
   (void *) BPF_FUNC_trace_printk;
-static int (*bpf_probe_read_str)(void *dst, u64 size, void *unsafe_ptr) =
+static int (*bpf_probe_read_str)(void *dst, u64 size, const void *unsafe_ptr) =
   (void *) BPF_FUNC_probe_read_str;
 int bpf_trace_printk(const char *fmt, ...) asm("llvm.bpf.extra");
 static inline __attribute__((always_inline))

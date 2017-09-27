@@ -235,7 +235,7 @@ Examples in situ:
 
 ### 1. bpf_probe_read()
 
-Syntax: ```int bpf_probe_read(void *dst, int size, void *src)```
+Syntax: ```int bpf_probe_read(void *dst, int size, const void *src)```
 
 Return: 0 on success
 
@@ -247,7 +247,7 @@ Examples in situ:
 
 ### 2. bpf_probe_read_str()
 
-Syntax: ```int bpf_probe_read_str(void *dst, int size, void *src)```
+Syntax: ```int bpf_probe_read_str(void *dst, int size, const void *src)```
 
 Return:
   - \> 0 length of the string including the trailing NUL on success
