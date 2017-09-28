@@ -17,6 +17,9 @@ configure_file(libbcc.pc.in ${CMAKE_CURRENT_BINARY_DIR}/libbcc.pc @ONLY)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -DBCC_PROG_TAG_DIR='\"${BCC_PROG_TAG_DIR}\"'")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
 
+string(REGEX MATCH "^([0-9]+).*" _ ${LLVM_PACKAGE_VERSION})
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DLLVM_MAJOR_VERSION=${CMAKE_MATCH_1}")
+
 include(static_libstdc++)
 
 add_library(bpf-static STATIC libbpf.c perf_reader.c)
@@ -25,6 +28,10 @@ add_library(bpf-shared SHARED libbpf.c perf_reader.c)
 set_target_properties(bpf-shared PROPERTIES OUTPUT_NAME bpf)
 
 set(bcc_common_sources bpf_common.cc bpf_module.cc exported_files.cc)
+if (${LLVM_PACKAGE_VERSION} VERSION_GREATER "5")
+  set(bcc_common_sources ${bcc_common_sources} bcc_debug.cc)
+endif()
+
 set(bcc_table_sources table_storage.cc shared_table.cc bpffs_table.cc json_map_decl_visitor.cc)
 set(bcc_util_sources ns_guard.cc common.cc)
 set(bcc_sym_sources bcc_syms.cc bcc_elf.c bcc_perf_map.c bcc_proc.c)

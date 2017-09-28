@@ -104,9 +104,10 @@ std::pair<bool, string> get_kernel_path_info(const string kdir)
 
 }
 
-int ClangLoader::parse(unique_ptr<llvm::Module> *mod, TableStorage &ts, const string &file,
-                       bool in_memory, const char *cflags[], int ncflags, const std::string &id,
-                       FuncSource& func_src) {
+int ClangLoader::parse(unique_ptr<llvm::Module> *mod, TableStorage &ts,
+                       const string &file, bool in_memory, const char *cflags[],
+                       int ncflags, const std::string &id, FuncSource &func_src,
+                       std::string &mod_src) {
   using namespace clang;
 
   string main_path = "/virtual/main.c";
@@ -152,6 +153,8 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, TableStorage &ts, const st
   vector<string> kflags;
   if (kbuild_helper.get_flags(un.machine, &kflags))
     return -1;
+  if (flags_ & DEBUG_SOURCE)
+    flags_cstr.push_back("-g");
   kflags.push_back("-include");
   kflags.push_back("/virtual/include/bcc/bpf.h");
   kflags.push_back("-include");
@@ -277,7 +280,7 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, TableStorage &ts, const st
   // capture the rewritten c file
   string out_str1;
   llvm::raw_string_ostream os1(out_str1);
-  BFrontendAction bact(os1, flags_, ts, id, func_src);
+  BFrontendAction bact(os1, flags_, ts, id, func_src, mod_src);
   if (!compiler1.ExecuteAction(bact))
     return -1;
   unique_ptr<llvm::MemoryBuffer> out_buf1 = llvm::MemoryBuffer::getMemBuffer(out_str1);
