@@ -44,6 +44,8 @@
 #include <llvm/Transforms/IPO/PassManagerBuilder.h>
 #include <llvm-c/Transforms/IPO.h>
 
+#include "common.h"
+#include "bcc_debug.h"
 #include "bcc_exception.h"
 #include "frontends/b/loader.h"
 #include "frontends/clang/loader.h"
@@ -108,6 +110,10 @@ BPFModule::BPFModule(unsigned flags, TableStorage *ts)
   LLVMInitializeBPFTargetMC();
   LLVMInitializeBPFTargetInfo();
   LLVMInitializeBPFAsmPrinter();
+#if LLVM_MAJOR_VERSION >= 6
+  if (flags & DEBUG_SOURCE)
+    LLVMInitializeBPFDisassembler();
+#endif
   LLVMLinkInMCJIT(); /* call empty function to force linking of MCJIT */
   if (!ts_) {
     local_ts_ = createSharedTableStorage();
@@ -458,7 +464,8 @@ unique_ptr<ExecutionEngine> BPFModule::finalize_rw(unique_ptr<Module> m) {
 // load an entire c file as a module
 int BPFModule::load_cfile(const string &file, bool in_memory, const char *cflags[], int ncflags) {
   clang_loader_ = ebpf::make_unique<ClangLoader>(&*ctx_, flags_);
-  if (clang_loader_->parse(&mod_, *ts_, file, in_memory, cflags, ncflags, id_, *func_src_))
+  if (clang_loader_->parse(&mod_, *ts_, file, in_memory, cflags, ncflags, id_,
+                           *func_src_, mod_src_))
     return -1;
   return 0;
 }
@@ -470,7 +477,8 @@ int BPFModule::load_cfile(const string &file, bool in_memory, const char *cflags
 // build an ExecutionEngine.
 int BPFModule::load_includes(const string &text) {
   clang_loader_ = ebpf::make_unique<ClangLoader>(&*ctx_, flags_);
-  if (clang_loader_->parse(&mod_, *ts_, text, true, nullptr, 0, "", *func_src_))
+  if (clang_loader_->parse(&mod_, *ts_, text, true, nullptr, 0, "", *func_src_,
+                           mod_src_))
     return -1;
   return 0;
 }
@@ -552,7 +560,7 @@ void BPFModule::dump_ir(Module &mod) {
 
 int BPFModule::run_pass_manager(Module &mod) {
   if (verifyModule(mod, &errs())) {
-    if (flags_ & 1)
+    if (flags_ & DEBUG_LLVM_IR)
       dump_ir(mod);
     return -1;
   }
@@ -570,7 +578,7 @@ int BPFModule::run_pass_manager(Module &mod) {
    */
   LLVMAddAlwaysInlinerPass(reinterpret_cast<LLVMPassManagerRef>(&PM));
   PMB.populateModulePassManager(PM);
-  if (flags_ & 1)
+  if (flags_ & DEBUG_LLVM_IR)
     PM.add(createPrintModulePass(outs()));
   PM.run(mod);
   return 0;
@@ -594,6 +602,9 @@ int BPFModule::finalize() {
     return -1;
   }
 
+  if (flags_ & DEBUG_SOURCE)
+    engine_->setProcessAllSections(true);
+
   if (int rc = run_pass_manager(*mod))
     return rc;
 
@@ -603,6 +614,11 @@ int BPFModule::finalize() {
   for (auto section : sections_)
     if (!strncmp(FN_PREFIX.c_str(), section.first.c_str(), FN_PREFIX.size()))
       function_names_.push_back(section.first);
+
+  if (flags_ & DEBUG_SOURCE) {
+    SourceDebugger src_debugger(mod, sections_, FN_PREFIX, mod_src_);
+    src_debugger.dump();
+  }
 
   return 0;
 }

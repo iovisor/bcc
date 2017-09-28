@@ -26,8 +26,6 @@
 
 #include "table_storage.h"
 
-#define DEBUG_PREPROCESSOR 0x4
-
 namespace clang {
 class ASTConsumer;
 class ASTContext;
@@ -123,8 +121,9 @@ class BFrontendAction : public clang::ASTFrontendAction {
  public:
   // Initialize with the output stream where the new source file contents
   // should be written.
-  BFrontendAction(llvm::raw_ostream &os, unsigned flags, TableStorage &ts, const std::string &id,
-                  FuncSource& func_src);
+  BFrontendAction(llvm::raw_ostream &os, unsigned flags, TableStorage &ts,
+                  const std::string &id, FuncSource &func_src,
+                  std::string &mod_src);
 
   // Called by clang when the AST has been completed, here the output stream
   // will be flushed.
@@ -145,7 +144,8 @@ class BFrontendAction : public clang::ASTFrontendAction {
   std::unique_ptr<clang::Rewriter> rewriter_;
   friend class BTypeVisitor;
   std::map<std::string, clang::SourceRange> func_range_;
-  FuncSource& func_src_;
+  FuncSource &func_src_;
+  std::string &mod_src_;
 };
 
 }  // namespace visitor

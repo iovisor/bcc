@@ -42,6 +42,7 @@ TRACEFS = "/sys/kernel/debug/tracing"
 DEBUG_LLVM_IR = 0x1
 DEBUG_BPF = 0x2
 DEBUG_PREPROCESSOR = 0x4
+DEBUG_SOURCE = 0x8
 LOG_BUFFER_SIZE = 65536
 
 class SymbolCache(object):

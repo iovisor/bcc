@@ -121,6 +121,7 @@ class BPFModule {
   std::map<llvm::Type *, std::string> readers_;
   std::map<llvm::Type *, std::string> writers_;
   std::string id_;
+  std::string mod_src_;
   TableStorage *ts_;
   std::unique_ptr<TableStorage> local_ts_;
 };

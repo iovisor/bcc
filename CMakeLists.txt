@@ -26,7 +26,7 @@ if(NOT PYTHON_ONLY AND ENABLE_CLANG_JIT)
 find_package(BISON)
 find_package(FLEX)
 find_package(LLVM REQUIRED CONFIG)
-message(STATUS "Found LLVM: ${LLVM_INCLUDE_DIRS}")
+message(STATUS "Found LLVM: ${LLVM_INCLUDE_DIRS} ${LLVM_PACKAGE_VERSION}")
 find_package(LibElf REQUIRED)
 
 # clang is linked as a library, but the library path searching is

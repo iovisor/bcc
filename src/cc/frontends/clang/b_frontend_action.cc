@@ -776,13 +776,25 @@ bool ProbeConsumer::HandleTopLevelDecl(DeclGroupRef Group) {
   return true;
 }
 
-BFrontendAction::BFrontendAction(llvm::raw_ostream &os, unsigned flags, TableStorage &ts,
-                                 const std::string &id, FuncSource& func_src)
-    : os_(os), flags_(flags), ts_(ts), id_(id), rewriter_(new Rewriter), func_src_(func_src) {}
+BFrontendAction::BFrontendAction(llvm::raw_ostream &os, unsigned flags,
+                                 TableStorage &ts, const std::string &id,
+                                 FuncSource &func_src, std::string &mod_src)
+    : os_(os),
+      flags_(flags),
+      ts_(ts),
+      id_(id),
+      rewriter_(new Rewriter),
+      func_src_(func_src),
+      mod_src_(mod_src) {}
 
 void BFrontendAction::EndSourceFileAction() {
   if (flags_ & DEBUG_PREPROCESSOR)
     rewriter_->getEditBuffer(rewriter_->getSourceMgr().getMainFileID()).write(llvm::errs());
+  if (flags_ & DEBUG_SOURCE) {
+    llvm::raw_string_ostream tmp_os(mod_src_);
+    rewriter_->getEditBuffer(rewriter_->getSourceMgr().getMainFileID())
+        .write(tmp_os);
+  }
 
   for (auto func : func_range_) {
     auto f = func.first;

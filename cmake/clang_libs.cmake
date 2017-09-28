@@ -1,4 +1,4 @@
-set(llvm_raw_libs bitwriter bpfcodegen irreader linker
+set(llvm_raw_libs bitwriter bpfcodegen debuginfodwarf irreader linker
   mcjit objcarcopts option passes nativecodegen lto)
 list(FIND LLVM_AVAILABLE_LIBS "LLVMCoverage" _llvm_coverage)
 if (${_llvm_coverage} GREATER -1)
@@ -7,6 +7,9 @@ endif()
 list(FIND LLVM_AVAILABLE_LIBS "LLVMCoroutines" _llvm_coroutines)
 if (${_llvm_coroutines} GREATER -1)
   list(APPEND llvm_raw_libs coroutines)
+endif()
+if (${LLVM_PACKAGE_VERSION} VERSION_GREATER "5")
+  list(APPEND llvm_raw_libs bpfdisassembler)
 endif()
 llvm_map_components_to_libnames(_llvm_libs ${llvm_raw_libs})
 llvm_expand_dependencies(llvm_libs ${_llvm_libs})
