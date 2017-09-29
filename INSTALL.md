@@ -55,7 +55,7 @@ Only the nightly packages are built for Ubuntu 16.04, but the steps are very str
 ```bash
 echo "deb [trusted=yes] https://repo.iovisor.org/apt/xenial xenial-nightly main" | sudo tee /etc/apt/sources.list.d/iovisor.list
 sudo apt-get update
-sudo apt-get install bcc-tools libbcc-examples
+sudo apt-get install bcc-tools libbcc-examples linux-headers-$(uname -r)
 ```
 
 ## Ubuntu Trusty - Binary
@@ -88,7 +88,7 @@ To install:
 sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys D4284CDD
 echo "deb https://repo.iovisor.org/apt trusty main" | sudo tee /etc/apt/sources.list.d/iovisor.list
 sudo apt-get update
-sudo apt-get install binutils bcc bcc-tools libbcc-examples python-bcc
+sudo apt-get install binutils bcc bcc-tools libbcc-examples python-bcc linux-headers-$(uname -r)
 ```
 
 **Nightly Packages**
