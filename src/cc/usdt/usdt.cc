@@ -32,7 +32,13 @@
 namespace USDT {
 
 Location::Location(uint64_t addr, const char *arg_fmt) : address_(addr) {
+#ifdef __powerpc64__
+  ArgumentParser_powerpc64 parser(arg_fmt);
+#elif defined(__x86_64__)
   ArgumentParser_x64 parser(arg_fmt);
+#else
+#error "bcc does not support this platform yet"
+#endif
   while (!parser.done()) {
     Argument arg;
     if (!parser.parse(&arg))
@@ -174,7 +180,7 @@ bool Probe::usdt_getarg(std::ostream &stream) {
         return false;
       stream << "\n  return 0;\n}\n";
     } else {
-      stream << "  switch(ctx->ip) {\n";
+      stream << "  switch(PT_REGS_IP(ctx)) {\n";
       for (Location &location : locations_) {
         uint64_t global_address;
 

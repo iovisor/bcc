@@ -18,7 +18,11 @@
 
 // Default constraint for the probe arguments as operands.
 #ifndef FOLLY_SDT_ARG_CONSTRAINT
+#if defined(__powerpc64__) || defined(__powerpc__)
+#define FOLLY_SDT_ARG_CONSTRAINT      "nQr"
+#elif defined(__x86_64__) || defined(__i386__)
 #define FOLLY_SDT_ARG_CONSTRAINT      "nor"
+#endif
 #endif
 
 // Instruction to emit for the probe.
@@ -73,7 +77,14 @@
   FOLLY_SDT_OPERANDS_7(_1, _2, _3, _4, _5, _6, _7), FOLLY_SDT_ARG(8, _8)
 
 // Templates to reference the arguments from operands in note section.
-#define FOLLY_SDT_ARGFMT(no)        %n[FOLLY_SDT_S##no]@%[FOLLY_SDT_A##no]
+#if defined(__powerpc64__ ) || defined(__powerpc__)
+#define FOLLY_SDT_ARGTMPL(id)       %I[id]%[id]
+#elif defined(__i386__)
+#define FOLLY_SDT_ARGTMPL(id)       %w[id]
+#else
+#define FOLLY_SDT_ARGTMPL(id)       %[id]
+#endif
+#define FOLLY_SDT_ARGFMT(no)        %n[FOLLY_SDT_S##no]@FOLLY_SDT_ARGTMPL(FOLLY_SDT_A##no)
 #define FOLLY_SDT_ARG_TEMPLATE_0    /*No arguments*/
 #define FOLLY_SDT_ARG_TEMPLATE_1    FOLLY_SDT_ARGFMT(1)
 #define FOLLY_SDT_ARG_TEMPLATE_2    FOLLY_SDT_ARG_TEMPLATE_1 FOLLY_SDT_ARGFMT(2)

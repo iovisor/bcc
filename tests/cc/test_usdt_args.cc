@@ -22,7 +22,7 @@
 using std::experimental::optional;
 using std::experimental::nullopt;
 
-static void verify_register(USDT::ArgumentParser_x64 &parser, int arg_size,
+static void verify_register(USDT::ArgumentParser &parser, int arg_size,
                             int constant) {
   USDT::Argument arg;
   REQUIRE(parser.parse(&arg));
@@ -32,7 +32,7 @@ static void verify_register(USDT::ArgumentParser_x64 &parser, int arg_size,
   REQUIRE(arg.constant() == constant);
 }
 
-static void verify_register(USDT::ArgumentParser_x64 &parser, int arg_size,
+static void verify_register(USDT::ArgumentParser &parser, int arg_size,
                             const std::string &regname,
                             optional<int> deref_offset = nullopt,
                             optional<std::string> deref_ident = nullopt,
@@ -54,7 +54,11 @@ static void verify_register(USDT::ArgumentParser_x64 &parser, int arg_size,
 
 TEST_CASE("test usdt argument parsing", "[usdt]") {
   SECTION("parse failure") {
+#ifdef __powerpc64__
+    USDT::ArgumentParser_powerpc64 parser("4@-12(42)");
+#elif defined(__x86_64__)
     USDT::ArgumentParser_x64 parser("4@i%ra+1r");
+#endif
     USDT::Argument arg;
     REQUIRE(!parser.parse(&arg));
     int i;
@@ -65,6 +69,51 @@ TEST_CASE("test usdt argument parsing", "[usdt]") {
     REQUIRE(i < 10);
   }
   SECTION("argument examples from the Python implementation") {
+#ifdef __powerpc64__
+    USDT::ArgumentParser_powerpc64 parser(
+        "-4@0 8@%r0 8@i0 4@0(%r0) -2@0(0) "
+        "1@0 -2@%r3 -8@i9 -1@0(%r4) -4@16(6) "
+        "2@7 4@%r11 4@i-67 8@-16(%r17) 1@-52(11) "
+        "-8@13 -8@%r25 2@i-11 -2@14(%r26) -8@-32(24) "
+        "4@29 2@%r17 -8@i-693 -1@-23(%r31) 4@28(30) "
+        "-2@31 -4@%r30 2@i1097 4@108(%r30) -2@-4(31)");
+
+    verify_register(parser, -4, "gpr[0]");
+    verify_register(parser, 8, "gpr[0]");
+    verify_register(parser, 8, 0);
+    verify_register(parser, 4, "gpr[0]", 0);
+    verify_register(parser, -2, "gpr[0]", 0);
+
+    verify_register(parser, 1, "gpr[0]");
+    verify_register(parser, -2, "gpr[3]");
+    verify_register(parser, -8, 9);
+    verify_register(parser, -1, "gpr[4]", 0);
+    verify_register(parser, -4, "gpr[6]", 16);
+
+    verify_register(parser, 2, "gpr[7]");
+    verify_register(parser, 4, "gpr[11]");
+    verify_register(parser, 4, -67);
+    verify_register(parser, 8, "gpr[17]", -16);
+    verify_register(parser, 1, "gpr[11]", -52);
+
+    verify_register(parser, -8, "gpr[13]");
+    verify_register(parser, -8, "gpr[25]");
+    verify_register(parser, 2, -11);
+    verify_register(parser, -2, "gpr[26]", 14);
+    verify_register(parser, -8, "gpr[24]", -32);
+
+    verify_register(parser, 4, "gpr[29]");
+    verify_register(parser, 2, "gpr[17]");
+    verify_register(parser, -8, -693);
+    verify_register(parser, -1, "gpr[31]", -23);
+    verify_register(parser, 4, "gpr[30]", 28);
+
+    verify_register(parser, -2, "gpr[31]");
+    verify_register(parser, -4, "gpr[30]");
+    verify_register(parser, 2, 1097);
+    verify_register(parser, 4, "gpr[30]", 108);
+    verify_register(parser, -2, "gpr[31]", -4);
+#elif defined(__x86_64__)
     USDT::ArgumentParser_x64 parser(
         "-4@$0 8@$1234 %rdi %rax %rsi "
         "-8@%rbx 4@%r12 8@-8(%rbp) 4@(%rax) "
@@ -94,6 +143,7 @@ TEST_CASE("test usdt argument parsing", "[usdt]") {
 
     verify_register(parser, 8, "ax", 0, nullopt, std::string("dx"), 8);
     verify_register(parser, 4, "bx", 0, nullopt, std::string("cx"));
+#endif
 
     REQUIRE(parser.done());
   }

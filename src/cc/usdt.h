@@ -74,37 +74,34 @@ public:
   const optional<int> deref_offset() const { return deref_offset_; }
 
   friend class ArgumentParser;
+  friend class ArgumentParser_powerpc64;
+  friend class ArgumentParser_x64;
 };
 
 class ArgumentParser {
+protected:
   const char *arg_;
   ssize_t cur_pos_;
 
   void skip_whitespace_from(size_t pos);
   void skip_until_whitespace_from(size_t pos);
-
-protected:
-  virtual bool normalize_register(std::string *reg, int *reg_size) = 0;
-
-  ssize_t parse_register(ssize_t pos, std::string &name, int &size);
-  ssize_t parse_number(ssize_t pos, optional<int> *number);
-  ssize_t parse_identifier(ssize_t pos, optional<std::string> *ident);
-  ssize_t parse_base_register(ssize_t pos, Argument *dest);
-  ssize_t parse_index_register(ssize_t pos, Argument *dest);
-  ssize_t parse_scale(ssize_t pos, Argument *dest);
-  ssize_t parse_expr(ssize_t pos, Argument *dest);
-  ssize_t parse_1(ssize_t pos, Argument *dest);
-
   void print_error(ssize_t pos);
 
 public:
-  bool parse(Argument *dest);
+  virtual bool parse(Argument *dest) = 0;
   bool done() { return cur_pos_ < 0 || arg_[cur_pos_] == '\0'; }
 
   ArgumentParser(const char *arg) : arg_(arg), cur_pos_(0) {}
 };
 
+class ArgumentParser_powerpc64 : public ArgumentParser {
+public:
+  bool parse(Argument *dest);
+  ArgumentParser_powerpc64(const char *arg) : ArgumentParser(arg) {}
+};
+
 class ArgumentParser_x64 : public ArgumentParser {
+private:
   enum Register {
     REG_A,
     REG_B,
@@ -133,8 +130,17 @@ class ArgumentParser_x64 : public ArgumentParser {
   static const std::unordered_map<std::string, RegInfo> registers_;
   bool normalize_register(std::string *reg, int *reg_size);
   void reg_to_name(std::string *norm, Register reg);
+  ssize_t parse_register(ssize_t pos, std::string &name, int &size);
+  ssize_t parse_number(ssize_t pos, optional<int> *number);
+  ssize_t parse_identifier(ssize_t pos, optional<std::string> *ident);
+  ssize_t parse_base_register(ssize_t pos, Argument *dest);
+  ssize_t parse_index_register(ssize_t pos, Argument *dest);
+  ssize_t parse_scale(ssize_t pos, Argument *dest);
+  ssize_t parse_expr(ssize_t pos, Argument *dest);
+  ssize_t parse_1(ssize_t pos, Argument *dest);
 
 public:
+  bool parse(Argument *dest);
   ArgumentParser_x64(const char *arg) : ArgumentParser(arg) {}
 };
 
