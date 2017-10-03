@@ -9,6 +9,7 @@ import socket
 import os
 import struct
 import dnslib
+import argparse
 
 
 def encode_dns(name):
@@ -35,6 +36,15 @@ def add_cache_entry(cache, name):
   leaf.p = (c_ubyte * 4).from_buffer(bytearray(4))
   cache[key] = leaf
 
+
+parser = argparse.ArgumentParser(usage='For detailed information about usage,\
+ try with -h option')
+req_args = parser.add_argument_group("Required arguments")
+req_args.add_argument("-i", "--interface", type=str, required=True, help="Interface name")
+req_args.add_argument("-d", "--domains", type=str, required=True,
+    help='List of domain names separated by comma. For example: -d "abc.def, xyz.mno"')
+args = parser.parse_args()
+
 # initialize BPF - load source code from http-parse-simple.c
 bpf = BPF(src_file = "dns_matching.c", debug=0)
 # print(bpf.dump_func("dns_test"))
@@ -45,16 +55,24 @@ bpf = BPF(src_file = "dns_matching.c", debug=0)
 function_dns_matching = bpf.load_func("dns_matching", BPF.SOCKET_FILTER)
 
 
-#create raw socket, bind it to eth0
+#create raw socket, bind it to user provided interface
 #attach bpf program to socket created
-BPF.attach_raw_socket(function_dns_matching, "eth1")
+BPF.attach_raw_socket(function_dns_matching, args.interface)
 
 # Get the table.
 cache = bpf.get_table("cache")
 
 # Add cache entries
-add_cache_entry(cache, "foo.bar")
-add_cache_entry(cache, "another.sample.domain")
+entries = [i.strip() for i in args.domains.split(",")]
+for e in entries:
+  print(">>>> Adding map entry: ", e)
+  add_cache_entry(cache, e)
+
+print("\nTry to lookup some domain names using nslookup from another terminal.")
+print("For exmaple:  nslookup foo.bar")
+print("\nBPF program will filter-in DNS packets which match with map entries.")
+print("Packets received by user space program will be printed here")
+print("\nHit Ctrl+C to end...")
 
 socket_fd = function_dns_matching.sock
 sock = socket.fromfd(socket_fd, socket.PF_PACKET, socket.SOCK_RAW, socket.IPPROTO_IP)
