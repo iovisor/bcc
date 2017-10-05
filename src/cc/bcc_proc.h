@@ -41,6 +41,8 @@ int bcc_mapping_is_file_backed(const char *mapname);
 // Returns -1 on error, and 0 on success
 int bcc_procutils_each_module(int pid, bcc_procutils_modulecb callback,
                               void *payload);
+// Iterate over all non-data Kernel symbols.
+// Returns -1 on error, and 0 on success
 int bcc_procutils_each_ksym(bcc_procutils_ksymcb callback, void *payload);
 void bcc_procutils_free(const char *ptr);
 const char *bcc_procutils_language(int pid);
