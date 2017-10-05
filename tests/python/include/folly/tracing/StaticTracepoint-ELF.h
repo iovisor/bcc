@@ -19,7 +19,7 @@
 // Default constraint for the probe arguments as operands.
 #ifndef FOLLY_SDT_ARG_CONSTRAINT
 #if defined(__powerpc64__) || defined(__powerpc__)
-#define FOLLY_SDT_ARG_CONSTRAINT      "nQr"
+#define FOLLY_SDT_ARG_CONSTRAINT      "nZr"
 #else
 #define FOLLY_SDT_ARG_CONSTRAINT      "nor"
 #endif
