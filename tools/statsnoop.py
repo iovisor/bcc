@@ -105,12 +105,22 @@ if debug:
 
 # initialize BPF
 b = BPF(text=bpf_text)
-b.attach_kprobe(event="sys_stat", fn_name="trace_entry")
-b.attach_kprobe(event="sys_statfs", fn_name="trace_entry")
-b.attach_kprobe(event="sys_newstat", fn_name="trace_entry")
-b.attach_kretprobe(event="sys_stat", fn_name="trace_return")
-b.attach_kretprobe(event="sys_statfs", fn_name="trace_return")
-b.attach_kretprobe(event="sys_newstat", fn_name="trace_return")
+
+# for POSIX compliance, all architectures implement these
+# system calls but the name of the actual entry point may
+# be different for which we must check if the entry points
+# actually exist before attaching the probes
+if BPF.ksymname("sys_stat") != -1:
+    b.attach_kprobe(event="sys_stat", fn_name="trace_entry")
+    b.attach_kretprobe(event="sys_stat", fn_name="trace_return")
+
+if BPF.ksymname("sys_statfs") != -1:
+    b.attach_kprobe(event="sys_statfs", fn_name="trace_entry")
+    b.attach_kretprobe(event="sys_statfs", fn_name="trace_return")
+
+if BPF.ksymname("sys_newstat") != -1:
+    b.attach_kprobe(event="sys_newstat", fn_name="trace_entry")
+    b.attach_kretprobe(event="sys_newstat", fn_name="trace_return")
 
 TASK_COMM_LEN = 16    # linux/sched.h
 NAME_MAX = 255        # linux/limits.h
