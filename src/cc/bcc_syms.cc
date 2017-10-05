@@ -61,21 +61,25 @@ void KSyms::refresh() {
 bool KSyms::resolve_addr(uint64_t addr, struct bcc_symbol *sym, bool demangle) {
   refresh();
 
-  if (syms_.empty()) {
-    sym->name = nullptr;
-    sym->demangle_name = nullptr;
-    sym->module = nullptr;
-    sym->offset = 0x0;
-    return false;
+  std::vector<Symbol>::iterator it;
+
+  if (syms_.empty())
+    goto unknown_symbol;
+
+  it = std::upper_bound(syms_.begin(), syms_.end(), Symbol("", addr));
+  if (it != syms_.begin()) {
+    it--;
+    sym->name = (*it).name.c_str();
+    if (demangle)
+      sym->demangle_name = sym->name;
+    sym->module = "kernel";
+    sym->offset = addr - (*it).addr;
+    return true;
   }
 
-  auto it = std::upper_bound(syms_.begin(), syms_.end(), Symbol("", addr)) - 1;
-  sym->name = (*it).name.c_str();
-  if (demangle)
-    sym->demangle_name = sym->name;
-  sym->module = "kernel";
-  sym->offset = addr - (*it).addr;
-  return true;
+unknown_symbol:
+  memset(sym, 0, sizeof(struct bcc_symbol));
+  return false;
 }
 
 bool KSyms::resolve_name(const char *_unused, const char *name,
