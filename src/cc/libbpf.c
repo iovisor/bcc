@@ -425,7 +425,7 @@ int bpf_open_raw_sock(const char *name)
 
   sock = socket(PF_PACKET, SOCK_RAW | SOCK_NONBLOCK | SOCK_CLOEXEC, htons(ETH_P_ALL));
   if (sock < 0) {
-    printf("cannot create raw socket\n");
+    fprintf(stderr, "cannot create raw socket\n");
     return -1;
   }
 
@@ -439,7 +439,7 @@ int bpf_open_raw_sock(const char *name)
   }
   sll.sll_protocol = htons(ETH_P_ALL);
   if (bind(sock, (struct sockaddr *)&sll, sizeof(sll)) < 0) {
-    printf("bind to %s: %s\n", name, strerror(errno));
+    fprintf(stderr, "bind to %s: %s\n", name, strerror(errno));
     close(sock);
     return -1;
   }
