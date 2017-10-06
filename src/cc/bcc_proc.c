@@ -17,19 +17,27 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <stdbool.h>
-#include <string.h>
-#include <stdint.h>
 #include <ctype.h>
-#include <stdio.h>
+#include <fcntl.h>
+#include <limits.h>
 #include <math.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
 #include "bcc_perf_map.h"
 #include "bcc_proc.h"
 #include "bcc_elf.h"
+
+#ifdef __x86_64__
+// https://www.kernel.org/doc/Documentation/x86/x86_64/mm.txt
+const unsigned long long kernelAddrSpace = 0x00ffffffffffffff;
+#else
+const unsigned long long kernelAddrSpace = 0x0;
+#endif
 
 char *bcc_procutils_which(const char *binpath) {
   char buffer[4096];
@@ -139,7 +147,9 @@ int bcc_procutils_each_module(int pid, bcc_procutils_modulecb callback,
 
 int bcc_procutils_each_ksym(bcc_procutils_ksymcb callback, void *payload) {
   char line[2048];
+  char *symname, *endsym;
   FILE *kallsyms;
+  unsigned long long addr;
 
   /* root is needed to list ksym addresses */
   if (geteuid() != 0)
@@ -149,21 +159,23 @@ int bcc_procutils_each_ksym(bcc_procutils_ksymcb callback, void *payload) {
   if (!kallsyms)
     return -1;
 
-  if (!fgets(line, sizeof(line), kallsyms)) {
-    fclose(kallsyms);
-    return -1;
-  }
-
   while (fgets(line, sizeof(line), kallsyms)) {
-    char *symname, *endsym;
-    unsigned long long addr;
-
     addr = strtoull(line, &symname, 16);
-    endsym = symname = symname + 3;
+    if (addr == 0 || addr == ULLONG_MAX)
+      continue;
+    if (addr < kernelAddrSpace)
+      continue;
 
+    symname++;
+    // Ignore data symbols
+    if (*symname == 'b' || *symname == 'B' || *symname == 'd' ||
+        *symname == 'D' || *symname == 'r' || *symname =='R')
+      continue;
+
+    endsym = (symname = symname + 2);
     while (*endsym && !isspace(*endsym)) endsym++;
-
     *endsym = '\0';
+
     callback(symname, addr, payload);
   }
 
