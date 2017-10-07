@@ -85,7 +85,8 @@ class ProcSyms : SymbolCache {
     UNKNOWN,
     EXEC,
     SO,
-    PERF_MAP
+    PERF_MAP,
+    VDSO
   };
 
   struct Module {

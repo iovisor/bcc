@@ -79,8 +79,7 @@ int bcc_mapping_is_file_backed(const char *mapname) {
     STARTS_WITH(mapname, "[stack") ||
     STARTS_WITH(mapname, "/SYSV") ||
     STARTS_WITH(mapname, "[heap]") ||
-    STARTS_WITH(mapname, "[vsyscall]") ||
-    STARTS_WITH(mapname, "[vdso]"));
+    STARTS_WITH(mapname, "[vsyscall]"));
 }
 
 int bcc_procutils_each_module(int pid, bcc_procutils_modulecb callback,

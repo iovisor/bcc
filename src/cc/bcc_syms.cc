@@ -255,6 +255,11 @@ bool ProcSyms::Module::init() {
     type_ = ModuleType::PERF_MAP;
     return true;
   }
+  
+  if (bcc_elf_is_vdso(name_.c_str()) == 1) {
+    type_ = ModuleType::VDSO;
+    return true;
+  }
 
   return false;
 }
@@ -278,6 +283,8 @@ void ProcSyms::Module::load_sym_table() {
     bcc_perf_map_foreach_sym(name_.c_str(), _add_symbol, this);
   if (type_ == ModuleType::EXEC || type_ == ModuleType::SO)
     bcc_elf_foreach_sym(name_.c_str(), _add_symbol, symbol_option_, this);
+  if (type_ == ModuleType::VDSO)
+    bcc_elf_foreach_vdso_sym(_add_symbol, this);
 
   std::sort(syms_.begin(), syms_.end());
 }
@@ -285,7 +292,7 @@ void ProcSyms::Module::load_sym_table() {
 bool ProcSyms::Module::contains(uint64_t addr, uint64_t &offset) const {
   for (const auto &range : ranges_)
     if (addr >= range.start && addr < range.end) {
-      offset = (type_ == ModuleType::SO)
+      offset = (type_ == ModuleType::SO || type_ == ModuleType::VDSO)
                    ? (addr - range.start + range.file_offset)
                    : addr;
       return true;

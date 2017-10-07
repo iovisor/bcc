@@ -57,10 +57,14 @@ int bcc_elf_foreach_load_section(const char *path,
 // Returns -1 on error, and 0 on success or stopped by callback
 int bcc_elf_foreach_sym(const char *path, bcc_elf_symcb callback, void *option,
                         void *payload);
+// Iterate over all symbols from current system's vDSO
+// Returns -1 on error, and 0 on success or stopped by callback
+int bcc_elf_foreach_vdso_sym(bcc_elf_symcb callback, void *payload);
 
 int bcc_elf_get_type(const char *path);
 int bcc_elf_is_shared_obj(const char *path);
 int bcc_elf_is_exe(const char *path);
+int bcc_elf_is_vdso(const char *name);
 
 #ifdef __cplusplus
 }

@@ -23,6 +23,7 @@ extern "C" {
 #endif
 
 #include <stdint.h>
+#include <stdbool.h>
 
 // Module name, start address, end address, file_offset,
 // whether to check mount namespace, payload

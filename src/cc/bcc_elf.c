@@ -16,6 +16,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <string.h>
@@ -26,21 +27,29 @@
 
 #include <gelf.h>
 #include "bcc_elf.h"
+#include "bcc_proc.h"
 #include "bcc_syms.h"
 
 #define NT_STAPSDT 3
 #define ELF_ST_TYPE(x) (((uint32_t) x) & 0xf)
 
-static int openelf(const char *path, Elf **elf_out, int *fd_out) {
+static int openelf_fd(int fd, Elf **elf_out) {
   if (elf_version(EV_CURRENT) == EV_NONE)
     return -1;
 
+  *elf_out = elf_begin(fd, ELF_C_READ, 0);
+  if (*elf_out == NULL)
+    return -1;
+
+  return 0;
+}
+
+static int openelf(const char *path, Elf **elf_out, int *fd_out) {
   *fd_out = open(path, O_RDONLY);
   if (*fd_out < 0)
     return -1;
 
-  *elf_out = elf_begin(*fd_out, ELF_C_READ, 0);
-  if (*elf_out == 0) {
+  if (openelf_fd(*fd_out, elf_out) == -1) {
     close(*fd_out);
     return -1;
   }
@@ -530,6 +539,72 @@ int bcc_elf_is_exe(const char *path) {
 
 int bcc_elf_is_shared_obj(const char *path) {
   return bcc_elf_get_type(path) == ET_DYN;
+}
+
+int bcc_elf_is_vdso(const char *name) {
+  return strcmp(name, "[vdso]") == 0;
+}
+
+// -2: Failed
+// -1: Not initialized
+// >0: Initialized
+static int vdso_image_fd = -1;
+
+static int find_vdso(const char *name, uint64_t st, uint64_t en,
+                     uint64_t offset, bool enter_ns, void *payload) {
+  int fd;
+  char tmpfile[128];
+  if (!bcc_elf_is_vdso(name))
+    return 0;
+
+  void *image = malloc(en - st);
+  if (!image)
+    goto on_error;
+  memcpy(image, (void *)st, en - st);
+
+  snprintf(tmpfile, sizeof(tmpfile), "/tmp/bcc_%d_vdso_image_XXXXXX", getpid());
+  fd = mkostemp(tmpfile, O_CLOEXEC);
+  if (fd < 0) {
+    fprintf(stderr, "Unable to create temp file: %s\n", strerror(errno));
+    goto on_error;
+  }
+  // Unlink the file to avoid leaking
+  if (unlink(tmpfile) == -1)
+    fprintf(stderr, "Unlink %s failed: %s\n", tmpfile, strerror(errno));
+
+  if (write(fd, image, en - st) == -1) {
+    fprintf(stderr, "Failed to write to vDSO image: %s\n", strerror(errno));
+    close(fd);
+    goto on_error;
+  }
+  vdso_image_fd = fd;
+
+on_error:
+  if (image)
+    free(image);
+  // Always stop the iteration
+  return -1;
+}
+
+int bcc_elf_foreach_vdso_sym(bcc_elf_symcb callback, void *payload) {
+  Elf *elf;
+  static struct bcc_symbol_option default_option = {
+    .use_debug_file = 0,
+    .check_debug_file_crc = 0,
+    .use_symbol_type = (1 << STT_FUNC) | (1 << STT_GNU_IFUNC)
+  };
+
+  if (vdso_image_fd == -1) {
+    vdso_image_fd = -2;
+    bcc_procutils_each_module(getpid(), &find_vdso, NULL);
+  }
+  if (vdso_image_fd == -2)
+    return -1;
+
+  if (openelf_fd(vdso_image_fd, &elf) == -1)
+    return -1;
+
+  return listsymbols(elf, callback, payload, &default_option);
 }
 
 #if 0
