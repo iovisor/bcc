@@ -199,13 +199,9 @@ def print_event(cpu, data, size, rw):
         e_mark = "-" * 5 + " END DATA (TRUNCATED, " + str(truncated_bytes) + \
                 " bytes lost) " + "-" * 5
 
-    print("%-12s %-18.9f %-16s %-6d %-6d\n%s\n%s\n%s\n\n" % (rw, time_s,
-                                                             event.comm.decode(),
-                                                             event.pid,
-                                                             event.len,
-                                                             s_mark,
-                                                             event.v0.decode(),
-                                                             e_mark))
+    fmt = "%-12s %-18.9f %-16s %-6d %-6d\n%s\n%s\n%s\n\n"
+    print(fmt % (rw, time_s, event.comm.decode(), event.pid, event.len, s_mark,
+                 event.v0.decode(), e_mark))
 
 b["perf_SSL_write"].open_perf_buffer(print_event_write)
 b["perf_SSL_read"].open_perf_buffer(print_event_read)
