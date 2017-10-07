@@ -40,7 +40,8 @@ def comm_for_pid(pid):
 counts = {}
 
 def parse_probes(typ):
-    if args.verbosity > 1: print("open %ss:" % typ)
+    if args.verbosity > 1:
+        print("open %ss:" % typ)
     for probe in open("/sys/kernel/debug/tracing/%s_events" % typ):
         # Probes opened by bcc have a specific pattern that includes the pid
         # of the requesting process.
@@ -48,8 +49,10 @@ def parse_probes(typ):
         if match:
             pid = int(match.group(1))
             counts[(pid, typ)] = counts.get((pid, typ), 0) + 1
-        if args.verbosity > 1: print(probe.strip())
-    if args.verbosity > 1: print("")
+        if args.verbosity > 1:
+            print(probe.strip())
+    if args.verbosity > 1:
+        print("")
 
 if args.verbosity > 0:
     parse_probes("kprobe")
