@@ -87,43 +87,35 @@ int bcc_procutils_each_module(int pid, bcc_procutils_modulecb callback,
                               void *payload) {
   char procmap_filename[128];
   FILE *procmap;
-  int ret;
-
   snprintf(procmap_filename, sizeof(procmap_filename), "/proc/%ld/maps",
            (long)pid);
   procmap = fopen(procmap_filename, "r");
-
   if (!procmap)
     return -1;
 
-  do {
-    char endline[4096];
-    char perm[8], dev[8];
-    long long begin, end, offset, inode;
-
-    ret = fscanf(procmap, "%llx-%llx %s %llx %s %lld", &begin, &end, perm,
-                 &offset, dev, &inode);
-
-    if (!fgets(endline, sizeof(endline), procmap))
+  char buf[PATH_MAX + 1], perm[5], dev[8];
+  char *name;
+  uint64_t begin, end, inode;
+  unsigned long long offset;
+  while (true) {
+    buf[0] = '\0';
+    // From fs/proc/task_mmu.c:show_map_vma
+    if (fscanf(procmap, "%lx-%lx %s %llx %s %lu%[^\n]", &begin, &end, perm,
+               &offset, dev, &inode, buf) != 7)
       break;
 
-    if (ret == 6) {
-      char *mapname = endline;
-      char *newline = strchr(endline, '\n');
+    if (perm[2] != 'x')
+      continue;
 
-      if (newline)
-        newline[0] = '\0';
+    name = buf;
+    while (isspace(*name))
+      name++;
+    if (!bcc_mapping_is_file_backed(name))
+      continue;
 
-      while (isspace(mapname[0]))
-        mapname++;
-
-      if (strchr(perm, 'x') && bcc_mapping_is_file_backed(mapname)) {
-        if (callback(mapname, (uint64_t)begin, (uint64_t)end, (uint64_t)offset,
-                     true, payload) < 0)
-          break;
-      }
-    }
-  } while (ret && ret != EOF);
+    if (callback(name, begin, end, (uint64_t)offset, true, payload) < 0)
+      break;
+  }
 
   fclose(procmap);
 
