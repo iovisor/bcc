@@ -492,8 +492,8 @@ BPF_PERF_OUTPUT(%s);
                     time = strftime("%H:%M:%S") if Probe.use_localtime else \
                            Probe._time_off_str(event.timestamp_ns)
                     print("%-8s %-6d %-6d %-12s %-16s %s" %
-                          (time[:8], event.tgid, event.pid, event.comm.decode(),
-                           self._display_function(), msg))
+                          (time[:8], event.tgid, event.pid,
+                           event.comm.decode(), self._display_function(), msg))
 
                 if self.kernel_stack:
                         self.print_stack(bpf, event.kernel_stack_id, -1)
