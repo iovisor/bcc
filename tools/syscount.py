@@ -15,6 +15,7 @@ import argparse
 import itertools
 import subprocess
 import sys
+import platform
 
 if sys.version_info.major < 3:
     izip_longest = itertools.izip_longest
@@ -362,7 +363,10 @@ try:
     out = subprocess.check_output('ausyscall --dump | tail -n +2', shell=True)
     syscalls = dict(map(parse_syscall, out.strip().split('\n')))
 except Exception as e:
-    pass
+    if platform.machine() == "x86_64":
+        pass
+    else:
+        raise Exception("ausyscall: command not found")
 
 parser = argparse.ArgumentParser(
     description="Summarize syscall counts and latencies.")
