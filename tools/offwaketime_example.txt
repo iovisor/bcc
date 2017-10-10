@@ -171,7 +171,7 @@ stack and the waker task name after "waker:". The wakeup stack is printed
 in reverse order.
 
 The number beneath the stacks is the total time spent from the blocking event
-to the wakeup event. This is summed for all occurances with the same stack
+to the wakeup event. This is summed for all occurrences with the same stack
 pairs.
 
 

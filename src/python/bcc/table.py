@@ -302,7 +302,7 @@ class TableBase(MutableMapping):
         it will be used to produce a bucket value for the histogram keys.
         If the value of strip_leading_zero is not False, prints a histogram
         that is omitted leading zeros from the beginning. The maximum index
-        allowed is log2_index_max (65), which will accomodate any 64-bit
+        allowed is log2_index_max (65), which will accommodate any 64-bit
         integer in the histogram.
         """
         if isinstance(self.Key(), ct.Structure):

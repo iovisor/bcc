@@ -6,7 +6,7 @@
 # USAGE: solisten.py [-h] [-p PID] [--show-netns]
 #
 # This is provided as a basic example of TCP connection & socket tracing.
-# It could be usefull in scenarios where load balancers needs to be updated
+# It could be useful in scenarios where load balancers needs to be updated
 # dynamically as application is fully initialized.
 #
 # All IPv4 listen attempts are traced, even if they ultimately fail or the

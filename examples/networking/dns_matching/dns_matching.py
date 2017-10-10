@@ -69,7 +69,7 @@ for e in entries:
   add_cache_entry(cache, e)
 
 print("\nTry to lookup some domain names using nslookup from another terminal.")
-print("For exmaple:  nslookup foo.bar")
+print("For example:  nslookup foo.bar")
 print("\nBPF program will filter-in DNS packets which match with map entries.")
 print("Packets received by user space program will be printed here")
 print("\nHit Ctrl+C to end...")

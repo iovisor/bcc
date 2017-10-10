@@ -50,7 +50,7 @@ parser.add_argument("-t", "--timestamp", action="store_true",
 parser.add_argument("-w", "--wide", action="store_true",
     help="wide column output (fits IPv6 addresses)")
 parser.add_argument("-s", "--csv", action="store_true",
-    help="comma seperated values output")
+    help="comma separated values output")
 parser.add_argument("-p", "--pid",
     help="trace this PID only")
 parser.add_argument("-L", "--localport",

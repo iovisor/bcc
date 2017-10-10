@@ -105,7 +105,7 @@ Lifespan of the session, in milliseconds.
 This traces the kernel TCP set state function, which should be called much
 less often than send/receive tracing, and therefore have lower overhead. The
 overhead of the tool is relative to the rate of new TCP sessions: if this is
-high, over 10,000 per second, then there may be noticable overhead just to
+high, over 10,000 per second, then there may be noticeable overhead just to
 print out 10k lines of formatted output per second.
 
 You can find out the rate of new TCP sessions using "sar \-n TCP 1", and

@@ -161,7 +161,7 @@ int bpf_get_first_key(int fd, void *key, size_t key_size)
       // of map's value. So we pass an invalid pointer for value, expect
       // the call to fail and check if the error is ENOENT indicating the
       // key doesn't exist. If we use NULL for the invalid pointer, it might
-      // trigger a page fault in kernel and affect performence. Hence we use
+      // trigger a page fault in kernel and affect performance. Hence we use
       // ~0 which will fail and return fast.
       // This should fail since we pass an invalid pointer for value.
       if (bpf_lookup_elem(fd, key, (void *)~0) >= 0)
