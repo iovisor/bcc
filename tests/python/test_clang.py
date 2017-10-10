@@ -612,6 +612,18 @@ struct key_t {
         with self.assertRaises(Exception):
             b = BPF(text=text)
 
+    def test_enumerations(self):
+        text = """
+enum b {
+    CHOICE_A,
+};
+struct a {
+    enum b test;
+};
+BPF_HASH(drops, struct a);
+        """
+        b = BPF(text=text)
+
 
 if __name__ == "__main__":
     main()

@@ -40,6 +40,8 @@ class BMapDeclVisitor : public clang::RecursiveASTVisitor<BMapDeclVisitor> {
   bool VisitTypedefType(const clang::TypedefType *T);
   bool VisitTagType(const clang::TagType *T);
   bool VisitPointerType(const clang::PointerType *T);
+  bool VisitEnumConstantDecl(clang::EnumConstantDecl *D);
+  bool VisitEnumDecl(clang::EnumDecl *D);
 
  private:
   clang::ASTContext &C;
@@ -53,6 +55,25 @@ bool BMapDeclVisitor::VisitFieldDecl(FieldDecl *D) {
   result_ += D->getName();
   result_ += "\",";
   return true;
+}
+
+bool BMapDeclVisitor::VisitEnumConstantDecl(EnumConstantDecl *D) {
+  result_ += "\"";
+  result_ += D->getName();
+  result_ += "\",";
+  return false;
+}
+
+bool BMapDeclVisitor::VisitEnumDecl(EnumDecl *D) {
+  result_ += "[\"";
+  result_ += D->getName();
+  result_ += "\", [";
+  for (auto it = D->enumerator_begin(); it != D->enumerator_end(); ++it) {
+    TraverseDecl(*it);
+  }
+  result_.erase(result_.end() - 1);
+  result_ += "], \"enum\"]";
+  return false;
 }
 
 bool BMapDeclVisitor::TraverseRecordDecl(RecordDecl *D) {
