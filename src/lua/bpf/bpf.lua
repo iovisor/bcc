@@ -475,7 +475,7 @@ end
 
 local function LOAD(dst, src, off, vtype)
 	local base = V[src].const
-	assert(base.__dissector, 'NYI: load() on variable that doesnt have dissector')
+	assert(base.__dissector, "NYI: load() on variable that doesn't have dissector")
 	-- Cast to different type if requested
 	vtype = vtype or base.__dissector
 	local w = ffi.sizeof(vtype)
@@ -971,7 +971,7 @@ return setmetatable(BC, {
 			bb_end(Vstate[code.bc_pc])
 		end
 		-- Perform fixup of jump targets
-		-- We need to do this because the number of consumed and emited
+		-- We need to do this because the number of consumed and emitted
 		-- bytecode instructions is different
 		local fixup = code.fixup[code.bc_pc]
 		if fixup ~= nil then

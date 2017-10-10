@@ -135,7 +135,7 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, TableStorage &ts,
 
   // -fno-color-diagnostics: this is a workaround for a bug in llvm terminalHasColors() as of
   // 22 Jul 2016. Also see bcc #615.
-  // Enable -O2 for clang. In clang 5.0, -O0 may result in funciton marking as
+  // Enable -O2 for clang. In clang 5.0, -O0 may result in function marking as
   // noinline and optnone (if not always inlining).
   // Note that first argument is ignored in clang compilation invocation.
   vector<const char *> flags_cstr({"-O0", "-O2", "-emit-llvm", "-I", dstack.cwd(),

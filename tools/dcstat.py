@@ -64,7 +64,7 @@ BPF_ARRAY(stats, u64, S_MAXSTAT);
  * __d_lookup_rcu()). It's counted via calls to lookup_fast().
  *
  * The implementation tries different, progressively slower, approaches to
- * lookup a file. At what point do we call it a dcache miss? I've choosen when
+ * lookup a file. At what point do we call it a dcache miss? I've chosen when
  * a d_lookup() (which is called during lookup_slow()) returns zero.
  *
  * I've also included a "SLOW" statistic to show how often the fast lookup

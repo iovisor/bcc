@@ -37,7 +37,7 @@ def main():
     errors = 0
 
     if not is_root():
-        print "Loading EBPF programs requires root priviledge."
+        print "Loading EBPF programs requires root privilege."
         print "Will only test compilation, not loading."
         print "(Run with sudo to test program loading.)"
 

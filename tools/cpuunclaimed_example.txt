@@ -53,7 +53,7 @@ Sampling run queues... Output every 1 seconds. Hit Ctrl-C to end.
 [...]
 
 It shows that 7 of the 8 CPUs (87.5%) are idle at the same time there are
-queued threads waiting to run on CPU. This is an artifical situation caused
+queued threads waiting to run on CPU. This is an artificial situation caused
 by binding threads to the same CPU, to demonstrate how the tool works.
 
 
