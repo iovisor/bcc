@@ -109,7 +109,7 @@ int trace_completion(struct pt_regs *ctx)
 # code substitutions
 if args.dist:
     bpf_text = bpf_text.replace('STORE',
-        'irq_key_t key = {.slot = bpf_log2l(delta)};' +
+        'irq_key_t key = {.slot = bpf_log2l(delta / %d)};' % factor +
         'bpf_probe_read(&key.name, sizeof(key.name), name);' +
         'dist.increment(key);')
 else:

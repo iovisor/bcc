@@ -103,7 +103,7 @@ TRACEPOINT_PROBE(irq, softirq_exit)
 # code substitutions
 if args.dist:
     bpf_text = bpf_text.replace('STORE',
-        'key.vec = vec; key.slot = bpf_log2l(delta); ' +
+        'key.vec = vec; key.slot = bpf_log2l(delta / %d); ' % factor +
         'dist.increment(key);')
 else:
     bpf_text = bpf_text.replace('STORE',
