@@ -34,10 +34,8 @@ namespace USDT {
 Location::Location(uint64_t addr, const char *arg_fmt) : address_(addr) {
 #ifdef __powerpc64__
   ArgumentParser_powerpc64 parser(arg_fmt);
-#elif defined(__x86_64__)
-  ArgumentParser_x64 parser(arg_fmt);
 #else
-#error "bcc does not support this platform yet"
+  ArgumentParser_x64 parser(arg_fmt);
 #endif
   while (!parser.done()) {
     Argument arg;
