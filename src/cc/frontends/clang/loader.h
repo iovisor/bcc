@@ -40,6 +40,7 @@ class FuncSource {
   std::map<std::string, SourceCode> funcs_;
  public:
   FuncSource() {}
+  void clear() { funcs_.clear(); }
   const char * src(const std::string& name);
   const char * src_rewritten(const std::string& name);
   void set_src(const std::string& name, const std::string& src);
@@ -54,6 +55,15 @@ class ClangLoader {
             const std::string &file, bool in_memory, const char *cflags[],
             int ncflags, const std::string &id, FuncSource &func_src,
             std::string &mod_src);
+
+ private:
+  int do_compile(std::unique_ptr<llvm::Module> *mod, TableStorage &ts,
+                 bool in_memory, const std::vector<const char *> &flags_cstr_in,
+                 const std::vector<const char *> &flags_cstr_rem,
+                 const std::string &main_path,
+                 const std::unique_ptr<llvm::MemoryBuffer> &main_buf,
+                 const std::string &id, FuncSource &func_src,
+                 std::string &mod_src, bool use_internal_bpfh);
 
  private:
   static std::map<std::string, std::unique_ptr<llvm::MemoryBuffer>> remapped_files_;
