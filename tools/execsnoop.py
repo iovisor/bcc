@@ -44,6 +44,8 @@ parser.add_argument("-n", "--name",
     help="only print commands matching this name (regex), any arg")
 parser.add_argument("-l", "--line",
     help="only print commands where arg contains this line (regex)")
+parser.add_argument("--max-args", default="20",
+    help="maximum number of arguments parsed and displayed, defaults to 20")
 args = parser.parse_args()
 
 # define BPF program
@@ -52,7 +54,6 @@ bpf_text = """
 #include <linux/sched.h>
 #include <linux/fs.h>
 
-#define MAXARG   20
 #define ARGSIZE  128
 
 enum event_type {
@@ -99,28 +100,12 @@ int kprobe__sys_execve(struct pt_regs *ctx, struct filename *filename,
 
     __submit_arg(ctx, (void *)filename, &data);
 
-    int i = 1;  // skip first arg, as we submitted filename
-
-    // unrolled loop to walk argv[] (MAXARG)
-    if (submit_arg(ctx, (void *)&__argv[i], &data) == 0) goto out; i++;
-    if (submit_arg(ctx, (void *)&__argv[i], &data) == 0) goto out; i++;
-    if (submit_arg(ctx, (void *)&__argv[i], &data) == 0) goto out; i++;
-    if (submit_arg(ctx, (void *)&__argv[i], &data) == 0) goto out; i++;
-    if (submit_arg(ctx, (void *)&__argv[i], &data) == 0) goto out; i++;
-    if (submit_arg(ctx, (void *)&__argv[i], &data) == 0) goto out; i++;
-    if (submit_arg(ctx, (void *)&__argv[i], &data) == 0) goto out; i++;
-    if (submit_arg(ctx, (void *)&__argv[i], &data) == 0) goto out; i++;
-    if (submit_arg(ctx, (void *)&__argv[i], &data) == 0) goto out; i++; // X
-    if (submit_arg(ctx, (void *)&__argv[i], &data) == 0) goto out; i++;
-    if (submit_arg(ctx, (void *)&__argv[i], &data) == 0) goto out; i++;
-    if (submit_arg(ctx, (void *)&__argv[i], &data) == 0) goto out; i++;
-    if (submit_arg(ctx, (void *)&__argv[i], &data) == 0) goto out; i++;
-    if (submit_arg(ctx, (void *)&__argv[i], &data) == 0) goto out; i++;
-    if (submit_arg(ctx, (void *)&__argv[i], &data) == 0) goto out; i++;
-    if (submit_arg(ctx, (void *)&__argv[i], &data) == 0) goto out; i++;
-    if (submit_arg(ctx, (void *)&__argv[i], &data) == 0) goto out; i++;
-    if (submit_arg(ctx, (void *)&__argv[i], &data) == 0) goto out; i++;
-    if (submit_arg(ctx, (void *)&__argv[i], &data) == 0) goto out; i++; // XX
+    // skip first arg, as we submitted filename
+    #pragma unroll
+    for (int i = 1; i < MAXARG; i++) {
+        if (submit_arg(ctx, (void *)&__argv[i], &data) == 0)
+             goto out;
+    }
 
     // handle truncated argument list
     char ellipsis[] = "...";
@@ -143,7 +128,7 @@ int kretprobe__sys_execve(struct pt_regs *ctx)
 """
 
 # initialize BPF
-b = BPF(text=bpf_text)
+b = BPF(text=bpf_text.replace("MAXARG", args.max_args))
 
 # header
 if args.timestamp:
