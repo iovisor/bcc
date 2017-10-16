@@ -108,8 +108,6 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, TableStorage &ts,
                        const string &file, bool in_memory, const char *cflags[],
                        int ncflags, const std::string &id, FuncSource &func_src,
                        std::string &mod_src) {
-  using namespace clang;
-
   string main_path = "/virtual/main.c";
   unique_ptr<llvm::MemoryBuffer> main_buf;
   struct utsname un;
@@ -155,22 +153,60 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, TableStorage &ts,
     return -1;
   if (flags_ & DEBUG_SOURCE)
     flags_cstr.push_back("-g");
-  kflags.push_back("-include");
-  kflags.push_back("/virtual/include/bcc/bpf.h");
-  kflags.push_back("-include");
-  kflags.push_back("/virtual/include/bcc/helpers.h");
-  kflags.push_back("-isystem");
-  kflags.push_back("/virtual/include");
   for (auto it = kflags.begin(); it != kflags.end(); ++it)
     flags_cstr.push_back(it->c_str());
+
+  vector<const char *> flags_cstr_rem;
+  flags_cstr_rem.push_back("-include");
+  flags_cstr_rem.push_back("/virtual/include/bcc/helpers.h");
+  flags_cstr_rem.push_back("-isystem");
+  flags_cstr_rem.push_back("/virtual/include");
   if (cflags) {
     for (auto i = 0; i < ncflags; ++i)
-      flags_cstr.push_back(cflags[i]);
+      flags_cstr_rem.push_back(cflags[i]);
   }
 #ifdef CUR_CPU_IDENTIFIER
   string cur_cpu_flag = string("-DCUR_CPU_IDENTIFIER=") + CUR_CPU_IDENTIFIER;
-  flags_cstr.push_back(cur_cpu_flag.c_str());
+  flags_cstr_rem.push_back(cur_cpu_flag.c_str());
 #endif
+
+  if (do_compile(mod, ts, in_memory, flags_cstr, flags_cstr_rem, main_path,
+                 main_buf, id, func_src, mod_src, true)) {
+#if BCC_BACKUP_COMPILE != 1
+    return -1;
+#else
+    // try one more time to compile with system bpf.h
+    llvm::errs() << "WARNING: compilation failure, trying with system bpf.h\n";
+
+    ts.DeletePrefix(Path({id}));
+    func_src.clear();
+    mod_src.clear();
+    if (do_compile(mod, ts, in_memory, flags_cstr, flags_cstr_rem, main_path,
+                   main_buf, id, func_src, mod_src, false))
+      return -1;
+#endif
+  }
+
+  return 0;
+}
+
+int ClangLoader::do_compile(unique_ptr<llvm::Module> *mod, TableStorage &ts,
+                            bool in_memory,
+                            const vector<const char *> &flags_cstr_in,
+                            const vector<const char *> &flags_cstr_rem,
+                            const std::string &main_path,
+                            const unique_ptr<llvm::MemoryBuffer> &main_buf,
+                            const std::string &id, FuncSource &func_src,
+                            std::string &mod_src, bool use_internal_bpfh) {
+  using namespace clang;
+
+  vector<const char *> flags_cstr = flags_cstr_in;
+  if (use_internal_bpfh) {
+    flags_cstr.push_back("-include");
+    flags_cstr.push_back("/virtual/include/bcc/bpf.h");
+  }
+  flags_cstr.insert(flags_cstr.end(), flags_cstr_rem.begin(),
+                    flags_cstr_rem.end());
 
   // set up the error reporting class
   IntrusiveRefCntPtr<DiagnosticOptions> diag_opts(new DiagnosticOptions());
