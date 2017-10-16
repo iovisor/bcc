@@ -7,6 +7,7 @@
   - [Arch](#arch---aur)
   - [Gentoo](#gentoo---portage)
   - [openSUSE](#opensuse---binary)
+  - [centos:7](#centos7---binary)
 * [Source](#source)
   - [Debian](#debian---source)
   - [Ubuntu](#ubuntu---source)
@@ -173,6 +174,12 @@ sudo zypper ref
 sudo zypper in bcc-tools bcc-examples
 ```
 
+## centos7 - Binary
+For centos:7 use the docker file provided
+```bash
+make build_centos7
+```
+this will create a directory named `rpms` in the project root. Copy the rpms and install them the usual way
 
 # Source
 
