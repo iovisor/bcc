@@ -616,7 +616,8 @@ int BPFModule::finalize() {
       function_names_.push_back(section.first);
 
   if (flags_ & DEBUG_SOURCE) {
-    SourceDebugger src_debugger(mod, sections_, FN_PREFIX, mod_src_);
+    SourceDebugger src_debugger(mod, sections_, FN_PREFIX, mod_src_,
+                                src_dbg_fmap_);
     src_debugger.dump();
   }
 
@@ -690,7 +691,7 @@ int BPFModule::annotate_prog_tag(const string &name, int prog_fd,
 
   ::snprintf(buf, sizeof(buf), BCC_PROG_TAG_DIR "/bpf_prog_%llx/%s.c",
              tag1, name.data());
-  FileDesc fd(open(buf, O_CREAT | O_WRONLY | O_TRUNC,  0644));
+  FileDesc fd(open(buf, O_CREAT | O_WRONLY | O_TRUNC, 0644));
   if (fd < 0) {
     fprintf(stderr, "cannot create %s\n", buf);
     return -1;
@@ -701,7 +702,7 @@ int BPFModule::annotate_prog_tag(const string &name, int prog_fd,
 
   ::snprintf(buf, sizeof(buf), BCC_PROG_TAG_DIR "/bpf_prog_%llx/%s.rewritten.c",
              tag1, name.data());
-  fd = open(buf, O_CREAT | O_WRONLY | O_TRUNC,  0644);
+  fd = open(buf, O_CREAT | O_WRONLY | O_TRUNC, 0644);
   if (fd < 0) {
     fprintf(stderr, "cannot create %s\n", buf);
     return -1;
@@ -709,6 +710,20 @@ int BPFModule::annotate_prog_tag(const string &name, int prog_fd,
 
   src = function_source_rewritten(name);
   write(fd, src, strlen(src));
+
+  if (!src_dbg_fmap_[name].empty()) {
+    ::snprintf(buf, sizeof(buf), BCC_PROG_TAG_DIR "/bpf_prog_%llx/%s.dis.txt",
+               tag1, name.data());
+    fd = open(buf, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+    if (fd < 0) {
+      fprintf(stderr, "cannot create %s\n", buf);
+      return -1;
+    }
+
+    const char *src = src_dbg_fmap_[name].c_str();
+    write(fd, src, strlen(src));
+  }
+
   return 0;
 }
 

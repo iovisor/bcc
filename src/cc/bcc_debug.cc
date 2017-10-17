@@ -77,14 +77,15 @@ vector<string> SourceDebugger::buildLineCache() {
 
 void SourceDebugger::dumpSrcLine(const vector<string> &LineCache,
                                  const string &FileName, uint32_t Line,
-                                 uint32_t &CurrentSrcLine) {
+                                 uint32_t &CurrentSrcLine,
+                                 llvm::raw_ostream &os) {
   if (Line != 0 && Line != CurrentSrcLine && Line < LineCache.size() &&
       FileName == mod_->getSourceFileName()) {
-    errs() << "; " << StringRef(LineCache[Line - 1]).ltrim()
-           << format(
-                  " // Line"
-                  "%4" PRIu64 "\n",
-                  Line);
+    os << "; " << StringRef(LineCache[Line - 1]).ltrim()
+       << format(
+              " // Line"
+              "%4" PRIu64 "\n",
+              Line);
     CurrentSrcLine = Line;
   }
 }
@@ -179,16 +180,19 @@ void SourceDebugger::dump() {
       uint64_t FuncSize = get<1>(section.second);
       ArrayRef<uint8_t> Data(FuncStart, FuncSize);
       uint32_t CurrentSrcLine = 0;
+      string func_name = section.first.substr(fn_prefix_.size());
 
       errs() << "Disassembly of section " << section.first << ":\n"
-             << section.first.substr(fn_prefix_.size()) << ":\n";
+             << func_name << ":\n";
 
+      string src_dbg_str;
+      llvm::raw_string_ostream os(src_dbg_str);
       for (uint64_t Index = 0; Index < FuncSize; Index += Size) {
         S = DisAsm->getInstruction(Inst, Size, Data.slice(Index), Index,
                                    nulls(), nulls());
         if (S != MCDisassembler::Success) {
-          errs() << "Debug Error: disassembler failed: " << std::to_string(S)
-                 << '\n';
+          os << "Debug Error: disassembler failed: " << std::to_string(S)
+             << '\n';
           break;
         } else {
           DILineInfo LineInfo;
@@ -199,14 +203,16 @@ void SourceDebugger::dump() {
 
           adjustInstSize(Size, Data[Index], Data[Index + 1]);
           dumpSrcLine(LineCache, LineInfo.FileName, LineInfo.Line,
-                      CurrentSrcLine);
-          errs() << format("%4" PRIu64 ":", Index >> 3) << '\t';
-          dumpBytes(Data.slice(Index, Size), errs());
-          IP->printInst(&Inst, errs(), "", *STI);
-          errs() << '\n';
+                      CurrentSrcLine, os);
+          os << format("%4" PRIu64 ":", Index >> 3) << '\t';
+          dumpBytes(Data.slice(Index, Size), os);
+          IP->printInst(&Inst, os, "", *STI);
+          os << '\n';
         }
       }
-      errs() << '\n';
+      os.flush();
+      errs() << src_dbg_str << '\n';
+      src_dbg_fmap_[func_name] = src_dbg_str;
     }
 }
 
