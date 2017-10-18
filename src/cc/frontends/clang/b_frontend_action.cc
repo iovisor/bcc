@@ -363,7 +363,7 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
           if (desc->second.type == BPF_MAP_TYPE_STACK_TRACE) {
             string arg0 =
                 rewriter_.getRewrittenText(expansionRange(Call->getArg(0)->getSourceRange()));
-            txt = "bpf_get_stackid(";
+            txt = "bcc_get_stackid(";
             txt += "bpf_pseudo_fd(1, " + fd + "), " + arg0;
             rewrite_end = Call->getArg(0)->getLocEnd();
             } else {
