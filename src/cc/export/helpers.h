@@ -547,7 +547,7 @@ int bpf_usdt_readarg_p(int argc, struct pt_regs *ctx, void *buf, u64 len) asm("l
 #define PT_REGS_PARM6(ctx)	((ctx)->gpr[8])
 #define PT_REGS_RC(ctx)		((ctx)->gpr[3])
 #define PT_REGS_IP(ctx)		((ctx)->nip)
-#define PT_REGS_SP(ctx)		((ctx)->sp)
+#define PT_REGS_SP(ctx)		((ctx)->gpr[1])
 #elif defined(__s390x__)
 #define PT_REGS_PARM1(x) ((x)->gprs[2])
 #define PT_REGS_PARM2(x) ((x)->gprs[3])
