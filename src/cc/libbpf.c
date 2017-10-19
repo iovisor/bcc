@@ -73,6 +73,8 @@
 #define PERF_FLAG_FD_CLOEXEC (1UL << 3)
 #endif
 
+#define min(x, y) ((x) < (y) ? (x) : (y))
+
 static int probe_perf_reader_page_cnt = 8;
 
 static uint64_t ptr_to_u64(void *ptr)
@@ -80,8 +82,11 @@ static uint64_t ptr_to_u64(void *ptr)
   return (uint64_t) (unsigned long) ptr;
 }
 
-int bpf_create_map(enum bpf_map_type map_type, int key_size, int value_size, int max_entries, int map_flags)
+int bpf_create_map(enum bpf_map_type map_type, const char *name,
+                   int key_size, int value_size,
+                   int max_entries, int map_flags)
 {
+  size_t name_len = name ? strlen(name) : 0;
   union bpf_attr attr;
   memset(&attr, 0, sizeof(attr));
   attr.map_type = map_type;
@@ -89,8 +94,15 @@ int bpf_create_map(enum bpf_map_type map_type, int key_size, int value_size, int
   attr.value_size = value_size;
   attr.max_entries = max_entries;
   attr.map_flags = map_flags;
+  memcpy(attr.map_name, name, min(name_len, BPF_OBJ_NAME_LEN - 1));
 
   int ret = syscall(__NR_bpf, BPF_MAP_CREATE, &attr, sizeof(attr));
+
+  if (ret < 0 && name_len && (errno == E2BIG || errno == EINVAL)) {
+    memset(attr.map_name, 0, BPF_OBJ_NAME_LEN);
+    ret = syscall(__NR_bpf, BPF_MAP_CREATE, &attr, sizeof(attr));
+  }
+
   if (ret < 0 && errno == EPERM) {
     // see note below about the rationale for this retry
 
@@ -329,11 +341,12 @@ int bpf_prog_get_tag(int fd, unsigned long long *ptag)
   return 0;
 }
 
-int bpf_prog_load(enum bpf_prog_type prog_type,
+int bpf_prog_load(enum bpf_prog_type prog_type, const char *name,
                   const struct bpf_insn *insns, int prog_len,
                   const char *license, unsigned kern_version,
                   char *log_buf, unsigned log_buf_size)
 {
+  size_t name_len = name ? strlen(name) : 0;
   union bpf_attr attr;
   char *bpf_log_buffer = NULL;
   unsigned buffer_size = 0;
@@ -347,6 +360,7 @@ int bpf_prog_load(enum bpf_prog_type prog_type,
   attr.log_buf = ptr_to_u64(log_buf);
   attr.log_size = log_buf_size;
   attr.log_level = log_buf ? 1 : 0;
+  memcpy(attr.prog_name, name, min(name_len, BPF_OBJ_NAME_LEN - 1));
 
   attr.kern_version = kern_version;
   if (log_buf)
@@ -356,12 +370,17 @@ int bpf_prog_load(enum bpf_prog_type prog_type,
     ret = -1;
     errno = EINVAL;
     fprintf(stderr,
-            "bpf: %s. Program too large (%d insns), at most %d insns\n\n",
+            "bpf: %s. Program too large (%u insns), at most %d insns\n\n",
             strerror(errno), attr.insn_cnt, BPF_MAXINSNS);
     return ret;
   }
 
   ret = syscall(__NR_bpf, BPF_PROG_LOAD, &attr, sizeof(attr));
+
+  if (ret < 0 && name_len && (errno == E2BIG || errno == EINVAL)) {
+    memset(attr.prog_name, 0, BPF_OBJ_NAME_LEN);
+    ret = syscall(__NR_bpf, BPF_PROG_LOAD, &attr, sizeof(attr));
+  }
 
   if (ret < 0 && errno == EPERM) {
     // When EPERM is returned, two reasons are possible:
