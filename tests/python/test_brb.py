@@ -13,7 +13,7 @@
 #
 # The vm1, vm2 and router are implemented as namespaces.
 # The bridge is implemented with limited functionality in bpf program.
-# 
+#
 # vm1 and vm2 are in different subnet. For vm1 to communicate to vm2,
 # the packet will have to travel from vm1 to pem, bridge1, router, bridge2, pem, and
 # then come to vm2.
@@ -33,7 +33,7 @@
 # 8: PING 200.1.1.1 (200.1.1.1) 56(84) bytes of data.
 # 8: 64 bytes from 200.1.1.1: icmp_req=1 ttl=63 time=0.074 ms
 # 8: 64 bytes from 200.1.1.1: icmp_req=2 ttl=63 time=0.061 ms
-# 8: 
+# 8:
 # 8: --- 200.1.1.1 ping statistics ---
 # 8: 2 packets transmitted, 2 received, 0% packet loss, time 999ms
 # 8: rtt min/avg/max/mdev = 0.061/0.067/0.074/0.010 ms
@@ -41,30 +41,31 @@
 # 8: [  5]  0.0- 1.0 sec  4.00 GBytes  34.3 Gbits/sec
 # 8: Starting netserver with host 'IN(6)ADDR_ANY' port '12865' and family AF_UNSPEC
 # 8: MIGRATED TCP STREAM TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to 200.1.1.1 (200.1.1.1) port 0 AF_INET : demo
-# 8: Recv   Send    Send                          
-# 8: Socket Socket  Message  Elapsed              
-# 8: Size   Size    Size     Time     Throughput  
-# 8: bytes  bytes   bytes    secs.    10^6bits/sec  
-# 8: 
-# 8:  87380  16384  65160    1.00     41991.68   
+# 8: Recv   Send    Send
+# 8: Socket Socket  Message  Elapsed
+# 8: Size   Size    Size     Time     Throughput
+# 8: bytes  bytes   bytes    secs.    10^6bits/sec
+# 8:
+# 8:  87380  16384  65160    1.00     41991.68
 # 8: MIGRATED TCP REQUEST/RESPONSE TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to 200.1.1.1 (200.1.1.1) port 0 AF_INET : demo : first burst 0
 # 8: Local /Remote
 # 8: Socket Size   Request  Resp.   Elapsed  Trans.
-# 8: Send   Recv   Size     Size    Time     Rate         
-# 8: bytes  Bytes  bytes    bytes   secs.    per sec   
-# 8: 
-# 8: 16384  87380  1        1       1.00     48645.53   
-# 8: 16384  87380 
+# 8: Send   Recv   Size     Size    Time     Rate
+# 8: bytes  Bytes  bytes    bytes   secs.    per sec
+# 8:
+# 8: 16384  87380  1        1       1.00     48645.53
+# 8: 16384  87380
 # 8: .
 # 8: ----------------------------------------------------------------------
 # 8: Ran 1 test in 11.296s
-# 8: 
+# 8:
 # 8: OK
 
 from ctypes import c_uint
 from netaddr import IPAddress, EUI
 from bcc import BPF
 from pyroute2 import IPRoute, NetNS, IPDB, NSPopen
+from utils import NSPopenWithCheck
 import sys
 from time import sleep
 from unittest import main, TestCase
@@ -196,15 +197,15 @@ class TestBPFSocket(TestCase):
             # total 8 packets should be counted
             self.assertEqual(self.pem_stats[c_uint(0)].value, 8)
 
-            nsp_server = NSPopen(ns2_ipdb.nl.netns, ["iperf", "-s", "-xSC"])
+            nsp_server = NSPopenWithCheck(ns2_ipdb.nl.netns, ["iperf", "-s", "-xSC"])
             sleep(1)
             nsp = NSPopen(ns1_ipdb.nl.netns, ["iperf", "-c", self.vm2_ip, "-t", "1", "-xSC"])
             nsp.wait(); nsp.release()
             nsp_server.kill(); nsp_server.wait(); nsp_server.release()
 
-            nsp_server = NSPopen(ns2_ipdb.nl.netns, ["netserver", "-D"])
+            nsp_server = NSPopenWithCheck(ns2_ipdb.nl.netns, ["netserver", "-D"])
             sleep(1)
-            nsp = NSPopen(ns1_ipdb.nl.netns, ["netperf", "-l", "1", "-H", self.vm2_ip, "--", "-m", "65160"])
+            nsp = NSPopenWithCheck(ns1_ipdb.nl.netns, ["netperf", "-l", "1", "-H", self.vm2_ip, "--", "-m", "65160"])
             nsp.wait(); nsp.release()
             nsp = NSPopen(ns1_ipdb.nl.netns, ["netperf", "-l", "1", "-H", self.vm2_ip, "-t", "TCP_RR"])
             nsp.wait(); nsp.release()

@@ -4,9 +4,9 @@
 #include <linux/blkdev.h>
 struct Request { u64 rq; };
 struct Time { u64 start; };
-BPF_TABLE("hash", struct Request, struct Time, requests, 1024);
+BPF_HASH(requests, struct Request, struct Time, 1024);
 #define SLOTS 100
-BPF_TABLE("array", u32, u64, latency, SLOTS);
+BPF_ARRAY(latency, u64, SLOTS);
 
 static u32 log2(u32 v) {
   u32 r, shift;

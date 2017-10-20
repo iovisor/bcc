@@ -17,25 +17,18 @@ $ tplist -l basic_usdt
 /home/vagrant/basic_usdt basic_usdt:loop_iter
 /home/vagrant/basic_usdt basic_usdt:end_main
 
-The loop_iter probe sounds interesting. What are the locations of that
-probe, and which variables are available?
+The loop_iter probe sounds interesting. How many arguments are available?
 
 $ tplist '*loop_iter' -l basic_usdt -v
 /home/vagrant/basic_usdt basic_usdt:loop_iter [sema 0x601036]
-  location 0x400550 raw args: -4@$42 8@%rax
-    4   signed bytes @ constant 42
-    8 unsigned bytes @ register %rax
-  location 0x40056f raw args: 8@-8(%rbp) 8@%rax
-    8 unsigned bytes @ -8(%rbp)
-    8 unsigned bytes @ register %rax
+  2 location(s)
+  2 argument(s)
 
 This output indicates that the loop_iter probe is used in two locations
-in the basic_usdt executable. The first location passes a constant value,
-42, to the probe. The second location passes a variable value located at
-an offset from the %rbp register. Don't worry -- you don't have to trace
-the register values yourself. The argdist and trace tools understand the
-probe format and can print out the arguments automatically -- you can
-refer to them as arg1, arg2, and so on.
+in the basic_usdt executable, and that it has two arguments. Fortunately,
+the argdist and trace tools understand the probe format and can print out
+the arguments automatically -- you can refer to them as arg1, arg2, and
+so on.
 
 Try to explore with some common libraries on your system and see if they
 contain UDST probes. Here are two examples you might find interesting:
@@ -95,6 +88,31 @@ The dev, sector, nr_sector, etc. variables can now all be used in probes
 you specify with argdist or trace.
 
 
+For debugging USDT probes, it is sometimes useful to see the exact locations
+and arguments of the probes, including the registers or global variables from
+which their values are coming from. In super-verbose mode, tplist will print
+this information (note the -vv):
+
+$ tplist -vv -l c *alloc*
+/lib64/libc.so.6 libc:memory_malloc_retry [sema 0x0]
+  location #0 0x835c0
+    argument #0 8 unsigned bytes @ bp
+  location #1 0x83778
+    argument #0 8 unsigned bytes @ bp
+  location #2 0x85a50
+    argument #0 8 unsigned bytes @ bp
+/lib64/libc.so.6 libc:memory_realloc_retry [sema 0x0]
+  location #0 0x84b90
+    argument #0 8 unsigned bytes @ r13
+    argument #1 8 unsigned bytes @ bp
+  location #1 0x85cf0
+    argument #0 8 unsigned bytes @ r13
+    argument #1 8 unsigned bytes @ bp
+/lib64/libc.so.6 libc:memory_calloc_retry [sema 0x0]
+  location #0 0x850f0
+    argument #0 8 unsigned bytes @ bp
+
+
 USAGE message:
 
 $ tplist -h
@@ -109,5 +127,5 @@ optional arguments:
   -h, --help         show this help message and exit
   -p PID, --pid PID  List USDT probes in the specified process
   -l LIB, --lib LIB  List USDT probes in the specified library or executable
-  -v                 Print the format (available variables)
+  -v                 Increase verbosity level (print variables, arguments, etc.)
 

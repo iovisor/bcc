@@ -10,7 +10,7 @@ ffi.cdef[[
 function TestUprobes:test_simple_library()
   local text = [[
 #include <uapi/linux/ptrace.h>
-BPF_TABLE("array", int, u64, stats, 1);
+BPF_ARRAY(stats, u64, 1);
 static void incr(int idx) {
     u64 *ptr = stats.lookup(&idx);
     if (ptr)
@@ -27,8 +27,8 @@ int count(struct pt_regs *ctx) {
   local text = text:gsub("PID", tostring(pid))
 
   local b = BPF:new{text=text}
-  b:attach_uprobe{name="c", sym="malloc_stats", fn_name="count"}
-  b:attach_uprobe{name="c", sym="malloc_stats", fn_name="count", retprobe=true}
+  b:attach_uprobe{name="c", sym="malloc_stats", fn_name="count", pid=pid}
+  b:attach_uprobe{name="c", sym="malloc_stats", fn_name="count", pid=pid, retprobe=true}
 
   assert_equals(BPF.num_open_uprobes(), 2)
 
@@ -41,7 +41,7 @@ end
 function TestUprobes:test_simple_binary()
   local text = [[
 #include <uapi/linux/ptrace.h>
-BPF_TABLE("array", int, u64, stats, 1);
+BPF_ARRAY(stats, u64, 1);
 static void incr(int idx) {
     u64 *ptr = stats.lookup(&idx);
     if (ptr)

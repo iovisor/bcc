@@ -1,0 +1,160 @@
+Demonstrations of nfsdist, the Linux eBPF/bcc version.
+
+nfsdist traces NFS reads, writes, opens, and getattr, and summarizes their
+latency as a power-of-2 histogram. For example:
+
+
+./nfsdist.py
+
+Tracing NFS operation latency... Hit Ctrl-C to end.
+
+operation = read
+     usecs               : count     distribution
+         0 -> 1          : 4        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 7107     |**************                          |
+        16 -> 31         : 19864    |****************************************|
+        32 -> 63         : 1494     |***                                     |
+        64 -> 127        : 491      |                                        |
+       128 -> 255        : 1810     |***                                     |
+       256 -> 511        : 6356     |************                            |
+       512 -> 1023       : 4860     |*********                               |
+      1024 -> 2047       : 3070     |******                                  |
+      2048 -> 4095       : 1853     |***                                     |
+      4096 -> 8191       : 921      |*                                       |
+      8192 -> 16383      : 122      |                                        |
+     16384 -> 32767      : 15       |                                        |
+     32768 -> 65535      : 5        |                                        |
+     65536 -> 131071     : 2        |                                        |
+    131072 -> 262143     : 1        |                                        |
+
+operation = write
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 1        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 9        |                                        |
+        64 -> 127        : 19491    |****************************************|
+       128 -> 255        : 3064     |******                                  |
+       256 -> 511        : 940      |*                                       |
+       512 -> 1023       : 365      |                                        |
+      1024 -> 2047       : 312      |                                        |
+      2048 -> 4095       : 119      |                                        |
+      4096 -> 8191       : 31       |                                        |
+      8192 -> 16383      : 84       |                                        |
+     16384 -> 32767      : 31       |                                        |
+     32768 -> 65535      : 5        |                                        |
+     65536 -> 131071     : 3        |                                        |
+    131072 -> 262143     : 0        |                                        |
+    262144 -> 524287     : 1        |                                        |
+
+operation = getattr
+     usecs               : count     distribution
+         0 -> 1          : 27       |****************************************|
+         2 -> 3          : 2        |**                                      |
+         4 -> 7          : 3        |****                                    |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 2        |**                                      |
+       512 -> 1023       : 2        |**                                      |
+
+operation = open
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 2        |****************************************|
+
+
+In this example you can see that the read traffic is rather bi-modal, with about
+26K reads falling within 8 - 30 usecs and about 18K reads spread between 128 -
+8191 usecs. Write traffic is largely clustered in the 64 - 127 usecs bracket.
+The faster read traffic is probably coming from a filesystem cache and the slower
+traffic from disk. The reason why the writes are so consistently fast is because
+this example test was run on a couple of VM's and I believe the hypervisor was
+caching all the write traffic to memory.
+
+This "latency" is measured from when the operation was issued from the VFS
+interface to the file system, to when it completed. This spans everything:
+RPC latency, network latency, file system CPU cycles, file system locks, run
+queue latency, etc. This is a better measure of the latency suffered by
+applications reading from a NFS share and can better expose problems
+experienced by NFS clients.
+
+Note that this only traces the common NFS operations (read, write, open and
+getattr). I chose to include getattr as a significant percentage of NFS
+traffic end up being getattr calls and are a good indicator of problems
+with an NFS server.
+
+An optional interval and a count can be provided, as well as -m to show the
+distributions in milliseconds. For example:
+
+./nfsdist -m 1 5
+Tracing NFS operation latency... Hit Ctrl-C to end.
+
+11:02:39:
+
+operation = write
+     msecs               : count     distribution
+         0 -> 1          : 1        |                                        |
+         2 -> 3          : 24       |********                                |
+         4 -> 7          : 114      |****************************************|
+         8 -> 15         : 9        |***                                     |
+        16 -> 31         : 1        |                                        |
+        32 -> 63         : 1        |                                        |
+
+11:02:40:
+
+operation = write
+     msecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 11       |***                                     |
+         4 -> 7          : 111      |****************************************|
+         8 -> 15         : 13       |****                                    |
+        16 -> 31         : 1        |                                        |
+
+11:02:41:
+
+operation = write
+     msecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 21       |******                                  |
+         4 -> 7          : 137      |****************************************|
+         8 -> 15         : 3        |                                        |
+
+This shows a write workload, with writes hovering primarily in the 4-7ms range.
+
+USAGE message:
+
+
+./nfsdist -h
+usage: nfsdist.py [-h] [-T] [-m] [-p PID] [interval] [count]
+
+Summarize NFS operation latency
+
+positional arguments:
+  interval            output interval, in seconds
+  count               number of outputs
+
+optional arguments:
+  -h, --help          show this help message and exit
+  -T, --notimestamp   don't include timestamp on interval output
+  -m, --milliseconds  output in milliseconds
+  -p PID, --pid PID   trace this PID only
+
+examples:
+    ./nfsdist            # show operation latency as a histogram
+    ./nfsdist -p 181     # trace PID 181 only
+    ./nfsdist 1 10       # print 1 second summaries, 10 times
+    ./nfsdist -m 5       # 5s summaries, milliseconds

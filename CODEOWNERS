@@ -1,0 +1,25 @@
+# This file should be kept up to date with the list of maintainers responsible
+# for the different subdirectories within BCC. One of these people SHOULD
+# review code that touches the respective areas, and MUST review it if the
+# change is substantial or API-breaking.
+
+# see https://help.github.com/articles/about-codeowners/ for syntax
+
+# Miscellaneous
+* @drzaeus77 @goldshtn @yonghong-song @4ast @brendangregg
+
+# Documentation
+/docs/ @brendangregg @goldshtn
+/man/ @brendangregg @goldshtn
+
+# Tools
+/tools/ @brendangregg @goldshtn
+
+# Compiler, C API
+/src/cc/ @drzaeus77 @yonghong-song @4ast
+
+# Python API
+/src/python/ @drzaeus77 @goldshtn
+
+# Tests
+/tests/ @drzaeus77 @yonghong-song

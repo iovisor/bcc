@@ -2,7 +2,7 @@
 .SH NAME
 xfsdist \- Summarize XFS operation latency. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B xfsdist [\-h] [\-T] [\-N] [\-d] [interval] [count]
+.B xfsdist [\-h] [\-T] [\-m] [\-p PID] [interval] [count]
 .SH DESCRIPTION
 This tool summarizes time (latency) spent in common XFS file operations: reads,
 writes, opens, and syncs, and presents it as a power-of-2 histogram. It uses an

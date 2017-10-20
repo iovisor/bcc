@@ -1,6 +1,6 @@
 # bcc Python Developer Tutorial
 
-This tutorial is about developing [bcc](https://github.com/iovisor/bcc) tools and programs using the Python interface. There are two parts: observability then networking. Snippits are taken from various programs in bcc: see their files for licences.
+This tutorial is about developing [bcc](https://github.com/iovisor/bcc) tools and programs using the Python interface. There are two parts: observability then networking. Snippets are taken from various programs in bcc: see their files for licences.
 
 Also see the bcc developer's [reference_guide.md](reference_guide.md), and a tutorial for end-users of tools: [tutorial.md](tutorial.md). There is also a lua interface for bcc.
 
@@ -36,7 +36,7 @@ There are six things to learn from this:
 
 1. ```bpf_trace_printk()```: A simple kernel facility for printf() to the common trace_pipe (/sys/kernel/debug/tracing/trace_pipe). This is ok for some quick examples, but has limitations: 3 args max, 1 %s only, and trace_pipe is globally shared, so concurrent programs will have clashing output. A better interface is via BPF_PERF_OUTPUT(), covered later.
 
-1. ```return 0;```: Necessary formality (if you want to know why, see #139).
+1. ```return 0;```: Necessary formality (if you want to know why, see [#139](https://github.com/iovisor/bcc/issues/139)).
 
 1. ```.trace_print()```: A bcc routine that reads trace_pipe and prints the output.
 
@@ -88,7 +88,7 @@ while 1:
     print("%-18.9f %-16s %-6d %s" % (ts, task, pid, msg))
 ```
 
-This is simalar to hello_world.py, and traces new processes via sys_clone() again, but has a few more things to learn:
+This is similar to hello_world.py, and traces new processes via sys_clone() again, but has a few more things to learn:
 
 1. ```prog =```: This time we declare the C program as a variable, and later refer to it. This is useful if you want to add some string substitutions based on command line arguments.
 
@@ -96,11 +96,11 @@ This is simalar to hello_world.py, and traces new processes via sys_clone() agai
 
 1. ```b.attach_kprobe(event="sys_clone", fn_name="hello")```: Creates a kprobe for the sys_clone() kernel function, which will execute our defined hello() function. You can call attach_kprobe() more than once, and attach your C function to multiple kernel functions.
 
-1. ```b.trace_fields()```: Returns a fixed set of fields from trace_pipe. Simalar to trace_print(), this is handy for hacking, but for real tooling we should switch to BPF_PERF_OUTPUT().
+1. ```b.trace_fields()```: Returns a fixed set of fields from trace_pipe. Similar to trace_print(), this is handy for hacking, but for real tooling we should switch to BPF_PERF_OUTPUT().
 
 ### Lesson 4. sync_timing.py
 
-Remember the days of sysadmins typing ```sync``` three times on a slow console before ```reboot```, to give the first asynchrosous sync time to complete? Then someone thought ```sync;sync;sync``` was clever, to run them all on one line, which became industry practice despite defeating the original purpose! And then sync became synchronous, so more reasons it was silly. Anyway.
+Remember the days of sysadmins typing ```sync``` three times on a slow console before ```reboot```, to give the first asynchronous sync time to complete? Then someone thought ```sync;sync;sync``` was clever, to run them all on one line, which became industry practice despite defeating the original purpose! And then sync became synchronous, so more reasons it was silly. Anyway.
 
 The following example times how quickly the ```do_sync``` function is called, and prints output if it has been called more recently than one second ago. A ```sync;sync;sync``` will print output for the 2nd and 3rd sync's:
 
@@ -123,7 +123,7 @@ b = BPF(text="""
 
 BPF_HASH(last);
 
-void do_trace(struct pt_regs *ctx) {
+int do_trace(struct pt_regs *ctx) {
 	u64 ts, *tsp, delta, key = 0;
 
     // attempt to read stored timestamp
@@ -140,6 +140,7 @@ void do_trace(struct pt_regs *ctx) {
     // update stored timestamp
     ts = bpf_ktime_get_ns();
     last.update(&key, &ts);
+    return 0;
 }
 """)
 
@@ -163,11 +164,11 @@ Things to learn:
 1. ```key = 0```: We'll only store one key/value pair in this hash, where the key is hardwired to zero.
 1. ```last.lookup(&key)```: Lookup the key in the hash, and return a pointer to its value if it exists, else NULL. We pass the key in as an address to a pointer.
 1. ```last.delete(&key)```: Delete the key from the hash. This is currently required because of [a kernel bug in `.update()`](https://git.kernel.org/cgit/linux/kernel/git/davem/net.git/commit/?id=a6ed3ea65d9868fdf9eff84e6fe4f666b8d14b02).
-1. ```last.update(&key)```: Set the key to equal the value in the 2nd argument. This records the timestamp.
+1. ```last.update(&key, &ts)```: Associate the value in the 2nd argument to the key, overwriting any previous value. This records the timestamp.
 
 ### Lesson 5. sync_count.py
 
-Modify the sync_timing.py program (prior lession) to store the count of all sys_sync() calls (both fast and slow), and print it with the output. This count can be recorded in the BPF program by adding a new key index to the existing hash.
+Modify the sync_timing.py program (prior lesson) to store the count of all sys_sync() calls (both fast and slow), and print it with the output. This count can be recorded in the BPF program by adding a new key index to the existing hash.
 
 ### Lesson 6. disksnoop.py
 
@@ -183,7 +184,7 @@ TIME(s)            T  BYTES    LAT(ms)
 [...]
 ```
 
-And a code snippit:
+And a code snippet:
 
 ```Python
 [...]
@@ -326,7 +327,7 @@ This may be improved in future bcc versions. Eg, the Python data struct could be
 
 Rewrite sync_timing.py, from a prior lesson, to use ```BPF_PERF_OUTPUT```.
 
-### Lesson 9. bitesize.py
+### Lesson 9. bitehist.py
 
 The following tool records a histogram of disk I/O sizes. Sample output:
 
@@ -345,7 +346,7 @@ Tracing... Hit Ctrl-C to end.
      128 -> 255      : 800      |**************************************|
 ```
 
-Code is [examples/tracing/bitesize.py](../examples/tracing/bitesize.py):
+Code is [examples/tracing/bitehist.py](../examples/tracing/bitehist.py):
 
 ```Python
 from bcc import BPF
@@ -378,7 +379,7 @@ except KeyboardInterrupt:
 b["dist"].print_log2_hist("kbytes")
 ```
 
-A recap from earlier lessions:
+A recap from earlier lessons:
 
 - ```kprobe__```: This prefix means the rest will be treated as a kernel function name that will be instrumented using kprobe.
 - ```struct pt_regs *ctx, struct request *req```: Arguments to kprobe. The ```ctx``` is registers and BPF context, the ```req``` is the first argument to the instrumented function: ```blk_account_io_completion()```.
@@ -393,7 +394,7 @@ New things to learn:
 
 ### Lesson 10. disklatency.py
 
-Write a program that times disk I/O, and prints a histogram of their latency. Disk I/O instrumentation and timing can be found in the disksnoop.py program from a prior lesson, and histogram code can be found in bitesize.py from a prior lesson.
+Write a program that times disk I/O, and prints a histogram of their latency. Disk I/O instrumentation and timing can be found in the disksnoop.py program from a prior lesson, and histogram code can be found in bitehist.py from a prior lesson.
 
 ### Lesson 11. vfsreadlat.py
 
@@ -486,7 +487,7 @@ while 1:
 
 Things to learn:
 
-1. ```TRACEPOINT_PROBE(random, urandom_read)```: Instrument the kernel tracepoint ```random:urandom_read```. These have a stable API, and thus are recommend to use instead of kprobes, wherever possible. You can run ```perf list``` for a list of tracepoints.
+1. ```TRACEPOINT_PROBE(random, urandom_read)```: Instrument the kernel tracepoint ```random:urandom_read```. These have a stable API, and thus are recommend to use instead of kprobes, wherever possible. You can run ```perf list``` for a list of tracepoints. Linux >= 4.7 is required to attach BPF programs to tracepoints.
 1. ```args->got_bits```: ```args``` is auto-populated to be a structure of the tracepoint arguments. The comment above says where you can see that structure. Eg:
 
 ```
@@ -603,7 +604,7 @@ TIME(s)            COMM             PID    ARGS
 24653340.510164998 node             24728  path:/images/favicon.png
 ```
 
-Relevent code from [examples/tracing/nodejs_http_server.py](../examples/tracing/nodejs_http_server.py):
+Relevant code from [examples/tracing/nodejs_http_server.py](../examples/tracing/nodejs_http_server.py):
 
 ```Python
 if len(sys.argv) < 2:
@@ -629,7 +630,7 @@ u = USDT(pid=int(pid))
 u.enable_probe(probe="http__server__request", fn_name="do_trace")
 
 # initialize BPF
-b = BPF(text=bpf_text, usdt=u)
+b = BPF(text=bpf_text, usdt_contexts=[u])
 ```
 
 Things to learn:
@@ -638,7 +639,7 @@ Things to learn:
 1. ```bpf_probe_read(&path, sizeof(path), (void *)addr)```: Now the string ```addr``` points to into our ```path``` variable.
 1. ```u = USDT(pid=int(pid))```: Initialize USDT tracing for the given PID.
 1. ```u.enable_probe(probe="http__server__request", fn_name="do_trace")```: Attach our ```do_trace()``` BPF C function to the Node.js ```http__server__request``` USDT probe.
-1. ```b = BPF(text=bpf_text, usdt=u)```: Need to pass in our USDT object, ```u```, to BPF object creation.
+1. ```b = BPF(text=bpf_text, usdt_contexts=[u])```: Need to pass in our USDT object, ```u```, to BPF object creation.
 
 ### Lesson 16. task_switch.c
 
@@ -669,7 +670,7 @@ struct key_t {
   u32 curr_pid;
 };
 // map_type, key_type, leaf_type, table_name, num_entry
-BPF_TABLE("hash", struct key_t, u64, stats, 1024);
+BPF_HASH(stats, struct key_t, u64, 1024);
 // attach to finish_task_switch in kernel/sched/core.c, which has the following
 // prototype:
 //   struct rq *finish_task_switch(struct task_struct *prev)

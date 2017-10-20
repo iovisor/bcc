@@ -2,24 +2,24 @@
 #include <net/sock.h>
 #include <bcc/proto.h>
 
-#define IP_TCP 	6   
+#define IP_TCP 	6
 #define ETH_HLEN 14
 
 struct Key {
 	u32 src_ip;               //source ip
 	u32 dst_ip;               //destination ip
 	unsigned short src_port;  //source port
-	unsigned short dst_port;  //destination port	
+	unsigned short dst_port;  //destination port
 };
 
 struct Leaf {
 	int timestamp;            //timestamp in ns
 };
 
-//BPF_TABLE(map_type, key_type, leaf_type, table_name, num_entry) 
+//BPF_TABLE(map_type, key_type, leaf_type, table_name, num_entry)
 //map <Key, Leaf>
 //tracing sessions having same Key(dst_ip, src_ip, dst_port,src_port)
-BPF_TABLE("hash", struct Key, struct Leaf, sessions, 1024);
+BPF_HASH(sessions, struct Key, struct Leaf, 1024);
 
 /*eBPF program.
   Filter IP and TCP packets, having payload not empty
@@ -40,7 +40,7 @@ int http_filter(struct __sk_buff *skb) {
 	struct ethernet_t *ethernet = cursor_advance(cursor, sizeof(*ethernet));
 	//filter IP packets (ethernet type = 0x0800)
 	if (!(ethernet->type == 0x0800)) {
-		goto DROP;	
+		goto DROP;
 	}
 
 	struct ip_t *ip = cursor_advance(cursor, sizeof(*ip));
@@ -69,16 +69,16 @@ int http_filter(struct __sk_buff *skb) {
 	//value to multiply * 4
 	//e.g. ip->hlen = 5 ; IP Header Length = 5 x 4 byte = 20 byte
 	ip_header_length = ip->hlen << 2;    //SHL 2 -> *4 multiply
-		
+
 	//calculate tcp header length
 	//value to multiply *4
 	//e.g. tcp->offset = 5 ; TCP Header Length = 5 x 4 byte = 20 byte
 	tcp_header_length = tcp->offset << 2; //SHL 2 -> *4 multiply
 
 	//calculate patload offset and length
-	payload_offset = ETH_HLEN + ip_header_length + tcp_header_length; 
+	payload_offset = ETH_HLEN + ip_header_length + tcp_header_length;
 	payload_length = ip->tlen - ip_header_length - tcp_header_length;
-		  
+
 	//http://stackoverflow.com/questions/25047905/http-request-minimum-size-in-bytes
 	//minimum length of http request is always geater than 7 bytes
 	//avoid invalid access memory
@@ -87,12 +87,13 @@ int http_filter(struct __sk_buff *skb) {
 		goto DROP;
 	}
 
-	//load firt 7 byte of payload into p (payload_array)
+	//load first 7 byte of payload into p (payload_array)
 	//direct access to skb not allowed
 	unsigned long p[7];
 	int i = 0;
 	int j = 0;
-	for (i = payload_offset ; i < (payload_offset + 7) ; i++) {
+	const int last_index = payload_offset + 7;
+	for (i = payload_offset ; i < last_index ; i++) {
 		p[j] = load_byte(skb , i);
 		j++;
 	}

@@ -19,3 +19,19 @@ TIME      PID    COMM          LATms HOST
 In this example, the first call to lookup "www.iovisor.org" took 90 ms, and
 the second took 0 ms (cached). The slowest call in this example was to "foo",
 which was an unsuccessful lookup.
+
+
+USAGE message:
+
+# ./gethostlatency -h
+usage: gethostlatency [-h] [-p PID]
+
+Show latency for getaddrinfo/gethostbyname[2] calls
+
+optional arguments:
+  -h, --help         show this help message and exit
+  -p PID, --pid PID  trace this PID only
+
+examples:
+    ./gethostlatency           # trace all TCP accept()s
+    ./gethostlatency -p 181    # only trace PID 181

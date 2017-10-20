@@ -43,7 +43,7 @@ struct dns_char_t
 } BPF_PACKET_HEADER;
 
 struct Key {
-  unsigned char p[32];
+  unsigned char p[255];
 };
 
 struct Leaf {
@@ -51,7 +51,7 @@ struct Leaf {
   unsigned char p[4];
 };
 
-BPF_TABLE("hash", struct Key, struct Leaf, cache, 128);
+BPF_HASH(cache, struct Key, struct Leaf, 128);
 
 int dns_matching(struct __sk_buff *skb)
 {
@@ -70,10 +70,6 @@ int dns_matching(struct __sk_buff *skb)
       struct udp_t *udp = cursor_advance(cursor, sizeof(*udp));
       if(udp->dport == 53){
 
-        // Our Cursor + the length of our udp packet - size of the udp header
-        // - the two 16bit values for QTYPE and QCLASS.
-        u8 *sentinel = cursor + udp->length - sizeof(*udp) - 4;
-
         struct dns_hdr_t *dns_hdr = cursor_advance(cursor, sizeof(*dns_hdr));
 
         // Do nothing if packet is not a request.
@@ -84,22 +80,24 @@ int dns_matching(struct __sk_buff *skb)
 
         u16 i = 0;
         struct dns_char_t *c;
-        // This unroll worked not in latest BCC version.
-        for(u8 j = 0; i<255;i++){
-          if (cursor == sentinel) goto end; c = cursor_advance(cursor, 1); key.p[i++] = c->c;
+        #pragma unroll
+        for(i = 0; i<255;i++){
+          c = cursor_advance(cursor, 1);
+          if (c->c == 0)
+            break;
+          key.p[i] = c->c;
         }
-        end:
-        {}
 
         struct Leaf * lookup_leaf = cache.lookup(&key);
 
-        // If DNS name is contained in our map, drop packet.
+        // If DNS name is contained in our map, keep the packet
         if(lookup_leaf) {
-          return 0;
+          bpf_trace_printk("Matched1\n");
+          return -1;
         }
       }
     }
   }
-
-  return -1;
+  // Drop the packet
+  return 0;
 }

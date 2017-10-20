@@ -27,7 +27,7 @@ def set_error(kind, file, error):
 def is_root():
     # Is this code portable?
     return os.getuid() == 0
-        
+
 def main():
     testpath = "testprograms"
     destFolder = "testoutputs"
@@ -37,10 +37,10 @@ def main():
     errors = 0
 
     if not is_root():
-        print "Loading EBPF programs requires root priviledge."
+        print "Loading EBPF programs requires root privilege."
         print "Will only test compilation, not loading."
         print "(Run with sudo to test program loading.)"
-    
+
     for f in files:
         path = os.path.join(testpath, f)
 
@@ -62,14 +62,14 @@ def main():
         else:
             # Try to load the compiled function
             if is_root():
-                try:                
+                try:
                     print("Compiling and loading BPF program")
                     b = BPF(src_file=destname, debug=0)
                     fn = b.load_func("ebpf_filter", BPF.SCHED_CLS)
                 except Exception as e:
                     print(e)
                     set_error("BPF error", path, str(e))
-                
+
         filesDone += 1
 
     print "Compiled", filesDone, "files", errors, "errors"
@@ -78,7 +78,7 @@ def main():
         for v in filesFailed[key]:
             print "\t", v
     exit(len(filesFailed) != 0)
-    
-        
+
+
 if __name__ == "__main__":
     main()

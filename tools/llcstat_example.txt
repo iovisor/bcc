@@ -1,0 +1,56 @@
+Demonstrations of llcstat.
+
+
+llcstat traces cache reference and cache miss events system-wide, and summarizes
+them by PID and CPU.
+
+These events, defined in uapi/linux/perf_event.h, have different meanings on
+different architecture. For x86-64, they mean misses and references to LLC.
+
+Example output:
+
+# ./llcstat.py 20 -c 5000
+Running for 20 seconds or hit Ctrl-C to end.
+PID      NAME             CPU     REFERENCE         MISS   HIT%
+0        swapper/15       15        3515000       640000  81.79%
+238      migration/38     38           5000            0 100.00%
+4512     ntpd             11           5000            0 100.00%
+150867   ipmitool         3           25000         5000  80.00%
+150895   lscpu            17         280000        25000  91.07%
+151807   ipmitool         15          15000         5000  66.67%
+150757   awk              2           15000         5000  66.67%
+151213   chef-client      5         1770000       240000  86.44%
+151822   scribe-dispatch  12          15000            0 100.00%
+123386   mysqld           5            5000            0 100.00%
+[...]
+Total References: 518920000 Total Misses: 90265000 Hit Rate: 82.61%
+
+This shows each PID's cache hit rate during the 20 seconds run period.
+
+A count of 5000 was used in this example, which means that one in every 5,000
+events will trigger an in-kernel counter to be incremented. This is refactored
+on the output, which is why it is always in multiples of 5,000.
+
+We don't instrument every single event since the overhead would be prohibitive,
+nor do we need to: this is a type of sampling profiler. Because of this, the
+processes that trigger the 5,000'th cache reference or misses can happen to
+some degree by chance. Overall it should make sense. But for low counts,
+you might find a case where -- by chance -- a process has been tallied with
+more misses than references, which would seem impossible.
+
+
+USAGE message:
+
+# ./llcstat.py --help
+usage: llcstat.py [-h] [-c SAMPLE_PERIOD] [duration]
+
+Summarize cache references and misses by PID
+
+positional arguments:
+  duration                Duration, in seconds, to run
+
+  optional arguments:
+    -h, --help            show this help message and exit
+    -c SAMPLE_PERIOD, --sample_period SAMPLE_PERIOD
+                          Sample one in this many number of cache reference
+                          and miss events

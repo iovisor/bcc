@@ -1,0 +1,325 @@
+Demonstrations of cpuunclaimed, the Linux eBPF/bcc version.
+
+
+This tool samples the length of the CPU run queues and determine when there are
+idle CPUs, yet queued threads waiting their turn. It reports the amount of idle
+(yet unclaimed by waiting threads) CPU as a system-wide percentage. For
+example:
+
+# ./cpuunclaimed.py
+Sampling run queues... Output every 1 seconds. Hit Ctrl-C to end.
+%CPU  83.00%, unclaimed idle 0.12%
+%CPU  87.25%, unclaimed idle 0.38%
+%CPU  85.00%, unclaimed idle 0.25%
+%CPU  85.00%, unclaimed idle 0.25%
+%CPU  80.88%, unclaimed idle 0.00%
+%CPU  82.25%, unclaimed idle 0.00%
+%CPU  83.50%, unclaimed idle 0.12%
+%CPU  81.50%, unclaimed idle 0.00%
+%CPU  81.38%, unclaimed idle 0.00%
+[...]
+
+This shows a system running at over 80% CPU utilization, and with less than
+0.5% unclaimed idle CPUs.
+
+Unclaimed idle CPUs can happen for a number of reasons:
+
+- An application has been bound to some, but not all, CPUs, and has runnable
+  threads that cannot migrate to other CPUs due to this configuration.
+- CPU affinity: an optimization that leaves threads on CPUs where the CPU
+  caches are warm, even if this means short periods of waiting while other
+  CPUs are idle. The wait period is tunale (see sysctl, kernel.sched*).
+- Scheduler bugs.
+
+An unclaimed idle of < 1% is likely to be CPU affinity, and not usually a
+cause for concern. By leaving the CPU idle, overall throughput of the system
+may be improved. This tool is best for identifying larger issues, > 2%, due
+to the coarseness of its 99 Hertz samples.
+
+
+This is an 8 CPU system, with an 8 CPU-bound threaded application running that
+has been bound to one CPU (via taskset):
+
+# ./cpuunclaimed.py 
+Sampling run queues... Output every 1 seconds. Hit Ctrl-C to end.
+%CPU  12.63%, unclaimed idle 86.36%
+%CPU  12.50%, unclaimed idle 87.50%
+%CPU  12.63%, unclaimed idle 87.37%
+%CPU  12.75%, unclaimed idle 87.25%
+%CPU  12.50%, unclaimed idle 87.50%
+%CPU  12.63%, unclaimed idle 87.37%
+%CPU  12.50%, unclaimed idle 87.50%
+%CPU  12.50%, unclaimed idle 87.50%
+[...]
+
+It shows that 7 of the 8 CPUs (87.5%) are idle at the same time there are
+queued threads waiting to run on CPU. This is an artificial situation caused
+by binding threads to the same CPU, to demonstrate how the tool works.
+
+
+This is an 8 CPU system running a Linux kernel build with "make -j8", and -T
+to print timestamps:
+
+# ./cpuunclaimed.py -T
+Sampling run queues... Output every 1 seconds. Hit Ctrl-C to end.
+22:25:55 %CPU  98.88%, unclaimed idle 0.12%
+22:25:56 %CPU  99.75%, unclaimed idle 0.25%
+22:25:57 %CPU  99.50%, unclaimed idle 0.50%
+22:25:58 %CPU  99.25%, unclaimed idle 0.75%
+22:25:59 %CPU  99.75%, unclaimed idle 0.25%
+22:26:00 %CPU  99.50%, unclaimed idle 0.50%
+22:26:01 %CPU  99.25%, unclaimed idle 0.75%
+22:26:02 %CPU  99.25%, unclaimed idle 0.75%
+22:26:03 %CPU  99.01%, unclaimed idle 0.87%
+22:26:04 %CPU  99.88%, unclaimed idle 0.12%
+22:26:05 %CPU  99.38%, unclaimed idle 0.62%
+
+There's now a consistent, yet small, amount of unclaimed idle CPU. This is
+expected to be deliberate: CPU affinity, as mentioned earlier.
+
+
+The -j option will print raw samples: around one hundred lines of output
+every second. For the same system with a Linux kernel build of "make -j8":
+
+# ./cpuunclaimed.py -j
+TIMESTAMP_ns,CPU0,CPU1,CPU2,CPU3,CPU4,CPU5,CPU6,CPU7
+514606928954752,1,1,1,1,1,1,1,1
+514606939054312,1,1,1,1,1,1,1,2
+514606949156518,1,1,1,1,1,1,1,1
+514606959256596,2,2,1,1,1,1,1,1
+514606969357989,1,1,1,1,1,2,1,1
+514606979459700,1,2,1,1,1,2,1,1
+514606989560481,1,1,1,1,1,1,1,1
+514606999661396,1,1,1,1,1,1,2,1
+514607009795601,1,1,1,1,1,1,1,2
+514607019862711,1,1,1,1,1,1,1,1
+514607029963734,1,1,1,1,1,1,1,1
+514607040062372,1,1,1,1,1,1,1,1
+514607050197735,1,1,1,2,1,1,1,1
+514607060266464,1,1,1,1,1,1,1,2
+514607070368025,1,1,1,1,1,2,1,1
+514607080468375,1,1,1,1,1,1,1,2
+514607090570292,3,2,1,1,1,1,1,1
+514607100670725,1,1,1,1,1,2,1,1
+514607110771946,1,2,1,1,1,1,1,1
+514607120873489,1,1,1,1,2,1,2,1
+514607130973857,2,1,1,1,3,1,1,1
+514607141080056,0,1,1,1,1,2,1,3
+514607151176312,1,1,1,2,1,1,1,1
+514607161277753,1,1,1,1,1,1,2,1
+514607171379095,1,1,1,1,1,1,1,1
+514607181479262,1,1,1,1,1,1,1,1
+514607191580794,3,1,1,1,1,1,1,1
+514607201680952,1,1,1,1,1,1,2,1
+514607211783683,1,1,1,1,1,1,1,1
+514607221883274,1,1,1,1,1,1,0,1
+514607231984244,1,1,1,1,1,1,1,1
+514607242085698,1,1,1,1,1,1,1,1
+514607252216898,1,2,1,1,1,1,1,1
+514607262289420,1,1,1,1,1,2,1,1
+514607272389922,1,1,1,1,1,1,1,1
+514607282489413,1,1,1,1,1,1,1,1
+514607292589950,1,3,1,1,1,1,1,1
+514607302693367,1,1,1,1,2,1,1,1
+514607312793792,1,1,1,1,1,1,1,1
+514607322895249,1,1,1,3,1,1,3,1
+514607332994278,1,0,1,1,1,2,1,2
+514607343095836,1,1,1,1,1,2,1,1
+514607353196533,1,1,1,1,2,1,1,1
+514607363297749,1,1,1,1,1,1,1,2
+514607373399011,1,1,1,1,1,1,1,2
+514607383499730,1,1,1,1,1,1,1,2
+514607393601510,1,1,1,1,1,1,1,2
+514607403704117,2,1,1,1,1,1,1,2
+514607413802700,1,1,1,1,2,1,0,1
+514607423904559,1,1,1,1,1,1,1,1
+[...]
+
+The output is verbose: printing out a timestamp, and then the length of each
+CPU's run queue. The second last line, of timestamp 514607413802700, is an
+example of what this tool detects: CPU 4 has a run queue length of 4, which
+means one thread running and one thread queued, while CPU 6 has a run queue
+length of 0: idle. The very next sample shows all CPUs busy.
+
+
+The -J option prints raw samples with time offsets showing when the samples
+were collected on each CPU. It's mostly useful for debugging the tool itself.
+For example, during a Linux kernel build:
+
+# ./cpuunclaimed.py -J
+TIMESTAMP_ns,CPU0,CPU1,CPU2,CPU3,CPU4,CPU5,CPU6,CPU7,OFFSET_ns_CPU0,OFFSET_ns_CPU1,OFFSET_ns_CPU2,OFFSET_ns_CPU3,OFFSET_ns_CPU4,OFFSET_ns_CPU5,OFFSET_ns_CPU6,OFFSET_ns_CPU7
+514722625198188,1,1,1,1,1,1,1,2,0,28321,51655,73396,89654,111172,132803,159792
+514722635299034,1,1,1,1,1,2,1,1,0,28809,51999,74183,89552,110011,131995,153519
+514722645400274,1,1,1,1,1,1,1,2,0,28024,51333,73652,88964,110075,131973,153568
+514722655501816,1,2,1,1,1,1,1,1,0,28893,51671,75233,89496,109430,131945,153694
+514722665602594,1,1,2,1,1,2,1,1,0,28623,50988,73866,89383,109186,131786,154555
+514722675703498,1,1,1,1,1,1,1,1,0,27379,51031,73175,89625,110380,131482,104811
+514722685804942,1,1,1,1,1,2,1,1,0,27213,50501,72183,88797,108780,130659,152153
+514722695906294,1,1,1,1,1,1,1,1,0,27036,51182,73420,87861,109585,130364,155089
+514722706005778,1,1,1,1,1,1,1,1,0,28492,51851,74138,89744,110208,132462,154060
+514722716060705,1,1,1,1,1,1,1,1,0,154499,152528,155232,155046,154502,178746,200001
+514722726209615,1,1,1,1,1,1,1,1,0,28170,49580,72605,87741,108144,130723,152138
+514722736309475,1,2,1,1,1,1,1,1,0,27421,51386,73061,89358,109457,131273,153005
+514722746410845,1,2,1,1,1,2,1,1,0,27788,50840,72720,88920,109111,131143,152979
+514722756511363,1,1,1,1,1,1,2,1,0,28280,50977,73559,89848,109659,131579,152693
+514722766613044,1,1,1,1,1,1,1,1,0,28046,50812,72754,89160,110108,130735,152948
+514722776712932,1,1,1,2,1,1,1,1,0,28586,51177,73974,89588,109947,132376,154162
+514722786815477,1,1,1,1,1,1,1,1,0,27973,71104,72539,88302,108896,130414,152236
+514722796914955,1,1,1,1,1,1,1,1,0,29054,52354,74214,89592,110615,132586,153925
+514722807044060,1,1,1,1,1,1,1,1,1587130,0,24079,46633,61787,82325,104706,125278
+514722817117432,2,1,2,1,1,1,1,1,0,27628,51038,75138,89724,109340,132426,155348
+514722827218254,1,1,1,1,1,1,2,1,0,29111,51868,74347,88904,109911,132764,153851
+514722837340158,1,1,1,1,1,1,1,1,0,7366,30760,53528,68622,89317,111095,132319
+514722847421305,1,1,1,1,1,1,1,1,0,28257,51105,73841,89037,110820,131605,153368
+514722857521112,1,1,1,1,1,1,1,1,0,28544,51441,73857,89530,110497,131915,153513
+514722867626129,0,2,1,1,1,1,1,1,0,24621,47917,70568,85391,106670,128081,150329
+514722877727183,2,1,1,1,1,1,1,1,0,24869,47630,71547,84761,106048,128444,149285
+514722887824589,1,1,1,1,1,1,2,1,0,28793,51212,73863,89584,109773,132348,153194
+514722897925481,1,1,1,1,1,1,2,1,0,29278,51163,73961,89774,109592,132029,153715
+514722908026097,1,1,1,1,1,1,1,1,0,30630,35595,36210,188001,190815,190072,190732
+514722918127439,1,1,1,1,1,1,1,1,0,28544,51885,73948,89987,109763,132632,154083
+514722928227399,1,1,1,1,1,1,1,1,0,31882,51574,74769,89939,110578,132951,154356
+514722938329471,1,1,1,1,1,1,1,1,0,28498,51304,74101,89670,110278,132653,153176
+514722948430589,1,1,1,1,1,1,1,1,0,27868,50925,73477,89676,109583,132360,153014
+514722958531802,1,1,1,1,1,1,1,1,0,28505,50886,73729,89919,109618,131988,152896
+514722968632181,1,1,1,1,1,1,1,1,0,28492,51749,73977,90334,109816,132897,152890
+514722978733584,1,1,1,1,1,1,1,1,0,28847,50957,74121,90014,110019,132377,152978
+514722988834321,1,1,1,1,1,1,1,1,0,28601,51437,74021,89968,110252,132233,153623
+514722998937170,1,1,2,1,1,1,1,1,0,27007,50044,73259,87725,108663,132194,152459
+514723009036821,1,2,1,2,1,1,1,1,0,28226,50937,73983,89110,110476,131740,153663
+514723019137577,1,1,1,1,1,1,1,1,0,30261,52357,75657,87803,61823,131850,153585
+514723029238745,1,1,1,1,1,1,1,1,0,28030,50752,74452,89240,110791,132187,153327
+514723039339069,1,1,1,1,1,1,1,1,0,29791,52636,75996,90475,110414,132232,154714
+514723049439822,1,1,1,1,2,1,1,1,0,29133,56662,74153,89520,110683,132740,154708
+514723059541617,1,1,1,1,1,1,1,1,0,27932,51480,74644,89656,109176,131499,153732
+514723069642500,1,1,2,1,1,1,2,1,0,27678,51509,73984,90136,110124,131554,153459
+514723079743525,2,1,1,1,1,1,1,1,0,28029,51424,74394,90056,110087,132383,152963
+514723089844091,2,1,1,2,1,1,1,1,0,28944,51692,74440,90339,110402,132722,154083
+514723099945957,1,1,2,1,1,1,1,1,0,28425,51267,73164,89322,115048,114630,115187
+514723110047020,1,1,2,0,1,1,1,2,0,28192,50811,76814,89835,109370,131265,153511
+514723120216662,1,1,2,1,1,2,1,1,29,34,0,4514,19268,40293,62674,84009
+[...]
+
+This is a Xen guest system, and it shows that CPU 0 usually completes first (an
+offset of 0), followed by CPU 1 around 28000 nanoseconds later, and so on.
+The spread of offsets is triggered by the bcc Python library that initializes
+the timers, which steps through the CPUs in sequence, with a small delay
+between them merely from executing its own loop code.
+
+Here's more output during a Linux kernel build:
+
+# ./cpuunclaimed.py -J
+TIMESTAMP_ns,CPU0,CPU1,CPU2,CPU3,CPU4,CPU5,CPU6,CPU7,OFFSET_ns_CPU0,OFFSET_ns_CPU1,OFFSET_ns_CPU2,OFFSET_ns_CPU3,OFFSET_ns_CPU4,OFFSET_ns_CPU5,OFFSET_ns_CPU6,OFFSET_ns_CPU7
+514722625198188,1,1,1,1,1,1,1,2,0,28321,51655,73396,89654,111172,132803,159792
+515700745758947,2,1,1,1,1,1,1,1,0,19835,34891,49397,59364,71988,87571,102769
+515700755860451,2,1,1,1,1,1,1,2,0,19946,34323,49855,59844,72741,87925,102891
+515700765960560,1,1,1,1,1,1,1,1,0,20805,35339,50436,59677,73557,88661,104796
+515700776061744,1,1,1,1,1,1,1,1,1626,77,0,190,153452,154665,178218,154116
+515700786162017,1,1,1,1,1,1,1,1,0,20497,35361,51552,59787,74451,147789,104545
+515700796262811,1,1,1,1,1,1,1,2,0,20910,35657,50805,60175,73953,88492,103527
+515700806364951,1,1,1,1,1,1,1,1,0,20140,35023,50074,59726,72757,88040,102421
+515700816465253,1,1,1,1,1,1,2,1,0,20952,34899,50262,60048,72890,88067,103545
+515700826566573,1,1,1,1,1,1,1,1,0,20898,35490,50609,59805,74060,88550,103354
+515700836667480,1,1,1,1,1,1,2,1,0,20548,34760,50959,59490,73059,87820,103006
+515700846768182,1,1,1,1,1,1,2,1,0,20571,35113,50777,59962,74139,88543,103192
+515700856869468,1,1,2,1,1,2,2,1,0,20932,35382,50510,60106,73739,91818,103684
+515700866971905,1,1,1,2,1,1,1,1,0,19780,33018,49075,58375,71949,86537,102136
+515700877073459,2,1,1,1,1,1,1,1,0,20065,73966,48989,58832,71408,85714,101067
+515700887172772,1,1,1,1,1,1,1,1,0,20909,34608,51493,59890,73564,88668,103454
+515700897273292,1,2,1,1,1,1,1,1,0,20353,35292,50114,59773,73948,88615,103383
+515700907374341,1,1,2,1,1,1,1,1,0,20816,35206,50915,60062,73878,88857,103794
+515700917475331,1,1,6,1,1,2,1,1,0,20752,34931,50280,59764,73781,88329,103234
+515700927576958,1,1,1,1,1,1,1,1,0,19929,34703,50181,59364,73004,88053,103127
+515700937677298,1,1,2,2,1,1,1,1,0,21178,34724,50740,61193,73452,89030,103390
+515700947778409,2,1,1,1,1,1,1,1,0,21059,35604,50853,60098,73919,88675,103506
+515700957879196,2,1,1,1,1,1,1,1,0,21326,35939,51492,60083,74249,89474,103761
+[...]
+
+Notice the tighter range of offsets? I began executing cpuunclaimed when the
+system was idle, and it initialized the CPU timers more quickly, and then I
+began the Linux kernel build.
+
+Here's some different output, this time from a physical system with 4 CPUs,
+also doing a kernel build,
+
+# ./cpuunclaimed.py -J
+TIMESTAMP_ns,CPU0,CPU1,CPU2,CPU3,OFFSET_ns_CPU0,OFFSET_ns_CPU1,OFFSET_ns_CPU2,OFFSET_ns_CPU3
+4429382557480,1,1,1,1,0,6011,10895,16018
+4429392655042,2,1,1,1,0,8217,13661,19378
+4429402757604,1,1,1,1,0,6879,12433,18000
+4429412857809,1,1,1,1,0,8303,13190,18719
+4429422960709,2,1,1,1,0,6095,11234,17079
+4429433060391,1,1,1,2,0,6747,12480,18070
+4429443161699,1,1,1,1,0,6560,12264,17945
+4429453262002,1,2,1,1,0,6992,12644,18341
+4429463363706,1,2,1,1,0,6211,12071,17853
+4429473465571,1,1,1,1,0,5766,11495,17638
+4429483566920,1,1,1,1,0,5223,11736,16358
+4429493666279,1,1,1,1,0,6964,12653,18410
+4429503769113,1,1,1,1,0,5161,11399,16612
+4429513870744,1,1,1,1,0,5943,10583,15768
+4429523969826,1,1,1,1,0,6533,12336,18189
+4429534070311,1,1,1,1,0,6834,12816,18488
+4429544170456,1,1,1,1,0,7284,13401,19129
+4429554274467,1,2,1,1,0,5941,11160,16594
+4429564372365,1,2,1,1,0,7514,13618,19190
+4429574474406,1,2,1,1,0,6687,12650,18248
+4429584574220,1,2,1,1,0,7912,13705,19136
+[...]
+
+If the offset range becomes too great, we can no longer conclude about when
+some CPUs were idle and others had queued work. The tool will detect this,
+and print an error message and exit.
+
+
+Some systems can power down CPUs when idle, and when they wake up again the
+timed samples may resume from different offsets. If this happens, this tool
+can no longer draw conclusions about when some CPUs were idle and others
+had queued work, so it prints an error, and exits. Eg:
+
+# ./cpuunclaimed.py 1
+Sampling run queues... Output every 1 seconds. Hit Ctrl-C to end.
+%CPU   0.25%, unclaimed idle 0.00%
+%CPU   0.75%, unclaimed idle 0.00%
+%CPU   0.25%, unclaimed idle 0.00%
+%CPU   0.00%, unclaimed idle 0.00%
+%CPU   0.00%, unclaimed idle 0.00%
+%CPU   0.12%, unclaimed idle 0.00%
+%CPU   0.00%, unclaimed idle 0.00%
+%CPU   0.25%, unclaimed idle 0.00%
+%CPU   0.00%, unclaimed idle 0.00%
+%CPU   0.12%, unclaimed idle 0.00%
+%CPU   0.13%, unclaimed idle 0.00%
+%CPU   0.12%, unclaimed idle 0.00%
+%CPU   0.00%, unclaimed idle 0.00%
+%CPU   0.00%, unclaimed idle 0.00%
+%CPU   0.00%, unclaimed idle 0.00%
+%CPU   0.00%, unclaimed idle 0.00%
+ERROR: CPU samples arrived at skewed offsets (CPUs may have powered down when idle), spanning 4328176 ns (expected < 4040404 ns). Debug with -J, and see the man page. As output may begin to be unreliable, exiting.
+
+It's expected that this will only really occur on idle systems.
+
+USAGE:
+
+# ./cpuunclaimed.py -h
+usage: cpuunclaimed.py [-h] [-j] [-J] [-T] [interval] [count]
+
+Sample CPU run queues and calculate unclaimed idle CPU
+
+positional arguments:
+  interval         output interval, in seconds
+  count            number of outputs
+
+optional arguments:
+  -h, --help       show this help message and exit
+  -j, --csv        print sample summaries (verbose) as comma-separated values
+  -J, --fullcsv    print sample summaries with extra fields: CPU sample
+                   offsets
+  -T, --timestamp  include timestamp on output
+
+examples:
+    ./cpuunclaimed            # sample and calculate unclaimed idle CPUs,
+                              # output every 1 second (default)
+    ./cpuunclaimed 5 10       # print 5 second summaries, 10 times
+    ./cpuunclaimed -T 1       # 1s summaries and timestamps
+    ./cpuunclaimed -j         # raw dump of all samples (verbose), CSV

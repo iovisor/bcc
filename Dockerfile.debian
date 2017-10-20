@@ -1,14 +1,17 @@
-FROM debian:jessie
+FROM debian:stretch
 
-RUN apt-key adv --keyserver ha.pool.sks-keyservers.net --recv 15CF4D18AF4F7421 && \
-    echo "deb http://llvm.org/apt/jessie/ llvm-toolchain-jessie-3.8 main" > /etc/apt/sources.list.d/llvm.list && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends build-essential fakeroot bison cmake debhelper devscripts flex git libedit-dev python zlib1g-dev libllvm3.8 llvm-3.8-dev libclang-3.8-dev libelf-dev luajit libluajit-5.1-dev && \
-    mkdir -p /usr/share/llvm-3.8 && \
-    ln -s /usr/lib/llvm-3.8/share/llvm/cmake /usr/share/llvm-3.8/cmake
+MAINTAINER Brenden Blanco <bblanco@gmail.com>
+
+RUN DEBIAN_RELEASE=stretch && \
+    # Adding non-free repo for netperf
+    echo "deb http://deb.debian.org/debian ${DEBIAN_RELEASE} non-free" > \
+        /etc/apt/sources.list.d/debian-non-free.list && \
+    apt-get -qq update && \
+    apt-get -y install pbuilder aptitude
 
 COPY ./ /root/bcc
 
 WORKDIR /root/bcc
 
-RUN ./scripts/build-deb.sh
+RUN /usr/lib/pbuilder/pbuilder-satisfydepends && \
+    ./scripts/build-deb.sh

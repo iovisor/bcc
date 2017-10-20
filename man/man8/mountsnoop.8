@@ -1,0 +1,55 @@
+.TH mountsnoop 8  "2016-10-14" "USER COMMANDS"
+.SH NAME
+mountsnoop \- Trace mount() and umount() syscalls. Uses Linux eBPF/bcc.
+.SH SYNOPSIS
+.B mountsnoop
+.SH DESCRIPTION
+mountsnoop traces the mount() and umount() syscalls, showing which processes
+are mounting and unmounting filesystems in what mount namespaces. This can be
+useful for troubleshooting system and container setup.
+
+This works by tracing the kernel sys_mount() and sys_umount() functions using
+dynamic tracing, and will need updating to match any changes to this function.
+
+This makes use of a Linux 4.4 feature (bpf_perf_event_output()).
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH FIELDS
+.TP
+COMM
+Process name
+.TP
+PID
+Process ID
+.TP
+TID
+Thread ID
+.TP
+MNT_NS
+Mount namespace inode number
+.TP
+CALL
+System call, arguments, and return value
+.SH OVERHEAD
+This traces the kernel mount and umount functions and prints output for each
+event. As the rate of these calls is generally expected to be very low, the
+overhead is also expected to be negligible. If your system calls mount() and
+umount() at a high rate, then test and understand overhead before use.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Omar Sandoval
+.SH SEE ALSO
+mount(2)
+umount(2)

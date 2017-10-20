@@ -23,7 +23,7 @@ bpf_text = """
 #include <uapi/linux/ptrace.h>
 int do_trace(struct pt_regs *ctx) {
     uint64_t addr;
-    char path[128];
+    char path[128]={0};
     bpf_usdt_readarg(6, ctx, &addr);
     bpf_probe_read(&path, sizeof(path), (void *)addr);
     bpf_trace_printk("path:%s\\n", path);
@@ -39,7 +39,7 @@ if debug:
     print(bpf_text)
 
 # initialize BPF
-b = BPF(text=bpf_text, usdt=u)
+b = BPF(text=bpf_text, usdt_contexts=[u])
 
 # header
 print("%-18s %-16s %-6s %s" % ("TIME(s)", "COMM", "PID", "ARGS"))

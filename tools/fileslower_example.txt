@@ -105,7 +105,7 @@ locks, run queue latency, etc. These can be explored using other commands.
 USAGE message:
 
 # ./fileslower -h
-usage: fileslower [-h] [-p PID] [min_ms]
+usage: fileslower.py [-h] [-p PID] [-a] [min_ms]
 
 Trace slow synchronous file reads and writes
 
@@ -115,6 +115,7 @@ positional arguments:
 optional arguments:
   -h, --help         show this help message and exit
   -p PID, --pid PID  trace this PID only
+  -a, --all-files    include non-regular file types
 
 examples:
     ./fileslower             # trace sync file I/O slower than 10 ms (default)

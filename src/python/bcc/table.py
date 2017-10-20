@@ -14,11 +14,14 @@
 
 from collections import MutableMapping
 import ctypes as ct
+from functools import reduce
 import multiprocessing
 import os
 
-from .libbcc import lib, _RAW_CB_TYPE
+from .libbcc import lib, _RAW_CB_TYPE, _LOST_CB_TYPE
 from .perf import Perf
+from .utils import get_online_cpus
+from .utils import get_possible_cpus
 from subprocess import check_output
 
 BPF_MAP_TYPE_HASH = 1
@@ -28,8 +31,14 @@ BPF_MAP_TYPE_PERF_EVENT_ARRAY = 4
 BPF_MAP_TYPE_PERCPU_HASH = 5
 BPF_MAP_TYPE_PERCPU_ARRAY = 6
 BPF_MAP_TYPE_STACK_TRACE = 7
+BPF_MAP_TYPE_CGROUP_ARRAY = 8
+BPF_MAP_TYPE_LRU_HASH = 9
+BPF_MAP_TYPE_LRU_PERCPU_HASH = 10
+BPF_MAP_TYPE_LPM_TRIE = 11
 
 stars_max = 40
+log2_index_max = 65
+linear_index_max = 1025
 
 # helper functions, consider moving these to a utils module
 def _stars(val, val_max, width):
@@ -45,7 +54,7 @@ def _stars(val, val_max, width):
     return text
 
 
-def _print_log2_hist(vals, val_type):
+def _print_log2_hist(vals, val_type, strip_leading_zero):
     global stars_max
     log2_dist_max = 64
     idx_max = -1
@@ -65,14 +74,43 @@ def _print_log2_hist(vals, val_type):
         stars = int(stars_max / 2)
 
     if idx_max > 0:
-        print(header % val_type);
+        print(header % val_type)
+
     for i in range(1, idx_max + 1):
         low = (1 << i) >> 1
         high = (1 << i) - 1
         if (low == high):
             low -= 1
         val = vals[i]
-        print(body % (low, high, val, stars,
+
+        if strip_leading_zero:
+            if val:
+                print(body % (low, high, val, stars,
+                              _stars(val, val_max, stars)))
+                strip_leading_zero = False
+        else:
+            print(body % (low, high, val, stars,
+                          _stars(val, val_max, stars)))
+
+def _print_linear_hist(vals, val_type):
+    global stars_max
+    log2_dist_max = 64
+    idx_max = -1
+    val_max = 0
+
+    for i, v in enumerate(vals):
+        if v > 0: idx_max = i
+        if v > val_max: val_max = v
+
+    header = "     %-13s : count     distribution"
+    body = "        %-10d : %-8d |%-*s|"
+    stars = stars_max
+
+    if idx_max >= 0:
+        print(header % val_type);
+    for i in range(0, idx_max + 1):
+        val = vals[i]
+        print(body % (i, val, stars,
                       _stars(val, val_max, stars)))
 
 
@@ -95,8 +133,14 @@ def Table(bpf, map_id, map_fd, keytype, leaftype, **kwargs):
         t = PerCpuHash(bpf, map_id, map_fd, keytype, leaftype, **kwargs)
     elif ttype == BPF_MAP_TYPE_PERCPU_ARRAY:
         t = PerCpuArray(bpf, map_id, map_fd, keytype, leaftype, **kwargs)
+    elif ttype == BPF_MAP_TYPE_LPM_TRIE:
+        t = LpmTrie(bpf, map_id, map_fd, keytype, leaftype)
     elif ttype == BPF_MAP_TYPE_STACK_TRACE:
         t = StackTrace(bpf, map_id, map_fd, keytype, leaftype)
+    elif ttype == BPF_MAP_TYPE_LRU_HASH:
+        t = LruHash(bpf, map_id, map_fd, keytype, leaftype)
+    elif ttype == BPF_MAP_TYPE_LRU_PERCPU_HASH:
+        t = LruPerCpuHash(bpf, map_id, map_fd, keytype, leaftype)
     if t == None:
         raise Exception("Unknown table type %d" % ttype)
     return t
@@ -111,6 +155,7 @@ class TableBase(MutableMapping):
         self.Key = keytype
         self.Leaf = leaftype
         self.ttype = lib.bpf_table_type_id(self.bpf.module, self.map_id)
+        self.flags = lib.bpf_table_flags_id(self.bpf.module, self.map_id)
         self._cbs = {}
 
     def key_sprintf(self, key):
@@ -200,29 +245,23 @@ class TableBase(MutableMapping):
             self.__delitem__(k)
 
     def zero(self):
-        for k in self.keys():
+        # Even though this is not very efficient, we grab the entire list of
+        # keys before enumerating it. This helps avoid a potential race where
+        # the leaf assignment changes a hash table bucket that is being
+        # enumerated by the same loop, and may lead to a hang.
+        for k in list(self.keys()):
             self[k] = self.Leaf()
 
     def __iter__(self):
-        return TableBase.Iter(self, self.Key)
+        return TableBase.Iter(self)
 
     def iter(self): return self.__iter__()
     def keys(self): return self.__iter__()
 
     class Iter(object):
-        def __init__(self, table, keytype):
-            self.Key = keytype
+        def __init__(self, table):
             self.table = table
-            k = self.Key()
-            kp = ct.pointer(k)
-            # if 0 is a valid key, try a few alternatives
-            if k in table:
-                ct.memset(kp, 0xff, ct.sizeof(k))
-                if k in table:
-                    ct.memset(kp, 0x55, ct.sizeof(k))
-                    if k in table:
-                        raise Exception("Unable to allocate iterator")
-            self.key = k
+            self.key = None
         def __iter__(self):
             return self
         def __next__(self):
@@ -234,25 +273,37 @@ class TableBase(MutableMapping):
     def next(self, key):
         next_key = self.Key()
         next_key_p = ct.pointer(next_key)
-        key_p = ct.pointer(key)
-        res = lib.bpf_get_next_key(self.map_fd,
-                ct.cast(key_p, ct.c_void_p),
-                ct.cast(next_key_p, ct.c_void_p))
+
+        if key is None:
+            res = lib.bpf_get_first_key(self.map_fd,
+                    ct.cast(next_key_p, ct.c_void_p),
+                    ct.sizeof(self.Key))
+        else:
+            key_p = ct.pointer(key)
+            res = lib.bpf_get_next_key(self.map_fd,
+                    ct.cast(key_p, ct.c_void_p),
+                    ct.cast(next_key_p, ct.c_void_p))
+
         if res < 0:
             raise StopIteration()
         return next_key
 
     def print_log2_hist(self, val_type="value", section_header="Bucket ptr",
-            section_print_fn=None):
+            section_print_fn=None, bucket_fn=None, strip_leading_zero=None):
         """print_log2_hist(val_type="value", section_header="Bucket ptr",
-                           section_print_fn=None)
+                           section_print_fn=None, bucket_fn=None)
 
         Prints a table as a log2 histogram. The table must be stored as
         log2. The val_type argument is optional, and is a column header.
         If the histogram has a secondary key, multiple tables will print
         and section_header can be used as a header description for each.
         If section_print_fn is not None, it will be passed the bucket value
-        to format into a string as it sees fit.
+        to format into a string as it sees fit. If bucket_fn is not None,
+        it will be used to produce a bucket value for the histogram keys.
+        If the value of strip_leading_zero is not False, prints a histogram
+        that is omitted leading zeros from the beginning. The maximum index
+        allowed is log2_index_max (65), which will accommodate any 64-bit
+        integer in the histogram.
         """
         if isinstance(self.Key(), ct.Structure):
             tmp = {}
@@ -260,7 +311,9 @@ class TableBase(MutableMapping):
             f2 = self.Key._fields_[1][0]
             for k, v in self.items():
                 bucket = getattr(k, f1)
-                vals = tmp[bucket] = tmp.get(bucket, [0] * 65)
+                if bucket_fn:
+                    bucket = bucket_fn(bucket)
+                vals = tmp[bucket] = tmp.get(bucket, [0] * log2_index_max)
                 slot = getattr(k, f2)
                 vals[slot] = v.value
             for bucket, vals in tmp.items():
@@ -269,12 +322,57 @@ class TableBase(MutableMapping):
                         section_print_fn(bucket)))
                 else:
                     print("\n%s = %r" % (section_header, bucket))
-                _print_log2_hist(vals, val_type)
+                _print_log2_hist(vals, val_type, strip_leading_zero)
         else:
-            vals = [0] * 65
+            vals = [0] * log2_index_max
             for k, v in self.items():
                 vals[k.value] = v.value
-            _print_log2_hist(vals, val_type)
+            _print_log2_hist(vals, val_type, strip_leading_zero)
+
+    def print_linear_hist(self, val_type="value", section_header="Bucket ptr",
+            section_print_fn=None, bucket_fn=None):
+        """print_linear_hist(val_type="value", section_header="Bucket ptr",
+                           section_print_fn=None, bucket_fn=None)
+
+        Prints a table as a linear histogram. This is intended to span integer
+        ranges, eg, from 0 to 100. The val_type argument is optional, and is a
+        column header.  If the histogram has a secondary key, multiple tables
+        will print and section_header can be used as a header description for
+        each.  If section_print_fn is not None, it will be passed the bucket
+        value to format into a string as it sees fit. If bucket_fn is not None,
+        it will be used to produce a bucket value for the histogram keys.
+        The maximum index allowed is linear_index_max (1025), which is hoped
+        to be sufficient for integer ranges spanned.
+        """
+        if isinstance(self.Key(), ct.Structure):
+            tmp = {}
+            f1 = self.Key._fields_[0][0]
+            f2 = self.Key._fields_[1][0]
+            for k, v in self.items():
+                bucket = getattr(k, f1)
+                if bucket_fn:
+                    bucket = bucket_fn(bucket)
+                vals = tmp[bucket] = tmp.get(bucket, [0] * linear_index_max)
+                slot = getattr(k, f2)
+                vals[slot] = v.value
+            for bucket, vals in tmp.items():
+                if section_print_fn:
+                    print("\n%s = %s" % (section_header,
+                        section_print_fn(bucket)))
+                else:
+                    print("\n%s = %r" % (section_header, bucket))
+                _print_linear_hist(vals, val_type)
+        else:
+            vals = [0] * linear_index_max
+            for k, v in self.items():
+                try:
+                    vals[k.value] = v.value
+                except IndexError:
+                    # Improve error text. If the limit proves a nusiance, this
+                    # function be rewritten to avoid having one.
+                    raise IndexError(("Index in print_linear_hist() of %d " +
+                        "exceeds max of %d.") % (k.value, linear_index_max))
+            _print_linear_hist(vals, val_type)
 
 
 class HashTable(TableBase):
@@ -292,6 +390,9 @@ class HashTable(TableBase):
         if res < 0:
             raise KeyError
 
+class LruHash(HashTable):
+    def __init__(self, *args, **kwargs):
+        super(LruHash, self).__init__(*args, **kwargs)
 
 class ArrayBase(TableBase):
     def __init__(self, *args, **kwargs):
@@ -369,101 +470,88 @@ class ProgArray(ArrayBase):
             leaf = self.Leaf(leaf.fd)
         super(ProgArray, self).__setitem__(key, leaf)
 
+    def __delitem__(self, key):
+        key = self._normalize_key(key)
+        key_p = ct.pointer(key)
+        res = lib.bpf_delete_elem(self.map_fd, ct.cast(key_p, ct.c_void_p))
+        if res < 0:
+            raise Exception("Could not delete item")
+
 class PerfEventArray(ArrayBase):
-    class Event(object):
-        def __init__(self, typ, config):
-            self.typ = typ
-            self.config = config
-
-    HW_CPU_CYCLES                = Event(Perf.PERF_TYPE_HARDWARE, 0)
-    HW_INSTRUCTIONS              = Event(Perf.PERF_TYPE_HARDWARE, 1)
-    HW_CACHE_REFERENCES          = Event(Perf.PERF_TYPE_HARDWARE, 2)
-    HW_CACHE_MISSES              = Event(Perf.PERF_TYPE_HARDWARE, 3)
-    HW_BRANCH_INSTRUCTIONS       = Event(Perf.PERF_TYPE_HARDWARE, 4)
-    HW_BRANCH_MISSES             = Event(Perf.PERF_TYPE_HARDWARE, 5)
-    HW_BUS_CYCLES                = Event(Perf.PERF_TYPE_HARDWARE, 6)
-    HW_STALLED_CYCLES_FRONTEND   = Event(Perf.PERF_TYPE_HARDWARE, 7)
-    HW_STALLED_CYCLES_BACKEND    = Event(Perf.PERF_TYPE_HARDWARE, 8)
-    HW_REF_CPU_CYCLES            = Event(Perf.PERF_TYPE_HARDWARE, 9)
-
-    # not yet supported, wip
-    #HW_CACHE_L1D_READ        = Event(Perf.PERF_TYPE_HW_CACHE, 0<<0|0<<8|0<<16)
-    #HW_CACHE_L1D_READ_MISS   = Event(Perf.PERF_TYPE_HW_CACHE, 0<<0|0<<8|1<<16)
-    #HW_CACHE_L1D_WRITE       = Event(Perf.PERF_TYPE_HW_CACHE, 0<<0|1<<8|0<<16)
-    #HW_CACHE_L1D_WRITE_MISS  = Event(Perf.PERF_TYPE_HW_CACHE, 0<<0|1<<8|1<<16)
-    #HW_CACHE_L1D_PREF        = Event(Perf.PERF_TYPE_HW_CACHE, 0<<0|2<<8|0<<16)
-    #HW_CACHE_L1D_PREF_MISS   = Event(Perf.PERF_TYPE_HW_CACHE, 0<<0|2<<8|1<<16)
-    #HW_CACHE_L1I_READ        = Event(Perf.PERF_TYPE_HW_CACHE, 1<<0|0<<8|0<<16)
-    #HW_CACHE_L1I_READ_MISS   = Event(Perf.PERF_TYPE_HW_CACHE, 1<<0|0<<8|1<<16)
-    #HW_CACHE_L1I_WRITE       = Event(Perf.PERF_TYPE_HW_CACHE, 1<<0|1<<8|0<<16)
-    #HW_CACHE_L1I_WRITE_MISS  = Event(Perf.PERF_TYPE_HW_CACHE, 1<<0|1<<8|1<<16)
-    #HW_CACHE_L1I_PREF        = Event(Perf.PERF_TYPE_HW_CACHE, 1<<0|2<<8|0<<16)
-    #HW_CACHE_L1I_PREF_MISS   = Event(Perf.PERF_TYPE_HW_CACHE, 1<<0|2<<8|1<<16)
-    #HW_CACHE_LL_READ         = Event(Perf.PERF_TYPE_HW_CACHE, 2<<0|0<<8|0<<16)
-    #HW_CACHE_LL_READ_MISS    = Event(Perf.PERF_TYPE_HW_CACHE, 2<<0|0<<8|1<<16)
-    #HW_CACHE_LL_WRITE        = Event(Perf.PERF_TYPE_HW_CACHE, 2<<0|1<<8|0<<16)
-    #HW_CACHE_LL_WRITE_MISS   = Event(Perf.PERF_TYPE_HW_CACHE, 2<<0|1<<8|1<<16)
-    #HW_CACHE_LL_PREF         = Event(Perf.PERF_TYPE_HW_CACHE, 2<<0|2<<8|0<<16)
-    #HW_CACHE_LL_PREF_MISS    = Event(Perf.PERF_TYPE_HW_CACHE, 2<<0|2<<8|1<<16)
 
     def __init__(self, *args, **kwargs):
         super(PerfEventArray, self).__init__(*args, **kwargs)
+        self._open_key_fds = {}
+
+    def __del__(self):
+        keys = list(self._open_key_fds.keys())
+        for key in keys:
+            del self[key]
 
     def __delitem__(self, key):
-        super(PerfEventArray, self).__delitem__(key)
-        self.close_perf_buffer(key)
+        if key not in self._open_key_fds:
+            return
+        # Delete entry from the array
+        c_key = self._normalize_key(key)
+        key_p = ct.pointer(c_key)
+        lib.bpf_delete_elem(self.map_fd, ct.cast(key_p, ct.c_void_p))
+        key_id = (id(self), key)
+        if key_id in self.bpf.open_kprobes:
+            # The key is opened for perf ring buffer
+            lib.perf_reader_free(self.bpf.open_kprobes[key_id])
+            self.bpf._del_kprobe(key_id)
+            del self._cbs[key]
+        else:
+            # The key is opened for perf event read
+            lib.bpf_close_perf_event_fd(self._open_key_fds[key])
+        del self._open_key_fds[key]
 
-    def open_perf_buffer(self, callback):
+    def open_perf_buffer(self, callback, page_cnt=8, lost_cb=None):
         """open_perf_buffers(callback)
 
         Opens a set of per-cpu ring buffer to receive custom perf event
         data from the bpf program. The callback will be invoked for each
-        event submitted from the kernel, up to millions per second.
+        event submitted from the kernel, up to millions per second. Use
+        page_cnt to change the size of the per-cpu ring buffer. The value
+        must be a power of two and defaults to 8.
         """
 
-        for i in range(0, multiprocessing.cpu_count()):
-            self._open_perf_buffer(i, callback)
+        if page_cnt & (page_cnt - 1) != 0:
+            raise Exception("Perf buffer page_cnt must be a power of two")
 
-    def _open_perf_buffer(self, cpu, callback):
+        for i in get_online_cpus():
+            self._open_perf_buffer(i, callback, page_cnt, lost_cb)
+
+    def _open_perf_buffer(self, cpu, callback, page_cnt, lost_cb):
         fn = _RAW_CB_TYPE(lambda _, data, size: callback(cpu, data, size))
-        reader = lib.bpf_open_perf_buffer(fn, None, -1, cpu)
+        lost_fn = _LOST_CB_TYPE(lambda lost: lost_cb(lost)) if lost_cb else ct.cast(None, _LOST_CB_TYPE)
+        reader = lib.bpf_open_perf_buffer(fn, lost_fn, None, -1, cpu, page_cnt)
         if not reader:
             raise Exception("Could not open perf buffer")
         fd = lib.perf_reader_fd(reader)
         self[self.Key(cpu)] = self.Leaf(fd)
         self.bpf._add_kprobe((id(self), cpu), reader)
         # keep a refcnt
-        self._cbs[cpu] = fn
-
-    def close_perf_buffer(self, key):
-        reader = self.bpf.open_kprobes.get((id(self), key))
-        if reader:
-            lib.perf_reader_free(reader)
-            self.bpf._del_kprobe((id(self), key))
-        del self._cbs[key]
+        self._cbs[cpu] = (fn, lost_fn)
+        # The actual fd is held by the perf reader, add to track opened keys
+        self._open_key_fds[cpu] = -1
 
     def _open_perf_event(self, cpu, typ, config):
         fd = lib.bpf_open_perf_event(typ, config, -1, cpu)
         if fd < 0:
             raise Exception("bpf_open_perf_event failed")
-        try:
-            self[self.Key(cpu)] = self.Leaf(fd)
-        finally:
-            # the fd is kept open in the map itself by the kernel
-            os.close(fd)
+        self[self.Key(cpu)] = self.Leaf(fd)
+        self._open_key_fds[cpu] = fd
 
-    def open_perf_event(self, ev):
-        """open_perf_event(ev)
+    def open_perf_event(self, typ, config):
+        """open_perf_event(typ, config)
 
         Configures the table such that calls from the bpf program to
-        table.perf_read(bpf_get_smp_processor_id()) will return the hardware
+        table.perf_read(CUR_CPU_IDENTIFIER) will return the hardware
         counter denoted by event ev on the local cpu.
         """
-        if not isinstance(ev, self.Event):
-            raise Exception("argument must be an Event, got %s", type(ev))
-
-        for i in range(0, multiprocessing.cpu_count()):
-            self._open_perf_event(i, ev.typ, ev.config)
+        for i in get_online_cpus():
+            self._open_perf_event(i, typ, config)
 
 
 class PerCpuHash(HashTable):
@@ -471,7 +559,7 @@ class PerCpuHash(HashTable):
         self.reducer = kwargs.pop("reducer", None)
         super(PerCpuHash, self).__init__(*args, **kwargs)
         self.sLeaf = self.Leaf
-        self.total_cpu = multiprocessing.cpu_count()
+        self.total_cpu = len(get_possible_cpus())
         # This needs to be 8 as hard coded into the linux kernel.
         self.alignment = ct.sizeof(self.sLeaf) % 8
         if self.alignment is 0:
@@ -507,7 +595,7 @@ class PerCpuHash(HashTable):
     def sum(self, key):
         if isinstance(self.Leaf(), ct.Structure):
             raise IndexError("Leaf must be an integer type for default sum functions")
-        return self.sLeaf(reduce(lambda x,y: x+y, self.getvalue(key)))
+        return self.sLeaf(sum(self.getvalue(key)))
 
     def max(self, key):
         if isinstance(self.Leaf(), ct.Structure):
@@ -516,15 +604,18 @@ class PerCpuHash(HashTable):
 
     def average(self, key):
         result = self.sum(key)
-        result.value/=self.total_cpu
-        return result
+        return result.value / self.total_cpu
+
+class LruPerCpuHash(PerCpuHash):
+    def __init__(self, *args, **kwargs):
+        super(LruPerCpuHash, self).__init__(*args, **kwargs)
 
 class PerCpuArray(ArrayBase):
     def __init__(self, *args, **kwargs):
         self.reducer = kwargs.pop("reducer", None)
         super(PerCpuArray, self).__init__(*args, **kwargs)
         self.sLeaf = self.Leaf
-        self.total_cpu = multiprocessing.cpu_count()
+        self.total_cpu = len(get_possible_cpus())
         # This needs to be 8 as hard coded into the linux kernel.
         self.alignment = ct.sizeof(self.sLeaf) % 8
         if self.alignment is 0:
@@ -560,7 +651,7 @@ class PerCpuArray(ArrayBase):
     def sum(self, key):
         if isinstance(self.Leaf(), ct.Structure):
             raise IndexError("Leaf must be an integer type for default sum functions")
-        return self.sLeaf(reduce(lambda x,y: x+y, self.getvalue(key)))
+        return self.sLeaf(sum(self.getvalue(key)))
 
     def max(self, key):
         if isinstance(self.Leaf(), ct.Structure):
@@ -569,8 +660,19 @@ class PerCpuArray(ArrayBase):
 
     def average(self, key):
         result = self.sum(key)
-        result.value/=self.total_cpu
-        return result
+        return result.value / self.total_cpu
+
+class LpmTrie(TableBase):
+    def __init__(self, *args, **kwargs):
+        super(LpmTrie, self).__init__(*args, **kwargs)
+
+    def __len__(self):
+        raise NotImplementedError
+
+    def __delitem__(self, key):
+        # Not implemented for lpm trie as of kernel commit
+        # b95a5c4db09bc7c253636cb84dc9b12c577fd5a0
+        raise NotImplementedError
 
 class StackTrace(TableBase):
     MAX_DEPTH = 127
@@ -617,4 +719,3 @@ class StackTrace(TableBase):
 
     def clear(self):
         pass
-

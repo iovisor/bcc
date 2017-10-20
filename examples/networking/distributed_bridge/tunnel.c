@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (the "License")
 #include <bcc/proto.h>
 
-BPF_TABLE("hash", u32, int, vni2if, 1024);
+BPF_HASH(vni2if, u32, int, 1024);
 
 struct vni_key {
   u64 mac;
@@ -15,12 +15,12 @@ struct host {
   u64 rx_pkts;
   u64 tx_pkts;
 };
-BPF_TABLE("hash", struct vni_key, struct host, mac2host, 10240);
+BPF_HASH(mac2host, struct vni_key, struct host);
 
 struct config {
   int tunnel_ifindex;
 };
-BPF_TABLE("hash", int, struct config, conf, 1);
+BPF_HASH(conf, int, struct config, 1);
 
 // Handle packets from the encap device, demux into the dest tenant
 int handle_ingress(struct __sk_buff *skb) {
@@ -29,7 +29,8 @@ int handle_ingress(struct __sk_buff *skb) {
   struct ethernet_t *ethernet = cursor_advance(cursor, sizeof(*ethernet));
 
   struct bpf_tunnel_key tkey = {};
-  bpf_skb_get_tunnel_key(skb, &tkey, sizeof(tkey), 0);
+  bpf_skb_get_tunnel_key(skb, &tkey,
+      offsetof(struct bpf_tunnel_key, remote_ipv6[1]), 0);
 
   int *ifindex = vni2if.lookup(&tkey.tunnel_id);
   if (ifindex) {
@@ -63,7 +64,8 @@ int handle_egress(struct __sk_buff *skb) {
     u32 zero = 0;
     tkey.tunnel_id = dst_host->tunnel_id;
     tkey.remote_ipv4 = dst_host->remote_ipv4;
-    bpf_skb_set_tunnel_key(skb, &tkey, sizeof(tkey), 0);
+    bpf_skb_set_tunnel_key(skb, &tkey,
+        offsetof(struct bpf_tunnel_key, remote_ipv6[1]), 0);
     lock_xadd(&dst_host->tx_pkts, 1);
   } else {
     struct bpf_tunnel_key tkey = {};
@@ -73,7 +75,8 @@ int handle_egress(struct __sk_buff *skb) {
       return 1;
     tkey.tunnel_id = dst_host->tunnel_id;
     tkey.remote_ipv4 = dst_host->remote_ipv4;
-    bpf_skb_set_tunnel_key(skb, &tkey, sizeof(tkey), 0);
+    bpf_skb_set_tunnel_key(skb, &tkey,
+        offsetof(struct bpf_tunnel_key, remote_ipv6[1]), 0);
   }
   bpf_clone_redirect(skb, cfg->tunnel_ifindex, 0/*egress*/);
   return 1;

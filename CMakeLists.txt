@@ -3,21 +3,31 @@
 cmake_minimum_required(VERSION 2.8.7)
 
 project(bcc)
-set(CMAKE_BUILD_TYPE Release)
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release)
+endif()
 
 enable_testing()
 
 include(cmake/GetGitRevisionDescription.cmake)
 include(cmake/version.cmake)
+include(CMakeDependentOption)
 include(GNUInstallDirs)
+include(CheckCXXCompilerFlag)
+include(cmake/FindCompilerFlag.cmake)
+
+option(ENABLE_CLANG_JIT "Enable Loading BPF through Clang Frontend" ON)
+option(ENABLE_USDT "Enable User-level Statically Defined Tracing" ON)
+CMAKE_DEPENDENT_OPTION(ENABLE_CPP_API "Enable C++ API" ON "ENABLE_USDT" OFF)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
-if(NOT PYTHON_ONLY)
+if(NOT PYTHON_ONLY AND ENABLE_CLANG_JIT)
 find_package(BISON)
 find_package(FLEX)
 find_package(LLVM REQUIRED CONFIG)
-message(STATUS "Found LLVM: ${LLVM_INCLUDE_DIRS}")
+message(STATUS "Found LLVM: ${LLVM_INCLUDE_DIRS} ${LLVM_PACKAGE_VERSION}")
+find_package(LibElf REQUIRED)
 
 # clang is linked as a library, but the library path searching is
 # primitively supported, unlike libLLVM
@@ -47,30 +57,35 @@ if(NOT DEFINED BCC_KERNEL_MODULES_DIR)
   set(BCC_KERNEL_MODULES_DIR "/lib/modules")
 endif()
 
-find_package(LibElf REQUIRED)
-
-# Set to non-zero if system installs kernel headers with split source and build
-# directories in /lib/modules/`uname -r`/. This is the case for debian and
-# suse, to the best of my knowledge.
-if(BCC_KERNEL_HAS_SOURCE_DIR)
-  set(BCC_KERNEL_HAS_SOURCE_DIR 1)
-  set(BCC_KERNEL_MODULES_SUFFIX "source")
-else()
-  set(BCC_KERNEL_HAS_SOURCE_DIR 0)
+if(NOT DEFINED BCC_PROG_TAG_DIR)
+  set(BCC_PROG_TAG_DIR "/var/tmp/bcc")
 endif()
 
-# Similar to above, set to custom value if kernel headers in
-# /lib/modules/`uname -r` sit in a different location than build/.
-if(NOT DEFINED BCC_KERNEL_MODULES_SUFFIX)
-  set(BCC_KERNEL_MODULES_SUFFIX "build")
+# As reported in issue #735, GCC 6 has some behavioral problems when
+# dealing with -isystem. Hence, skip the warning optimization
+# altogether on that compiler.
+option(USINGISYSTEM "using -isystem" ON)
+execute_process(COMMAND ${CMAKE_C_COMPILER} -dumpversion OUTPUT_VARIABLE GCC_VERSION)
+if (USINGISYSTEM AND GCC_VERSION VERSION_LESS 6.0)
+  # iterate over all available directories in LLVM_INCLUDE_DIRS to
+  # generate a correctly tokenized list of parameters
+  foreach(ONE_LLVM_INCLUDE_DIR ${LLVM_INCLUDE_DIRS})
+    set(CXX_ISYSTEM_DIRS "${CXX_ISYSTEM_DIRS} -isystem ${ONE_LLVM_INCLUDE_DIR}")
+  endforeach()
 endif()
+
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_STANDARD 11)
+
+endif(NOT PYTHON_ONLY AND ENABLE_CLANG_JIT)
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall")
-endif()
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall ${CXX_ISYSTEM_DIRS}")
 
+add_subdirectory(src)
+if(ENABLE_CLANG_JIT)
 add_subdirectory(examples)
 add_subdirectory(man)
-add_subdirectory(src)
 add_subdirectory(tests)
 add_subdirectory(tools)
+endif(ENABLE_CLANG_JIT)

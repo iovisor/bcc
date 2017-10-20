@@ -2,7 +2,7 @@
 .SH NAME
 ext4dist \- Summarize ext4 operation latency. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B ext4dist [\-h] [\-T] [\-N] [\-d] [interval] [count]
+.B ext4dist [\-h] [\-T] [\-m] [\-p PID] [interval] [count]
 .SH DESCRIPTION
 This tool summarizes time (latency) spent in common ext4 file operations: reads,
 writes, opens, and syncs, and presents it as a power-of-2 histogram. It uses an

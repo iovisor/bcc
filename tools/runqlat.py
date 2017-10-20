@@ -37,7 +37,7 @@ examples = """examples:
     ./runqlat -p 185     # trace PID 185 only
 """
 parser = argparse.ArgumentParser(
-    description="Summarize run queue (schedular) latency as a histogram",
+    description="Summarize run queue (scheduler) latency as a histogram",
     formatter_class=argparse.RawDescriptionHelpFormatter,
     epilog=examples)
 parser.add_argument("-T", "--timestamp", action="store_true",
@@ -46,6 +46,10 @@ parser.add_argument("-m", "--milliseconds", action="store_true",
     help="millisecond histogram")
 parser.add_argument("-P", "--pids", action="store_true",
     help="print a histogram per process ID")
+# PID options are --pid and --pids, so namespaces should be --pidns (not done
+# yet) and --pidnss:
+parser.add_argument("--pidnss", action="store_true",
+    help="print a histogram per PID namespace")
 parser.add_argument("-L", "--tids", action="store_true",
     help="print a histogram per thread ID")
 parser.add_argument("-p", "--pid",
@@ -62,11 +66,19 @@ debug = 0
 bpf_text = """
 #include <uapi/linux/ptrace.h>
 #include <linux/sched.h>
+#include <linux/nsproxy.h>
+#include <linux/pid_namespace.h>
 
 typedef struct pid_key {
     u64 id;    // work around
     u64 slot;
 } pid_key_t;
+
+typedef struct pidns_key {
+    u64 id;    // work around
+    u64 slot;
+} pidns_key_t;
+
 BPF_HASH(start, u32);
 STORAGE
 
@@ -145,6 +157,13 @@ if args.pids or args.tids:
     bpf_text = bpf_text.replace('STORE',
         'pid_key_t key = {.id = ' + pid + ', .slot = bpf_log2l(delta)}; ' +
         'dist.increment(key);')
+elif args.pidnss:
+    section = "pidns"
+    bpf_text = bpf_text.replace('STORAGE',
+        'BPF_HISTOGRAM(dist, pidns_key_t);')
+    bpf_text = bpf_text.replace('STORE', 'pidns_key_t key = ' +
+        '{.id = prev->nsproxy->pid_ns_for_children->ns.inum, ' +
+        '.slot = bpf_log2l(delta)}; dist.increment(key);')
 else:
     section = ""
     bpf_text = bpf_text.replace('STORAGE', 'BPF_HISTOGRAM(dist);')

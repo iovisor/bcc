@@ -50,7 +50,7 @@ class EbpfConditional(object):
                 "{0}.{1}.{2}", base, einstance.name, node.name)
         else:
             raise CompilationException(True, "{0} Unexpected expression ", node)
-        
+
     def emitExpression(self, expression, serializer, program, toplevel):
         assert isinstance(serializer, ProgramSerializer)
         assert isinstance(program, ebpfProgram.EbpfProgram)
@@ -59,9 +59,9 @@ class EbpfConditional(object):
         left = expression.left
         op = expression.op
         right = expression.right
-        
+
         assert isinstance(op, str)
-        
+
         if op == "valid":
             self.emitNode(right, serializer, program)
             serializer.append(".valid")

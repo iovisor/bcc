@@ -12,11 +12,28 @@ import pyroute2
 import time
 import sys
 
-if len(sys.argv) != 2:
-    print("Usage: {0} <ifdev>\n\ne.g.: {0} eth0".format(sys.argv[0]))
+flags = 0
+def usage():
+    print("Usage: {0} [-S] <ifdev>".format(sys.argv[0]))
+    print("       -S: use skb mode\n")
+    print("e.g.: {0} eth0\n".format(sys.argv[0]))
     exit(1)
 
-device = sys.argv[1]
+if len(sys.argv) < 2 or len(sys.argv) > 3:
+    usage()
+
+if len(sys.argv) == 2:
+    device = sys.argv[1]
+
+if len(sys.argv) == 3:
+    if "-S" in sys.argv:
+        # XDP_FLAGS_SKB_MODE
+        flags |= 2 << 0
+
+    if "-S" == sys.argv[1]:
+        device = sys.argv[2]
+    else:
+        device = sys.argv[1]
 
 mode = BPF.XDP
 #mode = BPF.SCHED_CLS
@@ -116,7 +133,7 @@ int xdp_prog1(struct CTXTYPE *ctx) {
 fn = b.load_func("xdp_prog1", mode)
 
 if mode == BPF.XDP:
-    b.attach_xdp(device, fn)
+    b.attach_xdp(device, fn, flags)
 else:
     ip = pyroute2.IPRoute()
     ipdb = pyroute2.IPDB(nl=ip)
@@ -143,7 +160,7 @@ while 1:
         break;
 
 if mode == BPF.XDP:
-    b.remove_xdp(device)
+    b.remove_xdp(device, flags)
 else:
     ip.tc("del", "clsact", idx)
     ipdb.release()

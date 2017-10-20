@@ -13,5 +13,13 @@ Module "bcc.tracerpipe" "bcc/tracerpipe.lua"
 Module "bcc.table" "bcc/table.lua"
 Module "bcc.usdt" "bcc/usdt.lua"
 
+Module "bpf" "bpf/init.lua"
+Module "bpf.bpf" "bpf/bpf.lua"
+Module "bpf.builtins" "bpf/builtins.lua"
+Module "bpf.cdef" "bpf/cdef.lua"
+Module "bpf.elf" "bpf/elf.lua"
+Module "bpf.ljbytecode" "bpf/ljbytecode.lua"
+Module "bpf.proto" "bpf/proto.lua"
+
 Main "bcc/run.lua"
 Output "bcc.lua"

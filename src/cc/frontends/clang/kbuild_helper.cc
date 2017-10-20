@@ -22,7 +22,8 @@ namespace ebpf {
 using std::string;
 using std::vector;
 
-KBuildHelper::KBuildHelper(const std::string &kdir) : kdir_(kdir) {
+KBuildHelper::KBuildHelper(const std::string &kdir, bool has_source_dir) : kdir_(kdir),
+                                                                           has_source_dir_(has_source_dir) {
 }
 
 // read the flags from cache or learn
@@ -60,7 +61,7 @@ int KBuildHelper::get_flags(const char *uname_machine, vector<string> *cflags) {
   cflags->push_back("/virtual/lib/clang/include");
 
   // some module build directories split headers between source/ and build/
-  if (KERNEL_HAS_SOURCE_DIR) {
+  if (has_source_dir_) {
     cflags->push_back("-I" + kdir_ + "/build/arch/"+arch+"/include");
     cflags->push_back("-I" + kdir_ + "/build/arch/"+arch+"/include/generated/uapi");
     cflags->push_back("-I" + kdir_ + "/build/arch/"+arch+"/include/generated");
@@ -88,6 +89,7 @@ int KBuildHelper::get_flags(const char *uname_machine, vector<string> *cflags) {
   cflags->push_back("-D__HAVE_BUILTIN_BSWAP64__");
   cflags->push_back("-Wno-unused-value");
   cflags->push_back("-Wno-pointer-sign");
+  cflags->push_back("-fno-stack-protector");
 
   return 0;
 }

@@ -38,7 +38,7 @@ int printarg(struct urandom_read_args *args) {
 
 # load BPF program
 b = BPF(text=bpf_text)
-b.attach_tracepoint("random:urandom_read", "printarg")
+b.attach_tracepoint(tp="random:urandom_read", fn_name="printarg")
 
 # header
 print("%-18s %-16s %-6s %s" % ("TIME(s)", "COMM", "PID", "GOTBITS"))

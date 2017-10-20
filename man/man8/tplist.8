@@ -22,7 +22,8 @@ Display the USDT probes from the specified library or executable. If the librar
 or executable can be found in the standard paths, a full path is not required.
 .TP
 \-v
-Display the variables associated with the tracepoint or USDT probe.
+Increase the verbosity level. Can be used to display the variables, locations,
+and arguments of tracepoints and USDT probes.
 .TP
 [filter]
 A wildcard expression that specifies which tracepoints or probes to print.
@@ -45,6 +46,10 @@ $
 Print all USDT probes in process 4717 from the libc provider:
 $
 .B tplist -p 4717 'libc:*'
+.TP
+Print all the USDT probes in the node executable:
+$
+.B tplist -l node
 .SH SOURCE
 This is from bcc.
 .IP

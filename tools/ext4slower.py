@@ -22,6 +22,7 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
 # 11-Feb-2016   Brendan Gregg   Created this.
+# 15-Oct-2016   Dina Goldshtein -p to filter by process ID.
 
 from __future__ import print_function
 from bcc import BPF
@@ -87,7 +88,7 @@ struct data_t {
     char file[DNAME_INLINE_LEN];
 };
 
-BPF_HASH(entryinfo, pid_t, struct val_t);
+BPF_HASH(entryinfo, u64, struct val_t);
 BPF_PERF_OUTPUT(events);
 
 //
@@ -99,8 +100,9 @@ BPF_PERF_OUTPUT(events);
 // which I do by checking file->f_op.
 int trace_read_entry(struct pt_regs *ctx, struct kiocb *iocb)
 {
-    u32 pid;
-    pid = bpf_get_current_pid_tgid();
+    u64 id =  bpf_get_current_pid_tgid();
+    u32 pid = id >> 32; // PID is higher part
+
     if (FILTER_PID)
         return 0;
 
@@ -109,13 +111,13 @@ int trace_read_entry(struct pt_regs *ctx, struct kiocb *iocb)
     if ((u64)fp->f_op != EXT4_FILE_OPERATIONS)
         return 0;
 
-    // store filep and timestamp by pid
+    // store filep and timestamp by id
     struct val_t val = {};
     val.ts = bpf_ktime_get_ns();
     val.fp = fp;
     val.offset = iocb->ki_pos;
     if (val.fp)
-        entryinfo.update(&pid, &val);
+        entryinfo.update(&id, &val);
 
     return 0;
 }
@@ -123,18 +125,19 @@ int trace_read_entry(struct pt_regs *ctx, struct kiocb *iocb)
 // ext4_file_write_iter():
 int trace_write_entry(struct pt_regs *ctx, struct kiocb *iocb)
 {
-    u32 pid;
-    pid = bpf_get_current_pid_tgid();
+    u64 id = bpf_get_current_pid_tgid();
+    u32 pid = id >> 32; // PID is higher part
+
     if (FILTER_PID)
         return 0;
 
-    // store filep and timestamp by pid
+    // store filep and timestamp by id
     struct val_t val = {};
     val.ts = bpf_ktime_get_ns();
     val.fp = iocb->ki_filp;
     val.offset = iocb->ki_pos;
     if (val.fp)
-        entryinfo.update(&pid, &val);
+        entryinfo.update(&id, &val);
 
     return 0;
 }
@@ -143,18 +146,19 @@ int trace_write_entry(struct pt_regs *ctx, struct kiocb *iocb)
 int trace_open_entry(struct pt_regs *ctx, struct inode *inode,
     struct file *file)
 {
-    u32 pid;
-    pid = bpf_get_current_pid_tgid();
+    u64 id = bpf_get_current_pid_tgid();
+    u32 pid = id >> 32; // PID is higher part
+
     if (FILTER_PID)
         return 0;
 
-    // store filep and timestamp by pid
+    // store filep and timestamp by id
     struct val_t val = {};
     val.ts = bpf_ktime_get_ns();
     val.fp = file;
     val.offset = 0;
     if (val.fp)
-        entryinfo.update(&pid, &val);
+        entryinfo.update(&id, &val);
 
     return 0;
 }
@@ -162,18 +166,19 @@ int trace_open_entry(struct pt_regs *ctx, struct inode *inode,
 // ext4_sync_file():
 int trace_fsync_entry(struct pt_regs *ctx, struct file *file)
 {
-    u32 pid;
-    pid = bpf_get_current_pid_tgid();
+    u64 id = bpf_get_current_pid_tgid();
+    u32 pid = id >> 32; // PID is higher part
+
     if (FILTER_PID)
         return 0;
 
-    // store filep and timestamp by pid
+    // store filep and timestamp by id
     struct val_t val = {};
     val.ts = bpf_ktime_get_ns();
     val.fp = file;
     val.offset = 0;
     if (val.fp)
-        entryinfo.update(&pid, &val);
+        entryinfo.update(&id, &val);
 
     return 0;
 }
@@ -185,9 +190,10 @@ int trace_fsync_entry(struct pt_regs *ctx, struct file *file)
 static int trace_return(struct pt_regs *ctx, int type)
 {
     struct val_t *valp;
-    u32 pid = bpf_get_current_pid_tgid();
+    u64 id = bpf_get_current_pid_tgid();
+    u32 pid = id >> 32; // PID is higher part
 
-    valp = entryinfo.lookup(&pid);
+    valp = entryinfo.lookup(&id);
     if (valp == 0) {
         // missed tracing issue or filtered
         return 0;
@@ -196,13 +202,9 @@ static int trace_return(struct pt_regs *ctx, int type)
     // calculate delta
     u64 ts = bpf_ktime_get_ns();
     u64 delta_us = (ts - valp->ts) / 1000;
-    entryinfo.delete(&pid);
+    entryinfo.delete(&id);
     if (FILTER_US)
         return 0;
-
-    // workaround (rewriter should handle file to d_iname in one step):
-    struct dentry *de = NULL;
-    bpf_probe_read(&de, sizeof(de), &valp->fp->f_path.dentry);
 
     // populate output struct
     u32 size = PT_REGS_RC(ctx);
@@ -210,9 +212,18 @@ static int trace_return(struct pt_regs *ctx, int type)
         .pid = pid};
     data.ts_us = ts / 1000;
     data.offset = valp->offset;
-    bpf_probe_read(&data.file, sizeof(data.file), de->d_iname);
     bpf_get_current_comm(&data.task, sizeof(data.task));
 
+    // workaround (rewriter should handle file to d_name in one step):
+    struct dentry *de = NULL;
+    struct qstr qs = {};
+    bpf_probe_read(&de, sizeof(de), &valp->fp->f_path.dentry);
+    bpf_probe_read(&qs, sizeof(qs), (void *)&de->d_name);
+    if (qs.len == 0)
+        return 0;
+    bpf_probe_read(&data.file, sizeof(data.file), (void *)qs.name);
+
+    // output
     events.perf_submit(ctx, &data, sizeof(data));
 
     return 0;
@@ -294,12 +305,12 @@ def print_event(cpu, data, size):
 
     if (csv):
         print("%d,%s,%d,%s,%d,%d,%d,%s" % (
-            event.ts_us, event.task, event.pid, type, event.size,
-            event.offset, event.delta_us, event.file))
+            event.ts_us, event.task.decode(), event.pid, type, event.size,
+            event.offset, event.delta_us, event.file.decode()))
         return
     print("%-8s %-14.14s %-6s %1s %-7s %-8d %7.2f %s" % (strftime("%H:%M:%S"),
-        event.task, event.pid, type, event.size, event.offset / 1024,
-        float(event.delta_us) / 1000, event.file))
+        event.task.decode(), event.pid, type, event.size, event.offset / 1024,
+        float(event.delta_us) / 1000, event.file.decode()))
 
 # initialize BPF
 b = BPF(text=bpf_text)
@@ -326,6 +337,6 @@ else:
         "BYTES", "OFF_KB", "LAT(ms)", "FILENAME"))
 
 # read events
-b["events"].open_perf_buffer(print_event)
+b["events"].open_perf_buffer(print_event, page_cnt=64)
 while 1:
     b.kprobe_poll()

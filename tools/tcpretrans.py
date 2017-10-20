@@ -70,28 +70,22 @@ struct ipv6_data_t {
 };
 BPF_PERF_OUTPUT(ipv6_events);
 
-static int trace_event(struct pt_regs *ctx, struct sock *sk, int type)
+static int trace_event(struct pt_regs *ctx, struct sock *skp, int type)
 {
-    if (sk == NULL)
+    if (skp == NULL)
         return 0;
     u32 pid = bpf_get_current_pid_tgid();
-    struct sock *skp = NULL;
-    bpf_probe_read(&skp, sizeof(skp), &sk);
 
     // pull in details
-    u16 family = 0, lport = 0, dport = 0;
-    char state = 0;
-    bpf_probe_read(&family, sizeof(family), &skp->__sk_common.skc_family);
-    bpf_probe_read(&lport, sizeof(lport), &skp->__sk_common.skc_num);
-    bpf_probe_read(&dport, sizeof(dport), &skp->__sk_common.skc_dport);
-    bpf_probe_read(&state, sizeof(state), (void *)&skp->__sk_common.skc_state);
+    u16 family = skp->__sk_common.skc_family;
+    u16 lport = skp->__sk_common.skc_num;
+    u16 dport = skp->__sk_common.skc_dport;
+    char state = skp->__sk_common.skc_state;
 
     if (family == AF_INET) {
         struct ipv4_data_t data4 = {.pid = pid, .ip = 4, .type = type};
-        bpf_probe_read(&data4.saddr, sizeof(u32),
-            &skp->__sk_common.skc_rcv_saddr);
-        bpf_probe_read(&data4.daddr, sizeof(u32),
-            &skp->__sk_common.skc_daddr);
+        data4.saddr = skp->__sk_common.skc_rcv_saddr;
+        data4.daddr = skp->__sk_common.skc_daddr;
         // lport is host order
         data4.lport = lport;
         data4.dport = ntohs(dport);
@@ -101,9 +95,9 @@ static int trace_event(struct pt_regs *ctx, struct sock *sk, int type)
     } else if (family == AF_INET6) {
         struct ipv6_data_t data6 = {.pid = pid, .ip = 6, .type = type};
         bpf_probe_read(&data6.saddr, sizeof(data6.saddr),
-            &skp->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
+            skp->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
         bpf_probe_read(&data6.daddr, sizeof(data6.daddr),
-            &skp->__sk_common.skc_v6_daddr.in6_u.u6_addr32);
+            skp->__sk_common.skc_v6_daddr.in6_u.u6_addr32);
         // lport is host order
         data6.lport = lport;
         data6.dport = ntohs(dport);

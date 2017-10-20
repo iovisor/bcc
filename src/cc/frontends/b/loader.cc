@@ -18,9 +18,7 @@
 #include "type_check.h"
 #include "codegen_llvm.h"
 #include "loader.h"
-#include "table_desc.h"
 
-using std::get;
 using std::string;
 using std::unique_ptr;
 using std::vector;
@@ -35,7 +33,7 @@ BLoader::~BLoader() {
 }
 
 int BLoader::parse(llvm::Module *mod, const string &filename, const string &proto_filename,
-                   unique_ptr<vector<TableDesc>> *tables) {
+                   TableStorage &ts, const string &id) {
   int rc;
 
   proto_parser_ = make_unique<ebpf::cc::Parser>(proto_filename);
@@ -57,18 +55,16 @@ int BLoader::parse(llvm::Module *mod, const string &filename, const string &prot
 
   ebpf::cc::TypeCheck type_check(parser_->scopes_.get(), proto_parser_->scopes_.get());
   auto ret = type_check.visit(parser_->root_node_);
-  if (get<0>(ret) != 0 || get<1>(ret).size()) {
-    fprintf(stderr, "Type error @line=%d: %s\n", get<0>(ret), get<1>(ret).c_str());
+  if (ret.code() != 0 || ret.msg().size()) {
+    fprintf(stderr, "Type error @line=%d: %s\n", ret.code(), ret.msg().c_str());
     return -1;
   }
 
-  *tables = make_unique<vector<TableDesc>>();
-
   codegen_ = ebpf::make_unique<ebpf::cc::CodegenLLVM>(mod, parser_->scopes_.get(), proto_parser_->scopes_.get());
-  ret = codegen_->visit(parser_->root_node_, **tables);
-  if (get<0>(ret) != 0 || get<1>(ret).size()) {
-    fprintf(stderr, "Codegen error @line=%d: %s\n", get<0>(ret), get<1>(ret).c_str());
-    return get<0>(ret);
+  ret = codegen_->visit(parser_->root_node_, ts, id);
+  if (ret.code() != 0 || ret.msg().size()) {
+    fprintf(stderr, "Codegen error @line=%d: %s\n", ret.code(), ret.msg().c_str());
+    return ret.code();
   }
 
   return 0;

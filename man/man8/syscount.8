@@ -1,0 +1,100 @@
+.TH syscount 8  "2017-02-15" "USER COMMANDS"
+.SH NAME
+syscount \- Summarize syscall counts and latencies.
+.SH SYNOPSIS
+.B syscount [-h] [-p PID] [-i INTERVAL] [-T TOP] [-x] [-L] [-m] [-P] [-l]
+.SH DESCRIPTION
+This tool traces syscall entry and exit tracepoints and summarizes either the
+number of syscalls of each type, or the number of syscalls per process. It can
+also collect latency (invocation time) for each syscall or each process.
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc. Linux 4.7+ is required to attach a BPF program to the
+raw_syscalls:sys_{enter,exit} tracepoints, used by this tool.
+.SH OPTIONS
+.TP
+\-h
+Print usage message.
+.TP
+\-p PID
+Trace only this process.
+.TP
+\-i INTERVAL
+Print the summary at the specified interval (in seconds).
+.TP
+\-T TOP
+Print only this many entries. Default: 10.
+.TP
+\-x
+Trace only failed syscalls (i.e., the return value from the syscall was < 0).
+.TP
+\-m
+Display times in milliseconds. Default: microseconds.
+.TP
+\-P
+Summarize by process and not by syscall.
+.TP
+\-l
+List the syscalls recognized by the tool (hard-coded list). Syscalls beyond this
+list will still be displayed, as "[unknown: nnn]" where nnn is the syscall
+number.
+.SH EXAMPLES
+.TP
+Summarize all syscalls by syscall:
+#
+.B syscount
+.TP
+Summarize all syscalls by process:
+#
+.B syscount \-P
+.TP
+Summarize only failed syscalls:
+#
+.B syscount \-x
+.TP
+Trace PID 181 only:
+#
+.B syscount \-p 181
+.TP
+Summarize syscalls counts and latencies:
+#
+.B syscount \-L
+.SH FIELDS
+.TP
+PID
+Process ID
+.TP
+COMM
+Process name
+.TP
+SYSCALL
+Syscall name, or "[unknown: nnn]" for syscalls that aren't recognized
+.TP
+COUNT
+The number of events
+.TP
+TIME
+The total elapsed time (in us or ms)
+.SH OVERHEAD
+For most applications, the overhead should be manageable if they perform 1000's
+or even 10,000's of syscalls per second. For higher rates, the overhead may
+become considerable. For example, tracing a loop of 4 million calls to geteuid(),
+slows it down by 1.85x when tracing only syscall counts, and slows it down by
+more than 5x when tracing syscall counts and latencies. However, this represents
+a rate of >3.5 million syscalls per second, which should not be typical.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Sasha Goldshtein
+.SH SEE ALSO
+funccount(8), ucalls(8), argdist(8), trace(8), funclatency(8)

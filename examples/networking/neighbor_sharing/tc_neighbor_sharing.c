@@ -7,7 +7,7 @@ struct ipkey {
   u32 client_ip;
 };
 
-BPF_TABLE("hash", struct ipkey, int, learned_ips, 1024);
+BPF_HASH(learned_ips, struct ipkey, int, 1024);
 
 // trivial action
 int pass(struct __sk_buff *skb) {
@@ -57,7 +57,7 @@ int classify_neighbor(struct __sk_buff *skb) {
     u32 sip = ip->src;
     struct ipkey key = {.client_ip=sip};
     int val = 1;
-    learned_ips.update(&key, &val);
+    learned_ips.insert(&key, &val);
     goto EOP;
   }
 EOP:

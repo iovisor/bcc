@@ -1,0 +1,72 @@
+.TH dbstat 8  "2017-02-15" "USER COMMANDS"
+.SH NAME
+dbstat \- Collect histograms of MySQL/PostgreSQL query latencies.
+.SH SYNOPSIS
+.	B dbstat [-v] [-p PID [PID ...]] [-m THRESHOLD] [-u] [-i INTERVAL] {mysql,postgres}
+.SH DESCRIPTION
+This traces queries served by a MySQL or PostgreSQL server, and collects a
+histogram of query latencies. The histogram is printed at the end of collection,
+or at specified intervals.
+
+This uses User Statically-Defined Tracing (USDT) probes, a feature added to
+MySQL and PostgreSQL for DTrace support, but which may not be enabled on a
+given installation. See requirements.
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF, bcc, and MySQL server with USDT probe support (when configuring
+the build: \-DENABLE_DTRACE=1) or PostgreSQL server with USDT probe support
+(when configuring the build: \-\-enable-dtrace).
+.SH OPTIONS
+\-h
+Print usage message.
+.TP
+\-p PID
+Trace this PID. If no PID is specified, the tool will attempt to automatically
+detect the MySQL or PostgreSQL processes running on the system.
+.TP
+\-m THRESHOLD
+Minimum query latency (duration) to trace, in milliseconds.
+Default is all queries.
+.TP
+\-u
+Display query latencies in microseconds (default: milliseconds).
+.TP
+\-i INTERVAL
+Print summaries (histograms) at this interval, specified in seconds.
+.TP
+{mysql,postgres}
+The database engine to trace.
+.SH EXAMPLES
+.TP
+Display histogram of MySQL query latencies:
+#
+.B dbstat mysql
+.TP
+Display histogram of PostgreSQL query latencies slower than 10ms in pid 408:
+#
+.B dbstat postgres -p 408 -m 10
+.TP
+Display histogram of PostgreSQL query latencies at 3-second intervals:
+#
+.B dbstat postgres -i 3
+.SH OVERHEAD
+This adds low-overhead instrumentation to queries, and only emits output
+data from kernel to user-level if they query exceeds the threshold. If the
+server query rate is less than 1,000/sec, the overhead is expected to be
+negligible. If the query rate is higher, test to gauge overhead.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Sasha Goldshtein
+.SH SEE ALSO
+dbslower(8)

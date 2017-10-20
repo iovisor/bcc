@@ -1,0 +1,158 @@
+Demonstrations of nfsslower, the Linux eBPF/bcc version.
+
+nfsslower show NFS reads, writes, opens and getattrs, slower than a
+threshold. For example:
+
+./nfsslower.py
+Tracing NFS operations that are slower than 10 ms
+TIME     COMM           PID    T BYTES   OFF_KB   LAT(ms) FILENAME
+11:25:16 dd             21295  W 1048576 15360      14.84 1.test
+11:25:16 dd             21295  W 1048576 16384      12.73 1.test
+11:25:16 dd             21295  W 1048576 17408      24.27 1.test
+11:25:16 dd             21295  W 1048576 18432      22.93 1.test
+11:25:16 dd             21295  W 1048576 19456      14.65 1.test
+11:25:16 dd             21295  W 1048576 20480      12.58 1.test
+11:25:16 dd             21297  W 1048576 6144       10.50 1.test.w
+11:25:16 dd             21297  W 1048576 7168       16.65 1.test.w
+11:25:16 dd             21297  W 1048576 8192       13.01 1.test.w
+11:25:16 dd             21297  W 1048576 9216       14.06 1.test.w
+
+This shows NFS writes from dd each 1MB in size to 2 different files. The
+writes all had latency higher than 10ms.
+
+This "latency" is measured from when the operation was issued from the VFS
+interface to the file system, to when it completed. This spans everything:
+RPC latency, network latency, file system CPU cycles, file system locks, run
+queue latency, etc. This is a better measure of the latency suffered by
+applications reading from a NFS share and can better expose problems
+experienced by NFS clients.
+
+Note that this only traces the common NFS operations (read,write,open and
+getattr). I chose to include getattr as a significant percentage of NFS
+traffic end up being getattr calls and are a good indicator of problems
+with an NFS server.
+
+The threshold can be provided as an argument. E.g. I/O slower than 1 ms:
+
+./nfsslower.py 1
+Tracing NFS operations that are slower than 1 ms
+TIME     COMM           PID    T BYTES   OFF_KB   LAT(ms) FILENAME
+11:40:16 cp             21583  R 131072  0           4.35 1.test
+11:40:16 cp             21583  R 131072  256         1.87 1.test
+11:40:16 cp             21583  R 131072  384         2.99 1.test
+11:40:16 cp             21583  R 131072  512         4.19 1.test
+11:40:16 cp             21583  R 131072  640         4.25 1.test
+11:40:16 cp             21583  R 131072  768         4.65 1.test
+11:40:16 cp             21583  R 131072  1280        1.08 1.test
+11:40:16 cp             21583  R 131072  1408        3.29 1.test
+11:40:16 cp             21583  R 131072  1792        3.12 1.test
+11:40:16 cp             21583  R 131072  3712        3.55 1.test
+11:40:16 cp             21583  R 131072  3840        1.12 1.test
+11:40:16 cp             21583  R 131072  4096        3.23 1.test
+11:40:16 cp             21583  R 131072  4224        2.73 1.test
+11:40:16 cp             21583  R 131072  4352        2.73 1.test
+11:40:16 cp             21583  R 131072  4480        6.09 1.test
+11:40:16 cp             21583  R 131072  5120        4.40 1.test
+[...]
+
+This shows all NFS_READS that were more than 1ms. Depending on your
+latency to your fileserver, you might need to tweak this value to
+remove 
+
+A threshold of 0 will trace all operations. Warning: the output will be
+verbose, as it will include all file system cache hits.
+
+./nfsslower.py 0
+Tracing NFS operations
+11:56:50 dd             21852  W 1048576 0           0.42 1.test
+11:56:50 dd             21852  W 1048576 1024        0.46 1.test
+11:56:50 dd             21852  W 1048576 2048        0.36 1.test
+11:56:50 cp             21854  G 0       0           0.35 1.test
+11:56:50 cp             21854  O 0       0           0.33 1.test
+11:56:50 cp             21854  G 0       0           0.00 1.test
+11:56:50 cp             21854  R 131072  0           0.07 1.test
+11:56:50 cp             21854  R 131072  128         0.02 1.test
+11:56:50 cp             21854  R 131072  256         0.02 1.test
+11:56:50 cp             21854  R 131072  384         0.02 1.test
+11:56:50 cp             21854  R 131072  512         0.02 1.test
+11:56:50 cp             21854  R 131072  640         0.02 1.test
+11:56:50 cp             21854  R 131072  768         0.02 1.test
+11:56:50 cp             21854  R 131072  896         0.02 1.test
+11:56:50 cp             21854  R 131072  1024        0.02 1.test
+11:56:50 cp             21854  R 131072  1152        0.02 1.test
+11:56:50 cp             21854  R 131072  1280        0.02 1.test
+11:56:50 cp             21854  R 131072  1408        0.02 1.test
+11:56:50 cp             21854  R 131072  1536        0.02 1.test
+11:56:50 cp             21854  R 131072  1664        0.02 1.test
+11:56:50 cp             21854  R 131072  1792        0.02 1.test
+11:56:50 cp             21854  R 131072  1920        0.02 1.test
+11:56:50 cp             21854  R 131072  2048        0.02 1.test
+11:56:50 cp             21854  R 131072  2176        0.04 1.test
+11:56:50 cp             21854  R 131072  2304        0.02 1.test
+11:56:50 cp             21854  R 131072  2432        0.03 1.test
+11:56:50 cp             21854  R 131072  2560        0.03 1.test
+11:56:50 cp             21854  R 131072  2688        0.02 1.test
+11:56:50 cp             21854  R 131072  2816        0.03 1.test
+11:56:50 cp             21854  R 131072  2944        0.02 1.test
+11:56:50 cp             21854  R 0       3072        0.00 1.test
+11:56:50 ls             21855  G 0       0           0.00 1.test
+11:56:50 ls             21856  G 0       0           0.36 music
+11:56:50 ls             21856  G 0       0           0.00 music
+11:56:50 ls             21856  G 0       0           0.00 test
+11:56:50 ls             21856  G 0       0           0.00 ff
+11:56:50 ls             21856  G 0       0           0.00 34.log
+11:56:50 ls             21856  G 0       0           0.00 vmlinuz-linux
+11:56:50 ls             21856  G 0       0           0.00 2.test
+11:56:50 ls             21856  G 0       0           0.00 rt.log
+11:56:50 ls             21856  G 0       0           0.00 1.lod
+11:56:50 ls             21856  G 0       0           0.00 COPYRIGHT.txt
+11:56:50 ls             21856  G 0       0           0.00 gg
+11:56:50 ls             21856  G 0       0           0.00 qw.log
+11:56:50 ls             21856  G 0       0           0.00 README.md
+11:56:50 ls             21856  G 0       0           0.00 1.log
+
+The output now includes open operations ("O"), and reads ("R") wand getattrs ("G").
+A cp operation
+
+
+A -j option will print just the fields (parsable output, csv):
+
+./nfsslower.py -j 0
+ENDTIME_us,TASK,PID,TYPE,BYTES,OFFSET_b,LATENCY_us,FILE
+87054476520,dd,22754,W,1048576,0,425,1.test
+87054482916,dd,22754,W,1048576,1048576,320,1.test
+87054488179,dd,22754,W,1048576,2097152,389,1.test
+87054511340,cp,22756,G,0,0,371,1.test
+87054511685,cp,22756,O,0,0,306,1.test
+87054511700,cp,22756,G,0,0,2,1.test
+87054512325,cp,22756,R,131072,0,56,1.test
+87054512432,cp,22756,R,131072,131072,22,1.test
+87054512520,cp,22756,R,131072,262144,32,1.test
+87054512600,cp,22756,R,131072,393216,21,1.test
+87054512678,cp,22756,R,131072,524288,21,1.test
+87054512803,cp,22756,R,131072,655360,56,1.test
+
+This may be useful for visualizing with another tool, for example, for
+producing a scatter plot of ENDTIME vs LATENCY, to look for time-based
+patterns.
+
+USAGE message:
+
+usage: nfsslower.py [-h] [-j] [-p PID] [min_ms]
+
+Trace READ, WRITE, OPEN and GETATTR NFS calls slower than a threshold,supports NFSv{3,4}
+
+positional arguments:
+  min_ms             Minimum IO duration to trace in ms (default=10ms)
+
+optional arguments:
+  -h, --help         show this help message and exit
+  -j, --csv          just print fields: comma-separated values
+  -p PID, --pid PID  Trace this pid only
+
+ ./nfsslower         # trace operations slower than 10ms
+ ./nfsslower 1       # trace operations slower than 1ms
+ ./nfsslower -j 1    # ... 1 ms, parsable output (csv)
+ ./nfsslower 0       # trace all nfs operations
+ ./nfsslower -p 121  # trace pid 121 only
+
