@@ -28,7 +28,8 @@ class TestKprobeRgx(TestCase):
     def test_send1(self):
         k1 = self.b["stats"].Key(1)
         k2 = self.b["stats"].Key(2)
-        self.assertEqual(self.b["stats"][k1].val, self.b["stats"][k2].val + 1)
+        self.assertTrue(self.b["stats"][k1].val >= 2)
+        self.assertTrue(self.b["stats"][k2].val == 1)
 
 class TestKprobeReplace(TestCase):
     def setUp(self):
