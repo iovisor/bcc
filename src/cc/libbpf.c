@@ -232,7 +232,7 @@ static void bpf_print_hints(char *log)
 }
 #define ROUND_UP(x, n) (((x) + (n) - 1u) & ~((n) - 1u))
 
-int bpf_obj_get_info(int prog_map_fd, void *info, int *info_len)
+int bpf_obj_get_info(int prog_map_fd, void *info, uint32_t *info_len)
 {
   union bpf_attr attr;
   int err;
@@ -1045,4 +1045,39 @@ int bpf_obj_get(const char *pathname)
   attr.pathname = ptr_to_u64((void *)pathname);
 
   return syscall(__NR_bpf, BPF_OBJ_GET, &attr, sizeof(attr));
+}
+
+int bpf_prog_get_next_id(uint32_t start_id, uint32_t *next_id)
+{
+  union bpf_attr attr;
+  int err;
+
+  memset(&attr, 0, sizeof(attr));
+  attr.start_id = start_id;
+
+  err = syscall(__NR_bpf, BPF_PROG_GET_NEXT_ID, &attr, sizeof(attr));
+  if (!err)
+    *next_id = attr.next_id;
+
+  return err;
+}
+
+int bpf_prog_get_fd_by_id(uint32_t id)
+{
+  union bpf_attr attr;
+
+  memset(&attr, 0, sizeof(attr));
+  attr.prog_id = id;
+
+  return syscall(__NR_bpf, BPF_PROG_GET_FD_BY_ID, &attr, sizeof(attr));
+}
+
+int bpf_map_get_fd_by_id(uint32_t id)
+{
+  union bpf_attr attr;
+
+  memset(&attr, 0, sizeof(attr));
+  attr.map_id = id;
+
+  return syscall(__NR_bpf, BPF_MAP_GET_FD_BY_ID, &attr, sizeof(attr));
 }
