@@ -175,6 +175,7 @@ with open(kallsyms) as syms:
             break
     if ops == '':
         print("ERROR: no btrfs_file_operations in /proc/kallsyms. Exiting.")
+        print("HINT: the kernel should be built with CONFIG_KALLSYMS_ALL.")
         exit()
     bpf_text = bpf_text.replace('BTRFS_FILE_OPERATIONS', ops)
 bpf_text = bpf_text.replace('FACTOR', str(factor))

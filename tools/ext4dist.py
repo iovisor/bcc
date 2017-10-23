@@ -155,6 +155,7 @@ with open(kallsyms) as syms:
             break
     if ops == '':
         print("ERROR: no ext4_file_operations in /proc/kallsyms. Exiting.")
+        print("HINT: the kernel should be built with CONFIG_KALLSYMS_ALL.")
         exit()
     bpf_text = bpf_text.replace('EXT4_FILE_OPERATIONS', ops)
 bpf_text = bpf_text.replace('FACTOR', str(factor))
