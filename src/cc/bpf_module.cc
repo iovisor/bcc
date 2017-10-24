@@ -111,6 +111,7 @@ BPFModule::BPFModule(unsigned flags, TableStorage *ts)
   LLVMInitializeBPFTargetInfo();
   LLVMInitializeBPFAsmPrinter();
 #if LLVM_MAJOR_VERSION >= 6
+  LLVMInitializeBPFAsmParser();
   if (flags & DEBUG_SOURCE)
     LLVMInitializeBPFDisassembler();
 #endif
