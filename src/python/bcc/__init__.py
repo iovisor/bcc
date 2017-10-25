@@ -324,6 +324,7 @@ class BPF(object):
         while True:
             log_buf = ct.create_string_buffer(buffer_len) if self.debug else None
             fd = lib.bpf_prog_load(prog_type,
+                    func_name.encode("ascii"),
                     lib.bpf_function_start(self.module, func_name.encode("ascii")),
                     lib.bpf_function_size(self.module, func_name.encode("ascii")),
                     lib.bpf_module_license(self.module),

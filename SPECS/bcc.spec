@@ -113,6 +113,7 @@ Command line tools for BPF Compiler Collection (BCC)
 %exclude /usr/share/bcc/examples/*/*/*.pyo
 
 %files -n bcc-tools
+/usr/share/bcc/introspection/*
 /usr/share/bcc/tools/*
 /usr/share/bcc/man/*
 

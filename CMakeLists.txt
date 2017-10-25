@@ -83,6 +83,7 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall ${CXX_ISYSTEM_DIRS}")
 
 add_subdirectory(src)
+add_subdirectory(introspection)
 if(ENABLE_CLANG_JIT)
 add_subdirectory(examples)
 add_subdirectory(man)

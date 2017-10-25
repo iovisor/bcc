@@ -156,6 +156,7 @@ function Bpf:load_func(fn_name, prog_type)
     "unknown program: "..fn_name)
 
   local fd = libbcc.bpf_prog_load(prog_type,
+    fn_name,
     libbcc.bpf_function_start(self.module, fn_name),
     libbcc.bpf_function_size(self.module, fn_name),
     libbcc.bpf_module_license(self.module),
