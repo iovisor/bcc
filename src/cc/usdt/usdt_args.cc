@@ -131,6 +131,98 @@ void ArgumentParser::skip_until_whitespace_from(size_t pos) {
     cur_pos_ = pos;
 }
 
+bool ArgumentParser_aarch64::parse_register(ssize_t pos, ssize_t &new_pos,
+                                            optional<int> *reg_num) {
+  new_pos = parse_number(pos, reg_num);
+  if (new_pos == pos || *reg_num < 0 || *reg_num > 31)
+    return error_return(pos, pos);
+  return true;
+}
+
+bool ArgumentParser_aarch64::parse_size(ssize_t pos, ssize_t &new_pos,
+                                        optional<int> *arg_size) {
+  int abs_arg_size;
+
+  new_pos = parse_number(pos, arg_size);
+  if (new_pos == pos)
+    return error_return(pos, pos);
+
+  abs_arg_size = abs(arg_size->value());
+  if (abs_arg_size != 1 && abs_arg_size != 2 && abs_arg_size != 4 &&
+      abs_arg_size != 8)
+    return error_return(pos, pos);
+  return true;
+}
+
+bool ArgumentParser_aarch64::parse_mem(ssize_t pos, ssize_t &new_pos,
+                                       optional<int> *reg_num,
+                                       optional<int> *offset) {
+  if (arg_[pos] != 'x')
+    return error_return(pos, pos);
+  if (parse_register(pos + 1, new_pos, reg_num) == false)
+    return false;
+
+  if (arg_[new_pos] == ',') {
+    pos = new_pos + 1;
+    new_pos = parse_number(pos, offset);
+    if (new_pos == pos)
+      return error_return(pos, pos);
+  }
+  if (arg_[new_pos] != ']')
+    return error_return(new_pos, new_pos);
+  new_pos++;
+  return true;
+}
+
+bool ArgumentParser_aarch64::parse(Argument *dest) {
+  if (done())
+    return false;
+
+  // Support the following argument patterns:
+  //   [-]<size>@<value>, [-]<size>@<reg>, [-]<size>@[<reg>], or
+  //   [-]<size>@[<reg>,<offset>]
+  ssize_t cur_pos = cur_pos_, new_pos;
+  optional<int> arg_size;
+
+  // Parse [-]<size>
+  if (parse_size(cur_pos, new_pos, &arg_size) == false)
+    return false;
+  dest->arg_size_ = arg_size;
+
+  // Make sure '@' present
+  if (arg_[new_pos] != '@')
+    return error_return(new_pos, new_pos);
+  cur_pos = new_pos + 1;
+
+  if (arg_[cur_pos] == 'x') {
+    // Parse ...@<reg>
+    optional<int> reg_num;
+    if (parse_register(cur_pos + 1, new_pos, &reg_num) == false)
+      return false;
+    cur_pos_ = new_pos;
+    dest->base_register_name_ = "regs[" + std::to_string(reg_num.value()) + "]";
+  } else if (arg_[cur_pos] == '[') {
+    // Parse ...@[<reg>] and ...@[<reg,<offset>]
+    optional<int> reg_num, offset = 0;
+    if (parse_mem(cur_pos + 1, new_pos, &reg_num, &offset) == false)
+      return false;
+    cur_pos_ = new_pos;
+    dest->base_register_name_ = "regs[" + std::to_string(reg_num.value()) + "]";
+    dest->deref_offset_ = offset;
+  } else {
+    // Parse ...@<value>
+    optional<int> val;
+    new_pos = parse_number(cur_pos, &val);
+    if (cur_pos == new_pos)
+      return error_return(cur_pos, cur_pos);
+    cur_pos_ = new_pos;
+    dest->constant_ = val;
+  }
+
+  skip_whitespace_from(cur_pos_);
+  return true;
+}
+
 bool ArgumentParser_powerpc64::parse(Argument *dest) {
   if (done())
     return false;
@@ -191,14 +283,6 @@ bool ArgumentParser_powerpc64::parse(Argument *dest) {
   cur_pos_ += matches.length(0);
   skip_whitespace_from(cur_pos_);
   return true;
-}
-
-ssize_t ArgumentParser_x64::parse_number(ssize_t pos, optional<int> *result) {
-  char *endp;
-  int number = strtol(arg_ + pos, &endp, 0);
-  if (endp > arg_ + pos)
-    *result = number;
-  return endp - arg_;
 }
 
 ssize_t ArgumentParser_x64::parse_identifier(ssize_t pos,
@@ -319,16 +403,10 @@ bool ArgumentParser_x64::parse(Argument *dest) {
     return false;
 
   ssize_t res = parse_1(cur_pos_, dest);
-  if (res < 0) {
-    print_error(-res);
-    skip_whitespace_from(-res + 1);
-    return false;
-  }
-  if (!isspace(arg_[res]) && arg_[res] != '\0') {
-    print_error(res);
-    skip_until_whitespace_from(res);
-    return false;
-  }
+  if (res < 0)
+    return error_return(-res, -res + 1);
+  if (!isspace(arg_[res]) && arg_[res] != '\0')
+    return error_return(res, res);
   skip_whitespace_from(res);
   return true;
 }

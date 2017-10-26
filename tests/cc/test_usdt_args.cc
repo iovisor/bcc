@@ -54,7 +54,9 @@ static void verify_register(USDT::ArgumentParser &parser, int arg_size,
 
 TEST_CASE("test usdt argument parsing", "[usdt]") {
   SECTION("parse failure") {
-#ifdef __powerpc64__
+#ifdef __aarch64__
+    USDT::ArgumentParser_aarch64 parser("4@[x32,200]");
+#elif __powerpc64__
     USDT::ArgumentParser_powerpc64 parser("4@-12(42)");
 #elif defined(__x86_64__)
     USDT::ArgumentParser_x64 parser("4@i%ra+1r");
@@ -69,7 +71,13 @@ TEST_CASE("test usdt argument parsing", "[usdt]") {
     REQUIRE(i < 10);
   }
   SECTION("argument examples from the Python implementation") {
-#ifdef __powerpc64__
+#ifdef __aarch64__
+    USDT::ArgumentParser_aarch64 parser("-1@x0 4@5 8@[x12] -4@[x31,-40]");
+    verify_register(parser, -1, "regs[0]");
+    verify_register(parser, 4, 5);
+    verify_register(parser, 8, "regs[12]", 0);
+    verify_register(parser, -4, "regs[31]", -40);
+#elif __powerpc64__
     USDT::ArgumentParser_powerpc64 parser(
         "-4@0 8@%r0 8@i0 4@0(%r0) -2@0(0) "
         "1@0 -2@%r3 -8@i9 -1@0(%r4) -4@16(6) "
