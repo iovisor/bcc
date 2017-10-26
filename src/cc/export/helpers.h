@@ -603,5 +603,22 @@ int tracepoint__##category##__##event(struct tracepoint__##category##__##event *
             bpf_probe_read((void *)dst, __length, (char *)args + __offset); \
         } while (0);
 
+#define MEMBER_ADDR(src, field)                                             \
+        ({                                                                  \
+            void* __ret;                                                    \
+            __ret = (void*) (((char*)src) + offsetof(typeof(*src), field)); \
+            __ret;                                                          \
+        })
+
+#define MEMBER_READ(dst, src, field)    \
+        do{                             \
+            bpf_probe_read(             \
+                dst,                    \
+                sizeof(src->field),     \
+                MEMBER_ADDR(src, field) \
+            );                          \
+        } while(0)
+
+
 #endif
 )********"
