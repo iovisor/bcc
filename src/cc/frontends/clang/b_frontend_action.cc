@@ -108,33 +108,26 @@ class ProbeSetter : public RecursiveASTVisitor<ProbeSetter> {
   set<Decl *> *ptregs_;
 };
 
-// Traces maps with external pointers as values. 
-class MapVisitor : public RecursiveASTVisitor<MapVisitor> {
- public:
-  explicit MapVisitor(set<Decl *> &m) : m_(m) {}
-  bool VisitCallExpr(CallExpr *Call) {
-    if (MemberExpr *Memb = dyn_cast<MemberExpr>(Call->getCallee()->IgnoreImplicit())) {
-      StringRef memb_name = Memb->getMemberDecl()->getName();
-      if (DeclRefExpr *Ref = dyn_cast<DeclRefExpr>(Memb->getBase())) {
-        if (SectionAttr *A = Ref->getDecl()->getAttr<SectionAttr>()) {
-          if (!A->getName().startswith("maps"))
-            return true;
+MapVisitor::MapVisitor(set<Decl *> &m) : m_(m) {}
 
-          if (memb_name == "update" || memb_name == "insert") {
-            if (ProbeChecker(Call->getArg(1), ptregs_).needs_probe()) {
-              m_.insert(Ref->getDecl());
-            }
+bool MapVisitor::VisitCallExpr(CallExpr *Call) {
+  if (MemberExpr *Memb = dyn_cast<MemberExpr>(Call->getCallee()->IgnoreImplicit())) {
+    StringRef memb_name = Memb->getMemberDecl()->getName();
+    if (DeclRefExpr *Ref = dyn_cast<DeclRefExpr>(Memb->getBase())) {
+      if (SectionAttr *A = Ref->getDecl()->getAttr<SectionAttr>()) {
+        if (!A->getName().startswith("maps"))
+          return true;
+
+        if (memb_name == "update" || memb_name == "insert") {
+          if (ProbeChecker(Call->getArg(1), ptregs_).needs_probe()) {
+            m_.insert(Ref->getDecl());
           }
         }
       }
     }
-    return true;
   }
-  void set_ptreg(Decl *D) { ptregs_.insert(D); }
- private:
-  set<Decl *> &m_;
-  set<clang::Decl *> ptregs_;
-};
+  return true;
+}
 
 ProbeVisitor::ProbeVisitor(ASTContext &C, Rewriter &rewriter, set<Decl *> &m) :
   C(C), rewriter_(rewriter), m_(m) {}
@@ -801,59 +794,47 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
 }
 
 // First traversal of AST to retrieve maps with external pointers.
-class MapConsumer : public clang::ASTConsumer {
- public:
-  explicit MapConsumer(set<Decl *> &m) : visitor_(m) {}
-  bool HandleTopLevelDecl(DeclGroupRef Group) {
-    for (auto D : Group) {
-      if (FunctionDecl *F = dyn_cast<FunctionDecl>(D)) {
-        if (F->isExternallyVisible() && F->hasBody()) {
-          for (auto arg : F->parameters()) {
-            if (arg != F->getParamDecl(0) && !arg->getType()->isFundamentalType()) {
-              visitor_.set_ptreg(arg);
-            }
+BTypeConsumer::BTypeConsumer(ASTContext &C, BFrontendAction &fe,
+                             Rewriter &rewriter, set<Decl *> &m) :
+    map_visitor_(m), btype_visitor_(C, fe), probe_visitor_(C, rewriter, m) {}
+
+bool BTypeConsumer::HandleTopLevelDecl(DeclGroupRef Group) {
+  for (auto D : Group) {
+    if (FunctionDecl *F = dyn_cast<FunctionDecl>(D)) {
+      if (F->isExternallyVisible() && F->hasBody()) {
+        for (auto arg : F->parameters()) {
+          if (arg != F->getParamDecl(0) && !arg->getType()->isFundamentalType()) {
+            map_visitor_.set_ptreg(arg);
           }
-          visitor_.TraverseDecl(D);
         }
+        map_visitor_.TraverseDecl(D);
       }
     }
-    return true;
   }
- private:
-  MapVisitor visitor_;
-};
-
-BTypeConsumer::BTypeConsumer(ASTContext &C, BFrontendAction &fe) : visitor_(C, fe) {}
+  return true;
+}
 
 void BTypeConsumer::HandleTranslationUnit(ASTContext &Context) {
   DeclContext::decl_iterator it;
   DeclContext *DC = TranslationUnitDecl::castToDeclContext(Context.getTranslationUnitDecl());
-  for (it = DC->decls_begin(); it != DC->decls_end(); it++) {
-    visitor_.TraverseDecl(*it);
-  }
-}
 
-ProbeConsumer::ProbeConsumer(ASTContext &C, Rewriter &rewriter, set<Decl *> &m)
-    : visitor_(C, rewriter, m) {}
-
-/**
- * ProbeVisitor's traversal runs after an entire translation unit has been parsed.
- * to make sure maps with external pointers have been identified.
- */
-void ProbeConsumer::HandleTranslationUnit(ASTContext &Context) {
-  DeclContext::decl_iterator it;
-  DeclContext *DC = TranslationUnitDecl::castToDeclContext(Context.getTranslationUnitDecl());
+  /**
+   * ProbeVisitor's traversal runs after an entire translation unit has been parsed.
+   * to make sure maps with external pointers have been identified.
+   */
   for (it = DC->decls_begin(); it != DC->decls_end(); it++) {
     Decl *D = *it;
     if (FunctionDecl *F = dyn_cast<FunctionDecl>(D)) {
       if (F->isExternallyVisible() && F->hasBody()) {
         for (auto arg : F->parameters()) {
           if (arg != F->getParamDecl(0) && !arg->getType()->isFundamentalType())
-            visitor_.set_ptreg(arg);
+            probe_visitor_.set_ptreg(arg);
         }
-        visitor_.TraverseDecl(D);
+        probe_visitor_.TraverseDecl(D);
       }
     }
+
+    btype_visitor_.TraverseDecl(D);
   }
 }
 
@@ -889,9 +870,7 @@ void BFrontendAction::EndSourceFileAction() {
 unique_ptr<ASTConsumer> BFrontendAction::CreateASTConsumer(CompilerInstance &Compiler, llvm::StringRef InFile) {
   rewriter_->setSourceMgr(Compiler.getSourceManager(), Compiler.getLangOpts());
   vector<unique_ptr<ASTConsumer>> consumers;
-  consumers.push_back(unique_ptr<ASTConsumer>(new MapConsumer(m_)));
-  consumers.push_back(unique_ptr<ASTConsumer>(new ProbeConsumer(Compiler.getASTContext(), *rewriter_, m_)));
-  consumers.push_back(unique_ptr<ASTConsumer>(new BTypeConsumer(Compiler.getASTContext(), *this)));
+  consumers.push_back(unique_ptr<ASTConsumer>(new BTypeConsumer(Compiler.getASTContext(), *this, *rewriter_, m_)));
   return unique_ptr<ASTConsumer>(new MultiplexConsumer(std::move(consumers)));
 }
 
