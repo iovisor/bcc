@@ -527,7 +527,7 @@ class PerfEventArray(ArrayBase):
         def raw_cb_(_, data, size):
             try:
                 callback(cpu, data, size)
-            except IOError, e:
+            except IOError as e:
                 if e.errno == errno.EPIPE:
                     exit()
                 else:
@@ -535,7 +535,7 @@ class PerfEventArray(ArrayBase):
         def lost_cb_(lost):
             try:
                 lost_cb(lost)
-            except IOError, e:
+            except IOError as e:
                 if e.errno == errno.EPIPE:
                     exit()
                 else:
