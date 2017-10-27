@@ -86,15 +86,9 @@ int trace_completion(struct pt_regs *ctx)
     if (tsp == 0 || descp == 0) {
         return 0;   // missed start
     }
-    // Note: descp is a value from map, so '&' can be done without
-    // probe_read, but the next level irqaction * needs a probe read.
-    // Do these steps first after reading the map, otherwise some of these
-    // pointers may get pushed onto the stack and verifier will fail.
-    struct irqaction *action = 0;
-    bpf_probe_read(&action, sizeof(action), &(*descp)->action);
-    const char **namep = &action->name;
-    char *name = 0;
-    bpf_probe_read(&name, sizeof(name), namep);
+    struct irq_desc *desc = *descp;
+    struct irqaction *action = desc->action;
+    char *name = (char *)action->name;
     delta = bpf_ktime_get_ns() - *tsp;
 
     // store as sum or histogram

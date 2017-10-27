@@ -42,6 +42,17 @@ namespace ebpf {
 class BFrontendAction;
 class FuncSource;
 
+// Traces maps with external pointers as values.
+class MapVisitor : public clang::RecursiveASTVisitor<MapVisitor> {
+ public:
+  explicit MapVisitor(std::set<clang::Decl *> &m);
+  bool VisitCallExpr(clang::CallExpr *Call);
+  void set_ptreg(clang::Decl *D) { ptregs_.insert(D); }
+ private:
+  std::set<clang::Decl *> &m_;
+  std::set<clang::Decl *> ptregs_;
+};
+
 // Type visitor and rewriter for B programs.
 // It will look for B-specific features and rewrite them into a valid
 // C program. As part of the processing, open the necessary BPF tables
@@ -77,7 +88,7 @@ class BTypeVisitor : public clang::RecursiveASTVisitor<BTypeVisitor> {
 // Do a depth-first search to rewrite all pointers that need to be probed
 class ProbeVisitor : public clang::RecursiveASTVisitor<ProbeVisitor> {
  public:
-  explicit ProbeVisitor(clang::ASTContext &C, clang::Rewriter &rewriter);
+  explicit ProbeVisitor(clang::ASTContext &C, clang::Rewriter &rewriter, std::set<clang::Decl *> &m);
   bool VisitVarDecl(clang::VarDecl *Decl);
   bool VisitCallExpr(clang::CallExpr *Call);
   bool VisitBinaryOperator(clang::BinaryOperator *E);
@@ -94,24 +105,19 @@ class ProbeVisitor : public clang::RecursiveASTVisitor<ProbeVisitor> {
   std::set<clang::Decl *> fn_visited_;
   std::set<clang::Expr *> memb_visited_;
   std::set<clang::Decl *> ptregs_;
+  std::set<clang::Decl *> &m_;
 };
 
 // A helper class to the frontend action, walks the decls
 class BTypeConsumer : public clang::ASTConsumer {
  public:
-  explicit BTypeConsumer(clang::ASTContext &C, BFrontendAction &fe);
+  explicit BTypeConsumer(clang::ASTContext &C, BFrontendAction &fe, clang::Rewriter &rewriter, std::set<clang::Decl *> &map);
   bool HandleTopLevelDecl(clang::DeclGroupRef Group) override;
+  void HandleTranslationUnit(clang::ASTContext &Context) override;
  private:
-  BTypeVisitor visitor_;
-};
-
-// A helper class to the frontend action, walks the decls
-class ProbeConsumer : public clang::ASTConsumer {
- public:
-  ProbeConsumer(clang::ASTContext &C, clang::Rewriter &rewriter);
-  bool HandleTopLevelDecl(clang::DeclGroupRef Group) override;
- private:
-  ProbeVisitor visitor_;
+  MapVisitor map_visitor_;
+  BTypeVisitor btype_visitor_;
+  ProbeVisitor probe_visitor_;
 };
 
 // Create a B program in 2 phases (everything else is normal C frontend):
@@ -146,6 +152,7 @@ class BFrontendAction : public clang::ASTFrontendAction {
   std::map<std::string, clang::SourceRange> func_range_;
   FuncSource &func_src_;
   std::string &mod_src_;
+  std::set<clang::Decl *> m_;
 };
 
 }  // namespace visitor

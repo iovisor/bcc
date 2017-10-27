@@ -108,7 +108,29 @@ class ProbeSetter : public RecursiveASTVisitor<ProbeSetter> {
   set<Decl *> *ptregs_;
 };
 
-ProbeVisitor::ProbeVisitor(ASTContext &C, Rewriter &rewriter) : C(C), rewriter_(rewriter) {}
+MapVisitor::MapVisitor(set<Decl *> &m) : m_(m) {}
+
+bool MapVisitor::VisitCallExpr(CallExpr *Call) {
+  if (MemberExpr *Memb = dyn_cast<MemberExpr>(Call->getCallee()->IgnoreImplicit())) {
+    StringRef memb_name = Memb->getMemberDecl()->getName();
+    if (DeclRefExpr *Ref = dyn_cast<DeclRefExpr>(Memb->getBase())) {
+      if (SectionAttr *A = Ref->getDecl()->getAttr<SectionAttr>()) {
+        if (!A->getName().startswith("maps"))
+          return true;
+
+        if (memb_name == "update" || memb_name == "insert") {
+          if (ProbeChecker(Call->getArg(1), ptregs_).needs_probe()) {
+            m_.insert(Ref->getDecl());
+          }
+        }
+      }
+    }
+  }
+  return true;
+}
+
+ProbeVisitor::ProbeVisitor(ASTContext &C, Rewriter &rewriter, set<Decl *> &m) :
+  C(C), rewriter_(rewriter), m_(m) {}
 
 bool ProbeVisitor::VisitVarDecl(VarDecl *Decl) {
   if (Expr *E = Decl->getInit()) {
@@ -141,6 +163,25 @@ bool ProbeVisitor::VisitBinaryOperator(BinaryOperator *E) {
   if (ProbeChecker(E->getRHS(), ptregs_).is_transitive()) {
     ProbeSetter setter(&ptregs_);
     setter.TraverseStmt(E->getLHS());
+  } else if (E->isAssignmentOp() && E->getRHS()->getStmtClass() == Stmt::CallExprClass) {
+    CallExpr *Call = dyn_cast<CallExpr>(E->getRHS());
+    if (MemberExpr *Memb = dyn_cast<MemberExpr>(Call->getCallee()->IgnoreImplicit())) {
+      StringRef memb_name = Memb->getMemberDecl()->getName();
+      if (DeclRefExpr *Ref = dyn_cast<DeclRefExpr>(Memb->getBase())) {
+        if (SectionAttr *A = Ref->getDecl()->getAttr<SectionAttr>()) {
+          if (!A->getName().startswith("maps"))
+            return true;
+
+          if (memb_name == "lookup" || memb_name == "lookup_or_init") {
+            if (m_.find(Ref->getDecl()) != m_.end()) {
+            // Retrieved an external pointer from a map, mark LHS as external pointer.
+              ProbeSetter setter(&ptregs_);
+              setter.TraverseStmt(E->getLHS());
+            }
+          }
+        }
+      }
+    }
   }
   return true;
 }
@@ -752,30 +793,49 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
   return true;
 }
 
-BTypeConsumer::BTypeConsumer(ASTContext &C, BFrontendAction &fe) : visitor_(C, fe) {}
+// First traversal of AST to retrieve maps with external pointers.
+BTypeConsumer::BTypeConsumer(ASTContext &C, BFrontendAction &fe,
+                             Rewriter &rewriter, set<Decl *> &m) :
+    map_visitor_(m), btype_visitor_(C, fe), probe_visitor_(C, rewriter, m) {}
 
 bool BTypeConsumer::HandleTopLevelDecl(DeclGroupRef Group) {
-  for (auto D : Group)
-    visitor_.TraverseDecl(D);
-  return true;
-}
-
-ProbeConsumer::ProbeConsumer(ASTContext &C, Rewriter &rewriter)
-    : visitor_(C, rewriter) {}
-
-bool ProbeConsumer::HandleTopLevelDecl(DeclGroupRef Group) {
   for (auto D : Group) {
     if (FunctionDecl *F = dyn_cast<FunctionDecl>(D)) {
       if (F->isExternallyVisible() && F->hasBody()) {
         for (auto arg : F->parameters()) {
-          if (arg != F->getParamDecl(0) && !arg->getType()->isFundamentalType())
-            visitor_.set_ptreg(arg);
+          if (arg != F->getParamDecl(0) && !arg->getType()->isFundamentalType()) {
+            map_visitor_.set_ptreg(arg);
+          }
         }
-        visitor_.TraverseDecl(D);
+        map_visitor_.TraverseDecl(D);
       }
     }
   }
   return true;
+}
+
+void BTypeConsumer::HandleTranslationUnit(ASTContext &Context) {
+  DeclContext::decl_iterator it;
+  DeclContext *DC = TranslationUnitDecl::castToDeclContext(Context.getTranslationUnitDecl());
+
+  /**
+   * ProbeVisitor's traversal runs after an entire translation unit has been parsed.
+   * to make sure maps with external pointers have been identified.
+   */
+  for (it = DC->decls_begin(); it != DC->decls_end(); it++) {
+    Decl *D = *it;
+    if (FunctionDecl *F = dyn_cast<FunctionDecl>(D)) {
+      if (F->isExternallyVisible() && F->hasBody()) {
+        for (auto arg : F->parameters()) {
+          if (arg != F->getParamDecl(0) && !arg->getType()->isFundamentalType())
+            probe_visitor_.set_ptreg(arg);
+        }
+        probe_visitor_.TraverseDecl(D);
+      }
+    }
+
+    btype_visitor_.TraverseDecl(D);
+  }
 }
 
 BFrontendAction::BFrontendAction(llvm::raw_ostream &os, unsigned flags,
@@ -810,8 +870,7 @@ void BFrontendAction::EndSourceFileAction() {
 unique_ptr<ASTConsumer> BFrontendAction::CreateASTConsumer(CompilerInstance &Compiler, llvm::StringRef InFile) {
   rewriter_->setSourceMgr(Compiler.getSourceManager(), Compiler.getLangOpts());
   vector<unique_ptr<ASTConsumer>> consumers;
-  consumers.push_back(unique_ptr<ASTConsumer>(new ProbeConsumer(Compiler.getASTContext(), *rewriter_)));
-  consumers.push_back(unique_ptr<ASTConsumer>(new BTypeConsumer(Compiler.getASTContext(), *this)));
+  consumers.push_back(unique_ptr<ASTConsumer>(new BTypeConsumer(Compiler.getASTContext(), *this, *rewriter_, m_)));
   return unique_ptr<ASTConsumer>(new MultiplexConsumer(std::move(consumers)));
 }
 
