@@ -36,8 +36,19 @@ int kprobe__md_flush_request(struct pt_regs *ctx, void *mddev, struct bio *bio)
     u32 pid = bpf_get_current_pid_tgid();
     data.pid = pid;
     bpf_get_current_comm(&data.comm, sizeof(data.comm));
+/*
+ * The following deals with a kernel version change (in mainline 4.14, although
+ * it may be backported to earlier kernels) with how the disk name is accessed.
+ * We handle both pre- and post-change versions here. Please avoid kernel
+ * version tests like this as much as possible: they inflate the code, test,
+ * and maintenance burden.
+ */
+#ifdef bio_dev
+    bpf_probe_read(&data.disk, sizeof(data.disk), bio->bi_disk->disk_name);
+#else
     bpf_probe_read(&data.disk, sizeof(data.disk),
-        bio->bi_bdev->bd_disk->disk_name);
+                   bio->bi_bdev->bd_disk->disk_name);
+#endif
     events.perf_submit(ctx, &data, sizeof(data));
     return 0;
 }
