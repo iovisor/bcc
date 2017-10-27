@@ -74,24 +74,49 @@ public:
   const optional<int> deref_offset() const { return deref_offset_; }
 
   friend class ArgumentParser;
+  friend class ArgumentParser_aarch64;
   friend class ArgumentParser_powerpc64;
   friend class ArgumentParser_x64;
 };
 
 class ArgumentParser {
-protected:
+ protected:
   const char *arg_;
   ssize_t cur_pos_;
 
   void skip_whitespace_from(size_t pos);
   void skip_until_whitespace_from(size_t pos);
   void print_error(ssize_t pos);
+  ssize_t parse_number(ssize_t pos, optional<int> *result) {
+    char *endp;
+    int number = strtol(arg_ + pos, &endp, 0);
+    if (endp > arg_ + pos)
+      *result = number;
+    return endp - arg_;
+  }
+  bool error_return(ssize_t error_start, ssize_t skip_start) {
+    print_error(error_start);
+    skip_until_whitespace_from(skip_start);
+    return false;
+  }
 
-public:
+ public:
   virtual bool parse(Argument *dest) = 0;
   bool done() { return cur_pos_ < 0 || arg_[cur_pos_] == '\0'; }
 
   ArgumentParser(const char *arg) : arg_(arg), cur_pos_(0) {}
+};
+
+class ArgumentParser_aarch64 : public ArgumentParser {
+ private:
+  bool parse_register(ssize_t pos, ssize_t &new_pos, optional<int> *reg_num);
+  bool parse_size(ssize_t pos, ssize_t &new_pos, optional<int> *arg_size);
+  bool parse_mem(ssize_t pos, ssize_t &new_pos, optional<int> *reg_num,
+                 optional<int> *offset);
+
+ public:
+  bool parse(Argument *dest);
+  ArgumentParser_aarch64(const char *arg) : ArgumentParser(arg) {}
 };
 
 class ArgumentParser_powerpc64 : public ArgumentParser {
@@ -131,7 +156,6 @@ private:
   bool normalize_register(std::string *reg, int *reg_size);
   void reg_to_name(std::string *norm, Register reg);
   ssize_t parse_register(ssize_t pos, std::string &name, int &size);
-  ssize_t parse_number(ssize_t pos, optional<int> *number);
   ssize_t parse_identifier(ssize_t pos, optional<std::string> *ident);
   ssize_t parse_base_register(ssize_t pos, Argument *dest);
   ssize_t parse_index_register(ssize_t pos, Argument *dest);

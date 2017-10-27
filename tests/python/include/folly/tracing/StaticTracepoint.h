@@ -16,9 +16,9 @@
 
 #pragma once
 
-#if defined(__ELF__) && \
-      (defined(__powerpc64__) || defined(__powerpc__) || \
-       defined(__x86_64__) || defined(__i386__))
+#if defined(__ELF__) &&                                                        \
+    (defined(__powerpc64__) || defined(__powerpc__) || defined(__aarch64__) || \
+     defined(__x86_64__) || defined(__i386__))
 #include <folly/tracing/StaticTracepoint-ELF.h>
 
 #define FOLLY_SDT(provider, name, ...)                                         \

@@ -32,7 +32,9 @@
 namespace USDT {
 
 Location::Location(uint64_t addr, const char *arg_fmt) : address_(addr) {
-#ifdef __powerpc64__
+#ifdef __aarch64__
+  ArgumentParser_aarch64 parser(arg_fmt);
+#elif __powerpc64__
   ArgumentParser_powerpc64 parser(arg_fmt);
 #else
   ArgumentParser_x64 parser(arg_fmt);
