@@ -185,7 +185,7 @@ int trace_return(struct pt_regs *ctx) {
 #ifdef SYSCALLS
 int syscall_entry(struct pt_regs *ctx) {
     u64 pid = bpf_get_current_pid_tgid();
-    u64 *valp, ip = ctx->ip, val = 0;
+    u64 *valp, ip = PT_REGS_IP(ctx), val = 0;
     PID_FILTER
 #ifdef LATENCY
     struct syscall_entry_t data = {};

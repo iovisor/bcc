@@ -76,13 +76,19 @@ BPF_HASH(start, u32);
 
 static u64 get_frame(u64 *bp) {
     if (*bp) {
-        // The following stack walker is x86_64 specific
+        // The following stack walker is x86_64/arm64 specific
         u64 ret = 0;
         if (bpf_probe_read(&ret, sizeof(ret), (void *)(*bp+8)))
             return 0;
         if (bpf_probe_read(bp, sizeof(*bp), (void *)*bp))
             return 0;
+#ifdef __x86_64__
         if (ret < __START_KERNEL_map)
+#elif __aarch64__
+        if (ret < VA_START)
+#else
+#error "Unsupported architecture for stack walker"
+#endif
             return 0;
         return ret;
     }
@@ -121,7 +127,7 @@ int waker(struct pt_regs *ctx, struct task_struct *p) {
 
     bpf_probe_read(&key.target, sizeof(key.target), p->comm);
     bpf_get_current_comm(&key.waker, sizeof(key.waker));
-    bp = ctx->bp;
+    bp = PT_REGS_FP(ctx);
 
     // unrolled loop (MAXDEPTH):
     if (!(key.ret[depth++] = get_frame(&bp))) goto out;

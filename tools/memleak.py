@@ -14,6 +14,7 @@
 from bcc import BPF
 from time import sleep
 from datetime import datetime
+import resource
 import argparse
 import subprocess
 import os
@@ -366,6 +367,7 @@ if kernel_trace:
 
 bpf_source = bpf_source.replace("SHOULD_PRINT", "1" if trace_all else "0")
 bpf_source = bpf_source.replace("SAMPLE_EVERY_N", str(sample_every_n))
+bpf_source = bpf_source.replace("PAGE_SIZE", str(resource.getpagesize()))
 
 size_filter = ""
 if min_size is not None and max_size is not None:
