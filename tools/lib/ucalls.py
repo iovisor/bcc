@@ -67,7 +67,8 @@ if language == "java":
     return_probe = "method__return"
     read_class = "bpf_usdt_readarg(2, ctx, &clazz);"
     read_method = "bpf_usdt_readarg(4, ctx, &method);"
-    extra_message = "If you do not see any results, make sure you ran java with option -XX:+ExtendedDTraceProbes"
+    extra_message = ("If you do not see any results, make sure you ran java"
+                     " with option -XX:+ExtendedDTraceProbes")
 elif language == "python":
     entry_probe = "function__entry"
     return_probe = "function__return"
@@ -84,7 +85,8 @@ elif language == "php":
     return_probe = "function__return"
     read_class = "bpf_usdt_readarg(4, ctx, &clazz);"
     read_method = "bpf_usdt_readarg(1, ctx, &method);"
-    extra_message = "If you do not see any results, make sure the environment variable USE_ZEND_DTRACE is set to 1"
+    extra_message = ("If you do not see any results, make sure the environment"
+                     " variable USE_ZEND_DTRACE is set to 1")
 elif not language or language == "none":
     if not args.syscalls:
         print("Nothing to do; use -S to trace syscalls.")

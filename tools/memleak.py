@@ -282,7 +282,7 @@ int posix_memalign_exit(struct pt_regs *ctx) {
 
         memptrs.delete(&pid);
 
-        if (bpf_probe_read(&addr, sizeof(void*), (void*)(size_t)*memptr64) != 0)
+        if (bpf_probe_read(&addr, sizeof(void*), (void*)(size_t)*memptr64))
                 return 0;
 
         u64 addr64 = (u64)(size_t)addr;
@@ -384,7 +384,7 @@ if not kernel_trace:
         stack_flags += "|BPF_F_USER_STACK"
 bpf_source = bpf_source.replace("STACK_FLAGS", stack_flags)
 
-bpf_program = BPF(text=bpf_source)
+bpf = BPF(text=bpf_source)
 
 if not kernel_trace:
         print("Attaching to pid %d, Ctrl+C to quit." % pid)
@@ -394,12 +394,12 @@ if not kernel_trace:
                         fn_prefix = sym
 
                 try:
-                        bpf_program.attach_uprobe(name=obj, sym=sym,
-                                                  fn_name=fn_prefix+"_enter",
-                                                  pid=pid)
-                        bpf_program.attach_uretprobe(name=obj, sym=sym,
-                                                     fn_name=fn_prefix+"_exit",
-                                                     pid=pid)
+                        bpf.attach_uprobe(name=obj, sym=sym,
+                                          fn_name=fn_prefix + "_enter",
+                                          pid=pid)
+                        bpf.attach_uretprobe(name=obj, sym=sym,
+                                             fn_name=fn_prefix + "_exit",
+                                             pid=pid)
                 except Exception:
                         if can_fail:
                                 return
@@ -413,8 +413,8 @@ if not kernel_trace:
         attach_probes("valloc")
         attach_probes("memalign")
         attach_probes("pvalloc")
-        attach_probes("aligned_alloc", can_fail=True) # added in C11
-        bpf_program.attach_uprobe(name=obj, sym="free", fn_name="free_enter",
+        attach_probes("aligned_alloc", can_fail=True)  # added in C11
+        bpf.attach_uprobe(name=obj, sym="free", fn_name="free_enter",
                                   pid=pid)
 
 else:
@@ -425,11 +425,12 @@ else:
         #
         # Memory allocations in Linux kernel are not limited to malloc/free
         # equivalents. It's also common to allocate a memory page or multiple
-        # pages. Page allocator have two interfaces, one working with page frame
-        # numbers (PFN), while other working with page addresses. It's possible
-        # to allocate pages with one kind of functions, and free them with
-        # another. Code in kernel can easy convert PFNs to addresses and back,
-        # but it's hard to do the same in eBPF kprobe without fragile hacks.
+        # pages. Page allocator have two interfaces, one working with page
+        # frame numbers (PFN), while other working with page addresses. It's
+        # possible to allocate pages with one kind of functions, and free them
+        # with another. Code in kernel can easy convert PFNs to addresses and
+        # back, but it's hard to do the same in eBPF kprobe without fragile
+        # hacks.
         #
         # Fortunately, Linux exposes tracepoints for memory allocations, which
         # can be instrumented by eBPF programs. Tracepoint for page allocations
@@ -440,8 +441,8 @@ def print_outstanding():
         print("[%s] Top %d stacks with outstanding allocations:" %
               (datetime.now().strftime("%H:%M:%S"), top_stacks))
         alloc_info = {}
-        allocs = bpf_program["allocs"]
-        stack_traces = bpf_program["stack_traces"]
+        allocs = bpf["allocs"]
+        stack_traces = bpf["stack_traces"]
         for address, info in sorted(allocs.items(), key=lambda a: a[1].size):
                 if BPF.monotonic_time() - min_age_ns < info.timestamp_ns:
                         continue
@@ -453,7 +454,7 @@ def print_outstanding():
                         stack = list(stack_traces.walk(info.stack_id))
                         combined = []
                         for addr in stack:
-                                combined.append(bpf_program.sym(addr, pid,
+                                combined.append(bpf.sym(addr, pid,
                                         show_module=True, show_offset=True))
                         alloc_info[info.stack_id] = Allocation(combined,
                                                                info.size)
@@ -467,8 +468,8 @@ def print_outstanding():
                       (alloc.size, alloc.count, "\n\t\t".join(alloc.stack)))
 
 def print_outstanding_combined():
-        stack_traces = bpf_program["stack_traces"]
-        stacks = sorted(bpf_program["combined_allocs"].items(),
+        stack_traces = bpf["stack_traces"]
+        stacks = sorted(bpf["combined_allocs"].items(),
                         key=lambda a: -a[1].total_size)
         cnt = 1
         entries = []
@@ -476,7 +477,7 @@ def print_outstanding_combined():
                 try:
                         trace = []
                         for addr in stack_traces.walk(stack_id.value):
-                                sym = bpf_program.sym(addr, pid,
+                                sym = bpf.sym(addr, pid,
                                                       show_module=True,
                                                       show_offset=True)
                                 trace.append(sym)
@@ -500,7 +501,7 @@ def print_outstanding_combined():
 count_so_far = 0
 while True:
         if trace_all:
-                print(bpf_program.trace_fields())
+                print(bpf.trace_fields())
         else:
                 try:
                         sleep(interval)

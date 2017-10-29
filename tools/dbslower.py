@@ -2,17 +2,18 @@
 #
 # dbslower      Trace MySQL and PostgreSQL queries slower than a threshold.
 #
-# USAGE: dbslower [-v] [-p PID [PID ...]] [-b PATH_TO_BINARY] [-m THRESHOLD] {mysql,postgres}
+# USAGE: dbslower [-v] [-p PID [PID ...]] [-b PATH_TO_BINARY] [-m THRESHOLD]
+#                 {mysql,postgres}
 #
 # By default, a threshold of 1ms is used. Set the threshold to 0 to trace all
-# queries (verbose). 
-# 
-# Script works in two different modes: 
-# 1) USDT probes, which means it needs MySQL and PostgreSQL built with 
+# queries (verbose).
+#
+# Script works in two different modes:
+# 1) USDT probes, which means it needs MySQL and PostgreSQL built with
 # USDT (DTrace) support.
-# 2) uprobe and uretprobe on exported function of binary specified by 
+# 2) uprobe and uretprobe on exported function of binary specified by
 # PATH_TO_BINARY parameter. (At the moment only MySQL support)
-# 
+#
 # If no PID or PATH_TO_BINARY is provided, the script attempts to discover
 # all MySQL or PostgreSQL database processes and uses USDT probes.
 #
@@ -57,12 +58,13 @@ threshold_ns = args.threshold * 1000000
 mode = "USDT"
 if args.path and not args.pids:
     if args.db == "mysql":
-        symbols = BPF.get_user_functions_and_addresses(args.path, "\\w+dispatch_command\\w+")
+        regex = "\\w+dispatch_command\\w+"
+        symbols = BPF.get_user_functions_and_addresses(args.path, regex)
 
         if len(symbols) == 0:
             print("Can't find function 'dispatch_command' in %s" % (args.path))
             exit(1)
-        
+
         (mysql_func_name, addr) = symbols[0]
 
         if mysql_func_name.find("COM_DATA") >= 0:
@@ -71,7 +73,8 @@ if args.path and not args.pids:
             mode = "MYSQL56"
     else:
         # Placeholder for PostrgeSQL
-        # Look on functions initStringInfo, pgstat_report_activity, EndCommand, NullCommand
+        # Look on functions initStringInfo, pgstat_report_activity, EndCommand,
+        # NullCommand
         print("Sorry at the moment PostgreSQL supports only USDT")
         exit(1)
 
@@ -109,7 +112,7 @@ int query_start(struct pt_regs *ctx) {
 
 #if defined(MYSQL56) || defined(MYSQL57)
 /*
-Trace only packets with enum_server_command == COM_QUERY 
+Trace only packets with enum_server_command == COM_QUERY
 */
     #ifdef MYSQL56
     u64 command  = (u64) PT_REGS_PARM1(ctx);
@@ -148,7 +151,7 @@ int query_end(struct pt_regs *ctx) {
     u64 delta = bpf_ktime_get_ns() - tempp->timestamp;
 #ifdef THRESHOLD
     if (delta >= THRESHOLD) {
-#endif //THRESHOLD     
+#endif //THRESHOLD
         struct data_t data = {};
         data.pid = pid >> 32;   // only process id
         data.timestamp = tempp->timestamp;
@@ -164,13 +167,16 @@ int query_end(struct pt_regs *ctx) {
 """.replace("DEFINE_USDT", "#define USDT" if mode == "USDT" else "") \
    .replace("DEFINE_MYSQL56", "#define MYSQL56" if mode == "MYSQL56" else "") \
    .replace("DEFINE_MYSQL57", "#define MYSQL57" if mode == "MYSQL57" else "") \
-   .replace("DEFINE_THRESHOLD", ("#define THRESHOLD " + str(threshold_ns)) if threshold_ns > 0 else "")
+   .replace("DEFINE_THRESHOLD",
+            "#define THRESHOLD %d" % threshold_ns if threshold_ns > 0 else "")
 
 if mode.startswith("MYSQL"):
     # Uprobes mode
     bpf = BPF(text=program)
-    bpf.attach_uprobe(name=args.path, sym=mysql_func_name, fn_name="query_start")
-    bpf.attach_uretprobe(name=args.path, sym=mysql_func_name, fn_name="query_end")
+    bpf.attach_uprobe(name=args.path, sym=mysql_func_name,
+                      fn_name="query_start")
+    bpf.attach_uretprobe(name=args.path, sym=mysql_func_name,
+                         fn_name="query_end")
 else:
     # USDT mode
     if not args.pids or len(args.pids) == 0:

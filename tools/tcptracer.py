@@ -546,7 +546,7 @@ def print_ipv4_event(cpu, data, size):
         if args.verbose:
             print("%-14d" % (event.ts_ns - start_ts), end="")
         else:
-            print("%-9.3f" % ((float(event.ts_ns) - start_ts) / 1000000000), end="")
+            print("%-9.3f" % ((event.ts_ns - start_ts) / 1000000000.0), end="")
     if event.type == 1:
         type_str = "C"
     elif event.type == 2:
@@ -583,7 +583,7 @@ def print_ipv6_event(cpu, data, size):
         if args.verbose:
             print("%-14d" % (event.ts_ns - start_ts), end="")
         else:
-            print("%-9.3f" % ((float(event.ts_ns) - start_ts) / 1000000000), end="")
+            print("%-9.3f" % ((event.ts_ns - start_ts) / 1000000000.0), end="")
     if event.type == 1:
         type_str = "C"
     elif event.type == 2:
@@ -601,8 +601,8 @@ def print_ipv6_event(cpu, data, size):
     print("%-6d %-16s %-2d %-16s %-16s %-6d %-6d" %
           (event.pid, event.comm.decode('utf-8'),
            event.ip,
-           "["+inet_ntop(AF_INET6, event.saddr)+"]",
-           "["+inet_ntop(AF_INET6, event.daddr)+"]",
+           "[" + inet_ntop(AF_INET6, event.saddr) + "]",
+           "[" + inet_ntop(AF_INET6, event.daddr) + "]",
            event.sport,
            event.dport), end="")
     if args.verbose and not args.netns:

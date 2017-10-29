@@ -149,7 +149,7 @@ int kprobe__tcp_cleanup_rbuf(struct pt_regs *ctx, struct sock *sk, int copied)
     u64 *val, zero = 0;
 
     if (copied <= 0)
-	    return 0;
+        return 0;
 
     if (family == AF_INET) {
         struct ipv4_key_t ipv4_key = {.pid = pid};
