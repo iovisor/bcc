@@ -222,11 +222,20 @@ def handle_loop(stdscr, args):
         )
         (height, width) = stdscr.getmaxyx()
         for i, stat in enumerate(process_stats):
+            uid = int(stat[1])
+            try:
+                username = pwd.getpwuid(uid)[0]
+            except KeyError as ex:
+                # `pwd` throws a KeyError if the user cannot be found. This can
+                # happen e.g. when the process is running in a cgroup that has
+                # different users from the host.
+                username = 'UNKNOWN({})'.format(uid)
+
             stdscr.addstr(
                 i + 2, 0,
                 "{0:8} {username:8.8} {2:16} {3:8} {4:8} "
                 "{5:8} {6:9.1f}% {7:9.1f}%".format(
-                    *stat, username=pwd.getpwuid(int(stat[1]))[0]
+                    *stat, username=username
                 )
             )
             if i > height - 4:
