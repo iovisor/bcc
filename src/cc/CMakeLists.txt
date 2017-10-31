@@ -25,6 +25,7 @@ include(static_libstdc++)
 add_library(bpf-static STATIC libbpf.c perf_reader.c)
 set_target_properties(bpf-static PROPERTIES OUTPUT_NAME bpf)
 add_library(bpf-shared SHARED libbpf.c perf_reader.c)
+set_target_properties(bpf-shared PROPERTIES VERSION ${REVISION_LAST} SOVERSION 0)
 set_target_properties(bpf-shared PROPERTIES OUTPUT_NAME bpf)
 
 set(bcc_common_sources bpf_common.cc bpf_module.cc exported_files.cc)
