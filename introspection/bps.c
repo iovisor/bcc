@@ -219,7 +219,7 @@ static int print_one_prog(uint32_t prog_id)
   nr_map_ids = min(prog_info.nr_map_ids, nr_map_ids);
   for (i = 0; i < nr_map_ids; i++) {
     struct bpf_map_info map_info = {};
-    uint32_t info_len = sizeof(map_info);
+    info_len = sizeof(map_info);
     int map_fd;
 
     map_fd = bpf_map_get_fd_by_id(map_ids[i]);
