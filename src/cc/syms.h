@@ -100,7 +100,6 @@ class ProcSyms : SymbolCache {
 
     Module(const char *name, ProcMountNS *mount_ns,
            struct bcc_symbol_option *option);
-    bool init();
 
     std::string name_;
     std::vector<Range> ranges_;

@@ -25,9 +25,11 @@
 bool bcc_is_perf_map(const char *path) {
   char* pos = strstr(path, ".map");
   // Path ends with ".map"
-  if (pos == NULL || *(pos + 4) != 0)
-    return false;
-  return access(path, R_OK) == 0;
+  return (pos != NULL) && (*(pos + 4)== 0);
+}
+
+bool bcc_is_valid_perf_map(const char *path) {
+  return bcc_is_perf_map(path) && (access(path, R_OK) == 0);
 }
 
 int bcc_perf_map_nstgid(int pid) {
