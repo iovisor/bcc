@@ -160,7 +160,8 @@ function Bpf:load_func(fn_name, prog_type)
     libbcc.bpf_function_start(self.module, fn_name),
     libbcc.bpf_function_size(self.module, fn_name),
     libbcc.bpf_module_license(self.module),
-    libbcc.bpf_module_kern_version(self.module), nil, 0)
+    libbcc.bpf_module_kern_version(self.module),
+    0, nil, 0)
 
   assert(fd >= 0, "failed to load BPF program "..fn_name)
   log.info("loaded %s (%d)", fn_name, fd)

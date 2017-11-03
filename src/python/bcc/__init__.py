@@ -320,23 +320,13 @@ class BPF(object):
             return self.funcs[func_name]
         if not lib.bpf_function_start(self.module, func_name.encode("ascii")):
             raise Exception("Unknown program %s" % func_name)
-        buffer_len = LOG_BUFFER_SIZE
-        while True:
-            log_buf = ct.create_string_buffer(buffer_len) if self.debug else None
-            fd = lib.bpf_prog_load(prog_type,
-                    func_name.encode("ascii"),
-                    lib.bpf_function_start(self.module, func_name.encode("ascii")),
-                    lib.bpf_function_size(self.module, func_name.encode("ascii")),
-                    lib.bpf_module_license(self.module),
-                    lib.bpf_module_kern_version(self.module),
-                    log_buf, ct.sizeof(log_buf) if log_buf else 0)
-            if fd < 0 and ct.get_errno() == errno.ENOSPC and self.debug:
-                buffer_len <<= 1
-            else:
-                break
-
-        if self.debug & DEBUG_BPF and log_buf.value:
-            print(log_buf.value.decode(), file=sys.stderr)
+        fd = lib.bpf_prog_load(prog_type,
+                func_name.encode("ascii"),
+                lib.bpf_function_start(self.module, func_name.encode("ascii")),
+                lib.bpf_function_size(self.module, func_name.encode("ascii")),
+                lib.bpf_module_license(self.module),
+                lib.bpf_module_kern_version(self.module),
+                1 if (self.debug & DEBUG_BPF) else 0, None, 0);
 
         if fd < 0:
             atexit.register(self.donothing)

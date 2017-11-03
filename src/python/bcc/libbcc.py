@@ -84,7 +84,7 @@ lib.bpf_attach_socket.restype = ct.c_int
 lib.bpf_attach_socket.argtypes = [ct.c_int, ct.c_int]
 lib.bpf_prog_load.restype = ct.c_int
 lib.bpf_prog_load.argtypes = [ct.c_int, ct.c_char_p, ct.c_void_p,
-        ct.c_size_t, ct.c_char_p, ct.c_uint, ct.c_char_p, ct.c_uint]
+        ct.c_size_t, ct.c_char_p, ct.c_uint, ct.c_int, ct.c_char_p, ct.c_uint]
 lib.bpf_attach_kprobe.restype = ct.c_void_p
 _CB_TYPE = ct.CFUNCTYPE(None, ct.py_object, ct.c_int,
         ct.c_ulonglong, ct.POINTER(ct.c_ulonglong))

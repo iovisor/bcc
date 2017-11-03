@@ -483,9 +483,8 @@ StatusTuple BPF::load_func(const std::string& func_name,
   fd = bpf_prog_load(type, func_name.c_str(),
                      reinterpret_cast<struct bpf_insn*>(func_start),
                      func_size, bpf_module_->license(),
-                     bpf_module_->kern_version(), nullptr,
-                     0  // BPFModule will handle error printing
-                    );
+                     bpf_module_->kern_version(),
+                     flag_ & DEBUG_BPF ? 1 : 0, nullptr, 0);
 
   if (fd < 0)
     return StatusTuple(-1, "Failed to load %s: %d", func_name.c_str(), fd);

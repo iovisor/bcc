@@ -46,7 +46,7 @@ public:
   static const int BPF_MAX_STACK_DEPTH = 127;
 
   explicit BPF(unsigned int flag = 0, TableStorage* ts = nullptr)
-      : bpf_module_(new BPFModule(flag, ts)) {}
+      : flag_(flag), bpf_module_(new BPFModule(flag, ts)) {}
   StatusTuple init(const std::string& bpf_program,
                    const std::vector<std::string>& cflags = {},
                    const std::vector<USDT>& usdt = {});
@@ -184,6 +184,8 @@ private:
                                   uint64_t symbol_addr,
                                   std::string &module_res,
                                   uint64_t &offset_res);
+
+  int flag_;
 
   std::unique_ptr<BPFModule> bpf_module_;
 
