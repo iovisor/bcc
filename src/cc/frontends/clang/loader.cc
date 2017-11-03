@@ -316,7 +316,7 @@ int ClangLoader::do_compile(unique_ptr<llvm::Module> *mod, TableStorage &ts,
   // capture the rewritten c file
   string out_str1;
   llvm::raw_string_ostream os1(out_str1);
-  BFrontendAction bact(os1, flags_, ts, id, func_src, mod_src);
+  BFrontendAction bact(os1, flags_, ts, id, main_path, func_src, mod_src);
   if (!compiler1.ExecuteAction(bact))
     return -1;
   unique_ptr<llvm::MemoryBuffer> out_buf1 = llvm::MemoryBuffer::getMemBuffer(out_str1);

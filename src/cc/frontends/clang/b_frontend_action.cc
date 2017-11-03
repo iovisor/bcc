@@ -259,7 +259,7 @@ bool BTypeVisitor::VisitFunctionDecl(FunctionDecl *D) {
   // put each non-static non-inline function decl in its own section, to be
   // extracted by the MemoryManager
   auto real_start_loc = rewriter_.getSourceMgr().getFileLoc(D->getLocStart());
-  if (D->isExternallyVisible() && D->hasBody()) {
+  if (fe_.is_rewritable_ext_func(D)) {
     current_fn_ = D->getName();
     string bd = rewriter_.getRewrittenText(expansionRange(D->getSourceRange()));
     fe_.func_src_.set_src(current_fn_, bd);
@@ -795,13 +795,16 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
 
 // First traversal of AST to retrieve maps with external pointers.
 BTypeConsumer::BTypeConsumer(ASTContext &C, BFrontendAction &fe,
-                             Rewriter &rewriter, set<Decl *> &m) :
-    map_visitor_(m), btype_visitor_(C, fe), probe_visitor_(C, rewriter, m) {}
+                             Rewriter &rewriter, set<Decl *> &m)
+    : fe_(fe),
+      map_visitor_(m),
+      btype_visitor_(C, fe),
+      probe_visitor_(C, rewriter, m) {}
 
 bool BTypeConsumer::HandleTopLevelDecl(DeclGroupRef Group) {
   for (auto D : Group) {
     if (FunctionDecl *F = dyn_cast<FunctionDecl>(D)) {
-      if (F->isExternallyVisible() && F->hasBody()) {
+      if (fe_.is_rewritable_ext_func(F)) {
         for (auto arg : F->parameters()) {
           if (arg != F->getParamDecl(0) && !arg->getType()->isFundamentalType()) {
             map_visitor_.set_ptreg(arg);
@@ -825,7 +828,7 @@ void BTypeConsumer::HandleTranslationUnit(ASTContext &Context) {
   for (it = DC->decls_begin(); it != DC->decls_end(); it++) {
     Decl *D = *it;
     if (FunctionDecl *F = dyn_cast<FunctionDecl>(D)) {
-      if (F->isExternallyVisible() && F->hasBody()) {
+      if (fe_.is_rewritable_ext_func(F)) {
         for (auto arg : F->parameters()) {
           if (arg != F->getParamDecl(0) && !arg->getType()->isFundamentalType())
             probe_visitor_.set_ptreg(arg);
@@ -840,14 +843,22 @@ void BTypeConsumer::HandleTranslationUnit(ASTContext &Context) {
 
 BFrontendAction::BFrontendAction(llvm::raw_ostream &os, unsigned flags,
                                  TableStorage &ts, const std::string &id,
+                                 const std::string &main_path,
                                  FuncSource &func_src, std::string &mod_src)
     : os_(os),
       flags_(flags),
       ts_(ts),
       id_(id),
       rewriter_(new Rewriter),
+      main_path_(main_path),
       func_src_(func_src),
       mod_src_(mod_src) {}
+
+bool BFrontendAction::is_rewritable_ext_func(FunctionDecl *D) {
+  StringRef file_name = rewriter_->getSourceMgr().getFilename(D->getLocStart());
+  return (D->isExternallyVisible() && D->hasBody() &&
+          (file_name.empty() || file_name == main_path_));
+}
 
 void BFrontendAction::EndSourceFileAction() {
   if (flags_ & DEBUG_PREPROCESSOR)

@@ -115,6 +115,7 @@ class BTypeConsumer : public clang::ASTConsumer {
   bool HandleTopLevelDecl(clang::DeclGroupRef Group) override;
   void HandleTranslationUnit(clang::ASTContext &Context) override;
  private:
+  BFrontendAction &fe_;
   MapVisitor map_visitor_;
   BTypeVisitor btype_visitor_;
   ProbeVisitor probe_visitor_;
@@ -128,8 +129,8 @@ class BFrontendAction : public clang::ASTFrontendAction {
   // Initialize with the output stream where the new source file contents
   // should be written.
   BFrontendAction(llvm::raw_ostream &os, unsigned flags, TableStorage &ts,
-                  const std::string &id, FuncSource &func_src,
-                  std::string &mod_src);
+                  const std::string &id, const std::string &main_path,
+                  FuncSource &func_src, std::string &mod_src);
 
   // Called by clang when the AST has been completed, here the output stream
   // will be flushed.
@@ -141,6 +142,7 @@ class BFrontendAction : public clang::ASTFrontendAction {
   clang::Rewriter &rewriter() const { return *rewriter_; }
   TableStorage &table_storage() const { return ts_; }
   std::string id() const { return id_; }
+  bool is_rewritable_ext_func(clang::FunctionDecl *D);
 
  private:
   llvm::raw_ostream &os_;
@@ -150,6 +152,7 @@ class BFrontendAction : public clang::ASTFrontendAction {
   std::unique_ptr<clang::Rewriter> rewriter_;
   friend class BTypeVisitor;
   std::map<std::string, clang::SourceRange> func_range_;
+  const std::string &main_path_;
   FuncSource &func_src_;
   std::string &mod_src_;
   std::set<clang::Decl *> m_;
