@@ -38,10 +38,27 @@ int bpf_delete_elem(int fd, void *key);
 int bpf_get_first_key(int fd, void *key, size_t key_size);
 int bpf_get_next_key(int fd, void *key, void *next_key);
 
+/*
+ * Load a BPF program, and return the FD of the loaded program.
+ *
+ * On newer Kernels, the parameter name is used to identify the loaded program
+ * for inspection and debugging. It could be different from the function name.
+ *
+ * If log_level has value greater than 0, or the load failed, it will enable
+ * extra logging of loaded BPF bytecode and register status, and will print the
+ * logging message to stderr. In such cases:
+ *   - If log_buf and log_buf_size are provided, it will use and also write the
+ *     log messages to the provided log_buf. If log_buf is insufficient in size,
+ *     it will not to any additional memory allocation.
+ *   - Otherwise, it will allocate an internal temporary buffer for log message
+ *     printing, and continue to attempt increase that allocated buffer size if
+ *     initial attemp was insufficient in size.
+ */
 int bpf_prog_load(enum bpf_prog_type prog_type, const char *name,
                   const struct bpf_insn *insns, int insn_len,
                   const char *license, unsigned kern_version,
-                  char *log_buf, unsigned log_buf_size);
+                  int log_level, char *log_buf, unsigned log_buf_size);
+
 int bpf_attach_socket(int sockfd, int progfd);
 
 /* create RAW socket and bind to interface 'name' */
