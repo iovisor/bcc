@@ -39,11 +39,18 @@ def _get_num_open_probes():
 
 TRACEFS = "/sys/kernel/debug/tracing"
 
+# Debug flags
+
+# Debug output compiled LLVM IR.
 DEBUG_LLVM_IR = 0x1
+# Debug output loaded BPF bytecode and register state on branches.
 DEBUG_BPF = 0x2
+# Debug output pre-processor result.
 DEBUG_PREPROCESSOR = 0x4
+# Debug output ASM instructions embedded with source.
 DEBUG_SOURCE = 0x8
-LOG_BUFFER_SIZE = 65536
+#Debug output register state on all instructions in addition to DEBUG_BPF.
+DEBUG_BPF_REGISTER_STATE = 0x16
 
 class SymbolCache(object):
     def __init__(self, pid):
@@ -249,9 +256,7 @@ class BPF(object):
             hdr_file (Optional[str]): Path to a helper header file for the `src_file`
             text (Optional[str]): Contents of a source file for the module
             debug (Optional[int]): Flags used for debug prints, can be |'d together
-                DEBUG_LLVM_IR: print LLVM IR to stderr
-                DEBUG_BPF: print BPF bytecode to stderr
-                DEBUG_PREPROCESSOR: print Preprocessed C file to stderr
+                                   See "Debug flags" for explanation
         """
 
         self.open_kprobes = {}
@@ -320,13 +325,18 @@ class BPF(object):
             return self.funcs[func_name]
         if not lib.bpf_function_start(self.module, func_name.encode("ascii")):
             raise Exception("Unknown program %s" % func_name)
+        log_level = 0
+        if (self.debug & DEBUG_BPF_REGISTER_STATE):
+            log_level = 2
+        elif (self.debug & DEBUG_BPF):
+            log_level = 1
         fd = lib.bpf_prog_load(prog_type,
                 func_name.encode("ascii"),
                 lib.bpf_function_start(self.module, func_name.encode("ascii")),
                 lib.bpf_function_size(self.module, func_name.encode("ascii")),
                 lib.bpf_module_license(self.module),
                 lib.bpf_module_kern_version(self.module),
-                1 if (self.debug & DEBUG_BPF) else 0, None, 0);
+                log_level, None, 0);
 
         if fd < 0:
             atexit.register(self.donothing)
