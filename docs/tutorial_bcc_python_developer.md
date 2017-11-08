@@ -67,8 +67,8 @@ from bcc import BPF
 # define BPF program
 prog = """
 int hello(void *ctx) {
-    bpf_trace_printk("Hello, World!\\n");
-    return 0;
+	bpf_trace_printk("Hello, World!\\n");
+	return 0;
 }
 """
 
@@ -126,21 +126,21 @@ BPF_HASH(last);
 int do_trace(struct pt_regs *ctx) {
 	u64 ts, *tsp, delta, key = 0;
 
-    // attempt to read stored timestamp
-    tsp = last.lookup(&key);
-    if (tsp != 0) {
-        delta = bpf_ktime_get_ns() - *tsp;
-        if (delta < 1000000000) {
-            // output if time is less than 1 second
-            bpf_trace_printk("%d\\n", delta / 1000000);
-        }
-        last.delete(&key);
-    }
+	// attempt to read stored timestamp
+	tsp = last.lookup(&key);
+	if (tsp != 0) {
+		delta = bpf_ktime_get_ns() - *tsp;
+		if (delta < 1000000000) {
+			// output if time is less than 1 second
+			bpf_trace_printk("%d\\n", delta / 1000000);
+		}
+		last.delete(&key);
+	}
 
-    // update stored timestamp
-    ts = bpf_ktime_get_ns();
-    last.update(&key, &ts);
-    return 0;
+	// update stored timestamp
+	ts = bpf_ktime_get_ns();
+	last.update(&key, &ts);
+	return 0;
 }
 """)
 
@@ -211,7 +211,7 @@ void trace_completion(struct pt_regs *ctx, struct request *req) {
 	if (tsp != 0) {
 		delta = bpf_ktime_get_ns() - *tsp;
 		bpf_trace_printk("%d %x %d\\n", req->__data_len,
-		    req->cmd_flags, delta / 1000);
+			req->cmd_flags, delta / 1000);
 		start.delete(&req);
 	}
 }
@@ -258,22 +258,22 @@ prog = """
 
 // define output data structure in C
 struct data_t {
-    u32 pid;
-    u64 ts;
-    char comm[TASK_COMM_LEN];
+	u32 pid;
+	u64 ts;
+	char comm[TASK_COMM_LEN];
 };
 BPF_PERF_OUTPUT(events);
 
 int hello(struct pt_regs *ctx) {
-    struct data_t data = {};
+	struct data_t data = {};
 
-    data.pid = bpf_get_current_pid_tgid();
-    data.ts = bpf_ktime_get_ns();
-    bpf_get_current_comm(&data.comm, sizeof(data.comm));
+	data.pid = bpf_get_current_pid_tgid();
+	data.ts = bpf_ktime_get_ns();
+	bpf_get_current_comm(&data.comm, sizeof(data.comm));
 
-    events.perf_submit(ctx, &data, sizeof(data));
+	events.perf_submit(ctx, &data, sizeof(data));
 
-    return 0;
+	return 0;
 }
 """
 
@@ -371,9 +371,9 @@ print("Tracing... Hit Ctrl-C to end.")
 
 # trace until Ctrl-C
 try:
-	sleep(99999999)
+    sleep(99999999)
 except KeyboardInterrupt:
-	print
+    print
 
 # output
 b["dist"].print_log2_hist("kbytes")
@@ -467,9 +467,9 @@ from bcc import BPF
 # load BPF program
 b = BPF(text="""
 TRACEPOINT_PROBE(random, urandom_read) {
-    // args is from /sys/kernel/debug/tracing/events/random/urandom_read/format
-    bpf_trace_printk("%d\\n", args->got_bits);
-    return 0;
+	// args is from /sys/kernel/debug/tracing/events/random/urandom_read/format
+	bpf_trace_printk("%d\\n", args->got_bits);
+	return 0;
 };
 """)
 
@@ -552,21 +552,21 @@ b = BPF(text="""
 #include <uapi/linux/ptrace.h>
 
 struct key_t {
-    char c[80];
+	char c[80];
 };
 BPF_HASH(counts, struct key_t);
 
 int count(struct pt_regs *ctx) {
-    if (!PT_REGS_PARM1(ctx))
-        return 0;
+	if (!PT_REGS_PARM1(ctx))
+		return 0;
 
-    struct key_t key = {};
-    u64 zero = 0, *val;
+	struct key_t key = {};
+	u64 zero = 0, *val;
 
-    bpf_probe_read(&key.c, sizeof(key.c), (void *)PT_REGS_PARM1(ctx));
-    val = counts.lookup_or_init(&key, &zero);
-    (*val)++;
-    return 0;
+	bpf_probe_read(&key.c, sizeof(key.c), (void *)PT_REGS_PARM1(ctx));
+	val = counts.lookup_or_init(&key, &zero);
+	(*val)++;
+	return 0;
 };
 """)
 b.attach_uprobe(name="c", sym="strlen", fn_name="count")
@@ -608,20 +608,20 @@ Relevant code from [examples/tracing/nodejs_http_server.py](../examples/tracing/
 
 ```Python
 if len(sys.argv) < 2:
-    print("USAGE: nodejs_http_server PID")
-    exit()
+	print("USAGE: nodejs_http_server PID")
+	exit()
 pid = sys.argv[1]
 
 # load BPF program
 bpf_text = """
 #include <uapi/linux/ptrace.h>
 int do_trace(struct pt_regs *ctx) {
-    uint64_t addr;
-    char path[128];
-    bpf_usdt_readarg(6, ctx, &addr);
-    bpf_probe_read(&path, sizeof(path), (void *)addr);
-    bpf_trace_printk("path:%s\\n", path);
-    return 0;
+	uint64_t addr;
+	char path[128];
+	bpf_usdt_readarg(6, ctx, &addr);
+	bpf_probe_read(&path, sizeof(path), (void *)addr);
+	bpf_trace_printk("path:%s\\n", path);
+	return 0;
 };
 """
 
