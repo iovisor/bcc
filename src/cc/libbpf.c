@@ -199,9 +199,16 @@ int bpf_get_next_key(int fd, void *key, void *next_key)
   return syscall(__NR_bpf, BPF_MAP_GET_NEXT_KEY, &attr, sizeof(attr));
 }
 
-static void bpf_print_hints(char *log)
+static void bpf_print_hints(int ret, char *log)
 {
+  if (ret < 0)
+    fprintf(stderr, "bpf: Failed to load program: %s\n", strerror(errno));
   if (log == NULL)
+    return;
+  else
+    fprintf(stderr, "%s\n", log);
+
+  if (ret >= 0)
     return;
 
   // The following error strings will need maintenance to match LLVM.
@@ -344,39 +351,58 @@ int bpf_prog_get_tag(int fd, unsigned long long *ptag)
 int bpf_prog_load(enum bpf_prog_type prog_type, const char *name,
                   const struct bpf_insn *insns, int prog_len,
                   const char *license, unsigned kern_version,
-                  char *log_buf, unsigned log_buf_size)
+                  int log_level, char *log_buf, unsigned log_buf_size)
 {
   size_t name_len = name ? strlen(name) : 0;
   union bpf_attr attr;
-  char *bpf_log_buffer = NULL;
-  unsigned buffer_size = 0;
+  char *tmp_log_buf = NULL;
+  unsigned tmp_log_buf_size = 0;
   int ret = 0;
 
   memset(&attr, 0, sizeof(attr));
+
   attr.prog_type = prog_type;
-  attr.insns = ptr_to_u64((void *) insns);
-  attr.insn_cnt = prog_len / sizeof(struct bpf_insn);
-  attr.license = ptr_to_u64((void *) license);
-  attr.log_buf = ptr_to_u64(log_buf);
-  attr.log_size = log_buf_size;
-  attr.log_level = log_buf ? 1 : 0;
-  memcpy(attr.prog_name, name, min(name_len, BPF_OBJ_NAME_LEN - 1));
-
   attr.kern_version = kern_version;
-  if (log_buf)
-    log_buf[0] = 0;
+  attr.license = ptr_to_u64((void *)license);
 
+  attr.insns = ptr_to_u64((void *)insns);
+  attr.insn_cnt = prog_len / sizeof(struct bpf_insn);
   if (attr.insn_cnt > BPF_MAXINSNS) {
-    ret = -1;
     errno = EINVAL;
     fprintf(stderr,
             "bpf: %s. Program too large (%u insns), at most %d insns\n\n",
             strerror(errno), attr.insn_cnt, BPF_MAXINSNS);
-    return ret;
+    return -1;
   }
 
-  ret = syscall(__NR_bpf, BPF_PROG_LOAD, &attr, sizeof(attr));
+  attr.log_level = log_level;
+  if (attr.log_level > 0) {
+    if (log_buf_size > 0) {
+      // Use user-provided log buffer if availiable.
+      log_buf[0] = 0;
+      attr.log_buf = ptr_to_u64(log_buf);
+      attr.log_size = log_buf_size;
+    } else {
+      // Create and use temporary log buffer if user didn't provide one.
+      tmp_log_buf_size = LOG_BUF_SIZE;
+      tmp_log_buf = malloc(tmp_log_buf_size);
+      if (!tmp_log_buf) {
+        fprintf(stderr, "bpf: Failed to allocate temporary log buffer: %s\n\n",
+                strerror(errno));
+        attr.log_level = 0;
+      } else {
+        tmp_log_buf[0] = 0;
+        attr.log_buf = ptr_to_u64(tmp_log_buf);
+        attr.log_size = tmp_log_buf_size;
+      }
+    }
+  }
 
+  memcpy(attr.prog_name, name, min(name_len, BPF_OBJ_NAME_LEN - 1));
+
+  ret = syscall(__NR_bpf, BPF_PROG_LOAD, &attr, sizeof(attr));
+  // BPF object name is not supported on older Kernels.
+  // If we failed due to this, clear the name and try again.
   if (ret < 0 && name_len && (errno == E2BIG || errno == EINVAL)) {
     memset(attr.prog_name, 0, BPF_OBJ_NAME_LEN);
     ret = syscall(__NR_bpf, BPF_PROG_LOAD, &attr, sizeof(attr));
@@ -390,7 +416,6 @@ int bpf_prog_load(enum bpf_prog_type prog_type, const char *name,
     // mem for the user, so an accurate calculation of how much memory to lock
     // for this new program is difficult to calculate. As a hack, bump the limit
     // to unlimited. If program load fails again, return the error.
-
     struct rlimit rl = {};
     if (getrlimit(RLIMIT_MEMLOCK, &rl) == 0) {
       rl.rlim_max = RLIM_INFINITY;
@@ -400,40 +425,65 @@ int bpf_prog_load(enum bpf_prog_type prog_type, const char *name,
     }
   }
 
-  if (ret < 0 && !log_buf) {
-
-    buffer_size = LOG_BUF_SIZE;
-    // caller did not specify log_buf but failure should be printed,
-    // so repeat the syscall and print the result to stderr
-    for (;;) {
-         bpf_log_buffer = malloc(buffer_size);
-         if (!bpf_log_buffer) {
-             fprintf(stderr,
-                     "bpf: buffer log memory allocation failed for error %s\n\n",
-                     strerror(errno));
-             return ret;
-         }
-         bpf_log_buffer[0] = 0;
-
-         attr.log_buf = ptr_to_u64(bpf_log_buffer);
-         attr.log_size = buffer_size;
-         attr.log_level = bpf_log_buffer ? 1 : 0;
-
-         ret = syscall(__NR_bpf, BPF_PROG_LOAD, &attr, sizeof(attr));
-         if (ret < 0 && errno == ENOSPC) {
-             free(bpf_log_buffer);
-             bpf_log_buffer = NULL;
-             buffer_size <<= 1;
-         } else {
-             break;
-         }
+  // The load has failed. Handle log message.
+  if (ret < 0) {
+    // User has provided a log buffer.
+    if (log_buf_size) {
+      // If logging is not already enabled, enable it and do the syscall again.
+      if (attr.log_level == 0) {
+        attr.log_level = 1;
+        attr.log_buf = ptr_to_u64(log_buf);
+        attr.log_size = log_buf_size;
+        ret = syscall(__NR_bpf, BPF_PROG_LOAD, &attr, sizeof(attr));
+      }
+      // Print the log message and return.
+      bpf_print_hints(ret, log_buf);
+      if (errno == ENOSPC)
+        fprintf(stderr, "bpf: log_buf size may be insufficient\n");
+      goto return_result;
     }
 
-    fprintf(stderr, "bpf: %s\n%s\n", strerror(errno), bpf_log_buffer);
-    bpf_print_hints(bpf_log_buffer);
+    // User did not provide log buffer. We will try to increase size of
+    // our temporary log buffer to get full error message.
+    if (tmp_log_buf)
+      free(tmp_log_buf);
+    tmp_log_buf_size = LOG_BUF_SIZE;
+    attr.log_level = 1;
+    for (;;) {
+      tmp_log_buf = malloc(tmp_log_buf_size);
+      if (!tmp_log_buf) {
+        fprintf(stderr, "bpf: Failed to allocate temporary log buffer: %s\n\n",
+                strerror(errno));
+        goto return_result;
+      }
+      tmp_log_buf[0] = 0;
+      attr.log_buf = ptr_to_u64(tmp_log_buf);
+      attr.log_size = tmp_log_buf_size;
 
-    free(bpf_log_buffer);
+      ret = syscall(__NR_bpf, BPF_PROG_LOAD, &attr, sizeof(attr));
+      if (ret < 0 && errno == ENOSPC) {
+        // Temporary buffer size is not enough. Double it and try again.
+        free(tmp_log_buf);
+        tmp_log_buf = NULL;
+        tmp_log_buf_size <<= 1;
+      } else {
+        break;
+      }
+    }
   }
+
+  // If log_level is not 0, either speficied by user or set due to error,
+  // print the log message.
+  if (attr.log_level > 0) {
+    if (log_buf)
+      bpf_print_hints(ret, log_buf);
+    else if (tmp_log_buf)
+      bpf_print_hints(ret, tmp_log_buf);
+  }
+
+return_result:
+  if (tmp_log_buf)
+    free(tmp_log_buf);
   return ret;
 }
 
