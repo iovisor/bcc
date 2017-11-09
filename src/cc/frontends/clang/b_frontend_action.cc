@@ -211,13 +211,13 @@ bool ProbeVisitor::VisitMemberExpr(MemberExpr *E) {
     return true;
 
   Expr *base;
-  SourceLocation rhs_start, op;
+  SourceLocation rhs_start, member;
   bool found = false;
   for (MemberExpr *M = E; M; M = dyn_cast<MemberExpr>(M->getBase())) {
     memb_visited_.insert(M);
     rhs_start = M->getLocEnd();
     base = M->getBase();
-    op = M->getOperatorLoc();
+    member = M->getMemberLoc();
     if (M->isArrow()) {
       found = true;
       break;
@@ -225,19 +225,18 @@ bool ProbeVisitor::VisitMemberExpr(MemberExpr *E) {
   }
   if (!found)
     return true;
-  if (op.isInvalid()) {
-    error(base->getLocEnd(), "internal error: opLoc is invalid while preparing probe rewrite");
+  if (member.isInvalid()) {
+    error(base->getLocEnd(), "internal error: MemberLoc is invalid while preparing probe rewrite");
     return false;
   }
   string rhs = rewriter_.getRewrittenText(expansionRange(SourceRange(rhs_start, E->getLocEnd())));
   string base_type = base->getType()->getPointeeType().getAsString();
   string pre, post;
   pre = "({ typeof(" + E->getType().getAsString() + ") _val; memset(&_val, 0, sizeof(_val));";
-  pre += " bpf_probe_read(&_val, sizeof(_val), (u64)";
-  post = " + offsetof(" + base_type + ", " + rhs + ")";
-  post += "); _val; })";
+  pre += " bpf_probe_read(&_val, sizeof(_val), (u64)&";
+  post = rhs + "); _val; })";
   rewriter_.InsertText(E->getLocStart(), pre);
-  rewriter_.ReplaceText(expansionRange(SourceRange(op, E->getLocEnd())), post);
+  rewriter_.ReplaceText(expansionRange(SourceRange(member, E->getLocEnd())), post);
   return true;
 }
 
