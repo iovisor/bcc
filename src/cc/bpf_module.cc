@@ -455,7 +455,7 @@ unique_ptr<ExecutionEngine> BPFModule::finalize_rw(unique_ptr<Module> m) {
   string err;
   EngineBuilder builder(move(m));
   builder.setErrorStr(&err);
-  builder.setUseOrcMCJITReplacement(true);
+  builder.setUseOrcMCJITReplacement(false);
   auto engine = unique_ptr<ExecutionEngine>(builder.create());
   if (!engine)
     fprintf(stderr, "Could not create ExecutionEngine: %s\n", err.c_str());
@@ -596,7 +596,7 @@ int BPFModule::finalize() {
   builder.setErrorStr(&err);
   builder.setMCJITMemoryManager(ebpf::make_unique<MyMemoryManager>(&sections_));
   builder.setMArch("bpf");
-  builder.setUseOrcMCJITReplacement(true);
+  builder.setUseOrcMCJITReplacement(false);
   engine_ = unique_ptr<ExecutionEngine>(builder.create());
   if (!engine_) {
     fprintf(stderr, "Could not create ExecutionEngine: %s\n", err.c_str());
