@@ -50,7 +50,7 @@ DEBUG_PREPROCESSOR = 0x4
 # Debug output ASM instructions embedded with source.
 DEBUG_SOURCE = 0x8
 #Debug output register state on all instructions in addition to DEBUG_BPF.
-DEBUG_BPF_REGISTER_STATE = 0x16
+DEBUG_BPF_REGISTER_STATE = 0x10
 
 class SymbolCache(object):
     def __init__(self, pid):

@@ -26,8 +26,9 @@
 #include <clang/Rewrite/Core/Rewriter.h>
 
 #include "b_frontend_action.h"
-#include "loader.h"
+#include "bpf_module.h"
 #include "common.h"
+#include "loader.h"
 #include "table_storage.h"
 
 #include "libbpf.h"
