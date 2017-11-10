@@ -49,8 +49,8 @@
 
 #include <llvm/IR/Module.h>
 
-#include "common.h"
 #include "bcc_exception.h"
+#include "bpf_module.h"
 #include "exported_files.h"
 #include "kbuild_helper.h"
 #include "b_frontend_action.h"
