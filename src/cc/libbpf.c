@@ -448,7 +448,8 @@ int bpf_prog_load(enum bpf_prog_type prog_type, const char *name,
     if (tmp_log_buf)
       free(tmp_log_buf);
     tmp_log_buf_size = LOG_BUF_SIZE;
-    attr.log_level = 1;
+    if (attr.log_level == 0)
+      attr.log_level = 1;
     for (;;) {
       tmp_log_buf = malloc(tmp_log_buf_size);
       if (!tmp_log_buf) {
