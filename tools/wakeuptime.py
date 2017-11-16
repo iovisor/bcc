@@ -5,12 +5,6 @@
 #
 # USAGE: wakeuptime [-h] [-u] [-p PID] [-v] [-f] [duration]
 #
-# The current implementation uses an unrolled loop for x86_64, and was written
-# as a proof of concept. This implementation should be replaced in the future
-# with an appropriate bpf_ call, when available.
-#
-# Currently limited to a stack trace depth of 21 (maxdepth + 1).
-#
 # Copyright 2016 Netflix, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
@@ -21,6 +15,25 @@ from bcc import BPF
 from time import sleep, strftime
 import argparse
 import signal
+import errno
+from sys import stderr
+
+# arg validation
+def positive_int(val):
+    try:
+        ival = int(val)
+    except ValueError:
+        raise argparse.ArgumentTypeError("must be an integer")
+
+    if ival < 0:
+        raise argparse.ArgumentTypeError("must be positive")
+    return ival
+
+def positive_nonzero_int(val):
+    ival = positive_int(val)
+    if ival == 0:
+        raise argparse.ArgumentTypeError("must be nonzero")
+    return ival
 
 # arguments
 examples = """examples:
@@ -37,21 +50,33 @@ parser = argparse.ArgumentParser(
 parser.add_argument("-u", "--useronly", action="store_true",
     help="user threads only (no kernel threads)")
 parser.add_argument("-p", "--pid",
+    type=positive_int,
     help="trace this PID only")
 parser.add_argument("-v", "--verbose", action="store_true",
     help="show raw addresses")
 parser.add_argument("-f", "--folded", action="store_true",
     help="output folded format")
+parser.add_argument("--stack-storage-size", default=1024,
+    type=positive_nonzero_int,
+    help="the number of unique stack traces that can be stored and "
+         "displayed (default 1024)")
 parser.add_argument("duration", nargs="?", default=99999999,
+    type=positive_nonzero_int,
     help="duration of trace, in seconds")
+parser.add_argument("-m", "--min-block-time", default=1,
+    type=positive_nonzero_int,
+    help="the amount of time in microseconds over which we " +
+         "store traces (default 1)")
+parser.add_argument("-M", "--max-block-time", default=(1 << 64) - 1,
+    type=positive_nonzero_int,
+    help="the amount of time in microseconds under which we " +
+         "store traces (default U64_MAX)")
 args = parser.parse_args()
 folded = args.folded
 duration = int(args.duration)
 debug = 0
-maxdepth = 20    # and MAXDEPTH
 if args.pid and args.useronly:
-    print("ERROR: use either -p or -u.")
-    exit()
+    parser.error("use either -p or -u.")
 
 # signal handler
 def signal_ignore(signal, frame):
@@ -62,38 +87,17 @@ bpf_text = """
 #include <uapi/linux/ptrace.h>
 #include <linux/sched.h>
 
-#define MAXDEPTH	20
-#define MINBLOCK_US	1
+#define MINBLOCK_US    MINBLOCK_US_VALUEULL
+#define MAXBLOCK_US    MAXBLOCK_US_VALUEULL
 
 struct key_t {
+    int  w_k_stack_id;
     char waker[TASK_COMM_LEN];
     char target[TASK_COMM_LEN];
-    // Skip saving the ip
-    u64 ret[MAXDEPTH];
 };
 BPF_HASH(counts, struct key_t);
 BPF_HASH(start, u32);
-
-static u64 get_frame(u64 *bp) {
-    if (*bp) {
-        // The following stack walker is x86_64/arm64 specific
-        u64 ret = 0;
-        if (bpf_probe_read(&ret, sizeof(ret), (void *)(*bp+8)))
-            return 0;
-        if (bpf_probe_read(bp, sizeof(*bp), (void *)*bp))
-            return 0;
-#ifdef __x86_64__
-        if (ret < __START_KERNEL_map)
-#elif __aarch64__
-        if (ret < VA_START)
-#else
-#error "Unsupported architecture for stack walker"
-#endif
-            return 0;
-        return ret;
-    }
-    return 0;
-}
+BPF_STACK_TRACE(stack_traces, STACK_STORAGE_SIZE)
 
 int offcpu(struct pt_regs *ctx) {
     u32 pid = bpf_get_current_pid_tgid();
@@ -118,41 +122,16 @@ int waker(struct pt_regs *ctx, struct task_struct *p) {
     // calculate delta time
     delta = bpf_ktime_get_ns() - *tsp;
     delta = delta / 1000;
-    if (delta < MINBLOCK_US)
+    if ((delta < MINBLOCK_US) || (delta > MAXBLOCK_US))
         return 0;
 
     struct key_t key = {};
-    u64 zero = 0, *val, bp = 0;
-    int depth = 0;
+    u64 zero = 0, *val;
 
+    key.w_k_stack_id = stack_traces.get_stackid(ctx, BPF_F_REUSE_STACKID);
     bpf_probe_read(&key.target, sizeof(key.target), p->comm);
     bpf_get_current_comm(&key.waker, sizeof(key.waker));
-    bp = PT_REGS_FP(ctx);
 
-    // unrolled loop (MAXDEPTH):
-    if (!(key.ret[depth++] = get_frame(&bp))) goto out;
-    if (!(key.ret[depth++] = get_frame(&bp))) goto out;
-    if (!(key.ret[depth++] = get_frame(&bp))) goto out;
-    if (!(key.ret[depth++] = get_frame(&bp))) goto out;
-    if (!(key.ret[depth++] = get_frame(&bp))) goto out;
-    if (!(key.ret[depth++] = get_frame(&bp))) goto out;
-    if (!(key.ret[depth++] = get_frame(&bp))) goto out;
-    if (!(key.ret[depth++] = get_frame(&bp))) goto out;
-    if (!(key.ret[depth++] = get_frame(&bp))) goto out;
-    if (!(key.ret[depth++] = get_frame(&bp))) goto out;
-
-    if (!(key.ret[depth++] = get_frame(&bp))) goto out;
-    if (!(key.ret[depth++] = get_frame(&bp))) goto out;
-    if (!(key.ret[depth++] = get_frame(&bp))) goto out;
-    if (!(key.ret[depth++] = get_frame(&bp))) goto out;
-    if (!(key.ret[depth++] = get_frame(&bp))) goto out;
-    if (!(key.ret[depth++] = get_frame(&bp))) goto out;
-    if (!(key.ret[depth++] = get_frame(&bp))) goto out;
-    if (!(key.ret[depth++] = get_frame(&bp))) goto out;
-    if (!(key.ret[depth++] = get_frame(&bp))) goto out;
-    if (!(key.ret[depth++] = get_frame(&bp))) goto out;
-
-out:
     val = counts.lookup_or_init(&key, &zero);
     (*val) += delta;
     return 0;
@@ -165,6 +144,12 @@ elif args.useronly:
 else:
     filter = '0'
 bpf_text = bpf_text.replace('FILTER', filter)
+
+# set stack storage size
+bpf_text = bpf_text.replace('STACK_STORAGE_SIZE', str(args.stack_storage_size))
+bpf_text = bpf_text.replace('MINBLOCK_US_VALUE', str(args.min_block_time))
+bpf_text = bpf_text.replace('MAXBLOCK_US_VALUE', str(args.max_block_time))
+
 if debug:
     print(bpf_text)
 
@@ -195,29 +180,42 @@ while (1):
 
     if not folded:
         print()
+    missing_stacks = 0
+    has_enomem = False
     counts = b.get_table("counts")
+    stack_traces = b.get_table("stack_traces")
     for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
+        # handle get_stackid errors
+        # check for an ENOMEM error
+        if k.w_k_stack_id == -errno.ENOMEM:
+            missing_stacks += 1
+            continue
+
+        waker_kernel_stack = [] if k.w_k_stack_id < 1 else \
+            reversed(list(stack_traces.walk(k.w_k_stack_id))[1:])
+
         if folded:
             # print folded stack output
-            line = k.waker.decode() + ";"
-            for i in reversed(range(0, maxdepth)):
-                if k.ret[i] == 0:
-                    continue
-                line = line + b.ksym(k.ret[i])
-                if i != 0:
-                    line = line + ";"
-            print("%s;%s %d" % (line, k.target.decode(), v.value))
+            line = \
+                [k.waker.decode()] + \
+                [b.ksym(addr)
+                    for addr in reversed(list(waker_kernel_stack))] + \
+                [k.target.decode()]
+            print("%s %d" % (";".join(line), v.value))
         else:
             # print default multi-line stack output
             print("    %-16s %s" % ("target:", k.target.decode()))
-            for i in range(0, maxdepth):
-                if k.ret[i] == 0:
-                    break
-                print("    %-16x %s" % (k.ret[i],
-                    b.ksym(k.ret[i])))
+            for addr in waker_kernel_stack:
+                print("    %-16x %s" % (addr, b.ksym(addr)))
             print("    %-16s %s" % ("waker:", k.waker.decode()))
             print("        %d\n" % v.value)
     counts.clear()
+
+    if missing_stacks > 0:
+        enomem_str = " Consider increasing --stack-storage-size."
+        print("WARNING: %d stack traces could not be displayed.%s" %
+            (missing_stacks, enomem_str),
+            file=stderr)
 
     if not folded:
         print("Detaching...")
