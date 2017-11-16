@@ -333,7 +333,7 @@ class SmokeTests(TestCase):
         # This attaches a large number (300+) kprobes, which can be slow,
         # so use an increased timeout value.
         self.run_with_int("lib/ucalls.py -l none -S %d" % os.getpid(),
-                          timeout=30, kill_timeout=30)
+                          timeout=60, kill_timeout=60)
 
     @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
     def test_uflow(self):
@@ -361,7 +361,7 @@ class SmokeTests(TestCase):
         self.run_with_int("lib/uthreads.py %d" % os.getpid())
 
     def test_vfscount(self):
-        self.run_with_int("vfscount.py")
+        self.run_with_int("vfscount.py", timeout=15, kill_timeout=15)
 
     def test_vfsstat(self):
         self.run_with_duration("vfsstat.py 1 1")
