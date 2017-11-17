@@ -101,8 +101,13 @@ BPF_STACK_TRACE(stack_traces, STACK_STORAGE_SIZE)
 
 int offcpu(struct pt_regs *ctx) {
     u32 pid = bpf_get_current_pid_tgid();
-    u64 ts = bpf_ktime_get_ns();
-    // XXX: should filter here too, but need task_struct
+    struct task_struct *p = (struct task_struct *) bpf_get_current_task();
+    u64 ts;
+
+    if (FILTER)
+        return 0;
+
+    ts = bpf_ktime_get_ns();
     start.update(&pid, &ts);
     return 0;
 }
