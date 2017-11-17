@@ -50,7 +50,18 @@ Kernel compile flags can usually be checked by looking at `/proc/config.gz` or
 
 ## Ubuntu Xenial - Binary
 
-Only the nightly packages are built for Ubuntu 16.04, but the steps are very straightforward. No need to upgrade the kernel or compile from source!
+The stable and the nightly packages are built for Ubuntu Xenial (16.04). The steps are very straightforward, no need to upgrade the kernel or compile from source!
+
+**Stable and Signed Packages**
+
+```bash
+sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys D4284CDD
+echo "deb https://repo.iovisor.org/apt/xenial xenial main" | sudo tee /etc/apt/sources.list.d/iovisor.list
+sudo apt-get update
+sudo apt-get install bcc-tools libbcc-examples linux-headers-$(uname -r)
+```
+
+**Nightly Packages**
 
 ```bash
 echo "deb [trusted=yes] https://repo.iovisor.org/apt/xenial xenial-nightly main" | sudo tee /etc/apt/sources.list.d/iovisor.list
