@@ -366,6 +366,7 @@ class SmokeTests(TestCase):
     def test_vfsstat(self):
         self.run_with_duration("vfsstat.py 1 1")
 
+    @skipUnless(kernel_version_ge(4,6), "requires kernel >= 4.6")
     def test_wakeuptime(self):
         self.run_with_duration("wakeuptime.py 1")
 
