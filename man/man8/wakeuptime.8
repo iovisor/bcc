@@ -2,7 +2,7 @@
 .SH NAME
 wakeuptime \- Summarize sleep to wakeup time by waker kernel stack. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B wakeuptime [\-h] [\-u] [\-p PID] [\-v] [\-f] [duration]
+.B wakeuptime [\-h] [\-u] [\-p PID] [\-v] [\-f] [\-\-stack-storage-size STACK_STORAGE_SIZE] [\-m MIN_BLOCK_TIME] [\-M MAX_BLOCK_TIME] [duration]
 .SH DESCRIPTION
 This program shows the kernel stack traces for threads that woke up other 
 blocked threads, along with the process names of the waker and target, along
@@ -23,10 +23,8 @@ of the blocked thread. wakeuptime shows the stack trace of the waker thread.
 
 See http://www.brendangregg.com/FlameGraphs/offcpuflamegraphs.html
 
-The stack depth is currently limited to 20, and the stack traces are kernel
-mode only. Check for newer versions where either may be improved.
-
-This currently only works on x86_64. Check for future versions.
+This tool only works on Linux 4.6+. It uses the new `BPF_STACK_TRACE` table
+APIs to generate the in-kernel stack traces.
 .SH REQUIREMENTS
 CONFIG_BPF and bcc.
 .SH OPTIONS
@@ -46,8 +44,17 @@ Show raw addresses (for non-folded format).
 \-p PID
 Trace this process ID only (filtered in-kernel).
 .TP
+\-\-stack-storage-size STACK_STORAGE_SIZE
+Change the number of unique stack traces that can be stored and displayed.
+.TP
 duration
 Duration to trace, in seconds.
+.TP
+\-m MIN_BLOCK_TIME
+The amount of time in microseconds over which we store traces (default 1)
+.TP
+\-M MAX_BLOCK_TIME
+The amount of time in microseconds under which we store traces (default U64_MAX)
 .SH EXAMPLES
 .TP
 Trace all thread blocking events, and summarize (in-kernel) by kernel stack trace and total blocked time:
@@ -77,8 +84,8 @@ printed. While these techniques greatly lower overhead, scheduler events are
 still a high frequency event, as they can exceed 1 million events per second,
 and so caution should still be used. Test before production use.
 
-If the overhead is still a problem, take a look at the MINBLOCK_US tunable in
-the code. If your aim is to chase down longer blocking events, then this could
+If the overhead is still a problem, take a look at the min block option.
+If your aim is to chase down longer blocking events, then this could
 be increased to filter shorter blocking events, further lowering overhead.
 .SH SOURCE
 This is from bcc.
