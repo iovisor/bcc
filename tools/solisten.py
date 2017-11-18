@@ -46,10 +46,12 @@ parser.add_argument("-n", "--netns", default=0, type=int,
 
 # BPF Program
 bpf_text = """
-#include <net/sock.h>
-#include <net/inet_sock.h>
 #include <net/net_namespace.h>
 #include <bcc/proto.h>
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wenum-conversion"
+#include <net/inet_sock.h>
+#pragma clang diagnostic pop
 
 // Common structure for UDP/TCP IPv4/IPv6
 struct listen_evt_t {
