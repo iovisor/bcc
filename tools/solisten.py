@@ -46,10 +46,12 @@ parser.add_argument("-n", "--netns", default=0, type=int,
 
 # BPF Program
 bpf_text = """
-#include <net/sock.h>
-#include <net/inet_sock.h>
 #include <net/net_namespace.h>
 #include <bcc/proto.h>
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wenum-conversion"
+#include <net/inet_sock.h>
+#pragma clang diagnostic pop
 
 // Common structure for UDP/TCP IPv4/IPv6
 struct listen_evt_t {
@@ -106,7 +108,6 @@ int kprobe__inet_listen(struct pt_regs *ctx, struct socket *sock, int backlog)
         // Get IP
         if (family == AF_INET) {
             evt.laddr[0] = inet->inet_rcv_saddr;
-            evt.laddr[0] = be32_to_cpu(evt.laddr[0]);
         } else if (family == AF_INET6) {
             bpf_probe_read(evt.laddr, sizeof(evt.laddr),
                            sk->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
