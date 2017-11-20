@@ -20,6 +20,7 @@
 #include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <inttypes.h>
 #include <limits.h>
 #include <linux/bpf.h>
 #include <linux/bpf_common.h>
@@ -846,27 +847,48 @@ error:
 
 static int invalid_perf_config(uint32_t type, uint64_t config) {
   switch (type) {
-    case PERF_TYPE_HARDWARE:
-      return config >= PERF_COUNT_HW_MAX;
-    case PERF_TYPE_SOFTWARE:
-      return config >= PERF_COUNT_SW_MAX;
-    case PERF_TYPE_RAW:
-      return 0;
-    default:
-      return 1;
+  case PERF_TYPE_HARDWARE:
+    if (config >= PERF_COUNT_HW_MAX) {
+      fprintf(stderr, "HARDWARE perf event config out of range\n");
+      goto is_invalid;
+    }
+    return 0;
+  case PERF_TYPE_SOFTWARE:
+    if (config >= PERF_COUNT_SW_MAX) {
+      fprintf(stderr, "SOFTWARE perf event config out of range\n");
+      goto is_invalid;
+    } else if (config == 10 /* PERF_COUNT_SW_BPF_OUTPUT */) {
+      fprintf(stderr, "Unable to open or attach perf event for BPF_OUTPUT\n");
+      goto is_invalid;
+    }
+    return 0;
+  case PERF_TYPE_HW_CACHE:
+    if (((config >> 16) >= PERF_COUNT_HW_CACHE_RESULT_MAX) ||
+        (((config >> 8) & 0xff) >= PERF_COUNT_HW_CACHE_OP_MAX) ||
+        ((config & 0xff) >= PERF_COUNT_HW_CACHE_MAX)) {
+      fprintf(stderr, "HW_CACHE perf event config out of range\n");
+      goto is_invalid;
+    }
+    return 0;
+  case PERF_TYPE_TRACEPOINT:
+  case PERF_TYPE_BREAKPOINT:
+    fprintf(stderr,
+            "Unable to open or attach TRACEPOINT or BREAKPOINT events\n");
+    goto is_invalid;
+  default:
+    return 0;
   }
+is_invalid:
+  fprintf(stderr, "Invalid perf event type %" PRIu32 " config %" PRIu64 "\n",
+          type, config);
+  return 1;
 }
 
 int bpf_open_perf_event(uint32_t type, uint64_t config, int pid, int cpu) {
   int fd;
   struct perf_event_attr attr = {};
 
-  if (type != PERF_TYPE_HARDWARE && type != PERF_TYPE_RAW) {
-    fprintf(stderr, "Unsupported perf event type\n");
-    return -1;
-  }
   if (invalid_perf_config(type, config)) {
-    fprintf(stderr, "Invalid perf event config\n");
     return -1;
   }
 
@@ -1013,12 +1035,7 @@ cleanup:
 int bpf_attach_perf_event(int progfd, uint32_t ev_type, uint32_t ev_config,
                           uint64_t sample_period, uint64_t sample_freq,
                           pid_t pid, int cpu, int group_fd) {
-  if (ev_type != PERF_TYPE_HARDWARE && ev_type != PERF_TYPE_SOFTWARE) {
-    fprintf(stderr, "Unsupported perf event type\n");
-    return -1;
-  }
   if (invalid_perf_config(ev_type, ev_config)) {
-    fprintf(stderr, "Invalid perf event config\n");
     return -1;
   }
   if (!((sample_period > 0) ^ (sample_freq > 0))) {
