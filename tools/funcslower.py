@@ -151,7 +151,7 @@ bpf_text = bpf_text.replace('DURATION_NS', str(duration_ns))
 if args.arguments:
     bpf_text = "#define GRAB_ARGS\n" + bpf_text
 if args.tgid:
-    bpf_text = bpf_text.replace('TGID_FILTER', 'tgid != %d' % tgid)
+    bpf_text = bpf_text.replace('TGID_FILTER', 'tgid != %d' % args.tgid)
 else:
     bpf_text = bpf_text.replace('TGID_FILTER', '0')
 
