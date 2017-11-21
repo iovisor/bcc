@@ -4,34 +4,33 @@ from __future__ import print_function
 from bcc import BPF
 from ctypes import *
 
-import sys
-import socket
 import os
-import struct
+import sys
+import fcntl
 import dnslib
 import argparse
 
 
 def encode_dns(name):
-  size = 255
-  if len(name) > 255:
+  if len(name) + 1 > 255:
     raise Exception("DNS Name too long.")
-  b = bytearray(size)
-  i = 0;
-  elements = name.split(".")
-  for element in elements:
-    b[i] = struct.pack("!B", len(element))
-    i += 1
-    for j in range(0, len(element)):
-      b[i] = element[j]
-      i += 1
-
-
-  return (c_ubyte * size).from_buffer(b)
+  b = bytearray()
+  for element in name.split('.'):
+    sublen = len(element)
+    if sublen > 63:
+      raise ValueError('DNS label %s is too long' % element)
+    b.append(sublen)
+    b.extend(element.encode('ascii'))
+  b.append(0)  # Add 0-len octet label for the root server
+  return b
 
 def add_cache_entry(cache, name):
   key = cache.Key()
-  key.p = encode_dns(name)
+  key_len = len(key.p)
+  name_buffer = encode_dns(name)
+  # Pad the buffer with null bytes if it is too short
+  name_buffer.extend((0,) * (key_len - len(name_buffer)))
+  key.p = (c_ubyte * key_len).from_buffer(name_buffer)
   leaf = cache.Leaf()
   leaf.p = (c_ubyte * 4).from_buffer(bytearray(4))
   cache[key] = leaf
@@ -41,8 +40,8 @@ parser = argparse.ArgumentParser(usage='For detailed information about usage,\
  try with -h option')
 req_args = parser.add_argument_group("Required arguments")
 req_args.add_argument("-i", "--interface", type=str, required=True, help="Interface name")
-req_args.add_argument("-d", "--domains", type=str, required=True,
-    help='List of domain names separated by comma. For example: -d "abc.def, xyz.mno"')
+req_args.add_argument("-d", "--domains", type=str, required=True, nargs="+",
+    help='List of domain names separated by space. For example: -d "abc.def xyz.mno"')
 args = parser.parse_args()
 
 # initialize BPF - load source code from http-parse-simple.c
@@ -63,8 +62,7 @@ BPF.attach_raw_socket(function_dns_matching, args.interface)
 cache = bpf.get_table("cache")
 
 # Add cache entries
-entries = [i.strip() for i in args.domains.split(",")]
-for e in entries:
+for e in args.domains:
   print(">>>> Adding map entry: ", e)
   add_cache_entry(cache, e)
 
@@ -75,12 +73,15 @@ print("Packets received by user space program will be printed here")
 print("\nHit Ctrl+C to end...")
 
 socket_fd = function_dns_matching.sock
-sock = socket.fromfd(socket_fd, socket.PF_PACKET, socket.SOCK_RAW, socket.IPPROTO_IP)
-sock.setblocking(True)
+fl = fcntl.fcntl(socket_fd, fcntl.F_GETFL)
+fcntl.fcntl(socket_fd, fcntl.F_SETFL, fl & (~os.O_NONBLOCK))
 
 while 1:
   #retrieve raw packet from socket
-  packet_str = os.read(socket_fd, 2048)
+  try:
+    packet_str = os.read(socket_fd, 2048)
+  except KeyboardInterrupt:
+    sys.exit(0)
   packet_bytearray = bytearray(packet_str)
 
   ETH_HLEN = 14
