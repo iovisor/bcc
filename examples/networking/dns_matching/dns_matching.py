@@ -39,9 +39,10 @@ def add_cache_entry(cache, name):
 parser = argparse.ArgumentParser(usage='For detailed information about usage,\
  try with -h option')
 req_args = parser.add_argument_group("Required arguments")
-req_args.add_argument("-i", "--interface", type=str, required=True, help="Interface name")
+req_args.add_argument("-i", "--interface", type=str, default="",
+                      help="Interface name, defaults to all if unspecified.")
 req_args.add_argument("-d", "--domains", type=str, required=True, nargs="+",
-    help='List of domain names separated by space. For example: -d "abc.def xyz.mno"')
+    help='List of domain names separated by space. For example: -d abc.def xyz.mno')
 args = parser.parse_args()
 
 # initialize BPF - load source code from http-parse-simple.c
