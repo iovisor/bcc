@@ -11,6 +11,9 @@
 # return from each function. For commonly-invoked functions like memory allocs
 # or file writes, this can be extremely expensive. Mind the overhead.
 #
+# NOTE: This tool cannot trace nested functions in the same invocation
+# due to instrumentation specifics, only innermost calls will be visible.
+#
 # By default, a minimum millisecond threshold of 1 is used.
 #
 # Copyright 2017, Sasha Goldshtein
