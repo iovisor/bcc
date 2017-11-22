@@ -61,7 +61,8 @@ int bpf_prog_load(enum bpf_prog_type prog_type, const char *name,
 
 int bpf_attach_socket(int sockfd, int progfd);
 
-/* create RAW socket and bind to interface 'name' */
+/* create RAW socket. If name is not NULL/a non-empty null-terminated string,
+ * bind the raw socket to the interface 'name' */
 int bpf_open_raw_sock(const char *name);
 
 typedef void (*perf_reader_cb)(void *cb_cookie, int pid, uint64_t callchain_num,

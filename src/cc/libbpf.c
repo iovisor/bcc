@@ -500,6 +500,10 @@ int bpf_open_raw_sock(const char *name)
     return -1;
   }
 
+  /* Do not bind on empty interface names */
+  if (!name || *name == '\0')
+    return sock;
+
   memset(&sll, 0, sizeof(sll));
   sll.sll_family = AF_PACKET;
   sll.sll_ifindex = if_nametoindex(name);
