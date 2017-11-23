@@ -66,7 +66,7 @@ class ClangLoader {
                  std::string &mod_src, bool use_internal_bpfh);
 
  private:
-  static std::map<std::string, std::unique_ptr<llvm::MemoryBuffer>> remapped_files_;
+  std::map<std::string, std::unique_ptr<llvm::MemoryBuffer>> remapped_files_;
   llvm::LLVMContext *ctx_;
   unsigned flags_;
 };

@@ -64,15 +64,11 @@ using std::vector;
 
 namespace ebpf {
 
-map<string, unique_ptr<llvm::MemoryBuffer>> ClangLoader::remapped_files_;
-
 ClangLoader::ClangLoader(llvm::LLVMContext *ctx, unsigned flags)
     : ctx_(ctx), flags_(flags)
 {
-  if (remapped_files_.empty()) {
-    for (auto f : ExportedFiles::headers())
-      remapped_files_[f.first] = llvm::MemoryBuffer::getMemBuffer(f.second);
-  }
+  for (auto f : ExportedFiles::headers())
+    remapped_files_[f.first] = llvm::MemoryBuffer::getMemBuffer(f.second);
 }
 
 ClangLoader::~ClangLoader() {}

@@ -120,14 +120,13 @@ class BPFModule {
 
  private:
   unsigned flags_;  // 0x1 for printing
+  bool used_b_loader_;
   std::string filename_;
   std::string proto_filename_;
   std::unique_ptr<llvm::LLVMContext> ctx_;
   std::unique_ptr<llvm::ExecutionEngine> engine_;
   std::unique_ptr<llvm::ExecutionEngine> rw_engine_;
   std::unique_ptr<llvm::Module> mod_;
-  std::unique_ptr<BLoader> b_loader_;
-  std::unique_ptr<ClangLoader> clang_loader_;
   std::unique_ptr<FuncSource> func_src_;
   std::map<std::string, std::tuple<uint8_t *, uintptr_t>> sections_;
   std::vector<TableDesc *> tables_;
