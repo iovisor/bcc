@@ -1,0 +1,87 @@
+.TH bps 8  "2017-10-19" "USER COMMANDS"
+.SH NAME
+bps \- List all BPF programs. 'ps' for BPF programs.
+.SH SYNOPSIS
+.B bps [bpf-prog-id]
+.SH DESCRIPTION
+.B bps
+lists all BPF programs loaded into the kernel.  It is similar
+to the ps command but for the BPF programs.
+
+Each loaded bpf program is identified by an unique integer (i.e.
+.B bpf-prog-id
+or simply BID).  If
+a
+.B bpf-prog-id
+is specified, the maps used by
+.B bpf-prog-id
+will also be listed.
+
+.SH EXAMPLES
+.TP
+List all BPF programs loaded into the kernel:
+.B bps
+.TP
+Show the details and maps of BID 6:
+.B bps 6
+.SH BPF PROGRAM FIELDS
+.TP
+.B BID
+BPF program ID.  It ends with '-' if it is not jitted.
+.TP
+.B TYPE
+The type of a BPF program. e.g. kprobe, tracepoint, xdp...etc.
+.TP
+.B UID
+The user ID that loaded the BPF program.
+.TP
+.B #MAPS
+Total number of maps used by a BPF program.
+.TP
+.B LoadTime
+When was the BPF program loaded?
+.TP
+.B NAME
+The name of a BPF program.  The user space library (like
+.B bcc
+) usually
+uses the C function name of the original BPF's source code as
+the program name.  It could be empty if the user space did not
+provide a name.
+
+.SH BPF MAP FIELDS
+.TP
+.B MID
+BPF map ID.
+.TP
+.B TYPE
+The type of a BPF map. e.g. hash, array, stack trace...etc.
+.TP
+.B FLAGS
+The flags used to create the BP map.
+.TP
+.B KeySz
+The key size of a BPF map.
+.TP
+.B ValueSz
+The value size of a BPF map.
+.TP
+.B MaxEnts
+The maximum number of entries of a map.
+.TP
+.B NAME
+The name of a BPF map.  The user space library (like
+.B bcc
+) usually uses the C variable name of the BPF map as its name.
+It could be empty if the user space did not provide a name.
+
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Martin Lau

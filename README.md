@@ -171,6 +171,12 @@ Examples:
 - examples/networking/[tunnel_monitor/](examples/networking/tunnel_monitor): Efficiently monitor traffic flows. [Example video](https://www.youtube.com/watch?v=yYy3Cwce02k).
 - examples/networking/vlan_learning/[vlan_learning.py](examples/networking/vlan_learning/vlan_learning.py) examples/[vlan_learning.c](examples/networking/vlan_learning/vlan_learning.c): Demux Ethernet traffic into worker veth+namespaces.
 
+### BPF Introspection:
+
+Tools that help to introspect BPF programs.
+
+- introspection/[bps.c](introspection/bps.c): List all BPF programs loaded into the kernel. 'ps' for BPF programs. [Examples](introspection/bps_example.txt).
+
 ## Motivation
 
 BPF guarantees that the programs loaded into the kernel cannot crash, and

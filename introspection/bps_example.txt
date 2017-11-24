@@ -1,0 +1,22 @@
+* List all BPF programs *
+# bps
+   BID TYPE                 UID  #MAPS LoadTime     NAME
+    82 kprobe                 0      1 Oct19/23:52  map_perf_test
+    83 kprobe                 0      1 Oct19/23:52  map_perf_test
+    84 kprobe                 0      1 Oct19/23:52  map_perf_test
+    85 kprobe                 0      1 Oct19/23:52  map_perf_test
+    86 kprobe                 0      4 Oct19/23:52  map_perf_test
+    87 kprobe                 0      1 Oct19/23:52  map_perf_test
+    88 kprobe                 0      1 Oct19/23:52  map_perf_test
+    89 kprobe                 0      1 Oct19/23:52  map_perf_test
+
+* List a particular BPF program and its maps *
+# bps 86
+   BID TYPE                 UID  #MAPS LoadTime     NAME
+    86 kprobe                 0      4 Oct19/23:52  map_perf_test
+
+MID TYPE            FLAGS         KeySz  ValueSz  MaxEnts NAME
+120 lru hash        0x0               4        8    10000 lru_hash_map
+129 lru hash        0x0               4        8       43 lru_hash_lookup
+123 array of maps   0x0               4        4     1024 array_of_lru_ha
+121 lru hash        0x2               4
