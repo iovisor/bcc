@@ -193,6 +193,8 @@ static int mntns_func(void *arg) {
   return 0;
 }
 
+extern int cmd_scanf(const char *cmd, const char *fmt, ...);
+
 TEST_CASE("resolve symbol addresses for a given PID", "[c_api]") {
   struct bcc_symbol sym;
   void *resolver = bcc_symcache_new(getpid(), nullptr);
@@ -230,7 +232,32 @@ TEST_CASE("resolve symbol addresses for a given PID", "[c_api]") {
     REQUIRE(sym.module);
     REQUIRE(sym.module[0] == '/');
     REQUIRE(string(sym.module).find("libc") != string::npos);
-    REQUIRE(string("strtok") == sym.name);
+
+    // In some cases, a symbol may have multiple aliases. Since
+    // bcc_symcache_resolve() returns only the first alias of a
+    // symbol, this may not always be "strtok" even if it points
+    // to the same address.
+    bool sym_match = (string("strtok") == sym.name);
+    if (!sym_match) {
+      uint64_t exp_addr, sym_addr;
+      char cmd[256];
+      const char *cmdfmt = "nm %s | grep \" %s$\" | cut -f 1 -d \" \"";
+
+      // Find address of symbol by the expected name
+      sprintf(cmd, cmdfmt, sym.module, "strtok");
+      REQUIRE(cmd_scanf(cmd, "%lx", &exp_addr) == 0);
+
+      // Find address of symbol by the name that was
+      // returned by bcc_symcache_resolve()
+      sprintf(cmd, cmdfmt, sym.module, sym.name);
+      REQUIRE(cmd_scanf(cmd, "%lx", &sym_addr) == 0);
+
+      // If both addresses match, they are definitely
+      // aliases of the same symbol
+      sym_match = (exp_addr == sym_addr);
+    }
+
+    REQUIRE(sym_match);
   }
 
   SECTION("resolve in separate mount namespace") {
