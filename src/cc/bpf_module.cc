@@ -101,6 +101,7 @@ class MyMemoryManager : public SectionMemoryManager {
 
 BPFModule::BPFModule(unsigned flags, TableStorage *ts)
     : flags_(flags),
+      used_b_loader_(false),
       ctx_(new LLVMContext),
       id_(std::to_string((uintptr_t)this)),
       ts_(ts) {
@@ -464,9 +465,9 @@ unique_ptr<ExecutionEngine> BPFModule::finalize_rw(unique_ptr<Module> m) {
 
 // load an entire c file as a module
 int BPFModule::load_cfile(const string &file, bool in_memory, const char *cflags[], int ncflags) {
-  clang_loader_ = ebpf::make_unique<ClangLoader>(&*ctx_, flags_);
-  if (clang_loader_->parse(&mod_, *ts_, file, in_memory, cflags, ncflags, id_,
-                           *func_src_, mod_src_))
+  ClangLoader clang_loader(&*ctx_, flags_);
+  if (clang_loader.parse(&mod_, *ts_, file, in_memory, cflags, ncflags, id_,
+                         *func_src_, mod_src_))
     return -1;
   return 0;
 }
@@ -477,9 +478,9 @@ int BPFModule::load_cfile(const string &file, bool in_memory, const char *cflags
 // Load in a pre-built list of functions into the initial Module object, then
 // build an ExecutionEngine.
 int BPFModule::load_includes(const string &text) {
-  clang_loader_ = ebpf::make_unique<ClangLoader>(&*ctx_, flags_);
-  if (clang_loader_->parse(&mod_, *ts_, text, true, nullptr, 0, "", *func_src_,
-                           mod_src_))
+  ClangLoader clang_loader(&*ctx_, flags_);
+  if (clang_loader.parse(&mod_, *ts_, text, true, nullptr, 0, "", *func_src_,
+                         mod_src_))
     return -1;
   return 0;
 }
@@ -816,7 +817,7 @@ const char * BPFModule::table_name(size_t id) const {
 }
 
 const char * BPFModule::table_key_desc(size_t id) const {
-  if (b_loader_) return nullptr;
+  if (used_b_loader_) return nullptr;
   if (id >= tables_.size())
     return nullptr;
   return tables_[id]->key_desc.c_str();
@@ -827,7 +828,7 @@ const char * BPFModule::table_key_desc(const string &name) const {
 }
 
 const char * BPFModule::table_leaf_desc(size_t id) const {
-  if (b_loader_) return nullptr;
+  if (used_b_loader_) return nullptr;
   if (id >= tables_.size())
     return nullptr;
   return tables_[id]->leaf_desc.c_str();
@@ -932,8 +933,9 @@ int BPFModule::load_b(const string &filename, const string &proto_filename) {
   if (int rc = load_includes(helpers_h->second))
     return rc;
 
-  b_loader_.reset(new BLoader(flags_));
-  if (int rc = b_loader_->parse(&*mod_, filename, proto_filename, *ts_, id_))
+  BLoader b_loader(flags_);
+  used_b_loader_ = true;
+  if (int rc = b_loader.parse(&*mod_, filename, proto_filename, *ts_, id_))
     return rc;
   if (int rc = annotate())
     return rc;
