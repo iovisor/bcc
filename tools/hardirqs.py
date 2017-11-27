@@ -4,7 +4,7 @@
 # hardirqs  Summarize hard IRQ (interrupt) event time.
 #           For Linux, uses BCC, eBPF.
 #
-# USAGE: hardirqs [-h] [-T] [-Q] [-m] [-D] [interval] [count]
+# USAGE: hardirqs [-h] [-T] [-N] [-C] [-d] [interval] [outputs]
 #
 # Thanks Amer Ather for help understanding irq behavior.
 #
@@ -33,15 +33,23 @@ parser.add_argument("-T", "--timestamp", action="store_true",
     help="include timestamp on output")
 parser.add_argument("-N", "--nanoseconds", action="store_true",
     help="output in nanoseconds")
+parser.add_argument("-C", "--count", action="store_true",
+    help="show event counts instead of timing")
 parser.add_argument("-d", "--dist", action="store_true",
     help="show distributions as histograms")
 parser.add_argument("interval", nargs="?", default=99999999,
     help="output interval, in seconds")
-parser.add_argument("count", nargs="?", default=99999999,
+parser.add_argument("outputs", nargs="?", default=99999999,
     help="number of outputs")
 args = parser.parse_args()
-countdown = int(args.count)
-if args.nanoseconds:
+countdown = int(args.outputs)
+if args.count and (args.dist or args.nanoseconds):
+    print("The --count option can't be used with time-based options")
+    exit()
+if args.count:
+    factor = 1
+    label = "count"
+elif args.nanoseconds:
     factor = 1
     label = "nsecs"
 else:
@@ -63,6 +71,22 @@ typedef struct irq_key {
 BPF_HASH(start, u32);
 BPF_HASH(irqdesc, u32, struct irq_desc *);
 BPF_HISTOGRAM(dist, irq_key_t);
+
+// count IRQ
+int count_only(struct pt_regs *ctx, struct irq_desc *desc)
+{
+    u32 pid = bpf_get_current_pid_tgid();
+
+    struct irqaction *action = desc->action;
+    char *name = (char *)action->name;
+
+    irq_key_t key = {.slot = 0 /* ignore */};
+    bpf_probe_read(&key.name, sizeof(key.name), name);
+    u64 zero = 0, *vp = dist.lookup_or_init(&key, &zero);
+    (*vp)++;
+
+    return 0;
+}
 
 // time IRQ
 int trace_start(struct pt_regs *ctx, struct irq_desc *desc)
@@ -119,10 +143,14 @@ if debug:
 b = BPF(text=bpf_text)
 
 # these should really use irq:irq_handler_entry/exit tracepoints:
-b.attach_kprobe(event="handle_irq_event_percpu", fn_name="trace_start")
-b.attach_kretprobe(event="handle_irq_event_percpu", fn_name="trace_completion")
-
-print("Tracing hard irq event time... Hit Ctrl-C to end.")
+if args.count:
+    b.attach_kprobe(event="handle_irq_event_percpu", fn_name="count_only")
+    print("Tracing hard irq events... Hit Ctrl-C to end.")
+else:
+    b.attach_kprobe(event="handle_irq_event_percpu", fn_name="trace_start")
+    b.attach_kretprobe(event="handle_irq_event_percpu",
+        fn_name="trace_completion")
+    print("Tracing hard irq event time... Hit Ctrl-C to end.")
 
 # output
 exiting = 0 if args.interval else 1

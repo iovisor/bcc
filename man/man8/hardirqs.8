@@ -2,7 +2,7 @@
 .SH NAME
 hardirqs \- Measure hard IRQ (hard interrupt) event time. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B hardirqs [\-h] [\-T] [\-N] [\-d] [interval] [count]
+.B hardirqs [\-h] [\-T] [\-N] [\-C] [\-d] [interval] [outputs]
 .SH DESCRIPTION
 This summarizes the time spent servicing hard IRQs (hard interrupts), and can
 show this time as either totals or histogram distributions. A system-wide
@@ -25,10 +25,13 @@ Print usage message.
 Include timestamps on output.
 .TP
 \-N
-Output in nanoseconds
+Output in nanoseconds.
+.TP
+\-C
+Count events only.
 .TP
 \-d
-Show IRQ time distribution as histograms
+Show IRQ time distribution as histograms.
 .SH EXAMPLES
 .TP
 Sum hard IRQ event time until Ctrl-C:
