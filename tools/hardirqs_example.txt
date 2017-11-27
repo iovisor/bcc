@@ -614,21 +614,55 @@ hardirq = 'resched3'
       2048 -> 4095       : 39       |*                                       |
 
 
+Sometimes you just want counts of events, and don't need the distribution
+of times. You can use the -C or --count option:
+
+# ./hardirqs.py -C
+Tracing hard irq events... Hit Ctrl-C to end.
+^C
+HARDIRQ                    TOTAL_count
+blkif                                2
+callfuncsingle3                      8
+callfuncsingle2                     10
+callfuncsingle1                     18
+resched7                            25
+callfuncsingle6                     25
+callfuncsingle5                     27
+callfuncsingle0                     27
+eth0                                34
+resched2                            40
+resched1                            66
+timer7                              70
+resched6                            71
+resched0                            73
+resched5                            79
+resched4                            90
+timer6                              95
+timer4                             100
+timer1                             109
+timer2                             115
+timer0                             117
+timer3                             123
+resched3                           140
+timer5                             288
+
+
 USAGE message:
 
 # ./hardirqs -h
-usage: hardirqs [-h] [-T] [-N] [-d] [interval] [count]
+usage: hardirqs [-h] [-T] [-N] [-C] [-d] [interval] [outputs]
 
 Summarize hard irq event time as histograms
 
 positional arguments:
   interval           output interval, in seconds
-  count              number of outputs
+  outputs            number of outputs
 
 optional arguments:
   -h, --help         show this help message and exit
   -T, --timestamp    include timestamp on output
   -N, --nanoseconds  output in nanoseconds
+  -C, --count        show event counts instead of timing
   -d, --dist         show distributions as histograms
 
 examples:
