@@ -378,7 +378,9 @@ class BPF(object):
         u"unsigned long long": ct.c_ulonglong,
         u"float": ct.c_float,
         u"double": ct.c_double,
-        u"long double": ct.c_longdouble
+        u"long double": ct.c_longdouble,
+        u"__int128": ct.c_int64 * 2,
+        u"unsigned __int128": ct.c_uint64 * 2,
     }
     @staticmethod
     def _decode_table_type(desc):
