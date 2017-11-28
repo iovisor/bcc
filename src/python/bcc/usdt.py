@@ -89,7 +89,7 @@ class USDTProbeLocation(object):
     def get_argument(self, index):
         arg = bcc_usdt_argument()
         res = lib.bcc_usdt_get_argument(self.probe.context, self.probe.name,
-                                        self.index, index, ct.pointer(arg))
+                                        self.index, index, ct.byref(arg))
         if res != 0:
             raise USDTException(
                     "error retrieving probe argument %d location %d" %
@@ -116,7 +116,7 @@ class USDTProbe(object):
     def get_location(self, index):
         loc = bcc_usdt_location()
         res = lib.bcc_usdt_get_location(self.context, self.name,
-                                        index, ct.pointer(loc))
+                                        index, ct.byref(loc))
         if res != 0:
             raise USDTException("error retrieving probe location %d" % index)
         return USDTProbeLocation(self, index, loc)

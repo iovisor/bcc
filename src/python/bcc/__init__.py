@@ -68,11 +68,11 @@ class SymbolCache(object):
         address as the offset.
         """
         sym = bcc_symbol()
-        psym = ct.pointer(sym)
         if demangle:
-            res = lib.bcc_symcache_resolve(self.cache, addr, psym)
+            res = lib.bcc_symcache_resolve(self.cache, addr, ct.byref(sym))
         else:
-            res = lib.bcc_symcache_resolve_no_demangle(self.cache, addr, psym)
+            res = lib.bcc_symcache_resolve_no_demangle(self.cache, addr,
+                                                       ct.byref(sym))
         if res < 0:
             if sym.module and sym.offset:
                 return (None, sym.offset,
@@ -80,7 +80,7 @@ class SymbolCache(object):
             return (None, addr, None)
         if demangle:
             name_res = sym.demangle_name.decode()
-            lib.bcc_symbol_free_demangle_name(psym)
+            lib.bcc_symbol_free_demangle_name(ct.byref(sym))
         else:
             name_res = sym.name.decode()
         return (name_res, sym.offset,
@@ -90,7 +90,7 @@ class SymbolCache(object):
         addr = ct.c_ulonglong()
         if lib.bcc_symcache_resolve_name(
                     self.cache, module.encode("ascii") if module else None,
-                    name.encode("ascii"), ct.pointer(addr)) < 0:
+                    name.encode("ascii"), ct.byref(addr)) < 0:
             return -1
         return addr.value
 
@@ -172,7 +172,7 @@ class BPF(object):
         CLOCK_MONOTONIC constant. The time returned is in nanoseconds.
         """
         t = cls.timespec()
-        if cls._clock_gettime(cls.CLOCK_MONOTONIC, ct.pointer(t)) != 0:
+        if cls._clock_gettime(cls.CLOCK_MONOTONIC, ct.byref(t)) != 0:
             errno = ct.get_errno()
             raise OSError(errno, os.strerror(errno))
         return t.tv_sec * 1e9 + t.tv_nsec
@@ -611,13 +611,12 @@ class BPF(object):
     @classmethod
     def _check_path_symbol(cls, module, symname, addr, pid):
         sym = bcc_symbol()
-        psym = ct.pointer(sym)
         c_pid = 0 if pid == -1 else pid
         if lib.bcc_resolve_symname(
             module.encode("ascii"), symname.encode("ascii"),
             addr or 0x0, c_pid,
             ct.cast(None, ct.POINTER(bcc_symbol_option)),
-            psym,
+            ct.byref(sym),
         ) < 0:
             raise Exception("could not determine address of symbol %s" % symname)
         module_path = ct.cast(sym.module, ct.c_char_p).value.decode()
