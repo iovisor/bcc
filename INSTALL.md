@@ -2,7 +2,7 @@
 
 * [Kernel Configuration](#kernel-configuration)
 * [Packages](#packages)
-  - [Ubuntu](#ubuntu-xenial---binary)
+  - [Ubuntu](#ubuntu---binary)
   - [Fedora](#fedora---binary)
   - [Arch](#arch---aur)
   - [Gentoo](#gentoo---portage)
@@ -48,9 +48,9 @@ Kernel compile flags can usually be checked by looking at `/proc/config.gz` or
 
 # Packages
 
-## Ubuntu Xenial - Binary
+## Ubuntu - Binary
 
-The stable and the nightly packages are built for Ubuntu Xenial (16.04). The steps are very straightforward, no need to upgrade the kernel or compile from source!
+The stable and the nightly packages are built for Ubuntu Xenial (16.04) and Ubuntu Artful (17.10). The steps are very straightforward, no need to upgrade the kernel or compile from source!
 
 **Stable and Signed Packages**
 
@@ -60,6 +60,7 @@ echo "deb https://repo.iovisor.org/apt/xenial xenial main" | sudo tee /etc/apt/s
 sudo apt-get update
 sudo apt-get install bcc-tools libbcc-examples linux-headers-$(uname -r)
 ```
+(s/xenial/artful as appropriate)
 
 **Nightly Packages**
 
@@ -68,60 +69,7 @@ echo "deb [trusted=yes] https://repo.iovisor.org/apt/xenial xenial-nightly main"
 sudo apt-get update
 sudo apt-get install bcc-tools libbcc-examples linux-headers-$(uname -r)
 ```
-
-## Ubuntu Trusty - Binary
-
-**Kernel**
-
-Install a 4.3+ kernel from http://kernel.ubuntu.com/~kernel-ppa/mainline,
-for example:
-
-```bash
-VER=4.5.1-040501
-PREFIX=http://kernel.ubuntu.com/~kernel-ppa/mainline/v4.5.1-wily/
-REL=201604121331
-wget ${PREFIX}/linux-headers-${VER}-generic_${VER}.${REL}_amd64.deb
-wget ${PREFIX}/linux-headers-${VER}_${VER}.${REL}_all.deb
-wget ${PREFIX}/linux-image-${VER}-generic_${VER}.${REL}_amd64.deb
-sudo dpkg -i linux-*${VER}.${REL}*.deb
-# reboot
-```
-
-Update PREFIX to the latest date, and you can browse the files in the PREFIX url to find the REL number.
-
-**Signed Packages**
-
-Tagged and signed bcc binary packages are built for Ubuntu Trusty (14.04) and
-hosted at https://repo.iovisor.org/apt/.
-
-To install:
-```bash
-sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys D4284CDD
-echo "deb https://repo.iovisor.org/apt trusty main" | sudo tee /etc/apt/sources.list.d/iovisor.list
-sudo apt-get update
-sudo apt-get install binutils bcc bcc-tools libbcc-examples python-bcc linux-headers-$(uname -r)
-```
-
-**Nightly Packages**
-
-```bash
-echo "deb [trusted=yes] https://repo.iovisor.org/apt/trusty trusty-nightly main" | sudo tee /etc/apt/sources.list.d/iovisor.list
-sudo apt-get update
-sudo apt-get install bcc-tools libbcc-examples
-```
-
-Test it:
-```
-sudo python /usr/share/bcc/examples/hello_world.py
-sudo python /usr/share/bcc/examples/tracing/task_switch.py
-```
-
-(Optional) Install pyroute2 for additional networking features
-```bash
-git clone https://github.com/svinota/pyroute2
-cd pyroute2; sudo make install
-sudo python /usr/share/bcc/examples/networking/simple_tc.py
-```
+(s/xenial/artful as appropriate)
 
 ## Fedora - Binary
 
@@ -134,12 +82,24 @@ sudo dnf update
 # reboot
 ```
 
-Nightly bcc binary packages for Fedora 23, 24, and 25 are hosted at
-`https://repo.iovisor.org/yum/nightly/f{23,24,25}`.
+**Nightly Packages**
+
+Nightly bcc binary packages for Fedora 25, 26, and 27 are hosted at
+`https://repo.iovisor.org/yum/nightly/f{25,26,27}`.
 
 To install:
 ```bash
-echo -e '[iovisor]\nbaseurl=https://repo.iovisor.org/yum/nightly/f25/$basearch\nenabled=1\ngpgcheck=0' | sudo tee /etc/yum.repos.d/iovisor.repo
+echo -e '[iovisor]\nbaseurl=https://repo.iovisor.org/yum/nightly/f27/$basearch\nenabled=1\ngpgcheck=0' | sudo tee /etc/yum.repos.d/iovisor.repo
+sudo dnf install bcc-tools kernel-devel-$(uname -r) kernel-headers-$(uname -r)
+```
+
+**Stable and Signed Packages**
+
+Stable bcc binary packages for Fedora 25, 26, and 27 are hosted at
+`https://repo.iovisor.org/yum/main/f{25,26,27}`.
+
+```bash
+echo -e '[iovisor]\nbaseurl=https://repo.iovisor.org/yum/main/f27/$basearch\nenabled=1' | sudo tee /etc/yum.repos.d/iovisor.repo
 sudo dnf install bcc-tools kernel-devel-$(uname -r) kernel-headers-$(uname -r)
 ```
 
