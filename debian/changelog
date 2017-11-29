@@ -1,3 +1,12 @@
+bcc (0.5.0-1) unstable; urgency=low
+
+  * Support for USDT in ARM64
+  * Bugfixes for 4.14 in some tools
+  * Fixes for smoke test failures
+  * Runtime memory usage reductions
+
+ -- Brenden Blanco <bblanco@gmail.com>  Wed, 29 Nov 2017 17:00:00 +0000
+
 bcc (0.4.0-1) unstable; urgency=low
 
   * Bugfixes
