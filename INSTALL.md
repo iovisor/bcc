@@ -276,7 +276,7 @@ sudo dnf install -y bison cmake ethtool flex git iperf libstdc++-static \
   elfutils-libelf-devel
 sudo dnf install -y luajit luajit-devel  # for Lua support
 sudo dnf install -y \
-  http://pkgs.repoforge.org/netperf/netperf-2.6.0-1.el6.rf.x86_64.rpm
+  http://repo.iovisor.org/yum/extra/mageia/cauldron/x86_64/netperf-2.7.0-1.mga6.x86_64.rpm
 sudo pip install pyroute2
 ```
 
