@@ -18,6 +18,7 @@
 #include <string>
 
 #include <clang/AST/ASTContext.h>
+#include <clang/AST/RecordLayout.h>
 #include <clang/AST/RecursiveASTVisitor.h>
 #include "common.h"
 #include "table_desc.h"
@@ -44,12 +45,46 @@ class BMapDeclVisitor : public clang::RecursiveASTVisitor<BMapDeclVisitor> {
   bool VisitEnumDecl(clang::EnumDecl *D);
 
  private:
+  bool shouldSkipPadding(const RecordDecl *D);
+  void genJSONForField(FieldDecl *F);
+
+ private:
   clang::ASTContext &C;
   std::string &result_;
 };
 
 // Encode the struct layout as a json description
 BMapDeclVisitor::BMapDeclVisitor(ASTContext &C, string &result) : C(C), result_(result) {}
+
+bool BMapDeclVisitor::shouldSkipPadding(const RecordDecl *D) {
+  if (D->isUnion() || D->field_empty())
+    return true;
+  for (auto F : D->getDefinition()->fields()) {
+    if (F->isBitField())
+      return true;
+    QualType Ty = F->getType();
+    if (Ty->isIncompleteArrayType())
+      return true;
+  }
+  return false;
+}
+
+void BMapDeclVisitor::genJSONForField(FieldDecl *F) {
+  if (F->isAnonymousStructOrUnion()) {
+    if (const RecordType *R = dyn_cast<RecordType>(F->getType()))
+      TraverseDecl(R->getDecl());
+    result_ += ", ";
+    return;
+  }
+  result_ += "[";
+  TraverseDecl(F);
+  if (const ConstantArrayType *T = dyn_cast<ConstantArrayType>(F->getType()))
+    result_ += ", [" + T->getSize().toString(10, false) + "]";
+  if (F->isBitField())
+    result_ += ", " + to_string(F->getBitWidthValue(C));
+  result_ += "], ";
+}
+
 bool BMapDeclVisitor::VisitFieldDecl(FieldDecl *D) {
   result_ += "\"";
   result_ += D->getName();
@@ -82,25 +117,36 @@ bool BMapDeclVisitor::TraverseRecordDecl(RecordDecl *D) {
     return false;
   return true;
 }
+
 bool BMapDeclVisitor::VisitRecordDecl(RecordDecl *D) {
   result_ += "[\"";
   result_ += D->getName();
   result_ += "\", [";
-  for (auto F : D->getDefinition()->fields()) {
-    if (F->isAnonymousStructOrUnion()) {
-      if (const RecordType *R = dyn_cast<RecordType>(F->getType()))
-        TraverseDecl(R->getDecl());
-      result_ += ", ";
-      continue;
+
+  bool SkipPadding = shouldSkipPadding(D);
+  if (SkipPadding) {
+    for (auto F : D->getDefinition()->fields()) {
+      genJSONForField(F);
     }
-    result_ += "[";
-    TraverseDecl(F);
-    if (const ConstantArrayType *T = dyn_cast<ConstantArrayType>(F->getType()))
-      result_ += ", [" + T->getSize().toString(10, false) + "]";
-    if (F->isBitField())
-      result_ += ", " + to_string(F->getBitWidthValue(C));
-    result_ += "], ";
+  } else {
+    const ASTRecordLayout &Layout = C.getASTRecordLayout(D);
+    CharUnits Offset = C.toCharUnitsFromBits(Layout.getFieldOffset(0));
+    for (auto F : D->getDefinition()->fields()) {
+      CharUnits FieldSize = C.getTypeSizeInChars(F->getType());
+      auto FieldOffsetBits = Layout.getFieldOffset(F->getFieldIndex());
+      CharUnits FieldOffset = C.toCharUnitsFromBits(FieldOffsetBits);
+
+      uint64_t Padding = (FieldOffset - Offset).getQuantity();
+      if (Padding) {
+        /* Padding before this field with "char __pad_<FieldIndex>[Padding]". */
+        result_ += "[\"__pad_" + to_string(F->getFieldIndex()) + "\",\"char\",["
+                + to_string(Padding) + "]], ";
+      }
+      Offset = FieldOffset + FieldSize;
+      genJSONForField(F);
+    }
   }
+
   if (!D->getDefinition()->field_empty())
     result_.erase(result_.end() - 2);
   result_ += "]";
