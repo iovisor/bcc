@@ -474,10 +474,12 @@ int bpf_prog_load(enum bpf_prog_type prog_type, const char *name,
     }
   }
 
-  // If log_level is not 0, either speficied by user or set due to error,
-  // print the log message.
+  // Check if we should print the log message if log_level is not 0,
+  // either specified by user or set due to error.
   if (attr.log_level > 0) {
-    if (log_buf)
+    // Don't print if user enabled logging and provided log buffer,
+    // but there is no error.
+    if (log_buf && ret < 0)
       bpf_print_hints(ret, log_buf);
     else if (tmp_log_buf)
       bpf_print_hints(ret, tmp_log_buf);
