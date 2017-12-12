@@ -88,7 +88,8 @@ static int submit_arg(struct pt_regs *ctx, void *ptr, struct data_t *data)
     return 0;
 }
 
-int kprobe__sys_execve(struct pt_regs *ctx, struct filename *filename,
+int kprobe__sys_execve(struct pt_regs *ctx,
+    const char __user *filename,
     const char __user *const __user *__argv,
     const char __user *const __user *__envp)
 {
