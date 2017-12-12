@@ -685,6 +685,7 @@ struct key_t {
   };
   u8 f1_3;                /* offset 48 */
   unsigned __int128 f1_4; /* offset 64 */
+  char f1_5;              /* offset 80 */
 };
 struct value_t {
   u8 src[4] __attribute__ ((aligned (8))); /* offset 0 */
@@ -694,8 +695,8 @@ BPF_HASH(table1, struct key_t, struct value_t);
 """
         b = BPF(text=text)
         table = b['table1']
-        self.assertEqual(ct.sizeof(table.Key), 80)
-        self.assertEqual(ct.sizeof(table.Leaf), 12)
+        self.assertEqual(ct.sizeof(table.Key), 96)
+        self.assertEqual(ct.sizeof(table.Leaf), 16)
 
 
 if __name__ == "__main__":

@@ -145,6 +145,13 @@ bool BMapDeclVisitor::VisitRecordDecl(RecordDecl *D) {
       Offset = FieldOffset + FieldSize;
       genJSONForField(F);
     }
+
+    /* Additional Padding after the last field so that the Record Size matches */
+    CharUnits RecordSize = Layout.getSize();
+    if (RecordSize > Offset) {
+        result_ += "[\"__pad_end\",\"char\",["
+                + to_string((RecordSize - Offset).getQuantity()) + "]], ";
+    }
   }
 
   if (!D->getDefinition()->field_empty())
