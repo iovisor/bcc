@@ -433,7 +433,7 @@ int trace_accept_return(struct pt_regs *ctx)
 
   // Get network namespace id, if kernel supports it
 #ifdef CONFIG_NET_NS
-  possible_net_t skc_net;
+  possible_net_t skc_net = { };
   bpf_probe_read(&skc_net, sizeof(skc_net), &newsk->__sk_common.skc_net);
   bpf_probe_read(&net_ns_inum, sizeof(net_ns_inum), &skc_net.net->ns.inum);
 #else
