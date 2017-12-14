@@ -236,7 +236,7 @@ sudo dpkg -i *bcc*.deb
 To build the toolchain from source, one needs:
 * LLVM 3.7.1 or newer, compiled with BPF support (default=on)
 * Clang, built from the same tree as LLVM
-* cmake, gcc (>=4.7), flex, bison
+* cmake (>=3.1), gcc (>=4.7), flex, bison
 * LuaJIT, if you want Lua support
 
 ### Install build dependencies
@@ -250,7 +250,7 @@ wget -O - http://llvm.org/apt/llvm-snapshot.gpg.key | sudo apt-key add -
 sudo apt-get update
 
 # All versions
-sudo apt-get -y install bison build-essential cmake flex git libedit-dev \
+sudo apt-get -y install bison build-essential cmake3 flex git libedit-dev \
   libllvm3.7 llvm-3.7-dev libclang-3.7-dev python zlib1g-dev libelf-dev
 
 # For Lua support
