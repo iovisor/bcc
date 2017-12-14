@@ -106,6 +106,12 @@ BPFStackTable::~BPFStackTable() {
     bcc_free_symcache(it.second, it.first);
 }
 
+void BPFStackTable::clear_table_non_atomic() {
+  for (int i = 0; i < capacity(); i++) {
+    remove(&i);
+  }
+}
+
 std::vector<uintptr_t> BPFStackTable::get_stack_addr(int stack_id) {
   std::vector<uintptr_t> res;
   stacktrace_t stack;
