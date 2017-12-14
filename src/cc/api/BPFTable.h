@@ -196,6 +196,20 @@ class BPFHashTable : public BPFTableBase<KeyType, ValueType> {
 
     return res;
   }
+
+  StatusTuple clear_table_non_atomic() {
+    KeyType cur;
+    if (!this->first(&cur))
+      return StatusTuple(0);
+
+    while (true) {
+      TRY2(remove_value(cur));
+      if (!this->next(&cur, &cur))
+        break;
+    }
+
+    return StatusTuple(0);
+  }
 };
 
 // From src/cc/export/helpers.h
@@ -211,6 +225,7 @@ class BPFStackTable : public BPFTableBase<int, stacktrace_t> {
                 bool check_debug_file_crc);
   ~BPFStackTable();
 
+  void clear_table_non_atomic();
   std::vector<uintptr_t> get_stack_addr(int stack_id);
   std::vector<std::string> get_stack_symbol(int stack_id, int pid);
 
