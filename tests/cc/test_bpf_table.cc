@@ -14,6 +14,10 @@
  * limitations under the License.
  */
 
+#include <linux/version.h>
+#include <unistd.h>
+#include <string>
+
 #include "BPF.h"
 #include "catch.hpp"
 
@@ -61,4 +65,102 @@ TEST_CASE("test bpf table", "[bpf_table]") {
 
   res = t.remove_value("0x07");
   REQUIRE(res.code() != 0);
+}
+
+TEST_CASE("test bpf hash table", "[bpf_hash_table]") {
+  const std::string BPF_PROGRAM = R"(
+    BPF_HASH(myhash, int, int, 128);
+  )";
+
+  ebpf::BPF bpf;
+  ebpf::StatusTuple res(0);
+  res = bpf.init(BPF_PROGRAM);
+  REQUIRE(res.code() == 0);
+
+  auto t = bpf.get_hash_table<int, int>("myhash");
+
+  int key, value;
+
+  // updaate element
+  key = 0x08;
+  value = 0x43;
+  res = t.update_value(key, value);
+  REQUIRE(res.code() == 0);
+  REQUIRE(t[key] == value);
+
+  // update another element
+  key = 0x12;
+  value = 0x778;
+  res = t.update_value(key, value);
+  REQUIRE(res.code() == 0);
+  key = 0x31;
+  value = 0x123;
+  res = t.update_value(key, value);
+  REQUIRE(res.code() == 0);
+  key = 0x12;
+  value = 0;
+  res = t.get_value(key, value);
+  REQUIRE(res.code() == 0);
+  REQUIRE(value == 0x778);
+
+  // remove value and dump table
+  key = 0x12;
+  res = t.remove_value(key);
+  REQUIRE(res.code() == 0);
+  auto values = t.get_table_offline();
+  REQUIRE(values.size() == 2);
+
+  // clear table
+  res = t.clear_table_non_atomic();
+  REQUIRE(res.code() == 0);
+  values = t.get_table_offline();
+  REQUIRE(values.size() == 0);
+}
+
+TEST_CASE("test bpf stack table", "[bpf_stack_table]") {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 6, 0)
+  const std::string BPF_PROGRAM = R"(
+    BPF_HASH(id, int, int, 1);
+    BPF_STACK_TRACE(stack_traces, 8);
+
+    int on_sys_getuid(void *ctx) {
+      int stack_id = stack_traces.get_stackid(ctx, BPF_F_REUSE_STACKID);
+      int zero = 0, *val;
+      val = id.lookup_or_init(&zero, &stack_id);
+      (*val) = stack_id;
+    }
+  )";
+
+  ebpf::BPF bpf;
+  ebpf::StatusTuple res(0);
+  res = bpf.init(BPF_PROGRAM);
+  REQUIRE(res.code() == 0);
+  res = bpf.attach_kprobe("sys_getuid", "on_sys_getuid");
+  REQUIRE(res.code() == 0);
+  REQUIRE(getuid() >= 0);
+  res = bpf.detach_kprobe("sys_getuid");
+  REQUIRE(res.code() == 0);
+
+  auto id = bpf.get_hash_table<int, int>("id");
+  auto stack_traces = bpf.get_stack_table("stack_traces");
+
+  int stack_id = id[0];
+  REQUIRE(stack_id >= 0);
+
+  auto addrs = stack_traces.get_stack_addr(stack_id);
+  auto symbols = stack_traces.get_stack_symbol(stack_id, -1);
+  REQUIRE(addrs.size() > 0);
+  REQUIRE(addrs.size() == symbols.size());
+  bool found = false;
+  for (const auto &symbol : symbols)
+    if (symbol.find("sys_getuid") != std::string::npos) {
+      found = true;
+      break;
+    }
+  REQUIRE(found);
+
+  stack_traces.clear_table_non_atomic();
+  addrs = stack_traces.get_stack_addr(stack_id);
+  REQUIRE(addrs.size() == 0);
+#endif
 }
