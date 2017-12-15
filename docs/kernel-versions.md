@@ -159,3 +159,5 @@ Helper | Kernel version | Commit
 `BPF_FUNC_tail_call()` | 4.2 | [04fd61ab36ec](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=04fd61ab36ec065e194ab5e74ae34a5240d992bb)
 `BPF_FUNC_trace_printk()` | 4.1 | [9c959c863f82](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=9c959c863f8217a2ff3d7c296e8223654d240569)
 `BPF_FUNC_xdp_adjust_head()` | 4.10 | [17bedab27231](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=17bedab2723145d17b14084430743549e6943d03)
+`BPF_FUNC_perf_event_read_value()` | 4.15 | [908432ca84fc](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=908432ca84fc229e906ba164219e9ad0fe56f755)
+`BPF_FUNC_perf_prog_read_value()` | 4.15 | [4bebdc7a85aa](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=4bebdc7a85aa400c0222b5329861e4ad9252f1e5)

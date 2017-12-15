@@ -96,6 +96,7 @@ struct _name##_table_t { \
   u32 leaf; \
   /* counter = map.perf_read(index) */ \
   u64 (*perf_read) (int); \
+  int (*perf_counter_value) (int, void *, u32); \
   u32 max_entries; \
 }; \
 __attribute__((section("maps/perf_array"))) \
@@ -245,6 +246,10 @@ static int (*bpf_perf_event_output)(void *ctx, void *map, u64 index, void *data,
   (void *) BPF_FUNC_perf_event_output;
 static int (*bpf_skb_load_bytes)(void *ctx, int offset, void *to, u32 len) =
   (void *) BPF_FUNC_skb_load_bytes;
+static int (*bpf_perf_event_read_value)(void *map, u64 flags, void *buf, u32 buf_size) =
+  (void *) BPF_FUNC_perf_event_read_value;
+static int (*bpf_perf_prog_read_value)(void *ctx, void *buf, u32 buf_size) =
+  (void *) BPF_FUNC_perf_prog_read_value;
 
 /* bcc_get_stackid will return a negative value in the case of an error
  *
