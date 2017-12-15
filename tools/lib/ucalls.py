@@ -255,11 +255,13 @@ if args.syscalls:
 def get_data():
     # Will be empty when no language was specified for tracing
     if args.latency:
-        data = list(map(lambda kv: (kv[0].clazz + "." + kv[0].method,
+        data = list(map(lambda kv: (kv[0].clazz.decode() + "." + \
+                                    kv[0].method.decode(),
                                    (kv[1].num_calls, kv[1].total_ns)),
                    bpf["times"].items()))
     else:
-        data = list(map(lambda kv: (kv[0].clazz + "." + kv[0].method,
+        data = list(map(lambda kv: (kv[0].clazz.decode() + "." + \
+                                    kv[0].method.decode(),
                                    (kv[1].value, 0)),
                    bpf["counts"].items()))
 
