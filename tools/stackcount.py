@@ -90,13 +90,11 @@ class Probe(object):
                 self.matched = self.bpf.num_open_uprobes()
             else:
                 self.bpf.attach_kprobe(event_re=self.pattern,
-                                       fn_name="trace_count",
-                                       pid=self.pid or -1)
+                                       fn_name="trace_count")
                 self.matched = self.bpf.num_open_kprobes()
         elif self.type == "t":
             self.bpf.attach_tracepoint(tp_re=self.pattern,
-                                       fn_name="trace_count",
-                                       pid=self.pid or -1)
+                                       fn_name="trace_count")
             self.matched = self.bpf.num_open_tracepoints()
         elif self.type == "u":
             pass    # Nothing to do -- attach already happened in `load`

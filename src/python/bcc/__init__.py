@@ -499,8 +499,7 @@ class BPF(object):
         del self.open_kprobes[name]
         _num_open_probes -= 1
 
-    def attach_kprobe(self, event="", fn_name="", event_re="",
-            pid=-1, cpu=0, group_fd=-1):
+    def attach_kprobe(self, event="", fn_name="", event_re=""):
 
         # allow the caller to glob multiple functions together
         if event_re:
@@ -508,8 +507,7 @@ class BPF(object):
             self._check_probe_quota(len(matches))
             for line in matches:
                 try:
-                    self.attach_kprobe(event=line, fn_name=fn_name, pid=pid,
-                            cpu=cpu, group_fd=group_fd)
+                    self.attach_kprobe(event=line, fn_name=fn_name)
                 except:
                     pass
             return
@@ -538,15 +536,13 @@ class BPF(object):
             raise Exception("Failed to detach BPF from kprobe")
         self._del_kprobe(ev_name)
 
-    def attach_kretprobe(self, event="", fn_name="", event_re="",
-            pid=-1, cpu=0, group_fd=-1):
+    def attach_kretprobe(self, event="", fn_name="", event_re=""):
 
         # allow the caller to glob multiple functions together
         if event_re:
             for line in BPF.get_kprobe_functions(event_re):
                 try:
-                    self.attach_kretprobe(event=line, fn_name=fn_name, pid=pid,
-                            cpu=cpu, group_fd=group_fd)
+                    self.attach_kretprobe(event=line, fn_name=fn_name)
                 except:
                     pass
             return
@@ -648,10 +644,8 @@ class BPF(object):
                         results.append(tp)
         return results
 
-    def attach_tracepoint(self, tp="", tp_re="", fn_name="", pid=-1,
-                          cpu=0, group_fd=-1):
-        """attach_tracepoint(tp="", tp_re="", fn_name="", pid=-1,
-                             cpu=0, group_fd=-1)
+    def attach_tracepoint(self, tp="", tp_re="", fn_name=""):
+        """attach_tracepoint(tp="", tp_re="", fn_name="")
 
         Run the bpf function denoted by fn_name every time the kernel tracepoint
         specified by 'tp' is hit. The optional parameters pid, cpu, and group_fd
@@ -673,8 +667,7 @@ class BPF(object):
 
         if tp_re:
             for tp in BPF.get_tracepoints(tp_re):
-                self.attach_tracepoint(tp=tp, fn_name=fn_name, pid=pid,
-                                       cpu=cpu, group_fd=group_fd)
+                self.attach_tracepoint(tp=tp, fn_name=fn_name)
             return
 
         fn = self.load_func(fn_name, BPF.TRACEPOINT)
@@ -794,9 +787,9 @@ class BPF(object):
             return "%s_%s_0x%x_%d" % (prefix, self._probe_repl.sub("_", path), addr, pid)
 
     def attach_uprobe(self, name="", sym="", sym_re="", addr=None,
-            fn_name="", pid=-1, cpu=0, group_fd=-1):
+            fn_name="", pid=-1):
         """attach_uprobe(name="", sym="", sym_re="", addr=None, fn_name=""
-                         pid=-1, cpu=0, group_fd=-1)
+                         pid=-1)
 
         Run the bpf function denoted by fn_name every time the symbol sym in
         the library or binary 'name' is encountered. The real address addr may
@@ -823,8 +816,7 @@ class BPF(object):
             self._check_probe_quota(len(addresses))
             for sym_addr in addresses:
                 self.attach_uprobe(name=name, addr=sym_addr,
-                                   fn_name=fn_name, pid=pid, cpu=cpu,
-                                   group_fd=group_fd)
+                                   fn_name=fn_name, pid=pid)
             return
 
         (path, addr) = BPF._check_path_symbol(name, sym, addr, pid)
@@ -860,9 +852,9 @@ class BPF(object):
         self._del_uprobe(ev_name)
 
     def attach_uretprobe(self, name="", sym="", sym_re="", addr=None,
-            fn_name="", pid=-1, cpu=0, group_fd=-1):
+            fn_name="", pid=-1):
         """attach_uretprobe(name="", sym="", sym_re="", addr=None, fn_name=""
-                            pid=-1, cpu=0, group_fd=-1)
+                            pid=-1)
 
         Run the bpf function denoted by fn_name every time the symbol sym in
         the library or binary 'name' finishes execution. See attach_uprobe for
@@ -872,8 +864,7 @@ class BPF(object):
         if sym_re:
             for sym_addr in BPF.get_user_addresses(name, sym_re):
                 self.attach_uretprobe(name=name, addr=sym_addr,
-                                      fn_name=fn_name, pid=pid, cpu=cpu,
-                                      group_fd=group_fd)
+                                      fn_name=fn_name, pid=pid)
             return
 
         name = str(name)

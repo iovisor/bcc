@@ -468,9 +468,7 @@ def main():
     bpf = BPF(src_file='deadlock_detector.c')
 
     # Trace where threads are created
-    bpf.attach_kretprobe(
-        event='sys_clone', fn_name='trace_clone', pid=args.pid
-    )
+    bpf.attach_kretprobe(event='sys_clone', fn_name='trace_clone')
 
     # We must trace unlock first, otherwise in the time we attached the probe
     # on lock() and have not yet attached the probe on unlock(), a thread can
