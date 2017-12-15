@@ -519,8 +519,8 @@ class BPF(object):
         fn = self.load_func(fn_name, BPF.KPROBE)
         ev_name = "p_" + event.replace("+", "_").replace(".", "_")
         res = lib.bpf_attach_kprobe(fn.fd, 0, ev_name.encode("ascii"),
-                event.encode("ascii"), pid, cpu, group_fd,
-                self._reader_cb_impl, ct.cast(id(self), ct.py_object))
+                event.encode("ascii"), self._reader_cb_impl,
+                ct.cast(id(self), ct.py_object))
         res = ct.cast(res, ct.c_void_p)
         if not res:
             raise Exception("Failed to attach BPF to kprobe")
@@ -556,8 +556,8 @@ class BPF(object):
         fn = self.load_func(fn_name, BPF.KPROBE)
         ev_name = "r_" + event.replace("+", "_").replace(".", "_")
         res = lib.bpf_attach_kprobe(fn.fd, 1, ev_name.encode("ascii"),
-                event.encode("ascii"), pid, cpu, group_fd,
-                self._reader_cb_impl, ct.cast(id(self), ct.py_object))
+                event.encode("ascii"), self._reader_cb_impl,
+                ct.cast(id(self), ct.py_object))
         res = ct.cast(res, ct.c_void_p)
         if not res:
             raise Exception("Failed to attach BPF to kprobe")
@@ -680,8 +680,8 @@ class BPF(object):
         fn = self.load_func(fn_name, BPF.TRACEPOINT)
         (tp_category, tp_name) = tp.split(':')
         res = lib.bpf_attach_tracepoint(fn.fd, tp_category.encode("ascii"),
-                tp_name.encode("ascii"), pid, cpu, group_fd,
-                self._reader_cb_impl, ct.cast(id(self), ct.py_object))
+                tp_name.encode("ascii"), self._reader_cb_impl,
+                ct.cast(id(self), ct.py_object))
         res = ct.cast(res, ct.c_void_p)
         if not res:
             raise Exception("Failed to attach BPF to tracepoint")
@@ -833,8 +833,8 @@ class BPF(object):
         fn = self.load_func(fn_name, BPF.KPROBE)
         ev_name = self._get_uprobe_evname("p", path, addr, pid)
         res = lib.bpf_attach_uprobe(fn.fd, 0, ev_name.encode("ascii"),
-                path.encode("ascii"), addr, pid, cpu, group_fd,
-                self._reader_cb_impl, ct.cast(id(self), ct.py_object))
+                path.encode("ascii"), addr, pid, self._reader_cb_impl,
+                ct.cast(id(self), ct.py_object))
         res = ct.cast(res, ct.c_void_p)
         if not res:
             raise Exception("Failed to attach BPF to uprobe")
@@ -883,8 +883,8 @@ class BPF(object):
         fn = self.load_func(fn_name, BPF.KPROBE)
         ev_name = self._get_uprobe_evname("r", path, addr, pid)
         res = lib.bpf_attach_uprobe(fn.fd, 1, ev_name.encode("ascii"),
-                path.encode("ascii"), addr, pid, cpu, group_fd,
-                self._reader_cb_impl, ct.cast(id(self), ct.py_object))
+                path.encode("ascii"), addr, pid, self._reader_cb_impl,
+                ct.cast(id(self), ct.py_object))
         res = ct.cast(res, ct.c_void_p)
         if not res:
             raise Exception("Failed to attach BPF to uprobe")

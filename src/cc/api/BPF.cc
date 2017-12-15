@@ -172,7 +172,7 @@ StatusTuple BPF::attach_kprobe(const std::string& kernel_func,
 
   void* res =
       bpf_attach_kprobe(probe_fd, attach_type, probe_event.c_str(), kernel_func.c_str(),
-                        pid, cpu, group_fd, cb, cb_cookie);
+                        cb, cb_cookie);
 
   if (!res) {
     TRY2(unload_func(probe_func));
@@ -208,7 +208,7 @@ StatusTuple BPF::attach_uprobe(const std::string& binary_path,
 
   void* res =
       bpf_attach_uprobe(probe_fd, attach_type, probe_event.c_str(), binary_path.c_str(),
-                        offset, pid, cpu, group_fd, cb, cb_cookie);
+                        offset, pid, cb, cb_cookie);
 
   if (!res) {
     TRY2(unload_func(probe_func));
@@ -275,8 +275,8 @@ StatusTuple BPF::attach_tracepoint(const std::string& tracepoint,
   TRY2(load_func(probe_func, BPF_PROG_TYPE_TRACEPOINT, probe_fd));
 
   void* res =
-      bpf_attach_tracepoint(probe_fd, tp_category.c_str(), tp_name.c_str(), pid,
-                            cpu, group_fd, cb, cb_cookie);
+      bpf_attach_tracepoint(probe_fd, tp_category.c_str(), tp_name.c_str(), cb,
+                            cb_cookie);
 
   if (!res) {
     TRY2(unload_func(probe_func));
