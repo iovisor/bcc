@@ -107,7 +107,7 @@ BPFStackTable::~BPFStackTable() {
 }
 
 void BPFStackTable::clear_table_non_atomic() {
-  for (int i = 0; i < capacity(); i++) {
+  for (int i = 0; size_t(i) < capacity(); i++) {
     remove(&i);
   }
 }

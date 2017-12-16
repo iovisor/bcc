@@ -128,6 +128,8 @@ TEST_CASE("test bpf stack table", "[bpf_stack_table]") {
       int zero = 0, *val;
       val = id.lookup_or_init(&zero, &stack_id);
       (*val) = stack_id;
+
+      return 0;
     }
   )";
 

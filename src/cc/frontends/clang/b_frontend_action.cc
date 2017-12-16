@@ -433,6 +433,9 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
           } else if (memb_name == "perf_read") {
             prefix = "bpf_perf_event_read";
             suffix = ")";
+          } else if (memb_name == "perf_counter_value") {
+            prefix = "bpf_perf_event_read_value";
+            suffix = ")";
           } else {
             error(Call->getLocStart(), "invalid bpf_table operation %0") << memb_name;
             return false;

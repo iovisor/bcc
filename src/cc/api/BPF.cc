@@ -15,7 +15,6 @@
  */
 
 #include <linux/bpf.h>
-#include <linux/perf_event.h>
 #include <unistd.h>
 #include <cstdio>
 #include <cstring>
@@ -408,8 +407,6 @@ StatusTuple BPF::open_perf_event(const std::string& name, uint32_t type,
                          name.c_str());
     perf_event_arrays_[name] = new BPFPerfEventArray(it->second);
   }
-  if (type != PERF_TYPE_RAW && type != PERF_TYPE_HARDWARE)
-    return StatusTuple(-1, "open_perf_event unsupported type");
   auto table = perf_event_arrays_[name];
   TRY2(table->open_all_cpu(type, config));
   return StatusTuple(0);

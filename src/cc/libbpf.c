@@ -1061,7 +1061,8 @@ int bpf_attach_perf_event(int progfd, uint32_t ev_type, uint32_t ev_config,
   struct perf_event_attr attr = {};
   attr.type = ev_type;
   attr.config = ev_config;
-  attr.inherit = 1;
+  if (pid > 0)
+    attr.inherit = 1;
   if (sample_freq > 0) {
     attr.freq = 1;
     attr.sample_freq = sample_freq;
