@@ -485,13 +485,13 @@ BPF_PERF_OUTPUT(%s);
                              range(0, len(self.values)))
                 msg = self._format_message(bpf, event.tgid, values)
                 if not Probe.print_time:
-                    print("%-6d %-6d %-12s %-16s %s" %
+                    print("%-7d %-7d %-15s %-16s %s" %
                           (event.tgid, event.pid, event.comm.decode(),
                            self._display_function(), msg))
                 else:
                     time = strftime("%H:%M:%S") if Probe.use_localtime else \
                            Probe._time_off_str(event.timestamp_ns)
-                    print("%-8s %-6d %-6d %-12s %-16s %s" %
+                    print("%-8s %-7d %-7d %-15s %-16s %s" %
                           (time[:8], event.tgid, event.pid,
                            event.comm.decode(), self._display_function(), msg))
 
@@ -685,11 +685,11 @@ trace -I 'kernel/sched/sched.h' \\
 
                 # Print header
                 if self.args.timestamp or self.args.time:
-                    print("%-8s %-6s %-6s %-12s %-16s %s" %
+                    print("%-8s %-7s %-7s %-15s %-16s %s" %
                           ("TIME", "PID", "TID", "COMM", "FUNC",
                           "-" if not all_probes_trivial else ""))
                 else:
-                    print("%-6s %-6s %-12s %-16s %s" %
+                    print("%-7s %-7s %-15s %-16s %s" %
                           ("PID", "TID", "COMM", "FUNC",
                           "-" if not all_probes_trivial else ""))
 
