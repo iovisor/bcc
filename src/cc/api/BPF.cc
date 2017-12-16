@@ -161,7 +161,6 @@ StatusTuple BPF::detach_all() {
 StatusTuple BPF::attach_kprobe(const std::string& kernel_func,
                                const std::string& probe_func,
                                bpf_probe_attach_type attach_type,
-                               pid_t pid, int cpu, int group_fd,
                                perf_reader_cb cb, void* cb_cookie) {
   std::string probe_event = get_kprobe_event(kernel_func, attach_type);
   if (kprobes_.find(probe_event) != kprobes_.end())
@@ -170,9 +169,8 @@ StatusTuple BPF::attach_kprobe(const std::string& kernel_func,
   int probe_fd;
   TRY2(load_func(probe_func, BPF_PROG_TYPE_KPROBE, probe_fd));
 
-  void* res =
-      bpf_attach_kprobe(probe_fd, attach_type, probe_event.c_str(), kernel_func.c_str(),
-                        cb, cb_cookie);
+  void* res = bpf_attach_kprobe(probe_fd, attach_type, probe_event.c_str(),
+                                kernel_func.c_str(), cb, cb_cookie);
 
   if (!res) {
     TRY2(unload_func(probe_func));
@@ -192,8 +190,7 @@ StatusTuple BPF::attach_uprobe(const std::string& binary_path,
                                const std::string& symbol,
                                const std::string& probe_func,
                                uint64_t symbol_addr,
-                               bpf_probe_attach_type attach_type,
-                               pid_t pid, int cpu, int group_fd,
+                               bpf_probe_attach_type attach_type, pid_t pid,
                                perf_reader_cb cb, void* cb_cookie) {
   std::string module;
   uint64_t offset;
@@ -207,8 +204,8 @@ StatusTuple BPF::attach_uprobe(const std::string& binary_path,
   TRY2(load_func(probe_func, BPF_PROG_TYPE_KPROBE, probe_fd));
 
   void* res =
-      bpf_attach_uprobe(probe_fd, attach_type, probe_event.c_str(), binary_path.c_str(),
-                        offset, pid, cb, cb_cookie);
+      bpf_attach_uprobe(probe_fd, attach_type, probe_event.c_str(),
+                        binary_path.c_str(), offset, pid, cb, cb_cookie);
 
   if (!res) {
     TRY2(unload_func(probe_func));
@@ -226,8 +223,7 @@ StatusTuple BPF::attach_uprobe(const std::string& binary_path,
   return StatusTuple(0);
 }
 
-StatusTuple BPF::attach_usdt(const USDT& usdt, pid_t pid, int cpu,
-                             int group_fd) {
+StatusTuple BPF::attach_usdt(const USDT& usdt, pid_t pid) {
   for (const auto& u : usdt_)
     if (u == usdt) {
       bool failed = false;
@@ -259,7 +255,6 @@ StatusTuple BPF::attach_usdt(const USDT& usdt, pid_t pid, int cpu,
 
 StatusTuple BPF::attach_tracepoint(const std::string& tracepoint,
                                    const std::string& probe_func,
-                                   pid_t pid, int cpu, int group_fd,
                                    perf_reader_cb cb, void* cb_cookie) {
   if (tracepoints_.find(tracepoint) != tracepoints_.end())
     return StatusTuple(-1, "Tracepoint %s already attached",
@@ -274,9 +269,8 @@ StatusTuple BPF::attach_tracepoint(const std::string& tracepoint,
   int probe_fd;
   TRY2(load_func(probe_func, BPF_PROG_TYPE_TRACEPOINT, probe_fd));
 
-  void* res =
-      bpf_attach_tracepoint(probe_fd, tp_category.c_str(), tp_name.c_str(), cb,
-                            cb_cookie);
+  void* res = bpf_attach_tracepoint(probe_fd, tp_category.c_str(),
+                                    tp_name.c_str(), cb, cb_cookie);
 
   if (!res) {
     TRY2(unload_func(probe_func));
@@ -309,7 +303,7 @@ StatusTuple BPF::attach_perf_event(uint32_t ev_type, uint32_t ev_config,
     cpus.push_back(cpu);
   else
     cpus = get_online_cpus();
-  for (int i: cpus) {
+  for (int i : cpus) {
     int fd = bpf_attach_perf_event(probe_fd, ev_type, ev_config, sample_period,
                                    sample_freq, pid, i, group_fd);
     if (fd < 0) {
@@ -347,8 +341,7 @@ StatusTuple BPF::detach_kprobe(const std::string& kernel_func,
 
 StatusTuple BPF::detach_uprobe(const std::string& binary_path,
                                const std::string& symbol, uint64_t symbol_addr,
-                               bpf_probe_attach_type attach_type,
-                               pid_t pid) {
+                               bpf_probe_attach_type attach_type, pid_t pid) {
   std::string module;
   uint64_t offset;
   TRY2(check_binary_symbol(binary_path, symbol, symbol_addr, module, offset));
@@ -399,21 +392,19 @@ StatusTuple BPF::detach_tracepoint(const std::string& tracepoint) {
 StatusTuple BPF::detach_perf_event(uint32_t ev_type, uint32_t ev_config) {
   auto it = perf_events_.find(std::make_pair(ev_type, ev_config));
   if (it == perf_events_.end())
-    return StatusTuple(-1, "Perf Event type %d config %d not attached",
-                       ev_type, ev_config);
+    return StatusTuple(-1, "Perf Event type %d config %d not attached", ev_type,
+                       ev_config);
   TRY2(detach_perf_event_all_cpu(it->second));
   perf_events_.erase(it);
   return StatusTuple(0);
 }
 
-StatusTuple BPF::open_perf_event(const std::string& name,
-                                 uint32_t type,
+StatusTuple BPF::open_perf_event(const std::string& name, uint32_t type,
                                  uint64_t config) {
   if (perf_event_arrays_.find(name) == perf_event_arrays_.end()) {
     TableStorage::iterator it;
     if (!bpf_module_->table_storage().Find(Path({bpf_module_->id(), name}), it))
-      return StatusTuple(-1,
-                         "open_perf_event: unable to find table_storage %s",
+      return StatusTuple(-1, "open_perf_event: unable to find table_storage %s",
                          name.c_str());
     perf_event_arrays_[name] = new BPFPerfEventArray(it->second);
   }
@@ -434,8 +425,7 @@ StatusTuple BPF::close_perf_event(const std::string& name) {
 
 StatusTuple BPF::open_perf_buffer(const std::string& name,
                                   perf_reader_raw_cb cb,
-                                  perf_reader_lost_cb lost_cb,
-                                  void* cb_cookie,
+                                  perf_reader_lost_cb lost_cb, void* cb_cookie,
                                   int page_cnt) {
   if (perf_buffers_.find(name) == perf_buffers_.end()) {
     TableStorage::iterator it;
@@ -467,8 +457,8 @@ void BPF::poll_perf_buffer(const std::string& name, int timeout) {
   it->second->poll(timeout);
 }
 
-StatusTuple BPF::load_func(const std::string& func_name,
-                           bpf_prog_type type, int& fd) {
+StatusTuple BPF::load_func(const std::string& func_name, bpf_prog_type type,
+                           int& fd) {
   if (funcs_.find(func_name) != funcs_.end()) {
     fd = funcs_[func_name];
     return StatusTuple(0);
@@ -487,17 +477,15 @@ StatusTuple BPF::load_func(const std::string& func_name,
     log_level = 1;
 
   fd = bpf_prog_load(type, func_name.c_str(),
-                     reinterpret_cast<struct bpf_insn*>(func_start),
-                     func_size, bpf_module_->license(),
-                     bpf_module_->kern_version(),
+                     reinterpret_cast<struct bpf_insn*>(func_start), func_size,
+                     bpf_module_->license(), bpf_module_->kern_version(),
                      log_level, nullptr, 0);
 
   if (fd < 0)
     return StatusTuple(-1, "Failed to load %s: %d", func_name.c_str(), fd);
 
-  bpf_module_->annotate_prog_tag(func_name, fd,
-                                 reinterpret_cast<struct bpf_insn*>(func_start),
-                                 func_size);
+  bpf_module_->annotate_prog_tag(
+      func_name, fd, reinterpret_cast<struct bpf_insn*>(func_start), func_size);
   funcs_[func_name] = fd;
   return StatusTuple(0);
 }
@@ -518,8 +506,8 @@ StatusTuple BPF::unload_func(const std::string& func_name) {
 StatusTuple BPF::check_binary_symbol(const std::string& binary_path,
                                      const std::string& symbol,
                                      uint64_t symbol_addr,
-                                     std::string &module_res,
-                                     uint64_t &offset_res) {
+                                     std::string& module_res,
+                                     uint64_t& offset_res) {
   bcc_symbol output;
   int res = bcc_resolve_symname(binary_path.c_str(), symbol.c_str(),
                                 symbol_addr, -1, nullptr, &output);
@@ -552,8 +540,7 @@ BPFProgTable BPF::get_prog_table(const std::string& name) {
   return BPFProgTable({});
 }
 
-BPFStackTable BPF::get_stack_table(const std::string& name,
-                                   bool use_debug_file,
+BPFStackTable BPF::get_stack_table(const std::string& name, bool use_debug_file,
                                    bool check_debug_file_crc) {
   TableStorage::iterator it;
   if (bpf_module_->table_storage().Find(Path({bpf_module_->id(), name}), it))
