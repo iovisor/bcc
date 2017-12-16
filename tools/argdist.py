@@ -590,6 +590,13 @@ argdist -p 2780 -z 120 \\
         -C 'p:c:write(int fd, char* buf, size_t len):char*:buf:fd==1'
         Spy on writes to STDOUT performed by process 2780, up to a string size
         of 120 characters
+
+argdist -I 'kernel/sched/sched.h' \\
+        -C 'p::__account_cfs_rq_runtime(struct cfs_rq *cfs_rq):s64:cfs_rq->runtime_remaining'
+        Trace on the cfs scheduling runqueue remaining runtime. The struct cfs_rq is defined
+        in kernel/sched/sched.h which is in kernel source tree and not in kernel-devel
+        package.  So this command needs to run at the kernel source tree root directory
+        so that the added header file can be found by the compiler.
 """
 
         def __init__(self):
@@ -625,7 +632,9 @@ argdist -p 2780 -z 120 \\
                 parser.add_argument("-I", "--include", action="append",
                   metavar="header",
                   help="additional header files to include in the BPF program "
-                       "as either full path, or relative to '/usr/include'")
+                       "as either full path, "
+                       "or relative to relative to current working directory, "
+                       "or relative to default kernel header search path")
                 self.args = parser.parse_args()
                 self.usdt_ctx = None
 

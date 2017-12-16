@@ -576,6 +576,16 @@ trace 'u:pthread:pthread_create (arg4 != 0)'
         Trace the USDT probe pthread_create when its 4th argument is non-zero
 trace 'p::SyS_nanosleep(struct timespec *ts) "sleep for %lld ns", ts->tv_nsec'
         Trace the nanosleep syscall and print the sleep duration in ns
+trace -I 'linux/fs.h' \\
+      'p::uprobe_register(struct inode *inode) "a_ops = %llx", inode->i_mapping->a_ops'
+        Trace the uprobe_register inode mapping ops, and the symbol can be found
+        in /proc/kallsyms
+trace -I 'kernel/sched/sched.h' \\
+      'p::__account_cfs_rq_runtime(struct cfs_rq *cfs_rq) "%d", cfs_rq->runtime_remaining'
+        Trace the cfs scheduling runqueue remaining runtime. The struct cfs_rq is defined
+        in kernel/sched/sched.h which is in kernel source tree and not in kernel-devel
+        package.  So this command needs to run at the kernel source tree root directory
+        so that the added header file can be found by the compiler.
 """
 
         def __init__(self):
@@ -615,10 +625,12 @@ trace 'p::SyS_nanosleep(struct timespec *ts) "sleep for %lld ns", ts->tv_nsec'
                 parser.add_argument("-I", "--include", action="append",
                   metavar="header",
                   help="additional header files to include in the BPF program "
-                       "as either full path, or relative to '/usr/include'")
+                       "as either full path, "
+                       "or relative to current working directory, "
+                       "or relative to default kernel header search path")
                 self.args = parser.parse_args()
                 if self.args.tgid and self.args.pid:
-                        parser.error("only one of -p and -t may be specified")
+                        parser.error("only one of -p and -L may be specified")
 
         def _create_probes(self):
                 Probe.configure(self.args)
