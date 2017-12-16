@@ -529,8 +529,8 @@ int bpf_attach_socket(int sock, int prog) {
 }
 
 static int bpf_attach_tracing_event(int progfd, const char *event_path,
-    struct perf_reader *reader, int pid, int cpu, int group_fd) {
-  int efd, pfd;
+                                    struct perf_reader *reader, int pid) {
+  int efd, pfd, cpu = 0;
   ssize_t bytes;
   char buf[256];
   struct perf_event_attr attr = {};
@@ -555,7 +555,15 @@ static int bpf_attach_tracing_event(int progfd, const char *event_path,
   attr.sample_type = PERF_SAMPLE_RAW | PERF_SAMPLE_CALLCHAIN;
   attr.sample_period = 1;
   attr.wakeup_events = 1;
-  pfd = syscall(__NR_perf_event_open, &attr, pid, cpu, group_fd, PERF_FLAG_FD_CLOEXEC);
+  // PID filter is only possible for uprobe events.
+  if (pid < 0)
+    pid = -1;
+  // perf_event_open API doesn't allow both pid and cpu to be -1.
+  // So only set it to -1 when PID is not -1.
+  // Tracing events do not do CPU filtering in any cases.
+  if (pid != -1)
+    cpu = -1;
+  pfd = syscall(__NR_perf_event_open, &attr, pid, cpu, -1 /* group_fd */, PERF_FLAG_FD_CLOEXEC);
   if (pfd < 0) {
     fprintf(stderr, "perf_event_open(%s/id): %s\n", event_path, strerror(errno));
     return -1;
@@ -577,9 +585,8 @@ static int bpf_attach_tracing_event(int progfd, const char *event_path,
   return 0;
 }
 
-void * bpf_attach_kprobe(int progfd, enum bpf_probe_attach_type attach_type, const char *ev_name,
-                        const char *fn_name,
-                        pid_t pid, int cpu, int group_fd,
+void *bpf_attach_kprobe(int progfd, enum bpf_probe_attach_type attach_type,
+                        const char *ev_name, const char *fn_name,
                         perf_reader_cb cb, void *cb_cookie)
 {
   int kfd;
@@ -611,7 +618,7 @@ void * bpf_attach_kprobe(int progfd, enum bpf_probe_attach_type attach_type, con
   close(kfd);
 
   snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/events/%ss/%s", event_type, event_alias);
-  if (bpf_attach_tracing_event(progfd, buf, reader, pid, cpu, group_fd) < 0)
+  if (bpf_attach_tracing_event(progfd, buf, reader, -1 /* PID */) < 0)
     goto error;
 
   return reader;
@@ -683,10 +690,10 @@ static void exit_mount_ns(int fd) {
     perror("setns");
 }
 
-void * bpf_attach_uprobe(int progfd, enum bpf_probe_attach_type attach_type, const char *ev_name,
-                        const char *binary_path, uint64_t offset,
-                        pid_t pid, int cpu, int group_fd,
-                        perf_reader_cb cb, void *cb_cookie)
+void *bpf_attach_uprobe(int progfd, enum bpf_probe_attach_type attach_type,
+                        const char *ev_name, const char *binary_path,
+                        uint64_t offset, pid_t pid, perf_reader_cb cb,
+                        void *cb_cookie)
 {
   char buf[PATH_MAX];
   char event_alias[PATH_MAX];
@@ -728,7 +735,7 @@ void * bpf_attach_uprobe(int progfd, enum bpf_probe_attach_type attach_type, con
   ns_fd = -1;
 
   snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/events/%ss/%s", event_type, event_alias);
-  if (bpf_attach_tracing_event(progfd, buf, reader, pid, cpu, group_fd) < 0)
+  if (bpf_attach_tracing_event(progfd, buf, reader, pid) < 0)
     goto error;
 
   return reader;
@@ -782,9 +789,9 @@ int bpf_detach_uprobe(const char *ev_name)
 }
 
 
-void * bpf_attach_tracepoint(int progfd, const char *tp_category,
-                             const char *tp_name, int pid, int cpu,
-                             int group_fd, perf_reader_cb cb, void *cb_cookie) {
+void *bpf_attach_tracepoint(int progfd, const char *tp_category,
+                            const char *tp_name, perf_reader_cb cb,
+                            void *cb_cookie) {
   char buf[256];
   struct perf_reader *reader = NULL;
 
@@ -794,7 +801,7 @@ void * bpf_attach_tracepoint(int progfd, const char *tp_category,
 
   snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/events/%s/%s",
            tp_category, tp_name);
-  if (bpf_attach_tracing_event(progfd, buf, reader, pid, cpu, group_fd) < 0)
+  if (bpf_attach_tracing_event(progfd, buf, reader, -1 /* PID */) < 0)
     goto error;
 
   return reader;

@@ -28,7 +28,7 @@ class TestTracingEvent(TestCase):
     def setUp(self):
         b = BPF(text=text, debug=0)
         self.stats = b.get_table("stats")
-        b.attach_kprobe(event="finish_task_switch", fn_name="count_sched", pid=0, cpu=-1)
+        b.attach_kprobe(event="finish_task_switch", fn_name="count_sched")
 
     def test_sched1(self):
         for i in range(0, 100):

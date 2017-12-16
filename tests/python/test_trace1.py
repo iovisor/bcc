@@ -27,9 +27,9 @@ class TestKprobe(TestCase):
     def setUp(self):
         b = BPF(arg1, arg2, debug=0)
         self.stats = b.get_table("stats", Key, Leaf)
-        b.attach_kprobe(event="sys_write", fn_name="sys_wr", pid=0, cpu=-1)
-        b.attach_kprobe(event="sys_read", fn_name="sys_rd", pid=0, cpu=-1)
-        b.attach_kprobe(event="htab_map_get_next_key", fn_name="sys_rd", pid=0, cpu=-1)
+        b.attach_kprobe(event="sys_write", fn_name="sys_wr")
+        b.attach_kprobe(event="sys_read", fn_name="sys_rd")
+        b.attach_kprobe(event="htab_map_get_next_key", fn_name="sys_rd")
 
     def test_trace1(self):
         with open("/dev/null", "a") as f:

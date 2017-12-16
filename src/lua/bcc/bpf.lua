@@ -189,9 +189,7 @@ function Bpf:attach_uprobe(args)
   local retprobe = args.retprobe and 1 or 0
 
   local res = libbcc.bpf_attach_uprobe(fn.fd, retprobe, ev_name, path, addr,
-    args.pid or -1,
-    args.cpu or 0,
-    args.group_fd or -1, nil, nil) -- TODO; reader callback
+    args.pid or -1, nil, nil) -- TODO; reader callback
 
   assert(res ~= nil, "failed to attach BPF to uprobe")
   self:probe_store("uprobe", ev_name, res)
@@ -209,9 +207,7 @@ function Bpf:attach_kprobe(args)
   local retprobe = args.retprobe and 1 or 0
 
   local res = libbcc.bpf_attach_kprobe(fn.fd, retprobe, ev_name, event,
-    args.pid or -1,
-    args.cpu or 0,
-    args.group_fd or -1, nil, nil) -- TODO; reader callback
+    nil, nil) -- TODO; reader callback
 
   assert(res ~= nil, "failed to attach BPF to kprobe")
   self:probe_store("kprobe", ev_name, res)

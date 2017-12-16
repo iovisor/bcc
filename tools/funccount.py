@@ -90,8 +90,7 @@ class Probe(object):
             for index, function in self.trace_functions.items():
                 self.bpf.attach_kprobe(
                         event=function,
-                        fn_name="trace_count_%d" % index,
-                        pid=self.pid or -1)
+                        fn_name="trace_count_%d" % index)
         elif self.type == "p" and self.library:
             for index, function in self.trace_functions.items():
                 self.bpf.attach_uprobe(
@@ -103,8 +102,7 @@ class Probe(object):
             for index, function in self.trace_functions.items():
                 self.bpf.attach_tracepoint(
                         tp=function,
-                        fn_name="trace_count_%d" % index,
-                        pid=self.pid or -1)
+                        fn_name="trace_count_%d" % index)
         elif self.type == "u":
             pass    # Nothing to do -- attach already happened in `load`
 
