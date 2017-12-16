@@ -10,6 +10,7 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 # Copyright (C) 2016 Sasha Goldshtein.
 
+from __future__ import print_function
 from bcc import BPF, USDT
 from functools import partial
 from time import sleep, strftime
@@ -26,7 +27,10 @@ class Probe(object):
         max_events = None
         event_count = 0
         first_ts = 0
+        print_time = False
         use_localtime = True
+        time_field = False
+        print_cpu = False
         tgid = -1
         pid = -1
         page_cnt = None
@@ -36,6 +40,8 @@ class Probe(object):
                 cls.max_events = args.max_events
                 cls.print_time = args.timestamp or args.time
                 cls.use_localtime = not args.timestamp
+                cls.time_field = cls.print_time and (not cls.use_localtime)
+                cls.print_cpu = args.print_cpu
                 cls.first_ts = BPF.monotonic_time()
                 cls.tgid = args.tgid or -1
                 cls.pid = args.pid or -1
@@ -251,12 +257,16 @@ static inline bool %s(char const *ignored, uintptr_t str) {
         def _generate_python_data_decl(self):
                 self.python_struct_name = "%s_%d_Data" % \
                                 (self._display_function(), self.probe_num)
-                fields = [
-                        ("timestamp_ns", ct.c_ulonglong),
+                fields = []
+                if self.time_field:
+                    fields.append(("timestamp_ns", ct.c_ulonglong))
+                if self.print_cpu:
+                    fields.append(("cpu", ct.c_int))
+                fields.extend([
                         ("tgid", ct.c_uint),
                         ("pid", ct.c_uint),
                         ("comm", ct.c_char * 16)       # TASK_COMM_LEN
-                ]
+                ])
                 for i in range(0, len(self.types)):
                         self._generate_python_field_decl(i, fields)
                 if self.kernel_stack:
@@ -295,7 +305,8 @@ static inline bool %s(char const *ignored, uintptr_t str) {
                 for i, field_type in enumerate(self.types):
                         data_fields += "        " + \
                                        self._generate_field_decl(i)
-
+                time_str = "u64 timestamp_ns;" if self.time_field else ""
+                cpu_str = "int cpu;" if self.print_cpu else ""
                 kernel_stack_str = "       int kernel_stack_id;" \
                                    if self.kernel_stack else ""
                 user_stack_str = "       int user_stack_id;" \
@@ -304,7 +315,8 @@ static inline bool %s(char const *ignored, uintptr_t str) {
                 text = """
 struct %s
 {
-        u64 timestamp_ns;
+%s
+%s
         u32 tgid;
         u32 pid;
         char comm[TASK_COMM_LEN];
@@ -316,7 +328,7 @@ struct %s
 BPF_PERF_OUTPUT(%s);
 %s
 """
-                return text % (self.struct_name, data_fields,
+                return text % (self.struct_name, time_str, cpu_str, data_fields,
                                kernel_stack_str, user_stack_str,
                                self.events_name, stack_table)
 
@@ -402,6 +414,10 @@ BPF_PERF_OUTPUT(%s);
                         heading = "int %s(%s)" % (self.probe_name, signature)
                         ctx_name = "ctx"
 
+                time_str = """
+        __data.timestamp_ns = bpf_ktime_get_ns();""" if self.time_field else ""
+                cpu_str = """
+        __data.cpu = bpf_get_smp_processor_id();""" if self.print_cpu else ""
                 stack_trace = ""
                 if self.user_stack:
                         stack_trace += """
@@ -425,7 +441,8 @@ BPF_PERF_OUTPUT(%s);
         if (!(%s)) return 0;
 
         struct %s __data = {0};
-        __data.timestamp_ns = bpf_ktime_get_ns();
+        %s
+        %s
         __data.tgid = __tgid;
         __data.pid = __pid;
         bpf_get_current_comm(&__data.comm, sizeof(__data.comm));
@@ -437,7 +454,7 @@ BPF_PERF_OUTPUT(%s);
 """
                 text = text % (pid_filter, prefix,
                                self._generate_usdt_filter_read(), self.filter,
-                               self.struct_name, data_fields,
+                               self.struct_name, time_str, cpu_str, data_fields,
                                stack_trace, self.events_name, ctx_name)
 
                 return self.streq_functions + data_decl + "\n" + text
@@ -484,16 +501,15 @@ BPF_PERF_OUTPUT(%s);
                 values = map(lambda i: getattr(event, "v%d" % i),
                              range(0, len(self.values)))
                 msg = self._format_message(bpf, event.tgid, values)
-                if not Probe.print_time:
-                    print("%-7d %-7d %-15s %-16s %s" %
-                          (event.tgid, event.pid, event.comm.decode(),
-                           self._display_function(), msg))
-                else:
+                if Probe.print_time:
                     time = strftime("%H:%M:%S") if Probe.use_localtime else \
                            Probe._time_off_str(event.timestamp_ns)
-                    print("%-8s %-7d %-7d %-15s %-16s %s" %
-                          (time[:8], event.tgid, event.pid,
-                           event.comm.decode(), self._display_function(), msg))
+                    print("%-8s " % time[:8], end="")
+                if Probe.print_cpu:
+                    print("%-3s " % event.cpu, end="")
+                print("%-7d %-7d %-15s %-16s %s" %
+                      (event.tgid, event.pid, event.comm.decode(),
+                       self._display_function(), msg))
 
                 if self.kernel_stack:
                         self.print_stack(bpf, event.kernel_stack_id, -1)
@@ -616,6 +632,8 @@ trace -I 'kernel/sched/sched.h' \\
                   help="print timestamp column (offset from trace start)")
                 parser.add_argument("-T", "--time", action="store_true",
                   help="print time column")
+                parser.add_argument("-C", "--print_cpu", action="store_true",
+                  help="print CPU id")
                 parser.add_argument("-K", "--kernel-stack",
                   action="store_true", help="output kernel stack trace")
                 parser.add_argument("-U", "--user-stack",
@@ -685,13 +703,12 @@ trace -I 'kernel/sched/sched.h' \\
 
                 # Print header
                 if self.args.timestamp or self.args.time:
-                    print("%-8s %-7s %-7s %-15s %-16s %s" %
-                          ("TIME", "PID", "TID", "COMM", "FUNC",
-                          "-" if not all_probes_trivial else ""))
-                else:
-                    print("%-7s %-7s %-15s %-16s %s" %
-                          ("PID", "TID", "COMM", "FUNC",
-                          "-" if not all_probes_trivial else ""))
+                    print("%-8s " % "TIME", end="");
+                if self.args.print_cpu:
+                    print("%-3s " % "CPU", end="");
+                print("%-7s %-7s %-15s %-16s %s" %
+                      ("PID", "TID", "COMM", "FUNC",
+                      "-" if not all_probes_trivial else ""))
 
                 while True:
                         self.bpf.kprobe_poll()
