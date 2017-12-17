@@ -72,6 +72,39 @@ int kprobe__finish_task_switch(struct pt_regs *ctx, struct task_struct *prev) {
         b["hist1"].print_log2_hist()
         b.cleanup()
 
+    def test_multiple_key(self):
+        b = BPF(text="""
+#include <uapi/linux/ptrace.h>
+#include <uapi/linux/fs.h>
+struct hist_s_key {
+    u64 key_1;
+    u64 key_2;
+};
+struct hist_key {
+    struct hist_s_key s_key;
+    u64 slot;
+};
+BPF_HISTOGRAM(mk_hist, struct hist_key, 1024);
+int kprobe__vfs_read(struct pt_regs *ctx, struct file *file,
+        char __user *buf, size_t count) {
+    struct hist_key key = {.slot = bpf_log2l(count)};
+    key.s_key.key_1 = (unsigned long)buf & 0x70;
+    key.s_key.key_2 = (unsigned long)buf & 0x7;
+    mk_hist.increment(key);
+    return 0;
+}
+""")
+        def bucket_sort(buckets):
+            buckets.sort()
+            return buckets
+
+        for i in range(0, 100): time.sleep(0.01)
+        b["mk_hist"].print_log2_hist("size", "k_1 & k_2",
+                section_print_fn=lambda bucket: "%3d %d" % (bucket[0], bucket[1]),
+                bucket_fn=lambda bucket: (bucket.key_1, bucket.key_2),
+                strip_leading_zero=True,
+                bucket_sort_fn=bucket_sort)
+        b.cleanup()
 
 if __name__ == "__main__":
     main()
