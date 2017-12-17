@@ -108,14 +108,17 @@ predicate and trace arguments.
 
 More and more high-level libraries are instrumented with USDT probe support.
 These probes can be traced by trace just like kernel tracepoints. For example,
-trace new threads being created and their function name:
+trace new threads being created and their function name, include time column
+and on which CPU it happened:
 
-# trace 'u:pthread:pthread_create "%U", arg3' -T
-TIME     PID    COMM         FUNC             -
-02:07:29 4051   contentions  pthread_create   primes_thread+0x0
-02:07:29 4051   contentions  pthread_create   primes_thread+0x0
-02:07:29 4051   contentions  pthread_create   primes_thread+0x0
-02:07:29 4051   contentions  pthread_create   primes_thread+0x0
+# trace 'u:pthread:pthread_create "%U", arg3' -T -C
+TIME     CPU PID     TID     COMM            FUNC             -
+13:22:01 25  2627    2629    automount       pthread_create   expire_proc_indirect+0x0 [automount]
+13:22:01 5   21360   21414   osqueryd        pthread_create   [unknown] [osqueryd]
+13:22:03 25  2627    2629    automount       pthread_create   expire_proc_indirect+0x0 [automount]
+13:22:04 15  21360   21414   osqueryd        pthread_create   [unknown] [osqueryd]
+13:22:07 25  2627    2629    automount       pthread_create   expire_proc_indirect+0x0 [automount]
+13:22:07 4   21360   21414   osqueryd        pthread_create   [unknown] [osqueryd]
 ^C
 
 The "%U" format specifier tells trace to resolve arg3 as a user-space symbol,
@@ -245,6 +248,7 @@ optional arguments:
                         number of events to print before quitting
   -t, --timestamp       print timestamp column (offset from trace start)
   -T, --time            print time column
+  -C, --print_cpu       print CPU id 
   -K, --kernel-stack    output kernel stack trace
   -U, --user-stack      output user stack trace
   -I header, --include header
