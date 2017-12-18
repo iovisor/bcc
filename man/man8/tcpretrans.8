@@ -1,6 +1,6 @@
 .TH tcpaccept 8  "2016-02-14" "USER COMMANDS"
 .SH NAME
-tcpaccept \- Trace TCP retransmits and TLPs. Uses Linux eBPF/bcc.
+tcpaccept \- Trace or count TCP retransmits and TLPs. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
 .B tcpaccept [\-h] [\-l]
 .SH DESCRIPTION
@@ -8,7 +8,9 @@ This traces TCP retransmits, showing address, port, and TCP state information,
 and sometimes the PID (although usually not, since retransmits are usually
 sent by the kernel on timeouts). To keep overhead very low, only
 the TCP retransmit functions are traced. This does not trace every packet
-(like tcpdump(8) or a packet sniffer).
+(like tcpdump(8) or a packet sniffer). Optionally, it can count retransmits
+over a user signalled interval to spot potentially dropping network paths the
+flows are traversing. 
 
 This uses dynamic tracing of the kernel tcp_retransmit_skb() and
 tcp_send_loss_probe() functions, and will need to be updated to
@@ -25,6 +27,9 @@ Print usage message.
 \-l
 Include tail loss probe attempts (in some cases the kernel may not
 complete the TLP send).
+.TP
+\-c
+Count occurring retransmits per flow. 
 .SH EXAMPLES
 .TP
 Trace TCP retransmits:
@@ -63,6 +68,9 @@ Remote port.
 .TP
 STATE
 TCP session state.
+.TP
+RETRANSMITS
+Accumulated occurred retransmits since start.
 .SH OVERHEAD
 Should be negligible: TCP retransmit events should be low (<1000/s), and the
 low overhead this tool adds to each event should make the cost negligible.
