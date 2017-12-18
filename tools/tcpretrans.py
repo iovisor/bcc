@@ -1,10 +1,10 @@
 #!/usr/bin/python
 # @lint-avoid-python-3-compatibility-imports
 #
-# tcpretrans    Trace TCP retransmits and TLPs.
+# tcpretrans    Trace or count TCP retransmits and TLPs.
 #               For Linux, uses BCC, eBPF. Embedded C.
 #
-# USAGE: tcpretrans [-h] [-l]
+# USAGE: tcpretrans [-c] [-h] [-l]
 #
 # This uses dynamic tracing of kernel functions, and will need to be updated
 # to match kernel changes.
@@ -38,6 +38,7 @@ parser.add_argument("-l", "--lossprobe", action="store_true",
 parser.add_argument("-c", "--count", action="store_true",
     help="count occurred retransmits per flow")
 args = parser.parse_args()
+debug = 0
 
 # define BPF program
 bpf_text = """
@@ -187,6 +188,9 @@ else:
     bpf_text = bpf_text.replace("IPV6_INIT", struct_init['ipv6']['trace'])
     bpf_text = bpf_text.replace("IPV4_CORE", "ipv4_events.perf_submit(ctx, &data4, sizeof(data4));")
     bpf_text = bpf_text.replace("IPV6_CORE", "ipv6_events.perf_submit(ctx, &data6, sizeof(data6));")
+
+if debug:
+    print(bpf_text)
 
 # event data
 class Data_ipv4(ct.Structure):
