@@ -275,9 +275,11 @@ class TableBase(MutableMapping):
         return next_key
 
     def print_log2_hist(self, val_type="value", section_header="Bucket ptr",
-            section_print_fn=None, bucket_fn=None, strip_leading_zero=None):
+            section_print_fn=None, bucket_fn=None, strip_leading_zero=None,
+            bucket_sort_fn=None):
         """print_log2_hist(val_type="value", section_header="Bucket ptr",
-                           section_print_fn=None, bucket_fn=None)
+                           section_print_fn=None, bucket_fn=None,
+                           strip_leading_zero=None, bucket_sort_fn=None):
 
         Prints a table as a log2 histogram. The table must be stored as
         log2. The val_type argument is optional, and is a column header.
@@ -287,9 +289,12 @@ class TableBase(MutableMapping):
         to format into a string as it sees fit. If bucket_fn is not None,
         it will be used to produce a bucket value for the histogram keys.
         If the value of strip_leading_zero is not False, prints a histogram
-        that is omitted leading zeros from the beginning. The maximum index
-        allowed is log2_index_max (65), which will accommodate any 64-bit
-        integer in the histogram.
+        that is omitted leading zeros from the beginning.
+        If bucket_sort_fn is not None, it will be used to sort the buckets
+        before iterating them, and it is useful when there are multiple fields
+        in the secondary key.
+        The maximum index allowed is log2_index_max (65), which will
+        accommodate any 64-bit integer in the histogram.
         """
         if isinstance(self.Key(), ct.Structure):
             tmp = {}
@@ -302,7 +307,13 @@ class TableBase(MutableMapping):
                 vals = tmp[bucket] = tmp.get(bucket, [0] * log2_index_max)
                 slot = getattr(k, f2)
                 vals[slot] = v.value
-            for bucket, vals in tmp.items():
+
+            buckets = tmp.keys()
+            if bucket_sort_fn:
+                buckets = bucket_sort_fn(buckets)
+
+            for bucket in buckets:
+                vals = tmp[bucket]
                 if section_print_fn:
                     print("\n%s = %s" % (section_header,
                         section_print_fn(bucket)))
@@ -316,9 +327,10 @@ class TableBase(MutableMapping):
             _print_log2_hist(vals, val_type, strip_leading_zero)
 
     def print_linear_hist(self, val_type="value", section_header="Bucket ptr",
-            section_print_fn=None, bucket_fn=None):
+            section_print_fn=None, bucket_fn=None, bucket_sort_fn=None):
         """print_linear_hist(val_type="value", section_header="Bucket ptr",
-                           section_print_fn=None, bucket_fn=None)
+                           section_print_fn=None, bucket_fn=None,
+                           bucket_sort_fn=None)
 
         Prints a table as a linear histogram. This is intended to span integer
         ranges, eg, from 0 to 100. The val_type argument is optional, and is a
@@ -327,6 +339,9 @@ class TableBase(MutableMapping):
         each.  If section_print_fn is not None, it will be passed the bucket
         value to format into a string as it sees fit. If bucket_fn is not None,
         it will be used to produce a bucket value for the histogram keys.
+        If bucket_sort_fn is not None, it will be used to sort the buckets
+        before iterating them, and it is useful when there are multiple fields
+        in the secondary key.
         The maximum index allowed is linear_index_max (1025), which is hoped
         to be sufficient for integer ranges spanned.
         """
@@ -341,7 +356,13 @@ class TableBase(MutableMapping):
                 vals = tmp[bucket] = tmp.get(bucket, [0] * linear_index_max)
                 slot = getattr(k, f2)
                 vals[slot] = v.value
-            for bucket, vals in tmp.items():
+
+            buckets = tmp.keys()
+            if bucket_sort_fn:
+                buckets = bucket_sort_fn(buckets)
+
+            for bucket in buckets:
+                vals = tmp[bucket]
                 if section_print_fn:
                     print("\n%s = %s" % (section_header,
                         section_print_fn(bucket)))
