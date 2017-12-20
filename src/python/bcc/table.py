@@ -532,7 +532,7 @@ class PerfEventArray(ArrayBase):
                     exit()
                 else:
                     raise e
-        def lost_cb_(lost):
+        def lost_cb_(_, lost):
             try:
                 lost_cb(lost)
             except IOError as e:
