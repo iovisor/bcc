@@ -253,7 +253,7 @@ void perf_reader_event_read(struct perf_reader *reader) {
        */
       uint64_t lost = *(uint64_t *)(ptr + sizeof(*e) + sizeof(uint64_t));
       if (reader->lost_cb) {
-        reader->lost_cb(lost);
+        reader->lost_cb(reader->cb_cookie, lost);
       } else {
         fprintf(stderr, "Possibly lost %" PRIu64 " samples\n", lost);
       }
