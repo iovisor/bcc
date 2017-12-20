@@ -252,8 +252,8 @@ function PerfEventArray:_open_perf_buffer(cpu, callback, ctype, page_cnt, lost_c
   local _lost_cb = nil
   if lost_cb then
     _lost_cb = ffi.cast("perf_reader_lost_cb",
-      function (lost)
-        lost_cb(lost)
+      function (cookie, lost)
+        lost_cb(cookie, lost)
       end)
   end
 
