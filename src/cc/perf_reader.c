@@ -243,7 +243,15 @@ void perf_reader_event_read(struct perf_reader *reader) {
     }
 
     if (e->type == PERF_RECORD_LOST) {
-      uint64_t lost = *(uint64_t *)(ptr + sizeof(*e));
+      /*
+       * struct {
+       *    struct perf_event_header    header;
+       *    u64                id;
+       *    u64                lost;
+       *    struct sample_id        sample_id;
+       * };
+       */
+      uint64_t lost = *(uint64_t *)(ptr + sizeof(*e) + sizeof(uint64_t));
       if (reader->lost_cb) {
         reader->lost_cb(lost);
       } else {
