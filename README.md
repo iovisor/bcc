@@ -9,7 +9,11 @@ and above.
 
 eBPF was [described by](https://lkml.org/lkml/2015/4/14/232) Ingo Molnár as:
 
-> One of the more interesting features in this cycle is the ability to attach eBPF programs (user-defined, sandboxed bytecode executed by the kernel) to kprobes. This allows user-defined instrumentation on a live kernel image that can never crash, hang or interfere with the kernel negatively.
+> One of the more interesting features in this cycle is the ability to
+> attach eBPF programs (user-defined, sandboxed bytecode executed by
+> the kernel) to kprobes. This allows user-defined instrumentation on
+> a live kernel image that can never crash, hang or interfere with the
+> kernel negatively.
 
 BCC makes BPF programs easier to write, with kernel instrumentation in C
 (and includes a C wrapper around LLVM), and front-ends in Python and lua.
@@ -54,7 +58,8 @@ See [FAQ.txt](FAQ.txt) for the most common troubleshoot questions.
 
 ## Reference guide
 
-See [docs/reference_guide.md](docs/reference_guide.md) for the reference guide to the bcc and bcc/BPF APIs.
+See [docs/reference_guide.md](docs/reference_guide.md) for the
+reference guide to the bcc and bcc/BPF APIs.
 
 ## Contents
 
@@ -240,4 +245,5 @@ what you want to work on.
 
 ## External links
 
-Looking for more information on BCC and how it's being used? You can find links to other BCC content on the web in [LINKS.md](LINKS.md).
+Looking for more information on BCC and how it's being used? You can
+find links to other BCC content on the web in [LINKS.md](LINKS.md).
