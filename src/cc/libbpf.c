@@ -48,6 +48,9 @@
 #include "libbpf.h"
 #include "perf_reader.h"
 
+// TODO: Remove this when CentOS 6 support is not needed anymore
+#include "setns.h"
+
 // TODO: remove these defines when linux-libc-dev exports them properly
 
 #ifndef __NR_bpf
@@ -72,6 +75,11 @@
 
 #ifndef PERF_FLAG_FD_CLOEXEC
 #define PERF_FLAG_FD_CLOEXEC (1UL << 3)
+#endif
+
+// TODO: Remove this when CentOS 6 support is not needed anymore
+#ifndef AF_ALG
+#define AF_ALG 38
 #endif
 
 #define min(x, y) ((x) < (y) ? (x) : (y))

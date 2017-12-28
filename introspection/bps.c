@@ -11,6 +11,11 @@
 
 #include "libbpf.h"
 
+// TODO: Remove this when CentOS 6 support is not needed anymore
+#ifndef CLOCK_BOOTTIME
+#define CLOCK_BOOTTIME 7
+#endif
+
 static const char * const prog_type_strings[] = {
   [BPF_PROG_TYPE_UNSPEC] = "unspec",
   [BPF_PROG_TYPE_SOCKET_FILTER] = "socket filter",
