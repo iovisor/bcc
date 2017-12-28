@@ -160,7 +160,7 @@ bool TracepointTypeVisitor::VisitFunctionDecl(FunctionDecl *D) {
       auto type = arg->getType();
       if (type->isPointerType() &&
           type->getPointeeType()->isStructureOrClassType()) {
-        auto type_name = QualType::getAsString(type.split());
+        auto type_name = type->getPointeeType().getAsString();
         string tp_cat, tp_evt;
         if (_is_tracepoint_struct_type(type_name, tp_cat, tp_evt)) {
           string tp_struct = GenerateTracepointStruct(
