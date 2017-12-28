@@ -29,7 +29,7 @@ set_target_properties(bpf-shared PROPERTIES VERSION ${REVISION_LAST} SOVERSION 0
 set_target_properties(bpf-shared PROPERTIES OUTPUT_NAME bpf)
 
 set(bcc_common_sources bpf_common.cc bpf_module.cc exported_files.cc)
-if (${LLVM_PACKAGE_VERSION} VERSION_GREATER "5")
+if (${LLVM_PACKAGE_VERSION} VERSION_EQUAL 6 OR ${LLVM_PACKAGE_VERSION} VERSION_GREATER 6)
   set(bcc_common_sources ${bcc_common_sources} bcc_debug.cc)
 endif()
 
