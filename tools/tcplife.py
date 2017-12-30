@@ -6,8 +6,8 @@
 #
 # USAGE: tcplife [-h] [-C] [-S] [-p PID] [interval [count]]
 #
-# This uses dynamic tracing of kernel functions, and will need to be updated
-# to match kernel changes.
+# This uses the tcp:tcp_set_state tracepoint if it exists (added to
+# Linux 4.15), else it uses kernel dynamic tracing of tcp_set_state().
 #
 # While throughput counters are emitted, they are fetched in a low-overhead
 # manner: reading members of the tcp_info struct on TCP close. ie, we do not
@@ -19,6 +19,7 @@
 # IDEA: Julia Evans
 #
 # 18-Oct-2016   Brendan Gregg   Created this.
+# 29-Dec-2017      "      "     Added tracepoint support.
 
 from __future__ import print_function
 from bcc import BPF
@@ -27,6 +28,9 @@ from socket import inet_ntop, ntohs, AF_INET, AF_INET6
 from struct import pack
 import ctypes as ct
 from time import strftime
+import os
+
+TRACEFS = "/sys/kernel/debug/tracing"
 
 # arguments
 examples = """examples:
@@ -103,7 +107,17 @@ struct id_t {
     char task[TASK_COMM_LEN];
 };
 BPF_HASH(whoami, struct sock *, struct id_t);
+"""
 
+#
+# XXX: The following is temporary code for older kernels, Linux 4.14 and
+# older. It uses kprobes to instrument tcp_set_state(). On Linux 4.15 and
+# later, the tcp:tcp_set_state tracepoint should be used instead, as is
+# done by the code that follows this. In the distant future (2021?), this
+# kprobe code can be removed. This is why there is so much code
+# duplication: to make removal easier.
+#
+bpf_text_kprobe = """
 int kprobe__tcp_set_state(struct pt_regs *ctx, struct sock *sk, int state)
 {
     u32 pid = bpf_get_current_pid_tgid() >> 32;
@@ -220,6 +234,131 @@ int kprobe__tcp_set_state(struct pt_regs *ctx, struct sock *sk, int state)
     return 0;
 }
 """
+
+bpf_text_tracepoint = """
+TRACEPOINT_PROBE(tcp, tcp_set_state)
+{
+    u32 pid = bpf_get_current_pid_tgid() >> 32;
+    // sk is mostly used as a UUID, once for skc_family, and two tcp stats:
+    struct sock *sk = (struct sock *)args->skaddr;
+
+    // lport is either used in a filter here, or later
+    u16 lport = args->sport;
+    FILTER_LPORT
+
+    // dport is either used in a filter here, or later
+    u16 dport = args->dport;
+    FILTER_DPORT
+
+    /*
+     * This tool includes PID and comm context. It's best effort, and may
+     * be wrong in some situations. It currently works like this:
+     * - record timestamp on any state < TCP_FIN_WAIT1
+     * - cache task context on:
+     *       TCP_SYN_SENT: tracing from client
+     *       TCP_LAST_ACK: client-closed from server
+     * - do output on TCP_CLOSE:
+     *       fetch task context if cached, or use current task
+     */
+
+    // capture birth time
+    if (args->newstate < TCP_FIN_WAIT1) {
+        /*
+         * Matching just ESTABLISHED may be sufficient, provided no code-path
+         * sets ESTABLISHED without a tcp_set_state() call. Until we know
+         * that for sure, match all early states to increase chances a
+         * timestamp is set.
+         * Note that this needs to be set before the PID filter later on,
+         * since the PID isn't reliable for these early stages, so we must
+         * save all timestamps and do the PID filter later when we can.
+         */
+        u64 ts = bpf_ktime_get_ns();
+        birth.update(&sk, &ts);
+    }
+
+    // record PID & comm on SYN_SENT
+    if (args->newstate == TCP_SYN_SENT || args->newstate == TCP_LAST_ACK) {
+        // now we can PID filter, both here and a little later on for CLOSE
+        FILTER_PID
+        struct id_t me = {.pid = pid};
+        bpf_get_current_comm(&me.task, sizeof(me.task));
+        whoami.update(&sk, &me);
+    }
+
+    if (args->newstate != TCP_CLOSE)
+        return 0;
+
+    // calculate lifespan
+    u64 *tsp, delta_us;
+    tsp = birth.lookup(&sk);
+    if (tsp == 0) {
+        whoami.delete(&sk);     // may not exist
+        return 0;               // missed create
+    }
+    delta_us = (bpf_ktime_get_ns() - *tsp) / 1000;
+    birth.delete(&sk);
+
+    // fetch possible cached data, and filter
+    struct id_t *mep;
+    mep = whoami.lookup(&sk);
+    if (mep != 0)
+        pid = mep->pid;
+    FILTER_PID
+
+    // get throughput stats. see tcp_get_info().
+    u64 rx_b = 0, tx_b = 0, sport = 0;
+    struct tcp_sock *tp = (struct tcp_sock *)sk;
+    bpf_probe_read(&rx_b, sizeof(rx_b), &tp->bytes_received);
+    bpf_probe_read(&tx_b, sizeof(tx_b), &tp->bytes_acked);
+
+    u16 family = 0;
+    bpf_probe_read(&family, sizeof(family), &sk->__sk_common.skc_family);
+
+    if (family == AF_INET) {
+        struct ipv4_data_t data4 = {.span_us = delta_us,
+            .rx_b = rx_b, .tx_b = tx_b};
+        data4.ts_us = bpf_ktime_get_ns() / 1000;
+        bpf_probe_read(&data4.saddr, sizeof(u32), args->saddr);
+        bpf_probe_read(&data4.daddr, sizeof(u32), args->daddr);
+        // a workaround until data4 compiles with separate lport/dport
+        data4.ports = dport + ((0ULL + lport) << 32);
+        data4.pid = pid;
+
+        if (mep == 0) {
+            bpf_get_current_comm(&data4.task, sizeof(data4.task));
+        } else {
+            bpf_probe_read(&data4.task, sizeof(data4.task), (void *)mep->task);
+        }
+        ipv4_events.perf_submit(args, &data4, sizeof(data4));
+
+    } else /* 6 */ {
+        struct ipv6_data_t data6 = {.span_us = delta_us,
+            .rx_b = rx_b, .tx_b = tx_b};
+        data6.ts_us = bpf_ktime_get_ns() / 1000;
+        bpf_probe_read(&data6.saddr, sizeof(data6.saddr), args->saddr_v6);
+        bpf_probe_read(&data6.daddr, sizeof(data6.daddr), args->saddr_v6);
+        // a workaround until data6 compiles with separate lport/dport
+        data6.ports = dport + ((0ULL + lport) << 32);
+        data6.pid = pid;
+        if (mep == 0) {
+            bpf_get_current_comm(&data6.task, sizeof(data6.task));
+        } else {
+            bpf_probe_read(&data6.task, sizeof(data6.task), (void *)mep->task);
+        }
+        ipv6_events.perf_submit(args, &data6, sizeof(data6));
+    }
+
+    if (mep != 0)
+        whoami.delete(&sk);
+
+    return 0;
+}
+"""
+
+if (os.path.exists(TRACEFS + "/events/tcp/tcp_set_state")):
+    bpf_text += bpf_text_tracepoint
+else:
+    bpf_text += bpf_text_kprobe
 
 # code substitutions
 if args.pid:
