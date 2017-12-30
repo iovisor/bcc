@@ -28,9 +28,6 @@ from socket import inet_ntop, ntohs, AF_INET, AF_INET6
 from struct import pack
 import ctypes as ct
 from time import strftime
-import os
-
-TRACEFS = "/sys/kernel/debug/tracing"
 
 # arguments
 examples = """examples:
@@ -355,7 +352,7 @@ TRACEPOINT_PROBE(tcp, tcp_set_state)
 }
 """
 
-if (os.path.exists(TRACEFS + "/events/tcp/tcp_set_state")):
+if (BPF.tracepoint_exists("tcp", "tcp_set_state")):
     bpf_text += bpf_text_tracepoint
 else:
     bpf_text += bpf_text_kprobe
