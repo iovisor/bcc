@@ -644,6 +644,11 @@ class BPF(object):
                         results.append(tp)
         return results
 
+    @staticmethod
+    def tracepoint_exists(category, event):
+        evt_dir = os.path.join(TRACEFS, "events", category, event)
+        return os.path.isdir(evt_dir)
+
     def attach_tracepoint(self, tp="", tp_re="", fn_name=""):
         """attach_tracepoint(tp="", tp_re="", fn_name="")
 
