@@ -42,7 +42,7 @@ TEST_CASE("test finding a probe in our own process", "[usdt]") {
     auto probe = ctx.get("sample_probe_1");
     REQUIRE(probe);
 
-    REQUIRE(probe->in_shared_object() == false);
+    REQUIRE(probe->in_shared_object(probe->bin_path()) == false);
     REQUIRE(probe->name() == "sample_probe_1");
     REQUIRE(probe->provider() == "libbcc_test");
     REQUIRE(probe->bin_path().find("/test_libbcc") != std::string::npos);
@@ -132,7 +132,7 @@ TEST_CASE("test listing all USDT probes in Ruby/MRI", "[usdt]") {
       auto probe = ctx.get(name);
       REQUIRE(probe);
 
-      REQUIRE(probe->in_shared_object() == true);
+      REQUIRE(probe->in_shared_object(probe->bin_path()) == true);
       REQUIRE(probe->name() == name);
       REQUIRE(probe->provider() == "ruby");
 
@@ -155,7 +155,7 @@ TEST_CASE("test listing all USDT probes in Ruby/MRI", "[usdt]") {
       auto probe = ctx.get(name);
       REQUIRE(probe);
 
-      REQUIRE(probe->in_shared_object() == true);
+      REQUIRE(probe->in_shared_object(probe->bin_path()) == true);
       REQUIRE(probe->name() == name);
       REQUIRE(probe->provider() == "ruby");
 
@@ -205,7 +205,7 @@ TEST_CASE("test listing all USDT probes in Ruby/MRI", "[usdt]") {
       auto probe = ctx.get(name);
       REQUIRE(probe);
 
-      REQUIRE(probe->in_shared_object() == true);
+      REQUIRE(probe->in_shared_object(probe->bin_path()) == true);
       REQUIRE(probe->name() == name);
       REQUIRE(probe->provider() == "ruby");
 

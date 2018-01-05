@@ -208,7 +208,8 @@ class bcc_usdt(ct.Structure):
 
 class bcc_usdt_location(ct.Structure):
     _fields_ = [
-            ('address', ct.c_ulonglong)
+            ('address', ct.c_ulonglong),
+            ('bin_path', ct.c_char_p),
         ]
 
 class BCC_USDT_ARGUMENT_FLAGS(object):
@@ -238,11 +239,11 @@ lib.bcc_usdt_foreach.restype = None
 lib.bcc_usdt_foreach.argtypes = [ct.c_void_p, _USDT_CB]
 
 lib.bcc_usdt_get_location.restype = ct.c_int
-lib.bcc_usdt_get_location.argtypes = [ct.c_void_p, ct.c_char_p, ct.c_int,
+lib.bcc_usdt_get_location.argtypes = [ct.c_void_p, ct.c_char_p, ct.c_char_p, ct.c_int,
                                       ct.POINTER(bcc_usdt_location)]
 
 lib.bcc_usdt_get_argument.restype = ct.c_int
-lib.bcc_usdt_get_argument.argtypes = [ct.c_void_p, ct.c_char_p, ct.c_int,
+lib.bcc_usdt_get_argument.argtypes = [ct.c_void_p, ct.c_char_p, ct.c_char_p, ct.c_int,
                                       ct.c_int, ct.POINTER(bcc_usdt_argument)]
 
 _USDT_PROBE_CB = ct.CFUNCTYPE(None, ct.c_char_p, ct.c_char_p,

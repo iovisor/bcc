@@ -37,6 +37,7 @@ struct bcc_usdt {
 
 struct bcc_usdt_location {
     uint64_t address;
+    const char *bin_path;
 };
 
 #define BCC_USDT_ARGUMENT_NONE                0x0
@@ -60,9 +61,11 @@ struct bcc_usdt_argument {
 
 typedef void (*bcc_usdt_cb)(struct bcc_usdt *);
 void bcc_usdt_foreach(void *usdt, bcc_usdt_cb callback);
-int bcc_usdt_get_location(void *usdt, const char *probe_name,
+int bcc_usdt_get_location(void *usdt, const char *provider_name,
+                          const char *probe_name,
                           int index, struct bcc_usdt_location *location);
-int bcc_usdt_get_argument(void *usdt, const char *probe_name,
+int bcc_usdt_get_argument(void *usdt, const char *provider_name,
+                          const char *probe_name,
                           int location_index, int argument_index,
                           struct bcc_usdt_argument *argument);
 

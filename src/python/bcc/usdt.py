@@ -82,13 +82,15 @@ class USDTProbeLocation(object):
         self.index = index
         self.num_arguments = probe.num_arguments
         self.address = location.address
+        self.bin_path = location.bin_path
 
     def __str__(self):
-        return "0x%x" % self.address
+        return "%s 0x%x" % (self.bin_path, self.address)
 
     def get_argument(self, index):
         arg = bcc_usdt_argument()
-        res = lib.bcc_usdt_get_argument(self.probe.context, self.probe.name,
+        res = lib.bcc_usdt_get_argument(self.probe.context, self.probe.provider,
+                                        self.probe.name,
                                         self.index, index, ct.byref(arg))
         if res != 0:
             raise USDTException(
@@ -107,15 +109,15 @@ class USDTProbe(object):
         self.num_arguments = probe.num_arguments
 
     def __str__(self):
-        return "%s %s:%s [sema 0x%x]" % \
-               (self.bin_path, self.provider, self.name, self.semaphore)
+        return "%s:%s [sema 0x%x]" % \
+               (self.provider, self.name, self.semaphore)
 
     def short_name(self):
         return "%s:%s" % (self.provider, self.name)
 
     def get_location(self, index):
         loc = bcc_usdt_location()
-        res = lib.bcc_usdt_get_location(self.context, self.name,
+        res = lib.bcc_usdt_get_location(self.context, self.provider, self.name,
                                         index, ct.byref(loc))
         if res != 0:
             raise USDTException("error retrieving probe location %d" % index)

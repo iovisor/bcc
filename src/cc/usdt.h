@@ -170,12 +170,13 @@ public:
 
 struct Location {
   uint64_t address_;
+  std::string bin_path_;
   std::vector<Argument> arguments_;
-  Location(uint64_t addr, const char *arg_fmt);
+  Location(uint64_t addr, const std::string &bin_path, const char *arg_fmt);
 };
 
 class Probe {
-  std::string bin_path_;
+  std::string bin_path_; // initial bin_path when Probe is created
   std::string provider_;
   std::string name_;
   uint64_t semaphore_;
@@ -184,7 +185,7 @@ class Probe {
 
   optional<int> pid_;
   ProcMountNS *mount_ns_;
-  optional<bool> in_shared_object_;
+  std::unordered_map<std::string, bool> object_type_map_; // bin_path => is shared lib?
 
   optional<std::string> attached_to_;
   optional<uint64_t> attached_semaphore_;
@@ -192,9 +193,10 @@ class Probe {
   std::string largest_arg_type(size_t arg_n);
 
   bool add_to_semaphore(int16_t val);
-  bool resolve_global_address(uint64_t *global, const uint64_t addr);
+  bool resolve_global_address(uint64_t *global, const std::string &bin_path,
+                              const uint64_t addr);
   bool lookup_semaphore_addr(uint64_t *address);
-  void add_location(uint64_t addr, const char *fmt);
+  void add_location(uint64_t addr, const std::string &bin_path, const char *fmt);
 
 public:
   Probe(const char *bin_path, const char *provider, const char *name,
@@ -205,6 +207,7 @@ public:
   uint64_t semaphore()   const { return semaphore_; }
 
   uint64_t address(size_t n = 0) const { return locations_[n].address_; }
+  const char *location_bin_path(size_t n = 0) const { return locations_[n].bin_path_.c_str(); }
   const Location &location(size_t n) const { return locations_[n]; }
   bool usdt_getarg(std::ostream &stream);
   std::string get_arg_ctype(int arg_index) {
@@ -217,7 +220,7 @@ public:
   bool disable();
   bool enabled() const { return !!attached_to_; }
 
-  bool in_shared_object();
+  bool in_shared_object(const std::string &bin_path);
   const std::string &name() { return name_; }
   const std::string &bin_path() { return bin_path_; }
   const std::string &provider() { return provider_; }
@@ -255,6 +258,7 @@ public:
   ino_t inode() const { return mount_ns_instance_->target_ino(); }
 
   Probe *get(const std::string &probe_name);
+  Probe *get(const std::string &provider_name, const std::string &probe_name);
   Probe *get(int pos) { return probes_[pos].get(); }
 
   bool enable_probe(const std::string &probe_name, const std::string &fn_name);
