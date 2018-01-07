@@ -71,6 +71,8 @@ add_test(NAME py_test_disassembler WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   COMMAND ${TEST_WRAPPER} py_test_disassembler sudo ${CMAKE_CURRENT_SOURCE_DIR}/test_disassembler.py)
 add_test(NAME py_test_tools_smoke WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   COMMAND ${TEST_WRAPPER} py_test_tools_smoke sudo ${CMAKE_CURRENT_SOURCE_DIR}/test_tools_smoke.py)
+add_test(NAME py_test_tools_on_remote WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  COMMAND ${TEST_WRAPPER} py_test_tools_on_remote sudo ${CMAKE_CURRENT_SOURCE_DIR}/test_tools_on_remote.py)
 add_test(NAME py_test_tools_memleak WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   COMMAND ${TEST_WRAPPER} py_test_tools_memleak sudo ${CMAKE_CURRENT_SOURCE_DIR}/test_tools_memleak.py)
 add_test(NAME py_test_usdt WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}

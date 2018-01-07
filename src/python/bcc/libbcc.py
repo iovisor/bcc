@@ -17,14 +17,15 @@ import ctypes as ct
 lib = ct.CDLL("libbcc.so.0", use_errno=True)
 
 # keep in sync with bcc_common.h
+_MAP_CB_TYPE = ct.CFUNCTYPE(ct.c_int, ct.c_void_p, ct.c_bool)
 lib.bpf_module_create_b.restype = ct.c_void_p
 lib.bpf_module_create_b.argtypes = [ct.c_char_p, ct.c_char_p, ct.c_uint]
 lib.bpf_module_create_c.restype = ct.c_void_p
 lib.bpf_module_create_c.argtypes = [ct.c_char_p, ct.c_uint,
-        ct.POINTER(ct.c_char_p), ct.c_int, ct.c_bool]
+        ct.POINTER(ct.c_char_p), ct.c_int, ct.c_bool, _MAP_CB_TYPE]
 lib.bpf_module_create_c_from_string.restype = ct.c_void_p
 lib.bpf_module_create_c_from_string.argtypes = [ct.c_char_p, ct.c_uint,
-        ct.POINTER(ct.c_char_p), ct.c_int, ct.c_bool]
+        ct.POINTER(ct.c_char_p), ct.c_int, ct.c_bool, _MAP_CB_TYPE]
 lib.bpf_module_destroy.restype = None
 lib.bpf_module_destroy.argtypes = [ct.c_void_p]
 lib.bpf_module_license.restype = ct.c_char_p
@@ -282,3 +283,6 @@ _USDT_PROBE_CB = ct.CFUNCTYPE(None, ct.c_char_p, ct.c_char_p,
 
 lib.bcc_usdt_foreach_uprobe.restype = None
 lib.bcc_usdt_foreach_uprobe.argtypes = [ct.c_void_p, _USDT_PROBE_CB]
+
+lib.bcc_create_map_xattr.restype = ct.c_int
+lib.bcc_create_map_xattr.argtypes = [ct.c_void_p, ct.c_bool]
