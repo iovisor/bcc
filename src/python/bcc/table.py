@@ -18,6 +18,7 @@ from functools import reduce
 import multiprocessing
 import os
 import errno
+import base64
 
 from .libbcc import lib, _RAW_CB_TYPE, _LOST_CB_TYPE
 from .perf import Perf
@@ -144,12 +145,14 @@ def Table(bpf, map_id, map_fd, keytype, leaftype, **kwargs):
         t = LruPerCpuHash(bpf, map_id, map_fd, keytype, leaftype)
     if t == None:
         raise Exception("Unknown table type %d" % ttype)
+    if 'libremote' in kwargs:
+        t.libremote = kwargs['libremote']
     return t
 
 
 class TableBase(MutableMapping):
 
-    def __init__(self, bpf, map_id, map_fd, keytype, leaftype):
+    def __init__(self, bpf, map_id, map_fd, keytype, leaftype, libremote=None):
         self.bpf = bpf
         self.map_id = map_id
         self.map_fd = map_fd
@@ -158,6 +161,7 @@ class TableBase(MutableMapping):
         self.ttype = lib.bpf_table_type_id(self.bpf.module, self.map_id)
         self.flags = lib.bpf_table_flags_id(self.bpf.module, self.map_id)
         self._cbs = {}
+        self.libremote = libremote
 
     def key_sprintf(self, key):
         buf = ct.create_string_buffer(ct.sizeof(self.Key) * 8)
@@ -192,13 +196,43 @@ class TableBase(MutableMapping):
         return leaf
 
     def __getitem__(self, key):
+        key_p = ct.pointer(key)
         leaf = self.Leaf()
+        leaf_p = ct.pointer(leaf)
+
+        if self.libremote:
+            klen = ct.sizeof(self.Key)
+            llen = ct.sizeof(self.Leaf)
+            kstr = base64.b64encode(ct.string_at(ct.cast(key_p, ct.c_void_p), klen))
+
+            (ret, lstr) = self.libremote.bpf_lookup_elem(self.map_fd, kstr, klen, llen)
+            if ret < 0:
+                raise KeyError("bpf lookup failed, returned {}".format(lstr))
+            lstr = lstr[0]
+
+            lbin_p = ct.c_char_p(base64.b64decode(lstr))
+            ct.memmove(leaf_p, lbin_p, llen)
+            return leaf
+
         res = lib.bpf_lookup_elem(self.map_fd, ct.byref(key), ct.byref(leaf))
         if res < 0:
             raise KeyError
         return leaf
 
     def __setitem__(self, key, leaf):
+        key_p = ct.pointer(key)
+        leaf_p = ct.pointer(leaf)
+
+        if self.libremote:
+            klen = ct.sizeof(key)
+            llen = ct.sizeof(leaf)
+            kstr = base64.b64encode(ct.string_at(ct.cast(key_p, ct.c_void_p), klen))
+            lstr = base64.b64encode(ct.string_at(ct.cast(leaf_p, ct.c_void_p), llen))
+
+            if self.libremote.bpf_update_elem(self.map_fd, kstr, klen, lstr, llen, 0) < 0:
+                raise Exception("Could not update table")
+            return
+
         res = lib.bpf_update_elem(self.map_fd, ct.byref(key), ct.byref(leaf),
                                   0)
         if res < 0:
@@ -206,7 +240,15 @@ class TableBase(MutableMapping):
             raise Exception("Could not update table: %s" % errstr)
 
     def __delitem__(self, key):
-        res = lib.bpf_delete_elem(self.map_fd, ct.byref(key))
+        key_p = ct.pointer(key)
+
+        if self.libremote:
+            klen = ct.sizeof(self.Key)
+            kstr = base64.b64encode(ct.string_at(ct.cast(key_p, ct.c_void_p), klen))
+            res = self.libremote.bpf_delete_elem(self.map_fd, kstr, klen)
+        else:
+            res = lib.bpf_delete_elem(self.map_fd, ct.byref(key))
+
         if res < 0:
             raise KeyError
 
@@ -235,6 +277,12 @@ class TableBase(MutableMapping):
         return [value for value in self.itervalues()]
 
     def clear(self):
+        # Clear map optimized for remotes
+        if self.libremote:
+            klen = ct.sizeof(self.Key)
+            self.libremote.bpf_clear_map(self.map_fd, klen)
+            return
+
         # default clear uses popitem, which can race with the bpf prog
         for k in self.keys():
             self.__delitem__(k)
@@ -267,13 +315,38 @@ class TableBase(MutableMapping):
 
     def next(self, key):
         next_key = self.Key()
+        next_key_p = ct.pointer(next_key)
 
         if key is None:
-            res = lib.bpf_get_first_key(self.map_fd, ct.byref(next_key),
-                                        ct.sizeof(self.Key))
+            if self.libremote:
+                size = ct.sizeof(self.Key)
+                vlen = ct.sizeof(self.Leaf)
+                ret = self.libremote.bpf_get_first_key(self.map_fd, size, vlen)
+                if ret[0] < 0:
+                    raise StopIteration()
+                key_str = ret[1][0]
+                key_p = ct.c_char_p(base64.b64decode(key_str))
+                ct.memmove(next_key_p, key_p, size)
+                res = ret[0]
+            else:
+                res = lib.bpf_get_first_key(self.map_fd, ct.byref(next_key),
+                                            ct.sizeof(self.Key))
         else:
-            res = lib.bpf_get_next_key(self.map_fd, ct.byref(key),
-                                       ct.byref(next_key))
+            key_p = ct.pointer(key)
+            if self.libremote:
+                klen = ct.sizeof(self.Key)
+                kstr = base64.b64encode(ct.string_at(ct.cast(key_p,
+                                        ct.c_void_p), klen))
+                ret = self.libremote.bpf_get_next_key(self.map_fd, kstr, klen)
+                if ret[0] < 0:
+                    raise StopIteration()
+                ret_key_str = ret[1][0]
+                ret_key_p = ct.c_char_p(base64.b64decode(ret_key_str))
+                ct.memmove(next_key_p, ret_key_p, klen)
+                res = ret[0]
+            else:
+                res = lib.bpf_get_next_key(self.map_fd, ct.byref(key),
+                                           ct.byref(next_key))
 
         if res < 0:
             raise StopIteration()
@@ -496,12 +569,16 @@ class PerfEventArray(ArrayBase):
         key_id = (id(self), key)
         if key_id in self.bpf.perf_buffers:
             # The key is opened for perf ring buffer
-            lib.perf_reader_free(self.bpf.perf_buffers[key_id])
+            if self.libremote is None:
+                lib.perf_reader_free(self.bpf.perf_buffers[key_id])
             del self.bpf.perf_buffers[key_id]
             del self._cbs[key]
         else:
             # The key is opened for perf event read
-            lib.bpf_close_perf_event_fd(self._open_key_fds[key])
+            if self.libremote:
+                self.libremote.bpf_close_perf_event_fd(self._open_key_fds[key])
+            else:
+                lib.bpf_close_perf_event_fd(self._open_key_fds[key])
         del self._open_key_fds[key]
 
     def open_perf_buffer(self, callback, page_cnt=8, lost_cb=None):
@@ -539,12 +616,24 @@ class PerfEventArray(ArrayBase):
                     raise e
         fn = _RAW_CB_TYPE(raw_cb_)
         lost_fn = _LOST_CB_TYPE(lost_cb_) if lost_cb else ct.cast(None, _LOST_CB_TYPE)
-        reader = lib.bpf_open_perf_buffer(fn, lost_fn, None, -1, cpu, page_cnt)
-        if not reader:
-            raise Exception("Could not open perf buffer")
-        fd = lib.perf_reader_fd(reader)
+
+        if self.libremote:
+            # fn and lost_fn are already tracked by self._cbs below so no need to pass
+            fd = self.libremote.bpf_open_perf_buffer(-1, cpu, page_cnt)
+            if fd < 0:
+                raise Exception("Could not open perf buffer")
+        else:
+            reader = lib.bpf_open_perf_buffer(fn, lost_fn, None, -1, cpu, page_cnt)
+            if not reader:
+                raise Exception("Could not open perf buffer")
+            fd = lib.perf_reader_fd(reader)
+
         self[self.Key(cpu)] = self.Leaf(fd)
-        self.bpf.perf_buffers[(id(self), cpu)] = reader
+        if self.libremote:
+            self.bpf.perf_buffers[(id(self), cpu)] = fd
+        else:
+            self.bpf.perf_buffers[(id(self), cpu)] = reader
+
         # keep a refcnt
         self._cbs[cpu] = (fn, lost_fn)
         # The actual fd is held by the perf reader, add to track opened keys

@@ -17,6 +17,14 @@
 #include "bpf_module.h"
 
 extern "C" {
+
+// This stores the appropriate callback function to invoke when there is a
+// need to create a map. This is done so that the Python interface can pass
+// custom callbacks to create maps for situations wherein the map creation
+// functions provided by libbbc are not sufficient (e.g. when there is a need
+// to create maps on remote target devices).
+bpf_create_map_cb_t bpf_create_map_cb;
+
 void * bpf_module_create_b(const char *filename, const char *proto_filename, unsigned flags) {
   auto mod = new ebpf::BPFModule(flags);
   if (mod->load_b(filename, proto_filename) != 0) {
@@ -26,7 +34,11 @@ void * bpf_module_create_b(const char *filename, const char *proto_filename, uns
   return mod;
 }
 
-void * bpf_module_create_c(const char *filename, unsigned flags, const char *cflags[], int ncflags) {
+void *bpf_module_create_c(const char *filename, unsigned flags,
+                          const char *cflags[], int ncflags,
+                          bpf_create_map_cb_t map_cb) {
+  bpf_create_map_cb = map_cb;
+
   auto mod = new ebpf::BPFModule(flags);
   if (mod->load_c(filename, cflags, ncflags) != 0) {
     delete mod;
@@ -35,7 +47,11 @@ void * bpf_module_create_c(const char *filename, unsigned flags, const char *cfl
   return mod;
 }
 
-void * bpf_module_create_c_from_string(const char *text, unsigned flags, const char *cflags[], int ncflags) {
+void *bpf_module_create_c_from_string(const char *text, unsigned flags,
+                                      const char *cflags[], int ncflags,
+                                      bpf_create_map_cb_t map_cb) {
+  bpf_create_map_cb = map_cb;
+
   auto mod = new ebpf::BPFModule(flags);
   if (mod->load_string(text, cflags, ncflags) != 0) {
     delete mod;

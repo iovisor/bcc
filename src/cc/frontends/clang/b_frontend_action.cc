@@ -790,10 +790,22 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
         return false;
       }
 
+      if (bpf_create_map_cb) {
+        struct bpf_create_map_args args;
+        args.type = map_type;
+        args.name = (char *)table.name.c_str();
+        args.key_size = table.key_size;
+        args.value_size = table.leaf_size;
+        args.max_entries = table.max_entries;
+        args.map_flags = table.flags;
+
+        table.fd = bpf_create_map_cb(&args);
+      } else {
+        table.fd =
+            bpf_create_map(map_type, table.name.c_str(), table.key_size,
+                           table.leaf_size, table.max_entries, table.flags);
+      }
       table.type = map_type;
-      table.fd = bpf_create_map(map_type, table.name.c_str(),
-                                table.key_size, table.leaf_size,
-                                table.max_entries, table.flags);
     }
     if (table.fd < 0) {
       error(Decl->getLocStart(), "could not open bpf map: %0\nis %1 map type enabled in your kernel?") <<
