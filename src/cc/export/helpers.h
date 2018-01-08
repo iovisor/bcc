@@ -598,14 +598,14 @@ int tracepoint__##category##__##event(struct tracepoint__##category##__##event *
 
 #define TP_DATA_LOC_READ_CONST(dst, field, length)                        \
         do {                                                              \
-            short __offset = args->data_loc_##field & 0xFFFF;             \
+            unsigned short __offset = args->data_loc_##field & 0xFFFF;    \
             bpf_probe_read((void *)dst, length, (char *)args + __offset); \
         } while (0);
 
 #define TP_DATA_LOC_READ(dst, field)                                        \
         do {                                                                \
-            short __offset = args->data_loc_##field & 0xFFFF;               \
-            short __length = args->data_loc_##field >> 16;                  \
+            unsigned short __offset = args->data_loc_##field & 0xFFFF;      \
+            unsigned short __length = args->data_loc_##field >> 16;         \
             bpf_probe_read((void *)dst, __length, (char *)args + __offset); \
         } while (0);
 
