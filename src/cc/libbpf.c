@@ -536,6 +536,111 @@ int bpf_attach_socket(int sock, int prog) {
   return setsockopt(sock, SOL_SOCKET, SO_ATTACH_BPF, &prog, sizeof(prog));
 }
 
+#define PMU_TYPE_FILE "/sys/bus/event_source/devices/%s/type"
+static int bpf_find_probe_type(const char *event_type)
+{
+  int fd;
+  int ret;
+  char buf[PATH_MAX];
+
+  ret = snprintf(buf, sizeof(buf), PMU_TYPE_FILE, event_type);
+  if (ret < 0 || ret >= sizeof(buf))
+    return -1;
+
+  fd = open(buf, O_RDONLY);
+  if (fd < 0)
+    return -1;
+  ret = read(fd, buf, sizeof(buf));
+  close(fd);
+  if (ret < 0 || ret >= sizeof(buf))
+    return -1;
+  errno = 0;
+  ret = (int)strtol(buf, NULL, 10);
+  return errno ? -1 : ret;
+}
+
+#define PMU_RETPROBE_FILE "/sys/bus/event_source/devices/%s/format/retprobe"
+static int bpf_get_retprobe_bit(const char *event_type)
+{
+  int fd;
+  int ret;
+  char buf[PATH_MAX];
+
+  ret = snprintf(buf, sizeof(buf), PMU_RETPROBE_FILE, event_type);
+  if (ret < 0 || ret >= sizeof(buf))
+    return -1;
+
+  fd = open(buf, O_RDONLY);
+  if (fd < 0)
+    return -1;
+  ret = read(fd, buf, sizeof(buf));
+  close(fd);
+  if (ret < 0 || ret >= sizeof(buf))
+    return -1;
+  if (strlen(buf) < strlen("config:"))
+    return -1;
+  errno = 0;
+  ret = (int)strtol(buf + strlen("config:"), NULL, 10);
+  return errno ? -1 : ret;
+}
+
+/*
+ * new kernel API allows creating [k,u]probe with perf_event_open, which
+ * makes it easier to clean up the [k,u]probe. This function tries to
+ * create pfd with the new API.
+ */
+static int bpf_try_perf_event_open_with_probe(const char *name, uint64_t offs,
+             int pid, char *event_type, int is_return)
+{
+  struct perf_event_attr attr = {};
+  int type = bpf_find_probe_type(event_type);
+  int is_return_bit = bpf_get_retprobe_bit(event_type);
+  int cpu = 0;
+
+  if (type < 0 || is_return_bit < 0)
+    return -1;
+  attr.sample_type = PERF_SAMPLE_RAW | PERF_SAMPLE_CALLCHAIN;
+  attr.sample_period = 1;
+  attr.wakeup_events = 1;
+  if (is_return)
+    attr.config |= 1 << is_return_bit;
+
+  /*
+   * struct perf_event_attr in latest perf_event.h has the following
+   * extension to config1 and config2. To keep bcc compatibe with
+   * older perf_event.h, we use config1 and config2 here instead of
+   * kprobe_func, uprobe_path, kprobe_addr, and probe_offset.
+   *
+   * union {
+   *  __u64 bp_addr;
+   *  __u64 kprobe_func;
+   *  __u64 uprobe_path;
+   *  __u64 config1;
+   * };
+   * union {
+   *   __u64 bp_len;
+   *   __u64 kprobe_addr;
+   *   __u64 probe_offset;
+   *   __u64 config2;
+   * };
+   */
+  attr.config2 = offs;  /* config2 here is kprobe_addr or probe_offset */
+  attr.size = sizeof(attr);
+  attr.type = type;
+  /* config1 here is kprobe_func or  uprobe_path */
+  attr.config1 = ptr_to_u64((void *)name);
+  // PID filter is only possible for uprobe events.
+  if (pid < 0)
+    pid = -1;
+  // perf_event_open API doesn't allow both pid and cpu to be -1.
+  // So only set it to -1 when PID is not -1.
+  // Tracing events do not do CPU filtering in any cases.
+  if (pid != -1)
+    cpu = -1;
+  return syscall(__NR_perf_event_open, &attr, pid, cpu, -1 /* group_fd */,
+                 PERF_FLAG_FD_CLOEXEC);
+}
+
 static int bpf_attach_tracing_event(int progfd, const char *event_path,
                                     struct perf_reader *reader, int pid) {
   int efd, pfd, cpu = 0;
