@@ -642,44 +642,48 @@ static int bpf_try_perf_event_open_with_probe(const char *name, uint64_t offs,
 }
 
 static int bpf_attach_tracing_event(int progfd, const char *event_path,
-                                    struct perf_reader *reader, int pid) {
-  int efd, pfd, cpu = 0;
+                                    struct perf_reader *reader, int pid,
+                                    int pfd)
+{
+  int efd, cpu = 0;
   ssize_t bytes;
   char buf[PATH_MAX];
   struct perf_event_attr attr = {};
 
-  snprintf(buf, sizeof(buf), "%s/id", event_path);
-  efd = open(buf, O_RDONLY, 0);
-  if (efd < 0) {
-    fprintf(stderr, "open(%s): %s\n", buf, strerror(errno));
-    return -1;
-  }
-
-  bytes = read(efd, buf, sizeof(buf));
-  if (bytes <= 0 || bytes >= sizeof(buf)) {
-    fprintf(stderr, "read(%s): %s\n", buf, strerror(errno));
-    close(efd);
-    return -1;
-  }
-  close(efd);
-  buf[bytes] = '\0';
-  attr.config = strtol(buf, NULL, 0);
-  attr.type = PERF_TYPE_TRACEPOINT;
-  attr.sample_type = PERF_SAMPLE_RAW | PERF_SAMPLE_CALLCHAIN;
-  attr.sample_period = 1;
-  attr.wakeup_events = 1;
-  // PID filter is only possible for uprobe events.
-  if (pid < 0)
-    pid = -1;
-  // perf_event_open API doesn't allow both pid and cpu to be -1.
-  // So only set it to -1 when PID is not -1.
-  // Tracing events do not do CPU filtering in any cases.
-  if (pid != -1)
-    cpu = -1;
-  pfd = syscall(__NR_perf_event_open, &attr, pid, cpu, -1 /* group_fd */, PERF_FLAG_FD_CLOEXEC);
   if (pfd < 0) {
-    fprintf(stderr, "perf_event_open(%s/id): %s\n", event_path, strerror(errno));
-    return -1;
+    snprintf(buf, sizeof(buf), "%s/id", event_path);
+    efd = open(buf, O_RDONLY, 0);
+    if (efd < 0) {
+      fprintf(stderr, "open(%s): %s\n", buf, strerror(errno));
+      return -1;
+    }
+
+    bytes = read(efd, buf, sizeof(buf));
+    if (bytes <= 0 || bytes >= sizeof(buf)) {
+      fprintf(stderr, "read(%s): %s\n", buf, strerror(errno));
+      close(efd);
+      return -1;
+    }
+    close(efd);
+    buf[bytes] = '\0';
+    attr.config = strtol(buf, NULL, 0);
+    attr.type = PERF_TYPE_TRACEPOINT;
+    attr.sample_type = PERF_SAMPLE_RAW | PERF_SAMPLE_CALLCHAIN;
+    attr.sample_period = 1;
+    attr.wakeup_events = 1;
+    // PID filter is only possible for uprobe events.
+    if (pid < 0)
+      pid = -1;
+    // perf_event_open API doesn't allow both pid and cpu to be -1.
+    // So only set it to -1 when PID is not -1.
+    // Tracing events do not do CPU filtering in any cases.
+    if (pid != -1)
+      cpu = -1;
+    pfd = syscall(__NR_perf_event_open, &attr, pid, cpu, -1 /* group_fd */, PERF_FLAG_FD_CLOEXEC);
+    if (pfd < 0) {
+      fprintf(stderr, "perf_event_open(%s/id): %s\n", event_path, strerror(errno));
+      return -1;
+    }
   }
   perf_reader_set_fd(reader, pfd);
 
@@ -703,6 +707,7 @@ void *bpf_attach_kprobe(int progfd, enum bpf_probe_attach_type attach_type,
                         perf_reader_cb cb, void *cb_cookie)
 {
   int kfd;
+  int pfd;
   char buf[256];
   char event_alias[128];
   struct perf_reader *reader = NULL;
@@ -712,26 +717,30 @@ void *bpf_attach_kprobe(int progfd, enum bpf_probe_attach_type attach_type,
   if (!reader)
     goto error;
 
-  snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/%s_events", event_type);
-  kfd = open(buf, O_WRONLY | O_APPEND, 0);
-  if (kfd < 0) {
-    fprintf(stderr, "open(%s): %s\n", buf, strerror(errno));
-    goto error;
-  }
+  pfd = bpf_try_perf_event_open_with_probe(fn_name, 0, -1, event_type,
+                                           attach_type != BPF_PROBE_ENTRY);
 
-  snprintf(event_alias, sizeof(event_alias), "%s_bcc_%d", ev_name, getpid());
-  snprintf(buf, sizeof(buf), "%c:%ss/%s %s", attach_type==BPF_PROBE_ENTRY ? 'p' : 'r',
-			event_type, event_alias, fn_name);
-  if (write(kfd, buf, strlen(buf)) < 0) {
-    if (errno == EINVAL)
-      fprintf(stderr, "check dmesg output for possible cause\n");
+  if (pfd < 0) {
+    snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/%s_events", event_type);
+    kfd = open(buf, O_WRONLY | O_APPEND, 0);
+    if (kfd < 0) {
+      fprintf(stderr, "open(%s): %s\n", buf, strerror(errno));
+      goto error;
+    }
+
+    snprintf(event_alias, sizeof(event_alias), "%s_bcc_%d", ev_name, getpid());
+    snprintf(buf, sizeof(buf), "%c:%ss/%s %s", attach_type==BPF_PROBE_ENTRY ? 'p' : 'r',
+             event_type, event_alias, fn_name);
+    if (write(kfd, buf, strlen(buf)) < 0) {
+      if (errno == EINVAL)
+        fprintf(stderr, "check dmesg output for possible cause\n");
+      close(kfd);
+      goto error;
+    }
     close(kfd);
-    goto error;
+    snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/events/%ss/%s", event_type, event_alias);
   }
-  close(kfd);
-
-  snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/events/%ss/%s", event_type, event_alias);
-  if (bpf_attach_tracing_event(progfd, buf, reader, -1 /* PID */) < 0)
+  if (bpf_attach_tracing_event(progfd, buf, reader, -1 /* PID */, pfd) < 0)
     goto error;
 
   return reader;
@@ -813,42 +822,47 @@ void *bpf_attach_uprobe(int progfd, enum bpf_probe_attach_type attach_type,
   struct perf_reader *reader = NULL;
   static char *event_type = "uprobe";
   int res, kfd = -1, ns_fd = -1;
+  int pfd;
 
   reader = perf_reader_new(cb, NULL, NULL, cb_cookie, probe_perf_reader_page_cnt);
   if (!reader)
     goto error;
 
-  snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/%s_events", event_type);
-  kfd = open(buf, O_WRONLY | O_APPEND, 0);
-  if (kfd < 0) {
-    fprintf(stderr, "open(%s): %s\n", buf, strerror(errno));
-    goto error;
-  }
+  pfd = bpf_try_perf_event_open_with_probe(binary_path, offset, pid, event_type,
+                                           attach_type != BPF_PROBE_ENTRY);
+  if (pfd < 0) {
+    snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/%s_events", event_type);
+    kfd = open(buf, O_WRONLY | O_APPEND, 0);
+    if (kfd < 0) {
+      fprintf(stderr, "open(%s): %s\n", buf, strerror(errno));
+      goto error;
+    }
 
-  res = snprintf(event_alias, sizeof(event_alias), "%s_bcc_%d", ev_name, getpid());
-  if (res < 0 || res >= sizeof(event_alias)) {
-    fprintf(stderr, "Event name (%s) is too long for buffer\n", ev_name);
-    goto error;
-  }
-  res = snprintf(buf, sizeof(buf), "%c:%ss/%s %s:0x%lx", attach_type==BPF_PROBE_ENTRY ? 'p' : 'r',
-			event_type, event_alias, binary_path, offset);
-  if (res < 0 || res >= sizeof(buf)) {
-    fprintf(stderr, "Event alias (%s) too long for buffer\n", event_alias);
-    goto error;
-  }
+    res = snprintf(event_alias, sizeof(event_alias), "%s_bcc_%d", ev_name, getpid());
+    if (res < 0 || res >= sizeof(event_alias)) {
+      fprintf(stderr, "Event name (%s) is too long for buffer\n", ev_name);
+      goto error;
+    }
+    res = snprintf(buf, sizeof(buf), "%c:%ss/%s %s:0x%lx", attach_type==BPF_PROBE_ENTRY ? 'p' : 'r',
+                   event_type, event_alias, binary_path, offset);
+    if (res < 0 || res >= sizeof(buf)) {
+      fprintf(stderr, "Event alias (%s) too long for buffer\n", event_alias);
+      goto error;
+    }
 
-  ns_fd = enter_mount_ns(pid);
-  if (write(kfd, buf, strlen(buf)) < 0) {
-    if (errno == EINVAL)
-      fprintf(stderr, "check dmesg output for possible cause\n");
-    goto error;
-  }
-  close(kfd);
-  exit_mount_ns(ns_fd);
-  ns_fd = -1;
+    ns_fd = enter_mount_ns(pid);
+    if (write(kfd, buf, strlen(buf)) < 0) {
+      if (errno == EINVAL)
+        fprintf(stderr, "check dmesg output for possible cause\n");
+      goto error;
+    }
+    close(kfd);
+    exit_mount_ns(ns_fd);
+    ns_fd = -1;
 
-  snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/events/%ss/%s", event_type, event_alias);
-  if (bpf_attach_tracing_event(progfd, buf, reader, pid) < 0)
+    snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/events/%ss/%s", event_type, event_alias);
+  }
+  if (bpf_attach_tracing_event(progfd, buf, reader, pid, pfd) < 0)
     goto error;
 
   return reader;
@@ -863,8 +877,43 @@ error:
 
 static int bpf_detach_probe(const char *ev_name, const char *event_type)
 {
-  int kfd, res;
+  int kfd = -1, res;
   char buf[PATH_MAX];
+  int found_event = 0;
+  size_t bufsize = 0;
+  char *cptr = NULL;
+  FILE *fp;
+
+  /*
+   * For [k,u]probe created with perf_event_open (on newer kernel), it is
+   * not necessary to clean it up in [k,u]probe_events. We first look up
+   * the %s_bcc_%d line in [k,u]probe_events. If the event is not found,
+   * it is safe to skip the cleaning up process (write -:... to the file).
+   */
+  snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/%s_events", event_type);
+  fp = fopen(buf, "r");
+  if (!fp) {
+    fprintf(stderr, "open(%s): %s\n", buf, strerror(errno));
+    goto error;
+  }
+
+  res = snprintf(buf, sizeof(buf), "%ss/%s_bcc_%d", event_type, ev_name, getpid());
+  if (res < 0 || res >= sizeof(buf)) {
+    fprintf(stderr, "snprintf(%s): %d\n", ev_name, res);
+    goto error;
+  }
+
+  while (getline(&cptr, &bufsize, fp) != -1)
+    if (strstr(cptr, buf) != NULL) {
+      found_event = 1;
+      break;
+    }
+  fclose(fp);
+  fp = NULL;
+
+  if (!found_event)
+    return 0;
+
   snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/%s_events", event_type);
   kfd = open(buf, O_WRONLY | O_APPEND, 0);
   if (kfd < 0) {
@@ -888,6 +937,8 @@ static int bpf_detach_probe(const char *ev_name, const char *event_type)
 error:
   if (kfd >= 0)
     close(kfd);
+  if (fp)
+    fclose(fp);
   return -1;
 }
 
@@ -914,7 +965,7 @@ void *bpf_attach_tracepoint(int progfd, const char *tp_category,
 
   snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/events/%s/%s",
            tp_category, tp_name);
-  if (bpf_attach_tracing_event(progfd, buf, reader, -1 /* PID */) < 0)
+  if (bpf_attach_tracing_event(progfd, buf, reader, -1 /* PID */, -1 /* pfd */) < 0)
     goto error;
 
   return reader;
