@@ -249,6 +249,7 @@ class Context {
 public:
   Context(const std::string &bin_path);
   Context(int pid);
+  Context(int pid, const std::string &bin_path);
   ~Context();
 
   optional<int> pid() const { return pid_; }

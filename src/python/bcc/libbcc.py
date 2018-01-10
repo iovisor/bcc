@@ -179,7 +179,7 @@ lib.bcc_symcache_refresh.restype = None
 lib.bcc_symcache_refresh.argtypes = [ct.c_void_p]
 
 lib.bcc_usdt_new_frompid.restype = ct.c_void_p
-lib.bcc_usdt_new_frompid.argtypes = [ct.c_int]
+lib.bcc_usdt_new_frompid.argtypes = [ct.c_int, ct.c_char_p]
 
 lib.bcc_usdt_new_frompath.restype = ct.c_void_p
 lib.bcc_usdt_new_frompath.argtypes = [ct.c_char_p]

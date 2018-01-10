@@ -22,7 +22,7 @@ extern "C" {
 
 #include <stdint.h>
 
-void *bcc_usdt_new_frompid(int pid);
+void *bcc_usdt_new_frompid(int pid, const char *path);
 void *bcc_usdt_new_frompath(const char *path);
 void bcc_usdt_close(void *usdt);
 

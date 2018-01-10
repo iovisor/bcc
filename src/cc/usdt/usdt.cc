@@ -365,6 +365,22 @@ Context::Context(int pid) : pid_(pid), pid_stat_(pid),
     probe->finalize_locations();
 }
 
+Context::Context(int pid, const std::string &bin_path)
+    : pid_(pid), pid_stat_(pid),
+      mount_ns_instance_(new ProcMountNS(pid)), loaded_(false) {
+  std::string full_path = resolve_bin_path(bin_path);
+  if (!full_path.empty()) {
+    if (bcc_elf_foreach_usdt(full_path.c_str(), _each_probe, this) == 0) {
+      cmd_bin_path_ = ebpf::get_pid_exe(pid);
+      if (cmd_bin_path_.empty())
+        return;
+      loaded_ = true;
+    }
+  }
+  for (const auto &probe : probes_)
+    probe->finalize_locations();
+}
+
 Context::~Context() {
   if (pid_stat_ && !pid_stat_->is_stale()) {
     for (auto &p : probes_) p->disable();
@@ -374,8 +390,13 @@ Context::~Context() {
 
 extern "C" {
 
-void *bcc_usdt_new_frompid(int pid) {
-  USDT::Context *ctx = new USDT::Context(pid);
+void *bcc_usdt_new_frompid(int pid, const char *path) {
+  USDT::Context *ctx;
+
+  if (!path)
+    ctx = new USDT::Context(pid);
+  else
+    ctx = new USDT::Context(pid, path);
   if (!ctx->loaded()) {
     delete ctx;
     return nullptr;

@@ -127,7 +127,10 @@ class USDT(object):
     def __init__(self, pid=None, path=None):
         if pid and pid != -1:
             self.pid = pid
-            self.context = lib.bcc_usdt_new_frompid(pid)
+            if path:
+                self.context = lib.bcc_usdt_new_frompid(pid, path.encode('ascii'))
+            else:
+                self.context = lib.bcc_usdt_new_frompid(pid, ct.c_char_p(0))
             if self.context == None:
                 raise USDTException("USDT failed to instrument PID %d" % pid)
         elif path:
