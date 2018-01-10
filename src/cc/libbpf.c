@@ -540,7 +540,7 @@ static int bpf_attach_tracing_event(int progfd, const char *event_path,
                                     struct perf_reader *reader, int pid) {
   int efd, pfd, cpu = 0;
   ssize_t bytes;
-  char buf[256];
+  char buf[PATH_MAX];
   struct perf_event_attr attr = {};
 
   snprintf(buf, sizeof(buf), "%s/id", event_path);
