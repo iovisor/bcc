@@ -12,6 +12,7 @@
 from bcc import BPF
 from time import sleep, strftime
 import argparse
+import errno
 import itertools
 import subprocess
 import sys
@@ -368,6 +369,19 @@ except Exception as e:
     else:
         raise Exception("ausyscall: command not found")
 
+
+def handle_errno(errstr):
+    try:
+        return abs(int(errstr))
+    except ValueError:
+        pass
+
+    try:
+        return getattr(errno, errstr)
+    except AttributeError:
+        raise argparse.ArgumentTypeError("couldn't map %s to an errno" % errstr)
+
+
 parser = argparse.ArgumentParser(
     description="Summarize syscall counts and latencies.")
 parser.add_argument("-p", "--pid", type=int, help="trace only this pid")
@@ -377,6 +391,8 @@ parser.add_argument("-T", "--top", type=int, default=10,
     help="print only the top syscalls by count or latency")
 parser.add_argument("-x", "--failures", action="store_true",
     help="trace only failed syscalls (return < 0)")
+parser.add_argument("-e", "--errno", type=handle_errno,
+    help="trace only syscalls that return this error (numeric or EPERM, etc.)")
 parser.add_argument("-L", "--latency", action="store_true",
     help="collect syscall latency")
 parser.add_argument("-m", "--milliseconds", action="store_true",
@@ -433,6 +449,11 @@ TRACEPOINT_PROBE(raw_syscalls, sys_exit) {
         return 0;
 #endif
 
+#ifdef FILTER_ERRNO
+    if (args->ret != -FILTER_ERRNO)
+        return 0;
+#endif
+
 #ifdef BY_PROCESS
     u32 key = pid_tgid >> 32;
 #else
@@ -461,6 +482,8 @@ if args.pid:
     text = ("#define FILTER_PID %d\n" % args.pid) + text
 if args.failures:
     text = "#define FILTER_FAILED\n" + text
+if args.errno:
+    text = "#define FILTER_ERRNO %d\n" % abs(args.errno) + text
 if args.latency:
     text = "#define LATENCY\n" + text
 if args.process:

@@ -2,7 +2,7 @@
 .SH NAME
 syscount \- Summarize syscall counts and latencies.
 .SH SYNOPSIS
-.B syscount [-h] [-p PID] [-i INTERVAL] [-T TOP] [-x] [-L] [-m] [-P] [-l]
+.B syscount [-h] [-p PID] [-i INTERVAL] [-T TOP] [-x] [-e ERRNO] [-L] [-m] [-P] [-l]
 .SH DESCRIPTION
 This tool traces syscall entry and exit tracepoints and summarizes either the
 number of syscalls of each type, or the number of syscalls per process. It can
@@ -29,6 +29,9 @@ Print only this many entries. Default: 10.
 \-x
 Trace only failed syscalls (i.e., the return value from the syscall was < 0).
 .TP
+\-e ERRNO
+Trace only syscalls that failed with that error (e.g. -e EPERM or -e 1).
+.TP
 \-m
 Display times in milliseconds. Default: microseconds.
 .TP
@@ -52,6 +55,10 @@ Summarize all syscalls by process:
 Summarize only failed syscalls:
 #
 .B syscount \-x
+.TP
+Summarize only syscalls that failed with EPERM:
+#
+.B syscount \-e EPERM
 .TP
 Trace PID 181 only:
 #
