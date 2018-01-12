@@ -616,7 +616,7 @@ StatusTuple USDT::init() {
   ::USDT::Context ctx(binary_path_);
   if (!ctx.loaded())
     return StatusTuple(-1, "Unable to load USDT " + print_name());
-  auto probe = ctx.get(name_);
+  auto probe = ctx.get(provider_, name_);
   if (probe == nullptr)
     return StatusTuple(-1, "Unable to find USDT " + print_name());
 

@@ -20,7 +20,7 @@ $ tplist -l basic_usdt
 The loop_iter probe sounds interesting. How many arguments are available?
 
 $ tplist '*loop_iter' -l basic_usdt -v
-/home/vagrant/basic_usdt basic_usdt:loop_iter [sema 0x601036]
+basic_usdt:loop_iter [sema 0x601036]
   2 location(s)
   2 argument(s)
 
@@ -94,22 +94,22 @@ which their values are coming from. In super-verbose mode, tplist will print
 this information (note the -vv):
 
 $ tplist -vv -l c *alloc*
-/lib64/libc.so.6 libc:memory_malloc_retry [sema 0x0]
-  location #0 0x835c0
+libc:memory_malloc_retry [sema 0x0]
+  location #0 /lib64/libc.so.6 0x835c0
     argument #0 8 unsigned bytes @ bp
-  location #1 0x83778
+  location #1 /lib64/libc.so.6 0x83778
     argument #0 8 unsigned bytes @ bp
-  location #2 0x85a50
+  location #2 /lib64/libc.so.6 0x85a50
     argument #0 8 unsigned bytes @ bp
-/lib64/libc.so.6 libc:memory_realloc_retry [sema 0x0]
-  location #0 0x84b90
+libc:memory_realloc_retry [sema 0x0]
+  location #0 /lib64/libc.so.6 0x84b90
     argument #0 8 unsigned bytes @ r13
     argument #1 8 unsigned bytes @ bp
-  location #1 0x85cf0
+  location #1 /lib64/libc.so.6 0x85cf0
     argument #0 8 unsigned bytes @ r13
     argument #1 8 unsigned bytes @ bp
-/lib64/libc.so.6 libc:memory_calloc_retry [sema 0x0]
-  location #0 0x850f0
+libc:memory_calloc_retry [sema 0x0]
+  location #0 /lib64/libc.so.6 0x850f0
     argument #0 8 unsigned bytes @ bp
 
 

@@ -13,7 +13,7 @@ namespace {
       if (::getenv("bar") != (char *)-1)
         return;
 
-      (void)bcc_usdt_new_frompid(-1);
+      (void)bcc_usdt_new_frompid(-1, nullptr);
       (void)bcc_usdt_new_frompath(nullptr);
       (void)bcc_usdt_close(nullptr);
     }
