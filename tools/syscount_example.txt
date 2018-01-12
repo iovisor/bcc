@@ -106,10 +106,43 @@ access                  1
 pause                   1
 ^C
 
+Similar to -x/--failures, sometimes you only care about certain syscall
+errors like EPERM or ENONET -- these are the ones that might be worth
+investigating with follow-up tools like opensnoop, execsnoop, or
+trace. Use the -e/--errno switch for this; the following example also
+demonstrates the -e switch, for printing ENOENT failures at predefined intervals:
+
+# syscount -e ENOENT -i 5
+Tracing syscalls, printing top 10... Ctrl+C to quit.
+[13:15:57]
+SYSCALL                   COUNT
+stat                       4669
+open                       1951
+access                      561
+lstat                        62
+openat                       42
+readlink                      8
+execve                        4
+newfstatat                    1
+
+[13:16:02]
+SYSCALL                   COUNT
+lstat                     18506
+stat                      13087
+open                       2907
+access                      412
+openat                       19
+readlink                     12
+execve                        7
+connect                       6
+unlink                        1
+rmdir                         1
+^C
+
 USAGE:
 # syscount -h
-usage: syscount.py [-h] [-p PID] [-i INTERVAL] [-T TOP] [-x] [-L] [-m] [-P]
-                   [-l]
+usage: syscount.py [-h] [-p PID] [-i INTERVAL] [-T TOP] [-x] [-e ERRNO] [-L]
+                   [-m] [-P] [-l]
 
 Summarize syscall counts and latencies.
 
@@ -120,6 +153,9 @@ optional arguments:
                         print summary at this interval (seconds)
   -T TOP, --top TOP     print only the top syscalls by count or latency
   -x, --failures        trace only failed syscalls (return < 0)
+  -e ERRNO, --errno ERRNO
+                        trace only syscalls that return this error (numeric or
+                        EPERM, etc.)
   -L, --latency         collect syscall latency
   -m, --milliseconds    display latency in milliseconds (default:
                         microseconds)
