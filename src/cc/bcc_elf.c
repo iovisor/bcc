@@ -85,7 +85,7 @@ static const char *parse_stapsdt_note(struct bcc_elf_usdt *probe,
 
 static int do_note_segment(Elf_Scn *section, int elf_class,
                            bcc_elf_probecb callback, const char *binpath,
-                           void *payload) {
+                           uint64_t first_inst_offset, void *payload) {
   Elf_Data *data = NULL;
 
   while ((data = elf_getdata(section, data)) != 0) {
@@ -110,8 +110,14 @@ static int do_note_segment(Elf_Scn *section, int elf_class,
       desc = (const char *)data->d_buf + desc_off;
       desc_end = desc + hdr.n_descsz;
 
-      if (parse_stapsdt_note(&probe, desc, elf_class) == desc_end)
-        callback(binpath, &probe, payload);
+      if (parse_stapsdt_note(&probe, desc, elf_class) == desc_end) {
+        if (probe.pc < first_inst_offset)
+          fprintf(stderr,
+                  "WARNING: invalid address 0x%lx for probe (%s,%s) in binary %s\n",
+                  probe.pc, probe.provider, probe.name, binpath);
+        else
+          callback(binpath, &probe, payload);
+      }
     }
   }
   return 0;
@@ -122,9 +128,25 @@ static int listprobes(Elf *e, bcc_elf_probecb callback, const char *binpath,
   Elf_Scn *section = NULL;
   size_t stridx;
   int elf_class = gelf_getclass(e);
+  uint64_t first_inst_offset = 0;
 
   if (elf_getshdrstrndx(e, &stridx) != 0)
     return -1;
+
+  // Get the offset to the first instruction
+  while ((section = elf_nextscn(e, section)) != 0) {
+    GElf_Shdr header;
+
+    if (!gelf_getshdr(section, &header))
+      continue;
+
+    // The elf file section layout is based on increasing virtual address,
+    // getting the first section with SHF_EXECINSTR is enough.
+    if (header.sh_flags & SHF_EXECINSTR) {
+      first_inst_offset = header.sh_addr;
+      break;
+    }
+  }
 
   while ((section = elf_nextscn(e, section)) != 0) {
     GElf_Shdr header;
@@ -138,7 +160,8 @@ static int listprobes(Elf *e, bcc_elf_probecb callback, const char *binpath,
 
     name = elf_strptr(e, stridx, header.sh_name);
     if (name && !strcmp(name, ".note.stapsdt")) {
-      if (do_note_segment(section, elf_class, callback, binpath, payload) < 0)
+      if (do_note_segment(section, elf_class, callback, binpath,
+                          first_inst_offset, payload) < 0)
         return -1;
     }
   }
