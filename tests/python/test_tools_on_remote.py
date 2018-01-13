@@ -51,11 +51,11 @@ class RemoteTests(TestCase, ToolTestRunner):
 
     @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
     def test_opensnoop(self):
-        self.run_with_int("opensnoop.py", kill_timeout=20)
+        self.run_with_int("opensnoop.py", kill_timeout=60)
 
     @skipUnless(kernel_version_ge(4,9), "requires kernel >= 4.9")
     def test_profile(self):
-        self.run_with_duration("profile.py 1", timeout=20)
+        self.run_with_duration("profile.py 1", timeout=60)
 
     @skipUnless(kernel_version_ge(4,9), "requires kernel >= 4.9")
     def test_runqlen(self):
@@ -63,11 +63,11 @@ class RemoteTests(TestCase, ToolTestRunner):
 
     @skipUnless(kernel_version_ge(4,6), "requires kernel >= 4.6")
     def test_stackcount(self):
-        self.run_with_duration("stackcount.py __kmalloc -i 1 -D 1", timeout=50)
+        self.run_with_duration("stackcount.py __kmalloc -i 1 -D 1", timeout=60)
 
     @skipUnless(kernel_version_ge(4,7), "requires kernel >= 4.7")
     def test_syscount(self):
-        self.run_with_duration("syscount.py -i 1 -d 5", timeout=20)
+        self.run_with_duration("syscount.py -i 1 -d 5", timeout=60)
 
     @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
     def test_trace(self):
