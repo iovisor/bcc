@@ -287,6 +287,8 @@ class BPF(object):
         if text:
             self.module = lib.bpf_module_create_c_from_string(text.encode("ascii"),
                     self.debug, cflags_array, len(cflags_array))
+            if not self.module:
+                raise Exception("Failed to compile BPF text:\n%s" % text)
         else:
             src_file = BPF._find_file(src_file)
             hdr_file = BPF._find_file(hdr_file)
@@ -296,9 +298,8 @@ class BPF(object):
             else:
                 self.module = lib.bpf_module_create_c(src_file.encode("ascii"),
                         self.debug, cflags_array, len(cflags_array))
-
-        if not self.module:
-            raise Exception("Failed to compile BPF module %s" % src_file)
+            if not self.module:
+                raise Exception("Failed to compile BPF module %s" % src_file)
 
         for usdt_context in usdt_contexts:
             usdt_context.attach_uprobes(self)
