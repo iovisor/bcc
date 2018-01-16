@@ -4,7 +4,7 @@
 # biotop  block device (disk) I/O by process.
 #         For Linux, uses BCC, eBPF.
 #
-# USAGE: biotop.py [-h] [-C] [-r MAXROWS] [interval] [count]
+# USAGE: biotop.py [-h] [-C] [-r MAXROWS] [-e] [interval] [count]
 #
 # This uses in-kernel eBPF maps to cache process details (PID and comm) by I/O
 # request, as well as a starting timestamp for calculating I/O latency.
@@ -36,6 +36,8 @@ parser.add_argument("-C", "--noclear", action="store_true",
     help="don't clear the screen")
 parser.add_argument("-r", "--maxrows", default=20,
     help="maximum rows to print, default 20")
+parser.add_argument("-e", "--ebpf", action="store_true",
+    help="report the eBPF program and exit")
 parser.add_argument("interval", nargs="?", default=1,
     help="output interval, in seconds")
 parser.add_argument("count", nargs="?", default=99999999,
@@ -55,7 +57,7 @@ def signal_ignore(signal, frame):
     print()
 
 # load BPF program
-b = BPF(text="""
+bpf_text = """
 #include <uapi/linux/ptrace.h>
 #include <linux/blkdev.h>
 
@@ -163,7 +165,13 @@ int trace_req_completion(struct pt_regs *ctx, struct request *req)
 
     return 0;
 }
-""", debug=0)
+"""
+
+if args.ebpf:
+    print(bpf_text)
+    exit()
+
+b = BPF(text=bpf_text)
 b.attach_kprobe(event="blk_account_io_start", fn_name="trace_pid_start")
 b.attach_kprobe(event="blk_start_request", fn_name="trace_req_start")
 b.attach_kprobe(event="blk_mq_start_request", fn_name="trace_req_start")

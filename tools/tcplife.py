@@ -58,6 +58,8 @@ parser.add_argument("-L", "--localport",
     help="comma-separated list of local ports to trace.")
 parser.add_argument("-D", "--remoteport",
     help="comma-separated list of remote ports to trace.")
+parser.add_argument("-e", "--ebpf", action="store_true",
+    help="report the eBPF program and exit")
 args = parser.parse_args()
 debug = 0
 
@@ -375,8 +377,10 @@ bpf_text = bpf_text.replace('FILTER_PID', '')
 bpf_text = bpf_text.replace('FILTER_DPORT', '')
 bpf_text = bpf_text.replace('FILTER_LPORT', '')
 
-if debug:
+if debug or args.ebpf:
     print(bpf_text)
+    if args.ebpf:
+        exit()
 
 # event data
 TASK_COMM_LEN = 16      # linux/sched.h

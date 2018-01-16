@@ -4,7 +4,7 @@
 # biolatency    Summarize block device I/O latency as a histogram.
 #       For Linux, uses BCC, eBPF.
 #
-# USAGE: biolatency [-h] [-T] [-Q] [-m] [-D] [interval] [count]
+# USAGE: biolatency [-h] [-T] [-Q] [-m] [-D] [-e] [interval] [count]
 #
 # Copyright (c) 2015 Brendan Gregg.
 # Licensed under the Apache License, Version 2.0 (the "License")
@@ -36,6 +36,8 @@ parser.add_argument("-m", "--milliseconds", action="store_true",
     help="millisecond histogram")
 parser.add_argument("-D", "--disks", action="store_true",
     help="print a histogram per disk device")
+parser.add_argument("-e", "--ebpf", action="store_true",
+    help="report the eBPF program and exit")
 parser.add_argument("interval", nargs="?", default=99999999,
     help="output interval, in seconds")
 parser.add_argument("count", nargs="?", default=99999999,
@@ -103,8 +105,10 @@ else:
     bpf_text = bpf_text.replace('STORAGE', 'BPF_HISTOGRAM(dist);')
     bpf_text = bpf_text.replace('STORE',
         'dist.increment(bpf_log2l(delta));')
-if debug:
+if debug or args.ebpf:
     print(bpf_text)
+    if args.ebpf:
+        exit()
 
 # load BPF program
 b = BPF(text=bpf_text)
