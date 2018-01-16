@@ -4,7 +4,7 @@
 # biotop  block device (disk) I/O by process.
 #         For Linux, uses BCC, eBPF.
 #
-# USAGE: biotop.py [-h] [-C] [-r MAXROWS] [-e] [interval] [count]
+# USAGE: biotop.py [-h] [-C] [-r MAXROWS] [interval] [count]
 #
 # This uses in-kernel eBPF maps to cache process details (PID and comm) by I/O
 # request, as well as a starting timestamp for calculating I/O latency.
@@ -31,17 +31,17 @@ examples = """examples:
 parser = argparse.ArgumentParser(
     description="Block device (disk) I/O by process",
     formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog=examples)
+    epilog=examples, allow_abbrev=False)
 parser.add_argument("-C", "--noclear", action="store_true",
     help="don't clear the screen")
 parser.add_argument("-r", "--maxrows", default=20,
     help="maximum rows to print, default 20")
-parser.add_argument("-e", "--ebpf", action="store_true",
-    help="report the eBPF program and exit")
 parser.add_argument("interval", nargs="?", default=1,
     help="output interval, in seconds")
 parser.add_argument("count", nargs="?", default=99999999,
     help="number of outputs")
+parser.add_argument("--ebpf", action="store_true",
+    help=argparse.SUPPRESS)
 args = parser.parse_args()
 interval = int(args.interval)
 countdown = int(args.count)

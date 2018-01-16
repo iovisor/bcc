@@ -43,7 +43,7 @@ examples = """examples:
 parser = argparse.ArgumentParser(
     description="Trace the lifespan of TCP sessions and summarize",
     formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog=examples)
+    epilog=examples, allow_abbrev=False)
 parser.add_argument("-T", "--time", action="store_true",
     help="include time column on output (HH:MM:SS)")
 parser.add_argument("-t", "--timestamp", action="store_true",
@@ -58,8 +58,8 @@ parser.add_argument("-L", "--localport",
     help="comma-separated list of local ports to trace.")
 parser.add_argument("-D", "--remoteport",
     help="comma-separated list of remote ports to trace.")
-parser.add_argument("-e", "--ebpf", action="store_true",
-    help="report the eBPF program and exit")
+parser.add_argument("--ebpf", action="store_true",
+    help=argparse.SUPPRESS)
 args = parser.parse_args()
 debug = 0
 

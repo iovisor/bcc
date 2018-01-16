@@ -4,7 +4,7 @@
 # biolatency    Summarize block device I/O latency as a histogram.
 #       For Linux, uses BCC, eBPF.
 #
-# USAGE: biolatency [-h] [-T] [-Q] [-m] [-D] [-e] [interval] [count]
+# USAGE: biolatency [-h] [-T] [-Q] [-m] [-D] [interval] [count]
 #
 # Copyright (c) 2015 Brendan Gregg.
 # Licensed under the Apache License, Version 2.0 (the "License")
@@ -27,7 +27,7 @@ examples = """examples:
 parser = argparse.ArgumentParser(
     description="Summarize block device I/O latency as a histogram",
     formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog=examples)
+    epilog=examples, allow_abbrev=False)
 parser.add_argument("-T", "--timestamp", action="store_true",
     help="include timestamp on output")
 parser.add_argument("-Q", "--queued", action="store_true",
@@ -36,12 +36,12 @@ parser.add_argument("-m", "--milliseconds", action="store_true",
     help="millisecond histogram")
 parser.add_argument("-D", "--disks", action="store_true",
     help="print a histogram per disk device")
-parser.add_argument("-e", "--ebpf", action="store_true",
-    help="report the eBPF program and exit")
 parser.add_argument("interval", nargs="?", default=99999999,
     help="output interval, in seconds")
 parser.add_argument("count", nargs="?", default=99999999,
     help="number of outputs")
+parser.add_argument("--ebpf", action="store_true",
+    help=argparse.SUPPRESS)
 args = parser.parse_args()
 countdown = int(args.count)
 debug = 0
