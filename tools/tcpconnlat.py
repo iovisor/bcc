@@ -144,7 +144,7 @@ int trace_tcp_rcv_state_process(struct pt_regs *ctx, struct sock *skp)
         data4.saddr = skp->__sk_common.skc_rcv_saddr;
         data4.daddr = skp->__sk_common.skc_daddr;
         data4.dport = ntohs(dport);
-        data4.delta_us = (now - ts) / 1000;
+        data4.delta_us = delta_us;
         __builtin_memcpy(&data4.task, infop->task, sizeof(data4.task));
         ipv4_events.perf_submit(ctx, &data4, sizeof(data4));
 
@@ -156,7 +156,7 @@ int trace_tcp_rcv_state_process(struct pt_regs *ctx, struct sock *skp)
         bpf_probe_read(&data6.daddr, sizeof(data6.daddr),
             skp->__sk_common.skc_v6_daddr.in6_u.u6_addr32);
         data6.dport = ntohs(dport);
-        data6.delta_us = (now - ts) / 1000;
+        data6.delta_us = delta_us;
         __builtin_memcpy(&data6.task, infop->task, sizeof(data6.task));
         ipv6_events.perf_submit(ctx, &data6, sizeof(data6));
     }
