@@ -950,7 +950,16 @@ class BPF(object):
                 ts_end = line.find(":")
                 pid, cpu, flags, ts = line[:ts_end].split()
                 cpu = cpu[1:-1]
-                msg = line[ts_end + 4:]
+                # line[ts_end:] will have ": [sym_or_addr]: msgs"
+                # For trace_pipe debug output, the addr typically
+                # is invalid (e.g., 0x1). For kernel 4.12 or earlier,
+                # if address is not able to match a kernel symbol,
+                # nothing will be printed out. For kernel 4.13 and later,
+                # however, the illegal address will be printed out.
+                # Hence, both cases are handled here.
+                line = line[ts_end + 1:]
+                sym_end = line.find(":")
+                msg = line[sym_end + 2:]
                 return (task, int(pid), int(cpu), flags, float(ts), msg)
         except KeyboardInterrupt:
             exit()
