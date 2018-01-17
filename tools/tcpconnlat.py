@@ -24,6 +24,8 @@ import ctypes as ct
 # arguments
 examples = """examples:
     ./tcpconnlat           # trace all TCP connect()s
+    ./tcpconnlat -m 1      # only show results slower than 1 ms
+    ./tcpconnlat -u 100    # only show results slower than 100 microseconds
     ./tcpconnlat -t        # include timestamps
     ./tcpconnlat -p 181    # only trace PID 181
 """
@@ -35,7 +37,21 @@ parser.add_argument("-t", "--timestamp", action="store_true",
     help="include timestamp on output")
 parser.add_argument("-p", "--pid",
     help="trace this PID only")
+parser.add_argument("-m", "--min-ms", type=float, dest="min_ms",
+    help="minimum latency filter (ms)")
+parser.add_argument("-u", "--min-us", type=float, dest="min_us",
+    help="minimum latency filter (us)")
+parser.add_argument("-v", "--verbose", action="store_true",
+    help="print the BPF program for debugging purposes")
 args = parser.parse_args()
+
+if args.min_ms:
+    duration_us = int(args.min_ms * 1000)
+elif args.min_us:
+    duration_us = int(args.min_us)
+else:
+    duration_us = 0   # default is show all
+
 debug = 0
 
 # define BPF program
@@ -104,8 +120,17 @@ int trace_tcp_rcv_state_process(struct pt_regs *ctx, struct sock *skp)
     if (infop == 0) {
         return 0;   // missed entry or filtered
     }
+
     u64 ts = infop->ts;
     u64 now = bpf_ktime_get_ns();
+
+    u64 delta_us = (now - ts) / 1000ul;
+
+#ifdef MIN_LATENCY
+    if ( delta_us < DURATION_US ) {
+        return 0; // connect latency is below latency filter minimum
+    }
+#endif
 
     // pull in details
     u16 family = 0, dport = 0;
@@ -142,13 +167,17 @@ int trace_tcp_rcv_state_process(struct pt_regs *ctx, struct sock *skp)
 }
 """
 
+if duration_us > 0:
+    bpf_text = "#define MIN_LATENCY\n" + bpf_text
+    bpf_text = bpf_text.replace('DURATION_US', str(duration_us))
+
 # code substitutions
 if args.pid:
     bpf_text = bpf_text.replace('FILTER',
         'if (pid != %s) { return 0; }' % args.pid)
 else:
     bpf_text = bpf_text.replace('FILTER', '')
-if debug:
+if debug or args.verbose:
     print(bpf_text)
 
 # initialize BPF
