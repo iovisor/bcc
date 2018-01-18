@@ -21,11 +21,22 @@ from struct import pack
 import argparse
 import ctypes as ct
 
+# arg validation
+def positive_float(val):
+    try:
+        ival = float(val)
+    except ValueError:
+        raise argparse.ArgumentTypeError("must be a float")
+
+    if ival < 0:
+        raise argparse.ArgumentTypeError("must be positive")
+    return ival
+
 # arguments
 examples = """examples:
     ./tcpconnlat           # trace all TCP connect()s
-    ./tcpconnlat -m 1      # only show results slower than 1 ms
-    ./tcpconnlat -u 100    # only show results slower than 100 microseconds
+    ./tcpconnlat 1         # trace connection latency slower than 1 ms
+    ./tcpconnlat 0.1       # trace connection latency slower than 100 us
     ./tcpconnlat -t        # include timestamps
     ./tcpconnlat -p 181    # only trace PID 181
 """
@@ -37,18 +48,16 @@ parser.add_argument("-t", "--timestamp", action="store_true",
     help="include timestamp on output")
 parser.add_argument("-p", "--pid",
     help="trace this PID only")
-parser.add_argument("-m", "--min-ms", type=float, dest="min_ms",
-    help="minimum latency filter (ms)")
-parser.add_argument("-u", "--min-us", type=float, dest="min_us",
-    help="minimum latency filter (us)")
+parser.add_argument("duration_ms", nargs="?", default=0,
+    type=positive_float,
+    help="minimum duration to trace (ms)")
 parser.add_argument("-v", "--verbose", action="store_true",
     help="print the BPF program for debugging purposes")
 args = parser.parse_args()
 
-if args.min_ms:
-    duration_us = int(args.min_ms * 1000)
-elif args.min_us:
-    duration_us = int(args.min_us)
+if args.duration_ms:
+    # support fractions but round to nearest microsecond
+    duration_us = int(args.duration_ms * 1000)
 else:
     duration_us = 0   # default is show all
 

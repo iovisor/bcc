@@ -47,6 +47,6 @@ examples:
     ./tcpconnlat           # trace all TCP connect()s
     ./tcpconnlat -t        # include timestamps
     ./tcpconnlat -p 181    # only trace PID 181
-    ./tcpconnlat -m 1      # only show connects longer than 1 ms
-    ./tcpconnlat -u 100    # only show connects longer than 100 us
+    ./tcpconnlat 1         # only show connects longer than 1 ms
+    ./tcpconnlat 0.1       # only show connects longer than 100 us
     ./tcpconnlat -v        # Show the BPF program

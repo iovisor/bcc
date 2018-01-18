@@ -2,7 +2,7 @@
 .SH NAME
 tcpconnlat \- Trace TCP active connection latency. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B tcpconnlat [\-h] [\-t] [\-p PID] [-m MIN_MS] [-u MIN_US] [-v]
+.B tcpconnlat [\-h] [\-t] [\-p PID] [-v] [min_ms]
 .SH DESCRIPTION
 This tool traces active TCP connections
 (eg, via a connect() syscall), and shows the latency (time) for the connection
@@ -31,14 +31,11 @@ Include a timestamp column.
 \-p PID
 Trace this process ID only (filtered in-kernel).
 .TP
-\-m MIN_NS
-Minimum duration to trace, in milliseconds.
-.TP
-\-u MIN_US
-Minimum duration to trace, in microseconds.
-.TP
 \-v
 Print the resulting BPF program, for debugging purposes.
+.TP
+min_ns
+Minimum duration to trace, in milliseconds.
 .SH EXAMPLES
 .TP
 Trace all active TCP connections, and show connection latency (SYN->response round trip):
@@ -55,7 +52,7 @@ Trace PID 181 only:
 .TP
 Trace connects with latency longer than 10 ms:
 #
-.B tcpconnlat \-m 10
+.B tcpconnlat 10
 .TP
 Print the BPF program:
 #
