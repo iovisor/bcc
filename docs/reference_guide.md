@@ -22,6 +22,8 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
         - [5. bpf_get_current_uid_gid()](#5-bpf_get_current_uid_gid)
         - [6. bpf_get_current_comm()](#6-bpf_get_current_comm)
         - [7. bpf_log2l()](#7-bpflog2l)
+    - [Debugging](#debugging)
+        - [1. bpf_override_return()](#1-bpf_override_return)
     - [Output](#output)
         - [1. bpf_trace_printk()](#1-bpf_trace_printk)
         - [2. BPF_PERF_OUTPUT](#2-bpf_perf_output)
@@ -323,6 +325,28 @@ Returns the log-2 of the provided value. This is often used to create indexes fo
 Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=bpf_log2l+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=bpf_log2l+path%3Atools&type=Code)
+
+## Debugging
+
+### 1. bpf_override_return()
+
+Syntax: ```int bpf_override_return(struct pt_regs *, unsigned long rc)```
+
+Return: 0 on success
+
+When used in a program attached to a function entry kprobe, causes the
+execution of the function to be skipped, immediately returning `rc` instead.
+This is used for targeted error injection. 
+
+Note: bpf_override_return will only work when the kprobed function is
+whitelisted to allow error injections.
+
+```C
+int kprobe__io_ctl_init(void *ctx) {
+	bpf_override_return(ctx, -ENOMEM);
+	return 0;
+}
+```
 
 ## Output
 
