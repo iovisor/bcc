@@ -477,10 +477,11 @@ class BPF(object):
             blacklist = set([line.rstrip().split()[1] for line in
                     blacklist_file])
         fns = []
-        with open("%s/available_filter_functions" % TRACEFS) as avail_file:
+        with open("/proc/kallsyms") as avail_file:
             for line in avail_file:
-                fn = line.rstrip().split()[0]
-                if re.match(event_re, fn) and fn not in blacklist:
+                (_, t, fn) = line.rstrip().split()[:3]
+                if (t.lower() in ['t', 'w']) and re.match(event_re, fn) \
+                    and fn not in blacklist:
                     fns.append(fn)
         return set(fns)     # Some functions may appear more than once
 
