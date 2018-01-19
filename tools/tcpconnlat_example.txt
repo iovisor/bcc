@@ -34,9 +34,12 @@ if the response is a RST (port closed).
 USAGE message:
 
 # ./tcpconnlat -h
-usage: tcpconnlat [-h] [-t] [-p PID]
+usage: tcpconnlat [-h] [-t] [-p PID] [min_ms]
 
 Trace TCP connects and show connection latency
+
+positional arguments:
+  min_ms             minimum duration to trace, in ms (default 0)
 
 optional arguments:
   -h, --help         show this help message and exit
