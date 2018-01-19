@@ -299,6 +299,8 @@ static int (*bpf_skb_change_head)(void *ctx, u32 len, u64 flags) =
   (void *) BPF_FUNC_skb_change_head;
 static int (*bpf_xdp_adjust_head)(void *ctx, int offset) =
   (void *) BPF_FUNC_xdp_adjust_head;
+static int (*bpf_override_return)(void *pt_regs, unsigned long rc) =
+  (void *) BPF_FUNC_override_return;
 
 /* llvm builtin functions that eBPF C program may use to
  * emit BPF_LD_ABS and BPF_LD_IND instructions
