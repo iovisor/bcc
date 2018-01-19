@@ -289,7 +289,7 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
     if folded:
         # print folded stack output
         line = \
-            [k.target] + \
+            [k.target.decode()] + \
             [b.sym(addr, k.tgid)
                 for addr in reversed(list(target_user_stack)[1:])] + \
             (["-"] if args.delimited else [""]) + \
@@ -301,7 +301,7 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
             (["-"] if args.delimited else [""]) + \
             [b.sym(addr, k.tgid)
                 for addr in reversed(list(waker_user_stack))] + \
-            [k.waker]
+            [k.waker.decode()]
         print("%s %d" % (";".join(line), v.value))
 
     else:
