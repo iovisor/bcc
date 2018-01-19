@@ -338,8 +338,12 @@ When used in a program attached to a function entry kprobe, causes the
 execution of the function to be skipped, immediately returning `rc` instead.
 This is used for targeted error injection. 
 
-Note: bpf_override_return will only work when the kprobed function is
-whitelisted to allow error injections.
+bpf_override_return will only work when the kprobed function is whitelisted to
+allow error injections. Whitelisting entails tagging a function with
+`BPF_ALLOW_ERROR_INJECTION()` in the kernel source tree; see `io_ctl_init` for
+an example. If the kprobed function is not whitelisted, the bpf program will
+fail to attach with ` ioctl(PERF_EVENT_IOC_SET_BPF): Invalid argument`
+
 
 ```C
 int kprobe__io_ctl_init(void *ctx) {
