@@ -21,9 +21,22 @@ from struct import pack
 import argparse
 import ctypes as ct
 
+# arg validation
+def positive_float(val):
+    try:
+        ival = float(val)
+    except ValueError:
+        raise argparse.ArgumentTypeError("must be a float")
+
+    if ival < 0:
+        raise argparse.ArgumentTypeError("must be positive")
+    return ival
+
 # arguments
 examples = """examples:
     ./tcpconnlat           # trace all TCP connect()s
+    ./tcpconnlat 1         # trace connection latency slower than 1 ms
+    ./tcpconnlat 0.1       # trace connection latency slower than 100 us
     ./tcpconnlat -t        # include timestamps
     ./tcpconnlat -p 181    # only trace PID 181
 """
@@ -35,7 +48,19 @@ parser.add_argument("-t", "--timestamp", action="store_true",
     help="include timestamp on output")
 parser.add_argument("-p", "--pid",
     help="trace this PID only")
+parser.add_argument("duration_ms", nargs="?", default=0,
+    type=positive_float,
+    help="minimum duration to trace (ms)")
+parser.add_argument("-v", "--verbose", action="store_true",
+    help="print the BPF program for debugging purposes")
 args = parser.parse_args()
+
+if args.duration_ms:
+    # support fractions but round to nearest microsecond
+    duration_us = int(args.duration_ms * 1000)
+else:
+    duration_us = 0   # default is show all
+
 debug = 0
 
 # define BPF program
@@ -104,8 +129,17 @@ int trace_tcp_rcv_state_process(struct pt_regs *ctx, struct sock *skp)
     if (infop == 0) {
         return 0;   // missed entry or filtered
     }
+
     u64 ts = infop->ts;
     u64 now = bpf_ktime_get_ns();
+
+    u64 delta_us = (now - ts) / 1000ul;
+
+#ifdef MIN_LATENCY
+    if ( delta_us < DURATION_US ) {
+        return 0; // connect latency is below latency filter minimum
+    }
+#endif
 
     // pull in details
     u16 family = 0, dport = 0;
@@ -119,7 +153,7 @@ int trace_tcp_rcv_state_process(struct pt_regs *ctx, struct sock *skp)
         data4.saddr = skp->__sk_common.skc_rcv_saddr;
         data4.daddr = skp->__sk_common.skc_daddr;
         data4.dport = ntohs(dport);
-        data4.delta_us = (now - ts) / 1000;
+        data4.delta_us = delta_us;
         __builtin_memcpy(&data4.task, infop->task, sizeof(data4.task));
         ipv4_events.perf_submit(ctx, &data4, sizeof(data4));
 
@@ -131,7 +165,7 @@ int trace_tcp_rcv_state_process(struct pt_regs *ctx, struct sock *skp)
         bpf_probe_read(&data6.daddr, sizeof(data6.daddr),
             skp->__sk_common.skc_v6_daddr.in6_u.u6_addr32);
         data6.dport = ntohs(dport);
-        data6.delta_us = (now - ts) / 1000;
+        data6.delta_us = delta_us;
         __builtin_memcpy(&data6.task, infop->task, sizeof(data6.task));
         ipv6_events.perf_submit(ctx, &data6, sizeof(data6));
     }
@@ -142,13 +176,17 @@ int trace_tcp_rcv_state_process(struct pt_regs *ctx, struct sock *skp)
 }
 """
 
+if duration_us > 0:
+    bpf_text = "#define MIN_LATENCY\n" + bpf_text
+    bpf_text = bpf_text.replace('DURATION_US', str(duration_us))
+
 # code substitutions
 if args.pid:
     bpf_text = bpf_text.replace('FILTER',
         'if (pid != %s) { return 0; }' % args.pid)
 else:
     bpf_text = bpf_text.replace('FILTER', '')
-if debug:
+if debug or args.verbose:
     print(bpf_text)
 
 # initialize BPF
