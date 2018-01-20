@@ -27,7 +27,7 @@ examples = """examples:
 parser = argparse.ArgumentParser(
     description="Summarize block device I/O latency as a histogram",
     formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog=examples, allow_abbrev=False)
+    epilog=examples)
 parser.add_argument("-T", "--timestamp", action="store_true",
     help="include timestamp on output")
 parser.add_argument("-Q", "--queued", action="store_true",

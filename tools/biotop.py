@@ -31,7 +31,7 @@ examples = """examples:
 parser = argparse.ArgumentParser(
     description="Block device (disk) I/O by process",
     formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog=examples, allow_abbrev=False)
+    epilog=examples)
 parser.add_argument("-C", "--noclear", action="store_true",
     help="don't clear the screen")
 parser.add_argument("-r", "--maxrows", default=20,

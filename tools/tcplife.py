@@ -43,7 +43,7 @@ examples = """examples:
 parser = argparse.ArgumentParser(
     description="Trace the lifespan of TCP sessions and summarize",
     formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog=examples, allow_abbrev=False)
+    epilog=examples)
 parser.add_argument("-T", "--time", action="store_true",
     help="include time column on output (HH:MM:SS)")
 parser.add_argument("-t", "--timestamp", action="store_true",
