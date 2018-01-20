@@ -1,8 +1,8 @@
-.TH tcpaccept 8  "2016-02-14" "USER COMMANDS"
+.TH tcpretrans 8  "2016-02-14" "USER COMMANDS"
 .SH NAME
-tcpaccept \- Trace or count TCP retransmits and TLPs. Uses Linux eBPF/bcc.
+tcpretrans \- Trace or count TCP retransmits and TLPs. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B tcpaccept [\-h] [\-l]
+.B tcpretrans [\-h] [\-l]
 .SH DESCRIPTION
 This traces TCP retransmits, showing address, port, and TCP state information,
 and sometimes the PID (although usually not, since retransmits are usually
@@ -38,7 +38,7 @@ Trace TCP retransmits:
 .TP
 Trace TCP retransmits and TLP attempts:
 #
-.B tcpconnect \-l
+.B tcpretrans \-l
 .SH FIELDS
 .TP
 TIME
