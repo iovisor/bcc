@@ -41,7 +41,7 @@ Here is a generic checklist for performance investigations with bcc, first as a 
 
 These tools may be installed on your system under /usr/share/bcc/tools, or you can run them from the bcc github repo under /tools where they have a .py extension. Browse the 50+ tools available for more analysis options.
 
-#### 1. execsnoop
+#### 1.1 execsnoop
 
 ```
 # ./execsnoop
@@ -59,7 +59,7 @@ It works by tracing exec(), not the fork(), so it will catch many types of new p
 
 More [examples](../tools/execsnoop_example.txt).
 
-#### 2. opensnoop
+#### 1.2. opensnoop
 
 ```
 # ./opensnoop
@@ -82,7 +82,7 @@ Files that are opened can tell you a lot about how applications work: identifyin
 
 More [examples](../tools/opensnoop_example.txt).
 
-#### 3. ext4slower (or btrfs\*, xfs\*, zfs\*)
+#### 1.3. ext4slower (or btrfs\*, xfs\*, zfs\*)
 
 ```
 # ./ext4slower
@@ -103,7 +103,7 @@ Similar tools exist in bcc for other file systems: btrfsslower, xfsslower, and z
 
 More [examples](../tools/ext4slower_example.txt).
 
-#### 4. biolatency
+#### 1.4. biolatency
 
 ```
 # ./biolatency
@@ -135,7 +135,7 @@ This is great for understanding disk I/O latency beyond the average times given 
 
 More [examples](../tools/biolatency_example.txt).
 
-#### 5. biosnoop
+#### 1.5. biosnoop
 
 ```
 # ./biosnoop
@@ -155,7 +155,7 @@ This allows you to examine disk I/O in more detail, and look for time-ordered pa
 
 More [examples](../tools/biosnoop_example.txt).
 
-#### 6. cachestat
+#### 1.6. cachestat
 
 ```
 # ./cachestat
@@ -175,7 +175,7 @@ Use this to identify a low cache hit ratio, and a high rate of misses: which giv
 
 More [examples](../tools/cachestat_example.txt).
 
-#### 7. tcpconnect
+#### 1.7. tcpconnect
 
 ```
 # ./tcpconnect
@@ -194,7 +194,7 @@ Look for unexpected connections that may point to inefficiencies in application 
 
 More [examples](../tools/tcpconnect_example.txt).
 
-#### 8. tcpaccept
+#### 1.8. tcpaccept
 
 ```
 # ./tcpaccept
@@ -211,7 +211,7 @@ Look for unexpected connections that may point to inefficiencies in application 
 
 More [examples](../tools/tcpaccept_example.txt).
 
-#### 9. tcpretrans
+#### 1.9. tcpretrans
 
 ```
 # ./tcpretrans 
@@ -228,7 +228,7 @@ TCP retransmissions cause latency and throughput issues. For ESTABLESHID retrans
 
 More [examples](../tools/tcpretrans_example.txt).
 
-#### 10. runqlat
+#### 1.10. runqlat
 
 ```
 # ./runqlat 
@@ -259,7 +259,7 @@ This can help quantify time lost waiting for a turn on CPU, during periods of CP
 
 More [examples](../tools/runqlat_example.txt).
 
-#### 11. profile
+#### 1.11. profile
 
 ```
 # ./profile
@@ -305,6 +305,117 @@ profile is a CPU profiler, which takes samples of stack traces at timed interval
 Use this tool to understand the code paths that are consuming CPU resources.
 
 More [examples](../tools/profile_example.txt).
+
+### 2. Observatility with Generic Tools
+
+In addition to the above tools for performance tuning, below is a checklist for bcc generic tools, first as a list, and in detail:
+
+1. trace
+1. argdist
+1. funccount
+
+These generic tools may be useful to provide visibility to solve your specific problems.
+
+#### 2.1. trace
+
+##### Example 1
+
+Suppose you want to track file ownership change. There are three syscalls, `chown`, `fchown` and `lchown` which users can use to change file ownership. The corresponding syscall entry is `SyS_[f|l]chown`.  The following command can be used to print out syscall parameters and the calling process user id. You can use `id` command to find the uid of a particular user.
+
+```
+$ trace.py \
+  'p::SyS_chown "file = %s, to_uid = %d, to_gid = %d, from_uid = %d", arg1, arg2, arg3, $uid' \
+  'p::SyS_fchown "fd = %d, to_uid = %d, to_gid = %d, from_uid = %d", arg1, arg2, arg3, $uid' \
+  'p::SyS_lchown "file = %s, to_uid = %d, to_gid = %d, from_uid = %d", arg1, arg2, arg3, $uid'
+PID    TID    COMM         FUNC             -
+1269255 1269255 python3.6    SyS_lchown       file = /tmp/dotsync-usisgezu/tmp, to_uid = 128203, to_gid = 100, from_uid = 128203
+1269441 1269441 zstd         SyS_chown        file = /tmp/dotsync-vic7ygj0/dotsync-package.zst, to_uid = 128203, to_gid = 100, from_uid = 128203
+1269255 1269255 python3.6    SyS_lchown       file = /tmp/dotsync-a40zd7ev/tmp, to_uid = 128203, to_gid = 100, from_uid = 128203
+1269442 1269442 zstd         SyS_chown        file = /tmp/dotsync-gzp413o_/dotsync-package.zst, to_uid = 128203, to_gid = 100, from_uid = 128203
+1269255 1269255 python3.6    SyS_lchown       file = /tmp/dotsync-whx4fivm/tmp/.bash_profile, to_uid = 128203, to_gid = 100, from_uid = 128203
+```
+
+##### Example 2
+
+Suppose you want to count nonvoluntary context switches (`nvcsw`) in your bpf based performance monitoring tools and you do not know what is the proper method. `/proc/<pid>/status` already tells you the number (`nonvoluntary_ctxt_switches`) for a pid and you can use `trace.py` to do a quick experiment to verify your method. With kernel source code, the `nvcsw` is counted at file `linux/kernel/sched/core.c` function `__schedule` and under condition
+```
+!(!preempt && prev->state) // i.e., preempt || !prev->state
+```
+
+The `__schedule` function is marked as `notrace`, and the best place to evaluate the above condition seems in `sched/sched_switch` tracepoint called inside function `__schedule` and defined in `linux/include/trace/events/sched.h`. `trace.py` already has `args` being the pointer to the tracepoint `TP_STRUCT__entry`.  The above condition in function `__schedule` can be represented as
+```
+args->prev_state == TASK_STATE_MAX || args->prev_state == 0
+```
+
+The below command can be used to count the involuntary context switches (per process or per pid) and compare to `/proc/<pid>/status` or `/proc/<pid>/task/<task_id>/status` for correctness, as in typical cases, involuntary context switches are not very common.
+```
+$ trace.py -p 1134138 't:sched:sched_switch (args->prev_state == TASK_STATE_MAX || args->prev_state == 0)'
+PID    TID    COMM         FUNC
+1134138 1134140 contention_test sched_switch
+1134138 1134142 contention_test sched_switch
+...
+$ trace.py -L 1134140 't:sched:sched_switch (args->prev_state == TASK_STATE_MAX || args->prev_state == 0)'
+PID    TID    COMM         FUNC
+1134138 1134140 contention_test sched_switch
+1134138 1134140 contention_test sched_switch
+...
+```
+
+##### Example 3
+
+This example is related to issue [1231](https://github.com/iovisor/bcc/issues/1231) and [1516](https://github.com/iovisor/bcc/issues/1516) where uprobe does not work at all in certain cases. First, you can do a `strace` as below
+
+```
+$ strace trace.py 'r:bash:readline "%s", retval'
+...
+perf_event_open(0x7ffd968212f0, -1, 0, -1, 0x8 /* PERF_FLAG_??? */) = -1 EIO (Input/output error)
+...
+```
+
+The `perf_event_open` syscall returns `-EIO`. Digging into kernel uprobe related codes in `/kernel/trace` and `/kernel/events` directories to search `EIO`, the function `uprobe_register` is the most suspicious. Let us find whether this function is called or not and what is the return value if it is called. In one terminal using the following command to print out the return value of uprobe_register,
+```
+$ trace.py 'r::uprobe_register "ret = %d", retval'
+```
+In another terminal run the same bash uretprobe tracing example, and you should get
+```
+$ trace.py 'r::uprobe_register "ret = %d", retval'
+PID    TID    COMM         FUNC             -
+1041401 1041401 python2.7    uprobe_register  ret = -5
+```
+
+The `-5` error code is EIO. This confirms that the following code in function `uprobe_register` is the most suspicious culprit.
+```
+ if (!inode->i_mapping->a_ops->readpage && !shmem_mapping(inode->i_mapping))
+        return -EIO;
+```
+The `shmem_mapping` function is defined as
+```
+bool shmem_mapping(struct address_space *mapping)
+{
+        return mapping->a_ops == &shmem_aops;
+}
+```
+
+To confirm the theory, find what is `inode->i_mapping->a_ops` with the following command
+```
+$ trace.py -I 'linux/fs.h' 'p::uprobe_register(struct inode *inode) "a_ops = %llx", inode->i_mapping->a_ops'
+PID    TID    COMM         FUNC             -
+814288 814288 python2.7    uprobe_register  a_ops = ffffffff81a2adc0
+^C$ grep ffffffff81a2adc0 /proc/kallsyms
+ffffffff81a2adc0 R empty_aops
+```
+
+The kernel symbol `empty_aops` does not have `readpage` defined and hence the above suspicious condition is true. Further examining the kernel source code shows that `overlayfs` does not provide its own `a_ops` while some other file systems (e.g., ext4) define their own `a_ops` (e.g., `ext4_da_aops`), and `ext4_da_aops` defines `readpage`. Hence, uprobe works fine on ext4 while not on overlayfs.
+
+More [examples](../tools/trace_example.txt).
+
+#### 2.2. argdist
+
+More [examples](../tools/argdist_example.txt).
+
+#### 2.3. funccount
+
+More [examples](../tools/funccount_example.txt).
 
 ## Networking
 
