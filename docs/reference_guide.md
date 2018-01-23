@@ -21,7 +21,8 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
         - [4. bpf_get_current_pid_tgid()](#4-bpf_get_current_pid_tgid)
         - [5. bpf_get_current_uid_gid()](#5-bpf_get_current_uid_gid)
         - [6. bpf_get_current_comm()](#6-bpf_get_current_comm)
-        - [7. bpf_log2l()](#7-bpflog2l)
+        - [7. bpf_get_current_task()](#7-bpf_get_current_task)
+        - [8. bpf_log2l()](#8-bpflog2l)
     - [Debugging](#debugging)
         - [1. bpf_override_return()](#1-bpf_override_return)
     - [Output](#output)
@@ -316,7 +317,30 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=bpf_get_current_comm+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=bpf_get_current_comm+path%3Atools&type=Code)
 
-### 7. bpf_log2l()
+### 7. bpf_get_current_task()
+
+Syntax: ```bpf_get_current_task()```
+
+Return: current task as a pointer to struct task_struct.
+
+Returns a pointer to the current task's task_struct object. This helper can be used to compute the on-CPU time for a process, identify kernel threads, get the current CPU's run queue, or retrieve many other pieces of information.
+
+With Linux 4.13, due to issues with field randomization, you may need two #define directives before the includes:
+```C
+#define randomized_struct_fields_start  struct {
+#define randomized_struct_fields_end    };
+#include <linux/sched.h>
+
+int do_trace(void *ctx) {
+    struct task_struct *t = (struct task_struct *)bpf_get_current_task();
+[...]
+```
+
+Examples in situ:
+[search /examples](https://github.com/iovisor/bcc/search?q=bpf_get_current_task+path%3Aexamples&type=Code),
+[search /tools](https://github.com/iovisor/bcc/search?q=bpf_get_current_task+path%3Atools&type=Code)
+
+### 8. bpf_log2l()
 
 Syntax: ```unsigned int bpf_log2l(unsigned long v)```
 
