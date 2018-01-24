@@ -28,6 +28,12 @@
 #include "libbpf.h"
 #include "perf_reader.h"
 
+enum {
+  RB_NOT_USED = 0, // ring buffer not usd
+  RB_USED_IN_MUNMAP = 1, // used in munmap
+  RB_USED_IN_READ = 2, // used in read
+};
+
 struct perf_reader {
   perf_reader_cb cb;
   perf_reader_raw_cb raw_cb;
@@ -36,6 +42,7 @@ struct perf_reader {
   void *buf; // for keeping segmented data
   size_t buf_size;
   void *base;
+  int rb_use_state;
   int page_size;
   int page_cnt;
   int fd;
@@ -63,6 +70,7 @@ struct perf_reader * perf_reader_new(perf_reader_cb cb,
 void perf_reader_free(void *ptr) {
   if (ptr) {
     struct perf_reader *reader = ptr;
+    while (!__sync_bool_compare_and_swap(&reader->rb_use_state, RB_NOT_USED, RB_USED_IN_MUNMAP));
     munmap(reader->base, reader->page_size * (reader->page_cnt + 1));
     if (reader->fd >= 0) {
       ioctl(reader->fd, PERF_EVENT_IOC_DISABLE, 0);
@@ -220,6 +228,9 @@ void perf_reader_event_read(struct perf_reader *reader) {
   uint8_t *sentinel = (uint8_t *)reader->base + buffer_size + reader->page_size;
   uint8_t *begin, *end;
 
+  if (!__sync_bool_compare_and_swap(&reader->rb_use_state, RB_NOT_USED, RB_USED_IN_READ))
+    return;
+
   // Consume all the events on this ring, calling the cb function for each one.
   // The message may fall on the ring boundary, in which case copy the message
   // into a malloced buffer.
@@ -268,6 +279,7 @@ void perf_reader_event_read(struct perf_reader *reader) {
 
     write_data_tail(perf_header, perf_header->data_tail + e->size);
   }
+  reader->rb_use_state = RB_NOT_USED;
 }
 
 int perf_reader_poll(int num_readers, struct perf_reader **readers, int timeout) {
