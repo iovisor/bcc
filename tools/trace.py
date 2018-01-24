@@ -602,6 +602,10 @@ trace -I 'kernel/sched/sched.h' \\
         in kernel/sched/sched.h which is in kernel source tree and not in kernel-devel
         package.  So this command needs to run at the kernel source tree root directory
         so that the added header file can be found by the compiler.
+trace -I 'net/sock.h' \\
+      'udpv6_sendmsg(struct sock *sk) (sk->sk_dport == 13568)'
+        Trace udpv6 sendmsg calls only if socket's destination port is equal
+        to 53 (DNS; 13568 in big endian order)
 """
 
         def __init__(self):
