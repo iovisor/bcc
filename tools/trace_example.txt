@@ -296,4 +296,6 @@ trace -I 'net/sock.h' \\
       'udpv6_sendmsg(struct sock *sk) (sk->sk_dport == 13568)'
         Trace udpv6 sendmsg calls only if socket's destination port is equal
         to 53 (DNS; 13568 in big endian order)
+trace -I 'linux/fs_struct.h' 'mntns_install "users = %d", $task->fs->users'
+        Trace the number of users accessing the file system of the current task
 "

@@ -204,7 +204,8 @@ class Probe(object):
                 "$gid": "(unsigned)(bpf_get_current_uid_gid() >> 32)",
                 "$pid": "(unsigned)(bpf_get_current_pid_tgid() & 0xffffffff)",
                 "$tgid": "(unsigned)(bpf_get_current_pid_tgid() >> 32)",
-                "$cpu": "bpf_get_smp_processor_id()"
+                "$cpu": "bpf_get_smp_processor_id()",
+                "$task" : "((struct task_struct *)bpf_get_current_task())"
         }
 
         def _generate_streq_function(self, string):
@@ -606,6 +607,8 @@ trace -I 'net/sock.h' \\
       'udpv6_sendmsg(struct sock *sk) (sk->sk_dport == 13568)'
         Trace udpv6 sendmsg calls only if socket's destination port is equal
         to 53 (DNS; 13568 in big endian order)
+trace -I 'linux/fs_struct.h' 'mntns_install "users = %d", $task->fs->users'
+        Trace the number of users accessing the file system of the current task
 """
 
         def __init__(self):
