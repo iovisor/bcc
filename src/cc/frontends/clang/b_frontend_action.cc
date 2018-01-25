@@ -197,7 +197,7 @@ bool ProbeVisitor::VisitUnaryOperator(UnaryOperator *E) {
   Expr *sub = E->getSubExpr();
   string rhs = rewriter_.getRewrittenText(expansionRange(sub->getSourceRange()));
   string text;
-  text = "({ typeof(" + E->getType().getAsString() + ") _val; memset(&_val, 0, sizeof(_val));";
+  text = "({ typeof(" + E->getType().getAsString() + ") _val; __builtin_memset(&_val, 0, sizeof(_val));";
   text += " bpf_probe_read(&_val, sizeof(_val), (u64)";
   text += rhs + "); _val; })";
   rewriter_.ReplaceText(expansionRange(E->getSourceRange()), text);
@@ -233,7 +233,7 @@ bool ProbeVisitor::VisitMemberExpr(MemberExpr *E) {
   string rhs = rewriter_.getRewrittenText(expansionRange(SourceRange(rhs_start, E->getLocEnd())));
   string base_type = base->getType()->getPointeeType().getAsString();
   string pre, post;
-  pre = "({ typeof(" + E->getType().getAsString() + ") _val; memset(&_val, 0, sizeof(_val));";
+  pre = "({ typeof(" + E->getType().getAsString() + ") _val; __builtin_memset(&_val, 0, sizeof(_val));";
   pre += " bpf_probe_read(&_val, sizeof(_val), (u64)&";
   post = rhs + "); _val; })";
   rewriter_.InsertText(E->getLocStart(), pre);
@@ -377,7 +377,7 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
           txt += "typeof(" + name + ".leaf) *_leaf = " + lookup + ", &_key); ";
           txt += "if (_leaf) (*_leaf)++; ";
           if (desc->second.type == BPF_MAP_TYPE_HASH) {
-            txt += "else { typeof(" + name + ".leaf) _zleaf; memset(&_zleaf, 0, sizeof(_zleaf)); ";
+            txt += "else { typeof(" + name + ".leaf) _zleaf; __builtin_memset(&_zleaf, 0, sizeof(_zleaf)); ";
             txt += "_zleaf++; ";
             txt += update + ", &_key, &_zleaf, BPF_NOEXIST); } ";
           }
