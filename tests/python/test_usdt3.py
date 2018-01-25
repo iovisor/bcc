@@ -73,7 +73,7 @@ int do_trace(struct pt_regs *ctx) {
 """
 
         def _create_file(name, text):
-            text_file = open(name, "w")
+            text_file = open(name, "wb")
             text_file.write(text)
             text_file.close()
 
@@ -131,7 +131,7 @@ int do_trace(struct pt_regs *ctx) {
                 self.probe_value_other = 1
 
         b["event"].open_perf_buffer(print_event)
-        for i in range(6):
+        for i in range(10):
             b.kprobe_poll()
 
         self.assertTrue(self.probe_value_1 != 0)
