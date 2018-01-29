@@ -400,6 +400,7 @@ BPF_ARRAY(t3, union emptyu, 1);
     def test_exported_maps(self):
         b1 = BPF(text="""BPF_TABLE_PUBLIC("hash", int, int, table1, 10);""")
         b2 = BPF(text="""BPF_TABLE("extern", int, int, table1, 10);""")
+        t = b2["table1"]
 
     def test_syntax_error(self):
         with self.assertRaises(Exception):
