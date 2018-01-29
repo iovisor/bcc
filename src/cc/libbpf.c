@@ -84,6 +84,72 @@
 
 #define min(x, y) ((x) < (y) ? (x) : (y))
 
+struct bpf_helper {
+  char *name;
+  char *required_version;
+};
+
+static struct bpf_helper helpers[] = {
+  {"map_lookup_elem", "3.19"},
+  {"map_update_elem", "3.19"},
+  {"map_delete_elem", "3.19"},
+  {"probe_read", "4.1"},
+  {"ktime_get_ns", "4.1"},
+  {"trace_printk", "4.1"},
+  {"get_prandom_u32", "4.1"},
+  {"get_smp_processor_id", "4.1"},
+  {"skb_store_bytes", "4.1"},
+  {"l3_csum_replace", "4.1"},
+  {"l4_csum_replace", "4.1"},
+  {"tail_call", "4.2"},
+  {"clone_redirect", "4.2"},
+  {"get_current_pid_tgid", "4.2"},
+  {"get_current_uid_gid", "4.2"},
+  {"get_current_comm", "4.2"},
+  {"get_cgroup_classid", "4.3"},
+  {"skb_vlan_push", "4.3"},
+  {"skb_vlan_pop", "4.3"},
+  {"skb_get_tunnel_key", "4.3"},
+  {"skb_set_tunnel_key", "4.3"},
+  {"perf_event_read", "4.3"},
+  {"redirect", "4.4"},
+  {"get_route_realm", "4.4"},
+  {"perf_event_output", "4.4"},
+  {"skb_load_bytes", "4.5"},
+  {"get_stackid", "4.6"},
+  {"csum_diff", "4.6"},
+  {"skb_get_tunnel_opt", "4.6"},
+  {"skb_set_tunnel_opt", "4.6"},
+  {"skb_change_proto", "4.8"},
+  {"skb_change_type", "4.8"},
+  {"skb_under_cgroup", "4.8"},
+  {"get_hash_recalc", "4.8"},
+  {"get_current_task", "4.8"},
+  {"probe_write_user", "4.8"},
+  {"current_task_under_cgroup", "4.9"},
+  {"skb_change_tail", "4.9"},
+  {"skb_pull_data", "4.9"},
+  {"csum_update", "4.9"},
+  {"set_hash_invalid", "4.9"},
+  {"get_numa_node_id", "4.10"},
+  {"skb_change_head", "4.10"},
+  {"xdp_adjust_head", "4.10"},
+  {"probe_read_str", "4.11"},
+  {"get_socket_cookie", "4.12"},
+  {"get_socket_uid", "4.12"},
+  {"set_hash", "4.13"},
+  {"setsockopt", "4.13"},
+  {"skb_adjust_room", "4.13"},
+  {"redirect_map", "4.14"},
+  {"sk_redirect_map", "4.14"},
+  {"sock_map_update", "4.14"},
+  {"xdp_adjust_meta", "4.15"},
+  {"perf_event_read_value", "4.15"},
+  {"perf_prog_read_value", "4.15"},
+  {"getsockopt", "4.15"},
+  {"override_return", "4.16"},
+};
+
 static int probe_perf_reader_page_cnt = 8;
 
 static uint64_t ptr_to_u64(void *ptr)
@@ -244,6 +310,22 @@ static void bpf_print_hints(int ret, char *log)
       "bpf_probe_read() to copy it to the BPF stack. Sometimes the "
       "bpf_probe_read is automatic by the bcc rewriter, other times "
       "you'll need to be explicit.\n\n");
+  }
+
+  // helper function not found in kernel
+  char *helper_str = strstr(log, "invalid func ");
+  if (helper_str != NULL) {
+    helper_str += strlen("invalid func ");
+    char *str = strchr(helper_str, '#');
+    if (str != NULL) {
+      helper_str = str + 1;
+    }
+    int helper_id = atoi(helper_str);
+    if (helper_id && helper_id < sizeof(helpers) / sizeof(struct bpf_helper)) {
+      struct bpf_helper helper = helpers[helper_id - 1];
+      fprintf(stderr, "HINT: bpf_%s missing (added in Linux %s).\n\n",
+              helper.name, helper.required_version);
+    }
   }
 }
 #define ROUND_UP(x, n) (((x) + (n) - 1u) & ~((n) - 1u))
