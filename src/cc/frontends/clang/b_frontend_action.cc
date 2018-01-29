@@ -778,7 +778,8 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
       return false;
     }
 
-    fe_.table_storage().VisitMapType(table, C, key_type, leaf_type);
+    if (!table.is_extern)
+      fe_.table_storage().VisitMapType(table, C, key_type, leaf_type);
     fe_.table_storage().Insert(local_path, move(table));
   } else if (const PointerType *P = Decl->getType()->getAs<PointerType>()) {
     // if var is a pointer to a packet type, clone the annotation into the var
