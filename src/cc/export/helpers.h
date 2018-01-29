@@ -250,6 +250,30 @@ static int (*bpf_perf_event_read_value)(void *map, u64 flags, void *buf, u32 buf
   (void *) BPF_FUNC_perf_event_read_value;
 static int (*bpf_perf_prog_read_value)(void *ctx, void *buf, u32 buf_size) =
   (void *) BPF_FUNC_perf_prog_read_value;
+static int (*bpf_current_task_under_cgroup)(void *map, int index) =
+  (void *) BPF_FUNC_current_task_under_cgroup;
+static u32 (*bpf_get_socket_cookie)(void *ctx) =
+  (void *) BPF_FUNC_get_socket_cookie;
+static u64 (*bpf_get_socket_uid)(void *ctx) =
+  (void *) BPF_FUNC_get_socket_uid;
+static int (*bpf_getsockopt)(void *ctx, int level, int optname, void *optval, int optlen) =
+  (void *) BPF_FUNC_getsockopt;
+static int (*bpf_redirect_map)(void *map, int key, int flags) =
+  (void *) BPF_FUNC_redirect_map;
+static int (*bpf_set_hash)(void *ctx, u32 hash) =
+  (void *) BPF_FUNC_set_hash;
+static int (*bpf_setsockopt)(void *ctx, int level, int optname, void *optval, int optlen) =
+  (void *) BPF_FUNC_setsockopt;
+static int (*bpf_skb_adjust_room)(void *ctx, int len_diff, u32 mode, u64 flags) =
+  (void *) BPF_FUNC_skb_adjust_room;
+static int (*bpf_skb_under_cgroup)(void *ctx, void *map, int index) =
+  (void *) BPF_FUNC_skb_under_cgroup;
+static int (*bpf_sk_redirect_map)(void *ctx, void *map, int key, int flags) =
+  (void *) BPF_FUNC_sk_redirect_map;
+static int (*bpf_sock_map_update)(void *map, void *key, void *value, unsigned long long flags) =
+  (void *) BPF_FUNC_sock_map_update;
+static int (*bpf_xdp_adjust_meta)(void *ctx, int offset) =
+  (void *) BPF_FUNC_xdp_adjust_meta;
 
 /* bcc_get_stackid will return a negative value in the case of an error
  *
