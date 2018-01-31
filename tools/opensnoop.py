@@ -68,7 +68,7 @@ struct data_t {
 BPF_HASH(infotmp, u64, struct val_t);
 BPF_PERF_OUTPUT(events);
 
-int trace_entry(struct pt_regs *ctx, const char __user *filename)
+int trace_entry(struct pt_regs *ctx, int dfd, const char __user *filename)
 {
     struct val_t val = {};
     u64 id = bpf_get_current_pid_tgid();
@@ -124,8 +124,8 @@ if debug:
 
 # initialize BPF
 b = BPF(text=bpf_text)
-b.attach_kprobe(event="sys_open", fn_name="trace_entry")
-b.attach_kretprobe(event="sys_open", fn_name="trace_return")
+b.attach_kprobe(event="do_sys_open", fn_name="trace_entry")
+b.attach_kretprobe(event="do_sys_open", fn_name="trace_return")
 
 TASK_COMM_LEN = 16    # linux/sched.h
 NAME_MAX = 255        # linux/limits.h

@@ -205,6 +205,11 @@ class TableBase(MutableMapping):
             errstr = os.strerror(ct.get_errno())
             raise Exception("Could not update table: %s" % errstr)
 
+    def __delitem__(self, key):
+        res = lib.bpf_delete_elem(self.map_fd, ct.byref(key))
+        if res < 0:
+            raise KeyError
+
     # override the MutableMapping's implementation of these since they
     # don't handle KeyError nicely
     def itervalues(self):
@@ -391,11 +396,6 @@ class HashTable(TableBase):
         for k in self: i += 1
         return i
 
-    def __delitem__(self, key):
-        res = lib.bpf_delete_elem(self.map_fd, ct.byref(key))
-        if res < 0:
-            raise KeyError
-
 class LruHash(HashTable):
     def __init__(self, *args, **kwargs):
         super(LruHash, self).__init__(*args, **kwargs)
@@ -430,11 +430,12 @@ class ArrayBase(TableBase):
 
     def __delitem__(self, key):
         key = self._normalize_key(key)
-        # Deleting from array type maps does not have an effect, so
-        # zero out the entry instead.
+        super(ArrayBase, self).__delitem__(key)
+
+    def clearitem(self, key):
+        key = self._normalize_key(key)
         leaf = self.Leaf()
-        res = lib.bpf_update_elem(self.map_fd, ct.byref(key), ct.byref(leaf),
-                                  0)
+        res = lib.bpf_update_elem(self.map_fd, ct.byref(key), ct.byref(leaf), 0)
         if res < 0:
             raise Exception("Could not clear item")
 
@@ -461,6 +462,9 @@ class Array(ArrayBase):
     def __init__(self, *args, **kwargs):
         super(Array, self).__init__(*args, **kwargs)
 
+    def __delitem__(self, key):
+        # Delete in Array type does not have an effect, so zero out instead
+        self.clearitem(key)
 
 class ProgArray(ArrayBase):
     def __init__(self, *args, **kwargs):
@@ -472,12 +476,6 @@ class ProgArray(ArrayBase):
         if isinstance(leaf, self.bpf.Function):
             leaf = self.Leaf(leaf.fd)
         super(ProgArray, self).__setitem__(key, leaf)
-
-    def __delitem__(self, key):
-        key = self._normalize_key(key)
-        res = lib.bpf_delete_elem(self.map_fd, ct.byref(key))
-        if res < 0:
-            raise Exception("Could not delete item")
 
 class PerfEventArray(ArrayBase):
 
@@ -494,8 +492,7 @@ class PerfEventArray(ArrayBase):
         if key not in self._open_key_fds:
             return
         # Delete entry from the array
-        c_key = self._normalize_key(key)
-        lib.bpf_delete_elem(self.map_fd, ct.byref(c_key))
+        super(PerfEventArray, self).__delitem__(key)
         key_id = (id(self), key)
         if key_id in self.bpf.open_kprobes:
             # The key is opened for perf ring buffer
@@ -665,6 +662,10 @@ class PerCpuArray(ArrayBase):
     def __setitem__(self, key, leaf):
         super(PerCpuArray, self).__setitem__(key, leaf)
 
+    def __delitem__(self, key):
+        # Delete in this type does not have an effect, so zero out instead
+        self.clearitem(key)
+
     def sum(self, key):
         if isinstance(self.Leaf(), ct.Structure):
             raise IndexError("Leaf must be an integer type for default sum functions")
@@ -727,11 +728,6 @@ class StackTrace(TableBase):
         i = 0
         for k in self: i += 1
         return i
-
-    def __delitem__(self, key):
-        res = lib.bpf_delete_elem(self.map_fd, ct.byref(key))
-        if res < 0:
-            raise KeyError
 
     def clear(self):
         pass
