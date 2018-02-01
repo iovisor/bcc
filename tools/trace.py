@@ -4,7 +4,7 @@
 #               parameters, with an optional filter.
 #
 # usage: trace [-h] [-p PID] [-L TID] [-v] [-Z STRING_SIZE] [-S]
-#              [-M MAX_EVENTS] [-T] [-t] [-K] [-U] [-I header]
+#              [-M MAX_EVENTS] [-T] [-t] [-K] [-U] [-a] [-I header]
 #              probe [probe ...]
 #
 # Licensed under the Apache License, Version 2.0 (the "License")
@@ -31,6 +31,7 @@ class Probe(object):
         use_localtime = True
         time_field = False
         print_cpu = False
+        print_address = False
         tgid = -1
         pid = -1
         page_cnt = None
@@ -42,6 +43,7 @@ class Probe(object):
                 cls.use_localtime = not args.timestamp
                 cls.time_field = cls.print_time and (not cls.use_localtime)
                 cls.print_cpu = args.print_cpu
+                cls.print_address = args.address
                 cls.first_ts = BPF.monotonic_time()
                 cls.tgid = args.tgid or -1
                 cls.pid = args.pid or -1
@@ -474,13 +476,16 @@ BPF_PERF_OUTPUT(%s);
 
         def print_stack(self, bpf, stack_id, tgid):
             if stack_id < 0:
-                    print("        %d" % stack_id)
-                    return
+                print("        %d" % stack_id)
+                return
 
             stack = list(bpf.get_table(self.stacks_name).walk(stack_id))
             for addr in stack:
-                    print("        %s" % (bpf.sym(addr, tgid,
-                                         show_module=True, show_offset=True)))
+                print("        ", end="")
+                if Probe.print_address:
+                    print("%16x " % addr, end="")
+                print("%s" % (bpf.sym(addr, tgid,
+                                     show_module=True, show_offset=True)))
 
         def _format_message(self, bpf, tgid, values):
                 # Replace each %K with kernel sym and %U with user sym in tgid
@@ -645,6 +650,8 @@ trace -I 'linux/fs_struct.h' 'mntns_install "users = %d", $task->fs->users'
                   action="store_true", help="output kernel stack trace")
                 parser.add_argument("-U", "--user-stack",
                   action="store_true", help="output user stack trace")
+                parser.add_argument("-a", "--address", action="store_true",
+                  help="print virtual address in stacks")
                 parser.add_argument(metavar="probe", dest="probes", nargs="+",
                   help="probe specifier (see examples)")
                 parser.add_argument("-I", "--include", action="append",

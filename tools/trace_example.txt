@@ -60,11 +60,24 @@ PID    COMM         FUNC             -
 2740   bash         readline         man ls
 ^C
 
-The special retval keywords stands for the function's return value, and can
+The special retval keyword stands for the function's return value, and can
 be used only in a retprobe, specified by the 'r' prefix. The next component
 of the probe is the library that contains the desired function. It's OK to
 specify executables too, as long as they can be found in the PATH. Or, you
 can specify the full path to the executable (e.g. "/usr/bin/bash").
+
+Sometimes it can be useful to see where in code the events happen. There are
+flags to print the kernel stack (-K), the user stack (-U) and optionally
+include the virtual address in the stacks as well (-a):
+
+# trace.py -U -a 'r::sys_futex "%d", retval'
+PID     TID     COMM            FUNC             -
+793922  793951  poller          sys_futex        0
+        7f6c72b6497a __lll_unlock_wake+0x1a [libpthread-2.23.so]
+              627fef folly::FunctionScheduler::run()+0x46f [router]
+        7f6c7345f171 execute_native_thread_routine+0x21 [libstdc++.so.6.0.21]
+        7f6c72b5b7a9 start_thread+0xd9 [libpthread-2.23.so]
+        7f6c7223fa7d clone+0x6d [libc-2.23.so]
 
 Multiple probes can be combined on the same command line. For example, let's
 trace failed read and write calls on the libc level, and include a time column:
@@ -225,7 +238,7 @@ size and is measured in pages. The value must be a power of two and defaults to
 USAGE message:
 
 usage: trace [-h] [-b BUFFER_PAGES] [-p PID] [-L TID] [-v] [-Z STRING_SIZE]
-             [-S] [-M MAX_EVENTS] [-t] [-T] [-K] [-U] [-I header]
+             [-S] [-M MAX_EVENTS] [-t] [-T] [-K] [-U] [-a] [-I header]
              probe [probe ...]
 
 Attach to functions and print trace messages.
@@ -251,6 +264,7 @@ optional arguments:
   -C, --print_cpu       print CPU id 
   -K, --kernel-stack    output kernel stack trace
   -U, --user-stack      output user stack trace
+  -a, --address         print virtual address in stacks
   -I header, --include header
                         additional header files to include in the BPF program
                         as either full path, or relative to current working directory,

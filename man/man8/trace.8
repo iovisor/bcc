@@ -3,7 +3,7 @@
 trace \- Trace a function and print its arguments or return value, optionally evaluating a filter. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
 .B trace [-h] [-b BUFFER_PAGES] [-p PID] [-L TID] [-v] [-Z STRING_SIZE] [-S]
-         [-M MAX_EVENTS] [-t] [-T] [-C] [-K] [-U] [-I header]
+         [-M MAX_EVENTS] [-t] [-T] [-C] [-K] [-U] [-a] [-I header]
          probe [probe ...]
 .SH DESCRIPTION
 trace probes functions you specify and displays trace messages if a particular
@@ -53,6 +53,8 @@ Print the kernel stack for each event.
 .TP
 \-U
 Print the user stack for each event.
+\-a
+Print virtual address in kernel and user stacks.
 .TP
 \-I header
 Additional header files to include in the BPF program. This is needed if your
