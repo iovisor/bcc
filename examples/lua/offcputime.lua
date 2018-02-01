@@ -27,7 +27,7 @@ struct key_t {
 };
 BPF_HASH(counts, struct key_t);
 BPF_HASH(start, u32);
-BPF_STACK_TRACE(stack_traces, 10240)
+BPF_STACK_TRACE(stack_traces, 10240);
 
 int oncpu(struct pt_regs *ctx, struct task_struct *prev) {
     u32 pid;

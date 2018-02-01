@@ -125,7 +125,7 @@ struct wokeby_t {
 };
 BPF_HASH(wokeby, u32, struct wokeby_t);
 
-BPF_STACK_TRACE(stack_traces, STACK_STORAGE_SIZE)
+BPF_STACK_TRACE(stack_traces, STACK_STORAGE_SIZE);
 
 int waker(struct pt_regs *ctx, struct task_struct *p) {
     u32 pid = p->pid;
