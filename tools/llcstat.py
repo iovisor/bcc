@@ -28,10 +28,12 @@ parser.add_argument(
     help="Sample one in this many number of cache reference / miss events")
 parser.add_argument(
     "duration", nargs="?", default=10, help="Duration, in seconds, to run")
+parser.add_argument("--ebpf", action="store_true",
+    help=argparse.SUPPRESS)
 args = parser.parse_args()
 
 # load BPF program
-b = BPF(text="""
+bpf_text="""
 #include <linux/ptrace.h>
 #include <uapi/linux/bpf_perf_event.h>
 
@@ -71,8 +73,13 @@ int on_cache_ref(struct bpf_perf_event_data *ctx) {
 
     return 0;
 }
-""")
+"""
 
+if args.ebpf:
+    print(bpf_text)
+    exit()
+
+b = BPF(text=bpf_text)
 b.attach_perf_event(
     ev_type=PerfType.HARDWARE, ev_config=PerfHWConfig.CACHE_MISSES,
     fn_name="on_cache_miss", sample_period=args.sample_period)

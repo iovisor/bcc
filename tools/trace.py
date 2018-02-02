@@ -660,6 +660,8 @@ trace -I 'linux/fs_struct.h' 'mntns_install "users = %d", $task->fs->users'
                        "as either full path, "
                        "or relative to current working directory, "
                        "or relative to default kernel header search path")
+                parser.add_argument("--ebpf", action="store_true",
+                  help=argparse.SUPPRESS)
                 self.args = parser.parse_args()
                 if self.args.tgid and self.args.pid:
                         parser.error("only one of -p and -L may be specified")
@@ -690,8 +692,10 @@ trace -I 'linux/fs_struct.h' 'mntns_install "users = %d", $task->fs->users'
                         self.program += probe.generate_program(
                                         self.args.include_self)
 
-                if self.args.verbose:
+                if self.args.verbose or self.args.ebpf:
                         print(self.program)
+                        if self.args.ebpf:
+                                exit()
 
         def _attach_probes(self):
                 usdt_contexts = []

@@ -63,6 +63,8 @@ parser.add_argument("-v", "--verbose", action="store_true",
     help="print the BPF program (for debugging purposes)")
 parser.add_argument("pattern",
     help="search expression for functions")
+parser.add_argument("--ebpf", action="store_true",
+    help=argparse.SUPPRESS)
 args = parser.parse_args()
 
 def bail(error):
@@ -184,8 +186,10 @@ else:
     bpf_text = bpf_text.replace('ENTRYSTORE', '')
     bpf_text = bpf_text.replace('STORE',
         'dist.increment(bpf_log2l(delta));')
-if args.verbose:
+if args.verbose or args.ebpf:
     print(bpf_text)
+    if args.ebpf:
+        exit()
 
 # signal handler
 def signal_ignore(signal, frame):

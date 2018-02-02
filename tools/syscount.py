@@ -401,6 +401,8 @@ parser.add_argument("-P", "--process", action="store_true",
     help="count by process and not by syscall")
 parser.add_argument("-l", "--list", action="store_true",
     help="print list of recognized syscalls and exit")
+parser.add_argument("--ebpf", action="store_true",
+    help=argparse.SUPPRESS)
 args = parser.parse_args()
 
 if args.list:
@@ -488,6 +490,9 @@ if args.latency:
     text = "#define LATENCY\n" + text
 if args.process:
     text = "#define BY_PROCESS\n" + text
+if args.ebpf:
+    print(text)
+    exit()
 
 bpf = BPF(text=text)
 

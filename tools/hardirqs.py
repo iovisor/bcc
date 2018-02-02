@@ -41,6 +41,8 @@ parser.add_argument("interval", nargs="?", default=99999999,
     help="output interval, in seconds")
 parser.add_argument("outputs", nargs="?", default=99999999,
     help="number of outputs")
+parser.add_argument("--ebpf", action="store_true",
+    help=argparse.SUPPRESS)
 args = parser.parse_args()
 countdown = int(args.outputs)
 if args.count and (args.dist or args.nanoseconds):
@@ -136,8 +138,10 @@ else:
         'bpf_probe_read(&key.name, sizeof(key.name), name);' +
         'u64 zero = 0, *vp = dist.lookup_or_init(&key, &zero);' +
         '(*vp) += delta;')
-if debug:
+if debug or args.ebpf:
     print(bpf_text)
+    if args.ebpf:
+        exit()
 
 # load BPF program
 b = BPF(text=bpf_text)

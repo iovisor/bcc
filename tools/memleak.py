@@ -97,6 +97,8 @@ parser.add_argument("-Z", "--max-size", type=int,
         help="capture only allocations smaller than this size")
 parser.add_argument("-O", "--obj", type=str, default="c",
         help="attach to allocator functions in the specified object")
+parser.add_argument("--ebpf", action="store_true",
+        help=argparse.SUPPRESS)
 
 args = parser.parse_args()
 
@@ -383,6 +385,10 @@ stack_flags = "BPF_F_REUSE_STACKID"
 if not kernel_trace:
         stack_flags += "|BPF_F_USER_STACK"
 bpf_source = bpf_source.replace("STACK_FLAGS", stack_flags)
+
+if args.ebpf:
+    print(bpf_source)
+    exit()
 
 bpf = BPF(text=bpf_source)
 

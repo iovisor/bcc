@@ -37,6 +37,8 @@ parser.add_argument("-l", "--lossprobe", action="store_true",
     help="include tail loss probe attempts")
 parser.add_argument("-c", "--count", action="store_true",
     help="count occurred retransmits per flow")
+parser.add_argument("--ebpf", action="store_true",
+    help=argparse.SUPPRESS)
 args = parser.parse_args()
 debug = 0
 
@@ -189,8 +191,10 @@ else:
     bpf_text = bpf_text.replace("IPV4_CORE", "ipv4_events.perf_submit(ctx, &data4, sizeof(data4));")
     bpf_text = bpf_text.replace("IPV6_CORE", "ipv6_events.perf_submit(ctx, &data6, sizeof(data6));")
 
-if debug:
+if debug or args.ebpf:
     print(bpf_text)
+    if args.ebpf:
+        exit()
 
 # event data
 class Data_ipv4(ct.Structure):

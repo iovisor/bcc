@@ -55,6 +55,8 @@ parser.add_argument("-v", "--verbose", action="store_true",
     help="print the BPF program for debugging purposes")
 parser.add_argument(metavar="function", nargs="+", dest="functions",
     help="function(s) to trace")
+parser.add_argument("--ebpf", action="store_true",
+    help=argparse.SUPPRESS)
 
 args = parser.parse_args()
 # fractions are allowed, but rounded to an integer nanosecond
@@ -165,8 +167,10 @@ int trace_%d(struct pt_regs *ctx) {
 }
 """ % (i, i)
 
-if args.verbose:
+if args.verbose or args.ebpf:
     print(bpf_text)
+    if args.ebpf:
+        exit()
 
 b = BPF(text=bpf_text)
 

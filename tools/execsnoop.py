@@ -46,6 +46,8 @@ parser.add_argument("-l", "--line",
     help="only print commands where arg contains this line (regex)")
 parser.add_argument("--max-args", default="20",
     help="maximum number of arguments parsed and displayed, defaults to 20")
+parser.add_argument("--ebpf", action="store_true",
+    help=argparse.SUPPRESS)
 args = parser.parse_args()
 
 # define BPF program
@@ -128,8 +130,13 @@ int kretprobe__sys_execve(struct pt_regs *ctx)
 }
 """
 
+bpf_text.replace("MAXARG", args.max_args)
+if args.ebpf:
+    print(bpf_text)
+    exit()
+
 # initialize BPF
-b = BPF(text=bpf_text.replace("MAXARG", args.max_args))
+b = BPF(text=bpf_text)
 
 # header
 if args.timestamp:

@@ -42,6 +42,8 @@ parser.add_argument("-p", "--pid", default=0, type=int,
     help="trace this PID only")
 parser.add_argument("-n", "--netns", default=0, type=int,
     help="trace this Network Namespace only")
+parser.add_argument("--ebpf", action="store_true",
+    help=argparse.SUPPRESS)
 
 
 # BPF Program
@@ -189,6 +191,10 @@ if __name__ == "__main__":
 
     bpf_text = bpf_text.replace("##FILTER_PID##", pid_filter)
     bpf_text = bpf_text.replace("##FILTER_NETNS##", netns_filter)
+
+    if args.ebpf:
+        print(bpf_text)
+        exit()
 
     # Initialize BPF
     b = BPF(text=bpf_text)

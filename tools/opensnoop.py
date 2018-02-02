@@ -41,6 +41,8 @@ parser.add_argument("-t", "--tid",
     help="trace this TID only")
 parser.add_argument("-n", "--name",
     help="only print process names containing this name")
+parser.add_argument("--ebpf", action="store_true",
+    help=argparse.SUPPRESS)
 args = parser.parse_args()
 debug = 0
 
@@ -119,8 +121,10 @@ elif args.pid:
         'if (pid != %s) { return 0; }' % args.pid)
 else:
     bpf_text = bpf_text.replace('FILTER', '')
-if debug:
+if debug or args.ebpf:
     print(bpf_text)
+    if args.ebpf:
+        exit()
 
 # initialize BPF
 b = BPF(text=bpf_text)

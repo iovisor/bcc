@@ -31,6 +31,8 @@ parser = argparse.ArgumentParser(
     epilog=examples)
 parser.add_argument("-p", "--pid", help="trace this PID only", type=int,
     default=-1)
+parser.add_argument("--ebpf", action="store_true",
+    help=argparse.SUPPRESS)
 args = parser.parse_args()
 
 # load BPF program
@@ -94,6 +96,10 @@ int do_return(struct pt_regs *ctx) {
     return 0;
 }
 """
+if args.ebpf:
+    print(bpf_text)
+    exit()
+
 b = BPF(text=bpf_text)
 b.attach_uprobe(name="c", sym="getaddrinfo", fn_name="do_entry", pid=args.pid)
 b.attach_uprobe(name="c", sym="gethostbyname", fn_name="do_entry",

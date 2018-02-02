@@ -39,6 +39,8 @@ parser.add_argument("-g", "--no-gnutls", action="store_false", dest="gnutls",
                     help="do not show GnuTLS calls.")
 parser.add_argument('-d', '--debug', dest='debug', action='count', default=0,
                     help='debug mode.')
+parser.add_argument("--ebpf", action="store_true",
+                    help=argparse.SUPPRESS)
 args = parser.parse_args()
 
 
@@ -119,8 +121,10 @@ if args.pid:
 else:
     prog = prog.replace('FILTER', '')
 
-if args.debug:
+if args.debug or args.ebpf:
     print(prog)
+    if args.ebpf:
+        exit()
 
 
 b = BPF(text=prog)

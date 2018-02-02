@@ -51,6 +51,8 @@ parser.add_argument("-x", "--exe", type=str,
     dest="path", metavar="PATH", help="path to binary")
 parser.add_argument("-m", "--threshold", type=int, default=1,
     help="trace queries slower than this threshold (ms)")
+parser.add_argument("--ebpf", action="store_true",
+    help=argparse.SUPPRESS)
 args = parser.parse_args()
 
 threshold_ns = args.threshold * 1000000
@@ -196,8 +198,10 @@ else:
 
     bpf = BPF(text=program, usdt_contexts=usdts)
 
-if args.verbose:
+if args.verbose or args.ebpf:
     print(program)
+    if args.ebpf:
+        exit()
 
 class Data(ct.Structure):
     _fields_ = [
