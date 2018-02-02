@@ -17,6 +17,7 @@
 #include <linux/version.h>
 #include <sys/utsname.h>
 #include <unistd.h>
+#include <stdlib.h>
 
 #include <clang/AST/ASTConsumer.h>
 #include <clang/AST/ASTContext.h>
@@ -30,6 +31,7 @@
 #include "common.h"
 #include "loader.h"
 #include "table_storage.h"
+#include "arch_helper.h"
 
 #include "libbpf.h"
 
@@ -47,16 +49,35 @@ const char *calling_conv_regs_s390x[] = {"gprs[2]", "gprs[3]", "gprs[4]",
 
 const char *calling_conv_regs_arm64[] = {"regs[0]", "regs[1]", "regs[2]",
                                        "regs[3]", "regs[4]", "regs[5]"};
-// todo: support more archs
-#if defined(__powerpc__)
-const char **calling_conv_regs = calling_conv_regs_ppc;
-#elif defined(__s390x__)
-const char **calling_conv_regs = calling_conv_regs_s390x;
-#elif defined(__aarch64__)
-const char **calling_conv_regs = calling_conv_regs_arm64;
-#else
-const char **calling_conv_regs = calling_conv_regs_x86;
-#endif
+
+void *get_call_conv_cb(bcc_arch_t arch)
+{
+  const char **ret;
+
+  switch(arch) {
+    case BCC_ARCH_PPC:
+    case BCC_ARCH_PPC_LE:
+      ret = calling_conv_regs_ppc;
+      break;
+    case BCC_ARCH_S390X:
+      ret = calling_conv_regs_s390x;
+      break;
+    case BCC_ARCH_ARM64:
+      ret = calling_conv_regs_arm64;
+      break;
+    default:
+      ret = calling_conv_regs_x86;
+  }
+
+  return (void *)ret;
+}
+
+const char **get_call_conv(void) {
+  const char **ret;
+
+  ret = (const char **)run_arch_callback(get_call_conv_cb);
+  return ret;
+}
 
 using std::map;
 using std::move;
@@ -256,6 +277,8 @@ BTypeVisitor::BTypeVisitor(ASTContext &C, BFrontendAction &fe)
     : C(C), diag_(C.getDiagnostics()), fe_(fe), rewriter_(fe.rewriter()), out_(llvm::errs()) {}
 
 bool BTypeVisitor::VisitFunctionDecl(FunctionDecl *D) {
+  const char **calling_conv_regs = get_call_conv();
+
   // put each non-static non-inline function decl in its own section, to be
   // extracted by the MemoryManager
   auto real_start_loc = rewriter_.getSourceMgr().getFileLoc(D->getLocStart());

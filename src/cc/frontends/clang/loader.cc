@@ -57,6 +57,7 @@
 #include "b_frontend_action.h"
 #include "tp_frontend_action.h"
 #include "loader.h"
+#include "arch_helper.h"
 
 using std::map;
 using std::string;
@@ -201,6 +202,37 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, TableStorage &ts,
   return 0;
 }
 
+void *get_clang_target_cb(bcc_arch_t arch)
+{
+  const char *ret;
+
+  switch(arch) {
+    case BCC_ARCH_PPC_LE:
+      ret = "powerpc64le-unknown-linux-gnu";
+      break;
+    case BCC_ARCH_PPC:
+      ret = "powerpc64-unknown-linux-gnu";
+      break;
+    case BCC_ARCH_S390X:
+      ret = "s390x-ibm-linux-gnu";
+      break;
+    case BCC_ARCH_ARM64:
+      ret = "aarch64-unknown-linux-gnu";
+      break;
+    default:
+      ret = "x86_64-unknown-linux-gnu";
+  }
+
+  return (void *)ret;
+}
+
+string get_clang_target(void) {
+  const char *ret;
+
+  ret = (const char *)run_arch_callback(get_clang_target_cb);
+  return string(ret);
+}
+
 int ClangLoader::do_compile(unique_ptr<llvm::Module> *mod, TableStorage &ts,
                             bool in_memory,
                             const vector<const char *> &flags_cstr_in,
@@ -227,19 +259,10 @@ int ClangLoader::do_compile(unique_ptr<llvm::Module> *mod, TableStorage &ts,
   DiagnosticsEngine diags(DiagID, &*diag_opts, diag_client);
 
   // set up the command line argument wrapper
-#if defined(__powerpc64__)
-#if defined(_CALL_ELF) && _CALL_ELF == 2
-  driver::Driver drv("", "powerpc64le-unknown-linux-gnu", diags);
-#else
-  driver::Driver drv("", "powerpc64-unknown-linux-gnu", diags);
-#endif
-#elif defined(__s390x__)
-  driver::Driver drv("", "s390x-ibm-linux-gnu", diags);
-#elif defined(__aarch64__)
-  driver::Driver drv("", "aarch64-unknown-linux-gnu", diags);
-#else
-  driver::Driver drv("", "x86_64-unknown-linux-gnu", diags);
-#endif
+
+  string target_triple = get_clang_target();
+  driver::Driver drv("", target_triple, diags);
+
   drv.setTitle("bcc-clang-driver");
   drv.setCheckInputsExist(false);
 
