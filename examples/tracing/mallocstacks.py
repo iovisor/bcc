@@ -25,7 +25,7 @@ b = BPF(text="""
 #include <uapi/linux/ptrace.h>
 
 BPF_HASH(calls, int);
-BPF_STACK_TRACE(stack_traces, 1024)
+BPF_STACK_TRACE(stack_traces, 1024);
 
 int alloc_enter(struct pt_regs *ctx, size_t size) {
     int key = stack_traces.get_stackid(ctx,

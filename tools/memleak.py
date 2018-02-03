@@ -138,7 +138,7 @@ struct combined_alloc_info_t {
 BPF_HASH(sizes, u64);
 BPF_TABLE("hash", u64, struct alloc_info_t, allocs, 1000000);
 BPF_HASH(memptrs, u64, u64);
-BPF_STACK_TRACE(stack_traces, 10240)
+BPF_STACK_TRACE(stack_traces, 10240);
 BPF_TABLE("hash", u64, struct combined_alloc_info_t, combined_allocs, 10240);
 
 static inline void update_statistics_add(u64 stack_id, u64 sz) {

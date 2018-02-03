@@ -184,7 +184,7 @@ struct bpf_stacktrace {
 };
 
 #define BPF_STACK_TRACE(_name, _max_entries) \
-  BPF_TABLE("stacktrace", int, struct bpf_stacktrace, _name, _max_entries);
+  BPF_TABLE("stacktrace", int, struct bpf_stacktrace, _name, _max_entries)
 
 // packet parsing state machine helpers
 #define cursor_advance(_cursor, _len) \

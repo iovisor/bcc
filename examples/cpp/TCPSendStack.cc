@@ -27,7 +27,7 @@ struct stack_key_t {
   int kernel_stack;
 };
 
-BPF_STACK_TRACE(stack_traces, 10240)
+BPF_STACK_TRACE(stack_traces, 10240);
 BPF_HASH(counts, struct stack_key_t, uint64_t);
 
 int on_tcp_send(struct pt_regs *ctx) {

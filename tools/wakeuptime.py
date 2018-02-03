@@ -97,7 +97,7 @@ struct key_t {
 };
 BPF_HASH(counts, struct key_t);
 BPF_HASH(start, u32);
-BPF_STACK_TRACE(stack_traces, STACK_STORAGE_SIZE)
+BPF_STACK_TRACE(stack_traces, STACK_STORAGE_SIZE);
 
 int offcpu(struct pt_regs *ctx) {
     u32 pid = bpf_get_current_pid_tgid();
