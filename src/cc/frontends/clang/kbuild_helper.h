@@ -18,6 +18,7 @@
 #include <string>
 #include <vector>
 #include <unistd.h>
+#include <errno.h>
 
 namespace ebpf {
 
