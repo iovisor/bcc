@@ -2,7 +2,7 @@
 .SH NAME
 opensnoop \- Trace open() syscalls. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B opensnoop [\-h] [\-T] [\-x] [\-p PID] [\-t TID] [\-n name]
+.B opensnoop [\-h] [\-T] [\-x] [\-p PID] [\-t TID] [\-d DURATION] [\-n name]
 .SH DESCRIPTION
 opensnoop traces the open() syscall, showing which processes are attempting
 to open which files. This can be useful for determining the location of config
@@ -36,6 +36,9 @@ Trace this process ID only (filtered in-kernel).
 \-t TID
 Trace this thread ID only (filtered in-kernel).
 .TP
+\-d DURATION
+Total duration of trace in seconds.
+.TP
 \-n name
 Only print processes where its name partially matches 'name'
 .SH EXAMPLES
@@ -43,6 +46,10 @@ Only print processes where its name partially matches 'name'
 Trace all open() syscalls:
 #
 .B opensnoop
+.TP
+Trace all open() syscalls, for 10 seconds only:
+#
+.B opensnoop -d 10
 .TP
 Trace all open() syscalls, and include timestamps:
 #

@@ -89,6 +89,18 @@ The ERR column is the system error number. Error number 2 is ENOENT: no such
 file or directory.
 
 
+A maximum tracing duration can be set with the -d option. For example, to trace
+for 2 seconds:
+
+# ./opensnoop -d 2
+PID    COMM               FD ERR PATH
+2191   indicator-multi    11   0 /sys/block
+2191   indicator-multi    11   0 /sys/block
+2191   indicator-multi    11   0 /sys/block
+2191   indicator-multi    11   0 /sys/block
+2191   indicator-multi    11   0 /sys/block
+
+
 The -n option can be used to filter on process name using partial matches:
 
 # ./opensnoop -n ed
@@ -123,7 +135,7 @@ to the '-n' option.
 USAGE message:
 
 # ./opensnoop -h
-usage: opensnoop [-h] [-T] [-x] [-p PID] [-t TID] [-n NAME]
+usage: opensnoop [-h] [-T] [-x] [-p PID] [-t TID] [-d DURATION] [-n NAME]
 
 Trace open() syscalls
 
@@ -133,6 +145,8 @@ optional arguments:
   -x, --failed          only show failed opens
   -p PID, --pid PID     trace this PID only
   -t TID, --tid TID     trace this TID only
+  -d DURATION, --duration DURATION
+                        total duration of trace in seconds
   -n NAME, --name NAME  only print process names containing this name
 
 examples:
@@ -141,4 +155,5 @@ examples:
     ./opensnoop -x        # only show failed opens
     ./opensnoop -p 181    # only trace PID 181
     ./opensnoop -t 123    # only trace TID 123
+    ./opensnoop -d 10     # trace for 10 seconds only
     ./opensnoop -n main   # only print process names containing "main"

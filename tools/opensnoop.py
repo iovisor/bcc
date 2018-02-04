@@ -4,7 +4,7 @@
 # opensnoop Trace open() syscalls.
 #           For Linux, uses BCC, eBPF. Embedded C.
 #
-# USAGE: opensnoop [-h] [-T] [-x] [-p PID] [-t TID] [-n NAME]
+# USAGE: opensnoop [-h] [-T] [-x] [-p PID] [-d DURATION] [-t TID] [-n NAME]
 #
 # Copyright (c) 2015 Brendan Gregg.
 # Licensed under the Apache License, Version 2.0 (the "License")
@@ -17,6 +17,7 @@ from __future__ import print_function
 from bcc import BPF
 import argparse
 import ctypes as ct
+from datetime import datetime, timedelta
 
 # arguments
 examples = """examples:
@@ -25,6 +26,7 @@ examples = """examples:
     ./opensnoop -x        # only show failed opens
     ./opensnoop -p 181    # only trace PID 181
     ./opensnoop -t 123    # only trace TID 123
+    ./opensnoop -d 10     # trace for 10 seconds only
     ./opensnoop -n main   # only print process names containing "main"
 """
 parser = argparse.ArgumentParser(
@@ -39,10 +41,14 @@ parser.add_argument("-p", "--pid",
     help="trace this PID only")
 parser.add_argument("-t", "--tid",
     help="trace this TID only")
+parser.add_argument("-d", "--duration",
+    help="total duration of trace in seconds")
 parser.add_argument("-n", "--name",
     help="only print process names containing this name")
 args = parser.parse_args()
 debug = 0
+if args.duration:
+    args.duration = timedelta(seconds=int(args.duration))
 
 # define BPF program
 bpf_text = """
@@ -179,5 +185,6 @@ def print_event(cpu, data, size):
 
 # loop with callback to print_event
 b["events"].open_perf_buffer(print_event, page_cnt=64)
-while 1:
+start_time = datetime.now()
+while not args.duration or datetime.now() - start_time < args.duration:
     b.kprobe_poll()
