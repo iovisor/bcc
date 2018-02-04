@@ -130,7 +130,7 @@ int kretprobe__sys_execve(struct pt_regs *ctx)
 }
 """
 
-bpf_text.replace("MAXARG", args.max_args)
+bpf_text = bpf_text.replace("MAXARG", args.max_args)
 if args.ebpf:
     print(bpf_text)
     exit()
