@@ -16,6 +16,7 @@
  */
 
 #include <fcntl.h>
+#include <sched.h>
 #include <sys/stat.h>
 #include <string>
 
