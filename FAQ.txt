@@ -38,3 +38,10 @@ A: You need to obtain a recent version of the Linux source code
 Q: hello_world.py fails with:
    ImportError: No module named past.builtins
 A: sudo pip install future
+
+Q: Running one of the bcc tools produces an import error:
+   Traceback (most recent call last):
+   File "./execsnoop", line 20, in <module>
+     from bcc import BPF
+   ImportError: No module named bcc
+A: Make sure the python bcc bindings package (python2-bcc) is installed.
