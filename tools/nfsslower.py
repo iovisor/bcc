@@ -53,6 +53,8 @@ parser.add_argument("-j", "--csv", action="store_true",
 parser.add_argument("-p", "--pid", help="Trace this pid only")
 parser.add_argument("min_ms", nargs="?", default='10',
                     help="Minimum IO duration to trace in ms (default=10ms)")
+parser.add_argument("--ebpf", action="store_true",
+                    help=argparse.SUPPRESS)
 args = parser.parse_args()
 min_ms = int(args.min_ms)
 pid = args.pid
@@ -236,8 +238,10 @@ if args.pid:
     bpf_text = bpf_text.replace('FILTER_PID', 'pid != %s' % pid)
 else:
     bpf_text = bpf_text.replace('FILTER_PID', '0')
-if debug:
+if debug or args.ebpf:
     print(bpf_text)
+    if args.ebpf:
+        exit()
 
 # kernel->user event data: struct data_t
 DNAME_INLINE_LEN = 32   # linux/dcache.h

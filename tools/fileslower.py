@@ -50,6 +50,8 @@ parser.add_argument("-a", "--all-files", action="store_true",
     help="include non-regular file types (sockets, FIFOs, etc)")
 parser.add_argument("min_ms", nargs="?", default='10',
     help="minimum I/O duration to trace, in ms (default 10)")
+parser.add_argument("--ebpf", action="store_true",
+    help=argparse.SUPPRESS)
 args = parser.parse_args()
 min_ms = int(args.min_ms)
 tgid = args.tgid
@@ -185,11 +187,13 @@ if args.all_files:
 else:
     bpf_text = bpf_text.replace('TYPE_FILTER', '!S_ISREG(mode)')
 
-if debug:
+if debug or args.ebpf:
     print(bpf_text)
+    if args.ebpf:
+        exit()
 
 # initialize BPF
-b = BPF(text=bpf_text,)
+b = BPF(text=bpf_text)
 
 # I'd rather trace these via new_sync_read/new_sync_write (which used to be
 # do_sync_read/do_sync_write), but those became static. So trace these from

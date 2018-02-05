@@ -71,6 +71,8 @@ parser.add_argument("-M", "--max-block-time", default=(1 << 64) - 1,
     type=positive_nonzero_int,
     help="the amount of time in microseconds under which we " +
          "store traces (default U64_MAX)")
+parser.add_argument("--ebpf", action="store_true",
+    help=argparse.SUPPRESS)
 args = parser.parse_args()
 folded = args.folded
 duration = int(args.duration)
@@ -155,8 +157,10 @@ bpf_text = bpf_text.replace('STACK_STORAGE_SIZE', str(args.stack_storage_size))
 bpf_text = bpf_text.replace('MINBLOCK_US_VALUE', str(args.min_block_time))
 bpf_text = bpf_text.replace('MAXBLOCK_US_VALUE', str(args.max_block_time))
 
-if debug:
+if debug or args.ebpf:
     print(bpf_text)
+    if args.ebpf:
+        exit()
 
 # initialize BPF
 b = BPF(text=bpf_text)

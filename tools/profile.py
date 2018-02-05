@@ -97,6 +97,8 @@ parser.add_argument("--stack-storage-size", default=10240,
 parser.add_argument("duration", nargs="?", default=99999999,
     type=positive_nonzero_int,
     help="duration of trace, in seconds")
+parser.add_argument("--ebpf", action="store_true",
+    help=argparse.SUPPRESS)
 
 # option logic
 args = parser.parse_args()
@@ -208,8 +210,10 @@ if not args.folded:
     else:
         print("... Hit Ctrl-C to end.")
 
-if debug:
+if debug or args.ebpf:
     print(bpf_text)
+    if args.ebpf:
+        exit()
 
 # initialize BPF & perf_events
 b = BPF(text=bpf_text)

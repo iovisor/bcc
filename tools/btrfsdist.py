@@ -40,6 +40,8 @@ parser.add_argument("interval", nargs="?",
     help="output interval, in seconds")
 parser.add_argument("count", nargs="?", default=99999999,
     help="number of outputs")
+parser.add_argument("--ebpf", action="store_true",
+    help=argparse.SUPPRESS)
 args = parser.parse_args()
 pid = args.pid
 countdown = int(args.count)
@@ -183,8 +185,10 @@ if args.pid:
     bpf_text = bpf_text.replace('FILTER_PID', 'pid != %s' % pid)
 else:
     bpf_text = bpf_text.replace('FILTER_PID', '0')
-if debug:
+if debug or args.ebpf:
     print(bpf_text)
+    if args.ebpf:
+        exit()
 
 # load BPF program
 b = BPF(text=bpf_text)

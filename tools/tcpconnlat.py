@@ -53,6 +53,8 @@ parser.add_argument("duration_ms", nargs="?", default=0,
     help="minimum duration to trace (ms)")
 parser.add_argument("-v", "--verbose", action="store_true",
     help="print the BPF program for debugging purposes")
+parser.add_argument("--ebpf", action="store_true",
+    help=argparse.SUPPRESS)
 args = parser.parse_args()
 
 if args.duration_ms:
@@ -186,8 +188,10 @@ if args.pid:
         'if (pid != %s) { return 0; }' % args.pid)
 else:
     bpf_text = bpf_text.replace('FILTER', '')
-if debug or args.verbose:
+if debug or args.verbose or args.ebpf:
     print(bpf_text)
+    if args.ebpf:
+        exit()
 
 # initialize BPF
 b = BPF(text=bpf_text)

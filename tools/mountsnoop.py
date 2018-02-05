@@ -393,10 +393,15 @@ def main():
     parser = argparse.ArgumentParser(
         description='trace mount() and umount() syscalls'
     )
+    parser.add_argument("--ebpf", action="store_true",
+        help=argparse.SUPPRESS)
     args = parser.parse_args()
 
     mounts = {}
     umounts = {}
+    if args.ebpf:
+        print(bpf_text)
+        exit()
     b = bcc.BPF(text=bpf_text)
     b['events'].open_perf_buffer(
         functools.partial(print_event, mounts, umounts))

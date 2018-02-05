@@ -60,6 +60,8 @@ parser.add_argument("interval", nargs="?", default=1, type=range_check,
     help="output interval, in seconds (default 1)")
 parser.add_argument("count", nargs="?", default=-1, type=range_check,
     help="number of outputs")
+parser.add_argument("--ebpf", action="store_true",
+    help=argparse.SUPPRESS)
 args = parser.parse_args()
 debug = 0
 
@@ -189,8 +191,10 @@ if args.pid:
         'if (pid != %s) { return 0; }' % args.pid)
 else:
     bpf_text = bpf_text.replace('FILTER', '')
-if debug:
+if debug or args.ebpf:
     print(bpf_text)
+    if args.ebpf:
+        exit()
 
 def pid_to_comm(pid):
     try:

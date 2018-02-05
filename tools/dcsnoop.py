@@ -38,6 +38,8 @@ parser = argparse.ArgumentParser(
     epilog=examples)
 parser.add_argument("-a", "--all", action="store_true",
     help="trace all lookups (default is fails only)")
+parser.add_argument("--ebpf", action="store_true",
+    help=argparse.SUPPRESS)
 args = parser.parse_args()
 
 # define BPF program
@@ -131,6 +133,10 @@ class Data(ct.Structure):
         ("comm", ct.c_char * TASK_COMM_LEN),
         ("filename", ct.c_char * MAX_FILE_LEN),
     ]
+
+if args.ebpf:
+    print(bpf_text)
+    exit()
 
 # initialize BPF
 b = BPF(text=bpf_text)

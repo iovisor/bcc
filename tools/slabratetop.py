@@ -41,6 +41,8 @@ parser.add_argument("interval", nargs="?", default=1,
     help="output interval, in seconds")
 parser.add_argument("count", nargs="?", default=99999999,
     help="number of outputs")
+parser.add_argument("--ebpf", action="store_true",
+    help=argparse.SUPPRESS)
 args = parser.parse_args()
 interval = int(args.interval)
 countdown = int(args.count)
@@ -90,8 +92,10 @@ int kprobe__kmem_cache_alloc(struct pt_regs *ctx, struct kmem_cache *cachep)
     return 0;
 }
 """
-if debug:
+if debug or args.ebpf:
     print(bpf_text)
+    if args.ebpf:
+        exit()
 
 # initialize BPF
 b = BPF(text=bpf_text)
