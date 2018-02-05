@@ -38,14 +38,16 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
         - [6. BPF_PERF_ARRAY](#6-bpf_perf_array)
         - [7. BPF_PERCPU_ARRAY](#7-bpf_percpu_array)
         - [8. BPF_LPM_TRIE](#8-bpf_lpm_trie)
-        - [9. map.lookup()](#9-maplookup)
-        - [10. map.lookup_or_init()](#10-maplookup_or_init)
-        - [11. map.delete()](#11-mapdelete)
-        - [12. map.update()](#12-mapupdate)
-        - [13. map.insert()](#13-mapinsert)
-        - [14. map.increment()](#14-mapincrement)
-        - [15. map.get_stackid()](#15-mapget_stackid)
-        - [16. map.perf_read()](#16-mapperf_read)
+        - [9. BPF_PROG_ARRAY](#9-bpf_prog_array)
+        - [10. map.lookup()](#10-maplookup)
+        - [11. map.lookup_or_init()](#11-maplookup_or_init)
+        - [12. map.delete()](#12-mapdelete)
+        - [13. map.update()](#13-mapupdate)
+        - [14. map.insert()](#14-mapinsert)
+        - [15. map.increment()](#15-mapincrement)
+        - [16. map.get_stackid()](#16-mapget_stackid)
+        - [17. map.perf_read()](#17-mapperf_read)
+        - [18. map.call()](#18-mapcall)
 
 - [bcc Python](#bcc-python)
     - [Initialization](#initialization)
@@ -607,7 +609,20 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=BPF_LPM_TRIE+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=BPF_LPM_TRIE+path%3Atools&type=Code)
 
-### 9. map.lookup()
+### 9. BPF_PROG_ARRAY
+
+Syntax: ```BPF_PROG_ARRAY(name, size)```
+
+This creates a program array named ```name``` with ```size``` entries. Each entry of the array is either a file descriptor to a bpf program or ```NULL```. The array acts as a jump table so that bpf programs can "tail-call" other bpf programs.
+
+Methods (covered later): map.call().
+
+Examples in situ:
+[search /examples](https://github.com/iovisor/bcc/search?q=BPF_PROG_ARRAY+path%3Aexamples&type=Code),
+[search /tests](https://github.com/iovisor/bcc/search?q=BPF_PROG_ARRAY+path%3Atests&type=Code),
+[assign fd](https://github.com/iovisor/bcc/blob/master/examples/networking/tunnel_monitor/monitor.py#L24-L26)
+
+### 10. map.lookup()
 
 Syntax: ```*val map.lookup(&key)```
 
@@ -617,7 +632,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=lookup+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=lookup+path%3Atools&type=Code)
 
-### 10. map.lookup_or_init()
+### 11. map.lookup_or_init()
 
 Syntax: ```*val map.lookup_or_init(&key, &zero)```
 
@@ -627,7 +642,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=lookup_or_init+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=lookup_or_init+path%3Atools&type=Code)
 
-### 11. map.delete()
+### 12. map.delete()
 
 Syntax: ```map.delete(&key)```
 
@@ -637,7 +652,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=delete+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=delete+path%3Atools&type=Code)
 
-### 12. map.update()
+### 13. map.update()
 
 Syntax: ```map.update(&key, &val)```
 
@@ -647,7 +662,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=update+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=update+path%3Atools&type=Code)
 
-### 13. map.insert()
+### 14. map.insert()
 
 Syntax: ```map.insert(&key, &val)```
 
@@ -656,7 +671,7 @@ Associate the value in the second argument to the key, only if there was no prev
 Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=insert+path%3Aexamples&type=Code)
 
-### 14. map.increment()
+### 15. map.increment()
 
 Syntax: ```map.increment(key)```
 
@@ -666,7 +681,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=increment+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=increment+path%3Atools&type=Code)
 
-### 15. map.get_stackid()
+### 16. map.get_stackid()
 
 Syntax: ```int map.get_stackid(void *ctx, u64 flags)```
 
@@ -676,7 +691,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=get_stackid+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=get_stackid+path%3Atools&type=Code)
 
-### 16. map.perf_read()
+### 17. map.perf_read()
 
 Syntax: ```u64 map.perf_read(u32 cpu)```
 
@@ -684,6 +699,45 @@ This returns the hardware performance counter as configured in [5. BPF_PERF_ARRA
 
 Examples in situ:
 [search /tests](https://github.com/iovisor/bcc/search?q=perf_read+path%3Atests&type=Code)
+
+### 18. map.call()
+
+Syntax: ```void map.call(void *ctx, int index)```
+
+This invokes ```bpf_tail_call()``` to tail-call the bpf program which the ```index``` entry in [9. BPF_PROG_ARRAY](#9-bpf_prog_array) points to. A tail-call is different from the normal call. It reuses the current stack frame after jumping to another bpf program and never goes back. If the ```index``` entry is empty, it won't jump anywhere and the program execution continues as normal.
+
+For example:
+
+```C
+BPF_PROG_ARRAY(prog_array, 10);
+
+int tail_call(void *ctx) {
+    bpf_trace_printk("Tail-call\n");
+    return 0;
+}
+
+int do_tail_call(void *ctx) {
+    bpf_trace_printk("Original program\n");
+    prog_array.call(ctx, 2);
+    return 0;
+}
+```
+
+```Python
+b = BPF(src_file="example.c")
+tail_fn = b.load_func("tail_call", BPF.KPROBE)
+prog_array = b.get_table("prog_array")
+prog_array[c_int(2)] = c_int(tail_fn.fd)
+b.attach_kprobe(event="some_kprobe_event", fn_name="do_tail_call")
+```
+
+This assigns ```tail_call()``` to ```prog_array[2]```. In the end of ```do_tail_call()```, ```prog_array.call(ctx, 2)``` tail-calls ```tail_call()``` and executes it.
+
+**NOTE:** To prevent infinite loop, the maximun number of tail-calls is 32 ([```MAX_TAIL_CALL_CNT```](https://github.com/torvalds/linux/search?l=C&q=MAX_TAIL_CALL_CNT+path%3Ainclude%2Flinux&type=Code)).
+
+Examples in situ:
+[search /examples](https://github.com/iovisor/bcc/search?l=C&q=call+path%3Aexamples&type=Code),
+[search /tests](https://github.com/iovisor/bcc/search?l=C&q=call+path%3Atests&type=Code)
 
 # bcc Python
 
