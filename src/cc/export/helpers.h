@@ -186,6 +186,9 @@ struct bpf_stacktrace {
 #define BPF_STACK_TRACE(_name, _max_entries) \
   BPF_TABLE("stacktrace", int, struct bpf_stacktrace, _name, _max_entries)
 
+#define BPF_PROG_ARRAY(_name, _max_entries) \
+  BPF_TABLE("prog", u32, u32, _name, _max_entries)
+
 // packet parsing state machine helpers
 #define cursor_advance(_cursor, _len) \
   ({ void *_tmp = _cursor; _cursor += _len; _tmp; })
