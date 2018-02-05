@@ -33,7 +33,7 @@ parser.add_argument("-N", "--netns", default=0, type=int,
 parser.add_argument("-v", "--verbose", action="store_true",
                     help="include Network Namespace in the output")
 parser.add_argument("--ebpf", action="store_true",
-                    help=argparse.SUPPRESS)
+                    help=ap.SUPPRESS)
 args = parser.parse_args()
 
 bpf_text = """
