@@ -17,6 +17,7 @@
 #pragma once
 
 #include <cstring>
+#include <errno.h>
 #include <sys/epoll.h>
 #include <exception>
 #include <map>
