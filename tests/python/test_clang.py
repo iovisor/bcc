@@ -426,7 +426,7 @@ int many(struct pt_regs *ctx, int a, int b, int c, int d, int e, int f, int g) {
 
     def test_call_macro_arg(self):
         text = """
-BPF_TABLE("prog", u32, u32, jmp, 32);
+BPF_PROG_ARRAY(jmp, 32);
 
 #define JMP_IDX_PIPE (1U << 1)
 
@@ -607,7 +607,7 @@ void do_trace(struct pt_regs *ctx) {
 
     def test_prog_array_delete(self):
         text = """
-BPF_TABLE("prog", int, int, dummy, 256);
+BPF_PROG_ARRAY(dummy, 256);
 """
         b1 = BPF(text=text)
         text = """

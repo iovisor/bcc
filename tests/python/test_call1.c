@@ -1,7 +1,7 @@
 // Copyright (c) PLUMgrid, Inc.
 // Licensed under the Apache License, Version 2.0 (the "License")
 
-BPF_TABLE("prog", int, int, jump, 64);
+BPF_PROG_ARRAY(jump, 64);
 BPF_ARRAY(stats, u64, 64);
 
 enum states {

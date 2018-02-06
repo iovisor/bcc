@@ -22,7 +22,7 @@ typedef struct eth_addr {
 } eth_addr_t;
 
 // Program table definitions for tail calls
-BPF_TABLE("prog", u32, u32, jump, 16);
+BPF_PROG_ARRAY(jump, 16);
 
 // physical endpoint manager (pem) tables which connects to boeht bridge 1 and bridge 2
 // <port_id, bpf_dest>

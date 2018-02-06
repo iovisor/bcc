@@ -17,7 +17,7 @@ struct counters {
 };
 
 BPF_HASH(stats, struct ipkey, struct counters, 1024);
-BPF_TABLE("prog", int, int, parser, 10);
+BPF_PROG_ARRAY(parser, 10);
 
 enum cb_index {
   CB_FLAGS = 0,
