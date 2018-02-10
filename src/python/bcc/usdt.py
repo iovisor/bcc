@@ -142,6 +142,9 @@ class USDT(object):
             raise USDTException(
                     "either a pid or a binary path must be specified")
 
+    def __del__(self):
+        lib.bcc_usdt_close(self.context)
+
     def enable_probe(self, probe, fn_name):
         if lib.bcc_usdt_enable_probe(self.context, probe.encode('ascii'),
                 fn_name.encode('ascii')) != 0:

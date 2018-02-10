@@ -414,8 +414,10 @@ void *bcc_usdt_new_frompath(const char *path) {
 }
 
 void bcc_usdt_close(void *usdt) {
-  USDT::Context *ctx = static_cast<USDT::Context *>(usdt);
-  delete ctx;
+  if (usdt) {
+    USDT::Context *ctx = static_cast<USDT::Context *>(usdt);
+    delete ctx;
+  }
 }
 
 int bcc_usdt_enable_probe(void *usdt, const char *probe_name,
