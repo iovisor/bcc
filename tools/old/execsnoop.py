@@ -46,8 +46,6 @@ parser.add_argument("-l", "--line",
     help="only print commands where arg contains this line (regex)")
 parser.add_argument("--max-args", default="20",
     help="maximum number of arguments parsed and displayed, defaults to 20")
-parser.add_argument("--ebpf", action="store_true",
-    help=argparse.SUPPRESS)
 args = parser.parse_args()
 
 # define BPF program
@@ -65,7 +63,6 @@ enum event_type {
 
 struct data_t {
     u32 pid;  // PID as in the userspace term (i.e. task->tgid in kernel)
-    int ppid;
     char comm[TASK_COMM_LEN];
     enum event_type type;
     char argv[ARGSIZE];
@@ -122,10 +119,6 @@ int kretprobe__sys_execve(struct pt_regs *ctx)
 {
     struct data_t data = {};
     data.pid = bpf_get_current_pid_tgid() >> 32;
-    struct task_struct *task = (struct task_struct *)bpf_get_current_task();
-    if (task) {
-        data.ppid = task->real_parent->pid;
-    }
     bpf_get_current_comm(&data.comm, sizeof(data.comm));
     data.type = EVENT_RET;
     data.retval = PT_REGS_RC(ctx);
@@ -135,13 +128,8 @@ int kretprobe__sys_execve(struct pt_regs *ctx)
 }
 """
 
-bpf_text = bpf_text.replace("MAXARG", args.max_args)
-if args.ebpf:
-    print(bpf_text)
-    exit()
-
 # initialize BPF
-b = BPF(text=bpf_text)
+b = BPF(text=bpf_text.replace("MAXARG", args.max_args))
 
 # header
 if args.timestamp:
@@ -154,7 +142,6 @@ ARGSIZE = 128           # should match #define in C above
 class Data(ct.Structure):
     _fields_ = [
         ("pid", ct.c_uint),
-        ("ppid", ct.c_int),
         ("comm", ct.c_char * TASK_COMM_LEN),
         ("type", ct.c_int),
         ("argv", ct.c_char * ARGSIZE),
@@ -167,6 +154,19 @@ class EventType(object):
 
 start_ts = time.time()
 argv = defaultdict(list)
+
+# TODO: This is best-effort PPID matching. Short-lived processes may exit
+# before we get a chance to read the PPID. This should be replaced with
+# fetching PPID via C when available (#364).
+def get_ppid(pid):
+    try:
+        with open("/proc/%d/status" % pid) as status:
+            for line in status:
+                if line.startswith("PPid:"):
+                    return int(line.split()[1])
+    except IOError:
+        pass
+    return 0
 
 # process event
 def print_event(cpu, data, size):
@@ -188,8 +188,9 @@ def print_event(cpu, data, size):
         if not skip:
             if args.timestamp:
                 print("%-8.3f" % (time.time() - start_ts), end="")
+            ppid = get_ppid(event.pid)
             print("%-16s %-6s %-6s %3s %s" % (event.comm.decode(), event.pid,
-                    event.ppid, event.retval,
+                    ppid if ppid > 0 else "?", event.retval,
                     b' '.join(argv[event.pid]).decode()))
         try:
             del(argv[event.pid])
