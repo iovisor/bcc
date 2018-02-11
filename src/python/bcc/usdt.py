@@ -168,6 +168,11 @@ tplist tool.""")
     def get_context(self):
         return self.context
 
+    def get_text(self):
+        ctx_array = (ct.c_void_p * 1)()
+        ctx_array[0] = ct.c_void_p(self.context)
+        return lib.bcc_usdt_genargs(ctx_array, 1).decode()
+
     def get_probe_arg_ctype(self, probe_name, arg_index):
         return lib.bcc_usdt_get_probe_argctype(
             self.context, probe_name, arg_index)
