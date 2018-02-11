@@ -14,7 +14,6 @@ from bcc import BPF
 # load BPF program
 b = BPF(text="""
 #include <uapi/linux/ptrace.h>
-#include <linux/blkdev.h>
 
 BPF_HASH(last);
 
