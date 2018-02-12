@@ -471,7 +471,7 @@ def print_outstanding():
                          key=lambda a: a.size)[-top_stacks:]
         for alloc in to_show:
                 print("\t%d bytes in %d allocations from stack\n\t\t%s" %
-                      (alloc.size, alloc.count, "\n\t\t".join(alloc.stack)))
+                      (alloc.size, alloc.count, b"\n\t\t".join(alloc.stack)))
 
 def print_outstanding_combined():
         stack_traces = bpf["stack_traces"]

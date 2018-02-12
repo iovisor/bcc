@@ -2,7 +2,7 @@
 # Copyright (c) Suchakra Sharma <suchakrapani.sharma@polymtl.ca>
 # Licensed under the Apache License, Version 2.0 (the "License")
 
-from bcc import BPF, _get_num_open_probes
+from bcc import BPF, _get_num_open_probes, TRACEFS
 import os
 import sys
 from unittest import main, TestCase
@@ -18,9 +18,9 @@ class TestKprobeCnt(TestCase):
 
     def test_attach1(self):
         actual_cnt = 0
-        with open("/sys/kernel/debug/tracing/available_filter_functions") as f:
+        with open("%s/available_filter_functions" % TRACEFS, "rb") as f:
             for line in f:
-                if str(line).startswith("vfs_"):
+                if line.startswith(b"vfs_"):
                     actual_cnt += 1
         open_cnt = self.b.num_open_kprobes()
         self.assertEqual(actual_cnt, open_cnt)

@@ -52,12 +52,12 @@ class SmokeTests(TestCase):
                         or (rc == 137 and kill), "rc was %d" % rc)
 
     def kmod_loaded(self, mod):
-        mods = open("/proc/modules", "r")
-        reg = re.compile("^%s\s" % mod)
-        for line in mods:
-            if reg.match(line):
-                return 1
-            return 0
+        with open("/proc/modules", "r") as mods:
+            reg = re.compile("^%s\s" % mod)
+            for line in mods:
+                if reg.match(line):
+                    return 1
+                return 0
 
     def setUp(self):
         pass
