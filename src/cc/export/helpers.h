@@ -328,6 +328,8 @@ static int (*bpf_xdp_adjust_head)(void *ctx, int offset) =
   (void *) BPF_FUNC_xdp_adjust_head;
 static int (*bpf_override_return)(void *pt_regs, unsigned long rc) =
   (void *) BPF_FUNC_override_return;
+static int (*bpf_sock_ops_cb_flags_set)(void *skops, int flags) =
+  (void *)BPF_FUNC_sock_ops_cb_flags_set;
 
 /* llvm builtin functions that eBPF C program may use to
  * emit BPF_LD_ABS and BPF_LD_IND instructions

@@ -148,6 +148,7 @@ static struct bpf_helper helpers[] = {
   {"perf_prog_read_value", "4.15"},
   {"getsockopt", "4.15"},
   {"override_return", "4.16"},
+  {"sock_ops_cb_flags_set", "4.16"},
 };
 
 static int probe_perf_reader_page_cnt = 8;

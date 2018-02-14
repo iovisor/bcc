@@ -164,3 +164,4 @@ Helper | Kernel version | Commit
 `BPF_FUNC_xdp_adjust_head()` | 4.10 | [`17bedab27231`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=17bedab2723145d17b14084430743549e6943d03)
 `BPF_FUNC_xdp_adjust_meta()` | 4.15 | [`de8f3a83b0a0`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=de8f3a83b0a0fddb2cf56e7a718127e9619ea3da)
 `BPF_FUNC_override_return()` | 4.16 | [`9802d86585db`](https://git.kernel.org/pub/scm/linux/kernel/git/davem/net-next.git/commit/?id=9802d86585db91655c7d1929a4f6bbe0952ea88e)
+`BPF_FUNC_sock_ops_cb_flags_set()` | 4.16 | [`b13d88072172`](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=b13d880721729384757f235166068c315326f4a1)
