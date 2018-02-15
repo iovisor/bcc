@@ -17,6 +17,7 @@ add_executable(test_libbcc
 	test_bpf_table.cc
 	test_hash_table.cc
 	test_perf_event.cc
+	test_prog_table.cc
 	test_usdt_args.cc
 	test_usdt_probes.cc
 	utils.cc)
