@@ -17,6 +17,7 @@
 #include <dlfcn.h>
 #include <stdint.h>
 #include <string.h>
+#include <link.h>
 #include <sys/mman.h>
 #include <sys/mount.h>
 #include <sys/stat.h>
@@ -137,6 +138,7 @@ static int mntns_func(void *arg) {
   char libpath[1024];
   ssize_t rb;
   void *dlhdl;
+  struct link_map *lm;
 
   if (setup_tmp_mnts() < 0) {
     return -1;
@@ -149,16 +151,17 @@ static int mntns_func(void *arg) {
     return -1;
   }
 
-  if (dlinfo(dlhdl, RTLD_DI_ORIGIN, &libpath) < 0) {
+  if (dlinfo(dlhdl, RTLD_DI_LINKMAP, &lm) < 0) {
     fprintf(stderr, "Unable to find origin of libz.so.1: %s\n", dlerror());
     return -1;
   }
 
+  strncpy(libpath, lm->l_name, 1024);
   dlclose(dlhdl);
   dlhdl = NULL;
 
   // Copy a shared library from shared mntns to private /tmp
-  snprintf(buf, 4096, "%s/libz.so.1", libpath);
+  snprintf(buf, 4096, "%s", libpath);
   in_fd = open(buf, O_RDONLY);
   if (in_fd < 0) {
     fprintf(stderr, "Unable to open %s: %s\n", buf, strerror(errno));
