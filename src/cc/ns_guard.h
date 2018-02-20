@@ -18,6 +18,7 @@
 #pragma once
 
 #include <memory>
+#include <sys/types.h>
 
 #include "file_desc.h"
 
