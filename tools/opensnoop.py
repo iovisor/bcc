@@ -14,7 +14,7 @@
 # 08-Oct-2016   Dina Goldshtein Support filtering by PID and TID.
 
 from __future__ import print_function
-from bcc import BPF
+from bcc import ArgString, BPF
 import argparse
 import ctypes as ct
 from datetime import datetime, timedelta
@@ -44,6 +44,7 @@ parser.add_argument("-t", "--tid",
 parser.add_argument("-d", "--duration",
     help="total duration of trace in seconds")
 parser.add_argument("-n", "--name",
+    type=ArgString,
     help="only print process names containing this name")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
@@ -176,7 +177,7 @@ def print_event(cpu, data, size):
     if args.failed and (event.ret >= 0):
         return
 
-    if args.name and args.name not in event.comm:
+    if args.name and bytes(args.name) not in event.comm:
         return
 
     if args.timestamp:
