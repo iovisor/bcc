@@ -99,8 +99,9 @@ class MyMemoryManager : public SectionMemoryManager {
   map<string, tuple<uint8_t *, uintptr_t>> *sections_;
 };
 
-BPFModule::BPFModule(unsigned flags, TableStorage *ts)
+BPFModule::BPFModule(unsigned flags, TableStorage *ts, bool rw_engine_enabled)
     : flags_(flags),
+      rw_engine_enabled_(rw_engine_enabled),
       used_b_loader_(false),
       ctx_(new LLVMContext),
       id_(std::to_string((uintptr_t)this)),
@@ -530,6 +531,8 @@ int BPFModule::annotate() {
 }
 
 StatusTuple BPFModule::sscanf(string fn_name, const char *str, void *val) {
+  if (!rw_engine_enabled_)
+    return StatusTuple(-1, "rw_engine not enabled");
   auto fn =
       (int (*)(const char *, void *))rw_engine_->getFunctionAddress(fn_name);
   if (!fn)
@@ -542,6 +545,8 @@ StatusTuple BPFModule::sscanf(string fn_name, const char *str, void *val) {
 
 StatusTuple BPFModule::snprintf(string fn_name, char *str, size_t sz,
                                 const void *val) {
+  if (!rw_engine_enabled_)
+    return StatusTuple(-1, "rw_engine not enabled");
   auto fn = (int (*)(char *, size_t,
                      const void *))rw_engine_->getFunctionAddress(fn_name);
   if (!fn)
@@ -937,8 +942,10 @@ int BPFModule::load_b(const string &filename, const string &proto_filename) {
   used_b_loader_ = true;
   if (int rc = b_loader.parse(&*mod_, filename, proto_filename, *ts_, id_))
     return rc;
-  if (int rc = annotate())
-    return rc;
+  if (rw_engine_enabled_) {
+    if (int rc = annotate())
+      return rc;
+  }
   if (int rc = finalize())
     return rc;
   return 0;
@@ -956,8 +963,10 @@ int BPFModule::load_c(const string &filename, const char *cflags[], int ncflags)
   }
   if (int rc = load_cfile(filename, false, cflags, ncflags))
     return rc;
-  if (int rc = annotate())
-    return rc;
+  if (rw_engine_enabled_) {
+    if (int rc = annotate())
+      return rc;
+  }
   if (int rc = finalize())
     return rc;
   return 0;
@@ -971,8 +980,10 @@ int BPFModule::load_string(const string &text, const char *cflags[], int ncflags
   }
   if (int rc = load_cfile(text, true, cflags, ncflags))
     return rc;
-  if (int rc = annotate())
-    return rc;
+  if (rw_engine_enabled_) {
+    if (int rc = annotate())
+      return rc;
+  }
 
   if (int rc = finalize())
     return rc;

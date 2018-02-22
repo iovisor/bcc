@@ -27,7 +27,8 @@ TEST_CASE("test array table", "[array_table]") {
     BPF_TABLE("array", int, int, myarray, 128);
   )";
 
-  ebpf::BPF bpf;
+  // turn off the rw_engine
+  ebpf::BPF bpf(0, nullptr, false);
   ebpf::StatusTuple res(0);
   res = bpf.init(BPF_PROGRAM);
   REQUIRE(res.code() == 0);
