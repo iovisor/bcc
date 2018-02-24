@@ -336,9 +336,9 @@ parts:
             - cmake
             - flex
             - libedit-dev
-            - libllvm3.7
-            - llvm-3.7-dev
-            - libclang-3.7-dev
+            - libllvm4.0
+            - llvm-4.0-dev
+            - libclang-4.0-dev
             - python
             - zlib1g-dev
             - libelf-dev
