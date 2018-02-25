@@ -15,6 +15,7 @@
  */
 
 #include "BPF.h"
+#include <linux/version.h>
 
 #include "catch.hpp"
 
@@ -85,3 +86,75 @@ TEST_CASE("test hash table", "[hash_table]") {
     }
   }
 }
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,6,0)
+TEST_CASE("percpu hash table", "[percpu_hash_table]") {
+  const std::string BPF_PROGRAM = R"(
+    BPF_TABLE("percpu_hash", int, u64, myhash, 128);
+    BPF_TABLE("percpu_array", int, u64, myarray, 64);
+  )";
+
+  ebpf::BPF bpf;
+  ebpf::StatusTuple res(0);
+  res = bpf.init(BPF_PROGRAM);
+  REQUIRE(res.code() == 0);
+
+  ebpf::BPFPercpuHashTable<int, uint64_t> t =
+    bpf.get_percpu_hash_table<int, uint64_t>("myhash");
+  size_t ncpus = ebpf::get_possible_cpus().size();
+
+  SECTION("bad table type") {
+    // try to get table of wrong type
+    auto f1 = [&](){
+      bpf.get_percpu_hash_table<int, uint64_t>("myarray");
+    };
+
+    REQUIRE_THROWS(f1());
+  }
+
+  SECTION("standard methods") {
+    int k;
+    std::vector<uint64_t> v1(ncpus);
+    std::vector<uint64_t> v2;
+
+    for (size_t j = 0; j < ncpus; j++) {
+      v1[j] = 42 * j;
+    }
+
+    k = 1;
+
+    // create new element
+    res = t.update_value(k, v1);
+    REQUIRE(res.code() == 0);
+    res = t.get_value(k, v2);
+    REQUIRE(res.code() == 0);
+    for (size_t j = 0; j < ncpus; j++) {
+      REQUIRE(v2.at(j) == 42 * j);
+    }
+
+    // update existing element
+    for (size_t j = 0; j < ncpus; j++) {
+      v1[j] = 69 * j;
+    }
+    res = t.update_value(k, v1);
+    REQUIRE(res.code() == 0);
+    res = t.get_value(k, v2);
+    REQUIRE(res.code() == 0);
+    for (size_t j = 0; j < ncpus; j++) {
+      REQUIRE(v2.at(j) == 69 * j);
+    }
+
+    // remove existing element
+    res = t.remove_value(k);
+    REQUIRE(res.code() == 0);
+
+    // remove non existing element
+    res = t.remove_value(k);
+    REQUIRE(res.code() != 0);
+
+    // get non existing element
+    res = t.get_value(k, v2);
+    REQUIRE(res.code() != 0);
+  }
+}
+#endif
