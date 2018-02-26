@@ -21,6 +21,8 @@
 #include <random>
 #include <iostream>
 
+#include <linux/version.h>
+
 TEST_CASE("test array table", "[array_table]") {
   const std::string BPF_PROGRAM = R"(
     BPF_TABLE("hash", int, int, myhash, 128);
@@ -92,3 +94,55 @@ TEST_CASE("test array table", "[array_table]") {
     REQUIRE(localtable == offlinetable);
   }
 }
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 6, 0)
+TEST_CASE("percpu array table", "[percpu_array_table]") {
+  const std::string BPF_PROGRAM = R"(
+    BPF_TABLE("percpu_hash", int, u64, myhash, 128);
+    BPF_TABLE("percpu_array", int, u64, myarray, 64);
+  )";
+
+  ebpf::BPF bpf;
+  ebpf::StatusTuple res(0);
+  res = bpf.init(BPF_PROGRAM);
+  REQUIRE(res.code() == 0);
+
+  ebpf::BPFPercpuArrayTable<uint64_t> t = bpf.get_percpu_array_table<uint64_t>("myarray");
+  size_t ncpus = ebpf::get_possible_cpus().size();
+
+  SECTION("bad table type") {
+    // try to get table of wrong type
+    auto f1 = [&](){
+      bpf.get_percpu_array_table<uint64_t>("myhash");
+    };
+
+    REQUIRE_THROWS(f1());
+  }
+
+  SECTION("standard methods") {
+    int i;
+    std::vector<uint64_t> v1(ncpus);
+    std::vector<uint64_t> v2;
+
+    for (size_t j = 0; j < ncpus; j++) {
+      v1[j] = 42 * j;
+    }
+
+    i = 1;
+    // update element
+    res = t.update_value(i, v1);
+    REQUIRE(res.code() == 0);
+    res = t.get_value(i, v2);
+    REQUIRE(res.code() == 0);
+    REQUIRE(v2.size() == ncpus);
+    for (size_t j = 0; j < ncpus; j++) {
+      REQUIRE(v2.at(j) == 42 * j);
+    }
+
+    // get non existing element
+    i = 1024;
+    res = t.get_value(i, v2);
+    REQUIRE(res.code() != 0);
+  }
+}
+#endif

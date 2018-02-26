@@ -54,6 +54,31 @@ StatusTuple BPFTable::get_value(const std::string& key_str,
   return leaf_to_string(value, value_str);
 }
 
+StatusTuple BPFTable::get_value(const std::string& key_str,
+                                std::vector<std::string>& value_str) {
+  size_t ncpus = get_possible_cpus().size();
+  char key[desc.key_size];
+  char value[desc.leaf_size * ncpus];
+
+  StatusTuple r(0);
+
+  r = string_to_key(key_str, key);
+  if (r.code() != 0)
+    return r;
+
+  if (!lookup(key, value))
+    return StatusTuple(-1, "error getting value");
+
+  value_str.resize(ncpus);
+
+  for (size_t i = 0; i < ncpus; i++) {
+    r = leaf_to_string(value + i * desc.leaf_size, value_str.at(i));
+    if (r.code() != 0)
+      return r;
+  }
+  return StatusTuple(0);
+}
+
 StatusTuple BPFTable::update_value(const std::string& key_str,
                                    const std::string& value_str) {
   char key[desc.key_size];
@@ -68,6 +93,33 @@ StatusTuple BPFTable::update_value(const std::string& key_str,
   r = string_to_leaf(value_str, value);
   if (r.code() != 0)
     return r;
+
+  if (!update(key, value))
+    return StatusTuple(-1, "error updating element");
+
+  return StatusTuple(0);
+}
+
+StatusTuple BPFTable::update_value(const std::string& key_str,
+                                   const std::vector<std::string>& value_str) {
+  size_t ncpus = get_possible_cpus().size();
+  char key[desc.key_size];
+  char value[desc.leaf_size * ncpus];
+
+  StatusTuple r(0);
+
+  r = string_to_key(key_str, key);
+  if (r.code() != 0)
+    return r;
+
+  if (value_str.size() != ncpus)
+    return StatusTuple(-1, "bad value size");
+
+  for (size_t i = 0; i < ncpus; i++) {
+    r = string_to_leaf(value_str.at(i), value + i * desc.leaf_size);
+    if (r.code() != 0)
+      return r;
+  }
 
   if (!update(key, value))
     return StatusTuple(-1, "error updating element");

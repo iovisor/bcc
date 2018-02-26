@@ -106,12 +106,28 @@ class BPF {
     return BPFArrayTable<ValueType>({});
   }
 
+  template <class ValueType>
+  BPFPercpuArrayTable<ValueType> get_percpu_array_table(const std::string& name) {
+    TableStorage::iterator it;
+    if (bpf_module_->table_storage().Find(Path({bpf_module_->id(), name}), it))
+      return BPFPercpuArrayTable<ValueType>(it->second);
+    return BPFPercpuArrayTable<ValueType>({});
+  }
+
   template <class KeyType, class ValueType>
   BPFHashTable<KeyType, ValueType> get_hash_table(const std::string& name) {
     TableStorage::iterator it;
     if (bpf_module_->table_storage().Find(Path({bpf_module_->id(), name}), it))
       return BPFHashTable<KeyType, ValueType>(it->second);
     return BPFHashTable<KeyType, ValueType>({});
+  }
+
+  template <class KeyType, class ValueType>
+  BPFPercpuHashTable<KeyType, ValueType> get_percpu_hash_table(const std::string& name) {
+    TableStorage::iterator it;
+    if (bpf_module_->table_storage().Find(Path({bpf_module_->id(), name}), it))
+      return BPFPercpuHashTable<KeyType, ValueType>(it->second);
+    return BPFPercpuHashTable<KeyType, ValueType>({});
   }
 
   BPFProgTable get_prog_table(const std::string& name);
