@@ -65,8 +65,6 @@ int bpf_attach_socket(int sockfd, int progfd);
  * bind the raw socket to the interface 'name' */
 int bpf_open_raw_sock(const char *name);
 
-typedef void (*perf_reader_cb)(void *cb_cookie, int pid, uint64_t callchain_num,
-                               void *callchain);
 typedef void (*perf_reader_raw_cb)(void *cb_cookie, void *raw, int raw_size);
 typedef void (*perf_reader_lost_cb)(void *cb_cookie, uint64_t lost);
 

@@ -99,7 +99,7 @@ ffi.cdef[[
 struct perf_reader;
 
 void perf_reader_free(void *ptr);
-int perf_reader_mmap(struct perf_reader *reader, unsigned type, unsigned long sample_type);
+int perf_reader_mmap(struct perf_reader *reader);
 int perf_reader_poll(int num_readers, struct perf_reader **readers, int timeout);
 int perf_reader_fd(struct perf_reader *reader);
 void perf_reader_set_fd(struct perf_reader *reader, int fd);

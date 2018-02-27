@@ -1057,7 +1057,7 @@ void * bpf_open_perf_buffer(perf_reader_raw_cb raw_cb,
   struct perf_event_attr attr = {};
   struct perf_reader *reader = NULL;
 
-  reader = perf_reader_new(NULL, raw_cb, lost_cb, cb_cookie, page_cnt);
+  reader = perf_reader_new(raw_cb, lost_cb, cb_cookie, page_cnt);
   if (!reader)
     goto error;
 
@@ -1074,7 +1074,7 @@ void * bpf_open_perf_buffer(perf_reader_raw_cb raw_cb,
   }
   perf_reader_set_fd(reader, pfd);
 
-  if (perf_reader_mmap(reader, attr.type, attr.sample_type) < 0)
+  if (perf_reader_mmap(reader) < 0)
     goto error;
 
   if (ioctl(pfd, PERF_EVENT_IOC_ENABLE, 0) < 0) {
