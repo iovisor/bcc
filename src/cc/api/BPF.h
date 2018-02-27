@@ -34,7 +34,7 @@ static const int DEFAULT_PERF_BUFFER_PAGE_CNT = 8;
 namespace ebpf {
 
 struct open_probe_t {
-  void* reader_ptr;
+  int perf_event_fd;
   std::string func;
   std::map<int, int>* per_cpu_fd;
 };
@@ -57,9 +57,7 @@ class BPF {
 
   StatusTuple attach_kprobe(const std::string& kernel_func,
                             const std::string& probe_func,
-                            bpf_probe_attach_type = BPF_PROBE_ENTRY,
-                            perf_reader_cb cb = nullptr,
-                            void* cb_cookie = nullptr);
+                            bpf_probe_attach_type = BPF_PROBE_ENTRY);
   StatusTuple detach_kprobe(
       const std::string& kernel_func,
       bpf_probe_attach_type attach_type = BPF_PROBE_ENTRY);
@@ -69,8 +67,7 @@ class BPF {
                             const std::string& probe_func,
                             uint64_t symbol_addr = 0,
                             bpf_probe_attach_type attach_type = BPF_PROBE_ENTRY,
-                            pid_t pid = -1, perf_reader_cb cb = nullptr,
-                            void* cb_cookie = nullptr);
+                            pid_t pid = -1);
   StatusTuple detach_uprobe(const std::string& binary_path,
                             const std::string& symbol, uint64_t symbol_addr = 0,
                             bpf_probe_attach_type attach_type = BPF_PROBE_ENTRY,
@@ -79,9 +76,7 @@ class BPF {
   StatusTuple detach_usdt(const USDT& usdt);
 
   StatusTuple attach_tracepoint(const std::string& tracepoint,
-                                const std::string& probe_func,
-                                perf_reader_cb cb = nullptr,
-                                void* cb_cookie = nullptr);
+                                const std::string& probe_func);
   StatusTuple detach_tracepoint(const std::string& tracepoint);
 
   StatusTuple attach_perf_event(uint32_t ev_type, uint32_t ev_config,

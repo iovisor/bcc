@@ -151,8 +151,6 @@ static struct bpf_helper helpers[] = {
   {"sock_ops_cb_flags_set", "4.16"},
 };
 
-static int probe_perf_reader_page_cnt = 8;
-
 static uint64_t ptr_to_u64(void *ptr)
 {
   return (uint64_t) (unsigned long) ptr;
@@ -682,7 +680,6 @@ static int bpf_try_perf_event_open_with_probe(const char *name, uint64_t offs,
 
   if (type < 0 || is_return_bit < 0)
     return -1;
-  attr.sample_type = PERF_SAMPLE_RAW | PERF_SAMPLE_CALLCHAIN;
   attr.sample_period = 1;
   attr.wakeup_events = 1;
   if (is_return)
@@ -724,16 +721,23 @@ static int bpf_try_perf_event_open_with_probe(const char *name, uint64_t offs,
                  PERF_FLAG_FD_CLOEXEC);
 }
 
-static int bpf_attach_tracing_event(int progfd, const char *event_path,
-                                    struct perf_reader *reader, int pid,
-                                    int pfd)
+// When a valid Perf Event FD provided through pfd, it will be used to enable
+// and attach BPF program to the event, and event_path will be ignored.
+// Otherwise, event_path is expected to contain the path to the event in debugfs
+// and it will be used to open the Perf Event FD.
+// In either case, if the attach partially failed (such as issue with the
+// ioctl operations), the **caller** need to clean up the Perf Event FD, either
+// provided by the caller or opened here.
+static int bpf_attach_tracing_event(int progfd, const char *event_path, int pid,
+                                    int *pfd)
 {
   int efd, cpu = 0;
   ssize_t bytes;
   char buf[PATH_MAX];
   struct perf_event_attr attr = {};
-
-  if (pfd < 0) {
+  // Caller did not provided a valid Perf Event FD. Create one with the debugfs
+  // event path provided.
+  if (*pfd < 0) {
     snprintf(buf, sizeof(buf), "%s/id", event_path);
     efd = open(buf, O_RDONLY, 0);
     if (efd < 0) {
@@ -751,7 +755,6 @@ static int bpf_attach_tracing_event(int progfd, const char *event_path,
     buf[bytes] = '\0';
     attr.config = strtol(buf, NULL, 0);
     attr.type = PERF_TYPE_TRACEPOINT;
-    attr.sample_type = PERF_SAMPLE_RAW | PERF_SAMPLE_CALLCHAIN;
     attr.sample_period = 1;
     attr.wakeup_events = 1;
     // PID filter is only possible for uprobe events.
@@ -762,22 +765,18 @@ static int bpf_attach_tracing_event(int progfd, const char *event_path,
     // Tracing events do not do CPU filtering in any cases.
     if (pid != -1)
       cpu = -1;
-    pfd = syscall(__NR_perf_event_open, &attr, pid, cpu, -1 /* group_fd */, PERF_FLAG_FD_CLOEXEC);
-    if (pfd < 0) {
+    *pfd = syscall(__NR_perf_event_open, &attr, pid, cpu, -1 /* group_fd */, PERF_FLAG_FD_CLOEXEC);
+    if (*pfd < 0) {
       fprintf(stderr, "perf_event_open(%s/id): %s\n", event_path, strerror(errno));
       return -1;
     }
   }
-  perf_reader_set_fd(reader, pfd);
 
-  if (perf_reader_mmap(reader, attr.type, attr.sample_type) < 0)
-    return -1;
-
-  if (ioctl(pfd, PERF_EVENT_IOC_SET_BPF, progfd) < 0) {
+  if (ioctl(*pfd, PERF_EVENT_IOC_SET_BPF, progfd) < 0) {
     perror("ioctl(PERF_EVENT_IOC_SET_BPF)");
     return -1;
   }
-  if (ioctl(pfd, PERF_EVENT_IOC_ENABLE, 0) < 0) {
+  if (ioctl(*pfd, PERF_EVENT_IOC_ENABLE, 0) < 0) {
     perror("ioctl(PERF_EVENT_IOC_ENABLE)");
     return -1;
   }
@@ -785,24 +784,19 @@ static int bpf_attach_tracing_event(int progfd, const char *event_path,
   return 0;
 }
 
-void *bpf_attach_kprobe(int progfd, enum bpf_probe_attach_type attach_type,
-                        const char *ev_name, const char *fn_name,
-                        perf_reader_cb cb, void *cb_cookie)
+int bpf_attach_kprobe(int progfd, enum bpf_probe_attach_type attach_type,
+                      const char *ev_name, const char *fn_name)
 {
-  int kfd;
-  int pfd;
+  int kfd, pfd = -1;
   char buf[256];
   char event_alias[128];
-  struct perf_reader *reader = NULL;
   static char *event_type = "kprobe";
 
-  reader = perf_reader_new(cb, NULL, NULL, cb_cookie, probe_perf_reader_page_cnt);
-  if (!reader)
-    goto error;
-
+  // Try create the kprobe Perf Event with perf_event_open API.
   pfd = bpf_try_perf_event_open_with_probe(fn_name, 0, -1, event_type,
                                            attach_type != BPF_PROBE_ENTRY);
-
+  // If failed, most likely Kernel doesn't support the new perf_event_open API
+  // yet. Try create the event using debugfs.
   if (pfd < 0) {
     snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/%s_events", event_type);
     kfd = open(buf, O_WRONLY | O_APPEND, 0);
@@ -823,15 +817,16 @@ void *bpf_attach_kprobe(int progfd, enum bpf_probe_attach_type attach_type,
     close(kfd);
     snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/events/%ss/%s", event_type, event_alias);
   }
-  if (bpf_attach_tracing_event(progfd, buf, reader, -1 /* PID */, pfd) < 0)
-    goto error;
-
-  return reader;
+  // If perf_event_open succeeded, bpf_attach_tracing_event will use the created
+  // Perf Event FD directly and buf would be empty and unused.
+  // Otherwise it will read the event ID from the path in buf, create the
+  // Perf Event event using that ID, and updated value of pfd.
+  if (bpf_attach_tracing_event(progfd, buf, -1 /* PID */, &pfd) == 0)
+    return pfd;
 
 error:
-  perf_reader_free(reader);
-  return NULL;
-
+  bpf_close_perf_event_fd(pfd);
+  return -1;
 }
 
 static int enter_mount_ns(int pid) {
@@ -895,24 +890,19 @@ static void exit_mount_ns(int fd) {
     perror("setns");
 }
 
-void *bpf_attach_uprobe(int progfd, enum bpf_probe_attach_type attach_type,
-                        const char *ev_name, const char *binary_path,
-                        uint64_t offset, pid_t pid, perf_reader_cb cb,
-                        void *cb_cookie)
+int bpf_attach_uprobe(int progfd, enum bpf_probe_attach_type attach_type,
+                      const char *ev_name, const char *binary_path,
+                      uint64_t offset, pid_t pid)
 {
   char buf[PATH_MAX];
   char event_alias[PATH_MAX];
-  struct perf_reader *reader = NULL;
   static char *event_type = "uprobe";
-  int res, kfd = -1, ns_fd = -1;
-  int pfd;
-
-  reader = perf_reader_new(cb, NULL, NULL, cb_cookie, probe_perf_reader_page_cnt);
-  if (!reader)
-    goto error;
-
+  int res, kfd = -1, pfd = -1, ns_fd = -1;
+  // Try create the uprobe Perf Event with perf_event_open API.
   pfd = bpf_try_perf_event_open_with_probe(binary_path, offset, pid, event_type,
                                            attach_type != BPF_PROBE_ENTRY);
+  // If failed, most likely Kernel doesn't support the new perf_event_open API
+  // yet. Try create the event using debugfs.
   if (pfd < 0) {
     snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/%s_events", event_type);
     kfd = open(buf, O_WRONLY | O_APPEND, 0);
@@ -940,22 +930,25 @@ void *bpf_attach_uprobe(int progfd, enum bpf_probe_attach_type attach_type,
       goto error;
     }
     close(kfd);
+    kfd = -1;
     exit_mount_ns(ns_fd);
     ns_fd = -1;
 
     snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/events/%ss/%s", event_type, event_alias);
   }
-  if (bpf_attach_tracing_event(progfd, buf, reader, pid, pfd) < 0)
-    goto error;
-
-  return reader;
+  // If perf_event_open succeeded, bpf_attach_tracing_event will use the created
+  // Perf Event FD directly and buf would be empty and unused.
+  // Otherwise it will read the event ID from the path in buf, create the
+  // Perf Event event using that ID, and updated value of pfd.
+  if (bpf_attach_tracing_event(progfd, buf, pid, &pfd) == 0)
+    return pfd;
 
 error:
   if (kfd >= 0)
     close(kfd);
   exit_mount_ns(ns_fd);
-  perf_reader_free(reader);
-  return NULL;
+  bpf_close_perf_event_fd(pfd);
+  return -1;
 }
 
 static int bpf_detach_probe(const char *ev_name, const char *event_type)
@@ -1036,26 +1029,19 @@ int bpf_detach_uprobe(const char *ev_name)
 }
 
 
-void *bpf_attach_tracepoint(int progfd, const char *tp_category,
-                            const char *tp_name, perf_reader_cb cb,
-                            void *cb_cookie) {
+int bpf_attach_tracepoint(int progfd, const char *tp_category,
+                          const char *tp_name)
+{
   char buf[256];
-  struct perf_reader *reader = NULL;
-
-  reader = perf_reader_new(cb, NULL, NULL, cb_cookie, probe_perf_reader_page_cnt);
-  if (!reader)
-    goto error;
+  int pfd = -1;
 
   snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/events/%s/%s",
            tp_category, tp_name);
-  if (bpf_attach_tracing_event(progfd, buf, reader, -1 /* PID */, -1 /* pfd */) < 0)
-    goto error;
+  if (bpf_attach_tracing_event(progfd, buf, -1 /* PID */, &pfd) == 0)
+    return pfd;
 
-  return reader;
-
-error:
-  perf_reader_free(reader);
-  return NULL;
+  bpf_close_perf_event_fd(pfd);
+  return -1;
 }
 
 int bpf_detach_tracepoint(const char *tp_category, const char *tp_name) {

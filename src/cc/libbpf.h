@@ -70,22 +70,17 @@ typedef void (*perf_reader_cb)(void *cb_cookie, int pid, uint64_t callchain_num,
 typedef void (*perf_reader_raw_cb)(void *cb_cookie, void *raw, int raw_size);
 typedef void (*perf_reader_lost_cb)(void *cb_cookie, uint64_t lost);
 
-void *bpf_attach_kprobe(int progfd, enum bpf_probe_attach_type attach_type,
-                        const char *ev_name, const char *fn_name,
-                        perf_reader_cb cb, void *cb_cookie);
-
+int bpf_attach_kprobe(int progfd, enum bpf_probe_attach_type attach_type,
+                      const char *ev_name, const char *fn_name);
 int bpf_detach_kprobe(const char *ev_name);
 
-void *bpf_attach_uprobe(int progfd, enum bpf_probe_attach_type attach_type,
-                        const char *ev_name, const char *binary_path,
-                        uint64_t offset, pid_t pid, perf_reader_cb cb,
-                        void *cb_cookie);
-
+int bpf_attach_uprobe(int progfd, enum bpf_probe_attach_type attach_type,
+                      const char *ev_name, const char *binary_path,
+                      uint64_t offset, pid_t pid);
 int bpf_detach_uprobe(const char *ev_name);
 
-void *bpf_attach_tracepoint(int progfd, const char *tp_category,
-                            const char *tp_name, perf_reader_cb cb,
-                            void *cb_cookie);
+int bpf_attach_tracepoint(int progfd, const char *tp_category,
+                          const char *tp_name);
 int bpf_detach_tracepoint(const char *tp_category, const char *tp_name);
 
 void * bpf_open_perf_buffer(perf_reader_raw_cb raw_cb,
