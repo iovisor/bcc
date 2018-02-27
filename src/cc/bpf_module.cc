@@ -486,6 +486,20 @@ int BPFModule::load_includes(const string &text) {
   return 0;
 }
 
+void BPFModule::annotate_light() {
+  for (auto fn = mod_->getFunctionList().begin(); fn != mod_->getFunctionList().end(); ++fn)
+    if (!fn->hasFnAttribute(Attribute::NoInline))
+      fn->addFnAttr(Attribute::AlwaysInline);
+
+  size_t id = 0;
+  Path path({id_});
+  for (auto it = ts_->lower_bound(path), up = ts_->upper_bound(path); it != up; ++it) {
+    TableDesc &table = it->second;
+    tables_.push_back(&it->second);
+    table_names_[table.name] = id++;
+  }
+}
+
 int BPFModule::annotate() {
   for (auto fn = mod_->getFunctionList().begin(); fn != mod_->getFunctionList().end(); ++fn)
     if (!fn->hasFnAttribute(Attribute::NoInline))
@@ -945,6 +959,8 @@ int BPFModule::load_b(const string &filename, const string &proto_filename) {
   if (rw_engine_enabled_) {
     if (int rc = annotate())
       return rc;
+  } else {
+    annotate_light();
   }
   if (int rc = finalize())
     return rc;
@@ -966,6 +982,8 @@ int BPFModule::load_c(const string &filename, const char *cflags[], int ncflags)
   if (rw_engine_enabled_) {
     if (int rc = annotate())
       return rc;
+  } else {
+    annotate_light();
   }
   if (int rc = finalize())
     return rc;
@@ -983,6 +1001,8 @@ int BPFModule::load_string(const string &text, const char *cflags[], int ncflags
   if (rw_engine_enabled_) {
     if (int rc = annotate())
       return rc;
+  } else {
+    annotate_light();
   }
 
   if (int rc = finalize())

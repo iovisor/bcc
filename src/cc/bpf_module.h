@@ -61,6 +61,7 @@ class BPFModule {
   int parse(llvm::Module *mod);
   int finalize();
   int annotate();
+  void annotate_light();
   std::unique_ptr<llvm::ExecutionEngine> finalize_rw(std::unique_ptr<llvm::Module> mod);
   std::string make_reader(llvm::Module *mod, llvm::Type *type);
   std::string make_writer(llvm::Module *mod, llvm::Type *type);
