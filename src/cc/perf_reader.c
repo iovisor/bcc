@@ -20,8 +20,10 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <syscall.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
+#include <sys/types.h>
 #include <unistd.h>
 #include <linux/perf_event.h>
 
@@ -43,6 +45,7 @@ struct perf_reader {
   size_t buf_size;
   void *base;
   int rb_use_state;
+  pid_t rb_read_tid;
   int page_size;
   int page_cnt;
   int fd;
@@ -70,7 +73,12 @@ struct perf_reader * perf_reader_new(perf_reader_cb cb,
 void perf_reader_free(void *ptr) {
   if (ptr) {
     struct perf_reader *reader = ptr;
-    while (!__sync_bool_compare_and_swap(&reader->rb_use_state, RB_NOT_USED, RB_USED_IN_MUNMAP));
+    pid_t tid = syscall(__NR_gettid);
+    while (!__sync_bool_compare_and_swap(&reader->rb_use_state, RB_NOT_USED, RB_USED_IN_MUNMAP)) {
+      // If the same thread, it is called from call back handler, no locking needed
+      if (tid == reader->rb_read_tid)
+        break;
+    }
     munmap(reader->base, reader->page_size * (reader->page_cnt + 1));
     if (reader->fd >= 0) {
       ioctl(reader->fd, PERF_EVENT_IOC_DISABLE, 0);
@@ -228,6 +236,7 @@ void perf_reader_event_read(struct perf_reader *reader) {
   uint8_t *sentinel = (uint8_t *)reader->base + buffer_size + reader->page_size;
   uint8_t *begin, *end;
 
+  reader->rb_read_tid = syscall(__NR_gettid);
   if (!__sync_bool_compare_and_swap(&reader->rb_use_state, RB_NOT_USED, RB_USED_IN_READ))
     return;
 
@@ -280,6 +289,8 @@ void perf_reader_event_read(struct perf_reader *reader) {
     write_data_tail(perf_header, perf_header->data_tail + e->size);
   }
   reader->rb_use_state = RB_NOT_USED;
+  __sync_synchronize();
+  reader->rb_read_tid = 0;
 }
 
 int perf_reader_poll(int num_readers, struct perf_reader **readers, int timeout) {
