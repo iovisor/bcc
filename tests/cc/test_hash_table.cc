@@ -101,7 +101,7 @@ TEST_CASE("percpu hash table", "[percpu_hash_table]") {
 
   ebpf::BPFPercpuHashTable<int, uint64_t> t =
     bpf.get_percpu_hash_table<int, uint64_t>("myhash");
-  size_t ncpus = ebpf::get_possible_cpus().size();
+  size_t ncpus = ebpf::BPFTable::get_possible_cpu_count();
 
   SECTION("bad table type") {
     // try to get table of wrong type

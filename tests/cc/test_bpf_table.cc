@@ -79,7 +79,7 @@ TEST_CASE("test bpf percpu tables", "[bpf_percpu_table]") {
   REQUIRE(res.code() == 0);
 
   ebpf::BPFTable t = bpf.get_table("myhash");
-  size_t ncpus = ebpf::get_possible_cpus().size();
+  size_t ncpus = ebpf::BPFTable::get_possible_cpu_count();
 
   std::vector<std::string> v1(ncpus);
   for (size_t i = 0; i < ncpus; i++) {
