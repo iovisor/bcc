@@ -494,10 +494,10 @@ class PerfEventArray(ArrayBase):
         # Delete entry from the array
         super(PerfEventArray, self).__delitem__(key)
         key_id = (id(self), key)
-        if key_id in self.bpf.open_kprobes:
+        if key_id in self.bpf.perf_buffers:
             # The key is opened for perf ring buffer
-            lib.perf_reader_free(self.bpf.open_kprobes[key_id])
-            self.bpf._del_kprobe(key_id)
+            lib.perf_reader_free(self.bpf.perf_buffers[key_id])
+            del self.bpf.perf_buffers[key_id]
             del self._cbs[key]
         else:
             # The key is opened for perf event read
@@ -544,7 +544,7 @@ class PerfEventArray(ArrayBase):
             raise Exception("Could not open perf buffer")
         fd = lib.perf_reader_fd(reader)
         self[self.Key(cpu)] = self.Leaf(fd)
-        self.bpf._add_kprobe((id(self), cpu), reader)
+        self.bpf.perf_buffers[(id(self), cpu)] = reader
         # keep a refcnt
         self._cbs[cpu] = (fn, lost_fn)
         # The actual fd is held by the perf reader, add to track opened keys

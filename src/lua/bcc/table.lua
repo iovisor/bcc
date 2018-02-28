@@ -263,7 +263,7 @@ function PerfEventArray:_open_perf_buffer(cpu, callback, ctype, page_cnt, lost_c
 
   local fd = libbcc.perf_reader_fd(reader)
   self:set(cpu, fd)
-  self.bpf:probe_store("kprobe", _perf_id(self.map_id, cpu), reader)
+  self.bpf:perf_buffer_store(_perf_id(self.map_id, cpu), reader)
   self._callbacks[cpu] = _cb
 end
 

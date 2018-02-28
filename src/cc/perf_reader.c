@@ -37,7 +37,6 @@ enum {
 };
 
 struct perf_reader {
-  perf_reader_cb cb;
   perf_reader_raw_cb raw_cb;
   perf_reader_lost_cb lost_cb;
   void *cb_cookie; // to be returned in the cb
@@ -49,18 +48,14 @@ struct perf_reader {
   int page_size;
   int page_cnt;
   int fd;
-  uint32_t type;
-  uint64_t sample_type;
 };
 
-struct perf_reader * perf_reader_new(perf_reader_cb cb,
-                                     perf_reader_raw_cb raw_cb,
+struct perf_reader * perf_reader_new(perf_reader_raw_cb raw_cb,
                                      perf_reader_lost_cb lost_cb,
                                      void *cb_cookie, int page_cnt) {
   struct perf_reader *reader = calloc(1, sizeof(struct perf_reader));
   if (!reader)
     return NULL;
-  reader->cb = cb;
   reader->raw_cb = raw_cb;
   reader->lost_cb = lost_cb;
   reader->cb_cookie = cb_cookie;
@@ -89,7 +84,7 @@ void perf_reader_free(void *ptr) {
   }
 }
 
-int perf_reader_mmap(struct perf_reader *reader, unsigned type, unsigned long sample_type) {
+int perf_reader_mmap(struct perf_reader *reader) {
   int mmap_size = reader->page_size * (reader->page_cnt + 1);
 
   if (reader->fd < 0) {
@@ -102,8 +97,6 @@ int perf_reader_mmap(struct perf_reader *reader, unsigned type, unsigned long sa
     perror("mmap");
     return -1;
   }
-  reader->type = type;
-  reader->sample_type = sample_type;
 
   return 0;
 }
@@ -120,69 +113,6 @@ struct perf_sample_trace_kprobe {
   uint64_t ip;
 };
 
-static void parse_tracepoint(struct perf_reader *reader, void *data, int size) {
-  uint8_t *ptr = data;
-  struct perf_event_header *header = (void *)data;
-
-  struct perf_sample_trace_kprobe *tk = NULL;
-  uint64_t *callchain = NULL;
-  uint64_t num_callchain = 0;
-
-  ptr += sizeof(*header);
-  if (ptr > (uint8_t *)data + size) {
-    fprintf(stderr, "%s: corrupt sample header\n", __FUNCTION__);
-    return;
-  }
-
-  if (reader->sample_type & PERF_SAMPLE_CALLCHAIN) {
-    struct {
-      uint64_t nr;
-      uint64_t ips[0];
-    } *cc = (void *)ptr;
-    ptr += sizeof(cc->nr) + sizeof(*cc->ips) * cc->nr;
-    // size sanity check
-    if (ptr > (uint8_t *)data + size) {
-      fprintf(stderr, "%s: corrupt callchain sample\n", __FUNCTION__);
-      return;
-    }
-    int i;
-    // don't include magic numbers in the call chain
-    for (i = 0; i < cc->nr; ++i) {
-      if (cc->ips[i] == PERF_CONTEXT_USER)
-        break;
-      if (cc->ips[i] >= PERF_CONTEXT_MAX)
-        continue;
-      if (!callchain)
-        callchain = &cc->ips[i];
-      ++num_callchain;
-    }
-  }
-  // for kprobes, raw samples just include the common data structure and the
-  // instruction pointer
-  if (reader->sample_type & PERF_SAMPLE_RAW) {
-    struct {
-      uint32_t size;
-      char data[0];
-    } *raw = (void *)ptr;
-    ptr += sizeof(raw->size) + raw->size;
-    if (ptr > (uint8_t *)data + size) {
-      fprintf(stderr, "%s: corrupt raw sample\n", __FUNCTION__);
-      return;
-    }
-    tk = (void *)raw->data;
-  }
-
-  // sanity check
-  if (ptr != (uint8_t *)data + size) {
-    fprintf(stderr, "%s: extra data at end of sample\n", __FUNCTION__);
-    return;
-  }
-
-  // call out to the user with the parsed data
-  if (reader->cb)
-    reader->cb(reader->cb_cookie, tk ? tk->common.pid : -1, num_callchain, callchain);
-}
-
 static void parse_sw(struct perf_reader *reader, void *data, int size) {
   uint8_t *ptr = data;
   struct perf_event_header *header = (void *)data;
@@ -198,13 +128,11 @@ static void parse_sw(struct perf_reader *reader, void *data, int size) {
     return;
   }
 
-  if (reader->sample_type & PERF_SAMPLE_RAW) {
-    raw = (void *)ptr;
-    ptr += sizeof(raw->size) + raw->size;
-    if (ptr > (uint8_t *)data + size) {
-      fprintf(stderr, "%s: corrupt raw sample\n", __FUNCTION__);
-      return;
-    }
+  raw = (void *)ptr;
+  ptr += sizeof(raw->size) + raw->size;
+  if (ptr > (uint8_t *)data + size) {
+    fprintf(stderr, "%s: corrupt raw sample\n", __FUNCTION__);
+    return;
   }
 
   // sanity check
@@ -278,10 +206,7 @@ void perf_reader_event_read(struct perf_reader *reader) {
         fprintf(stderr, "Possibly lost %" PRIu64 " samples\n", lost);
       }
     } else if (e->type == PERF_RECORD_SAMPLE) {
-      if (reader->type == PERF_TYPE_TRACEPOINT)
-        parse_tracepoint(reader, ptr, e->size);
-      else if (reader->type == PERF_TYPE_SOFTWARE)
-        parse_sw(reader, ptr, e->size);
+      parse_sw(reader, ptr, e->size);
     } else {
       fprintf(stderr, "%s: unknown sample type %d\n", __FUNCTION__, e->type);
     }

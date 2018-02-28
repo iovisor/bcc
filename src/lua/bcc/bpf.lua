@@ -24,6 +24,7 @@ local Bpf = class("BPF")
 
 Bpf.static.open_kprobes = {}
 Bpf.static.open_uprobes = {}
+Bpf.static.perf_buffers = {}
 Bpf.static.KPROBE_LIMIT = 1000
 Bpf.static.tracer_pipe = nil
 Bpf.static.DEFAULT_CFLAGS = {
@@ -39,8 +40,8 @@ end
 
 function Bpf.static.cleanup()
   local function detach_all(probe_type, all_probes)
-    for key, probe in pairs(all_probes) do
-      libbcc.perf_reader_free(probe)
+    for key, fd in pairs(all_probes) do
+      libbcc.bpf_close_perf_event_fd(fd)
       -- skip bcc-specific kprobes
       if not key:starts("bcc:") then
         if probe_type == "kprobes" then
@@ -55,6 +56,12 @@ function Bpf.static.cleanup()
 
   detach_all("kprobes", Bpf.static.open_kprobes)
   detach_all("uprobes", Bpf.static.open_uprobes)
+
+  for key, perf_buffer in pairs(Bpf.static.perf_buffers) do
+    libbcc.perf_reader_free(perf_buffer)
+    Bpf.static.perf_buffers[key] = nil
+  end
+
   if Bpf.static.tracer_pipe ~= nil then
     Bpf.static.tracer_pipe:close()
   end
@@ -189,9 +196,9 @@ function Bpf:attach_uprobe(args)
   local retprobe = args.retprobe and 1 or 0
 
   local res = libbcc.bpf_attach_uprobe(fn.fd, retprobe, ev_name, path, addr,
-    args.pid or -1, nil, nil) -- TODO; reader callback
+    args.pid or -1)
 
-  assert(res ~= nil, "failed to attach BPF to uprobe")
+  assert(res >= 0, "failed to attach BPF to uprobe")
   self:probe_store("uprobe", ev_name, res)
   return self
 end
@@ -206,10 +213,9 @@ function Bpf:attach_kprobe(args)
   local ev_name = string.format("%s_%s", ptype, event:gsub("[%+%.]", "_"))
   local retprobe = args.retprobe and 1 or 0
 
-  local res = libbcc.bpf_attach_kprobe(fn.fd, retprobe, ev_name, event,
-    nil, nil) -- TODO; reader callback
+  local res = libbcc.bpf_attach_kprobe(fn.fd, retprobe, ev_name, event)
 
-  assert(res ~= nil, "failed to attach BPF to kprobe")
+  assert(res >= 0, "failed to attach BPF to kprobe")
   self:probe_store("kprobe", ev_name, res)
   return self
 end
@@ -228,16 +234,22 @@ function Bpf:get_table(name, key_type, leaf_type)
   return self.tables[name]
 end
 
-function Bpf:probe_store(t, id, reader)
+function Bpf:probe_store(t, id, fd)
   if t == "kprobe" then
-    Bpf.open_kprobes[id] = reader
+    Bpf.open_kprobes[id] = fd
   elseif t == "uprobe" then
-    Bpf.open_uprobes[id] = reader
+    Bpf.open_uprobes[id] = fd
   else
     error("unknown probe type '%s'" % t)
   end
 
-  log.info("%s -> %s", id, reader)
+  log.info("%s -> %s", id, fd)
+end
+
+function Bpf:perf_buffer_store(t, id, reader)
+    Bpf.perf_buffers[id] = reader
+
+    log.info("%s -> %s", id, fd)
 end
 
 function Bpf:probe_lookup(t, id)
@@ -250,32 +262,32 @@ function Bpf:probe_lookup(t, id)
   end
 end
 
-function Bpf:_kprobe_array()
-  local kprobe_count = table.count(Bpf.open_kprobes)
-  local readers = ffi.new("struct perf_reader*[?]", kprobe_count)
+function Bpf:_perf_buffer_array()
+  local perf_buffer_count = table.count(Bpf.perf_buffers)
+  local readers = ffi.new("struct perf_reader*[?]", perf_buffer_count)
   local n = 0
 
-  for _, r in pairs(Bpf.open_kprobes) do
+  for _, r in pairs(Bpf.perf_buffers) do
     readers[n] = r
     n = n + 1
   end
 
-  assert(n == kprobe_count)
+  assert(n == perf_buffer_count)
   return readers, n
 end
 
 function Bpf:kprobe_poll_loop()
-  local probes, probe_count = self:_kprobe_array()
+  local perf_buffer, perf_buffer_count = self:_perf_buffer_array()
   return pcall(function()
     while true do
-      libbcc.perf_reader_poll(probe_count, probes, -1)
+      libbcc.perf_reader_poll(perf_buffer_count, perf_buffers, -1)
     end
   end)
 end
 
 function Bpf:kprobe_poll(timeout)
-  local probes, probe_count = self:_kprobe_array()
-  libbcc.perf_reader_poll(probe_count, probes, timeout or -1)
+  local perf_buffer, perf_buffer_count = self:_perf_buffer_array()
+  libbcc.perf_reader_poll(perf_buffer_count, perf_buffers, timeout or -1)
 end
 
 return Bpf
