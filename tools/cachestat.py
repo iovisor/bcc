@@ -39,16 +39,13 @@ def get_meminfo():
     return result
 
 # set global variables
-rtaccess = 0
-wtaccess = 0
 mpa = 0
 mbd = 0
 apcl = 0
 apd = 0
-access = 0
+total = 0
 misses = 0
-rhits = 0
-whits = 0
+hits = 0
 debug = 0
 
 # args
@@ -116,9 +113,8 @@ b.attach_kprobe(event="mark_buffer_dirty", fn_name="do_count")
 # header
 if tstamp:
     print("%-8s " % "TIME", end="")
-print("%8s %8s %8s %10s %10s %12s %10s" %
-     ("HITS", "MISSES", "DIRTIES",
-     "READ_HIT%", "WRITE_HIT%", "BUFFERS_MB", "CACHED_MB"))
+print("%8s %8s %8s %8s %12s %10s" %
+     ("TOTAL", "MISSES", "HITS", "DIRTIES", "BUFFERS_MB", "CACHED_MB"))
 
 loop = 0
 exiting = 0
@@ -150,28 +146,29 @@ while 1:
         if re.match(b'account_page_dirtied', b.ksym(k.ip)) is not None:
             apd = max(0, v.value)
 
-        # access = total cache access incl. reads(mpa) and writes(mbd)
-        # misses = total of add to lru which we do when we write(mbd)
-        # and also the mark the page dirty(same as mbd)
-        access = (mpa + mbd)
-        misses = (apcl + apd)
+        # total = total cache accesses without counting dirties
+        # misses = total of add to lru because of read misses
+        total = (mpa - mbd)
+        misses = (apcl - apd)
 
-        # rtaccess is the read hit % during the sample period.
-        # wtaccess is the write hit % during the smaple period.
-        if mpa > 0:
-            rtaccess = float(mpa) / (access + misses)
-        if apcl > 0:
-            wtaccess = float(apcl) / (access + misses)
+        if total < 0:
+            total = 0
 
-        if wtaccess != 0:
-            whits = 100 * wtaccess
-        if rtaccess != 0:
-            rhits = 100 * rtaccess
+        if misses < 0:
+            misses = 0
+
+        hits = total - misses
+
+        # If hits are < 0, then its possible misses are overestimated
+        # due to possibly page cache read ahead adding more pages than
+        # needed. In this case just assume misses as total and reset hits.
+        if hits < 0:
+            misses = total
+            hits = 0
 
     if debug:
-        print("%d %d %d %d %d %d %f %f %d %d\n" %
-        (mpa, mbd, apcl, apd, access, misses,
-        rtaccess, wtaccess, rhits, whits))
+        print("%d %d %d %d %d %d %d\n" %
+        (mpa, mbd, apcl, apd, total, misses, hits))
 
     counts.clear()
 
@@ -182,21 +179,18 @@ while 1:
 
     if tstamp == 1:
         print("%-8s " % strftime("%H:%M:%S"), end="")
-    print("%8d %8d %8d %9.1f%% %9.1f%% %12.0f %10.0f" %
-    (access, misses, mbd, rhits, whits, buff, cached))
+    print("%8d %8d %8d %8d %12.0f %10.0f" %
+    (total, misses, hits, mbd, buff, cached))
 
     mpa = 0
     mbd = 0
     apcl = 0
     apd = 0
-    access = 0
+    total = 0
     misses = 0
-    rhits = 0
+    hits = 0
     cached = 0
     buff = 0
-    whits = 0
-    rtaccess = 0
-    wtaccess = 0
 
     if exiting:
         print("Detaching...")
