@@ -108,7 +108,7 @@ TEST_CASE("percpu array table", "[percpu_array_table]") {
   REQUIRE(res.code() == 0);
 
   ebpf::BPFPercpuArrayTable<uint64_t> t = bpf.get_percpu_array_table<uint64_t>("myarray");
-  size_t ncpus = ebpf::get_possible_cpus().size();
+  size_t ncpus = ebpf::BPFTable::get_possible_cpu_count();
 
   SECTION("bad table type") {
     // try to get table of wrong type

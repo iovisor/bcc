@@ -29,7 +29,6 @@
 #include "bcc_exception.h"
 #include "bcc_syms.h"
 #include "bpf_module.h"
-#include "common.h"
 #include "libbpf.h"
 #include "perf_reader.h"
 #include "table_desc.h"
@@ -105,6 +104,8 @@ class BPFTable : public BPFTableBase<void, void> {
                            const std::vector<std::string>& value_str);
 
   StatusTuple remove_value(const std::string& key_str);
+
+  static size_t get_possible_cpu_count();
 };
 
 template <class ValueType>
@@ -157,7 +158,7 @@ class BPFPercpuArrayTable : public BPFArrayTable<std::vector<ValueType>> {
  public:
   BPFPercpuArrayTable(const TableDesc& desc)
       : BPFArrayTable<std::vector<ValueType>>(desc),
-      ncpus(get_possible_cpus().size()) {
+        ncpus(BPFTable::get_possible_cpu_count()) {
     if (desc.type != BPF_MAP_TYPE_PERCPU_ARRAY)
       throw std::invalid_argument("Table '" + desc.name + "' is not a percpu array table");
     // leaf structures have to be aligned to 8 bytes as hardcoded in the linux kernel.
@@ -254,7 +255,7 @@ class BPFPercpuHashTable : public BPFHashTable<KeyType, std::vector<ValueType>> 
  public:
   explicit BPFPercpuHashTable(const TableDesc& desc)
       : BPFHashTable<KeyType, std::vector<ValueType>>(desc),
-      ncpus(get_possible_cpus().size()) {
+        ncpus(BPFTable::get_possible_cpu_count()) {
     if (desc.type != BPF_MAP_TYPE_PERCPU_HASH &&
         desc.type != BPF_MAP_TYPE_LRU_PERCPU_HASH)
       throw std::invalid_argument("Table '" + desc.name + "' is not a percpu hash table");

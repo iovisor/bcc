@@ -142,6 +142,10 @@ StatusTuple BPFTable::remove_value(const std::string& key_str) {
   return StatusTuple(0);
 }
 
+size_t BPFTable::get_possible_cpu_count() {
+  return get_possible_cpus().size();
+}
+
 BPFStackTable::BPFStackTable(const TableDesc& desc,
                              bool use_debug_file,
                              bool check_debug_file_crc)
