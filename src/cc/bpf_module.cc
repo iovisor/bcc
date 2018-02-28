@@ -140,6 +140,11 @@ BPFModule::~BPFModule() {
     v->leaf_snprintf = unimplemented_snprintf;
   }
 
+  if (!rw_engine_enabled_) {
+    for (auto section : sections_)
+      delete get<0>(section.second);
+  }
+
   engine_.reset();
   rw_engine_.reset();
   ctx_.reset();
@@ -607,14 +612,17 @@ int BPFModule::run_pass_manager(Module &mod) {
 
 int BPFModule::finalize() {
   Module *mod = &*mod_;
+  std::map<std::string, std::tuple<uint8_t *, uintptr_t>> tmp_sections,
+      *sections_p;
 
   mod->setDataLayout("e-m:e-p:64:64-i64:64-n32:64-S128");
   mod->setTargetTriple("bpf-pc-linux");
+  sections_p = rw_engine_enabled_ ? &sections_ : &tmp_sections;
 
   string err;
   EngineBuilder builder(move(mod_));
   builder.setErrorStr(&err);
-  builder.setMCJITMemoryManager(ebpf::make_unique<MyMemoryManager>(&sections_));
+  builder.setMCJITMemoryManager(ebpf::make_unique<MyMemoryManager>(sections_p));
   builder.setMArch("bpf");
   builder.setUseOrcMCJITReplacement(false);
   engine_ = unique_ptr<ExecutionEngine>(builder.create());
@@ -631,16 +639,34 @@ int BPFModule::finalize() {
 
   engine_->finalizeObject();
 
+  if (flags_ & DEBUG_SOURCE) {
+    SourceDebugger src_debugger(mod, *sections_p, FN_PREFIX, mod_src_,
+                                src_dbg_fmap_);
+    src_debugger.dump();
+  }
+
+  if (!rw_engine_enabled_) {
+    // Setup sections_ correctly and then free llvm internal memory
+    for (auto section : tmp_sections) {
+      auto fname = section.first;
+      uintptr_t size = get<1>(section.second);
+      uint8_t *tmp_p = NULL;
+      // Only copy data for non-map sections
+      if (strncmp("maps/", section.first.c_str(), 5)) {
+        uint8_t *addr = get<0>(section.second);
+        tmp_p = new uint8_t[size];
+        memcpy(tmp_p, addr, size);
+      }
+      sections_[fname] = make_tuple(tmp_p, size);
+    }
+    engine_.reset();
+    ctx_.reset();
+  }
+
   // give functions an id
   for (auto section : sections_)
     if (!strncmp(FN_PREFIX.c_str(), section.first.c_str(), FN_PREFIX.size()))
       function_names_.push_back(section.first);
-
-  if (flags_ & DEBUG_SOURCE) {
-    SourceDebugger src_debugger(mod, sections_, FN_PREFIX, mod_src_,
-                                src_dbg_fmap_);
-    src_debugger.dump();
-  }
 
   return 0;
 }
