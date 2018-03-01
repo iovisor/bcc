@@ -670,4 +670,4 @@ def inet_ntoa(addr):
 b["tcp_ipv4_event"].open_perf_buffer(print_ipv4_event)
 b["tcp_ipv6_event"].open_perf_buffer(print_ipv6_event)
 while True:
-    b.kprobe_poll()
+    b.perf_buffer_poll()

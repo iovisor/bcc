@@ -120,4 +120,4 @@ def print_event(cpu, data, size):
 
 bpf["threads"].open_perf_buffer(print_event)
 while 1:
-    bpf.kprobe_poll()
+    bpf.perf_buffer_poll()

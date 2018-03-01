@@ -276,7 +276,7 @@ function Bpf:_perf_buffer_array()
   return readers, n
 end
 
-function Bpf:kprobe_poll_loop()
+function Bpf:perf_buffer_poll_loop()
   local perf_buffers, perf_buffer_count = self:_perf_buffer_array()
   return pcall(function()
     while true do
@@ -285,9 +285,17 @@ function Bpf:kprobe_poll_loop()
   end)
 end
 
-function Bpf:kprobe_poll(timeout)
+function Bpf:kprobe_poll_loop()
+  return self:perf_buffer_poll_loop()
+end
+
+function Bpf:perf_buffer_poll(timeout)
   local perf_buffers, perf_buffer_count = self:_perf_buffer_array()
   libbcc.perf_reader_poll(perf_buffer_count, perf_buffers, timeout or -1)
+end
+
+function Bpf:kprobe_poll(timeout)
+  self:perf_buffer_poll(timeout)
 end
 
 return Bpf

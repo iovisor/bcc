@@ -80,6 +80,6 @@ try:
     print('Try: "ping -6 ff02::1%me"\n')
     print("%-3s %-32s %-12s %-10s" % ("CPU", "SRC IP", "DST IP", "Magic"))
     while True:
-        b.kprobe_poll()
+        b.perf_buffer_poll()
 finally:
     if "me" in locals(): ipr.link("del", index=me)

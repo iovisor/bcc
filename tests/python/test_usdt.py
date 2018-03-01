@@ -213,7 +213,7 @@ int do_trace5(struct pt_regs *ctx) {
 
         # three iterations to make sure we get some probes and have time to process them
         for i in range(3):
-            b.kprobe_poll()
+            b.perf_buffer_poll()
         self.assertTrue(self.evt_st_1 == 1 and self.evt_st_2 == 1 and self.evt_st_3 == 1)
 
     def tearDown(self):

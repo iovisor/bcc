@@ -51,4 +51,4 @@ def print_counter():
 print("Tracing sys_write, try `dd if=/dev/zero of=/dev/null`")
 print("Tracing... Hit Ctrl-C to end.")
 while 1:
-    b.kprobe_poll()
+    b.perf_buffer_poll()

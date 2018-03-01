@@ -132,7 +132,7 @@ int do_trace(struct pt_regs *ctx) {
 
         b["event"].open_perf_buffer(print_event)
         for i in range(10):
-            b.kprobe_poll()
+            b.perf_buffer_poll()
 
         self.assertTrue(self.probe_value_1 != 0)
         self.assertTrue(self.probe_value_2 != 0)

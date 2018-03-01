@@ -1100,11 +1100,11 @@ class BPF(object):
         """
         return len(self.tracepoint_fds)
 
-    def kprobe_poll(self, timeout = -1):
-        """kprobe_poll(self)
+    def perf_buffer_poll(self, timeout = -1):
+        """perf_buffer_poll(self)
 
-        Poll from the ring buffers for all of the open kprobes, calling the
-        cb() that was given in the BPF constructor for each entry.
+        Poll from all open perf ring buffers, calling the callback that was
+        provided when calling open_perf_buffer for each entry.
         """
         try:
             readers = (ct.c_void_p * len(self.perf_buffers))()
@@ -1113,6 +1113,13 @@ class BPF(object):
             lib.perf_reader_poll(len(readers), readers, timeout)
         except KeyboardInterrupt:
             exit()
+
+    def kprobe_poll(self, timeout = -1):
+        """kprobe_poll(self)
+
+        Deprecated. Use perf_buffer_poll instead.
+        """
+        self.perf_buffer_poll(timeout)
 
     def donothing(self):
         """the do nothing exit handler"""

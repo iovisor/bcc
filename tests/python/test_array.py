@@ -65,7 +65,7 @@ int kprobe__sys_nanosleep(void *ctx) {
         b = BPF(text=text)
         b["events"].open_perf_buffer(cb, lost_cb=lost_cb)
         time.sleep(0.1)
-        b.kprobe_poll()
+        b.perf_buffer_poll()
         self.assertGreater(self.counter, 0)
         b.cleanup()
 
@@ -98,7 +98,7 @@ int kprobe__sys_nanosleep(void *ctx) {
         online_cpus = get_online_cpus()
         for cpu in online_cpus:
             subprocess.call(['taskset', '-c', str(cpu), 'sleep', '0.1'])
-        b.kprobe_poll()
+        b.perf_buffer_poll()
         b.cleanup()
         self.assertGreaterEqual(len(self.events), len(online_cpus), 'Received only {}/{} events'.format(len(self.events), len(online_cpus)))
 
