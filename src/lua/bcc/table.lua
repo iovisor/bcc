@@ -258,7 +258,7 @@ function PerfEventArray:_open_perf_buffer(cpu, callback, ctype, page_cnt, lost_c
   end
 
   -- default to 8 pages per buffer
-  local reader = libbcc.bpf_open_perf_buffer(_cb, nil, _lost_cb, -1, cpu, page_cnt or 8)
+  local reader = libbcc.bpf_open_perf_buffer(_cb, _lost_cb, nil, -1, cpu, page_cnt or 8)
   assert(reader, "failed to open perf buffer")
 
   local fd = libbcc.perf_reader_fd(reader)

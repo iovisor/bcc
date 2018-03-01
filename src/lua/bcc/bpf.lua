@@ -246,10 +246,10 @@ function Bpf:probe_store(t, id, fd)
   log.info("%s -> %s", id, fd)
 end
 
-function Bpf:perf_buffer_store(t, id, reader)
+function Bpf:perf_buffer_store(id, reader)
     Bpf.perf_buffers[id] = reader
 
-    log.info("%s -> %s", id, fd)
+    log.info("%s -> %s", id, reader)
 end
 
 function Bpf:probe_lookup(t, id)
@@ -277,7 +277,7 @@ function Bpf:_perf_buffer_array()
 end
 
 function Bpf:kprobe_poll_loop()
-  local perf_buffer, perf_buffer_count = self:_perf_buffer_array()
+  local perf_buffers, perf_buffer_count = self:_perf_buffer_array()
   return pcall(function()
     while true do
       libbcc.perf_reader_poll(perf_buffer_count, perf_buffers, -1)
@@ -286,7 +286,7 @@ function Bpf:kprobe_poll_loop()
 end
 
 function Bpf:kprobe_poll(timeout)
-  local perf_buffer, perf_buffer_count = self:_perf_buffer_array()
+  local perf_buffers, perf_buffer_count = self:_perf_buffer_array()
   libbcc.perf_reader_poll(perf_buffer_count, perf_buffers, timeout or -1)
 end
 
