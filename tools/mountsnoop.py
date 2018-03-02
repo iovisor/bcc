@@ -408,7 +408,7 @@ def main():
     print('{:16} {:<7} {:<7} {:<11} {}'.format(
         'COMM', 'PID', 'TID', 'MNT_NS', 'CALL'))
     while True:
-        b.kprobe_poll()
+        b.perf_buffer_poll()
 
 
 if __name__ == '__main__':

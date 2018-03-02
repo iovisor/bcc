@@ -27,5 +27,5 @@ return function(BPF)
   b:get_table("events"):open_perf_buffer(print_readline, "struct { uint64_t pid; char str[80]; }", nil)
 
   print("%-9s %-6s %s" % {"TIME", "PID", "COMMAND"})
-  b:kprobe_poll_loop()
+  b:perf_buffer_poll_loop()
 end

@@ -77,4 +77,4 @@ def print_event(cpu, data, size):
 # read events
 b["events"].open_perf_buffer(print_event)
 while 1:
-    b.kprobe_poll()
+    b.perf_buffer_poll()

@@ -192,4 +192,4 @@ def print_event(cpu, data, size):
 b["events"].open_perf_buffer(print_event, page_cnt=64)
 start_time = datetime.now()
 while not args.duration or datetime.now() - start_time < args.duration:
-    b.kprobe_poll()
+    b.perf_buffer_poll()

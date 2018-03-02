@@ -64,7 +64,7 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
         - [1. trace_print()](#1-trace_print)
         - [2. trace_fields()](#2-trace_fields)
     - [Output](#output)
-        - [1. kprobe_poll()](#1-kprobe_poll)
+        - [1. perf_buffer_poll()](#1-perf_buffer_poll)
     - [Maps](#maps)
         - [1. get_table()](#1-get_table)
         - [2. open_perf_buffer()](#2-open_perf_buffer)
@@ -1023,14 +1023,14 @@ Examples in situ:
 
 Normal output from a BPF program is either:
 
-- per-event: using PERF_EVENT_OUTPUT, open_perf_buffer(), and kprobe_poll().
+- per-event: using PERF_EVENT_OUTPUT, open_perf_buffer(), and perf_buffer_poll().
 - map summary: using items(), or print_log2_hist(), covered in the Maps section.
 
-### 1. kprobe_poll()
+### 1. perf_buffer_poll()
 
-Syntax: ```BPF.kprobe_poll()```
+Syntax: ```BPF.perf_buffer_poll()```
 
-This polls from the ring buffers for all of the open kprobes, calling the callback function that was given in the BPF constructor for each entry, usually via ```open_perf_buffer()```.
+This polls from all open perf ring buffers, calling the callback function that was provided when calling open_perf_buffer for each entry.
 
 Example:
 
@@ -1038,13 +1038,13 @@ Example:
 # loop with callback to print_event
 b["events"].open_perf_buffer(print_event)
 while 1:
-    b.kprobe_poll()
+    b.perf_buffer_poll()
 ```
 
 Examples in situ:
 [code](https://github.com/iovisor/bcc/blob/08fbceb7e828f0e3e77688497727c5b2405905fd/examples/tracing/hello_perf_output.py#L61),
-[search /examples](https://github.com/iovisor/bcc/search?q=kprobe_poll+path%3Aexamples+language%3Apython&type=Code),
-[search /tools](https://github.com/iovisor/bcc/search?q=kprobe_poll+path%3Atools+language%3Apython&type=Code)
+[search /examples](https://github.com/iovisor/bcc/search?q=perf_buffer_poll+path%3Aexamples+language%3Apython&type=Code),
+[search /tools](https://github.com/iovisor/bcc/search?q=perf_buffer_poll+path%3Atools+language%3Apython&type=Code)
 
 ## Maps
 
@@ -1083,7 +1083,7 @@ def print_event(cpu, data, size):
 # loop with callback to print_event
 b["events"].open_perf_buffer(print_event)
 while 1:
-    b.kprobe_poll()
+    b.perf_buffer_poll()
 ```
 
 Note that the data structure transferred will need to be declared in C in the BPF program, and in Python. For example:

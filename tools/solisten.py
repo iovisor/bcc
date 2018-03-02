@@ -210,4 +210,4 @@ if __name__ == "__main__":
 
     # Read events
     while 1:
-        b.kprobe_poll()
+        b.perf_buffer_poll()

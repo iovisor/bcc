@@ -150,7 +150,7 @@ int do_trace3(struct pt_regs *ctx) {
 
         # three iterations to make sure we get some probes and have time to process them
         for i in range(3):
-            b.kprobe_poll()
+            b.perf_buffer_poll()
 
         # note that event1 and event4 do not really fire, so their state should be 0
         # use separate asserts so that if test fails we know which one is the culprit

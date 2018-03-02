@@ -189,5 +189,5 @@ return function(BPF, utils)
       char name[$];
     }
   ]], {DISK_NAME_LEN, TASK_COMM_LEN}, 64)
-  bpf:kprobe_poll_loop()
+  bpf:perf_buffer_poll_loop()
 end

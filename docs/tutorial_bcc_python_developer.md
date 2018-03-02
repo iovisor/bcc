@@ -305,7 +305,7 @@ def print_event(cpu, data, size):
 # loop with callback to print_event
 b["events"].open_perf_buffer(print_event)
 while 1:
-    b.kprobe_poll()
+    b.perf_buffer_poll()
 ```
 
 Things to learn:
@@ -319,7 +319,7 @@ Things to learn:
 1. ```class Data(ct.Structure)```: Now define the Python version of the C data structure.
 1. ```def print_event()```: Define a Python function that will handle reading events from the ```events``` stream.
 1. ```b["events"].open_perf_buffer(print_event)```: Associate the Python ```print_event``` function with the ```events``` stream.
-1. ```while 1: b.kprobe_poll()```: Block waiting for events.
+1. ```while 1: b.perf_buffer_poll()```: Block waiting for events.
 
 This may be improved in future bcc versions. Eg, the Python data struct could be auto-generated from the C code.
 

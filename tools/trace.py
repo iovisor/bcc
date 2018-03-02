@@ -729,7 +729,7 @@ trace -I 'linux/fs_struct.h' 'mntns_install "users = %d", $task->fs->users'
                       "-" if not all_probes_trivial else ""))
 
                 while True:
-                        self.bpf.kprobe_poll()
+                        self.bpf.perf_buffer_poll()
 
         def run(self):
                 try:

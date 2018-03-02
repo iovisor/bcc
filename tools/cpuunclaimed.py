@@ -218,7 +218,7 @@ while 1:
             sleep(wakeup_s)
     except KeyboardInterrupt:
         exiting = 1
-    b.kprobe_poll()
+    b.perf_buffer_poll()
     slept += wakeup_s
 
     if slept < 0.999 * interval:   # floating point workaround
