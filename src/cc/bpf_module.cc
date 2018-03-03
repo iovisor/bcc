@@ -142,7 +142,7 @@ BPFModule::~BPFModule() {
 
   if (!rw_engine_enabled_) {
     for (auto section : sections_)
-      delete get<0>(section.second);
+      delete[] get<0>(section.second);
   }
 
   engine_.reset();
