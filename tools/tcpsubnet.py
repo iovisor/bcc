@@ -60,7 +60,7 @@ parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
 parser.add_argument("-f", "--format", default="B",
     help="[bkmBKM] format to report: bits, Kbits, Mbits, bytes, " +
-    "KBytes, MBytes", choices=["b", "k", "m", "B", "K", "M"])
+    "KBytes, MBytes (default B)", choices=["b", "k", "m", "B", "K", "M"])
 parser.add_argument("-i", "--interval", default=1, type=int,
     help="output interval, in seconds (default 1)")
 args = parser.parse_args()
@@ -213,8 +213,8 @@ b = BPF(text=bpf_text)
 
 ipv4_send_bytes = b["ipv4_send_bytes"]
 
-print("Tracing... Output every %d secs. Hit Ctrl-C to end" %
-        args.interval)
+if not args.json:
+    print("Tracing... Output every %d secs. Hit Ctrl-C to end" % args.interval)
 
 # output
 exiting = 0
