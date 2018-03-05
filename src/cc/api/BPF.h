@@ -141,7 +141,7 @@ class BPF {
                                void* cb_cookie = nullptr,
                                int page_cnt = DEFAULT_PERF_BUFFER_PAGE_CNT);
   StatusTuple close_perf_buffer(const std::string& name);
-  void poll_perf_buffer(const std::string& name, int timeout = -1);
+  void poll_perf_buffer(const std::string& name, int timeout_ms = -1);
 
   StatusTuple load_func(const std::string& func_name, enum bpf_prog_type type,
                         int& fd);

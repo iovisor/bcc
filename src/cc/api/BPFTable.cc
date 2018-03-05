@@ -295,10 +295,10 @@ StatusTuple BPFPerfBuffer::close_all_cpu() {
   return StatusTuple(0);
 }
 
-void BPFPerfBuffer::poll(int timeout) {
+void BPFPerfBuffer::poll(int timeout_ms) {
   if (epfd_ < 0)
     return;
-  int cnt = epoll_wait(epfd_, ep_events_.get(), cpu_readers_.size(), timeout);
+  int cnt = epoll_wait(epfd_, ep_events_.get(), cpu_readers_.size(), timeout_ms);
   if (cnt <= 0)
     return;
   for (int i = 0; i < cnt; i++)
