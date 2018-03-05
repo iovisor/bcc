@@ -136,11 +136,20 @@ class BPF {
 
   StatusTuple close_perf_event(const std::string& name);
 
+  // Open a Perf Buffer of given name, providing callback and callback cookie
+  // to use when polling. BPF class owns the opened Perf Buffer and will free
+  // it on-demand or on destruction.
   StatusTuple open_perf_buffer(const std::string& name, perf_reader_raw_cb cb,
                                perf_reader_lost_cb lost_cb = nullptr,
                                void* cb_cookie = nullptr,
                                int page_cnt = DEFAULT_PERF_BUFFER_PAGE_CNT);
+  // Close and free the Perf Buffer of given name.
   StatusTuple close_perf_buffer(const std::string& name);
+  // Obtain an pointer to the opened BPFPerfBuffer instance of given name.
+  // Will return nullptr if such open Perf Buffer doesn't exist.
+  BPFPerfBuffer* get_perf_buffer(const std::string& name);
+  // Poll an opened Perf Buffer of given name with given timeout, using callback
+  // provided when opening. Do nothing if such open Perf Buffer doesn't exist.
   void poll_perf_buffer(const std::string& name, int timeout_ms = -1);
 
   StatusTuple load_func(const std::string& func_name, enum bpf_prog_type type,
