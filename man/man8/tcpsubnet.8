@@ -41,7 +41,7 @@ Prints the BPF program.
 subnets
 Comma separated list of subnets. Traffic will be categorized
 in theses subnets. Order matters.
-(default 127.0.0.1/32,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16)
+(default 127.0.0.1/32,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,0.0.0.0/0)
 .SH EXAMPLES
 .TP
 Summarize TCP traffic by the default subnets:
@@ -63,11 +63,14 @@ Subnet
 (Standard output) Right hand side column:
 Aggregate traffic in units passed as argument
 .TP
-(JSON output) Key
-Subnet
+(JSON output) date
+Current date formatted in the system locale
 .TP
-(JSON output) Value
-Aggregate traffic in units passed as argument
+(JSON output) time
+Current time formatted in the system locale
+.TP
+(JSON output) entries
+Map of subnets to aggregates. Values will be in format passed to -f
 .SH OVERHEAD
 This traces all tcp_sendmsg function calls in the TCP/IP stack.
 It summarizes data in-kernel to reduce overhead.

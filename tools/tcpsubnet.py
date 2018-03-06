@@ -24,6 +24,7 @@
 #
 # 03-Oct-2017   Rodrigo Manyari   Created this based on tcptop.
 # 13-Feb-2018   Rodrigo Manyari   Fix pep8 errors, some refactoring.
+# 05-Mar-2018   Rodrigo Manyari   Add date time to output.
 
 import argparse
 import json
@@ -31,20 +32,22 @@ import logging
 import struct
 import socket
 from bcc import BPF
+from datetime import datetime as dt
 from time import sleep
 
 # arguments
 examples = """examples:
     ./tcpsubnet                 # Trace TCP sent to the default subnets:
                                 # 127.0.0.1/32,10.0.0.0/8,172.16.0.0/12,
-                                # 192.168.0.0/16
+                                # 192.168.0.0/16,0.0.0.0/0
     ./tcpsubnet -f K            # Trace TCP sent to the default subnets
                                 # aggregated in KBytes.
     ./tcpsubnet 10.80.0.0/24    # Trace TCP sent to 10.80.0.0/24 only
     ./tcpsubnet -J              # Format the output in JSON.
 """
 
-default_subnets = "127.0.0.1/32,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+default_subnets = "127.0.0.1/32,10.0.0.0/8," \
+    "172.16.0.0/12,192.168.0.0/16,0.0.0.0/0"
 
 parser = argparse.ArgumentParser(
     description="Summarize TCP send and aggregate by subnet",
@@ -235,6 +238,12 @@ while (1):
     data = {}
 
     # output
+    now = dt.now()
+    data['date'] = now.strftime('%x')
+    data['time'] = now.strftime('%X')
+    data['entries'] = {}
+    if not args.json:
+        print(now.strftime('[%x %X]'))
     for k, v in reversed(sorted(keys.items(), key=lambda keys: keys[1].value)):
         send_bytes = 0
         if k in ipv4_send_bytes:
@@ -242,7 +251,7 @@ while (1):
         subnet = subnets[k.index][0]
         send = formatFn(send_bytes)
         if args.json:
-            data[subnet] = send
+            data['entries'][subnet] = send
         else:
             print("%-21s %6d" % (subnet, send))
 
