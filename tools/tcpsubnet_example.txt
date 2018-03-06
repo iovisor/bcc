@@ -1,0 +1,161 @@
+Demonstrations of tcpsubnet, the Linux eBPF/bcc version.
+
+
+tcpsubnet summarizes throughput by destination subnet.
+It works only for IPv4. Eg:
+
+# tcpsubnet
+Tracing... Output every 1 secs. Hit Ctrl-C to end
+[03/05/18 22:32:47]
+127.0.0.1/32               8
+[03/05/18 22:32:48]
+[03/05/18 22:32:49]
+[03/05/18 22:32:50]
+[03/05/18 22:32:51]
+[03/05/18 22:32:52]
+127.0.0.1/32              10
+[03/05/18 22:32:53]
+
+This example output shows the number of bytes sent to 127.0.0.1/32 (the
+loopback interface). For demo purposes, I set netcat listening on port
+8080, connected to it and sent the following payloads.
+
+# nc 127.0.0.1 8080
+1111111
+111111111
+
+The first line sends 7 digits plus the null character (8 bytes)
+The second line sends 9 digits plus the null character (10 bytes)
+
+Notice also, how tcpsubnet prints a header line with the current date
+and time formatted in the current locale.
+
+Try it yourself to get a feeling of how tcpsubnet works.
+
+By default, tcpsubnet will categorize traffic in the following subnets:
+
+- 127.0.0.1/32
+- 10.0.0.0/8
+- 172.16.0.0/12
+- 192.168.0.0/16
+- 0.0.0.0/0
+
+The last subnet is a catch-all. In other words, anything that doesn't
+match the first 4 defaults will be categorized under 0.0.0.0/0
+You can change this default behavoir by passing a comma separated list
+of subnets. Let's say we would like to know how much traffic we
+are sending to github.com. We first find out what IPs github.com resolves
+to, Eg:
+
+# dig +short github.com
+192.30.253.112
+192.30.253.113
+
+With this information, we can come up with a reasonable range of IPs
+to monitor, Eg:
+ 
+# tcpsubnet.py 192.30.253.110/27,0.0.0.0/0
+Tracing... Output every 1 secs. Hit Ctrl-C to end
+[03/05/18 22:38:58]
+0.0.0.0/0               5780
+192.30.253.110/27       2205
+[03/05/18 22:38:59]
+0.0.0.0/0               2036
+192.30.253.110/27       1183
+[03/05/18 22:39:00]
+[03/05/18 22:39:01]
+192.30.253.110/27      12537
+
+If we would like to be more accurate, we can use the two IPs returned
+by dig, Eg:
+
+# tcpsubnet 192.30.253.113/32,192.130.253.112/32,0.0.0.0/0
+Tracing... Output every 1 secs. Hit Ctrl-C to end
+[03/05/18 22:42:56]
+0.0.0.0/0               1177
+192.30.253.113/32        910
+[03/05/18 22:42:57]
+0.0.0.0/0              48704
+192.30.253.113/32        892
+[03/05/18 22:42:58]
+192.30.253.113/32        891
+0.0.0.0/0                858
+[03/05/18 22:42:59]
+0.0.0.0/0              11159
+192.30.253.113/32        894
+[03/05/18 22:43:00]
+0.0.0.0/0              60601
+
+NOTE: When used in production, it is expected that you will have full
+information about your network topology. In which case you won't need
+to approximate subnets nor need to put individual IP addresses like
+we just did.
+
+Notice that the order of the subnet matters. Say, we put 0.0.0.0/0 as
+the first element of the list and 192.130.253.112/32 as the second, all the
+traffic going to 192.130.253.112/32 will have been categorized in
+0.0.0.0/0 as 192.130.253.112/32 is contained in 0.0.0.0/0.
+
+The default ouput unit is bytes. You can change it by using the
+-f [--format] flag. tcpsubnet uses the same flags as iperf for the unit
+format and adds mM. When using kmKM, the output will be rounded to floor.
+Eg:
+
+# tcpsubnet -fK 0.0.0.0/0
+[03/05/18 22:44:04]
+0.0.0.0/0                  1
+[03/05/18 22:44:05]
+0.0.0.0/0                  5
+[03/05/18 22:44:06]
+0.0.0.0/0                 31
+
+Just like the majority of the bcc tools, tcpsubnet supports -i and --ebpf
+
+It also supports -v [--verbose] which gives useful debugging information
+on how the subnets are evaluated and the BPF program is constructed.
+
+Last but not least, it supports -J [--json] to print the output in
+JSON format. This is handy if you're calling tcpsubnet from another
+program (say a nodejs server) and would like to have a structured stdout.
+The output in JSON format will also include the date and time.
+Eg:
+
+# tcpsubnet -J -fK 192.130.253.110/27,0.0.0.0/0
+{"date": "03/05/18", "entries": {"0.0.0.0/0": 2}, "time": "22:46:27"}
+{"date": "03/05/18", "entries": {}, "time": "22:46:28"}
+{"date": "03/05/18", "entries": {}, "time": "22:46:29"}
+{"date": "03/05/18", "entries": {}, "time": "22:46:30"}
+{"date": "03/05/18", "entries": {"192.30.253.110/27": 0}, "time": "22:46:31"}
+{"date": "03/05/18", "entries": {"192.30.253.110/27": 1}, "time": "22:46:32"}
+{"date": "03/05/18", "entries": {"192.30.253.110/27": 18}, "time": "22:46:32"}
+
+
+USAGE:
+
+# ./tcpsubnet -h
+usage: tcpsubnet.py [-h] [-v] [-J] [-f {b,k,m,B,K,M}] [-i INTERVAL] [subnets]
+
+Summarize TCP send and aggregate by subnet
+
+positional arguments:
+  subnets               comma separated list of subnets
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -v, --verbose         output debug statements
+  -J, --json            format output in JSON
+  -f {b,k,m,B,K,M}, --format {b,k,m,B,K,M}
+                        [bkmBKM] format to report: bits, Kbits, Mbits, bytes,
+                        KBytes, MBytes (default B)
+  -i INTERVAL, --interval INTERVAL
+                        output interval, in seconds (default 1)
+
+examples:
+    ./tcpsubnet                 # Trace TCP sent to the default subnets:
+                                # 127.0.0.1/32,10.0.0.0/8,172.16.0.0/12,
+                                # 192.168.0.0/16,0.0.0.0/0
+    ./tcpsubnet -f K            # Trace TCP sent to the default subnets
+                                # aggregated in KBytes.
+    ./tcpsubnet 10.80.0.0/24    # Trace TCP sent to 10.80.0.0/24 only
+    ./tcpsubnet -J              # Format the output in JSON.
+

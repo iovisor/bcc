@@ -1,0 +1,100 @@
+.TH tcpsubnet 8  "2018-03-01" "USER COMMANDS"
+.SH NAME
+tcpsubnet \- Summarize and aggregate IPv4 TCP traffic by subnet.
+.SH SYNOPSIS
+.B tcpsubnet [\-h] [\-v] [\--ebpf] [\-J] [\-f FORMAT] [\-i INTERVAL] [subnets]
+.SH DESCRIPTION
+This tool summarizes and aggregates IPv4 TCP sent to the subnets
+passed in argument and prints to stdout on a fixed interval.
+
+This uses dynamic tracing of kernel TCP send/receive functions, and will
+need to be updated to match kernel changes.
+
+The traced data is summarized in-kernel using a BPF map to reduce overhead.
+At very high TCP event rates, the overhead may still be measurable.
+See the OVERHEAD section for more details.
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH OPTIONS
+.TP
+\-h
+Print USAGE message.
+.TP
+\-v
+Run in verbose mode. Will output subnet evaluation and the BPF program
+.TP
+\-J
+Format output in JSON.
+.TP
+\-i
+Interval between updates, seconds (default 1).
+.TP
+\-f
+Format output units. Supported values are bkmBKM. When using
+kmKM the output will be rounded to floor.
+.TP
+\--ebpf
+Prints the BPF program.
+.TP
+subnets
+Comma separated list of subnets. Traffic will be categorized
+in theses subnets. Order matters.
+(default 127.0.0.1/32,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,0.0.0.0/0)
+.SH EXAMPLES
+.TP
+Summarize TCP traffic by the default subnets:
+#
+.B tcpsubnet
+.TP
+Summarize all TCP traffic:
+#
+.B tcpsubnet 0.0.0.0/0
+.TP
+Summarize all TCP traffic and output in JSON and Kb:
+#
+.B tcpsubnet -J -fk 0.0.0.0/0
+.SH FIELDS
+.TP
+(Standad output) Left hand side column:
+Subnet
+.TP
+(Standard output) Right hand side column:
+Aggregate traffic in units passed as argument
+.TP
+(JSON output) date
+Current date formatted in the system locale
+.TP
+(JSON output) time
+Current time formatted in the system locale
+.TP
+(JSON output) entries
+Map of subnets to aggregates. Values will be in format passed to -f
+.SH OVERHEAD
+This traces all tcp_sendmsg function calls in the TCP/IP stack.
+It summarizes data in-kernel to reduce overhead.
+A simple iperf test (v2.0.5) with the default values shows a loss
+of ~5% throughput. On 10 runs without tcpsubnet running the average
+throughput was 32.42Gb/s, with tcpsubnet enabled it was 31.26Gb/s.
+This is not meant to be used as a long running service. Use it
+for troubleshooting or for a controlled interval. As always,
+try it out in a test environment first.
+
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Rodrigo Manyari
+.SH INSPIRATION
+tcptop(8) by Brendan Gregg
+.SH SEE ALSO
+netlink(7)

@@ -82,6 +82,7 @@ pair of .c and .py files, and some are directories of files.
 #### Tools:
 <center><a href="images/bcc_tracing_tools_2017.png"><img src="images/bcc_tracing_tools_2017.png" border=0 width=700></a></center>
 
+
 - tools/[argdist](tools/argdist.py): Display function parameter values as a histogram or frequency count. [Examples](tools/argdist_example.txt).
 - tools/[bashreadline](tools/bashreadline.py): Print entered bash commands system wide. [Examples](tools/bashreadline_example.txt).
 - tools/[biolatency](tools/biolatency.py): Summarize block device I/O latency as a histogram. [Examples](tools/biolatency_example.txt).
@@ -140,6 +141,7 @@ pair of .c and .py files, and some are directories of files.
 - tools/[tcpconnlat](tools/tcpconnlat.py): Trace TCP active connection latency (connect()). [Examples](tools/tcpconnlat_example.txt).
 - tools/[tcplife](tools/tcplife.py): Trace TCP sessions and summarize lifespan. [Examples](tools/tcplife_example.txt).
 - tools/[tcpretrans](tools/tcpretrans.py): Trace TCP retransmits and TLPs. [Examples](tools/tcpretrans_example.txt).
+- tools/[tcpsubnet](tools/tcpsubnet.py): Summarize and aggregate TCP send by subnet. [Examples](tools/tcpsubnet_example.txt).
 - tools/[tcptop](tools/tcptop.py): Summarize TCP send/recv throughput by host. Top for TCP. [Examples](tools/tcptop_example.txt).
 - tools/[tcptracer](tools/tcptracer.py): Trace TCP established connections (connect(), accept(), close()). [Examples](tools/tcptracer_example.txt).
 - tools/[tplist](tools/tplist.py): Display kernel tracepoints or USDT probes and their formats. [Examples](tools/tplist_example.txt).
