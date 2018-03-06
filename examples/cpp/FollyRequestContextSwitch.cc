@@ -98,8 +98,11 @@ int main(int argc, char** argv) {
 
   signal(SIGINT, signal_handler);
   std::cout << "Started tracing, hit Ctrl-C to terminate." << std::endl;
-  while (true)
-    bpf->poll_perf_buffer("events");
+  auto perf_buffer = bpf->get_perf_buffer("events");
+  if (perf_buffer)
+    while (true)
+      // 100ms timeout
+      perf_buffer->poll(100);
 
   return 0;
 }

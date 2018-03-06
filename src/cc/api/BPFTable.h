@@ -309,7 +309,7 @@ class BPFPerfBuffer : public BPFTableBase<int, int> {
   StatusTuple open_all_cpu(perf_reader_raw_cb cb, perf_reader_lost_cb lost_cb,
                            void* cb_cookie, int page_cnt);
   StatusTuple close_all_cpu();
-  void poll(int timeout);
+  void poll(int timeout_ms);
 
  private:
   StatusTuple open_on_cpu(perf_reader_raw_cb cb, perf_reader_lost_cb lost_cb,

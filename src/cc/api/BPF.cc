@@ -443,11 +443,16 @@ StatusTuple BPF::close_perf_buffer(const std::string& name) {
   return StatusTuple(0);
 }
 
-void BPF::poll_perf_buffer(const std::string& name, int timeout) {
+BPFPerfBuffer* BPF::get_perf_buffer(const std::string& name) {
+  auto it = perf_buffers_.find(name);
+  return (it == perf_buffers_.end()) ? nullptr : it->second;
+}
+
+void BPF::poll_perf_buffer(const std::string& name, int timeout_ms) {
   auto it = perf_buffers_.find(name);
   if (it == perf_buffers_.end())
     return;
-  it->second->poll(timeout);
+  it->second->poll(timeout_ms);
 }
 
 StatusTuple BPF::load_func(const std::string& func_name, bpf_prog_type type,
