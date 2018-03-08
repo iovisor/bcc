@@ -10,4 +10,3 @@ if(DEFINED BCC_BACKUP_COMPILE)
 endif()
 
 add_library(clang_frontend STATIC loader.cc b_frontend_action.cc tp_frontend_action.cc kbuild_helper.cc ../../common.cc)
-target_link_libraries(clang_frontend bcc-static)
