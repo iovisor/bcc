@@ -1,3 +1,6 @@
+- 2018-02-22: [Some advanced BCC topics](https://lwn.net/Articles/747640)
+- 2018-01-23: [BPFd: Running BCC tools remotely across systems and architectures](https://lwn.net/Articles/744522)
+- 2017-12-22: [An introduction to the BPF Compiler Collection](https://lwn.net/Articles/742082)
 - 2017-09-13: [Performance Analysis Superpowers with Linux BPF](https://www.slideshare.net/brendangregg/ossna-2017-performance-analysis-superpowers-with-linux-bpf)
 - 2017-07-28: [Tracing a packet journey using Linux tracepoints, perf and eBPF](https://blog.yadutaf.fr/2017/07/28/tracing-a-packet-journey-using-linux-tracepoints-perf-ebpf/)
 - 2017-07-13: [Performance Superpowers with Enhanced BPF](https://www.usenix.org/conference/atc17/program/presentation/gregg-superpowers)
