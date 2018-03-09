@@ -138,7 +138,7 @@ Helper | Kernel version | Commit
 `BPF_FUNC_probe_read_str()` | 4.11 | [`a5e8c07059d0`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=a5e8c07059d0f0b31737408711d44794928ac218)
 `BPF_FUNC_probe_write_user()` | 4.8 | [`96ae52279594`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=96ae52279594470622ff0585621a13e96b700600)
 `BPF_FUNC_redirect()` | 4.4 | [`27b29f63058d`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=27b29f63058d26c6c1742f1993338280d5a41dc6)
-`BPF_FUNC_redirect_map()` | 4.14 | [`174a79ff9515`](https://git.kernel.org/cgit/linux/kernel/git/davem/net-next.git/commit/?id=174a79ff9515f400b9a6115643dafd62a635b7e6)
+`BPF_FUNC_redirect_map()` | 4.14 | [`97f91a7cf04f`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=97f91a7cf04ff605845c20948b8a80e54cbd3376)
 `BPF_FUNC_set_hash()` | 4.13 | [`ded092cd73c2`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=ded092cd73c2c56a394b936f86897f29b2e131c0)
 `BPF_FUNC_set_hash_invalid()` | 4.9 | [`7a4b28c6cc9f`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=7a4b28c6cc9ffac50f791b99cc7e46106436e5d8)
 `BPF_FUNC_setsockopt()` | 4.13 | [`8c4b4c7e9ff0`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=8c4b4c7e9ff0447995750d9329949fa082520269)
