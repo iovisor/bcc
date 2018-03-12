@@ -15,6 +15,7 @@
  */
 
 #include <linux/bpf.h>
+#include <linux/perf_event.h>
 #include <unistd.h>
 #include <cstdio>
 #include <cstring>
@@ -292,12 +293,13 @@ StatusTuple BPF::attach_perf_event(uint32_t ev_type, uint32_t ev_config,
   int probe_fd;
   TRY2(load_func(probe_func, BPF_PROG_TYPE_PERF_EVENT, probe_fd));
 
-  auto fds = new std::map<int, int>();
   std::vector<int> cpus;
   if (cpu >= 0)
     cpus.push_back(cpu);
   else
     cpus = get_online_cpus();
+  auto fds = new std::vector<std::pair<int, int>>();
+  fds->reserve(cpus.size());
   for (int i : cpus) {
     int fd = bpf_attach_perf_event(probe_fd, ev_type, ev_config, sample_period,
                                    sample_freq, pid, i, group_fd);
@@ -309,7 +311,7 @@ StatusTuple BPF::attach_perf_event(uint32_t ev_type, uint32_t ev_config,
       return StatusTuple(-1, "Failed to attach perf event type %d config %d",
                          ev_type, ev_config);
     }
-    fds->emplace(i, fd);
+    fds->emplace_back(i, fd);
   }
 
   open_probe_t p = {};
@@ -317,6 +319,46 @@ StatusTuple BPF::attach_perf_event(uint32_t ev_type, uint32_t ev_config,
   p.per_cpu_fd = fds;
   perf_events_[ev_pair] = std::move(p);
   return StatusTuple(0);
+}
+
+StatusTuple BPF::attach_perf_event_raw(void* perf_event_attr,
+                                       const std::string& probe_func,
+                                       pid_t pid, int cpu, int group_fd) {
+  auto attr = static_cast<struct perf_event_attr*>(perf_event_attr);
+  auto ev_pair = std::make_pair(attr->type, attr->config);
+  if (perf_events_.find(ev_pair) != perf_events_.end())
+    return StatusTuple(-1, "Perf event type %d config %d already attached",
+                       attr->type, attr->config);
+
+  int probe_fd;
+  TRY2(load_func(probe_func, BPF_PROG_TYPE_PERF_EVENT, probe_fd));
+
+  std::vector<int> cpus;
+  if (cpu >= 0)
+    cpus.push_back(cpu);
+  else
+    cpus = get_online_cpus();
+  auto fds = new std::vector<std::pair<int, int>>();
+  fds->reserve(cpus.size());
+  for (int i : cpus) {
+    int fd = bpf_attach_perf_event_raw(probe_fd, attr, pid, i, group_fd);
+    if (fd < 0) {
+      for (const auto& it : *fds)
+        close(it.second);
+      delete fds;
+      TRY2(unload_func(probe_func));
+      return StatusTuple(-1, "Failed to attach perf event type %d config %d",
+                         attr->type, attr->config);
+    }
+    fds->emplace_back(i, fd);
+  }
+
+  open_probe_t p = {};
+  p.func = probe_func;
+  p.per_cpu_fd = fds;
+  perf_events_[ev_pair] = std::move(p);
+  return StatusTuple(0);
+
 }
 
 StatusTuple BPF::detach_kprobe(const std::string& kernel_func,
@@ -392,6 +434,11 @@ StatusTuple BPF::detach_perf_event(uint32_t ev_type, uint32_t ev_config) {
   TRY2(detach_perf_event_all_cpu(it->second));
   perf_events_.erase(it);
   return StatusTuple(0);
+}
+
+StatusTuple BPF::detach_perf_event_raw(void* perf_event_attr) {
+  auto attr = static_cast<struct perf_event_attr*>(perf_event_attr);
+  return detach_perf_event(attr->type, attr->config);
 }
 
 StatusTuple BPF::open_perf_event(const std::string& name, uint32_t type,

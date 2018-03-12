@@ -1278,6 +1278,28 @@ cleanup:
     return ret;
 }
 
+int bpf_attach_perf_event_raw(int progfd, void *perf_event_attr, pid_t pid,
+                              int cpu, int group_fd) {
+  int fd = syscall(__NR_perf_event_open, perf_event_attr, pid, cpu, group_fd,
+                   PERF_FLAG_FD_CLOEXEC);
+  if (fd < 0) {
+    perror("perf_event_open failed");
+    return -1;
+  }
+  if (ioctl(fd, PERF_EVENT_IOC_SET_BPF, progfd) != 0) {
+    perror("ioctl(PERF_EVENT_IOC_SET_BPF) failed");
+    close(fd);
+    return -1;
+  }
+  if (ioctl(fd, PERF_EVENT_IOC_ENABLE, 0) != 0) {
+    perror("ioctl(PERF_EVENT_IOC_ENABLE) failed");
+    close(fd);
+    return -1;
+  }
+
+  return fd;
+}
+
 int bpf_attach_perf_event(int progfd, uint32_t ev_type, uint32_t ev_config,
                           uint64_t sample_period, uint64_t sample_freq,
                           pid_t pid, int cpu, int group_fd) {
@@ -1303,25 +1325,7 @@ int bpf_attach_perf_event(int progfd, uint32_t ev_type, uint32_t ev_config,
     attr.sample_period = sample_period;
   }
 
-  int fd = syscall(
-    __NR_perf_event_open, &attr, pid, cpu, group_fd, PERF_FLAG_FD_CLOEXEC
-  );
-  if (fd < 0) {
-    perror("perf_event_open failed");
-    return -1;
-  }
-  if (ioctl(fd, PERF_EVENT_IOC_SET_BPF, progfd) != 0) {
-    perror("ioctl(PERF_EVENT_IOC_SET_BPF) failed");
-    close(fd);
-    return -1;
-  }
-  if (ioctl(fd, PERF_EVENT_IOC_ENABLE, 0) != 0) {
-    perror("ioctl(PERF_EVENT_IOC_ENABLE) failed");
-    close(fd);
-    return -1;
-  }
-
-  return fd;
+  return bpf_attach_perf_event_raw(progfd, &attr, pid, cpu, group_fd);
 }
 
 int bpf_close_perf_event_fd(int fd) {

@@ -36,7 +36,7 @@ namespace ebpf {
 struct open_probe_t {
   int perf_event_fd;
   std::string func;
-  std::map<int, int>* per_cpu_fd;
+  std::vector<std::pair<int, int>>* per_cpu_fd;
 };
 
 class USDT;
@@ -84,7 +84,12 @@ class BPF {
                                 uint64_t sample_period, uint64_t sample_freq,
                                 pid_t pid = -1, int cpu = -1,
                                 int group_fd = -1);
+  StatusTuple attach_perf_event_raw(void* perf_event_attr,
+                                    const std::string& probe_func,
+                                    pid_t pid = -1, int cpu = -1,
+                                    int group_fd = -1);
   StatusTuple detach_perf_event(uint32_t ev_type, uint32_t ev_config);
+  StatusTuple detach_perf_event_raw(void* perf_event_attr);
 
   BPFTable get_table(const std::string& name) {
     TableStorage::iterator it;
