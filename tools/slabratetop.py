@@ -63,7 +63,11 @@ bpf_text = """
 #include <uapi/linux/ptrace.h>
 #include <linux/mm.h>
 #include <linux/slab.h>
+#ifdef CONFIG_SLUB
 #include <linux/slub_def.h>
+#else
+#include <linux/slab_def.h>
+#endif
 
 #define CACHE_NAME_SIZE 32
 
