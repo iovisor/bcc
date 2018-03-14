@@ -408,6 +408,8 @@ int bpf_prog_compute_tag(const struct bpf_insn *insns, int prog_len,
     return -1;
   }
   *ptag = __builtin_bswap64(u.tag);
+  close(shafd2);
+  close(shafd);
   return 0;
 }
 
