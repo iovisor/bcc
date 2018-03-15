@@ -11,7 +11,10 @@ if(NETPERF STREQUAL "NETPERF-NOTFOUND")
 endif()
 find_program(IPERF iperf)
 if(IPERF STREQUAL "IPERF-NOTFOUND")
-  message(WARNING "Recommended test program 'iperf' not found")
+  find_program(IPERF3 iperf3)
+  if(IPERF3 STREQUAL "IPERF3-NOTFOUND")
+    message(WARNING "Recommended test program 'iperf' or 'iperf3' not found")
+  endif()
 endif()
 
 add_test(NAME py_test_stat1_b WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
