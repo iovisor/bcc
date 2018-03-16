@@ -1,0 +1,81 @@
+Some examples for inject
+
+inject guarantees the appropriate erroneous return of the specified injection
+mode(kmalloc,bio,etc) given a call chain and an optional set of predicates. You
+can also optionally print out the generated BPF program for
+modification/debugging purposes.
+
+For example, suppose you want to fail kmalloc() from mount_subtree() when called
+from btrfs_mount():
+
+# ./inject.py kmalloc -I 'linux/mm.h' -I 'linux/fs.h' -v '(true)<-
+mount_subtree(struct vfsmount *mnt, const char *name) (true) <-
+btrfs_mount(struct file_system_type *fs_type, int flags, const char
+*device_name, void *data)'
+
+The first argument indicates the mode(or what to fail). Appropriate headers
+are specified. The verbosity flag prints the generated program.
+
+Note that btrfs_mount() has no accompanying predicate. In such cases the program
+defaults to (true).
+
+Next, lets say we want to hit one of the BUG_ONs in fs/btrfs. As of 4.16-rc3,
+there is a BUG_ON in btrfs_prepare_close_one_device() at fs/btrfs/volumes.c:1002
+
+To hit this, we can use the following:
+
+# ./inject.py kmalloc -v -I 'linux/mm.h' '(true)<- btrfs_alloc_device(struct
+btrfs_fs_info *fs_info, const u64 *ded, const u8 *uuid)(true)<-
+btrfs_close_devices(struct btrfs_fs_devices *fs_devices)(true)'
+
+While the script was executing, I mounted and unmounted btrfs, causing a
+segfault on umount(since that satisfied the call path indicated). A look at
+dmesg will confirm we successfully hit that BUG_ON and caused a panic.
+
+In general, it's worth noting that the required specificity of the call chain is
+dependent on how much granularity you need. The example above might have
+performed as expected without the intermediate btrfs_alloc_device, but might
+have also done something unexpected(an earlier kmalloc could have failed before
+the one we were targetting).
+
+For hot paths, the approach outlined above isn't enough. If a path is traversed
+very often, we can distinguish distinct calls with function arguments. Let's say
+we want to fail the dentry allocation of a file creatively named 'bananas'. We
+can do the following:
+
+# ./inject.py kmalloc -v -I 'linux/fs.h' '(true) <- d_alloc_parallel(struct
+dentry *parent, const struct qstr *name, wait_queue_head_t *wq)
+(STRCMP(name->name, 'bananas'))'
+
+While this script is executing, any operation that would cause a dentry
+allocation where the name is 'bananas' fails, as expected.
+
+To note, STRCMP is a workaround for some rewriter issues. It will take input of
+the form (x->...->z, 'literal'), and generate some equivalent code that the
+verifier is more friendly about. It's not horribly robust, but works for the
+purposes of making string comparisons a bit easier.
+
+Finally, we briefly demonstrate how to inject bio failures. The mechanism is
+identical, so any information from above will apply.
+
+Let's say we want to fail bio requests when the request is to some specific
+sector. An example use case would be to fail superblock writes in btrfs. For
+btrfs, we know that there must be a superblock at 65536 bytes, or sector 128.
+This allows us to run the following:
+
+# ./inject.py bio -v -I 'linux/blkdev.h'  '(({struct gendisk *d = bio->bi_disk;
+struct disk_part_tbl *tbl = d->part_tbl; struct hd_struct **parts = (void *)tbl +
+sizeof(struct disk_part_tbl); struct hd_struct **partp = parts + bio->bi_partno;
+struct hd_struct *p = *partp; dev_t disk = p->__dev.devt; disk ==
+MKDEV(254,16);}) && bio->bi_iter.bi_sector == 128)'
+
+The predicate in the command above has two parts. The first is a compound
+statement which shortens to "only if the system is btrfs", but is long due
+to rewriter/verifier shenanigans. The major/minor information can be found
+however; I used Python. The second part simply checks the starting
+address of bi_iter. While executing, this script effectively fails superblock
+writes to the superblock at sector 128 without affecting other filesystems.
+
+As an extension to the above, one could easily fail all btrfs superblock writes
+(we only fail the primary) by calculating the sector number of the mirrors and
+amending the predicate accordingly.
