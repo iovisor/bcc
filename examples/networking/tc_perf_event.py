@@ -54,8 +54,8 @@ def print_skb_event(cpu, data, size):
 
     # Only print for echo request
     if icmp_type == 128:
-        src_ip = bytes(skb_event.raw[22:38])
-        dst_ip = bytes(skb_event.raw[38:54])
+        src_ip = bytes(bytearray(skb_event.raw[22:38]))
+        dst_ip = bytes(bytearray(skb_event.raw[38:54]))
         print("%-3s %-32s %-12s 0x%08x" %
               (cpu, socket.inet_ntop(socket.AF_INET6, src_ip),
                socket.inet_ntop(socket.AF_INET6, dst_ip),
