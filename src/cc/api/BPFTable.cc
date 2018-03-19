@@ -157,6 +157,13 @@ BPFStackTable::BPFStackTable(const TableDesc& desc,
   };
 }
 
+BPFStackTable::BPFStackTable(BPFStackTable&& that) :
+  BPFTableBase<int, stacktrace_t>(that.desc),
+  symbol_option_(std::move(that.symbol_option_)),
+  pid_sym_(std::move(that.pid_sym_)) {
+    that.pid_sym_.clear();
+}
+
 BPFStackTable::~BPFStackTable() {
   for (auto it : pid_sym_)
     bcc_free_symcache(it.second, it.first);
