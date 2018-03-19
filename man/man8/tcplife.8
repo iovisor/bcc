@@ -10,10 +10,10 @@ duration, and throughput for the session. This is useful for workload
 characterisation and flow accounting: identifying what connections are
 happening, with the bytes transferred.
 
-This tool works using the tcp:tcp_set_state tracepoint if it exists, added
-to Linux 4.15, and switches to using kernel dynamic tracing for older kernels.
-Only TCP state changes are traced, so it is expected that the overhead of
-this tool is much lower than typical send/receive tracing.
+This tool works using the sock:inet_sock_set_state tracepoint if it exists,
+added to Linux 4.16, and switches to using kernel dynamic tracing for older
+kernels. Only TCP state changes are traced, so it is expected that the
+overhead of this tool is much lower than typical send/receive tracing.
 
 Since this uses BPF, only the root user can use this tool.
 .SH REQUIREMENTS
