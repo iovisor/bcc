@@ -8,7 +8,8 @@ Build-Depends: debhelper (>= 9), cmake, libllvm3.7 | libllvm3.8,
     libelf-dev, bison, flex, libfl-dev, libedit-dev, zlib1g-dev, git,
     clang-format | clang-format-3.7 | clang-format-3.8, python (>= 2.7),
     python-netaddr, python-pyroute2, luajit, libluajit-5.1-dev, arping,
-    inetutils-ping | iputils-ping, iperf, netperf, ethtool, devscripts
+    inetutils-ping | iputils-ping, iperf, netperf, ethtool, devscripts,
+    python3
 Homepage: https://github.com/iovisor/bcc
 
 Package: libbcc
@@ -27,6 +28,11 @@ Package: python-bcc
 Architecture: all
 Depends: libbcc, python, binutils
 Description: Python wrappers for BPF Compiler Collection (BCC)
+
+Package: python3-bcc
+Architecture: all
+Depends: libbcc, python3, binutils
+Description: Python3 wrappers for BPF Compiler Collection (BCC)
 
 Package: bcc-tools
 Architecture: all
