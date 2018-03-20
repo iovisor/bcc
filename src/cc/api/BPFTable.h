@@ -289,6 +289,7 @@ class BPFStackTable : public BPFTableBase<int, stacktrace_t> {
   BPFStackTable(const TableDesc& desc,
                 bool use_debug_file,
                 bool check_debug_file_crc);
+  BPFStackTable(BPFStackTable&& that);
   ~BPFStackTable();
 
   void clear_table_non_atomic();
