@@ -6,8 +6,9 @@
 #
 # USAGE: tcplife [-h] [-C] [-S] [-p PID] [interval [count]]
 #
-# This uses the tcp:tcp_set_state tracepoint if it exists (added to
-# Linux 4.15), else it uses kernel dynamic tracing of tcp_set_state().
+# This uses the sock:inet_sock_set_state tracepoint if it exists (added to
+# Linux 4.16, and replacing the earlier tcp:tcp_set_state), else it uses
+# kernel dynamic tracing of tcp_set_state().
 #
 # While throughput counters are emitted, they are fetched in a low-overhead
 # manner: reading members of the tcp_info struct on TCP close. ie, we do not
@@ -110,9 +111,9 @@ BPF_HASH(whoami, struct sock *, struct id_t);
 
 #
 # XXX: The following is temporary code for older kernels, Linux 4.14 and
-# older. It uses kprobes to instrument tcp_set_state(). On Linux 4.15 and
-# later, the tcp:tcp_set_state tracepoint should be used instead, as is
-# done by the code that follows this. In the distant future (2021?), this
+# older. It uses kprobes to instrument tcp_set_state(). On Linux 4.16 and
+# later, the sock:inet_sock_set_state tracepoint should be used instead, as
+# is done by the code that follows this. In the distant future (2021?), this
 # kprobe code can be removed. This is why there is so much code
 # duplication: to make removal easier.
 #
@@ -235,10 +236,13 @@ int kprobe__tcp_set_state(struct pt_regs *ctx, struct sock *sk, int state)
 """
 
 bpf_text_tracepoint = """
-TRACEPOINT_PROBE(tcp, tcp_set_state)
+TRACEPOINT_PROBE(sock, inet_sock_set_state)
 {
+    if (args->protocol != IPPROTO_TCP)
+        return 0;
+
     u32 pid = bpf_get_current_pid_tgid() >> 32;
-    // sk is mostly used as a UUID, once for skc_family, and two tcp stats:
+    // sk is mostly used as a UUID, and for two tcp stats:
     struct sock *sk = (struct sock *)args->skaddr;
 
     // lport is either used in a filter here, or later
@@ -310,10 +314,7 @@ TRACEPOINT_PROBE(tcp, tcp_set_state)
     bpf_probe_read(&rx_b, sizeof(rx_b), &tp->bytes_received);
     bpf_probe_read(&tx_b, sizeof(tx_b), &tp->bytes_acked);
 
-    u16 family = 0;
-    bpf_probe_read(&family, sizeof(family), &sk->__sk_common.skc_family);
-
-    if (family == AF_INET) {
+    if (args->family == AF_INET) {
         struct ipv4_data_t data4 = {.span_us = delta_us,
             .rx_b = rx_b, .tx_b = tx_b};
         data4.ts_us = bpf_ktime_get_ns() / 1000;
@@ -354,7 +355,7 @@ TRACEPOINT_PROBE(tcp, tcp_set_state)
 }
 """
 
-if (BPF.tracepoint_exists("tcp", "tcp_set_state")):
+if (BPF.tracepoint_exists("sock", "inet_sock_set_state")):
     bpf_text += bpf_text_tracepoint
 else:
     bpf_text += bpf_text_kprobe
