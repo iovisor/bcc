@@ -8,6 +8,9 @@ predicates are satisfied. Uses Linux eBPF/bcc.
 inject injects errors into specified kernel functionality when a given call
 chain and associated predicates are satsified.
 
+WARNING: This tool injects failures into key kernel functions and may crash the
+kernel. You should know what you're doing if you're using this tool.
+
 This makes use of a Linux 4.16 feature (bpf_override_return())
 
 Additionally, use of the kmalloc failure mode is only possible with 

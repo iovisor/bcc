@@ -1,36 +1,61 @@
 Some examples for inject
 
 inject guarantees the appropriate erroneous return of the specified injection
-mode(kmalloc,bio,etc) given a call chain and an optional set of predicates. You
+mode (kmalloc,bio,etc) given a call chain and an optional set of predicates. You
 can also optionally print out the generated BPF program for
 modification/debugging purposes.
 
-For example, suppose you want to fail kmalloc() from mount_subtree() when called
-from btrfs_mount():
+As a simple example, let's say you wanted to fail all mounts. While we cannot
+fail the mount() syscall directly (a patch is in the works), we can easily
+fail do_mount() calls like so:
 
-# ./inject.py kmalloc -I 'linux/mm.h' -I 'linux/fs.h' -v '(true)<-
-mount_subtree(struct vfsmount *mnt, const char *name) (true) <-
-btrfs_mount(struct file_system_type *fs_type, int flags, const char
-*device_name, void *data)'
+# ./inject.py kmalloc -v -I 'linux/fs.h' 'do_mount()'
 
-The first argument indicates the mode(or what to fail). Appropriate headers
-are specified. The verbosity flag prints the generated program.
+The first argument indicates the mode (or what to fail). Appropriate headers are
+specified. The verbosity flag prints the generated program.
 
-Note that btrfs_mount() has no accompanying predicate. In such cases the program
-defaults to (true).
+Trying to mount various filesystems will fail and report an inability to
+allocate memory, as expected.
+
+Whenever a predicate is missing, an implicit "(true)" is inserted. The example
+above can be explicitly written as:
+
+# ./inject.py kmalloc -v -I 'linux/fs.h' '(true) => do_mount()(true)'
+
+The "(true)" without an associated function is a predicate for the error
+injection mechanism of the current mode. In the case of kmalloc, the predicate
+would have access to the arguments of:
+
+	int should_failslab(struct kmem_cache *s, gfp_t gfpflags);
+
+The bio mode works similarly, with access to the arguments of:
+	
+	static noinline int should_fail_bio(struct bio *bio)
+
+We also note that it's unnecessary to state the arguments of the function if you
+have no intention to reference them in the associated predicate.
+
+Now let's say we want to be a bit more specific; suppose you want to fail
+kmalloc() from mount_subtree() when called from btrfs_mount(). This will fail
+only btrfs mounts:
+
+# ./inject.py kmalloc -I 'linux/fs.h' -v 'mount_subtree() => btrfs_mount()'
+
+Attempting to mount btrfs filesystem during the execution of this command will
+yield an error, but other filesystems will be fine.
 
 Next, lets say we want to hit one of the BUG_ONs in fs/btrfs. As of 4.16-rc3,
 there is a BUG_ON in btrfs_prepare_close_one_device() at fs/btrfs/volumes.c:1002
 
 To hit this, we can use the following:
 
-# ./inject.py kmalloc -v -I 'linux/mm.h' '(true)<- btrfs_alloc_device(struct
-btrfs_fs_info *fs_info, const u64 *ded, const u8 *uuid)(true)<-
-btrfs_close_devices(struct btrfs_fs_devices *fs_devices)(true)'
+# ./inject.py kmalloc -v -I 'linux/mm.h' 'btrfs_alloc_device()
+	=> btrfs_close_devices()'
 
 While the script was executing, I mounted and unmounted btrfs, causing a
 segfault on umount(since that satisfied the call path indicated). A look at
-dmesg will confirm we successfully hit that BUG_ON and caused a panic.
+dmesg will confirm that the erroneous return value injected by the script
+tripped the BUG_ON, causing a segfault down the line.
 
 In general, it's worth noting that the required specificity of the call chain is
 dependent on how much granularity you need. The example above might have
@@ -43,12 +68,14 @@ very often, we can distinguish distinct calls with function arguments. Let's say
 we want to fail the dentry allocation of a file creatively named 'bananas'. We
 can do the following:
 
-# ./inject.py kmalloc -v -I 'linux/fs.h' '(true) <- d_alloc_parallel(struct
-dentry *parent, const struct qstr *name, wait_queue_head_t *wq)
-(STRCMP(name->name, 'bananas'))'
+# ./inject.py kmalloc -v -I 'linux/fs.h' 'd_alloc_parallel(struct dentry
+*parent, const struct qstr *name)(STRCMP(name->name, 'bananas'))' 
 
 While this script is executing, any operation that would cause a dentry
 allocation where the name is 'bananas' fails, as expected.
+
+Here, since we're referencing a function argument in our predicate, we need to
+provide the function signature up to the argument we're using.
 
 To note, STRCMP is a workaround for some rewriter issues. It will take input of
 the form (x->...->z, 'literal'), and generate some equivalent code that the
@@ -79,3 +106,20 @@ writes to the superblock at sector 128 without affecting other filesystems.
 As an extension to the above, one could easily fail all btrfs superblock writes
 (we only fail the primary) by calculating the sector number of the mirrors and
 amending the predicate accordingly.
+
+USAGE message:
+
+usage: inject.py [-h] [-I header] [-v] mode spec
+
+Fail specified kernel functionality when call chain and predicates are met
+
+positional arguments:
+  mode                  indicate which base kernel function to fail
+  spec                  specify call chain
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -I header, --include header
+                        additional header files to include in the BPF program
+  -v, --verbose         print BPF program
+
