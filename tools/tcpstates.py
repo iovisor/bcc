@@ -70,9 +70,9 @@ struct ipv4_data_t {
     u64 ts_us;
     u64 skaddr;
     u64 pid;
+    u64 ports;
     u64 saddr;
     u64 daddr;
-    u64 ports;
     u64 span_us;
     u64 oldstate;
     u64 newstate;
@@ -84,9 +84,9 @@ struct ipv6_data_t {
     u64 ts_us;
     u64 skaddr;
     u64 pid;
+    u64 ports;
     unsigned __int128 saddr;
     unsigned __int128 daddr;
-    u64 ports;
     u64 span_us;
     u64 oldstate;
     u64 newstate;
@@ -193,9 +193,9 @@ class Data_ipv4(ct.Structure):
         ("ts_us", ct.c_ulonglong),
         ("skaddr", ct.c_ulonglong),
         ("pid", ct.c_ulonglong),
+        ("ports", ct.c_ulonglong),
         ("saddr", ct.c_ulonglong),
         ("daddr", ct.c_ulonglong),
-        ("ports", ct.c_ulonglong),
         ("span_us", ct.c_ulonglong),
         ("oldstate", ct.c_ulonglong),
         ("newstate", ct.c_ulonglong),
@@ -207,9 +207,9 @@ class Data_ipv6(ct.Structure):
         ("ts_us", ct.c_ulonglong),
         ("skaddr", ct.c_ulonglong),
         ("pid", ct.c_ulonglong),
+        ("ports", ct.c_ulonglong),
         ("saddr", (ct.c_ulonglong * 2)),
         ("daddr", (ct.c_ulonglong * 2)),
-        ("ports", ct.c_ulonglong),
         ("span_us", ct.c_ulonglong),
         ("oldstate", ct.c_ulonglong),
         ("newstate", ct.c_ulonglong),
