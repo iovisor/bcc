@@ -66,16 +66,15 @@ BPF_HASH(last, struct sock *, u64);
 
 // separate data structs for ipv4 and ipv6
 struct ipv4_data_t {
-    // XXX: switch some to u32's when supported
     u64 ts_us;
     u64 skaddr;
-    u64 pid;
-    u64 ports;
     u64 saddr;
     u64 daddr;
     u64 span_us;
-    u64 oldstate;
-    u64 newstate;
+    u32 pid;
+    u32 ports;
+    u32 oldstate;
+    u32 newstate;
     char task[TASK_COMM_LEN];
 };
 BPF_PERF_OUTPUT(ipv4_events);
@@ -83,13 +82,13 @@ BPF_PERF_OUTPUT(ipv4_events);
 struct ipv6_data_t {
     u64 ts_us;
     u64 skaddr;
-    u64 pid;
-    u64 ports;
     unsigned __int128 saddr;
     unsigned __int128 daddr;
     u64 span_us;
-    u64 oldstate;
-    u64 newstate;
+    u32 pid;
+    u32 ports;
+    u32 oldstate;
+    u32 newstate;
     char task[TASK_COMM_LEN];
 };
 BPF_PERF_OUTPUT(ipv6_events);
@@ -192,13 +191,13 @@ class Data_ipv4(ct.Structure):
     _fields_ = [
         ("ts_us", ct.c_ulonglong),
         ("skaddr", ct.c_ulonglong),
-        ("pid", ct.c_ulonglong),
-        ("ports", ct.c_ulonglong),
         ("saddr", ct.c_ulonglong),
         ("daddr", ct.c_ulonglong),
         ("span_us", ct.c_ulonglong),
-        ("oldstate", ct.c_ulonglong),
-        ("newstate", ct.c_ulonglong),
+        ("pid", ct.c_uint),
+        ("ports", ct.c_uint),
+        ("oldstate", ct.c_uint),
+        ("newstate", ct.c_uint),
         ("task", ct.c_char * TASK_COMM_LEN)
     ]
 
@@ -206,13 +205,13 @@ class Data_ipv6(ct.Structure):
     _fields_ = [
         ("ts_us", ct.c_ulonglong),
         ("skaddr", ct.c_ulonglong),
-        ("pid", ct.c_ulonglong),
-        ("ports", ct.c_ulonglong),
         ("saddr", (ct.c_ulonglong * 2)),
         ("daddr", (ct.c_ulonglong * 2)),
         ("span_us", ct.c_ulonglong),
-        ("oldstate", ct.c_ulonglong),
-        ("newstate", ct.c_ulonglong),
+        ("pid", ct.c_uint),
+        ("ports", ct.c_uint),
+        ("oldstate", ct.c_uint),
+        ("newstate", ct.c_uint),
         ("task", ct.c_char * TASK_COMM_LEN)
     ]
 
