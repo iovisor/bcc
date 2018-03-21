@@ -1,0 +1,128 @@
+.TH tcpstates 8  "2018-03-20" "USER COMMANDS"
+.SH NAME
+tcpstates \- Trace TCP session state changes with durations. Uses Linux eBPF/bcc.
+.SH SYNOPSIS
+.B tcpstates [\-h] [\-T] [\-t] [\-w] [\-s] [\-D PORTS] [\-L PORTS]
+.SH DESCRIPTION
+This tool traces TCP session state changes while tracing, and prints details
+including the duration in each state. This can help explain the latency of
+TCP connections: whether the time is spent in the ESTABLISHED state (data
+transfer), or initialization state (SYN_SENT), etc.
+
+This tool works using the sock:inet_sock_set_state tracepoint, which was
+added to Linux 4.16. Linux 4.16 also included extra state transitions so that
+all TCP transitions could be observed by this tracepoint.
+
+Only TCP state changes are traced, so it is expected that the
+overhead of this tool is much lower than typical send/receive tracing.
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc, and the sock:inet_sock_set_state tracepoint.
+.SH OPTIONS
+.TP
+\-h
+Print usage message.
+.TP
+\-s
+Comma separated values output (parseable).
+.TP
+\-t
+Include a timestamp column (seconds).
+.TP
+\-T
+Include a time column (HH:MM:SS).
+.TP
+\-w
+Wide column output (fits IPv6 addresses).
+.TP
+\-L PORTS
+Comma-separated list of local ports to trace (filtered in-kernel).
+.TP
+\-D PORTS
+Comma-separated list of destination ports to trace (filtered in-kernel).
+.SH EXAMPLES
+.TP
+Trace all TCP sessions, and show all state changes:
+#
+.B tcpstates
+.TP
+Include a timestamp column, and wide column output:
+#
+.B tcpstates \-tw
+.TP
+Trace connections to local ports 80 and 81 only:
+#
+.B tcpstates \-L 80,81
+.TP
+Trace connections to remote port 80 only:
+#
+.B tcpstates \-D 80
+.SH FIELDS
+.TP
+TIME
+Time of the change, in HH:MM:SS format.
+.TP
+TIME(s)
+Time of the change, in seconds.
+.TP
+C-PID
+The current on-CPU process ID. This may show the process that owns the TCP
+session if the state change executes in synchronous process context, else it
+is likely to show the kernel (asynchronous state change).
+.TP
+C-COMM
+The current on-CPU process name. This may show the process that owns the TCP
+session if the state change executes in synchronous process context, else it
+is likely to show the kernel (asynchronous state change).
+.TP
+IP
+IP address family (4 or 6)
+.TP
+LADDR
+Local IP address.
+.TP
+DADDR
+Remote IP address.
+.TP
+LPORT
+Local port.
+.TP
+DPORT
+Destination port.
+.TP
+OLDSTATE
+Previous TCP state.
+.TP
+NEWSTATE
+New TCP state.
+.TP
+MS
+Duration of this state.
+.SH OVERHEAD
+This traces the kernel TCP set state function, which should be called much
+less often than send/receive tracing, and therefore have lower overhead. The
+overhead of the tool is relative to the rate of new TCP sessions: if this is
+high, over 10,000 per second, then there may be noticeable overhead just to
+print out 10k lines of formatted output per second.
+
+You can find out the rate of new TCP sessions using "sar \-n TCP 1", and
+adding the active/s and passive/s columns.
+
+As always, test and understand this tools overhead for your types of
+workloads before production use.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Brendan Gregg
+.SH SEE ALSO
+tcpaccept(8), tcpconnect(8), tcptop(8), tcplife(8)
