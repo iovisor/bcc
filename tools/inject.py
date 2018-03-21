@@ -347,7 +347,7 @@ class Tool:
             count += c == '('
             count -= c == ')'
             if not count:
-                if c == '\0' or (c == '<' and data[i + 1] == '-'):
+                if c == '\0' or (c == '=' and data[i + 1] == '>'):
                     if len(cur_frame) == 2:
                         frame = tuple(cur_frame)
                     elif cur_frame[0][0] == '(':
