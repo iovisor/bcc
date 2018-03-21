@@ -426,6 +426,7 @@ struct pid_struct {
     def _generate_program(self):
         # leave out auto includes for now
 
+        self.program += "#include <linux/mm.h>\n"
         for include in (self.args.include or []):
             self.program += "#include <%s>\n" % include
 

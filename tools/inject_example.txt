@@ -9,7 +9,7 @@ As a simple example, let's say you wanted to fail all mounts. While we cannot
 fail the mount() syscall directly (a patch is in the works), we can easily
 fail do_mount() calls like so:
 
-# ./inject.py kmalloc -v -I 'linux/fs.h' 'do_mount()'
+# ./inject.py kmalloc -v 'do_mount()'
 
 The first argument indicates the mode (or what to fail). Appropriate headers are
 specified. The verbosity flag prints the generated program.
@@ -20,7 +20,7 @@ allocate memory, as expected.
 Whenever a predicate is missing, an implicit "(true)" is inserted. The example
 above can be explicitly written as:
 
-# ./inject.py kmalloc -v -I 'linux/fs.h' '(true) => do_mount()(true)'
+# ./inject.py kmalloc -v '(true) => do_mount()(true)'
 
 The "(true)" without an associated function is a predicate for the error
 injection mechanism of the current mode. In the case of kmalloc, the predicate
@@ -39,7 +39,7 @@ Now let's say we want to be a bit more specific; suppose you want to fail
 kmalloc() from mount_subtree() when called from btrfs_mount(). This will fail
 only btrfs mounts:
 
-# ./inject.py kmalloc -I 'linux/fs.h' -v 'mount_subtree() => btrfs_mount()'
+# ./inject.py kmalloc -v 'mount_subtree() => btrfs_mount()'
 
 Attempting to mount btrfs filesystem during the execution of this command will
 yield an error, but other filesystems will be fine.
@@ -49,8 +49,7 @@ there is a BUG_ON in btrfs_prepare_close_one_device() at fs/btrfs/volumes.c:1002
 
 To hit this, we can use the following:
 
-# ./inject.py kmalloc -v -I 'linux/mm.h' 'btrfs_alloc_device()
-	=> btrfs_close_devices()'
+# ./inject.py kmalloc -v 'btrfs_alloc_device() => btrfs_close_devices()'
 
 While the script was executing, I mounted and unmounted btrfs, causing a
 segfault on umount(since that satisfied the call path indicated). A look at
@@ -68,8 +67,8 @@ very often, we can distinguish distinct calls with function arguments. Let's say
 we want to fail the dentry allocation of a file creatively named 'bananas'. We
 can do the following:
 
-# ./inject.py kmalloc -v -I 'linux/fs.h' 'd_alloc_parallel(struct dentry
-*parent, const struct qstr *name)(STRCMP(name->name, 'bananas'))' 
+# ./inject.py kmalloc -v 'd_alloc_parallel(struct dentry *parent, const struct
+qstr *name)(STRCMP(name->name, 'bananas'))' 
 
 While this script is executing, any operation that would cause a dentry
 allocation where the name is 'bananas' fails, as expected.
