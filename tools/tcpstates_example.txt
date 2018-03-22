@@ -1,0 +1,52 @@
+Demonstrations of tcpstates, the Linux BPF/bcc version.
+
+
+tcpstates prints TCP state change information, including the duration in each
+state as milliseconds. For example, a single TCP session:
+
+# tcpstates
+SKADDR           C-PID C-COMM     LADDR           LPORT RADDR           RPORT OLDSTATE    -> NEWSTATE    MS
+ffff9fd7e8192000 22384 curl       100.66.100.185  0     52.33.159.26    80    CLOSE       -> SYN_SENT    0.000
+ffff9fd7e8192000 0     swapper/5  100.66.100.185  63446 52.33.159.26    80    SYN_SENT    -> ESTABLISHED 1.373
+ffff9fd7e8192000 22384 curl       100.66.100.185  63446 52.33.159.26    80    ESTABLISHED -> FIN_WAIT1   176.042
+ffff9fd7e8192000 0     swapper/5  100.66.100.185  63446 52.33.159.26    80    FIN_WAIT1   -> FIN_WAIT2   0.536
+ffff9fd7e8192000 0     swapper/5  100.66.100.185  63446 52.33.159.26    80    FIN_WAIT2   -> CLOSE       0.006
+^C
+
+This showed that the most time was spent in the ESTABLISHED state (which then
+transitioned to FIN_WAIT1), which was 176.042 milliseconds.
+
+The first column is the socked address, as the output may include lines from
+different sessions interleaved. The next two columns show the current on-CPU
+process ID and command name: these may show the process that owns the TCP
+session, depending on whether the state change executes synchronously in
+process context. If that's not the case, they may show kernel details.
+
+
+USAGE:
+
+# tcpstates -h
+usage: tcpstates [-h] [-T] [-t] [-w] [-s] [-L LOCALPORT] [-D REMOTEPORT]
+
+Trace TCP session state changes and durations
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -T, --time            include time column on output (HH:MM:SS)
+  -t, --timestamp       include timestamp on output (seconds)
+  -w, --wide            wide column output (fits IPv6 addresses)
+  -s, --csv             comma separated values output
+  -L LOCALPORT, --localport LOCALPORT
+                        comma-separated list of local ports to trace.
+  -D REMOTEPORT, --remoteport REMOTEPORT
+                        comma-separated list of remote ports to trace.
+
+examples:
+    ./tcpstates           # trace all TCP state changes
+    ./tcpstates -t        # include timestamp column
+    ./tcpstates -T        # include time column (HH:MM:SS)
+    ./tcpstates -w        # wider colums (fit IPv6)
+    ./tcpstates -stT      # csv output, with times & timestamps
+    ./tcpstates -L 80     # only trace local port 80
+    ./tcpstates -L 80,81  # only trace local ports 80 and 81
+    ./tcpstates -D 80     # only trace remote port 80
