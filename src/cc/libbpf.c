@@ -149,6 +149,10 @@ static struct bpf_helper helpers[] = {
   {"getsockopt", "4.15"},
   {"override_return", "4.16"},
   {"sock_ops_cb_flags_set", "4.16"},
+  {"msg_redirect_map", "4.16"},
+  {"msg_apply_bytes", "4.16"},
+  {"msg_cork_bytes", "4.16"},
+  {"msg_pull_data", "4.16"},
 };
 
 static uint64_t ptr_to_u64(void *ptr)
