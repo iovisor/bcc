@@ -348,7 +348,7 @@ class BPF(object):
         if fd < 0:
             atexit.register(self.donothing)
             if ct.get_errno() == errno.EPERM:
-                raise Exception("Need super-user privilges to run")
+                raise Exception("Need super-user privileges to run")
 
             errstr = os.strerror(ct.get_errno())
             raise Exception("Failed to load BPF program %s: %s" %
