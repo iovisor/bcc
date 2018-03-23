@@ -481,9 +481,18 @@ class BPF(object):
         with open("%s/../kprobes/blacklist" % TRACEFS, "rb") as blacklist_f:
             blacklist = set([line.rstrip().split()[1] for line in blacklist_f])
         fns = []
+
+        found_stext = False
         with open("/proc/kallsyms", "rb") as avail_file:
             for line in avail_file:
                 (_, t, fn) = line.rstrip().split()[:3]
+                if found_stext is False:
+                    if fn == b'_stext':
+                        found_stext = True
+                    continue
+
+                if fn == b'_etext':
+                    break
                 if (t.lower() in [b't', b'w']) and re.match(event_re, fn) \
                     and fn not in blacklist:
                     fns.append(fn)
@@ -558,7 +567,7 @@ class BPF(object):
         ev_name = b"r_" + event.replace(b"+", b"_").replace(b".", b"_")
         fd = lib.bpf_attach_kprobe(fn.fd, 1, ev_name, event)
         if fd < 0:
-            raise Exception("Failed to attach BPF to kprobe")
+            raise Exception("Failed to attach BPF to kretprobe")
         self._add_kprobe_fd(ev_name, fd)
         return self
 
@@ -877,7 +886,7 @@ class BPF(object):
         ev_name = self._get_uprobe_evname(b"r", path, addr, pid)
         fd = lib.bpf_attach_uprobe(fn.fd, 1, ev_name, path, addr, pid)
         if fd < 0:
-            raise Exception("Failed to attach BPF to uprobe")
+            raise Exception("Failed to attach BPF to uretprobe")
         self._add_uprobe_fd(ev_name, fd)
         return self
 
