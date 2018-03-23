@@ -18,6 +18,14 @@ if [ $? -ne 0 ]; then
 	((ret++))
 fi
 
+virtual=$(grep -oP "(?<=^\sFN\()\w+" src/cc/compat/linux/virtual_bpf.h | tail -n +2 | sort -u)
+dif=$(diff <(echo "$compat") <(echo "$virtual"))
+if [ $? -ne 0 ]; then
+	echo "The lists of helpers in src/cc/compat/linux/bpf.h and src/cc/compat/linux/virtual_bpf.h differ:"
+	echo "$dif"
+	((ret++))
+fi
+
 export=$(grep -oP "(?<=BPF_FUNC_)\w+" src/cc/export/helpers.h | sort -u)
 dif=$(diff <(echo "$compat") <(echo "$export"))
 if [ $? -ne 0 ]; then
