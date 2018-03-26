@@ -191,7 +191,7 @@ bool ProcSyms::resolve_addr(uint64_t addr, struct bcc_symbol *sym,
     if (mod.contains(addr, offset)) {
       if (mod.find_addr(offset, sym)) {
         if (demangle) {
-          if (sym->name)
+          if (sym->name && (!strncmp(sym->name, "_Z", 2) || !strncmp(sym->name, "___Z", 4)))
             sym->demangle_name =
                 abi::__cxa_demangle(sym->name, nullptr, nullptr, nullptr);
           if (!sym->demangle_name)
