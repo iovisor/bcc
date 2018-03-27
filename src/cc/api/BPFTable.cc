@@ -178,6 +178,8 @@ void BPFStackTable::clear_table_non_atomic() {
 std::vector<uintptr_t> BPFStackTable::get_stack_addr(int stack_id) {
   std::vector<uintptr_t> res;
   stacktrace_t stack;
+  if (stack_id < 0)
+    return res;
   if (!lookup(&stack_id, &stack))
     return res;
   for (int i = 0; (i < BPF_MAX_STACK_DEPTH) && (stack.ip[i] != 0); i++)
@@ -189,6 +191,8 @@ std::vector<std::string> BPFStackTable::get_stack_symbol(int stack_id,
                                                          int pid) {
   auto addresses = get_stack_addr(stack_id);
   std::vector<std::string> res;
+  if (addresses.empty())
+    return res;
   res.reserve(addresses.size());
 
   if (pid < 0)
