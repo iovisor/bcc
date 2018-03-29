@@ -362,7 +362,7 @@ try:
     # Skip the first line, which is a header. The rest of the lines are simply
     # SYSCALL_NUM\tSYSCALL_NAME pairs.
     out = subprocess.check_output('ausyscall --dump | tail -n +2', shell=True)
-    syscalls = dict(map(parse_syscall, out.strip().split('\n')))
+    syscalls = dict(map(parse_syscall, out.decode().strip().split('\n')))
 except Exception as e:
     if platform.machine() == "x86_64":
         pass
