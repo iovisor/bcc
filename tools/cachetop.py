@@ -88,16 +88,16 @@ def get_processes_stats(
         whits = 0
 
         for k, v in count.items():
-            if re.match('mark_page_accessed', bpf.ksym(k)) is not None:
+            if re.match(b'mark_page_accessed', bpf.ksym(k)) is not None:
                 mpa = max(0, v)
 
-            if re.match('mark_buffer_dirty', bpf.ksym(k)) is not None:
+            if re.match(b'mark_buffer_dirty', bpf.ksym(k)) is not None:
                 mbd = max(0, v)
 
-            if re.match('add_to_page_cache_lru', bpf.ksym(k)) is not None:
+            if re.match(b'add_to_page_cache_lru', bpf.ksym(k)) is not None:
                 apcl = max(0, v)
 
-            if re.match('account_page_dirtied', bpf.ksym(k)) is not None:
+            if re.match(b'account_page_dirtied', bpf.ksym(k)) is not None:
                 apd = max(0, v)
 
             # access = total cache access incl. reads(mpa) and writes(mbd)
