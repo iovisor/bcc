@@ -425,7 +425,11 @@ StatusTuple CodegenLLVM::visit_string_expr_node(StringExprNode *n) {
   Value *global = B.CreateGlobalString(n->val_);
   Value *ptr = make_alloca(resolve_entry_stack(), B.getInt8Ty(), "",
                            B.getInt64(n->val_.size() + 1));
+#if LLVM_MAJOR_VERSION >= 7
+  B.CreateMemCpy(ptr, 1, global, 1, n->val_.size() + 1);
+#else
   B.CreateMemCpy(ptr, global, n->val_.size() + 1, 1);
+#endif
   expr_ = ptr;
 
   return StatusTuple(0);
