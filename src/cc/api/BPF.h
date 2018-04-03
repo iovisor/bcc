@@ -155,7 +155,11 @@ class BPF {
   BPFPerfBuffer* get_perf_buffer(const std::string& name);
   // Poll an opened Perf Buffer of given name with given timeout, using callback
   // provided when opening. Do nothing if such open Perf Buffer doesn't exist.
-  void poll_perf_buffer(const std::string& name, int timeout_ms = -1);
+  // Returns: 
+  //   -1 on error or if perf buffer with such name doesn't exist; 
+  //   0, if no data was available before timeout; 
+  //   number of CPUs that have new data, otherwise.
+  int poll_perf_buffer(const std::string& name, int timeout_ms = -1);
 
   StatusTuple load_func(const std::string& func_name, enum bpf_prog_type type,
                         int& fd);

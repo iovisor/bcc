@@ -306,14 +306,13 @@ StatusTuple BPFPerfBuffer::close_all_cpu() {
   return StatusTuple(0);
 }
 
-void BPFPerfBuffer::poll(int timeout_ms) {
+int BPFPerfBuffer::poll(int timeout_ms) {
   if (epfd_ < 0)
-    return;
+    return -1;
   int cnt = epoll_wait(epfd_, ep_events_.get(), cpu_readers_.size(), timeout_ms);
-  if (cnt <= 0)
-    return;
   for (int i = 0; i < cnt; i++)
     perf_reader_event_read(static_cast<perf_reader*>(ep_events_[i].data.ptr));
+  return cnt;
 }
 
 BPFPerfBuffer::~BPFPerfBuffer() {

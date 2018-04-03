@@ -495,11 +495,11 @@ BPFPerfBuffer* BPF::get_perf_buffer(const std::string& name) {
   return (it == perf_buffers_.end()) ? nullptr : it->second;
 }
 
-void BPF::poll_perf_buffer(const std::string& name, int timeout_ms) {
+int BPF::poll_perf_buffer(const std::string& name, int timeout_ms) {
   auto it = perf_buffers_.find(name);
   if (it == perf_buffers_.end())
-    return;
-  it->second->poll(timeout_ms);
+    return -1;
+  return it->second->poll(timeout_ms);
 }
 
 StatusTuple BPF::load_func(const std::string& func_name, bpf_prog_type type,
