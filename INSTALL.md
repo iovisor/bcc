@@ -310,7 +310,7 @@ sudo make install
 
 ```
 sudo zypper in bison cmake flex gcc gcc-c++ git libelf-devel libstdc++-devel \
-  llvm-devel pkg-config python-devel python-setuptools python3-devel \
+  llvm-devel clang-devel pkg-config python-devel python-setuptools python3-devel \
   python3-setuptools
 sudo zypper in luajit-devel       # for lua support in openSUSE Leap 42.2 or later
 sudo zypper in lua51-luajit-devel # for lua support in openSUSE Tumbleweed
