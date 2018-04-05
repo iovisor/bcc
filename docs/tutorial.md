@@ -224,7 +224,7 @@ TIME     PID    IP LADDR:LPORT          T> RADDR:RPORT          STATE
 
 tcprerans prints one line of output for every TCP retransmit packet, with details including source and destination addresses, and kernel state of the TCP connection.
 
-TCP retransmissions cause latency and throughput issues. For ESTABLESHID retransmits, look for patterns with networks. For SYN_SENT, this may point to target kernel CPU saturation and kernel packet drops.
+TCP retransmissions cause latency and throughput issues. For ESTABLISHED retransmits, look for patterns with networks. For SYN_SENT, this may point to target kernel CPU saturation and kernel packet drops.
 
 More [examples](../tools/tcpretrans_example.txt).
 

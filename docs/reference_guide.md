@@ -255,7 +255,7 @@ Examples in situ:
 Syntax: ```int bpf_probe_read_str(void *dst, int size, const void *src)```
 
 Return:
-  - \> 0 length of the string including the trailing NUL on success
+  - \> 0 length of the string including the trailing NULL on success
   - \< 0 error
 
 This copies a `NULL` terminated string from memory location to BPF stack, so that BPF can later operate on it. In case the string length is smaller than size, the target is not padded with further `NULL` bytes. In case the string length is larger than size, just `size - 1` bytes are copied and the last byte is set to `NULL`.
@@ -733,7 +733,7 @@ b.attach_kprobe(event="some_kprobe_event", fn_name="do_tail_call")
 
 This assigns ```tail_call()``` to ```prog_array[2]```. In the end of ```do_tail_call()```, ```prog_array.call(ctx, 2)``` tail-calls ```tail_call()``` and executes it.
 
-**NOTE:** To prevent infinite loop, the maximun number of tail-calls is 32 ([```MAX_TAIL_CALL_CNT```](https://github.com/torvalds/linux/search?l=C&q=MAX_TAIL_CALL_CNT+path%3Ainclude%2Flinux&type=Code)).
+**NOTE:** To prevent infinite loop, the maximum number of tail-calls is 32 ([```MAX_TAIL_CALL_CNT```](https://github.com/torvalds/linux/search?l=C&q=MAX_TAIL_CALL_CNT+path%3Ainclude%2Flinux&type=Code)).
 
 Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?l=C&q=call+path%3Aexamples&type=Code),
