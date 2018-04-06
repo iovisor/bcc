@@ -145,19 +145,19 @@ static void parse_sw(struct perf_reader *reader, void *data, int size) {
     reader->raw_cb(reader->cb_cookie, raw->data, raw->size);
 }
 
-static uint64_t read_data_head(struct perf_event_mmap_page *perf_header) {
-  uint64_t data_head = *((volatile uint64_t *)&perf_header->data_head);
+static uint64_t read_data_head(volatile struct perf_event_mmap_page *perf_header) {
+  uint64_t data_head = perf_header->data_head;
   asm volatile("" ::: "memory");
   return data_head;
 }
 
-static void write_data_tail(struct perf_event_mmap_page *perf_header, uint64_t data_tail) {
+static void write_data_tail(volatile struct perf_event_mmap_page *perf_header, uint64_t data_tail) {
   asm volatile("" ::: "memory");
   perf_header->data_tail = data_tail;
 }
 
 void perf_reader_event_read(struct perf_reader *reader) {
-  struct perf_event_mmap_page *perf_header = reader->base;
+  volatile struct perf_event_mmap_page *perf_header = reader->base;
   uint64_t buffer_size = (uint64_t)reader->page_size * reader->page_cnt;
   uint64_t data_head;
   uint8_t *base = (uint8_t *)reader->base + reader->page_size;
