@@ -146,7 +146,7 @@ static void parse_sw(struct perf_reader *reader, void *data, int size) {
 }
 
 static uint64_t read_data_head(struct perf_event_mmap_page *perf_header) {
-  uint64_t data_head = *((volatile uint64_t *)&perf_header->data_head);
+  volatile uint64_t data_head = *(&perf_header->data_head);
   asm volatile("" ::: "memory");
   return data_head;
 }
