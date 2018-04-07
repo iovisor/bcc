@@ -142,6 +142,45 @@ StatusTuple BPFTable::remove_value(const std::string& key_str) {
   return StatusTuple(0);
 }
 
+StatusTuple BPFTable::clear_table_non_atomic() {
+  if (desc.type == BPF_MAP_TYPE_HASH ||
+      desc.type == BPF_MAP_TYPE_PERCPU_HASH ||
+      desc.type == BPF_MAP_TYPE_LRU_HASH ||
+      desc.type == BPF_MAP_TYPE_PERCPU_HASH ||
+      desc.type == BPF_MAP_TYPE_HASH_OF_MAPS) {
+    // For hash maps, use the first() interface (which uses get_next_key) to
+    // iterate through the map and clear elements
+    auto key = std::unique_ptr<void, decltype(::free)*>(
+      ::malloc(desc.key_size),
+      ::free);
+
+    while (this->first(key.get()))
+      if (!this->remove(key.get())) {
+        return StatusTuple(
+          -1,
+          "Failed to delete element when clearing table %s",
+          desc.name.c_str());
+      }
+  } else if (desc.type == BPF_MAP_TYPE_ARRAY ||
+             desc.type == BPF_MAP_TYPE_PERCPU_ARRAY) {
+    return StatusTuple(
+      -1, "Array map %s do not support clearing elements", desc.name.c_str());
+  } else if (desc.type == BPF_MAP_TYPE_PROG_ARRAY ||
+             desc.type == BPF_MAP_TYPE_PERF_EVENT_ARRAY ||
+             desc.type == BPF_MAP_TYPE_STACK_TRACE ||
+             desc.type == BPF_MAP_TYPE_ARRAY_OF_MAPS) {
+    // For Stack-trace and FD arrays, just iterate over all indices
+    for (size_t i = 0; i < desc.max_entries; i++) {
+      this->remove(&i);
+    }
+  } else {
+    return StatusTuple(
+      -1, "Clearing for map type of %s not supported yet", desc.name.c_str());
+  }
+
+  return StatusTuple(0);
+}
+
 size_t BPFTable::get_possible_cpu_count() {
   return get_possible_cpus().size();
 }
@@ -149,7 +188,7 @@ size_t BPFTable::get_possible_cpu_count() {
 BPFStackTable::BPFStackTable(const TableDesc& desc,
                              bool use_debug_file,
                              bool check_debug_file_crc)
-  : BPFTableBase<int, stacktrace_t>(desc) {
+    : BPFTableBase<int, stacktrace_t>(desc) {
   symbol_option_ = {
     .use_debug_file = use_debug_file,
     .check_debug_file_crc = check_debug_file_crc,
@@ -157,11 +196,11 @@ BPFStackTable::BPFStackTable(const TableDesc& desc,
   };
 }
 
-BPFStackTable::BPFStackTable(BPFStackTable&& that) :
-  BPFTableBase<int, stacktrace_t>(that.desc),
-  symbol_option_(std::move(that.symbol_option_)),
-  pid_sym_(std::move(that.pid_sym_)) {
-    that.pid_sym_.clear();
+BPFStackTable::BPFStackTable(BPFStackTable&& that)
+    : BPFTableBase<int, stacktrace_t>(that.desc),
+      symbol_option_(std::move(that.symbol_option_)),
+      pid_sym_(std::move(that.pid_sym_)) {
+  that.pid_sym_.clear();
 }
 
 BPFStackTable::~BPFStackTable() {
@@ -214,8 +253,8 @@ std::vector<std::string> BPFStackTable::get_stack_symbol(int stack_id,
 }
 
 StatusTuple BPFPerfBuffer::open_on_cpu(perf_reader_raw_cb cb,
-                                       perf_reader_lost_cb lost_cb,
-                                       int cpu, void* cb_cookie, int page_cnt) {
+                                       perf_reader_lost_cb lost_cb, int cpu,
+                                       void* cb_cookie, int page_cnt) {
   if (cpu_readers_.find(cpu) != cpu_readers_.end())
     return StatusTuple(-1, "Perf buffer already open on CPU %d", cpu);
 

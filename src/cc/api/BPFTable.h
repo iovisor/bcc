@@ -105,6 +105,8 @@ class BPFTable : public BPFTableBase<void, void> {
 
   StatusTuple remove_value(const std::string& key_str);
 
+  StatusTuple clear_table_non_atomic();
+
   static size_t get_possible_cpu_count();
 };
 
@@ -237,14 +239,8 @@ class BPFHashTable : public BPFTableBase<KeyType, ValueType> {
 
   StatusTuple clear_table_non_atomic() {
     KeyType cur;
-    if (!this->first(&cur))
-      return StatusTuple(0);
-
-    while (true) {
+    while (this->first(&cur))
       TRY2(remove_value(cur));
-      if (!this->next(&cur, &cur))
-        break;
-    }
 
     return StatusTuple(0);
   }
