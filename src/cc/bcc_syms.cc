@@ -158,6 +158,18 @@ int ProcSyms::_add_module(const char *modname, uint64_t start, uint64_t end,
     auto module = Module(
         modname, check_mount_ns ? ps->mount_ns_instance_.get() : nullptr,
         &ps->symbol_option_);
+
+    // pid/maps doesn't account for file_offset of text within the ELF.
+    // It only gives the mmap offset. We need the real offset for symbol
+    // lookup.
+    if (module.type_ == ModuleType::SO) {
+      if (bcc_elf_get_text_scn_info(modname, &module.elf_so_addr_,
+                                    &module.elf_so_offset_) < 0) {
+        fprintf(stderr, "WARNING: Couldn't find .text section in %s\n", modname);
+        fprintf(stderr, "WARNING: BCC can't handle sym look ups for %s", modname);
+      }
+    }
+
     if (!bcc_is_perf_map(modname) || module.type_ != ModuleType::UNKNOWN)
       // Always add the module even if we can't read it, so that we could
       // report correct module name. Unless it's a perf map that we only
@@ -251,6 +263,10 @@ ProcSyms::Module::Module(const char *name, ProcMountNS *mount_ns,
     type_ = ModuleType::PERF_MAP;
   else if (bcc_elf_is_vdso(name_.c_str()) == 1)
     type_ = ModuleType::VDSO;
+
+  // Will be stored later
+  elf_so_offset_ = 0;
+  elf_so_addr_ = 0;
 }
 
 int ProcSyms::Module::_add_symbol(const char *symname, uint64_t start,
@@ -282,13 +298,22 @@ void ProcSyms::Module::load_sym_table() {
 }
 
 bool ProcSyms::Module::contains(uint64_t addr, uint64_t &offset) const {
-  for (const auto &range : ranges_)
+  for (const auto &range : ranges_) {
     if (addr >= range.start && addr < range.end) {
-      offset = (type_ == ModuleType::SO || type_ == ModuleType::VDSO)
-                   ? (addr - range.start + range.file_offset)
-                   : addr;
+      if (type_ == ModuleType::SO || type_ == ModuleType::VDSO) {
+        // Offset within the mmap
+        offset = addr - range.start + range.file_offset;
+
+        // Offset within the ELF for SO symbol lookup
+        offset += (elf_so_addr_ - elf_so_offset_);
+      } else {
+        offset = addr;
+      }
+
       return true;
     }
+  }
+
   return false;
 }
 

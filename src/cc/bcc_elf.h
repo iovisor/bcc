@@ -61,6 +61,9 @@ int bcc_elf_foreach_sym(const char *path, bcc_elf_symcb callback, void *option,
 // Returns -1 on error, and 0 on success or stopped by callback
 int bcc_elf_foreach_vdso_sym(bcc_elf_symcb callback, void *payload);
 
+int bcc_elf_get_text_scn_info(const char *path, uint64_t *addr,
+                              uint64_t *offset);
+
 int bcc_elf_get_type(const char *path);
 int bcc_elf_is_shared_obj(const char *path);
 int bcc_elf_is_exe(const char *path);
