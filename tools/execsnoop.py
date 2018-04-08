@@ -31,6 +31,7 @@ examples = """examples:
     ./execsnoop           # trace all exec() syscalls
     ./execsnoop -x        # include failed exec()s
     ./execsnoop -t        # include timestamps
+    ./execsnoop -q        # add "quotemarks" around arguments
     ./execsnoop -n main   # only print command lines containing "main"
     ./execsnoop -l tpkg   # only print command where arguments contains "tpkg"
 """
