@@ -42,6 +42,9 @@ parser.add_argument("-t", "--timestamp", action="store_true",
     help="include timestamp on output")
 parser.add_argument("-x", "--fails", action="store_true",
     help="include failed exec()s")
+parser.add_argument("-q", "--quote", action="store_true",
+    help="Add quotemarks (\") around arguments."
+    )
 parser.add_argument("-n", "--name",
     type=ArgString,
     help="only print commands matching this name (regex), any arg")
@@ -192,6 +195,11 @@ def print_event(cpu, data, size):
             skip = True
         if args.name and not re.search(bytes(args.name), event.comm):
             skip = True
+        if args.quote:
+            argv[event.pid] = [
+                "\"" + arg.replace("\"", "\\\"") + "\""
+                for arg in argv[event.pid]
+            ]
         if args.line and not re.search(bytes(args.line),
                                        b' '.join(argv[event.pid])):
             skip = True
