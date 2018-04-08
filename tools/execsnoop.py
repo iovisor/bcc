@@ -195,14 +195,14 @@ def print_event(cpu, data, size):
             skip = True
         if args.name and not re.search(bytes(args.name), event.comm):
             skip = True
+        if args.line and not re.search(bytes(args.line),
+                                       b' '.join(argv[event.pid])):
+            skip = True
         if args.quote:
             argv[event.pid] = [
                 "\"" + arg.replace("\"", "\\\"") + "\""
                 for arg in argv[event.pid]
             ]
-        if args.line and not re.search(bytes(args.line),
-                                       b' '.join(argv[event.pid])):
-            skip = True
 
         if not skip:
             if args.timestamp:
