@@ -30,6 +30,10 @@ Include a timestamp column.
 \-x
 Include failed exec()s
 .TP
+\-q
+Add "quotemarks" around arguments. Escape quotemarks in arguments with a
+backslash. For tracing empty arguments or arguments that contain whitespace. 
+.TP
 \-n NAME
 Only print command lines matching this name (regex)
 .TP
@@ -51,6 +55,10 @@ Trace all exec() syscalls, and include timestamps:
 Include failed exec()s:
 #
 .B execsnoop \-x
+.TP
+Put quotemarks around arguments. 
+#
+.B execsnoop \-q
 .TP
 Only trace exec()s where the filename contains "mount":
 #

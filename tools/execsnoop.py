@@ -31,6 +31,7 @@ examples = """examples:
     ./execsnoop           # trace all exec() syscalls
     ./execsnoop -x        # include failed exec()s
     ./execsnoop -t        # include timestamps
+    ./execsnoop -q        # add "quotemarks" around arguments
     ./execsnoop -n main   # only print command lines containing "main"
     ./execsnoop -l tpkg   # only print command where arguments contains "tpkg"
 """
@@ -42,6 +43,9 @@ parser.add_argument("-t", "--timestamp", action="store_true",
     help="include timestamp on output")
 parser.add_argument("-x", "--fails", action="store_true",
     help="include failed exec()s")
+parser.add_argument("-q", "--quote", action="store_true",
+    help="Add quotemarks (\") around arguments."
+    )
 parser.add_argument("-n", "--name",
     type=ArgString,
     help="only print commands matching this name (regex), any arg")
@@ -195,6 +199,11 @@ def print_event(cpu, data, size):
         if args.line and not re.search(bytes(args.line),
                                        b' '.join(argv[event.pid])):
             skip = True
+        if args.quote:
+            argv[event.pid] = [
+                "\"" + arg.replace("\"", "\\\"") + "\""
+                for arg in argv[event.pid]
+            ]
 
         if not skip:
             if args.timestamp:
