@@ -500,6 +500,41 @@ int bcc_elf_foreach_sym(const char *path, bcc_elf_symcb callback,
       path, callback, (struct bcc_symbol_option*)option, payload, 0);
 }
 
+int bcc_elf_get_text_scn_info(const char *path, uint64_t *addr,
+				   uint64_t *offset) {
+  Elf *e = NULL;
+  int fd = -1, err;
+  Elf_Scn *section = NULL;
+  GElf_Shdr header;
+  size_t stridx;
+  char *name;
+
+  if ((err = openelf(path, &e, &fd)) < 0 ||
+      (err = elf_getshdrstrndx(e, &stridx)) < 0)
+    goto exit;
+
+  err = -1;
+  while ((section = elf_nextscn(e, section)) != 0) {
+    if (!gelf_getshdr(section, &header))
+      continue;
+
+    name = elf_strptr(e, stridx, header.sh_name);
+    if (name && !strcmp(name, ".text")) {
+      *addr = (uint64_t)header.sh_addr;
+      *offset = (uint64_t)header.sh_offset;
+      err = 0;
+      break;
+    }
+  }
+
+exit:
+  if (e)
+    elf_end(e);
+  if (fd >= 0)
+    close(fd);
+  return err;
+}
+
 int bcc_elf_foreach_load_section(const char *path,
                                  bcc_elf_load_sectioncb callback,
                                  void *payload) {

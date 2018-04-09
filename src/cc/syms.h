@@ -108,6 +108,10 @@ class ProcSyms : SymbolCache {
     bcc_symbol_option *symbol_option_;
     ModuleType type_;
 
+    // The file offset within the ELF of the SO's first text section.
+    uint64_t elf_so_offset_;
+    uint64_t elf_so_addr_;
+
     std::unordered_set<std::string> symnames_;
     std::vector<Symbol> syms_;
 
