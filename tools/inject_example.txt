@@ -5,14 +5,16 @@ mode (kmalloc,bio,etc) given a call chain and an optional set of predicates. You
 can also optionally print out the generated BPF program for
 modification/debugging purposes.
 
-As a simple example, let's say you wanted to fail all mounts. While we cannot
-fail the mount() syscall directly (a patch is in the works), we can easily
-fail do_mount() calls like so:
+As a simple example, let's say you wanted to fail all mounts. As of 4.17 we can
+fail syscalls directly, so let's do that:
 
-# ./inject.py kmalloc -v 'do_mount()'
+# ./inject.py kmalloc -v 'SyS_mount()'
 
 The first argument indicates the mode (or what to fail). Appropriate headers are
-specified. The verbosity flag prints the generated program.
+specified, if necessary. The verbosity flag prints the generated program. Note
+that some syscalls will be available as 'SyS_xyz' and some will be available as
+'sys_xyz'. This is largely dependent on the number of arguments each syscall
+takes.
 
 Trying to mount various filesystems will fail and report an inability to
 allocate memory, as expected.
@@ -20,7 +22,7 @@ allocate memory, as expected.
 Whenever a predicate is missing, an implicit "(true)" is inserted. The example
 above can be explicitly written as:
 
-# ./inject.py kmalloc -v '(true) => do_mount()(true)'
+# ./inject.py kmalloc -v '(true) => SyS_mount()(true)'
 
 The "(true)" without an associated function is a predicate for the error
 injection mechanism of the current mode. In the case of kmalloc, the predicate
@@ -106,9 +108,14 @@ As an extension to the above, one could easily fail all btrfs superblock writes
 (we only fail the primary) by calculating the sector number of the mirrors and
 amending the predicate accordingly.
 
-USAGE message:
+Inject also provides a probability option; this allows you to fail the
+path+predicates some percentage of the time. For example, let's say we want to
+fail our mounts half the time:
 
-usage: inject.py [-h] [-I header] [-v] mode spec
+# ./inject.py kmalloc -v -P 0.01 'SyS_mount()'
+
+USAGE message:
+usage: inject.py [-h] [-I header] [-P probability] [-v] mode spec
 
 Fail specified kernel functionality when call chain and predicates are met
 
@@ -120,5 +127,6 @@ optional arguments:
   -h, --help            show this help message and exit
   -I header, --include header
                         additional header files to include in the BPF program
+  -P probability, --probability probability
+                        probability that this call chain will fail
   -v, --verbose         print BPF program
-
