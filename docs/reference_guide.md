@@ -23,6 +23,7 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
         - [6. bpf_get_current_comm()](#6-bpf_get_current_comm)
         - [7. bpf_get_current_task()](#7-bpf_get_current_task)
         - [8. bpf_log2l()](#8-bpflog2l)
+        - [9. bpf_get_prandom_u32()](#9-bpf_get_prandom_u32)
     - [Debugging](#debugging)
         - [1. bpf_override_return()](#1-bpf_override_return)
     - [Output](#output)
@@ -351,6 +352,16 @@ Returns the log-2 of the provided value. This is often used to create indexes fo
 Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=bpf_log2l+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=bpf_log2l+path%3Atools&type=Code)
+
+### 9. bpf_get_prandom_u32()
+
+Syntax: ```u32 bpf_get_prandom_u32()```
+
+Returns a pseudo-random u32.
+
+Example in situ:
+[search /examples](https://github.com/iovisor/bcc/search?q=bpf_get_prandom_u32+path%3Aexamples&type=Code),
+[search /tools](https://github.com/iovisor/bcc/search?q=bpf_get_prandom_u32+path%3Atools&type=Code)
 
 ## Debugging
 
