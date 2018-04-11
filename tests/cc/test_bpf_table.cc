@@ -54,6 +54,16 @@ TEST_CASE("test bpf table", "[bpf_table]") {
   res = t.get_value("0x11", value);
   REQUIRE(res.code() != 0);
 
+  // clear table
+  res = t.update_value("0x15", "0x888");
+  REQUIRE(res.code() == 0);
+  auto elements = bpf->get_hash_table<int, int>("myhash").get_table_offline();
+  REQUIRE(elements.size() == 2);
+  res = t.clear_table_non_atomic();
+  REQUIRE(res.code() == 0);
+  elements = bpf->get_hash_table<int, int>("myhash").get_table_offline();
+  REQUIRE(elements.size() == 0);
+
   // delete bpf_module, call to key/leaf printf/scanf must fail
   delete bpf;
 
