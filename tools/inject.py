@@ -33,6 +33,7 @@
 # 16-Mar-2018   Howard McLauchlan   Created this.
 
 import argparse
+import re
 from bcc import BPF
 
 
@@ -350,6 +351,7 @@ class Tool:
         frames = []
         cur_frame = []
         i = 0
+        last_frame_added = 0
 
         while i < len(data):
             # improper input
@@ -360,6 +362,10 @@ class Tool:
             count -= c == ')'
             if not count:
                 if c == '\0' or (c == '=' and data[i + 1] == '>'):
+                    # This block is closing a chunk. This means cur_frame must
+                    # have something in it.
+                    if not cur_frame:
+                        raise Exception("Cannot parse spec, missing parens")
                     if len(cur_frame) == 2:
                         frame = tuple(cur_frame)
                     elif cur_frame[0][0] == '(':
@@ -373,7 +379,12 @@ class Tool:
                 elif c == ')':
                     cur_frame.append(data[start:i + 1].strip())
                     start = i + 1
+                    last_frame_added = start
             i += 1
+
+        # We only permit spaces after the last frame
+        if self.spec[last_frame_added:].strip():
+            raise Exception("Invalid characters found after last frame");
         # improper input
         if count:
             raise Exception("Check your parentheses")
@@ -389,7 +400,9 @@ class Tool:
             func, pred = f[0], f[1]
 
             if not self._validate_predicate(pred):
-                raise Exception
+                raise Exception("Invalid predicate")
+            if not self._validate_identifier(func):
+                raise Exception("Invalid function identifier")
             tup = (pred, absolute_order)
 
             if func not in self.map:
@@ -404,6 +417,16 @@ class Tool:
             absolute_order += 1
 
         self.length = absolute_order
+
+    def _validate_identifier(self, func):
+        # We've already established paren balancing. We will only look for
+        # identifier validity here.
+        paren_index = func.find("(")
+        potential_id = func[:paren_index]
+        pattern = '[_a-zA-z][_a-zA-Z0-9]*$'
+        if re.match(pattern, potential_id):
+            return True
+        return False
 
     def _validate_predicate(self, pred):
 
