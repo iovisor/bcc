@@ -295,6 +295,21 @@ class Probe:
 
 
 class Tool:
+
+    examples ="""
+EXAMPLES:
+# ./inject.py kmalloc -v 'SyS_mount()'
+    Fails all calls to syscall mount
+# ./inject.py kmalloc -v '(true) => SyS_mount()(true)'
+    Explicit rewriting of above
+# ./inject.py kmalloc -v 'mount_subtree() => btrfs_mount()'
+    Fails btrfs mounts only
+# ./inject.py kmalloc -v 'd_alloc_parallel(struct dentry *parent, const struct \\
+    qstr *name)(STRCMP(name->name, 'bananas'))'
+    Fails dentry allocations of files named 'bananas'
+# ./inject.py kmalloc -v -P 0.01 'SyS_mount()'
+    Fails calls to syscall mount with 1% probability
+    """
     # add cases as necessary
     error_injection_mapping = {
         "kmalloc": "should_failslab(struct kmem_cache *s, gfp_t gfpflags)",
@@ -304,8 +319,9 @@ class Tool:
     def __init__(self):
         parser = argparse.ArgumentParser(description="Fail specified kernel" +
                 " functionality when call chain and predicates are met",
-                formatter_class=argparse.RawDescriptionHelpFormatter)
-        parser.add_argument(metavar="mode", dest="mode",
+                formatter_class=argparse.RawDescriptionHelpFormatter,
+                epilog=Tool.examples)
+        parser.add_argument(dest="mode", choices=['kmalloc','bio'],
                 help="indicate which base kernel function to fail")
         parser.add_argument(metavar="spec", dest="spec",
                 help="specify call chain")
@@ -316,7 +332,7 @@ class Tool:
                 metavar="probability", type=float,
                 help="probability that this call chain will fail")
         parser.add_argument("-v", "--verbose", action="store_true",
-            help="print BPF program")
+                help="print BPF program")
         self.args = parser.parse_args()
 
         self.program = ""
