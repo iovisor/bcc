@@ -158,12 +158,8 @@ if debug or args.ebpf:
 
 # initialize BPF
 b = BPF(text=bpf_text)
-b.attach_kprobe(event="__vfs_read", fn_name="trace_read_entry")
-try:
-    b.attach_kprobe(event="__vfs_write", fn_name="trace_write_entry")
-except:
-    # older kernels don't have __vfs_write so try vfs_write instead
-    b.attach_kprobe(event="vfs_write", fn_name="trace_write_entry")
+b.attach_kprobe(event="vfs_read", fn_name="trace_read_entry")
+b.attach_kprobe(event="vfs_write", fn_name="trace_write_entry")
 
 DNAME_INLINE_LEN = 32  # linux/dcache.h
 
