@@ -131,7 +131,11 @@ TEST_CASE("test attach perf event", "[bpf_perf_event]") {
   auto ret = bpf.get_hash_table<int, int>("ret");
   REQUIRE(ret[0] == 0);
   REQUIRE(counter.counter >= 0);
-  REQUIRE(counter.enabled >= 1000000000);
+  // the program slept one second between perf_event attachment and detachment
+  // in the above, so the enabled counter should be 1000000000ns or
+  // more. But in reality, most of counters (if not all) are 9xxxxxxxx,
+  // and I also saw one 8xxxxxxxx. So let us a little bit conservative here.
+  REQUIRE(counter.enabled >= 800000000);
   REQUIRE(counter.running >= 0);
   REQUIRE(counter.running <= counter.enabled);
 #endif
