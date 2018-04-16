@@ -55,3 +55,8 @@ Provides: bpfcc-lua
 Conflicts: bpfcc-lua
 Depends: libbcc (= ${binary:Version})
 Description: Standalone tool to run BCC tracers written in Lua
+
+Package: bpfd
+Architecture: all
+Depends: libbcc
+Description: Proxy daemon for remote target devices

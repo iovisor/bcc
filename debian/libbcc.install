@@ -1,3 +1,4 @@
 usr/include/bcc/*
 usr/lib/*/libbcc*
+usr/lib/*/libbpf*
 usr/lib/*/pkgconfig/libbcc.pc
