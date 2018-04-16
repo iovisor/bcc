@@ -115,12 +115,12 @@ fail our mounts half the time:
 # ./inject.py kmalloc -v -P 0.01 'SyS_mount()'
 
 USAGE message:
-usage: inject.py [-h] [-I header] [-P probability] [-v] mode spec
+usage: inject.py [-h] [-I header] [-P probability] [-v] {kmalloc,bio} spec
 
 Fail specified kernel functionality when call chain and predicates are met
 
 positional arguments:
-  mode                  indicate which base kernel function to fail
+  {kmalloc,bio}         indicate which base kernel function to fail
   spec                  specify call chain
 
 optional arguments:
@@ -130,3 +130,16 @@ optional arguments:
   -P probability, --probability probability
                         probability that this call chain will fail
   -v, --verbose         print BPF program
+
+EXAMPLES:
+# ./inject.py kmalloc -v 'SyS_mount()'
+    Fails all calls to syscall mount
+# ./inject.py kmalloc -v '(true) => SyS_mount()(true)'
+    Explicit rewriting of above
+# ./inject.py kmalloc -v 'mount_subtree() => btrfs_mount()'
+    Fails btrfs mounts only
+# ./inject.py kmalloc -v 'd_alloc_parallel(struct dentry *parent, const struct \
+    qstr *name)(STRCMP(name->name, 'bananas'))'
+    Fails dentry allocations of files named 'bananas'
+# ./inject.py kmalloc -v -P 0.01 'SyS_mount()'
+    Fails calls to syscall mount with 1% probability
