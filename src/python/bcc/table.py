@@ -313,7 +313,7 @@ class TableBase(MutableMapping):
                 slot = getattr(k, f2)
                 vals[slot] = v.value
 
-            buckets = tmp.keys()
+            buckets = list(tmp.keys())
             if bucket_sort_fn:
                 buckets = bucket_sort_fn(buckets)
 
