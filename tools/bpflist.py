@@ -72,8 +72,10 @@ def find_bpf_fds(pid):
 
 for pdir in os.listdir('/proc'):
     if re.match('\\d+', pdir):
-        find_bpf_fds(int(pdir))
-
+        try:
+            find_bpf_fds(int(pdir))
+        except OSError:
+            continue
 print("%-6s %-16s %-8s %s" % ("PID", "COMM", "TYPE", "COUNT"))
 for (pid, typ), count in sorted(counts.items(), key=lambda t: t[0][0]):
     comm = comm_for_pid(pid)
