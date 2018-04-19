@@ -87,16 +87,24 @@ STORAGE
 struct rq;
 
 // record enqueue timestamp
-int trace_enqueue(struct pt_regs *ctx, struct rq *rq, struct task_struct *p,
-    int flags)
+static int trace_enqueue(u32 tgid, u32 pid)
 {
-    u32 tgid = p->tgid;
-    u32 pid = p->pid;
     if (FILTER)
         return 0;
     u64 ts = bpf_ktime_get_ns();
     start.update(&pid, &ts);
     return 0;
+}
+
+int trace_wake_up_new_task(struct pt_regs *ctx, struct task_struct *p)
+{
+    return trace_enqueue(p->tgid, p->pid);
+}
+
+int trace_ttwu_do_wakeup(struct pt_regs *ctx, struct rq *rq, struct task_struct *p,
+    int wake_flags)
+{
+    return trace_enqueue(p->tgid, p->pid);
 }
 
 // calculate latency
@@ -178,7 +186,8 @@ if debug or args.ebpf:
 
 # load BPF program
 b = BPF(text=bpf_text)
-b.attach_kprobe(event_re="enqueue_task_*", fn_name="trace_enqueue")
+b.attach_kprobe(event="ttwu_do_wakeup", fn_name="trace_ttwu_do_wakeup")
+b.attach_kprobe(event="wake_up_new_task", fn_name="trace_wake_up_new_task")
 b.attach_kprobe(event="finish_task_switch", fn_name="trace_run")
 
 print("Tracing run queue latency... Hit Ctrl-C to end.")
