@@ -159,7 +159,7 @@ class Probe(object):
                                    else Probe.tgid
                 self.usdt = USDT(path=self.library, pid=target)
                 for probe in self.usdt.enumerate_probes():
-                        if probe.name == self.usdt_name:
+                        if probe.name == self.usdt_name.encode('ascii'):
                                 return  # Found it, will enable later
                 self._bail("unrecognized USDT probe %s" % self.usdt_name)
 
