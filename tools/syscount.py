@@ -506,15 +506,9 @@ def print_stats():
 agg_colname = "PID    COMM" if args.process else "SYSCALL"
 time_colname = "TIME (ms)" if args.milliseconds else "TIME (us)"
 
-def comm_for_pid(pid):
-    try:
-        return open("/proc/%d/comm" % pid, "rb").read().strip()
-    except Exception:
-        return b"[unknown]"
-
 def agg_colval(key):
     if args.process:
-        return b"%-6d %-15s" % (key.value, comm_for_pid(key.value))
+        return b"%-6d %-15s" % (key.value, bpf.comm_for_pid(key.value))
     else:
         return syscalls.get(key.value, b"[unknown: %d]" % key.value)
 

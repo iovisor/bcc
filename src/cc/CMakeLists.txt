@@ -81,6 +81,7 @@ if(ENABLE_USDT)
 endif()
 
 add_subdirectory(frontends)
+add_subdirectory(bpfd)
 
 # Link against LLVM libraries
 target_link_libraries(bcc-shared ${bcc_common_libs_for_s})

@@ -79,6 +79,12 @@ Requires: python-bcc
 %description -n bcc-tools
 Command line tools for BPF Compiler Collection (BCC)
 
+%package -n bpfd
+Summary: Proxy daemon for remote target devices
+Requires: libbcc = %{version}-%{release}
+%description -n bpfd
+Proxy daemon for remote target devices
+
 %files -n python-bcc
 %{python_sitelib}/bcc*
 
@@ -99,3 +105,6 @@ Command line tools for BPF Compiler Collection (BCC)
 /usr/share/bcc/introspection/*
 /usr/share/bcc/tools/*
 /usr/share/bcc/man/*
+
+%files -n bpfd
+/usr/bin/bpfd
