@@ -27,4 +27,10 @@ in
       "-DENABLE_USDT=ON"
       "-DENABLE_CPP_API=ON"
     ];
+
+    shellHook = ''
+      ( cd build; cmakeConfigurePhase 2>&1 > /dev/null )
+      export LD_LIBRARY_PATH="$PWD/build/src/cc:$LD_LIBRARY_PATH"
+      export PYTHONPATH="$PWD/src/python:$PYTHONPATH"
+    '';
   }
