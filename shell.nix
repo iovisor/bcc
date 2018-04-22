@@ -28,8 +28,10 @@ in
       "-DENABLE_CPP_API=ON"
     ];
 
+    dontFixCmake = true;
+
     shellHook = ''
-      ( cd build; cmakeConfigurePhase 2>&1 > /dev/null )
+      cmakeConfigurePhase 2>&1 > /dev/null
       export LD_LIBRARY_PATH="$PWD/build/src/cc:$LD_LIBRARY_PATH"
       export PYTHONPATH="$PWD/src/python:$PYTHONPATH"
     '';
