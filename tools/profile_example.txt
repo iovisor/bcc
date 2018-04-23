@@ -704,8 +704,8 @@ Run ./profile -h to see the default.
 USAGE message:
 
 # ./profile -h
-usage: profile [-h] [-p PID] [-U | -K] [-F FREQUENCY] [-d] [-a] [-f]
-                  [--stack-storage-size STACK_STORAGE_SIZE]
+usage: profile [-h] [-p PID] [-U | -K] [-F FREQUENCY | -c COUNT] [-d] [-a]
+                  [-f] [--stack-storage-size STACK_STORAGE_SIZE]
                   [duration]
 
 Profile CPU stack traces at a timed interval
@@ -723,7 +723,9 @@ optional arguments:
                         show stacks from kernel space only (no user space
                         stacks)
   -F FREQUENCY, --frequency FREQUENCY
-                        sample frequency, Hertz (default 49)
+                        sample frequency, Hertz
+  -c COUNT, --count COUNT
+                        sample period, number of events
   -d, --delimited       insert delimiter between kernel/user stacks
   -a, --annotations     add _[k] annotations to kernel frames
   -f, --folded          output folded format, one line per stack (for flame
@@ -735,6 +737,7 @@ optional arguments:
 examples:
     ./profile             # profile stack traces at 49 Hertz until Ctrl-C
     ./profile -F 99       # profile stack traces at 99 Hertz
+    ./profile -c 1000000  # profile stack traces every 1 in a million events
     ./profile 5           # profile at 49 Hertz for 5 seconds only
     ./profile -f 5        # output in folded format for flame graphs
     ./profile -p 185      # only profile threads for PID 185

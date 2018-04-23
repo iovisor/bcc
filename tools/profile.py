@@ -63,6 +63,7 @@ def positive_nonzero_int(val):
 examples = """examples:
     ./profile             # profile stack traces at 49 Hertz until Ctrl-C
     ./profile -F 99       # profile stack traces at 99 Hertz
+    ./profile -c 1000000  # profile stack traces every 1 in a million events
     ./profile 5           # profile at 49 Hertz for 5 seconds only
     ./profile -f 5        # output in folded format for flame graphs
     ./profile -p 185      # only profile threads for PID 185
@@ -82,8 +83,11 @@ stack_group.add_argument("-U", "--user-stacks-only", action="store_true",
     help="show stacks from user space only (no kernel space stacks)")
 stack_group.add_argument("-K", "--kernel-stacks-only", action="store_true",
     help="show stacks from kernel space only (no user space stacks)")
-parser.add_argument("-F", "--frequency", type=positive_int, default=49,
-    help="sample frequency, Hertz (default 49)")
+sample_group = parser.add_mutually_exclusive_group()
+sample_group.add_argument("-F", "--frequency", type=positive_int,
+    help="sample frequency, Hertz")
+sample_group.add_argument("-c", "--count", type=positive_int,
+    help="sample period, number of events")
 parser.add_argument("-d", "--delimited", action="store_true",
     help="insert delimiter between kernel/user stacks")
 parser.add_argument("-a", "--annotations", action="store_true",
@@ -214,10 +218,22 @@ else:
 bpf_text = bpf_text.replace('USER_STACK_GET', user_stack_get)
 bpf_text = bpf_text.replace('KERNEL_STACK_GET', kernel_stack_get)
 
+sample_freq = 0
+sample_period = 0
+if args.frequency:
+    sample_freq = args.frequency
+elif args.count:
+    sample_period = args.count
+else:
+    # If user didn't specify anything, use default 49Hz sampling
+    sample_freq = 49
+sample_context = "%s%d %s" % (("", sample_freq, "Hertz") if sample_freq
+                         else ("every ", sample_period, "events"))
+
 # header
 if not args.folded:
-    print("Sampling at %d Hertz of %s by %s stack" %
-        (args.frequency, thread_context, stack_context), end="")
+    print("Sampling at %s of %s by %s stack" %
+        (sample_context, thread_context, stack_context), end="")
     if duration < 99999999:
         print(" for %d secs." % duration)
     else:
@@ -232,7 +248,7 @@ if debug or args.ebpf:
 b = BPF(text=bpf_text)
 b.attach_perf_event(ev_type=PerfType.SOFTWARE,
     ev_config=PerfSWConfig.CPU_CLOCK, fn_name="do_perf_event",
-    sample_period=0, sample_freq=args.frequency)
+    sample_period=sample_period, sample_freq=sample_freq)
 
 # signal handler
 def signal_ignore(signal, frame):
