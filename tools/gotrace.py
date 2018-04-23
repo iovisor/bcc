@@ -88,7 +88,6 @@ class Probe(object):
                 #                               ---------  ----------   --
                 (spec, rest) = re.match(r'([^ \t]+)(.*)',
                                              text).groups()
-                print(spec)
                 (spec, sig) = re.match(r'(.*)(\([^)]\))?$', spec).groups()
 
                 self._parse_spec(spec)
@@ -197,13 +196,14 @@ class Probe(object):
                                 self.values.append(part)
 
         aliases = {
+                "arg1": "$ptr(PT_REGS_SP(ctx)+1*8)",
+                "arg2": "$ptr(PT_REGS_SP(ctx)+2*8)",
+                "arg3": "$ptr(PT_REGS_SP(ctx)+3*8)",
+                "arg4": "$ptr(PT_REGS_SP(ctx)+4*8)",
+                "arg5": "$ptr(PT_REGS_SP(ctx)+5*8)",
+                "arg6": "$ptr(PT_REGS_SP(ctx)+6*8)",
                 "retval": "PT_REGS_RC(ctx)",
-                "arg1": "PT_REGS_PARM1(ctx)",
-                "arg2": "PT_REGS_PARM2(ctx)",
-                "arg3": "PT_REGS_PARM3(ctx)",
-                "arg4": "PT_REGS_PARM4(ctx)",
-                "arg5": "PT_REGS_PARM5(ctx)",
-                "arg6": "PT_REGS_PARM6(ctx)",
+                "$ptr(": "1;bpf_probe_read(&__data.v0,sizeof(__data.v0),(void *)", # terrible hack
                 "$uid": "(unsigned)(bpf_get_current_uid_gid() & 0xffffffff)",
                 "$gid": "(unsigned)(bpf_get_current_uid_gid() >> 32)",
                 "$pid": "(unsigned)(bpf_get_current_pid_tgid() & 0xffffffff)",
