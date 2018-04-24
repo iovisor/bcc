@@ -292,7 +292,7 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
             else:
                 line.extend([b.sym(addr, k.tgid) for addr in reversed(user_stack)])
         if not args.user_stacks_only:
-            line.extend(["-"] if (need_delimiter and k.kernel_stack_id >= 0) else [])
+            line.extend(["-"] if (need_delimiter and k.kernel_stack_id >= 0 and k.user_stack_id >= 0) else [])
             if stack_id_err(k.kernel_stack_id):
                 line.append("[Missed Kernel Stack]")
             else:
@@ -307,7 +307,7 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
                 for addr in kernel_stack:
                     print("    %s" % b.ksym(addr))
         if not args.kernel_stacks_only:
-            if need_delimiter and k.user_stack_id >= 0:
+            if need_delimiter and k.user_stack_id >= 0 and k.kernel_stack_id >= 0:
                 print("    --")
             if stack_id_err(k.user_stack_id):
                 print("    [Missed User Stack]")

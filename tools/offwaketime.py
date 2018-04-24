@@ -35,6 +35,11 @@ def positive_nonzero_int(val):
         raise argparse.ArgumentTypeError("must be nonzero")
     return ival
 
+def stack_id_err(stack_id):
+    # -EFAULT in get_stackid normally means the stack-trace is not availible,
+    # Such as getting kernel stack trace in userspace code
+    return (stack_id < 0) and (stack_id != -errno.EFAULT)
+
 # arguments
 examples = """examples:
     ./offwaketime             # trace off-CPU + waker stack time until Ctrl-C
@@ -239,9 +244,8 @@ bpf_text = bpf_text.replace('MINBLOCK_US_VALUE', str(args.min_block_time))
 bpf_text = bpf_text.replace('MAXBLOCK_US_VALUE', str(args.max_block_time))
 
 # handle stack args
-kernel_stack_get = "stack_traces.get_stackid(ctx, BPF_F_REUSE_STACKID)"
-user_stack_get = \
-    "stack_traces.get_stackid(ctx, BPF_F_REUSE_STACKID | BPF_F_USER_STACK)"
+kernel_stack_get = "stack_traces.get_stackid(ctx, 0)"
+user_stack_get = "stack_traces.get_stackid(ctx, BPF_F_USER_STACK)"
 stack_context = ""
 if args.user_stacks_only:
     stack_context = "user"
@@ -288,15 +292,20 @@ missing_stacks = 0
 has_enomem = False
 counts = b.get_table("counts")
 stack_traces = b.get_table("stack_traces")
+need_delimiter = args.delimited and not (args.kernel_stacks_only or
+                                         args.user_stacks_only)
 for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
     # handle get_stackid errors
-    # check for an ENOMEM error
-    if k.w_k_stack_id == -errno.ENOMEM or \
-       k.t_k_stack_id == -errno.ENOMEM or \
-       k.w_u_stack_id == -errno.ENOMEM or \
-       k.t_u_stack_id == -errno.ENOMEM:
-        missing_stacks += 1
-        continue
+    if not args.user_stacks_only:
+        missing_stacks += int(stack_id_err(k.w_k_stack_id))
+        missing_stacks += int(stack_id_err(k.t_k_stack_id))
+        has_enomem = has_enomem or (k.w_k_stack_id == -errno.ENOMEM) or \
+                     (k.t_k_stack_id == -errno.ENOMEM)
+    if not args.kernel_stacks_only:
+        missing_stacks += int(stack_id_err(k.w_u_stack_id))
+        missing_stacks += int(stack_id_err(k.t_u_stack_id))
+        has_enomem = has_enomem or (k.w_u_stack_id == -errno.ENOMEM) or \
+                     (k.t_u_stack_id == -errno.ENOMEM)
 
     waker_user_stack = [] if k.w_u_stack_id < 1 else \
         reversed(list(stack_traces.walk(k.w_u_stack_id))[1:])
@@ -309,47 +318,76 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
 
     if folded:
         # print folded stack output
-        line = \
-            [k.target.decode()] + \
-            [b.sym(addr, k.t_tgid)
-                for addr in reversed(list(target_user_stack)[1:])] + \
-            (["-"] if args.delimited else [""]) + \
-            [b.ksym(addr)
-                for addr in reversed(list(target_kernel_stack)[1:])] + \
-            ["--"] + \
-            [b.ksym(addr)
-                for addr in reversed(list(waker_kernel_stack))] + \
-            (["-"] if args.delimited else [""]) + \
-            [b.sym(addr, k.w_tgid)
-                for addr in reversed(list(waker_user_stack))] + \
-            [k.waker.decode()]
+        line = [k.target.decode()]
+        if not args.kernel_stacks_only:
+            if stack_id_err(k.t_u_stack_id):
+                line.append("[Missed User Stack]")
+            else:
+                line.extend([b.sym(addr, k.t_tgid)
+                    for addr in reversed(list(target_user_stack)[1:])])
+        if not args.user_stacks_only:
+            line.extend(["-"] if (need_delimiter and k.t_k_stack_id > 0 and k.t_u_stack_id > 0) else [])
+            if stack_id_err(k.t_k_stack_id):
+                line.append("[Missed Kernel Stack]")
+            else:
+                line.extend([b.ksym(addr)
+                    for addr in reversed(list(target_kernel_stack)[1:])])
+        line.append("--")
+        if not args.user_stacks_only:
+            if stack_id_err(k.w_k_stack_id):
+                line.append("[Missed Kernel Stack]")
+            else:
+                line.extend([b.ksym(addr)
+                    for addr in reversed(list(waker_kernel_stack))])
+        if not args.kernel_stacks_only:
+            line.extend(["-"] if (need_delimiter and k.w_u_stack_id > 0 and k.w_k_stack_id > 0) else [])
+            if stack_id_err(k.w_u_stack_id):
+                line.extend("[Missed User Stack]")
+            else:
+                line.extend([b.sym(addr, k.w_tgid)
+                    for addr in reversed(list(waker_user_stack))])
+        line.append(k.waker.decode())
         print("%s %d" % (";".join(line), v.value))
-
     else:
         # print wakeup name then stack in reverse order
         print("    %-16s %s %s" % ("waker:", k.waker.decode(), k.t_pid))
-        for addr in waker_user_stack:
-            print("    %s" % b.sym(addr, k.w_tgid))
-        if args.delimited:
-            print("    -")
-        for addr in waker_kernel_stack:
-            print("    %s" % b.ksym(addr))
+        if not args.kernel_stacks_only:
+            if stack_id_err(k.w_u_stack_id):
+                print("    [Missed User Stack]")
+            else:
+                for addr in waker_user_stack:
+                    print("    %s" % b.sym(addr, k.w_tgid))
+        if not args.user_stacks_only:
+            if need_delimiter and k.w_u_stack_id > 0 and k.w_k_stack_id > 0:
+                print("    -")
+            if stack_id_err(k.w_k_stack_id):
+                print("    [Missed Kernel Stack]")
+            else:
+                for addr in waker_kernel_stack:
+                    print("    %s" % b.ksym(addr))
 
         # print waker/wakee delimiter
         print("    %-16s %s" % ("--", "--"))
-
-        # print default multi-line stack output
-        for addr in target_kernel_stack:
-            print("    %s" % b.ksym(addr))
-        if args.delimited:
-            print("    -")
-        for addr in target_user_stack:
-            print("    %s" % b.sym(addr, k.t_tgid))
+        
+        if not args.user_stacks_only:
+            if stack_id_err(k.t_k_stack_id):
+                print("    [Missed Kernel Stack]")
+            else:
+                for addr in target_kernel_stack:
+                    print("    %s" % b.ksym(addr))
+        if not args.kernel_stacks_only:
+            if need_delimiter and k.t_u_stack_id > 0 and k.t_k_stack_id > 0:
+                print("    -")
+            if stack_id_err(k.t_u_stack_id):
+                print("    [Missed User Stack]")
+            else:
+                for addr in target_user_stack:
+                    print("    %s" % b.sym(addr, k.t_tgid))
         print("    %-16s %s %s" % ("target:", k.target.decode(), k.w_pid))
         print("        %d\n" % v.value)
 
 if missing_stacks > 0:
     enomem_str = " Consider increasing --stack-storage-size."
-    print("WARNING: %d stack traces could not be displayed.%s" %
-        (missing_stacks, enomem_str),
+    print("WARNING: %d stack traces lost and could not be displayed.%s" %
+        (missing_stacks, (enomem_str if has_enomem else "")),
         file=stderr)
