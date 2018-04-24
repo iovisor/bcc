@@ -114,22 +114,31 @@ struct key_t {
     int t_k_stack_id;
     int t_u_stack_id;
     u32 t_pid;
+    u32 t_tgid;
     u32 w_pid;
-    u32 tgid;
+    u32 w_tgid;
 };
 BPF_HASH(counts, struct key_t);
+
+// Key of this hash is PID of waiting Process,
+// value is timestamp when it went into waiting
 BPF_HASH(start, u32);
+
 struct wokeby_t {
     char name[TASK_COMM_LEN];
     int k_stack_id;
     int u_stack_id;
     int w_pid;
+    int w_tgid;
 };
+// Key of the hash is PID of the Process to be waken, value is information
+// of the Process who wakes it
 BPF_HASH(wokeby, u32, struct wokeby_t);
 
 BPF_STACK_TRACE(stack_traces, STACK_STORAGE_SIZE);
 
 int waker(struct pt_regs *ctx, struct task_struct *p) {
+    // PID and TGID of the target Process to be waken
     u32 pid = p->pid;
     u32 tgid = p->tgid;
 
@@ -137,35 +146,41 @@ int waker(struct pt_regs *ctx, struct task_struct *p) {
         return 0;
     }
 
+    // Construct information about current (the waker) Process
     struct wokeby_t woke = {};
     bpf_get_current_comm(&woke.name, sizeof(woke.name));
-
     woke.k_stack_id = KERNEL_STACK_GET;
     woke.u_stack_id = USER_STACK_GET;
-    woke.w_pid = pid;
+    woke.w_pid = bpf_get_current_pid_tgid();
+    woke.w_tgid = bpf_get_current_pid_tgid() >> 32;
+
     wokeby.update(&pid, &woke);
     return 0;
 }
 
 int oncpu(struct pt_regs *ctx, struct task_struct *p) {
-    u32 pid = p->pid, t_pid=pid;
+    // PID and TGID of the previous Process (Process going into waiting)
+    u32 pid = p->pid;
     u32 tgid = p->tgid;
-    u64 ts, *tsp;
+    u64 *tsp;
+    u64 ts = bpf_ktime_get_ns();
 
-    // record previous thread sleep time
+    // Record timestamp for the previous Process (Process going into waiting)
     if (THREAD_FILTER) {
-        ts = bpf_ktime_get_ns();
         start.update(&pid, &ts);
     }
 
-    // calculate current thread's delta time
+    // Calculate current Process's wait time by finding the timestamp of when
+    // it went into waiting.
+    // pid and tgid are now the PID and TGID of the current (waking) Process.
     pid = bpf_get_current_pid_tgid();
     tgid = bpf_get_current_pid_tgid() >> 32;
     tsp = start.lookup(&pid);
     if (tsp == 0) {
-        return 0;        // missed start or filtered
+        // Missed or filtered when the Process went into waiting
+        return 0;
     }
-    u64 delta = bpf_ktime_get_ns() - *tsp;
+    u64 delta = ts - *tsp;
     start.delete(&pid);
     delta = delta / 1000;
     if ((delta < MINBLOCK_US) || (delta > MAXBLOCK_US)) {
@@ -176,18 +191,19 @@ int oncpu(struct pt_regs *ctx, struct task_struct *p) {
     u64 zero = 0, *val;
     struct key_t key = {};
     struct wokeby_t *woke;
-    bpf_get_current_comm(&key.target, sizeof(key.target));
 
+    bpf_get_current_comm(&key.target, sizeof(key.target));
+    key.t_pid = pid;
+    key.t_tgid = tgid;
     key.t_k_stack_id = KERNEL_STACK_GET;
     key.t_u_stack_id = USER_STACK_GET;
-    key.t_pid = t_pid;
 
     woke = wokeby.lookup(&pid);
     if (woke) {
         key.w_k_stack_id = woke->k_stack_id;
         key.w_u_stack_id = woke->u_stack_id;
         key.w_pid = woke->w_pid;
-        key.tgid = tgid;
+        key.w_tgid = woke->w_tgid;
         __builtin_memcpy(&key.waker, woke->name, TASK_COMM_LEN);
         wokeby.delete(&pid);
     }
@@ -295,7 +311,7 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
         # print folded stack output
         line = \
             [k.target.decode()] + \
-            [b.sym(addr, k.tgid)
+            [b.sym(addr, k.t_tgid)
                 for addr in reversed(list(target_user_stack)[1:])] + \
             (["-"] if args.delimited else [""]) + \
             [b.ksym(addr)
@@ -304,7 +320,7 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
             [b.ksym(addr)
                 for addr in reversed(list(waker_kernel_stack))] + \
             (["-"] if args.delimited else [""]) + \
-            [b.sym(addr, k.tgid)
+            [b.sym(addr, k.w_tgid)
                 for addr in reversed(list(waker_user_stack))] + \
             [k.waker.decode()]
         print("%s %d" % (";".join(line), v.value))
@@ -313,7 +329,7 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
         # print wakeup name then stack in reverse order
         print("    %-16s %s %s" % ("waker:", k.waker.decode(), k.t_pid))
         for addr in waker_user_stack:
-            print("    %s" % b.sym(addr, k.tgid))
+            print("    %s" % b.sym(addr, k.w_tgid))
         if args.delimited:
             print("    -")
         for addr in waker_kernel_stack:
@@ -328,7 +344,7 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
         if args.delimited:
             print("    -")
         for addr in target_user_stack:
-            print("    %s" % b.sym(addr, k.tgid))
+            print("    %s" % b.sym(addr, k.t_tgid))
         print("    %-16s %s %s" % ("target:", k.target.decode(), k.w_pid))
         print("        %d\n" % v.value)
 
