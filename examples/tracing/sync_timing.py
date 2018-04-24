@@ -38,7 +38,7 @@ int do_trace(struct pt_regs *ctx) {
 }
 """)
 
-b.attach_kprobe(event="sys_sync", fn_name="do_trace")
+b.attach_kprobe(event=b.get_syscall_fnname("sync"), fn_name="do_trace")
 print("Tracing for quick sync's... Ctrl-C to end")
 
 # format output

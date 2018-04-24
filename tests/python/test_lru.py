@@ -33,7 +33,8 @@ class TestLru(unittest.TestCase):
         """
         b = BPF(text=test_prog1)
         stats_map = b.get_table("stats")
-        b.attach_kprobe(event="sys_clone", fn_name="hello_world")
+        event_name = b.get_syscall_fnname("clone")
+        b.attach_kprobe(event=event_name, fn_name="hello_world")
         ini = stats_map.Leaf()
         for i in range(0, multiprocessing.cpu_count()):
             ini[i] = 0
@@ -53,7 +54,7 @@ class TestLru(unittest.TestCase):
         max = stats_map.max(stats_map.Key(0))
         self.assertGreater(sum.value, 0L)
         self.assertGreater(max.value, 0L)
-        b.detach_kprobe("sys_clone")
+        b.detach_kprobe(event_name)
 
 if __name__ == "__main__":
     unittest.main()

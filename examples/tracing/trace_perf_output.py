@@ -25,7 +25,7 @@ def cb(cpu, data, size):
 prog = """
 BPF_PERF_OUTPUT(events);
 BPF_ARRAY(counters, u64, 10);
-int kprobe__sys_clone(void *ctx) {
+int do_sys_clone(void *ctx) {
   struct {
     u64 ts;
     u64 magic;
@@ -40,6 +40,8 @@ int kprobe__sys_clone(void *ctx) {
 }
 """
 b = BPF(text=prog)
+event_name = b.get_syscall_fnname("clone")
+b.attach_kprobe(event=event_name, fn_name="do_sys_clone")
 b["events"].open_perf_buffer(cb)
 
 @atexit.register
@@ -48,7 +50,7 @@ def print_counter():
     global b
     print("counter = %d vs %d" % (counter, b["counters"][ct.c_int(0)].value))
 
-print("Tracing sys_write, try `dd if=/dev/zero of=/dev/null`")
+print("Tracing " + event_name + ", try `dd if=/dev/zero of=/dev/null`")
 print("Tracing... Hit Ctrl-C to end.")
 while 1:
     b.perf_buffer_poll()

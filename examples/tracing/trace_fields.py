@@ -15,6 +15,6 @@ int hello(void *ctx) {
 }
 """
 b = BPF(text=prog)
-b.attach_kprobe(event="sys_clone", fn_name="hello")
+b.attach_kprobe(event=b.get_syscall_fnname("clone"), fn_name="hello")
 print "PID MESSAGE"
 b.trace_print(fmt="{1} {5}")

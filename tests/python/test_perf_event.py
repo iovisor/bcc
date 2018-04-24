@@ -15,7 +15,7 @@ class TestPerfCounter(unittest.TestCase):
 BPF_PERF_ARRAY(cnt1, NUM_CPUS);
 BPF_ARRAY(prev, u64, NUM_CPUS);
 BPF_HISTOGRAM(dist);
-int kprobe__sys_getuid(void *ctx) {
+int do_sys_getuid(void *ctx) {
     u32 cpu = bpf_get_smp_processor_id();
     u64 val = cnt1.perf_read(CUR_CPU_IDENTIFIER);
 
@@ -25,7 +25,7 @@ int kprobe__sys_getuid(void *ctx) {
     prev.update(&cpu, &val);
     return 0;
 }
-int kretprobe__sys_getuid(void *ctx) {
+int do_ret_sys_getuid(void *ctx) {
     u32 cpu = bpf_get_smp_processor_id();
     u64 val = cnt1.perf_read(CUR_CPU_IDENTIFIER);
 
@@ -40,6 +40,9 @@ int kretprobe__sys_getuid(void *ctx) {
 """
         b = bcc.BPF(text=text, debug=0,
                 cflags=["-DNUM_CPUS=%d" % multiprocessing.cpu_count()])
+        event_name = b.get_syscall_fnname("getuid")
+        b.attach_kprobe(event=event_name, fn_name="do_sys_getuid")
+        b.attach_kretprobe(event=event_name, fn_name="do_ret_sys_getuid")
         cnt1 = b["cnt1"]
         try:
             cnt1.open_perf_event(bcc.PerfType.HARDWARE, bcc.PerfHWConfig.CPU_CYCLES)
