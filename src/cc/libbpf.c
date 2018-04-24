@@ -816,8 +816,10 @@ int bpf_attach_kprobe(int progfd, enum bpf_probe_attach_type attach_type,
     snprintf(buf, sizeof(buf), "%c:%ss/%s %s", attach_type==BPF_PROBE_ENTRY ? 'p' : 'r',
              event_type, event_alias, fn_name);
     if (write(kfd, buf, strlen(buf)) < 0) {
-      if (errno == EINVAL)
-        fprintf(stderr, "check dmesg output for possible cause\n");
+      if (errno == ENOENT)
+         fprintf(stderr, "cannot attach kprobe, probe entry may not exist\n");
+      else
+         fprintf(stderr, "cannot attach kprobe, %s\n", strerror(errno));
       close(kfd);
       goto error;
     }
