@@ -758,7 +758,7 @@ Constructors.
 
 ### 1. BPF
 
-Syntax: ```BPF({text=BPF_program | src_file=filename} [, usdt_contexts=[USDT_object, ...]])```
+Syntax: ```BPF({text=BPF_program | src_file=filename} [, usdt_contexts=[USDT_object, ...]] [, cflags=[arg1, ...]])```
 
 Creates a BPF object. This is the main object for defining a BPF program, and interacting with its output.
 
@@ -784,6 +784,9 @@ b = BPF(src_file = "vfsreadlat.c")
 u = USDT(pid=int(pid))
 [...]
 b = BPF(text=bpf_text, usdt_contexts=[u])
+
+# add include paths:
+u = BPF(text=prog, cflags=["-I/path/to/include"])
 ```
 
 Examples in situ:
