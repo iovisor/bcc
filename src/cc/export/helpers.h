@@ -103,6 +103,17 @@ struct _name##_table_t { \
 __attribute__((section("maps/perf_array"))) \
 struct _name##_table_t _name = { .max_entries = (_max_entries) }
 
+// Table for cgroup file descriptors
+#define BPF_CGROUP_ARRAY(_name, _max_entries) \
+struct _name##_table_t { \
+  int key; \
+  u32 leaf; \
+  int (*check_current_task) (int); \
+  u32 max_entries; \
+}; \
+__attribute__((section("maps/cgroup_array"))) \
+struct _name##_table_t _name = { .max_entries = (_max_entries) }
+
 #define BPF_HASH1(_name) \
   BPF_TABLE("hash", u64, u64, _name, 10240)
 #define BPF_HASH2(_name, _key_type) \
