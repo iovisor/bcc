@@ -132,6 +132,8 @@ class BPF {
 
   BPFProgTable get_prog_table(const std::string& name);
 
+  BPFCgroupArray get_cgroup_array(const std::string& name);
+
   BPFStackTable get_stack_table(const std::string& name,
                                 bool use_debug_file = true,
                                 bool check_debug_file_crc = true);
