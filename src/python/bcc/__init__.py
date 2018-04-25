@@ -522,6 +522,19 @@ class BPF(object):
         global _num_open_probes
         del self.uprobe_fds[name]
         _num_open_probes -= 1
+
+    def get_syscall_prefix(self):
+        # test bpf syscall kernel func name
+        if self.ksymname("sys_bpf") != -1:
+            return "sys_"
+        if self.ksymname("__x64_sys_bpf") != -1:
+            return "__x64_sys_"
+        # none of them, just return "sys_", later API
+        # calls will return error
+        return "sys_"
+
+    def get_syscall_fnname(self, name):
+        return self.get_syscall_prefix() + name
        
     def attach_kprobe(self, event=b"", fn_name=b"", event_re=b""):
         event = _assert_is_bytes(event)

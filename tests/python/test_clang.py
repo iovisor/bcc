@@ -295,7 +295,7 @@ struct args_t {
     int flags;
     int mode;
 };
-int kprobe__sys_open(struct pt_regs *ctx, const char *filename,
+int do_sys_open(struct pt_regs *ctx, const char *filename,
         int flags, int mode) {
     struct args_t args = {};
     args.filename = filename;
@@ -305,6 +305,8 @@ int kprobe__sys_open(struct pt_regs *ctx, const char *filename,
     return 0;
 };
 """)
+        b.attach_kprobe(event=b.get_syscall_fnname("open"),
+                        fn_name="do_sys_open")
 
     def test_task_switch(self):
         b = BPF(text="""
@@ -599,7 +601,7 @@ void do_trace(struct pt_regs *ctx) {
         c_val = ct.c_ulong(1)
         b["dummy"][ct.c_ulong(0)] = c_val
         b["dummy"][ct.c_ulong(1)] = c_val
-        b.attach_kprobe(event="sys_sync", fn_name="do_trace")
+        b.attach_kprobe(event=b.get_syscall_fnname("sync"), fn_name="do_trace")
         libc = ct.CDLL("libc.so.6")
         libc.sync()
         self.assertEqual(1, b["dummy"][ct.c_ulong(0)].value)

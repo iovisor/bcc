@@ -22,8 +22,10 @@ class TestKprobeRgx(TestCase):
           return 0;
         }
         """)
-        self.b.attach_kprobe(event_re="^SyS_bp.*", fn_name="hello")
-        self.b.attach_kretprobe(event_re="^SyS_bp.*", fn_name="goodbye")
+        self.b.attach_kprobe(event_re="^" + self.b.get_syscall_prefix() + "bp.*",
+                             fn_name="hello")
+        self.b.attach_kretprobe(event_re="^" + self.b.get_syscall_prefix() + "bp.*",
+                                fn_name="goodbye")
 
     def test_send1(self):
         k1 = self.b["stats"].Key(1)

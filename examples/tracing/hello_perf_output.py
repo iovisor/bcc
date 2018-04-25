@@ -32,7 +32,7 @@ int hello(struct pt_regs *ctx) {
 
 # load BPF program
 b = BPF(text=prog)
-b.attach_kprobe(event="sys_clone", fn_name="hello")
+b.attach_kprobe(event=b.get_syscall_fnname("clone"), fn_name="hello")
 
 # define output data structure in Python
 TASK_COMM_LEN = 16    # linux/sched.h

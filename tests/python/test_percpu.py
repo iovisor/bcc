@@ -36,7 +36,8 @@ class TestPercpu(unittest.TestCase):
         """
         bpf_code = BPF(text=test_prog1)
         stats_map = bpf_code.get_table("stats")
-        bpf_code.attach_kprobe(event="sys_clone", fn_name="hello_world")
+        event_name = bpf_code.get_syscall_fnname("clone")
+        bpf_code.attach_kprobe(event=event_name, fn_name="hello_world")
         ini = stats_map.Leaf()
         for i in range(0, multiprocessing.cpu_count()):
             ini[i] = 0
@@ -50,7 +51,7 @@ class TestPercpu(unittest.TestCase):
         max = stats_map.max(stats_map.Key(0))
         self.assertGreater(sum.value, int(0))
         self.assertGreater(max.value, int(0))
-        bpf_code.detach_kprobe("sys_clone")
+        bpf_code.detach_kprobe(event_name)
 
     def test_u32(self):
         test_prog1 = """
@@ -65,7 +66,8 @@ class TestPercpu(unittest.TestCase):
         """
         bpf_code = BPF(text=test_prog1)
         stats_map = bpf_code.get_table("stats")
-        bpf_code.attach_kprobe(event="sys_clone", fn_name="hello_world")
+        event_name = bpf_code.get_syscall_fnname("clone")
+        bpf_code.attach_kprobe(event=event_name, fn_name="hello_world")
         ini = stats_map.Leaf()
         for i in range(0, multiprocessing.cpu_count()):
             ini[i] = 0
@@ -79,7 +81,7 @@ class TestPercpu(unittest.TestCase):
         max = stats_map.max(stats_map.Key(0))
         self.assertGreater(sum.value, int(0))
         self.assertGreater(max.value, int(0))
-        bpf_code.detach_kprobe("sys_clone")
+        bpf_code.detach_kprobe(event_name)
 
     def test_struct_custom_func(self):
         test_prog2 = """
@@ -100,7 +102,8 @@ class TestPercpu(unittest.TestCase):
         bpf_code = BPF(text=test_prog2)
         stats_map = bpf_code.get_table("stats",
                 reducer=lambda x,y: stats_map.sLeaf(x.c1+y.c1))
-        bpf_code.attach_kprobe(event="sys_clone", fn_name="hello_world")
+        event_name = bpf_code.get_syscall_fnname("clone")
+        bpf_code.attach_kprobe(event=event_name, fn_name="hello_world")
         ini = stats_map.Leaf()
         for i in ini:
             i = stats_map.sLeaf(0,0)
@@ -110,7 +113,7 @@ class TestPercpu(unittest.TestCase):
         self.assertEqual(len(stats_map),1)
         k = stats_map[ stats_map.Key(0) ]
         self.assertGreater(k.c1, int(0))
-        bpf_code.detach_kprobe("sys_clone")
+        bpf_code.detach_kprobe(event_name)
 
 
 if __name__ == "__main__":
