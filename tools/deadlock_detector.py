@@ -465,10 +465,10 @@ def main():
             print('%s. Is the process (pid=%d) running?' % (str(e), args.pid))
             sys.exit(1)
 
-    bpf = BPF(src_file='deadlock_detector.c')
+    bpf = BPF(src_file=b'deadlock_detector.c')
 
     # Trace where threads are created
-    bpf.attach_kretprobe(event='sys_clone', fn_name='trace_clone')
+    bpf.attach_kretprobe(event=bpf.get_syscall_fnname('clone'), fn_name='trace_clone')
 
     # We must trace unlock first, otherwise in the time we attached the probe
     # on lock() and have not yet attached the probe on unlock(), a thread can

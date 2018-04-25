@@ -25,12 +25,14 @@ struct data_t {
 
 BPF_PERF_OUTPUT(events);
 
-void kprobe__sys_sync(void *ctx) {
+void do_sys_sync(void *ctx) {
     struct data_t data = {};
     data.ts = bpf_ktime_get_ns() / 1000;
     events.perf_submit(ctx, &data, sizeof(data));
 };
 """)
+b.attach_kprobe(event=b.get_syscall_fnname("sync"),
+                fn_name="do_sys_sync")
 
 class Data(ct.Structure):
     _fields_ = [
