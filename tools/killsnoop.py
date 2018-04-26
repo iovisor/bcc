@@ -60,7 +60,7 @@ struct data_t {
 BPF_HASH(infotmp, u32, struct val_t);
 BPF_PERF_OUTPUT(events);
 
-int kprobe__sys_kill(struct pt_regs *ctx, int tpid, int sig)
+int do_sys_kill(struct pt_regs *ctx, int tpid, int sig)
 {
     u32 pid = bpf_get_current_pid_tgid();
     FILTER
@@ -75,7 +75,7 @@ int kprobe__sys_kill(struct pt_regs *ctx, int tpid, int sig)
     return 0;
 };
 
-int kretprobe__sys_kill(struct pt_regs *ctx)
+int do_ret_sys_kill(struct pt_regs *ctx)
 {
     struct data_t data = {};
     struct val_t *valp;
@@ -111,6 +111,10 @@ if debug or args.ebpf:
 
 # initialize BPF
 b = BPF(text=bpf_text)
+kill_fnname = b.get_syscall_fnname("kill")
+b.attach_kprobe(event=kill_fnname, fn_name="do_sys_kill")
+b.attach_kretprobe(event=kill_fnname, fn_name="do_ret_sys_kill")
+
 
 TASK_COMM_LEN = 16    # linux/sched.h
 

@@ -98,7 +98,7 @@ static int submit_arg(struct pt_regs *ctx, void *ptr, struct data_t *data)
     return 0;
 }
 
-int kprobe__sys_execve(struct pt_regs *ctx,
+int do_sys_execve(struct pt_regs *ctx,
     const char __user *filename,
     const char __user *const __user *__argv,
     const char __user *const __user *__envp)
@@ -125,7 +125,7 @@ out:
     return 0;
 }
 
-int kretprobe__sys_execve(struct pt_regs *ctx)
+int do_ret_sys_execve(struct pt_regs *ctx)
 {
     struct data_t data = {};
     data.pid = bpf_get_current_pid_tgid() >> 32;
@@ -145,6 +145,9 @@ if args.ebpf:
 
 # initialize BPF
 b = BPF(text=bpf_text)
+execve_fnname = b.get_syscall_fnname("execve")
+b.attach_kprobe(event=execve_fnname, fn_name="do_sys_execve")
+b.attach_kretprobe(event=execve_fnname, fn_name="do_ret_sys_execve")
 
 # header
 if args.timestamp:
