@@ -15,10 +15,11 @@
 
 from __future__ import print_function
 from bcc import BPF
+import bcc.utils as utils
 import ctypes as ct
 
 # load BPF program
-b = BPF(text="""
+bpf_text="""
 struct data_t {
     u64 ts;
 };
@@ -30,8 +31,9 @@ void kprobe__sys_sync(void *ctx) {
     data.ts = bpf_ktime_get_ns() / 1000;
     events.perf_submit(ctx, &data, sizeof(data));
 };
-""")
-
+"""
+bpf_text = bpf_text.replace("sys_sync", utils.get_syscall_prefix() + "sync")
+b = BPF(text=bpf_text)
 class Data(ct.Structure):
     _fields_ = [
         ("ts", ct.c_ulonglong)

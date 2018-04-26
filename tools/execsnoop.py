@@ -137,7 +137,7 @@ int kretprobe__sys_execve(struct pt_regs *ctx)
     return 0;
 }
 """
-
+bpf_text = bpf_text.replace("sys_execve", utils.get_syscall_prefix() + "execve")
 bpf_text = bpf_text.replace("MAXARG", args.max_args)
 if args.ebpf:
     print(bpf_text)

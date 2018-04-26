@@ -13,6 +13,7 @@
 from __future__ import print_function
 import argparse
 import bcc
+import bcc.utils as utils
 import ctypes
 import errno
 import functools
@@ -397,11 +398,14 @@ def main():
         help=argparse.SUPPRESS)
     args = parser.parse_args()
 
+    global bpf_text
     mounts = {}
     umounts = {}
     if args.ebpf:
         print(bpf_text)
         exit()
+    bpf_text = bpf_text.replace("sys_mount", utils.get_syscall_prefix() + "mount")
+    bpf_text = bpf_text.replace("sys_umount", utils.get_syscall_prefix() + "umount")
     b = bcc.BPF(text=bpf_text)
     b['events'].open_perf_buffer(
         functools.partial(print_event, mounts, umounts))
