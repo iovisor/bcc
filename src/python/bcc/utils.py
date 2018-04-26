@@ -16,7 +16,50 @@ import sys
 import traceback
 import warnings
 
-from .libbcc import lib
+from .libbcc import lib, bcc_symbol_option
+
+class SymbolCache(object):
+    def __init__(self, pid):
+        self.cache = lib.bcc_symcache_new(
+                pid, ct.cast(None, ct.POINTER(bcc_symbol_option)))
+
+    def resolve(self, addr, demangle):
+        """
+        Return a tuple of the symbol (function), its offset from the beginning
+        of the function, and the module in which it lies. For example:
+            ("start_thread", 0x202, "/usr/lib/.../libpthread-2.24.so")
+        If the symbol cannot be found but we know which module it is in,
+        return the module name and the offset from the beginning of the
+        module. If we don't even know the module, return the absolute
+        address as the offset.
+        """
+        sym = bcc_symbol()
+        if demangle:
+            res = lib.bcc_symcache_resolve(self.cache, addr, ct.byref(sym))
+        else:
+            res = lib.bcc_symcache_resolve_no_demangle(self.cache, addr,
+                                                       ct.byref(sym))
+        if res < 0:
+            if sym.module and sym.offset:
+                return (None, sym.offset,
+                        ct.cast(sym.module, ct.c_char_p).value)
+            return (None, addr, None)
+        if demangle:
+            name_res = sym.demangle_name
+            lib.bcc_symbol_free_demangle_name(ct.byref(sym))
+        else:
+            name_res = sym.name
+        return (name_res, sym.offset, ct.cast(sym.module, ct.c_char_p).value)
+
+    def resolve_name(self, module, name):
+        module = _assert_is_bytes(module)
+        name = _assert_is_bytes(name)
+        addr = ct.c_ulonglong()
+        if lib.bcc_symcache_resolve_name(self.cache, module, name,
+                ct.byref(addr)) < 0:
+            return -1
+        return addr.value
+
 
 def _read_cpu_range(path):
     cpus = []
@@ -95,4 +138,13 @@ def _assert_is_bytes(arg):
         warnings.warn("not a bytes object: %r" % arg, DeprecationWarning, 2)
         return ArgString(arg).__bytes__()
     return arg
-
+def get_syscall_prefix():
+    # test bpf syscall kernel func name
+    ksyms = SymbolCache(-1)
+    if ksyms.resolve_name(None, "sys_bpf") != -1:
+        return "sys_"
+    if ksyms.resolve_name(None, "__x64_sys_bpf") != -1:
+        return "__x64_sys_"
+    # none of them, just return "sys_", later api
+    # calls will return error
+    return "sys_"

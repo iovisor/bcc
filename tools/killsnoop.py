@@ -14,6 +14,7 @@
 
 from __future__ import print_function
 from bcc import BPF
+import bcc.utils as utils
 import argparse
 from time import strftime
 import ctypes as ct
@@ -108,7 +109,7 @@ if debug or args.ebpf:
     print(bpf_text)
     if args.ebpf:
         exit()
-
+bpf_text = bpf_text.replace("sys_kill", utils.get_syscall_prefix() + "kill")
 # initialize BPF
 b = BPF(text=bpf_text)
 
