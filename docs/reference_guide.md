@@ -758,9 +758,20 @@ Constructors.
 
 ### 1. BPF
 
-Syntax: ```BPF({text=BPF_program | src_file=filename} [, usdt_contexts=[USDT_object, ...]] [, cflags=[arg1, ...]])```
+Syntax: ```BPF({text=BPF_program | src_file=filename} [, usdt_contexts=[USDT_object, ...]] [, cflags=[arg1, ...]] [, debug=int])```
 
 Creates a BPF object. This is the main object for defining a BPF program, and interacting with its output.
+
+Exactly one of `text` or `src_file` must be supplied (not both).
+
+The `cflags` specifies additional arguments to be passed to the compiler, for example `-DMACRO_NAME=value` or `-I/include/path`.  The arguments are passed as an array, with each element being an additional argument.  Note that strings are not split on whitespace, so each argument must be a different element of the array, e.g. `["-include", "header.h"]`.
+
+The `debug` flags control debug output, and can be or'ed together:
+- `DEBUG_LLVM_IR = 0x1` compiled LLVM IR
+- `DEBUG_BPF = 0x2` loaded BPF bytecode and register state on branches
+- `DEBUG_PREPROCESSOR = 0x4` pre-processor result
+- `DEBUG_SOURCE = 0x8` ASM instructions embedded with source
+- `DEBUG_BPF_REGISTER_STATE = 0x10` register state on all instructions in addition to DEBUG_BPF
 
 Examples:
 
