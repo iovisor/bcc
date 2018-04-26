@@ -110,21 +110,24 @@ if debug or args.ebpf:
 # initialize BPF
 b = BPF(text=bpf_text)
 
+stat = b.get_syscall_fnname("stat")
+statfs = b.get_syscall_fnname("statfs")
+newstat = b.get_syscall_fnname("newstat")
 # for POSIX compliance, all architectures implement these
 # system calls but the name of the actual entry point may
 # be different for which we must check if the entry points
 # actually exist before attaching the probes
-if BPF.ksymname("sys_stat") != -1:
-    b.attach_kprobe(event="sys_stat", fn_name="trace_entry")
-    b.attach_kretprobe(event="sys_stat", fn_name="trace_return")
+if BPF.ksymname(stat) != -1:
+    b.attach_kprobe(event=stat, fn_name="trace_entry")
+    b.attach_kretprobe(event=stat, fn_name="trace_return")
 
-if BPF.ksymname("sys_statfs") != -1:
-    b.attach_kprobe(event="sys_statfs", fn_name="trace_entry")
-    b.attach_kretprobe(event="sys_statfs", fn_name="trace_return")
+if BPF.ksymname(statfs) != -1:
+    b.attach_kprobe(event=statfs, fn_name="trace_entry")
+    b.attach_kretprobe(event=statfs, fn_name="trace_return")
 
-if BPF.ksymname("sys_newstat") != -1:
-    b.attach_kprobe(event="sys_newstat", fn_name="trace_entry")
-    b.attach_kretprobe(event="sys_newstat", fn_name="trace_return")
+if BPF.ksymname(newstat) != -1:
+    b.attach_kprobe(event=newstat, fn_name="trace_entry")
+    b.attach_kretprobe(event=newstat, fn_name="trace_return")
 
 TASK_COMM_LEN = 16    # linux/sched.h
 NAME_MAX = 255        # linux/limits.h
