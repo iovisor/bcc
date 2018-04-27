@@ -47,7 +47,8 @@ class BPF {
 
   explicit BPF(unsigned int flag = 0, TableStorage* ts = nullptr,
                bool rw_engine_enabled = true)
-      : flag_(flag), syscall_prefix_idx_(0),
+      : flag_(flag),
+        syscall_prefix_idx_(0),
         bpf_module_(new BPFModule(flag, ts, rw_engine_enabled)) {}
   StatusTuple init(const std::string& bpf_program,
                    const std::vector<std::string>& cflags = {},
@@ -91,7 +92,7 @@ class BPF {
                                     int group_fd = -1);
   StatusTuple detach_perf_event(uint32_t ev_type, uint32_t ev_config);
   StatusTuple detach_perf_event_raw(void* perf_event_attr);
-  std::string get_syscall_fnname(const std::string &name);
+  std::string get_syscall_fnname(const std::string& name);
 
   BPFTable get_table(const std::string& name) {
     TableStorage::iterator it;
@@ -109,7 +110,8 @@ class BPF {
   }
 
   template <class ValueType>
-  BPFPercpuArrayTable<ValueType> get_percpu_array_table(const std::string& name) {
+  BPFPercpuArrayTable<ValueType> get_percpu_array_table(
+      const std::string& name) {
     TableStorage::iterator it;
     if (bpf_module_->table_storage().Find(Path({bpf_module_->id(), name}), it))
       return BPFPercpuArrayTable<ValueType>(it->second);
@@ -125,7 +127,8 @@ class BPF {
   }
 
   template <class KeyType, class ValueType>
-  BPFPercpuHashTable<KeyType, ValueType> get_percpu_hash_table(const std::string& name) {
+  BPFPercpuHashTable<KeyType, ValueType> get_percpu_hash_table(
+      const std::string& name) {
     TableStorage::iterator it;
     if (bpf_module_->table_storage().Find(Path({bpf_module_->id(), name}), it))
       return BPFPercpuHashTable<KeyType, ValueType>(it->second);
@@ -159,9 +162,9 @@ class BPF {
   BPFPerfBuffer* get_perf_buffer(const std::string& name);
   // Poll an opened Perf Buffer of given name with given timeout, using callback
   // provided when opening. Do nothing if such open Perf Buffer doesn't exist.
-  // Returns: 
-  //   -1 on error or if perf buffer with such name doesn't exist; 
-  //   0, if no data was available before timeout; 
+  // Returns:
+  //   -1 on error or if perf buffer with such name doesn't exist;
+  //   0, if no data was available before timeout;
   //   number of CPUs that have new data, otherwise.
   int poll_perf_buffer(const std::string& name, int timeout_ms = -1);
 

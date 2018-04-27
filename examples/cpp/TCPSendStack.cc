@@ -78,10 +78,10 @@ int main(int argc, char** argv) {
 
   auto table =
       bpf.get_hash_table<stack_key_t, uint64_t>("counts").get_table_offline();
-  std::sort(table.begin(), table.end(), [](std::pair<stack_key_t, uint64_t> a,
-                                           std::pair<stack_key_t, uint64_t> b) {
-    return a.second < b.second;
-  });
+  std::sort(
+      table.begin(), table.end(),
+      [](std::pair<stack_key_t, uint64_t> a,
+         std::pair<stack_key_t, uint64_t> b) { return a.second < b.second; });
   auto stacks = bpf.get_stack_table("stack_traces");
 
   for (auto it : table) {
