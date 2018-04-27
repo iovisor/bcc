@@ -191,6 +191,9 @@ BPFStackTable::BPFStackTable(const TableDesc& desc,
                              bool use_debug_file,
                              bool check_debug_file_crc)
     : BPFTableBase<int, stacktrace_t>(desc) {
+  if (desc.type != BPF_MAP_TYPE_STACK_TRACE)
+    throw std::invalid_argument("Table '" + desc.name + "' is not a stack table");
+
   symbol_option_ = {
     .use_debug_file = use_debug_file,
     .check_debug_file_crc = check_debug_file_crc,
@@ -252,6 +255,12 @@ std::vector<std::string> BPFStackTable::get_stack_symbol(int stack_id,
     }
 
   return res;
+}
+
+BPFPerfBuffer::BPFPerfBuffer(const TableDesc& desc)
+  : BPFTableBase<int, int>(desc), epfd_(-1) {
+  if (desc.type != BPF_MAP_TYPE_PERF_EVENT_ARRAY)
+    throw std::invalid_argument("Table '" + desc.name + "' is not a perf buffer");
 }
 
 StatusTuple BPFPerfBuffer::open_on_cpu(perf_reader_raw_cb cb,
@@ -363,6 +372,12 @@ BPFPerfBuffer::~BPFPerfBuffer() {
               << std::endl;
 }
 
+BPFPerfEventArray::BPFPerfEventArray(const TableDesc& desc)
+  : BPFTableBase<int, int>(desc) {
+  if (desc.type != BPF_MAP_TYPE_PERF_EVENT_ARRAY)
+    throw std::invalid_argument("Table '" + desc.name + "' is not a perf event array");
+}
+
 StatusTuple BPFPerfEventArray::open_all_cpu(uint32_t type, uint64_t config) {
   if (cpu_fds_.size() != 0)
     return StatusTuple(-1, "Previously opened perf event not cleaned");
@@ -436,6 +451,12 @@ BPFPerfEventArray::~BPFPerfEventArray() {
   }
 }
 
+BPFProgTable::BPFProgTable(const TableDesc& desc)
+  : BPFTableBase<int, int>(desc) {
+  if (desc.type != BPF_MAP_TYPE_PROG_ARRAY)
+    throw std::invalid_argument("Table '" + desc.name + "' is not a prog table");
+}
+
 StatusTuple BPFProgTable::update_value(const int& index, const int& prog_fd) {
   if (!this->update(const_cast<int*>(&index), const_cast<int*>(&prog_fd)))
     return StatusTuple(-1, "Error updating value: %s", std::strerror(errno));
@@ -446,6 +467,12 @@ StatusTuple BPFProgTable::remove_value(const int& index) {
   if (!this->remove(const_cast<int*>(&index)))
     return StatusTuple(-1, "Error removing value: %s", std::strerror(errno));
   return StatusTuple(0);
+}
+
+BPFCgroupArray::BPFCgroupArray(const TableDesc& desc)
+  : BPFTableBase<int, int>(desc) {
+  if (desc.type != BPF_MAP_TYPE_CGROUP_ARRAY)
+    throw std::invalid_argument("Table '" + desc.name + "' is not a cgroup array");
 }
 
 StatusTuple BPFCgroupArray::update_value(const int& index,

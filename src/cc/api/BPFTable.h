@@ -299,8 +299,7 @@ class BPFStackTable : public BPFTableBase<int, stacktrace_t> {
 
 class BPFPerfBuffer : public BPFTableBase<int, int> {
  public:
-  BPFPerfBuffer(const TableDesc& desc)
-      : BPFTableBase<int, int>(desc), epfd_(-1) {}
+  BPFPerfBuffer(const TableDesc& desc);
   ~BPFPerfBuffer();
 
   StatusTuple open_all_cpu(perf_reader_raw_cb cb, perf_reader_lost_cb lost_cb,
@@ -321,8 +320,7 @@ class BPFPerfBuffer : public BPFTableBase<int, int> {
 
 class BPFPerfEventArray : public BPFTableBase<int, int> {
  public:
-  BPFPerfEventArray(const TableDesc& desc)
-      : BPFTableBase<int, int>(desc) {}
+  BPFPerfEventArray(const TableDesc& desc);
   ~BPFPerfEventArray();
 
   StatusTuple open_all_cpu(uint32_t type, uint64_t config);
@@ -337,11 +335,7 @@ class BPFPerfEventArray : public BPFTableBase<int, int> {
 
 class BPFProgTable : public BPFTableBase<int, int> {
 public:
-  BPFProgTable(const TableDesc& desc)
-      : BPFTableBase<int, int>(desc) {
-    if (desc.type != BPF_MAP_TYPE_PROG_ARRAY)
-      throw std::invalid_argument("Table '" + desc.name + "' is not a prog table");
-  }
+  BPFProgTable(const TableDesc& desc);
 
   StatusTuple update_value(const int& index, const int& prog_fd);
   StatusTuple remove_value(const int& index);
@@ -349,11 +343,7 @@ public:
 
 class BPFCgroupArray : public BPFTableBase<int, int> {
 public:
-  BPFCgroupArray(const TableDesc& desc)
-      : BPFTableBase<int, int>(desc) {
-    if (desc.type != BPF_MAP_TYPE_CGROUP_ARRAY)
-      throw std::invalid_argument("Table '" + desc.name + "' is not a cgroup array");
-  }
+  BPFCgroupArray(const TableDesc& desc);
 
   StatusTuple update_value(const int& index, const int& cgroup2_fd);
   StatusTuple update_value(const int& index, const std::string& cgroup2_path);
