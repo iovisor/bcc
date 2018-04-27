@@ -27,17 +27,15 @@ struct stack_key_t {
   int kernel_stack;
 };
 
-BPF_STACK_TRACE(stack_traces, 10240);
+BPF_STACK_TRACE(stack_traces, 16384);
 BPF_HASH(counts, struct stack_key_t, uint64_t);
 
 int on_tcp_send(struct pt_regs *ctx) {
   struct stack_key_t key = {};
   key.pid = bpf_get_current_pid_tgid() >> 32;
   bpf_get_current_comm(&key.name, sizeof(key.name));
-  key.kernel_stack = stack_traces.get_stackid(ctx, BPF_F_REUSE_STACKID);
-  key.user_stack = stack_traces.get_stackid(
-    ctx, BPF_F_REUSE_STACKID | BPF_F_USER_STACK
-  );
+  key.kernel_stack = stack_traces.get_stackid(ctx, 0);
+  key.user_stack = stack_traces.get_stackid(ctx, BPF_F_USER_STACK);
 
   u64 zero = 0, *val;
   val = counts.lookup_or_init(&key, &zero);
@@ -76,6 +74,12 @@ int main(int argc, char** argv) {
   std::cout << "Probing for " << probe_time << " seconds" << std::endl;
   sleep(probe_time);
 
+  auto detach_res = bpf.detach_kprobe("tcp_sendmsg");
+  if (detach_res.code() != 0) {
+    std::cerr << detach_res.msg() << std::endl;
+    return 1;
+  }
+
   auto table =
       bpf.get_hash_table<stack_key_t, uint64_t>("counts").get_table_offline();
   std::sort(
@@ -84,31 +88,42 @@ int main(int argc, char** argv) {
          std::pair<stack_key_t, uint64_t> b) { return a.second < b.second; });
   auto stacks = bpf.get_stack_table("stack_traces");
 
+  int lost_stacks = 0;
   for (auto it : table) {
     std::cout << "PID: " << it.first.pid << " (" << it.first.name << ") "
               << "made " << it.second
               << " TCP sends on following stack: " << std::endl;
-    std::cout << "  Kernel Stack:" << std::endl;
     if (it.first.kernel_stack >= 0) {
+      std::cout << "  Kernel Stack:" << std::endl;
       auto syms = stacks.get_stack_symbol(it.first.kernel_stack, -1);
       for (auto sym : syms)
         std::cout << "    " << sym << std::endl;
-    } else
-      std::cout << "    " << it.first.kernel_stack << std::endl;
-    std::cout << "  User Stack:" << std::endl;
+    } else {
+      // -EFAULT normally means the stack is not availiable and not an error
+      if (it.first.kernel_stack != -EFAULT) {
+        lost_stacks++;
+        std::cout << "    [Lost Kernel Stack" << it.first.kernel_stack << "]"
+                  << std::endl;
+      }
+    }
     if (it.first.user_stack >= 0) {
+      std::cout << "  User Stack:" << std::endl;
       auto syms = stacks.get_stack_symbol(it.first.user_stack, it.first.pid);
       for (auto sym : syms)
         std::cout << "    " << sym << std::endl;
-    } else
-      std::cout << "    " << it.first.user_stack << std::endl;
+    } else {
+      // -EFAULT normally means the stack is not availiable and not an error
+      if (it.first.user_stack != -EFAULT) {
+        lost_stacks++;
+        std::cout << "    [Lost User Stack " << it.first.user_stack << "]"
+                  << std::endl;
+      }
+    }
   }
 
-  auto detach_res = bpf.detach_kprobe("tcp_sendmsg");
-  if (detach_res.code() != 0) {
-    std::cerr << detach_res.msg() << std::endl;
-    return 1;
-  }
+  if (lost_stacks > 0)
+    std::cout << "Total " << lost_stacks << " stack-traces lost due to "
+              << "hash collision or stack table full" << std::endl;
 
   return 0;
 }
