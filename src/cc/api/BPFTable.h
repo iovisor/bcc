@@ -343,18 +343,21 @@ public:
       throw std::invalid_argument("Table '" + desc.name + "' is not a prog table");
   }
 
-  // updates an element
-  StatusTuple update_value(const int& index, const int& value) {
-    if (!this->update(const_cast<int*>(&index), const_cast<int*>(&value)))
-      return StatusTuple(-1, "Error updating value: %s", std::strerror(errno));
-    return StatusTuple(0);
+  StatusTuple update_value(const int& index, const int& prog_fd);
+  StatusTuple remove_value(const int& index);
+};
+
+class BPFCgroupArray : public BPFTableBase<int, int> {
+public:
+  BPFCgroupArray(const TableDesc& desc)
+      : BPFTableBase<int, int>(desc) {
+    if (desc.type != BPF_MAP_TYPE_CGROUP_ARRAY)
+      throw std::invalid_argument("Table '" + desc.name + "' is not a cgroup array");
   }
 
-  StatusTuple remove_value(const int& index) {
-    if (!this->remove(const_cast<int*>(&index)))
-      return StatusTuple(-1, "Error removing value: %s", std::strerror(errno));
-    return StatusTuple(0);
-  }
+  StatusTuple update_value(const int& index, const int& cgroup2_fd);
+  StatusTuple update_value(const int& index, const std::string& cgroup2_path);
+  StatusTuple remove_value(const int& index);
 };
 
 }  // namespace ebpf

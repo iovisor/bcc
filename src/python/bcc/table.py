@@ -142,6 +142,8 @@ def Table(bpf, map_id, map_fd, keytype, leaftype, **kwargs):
         t = LruHash(bpf, map_id, map_fd, keytype, leaftype)
     elif ttype == BPF_MAP_TYPE_LRU_PERCPU_HASH:
         t = LruPerCpuHash(bpf, map_id, map_fd, keytype, leaftype)
+    elif ttype == BPF_MAP_TYPE_CGROUP_ARRAY:
+        t = CgroupArray(bpf, map_id, map_fd, keytype, leaftype)
     if t == None:
         raise Exception("Unknown table type %d" % ttype)
     return t
@@ -199,8 +201,7 @@ class TableBase(MutableMapping):
         return leaf
 
     def __setitem__(self, key, leaf):
-        res = lib.bpf_update_elem(self.map_fd, ct.byref(key), ct.byref(leaf),
-                                  0)
+        res = lib.bpf_update_elem(self.map_fd, ct.byref(key), ct.byref(leaf), 0)
         if res < 0:
             errstr = os.strerror(ct.get_errno())
             raise Exception("Could not update table: %s" % errstr)
@@ -476,6 +477,40 @@ class ProgArray(ArrayBase):
         if isinstance(leaf, self.bpf.Function):
             leaf = self.Leaf(leaf.fd)
         super(ProgArray, self).__setitem__(key, leaf)
+
+class FileDesc:
+    def __init__(self, fd):
+        if (fd is None) or (fd < 0):
+            raise Exception("Invalid file descriptor")
+        self.fd = fd
+
+    def clean_up(self):
+        if (self.fd is not None) and (self.fd >= 0):
+            os.close(self.fd)
+            self.fd = None
+
+    def __del__(self):
+        self.clean_up()
+
+    def __enter__(self, *args, **kwargs):
+        return self
+
+    def __exit__(self, *args, **kwargs):
+        self.clean_up()
+
+class CgroupArray(ArrayBase):
+    def __init__(self, *args, **kwargs):
+        super(CgroupArray, self).__init__(*args, **kwargs)
+
+    def __setitem__(self, key, leaf):
+        if isinstance(leaf, int):
+            super(CgroupArray, self).__setitem__(key, self.Leaf(leaf))
+        elif isinstance(leaf, str):
+            # TODO: Add os.O_CLOEXEC once we move to Python version >3.3
+            with FileDesc(os.open(leaf, os.O_RDONLY)) as f:
+                super(CgroupArray, self).__setitem__(key, self.Leaf(f.fd))
+        else:
+            raise Exception("Cgroup array key must be either FD or cgroup path")
 
 class PerfEventArray(ArrayBase):
 

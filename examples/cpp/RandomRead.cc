@@ -19,6 +19,10 @@ const std::string BPF_PROGRAM = R"(
 #include <linux/sched.h>
 #include <uapi/linux/ptrace.h>
 
+#ifndef CGROUP_FILTER
+#define CGROUP_FILTER 0
+#endif
+
 struct urandom_read_args {
   // See /sys/kernel/debug/tracing/events/random/urandom_read/format
   uint64_t common__unused;
@@ -35,8 +39,12 @@ struct event_t {
 };
 
 BPF_PERF_OUTPUT(events);
+BPF_CGROUP_ARRAY(cgroup, 1);
 
 int on_urandom_read(struct urandom_read_args* attr) {
+  if (CGROUP_FILTER && (cgroup.check_current_task(0) != 1))
+    return 0;
+
   struct event_t event = {};
   event.pid = bpf_get_current_pid_tgid();
   bpf_get_current_comm(&event.comm, sizeof(event.comm));
@@ -72,11 +80,28 @@ void signal_handler(int s) {
 }
 
 int main(int argc, char** argv) {
+  if (argc != 1 && argc != 2) {
+    std::cerr << "USAGE: RandomRead [cgroup2_path]" << std::endl;
+    return 1;
+  }
+
+  std::vector<std::string> cflags = {};
+  if (argc == 2)
+    cflags.emplace_back("-DCGROUP_FILTER=1");
+
   bpf = new ebpf::BPF();
-  auto init_res = bpf->init(BPF_PROGRAM);
+  auto init_res = bpf->init(BPF_PROGRAM, cflags, {});
   if (init_res.code() != 0) {
     std::cerr << init_res.msg() << std::endl;
     return 1;
+  }
+  if (argc == 2) {
+    auto cgroup_array = bpf->get_cgroup_array("cgroup");
+    auto update_res = cgroup_array.update_value(0, argv[1]);
+    if (update_res.code() != 0) {
+      std::cerr << update_res.msg() << std::endl;
+      return 1;
+    }
   }
 
   auto attach_res =

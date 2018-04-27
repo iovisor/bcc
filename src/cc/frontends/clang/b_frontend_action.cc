@@ -459,6 +459,9 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
           } else if (memb_name == "perf_counter_value") {
             prefix = "bpf_perf_event_read_value";
             suffix = ")";
+          } else if (memb_name == "check_current_task") {
+            prefix = "bpf_current_task_under_cgroup";
+            suffix = ")";
           } else {
             error(Call->getLocStart(), "invalid bpf_table operation %0") << memb_name;
             return false;
@@ -762,6 +765,8 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
       table.max_entries = numcpu;
     } else if (A->getName() == "maps/perf_array") {
       map_type = BPF_MAP_TYPE_PERF_EVENT_ARRAY;
+    } else if (A->getName() == "maps/cgroup_array") {
+      map_type = BPF_MAP_TYPE_CGROUP_ARRAY;
     } else if (A->getName() == "maps/stacktrace") {
       map_type = BPF_MAP_TYPE_STACK_TRACE;
     } else if (A->getName() == "maps/extern") {
