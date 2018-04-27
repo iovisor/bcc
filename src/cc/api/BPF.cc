@@ -39,6 +39,11 @@
 
 namespace ebpf {
 
+static const char *syscall_prefix[] = {
+  "sys_",
+  "__x64_sys_",
+};
+
 std::string uint_to_hex(uint64_t value) {
   std::stringstream ss;
   ss << std::hex << value;
@@ -57,6 +62,10 @@ StatusTuple BPF::init(const std::string& bpf_program,
                       const std::vector<std::string>& cflags,
                       const std::vector<USDT>& usdt) {
   std::string all_bpf_program;
+  bcc_symbol_option symbol_option = {};
+  void *ksym_cache;
+  uint64_t addr;
+  int ret;
 
   for (auto u : usdt) {
     if (!u.initialized_)
@@ -73,6 +82,16 @@ StatusTuple BPF::init(const std::string& bpf_program,
   all_bpf_program += bpf_program;
   if (bpf_module_->load_string(all_bpf_program, flags, flags_len) != 0)
     return StatusTuple(-1, "Unable to initialize BPF program");
+
+  ksym_cache = bcc_symcache_new(-1, &symbol_option);
+  ret = bcc_symcache_resolve_name(ksym_cache, NULL, "sys_bpf", &addr);
+  if (ret == 0) {
+    syscall_prefix_idx_ = 0;
+  } else {
+    ret = bcc_symcache_resolve_name(ksym_cache, NULL, "__x64_sys_bpf", &addr);
+    syscall_prefix_idx_ = (ret == 0) ? 1 : 0;
+  }
+  bcc_free_symcache(ksym_cache, -1);
 
   return StatusTuple(0);
 };
@@ -546,6 +565,11 @@ StatusTuple BPF::unload_func(const std::string& func_name) {
 
   funcs_.erase(it);
   return StatusTuple(0);
+}
+
+std::string BPF::get_syscall_fnname(const std::string &name) {
+  std::string fn_name = syscall_prefix[syscall_prefix_idx_] + name;
+  return std::move(fn_name);
 }
 
 StatusTuple BPF::check_binary_symbol(const std::string& binary_path,

@@ -62,10 +62,11 @@ TEST_CASE("test read perf event", "[bpf_perf_event]") {
   res =
       bpf.open_perf_event("cnt", PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CPU_CLOCK);
   REQUIRE(res.code() == 0);
-  res = bpf.attach_kprobe("sys_getuid", "on_sys_getuid");
+  std::string getuid_fnname = bpf.get_syscall_fnname("getuid");
+  res = bpf.attach_kprobe(getuid_fnname, "on_sys_getuid");
   REQUIRE(res.code() == 0);
   REQUIRE(getuid() >= 0);
-  res = bpf.detach_kprobe("sys_getuid");
+  res = bpf.detach_kprobe(getuid_fnname);
   REQUIRE(res.code() == 0);
   res = bpf.close_perf_event("cnt");
   REQUIRE(res.code() == 0);

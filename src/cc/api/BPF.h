@@ -47,7 +47,8 @@ class BPF {
 
   explicit BPF(unsigned int flag = 0, TableStorage* ts = nullptr,
                bool rw_engine_enabled = true)
-      : flag_(flag), bpf_module_(new BPFModule(flag, ts, rw_engine_enabled)) {}
+      : flag_(flag), syscall_prefix_idx_(0),
+        bpf_module_(new BPFModule(flag, ts, rw_engine_enabled)) {}
   StatusTuple init(const std::string& bpf_program,
                    const std::vector<std::string>& cflags = {},
                    const std::vector<USDT>& usdt = {});
@@ -90,6 +91,7 @@ class BPF {
                                     int group_fd = -1);
   StatusTuple detach_perf_event(uint32_t ev_type, uint32_t ev_config);
   StatusTuple detach_perf_event_raw(void* perf_event_attr);
+  std::string get_syscall_fnname(const std::string &name);
 
   BPFTable get_table(const std::string& name) {
     TableStorage::iterator it;
@@ -213,6 +215,8 @@ class BPF {
                                   uint64_t& offset_res);
 
   int flag_;
+
+  int syscall_prefix_idx_;
 
   std::unique_ptr<BPFModule> bpf_module_;
 
