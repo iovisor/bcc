@@ -135,6 +135,17 @@ class BPF(object):
     TRACEPOINT = 5
     XDP = 6
     PERF_EVENT = 7
+    CGROUP_SKB = 8
+    CGROUP_SOCK = 9
+    LWT_IN = 10
+    LWT_OUT = 11
+    LWT_XMIT = 12
+    SOCK_OPS = 13
+    SK_SKB = 14
+    CGROUP_DEVICE = 15
+    SK_MSG = 16
+    RAW_TRACEPOINT = 17
+    CGROUP_SOCK_ADDR = 18
 
     # from xdp_action uapi/linux/bpf.h
     XDP_ABORTED = 0
@@ -267,6 +278,7 @@ class BPF(object):
         self.kprobe_fds = {}
         self.uprobe_fds = {}
         self.tracepoint_fds = {}
+        self.raw_tracepoint_fds = {}
         self.perf_buffers = {}
         self.open_perf_events = {}
         self.tracefile = None
@@ -310,7 +322,8 @@ class BPF(object):
         for usdt_context in usdt_contexts:
             usdt_context.attach_uprobes(self)
 
-        # If any "kprobe__" or "tracepoint__" prefixed functions were defined,
+        # If any "kprobe__" or "tracepoint__" or "raw_tracepoint__"
+        # prefixed functions were defined,
         # they will be loaded and attached here.
         self._trace_autoload()
 
@@ -725,6 +738,52 @@ class BPF(object):
         self.tracepoint_fds[tp] = fd
         return self
 
+    def attach_raw_tracepoint(self, tp=b"", fn_name=b""):
+        """attach_raw_tracepoint(self, tp=b"", fn_name=b"")
+
+        Run the bpf function denoted by fn_name every time the kernel tracepoint
+        specified by 'tp' is hit. The bpf function should be loaded as a
+        RAW_TRACEPOINT type. The fn_name is the kernel tracepoint name,
+        e.g., sched_switch, sys_enter_bind, etc.
+
+        Examples:
+            BPF(text).attach_raw_tracepoint(tp="sched_switch", fn_name="on_switch")
+        """
+
+        tp = _assert_is_bytes(tp)
+        if tp in self.raw_tracepoint_fds:
+            raise Exception("Raw tracepoint %s has been attached" % tp)
+
+        fn_name = _assert_is_bytes(fn_name)
+        fn = self.load_func(fn_name, BPF.RAW_TRACEPOINT)
+        fd = lib.bpf_attach_raw_tracepoint(fn.fd, tp)
+        if fd < 0:
+            raise Exception("Failed to attach BPF to raw tracepoint")
+        self.raw_tracepoint_fds[tp] = fd;
+        return self
+
+    def detach_raw_tracepoint(self, tp=b""):
+        """detach_raw_tracepoint(tp="")
+
+        Stop running the bpf function that is attached to the kernel tracepoint
+        specified by 'tp'.
+
+        Example: bpf.detach_raw_tracepoint("sched_switch")
+        """
+
+        tp = _assert_is_bytes(tp)
+        if tp not in self.raw_tracepoint_fds:
+            raise Exception("Raw tracepoint %s is not attached" % tp)
+        os.close(self.raw_tracepoint_fds[tp])
+        del self.raw_tracepoint_fds[tp]
+
+    @staticmethod
+    def support_raw_tracepoint():
+        # kernel symbol "bpf_find_raw_tracepoint" indicates raw_tracepint support
+        if BPF.ksymname("bpf_find_raw_tracepoint") != -1:
+            return True
+        return False
+
     def detach_tracepoint(self, tp=b""):
         """detach_tracepoint(tp="")
 
@@ -954,6 +1013,10 @@ class BPF(object):
                 fn = self.load_func(func_name, BPF.TRACEPOINT)
                 tp = fn.name[len(b"tracepoint__"):].replace(b"__", b":")
                 self.attach_tracepoint(tp=tp, fn_name=fn.name)
+            elif func_name.startswith(b"raw_tracepoint__"):
+                fn = self.load_func(func_name, BPF.RAW_TRACEPOINT)
+                tp = fn.name[len(b"raw_tracepoint__"):]
+                self.attach_raw_tracepoint(tp=tp, fn_name=fn.name)
 
     def trace_open(self, nonblocking=False):
         """trace_open(nonblocking=False)
@@ -1154,6 +1217,8 @@ class BPF(object):
             self.detach_uprobe_event(k)
         for k, v in list(self.tracepoint_fds.items()):
             self.detach_tracepoint(k)
+        for k, v in list(self.raw_tracepoint_fds.items()):
+            self.detach_raw_tracepoint(k)
 
         # Clean up opened perf ring buffer and perf events
         table_keys = list(self.tables.keys())
