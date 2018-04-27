@@ -178,10 +178,11 @@ TEST_CASE("test bpf stack table", "[bpf_stack_table]") {
   ebpf::StatusTuple res(0);
   res = bpf.init(BPF_PROGRAM);
   REQUIRE(res.code() == 0);
-  res = bpf.attach_kprobe("sys_getuid", "on_sys_getuid");
+  std::string getuid_fnname = bpf.get_syscall_fnname("getuid");
+  res = bpf.attach_kprobe(getuid_fnname, "on_sys_getuid");
   REQUIRE(res.code() == 0);
   REQUIRE(getuid() >= 0);
-  res = bpf.detach_kprobe("sys_getuid");
+  res = bpf.detach_kprobe(getuid_fnname);
   REQUIRE(res.code() == 0);
 
   auto id = bpf.get_hash_table<int, int>("id");

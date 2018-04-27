@@ -27,8 +27,9 @@ int main() {
 
   std::ifstream pipe("/sys/kernel/debug/tracing/trace_pipe");
   std::string line;
+  std::string clone_fnname = bpf.get_syscall_fnname("clone");
 
-  auto attach_res = bpf.attach_kprobe("sys_clone", "on_sys_clone");
+  auto attach_res = bpf.attach_kprobe(clone_fnname, "on_sys_clone");
   if (attach_res.code() != 0) {
     std::cerr << attach_res.msg() << std::endl;
     return 1;
@@ -38,7 +39,7 @@ int main() {
     if (std::getline(pipe, line)) {
       std::cout << line << std::endl;
       // Detach the probe if we got at least one line.
-      auto detach_res = bpf.detach_kprobe("sys_clone");
+      auto detach_res = bpf.detach_kprobe(clone_fnname);
       if (detach_res.code() != 0) {
         std::cerr << detach_res.msg() << std::endl;
         return 1;
