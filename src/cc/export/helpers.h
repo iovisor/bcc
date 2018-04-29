@@ -683,6 +683,9 @@ int bpf_usdt_readarg_p(int argc, struct pt_regs *ctx, void *buf, u64 len) asm("l
 #define TRACEPOINT_PROBE(category, event) \
 int tracepoint__##category##__##event(struct tracepoint__##category##__##event *args)
 
+#define RAW_TRACEPOINT_PROBE(event) \
+int raw_tracepoint__##event(struct bpf_raw_tracepoint_args *ctx)
+
 #define TP_DATA_LOC_READ_CONST(dst, field, length)                        \
         do {                                                              \
             unsigned short __offset = args->data_loc_##field & 0xFFFF;    \

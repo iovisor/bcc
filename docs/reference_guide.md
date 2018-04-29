@@ -14,6 +14,7 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
         - [4. uprobes](#4-uprobes)
         - [5. uretprobes](#5-uretprobes)
         - [6. USDT probes](#6-usdt-probes)
+        - [7. Raw Tracepoints](#7-raw-tracepoints)
     - [Data](#data)
         - [1. bpf_probe_read()](#1-bpf_probe_read)
         - [2. bpf_probe_read_str()](#2-bpf_probe_read_str)
@@ -61,6 +62,7 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
         - [4. attach_uprobe()](#4-attach_uprobe)
         - [5. attach_uretprobe()](#5-attach_uretprobe)
         - [6. USDT.enable_probe()](#6-usdtenable_probe)
+        - [7. attach_raw_tracepoint()](#7-attach_raw_tracepoint)
     - [Debug Output](#debug-output)
         - [1. trace_print()](#1-trace_print)
         - [2. trace_fields()](#2-trace_fields)
@@ -236,6 +238,35 @@ Examples in situ:
 [code](https://github.com/iovisor/bcc/commit/4f88a9401357d7b75e917abd994aa6ea97dda4d3#diff-04a7cad583be5646080970344c48c1f4R24),
 [search /examples](https://github.com/iovisor/bcc/search?q=bpf_usdt_readarg+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=bpf_usdt_readarg+path%3Atools&type=Code)
+
+### 7. Raw Tracepoints
+
+Syntax: RAW_TRACEPOINT_PROBE(*event*)
+
+This is a macro that instruments the raw tracepoint defined by *event*.
+
+The argument is a pointer to struct ```bpf_raw_tracepoint_args```, which is defined in [bpf.h](https://github.com/iovisor/bcc/blob/master/src/cc/compat/linux/bpf.h).  The struct field ```args``` contains all parameters of the raw tracepoint where you can found at linux tree [include/trace/events](https://github.com/torvalds/linux/tree/master/include/trace/events)
+directory.
+
+For example:
+```C
+RAW_TRACEPOINT_PROBE(sched_switch)
+{
+    // TP_PROTO(bool preempt, struct task_struct *prev, struct task_struct *next)
+    struct task_struct *prev = (struct task_struct *)ctx->args[1];
+    struct task_struct *next= (struct task_struct *)ctx->args[2];
+    s32 prev_tgid, next_tgid;
+
+    bpf_probe_read(&prev_tgid, sizeof(prev->tgid), &prev->tgid);
+    bpf_probe_read(&next_tgid, sizeof(next->tgid), &next->tgid);
+    bpf_trace_printk("%d -> %d\\n", prev_tgid, next_tgid);
+}
+```
+
+This instruments the sched:sched_switch tracepoint, and prints the prev and next tgid.
+
+Examples in situ:
+[search /tools](https://github.com/iovisor/bcc/search?q=RAW_TRACEPOINT_PROBE+path%3Atools&type=Code)
 
 ## Data
 
@@ -992,6 +1023,23 @@ To check if your binary has USDT probes, and what they are, you can run ```reade
 Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=enable_probe+path%3Aexamples+language%3Apython&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=enable_probe+path%3Atools+language%3Apython&type=Code)
+
+### 7. attach_raw_tracepoint()
+
+Syntax: ```BPF.attach_raw_tracepoint(tp="tracepoint", fn_name="name")```
+
+Instruments the kernel raw tracepoint described by ```tracepoint``` (```event``` only, no ```category```), and when hit, runs the BPF function ```name()```.
+
+This is an explicit way to instrument tracepoints. The ```RAW_TRACEPOINT_PROBE``` syntax, covered in the earlier raw tracepoints section, is an alternate method.
+
+For example:
+
+```Python
+b.attach_raw_tracepoint("sched_swtich", "do_trace")
+```
+
+Examples in situ:
+[search /tools](https://github.com/iovisor/bcc/search?q=attach_raw_tracepoint+path%3Atools+language%3Apython&type=Code)
 
 ## Debug Output
 
