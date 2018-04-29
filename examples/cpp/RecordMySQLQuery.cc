@@ -83,10 +83,11 @@ int main(int argc, char** argv) {
 
   auto table_handle = bpf.get_hash_table<query_probe_t, int>("queries");
   auto table = table_handle.get_table_offline();
-  std::sort(table.begin(), table.end(), [](std::pair<query_probe_t, int> a,
-                                           std::pair<query_probe_t, int> b) {
-    return a.first.ts < b.first.ts;
-  });
+  std::sort(
+      table.begin(), table.end(),
+      [](std::pair<query_probe_t, int> a, std::pair<query_probe_t, int> b) {
+        return a.first.ts < b.first.ts;
+      });
   std::cout << table.size() << " queries recorded:" << std::endl;
   for (auto it : table) {
     std::cout << "Time: " << it.first.ts << " PID: " << it.first.pid

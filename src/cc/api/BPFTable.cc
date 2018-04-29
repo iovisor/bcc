@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
+#include <fcntl.h>
 #include <linux/elf.h>
 #include <linux/perf_event.h>
 #include <sys/epoll.h>
-#include <fcntl.h>
 #include <unistd.h>
 #include <cerrno>
 #include <cinttypes>
@@ -145,28 +145,25 @@ StatusTuple BPFTable::remove_value(const std::string& key_str) {
 }
 
 StatusTuple BPFTable::clear_table_non_atomic() {
-  if (desc.type == BPF_MAP_TYPE_HASH ||
-      desc.type == BPF_MAP_TYPE_PERCPU_HASH ||
+  if (desc.type == BPF_MAP_TYPE_HASH || desc.type == BPF_MAP_TYPE_PERCPU_HASH ||
       desc.type == BPF_MAP_TYPE_LRU_HASH ||
       desc.type == BPF_MAP_TYPE_PERCPU_HASH ||
       desc.type == BPF_MAP_TYPE_HASH_OF_MAPS) {
     // For hash maps, use the first() interface (which uses get_next_key) to
     // iterate through the map and clear elements
-    auto key = std::unique_ptr<void, decltype(::free)*>(
-      ::malloc(desc.key_size),
-      ::free);
+    auto key = std::unique_ptr<void, decltype(::free)*>(::malloc(desc.key_size),
+                                                        ::free);
 
     while (this->first(key.get()))
       if (!this->remove(key.get())) {
-        return StatusTuple(
-          -1,
-          "Failed to delete element when clearing table %s",
-          desc.name.c_str());
+        return StatusTuple(-1,
+                           "Failed to delete element when clearing table %s",
+                           desc.name.c_str());
       }
   } else if (desc.type == BPF_MAP_TYPE_ARRAY ||
              desc.type == BPF_MAP_TYPE_PERCPU_ARRAY) {
-    return StatusTuple(
-      -1, "Array map %s do not support clearing elements", desc.name.c_str());
+    return StatusTuple(-1, "Array map %s do not support clearing elements",
+                       desc.name.c_str());
   } else if (desc.type == BPF_MAP_TYPE_PROG_ARRAY ||
              desc.type == BPF_MAP_TYPE_PERF_EVENT_ARRAY ||
              desc.type == BPF_MAP_TYPE_STACK_TRACE ||
@@ -176,26 +173,25 @@ StatusTuple BPFTable::clear_table_non_atomic() {
       this->remove(&i);
     }
   } else {
-    return StatusTuple(
-      -1, "Clearing for map type of %s not supported yet", desc.name.c_str());
+    return StatusTuple(-1, "Clearing for map type of %s not supported yet",
+                       desc.name.c_str());
   }
 
   return StatusTuple(0);
 }
 
-size_t BPFTable::get_possible_cpu_count() {
-  return get_possible_cpus().size();
-}
+size_t BPFTable::get_possible_cpu_count() { return get_possible_cpus().size(); }
 
-BPFStackTable::BPFStackTable(const TableDesc& desc,
-                             bool use_debug_file,
+BPFStackTable::BPFStackTable(const TableDesc& desc, bool use_debug_file,
                              bool check_debug_file_crc)
     : BPFTableBase<int, stacktrace_t>(desc) {
-  symbol_option_ = {
-    .use_debug_file = use_debug_file,
-    .check_debug_file_crc = check_debug_file_crc,
-    .use_symbol_type = (1 << STT_FUNC) | (1 << STT_GNU_IFUNC)
-  };
+  if (desc.type != BPF_MAP_TYPE_STACK_TRACE)
+    throw std::invalid_argument("Table '" + desc.name +
+                                "' is not a stack table");
+
+  symbol_option_ = {.use_debug_file = use_debug_file,
+                    .check_debug_file_crc = check_debug_file_crc,
+                    .use_symbol_type = (1 << STT_FUNC) | (1 << STT_GNU_IFUNC)};
 }
 
 BPFStackTable::BPFStackTable(BPFStackTable&& that)
@@ -252,6 +248,13 @@ std::vector<std::string> BPFStackTable::get_stack_symbol(int stack_id,
     }
 
   return res;
+}
+
+BPFPerfBuffer::BPFPerfBuffer(const TableDesc& desc)
+    : BPFTableBase<int, int>(desc), epfd_(-1) {
+  if (desc.type != BPF_MAP_TYPE_PERF_EVENT_ARRAY)
+    throw std::invalid_argument("Table '" + desc.name +
+                                "' is not a perf buffer");
 }
 
 StatusTuple BPFPerfBuffer::open_on_cpu(perf_reader_raw_cb cb,
@@ -350,7 +353,8 @@ StatusTuple BPFPerfBuffer::close_all_cpu() {
 int BPFPerfBuffer::poll(int timeout_ms) {
   if (epfd_ < 0)
     return -1;
-  int cnt = epoll_wait(epfd_, ep_events_.get(), cpu_readers_.size(), timeout_ms);
+  int cnt =
+      epoll_wait(epfd_, ep_events_.get(), cpu_readers_.size(), timeout_ms);
   for (int i = 0; i < cnt; i++)
     perf_reader_event_read(static_cast<perf_reader*>(ep_events_[i].data.ptr));
   return cnt;
@@ -361,6 +365,13 @@ BPFPerfBuffer::~BPFPerfBuffer() {
   if (res.code() != 0)
     std::cerr << "Failed to close all perf buffer on destruction: " << res.msg()
               << std::endl;
+}
+
+BPFPerfEventArray::BPFPerfEventArray(const TableDesc& desc)
+    : BPFTableBase<int, int>(desc) {
+  if (desc.type != BPF_MAP_TYPE_PERF_EVENT_ARRAY)
+    throw std::invalid_argument("Table '" + desc.name +
+                                "' is not a perf event array");
 }
 
 StatusTuple BPFPerfEventArray::open_all_cpu(uint32_t type, uint64_t config) {
@@ -411,8 +422,8 @@ StatusTuple BPFPerfEventArray::open_on_cpu(int cpu, uint32_t type,
   }
   if (!update(&cpu, &fd)) {
     bpf_close_perf_event_fd(fd);
-    return StatusTuple(-1, "Unable to open perf event on CPU %d: %s",
-                       cpu, std::strerror(errno));
+    return StatusTuple(-1, "Unable to open perf event on CPU %d: %s", cpu,
+                       std::strerror(errno));
   }
   cpu_fds_[cpu] = fd;
   return StatusTuple(0);
@@ -436,6 +447,13 @@ BPFPerfEventArray::~BPFPerfEventArray() {
   }
 }
 
+BPFProgTable::BPFProgTable(const TableDesc& desc)
+    : BPFTableBase<int, int>(desc) {
+  if (desc.type != BPF_MAP_TYPE_PROG_ARRAY)
+    throw std::invalid_argument("Table '" + desc.name +
+                                "' is not a prog table");
+}
+
 StatusTuple BPFProgTable::update_value(const int& index, const int& prog_fd) {
   if (!this->update(const_cast<int*>(&index), const_cast<int*>(&prog_fd)))
     return StatusTuple(-1, "Error updating value: %s", std::strerror(errno));
@@ -446,6 +464,13 @@ StatusTuple BPFProgTable::remove_value(const int& index) {
   if (!this->remove(const_cast<int*>(&index)))
     return StatusTuple(-1, "Error removing value: %s", std::strerror(errno));
   return StatusTuple(0);
+}
+
+BPFCgroupArray::BPFCgroupArray(const TableDesc& desc)
+    : BPFTableBase<int, int>(desc) {
+  if (desc.type != BPF_MAP_TYPE_CGROUP_ARRAY)
+    throw std::invalid_argument("Table '" + desc.name +
+                                "' is not a cgroup array");
 }
 
 StatusTuple BPFCgroupArray::update_value(const int& index,

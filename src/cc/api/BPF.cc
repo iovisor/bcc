@@ -39,9 +39,9 @@
 
 namespace ebpf {
 
-static const char *syscall_prefix[] = {
-  "sys_",
-  "__x64_sys_",
+static const char* syscall_prefix[] = {
+    "sys_",
+    "__x64_sys_",
 };
 
 std::string uint_to_hex(uint64_t value) {
@@ -63,7 +63,7 @@ StatusTuple BPF::init(const std::string& bpf_program,
                       const std::vector<USDT>& usdt) {
   std::string all_bpf_program;
   bcc_symbol_option symbol_option = {};
-  void *ksym_cache;
+  void* ksym_cache;
   uint64_t addr;
   int ret;
 
@@ -284,8 +284,8 @@ StatusTuple BPF::attach_tracepoint(const std::string& tracepoint,
   int probe_fd;
   TRY2(load_func(probe_func, BPF_PROG_TYPE_TRACEPOINT, probe_fd));
 
-  int res_fd = bpf_attach_tracepoint(probe_fd, tp_category.c_str(),
-                                    tp_name.c_str());
+  int res_fd =
+      bpf_attach_tracepoint(probe_fd, tp_category.c_str(), tp_name.c_str());
 
   if (res_fd < 0) {
     TRY2(unload_func(probe_func));
@@ -341,8 +341,8 @@ StatusTuple BPF::attach_perf_event(uint32_t ev_type, uint32_t ev_config,
 }
 
 StatusTuple BPF::attach_perf_event_raw(void* perf_event_attr,
-                                       const std::string& probe_func,
-                                       pid_t pid, int cpu, int group_fd) {
+                                       const std::string& probe_func, pid_t pid,
+                                       int cpu, int group_fd) {
   auto attr = static_cast<struct perf_event_attr*>(perf_event_attr);
   auto ev_pair = std::make_pair(attr->type, attr->config);
   if (perf_events_.find(ev_pair) != perf_events_.end())
@@ -377,7 +377,6 @@ StatusTuple BPF::attach_perf_event_raw(void* perf_event_attr,
   p.per_cpu_fd = fds;
   perf_events_[ev_pair] = std::move(p);
   return StatusTuple(0);
-
 }
 
 StatusTuple BPF::detach_kprobe(const std::string& kernel_func,
@@ -567,7 +566,7 @@ StatusTuple BPF::unload_func(const std::string& func_name) {
   return StatusTuple(0);
 }
 
-std::string BPF::get_syscall_fnname(const std::string &name) {
+std::string BPF::get_syscall_fnname(const std::string& name) {
   std::string fn_name = syscall_prefix[syscall_prefix_idx_] + name;
   return std::move(fn_name);
 }
