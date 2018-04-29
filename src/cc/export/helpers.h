@@ -352,6 +352,10 @@ static int (*bpf_msg_pull_data)(void *msg, u32 start, u32 end, u64 flags) =
   (void *) BPF_FUNC_msg_pull_data;
 static int (*bpf_bind)(void *ctx, void *addr, int addr_len) =
   (void *) BPF_FUNC_bind;
+static int (*bpf_xdp_adjust_tail)(void *ctx, int offset) =
+  (void *) BPF_FUNC_xdp_adjust_tail;
+static int (*bpf_skb_get_xfrm_state)(void *ctx, u32 index, void *xfrm_state, u32 size, u64 flags) =
+  (void *) BPF_FUNC_skb_get_xfrm_state;
 
 /* llvm builtin functions that eBPF C program may use to
  * emit BPF_LD_ABS and BPF_LD_IND instructions

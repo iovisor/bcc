@@ -154,6 +154,8 @@ static struct bpf_helper helpers[] = {
   {"msg_cork_bytes", "4.17"},
   {"msg_pull_data", "4.17"},
   {"bind", "4.17"},
+  {"xdp_adjust_tail", "4.18"},
+  {"skb_get_xfrm_state", "4.18"},
 };
 
 static uint64_t ptr_to_u64(void *ptr)
