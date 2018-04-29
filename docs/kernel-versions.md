@@ -8,6 +8,10 @@ Kernel version | Commit
 
 ## JIT compiling
 
+The list of supported architectures for your kernel can be retrieved with:
+
+    git grep HAVE_EBPF_JIT arch/
+
 Feature / Architecture | Kernel version | Commit
 -----------------------|----------------|-------
 x86\_64 | 3.16 | [`622582786c9e`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=622582786c9e041d0bd52bde201787adeab249f8)
@@ -19,8 +23,15 @@ Constant blinding - PowerPC64 | 4.9 | [`b7b7013cac55`](https://git.kernel.org/cg
 Sparc64 | 4.12 | [`7a12b5031c6b`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=7a12b5031c6b947cc13918237ae652b536243b76)
 MIPS | 4.13 | [`f381bf6d82f0`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=f381bf6d82f032b7410185b35d000ea370ac706b)
 ARM32 | 4.14 | [`39c13c204bb1`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=39c13c204bb1150d401e27d41a9d8b332be47c49)
+x86\_32 | ? | [Not upstream yet](https://lwn.net/Articles/752957/)
 
 ## Main features
+
+Several (but not all) of these _main features_ translate to an eBPF program type.
+The list of such program types supported in your kernel can be found in file
+[`include/uapi/linux/bpf.h`](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/include/uapi/linux/bpf.h):
+
+    git grep -W 'bpf_prog_type {' include/uapi/linux/bpf.h
 
 Feature | Kernel version | Commit
 --------|----------------|-------
@@ -51,8 +62,21 @@ Testing / benchmarking BPF programs | 4.12 | [`1cf1cae963c2`](https://git.kernel
 BPF programs and maps IDs | 4.13 | [`dc4bb0e23561`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=dc4bb0e2356149aee4cdae061936f3bbdd45595c)
 BPF support for `sock_ops` | 4.13 | [`40304b2a1567`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=40304b2a1567fecc321f640ee4239556dd0f3ee0)
 BPF support for skbs on sockets | 4.14 | [`b005fd189cec`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=b005fd189cec9407b700599e1e80e0552446ee79)
+bpftool utility in kernel sources | 4.15 | [`71bb428fe2c1`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=71bb428fe2c19512ac671d5ee16ef3e73e1b49a8)
+BPF attached to cgroups as device controller | 4.15 | [`ebc614f68736`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=ebc614f687369f9df99828572b1d85a7c2de3d92)
+BPF used for monitoring socket RX/TX data | 4.17 | [`4f738adba30a`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=4f738adba30a7cfc006f605707e7aee847ffefa0)
+BPF attached to raw tracepoints | 4.17 | [`c4f6699dfcb8`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=c4f6699dfcb8558d138fe838f741b2c10f416cf9)
+BPF attached to `bind()` system call | 4.17 | [`4fbac77d2d09`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=4fbac77d2d092b475dda9eea66da674369665427)
+BPF Type Format (BTF) | 4.18 | [`69b693f0aefa`](https://git.kernel.org/cgit/linux/kernel/git/davem/net-next.git/commit/?id=69b693f0aefa0ed521e8bd02260523b5ae446ad7)
+AF_XDP | ? | [Not upstream yet](https://lwn.net/Articles/752959/)
+bpfilter | ? | [Not upstream yet](https://lwn.net/Articles/747504/)
 
 ## Tables (_a.k.a._ Maps)
+
+The list of map types supported in your kernel can be found in file
+[`include/uapi/linux/bpf.h`](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/include/uapi/linux/bpf.h):
+
+    git grep -W 'bpf_map_type {' include/uapi/linux/bpf.h
 
 Table type | Kernel version | Commit
 -----------|----------------|-------
@@ -72,10 +96,14 @@ Array of maps | 4.12 | [`56f668dfe00d`](https://git.kernel.org/cgit/linux/kernel
 Hash of maps | 4.12 | [`bcc6b1b7ebf8`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=bcc6b1b7ebf857a9fe56202e2be3361131588c15)
 Netdevice references | 4.14 | [`546ac1ffb70d`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=546ac1ffb70d25b56c1126940e5ec639c4dd7413)
 Socket references | 4.14 | [`174a79ff9515`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=174a79ff9515f400b9a6115643dafd62a635b7e6)
-Text string | _To be done?_ |
-Variable-length maps | _To be done?_ |
+CPU references | 4.15 | [`6710e1126934`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=6710e1126934d8b4372b4d2f9ae1646cd3f151bf)
 
 ## XDP
+
+An approximate list of drivers or components supporting XDP programs for your
+kernel can be retrieved with:
+
+    git grep -l XDP_SETUP_PROG drivers/
 
 Feature / Driver | Kernel version | Commit
 -----------------|----------------|-------
@@ -101,6 +129,11 @@ Intel `e1000` driver | | [Not upstream yet](https://git.kernel.org/pub/scm/linux
 Intel `e1000e` driver | | [Not planned for upstream at this time](https://github.com/adjavon/e1000e_xdp)
 
 ## Helpers
+
+The list of helpers supported in your kernel can be found in file
+[`include/uapi/linux/bpf.h`](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/include/uapi/linux/bpf.h):
+
+    git grep '	FN(' include/uapi/linux/bpf.h
 
 Alphabetical order
 
