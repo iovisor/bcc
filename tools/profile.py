@@ -102,7 +102,7 @@ parser.add_argument("-f", "--folded", action="store_true",
 parser.add_argument("--stack-storage-size", default=10240,
     type=positive_nonzero_int,
     help="the number of unique stack traces that can be stored and "
-        "displayed (default 2048)")
+        "displayed (default %(default)s)")
 parser.add_argument("duration", nargs="?", default=99999999,
     type=positive_nonzero_int,
     help="duration of trace, in seconds")
