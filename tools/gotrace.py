@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 #
-# trace         Trace a function and print a trace message based on its
+# gotrace         Trace a Go function and print a trace message based on its
 #               parameters, with an optional filter.
 #
-# usage: trace [-h] [-p PID] [-L TID] [-v] [-Z STRING_SIZE] [-S]
+# usage: gotrace [-h] [-p PID] [-L TID] [-v] [-Z STRING_SIZE] [-S]
 #              [-M MAX_EVENTS] [-T] [-t] [-K] [-U] [-a] [-I header]
 #              probe [probe ...]
 #
@@ -20,6 +20,9 @@ import ctypes as ct
 import os
 import traceback
 import sys
+
+from pprint import pprint
+from inspect import getmembers
 
 class Probe(object):
         probe_count = 0
@@ -196,14 +199,14 @@ class Probe(object):
                                 self.values.append(part)
 
         aliases = {
-                "arg1": "$ptr(PT_REGS_SP(ctx)+1*8)",
-                "arg2": "$ptr(PT_REGS_SP(ctx)+2*8)",
-                "arg3": "$ptr(PT_REGS_SP(ctx)+3*8)",
-                "arg4": "$ptr(PT_REGS_SP(ctx)+4*8)",
-                "arg5": "$ptr(PT_REGS_SP(ctx)+5*8)",
-                "arg6": "$ptr(PT_REGS_SP(ctx)+6*8)",
+                "arg0": "$sp:0",
+                "arg1": "$sp:1",
+                "arg2": "$sp:2",
+                "arg3": "$sp:3",
+                "arg4": "$sp:4",
+                "arg5": "$sp:5",
+                "arg6": "$sp:6",
                 "retval": "PT_REGS_RC(ctx)",
-                "$ptr(": "1;bpf_probe_read(&__data.v0,sizeof(__data.v0),(void *)", # terrible hack
                 "$uid": "(unsigned)(bpf_get_current_uid_gid() & 0xffffffff)",
                 "$gid": "(unsigned)(bpf_get_current_uid_gid() >> 32)",
                 "$pid": "(unsigned)(bpf_get_current_pid_tgid() & 0xffffffff)",
@@ -258,6 +261,9 @@ static inline bool %s(char const *ignored, uintptr_t str) {
                 else:
                         ptype = Probe.p_type[field_type]
                 fields.append(("v%d" % idx, ptype))
+                if field_type == "s":
+                    fields.append(("l%d" % idx, Probe.p_type["hu"]))
+
 
         def _generate_python_data_decl(self):
                 self.python_struct_name = "%s_%d_Data" % \
@@ -292,7 +298,7 @@ static inline bool %s(char const *ignored, uintptr_t str) {
         def _generate_field_decl(self, idx):
                 field_type = self.types[idx]
                 if field_type == "s":
-                        return "char v%d[%d];\n" % (idx, self.string_size)
+                        return "char v%d[%d]; unsigned short l%d;\n" % (idx, self.string_size, idx)
                 if field_type in Probe.fmt_types:
                         return "%s v%d;\n" % (Probe.c_type[field_type], idx)
                 self._bail("unrecognized format specifier %s" % field_type)
@@ -349,16 +355,45 @@ BPF_PERF_OUTPUT(%s);
                                 "        bpf_usdt_readarg(%s, ctx, &%s);\n") \
                                 % (arg_ctype, expr, expr[3], expr)
 
+                if expr[0:4] == "$sp:":
+                    offset = int(expr[4:])
+                    expr = self._generate_sp_offset(offset)
+                    if field_type == "s":
+                        len_from = self._generate_sp_offset(offset+1)
+                        return text + """
+                        char *strsrc%d;
+            if (%s != 0 && %s != 0) {
+                    bpf_probe_read(&strsrc%d, sizeof(strsrc%d), (void *)%s);
+                    bpf_probe_read(&__data.l%d, sizeof(__data.l%d), (void *)%s);
+                    bpf_probe_read_str(&__data.v%d, %d, (void *)strsrc%d);
+            }
+                        """ % (idx, \
+                                expr, len_from, \
+                                idx, idx, expr,
+                                idx, idx, len_from, \
+                                idx, self.string_size, idx)
+
+                    return text + """
+        if (%s != 0) {
+                bpf_probe_read(&__data.v%d, sizeof(__data.v%d), (void *)%s);
+        }
+                    """ % (expr, idx, idx, expr)
+
+
                 if field_type == "s":
                         return text + """
         if (%s != 0) {
                 bpf_probe_read(&__data.v%d, sizeof(__data.v%d), (void *)%s);
         }
                 """ % (expr, idx, idx, expr)
+
                 if field_type in Probe.fmt_types:
                         return text + "        __data.v%d = (%s)%s;\n" % \
                                         (idx, Probe.c_type[field_type], expr)
                 self._bail("unrecognized field type %s" % field_type)
+
+        def _generate_sp_offset(self, offset):
+            return "PT_REGS_SP(ctx)+%d*8" % offset
 
         def _generate_usdt_filter_read(self):
             text = ""
@@ -489,12 +524,15 @@ BPF_PERF_OUTPUT(%s);
                 print("%s" % (bpf.sym(addr, tgid,
                                      show_module=True, show_offset=True)))
 
-        def _format_message(self, bpf, tgid, values):
+        def _format_message(self, bpf, tgid, values, lengths):
                 # Replace each %K with kernel sym and %U with user sym in tgid
+                strings = [ i for i, t in enumerate(self.types) if t == 's']
                 kernel_placeholders = [i for i, t in enumerate(self.types)
                                        if t == 'K']
                 user_placeholders = [i for i, t in enumerate(self.types)
                                      if t == 'U']
+                for s in strings:
+                    values[s] = values[s][0:lengths[s]]
                 for kp in kernel_placeholders:
                         values[kp] = bpf.ksym(values[kp], show_offset=True)
                 for up in user_placeholders:
@@ -508,16 +546,18 @@ BPF_PERF_OUTPUT(%s);
                 event = ct.cast(data, ct.POINTER(self.python_struct)).contents
                 values = map(lambda i: getattr(event, "v%d" % i),
                              range(0, len(self.values)))
-                msg = self._format_message(bpf, event.tgid, values)
+                lengths = map(lambda i: getattr(event, "l%d" % i, 0),
+                             range(0, len(self.values)))
+                #pprint(getmembers(event))
+                #print("%r" % values)
+                msg = self._format_message(bpf, event.tgid, values, lengths)
                 if Probe.print_time:
                     time = strftime("%H:%M:%S") if Probe.use_localtime else \
                            Probe._time_off_str(event.timestamp_ns)
                     print("%-8s " % time[:8], end="")
                 if Probe.print_cpu:
                     print("%-3s " % event.cpu, end="")
-                print("%-7d %-7d %-15s %-16s %s" %
-                      (event.tgid, event.pid, event.comm.decode(),
-                       self._display_function(), msg))
+                print("%-7d %-7d %-15s %-16s %s" % (event.tgid, event.pid, event.comm.decode(), self._display_function(), msg))
 
                 if self.kernel_stack:
                         self.print_stack(bpf, event.kernel_stack_id, -1)
