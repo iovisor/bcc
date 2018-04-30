@@ -62,9 +62,11 @@ set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${llvm_lib_exclude_f
 # bcc_common_libs_for_a for archive libraries
 # bcc_common_libs_for_s for shared libraries
 set(bcc_common_libs_for_a b_frontend clang_frontend bpf-static
+  -Wl,--whole-archive ${clang_libs} ${llvm_libs} -Wl,--no-whole-archive
+  ${LIBELF_LIBRARIES})
+set(bcc_common_libs_for_s b_frontend clang_frontend bpf-static
   ${clang_libs} ${llvm_libs} ${LIBELF_LIBRARIES})
-set(bcc_common_libs_for_s ${bcc_common_libs_for_a})
-set(bcc_common_libs_for_lua ${bcc_common_libs_for_a})
+set(bcc_common_libs_for_lua ${bcc_common_libs_for_s})
 
 if(ENABLE_CPP_API)
   add_subdirectory(api)
