@@ -57,7 +57,7 @@ BPF attached to cgroups for socket filtering | 4.10 | [`0e33661de493`](https://g
 Lightweight tunnel encapsulation | 4.10 | [`3a0af8fd61f9`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=3a0af8fd61f90920f6fa04e4f1e9a6a73c1b4fd2)
 **e**BPF support for `xt_bpf` module (iptables) | 4.10 | [`2c16d6033264`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=2c16d60332643e90d4fa244f4a706c454b8c7569)
 BPF program tag | 4.10 | [`7bd509e311f4`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=7bd509e311f408f7a5132fcdde2069af65fa05ae)
-Tracepoints to debug BPF | 4.11 | [`a67edbf4fb6d`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=a67edbf4fb6deadcfe57a04a134abed4a5ba3bb5)
+Tracepoints to debug BPF | 4.11 (removed in 4.18) | [`a67edbf4fb6d`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=a67edbf4fb6deadcfe57a04a134abed4a5ba3bb5) [`4d220ed0f814`](https://git.kernel.org/cgit/linux/kernel/git/bpf/bpf-next.git/commit/?id=4d220ed0f8140c478ab7b0a14d96821da639b646)
 Testing / benchmarking BPF programs | 4.12 | [`1cf1cae963c2`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=1cf1cae963c2e6032aebe1637e995bc2f5d330f4)
 BPF programs and maps IDs | 4.13 | [`dc4bb0e23561`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=dc4bb0e2356149aee4cdae061936f3bbdd45595c)
 BPF support for `sock_ops` | 4.13 | [`40304b2a1567`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=40304b2a1567fecc321f640ee4239556dd0f3ee0)
