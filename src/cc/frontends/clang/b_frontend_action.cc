@@ -156,8 +156,9 @@ ProbeVisitor::ProbeVisitor(ASTContext &C, Rewriter &rewriter, set<Decl *> &m) :
 
 bool ProbeVisitor::VisitVarDecl(VarDecl *Decl) {
   if (Expr *E = Decl->getInit()) {
-    if (ProbeChecker(E, ptregs_).is_transitive())
+    if (ProbeChecker(E, ptregs_).is_transitive() || IsContextMemberExpr(E)) {
       set_ptreg(Decl);
+    }
   }
   return true;
 }
@@ -185,7 +186,7 @@ bool ProbeVisitor::VisitBinaryOperator(BinaryOperator *E) {
   if (ProbeChecker(E->getRHS(), ptregs_).is_transitive()) {
     ProbeSetter setter(&ptregs_);
     setter.TraverseStmt(E->getLHS());
-  } else if (E->isAssignmentOp() && E->getRHS()->getStmtClass() == Stmt::CallExprClass) {
+  } else if (E->getRHS()->getStmtClass() == Stmt::CallExprClass) {
     CallExpr *Call = dyn_cast<CallExpr>(E->getRHS());
     if (MemberExpr *Memb = dyn_cast<MemberExpr>(Call->getCallee()->IgnoreImplicit())) {
       StringRef memb_name = Memb->getMemberDecl()->getName();
@@ -204,6 +205,9 @@ bool ProbeVisitor::VisitBinaryOperator(BinaryOperator *E) {
         }
       }
     }
+  } else if (IsContextMemberExpr(E->getRHS())) {
+    ProbeSetter setter(&ptregs_);
+    setter.TraverseStmt(E->getLHS());
   }
   return true;
 }
@@ -260,6 +264,40 @@ bool ProbeVisitor::VisitMemberExpr(MemberExpr *E) {
   rewriter_.InsertText(E->getLocStart(), pre);
   rewriter_.ReplaceText(expansionRange(SourceRange(member, E->getLocEnd())), post);
   return true;
+}
+
+bool ProbeVisitor::IsContextMemberExpr(Expr *E) {
+  if (!E->getType()->isPointerType())
+    return false;
+
+  MemberExpr *Memb = dyn_cast<MemberExpr>(E->IgnoreParenCasts());
+  Expr *base;
+  SourceLocation rhs_start, member;
+  bool found = false;
+  MemberExpr *M;
+  for (M = Memb; M; M = dyn_cast<MemberExpr>(M->getBase())) {
+    memb_visited_.insert(M);
+    rhs_start = M->getLocEnd();
+    base = M->getBase();
+    member = M->getMemberLoc();
+    if (M->isArrow()) {
+      found = true;
+      break;
+    }
+  }
+  if (!found) {
+    return false;
+  }
+  if (member.isInvalid()) {
+    return false;
+  }
+
+  if (DeclRefExpr *base_expr = dyn_cast<DeclRefExpr>(base->IgnoreImplicit())) {
+    if (base_expr->getDecl() == ctx_) {
+      return true;
+    }
+  }
+  return false;
 }
 
 SourceRange
@@ -862,8 +900,11 @@ void BTypeConsumer::HandleTranslationUnit(ASTContext &Context) {
     if (FunctionDecl *F = dyn_cast<FunctionDecl>(D)) {
       if (fe_.is_rewritable_ext_func(F)) {
         for (auto arg : F->parameters()) {
-          if (arg != F->getParamDecl(0) && !arg->getType()->isFundamentalType())
+          if (arg == F->getParamDecl(0)) {
+            probe_visitor_.set_ctx(arg);
+          } else if (!arg->getType()->isFundamentalType()) {
             probe_visitor_.set_ptreg(arg);
+          }
         }
         probe_visitor_.TraverseDecl(D);
       }
