@@ -52,7 +52,7 @@ target_link_libraries(bcc-loader-static elf)
 add_library(bcc-static STATIC
   ${bcc_common_sources} ${bcc_table_sources} ${bcc_util_sources})
 set_target_properties(bcc-static PROPERTIES OUTPUT_NAME bcc)
-add_library(bcc-lua-static STATIC
+set(bcc-lua-static
   ${bcc_common_sources} ${bcc_table_sources} ${bcc_sym_sources} ${bcc_util_sources})
 
 include(clang_libs)
@@ -64,9 +64,9 @@ set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${llvm_lib_exclude_f
 set(bcc_common_libs_for_a b_frontend clang_frontend bpf-static
   -Wl,--whole-archive ${clang_libs} ${llvm_libs} -Wl,--no-whole-archive
   ${LIBELF_LIBRARIES})
-set(bcc_common_libs_for_s b_frontend clang_frontend bpf-static
+set(bcc_common_libs_for_s ${bcc_common_libs_for_a})
+set(bcc_common_libs_for_lua b_frontend clang_frontend bpf-static
   ${clang_libs} ${llvm_libs} ${LIBELF_LIBRARIES})
-set(bcc_common_libs_for_lua ${bcc_common_libs_for_s})
 
 if(ENABLE_CPP_API)
   add_subdirectory(api)
@@ -87,7 +87,7 @@ add_subdirectory(frontends)
 # Link against LLVM libraries
 target_link_libraries(bcc-shared ${bcc_common_libs_for_s})
 target_link_libraries(bcc-static ${bcc_common_libs_for_a} bcc-loader-static)
-target_link_libraries(bcc-lua-static ${bcc_common_libs_for_lua})
+set(bcc-lua-static ${bcc-lua-static} ${bcc_common_libs_for_lua})
 
 install(TARGETS bcc-shared LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
 install(FILES ${bcc_table_headers} DESTINATION include/bcc)
