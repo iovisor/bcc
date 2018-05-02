@@ -701,6 +701,30 @@ BPF_HASH(table1, struct key_t, struct value_t);
         self.assertEqual(ct.sizeof(table.Key), 96)
         self.assertEqual(ct.sizeof(table.Leaf), 16)
 
+    @skipUnless(kernel_version_ge(4,7), "requires kernel >= 4.7")
+    def test_probe_read_tracepoint_context(self):
+        text = """
+#include <linux/netdevice.h>
+TRACEPOINT_PROBE(skb, kfree_skb) {
+    struct sk_buff *skb = (struct sk_buff *)args->skbaddr;
+    return skb->protocol;
+}
+"""
+        b = BPF(text=text)
+
+    def test_probe_read_kprobe_ctx(self):
+        text = """
+#include <linux/sched.h>
+#include <net/inet_sock.h>
+int test(struct pt_regs *ctx) {
+    struct sock *sk;
+    sk = (struct sock *)ctx->di;
+    return sk->sk_dport;
+}
+"""
+        b = BPF(text=text)
+        fn = b.load_func("test", BPF.KPROBE)
+
 
 if __name__ == "__main__":
     main()

@@ -95,7 +95,9 @@ class ProbeVisitor : public clang::RecursiveASTVisitor<ProbeVisitor> {
   bool VisitUnaryOperator(clang::UnaryOperator *E);
   bool VisitMemberExpr(clang::MemberExpr *E);
   void set_ptreg(clang::Decl *D) { ptregs_.insert(D); }
+  void set_ctx(clang::Decl *D) { ctx_ = D; }
  private:
+  bool IsContextMemberExpr(clang::Expr *E);
   clang::SourceRange expansionRange(clang::SourceRange range);
   template <unsigned N>
   clang::DiagnosticBuilder error(clang::SourceLocation loc, const char (&fmt)[N]);
@@ -106,6 +108,7 @@ class ProbeVisitor : public clang::RecursiveASTVisitor<ProbeVisitor> {
   std::set<clang::Expr *> memb_visited_;
   std::set<clang::Decl *> ptregs_;
   std::set<clang::Decl *> &m_;
+  clang::Decl *ctx_;
 };
 
 // A helper class to the frontend action, walks the decls
