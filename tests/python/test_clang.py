@@ -704,10 +704,10 @@ BPF_HASH(table1, struct key_t, struct value_t);
     @skipUnless(kernel_version_ge(4,7), "requires kernel >= 4.7")
     def test_probe_read_tracepoint_context(self):
         text = """
-#include <net/inet_sock.h>
-TRACEPOINT_PROBE(tcp, tcp_retransmit_skb) {
-    struct sock *sk = (struct sock *)args->skaddr;
-    return sk->sk_dport;
+#include <linux/netdevice.h>
+TRACEPOINT_PROBE(skb, kfree_skb) {
+    struct sk_buff *skb = (struct sk_buff *)args->skbaddr;
+    return skb->protocol;
 }
 """
         b = BPF(text=text)
