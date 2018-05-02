@@ -302,7 +302,11 @@ bool ProbeVisitor::IsContextMemberExpr(Expr *E) {
 
 SourceRange
 ProbeVisitor::expansionRange(SourceRange range) {
+#if LLVM_MAJOR_VERSION >= 7
+  return rewriter_.getSourceMgr().getExpansionRange(range).getAsRange();
+#else
   return rewriter_.getSourceMgr().getExpansionRange(range);
+#endif
 }
 
 template <unsigned N>
@@ -695,7 +699,11 @@ bool BTypeVisitor::VisitImplicitCastExpr(ImplicitCastExpr *E) {
 
 SourceRange
 BTypeVisitor::expansionRange(SourceRange range) {
+#if LLVM_MAJOR_VERSION >= 7
+  return rewriter_.getSourceMgr().getExpansionRange(range).getAsRange();
+#else
   return rewriter_.getSourceMgr().getExpansionRange(range);
+#endif
 }
 
 template <unsigned N>
