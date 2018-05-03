@@ -615,7 +615,6 @@ int BPFModule::finalize() {
   std::map<std::string, std::tuple<uint8_t *, uintptr_t>> tmp_sections,
       *sections_p;
 
-  mod->setDataLayout("e-m:e-p:64:64-i64:64-n32:64-S128");
   mod->setTargetTriple("bpf-pc-linux");
   sections_p = rw_engine_enabled_ ? &sections_ : &tmp_sections;
 
