@@ -182,8 +182,6 @@ if debug or args.ebpf:
     if args.ebpf:
         exit()
 
-# load BPF program
-b = BPF(text=bpf_text)
 # initialize BPF & perf_events
 b = BPF(text=bpf_text)
 b.attach_perf_event(ev_type=PerfType.SOFTWARE,
