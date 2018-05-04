@@ -512,13 +512,10 @@ def print_stats_for_pid(pid, stats, full_stacks, syms,
             key=lambda x: x.sum_all()[order_by], reverse=True):
         sub_stats = sub_stats.sort(order_by)
         subtotal = sub_stats.sum_all()
-        sort_key_us = subtotal[order_by]
-        sort_key_ms = us_to_ms(sort_key_us)
-        if sort_key_ms == 0:
-            break
         add_derived_stats(subtotal, sub_stats, group_by, order_by)
-        total_so_far += sort_key_us
-        subtotal['pct_this'] = round(100.0 * sort_key_us / total[order_by])
+        order_by_val = subtotal[order_by]
+        total_so_far += order_by_val
+        subtotal['pct_this'] = round(100.0 * order_by_val / total[order_by])
         subtotal['pct_cuml'] = round(100.0 * total_so_far / total[order_by])
         str_values = [formatters[col].fmt(subtotal[col]) for col in columns]
         padded = zip(widths, str_values)
@@ -529,6 +526,11 @@ def print_stats_for_pid(pid, stats, full_stacks, syms,
             stack_indent = " " * (len(header) - formatters[syms].width)
             for sym in stack_syms(subtotal[syms]):
                 print(indent + stack_indent + shorten_symbol(sym))
+        # Don't print long tails
+        # TODO: Add flag to print everything?
+        if subtotal['pct_cuml'] == 100 or\
+           formatters[order_by].fmt(order_by_val) == "0":
+            break
 
 
 def to_literal(s):
