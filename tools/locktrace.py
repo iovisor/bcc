@@ -15,7 +15,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import unicode_literals
 from __future__ import print_function
-from bcc import BPF
+from bcc import BPF, PerfType, PerfSWConfig
 from cStringIO import StringIO
 from ctypes import c_int
 from sys import stderr
@@ -26,6 +26,7 @@ import os
 import re
 import signal
 import sys
+import time
 
 
 examples = """
@@ -88,6 +89,7 @@ args = parser.parse_args()
 
 pid = args.pid
 duration = args.duration
+sample_frequency = 99
 
 futex_commands = [
     "FUTEX_WAIT",
@@ -106,12 +108,16 @@ futex_commands = [
 ]
 
 script_path = os.path.dirname(os.path.realpath(__file__))
-with open(script_path + '/locktrace.c', 'r') as bpf_file:
+with open(script_path + '/locktrace.h', 'r') as bpf_file:
     bpf_src = bpf_file.read()
+bpf_src += "\n\n"
+with open(script_path + '/locktrace.c', 'r') as bpf_file:
+    bpf_src += bpf_file.read()
 
 debug_stats_names = []
 with open(script_path + '/locktrace_dbg.inc', 'r') as dbg_file:
-    debug_stats_names = map(lambda x: x.rstrip(), dbg_file.readlines())
+    debug_stats_names = map(lambda x: re.match("EMIT\((\S+)\)", x).group(1),
+                            dbg_file.readlines())
 
 debug_stats_names.insert(0, "INVALID")
 bpf_src = bpf_src.replace("DEBUG_STATS_ENUM_VALS",
@@ -133,39 +139,51 @@ bpf_src = bpf_src.replace('STACK_STORAGE_SIZE', str(args.stack_storage_size))
 
 # initialize BPF
 bpf_program = BPF(text=bpf_src)
-bpf_program.attach_kprobe(event="finish_task_switch", fn_name="sched_switch")
+bpf_program.attach_tracepoint(tp='syscalls:sys_enter_futex',
+                              fn_name='on_enter_futex')
+bpf_program.attach_tracepoint(tp='syscalls:sys_exit_futex',
+                              fn_name='on_exit_futex')
+bpf_program.attach_tracepoint(tp='sched:sched_switch',
+                              fn_name='on_sched_switch')
 
-matched = bpf_program.num_open_kprobes()
-if matched != 1:
-    print("error: Failed to attach one or more kprobes (%d). Exiting." %
-          (matched), file=stderr)
-    exit(1)
+bpf_program.attach_perf_event(ev_type=PerfType.SOFTWARE,
+    ev_config=PerfSWConfig.CPU_CLOCK, fn_name="on_perf_cycles",
+    sample_period=0, sample_freq=sample_frequency)
 
+profile_start = time.time()
 matched = bpf_program.num_open_tracepoints()
-if matched != 2:
+if matched != 3:
     print("error: Failed to attach to one or more tracepoints (%d). Exiting." %
           (matched), file=stderr)
     exit(1)
 
-
 # signal handler
 def signal_ignore(signal, frame):
-    print(file=stderr)
-
+    print("\nInterrupted\n", file=stderr)
 
 try:
     sleep(duration)
 except KeyboardInterrupt:
     # as cleanup can take many seconds, trap Ctrl-C:
     signal.signal(signal.SIGINT, signal_ignore)
+profile_end = time.time()
 
+bpf_program.detach_tracepoint(tp='syscalls:sys_enter_futex')
+bpf_program.detach_tracepoint(tp='syscalls:sys_exit_futex')
+bpf_program.detach_tracepoint(tp='sched:sched_switch')
+bpf_program.detach_perf_event(ev_type=PerfType.SOFTWARE,
+                              ev_config=PerfSWConfig.CPU_CLOCK)
 missing_stacks = 0
 has_enomem = False
 stats = bpf_program.get_table("lock_stats")
-stack_traces = bpf_program.get_table("stack_traces")
-comms = bpf_program.get_table("tgid_comm")
-print("pid,tid,addr,blocked_us,sys_us,max_blocked_us,max_sys_us," +
-      "wait_count,blocked_count,wake_count,errors,stack")
+cycles = bpf_program.get_table("cycle_counts")
+usr_stack_traces = bpf_program.get_table("usr_stack_traces")
+kernel_stack_traces = bpf_program.get_table("kernel_stack_traces")
+print("{'duration': %f}" % (profile_end - profile_start))
+print("pid|tid|addr|blocked_us|sys_futex_us|max_blocked_us|max_sys_futex_us|" +
+      "wait_count|blocked_count|wake_count|errors|usr_ms|sys_ms|" +
+      "comm|kernel_stack|usr_stack|kernel_syms|usr_syms")
+print("Processing trace data...", file=stderr)
 for k, v in sorted(stats.items(),
                    key=lambda lock: (lock[0].tgid, lock[1].elapsed_blocked_us),
                    reverse=True):
@@ -177,26 +195,53 @@ for k, v in sorted(stats.items(),
             has_enomem = True
         continue
 
-    user_stack = [] if k.usr_stack_id < 0 else \
-        stack_traces.walk(k.usr_stack_id)
-
-    user_stack = list(user_stack)
-    comm = comms[c_int(k.tgid)].name.decode()
-    line = [comm] + \
-        [bpf_program.sym(addr, k.tgid) for addr in reversed(user_stack)]
-    print("%d,%d,0x%x,%d,%d,%d,%d,%d,%d,%d,%d,%s" % (
+    usr_stack = [] if k.usr_stack_id < 0 else \
+        list(usr_stack_traces.walk(k.usr_stack_id))
+    usr_syms = [bpf_program.sym(addr, k.tgid) for addr in usr_stack]
+    print("%d|%d|0x%x|%d|%d|%d|%d|%d|%d|%d|%d|0|0|%s||%s||%s" % (
           k.tgid, k.pid, k.uaddr,
           v.elapsed_blocked_us, v.elapsed_sys_us,
           v.max_blocked_us, v.max_sys_us,
-          v.wait_count, v.blocked_count, v.wake_count, v.errors,
-          ";".join(line)))
+          v.wait_count, v.blocked_count, v.wake_count, v.errors, k.comm,
+          ";".join(map(str, usr_stack)), ";".join(usr_syms)))
 
-print("Total records: %d" % (len(stats)), file=stderr)
+print("Processing sample data...", file=stderr)
+for k, count in sorted(cycles.items(),
+                   key=lambda sample: (sample[0].tgid, sample[1]),
+                   reverse=True):
+    # handle get_stackid erorrs
+    if (k.usr_stack_id < 0 and k.usr_stack_id != -errno.EFAULT) or\
+       (k.kernel_stack_id < 0 and k.kernel_stack_id != -errno.EFAULT):
+        missing_stacks += 1
+        # check for an ENOMEM error
+        if k.usr_stack_id == -errno.ENOMEM or\
+           k.kernel_stack_id == -errno.ENOMEM:
+            has_enomem = True
+        continue
+
+    usr_stack = [] if k.usr_stack_id < 0 else \
+        list(usr_stack_traces.walk(k.usr_stack_id))
+    usr_syms = [bpf_program.sym(addr, k.tgid) for addr in usr_stack]
+    usr_ms = sys_ms = 0
+    if k.kernel_stack_id >= 0:
+        kernel_stack = list(kernel_stack_traces.walk(k.kernel_stack_id))
+        kernel_syms = [bpf_program.ksym(addr) for addr in kernel_stack]
+        sys_ms = (1000 / sample_frequency) * count.value
+    else:
+        kernel_stack = kernel_syms = []
+        usr_ms = (1000 / sample_frequency) * count.value
+    print("%d|%d|0x0|0|0|0|0|0|0|0|0|%d|%d|%s|%s|%s|%s|%s" % (
+          k.tgid, k.pid, usr_ms, sys_ms, k.comm,
+          ";".join(map(str, kernel_stack)), ";".join(map(str, usr_stack)),
+          ";".join(kernel_syms), ";".join(usr_syms)))
+
+print("Total records: %d from tracing and %d from sampling"
+      % (len(stats), len(cycles)), file=stderr)
 
 if missing_stacks > 0:
     enomem_str = "" if not has_enomem else \
         " Consider increasing --stack-storage-size."
-    print("WARNING: %d stack traces could not be displayed.%s" %
+    print("WARNING: %d records/samples were lost. %s" %
         (missing_stacks, enomem_str),
         file=stderr)
 
@@ -241,4 +286,4 @@ if args.debug:
                                   futex_commands[key.value & 0xff])
         else:
             key_name = debug_stats_names[key.value]
-        print("%-45s %10i" % (key_name, stats[key].value), file=stderr)
+        print("%-55s %10i" % (key_name, stats[key].value), file=stderr)
