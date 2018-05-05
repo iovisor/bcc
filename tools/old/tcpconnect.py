@@ -55,7 +55,7 @@ int trace_connect_entry(struct pt_regs *ctx, struct sock *sk)
 
 static int trace_connect_return(struct pt_regs *ctx, short ipver)
 {
-    int ret = ctx->ax;
+    int ret = PT_REGS_RC(ctx);
     u32 pid = bpf_get_current_pid_tgid();
 
     struct sock **skpp;
