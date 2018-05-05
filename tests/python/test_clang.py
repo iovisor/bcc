@@ -343,6 +343,32 @@ int kprobe____kmalloc(struct pt_regs *ctx, size_t size) {
     return 0;
 }""")
 
+    def test_probe_simple_member_assign(self):
+        b = BPF(text="""
+#include <uapi/linux/ptrace.h>
+#include <linux/netdevice.h>
+struct leaf { void *ptr; };
+int test(struct pt_regs *ctx, struct sk_buff *skb) {
+    struct leaf l = {};
+    struct leaf *lp = &l;
+    lp->ptr = skb;
+    return 0;
+}""")
+        b.load_func("test", BPF.KPROBE)
+
+    def test_probe_member_expr(self):
+        b = BPF(text="""
+#include <uapi/linux/ptrace.h>
+#include <linux/netdevice.h>
+struct leaf { struct sk_buff *ptr; };
+int test(struct pt_regs *ctx, struct sk_buff *skb) {
+    struct leaf l = {};
+    struct leaf *lp = &l;
+    lp->ptr = skb;
+    return lp->ptr->priority;
+}""")
+        b.load_func("test", BPF.KPROBE)
+
     def test_unop_probe_read(self):
         text = """
 #include <linux/blkdev.h>
