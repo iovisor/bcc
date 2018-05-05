@@ -75,12 +75,10 @@ static int trace_connect_return(struct pt_regs *ctx, short ipver)
     struct sock *skp = *skpp;
     u32 saddr = 0, daddr = 0;
     u16 dport = 0;
-    bpf_probe_read(&dport, sizeof(dport), &skp->__sk_common.skc_dport);
+    dport = skp->__sk_common.skc_dport;
     if (ipver == 4) {
-        bpf_probe_read(&saddr, sizeof(saddr),
-            &skp->__sk_common.skc_rcv_saddr);
-        bpf_probe_read(&daddr, sizeof(daddr),
-            &skp->__sk_common.skc_daddr);
+        saddr = skp->__sk_common.skc_rcv_saddr;
+        daddr = skp->__sk_common.skc_daddr;
 
         // output
         bpf_trace_printk("4 %x %x %d\\n", saddr, daddr, ntohs(dport));
