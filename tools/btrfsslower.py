@@ -224,8 +224,8 @@ static int trace_return(struct pt_regs *ctx, int type)
     // workaround (rewriter should handle file to d_name in one step):
     struct dentry *de = NULL;
     struct qstr qs = {};
-    bpf_probe_read(&de, sizeof(de), &valp->fp->f_path.dentry);
-    bpf_probe_read(&qs, sizeof(qs), (void *)&de->d_name);
+    de = valp->fp->f_path.dentry;
+    qs = de->d_name;
     if (qs.len == 0)
         return 0;
     bpf_probe_read(&data.file, sizeof(data.file), (void *)qs.name);
