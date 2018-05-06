@@ -105,6 +105,13 @@ class ProbeChecker : public RecursiveASTVisitor<ProbeChecker> {
     }
     return false;
   }
+  bool VisitMemberExpr(MemberExpr *M) {
+    if (ptregs_.find(M->getMemberDecl()) != ptregs_.end()) {
+      needs_probe_ = true;
+      return false;
+    }
+    return true;
+  }
   bool VisitDeclRefExpr(DeclRefExpr *E) {
     if (ptregs_.find(E->getDecl()) != ptregs_.end())
       needs_probe_ = true;
@@ -125,6 +132,10 @@ class ProbeSetter : public RecursiveASTVisitor<ProbeSetter> {
   bool VisitDeclRefExpr(DeclRefExpr *E) {
     ptregs_->insert(E->getDecl());
     return true;
+  }
+  bool VisitMemberExpr(MemberExpr *M) {
+    ptregs_->insert(M->getMemberDecl());
+    return false;
   }
  private:
   set<Decl *> *ptregs_;
@@ -231,11 +242,6 @@ bool ProbeVisitor::VisitUnaryOperator(UnaryOperator *E) {
 bool ProbeVisitor::VisitMemberExpr(MemberExpr *E) {
   if (memb_visited_.find(E) != memb_visited_.end()) return true;
 
-  // Checks to see if the expression references something that needs to be run
-  // through bpf_probe_read.
-  if (!ProbeChecker(E, ptregs_).needs_probe())
-    return true;
-
   Expr *base;
   SourceLocation rhs_start, member;
   bool found = false;
@@ -255,6 +261,12 @@ bool ProbeVisitor::VisitMemberExpr(MemberExpr *E) {
     error(base->getLocEnd(), "internal error: MemberLoc is invalid while preparing probe rewrite");
     return false;
   }
+
+  // Checks to see if the expression references something that needs to be run
+  // through bpf_probe_read.
+  if (!ProbeChecker(base, ptregs_).needs_probe())
+    return true;
+
   string rhs = rewriter_.getRewrittenText(expansionRange(SourceRange(rhs_start, E->getLocEnd())));
   string base_type = base->getType()->getPointeeType().getAsString();
   string pre, post;
