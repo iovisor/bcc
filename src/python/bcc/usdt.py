@@ -175,7 +175,7 @@ tplist tool.""")
 
     def get_probe_arg_ctype(self, probe_name, arg_index):
         return lib.bcc_usdt_get_probe_argctype(
-            self.context, probe_name, arg_index)
+            self.context, probe_name.encode('ascii'), arg_index).decode()
 
     def enumerate_probes(self):
         probes = []

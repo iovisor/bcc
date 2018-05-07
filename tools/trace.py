@@ -342,10 +342,10 @@ BPF_PERF_OUTPUT(%s);
                 if self.probe_type == "u" and expr[0:3] == "arg":
                         arg_index = int(expr[3])
                         arg_ctype = self.usdt.get_probe_arg_ctype(
-                                self.usdt_name.encode('ascii'), arg_index - 1)
+                                self.usdt_name, arg_index - 1)
                         text = ("        %s %s = 0;\n" +
                                 "        bpf_usdt_readarg(%s, ctx, &%s);\n") \
-                                % (arg_ctype.decode(), expr, expr[3], expr)
+                                % (arg_ctype, expr, expr[3], expr)
 
                 if field_type == "s":
                         return text + """
