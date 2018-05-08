@@ -88,7 +88,8 @@ class BTypeVisitor : public clang::RecursiveASTVisitor<BTypeVisitor> {
 // Do a depth-first search to rewrite all pointers that need to be probed
 class ProbeVisitor : public clang::RecursiveASTVisitor<ProbeVisitor> {
  public:
-  explicit ProbeVisitor(clang::ASTContext &C, clang::Rewriter &rewriter, std::set<clang::Decl *> &m);
+  explicit ProbeVisitor(clang::ASTContext &C, clang::Rewriter &rewriter,
+                        std::set<clang::Decl *> &m, bool track_helpers);
   bool VisitVarDecl(clang::VarDecl *Decl);
   bool VisitCallExpr(clang::CallExpr *Call);
   bool VisitBinaryOperator(clang::BinaryOperator *E);
@@ -96,6 +97,7 @@ class ProbeVisitor : public clang::RecursiveASTVisitor<ProbeVisitor> {
   bool VisitMemberExpr(clang::MemberExpr *E);
   void set_ptreg(clang::Decl *D) { ptregs_.insert(D); }
   void set_ctx(clang::Decl *D) { ctx_ = D; }
+  std::set<clang::Decl *> get_ptregs() { return ptregs_; }
  private:
   bool IsContextMemberExpr(clang::Expr *E);
   clang::SourceRange expansionRange(clang::SourceRange range);
@@ -109,19 +111,20 @@ class ProbeVisitor : public clang::RecursiveASTVisitor<ProbeVisitor> {
   std::set<clang::Decl *> ptregs_;
   std::set<clang::Decl *> &m_;
   clang::Decl *ctx_;
+  bool track_helpers_;
 };
 
 // A helper class to the frontend action, walks the decls
 class BTypeConsumer : public clang::ASTConsumer {
  public:
   explicit BTypeConsumer(clang::ASTContext &C, BFrontendAction &fe, clang::Rewriter &rewriter, std::set<clang::Decl *> &map);
-  bool HandleTopLevelDecl(clang::DeclGroupRef Group) override;
   void HandleTranslationUnit(clang::ASTContext &Context) override;
  private:
   BFrontendAction &fe_;
   MapVisitor map_visitor_;
   BTypeVisitor btype_visitor_;
-  ProbeVisitor probe_visitor_;
+  ProbeVisitor probe_visitor1_;
+  ProbeVisitor probe_visitor2_;
 };
 
 // Create a B program in 2 phases (everything else is normal C frontend):
