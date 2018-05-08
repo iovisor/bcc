@@ -67,7 +67,7 @@ BPF_HASH(start, u32);
 struct rq;
 
 struct data_t {
-    u64 pid;
+    u32 pid;
     char task[TASK_COMM_LEN];
     u64 delta_us;
 };
@@ -127,7 +127,9 @@ int trace_run(struct pt_regs *ctx, struct task_struct *prev)
     if (FILTER_US)
         return 0;
 
-    struct data_t data = {.delta_us = delta_us, .pid = pid};
+    struct data_t data = {};
+    data.pid = pid;
+    data.delta_us = delta_us;
     bpf_get_current_comm(&data.task, sizeof(data.task));
 
     // output
@@ -195,7 +197,9 @@ RAW_TRACEPOINT_PROBE(sched_switch)
     if (FILTER_US)
         return 0;
 
-    struct data_t data = {.delta_us = delta_us, .pid = pid};
+    struct data_t data = {};
+    data.pid = pid;
+    data.delta_us = delta_us;
     bpf_get_current_comm(&data.task, sizeof(data.task));
 
     // output
@@ -231,7 +235,7 @@ DNAME_INLINE_LEN = 32   # linux/dcache.h
 TASK_COMM_LEN = 16      # linux/sched.h
 class Data(ct.Structure):
     _fields_ = [
-        ("pid", ct.c_ulonglong),
+        ("pid", ct.c_uint),
         ("task", ct.c_char * TASK_COMM_LEN),
         ("delta_us", ct.c_ulonglong),
     ]
