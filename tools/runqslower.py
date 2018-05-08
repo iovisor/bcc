@@ -11,6 +11,19 @@
 #
 # REQUIRES: Linux 4.9+ (BPF_PROG_TYPE_PERF_EVENT support).
 #
+# This measures the time a task spends waiting on a run queue for a turn
+# on-CPU, and shows this time as a individual events. This time should be small,
+# but a task may need to wait its turn due to CPU load.
+#
+# This measures two types of run queue latency:
+# 1. The time from a task being enqueued on a run queue to its context switch
+#    and execution. This traces ttwu_do_wakeup(), wake_up_new_task() ->
+#    finish_task_switch() with either raw tracepoints (if supported) or kprobes
+#    and instruments the run queue latency after a voluntary context switch.
+# 2. The time from when a task was involuntary context switched and still
+#    in the runnable state, to when it next executed. This is instrumented
+#    from finish_task_switch() alone.
+#
 # Copyright 2016 Cloudflare, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
