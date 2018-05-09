@@ -445,12 +445,12 @@ class BPF(object):
         if map_fd < 0:
             raise KeyError
         if not keytype:
-            key_desc = lib.bpf_table_key_desc(self.module, name)
+            key_desc = lib.bpf_table_key_desc(self.module, name).decode("utf-8")
             if not key_desc:
                 raise Exception("Failed to load BPF Table %s key desc" % name)
             keytype = BPF._decode_table_type(json.loads(key_desc))
         if not leaftype:
-            leaf_desc = lib.bpf_table_leaf_desc(self.module, name)
+            leaf_desc = lib.bpf_table_leaf_desc(self.module, name).decode("utf-8")
             if not leaf_desc:
                 raise Exception("Failed to load BPF Table %s leaf desc" % name)
             leaftype = BPF._decode_table_type(json.loads(leaf_desc))
