@@ -1057,7 +1057,7 @@ class BPF(object):
                 # however, the illegal address will be printed out.
                 # Hence, both cases are handled here.
                 line = line[ts_end + 1:]
-                sym_end = line.find(":")
+                sym_end = line.find(b":")
                 msg = line[sym_end + 2:]
                 return (task, int(pid), int(cpu), flags, float(ts), msg)
         except KeyboardInterrupt:
