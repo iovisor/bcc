@@ -90,7 +90,7 @@ struct rq;
 // record enqueue timestamp
 static int trace_enqueue(u32 tgid, u32 pid)
 {
-    if (FILTER)
+    if (FILTER || pid == 0)
         return 0;
     u64 ts = bpf_ktime_get_ns();
     start.update(&pid, &ts);
@@ -119,7 +119,7 @@ int trace_run(struct pt_regs *ctx, struct task_struct *prev)
     if (prev->state == TASK_RUNNING) {
         tgid = prev->tgid;
         pid = prev->pid;
-        if (!(FILTER)) {
+        if (!(FILTER || pid == 0)) {
             u64 ts = bpf_ktime_get_ns();
             start.update(&pid, &ts);
         }
@@ -127,7 +127,7 @@ int trace_run(struct pt_regs *ctx, struct task_struct *prev)
 
     tgid = bpf_get_current_pid_tgid() >> 32;
     pid = bpf_get_current_pid_tgid();
-    if (FILTER)
+    if (FILTER || pid == 0)
         return 0;
     u64 *tsp, delta;
 
@@ -183,7 +183,7 @@ RAW_TRACEPOINT_PROBE(sched_switch)
     if (state == TASK_RUNNING) {
         bpf_probe_read(&tgid, sizeof(prev->tgid), &prev->tgid);
         bpf_probe_read(&pid, sizeof(prev->pid), &prev->pid);
-        if (!(FILTER)) {
+        if (!(FILTER || pid == 0)) {
             u64 ts = bpf_ktime_get_ns();
             start.update(&pid, &ts);
         }
@@ -191,7 +191,7 @@ RAW_TRACEPOINT_PROBE(sched_switch)
 
     bpf_probe_read(&tgid, sizeof(next->tgid), &next->tgid);
     bpf_probe_read(&pid, sizeof(next->pid), &next->pid);
-    if (FILTER)
+    if (FILTER || pid == 0)
         return 0;
     u64 *tsp, delta;
 

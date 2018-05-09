@@ -77,7 +77,7 @@ BPF_PERF_OUTPUT(events);
 // record enqueue timestamp
 static int trace_enqueue(u32 tgid, u32 pid)
 {
-    if (FILTER_PID)
+    if (FILTER_PID || pid == 0)
         return 0;
     u64 ts = bpf_ktime_get_ns();
     start.update(&pid, &ts);
@@ -106,7 +106,7 @@ int trace_run(struct pt_regs *ctx, struct task_struct *prev)
     if (prev->state == TASK_RUNNING) {
         tgid = prev->tgid;
         pid = prev->pid;
-        if (!(FILTER_PID)) {
+        if (!(FILTER_PID || pid == 0)) {
             u64 ts = bpf_ktime_get_ns();
             start.update(&pid, &ts);
         }
@@ -176,7 +176,7 @@ RAW_TRACEPOINT_PROBE(sched_switch)
     if (state == TASK_RUNNING) {
         bpf_probe_read(&tgid, sizeof(prev->tgid), &prev->tgid);
         bpf_probe_read(&pid, sizeof(prev->pid), &prev->pid);
-        if (!(FILTER_PID)) {
+        if (!(FILTER_PID || pid == 0)) {
             u64 ts = bpf_ktime_get_ns();
             start.update(&pid, &ts);
         }
