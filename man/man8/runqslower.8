@@ -1,14 +1,14 @@
-.TH runqlat 8  "2016-02-07" "USER COMMANDS"
+.TH runqslower 8  "2016-02-07" "USER COMMANDS"
 .SH NAME
-runqlat \- Run queue (scheduler) latency as a histogram.
+runqlat \- Trace long process scheduling delays.
 .SH SYNOPSIS
-.B runqlat [\-h] [\-T] [\-m] [\-P] [\-\-pidnss] [\-L] [\-p PID] [interval] [count]
+.B runqslower [\-p PID] [min_us]
 .SH DESCRIPTION
 This measures the time a task spends waiting on a run queue (or equivalent
-scheduler data structure) for a turn on-CPU, and shows this time as a
-histogram. This time should be small, but a task may need to wait its turn due
-to CPU load. The higher the CPU load, the longer a task will generally need to
-wait its turn.
+scheduler data structure) for a turn on-CPU, and shows occurrences of time
+exceeding passed threshold. This time should be small, but a task may need
+to wait its turn due to CPU load. The higher the CPU load, the longer a task
+will generally need to wait its turn.
 
 This tool measures two types of run queue latency:
 
@@ -21,9 +21,8 @@ and instruments the run queue latency after a voluntary context switch.
 in the runnable state, to when it next executed. This is instrumented
 from finish_task_switch() alone.
 
-This tool uses in-kernel eBPF maps for storing timestamps and the histogram,
-for efficiency. Despite this, the overhead of this tool may become significant
-for some workloads: see the OVERHEAD section.
+The overhead of this tool may become significant for some workloads:
+see the OVERHEAD section.
 
 This works by tracing various kernel scheduler functions using dynamic tracing,
 and will need updating to match any changes to these functions.
@@ -36,60 +35,34 @@ CONFIG_BPF and bcc.
 \-h
 Print usage message.
 .TP
-\-T
-Include timestamps on output.
-.TP
-\-m
-Output histogram in milliseconds.
-.TP
-\-P
-Print a histogram for each PID.
-.TP
-\-\-pidnss
-Print a histogram for each PID namespace (short for PID namespaces). For
-container analysis.
-.TP
-\-L
-Print a histogram for each thread ID.
-.TP
 \-p PID
 Only show this PID (filtered in kernel for efficiency).
 .TP
-interval
-Output interval, in seconds.
-.TP
-count
-Number of outputs.
+min_us
+Minimum scheduling delay in microseconds to output.
 .SH EXAMPLES
 .TP
-Summarize run queue latency as a histogram:
+Show scheduling delays longer than 10ms:
 #
-.B runqlat
+.B runqslower
 .TP
-Print 1 second summaries, 10 times:
+Show scheduling delays longer than 1ms for process with PID 123:
 #
-.B runqlat 1 10
-.TP
-Print 1 second summaries, using milliseconds as units for the histogram, and include timestamps on output:
-#
-.B runqlat \-mT 1
-.TP
-Trace PID 186 only, 1 second summaries:
-#
-.B runqlat -P 185 1
+.B runqslower -p 123 1000
 .SH FIELDS
 .TP
-usecs
-Microsecond range
+TIME
+Time of when scheduling event occurred.
 .TP
-msecs
-Millisecond range
+COMM
+Process name.
 .TP
-count
-How many times a task event fell into this range
+PID
+Process ID.
 .TP
-distribution
-An ASCII bar chart to visualize the distribution (count column)
+LAT(us)
+Scheduling latency from time when task was ready to run to the time it was
+assigned to a CPU to run.
 .SH OVERHEAD
 This traces scheduler functions, which can become very frequent. While eBPF
 has very low overhead, and this tool uses in-kernel maps for efficiency, the
@@ -108,6 +81,6 @@ Linux
 .SH STABILITY
 Unstable - in development.
 .SH AUTHOR
-Brendan Gregg
+Ivan Babrou
 .SH SEE ALSO
-runqlen(8), runqslower(8), pidstat(1)
+runqlen(8), runqlat(8), pidstat(1)

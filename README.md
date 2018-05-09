@@ -2,7 +2,7 @@
 # BPF Compiler Collection (BCC)
 
 BCC is a toolkit for creating efficient kernel tracing and manipulation
-programs, and includes several useful tools and examples. It makes use of 
+programs, and includes several useful tools and examples. It makes use of
 extended BPF (Berkeley Packet Filters), formally known as eBPF, a new feature
 that was first added to Linux 3.15. Much of what BCC uses requires Linux 4.1
 and above.
@@ -23,7 +23,7 @@ power-of-2 histogram of the I/O size. For efficiency, only the histogram
 summary is returned to user-level.
 
 ```Shell
-# ./bitehist.py 
+# ./bitehist.py
 Tracing... Hit Ctrl-C to end.
 ^C
      kbytes          : count     distribution
@@ -130,6 +130,7 @@ pair of .c and .py files, and some are directories of files.
 - tools/[reset-trace](tools/reset-trace.sh): Reset the state of tracing. Maintenance tool only. [Examples](tools/reset-trace_example.txt).
 - tools/[runqlat](tools/runqlat.py): Run queue (scheduler) latency as a histogram. [Examples](tools/runqlat_example.txt).
 - tools/[runqlen](tools/runqlen.py): Run queue length as a histogram. [Examples](tools/runqlen_example.txt).
+- tools/[runqslower](tools/runqslower.py): Trace long process scheduling delays. [Examples](tools/runqslower_example.txt).
 - tools/[slabratetop](tools/slabratetop.py): Kernel SLAB/SLUB memory cache allocation rate top. [Examples](tools/slabratetop_example.txt).
 - tools/[softirqs](tools/softirqs.py):  Measure soft IRQ (soft interrupt) event time. [Examples](tools/softirqs_example.txt).
 - tools/[solisten](tools/solisten.py): Trace TCP socket listen. [Examples](tools/solisten_example.txt).
