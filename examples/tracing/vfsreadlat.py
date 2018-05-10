@@ -15,6 +15,7 @@
 #
 # 15-Aug-2015	Brendan Gregg	Created this.
 
+from __future__ import print_function
 from bcc import BPF
 from ctypes import c_ushort, c_int, c_ulonglong
 from time import sleep
@@ -58,7 +59,7 @@ while (1):
 	except KeyboardInterrupt:
 		pass; do_exit = 1
 
-	print
+	print()
 	b["dist"].print_log2_hist("usecs")
 	b["dist"].clear()
 	if do_exit:

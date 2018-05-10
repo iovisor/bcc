@@ -6,6 +6,7 @@
 # Runs the compiler on all files in the 'testprograms' folder
 # Writes outputs in the 'testoutputs' folder
 
+from __future__ import print_function
 from bcc import BPF
 import os, sys
 sys.path.append("../compiler") # To get hold of p4toEbpf
@@ -37,9 +38,9 @@ def main():
     errors = 0
 
     if not is_root():
-        print "Loading EBPF programs requires root privilege."
-        print "Will only test compilation, not loading."
-        print "(Run with sudo to test program loading.)"
+        print("Loading EBPF programs requires root privilege.")
+        print("Will only test compilation, not loading.")
+        print("(Run with sudo to test program loading.)")
 
     for f in files:
         path = os.path.join(testpath, f)
@@ -57,7 +58,7 @@ def main():
         result = p4toEbpf.process(args)
         if result.kind != "OK":
             errors += 1
-            print path, result.error
+            print(path, result.error)
             set_error(result.kind, path, result.error)
         else:
             # Try to load the compiled function
@@ -72,11 +73,11 @@ def main():
 
         filesDone += 1
 
-    print "Compiled", filesDone, "files", errors, "errors"
+    print("Compiled", filesDone, "files", errors, "errors")
     for key in sorted(filesFailed):
-        print key, ":", len(filesFailed[key]), "programs"
+        print(key, ":", len(filesFailed[key]), "programs")
         for v in filesFailed[key]:
-            print "\t", v
+            print("\t", v)
     exit(len(filesFailed) != 0)
 
 

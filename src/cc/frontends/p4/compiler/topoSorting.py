@@ -20,6 +20,7 @@
 
 # -*- coding: utf-8 -*-
 
+from __future__ import print_function
 
 class Node(object):
     def __init__(self, n):
@@ -55,7 +56,7 @@ class Graph(object):
                 sequence += [str(node)]
             if node._behavioral_topo_sorting_mark == 1:
                 if sequence is not None:
-                    print "cycle", sequence
+                    print("cycle", sequence)
                 return False
             if node._behavioral_topo_sorting_mark != 2:
                 node._behavioral_topo_sorting_mark = 1

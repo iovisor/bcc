@@ -6,6 +6,7 @@
 # run in project examples directory with:
 # sudo ./trace_fields.py"
 
+from __future__ import print_function
 from bcc import BPF
 
 prog = """
@@ -16,5 +17,5 @@ int hello(void *ctx) {
 """
 b = BPF(text=prog)
 b.attach_kprobe(event=b.get_syscall_fnname("clone"), fn_name="hello")
-print "PID MESSAGE"
+print("PID MESSAGE")
 b.trace_print(fmt="{1} {5}")
