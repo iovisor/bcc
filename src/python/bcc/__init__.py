@@ -495,17 +495,18 @@ class BPF(object):
             blacklist = set([line.rstrip().split()[1] for line in blacklist_f])
         fns = []
 
-        found_stext = False
+        in_init_section = 0
         with open("/proc/kallsyms", "rb") as avail_file:
             for line in avail_file:
-                (_, t, fn) = line.rstrip().split()[:3]
-                if found_stext is False:
-                    if fn == b'_stext':
-                        found_stext = True
+                (t, fn) = line.rstrip().split()[1:3]
+                if in_init_section == 0:
+                    if fn == b'__init_begin':
+                        in_init_section = 1
+                        continue
+                elif in_init_section == 1:
+                    if fn == b'__init_end':
+                        in_init_section = 2
                     continue
-
-                if fn == b'_etext':
-                    break
                 if (t.lower() in [b't', b'w']) and re.match(event_re, fn) \
                     and fn not in blacklist:
                     fns.append(fn)
