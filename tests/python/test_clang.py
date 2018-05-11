@@ -383,6 +383,52 @@ int trace_entry(struct pt_regs *ctx, struct request *req) {
         b = BPF(text=text)
         fn = b.load_func("trace_entry", BPF.KPROBE)
 
+    def test_probe_read_nested_deref(self):
+        text = """
+#include <net/inet_sock.h>
+int test(struct pt_regs *ctx, struct sock *sk) {
+    struct sock *ptr1;
+    struct sock **ptr2 = &ptr1;
+    *ptr2 = sk;
+    return ((struct sock *)(*ptr2))->sk_daddr;
+}
+"""
+        b = BPF(text=text)
+        fn = b.load_func("test", BPF.KPROBE)
+
+    def test_probe_read_nested_deref2(self):
+        text = """
+#include <net/inet_sock.h>
+int test(struct pt_regs *ctx, struct sock *sk) {
+    struct sock *ptr1;
+    struct sock **ptr2 = &ptr1;
+    struct sock ***ptr3 = &ptr2;
+    *ptr2 = sk;
+    *ptr3 = ptr2;
+    return ((struct sock *)(**ptr3))->sk_daddr;
+}
+"""
+        b = BPF(text=text)
+        fn = b.load_func("test", BPF.KPROBE)
+
+    def test_probe_read_nested_deref_func(self):
+        text = """
+#include <net/inet_sock.h>
+static int subtest(struct sock ***skp) {
+    return ((struct sock *)(**skp))->sk_daddr;
+}
+int test(struct pt_regs *ctx, struct sock *sk) {
+    struct sock *ptr1;
+    struct sock **ptr2 = &ptr1;
+    struct sock ***ptr3 = &ptr2;
+    *ptr2 = sk;
+    *ptr3 = ptr2;
+    return subtest(ptr3);
+}
+"""
+        b = BPF(text=text)
+        fn = b.load_func("test", BPF.KPROBE)
+
     def test_paren_probe_read(self):
         text = """
 #include <net/inet_sock.h>
