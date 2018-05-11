@@ -306,7 +306,7 @@ class BPF(object):
             self.module = lib.bpf_module_create_c_from_string(text,
                     self.debug, cflags_array, len(cflags_array))
             if not self.module:
-                raise Exception("Failed to compile BPF text:\n%s" % text)
+                raise Exception("Failed to compile BPF text")
         else:
             src_file = BPF._find_file(src_file)
             hdr_file = BPF._find_file(hdr_file)
