@@ -185,7 +185,7 @@ else
 end
 -- Map symbolic registers to architecture ABI
 ffi.metatype('struct pt_regs', {
-		__index = function (t,k)
+		__index = function (_ --[[t]],k)
 			return assert(parm_to_reg[k], 'no such register: '..k)
 		end,
 })
@@ -264,8 +264,8 @@ M.type = function(typestr, t)
 	t.__dissector=ffi.typeof(typestr)
 	return t
 end
-M.skb     = M.type('struct sk_buff', {__base=true})
-M.pt_regs = M.type('struct pt_regs', {__base=true, source='probe'})
+M.skb     = M.type('struct sk_buff', {source='ptr_to_ctx'})
+M.pt_regs = M.type('struct pt_regs', {source='ptr_to_probe'})
 M.pkt     = {off=0, __dissector=ffi.typeof('struct eth_t')} -- skb needs special accessors
 -- M.eth     = function (...) return dissector(ffi.typeof('struct eth_t'), ...) end
 M.dot1q   = function (...) return dissector(ffi.typeof('struct dot1q_t'), ...) end

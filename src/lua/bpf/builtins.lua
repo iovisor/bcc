@@ -44,6 +44,22 @@ local function width_type(w)
 end
 builtins.width_type = width_type
 
+-- Return struct member size/type (requires LuaJIT 2.1+)
+-- I am ashamed that there's no easier way around it.
+local function sizeofattr(ct, name)
+	if not ffi.typeinfo then error('LuaJIT 2.1+ is required for ffi.typeinfo') end
+	local cinfo = ffi.typeinfo(ct)
+	while true do
+		cinfo = ffi.typeinfo(cinfo.sib)
+		if not cinfo then return end
+		if cinfo.name == name then break end
+	end
+	local size = math.max(1, ffi.typeinfo(cinfo.sib or ct).size - cinfo.size)
+	-- Guess type name
+	return size, builtins.width_type(size)
+end
+builtins.sizeofattr = sizeofattr
+
 -- Byte-order conversions for little endian
 local function ntoh(x, w)
 	if w then x = ffi.cast(const_width_type[w/8], x) end
@@ -76,21 +92,34 @@ if ffi.abi('be') then
 		return w and ffi.cast(const_width_type[w/8], x) or x
 	end
 	hton = ntoh
-	builtins[ntoh] = function(a, b, w) return end
-	builtins[hton] = function(a, b, w) return end
+	builtins[ntoh] = function(_, _, _) return end
+	builtins[hton] = function(_, _, _) return end
 end
 -- Other built-ins
 local function xadd() error('NYI') end
 builtins.xadd = xadd
-builtins[xadd] = function (e, dst, a, b, off)
-	assert(e.V[a].const.__dissector, 'xadd(a, b) called on non-pointer')
-	local w = ffi.sizeof(e.V[a].const.__dissector)
+builtins[xadd] = function (e, ret, a, b, off)
+	local vinfo = e.V[a].const
+	assert(vinfo and vinfo.__dissector, 'xadd(a, b) called on non-pointer')
+	local w = ffi.sizeof(vinfo.__dissector)
+	-- Calculate structure attribute offsets
+	if e.V[off] and type(e.V[off].const) == 'string' then
+		local ct, field = vinfo.__dissector, e.V[off].const
+		off = ffi.offsetof(ct, field)
+		assert(off, 'xadd(a, b, offset) - offset is not valid in given structure')
+		w = sizeofattr(ct, field)
+	end
 	assert(w == 4 or w == 8, 'NYI: xadd() - 1 and 2 byte atomic increments are not supported')
 	-- Allocate registers and execute
-	e.vcopy(dst, a)
 	local src_reg = e.vreg(b)
-	local dst_reg = e.vreg(dst)
-	e.emit(BPF.JMP + BPF.JEQ + BPF.K, dst_reg, 0, 1, 0) -- if (dst != NULL)
+	local dst_reg = e.vreg(a)
+	-- Set variable for return value and call
+	e.vset(ret)
+	e.vreg(ret, 0, true, ffi.typeof('int32_t'))
+	-- Optimize the NULL check away if provably not NULL
+	if not vinfo.source or vinfo.source:find('_or_null', 1, true) then
+		e.emit(BPF.JMP + BPF.JEQ + BPF.K, dst_reg, 0, 1, 0) -- if (dst != NULL)
+	end
 	e.emit(BPF.XADD + BPF.STX + const_width[w], dst_reg, src_reg, off or 0, 0)
 end
 
@@ -221,7 +250,8 @@ builtins[print] = function (e, ret, fmt, a1, a2, a3)
 		-- TODO: this is materialize step
 		e.V[fmt].const = {__base=dst}
 		e.V[fmt].type = ffi.typeof('char ['..len..']')
-	elseif e.V[fmt].const.__base then -- NOP
+	elseif e.V[fmt].const.__base then -- luacheck: ignore
+		-- NOP
 	else error('NYI: print(fmt, ...) - format variable is not literal/stack memory') end
 	-- Prepare helper call
 	e.emit(BPF.ALU64 + BPF.MOV + BPF.X, 1, 10, 0, 0)
@@ -270,7 +300,6 @@ end
 
 -- Implements bpf_skb_load_bytes(ctx, off, var, vlen) on skb->data
 local function load_bytes(e, dst, off, var)
-	print(e.V[off].const, e.V[var].const)
 	-- Set R2 = offset
 	e.vset(e.tmpvar, nil, off)
 	e.vreg(e.tmpvar, 2, false, ffi.typeof('uint64_t'))
@@ -350,7 +379,7 @@ builtins[math.log2] = function (e, dst, x)
 	e.vcopy(e.tmpvar, x)
 	local v = e.vreg(e.tmpvar, 2)
 	if cdef.isptr(e.V[x].const) then -- No pointer arithmetics, dereference
-		e.vderef(v, v, ffi.typeof('uint64_t'))
+		e.vderef(v, v, {__dissector=ffi.typeof('uint64_t')})
 	end
 	-- Invert value to invert all tests, otherwise we would need and+jnz
 	e.emit(BPF.ALU64 + BPF.NEG + BPF.K, v, 0, 0, 0)        -- v = ~v

@@ -55,6 +55,7 @@ local const_expr = {
 	JGE = function (a, b) return a >= b end,
 	JGT = function (a, b) return a > b end,
 }
+
 local const_width = {
 	[1] = BPF.B, [2] = BPF.H, [4] = BPF.W, [8] = BPF.DW,
 }
@@ -65,19 +66,16 @@ local builtins_strict = {
 	[print]   = true,
 }
 
--- Return struct member size/type (requires LuaJIT 2.1+)
--- I am ashamed that there's no easier way around it.
-local function sizeofattr(ct, name)
-	if not ffi.typeinfo then error('LuaJIT 2.1+ is required for ffi.typeinfo') end
-	local cinfo = ffi.typeinfo(ct)
-	while true do
-		cinfo = ffi.typeinfo(cinfo.sib)
-		if not cinfo then return end
-		if cinfo.name == name then break end
+-- Deep copy a table
+local function table_copy(t)
+	local copy = {}
+	for n,v in pairs(t) do
+		if type(v) == 'table' then
+			v = table_copy(v)
+		end
+		copy[n] = v
 	end
-	local size = math.max(1, ffi.typeinfo(cinfo.sib or ct).size - cinfo.size)
-	-- Guess type name
-	return size, builtins.width_type(size)
+	return copy
 end
 
 -- Return true if the constant part is a proxy
@@ -197,7 +195,7 @@ local function vreg(var, reg, reserve, vtype)
 	-- Materialize variable shadow copy
 	local src = vinfo
 	while src.shadow do src = V[src.shadow] end
-	if reserve then
+	if reserve then -- luacheck: ignore
 		-- No load to register occurs
 	elseif src.reg then
 		emit(BPF.ALU64 + BPF.MOV + BPF.X, reg, src.reg, 0, 0)
@@ -237,15 +235,19 @@ local function vcopy(dst, src)
 end
 
 -- Dereference variable of pointer type
-local function vderef(dst_reg, src_reg, vtype)
+local function vderef(dst_reg, src_reg, vinfo)
 	-- Dereference map pointers for primitive types
 	-- BPF doesn't allow pointer arithmetics, so use the entry value
+	local vtype = vinfo.__dissector
 	local w = ffi.sizeof(vtype)
 	assert(const_width[w], 'NYI: sizeof('..tostring(vtype)..') not 1/2/4/8 bytes')
 	if dst_reg ~= src_reg then
 		emit(BPF.ALU64 + BPF.MOV + BPF.X, dst_reg, src_reg, 0, 0)    -- dst = src
 	end
-	emit(BPF.JMP + BPF.JEQ + BPF.K, src_reg, 0, 1, 0)                -- if (src != NULL)
+	-- Optimize the NULL check away if provably not NULL
+	if not vinfo.source or vinfo.source:find('_or_null', 1, true) then
+		emit(BPF.JMP + BPF.JEQ + BPF.K, src_reg, 0, 1, 0)            -- if (src != NULL)
+	end
 	emit(BPF.MEM + BPF.LDX + const_width[w], dst_reg, src_reg, 0, 0) --     dst = *src;
 end
 
@@ -286,12 +288,20 @@ end
 local function bb_end(Vcomp)
 	for i,v in pairs(V) do
 		if Vcomp[i] and Vcomp[i].spill and not v.spill then
+			-- Materialize constant to be able to spill
+			if not v.reg and v.const then
+				vreg(i)
+			end
 			reg_spill(i)
 		end
 	end
 	for i,v in pairs(V) do
 		if Vcomp[i] and Vcomp[i].reg and not v.reg then
 			vreg(i, Vcomp[i].reg)
+		end
+		-- Compensate variable metadata change
+		if Vcomp[i] and Vcomp[i].const then
+			V[i].const.source = Vcomp[i].const.source
 		end
 	end
 end
@@ -334,16 +344,15 @@ local function CMP_REG(a, b, op)
 		-- compiler to replace it's absolute offset to LJ bytecode insn with a relative
 		-- offset in BPF program code, verifier will accept only programs with valid JMP targets
 		local a_reg, b_reg = vreg(a), vreg(b)
-		-- Migrate operands from R0-5 as it will be spilled in compensation code when JMP out of BB
-		if a_reg == 0 then a_reg = vreg(a, 7) end
 		emit(BPF.JMP + BPF[op] + BPF.X, a_reg, b_reg, 0xffff, 0)
 		code.seen_cmp = code.pc-1
 	end
 end
 
 local function CMP_IMM(a, b, op)
-	if V[a].const and not is_proxy(V[a].const) then -- Fold compile-time expressions
-		code.seen_cmp = const_expr[op](V[a].const, b) and ALWAYS or NEVER
+	local c = V[a].const
+	if c and not is_proxy(c) then -- Fold compile-time expressions
+		code.seen_cmp = const_expr[op](c, b) and ALWAYS or NEVER
 	else
 		-- Convert imm32 to number
 		if type(b) == 'string' then
@@ -362,10 +371,17 @@ local function CMP_IMM(a, b, op)
 		-- compiler to replace it's absolute offset to LJ bytecode insn with a relative
 		-- offset in BPF program code, verifier will accept only programs with valid JMP targets
 		local reg = vreg(a)
-		-- Migrate operands from R0-5 as it will be spilled in compensation code when JMP out of BB
-		if reg == 0 then reg = vreg(a, 7) end
 		emit(BPF.JMP + BPF[op] + BPF.K, reg, 0, 0xffff, b)
 		code.seen_cmp = code.pc-1
+		-- Remember NULL pointer checks as BPF prohibits pointer comparisons
+		-- and repeated checks wouldn't pass the verifier, only comparisons
+		-- against constants are checked.
+		if op == 'JEQ' and tonumber(b) == 0 and c and c.source then
+			local pos = c.source:find('_or_null', 1, true)
+			if pos then
+				code.seen_null_guard = a
+			end
+		end
 	end
 end
 
@@ -379,7 +395,7 @@ local function ALU_IMM(dst, a, b, op)
 		vcopy(dst, a)
 		local dst_reg = vreg(dst)
 		if cdef.isptr(V[a].type) then
-			vderef(dst_reg, dst_reg, V[a].const.__dissector)
+			vderef(dst_reg, dst_reg, V[a].const)
 			V[dst].type = V[a].const.__dissector
 		else
 			V[dst].type = V[a].type
@@ -402,13 +418,13 @@ local function ALU_REG(dst, a, b, op)
 			-- We have to allocate a temporary register for dereferencing to preserve
 			-- pointer in source variable that MUST NOT be altered
 			reg_alloc(stackslots, 2)
-			vderef(2, src_reg, V[b].const.__dissector)
+			vderef(2, src_reg, V[b].const)
 			src_reg = 2
 		end
 		vcopy(dst, a) -- DST may alias B, so copy must occur after we materialize B
 		local dst_reg = vreg(dst)
 		if cdef.isptr(V[a].type) then
-			vderef(dst_reg, dst_reg, V[a].const.__dissector)
+			vderef(dst_reg, dst_reg, V[a].const)
 			V[dst].type = V[a].const.__dissector
 		end
 		emit(BPF.ALU64 + BPF[op] + BPF.X, dst_reg, src_reg, 0, 0)
@@ -590,7 +606,7 @@ local function MAP_GET(dst, map_var, key, imm)
 	MAP_INIT(map_var, key, imm)
 	-- Flag as pointer type and associate dissector for map value type
 	vreg(dst, 0, true, ffi.typeof('uint8_t *'))
-	V[dst].const = {__dissector=map.val_type}
+	V[dst].const = {__dissector=map.val_type, source='ptr_to_map_value_or_null'}
 	emit(BPF.JMP + BPF.CALL, 0, 0, 0, HELPER.map_lookup_elem)
 	V[stackslots].reg = nil -- Free temporary registers
 end
@@ -630,7 +646,7 @@ local function MAP_SET(map_var, key, key_imm, src)
 	elseif V[src].reg and pod_type then
 		-- Value is a pointer, derefernce it and spill it
 		if cdef.isptr(V[src].type) then
-			vderef(3, V[src].reg, V[src].const.__dissector)
+			vderef(3, V[src].reg, V[src].const)
 			emit(BPF.MEM + BPF.STX + w, 10, 3, -sp, 0)
 		else
 			emit(BPF.MEM + BPF.STX + w, 10, V[src].reg, -sp, 0)
@@ -645,18 +661,22 @@ local function MAP_SET(map_var, key, key_imm, src)
 				emit(BPF.JMP + BPF.CALL, 0, 0, 0, HELPER.map_update_elem)
 				return
 			end
-			vderef(3, V[src].reg, V[src].const.__dissector)
+			vderef(3, V[src].reg, V[src].const)
 			emit(BPF.MEM + BPF.STX + w, 10, 3, -sp, 0)
 		else
 			sp = V[src].spill
 		end
 	-- Value is already on stack, write to base-relative address
 	elseif base.__base then
-		assert(val_size == ffi.sizeof(V[key].type), 'VAR '..key..' type incompatible with BPF map value type')
+		if val_size ~= ffi.sizeof(V[src].type) then
+			local err = string.format('VAR %d type (%s) incompatible with BPF map value type (%s): expected %d, got %d',
+				src, V[src].type, map.val_type, val_size, ffi.sizeof(V[src].type))
+			error(err)
+		end
 		sp = base.__base
 	-- Value is constant, materialize it on stack
 	else
-		error('VAR '.. key or key_imm ..' is neither const-expr/register/stack/spilled')
+		error('VAR '.. src ..' is neither const-expr/register/stack/spilled')
 	end
 	emit(BPF.ALU64 + BPF.MOV + BPF.X, 3, 10, 0, 0)
 	emit(BPF.ALU64 + BPF.ADD + BPF.K, 3, 0, 0, -sp)
@@ -746,7 +766,7 @@ local BC = {
 		elseif cdef.isptr(V[b].type) and d == 0 then
 			vcopy(a, b)
 			local dst_reg = vreg(a)
-			vderef(dst_reg, dst_reg, V[a].const.__dissector)
+			vderef(dst_reg, dst_reg, V[a].const)
 			V[a].type = V[a].const.__dissector
 		else
 			LOAD(a, b, d, ffi.typeof('uint8_t'))
@@ -774,7 +794,7 @@ local BC = {
 		if base.__dissector then
 			local ofs,bpos = ffi.offsetof(base.__dissector, c)
 			assert(not bpos, 'NYI: B[C] = A, where C is a bitfield')
-			local w = sizeofattr(base.__dissector, c)
+			local w = builtins.sizeofattr(base.__dissector, c)
 			-- TODO: support vectorized moves larger than register width
 			assert(const_width[w], 'B[C] = A, sizeof(A) must be 1/2/4/8')
 			local src_reg = vreg(a)
@@ -782,7 +802,7 @@ local BC = {
 			if cdef.isptr(V[a].type) then
 				local tmp_reg = reg_alloc(stackslots, 1) -- Clone variable in tmp register
 				emit(BPF.ALU64 + BPF.MOV + BPF.X, tmp_reg, src_reg, 0, 0)
-				vderef(tmp_reg, tmp_reg, V[a].const.__dissector)
+				vderef(tmp_reg, tmp_reg, V[a].const)
 				src_reg = tmp_reg -- Materialize and dereference it
 			-- Source is a value on stack, we must load it first
 			elseif V[a].const and V[a].const.__base > 0 then
@@ -790,10 +810,10 @@ local BC = {
 				V[a].type = V[a].const.__dissector
 				V[a].const = nil -- Value is dereferenced
 			end
-			-- If the table is not on stack, it must be checked for NULL
-			if not base.__base then
-				emit(BPF.JMP + BPF.JEQ + BPF.K, V[b].reg, 0, 1, 0) -- if (map[x] != NULL)
-				emit(BPF.MEM + BPF.STX + const_width[w], V[b].reg, src_reg, ofs, 0)
+			-- If changing map value, write to absolute address + offset
+			if base.source and base.source:find('ptr_to_map_value', 1, true) then
+				local dst_reg = vreg(b)
+				emit(BPF.MEM + BPF.STX + const_width[w], dst_reg, src_reg, ofs, 0)
 			else -- Table is already on stack, write to base-relative address
 				emit(BPF.MEM + BPF.STX + const_width[w], 10, src_reg, -base.__base + ofs, 0)
 			end
@@ -824,30 +844,42 @@ local BC = {
 			if not ofs and proto[c] then -- Load new dissector on given offset
 				BUILTIN(proto[c], a, b, c)
 			else
+				-- Loading register from offset is a little bit tricky as there are
+				-- several data sources and value loading modes with different restrictions
+				-- such as checking pointer values for NULL compared to using stack.
 				assert(ofs, tostring(base.__dissector)..'.'..c..' attribute not exists')
 				if a ~= b then vset(a) end
 				-- Dissected value is probably not constant anymore
 				local new_const = nil
+				local w, atype = builtins.sizeofattr(base.__dissector, c)
 				-- Simple register load, get absolute offset or R-relative
-				local w, atype = sizeofattr(base.__dissector, c)
-				if base.__base == true then -- R-relative addressing
+				if base.source and base.source:find('ptr_to_', 1, true) then -- R-relative addressing
+					local src_reg = vreg(b, nil, true)
 					local dst_reg = vreg(a, nil, true)
 					assert(const_width[w], 'NYI: sizeof('..tostring(base.__dissector)..'.'..c..') not 1/2/4/8 bytes')
-					emit(BPF.MEM + BPF.LDX + const_width[w], dst_reg, V[b].reg, ofs, 0)
-				elseif not base.source and base.__base and base.__base > 0 then -- [FP+K] addressing
+					-- The pointer must be checked for NULL if possible
+					-- It isn't done automatically as there is no clear semantics on what to do
+					-- when deferencing a NULL pointer (either program exit or branch).
+					emit(BPF.MEM + BPF.LDX + const_width[w], dst_reg, src_reg, ofs, 0)
+				-- [SP+K] addressing using R10 (stack pointer)
+				-- Doesn't need to be checked for NULL
+				elseif not base.source and base.__base and base.__base > 0 then
 					if cdef.isptr(atype) then -- If the member is pointer type, update base pointer with offset
 						new_const = {__base = base.__base-ofs}
 					else
 						local dst_reg = vreg(a, nil, true)
 						emit(BPF.MEM + BPF.LDX + const_width[w], dst_reg, 10, -base.__base+ofs, 0)
 					end
-				elseif base.off then -- Absolute address to payload
-					LD_ABS(a, ofs + base.off, w)
-				elseif base.source == 'probe' then -- Indirect read using probe
+				-- Indirect read using probe (uprobe or kprobe, uses helper)
+				elseif base.source == 'ptr_to_probe' then
 					BUILTIN(builtins[builtins.probe_read], nil, a, b, atype, ofs)
 					V[a].source = V[b].source -- Builtin handles everything
 					return
-				else -- Indirect address to payload
+				-- Absolute address to skb payload (not a direct skb access)
+				elseif base.off then
+					LD_ABS(a, ofs + base.off, w)
+				-- Indirect address to skb payload
+				else
 					LD_IND(a, b, w, ofs)
 				end
 				-- Bitfield, must be further narrowed with a bitmask/shift
@@ -884,6 +916,8 @@ local BC = {
 		for i, _ in pairs(V) do
 			if i >= a then V[i] = {} end
 		end
+		-- Cross basic block boundary if the jump is conditional or
+		-- when the jump target isn't provably unreachable
 		local val = code.fixup[c] or {}
 		if code.seen_cmp and code.seen_cmp ~= ALWAYS then
 			if code.seen_cmp ~= NEVER then -- Do not emit the jump or fixup
@@ -893,25 +927,40 @@ local BC = {
 				-- First branch point, emit compensation code
 				local Vcomp = Vstate[c]
 				if not Vcomp then
-					for i,v in pairs(V) do
-						if not v.reg and v.const and not is_proxy(v.const) then
-							vreg(i, 0)   -- Load to TMP register (not saved)
+					-- Select scratch register (R0-5) that isn't used as operand
+					-- in the CMP instruction, as the variable may not be live, after
+					-- the JMP, but it may be used in the JMP+CMP instruction itself
+					local tmp_reg = 0
+					for reg = 0, 5 do
+						if reg ~= jmpi.dst_reg and reg ~= jmpi.src_reg then
+							tmp_reg = reg
+							break
 						end
-						if v.reg and v.reg <= 5 then
+					end
+					-- Force materialization of constants at the end of BB
+					for i, v in pairs(V) do
+						if not v.reg and v.const and not is_proxy(v.const) then
+							vreg(i, tmp_reg) -- Load to TMP register (not saved)
 							reg_spill(i) -- Spill caller-saved registers
 						end
 					end
 					-- Record variable state
 					Vstate[c] = V
-					V = {}
-					for i,v in pairs(Vstate[c]) do
-						V[i] = {}
-						for k,e in pairs(v) do
-							V[i][k] = e
-						end
-					end
+					V = table_copy(V)
 				-- Variable state already set, emit specific compensation code
-				else bb_end(Vcomp) end
+				else
+					bb_end(Vcomp)
+				end
+				-- Record pointer NULL check from condition
+				-- If the condition checks pointer variable against NULL,
+				-- we can assume it will not be NULL in the fall-through block
+				if code.seen_null_guard then
+					local vinfo = V[code.seen_null_guard].const
+					local pos = vinfo.source:find('_or_null', 1, true)
+					if pos then
+						vinfo.source = vinfo.source:sub(1, pos - 1)
+					end
+				end
 				-- Reemit CMP insn
 				emit(jmpi.code, jmpi.dst_reg, jmpi.src_reg, jmpi.off, jmpi.imm)
 				-- Fuse JMP into previous CMP opcode, mark JMP target for fixup
@@ -920,8 +969,15 @@ local BC = {
 				code.fixup[c] = val
 			end
 			code.seen_cmp = nil
+			code.seen_null_guard = nil
 		else
-			emit(BPF.JMP + BPF.JEQ + BPF.X, 6, 6, 0xffff, 0) -- Always true
+			-- We need to synthesise a condition that's always true, however
+			-- BPF prohibits pointer arithmetic to prevent pointer leaks
+			-- so we have to clear out one register and use it for cmp that's always true
+			local dst_reg = reg_alloc(stackslots)
+			emit(BPF.ALU64 + BPF.MOV + BPF.K, dst_reg, 0, 0, 0)
+			emit(BPF.JMP + BPF.JEQ + BPF.K, dst_reg, 0, 0xffff, 0)
+			V[stackslots].reg = nil -- Only temporary allocation
 			table.insert(val, code.pc-1) -- Fixup JMP target
 			code.reachable = false -- Code following the JMP is not reachable
 			code.fixup[c] = val
@@ -931,7 +987,7 @@ local BC = {
 		if V[a].reg ~= 0 then vreg(a, 0) end
 		-- Dereference pointer variables
 		if cdef.isptr(V[a].type) then
-			vderef(0, 0, V[a].const.__dissector)
+			vderef(0, 0, V[a].const)
 		end
 		emit(BPF.JMP + BPF.EXIT, 0, 0, 0, 0)
 		-- Free optimisation: spilled variable will not be filled again
@@ -1174,7 +1230,7 @@ local tracepoint_mt = {
 		bpf = function (t, prog)
 			if type(prog) ~= 'table' then
 				-- Create protocol parser with source=probe
-				prog = compile(prog, {proto.type(t.type, {source='probe'})})
+				prog = compile(prog, {proto.type(t.type, {source='ptr_to_probe'})})
 			end
 			-- Load the BPF program
 			local prog_fd, err, log = S.bpf_prog_load(S.c.BPF_PROG.TRACEPOINT, prog.insn, prog.pc)
@@ -1271,7 +1327,11 @@ return setmetatable({
 			ok, err = sock:bind(S.t.sockaddr_ll({protocol='all', ifindex=iface.index}))
 			assert(ok, tostring(err))
 		elseif type(sock) == 'number' then
-			sock = assert(S.t.socket(sock))
+			sock = S.t.fd(sock):nogc()
+		elseif ffi.istype(S.t.fd, sock) then -- luacheck: ignore
+			-- No cast required
+		else
+			return nil, 'socket must either be an fd number, an interface name, or an ljsyscall socket'
 		end
 		-- Load program and attach it to socket
 		if type(prog) ~= 'table' then

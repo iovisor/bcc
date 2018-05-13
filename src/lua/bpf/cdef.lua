@@ -203,10 +203,10 @@ function M.event_reader(reader, event_type)
 	end
 	-- Wrap reader in interface that can interpret read event messages
 	return setmetatable({reader=reader,type=event_type}, {__index = {
-		block = function(self)
+		block = function(_ --[[self]])
 			return S.select { readfds = {reader.fd} }
 		end,
-		next = function(self, k)
+		next = function(_ --[[self]], k)
 			local len, ev = reader:next(k)
 			-- Filter out only sample frames
 			while ev and ev.type ~= S.c.PERF_RECORD.SAMPLE do
