@@ -13,7 +13,7 @@ This observability tutorial contains 17 lessons, and 46 enumerated things to lea
 Start by running [examples/hello_world.py](../examples/hello_world.py), while running some commands (eg, "ls") in another session. It should print "Hello, World!" for new processes. If not, start by fixing bcc: see [INSTALL.md](../INSTALL.md).
 
 ```
-# ./examples/hello_world.py 
+# ./examples/hello_world.py
             bash-13364 [002] d... 24573433.052937: : Hello, World!
             bash-13364 [003] d... 24573436.642808: : Hello, World!
 [...]
@@ -51,7 +51,7 @@ Improve it by printing "Tracing sys_sync()... Ctrl-C to end." when the program f
 This program is in [examples/tracing/hello_fields.py](../examples/tracing/trace_fields.py). Sample output (run commands in another session):
 
 ```
-# ./examples/tracing/hello_fields.py 
+# ./examples/tracing/hello_fields.py
 TIME(s)            COMM             PID    MESSAGE
 24585001.174885999 sshd             1432   Hello, World!
 24585001.195710000 sshd             15780  Hello, World!
@@ -175,7 +175,7 @@ Modify the sync_timing.py program (prior lesson) to store the count of all sys_s
 Browse the [examples/tracing/disksnoop.py](../examples/tracing/disksnoop.py) program to see what is new. Here is some sample output:
 
 ```
-# ./disksnoop.py 
+# ./disksnoop.py
 TIME(s)            T  BYTES    LAT(ms)
 16458043.436012    W  4096        3.13
 16458043.437326    W  4096        4.44
@@ -237,7 +237,7 @@ This is a pretty interesting program, and if you can understand all the code, yo
 Let's finally stop using bpf_trace_printk() and use the proper BPF_PERF_OUTPUT() interface. This will also mean we stop getting the free trace_field() members like PID and timestamp, and will need to fetch them directly. Sample output while commands are run in another session:
 
 ```
-# ./hello_perf_output.py 
+# ./hello_perf_output.py
 TIME(s)            COMM             PID    MESSAGE
 0.000000000        bash             22986  Hello, perf_output!
 0.021080275        systemd-udevd    484    Hello, perf_output!
@@ -388,7 +388,7 @@ A recap from earlier lessons:
 New things to learn:
 
 1. ```BPF_HISTOGRAM(dist)```: Defines a BPF map object that is a histogram, and names it "dist".
-1. ```dist.increment()```: Increments the histogram bucket index provided as an argument by one.
+1. ```dist.increment()```: Increments the histogram bucket index provided as first argument by one by default. Optionally, custom increments can be passed as the second argument.
 1. ```bpf_log2l()```: Returns the log-2 of the provided value. This becomes the index of our histogram, so that we're constructing a power-of-2 histogram.
 1. ```b["dist"].print_log2_hist("kbytes")```: Prints the "dist" histogram as power-of-2, with a column header of "kbytes". The only data transferred from kernel to user space is the bucket counts, making this efficient.
 
@@ -449,7 +449,7 @@ Browse the code in [examples/tracing/vfsreadlat.py](../examples/tracing/vfsreadl
 Tracing while a ```dd if=/dev/urandom of=/dev/null bs=8k count=5``` is run:
 
 ```
-# ./urandomread.py 
+# ./urandomread.py
 TIME(s)            COMM             PID    GOTBITS
 24652832.956994001 smtp             24690  384
 24652837.726500999 dd               24692  65536
@@ -518,7 +518,7 @@ Convert disksnoop.py from a previous lesson to use the ```block:block_rq_issue``
 This program instruments a user-level function, the ```strlen()``` library function, and frequency counts its string argument. Example output:
 
 ```
-# ./strlen_count.py 
+# ./strlen_count.py
 Tracing strlen()... Hit Ctrl-C to end.
 ^C     COUNT STRING
          1 " "
