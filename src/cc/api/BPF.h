@@ -48,7 +48,6 @@ class BPF {
   explicit BPF(unsigned int flag = 0, TableStorage* ts = nullptr,
                bool rw_engine_enabled = true)
       : flag_(flag),
-        syscall_prefix_idx_(0),
         bpf_module_(new BPFModule(flag, ts, rw_engine_enabled)) {}
   StatusTuple init(const std::string& bpf_program,
                    const std::vector<std::string>& cflags = {},
@@ -219,7 +218,7 @@ class BPF {
 
   int flag_;
 
-  int syscall_prefix_idx_;
+  std::unique_ptr<std::string> syscall_prefix_;
 
   std::unique_ptr<BPFModule> bpf_module_;
 
