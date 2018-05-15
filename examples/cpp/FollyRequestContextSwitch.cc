@@ -88,6 +88,8 @@ int main(int argc, char** argv) {
   if (attach_res.code() != 0) {
     std::cerr << attach_res.msg() << std::endl;
     return 1;
+  } else {
+    std::cout << "Attached to USDT " << u[0];
   }
 
   auto open_res = bpf->open_perf_buffer("events", &handle_output);

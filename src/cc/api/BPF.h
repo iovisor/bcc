@@ -19,6 +19,7 @@
 #include <cctype>
 #include <cstdint>
 #include <memory>
+#include <ostream>
 #include <string>
 
 #include "BPFTable.h"
@@ -47,8 +48,7 @@ class BPF {
 
   explicit BPF(unsigned int flag = 0, TableStorage* ts = nullptr,
                bool rw_engine_enabled = true)
-      : flag_(flag),
-        bpf_module_(new BPFModule(flag, ts, rw_engine_enabled)) {}
+      : flag_(flag), bpf_module_(new BPFModule(flag, ts, rw_engine_enabled)) {}
   StatusTuple init(const std::string& bpf_program,
                    const std::vector<std::string>& cflags = {},
                    const std::vector<USDT>& usdt = {});
@@ -251,7 +251,13 @@ class USDT {
   }
 
   std::string print_name() const {
-    return provider_ + ":" + name_ + " from " + binary_path_;
+    return provider_ + ":" + name_ + " from " + binary_path_ + " for probe " +
+           "probe_func_";
+  }
+
+  friend std::ostream& operator<<(std::ostream& out, const USDT& usdt) {
+    return out << usdt.provider_ << ":" << usdt.name_ << " from "
+               << usdt.binary_path_ << " for probe " << usdt.probe_func_;
   }
 
  private:
