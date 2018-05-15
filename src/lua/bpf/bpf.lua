@@ -471,6 +471,9 @@ local function LD_IND(dst, src, w, off)
 	local src_reg = vreg(src) -- Must materialize first in case dst == src
 	local dst_reg = vreg(dst, 0, true, builtins.width_type(w)) -- Reserve R0
 	emit(BPF.LD + BPF.IND + const_width[w], dst_reg, src_reg, 0, off or 0)
+	if w > 1 and ffi.abi('le') then -- LD_ABS has htonl() semantics, reverse
+		emit(BPF.ALU + BPF.END + BPF.TO_BE, dst_reg, 0, 0, w * 8)
+	end
 end
 
 local function LD_FIELD(a, d, w, imm)
