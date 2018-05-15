@@ -444,6 +444,9 @@ local function LD_ABS(dst, off, w)
 	if w < 8 then
 		local dst_reg = vreg(dst, 0, true, builtins.width_type(w)) -- Reserve R0
 		emit(BPF.LD + BPF.ABS + const_width[w], dst_reg, 0, 0, off)
+		if w > 1 and ffi.abi('le') then -- LD_ABS has htonl() semantics, reverse
+			emit(BPF.ALU + BPF.END + BPF.TO_BE, dst_reg, 0, 0, w * 8)
+		end
 	elseif w == 8 then
 		-- LD_ABS|IND prohibits DW, we need to do two W loads and combine them
 		local tmp_reg = vreg(stackslots, 0, true, builtins.width_type(w)) -- Reserve R0
