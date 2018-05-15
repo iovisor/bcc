@@ -310,6 +310,28 @@ ffi.metatype(ffi.typeof('struct ip_t'), {
 	}
 })
 
+ffi.metatype(ffi.typeof('struct ip6_t'), {
+	__index = {
+		-- Skip fixed IPv6 header length (40 bytes)
+		-- The caller must check the value of `next_header` to skip any extension headers
+		icmp6 = function(e, dst) next_skip(e, dst, ffi.sizeof('struct ip6_t')) end,
+		udp  = function(e, dst) next_skip(e, dst, ffi.sizeof('struct ip6_t')) end,
+		tcp  = function(e, dst) next_skip(e, dst, ffi.sizeof('struct ip6_t')) end,
+		ip6_opt = function(e, dst) next_skip(e, dst, ffi.sizeof('struct ip6_t')) end,
+	}
+})
+
+local ip6_opt_ext_len_off = ffi.offsetof('struct ip6_opt_t', 'ext_len')
+ffi.metatype(ffi.typeof('struct ip6_opt_t'), {
+	__index = {
+		-- Skip IPv6 extension header length (field `ext_len`)
+		icmp6 = function(e, dst) next_offset(e, dst, ffi.typeof('uint8_t'), ip6_opt_ext_len_off, 0, 0) end,
+		udp  = function(e, dst) next_offset(e, dst, ffi.typeof('uint8_t'), ip6_opt_ext_len_off, 0, 0) end,
+		tcp  = function(e, dst) next_offset(e, dst, ffi.typeof('uint8_t'), ip6_opt_ext_len_off, 0, 0) end,
+		ip6_opt = function(e, dst) next_offset(e, dst, ffi.typeof('uint8_t'), ip6_opt_ext_len_off, 0, 0) end,
+	}
+})
+
 ffi.metatype(ffi.typeof('struct tcp_t'), {
 	__index = {
 		-- Skip TCP header length (stored as number of words)
