@@ -244,6 +244,8 @@ class USDT {
         name_(name),
         probe_func_(probe_func) {}
 
+  StatusTuple init();
+
   bool operator==(const USDT& other) const {
     return (provider_ == other.provider_) && (name_ == other.name_) &&
            (binary_path_ == other.binary_path_) &&
@@ -261,7 +263,6 @@ class USDT {
   }
 
  private:
-  StatusTuple init();
   bool initialized_;
 
   std::string binary_path_;
