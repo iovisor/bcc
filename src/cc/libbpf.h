@@ -93,7 +93,7 @@ int bpf_attach_xdp(const char *dev_name, int progfd, uint32_t flags);
 // attach a prog expressed by progfd to run on a specific perf event. The perf
 // event will be created using the perf_event_attr pointer provided.
 int bpf_attach_perf_event_raw(int progfd, void *perf_event_attr, pid_t pid,
-                              int cpu, int group_fd);
+                              int cpu, int group_fd, unsigned long extra_flags);
 // attach a prog expressed by progfd to run on a specific perf event, with
 // certain sample period or sample frequency
 int bpf_attach_perf_event(int progfd, uint32_t ev_type, uint32_t ev_config,

@@ -1305,9 +1305,9 @@ cleanup:
 }
 
 int bpf_attach_perf_event_raw(int progfd, void *perf_event_attr, pid_t pid,
-                              int cpu, int group_fd) {
+                              int cpu, int group_fd, unsigned long extra_flags) {
   int fd = syscall(__NR_perf_event_open, perf_event_attr, pid, cpu, group_fd,
-                   PERF_FLAG_FD_CLOEXEC);
+                   PERF_FLAG_FD_CLOEXEC | extra_flags);
   if (fd < 0) {
     perror("perf_event_open failed");
     return -1;
@@ -1351,7 +1351,7 @@ int bpf_attach_perf_event(int progfd, uint32_t ev_type, uint32_t ev_config,
     attr.sample_period = sample_period;
   }
 
-  return bpf_attach_perf_event_raw(progfd, &attr, pid, cpu, group_fd);
+  return bpf_attach_perf_event_raw(progfd, &attr, pid, cpu, group_fd, 0);
 }
 
 int bpf_close_perf_event_fd(int fd) {

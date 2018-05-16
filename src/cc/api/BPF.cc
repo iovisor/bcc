@@ -324,7 +324,8 @@ StatusTuple BPF::attach_perf_event(uint32_t ev_type, uint32_t ev_config,
 
 StatusTuple BPF::attach_perf_event_raw(void* perf_event_attr,
                                        const std::string& probe_func, pid_t pid,
-                                       int cpu, int group_fd) {
+                                       int cpu, int group_fd,
+                                       unsigned long extra_flags) {
   auto attr = static_cast<struct perf_event_attr*>(perf_event_attr);
   auto ev_pair = std::make_pair(attr->type, attr->config);
   if (perf_events_.find(ev_pair) != perf_events_.end())
@@ -342,7 +343,8 @@ StatusTuple BPF::attach_perf_event_raw(void* perf_event_attr,
   auto fds = new std::vector<std::pair<int, int>>();
   fds->reserve(cpus.size());
   for (int i : cpus) {
-    int fd = bpf_attach_perf_event_raw(probe_fd, attr, pid, i, group_fd);
+    int fd = bpf_attach_perf_event_raw(probe_fd, attr, pid, i, group_fd,
+                                       extra_flags);
     if (fd < 0) {
       for (const auto& it : *fds)
         close(it.second);
