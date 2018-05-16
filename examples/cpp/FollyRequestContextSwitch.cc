@@ -74,10 +74,16 @@ int main(int argc, char** argv) {
   }
   std::string binary_path(argv[1]);
 
-  bpf = new ebpf::BPF();
   std::vector<ebpf::USDT> u;
   u.emplace_back(binary_path, "folly", "request_context_switch_before",
                  "on_context_switch");
+  auto usdt_init_res = u[0].init();
+  if (usdt_init_res.code() != 0) {
+    std::cerr << usdt_init_res.msg() << std::endl;
+    return 1;
+  }
+
+  bpf = new ebpf::BPF();
   auto init_res = bpf->init(BPF_PROGRAM, {}, u);
   if (init_res.code() != 0) {
     std::cerr << init_res.msg() << std::endl;
@@ -88,6 +94,8 @@ int main(int argc, char** argv) {
   if (attach_res.code() != 0) {
     std::cerr << attach_res.msg() << std::endl;
     return 1;
+  } else {
+    std::cout << "Attached to USDT " << u[0];
   }
 
   auto open_res = bpf->open_perf_buffer("events", &handle_output);
