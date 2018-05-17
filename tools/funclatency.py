@@ -47,8 +47,10 @@ parser = argparse.ArgumentParser(
     epilog=examples)
 parser.add_argument("-p", "--pid", type=int,
     help="trace this PID only")
-parser.add_argument("-i", "--interval", default=99999999,
+parser.add_argument("-i", "--interval",
     help="summary interval, seconds")
+parser.add_argument("-d", "--duration",
+    help="total duration of trace, seconds")
 parser.add_argument("-T", "--timestamp", action="store_true",
     help="include timestamp on output")
 parser.add_argument("-u", "--microseconds", action="store_true",
@@ -66,6 +68,10 @@ parser.add_argument("pattern",
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
 args = parser.parse_args()
+if args.duration and not args.interval:
+    args.interval = args.duration
+if not args.interval:
+    args.interval = 99999999
 
 def bail(error):
     print("Error: " + error)
@@ -226,14 +232,18 @@ def print_section(key):
         return "%s [%d]" % (BPF.sym(key[0], key[1]), key[1])
 
 exiting = 0 if args.interval else 1
+seconds = 0
 dist = b.get_table("dist")
 while (1):
     try:
         sleep(int(args.interval))
+        seconds += int(args.interval)
     except KeyboardInterrupt:
         exiting = 1
         # as cleanup can take many seconds, trap Ctrl-C:
         signal.signal(signal.SIGINT, signal_ignore)
+    if args.duration and seconds >= int(args.duration):
+        exiting = 1
 
     print()
     if args.timestamp:

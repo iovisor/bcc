@@ -388,6 +388,8 @@ parser = argparse.ArgumentParser(
 parser.add_argument("-p", "--pid", type=int, help="trace only this pid")
 parser.add_argument("-i", "--interval", type=int,
     help="print summary at this interval (seconds)")
+parser.add_argument("-d", "--duration",
+    help="total duration of trace, seconds")
 parser.add_argument("-T", "--top", type=int, default=10,
     help="print only the top syscalls by count or latency")
 parser.add_argument("-x", "--failures", action="store_true",
@@ -405,6 +407,10 @@ parser.add_argument("-l", "--list", action="store_true",
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
 args = parser.parse_args()
+if args.duration and not args.interval:
+    args.interval = args.duration
+if not args.interval:
+    args.interval = 99999999
 
 if args.list:
     for grp in izip_longest(*(iter(sorted(syscalls.values())),) * 4):
@@ -545,11 +551,20 @@ def print_latency_stats():
 
 print("Tracing %ssyscalls, printing top %d... Ctrl+C to quit." %
       ("failed " if args.failures else "", args.top))
+exiting = 0 if args.interval else 1
+seconds = 0
 while True:
     try:
-        sleep(args.interval or 999999999)
-        print_stats()
+        sleep(int(args.interval))
+        seconds += int(args.interval)
     except KeyboardInterrupt:
-        if not args.interval:
-            print_stats()
-        break
+        exiting = 1
+        signal.signal(signal.SIGINT, signal_ignore)
+    if args.duration and seconds >= int(args.duration):
+        exiting = 1
+
+    print_stats()
+
+    if exiting:
+        print("Detaching...")
+        exit()
