@@ -88,7 +88,8 @@ class BPF {
   StatusTuple attach_perf_event_raw(void* perf_event_attr,
                                     const std::string& probe_func,
                                     pid_t pid = -1, int cpu = -1,
-                                    int group_fd = -1);
+                                    int group_fd = -1,
+                                    unsigned long extra_flags = 0);
   StatusTuple detach_perf_event(uint32_t ev_type, uint32_t ev_config);
   StatusTuple detach_perf_event_raw(void* perf_event_attr);
   std::string get_syscall_fnname(const std::string& name);
