@@ -610,7 +610,9 @@ argdist -I 'kernel/sched/sched.h' \\
                   type=int,
                   help="maximum string size to read from char* arguments")
                 parser.add_argument("-i", "--interval", default=1, type=int,
-                  help="output interval, in seconds")
+                  help="output interval, in seconds (default 1 second)")
+                parser.add_argument("-d", "--duration", type=int,
+                  help="total duration of trace, in seconds")
                 parser.add_argument("-n", "--number", type=int, dest="count",
                   help="number of outputs")
                 parser.add_argument("-v", "--verbose", action="store_true",
@@ -684,9 +686,11 @@ struct __string_t { char s[%d]; };
 
         def _main_loop(self):
                 count_so_far = 0
+                seconds = 0
                 while True:
                         try:
                                 sleep(self.args.interval)
+                                seconds += self.args.interval
                         except KeyboardInterrupt:
                                 exit()
                         print("[%s]" % strftime("%H:%M:%S"))
@@ -695,6 +699,9 @@ struct __string_t { char s[%d]; };
                         count_so_far += 1
                         if self.args.count is not None and \
                            count_so_far >= self.args.count:
+                                exit()
+                        if self.args.duration and \
+                           seconds >= self.args.duration:
                                 exit()
 
         def run(self):

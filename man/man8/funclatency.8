@@ -2,7 +2,7 @@
 .SH NAME
 funclatency \- Time functions and print latency as a histogram.
 .SH SYNOPSIS
-.B funclatency [\-h] [\-p PID] [\-i INTERVAL] [\-T] [\-u] [\-m] [\-F] [\-r] [\-v] pattern
+.B funclatency [\-h] [\-p PID] [\-i INTERVAL] [\-d DURATION] [\-T] [\-u] [\-m] [\-F] [\-r] [\-v] pattern
 .SH DESCRIPTION
 This tool traces function calls and times their duration (latency), and
 shows the latency distribution as a histogram. The time is measured from when
@@ -36,6 +36,9 @@ Trace this process ID only.
 .TP
 \-i INTERVAL
 Print output every interval seconds.
+.TP
+\-d DURATION
+Total duration of trace, in seconds.
 .TP
 \-T
 Include timestamps on output.
@@ -71,6 +74,10 @@ Time vfs_read(), and print the histogram in units of microseconds:
 Time do_nanosleep(), and print the histogram in units of milliseconds:
 #
 .B funclatency \-m do_nanosleep
+.TP
+Time libc open(), and print output every 2 seconds, for duration 10 seconds:
+#
+.B funclatency \-i 2 -d 10 c:read
 .TP
 Time vfs_read(), and print output every 5 seconds, with timestamps:
 #

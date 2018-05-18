@@ -343,7 +343,9 @@ optional arguments:
   -h, --help            show this help message and exit
   -p PID, --pid PID     trace this PID only
   -i INTERVAL, --interval INTERVAL
-                        summary interval, seconds
+                        summary interval, in seconds
+  -d DURATION, --duration DURATION
+			total duration of trace, in seconds
   -T, --timestamp       include timestamp on output
   -u, --microseconds    microsecond histogram
   -m, --milliseconds    millisecond histogram
@@ -357,6 +359,7 @@ examples:
     ./funclatency c:read            # time the read() C library function
     ./funclatency -u vfs_read       # time vfs_read(), in microseconds
     ./funclatency -m do_nanosleep   # time do_nanosleep(), in milliseconds
+    ./funclatency -i 2 -d 10 c:open # output every 2 seconds, for duration 10s
     ./funclatency -mTi 5 vfs_read   # output every 5 seconds, with timestamps
     ./funclatency -p 181 vfs_read   # time process 181 only
     ./funclatency 'vfs_fstat*'      # time both vfs_fstat() and vfs_fstatat()

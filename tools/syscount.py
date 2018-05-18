@@ -17,6 +17,7 @@ import errno
 import itertools
 import subprocess
 import sys
+import signal
 import platform
 
 if sys.version_info.major < 3:
@@ -370,6 +371,9 @@ except Exception as e:
     else:
         raise Exception("ausyscall: command not found")
 
+# signal handler
+def signal_ignore(signal, frame):
+    print()
 
 def handle_errno(errstr):
     try:
@@ -388,6 +392,8 @@ parser = argparse.ArgumentParser(
 parser.add_argument("-p", "--pid", type=int, help="trace only this pid")
 parser.add_argument("-i", "--interval", type=int,
     help="print summary at this interval (seconds)")
+parser.add_argument("-d", "--duration", type=int,
+    help="total duration of trace, in seconds")
 parser.add_argument("-T", "--top", type=int, default=10,
     help="print only the top syscalls by count or latency")
 parser.add_argument("-x", "--failures", action="store_true",
@@ -405,6 +411,10 @@ parser.add_argument("-l", "--list", action="store_true",
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
 args = parser.parse_args()
+if args.duration and not args.interval:
+    args.interval = args.duration
+if not args.interval:
+    args.interval = 99999999
 
 if args.list:
     for grp in izip_longest(*(iter(sorted(syscalls.values())),) * 4):
@@ -545,11 +555,20 @@ def print_latency_stats():
 
 print("Tracing %ssyscalls, printing top %d... Ctrl+C to quit." %
       ("failed " if args.failures else "", args.top))
+exiting = 0 if args.interval else 1
+seconds = 0
 while True:
     try:
-        sleep(args.interval or 999999999)
-        print_stats()
+        sleep(args.interval)
+        seconds += args.interval
     except KeyboardInterrupt:
-        if not args.interval:
-            print_stats()
-        break
+        exiting = 1
+        signal.signal(signal.SIGINT, signal_ignore)
+    if args.duration and seconds >= args.duration:
+        exiting = 1
+
+    print_stats()
+
+    if exiting:
+        print("Detaching...")
+        exit()
