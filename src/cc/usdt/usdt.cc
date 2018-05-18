@@ -19,6 +19,7 @@
 #include <unordered_set>
 
 #include <fcntl.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
 
@@ -393,10 +394,19 @@ extern "C" {
 void *bcc_usdt_new_frompid(int pid, const char *path) {
   USDT::Context *ctx;
 
-  if (!path)
+  if (!path) {
     ctx = new USDT::Context(pid);
-  else
+  } else {
+    struct stat buffer;
+    if (strlen(path) >= 1 && path[0] != '/') {
+      fprintf(stderr, "HINT: Binary path should be absolute.\n\n");
+      return nullptr;
+    } else if (stat(path, &buffer) == -1) {
+      fprintf(stderr, "HINT: Specified binary doesn't exist.\n\n");
+      return nullptr;
+    }
     ctx = new USDT::Context(pid, path);
+  }
   if (!ctx->loaded()) {
     delete ctx;
     return nullptr;
