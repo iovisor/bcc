@@ -151,6 +151,8 @@ optional arguments:
   -p PID, --pid PID     trace only this pid
   -i INTERVAL, --interval INTERVAL
                         print summary at this interval (seconds)
+  -d DURATION, --duration DURATION
+			total duration of trace, in seconds
   -T TOP, --top TOP     print only the top syscalls by count or latency
   -x, --failures        trace only failed syscalls (return < 0)
   -e ERRNO, --errno ERRNO

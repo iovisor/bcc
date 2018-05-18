@@ -348,7 +348,9 @@ optional arguments:
   -z STRING_SIZE, --string-size STRING_SIZE
                         maximum string size to read from char* arguments
   -i INTERVAL, --interval INTERVAL
-                        output interval, in seconds
+                        output interval, in seconds (default 1 second)
+  -d DURATION, --duration DURATION
+			total duration of trace, in seconds
   -n COUNT, --number COUNT
                         number of outputs
   -v, --verbose         print resulting BPF program code before executing

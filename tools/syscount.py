@@ -17,6 +17,7 @@ import errno
 import itertools
 import subprocess
 import sys
+import signal
 import platform
 
 if sys.version_info.major < 3:
@@ -370,6 +371,9 @@ except Exception as e:
     else:
         raise Exception("ausyscall: command not found")
 
+# signal handler
+def signal_ignore(signal, frame):
+    print()
 
 def handle_errno(errstr):
     try:
@@ -388,8 +392,8 @@ parser = argparse.ArgumentParser(
 parser.add_argument("-p", "--pid", type=int, help="trace only this pid")
 parser.add_argument("-i", "--interval", type=int,
     help="print summary at this interval (seconds)")
-parser.add_argument("-d", "--duration",
-    help="total duration of trace, seconds")
+parser.add_argument("-d", "--duration", type=int,
+    help="total duration of trace, in seconds")
 parser.add_argument("-T", "--top", type=int, default=10,
     help="print only the top syscalls by count or latency")
 parser.add_argument("-x", "--failures", action="store_true",
@@ -555,12 +559,12 @@ exiting = 0 if args.interval else 1
 seconds = 0
 while True:
     try:
-        sleep(int(args.interval))
-        seconds += int(args.interval)
+        sleep(args.interval)
+        seconds += args.interval
     except KeyboardInterrupt:
         exiting = 1
         signal.signal(signal.SIGINT, signal_ignore)
-    if args.duration and seconds >= int(args.duration):
+    if args.duration and seconds >= args.duration:
         exiting = 1
 
     print_stats()

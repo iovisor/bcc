@@ -35,6 +35,7 @@ examples = """examples:
     ./funclatency c:read            # time the read() C library function
     ./funclatency -u vfs_read       # time vfs_read(), in microseconds
     ./funclatency -m do_nanosleep   # time do_nanosleep(), in milliseconds
+    ./funclatency -i 2 -d 10 c:open # output every 2 seconds, for duration 10s
     ./funclatency -mTi 5 vfs_read   # output every 5 seconds, with timestamps
     ./funclatency -p 181 vfs_read   # time process 181 only
     ./funclatency 'vfs_fstat*'      # time both vfs_fstat() and vfs_fstatat()
@@ -47,10 +48,10 @@ parser = argparse.ArgumentParser(
     epilog=examples)
 parser.add_argument("-p", "--pid", type=int,
     help="trace this PID only")
-parser.add_argument("-i", "--interval",
-    help="summary interval, seconds")
-parser.add_argument("-d", "--duration",
-    help="total duration of trace, seconds")
+parser.add_argument("-i", "--interval", type=int,
+    help="summary interval, in seconds")
+parser.add_argument("-d", "--duration", type=int,
+    help="total duration of trace, in seconds")
 parser.add_argument("-T", "--timestamp", action="store_true",
     help="include timestamp on output")
 parser.add_argument("-u", "--microseconds", action="store_true",
@@ -236,13 +237,13 @@ seconds = 0
 dist = b.get_table("dist")
 while (1):
     try:
-        sleep(int(args.interval))
-        seconds += int(args.interval)
+        sleep(args.interval)
+        seconds += args.interval
     except KeyboardInterrupt:
         exiting = 1
         # as cleanup can take many seconds, trap Ctrl-C:
         signal.signal(signal.SIGINT, signal_ignore)
-    if args.duration and seconds >= int(args.duration):
+    if args.duration and seconds >= args.duration:
         exiting = 1
 
     print()
