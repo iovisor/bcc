@@ -810,6 +810,25 @@ int test(struct pt_regs *ctx) {
         b = BPF(text=text)
         fn = b.load_func("test", BPF.KPROBE)
 
+    @skipUnless(kernel_version_ge(4,7), "requires kernel >= 4.7")
+    def test_probe_read_tc_ctx(self):
+        text = """
+#include <uapi/linux/pkt_cls.h>
+#include <linux/if_ether.h>
+int test(struct __sk_buff *ctx) {
+    void* data_end = (void*)(long)ctx->data_end;
+    void* data = (void*)(long)ctx->data;
+    if (data + sizeof(struct ethhdr) > data_end)
+        return TC_ACT_SHOT;
+    struct ethhdr *eh = (struct ethhdr *)data;
+    if (eh->h_proto == 0x1)
+        return TC_ACT_SHOT;
+    return TC_ACT_OK;
+}
+"""
+        b = BPF(text=text)
+        fn = b.load_func("test", BPF.SCHED_CLS)
+
 
 if __name__ == "__main__":
     main()
