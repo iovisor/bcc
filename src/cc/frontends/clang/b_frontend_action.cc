@@ -911,7 +911,16 @@ void BTypeConsumer::HandleTranslationUnit(ASTContext &Context) {
       if (fe_.is_rewritable_ext_func(F)) {
         for (auto arg : F->parameters()) {
           if (arg == F->getParamDecl(0)) {
-            probe_visitor1_.set_ctx(arg);
+            /**
+             * Limit tracing of pointers from context to tracing contexts.
+             * We're whitelisting instead of blacklisting to avoid issues with
+             * existing programs if new context types are added in the future.
+             */
+            string type = arg->getType().getAsString();
+            if (type == "struct pt_regs *" ||
+                type == "struct bpf_raw_tracepoint_args *" ||
+                type.substr(0, 19) == "struct tracepoint__")
+              probe_visitor1_.set_ctx(arg);
           } else if (!arg->getType()->isFundamentalType()) {
             probe_visitor1_.set_ptreg(arg);
           }
