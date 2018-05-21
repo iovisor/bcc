@@ -416,6 +416,13 @@ local function CMP_IMM(a, b, op)
 			if pos then
 				code.seen_null_guard = a
 			end
+		-- Inverse NULL pointer check (if a ~= nil)
+		elseif op == 'JNE' and tonumber(b) == 0 and V[a].source then
+			local pos = V[a].source:find('_or_null', 1, true)
+			if pos then
+				code.seen_null_guard = a
+				code.seen_null_guard_inverse = true
+			end
 		end
 	end
 end
@@ -1096,6 +1103,7 @@ local BC = {
 					end
 					-- Record variable state
 					Vstate[c] = V
+					Vcomp = V
 					V = table_copy(V)
 				-- Variable state already set, emit specific compensation code
 				else
@@ -1105,7 +1113,13 @@ local BC = {
 				-- If the condition checks pointer variable against NULL,
 				-- we can assume it will not be NULL in the fall-through block
 				if code.seen_null_guard then
-					local vinfo = V[code.seen_null_guard]
+					local var = code.seen_null_guard
+					-- The null guard can have two forms:
+					--   if x == nil then goto
+					--   if x ~= nil then goto
+					-- First form guarantees that the variable will be non-nil on the following instruction
+					-- Second form guarantees that the variable will be non-nil at the jump target
+					local vinfo = code.seen_null_guard_inverse and Vcomp[var] or V[var]
 					if vinfo.source then
 						local pos = vinfo.source:find('_or_null', 1, true)
 						if pos then
@@ -1122,6 +1136,7 @@ local BC = {
 			end
 			code.seen_cmp = nil
 			code.seen_null_guard = nil
+			code.seen_null_guard_inverse = nil
 		elseif c == code.bc_pc + 1 then -- luacheck: ignore 542
 			-- Eliminate jumps to next immediate instruction
 			-- e.g. 0002    JMP      1 => 0003

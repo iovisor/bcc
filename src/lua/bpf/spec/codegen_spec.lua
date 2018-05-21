@@ -582,11 +582,10 @@ describe('codegen', function()
 					ADD		R3 			#4294967240
 					CALL	R0 			#2 ; map_update_elem
 					MOV		R7 			#0
-					JEQ		R7 			#0 => 0026
+					JEQ		R7 			#0 => 0025
 					MOV		R7 			#1
 					MOV		R8 			R0
 					STXDW	[R10-16] 	R0
-					JEQ		R8 			#0 => 0026
 					XADDW	[R8+0] 		R7
 					MOV		R0 			#0
 					EXIT	R0 			#0
