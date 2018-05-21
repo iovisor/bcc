@@ -100,7 +100,7 @@ local function xadd() error('NYI') end
 builtins.xadd = xadd
 builtins[xadd] = function (e, ret, a, b, off)
 	local vinfo = e.V[a].const
-	assert(vinfo and vinfo.__dissector, 'xadd(a, b) called on non-pointer')
+	assert(vinfo and vinfo.__dissector, 'xadd(a, b[, offset]) called on non-pointer')
 	local w = ffi.sizeof(vinfo.__dissector)
 	-- Calculate structure attribute offsets
 	if e.V[off] and type(e.V[off].const) == 'string' then
@@ -117,7 +117,7 @@ builtins[xadd] = function (e, ret, a, b, off)
 	e.vset(ret)
 	e.vreg(ret, 0, true, ffi.typeof('int32_t'))
 	-- Optimize the NULL check away if provably not NULL
-	if not vinfo.source or vinfo.source:find('_or_null', 1, true) then
+	if not e.V[a].source or e.V[a].source:find('_or_null', 1, true) then
 		e.emit(BPF.JMP + BPF.JEQ + BPF.K, dst_reg, 0, 1, 0) -- if (dst != NULL)
 	end
 	e.emit(BPF.XADD + BPF.STX + const_width[w], dst_reg, src_reg, off or 0, 0)
@@ -166,11 +166,10 @@ end
 builtins[ffi.cast] = function (e, dst, ct, x)
 	assert(e.V[ct].const, 'ffi.cast(ctype, x) called with bad ctype')
 	e.vcopy(dst, x)
-	if not e.V[x].const then
-		e.V[dst].type = ffi.typeof(e.V[ct].const)
-	else
+	if e.V[x].const and type(e.V[x].const) == 'table' then
 		e.V[dst].const.__dissector = ffi.typeof(e.V[ct].const)
 	end
+	e.V[dst].type = ffi.typeof(e.V[ct].const)
 	-- Specific types also encode source of the data
 	-- This is because BPF has different helpers for reading
 	-- different data sources, so variables must track origins.
@@ -178,7 +177,7 @@ builtins[ffi.cast] = function (e, dst, ct, x)
 	-- struct skb     - source of the data is socket buffer
 	-- struct X       - source of the data is probe/tracepoint
 	if ffi.typeof(e.V[ct].const) == ffi.typeof('struct pt_regs') then
-		e.V[dst].source = 'probe'
+		e.V[dst].source = 'ptr_to_probe'
 	end
 end
 
@@ -189,7 +188,14 @@ builtins[ffi.new] = function (e, dst, ct, x)
 	assert(not x, 'NYI: ffi.new(ctype, ...) - initializer is not supported')
 	assert(not cdef.isptr(ct, true), 'NYI: ffi.new(ctype, ...) - ctype MUST NOT be a pointer')
 	e.vset(dst, nil, ct)
+	e.V[dst].source = 'ptr_to_stack'
 	e.V[dst].const = {__base = e.valloc(ffi.sizeof(ct), true), __dissector = ct}
+	-- Set array dissector if created an array
+	-- e.g. if ct is 'char [2]', then dissector is 'char'
+	local elem_type = tostring(ct):match('ctype<(.+)%s%[(%d+)%]>')
+	if elem_type then
+		e.V[dst].const.__dissector = ffi.typeof(elem_type)
+	end
 end
 
 builtins[ffi.copy] = function (e, ret, dst, src)
@@ -198,7 +204,7 @@ builtins[ffi.copy] = function (e, ret, dst, src)
 	-- Specific types also encode source of the data
 	-- struct pt_regs - source of the data is probe
 	-- struct skb     - source of the data is socket buffer
-	if e.V[src].source == 'probe' then
+	if e.V[src].source and e.V[src].source:find('ptr_to_probe', 1, true) then
 		e.reg_alloc(e.tmpvar, 1)
 		-- Load stack pointer to dst, since only load to stack memory is supported
 		-- we have to either use spilled variable or allocated stack memory offset
@@ -379,7 +385,7 @@ builtins[math.log2] = function (e, dst, x)
 	e.vcopy(e.tmpvar, x)
 	local v = e.vreg(e.tmpvar, 2)
 	if cdef.isptr(e.V[x].const) then -- No pointer arithmetics, dereference
-		e.vderef(v, v, {__dissector=ffi.typeof('uint64_t')})
+		e.vderef(v, v, {const = {__dissector=ffi.typeof('uint64_t')}})
 	end
 	-- Invert value to invert all tests, otherwise we would need and+jnz
 	e.emit(BPF.ALU64 + BPF.NEG + BPF.K, v, 0, 0, 0)        -- v = ~v

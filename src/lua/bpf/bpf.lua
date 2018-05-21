@@ -180,8 +180,14 @@ local function vset(var, reg, const, vtype)
 		end
 	end
 	-- Get precise type for CDATA or attempt to narrow numeric constant
-	if not vtype and type(const) == 'cdata' then vtype = ffi.typeof(const) end
+	if not vtype and type(const) == 'cdata' then
+		vtype = ffi.typeof(const)
+	end
 	V[var] = {reg=reg, const=const, type=vtype}
+	-- Track variable source
+	if V[var].const and type(const) == 'table' then
+		V[var].source = V[var].const.source
+	end
 end
 
 -- Materialize (or register) a variable in a register
@@ -238,7 +244,8 @@ end
 local function vderef(dst_reg, src_reg, vinfo)
 	-- Dereference map pointers for primitive types
 	-- BPF doesn't allow pointer arithmetics, so use the entry value
-	local vtype = vinfo.__dissector
+	assert(type(vinfo.const) == 'table' and vinfo.const.__dissector, 'cannot dereference a non-pointer variable')
+	local vtype = vinfo.const.__dissector
 	local w = ffi.sizeof(vtype)
 	assert(const_width[w], 'NYI: sizeof('..tostring(vtype)..') not 1/2/4/8 bytes')
 	if dst_reg ~= src_reg then
@@ -282,6 +289,34 @@ local function valloc(size, blank)
 	return stack_top
 end
 
+-- Turn variable into scalar in register (or constant)
+local function vscalar(a, w)
+	assert(const_width[w], 'sizeof(scalar variable) must be 1/2/4/8')
+	local src_reg
+	-- If source is a pointer, we must dereference it first
+	if cdef.isptr(V[a].type) then
+		src_reg = vreg(a)
+		local tmp_reg = reg_alloc(stackslots, 1) -- Clone variable in tmp register
+		emit(BPF.ALU64 + BPF.MOV + BPF.X, tmp_reg, src_reg, 0, 0)
+		vderef(tmp_reg, tmp_reg, V[a])
+		src_reg = tmp_reg -- Materialize and dereference it
+	-- Source is a value on stack, we must load it first
+	elseif type(V[a].const) == 'table' and V[a].const.__base > 0 then
+		src_reg = vreg(a)
+		emit(BPF.MEM + BPF.LDX + const_width[w], src_reg, 10, -V[a].const.__base, 0)
+		V[a].type = V[a].const.__dissector
+		V[a].const = nil -- Value is dereferenced
+	-- If source is an imm32 number, avoid register load
+	elseif type(V[a].const) == 'number' and w < 8 then
+		return nil, V[a].const
+	-- Load variable from any other source
+	else
+		src_reg = vreg(a)
+	end
+
+	return src_reg, nil
+end
+
 -- Emit compensation code at the end of basic block to unify variable set layout on all block exits
 -- 1. we need to free registers by spilling
 -- 2. fill registers to match other exits from this BB
@@ -289,7 +324,7 @@ local function bb_end(Vcomp)
 	for i,v in pairs(V) do
 		if Vcomp[i] and Vcomp[i].spill and not v.spill then
 			-- Materialize constant to be able to spill
-			if not v.reg and v.const then
+			if not v.reg and cdef.isimmconst(v) then
 				vreg(i)
 			end
 			reg_spill(i)
@@ -300,8 +335,8 @@ local function bb_end(Vcomp)
 			vreg(i, Vcomp[i].reg)
 		end
 		-- Compensate variable metadata change
-		if Vcomp[i] and Vcomp[i].const then
-			V[i].const.source = Vcomp[i].const.source
+		if Vcomp[i] and Vcomp[i].source then
+			V[i].source = Vcomp[i].source
 		end
 	end
 end
@@ -376,8 +411,8 @@ local function CMP_IMM(a, b, op)
 		-- Remember NULL pointer checks as BPF prohibits pointer comparisons
 		-- and repeated checks wouldn't pass the verifier, only comparisons
 		-- against constants are checked.
-		if op == 'JEQ' and tonumber(b) == 0 and c and c.source then
-			local pos = c.source:find('_or_null', 1, true)
+		if op == 'JEQ' and tonumber(b) == 0 and V[a].source then
+			local pos = V[a].source:find('_or_null', 1, true)
 			if pos then
 				code.seen_null_guard = a
 			end
@@ -395,7 +430,7 @@ local function ALU_IMM(dst, a, b, op)
 		vcopy(dst, a)
 		local dst_reg = vreg(dst)
 		if cdef.isptr(V[a].type) then
-			vderef(dst_reg, dst_reg, V[a].const)
+			vderef(dst_reg, dst_reg, V[a])
 			V[dst].type = V[a].const.__dissector
 		else
 			V[dst].type = V[a].type
@@ -418,13 +453,13 @@ local function ALU_REG(dst, a, b, op)
 			-- We have to allocate a temporary register for dereferencing to preserve
 			-- pointer in source variable that MUST NOT be altered
 			reg_alloc(stackslots, 2)
-			vderef(2, src_reg, V[b].const)
+			vderef(2, src_reg, V[b])
 			src_reg = 2
 		end
 		vcopy(dst, a) -- DST may alias B, so copy must occur after we materialize B
 		local dst_reg = vreg(dst)
 		if cdef.isptr(V[a].type) then
-			vderef(dst_reg, dst_reg, V[a].const)
+			vderef(dst_reg, dst_reg, V[a])
 			V[dst].type = V[a].const.__dissector
 		end
 		emit(BPF.ALU64 + BPF[op] + BPF.X, dst_reg, src_reg, 0, 0)
@@ -440,7 +475,8 @@ local function ALU_IMM_NV(dst, a, b, op)
 	ALU_REG(dst, stackslots+1, b, op)
 end
 
-local function LD_ABS(dst, off, w)
+local function LD_ABS(dst, w, off)
+	assert(off, 'LD_ABS called without offset')
 	if w < 8 then
 		local dst_reg = vreg(dst, 0, true, builtins.width_type(w)) -- Reserve R0
 		emit(BPF.LD + BPF.ABS + const_width[w], dst_reg, 0, 0, off)
@@ -476,12 +512,10 @@ local function LD_IND(dst, src, w, off)
 	end
 end
 
-local function LD_FIELD(a, d, w, imm)
-	if imm then
-		LD_ABS(a, imm, w)
-	else
-		LD_IND(a, d, w)
-	end
+local function LD_MEM(dst, src, w, off)
+	local src_reg = vreg(src) -- Must materialize first in case dst == src
+	local dst_reg = vreg(dst, nil, true, builtins.width_type(w)) -- Reserve R0
+	emit(BPF.MEM + BPF.LDX + const_width[w], dst_reg, src_reg, off or 0, 0)
 end
 
 -- @note: This is specific now as it expects registers reserved
@@ -495,22 +529,6 @@ local function LD_IMM_X(dst_reg, src_type, imm, w)
 	end
 end
 
-local function LOAD(dst, src, off, vtype)
-	local base = V[src].const
-	assert(base.__dissector, "NYI: load() on variable that doesn't have dissector")
-	-- Cast to different type if requested
-	vtype = vtype or base.__dissector
-	local w = ffi.sizeof(vtype)
-	assert(w <= 4, 'NYI: load() supports 1/2/4 bytes at a time only')
-	if base.off then -- Absolute address to payload
-		LD_ABS(dst, off + base.off, w)
-	else -- Indirect address to payload
-		LD_IND(dst, src, w, off)
-	end
-	V[dst].type = vtype
-	V[dst].const = nil -- Dissected value is not constant anymore
-end
-
 local function BUILTIN(func, ...)
 	local builtin_export = {
 		-- Compiler primitives (work with variable slots, emit instructions)
@@ -520,6 +538,41 @@ local function BUILTIN(func, ...)
 		LD_IMM_X = LD_IMM_X,
 	}
 	func(builtin_export, ...)
+end
+
+local function LOAD(dst, src, off, vtype)
+	local base = V[src].const
+	assert(base and base.__dissector, 'NYI: load() on variable that doesn\'t have dissector')
+	assert(V[src].source, 'NYI: load() on variable with unknown source')
+	-- Cast to different type if requested
+	vtype = vtype or base.__dissector
+	local w = ffi.sizeof(vtype)
+	assert(const_width[w], 'NYI: load() supports 1/2/4/8 bytes at a time only, wanted ' .. tostring(w))
+	-- Packet access with a dissector (use BPF_LD)
+	if V[src].source:find('ptr_to_pkt', 1, true) then
+		if base.off then -- Absolute address to payload
+			LD_ABS(dst, w, off + base.off)
+		else -- Indirect address to payload
+			LD_IND(dst, src, w, off)
+		end
+	-- Direct access to first argument (skb fields, pt regs, ...)
+	elseif V[src].source:find('ptr_to_ctx', 1, true) then
+		LD_MEM(dst, src, w, off)
+	-- Direct skb access with a dissector (use BPF_MEM)
+	elseif V[src].source:find('ptr_to_skb', 1, true) then
+		LD_MEM(dst, src, w, off)
+	-- Pointer to map-backed memory (use BPF_MEM)
+	elseif V[src].source:find('ptr_to_map_value', 1, true) then
+		LD_MEM(dst, src, w, off)
+	-- Indirect read using probe (uprobe or kprobe, uses helper)
+	elseif V[src].source:find('ptr_to_probe', 1, true) then
+		BUILTIN(builtins[builtins.probe_read], nil, dst, src, vtype, off)
+		V[dst].source = V[src].source -- Builtin handles everything
+	else
+		error('NYI: load() on variable from ' .. V[src].source)
+	end
+	V[dst].type = vtype
+	V[dst].const = nil -- Dissected value is not constant anymore
 end
 
 local function CALL(a, b, d)
@@ -551,7 +604,12 @@ local function CALL(a, b, d)
 		assert(V[a+1].const and V[a+2].const, 'NYI: slice() arguments must be constant')
 		local off = V[a+1].const
 		local vtype = builtins.width_type(V[a+2].const - off)
-		LOAD(a, a, off, vtype)
+		-- Access to packet via packet (use BPF_LD)
+		if V[a].source and V[a].source:find('ptr_to_', 1, true) then
+			LOAD(a, a, off, vtype)
+		else
+			error('NYI: <dissector>.slice(a, b) on non-pointer memory ' .. (V[a].source or 'unknown'))
+		end
 	-- Strict builtins cannot be expanded on compile-time
 	elseif builtins_strict[func] and builtin then
 		args = {a}
@@ -559,6 +617,7 @@ local function CALL(a, b, d)
 		BUILTIN(builtin, unpack(args))
 	-- Attempt compile-time call expansion (expects all argument compile-time known)
 	else
+		assert(const, 'NYI: CALL attempted on constant arguments, but at least one argument is not constant')
 		V[a].const = func(unpack(args))
 	end
 end
@@ -612,7 +671,8 @@ local function MAP_GET(dst, map_var, key, imm)
 	MAP_INIT(map_var, key, imm)
 	-- Flag as pointer type and associate dissector for map value type
 	vreg(dst, 0, true, ffi.typeof('uint8_t *'))
-	V[dst].const = {__dissector=map.val_type, source='ptr_to_map_value_or_null'}
+	V[dst].const = {__dissector=map.val_type}
+	V[dst].source = 'ptr_to_map_value_or_null'
 	emit(BPF.JMP + BPF.CALL, 0, 0, 0, HELPER.map_lookup_elem)
 	V[stackslots].reg = nil -- Free temporary registers
 end
@@ -652,7 +712,7 @@ local function MAP_SET(map_var, key, key_imm, src)
 	elseif V[src].reg and pod_type then
 		-- Value is a pointer, derefernce it and spill it
 		if cdef.isptr(V[src].type) then
-			vderef(3, V[src].reg, V[src].const)
+			vderef(3, V[src].reg, V[src])
 			emit(BPF.MEM + BPF.STX + w, 10, 3, -sp, 0)
 		else
 			emit(BPF.MEM + BPF.STX + w, 10, V[src].reg, -sp, 0)
@@ -667,7 +727,7 @@ local function MAP_SET(map_var, key, key_imm, src)
 				emit(BPF.JMP + BPF.CALL, 0, 0, 0, HELPER.map_update_elem)
 				return
 			end
-			vderef(3, V[src].reg, V[src].const)
+			vderef(3, V[src].reg, V[src])
 			emit(BPF.MEM + BPF.STX + w, 10, 3, -sp, 0)
 		else
 			sp = V[src].spill
@@ -763,39 +823,96 @@ local BC = {
 			vset(a, nil, env[c])
 		else error(string.format("undefined upvalue '%s'", c)) end
 	end,
-	TGETB = function (a, b, _, d) -- TGETB (A = B[D])
-		if a ~= b then vset(a) end
-		local base = V[b].const
-		if base.__map then -- BPF map read (constant)
-			MAP_GET(a, b, nil, d)
-		-- Specialise PTR[0] as dereference operator
-		elseif cdef.isptr(V[b].type) and d == 0 then
-			vcopy(a, b)
-			local dst_reg = vreg(a)
-			vderef(dst_reg, dst_reg, V[a].const)
-			V[a].type = V[a].const.__dissector
-		else
-			LOAD(a, b, d, ffi.typeof('uint8_t'))
-		end
-	end,
 	TSETB = function (a, b, _, d) -- TSETB (B[D] = A)
-		if V[b].const.__map then -- BPF map read (constant)
+		assert(V[b] and type(V[b].const) == 'table', 'NYI: B[D] where B is not Lua table, BPF map, or pointer')
+		local vinfo = V[b].const
+		if vinfo.__map then -- BPF map read (constant)
 			return MAP_SET(b, nil, d, a) -- D is literal
-		elseif V[b].const and V[b].const and V[a].const then
-			V[b].const[V[d].const] = V[a].const
-		else error('NYI: B[D] = A, where B is not Lua table or BPF map')
+		elseif vinfo.__dissector then
+			assert(vinfo.__dissector, 'NYI: B[D] where B does not have a known element size')
+			local w = ffi.sizeof(vinfo.__dissector)
+			-- TODO: support vectorized moves larger than register width
+			assert(const_width[w], 'B[C] = A, sizeof(A) must be 1/2/4/8')
+			local src_reg, const = vscalar(a, w)
+			-- If changing map value, write to absolute address + offset
+			if V[b].source and V[b].source:find('ptr_to_map_value', 1, true) then
+				local dst_reg = vreg(b)
+				-- Optimization: immediate values (imm32) can be stored directly
+				if type(const) == 'number' then
+					emit(BPF.MEM + BPF.ST + const_width[w], dst_reg, 0, d, const)
+				else
+					emit(BPF.MEM + BPF.STX + const_width[w], dst_reg, src_reg, d, 0)
+				end
+			-- Table is already on stack, write to vinfo-relative address
+			elseif vinfo.__base then
+				-- Optimization: immediate values (imm32) can be stored directly
+				if type(const) == 'number' then
+					emit(BPF.MEM + BPF.ST + const_width[w], 10, 0, -vinfo.__base + (d * w), const)
+				else
+					emit(BPF.MEM + BPF.STX + const_width[w], 10, src_reg, -vinfo.__base + (d * w), 0)
+				end
+			else
+				error('NYI: B[D] where B is not Lua table, BPF map, or pointer')
+			end
+		elseif vinfo and vinfo and V[a].const then
+			vinfo[V[d].const] = V[a].const
+		else
+			error('NYI: B[D] where B is not Lua table, BPF map, or pointer')
 		end
 	end,
 	TSETV = function (a, b, _, d) -- TSETV (B[D] = A)
-		if V[b].const.__map then -- BPF map read (constant)
+		assert(V[b] and type(V[b].const) == 'table', 'NYI: B[D] where B is not Lua table, BPF map, or pointer')
+		local vinfo = V[b].const
+		if vinfo.__map then -- BPF map read (constant)
 			return MAP_SET(b, d, nil, a) -- D is variable
-		elseif V[b].const and V[d].const and V[a].const then
-			V[b].const[V[d].const] = V[a].const
-		else error('NYI: B[D] = A, where B is not Lua table or BPF map')
+		elseif vinfo.__dissector then
+			assert(vinfo.__dissector, 'NYI: B[D] where B does not have a known element size')
+			local w = ffi.sizeof(vinfo.__dissector)
+			-- TODO: support vectorized moves larger than register width
+			assert(const_width[w], 'B[C] = A, sizeof(A) must be 1/2/4/8')
+			local src_reg, const = vscalar(a, w)
+			-- If changing map value, write to absolute address + offset
+			if V[b].source and V[b].source:find('ptr_to_map_value', 1, true) then
+				-- Calculate variable address from two registers
+				local tmp_var = stackslots + 1
+				vset(tmp_var, nil, d)
+				ALU_REG(tmp_var, tmp_var, b, 'ADD')
+				local dst_reg = vreg(tmp_var)
+				V[tmp_var].reg = nil -- Only temporary allocation
+				-- Optimization: immediate values (imm32) can be stored directly
+				if type(const) == 'number' then
+					emit(BPF.MEM + BPF.ST + const_width[w], dst_reg, 0, 0, const)
+				else
+					emit(BPF.MEM + BPF.STX + const_width[w], dst_reg, src_reg, 0, 0)
+				end
+			-- Table is already on stack, write to vinfo-relative address
+			elseif vinfo.__base then
+				-- Calculate variable address from two registers
+				local tmp_var = stackslots + 1
+				vcopy(tmp_var, d)                       -- Element position
+				if w > 1 then
+					ALU_IMM(tmp_var, tmp_var, w, 'MUL') -- multiply by element size
+				end
+				local dst_reg = vreg(tmp_var)           -- add R10 (stack pointer)
+				emit(BPF.ALU64 + BPF.ADD + BPF.X, dst_reg, 10, 0, 0)
+				V[tmp_var].reg = nil -- Only temporary allocation
+				-- Optimization: immediate values (imm32) can be stored directly
+				if type(const) == 'number' then
+					emit(BPF.MEM + BPF.ST + const_width[w], dst_reg, 0, -vinfo.__base, const)
+				else
+					emit(BPF.MEM + BPF.STX + const_width[w], dst_reg, src_reg, -vinfo.__base, 0)
+				end
+			else
+				error('NYI: B[D] where B is not Lua table, BPF map, or pointer')
+			end
+		elseif vinfo and V[d].const and V[a].const then
+			vinfo[V[d].const] = V[a].const
+		else
+			error('NYI: B[D] where B is not Lua table, BPF map, or pointer')
 		end
 	end,
 	TSETS = function (a, b, c, _) -- TSETS (B[C] = A)
-		assert(V[b] and V[b].const, 'NYI: B[D] where B is not Lua table or BPF map')
+		assert(V[b] and V[b].const, 'NYI: B[D] where B is not Lua table, BPF map, or pointer')
 		local base = V[b].const
 		if base.__dissector then
 			local ofs,bpos = ffi.offsetof(base.__dissector, c)
@@ -803,44 +920,75 @@ local BC = {
 			local w = builtins.sizeofattr(base.__dissector, c)
 			-- TODO: support vectorized moves larger than register width
 			assert(const_width[w], 'B[C] = A, sizeof(A) must be 1/2/4/8')
-			local src_reg = vreg(a)
-			-- If source is a pointer, we must dereference it first
-			if cdef.isptr(V[a].type) then
-				local tmp_reg = reg_alloc(stackslots, 1) -- Clone variable in tmp register
-				emit(BPF.ALU64 + BPF.MOV + BPF.X, tmp_reg, src_reg, 0, 0)
-				vderef(tmp_reg, tmp_reg, V[a].const)
-				src_reg = tmp_reg -- Materialize and dereference it
-			-- Source is a value on stack, we must load it first
-			elseif V[a].const and V[a].const.__base > 0 then
-				emit(BPF.MEM + BPF.LDX + const_width[w], src_reg, 10, -V[a].const.__base, 0)
-				V[a].type = V[a].const.__dissector
-				V[a].const = nil -- Value is dereferenced
-			end
+			local src_reg, const = vscalar(a, w)
 			-- If changing map value, write to absolute address + offset
-			if base.source and base.source:find('ptr_to_map_value', 1, true) then
+			if V[b].source and V[b].source:find('ptr_to_map_value', 1, true) then
 				local dst_reg = vreg(b)
-				emit(BPF.MEM + BPF.STX + const_width[w], dst_reg, src_reg, ofs, 0)
-			else -- Table is already on stack, write to base-relative address
-				emit(BPF.MEM + BPF.STX + const_width[w], 10, src_reg, -base.__base + ofs, 0)
+				-- Optimization: immediate values (imm32) can be stored directly
+				if type(const) == 'number' then
+					emit(BPF.MEM + BPF.ST + const_width[w], dst_reg, 0, ofs, const)
+				else
+					emit(BPF.MEM + BPF.STX + const_width[w], dst_reg, src_reg, ofs, 0)
+				end
+			-- Table is already on stack, write to base-relative address
+			elseif base.__base then
+				-- Optimization: immediate values (imm32) can be stored directly
+				if type(const) == 'number' and w < 8 then
+					emit(BPF.MEM + BPF.ST + const_width[w], 10, 0, -base.__base + ofs, const)
+				else
+					emit(BPF.MEM + BPF.STX + const_width[w], 10, src_reg, -base.__base + ofs, 0)
+				end
+			else
+				error('NYI: B[C] where B is not Lua table, BPF map, or pointer')
 			end
 		elseif V[a].const then
 			base[c] = V[a].const
-		else error('NYI: B[C] = A, where B is not Lua table or BPF map')
+		else
+			error('NYI: B[C] where B is not Lua table, BPF map, or pointer')
+		end
+	end,
+	TGETB = function (a, b, _, d) -- TGETB (A = B[D])
+		local base = V[b].const
+		assert(type(base) == 'table', 'NYI: B[C] where C is string and B not Lua table or BPF map')
+		if a ~= b then vset(a) end
+		if base.__map then -- BPF map read (constant)
+			MAP_GET(a, b, nil, d)
+		-- Pointer access with a dissector (traditional uses BPF_LD, direct uses BPF_MEM)
+		elseif V[b].source and V[b].source:find('ptr_to_') then
+			local vtype = base.__dissector and base.__dissector or ffi.typeof('uint8_t')
+			LOAD(a, b, d, vtype)
+		-- Specialise PTR[0] as dereference operator
+		elseif cdef.isptr(V[b].type) and d == 0 then
+			vcopy(a, b)
+			local dst_reg = vreg(a)
+			vderef(dst_reg, dst_reg, V[a])
+			V[a].type = V[a].const.__dissector
+		else
+			error('NYI: A = B[D], where B is not Lua table or packet dissector or pointer dereference')
 		end
 	end,
 	TGETV = function (a, b, _, d) -- TGETV (A = B[D])
-		assert(V[b] and V[b].const, 'NYI: B[D] where B is not Lua table or BPF map')
+		local base = V[b].const
+		assert(type(base) == 'table', 'NYI: B[C] where C is string and B not Lua table or BPF map')
 		if a ~= b then vset(a) end
-		if V[b].const.__map then -- BPF map read
+		if base.__map then -- BPF map read
 			MAP_GET(a, b, d)
-		elseif V[b].const == env.pkt then  -- Raw packet, no offset
-			LD_FIELD(a, d, 1, V[d].const)
-		else V[a].const = V[b].const[V[d].const] end
+		-- Pointer access with a dissector (traditional uses BPF_LD, direct uses BPF_MEM)
+		elseif V[b].source and V[b].source:find('ptr_to_') then
+			local vtype = base.__dissector and base.__dissector or ffi.typeof('uint8_t')
+			LOAD(a, b, d, vtype)
+		-- Constant dereference
+		elseif type(V[d].const) == 'number' then
+			V[a].const = base[V[d].const]
+		else
+			error('NYI: A = B[D], where B is not Lua table or packet dissector or pointer dereference')
+		end
 	end,
 	TGETS = function (a, b, c, _) -- TGETS (A = B[C])
-		assert(V[b] and V[b].const, 'NYI: B[C] where C is string and B not Lua table or BPF map')
 		local base = V[b].const
-		if type(base) == 'table' and base.__dissector then
+		assert(type(base) == 'table', 'NYI: B[C] where C is string and B not Lua table or BPF map')
+		if a ~= b then vset(a) end
+		if base.__dissector then
 			local ofs,bpos,bsize = ffi.offsetof(base.__dissector, c)
 			-- Resolve table key using metatable
 			if not ofs and type(base.__dissector[c]) == 'string' then
@@ -858,35 +1006,20 @@ local BC = {
 				-- Dissected value is probably not constant anymore
 				local new_const = nil
 				local w, atype = builtins.sizeofattr(base.__dissector, c)
-				-- Simple register load, get absolute offset or R-relative
-				if base.source and base.source:find('ptr_to_', 1, true) then -- R-relative addressing
-					local src_reg = vreg(b, nil, true)
-					local dst_reg = vreg(a, nil, true)
-					assert(const_width[w], 'NYI: sizeof('..tostring(base.__dissector)..'.'..c..') not 1/2/4/8 bytes')
-					-- The pointer must be checked for NULL if possible
-					-- It isn't done automatically as there is no clear semantics on what to do
-					-- when deferencing a NULL pointer (either program exit or branch).
-					emit(BPF.MEM + BPF.LDX + const_width[w], dst_reg, src_reg, ofs, 0)
 				-- [SP+K] addressing using R10 (stack pointer)
 				-- Doesn't need to be checked for NULL
-				elseif not base.source and base.__base and base.__base > 0 then
+				if base.__base and base.__base > 0 then
 					if cdef.isptr(atype) then -- If the member is pointer type, update base pointer with offset
 						new_const = {__base = base.__base-ofs}
 					else
 						local dst_reg = vreg(a, nil, true)
 						emit(BPF.MEM + BPF.LDX + const_width[w], dst_reg, 10, -base.__base+ofs, 0)
 					end
-				-- Indirect read using probe (uprobe or kprobe, uses helper)
-				elseif base.source == 'ptr_to_probe' then
-					BUILTIN(builtins[builtins.probe_read], nil, a, b, atype, ofs)
-					V[a].source = V[b].source -- Builtin handles everything
-					return
-				-- Absolute address to skb payload (not a direct skb access)
-				elseif base.off then
-					LD_ABS(a, ofs + base.off, w)
-				-- Indirect address to skb payload
+				-- Pointer access with a dissector (traditional uses BPF_LD, direct uses BPF_MEM)
+				elseif V[b].source and V[b].source:find('ptr_to_') then
+					LOAD(a, b, ofs, atype)
 				else
-					LD_IND(a, b, w, ofs)
+					error('NYI: B[C] where B is not Lua table, BPF map, or pointer')
 				end
 				-- Bitfield, must be further narrowed with a bitmask/shift
 				if bpos then
@@ -906,8 +1039,20 @@ local BC = {
 				V[a].type = atype
 				V[a].const = new_const
 				V[a].source = V[b].source
+				-- Track direct access to skb data
+				-- see https://www.kernel.org/doc/Documentation/networking/filter.txt "Direct packet access"
+				if ffi.istype(base.__dissector, ffi.typeof('struct sk_buff')) then
+					-- Direct access to skb uses skb->data and skb->data_end
+					-- which are encoded as u32, but are actually pointers
+					if c == 'data' or c == 'data_end' then
+						V[a].const = {__dissector = ffi.typeof('uint8_t')}
+						V[a].source = 'ptr_to_skb'
+					end
+				end
 			end
-		else V[a].const = base[c] end
+		else
+			V[a].const = base[c]
+		end
 	end,
 	-- Loops and branches
 	CALLM = function (a, b, _, d) -- A = A(A+1, ..., A+D+MULTRES)
@@ -922,8 +1067,7 @@ local BC = {
 		for i, _ in pairs(V) do
 			if i >= a then V[i] = {} end
 		end
-		-- Cross basic block boundary if the jump is conditional or
-		-- when the jump target isn't provably unreachable
+		-- Cross basic block boundary if the jump target isn't provably unreachable
 		local val = code.fixup[c] or {}
 		if code.seen_cmp and code.seen_cmp ~= ALWAYS then
 			if code.seen_cmp ~= NEVER then -- Do not emit the jump or fixup
@@ -945,7 +1089,7 @@ local BC = {
 					end
 					-- Force materialization of constants at the end of BB
 					for i, v in pairs(V) do
-						if not v.reg and v.const and not is_proxy(v.const) then
+						if not v.reg and cdef.isimmconst(v) then
 							vreg(i, tmp_reg) -- Load to TMP register (not saved)
 							reg_spill(i) -- Spill caller-saved registers
 						end
@@ -961,10 +1105,12 @@ local BC = {
 				-- If the condition checks pointer variable against NULL,
 				-- we can assume it will not be NULL in the fall-through block
 				if code.seen_null_guard then
-					local vinfo = V[code.seen_null_guard].const
-					local pos = vinfo.source:find('_or_null', 1, true)
-					if pos then
-						vinfo.source = vinfo.source:sub(1, pos - 1)
+					local vinfo = V[code.seen_null_guard]
+					if vinfo.source then
+						local pos = vinfo.source:find('_or_null', 1, true)
+						if pos then
+							vinfo.source = vinfo.source:sub(1, pos - 1)
+						end
 					end
 				end
 				-- Reemit CMP insn
@@ -976,28 +1122,51 @@ local BC = {
 			end
 			code.seen_cmp = nil
 			code.seen_null_guard = nil
+		elseif c == code.bc_pc + 1 then -- luacheck: ignore 542
+			-- Eliminate jumps to next immediate instruction
+			-- e.g. 0002    JMP      1 => 0003
 		else
 			-- We need to synthesise a condition that's always true, however
 			-- BPF prohibits pointer arithmetic to prevent pointer leaks
 			-- so we have to clear out one register and use it for cmp that's always true
 			local dst_reg = reg_alloc(stackslots)
+			V[stackslots].reg = nil -- Only temporary allocation
+			-- First branch point, emit compensation code
+			local Vcomp = Vstate[c]
+			if not Vcomp then
+				-- Force materialization of constants at the end of BB
+				for i, v in pairs(V) do
+					if not v.reg and cdef.isimmconst(v) then
+						vreg(i, dst_reg) -- Load to TMP register (not saved)
+						reg_spill(i) -- Spill caller-saved registers
+					end
+				end
+				-- Record variable state
+				Vstate[c] = V
+				V = table_copy(V)
+			-- Variable state already set, emit specific compensation code
+			else
+				bb_end(Vcomp)
+			end
 			emit(BPF.ALU64 + BPF.MOV + BPF.K, dst_reg, 0, 0, 0)
 			emit(BPF.JMP + BPF.JEQ + BPF.K, dst_reg, 0, 0xffff, 0)
-			V[stackslots].reg = nil -- Only temporary allocation
 			table.insert(val, code.pc-1) -- Fixup JMP target
 			code.reachable = false -- Code following the JMP is not reachable
 			code.fixup[c] = val
 		end
 	end,
 	RET1 = function (a, _, _, _) -- RET1
+		-- Free optimisation: spilled variable will not be filled again
+		for i, v in pairs(V) do
+			if i ~= a then v.reg = nil end
+		end
 		if V[a].reg ~= 0 then vreg(a, 0) end
-		-- Dereference pointer variables
+		-- Convenience: dereference pointer variables
+		-- e.g. 'return map[k]' will return actual map value, not pointer
 		if cdef.isptr(V[a].type) then
-			vderef(0, 0, V[a].const)
+			vderef(0, 0, V[a])
 		end
 		emit(BPF.JMP + BPF.EXIT, 0, 0, 0, 0)
-		-- Free optimisation: spilled variable will not be filled again
-		for _,v in pairs(V) do if v.reg == 0 then v.reg = nil end end
 		code.reachable = false
 	end,
 	RET0 = function (_, _, _, _) -- RET0
@@ -1009,12 +1178,19 @@ local BC = {
 		return code
 	end
 }
+
+-- Composite instructions
+function BC.CALLT(a, _, _, d) -- Tailcall: return A(A+1, ..., A+D-1)
+	CALL(a, 1, d)
+	BC.RET1(a)
+end
+
 -- Always initialize R6 with R1 context
 emit(BPF.ALU64 + BPF.MOV + BPF.X, 6, 1, 0, 0)
 -- Register R6 as context variable (first argument)
 if params and params > 0 then
 	vset(0, 6, param_types[1] or proto.skb)
-	V[0].source = V[0].const.source -- Propagate source annotation from typeinfo
+	assert(V[0].source == V[0].const.source) -- Propagate source annotation from typeinfo
 end
 -- Register tmpvars
 vset(stackslots)
@@ -1029,8 +1205,22 @@ return setmetatable(BC, {
 	__call = function (t, op, a, b, c, d)
 		code.bc_pc = code.bc_pc + 1
 		-- Exitting BB straight through, emit compensation code
-		if Vstate[code.bc_pc] and code.reachable then
-			bb_end(Vstate[code.bc_pc])
+		if Vstate[code.bc_pc] then
+			if code.reachable then
+				-- Instruction is reachable from previous line
+				-- so we must make the variable allocation consistent
+				-- with the variable allocation at the jump source
+				-- e.g. 0001 x:R0 = 5
+				--      0002 if rand() then goto 0005
+				--      0003 x:R0 -> x:stack
+				--      0004 y:R0 = 5
+				--      0005 x:? = 10 <-- x was in R0 before jump, and stack after jump
+				bb_end(Vstate[code.bc_pc])
+			else
+				-- Instruction isn't reachable from previous line, restore variable layout
+				-- e.g. RET or condition-less JMP on previous line
+				V = table_copy(Vstate[code.bc_pc])
+			end
 		end
 		-- Perform fixup of jump targets
 		-- We need to do this because the number of consumed and emitted
@@ -1066,8 +1256,8 @@ local function dump_mem(cls, ins, _, fuse)
 	local dst = cls < 2 and 'R'..ins.dst_reg or string.format('[R%d%+d]', ins.dst_reg, off)
 	local src = cls % 2 == 0 and '#'..ins.imm or 'R'..ins.src_reg
 	if cls == BPF.LDX then src = string.format('[R%d%+d]', ins.src_reg, off) end
-	if mode == BPF.ABS then src = string.format('[%d]', ins.imm) end
-	if mode == BPF.IND then src = string.format('[R%d%+d]', ins.src_reg, ins.imm) end
+	if mode == BPF.ABS then src = string.format('skb[%d]', ins.imm) end
+	if mode == BPF.IND then src = string.format('skb[R%d%+d]', ins.src_reg, ins.imm) end
 	return string.format('%s\t%s\t%s', fuse and '' or name, fuse and '' or dst, src)
 end
 
@@ -1091,26 +1281,37 @@ local function dump_alu(cls, ins, pc)
 	return string.format('%s\t%s\t%s%s', name, 'R'..ins.dst_reg, src, target)
 end
 
-local function dump(code)
+local function dump_string(code, off, hide_counter)
 	if not code then return end
-	print(string.format('-- BPF %s:0-%u', code.insn, code.pc))
 	local cls_map = {
 		[0] = dump_mem, [1] = dump_mem, [2] = dump_mem, [3] = dump_mem,
 		[4] = dump_alu, [5] = dump_alu, [7] = dump_alu,
 	}
+	local result = {}
 	local fused = false
-	for i = 0, code.pc - 1 do
+	for i = off or 0, code.pc - 1 do
 		local ins = code.insn[i]
 		local cls = bit.band(ins.code, 0x07)
 		local line = cls_map[cls](cls, ins, i, fused)
-		print(string.format('%04u\t%s', i, line))
+		if hide_counter then
+			table.insert(result, line)
+		else
+			table.insert(result, string.format('%04u\t%s', i, line))
+		end
 		fused = string.find(line, 'LDDW', 1)
 	end
+	return table.concat(result, '\n')
+end
+
+local function dump(code)
+	if not code then return end
+	print(string.format('-- BPF %s:0-%u', code.insn, code.pc))
+	print(dump_string(code))
 end
 
 local function compile(prog, params)
 	-- Create code emitter sandbox, include caller locals
-	local env = { pkt=proto.pkt, BPF=BPF, ffi=ffi }
+	local env = { pkt=proto.pkt, eth=proto.pkt, BPF=BPF, ffi=ffi }
 	-- Include upvalues up to 4 nested scopes back
 	-- the narrower scope overrides broader scope
 	for k = 5, 2, -1 do
@@ -1144,9 +1345,9 @@ local function compile(prog, params)
 			print(debug.traceback())
 	end
 	for _,op,a,b,c,d in bytecode.decoder(prog) do
-		local ok, res, err = xpcall(E,on_err,op,a,b,c,d)
+		local ok, _, err = xpcall(E,on_err,op,a,b,c,d)
 		if not ok then
-			return nil, res, err
+			return nil, err
 		end
 	end
 	return E:compile()
@@ -1235,7 +1436,7 @@ local tracepoint_mt = {
 	__index = {
 		bpf = function (t, prog)
 			if type(prog) ~= 'table' then
-				-- Create protocol parser with source=probe
+				-- Create protocol parser with source probe
 				prog = compile(prog, {proto.type(t.type, {source='ptr_to_probe'})})
 			end
 			-- Load the BPF program
@@ -1298,6 +1499,7 @@ end
 return setmetatable({
 	new = create_emitter,
 	dump = dump,
+	dump_string = dump_string,
 	maps = {},
 	map = function (type, max_entries, key_ctype, val_ctype)
 		if not key_ctype then key_ctype = ffi.typeof('uint32_t') end

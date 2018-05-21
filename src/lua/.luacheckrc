@@ -1,6 +1,10 @@
 std = 'luajit'
 
-new_read_globals = {}
+new_read_globals = {
+	'assert',
+	'describe',
+	'it',
+}
 new_globals = {
 	'math',
 }
