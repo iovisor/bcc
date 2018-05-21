@@ -213,8 +213,9 @@ def print_event(cpu, data, size):
                 print("%-8.3f" % (time.time() - start_ts), end="")
             ppid = get_ppid(event.pid)
             ppid = b"%d" % ppid if ppid > 0 else b"?"
+            argv_text = b' '.join(argv[event.pid]).replace(b'\n', b'\\n')
             printb(b"%-16s %-6d %-6s %3d %s" % (event.comm, event.pid,
-                   ppid, event.retval, b' '.join(argv[event.pid])))
+                   ppid, event.retval, argv_text))
         try:
             del(argv[event.pid])
         except Exception:
