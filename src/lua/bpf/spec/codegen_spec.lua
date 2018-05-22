@@ -73,6 +73,50 @@ describe('codegen', function()
 				]]
 			}
 		end)
+		it('materialize constant longer than i32', function()
+			compile {
+				input = function ()
+					return 4294967295
+				end,
+				expect = [[
+					LDDW	R0	#4294967295
+					EXIT	R0	#0
+				]]
+			}
+		end)
+		it('materialize cdata constant', function()
+			compile {
+				input = function ()
+					return 5ULL
+				end,
+				expect = [[
+					LDDW	R0	#5 -- composed instruction
+					EXIT	R0	#0
+				]]
+			}
+		end)
+		it('materialize signed cdata constant', function()
+			compile {
+				input = function ()
+					return 5LL
+				end,
+				expect = [[
+					LDDW	R0	#5 -- composed instruction
+					EXIT	R0	#0
+				]]
+			}
+		end)
+		it('materialize coercible numeric cdata constant', function()
+			compile {
+				input = function ()
+					return 0x00005
+				end,
+				expect = [[
+					MOV		R0	#5
+					EXIT	R0	#0
+				]]
+			}
+		end)
 		it('materialize constant through variable', function()
 		compile {
 			input = function ()
@@ -811,6 +855,27 @@ describe('codegen', function()
 				]]
 			}
 		end)
+		it('condition with cdata constant return', function()
+			local cdata = 2ULL
+			compile {
+				input = function (skb)
+					local v = eth.ip.tos
+					if v then
+						return cdata + 1
+					else
+						return 0
+					end
+				end,
+				expect = [[
+					LDB		R0 			skb[15]
+					JEQ		R0 			#0 => 0006
+					LDDW	R0 			#3
+					EXIT	R0 			#0
+					MOV		R0 			#0 -- 0006 jump target
+					EXIT	R0 			#0
+				]]
+			}
+		end)
 		it('condition with constant return (inversed)', function()
 			compile {
 				input = function (skb)
@@ -909,5 +974,62 @@ describe('codegen', function()
 				]]
 			}
 		end)
+		it('nested condition with variable shadowing', function()
+			compile {
+				input = function (skb)
+					local v = 0
+					local tos = eth.ip.tos
+					if tos then
+						local v = 0 -- luacheck: ignore 231
+						if tos > 5 then
+							v = 5 -- changing shadowing variable
+						end
+					else
+						v = 1
+					end
+					return v
+				end,
+				expect = [[
+					LDB		R0 			skb[15]
+					MOV		R1 			#0
+					STXDW	[R10-16] 	R1 -- materialize v = 0
+					JEQ		R0 			#0 => 0011 -- if not tos
+					MOV		R7 			#5
+					MOV		R1 			#0
+					STXDW	[R10-32] 	R1 -- materialize shadowing variable
+					JGE		R7 			R0 => 0013 -- if 5 > tos
+					MOV		R7 			#0 -- erased 'v = 5' dead store
+					JEQ		R7 			#0 => 0013
+					MOV		R7 			#1 -- 0011 jump target
+					STXDW	[R10-16]	R7 -- materialize v = 1
+					LDXDW	R0 			[R10-16] -- 0013 jump target
+					EXIT	R0 			#0
+				]]
+			}
+		end)
+		it('condition materializes shadowing variable at the end of BB', function()
+			compile {
+				input = function (skb)
+					local v = time()
+					local v1 = 0 -- luacheck: ignore 231
+					if eth.ip.tos then
+						v1 = v
+					end
+				end,
+				expect = [[
+					CALL	R0 			#5 ; ktime_get_ns
+					STXDW	[R10-16] 	R0
+					LDB		R0 			skb[15]
+					MOV		R1 			#0
+					STXDW	[R10-24] 	R1 -- materialize v1 = 0
+					JEQ		R0 			#0 => 0009
+					LDXDW	R7 			[R10-16]
+					STXDW	[R10-24] 	R7 -- v1 = v0
+					MOV		R0 #0
+					EXIT	R0 #0
+				]]
+			}
+		end)
+
 	end)
 end)

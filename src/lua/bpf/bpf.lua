@@ -115,6 +115,7 @@ end
 
 local function reg_spill(var)
 	local vinfo = V[var]
+	assert(vinfo.reg, 'attempt to spill VAR that doesn\'t have an allocated register')
 	vinfo.spill = (var + 1) * ffi.sizeof('uint64_t') -- Index by (variable number) * (register width)
 	emit(BPF.MEM + BPF.STX + BPF.DW, 10, vinfo.reg, -vinfo.spill, 0)
 	vinfo.reg = nil
@@ -122,6 +123,7 @@ end
 
 local function reg_fill(var, reg)
 	local vinfo = V[var]
+	assert(reg, 'attempt to fill variable to register but not register is allocated')
 	assert(vinfo.spill, 'attempt to fill register with a VAR that isn\'t spilled')
 	emit(BPF.MEM + BPF.LDX + BPF.DW, reg, 10, -vinfo.spill, 0)
 	vinfo.reg = reg
@@ -323,8 +325,8 @@ end
 local function bb_end(Vcomp)
 	for i,v in pairs(V) do
 		if Vcomp[i] and Vcomp[i].spill and not v.spill then
-			-- Materialize constant to be able to spill
-			if not v.reg and cdef.isimmconst(v) then
+			-- Materialize constant or shadowing variable to be able to spill
+			if not v.reg and (v.shadow or cdef.isimmconst(v)) then
 				vreg(i)
 			end
 			reg_spill(i)
@@ -430,7 +432,7 @@ end
 local function ALU_IMM(dst, a, b, op)
 	-- Fold compile-time expressions
 	if V[a].const and not is_proxy(V[a].const) then
-			assert(type(V[a].const) == 'number', 'VAR '..a..' must be numeric')
+			assert(cdef.isimmconst(V[a]), 'VAR '..a..' must be numeric')
 			vset(dst, nil, const_expr[op](V[a].const, b))
 	-- Now we need to materialize dissected value at DST, and add it
 	else
@@ -449,8 +451,8 @@ end
 local function ALU_REG(dst, a, b, op)
 	-- Fold compile-time expressions
 	if V[a].const and not (is_proxy(V[a].const) or is_proxy(V[b].const)) then
-		assert(type(V[a].const) == 'number', 'VAR '..a..' must be numeric')
-		assert(type(V[b].const) == 'number', 'VAR '..b..' must be numeric')
+		assert(cdef.isimmconst(V[a]), 'VAR '..a..' must be numeric')
+		assert(cdef.isimmconst(V[b]), 'VAR '..b..' must be numeric')
 		if type(op) == 'string' then op = const_expr[op] end
 		vcopy(dst, a)
 		V[dst].const = op(V[a].const, V[b].const)
@@ -761,10 +763,26 @@ end
 local BC = {
 	-- Constants
 	KNUM = function(a, _, c, _) -- KNUM
-		vset(a, nil, c, ffi.typeof('int32_t')) -- TODO: only 32bit immediates are supported now
+		if c < 2147483648 then
+			vset(a, nil, c, ffi.typeof('int32_t'))
+		else
+			vset(a, nil, c, ffi.typeof('uint64_t'))
+		end
 	end,
 	KSHORT = function(a, _, _, d) -- KSHORT
 		vset(a, nil, d, ffi.typeof('int16_t'))
+	end,
+	KCDATA = function(a, _, c, _) -- KCDATA
+		-- Coerce numeric types if possible
+		local ct = ffi.typeof(c)
+		if ffi.istype(ct, ffi.typeof('uint64_t')) or ffi.istype(ct, ffi.typeof('int64_t')) then
+			vset(a, nil, c, ct)
+		elseif tonumber(c) ~= nil then
+			-- TODO: this should not be possible
+			vset(a, nil, tonumber(c), ct)
+		else
+			error('NYI: cannot use CDATA constant of type ' .. ct)
+		end
 	end,
 	KPRI = function(a, _, _, d) -- KPRI
 		-- KNIL is 0, must create a special type to identify it
@@ -887,7 +905,7 @@ local BC = {
 				local dst_reg = vreg(tmp_var)
 				V[tmp_var].reg = nil -- Only temporary allocation
 				-- Optimization: immediate values (imm32) can be stored directly
-				if type(const) == 'number' then
+				if type(const) == 'number' and w < 8 then
 					emit(BPF.MEM + BPF.ST + const_width[w], dst_reg, 0, 0, const)
 				else
 					emit(BPF.MEM + BPF.STX + const_width[w], dst_reg, src_reg, 0, 0)
@@ -904,7 +922,7 @@ local BC = {
 				emit(BPF.ALU64 + BPF.ADD + BPF.X, dst_reg, 10, 0, 0)
 				V[tmp_var].reg = nil -- Only temporary allocation
 				-- Optimization: immediate values (imm32) can be stored directly
-				if type(const) == 'number' then
+				if type(const) == 'number' and w < 8 then
 					emit(BPF.MEM + BPF.ST + const_width[w], dst_reg, 0, -vinfo.__base, const)
 				else
 					emit(BPF.MEM + BPF.STX + const_width[w], dst_reg, src_reg, -vinfo.__base, 0)
@@ -932,7 +950,7 @@ local BC = {
 			if V[b].source and V[b].source:find('ptr_to_map_value', 1, true) then
 				local dst_reg = vreg(b)
 				-- Optimization: immediate values (imm32) can be stored directly
-				if type(const) == 'number' then
+				if type(const) == 'number' and w < 8 then
 					emit(BPF.MEM + BPF.ST + const_width[w], dst_reg, 0, ofs, const)
 				else
 					emit(BPF.MEM + BPF.STX + const_width[w], dst_reg, src_reg, ofs, 0)
@@ -1072,7 +1090,9 @@ local BC = {
 	JMP = function (a, _, c, _) -- JMP
 		-- Discard unused slots after jump
 		for i, _ in pairs(V) do
-			if i >= a then V[i] = {} end
+			if i >= a and i < stackslots then
+				V[i] = nil
+			end
 		end
 		-- Cross basic block boundary if the jump target isn't provably unreachable
 		local val = code.fixup[c] or {}

@@ -421,9 +421,9 @@ builtins[math.log] = function (e, dst, x)
 end
 
 -- Call-type helpers
-local function call_helper(e, dst, h)
+local function call_helper(e, dst, h, vtype)
 	e.vset(dst)
-	e.vreg(dst, 0, true)
+	e.vreg(dst, 0, true, vtype or ffi.typeof('uint64_t'))
 	e.emit(BPF.JMP + BPF.CALL, 0, 0, 0, h)
 	e.V[dst].const = nil -- Target is not a function anymore
 end
@@ -443,7 +443,7 @@ builtins.perf_submit = perf_submit
 builtins.stack_id = stack_id
 builtins.load_bytes = load_bytes
 builtins[cpu] = function (e, dst) return call_helper(e, dst, HELPER.get_smp_processor_id) end
-builtins[rand] = function (e, dst) return call_helper(e, dst, HELPER.get_prandom_u32) end
+builtins[rand] = function (e, dst) return call_helper(e, dst, HELPER.get_prandom_u32, ffi.typeof('uint32_t')) end
 builtins[time] = function (e, dst) return call_helper(e, dst, HELPER.ktime_get_ns) end
 builtins[pid_tgid] = function (e, dst) return call_helper(e, dst, HELPER.get_current_pid_tgid) end
 builtins[uid_gid] = function (e, dst) return call_helper(e, dst, HELPER.get_current_uid_gid) end

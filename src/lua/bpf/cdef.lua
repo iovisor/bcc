@@ -214,7 +214,9 @@ end
 -- Return true if variable is a non-nil constant that can be used as immediate value
 -- e.g. result of KSHORT and KNUM
 function M.isimmconst(v)
-	return type(v.const) == 'number' and not ffi.istype(v.type, ffi.typeof('void'))
+	return (type(v.const) == 'number' and not ffi.istype(v.type, ffi.typeof('void')))
+		or type(v.const) == 'cdata' and ffi.istype(v.type, ffi.typeof('uint64_t')) -- Lua numbers are at most 52 bits
+		or type(v.const) == 'cdata' and ffi.istype(v.type, ffi.typeof('int64_t'))
 end
 
 function M.osversion()
