@@ -311,8 +311,8 @@ TRACEPOINT_PROBE(sock, inet_sock_set_state)
     // get throughput stats. see tcp_get_info().
     u64 rx_b = 0, tx_b = 0, sport = 0;
     struct tcp_sock *tp = (struct tcp_sock *)sk;
-    bpf_probe_read(&rx_b, sizeof(rx_b), &tp->bytes_received);
-    bpf_probe_read(&tx_b, sizeof(tx_b), &tp->bytes_acked);
+    rx_b = tp->bytes_received;
+    tx_b = tp->bytes_acked;
 
     if (args->family == AF_INET) {
         struct ipv4_data_t data4 = {.span_us = delta_us,
