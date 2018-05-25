@@ -12,6 +12,7 @@ import netifaces as ni
 from sys import argv
 from kafka import KafkaProducer
 from kafka.errors import KafkaError
+from datetime import datetime
 
 #args
 def usage():
@@ -70,7 +71,7 @@ if len(argv) > 5:
 
 print ("binding socket to '%s'" % interface)	
  
-# initialize BPF - load source code from http-parse-simple.c
+#initialize BPF - load source code from http-parse-simple.c
 bpf = BPF(src_file = "data-plane-tracing.c", debug = 0)
 
 #load eBPF program http_filter of type SOCKET_FILTER into the kernel eBPF vm
@@ -90,9 +91,12 @@ sock = socket.fromfd(socket_fd,socket.PF_PACKET,socket.SOCK_RAW,socket.IPPROTO_I
 #set it as blocking socket
 sock.setblocking(True)
 
-#get interface ip address
-ni.ifaddresses('eno1')
-ip = ni.ifaddresses('eno1')[ni.AF_INET][0]['addr']
+#get interface ip address. In case ip is not set then just add 127.0.0.1.
+ni.ifaddresses(interface)
+try:
+    ip = ni.ifaddresses(interface)[ni.AF_INET][0]['addr']
+except:
+    ip = '127.0.0.1'    
 
 print("timestamp, hosname, MachineIP   ipver     Src-Host IP Addr     Dst-Host IP Addr     Src-Host_Port   Des-Host_Port  Src-VM_Addr   Dest-VM_Addr     Src-VM_Port   Dest-VM_Port VNI  VLANID  protocol  Packet Length ")
 
@@ -168,9 +172,11 @@ while 1:
     else:
         continue
     
+    timestamp = str(datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S.%f'))
+    
     #send data to remote server via Kafka Messaging Bus
     if kafkaserver:
-        MESSAGE = (str(int(round(time.time() * 1000000))), socket.gethostname(),ip, str(int(ipversion, 2)), str(src_host_ip), str(dest_host_ip), str(src_host_port), str(dest_host_port), str(int(VNI)), str(src_vm_mac), str(dest_vm_mac), str(int(VLANID)), src_vm_ip, dest_vm_ip, str(packet_bytearray[77]), str(src_vm_port), str(dest_vm_port), str(total_length))
+        MESSAGE = (timestamp, socket.gethostname(),ip, str(int(ipversion, 2)), str(src_host_ip), str(dest_host_ip), str(src_host_port), str(dest_host_port), str(int(VNI)), str(src_vm_mac), str(dest_vm_mac), str(int(VLANID)), src_vm_ip, dest_vm_ip, str(packet_bytearray[77]), str(src_vm_port), str(dest_vm_port), str(total_length))
         print (MESSAGE)
         MESSAGE = ','.join(MESSAGE)
         MESSAGE = MESSAGE.encode() 
@@ -179,12 +185,9 @@ while 1:
     
     #save data to files
     else:
-        MESSAGE = str(int(round(time.time() * 1000000)))+","+socket.gethostname()+","+ip+","+str(int(ipversion, 2))+","+src_host_ip+","+dest_host_ip+","+str(src_host_port)+","+str(dest_host_port)+","+str(int(VNI))+","+str(src_vm_mac)+","+str(dest_vm_mac)+","+str(int(VLANID))+","+src_vm_ip+","+dest_vm_ip+","+str(packet_bytearray[77])+","+str(src_vm_port)+","+str(dest_vm_port)+","+str(total_length)
+        MESSAGE = timestamp+","+socket.gethostname()+","+ip+","+str(int(ipversion, 2))+","+src_host_ip+","+dest_host_ip+","+str(src_host_port)+","+str(dest_host_port)+","+str(int(VNI))+","+str(src_vm_mac)+","+str(dest_vm_mac)+","+str(int(VLANID))+","+src_vm_ip+","+dest_vm_ip+","+str(packet_bytearray[77])+","+str(src_vm_port)+","+str(dest_vm_port)+","+str(total_length)
         print (MESSAGE)
         #save data to a file on hour basis 
         filename = "./vlan-data-"+time.strftime("%Y-%m-%d-%H")+"-00"
         with open(filename, "a") as f:
             f.write("%s\n" % MESSAGE)
-        #f = open(filename, "a")
-        #f.write("%s\n" % MESSAGE)
-        #f.close
