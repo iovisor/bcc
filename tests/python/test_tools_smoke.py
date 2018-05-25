@@ -308,7 +308,7 @@ class SmokeTests(TestCase):
 
     @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
     def test_tcplife(self):
-        self.run_with_int("tcpconnlat.py")
+        self.run_with_int("tcplife.py")
 
     @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
     def test_tcpretrans(self):
