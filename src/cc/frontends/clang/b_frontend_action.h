@@ -47,10 +47,10 @@ class MapVisitor : public clang::RecursiveASTVisitor<MapVisitor> {
  public:
   explicit MapVisitor(std::set<clang::Decl *> &m);
   bool VisitCallExpr(clang::CallExpr *Call);
-  void set_ptreg(clang::Decl *D) { ptregs_.insert(D); }
+  void set_ptreg(std::tuple<clang::Decl *, int> &pt) { ptregs_.insert(pt); }
  private:
   std::set<clang::Decl *> &m_;
-  std::set<clang::Decl *> ptregs_;
+  std::set<std::tuple<clang::Decl *, int>> ptregs_;
 };
 
 // Type visitor and rewriter for B programs.
@@ -95,9 +95,9 @@ class ProbeVisitor : public clang::RecursiveASTVisitor<ProbeVisitor> {
   bool VisitBinaryOperator(clang::BinaryOperator *E);
   bool VisitUnaryOperator(clang::UnaryOperator *E);
   bool VisitMemberExpr(clang::MemberExpr *E);
-  void set_ptreg(clang::Decl *D) { ptregs_.insert(D); }
+  void set_ptreg(std::tuple<clang::Decl *, int> &pt) { ptregs_.insert(pt); }
   void set_ctx(clang::Decl *D) { ctx_ = D; }
-  std::set<clang::Decl *> get_ptregs() { return ptregs_; }
+  std::set<std::tuple<clang::Decl *, int>> get_ptregs() { return ptregs_; }
  private:
   bool IsContextMemberExpr(clang::Expr *E);
   clang::SourceRange expansionRange(clang::SourceRange range);
@@ -108,7 +108,7 @@ class ProbeVisitor : public clang::RecursiveASTVisitor<ProbeVisitor> {
   clang::Rewriter &rewriter_;
   std::set<clang::Decl *> fn_visited_;
   std::set<clang::Expr *> memb_visited_;
-  std::set<clang::Decl *> ptregs_;
+  std::set<std::tuple<clang::Decl *, int>> ptregs_;
   std::set<clang::Decl *> &m_;
   clang::Decl *ctx_;
   bool track_helpers_;
@@ -117,7 +117,8 @@ class ProbeVisitor : public clang::RecursiveASTVisitor<ProbeVisitor> {
 // A helper class to the frontend action, walks the decls
 class BTypeConsumer : public clang::ASTConsumer {
  public:
-  explicit BTypeConsumer(clang::ASTContext &C, BFrontendAction &fe, clang::Rewriter &rewriter, std::set<clang::Decl *> &map);
+  explicit BTypeConsumer(clang::ASTContext &C, BFrontendAction &fe,
+                         clang::Rewriter &rewriter, std::set<clang::Decl *> &m);
   void HandleTranslationUnit(clang::ASTContext &Context) override;
  private:
   BFrontendAction &fe_;

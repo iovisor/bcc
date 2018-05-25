@@ -82,6 +82,8 @@ const char **get_call_conv(void) {
 using std::map;
 using std::move;
 using std::set;
+using std::tuple;
+using std::make_tuple;
 using std::string;
 using std::to_string;
 using std::unique_ptr;
@@ -90,15 +92,19 @@ using namespace clang;
 
 class ProbeChecker : public RecursiveASTVisitor<ProbeChecker> {
  public:
-  explicit ProbeChecker(Expr *arg, const set<Decl *> &ptregs, bool track_helpers)
+  explicit ProbeChecker(Expr *arg, const set<tuple<Decl *, int>> &ptregs,
+                        bool track_helpers, bool is_assign)
       : needs_probe_(false), is_transitive_(false), ptregs_(ptregs),
-        track_helpers_(track_helpers) {
+        track_helpers_(track_helpers), nb_derefs_(0), is_assign_(is_assign) {
     if (arg) {
       TraverseStmt(arg);
       if (arg->getType()->isPointerType())
         is_transitive_ = needs_probe_;
     }
   }
+  explicit ProbeChecker(Expr *arg, const set<tuple<Decl *, int>> &ptregs,
+                        bool is_transitive)
+      : ProbeChecker(arg, ptregs, is_transitive, false) {}
   bool VisitCallExpr(CallExpr *E) {
     needs_probe_ = false;
     if (!track_helpers_)
@@ -108,40 +114,78 @@ class ProbeChecker : public RecursiveASTVisitor<ProbeChecker> {
     return false;
   }
   bool VisitMemberExpr(MemberExpr *M) {
-    if (ptregs_.find(M->getMemberDecl()) != ptregs_.end()) {
+    tuple<Decl *, int> pt = make_tuple(M->getMemberDecl(), nb_derefs_);
+    if (ptregs_.find(pt) != ptregs_.end()) {
       needs_probe_ = true;
       return false;
     }
     return true;
   }
+  bool VisitUnaryOperator(UnaryOperator *E) {
+    if (E->getOpcode() == UO_Deref)
+      nb_derefs_++;
+    else if (E->getOpcode() == UO_AddrOf)
+      nb_derefs_--;
+    return true;
+  }
   bool VisitDeclRefExpr(DeclRefExpr *E) {
-    if (ptregs_.find(E->getDecl()) != ptregs_.end())
-      needs_probe_ = true;
+    if (is_assign_) {
+      // We're looking for an external pointer, regardless of the number of
+      // dereferences.
+      for(auto p : ptregs_) {
+        if (std::get<0>(p) == E->getDecl()) {
+          needs_probe_ = true;
+          nb_derefs_ += std::get<1>(p);
+          return false;
+        }
+      }
+    } else {
+      tuple<Decl *, int> pt = make_tuple(E->getDecl(), nb_derefs_);
+      if (ptregs_.find(pt) != ptregs_.end())
+        needs_probe_ = true;
+    }
     return true;
   }
   bool needs_probe() const { return needs_probe_; }
   bool is_transitive() const { return is_transitive_; }
+  int get_nb_derefs() const { return nb_derefs_; }
  private:
   bool needs_probe_;
   bool is_transitive_;
-  const set<Decl *> &ptregs_;
+  const set<tuple<Decl *, int>> &ptregs_;
   bool track_helpers_;
+  // Nb of dereferences we go through before finding the external pointer.
+  // A negative number counts the number of addrof.
+  int nb_derefs_;
+  bool is_assign_;
 };
 
 // Visit a piece of the AST and mark it as needing probe reads
 class ProbeSetter : public RecursiveASTVisitor<ProbeSetter> {
  public:
-  explicit ProbeSetter(set<Decl *> *ptregs) : ptregs_(ptregs) {}
+  explicit ProbeSetter(set<tuple<Decl *, int>> *ptregs, int nb_addrof)
+      : ptregs_(ptregs), nb_derefs_(-nb_addrof) {}
   bool VisitDeclRefExpr(DeclRefExpr *E) {
-    ptregs_->insert(E->getDecl());
+    tuple<Decl *, int> pt = make_tuple(E->getDecl(), nb_derefs_);
+    ptregs_->insert(pt);
+    return true;
+  }
+  explicit ProbeSetter(set<tuple<Decl *, int>> *ptregs)
+      : ProbeSetter(ptregs, 0) {}
+  bool VisitUnaryOperator(UnaryOperator *E) {
+    if (E->getOpcode() == UO_Deref)
+      nb_derefs_++;
     return true;
   }
   bool VisitMemberExpr(MemberExpr *M) {
-    ptregs_->insert(M->getMemberDecl());
+    tuple<Decl *, int> pt = make_tuple(M->getMemberDecl(), nb_derefs_);
+    ptregs_->insert(pt);
     return false;
   }
  private:
-  set<Decl *> *ptregs_;
+  set<tuple<Decl *, int>> *ptregs_;
+  // Nb of dereferences we go through before getting to the actual variable.
+  int nb_derefs_;
 };
 
 MapVisitor::MapVisitor(set<Decl *> &m) : m_(m) {}
@@ -155,9 +199,10 @@ bool MapVisitor::VisitCallExpr(CallExpr *Call) {
           return true;
 
         if (memb_name == "update" || memb_name == "insert") {
-          if (ProbeChecker(Call->getArg(1), ptregs_, true).needs_probe()) {
+          ProbeChecker checker = ProbeChecker(Call->getArg(1), ptregs_, true,
+                                              true);
+          if (checker.needs_probe())
             m_.insert(Ref->getDecl());
-          }
         }
       }
     }
@@ -165,13 +210,16 @@ bool MapVisitor::VisitCallExpr(CallExpr *Call) {
   return true;
 }
 
-ProbeVisitor::ProbeVisitor(ASTContext &C, Rewriter &rewriter, set<Decl *> &m, bool track_helpers) :
+ProbeVisitor::ProbeVisitor(ASTContext &C, Rewriter &rewriter,
+                           set<Decl *> &m, bool track_helpers) :
   C(C), rewriter_(rewriter), m_(m), track_helpers_(track_helpers) {}
 
-bool ProbeVisitor::VisitVarDecl(VarDecl *Decl) {
-  if (Expr *E = Decl->getInit()) {
-    if (ProbeChecker(E, ptregs_, track_helpers_).is_transitive() || IsContextMemberExpr(E)) {
-      set_ptreg(Decl);
+bool ProbeVisitor::VisitVarDecl(VarDecl *D) {
+  if (Expr *E = D->getInit()) {
+    ProbeChecker checker = ProbeChecker(E, ptregs_, track_helpers_, true);
+    if (checker.is_transitive() || IsContextMemberExpr(E)) {
+      tuple<Decl *, int> pt = make_tuple(D, checker.get_nb_derefs());
+      set_ptreg(pt);
     }
   }
   return true;
@@ -181,8 +229,13 @@ bool ProbeVisitor::VisitCallExpr(CallExpr *Call) {
     if (F->hasBody()) {
       unsigned i = 0;
       for (auto arg : Call->arguments()) {
-        if (ProbeChecker(arg, ptregs_, track_helpers_).needs_probe())
-          ptregs_.insert(F->getParamDecl(i));
+        ProbeChecker checker = ProbeChecker(arg, ptregs_, track_helpers_,
+                                            true);
+        if (checker.needs_probe()) {
+          tuple<Decl *, int> pt = make_tuple(F->getParamDecl(i),
+                                             checker.get_nb_derefs());
+          ptregs_.insert(pt);
+        }
         ++i;
       }
       if (fn_visited_.find(F) == fn_visited_.end()) {
@@ -197,8 +250,14 @@ bool ProbeVisitor::VisitBinaryOperator(BinaryOperator *E) {
   if (!E->isAssignmentOp())
     return true;
   // copy probe attribute from RHS to LHS if present
-  if (ProbeChecker(E->getRHS(), ptregs_, track_helpers_).is_transitive()) {
-    ProbeSetter setter(&ptregs_);
+  ProbeChecker checker = ProbeChecker(E->getRHS(), ptregs_, track_helpers_,
+                                      true);
+  if (checker.is_transitive()) {
+    // The negative of the number of dereferences is the number of addrof.  In
+    // an assignment, if we went through n addrof before getting the external
+    // pointer, then we'll need n dereferences on the left-hand side variable
+    // to get to the external pointer.
+    ProbeSetter setter(&ptregs_, -checker.get_nb_derefs());
     setter.TraverseStmt(E->getLHS());
   } else if (E->getRHS()->getStmtClass() == Stmt::CallExprClass) {
     CallExpr *Call = dyn_cast<CallExpr>(E->getRHS());
@@ -211,8 +270,13 @@ bool ProbeVisitor::VisitBinaryOperator(BinaryOperator *E) {
 
           if (memb_name == "lookup" || memb_name == "lookup_or_init") {
             if (m_.find(Ref->getDecl()) != m_.end()) {
-            // Retrieved an external pointer from a map, mark LHS as external pointer.
-              ProbeSetter setter(&ptregs_);
+            // Retrieved an ext. pointer from a map, mark LHS as ext. pointer.
+              // Pointers from maps always need a single dereference to get the
+              // actual value.  The value may be an external pointer but cannot
+              // be a pointer to an external pointer as the verifier prohibits
+              // storing known pointers (to map values, context, the stack, or
+              // the packet) in maps.
+              ProbeSetter setter(&ptregs_, 1);
               setter.TraverseStmt(E->getLHS());
             }
           }
@@ -230,10 +294,10 @@ bool ProbeVisitor::VisitUnaryOperator(UnaryOperator *E) {
     return true;
   if (memb_visited_.find(E) != memb_visited_.end())
     return true;
-  if (!ProbeChecker(E, ptregs_, track_helpers_).needs_probe())
+  Expr *sub = E->getSubExpr();
+  if (!ProbeChecker(sub, ptregs_, track_helpers_).needs_probe())
     return true;
   memb_visited_.insert(E);
-  Expr *sub = E->getSubExpr();
   string rhs = rewriter_.getRewrittenText(expansionRange(sub->getSourceRange()));
   string text;
   text = "({ typeof(" + E->getType().getAsString() + ") _val; __builtin_memset(&_val, 0, sizeof(_val));";
@@ -922,7 +986,8 @@ void BTypeConsumer::HandleTranslationUnit(ASTContext &Context) {
                 type.substr(0, 19) == "struct tracepoint__")
               probe_visitor1_.set_ctx(arg);
           } else if (!arg->getType()->isFundamentalType()) {
-            probe_visitor1_.set_ptreg(arg);
+            tuple<Decl *, int> pt = make_tuple(arg, 0);
+            probe_visitor1_.set_ptreg(pt);
           }
         }
 
