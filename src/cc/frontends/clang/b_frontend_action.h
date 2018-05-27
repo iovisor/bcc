@@ -150,6 +150,7 @@ class BFrontendAction : public clang::ASTFrontendAction {
   TableStorage &table_storage() const { return ts_; }
   std::string id() const { return id_; }
   bool is_rewritable_ext_func(clang::FunctionDecl *D);
+  void DoMiscWorkAround();
 
  private:
   llvm::raw_ostream &os_;
