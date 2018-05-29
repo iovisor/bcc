@@ -29,5 +29,6 @@ VLAN Filter application can be executed by using one of the below commands:
 * $ sudo python data-plane-tracing.py
 * $ sudo python data-plane-tracing -i eth2 -k vc.manage.overcloud:9092
 
-# How to install Kafka
+# How to install Required Dependencies
 * $ pip install kafka-python
+* $ pip install netifaces
