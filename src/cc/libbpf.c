@@ -794,7 +794,7 @@ static int bpf_attach_tracing_event(int progfd, const char *event_path, int pid,
 }
 
 int bpf_attach_kprobe(int progfd, enum bpf_probe_attach_type attach_type,
-                      const char *ev_name, const char *fn_name)
+                      const char *ev_name, const char *fn_name, uint64_t fn_offset)
 {
   int kfd, pfd = -1;
   char buf[256];
@@ -802,7 +802,7 @@ int bpf_attach_kprobe(int progfd, enum bpf_probe_attach_type attach_type,
   static char *event_type = "kprobe";
 
   // Try create the kprobe Perf Event with perf_event_open API.
-  pfd = bpf_try_perf_event_open_with_probe(fn_name, 0, -1, event_type,
+  pfd = bpf_try_perf_event_open_with_probe(fn_name, fn_offset, -1, event_type,
                                            attach_type != BPF_PROBE_ENTRY);
   // If failed, most likely Kernel doesn't support the new perf_event_open API
   // yet. Try create the event using debugfs.
@@ -815,8 +815,15 @@ int bpf_attach_kprobe(int progfd, enum bpf_probe_attach_type attach_type,
     }
 
     snprintf(event_alias, sizeof(event_alias), "%s_bcc_%d", ev_name, getpid());
-    snprintf(buf, sizeof(buf), "%c:%ss/%s %s", attach_type==BPF_PROBE_ENTRY ? 'p' : 'r',
-             event_type, event_alias, fn_name);
+
+    if (fn_offset > 0 && attach_type == BPF_PROBE_ENTRY)
+      snprintf(buf, sizeof(buf), "p:%ss/%s %s+%"PRIu64,
+               event_type, event_alias, fn_name, fn_offset);
+    else
+      snprintf(buf, sizeof(buf), "%c:%ss/%s %s",
+               attach_type == BPF_PROBE_ENTRY ? 'p' : 'r',
+               event_type, event_alias, fn_name);
+
     if (write(kfd, buf, strlen(buf)) < 0) {
       if (errno == ENOENT)
          fprintf(stderr, "cannot attach kprobe, probe entry may not exist\n");
