@@ -128,6 +128,7 @@ int kprobe__tcp_set_state(struct pt_regs *ctx, struct sock *sk, int state)
 
     // dport is either used in a filter here, or later
     u16 dport = sk->__sk_common.skc_dport;
+    dport = ntohs(dport);
     FILTER_DPORT
 
     /*
@@ -366,7 +367,7 @@ if args.pid:
         'if (pid != %s) { return 0; }' % args.pid)
 if args.remoteport:
     dports = [int(dport) for dport in args.remoteport.split(',')]
-    dports_if = ' && '.join(['dport != %d' % ntohs(dport) for dport in dports])
+    dports_if = ' && '.join(['dport != %d' % dport for dport in dports])
     bpf_text = bpf_text.replace('FILTER_DPORT',
         'if (%s) { birth.delete(&sk); return 0; }' % dports_if)
 if args.localport:
