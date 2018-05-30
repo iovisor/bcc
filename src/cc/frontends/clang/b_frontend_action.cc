@@ -1057,7 +1057,28 @@ bool BFrontendAction::is_rewritable_ext_func(FunctionDecl *D) {
           (file_name.empty() || file_name == main_path_));
 }
 
+void BFrontendAction::DoMiscWorkAround() {
+  // In 4.16 and later, CONFIG_CC_STACKPROTECTOR is moved out of Kconfig and into
+  // Makefile. It will be set depending on CONFIG_CC_STACKPROTECTOR_{AUTO|REGULAR|STRONG}.
+  // CONFIG_CC_STACKPROTECTOR is still used in various places, e.g., struct task_struct,
+  // to guard certain fields. The workaround here intends to define
+  // CONFIG_CC_STACKPROTECTOR properly based on other configs, so it relieved any bpf
+  // program (using task_struct, etc.) of patching the below code.
+  rewriter_->getEditBuffer(rewriter_->getSourceMgr().getMainFileID()).InsertText(0,
+    "#if !defined(CONFIG_CC_STACKPROTECTOR)\n"
+    "#if defined(CONFIG_CC_STACKPROTECTOR_AUTO) \\\n"
+    "    || defined(CONFIG_CC_STACKPROTECTOR_REGULAR) \\\n"
+    "    || defined(CONFIG_CC_STACKPROTECTOR_STRONG)\n"
+    "#define CONFIG_CC_STACKPROTECTOR\n"
+    "#endif\n"
+    "#endif\n",
+    false);
+}
+
 void BFrontendAction::EndSourceFileAction() {
+  // Additional misc rewrites
+  DoMiscWorkAround();
+
   if (flags_ & DEBUG_PREPROCESSOR)
     rewriter_->getEditBuffer(rewriter_->getSourceMgr().getMainFileID()).write(llvm::errs());
   if (flags_ & DEBUG_SOURCE) {
