@@ -98,7 +98,7 @@ try:
 except:
     ip = '127.0.0.1'    
 
-print("timestamp, hosname, MachineIP   ipver     Src-Host IP Addr     Dst-Host IP Addr     Src-Host_Port   Des-Host_Port  Src-VM_Addr   Dest-VM_Addr     Src-VM_Port   Dest-VM_Port VNI  VLANID  protocol  Packet Length ")
+print("| Timestamp | Host Name | Host IP | IP Version | Source Host IP | Dest Host IP | Source Host Port | Dest Host Port | VNI | Source VM MAC | Dest VM MAC | VLAN ID | Source VM IP | Dest VM IP | Protocol | Source VM Port | Dest VM Port | Packet Length |")
 
 while 1:
     #retrieve raw packet from socket
