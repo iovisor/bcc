@@ -161,6 +161,7 @@ StatusTuple BPF::detach_all() {
 
 StatusTuple BPF::attach_kprobe(const std::string& kernel_func,
                                const std::string& probe_func,
+                               uint64_t kernel_func_offset,
                                bpf_probe_attach_type attach_type) {
   std::string probe_event = get_kprobe_event(kernel_func, attach_type);
   if (kprobes_.find(probe_event) != kprobes_.end())
@@ -170,7 +171,7 @@ StatusTuple BPF::attach_kprobe(const std::string& kernel_func,
   TRY2(load_func(probe_func, BPF_PROG_TYPE_KPROBE, probe_fd));
 
   int res_fd = bpf_attach_kprobe(probe_fd, attach_type, probe_event.c_str(),
-                                 kernel_func.c_str());
+                                 kernel_func.c_str(), kernel_func_offset);
 
   if (res_fd < 0) {
     TRY2(unload_func(probe_func));

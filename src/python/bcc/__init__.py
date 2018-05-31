@@ -550,7 +550,7 @@ class BPF(object):
     def get_syscall_fnname(self, name):
         return self.get_syscall_prefix() + name
        
-    def attach_kprobe(self, event=b"", fn_name=b"", event_re=b""):
+    def attach_kprobe(self, event=b"", event_off=0, fn_name=b"", event_re=b""):
         event = _assert_is_bytes(event)
         fn_name = _assert_is_bytes(fn_name)
         event_re = _assert_is_bytes(event_re)
@@ -569,7 +569,7 @@ class BPF(object):
         self._check_probe_quota(1)
         fn = self.load_func(fn_name, BPF.KPROBE)
         ev_name = b"p_" + event.replace(b"+", b"_").replace(b".", b"_")
-        fd = lib.bpf_attach_kprobe(fn.fd, 0, ev_name, event)
+        fd = lib.bpf_attach_kprobe(fn.fd, 0, ev_name, event, event_off)
         if fd < 0:
             raise Exception("Failed to attach BPF to kprobe")
         self._add_kprobe_fd(ev_name, fd)
