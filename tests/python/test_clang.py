@@ -538,7 +538,7 @@ int process(struct xdp_md *ctx) {
         t = b["act"]
         self.assertEqual(len(t), 32);
 
-    def test_ext_ptr_maps(self):
+    def test_ext_ptr_maps1(self):
         bpf_text = """
 #include <uapi/linux/ptrace.h>
 #include <net/sock.h>
@@ -557,6 +557,35 @@ int trace_exit(struct pt_regs *ctx) {
     u32 pid = bpf_get_current_pid_tgid();
     struct sock **skpp;
     skpp = currsock.lookup(&pid);
+    if (skpp) {
+        struct sock *skp = *skpp;
+        return skp->__sk_common.skc_dport;
+    }
+    return 0;
+}
+        """
+        b = BPF(text=bpf_text)
+        b.load_func("trace_entry", BPF.KPROBE)
+        b.load_func("trace_exit", BPF.KPROBE)
+
+    def test_ext_ptr_maps2(self):
+        bpf_text = """
+#include <uapi/linux/ptrace.h>
+#include <net/sock.h>
+#include <bcc/proto.h>
+
+BPF_HASH(currsock, u32, struct sock *);
+
+int trace_entry(struct pt_regs *ctx, struct sock *sk,
+    struct sockaddr *uaddr, int addr_len) {
+    u32 pid = bpf_get_current_pid_tgid();
+    currsock.update(&pid, &sk);
+    return 0;
+};
+
+int trace_exit(struct pt_regs *ctx) {
+    u32 pid = bpf_get_current_pid_tgid();
+    struct sock **skpp = currsock.lookup(&pid);
     if (skpp) {
         struct sock *skp = *skpp;
         return skp->__sk_common.skc_dport;
