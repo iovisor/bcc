@@ -53,7 +53,6 @@ BPF_STACK_TRACE(stack_traces, 1024);
 // separate data structs for ipv4 and ipv6
 struct ipv4_data_t {
     // XXX: switch some to u32's when supported
-    u64 stack_id;
     u64 pid;
     u64 ip;
     u64 saddr;
@@ -62,11 +61,11 @@ struct ipv4_data_t {
     u64 dport;
     u64 state;
     u64 tcpflags;
+    u64 stack_id;
 };
 BPF_PERF_OUTPUT(ipv4_events);
 
 struct ipv6_data_t {
-    u64 stack_id;
     u64 pid;
     u64 ip;
     unsigned __int128 saddr;
@@ -75,6 +74,7 @@ struct ipv6_data_t {
     u64 dport;
     u64 state;
     u64 tcpflags;
+    u64 stack_id;
 };
 BPF_PERF_OUTPUT(ipv6_events);
 
@@ -120,8 +120,8 @@ int trace_tcp_drop(struct pt_regs *ctx, struct sock *sk, struct sk_buff *skb)
         bpf_probe_read(&data4.daddr, sizeof(u32), &ip->daddr);
         data4.dport = dport;
         data4.sport = sport;
-        data4.tcpflags = tcpflags;
         data4.state = state;
+        data4.tcpflags = tcpflags;
         data4.stack_id = stack_traces.get_stackid(ctx, 0);
         ipv4_events.perf_submit(ctx, &data4, sizeof(data4));
 
@@ -133,8 +133,8 @@ int trace_tcp_drop(struct pt_regs *ctx, struct sock *sk, struct sk_buff *skb)
             sk->__sk_common.skc_v6_daddr.in6_u.u6_addr32);
         data6.dport = dport;
         data6.sport = sport;
-        data6.tcpflags = tcpflags;
         data6.state = state;
+        data6.tcpflags = tcpflags;
         data6.stack_id = stack_traces.get_stackid(ctx, 0);
         ipv6_events.perf_submit(ctx, &data6, sizeof(data6));
     }
@@ -152,7 +152,6 @@ if debug or args.ebpf:
 # event data
 class Data_ipv4(ct.Structure):
     _fields_ = [
-        ("stack_id", ct.c_ulonglong),
         ("pid", ct.c_ulonglong),
         ("ip", ct.c_ulonglong),
         ("saddr", ct.c_ulonglong),
@@ -160,12 +159,12 @@ class Data_ipv4(ct.Structure):
         ("sport", ct.c_ulonglong),
         ("dport", ct.c_ulonglong),
         ("state", ct.c_ulonglong),
-        ("tcpflags", ct.c_ulonglong)
+        ("tcpflags", ct.c_ulonglong),
+        ("stack_id", ct.c_ulonglong)
     ]
 
 class Data_ipv6(ct.Structure):
     _fields_ = [
-        ("stack_id", ct.c_ulonglong),
         ("pid", ct.c_ulonglong),
         ("ip", ct.c_ulonglong),
         ("saddr", (ct.c_ulonglong * 2)),
@@ -173,7 +172,8 @@ class Data_ipv6(ct.Structure):
         ("sport", ct.c_ulonglong),
         ("dport", ct.c_ulonglong),
         ("state", ct.c_ulonglong),
-        ("tcpflags", ct.c_ulonglong)
+        ("tcpflags", ct.c_ulonglong),
+        ("stack_id", ct.c_ulonglong)
     ]
 
 # process event
