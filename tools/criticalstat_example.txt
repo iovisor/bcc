@@ -1,0 +1,139 @@
+Demonstrations of criticalstat: Find long atomic critical sections in the kernel.
+
+criticalstat traces and reports occurences of atomic critical sections in the
+kernel with useful stacktraces showing the origin of them. Such critical
+sections frequently occur due to use of spinlocks, or if interrupts or
+preemption were explicity disabled by a driver. IRQ routines in Linux are also
+executed with interrupts disabled. There are many reasons. Such critical
+sections are a source of long latency/responsive issues for real-time systems.
+
+This works by probing the preempt/irq and cpuidle tracepoints in the kernel.
+Since this uses BPF, only the root user can use this tool. Further, the kernel
+has to be built with certain CONFIG options enabled inorder for it to work:
+CONFIG_PREEMPTIRQ_EVENTS
+CONFIG_DEBUG_PREEMPT
+Additionally, the following options should be turned off on older kernels:
+CONFIG_PROVE_LOCKING
+CONFIG_LOCKDEP
+
+USAGE:
+# ./criticalstat -h
+usage: criticalstat [-h] [-p] [-i] [-d DURATION]
+
+Trace long critical sections
+
+optional arguments:
+  -h, --help            Show this help message and exit
+  -p, --preemptoff      Find long sections where preemption was off
+  -i, --irqoff          Find long sections where IRQ was off
+  -d DURATION, --duration DURATION
+                        Duration in uS (microseconds) below which we filter
+
+examples:
+    ./criticalstat          	# run with default options: irq off for more than 100 uS
+    ./criticalstat -p       	# find sections with preemption disabled for more than 100 uS
+    ./criticalstat -d 500   	# find sections with IRQs disabled for more than 500 uS
+    ./criticalstat -p -d 500	# find sections with preemption disabled for more than 500 uS
+
+The tool runs continuously until interrupted by Ctrl-C
+
+
+By default, criticalstat finds IRQ disable sections for > 100us.
+
+# ./criticalstat
+Finding critical section with IRQ disabled for > 100us
+===================================
+TASK: kworker/u16:5 (pid  5903 tid  5903) Total Time: 194.427  us
+
+Section start: __schedule -> schedule
+Section end:   _raw_spin_unlock_irq -> finish_task_switch
+  trace_hardirqs_on+0xdc
+  trace_hardirqs_on+0xdc
+  _raw_spin_unlock_irq+0x18
+  finish_task_switch+0xf0
+  __schedule+0x8c8
+  preempt_schedule_irq+0x38
+  el1_preempt+0x8
+===================================
+
+
+If too many sections are showing up, the user can raise the threshold to only
+show critical sections that are > 500us by passing "-d" option:
+
+# ./criticalstat -d 500
+Finding critical section with IRQ disabled for > 500us
+===================================
+TASK: crtc_commit:111 (pid   246 tid   246) Total Time: 580.730  us
+
+Section start: clk_enable_lock -> clk_enable
+Section end:   _raw_spin_unlock_irqrestore -> clk_enable
+  trace_hardirqs_on+0xdc
+  trace_hardirqs_on+0xdc
+  _raw_spin_unlock_irqrestore+0x24
+  clk_enable+0x80
+  msm_dss_enable_clk+0x7c
+  sde_power_resource_enable+0x578
+  _sde_crtc_vblank_enable_no_lock+0x68
+  sde_crtc_vblank+0x8c
+  sde_kms_enable_vblank+0x18
+  vblank_ctrl_worker+0xd0
+  kthread_worker_fn+0xf8
+  kthread+0x114
+  ret_from_fork+0x10
+===================================
+
+
+If instead of irq disabled sections, we want to see preempt disabled sections,
+then pass the "-p" option. Below we try to find preempt-disabled critical
+sections that are > 500us.
+
+# ./criticalstat -p -d 500
+Finding critical section with preempt disabled for > 500us
+===================================
+TASK: swapper/1 (pid     0 tid     0) Total Time: 618.437  us
+
+Section start: preempt_count_add -> preempt_count_add
+Section end:   preempt_count_sub -> preempt_count_sub
+  trace_preempt_on+0x98
+  trace_preempt_on+0x98
+  preempt_latency_stop+0x164
+  preempt_count_sub+0x50
+  schedule+0x74
+  schedule_preempt_disabled+0x14
+  cpu_startup_entry+0x84
+  secondary_start_kernel+0x1c8
+  [unknown]
+===================================
+
+
+criticalstat -p can also reflect kernel scheduler issues sometimes. These may
+show up as long preempt-off sections if the functions in the scheduler take a
+long time to run (such as pick_next_task_fair which selects the CPU for a task
+
+Follow is a report showing a preempt-off latency of 700us during the schedule
+loop's execution:
+
+===================================
+TASK: irq/296-cs35l36 (pid   666 tid   666) Total Time: 732.657  us
+
+Section start: schedule -> schedule
+Section end:   schedule -> schedule
+  trace_preempt_on+0x98
+  trace_preempt_on+0x98
+  preempt_count_sub+0xa4
+  schedule+0x78
+  schedule_timeout+0x80
+  wait_for_common+0xb4
+  wait_for_completion_timeout+0x28
+  geni_i2c_xfer+0x298
+  __i2c_transfer+0x4e0
+  i2c_transfer+0x8
+  irq_thread_fn+0x2c
+  irq_thread+0x160
+  kthread+0x118
+  ret_from_fork+0x10
+===================================
+
+
+See Also: Linux kernel's preemptoff and irqoff tracers which provide similar
+tracing but with some limitations.
