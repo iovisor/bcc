@@ -242,7 +242,7 @@ bool ProbeVisitor::assignsExtPtr(Expr *E, int *nbAddrOf) {
 
           if (memb_name == "lookup" || memb_name == "lookup_or_init") {
             if (m_.find(Ref->getDecl()) != m_.end()) {
-            // Retrieved an ext. pointer from a map, mark LHS as ext. pointer.
+              // Retrieved an ext. pointer from a map, mark LHS as ext. pointer.
               // Pointers from maps always need a single dereference to get the
               // actual value.  The value may be an external pointer but cannot
               // be a pointer to an external pointer as the verifier prohibits
@@ -269,7 +269,20 @@ bool ProbeVisitor::VisitVarDecl(VarDecl *D) {
   }
   return true;
 }
+
 bool ProbeVisitor::VisitCallExpr(CallExpr *Call) {
+  // Skip bpf_probe_read for the third argument if it is an AddrOf.
+  if (VarDecl *V = dyn_cast<VarDecl>(Call->getCalleeDecl())) {
+    if (V->getName() == "bpf_probe_read" && Call->getNumArgs() >= 3) {
+      const Expr *E = Call->getArg(2)->IgnoreParenCasts();
+      if (const UnaryOperator *UnaryExpr = dyn_cast<UnaryOperator>(E)) {
+        if (UnaryExpr->getOpcode() == UO_AddrOf)
+          return false;
+      }
+      return true;
+    }
+  }
+
   if (FunctionDecl *F = dyn_cast<FunctionDecl>(Call->getCalleeDecl())) {
     if (F->hasBody()) {
       unsigned i = 0;
