@@ -940,94 +940,69 @@ int test(struct __sk_buff *ctx) {
         b = BPF(text=text)
         fn = b.load_func("test", BPF.SCHED_CLS)
 
-    def test_probe_read_ptr_addition1(self):
+    def test_probe_read_return(self):
         text = """
 #define KBUILD_MODNAME "foo"
-#include <linux/sched.h>
-#include <linux/tcp.h>
-int test(struct pt_regs *ctx, struct sock *sk, struct sk_buff *skb) {
-    u16 header = skb->transport_header;
-    struct tcphdr *th = (struct tcphdr *)(skb->head + header);
-    return th->seq;
-}
-"""
-        b = BPF(text=text)
-        fn = b.load_func("test", BPF.KPROBE)
-
-    def test_probe_read_ptr_addition2(self):
-        text = """
-#define KBUILD_MODNAME "foo"
-#include <linux/sched.h>
-#include <linux/tcp.h>
-int test(struct pt_regs *ctx, struct sock *sk, struct sk_buff *skb) {
-    struct tcphdr *th;
-    th = (struct tcphdr *)(skb->head + skb->transport_header);
-    return th->seq;
-}
-"""
-        b = BPF(text=text)
-        fn = b.load_func("test", BPF.KPROBE)
-
-    def test_probe_read_u64_through_map(self):
-        bpf_text = """
 #include <uapi/linux/ptrace.h>
-#include <net/sock.h>
-#include <bcc/proto.h>
-BPF_HASH(currsock, u32, u64);
-int trace_entry(struct pt_regs *ctx, u64 sk,
-    struct sockaddr *uaddr, int addr_len) {
-    u32 pid = bpf_get_current_pid_tgid();
-    currsock.update(&pid, &sk);
-    return 0;
-};
-int trace_exit(struct pt_regs *ctx) {
-    u32 pid = bpf_get_current_pid_tgid();
-    u64 *skpp;
-    skpp = currsock.lookup(&pid);
-    if (skpp) {
-        struct sock *skp = (struct sock *)(*skpp);
-        return skp->__sk_common.skc_dport;
-    }
-    return 0;
+#include <linux/tcp.h>
+static inline unsigned char *my_skb_transport_header(struct sk_buff *skb) {
+    return skb->head + skb->transport_header;
 }
-        """
-        b = BPF(text=bpf_text)
-        b.load_func("trace_entry", BPF.KPROBE)
-        b.load_func("trace_exit", BPF.KPROBE)
-
-    @skipUnless(kernel_version_ge(4,8), "requires kernel >= 4.8")
-    def test_probe_read_u64_from_helper(self):
-        text = """
-#include <linux/sched.h>
-int test(struct pt_regs *ctx) {
-    struct task_struct *task;
-    u64 t = bpf_get_current_task();
-    task = (struct task_struct *)t;
-    return task->prio;
+int test(struct pt_regs *ctx, struct sock *sk, struct sk_buff *skb) {
+    struct tcphdr *th = (struct tcphdr *)my_skb_transport_header(skb);
+    return th->seq;
 }
 """
         b = BPF(text=text)
         fn = b.load_func("test", BPF.KPROBE)
 
-    def test_probe_read_u64_from_args(self):
+    def test_probe_read_multiple_return(self):
         text = """
-#include <net/inet_sock.h>
-int test(struct pt_regs *ctx, u64 sk) {
-    u16 sport = ((struct inet_sock *)sk)->inet_sport;
-    return sport;
+#define KBUILD_MODNAME "foo"
+#include <uapi/linux/ptrace.h>
+#include <linux/tcp.h>
+static inline u64 error_function() {
+    return 0;
 }
- """
+static inline unsigned char *my_skb_transport_header(struct sk_buff *skb) {
+    if (skb)
+        return skb->head + skb->transport_header;
+    return (unsigned char *)error_function();
+}
+int test(struct pt_regs *ctx, struct sock *sk, struct sk_buff *skb) {
+    struct tcphdr *th = (struct tcphdr *)my_skb_transport_header(skb);
+    return th->seq;
+}
+"""
         b = BPF(text=text)
         fn = b.load_func("test", BPF.KPROBE)
 
-    def test_probe_read_nested_deref_u64(self):
+    def test_probe_read_return_expr(self):
         text = """
-#include <net/inet_sock.h>
-int test(struct pt_regs *ctx, struct sock *sk) {
-    u64 *ptr1;
-    u64 **ptr2 = &ptr1;
-    *ptr2 = (u64)sk;
-    return ((struct sock *)(*ptr2))->sk_daddr;
+#define KBUILD_MODNAME "foo"
+#include <uapi/linux/ptrace.h>
+#include <linux/tcp.h>
+static inline unsigned char *my_skb_transport_header(struct sk_buff *skb) {
+    return skb->head + skb->transport_header;
+}
+int test(struct pt_regs *ctx, struct sock *sk, struct sk_buff *skb) {
+    u32 *seq = (u32 *)my_skb_transport_header(skb) + offsetof(struct tcphdr, seq);
+    return *seq;
+}
+"""
+        b = BPF(text=text)
+        fn = b.load_func("test", BPF.KPROBE)
+
+    def test_probe_read_return_call(self):
+        text = """
+#define KBUILD_MODNAME "foo"
+#include <uapi/linux/ptrace.h>
+#include <linux/tcp.h>
+static inline struct tcphdr *my_skb_transport_header(struct sk_buff *skb) {
+    return (struct tcphdr *)skb->head + skb->transport_header;
+}
+int test(struct pt_regs *ctx, struct sock *sk, struct sk_buff *skb) {
+    return my_skb_transport_header(skb)->seq;
 }
 """
         b = BPF(text=text)
