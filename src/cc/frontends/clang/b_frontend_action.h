@@ -47,10 +47,10 @@ class MapVisitor : public clang::RecursiveASTVisitor<MapVisitor> {
  public:
   explicit MapVisitor(std::set<clang::Decl *> &m);
   bool VisitCallExpr(clang::CallExpr *Call);
-  void set_ptreg(std::tuple<clang::Decl *, int> &pt) { ptregs_.insert(pt); }
+  void set_extreg(std::tuple<clang::Decl *, int> &ext) { extregs_.insert(ext); }
  private:
   std::set<clang::Decl *> &m_;
-  std::set<std::tuple<clang::Decl *, int>> ptregs_;
+  std::set<std::tuple<clang::Decl *, int>> extregs_;
 };
 
 // Type visitor and rewriter for B programs.
@@ -95,9 +95,9 @@ class ProbeVisitor : public clang::RecursiveASTVisitor<ProbeVisitor> {
   bool VisitBinaryOperator(clang::BinaryOperator *E);
   bool VisitUnaryOperator(clang::UnaryOperator *E);
   bool VisitMemberExpr(clang::MemberExpr *E);
-  void set_ptreg(std::tuple<clang::Decl *, int> &pt) { ptregs_.insert(pt); }
+  void set_extreg(std::tuple<clang::Decl *, int> &ext) { extregs_.insert(ext); }
   void set_ctx(clang::Decl *D) { ctx_ = D; }
-  std::set<std::tuple<clang::Decl *, int>> get_ptregs() { return ptregs_; }
+  std::set<std::tuple<clang::Decl *, int>> get_extregs() { return extregs_; }
  private:
   bool IsContextMemberExpr(clang::Expr *E);
   clang::SourceRange expansionRange(clang::SourceRange range);
@@ -108,7 +108,7 @@ class ProbeVisitor : public clang::RecursiveASTVisitor<ProbeVisitor> {
   clang::Rewriter &rewriter_;
   std::set<clang::Decl *> fn_visited_;
   std::set<clang::Expr *> memb_visited_;
-  std::set<std::tuple<clang::Decl *, int>> ptregs_;
+  std::set<std::tuple<clang::Decl *, int>> extregs_;
   std::set<clang::Decl *> &m_;
   clang::Decl *ctx_;
   bool track_helpers_;
