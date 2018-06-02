@@ -156,6 +156,18 @@ static struct bpf_helper helpers[] = {
   {"bind", "4.17"},
   {"xdp_adjust_tail", "4.18"},
   {"skb_get_xfrm_state", "4.18"},
+  {"get_stack", "4.18"},
+  {"skb_load_bytes_relative", "4.18"},
+  {"fib_lookup", "4.18"},
+  {"sock_hash_update", "4.18"},
+  {"msg_redirect_hash", "4.18"},
+  {"sk_redirect_hash", "4.18"},
+  {"lwt_push_encap", "4.18"},
+  {"lwt_seg6_store_bytes", "4.18"},
+  {"lwt_seg6_adjust_srh", "4.18"},
+  {"lwt_seg6_action", "4.18"},
+  {"rc_repeat", "4.18"},
+  {"rc_keydown", "4.18"},
 };
 
 static uint64_t ptr_to_u64(void *ptr)
