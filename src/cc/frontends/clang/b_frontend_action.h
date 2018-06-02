@@ -99,6 +99,7 @@ class ProbeVisitor : public clang::RecursiveASTVisitor<ProbeVisitor> {
   void set_ctx(clang::Decl *D) { ctx_ = D; }
   std::set<std::tuple<clang::Decl *, int>> get_ptregs() { return ptregs_; }
  private:
+  bool assignsExtPtr(clang::Expr *E, int *nbAddrOf);
   bool IsContextMemberExpr(clang::Expr *E);
   clang::SourceRange expansionRange(clang::SourceRange range);
   template <unsigned N>

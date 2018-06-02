@@ -214,11 +214,56 @@ ProbeVisitor::ProbeVisitor(ASTContext &C, Rewriter &rewriter,
                            set<Decl *> &m, bool track_helpers) :
   C(C), rewriter_(rewriter), m_(m), track_helpers_(track_helpers) {}
 
+bool ProbeVisitor::assignsExtPtr(Expr *E, int *nbAddrOf) {
+  if (IsContextMemberExpr(E)) {
+    *nbAddrOf = 0;
+    return true;
+  }
+
+  ProbeChecker checker = ProbeChecker(E, ptregs_, track_helpers_,
+                                      true);
+  if (checker.is_transitive()) {
+    // The negative of the number of dereferences is the number of addrof.  In
+    // an assignment, if we went through n addrof before getting the external
+    // pointer, then we'll need n dereferences on the left-hand side variable
+    // to get to the external pointer.
+    *nbAddrOf = -checker.get_nb_derefs();
+    return true;
+  }
+
+  if (E->getStmtClass() == Stmt::CallExprClass) {
+    CallExpr *Call = dyn_cast<CallExpr>(E);
+    if (MemberExpr *Memb = dyn_cast<MemberExpr>(Call->getCallee()->IgnoreImplicit())) {
+      StringRef memb_name = Memb->getMemberDecl()->getName();
+      if (DeclRefExpr *Ref = dyn_cast<DeclRefExpr>(Memb->getBase())) {
+        if (SectionAttr *A = Ref->getDecl()->getAttr<SectionAttr>()) {
+          if (!A->getName().startswith("maps"))
+            return false;
+
+          if (memb_name == "lookup" || memb_name == "lookup_or_init") {
+            if (m_.find(Ref->getDecl()) != m_.end()) {
+            // Retrieved an ext. pointer from a map, mark LHS as ext. pointer.
+              // Pointers from maps always need a single dereference to get the
+              // actual value.  The value may be an external pointer but cannot
+              // be a pointer to an external pointer as the verifier prohibits
+              // storing known pointers (to map values, context, the stack, or
+              // the packet) in maps.
+              *nbAddrOf = 1;
+              return true;
+            }
+          }
+        }
+      }
+    }
+  }
+  return false;
+}
 bool ProbeVisitor::VisitVarDecl(VarDecl *D) {
   if (Expr *E = D->getInit()) {
-    ProbeChecker checker = ProbeChecker(E, ptregs_, track_helpers_, true);
-    if (checker.is_transitive() || IsContextMemberExpr(E)) {
-      tuple<Decl *, int> pt = make_tuple(D, checker.get_nb_derefs());
+    int nbAddrOf;
+    if (assignsExtPtr(E, &nbAddrOf)) {
+      // The negative of the number of addrof is the number of dereferences.
+      tuple<Decl *, int> pt = make_tuple(D, -nbAddrOf);
       set_ptreg(pt);
     }
   }
@@ -249,42 +294,11 @@ bool ProbeVisitor::VisitCallExpr(CallExpr *Call) {
 bool ProbeVisitor::VisitBinaryOperator(BinaryOperator *E) {
   if (!E->isAssignmentOp())
     return true;
-  // copy probe attribute from RHS to LHS if present
-  ProbeChecker checker = ProbeChecker(E->getRHS(), ptregs_, track_helpers_,
-                                      true);
-  if (checker.is_transitive()) {
-    // The negative of the number of dereferences is the number of addrof.  In
-    // an assignment, if we went through n addrof before getting the external
-    // pointer, then we'll need n dereferences on the left-hand side variable
-    // to get to the external pointer.
-    ProbeSetter setter(&ptregs_, -checker.get_nb_derefs());
-    setter.TraverseStmt(E->getLHS());
-  } else if (E->getRHS()->getStmtClass() == Stmt::CallExprClass) {
-    CallExpr *Call = dyn_cast<CallExpr>(E->getRHS());
-    if (MemberExpr *Memb = dyn_cast<MemberExpr>(Call->getCallee()->IgnoreImplicit())) {
-      StringRef memb_name = Memb->getMemberDecl()->getName();
-      if (DeclRefExpr *Ref = dyn_cast<DeclRefExpr>(Memb->getBase())) {
-        if (SectionAttr *A = Ref->getDecl()->getAttr<SectionAttr>()) {
-          if (!A->getName().startswith("maps"))
-            return true;
 
-          if (memb_name == "lookup" || memb_name == "lookup_or_init") {
-            if (m_.find(Ref->getDecl()) != m_.end()) {
-            // Retrieved an ext. pointer from a map, mark LHS as ext. pointer.
-              // Pointers from maps always need a single dereference to get the
-              // actual value.  The value may be an external pointer but cannot
-              // be a pointer to an external pointer as the verifier prohibits
-              // storing known pointers (to map values, context, the stack, or
-              // the packet) in maps.
-              ProbeSetter setter(&ptregs_, 1);
-              setter.TraverseStmt(E->getLHS());
-            }
-          }
-        }
-      }
-    }
-  } else if (IsContextMemberExpr(E->getRHS())) {
-    ProbeSetter setter(&ptregs_);
+  // copy probe attribute from RHS to LHS if present
+  int nbAddrOf;
+  if (assignsExtPtr(E->getRHS(), &nbAddrOf)) {
+    ProbeSetter setter(&ptregs_, nbAddrOf);
     setter.TraverseStmt(E->getLHS());
   }
   return true;
@@ -355,7 +369,6 @@ bool ProbeVisitor::IsContextMemberExpr(Expr *E) {
   bool found = false;
   MemberExpr *M;
   for (M = Memb; M; M = dyn_cast<MemberExpr>(M->getBase())) {
-    memb_visited_.insert(M);
     rhs_start = M->getLocEnd();
     base = M->getBase();
     member = M->getMemberLoc();
