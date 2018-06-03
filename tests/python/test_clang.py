@@ -76,6 +76,24 @@ int count_foo(struct pt_regs *ctx, unsigned long a, unsigned long b) {
         b = BPF(text=text, debug=0)
         fn = b.load_func("count_foo", BPF.KPROBE)
 
+    def test_probe_read3(self):
+        text = """
+#define KBUILD_MODNAME "foo"
+#include <net/tcp.h>
+int count_tcp(struct pt_regs *ctx, struct sk_buff *skb) {
+    // The below define is in net/tcp.h:
+    //    #define TCP_SKB_CB(__skb)	((struct tcp_skb_cb *)&((__skb)->cb[0]))
+    // Note that it has AddrOf in the macro, which will cause current rewriter
+    // failing below statement
+    // return TCP_SKB_CB(skb)->tcp_gso_size;
+    u16 val = 0;
+    bpf_probe_read(&val, sizeof(val), &(TCP_SKB_CB(skb)->tcp_gso_size));
+    return val;
+}
+"""
+        b = BPF(text=text)
+        fn = b.load_func("count_tcp", BPF.KPROBE)
+
     def test_probe_read_keys(self):
         text = """
 #include <uapi/linux/ptrace.h>
