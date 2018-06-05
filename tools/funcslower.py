@@ -28,12 +28,14 @@ import ctypes as ct
 import time
 
 examples = """examples:
-  ./funcslower vfs_write       # trace vfs_write calls slower than 1ms
-  ./funcslower -m 10 vfs_write # same, but slower than 10ms
-  ./funcslower -u 10 c:open    # trace open calls slower than 10us
-  ./funcslower -p 135 c:open   # trace pid 135 only
-  ./funcslower c:malloc c:free # trace both malloc and free slower than 1ms
-  ./funcslower -a 2 c:open     # show first two arguments to open
+  ./funcslower vfs_write        # trace vfs_write calls slower than 1ms
+  ./funcslower -m 10 vfs_write  # same, but slower than 10ms
+  ./funcslower -u 10 c:open     # trace open calls slower than 10us
+  ./funcslower -p 135 c:open    # trace pid 135 only
+  ./funcslower c:malloc c:free  # trace both malloc and free slower than 1ms
+  ./funcslower -a 2 c:open      # show first two arguments to open
+  ./funcslower -UK -m 10 c:open # Show user and kernel stack frame of open calls slower than 10ms
+  ./funcslower -f -UK c:open    # Output in folded format for flame graphs
 """
 parser = argparse.ArgumentParser(
     description="Trace slow kernel or user function calls.",
@@ -57,6 +59,12 @@ parser.add_argument(metavar="function", nargs="+", dest="functions",
     help="function(s) to trace")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
+parser.add_argument("-f", "--folded", action="store_true",
+    help="output folded format, one line per stack (for flame graphs)")
+parser.add_argument("-U", "--user-stack",
+  action="store_true", help="output user stack trace")
+parser.add_argument("-K", "--kernel-stack",
+  action="store_true", help="output kernel stack trace")
 
 args = parser.parse_args()
 # fractions are allowed, but rounded to an integer nanosecond
@@ -86,6 +94,13 @@ struct data_t {
     u64 duration_ns;
     u64 retval;
     char comm[TASK_COMM_LEN];
+#ifdef USER_STACKS
+    int user_stack_id;
+#endif
+#ifdef KERNEL_STACKS
+    int kernel_stack_id;
+    u64 kernel_ip;
+#endif
 #ifdef GRAB_ARGS
     u64 args[6];
 #endif
@@ -93,6 +108,14 @@ struct data_t {
 
 BPF_HASH(entryinfo, u64, struct entry_t);
 BPF_PERF_OUTPUT(events);
+
+#ifdef USER_STACKS
+BPF_STACK_TRACE(stacks, 2048);
+#else
+#ifdef KERNEL_STACKS
+BPF_STACK_TRACE(stacks, 2048);
+#endif
+#endif
 
 static int trace_entry(struct pt_regs *ctx, int id)
 {
@@ -142,6 +165,31 @@ int trace_return(struct pt_regs *ctx)
     data.start_ns = entryp->start_ns;
     data.duration_ns = delta_ns;
     data.retval = PT_REGS_RC(ctx);
+
+#ifdef USER_STACKS
+    data.user_stack_id = stacks.get_stackid(ctx, BPF_F_REUSE_STACKID | BPF_F_USER_STACK);
+#endif
+
+#ifdef KERNEL_STACKS
+    data.kernel_stack_id = stacks.get_stackid(ctx, 0 | BPF_F_REUSE_STACKID);
+
+    if (data.kernel_stack_id >= 0) {
+        // populate extras to fix the kernel stack
+        struct pt_regs regs = {};
+        bpf_probe_read(&regs, sizeof(regs), (void *)ctx);
+        u64 ip = PT_REGS_IP(&regs);
+
+        // if ip isn't sane, leave key ips as zero for later checking
+#ifdef CONFIG_RANDOMIZE_MEMORY
+        if (ip > __PAGE_OFFSET_BASE) {
+#else
+        if (ip > PAGE_OFFSET) {
+#endif
+            data.kernel_ip = ip;
+        }
+    }
+#endif
+
 #ifdef GRAB_ARGS
     bpf_probe_read(&data.args[0], sizeof(data.args), entryp->args);
 #endif
@@ -155,6 +203,10 @@ int trace_return(struct pt_regs *ctx)
 bpf_text = bpf_text.replace('DURATION_NS', str(duration_ns))
 if args.arguments:
     bpf_text = "#define GRAB_ARGS\n" + bpf_text
+if args.user_stack:
+    bpf_text = "#define USER_STACKS\n" + bpf_text
+if args.kernel_stack:
+    bpf_text = "#define KERNEL_STACKS\n" + bpf_text
 if args.tgid:
     bpf_text = bpf_text.replace('TGID_FILTER', 'tgid != %d' % args.tgid)
 else:
@@ -193,17 +245,22 @@ class Data(ct.Structure):
         ("duration_ns", ct.c_ulonglong),
         ("retval", ct.c_ulonglong),
         ("comm", ct.c_char * TASK_COMM_LEN)
-    ] + ([("args", ct.c_ulonglong * 6)] if args.arguments else [])
+    ] + ([("args", ct.c_ulonglong * 6)] if args.arguments else []) + \
+            ([("user_stack_id", ct.c_int)] if args.user_stack else []) + \
+            ([("kernel_stack_id", ct.c_int),("kernel_ip", ct.c_ulonglong)] if args.kernel_stack else [])
 
 time_designator = "us" if args.min_us else "ms"
 time_value = args.min_us or args.min_ms or 1
 time_multiplier = 1000 if args.min_us else 1000000
 time_col = args.time or args.timestamp
-print("Tracing function calls slower than %g %s... Ctrl+C to quit." %
-      (time_value, time_designator))
-print((("%-10s " % "TIME" if time_col else "") + "%-14s %-6s %7s %16s %s") %
-    ("COMM", "PID", "LAT(%s)" % time_designator, "RVAL",
-    "FUNC" + (" ARGS" if args.arguments else "")))
+
+# Do not print header when folded
+if not args.folded:
+    print("Tracing function calls slower than %g %s... Ctrl+C to quit." %
+          (time_value, time_designator))
+    print((("%-10s " % "TIME" if time_col else "") + "%-14s %-6s %7s %16s %s") %
+        ("COMM", "PID", "LAT(%s)" % time_designator, "RVAL",
+        "FUNC" + (" ARGS" if args.arguments else "")))
 
 earliest_ts = 0
 
@@ -222,12 +279,51 @@ def args_str(event):
         return ""
     return str.join(" ", ["0x%x" % arg for arg in event.args[:args.arguments]])
 
+def print_stack(event):
+    user_stack = []
+    stack_traces = b.get_table("stacks")
+
+    if args.user_stack and event.user_stack_id > 0:
+        user_stack = stack_traces.walk(event.user_stack_id)
+
+    kernel_stack = []
+    if args.kernel_stack and event.kernel_stack_id > 0:
+        kernel_tmp = stack_traces.walk(event.kernel_stack_id)
+
+        # fix kernel stack
+        for addr in kernel_tmp:
+            kernel_stack.append(addr)
+        # the later IP checking
+        if event.kernel_ip:
+            kernel_stack.insert(0, event.kernel_ip)
+
+    do_delimiter = user_stack and kernel_stack
+
+    if args.folded:
+        # print folded stack output
+        user_stack = list(user_stack)
+        kernel_stack = list(kernel_stack)
+        line = [event.comm.decode()] + \
+            [b.sym(addr, event.tgid_pid) for addr in reversed(user_stack)] + \
+            (do_delimiter and ["-"] or []) + \
+            [b.ksym(addr) for addr in reversed(kernel_stack)]
+        print("%s %d" % (";".join(line), 1))
+    else:
+        # print default multi-line stack output.
+        for addr in kernel_stack:
+            print("    %s" % b.ksym(addr))
+        for addr in user_stack:
+            print("    %s" % b.sym(addr, event.tgid_pid))
+
 def print_event(cpu, data, size):
     event = ct.cast(data, ct.POINTER(Data)).contents
     ts = float(event.duration_ns) / time_multiplier
-    print((time_str(event) + "%-14.14s %-6s %7.2f %16x %s %s") %
-        (event.comm.decode(), event.tgid_pid >> 32,
-         ts, event.retval, args.functions[event.id], args_str(event)))
+    if not args.folded:
+        print((time_str(event) + "%-14.14s %-6s %7.2f %16x %s %s") %
+            (event.comm.decode(), event.tgid_pid >> 32,
+             ts, event.retval, args.functions[event.id], args_str(event)))
+    if args.user_stack or args.kernel_stack:
+        print_stack(event)
 
 b["events"].open_perf_buffer(print_event, page_cnt=64)
 while True:
