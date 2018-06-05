@@ -174,10 +174,7 @@ int trace_return(struct pt_regs *ctx)
     data.kernel_stack_id = stacks.get_stackid(ctx, 0 | BPF_F_REUSE_STACKID);
 
     if (data.kernel_stack_id >= 0) {
-        // populate extras to fix the kernel stack
-        struct pt_regs regs = {};
-        bpf_probe_read(&regs, sizeof(regs), (void *)ctx);
-        u64 ip = PT_REGS_IP(&regs);
+        u64 ip = PT_REGS_IP(ctx);
 
         // if ip isn't sane, leave key ips as zero for later checking
 #ifdef CONFIG_RANDOMIZE_MEMORY
