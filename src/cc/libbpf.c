@@ -1014,6 +1014,7 @@ static int bpf_detach_probe(const char *ev_name, const char *event_type)
       found_event = 1;
       break;
     }
+  free(cptr);
   fclose(fp);
   fp = NULL;
 
