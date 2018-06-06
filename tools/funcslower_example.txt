@@ -75,9 +75,38 @@ This shows the first two arguments to __kmalloc -- the first one is the size
 of the requested allocation. The return value is also shown (null return values
 would indicate a failure).
 
+# ./funcslower.py -U -u 100 'c:open'
+Tracing function calls slower than 100 us... Ctrl+C to quit.
+COMM           PID    LAT(us)             RVAL FUNC
+ranlib         23857   910.01                6 c:open
+    b'llvm::sys::fs::openFileForRead(llvm::Twine const&, int&, llvm::SmallVectorImpl<char>*)'
+    b'[unknown]'
+    b'[unknown]'
+ar             24259  17460.29                8 c:open
+    b'llvm::sys::fs::openFileForRead(llvm::Twine const&, int&, llvm::SmallVectorImpl<char>*)'
+    b'[unknown]'
+    b'[unknown]'
+ranlib         24268  1105.09                7 c:open
+    b'llvm::sys::fs::openFileForRead(llvm::Twine const&, int&, llvm::SmallVectorImpl<char>*)'
+    b'[unknown]'
+    b'[unknown]'
+sh             25222   100.56                3 c:open
+    b'[unknown]'
+    b'[unknown]'
+sh             26321   103.44                3 c:open
+    b'[unknown]'
+    b'[unknown]'
+ar             29657  16472.37                9 c:open
+    b'llvm::sys::fs::openFileForRead(llvm::Twine const&, int&, llvm::SmallVectorImpl<char>*)'
+    b'[unknown]'
+    b'[unknown]'
+^C
+
+Shows the user space stack trace of calls to the libc function call open taking longer than 100 us.
+
 USAGE message:
 
-usage: funcslower.py [-h] [-p PID] [-m MIN_MS] [-u MIN_US] [-a ARGUMENTS] [-T]
+usage: funcslower.py [-hf] [-p PID] [-U | -K] [-m MIN_MS] [-u MIN_US] [-a ARGUMENTS] [-T]
                      [-t] [-v]
                      function [function ...]
 
@@ -93,6 +122,11 @@ optional arguments:
                         minimum duration to trace (ms)
   -u MIN_US, --min-us MIN_US
                         minimum duration to trace (us)
+  -U, --user-stack
+                        show stacks from user space
+  -K, --kernel-stack
+                        show stacks from kernel space
+  -f                    print output in folded stack format.
   -a ARGUMENTS, --arguments ARGUMENTS
                         print this many entry arguments, as hex
   -T, --time            show HH:MM:SS timestamp
