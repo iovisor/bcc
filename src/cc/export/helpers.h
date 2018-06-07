@@ -201,6 +201,23 @@ struct bpf_stacktrace {
 #define BPF_PROG_ARRAY(_name, _max_entries) \
   BPF_TABLE("prog", u32, u32, _name, _max_entries)
 
+#define BPF_XDP_REDIRECT_MAP(_table_type, _leaf_type, _name, _max_entries) \
+struct _name##_table_t { \
+  u32 key; \
+  _leaf_type leaf; \
+  /* xdp_act = map.redirect_map(index, flag) */ \
+  u64 (*redirect_map) (int, int); \
+  u32 max_entries; \
+}; \
+__attribute__((section("maps/"_table_type))) \
+struct _name##_table_t _name = { .max_entries = (_max_entries) }
+
+#define BPF_DEVMAP(_name, _max_entries) \
+  BPF_XDP_REDIRECT_MAP("devmap", int, _name, _max_entries)
+
+#define BPF_CPUMAP(_name, _max_entries) \
+  BPF_XDP_REDIRECT_MAP("cpumap", u32, _name, _max_entries)
+
 // packet parsing state machine helpers
 #define cursor_advance(_cursor, _len) \
   ({ void *_tmp = _cursor; _cursor += _len; _tmp; })
