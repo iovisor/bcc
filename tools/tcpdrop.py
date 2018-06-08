@@ -52,29 +52,28 @@ BPF_STACK_TRACE(stack_traces, 1024);
 
 // separate data structs for ipv4 and ipv6
 struct ipv4_data_t {
-    // XXX: switch some to u32's when supported
-    u64 pid;
+    u32 pid;
     u64 ip;
     u64 saddr;
     u64 daddr;
-    u64 sport;
-    u64 dport;
-    u64 state;
-    u64 tcpflags;
-    u64 stack_id;
+    u16 sport;
+    u16 dport;
+    u8 state;
+    u8 tcpflags;
+    u32 stack_id;
 };
 BPF_PERF_OUTPUT(ipv4_events);
 
 struct ipv6_data_t {
-    u64 pid;
+    u32 pid;
     u64 ip;
     unsigned __int128 saddr;
     unsigned __int128 daddr;
-    u64 sport;
-    u64 dport;
-    u64 state;
-    u64 tcpflags;
-    u64 stack_id;
+    u16 sport;
+    u16 dport;
+    u8 state;
+    u8 tcpflags;
+    u32 stack_id;
 };
 BPF_PERF_OUTPUT(ipv6_events);
 
@@ -152,28 +151,28 @@ if debug or args.ebpf:
 # event data
 class Data_ipv4(ct.Structure):
     _fields_ = [
-        ("pid", ct.c_ulonglong),
+        ("pid", ct.c_ulong),
         ("ip", ct.c_ulonglong),
         ("saddr", ct.c_ulonglong),
         ("daddr", ct.c_ulonglong),
-        ("sport", ct.c_ulonglong),
-        ("dport", ct.c_ulonglong),
-        ("state", ct.c_ulonglong),
-        ("tcpflags", ct.c_ulonglong),
-        ("stack_id", ct.c_ulonglong)
+        ("sport", ct.c_ushort),
+        ("dport", ct.c_ushort),
+        ("state", ct.c_ubyte),
+        ("tcpflags", ct.c_ubyte),
+        ("stack_id", ct.c_ulong)
     ]
 
 class Data_ipv6(ct.Structure):
     _fields_ = [
-        ("pid", ct.c_ulonglong),
+        ("pid", ct.c_ulong),
         ("ip", ct.c_ulonglong),
         ("saddr", (ct.c_ulonglong * 2)),
         ("daddr", (ct.c_ulonglong * 2)),
-        ("sport", ct.c_ulonglong),
-        ("dport", ct.c_ulonglong),
-        ("state", ct.c_ulonglong),
-        ("tcpflags", ct.c_ulonglong),
-        ("stack_id", ct.c_ulonglong)
+        ("sport", ct.c_ushort),
+        ("dport", ct.c_ushort),
+        ("state", ct.c_ubyte),
+        ("tcpflags", ct.c_ubyte),
+        ("stack_id", ct.c_ulong)
     ]
 
 # process event
