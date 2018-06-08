@@ -141,6 +141,7 @@ pair of .c and .py files, and some are directories of files.
 - tools/[tcpaccept](tools/tcpaccept.py): Trace TCP passive connections (accept()). [Examples](tools/tcpaccept_example.txt).
 - tools/[tcpconnect](tools/tcpconnect.py): Trace TCP active connections (connect()). [Examples](tools/tcpconnect_example.txt).
 - tools/[tcpconnlat](tools/tcpconnlat.py): Trace TCP active connection latency (connect()). [Examples](tools/tcpconnlat_example.txt).
+- tools/[tcpdrop](tools/tcpdrop.py): Trace kernel-based TCP packet drops with details. [Examples](tools/tcpdrop_example.txt).
 - tools/[tcplife](tools/tcplife.py): Trace TCP sessions and summarize lifespan. [Examples](tools/tcplife_example.txt).
 - tools/[tcpretrans](tools/tcpretrans.py): Trace TCP retransmits and TLPs. [Examples](tools/tcpretrans_example.txt).
 - tools/[tcpstates](tools/tcpstates.py): Trace TCP session state changes with durations. [Examples](tools/tcpstates_example.txt).
