@@ -9,10 +9,6 @@
 # counting there. Only the unique stacks and counts are passed to user space
 # at the end of the profile, greatly reducing the kernel<->user transfer.
 #
-# This uses perf_event_open to setup a timer which is instrumented by BPF,
-# and for efficiency it does not initialize the perf ring buffer, so the
-# redundant perf samples are not collected.
-#
 # REQUIRES: Linux 4.9+ (BPF_PROG_TYPE_PERF_EVENT support). Under tools/old is
 # a version of this tool that may work on Linux 4.6 - 4.8.
 #
