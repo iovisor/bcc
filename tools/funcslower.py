@@ -299,9 +299,6 @@ def print_stack(event):
         # fix kernel stack
         for addr in kernel_tmp:
             kernel_stack.append(addr)
-        # the later IP checking
-        if event.kernel_ip:
-            kernel_stack.insert(0, event.kernel_ip)
 
     do_delimiter = user_stack and kernel_stack
 
