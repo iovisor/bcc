@@ -75,34 +75,42 @@ This shows the first two arguments to __kmalloc -- the first one is the size
 of the requested allocation. The return value is also shown (null return values
 would indicate a failure).
 
-# ./funcslower.py -U -u 100 'c:open'
-Tracing function calls slower than 100 us... Ctrl+C to quit.
-COMM           PID    LAT(us)             RVAL FUNC
-ranlib         23857   910.01                6 c:open
-    b'llvm::sys::fs::openFileForRead(llvm::Twine const&, int&, llvm::SmallVectorImpl<char>*)'
-    b'[unknown]'
-    b'[unknown]'
-ar             24259  17460.29                8 c:open
-    b'llvm::sys::fs::openFileForRead(llvm::Twine const&, int&, llvm::SmallVectorImpl<char>*)'
-    b'[unknown]'
-    b'[unknown]'
-ranlib         24268  1105.09                7 c:open
-    b'llvm::sys::fs::openFileForRead(llvm::Twine const&, int&, llvm::SmallVectorImpl<char>*)'
-    b'[unknown]'
-    b'[unknown]'
-sh             25222   100.56                3 c:open
-    b'[unknown]'
-    b'[unknown]'
-sh             26321   103.44                3 c:open
-    b'[unknown]'
-    b'[unknown]'
-ar             29657  16472.37                9 c:open
-    b'llvm::sys::fs::openFileForRead(llvm::Twine const&, int&, llvm::SmallVectorImpl<char>*)'
-    b'[unknown]'
-    b'[unknown]'
+# ./funcslower -U -m 30 '/usr/sbin/nginx:database_write'
+Tracing function calls slower than 30 ms... Ctrl+C to quit.
+COMM           PID    LAT(ms)             RVAL FUNC
+nginx          1617     30.15                9 /usr/sbin/nginx:database_write
+    DataBaseProvider::setData(std::string const&, record_s&)
+    UserDataProvider::saveRecordData(RecordData const&)
+    RequestProcessor::writeResponse(int)
+    RequestProcessor::processRequest()
+    RequestRouter::processRequest(RequestWrapper*, ResponseWrapper*)
+    ngx_http_core_content_phase
+    ngx_http_core_run_phases
+    ngx_http_process_request
+    ngx_process_events_and_timers
+    ngx_spawn_process
+    ngx_master_process_cycle
+    main
+    __libc_start_main
+    [unknown]
+nginx          1629     30.14                9 /usr/sbin/nginx:database_write
+    DataBaseProvider::setData(std::string const&, record_s&)
+    UserDataProvider::saveRecordData(RecordData const&)
+    RequestProcessor::writeResponse(int)
+    RequestProcessor::processRequest()
+    RequestRouter::processRequest(RequestWrapper*, ResponseWrapper*)
+    ngx_http_core_content_phase
+    ngx_http_core_run_phases
+    ngx_http_process_request
+    ngx_process_events_and_timers
+    ngx_spawn_process
+    ngx_master_process_cycle
+    main
+    __libc_start_main
+    [unknown]
 ^C
 
-Shows the user space stack trace of calls to the libc function call open taking longer than 100 us.
+Shows the user space stack trace of calls to the user space function call open taking longer than 30 ms.
 
 USAGE message:
 
