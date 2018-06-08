@@ -1,8 +1,8 @@
 .TH funcslower 8  "2017-03-30" "USER COMMANDS"
 .SH NAME
-fileslower \- Trace slow kernel or user function calls.
+funcslower \- Trace slow kernel or user function calls.
 .SH SYNOPSIS
-.B fileslower [\-hf] [\-p PID] [\-U | \-K] [-m MIN_MS] [-u MIN_US] [-a ARGUMENTS] [-T] [-t] [-v] function [function ...]
+.B funcslower [\-hf] [\-p PID] [\-U | \-K] [-m MIN_MS] [-u MIN_US] [-a ARGUMENTS] [-T] [-t] [-v] function [function ...]
 .SH DESCRIPTION
 This script traces a kernel or user function's entry and return points, and
 prints a message when the function's latency exceeded the specified threshold.
