@@ -152,6 +152,7 @@ class BPF(object):
     XDP_DROP = 1
     XDP_PASS = 2
     XDP_TX = 3
+    XDP_REDIRECT = 4
 
     _probe_repl = re.compile(b"[^a-zA-Z0-9_]")
     _sym_caches = {}

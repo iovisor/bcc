@@ -609,6 +609,9 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
           } else if (memb_name == "check_current_task") {
             prefix = "bpf_current_task_under_cgroup";
             suffix = ")";
+          } else if (memb_name == "redirect_map") {
+            prefix = "bpf_redirect_map";
+            suffix = ")";
           } else {
             error(Call->getLocStart(), "invalid bpf_table operation %0") << memb_name;
             return false;
@@ -920,6 +923,10 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
       map_type = BPF_MAP_TYPE_CGROUP_ARRAY;
     } else if (A->getName() == "maps/stacktrace") {
       map_type = BPF_MAP_TYPE_STACK_TRACE;
+    } else if (A->getName() == "maps/devmap") {
+      map_type = BPF_MAP_TYPE_DEVMAP;
+    } else if (A->getName() == "maps/cpumap") {
+      map_type = BPF_MAP_TYPE_CPUMAP;
     } else if (A->getName() == "maps/extern") {
       if (!fe_.table_storage().Find(global_path, table_it)) {
         error(Decl->getLocStart(), "reference to undefined table");

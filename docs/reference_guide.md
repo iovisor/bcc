@@ -41,15 +41,18 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
         - [7. BPF_PERCPU_ARRAY](#7-bpf_percpu_array)
         - [8. BPF_LPM_TRIE](#8-bpf_lpm_trie)
         - [9. BPF_PROG_ARRAY](#9-bpf_prog_array)
-        - [10. map.lookup()](#10-maplookup)
-        - [11. map.lookup_or_init()](#11-maplookup_or_init)
-        - [12. map.delete()](#12-mapdelete)
-        - [13. map.update()](#13-mapupdate)
-        - [14. map.insert()](#14-mapinsert)
-        - [15. map.increment()](#15-mapincrement)
-        - [16. map.get_stackid()](#16-mapget_stackid)
-        - [17. map.perf_read()](#17-mapperf_read)
-        - [18. map.call()](#18-mapcall)
+        - [10. BPF_DEVMAP](#10-bpf_devmap)
+        - [11. BPF_CPUMAP](#11-bpf_cpumap)
+        - [12. map.lookup()](#12-maplookup)
+        - [13. map.lookup_or_init()](#13-maplookup_or_init)
+        - [14. map.delete()](#14-mapdelete)
+        - [15. map.update()](#15-mapupdate)
+        - [16. map.insert()](#16-mapinsert)
+        - [17. map.increment()](#17-mapincrement)
+        - [18. map.get_stackid()](#18-mapget_stackid)
+        - [19. map.perf_read()](#19-mapperf_read)
+        - [20. map.call()](#20-mapcall)
+        - [21. map.redirect_map()](#21-mapredirect_map)
 
 - [bcc Python](#bcc-python)
     - [Initialization](#initialization)
@@ -664,7 +667,39 @@ Examples in situ:
 [search /tests](https://github.com/iovisor/bcc/search?q=BPF_PROG_ARRAY+path%3Atests&type=Code),
 [assign fd](https://github.com/iovisor/bcc/blob/master/examples/networking/tunnel_monitor/monitor.py#L24-L26)
 
-### 10. map.lookup()
+### 10. BPF_DEVMAP
+
+Syntax: ```BPF_DEVMAP(name, size)```
+
+This creates a device map named ```name``` with ```size``` entries. Each entry of the map is an `ifindex` to a network interface. This map is only used in XDP.
+
+For example:
+```C
+BPF_DEVMAP(devmap, 10);
+```
+
+Methods (covered later): map.redirect_map().
+
+Examples in situ:
+[search /examples](https://github.com/iovisor/bcc/search?q=BPF_DEVMAP+path%3Aexamples&type=Code),
+
+### 11. BPF_CPUMAP
+
+Syntax: ```BPF_CPUMAP(name, size)```
+
+This creates a cpu map named ```name``` with ```size``` entries. The index of the map represents the CPU id and each entry is the size of the ring buffer allocated for the CPU. This map is only used in XDP.
+
+For example:
+```C
+BPF_CPUMAP(cpumap, 16);
+```
+
+Methods (covered later): map.redirect_map().
+
+Examples in situ:
+[search /examples](https://github.com/iovisor/bcc/search?q=BPF_CPUMAP+path%3Aexamples&type=Code),
+
+### 12. map.lookup()
 
 Syntax: ```*val map.lookup(&key)```
 
@@ -674,7 +709,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=lookup+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=lookup+path%3Atools&type=Code)
 
-### 11. map.lookup_or_init()
+### 13. map.lookup_or_init()
 
 Syntax: ```*val map.lookup_or_init(&key, &zero)```
 
@@ -684,7 +719,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=lookup_or_init+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=lookup_or_init+path%3Atools&type=Code)
 
-### 12. map.delete()
+### 14. map.delete()
 
 Syntax: ```map.delete(&key)```
 
@@ -694,7 +729,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=delete+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=delete+path%3Atools&type=Code)
 
-### 13. map.update()
+### 15. map.update()
 
 Syntax: ```map.update(&key, &val)```
 
@@ -704,7 +739,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=update+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=update+path%3Atools&type=Code)
 
-### 14. map.insert()
+### 16. map.insert()
 
 Syntax: ```map.insert(&key, &val)```
 
@@ -713,7 +748,7 @@ Associate the value in the second argument to the key, only if there was no prev
 Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=insert+path%3Aexamples&type=Code)
 
-### 15. map.increment()
+### 17. map.increment()
 
 Syntax: ```map.increment(key)```
 
@@ -723,7 +758,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=increment+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=increment+path%3Atools&type=Code)
 
-### 16. map.get_stackid()
+### 18. map.get_stackid()
 
 Syntax: ```int map.get_stackid(void *ctx, u64 flags)```
 
@@ -733,7 +768,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=get_stackid+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=get_stackid+path%3Atools&type=Code)
 
-### 17. map.perf_read()
+### 19. map.perf_read()
 
 Syntax: ```u64 map.perf_read(u32 cpu)```
 
@@ -742,7 +777,7 @@ This returns the hardware performance counter as configured in [5. BPF_PERF_ARRA
 Examples in situ:
 [search /tests](https://github.com/iovisor/bcc/search?q=perf_read+path%3Atests&type=Code)
 
-### 18. map.call()
+### 20. map.call()
 
 Syntax: ```void map.call(void *ctx, int index)```
 
@@ -780,6 +815,44 @@ This assigns ```tail_call()``` to ```prog_array[2]```. In the end of ```do_tail_
 Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?l=C&q=call+path%3Aexamples&type=Code),
 [search /tests](https://github.com/iovisor/bcc/search?l=C&q=call+path%3Atests&type=Code)
+
+### 21. map.redirect_map()
+
+Syntax: ```int map.redirect_map(int index, int flags)```
+
+This redirects the incoming packets based on the ```index``` entry. If the map is [10. BPF_DEVMAP](#10-bpf_devmap), the packet will be sent to the transmit queue of the network interface that the entry points to. If the map is [11. BPF_CPUMAP](#11-bpf_cpumap), the packet will be sent to the ring buffer of the ```index``` CPU and be processed by the CPU later.
+
+If the packet is redirected successfully, the function will return XDP_REDIRECT. Otherwise, it will return XDP_ABORTED to discard the packet.
+
+For example:
+```C
+BPF_DEVMAP(devmap, 1);
+
+int redirect_example(struct xdp_md *ctx) {
+    return devmap.redirect_map(0, 0);
+}
+int xdp_dummy(struct xdp_md *ctx) {
+    return XDP_PASS;
+}
+```
+
+```Python
+ip = pyroute2.IPRoute()
+idx = ip.link_lookup(ifname="eth1")[0]
+
+b = bcc.BPF(src_file="example.c")
+
+devmap = b.get_table("devmap")
+devmap[c_uint32(0)] = c_int(idx)
+
+in_fn = b.load_func("redirect_example", BPF.XDP)
+out_fn = b.load_func("xdp_dummy", BPF.XDP)
+b.attach_xdp("eth0", in_fn, 0)
+b.attach_xdp("eth1", out_fn, 0)
+```
+
+Examples in situ:
+[search /examples](https://github.com/iovisor/bcc/search?l=C&q=redirect_map+path%3Aexamples&type=Code),
 
 # bcc Python
 
