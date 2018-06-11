@@ -314,6 +314,10 @@ class SmokeTests(TestCase):
     def test_tcpretrans(self):
         self.run_with_int("tcpretrans.py")
 
+    @skipUnless(kernel_version_ge(4, 7), "requires kernel >= 4.7")
+    def test_tcpdrop(self):
+        self.run_with_int("tcpdrop.py")
+
     def test_tcptop(self):
         self.run_with_duration("tcptop.py 1 1")
 
