@@ -270,6 +270,12 @@ bool ProbeVisitor::VisitVarDecl(VarDecl *D) {
   return true;
 }
 
+bool ProbeVisitor::TraverseStmt(Stmt *S) {
+  if (whitelist_.find(S) != whitelist_.end())
+    return true;
+  return RecursiveASTVisitor<ProbeVisitor>::TraverseStmt(S);
+}
+
 bool ProbeVisitor::VisitCallExpr(CallExpr *Call) {
   // Skip bpf_probe_read for the third argument if it is an AddrOf.
   if (VarDecl *V = dyn_cast<VarDecl>(Call->getCalleeDecl())) {
@@ -277,7 +283,7 @@ bool ProbeVisitor::VisitCallExpr(CallExpr *Call) {
       const Expr *E = Call->getArg(2)->IgnoreParenCasts();
       if (const UnaryOperator *UnaryExpr = dyn_cast<UnaryOperator>(E)) {
         if (UnaryExpr->getOpcode() == UO_AddrOf)
-          return false;
+          whitelist_.insert(E);
       }
       return true;
     }
