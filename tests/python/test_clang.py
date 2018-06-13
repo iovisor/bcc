@@ -921,6 +921,18 @@ int test(struct pt_regs *ctx) {
         b = BPF(text=text)
         fn = b.load_func("test", BPF.KPROBE)
 
+    def test_probe_read_ctx_array(self):
+        text = """
+#include <linux/sched.h>
+#include <net/inet_sock.h>
+int test(struct pt_regs *ctx) {
+    struct sock *newsk = (struct sock *)PT_REGS_RC(ctx);
+    return newsk->__sk_common.skc_rcv_saddr;
+}
+"""
+        b = BPF(text=text)
+        fn = b.load_func("test", BPF.KPROBE)
+
     @skipUnless(kernel_version_ge(4,7), "requires kernel >= 4.7")
     def test_probe_read_tc_ctx(self):
         text = """
