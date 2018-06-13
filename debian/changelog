@@ -1,3 +1,12 @@
+bcc (0.6.0-1) unstable; urgency=low
+
+  * Support for kernel up to 4.17
+  * Many bugfixes
+  * Many new tools
+  * Improved python3 support
+
+ -- Brenden Blanco <bblanco@gmail.com>  Wed, 13 Jun 2018 17:00:00 +0000
+
 bcc (0.5.0-1) unstable; urgency=low
 
   * Support for USDT in ARM64
