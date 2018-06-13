@@ -91,6 +91,7 @@ class ProbeVisitor : public clang::RecursiveASTVisitor<ProbeVisitor> {
   explicit ProbeVisitor(clang::ASTContext &C, clang::Rewriter &rewriter,
                         std::set<clang::Decl *> &m, bool track_helpers);
   bool VisitVarDecl(clang::VarDecl *Decl);
+  bool TraverseStmt(clang::Stmt *S);
   bool VisitCallExpr(clang::CallExpr *Call);
   bool VisitBinaryOperator(clang::BinaryOperator *E);
   bool VisitUnaryOperator(clang::UnaryOperator *E);
@@ -109,6 +110,7 @@ class ProbeVisitor : public clang::RecursiveASTVisitor<ProbeVisitor> {
   clang::Rewriter &rewriter_;
   std::set<clang::Decl *> fn_visited_;
   std::set<clang::Expr *> memb_visited_;
+  std::set<const clang::Stmt *> whitelist_;
   std::set<std::tuple<clang::Decl *, int>> ptregs_;
   std::set<clang::Decl *> &m_;
   clang::Decl *ctx_;
