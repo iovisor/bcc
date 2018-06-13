@@ -70,6 +70,11 @@ class BTypeVisitor : public clang::RecursiveASTVisitor<BTypeVisitor> {
  private:
   clang::SourceRange expansionRange(clang::SourceRange range);
   bool checkFormatSpecifiers(const std::string& fmt, clang::SourceLocation loc);
+  void genParamDirectAssign(clang::FunctionDecl *D, std::string& preamble,
+                            const char **calling_conv_regs);
+  void genParamIndirectAssign(clang::FunctionDecl *D, std::string& preamble,
+                              const char **calling_conv_regs);
+  void rewriteFuncParam(clang::FunctionDecl *D);
   template <unsigned N>
   clang::DiagnosticBuilder error(clang::SourceLocation loc, const char (&fmt)[N]);
   template <unsigned N>

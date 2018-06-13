@@ -86,7 +86,7 @@ struct data_t {
 
 BPF_PERF_OUTPUT(events);
 
-int do_sys_mount(struct pt_regs *ctx, char __user *source,
+int syscall__mount(struct pt_regs *ctx, char __user *source,
                       char __user *target, char __user *type,
                       unsigned long flags)
 {
@@ -145,7 +145,7 @@ int do_ret_sys_mount(struct pt_regs *ctx)
     return 0;
 }
 
-int do_sys_umount(struct pt_regs *ctx, char __user *target, int flags)
+int syscall__umount(struct pt_regs *ctx, char __user *target, int flags)
 {
     struct data_t event = {};
     struct task_struct *task;
@@ -404,10 +404,10 @@ def main():
         exit()
     b = bcc.BPF(text=bpf_text)
     mount_fnname = b.get_syscall_fnname("mount")
-    b.attach_kprobe(event=mount_fnname, fn_name="do_sys_mount")
+    b.attach_kprobe(event=mount_fnname, fn_name="syscall__mount")
     b.attach_kretprobe(event=mount_fnname, fn_name="do_ret_sys_mount")
     umount_fnname = b.get_syscall_fnname("umount")
-    b.attach_kprobe(event=umount_fnname, fn_name="do_sys_umount")
+    b.attach_kprobe(event=umount_fnname, fn_name="syscall__umount")
     b.attach_kretprobe(event=umount_fnname, fn_name="do_ret_sys_umount")
     b['events'].open_perf_buffer(
         functools.partial(print_event, mounts, umounts))

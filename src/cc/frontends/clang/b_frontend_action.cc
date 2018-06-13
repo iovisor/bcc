@@ -429,9 +429,83 @@ DiagnosticBuilder ProbeVisitor::error(SourceLocation loc, const char (&fmt)[N]) 
 BTypeVisitor::BTypeVisitor(ASTContext &C, BFrontendAction &fe)
     : C(C), diag_(C.getDiagnostics()), fe_(fe), rewriter_(fe.rewriter()), out_(llvm::errs()) {}
 
-bool BTypeVisitor::VisitFunctionDecl(FunctionDecl *D) {
+void BTypeVisitor::genParamDirectAssign(FunctionDecl *D, string& preamble,
+                                        const char **calling_conv_regs) {
+  for (size_t idx = 0; idx < fn_args_.size(); idx++) {
+    ParmVarDecl *arg = fn_args_[idx];
+
+    if (idx >= 1) {
+      // Move the args into a preamble section where the same params are
+      // declared and initialized from pt_regs.
+      // Todo: this init should be done only when the program requests it.
+      string text = rewriter_.getRewrittenText(expansionRange(arg->getSourceRange()));
+      arg->addAttr(UnavailableAttr::CreateImplicit(C, "ptregs"));
+      size_t d = idx - 1;
+      const char *reg = calling_conv_regs[d];
+      preamble += " " + text + " = " + fn_args_[0]->getName().str() + "->" +
+                  string(reg) + ";";
+    }
+  }
+}
+
+void BTypeVisitor::genParamIndirectAssign(FunctionDecl *D, string& preamble,
+                                          const char **calling_conv_regs) {
+  string new_ctx;
+
+  for (size_t idx = 0; idx < fn_args_.size(); idx++) {
+    ParmVarDecl *arg = fn_args_[idx];
+
+    if (idx == 0) {
+      new_ctx = "__" + arg->getName().str();
+      preamble += " struct pt_regs * " + new_ctx + " = " +
+                  arg->getName().str() + "->" +
+                  string(calling_conv_regs[0]) + ";";
+    } else {
+      // Move the args into a preamble section where the same params are
+      // declared and initialized from pt_regs.
+      // Todo: this init should be done only when the program requests it.
+      string text = rewriter_.getRewrittenText(expansionRange(arg->getSourceRange()));
+      size_t d = idx - 1;
+      const char *reg = calling_conv_regs[d];
+      preamble += "\n " + text + ";";
+      preamble += " bpf_probe_read(&" + arg->getName().str() + ", sizeof(" +
+                  arg->getName().str() + "), &" + new_ctx + "->" +
+                  string(reg) + ");";
+    }
+  }
+}
+
+void BTypeVisitor::rewriteFuncParam(FunctionDecl *D) {
   const char **calling_conv_regs = get_call_conv();
 
+  string preamble = "{\n";
+  if (D->param_size() > 1) {
+    // If function prefix is "syscall__" or "kprobe____x64_sys_",
+    // the function will attach to a kprobe syscall function.
+    // Guard parameter assiggnment with CONFIG_ARCH_HAS_SYSCALL_WRAPPER.
+    // For __x64_sys_* syscalls, this is always true, but we guard
+    // it in case of "syscall__" for other architectures.
+    if (strncmp(D->getName().str().c_str(), "syscall__", 9) == 0 ||
+        strncmp(D->getName().str().c_str(), "kprobe____x64_sys_", 18) == 0) {
+      preamble += "#ifdef CONFIG_ARCH_HAS_SYSCALL_WRAPPER\n";
+      genParamIndirectAssign(D, preamble, calling_conv_regs);
+      preamble += "\n#else\n";
+      genParamDirectAssign(D, preamble, calling_conv_regs);
+      preamble += "\n#endif\n";
+    } else {
+      genParamDirectAssign(D, preamble, calling_conv_regs);
+    }
+    rewriter_.ReplaceText(
+        expansionRange(SourceRange(D->getParamDecl(0)->getLocEnd(),
+                    D->getParamDecl(D->getNumParams() - 1)->getLocEnd())),
+        fn_args_[0]->getName());
+  }
+  // for each trace argument, convert the variable from ptregs to something on stack
+  if (CompoundStmt *S = dyn_cast<CompoundStmt>(D->getBody()))
+    rewriter_.ReplaceText(S->getLBracLoc(), 1, preamble);
+}
+
+bool BTypeVisitor::VisitFunctionDecl(FunctionDecl *D) {
   // put each non-static non-inline function decl in its own section, to be
   // extracted by the MemoryManager
   auto real_start_loc = rewriter_.getSourceMgr().getFileLoc(D->getLocStart());
@@ -447,37 +521,17 @@ bool BTypeVisitor::VisitFunctionDecl(FunctionDecl *D) {
             "too many arguments, bcc only supports in-register parameters");
       return false;
     }
-    // remember the arg names of the current function...first one is the ctx
+
     fn_args_.clear();
-    string preamble = "{";
     for (auto arg_it = D->param_begin(); arg_it != D->param_end(); arg_it++) {
-      auto arg = *arg_it;
+      auto *arg = *arg_it;
       if (arg->getName() == "") {
         error(arg->getLocEnd(), "arguments to BPF program definition must be named");
         return false;
       }
       fn_args_.push_back(arg);
-      if (fn_args_.size() > 1) {
-        // Move the args into a preamble section where the same params are
-        // declared and initialized from pt_regs.
-        // Todo: this init should be done only when the program requests it.
-        string text = rewriter_.getRewrittenText(expansionRange(arg->getSourceRange()));
-        arg->addAttr(UnavailableAttr::CreateImplicit(C, "ptregs"));
-        size_t d = fn_args_.size() - 2;
-        const char *reg = calling_conv_regs[d];
-        preamble += " " + text + " = " + fn_args_[0]->getName().str() + "->" +
-                    string(reg) + ";";
-      }
     }
-    if (D->param_size() > 1) {
-      rewriter_.ReplaceText(
-          expansionRange(SourceRange(D->getParamDecl(0)->getLocEnd(),
-                      D->getParamDecl(D->getNumParams() - 1)->getLocEnd())),
-          fn_args_[0]->getName());
-    }
-    // for each trace argument, convert the variable from ptregs to something on stack
-    if (CompoundStmt *S = dyn_cast<CompoundStmt>(D->getBody()))
-      rewriter_.ReplaceText(S->getLBracLoc(), 1, preamble);
+    rewriteFuncParam(D);
   } else if (D->hasBody() &&
              rewriter_.getSourceMgr().getFileID(real_start_loc)
                == rewriter_.getSourceMgr().getMainFileID()) {

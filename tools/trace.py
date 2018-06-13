@@ -64,6 +64,11 @@ class Probe(object):
                 self.probe_name = re.sub(r'[^A-Za-z0-9_]', '_',
                                          self.probe_name)
 
+                # compiler can generate proper codes for function
+                # signatures with "syscall__" prefix
+                if self.is_syscall_kprobe:
+                        self.probe_name = "syscall__" + self.probe_name[6:]
+
         def __str__(self):
                 return "%s:%s:%s FLT=%s ACT=%s/%s" % (self.probe_type,
                         self.library, self._display_function(), self.filter,
@@ -154,6 +159,12 @@ class Probe(object):
                         self.library = ':'.join(parts[1:-1])
                         self.function = parts[-1]
 
+                # only x64 syscalls needs checking, no other syscall wrapper yet.
+                self.is_syscall_kprobe = False
+                if self.probe_type == "p" and len(self.library) == 0 and \
+                   self.function[:10] == "__x64_sys_":
+                        self.is_syscall_kprobe = True
+
         def _find_usdt_probe(self):
                 target = Probe.pid if Probe.pid and Probe.pid != -1 \
                                    else Probe.tgid
@@ -194,14 +205,32 @@ class Probe(object):
                         if len(part) > 0:
                                 self.values.append(part)
 
-        aliases = {
-                "retval": "PT_REGS_RC(ctx)",
+        aliases_arg = {
                 "arg1": "PT_REGS_PARM1(ctx)",
                 "arg2": "PT_REGS_PARM2(ctx)",
                 "arg3": "PT_REGS_PARM3(ctx)",
                 "arg4": "PT_REGS_PARM4(ctx)",
                 "arg5": "PT_REGS_PARM5(ctx)",
                 "arg6": "PT_REGS_PARM6(ctx)",
+        }
+
+        aliases_indarg = {
+                "arg1": "({u64 _val; struct pt_regs *_ctx = PT_REGS_PARM1(ctx);"
+                        "  bpf_probe_read(&_val, sizeof(_val), &(PT_REGS_PARM1(_ctx))); _val;})",
+                "arg2": "({u64 _val; struct pt_regs *_ctx = PT_REGS_PARM2(ctx);"
+                        "  bpf_probe_read(&_val, sizeof(_val), &(PT_REGS_PARM2(_ctx))); _val;})",
+                "arg3": "({u64 _val; struct pt_regs *_ctx = PT_REGS_PARM3(ctx);"
+                        "  bpf_probe_read(&_val, sizeof(_val), &(PT_REGS_PARM3(_ctx))); _val;})",
+                "arg4": "({u64 _val; struct pt_regs *_ctx = PT_REGS_PARM4(ctx);"
+                        "  bpf_probe_read(&_val, sizeof(_val), &(PT_REGS_PARM4(_ctx))); _val;})",
+                "arg5": "({u64 _val; struct pt_regs *_ctx = PT_REGS_PARM5(ctx);"
+                        "  bpf_probe_read(&_val, sizeof(_val), &(PT_REGS_PARM5(_ctx))); _val;})",
+                "arg6": "({u64 _val; struct pt_regs *_ctx = PT_REGS_PARM6(ctx);"
+                        "  bpf_probe_read(&_val, sizeof(_val), &(PT_REGS_PARM6(_ctx))); _val;})",
+        }
+
+        aliases_common = {
+                "retval": "PT_REGS_RC(ctx)",
                 "$uid": "(unsigned)(bpf_get_current_uid_gid() & 0xffffffff)",
                 "$gid": "(unsigned)(bpf_get_current_uid_gid() >> 32)",
                 "$pid": "(unsigned)(bpf_get_current_pid_tgid() & 0xffffffff)",
@@ -229,13 +258,19 @@ static inline bool %s(char const *ignored, uintptr_t str) {
                 return fname
 
         def _rewrite_expr(self, expr):
-                for alias, replacement in Probe.aliases.items():
+                if self.is_syscall_kprobe:
+                    for alias, replacement in Probe.aliases_indarg.items():
+                        expr = expr.replace(alias, replacement)
+                else:
+                    for alias, replacement in Probe.aliases_arg.items():
                         # For USDT probes, we replace argN values with the
                         # actual arguments for that probe obtained using
                         # bpf_readarg_N macros emitted at BPF construction.
-                        if alias.startswith("arg") and self.probe_type == "u":
+                        if self.probe_type == "u":
                                 continue
                         expr = expr.replace(alias, replacement)
+                for alias, replacement in Probe.aliases_common.items():
+                    expr = expr.replace(alias, replacement)
                 matches = re.finditer('STRCMP\\(("[^"]+\\")', expr)
                 for match in matches:
                         string = match.group(1)
@@ -362,9 +397,8 @@ BPF_PERF_OUTPUT(%s);
             text = ""
             if self.probe_type != "u":
                     return text
-            for arg, _ in Probe.aliases.items():
-                    if not (arg.startswith("arg") and
-                            (arg in self.filter)):
+            for arg, _ in Probe.aliases_arg.items():
+                    if not (arg in self.filter):
                             continue
                     arg_index = int(arg.replace("arg", ""))
                     arg_ctype = self.usdt.get_probe_arg_ctype(

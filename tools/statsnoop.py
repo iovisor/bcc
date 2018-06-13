@@ -61,7 +61,7 @@ BPF_HASH(args_filename, u32, const char *);
 BPF_HASH(infotmp, u32, struct val_t);
 BPF_PERF_OUTPUT(events);
 
-int trace_entry(struct pt_regs *ctx, const char __user *filename)
+int syscall__entry(struct pt_regs *ctx, const char __user *filename)
 {
     struct val_t val = {};
     u32 pid = bpf_get_current_pid_tgid();
@@ -116,17 +116,17 @@ b = BPF(text=bpf_text)
 # actually exist before attaching the probes
 syscall_fnname = b.get_syscall_fnname("stat")
 if BPF.ksymname(syscall_fnname) != -1:
-    b.attach_kprobe(event=syscall_fnname, fn_name="trace_entry")
+    b.attach_kprobe(event=syscall_fnname, fn_name="syscall__entry")
     b.attach_kretprobe(event=syscall_fnname, fn_name="trace_return")
 
 syscall_fnname = b.get_syscall_fnname("statfs")
 if BPF.ksymname(syscall_fnname) != -1:
-    b.attach_kprobe(event=syscall_fnname, fn_name="trace_entry")
+    b.attach_kprobe(event=syscall_fnname, fn_name="syscall__entry")
     b.attach_kretprobe(event=syscall_fnname, fn_name="trace_return")
 
 syscall_fnname = b.get_syscall_fnname("newstat")
 if BPF.ksymname(syscall_fnname) != -1:
-    b.attach_kprobe(event=syscall_fnname, fn_name="trace_entry")
+    b.attach_kprobe(event=syscall_fnname, fn_name="syscall__entry")
     b.attach_kretprobe(event=syscall_fnname, fn_name="trace_return")
 
 TASK_COMM_LEN = 16    # linux/sched.h
