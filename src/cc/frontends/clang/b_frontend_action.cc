@@ -382,18 +382,24 @@ bool ProbeVisitor::IsContextMemberExpr(Expr *E) {
   if (!E->getType()->isPointerType())
     return false;
 
-  MemberExpr *Memb = dyn_cast<MemberExpr>(E->IgnoreParenCasts());
   Expr *base;
-  SourceLocation rhs_start, member;
+  SourceLocation member;
   bool found = false;
   MemberExpr *M;
-  for (M = Memb; M; M = dyn_cast<MemberExpr>(M->getBase())) {
-    rhs_start = M->getLocEnd();
-    base = M->getBase();
-    member = M->getMemberLoc();
-    if (M->isArrow()) {
-      found = true;
-      break;
+  Expr *Ex = E->IgnoreParenCasts();
+  while (Ex->getStmtClass() == Stmt::ArraySubscriptExprClass
+         || Ex->getStmtClass() == Stmt::MemberExprClass) {
+    if (Ex->getStmtClass() == Stmt::ArraySubscriptExprClass) {
+      Ex = dyn_cast<ArraySubscriptExpr>(Ex)->getBase()->IgnoreParenCasts();
+    } else if (Ex->getStmtClass() == Stmt::MemberExprClass) {
+      M = dyn_cast<MemberExpr>(Ex);
+      base = M->getBase()->IgnoreParenCasts();
+      member = M->getMemberLoc();
+      if (M->isArrow()) {
+        found = true;
+        break;
+      }
+      Ex = base;
     }
   }
   if (!found) {
@@ -403,7 +409,7 @@ bool ProbeVisitor::IsContextMemberExpr(Expr *E) {
     return false;
   }
 
-  if (DeclRefExpr *base_expr = dyn_cast<DeclRefExpr>(base->IgnoreImplicit())) {
+  if (DeclRefExpr *base_expr = dyn_cast<DeclRefExpr>(base)) {
     if (base_expr->getDecl() == ctx_) {
       return true;
     }
