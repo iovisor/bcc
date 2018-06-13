@@ -202,7 +202,7 @@ def print_ipv6_event(cpu, data, size):
 
 # initialize BPF
 b = BPF(text=bpf_text)
-if b.get_kprobe_functions("tcp_drop"):
+if b.get_kprobe_functions(b"tcp_drop"):
     b.attach_kprobe(event="tcp_drop", fn_name="trace_tcp_drop")
 else:
     print("ERROR: tcp_drop() kernel function not found or traceable. "
