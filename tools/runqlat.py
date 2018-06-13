@@ -152,45 +152,37 @@ RAW_TRACEPOINT_PROBE(sched_wakeup)
 {
     // TP_PROTO(struct task_struct *p)
     struct task_struct *p = (struct task_struct *)ctx->args[0];
-    u32 tgid, pid;
-
-    bpf_probe_read(&tgid, sizeof(tgid), &p->tgid);
-    bpf_probe_read(&pid, sizeof(pid), &p->pid);
-    return trace_enqueue(tgid, pid);
+    return trace_enqueue(p->tgid, p->pid);
 }
 
 RAW_TRACEPOINT_PROBE(sched_wakeup_new)
 {
     // TP_PROTO(struct task_struct *p)
     struct task_struct *p = (struct task_struct *)ctx->args[0];
-    u32 tgid, pid;
-
-    bpf_probe_read(&tgid, sizeof(tgid), &p->tgid);
-    bpf_probe_read(&pid, sizeof(pid), &p->pid);
-    return trace_enqueue(tgid, pid);
+    return trace_enqueue(p->tgid, p->pid);
 }
 
 RAW_TRACEPOINT_PROBE(sched_switch)
 {
     // TP_PROTO(bool preempt, struct task_struct *prev, struct task_struct *next)
     struct task_struct *prev = (struct task_struct *)ctx->args[1];
-    struct task_struct *next= (struct task_struct *)ctx->args[2];
+    struct task_struct *next = (struct task_struct *)ctx->args[2];
     u32 pid, tgid;
     long state;
 
     // ivcsw: treat like an enqueue event and store timestamp
     bpf_probe_read(&state, sizeof(long), &prev->state);
     if (state == TASK_RUNNING) {
-        bpf_probe_read(&tgid, sizeof(prev->tgid), &prev->tgid);
-        bpf_probe_read(&pid, sizeof(prev->pid), &prev->pid);
+        tgid = prev->tgid;
+        pid = prev->pid;
         if (!(FILTER || pid == 0)) {
             u64 ts = bpf_ktime_get_ns();
             start.update(&pid, &ts);
         }
     }
 
-    bpf_probe_read(&tgid, sizeof(next->tgid), &next->tgid);
-    bpf_probe_read(&pid, sizeof(next->pid), &next->pid);
+    tgid = next->tgid;
+    pid = next->pid;
     if (FILTER || pid == 0)
         return 0;
     u64 *tsp, delta;
