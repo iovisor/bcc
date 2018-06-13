@@ -94,12 +94,14 @@ Requires: libbcc = %{version}-%{release}
 %description -n python2-bcc
 Python bindings for BPF Compiler Collection (BCC)
 
+%if %{with python3}
 %package -n python3-bcc
 Summary: Python3 bindings for BPF Compiler Collection (BCC)
 Requires: libbcc = %{version}-%{release}
 %{?python_provide:%python_provide python3-bcc}
 %description -n python3-bcc
 Python bindings for BPF Compiler Collection (BCC)
+%endif
 
 %if %{with_lua}
 %package -n bcc-lua
@@ -131,8 +133,10 @@ Command line tools for BPF Compiler Collection (BCC)
 %files -n python2-bcc
 %{python2_sitelib}/bcc*
 
+%if %{with python3}
 %files -n python3-bcc
 %{python3_sitelib}/bcc*
+%endif
 
 %if %{with_lua}
 %files -n bcc-lua
@@ -158,7 +162,7 @@ Command line tools for BPF Compiler Collection (BCC)
 %postun -n libbcc -p /sbin/ldconfig
 
 %changelog
-* Thu Jun 07 2018 Brenden Blanco <bblanco@gmail.com> - 0.5.0-1
+* Thu Jun 13 2018 Brenden Blanco <bblanco@gmail.com> - 0.5.0-1
 - Add with llvm_shared conditional
 - Add python2/python3 package targets
 
