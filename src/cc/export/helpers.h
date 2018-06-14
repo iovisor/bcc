@@ -201,6 +201,23 @@ struct bpf_stacktrace {
 #define BPF_PROG_ARRAY(_name, _max_entries) \
   BPF_TABLE("prog", u32, u32, _name, _max_entries)
 
+#define BPF_XDP_REDIRECT_MAP(_table_type, _leaf_type, _name, _max_entries) \
+struct _name##_table_t { \
+  u32 key; \
+  _leaf_type leaf; \
+  /* xdp_act = map.redirect_map(index, flag) */ \
+  u64 (*redirect_map) (int, int); \
+  u32 max_entries; \
+}; \
+__attribute__((section("maps/"_table_type))) \
+struct _name##_table_t _name = { .max_entries = (_max_entries) }
+
+#define BPF_DEVMAP(_name, _max_entries) \
+  BPF_XDP_REDIRECT_MAP("devmap", int, _name, _max_entries)
+
+#define BPF_CPUMAP(_name, _max_entries) \
+  BPF_XDP_REDIRECT_MAP("cpumap", u32, _name, _max_entries)
+
 // packet parsing state machine helpers
 #define cursor_advance(_cursor, _len) \
   ({ void *_tmp = _cursor; _cursor += _len; _tmp; })
@@ -356,6 +373,30 @@ static int (*bpf_xdp_adjust_tail)(void *ctx, int offset) =
   (void *) BPF_FUNC_xdp_adjust_tail;
 static int (*bpf_skb_get_xfrm_state)(void *ctx, u32 index, void *xfrm_state, u32 size, u64 flags) =
   (void *) BPF_FUNC_skb_get_xfrm_state;
+static int (*bpf_get_stack)(void *ctx, void *buf, u32 size, u64 flags) =
+  (void *) BPF_FUNC_get_stack;
+static int (*bpf_skb_load_bytes_relative)(void *ctx, u32 offset, void *to, u32 len, u32 start_header) =
+  (void *) BPF_FUNC_skb_load_bytes_relative;
+static int (*bpf_fib_lookup)(void *ctx, void *params, int plen, u32 flags) =
+  (void *) BPF_FUNC_fib_lookup;
+static int (*bpf_sock_hash_update)(void *ctx, void *map, void *key, u64 flags) =
+  (void *) BPF_FUNC_sock_hash_update;
+static int (*bpf_msg_redirect_hash)(void *ctx, void *map, void *key, u64 flags) =
+  (void *) BPF_FUNC_msg_redirect_hash;
+static int (*bpf_sk_redirect_hash)(void *ctx, void *map, void *key, u64 flags) =
+  (void *) BPF_FUNC_sk_redirect_hash;
+static int (*bpf_lwt_push_encap)(void *skb, u32 type, void *hdr, u32 len) =
+  (void *) BPF_FUNC_lwt_push_encap;
+static int (*bpf_lwt_seg6_store_bytes)(void *ctx, u32 offset, const void *from, u32 len) =
+  (void *) BPF_FUNC_lwt_seg6_store_bytes;
+static int (*bpf_lwt_seg6_adjust_srh)(void *ctx, u32 offset, s32 delta) =
+  (void *) BPF_FUNC_lwt_seg6_adjust_srh;
+static int (*bpf_lwt_seg6_action)(void *ctx, u32 action, void *param, u32 param_len) =
+  (void *) BPF_FUNC_lwt_seg6_action;
+static int (*bpf_rc_keydown)(void *ctx, u32 protocol, u64 scancode, u32 toggle) =
+  (void *) BPF_FUNC_rc_keydown;
+static int (*bpf_rc_repeat)(void *ctx) =
+  (void *) BPF_FUNC_rc_repeat;
 
 /* llvm builtin functions that eBPF C program may use to
  * emit BPF_LD_ABS and BPF_LD_IND instructions

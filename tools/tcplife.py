@@ -128,6 +128,7 @@ int kprobe__tcp_set_state(struct pt_regs *ctx, struct sock *sk, int state)
 
     // dport is either used in a filter here, or later
     u16 dport = sk->__sk_common.skc_dport;
+    dport = ntohs(dport);
     FILTER_DPORT
 
     /*
@@ -201,7 +202,7 @@ int kprobe__tcp_set_state(struct pt_regs *ctx, struct sock *sk, int state)
         data4.daddr = sk->__sk_common.skc_daddr;
         // a workaround until data4 compiles with separate lport/dport
         data4.pid = pid;
-        data4.ports = ntohs(dport) + ((0ULL + lport) << 32);
+        data4.ports = dport + ((0ULL + lport) << 32);
         if (mep == 0) {
             bpf_get_current_comm(&data4.task, sizeof(data4.task));
         } else {
@@ -218,7 +219,7 @@ int kprobe__tcp_set_state(struct pt_regs *ctx, struct sock *sk, int state)
         bpf_probe_read(&data6.daddr, sizeof(data6.daddr),
             sk->__sk_common.skc_v6_daddr.in6_u.u6_addr32);
         // a workaround until data6 compiles with separate lport/dport
-        data6.ports = ntohs(dport) + ((0ULL + lport) << 32);
+        data6.ports = dport + ((0ULL + lport) << 32);
         data6.pid = pid;
         if (mep == 0) {
             bpf_get_current_comm(&data6.task, sizeof(data6.task));
@@ -366,7 +367,7 @@ if args.pid:
         'if (pid != %s) { return 0; }' % args.pid)
 if args.remoteport:
     dports = [int(dport) for dport in args.remoteport.split(',')]
-    dports_if = ' && '.join(['dport != %d' % ntohs(dport) for dport in dports])
+    dports_if = ' && '.join(['dport != %d' % dport for dport in dports])
     bpf_text = bpf_text.replace('FILTER_DPORT',
         'if (%s) { birth.delete(&sk); return 0; }' % dports_if)
 if args.localport:

@@ -36,6 +36,13 @@ BPF_MAP_TYPE_CGROUP_ARRAY = 8
 BPF_MAP_TYPE_LRU_HASH = 9
 BPF_MAP_TYPE_LRU_PERCPU_HASH = 10
 BPF_MAP_TYPE_LPM_TRIE = 11
+BPF_MAP_TYPE_ARRAY_OF_MAPS = 12
+BPF_MAP_TYPE_HASH_OF_MAPS = 13
+BPF_MAP_TYPE_DEVMAP = 14
+BPF_MAP_TYPE_SOCKMAP = 15
+BPF_MAP_TYPE_CPUMAP = 16
+BPF_MAP_TYPE_XSKMAP = 17
+BPF_MAP_TYPE_SOCKHASH = 18
 
 stars_max = 40
 log2_index_max = 65
@@ -144,6 +151,10 @@ def Table(bpf, map_id, map_fd, keytype, leaftype, **kwargs):
         t = LruPerCpuHash(bpf, map_id, map_fd, keytype, leaftype)
     elif ttype == BPF_MAP_TYPE_CGROUP_ARRAY:
         t = CgroupArray(bpf, map_id, map_fd, keytype, leaftype)
+    elif ttype == BPF_MAP_TYPE_DEVMAP:
+        t = DevMap(bpf, map_id, map_fd, keytype, leaftype)
+    elif ttype == BPF_MAP_TYPE_CPUMAP:
+        t = CpuMap(bpf, map_id, map_fd, keytype, leaftype)
     if t == None:
         raise Exception("Unknown table type %d" % ttype)
     return t
@@ -766,3 +777,11 @@ class StackTrace(TableBase):
 
     def clear(self):
         pass
+
+class DevMap(ArrayBase):
+    def __init__(self, *args, **kwargs):
+        super(DevMap, self).__init__(*args, **kwargs)
+
+class CpuMap(ArrayBase):
+    def __init__(self, *args, **kwargs):
+        super(CpuMap, self).__init__(*args, **kwargs)

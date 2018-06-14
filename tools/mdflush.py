@@ -44,11 +44,11 @@ int kprobe__md_flush_request(struct pt_regs *ctx, void *mddev, struct bio *bio)
  * and maintenance burden.
  */
 #ifdef bio_dev
-    bpf_probe_read(&data.disk, sizeof(data.disk), bio->bi_disk->disk_name);
+    struct gendisk *bi_disk = bio->bi_disk;
 #else
-    bpf_probe_read(&data.disk, sizeof(data.disk),
-                   bio->bi_bdev->bd_disk->disk_name);
+    struct gendisk *bi_disk = bio->bi_bdev->bd_disk;
 #endif
+    bpf_probe_read(&data.disk, sizeof(data.disk), bi_disk->disk_name);
     events.perf_submit(ctx, &data, sizeof(data));
     return 0;
 }

@@ -156,6 +156,18 @@ static struct bpf_helper helpers[] = {
   {"bind", "4.17"},
   {"xdp_adjust_tail", "4.18"},
   {"skb_get_xfrm_state", "4.18"},
+  {"get_stack", "4.18"},
+  {"skb_load_bytes_relative", "4.18"},
+  {"fib_lookup", "4.18"},
+  {"sock_hash_update", "4.18"},
+  {"msg_redirect_hash", "4.18"},
+  {"sk_redirect_hash", "4.18"},
+  {"lwt_push_encap", "4.18"},
+  {"lwt_seg6_store_bytes", "4.18"},
+  {"lwt_seg6_adjust_srh", "4.18"},
+  {"lwt_seg6_action", "4.18"},
+  {"rc_repeat", "4.18"},
+  {"rc_keydown", "4.18"},
 };
 
 static uint64_t ptr_to_u64(void *ptr)
@@ -456,7 +468,7 @@ int bpf_prog_load(enum bpf_prog_type prog_type, const char *name,
   union bpf_attr attr;
   char *tmp_log_buf = NULL;
   unsigned tmp_log_buf_size = 0;
-  int ret = 0;
+  int ret = 0, name_offset = 0;
 
   memset(&attr, 0, sizeof(attr));
 
@@ -497,7 +509,14 @@ int bpf_prog_load(enum bpf_prog_type prog_type, const char *name,
     }
   }
 
-  memcpy(attr.prog_name, name, min(name_len, BPF_OBJ_NAME_LEN - 1));
+  if (strncmp(name, "kprobe__", 8) == 0)
+    name_offset = 8;
+  else if (strncmp(name, "tracepoint__", 12) == 0)
+    name_offset = 12;
+  else if (strncmp(name, "raw_tracepoint__", 16) == 0)
+    name_offset = 16;
+  memcpy(attr.prog_name, name + name_offset,
+         min(name_len - name_offset, BPF_OBJ_NAME_LEN - 1));
 
   ret = syscall(__NR_bpf, BPF_PROG_LOAD, &attr, sizeof(attr));
   // BPF object name is not supported on older Kernels.
@@ -794,7 +813,7 @@ static int bpf_attach_tracing_event(int progfd, const char *event_path, int pid,
 }
 
 int bpf_attach_kprobe(int progfd, enum bpf_probe_attach_type attach_type,
-                      const char *ev_name, const char *fn_name)
+                      const char *ev_name, const char *fn_name, uint64_t fn_offset)
 {
   int kfd, pfd = -1;
   char buf[256];
@@ -802,7 +821,7 @@ int bpf_attach_kprobe(int progfd, enum bpf_probe_attach_type attach_type,
   static char *event_type = "kprobe";
 
   // Try create the kprobe Perf Event with perf_event_open API.
-  pfd = bpf_try_perf_event_open_with_probe(fn_name, 0, -1, event_type,
+  pfd = bpf_try_perf_event_open_with_probe(fn_name, fn_offset, -1, event_type,
                                            attach_type != BPF_PROBE_ENTRY);
   // If failed, most likely Kernel doesn't support the new perf_event_open API
   // yet. Try create the event using debugfs.
@@ -815,8 +834,15 @@ int bpf_attach_kprobe(int progfd, enum bpf_probe_attach_type attach_type,
     }
 
     snprintf(event_alias, sizeof(event_alias), "%s_bcc_%d", ev_name, getpid());
-    snprintf(buf, sizeof(buf), "%c:%ss/%s %s", attach_type==BPF_PROBE_ENTRY ? 'p' : 'r',
-             event_type, event_alias, fn_name);
+
+    if (fn_offset > 0 && attach_type == BPF_PROBE_ENTRY)
+      snprintf(buf, sizeof(buf), "p:%ss/%s %s+%"PRIu64,
+               event_type, event_alias, fn_name, fn_offset);
+    else
+      snprintf(buf, sizeof(buf), "%c:%ss/%s %s",
+               attach_type == BPF_PROBE_ENTRY ? 'p' : 'r',
+               event_type, event_alias, fn_name);
+
     if (write(kfd, buf, strlen(buf)) < 0) {
       if (errno == ENOENT)
          fprintf(stderr, "cannot attach kprobe, probe entry may not exist\n");
@@ -995,6 +1021,7 @@ static int bpf_detach_probe(const char *ev_name, const char *event_type)
       found_event = 1;
       break;
     }
+  free(cptr);
   fclose(fp);
   fp = NULL;
 

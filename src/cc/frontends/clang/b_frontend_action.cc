@@ -107,6 +107,23 @@ class ProbeChecker : public RecursiveASTVisitor<ProbeChecker> {
       : ProbeChecker(arg, ptregs, is_transitive, false) {}
   bool VisitCallExpr(CallExpr *E) {
     needs_probe_ = false;
+
+    if (is_assign_) {
+      // We're looking for a function that returns an external pointer,
+      // regardless of the number of dereferences.
+      for(auto p : ptregs_) {
+        if (std::get<0>(p) == E->getDirectCallee()) {
+          needs_probe_ = true;
+          nb_derefs_ += std::get<1>(p);
+          return false;
+        }
+      }
+    } else {
+      tuple<Decl *, int> pt = make_tuple(E->getDirectCallee(), nb_derefs_);
+      if (ptregs_.find(pt) != ptregs_.end())
+        needs_probe_ = true;
+    }
+
     if (!track_helpers_)
       return false;
     if (VarDecl *V = dyn_cast<VarDecl>(E->getCalleeDecl()))
@@ -214,17 +231,84 @@ ProbeVisitor::ProbeVisitor(ASTContext &C, Rewriter &rewriter,
                            set<Decl *> &m, bool track_helpers) :
   C(C), rewriter_(rewriter), m_(m), track_helpers_(track_helpers) {}
 
+bool ProbeVisitor::assignsExtPtr(Expr *E, int *nbAddrOf) {
+  if (IsContextMemberExpr(E)) {
+    *nbAddrOf = 0;
+    return true;
+  }
+
+  /* If the expression contains a call to another function, we need to visit
+  * that function first to know if a rewrite is necessary (i.e., if the
+  * function returns an external pointer). */
+  if (!TraverseStmt(E))
+    return false;
+
+  ProbeChecker checker = ProbeChecker(E, ptregs_, track_helpers_,
+                                      true);
+  if (checker.is_transitive()) {
+    // The negative of the number of dereferences is the number of addrof.  In
+    // an assignment, if we went through n addrof before getting the external
+    // pointer, then we'll need n dereferences on the left-hand side variable
+    // to get to the external pointer.
+    *nbAddrOf = -checker.get_nb_derefs();
+    return true;
+  }
+
+  if (E->IgnoreParenCasts()->getStmtClass() == Stmt::CallExprClass) {
+    CallExpr *Call = dyn_cast<CallExpr>(E->IgnoreParenCasts());
+    if (MemberExpr *Memb = dyn_cast<MemberExpr>(Call->getCallee()->IgnoreImplicit())) {
+      StringRef memb_name = Memb->getMemberDecl()->getName();
+      if (DeclRefExpr *Ref = dyn_cast<DeclRefExpr>(Memb->getBase())) {
+        if (SectionAttr *A = Ref->getDecl()->getAttr<SectionAttr>()) {
+          if (!A->getName().startswith("maps"))
+            return false;
+
+          if (memb_name == "lookup" || memb_name == "lookup_or_init") {
+            if (m_.find(Ref->getDecl()) != m_.end()) {
+              // Retrieved an ext. pointer from a map, mark LHS as ext. pointer.
+              // Pointers from maps always need a single dereference to get the
+              // actual value.  The value may be an external pointer but cannot
+              // be a pointer to an external pointer as the verifier prohibits
+              // storing known pointers (to map values, context, the stack, or
+              // the packet) in maps.
+              *nbAddrOf = 1;
+              return true;
+            }
+          }
+        }
+      }
+    }
+  }
+  return false;
+}
 bool ProbeVisitor::VisitVarDecl(VarDecl *D) {
   if (Expr *E = D->getInit()) {
-    ProbeChecker checker = ProbeChecker(E, ptregs_, track_helpers_, true);
-    if (checker.is_transitive() || IsContextMemberExpr(E)) {
-      tuple<Decl *, int> pt = make_tuple(D, checker.get_nb_derefs());
+    int nbAddrOf;
+    if (assignsExtPtr(E, &nbAddrOf)) {
+      // The negative of the number of addrof is the number of dereferences.
+      tuple<Decl *, int> pt = make_tuple(D, -nbAddrOf);
       set_ptreg(pt);
     }
   }
   return true;
 }
+
+bool ProbeVisitor::TraverseStmt(Stmt *S) {
+  if (whitelist_.find(S) != whitelist_.end())
+    return true;
+  return RecursiveASTVisitor<ProbeVisitor>::TraverseStmt(S);
+}
+
 bool ProbeVisitor::VisitCallExpr(CallExpr *Call) {
+  // Skip bpf_probe_read for the third argument if it is an AddrOf.
+  if (VarDecl *V = dyn_cast<VarDecl>(Call->getCalleeDecl())) {
+    if (V->getName() == "bpf_probe_read" && Call->getNumArgs() >= 3) {
+      const Expr *E = Call->getArg(2)->IgnoreParenCasts();
+      whitelist_.insert(E);
+      return true;
+    }
+  }
+
   if (FunctionDecl *F = dyn_cast<FunctionDecl>(Call->getCalleeDecl())) {
     if (F->hasBody()) {
       unsigned i = 0;
@@ -240,8 +324,45 @@ bool ProbeVisitor::VisitCallExpr(CallExpr *Call) {
       }
       if (fn_visited_.find(F) == fn_visited_.end()) {
         fn_visited_.insert(F);
+        /* Maintains a stack of the number of dereferences for the external
+         * pointers returned by each function in the call stack or -1 if the
+         * function didn't return an external pointer. */
+        ptregs_returned_.push_back(-1);
         TraverseDecl(F);
+        int nb_derefs = ptregs_returned_.back();
+        ptregs_returned_.pop_back();
+        if (nb_derefs != -1) {
+          tuple<Decl *, int> pt = make_tuple(F, nb_derefs);
+          ptregs_.insert(pt);
+        }
       }
+    }
+  }
+  return true;
+}
+bool ProbeVisitor::VisitReturnStmt(ReturnStmt *R) {
+  /* If this function wasn't called by another, there's no need to check the
+   * return statement for external pointers. */
+  if (ptregs_returned_.size() == 0)
+    return true;
+
+  /* Reverse order of traversals.  This is needed if, in the return statement,
+   * we're calling a function that's returning an external pointer: we need to
+   * know what the function is returning to decide what this function is
+   * returning. */
+  if (!TraverseStmt(R->getRetValue()))
+    return false;
+
+  ProbeChecker checker = ProbeChecker(R->getRetValue(), ptregs_,
+                                      track_helpers_, true);
+  if (checker.needs_probe()) {
+    int curr_nb_derefs = ptregs_returned_.back();
+    /* If the function returns external pointers with different levels of
+     * indirection, we handle the case with the highest level of indirection
+     * and leave it to the user to manually handle other cases. */
+    if (checker.get_nb_derefs() > curr_nb_derefs) {
+      ptregs_returned_.pop_back();
+      ptregs_returned_.push_back(checker.get_nb_derefs());
     }
   }
   return true;
@@ -249,42 +370,11 @@ bool ProbeVisitor::VisitCallExpr(CallExpr *Call) {
 bool ProbeVisitor::VisitBinaryOperator(BinaryOperator *E) {
   if (!E->isAssignmentOp())
     return true;
-  // copy probe attribute from RHS to LHS if present
-  ProbeChecker checker = ProbeChecker(E->getRHS(), ptregs_, track_helpers_,
-                                      true);
-  if (checker.is_transitive()) {
-    // The negative of the number of dereferences is the number of addrof.  In
-    // an assignment, if we went through n addrof before getting the external
-    // pointer, then we'll need n dereferences on the left-hand side variable
-    // to get to the external pointer.
-    ProbeSetter setter(&ptregs_, -checker.get_nb_derefs());
-    setter.TraverseStmt(E->getLHS());
-  } else if (E->getRHS()->getStmtClass() == Stmt::CallExprClass) {
-    CallExpr *Call = dyn_cast<CallExpr>(E->getRHS());
-    if (MemberExpr *Memb = dyn_cast<MemberExpr>(Call->getCallee()->IgnoreImplicit())) {
-      StringRef memb_name = Memb->getMemberDecl()->getName();
-      if (DeclRefExpr *Ref = dyn_cast<DeclRefExpr>(Memb->getBase())) {
-        if (SectionAttr *A = Ref->getDecl()->getAttr<SectionAttr>()) {
-          if (!A->getName().startswith("maps"))
-            return true;
 
-          if (memb_name == "lookup" || memb_name == "lookup_or_init") {
-            if (m_.find(Ref->getDecl()) != m_.end()) {
-            // Retrieved an ext. pointer from a map, mark LHS as ext. pointer.
-              // Pointers from maps always need a single dereference to get the
-              // actual value.  The value may be an external pointer but cannot
-              // be a pointer to an external pointer as the verifier prohibits
-              // storing known pointers (to map values, context, the stack, or
-              // the packet) in maps.
-              ProbeSetter setter(&ptregs_, 1);
-              setter.TraverseStmt(E->getLHS());
-            }
-          }
-        }
-      }
-    }
-  } else if (IsContextMemberExpr(E->getRHS())) {
-    ProbeSetter setter(&ptregs_);
+  // copy probe attribute from RHS to LHS if present
+  int nbAddrOf;
+  if (assignsExtPtr(E->getRHS(), &nbAddrOf)) {
+    ProbeSetter setter(&ptregs_, nbAddrOf);
     setter.TraverseStmt(E->getLHS());
   }
   return true;
@@ -329,6 +419,15 @@ bool ProbeVisitor::VisitMemberExpr(MemberExpr *E) {
     return false;
   }
 
+  /* If the base of the dereference is a call to another function, we need to
+   * visit that function first to know if a rewrite is necessary (i.e., if the
+   * function returns an external pointer). */
+  if (base->IgnoreParenCasts()->getStmtClass() == Stmt::CallExprClass) {
+    CallExpr *Call = dyn_cast<CallExpr>(base->IgnoreParenCasts());
+    if (!TraverseStmt(Call))
+      return false;
+  }
+
   // Checks to see if the expression references something that needs to be run
   // through bpf_probe_read.
   if (!ProbeChecker(base, ptregs_, track_helpers_).needs_probe())
@@ -355,7 +454,6 @@ bool ProbeVisitor::IsContextMemberExpr(Expr *E) {
   bool found = false;
   MemberExpr *M;
   for (M = Memb; M; M = dyn_cast<MemberExpr>(M->getBase())) {
-    memb_visited_.insert(M);
     rhs_start = M->getLocEnd();
     base = M->getBase();
     member = M->getMemberLoc();
@@ -397,9 +495,83 @@ DiagnosticBuilder ProbeVisitor::error(SourceLocation loc, const char (&fmt)[N]) 
 BTypeVisitor::BTypeVisitor(ASTContext &C, BFrontendAction &fe)
     : C(C), diag_(C.getDiagnostics()), fe_(fe), rewriter_(fe.rewriter()), out_(llvm::errs()) {}
 
-bool BTypeVisitor::VisitFunctionDecl(FunctionDecl *D) {
+void BTypeVisitor::genParamDirectAssign(FunctionDecl *D, string& preamble,
+                                        const char **calling_conv_regs) {
+  for (size_t idx = 0; idx < fn_args_.size(); idx++) {
+    ParmVarDecl *arg = fn_args_[idx];
+
+    if (idx >= 1) {
+      // Move the args into a preamble section where the same params are
+      // declared and initialized from pt_regs.
+      // Todo: this init should be done only when the program requests it.
+      string text = rewriter_.getRewrittenText(expansionRange(arg->getSourceRange()));
+      arg->addAttr(UnavailableAttr::CreateImplicit(C, "ptregs"));
+      size_t d = idx - 1;
+      const char *reg = calling_conv_regs[d];
+      preamble += " " + text + " = " + fn_args_[0]->getName().str() + "->" +
+                  string(reg) + ";";
+    }
+  }
+}
+
+void BTypeVisitor::genParamIndirectAssign(FunctionDecl *D, string& preamble,
+                                          const char **calling_conv_regs) {
+  string new_ctx;
+
+  for (size_t idx = 0; idx < fn_args_.size(); idx++) {
+    ParmVarDecl *arg = fn_args_[idx];
+
+    if (idx == 0) {
+      new_ctx = "__" + arg->getName().str();
+      preamble += " struct pt_regs * " + new_ctx + " = " +
+                  arg->getName().str() + "->" +
+                  string(calling_conv_regs[0]) + ";";
+    } else {
+      // Move the args into a preamble section where the same params are
+      // declared and initialized from pt_regs.
+      // Todo: this init should be done only when the program requests it.
+      string text = rewriter_.getRewrittenText(expansionRange(arg->getSourceRange()));
+      size_t d = idx - 1;
+      const char *reg = calling_conv_regs[d];
+      preamble += "\n " + text + ";";
+      preamble += " bpf_probe_read(&" + arg->getName().str() + ", sizeof(" +
+                  arg->getName().str() + "), &" + new_ctx + "->" +
+                  string(reg) + ");";
+    }
+  }
+}
+
+void BTypeVisitor::rewriteFuncParam(FunctionDecl *D) {
   const char **calling_conv_regs = get_call_conv();
 
+  string preamble = "{\n";
+  if (D->param_size() > 1) {
+    // If function prefix is "syscall__" or "kprobe____x64_sys_",
+    // the function will attach to a kprobe syscall function.
+    // Guard parameter assiggnment with CONFIG_ARCH_HAS_SYSCALL_WRAPPER.
+    // For __x64_sys_* syscalls, this is always true, but we guard
+    // it in case of "syscall__" for other architectures.
+    if (strncmp(D->getName().str().c_str(), "syscall__", 9) == 0 ||
+        strncmp(D->getName().str().c_str(), "kprobe____x64_sys_", 18) == 0) {
+      preamble += "#ifdef CONFIG_ARCH_HAS_SYSCALL_WRAPPER\n";
+      genParamIndirectAssign(D, preamble, calling_conv_regs);
+      preamble += "\n#else\n";
+      genParamDirectAssign(D, preamble, calling_conv_regs);
+      preamble += "\n#endif\n";
+    } else {
+      genParamDirectAssign(D, preamble, calling_conv_regs);
+    }
+    rewriter_.ReplaceText(
+        expansionRange(SourceRange(D->getParamDecl(0)->getLocEnd(),
+                    D->getParamDecl(D->getNumParams() - 1)->getLocEnd())),
+        fn_args_[0]->getName());
+  }
+  // for each trace argument, convert the variable from ptregs to something on stack
+  if (CompoundStmt *S = dyn_cast<CompoundStmt>(D->getBody()))
+    rewriter_.ReplaceText(S->getLBracLoc(), 1, preamble);
+}
+
+bool BTypeVisitor::VisitFunctionDecl(FunctionDecl *D) {
   // put each non-static non-inline function decl in its own section, to be
   // extracted by the MemoryManager
   auto real_start_loc = rewriter_.getSourceMgr().getFileLoc(D->getLocStart());
@@ -415,37 +587,17 @@ bool BTypeVisitor::VisitFunctionDecl(FunctionDecl *D) {
             "too many arguments, bcc only supports in-register parameters");
       return false;
     }
-    // remember the arg names of the current function...first one is the ctx
+
     fn_args_.clear();
-    string preamble = "{";
     for (auto arg_it = D->param_begin(); arg_it != D->param_end(); arg_it++) {
-      auto arg = *arg_it;
+      auto *arg = *arg_it;
       if (arg->getName() == "") {
         error(arg->getLocEnd(), "arguments to BPF program definition must be named");
         return false;
       }
       fn_args_.push_back(arg);
-      if (fn_args_.size() > 1) {
-        // Move the args into a preamble section where the same params are
-        // declared and initialized from pt_regs.
-        // Todo: this init should be done only when the program requests it.
-        string text = rewriter_.getRewrittenText(expansionRange(arg->getSourceRange()));
-        arg->addAttr(UnavailableAttr::CreateImplicit(C, "ptregs"));
-        size_t d = fn_args_.size() - 2;
-        const char *reg = calling_conv_regs[d];
-        preamble += " " + text + " = " + fn_args_[0]->getName().str() + "->" +
-                    string(reg) + ";";
-      }
     }
-    if (D->param_size() > 1) {
-      rewriter_.ReplaceText(
-          expansionRange(SourceRange(D->getParamDecl(0)->getLocEnd(),
-                      D->getParamDecl(D->getNumParams() - 1)->getLocEnd())),
-          fn_args_[0]->getName());
-    }
-    // for each trace argument, convert the variable from ptregs to something on stack
-    if (CompoundStmt *S = dyn_cast<CompoundStmt>(D->getBody()))
-      rewriter_.ReplaceText(S->getLBracLoc(), 1, preamble);
+    rewriteFuncParam(D);
   } else if (D->hasBody() &&
              rewriter_.getSourceMgr().getFileID(real_start_loc)
                == rewriter_.getSourceMgr().getMainFileID()) {
@@ -582,6 +734,9 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
             suffix = ")";
           } else if (memb_name == "check_current_task") {
             prefix = "bpf_current_task_under_cgroup";
+            suffix = ")";
+          } else if (memb_name == "redirect_map") {
+            prefix = "bpf_redirect_map";
             suffix = ")";
           } else {
             error(Call->getLocStart(), "invalid bpf_table operation %0") << memb_name;
@@ -894,6 +1049,10 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
       map_type = BPF_MAP_TYPE_CGROUP_ARRAY;
     } else if (A->getName() == "maps/stacktrace") {
       map_type = BPF_MAP_TYPE_STACK_TRACE;
+    } else if (A->getName() == "maps/devmap") {
+      map_type = BPF_MAP_TYPE_DEVMAP;
+    } else if (A->getName() == "maps/cpumap") {
+      map_type = BPF_MAP_TYPE_CPUMAP;
     } else if (A->getName() == "maps/extern") {
       if (!fe_.table_storage().Find(global_path, table_it)) {
         error(Decl->getLocStart(), "reference to undefined table");
@@ -1057,7 +1216,28 @@ bool BFrontendAction::is_rewritable_ext_func(FunctionDecl *D) {
           (file_name.empty() || file_name == main_path_));
 }
 
+void BFrontendAction::DoMiscWorkAround() {
+  // In 4.16 and later, CONFIG_CC_STACKPROTECTOR is moved out of Kconfig and into
+  // Makefile. It will be set depending on CONFIG_CC_STACKPROTECTOR_{AUTO|REGULAR|STRONG}.
+  // CONFIG_CC_STACKPROTECTOR is still used in various places, e.g., struct task_struct,
+  // to guard certain fields. The workaround here intends to define
+  // CONFIG_CC_STACKPROTECTOR properly based on other configs, so it relieved any bpf
+  // program (using task_struct, etc.) of patching the below code.
+  rewriter_->getEditBuffer(rewriter_->getSourceMgr().getMainFileID()).InsertText(0,
+    "#if !defined(CONFIG_CC_STACKPROTECTOR)\n"
+    "#if defined(CONFIG_CC_STACKPROTECTOR_AUTO) \\\n"
+    "    || defined(CONFIG_CC_STACKPROTECTOR_REGULAR) \\\n"
+    "    || defined(CONFIG_CC_STACKPROTECTOR_STRONG)\n"
+    "#define CONFIG_CC_STACKPROTECTOR\n"
+    "#endif\n"
+    "#endif\n",
+    false);
+}
+
 void BFrontendAction::EndSourceFileAction() {
+  // Additional misc rewrites
+  DoMiscWorkAround();
+
   if (flags_ & DEBUG_PREPROCESSOR)
     rewriter_->getEditBuffer(rewriter_->getSourceMgr().getMainFileID()).write(llvm::errs());
   if (flags_ & DEBUG_SOURCE) {

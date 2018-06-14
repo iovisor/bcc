@@ -70,6 +70,11 @@ class BTypeVisitor : public clang::RecursiveASTVisitor<BTypeVisitor> {
  private:
   clang::SourceRange expansionRange(clang::SourceRange range);
   bool checkFormatSpecifiers(const std::string& fmt, clang::SourceLocation loc);
+  void genParamDirectAssign(clang::FunctionDecl *D, std::string& preamble,
+                            const char **calling_conv_regs);
+  void genParamIndirectAssign(clang::FunctionDecl *D, std::string& preamble,
+                              const char **calling_conv_regs);
+  void rewriteFuncParam(clang::FunctionDecl *D);
   template <unsigned N>
   clang::DiagnosticBuilder error(clang::SourceLocation loc, const char (&fmt)[N]);
   template <unsigned N>
@@ -91,7 +96,9 @@ class ProbeVisitor : public clang::RecursiveASTVisitor<ProbeVisitor> {
   explicit ProbeVisitor(clang::ASTContext &C, clang::Rewriter &rewriter,
                         std::set<clang::Decl *> &m, bool track_helpers);
   bool VisitVarDecl(clang::VarDecl *Decl);
+  bool TraverseStmt(clang::Stmt *S);
   bool VisitCallExpr(clang::CallExpr *Call);
+  bool VisitReturnStmt(clang::ReturnStmt *R);
   bool VisitBinaryOperator(clang::BinaryOperator *E);
   bool VisitUnaryOperator(clang::UnaryOperator *E);
   bool VisitMemberExpr(clang::MemberExpr *E);
@@ -99,6 +106,7 @@ class ProbeVisitor : public clang::RecursiveASTVisitor<ProbeVisitor> {
   void set_ctx(clang::Decl *D) { ctx_ = D; }
   std::set<std::tuple<clang::Decl *, int>> get_ptregs() { return ptregs_; }
  private:
+  bool assignsExtPtr(clang::Expr *E, int *nbAddrOf);
   bool IsContextMemberExpr(clang::Expr *E);
   clang::SourceRange expansionRange(clang::SourceRange range);
   template <unsigned N>
@@ -108,10 +116,12 @@ class ProbeVisitor : public clang::RecursiveASTVisitor<ProbeVisitor> {
   clang::Rewriter &rewriter_;
   std::set<clang::Decl *> fn_visited_;
   std::set<clang::Expr *> memb_visited_;
+  std::set<const clang::Stmt *> whitelist_;
   std::set<std::tuple<clang::Decl *, int>> ptregs_;
   std::set<clang::Decl *> &m_;
   clang::Decl *ctx_;
   bool track_helpers_;
+  std::list<int> ptregs_returned_;
 };
 
 // A helper class to the frontend action, walks the decls
@@ -150,6 +160,7 @@ class BFrontendAction : public clang::ASTFrontendAction {
   TableStorage &table_storage() const { return ts_; }
   std::string id() const { return id_; }
   bool is_rewritable_ext_func(clang::FunctionDecl *D);
+  void DoMiscWorkAround();
 
  private:
   llvm::raw_ostream &os_;

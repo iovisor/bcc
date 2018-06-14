@@ -147,7 +147,11 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, TableStorage &ts,
   // Enable -O2 for clang. In clang 5.0, -O0 may result in function marking as
   // noinline and optnone (if not always inlining).
   // Note that first argument is ignored in clang compilation invocation.
+  // "-D __BPF_TRACING__" below is added to suppress a warning in 4.17+.
+  // It can be removed once clang supports asm-goto or the kernel removes
+  // the warning.
   vector<const char *> flags_cstr({"-O0", "-O2", "-emit-llvm", "-I", dstack.cwd(),
+                                   "-D", "__BPF_TRACING__",
                                    "-Wno-deprecated-declarations",
                                    "-Wno-gnu-variable-sized-type-not-at-end",
                                    "-Wno-pragma-once-outside-header",

@@ -118,14 +118,10 @@ int kprobe__tcp_sendmsg(struct pt_regs *ctx, struct sock *sk,
     } else if (family == AF_INET6) {
         struct ipv6_key_t ipv6_key = {.pid = pid};
 
-        bpf_probe_read(&ipv6_key.saddr0, sizeof(ipv6_key.saddr0),
-            &sk->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32[0]);
-        bpf_probe_read(&ipv6_key.saddr1, sizeof(ipv6_key.saddr1),
-            &sk->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32[2]);
-        bpf_probe_read(&ipv6_key.daddr0, sizeof(ipv6_key.daddr0),
-            &sk->__sk_common.skc_v6_daddr.in6_u.u6_addr32[0]);
-        bpf_probe_read(&ipv6_key.daddr1, sizeof(ipv6_key.daddr1),
-            &sk->__sk_common.skc_v6_daddr.in6_u.u6_addr32[2]);
+        ipv6_key.saddr0 = *(u64 *)&sk->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32[0];
+        ipv6_key.saddr1 = *(u64 *)&sk->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32[2];
+        ipv6_key.daddr0 = *(u64 *)&sk->__sk_common.skc_v6_daddr.in6_u.u6_addr32[0];
+        ipv6_key.daddr1 = *(u64 *)&sk->__sk_common.skc_v6_daddr.in6_u.u6_addr32[2];
         ipv6_key.lport = sk->__sk_common.skc_num;
         dport = sk->__sk_common.skc_dport;
         ipv6_key.dport = ntohs(dport);
@@ -165,14 +161,10 @@ int kprobe__tcp_cleanup_rbuf(struct pt_regs *ctx, struct sock *sk, int copied)
 
     } else if (family == AF_INET6) {
         struct ipv6_key_t ipv6_key = {.pid = pid};
-        bpf_probe_read(&ipv6_key.saddr0, sizeof(ipv6_key.saddr0),
-            &sk->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32[0]);
-        bpf_probe_read(&ipv6_key.saddr1, sizeof(ipv6_key.saddr1),
-            &sk->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32[2]);
-        bpf_probe_read(&ipv6_key.daddr0, sizeof(ipv6_key.daddr0),
-            &sk->__sk_common.skc_v6_daddr.in6_u.u6_addr32[0]);
-        bpf_probe_read(&ipv6_key.daddr1, sizeof(ipv6_key.daddr1),
-            &sk->__sk_common.skc_v6_daddr.in6_u.u6_addr32[2]);
+        ipv6_key.saddr0 = *(u64 *)&sk->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32[0];
+        ipv6_key.saddr1 = *(u64 *)&sk->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32[2];
+        ipv6_key.daddr0 = *(u64 *)&sk->__sk_common.skc_v6_daddr.in6_u.u6_addr32[0];
+        ipv6_key.daddr1 = *(u64 *)&sk->__sk_common.skc_v6_daddr.in6_u.u6_addr32[2];
         ipv6_key.lport = sk->__sk_common.skc_num;
         dport = sk->__sk_common.skc_dport;
         ipv6_key.dport = ntohs(dport);
