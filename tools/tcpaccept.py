@@ -88,16 +88,14 @@ int kretprobe__inet_csk_accept(struct pt_regs *ctx)
 
     // pull in details
     u16 family = 0, lport = 0;
-    bpf_probe_read(&family, sizeof(family), &newsk->__sk_common.skc_family);
-    bpf_probe_read(&lport, sizeof(lport), &newsk->__sk_common.skc_num);
+    family = newsk->__sk_common.skc_family;
+    lport = newsk->__sk_common.skc_num;
 
     if (family == AF_INET) {
         struct ipv4_data_t data4 = {.pid = pid, .ip = 4};
         data4.ts_us = bpf_ktime_get_ns() / 1000;
-        bpf_probe_read(&data4.saddr, sizeof(u32),
-            &newsk->__sk_common.skc_rcv_saddr);
-        bpf_probe_read(&data4.daddr, sizeof(u32),
-            &newsk->__sk_common.skc_daddr);
+        data4.saddr = newsk->__sk_common.skc_rcv_saddr;
+        data4.daddr = newsk->__sk_common.skc_daddr;
         data4.lport = lport;
         bpf_get_current_comm(&data4.task, sizeof(data4.task));
         ipv4_events.perf_submit(ctx, &data4, sizeof(data4));
