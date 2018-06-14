@@ -23,6 +23,7 @@
 #
 # 11-Feb-2016   Brendan Gregg   Created this.
 # 15-Oct-2016   Dina Goldshtein -p to filter by process ID.
+# 13-Jun-2018   Joe Yin modify generic_file_read_iter to ext4_file_read_iter.
 
 from __future__ import print_function
 from bcc import BPF
@@ -100,6 +101,9 @@ BPF_PERF_OUTPUT(events);
 // The current ext4 (Linux 4.5) uses generic_file_read_iter(), instead of it's
 // own function, for reads. So we need to trace that and then filter on ext4,
 // which I do by checking file->f_op.
+// The new Linux version (since form 4.10) uses ext4_file_read_iter(), And if the 'CONFIG_FS_DAX' 
+// is not set ,then ext4_file_read_iter() will call generic_file_read_iter(), else it will call 
+// ext4_dax_read_iter(), and trace generic_file_read_iter() will fail.
 int trace_read_entry(struct pt_regs *ctx, struct kiocb *iocb)
 {
     u64 id =  bpf_get_current_pid_tgid();
@@ -321,11 +325,17 @@ def print_event(cpu, data, size):
 b = BPF(text=bpf_text)
 
 # Common file functions. See earlier comment about generic_file_read_iter().
-b.attach_kprobe(event="generic_file_read_iter", fn_name="trace_read_entry")
+if BPF.get_kprobe_functions(b'ext4_file_read_iter'):
+    b.attach_kprobe(event="ext4_file_read_iter", fn_name="trace_read_entry")
+else:
+    b.attach_kprobe(event="generic_file_read_iter", fn_name="trace_read_entry")
 b.attach_kprobe(event="ext4_file_write_iter", fn_name="trace_write_entry")
 b.attach_kprobe(event="ext4_file_open", fn_name="trace_open_entry")
 b.attach_kprobe(event="ext4_sync_file", fn_name="trace_fsync_entry")
-b.attach_kretprobe(event="generic_file_read_iter", fn_name="trace_read_return")
+if BPF.get_kprobe_functions(b'ext4_file_read_iter'):
+    b.attach_kretprobe(event="ext4_file_read_iter", fn_name="trace_read_return")
+else:
+    b.attach_kretprobe(event="generic_file_read_iter", fn_name="trace_read_return")
 b.attach_kretprobe(event="ext4_file_write_iter", fn_name="trace_write_return")
 b.attach_kretprobe(event="ext4_file_open", fn_name="trace_open_return")
 b.attach_kretprobe(event="ext4_sync_file", fn_name="trace_fsync_return")
