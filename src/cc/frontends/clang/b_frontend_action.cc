@@ -107,6 +107,23 @@ class ProbeChecker : public RecursiveASTVisitor<ProbeChecker> {
       : ProbeChecker(arg, ptregs, is_transitive, false) {}
   bool VisitCallExpr(CallExpr *E) {
     needs_probe_ = false;
+
+    if (is_assign_) {
+      // We're looking for a function that returns an external pointer,
+      // regardless of the number of dereferences.
+      for(auto p : ptregs_) {
+        if (std::get<0>(p) == E->getDirectCallee()) {
+          needs_probe_ = true;
+          nb_derefs_ += std::get<1>(p);
+          return false;
+        }
+      }
+    } else {
+      tuple<Decl *, int> pt = make_tuple(E->getDirectCallee(), nb_derefs_);
+      if (ptregs_.find(pt) != ptregs_.end())
+        needs_probe_ = true;
+    }
+
     if (!track_helpers_)
       return false;
     if (VarDecl *V = dyn_cast<VarDecl>(E->getCalleeDecl()))
@@ -220,6 +237,12 @@ bool ProbeVisitor::assignsExtPtr(Expr *E, int *nbAddrOf) {
     return true;
   }
 
+  /* If the expression contains a call to another function, we need to visit
+  * that function first to know if a rewrite is necessary (i.e., if the
+  * function returns an external pointer). */
+  if (!TraverseStmt(E))
+    return false;
+
   ProbeChecker checker = ProbeChecker(E, ptregs_, track_helpers_,
                                       true);
   if (checker.is_transitive()) {
@@ -231,8 +254,8 @@ bool ProbeVisitor::assignsExtPtr(Expr *E, int *nbAddrOf) {
     return true;
   }
 
-  if (E->getStmtClass() == Stmt::CallExprClass) {
-    CallExpr *Call = dyn_cast<CallExpr>(E);
+  if (E->IgnoreParenCasts()->getStmtClass() == Stmt::CallExprClass) {
+    CallExpr *Call = dyn_cast<CallExpr>(E->IgnoreParenCasts());
     if (MemberExpr *Memb = dyn_cast<MemberExpr>(Call->getCallee()->IgnoreImplicit())) {
       StringRef memb_name = Memb->getMemberDecl()->getName();
       if (DeclRefExpr *Ref = dyn_cast<DeclRefExpr>(Memb->getBase())) {
@@ -301,8 +324,45 @@ bool ProbeVisitor::VisitCallExpr(CallExpr *Call) {
       }
       if (fn_visited_.find(F) == fn_visited_.end()) {
         fn_visited_.insert(F);
+        /* Maintains a stack of the number of dereferences for the external
+         * pointers returned by each function in the call stack or -1 if the
+         * function didn't return an external pointer. */
+        ptregs_returned_.push_back(-1);
         TraverseDecl(F);
+        int nb_derefs = ptregs_returned_.back();
+        ptregs_returned_.pop_back();
+        if (nb_derefs != -1) {
+          tuple<Decl *, int> pt = make_tuple(F, nb_derefs);
+          ptregs_.insert(pt);
+        }
       }
+    }
+  }
+  return true;
+}
+bool ProbeVisitor::VisitReturnStmt(ReturnStmt *R) {
+  /* If this function wasn't called by another, there's no need to check the
+   * return statement for external pointers. */
+  if (ptregs_returned_.size() == 0)
+    return true;
+
+  /* Reverse order of traversals.  This is needed if, in the return statement,
+   * we're calling a function that's returning an external pointer: we need to
+   * know what the function is returning to decide what this function is
+   * returning. */
+  if (!TraverseStmt(R->getRetValue()))
+    return false;
+
+  ProbeChecker checker = ProbeChecker(R->getRetValue(), ptregs_,
+                                      track_helpers_, true);
+  if (checker.needs_probe()) {
+    int curr_nb_derefs = ptregs_returned_.back();
+    /* If the function returns external pointers with different levels of
+     * indirection, we handle the case with the highest level of indirection
+     * and leave it to the user to manually handle other cases. */
+    if (checker.get_nb_derefs() > curr_nb_derefs) {
+      ptregs_returned_.pop_back();
+      ptregs_returned_.push_back(checker.get_nb_derefs());
     }
   }
   return true;
@@ -357,6 +417,15 @@ bool ProbeVisitor::VisitMemberExpr(MemberExpr *E) {
   if (member.isInvalid()) {
     error(base->getLocEnd(), "internal error: MemberLoc is invalid while preparing probe rewrite");
     return false;
+  }
+
+  /* If the base of the dereference is a call to another function, we need to
+   * visit that function first to know if a rewrite is necessary (i.e., if the
+   * function returns an external pointer). */
+  if (base->IgnoreParenCasts()->getStmtClass() == Stmt::CallExprClass) {
+    CallExpr *Call = dyn_cast<CallExpr>(base->IgnoreParenCasts());
+    if (!TraverseStmt(Call))
+      return false;
   }
 
   // Checks to see if the expression references something that needs to be run

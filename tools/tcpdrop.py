@@ -107,16 +107,16 @@ int trace_tcp_drop(struct pt_regs *ctx, struct sock *sk, struct sk_buff *skb)
     u8 tcpflags = 0;
     struct tcphdr *tcp = skb_to_tcphdr(skb);
     struct iphdr *ip = skb_to_iphdr(skb);
-    bpf_probe_read(&sport, sizeof(sport), &tcp->source);
-    bpf_probe_read(&dport, sizeof(dport), &tcp->dest);
+    sport = tcp->source;
+    dport = tcp->dest;
     bpf_probe_read(&tcpflags, sizeof(tcpflags), &tcp_flag_byte(tcp));
     sport = ntohs(sport);
     dport = ntohs(dport);
 
     if (family == AF_INET) {
         struct ipv4_data_t data4 = {.pid = pid, .ip = 4};
-        bpf_probe_read(&data4.saddr, sizeof(u32), &ip->saddr);
-        bpf_probe_read(&data4.daddr, sizeof(u32), &ip->daddr);
+        data4.saddr = ip->saddr;
+        data4.daddr = ip->daddr;
         data4.dport = dport;
         data4.sport = sport;
         data4.state = state;

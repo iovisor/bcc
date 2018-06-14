@@ -98,6 +98,7 @@ class ProbeVisitor : public clang::RecursiveASTVisitor<ProbeVisitor> {
   bool VisitVarDecl(clang::VarDecl *Decl);
   bool TraverseStmt(clang::Stmt *S);
   bool VisitCallExpr(clang::CallExpr *Call);
+  bool VisitReturnStmt(clang::ReturnStmt *R);
   bool VisitBinaryOperator(clang::BinaryOperator *E);
   bool VisitUnaryOperator(clang::UnaryOperator *E);
   bool VisitMemberExpr(clang::MemberExpr *E);
@@ -120,6 +121,7 @@ class ProbeVisitor : public clang::RecursiveASTVisitor<ProbeVisitor> {
   std::set<clang::Decl *> &m_;
   clang::Decl *ctx_;
   bool track_helpers_;
+  std::list<int> ptregs_returned_;
 };
 
 // A helper class to the frontend action, walks the decls
