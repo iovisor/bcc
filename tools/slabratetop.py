@@ -87,7 +87,8 @@ BPF_HASH(counts, struct info_t, struct val_t);
 int kprobe__kmem_cache_alloc(struct pt_regs *ctx, struct kmem_cache *cachep)
 {
     struct info_t info = {};
-    bpf_probe_read(&info.name, sizeof(info.name), (void *)cachep->name);
+    const char *name = cachep->name;
+    bpf_probe_read(&info.name, sizeof(info.name), name);
 
     struct val_t *valp, zero = {};
     valp = counts.lookup_or_init(&info, &zero);

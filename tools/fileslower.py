@@ -111,8 +111,9 @@ static int trace_rw_entry(struct pt_regs *ctx, struct file *file,
     val.sz = count;
     val.ts = bpf_ktime_get_ns();
 
-    val.name_len = de->d_name.len;
-    bpf_probe_read(&val.name, sizeof(val.name), (void *)de->d_name.name);
+    struct qstr d_name = de->d_name;
+    val.name_len = d_name.len;
+    bpf_probe_read(&val.name, sizeof(val.name), d_name.name);
     bpf_get_current_comm(&val.comm, sizeof(val.comm));
     entryinfo.update(&pid, &val);
 

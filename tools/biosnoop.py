@@ -94,8 +94,9 @@ int trace_req_completion(struct pt_regs *ctx, struct request *req)
         data.len = req->__data_len;
         data.sector = req->__sector;
         bpf_probe_read(&data.name, sizeof(data.name), valp->name);
+        struct gendisk *rq_disk = req->rq_disk;
         bpf_probe_read(&data.disk_name, sizeof(data.disk_name),
-                       req->rq_disk->disk_name);
+                       rq_disk->disk_name);
     }
 
 /*

@@ -84,14 +84,14 @@ int trace_unlink(struct pt_regs *ctx, struct inode *dir, struct dentry *dentry)
     delta = (bpf_ktime_get_ns() - *tsp) / 1000000;
     birth.delete(&dentry);
 
-    if (dentry->d_name.len == 0)
+    struct qstr d_name = dentry->d_name;
+    if (d_name.len == 0)
         return 0;
 
     if (bpf_get_current_comm(&data.comm, sizeof(data.comm)) == 0) {
         data.pid = pid;
         data.delta = delta;
-        bpf_probe_read(&data.fname, sizeof(data.fname),
-            (void *)dentry->d_name.name);
+        bpf_probe_read(&data.fname, sizeof(data.fname), d_name.name);
     }
 
     events.perf_submit(ctx, &data, sizeof(data));

@@ -100,14 +100,15 @@ static int do_entry(struct pt_regs *ctx, struct file *file,
     // skip I/O lacking a filename
     struct dentry *de = file->f_path.dentry;
     int mode = file->f_inode->i_mode;
-    if (de->d_name.len == 0 || TYPE_FILTER)
+    struct qstr d_name = de->d_name;
+    if (d_name.len == 0 || TYPE_FILTER)
         return 0;
 
     // store counts and sizes by pid & file
     struct info_t info = {.pid = pid};
     bpf_get_current_comm(&info.comm, sizeof(info.comm));
-    info.name_len = de->d_name.len;
-    bpf_probe_read(&info.name, sizeof(info.name), (void *)de->d_name.name);
+    info.name_len = d_name.len;
+    bpf_probe_read(&info.name, sizeof(info.name), d_name.name);
     if (S_ISREG(mode)) {
         info.type = 'R';
     } else if (S_ISSOCK(mode)) {

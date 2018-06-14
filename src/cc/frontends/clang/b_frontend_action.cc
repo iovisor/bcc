@@ -281,10 +281,7 @@ bool ProbeVisitor::VisitCallExpr(CallExpr *Call) {
   if (VarDecl *V = dyn_cast<VarDecl>(Call->getCalleeDecl())) {
     if (V->getName() == "bpf_probe_read" && Call->getNumArgs() >= 3) {
       const Expr *E = Call->getArg(2)->IgnoreParenCasts();
-      if (const UnaryOperator *UnaryExpr = dyn_cast<UnaryOperator>(E)) {
-        if (UnaryExpr->getOpcode() == UO_AddrOf)
-          whitelist_.insert(E);
-      }
+      whitelist_.insert(E);
       return true;
     }
   }
