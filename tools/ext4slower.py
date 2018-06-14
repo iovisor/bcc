@@ -41,7 +41,6 @@ examples = """examples:
     ./ext4slower -j 1        # ... 1 ms, parsable output (csv)
     ./ext4slower 0           # trace all operations (warning: verbose)
     ./ext4slower -p 185      # trace PID 185 only
-    ./ext4slower -n          # trace Linux 4.10+ 
 """
 parser = argparse.ArgumentParser(
     description="Trace common ext4 file operations slower than a threshold",
@@ -51,8 +50,6 @@ parser.add_argument("-j", "--csv", action="store_true",
     help="just print fields: comma-separated values")
 parser.add_argument("-p", "--pid",
     help="trace this PID only")
-parser.add_argument("-n", "--newver", action="store_true",
-    help="trace Linux 4.10+")
 parser.add_argument("min_ms", nargs="?", default='10',
     help="minimum I/O duration to trace, in ms (default 10)")
 parser.add_argument("--ebpf", action="store_true",
@@ -61,7 +58,6 @@ args = parser.parse_args()
 min_ms = int(args.min_ms)
 pid = args.pid
 csv = args.csv
-newver = args.newver
 debug = 0
 
 # define BPF program
@@ -329,14 +325,14 @@ def print_event(cpu, data, size):
 b = BPF(text=bpf_text)
 
 # Common file functions. See earlier comment about generic_file_read_iter().
-if (newver):
+if BPF.get_kprobe_functions(b'ext4_file_read_iter'):
     b.attach_kprobe(event="ext4_file_read_iter", fn_name="trace_read_entry")
 else:
     b.attach_kprobe(event="generic_file_read_iter", fn_name="trace_read_entry")
 b.attach_kprobe(event="ext4_file_write_iter", fn_name="trace_write_entry")
 b.attach_kprobe(event="ext4_file_open", fn_name="trace_open_entry")
 b.attach_kprobe(event="ext4_sync_file", fn_name="trace_fsync_entry")
-if (newver):
+if BPF.get_kprobe_functions(b'ext4_file_read_iter'):
     b.attach_kretprobe(event="ext4_file_read_iter", fn_name="trace_read_return")
 else:
     b.attach_kretprobe(event="generic_file_read_iter", fn_name="trace_read_return")
