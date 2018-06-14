@@ -76,6 +76,18 @@ int count_foo(struct pt_regs *ctx, unsigned long a, unsigned long b) {
         b = BPF(text=text, debug=0)
         fn = b.load_func("count_foo", BPF.KPROBE)
 
+    def test_probe_read3(self):
+        text = """
+#define KBUILD_MODNAME "foo"
+#include <net/tcp.h>
+#define _(P) ({typeof(P) val = 0; bpf_probe_read(&val, sizeof(val), &P); val;})
+int count_tcp(struct pt_regs *ctx, struct sk_buff *skb) {
+    return _(TCP_SKB_CB(skb)->tcp_gso_size);
+}
+"""
+        b = BPF(text=text)
+        fn = b.load_func("count_tcp", BPF.KPROBE)
+
     def test_probe_read_whitelist1(self):
         text = """
 #define KBUILD_MODNAME "foo"
