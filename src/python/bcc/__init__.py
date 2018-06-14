@@ -28,6 +28,7 @@ from .libbcc import lib, bcc_symbol, bcc_symbol_option, _SYM_CB_TYPE
 from .table import Table, PerfEventArray
 from .perf import Perf
 from .utils import get_online_cpus, printb, _assert_is_bytes, ArgString
+from .version import __version__
 
 _probe_limit = 1000
 _num_open_probes = 0

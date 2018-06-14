@@ -12,6 +12,7 @@ if(NOT PYTHON_CMD)
 endif()
 
 configure_file(setup.py.in ${CMAKE_CURRENT_BINARY_DIR}/setup.py @ONLY)
+configure_file(bcc/version.py.in ${CMAKE_CURRENT_BINARY_DIR}/bcc/version.py @ONLY)
 if(EXISTS "/etc/debian_version")
   set(PYTHON_FLAGS "${PYTHON_FLAGS} --install-layout deb")
 endif()
