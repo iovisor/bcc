@@ -420,7 +420,7 @@ bool ProbeVisitor::VisitMemberExpr(MemberExpr *E) {
   }
 
   if (!rewriter_.isRewritable(E->getLocStart()))
-    return false;
+    return true;
 
   /* If the base of the dereference is a call to another function, we need to
    * visit that function first to know if a rewrite is necessary (i.e., if the
