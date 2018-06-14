@@ -153,9 +153,7 @@ int do_perf_event(struct bpf_perf_event_data *ctx) {
 
     if (key.kernel_stack_id >= 0) {
         // populate extras to fix the kernel stack
-        struct pt_regs regs = {};
-        bpf_probe_read(&regs, sizeof(regs), (void *)&ctx->regs);
-        u64 ip = PT_REGS_IP(&regs);
+        u64 ip = PT_REGS_IP(&ctx->regs);
         u64 page_offset;
 
         // if ip isn't sane, leave key ips as zero for later checking
