@@ -102,6 +102,7 @@ class ProbeVisitor : public clang::RecursiveASTVisitor<ProbeVisitor> {
   bool VisitBinaryOperator(clang::BinaryOperator *E);
   bool VisitUnaryOperator(clang::UnaryOperator *E);
   bool VisitMemberExpr(clang::MemberExpr *E);
+  bool VisitArraySubscriptExpr(clang::ArraySubscriptExpr *E);
   void set_ptreg(std::tuple<clang::Decl *, int> &pt) { ptregs_.insert(pt); }
   void set_ctx(clang::Decl *D) { ctx_ = D; }
   std::set<std::tuple<clang::Decl *, int>> get_ptregs() { return ptregs_; }
@@ -123,6 +124,8 @@ class ProbeVisitor : public clang::RecursiveASTVisitor<ProbeVisitor> {
   clang::Decl *ctx_;
   bool track_helpers_;
   std::list<int> ptregs_returned_;
+  const clang::Stmt *addrof_stmt_;
+  bool is_addrof_;
 };
 
 // A helper class to the frontend action, walks the decls

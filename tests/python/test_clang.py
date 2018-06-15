@@ -951,7 +951,7 @@ TRACEPOINT_PROBE(skb, kfree_skb) {
 #include <net/inet_sock.h>
 int test(struct pt_regs *ctx) {
     struct sock *sk;
-    sk = (struct sock *)ctx->di;
+    sk = (struct sock *)PT_REGS_PARM1(ctx);
     return sk->sk_dport;
 }
 """
@@ -1052,6 +1052,24 @@ static inline struct tcphdr *my_skb_transport_header(struct sk_buff *skb) {
 }
 int test(struct pt_regs *ctx, struct sock *sk, struct sk_buff *skb) {
     return my_skb_transport_header(skb)->seq;
+}
+"""
+        b = BPF(text=text)
+        fn = b.load_func("test", BPF.KPROBE)
+
+    def test_no_probe_read_addrof(self):
+        text = """
+#include <linux/sched.h>
+#include <net/inet_sock.h>
+static inline int test_help(__be16 *addr) {
+    __be16 val = 0;
+    bpf_probe_read(&val, sizeof(val), addr);
+    return val;
+}
+int test(struct pt_regs *ctx) {
+    struct sock *sk;
+    sk = (struct sock *)PT_REGS_PARM1(ctx);
+    return test_help(&sk->sk_dport);
 }
 """
         b = BPF(text=text)
