@@ -83,9 +83,22 @@ int kretprobe__inet_csk_accept(struct pt_regs *ctx)
     u8 protocol = 0;
     // workaround for reading the sk_protocol bitfield:
     bpf_probe_read(&protocol, 1, (void *)((long)&newsk->sk_wmem_queued) - 3);
-    if (protocol != IPPROTO_TCP)
-        return 0;
+    
+    // Flowwing comments add by Joe Yin:
+    // Unfortunately,it can not work since Linux 4.10,
+    // because the sk_wmem_queued is not following the bitfield of sk_protocol.
+    // And the following member is sk_gso_max_segs.
+    // So, we can use this:
+    // bpf_probe_read(&protocol, 1, (void *)((u64)&newsk->sk_gso_max_segs) - 3);
+    // And it works from 4.10 to the latest 4.17.1, but maybe one day will fail
+    // again. 
 
+    if (protocol != IPPROTO_TCP)
+    {    
+        bpf_probe_read(&protocol, 1, (void *)((u64)&newsk->sk_gso_max_segs) - 3);
+        if (protocol != IPPROTO_TCP)
+            return 0;
+    }
     // pull in details
     u16 family = 0, lport = 0;
     bpf_probe_read(&family, sizeof(family), &newsk->__sk_common.skc_family);
