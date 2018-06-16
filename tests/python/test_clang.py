@@ -76,6 +76,30 @@ int count_foo(struct pt_regs *ctx, unsigned long a, unsigned long b) {
         b = BPF(text=text, debug=0)
         fn = b.load_func("count_foo", BPF.KPROBE)
 
+    def test_probe_read3(self):
+        text = """
+#define KBUILD_MODNAME "foo"
+#include <net/tcp.h>
+#define _(P) ({typeof(P) val = 0; bpf_probe_read(&val, sizeof(val), &P); val;})
+int count_tcp(struct pt_regs *ctx, struct sk_buff *skb) {
+    return _(TCP_SKB_CB(skb)->tcp_gso_size);
+}
+"""
+        b = BPF(text=text)
+        fn = b.load_func("count_tcp", BPF.KPROBE)
+
+    def test_probe_read4(self):
+        text = """
+#define KBUILD_MODNAME "foo"
+#include <net/tcp.h>
+#define _(P) ({typeof(P) val = 0; bpf_probe_read(&val, sizeof(val), &P); val;})
+int test(struct pt_regs *ctx, struct sk_buff *skb) {
+    return _(TCP_SKB_CB(skb)->tcp_gso_size) + skb->protocol;
+}
+"""
+        b = BPF(text=text)
+        fn = b.load_func("test", BPF.KPROBE)
+
     def test_probe_read_whitelist1(self):
         text = """
 #define KBUILD_MODNAME "foo"
@@ -916,6 +940,18 @@ int test(struct pt_regs *ctx) {
     struct sock *sk;
     sk = (struct sock *)ctx->di;
     return sk->sk_dport;
+}
+"""
+        b = BPF(text=text)
+        fn = b.load_func("test", BPF.KPROBE)
+
+    def test_probe_read_ctx_array(self):
+        text = """
+#include <linux/sched.h>
+#include <net/inet_sock.h>
+int test(struct pt_regs *ctx) {
+    struct sock *newsk = (struct sock *)PT_REGS_RC(ctx);
+    return newsk->__sk_common.skc_rcv_saddr;
 }
 """
         b = BPF(text=text)
