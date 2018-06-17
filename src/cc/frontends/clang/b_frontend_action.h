@@ -102,7 +102,6 @@ class ProbeVisitor : public clang::RecursiveASTVisitor<ProbeVisitor> {
   bool VisitBinaryOperator(clang::BinaryOperator *E);
   bool VisitUnaryOperator(clang::UnaryOperator *E);
   bool VisitMemberExpr(clang::MemberExpr *E);
-  bool VisitArraySubscriptExpr(clang::ArraySubscriptExpr *E);
   void set_ptreg(std::tuple<clang::Decl *, int> &pt) { ptregs_.insert(pt); }
   void set_ctx(clang::Decl *D) { ctx_ = D; }
   std::set<std::tuple<clang::Decl *, int>> get_ptregs() { return ptregs_; }
