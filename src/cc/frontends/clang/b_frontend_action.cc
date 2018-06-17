@@ -229,7 +229,8 @@ bool MapVisitor::VisitCallExpr(CallExpr *Call) {
 
 ProbeVisitor::ProbeVisitor(ASTContext &C, Rewriter &rewriter,
                            set<Decl *> &m, bool track_helpers) :
-  C(C), rewriter_(rewriter), m_(m), track_helpers_(track_helpers) {}
+  C(C), rewriter_(rewriter), m_(m), track_helpers_(track_helpers),
+  addrof_stmt_(nullptr), is_addrof_(false) {}
 
 bool ProbeVisitor::assignsExtPtr(Expr *E, int *nbAddrOf) {
   if (IsContextMemberExpr(E)) {
@@ -296,7 +297,12 @@ bool ProbeVisitor::VisitVarDecl(VarDecl *D) {
 bool ProbeVisitor::TraverseStmt(Stmt *S) {
   if (whitelist_.find(S) != whitelist_.end())
     return true;
-  return RecursiveASTVisitor<ProbeVisitor>::TraverseStmt(S);
+  auto ret = RecursiveASTVisitor<ProbeVisitor>::TraverseStmt(S);
+  if (addrof_stmt_ == S) {
+    addrof_stmt_ = nullptr;
+    is_addrof_ = false;
+  }
+  return ret;
 }
 
 bool ProbeVisitor::VisitCallExpr(CallExpr *Call) {
@@ -380,6 +386,10 @@ bool ProbeVisitor::VisitBinaryOperator(BinaryOperator *E) {
   return true;
 }
 bool ProbeVisitor::VisitUnaryOperator(UnaryOperator *E) {
+  if (E->getOpcode() == UO_AddrOf) {
+    addrof_stmt_ = E;
+    is_addrof_ = true;
+  }
   if (E->getOpcode() != UO_Deref)
     return true;
   if (memb_visited_.find(E) != memb_visited_.end())
@@ -394,6 +404,13 @@ bool ProbeVisitor::VisitUnaryOperator(UnaryOperator *E) {
   post = "); _val; })";
   rewriter_.ReplaceText(expansionLoc(E->getOperatorLoc()), 1, pre);
   rewriter_.InsertTextAfterToken(expansionLoc(sub->getLocEnd()), post);
+  return true;
+}
+bool ProbeVisitor::VisitArraySubscriptExpr(ArraySubscriptExpr *E) {
+  // &({..._val; bpf_probe_read(&_val, ...); _val;})[0] is permitted
+  // by C standard.
+  if (is_addrof_)
+    is_addrof_ = false;
   return true;
 }
 bool ProbeVisitor::VisitMemberExpr(MemberExpr *E) {
@@ -421,6 +438,13 @@ bool ProbeVisitor::VisitMemberExpr(MemberExpr *E) {
 
   if (!rewriter_.isRewritable(E->getLocStart()))
     return true;
+
+  // parent expr has addrof, skip the rewrite, set is_addrof_ to flase so
+  // it won't affect next level of indirect address
+  if (is_addrof_) {
+    is_addrof_ = false;
+    return true;
+  }
 
   /* If the base of the dereference is a call to another function, we need to
    * visit that function first to know if a rewrite is necessary (i.e., if the
