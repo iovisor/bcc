@@ -388,12 +388,12 @@ bool ProbeVisitor::VisitUnaryOperator(UnaryOperator *E) {
   if (!ProbeChecker(sub, ptregs_, track_helpers_).needs_probe())
     return true;
   memb_visited_.insert(E);
-  string rhs = rewriter_.getRewrittenText(expansionRange(sub->getSourceRange()));
-  string text;
-  text = "({ typeof(" + E->getType().getAsString() + ") _val; __builtin_memset(&_val, 0, sizeof(_val));";
-  text += " bpf_probe_read(&_val, sizeof(_val), (u64)";
-  text += rhs + "); _val; })";
-  rewriter_.ReplaceText(expansionRange(E->getSourceRange()), text);
+  string pre, post;
+  pre = "({ typeof(" + E->getType().getAsString() + ") _val; __builtin_memset(&_val, 0, sizeof(_val));";
+  pre += " bpf_probe_read(&_val, sizeof(_val), (u64)";
+  post = "); _val; })";
+  rewriter_.ReplaceText(expansionLoc(E->getOperatorLoc()), 1, pre);
+  rewriter_.InsertTextAfterToken(expansionLoc(sub->getLocEnd()), post);
   return true;
 }
 bool ProbeVisitor::VisitMemberExpr(MemberExpr *E) {
@@ -442,7 +442,7 @@ bool ProbeVisitor::VisitMemberExpr(MemberExpr *E) {
   pre = "({ typeof(" + E->getType().getAsString() + ") _val; __builtin_memset(&_val, 0, sizeof(_val));";
   pre += " bpf_probe_read(&_val, sizeof(_val), (u64)&";
   post = rhs + "); _val; })";
-  rewriter_.InsertText(E->getLocStart(), pre);
+  rewriter_.InsertText(expansionLoc(E->getLocStart()), pre);
   rewriter_.ReplaceText(expansionRange(SourceRange(member, E->getLocEnd())), post);
   return true;
 }
@@ -493,6 +493,11 @@ ProbeVisitor::expansionRange(SourceRange range) {
 #else
   return rewriter_.getSourceMgr().getExpansionRange(range);
 #endif
+}
+
+SourceLocation
+ProbeVisitor::expansionLoc(SourceLocation loc) {
+  return rewriter_.getSourceMgr().getExpansionLoc(loc);
 }
 
 template <unsigned N>
