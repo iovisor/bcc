@@ -136,13 +136,37 @@ class ProbeChecker : public RecursiveASTVisitor<ProbeChecker> {
       needs_probe_ = true;
       return false;
     }
+    if (M->isArrow()) {
+      /* In A->b, if A is an external pointer, then A->b should be considered
+       * one too.  However, if we're taking the address of A->b
+       * (nb_derefs_ < 0), we should take it into account for the number of
+       * indirections; &A->b is a pointer to A with an offset. */
+      if (nb_derefs_ >= 0) {
+        ProbeChecker checker = ProbeChecker(M->getBase(), ptregs_,
+                                            track_helpers_, is_assign_);
+        if (checker.needs_probe() && checker.get_nb_derefs() == 0) {
+          needs_probe_ = true;
+          return false;
+        }
+      }
+      nb_derefs_++;
+    }
     return true;
   }
   bool VisitUnaryOperator(UnaryOperator *E) {
-    if (E->getOpcode() == UO_Deref)
+    if (E->getOpcode() == UO_Deref) {
+      /* In *A, if A is an external pointer, then *A should be considered one
+       * too. */
+      ProbeChecker checker = ProbeChecker(E->getSubExpr(), ptregs_,
+                                          track_helpers_, is_assign_);
+      if (checker.needs_probe() && checker.get_nb_derefs() == 0) {
+        needs_probe_ = true;
+        return false;
+      }
       nb_derefs_++;
-    else if (E->getOpcode() == UO_AddrOf)
+    } else if (E->getOpcode() == UO_AddrOf) {
       nb_derefs_--;
+    }
     return true;
   }
   bool VisitDeclRefExpr(DeclRefExpr *E) {
@@ -404,13 +428,6 @@ bool ProbeVisitor::VisitUnaryOperator(UnaryOperator *E) {
   post = "); _val; })";
   rewriter_.ReplaceText(expansionLoc(E->getOperatorLoc()), 1, pre);
   rewriter_.InsertTextAfterToken(expansionLoc(sub->getLocEnd()), post);
-  return true;
-}
-bool ProbeVisitor::VisitArraySubscriptExpr(ArraySubscriptExpr *E) {
-  // &({..._val; bpf_probe_read(&_val, ...); _val;})[0] is permitted
-  // by C standard.
-  if (is_addrof_)
-    is_addrof_ = false;
   return true;
 }
 bool ProbeVisitor::VisitMemberExpr(MemberExpr *E) {
