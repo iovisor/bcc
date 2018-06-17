@@ -303,6 +303,19 @@ int trace_entry(struct pt_regs *ctx, struct file *file) {
         b = BPF(text=text, debug=0)
         fn = b.load_func("trace_entry", BPF.KPROBE)
 
+    def test_nested_probe_read_deref(self):
+        text = """
+#include <uapi/linux/ptrace.h>
+struct sock {
+    u32 *sk_daddr;
+};
+int test(struct pt_regs *ctx, struct sock *skp) {
+    return *(skp->sk_daddr);
+}
+"""
+        b = BPF(text=text)
+        fn = b.load_func("test", BPF.KPROBE)
+
     def test_char_array_probe(self):
         BPF(text="""#include <linux/blkdev.h>
 int kprobe__blk_update_request(struct pt_regs *ctx, struct request *req) {
