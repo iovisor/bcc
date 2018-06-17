@@ -429,7 +429,7 @@ int test(struct pt_regs *ctx, struct sk_buff *skb) {
 }""")
         b.load_func("test", BPF.KPROBE)
 
-    def test_probe_member_expr(self):
+    def test_probe_member_expr_deref(self):
         b = BPF(text="""
 #include <uapi/linux/ptrace.h>
 #include <linux/netdevice.h>
@@ -439,6 +439,19 @@ int test(struct pt_regs *ctx, struct sk_buff *skb) {
     struct leaf *lp = &l;
     lp->ptr = skb;
     return lp->ptr->priority;
+}""")
+        b.load_func("test", BPF.KPROBE)
+
+    def test_probe_member_expr(self):
+        b = BPF(text="""
+#include <uapi/linux/ptrace.h>
+#include <linux/netdevice.h>
+struct leaf { struct sk_buff *ptr; };
+int test(struct pt_regs *ctx, struct sk_buff *skb) {
+    struct leaf l = {};
+    struct leaf *lp = &l;
+    lp->ptr = skb;
+    return l.ptr->priority;
 }""")
         b.load_func("test", BPF.KPROBE)
 
@@ -497,6 +510,44 @@ int test(struct pt_regs *ctx, struct sock *sk) {
     *ptr2 = sk;
     *ptr3 = ptr2;
     return subtest(ptr3);
+}
+"""
+        b = BPF(text=text)
+        fn = b.load_func("test", BPF.KPROBE)
+
+    def test_probe_read_nested_member1(self):
+        text = """
+#include <net/inet_sock.h>
+int test(struct pt_regs *ctx, struct sock *skp) {
+    u32 *daddr = &skp->sk_daddr;
+    return *daddr;
+}
+"""
+        b = BPF(text=text)
+        fn = b.load_func("test", BPF.KPROBE)
+
+    def test_probe_read_nested_member2(self):
+        text = """
+#include <uapi/linux/ptrace.h>
+struct sock {
+    u32 **sk_daddr;
+};
+int test(struct pt_regs *ctx, struct sock *skp) {
+    u32 *daddr = *(skp->sk_daddr);
+    return *daddr;
+}
+"""
+        b = BPF(text=text)
+        fn = b.load_func("test", BPF.KPROBE)
+
+    def test_probe_read_nested_member3(self):
+        text = """
+#include <uapi/linux/ptrace.h>
+struct sock {
+    u32 *sk_daddr;
+};
+int test(struct pt_regs *ctx, struct sock *skp) {
+    return *(&skp->sk_daddr);
 }
 """
         b = BPF(text=text)
