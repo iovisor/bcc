@@ -109,6 +109,7 @@ class ProbeVisitor : public clang::RecursiveASTVisitor<ProbeVisitor> {
   bool assignsExtPtr(clang::Expr *E, int *nbAddrOf);
   bool IsContextMemberExpr(clang::Expr *E);
   clang::SourceRange expansionRange(clang::SourceRange range);
+  clang::SourceLocation expansionLoc(clang::SourceLocation loc);
   template <unsigned N>
   clang::DiagnosticBuilder error(clang::SourceLocation loc, const char (&fmt)[N]);
 
