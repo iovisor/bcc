@@ -1,5 +1,6 @@
+R"********(
 /*
- * Copyright (c) 2016 PLUMgrid, Inc.
+ * Copyright (c) 2018 Clevernet, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,19 +15,14 @@
  * limitations under the License.
  */
 
-#pragma once
+#ifndef BPF_LICENSE
+/* No license defined, using GPL
+ * Use cflags to define your own BPF_LICENSE */
+#define BPF_LICENSE GPL
+#endif
+#define ___LICENSE(s) #s
+#define __LICENSE(s) ___LICENSE(s)
+#define _LICENSE __LICENSE(BPF_LICENSE)
+char _license[] SEC("license") = _LICENSE;
 
-#include <map>
-#include <string>
-
-namespace ebpf {
-
-class ExportedFiles {
-  static std::map<std::string, const char *> headers_;
-  static std::map<std::string, const char *> footers_;
- public:
-  static const std::map<std::string, const char *> & headers() { return headers_; }
-  static const std::map<std::string, const char *> & footers() { return footers_; }
-};
-
-}
+)********"

@@ -70,7 +70,9 @@ ClangLoader::ClangLoader(llvm::LLVMContext *ctx, unsigned flags)
     : ctx_(ctx), flags_(flags)
 {
   for (auto f : ExportedFiles::headers())
-    remapped_files_[f.first] = llvm::MemoryBuffer::getMemBuffer(f.second);
+    remapped_headers_[f.first] = llvm::MemoryBuffer::getMemBuffer(f.second);
+  for (auto f : ExportedFiles::footers())
+    remapped_footers_[f.first] = llvm::MemoryBuffer::getMemBuffer(f.second);
 }
 
 ClangLoader::~ClangLoader() {}
@@ -309,7 +311,9 @@ int ClangLoader::do_compile(unique_ptr<llvm::Module> *mod, TableStorage &ts,
     return -1;
 
   invocation0.getPreprocessorOpts().RetainRemappedFileBuffers = true;
-  for (const auto &f : remapped_files_)
+  for (const auto &f : remapped_headers_)
+    invocation0.getPreprocessorOpts().addRemappedFile(f.first, &*f.second);
+  for (const auto &f : remapped_footers_)
     invocation0.getPreprocessorOpts().addRemappedFile(f.first, &*f.second);
 
   if (in_memory) {
@@ -341,7 +345,9 @@ int ClangLoader::do_compile(unique_ptr<llvm::Module> *mod, TableStorage &ts,
   // give to it. Since the embedded header files should be copied fewer times
   // and reused if possible, set this flag to true.
   invocation1.getPreprocessorOpts().RetainRemappedFileBuffers = true;
-  for (const auto &f : remapped_files_)
+  for (const auto &f : remapped_headers_)
+    invocation1.getPreprocessorOpts().addRemappedFile(f.first, &*f.second);
+  for (const auto &f : remapped_footers_)
     invocation1.getPreprocessorOpts().addRemappedFile(f.first, &*f.second);
   invocation1.getPreprocessorOpts().addRemappedFile(main_path, &*out_buf);
   invocation1.getFrontendOpts().Inputs.clear();
@@ -367,7 +373,9 @@ int ClangLoader::do_compile(unique_ptr<llvm::Module> *mod, TableStorage &ts,
           const_cast<const char **>(ccargs.data()) + ccargs.size(), diags))
     return -1;
   invocation2.getPreprocessorOpts().RetainRemappedFileBuffers = true;
-  for (const auto &f : remapped_files_)
+  for (const auto &f : remapped_headers_)
+    invocation2.getPreprocessorOpts().addRemappedFile(f.first, &*f.second);
+  for (const auto &f : remapped_footers_)
     invocation2.getPreprocessorOpts().addRemappedFile(f.first, &*f.second);
   invocation2.getPreprocessorOpts().addRemappedFile(main_path, &*out_buf1);
   invocation2.getFrontendOpts().Inputs.clear();

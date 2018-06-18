@@ -222,8 +222,6 @@ struct _name##_table_t _name = { .max_entries = (_max_entries) }
 #define cursor_advance(_cursor, _len) \
   ({ void *_tmp = _cursor; _cursor += _len; _tmp; })
 
-char _license[4] SEC("license") = "GPL";
-
 unsigned _version SEC("version") = LINUX_VERSION_CODE;
 
 /* helper functions called from eBPF programs written in C */

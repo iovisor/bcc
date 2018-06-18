@@ -1287,6 +1287,10 @@ void BFrontendAction::DoMiscWorkAround() {
     "#endif\n"
     "#endif\n",
     false);
+
+  rewriter_->getEditBuffer(rewriter_->getSourceMgr().getMainFileID()).InsertTextAfter(
+    rewriter_->getSourceMgr().getBuffer(rewriter_->getSourceMgr().getMainFileID())->getBufferSize(),
+    "\n#include <bcc/footer.h>\n");
 }
 
 void BFrontendAction::EndSourceFileAction() {
