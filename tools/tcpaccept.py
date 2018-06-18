@@ -82,7 +82,6 @@ int kretprobe__inet_csk_accept(struct pt_regs *ctx)
     // check this is TCP
     u8 protocol = 0;
     // workaround for reading the sk_protocol bitfield:
-    // bpf_probe_read(&protocol, 1, (void *)((u64)&newsk->sk_wmem_queued) - 1);
     
     // Following comments add by Joe Yin:
     // Unfortunately,it can not work since Linux 4.10,
@@ -115,7 +114,7 @@ int kretprobe__inet_csk_accept(struct pt_regs *ctx)
 #endif
 
     if (protocol != IPPROTO_TCP)
-            return 0;
+        return 0;
 
     // pull in details
     u16 family = 0, lport = 0;
