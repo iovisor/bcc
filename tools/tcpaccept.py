@@ -82,7 +82,37 @@ int kretprobe__inet_csk_accept(struct pt_regs *ctx)
     // check this is TCP
     u8 protocol = 0;
     // workaround for reading the sk_protocol bitfield:
-    bpf_probe_read(&protocol, 1, (void *)((long)&newsk->sk_wmem_queued) - 3);
+    
+    // Following comments add by Joe Yin:
+    // Unfortunately,it can not work since Linux 4.10,
+    // because the sk_wmem_queued is not following the bitfield of sk_protocol.
+    // And the following member is sk_gso_max_segs.
+    // So, we can use this:
+    // bpf_probe_read(&protocol, 1, (void *)((u64)&newsk->sk_gso_max_segs) - 3);
+    // In order to  diff the pre-4.10 and 4.10+ ,introduce the variables gso_max_segs_offset,sk_lingertime, 
+    // sk_lingertime is closed to the gso_max_segs_offset,and  
+    // the offset between the two members is 4 
+
+    int gso_max_segs_offset = offsetof(struct sock, sk_gso_max_segs);
+    int sk_lingertime_offset = offsetof(struct sock, sk_lingertime);
+
+    if (sk_lingertime_offset - gso_max_segs_offset == 4) 
+        // 4.10+ with little endian
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+            bpf_probe_read(&protocol, 1, (void *)((u64)&newsk->sk_gso_max_segs) - 3);
+    else
+        // pre-4.10 with little endian
+            bpf_probe_read(&protocol, 1, (void *)((u64)&newsk->sk_wmem_queued) - 3);
+#elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+        // 4.10+ with big endian
+            bpf_probe_read(&protocol, 1, (void *)((u64)&newsk->sk_gso_max_segs) - 1);
+    else
+        // pre-4.10 with big endian
+            bpf_probe_read(&protocol, 1, (void *)((u64)&newsk->sk_wmem_queued) - 1);
+#else
+# error "Fix your compiler's __BYTE_ORDER__?!"
+#endif
+
     if (protocol != IPPROTO_TCP)
         return 0;
 
