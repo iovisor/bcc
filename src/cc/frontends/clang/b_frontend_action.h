@@ -109,6 +109,7 @@ class ProbeVisitor : public clang::RecursiveASTVisitor<ProbeVisitor> {
   bool assignsExtPtr(clang::Expr *E, int *nbAddrOf);
   bool IsContextMemberExpr(clang::Expr *E);
   clang::SourceRange expansionRange(clang::SourceRange range);
+  clang::SourceLocation expansionLoc(clang::SourceLocation loc);
   template <unsigned N>
   clang::DiagnosticBuilder error(clang::SourceLocation loc, const char (&fmt)[N]);
 
@@ -122,6 +123,8 @@ class ProbeVisitor : public clang::RecursiveASTVisitor<ProbeVisitor> {
   clang::Decl *ctx_;
   bool track_helpers_;
   std::list<int> ptregs_returned_;
+  const clang::Stmt *addrof_stmt_;
+  bool is_addrof_;
 };
 
 // A helper class to the frontend action, walks the decls

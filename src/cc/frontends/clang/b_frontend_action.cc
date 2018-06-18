@@ -136,13 +136,37 @@ class ProbeChecker : public RecursiveASTVisitor<ProbeChecker> {
       needs_probe_ = true;
       return false;
     }
+    if (M->isArrow()) {
+      /* In A->b, if A is an external pointer, then A->b should be considered
+       * one too.  However, if we're taking the address of A->b
+       * (nb_derefs_ < 0), we should take it into account for the number of
+       * indirections; &A->b is a pointer to A with an offset. */
+      if (nb_derefs_ >= 0) {
+        ProbeChecker checker = ProbeChecker(M->getBase(), ptregs_,
+                                            track_helpers_, is_assign_);
+        if (checker.needs_probe() && checker.get_nb_derefs() == 0) {
+          needs_probe_ = true;
+          return false;
+        }
+      }
+      nb_derefs_++;
+    }
     return true;
   }
   bool VisitUnaryOperator(UnaryOperator *E) {
-    if (E->getOpcode() == UO_Deref)
+    if (E->getOpcode() == UO_Deref) {
+      /* In *A, if A is an external pointer, then *A should be considered one
+       * too. */
+      ProbeChecker checker = ProbeChecker(E->getSubExpr(), ptregs_,
+                                          track_helpers_, is_assign_);
+      if (checker.needs_probe() && checker.get_nb_derefs() == 0) {
+        needs_probe_ = true;
+        return false;
+      }
       nb_derefs_++;
-    else if (E->getOpcode() == UO_AddrOf)
+    } else if (E->getOpcode() == UO_AddrOf) {
       nb_derefs_--;
+    }
     return true;
   }
   bool VisitDeclRefExpr(DeclRefExpr *E) {
@@ -229,7 +253,8 @@ bool MapVisitor::VisitCallExpr(CallExpr *Call) {
 
 ProbeVisitor::ProbeVisitor(ASTContext &C, Rewriter &rewriter,
                            set<Decl *> &m, bool track_helpers) :
-  C(C), rewriter_(rewriter), m_(m), track_helpers_(track_helpers) {}
+  C(C), rewriter_(rewriter), m_(m), track_helpers_(track_helpers),
+  addrof_stmt_(nullptr), is_addrof_(false) {}
 
 bool ProbeVisitor::assignsExtPtr(Expr *E, int *nbAddrOf) {
   if (IsContextMemberExpr(E)) {
@@ -296,7 +321,12 @@ bool ProbeVisitor::VisitVarDecl(VarDecl *D) {
 bool ProbeVisitor::TraverseStmt(Stmt *S) {
   if (whitelist_.find(S) != whitelist_.end())
     return true;
-  return RecursiveASTVisitor<ProbeVisitor>::TraverseStmt(S);
+  auto ret = RecursiveASTVisitor<ProbeVisitor>::TraverseStmt(S);
+  if (addrof_stmt_ == S) {
+    addrof_stmt_ = nullptr;
+    is_addrof_ = false;
+  }
+  return ret;
 }
 
 bool ProbeVisitor::VisitCallExpr(CallExpr *Call) {
@@ -380,6 +410,10 @@ bool ProbeVisitor::VisitBinaryOperator(BinaryOperator *E) {
   return true;
 }
 bool ProbeVisitor::VisitUnaryOperator(UnaryOperator *E) {
+  if (E->getOpcode() == UO_AddrOf) {
+    addrof_stmt_ = E;
+    is_addrof_ = true;
+  }
   if (E->getOpcode() != UO_Deref)
     return true;
   if (memb_visited_.find(E) != memb_visited_.end())
@@ -388,12 +422,12 @@ bool ProbeVisitor::VisitUnaryOperator(UnaryOperator *E) {
   if (!ProbeChecker(sub, ptregs_, track_helpers_).needs_probe())
     return true;
   memb_visited_.insert(E);
-  string rhs = rewriter_.getRewrittenText(expansionRange(sub->getSourceRange()));
-  string text;
-  text = "({ typeof(" + E->getType().getAsString() + ") _val; __builtin_memset(&_val, 0, sizeof(_val));";
-  text += " bpf_probe_read(&_val, sizeof(_val), (u64)";
-  text += rhs + "); _val; })";
-  rewriter_.ReplaceText(expansionRange(E->getSourceRange()), text);
+  string pre, post;
+  pre = "({ typeof(" + E->getType().getAsString() + ") _val; __builtin_memset(&_val, 0, sizeof(_val));";
+  pre += " bpf_probe_read(&_val, sizeof(_val), (u64)";
+  post = "); _val; })";
+  rewriter_.ReplaceText(expansionLoc(E->getOperatorLoc()), 1, pre);
+  rewriter_.InsertTextAfterToken(expansionLoc(sub->getLocEnd()), post);
   return true;
 }
 bool ProbeVisitor::VisitMemberExpr(MemberExpr *E) {
@@ -422,6 +456,13 @@ bool ProbeVisitor::VisitMemberExpr(MemberExpr *E) {
   if (!rewriter_.isRewritable(E->getLocStart()))
     return true;
 
+  // parent expr has addrof, skip the rewrite, set is_addrof_ to flase so
+  // it won't affect next level of indirect address
+  if (is_addrof_) {
+    is_addrof_ = false;
+    return true;
+  }
+
   /* If the base of the dereference is a call to another function, we need to
    * visit that function first to know if a rewrite is necessary (i.e., if the
    * function returns an external pointer). */
@@ -442,7 +483,7 @@ bool ProbeVisitor::VisitMemberExpr(MemberExpr *E) {
   pre = "({ typeof(" + E->getType().getAsString() + ") _val; __builtin_memset(&_val, 0, sizeof(_val));";
   pre += " bpf_probe_read(&_val, sizeof(_val), (u64)&";
   post = rhs + "); _val; })";
-  rewriter_.InsertText(E->getLocStart(), pre);
+  rewriter_.InsertText(expansionLoc(E->getLocStart()), pre);
   rewriter_.ReplaceText(expansionRange(SourceRange(member, E->getLocEnd())), post);
   return true;
 }
@@ -493,6 +534,11 @@ ProbeVisitor::expansionRange(SourceRange range) {
 #else
   return rewriter_.getSourceMgr().getExpansionRange(range);
 #endif
+}
+
+SourceLocation
+ProbeVisitor::expansionLoc(SourceLocation loc) {
+  return rewriter_.getSourceMgr().getExpansionLoc(loc);
 }
 
 template <unsigned N>

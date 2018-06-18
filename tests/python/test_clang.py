@@ -303,6 +303,19 @@ int trace_entry(struct pt_regs *ctx, struct file *file) {
         b = BPF(text=text, debug=0)
         fn = b.load_func("trace_entry", BPF.KPROBE)
 
+    def test_nested_probe_read_deref(self):
+        text = """
+#include <uapi/linux/ptrace.h>
+struct sock {
+    u32 *sk_daddr;
+};
+int test(struct pt_regs *ctx, struct sock *skp) {
+    return *(skp->sk_daddr);
+}
+"""
+        b = BPF(text=text)
+        fn = b.load_func("test", BPF.KPROBE)
+
     def test_char_array_probe(self):
         BPF(text="""#include <linux/blkdev.h>
 int kprobe__blk_update_request(struct pt_regs *ctx, struct request *req) {
@@ -416,7 +429,7 @@ int test(struct pt_regs *ctx, struct sk_buff *skb) {
 }""")
         b.load_func("test", BPF.KPROBE)
 
-    def test_probe_member_expr(self):
+    def test_probe_member_expr_deref(self):
         b = BPF(text="""
 #include <uapi/linux/ptrace.h>
 #include <linux/netdevice.h>
@@ -426,6 +439,19 @@ int test(struct pt_regs *ctx, struct sk_buff *skb) {
     struct leaf *lp = &l;
     lp->ptr = skb;
     return lp->ptr->priority;
+}""")
+        b.load_func("test", BPF.KPROBE)
+
+    def test_probe_member_expr(self):
+        b = BPF(text="""
+#include <uapi/linux/ptrace.h>
+#include <linux/netdevice.h>
+struct leaf { struct sk_buff *ptr; };
+int test(struct pt_regs *ctx, struct sk_buff *skb) {
+    struct leaf l = {};
+    struct leaf *lp = &l;
+    lp->ptr = skb;
+    return l.ptr->priority;
 }""")
         b.load_func("test", BPF.KPROBE)
 
@@ -484,6 +510,44 @@ int test(struct pt_regs *ctx, struct sock *sk) {
     *ptr2 = sk;
     *ptr3 = ptr2;
     return subtest(ptr3);
+}
+"""
+        b = BPF(text=text)
+        fn = b.load_func("test", BPF.KPROBE)
+
+    def test_probe_read_nested_member1(self):
+        text = """
+#include <net/inet_sock.h>
+int test(struct pt_regs *ctx, struct sock *skp) {
+    u32 *daddr = &skp->sk_daddr;
+    return *daddr;
+}
+"""
+        b = BPF(text=text)
+        fn = b.load_func("test", BPF.KPROBE)
+
+    def test_probe_read_nested_member2(self):
+        text = """
+#include <uapi/linux/ptrace.h>
+struct sock {
+    u32 **sk_daddr;
+};
+int test(struct pt_regs *ctx, struct sock *skp) {
+    u32 *daddr = *(skp->sk_daddr);
+    return *daddr;
+}
+"""
+        b = BPF(text=text)
+        fn = b.load_func("test", BPF.KPROBE)
+
+    def test_probe_read_nested_member3(self):
+        text = """
+#include <uapi/linux/ptrace.h>
+struct sock {
+    u32 *sk_daddr;
+};
+int test(struct pt_regs *ctx, struct sock *skp) {
+    return *(&skp->sk_daddr);
 }
 """
         b = BPF(text=text)
@@ -938,7 +1002,7 @@ TRACEPOINT_PROBE(skb, kfree_skb) {
 #include <net/inet_sock.h>
 int test(struct pt_regs *ctx) {
     struct sock *sk;
-    sk = (struct sock *)ctx->di;
+    sk = (struct sock *)PT_REGS_PARM1(ctx);
     return sk->sk_dport;
 }
 """
@@ -1039,6 +1103,24 @@ static inline struct tcphdr *my_skb_transport_header(struct sk_buff *skb) {
 }
 int test(struct pt_regs *ctx, struct sock *sk, struct sk_buff *skb) {
     return my_skb_transport_header(skb)->seq;
+}
+"""
+        b = BPF(text=text)
+        fn = b.load_func("test", BPF.KPROBE)
+
+    def test_no_probe_read_addrof(self):
+        text = """
+#include <linux/sched.h>
+#include <net/inet_sock.h>
+static inline int test_help(__be16 *addr) {
+    __be16 val = 0;
+    bpf_probe_read(&val, sizeof(val), addr);
+    return val;
+}
+int test(struct pt_regs *ctx) {
+    struct sock *sk;
+    sk = (struct sock *)PT_REGS_PARM1(ctx);
+    return test_help(&sk->sk_dport);
 }
 """
         b = BPF(text=text)
