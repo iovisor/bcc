@@ -1,0 +1,74 @@
+.TH criticalstat 8  "2018-06-07" "USER COMMANDS"
+.SH NAME
+criticalstat \- A tracer to find and report long atomic critical sections in kernel
+.SH SYNOPSIS
+.B criticalstat [\-h] [\-p] [\-i] [\-d DURATION]
+.SH DESCRIPTION
+
+criticalstat traces and reports occurences of atomic critical sections in the
+kernel with useful stacktraces showing the origin of them. Such critical
+sections frequently occur due to use of spinlocks, or if interrupts or
+preemption were explicity disabled by a driver. IRQ routines in Linux are also
+executed with interrupts disabled. There are many reasons. Such critical
+sections are a source of long latency/responsive issues for real-time systems.
+
+This works by probing the preempt/irq and cpuidle tracepoints in the kernel.
+Since this uses BPF, only the root user can use this tool. Further, the kernel
+has to be built with certain CONFIG options enabled. See below.
+
+.SH REQUIREMENTS
+Enable CONFIG_PREEMPTIRQ_EVENTS and CONFIG_DEBUG_PREEMPT. Additionally, the
+following options should be DISABLED on older kernels: CONFIG_PROVE_LOCKING,
+CONFIG_LOCKDEP.
+.SH OPTIONS
+.TP
+\-h
+Print usage message.
+.TP
+\-p
+Find long sections where preemption was disabled on local CPU.
+.TP
+\-i
+Find long sections where interrupt was disabled on local CPU.
+.TP
+\-d DURATION
+Only identify sections that are longer than DURATION in microseconds.
+.SH EXAMPLES
+.TP
+Run with default options: irq disabled for more than 100 uS
+#
+.B criticalstat
+.TP
+Find sections with preemption disabled for more than 100 uS.
+#
+.B criticalstat -p
+.TP
+Find sections with IRQ disabled for more than 500 uS.
+#
+.B criticalstat -d 500
+.TP
+Find sections with preemption disabled for more than 500 uS.
+#
+.B criticalstat -p -d 500
+.SH OVERHEAD
+This tool can cause overhead if the application is spending a lot of time in
+kernel mode. The overhead is variable but can be 2-4% of performance
+degradation. If overhead is seen to be too much, please pass a higher DURATION
+to the -d option to filter more aggressively.
+
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Joel Fernandes
+.SH SEE ALSO
+Linux kernel's preemptoff and irqoff tracers.
+
