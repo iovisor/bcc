@@ -70,7 +70,15 @@ struct ipv6_data_t {
     char task[TASK_COMM_LEN];
 };
 BPF_PERF_OUTPUT(ipv6_events);
+"""
 
+#
+# The following is the code for older kernels(Linux pre-4.16).
+# It uses kprobes to instrument inet_csk_accept(). On Linux 4.16 and
+# later, the sock:inet_sock_set_state tracepoint should be used instead, as
+# is done by the code that follows this. 
+#
+bpf_text_kprobe = """
 int kretprobe__inet_csk_accept(struct pt_regs *ctx)
 {
     struct sock *newsk = (struct sock *)PT_REGS_RC(ctx);
@@ -146,6 +154,51 @@ int kretprobe__inet_csk_accept(struct pt_regs *ctx)
     return 0;
 }
 """
+
+bpf_text_tracepoint = """
+TRACEPOINT_PROBE(sock, inet_sock_set_state)
+{
+    if (args->protocol != IPPROTO_TCP)
+        return 0;
+    u32 pid = bpf_get_current_pid_tgid();
+    struct sock *newsk = (struct sock *)args->skaddr;
+
+    // pull in details
+    u16 family = 0, lport = 0;
+    family = newsk->__sk_common.skc_family;
+    lport = newsk->__sk_common.skc_num;
+
+    if (family == AF_INET) {
+        struct ipv4_data_t data4 = {.pid = pid, .ip = 4};
+        data4.ts_us = bpf_ktime_get_ns() / 1000;
+        data4.saddr = newsk->__sk_common.skc_rcv_saddr;
+        data4.daddr = newsk->__sk_common.skc_daddr;
+        data4.lport = lport;
+        bpf_get_current_comm(&data4.task, sizeof(data4.task));
+        ipv4_events.perf_submit(ctx, &data4, sizeof(data4));
+
+    } else if (family == AF_INET6) {
+        struct ipv6_data_t data6 = {.pid = pid, .ip = 6};
+        data6.ts_us = bpf_ktime_get_ns() / 1000;
+        bpf_probe_read(&data6.saddr, sizeof(data6.saddr),
+            &newsk->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
+        bpf_probe_read(&data6.daddr, sizeof(data6.daddr),
+            &newsk->__sk_common.skc_v6_daddr.in6_u.u6_addr32);
+        data6.lport = lport;
+        bpf_get_current_comm(&data6.task, sizeof(data6.task));
+        ipv6_events.perf_submit(ctx, &data6, sizeof(data6));
+    }
+    // else drop
+
+    return 0;
+}
+"""
+
+if (BPF.tracepoint_exists("sock", "inet_sock_set_state")):
+    bpf_text += bpf_text_tracepoint
+else:
+    bpf_text += bpf_text_kprobe
+
 
 # code substitutions
 if args.pid:
