@@ -306,7 +306,7 @@ def print_event(cpu, data, size):
         print("Section start: {} -> {}".format(b.ksym(stext + event.addrs[0]), b.ksym(stext + event.addrs[1])))
         print("Section end:   {} -> {}".format(b.ksym(stext + event.addrs[2]), b.ksym(stext + event.addrs[3])))
 
-        if event.stack_id < 0:
+        if event.stack_id >= 0:
             kstack = stack_traces.walk(event.stack_id)
             syms = get_syms(kstack)
             if not syms:
