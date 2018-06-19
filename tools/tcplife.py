@@ -337,7 +337,7 @@ TRACEPOINT_PROBE(sock, inet_sock_set_state)
             .rx_b = rx_b, .tx_b = tx_b};
         data6.ts_us = bpf_ktime_get_ns() / 1000;
         bpf_probe_read(&data6.saddr, sizeof(data6.saddr), args->saddr_v6);
-        bpf_probe_read(&data6.daddr, sizeof(data6.daddr), args->saddr_v6);
+        bpf_probe_read(&data6.daddr, sizeof(data6.daddr), args->daddr_v6);
         // a workaround until data6 compiles with separate lport/dport
         data6.ports = dport + ((0ULL + lport) << 32);
         data6.pid = pid;
