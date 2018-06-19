@@ -161,18 +161,17 @@ TRACEPOINT_PROBE(sock, inet_sock_set_state)
     if (args->protocol != IPPROTO_TCP)
         return 0;
     u32 pid = bpf_get_current_pid_tgid();
-    struct sock *newsk = (struct sock *)args->skaddr;
-
     // pull in details
     u16 family = 0, lport = 0;
-    family = newsk->__sk_common.skc_family;
-    lport = newsk->__sk_common.skc_num;
+    family = args->family;
+    lport = args->sport;
 
+    // pull in details
     if (family == AF_INET) {
         struct ipv4_data_t data4 = {.pid = pid, .ip = 4};
         data4.ts_us = bpf_ktime_get_ns() / 1000;
-        data4.saddr = newsk->__sk_common.skc_rcv_saddr;
-        data4.daddr = newsk->__sk_common.skc_daddr;
+        bpf_probe_read(&data4.saddr, sizeof(u32), args->saddr);
+        bpf_probe_read(&data4.daddr, sizeof(u32), args->daddr);
         data4.lport = lport;
         bpf_get_current_comm(&data4.task, sizeof(data4.task));
         ipv4_events.perf_submit(ctx, &data4, sizeof(data4));
@@ -180,10 +179,8 @@ TRACEPOINT_PROBE(sock, inet_sock_set_state)
     } else if (family == AF_INET6) {
         struct ipv6_data_t data6 = {.pid = pid, .ip = 6};
         data6.ts_us = bpf_ktime_get_ns() / 1000;
-        bpf_probe_read(&data6.saddr, sizeof(data6.saddr),
-            &newsk->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
-        bpf_probe_read(&data6.daddr, sizeof(data6.daddr),
-            &newsk->__sk_common.skc_v6_daddr.in6_u.u6_addr32);
+        bpf_probe_read(&data6.saddr, sizeof(data6.saddr), args->saddr_v6);
+        bpf_probe_read(&data6.daddr, sizeof(data6.daddr), args->daddr_v6);
         data6.lport = lport;
         bpf_get_current_comm(&data6.task, sizeof(data6.task));
         ipv6_events.perf_submit(ctx, &data6, sizeof(data6));
