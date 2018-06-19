@@ -166,7 +166,6 @@ TRACEPOINT_PROBE(sock, inet_sock_set_state)
     family = args->family;
     lport = args->sport;
 
-    // pull in details
     if (family == AF_INET) {
         struct ipv4_data_t data4 = {.pid = pid, .ip = 4};
         data4.ts_us = bpf_ktime_get_ns() / 1000;
@@ -175,7 +174,6 @@ TRACEPOINT_PROBE(sock, inet_sock_set_state)
         data4.lport = lport;
         bpf_get_current_comm(&data4.task, sizeof(data4.task));
         ipv4_events.perf_submit(ctx, &data4, sizeof(data4));
-
     } else if (family == AF_INET6) {
         struct ipv6_data_t data6 = {.pid = pid, .ip = 6};
         data6.ts_us = bpf_ktime_get_ns() / 1000;
