@@ -319,8 +319,8 @@ TRACEPOINT_PROBE(sock, inet_sock_set_state)
         struct ipv4_data_t data4 = {.span_us = delta_us,
             .rx_b = rx_b, .tx_b = tx_b};
         data4.ts_us = bpf_ktime_get_ns() / 1000;
-        data4.saddr = args->saddr;
-        data4.daddr = args->daddr;
+        bpf_probe_read(&data4.saddr, sizeof(u32), args->saddr);
+        bpf_probe_read(&data4.daddr, sizeof(u32), args->daddr);
         // a workaround until data4 compiles with separate lport/dport
         data4.ports = dport + ((0ULL + lport) << 32);
         data4.pid = pid;
@@ -336,8 +336,8 @@ TRACEPOINT_PROBE(sock, inet_sock_set_state)
         struct ipv6_data_t data6 = {.span_us = delta_us,
             .rx_b = rx_b, .tx_b = tx_b};
         data6.ts_us = bpf_ktime_get_ns() / 1000;
-        data6.saddr = args->saddr_v6;
-        data6.daddr = args->daddr_v6;
+        bpf_probe_read(&data6.saddr, sizeof(data6.saddr), args->saddr_v6);
+        bpf_probe_read(&data6.daddr, sizeof(data6.daddr), args->saddr_v6);
         // a workaround until data6 compiles with separate lport/dport
         data6.ports = dport + ((0ULL + lport) << 32);
         data6.pid = pid;

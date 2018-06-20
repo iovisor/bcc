@@ -169,7 +169,7 @@ TRACEPOINT_PROBE(sock, inet_sock_set_state)
     if (family == AF_INET) {
         struct ipv4_data_t data4 = {.pid = pid, .ip = 4};
         data4.ts_us = bpf_ktime_get_ns() / 1000;
-	bpf_probe_read(&data4.saddr, sizeof(data4.saddr), args->saddr);
+        bpf_probe_read(&data4.saddr, sizeof(data4.saddr), args->saddr);
         bpf_probe_read(&data4.daddr, sizeof(data4.daddr), args->daddr);
         data4.lport = lport;
         bpf_get_current_comm(&data4.task, sizeof(data4.task));
