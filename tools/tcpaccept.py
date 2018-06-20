@@ -52,8 +52,8 @@ struct ipv4_data_t {
     // XXX: switch some to u32's when supported
     u64 ts_us;
     u64 pid;
-    u64 saddr;
-    u64 daddr;
+    u32 saddr;
+    u32 daddr;
     u64 ip;
     u64 lport;
     char task[TASK_COMM_LEN];
@@ -169,19 +169,19 @@ TRACEPOINT_PROBE(sock, inet_sock_set_state)
     if (family == AF_INET) {
         struct ipv4_data_t data4 = {.pid = pid, .ip = 4};
         data4.ts_us = bpf_ktime_get_ns() / 1000;
-        bpf_probe_read(&data4.saddr, sizeof(u32), args->saddr);
-        bpf_probe_read(&data4.daddr, sizeof(u32), args->daddr);
+	bpf_probe_read(&data4.saddr, sizeof(data4.saddr), args->saddr);
+        bpf_probe_read(&data4.daddr, sizeof(data4.daddr), args->daddr);
         data4.lport = lport;
         bpf_get_current_comm(&data4.task, sizeof(data4.task));
-        ipv4_events.perf_submit(ctx, &data4, sizeof(data4));
+        ipv4_events.perf_submit(args, &data4, sizeof(data4));
     } else if (family == AF_INET6) {
         struct ipv6_data_t data6 = {.pid = pid, .ip = 6};
         data6.ts_us = bpf_ktime_get_ns() / 1000;
-        bpf_probe_read(&data6.saddr, sizeof(data6.saddr), args->saddr_v6);
-        bpf_probe_read(&data6.daddr, sizeof(data6.daddr), args->daddr_v6);
+	bpf_probe_read(&data6.saddr, sizeof(data6.saddr), args->saddr);
+        bpf_probe_read(&data6.daddr, sizeof(data6.daddr), args->daddr);
         data6.lport = lport;
         bpf_get_current_comm(&data6.task, sizeof(data6.task));
-        ipv6_events.perf_submit(ctx, &data6, sizeof(data6));
+        ipv6_events.perf_submit(args, &data6, sizeof(data6));
     }
     // else drop
 
@@ -213,8 +213,8 @@ class Data_ipv4(ct.Structure):
     _fields_ = [
         ("ts_us", ct.c_ulonglong),
         ("pid", ct.c_ulonglong),
-        ("saddr", ct.c_ulonglong),
-        ("daddr", ct.c_ulonglong),
+        ("saddr", ct.c_uint),
+        ("daddr", ct.c_uint),
         ("ip", ct.c_ulonglong),
         ("lport", ct.c_ulonglong),
         ("task", ct.c_char * TASK_COMM_LEN)
