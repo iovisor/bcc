@@ -159,7 +159,7 @@ std::string Probe::largest_arg_type(size_t arg_n) {
 }
 
 bool Probe::usdt_getarg(std::ostream &stream) {
-  if (!attached_to_.has_value() || attached_to_.value().empty())
+  if (!attached_to_ || attached_to_->empty())
     return false;
 
   return usdt_getarg(stream, attached_to_.value());

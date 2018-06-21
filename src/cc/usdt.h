@@ -26,6 +26,11 @@
 
 struct bcc_usdt;
 
+namespace ebpf {
+  class BPF;
+  class USDT;
+}
+
 namespace USDT {
 
 using std::experimental::optional;
@@ -228,6 +233,9 @@ public:
   const std::string &provider() { return provider_; }
 
   friend class Context;
+
+  friend class ::ebpf::BPF;
+  friend class ::ebpf::USDT;
 };
 
 class Context {
@@ -271,5 +279,8 @@ public:
 
   typedef void (*each_uprobe_cb)(const char *, const char *, uint64_t, int);
   void each_uprobe(each_uprobe_cb callback);
+
+  friend class ::ebpf::BPF;
+  friend class ::ebpf::USDT;
 };
 }
