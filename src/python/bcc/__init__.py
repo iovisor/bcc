@@ -1041,30 +1041,27 @@ class BPF(object):
         fields (task, pid, cpu, flags, timestamp, msg) or None if no
         line was read (nonblocking=True)
         """
-        try:
-            while True:
-                line = self.trace_readline(nonblocking)
-                if not line and nonblocking: return (None,) * 6
-                # don't print messages related to lost events
-                if line.startswith(b"CPU:"): continue
-                task = line[:16].lstrip()
-                line = line[17:]
-                ts_end = line.find(b":")
-                pid, cpu, flags, ts = line[:ts_end].split()
-                cpu = cpu[1:-1]
-                # line[ts_end:] will have ": [sym_or_addr]: msgs"
-                # For trace_pipe debug output, the addr typically
-                # is invalid (e.g., 0x1). For kernel 4.12 or earlier,
-                # if address is not able to match a kernel symbol,
-                # nothing will be printed out. For kernel 4.13 and later,
-                # however, the illegal address will be printed out.
-                # Hence, both cases are handled here.
-                line = line[ts_end + 1:]
-                sym_end = line.find(b":")
-                msg = line[sym_end + 2:]
-                return (task, int(pid), int(cpu), flags, float(ts), msg)
-        except KeyboardInterrupt:
-            exit()
+        while True:
+            line = self.trace_readline(nonblocking)
+            if not line and nonblocking: return (None,) * 6
+            # don't print messages related to lost events
+            if line.startswith(b"CPU:"): continue
+            task = line[:16].lstrip()
+            line = line[17:]
+            ts_end = line.find(b":")
+            pid, cpu, flags, ts = line[:ts_end].split()
+            cpu = cpu[1:-1]
+            # line[ts_end:] will have ": [sym_or_addr]: msgs"
+            # For trace_pipe debug output, the addr typically
+            # is invalid (e.g., 0x1). For kernel 4.12 or earlier,
+            # if address is not able to match a kernel symbol,
+            # nothing will be printed out. For kernel 4.13 and later,
+            # however, the illegal address will be printed out.
+            # Hence, both cases are handled here.
+            line = line[ts_end + 1:]
+            sym_end = line.find(b":")
+            msg = line[sym_end + 2:]
+            return (task, int(pid), int(cpu), flags, float(ts), msg)
 
     def trace_readline(self, nonblocking=False):
         """trace_readline(nonblocking=False)
@@ -1080,8 +1077,6 @@ class BPF(object):
             line = trace.readline(1024).rstrip()
         except IOError:
             pass
-        except KeyboardInterrupt:
-            exit()
         return line
 
     def trace_print(self, fmt=None):
@@ -1093,18 +1088,15 @@ class BPF(object):
         example: trace_print(fmt="pid {1}, msg = {5}")
         """
 
-        try:
-            while True:
-                if fmt:
-                    fields = self.trace_fields(nonblocking=False)
-                    if not fields: continue
-                    line = fmt.format(*fields)
-                else:
-                    line = self.trace_readline(nonblocking=False)
-                print(line)
-                sys.stdout.flush()
-        except KeyboardInterrupt:
-            exit()
+        while True:
+            if fmt:
+                fields = self.trace_fields(nonblocking=False)
+                if not fields: continue
+                line = fmt.format(*fields)
+            else:
+                line = self.trace_readline(nonblocking=False)
+            print(line)
+            sys.stdout.flush()
 
     @staticmethod
     def _sym_cache(pid):
@@ -1194,13 +1186,10 @@ class BPF(object):
         Poll from all open perf ring buffers, calling the callback that was
         provided when calling open_perf_buffer for each entry.
         """
-        try:
-            readers = (ct.c_void_p * len(self.perf_buffers))()
-            for i, v in enumerate(self.perf_buffers.values()):
-                readers[i] = v
-            lib.perf_reader_poll(len(readers), readers, timeout)
-        except KeyboardInterrupt:
-            exit()
+        readers = (ct.c_void_p * len(self.perf_buffers))()
+        for i, v in enumerate(self.perf_buffers.values()):
+            readers[i] = v
+        lib.perf_reader_poll(len(readers), readers, timeout)
 
     def kprobe_poll(self, timeout = -1):
         """kprobe_poll(self)
