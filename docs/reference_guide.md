@@ -1550,7 +1550,7 @@ Exception: Failed to load BPF program kretprobe__inet_csk_accept
 
 This error happens when a GPL-only helper is called from a non-GPL BPF program. To fix this error, do not use GPL-only helpers from a proprietary BPF program, or relicense the BPF program under a GPL-compatible license. Check which [BPF helpers](https://github.com/iovisor/bcc/blob/master/docs/kernel-versions.md#helpers) are GPL-only, and what licenses are considered GPL-compatible.
 
-Example calling `bpf_get_stackid()`, a GPL-only BPF helper, from a proprietary program (`cflags=['-DBPF_LICENSE=Proprietary']`):
+Example calling `bpf_get_stackid()`, a GPL-only BPF helper, from a proprietary program (`#define BPF_LICENSE Proprietary`):
 
 ```
 bpf: Failed to load program: Invalid argument
