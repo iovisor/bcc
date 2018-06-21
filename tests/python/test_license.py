@@ -11,12 +11,10 @@ class TestLicense(unittest.TestCase):
 BPF_STACK_TRACE(stack_traces, 10240);
 struct gpl_s {
     u64 ts;
-    int id;
 };
 BPF_PERF_OUTPUT(events);
 int license_program(struct pt_regs *ctx) {
     struct gpl_s data = {};
-    data.id = stack_traces.get_stackid(ctx, BPF_F_REUSE_STACKID);
     data.ts = bpf_ktime_get_ns();
     events.perf_submit(ctx, &data, sizeof(data));
     return 0;
