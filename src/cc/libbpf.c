@@ -514,14 +514,16 @@ int bpf_prog_load(enum bpf_prog_type prog_type, const char *name,
     }
   }
 
-  if (strncmp(name, "kprobe__", 8) == 0)
-    name_offset = 8;
-  else if (strncmp(name, "tracepoint__", 12) == 0)
-    name_offset = 12;
-  else if (strncmp(name, "raw_tracepoint__", 16) == 0)
-    name_offset = 16;
-  memcpy(attr.prog_name, name + name_offset,
-         min(name_len - name_offset, BPF_OBJ_NAME_LEN - 1));
+  if (name_len) {
+    if (strncmp(name, "kprobe__", 8) == 0)
+      name_offset = 8;
+    else if (strncmp(name, "tracepoint__", 12) == 0)
+      name_offset = 12;
+    else if (strncmp(name, "raw_tracepoint__", 16) == 0)
+      name_offset = 16;
+    memcpy(attr.prog_name, name + name_offset,
+           min(name_len - name_offset, BPF_OBJ_NAME_LEN - 1));
+  }
 
   ret = syscall(__NR_bpf, BPF_PROG_LOAD, &attr, sizeof(attr));
   // BPF object name is not supported on older Kernels.
