@@ -691,7 +691,7 @@ static int bpf_get_retprobe_bit(const char *event_type)
   close(fd);
   if (ret < 0 || ret >= sizeof(buf))
     return -1;
-  if (strlen(buf) < strlen("config:"))
+  if (strncmp(buf, "config:", strlen("config:")))
     return -1;
   errno = 0;
   ret = (int)strtol(buf + strlen("config:"), NULL, 10);
