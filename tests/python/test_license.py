@@ -8,7 +8,6 @@ from bcc import BPF
 class TestLicense(unittest.TestCase):
     gpl_only_text = """
 #include <uapi/linux/ptrace.h>
-BPF_STACK_TRACE(stack_traces, 10240);
 struct gpl_s {
     u64 ts;
 };
