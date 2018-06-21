@@ -52,8 +52,8 @@ struct ipv4_data_t {
     // XXX: switch some to u32's when supported
     u64 ts_us;
     u64 pid;
-    u64 saddr;
-    u64 daddr;
+    u32 saddr;
+    u32 daddr;
     u64 ip;
     u64 lport;
     char task[TASK_COMM_LEN];
@@ -70,7 +70,15 @@ struct ipv6_data_t {
     char task[TASK_COMM_LEN];
 };
 BPF_PERF_OUTPUT(ipv6_events);
+"""
 
+#
+# The following is the code for older kernels(Linux pre-4.16).
+# It uses kprobes to instrument inet_csk_accept(). On Linux 4.16 and
+# later, the sock:inet_sock_set_state tracepoint should be used instead, as
+# is done by the code that follows this. 
+#
+bpf_text_kprobe = """
 int kretprobe__inet_csk_accept(struct pt_regs *ctx)
 {
     struct sock *newsk = (struct sock *)PT_REGS_RC(ctx);
@@ -147,6 +155,46 @@ int kretprobe__inet_csk_accept(struct pt_regs *ctx)
 }
 """
 
+bpf_text_tracepoint = """
+TRACEPOINT_PROBE(sock, inet_sock_set_state)
+{
+    if (args->protocol != IPPROTO_TCP)
+        return 0;
+    u32 pid = bpf_get_current_pid_tgid();
+    // pull in details
+    u16 family = 0, lport = 0;
+    family = args->family;
+    lport = args->sport;
+
+    if (family == AF_INET) {
+        struct ipv4_data_t data4 = {.pid = pid, .ip = 4};
+        data4.ts_us = bpf_ktime_get_ns() / 1000;
+        __builtin_memcpy(&data4.saddr, args->saddr, sizeof(data4.saddr));
+        __builtin_memcpy(&data4.daddr, args->daddr, sizeof(data4.daddr));
+        data4.lport = lport;
+        bpf_get_current_comm(&data4.task, sizeof(data4.task));
+        ipv4_events.perf_submit(args, &data4, sizeof(data4));
+    } else if (family == AF_INET6) {
+        struct ipv6_data_t data6 = {.pid = pid, .ip = 6};
+        data6.ts_us = bpf_ktime_get_ns() / 1000;
+        __builtin_memcpy(&data6.saddr, args->saddr, sizeof(data6.saddr));
+        __builtin_memcpy(&data6.daddr, args->daddr, sizeof(data6.daddr));
+        data6.lport = lport;
+        bpf_get_current_comm(&data6.task, sizeof(data6.task));
+        ipv6_events.perf_submit(args, &data6, sizeof(data6));
+    }
+    // else drop
+
+    return 0;
+}
+"""
+
+if (BPF.tracepoint_exists("sock", "inet_sock_set_state")):
+    bpf_text += bpf_text_tracepoint
+else:
+    bpf_text += bpf_text_kprobe
+
+
 # code substitutions
 if args.pid:
     bpf_text = bpf_text.replace('FILTER',
@@ -165,8 +213,8 @@ class Data_ipv4(ct.Structure):
     _fields_ = [
         ("ts_us", ct.c_ulonglong),
         ("pid", ct.c_ulonglong),
-        ("saddr", ct.c_ulonglong),
-        ("daddr", ct.c_ulonglong),
+        ("saddr", ct.c_uint),
+        ("daddr", ct.c_uint),
         ("ip", ct.c_ulonglong),
         ("lport", ct.c_ulonglong),
         ("task", ct.c_char * TASK_COMM_LEN)
