@@ -209,7 +209,9 @@ public:
   uint64_t address(size_t n = 0) const { return locations_[n].address_; }
   const char *location_bin_path(size_t n = 0) const { return locations_[n].bin_path_.c_str(); }
   const Location &location(size_t n) const { return locations_[n]; }
+
   bool usdt_getarg(std::ostream &stream);
+  bool usdt_getarg(std::ostream &stream, const std::string& probe_func);
   std::string get_arg_ctype(int arg_index) {
     return largest_arg_type(arg_index);
   }
