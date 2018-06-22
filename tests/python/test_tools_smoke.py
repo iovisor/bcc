@@ -66,7 +66,7 @@ class SmokeTests(TestCase):
         pass
 
     def test_argdist(self):
-        self.run_with_duration("argdist.py -C 'p::do_sys_open()' -n 1 -i 1")
+        self.run_with_duration("argdist.py -v -C 'p::do_sys_open()' -n 1 -i 1")
 
     @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
     def test_bashreadline(self):
