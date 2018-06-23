@@ -22,7 +22,7 @@ Description: Shared Library for BPF Compiler Collection (BCC)
 Package: libbcc-examples
 Architecture: any
 Depends: libbcc (= ${binary:Version})
-Description: Shared Library for BPF Compiler Collection (BCC)
+Description: Examples for BPF Compiler Collection (BCC)
 
 Package: python-bcc
 Architecture: all
