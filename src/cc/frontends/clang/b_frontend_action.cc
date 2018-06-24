@@ -25,6 +25,7 @@
 #include <clang/Frontend/CompilerInstance.h>
 #include <clang/Frontend/MultiplexConsumer.h>
 #include <clang/Rewrite/Core/Rewriter.h>
+#include <clang/Lex/Lexer.h>
 
 #include "b_frontend_action.h"
 #include "bpf_module.h"
@@ -487,7 +488,64 @@ bool ProbeVisitor::VisitMemberExpr(MemberExpr *E) {
   rewriter_.ReplaceText(expansionRange(SourceRange(member, E->getLocEnd())), post);
   return true;
 }
+bool ProbeVisitor::VisitArraySubscriptExpr(ArraySubscriptExpr *E) {
+  if (memb_visited_.find(E) != memb_visited_.end()) return true;
+  if (!ProbeChecker(E, ptregs_, track_helpers_).needs_probe())
+    return true;
 
+  // Parent expr has addrof, skip the rewrite.
+  if (is_addrof_)
+    return true;
+
+  if (!rewriter_.isRewritable(E->getLocStart()))
+    return true;
+
+  Expr *base = E->getBase();
+  Expr *idx = E->getIdx();
+  memb_visited_.insert(E);
+
+  string pre, lbracket, rbracket;
+  LangOptions opts;
+  SourceLocation lbracket_start, lbracket_end;
+  SourceRange lbracket_range;
+  pre = "({ typeof(" + E->getType().getAsString() + ") _val; __builtin_memset(&_val, 0, sizeof(_val));";
+  pre += " bpf_probe_read(&_val, sizeof(_val), (u64)(";
+  if (isMemberDereference(base)) {
+    pre += "&";
+    // If the base of the array subscript is a member dereference, we'll rewrite
+    // both at the same time.
+    addrof_stmt_ = base;
+    is_addrof_ = true;
+  }
+  rewriter_.InsertText(expansionLoc(base->getLocStart()), pre);
+
+  /* Replace left bracket and any space around it.  Since Clang doesn't provide
+   * a method to retrieve the left bracket, replace everything from the end of
+   * the base to the start of the index. */
+  lbracket = ") + (";
+  lbracket_start = Lexer::getLocForEndOfToken(base->getLocEnd(), 1,
+                                              rewriter_.getSourceMgr(),
+                                              opts).getLocWithOffset(1);
+  lbracket_end = idx->getLocStart().getLocWithOffset(-1);
+  lbracket_range = expansionRange(SourceRange(lbracket_start, lbracket_end));
+  rewriter_.ReplaceText(lbracket_range, lbracket);
+
+  rbracket = ")); _val; })";
+  rewriter_.ReplaceText(expansionLoc(E->getRBracketLoc()), 1, rbracket);
+
+  return true;
+}
+
+bool ProbeVisitor::isMemberDereference(Expr *E) {
+  if (E->IgnoreParenCasts()->getStmtClass() != Stmt::MemberExprClass)
+    return false;
+  for (MemberExpr *M = dyn_cast<MemberExpr>(E->IgnoreParenCasts()); M;
+       M = dyn_cast<MemberExpr>(M->getBase()->IgnoreParenCasts())) {
+    if (M->isArrow())
+      return true;
+  }
+  return false;
+}
 bool ProbeVisitor::IsContextMemberExpr(Expr *E) {
   if (!E->getType()->isPointerType())
     return false;
