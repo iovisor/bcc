@@ -21,25 +21,25 @@ Description: Shared Library for BPF Compiler Collection (BCC)
 
 Package: libbcc-examples
 Architecture: any
-Depends: libbcc
-Description: Shared Library for BPF Compiler Collection (BCC)
+Depends: libbcc (= ${binary:Version})
+Description: Examples for BPF Compiler Collection (BCC)
 
 Package: python-bcc
 Architecture: all
-Depends: libbcc, python, binutils
+Depends: libbcc (= ${binary:Version}), python, binutils
 Description: Python wrappers for BPF Compiler Collection (BCC)
 
 Package: python3-bcc
 Architecture: all
-Depends: libbcc, python3, binutils
+Depends: libbcc (= ${binary:Version}), python3, binutils
 Description: Python3 wrappers for BPF Compiler Collection (BCC)
 
 Package: bcc-tools
 Architecture: all
-Depends: python-bcc
+Depends: python-bcc (= ${binary:Version})
 Description: Command line tools for BPF Compiler Collection (BCC)
 
 Package: bcc-lua
 Architecture: all
-Depends: libbcc
+Depends: libbcc (= ${binary:Version})
 Description: Standalone tool to run BCC tracers written in Lua
