@@ -181,7 +181,7 @@ b = BPF(text=bpf_text)
 # if fails and will attach the generic_file_read_iter which used to pre-4.10.
 
 try:
-	b.attach_kprobe(event="ext4_file_read_iter", fn_name="trace_read_entry")
+	b.attach_kprobe(event="ext4_file_read_iter", fn_name="trace_entry")
 except:
 	b.attach_kprobe(event="generic_file_read_iter", fn_name="trace_read_entry")
 b.attach_kprobe(event="ext4_file_write_iter", fn_name="trace_entry")
