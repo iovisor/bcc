@@ -178,7 +178,7 @@ b = BPF(text=bpf_text)
 # From Linux 4.10, the function .read_iter at the ext4_file_operations has 
 # changed to ext4_file_read_iter.
 # So, I add the try and except,it will first to attach ext4_file_read_iter,
-# if fails and will attach the generic_file_read_iter which usd to pre-4.10.
+# if fails and will attach the generic_file_read_iter which used to pre-4.10.
 
 try:
 	b.attach_kprobe(event="ext4_file_read_iter", fn_name="trace_read_entry")
