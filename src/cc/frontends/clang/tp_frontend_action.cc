@@ -98,6 +98,9 @@ static inline field_kind_t _get_field_kind(string const& line,
     return field_kind_t::data_loc;
   if (field_name.find("common_") == 0)
     return field_kind_t::common;
+  // do not change type definition for array
+  if (field_name.find("[") != string::npos)
+    return field_kind_t::regular;
 
   // adjust the field_type based on the size of field
   // otherwise, incorrect value may be retrieved for big endian
