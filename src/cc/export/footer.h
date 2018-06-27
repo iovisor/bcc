@@ -17,7 +17,7 @@ R"********(
 
 #ifndef BPF_LICENSE
 /* No license defined, using GPL
- * Use cflags to define your own BPF_LICENSE */
+ * You can define your own BPF_LICENSE in your C code */
 #define BPF_LICENSE GPL
 #endif
 #define ___LICENSE(s) #s
