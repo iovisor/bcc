@@ -210,7 +210,7 @@ class Data_ipv4(ct.Structure):
         ("saddr", ct.c_uint),
         ("daddr", ct.c_uint),
         ("ip", ct.c_ulonglong),
-        ("dport", ct.c_uint),
+        ("dport", ct.c_ushort),
         ("delta_us", ct.c_ulonglong),
         ("task", ct.c_char * TASK_COMM_LEN)
     ]
@@ -222,7 +222,7 @@ class Data_ipv6(ct.Structure):
         ("saddr", (ct.c_ulonglong * 2)),
         ("daddr", (ct.c_ulonglong * 2)),
         ("ip", ct.c_ulonglong),
-        ("dport", ct.c_uint),
+        ("dport", ct.c_ushort),
         ("delta_us", ct.c_ulonglong),
         ("task", ct.c_char * TASK_COMM_LEN)
     ]
