@@ -84,8 +84,8 @@ struct ipv4_data_t {
     // XXX: switch some to u32's when supported
     u64 ts_us;
     u64 pid;
-    u64 saddr;
-    u64 daddr;
+    u32 saddr;
+    u32 daddr;
     u64 ip;
     u64 dport;
     u64 delta_us;
@@ -207,8 +207,8 @@ class Data_ipv4(ct.Structure):
     _fields_ = [
         ("ts_us", ct.c_ulonglong),
         ("pid", ct.c_ulonglong),
-        ("saddr", ct.c_ulonglong),
-        ("daddr", ct.c_ulonglong),
+        ("saddr", ct.c_uint),
+        ("daddr", ct.c_uint),
         ("ip", ct.c_ulonglong),
         ("dport", ct.c_ulonglong),
         ("delta_us", ct.c_ulonglong),
