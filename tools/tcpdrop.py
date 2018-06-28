@@ -104,12 +104,11 @@ int trace_tcp_drop(struct pt_regs *ctx, struct sock *sk, struct sk_buff *skb)
     u16 family = sk->__sk_common.skc_family;
     char state = sk->__sk_common.skc_state;
     u16 sport = 0, dport = 0;
-    u8 tcpflags = 0;
     struct tcphdr *tcp = skb_to_tcphdr(skb);
     struct iphdr *ip = skb_to_iphdr(skb);
+    u8 tcpflags = ((u_int8_t *)tcp)[13];
     sport = tcp->source;
     dport = tcp->dest;
-    bpf_probe_read(&tcpflags, sizeof(tcpflags), &tcp_flag_byte(tcp));
     sport = ntohs(sport);
     dport = ntohs(dport);
 
