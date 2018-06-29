@@ -54,24 +54,24 @@ bpf_text = """
 // separate data structs for ipv4 and ipv6
 struct ipv4_data_t {
     // XXX: switch some to u32's when supported
-    u64 pid;
+    u32 pid;
     u64 ip;
-    u64 saddr;
-    u64 daddr;
-    u64 lport;
-    u64 dport;
+    u32 saddr;
+    u32 daddr;
+    u16 lport;
+    u16 dport;
     u64 state;
     u64 type;
 };
 BPF_PERF_OUTPUT(ipv4_events);
 
 struct ipv6_data_t {
-    u64 pid;
+    u32 pid;
     u64 ip;
     unsigned __int128 saddr;
     unsigned __int128 daddr;
-    u64 lport;
-    u64 dport;
+    u16 lport;
+    u16 dport;
     u64 state;
     u64 type;
 };
@@ -142,7 +142,10 @@ struct_init = { 'ipv4':
                flow_key.dport = ntohs(dport);""",
                'trace' : 
                """
-               struct ipv4_data_t data4 = {.pid = pid, .ip = 4, .type = type};
+               struct ipv4_data_t data4 = {};
+               data4.pid = pid;
+               data4.ip = 4;
+               data4.type = type;
                data4.saddr = skp->__sk_common.skc_rcv_saddr;
                data4.daddr = skp->__sk_common.skc_daddr;
                // lport is host order
@@ -154,19 +157,15 @@ struct_init = { 'ipv4':
         { 'count' :
             """
                     struct ipv6_flow_key_t flow_key = {};
-                    bpf_probe_read(&flow_key.saddr, sizeof(flow_key.saddr),
-                        skp->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
-                    bpf_probe_read(&flow_key.daddr, sizeof(flow_key.daddr),
-                        skp->__sk_common.skc_v6_daddr.in6_u.u6_addr32);
+                    __builtin_memcpy(&data6.saddr, skp->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32, sizeof(data6.saddr));
+                    __builtin_memcpy(&data6.daddr, skp->__sk_common.skc_v6_daddr.in6_u.u6_addr32, sizeof(data6.daddr));
                     // lport is host order
                     flow_key.lport = lport;
                     flow_key.dport = ntohs(dport);""",
           'trace' : """
                     struct ipv6_data_t data6 = {.pid = pid, .ip = 6, .type = type};
-                    bpf_probe_read(&data6.saddr, sizeof(data6.saddr),
-                        skp->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
-                    bpf_probe_read(&data6.daddr, sizeof(data6.daddr),
-                        skp->__sk_common.skc_v6_daddr.in6_u.u6_addr32);
+                    __builtin_memcpy(&data6.saddr, skp->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32, sizeof(data6.saddr));
+                    __builtin_memcpy(&data6.daddr, skp->__sk_common.skc_v6_daddr.in6_u.u6_addr32, sizeof(data6.daddr));
                     // lport is host order
                     data6.lport = lport;
                     data6.dport = ntohs(dport);
@@ -199,24 +198,24 @@ if debug or args.ebpf:
 # event data
 class Data_ipv4(ct.Structure):
     _fields_ = [
-        ("pid", ct.c_ulonglong),
+        ("pid", ct.c_uint),
         ("ip", ct.c_ulonglong),
-        ("saddr", ct.c_ulonglong),
-        ("daddr", ct.c_ulonglong),
-        ("lport", ct.c_ulonglong),
-        ("dport", ct.c_ulonglong),
+        ("saddr", ct.c_uint),
+        ("daddr", ct.c_uint),
+        ("lport", ct.c_ushort),
+        ("dport", ct.c_ushort),
         ("state", ct.c_ulonglong),
         ("type", ct.c_ulonglong)
     ]
 
 class Data_ipv6(ct.Structure):
     _fields_ = [
-        ("pid", ct.c_ulonglong),
+        ("pid", ct.c_uint),
         ("ip", ct.c_ulonglong),
         ("saddr", (ct.c_ulonglong * 2)),
         ("daddr", (ct.c_ulonglong * 2)),
-        ("lport", ct.c_ulonglong),
-        ("dport", ct.c_ulonglong),
+        ("lport", ct.c_ushort),
+        ("dport", ct.c_ushort),
         ("state", ct.c_ulonglong),
         ("type", ct.c_ulonglong)
     ]
