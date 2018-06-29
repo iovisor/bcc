@@ -107,16 +107,16 @@ int kretprobe__inet_csk_accept(struct pt_regs *ctx)
     if (sk_lingertime_offset - gso_max_segs_offset == 4) 
         // 4.10+ with little endian
 #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-            bpf_probe_read(&protocol, 1, (void *)((u64)&newsk->sk_gso_max_segs) - 3);
+        protocol = *(u8 *)((u64)&newsk->sk_gso_max_segs - 3);
     else
         // pre-4.10 with little endian
-            bpf_probe_read(&protocol, 1, (void *)((u64)&newsk->sk_wmem_queued) - 3);
+        protocol = *(u8 *)((u64)&newsk->sk_wmem_queued - 3);
 #elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
         // 4.10+ with big endian
-            bpf_probe_read(&protocol, 1, (void *)((u64)&newsk->sk_gso_max_segs) - 1);
+        protocol = *(u8 *)((u64)&newsk->sk_gso_max_segs - 1);
     else
         // pre-4.10 with big endian
-            bpf_probe_read(&protocol, 1, (void *)((u64)&newsk->sk_wmem_queued) - 1);
+        protocol = *(u8 *)((u64)&newsk->sk_wmem_queued - 1);
 #else
 # error "Fix your compiler's __BYTE_ORDER__?!"
 #endif
