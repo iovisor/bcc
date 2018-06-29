@@ -168,11 +168,9 @@ RAW_TRACEPOINT_PROBE(sched_switch)
     struct task_struct *prev = (struct task_struct *)ctx->args[1];
     struct task_struct *next = (struct task_struct *)ctx->args[2];
     u32 pid, tgid;
-    long state;
 
     // ivcsw: treat like an enqueue event and store timestamp
-    bpf_probe_read(&state, sizeof(long), &prev->state);
-    if (state == TASK_RUNNING) {
+    if (prev->state == TASK_RUNNING) {
         tgid = prev->tgid;
         pid = prev->pid;
         if (!(FILTER || pid == 0)) {

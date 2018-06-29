@@ -145,11 +145,7 @@ RAW_TRACEPOINT_PROBE(sched_wakeup)
 {
     // TP_PROTO(struct task_struct *p)
     struct task_struct *p = (struct task_struct *)ctx->args[0];
-    u32 tgid, pid;
-
-    bpf_probe_read(&tgid, sizeof(tgid), &p->tgid);
-    bpf_probe_read(&pid, sizeof(pid), &p->pid);
-    return trace_enqueue(tgid, pid);
+    return trace_enqueue(p->tgid, p->pid);
 }
 
 RAW_TRACEPOINT_PROBE(sched_wakeup_new)
