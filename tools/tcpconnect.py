@@ -126,8 +126,10 @@ static int trace_connect_return(struct pt_regs *ctx, short ipver)
     } else /* 6 */ {
         struct ipv6_data_t data6 = {.pid = pid, .ip = ipver};
         data6.ts_us = bpf_ktime_get_ns() / 1000;
-        __builtin_memcpy(&data6.saddr, skp->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32, sizeof(data6.saddr));
-        __builtin_memcpy(&data6.daddr, skp->__sk_common.skc_v6_daddr.in6_u.u6_addr32, sizeof(data6.daddr));
+        bpf_probe_read(&data6.saddr, sizeof(data6.saddr),
+            skp->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
+        bpf_probe_read(&data6.daddr, sizeof(data6.daddr),
+            skp->__sk_common.skc_v6_daddr.in6_u.u6_addr32);
         data6.dport = ntohs(dport);
         bpf_get_current_comm(&data6.task, sizeof(data6.task));
         ipv6_events.perf_submit(ctx, &data6, sizeof(data6));

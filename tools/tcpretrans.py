@@ -157,15 +157,19 @@ struct_init = { 'ipv4':
         { 'count' :
             """
                     struct ipv6_flow_key_t flow_key = {};
-                    __builtin_memcpy(&data6.saddr, skp->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32, sizeof(data6.saddr));
-                    __builtin_memcpy(&data6.daddr, skp->__sk_common.skc_v6_daddr.in6_u.u6_addr32, sizeof(data6.daddr));
+                    bpf_probe_read(&flow_key.saddr, sizeof(flow_key.saddr),
+                        skp->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
+                    bpf_probe_read(&flow_key.daddr, sizeof(flow_key.daddr),
+                        skp->__sk_common.skc_v6_daddr.in6_u.u6_addr32);
                     // lport is host order
                     flow_key.lport = lport;
                     flow_key.dport = ntohs(dport);""",
           'trace' : """
                     struct ipv6_data_t data6 = {.pid = pid, .ip = 6, .type = type};
-                    __builtin_memcpy(&data6.saddr, skp->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32, sizeof(data6.saddr));
-                    __builtin_memcpy(&data6.daddr, skp->__sk_common.skc_v6_daddr.in6_u.u6_addr32, sizeof(data6.daddr));
+                    bpf_probe_read(&data6.saddr, sizeof(data6.saddr),
+                        skp->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
+                    bpf_probe_read(&data6.daddr, sizeof(data6.daddr),
+                        skp->__sk_common.skc_v6_daddr.in6_u.u6_addr32);
                     // lport is host order
                     data6.lport = lport;
                     data6.dport = ntohs(dport);

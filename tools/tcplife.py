@@ -216,8 +216,10 @@ int kprobe__tcp_set_state(struct pt_regs *ctx, struct sock *sk, int state)
         struct ipv6_data_t data6 = {.span_us = delta_us,
             .rx_b = rx_b, .tx_b = tx_b};
         data6.ts_us = bpf_ktime_get_ns() / 1000;
-        __builtin_memcpy(&data6.saddr, sk->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32, sizeof(data6.saddr));
-        __builtin_memcpy(&data6.daddr, sk->__sk_common.skc_v6_daddr.in6_u.u6_addr32, sizeof(data6.daddr));
+        bpf_probe_read(&data6.saddr, sizeof(data6.saddr),
+            sk->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
+        bpf_probe_read(&data6.daddr, sizeof(data6.daddr),
+            sk->__sk_common.skc_v6_daddr.in6_u.u6_addr32);
         // a workaround until data6 compiles with separate lport/dport
         data6.ports = dport + ((0ULL + lport) << 32);
         data6.pid = pid;
