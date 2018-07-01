@@ -144,8 +144,8 @@ TRACEPOINT_PROBE(sock, inet_sock_set_state)
             .oldstate = args->oldstate, .newstate = args->newstate};
         data6.skaddr = (u64)args->skaddr;
         data6.ts_us = bpf_ktime_get_ns() / 1000;
-        __builtin_memcpy(&data6.saddr, args->saddr, sizeof(data6.saddr));
-        __builtin_memcpy(&data6.daddr, args->daddr, sizeof(data6.daddr));
+        __builtin_memcpy(&data6.saddr, args->saddr_v6, sizeof(data6.saddr));
+        __builtin_memcpy(&data6.daddr, args->daddr_v6, sizeof(data6.daddr));
         // a workaround until data6 compiles with separate lport/dport
         data6.ports = dport + ((0ULL + lport) << 32);
         data6.pid = pid;
