@@ -19,6 +19,16 @@ import ctypes as ct
 import json
 import uuid
 
+# TODO: add a unix socket member and have probe output to the socket
+#       as another option (instead of sys.stdout).
+#       default: '/var/run/uprobe_sensor/bashreadline'
+#
+# TODO: use the json encoder/decoder to read and write json objects
+#
+# TODO: store records in a dictionary, then dump to unix socket
+#       when receiving a records request
+#
+
 connect_string = "{Virtue-protocol-verion: 0.1}"
 #"{Virtue-protocol-verion: 0.1, reply: [nonce, id, record 1] }\n"
 
