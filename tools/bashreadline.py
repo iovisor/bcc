@@ -15,6 +15,23 @@ from __future__ import print_function
 from bcc import BPF
 from time import strftime
 import ctypes as ct
+import argparse
+import json
+
+# arguments
+examples = """examples:
+    ./bashreadline        # trace all readline syscalls by bash
+    ./bashreadline -j     # output json objects
+"""
+parser = argparse.ArgumentParser(
+    description="Trace readline syscalls made by bash",
+    formatter_class=argparse.RawDescriptionHelpFormatter,
+    epilog=examples)
+
+parser.add_argument("-j", "--json", action="store_true",
+                    help="output json objects")
+args = parser.parse_args()
+
 
 # load BPF program
 bpf_text = """
@@ -52,13 +69,22 @@ b = BPF(text=bpf_text)
 b.attach_uretprobe(name="/bin/bash", sym="readline", fn_name="printret")
 
 # header
-print("%-9s %-6s %s" % ("TIME", "PID", "COMMAND"))
+if not args.json:
+    print("%-9s %-6s %s" % ("TIME", "PID", "COMMAND"))
 
 def print_event(cpu, data, size):
     event = ct.cast(data, ct.POINTER(Data)).contents
     print("%-9s %-6d %s" % (strftime("%H:%M:%S"), event.pid,
                             event.str.decode()))
+    
+def print_event_json(cpu, data, size):
+    event = ct.cast(data, ct.POINTER(Data)).contents
+    print('{"tag": bashreadline, "time": %s, "pid": %d, "command": %s}' \
+          % (strftime("%H:%M:%S"), event.pid, event.str.decode()))
+if args.json:
+    b["events"].open_perf_buffer(print_event_json)
+else:
+    b["events"].open_perf_buffer(print_event)
 
-b["events"].open_perf_buffer(print_event)
 while 1:
     b.perf_buffer_poll()
