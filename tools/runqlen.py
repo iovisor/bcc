@@ -28,7 +28,7 @@ from os import open, close, dup, unlink, O_WRONLY
 
 
 
-class renqlen_sensor:
+class RunqlenSensor:
 
     # define BPF program
     bpf_text = """
@@ -279,7 +279,7 @@ def client_main(args):
     debug = 0
     frequency = 99
 
-    probe = renqlen_sensor(args)
+    probe = RunqlenSensor(args)
 
 if __name__ == "__main__":
     import argparse, sys

@@ -33,7 +33,7 @@ class Data(ct.Structure):
         ("buf", ct.c_char * BUFSIZE)
     ]
 
-class ttysnoop_probe:
+class TTYSnoopSensor:
     # define BPF program
     bpf_text = """
     #include <uapi/linux/ptrace.h>
@@ -142,7 +142,7 @@ def client_main(args):
             print("Unable to read device %s. Exiting." % path)
         exit()
 
-    probe = ttysnoop_probe(args, pi)
+    probe = TTYSnoopSensor(args, pi)
 
 if __name__ == "__main__":
     import argparse, sys
