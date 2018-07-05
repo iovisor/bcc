@@ -90,7 +90,7 @@ Nightly bcc binary packages for Fedora 25, 26, and 27 are hosted at
 To install:
 ```bash
 echo -e '[iovisor]\nbaseurl=https://repo.iovisor.org/yum/nightly/f27/$basearch\nenabled=1\ngpgcheck=0' | sudo tee /etc/yum.repos.d/iovisor.repo
-sudo dnf install bcc-tools kernel-devel-$(uname -r) kernel-headers-$(uname -r)
+sudo dnf install bcc-tools kernel-headers kernel-devel
 ```
 
 **Stable and Signed Packages**

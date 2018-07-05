@@ -26,6 +26,11 @@
 
 struct bcc_usdt;
 
+namespace ebpf {
+  class BPF;
+  class USDT;
+}
+
 namespace USDT {
 
 using std::experimental::optional;
@@ -209,7 +214,9 @@ public:
   uint64_t address(size_t n = 0) const { return locations_[n].address_; }
   const char *location_bin_path(size_t n = 0) const { return locations_[n].bin_path_.c_str(); }
   const Location &location(size_t n) const { return locations_[n]; }
+
   bool usdt_getarg(std::ostream &stream);
+  bool usdt_getarg(std::ostream &stream, const std::string& probe_func);
   std::string get_arg_ctype(int arg_index) {
     return largest_arg_type(arg_index);
   }
@@ -226,6 +233,9 @@ public:
   const std::string &provider() { return provider_; }
 
   friend class Context;
+
+  friend class ::ebpf::BPF;
+  friend class ::ebpf::USDT;
 };
 
 class Context {
@@ -269,5 +279,8 @@ public:
 
   typedef void (*each_uprobe_cb)(const char *, const char *, uint64_t, int);
   void each_uprobe(each_uprobe_cb callback);
+
+  friend class ::ebpf::BPF;
+  friend class ::ebpf::USDT;
 };
 }

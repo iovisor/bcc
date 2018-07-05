@@ -20,6 +20,7 @@
 
 #include "catch.hpp"
 #include "usdt.h"
+#include "api/BPF.h"
 
 #ifdef HAVE_SDT_HEADER
 /* required to insert USDT probes on this very executable --
@@ -53,6 +54,34 @@ TEST_CASE("test finding a probe in our own process", "[usdt]") {
 
     REQUIRE(a_probed_function() != 0);
   }
+}
+
+TEST_CASE("test fine a probe in our own binary with C++ API", "[usdt]") {
+    ebpf::BPF bpf;
+    ebpf::USDT u("/proc/self/exe", "libbcc_test", "sample_probe_1", "on_event");
+
+    auto res = bpf.init("int on_event() { return 0; }", {}, {u});
+    REQUIRE(res.code() == 0);
+
+    res = bpf.attach_usdt(u);
+    REQUIRE(res.code() == 0);
+
+    res = bpf.detach_usdt(u);
+    REQUIRE(res.code() == 0);
+}
+
+TEST_CASE("test fine a probe in our Process with C++ API", "[usdt]") {
+    ebpf::BPF bpf;
+    ebpf::USDT u(::getpid(), "libbcc_test", "sample_probe_1", "on_event");
+
+    auto res = bpf.init("int on_event() { return 0; }", {}, {u});
+    REQUIRE(res.code() == 0);
+
+    res = bpf.attach_usdt(u);
+    REQUIRE(res.code() == 0);
+
+    res = bpf.detach_usdt(u);
+    REQUIRE(res.code() == 0);
 }
 #endif  // HAVE_SDT_HEADER
 

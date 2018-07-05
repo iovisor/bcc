@@ -75,7 +75,7 @@ class BPF {
                             bpf_probe_attach_type attach_type = BPF_PROBE_ENTRY,
                             pid_t pid = -1);
   StatusTuple attach_usdt(const USDT& usdt, pid_t pid = -1);
-  StatusTuple detach_usdt(const USDT& usdt);
+  StatusTuple detach_usdt(const USDT& usdt, pid_t pid = -1);
 
   StatusTuple attach_tracepoint(const std::string& tracepoint,
                                 const std::string& probe_func);
@@ -239,41 +239,39 @@ class BPF {
 class USDT {
  public:
   USDT(const std::string& binary_path, const std::string& provider,
-       const std::string& name, const std::string& probe_func)
-      : initialized_(false),
-        binary_path_(binary_path),
-        provider_(provider),
-        name_(name),
-        probe_func_(probe_func) {}
+       const std::string& name, const std::string& probe_func);
+  USDT(pid_t pid, const std::string& provider, const std::string& name,
+       const std::string& probe_func);
+  USDT(const std::string& binary_path, pid_t pid, const std::string& provider,
+       const std::string& name, const std::string& probe_func);
+  USDT(const USDT& usdt);
 
   StatusTuple init();
 
-  bool operator==(const USDT& other) const {
-    return (provider_ == other.provider_) && (name_ == other.name_) &&
-           (binary_path_ == other.binary_path_) &&
-           (probe_func_ == other.probe_func_);
-  }
+  bool operator==(const USDT& other) const;
 
   std::string print_name() const {
-    return provider_ + ":" + name_ + " from " + binary_path_ + " for probe " +
-           "probe_func_";
+    return provider_ + ":" + name_ + " from binary " + binary_path_ + " PID " +
+           std::to_string(pid_) + " for probe " + "probe_func_";
   }
 
   friend std::ostream& operator<<(std::ostream& out, const USDT& usdt) {
-    return out << usdt.provider_ << ":" << usdt.name_ << " from "
-               << usdt.binary_path_ << " for probe " << usdt.probe_func_;
+    return out << usdt.provider_ << ":" << usdt.name_ << " from binary "
+               << usdt.binary_path_ << " PID " << usdt.pid_ << " for probe "
+               << usdt.probe_func_;
   }
 
  private:
   bool initialized_;
 
   std::string binary_path_;
+  pid_t pid_;
+
   std::string provider_;
   std::string name_;
   std::string probe_func_;
 
-  std::vector<uintptr_t> addresses_;
-
+  std::unique_ptr<void, std::function<void(void*)>> probe_;
   std::string program_text_;
 
   friend class BPF;

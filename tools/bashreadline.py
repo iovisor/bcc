@@ -93,9 +93,8 @@ class BashReadlineProbe:
         print('{"tag": bashreadline, "time": %s, "pid": %d, "command": %s}' \
               % (strftime("%H:%M:%S"), event.pid, event.str.decode()))
 
-def client_main(args):
 
-# arguments
+def client_main(args):
     examples = """examples:
         ./bashreadline        # trace all readline syscalls by bash
         ./bashreadline -j     # output json objects
@@ -104,6 +103,7 @@ def client_main(args):
         description="Trace readline syscalls made by bash",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=examples)
+
 
     parser.add_argument("-j", "--json", action="store_true",
                         help="output json objects")
