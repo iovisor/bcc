@@ -66,8 +66,8 @@ class BashReadlineProbe:
     """
 
     def __init__(self, json):
-        self.b = BPF(text=self.bpf_text)
-        self.b.attach_uretprobe(name="/bin/bash", sym="readline", fn_name="printret")
+        b = BPF(text=self.bpf_text)
+        b.attach_uretprobe(name="/bin/bash", sym="readline", fn_name="printret")
         self.json = json
 
         # header
@@ -75,12 +75,12 @@ class BashReadlineProbe:
             print("%-9s %-6s %s" % ("TIME", "PID", "COMMAND"))
 
         if self.json:
-            self.b["events"].open_perf_buffer(self.print_event_json)
+            b["events"].open_perf_buffer(self.print_event_json)
         else:
-            self.b["events"].open_perf_buffer(self.print_event)
+            b["events"].open_perf_buffer(self.print_event)
 
         while 1:
-            self.b.perf_buffer_poll()
+            b.perf_buffer_poll()
 
 
     def print_event(self, cpu, data, size):
@@ -103,7 +103,6 @@ def client_main(args):
         description="Trace readline syscalls made by bash",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=examples)
-
 
     parser.add_argument("-j", "--json", action="store_true",
                         help="output json objects")
