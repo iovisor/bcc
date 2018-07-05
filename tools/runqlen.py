@@ -18,6 +18,7 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
 # 12-Dec-2016   Brendan Gregg   Created this.
+# 05-Jul-2018   Michael D. Day converted to a class
 
 from __future__ import print_function
 from bcc import BPF, PerfType, PerfSWConfig
