@@ -175,7 +175,8 @@ class TCPTop:
         ipv6_send_bytes = b["ipv6_send_bytes"]
         ipv6_recv_bytes = b["ipv6_recv_bytes"]
 
-        print('Tracing... Output every %s secs. Hit Ctrl-C to end' % args.interval)
+        if not args.json:
+            print('Tracing... Output every %s secs. Hit Ctrl-C to end' % args.interval)
 
         # output
         i = 0
@@ -193,7 +194,12 @@ class TCPTop:
                 call("clear")
             if not args.nosummary:
                 with open(self.loadavg) as stats:
-                    print("%-8s loadavg: %s" % (strftime("%H:%M:%S"), stats.read()))
+                    if args.json:
+                        line = '"time": %-8s, "loadavg": %s' % (strftime("%H:%M:%S"), stats.read())
+                        line = line.rstrip('\n')
+                        print('{%s}' %line)
+                    else:
+                        print("%-8s loadavg: %s" % (strftime("%H:%M:%S"), stats.read()))
 
             # IPv4:  build dict of all seen keys
             keys = ipv4_recv_bytes
@@ -201,20 +207,33 @@ class TCPTop:
                 if k not in keys:
                     keys[k] = v
 
-            if keys:
+            if keys and not args.json:
                 print("%-6s %-12s %-21s %-21s %6s %6s" % ("PID", "COMM",
-                    "LADDR", "RADDR", "RX_KB", "TX_KB"))
+                    "LADDR", "RADDR", "RX", "TX"))
 
             # output
             for k, v in reversed(sorted(keys.items(), key=lambda keys: keys[1].value)):
                 send_kbytes = 0
                 if k in ipv4_send_bytes:
-                    send_kbytes = int(ipv4_send_bytes[k].value / 1024)
+                    if args.bytes:
+                        send_kbytes = ipv4_send_bytes[k].value
+                    else:
+                        send_kbytes = int(ipv4_send_bytes[k].value / 1024)
                 recv_kbytes = 0
                 if k in ipv4_recv_bytes:
-                    recv_kbytes = int(ipv4_recv_bytes[k].value / 1024)
+                    if args.bytes:
+                        recv_kbytes = ipv4_recv_bytes[k].value
+                    else:
+                        recv_kbytes = int(ipv4_recv_bytes[k].value / 1024)
 
-                print("%-6d %-12.12s %-21s %-21s %6d %6d" % (k.pid,
+                if args.json:
+                    print('{"pid": %-6d, "command": %-12.12s, "local-addr": %-21s, "remote-addr": %-21s, "rx": %6d, "tx": %6d}' % (k.pid,
+                    pid_to_comm(k.pid),
+                    inet_ntop(AF_INET, pack("I", k.saddr)) + ":" + str(k.lport),
+                    inet_ntop(AF_INET, pack("I", k.daddr)) + ":" + str(k.dport),
+                    recv_kbytes, send_kbytes))
+                else:
+                    print("%-6d %-12.12s %-21s %-21s %6d %6d" % (k.pid,
                     pid_to_comm(k.pid),
                     inet_ntop(AF_INET, pack("I", k.saddr)) + ":" + str(k.lport),
                     inet_ntop(AF_INET, pack("I", k.daddr)) + ":" + str(k.dport),
@@ -231,25 +250,41 @@ class TCPTop:
 
             if keys:
                 # more than 80 chars, sadly.
-                print("\n%-6s %-12s %-32s %-32s %6s %6s" % ("PID", "COMM",
-                    "LADDR6", "RADDR6", "RX_KB", "TX_KB"))
+                if not args.json:
+                    print("\n%-6s %-12s %-32s %-32s %6s %6s" % ("PID", "COMM",
+                        "LADDR6", "RADDR6", "RX", "TX"))
 
             # output
             for k, v in reversed(sorted(keys.items(), key=lambda keys: keys[1].value)):
                 send_kbytes = 0
                 if k in ipv6_send_bytes:
-                    send_kbytes = int(ipv6_send_bytes[k].value / 1024)
+                    if args.bytes:
+                        send_kbytes = ipv6_send_bytes[k].value
+                    else:
+                        send_kbytes = int(ipv6_send_bytes[k].value / 1024)
                 recv_kbytes = 0
                 if k in ipv6_recv_bytes:
-                    recv_kbytes = int(ipv6_recv_bytes[k].value / 1024)
+                    if args.bytes:
+                        recv_kbytes = ipv6_recv_bytes[k].value
+                    else:
+                        recv_kbytes = int(ipv6_recv_bytes[k].value / 1024)
 
-                print("%-6d %-12.12s %-32s %-32s %6d %6d" % (k.pid,
-                    pid_to_comm(k.pid),
-                    inet_ntop(AF_INET6, pack("QQ", k.saddr0, k.saddr1)) + ":" +
-                    str(k.lport),
-                    inet_ntop(AF_INET6, pack("QQ", k.daddr0, k.daddr1)) + ":" +
-                    str(k.dport),
-                    recv_kbytes, send_kbytes))
+                if args.json:
+                    print('{"pid":%-6d, "command": %-12.12s, "local-addr6": %-32s, "remote-addr6": %-32s, "rx": %6d, "tx": %6d}' % (k.pid,
+                        pid_to_comm(k.pid),
+                        inet_ntop(AF_INET6, pack("QQ", k.saddr0, k.saddr1)) + ":" +
+                        str(k.lport),
+                        inet_ntop(AF_INET6, pack("QQ", k.daddr0, k.daddr1)) + ":" +
+                        str(k.dport),
+                        recv_kbytes, send_kbytes))
+                else:
+                    print("%-6d %-12.12s %-32s %-32s %6d %6d" % (k.pid,
+                        pid_to_comm(k.pid),
+                        inet_ntop(AF_INET6, pack("QQ", k.saddr0, k.saddr1)) + ":" +
+                        str(k.lport),
+                        inet_ntop(AF_INET6, pack("QQ", k.daddr0, k.daddr1)) + ":" +
+                        str(k.dport),
+                        recv_kbytes, send_kbytes))
 
             ipv6_send_bytes.clear()
             ipv6_recv_bytes.clear()
@@ -289,6 +324,8 @@ def client_main(args):
         help=argparse.SUPPRESS)
     parser.add_argument("-j", "--json", action="store_true",
                         help="output json objects")
+    parser.add_argument("-b", "--bytes", action="store_true",
+                        help="output data in bytes instead of kbytes")
 
     args = parser.parse_args()
     debug = 0
