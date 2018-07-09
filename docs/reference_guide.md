@@ -90,6 +90,10 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
     - [1. Invalid mem access](#1-invalid-mem-access)
     - [2. Cannot call GPL only function from proprietary program](#2-cannot-call-gpl-only-function-from-proprietary-program)
 
+- [Environment Variables](#envvars)
+    - [1. kernel source directory](#1-kernel-source-directory)
+    - [2. kernel version overriding](#2-kernel-version-overriding)
+
 # BPF C
 
 This section describes the C part of a bcc program.
@@ -1558,3 +1562,26 @@ bpf: Failed to load program: Invalid argument
 8: (85) call bpf_get_stackid#27
 cannot call GPL only function from proprietary program
 ```
+
+# Environment Variables
+
+## 1. Kernel source directory
+
+eBPF program compilation needs kernel sources or kernel headers with headers
+compiled. In case your kernel sources are at a non-standard location where BCC
+cannot find then, its possible to provide BCC the absolute path of the location
+by setting `BCC_KERNEL_SOURCE` to it.
+
+## 2. Kernel version overriding
+
+By default, BCC stores the `LINUX_VERSION_CODE` in the generated eBPF object
+which is then passed along to the kernel when the eBPF program is loaded.
+Sometimes this is quite inconvenient especially when the kernel is slightly
+updated such as an LTS kernel release. Its extremely unlikely the slight
+mismatch would cause any issues with the loaded eBPF program. By setting
+`BCC_LINUX_VERSION_CODE` to the version of the kernel that's running, the check
+for verifying the kernel version can be bypassed. This is needed for programs
+that use kprobes. This needs to be encoded in the format: `(VERSION * 65536) +
+(PATCHLEVEL * 256) + SUBLEVEL`. For example, if the running kernel is `4.9.10`,
+then can set `export BCC_LINUX_VERSION_CODE=264458` to override the kernel
+version check successfully.
