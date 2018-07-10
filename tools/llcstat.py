@@ -7,6 +7,8 @@
 #
 #            For Linux, uses BCC, eBPF. Embedded C.
 #
+# SEE ALSO: perf top -e cache-misses -e cache-references -a -ns pid,cpu,comm
+#
 # REQUIRES: Linux 4.9+ (BPF_PROG_TYPE_PERF_EVENT support).
 #
 # Copyright (c) 2016 Facebook, Inc.
