@@ -1337,6 +1337,9 @@ void BFrontendAction::DoMiscWorkAround() {
   // CONFIG_CC_STACKPROTECTOR properly based on other configs, so it relieved any bpf
   // program (using task_struct, etc.) of patching the below code.
   rewriter_->getEditBuffer(rewriter_->getSourceMgr().getMainFileID()).InsertText(0,
+    "#if defined(BPF_LICENSE)\n"
+    "#error BPF_LICENSE cannot be specified through cflags\n"
+    "#endif\n"
     "#if !defined(CONFIG_CC_STACKPROTECTOR)\n"
     "#if defined(CONFIG_CC_STACKPROTECTOR_AUTO) \\\n"
     "    || defined(CONFIG_CC_STACKPROTECTOR_REGULAR) \\\n"
@@ -1345,6 +1348,10 @@ void BFrontendAction::DoMiscWorkAround() {
     "#endif\n"
     "#endif\n",
     false);
+
+  rewriter_->getEditBuffer(rewriter_->getSourceMgr().getMainFileID()).InsertTextAfter(
+    rewriter_->getSourceMgr().getBuffer(rewriter_->getSourceMgr().getMainFileID())->getBufferSize(),
+    "\n#include <bcc/footer.h>\n");
 }
 
 void BFrontendAction::EndSourceFileAction() {
