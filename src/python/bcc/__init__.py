@@ -166,6 +166,13 @@ class BPF(object):
         "linux/netdevice.h": ["sk_buff", "net_device"]
     }
 
+    _syscall_prefixes = [
+        "sys_",
+        "__x64_sys_",
+        "__x32_compat_sys_",
+        "__ia32_compat_sys_",
+    ]
+
     # BPF timestamps come from the monotonic clock. To be able to filter
     # and compare them from Python, we need to invoke clock_gettime.
     # Adapted from http://stackoverflow.com/a/1205762
@@ -539,18 +546,29 @@ class BPF(object):
         del self.uprobe_fds[name]
         _num_open_probes -= 1
 
+    # Find current system's syscall prefix by testing on the BPF syscall.
+    # If no valid value found, will return the first possible value which
+    # would probably lead to error in later API calls.
     def get_syscall_prefix(self):
-        # test bpf syscall kernel func name
-        if self.ksymname("sys_bpf") != -1:
-            return "sys_"
-        if self.ksymname("__x64_sys_bpf") != -1:
-            return "__x64_sys_"
-        # none of them, just return "sys_", later API
-        # calls will return error
-        return "sys_"
+        for prefix in self._syscall_prefixes:
+            if self.ksymname("{}bpf".format(prefix)) != -1:
+                return prefix
+        return self._syscall_prefixes[0]
 
+    # Given a syscall's name, return the full Kernel function name with current
+    # system's syscall prefix. For example, given "clone" the helper would
+    # return "sys_clone" or "__x64_sys_clone".
     def get_syscall_fnname(self, name):
         return self.get_syscall_prefix() + name
+
+    # Given a Kernel function name that represents a syscall but already has a
+    # prefix included, transform it to current system's prefix. For example,
+    # if "sys_clone" provided, the helper may translate it to "__x64_sys_clone".
+    def fix_syscall_fnname(self, name):
+        for prefix in self._syscall_prefixes:
+            if name.startswith(prefix):
+                return self.get_syscall_fnname(name[len(prefix):])
+        return name
        
     def attach_kprobe(self, event=b"", event_off=0, fn_name=b"", event_re=b""):
         event = _assert_is_bytes(event)
@@ -1008,10 +1026,14 @@ class BPF(object):
             func_name = lib.bpf_function_name(self.module, i)
             if func_name.startswith(b"kprobe__"):
                 fn = self.load_func(func_name, BPF.KPROBE)
-                self.attach_kprobe(event=fn.name[8:], fn_name=fn.name)
+                self.attach_kprobe(
+                    event=self.fix_syscall_fnname(func_name[8:]),
+                    fn_name=fn.name)
             elif func_name.startswith(b"kretprobe__"):
                 fn = self.load_func(func_name, BPF.KPROBE)
-                self.attach_kretprobe(event=fn.name[11:], fn_name=fn.name)
+                self.attach_kretprobe(
+                    event=self.fix_syscall_fnname(func_name[11:]),
+                    fn_name=fn.name)
             elif func_name.startswith(b"tracepoint__"):
                 fn = self.load_func(func_name, BPF.TRACEPOINT)
                 tp = fn.name[len(b"tracepoint__"):].replace(b"__", b":")
