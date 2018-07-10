@@ -13,9 +13,11 @@
 %if %{with python3}
 %global __python %{__python3}
 %global python_bcc python3-bcc
+%global python_cmds "python2;python3"
 %else
 %global __python %{__python2}
 %global python_bcc python2-bcc
+%global python_cmds "python2"
 %endif
 
 %define debug_package %{nil}
@@ -68,7 +70,7 @@ pushd build
 cmake .. -DREVISION_LAST=%{version} -DREVISION=%{version} \
       -DCMAKE_INSTALL_PREFIX=/usr \
       %{?lua_config} \
-      -DPYTHON_CMD="python2;python3" \
+      -DPYTHON_CMD="%{python_cmds}" \
       %{?with_llvm_shared:-DENABLE_LLVM_SHARED=1}
 make %{?_smp_mflags}
 popd
