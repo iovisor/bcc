@@ -73,6 +73,7 @@ enum event_type {
 
 struct data_t {
     u32 pid;  // PID as in the userspace term (i.e. task->tgid in kernel)
+    u32 ppid; // Parent PID as in the userspace term (i.e task->real_parent->tgid in kernel)
     char comm[TASK_COMM_LEN];
     enum event_type type;
     char argv[ARGSIZE];
@@ -105,7 +106,13 @@ int syscall__execve(struct pt_regs *ctx,
 {
     // create data here and pass to submit_arg to save stack space (#555)
     struct data_t data = {};
+    struct task_struct *task;
+
     data.pid = bpf_get_current_pid_tgid() >> 32;
+
+    task = (struct task_struct *)bpf_get_current_task();
+    data.ppid = task->real_parent->tgid;
+
     bpf_get_current_comm(&data.comm, sizeof(data.comm));
     data.type = EVENT_ARG;
 
@@ -128,7 +135,13 @@ out:
 int do_ret_sys_execve(struct pt_regs *ctx)
 {
     struct data_t data = {};
+    struct task_struct *task;
+
     data.pid = bpf_get_current_pid_tgid() >> 32;
+
+    task = (struct task_struct *)bpf_get_current_task();
+    data.ppid = task->real_parent->tgid;
+
     bpf_get_current_comm(&data.comm, sizeof(data.comm));
     data.type = EVENT_RET;
     data.retval = PT_REGS_RC(ctx);
@@ -160,6 +173,7 @@ ARGSIZE = 128           # should match #define in C above
 class Data(ct.Structure):
     _fields_ = [
         ("pid", ct.c_uint),
+        ("ppid", ct.c_uint),
         ("comm", ct.c_char * TASK_COMM_LEN),
         ("type", ct.c_int),
         ("argv", ct.c_char * ARGSIZE),
@@ -211,7 +225,7 @@ def print_event(cpu, data, size):
         if not skip:
             if args.timestamp:
                 print("%-8.3f" % (time.time() - start_ts), end="")
-            ppid = get_ppid(event.pid)
+            ppid = event.ppid if event.ppid > 0 else get_ppid(event.pid)
             ppid = b"%d" % ppid if ppid > 0 else b"?"
             argv_text = b' '.join(argv[event.pid]).replace(b'\n', b'\\n')
             printb(b"%-16s %-6d %-6s %3d %s" % (event.comm, event.pid,
