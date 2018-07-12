@@ -188,8 +188,9 @@ start_ts = time.time()
 argv = defaultdict(list)
 
 # TODO: This is best-effort PPID matching. Short-lived processes may exit
-# before we get a chance to read the PPID. This should be replaced with
-# fetching PPID via C when available (#364).
+# before we get a chance to read the PPID.
+# This is a fallback for when fetching the PPID from task->real_parent->tgip
+# returns 0, which happens in some kernel versions.
 def get_ppid(pid):
     try:
         with open("/proc/%d/status" % pid) as status:
