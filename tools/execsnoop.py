@@ -111,6 +111,9 @@ int syscall__execve(struct pt_regs *ctx,
     data.pid = bpf_get_current_pid_tgid() >> 32;
 
     task = (struct task_struct *)bpf_get_current_task();
+    // Some kernels, like Ubuntu 4.13.0-generic, return 0
+    // as the real_parent->tgid.
+    // We use the get_ppid function as a fallback in those cases. (#1883)
     data.ppid = task->real_parent->tgid;
 
     bpf_get_current_comm(&data.comm, sizeof(data.comm));
@@ -140,6 +143,9 @@ int do_ret_sys_execve(struct pt_regs *ctx)
     data.pid = bpf_get_current_pid_tgid() >> 32;
 
     task = (struct task_struct *)bpf_get_current_task();
+    // Some kernels, like Ubuntu 4.13.0-generic, return 0
+    // as the real_parent->tgid.
+    // We use the get_ppid function as a fallback in those cases. (#1883)
     data.ppid = task->real_parent->tgid;
 
     bpf_get_current_comm(&data.comm, sizeof(data.comm));
@@ -187,7 +193,7 @@ class EventType(object):
 start_ts = time.time()
 argv = defaultdict(list)
 
-# TODO: This is best-effort PPID matching. Short-lived processes may exit
+# This is best-effort PPID matching. Short-lived processes may exit
 # before we get a chance to read the PPID.
 # This is a fallback for when fetching the PPID from task->real_parent->tgip
 # returns 0, which happens in some kernel versions.
