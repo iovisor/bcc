@@ -144,7 +144,7 @@ class SmokeTests(TestCase):
         # self.run_with_int("deadlock_detector.py $(pgrep -n bash)", timeout=10)
         pass
 
-    @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
+    @skipUnless(kernel_version_ge(4,8), "requires kernel >= 4.8")
     def test_execsnoop(self):
         self.run_with_int("execsnoop.py")
 
