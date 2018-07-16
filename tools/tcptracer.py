@@ -116,8 +116,7 @@ static int read_ipv4_tuple(struct ipv4_tuple_t *tuple, struct sock *skp)
   u16 sport = sockp->inet_sport;
   u16 dport = skp->__sk_common.skc_dport;
 #ifdef CONFIG_NET_NS
-  possible_net_t skc_net = skp->__sk_common.skc_net;
-  bpf_probe_read(&net_ns_inum, sizeof(net_ns_inum), &skc_net.net->ns.inum);
+  net_ns_inum = skp->__sk_common.skc_net.net->ns.inum;
 #endif
 
   ##FILTER_NETNS##
@@ -144,8 +143,7 @@ static int read_ipv6_tuple(struct ipv6_tuple_t *tuple, struct sock *skp)
   u16 sport = sockp->inet_sport;
   u16 dport = skp->__sk_common.skc_dport;
 #ifdef CONFIG_NET_NS
-  possible_net_t skc_net = skp->__sk_common.skc_net;
-  bpf_probe_read(&net_ns_inum, sizeof(net_ns_inum), &skc_net.net->ns.inum);
+  net_ns_inum = skp->__sk_common.skc_net.net->ns.inum;
 #endif
   bpf_probe_read(&saddr, sizeof(saddr),
                  skp->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
@@ -430,16 +428,12 @@ int trace_accept_return(struct pt_regs *ctx)
   u32 net_ns_inum = 0;
   u8 ipver = 0;
 
-  bpf_probe_read(&dport, sizeof(dport), &newsk->__sk_common.skc_dport);
-  bpf_probe_read(&lport, sizeof(lport), &newsk->__sk_common.skc_num);
+  dport = newsk->__sk_common.skc_dport;
+  lport = newsk->__sk_common.skc_num;
 
   // Get network namespace id, if kernel supports it
 #ifdef CONFIG_NET_NS
-  possible_net_t skc_net = { };
-  bpf_probe_read(&skc_net, sizeof(skc_net), &newsk->__sk_common.skc_net);
-  bpf_probe_read(&net_ns_inum, sizeof(net_ns_inum), &skc_net.net->ns.inum);
-#else
-  net_ns_inum = 0;
+  net_ns_inum = newsk->__sk_common.skc_net.net->ns.inum;
 #endif
 
   ##FILTER_NETNS##
@@ -455,10 +449,8 @@ int trace_accept_return(struct pt_regs *ctx)
       evt4.pid = pid >> 32;
       evt4.ip = ipver;
 
-      bpf_probe_read(&evt4.saddr, sizeof(evt4.saddr),
-                     &newsk->__sk_common.skc_rcv_saddr);
-      bpf_probe_read(&evt4.daddr, sizeof(evt4.daddr),
-                     &newsk->__sk_common.skc_daddr);
+      evt4.saddr = newsk->__sk_common.skc_rcv_saddr;
+      evt4.daddr = newsk->__sk_common.skc_daddr;
 
       evt4.sport = lport;
       evt4.dport = ntohs(dport);

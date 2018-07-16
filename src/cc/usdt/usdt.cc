@@ -159,10 +159,14 @@ std::string Probe::largest_arg_type(size_t arg_n) {
 }
 
 bool Probe::usdt_getarg(std::ostream &stream) {
-  const size_t arg_count = locations_[0].arguments_.size();
-
-  if (!attached_to_)
+  if (!attached_to_ || attached_to_->empty())
     return false;
+
+  return usdt_getarg(stream, attached_to_.value());
+}
+
+bool Probe::usdt_getarg(std::ostream &stream, const std::string& probe_func) {
+  const size_t arg_count = locations_[0].arguments_.size();
 
   if (arg_count == 0)
     return true;
@@ -175,7 +179,7 @@ bool Probe::usdt_getarg(std::ostream &stream) {
                 "static __always_inline int _bpf_readarg_%s_%d("
                 "struct pt_regs *ctx, void *dest, size_t len) {\n"
                 "  if (len != sizeof(%s)) return -1;\n",
-                attached_to_.value(), arg_n + 1, ctype);
+                probe_func, arg_n + 1, ctype);
 
     if (locations_.size() == 1) {
       Location &location = locations_.front();
