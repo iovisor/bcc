@@ -23,6 +23,7 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
 # 02-Sep-2016   Brendan Gregg   Created this.
+# 06-Jul-2018   Michael D Day II converted to a class, added JSON output
 
 from __future__ import print_function
 from bcc import BPF
