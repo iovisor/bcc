@@ -7,17 +7,27 @@
 %endif
 
 # use --with shared to only link against libLLVM.so
+%if 0%{?fedora} >= 28 || 0%{?rhel} > 7
+%bcond_without llvm_shared
+%else
 %bcond_with llvm_shared
+%endif
 
+# Build python3 support for distributions that have it
+%if 0%{?fedora} >= 28 || 0%{?rhel} > 7
+%bcond_without python3
+%else
 %bcond_with python3
+%endif
+
 %if %{with python3}
 %global __python %{__python3}
 %global python_bcc python3-bcc
-%global python_cmds "python2;python3"
+%global python_cmds python2;python3
 %else
 %global __python %{__python2}
 %global python_bcc python2-bcc
-%global python_cmds "python2"
+%global python_cmds python2
 %endif
 
 %define debug_package %{nil}
@@ -164,7 +174,8 @@ Command line tools for BPF Compiler Collection (BCC)
 %postun -n libbcc -p /sbin/ldconfig
 
 %changelog
-* Thu Jun 13 2018 Brenden Blanco <bblanco@gmail.com> - 0.5.0-1
+* Wed Jul 18 2018 Brenden Blanco <bblanco@gmail.com> - 0.6.0-1
+- Make python3 the default when possible
 - Add with llvm_shared conditional
 - Add python2/python3 package targets
 
