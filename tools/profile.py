@@ -102,6 +102,8 @@ parser.add_argument("--stack-storage-size", default=16384,
 parser.add_argument("duration", nargs="?", default=99999999,
     type=positive_nonzero_int,
     help="duration of trace, in seconds")
+parser.add_argument("-C", "--cpu", type=int, default=-1,
+    help="cpu number to run profile on")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
 
@@ -138,6 +140,7 @@ BPF_STACK_TRACE(stack_traces, STACK_STORAGE_SIZE);
 // This code gets a bit complex. Probably not suitable for casual hacking.
 
 int do_perf_event(struct bpf_perf_event_data *ctx) {
+    CPU_FILTER
     u32 pid = bpf_get_current_pid_tgid() >> 32;
     if (!(THREAD_FILTER))
         return 0;
@@ -213,6 +216,14 @@ else:
     stack_context = "user + kernel"
 bpf_text = bpf_text.replace('USER_STACK_GET', user_stack_get)
 bpf_text = bpf_text.replace('KERNEL_STACK_GET', kernel_stack_get)
+if args.cpu >= 0:
+    cpu_filter = """
+    if (bpf_get_smp_processor_id() != {})
+        return 0;
+    """.format(args.cpu)
+    bpf_text = bpf_text.replace('CPU_FILTER', cpu_filter)
+else:
+    bpf_text = bpf_text.replace('CPU_FILTER', "")
 
 sample_freq = 0
 sample_period = 0
