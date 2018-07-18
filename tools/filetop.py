@@ -143,7 +143,8 @@ class FileTop:
 
         DNAME_INLINE_LEN = 32  # linux/dcache.h
 
-        print('Tracing... Output every %d secs. Hit Ctrl-C to end' % self.interval)
+        if not args.json:
+            print('Tracing... Output every %d secs. Hit Ctrl-C to end' % self.interval)
 
         # output
         exiting = 0
@@ -159,24 +160,36 @@ class FileTop:
             else:
                 print()
             with open(self.loadavg) as stats:
-                print("%-8s loadavg: %s" % (strftime("%H:%M:%S"), stats.read()))
-            print("%-6s %-16s %-6s %-6s %-7s %-7s %1s %s" % ("TID", "COMM",
-                "READS", "WRITES", "R_Kb", "W_Kb", "T", "FILE"))
+                if args.json:
+                    line = '"time": %-8s, "loadavg": %s' % (strftime("%H:%M:%S"), stats.read())
+                    line = line.rstrip('\n')
+                    print('{%s}' %line)
+                else:
+                    print("%-8s loadavg: %s" % (strftime("%H:%M:%S"), stats.read()))
+
+            if not args.json:
+                print("%-6s %-16s %-6s %-6s %-7s %-7s %1s %s" % ("TID", "COMM",
+                                                                 "READS", "WRITES", "R_Kb", "W_Kb", "T", "FILE"))
 
             # by-TID output
             counts = b.get_table("counts")
             line = 0
             for k, v in reversed(sorted(counts.items(),
                                         key=lambda counts:
-                                          getattr(counts[1], args.sort))):
+                                        getattr(counts[1], args.sort))):
                 name = k.name.decode()
                 if k.name_len > DNAME_INLINE_LEN:
                     name = name[:-3] + "..."
 
                 # print line
-                print("%-6d %-16s %-6d %-6d %-7d %-7d %1s %s" % (k.pid,
-                    k.comm.decode(), v.reads, v.writes, v.rbytes / 1024,
-                    v.wbytes / 1024, k.type.decode(), name))
+                if args.json:
+                    print('{"pid": %-6s, "command": %-16s, "reads": %-6d, "writes": %-6d, "read-bytes": %-7d, "write-bytes": %-7d, "type": %1s, "name": %s}' % (k.pid,
+                        k.comm.decode(), v.reads, v.writes, v.rbytes / 1024,
+                        v.wbytes / 1024, k.type.decode(), name))
+                else:
+                    print("%-6d %-16s %-6d %-6d %-7d %-7d %1s %s" % (k.pid,
+                        k.comm.decode(), v.reads, v.writes, v.rbytes / 1024,
+                        v.wbytes / 1024, k.type.decode(), name))
 
                 line += 1
                 if line >= self.maxrows:
@@ -185,7 +198,8 @@ class FileTop:
 
             self.countdown -= 1
             if exiting or self.countdown == 0:
-                print("Detaching...")
+                if not args.json:
+                    print("Detaching...")
                 exit()
 
 def client_main(args):
@@ -218,6 +232,8 @@ def client_main(args):
         help="number of outputs")
     parser.add_argument("--ebpf", action="store_true",
         help=argparse.SUPPRESS)
+    parser.add_argument("-j", "--json", action="store_true",
+                        help="output json objects")
 
     args = parser.parse_args()
     debug = 0
