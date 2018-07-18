@@ -574,7 +574,7 @@ You can also restrict profiling to just kernel stacks (-K) or user stacks (-U).
 For example, just user stacks:
 
 # ./profile -C 7 2
-Sampling at 49 Hertz of all threads by user + kernel stack for 2 secs.
+Sampling at 49 Hertz of all threads by user + kernel stack on CPU#7 for 2 secs.
 
     PyEval_EvalFrameEx
     [unknown]

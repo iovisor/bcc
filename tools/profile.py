@@ -140,7 +140,6 @@ BPF_STACK_TRACE(stack_traces, STACK_STORAGE_SIZE);
 // This code gets a bit complex. Probably not suitable for casual hacking.
 
 int do_perf_event(struct bpf_perf_event_data *ctx) {
-    CPU_FILTER
     u32 pid = bpf_get_current_pid_tgid() >> 32;
     if (!(THREAD_FILTER))
         return 0;
@@ -216,14 +215,6 @@ else:
     stack_context = "user + kernel"
 bpf_text = bpf_text.replace('USER_STACK_GET', user_stack_get)
 bpf_text = bpf_text.replace('KERNEL_STACK_GET', kernel_stack_get)
-if args.cpu >= 0:
-    cpu_filter = """
-    if (bpf_get_smp_processor_id() != {})
-        return 0;
-    """.format(args.cpu)
-    bpf_text = bpf_text.replace('CPU_FILTER', cpu_filter)
-else:
-    bpf_text = bpf_text.replace('CPU_FILTER', "")
 
 sample_freq = 0
 sample_period = 0
@@ -241,6 +232,8 @@ sample_context = "%s%d %s" % (("", sample_freq, "Hertz") if sample_freq
 if not args.folded:
     print("Sampling at %s of %s by %s stack" %
         (sample_context, thread_context, stack_context), end="")
+    if args.cpu >= 0:
+        print(" on CPU#{}".format(args.cpu), end="")
     if duration < 99999999:
         print(" for %d secs." % duration)
     else:
@@ -255,7 +248,7 @@ if debug or args.ebpf:
 b = BPF(text=bpf_text)
 b.attach_perf_event(ev_type=PerfType.SOFTWARE,
     ev_config=PerfSWConfig.CPU_CLOCK, fn_name="do_perf_event",
-    sample_period=sample_period, sample_freq=sample_freq)
+    sample_period=sample_period, sample_freq=sample_freq, cpu=args.cpu)
 
 # signal handler
 def signal_ignore(signal, frame):
