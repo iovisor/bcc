@@ -102,6 +102,8 @@ parser.add_argument("--stack-storage-size", default=16384,
 parser.add_argument("duration", nargs="?", default=99999999,
     type=positive_nonzero_int,
     help="duration of trace, in seconds")
+parser.add_argument("-C", "--cpu", type=int, default=-1,
+    help="cpu number to run profile on")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
 
@@ -230,6 +232,8 @@ sample_context = "%s%d %s" % (("", sample_freq, "Hertz") if sample_freq
 if not args.folded:
     print("Sampling at %s of %s by %s stack" %
         (sample_context, thread_context, stack_context), end="")
+    if args.cpu >= 0:
+        print(" on CPU#{}".format(args.cpu), end="")
     if duration < 99999999:
         print(" for %d secs." % duration)
     else:
@@ -244,7 +248,7 @@ if debug or args.ebpf:
 b = BPF(text=bpf_text)
 b.attach_perf_event(ev_type=PerfType.SOFTWARE,
     ev_config=PerfSWConfig.CPU_CLOCK, fn_name="do_perf_event",
-    sample_period=sample_period, sample_freq=sample_freq)
+    sample_period=sample_period, sample_freq=sample_freq, cpu=args.cpu)
 
 # signal handler
 def signal_ignore(signal, frame):

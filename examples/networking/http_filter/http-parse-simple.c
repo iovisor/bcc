@@ -34,12 +34,20 @@ int http_filter(struct __sk_buff *skb) {
 	u32  payload_offset = 0;
 	u32  payload_length = 0;
 
-	struct tcp_t *tcp = cursor_advance(cursor, sizeof(*tcp));
-
 	//calculate ip header length
 	//value to multiply * 4
 	//e.g. ip->hlen = 5 ; IP Header Length = 5 x 4 byte = 20 byte
 	ip_header_length = ip->hlen << 2;    //SHL 2 -> *4 multiply
+
+        //check ip header length against minimum
+	if (ip_header_length < sizeof(*ip)) {
+		goto DROP;
+	}
+
+        //shift cursor forward for dynamic ip header size
+        void *_ = cursor_advance(cursor, (ip_header_length-sizeof(*ip)));
+
+	struct tcp_t *tcp = cursor_advance(cursor, sizeof(*tcp));
 
 	//calculate tcp header length
 	//value to multiply *4
