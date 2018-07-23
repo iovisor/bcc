@@ -1,3 +1,11 @@
+bcc (0.6.1-1) unstable; urgency=low
+
+  * Build support for Fedora 28 and Ubuntu 18.04
+  * Add option to change license
+  * Optimizations for some uses of bpf_probe_reads
+
+ -- Brenden Blanco <bblanco@gmail.com>  Mon, 23 Jul 2018 17:00:00 +0000
+
 bcc (0.6.0-1) unstable; urgency=low
 
   * Support for kernel up to 4.17
