@@ -47,10 +47,15 @@ add_library(bcc-shared SHARED
 set_target_properties(bcc-shared PROPERTIES VERSION ${REVISION_LAST} SOVERSION 0)
 set_target_properties(bcc-shared PROPERTIES OUTPUT_NAME bcc)
 
+if(ENABLE_USDT)
+  set(bcc_usdt_sources usdt/usdt.cc usdt/usdt_args.cc)
+  # else undefined
+endif()
+
 add_library(bcc-loader-static STATIC ${bcc_sym_sources} ${bcc_util_sources})
 target_link_libraries(bcc-loader-static elf)
 add_library(bcc-static STATIC
-  ${bcc_common_sources} ${bcc_table_sources} ${bcc_util_sources})
+  ${bcc_common_sources} ${bcc_table_sources} ${bcc_util_sources} ${bcc_usdt_sources})
 set_target_properties(bcc-static PROPERTIES OUTPUT_NAME bcc)
 set(bcc-lua-static
   ${bcc_common_sources} ${bcc_table_sources} ${bcc_sym_sources} ${bcc_util_sources})
@@ -76,6 +81,7 @@ if(ENABLE_CPP_API)
 endif()
 
 if(ENABLE_USDT)
+  list(APPEND bcc_api_headers bcc_usdt.h)
   add_subdirectory(usdt)
   list(APPEND bcc_common_libs_for_a usdt-static)
   list(APPEND bcc_common_libs_for_s usdt-static)
