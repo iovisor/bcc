@@ -114,7 +114,9 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, TableStorage &ts,
   uname(&un);
   string kdir, kpath;
   const char *kpath_env = ::getenv("BCC_KERNEL_SOURCE");
+  const char *version_override = ::getenv("BCC_LINUX_VERSION_CODE");
   bool has_kpath_source = false;
+  string vmacro;
 
   if (kpath_env) {
     kpath = string(kpath_env);
@@ -175,6 +177,15 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, TableStorage &ts,
     flags_cstr.push_back(it->c_str());
 
   vector<const char *> flags_cstr_rem;
+
+  if (version_override) {
+    vmacro = "-DLINUX_VERSION_CODE_OVERRIDE=" + string(version_override);
+
+    std::cout << "WARNING: Linux version for eBPF program is being overridden with: " << version_override << "\n";
+    std::cout << "WARNING: Due to this, the results of the program may be unpredictable\n";
+    flags_cstr_rem.push_back(vmacro.c_str());
+  }
+
   flags_cstr_rem.push_back("-include");
   flags_cstr_rem.push_back("/virtual/include/bcc/helpers.h");
   flags_cstr_rem.push_back("-isystem");
