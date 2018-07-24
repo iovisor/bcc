@@ -433,7 +433,7 @@ static char *find_debug_via_debuglink(Elf *e, const char *binpath,
 
 DONE:
   free(bindir);
-  if (check_crc && !verify_checksum(res, crc))
+  if (res && check_crc && !verify_checksum(res, crc))
     return NULL;
   return res;
 }
