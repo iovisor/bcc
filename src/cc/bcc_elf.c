@@ -377,8 +377,10 @@ static int verify_checksum(const char *file, unsigned int crc) {
   if (fd < 0)
     return 0;
 
-  if (fstat(fd, &st) < 0)
+  if (fstat(fd, &st) < 0) {
+    close(fd);
     return 0;
+  }
 
   buf = mmap(NULL, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
   if (!buf) {
