@@ -134,14 +134,12 @@ int waker(struct pt_regs *ctx, struct task_struct *p) {
         return 0;
 
     struct key_t key = {};
-    u64 zero = 0, *val;
 
     key.w_k_stack_id = stack_traces.get_stackid(ctx, BPF_F_REUSE_STACKID);
     bpf_probe_read(&key.target, sizeof(key.target), p->comm);
     bpf_get_current_comm(&key.waker, sizeof(key.waker));
 
-    val = counts.lookup_or_init(&key, &zero);
-    (*val) += delta;
+    counts.increment(key, delta);
     return 0;
 }
 """

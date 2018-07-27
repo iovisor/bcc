@@ -135,8 +135,7 @@ else:
     bpf_text = bpf_text.replace('STORE',
         'irq_key_t key = {.slot = 0 /* ignore */};' +
         'bpf_probe_read(&key.name, sizeof(key.name), name);' +
-        'u64 zero = 0, *vp = dist.lookup_or_init(&key, &zero);' +
-        '(*vp) += delta;')
+        'dist.increment(key, delta);')
 if debug or args.ebpf:
     print(bpf_text)
     if args.ebpf:
