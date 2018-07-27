@@ -792,7 +792,7 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
           txt  = "({ typeof(" + name + ".key) _key = " + arg0 + "; ";
           txt += "typeof(" + name + ".leaf) *_leaf = " + lookup + ", &_key); ";
 
-          txt += "if (_leaf) (*_leaf)+= " + increment_value + ";";
+          txt += "if (_leaf) (*_leaf) += " + increment_value + ";";
           if (desc->second.type == BPF_MAP_TYPE_HASH) {
             txt += "else { typeof(" + name + ".leaf) _zleaf; __builtin_memset(&_zleaf, 0, sizeof(_zleaf)); ";
             txt += "_zleaf += " + increment_value + ";";
