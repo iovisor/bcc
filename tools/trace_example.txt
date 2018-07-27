@@ -138,7 +138,7 @@ The "%U" format specifier tells trace to resolve arg3 as a user-space symbol,
 if possible. Similarly, use "%K" for kernel symbols.
 
 Ruby, Node, and OpenJDK are also instrumented with USDT. For example, let's
-trace Ruby methods being called (this requires a version of Ruby built with 
+trace Ruby methods being called (this requires a version of Ruby built with
 the --enable-dtrace configure flag):
 
 # trace 'u:ruby:method__entry "%s.%s", arg1, arg2' -p $(pidof irb) -T
@@ -234,6 +234,18 @@ The perf ring buffer size can be changed with -b. The unit is size per-CPU buffe
 size and is measured in pages. The value must be a power of two and defaults to
 64 pages.
 
+# trace.py 'sys_setsockopt(int fd, int level, int optname, char* optval, int optlen)(level==0 && optname == 1 && STRCMP("{0x6C, 0x00, 0x00, 0x00}", optval))' -U -M 1 --bin_cmp
+PID     TID     COMM            FUNC             -
+1855611 1863183 worker          sys_setsockopt   found
+
+In this example we are catching setsockopt syscall to change IPv4 IP_TOS
+value only for the cases where new TOS value is equal to 108. we are using
+STRCMP helper in binary mode (--bin_cmp flag) to compare optval array
+against int value of 108 (parametr of setsockopt call) in hex representation
+(little endian format)
+
+
+
 
 USAGE message:
 
@@ -261,7 +273,8 @@ optional arguments:
                         number of events to print before quitting
   -t, --timestamp       print timestamp column (offset from trace start)
   -T, --time            print time column
-  -C, --print_cpu       print CPU id 
+  -C, --print_cpu       print CPU id
+  -B, --bin_cmp         allow to use STRCMP with binary values
   -K, --kernel-stack    output kernel stack trace
   -U, --user-stack      output user stack trace
   -a, --address         print virtual address in stacks
