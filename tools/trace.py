@@ -48,6 +48,7 @@ class Probe(object):
                 cls.tgid = args.tgid or -1
                 cls.pid = args.pid or -1
                 cls.page_cnt = args.buffer_pages
+                cls.bin_cmp = args.bin_cmp
 
         def __init__(self, probe, string_size, kernel_stack, user_stack):
                 self.usdt = None
@@ -271,7 +272,11 @@ static inline bool %s(char const *ignored, uintptr_t str) {
                         expr = expr.replace(alias, replacement)
                 for alias, replacement in Probe.aliases_common.items():
                     expr = expr.replace(alias, replacement)
-                matches = re.finditer('STRCMP\\(("[^"]+\\")', expr)
+                if self.bin_cmp:
+                    STRCMP_RE = 'STRCMP\\(\"([^"]+)\\"'
+                else:
+                    STRCMP_RE = 'STRCMP\\(("[^"]+\\")'
+                matches = re.finditer(STRCMP_RE, expr)
                 for match in matches:
                         string = match.group(1)
                         fname = self._generate_streq_function(string)
@@ -680,6 +685,8 @@ trace -I 'linux/fs_struct.h' 'mntns_install "users = %d", $task->fs->users'
                   help="print time column")
                 parser.add_argument("-C", "--print_cpu", action="store_true",
                   help="print CPU id")
+                parser.add_argument("-B", "--bin_cmp", action="store_true",
+                  help="allow to use STRCMP with binary values")
                 parser.add_argument("-K", "--kernel-stack",
                   action="store_true", help="output kernel stack trace")
                 parser.add_argument("-U", "--user-stack",
