@@ -84,8 +84,7 @@ int count_only(struct pt_regs *ctx, struct irq_desc *desc)
 
     irq_key_t key = {.slot = 0 /* ignore */};
     bpf_probe_read(&key.name, sizeof(key.name), name);
-    u64 zero = 0, *vp = dist.lookup_or_init(&key, &zero);
-    (*vp)++;
+    dist.increment(key);
 
     return 0;
 }
