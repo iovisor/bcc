@@ -49,7 +49,7 @@ struct _name##_table_t { \
   int (*insert) (_key_type *, _leaf_type *); \
   int (*delete) (_key_type *); \
   void (*call) (void *, int index); \
-  void (*increment) (_key_type); \
+  void (*increment) (_key_type, ...); \
   int (*get_stackid) (void *, u64); \
   u32 max_entries; \
   int flags; \
