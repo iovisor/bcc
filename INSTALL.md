@@ -12,6 +12,7 @@
   - [Ubuntu](#ubuntu---source)
   - [Fedora](#fedora---source)
   - [openSUSE](#opensuse---source)
+  - [Amazon Linux](#amazon-linux---source)
 * [Older Instructions](#older-instructions)
 
 ## Kernel Configuration
@@ -330,6 +331,51 @@ pushd src/python/
 make
 sudo make install
 popd
+```
+
+## Amazon Linux - Source
+
+Tested on Amazon Linux AMI release 2018.03 (kernel 4.14.47-56.37.amzn1.x86_64)
+
+### Install packages required for building
+```
+# enable epel to get iperf, luajit, luajit-devel, cmake3 (cmake3 is required to support c++11) 
+sudo yum-config-manager --enable epel
+
+sudo yum install -y bison cmake3 ethtool flex git iperf libstdc++-static python-netaddr gcc gcc-c++ make zlib-devel elfutils-libelf-devel
+sudo yum install -y luajit luajit-devel
+sudo yum install -y http://repo.iovisor.org/yum/extra/mageia/cauldron/x86_64/netperf-2.7.0-1.mga6.x86_64.rpm
+sudo pip install pyroute2
+sudo yum install -y ncurses-devel
+```
+
+### Install clang 3.7.1 pre-built binaries
+```
+wget http://releases.llvm.org/3.7.1/clang+llvm-3.7.1-x86_64-fedora22.tar.xz
+tar xf clang*
+(cd clang* && sudo cp -R * /usr/local/)
+```
+
+### Build bcc
+```
+git clone https://github.com/iovisor/bcc.git
+pushd .
+mkdir bcc/build; cd bcc/build
+cmake3 .. -DCMAKE_INSTALL_PREFIX=/usr
+time make
+sudo make install
+popd
+```
+
+### Setup required to run the tools
+```
+sudo yum -y install kernel-devel-$(uname -r)
+sudo mount -t debugfs debugfs /sys/kernel/debug
+```
+
+### Test
+```
+sudo /usr/share/bcc/tools/execsnoop
 ```
 
 # Older Instructions
