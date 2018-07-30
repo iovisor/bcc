@@ -189,6 +189,9 @@ apps:
     perlstat:
         command: wrapper perlstat
         aliases: [perlstat]
+    shmsnoop:
+        command: wrapper shmsnoop
+        aliases: [shmsnoop]
     phpcalls:
         command: wrapper phpcalls
         aliases: [phpcalls]
