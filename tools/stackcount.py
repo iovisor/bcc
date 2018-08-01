@@ -128,9 +128,7 @@ int trace_count(void *ctx) {
     key.tgid = GET_TGID;
     STORE_COMM
     %s
-    u64 zero = 0;
-    u64 *val = counts.lookup_or_init(&key, &zero);
-    (*val)++;
+    counts.increment(key);
     return 0;
 }
         """

@@ -145,7 +145,6 @@ int do_perf_event(struct bpf_perf_event_data *ctx) {
         return 0;
 
     // create map key
-    u64 zero = 0, *val;
     struct key_t key = {.pid = pid};
     bpf_get_current_comm(&key.name, sizeof(key.name));
 
@@ -180,8 +179,7 @@ int do_perf_event(struct bpf_perf_event_data *ctx) {
         }
     }
 
-    val = counts.lookup_or_init(&key, &zero);
-    (*val)++;
+    counts.increment(key);
     return 0;
 }
 """

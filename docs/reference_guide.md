@@ -413,7 +413,7 @@ Return: 0 on success
 
 When used in a program attached to a function entry kprobe, causes the
 execution of the function to be skipped, immediately returning `rc` instead.
-This is used for targeted error injection. 
+This is used for targeted error injection.
 
 bpf_override_return will only work when the kprobed function is whitelisted to
 allow error injections. Whitelisting entails tagging a function with
@@ -756,9 +756,9 @@ Examples in situ:
 
 ### 17. map.increment()
 
-Syntax: ```map.increment(key)```
+Syntax: ```map.increment(key[, increment_amount])```
 
-Increments the key's value by one. Used for histograms.
+Increments the key's value by `increment_amount`, which defaults to 1. Used for histograms.
 
 Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=increment+path%3Aexamples&type=Code),

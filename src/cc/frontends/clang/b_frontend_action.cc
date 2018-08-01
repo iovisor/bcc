@@ -780,14 +780,22 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
         } else if (memb_name == "increment") {
           string name = Ref->getDecl()->getName();
           string arg0 = rewriter_.getRewrittenText(expansionRange(Call->getArg(0)->getSourceRange()));
+
+          string increment_value = "1";
+          if (Call->getNumArgs() == 2) {
+            increment_value = rewriter_.getRewrittenText(expansionRange(Call->getArg(1)->getSourceRange()));
+
+          }
+
           string lookup = "bpf_map_lookup_elem_(bpf_pseudo_fd(1, " + fd + ")";
           string update = "bpf_map_update_elem_(bpf_pseudo_fd(1, " + fd + ")";
           txt  = "({ typeof(" + name + ".key) _key = " + arg0 + "; ";
           txt += "typeof(" + name + ".leaf) *_leaf = " + lookup + ", &_key); ";
-          txt += "if (_leaf) (*_leaf)++; ";
+
+          txt += "if (_leaf) (*_leaf) += " + increment_value + ";";
           if (desc->second.type == BPF_MAP_TYPE_HASH) {
             txt += "else { typeof(" + name + ".leaf) _zleaf; __builtin_memset(&_zleaf, 0, sizeof(_zleaf)); ";
-            txt += "_zleaf++; ";
+            txt += "_zleaf += " + increment_value + ";";
             txt += update + ", &_key, &_zleaf, BPF_NOEXIST); } ";
           }
           txt += "})";

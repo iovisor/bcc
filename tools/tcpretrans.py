@@ -131,8 +131,8 @@ int trace_tlp(struct pt_regs *ctx, struct sock *sk)
 }
 """
 
-struct_init = { 'ipv4':  
-        { 'count' : 
+struct_init = { 'ipv4':
+        { 'count' :
             """
                struct ipv4_flow_key_t flow_key = {};
                flow_key.saddr = skp->__sk_common.skc_rcv_saddr;
@@ -140,7 +140,7 @@ struct_init = { 'ipv4':
                // lport is host order
                flow_key.lport = lport;
                flow_key.dport = ntohs(dport);""",
-               'trace' : 
+               'trace' :
                """
                struct ipv4_data_t data4 = {.pid = pid, .ip = 4, .type = type};
                data4.saddr = skp->__sk_common.skc_rcv_saddr;
@@ -150,7 +150,7 @@ struct_init = { 'ipv4':
                data4.dport = ntohs(dport);
                data4.state = state; """
                },
-        'ipv6': 
+        'ipv6':
         { 'count' :
             """
                     struct ipv6_flow_key_t flow_key = {};
@@ -175,10 +175,8 @@ struct_init = { 'ipv4':
         }
 
 count_core_base = """
-        u64 zero = 0, *val;
-        val = COUNT_STRUCT.lookup_or_init(&flow_key, &zero);
-        (*val)++;
-""" 
+        COUNT_STRUCT.increment(flow_key);
+"""
 
 if args.count:
     bpf_text = bpf_text.replace("IPV4_INIT", struct_init['ipv4']['count'])
@@ -266,7 +264,7 @@ def depict_cnt(counts_tab, l3prot='ipv4'):
         ep_fmt = "[%s]#%d"
         if l3prot == 'ipv4':
             depict_key = "%-20s <-> %-20s" % (ep_fmt % (inet_ntop(AF_INET, pack('I', k.saddr)), k.lport),
-                                              ep_fmt % (inet_ntop(AF_INET, pack('I', k.daddr)), k.dport)) 
+                                              ep_fmt % (inet_ntop(AF_INET, pack('I', k.daddr)), k.dport))
         else:
             depict_key = "%-20s <-> %-20s" % (ep_fmt % (inet_ntop(AF_INET6, k.saddr), k.lport),
                                               ep_fmt % (inet_ntop(AF_INET6, k.daddr), k.dport))
@@ -290,7 +288,7 @@ if args.count:
     # header
     print("\n%-25s %-25s %-10s" % (
         "LADDR:LPORT", "RADDR:RPORT", "RETRANSMITS"))
-    depict_cnt(b.get_table("ipv4_count")) 
+    depict_cnt(b.get_table("ipv4_count"))
     depict_cnt(b.get_table("ipv6_count"), l3prot='ipv6')
 # read events
 else:
