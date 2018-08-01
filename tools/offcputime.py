@@ -156,7 +156,6 @@ int oncpu(struct pt_regs *ctx, struct task_struct *prev) {
     }
 
     // create map key
-    u64 zero = 0, *val;
     struct key_t key = {};
 
     key.pid = pid;
@@ -165,8 +164,7 @@ int oncpu(struct pt_regs *ctx, struct task_struct *prev) {
     key.kernel_stack_id = KERNEL_STACK_GET;
     bpf_get_current_comm(&key.name, sizeof(key.name));
 
-    val = counts.lookup_or_init(&key, &zero);
-    (*val) += delta;
+    counts.increment(key, delta);
     return 0;
 }
 """

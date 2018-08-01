@@ -104,7 +104,6 @@ int kprobe__tcp_sendmsg(struct pt_regs *ctx, struct sock *sk,
     u32 pid = bpf_get_current_pid_tgid();
     FILTER
     u16 dport = 0, family = sk->__sk_common.skc_family;
-    u64 *val, zero = 0;
 
     if (family == AF_INET) {
         struct ipv4_key_t ipv4_key = {.pid = pid};
@@ -113,8 +112,7 @@ int kprobe__tcp_sendmsg(struct pt_regs *ctx, struct sock *sk,
         ipv4_key.lport = sk->__sk_common.skc_num;
         dport = sk->__sk_common.skc_dport;
         ipv4_key.dport = ntohs(dport);
-        val = ipv4_send_bytes.lookup_or_init(&ipv4_key, &zero);
-        (*val) += size;
+        ipv4_send_bytes.increment(ipv4_key, size);
 
     } else if (family == AF_INET6) {
         struct ipv6_key_t ipv6_key = {.pid = pid};
@@ -126,8 +124,8 @@ int kprobe__tcp_sendmsg(struct pt_regs *ctx, struct sock *sk,
         ipv6_key.lport = sk->__sk_common.skc_num;
         dport = sk->__sk_common.skc_dport;
         ipv6_key.dport = ntohs(dport);
-        val = ipv6_send_bytes.lookup_or_init(&ipv6_key, &zero);
-        (*val) += size;
+        ipv6_send_bytes.increment(ipv6_key, size);
+
     }
     // else drop
 
@@ -157,8 +155,8 @@ int kprobe__tcp_cleanup_rbuf(struct pt_regs *ctx, struct sock *sk, int copied)
         ipv4_key.lport = sk->__sk_common.skc_num;
         dport = sk->__sk_common.skc_dport;
         ipv4_key.dport = ntohs(dport);
-        val = ipv4_recv_bytes.lookup_or_init(&ipv4_key, &zero);
-        (*val) += copied;
+        ipv4_recv_bytes.increment(ipv4_key, copied);
+
 
     } else if (family == AF_INET6) {
         struct ipv6_key_t ipv6_key = {.pid = pid};
@@ -169,8 +167,7 @@ int kprobe__tcp_cleanup_rbuf(struct pt_regs *ctx, struct sock *sk, int copied)
         ipv6_key.lport = sk->__sk_common.skc_num;
         dport = sk->__sk_common.skc_dport;
         ipv6_key.dport = ntohs(dport);
-        val = ipv6_recv_bytes.lookup_or_init(&ipv6_key, &zero);
-        (*val) += copied;
+        ipv6_recv_bytes.increment(ipv6_key, copied);
     }
     // else drop
 

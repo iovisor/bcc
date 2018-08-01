@@ -94,12 +94,10 @@ BPF_HASH(counts, struct key_t);
 
 int do_count(struct pt_regs *ctx) {
     struct key_t key = {};
-    u64 zero = 0, *val;
     u64 ip;
 
     key.ip = PT_REGS_IP(ctx);
-    val = counts.lookup_or_init(&key, &zero);  // update counter
-    (*val)++;
+    counts.increment(key); // update counter
     return 0;
 }
 

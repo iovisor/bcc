@@ -27,10 +27,8 @@ BPF_HASH(counts, struct key_t, u64, 256);
 
 int do_count(struct pt_regs *ctx) {
     struct key_t key = {};
-    u64 zero = 0, *val;
     key.ip = PT_REGS_IP(ctx);
-    val = counts.lookup_or_init(&key, &zero);
-    (*val)++;
+    counts.increment(key);
     return 0;
 }
 """)
