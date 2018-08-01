@@ -235,10 +235,13 @@ sudo dpkg -i *bcc*.deb
 ## Ubuntu - Source
 
 To build the toolchain from source, one needs:
-* LLVM 3.7.1 or newer, compiled with BPF support (default=on)
+* LLVM 
+** For Intel systems, 3.7.1 or newer, compiled with BPF support (default=on)
+** For arm64 systems, 6.0.0 or newer, compiled with BPF support (default=on)
 * Clang, built from the same tree as LLVM
 * cmake (>=3.1), gcc (>=4.7), flex, bison
 * LuaJIT, if you want Lua support
+** for arm64 systems, LuaJIT 2.1.0-beta3 or newer
 
 ### Install build dependencies
 ```
@@ -250,12 +253,28 @@ deb-src http://llvm.org/apt/$VER/ llvm-toolchain-$VER-3.7 main" | \
 wget -O - http://llvm.org/apt/llvm-snapshot.gpg.key | sudo apt-key add -
 sudo apt-get update
 
-# All versions
+# All versions (Intel)
 sudo apt-get -y install bison build-essential cmake3 flex git libedit-dev \
   libllvm3.7 llvm-3.7-dev libclang-3.7-dev python zlib1g-dev libelf-dev
-
-# For Lua support
+  
+# For Lua support (Intel)
 sudo apt-get -y install luajit luajit-5.1-dev
+
+# Xenial 16.04 LTS on arm64
+#
+# The arm64 system llvm and clang are not new enough to build this, and at the
+# moment LLVM 6.0.0 is not yet released. Until it is, build it from source
+# according to the supplied directions at http://llvm.org/
+#
+# arping and netperf are needed for testing
+#
+sudo apt-get -y install bison build-essential cmake flex git libedit-dev \
+  python zlib1g-dev libelf-dev arping netperf
+
+# For Lua support (arm64)
+wget http://luajit.org/download/LuaJIT-2.1.0-beta3.tar.gz
+tar -zvxf LuaJIT-2.1.0-beta3.tar.gz
+cd LuaJIT-2.1.0-beta3 && make && sudo make install
 ```
 
 ### Install and compile BCC
