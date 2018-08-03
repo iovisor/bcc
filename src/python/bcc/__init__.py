@@ -167,10 +167,10 @@ class BPF(object):
     }
 
     _syscall_prefixes = [
-        "sys_",
-        "__x64_sys_",
-        "__x32_compat_sys_",
-        "__ia32_compat_sys_",
+        b"sys_",
+        b"__x64_sys_",
+        b"__x32_compat_sys_",
+        b"__ia32_compat_sys_",
     ]
 
     # BPF timestamps come from the monotonic clock. To be able to filter
