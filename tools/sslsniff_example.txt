@@ -1,16 +1,16 @@
 Demonstrations of sslsniff.py
 
 
-This tool traces the OpenSSL functions SSL_READ and SSL_WRITE.
-Data passed to this functions is printed as plain text.
-Useful, for example, to sniff HTTP before encrypted with SSL.
+This tool traces the write/send and read/recv functions of OpenSSL,
+GnuTLS and NSS.  Data passed to this functions is printed as plain
+text.  Useful, for example, to sniff HTTP before encrypted with SSL.
 
 
 Output of tool executing in other shell "curl https://example.com"
 
 % sudo python sslsniff.py
 FUNC         TIME(s)            COMM             PID    LEN   
-SSL_WRITE    0.000000000        curl             12915  75    
+WRITE/SEND   0.000000000        curl             12915  75    
 ----- DATA -----
 GET / HTTP/1.1
 Host: example.com
@@ -20,7 +20,7 @@ Accept: */*
 
 ----- END DATA -----
 
-SSL_READ     0.127144585        curl             12915  333   
+READ/RECV    0.127144585        curl             12915  333   
 ----- DATA -----
 HTTP/1.1 200 OK
 Cache-Control: max-age=604800
@@ -38,7 +38,7 @@ Content-Length: 1270
 
 ----- END DATA -----
 
-SSL_READ     0.129967972        curl             12915  1270  
+READ/RECV    0.129967972        curl             12915  1270  
 ----- DATA -----
 <!doctype html>
 <html>
@@ -65,7 +65,7 @@ SSL_READ     0.129967972        curl             12915  1270
 
 USAGE message:
 
-usage: sslsniff.py [-h] [-p PID] [-c COMM] [-o] [-g] [-d]
+usage: sslsniff.py [-h] [-p PID] [-c COMM] [-o] [-g] [-n] [-d]
 
 Sniff SSL data
 
@@ -75,6 +75,7 @@ optional arguments:
   -c COMM, --comm COMM  sniff only commands matching string.
   -o, --no-openssl      do not show OpenSSL calls.
   -g, --no-gnutls       do not show GnuTLS calls.
+  -n, --no-nss          do not show NSS calls.
   -d, --debug           debug mode.
 
 examples:
@@ -83,3 +84,4 @@ examples:
     ./sslsniff -c curl      # sniff curl command only
     ./sslsniff --no-openssl # don't show OpenSSL calls
     ./sslsniff --no-gnutls  # don't show GnuTLS calls
+    ./sslsniff --no-nss     # don't show NSS calls
