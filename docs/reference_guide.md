@@ -53,6 +53,7 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
         - [19. map.perf_read()](#19-mapperf_read)
         - [20. map.call()](#20-mapcall)
         - [21. map.redirect_map()](#21-mapredirect_map)
+    - [Licensing](#licensing)
 
 - [bcc Python](#bcc-python)
     - [Initialization](#initialization)
@@ -87,6 +88,11 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
 
 - [BPF Errors](#bpf-errors)
     - [1. Invalid mem access](#1-invalid-mem-access)
+    - [2. Cannot call GPL only function from proprietary program](#2-cannot-call-gpl-only-function-from-proprietary-program)
+
+- [Environment Variables](#envvars)
+    - [1. kernel source directory](#1-kernel-source-directory)
+    - [2. kernel version overriding](#2-kernel-version-overriding)
 
 # BPF C
 
@@ -407,7 +413,7 @@ Return: 0 on success
 
 When used in a program attached to a function entry kprobe, causes the
 execution of the function to be skipped, immediately returning `rc` instead.
-This is used for targeted error injection. 
+This is used for targeted error injection.
 
 bpf_override_return will only work when the kprobed function is whitelisted to
 allow error injections. Whitelisting entails tagging a function with
@@ -750,9 +756,9 @@ Examples in situ:
 
 ### 17. map.increment()
 
-Syntax: ```map.increment(key)```
+Syntax: ```map.increment(key[, increment_amount])```
 
-Increments the key's value by one. Used for histograms.
+Increments the key's value by `increment_amount`, which defaults to 1. Used for histograms.
 
 Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=increment+path%3Aexamples&type=Code),
@@ -853,6 +859,28 @@ b.attach_xdp("eth1", out_fn, 0)
 
 Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?l=C&q=redirect_map+path%3Aexamples&type=Code),
+
+## Licensing
+
+Depending on which [BPF helpers](kernel-versions.md#helpers) are used, a GPL-compatible license is required.
+
+The special BCC macro `BPF_LICENSE` specifies the license of the BPF program. You can set the license as a comment in your source code, but the kernel has a special interface to specify it programmatically. If you need to use GPL-only helpers, it is recommended to specify the macro in your C code so that the kernel can understand it:
+
+```C
+// SPDX-License-Identifier: GPL-2.0+
+#define BPF_LICENSE GPL
+```
+
+Otherwise, the kernel may reject loading your program (see the [error description](#2-cannot-call-gpl-only-function-from-proprietary-program) below). Note that it supports multiple words and quotes are not necessary:
+
+```C
+// SPDX-License-Identifier: GPL-2.0+ OR BSD-2-Clause
+#define BPF_LICENSE Dual BSD/GPL
+```
+
+Check the [BPF helpers reference](kernel-versions.md#helpers) to see which helpers are GPL-only and what the kernel understands as GPL-compatible.
+
+**If the macro is not specified, BCC will automatically define the license of the program as GPL.**
 
 # bcc Python
 
@@ -1521,3 +1549,39 @@ Traceback (most recent call last):
     raise Exception("Failed to load BPF program %s" % func_name)
 Exception: Failed to load BPF program kretprobe__inet_csk_accept
 ```
+
+## 2. Cannot call GPL only function from proprietary program
+
+This error happens when a GPL-only helper is called from a non-GPL BPF program. To fix this error, do not use GPL-only helpers from a proprietary BPF program, or relicense the BPF program under a GPL-compatible license. Check which [BPF helpers](https://github.com/iovisor/bcc/blob/master/docs/kernel-versions.md#helpers) are GPL-only, and what licenses are considered GPL-compatible.
+
+Example calling `bpf_get_stackid()`, a GPL-only BPF helper, from a proprietary program (`#define BPF_LICENSE Proprietary`):
+
+```
+bpf: Failed to load program: Invalid argument
+[...]
+8: (85) call bpf_get_stackid#27
+cannot call GPL only function from proprietary program
+```
+
+# Environment Variables
+
+## 1. Kernel source directory
+
+eBPF program compilation needs kernel sources or kernel headers with headers
+compiled. In case your kernel sources are at a non-standard location where BCC
+cannot find then, its possible to provide BCC the absolute path of the location
+by setting `BCC_KERNEL_SOURCE` to it.
+
+## 2. Kernel version overriding
+
+By default, BCC stores the `LINUX_VERSION_CODE` in the generated eBPF object
+which is then passed along to the kernel when the eBPF program is loaded.
+Sometimes this is quite inconvenient especially when the kernel is slightly
+updated such as an LTS kernel release. Its extremely unlikely the slight
+mismatch would cause any issues with the loaded eBPF program. By setting
+`BCC_LINUX_VERSION_CODE` to the version of the kernel that's running, the check
+for verifying the kernel version can be bypassed. This is needed for programs
+that use kprobes. This needs to be encoded in the format: `(VERSION * 65536) +
+(PATCHLEVEL * 256) + SUBLEVEL`. For example, if the running kernel is `4.9.10`,
+then can set `export BCC_LINUX_VERSION_CODE=264458` to override the kernel
+version check successfully.

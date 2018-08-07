@@ -193,7 +193,6 @@ int oncpu(struct pt_regs *ctx, struct task_struct *p) {
     }
 
     // create map key
-    u64 zero = 0, *val;
     struct key_t key = {};
     struct wokeby_t *woke;
 
@@ -213,8 +212,7 @@ int oncpu(struct pt_regs *ctx, struct task_struct *p) {
         wokeby.delete(&pid);
     }
 
-    val = counts.lookup_or_init(&key, &zero);
-    (*val) += delta;
+    counts.increment(key, delta);
     return 0;
 }
 """
@@ -368,7 +366,7 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
 
         # print waker/wakee delimiter
         print("    %-16s %s" % ("--", "--"))
-        
+
         if not args.user_stacks_only:
             if stack_id_err(k.t_k_stack_id):
                 print("    [Missed Kernel Stack]")

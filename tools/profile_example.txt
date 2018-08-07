@@ -573,6 +573,41 @@ Sampling at 9 Hertz of all threads by user + kernel stack... Hit Ctrl-C to end.
 You can also restrict profiling to just kernel stacks (-K) or user stacks (-U).
 For example, just user stacks:
 
+# ./profile -C 7 2
+Sampling at 49 Hertz of all threads by user + kernel stack on CPU#7 for 2 secs.
+
+    PyEval_EvalFrameEx
+    [unknown]
+    [unknown]
+    -                python (2827439)
+        1
+
+    PyDict_GetItem
+    [unknown]
+    -                python (2827439)
+        1
+
+    [unknown]
+    -                python (2827439)
+        1
+
+    PyEval_EvalFrameEx
+    [unknown]
+    [unknown]
+    -                python (2827439)
+        1
+
+    PyEval_EvalFrameEx
+    -                python (2827439)
+        1
+
+    [unknown]
+    [unknown]
+    -                python (2827439)
+
+in this example python application was busylooping on a single core/cpu (#7)
+we were collecting stack traces only from it
+
 # ./profile -U
 Sampling at 49 Hertz of all threads by user stack... Hit Ctrl-C to end.
 ^C
@@ -733,6 +768,7 @@ optional arguments:
   --stack-storage-size STACK_STORAGE_SIZE
                         the number of unique stack traces that can be stored
                         and displayed (default 2048)
+  -C CPU, --cpu CPU     cpu number to run profile on
 
 examples:
     ./profile             # profile stack traces at 49 Hertz until Ctrl-C

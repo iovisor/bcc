@@ -733,10 +733,6 @@ class LpmTrie(TableBase):
     def __len__(self):
         raise NotImplementedError
 
-    def __delitem__(self, key):
-        # Not implemented for lpm trie as of kernel commit
-        # b95a5c4db09bc7c253636cb84dc9b12c577fd5a0
-        raise NotImplementedError
 
 class StackTrace(TableBase):
     MAX_DEPTH = 127

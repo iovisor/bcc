@@ -1,12 +1,12 @@
 .TH sslsniff 8  "2016-08-16" "USER COMMANDS"
 .SH NAME
-sslsniff \- Print data passed to OpenSSL. Uses Linux eBPF/bcc.
+sslsniff \- Print data passed to OpenSSL, GnuTLS or NSS. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B sslsniff
+.B sslsniff [-h] [-p PID] [-c COMM] [-o] [-g] [-n] [-d]
 .SH DESCRIPTION
-sslsniff prints data sent to SSL_write and SSL_read OpenSSL functions, allowing
-us to read plain text content before encryption (when writing) and after
-decryption (when reading).
+sslsniff prints data sent to write/send and read/recv functions of
+OpenSSL, GnuTLS and NSS, allowing us to read plain text content before
+encryption (when writing) and after decryption (when reading).
 
 This works reading the second parameter of both functions (*buf).
 
@@ -15,13 +15,13 @@ Since this uses BPF, only the root user can use this tool.
 CONFIG_BPF and bcc.
 .SH EXAMPLES
 .TP
-Print all calls to SSL_write and SSL_read system-wide:
+Print all calls to SSL write/send and read/recv system-wide:
 #
 .B sslsniff
 .SH FIELDS
 .TP
 FUNC
-Which function is being called (SSL_write or SSL_read)
+Which function is being called (write/send or read/recv)
 .TP
 TIME
 Time of the command, in seconds.
@@ -30,10 +30,10 @@ COMM
 Entered command.
 .TP
 PID
-Process ID calling OpenSSL.
+Process ID calling SSL.
 .TP
 LEN
-Bytes written or read by OpenSSL functions.
+Bytes written or read by SSL functions.
 .SH SOURCE
 This is from bcc.
 .IP

@@ -84,6 +84,10 @@ TEST_CASE("test hash table", "[hash_table]") {
       REQUIRE(pair.first % 3 == 0);
       REQUIRE(pair.first / 3 == pair.second);
     }
+
+    // clear table
+    t.clear_table_non_atomic();
+    REQUIRE(t.get_table_offline().size() == 0);
   }
 }
 
@@ -155,6 +159,35 @@ TEST_CASE("percpu hash table", "[percpu_hash_table]") {
     // get non existing element
     res = t.get_value(k, v2);
     REQUIRE(res.code() != 0);
+  }
+
+  SECTION("walk table") {
+    std::vector<uint64_t> v(ncpus);
+
+    for (int k = 3; k <= 30; k+=3) {
+      for (size_t cpu = 0; cpu < ncpus; cpu++) {
+        v[cpu] = k * cpu;
+      }
+      res = t.update_value(k, v);
+      REQUIRE(res.code() == 0);
+    }
+
+    // get whole table
+    auto offline = t.get_table_offline();
+    REQUIRE(offline.size() == 10);
+    for (int i = 0; i < 10; i++) {
+      // check the key
+      REQUIRE(offline.at(i).first % 3 == 0);
+
+      // check value
+      for (size_t cpu = 0; cpu < ncpus; cpu++) {
+        REQUIRE(offline.at(i).second.at(cpu) == cpu * offline.at(i).first);
+      }
+    }
+
+    // clear table
+    t.clear_table_non_atomic();
+    REQUIRE(t.get_table_offline().size() == 0);
   }
 }
 #endif

@@ -7,6 +7,8 @@
 #
 #            For Linux, uses BCC, eBPF. Embedded C.
 #
+# SEE ALSO: perf top -e cache-misses -e cache-references -a -ns pid,cpu,comm
+#
 # REQUIRES: Linux 4.9+ (BPF_PROG_TYPE_PERF_EVENT support).
 #
 # Copyright (c) 2016 Facebook, Inc.
@@ -56,9 +58,7 @@ int on_cache_miss(struct bpf_perf_event_data *ctx) {
     struct key_t key = {};
     get_key(&key);
 
-    u64 zero = 0, *val;
-    val = miss_count.lookup_or_init(&key, &zero);
-    (*val) += ctx->sample_period;
+    miss_count.increment(key, ctx->sample_period);
 
     return 0;
 }
@@ -67,9 +67,7 @@ int on_cache_ref(struct bpf_perf_event_data *ctx) {
     struct key_t key = {};
     get_key(&key);
 
-    u64 zero = 0, *val;
-    val = ref_count.lookup_or_init(&key, &zero);
-    (*val) += ctx->sample_period;
+    ref_count.increment(key, ctx->sample_period);
 
     return 0;
 }

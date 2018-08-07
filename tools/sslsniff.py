@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
-# sslsniff  Captures data on read/recv or write/send functions of OpenSSL and
-#           GnuTLS
+# sslsniff  Captures data on read/recv or write/send functions of OpenSSL,
+#           GnuTLS and NSS
 #           For Linux, uses BCC, eBPF.
 #
 # USAGE: sslsniff.py [-h] [-p PID] [-c COMM] [-o] [-g] [-d]
@@ -25,6 +25,7 @@ examples = """examples:
     ./sslsniff -c curl      # sniff curl command only
     ./sslsniff --no-openssl # don't show OpenSSL calls
     ./sslsniff --no-gnutls  # don't show GnuTLS calls
+    ./sslsniff --no-nss     # don't show NSS calls
 """
 parser = argparse.ArgumentParser(
     description="Sniff SSL data",
@@ -37,6 +38,8 @@ parser.add_argument("-o", "--no-openssl", action="store_false", dest="openssl",
                     help="do not show OpenSSL calls.")
 parser.add_argument("-g", "--no-gnutls", action="store_false", dest="gnutls",
                     help="do not show GnuTLS calls.")
+parser.add_argument("-n", "--no-nss", action="store_false", dest="nss",
+                    help="do not show NSS calls.")
 parser.add_argument('-d', '--debug', dest='debug', action='count', default=0,
                     help='debug mode.')
 parser.add_argument("--ebpf", action="store_true",
@@ -147,6 +150,20 @@ if args.gnutls:
     b.attach_uprobe(name="gnutls", sym="gnutls_record_recv",
                     fn_name="probe_SSL_read_enter", pid=args.pid or -1)
     b.attach_uretprobe(name="gnutls", sym="gnutls_record_recv",
+                       fn_name="probe_SSL_read_exit", pid=args.pid or -1)
+
+if args.nss:
+    b.attach_uprobe(name="nspr4", sym="PR_Write", fn_name="probe_SSL_write",
+                    pid=args.pid or -1)
+    b.attach_uprobe(name="nspr4", sym="PR_Send", fn_name="probe_SSL_write",
+                    pid=args.pid or -1)
+    b.attach_uprobe(name="nspr4", sym="PR_Read", fn_name="probe_SSL_read_enter",
+                    pid=args.pid or -1)
+    b.attach_uretprobe(name="nspr4", sym="PR_Read",
+                       fn_name="probe_SSL_read_exit", pid=args.pid or -1)
+    b.attach_uprobe(name="nspr4", sym="PR_Recv", fn_name="probe_SSL_read_enter",
+                    pid=args.pid or -1)
+    b.attach_uretprobe(name="nspr4", sym="PR_Recv",
                        fn_name="probe_SSL_read_exit", pid=args.pid or -1)
 
 # define output data structure in Python

@@ -49,7 +49,7 @@ struct _name##_table_t { \
   int (*insert) (_key_type *, _leaf_type *); \
   int (*delete) (_key_type *); \
   void (*call) (void *, int index); \
-  void (*increment) (_key_type); \
+  void (*increment) (_key_type, ...); \
   int (*get_stackid) (void *, u64); \
   u32 max_entries; \
   int flags; \
@@ -222,9 +222,11 @@ struct _name##_table_t _name = { .max_entries = (_max_entries) }
 #define cursor_advance(_cursor, _len) \
   ({ void *_tmp = _cursor; _cursor += _len; _tmp; })
 
-char _license[4] SEC("license") = "GPL";
-
+#ifdef LINUX_VERSION_CODE_OVERRIDE
+unsigned _version SEC("version") = LINUX_VERSION_CODE_OVERRIDE;
+#else
 unsigned _version SEC("version") = LINUX_VERSION_CODE;
+#endif
 
 /* helper functions called from eBPF programs written in C */
 static void *(*bpf_map_lookup_elem)(void *map, void *key) =

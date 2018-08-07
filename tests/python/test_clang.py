@@ -1126,6 +1126,104 @@ int test(struct pt_regs *ctx) {
         b = BPF(text=text)
         fn = b.load_func("test", BPF.KPROBE)
 
+    def test_probe_read_array_accesses1(self):
+        text = """
+#include <linux/ptrace.h>
+#include <linux/dcache.h>
+int test(struct pt_regs *ctx, const struct qstr *name) {
+    return name->name[1];
+}
+"""
+        b = BPF(text=text)
+        fn = b.load_func("test", BPF.KPROBE)
+
+    def test_probe_read_array_accesses2(self):
+        text = """
+#include <linux/ptrace.h>
+#include <linux/dcache.h>
+int test(struct pt_regs *ctx, const struct qstr *name) {
+    return name->name  [ 1];
+}
+"""
+        b = BPF(text=text)
+        fn = b.load_func("test", BPF.KPROBE)
+
+    def test_probe_read_array_accesses3(self):
+        text = """
+#include <linux/ptrace.h>
+#include <linux/dcache.h>
+int test(struct pt_regs *ctx, const struct qstr *name) {
+    return (name->name)[1];
+}
+"""
+        b = BPF(text=text)
+        fn = b.load_func("test", BPF.KPROBE)
+
+    def test_probe_read_array_accesses4(self):
+        text = """
+#include <linux/ptrace.h>
+int test(struct pt_regs *ctx, char *name) {
+    return name[1];
+}
+"""
+        b = BPF(text=text)
+        fn = b.load_func("test", BPF.KPROBE)
+
+    def test_probe_read_array_accesses5(self):
+        text = """
+#include <linux/ptrace.h>
+int test(struct pt_regs *ctx, char **name) {
+    return (*name)[1];
+}
+"""
+        b = BPF(text=text)
+        fn = b.load_func("test", BPF.KPROBE)
+
+    def test_probe_read_array_accesses6(self):
+        text = """
+#include <linux/ptrace.h>
+struct test_t {
+    int tab[5];
+};
+int test(struct pt_regs *ctx, struct test_t *t) {
+    return *(&t->tab[1]);
+}
+"""
+        b = BPF(text=text)
+        fn = b.load_func("test", BPF.KPROBE)
+
+    def test_probe_read_array_accesses7(self):
+        text = """
+#include <net/inet_sock.h>
+int test(struct pt_regs *ctx, struct sock *sk) {
+    return sk->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32[0];
+}
+"""
+        b = BPF(text=text)
+        fn = b.load_func("test", BPF.KPROBE)
+
+    def test_probe_read_array_accesses8(self):
+        text = """
+#include <linux/mm_types.h>
+int test(struct pt_regs *ctx, struct mm_struct *mm) {
+    return mm->rss_stat.count[MM_ANONPAGES].counter;
+}
+"""
+        b = BPF(text=text)
+        fn = b.load_func("test", BPF.KPROBE)
+
+    def test_arbitrary_increment_simple(self):
+        b = BPF(text=b"""
+#include <uapi/linux/ptrace.h>
+struct bpf_map;
+BPF_HASH(map);
+int map_delete(struct pt_regs *ctx, struct bpf_map *bpfmap, u64 *k) {
+    map.increment(42, 10);
+    return 0;
+}
+""")
+        b.attach_kprobe(event=b"htab_map_delete_elem", fn_name=b"map_delete")
+        b.cleanup()
 
 if __name__ == "__main__":
     main()

@@ -232,11 +232,14 @@ class BPFHashTable : public BPFTableBase<KeyType, ValueType> {
     KeyType cur;
     ValueType value;
 
+    StatusTuple r(0);
+
     if (!this->first(&cur))
       return res;
 
     while (true) {
-      if (!this->lookup(&cur, &value))
+      r = get_value(cur, value);
+      if (r.code() != 0)
         break;
       res.emplace_back(cur, value);
       if (!this->next(&cur, &cur))

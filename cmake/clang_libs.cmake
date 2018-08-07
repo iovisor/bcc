@@ -1,3 +1,6 @@
+if(ENABLE_LLVM_SHARED)
+set(llvm_libs "LLVM")
+else()
 set(llvm_raw_libs bitwriter bpfcodegen debuginfodwarf irreader linker
   mcjit objcarcopts option passes nativecodegen lto)
 list(FIND LLVM_AVAILABLE_LIBS "LLVMCoverage" _llvm_coverage)
@@ -14,6 +17,7 @@ if (${LLVM_PACKAGE_VERSION} VERSION_EQUAL 6 OR ${LLVM_PACKAGE_VERSION} VERSION_G
 endif()
 llvm_map_components_to_libnames(_llvm_libs ${llvm_raw_libs})
 llvm_expand_dependencies(llvm_libs ${_llvm_libs})
+endif()
 
 # order is important
 set(clang_libs

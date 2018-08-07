@@ -153,7 +153,6 @@ def handle_loop(stdscr, args):
 
     int do_count(struct pt_regs *ctx) {
         struct key_t key = {};
-        u64 zero = 0 , *val;
         u64 pid = bpf_get_current_pid_tgid();
         u32 uid = bpf_get_current_uid_gid();
 
@@ -162,8 +161,7 @@ def handle_loop(stdscr, args):
         key.uid = uid & 0xFFFFFFFF;
         bpf_get_current_comm(&(key.comm), 16);
 
-        val = counts.lookup_or_init(&key, &zero);  // update counter
-        (*val)++;
+        counts.increment(key);
         return 0;
     }
 

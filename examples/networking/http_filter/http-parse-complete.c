@@ -56,6 +56,19 @@ int http_filter(struct __sk_buff *skb) {
 	struct Key 	key;
 	struct Leaf zero = {0};
 
+        //calculate ip header length
+        //value to multiply * 4
+        //e.g. ip->hlen = 5 ; IP Header Length = 5 x 4 byte = 20 byte
+        ip_header_length = ip->hlen << 2;    //SHL 2 -> *4 multiply
+
+        //check ip header length against minimum
+        if (ip_header_length < sizeof(*ip)) {
+                goto DROP;
+        }
+
+        //shift cursor forward for dynamic ip header size
+        void *_ = cursor_advance(cursor, (ip_header_length-sizeof(*ip)));
+
 	struct tcp_t *tcp = cursor_advance(cursor, sizeof(*tcp));
 
 	//retrieve ip src/dest and port src/dest of current packet
@@ -64,11 +77,6 @@ int http_filter(struct __sk_buff *skb) {
 	key.src_ip = ip->src;
 	key.dst_port = tcp->dst_port;
 	key.src_port = tcp->src_port;
-
-	//calculate ip header length
-	//value to multiply * 4
-	//e.g. ip->hlen = 5 ; IP Header Length = 5 x 4 byte = 20 byte
-	ip_header_length = ip->hlen << 2;    //SHL 2 -> *4 multiply
 
 	//calculate tcp header length
 	//value to multiply *4

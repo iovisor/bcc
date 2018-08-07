@@ -16,6 +16,7 @@ include(GNUInstallDirs)
 include(CheckCXXCompilerFlag)
 include(cmake/FindCompilerFlag.cmake)
 
+option(ENABLE_LLVM_SHARED "Enable linking LLVM as a shared library" OFF)
 option(ENABLE_CLANG_JIT "Enable Loading BPF through Clang Frontend" ON)
 option(ENABLE_USDT "Enable User-level Statically Defined Tracing" ON)
 CMAKE_DEPENDENT_OPTION(ENABLE_CPP_API "Enable C++ API" ON "ENABLE_USDT" OFF)

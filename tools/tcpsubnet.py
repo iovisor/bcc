@@ -114,7 +114,6 @@ int kprobe__tcp_sendmsg(struct pt_regs *ctx, struct sock *sk,
     struct msghdr *msg, size_t size)
 {
     u16 family = sk->__sk_common.skc_family;
-    u64 *val, zero = 0;
 
     if (family == AF_INET) {
         u32 dst = sk->__sk_common.skc_daddr;
@@ -176,9 +175,8 @@ def generate_bpf_subnets(subnets):
         if (!categorized && (__NET_ADDR__ & __NET_MASK__) ==
              (dst & __NET_MASK__)) {
           struct index_key_t key = {.index = __POS__};
-          val = ipv4_send_bytes.lookup_or_init(&key, &zero);
+          ipv4_send_bytes.increment(key, size);
           categorized = 1;
-          (*val) += size;
         }
     """
     bpf = ''

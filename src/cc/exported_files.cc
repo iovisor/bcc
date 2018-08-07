@@ -43,4 +43,11 @@ map<string, const char *> ExportedFiles::headers_ = {
   },
 };
 
+map<string, const char *> ExportedFiles::footers_ = {
+  {
+    "/virtual/include/bcc/footer.h",
+    #include "export/footer.h"
+  },
+};
+
 }

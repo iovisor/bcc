@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 #
 # This script generates a BPF program with structure inspired by trace.py. The
 # generated program operates on PID-indexed stacks. Generally speaking,
