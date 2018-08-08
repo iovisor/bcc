@@ -481,8 +481,8 @@ int bpf_prog_load(enum bpf_prog_type prog_type, const char *name,
   if (attr.insn_cnt > BPF_MAXINSNS) {
     errno = EINVAL;
     fprintf(stderr,
-            "bpf: %s. Program too large (%u insns), at most %d insns\n\n",
-            strerror(errno), attr.insn_cnt, BPF_MAXINSNS);
+            "bpf: %s. Program %s too large (%u insns), at most %d insns\n\n",
+            strerror(errno), name, attr.insn_cnt, BPF_MAXINSNS);
     return -1;
   }
 
