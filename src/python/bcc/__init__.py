@@ -551,7 +551,7 @@ class BPF(object):
     # would probably lead to error in later API calls.
     def get_syscall_prefix(self):
         for prefix in self._syscall_prefixes:
-            if self.ksymname("{}bpf".format(prefix)) != -1:
+            if self.ksymname(b"%sbpf" % prefix) != -1:
                 return prefix
         return self._syscall_prefixes[0]
 
@@ -559,12 +559,14 @@ class BPF(object):
     # system's syscall prefix. For example, given "clone" the helper would
     # return "sys_clone" or "__x64_sys_clone".
     def get_syscall_fnname(self, name):
+        name = _assert_is_bytes(name)
         return self.get_syscall_prefix() + name
 
     # Given a Kernel function name that represents a syscall but already has a
     # prefix included, transform it to current system's prefix. For example,
     # if "sys_clone" provided, the helper may translate it to "__x64_sys_clone".
     def fix_syscall_fnname(self, name):
+        name = _assert_is_bytes(name)
         for prefix in self._syscall_prefixes:
             if name.startswith(prefix):
                 return self.get_syscall_fnname(name[len(prefix):])
