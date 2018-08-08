@@ -447,7 +447,7 @@ const char *bcc_procutils_language(int pid) {
       for (i = 0; i < nb_languages; i++) {
         snprintf(pathname, sizeof(pathname), "/lib%s", languages[i]);
         if (strstr(mapname, pathname)) {
-	  fclose(procfile);
+          fclose(procfile);
           return languages[i];
 	}
         if ((str = strstr(mapname, "libc")) &&
