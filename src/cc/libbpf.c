@@ -925,6 +925,7 @@ static void exit_mount_ns(int fd) {
 
   if (setns(fd, CLONE_NEWNS))
     perror("setns");
+  close(fd);
 }
 
 int bpf_attach_uprobe(int progfd, enum bpf_probe_attach_type attach_type,

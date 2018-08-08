@@ -57,6 +57,8 @@ std::string get_pid_exe(pid_t pid) {
   res = readlink(exe_link.c_str(), exe_path, sizeof(exe_path));
   if (res == -1)
     return "";
+  if (res >= sizeof(exe_path))
+    res = sizeof(exe_path) - 1;
   exe_path[res] = '\0';
   return std::string(exe_path);
 }
