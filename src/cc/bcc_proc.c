@@ -446,8 +446,10 @@ const char *bcc_procutils_language(int pid) {
       while (isspace(mapname[0])) mapname++;
       for (i = 0; i < nb_languages; i++) {
         snprintf(pathname, sizeof(pathname), "/lib%s", languages[i]);
-        if (strstr(mapname, pathname))
+        if (strstr(mapname, pathname)) {
+          fclose(procfile);
           return languages[i];
+	}
         if ((str = strstr(mapname, "libc")) &&
             (str[4] == '-' || str[4] == '.'))
           libc = true;

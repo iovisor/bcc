@@ -377,8 +377,10 @@ static int verify_checksum(const char *file, unsigned int crc) {
   if (fd < 0)
     return 0;
 
-  if (fstat(fd, &st) < 0)
+  if (fstat(fd, &st) < 0) {
+    close(fd);
     return 0;
+  }
 
   buf = mmap(NULL, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
   if (!buf) {
@@ -433,7 +435,7 @@ static char *find_debug_via_debuglink(Elf *e, const char *binpath,
 
 DONE:
   free(bindir);
-  if (check_crc && !verify_checksum(res, crc))
+  if (res && check_crc && !verify_checksum(res, crc))
     return NULL;
   return res;
 }
