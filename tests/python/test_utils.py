@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # Copyright (c) Catalysts GmbH
 # Licensed under the Apache License, Version 2.0 (the "License")
 
