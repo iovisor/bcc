@@ -192,6 +192,9 @@ apps:
     shmsnoop:
         command: wrapper shmsnoop
         aliases: [shmsnoop]
+    sofdsnoop:
+        command: wrapper sofdsnoop
+        aliases: [sofdsnoop]
     phpcalls:
         command: wrapper phpcalls
         aliases: [phpcalls]

@@ -1,0 +1,85 @@
+.TH sofdsnoop 8  "2018-11-08" "USER COMMANDS"
+.SH NAME
+sofdsnoop \- Trace FDs passed through unix sockets. Uses Linux eBPF/bcc.
+.SH SYNOPSIS
+.B sofdsnoop [-h] [-T] [-p PID] [-t TID] [-n NAME] [-d DURATION]
+.SH DESCRIPTION
+sofdsnoop traces FDs passed through unix sockets
+
+Every file descriptor that is passed via unix sockets os displayed
+on separate line together with process info (TID/COMM columns),
+ACTION details (SEND/RECV), file descriptor number (FD) and its
+translation to file if available (NAME).
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH OPTIONS
+.TP
+\-h
+Print usage message.
+.TP
+\-T
+Include a timestamp column.
+.TP
+\-p PID
+Trace this process ID only (filtered in-kernel).
+.TP
+\-t TID
+Trace this thread ID only (filtered in-kernel).
+.TP
+\-d DURATION
+Total duration of trace in seconds.
+.TP
+\-n NAME
+Only print command lines matching this command name (regex)
+.SH EXAMPLES
+.TP
+Trace all sockets:
+#
+.B sofdsnoop
+.TP
+Trace all sockets, and include timestamps:
+#
+.B sofdsnoop \-T
+.TP
+Only trace sockets where the process contains "server":
+#
+.B sofdsnoop \-n server
+.SH FIELDS
+.TP
+TIME(s)
+Time of SEDN/RECV actions, in seconds.
+.TP
+ACTION
+Operation on the fd SEND/RECV.
+.TP
+TID
+Process TID
+.TP
+COMM
+Parent process/command name.
+.TP
+SOCKET
+The socket carrier.
+.TP
+FD
+file descriptor number
+.TP
+NAME
+file name for SEND lines
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Jiri Olsa
+.SH SEE ALSO
+opensnoop(1)
