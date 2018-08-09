@@ -78,12 +78,16 @@ if args.ebpf:
     exit()
 
 b = BPF(text=bpf_text)
-b.attach_perf_event(
-    ev_type=PerfType.HARDWARE, ev_config=PerfHWConfig.CACHE_MISSES,
-    fn_name="on_cache_miss", sample_period=args.sample_period)
-b.attach_perf_event(
-    ev_type=PerfType.HARDWARE, ev_config=PerfHWConfig.CACHE_REFERENCES,
-    fn_name="on_cache_ref", sample_period=args.sample_period)
+try:
+    b.attach_perf_event(
+        ev_type=PerfType.HARDWARE, ev_config=PerfHWConfig.CACHE_MISSES,
+        fn_name="on_cache_miss", sample_period=args.sample_period)
+    b.attach_perf_event(
+        ev_type=PerfType.HARDWARE, ev_config=PerfHWConfig.CACHE_REFERENCES,
+        fn_name="on_cache_ref", sample_period=args.sample_period)
+except:
+    print("Failed to attach to a hardware event. Is this a virtual machine?")
+    exit()
 
 print("Running for {} seconds or hit Ctrl-C to end.".format(args.duration))
 
