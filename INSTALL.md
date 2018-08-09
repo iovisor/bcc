@@ -85,7 +85,7 @@ sudo dnf update
 
 **Nightly Packages**
 
-Nightly bcc binary packages for Fedora 25, 26, and 27 are hosted at
+Nightly bcc binary packages for Fedora 25, 26, 27, and 28 are hosted at
 `https://repo.iovisor.org/yum/nightly/f{25,26,27}`.
 
 To install:
@@ -96,7 +96,7 @@ sudo dnf install bcc-tools kernel-headers kernel-devel
 
 **Stable and Signed Packages**
 
-Stable bcc binary packages for Fedora 25, 26, and 27 are hosted at
+Stable bcc binary packages for Fedora 25, 26, 27, and 28 are hosted at
 `https://repo.iovisor.org/yum/main/f{25,26,27}`.
 
 ```bash
