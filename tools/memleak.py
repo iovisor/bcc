@@ -18,6 +18,7 @@ import resource
 import argparse
 import subprocess
 import os
+import sys
 
 class Allocation(object):
     def __init__(self, stack, size):
@@ -517,6 +518,7 @@ while True:
                         print_outstanding_combined()
                 else:
                         print_outstanding()
+                sys.stdout.flush()
                 count_so_far += 1
                 if num_prints is not None and count_so_far >= num_prints:
                         exit()

@@ -56,30 +56,33 @@ def setUpModule():
 
 @skipUnless(kernel_version_ge(4, 6), "requires kernel >= 4.6")
 class MemleakToolTests(TestCase):
+    def tearDown(self):
+        if self.p:
+            del(self.p)
     def run_leaker(self, leak_kind):
         # Starting memleak.py, which in turn launches the leaking application.
-        p = subprocess.Popen(cfg.cmd_format.format(leak_kind),
-                             stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                             shell=True)
+        self.p = subprocess.Popen(cfg.cmd_format.format(leak_kind),
+                                  stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                  shell=True)
 
         # Waiting for the first report.
         while True:
-            p.poll()
-            if p.returncode is not None:
+            self.p.poll()
+            if self.p.returncode is not None:
                 break
-            line = p.stdout.readline()
-            if "with outstanding allocations" in line:
+            line = self.p.stdout.readline()
+            if b"with outstanding allocations" in line:
                 break
 
         # At this point, memleak.py have already launched application and set
         # probes. Sending command to the leaking application to make its
         # allocations.
-        out = p.communicate(input="\n")[0]
+        out = self.p.communicate(input=b"\n")[0]
 
         # If there were memory leaks, they are in the output. Filter the lines
         # containing "byte" substring. Every interesting line is expected to
         # start with "N bytes from"
-        x = [x for x in out.split('\n') if 'byte' in x]
+        x = [x for x in out.split(b'\n') if b'byte' in x]
 
         self.assertTrue(len(x) >= 1,
                         msg="At least one line should have 'byte' substring.")
