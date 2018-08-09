@@ -1,0 +1,69 @@
+Demonstrations of sofdsnoop, the Linux eBPF/bcc version.
+
+sofdsnoop traces FDs passed through unix sockets
+
+# ./sofdsnoop.py
+ACTION TID    COMM             SOCKET                    FD    NAME
+SEND   2576   Web Content      24:socket:[39763]         51    /dev/shm/org.mozilla.ipc.2576.23874
+RECV   2576   Web Content      49:socket:[809997]        51
+SEND   2576   Web Content      24:socket:[39763]         58    N/A
+RECV   2464   Gecko_IOThread   75:socket:[39753]         55
+
+Every file descriptor that is passed via unix sockets os displayed
+on separate line together with process info (TID/COMM columns),
+ACTION details (SEND/RECV), file descriptor number (FD) and its
+translation to file if available (NAME).
+
+The file descriptor (fd) value is bound to a process. The SEND
+lines display the fd value within the sending process. The RECV
+lines display the fd value of the sending process. That's why
+there's translation to name only on SEND lines, where we are
+able to find it in task proc records.
+
+This works by tracing sendmsg/recvmsg system calls to provide
+the socket fds, and scm_send_entry/scm_detach_fds to provide
+the file descriptor details.
+
+A -T option can be used to include a timestamp column,
+and a -n option to match on a command name. Regular
+expressions are allowed.  For example, matching commands
+containing "server" with timestamps:
+
+# ./sofdsnoop.py -T -n Web
+TIME(s)       ACTION TID    COMM             SOCKET                    FD    NAME
+0.000000000   SEND   2576   Web Content      24:socket:[39763]         51    /dev/shm/org.mozilla.ipc.2576.25404 (deleted)
+0.000413000   RECV   2576   Web Content      49:/dev/shm/org.mozilla.ipc.2576.25404 (deleted) 51
+0.000558000   SEND   2576   Web Content      24:socket:[39763]         58    N/A
+0.000952000   SEND   2576   Web Content      24:socket:[39763]         58    socket:[817962]
+
+
+A -p option can be used to trace only selected process:
+
+# ./sofdsnoop.py -p 2576 -T
+TIME(s)       ACTION TID    COMM             SOCKET                    FD    NAME
+0.000000000   SEND   2576   Web Content      24:socket:[39763]         51    N/A
+0.000138000   RECV   2576   Web Content      49:N/A                    5
+0.000191000   SEND   2576   Web Content      24:socket:[39763]         58    N/A
+0.000424000   RECV   2576   Web Content      51:/dev/shm/org.mozilla.ipc.2576.25319 (deleted) 49
+
+USAGE message:
+usage: sofdsnoop.py [-h] [-T] [-p PID] [-t TID] [-n NAME] [-d DURATION]
+
+Trace file descriptors passed via socket
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -T, --timestamp       include timestamp on output
+  -p PID, --pid PID     trace this PID only
+  -t TID, --tid TID     trace this TID only
+  -n NAME, --name NAME  only print process names containing this name
+  -d DURATION, --duration DURATION
+                        total duration of trace in seconds
+
+examples:
+    ./sofdsnoop           # trace file descriptors passes
+    ./sofdsnoop -T        # include timestamps
+    ./sofdsnoop -p 181    # only trace PID 181
+    ./sofdsnoop -t 123    # only trace TID 123
+    ./sofdsnoop -d 10     # trace for 10 seconds only
+    ./sofdsnoop -n main   # only print process names containing "main"
