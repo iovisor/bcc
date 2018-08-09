@@ -306,7 +306,7 @@ def print_stack(event):
         # print folded stack output
         user_stack = list(user_stack)
         kernel_stack = list(kernel_stack)
-        line = [event.comm.decode()] + \
+        line = [event.comm.decode('utf-8', 'replace')] + \
             [b.sym(addr, event.tgid_pid) for addr in reversed(user_stack)] + \
             (do_delimiter and ["-"] or []) + \
             [b.ksym(addr) for addr in reversed(kernel_stack)]
@@ -323,7 +323,7 @@ def print_event(cpu, data, size):
     ts = float(event.duration_ns) / time_multiplier
     if not args.folded:
         print((time_str(event) + "%-14.14s %-6s %7.2f %16x %s %s") %
-            (event.comm.decode(), event.tgid_pid >> 32,
+            (event.comm.decode('utf-8', 'replace'), event.tgid_pid >> 32,
              ts, event.retval, args.functions[event.id], args_str(event)))
     if args.user_stack or args.kernel_stack:
         print_stack(event)

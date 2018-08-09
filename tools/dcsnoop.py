@@ -153,8 +153,9 @@ start_ts = time.time()
 def print_event(cpu, data, size):
     event = ct.cast(data, ct.POINTER(Data)).contents
     print("%-11.6f %-6d %-16s %1s %s" % (
-            time.time() - start_ts, event.pid, event.comm.decode(),
-            mode_s[event.type], event.filename.decode()))
+            time.time() - start_ts, event.pid,
+            event.comm.decode('utf-8', 'replace'), mode_s[event.type],
+            event.filename.decode('utf-8', 'replace')))
 
 # header
 print("%-11s %-6s %-16s %1s %s" % ("TIME(s)", "PID", "COMM", "T", "FILE"))

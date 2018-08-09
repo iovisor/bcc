@@ -382,8 +382,8 @@ def print_event(mounts, umounts, cpu, data, size):
                     flags=decode_umount_flags(syscall['flags']),
                     retval=decode_errno(event.union.retval))
             print('{:16} {:<7} {:<7} {:<11} {}'.format(
-                syscall['comm'].decode(), syscall['tgid'], syscall['pid'],
-                syscall['mnt_ns'], call))
+                syscall['comm'].decode('utf-8', 'replace'), syscall['tgid'],
+                syscall['pid'], syscall['mnt_ns'], call))
     except KeyError:
         # This might happen if we lost an event.
         pass
