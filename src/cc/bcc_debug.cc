@@ -154,7 +154,12 @@ void SourceDebugger::dump() {
   }
 
   // bcc has only one compilation unit
+  // getCompileUnitAtIndex() was gone in llvm 8.0 (https://reviews.llvm.org/D49741)
+#if LLVM_MAJOR_VERSION >= 8
+  DWARFCompileUnit *CU = cast<DWARFCompileUnit>(DwarfCtx->getUnitAtIndex(0));
+#else
   DWARFCompileUnit *CU = DwarfCtx->getCompileUnitAtIndex(0);
+#endif
   if (!CU) {
     errs() << "Debug Error: dwarf context failed to get compile unit\n";
     return;
