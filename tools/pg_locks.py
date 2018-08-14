@@ -37,7 +37,7 @@ struct message {
 BPF_PERF_OUTPUT(events);
 BPF_PERF_OUTPUT(messages);
 
-BPF_HASH(lock_hold, struct LWLock *, struct lwlock);
+BPF_HASH(lock_hold, u32, struct lwlock);
 BPF_HASH(lock_wait, u32, struct lwlock);
 
 // Histogram of lock hold times
@@ -65,7 +65,6 @@ void probe_lwlock_acquire_start(struct pt_regs *ctx, struct LWLock *lock, int mo
         struct message msg = {};
         strcpy(msg.text, "Lock is overwritten");
         messages.perf_submit(ctx, &msg, sizeof(msg));
-        //return;
     }
 
     lock_wait.update(&pid, &data);
@@ -95,16 +94,15 @@ void probe_lwlock_acquire_finish(struct pt_regs *ctx, struct LWLock *lock, int m
     strcpy(data.debug, "Acquired");
 
     events.perf_submit(ctx, &data, sizeof(data));
-    struct lwlock *test = lock_hold.lookup(&lock);
+    struct lwlock *test = lock_hold.lookup(&pid);
     if (test != 0)
     {
         struct message msg = {};
         strcpy(msg.text, "Lock is overwritten");
         messages.perf_submit(ctx, &msg, sizeof(msg));
-        //return;
     }
 
-    lock_hold.update(&lock, &data);
+    lock_hold.update(&pid, &data);
 }
 
 void probe_lwlock_release(struct pt_regs *ctx, struct LWLock *lock)
@@ -112,7 +110,7 @@ void probe_lwlock_release(struct pt_regs *ctx, struct LWLock *lock)
     u64 now = bpf_ktime_get_ns();
     u32 pid = bpf_get_current_pid_tgid();
     unsigned short tranche_id = lock->tranche;
-    struct lwlock *data = lock_hold.lookup(&lock);
+    struct lwlock *data = lock_hold.lookup(&pid);
     if (data == 0 || data->acquired == 0)
     {
         struct message msg = {};
@@ -128,7 +126,7 @@ void probe_lwlock_release(struct pt_regs *ctx, struct LWLock *lock)
     events.perf_submit(ctx, data, sizeof(*data));
     u64 lwlock_slot = bpf_log2l(hold_time / 1000);
     lock_hold_hist.increment(lwlock_slot);
-    lock_hold.delete(&lock);
+    lock_hold.delete(&pid);
 }
 """
 
