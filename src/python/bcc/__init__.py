@@ -614,7 +614,7 @@ class BPF(object):
         self._check_probe_quota(1)
         fn = self.load_func(fn_name, BPF.KPROBE)
         ev_name = b"r_" + event.replace(b"+", b"_").replace(b".", b"_")
-        fd = lib.bpf_attach_kprobe(fn.fd, 1, ev_name, event)
+        fd = lib.bpf_attach_kprobe(fn.fd, 1, ev_name, event, 0)
         if fd < 0:
             raise Exception("Failed to attach BPF to kretprobe")
         self._add_kprobe_fd(ev_name, fd)
