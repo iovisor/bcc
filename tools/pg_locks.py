@@ -10,24 +10,11 @@ import ctypes as ct
 text = """
 #include <linux/ptrace.h>
 
-typedef struct pg_atomic_uint32
-{
-    volatile unsigned int value;
-} pg_atomic_uint32;
-
-typedef struct LWLock
-{
-	unsigned short tranche;		/* tranche ID */
-	pg_atomic_uint32 state;		/* state of exclusive/nonexclusive lockers */
-} LWLock;
-
 struct lwlock {
     u32 pid;
-    struct LWLock *lock;
     int mode;
     u64 acquired;
     u64 released;
-    char debug[20];
 };
 
 struct message {
@@ -53,7 +40,7 @@ BPF_HASH(lock_wait, u32, struct lwlock);
 BPF_HISTOGRAM(lock_hold_shared_hist, u64);
 BPF_HISTOGRAM(lock_hold_exclusive_hist, u64);
 
-// Histogram of lock hold times
+// Histogram of lock wait times
 BPF_HISTOGRAM(lock_wait_shared_hist, u64);
 BPF_HISTOGRAM(lock_wait_exclusive_hist, u64);
 
@@ -65,9 +52,7 @@ void probe_lwlock_acquire_start(struct pt_regs *ctx, struct LWLock *lock, int mo
     data.mode = mode;
     data.acquired = now;
     data.pid = pid;
-    data.lock = lock;
     data.released = 0;
-    strcpy(data.debug, "Acquired");
 
     events.perf_submit(ctx, &data, sizeof(data));
     struct lwlock *test = lock_wait.lookup(&pid);
@@ -109,9 +94,7 @@ void probe_lwlock_acquire_finish(struct pt_regs *ctx, struct LWLock *lock, int m
     data.mode = mode;
     data.acquired = now;
     data.pid = pid;
-    data.lock = lock;
     data.released = 0;
-    strcpy(data.debug, "Acquired");
 
     events.perf_submit(ctx, &data, sizeof(data));
     struct lwlock *test = lock_hold.lookup(&pid);
@@ -130,7 +113,7 @@ void probe_lwlock_release(struct pt_regs *ctx, struct LWLock *lock)
     u64 now = bpf_ktime_get_ns();
     u32 pid = bpf_get_current_pid_tgid();
     struct lwlock *data = lock_hold.lookup(&pid);
-    if (data == 0 || data->acquired == 0)
+    if (data == 0)
     {
         struct message msg = {};
         strcpy(msg.text, "Lock is missing");
@@ -140,7 +123,6 @@ void probe_lwlock_release(struct pt_regs *ctx, struct LWLock *lock)
 
     u64 hold_time = now - data->acquired;
     data->released = now;
-    strcpy(data->debug, "Released");
 
     events.perf_submit(ctx, data, sizeof(*data));
     u64 lwlock_slot = bpf_log2l(hold_time / 1000);
@@ -159,6 +141,7 @@ void probe_lwlock_release(struct pt_regs *ctx, struct LWLock *lock)
 }
 """
 
+
 def attach(bpf, binary_path):
     bpf.attach_uprobe(name=binary_path, sym="LWLockAcquire", fn_name="probe_lwlock_acquire_start")
     bpf.attach_uretprobe(name=binary_path, sym="LWLockAcquire", fn_name="probe_lwlock_acquire_finish")
@@ -168,9 +151,11 @@ def attach(bpf, binary_path):
 
     bpf.attach_uprobe(name=binary_path, sym="LWLockRelease", fn_name="probe_lwlock_release")
 
+
 # signal handler
 def signal_ignore(signal, frame):
     print()
+
 
 class Data(ct.Structure):
     _fields_ = [("pid", ct.c_ulong),
@@ -180,18 +165,23 @@ class Data(ct.Structure):
                 ("released", ct.c_ulonglong),
                 ("debug", ct.c_char * 100)]
 
+
 class Message(ct.Structure):
     _fields_ = [("text", ct.c_char * 100)]
+
 
 def print_messages(cpu, data, size):
     msg = ct.cast(data, ct.POINTER(Message)).contents
     print(msg.text)
 
+
 def print_event(cpu, data, size):
     event = ct.cast(data, ct.POINTER(Data)).contents
-    print("Event: acquired {} released {} lock {} pid {}, debug {}".format(event.acquired, event.released, event.lock, event.pid, event.debug))
+    print("Event: acquired {} released {} pid {}".format(
+        event.acquired, event.released, event.pid))
 
-def run(binary_path):
+
+def run(binary_path, debug=False):
     bpf = BPF(text=text)
     attach(bpf, binary_path)
     lock_hold_exclusive_hist = bpf["lock_hold_exclusive_hist"]
@@ -200,13 +190,15 @@ def run(binary_path):
     lock_wait_shared_hist = bpf["lock_wait_shared_hist"]
     exiting = False
 
-    # bpf["events"].open_perf_buffer(print_event)
-    # bpf["messages"].open_perf_buffer(print_messages)
+    if debug:
+        bpf["events"].open_perf_buffer(print_event)
+        bpf["messages"].open_perf_buffer(print_messages)
 
     while True:
         try:
             sleep(1)
-            # bpf.perf_buffer_poll()
+            if debug:
+                bpf.perf_buffer_poll()
         except KeyboardInterrupt:
             exiting = True
             # as cleanup can take many seconds, trap Ctrl-C:
@@ -231,6 +223,7 @@ def run(binary_path):
     print("Shared lock waiting time")
     lock_wait_shared_hist.print_log2_hist("wait time (us)")
     print("")
+
 
 if __name__ == "__main__":
     run(sys.argv[1])
