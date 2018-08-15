@@ -85,7 +85,6 @@ void probe_lwlock_acquire_finish(struct pt_regs *ctx, struct LWLock *lock, int m
 {
     u64 now = bpf_ktime_get_ns();
     u32 pid = bpf_get_current_pid_tgid();
-    unsigned short tranche_id = lock->tranche;
     struct lwlock data = {};
     struct lwlock *wait_data = lock_wait.lookup(&pid);
 
@@ -130,7 +129,6 @@ void probe_lwlock_release(struct pt_regs *ctx, struct LWLock *lock)
 {
     u64 now = bpf_ktime_get_ns();
     u32 pid = bpf_get_current_pid_tgid();
-    unsigned short tranche_id = lock->tranche;
     struct lwlock *data = lock_hold.lookup(&pid);
     if (data == 0 || data->acquired == 0)
     {
@@ -164,6 +162,10 @@ void probe_lwlock_release(struct pt_regs *ctx, struct LWLock *lock)
 def attach(bpf, binary_path):
     bpf.attach_uprobe(name=binary_path, sym="LWLockAcquire", fn_name="probe_lwlock_acquire_start")
     bpf.attach_uretprobe(name=binary_path, sym="LWLockAcquire", fn_name="probe_lwlock_acquire_finish")
+
+    bpf.attach_uprobe(name=binary_path, sym="LWLockAcquireOrWait", fn_name="probe_lwlock_acquire_start")
+    bpf.attach_uretprobe(name=binary_path, sym="LWLockAcquireOrWait", fn_name="probe_lwlock_acquire_finish")
+
     bpf.attach_uprobe(name=binary_path, sym="LWLockRelease", fn_name="probe_lwlock_release")
 
 # signal handler
