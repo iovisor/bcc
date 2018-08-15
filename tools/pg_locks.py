@@ -10,6 +10,17 @@ import ctypes as ct
 text = """
 #include <linux/ptrace.h>
 
+typedef struct pg_atomic_uint32
+{
+    volatile unsigned int value;
+} pg_atomic_uint32;
+
+typedef struct LWLock
+{
+       unsigned short tranche;         /* tranche ID */
+       pg_atomic_uint32 state;         /* state of exclusive/nonexclusive lockers */
+} LWLock;
+
 struct lwlock {
     u32 pid;
     int mode;
@@ -159,11 +170,9 @@ def signal_ignore(signal, frame):
 
 class Data(ct.Structure):
     _fields_ = [("pid", ct.c_ulong),
-                ("lock", ct.c_ulong),
                 ("mode", ct.c_int),
                 ("acquired", ct.c_ulonglong),
-                ("released", ct.c_ulonglong),
-                ("debug", ct.c_char * 100)]
+                ("released", ct.c_ulonglong)]
 
 
 class Message(ct.Structure):
