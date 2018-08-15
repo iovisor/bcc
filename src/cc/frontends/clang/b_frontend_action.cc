@@ -509,7 +509,7 @@ bool ProbeVisitor::VisitArraySubscriptExpr(ArraySubscriptExpr *E) {
   SourceLocation lbracket_start, lbracket_end;
   SourceRange lbracket_range;
   pre = "({ typeof(" + E->getType().getAsString() + ") _val; __builtin_memset(&_val, 0, sizeof(_val));";
-  pre += " bpf_probe_read(&_val, sizeof(_val), (u64)(";
+  pre += " bpf_probe_read(&_val, sizeof(_val), (u64)((";
   if (isMemberDereference(base)) {
     pre += "&";
     // If the base of the array subscript is a member dereference, we'll rewrite
@@ -530,7 +530,7 @@ bool ProbeVisitor::VisitArraySubscriptExpr(ArraySubscriptExpr *E) {
   lbracket_range = expansionRange(SourceRange(lbracket_start, lbracket_end));
   rewriter_.ReplaceText(lbracket_range, lbracket);
 
-  rbracket = ")); _val; })";
+  rbracket = "))); _val; })";
   rewriter_.ReplaceText(expansionLoc(E->getRBracketLoc()), 1, rbracket);
 
   return true;
