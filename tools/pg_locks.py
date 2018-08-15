@@ -34,6 +34,15 @@ struct message {
     char text[100];
 };
 
+typedef enum LWLockMode
+{
+    LW_EXCLUSIVE,
+    LW_SHARED,
+    LW_WAIT_UNTIL_FREE	/* A special mode used in PGPROC->lwlockMode,
+                         * when waiting for lock to become free. Not
+                         * to be used as LWLockAcquire argument */
+} LWLockMode;
+
 BPF_PERF_OUTPUT(events);
 BPF_PERF_OUTPUT(messages);
 
@@ -41,10 +50,12 @@ BPF_HASH(lock_hold, u32, struct lwlock);
 BPF_HASH(lock_wait, u32, struct lwlock);
 
 // Histogram of lock hold times
-BPF_HISTOGRAM(lock_hold_hist, u64);
+BPF_HISTOGRAM(lock_hold_shared_hist, u64);
+BPF_HISTOGRAM(lock_hold_exclusive_hist, u64);
 
 // Histogram of lock hold times
-BPF_HISTOGRAM(lock_wait_hist, u64);
+BPF_HISTOGRAM(lock_wait_shared_hist, u64);
+BPF_HISTOGRAM(lock_wait_exclusive_hist, u64);
 
 void probe_lwlock_acquire_start(struct pt_regs *ctx, struct LWLock *lock, int mode)
 {
@@ -82,7 +93,17 @@ void probe_lwlock_acquire_finish(struct pt_regs *ctx, struct LWLock *lock, int m
     {
         u64 wait_time = now - wait_data->acquired;
         u64 lwlock_slot = bpf_log2l(wait_time / 1000);
-        lock_wait_hist.increment(lwlock_slot);
+        switch (mode)
+        {
+            case LW_EXCLUSIVE:
+                lock_wait_exclusive_hist.increment(lwlock_slot);
+                break;
+            case LW_SHARED:
+                lock_wait_shared_hist.increment(lwlock_slot);
+                break;
+            default:
+                break;
+        }
         lock_wait.delete(&pid);
     }
 
@@ -125,7 +146,17 @@ void probe_lwlock_release(struct pt_regs *ctx, struct LWLock *lock)
 
     events.perf_submit(ctx, data, sizeof(*data));
     u64 lwlock_slot = bpf_log2l(hold_time / 1000);
-    lock_hold_hist.increment(lwlock_slot);
+    switch (data->mode)
+    {
+        case LW_EXCLUSIVE:
+            lock_hold_exclusive_hist.increment(lwlock_slot);
+            break;
+        case LW_SHARED:
+            lock_hold_shared_hist.increment(lwlock_slot);
+            break;
+        default:
+            break;
+    }
     lock_hold.delete(&pid);
 }
 """
@@ -161,8 +192,10 @@ def print_event(cpu, data, size):
 def run(binary_path):
     bpf = BPF(text=text)
     attach(bpf, binary_path)
-    lock_hold_hist = bpf["lock_hold_hist"]
-    lock_wait_hist = bpf["lock_wait_hist"]
+    lock_hold_exclusive_hist = bpf["lock_hold_exclusive_hist"]
+    lock_hold_shared_hist = bpf["lock_hold_shared_hist"]
+    lock_wait_exclusive_hist = bpf["lock_wait_exclusive_hist"]
+    lock_wait_shared_hist = bpf["lock_wait_shared_hist"]
     exiting = False
 
     # bpf["events"].open_perf_buffer(print_event)
@@ -181,11 +214,21 @@ def run(binary_path):
             print("Detaching...")
             break
 
-    print("Lock holding time")
-    lock_hold_hist.print_log2_hist("hold time (us)")
+    print("Exclusive lock holding time")
+    lock_hold_exclusive_hist.print_log2_hist("hold time (us)")
+    print("")
 
-    print("Lock waiting time")
-    lock_wait_hist.print_log2_hist("wait time (us)")
+    print("Shared lock holding time")
+    lock_hold_shared_hist.print_log2_hist("hold time (us)")
+    print("")
+
+    print("Exclusive lock waiting time")
+    lock_wait_exclusive_hist.print_log2_hist("wait time (us)")
+    print("")
+
+    print("Shared lock waiting time")
+    lock_wait_shared_hist.print_log2_hist("wait time (us)")
+    print("")
 
 if __name__ == "__main__":
     run(sys.argv[1])
