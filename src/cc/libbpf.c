@@ -168,6 +168,11 @@ static struct bpf_helper helpers[] = {
   {"lwt_seg6_action", "4.18"},
   {"rc_repeat", "4.18"},
   {"rc_keydown", "4.18"},
+  {"skb_cgroup_id", "4.18"},
+  {"get_current_cgroup_id", "4.18"},
+  {"get_local_storage", "4.19"},
+  {"sk_select_reuseport", "4.19"},
+  {"skb_ancestor_cgroup_id", "4.19"},
 };
 
 static uint64_t ptr_to_u64(void *ptr)
