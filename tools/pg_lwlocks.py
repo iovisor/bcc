@@ -191,6 +191,7 @@ def print_event(cpu, data, size):
 
 
 def run(binary_path, debug=False):
+    print("Attaching...")
     bpf = BPF(text=text)
     attach(bpf, binary_path)
     lock_hold_exclusive_hist = bpf["lock_hold_exclusive_hist"]
@@ -203,6 +204,7 @@ def run(binary_path, debug=False):
         bpf["events"].open_perf_buffer(print_event)
         bpf["messages"].open_perf_buffer(print_messages)
 
+    print("Listening...")
     while True:
         try:
             sleep(1)
