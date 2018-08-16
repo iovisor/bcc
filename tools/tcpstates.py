@@ -68,8 +68,8 @@ BPF_HASH(last, struct sock *, u64);
 struct ipv4_data_t {
     u64 ts_us;
     u64 skaddr;
-    u64 saddr;
-    u64 daddr;
+    u32 saddr;
+    u32 daddr;
     u64 span_us;
     u32 pid;
     u32 ports;
@@ -129,8 +129,8 @@ TRACEPOINT_PROBE(sock, inet_sock_set_state)
             .oldstate = args->oldstate, .newstate = args->newstate};
         data4.skaddr = (u64)args->skaddr;
         data4.ts_us = bpf_ktime_get_ns() / 1000;
-        bpf_probe_read(&data4.saddr, sizeof(u32), args->saddr);
-        bpf_probe_read(&data4.daddr, sizeof(u32), args->daddr);
+        __builtin_memcpy(&data4.saddr, args->saddr, sizeof(data4.saddr));
+        __builtin_memcpy(&data4.daddr, args->daddr, sizeof(data4.daddr));
         // a workaround until data4 compiles with separate lport/dport
         data4.ports = dport + ((0ULL + lport) << 32);
         data4.pid = pid;
@@ -144,8 +144,8 @@ TRACEPOINT_PROBE(sock, inet_sock_set_state)
             .oldstate = args->oldstate, .newstate = args->newstate};
         data6.skaddr = (u64)args->skaddr;
         data6.ts_us = bpf_ktime_get_ns() / 1000;
-        bpf_probe_read(&data6.saddr, sizeof(data6.saddr), args->saddr_v6);
-        bpf_probe_read(&data6.daddr, sizeof(data6.daddr), args->saddr_v6);
+        __builtin_memcpy(&data6.saddr, args->saddr_v6, sizeof(data6.saddr));
+        __builtin_memcpy(&data6.daddr, args->daddr_v6, sizeof(data6.daddr));
         // a workaround until data6 compiles with separate lport/dport
         data6.ports = dport + ((0ULL + lport) << 32);
         data6.pid = pid;
@@ -191,8 +191,8 @@ class Data_ipv4(ct.Structure):
     _fields_ = [
         ("ts_us", ct.c_ulonglong),
         ("skaddr", ct.c_ulonglong),
-        ("saddr", ct.c_ulonglong),
-        ("daddr", ct.c_ulonglong),
+        ("saddr", ct.c_uint),
+        ("daddr", ct.c_uint),
         ("span_us", ct.c_ulonglong),
         ("pid", ct.c_uint),
         ("ports", ct.c_uint),

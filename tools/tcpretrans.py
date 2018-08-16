@@ -54,24 +54,24 @@ bpf_text = """
 // separate data structs for ipv4 and ipv6
 struct ipv4_data_t {
     // XXX: switch some to u32's when supported
-    u64 pid;
+    u32 pid;
     u64 ip;
-    u64 saddr;
-    u64 daddr;
-    u64 lport;
-    u64 dport;
+    u32 saddr;
+    u32 daddr;
+    u16 lport;
+    u16 dport;
     u64 state;
     u64 type;
 };
 BPF_PERF_OUTPUT(ipv4_events);
 
 struct ipv6_data_t {
-    u64 pid;
+    u32 pid;
     u64 ip;
     unsigned __int128 saddr;
     unsigned __int128 daddr;
-    u64 lport;
-    u64 dport;
+    u16 lport;
+    u16 dport;
     u64 state;
     u64 type;
 };
@@ -142,7 +142,10 @@ struct_init = { 'ipv4':
                flow_key.dport = ntohs(dport);""",
                'trace' :
                """
-               struct ipv4_data_t data4 = {.pid = pid, .ip = 4, .type = type};
+               struct ipv4_data_t data4 = {};
+               data4.pid = pid;
+               data4.ip = 4;
+               data4.type = type;
                data4.saddr = skp->__sk_common.skc_rcv_saddr;
                data4.daddr = skp->__sk_common.skc_daddr;
                // lport is host order
@@ -197,24 +200,24 @@ if debug or args.ebpf:
 # event data
 class Data_ipv4(ct.Structure):
     _fields_ = [
-        ("pid", ct.c_ulonglong),
+        ("pid", ct.c_uint),
         ("ip", ct.c_ulonglong),
-        ("saddr", ct.c_ulonglong),
-        ("daddr", ct.c_ulonglong),
-        ("lport", ct.c_ulonglong),
-        ("dport", ct.c_ulonglong),
+        ("saddr", ct.c_uint),
+        ("daddr", ct.c_uint),
+        ("lport", ct.c_ushort),
+        ("dport", ct.c_ushort),
         ("state", ct.c_ulonglong),
         ("type", ct.c_ulonglong)
     ]
 
 class Data_ipv6(ct.Structure):
     _fields_ = [
-        ("pid", ct.c_ulonglong),
+        ("pid", ct.c_uint),
         ("ip", ct.c_ulonglong),
         ("saddr", (ct.c_ulonglong * 2)),
         ("daddr", (ct.c_ulonglong * 2)),
-        ("lport", ct.c_ulonglong),
-        ("dport", ct.c_ulonglong),
+        ("lport", ct.c_ushort),
+        ("dport", ct.c_ushort),
         ("state", ct.c_ulonglong),
         ("type", ct.c_ulonglong)
     ]
