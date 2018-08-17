@@ -54,8 +54,8 @@ BPF_STACK_TRACE(stack_traces, 1024);
 struct ipv4_data_t {
     u32 pid;
     u64 ip;
-    u64 saddr;
-    u64 daddr;
+    u32 saddr;
+    u32 daddr;
     u16 sport;
     u16 dport;
     u8 state;
@@ -113,7 +113,9 @@ int trace_tcp_drop(struct pt_regs *ctx, struct sock *sk, struct sk_buff *skb)
     dport = ntohs(dport);
 
     if (family == AF_INET) {
-        struct ipv4_data_t data4 = {.pid = pid, .ip = 4};
+        struct ipv4_data_t data4 = {};
+        data4.pid = pid;
+        data4.ip = 4;
         data4.saddr = ip->saddr;
         data4.daddr = ip->daddr;
         data4.dport = dport;
@@ -150,10 +152,10 @@ if debug or args.ebpf:
 # event data
 class Data_ipv4(ct.Structure):
     _fields_ = [
-        ("pid", ct.c_ulong),
+        ("pid", ct.c_uint),
         ("ip", ct.c_ulonglong),
-        ("saddr", ct.c_ulonglong),
-        ("daddr", ct.c_ulonglong),
+        ("saddr", ct.c_uint),
+        ("daddr", ct.c_uint),
         ("sport", ct.c_ushort),
         ("dport", ct.c_ushort),
         ("state", ct.c_ubyte),
@@ -163,7 +165,7 @@ class Data_ipv4(ct.Structure):
 
 class Data_ipv6(ct.Structure):
     _fields_ = [
-        ("pid", ct.c_ulong),
+        ("pid", ct.c_uint),
         ("ip", ct.c_ulonglong),
         ("saddr", (ct.c_ulonglong * 2)),
         ("daddr", (ct.c_ulonglong * 2)),
