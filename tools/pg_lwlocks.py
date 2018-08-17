@@ -1,10 +1,19 @@
 #!/usr/bin/env python
+#
+# pg_lwlocks    Time LWLocks in PostgreSQL and print wait/hold time
+#               as a histogram. For Linux, uses BCC, eBPF.
+#
+# usage: pg_lwlocks [-p PID] [-x BIN_PATH] [-d]
 
-import sys
+from __future__ import print_function
 from time import sleep
 from bcc import BPF
-import signal
+
+import argparse
 import ctypes as ct
+import signal
+import sys
+
 
 text = """
 #include <linux/ptrace.h>
@@ -16,8 +25,8 @@ typedef struct pg_atomic_uint32
 
 typedef struct LWLock
 {
-       unsigned short tranche;         /* tranche ID */
-       pg_atomic_uint32 state;         /* state of exclusive/nonexclusive lockers */
+       unsigned short tranche;  /* tranche ID */
+       pg_atomic_uint32 state;  /* state of exclusive/nonexclusive lockers */
 } LWLock;
 
 struct lwlock {
@@ -54,7 +63,8 @@ BPF_HISTOGRAM(lock_hold_exclusive_hist, u64);
 BPF_HISTOGRAM(lock_wait_shared_hist, u64);
 BPF_HISTOGRAM(lock_wait_exclusive_hist, u64);
 
-void probe_lwlock_acquire_start(struct pt_regs *ctx, struct LWLock *lock, int mode)
+void probe_lwlock_acquire_start(struct pt_regs *ctx,
+                                struct LWLock *lock, int mode)
 {
     u64 now = bpf_ktime_get_ns();
     u32 pid = bpf_get_current_pid_tgid();
@@ -76,7 +86,8 @@ void probe_lwlock_acquire_start(struct pt_regs *ctx, struct LWLock *lock, int mo
     lock_wait.update(&pid, &data);
 }
 
-void probe_lwlock_acquire_finish(struct pt_regs *ctx, struct LWLock *lock, int mode)
+void probe_lwlock_acquire_finish(struct pt_regs *ctx,
+                                 struct LWLock *lock, int mode)
 {
     u64 now = bpf_ktime_get_ns();
     u32 pid = bpf_get_current_pid_tgid();
@@ -152,14 +163,34 @@ void probe_lwlock_release(struct pt_regs *ctx, struct LWLock *lock)
 """
 
 
-def attach(bpf, binary_path):
-    bpf.attach_uprobe(name=binary_path, sym="LWLockAcquire", fn_name="probe_lwlock_acquire_start")
-    bpf.attach_uretprobe(name=binary_path, sym="LWLockAcquire", fn_name="probe_lwlock_acquire_finish")
+def attach(bpf, binary_path, pid=-1):
+    bpf.attach_uprobe(
+        name=binary_path,
+        sym="LWLockAcquire",
+        fn_name="probe_lwlock_acquire_start",
+        pid=pid)
+    bpf.attach_uretprobe(
+        name=binary_path,
+        sym="LWLockAcquire",
+        fn_name="probe_lwlock_acquire_finish",
+        pid=pid)
 
-    bpf.attach_uprobe(name=binary_path, sym="LWLockAcquireOrWait", fn_name="probe_lwlock_acquire_start")
-    bpf.attach_uretprobe(name=binary_path, sym="LWLockAcquireOrWait", fn_name="probe_lwlock_acquire_finish")
+    bpf.attach_uprobe(
+        name=binary_path,
+        sym="LWLockAcquireOrWait",
+        fn_name="probe_lwlock_acquire_start",
+        pid=pid)
+    bpf.attach_uretprobe(
+        name=binary_path,
+        sym="LWLockAcquireOrWait",
+        fn_name="probe_lwlock_acquire_finish",
+        pid=pid)
 
-    bpf.attach_uprobe(name=binary_path, sym="LWLockRelease", fn_name="probe_lwlock_release")
+    bpf.attach_uprobe(
+        name=binary_path,
+        sym="LWLockRelease",
+        fn_name="probe_lwlock_release",
+        pid=pid)
 
 
 # signal handler
@@ -189,17 +220,17 @@ def print_event(cpu, data, size):
         event.acquired, event.released, event.pid))
 
 
-def run(binary_path, debug=False):
+def run(args):
     print("Attaching...")
     bpf = BPF(text=text)
-    attach(bpf, binary_path)
+    attach(bpf, args.path, args.pid)
     lock_hold_exclusive_hist = bpf["lock_hold_exclusive_hist"]
     lock_hold_shared_hist = bpf["lock_hold_shared_hist"]
     lock_wait_exclusive_hist = bpf["lock_wait_exclusive_hist"]
     lock_wait_shared_hist = bpf["lock_wait_shared_hist"]
     exiting = False
 
-    if debug:
+    if args.debug:
         bpf["events"].open_perf_buffer(print_event)
         bpf["messages"].open_perf_buffer(print_messages)
 
@@ -207,7 +238,7 @@ def run(binary_path, debug=False):
     while True:
         try:
             sleep(1)
-            if debug:
+            if args.debug:
                 bpf.perf_buffer_poll()
         except KeyboardInterrupt:
             exiting = True
@@ -235,5 +266,18 @@ def run(binary_path, debug=False):
     print("")
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Time LWLocks in PostgreSQL",
+        formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("path", type=str, help="path to target binary")
+    parser.add_argument("-p", "--pid", type=int, default=-1,
+            help="trace this PID only")
+    parser.add_argument("-d", "--debug", action='store_true', default=False,
+            help="debug mode")
+
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
-    run(sys.argv[1])
+    run(parse_args())
