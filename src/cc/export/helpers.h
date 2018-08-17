@@ -399,6 +399,16 @@ static int (*bpf_rc_keydown)(void *ctx, u32 protocol, u64 scancode, u32 toggle) 
   (void *) BPF_FUNC_rc_keydown;
 static int (*bpf_rc_repeat)(void *ctx) =
   (void *) BPF_FUNC_rc_repeat;
+static u64 (*bpf_skb_cgroup_id)(void *skb) =
+  (void *) BPF_FUNC_skb_cgroup_id;
+static u64 (*bpf_get_current_cgroup_id)(void) =
+  (void *) BPF_FUNC_get_current_cgroup_id;
+static u64 (*bpf_skb_ancestor_cgroup_id)(void *skb, int ancestor_level) =
+  (void *) BPF_FUNC_skb_ancestor_cgroup_id;
+static void * (*bpf_get_local_storage)(void *map, u64 flags) =
+  (void *) BPF_FUNC_get_local_storage;
+static int (*bpf_sk_select_reuseport)(void *reuse, void *map, void *key, u64 flags) =
+  (void *) BPF_FUNC_sk_select_reuseport;
 
 /* llvm builtin functions that eBPF C program may use to
  * emit BPF_LD_ABS and BPF_LD_IND instructions
