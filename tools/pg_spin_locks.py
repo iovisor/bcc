@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 import sys
-import itertools
 from time import sleep
 from bcc import BPF
 import signal

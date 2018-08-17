@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 import sys
-import itertools
 from time import sleep
 from bcc import BPF
 import signal
@@ -26,10 +25,10 @@ BPF_PERF_OUTPUT(messages);
 BPF_HASH(lock_hold, u32, struct pg_semaphore);
 BPF_HASH(lock_wait, u32, struct pg_semaphore);
 
-// Histogram of lock hold times
+// Histogram of semaphore hold times
 BPF_HISTOGRAM(lock_hold_semaphore_hist, u64);
 
-// Histogram of lock wait times
+// Histogram of semaphore wait times
 BPF_HISTOGRAM(lock_wait_semaphore_hist, u64);
 
 void probe_semaphore_lock_start(struct pt_regs *ctx)
@@ -46,7 +45,7 @@ void probe_semaphore_lock_start(struct pt_regs *ctx)
     if (test != 0)
     {
         struct message msg = {};
-        strcpy(msg.text, "Lock is overwritten");
+        strcpy(msg.text, "Semaphore is overwritten");
         messages.perf_submit(ctx, &msg, sizeof(msg));
     }
 
@@ -77,7 +76,7 @@ void probe_semaphore_lock_finish(struct pt_regs *ctx)
     if (test != 0)
     {
         struct message msg = {};
-        strcpy(msg.text, "Lock is overwritten");
+        strcpy(msg.text, "Semaphore is overwritten");
         messages.perf_submit(ctx, &msg, sizeof(msg));
     }
 
@@ -92,7 +91,7 @@ void probe_semaphore_unlock(struct pt_regs *ctx)
     if (data == 0)
     {
         struct message msg = {};
-        strcpy(msg.text, "Lock is missing");
+        strcpy(msg.text, "Semaphore is missing");
         messages.perf_submit(ctx, &msg, sizeof(msg));
         return;
     }
