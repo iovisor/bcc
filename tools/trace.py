@@ -393,6 +393,13 @@ BPF_PERF_OUTPUT(%s);
                 bpf_probe_read(&__data.v%d, sizeof(__data.v%d), (void *)%s);
         }
                 """ % (expr, idx, idx, expr)
+                if expr.startswith('*'):
+                    ptr_expr = expr[1:]
+                    return text + """
+        if (%s != 0) {
+            bpf_probe_read(&__data.v%d, sizeof(__data.v%d), (void *)%s);
+        }
+            """ % (ptr_expr, idx, idx, ptr_expr)
                 if field_type in Probe.fmt_types:
                         return text + "        __data.v%d = (%s)%s;\n" % \
                                         (idx, Probe.c_type[field_type], expr)
