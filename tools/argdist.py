@@ -559,7 +559,7 @@ argdist -p 1005 -H 'r:c:read()'
 argdist -C 'r::__vfs_read():u32:$PID:$latency > 100000'
         Print frequency of reads by process where the latency was >0.1ms
 
-argdist -H 'r::__vfs_read(void *file, void *buf, size_t count):size_t
+argdist -H 'r::__vfs_read(void *file, void *buf, size_t count):size_t:
             $entry(count):$latency > 1000000'
         Print a histogram of read sizes that were longer than 1ms
 
