@@ -3,7 +3,7 @@
 # pg_lwlocks    Time LWLocks in PostgreSQL and print wait/hold time
 #               as a histogram. For Linux, uses BCC, eBPF.
 #
-# usage: pg_lwlocks [-p PID] [-x BIN_PATH] [-d]
+# usage: pg_lwlocks BIN_PATH [-p PID] [-d]
 
 from __future__ import print_function
 from time import sleep

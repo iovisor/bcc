@@ -1,10 +1,20 @@
 #!/usr/bin/env python
+#
+# pg_sema    Time semaphore actions in PostgreSQL and print
+#            wait/hold time as a histogram. For Linux, uses BCC, eBPF.
+#
+# usage: pg_sema BIN_PATH [-p PID] [-d]
 
-import sys
+
+from __future__ import print_function
 from time import sleep
 from bcc import BPF
-import signal
+
+import argparse
 import ctypes as ct
+import signal
+import sys
+
 
 text = """
 #include <linux/ptrace.h>
@@ -107,11 +117,23 @@ void probe_semaphore_unlock(struct pt_regs *ctx)
 """
 
 
-def attach(bpf, binary_path):
-    bpf.attach_uprobe(name=binary_path, sym="PGSemaphoreLock", fn_name="probe_semaphore_lock_start")
-    bpf.attach_uretprobe(name=binary_path, sym="PGSemaphoreLock", fn_name="probe_semaphore_lock_finish")
+def attach(bpf, binary_path, pid=-1):
+    bpf.attach_uprobe(
+        name=binary_path,
+        sym="PGSemaphoreLock",
+        fn_name="probe_semaphore_lock_start",
+        pid=pid)
+    bpf.attach_uretprobe(
+        name=binary_path,
+        sym="PGSemaphoreLock",
+        fn_name="probe_semaphore_lock_finish",
+        pid=pid)
 
-    bpf.attach_uprobe(name=binary_path, sym="PGSemaphoreUnlock", fn_name="probe_semaphore_unlock")
+    bpf.attach_uprobe(
+        name=binary_path,
+        sym="PGSemaphoreUnlock",
+        fn_name="probe_semaphore_unlock",
+        pid=pid)
 
 
 # signal handler
@@ -141,15 +163,15 @@ def print_event(cpu, data, size):
         event.acquired, event.released, event.pid))
 
 
-def run(binary_path, debug=False):
+def run(args):
     print("Attaching...")
     bpf = BPF(text=text)
-    attach(bpf, binary_path)
+    attach(bpf, args.path, args.pid)
     lock_hold_semaphore_hist = bpf["lock_hold_semaphore_hist"]
     lock_wait_semaphore_hist = bpf["lock_wait_semaphore_hist"]
     exiting = False
 
-    if debug:
+    if args.debug:
         bpf["events"].open_perf_buffer(print_event)
         bpf["messages"].open_perf_buffer(print_messages)
 
@@ -157,7 +179,7 @@ def run(binary_path, debug=False):
     while True:
         try:
             sleep(1)
-            if debug:
+            if args.debug:
                 bpf.perf_buffer_poll()
         except KeyboardInterrupt:
             exiting = True
@@ -177,5 +199,18 @@ def run(binary_path, debug=False):
     print("")
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Time LWLocks in PostgreSQL",
+        formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("path", type=str, help="path to target binary")
+    parser.add_argument("-p", "--pid", type=int, default=-1,
+            help="trace this PID only")
+    parser.add_argument("-d", "--debug", action='store_true', default=False,
+            help="debug mode")
+
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
-    run(sys.argv[1])
+    run(parse_args())
