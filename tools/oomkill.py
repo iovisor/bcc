@@ -38,7 +38,6 @@ BPF_PERF_OUTPUT(events);
 
 void kprobe__oom_kill_process(struct pt_regs *ctx, struct oom_control *oc, const char *message)
 {
-    struct task_struct *chosen;
     unsigned long totalpages;
     struct task_struct *p = oc->chosen;
     struct data_t data = {};
