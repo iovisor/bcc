@@ -25,7 +25,6 @@ loadavg = "/proc/loadavg"
 bpf_text = """
 #include <uapi/linux/ptrace.h>
 #include <linux/oom.h>
-
 struct data_t {
     u64 fpid;
     u64 tpid;
@@ -33,9 +32,7 @@ struct data_t {
     char fcomm[TASK_COMM_LEN];
     char tcomm[TASK_COMM_LEN];
 };
-
 BPF_PERF_OUTPUT(events);
-
 void kprobe__oom_kill_process(struct pt_regs *ctx, struct oom_control *oc,
     struct task_struct *p, unsigned int points, unsigned long totalpages)
 {
