@@ -25,7 +25,6 @@ loadavg = "/proc/loadavg"
 bpf_text = """
 #include <uapi/linux/ptrace.h>
 #include <linux/oom.h>
-
 struct data_t {
     u64 fpid;
     u64 tpid;
@@ -33,18 +32,15 @@ struct data_t {
     char fcomm[TASK_COMM_LEN];
     char tcomm[TASK_COMM_LEN];
 };
-
 BPF_PERF_OUTPUT(events);
-
-void kprobe__oom_kill_process(struct pt_regs *ctx, struct oom_control *oc, const char *message)
+void kprobe__oom_kill_process(struct pt_regs *ctx, struct oom_control *oc,
+    struct task_struct *p, unsigned int points, unsigned long totalpages)
 {
-    unsigned long totalpages;
-    struct task_struct *p = oc->chosen;
     struct data_t data = {};
     u32 pid = bpf_get_current_pid_tgid();
     data.fpid = pid;
     data.tpid = p->pid;
-    data.pages = oc->totalpages;
+    data.pages = totalpages;
     bpf_get_current_comm(&data.fcomm, sizeof(data.fcomm));
     bpf_probe_read(&data.tcomm, sizeof(data.tcomm), p->comm);
     events.perf_submit(ctx, &data, sizeof(data));
