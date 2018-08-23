@@ -1,0 +1,43 @@
+FROM centos:7
+
+RUN yum install -y epel-release
+RUN rpm --import https://www.elrepo.org/RPM-GPG-KEY-elrepo.org
+RUN rpm -Uvh http://www.elrepo.org/elrepo-release-7.0-3.el7.elrepo.noarch.rpm
+
+RUN rm -f /etc/yum.repos.d/CentOS-Media.repo
+
+RUN yum update -y --enablerepo="*"
+RUN yum groupinstall -y "Development tools" --enablerepo="*"
+RUN yum install --enablerepo="*" -y elfutils-libelf-devel \
+                   iperf \
+                   cmake3 \
+                   git \
+                   kernel-ml-devel \
+                   kernel-ml-headers \
+                   rpm-build \
+                   rpmdevtools \
+                   wget \
+                   elfutils-libelf-devel-static \
+                   libxml2-devel \
+                   python2-devel \
+                   luajit \
+                   luajit-devel \
+                   ncurses-devel
+
+WORKDIR /root
+
+RUN update-alternatives --install /usr/bin/cmake cmake /usr/bin/cmake3 1 && \
+    update-alternatives --install /usr/bin/ctest ctest /usr/bin/ctest3 1 && \
+    update-alternatives --install /usr/bin/ccmake ccmake /usr/bin/ccmake3 1 && \
+    update-alternatives --install /usr/bin/cpack cpack /usr/bin/cpack3 1
+
+RUN wget http://llvm.org/releases/3.7.1/{cfe,llvm}-3.7.1.src.tar.xz
+
+RUN tar -xf llvm-3.7.1.src.tar.xz && mkdir llvm-3.7.1.src/tools/clang && tar -xf cfe-3.7.1.src.tar.xz -C llvm-3.7.1.src/tools/clang --strip 1 && mkdir llvm-3.7.1.src/build
+RUN cd llvm-3.7.1.src/build && cmake .. -DCMAKE_BUILD_TYPE=Release -DLLVM_TARGETS_TO_BUILD="X86;BPF" -DCMAKE_INSTALL_PREFIX=/usr
+RUN cd llvm-3.7.1.src/build && make -j$(nproc) && make install
+
+COPY . /bcc
+WORKDIR /bcc
+
+RUN CC=clang CXX=clang++ ./scripts/build-rpm-centos.sh

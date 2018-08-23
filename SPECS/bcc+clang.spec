@@ -25,7 +25,7 @@ userspace.
 %setup -T -b 1 -n llvm-%{llvmver}.src
 mkdir tools/clang
 tar -xvvJf %{_sourcedir}/cfe-%{llvmver}.src.tar.xz -C tools/clang --strip 1
-%setup -D -n bcc
+%setup -D -n bcc-%{version}
 
 %build
 

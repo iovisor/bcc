@@ -1,4 +1,5 @@
 %bcond_with local_clang_static
+%bcond_with cmake3
 #lua jit not available for some architectures
 %ifarch ppc64 aarch64 ppc64le
 %{!?with_lua: %global with_lua 0}
@@ -43,7 +44,7 @@ URL:            https://github.com/iovisor/bcc
 Source0:        bcc.tar.gz
 
 ExclusiveArch: x86_64 ppc64 aarch64 ppc64le
-BuildRequires: bison cmake >= 2.8.7 flex make
+BuildRequires: bison flex make
 BuildRequires: gcc gcc-c++ python2-devel elfutils-libelf-devel-static
 %if %{with python3}
 BuildRequires: python3-devel
@@ -57,6 +58,11 @@ BuildRequires: clang-devel
 %if %{without llvm_shared}
 BuildRequires: llvm-static
 %endif
+%endif
+%if %{with cmake3}
+BuildRequires: cmake3
+%else
+BuildRequires: cmake >= 2.8.7
 %endif
 BuildRequires: pkgconfig ncurses-devel
 
