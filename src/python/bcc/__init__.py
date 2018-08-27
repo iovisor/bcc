@@ -568,10 +568,10 @@ class BPF(object):
     def fix_syscall_fnname(self, name):
         name = _assert_is_bytes(name)
         for prefix in self._syscall_prefixes:
-            if name.startswith(prefix):
+            if name.startswith(prefix.encode()):
                 return self.get_syscall_fnname(name[len(prefix):])
         return name
-       
+
     def attach_kprobe(self, event=b"", event_off=0, fn_name=b"", event_re=b""):
         event = _assert_is_bytes(event)
         fn_name = _assert_is_bytes(fn_name)
