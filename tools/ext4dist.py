@@ -110,14 +110,20 @@ static int trace_return(struct pt_regs *ctx, const char *op)
     if (tsp == 0) {
         return 0;   // missed start or filtered
     }
-    u64 delta = (bpf_ktime_get_ns() - *tsp) / FACTOR;
+    u64 delta = bpf_ktime_get_ns() - *tsp;
+    start.delete(&pid);
+
+    // Skip entries with backwards time: temp workaround for #728
+    if ((s64) delta < 0)
+        return 0;
+
+    delta /= FACTOR;
 
     // store as histogram
     dist_key_t key = {.slot = bpf_log2l(delta)};
     __builtin_memcpy(&key.op, op, sizeof(key.op));
     dist.increment(key);
 
-    start.delete(&pid);
     return 0;
 }
 
