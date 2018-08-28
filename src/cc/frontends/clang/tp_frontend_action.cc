@@ -114,7 +114,7 @@ static inline field_kind_t _get_field_kind(string const& line,
     if (field_type == "char" || field_type == "short" ||
         field_type == "int8_t" || field_type == "int16_t")
       field_type = "s32";
-    if (field_type == "unsigned char" || field_type == "unsiggned short" ||
+    if (field_type == "unsigned char" || field_type == "unsigned short" ||
         field_type == "uint8_t" || field_type == "uint16_t")
       field_type = "u32";
   } else if (size == 8) {
@@ -122,7 +122,7 @@ static inline field_kind_t _get_field_kind(string const& line,
         field_type == "int8_t" || field_type == "int16_t" ||
         field_type == "int32_t")
       field_type = "s64";
-    if (field_type == "unsigned char" || field_type == "unsiggned short" ||
+    if (field_type == "unsigned char" || field_type == "unsigned short" ||
         field_type == "unsigned int" || field_type == "uint8_t" ||
         field_type == "uint16_t" || field_type == "uint32_t")
       field_type = "u64";
