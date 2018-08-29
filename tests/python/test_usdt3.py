@@ -131,8 +131,14 @@ int do_trace(struct pt_regs *ctx) {
                 self.probe_value_other = 1
 
         b["event"].open_perf_buffer(print_event)
-        for i in range(10):
-            b.perf_buffer_poll()
+        for i in range(100):
+            if (self.probe_value_1 == 0 or
+                self.probe_value_2 == 0 or
+                self.probe_value_3 == 0 or
+                self.probe_value_other != 0):
+                b.perf_buffer_poll()
+            else:
+                break;
 
         self.assertTrue(self.probe_value_1 != 0)
         self.assertTrue(self.probe_value_2 != 0)
