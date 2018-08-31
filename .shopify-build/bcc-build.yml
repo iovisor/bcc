@@ -1,12 +1,18 @@
 containers:
+<<<<<<< HEAD
   eoan:
     docker: ubuntu:19.10
+=======
+  stretch:
+    docker: debian:stretch-backports
+>>>>>>> Setup shopify build
   packagecloud:
     docker: gcr.io/shopify-docker-images/ci-branches/ci/packagecloud:97c5a43ff3b5dc0658d8618afcbc91a694365477
 
 steps:
 - label: Build debs
   timeout: 60m
+<<<<<<< HEAD
   container: eoan
   git:
     history: true
@@ -18,6 +24,20 @@ steps:
   - ./scripts/build-deb.sh
   - mkdir -p /artifacts
   - cp /app/*.deb /artifacts/
+=======
+  container: stretch
+  run:
+  - sed -i 's/main/main non-free/g' /etc/apt/sources.list
+  - rm -rf /var/lib/apt/lists/*
+  - apt-get update
+  - apt-get install -y git
+  - git clone ${BUILDKITE_REPO} /bcc-build && cd /bcc-build && git reset --hard "${REVISION}" && git fetch --tags
+  - apt-get install -y clang-6.0 libclang-6.0-dev clang-format-6.0 cmake libelf-dev bison flex libfl-dev libedit-dev zlib1g-dev python-netaddr python-pyroute2 luajit libluajit-5.1-dev arping netperf iperf ethtool
+  - apt-get install -y pbuilder build-essential
+  - cd /bcc-build && ./scripts/build-deb.sh
+  - mkdir -p /artifacts
+  - cp /bcc-build/*.deb /artifacts/
+>>>>>>> Setup shopify build
   artifact_paths:
   - /artifacts
 
@@ -28,7 +48,11 @@ steps:
   container: packagecloud
   run:
   - ls -l debs
+<<<<<<< HEAD
   - FLAVOUR=ubuntu publish_debs debs eoan shopify/public
+=======
+  - FLAVOUR=debian publish_debs debs stretch shopify/public
+>>>>>>> Setup shopify build
   import_artifacts:
   - pattern: '*.deb'
     into: debs

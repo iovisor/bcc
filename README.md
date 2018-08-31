@@ -1,3 +1,5 @@
+[![Build status](https://badge.buildkite.com/27adaad0bd5ac6fd8d8b9cff2eeff287da68b5cbd7c7a1bd9c.svg)](https://buildkite.com/shopify/bcc-build)
+
 ![BCC Logo](images/logo2.png)
 # BPF Compiler Collection (BCC)
 
