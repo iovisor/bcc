@@ -42,7 +42,7 @@ examples = """examples:
     ./wakeuptime 5           # trace for 5 seconds only
     ./wakeuptime -f 5        # 5 seconds, and output in folded format
     ./wakeuptime -u          # don't include kernel threads (user only)
-    ./wakeuptime -p 185      # trace fo PID 185 only
+    ./wakeuptime -p 185      # trace for PID 185 only
 """
 parser = argparse.ArgumentParser(
     description="Summarize sleep to wakeup time by waker kernel stack",
