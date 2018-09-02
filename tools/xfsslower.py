@@ -173,8 +173,15 @@ static int trace_return(struct pt_regs *ctx, int type)
 
     // calculate delta
     u64 ts = bpf_ktime_get_ns();
-    u64 delta_us = (ts - valp->ts) / 1000;
+    u64 delta_us = ts - valp->ts;
     entryinfo.delete(&id);
+
+    // Skip entries with backwards time: temp workaround for #728
+    if ((s64) delta_us < 0)
+        return 0;
+
+    delta_us /= 1000;
+
     if (FILTER_US)
         return 0;
 
