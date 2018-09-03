@@ -1,0 +1,37 @@
+<<<<<<< HEAD
+=======
+containers:
+  xenial:
+    docker: ubuntu:16.04
+  packagecloud:
+    docker: gcr.io/shopify-docker-images/ci-branches/ci/packagecloud:97c5a43ff3b5dc0658d8618afcbc91a694365477
+
+steps:
+- label: Build debs
+  timeout: 60m
+  container: xenial
+  git:
+    history: true
+  run:
+  - apt-get -qq update
+  - apt-get -y install pbuilder aptitude
+  - cd /app && /usr/lib/pbuilder/pbuilder-satisfydepends
+  - cd /app && ./scripts/build-deb.sh
+  - mkdir -p /artifacts
+  - cp /app/*.deb /artifacts/
+  artifact_paths:
+  - /artifacts
+
+- wait
+
+- label: Publish to Packagecloud
+  timeout: 5m
+  container: packagecloud
+  run:
+  - ls -l debs
+  - FLAVOUR=ubuntu publish_debs debs xenial shopify/public
+  import_artifacts:
+  - pattern: '*.deb'
+    into: debs
+  branches: master
+>>>>>>> Add git history
