@@ -15,8 +15,9 @@ steps:
   run:
   - apt-get -qq update
   - apt-get -y install pbuilder aptitude
-  - cd /app && /usr/lib/pbuilder/pbuilder-satisfydepends
-  - cd /app && ./scripts/build-deb.sh
+  - git fetch --tags --all
+  - /usr/lib/pbuilder/pbuilder-satisfydepends
+  - ./scripts/build-deb.sh
   - mkdir -p /artifacts
   - cp /app/*.deb /artifacts/
   artifact_paths:
