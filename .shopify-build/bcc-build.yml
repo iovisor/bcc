@@ -14,7 +14,7 @@ steps:
     history: true
   run:
   - apt-get -qq update
-  - apt-get -y install pbuilder aptitude git
+  - apt-get -y install pbuilder aptitude git python python3 python-dev python3-dev
   - git fetch --tags --all
   - /usr/lib/pbuilder/pbuilder-satisfydepends
   - ./scripts/build-deb.sh
