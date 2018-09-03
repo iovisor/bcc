@@ -14,7 +14,7 @@ steps:
     history: true
   run:
   - apt-get -qq update
-  - apt-get -y install pbuilder aptitude
+  - apt-get -y install pbuilder aptitude git
   - git fetch --tags --all
   - /usr/lib/pbuilder/pbuilder-satisfydepends
   - ./scripts/build-deb.sh
