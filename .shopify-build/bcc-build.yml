@@ -1,17 +1,23 @@
 containers:
 <<<<<<< HEAD
+<<<<<<< HEAD
   eoan:
     docker: ubuntu:19.10
 =======
   stretch:
     docker: debian:stretch-backports
 >>>>>>> Setup shopify build
+=======
+  xenial:
+    docker: ubuntu:16.04
+>>>>>>> Switch build to xenial to fix python issues
   packagecloud:
     docker: gcr.io/shopify-docker-images/ci-branches/ci/packagecloud:97c5a43ff3b5dc0658d8618afcbc91a694365477
 
 steps:
 - label: Build debs
   timeout: 60m
+<<<<<<< HEAD
 <<<<<<< HEAD
   container: eoan
   git:
@@ -26,6 +32,9 @@ steps:
   - cp /app/*.deb /artifacts/
 =======
   container: stretch
+=======
+  container: xenial
+>>>>>>> Switch build to xenial to fix python issues
   run:
   - sed -i 's/main/main non-free/g' /etc/apt/sources.list
   - rm -rf /var/lib/apt/lists/*
@@ -49,10 +58,14 @@ steps:
   run:
   - ls -l debs
 <<<<<<< HEAD
+<<<<<<< HEAD
   - FLAVOUR=ubuntu publish_debs debs eoan shopify/public
 =======
   - FLAVOUR=debian publish_debs debs stretch shopify/public
 >>>>>>> Setup shopify build
+=======
+  - FLAVOUR=ubuntu publish_debs debs xenial shopify/public
+>>>>>>> Switch build to xenial to fix python issues
   import_artifacts:
   - pattern: '*.deb'
     into: debs
