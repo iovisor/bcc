@@ -180,6 +180,15 @@ apps:
     opensnoop:
         command: wrapper opensnoop
         aliases: [opensnoop]
+    perlcalls:
+        command: wrapper perlcalls
+        aliases: [perlcalls]
+    perlflow:
+        command: wrapper perlflow
+        aliases: [perlflow]
+    perlstat:
+        command: wrapper perlstat
+        aliases: [perlstat]
     phpcalls:
         command: wrapper phpcalls
         aliases: [phpcalls]
