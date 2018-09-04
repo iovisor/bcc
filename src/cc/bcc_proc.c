@@ -406,9 +406,9 @@ void bcc_procutils_free(const char *ptr) {
 }
 
 /* Detects the following languages + C. */
-const char *languages[] = {"java", "python", "ruby", "php", "node"};
+const char *languages[] = {"java", "node", "perl", "php", "python", "ruby"};
 const char *language_c = "c";
-const int nb_languages = 5;
+const int nb_languages = 6;
 
 const char *bcc_procutils_language(int pid) {
   char procfilename[24], line[4096], pathname[32], *str;

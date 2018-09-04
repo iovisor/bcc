@@ -4,7 +4,7 @@
 # uflow  Trace method execution flow in high-level languages.
 #        For Linux, uses BCC, eBPF.
 #
-# USAGE: uflow [-C CLASS] [-M METHOD] [-v] {java,python,ruby,php} pid
+# USAGE: uflow [-C CLASS] [-M METHOD] [-v] {java,perl,php,python,ruby} pid
 #
 # Copyright 2016 Sasha Goldshtein
 # Licensed under the Apache License, Version 2.0 (the "License")
@@ -18,7 +18,7 @@ import ctypes as ct
 import time
 import os
 
-languages = ["java", "python", "ruby", "php"]
+languages = ["java", "perl", "php", "python", "ruby"]
 
 examples = """examples:
     ./uflow -l java 185                # trace Java method calls in process 185
@@ -127,6 +127,20 @@ if language == "java":
     enable_probe("method__return", "java_return",
                  "bpf_usdt_readarg(2, ctx, &clazz);",
                  "bpf_usdt_readarg(4, ctx, &method);", is_return=True)
+elif language == "perl":
+    enable_probe("sub__entry", "perl_entry",
+                 "bpf_usdt_readarg(2, ctx, &clazz);",
+                 "bpf_usdt_readarg(1, ctx, &method);", is_return=False)
+    enable_probe("sub__return", "perl_return",
+                 "bpf_usdt_readarg(2, ctx, &clazz);",
+                 "bpf_usdt_readarg(1, ctx, &method);", is_return=True)
+elif language == "php":
+    enable_probe("function__entry", "php_entry",
+                 "bpf_usdt_readarg(4, ctx, &clazz);",
+                 "bpf_usdt_readarg(1, ctx, &method);", is_return=False)
+    enable_probe("function__return", "php_return",
+                 "bpf_usdt_readarg(4, ctx, &clazz);",
+                 "bpf_usdt_readarg(1, ctx, &method);", is_return=True)
 elif language == "python":
     enable_probe("function__entry", "python_entry",
                  "bpf_usdt_readarg(1, ctx, &clazz);",   # filename really
@@ -147,13 +161,6 @@ elif language == "ruby":
     enable_probe("cmethod__return", "ruby_creturn",
                  "bpf_usdt_readarg(1, ctx, &clazz);",
                  "bpf_usdt_readarg(2, ctx, &method);", is_return=True)
-elif language == "php":
-    enable_probe("function__entry", "php_entry",
-                 "bpf_usdt_readarg(4, ctx, &clazz);",
-                 "bpf_usdt_readarg(1, ctx, &method);", is_return=False)
-    enable_probe("function__return", "php_return",
-                 "bpf_usdt_readarg(4, ctx, &clazz);",
-                 "bpf_usdt_readarg(1, ctx, &method);", is_return=True)
 else:
     print("No language detected; use -l to trace a language.")
     exit(1)

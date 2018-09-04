@@ -4,7 +4,7 @@
 # ucalls  Summarize method calls in high-level languages and/or system calls.
 #         For Linux, uses BCC, eBPF.
 #
-# USAGE: ucalls [-l {java,python,ruby,php}] [-h] [-T TOP] [-L] [-S] [-v] [-m]
+# USAGE: ucalls [-l {java,perl,php,python,ruby}] [-h] [-T TOP] [-L] [-S] [-v] [-m]
 #        pid [interval]
 #
 # Copyright 2016 Sasha Goldshtein
@@ -18,7 +18,7 @@ from bcc import BPF, USDT, utils
 from time import sleep
 import os
 
-languages = ["java", "python", "ruby", "php"]
+languages = ["java", "perl", "php", "python", "ruby"]
 
 examples = """examples:
     ./ucalls -l java 185        # trace Java calls and print statistics on ^C
@@ -69,6 +69,18 @@ if language == "java":
     read_method = "bpf_usdt_readarg(4, ctx, &method);"
     extra_message = ("If you do not see any results, make sure you ran java"
                      " with option -XX:+ExtendedDTraceProbes")
+elif language == "perl":
+    entry_probe = "sub__entry"
+    return_probe = "sub__return"
+    read_class = "bpf_usdt_readarg(2, ctx, &clazz);"    # filename really
+    read_method = "bpf_usdt_readarg(1, ctx, &method);"
+elif language == "php":
+    entry_probe = "function__entry"
+    return_probe = "function__return"
+    read_class = "bpf_usdt_readarg(4, ctx, &clazz);"
+    read_method = "bpf_usdt_readarg(1, ctx, &method);"
+    extra_message = ("If you do not see any results, make sure the environment"
+                     " variable USE_ZEND_DTRACE is set to 1")
 elif language == "python":
     entry_probe = "function__entry"
     return_probe = "function__return"
@@ -80,13 +92,6 @@ elif language == "ruby":
     return_probe = "method__return"
     read_class = "bpf_usdt_readarg(1, ctx, &clazz);"
     read_method = "bpf_usdt_readarg(2, ctx, &method);"
-elif language == "php":
-    entry_probe = "function__entry"
-    return_probe = "function__return"
-    read_class = "bpf_usdt_readarg(4, ctx, &clazz);"
-    read_method = "bpf_usdt_readarg(1, ctx, &method);"
-    extra_message = ("If you do not see any results, make sure the environment"
-                     " variable USE_ZEND_DTRACE is set to 1")
 elif not language or language == "none":
     if not args.syscalls:
         print("Nothing to do; use -S to trace syscalls.")

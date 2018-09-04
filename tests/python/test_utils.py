@@ -15,7 +15,7 @@ class TestUtils(unittest.TestCase):
         self.assertEqual(len(online_cpus), num_cores)
 
     def test_detect_language(self):
-        candidates = ["java", "ruby", "php", "node", "c", "python"]
+        candidates = ["c", "java", "perl", "php", "node", "ruby", "python"]
         language = detect_language(candidates, os.getpid())
         self.assertEqual(language, "python")
 
