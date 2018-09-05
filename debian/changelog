@@ -1,3 +1,9 @@
+bcc (0.7.0-1) unstable; urgency=low
+
+  * Support for kernel up to 4.18
+
+ -- Brenden Blanco <bblanco@gmail.com>  Tue, 04 Sep 2018 17:00:00 +0000
+
 bcc (0.6.1-1) unstable; urgency=low
 
   * Build support for Fedora 28 and Ubuntu 18.04
