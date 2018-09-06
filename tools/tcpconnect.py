@@ -57,7 +57,6 @@ BPF_HASH(currsock, u32, struct sock *);
 
 // separate data structs for ipv4 and ipv6
 struct ipv4_data_t {
-    // XXX: switch some to u32's when supported
     u64 ts_us;
     u32 pid;
     u32 saddr;

@@ -87,11 +87,8 @@ BPF_HASH(ipv4_recv_bytes, struct ipv4_key_t);
 
 struct ipv6_key_t {
     u32 pid;
-    // workaround until unsigned __int128 support:
-    u64 saddr0;
-    u64 saddr1;
-    u64 daddr0;
-    u64 daddr1;
+    unsigned __int128 saddr;
+    unsigned __int128 daddr;
     u16 lport;
     u16 dport;
 };
@@ -116,16 +113,14 @@ int kprobe__tcp_sendmsg(struct pt_regs *ctx, struct sock *sk,
 
     } else if (family == AF_INET6) {
         struct ipv6_key_t ipv6_key = {.pid = pid};
-
-        ipv6_key.saddr0 = *(u64 *)&sk->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32[0];
-        ipv6_key.saddr1 = *(u64 *)&sk->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32[2];
-        ipv6_key.daddr0 = *(u64 *)&sk->__sk_common.skc_v6_daddr.in6_u.u6_addr32[0];
-        ipv6_key.daddr1 = *(u64 *)&sk->__sk_common.skc_v6_daddr.in6_u.u6_addr32[2];
+        __builtin_memcpy(&ipv6_key.saddr,
+            sk->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32, sizeof(ipv6_key.saddr));
+        __builtin_memcpy(&ipv6_key.daddr,
+            sk->__sk_common.skc_v6_daddr.in6_u.u6_addr32, sizeof(ipv6_key.daddr));
         ipv6_key.lport = sk->__sk_common.skc_num;
         dport = sk->__sk_common.skc_dport;
         ipv6_key.dport = ntohs(dport);
         ipv6_send_bytes.increment(ipv6_key, size);
-
     }
     // else drop
 
@@ -157,13 +152,12 @@ int kprobe__tcp_cleanup_rbuf(struct pt_regs *ctx, struct sock *sk, int copied)
         ipv4_key.dport = ntohs(dport);
         ipv4_recv_bytes.increment(ipv4_key, copied);
 
-
     } else if (family == AF_INET6) {
         struct ipv6_key_t ipv6_key = {.pid = pid};
-        ipv6_key.saddr0 = *(u64 *)&sk->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32[0];
-        ipv6_key.saddr1 = *(u64 *)&sk->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32[2];
-        ipv6_key.daddr0 = *(u64 *)&sk->__sk_common.skc_v6_daddr.in6_u.u6_addr32[0];
-        ipv6_key.daddr1 = *(u64 *)&sk->__sk_common.skc_v6_daddr.in6_u.u6_addr32[2];
+        __builtin_memcpy(&ipv6_key.saddr,
+            sk->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32, sizeof(ipv6_key.saddr));
+        __builtin_memcpy(&ipv6_key.daddr,
+            sk->__sk_common.skc_v6_daddr.in6_u.u6_addr32, sizeof(ipv6_key.daddr));
         ipv6_key.lport = sk->__sk_common.skc_num;
         dport = sk->__sk_common.skc_dport;
         ipv6_key.dport = ntohs(dport);
@@ -204,9 +198,9 @@ def get_ipv4_session_key(k):
 
 def get_ipv6_session_key(k):
     return TCPSessionKey(pid=k.pid,
-                         laddr=inet_ntop(AF_INET6, pack("QQ", k.saddr0, k.saddr1)),
+                         laddr=inet_ntop(AF_INET6, k.saddr),
                          lport=k.lport,
-                         daddr=inet_ntop(AF_INET6, pack("QQ", k.daddr0, k.daddr1)),
+                         daddr=inet_ntop(AF_INET6, k.daddr),
                          dport=k.dport)
 
 # initialize BPF

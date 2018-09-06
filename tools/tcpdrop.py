@@ -126,7 +126,9 @@ int trace_tcp_drop(struct pt_regs *ctx, struct sock *sk, struct sk_buff *skb)
         ipv4_events.perf_submit(ctx, &data4, sizeof(data4));
 
     } else if (family == AF_INET6) {
-        struct ipv6_data_t data6 = {.pid = pid, .ip = 6};
+        struct ipv6_data_t data6 = {};
+        data6.pid = pid;
+        data6.ip = 6;
         bpf_probe_read(&data6.saddr, sizeof(data6.saddr),
             sk->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
         bpf_probe_read(&data6.daddr, sizeof(data6.daddr),

@@ -126,7 +126,8 @@ TRACEPOINT_PROBE(sock, inet_sock_set_state)
     if (args->family == AF_INET) {
         struct ipv4_data_t data4 = {
             .span_us = delta_us,
-            .oldstate = args->oldstate, .newstate = args->newstate};
+            .oldstate = args->oldstate,
+            .newstate = args->newstate };
         data4.skaddr = (u64)args->skaddr;
         data4.ts_us = bpf_ktime_get_ns() / 1000;
         __builtin_memcpy(&data4.saddr, args->saddr, sizeof(data4.saddr));
@@ -141,7 +142,8 @@ TRACEPOINT_PROBE(sock, inet_sock_set_state)
     } else /* 6 */ {
         struct ipv6_data_t data6 = {
             .span_us = delta_us,
-            .oldstate = args->oldstate, .newstate = args->newstate};
+            .oldstate = args->oldstate,
+            .newstate = args->newstate };
         data6.skaddr = (u64)args->skaddr;
         data6.ts_us = bpf_ktime_get_ns() / 1000;
         __builtin_memcpy(&data6.saddr, args->saddr_v6, sizeof(data6.saddr));
