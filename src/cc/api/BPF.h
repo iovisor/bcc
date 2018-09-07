@@ -245,6 +245,7 @@ class USDT {
   USDT(const std::string& binary_path, pid_t pid, const std::string& provider,
        const std::string& name, const std::string& probe_func);
   USDT(const USDT& usdt);
+  USDT(USDT&& usdt) noexcept;
 
   StatusTuple init();
 
@@ -252,7 +253,7 @@ class USDT {
 
   std::string print_name() const {
     return provider_ + ":" + name_ + " from binary " + binary_path_ + " PID " +
-           std::to_string(pid_) + " for probe " + "probe_func_";
+           std::to_string(pid_) + " for probe " + probe_func_;
   }
 
   friend std::ostream& operator<<(std::ostream& out, const USDT& usdt) {
