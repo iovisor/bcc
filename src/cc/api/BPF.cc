@@ -59,10 +59,13 @@ StatusTuple BPF::init(const std::string& bpf_program,
                       const std::vector<USDT>& usdt) {
   std::string all_bpf_program;
 
+  usdt_.reserve(usdt.size());
   for (const auto& u : usdt) {
     usdt_.emplace_back(u);
-    TRY2(usdt_.back().init());
-    all_bpf_program += usdt_.back().program_text_;
+  }
+  for (auto& u : usdt_) {
+    TRY2(u.init());
+    all_bpf_program += u.program_text_;
   }
 
   auto flags_len = cflags.size();
@@ -732,6 +735,18 @@ USDT::USDT(const USDT& usdt)
       provider_(usdt.provider_),
       name_(usdt.name_),
       probe_func_(usdt.probe_func_) {}
+
+USDT::USDT(USDT&& usdt) noexcept
+    : initialized_(usdt.initialized_),
+      binary_path_(std::move(usdt.binary_path_)),
+      pid_(usdt.pid_),
+      provider_(std::move(usdt.provider_)),
+      name_(std::move(usdt.name_)),
+      probe_func_(std::move(usdt.probe_func_)),
+      probe_(std::move(usdt.probe_)),
+      program_text_(std::move(usdt.program_text_)) {
+  usdt.initialized_ = false;
+}
 
 bool USDT::operator==(const USDT& other) const {
   return (provider_ == other.provider_) && (name_ == other.name_) &&
