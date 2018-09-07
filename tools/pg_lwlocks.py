@@ -31,13 +31,15 @@ typedef struct LWLock
 
 struct lwlock {
     u32 pid;
-    int mode;
+    u32 mode;
+    u32 lock;
+    bool missing;
+    bool overwritten;
+    bool deleted;
+    bool wait;
+    bool hold;
     u64 acquired;
     u64 released;
-};
-
-struct message {
-    char text[100];
 };
 
 typedef enum LWLockMode
@@ -49,11 +51,12 @@ typedef enum LWLockMode
                          * to be used as LWLockAcquire argument */
 } LWLockMode;
 
-BPF_PERF_OUTPUT(events);
-BPF_PERF_OUTPUT(messages);
+#define HASH_SIZE 2^14
 
-BPF_HASH(lock_hold, u32, struct lwlock);
-BPF_HASH(lock_wait, u32, struct lwlock);
+BPF_PERF_OUTPUT(events);
+
+BPF_HASH(lock_hold, u32, struct lwlock, HASH_SIZE);
+BPF_HASH(lock_wait, u32, struct lwlock, HASH_SIZE);
 
 // Histogram of lock hold times
 BPF_HISTOGRAM(lock_hold_shared_hist, u64);
@@ -73,32 +76,40 @@ void probe_lwlock_acquire_start(struct pt_regs *ctx,
     data.acquired = now;
     data.pid = pid;
     data.released = 0;
+    data.lock = (u32) lock;
+    data.wait = true;
 
-    events.perf_submit(ctx, &data, sizeof(data));
     struct lwlock *test = lock_wait.lookup(&pid);
-    if (test != 0)
+    if (test != NULL)
     {
-        struct message msg = {};
-        strcpy(msg.text, "Lock is overwritten");
-        messages.perf_submit(ctx, &msg, sizeof(msg));
+        test->overwritten = true;
+        events.perf_submit(ctx, test, sizeof(*test));
     }
-
-    lock_wait.update(&pid, &data);
+    else
+    {
+        events.perf_submit(ctx, &data, sizeof(data));
+        lock_wait.update(&pid, &data);
+    }
 }
 
-void probe_lwlock_acquire_finish(struct pt_regs *ctx,
-                                 struct LWLock *lock, int mode)
+void probe_lwlock_acquire_finish(struct pt_regs *ctx)
 {
     u64 now = bpf_ktime_get_ns();
     u32 pid = bpf_get_current_pid_tgid();
     struct lwlock data = {};
     struct lwlock *wait_data = lock_wait.lookup(&pid);
 
-    if (wait_data != 0)
+    if (wait_data != NULL)
     {
-        u64 wait_time = now - wait_data->acquired;
+        u64 timestamp = now;
+        u64 wait_time = timestamp - wait_data->acquired;
         u64 lwlock_slot = bpf_log2l(wait_time / 1000);
-        switch (mode)
+
+        wait_data->released = timestamp;
+        data.mode = wait_data->mode;
+        data.lock = wait_data->lock;
+
+        switch (wait_data->mode)
         {
             case LW_EXCLUSIVE:
                 lock_wait_exclusive_hist.increment(lwlock_slot);
@@ -109,24 +120,33 @@ void probe_lwlock_acquire_finish(struct pt_regs *ctx,
             default:
                 break;
         }
+
+        wait_data->deleted = true;
+        events.perf_submit(ctx, wait_data, sizeof(*wait_data));
         lock_wait.delete(&pid);
     }
+    else
+    {
+        // can't determine the mode, skip
+        return;
+    }
 
-    data.mode = mode;
     data.acquired = now;
     data.pid = pid;
     data.released = 0;
+    data.hold = true;
 
-    events.perf_submit(ctx, &data, sizeof(data));
     struct lwlock *test = lock_hold.lookup(&pid);
-    if (test != 0)
+    if (test != NULL)
     {
-        struct message msg = {};
-        strcpy(msg.text, "Lock is overwritten");
-        messages.perf_submit(ctx, &msg, sizeof(msg));
+        test->overwritten = true;
+        events.perf_submit(ctx, test, sizeof(*test));
     }
-
-    lock_hold.update(&pid, &data);
+    else
+    {
+        events.perf_submit(ctx, &data, sizeof(data));
+        lock_hold.update(&pid, &data);
+    }
 }
 
 void probe_lwlock_release(struct pt_regs *ctx, struct LWLock *lock)
@@ -134,18 +154,22 @@ void probe_lwlock_release(struct pt_regs *ctx, struct LWLock *lock)
     u64 now = bpf_ktime_get_ns();
     u32 pid = bpf_get_current_pid_tgid();
     struct lwlock *data = lock_hold.lookup(&pid);
-    if (data == 0)
+
+    if (data == NULL)
     {
-        struct message msg = {};
-        strcpy(msg.text, "Lock is missing");
-        messages.perf_submit(ctx, &msg, sizeof(msg));
+        struct lwlock hold_data = {};
+        hold_data.pid = pid;
+        hold_data.lock = (u32) lock;
+        hold_data.hold = true;
+        hold_data.missing = true;
+
+        events.perf_submit(ctx, &hold_data, sizeof(hold_data));
         return;
     }
 
     u64 hold_time = now - data->acquired;
     data->released = now;
 
-    events.perf_submit(ctx, data, sizeof(*data));
     u64 lwlock_slot = bpf_log2l(hold_time / 1000);
     switch (data->mode)
     {
@@ -158,6 +182,9 @@ void probe_lwlock_release(struct pt_regs *ctx, struct LWLock *lock)
         default:
             break;
     }
+
+    data->deleted = true;
+    events.perf_submit(ctx, data, sizeof(*data));
     lock_hold.delete(&pid);
 }
 """
@@ -199,30 +226,52 @@ def signal_ignore(signal, frame):
 
 
 class Data(ct.Structure):
-    _fields_ = [("pid", ct.c_ulong),
-                ("mode", ct.c_int),
-                ("acquired", ct.c_ulonglong),
-                ("released", ct.c_ulonglong)]
-
-
-class Message(ct.Structure):
-    _fields_ = [("text", ct.c_char * 100)]
-
-
-def print_messages(cpu, data, size):
-    msg = ct.cast(data, ct.POINTER(Message)).contents
-    print(msg.text)
+    _fields_ = [("pid", ct.c_uint32),
+                ("mode", ct.c_uint32),
+                ("lock", ct.c_uint32),
+                ("missing", ct.c_bool),
+                ("overwritten", ct.c_bool),
+                ("deleted", ct.c_bool),
+                ("wait", ct.c_bool),
+                ("hold", ct.c_bool),
+                ("acquired", ct.c_uint64),
+                ("released", ct.c_uint64)]
 
 
 def print_event(cpu, data, size):
     event = ct.cast(data, ct.POINTER(Data)).contents
-    print("Event: acquired {} released {} pid {}".format(
-        event.acquired, event.released, event.pid))
+    prefix = None
+
+    if event.missing:
+        prefix = "Missing"
+    if event.overwritten:
+        prefix = "Overwritten"
+    if event.deleted:
+        prefix = "About to delete"
+
+    if event.hold and prefix is not None:
+        prefix += " hold"
+    if event.wait and prefix is not None:
+        prefix += " wait"
+
+    if event.hold and prefix is None:
+        prefix = "Hold"
+    if event.wait and prefix is None:
+        prefix = "Wait"
+
+    print("{} event: acquired {} released {} pid {} mode {} lock {}".format(
+        prefix or "",
+        event.acquired,
+        event.released,
+        event.pid,
+        event.mode,
+        event.lock))
 
 
 def run(args):
     print("Attaching...")
-    bpf = BPF(text=text)
+    debug = 4 if args.debug else 0
+    bpf = BPF(text=text, debug=debug)
     attach(bpf, args.path, args.pid)
     lock_hold_exclusive_hist = bpf["lock_hold_exclusive_hist"]
     lock_hold_shared_hist = bpf["lock_hold_shared_hist"]
@@ -232,7 +281,6 @@ def run(args):
 
     if args.debug:
         bpf["events"].open_perf_buffer(print_event)
-        bpf["messages"].open_perf_buffer(print_messages)
 
     print("Listening...")
     while True:
