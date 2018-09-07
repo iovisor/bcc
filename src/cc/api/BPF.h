@@ -245,6 +245,7 @@ class USDT {
   USDT(const std::string& binary_path, pid_t pid, const std::string& provider,
        const std::string& name, const std::string& probe_func);
   USDT(const USDT& usdt);
+  USDT(USDT&& usdt) noexcept;
 
   StatusTuple init();
 

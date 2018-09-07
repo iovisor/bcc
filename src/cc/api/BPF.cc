@@ -736,6 +736,18 @@ USDT::USDT(const USDT& usdt)
       name_(usdt.name_),
       probe_func_(usdt.probe_func_) {}
 
+USDT::USDT(USDT&& usdt) noexcept
+    : initialized_(usdt.initialized_),
+      binary_path_(std::move(usdt.binary_path_)),
+      pid_(usdt.pid_),
+      provider_(std::move(usdt.provider_)),
+      name_(std::move(usdt.name_)),
+      probe_func_(std::move(usdt.probe_func_)),
+      probe_(std::move(usdt.probe_)),
+      program_text_(std::move(usdt.program_text_)) {
+  usdt.initialized_ = false;
+}
+
 bool USDT::operator==(const USDT& other) const {
   return (provider_ == other.provider_) && (name_ == other.name_) &&
          (binary_path_ == other.binary_path_) && (pid_ == other.pid_) &&
