@@ -59,10 +59,13 @@ StatusTuple BPF::init(const std::string& bpf_program,
                       const std::vector<USDT>& usdt) {
   std::string all_bpf_program;
 
+  usdt_.reserve(usdt.size());
   for (const auto& u : usdt) {
     usdt_.emplace_back(u);
-    TRY2(usdt_.back().init());
-    all_bpf_program += usdt_.back().program_text_;
+  }
+  for (auto& u : usdt_) {
+    TRY2(u.init());
+    all_bpf_program += u.program_text_;
   }
 
   auto flags_len = cflags.size();

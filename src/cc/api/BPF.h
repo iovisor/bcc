@@ -252,7 +252,7 @@ class USDT {
 
   std::string print_name() const {
     return provider_ + ":" + name_ + " from binary " + binary_path_ + " PID " +
-           std::to_string(pid_) + " for probe " + "probe_func_";
+           std::to_string(pid_) + " for probe " + probe_func_;
   }
 
   friend std::ostream& operator<<(std::ostream& out, const USDT& usdt) {
