@@ -98,7 +98,7 @@ static int trace_event(struct pt_regs *ctx, struct sock *skp, int type)
 {
     if (skp == NULL)
         return 0;
-    u32 pid = bpf_get_current_pid_tgid();
+    u32 pid = bpf_get_current_pid_tgid() >> 32;
 
     // pull in details
     u16 family = skp->__sk_common.skc_family;
