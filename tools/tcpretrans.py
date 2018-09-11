@@ -53,7 +53,6 @@ bpf_text = """
 
 // separate data structs for ipv4 and ipv6
 struct ipv4_data_t {
-    // XXX: switch some to u32's when supported
     u32 pid;
     u64 ip;
     u32 saddr;
@@ -165,7 +164,10 @@ struct_init = { 'ipv4':
                     flow_key.lport = lport;
                     flow_key.dport = ntohs(dport);""",
           'trace' : """
-                    struct ipv6_data_t data6 = {.pid = pid, .ip = 6, .type = type};
+                    struct ipv6_data_t data6 = {};
+                    data6.pid = pid;
+                    data6.ip = 6;
+                    data6.type = type;
                     bpf_probe_read(&data6.saddr, sizeof(data6.saddr),
                         skp->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
                     bpf_probe_read(&data6.daddr, sizeof(data6.daddr),
