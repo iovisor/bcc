@@ -76,7 +76,6 @@ BPF_HASH(birth, struct sock *, u64);
 
 // separate data structs for ipv4 and ipv6
 struct ipv4_data_t {
-    // XXX: switch some to u32's when supported
     u64 ts_us;
     u32 pid;
     u32 saddr;
@@ -213,8 +212,10 @@ int kprobe__tcp_set_state(struct pt_regs *ctx, struct sock *sk, int state)
         ipv4_events.perf_submit(ctx, &data4, sizeof(data4));
 
     } else /* 6 */ {
-        struct ipv6_data_t data6 = {.span_us = delta_us,
-            .rx_b = rx_b, .tx_b = tx_b};
+        struct ipv6_data_t data6 = {};
+        data6.span_us = delta_us;
+        data6.rx_b = rx_b;
+        data6.tx_b = tx_b;
         data6.ts_us = bpf_ktime_get_ns() / 1000;
         bpf_probe_read(&data6.saddr, sizeof(data6.saddr),
             sk->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
@@ -337,8 +338,10 @@ TRACEPOINT_PROBE(sock, inet_sock_set_state)
         ipv4_events.perf_submit(args, &data4, sizeof(data4));
 
     } else /* 6 */ {
-        struct ipv6_data_t data6 = {.span_us = delta_us,
-            .rx_b = rx_b, .tx_b = tx_b};
+        struct ipv6_data_t data6 = {};
+        data6.span_us = delta_us;
+        data6.rx_b = rx_b;
+        data6.tx_b = tx_b;
         data6.ts_us = bpf_ktime_get_ns() / 1000;
         __builtin_memcpy(&data6.saddr, args->saddr_v6, sizeof(data6.saddr));
         __builtin_memcpy(&data6.daddr, args->daddr_v6, sizeof(data6.daddr));
