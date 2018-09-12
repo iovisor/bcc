@@ -11,7 +11,7 @@ Build-Depends: debhelper (>= 9), cmake,
     libelf-dev, bison, flex, libfl-dev, libedit-dev, zlib1g-dev, git,
     python (>= 2.7), python-netaddr, python-pyroute2, luajit,
     libluajit-5.1-dev, arping, inetutils-ping | iputils-ping, iperf, netperf,
-    ethtool, devscripts, python3
+    ethtool, devscripts, python3, dh-python
 Homepage: https://github.com/iovisor/bcc
 
 Package: libbcc
