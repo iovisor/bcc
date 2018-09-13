@@ -68,10 +68,10 @@ int xdp_dummy(struct xdp_md *ctx) {
 }
 """, cflags=["-w", "-D__MAX_CPU__=%u" % max_cpu], debug=0)
 
-dest = b.get_table("dest");
+dest = b.get_table("dest")
 dest[0] = ct.c_uint32(cpu_id)
 
-cpumap = b.get_table("cpumap");
+cpumap = b.get_table("cpumap")
 cpumap[cpu_id] = ct.c_uint32(192)
 
 in_fn = b.load_func("xdp_redirect_cpu", BPF.XDP)
@@ -90,6 +90,6 @@ while 1:
         time.sleep(1)
     except KeyboardInterrupt:
         print("Removing filter from device")
-        break;
+        break
 
 b.remove_xdp(in_if, flags)
