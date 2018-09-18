@@ -390,9 +390,10 @@ BPF_PERF_OUTPUT(%s);
                 if field_type == "s":
                         return text + """
         if (%s != 0) {
-                bpf_probe_read(&__data.v%d, sizeof(__data.v%d), (void *)%s);
+                void *__tmp = (void *)%s;
+                bpf_probe_read(&__data.v%d, sizeof(__data.v%d), __tmp);
         }
-                """ % (expr, idx, idx, expr)
+                """ % (expr, expr, idx, idx)
                 if field_type in Probe.fmt_types:
                         return text + "        __data.v%d = (%s)%s;\n" % \
                                         (idx, Probe.c_type[field_type], expr)
