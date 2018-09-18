@@ -1,0 +1,27 @@
+Demonstrations of vfsrwcount
+
+This counts how many bytes the vfs_read and vfs_write functions generate,
+group the result by process and file, the output format is:
+hour:minute:second
+read:
+[process_pid] [process_comm] [file_name] [count]
+...
+write:
+[process_pid] [process_comm] [file_name] [count]
+
+# ./vfsrwcount
+06:00:15: 
+read:
+[12582] [fixdep] [swab.h] [550]
+[12582] [fixdep] [scsi_proto.h] [10960]
+...
+write:
+[12582] [fixdep] [.rtsx_scsi.o.tmp] [4107]
+[12581] [x86_64-linux-gn] [rtsx_scsi.o] [1691]
+...
+
+When multiple programs generate IOs on multiple disks, this script
+could help to find out that each program generates how many IOs on
+each disk. It prints file name instead of full file path, because
+getting full file path is an expensive operation, the file name should
+provide enough hint about the IO is on which disk.
