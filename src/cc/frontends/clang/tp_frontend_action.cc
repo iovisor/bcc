@@ -28,6 +28,7 @@
 #include <clang/Frontend/MultiplexConsumer.h>
 #include <clang/Rewrite/Core/Rewriter.h>
 
+#include "frontend_action_common.h"
 #include "tp_frontend_action.h"
 
 namespace ebpf {
@@ -209,11 +210,11 @@ bool TracepointTypeVisitor::VisitFunctionDecl(FunctionDecl *D) {
         string tp_cat, tp_evt;
         if (_is_tracepoint_struct_type(type_name, tp_cat, tp_evt)) {
           string tp_struct = GenerateTracepointStruct(
-              D->getLocStart(), tp_cat, tp_evt);
+              GET_BEGINLOC(D), tp_cat, tp_evt);
           // Get the actual function declaration point (the macro instantiation
           // point if using the TRACEPOINT_PROBE macro instead of the macro
           // declaration point in bpf_helpers.h).
-          auto insert_loc = D->getLocStart();
+          auto insert_loc = GET_BEGINLOC(D);
           insert_loc = rewriter_.getSourceMgr().getFileLoc(insert_loc);
           rewriter_.InsertText(insert_loc, tp_struct);
         }

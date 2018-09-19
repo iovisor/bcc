@@ -27,6 +27,7 @@
 #include <clang/Rewrite/Core/Rewriter.h>
 #include <clang/Lex/Lexer.h>
 
+#include "frontend_action_common.h"
 #include "b_frontend_action.h"
 #include "bpf_module.h"
 #include "common.h"
@@ -428,7 +429,7 @@ bool ProbeVisitor::VisitUnaryOperator(UnaryOperator *E) {
   pre += " bpf_probe_read(&_val, sizeof(_val), (u64)";
   post = "); _val; })";
   rewriter_.ReplaceText(expansionLoc(E->getOperatorLoc()), 1, pre);
-  rewriter_.InsertTextAfterToken(expansionLoc(sub->getLocEnd()), post);
+  rewriter_.InsertTextAfterToken(expansionLoc(GET_ENDLOC(sub)), post);
   return true;
 }
 bool ProbeVisitor::VisitMemberExpr(MemberExpr *E) {
@@ -439,7 +440,7 @@ bool ProbeVisitor::VisitMemberExpr(MemberExpr *E) {
   bool found = false;
   for (MemberExpr *M = E; M; M = dyn_cast<MemberExpr>(M->getBase())) {
     memb_visited_.insert(M);
-    rhs_start = M->getLocEnd();
+    rhs_start = GET_ENDLOC(M);
     base = M->getBase();
     member = M->getMemberLoc();
     if (M->isArrow()) {
@@ -450,11 +451,11 @@ bool ProbeVisitor::VisitMemberExpr(MemberExpr *E) {
   if (!found)
     return true;
   if (member.isInvalid()) {
-    error(base->getLocEnd(), "internal error: MemberLoc is invalid while preparing probe rewrite");
+    error(GET_ENDLOC(base), "internal error: MemberLoc is invalid while preparing probe rewrite");
     return false;
   }
 
-  if (!rewriter_.isRewritable(E->getLocStart()))
+  if (!rewriter_.isRewritable(GET_BEGINLOC(E)))
     return true;
 
   // parent expr has addrof, skip the rewrite, set is_addrof_ to flase so
@@ -478,14 +479,14 @@ bool ProbeVisitor::VisitMemberExpr(MemberExpr *E) {
   if (!ProbeChecker(base, ptregs_, track_helpers_).needs_probe())
     return true;
 
-  string rhs = rewriter_.getRewrittenText(expansionRange(SourceRange(rhs_start, E->getLocEnd())));
+  string rhs = rewriter_.getRewrittenText(expansionRange(SourceRange(rhs_start, GET_ENDLOC(E))));
   string base_type = base->getType()->getPointeeType().getAsString();
   string pre, post;
   pre = "({ typeof(" + E->getType().getAsString() + ") _val; __builtin_memset(&_val, 0, sizeof(_val));";
   pre += " bpf_probe_read(&_val, sizeof(_val), (u64)&";
   post = rhs + "); _val; })";
-  rewriter_.InsertText(expansionLoc(E->getLocStart()), pre);
-  rewriter_.ReplaceText(expansionRange(SourceRange(member, E->getLocEnd())), post);
+  rewriter_.InsertText(expansionLoc(GET_BEGINLOC(E)), pre);
+  rewriter_.ReplaceText(expansionRange(SourceRange(member, GET_ENDLOC(E))), post);
   return true;
 }
 bool ProbeVisitor::VisitArraySubscriptExpr(ArraySubscriptExpr *E) {
@@ -497,7 +498,7 @@ bool ProbeVisitor::VisitArraySubscriptExpr(ArraySubscriptExpr *E) {
   if (is_addrof_)
     return true;
 
-  if (!rewriter_.isRewritable(E->getLocStart()))
+  if (!rewriter_.isRewritable(GET_BEGINLOC(E)))
     return true;
 
   Expr *base = E->getBase();
@@ -517,16 +518,16 @@ bool ProbeVisitor::VisitArraySubscriptExpr(ArraySubscriptExpr *E) {
     addrof_stmt_ = base;
     is_addrof_ = true;
   }
-  rewriter_.InsertText(expansionLoc(base->getLocStart()), pre);
+  rewriter_.InsertText(expansionLoc(GET_BEGINLOC(base)), pre);
 
   /* Replace left bracket and any space around it.  Since Clang doesn't provide
    * a method to retrieve the left bracket, replace everything from the end of
    * the base to the start of the index. */
   lbracket = ") + (";
-  lbracket_start = Lexer::getLocForEndOfToken(base->getLocEnd(), 1,
+  lbracket_start = Lexer::getLocForEndOfToken(GET_ENDLOC(base), 1,
                                               rewriter_.getSourceMgr(),
                                               opts).getLocWithOffset(1);
-  lbracket_end = idx->getLocStart().getLocWithOffset(-1);
+  lbracket_end = GET_BEGINLOC(idx).getLocWithOffset(-1);
   lbracket_range = expansionRange(SourceRange(lbracket_start, lbracket_end));
   rewriter_.ReplaceText(lbracket_range, lbracket);
 
@@ -675,8 +676,8 @@ void BTypeVisitor::rewriteFuncParam(FunctionDecl *D) {
       genParamDirectAssign(D, preamble, calling_conv_regs);
     }
     rewriter_.ReplaceText(
-        expansionRange(SourceRange(D->getParamDecl(0)->getLocEnd(),
-                    D->getParamDecl(D->getNumParams() - 1)->getLocEnd())),
+        expansionRange(SourceRange(GET_ENDLOC(D->getParamDecl(0)),
+                    GET_ENDLOC(D->getParamDecl(D->getNumParams() - 1)))),
         fn_args_[0]->getName());
   }
   // for each trace argument, convert the variable from ptregs to something on stack
@@ -687,7 +688,7 @@ void BTypeVisitor::rewriteFuncParam(FunctionDecl *D) {
 bool BTypeVisitor::VisitFunctionDecl(FunctionDecl *D) {
   // put each non-static non-inline function decl in its own section, to be
   // extracted by the MemoryManager
-  auto real_start_loc = rewriter_.getSourceMgr().getFileLoc(D->getLocStart());
+  auto real_start_loc = rewriter_.getSourceMgr().getFileLoc(GET_BEGINLOC(D));
   if (fe_.is_rewritable_ext_func(D)) {
     current_fn_ = D->getName();
     string bd = rewriter_.getRewrittenText(expansionRange(D->getSourceRange()));
@@ -696,7 +697,7 @@ bool BTypeVisitor::VisitFunctionDecl(FunctionDecl *D) {
     string attr = string("__attribute__((section(\"") + BPF_FN_PREFIX + D->getName().str() + "\")))\n";
     rewriter_.InsertText(real_start_loc, attr);
     if (D->param_size() > MAX_CALLING_CONV_REGS + 1) {
-      error(D->getParamDecl(MAX_CALLING_CONV_REGS + 1)->getLocStart(),
+      error(GET_BEGINLOC(D->getParamDecl(MAX_CALLING_CONV_REGS + 1)),
             "too many arguments, bcc only supports in-register parameters");
       return false;
     }
@@ -705,7 +706,7 @@ bool BTypeVisitor::VisitFunctionDecl(FunctionDecl *D) {
     for (auto arg_it = D->param_begin(); arg_it != D->param_end(); arg_it++) {
       auto *arg = *arg_it;
       if (arg->getName() == "") {
-        error(arg->getLocEnd(), "arguments to BPF program definition must be named");
+        error(GET_ENDLOC(arg), "arguments to BPF program definition must be named");
         return false;
       }
       fn_args_.push_back(arg);
@@ -746,8 +747,8 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
         if (!A->getName().startswith("maps"))
           return true;
 
-        string args = rewriter_.getRewrittenText(expansionRange(SourceRange(Call->getArg(0)->getLocStart(),
-                                                   Call->getArg(Call->getNumArgs() - 1)->getLocEnd())));
+        string args = rewriter_.getRewrittenText(expansionRange(SourceRange(GET_BEGINLOC(Call->getArg(0)),
+                                                   GET_ENDLOC(Call->getArg(Call->getNumArgs() - 1)))));
 
         // find the table fd, which was opened at declaration time
         TableStorage::iterator desc;
@@ -755,15 +756,15 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
         Path global_path({Ref->getDecl()->getName()});
         if (!fe_.table_storage().Find(local_path, desc)) {
           if (!fe_.table_storage().Find(global_path, desc)) {
-            error(Ref->getLocEnd(), "bpf_table %0 failed to open") << Ref->getDecl()->getName();
+            error(GET_ENDLOC(Ref), "bpf_table %0 failed to open") << Ref->getDecl()->getName();
             return false;
           }
         }
         string fd = to_string(desc->second.fd);
         string prefix, suffix;
         string txt;
-        auto rewrite_start = Call->getLocStart();
-        auto rewrite_end = Call->getLocEnd();
+        auto rewrite_start = GET_BEGINLOC(Call);
+        auto rewrite_end = GET_ENDLOC(Call);
         if (memb_name == "lookup_or_init") {
           string name = Ref->getDecl()->getName();
           string arg0 = rewriter_.getRewrittenText(expansionRange(Call->getArg(0)->getSourceRange()));
@@ -802,8 +803,8 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
         } else if (memb_name == "perf_submit") {
           string name = Ref->getDecl()->getName();
           string arg0 = rewriter_.getRewrittenText(expansionRange(Call->getArg(0)->getSourceRange()));
-          string args_other = rewriter_.getRewrittenText(expansionRange(SourceRange(Call->getArg(1)->getLocStart(),
-                                                           Call->getArg(2)->getLocEnd())));
+          string args_other = rewriter_.getRewrittenText(expansionRange(SourceRange(GET_BEGINLOC(Call->getArg(1)),
+                                                           GET_ENDLOC(Call->getArg(2)))));
           txt = "bpf_perf_event_output(" + arg0 + ", bpf_pseudo_fd(1, " + fd + ")";
           txt += ", CUR_CPU_IDENTIFIER, " + args_other + ")";
         } else if (memb_name == "perf_submit_skb") {
@@ -823,9 +824,9 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
                 rewriter_.getRewrittenText(expansionRange(Call->getArg(0)->getSourceRange()));
             txt = "bcc_get_stackid(";
             txt += "bpf_pseudo_fd(1, " + fd + "), " + arg0;
-            rewrite_end = Call->getArg(0)->getLocEnd();
+            rewrite_end = GET_ENDLOC(Call->getArg(0));
             } else {
-              error(Call->getLocStart(), "get_stackid only available on stacktrace maps");
+              error(GET_BEGINLOC(Call), "get_stackid only available on stacktrace maps");
               return false;
             }
         } else {
@@ -837,7 +838,7 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
             suffix = ", BPF_ANY)";
           } else if (memb_name == "insert") {
             if (desc->second.type == BPF_MAP_TYPE_ARRAY) {
-              warning(Call->getLocStart(), "all element of an array already exist; insert() will have no effect");
+              warning(GET_BEGINLOC(Call), "all element of an array already exist; insert() will have no effect");
             }
             prefix = "bpf_map_update_elem";
             suffix = ", BPF_NOEXIST)";
@@ -860,7 +861,7 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
             prefix = "bpf_redirect_map";
             suffix = ")";
           } else {
-            error(Call->getLocStart(), "invalid bpf_table operation %0") << memb_name;
+            error(GET_BEGINLOC(Call), "invalid bpf_table operation %0") << memb_name;
             return false;
           }
           prefix += "((void *)bpf_pseudo_fd(1, " + fd + "), ";
@@ -868,7 +869,7 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
           txt = prefix + args + suffix;
         }
         if (!rewriter_.isRewritable(rewrite_start) || !rewriter_.isRewritable(rewrite_end)) {
-          error(Call->getLocStart(), "cannot use map function inside a macro");
+          error(GET_BEGINLOC(Call), "cannot use map function inside a macro");
           return false;
         }
         rewriter_.ReplaceText(expansionRange(SourceRange(rewrite_start, rewrite_end)), txt);
@@ -884,8 +885,8 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
       // rewrites, and clang::Rewriter does not support rewrites in macros,
       // unless one preprocesses the entire source file.
       if (A->getLabel() == "llvm.bpf.extra") {
-        if (!rewriter_.isRewritable(Call->getLocStart())) {
-          error(Call->getLocStart(), "cannot use builtin inside a macro");
+        if (!rewriter_.isRewritable(GET_BEGINLOC(Call))) {
+          error(GET_BEGINLOC(Call), "cannot use builtin inside a macro");
           return false;
         }
 
@@ -904,7 +905,7 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
           text += ", ((" + args[3] + " & 0x1) << 4) | sizeof(" + args[2] + "))";
           rewriter_.ReplaceText(expansionRange(Call->getSourceRange()), text);
         } else if (Decl->getName() == "bpf_trace_printk") {
-          checkFormatSpecifiers(args[0], Call->getArg(0)->getLocStart());
+          checkFormatSpecifiers(args[0], GET_BEGINLOC(Call->getArg(0)));
           //  #define bpf_trace_printk(fmt, args...)
           //    ({ char _fmt[] = fmt; bpf_trace_printk_(_fmt, sizeof(_fmt), args...); })
           text = "({ char _fmt[] = " + args[0] + "; bpf_trace_printk_(_fmt, sizeof(_fmt)";
@@ -912,8 +913,8 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
             text += "); })";
             rewriter_.ReplaceText(expansionRange(Call->getSourceRange()), text);
           } else {
-            rewriter_.ReplaceText(expansionRange(SourceRange(Call->getLocStart(), Call->getArg(0)->getLocEnd())), text);
-            rewriter_.InsertTextAfter(Call->getLocEnd(), "); }");
+            rewriter_.ReplaceText(expansionRange(SourceRange(GET_BEGINLOC(Call), GET_ENDLOC(Call->getArg(0)))), text);
+            rewriter_.InsertTextAfter(GET_ENDLOC(Call), "); }");
           }
         } else if (Decl->getName() == "bpf_num_cpus") {
           int numcpu = sysconf(_SC_NPROCESSORS_ONLN);
@@ -937,10 +938,10 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
       }
     } else if (FunctionDecl *F = dyn_cast<FunctionDecl>(Decl)) {
       if (F->isExternallyVisible() && !F->getBuiltinID()) {
-        auto start_loc = rewriter_.getSourceMgr().getFileLoc(Decl->getLocStart());
+        auto start_loc = rewriter_.getSourceMgr().getFileLoc(GET_BEGINLOC(Decl));
         if (rewriter_.getSourceMgr().getFileID(start_loc)
             == rewriter_.getSourceMgr().getMainFileID()) {
-          error(Call->getLocStart(), "cannot call non-static helper function");
+          error(GET_BEGINLOC(Call), "cannot call non-static helper function");
           return false;
         }
       }
@@ -1006,8 +1007,8 @@ bool BTypeVisitor::VisitBinaryOperator(BinaryOperator *E) {
       if (DeprecatedAttr *A = Base->getDecl()->getAttr<DeprecatedAttr>()) {
         if (A->getMessage() == "packet") {
           if (FieldDecl *F = dyn_cast<FieldDecl>(Memb->getMemberDecl())) {
-            if (!rewriter_.isRewritable(E->getLocStart())) {
-              error(E->getLocStart(), "cannot use \"packet\" header type inside a macro");
+            if (!rewriter_.isRewritable(GET_BEGINLOC(E))) {
+              error(GET_BEGINLOC(E), "cannot use \"packet\" header type inside a macro");
               return false;
             }
             uint64_t ofs = C.getFieldOffset(F);
@@ -1015,8 +1016,8 @@ bool BTypeVisitor::VisitBinaryOperator(BinaryOperator *E) {
             string base = rewriter_.getRewrittenText(expansionRange(Base->getSourceRange()));
             string text = "bpf_dins_pkt(" + fn_args_[0]->getName().str() + ", (u64)" + base + "+" + to_string(ofs >> 3)
                 + ", " + to_string(ofs & 0x7) + ", " + to_string(sz) + ",";
-            rewriter_.ReplaceText(expansionRange(SourceRange(E->getLocStart(), E->getOperatorLoc())), text);
-            rewriter_.InsertTextAfterToken(E->getLocEnd(), ")");
+            rewriter_.ReplaceText(expansionRange(SourceRange(GET_BEGINLOC(E), E->getOperatorLoc())), text);
+            rewriter_.InsertTextAfterToken(GET_ENDLOC(E), ")");
           }
         }
       }
@@ -1036,8 +1037,8 @@ bool BTypeVisitor::VisitImplicitCastExpr(ImplicitCastExpr *E) {
     if (DeprecatedAttr *A = Ref->getDecl()->getAttr<DeprecatedAttr>()) {
       if (A->getMessage() == "packet") {
         if (FieldDecl *F = dyn_cast<FieldDecl>(Memb->getMemberDecl())) {
-          if (!rewriter_.isRewritable(E->getLocStart())) {
-            error(E->getLocStart(), "cannot use \"packet\" header type inside a macro");
+          if (!rewriter_.isRewritable(GET_BEGINLOC(E))) {
+            error(GET_BEGINLOC(E), "cannot use \"packet\" header type inside a macro");
             return false;
           }
           uint64_t ofs = C.getFieldOffset(F);
@@ -1081,7 +1082,7 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
     if (!A->getName().startswith("maps"))
       return true;
     if (!R) {
-      error(Decl->getLocEnd(), "invalid type for bpf_table, expect struct");
+      error(GET_ENDLOC(Decl), "invalid type for bpf_table, expect struct");
       return false;
     }
     const RecordDecl *RD = R->getDecl()->getDefinition();
@@ -1096,21 +1097,21 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
     unsigned i = 0;
     for (auto F : RD->fields()) {
       if (F->getType().getTypePtr()->isIncompleteType()) {
-        error(F->getLocStart(), "unknown type");
+        error(GET_BEGINLOC(F), "unknown type");
         return false;
       }
 
       size_t sz = C.getTypeSize(F->getType()) >> 3;
       if (F->getName() == "key") {
         if (sz == 0) {
-          error(F->getLocStart(), "invalid zero-sized leaf");
+          error(GET_BEGINLOC(F), "invalid zero-sized leaf");
           return false;
         }
         table.key_size = sz;
         key_type = F->getType();
       } else if (F->getName() == "leaf") {
         if (sz == 0) {
-          error(F->getLocStart(), "invalid zero-sized leaf");
+          error(GET_BEGINLOC(F), "invalid zero-sized leaf");
           return false;
         }
         table.leaf_size = sz;
@@ -1155,7 +1156,7 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
       if (key_type->isSpecificBuiltinType(BuiltinType::Int))
         map_type = BPF_MAP_TYPE_ARRAY;
       if (!leaf_type->isSpecificBuiltinType(BuiltinType::ULongLong))
-        error(Decl->getLocStart(), "histogram leaf type must be u64, got %0") << leaf_type;
+        error(GET_BEGINLOC(Decl), "histogram leaf type must be u64, got %0") << leaf_type;
     } else if (A->getName() == "maps/prog") {
       map_type = BPF_MAP_TYPE_PROG_ARRAY;
     } else if (A->getName() == "maps/perf_output") {
@@ -1176,7 +1177,7 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
       map_type = BPF_MAP_TYPE_CPUMAP;
     } else if (A->getName() == "maps/extern") {
       if (!fe_.table_storage().Find(global_path, table_it)) {
-        error(Decl->getLocStart(), "reference to undefined table");
+        error(GET_BEGINLOC(Decl), "reference to undefined table");
         return false;
       }
       table = table_it->second.dup();
@@ -1187,7 +1188,7 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
       Path local_path({fe_.id(), table.name});
       Path global_path({table.name});
       if (!fe_.table_storage().Find(local_path, table_it)) {
-        error(Decl->getLocStart(), "reference to undefined table");
+        error(GET_BEGINLOC(Decl), "reference to undefined table");
         return false;
       }
       fe_.table_storage().Insert(global_path, table_it->second.dup());
@@ -1196,7 +1197,7 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
 
     if (!table.is_extern) {
       if (map_type == BPF_MAP_TYPE_UNSPEC) {
-        error(Decl->getLocStart(), "unsupported map type: %0") << A->getName();
+        error(GET_BEGINLOC(Decl), "unsupported map type: %0") << A->getName();
         return false;
       }
 
@@ -1206,7 +1207,7 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
                                 table.max_entries, table.flags);
     }
     if (table.fd < 0) {
-      error(Decl->getLocStart(), "could not open bpf map: %0\nis %1 map type enabled in your kernel?") <<
+      error(GET_BEGINLOC(Decl), "could not open bpf map: %0\nis %1 map type enabled in your kernel?") <<
           strerror(errno) << A->getName();
       return false;
     }
@@ -1332,7 +1333,7 @@ BFrontendAction::BFrontendAction(llvm::raw_ostream &os, unsigned flags,
       mod_src_(mod_src) {}
 
 bool BFrontendAction::is_rewritable_ext_func(FunctionDecl *D) {
-  StringRef file_name = rewriter_->getSourceMgr().getFilename(D->getLocStart());
+  StringRef file_name = rewriter_->getSourceMgr().getFilename(GET_BEGINLOC(D));
   return (D->isExternallyVisible() && D->hasBody() &&
           (file_name.empty() || file_name == main_path_));
 }
