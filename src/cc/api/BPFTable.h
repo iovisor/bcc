@@ -367,4 +367,14 @@ class BPFCgroupArray : public BPFTableBase<int, int> {
   StatusTuple remove_value(const int& index);
 };
 
+class BPFDevmapTable : public BPFTableBase<int, int> {
+public:
+  BPFDevmapTable(const TableDesc& desc);
+  
+  StatusTuple update_value(const int& index, const int& value);
+  StatusTuple get_value(const int& index, int& value);
+  StatusTuple remove_value(const int& index);
+
+};
+
 }  // namespace ebpf
