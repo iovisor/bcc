@@ -104,6 +104,7 @@ class BPFTable : public BPFTableBase<void, void> {
   StatusTuple remove_value(const std::string& key_str);
 
   StatusTuple clear_table_non_atomic();
+  StatusTuple get_table_offline(std::vector<std::pair<std::string, std::string>> &res);
 
   static size_t get_possible_cpu_count();
 };
