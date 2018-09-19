@@ -180,10 +180,10 @@ class Probe(object):
 
         def _parse_types(self, fmt):
                 for match in re.finditer(
-                            r'[^%]%(s|u|d|llu|lld|hu|hd|x|llx|c|K|U)', fmt):
+                            r'[^%]%(s|u|d|lu|llu|ld|lld|hu|hd|x|lx|llx|c|K|U)', fmt):
                         self.types.append(match.group(1))
-                fmt = re.sub(r'([^%]%)(u|d|llu|lld|hu|hd)', r'\1d', fmt)
-                fmt = re.sub(r'([^%]%)(x|llx)', r'\1x', fmt)
+                fmt = re.sub(r'([^%]%)(u|d|lu|llu|ld|lld|hu|hd)', r'\1d', fmt)
+                fmt = re.sub(r'([^%]%)(x|lx|llx)', r'\1x', fmt)
                 fmt = re.sub('%K|%U', '%s', fmt)
                 self.python_format = fmt.strip('"')
 
@@ -283,10 +283,12 @@ static inline bool %s(char const *ignored, uintptr_t str) {
                         expr = expr.replace("STRCMP", fname, 1)
                 return expr
 
-        p_type = {"u": ct.c_uint, "d": ct.c_int,
+        p_type = {"u": ct.c_uint, "d": ct.c_int, "lu": ct.c_ulong,
+                  "ld": ct.c_long,
                   "llu": ct.c_ulonglong, "lld": ct.c_longlong,
                   "hu": ct.c_ushort, "hd": ct.c_short,
-                  "x": ct.c_uint, "llx": ct.c_ulonglong, "c": ct.c_ubyte,
+                  "x": ct.c_uint, "lx": ct.c_ulong, "llx": ct.c_ulonglong,
+                  "c": ct.c_ubyte,
                   "K": ct.c_ulonglong, "U": ct.c_ulonglong}
 
         def _generate_python_field_decl(self, idx, fields):
@@ -320,9 +322,11 @@ static inline bool %s(char const *ignored, uintptr_t str) {
                             dict(_fields_=fields))
 
         c_type = {"u": "unsigned int", "d": "int",
+                  "lu": "unsigned long", "ld": "long",
                   "llu": "unsigned long long", "lld": "long long",
                   "hu": "unsigned short", "hd": "short",
-                  "x": "unsigned int", "llx": "unsigned long long",
+                  "x": "unsigned int", "lx": "unsigned long",
+                  "llx": "unsigned long long",
                   "c": "char", "K": "unsigned long long",
                   "U": "unsigned long long"}
         fmt_types = c_type.keys()
