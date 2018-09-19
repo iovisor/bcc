@@ -99,8 +99,9 @@ if args.disks:
         'BPF_HISTOGRAM(dist, disk_key_t);')
     bpf_text = bpf_text.replace('STORE',
         'disk_key_t key = {.slot = bpf_log2l(delta)}; ' +
-        'bpf_probe_read(&key.disk, sizeof(key.disk), ' +
-        'req->rq_disk->disk_name); dist.increment(key);')
+        'void *__tmp = (void *)req->rq_disk->disk_name; ' +
+        'bpf_probe_read(&key.disk, sizeof(key.disk), __tmp); ' +
+        'dist.increment(key);')
 else:
     bpf_text = bpf_text.replace('STORAGE', 'BPF_HISTOGRAM(dist);')
     bpf_text = bpf_text.replace('STORE',
