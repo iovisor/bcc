@@ -495,4 +495,31 @@ StatusTuple BPFCgroupArray::remove_value(const int& index) {
   return StatusTuple(0);
 }
 
+BPFDevmapTable::BPFDevmapTable(const TableDesc& desc) 
+    : BPFTableBase<int, int>(desc) {
+    if(desc.type != BPF_MAP_TYPE_DEVMAP)
+      throw std::invalid_argument("Table '" + desc.name + 
+                                  "' is not a devmap table");
+}
+
+StatusTuple BPFDevmapTable::update_value(const int& index, 
+                                         const int& value) {
+    if (!this->update(const_cast<int*>(&index), const_cast<int*>(&value)))
+      return StatusTuple(-1, "Error updating value: %s", std::strerror(errno));
+    return StatusTuple(0);
+}
+
+StatusTuple BPFDevmapTable::get_value(const int& index, 
+                                      int& value) {
+    if (!this->lookup(const_cast<int*>(&index), &value))
+      return StatusTuple(-1, "Error getting value: %s", std::strerror(errno));
+    return StatusTuple(0);
+}
+
+StatusTuple BPFDevmapTable::remove_value(const int& index) {
+    if (!this->remove(const_cast<int*>(&index)))
+      return StatusTuple(-1, "Error removing value: %s", std::strerror(errno));
+    return StatusTuple(0);
+}
+
 }  // namespace ebpf
