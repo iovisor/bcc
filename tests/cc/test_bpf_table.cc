@@ -28,6 +28,7 @@ TEST_CASE("test bpf table", "[bpf_table]") {
 
   ebpf::BPF *bpf(new ebpf::BPF);
   ebpf::StatusTuple res(0);
+  std::vector<std::pair<std::string, std::string>> elements;
   res = bpf->init(BPF_PROGRAM);
   REQUIRE(res.code() == 0);
 
@@ -37,7 +38,7 @@ TEST_CASE("test bpf table", "[bpf_table]") {
   std::string value;
   res = t.update_value("0x07", "0x42");
   REQUIRE(res.code() == 0);
-  res = t.get_value("0x07", value);
+  res = t.get_value("0x7", value);
   REQUIRE(res.code() == 0);
   REQUIRE(value == "0x42");
 
@@ -54,14 +55,27 @@ TEST_CASE("test bpf table", "[bpf_table]") {
   res = t.get_value("0x11", value);
   REQUIRE(res.code() != 0);
 
-  // clear table
   res = t.update_value("0x15", "0x888");
   REQUIRE(res.code() == 0);
-  auto elements = bpf->get_hash_table<int, int>("myhash").get_table_offline();
+  res = t.get_table_offline(elements);
+  REQUIRE(res.code() == 0);
   REQUIRE(elements.size() == 2);
+
+  // check that elements match what is in the  table
+  for (auto &it : elements) {
+    if (it.first == "0x15") {
+      REQUIRE(it.second == "0x888");
+    } else if (it.first == "0x7") {
+      REQUIRE(it.second == "0x42");
+    } else {
+      FAIL("Element " + it.first + " should not be on the table", it.first);
+    }
+  }
+
   res = t.clear_table_non_atomic();
   REQUIRE(res.code() == 0);
-  elements = bpf->get_hash_table<int, int>("myhash").get_table_offline();
+  res = t.get_table_offline(elements);
+  REQUIRE(res.code() == 0);
   REQUIRE(elements.size() == 0);
 
   // delete bpf_module, call to key/leaf printf/scanf must fail
