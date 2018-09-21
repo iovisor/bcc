@@ -505,6 +505,12 @@ bool ProbeVisitor::VisitArraySubscriptExpr(ArraySubscriptExpr *E) {
   Expr *idx = E->getIdx();
   memb_visited_.insert(E);
 
+  if (!rewriter_.isRewritable(GET_BEGINLOC(base)))
+    return true;
+  if (!rewriter_.isRewritable(GET_BEGINLOC(idx)))
+    return true;
+
+
   string pre, lbracket, rbracket;
   LangOptions opts;
   SourceLocation lbracket_start, lbracket_end;
