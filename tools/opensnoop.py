@@ -61,7 +61,6 @@ bpf_text = """
 
 struct val_t {
     u64 id;
-    u64 ts;
     char comm[TASK_COMM_LEN];
     const char *fname;
 };
@@ -87,7 +86,6 @@ int trace_entry(struct pt_regs *ctx, int dfd, const char __user *filename)
     FILTER
     if (bpf_get_current_comm(&val.comm, sizeof(val.comm)) == 0) {
         val.id = id;
-        val.ts = bpf_ktime_get_ns();
         val.fname = filename;
         infotmp.update(&id, &val);
     }
