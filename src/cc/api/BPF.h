@@ -47,8 +47,9 @@ class BPF {
   static const int BPF_MAX_STACK_DEPTH = 127;
 
   explicit BPF(unsigned int flag = 0, TableStorage* ts = nullptr,
-               bool rw_engine_enabled = true)
-      : flag_(flag), bpf_module_(new BPFModule(flag, ts, rw_engine_enabled)) {}
+               bool rw_engine_enabled = true, const std::string &maps_ns = "")
+      : flag_(flag),
+      bpf_module_(new BPFModule(flag, ts, rw_engine_enabled, maps_ns)) {}
   StatusTuple init(const std::string& bpf_program,
                    const std::vector<std::string>& cflags = {},
                    const std::vector<USDT>& usdt = {});
