@@ -49,6 +49,8 @@ parser.add_argument("-v", "--verbose", action="store_true",
     help="verbose mode: print the BPF program (for debugging purposes)")
 parser.add_argument("-m", "--milliseconds", action="store_true",
     help="report times in milliseconds (default is microseconds)")
+parser.add_argument("--ebpf", action="store_true",
+    help=argparse.SUPPRESS)
 args = parser.parse_args()
 
 language = args.language
@@ -243,10 +245,12 @@ if language:
 else:
     usdt = None
 
-if args.verbose:
-    if usdt:
+if args.ebpf or args.verbose:
+    if args.verbose and usdt:
         print(usdt.get_text())
     print(program)
+    if args.ebpf:
+        exit()
 
 bpf = BPF(text=program, usdt_contexts=[usdt] if usdt else [])
 if args.syscalls:

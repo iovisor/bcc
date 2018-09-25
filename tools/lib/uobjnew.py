@@ -4,7 +4,7 @@
 # uobjnew  Summarize object allocations in high-level languages.
 #          For Linux, uses BCC, eBPF.
 #
-# USAGE: uobjnew [-h] [-T TOP] [-v] {java,ruby,c} pid [interval]
+# USAGE: uobjnew [-h] [-T TOP] [-v] {c,java,ruby} pid [interval]
 #
 # Copyright 2016 Sasha Goldshtein
 # Licensed under the Apache License, Version 2.0 (the "License")
@@ -18,7 +18,7 @@ from time import sleep
 import os
 
 # C needs to be the last language.
-languages = ["java", "ruby", "c"]
+languages = ["c", "java", "ruby"]
 
 examples = """examples:
     ./uobjnew -l java 145         # summarize Java allocations in process 145
@@ -41,6 +41,8 @@ parser.add_argument("-S", "--top-size", type=int,
     help="number of largest types by allocated bytes to print")
 parser.add_argument("-v", "--verbose", action="store_true",
     help="verbose mode: print the BPF program (for debugging purposes)")
+parser.add_argument("--ebpf", action="store_true",
+    help=argparse.SUPPRESS)
 args = parser.parse_args()
 
 language = args.language
@@ -69,9 +71,24 @@ BPF_HASH(allocs, struct key_t, struct val_t);
 usdt = USDT(pid=args.pid)
 
 #
+# C
+#
+if language == "c":
+    program += """
+int alloc_entry(struct pt_regs *ctx, size_t size) {
+    struct key_t key = {};
+    struct val_t *valp, zero = {};
+    key.size = size;
+    valp = allocs.lookup_or_init(&key, &zero);
+    valp->total_size += size;
+    valp->num_allocs += 1;
+    return 0;
+}
+    """
+#
 # Java
 #
-if language == "java":
+elif language == "java":
     program += """
 int alloc_entry(struct pt_regs *ctx) {
     struct key_t key = {};
@@ -120,30 +137,18 @@ int object_alloc_entry(struct pt_regs *ctx) {
         program += create_template.replace("THETHING", thing)
         usdt.enable_probe_or_bail("%s__create" % thing,
                                   "%s_alloc_entry" % thing)
-#
-# C
-#
-elif language == "c":
-    program += """
-int alloc_entry(struct pt_regs *ctx, size_t size) {
-    struct key_t key = {};
-    struct val_t *valp, zero = {};
-    key.size = size;
-    valp = allocs.lookup_or_init(&key, &zero);
-    valp->total_size += size;
-    valp->num_allocs += 1;
-    return 0;
-}
-    """
 
 else:
     print("No language detected; use -l to trace a language.")
     exit(1)
 
 
-if args.verbose:
-    print(usdt.get_text())
+if args.ebpf or args.verbose:
+    if args.verbose:
+        print(usdt.get_text())
     print(program)
+    if args.ebpf:
+        exit()
 
 bpf = BPF(text=program, usdt_contexts=[usdt])
 if language == "c":

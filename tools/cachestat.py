@@ -19,6 +19,7 @@
 from __future__ import print_function
 from bcc import BPF
 from time import sleep, strftime
+import argparse
 import signal
 import re
 from sys import argv
@@ -48,43 +49,25 @@ misses = 0
 hits = 0
 debug = 0
 
-# args
-def usage():
-    print("USAGE: %s [-T] [ interval [count] ]" % argv[0])
-    exit()
-
 # arguments
-interval = 5
-count = -1
-tstamp = 0
+parser = argparse.ArgumentParser(
+    description="Count cache kernel function calls",
+    formatter_class=argparse.RawDescriptionHelpFormatter)
+parser.add_argument("-T", "--timestamp", action="store_true",
+    help="include timestamp on output")
+parser.add_argument("interval", nargs="?", default=5,
+    help="output interval, in seconds")
+parser.add_argument("count", nargs="?", default=-1,
+    help="number of outputs")
+parser.add_argument("--ebpf", action="store_true",
+    help=argparse.SUPPRESS)
+args = parser.parse_args()
+count = int(args.count)
+tstamp = args.timestamp
+interval = int(args.interval)
 
-if len(argv) > 1:
-    if str(argv[1]) == '-T':
-        tstamp = 1
-
-if len(argv) > 1 and tstamp == 0:
-    try:
-        if int(argv[1]) > 0:
-            interval = int(argv[1])
-        if len(argv) > 2:
-            if int(argv[2]) > 0:
-                count = int(argv[2])
-    except:
-        usage()
-
-elif len(argv) > 2 and tstamp == 1:
-    try:
-        if int(argv[2]) > 0:
-            interval = int(argv[2])
-        if len(argv) >= 4:
-            if int(argv[3]) > 0:
-                count = int(argv[3])
-    except:
-        usage()
-
-# load BPF program
+# define BPF program
 bpf_text = """
-
 #include <uapi/linux/ptrace.h>
 struct key_t {
     u64 ip;
@@ -102,6 +85,13 @@ int do_count(struct pt_regs *ctx) {
 }
 
 """
+
+if debug or args.ebpf:
+    print(bpf_text)
+    if args.ebpf:
+        exit()
+
+# load BPF program
 b = BPF(text=bpf_text)
 b.attach_kprobe(event="add_to_page_cache_lru", fn_name="do_count")
 b.attach_kprobe(event="mark_page_accessed", fn_name="do_count")
@@ -129,7 +119,7 @@ while 1:
         # as cleanup can take many seconds, trap Ctrl-C:
         signal.signal(signal.SIGINT, signal_ignore)
 
-    counts = b.get_table("counts")
+    counts = b["counts"]
     for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
 
         if re.match(b'mark_page_accessed', b.ksym(k.ip)) is not None:
@@ -175,7 +165,7 @@ while 1:
     cached = int(mem["Cached"]) / 1024
     buff = int(mem["Buffers"]) / 1024
 
-    if tstamp == 1:
+    if tstamp:
         print("%-8s " % strftime("%H:%M:%S"), end="")
     print("%8d %8d %8d %8d %12.0f %10.0f" %
     (total, misses, hits, mbd, buff, cached))
