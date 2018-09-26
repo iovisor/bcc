@@ -4,7 +4,7 @@
 # ugc  Summarize garbage collection events in high-level languages.
 #      For Linux, uses BCC, eBPF.
 #
-# USAGE: ugc [-v] [-m] [-M MSEC] [-F FILTER] {java,python,ruby,node} pid
+# USAGE: ugc [-v] [-m] [-M MSEC] [-F FILTER] {java,node,python,ruby} pid
 #
 # Copyright 2016 Sasha Goldshtein
 # Licensed under the Apache License, Version 2.0 (the "License")
@@ -18,7 +18,7 @@ import ctypes as ct
 import time
 import os
 
-languages = ["java", "python", "ruby", "node"]
+languages = ["java", "node", "python", "ruby"]
 
 examples = """examples:
     ./ugc -l java 185        # trace Java GCs in process 185
@@ -40,6 +40,8 @@ parser.add_argument("-M", "--minimum", type=int, default=0,
     help="display only GCs longer than this many milliseconds")
 parser.add_argument("-F", "--filter", type=str,
     help="display only GCs whose description contains this text")
+parser.add_argument("--ebpf", action="store_true",
+    help=argparse.SUPPRESS)
 args = parser.parse_args()
 
 usdt = USDT(pid=args.pid)
@@ -150,6 +152,21 @@ if language == "java":
     probes.append(Probe("gc__begin", "gc__end",
                         "", "", lambda _: "no additional info available"))
 #
+# Node
+#
+elif language == "node":
+    end_save = """
+    u32 gc_type = 0;
+    bpf_usdt_readarg(1, ctx, &gc_type);
+    event.field1 = gc_type;
+    """
+    descs = {"GC scavenge": 1, "GC mark-sweep-compact": 2,
+             "GC incremental mark": 4, "GC weak callbacks": 8}
+    probes.append(Probe("gc__start", "gc__done", "", end_save,
+                  lambda e: str.join(", ",
+                                     [desc for desc, val in descs.items()
+                                      if e.field1 & val != 0])))
+#
 # Python
 #
 elif language == "python":
@@ -179,21 +196,6 @@ elif language == "ruby":
                         "", "", lambda _: "GC mark stage"))
     probes.append(Probe("gc__sweep__begin", "gc__sweep__end",
                         "", "", lambda _: "GC sweep stage"))
-#
-# Node
-#
-elif language == "node":
-    end_save = """
-    u32 gc_type = 0;
-    bpf_usdt_readarg(1, ctx, &gc_type);
-    event.field1 = gc_type;
-    """
-    descs = {"GC scavenge": 1, "GC mark-sweep-compact": 2,
-             "GC incremental mark": 4, "GC weak callbacks": 8}
-    probes.append(Probe("gc__start", "gc__done", "", end_save,
-                  lambda e: str.join(", ",
-                                     [desc for desc, val in descs.items()
-                                      if e.field1 & val != 0])))
 
 else:
     print("No language detected; use -l to trace a language.")
@@ -204,9 +206,12 @@ for probe in probes:
     program += probe.generate()
     probe.attach()
 
-if args.verbose:
-    print(usdt.get_text())
+if args.ebpf or args.verbose:
+    if args.verbose:
+        print(usdt.get_text())
     print(program)
+    if args.ebpf:
+        exit()
 
 bpf = BPF(text=program, usdt_contexts=[usdt])
 print("Tracing garbage collections in %s process %d... Ctrl-C to quit." %

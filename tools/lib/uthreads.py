@@ -34,6 +34,8 @@ parser.add_argument("-l", "--language", choices=languages + ["none"],
 parser.add_argument("pid", type=int, help="process id to attach to")
 parser.add_argument("-v", "--verbose", action="store_true",
     help="verbose mode: print the BPF program (for debugging purposes)")
+parser.add_argument("--ebpf", action="store_true",
+    help=argparse.SUPPRESS)
 args = parser.parse_args()
 
 usdt = USDT(pid=args.pid)
@@ -88,9 +90,12 @@ int %s(struct pt_regs *ctx) {
     usdt.enable_probe_or_bail("thread__start", "trace_start")
     usdt.enable_probe_or_bail("thread__stop", "trace_stop")
 
-if args.verbose:
-    print(usdt.get_text())
+if args.ebpf or args.verbose:
+    if args.verbose:
+        print(usdt.get_text())
     print(program)
+    if args.ebpf:
+        exit()
 
 bpf = BPF(text=program, usdt_contexts=[usdt])
 print("Tracing thread events in process %d (language: %s)... Ctrl-C to quit." %

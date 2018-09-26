@@ -39,6 +39,8 @@ parser.add_argument("-C", "--class", dest="clazz",
     help="trace only calls to classes starting with this prefix")
 parser.add_argument("-v", "--verbose", action="store_true",
     help="verbose mode: print the BPF program (for debugging purposes)")
+parser.add_argument("--ebpf", action="store_true",
+    help=argparse.SUPPRESS)
 args = parser.parse_args()
 
 usdt = USDT(pid=args.pid)
@@ -165,9 +167,12 @@ else:
     print("No language detected; use -l to trace a language.")
     exit(1)
 
-if args.verbose:
-    print(usdt.get_text())
+if args.ebpf or args.verbose:
+    if args.verbose:
+        print(usdt.get_text())
     print(program)
+    if args.ebpf:
+        exit()
 
 bpf = BPF(text=program, usdt_contexts=[usdt])
 print("Tracing method calls in %s process %d... Ctrl-C to quit." %
