@@ -1,11 +1,11 @@
 # Copyright (c) PLUMgrid, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
 
-macro(symlink_file SRC DST)
-  execute_process(COMMAND ${CMAKE_COMMAND} -E create_symlink ${SRC} ${DST})
-endmacro()
+set(PYTHON_SRC __init__.py perf.py tcp.py utils.py libbcc.py table.py usdt.py)
 
-symlink_file(${CMAKE_CURRENT_SOURCE_DIR}/bcc ${CMAKE_CURRENT_BINARY_DIR}/bcc)
+foreach (PY_SRC ${PYTHON_SRC})
+  configure_file(bcc/${PY_SRC} ${CMAKE_CURRENT_BINARY_DIR}/bcc/${PY_SRC} COPYONLY)
+endforeach()
 
 if(NOT PYTHON_CMD)
   set(PYTHON_CMD "python")
