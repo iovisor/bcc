@@ -1097,6 +1097,7 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
     TableStorage::iterator table_it;
     table.name = Decl->getName();
     Path local_path({fe_.id(), table.name});
+    Path maps_ns_path({"ns", fe_.maps_ns(), table.name});
     Path global_path({table.name});
     QualType key_type, leaf_type;
 
@@ -1182,9 +1183,11 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
     } else if (A->getName() == "maps/cpumap") {
       map_type = BPF_MAP_TYPE_CPUMAP;
     } else if (A->getName() == "maps/extern") {
-      if (!fe_.table_storage().Find(global_path, table_it)) {
-        error(GET_BEGINLOC(Decl), "reference to undefined table");
-        return false;
+      if (!fe_.table_storage().Find(maps_ns_path, table_it)) {
+        if (!fe_.table_storage().Find(global_path, table_it)) {
+          error(GET_BEGINLOC(Decl), "reference to undefined table");
+          return false;
+        }
       }
       table = table_it->second.dup();
       table.is_extern = true;
@@ -1198,6 +1201,17 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
         return false;
       }
       fe_.table_storage().Insert(global_path, table_it->second.dup());
+      return true;
+    } else if(A->getName() == "maps/shared") {
+      if (table.name.substr(0, 2) == "__")
+        table.name = table.name.substr(2);
+      Path local_path({fe_.id(), table.name});
+      Path maps_ns_path({"ns", fe_.maps_ns(), table.name});
+      if (!fe_.table_storage().Find(local_path, table_it)) {
+        error(GET_BEGINLOC(Decl), "reference to undefined table");
+        return false;
+      }
+      fe_.table_storage().Insert(maps_ns_path, table_it->second.dup());
       return true;
     }
 
@@ -1328,11 +1342,13 @@ void BTypeConsumer::HandleTranslationUnit(ASTContext &Context) {
 BFrontendAction::BFrontendAction(llvm::raw_ostream &os, unsigned flags,
                                  TableStorage &ts, const std::string &id,
                                  const std::string &main_path,
-                                 FuncSource &func_src, std::string &mod_src)
+                                 FuncSource &func_src, std::string &mod_src,
+                                 const std::string &maps_ns)
     : os_(os),
       flags_(flags),
       ts_(ts),
       id_(id),
+      maps_ns_(maps_ns),
       rewriter_(new Rewriter),
       main_path_(main_path),
       func_src_(func_src),
