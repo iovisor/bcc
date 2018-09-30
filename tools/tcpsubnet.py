@@ -4,7 +4,7 @@
 # tcpsubnet   Summarize TCP bytes sent to different subnets.
 #             For Linux, uses BCC, eBPF. Embedded C.
 #
-# USAGE: tcpsubnet [-h] [-v] [--ebpf] [-J] [-f FORMAT] [-i INTERVAL] [subnets]
+# USAGE: tcpsubnet [-h] [-v] [-J] [-f FORMAT] [-i INTERVAL] [subnets]
 #
 # This uses dynamic tracing of kernel functions, and will need to be updated
 # to match kernel changes.

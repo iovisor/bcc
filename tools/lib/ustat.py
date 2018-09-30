@@ -147,6 +147,8 @@ class Tool(object):
             help="output interval, in seconds")
         parser.add_argument("count", nargs="?", default=99999999, type=int,
             help="number of outputs")
+        parser.add_argument("--ebpf", action="store_true",
+            help=argparse.SUPPRESS)
         self.args = parser.parse_args()
 
     def _create_probes(self):
@@ -197,8 +199,10 @@ class Tool(object):
 
     def _attach_probes(self):
         program = str.join('\n', [p.get_program() for p in self.probes])
-        if self.args.debug:
+        if self.args.debug or self.args.ebpf:
             print(program)
+            if self.args.ebpf:
+                exit()
             for probe in self.probes:
                 print("Attached to %s processes:" % probe.language,
                         str.join(', ', map(str, probe.targets)))
