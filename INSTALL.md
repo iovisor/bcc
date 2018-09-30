@@ -52,7 +52,7 @@ Kernel compile flags can usually be checked by looking at `/proc/config.gz` or
 
 ## Ubuntu - Binary
 
-The stable and the nightly packages are built for Ubuntu Xenial (16.04) and Ubuntu Artful (17.10). The steps are very straightforward, no need to upgrade the kernel or compile from source!
+The stable and the nightly packages are built for Ubuntu Xenial (16.04), Ubuntu Artful (17.10) and Ubuntu Bionic (18.04). The steps are very straightforward, no need to upgrade the kernel or compile from source!
 
 **Stable and Signed Packages**
 
@@ -62,7 +62,7 @@ echo "deb https://repo.iovisor.org/apt/xenial xenial main" | sudo tee /etc/apt/s
 sudo apt-get update
 sudo apt-get install bcc-tools libbcc-examples linux-headers-$(uname -r)
 ```
-(s/xenial/artful as appropriate)
+(replace `xenial` with `artful` or `bionic` as appropriate)
 
 **Nightly Packages**
 
@@ -71,7 +71,7 @@ echo "deb [trusted=yes] https://repo.iovisor.org/apt/xenial xenial-nightly main"
 sudo apt-get update
 sudo apt-get install bcc-tools libbcc-examples linux-headers-$(uname -r)
 ```
-(s/xenial/artful as appropriate)
+(replace `xenial` with `artful` or `bionic` as appropriate)
 
 ## Fedora - Binary
 
