@@ -64,6 +64,7 @@ BPF support for `sock_ops` | 4.13 | [`40304b2a1567`](https://git.kernel.org/cgit
 BPF support for skbs on sockets | 4.14 | [`b005fd189cec`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=b005fd189cec9407b700599e1e80e0552446ee79)
 bpftool utility in kernel sources | 4.15 | [`71bb428fe2c1`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=71bb428fe2c19512ac671d5ee16ef3e73e1b49a8)
 BPF attached to cgroups as device controller | 4.15 | [`ebc614f68736`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=ebc614f687369f9df99828572b1d85a7c2de3d92)
+bpf2bpf function calls | 4.16 |  [`cc8b0b92a169`](https://github.com/torvalds/linux/commit/cc8b0b92a1699bc32f7fec71daa2bfc90de43a4d)
 BPF used for monitoring socket RX/TX data | 4.17 | [`4f738adba30a`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=4f738adba30a7cfc006f605707e7aee847ffefa0)
 BPF attached to raw tracepoints | 4.17 | [`c4f6699dfcb8`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=c4f6699dfcb8558d138fe838f741b2c10f416cf9)
 BPF attached to `bind()` system call | 4.17 | [`4fbac77d2d09`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=4fbac77d2d092b475dda9eea66da674369665427)
