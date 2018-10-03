@@ -15,7 +15,7 @@ limitations under the License.
 ]]
 local ffi = require('ffi')
 local bit = require('bit')
-local S = require('syscall')
+local has_syscall, S = pcall(require, 'syscall')
 local M = {}
 
 ffi.cdef [[
@@ -132,23 +132,54 @@ struct bpf_stacktrace {
 ]]
 
 -- Compatibility: ljsyscall doesn't have support for BPF syscall
-if not S.bpf then
+if not has_syscall or not S.bpf then
 	error("ljsyscall doesn't support bpf(), must be updated")
 else
+	local strflag = require('syscall.helpers').strflag
 	-- Compatibility: ljsyscall<=0.12
-	if not S.c.BPF_MAP.PERCPU_HASH then
-		S.c.BPF_MAP.PERCPU_HASH  = 5
-		S.c.BPF_MAP.PERCPU_ARRAY = 6
-		S.c.BPF_MAP.STACK_TRACE  = 7
-		S.c.BPF_MAP.CGROUP_ARRAY = 8
-		S.c.BPF_MAP.LRU_HASH     = 9
-		S.c.BPF_MAP.LRU_PERCPU_HASH = 10
-		S.c.BPF_MAP.LPM_TRIE     = 11
+	if not S.c.BPF_MAP.LRU_HASH then
+		S.c.BPF_MAP = strflag {
+			UNSPEC           = 0,
+			HASH             = 1,
+			ARRAY            = 2,
+			PROG_ARRAY       = 3,
+			PERF_EVENT_ARRAY = 4,
+			PERCPU_HASH      = 5,
+			PERCPU_ARRAY     = 6,
+			STACK_TRACE      = 7,
+			CGROUP_ARRAY     = 8,
+			LRU_HASH         = 9,
+			LRU_PERCPU_HASH  = 10,
+			LPM_TRIE         = 11,
+			ARRAY_OF_MAPS    = 12,
+			HASH_OF_MAPS     = 13,
+			DEVMAP           = 14,
+			SOCKMAP          = 15,
+			CPUMAP           = 16,
+		}
 	end
 	if not S.c.BPF_PROG.TRACEPOINT then
-		S.c.BPF_PROG.TRACEPOINT  = 5
-		S.c.BPF_PROG.XDP         = 6
-		S.c.BPF_PROG.PERF_EVENT  = 7
+		S.c.BPF_PROG = strflag {
+			UNSPEC           = 0,
+			SOCKET_FILTER    = 1,
+			KPROBE           = 2,
+			SCHED_CLS        = 3,
+			SCHED_ACT        = 4,
+			TRACEPOINT       = 5,
+			XDP              = 6,
+			PERF_EVENT       = 7,
+			CGROUP_SKB       = 8,
+			CGROUP_SOCK      = 9,
+			LWT_IN           = 10,
+			LWT_OUT          = 11,
+			LWT_XMIT         = 12,
+			SOCK_OPS         = 13,
+			SK_SKB           = 14,
+			CGROUP_DEVICE    = 15,
+			SK_MSG           = 16,
+			RAW_TRACEPOINT   = 17,
+			CGROUP_SOCK_ADDR = 18,
+		}
 	end
 end
 
@@ -180,6 +211,14 @@ function M.isptr(v, noarray)
 	return ctname
 end
 
+-- Return true if variable is a non-nil constant that can be used as immediate value
+-- e.g. result of KSHORT and KNUM
+function M.isimmconst(v)
+	return (type(v.const) == 'number' and not ffi.istype(v.type, ffi.typeof('void')))
+		or type(v.const) == 'cdata' and ffi.istype(v.type, ffi.typeof('uint64_t')) -- Lua numbers are at most 52 bits
+		or type(v.const) == 'cdata' and ffi.istype(v.type, ffi.typeof('int64_t'))
+end
+
 function M.osversion()
 	-- We have no better way to extract current kernel hex-string other
 	-- than parsing headers, compiling a helper function or reading /proc
@@ -203,10 +242,10 @@ function M.event_reader(reader, event_type)
 	end
 	-- Wrap reader in interface that can interpret read event messages
 	return setmetatable({reader=reader,type=event_type}, {__index = {
-		block = function(self)
+		block = function(_ --[[self]])
 			return S.select { readfds = {reader.fd} }
 		end,
-		next = function(self, k)
+		next = function(_ --[[self]], k)
 			local len, ev = reader:next(k)
 			-- Filter out only sample frames
 			while ev and ev.type ~= S.c.PERF_RECORD.SAMPLE do
