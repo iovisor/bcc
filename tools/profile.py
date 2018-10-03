@@ -268,7 +268,7 @@ if not args.folded:
 
 def aksym(addr):
     if args.annotations:
-        return b.ksym(addr) + "_[k]"
+        return b.ksym(addr) + "_[k]".encode()
     else:
         return b.ksym(addr)
 
