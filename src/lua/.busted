@@ -1,0 +1,9 @@
+-- Configuration for unit tests
+-- See: http://olivinelabs.com/busted/
+return {
+	default = {
+		lpath = "./?.lua;./?/init.lua",
+		helper = "./bpf/spec/helper.lua",
+		["auto-insulate"] = false,
+	}
+}
