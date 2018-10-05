@@ -196,7 +196,9 @@ def print_event(cpu, data, size):
     direction = "<- " if event.depth & (1 << 63) else "-> "
     print("%-3d %-6d %-6d %-8.3f %-40s" % (cpu, event.pid >> 32,
         event.pid & 0xFFFFFFFF, time.time() - start_ts,
-        ("  " * (depth - 1)) + direction + event.clazz + "." + event.method))
+        ("  " * (depth - 1)) + direction + \
+            event.clazz.decode('utf-8', 'replace') + "." + \
+            event.method.decode('utf-8', 'replace')))
 
 bpf["calls"].open_perf_buffer(print_event)
 while 1:
