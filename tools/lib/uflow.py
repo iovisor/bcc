@@ -49,7 +49,6 @@ program = """
 struct call_t {
     u64 depth;                  // first bit is direction (0 entry, 1 return)
     u64 pid;                    // (tgid << 32) + pid from bpf_get_current...
-    u64 timestamp;              // ns
     char clazz[80];
     char method[80];
 };
@@ -89,7 +88,6 @@ int NAME(struct pt_regs *ctx) {
     FILTER_METHOD
 
     data.pid = bpf_get_current_pid_tgid();
-    data.timestamp = bpf_ktime_get_ns();
     depth = entry.lookup_or_init(&data.pid, &zero);
     data.depth = DEPTH;
     UPDATE
@@ -183,7 +181,6 @@ class CallEvent(ct.Structure):
     _fields_ = [
         ("depth", ct.c_ulonglong),
         ("pid", ct.c_ulonglong),
-        ("timestamp", ct.c_ulonglong),
         ("clazz", ct.c_char * 80),
         ("method", ct.c_char * 80)
         ]
@@ -196,7 +193,9 @@ def print_event(cpu, data, size):
     direction = "<- " if event.depth & (1 << 63) else "-> "
     print("%-3d %-6d %-6d %-8.3f %-40s" % (cpu, event.pid >> 32,
         event.pid & 0xFFFFFFFF, time.time() - start_ts,
-        ("  " * (depth - 1)) + direction + event.clazz + "." + event.method))
+        ("  " * (depth - 1)) + direction + \
+            event.clazz.decode('utf-8', 'replace') + "." + \
+            event.method.decode('utf-8', 'replace')))
 
 bpf["calls"].open_perf_buffer(print_event)
 while 1:
