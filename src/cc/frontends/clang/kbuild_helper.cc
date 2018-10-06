@@ -15,7 +15,6 @@
  */
 #include <fcntl.h>
 #include <stdlib.h>
-#include <ftw.h>
 #include <iostream>
 #include "kbuild_helper.h"
 
