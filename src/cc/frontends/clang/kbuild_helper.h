@@ -19,6 +19,7 @@
 #include <vector>
 #include <unistd.h>
 #include <errno.h>
+#include <ftw.h>
 
 namespace ebpf {
 
