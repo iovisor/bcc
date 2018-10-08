@@ -38,6 +38,7 @@ static const char * const prog_type_strings[] = {
   [BPF_PROG_TYPE_CGROUP_SOCK_ADDR] = "cgroup_sock_addr",
   [BPF_PROG_TYPE_LIRC_MODE2] = "lirc_mode2",
   [BPF_PROG_TYPE_SK_REUSEPORT] = "sk_reuseport",
+  [BPF_PROG_TYPE_FLOW_DISSECTOR] = "flow_dissector",
 };
 
 static const char * const map_type_strings[] = {
