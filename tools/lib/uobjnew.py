@@ -4,7 +4,7 @@
 # uobjnew  Summarize object allocations in high-level languages.
 #          For Linux, uses BCC, eBPF.
 #
-# USAGE: uobjnew [-h] [-T TOP] [-v] {c,java,ruby} pid [interval]
+# USAGE: uobjnew [-h] [-T TOP] [-v] {c,java,ruby,tcl} pid [interval]
 #
 # Copyright 2016 Sasha Goldshtein
 # Licensed under the Apache License, Version 2.0 (the "License")
@@ -18,7 +18,7 @@ from time import sleep
 import os
 
 # C needs to be the last language.
-languages = ["c", "java", "ruby"]
+languages = ["c", "java", "ruby", "tcl"]
 
 examples = """examples:
     ./uobjnew -l java 145         # summarize Java allocations in process 145
@@ -137,7 +137,20 @@ int object_alloc_entry(struct pt_regs *ctx) {
         program += create_template.replace("THETHING", thing)
         usdt.enable_probe_or_bail("%s__create" % thing,
                                   "%s_alloc_entry" % thing)
-
+#
+# Tcl
+#
+elif language == "tcl":
+    program += """
+int alloc_entry(struct pt_regs *ctx) {
+    struct key_t key = { .name = "<ALL>" };
+    struct val_t *valp, zero = {};
+    valp = allocs.lookup_or_init(&key, &zero);
+    valp->num_allocs += 1;
+    return 0;
+}
+    """
+    usdt.enable_probe_or_bail("obj__create", "alloc_entry")
 else:
     print("No language detected; use -l to trace a language.")
     exit(1)
@@ -173,7 +186,7 @@ while True:
         data = data[-args.top_size:]
     else:
         data = sorted(data.items(), key=lambda kv: kv[1].total_size)
-    print("%-30s %8s %12s" % ("TYPE", "# ALLOCS", "# BYTES"))
+    print("%-30s %8s %12s" % ("NAME/TYPE", "# ALLOCS", "# BYTES"))
     for key, value in data:
         if language == "c":
             obj_type = "block size %d" % key.size
