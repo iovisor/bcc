@@ -172,8 +172,9 @@ def print_event(cpu, data, size):
     if args.timestamp:
         print("%-14.9f" % (float(event.ts_ns - start_ts) / 1000000000), end="")
 
-    print("%-6d %-16s %4d %3d %s" % (event.pid, event.comm.decode(),
-        fd_s, err, event.fname.decode()))
+    print("%-6d %-16s %4d %3d %s" % (event.pid,
+        event.comm.decode('utf-8', 'replace'), fd_s, err,
+        event.fname.decode('utf-8', 'replace')))
 
 # loop with callback to print_event
 b["events"].open_perf_buffer(print_event, page_cnt=64)

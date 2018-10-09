@@ -316,7 +316,7 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
 
     if folded:
         # print folded stack output
-        line = [k.target.decode()]
+        line = [k.target.decode('utf-8', 'replace')]
         if not args.kernel_stacks_only:
             if stack_id_err(k.t_u_stack_id):
                 line.append("[Missed User Stack]")
@@ -344,11 +344,11 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
             else:
                 line.extend([b.sym(addr, k.w_tgid)
                     for addr in reversed(list(waker_user_stack))])
-        line.append(k.waker.decode())
+        line.append(k.waker.decode('utf-8', 'replace'))
         print("%s %d" % (";".join(line), v.value))
     else:
         # print wakeup name then stack in reverse order
-        print("    %-16s %s %s" % ("waker:", k.waker.decode(), k.t_pid))
+        print("    %-16s %s %s" % ("waker:", k.waker.decode('utf-8', 'replace'), k.t_pid))
         if not args.kernel_stacks_only:
             if stack_id_err(k.w_u_stack_id):
                 print("    [Missed User Stack]")
@@ -381,7 +381,7 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
             else:
                 for addr in target_user_stack:
                     print("    %s" % b.sym(addr, k.t_tgid))
-        print("    %-16s %s %s" % ("target:", k.target.decode(), k.w_pid))
+        print("    %-16s %s %s" % ("target:", k.target.decode('utf-8', 'replace'), k.w_pid))
         print("        %d\n" % v.value)
 
 if missing_stacks > 0:

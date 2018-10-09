@@ -113,7 +113,7 @@ for (k, v) in b.get_table('ref_count').items():
     # This happens on some PIDs due to missed counts caused by sampling
     hit = (v.value - miss) if (v.value >= miss) else 0
     print('{:<8d} {:<16s} {:<4d} {:>12d} {:>12d} {:>6.2f}%'.format(
-        k.pid, k.name.decode(), k.cpu, v.value, miss,
+        k.pid, k.name.decode('utf-8', 'replace'), k.cpu, v.value, miss,
         (float(hit) / float(v.value)) * 100.0))
 print('Total References: {} Total Misses: {} Hit Rate: {:.2f}%'.format(
     tot_ref, tot_miss, (float(tot_ref - tot_miss) / float(tot_ref)) * 100.0))

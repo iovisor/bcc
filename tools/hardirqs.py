@@ -172,7 +172,7 @@ while (1):
     else:
         print("%-26s %11s" % ("HARDIRQ", "TOTAL_" + label))
         for k, v in sorted(dist.items(), key=lambda dist: dist[1].value):
-            print("%-26s %11d" % (k.name.decode(), v.value / factor))
+            print("%-26s %11d" % (k.name.decode('utf-8', 'replace'), v.value / factor))
     dist.clear()
 
     countdown -= 1

@@ -281,7 +281,7 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
         # print folded stack output
         user_stack = list(user_stack)
         kernel_stack = list(kernel_stack)
-        line = [k.name.decode()]
+        line = [k.name.decode('utf-8', 'replace')]
         # if we failed to get the stack is, such as due to no space (-ENOMEM) or
         # hash collision (-EEXIST), we still print a placeholder for consistency
         if not args.kernel_stacks_only:
@@ -312,7 +312,7 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
             else:
                 for addr in user_stack:
                     print("    %s" % b.sym(addr, k.tgid))
-        print("    %-16s %s (%d)" % ("-", k.name.decode(), k.pid))
+        print("    %-16s %s (%d)" % ("-", k.name.decode('utf-8', 'replace'), k.pid))
         print("        %d\n" % v.value)
 
 if missing_stacks > 0:

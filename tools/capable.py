@@ -148,8 +148,8 @@ def print_event(cpu, data, size):
     else:
         name = "?"
     print("%-9s %-6d %-6d %-16s %-4d %-20s %d" % (strftime("%H:%M:%S"),
-        event.uid, event.pid, event.comm.decode(), event.cap, name,
-        event.audit))
+        event.uid, event.pid, event.comm.decode('utf-8', 'replace'),
+        event.cap, name, event.audit))
 
 # loop with callback to print_event
 b["events"].open_perf_buffer(print_event)

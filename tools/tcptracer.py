@@ -556,7 +556,7 @@ def print_ipv4_event(cpu, data, size):
         print("%-2s " % (type_str), end="")
 
     print("%-6d %-16s %-2d %-16s %-16s %-6d %-6d" %
-          (event.pid, event.comm.decode('utf-8'),
+          (event.pid, event.comm.decode('utf-8', 'replace'),
            event.ip,
            inet_ntop(AF_INET, pack("I", event.saddr)),
            inet_ntop(AF_INET, pack("I", event.daddr)),
@@ -593,7 +593,7 @@ def print_ipv6_event(cpu, data, size):
         print("%-2s " % (type_str), end="")
 
     print("%-6d %-16s %-2d %-16s %-16s %-6d %-6d" %
-          (event.pid, event.comm.decode('utf-8'),
+          (event.pid, event.comm.decode('utf-8', 'replace'),
            event.ip,
            "[" + inet_ntop(AF_INET6, event.saddr) + "]",
            "[" + inet_ntop(AF_INET6, event.daddr) + "]",
