@@ -311,10 +311,8 @@ bool Context::enable_probe(const std::string &probe_name,
     }
   }
 
-  if (found_probe != nullptr) {
-    found_probe->enable(fn_name);
-    return true;
-  }
+  if (found_probe != nullptr)
+    return found_probe->enable(fn_name);
 
   return false;
 }
