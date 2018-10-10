@@ -4,7 +4,7 @@
 # uflow  Trace method execution flow in high-level languages.
 #        For Linux, uses BCC, eBPF.
 #
-# USAGE: uflow [-C CLASS] [-M METHOD] [-v] {java,perl,php,python,ruby} pid
+# USAGE: uflow [-C CLASS] [-M METHOD] [-v] {java,perl,php,python,ruby,tcl} pid
 #
 # Copyright 2016 Sasha Goldshtein
 # Licensed under the Apache License, Version 2.0 (the "License")
@@ -18,7 +18,7 @@ import ctypes as ct
 import time
 import os
 
-languages = ["java", "perl", "php", "python", "ruby"]
+languages = ["java", "perl", "php", "python", "ruby", "tcl"]
 
 examples = """examples:
     ./uflow -l java 185                # trace Java method calls in process 185
@@ -161,6 +161,13 @@ elif language == "ruby":
     enable_probe("cmethod__return", "ruby_creturn",
                  "bpf_usdt_readarg(1, ctx, &clazz);",
                  "bpf_usdt_readarg(2, ctx, &method);", is_return=True)
+elif language == "tcl":
+    enable_probe("proc__args", "tcl_entry",
+                 "",  # no class/file info available
+                 "bpf_usdt_readarg(1, ctx, &method);", is_return=False)
+    enable_probe("proc__return", "tcl_return",
+                 "",  # no class/file info available
+                 "bpf_usdt_readarg(1, ctx, &method);", is_return=True)
 else:
     print("No language detected; use -l to trace a language.")
     exit(1)

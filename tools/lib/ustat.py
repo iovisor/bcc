@@ -5,7 +5,7 @@
 #        method calls, class loads, garbage collections, and more.
 #        For Linux, uses BCC, eBPF.
 #
-# USAGE: ustat [-l {java,node,perl,php,python,ruby}] [-C]
+# USAGE: ustat [-l {java,node,perl,php,python,ruby,tcl}] [-C]
 #        [-S {cload,excp,gc,method,objnew,thread}] [-r MAXROWS] [-d]
 #        [interval [count]]
 #
@@ -132,7 +132,7 @@ class Tool(object):
             formatter_class=argparse.RawDescriptionHelpFormatter,
             epilog=examples)
         parser.add_argument("-l", "--language",
-            choices=["java", "node", "perl", "php", "python", "ruby"],
+            choices=["java", "node", "perl", "php", "python", "ruby", "tcl"],
             help="language to trace (default: all languages)")
         parser.add_argument("-C", "--noclear", action="store_true",
             help="don't clear the screen")
@@ -189,6 +189,10 @@ class Tool(object):
                     "require__entry": Category.CLOAD,
                     "load__entry": Category.CLOAD,
                     "raise": Category.EXCP
+                    }),
+                "tcl": Probe("tcl", ["tclsh", "wish"], {
+                    "proc__entry": Category.METHOD,
+                    "obj__create": Category.OBJNEW
                     }),
                 }
 

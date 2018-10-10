@@ -4,7 +4,7 @@
 # uthreads  Trace thread creation/destruction events in high-level languages.
 #           For Linux, uses BCC, eBPF.
 #
-# USAGE: uthreads [-l {java}] [-v] pid
+# USAGE: uthreads [-l {c,java,none}] [-v] pid
 #
 # Copyright 2016 Sasha Goldshtein
 # Licensed under the Apache License, Version 2.0 (the "License")
@@ -18,11 +18,11 @@ import ctypes as ct
 import time
 import os
 
-languages = ["java"]
+languages = ["c", "java"]
 
 examples = """examples:
-    ./uthreads -l java 185   # trace Java threads in process 185
-    ./uthreads 12245         # trace only pthreads in process 12245
+    ./uthreads -l java 185    # trace Java threads in process 185
+    ./uthreads -l none 12245  # trace only pthreads in process 12245
 """
 parser = argparse.ArgumentParser(
     description="Trace thread creation/destruction events in " +
@@ -68,7 +68,10 @@ language = args.language
 if not language:
     language = utils.detect_language(languages, args.pid)
 
-if language == "java":
+if language == "c":
+    # Nothing to add
+    pass
+elif language == "java":
     template = """
 int %s(struct pt_regs *ctx) {
     char type[] = "%s";

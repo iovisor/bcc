@@ -1,24 +1,24 @@
-.TH ugc 8  "2016-11-07" "USER COMMANDS"
+.TH ugc 8  "2018-10-09" "USER COMMANDS"
 .SH NAME
-ugc, javagc, pythongc, rubygc, nodegc \- Trace garbage collection events in
+ugc, javagc, nodegc, pythongc, rubygc \- Trace garbage collection events in
 high-level languages.
 .SH SYNOPSIS
 .B javagc [-h] [-v] [-m] [-M MINIMUM] [-F FILTER] pid
+.br
+.B nodegc [-h] [-v] [-m] [-M MINIMUM] [-F FILTER] pid
 .br
 .B pythongc [-h] [-v] [-m] [-M MINIMUM] [-F FILTER] pid
 .br
 .B rubygc [-h] [-v] [-m] [-M MINIMUM] [-F FILTER] pid
 .br
-.B nodegc [-h] [-v] [-m] [-M MINIMUM] [-F FILTER] pid
-.br
-.B ugc [-h] [-v] [-m] [-M MINIMUM] [-F FILTER] [-l {java,python,ruby,node}] pid
+.B ugc [-h] [-v] [-m] [-M MINIMUM] [-F FILTER] [-l {java,node,python,ruby}] pid
 .SH DESCRIPTION
 This traces garbage collection events as they occur, including their duration
 and any additional information (such as generation collected or type of GC)
 provided by the respective language's runtime.
 
 This tool relies on USDT probes embedded in many high-level languages, such as
-Node, Java, Python, and Ruby. It requires a runtime instrumented with these 
+Java, Node, Python, and Ruby. It requires a runtime instrumented with these
 probes, which in some cases requires building from source with a USDT-specific
 flag, such as "--enable-dtrace" or "--with-dtrace".
 
@@ -45,7 +45,7 @@ if you have thousands of collection events, specifying this filter will not
 reduce the amount of data that has to be transferred from the BPF program to
 the user-space script.
 .TP
-{java,python,ruby,node}
+{java,node,python,ruby}
 The language to trace.
 .TP
 pid
