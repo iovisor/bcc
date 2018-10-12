@@ -277,11 +277,13 @@ if not folded:
     else:
         print("... Hit Ctrl-C to end.")
 
-# as cleanup can take many seconds, trap Ctrl-C:
-# print a newline for folded output on Ctrl-C
-signal.signal(signal.SIGINT, signal_ignore)
+try:
+    sleep(duration)
+except KeyboardInterrupt:
+    # as cleanup can take many seconds, trap Ctrl-C:
+    # print a newline for folded output on Ctrl-C
+    signal.signal(signal.SIGINT, signal_ignore)
 
-sleep(duration)
 
 if not folded:
     print()
