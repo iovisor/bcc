@@ -199,23 +199,23 @@ while (1):
     for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
         if folded:
             # print folded stack output
-            line = k.waker.decode() + ";"
+            line = k.waker.decode('utf-8', 'replace') + ";"
             for i in reversed(range(0, maxdepth)):
                 if k.ret[i] == 0:
                     continue
                 line = line + b.ksym(k.ret[i])
                 if i != 0:
                     line = line + ";"
-            print("%s;%s %d" % (line, k.target.decode(), v.value))
+            print("%s;%s %d" % (line, k.target.decode('utf-8', 'replace'), v.value))
         else:
             # print default multi-line stack output
-            print("    %-16s %s" % ("target:", k.target.decode()))
+            print("    %-16s %s" % ("target:", k.target.decode('utf-8', 'replace')))
             for i in range(0, maxdepth):
                 if k.ret[i] == 0:
                     break
                 print("    %-16x %s" % (k.ret[i],
                     b.ksym(k.ret[i])))
-            print("    %-16s %s" % ("waker:", k.waker.decode()))
+            print("    %-16s %s" % ("waker:", k.waker.decode('utf-8', 'replace')))
             print("        %d\n" % v.value)
     counts.clear()
 

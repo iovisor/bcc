@@ -136,7 +136,8 @@ print("%-8s %-6s %-16s %-7s %s" % ("TIME", "PID", "COMM", "AGE(s)", "FILE"))
 def print_event(cpu, data, size):
     event = ct.cast(data, ct.POINTER(Data)).contents
     print("%-8s %-6d %-16s %-7.2f %s" % (strftime("%H:%M:%S"), event.pid,
-        event.comm.decode(), float(event.delta) / 1000, event.fname.decode()))
+        event.comm.decode('utf-8', 'replace'), float(event.delta) / 1000,
+        event.fname.decode('utf-8', 'replace')))
 
 b["events"].open_perf_buffer(print_event)
 while 1:

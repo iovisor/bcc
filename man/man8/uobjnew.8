@@ -1,22 +1,24 @@
-.TH uobjnew 8  "2016-11-07" "USER COMMANDS"
+.TH uobjnew 8  "2018-10-09" "USER COMMANDS"
 .SH NAME
-uobjnew, javaobjnew, rubyobjnew, cobjnew \- Summarize object allocations in
+uobjnew, cobjnew, javaobjnew, rubyobjnew, tclobjnew \- Summarize object allocations in
 high-level languages.
 .SH SYNOPSIS
+.B cobjnew [-h] [-C TOP_COUNT] [-S TOP_SIZE] [-v] pid [interval]
+.br
 .B javaobjnew [-h] [-C TOP_COUNT] [-S TOP_SIZE] [-v] pid [interval]
 .br
 .B rubyobjnew [-h] [-C TOP_COUNT] [-S TOP_SIZE] [-v] pid [interval]
 .br
-.B cobjnew [-h] [-C TOP_COUNT] [-S TOP_SIZE] [-v] pid [interval]
+.B tclobjnew [-h] [-C TOP_COUNT] [-S TOP_SIZE] [-v] pid [interval]
 .br
-.B uobjnew [-h] [-C TOP_COUNT] [-S TOP_SIZE] [-v] [-l {java,ruby,c}] pid [interval]
+.B uobjnew [-h] [-C TOP_COUNT] [-S TOP_SIZE] [-v] [-l {c,java,ruby,tcl}] pid [interval]
 .SH DESCRIPTION
 uobjnew traces object allocations in high-level languages (including "malloc")
-and prints summaries of the most frequently allocated types by number of 
+and prints summaries of the most frequently allocated types by number of
 objects or number of bytes.
 
 This tool relies on USDT probes embedded in many high-level languages, such as
-Node, Java, Python, and Ruby. It requires a runtime instrumented with these 
+C, Java, Ruby, and Tcl. It requires a runtime instrumented with these
 probes, which in some cases requires building from source with a USDT-specific
 flag, such as "--enable-dtrace" or "--with-dtrace". For Java, the Java process
 must be started with the "-XX:+ExtendedDTraceProbes" flag.
@@ -35,7 +37,7 @@ Print the top object types sorted by size.
 \-v
 Print the resulting BPF program, for debugging purposes.
 .TP
-{java,ruby,c}
+{c,java,ruby,tcl}
 The language to trace.
 .TP
 pid

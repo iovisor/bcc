@@ -4,7 +4,7 @@
 # ucalls  Summarize method calls in high-level languages and/or system calls.
 #         For Linux, uses BCC, eBPF.
 #
-# USAGE: ucalls [-l {java,perl,php,python,ruby}] [-h] [-T TOP] [-L] [-S] [-v] [-m]
+# USAGE: ucalls [-l {java,perl,php,python,ruby,tcl}] [-h] [-T TOP] [-L] [-S] [-v] [-m]
 #        pid [interval]
 #
 # Copyright 2016 Sasha Goldshtein
@@ -18,7 +18,7 @@ from bcc import BPF, USDT, utils
 from time import sleep
 import os
 
-languages = ["java", "perl", "php", "python", "ruby"]
+languages = ["java", "perl", "php", "python", "ruby", "tcl"]
 
 examples = """examples:
     ./ucalls -l java 185        # trace Java calls and print statistics on ^C
@@ -94,6 +94,12 @@ elif language == "ruby":
     return_probe = "method__return"
     read_class = "bpf_usdt_readarg(1, ctx, &clazz);"
     read_method = "bpf_usdt_readarg(2, ctx, &method);"
+elif language == "tcl":
+    # TODO Also consider probe cmd__entry and cmd__return with same arguments
+    entry_probe = "proc__entry"
+    return_probe = "proc__return"
+    read_class = ""  # no class/file info available
+    read_method = "bpf_usdt_readarg(1, ctx, &method);"
 elif not language or language == "none":
     if not args.syscalls:
         print("Nothing to do; use -S to trace syscalls.")

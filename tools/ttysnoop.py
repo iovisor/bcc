@@ -115,7 +115,7 @@ if not args.noclear:
 # process event
 def print_event(cpu, data, size):
     event = ct.cast(data, ct.POINTER(Data)).contents
-    print("%s" % event.buf[0:event.count].decode(), end="")
+    print("%s" % event.buf[0:event.count].decode('utf-8', 'replace'), end="")
     sys.stdout.flush()
 
 # loop with callback to print_event

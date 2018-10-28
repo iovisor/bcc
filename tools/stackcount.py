@@ -339,7 +339,7 @@ class Tool(object):
                     # print folded stack output
                     user_stack = list(user_stack)
                     kernel_stack = list(kernel_stack)
-                    line = [k.name.decode()] + \
+                    line = [k.name.decode('utf-8', 'replace')] + \
                         [b.sym(addr, k.tgid) for addr in
                         reversed(user_stack)] + \
                         (self.need_delimiter and ["-"] or []) + \

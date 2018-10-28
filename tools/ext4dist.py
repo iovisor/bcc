@@ -183,10 +183,10 @@ b = BPF(text=bpf_text)
 # Comment by Joe Yin 
 # From Linux 4.10, the function .read_iter at the ext4_file_operations has 
 # changed to ext4_file_read_iter.
-# So, I add get_kprobe_functions('ext4_file_read_iter'),it will first to attach ext4_file_read_iter,
+# So, I add get_kprobe_functions(b'ext4_file_read_iter'),it will first to attach ext4_file_read_iter,
 # if fails and will attach the generic_file_read_iter which used to pre-4.10.
 
-if BPF.get_kprobe_functions('ext4_file_read_iter'):
+if BPF.get_kprobe_functions(b'ext4_file_read_iter'):
 	b.attach_kprobe(event="ext4_file_read_iter", fn_name="trace_entry")
 else:
 	b.attach_kprobe(event="generic_file_read_iter", fn_name="trace_read_entry")

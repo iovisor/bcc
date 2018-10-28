@@ -176,8 +176,8 @@ def print_event(cpu, data, size):
         delta = float(delta) + (event.ts - prev_ts)
 
     print("%-14.9f %-14.14s %-6s %-7s %-2s %-9s %-7s %7.2f" % (
-        delta / 1000000, event.name.decode(), event.pid,
-        event.disk_name.decode(), rwflg, val,
+        delta / 1000000, event.name.decode('utf-8', 'replace'), event.pid,
+        event.disk_name.decode('utf-8', 'replace'), rwflg, val,
         event.len, float(event.delta) / 1000000))
 
     prev_ts = event.ts

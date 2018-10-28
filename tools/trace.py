@@ -558,7 +558,8 @@ BPF_PERF_OUTPUT(%s);
                 if Probe.print_cpu:
                     print("%-3s " % event.cpu, end="")
                 print("%-7d %-7d %-15s %-16s %s" %
-                      (event.tgid, event.pid, event.comm.decode(),
+                      (event.tgid, event.pid,
+                       event.comm.decode('utf-8', 'replace'),
                        self._display_function(), msg))
 
                 if self.kernel_stack:

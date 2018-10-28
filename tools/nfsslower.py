@@ -280,13 +280,13 @@ def print_event(cpu, data, size):
         return
     print("%-8s %-14.14s %-6s %1s %-7s %-8d %7.2f %s" %
           (strftime("%H:%M:%S"),
-           event.task.decode(),
+           event.task.decode('utf-8', 'replace'),
            event.pid,
            type,
            event.size,
            event.offset / 1024,
            float(event.delta_us) / 1000,
-           event.file.decode()))
+           event.file.decode('utf-8', 'replace')))
 
 
 # Currently specifically works for NFSv4, the other kprobes are generic

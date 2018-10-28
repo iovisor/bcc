@@ -306,7 +306,7 @@ int ClangLoader::do_compile(unique_ptr<llvm::Module> *mod, TableStorage &ts,
   }
 
   // Initialize a compiler invocation object from the clang (-cc1) arguments.
-  const driver::ArgStringList &ccargs = cmd.getArguments();
+  const llvm::opt::ArgStringList &ccargs = cmd.getArguments();
 
   if (flags_ & DEBUG_PREPROCESSOR) {
     llvm::errs() << "clang";

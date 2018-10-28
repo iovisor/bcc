@@ -1,7 +1,7 @@
 Demonstrations of uthreads.
 
 
-uthreads traces thread creation events in Java or raw pthreads, and prints
+uthreads traces thread creation events in Java or raw (C) pthreads, and prints
 details about the newly created thread. For Java threads, the thread name is
 printed; for pthreads, the thread's start function is printed, if there is
 symbol information to resolve it.
@@ -23,7 +23,7 @@ runtime.
 Next, trace only pthread creation events in some native application:
 
 # ./uthreads 27450
-Tracing thread events in process 27450 (language: none)... Ctrl-C to quit.
+Tracing thread events in process 27450 (language: c)... Ctrl-C to quit.
 TIME     ID               TYPE     DESCRIPTION                   
 0.924    27462            pthread  primes_thread [primes]
 0.927    27463            pthread  primes_thread [primes]     
@@ -39,7 +39,7 @@ instead.
 USAGE message:
 
 # ./uthreads -h
-usage: uthreads.py [-h] [-l {java,none}] [-v] pid
+usage: uthreads.py [-h] [-l {c,java,none}] [-v] pid
 
 Trace thread creation/destruction events in high-level languages.
 
@@ -48,11 +48,11 @@ positional arguments:
 
 optional arguments:
   -h, --help            show this help message and exit
-  -l {java,none}, --language {java,none}
+  -l {c,java,none}, --language {c,java,none}
                         language to trace (none for pthreads only)
   -v, --verbose         verbose mode: print the BPF program (for debugging
                         purposes)
 
 examples:
-    ./uthreads -l java 185   # trace Java threads in process 185
-    ./uthreads 12245         # trace only pthreads in process 12245
+    ./uthreads -l java 185    # trace Java threads in process 185
+    ./uthreads -l none 12245  # trace only pthreads in process 12245

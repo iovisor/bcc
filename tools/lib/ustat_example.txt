@@ -4,7 +4,7 @@ Demonstrations of ustat.
 ustat is a "top"-like tool for monitoring events in high-level languages. It 
 prints statistics about garbage collections, method calls, object allocations,
 and various other events for every process that it recognizes with a Java,
-Node, Perl, PHP, Python, and Ruby runtime.
+Node, Perl, PHP, Python, Ruby, and Tcl runtime.
 
 For example:
 
@@ -48,7 +48,7 @@ PID    CMDLINE              METHOD/s   GC/s   OBJNEW/s   CLOAD/s  EXC/s  THR/s
 USAGE message:
 
 # ./ustat.py -h
-usage: ustat.py [-h] [-l {java,node,perl,php,python,ruby}] [-C]
+usage: ustat.py [-h] [-l {java,node,perl,php,python,ruby,tcl}] [-C]
                 [-S {cload,excp,gc,method,objnew,thread}] [-r MAXROWS] [-d]
                 [interval] [count]
 
@@ -60,7 +60,7 @@ positional arguments:
 
 optional arguments:
   -h, --help            show this help message and exit
-  -l {{java,node,perl,php,python,ruby}}, --language {java,node,perl,php,python,ruby}
+  -l {java,node,perl,php,python,ruby,tcl}, --language {java,node,perl,php,python,ruby,tcl}
                         language to trace (default: all languages)
   -C, --noclear         don't clear the screen
   -S {cload,excp,gc,method,objnew,thread}, --sort {cload,excp,gc,method,objnew,thread}

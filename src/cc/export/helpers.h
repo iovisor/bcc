@@ -415,6 +415,26 @@ static void * (*bpf_get_local_storage)(void *map, u64 flags) =
   (void *) BPF_FUNC_get_local_storage;
 static int (*bpf_sk_select_reuseport)(void *reuse, void *map, void *key, u64 flags) =
   (void *) BPF_FUNC_sk_select_reuseport;
+static struct bpf_sock *(*bpf_sk_lookup_tcp)(void *ctx,
+                                             struct bpf_sock_tuple *tuple,
+                                             int size, unsigned int netns_id,
+                                             unsigned long long flags) =
+  (void *) BPF_FUNC_sk_lookup_tcp;
+static struct bpf_sock *(*bpf_sk_lookup_udp)(void *ctx,
+                                             struct bpf_sock_tuple *tuple,
+                                             int size, unsigned int netns_id,
+                                             unsigned long long flags) =
+  (void *) BPF_FUNC_sk_lookup_udp;
+static int (*bpf_sk_release)(struct bpf_sock *sk) =
+  (void *) BPF_FUNC_sk_release;
+static int bpf_map_push_elem(struct bpf_map *map, const void *value, u64 flags) =
+  (void *) BPF_FUNC_map_push_elem;
+static int bpf_map_pop_elem(struct bpf_map *map, void *value) =
+  (void *) BPF_FUNC_map_pop_elem;
+static int bpf_map_peek_elem(struct bpf_map *map, void *value) =
+  (void *) BPF_FUNC_map_peek_elem;
+static int bpf_msg_push_data(struct sk_buff *skb, u32 start, u32 len, u64 flags) =
+  (void *) BPF_FUNC_msg_push_data;
 
 /* llvm builtin functions that eBPF C program may use to
  * emit BPF_LD_ABS and BPF_LD_IND instructions

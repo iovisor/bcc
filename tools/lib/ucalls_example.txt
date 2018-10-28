@@ -2,8 +2,8 @@ Demonstrations of ucalls.
 
 
 ucalls summarizes method calls in various high-level languages, including Java,
-Perl, PHP, Python, Ruby, and Linux system calls. It displays statistics on the
-most frequently called methods, as well as the latency (duration) of these
+Perl, PHP, Python, Ruby, Tcl, and Linux system calls. It displays statistics on
+the most frequently called methods, as well as the latency (duration) of these
 methods.
 
 Through the syscalls support, ucalls can provide basic information on a 
@@ -61,7 +61,7 @@ METHOD                                              # CALLS
 USAGE message:
 
 # ./ucalls.py -h
-usage: ucalls.py [-h] [-l {java,perl,php,python,ruby,none}] [-T TOP] [-L] [-S] [-v]
+usage: ucalls.py [-h] [-l {java,perl,php,python,ruby,tcl,none}] [-T TOP] [-L] [-S] [-v]
                  [-m]
                  pid [interval]
 
@@ -73,7 +73,7 @@ positional arguments:
 
 optional arguments:
   -h, --help            show this help message and exit
-  -l {java,perl,php,python,ruby,none}, --language {java,perl,php,python,ruby,none}
+  -l {java,perl,php,python,ruby,tcl,none}, --language {java,perl,php,python,ruby,tcl,none}
                         language to trace (if none, trace syscalls only)
   -T TOP, --top TOP     number of most frequent/slow calls to print
   -L, --latency         record method latency from enter to exit (except
