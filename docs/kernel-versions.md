@@ -104,6 +104,9 @@ AF_XDP socket (XSK) references | 4.18 | [`fbfc504a24f5`](https://git.kernel.org/
 Socket references (hashmap) | 4.18 | [`81110384441a`](https://git.kernel.org/cgit/linux/kernel/git/davem/net-next.git/commit/?id=81110384441a59cff47430f20f049e69b98c17f4)
 cgroup storage | 4.19 | [`de9cbbaadba5`](https://github.com/torvalds/linux/commit/de9cbbaadba5adf88a19e46df61f7054000838f6)
 reuseport sockarray | 4.19 | [`5dc4c4b7d4e8`](https://github.com/torvalds/linux/commit/5dc4c4b7d4e8115e7cde96a030f98cb3ab2e458c)
+precpu cgroup storage | 4.20 | [`b741f1630346`](https://github.com/torvalds/linux/commit/b741f1630346defcbc8cc60f1a2bdae8b3b0036f)
+queue | 4.20 | [`f1a2e44a3aec`](https://github.com/torvalds/linux/commit/f1a2e44a3aeccb3ff18d3ccc0b0203e70b95bd92)
+stack | 4.20 | [`f1a2e44a3aec`](https://github.com/torvalds/linux/commit/f1a2e44a3aeccb3ff18d3ccc0b0203e70b95bd92)
 
 ## XDP
 
@@ -178,10 +181,14 @@ Helper | Kernel version | License | Commit |
 `BPF_FUNC_lwt_seg6_store_bytes()` | 4.18 |  | [`fe94cc290f53`](https://git.kernel.org/cgit/linux/kernel/git/davem/net-next.git/commit/?id=fe94cc290f535709d3c5ebd1e472dfd0aec7ee79)
 `BPF_FUNC_map_delete_elem()` | 3.19 |  | [`d0003ec01c66`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=d0003ec01c667b731c139e23de3306a8b328ccf5)
 `BPF_FUNC_map_lookup_elem()` | 3.19 |  | [`d0003ec01c66`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=d0003ec01c667b731c139e23de3306a8b328ccf5)
+`BPF_FUNC_map_peek_elem()` | 3.20 |  | [`f1a2e44a3aec`](https://github.com/torvalds/linux/commit/f1a2e44a3aeccb3ff18d3ccc0b0203e70b95bd92)
+`BPF_FUNC_map_pop_elem()` | 3.20 |  | [`f1a2e44a3aec`](https://github.com/torvalds/linux/commit/f1a2e44a3aeccb3ff18d3ccc0b0203e70b95bd92)
+`BPF_FUNC_map_push_elem()` | 3.20 |  | [`f1a2e44a3aec`](https://github.com/torvalds/linux/commit/f1a2e44a3aeccb3ff18d3ccc0b0203e70b95bd92)
 `BPF_FUNC_map_update_elem()` | 3.19 |  | [`d0003ec01c66`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=d0003ec01c667b731c139e23de3306a8b328ccf5)
 `BPF_FUNC_msg_apply_bytes()` | 4.17 |  | [`2a100317c9eb`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=2a100317c9ebc204a166f16294884fbf9da074ce)
 `BPF_FUNC_msg_cork_bytes()` | 4.17 |  | [`91843d540a13`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=91843d540a139eb8070bcff8aa10089164436deb)
 `BPF_FUNC_msg_pull_data()` | 4.17 |  | [`015632bb30da`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=015632bb30daaaee64e1bcac07570860e0bf3092)
+`BPF_FUNC_msg_push_data()` | 4.20 |  | [`6fff607e2f14`](https://github.com/torvalds/linux/commit/6fff607e2f14bd7c63c06c464a6f93b8efbabe28)
 `BPF_FUNC_msg_redirect_hash()` | 4.18 |  | [`81110384441a`](https://git.kernel.org/cgit/linux/kernel/git/davem/net-next.git/commit/?id=81110384441a59cff47430f20f049e69b98c17f4)
 `BPF_FUNC_msg_redirect_map()` | 4.17 |  | [`4f738adba30a`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=4f738adba30a7cfc006f605707e7aee847ffefa0)
 `BPF_FUNC_perf_event_output()` | 4.4 | GPL | [`a43eec304259`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=a43eec304259a6c637f4014a6d4767159b6a3aa3)
@@ -198,8 +205,11 @@ Helper | Kernel version | License | Commit |
 `BPF_FUNC_set_hash()` | 4.13 |  | [`ded092cd73c2`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=ded092cd73c2c56a394b936f86897f29b2e131c0)
 `BPF_FUNC_set_hash_invalid()` | 4.9 |  | [`7a4b28c6cc9f`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=7a4b28c6cc9ffac50f791b99cc7e46106436e5d8)
 `BPF_FUNC_setsockopt()` | 4.13 |  | [`8c4b4c7e9ff0`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=8c4b4c7e9ff0447995750d9329949fa082520269)
+`BPF_FUNC_sk_lookup_tcp()` | 4.20 |  | [`6acc9b432e67`](https://github.com/torvalds/linux/commit/6acc9b432e6714d72d7d77ec7c27f6f8358d0c71)
+`BPF_FUNC_sk_lookup_udp()` | 4.20 |  | [`6acc9b432e67`](https://github.com/torvalds/linux/commit/6acc9b432e6714d72d7d77ec7c27f6f8358d0c71)
 `BPF_FUNC_sk_redirect_hash()` | 4.18 |  | [`81110384441a`](https://git.kernel.org/cgit/linux/kernel/git/davem/net-next.git/commit/?id=81110384441a59cff47430f20f049e69b98c17f4)
 `BPF_FUNC_sk_redirect_map()` | 4.14 |  | [`174a79ff9515`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=174a79ff9515f400b9a6115643dafd62a635b7e6)
+`BPF_FUNC_sk_release()` | 4.20 |  | [`6acc9b432e67`](https://github.com/torvalds/linux/commit/6acc9b432e6714d72d7d77ec7c27f6f8358d0c71)
 `BPF_FUNC_sk_select_reuseport()` | 4.19 |  | [`2dbb9b9e6df6`](https://github.com/torvalds/linux/commit/2dbb9b9e6df67d444fbe425c7f6014858d337adf)
 `BPF_FUNC_skb_adjust_room()` | 4.13 |  | [`2be7e212d541`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=2be7e212d5419a400d051c84ca9fdd083e5aacac)
 `BPF_FUNC_skb_ancestor_cgroup_id()` | 4.19 |  | [`7723628101aa`](https://github.com/torvalds/linux/commit/7723628101aaeb1d723786747529b4ea65c5b5c5)
@@ -260,9 +270,9 @@ The list of program types and supported helper functions can be retrieved with:
 |`BPF_PROG_TYPE_LWT_OUT`| `LWT functions` <br> `Base functions`|
 |`BPF_PROG_TYPE_LWT_XMIT`| `BPF_FUNC_skb_get_tunnel_key()` <br> `BPF_FUNC_skb_set_tunnel_key()` <br> `BPF_FUNC_skb_get_tunnel_opt()` <br> `BPF_FUNC_skb_set_tunnel_opt()` <br> `BPF_FUNC_redirect()` <br> `BPF_FUNC_clone_redirect()` <br> `BPF_FUNC_skb_change_tail()` <br> `BPF_FUNC_skb_change_head()` <br> `BPF_FUNC_skb_store_bytes()` <br> `BPF_FUNC_csum_update()` <br> `BPF_FUNC_l3_csum_replace()` <br> `BPF_FUNC_l4_csum_replace()` <br> `BPF_FUNC_set_hash_invalid()` <br> `LWT functions`|
 |`BPF_PROG_TYPE_SOCK_OPS`|`BPF_FUNC_setsockopt()` <br> `BPF_FUNC_getsockopt()` <br> `BPF_FUNC_sock_ops_cb_flags_set()` <br> `BPF_FUNC_sock_map_update()` <br> `BPF_FUNC_sock_hash_update()` <br> `BPF_FUNC_get_socket_cookie()` <br> `Base functions`|
-|`BPF_PROG_TYPE_SK_SKB`|`BPF_FUNC_skb_store_bytes()` <br> `BPF_FUNC_skb_load_bytes()` <br> `BPF_FUNC_skb_pull_data()` <br> `BPF_FUNC_skb_change_tail()` <br> `BPF_FUNC_skb_change_head()` <br> `BPF_FUNC_get_socket_cookie()` <br> `BPF_FUNC_get_socket_uid()` <br> `BPF_FUNC_sk_redirect_map()` <br> `BPF_FUNC_sk_redirect_hash()` <br> `Base functions`|
+|`BPF_PROG_TYPE_SK_SKB`|`BPF_FUNC_skb_store_bytes()` <br> `BPF_FUNC_skb_load_bytes()` <br> `BPF_FUNC_skb_pull_data()` <br> `BPF_FUNC_skb_change_tail()` <br> `BPF_FUNC_skb_change_head()` <br> `BPF_FUNC_get_socket_cookie()` <br> `BPF_FUNC_get_socket_uid()` <br> `BPF_FUNC_sk_redirect_map()` <br> `BPF_FUNC_sk_redirect_hash()` <br> `BPF_FUNC_sk_lookup_tcp()` <br> `BPF_FUNC_sk_lookup_udp()` <br> `BPF_FUNC_sk_release()` <br> `Base functions`|
 |`BPF_PROG_TYPE_CGROUP_DEVICE`|`BPF_FUNC_map_lookup_elem()` <br> `BPF_FUNC_map_update_elem()` <br> `BPF_FUNC_map_delete_elem()` <br> `BPF_FUNC_get_current_uid_gid()` <br> `BPF_FUNC_trace_printk()`|
-|`BPF_PROG_TYPE_SK_MSG`|`BPF_FUNC_msg_redirect_map()` <br> `BPF_FUNC_msg_redirect_hash()` <br> `BPF_FUNC_msg_apply_bytes()` <br> `BPF_FUNC_msg_cork_bytes()` <br> `BPF_FUNC_msg_pull_data()` <br> `Base functions`|
+|`BPF_PROG_TYPE_SK_MSG`|`BPF_FUNC_msg_redirect_map()` <br> `BPF_FUNC_msg_redirect_hash()` <br> `BPF_FUNC_msg_apply_bytes()` <br> `BPF_FUNC_msg_cork_bytes()` <br> `BPF_FUNC_msg_pull_data()` <br> `BPF_FUNC_msg_push_data()` <br> `Base functions`|
 |`BPF_PROG_TYPE_RAW_TRACEPOINT`|`BPF_FUNC_perf_event_output()` <br> `BPF_FUNC_get_stackid()` <br> `BPF_FUNC_get_stack()` <br> `Tracing functions`|
 |`BPF_PROG_TYPE_CGROUP_SOCK_ADDR`|`BPF_FUNC_get_current_uid_gid()` <br> `BPF_FUNC_bind()` <br> `BPF_FUNC_get_socket_cookie()` <br> `Base functions`|
 |`BPF_PROG_TYPE_LWT_SEG6LOCAL`|`BPF_FUNC_lwt_seg6_store_bytes()` <br> `BPF_FUNC_lwt_seg6_action()` <br> `BPF_FUNC_lwt_seg6_adjust_srh()` <br> `LWT functions`|
@@ -272,6 +282,6 @@ The list of program types and supported helper functions can be retrieved with:
 
 |Function Group| Functions|
 |------------------|-------|
-|`Base functions`| `BPF_FUNC_map_lookup_elem()` <br> `BPF_FUNC_map_update_elem()` <br> `BPF_FUNC_map_delete_elem()` <br> `BPF_FUNC_get_prandom_u32()` <br> `BPF_FUNC_get_smp_processor_id()` <br> `BPF_FUNC_get_numa_node_id()` <br> `BPF_FUNC_tail_call()` <br> `BPF_FUNC_ktime_get_ns()` <br> `BPF_FUNC_trace_printk()`|
+|`Base functions`| `BPF_FUNC_map_lookup_elem()` <br> `BPF_FUNC_map_update_elem()` <br> `BPF_FUNC_map_delete_elem()` <br> `BPF_FUNC_map_peek_elem()` <br> `BPF_FUNC_map_pop_elem()` <br> `BPF_FUNC_map_push_elem()` <br> `BPF_FUNC_get_prandom_u32()` <br> `BPF_FUNC_get_smp_processor_id()` <br> `BPF_FUNC_get_numa_node_id()` <br> `BPF_FUNC_tail_call()` <br> `BPF_FUNC_ktime_get_ns()` <br> `BPF_FUNC_trace_printk()`|
 |`Tracing functions`|`BPF_FUNC_map_lookup_elem()` <br> `BPF_FUNC_map_update_elem()` <br> `BPF_FUNC_map_delete_elem()` <br> `BPF_FUNC_probe_read()` <br> `BPF_FUNC_ktime_get_ns()` <br> `BPF_FUNC_tail_call()` <br> `BPF_FUNC_get_current_pid_tgid()` <br> `BPF_FUNC_get_current_task()` <br> `BPF_FUNC_get_current_uid_gid()` <br> `BPF_FUNC_get_current_comm()` <br> `BPF_FUNC_trace_printk()` <br> `BPF_FUNC_get_smp_processor_id()` <br> `BPF_FUNC_get_numa_node_id()` <br> `BPF_FUNC_perf_event_read()` <br> `BPF_FUNC_probe_write_user()` <br> `BPF_FUNC_current_task_under_cgroup()` <br> `BPF_FUNC_get_prandom_u32()` <br> `BPF_FUNC_probe_read_str()` <br> `BPF_FUNC_get_current_cgroup_id()` |
 |`LWT functions`|  `BPF_FUNC_skb_load_bytes()` <br> `BPF_FUNC_skb_pull_data()` <br> `BPF_FUNC_csum_diff()` <br> `BPF_FUNC_get_cgroup_classid()` <br> `BPF_FUNC_get_route_realm()` <br> `BPF_FUNC_get_hash_recalc()` <br> `BPF_FUNC_perf_event_output()` <br> `BPF_FUNC_get_smp_processor_id()` <br> `BPF_FUNC_skb_under_cgroup()`|

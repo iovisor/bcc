@@ -173,6 +173,13 @@ static struct bpf_helper helpers[] = {
   {"get_local_storage", "4.19"},
   {"sk_select_reuseport", "4.19"},
   {"skb_ancestor_cgroup_id", "4.19"},
+  {"sk_lookup_tcp", "4.20"},
+  {"sk_lookup_udp", "4.20"},
+  {"sk_release", "4.20"},
+  {"map_push_elem", "4.20"},
+  {"map_pop_elem", "4.20"},
+  {"map_peak_elem", "4.20"},
+  {"msg_push_data", "4.20"},
 };
 
 static uint64_t ptr_to_u64(void *ptr)
