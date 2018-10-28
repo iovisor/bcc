@@ -62,6 +62,9 @@ static const char * const map_type_strings[] = {
   [BPF_MAP_TYPE_SOCKHASH] = "sockhash",
   [BPF_MAP_TYPE_CGROUP_STORAGE] = "cgroup_storage",
   [BPF_MAP_TYPE_REUSEPORT_SOCKARRAY] = "reuseport_sockarray",
+  [BPF_MAP_TYPE_PERCPU_CGROUP_STORAGE] = "precpu_cgroup_storage",
+  [BPF_MAP_TYPE_QUEUE] = "queue",
+  [BPF_MAP_TYPE_STACK] = "stack",
 };
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof(*(x)))
