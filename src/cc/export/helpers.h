@@ -427,13 +427,13 @@ static struct bpf_sock *(*bpf_sk_lookup_udp)(void *ctx,
   (void *) BPF_FUNC_sk_lookup_udp;
 static int (*bpf_sk_release)(struct bpf_sock *sk) =
   (void *) BPF_FUNC_sk_release;
-static int bpf_map_push_elem(struct bpf_map *map, const void *value, u64 flags) =
+static int (*bpf_map_push_elem)(void *map, const void *value, u64 flags) =
   (void *) BPF_FUNC_map_push_elem;
-static int bpf_map_pop_elem(struct bpf_map *map, void *value) =
+static int (*bpf_map_pop_elem)(void *map, void *value) =
   (void *) BPF_FUNC_map_pop_elem;
-static int bpf_map_peek_elem(struct bpf_map *map, void *value) =
+static int (*bpf_map_peek_elem)(void *map, void *value) =
   (void *) BPF_FUNC_map_peek_elem;
-static int bpf_msg_push_data(struct sk_buff *skb, u32 start, u32 len, u64 flags) =
+static int (*bpf_msg_push_data)(void *skb, u32 start, u32 len, u64 flags) =
   (void *) BPF_FUNC_msg_push_data;
 
 /* llvm builtin functions that eBPF C program may use to
