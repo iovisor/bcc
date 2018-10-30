@@ -159,8 +159,12 @@ bool BMapDeclVisitor::VisitRecordDecl(RecordDecl *D) {
   result_ += "]";
   if (D->isUnion())
     result_ += ", \"union\"";
-  else if (D->isStruct())
-    result_ += ", \"struct\"";
+  else if (D->isStruct()) {
+    if (SkipPadding)
+      result_ += ", \"struct\"";
+    else
+      result_ += ", \"struct_packed\"";
+  }
   result_ += "]";
   return true;
 }
