@@ -26,7 +26,9 @@ enum FieldType {
   UINT16_T,
   UINT32_T,
   UINT64_T,
+#ifdef __SIZEOF_INT128__
   UINT128_T,
+#endif
   VOID
 };
 
@@ -36,7 +38,9 @@ static inline size_t enum_to_size(const FieldType t) {
     case UINT16_T: return sizeof(uint16_t);
     case UINT32_T: return sizeof(uint32_t);
     case UINT64_T: return sizeof(uint64_t);
+#ifdef __SIZEOF_INT128__
     case UINT128_T: return sizeof(__uint128_t);
+#endif
     default:
       return 0;
   }
@@ -82,8 +86,10 @@ static inline FieldType bits_to_enum(int v) {
     return UINT32_T;
   } else if (v == 64) {
     return UINT64_T;
+#ifdef __SIZEOF_INT128__
   } else if (v >= 128) {
     return UINT128_T;
+#endif
   }
   return VOID;
 }
@@ -101,7 +107,9 @@ static inline size_t align_offset(size_t offset, FieldType ft) {
     case UINT32_T:
       return offset % 32 > 0 ? offset + (32 - offset % 32) : offset;
     case UINT64_T:
+#ifdef __SIZEOF_INT128__
     case UINT128_T:
+#endif
       return offset % 64 > 0 ? offset + (64 - offset % 64) : offset;
     default:
       ;
