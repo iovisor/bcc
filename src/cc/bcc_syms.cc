@@ -444,7 +444,7 @@ int bcc_resolve_global_addr(int pid, const char *module, const uint64_t address,
       mod.start == 0x0)
     return -1;
 
-  *global = mod.start + mod.file_offset + address;
+  *global = mod.start - mod.file_offset + address;
   return 0;
 }
 
