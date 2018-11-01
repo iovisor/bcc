@@ -398,6 +398,7 @@ static int verify_checksum(const char *file, unsigned int crc) {
 static char *find_debug_via_debuglink(Elf *e, const char *binpath,
                                       int check_crc) {
   char fullpath[PATH_MAX];
+  char *tmppath;
   char *bindir = NULL;
   char *res = NULL;
   unsigned int crc;
@@ -406,8 +407,8 @@ static char *find_debug_via_debuglink(Elf *e, const char *binpath,
   if (!find_debuglink(e, &name, &crc))
     return NULL;
 
-  bindir = strdup(binpath);
-  bindir = dirname(bindir);
+  tmppath = strdup(binpath);
+  bindir = dirname(tmppath);
 
   // Search for the file in 'binpath', but ignore the file we find if it
   // matches the binary itself: the binary will always be probed later on,
@@ -434,9 +435,11 @@ static char *find_debug_via_debuglink(Elf *e, const char *binpath,
   }
 
 DONE:
-  free(bindir);
-  if (res && check_crc && !verify_checksum(res, crc))
+  free(tmppath);
+  if (res && check_crc && !verify_checksum(res, crc)) {
+    free(res);
     return NULL;
+  }
   return res;
 }
 

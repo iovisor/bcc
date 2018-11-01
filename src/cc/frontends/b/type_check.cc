@@ -204,6 +204,7 @@ StatusTuple TypeCheck::visit_binop_expr_node(BinopExprNode *n) {
     case Tok::TCGT:
     case Tok::TCGE:
       n->bit_width_ = 1;
+      break;
     default:
       n->bit_width_ = std::max(n->lhs_->bit_width_, n->rhs_->bit_width_);
   }
