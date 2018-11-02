@@ -92,14 +92,14 @@ int bcc_procutils_each_module(int pid, bcc_procutils_modulecb callback,
   if (!procmap)
     return -1;
 
-  char buf[PATH_MAX + 1], perm[5], dev[8];
+  char buf[PATH_MAX + 1], perm[5], dev[6];
   char *name;
   uint64_t begin, end, inode;
   unsigned long long offset;
   while (true) {
     buf[0] = '\0';
     // From fs/proc/task_mmu.c:show_map_vma
-    if (fscanf(procmap, "%lx-%lx %s %llx %s %lu%[^\n]", &begin, &end, perm,
+    if (fscanf(procmap, "%lx-%lx %4s %llx %5s %lu%[^\n]", &begin, &end, perm,
                &offset, dev, &inode, buf) != 7)
       break;
 
