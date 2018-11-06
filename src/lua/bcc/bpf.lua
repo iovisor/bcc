@@ -211,9 +211,10 @@ function Bpf:attach_kprobe(args)
   local event = args.event or ""
   local ptype = args.retprobe and "r" or "p"
   local ev_name = string.format("%s_%s", ptype, event:gsub("[%+%.]", "_"))
+  local offset = args.fn_offset or 0
   local retprobe = args.retprobe and 1 or 0
 
-  local res = libbcc.bpf_attach_kprobe(fn.fd, retprobe, ev_name, event)
+  local res = libbcc.bpf_attach_kprobe(fn.fd, retprobe, ev_name, event, offset)
 
   assert(res >= 0, "failed to attach BPF to kprobe")
   self:probe_store("kprobe", ev_name, res)
