@@ -44,6 +44,24 @@ checking CAP_FOWNER, CAP_FSETID, etc.
 To see what each of these capabilities does, check the capabilities(7) man
 page and the kernel source.
 
+It is possible to include a kernel stack trace to the capable events by passing
+-K to the command:
+
+# ./capable.py -K
+TIME      UID    PID    COMM             CAP  NAME                 AUDIT
+15:32:21  1000   10708  fetchmail        7    CAP_SETUID           1
+        cap_capable+0x1 [kernel]
+        ns_capable_common+0x7a [kernel]
+        __sys_setresuid+0xc8 [kernel]
+        do_syscall_64+0x56 [kernel]
+        entry_SYSCALL_64_after_hwframe+0x49 [kernel]
+15:32:21  1000   30047  procmail         6    CAP_SETGID           1
+        cap_capable+0x1 [kernel]
+        ns_capable_common+0x7a [kernel]
+        may_setgroups+0x2f [kernel]
+        __x64_sys_setgroups+0x18 [kernel]
+        do_syscall_64+0x56 [kernel]
+        entry_SYSCALL_64_after_hwframe+0x49 [kernel]
 
 Sometimes capable catches itself starting up:
 
@@ -64,7 +82,7 @@ These are capability checks from BPF and perf_events syscalls.
 USAGE:
 
 # ./capable.py -h
-usage: capable.py [-h] [-v] [-p PID]
+usage: capable.py [-h] [-v] [-p PID] [-K]
 
 Trace security capability checks
 
@@ -77,3 +95,4 @@ examples:
     ./capable             # trace capability checks
     ./capable -v          # verbose: include non-audit checks
     ./capable -p 181      # only trace PID 181
+    ./capable -K          # add kernel stacks to trace
