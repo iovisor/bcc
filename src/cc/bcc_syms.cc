@@ -46,6 +46,41 @@ bool ProcStat::is_stale() {
 ProcStat::ProcStat(int pid)
     : procfs_(tfm::format("/proc/%d/exe", pid)), inode_(getinode_()) {}
 
+static int _sym_count_prefix_underscores(const std::string symname) {
+  std::string::const_iterator it;
+  for (it = symname.begin(); it != symname.end() && (*it) == '_'; it++);
+  return it - symname.begin();
+}
+
+static bool _sym_has_better_name(const std::string symnamea,
+                                 const std::string symnameb) {
+  int a, b;
+
+  // Prefer the symbol with less underscores in prefix
+  a = _sym_count_prefix_underscores(symnamea);
+  b = _sym_count_prefix_underscores(symnameb);
+  if (a < b)
+    return true;
+  else if (a > b)
+    return false;
+
+  // Prefer the symbol with less underscores overall
+  a += std::count(symnamea.begin() + a, symnamea.end(), '_');
+  b += std::count(symnameb.begin() + b, symnameb.end(), '_');
+  if (a < b)
+    return true;
+  else if (a > b)
+    return false;
+
+  // Prefer the symbol with a longer name
+  a = symnamea.length();
+  b = symnameb.length();
+  if (a < b)
+    return false;
+
+  return true;
+}
+
 void KSyms::_add_symbol(const char *symname, uint64_t addr, void *p) {
   KSyms *ks = static_cast<KSyms *>(p);
   ks->syms_.emplace_back(symname, addr);
@@ -54,7 +89,14 @@ void KSyms::_add_symbol(const char *symname, uint64_t addr, void *p) {
 void KSyms::refresh() {
   if (syms_.empty()) {
     bcc_procutils_each_ksym(_add_symbol, this);
-    std::sort(syms_.begin(), syms_.end());
+    std::sort(syms_.begin(), syms_.end(), [](const Symbol& syma, const Symbol& symb) {
+      if (syma.addr < symb.addr) return true;
+      else if (syma.addr > symb.addr) return false;
+      // For same start address, order based on symbol names from worst
+      // to best as resolve_addr() is using std::upper_bound(). This way,
+      // the symbol with the best name gets picked first.
+      return !_sym_has_better_name(syma.name, symb.name);
+    });
   }
 }
 
@@ -295,7 +337,14 @@ void ProcSyms::Module::load_sym_table() {
   if (type_ == ModuleType::VDSO)
     bcc_elf_foreach_vdso_sym(_add_symbol, this);
 
-  std::sort(syms_.begin(), syms_.end());
+  std::sort(syms_.begin(), syms_.end(), [](const Symbol& syma, const Symbol& symb) {
+    if (syma.start < symb.start) return true;
+    else if (syma.start > symb.start) return false;
+    // For same start address, order based on symbol names from worst
+    // to best as find_addr() is using std::upper_bound(). This way,
+    // the symbol with the best name gets picked first.
+    return !_sym_has_better_name(*(syma.name), *(symb.name));
+  });
 }
 
 bool ProcSyms::Module::contains(uint64_t addr, uint64_t &offset) const {
