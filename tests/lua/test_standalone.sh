@@ -15,7 +15,8 @@ if [[ ! -x bcc-lua ]]; then
     exit 0
 fi
 
-if ldd bcc-lua | grep -q luajit; then
+LIBRARY=$(ldd bcc-lua | grep luajit)
+if [ $? -ne 0 -o -z "$LIBRARY" ] ; then
     fail "bcc-lua depends on libluajit"
 fi
 
