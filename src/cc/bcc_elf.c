@@ -253,7 +253,8 @@ static int list_in_scn(Elf *e, Elf_Scn *section, size_t stridx, size_t symsize,
       if (!(option->use_symbol_type & (1 << st_type)))
         continue;
 
-#if defined(__powerpc64__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+#ifdef __powerpc64__
+#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
       if (opddata && sym.st_shndx == opdidx) {
         size_t offset = sym.st_value - opdshdr.sh_addr;
         /* Find the function descriptor */
@@ -261,6 +262,29 @@ static int list_in_scn(Elf *e, Elf_Scn *section, size_t stridx, size_t symsize,
         /* Read the actual entry point address from the descriptor */
         sym.st_value = *descr;
       }
+#elif __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+      if (option->use_symbol_type & (1 << STT_PPC64LE_SYM_LEP)) {
+        /*
+         * The PowerPC 64-bit ELF v2 ABI says that the 3 most significant bits
+         * in the st_other field of the symbol table specifies the number of
+         * instructions between a function's Global Entry Point (GEP) and Local
+         * Entry Point (LEP).
+         */
+        switch (sym.st_other >> 5) {
+          /* GEP and LEP are the same for 0 or 1, usage is reserved for 7 */
+          /* If 2, LEP is 1 instruction past the GEP */
+          case 2: sym.st_value += 4; break;
+          /* If 3, LEP is 2 instructions past the GEP */
+          case 3: sym.st_value += 8; break;
+          /* If 4, LEP is 4 instructions past the GEP */
+          case 4: sym.st_value += 16; break;
+          /* If 5, LEP is 8 instructions past the GEP */
+          case 5: sym.st_value += 32; break;
+          /* If 6, LEP is 16 instructions past the GEP */
+          case 6: sym.st_value += 64; break;
+        }
+      }
+#endif
 #endif
 
       if (callback(name, sym.st_value, sym.st_size, payload) < 0)
