@@ -602,7 +602,8 @@ class BPF(object):
         ev_name = b"p_" + event.replace(b"+", b"_").replace(b".", b"_")
         fd = lib.bpf_attach_kprobe(fn.fd, 0, ev_name, event, event_off)
         if fd < 0:
-            raise Exception("Failed to attach BPF to kprobe")
+            raise Exception("Failed to attach BPF program %s to kprobe %s" %
+                            (fn_name, event))
         self._add_kprobe_fd(ev_name, fd)
         return self
 
@@ -625,7 +626,8 @@ class BPF(object):
         ev_name = b"r_" + event.replace(b"+", b"_").replace(b".", b"_")
         fd = lib.bpf_attach_kprobe(fn.fd, 1, ev_name, event, 0)
         if fd < 0:
-            raise Exception("Failed to attach BPF to kretprobe")
+            raise Exception("Failed to attach BPF program %s to kretprobe %s" %
+                            (fn_name, event))
         self._add_kprobe_fd(ev_name, fd)
         return self
 
@@ -766,7 +768,8 @@ class BPF(object):
         (tp_category, tp_name) = tp.split(b':')
         fd = lib.bpf_attach_tracepoint(fn.fd, tp_category, tp_name)
         if fd < 0:
-            raise Exception("Failed to attach BPF to tracepoint")
+            raise Exception("Failed to attach BPF program %s to tracepoint %s" %
+                            (fn_name, tp))
         self.tracepoint_fds[tp] = fd
         return self
 
