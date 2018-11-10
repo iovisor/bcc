@@ -117,7 +117,7 @@ int kprobe__cap_capable(struct pt_regs *ctx, const struct cred *cred,
     u32 uid = bpf_get_current_uid_gid();
     struct data_t data = {.tgid = __tgid, .pid = __pid, .uid = uid, .cap = cap, .audit = audit};
 #ifdef KERNEL_STACKS
-    data.kernel_stack_id = stacks.get_stackid(ctx, BPF_F_REUSE_STACKID);
+    data.kernel_stack_id = stacks.get_stackid(ctx, 0);
 #endif
     bpf_get_current_comm(&data.comm, sizeof(data.comm));
     events.perf_submit(ctx, &data, sizeof(data));
