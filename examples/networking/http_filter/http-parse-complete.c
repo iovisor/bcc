@@ -99,11 +99,8 @@ int http_filter(struct __sk_buff *skb) {
 	//direct access to skb not allowed
 	unsigned long p[7];
 	int i = 0;
-	int j = 0;
-	const int last_index = payload_offset + 7;
-	for (i = payload_offset ; i < last_index ; i++) {
-		p[j] = load_byte(skb , i);
-		j++;
+	for (i = 0; i < 7; i++) {
+		p[i] = load_byte(skb , payload_offset + i);
 	}
 
 	//find a match with an HTTP message
