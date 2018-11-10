@@ -258,7 +258,11 @@ deb-src http://llvm.org/apt/$VER/ llvm-toolchain-$VER-3.7 main" | \
 wget -O - http://llvm.org/apt/llvm-snapshot.gpg.key | sudo apt-key add -
 sudo apt-get update
 
-# All versions
+# For bionic
+sudo apt-get -y install bison build-essential cmake flex git libedit-dev \
+  libllvm6.0 llvm-6.0-dev libclang-6.0-dev python zlib1g-dev libelf-dev
+
+# For other versions
 sudo apt-get -y install bison build-essential cmake flex git libedit-dev \
   libllvm3.7 llvm-3.7-dev libclang-3.7-dev python zlib1g-dev libelf-dev
 
