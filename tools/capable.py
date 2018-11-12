@@ -153,8 +153,8 @@ class Data(ct.Structure):
     ] + ([("kernel_stack_id", ct.c_int)] if args.kernel_stack else [])
 
 # header
-print("%-9s %-6s %-6s %-16s %-4s %-20s %s" % (
-    "TIME", "UID", "PID", "COMM", "CAP", "NAME", "AUDIT"))
+print("%-9s %-6s %-6s %-6s %-16s %-4s %-20s %s" % (
+    "TIME", "UID", "PID", "TID", "COMM", "CAP", "NAME", "AUDIT"))
 
 def print_stack(bpf, stack_id, tgid):
     if stack_id < 0:
@@ -173,8 +173,8 @@ def print_event(bpf, cpu, data, size):
         name = capabilities[event.cap]
     else:
         name = "?"
-    print("%-9s %-6d %-6d %-16s %-4d %-20s %d" % (strftime("%H:%M:%S"),
-        event.uid, event.pid, event.comm.decode('utf-8', 'replace'),
+    print("%-9s %-6d %-6d %-6d %-16s %-4d %-20s %d" % (strftime("%H:%M:%S"),
+        event.uid, event.pid, event.tgid, event.comm.decode('utf-8', 'replace'),
         event.cap, name, event.audit))
     if args.kernel_stack:
         print_stack(bpf, event.kernel_stack_id, -1)
