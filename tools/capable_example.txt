@@ -66,22 +66,6 @@ TIME      UID    PID    COMM             CAP  NAME                 AUDIT
 Similarly, it is possible to include user-space stack with -U (or they can be
 used both at the same time to include user and kernel stack).
 
-Sometimes capable catches itself starting up:
-
-# ./capable.py 
-TIME      UID    PID    COMM             CAP  NAME                 AUDIT
-22:22:19  0      21949  capable.py       21   CAP_SYS_ADMIN        1
-22:22:19  0      21949  capable.py       21   CAP_SYS_ADMIN        1
-22:22:19  0      21949  capable.py       21   CAP_SYS_ADMIN        1
-22:22:19  0      21949  capable.py       21   CAP_SYS_ADMIN        1
-22:22:19  0      21949  capable.py       21   CAP_SYS_ADMIN        1
-22:22:19  0      21949  capable.py       21   CAP_SYS_ADMIN        1
-22:22:19  0      21952  run              24   CAP_SYS_RESOURCE     1
-[...]
-
-These are capability checks from BPF and perf_events syscalls.
-
-
 USAGE:
 
 # ./capable.py -h

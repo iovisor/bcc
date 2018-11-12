@@ -12,6 +12,7 @@
 # 13-Sep-2016   Brendan Gregg   Created this.
 
 from __future__ import print_function
+from os import getpid
 from functools import partial
 from bcc import BPF
 import argparse
@@ -123,6 +124,7 @@ int kprobe__cap_capable(struct pt_regs *ctx, const struct cred *cred,
     u32 pid = __pid_tgid;
     FILTER1
     FILTER2
+    FILTER3
 
     u32 uid = bpf_get_current_uid_gid();
     struct data_t data = {.pid_tgid = __pid_tgid, .tgid = tgid, .pid = pid, .uid = uid, .cap = cap, .audit = audit};
@@ -149,6 +151,8 @@ if args.user_stack:
     bpf_text = "#define USER_STACKS\n" + bpf_text
 bpf_text = bpf_text.replace('FILTER1', '')
 bpf_text = bpf_text.replace('FILTER2', '')
+bpf_text = bpf_text.replace('FILTER3',
+    'if (pid == %s) { return 0; }' % getpid())
 if debug:
     print(bpf_text)
 
