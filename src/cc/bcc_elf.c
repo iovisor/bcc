@@ -184,10 +184,49 @@ int bcc_elf_foreach_usdt(const char *path, bcc_elf_probecb callback,
   return res;
 }
 
+static Elf_Scn * get_section(Elf *e, const char *section_name,
+                             GElf_Shdr *section_hdr, size_t *section_idx) {
+  Elf_Scn *section = NULL;
+  GElf_Shdr header;
+  char *name;
+
+  size_t stridx;
+  if (elf_getshdrstrndx(e, &stridx) != 0)
+    return NULL;
+
+  size_t index;
+  for (index = 1; (section = elf_nextscn(e, section)) != 0; index++) {
+    if (!gelf_getshdr(section, &header))
+      continue;
+
+    name = elf_strptr(e, stridx, header.sh_name);
+    if (name && !strcmp(name, section_name)) {
+      if (section_hdr)
+        *section_hdr = header;
+      if (section_idx)
+        *section_idx = index;
+      return section;
+    }
+  }
+
+  return NULL;
+}
+
 static int list_in_scn(Elf *e, Elf_Scn *section, size_t stridx, size_t symsize,
                        struct bcc_symbol_option *option,
                        bcc_elf_symcb callback, void *payload) {
   Elf_Data *data = NULL;
+
+#if defined(__powerpc64__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+  size_t opdidx = 0;
+  Elf_Scn *opdsec = NULL;
+  GElf_Shdr opdshdr = {};
+  Elf_Data *opddata = NULL;
+
+  opdsec = get_section(e, ".opd", &opdshdr, &opdidx);
+  if (opdsec && opdshdr.sh_type == SHT_PROGBITS)
+    opddata = elf_getdata(opdsec, NULL);
+#endif
 
   while ((data = elf_getdata(section, data)) != 0) {
     size_t i, symcount = data->d_size / symsize;
@@ -213,6 +252,40 @@ static int list_in_scn(Elf *e, Elf_Scn *section, size_t stridx, size_t symsize,
       uint32_t st_type = ELF_ST_TYPE(sym.st_info);
       if (!(option->use_symbol_type & (1 << st_type)))
         continue;
+
+#ifdef __powerpc64__
+#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+      if (opddata && sym.st_shndx == opdidx) {
+        size_t offset = sym.st_value - opdshdr.sh_addr;
+        /* Find the function descriptor */
+        uint64_t *descr = opddata->d_buf + offset;
+        /* Read the actual entry point address from the descriptor */
+        sym.st_value = *descr;
+      }
+#elif __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+      if (option->use_symbol_type & (1 << STT_PPC64LE_SYM_LEP)) {
+        /*
+         * The PowerPC 64-bit ELF v2 ABI says that the 3 most significant bits
+         * in the st_other field of the symbol table specifies the number of
+         * instructions between a function's Global Entry Point (GEP) and Local
+         * Entry Point (LEP).
+         */
+        switch (sym.st_other >> 5) {
+          /* GEP and LEP are the same for 0 or 1, usage is reserved for 7 */
+          /* If 2, LEP is 1 instruction past the GEP */
+          case 2: sym.st_value += 4; break;
+          /* If 3, LEP is 2 instructions past the GEP */
+          case 3: sym.st_value += 8; break;
+          /* If 4, LEP is 4 instructions past the GEP */
+          case 4: sym.st_value += 16; break;
+          /* If 5, LEP is 8 instructions past the GEP */
+          case 5: sym.st_value += 32; break;
+          /* If 6, LEP is 16 instructions past the GEP */
+          case 6: sym.st_value += 64; break;
+        }
+      }
+#endif
+#endif
 
       if (callback(name, sym.st_value, sym.st_size, payload) < 0)
         return 1;      // signal termination to caller
@@ -248,24 +321,9 @@ static int listsymbols(Elf *e, bcc_elf_symcb callback, void *payload,
 }
 
 static Elf_Data * get_section_elf_data(Elf *e, const char *section_name) {
-  Elf_Scn *section = NULL;
-  GElf_Shdr header;
-  char *name;
-
-  size_t stridx;
-  if (elf_getshdrstrndx(e, &stridx) != 0)
-    return NULL;
-
-  while ((section = elf_nextscn(e, section)) != 0) {
-    if (!gelf_getshdr(section, &header))
-      continue;
-
-    name = elf_strptr(e, stridx, header.sh_name);
-    if (name && !strcmp(name, section_name)) {
-      return elf_getdata(section, NULL);
-    }
-  }
-
+  Elf_Scn *section = get_section(e, section_name, NULL, NULL);
+  if (section)
+    return elf_getdata(section, NULL);
   return NULL;
 }
 

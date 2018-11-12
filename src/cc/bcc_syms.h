@@ -34,6 +34,13 @@ typedef int (*SYM_CB)(const char *symname, uint64_t addr);
 #ifndef STT_GNU_IFUNC
 #define STT_GNU_IFUNC 10
 #endif
+
+#if defined(__powerpc64__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+// Indicate if the Local Entry Point (LEP) should be used as a symbol's
+// start address
+#define STT_PPC64LE_SYM_LEP 31
+#endif
+
 static const uint32_t BCC_SYM_ALL_TYPES = 65535;
 struct bcc_symbol_option {
   int use_debug_file;
