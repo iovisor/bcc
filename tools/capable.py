@@ -4,7 +4,7 @@
 # capable   Trace security capabilitiy checks (cap_capable()).
 #           For Linux, uses BCC, eBPF. Embedded C.
 #
-# USAGE: capable [-h] [-v] [-p PID] [-K]
+# USAGE: capable [-h] [-v] [-p PID] [-K] [-U]
 #
 # Copyright 2016 Netflix, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
@@ -24,6 +24,7 @@ examples = """examples:
     ./capable -v          # verbose: include non-audit checks
     ./capable -p 181      # only trace PID 181
     ./capable -K          # add kernel stacks to trace
+    ./capable -U          # add user-space stacks to trace
 """
 parser = argparse.ArgumentParser(
     description="Trace security capability checks",
@@ -35,6 +36,8 @@ parser.add_argument("-p", "--pid",
     help="trace this PID only")
 parser.add_argument("-K", "--kernel-stack", action="store_true",
     help="output kernel stack trace")
+parser.add_argument("-U", "--user-stack", action="store_true",
+    help="output user stack trace")
 args = parser.parse_args()
 debug = 0
 
@@ -88,6 +91,7 @@ bpf_text = """
 #include <linux/sched.h>
 
 struct data_t {
+   u64 pid_tgid;
    u32 tgid;
    u32 pid;
    u32 uid;
@@ -97,27 +101,36 @@ struct data_t {
 #ifdef KERNEL_STACKS
    int kernel_stack_id;
 #endif
+#ifdef USER_STACKS
+   int user_stack_id;
+#endif
+#if ((defined(KERNEL_STACKS) && defined(USER_STACKS)) || (!defined(KERNEL_STACKS) && !defined(USER_STACKS)))
+   int __pad;
+#endif
 };
 
 BPF_PERF_OUTPUT(events);
 
-#ifdef KERNEL_STACKS
-BPF_STACK_TRACE(stacks, 1024);
+#if defined(USER_STACKS) || defined(KERNEL_STACKS)
+BPF_STACK_TRACE(stacks, 2048);
 #endif
 
 int kprobe__cap_capable(struct pt_regs *ctx, const struct cred *cred,
     struct user_namespace *targ_ns, int cap, int audit)
 {
     u64 __pid_tgid = bpf_get_current_pid_tgid();
-    u32 __tgid = __pid_tgid >> 32;
-    u32 __pid = __pid_tgid;
+    u32 tgid = __pid_tgid >> 32;
+    u32 pid = __pid_tgid;
     FILTER1
     FILTER2
 
     u32 uid = bpf_get_current_uid_gid();
-    struct data_t data = {.tgid = __tgid, .pid = __pid, .uid = uid, .cap = cap, .audit = audit};
+    struct data_t data = {.pid_tgid = __pid_tgid, .tgid = tgid, .pid = pid, .uid = uid, .cap = cap, .audit = audit};
 #ifdef KERNEL_STACKS
     data.kernel_stack_id = stacks.get_stackid(ctx, 0);
+#endif
+#ifdef USER_STACKS
+    data.user_stack_id = stacks.get_stackid(ctx, BPF_F_USER_STACK);
 #endif
     bpf_get_current_comm(&data.comm, sizeof(data.comm));
     events.perf_submit(ctx, &data, sizeof(data));
@@ -132,6 +145,8 @@ if not args.verbose:
     bpf_text = bpf_text.replace('FILTER2', 'if (audit == 0) { return 0; }')
 if args.kernel_stack:
     bpf_text = "#define KERNEL_STACKS\n" + bpf_text
+if args.user_stack:
+    bpf_text = "#define USER_STACKS\n" + bpf_text
 bpf_text = bpf_text.replace('FILTER1', '')
 bpf_text = bpf_text.replace('FILTER2', '')
 if debug:
@@ -144,13 +159,15 @@ TASK_COMM_LEN = 16    # linux/sched.h
 
 class Data(ct.Structure):
     _fields_ = [
+        ("pid_tgid", ct.c_uint64),
         ("tgid", ct.c_uint32),
         ("pid", ct.c_uint32),
         ("uid", ct.c_uint32),
         ("cap", ct.c_int),
         ("audit", ct.c_int),
         ("comm", ct.c_char * TASK_COMM_LEN),
-    ] + ([("kernel_stack_id", ct.c_int)] if args.kernel_stack else [])
+    ] + ([("kernel_stack_id", ct.c_int)] if args.kernel_stack else []) \
+      + ([("user_stack_id", ct.c_int)] if args.user_stack else [])
 
 # header
 print("%-9s %-6s %-6s %-6s %-16s %-4s %-20s %s" % (
@@ -178,6 +195,8 @@ def print_event(bpf, cpu, data, size):
         event.cap, name, event.audit))
     if args.kernel_stack:
         print_stack(bpf, event.kernel_stack_id, -1)
+    if args.user_stack:
+        print_stack(bpf, event.user_stack_id, event.tgid)
 
 # loop with callback to print_event
 callback = partial(print_event, b)

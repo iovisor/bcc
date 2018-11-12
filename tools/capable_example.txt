@@ -63,6 +63,9 @@ TIME      UID    PID    COMM             CAP  NAME                 AUDIT
         do_syscall_64+0x56 [kernel]
         entry_SYSCALL_64_after_hwframe+0x49 [kernel]
 
+Similarly, it is possible to include user-space stack with -U (or they can be
+used both at the same time to include user and kernel stack).
+
 Sometimes capable catches itself starting up:
 
 # ./capable.py 
@@ -82,17 +85,20 @@ These are capability checks from BPF and perf_events syscalls.
 USAGE:
 
 # ./capable.py -h
-usage: capable.py [-h] [-v] [-p PID] [-K]
+usage: capable.py [-h] [-v] [-p PID] [-K] [-U]
 
 Trace security capability checks
 
 optional arguments:
-  -h, --help         show this help message and exit
-  -v, --verbose      include non-audit checks
-  -p PID, --pid PID  trace this PID only
+  -h, --help          show this help message and exit
+  -v, --verbose       include non-audit checks
+  -p PID, --pid PID   trace this PID only
+  -K, --kernel-stack  output kernel stack trace
+  -U, --user-stack    output user stack trace
 
 examples:
     ./capable             # trace capability checks
     ./capable -v          # verbose: include non-audit checks
     ./capable -p 181      # only trace PID 181
     ./capable -K          # add kernel stacks to trace
+    ./capable -U          # add user-space stacks to trace
