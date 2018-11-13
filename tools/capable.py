@@ -92,7 +92,6 @@ bpf_text = """
 #include <linux/sched.h>
 
 struct data_t {
-   u64 pid_tgid;
    u32 tgid;
    u32 pid;
    u32 uid;
@@ -104,9 +103,6 @@ struct data_t {
 #endif
 #ifdef USER_STACKS
    int user_stack_id;
-#endif
-#if ((defined(KERNEL_STACKS) && defined(USER_STACKS)) || (!defined(KERNEL_STACKS) && !defined(USER_STACKS)))
-   int __pad;
 #endif
 };
 
@@ -127,7 +123,7 @@ int kprobe__cap_capable(struct pt_regs *ctx, const struct cred *cred,
     FILTER3
 
     u32 uid = bpf_get_current_uid_gid();
-    struct data_t data = {.pid_tgid = __pid_tgid, .tgid = tgid, .pid = pid, .uid = uid, .cap = cap, .audit = audit};
+    struct data_t data = {.tgid = tgid, .pid = pid, .uid = uid, .cap = cap, .audit = audit};
 #ifdef KERNEL_STACKS
     data.kernel_stack_id = stacks.get_stackid(ctx, 0);
 #endif
@@ -163,7 +159,6 @@ TASK_COMM_LEN = 16    # linux/sched.h
 
 class Data(ct.Structure):
     _fields_ = [
-        ("pid_tgid", ct.c_uint64),
         ("tgid", ct.c_uint32),
         ("pid", ct.c_uint32),
         ("uid", ct.c_uint32),
