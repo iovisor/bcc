@@ -18,6 +18,7 @@ from bcc import BPF
 import argparse
 from time import strftime
 import ctypes as ct
+from enum import Enum
 
 # arguments
 examples = """examples:
@@ -85,6 +86,11 @@ capabilities = {
     36: "CAP_BLOCK_SUSPEND",
     37: "CAP_AUDIT_READ",
 }
+
+# Stack trace types
+class StackType(Enum):
+    Kernel = 0
+    User = 1
 
 # define BPF program
 bpf_text = """
@@ -172,9 +178,14 @@ class Data(ct.Structure):
 print("%-9s %-6s %-6s %-6s %-16s %-4s %-20s %s" % (
     "TIME", "UID", "PID", "TID", "COMM", "CAP", "NAME", "AUDIT"))
 
-def print_stack(bpf, stack_id, tgid):
-    if stack_id < 0:
-        print("        %d" % stack_id)
+def stack_id_err(stack_id):
+    # -EFAULT in get_stackid normally means the stack-trace is not availible,
+    # Such as getting kernel stack trace in userspace code
+    return (stack_id < 0) and (stack_id != -errno.EFAULT)
+
+def print_stack(bpf, stack_id, stack_type, tgid):
+    if stack_id_err(stack_id):
+        print("    [Missed %s Stack]" % stack_type.name)
         return
     stack = list(bpf.get_table("stacks").walk(stack_id))
     for addr in stack:
@@ -193,9 +204,9 @@ def print_event(bpf, cpu, data, size):
         event.uid, event.pid, event.tgid, event.comm.decode('utf-8', 'replace'),
         event.cap, name, event.audit))
     if args.kernel_stack:
-        print_stack(bpf, event.kernel_stack_id, -1)
+        print_stack(bpf, event.kernel_stack_id, StackType.Kernel, -1)
     if args.user_stack:
-        print_stack(bpf, event.user_stack_id, event.tgid)
+        print_stack(bpf, event.user_stack_id, StackType.User, event.tgid)
 
 # loop with callback to print_event
 callback = partial(print_event, b)
