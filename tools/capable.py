@@ -19,7 +19,6 @@ import errno
 import argparse
 from time import strftime
 import ctypes as ct
-from enum import Enum
 
 # arguments
 examples = """examples:
@@ -88,10 +87,14 @@ capabilities = {
     37: "CAP_AUDIT_READ",
 }
 
+class Enum(set):
+    def __getattr__(self, name):
+        if name in self:
+            return name
+        raise AttributeError
+
 # Stack trace types
-class StackType(Enum):
-    Kernel = 0
-    User = 1
+StackType = Enum(("Kernel", "User",))
 
 # define BPF program
 bpf_text = """
@@ -186,7 +189,7 @@ def stack_id_err(stack_id):
 
 def print_stack(bpf, stack_id, stack_type, tgid):
     if stack_id_err(stack_id):
-        print("    [Missed %s Stack]" % stack_type.name)
+        print("    [Missed %s Stack]" % stack_type)
         return
     stack = list(bpf.get_table("stacks").walk(stack_id))
     for addr in stack:
