@@ -94,15 +94,15 @@ struct data_t {
     u64 duration_ns;
     u64 retval;
     char comm[TASK_COMM_LEN];
+#ifdef GRAB_ARGS
+    u64 args[6];
+#endif
 #ifdef USER_STACKS
     int user_stack_id;
 #endif
 #ifdef KERNEL_STACKS
     int kernel_stack_id;
     u64 kernel_ip;
-#endif
-#ifdef GRAB_ARGS
-    u64 args[6];
 #endif
 };
 
