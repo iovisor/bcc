@@ -2,7 +2,7 @@
 .SH NAME
 capable \- Trace security capability checks (cap_capable()).
 .SH SYNOPSIS
-.B capable [\-h] [\-v] [\-p PID]
+.B capable [\-h] [\-v] [\-p PID] [\-K] [\-U]
 .SH DESCRIPTION
 This traces security capability checks in the kernel, and prints details for
 each call. This can be useful for general debugging, and also security
@@ -19,6 +19,12 @@ USAGE message.
 Include non-audit capability checks. These are those deemed not interesting and
 not necessary to audit, such as CAP_SYS_ADMIN checks on memory allocation to
 affect the behavior of overcommit.
+.TP
+\-K
+Include kernel stack traces to the output.
+.TP
+\-U
+Include user-space stack traces to the output.
 .SH EXAMPLES
 .TP
 Trace all capability checks system-wide:

@@ -4,9 +4,7 @@
 # capable   Trace security capabilitiy checks (cap_capable()).
 #           For Linux, uses BCC, eBPF. Embedded C.
 #
-# USAGE: capable [-h] [-v] [-p PID]
-#
-# ToDo: add -s for kernel stacks.
+# USAGE: capable [-h] [-v] [-p PID] [-K] [-U]
 #
 # Copyright 2016 Netflix, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
@@ -14,7 +12,10 @@
 # 13-Sep-2016   Brendan Gregg   Created this.
 
 from __future__ import print_function
+from os import getpid
+from functools import partial
 from bcc import BPF
+import errno
 import argparse
 from time import strftime
 import ctypes as ct
@@ -24,6 +25,8 @@ examples = """examples:
     ./capable             # trace capability checks
     ./capable -v          # verbose: include non-audit checks
     ./capable -p 181      # only trace PID 181
+    ./capable -K          # add kernel stacks to trace
+    ./capable -U          # add user-space stacks to trace
 """
 parser = argparse.ArgumentParser(
     description="Trace security capability checks",
@@ -33,6 +36,10 @@ parser.add_argument("-v", "--verbose", action="store_true",
     help="include non-audit checks")
 parser.add_argument("-p", "--pid",
     help="trace this PID only")
+parser.add_argument("-K", "--kernel-stack", action="store_true",
+    help="output kernel stack trace")
+parser.add_argument("-U", "--user-stack", action="store_true",
+    help="output user stack trace")
 args = parser.parse_args()
 debug = 0
 
@@ -80,31 +87,59 @@ capabilities = {
     37: "CAP_AUDIT_READ",
 }
 
+class Enum(set):
+    def __getattr__(self, name):
+        if name in self:
+            return name
+        raise AttributeError
+
+# Stack trace types
+StackType = Enum(("Kernel", "User",))
+
 # define BPF program
 bpf_text = """
 #include <uapi/linux/ptrace.h>
 #include <linux/sched.h>
 
 struct data_t {
-   // switch to u32s when supported
-   u64 pid;
-   u64 uid;
+   u32 tgid;
+   u32 pid;
+   u32 uid;
    int cap;
    int audit;
    char comm[TASK_COMM_LEN];
+#ifdef KERNEL_STACKS
+   int kernel_stack_id;
+#endif
+#ifdef USER_STACKS
+   int user_stack_id;
+#endif
 };
 
 BPF_PERF_OUTPUT(events);
 
+#if defined(USER_STACKS) || defined(KERNEL_STACKS)
+BPF_STACK_TRACE(stacks, 2048);
+#endif
+
 int kprobe__cap_capable(struct pt_regs *ctx, const struct cred *cred,
     struct user_namespace *targ_ns, int cap, int audit)
 {
-    u32 pid = bpf_get_current_pid_tgid();
+    u64 __pid_tgid = bpf_get_current_pid_tgid();
+    u32 tgid = __pid_tgid >> 32;
+    u32 pid = __pid_tgid;
     FILTER1
     FILTER2
+    FILTER3
 
     u32 uid = bpf_get_current_uid_gid();
-    struct data_t data = {.pid = pid, .uid = uid, .cap = cap, .audit = audit};
+    struct data_t data = {.tgid = tgid, .pid = pid, .uid = uid, .cap = cap, .audit = audit};
+#ifdef KERNEL_STACKS
+    data.kernel_stack_id = stacks.get_stackid(ctx, 0);
+#endif
+#ifdef USER_STACKS
+    data.user_stack_id = stacks.get_stackid(ctx, BPF_F_USER_STACK);
+#endif
     bpf_get_current_comm(&data.comm, sizeof(data.comm));
     events.perf_submit(ctx, &data, sizeof(data));
 
@@ -116,8 +151,14 @@ if args.pid:
         'if (pid != %s) { return 0; }' % args.pid)
 if not args.verbose:
     bpf_text = bpf_text.replace('FILTER2', 'if (audit == 0) { return 0; }')
+if args.kernel_stack:
+    bpf_text = "#define KERNEL_STACKS\n" + bpf_text
+if args.user_stack:
+    bpf_text = "#define USER_STACKS\n" + bpf_text
 bpf_text = bpf_text.replace('FILTER1', '')
 bpf_text = bpf_text.replace('FILTER2', '')
+bpf_text = bpf_text.replace('FILTER3',
+    'if (pid == %s) { return 0; }' % getpid())
 if debug:
     print(bpf_text)
 
@@ -128,30 +169,51 @@ TASK_COMM_LEN = 16    # linux/sched.h
 
 class Data(ct.Structure):
     _fields_ = [
-        ("pid", ct.c_ulonglong),
-        ("uid", ct.c_ulonglong),
+        ("tgid", ct.c_uint32),
+        ("pid", ct.c_uint32),
+        ("uid", ct.c_uint32),
         ("cap", ct.c_int),
         ("audit", ct.c_int),
-        ("comm", ct.c_char * TASK_COMM_LEN)
-    ]
+        ("comm", ct.c_char * TASK_COMM_LEN),
+    ] + ([("kernel_stack_id", ct.c_int)] if args.kernel_stack else []) \
+      + ([("user_stack_id", ct.c_int)] if args.user_stack else [])
 
 # header
-print("%-9s %-6s %-6s %-16s %-4s %-20s %s" % (
-    "TIME", "UID", "PID", "COMM", "CAP", "NAME", "AUDIT"))
+print("%-9s %-6s %-6s %-6s %-16s %-4s %-20s %s" % (
+    "TIME", "UID", "PID", "TID", "COMM", "CAP", "NAME", "AUDIT"))
+
+def stack_id_err(stack_id):
+    # -EFAULT in get_stackid normally means the stack-trace is not availible,
+    # Such as getting kernel stack trace in userspace code
+    return (stack_id < 0) and (stack_id != -errno.EFAULT)
+
+def print_stack(bpf, stack_id, stack_type, tgid):
+    if stack_id_err(stack_id):
+        print("    [Missed %s Stack]" % stack_type)
+        return
+    stack = list(bpf.get_table("stacks").walk(stack_id))
+    for addr in stack:
+        print("        ", end="")
+        print("%s" % (bpf.sym(addr, tgid, show_module=True, show_offset=True)))
 
 # process event
-def print_event(cpu, data, size):
+def print_event(bpf, cpu, data, size):
     event = ct.cast(data, ct.POINTER(Data)).contents
 
     if event.cap in capabilities:
         name = capabilities[event.cap]
     else:
         name = "?"
-    print("%-9s %-6d %-6d %-16s %-4d %-20s %d" % (strftime("%H:%M:%S"),
-        event.uid, event.pid, event.comm.decode('utf-8', 'replace'),
+    print("%-9s %-6d %-6d %-6d %-16s %-4d %-20s %d" % (strftime("%H:%M:%S"),
+        event.uid, event.pid, event.tgid, event.comm.decode('utf-8', 'replace'),
         event.cap, name, event.audit))
+    if args.kernel_stack:
+        print_stack(bpf, event.kernel_stack_id, StackType.Kernel, -1)
+    if args.user_stack:
+        print_stack(bpf, event.user_stack_id, StackType.User, event.tgid)
 
 # loop with callback to print_event
-b["events"].open_perf_buffer(print_event)
+callback = partial(print_event, b)
+b["events"].open_perf_buffer(callback)
 while 1:
     b.perf_buffer_poll()
