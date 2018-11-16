@@ -262,6 +262,14 @@ class SmokeTests(TestCase):
     def test_runqlen(self):
         self.run_with_duration("runqlen.py 1 1")
 
+    @skipUnless(kernel_version_ge(4,8), "requires kernel >= 4.8")
+    def test_shmsnoop(self):
+        self.run_with_int("shmsnoop.py")
+
+    @skipUnless(kernel_version_ge(4,8), "requires kernel >= 4.8")
+    def test_sofdsnoop(self):
+        self.run_with_int("sofdsnoop.py")
+
     def test_slabratetop(self):
         self.run_with_duration("slabratetop.py 1 1")
 
