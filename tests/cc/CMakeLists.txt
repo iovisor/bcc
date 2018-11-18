@@ -9,6 +9,9 @@ target_link_libraries(test_static bcc-static)
 
 add_test(NAME c_test_static COMMAND ${TEST_WRAPPER} c_test_static sudo ${CMAKE_CURRENT_BINARY_DIR}/test_static)
 
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-result")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-unused-result")
+
 if(ENABLE_USDT)
 add_executable(test_libbcc
 	test_libbcc.cc
