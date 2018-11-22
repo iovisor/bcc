@@ -29,7 +29,7 @@ all: set_version
 	snapcraft
 
 set_version:
-	cat snapcraft.yaml | sed 's/version: .*/version: $(V)/' > snapcraft-tmp.yaml
+	cat snapcraft.yaml | sed 's/^version: .*/version: $(V)/' > snapcraft-tmp.yaml
 	mv snapcraft-tmp.yaml snapcraft.yaml
 
 install:
