@@ -26,7 +26,8 @@ process context. If that's not the case, they may show kernel details.
 USAGE:
 
 # tcpstates -h
-usage: tcpstates [-h] [-T] [-t] [-w] [-s] [-L LOCALPORT] [-D REMOTEPORT]
+usage: tcpstates.py [-h] [-T] [-t] [-w] [-s] [-L LOCALPORT] [-D REMOTEPORT]
+                    [-Y]
 
 Trace TCP session state changes and durations
 
@@ -40,6 +41,7 @@ optional arguments:
                         comma-separated list of local ports to trace.
   -D REMOTEPORT, --remoteport REMOTEPORT
                         comma-separated list of remote ports to trace.
+  -Y, --journal         log session state changes to the systemd journal
 
 examples:
     ./tcpstates           # trace all TCP state changes
@@ -47,6 +49,7 @@ examples:
     ./tcpstates -T        # include time column (HH:MM:SS)
     ./tcpstates -w        # wider colums (fit IPv6)
     ./tcpstates -stT      # csv output, with times & timestamps
+    ./tcpstates -Y        # log events to the systemd journal
     ./tcpstates -L 80     # only trace local port 80
     ./tcpstates -L 80,81  # only trace local ports 80 and 81
     ./tcpstates -D 80     # only trace remote port 80
