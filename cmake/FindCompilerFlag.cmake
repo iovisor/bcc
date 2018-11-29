@@ -15,3 +15,8 @@ else()
 	endif()
 	set(CMAKE_REQUIRED_FLAGS "${_backup_c_flags}")
 endif()
+
+# check whether reallocarray availability
+# this is used to satisfy reallocarray usage under src/cc/libbpf/
+CHECK_CXX_SOURCE_COMPILES("int main() {return !!reallocarray(NULL, 1, 1);}"
+			  HAVE_REALLOCARRAY_SUPPORT)

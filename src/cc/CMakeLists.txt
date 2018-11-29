@@ -10,6 +10,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/frontends/clang)
 include_directories(${LLVM_INCLUDE_DIRS})
 include_directories(${LIBELF_INCLUDE_DIRS})
 # todo: if check for kernel version
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/libbpf/include)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/libbpf/include/uapi)
 add_definitions(${LLVM_DEFINITIONS})
 configure_file(libbcc.pc.in ${CMAKE_CURRENT_BINARY_DIR}/libbcc.pc @ONLY)
@@ -18,14 +19,25 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -DBCC_PROG_TAG_DIR='\"${BCC_PROG_T
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-result")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC -Wno-unused-result")
 
+if (NOT HAVE_REALLOCARRAY_SUPPORT)
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DCOMPAT_NEED_REALLOCARRAY")
+endif()
+
 string(REGEX MATCH "^([0-9]+).*" _ ${LLVM_PACKAGE_VERSION})
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DLLVM_MAJOR_VERSION=${CMAKE_MATCH_1}")
 
 include(static_libstdc++)
 
-add_library(bpf-static STATIC libbpf.c perf_reader.c)
+add_library(bpf-static STATIC libbpf.c perf_reader.c
+  libbpf/src/bpf.c libbpf/src/btf.c libbpf/src/libbpf.c
+  libbpf/src/libbpf_errno.c libbpf/src/netlink.c
+  libbpf/src/nlattr.c libbpf/src/str_error.c)
+
 set_target_properties(bpf-static PROPERTIES OUTPUT_NAME bpf)
-add_library(bpf-shared SHARED libbpf.c perf_reader.c)
+add_library(bpf-shared SHARED libbpf.c perf_reader.c
+  libbpf/src/bpf.c libbpf/src/btf.c libbpf/src/libbpf.c
+  libbpf/src/libbpf_errno.c libbpf/src/netlink.c
+  libbpf/src/nlattr.c libbpf/src/str_error.c)
 set_target_properties(bpf-shared PROPERTIES VERSION ${REVISION_LAST} SOVERSION 0)
 set_target_properties(bpf-shared PROPERTIES OUTPUT_NAME bpf)
 
