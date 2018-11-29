@@ -3,6 +3,7 @@
 
 include_directories(${CMAKE_SOURCE_DIR}/src/cc)
 include_directories(${CMAKE_SOURCE_DIR}/src/cc/api)
+include_directories(${CMAKE_SOURCE_DIR}/src/cc/libbpf/include/uapi)
 
 option(INSTALL_CPP_EXAMPLES "Install C++ examples. Those binaries are statically linked and can take plenty of disk space" OFF)
 

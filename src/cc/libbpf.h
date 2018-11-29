@@ -18,7 +18,7 @@
 #ifndef LIBBPF_H
 #define LIBBPF_H
 
-#include "compat/linux/bpf.h"
+#include "linux/bpf.h"
 #include <stdint.h>
 #include <sys/types.h>
 

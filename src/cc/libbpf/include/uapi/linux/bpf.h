@@ -9,7 +9,7 @@
 #define _UAPI__LINUX_BPF_H__
 
 #include <linux/types.h>
-#include "bpf_common.h"
+#include <linux/bpf_common.h>
 
 /* Extended instruction set based on top of classic BPF */
 
@@ -2468,6 +2468,7 @@ struct __sk_buff {
 
 	__u32 data_meta;
 	struct bpf_flow_keys *flow_keys;
+	__u64 tstamp;
 };
 
 struct bpf_tunnel_key {
