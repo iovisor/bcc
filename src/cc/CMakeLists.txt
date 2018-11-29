@@ -12,6 +12,7 @@ include_directories(${LIBELF_INCLUDE_DIRS})
 # todo: if check for kernel version
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/libbpf/include)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/libbpf/include/uapi)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/libbpf/src)
 add_definitions(${LLVM_DEFINITIONS})
 configure_file(libbcc.pc.in ${CMAKE_CURRENT_BINARY_DIR}/libbcc.pc @ONLY)
 
