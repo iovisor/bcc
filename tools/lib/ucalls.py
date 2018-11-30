@@ -17,6 +17,7 @@ import argparse
 from bcc import BPF, USDT, utils
 from time import sleep
 import os
+import subprocess
 import platform
 
 #
@@ -626,7 +627,6 @@ def get_data():
                    bpf["counts"].items()))
 
     if args.syscalls:
-        global syscalls
         if args.latency:
             syscalls = map(lambda kv: (syscall_name(kv[0].value),
                                        (kv[1].num_calls, kv[1].total_ns)),
