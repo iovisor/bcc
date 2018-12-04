@@ -8,12 +8,11 @@ import platform
 # Automatically generated from strace/linux/x86_64/syscallent.h using the
 # following command:
 #
-#  cat syscallent.h | awk -F, '{ gsub(/[ \t"}]/, "", $4);
-#                                gsub(/[ \t/*]/, "", $5);
-#                                print "    "$5": \""$4"\","; }
-#                              BEGIN { print "syscalls = {" }
-#                              END { print "}" }'
-#
+# cat syscallent.h | awk -F, '{ gsub(/[ \t"}]/, "", $4);
+#                               gsub(/[\[\] \t{]/, "", $1); split($1, a, "=");
+#                               print "    "a[1]": b\""$4"\","; }
+#                               BEGIN { print "syscalls = {" }
+#                               END { print "}" '}
 syscalls = {
     0: b"read",
     1: b"write",
@@ -32,8 +31,8 @@ syscalls = {
     14: b"rt_sigprocmask",
     15: b"rt_sigreturn",
     16: b"ioctl",
-    17: b"pread",
-    18: b"pwrite",
+    17: b"pread64",
+    18: b"pwrite64",
     19: b"readv",
     20: b"writev",
     21: b"access",
@@ -75,7 +74,7 @@ syscalls = {
     57: b"fork",
     58: b"vfork",
     59: b"execve",
-    60: b"_exit",
+    60: b"exit",
     61: b"wait4",
     62: b"kill",
     63: b"uname",
@@ -181,7 +180,7 @@ syscalls = {
     163: b"acct",
     164: b"settimeofday",
     165: b"mount",
-    166: b"umount",
+    166: b"umount2",
     167: b"swapon",
     168: b"swapoff",
     169: b"reboot",
@@ -329,6 +328,27 @@ syscalls = {
     311: b"process_vm_writev",
     312: b"kcmp",
     313: b"finit_module",
+    314: b"sched_setattr",
+    315: b"sched_getattr",
+    316: b"renameat2",
+    317: b"seccomp",
+    318: b"getrandom",
+    319: b"memfd_create",
+    320: b"kexec_file_load",
+    321: b"bpf",
+    322: b"execveat",
+    323: b"userfaultfd",
+    324: b"membarrier",
+    325: b"mlock2",
+    326: b"copy_file_range",
+    327: b"preadv2",
+    328: b"pwritev2",
+    329: b"pkey_mprotect",
+    330: b"pkey_alloc",
+    331: b"pkey_free",
+    332: b"statx",
+    333: b"io_pgetevents",
+    334: b"rseq",
 }
 
 # Try to use ausyscall if it is available, because it can give us an up-to-date
