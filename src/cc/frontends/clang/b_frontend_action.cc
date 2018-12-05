@@ -1080,6 +1080,26 @@ DiagnosticBuilder BTypeVisitor::warning(SourceLocation loc, const char (&fmt)[N]
   return C.getDiagnostics().Report(loc, diag_id);
 }
 
+int64_t BTypeVisitor::getFieldValue(VarDecl *Decl, FieldDecl *FDecl, int64_t OrigFValue) {
+  unsigned idx = FDecl->getFieldIndex();
+
+  if (auto I = dyn_cast_or_null<InitListExpr>(Decl->getInit())) {
+#if LLVM_MAJOR_VERSION >= 8
+    Expr::EvalResult res;
+    if (I->getInit(idx)->EvaluateAsInt(res, C)) {
+      return res.Val.getInt().getExtValue();
+    }
+#else
+    llvm::APSInt res;
+    if (I->getInit(idx)->EvaluateAsInt(res, C)) {
+      return res.getExtValue();
+    }
+#endif
+  }
+
+  return OrigFValue;
+}
+
 // Open table FDs when bpf tables (as denoted by section("maps*") attribute)
 // are declared.
 bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
@@ -1124,21 +1144,9 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
         table.leaf_size = sz;
         leaf_type = F->getType();
       } else if (F->getName() == "max_entries") {
-        unsigned idx = F->getFieldIndex();
-        if (auto I = dyn_cast_or_null<InitListExpr>(Decl->getInit())) {
-          llvm::APSInt res;
-          if (I->getInit(idx)->EvaluateAsInt(res, C)) {
-            table.max_entries = res.getExtValue();
-          }
-        }
+            table.max_entries = getFieldValue(Decl, F, table.max_entries);
       } else if (F->getName() == "flags") {
-        unsigned idx = F->getFieldIndex();
-        if (auto I = dyn_cast_or_null<InitListExpr>(Decl->getInit())) {
-          llvm::APSInt res;
-          if (I->getInit(idx)->EvaluateAsInt(res, C)) {
-            table.flags = res.getExtValue();
-          }
-        }
+            table.flags = getFieldValue(Decl, F, table.flags);
       }
       ++i;
     }
