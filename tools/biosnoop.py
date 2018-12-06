@@ -122,7 +122,8 @@ int trace_req_completion(struct pt_regs *ctx, struct request *req)
 }
 """, debug=0)
 b.attach_kprobe(event="blk_account_io_start", fn_name="trace_pid_start")
-b.attach_kprobe(event="blk_start_request", fn_name="trace_req_start")
+if BPF.get_kprobe_functions(b'blk_start_request'):
+    b.attach_kprobe(event="blk_start_request", fn_name="trace_req_start")
 b.attach_kprobe(event="blk_mq_start_request", fn_name="trace_req_start")
 b.attach_kprobe(event="blk_account_io_completion",
     fn_name="trace_req_completion")
