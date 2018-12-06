@@ -27,22 +27,21 @@ slowy/App.isPrime                                      8969 4841017.64
 To trace only syscalls in a particular process and print the top 10 most 
 frequently-invoked ones:
 
-# ucalls -ST 10 3018
-Attached 375 kernel probes for syscall tracing.
-Tracing calls in process 3018 (language: none)... Ctrl-C to quit.
-
-METHOD                                              # CALLS
-sys_rt_sigaction                                          4
-SyS_rt_sigprocmask                                        4
-sys_mprotect                                              5
-sys_read                                                 22
-SyS_write                                                39
-SyS_epoll_wait                                           42
-sys_futex                                               177
-SyS_mmap                                                180
-sys_mmap_pgoff                                          181
-sys_munmap                                              817
+# ucalls -l none -ST 10 7913
+Attached kernel tracepoints for syscall tracing.
+Tracing calls in process 7913 (language: none)... Ctrl-C to quit.
 ^C
+METHOD                                              # CALLS
+timerfd_settime                                           9
+tgkill                                                   10
+getpid                                                   10
+stat                                                     80
+writev                                                  158
+pselect6                                                204
+rt_sigreturn                                            301
+rt_sigprocmask                                          872
+poll                                                   1387
+recvmsg                                                1417
 Detaching kernel probes, please wait...
 
 
