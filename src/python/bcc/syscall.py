@@ -376,7 +376,7 @@ def _parse_syscall(line):
 try:
     # Skip the first line, which is a header. The rest of the lines are simply
     # SYSCALL_NUM\tSYSCALL_NAME pairs.
-    out = subprocess.check_output('ausyscall --dump', stderr=subprocess.STDOUT)
+    out = subprocess.check_output(['ausyscall', '--dump'], stderr=subprocess.STDOUT)
     # remove the first line of expected output
     out = out.split('\n',1)[1]
     syscalls = dict(map(_parse_syscall, out.strip().split(b'\n')))
