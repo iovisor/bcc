@@ -1,8 +1,11 @@
 if(ENABLE_LLVM_SHARED)
 set(llvm_libs "LLVM")
 else()
-set(llvm_raw_libs bitwriter bpfcodegen debuginfodwarf irreader linker
-  mcjit objcarcopts option passes nativecodegen lto)
+set(llvm_raw_libs bitwriter bpfcodegen executionengine debuginfodwarf irreader linker
+  interpreter mcjit objcarcopts option passes lto)
+if(ENABLE_LLVM_NATIVECODEGEN)
+set(llvm_raw_libs ${llvm_raw_libs} nativecodegen)
+endif()
 list(FIND LLVM_AVAILABLE_LIBS "LLVMCoverage" _llvm_coverage)
 if (${_llvm_coverage} GREATER -1)
   list(APPEND llvm_raw_libs coverage)

@@ -34,6 +34,12 @@ if (${LLVM_PACKAGE_VERSION} VERSION_EQUAL 6 OR ${LLVM_PACKAGE_VERSION} VERSION_G
   set(bcc_common_sources ${bcc_common_sources} bcc_debug.cc)
 endif()
 
+if(ENABLE_LLVM_NATIVECODEGEN)
+set(bcc_common_sources ${bcc_common_sources} bpf_module_rw_engine.cc)
+else()
+set(bcc_common_sources ${bcc_common_sources} bpf_module_rw_engine_disabled.cc)
+endif()
+
 set(bcc_table_sources table_storage.cc shared_table.cc bpffs_table.cc json_map_decl_visitor.cc)
 set(bcc_util_sources ns_guard.cc common.cc)
 set(bcc_sym_sources bcc_syms.cc bcc_elf.c bcc_perf_map.c bcc_proc.c)
