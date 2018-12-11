@@ -108,8 +108,6 @@ BPFModule::BPFModule(unsigned flags, TableStorage *ts, bool rw_engine_enabled,
       id_(std::to_string((uintptr_t)this)),
       maps_ns_(maps_ns),
       ts_(ts) {
-  InitializeNativeTarget();
-  InitializeNativeTargetAsmPrinter();
   LLVMInitializeBPFTarget();
   LLVMInitializeBPFTargetMC();
   LLVMInitializeBPFTargetInfo();
