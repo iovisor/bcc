@@ -23,6 +23,7 @@
 #include <vector>
 
 #include "bcc_exception.h"
+#include "compat/linux/bpf.h"
 
 namespace llvm {
 class ExecutionEngine;
@@ -57,6 +58,10 @@ class FuncSource;
 class BPFModule {
  private:
   static const std::string FN_PREFIX;
+  void init_module();
+  void init_clang();
+  void cleanup_module();
+  void cleanup_clang();
   int init_engine();
   int parse(llvm::Module *mod);
   int finalize();

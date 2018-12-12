@@ -411,26 +411,4 @@ int ClangLoader::do_compile(unique_ptr<llvm::Module> *mod, TableStorage &ts,
   return 0;
 }
 
-const char * FuncSource::src(const std::string& name) {
-  auto src = funcs_.find(name);
-  if (src == funcs_.end())
-    return "";
-  return src->second.src_.data();
-}
-
-const char * FuncSource::src_rewritten(const std::string& name) {
-  auto src = funcs_.find(name);
-  if (src == funcs_.end())
-    return "";
-  return src->second.src_rewritten_.data();
-}
-
-void FuncSource::set_src(const std::string& name, const std::string& src) {
-  funcs_[name].src_ = src;
-}
-
-void FuncSource::set_src_rewritten(const std::string& name, const std::string& src) {
-  funcs_[name].src_rewritten_ = src;
-}
-
 }  // namespace ebpf
