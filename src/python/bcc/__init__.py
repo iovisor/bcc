@@ -543,11 +543,11 @@ class BPF(object):
                 # prefix _kbl_addr_*, blacklisting them by looking at the name
                 # allows to catch also those symbols that are defined in kernel
                 # modules.
-                if fn.startswith('_kbl_addr_'):
+                if fn.startswith(b'_kbl_addr_'):
                     continue
                 # Explicitly blacklist perf-related functions, they are all
                 # non-attachable.
-                elif fn.startswith('__perf') or fn.startswith('perf_'):
+                elif fn.startswith(b'__perf') or fn.startswith(b'perf_'):
                     continue
                 if (t.lower() in [b't', b'w']) and re.match(event_re, fn) \
                     and fn not in blacklist:
