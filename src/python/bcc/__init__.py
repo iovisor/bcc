@@ -515,9 +515,12 @@ class BPF(object):
         fns = []
 
         in_init_section = 0
+        in_irq_section = 0
         with open("/proc/kallsyms", "rb") as avail_file:
             for line in avail_file:
                 (t, fn) = line.rstrip().split()[1:3]
+                # Skip all functions defined between __init_begin and
+                # __init_end
                 if in_init_section == 0:
                     if fn == b'__init_begin':
                         in_init_section = 1
@@ -525,6 +528,26 @@ class BPF(object):
                 elif in_init_section == 1:
                     if fn == b'__init_end':
                         in_init_section = 2
+                    continue
+                # Skip all functions defined between __irqentry_text_start and
+                # __irqentry_text_end
+                if in_irq_section == 0:
+                    if fn == b'__irqentry_text_start':
+                        in_irq_section = 1
+                        continue
+                elif in_irq_section == 1:
+                    if fn == b'__irqentry_text_end':
+                        in_irq_section = 2
+                    continue
+                # All functions defined as NOKPROBE_SYMBOL() start with the
+                # prefix _kbl_addr_*, blacklisting them by looking at the name
+                # allows to catch also those symbols that are defined in kernel
+                # modules.
+                if fn.startswith(b'_kbl_addr_'):
+                    continue
+                # Explicitly blacklist perf-related functions, they are all
+                # non-attachable.
+                elif fn.startswith(b'__perf') or fn.startswith(b'perf_'):
                     continue
                 if (t.lower() in [b't', b'w']) and re.match(event_re, fn) \
                     and fn not in blacklist:
