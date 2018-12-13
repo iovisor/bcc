@@ -100,7 +100,7 @@ void BPFModule::init_clang() {
   LLVMInitializeBPFAsmPrinter();
 #if LLVM_MAJOR_VERSION >= 6
   LLVMInitializeBPFAsmParser();
-  if (flags & DEBUG_SOURCE)
+  if (flags_ & DEBUG_SOURCE)
     LLVMInitializeBPFDisassembler();
 #endif
   LLVMLinkInMCJIT(); /* call empty function to force linking of MCJIT */
