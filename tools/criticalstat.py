@@ -328,4 +328,7 @@ print("Finding critical section with {} disabled for > {}us".format(
     ('preempt' if preemptoff else 'IRQ'), args.duration))
 
 while 1:
-    b.perf_buffer_poll();
+    try:
+        b.perf_buffer_poll()
+    except KeyboardInterrupt:
+        exit()

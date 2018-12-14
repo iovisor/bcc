@@ -507,7 +507,10 @@ struct pid_struct {
 
     def _main_loop(self):
         while True:
-            self.bpf.perf_buffer_poll()
+            try:
+                self.bpf.perf_buffer_poll()
+            except KeyboardInterrupt:
+                exit()
 
     def run(self):
         self._create_probes()
