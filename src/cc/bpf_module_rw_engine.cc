@@ -29,7 +29,7 @@ namespace ebpf {
 
 using std::map;
 using std::move;
-using std::string;GlobalVariable
+using std::string;
 using std::unique_ptr;
 using std::vector;
 using namespace llvm;
