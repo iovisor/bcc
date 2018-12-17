@@ -67,7 +67,7 @@ before the actual queries start coming in.
 
 USAGE:
 # dbslower -h
-usage: dbslower.py [-h] [-v] [-p [PIDS [PIDS ...]]] [-m THRESHOLD]
+usage: dbslower.py [-h] [-v] [-p [PIDS [PIDS ...]]] [-x PATH] [-m THRESHOLD]
                    {mysql,postgres}
 
 positional arguments:
@@ -78,6 +78,7 @@ optional arguments:
   -v, --verbose         print the BPF program
   -p [PID [PID ...]], --pid [PID [PID ...]]
                         the pid(s) to trace
+  -x PATH, --exe PATH   path to binary
   -m THRESHOLD, --threshold THRESHOLD
                         trace queries slower than this threshold (ms)
 
@@ -86,3 +87,4 @@ examples:
     dbslower postgres -p 188 322 # trace specific PostgreSQL processes
     dbslower mysql -p 480 -m 30  # trace MySQL queries slower than 30ms
     dbslower mysql -p 480 -v     # trace MySQL queries and print the BPF program
+    dbslower mysql -x $(which mysqld)  # trace MySQL queries with uprobes
