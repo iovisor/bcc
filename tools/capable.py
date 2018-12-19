@@ -216,4 +216,7 @@ def print_event(bpf, cpu, data, size):
 callback = partial(print_event, b)
 b["events"].open_perf_buffer(callback)
 while 1:
-    b.perf_buffer_poll()
+    try:
+        b.perf_buffer_poll()
+    except KeyboardInterrupt:
+        exit()

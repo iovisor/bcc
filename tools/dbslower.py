@@ -230,4 +230,7 @@ print("%-14s %-6s %8s %s" % ("TIME(s)", "PID", "MS", "QUERY"))
 
 bpf["events"].open_perf_buffer(print_event, page_cnt=64)
 while True:
-    bpf.perf_buffer_poll()
+    try:
+        bpf.perf_buffer_poll()
+    except KeyboardInterrupt:
+        exit()
