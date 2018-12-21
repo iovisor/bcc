@@ -1,7 +1,7 @@
 set(EXAMPLE_PROGRAMS hello_world.py)
 install(PROGRAMS ${EXAMPLE_PROGRAMS} DESTINATION share/bcc/examples)
 
-if(ENABLE_CLANG_JIT)
+if(NOT LIBBPF_ONLY)
 if(ENABLE_USDT)
 add_subdirectory(cpp)
 endif(ENABLE_USDT)
