@@ -658,7 +658,7 @@ class BPF(object):
 
     def detach_kprobe_event(self, ev_name):
         if ev_name not in self.kprobe_fds:
-            raise Exception("Kprobe %s is not attached" % event)
+            raise Exception("Kprobe %s is not attached" % ev_name)
         res = lib.bpf_close_perf_event_fd(self.kprobe_fds[ev_name])
         if res < 0:
             raise Exception("Failed to close kprobe FD")
