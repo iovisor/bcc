@@ -16,6 +16,7 @@ include(GNUInstallDirs)
 include(CheckCXXCompilerFlag)
 include(cmake/FindCompilerFlag.cmake)
 
+option(ENABLE_LLVM_NATIVECODEGEN "Enable use of llvm nativecodegen module (needed by rw-engine)" ON)
 option(ENABLE_RTTI "Enable compiling with real time type information" OFF)
 option(ENABLE_LLVM_SHARED "Enable linking LLVM as a shared library" OFF)
 option(ENABLE_CLANG_JIT "Enable Loading BPF through Clang Frontend" ON)
