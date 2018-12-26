@@ -176,6 +176,8 @@ class BPF {
                         int& fd);
   StatusTuple unload_func(const std::string& func_name);
 
+  int free_bcc_memory();
+
  private:
   std::string get_kprobe_event(const std::string& kernel_func,
                                bpf_probe_attach_type type);

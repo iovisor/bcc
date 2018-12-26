@@ -77,3 +77,5 @@ add_test(NAME py_test_usdt3 WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   COMMAND ${TEST_WRAPPER} py_test_usdt3 sudo ${CMAKE_CURRENT_SOURCE_DIR}/test_usdt3.py)
 add_test(NAME py_test_license WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   COMMAND ${TEST_WRAPPER} py_test_license sudo ${CMAKE_CURRENT_SOURCE_DIR}/test_license.py)
+add_test(NAME py_test_free_bcc_memory WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  COMMAND ${TEST_WRAPPER} py_test_free_bcc_memory sudo ${CMAKE_CURRENT_SOURCE_DIR}/test_free_bcc_memory.py)

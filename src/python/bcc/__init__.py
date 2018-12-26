@@ -1259,6 +1259,9 @@ class BPF(object):
         """
         self.perf_buffer_poll(timeout)
 
+    def free_bcc_memory(self):
+        return lib.bcc_free_memory()
+
     def donothing(self):
         """the do nothing exit handler"""
 
