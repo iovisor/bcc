@@ -7,7 +7,7 @@
   - [Arch](#arch---aur)
   - [Gentoo](#gentoo---portage)
   - [openSUSE](#opensuse---binary)
-  - [RHEL](#redhat---binary)
+  - [RHEL](#rhel---binary)
 * [Source](#source)
   - [Debian](#debian---source)
   - [Ubuntu](#ubuntu---source)
@@ -148,7 +148,7 @@ sudo zypper in bcc-tools bcc-examples
 
 ## RHEL - Binary
 
-For Redhat 7.6 (Beta) bcc is already included in the official yum repository as bcc-tools. As part of the install the following dependencies are installed: bcc.x86_64 0:0.6.0-3.el7 ,llvm-private.x86_64 0:6.0.1-2.el7 ,python-bcc.x86_64 0:0.6.0-3.el7,python-netaddr.noarch 0:0.7.5-9.el7
+For RHEL 7.6, bcc is already included in the official yum repository as bcc-tools. As part of the install, the following dependencies are installed: bcc.x86_64 0:0.6.1-2.el7 ,llvm-private.x86_64 0:6.0.1-2.el7 ,python-bcc.x86_64 0:0.6.1-2.el7,python-netaddr.noarch 0:0.7.5-9.el7
 
 ```
 yum install bcc-tools
