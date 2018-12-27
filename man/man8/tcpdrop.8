@@ -1,0 +1,73 @@
+.TH tcpdrop 8  "2018-05-30" "USER COMMANDS"
+.SH NAME
+tcpdrop \- Trace kernel-based TCP packet drops with details. Uses Linux eBPF/bcc.
+.SH SYNOPSIS
+.B tcpdrop [\-h] [\-T] [\-t] [\-w] [\-s] [\-p PID] [\-D PORTS] [\-L PORTS]
+.SH DESCRIPTION
+This tool traces TCP packets or segments that were dropped by the kernel, and
+shows details from the IP and TCP headers, the socket state, and the
+kernel stack trace. This is useful for debugging cases of high kernel drops,
+which can cause timer-based retransmits and performance issues.
+
+This tool works using dynamic tracing of the tcp_drop() kernel function,
+which requires a recent kernel version.
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH OPTIONS
+.TP
+\-h
+Print usage message.
+.B tcpdrop
+.SH FIELDS
+.TP
+TIME
+Time of the drop, in HH:MM:SS format.
+.TP
+PID
+Process ID that was on-CPU during the drop. This may be unrelated, as drops
+can occur on the receive interrupt and be unrelated to the PID that was
+interrupted.
+.TP
+IP
+IP address family (4 or 6)
+.TP
+SADDR
+Source IP address.
+.TP
+SPORT
+Source TCP port.
+.TP
+DADDR
+Destination IP address.
+.TP
+DPORT
+Destionation TCP port.
+.TP
+STATE
+TCP session state ("ESTABLISHED", etc).
+.TP
+FLAGS
+TCP flags ("SYN", etc).
+.SH OVERHEAD
+This traces the kernel tcp_drop() function, which should be low frequency,
+and therefore the overhead of this tool should be negligible.
+
+As always, test and understand this tools overhead for your types of
+workloads before production use.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Brendan Gregg
+.SH SEE ALSO
+tcplife(8), tcpaccept(8), tcpconnect(8), tcptop(8)

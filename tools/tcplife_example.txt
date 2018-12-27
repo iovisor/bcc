@@ -117,7 +117,7 @@ optional arguments:
   -T, --time            include time column on output (HH:MM:SS)
   -t, --timestamp       include timestamp on output (seconds)
   -w, --wide            wide column output (fits IPv6 addresses)
-  -s, --csv             comma seperated values output
+  -s, --csv             comma separated values output
   -p PID, --pid PID     trace this PID only
   -L LOCALPORT, --localport LOCALPORT
                         comma-separated list of local ports to trace.

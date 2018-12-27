@@ -17,6 +17,7 @@
 
 from __future__ import print_function
 from bcc import BPF
+from bcc.utils import printb
 from time import sleep, strftime
 import argparse
 import signal
@@ -41,6 +42,8 @@ parser.add_argument("interval", nargs="?", default=1,
     help="output interval, in seconds")
 parser.add_argument("count", nargs="?", default=99999999,
     help="number of outputs")
+parser.add_argument("--ebpf", action="store_true",
+    help=argparse.SUPPRESS)
 args = parser.parse_args()
 interval = int(args.interval)
 countdown = int(args.count)
@@ -60,7 +63,11 @@ bpf_text = """
 #include <uapi/linux/ptrace.h>
 #include <linux/mm.h>
 #include <linux/slab.h>
+#ifdef CONFIG_SLUB
 #include <linux/slub_def.h>
+#else
+#include <linux/slab_def.h>
+#endif
 
 #define CACHE_NAME_SIZE 32
 
@@ -80,7 +87,8 @@ BPF_HASH(counts, struct info_t, struct val_t);
 int kprobe__kmem_cache_alloc(struct pt_regs *ctx, struct kmem_cache *cachep)
 {
     struct info_t info = {};
-    bpf_probe_read(&info.name, sizeof(info.name), (void *)cachep->name);
+    const char *name = cachep->name;
+    bpf_probe_read(&info.name, sizeof(info.name), name);
 
     struct val_t *valp, zero = {};
     valp = counts.lookup_or_init(&info, &zero);
@@ -90,8 +98,10 @@ int kprobe__kmem_cache_alloc(struct pt_regs *ctx, struct kmem_cache *cachep)
     return 0;
 }
 """
-if debug:
+if debug or args.ebpf:
     print(bpf_text)
+    if args.ebpf:
+        exit()
 
 # initialize BPF
 b = BPF(text=bpf_text)
@@ -120,7 +130,7 @@ while 1:
     line = 0
     for k, v in reversed(sorted(counts.items(),
                                 key=lambda counts: counts[1].size)):
-        print("%-32s %6d %10d" % (k.name.decode(), v.count, v.size))
+        printb(b"%-32s %6d %10d" % (k.name, v.count, v.size))
 
         line += 1
         if line >= maxrows:

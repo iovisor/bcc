@@ -25,7 +25,7 @@ struct data_t {
     char comm[TASK_COMM_LEN];
 };
 
-BPF_STACK_TRACE(stack_traces, 128)
+BPF_STACK_TRACE(stack_traces, 128);
 BPF_PERF_OUTPUT(events);
 
 void trace_stack(struct pt_regs *ctx) {
@@ -103,5 +103,5 @@ return function(BPF, utils)
   bpf:get_table("events"):open_perf_buffer(print_event,
     "struct { uint64_t stack_id; uint32_t pid; char comm[$]; }",
     {TASK_COMM_LEN})
-  bpf:kprobe_poll_loop()
+  bpf:perf_buffer_poll_loop()
 end

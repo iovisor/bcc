@@ -31,6 +31,8 @@ parser = argparse.ArgumentParser(
     epilog=examples)
 parser.add_argument("-p", "--pid", help="trace this PID only", type=int,
     default=-1)
+parser.add_argument("--ebpf", action="store_true",
+    help=argparse.SUPPRESS)
 args = parser.parse_args()
 
 # load BPF program
@@ -94,6 +96,10 @@ int do_return(struct pt_regs *ctx) {
     return 0;
 }
 """
+if args.ebpf:
+    print(bpf_text)
+    exit()
+
 b = BPF(text=bpf_text)
 b.attach_uprobe(name="c", sym="getaddrinfo", fn_name="do_entry", pid=args.pid)
 b.attach_uprobe(name="c", sym="gethostbyname", fn_name="do_entry",
@@ -123,10 +129,13 @@ print("%-9s %-6s %-16s %10s %s" % ("TIME", "PID", "COMM", "LATms", "HOST"))
 def print_event(cpu, data, size):
     event = ct.cast(data, ct.POINTER(Data)).contents
     print("%-9s %-6d %-16s %10.2f %s" % (strftime("%H:%M:%S"), event.pid,
-        event.comm.decode(), (float(event.delta) / 1000000),
-        event.host.decode()))
+        event.comm.decode('utf-8', 'replace'), (float(event.delta) / 1000000),
+        event.host.decode('utf-8', 'replace')))
 
 # loop with callback to print_event
 b["events"].open_perf_buffer(print_event)
 while 1:
-    b.kprobe_poll()
+    try:
+        b.perf_buffer_poll()
+    except KeyboardInterrupt:
+        exit()

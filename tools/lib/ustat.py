@@ -5,7 +5,7 @@
 #        method calls, class loads, garbage collections, and more.
 #        For Linux, uses BCC, eBPF.
 #
-# USAGE: ustat [-l {java,python,ruby,node,php}] [-C]
+# USAGE: ustat [-l {java,node,perl,php,python,ruby,tcl}] [-C]
 #        [-S {cload,excp,gc,method,objnew,thread}] [-r MAXROWS] [-d]
 #        [interval [count]]
 #
@@ -132,7 +132,7 @@ class Tool(object):
             formatter_class=argparse.RawDescriptionHelpFormatter,
             epilog=examples)
         parser.add_argument("-l", "--language",
-            choices=["java", "python", "ruby", "node", "php"],
+            choices=["java", "node", "perl", "php", "python", "ruby", "tcl"],
             help="language to trace (default: all languages)")
         parser.add_argument("-C", "--noclear", action="store_true",
             help="don't clear the screen")
@@ -147,21 +147,35 @@ class Tool(object):
             help="output interval, in seconds")
         parser.add_argument("count", nargs="?", default=99999999, type=int,
             help="number of outputs")
+        parser.add_argument("--ebpf", action="store_true",
+            help=argparse.SUPPRESS)
         self.args = parser.parse_args()
 
     def _create_probes(self):
         probes_by_lang = {
+                "java": Probe("java", ["java"], {
+                    "gc__begin": Category.GC,
+                    "mem__pool__gc__begin": Category.GC,
+                    "thread__start": Category.THREAD,
+                    "class__loaded": Category.CLOAD,
+                    "object__alloc": Category.OBJNEW,
+                    "method__entry": Category.METHOD,
+                    "ExceptionOccurred__entry": Category.EXCP
+                    }),
                 "node": Probe("node", ["node"], {
                     "gc__start": Category.GC
                     }),
-                "python": Probe("python", ["python"], {
-                    "function__entry": Category.METHOD,
-                    "gc__start": Category.GC
+                "perl": Probe("perl", ["perl"], {
+                    "sub__entry": Category.METHOD
                     }),
                 "php": Probe("php", ["php"], {
                     "function__entry": Category.METHOD,
                     "compile__file__entry": Category.CLOAD,
                     "exception__thrown": Category.EXCP
+                    }),
+                "python": Probe("python", ["python"], {
+                    "function__entry": Category.METHOD,
+                    "gc__start": Category.GC
                     }),
                 "ruby": Probe("ruby", ["ruby", "irb"], {
                     "method__entry": Category.METHOD,
@@ -176,15 +190,10 @@ class Tool(object):
                     "load__entry": Category.CLOAD,
                     "raise": Category.EXCP
                     }),
-                "java": Probe("java", ["java"], {
-                    "gc__begin": Category.GC,
-                    "mem__pool__gc__begin": Category.GC,
-                    "thread__start": Category.THREAD,
-                    "class__loaded": Category.CLOAD,
-                    "object__alloc": Category.OBJNEW,
-                    "method__entry": Category.METHOD,
-                    "ExceptionOccurred__entry": Category.EXCP
-                    })
+                "tcl": Probe("tcl", ["tclsh", "wish"], {
+                    "proc__entry": Category.METHOD,
+                    "obj__create": Category.OBJNEW
+                    }),
                 }
 
         if self.args.language:
@@ -194,8 +203,10 @@ class Tool(object):
 
     def _attach_probes(self):
         program = str.join('\n', [p.get_program() for p in self.probes])
-        if self.args.debug:
+        if self.args.debug or self.args.ebpf:
             print(program)
+            if self.args.ebpf:
+                exit()
             for probe in self.probes:
                 print("Attached to %s processes:" % probe.language,
                         str.join(', ', map(str, probe.targets)))

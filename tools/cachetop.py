@@ -72,7 +72,7 @@ def get_processes_stats(
     counts = bpf.get_table("counts")
     stats = defaultdict(lambda: defaultdict(int))
     for k, v in counts.items():
-        stats["%d-%d-%s" % (k.pid, k.uid, k.comm.decode())][k.ip] = v.value
+        stats["%d-%d-%s" % (k.pid, k.uid, k.comm.decode('utf-8', 'replace'))][k.ip] = v.value
     stats_list = []
 
     for pid, count in sorted(stats.items(), key=lambda stat: stat[0]):
@@ -88,16 +88,16 @@ def get_processes_stats(
         whits = 0
 
         for k, v in count.items():
-            if re.match('mark_page_accessed', bpf.ksym(k)) is not None:
+            if re.match(b'mark_page_accessed', bpf.ksym(k)) is not None:
                 mpa = max(0, v)
 
-            if re.match('mark_buffer_dirty', bpf.ksym(k)) is not None:
+            if re.match(b'mark_buffer_dirty', bpf.ksym(k)) is not None:
                 mbd = max(0, v)
 
-            if re.match('add_to_page_cache_lru', bpf.ksym(k)) is not None:
+            if re.match(b'add_to_page_cache_lru', bpf.ksym(k)) is not None:
                 apcl = max(0, v)
 
-            if re.match('account_page_dirtied', bpf.ksym(k)) is not None:
+            if re.match(b'account_page_dirtied', bpf.ksym(k)) is not None:
                 apd = max(0, v)
 
             # access = total cache access incl. reads(mpa) and writes(mbd)
@@ -153,7 +153,6 @@ def handle_loop(stdscr, args):
 
     int do_count(struct pt_regs *ctx) {
         struct key_t key = {};
-        u64 zero = 0 , *val;
         u64 pid = bpf_get_current_pid_tgid();
         u32 uid = bpf_get_current_uid_gid();
 
@@ -162,8 +161,7 @@ def handle_loop(stdscr, args):
         key.uid = uid & 0xFFFFFFFF;
         bpf_get_current_comm(&(key.comm), 16);
 
-        val = counts.lookup_or_init(&key, &zero);  // update counter
-        (*val)++;
+        counts.increment(key);
         return 0;
     }
 
@@ -222,11 +220,20 @@ def handle_loop(stdscr, args):
         )
         (height, width) = stdscr.getmaxyx()
         for i, stat in enumerate(process_stats):
+            uid = int(stat[1])
+            try:
+                username = pwd.getpwuid(uid)[0]
+            except KeyError as ex:
+                # `pwd` throws a KeyError if the user cannot be found. This can
+                # happen e.g. when the process is running in a cgroup that has
+                # different users from the host.
+                username = 'UNKNOWN({})'.format(uid)
+
             stdscr.addstr(
                 i + 2, 0,
                 "{0:8} {username:8.8} {2:16} {3:8} {4:8} "
                 "{5:8} {6:9.1f}% {7:9.1f}%".format(
-                    *stat, username=pwd.getpwuid(int(stat[1]))[0]
+                    *stat, username=username
                 )
             )
             if i > height - 4:

@@ -13,7 +13,7 @@ This observability tutorial contains 17 lessons, and 46 enumerated things to lea
 Start by running [examples/hello_world.py](../examples/hello_world.py), while running some commands (eg, "ls") in another session. It should print "Hello, World!" for new processes. If not, start by fixing bcc: see [INSTALL.md](../INSTALL.md).
 
 ```
-# ./examples/hello_world.py 
+# ./examples/hello_world.py
             bash-13364 [002] d... 24573433.052937: : Hello, World!
             bash-13364 [003] d... 24573436.642808: : Hello, World!
 [...]
@@ -51,7 +51,7 @@ Improve it by printing "Tracing sys_sync()... Ctrl-C to end." when the program f
 This program is in [examples/tracing/hello_fields.py](../examples/tracing/trace_fields.py). Sample output (run commands in another session):
 
 ```
-# ./examples/tracing/hello_fields.py 
+# ./examples/tracing/hello_fields.py
 TIME(s)            COMM             PID    MESSAGE
 24585001.174885999 sshd             1432   Hello, World!
 24585001.195710000 sshd             15780  Hello, World!
@@ -74,7 +74,7 @@ int hello(void *ctx) {
 
 # load BPF program
 b = BPF(text=prog)
-b.attach_kprobe(event="sys_clone", fn_name="hello")
+b.attach_kprobe(event=b.get_syscall_fnname("clone"), fn_name="hello")
 
 # header
 print("%-18s %-16s %-6s %s" % ("TIME(s)", "COMM", "PID", "MESSAGE"))
@@ -94,7 +94,7 @@ This is similar to hello_world.py, and traces new processes via sys_clone() agai
 
 1. ```hello()```: Now we're just declaring a C function, instead of the ```kprobe__``` shortcut. We'll refer to this later. All C functions declared in the BPF program are expected to be executed on a probe, hence they all need to take a ```pt_reg* ctx``` as first argument. If you need to define some helper function that will not be executed on a probe, they need to be defined as ```static inline``` in order to be inlined by the compiler. Sometimes you would also need to add ```_always_inline``` function attribute to it.
 
-1. ```b.attach_kprobe(event="sys_clone", fn_name="hello")```: Creates a kprobe for the sys_clone() kernel function, which will execute our defined hello() function. You can call attach_kprobe() more than once, and attach your C function to multiple kernel functions.
+1. ```b.attach_kprobe(event=b.get_syscall_fnname("clone"), fn_name="hello")```: Creates a kprobe for the kernel clone system call function, which will execute our defined hello() function. You can call attach_kprobe() more than once, and attach your C function to multiple kernel functions.
 
 1. ```b.trace_fields()```: Returns a fixed set of fields from trace_pipe. Similar to trace_print(), this is handy for hacking, but for real tooling we should switch to BPF_PERF_OUTPUT().
 
@@ -114,17 +114,17 @@ At time 0.10 s: multiple syncs detected, last 96 ms ago
 This program is [examples/tracing/sync_timing.py](../examples/tracing/sync_timing.py):
 
 ```Python
+from __future__ import print_function
 from bcc import BPF
 
 # load BPF program
 b = BPF(text="""
 #include <uapi/linux/ptrace.h>
-#include <linux/blkdev.h>
 
 BPF_HASH(last);
 
 int do_trace(struct pt_regs *ctx) {
-	u64 ts, *tsp, delta, key = 0;
+    u64 ts, *tsp, delta, key = 0;
 
     // attempt to read stored timestamp
     tsp = last.lookup(&key);
@@ -144,7 +144,7 @@ int do_trace(struct pt_regs *ctx) {
 }
 """)
 
-b.attach_kprobe(event="sys_sync", fn_name="do_trace")
+b.attach_kprobe(event=b.get_syscall_fnname("sync"), fn_name="do_trace")
 print("Tracing for quick sync's... Ctrl-C to end")
 
 # format output
@@ -168,14 +168,14 @@ Things to learn:
 
 ### Lesson 5. sync_count.py
 
-Modify the sync_timing.py program (prior lesson) to store the count of all sys_sync() calls (both fast and slow), and print it with the output. This count can be recorded in the BPF program by adding a new key index to the existing hash.
+Modify the sync_timing.py program (prior lesson) to store the count of all kernel sync system calls (both fast and slow), and print it with the output. This count can be recorded in the BPF program by adding a new key index to the existing hash.
 
 ### Lesson 6. disksnoop.py
 
 Browse the [examples/tracing/disksnoop.py](../examples/tracing/disksnoop.py) program to see what is new. Here is some sample output:
 
 ```
-# ./disksnoop.py 
+# ./disksnoop.py
 TIME(s)            T  BYTES    LAT(ms)
 16458043.436012    W  4096        3.13
 16458043.437326    W  4096        4.44
@@ -237,7 +237,7 @@ This is a pretty interesting program, and if you can understand all the code, yo
 Let's finally stop using bpf_trace_printk() and use the proper BPF_PERF_OUTPUT() interface. This will also mean we stop getting the free trace_field() members like PID and timestamp, and will need to fetch them directly. Sample output while commands are run in another session:
 
 ```
-# ./hello_perf_output.py 
+# ./hello_perf_output.py
 TIME(s)            COMM             PID    MESSAGE
 0.000000000        bash             22986  Hello, perf_output!
 0.021080275        systemd-udevd    484    Hello, perf_output!
@@ -279,12 +279,12 @@ int hello(struct pt_regs *ctx) {
 
 # load BPF program
 b = BPF(text=prog)
-b.attach_kprobe(event="sys_clone", fn_name="hello")
+b.attach_kprobe(event=b.get_syscall_fnname("clone"), fn_name="hello")
 
 # define output data structure in Python
 TASK_COMM_LEN = 16    # linux/sched.h
 class Data(ct.Structure):
-    _fields_ = [("pid", ct.c_ulonglong),
+    _fields_ = [("pid", ct.c_uint),
                 ("ts", ct.c_ulonglong),
                 ("comm", ct.c_char * TASK_COMM_LEN)]
 
@@ -305,7 +305,7 @@ def print_event(cpu, data, size):
 # loop with callback to print_event
 b["events"].open_perf_buffer(print_event)
 while 1:
-    b.kprobe_poll()
+    b.perf_buffer_poll()
 ```
 
 Things to learn:
@@ -319,7 +319,7 @@ Things to learn:
 1. ```class Data(ct.Structure)```: Now define the Python version of the C data structure.
 1. ```def print_event()```: Define a Python function that will handle reading events from the ```events``` stream.
 1. ```b["events"].open_perf_buffer(print_event)```: Associate the Python ```print_event``` function with the ```events``` stream.
-1. ```while 1: b.kprobe_poll()```: Block waiting for events.
+1. ```while 1: b.perf_buffer_poll()```: Block waiting for events.
 
 This may be improved in future bcc versions. Eg, the Python data struct could be auto-generated from the C code.
 
@@ -349,6 +349,7 @@ Tracing... Hit Ctrl-C to end.
 Code is [examples/tracing/bitehist.py](../examples/tracing/bitehist.py):
 
 ```Python
+from __future__ import print_function
 from bcc import BPF
 from time import sleep
 
@@ -373,7 +374,7 @@ print("Tracing... Hit Ctrl-C to end.")
 try:
 	sleep(99999999)
 except KeyboardInterrupt:
-	print
+	print()
 
 # output
 b["dist"].print_log2_hist("kbytes")
@@ -388,7 +389,7 @@ A recap from earlier lessons:
 New things to learn:
 
 1. ```BPF_HISTOGRAM(dist)```: Defines a BPF map object that is a histogram, and names it "dist".
-1. ```dist.increment()```: Increments the histogram bucket index provided as an argument by one.
+1. ```dist.increment()```: Increments the histogram bucket index provided as first argument by one by default. Optionally, custom increments can be passed as the second argument.
 1. ```bpf_log2l()```: Returns the log-2 of the provided value. This becomes the index of our histogram, so that we're constructing a power-of-2 histogram.
 1. ```b["dist"].print_log2_hist("kbytes")```: Prints the "dist" histogram as power-of-2, with a column header of "kbytes". The only data transferred from kernel to user space is the bucket counts, making this efficient.
 
@@ -449,7 +450,7 @@ Browse the code in [examples/tracing/vfsreadlat.py](../examples/tracing/vfsreadl
 Tracing while a ```dd if=/dev/urandom of=/dev/null bs=8k count=5``` is run:
 
 ```
-# ./urandomread.py 
+# ./urandomread.py
 TIME(s)            COMM             PID    GOTBITS
 24652832.956994001 smtp             24690  384
 24652837.726500999 dd               24692  65536
@@ -462,6 +463,7 @@ TIME(s)            COMM             PID    GOTBITS
 Hah! I caught smtp by accident. Code is [examples/tracing/urandomread.py](../examples/tracing/urandomread.py):
 
 ```Python
+from __future__ import print_function
 from bcc import BPF
 
 # load BPF program
@@ -470,7 +472,7 @@ TRACEPOINT_PROBE(random, urandom_read) {
     // args is from /sys/kernel/debug/tracing/events/random/urandom_read/format
     bpf_trace_printk("%d\\n", args->got_bits);
     return 0;
-};
+}
 """)
 
 # header
@@ -518,7 +520,7 @@ Convert disksnoop.py from a previous lesson to use the ```block:block_rq_issue``
 This program instruments a user-level function, the ```strlen()``` library function, and frequency counts its string argument. Example output:
 
 ```
-# ./strlen_count.py 
+# ./strlen_count.py
 Tracing strlen()... Hit Ctrl-C to end.
 ^C     COUNT STRING
          1 " "
@@ -544,6 +546,7 @@ These are various strings that are being processed by this library function whil
 Code is [examples/tracing/strlen_count.py](../examples/tracing/strlen_count.py):
 
 ```Python
+from __future__ import print_function
 from bcc import BPF
 from time import sleep
 
@@ -564,6 +567,7 @@ int count(struct pt_regs *ctx) {
     u64 zero = 0, *val;
 
     bpf_probe_read(&key.c, sizeof(key.c), (void *)PT_REGS_PARM1(ctx));
+    // could also use `counts.increment(key)`
     val = counts.lookup_or_init(&key, &zero);
     (*val)++;
     return 0;
@@ -607,17 +611,22 @@ TIME(s)            COMM             PID    ARGS
 Relevant code from [examples/tracing/nodejs_http_server.py](../examples/tracing/nodejs_http_server.py):
 
 ```Python
+from __future__ import print_function
+from bcc import BPF, USDT
+import sys
+
 if len(sys.argv) < 2:
     print("USAGE: nodejs_http_server PID")
     exit()
 pid = sys.argv[1]
+debug = 0
 
 # load BPF program
 bpf_text = """
 #include <uapi/linux/ptrace.h>
 int do_trace(struct pt_regs *ctx) {
     uint64_t addr;
-    char path[128];
+    char path[128]={0};
     bpf_usdt_readarg(6, ctx, &addr);
     bpf_probe_read(&path, sizeof(path), (void *)addr);
     bpf_trace_printk("path:%s\\n", path);
@@ -628,6 +637,9 @@ int do_trace(struct pt_regs *ctx) {
 # enable USDT probe from given PID
 u = USDT(pid=int(pid))
 u.enable_probe(probe="http__server__request", fn_name="do_trace")
+if debug:
+    print(u.get_text())
+    print(bpf_text)
 
 # initialize BPF
 b = BPF(text=bpf_text, usdt_contexts=[u])
@@ -671,9 +683,6 @@ struct key_t {
 };
 // map_type, key_type, leaf_type, table_name, num_entry
 BPF_HASH(stats, struct key_t, u64, 1024);
-// attach to finish_task_switch in kernel/sched/core.c, which has the following
-// prototype:
-//   struct rq *finish_task_switch(struct task_struct *prev)
 int count_sched(struct pt_regs *ctx, struct task_struct *prev) {
   struct key_t key = {};
   u64 zero = 0, *val;
@@ -681,6 +690,7 @@ int count_sched(struct pt_regs *ctx, struct task_struct *prev) {
   key.curr_pid = bpf_get_current_pid_tgid();
   key.prev_pid = prev->pid;
 
+  // could also use `stats.increment(key);`
   val = stats.lookup_or_init(&key, &zero);
   (*val)++;
   return 0;

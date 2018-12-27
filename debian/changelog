@@ -1,3 +1,42 @@
+bcc (0.7.0-1) unstable; urgency=low
+
+  * Support for kernel up to 4.18
+
+ -- Brenden Blanco <bblanco@gmail.com>  Tue, 04 Sep 2018 17:00:00 +0000
+
+bcc (0.6.1-1) unstable; urgency=low
+
+  * Build support for Fedora 28 and Ubuntu 18.04
+  * Add option to change license
+  * Optimizations for some uses of bpf_probe_reads
+
+ -- Brenden Blanco <bblanco@gmail.com>  Mon, 23 Jul 2018 17:00:00 +0000
+
+bcc (0.6.0-1) unstable; urgency=low
+
+  * Support for kernel up to 4.17
+  * Many bugfixes
+  * Many new tools
+  * Improved python3 support
+
+ -- Brenden Blanco <bblanco@gmail.com>  Wed, 13 Jun 2018 17:00:00 +0000
+
+bcc (0.5.0-1) unstable; urgency=low
+
+  * Support for USDT in ARM64
+  * Bugfixes for 4.14 in some tools
+  * Fixes for smoke test failures
+  * Runtime memory usage reductions
+
+ -- Brenden Blanco <bblanco@gmail.com>  Wed, 29 Nov 2017 17:00:00 +0000
+
+bcc (0.4.0-1) unstable; urgency=low
+
+  * Bugfixes
+  * Support for kernel up to 4.14
+
+ -- Brenden Blanco <bblanco@gmail.com>  Fri, 20 Oct 2017 17:00:00 +0000
+
 bcc (0.3.0-1) unstable; urgency=low
 
   * Many bugfixes

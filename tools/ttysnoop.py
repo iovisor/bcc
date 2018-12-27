@@ -42,6 +42,8 @@ parser.add_argument("-C", "--noclear", action="store_true",
     help="don't clear the screen")
 parser.add_argument("device", default="-1",
     help="path to a tty device (eg, /dev/tty0) or pts number")
+parser.add_argument("--ebpf", action="store_true",
+    help=argparse.SUPPRESS)
 args = parser.parse_args()
 debug = 0
 
@@ -91,8 +93,10 @@ int kprobe__tty_write(struct pt_regs *ctx, struct file *file,
 """
 
 bpf_text = bpf_text.replace('PTS', str(pi.st_ino))
-if debug:
+if debug or args.ebpf:
     print(bpf_text)
+    if args.ebpf:
+        exit()
 
 # initialize BPF
 b = BPF(text=bpf_text)
@@ -111,10 +115,13 @@ if not args.noclear:
 # process event
 def print_event(cpu, data, size):
     event = ct.cast(data, ct.POINTER(Data)).contents
-    print("%s" % event.buf[0:event.count].decode(), end="")
+    print("%s" % event.buf[0:event.count].decode('utf-8', 'replace'), end="")
     sys.stdout.flush()
 
 # loop with callback to print_event
 b["events"].open_perf_buffer(print_event)
 while 1:
-    b.kprobe_poll()
+    try:
+        b.perf_buffer_poll()
+    except KeyboardInterrupt:
+        exit()

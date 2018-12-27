@@ -14,6 +14,7 @@
 
 from __future__ import print_function
 from bcc import BPF
+from bcc.utils import ArgString, printb
 import argparse
 from time import strftime
 import ctypes as ct
@@ -32,6 +33,8 @@ parser.add_argument("-x", "--failed", action="store_true",
     help="only show failed kill syscalls")
 parser.add_argument("-p", "--pid",
     help="trace this PID only")
+parser.add_argument("--ebpf", action="store_true",
+    help=argparse.SUPPRESS)
 args = parser.parse_args()
 debug = 0
 
@@ -58,7 +61,7 @@ struct data_t {
 BPF_HASH(infotmp, u32, struct val_t);
 BPF_PERF_OUTPUT(events);
 
-int kprobe__sys_kill(struct pt_regs *ctx, int tpid, int sig)
+int syscall__kill(struct pt_regs *ctx, int tpid, int sig)
 {
     u32 pid = bpf_get_current_pid_tgid();
     FILTER
@@ -73,7 +76,7 @@ int kprobe__sys_kill(struct pt_regs *ctx, int tpid, int sig)
     return 0;
 };
 
-int kretprobe__sys_kill(struct pt_regs *ctx)
+int do_ret_sys_kill(struct pt_regs *ctx)
 {
     struct data_t data = {};
     struct val_t *valp;
@@ -102,11 +105,17 @@ if args.pid:
         'if (pid != %s) { return 0; }' % args.pid)
 else:
     bpf_text = bpf_text.replace('FILTER', '')
-if debug:
+if debug or args.ebpf:
     print(bpf_text)
+    if args.ebpf:
+        exit()
 
 # initialize BPF
 b = BPF(text=bpf_text)
+kill_fnname = b.get_syscall_fnname("kill")
+b.attach_kprobe(event=kill_fnname, fn_name="syscall__kill")
+b.attach_kretprobe(event=kill_fnname, fn_name="do_ret_sys_kill")
+
 
 TASK_COMM_LEN = 16    # linux/sched.h
 
@@ -130,10 +139,13 @@ def print_event(cpu, data, size):
     if (args.failed and (event.ret >= 0)):
         return
 
-    print("%-9s %-6d %-16s %-4d %-6d %d" % (strftime("%H:%M:%S"),
-        event.pid, event.comm.decode(), event.sig, event.tpid, event.ret))
+    printb(b"%-9s %-6d %-16s %-4d %-6d %d" % (strftime("%H:%M:%S").encode('ascii'),
+        event.pid, event.comm, event.sig, event.tpid, event.ret))
 
 # loop with callback to print_event
 b["events"].open_perf_buffer(print_event)
 while 1:
-    b.kprobe_poll()
+    try:
+        b.perf_buffer_poll()
+    except KeyboardInterrupt:
+        exit()

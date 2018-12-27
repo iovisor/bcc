@@ -90,13 +90,11 @@ class Probe(object):
                 self.matched = self.bpf.num_open_uprobes()
             else:
                 self.bpf.attach_kprobe(event_re=self.pattern,
-                                       fn_name="trace_count",
-                                       pid=self.pid or -1)
+                                       fn_name="trace_count")
                 self.matched = self.bpf.num_open_kprobes()
         elif self.type == "t":
             self.bpf.attach_tracepoint(tp_re=self.pattern,
-                                       fn_name="trace_count",
-                                       pid=self.pid or -1)
+                                       fn_name="trace_count")
             self.matched = self.bpf.num_open_tracepoints()
         elif self.type == "u":
             pass    # Nothing to do -- attach already happened in `load`
@@ -130,9 +128,7 @@ int trace_count(void *ctx) {
     key.tgid = GET_TGID;
     STORE_COMM
     %s
-    u64 zero = 0;
-    u64 *val = counts.lookup_or_init(&key, &zero);
-    (*val)++;
+    counts.increment(key);
     return 0;
 }
         """
@@ -343,7 +339,7 @@ class Tool(object):
                     # print folded stack output
                     user_stack = list(user_stack)
                     kernel_stack = list(kernel_stack)
-                    line = [k.name.decode()] + \
+                    line = [k.name.decode('utf-8', 'replace')] + \
                         [b.sym(addr, k.tgid) for addr in
                         reversed(user_stack)] + \
                         (self.need_delimiter and ["-"] or []) + \

@@ -32,6 +32,8 @@ parser.add_argument("-N", "--netns", default=0, type=int,
                     help="trace this Network Namespace only")
 parser.add_argument("-v", "--verbose", action="store_true",
                     help="include Network Namespace in the output")
+parser.add_argument("--ebpf", action="store_true",
+                    help=ap.SUPPRESS)
 args = parser.parse_args()
 
 bpf_text = """
@@ -107,20 +109,14 @@ BPF_HASH(connectsock, u64, struct sock *);
 
 static int read_ipv4_tuple(struct ipv4_tuple_t *tuple, struct sock *skp)
 {
-  u32 saddr = 0, daddr = 0, net_ns_inum = 0;
-  u16 sport = 0, dport = 0;
-  possible_net_t skc_net;
-
-  bpf_probe_read(&saddr, sizeof(saddr), &skp->__sk_common.skc_rcv_saddr);
-  bpf_probe_read(&daddr, sizeof(daddr), &skp->__sk_common.skc_daddr);
-  bpf_probe_read(&sport, sizeof(sport),
-                 &((struct inet_sock *)skp)->inet_sport);
-  bpf_probe_read(&dport, sizeof(dport), &skp->__sk_common.skc_dport);
+  u32 net_ns_inum = 0;
+  u32 saddr = skp->__sk_common.skc_rcv_saddr;
+  u32 daddr = skp->__sk_common.skc_daddr;
+  struct inet_sock *sockp = (struct inet_sock *)skp;
+  u16 sport = sockp->inet_sport;
+  u16 dport = skp->__sk_common.skc_dport;
 #ifdef CONFIG_NET_NS
-  bpf_probe_read(&skc_net, sizeof(skc_net), &skp->__sk_common.skc_net);
-  bpf_probe_read(&net_ns_inum, sizeof(net_ns_inum), &skc_net.net->ns.inum);
-#else
-  net_ns_inum = 0;
+  net_ns_inum = skp->__sk_common.skc_net.net->ns.inum;
 #endif
 
   ##FILTER_NETNS##
@@ -142,23 +138,17 @@ static int read_ipv4_tuple(struct ipv4_tuple_t *tuple, struct sock *skp)
 static int read_ipv6_tuple(struct ipv6_tuple_t *tuple, struct sock *skp)
 {
   u32 net_ns_inum = 0;
-  u16 sport = 0, dport = 0;
   unsigned __int128 saddr = 0, daddr = 0;
-  possible_net_t skc_net;
-
-  bpf_probe_read(&sport, sizeof(sport),
-                 &((struct inet_sock *)skp)->inet_sport);
-  bpf_probe_read(&dport, sizeof(dport), &skp->__sk_common.skc_dport);
-  bpf_probe_read(&saddr, sizeof(saddr),
-                 &skp->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
-  bpf_probe_read(&daddr, sizeof(daddr),
-                 &skp->__sk_common.skc_v6_daddr.in6_u.u6_addr32);
+  struct inet_sock *sockp = (struct inet_sock *)skp;
+  u16 sport = sockp->inet_sport;
+  u16 dport = skp->__sk_common.skc_dport;
 #ifdef CONFIG_NET_NS
-  bpf_probe_read(&skc_net, sizeof(skc_net), &skp->__sk_common.skc_net);
-  bpf_probe_read(&net_ns_inum, sizeof(net_ns_inum), &skc_net.net->ns.inum);
-#else
-  net_ns_inum = 0;
+  net_ns_inum = skp->__sk_common.skc_net.net->ns.inum;
 #endif
+  bpf_probe_read(&saddr, sizeof(saddr),
+                 skp->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
+  bpf_probe_read(&daddr, sizeof(daddr),
+                 skp->__sk_common.skc_v6_daddr.in6_u.u6_addr32);
 
   ##FILTER_NETNS##
 
@@ -178,10 +168,7 @@ static int read_ipv6_tuple(struct ipv6_tuple_t *tuple, struct sock *skp)
 
 static bool check_family(struct sock *sk, u16 expected_family) {
   u64 zero = 0;
-  u16 family = 0;
-
-  bpf_probe_read(&family, sizeof(family), &sk->__sk_common.skc_family);
-
+  u16 family = sk->__sk_common.skc_family;
   return family == expected_family;
 }
 
@@ -279,14 +266,11 @@ int trace_connect_v6_return(struct pt_regs *ctx)
   return 0;
 }
 
-int trace_tcp_set_state_entry(struct pt_regs *ctx, struct sock *sk, int state)
+int trace_tcp_set_state_entry(struct pt_regs *ctx, struct sock *skp, int state)
 {
   if (state != TCP_ESTABLISHED && state != TCP_CLOSE) {
       return 0;
   }
-
-  struct sock *skp;
-  bpf_probe_read(&skp, sizeof(struct sock *), &sk);
 
   u8 ipver = 0;
   if (check_family(skp, AF_INET)) {
@@ -367,18 +351,13 @@ int trace_tcp_set_state_entry(struct pt_regs *ctx, struct sock *sk, int state)
   return 0;
 }
 
-int trace_close_entry(struct pt_regs *ctx, struct sock *sk)
+int trace_close_entry(struct pt_regs *ctx, struct sock *skp)
 {
   u64 pid = bpf_get_current_pid_tgid();
 
   ##FILTER_PID##
 
-  // pull in details
-  struct sock *skp;
-  bpf_probe_read(&skp, sizeof(struct sock *), &sk);
-
-  u8 oldstate = 0;
-  bpf_probe_read(&oldstate, sizeof(oldstate), (u8 *)&skp->sk_state);
+  u8 oldstate = skp->sk_state;
   // Don't generate close events for connections that were never
   // established in the first place.
   if (oldstate == TCP_SYN_SENT ||
@@ -449,16 +428,12 @@ int trace_accept_return(struct pt_regs *ctx)
   u32 net_ns_inum = 0;
   u8 ipver = 0;
 
-  bpf_probe_read(&dport, sizeof(dport), &newsk->__sk_common.skc_dport);
-  bpf_probe_read(&lport, sizeof(lport), &newsk->__sk_common.skc_num);
+  dport = newsk->__sk_common.skc_dport;
+  lport = newsk->__sk_common.skc_num;
 
   // Get network namespace id, if kernel supports it
 #ifdef CONFIG_NET_NS
-  possible_net_t skc_net;
-  bpf_probe_read(&skc_net, sizeof(skc_net), &newsk->__sk_common.skc_net);
-  bpf_probe_read(&net_ns_inum, sizeof(net_ns_inum), &skc_net.net->ns.inum);
-#else
-  net_ns_inum = 0;
+  net_ns_inum = newsk->__sk_common.skc_net.net->ns.inum;
 #endif
 
   ##FILTER_NETNS##
@@ -474,10 +449,8 @@ int trace_accept_return(struct pt_regs *ctx)
       evt4.pid = pid >> 32;
       evt4.ip = ipver;
 
-      bpf_probe_read(&evt4.saddr, sizeof(evt4.saddr),
-                     &newsk->__sk_common.skc_rcv_saddr);
-      bpf_probe_read(&evt4.daddr, sizeof(evt4.daddr),
-                     &newsk->__sk_common.skc_daddr);
+      evt4.saddr = newsk->__sk_common.skc_rcv_saddr;
+      evt4.daddr = newsk->__sk_common.skc_daddr;
 
       evt4.sport = lport;
       evt4.dport = ntohs(dport);
@@ -500,9 +473,9 @@ int trace_accept_return(struct pt_regs *ctx)
       evt6.ip = ipver;
 
       bpf_probe_read(&evt6.saddr, sizeof(evt6.saddr),
-                     &newsk->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
+                     newsk->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
       bpf_probe_read(&evt6.daddr, sizeof(evt6.daddr),
-                     &newsk->__sk_common.skc_v6_daddr.in6_u.u6_addr32);
+                     newsk->__sk_common.skc_v6_daddr.in6_u.u6_addr32);
 
       evt6.sport = lport;
       evt6.dport = ntohs(dport);
@@ -567,7 +540,7 @@ def print_ipv4_event(cpu, data, size):
         if args.verbose:
             print("%-14d" % (event.ts_ns - start_ts), end="")
         else:
-            print("%-9.3f" % ((float(event.ts_ns) - start_ts) / 1000000000), end="")
+            print("%-9.3f" % ((event.ts_ns - start_ts) / 1000000000.0), end="")
     if event.type == 1:
         type_str = "C"
     elif event.type == 2:
@@ -583,7 +556,7 @@ def print_ipv4_event(cpu, data, size):
         print("%-2s " % (type_str), end="")
 
     print("%-6d %-16s %-2d %-16s %-16s %-6d %-6d" %
-          (event.pid, event.comm.decode('utf-8'),
+          (event.pid, event.comm.decode('utf-8', 'replace'),
            event.ip,
            inet_ntop(AF_INET, pack("I", event.saddr)),
            inet_ntop(AF_INET, pack("I", event.daddr)),
@@ -604,7 +577,7 @@ def print_ipv6_event(cpu, data, size):
         if args.verbose:
             print("%-14d" % (event.ts_ns - start_ts), end="")
         else:
-            print("%-9.3f" % ((float(event.ts_ns) - start_ts) / 1000000000), end="")
+            print("%-9.3f" % ((event.ts_ns - start_ts) / 1000000000.0), end="")
     if event.type == 1:
         type_str = "C"
     elif event.type == 2:
@@ -620,10 +593,10 @@ def print_ipv6_event(cpu, data, size):
         print("%-2s " % (type_str), end="")
 
     print("%-6d %-16s %-2d %-16s %-16s %-6d %-6d" %
-          (event.pid, event.comm.decode('utf-8'),
+          (event.pid, event.comm.decode('utf-8', 'replace'),
            event.ip,
-           "["+inet_ntop(AF_INET6, event.saddr)+"]",
-           "["+inet_ntop(AF_INET6, event.daddr)+"]",
+           "[" + inet_ntop(AF_INET6, event.saddr) + "]",
+           "[" + inet_ntop(AF_INET6, event.daddr) + "]",
            event.sport,
            event.dport), end="")
     if args.verbose and not args.netns:
@@ -642,6 +615,10 @@ if args.netns:
 
 bpf_text = bpf_text.replace('##FILTER_PID##', pid_filter)
 bpf_text = bpf_text.replace('##FILTER_NETNS##', netns_filter)
+
+if args.ebpf:
+    print(bpf_text)
+    exit()
 
 # initialize BPF
 b = BPF(text=bpf_text)
@@ -685,4 +662,7 @@ def inet_ntoa(addr):
 b["tcp_ipv4_event"].open_perf_buffer(print_ipv4_event)
 b["tcp_ipv6_event"].open_perf_buffer(print_ipv6_event)
 while True:
-    b.kprobe_poll()
+    try:
+        b.perf_buffer_poll()
+    except KeyboardInterrupt:
+        exit()

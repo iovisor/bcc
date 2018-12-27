@@ -2,7 +2,7 @@
 # BPF Compiler Collection (BCC)
 
 BCC is a toolkit for creating efficient kernel tracing and manipulation
-programs, and includes several useful tools and examples. It makes use of 
+programs, and includes several useful tools and examples. It makes use of
 extended BPF (Berkeley Packet Filters), formally known as eBPF, a new feature
 that was first added to Linux 3.15. Much of what BCC uses requires Linux 4.1
 and above.
@@ -23,7 +23,7 @@ power-of-2 histogram of the I/O size. For efficiency, only the histogram
 summary is returned to user-level.
 
 ```Shell
-# ./bitehist.py 
+# ./bitehist.py
 Tracing... Hit Ctrl-C to end.
 ^C
      kbytes          : count     distribution
@@ -82,6 +82,7 @@ pair of .c and .py files, and some are directories of files.
 #### Tools:
 <center><a href="images/bcc_tracing_tools_2017.png"><img src="images/bcc_tracing_tools_2017.png" border=0 width=700></a></center>
 
+
 - tools/[argdist](tools/argdist.py): Display function parameter values as a histogram or frequency count. [Examples](tools/argdist_example.txt).
 - tools/[bashreadline](tools/bashreadline.py): Print entered bash commands system wide. [Examples](tools/bashreadline_example.txt).
 - tools/[biolatency](tools/biolatency.py): Summarize block device I/O latency as a histogram. [Examples](tools/biolatency_example.txt).
@@ -96,6 +97,7 @@ pair of .c and .py files, and some are directories of files.
 - tools/[cachetop](tools/cachetop.py): Trace page cache hit/miss ratio by processes. [Examples](tools/cachetop_example.txt).
 - tools/[cpudist](tools/cpudist.py): Summarize on- and off-CPU time per task as a histogram. [Examples](tools/cpudist_example.txt)
 - tools/[cpuunclaimed](tools/cpuunclaimed.py): Sample CPU run queues and calculate unclaimed idle CPU. [Examples](tools/cpuunclaimed_example.txt)
+- tools/[criticalstat](tools/criticalstat.py): Trace and report long atomic critical sections in the kernel. [Examples](tools/criticalstat_example.txt)
 - tools/[dbslower](tools/dbslower.py): Trace MySQL/PostgreSQL queries slower than a threshold. [Examples](tools/dbslower_example.txt).
 - tools/[dbstat](tools/dbstat.py): Summarize MySQL/PostgreSQL query latency as a histogram. [Examples](tools/dbstat_example.txt).
 - tools/[dcsnoop](tools/dcsnoop.py): Trace directory entry cache (dcache) lookups. [Examples](tools/dcsnoop_example.txt).
@@ -112,6 +114,7 @@ pair of .c and .py files, and some are directories of files.
 - tools/[funcslower](tools/funcslower.py): Trace slow kernel or user function calls. [Examples](tools/funcslower_example.txt).
 - tools/[gethostlatency](tools/gethostlatency.py): Show latency for getaddrinfo/gethostbyname[2] calls. [Examples](tools/gethostlatency_example.txt).
 - tools/[hardirqs](tools/hardirqs.py):  Measure hard IRQ (hard interrupt) event time. [Examples](tools/hardirqs_example.txt).
+- tools/[inject](tools/inject.py): Targeted error injection with call chain and predicates [Examples](tools/inject_example.txt).
 - tools/[killsnoop](tools/killsnoop.py): Trace signals issued by the kill() syscall. [Examples](tools/killsnoop_example.txt).
 - tools/[llcstat](tools/llcstat.py): Summarize CPU cache references and misses by process. [Examples](tools/llcstat_example.txt).
 - tools/[mdflush](tools/mdflush.py): Trace md flush events. [Examples](tools/mdflush_example.txt).
@@ -128,6 +131,9 @@ pair of .c and .py files, and some are directories of files.
 - tools/[reset-trace](tools/reset-trace.sh): Reset the state of tracing. Maintenance tool only. [Examples](tools/reset-trace_example.txt).
 - tools/[runqlat](tools/runqlat.py): Run queue (scheduler) latency as a histogram. [Examples](tools/runqlat_example.txt).
 - tools/[runqlen](tools/runqlen.py): Run queue length as a histogram. [Examples](tools/runqlen_example.txt).
+- tools/[runqslower](tools/runqslower.py): Trace long process scheduling delays. [Examples](tools/runqslower_example.txt).
+- tools/[shmsnoop](tools/shmsnoop.py): Trace System V shared memory syscalls. [Examples](tools/shmsnoop_example.txt).
+- tools/[sofdsnoop](tools/sofdsnoop.py): Trace FDs passed through unix sockets. [Examples](tools/sofdsnoop_example.txt).
 - tools/[slabratetop](tools/slabratetop.py): Kernel SLAB/SLUB memory cache allocation rate top. [Examples](tools/slabratetop_example.txt).
 - tools/[softirqs](tools/softirqs.py):  Measure soft IRQ (soft interrupt) event time. [Examples](tools/softirqs_example.txt).
 - tools/[solisten](tools/solisten.py): Trace TCP socket listen. [Examples](tools/solisten_example.txt).
@@ -138,8 +144,11 @@ pair of .c and .py files, and some are directories of files.
 - tools/[tcpaccept](tools/tcpaccept.py): Trace TCP passive connections (accept()). [Examples](tools/tcpaccept_example.txt).
 - tools/[tcpconnect](tools/tcpconnect.py): Trace TCP active connections (connect()). [Examples](tools/tcpconnect_example.txt).
 - tools/[tcpconnlat](tools/tcpconnlat.py): Trace TCP active connection latency (connect()). [Examples](tools/tcpconnlat_example.txt).
+- tools/[tcpdrop](tools/tcpdrop.py): Trace kernel-based TCP packet drops with details. [Examples](tools/tcpdrop_example.txt).
 - tools/[tcplife](tools/tcplife.py): Trace TCP sessions and summarize lifespan. [Examples](tools/tcplife_example.txt).
 - tools/[tcpretrans](tools/tcpretrans.py): Trace TCP retransmits and TLPs. [Examples](tools/tcpretrans_example.txt).
+- tools/[tcpstates](tools/tcpstates.py): Trace TCP session state changes with durations. [Examples](tools/tcpstates_example.txt).
+- tools/[tcpsubnet](tools/tcpsubnet.py): Summarize and aggregate TCP send by subnet. [Examples](tools/tcpsubnet_example.txt).
 - tools/[tcptop](tools/tcptop.py): Summarize TCP send/recv throughput by host. Top for TCP. [Examples](tools/tcptop_example.txt).
 - tools/[tcptracer](tools/tcptracer.py): Trace TCP established connections (connect(), accept(), close()). [Examples](tools/tcptracer_example.txt).
 - tools/[tplist](tools/tplist.py): Display kernel tracepoints or USDT probes and their formats. [Examples](tools/tplist_example.txt).
@@ -170,6 +179,12 @@ Examples:
 - examples/networking/neighbor_sharing/[tc_neighbor_sharing.py](examples/networking/neighbor_sharing/tc_neighbor_sharing.py) examples/networking/neighbor_sharing/[tc_neighbor_sharing.c](examples/networking/neighbor_sharing/tc_neighbor_sharing.c): Per-IP classification and rate limiting.
 - examples/networking/[tunnel_monitor/](examples/networking/tunnel_monitor): Efficiently monitor traffic flows. [Example video](https://www.youtube.com/watch?v=yYy3Cwce02k).
 - examples/networking/vlan_learning/[vlan_learning.py](examples/networking/vlan_learning/vlan_learning.py) examples/[vlan_learning.c](examples/networking/vlan_learning/vlan_learning.c): Demux Ethernet traffic into worker veth+namespaces.
+
+### BPF Introspection:
+
+Tools that help to introspect BPF programs.
+
+- introspection/[bps.c](introspection/bps.c): List all BPF programs loaded into the kernel. 'ps' for BPF programs. [Examples](introspection/bps_example.txt).
 
 ## Motivation
 

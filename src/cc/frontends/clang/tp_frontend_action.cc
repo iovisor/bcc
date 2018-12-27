@@ -28,6 +28,7 @@
 #include <clang/Frontend/MultiplexConsumer.h>
 #include <clang/Rewrite/Core/Rewriter.h>
 
+#include "frontend_action_common.h"
 #include "tp_frontend_action.h"
 
 namespace ebpf {
@@ -62,7 +63,15 @@ static inline field_kind_t _get_field_kind(string const& line,
   if (field_pos == string::npos)
     return field_kind_t::invalid;
 
-  auto semi_pos = line.find(';', field_pos);
+  auto field_semi_pos = line.find(';', field_pos);
+  if (field_semi_pos == string::npos)
+    return field_kind_t::invalid;
+
+  auto offset_pos = line.find("offset:", field_semi_pos);
+  if (offset_pos == string::npos)
+    return field_kind_t::invalid;
+
+  auto semi_pos = line.find(';', offset_pos);
   if (semi_pos == string::npos)
     return field_kind_t::invalid;
 
@@ -70,8 +79,16 @@ static inline field_kind_t _get_field_kind(string const& line,
   if (size_pos == string::npos)
     return field_kind_t::invalid;
 
+  semi_pos = line.find(';', size_pos);
+  if (semi_pos == string::npos)
+    return field_kind_t::invalid;
+
+  auto size_str = line.substr(size_pos + 5,
+                              semi_pos - size_pos - 5);
+  int size = std::stoi(size_str, nullptr);
+
   auto field = line.substr(field_pos + 6/*"field:"*/,
-                           semi_pos - field_pos - 6);
+                           field_semi_pos - field_pos - 6);
   auto pos = field.find_last_of("\t ");
   if (pos == string::npos)
     return field_kind_t::invalid;
@@ -82,6 +99,37 @@ static inline field_kind_t _get_field_kind(string const& line,
     return field_kind_t::data_loc;
   if (field_name.find("common_") == 0)
     return field_kind_t::common;
+  // do not change type definition for array
+  if (field_name.find("[") != string::npos)
+    return field_kind_t::regular;
+
+  // adjust the field_type based on the size of field
+  // otherwise, incorrect value may be retrieved for big endian
+  // and the field may have incorrect structure offset.
+  if (size == 2) {
+    if (field_type == "char" || field_type == "int8_t")
+      field_type = "s16";
+    if (field_type == "unsigned char" || field_type == "uint8_t")
+      field_type = "u16";
+  } else if (size == 4) {
+    if (field_type == "char" || field_type == "short" ||
+        field_type == "int8_t" || field_type == "int16_t")
+      field_type = "s32";
+    if (field_type == "unsigned char" || field_type == "unsigned short" ||
+        field_type == "uint8_t" || field_type == "uint16_t")
+      field_type = "u32";
+  } else if (size == 8) {
+    if (field_type == "char" || field_type == "short" || field_type == "int" ||
+        field_type == "int8_t" || field_type == "int16_t" ||
+        field_type == "int32_t" || field_type == "pid_t")
+      field_type = "s64";
+    if (field_type == "unsigned char" || field_type == "unsigned short" ||
+        field_type == "unsigned int" || field_type == "uint8_t" ||
+        field_type == "uint16_t" || field_type == "uint32_t" ||
+        field_type == "unsigned" || field_type == "u32" ||
+        field_type == "uid_t" || field_type == "gid_t")
+      field_type = "u64";
+  }
 
   return field_kind_t::regular;
 }
@@ -160,15 +208,15 @@ bool TracepointTypeVisitor::VisitFunctionDecl(FunctionDecl *D) {
       auto type = arg->getType();
       if (type->isPointerType() &&
           type->getPointeeType()->isStructureOrClassType()) {
-        auto type_name = QualType::getAsString(type.split());
+        auto type_name = type->getPointeeType().getAsString();
         string tp_cat, tp_evt;
         if (_is_tracepoint_struct_type(type_name, tp_cat, tp_evt)) {
           string tp_struct = GenerateTracepointStruct(
-              D->getLocStart(), tp_cat, tp_evt);
+              GET_BEGINLOC(D), tp_cat, tp_evt);
           // Get the actual function declaration point (the macro instantiation
           // point if using the TRACEPOINT_PROBE macro instead of the macro
           // declaration point in bpf_helpers.h).
-          auto insert_loc = D->getLocStart();
+          auto insert_loc = GET_BEGINLOC(D);
           insert_loc = rewriter_.getSourceMgr().getFileLoc(insert_loc);
           rewriter_.InsertText(insert_loc, tp_struct);
         }

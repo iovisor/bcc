@@ -17,6 +17,7 @@
 #include <dlfcn.h>
 #include <stdint.h>
 #include <string.h>
+#include <link.h>
 #include <sys/mman.h>
 #include <sys/mount.h>
 #include <sys/stat.h>
@@ -137,6 +138,7 @@ static int mntns_func(void *arg) {
   char libpath[1024];
   ssize_t rb;
   void *dlhdl;
+  struct link_map *lm;
 
   if (setup_tmp_mnts() < 0) {
     return -1;
@@ -149,16 +151,17 @@ static int mntns_func(void *arg) {
     return -1;
   }
 
-  if (dlinfo(dlhdl, RTLD_DI_ORIGIN, &libpath) < 0) {
+  if (dlinfo(dlhdl, RTLD_DI_LINKMAP, &lm) < 0) {
     fprintf(stderr, "Unable to find origin of libz.so.1: %s\n", dlerror());
     return -1;
   }
 
+  strncpy(libpath, lm->l_name, 1024);
   dlclose(dlhdl);
   dlhdl = NULL;
 
   // Copy a shared library from shared mntns to private /tmp
-  snprintf(buf, 4096, "%s/libz.so.1", libpath);
+  snprintf(buf, 4096, "%s", libpath);
   in_fd = open(buf, O_RDONLY);
   if (in_fd < 0) {
     fprintf(stderr, "Unable to open %s: %s\n", buf, strerror(errno));
@@ -192,6 +195,8 @@ static int mntns_func(void *arg) {
 
   return 0;
 }
+
+extern int cmd_scanf(const char *cmd, const char *fmt, ...);
 
 TEST_CASE("resolve symbol addresses for a given PID", "[c_api]") {
   struct bcc_symbol sym;
@@ -230,7 +235,32 @@ TEST_CASE("resolve symbol addresses for a given PID", "[c_api]") {
     REQUIRE(sym.module);
     REQUIRE(sym.module[0] == '/');
     REQUIRE(string(sym.module).find("libc") != string::npos);
-    REQUIRE(string("strtok") == sym.name);
+
+    // In some cases, a symbol may have multiple aliases. Since
+    // bcc_symcache_resolve() returns only the first alias of a
+    // symbol, this may not always be "strtok" even if it points
+    // to the same address.
+    bool sym_match = (string("strtok") == sym.name);
+    if (!sym_match) {
+      uint64_t exp_addr, sym_addr;
+      char cmd[256];
+      const char *cmdfmt = "nm %s | grep \" %s$\" | cut -f 1 -d \" \"";
+
+      // Find address of symbol by the expected name
+      sprintf(cmd, cmdfmt, sym.module, "strtok");
+      REQUIRE(cmd_scanf(cmd, "%lx", &exp_addr) == 0);
+
+      // Find address of symbol by the name that was
+      // returned by bcc_symcache_resolve()
+      sprintf(cmd, cmdfmt, sym.module, sym.name);
+      REQUIRE(cmd_scanf(cmd, "%lx", &sym_addr) == 0);
+
+      // If both addresses match, they are definitely
+      // aliases of the same symbol
+      sym_match = (exp_addr == sym_addr);
+    }
+
+    REQUIRE(sym_match);
   }
 
   SECTION("resolve in separate mount namespace") {

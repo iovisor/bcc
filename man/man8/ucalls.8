@@ -1,27 +1,31 @@
-.TH ucalls 8  "2016-11-07" "USER COMMANDS"
+.TH ucalls 8  "2018-10-09" "USER COMMANDS"
 .SH NAME
-ucalls, javacalls, pythoncalls, rubycalls, phpcalls \- Summarize method calls
+ucalls, javacalls, perlcalls, phpcalls, pythoncalls, rubycalls, tclcalls \- Summarize method calls
 from high-level languages and Linux syscalls.
 .SH SYNOPSIS
 .B javacalls [-h] [-T TOP] [-L] [-S] [-v] [-m] pid [interval]
+.br
+.B perlcalls [-h] [-T TOP] [-L] [-S] [-v] [-m] pid [interval]
+.br
+.B phpcalls [-h] [-T TOP] [-L] [-S] [-v] [-m] pid [interval]
 .br
 .B pythoncalls [-h] [-T TOP] [-L] [-S] [-v] [-m] pid [interval]
 .br
 .B rubycalls [-h] [-T TOP] [-L] [-S] [-v] [-m] pid [interval]
 .br
-.B phpcalls [-h] [-T TOP] [-L] [-S] [-v] [-m] pid [interval]
+.B tclcalls [-h] [-T TOP] [-L] [-S] [-v] [-m] pid [interval]
 .br
-.B ucalls [-l {java,python,ruby,php}] [-h] [-T TOP] [-L] [-S] [-v] [-m] pid [interval]
+.B ucalls [-l {java,perl,php,python,ruby}] [-h] [-T TOP] [-L] [-S] [-v] [-m] pid [interval]
 .SH DESCRIPTION
-This tool summarizes method calls from high-level languages such as Python, 
-Java, Ruby, and PHP. It can also trace Linux system calls. Whenever a method is 
-invoked, ucalls records the call count and optionally the method's execution
+This tool summarizes method calls from high-level languages such as Java, Perl,
+PHP, Python, Ruby, and Tcl. It can also trace Linux system calls. Whenever a method
+is invoked, ucalls records the call count and optionally the method's execution
 time (latency) and displays a summary.
 
 This uses in-kernel eBPF maps to store per process summaries for efficiency.
 
 This tool relies on USDT probes embedded in many high-level languages, such as
-Java, Python, Ruby, and PHP. It requires a runtime instrumented with these 
+Java, Perl, PHP, Python, Ruby, and Tcl. It requires a runtime instrumented with these
 probes, which in some cases requires building from source with a USDT-specific
 flag, such as "--enable-dtrace" or "--with-dtrace". For Java, method probes are
 not enabled by default, and can be turned on by running the Java process with
@@ -33,7 +37,7 @@ Since this uses BPF, only the root user can use this tool.
 CONFIG_BPF and bcc.
 .SH OPTIONS
 .TP
-\-l {java,python,ruby,php}
+\-l {java,perl,php,python,ruby,tcl}
 The language to trace. If not provided, only syscalls are traced (when the \-S
 option is used).
 .TP
@@ -73,9 +77,9 @@ Trace only syscalls and print a summary after 10 seconds:
 .B ucalls -S 788 10
 .SH OVERHEAD
 Tracing individual method calls will produce a considerable overhead in all
-high-level languages. For languages with just-in-time compilation, such as 
-Java, the overhead can be more considerable than for interpreted languages. 
-On the other hand, syscall tracing will typically be tolerable for most 
+high-level languages. For languages with just-in-time compilation, such as
+Java, the overhead can be more considerable than for interpreted languages.
+On the other hand, syscall tracing will typically be tolerable for most
 processes, unless they have a very unusual rate of system calls.
 .SH SOURCE
 This is from bcc.

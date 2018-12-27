@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
-# sslsniff  Captures data on read/recv or write/send functions of OpenSSL and
-#           GnuTLS
+# sslsniff  Captures data on read/recv or write/send functions of OpenSSL,
+#           GnuTLS and NSS
 #           For Linux, uses BCC, eBPF.
 #
 # USAGE: sslsniff.py [-h] [-p PID] [-c COMM] [-o] [-g] [-d]
@@ -25,6 +25,7 @@ examples = """examples:
     ./sslsniff -c curl      # sniff curl command only
     ./sslsniff --no-openssl # don't show OpenSSL calls
     ./sslsniff --no-gnutls  # don't show GnuTLS calls
+    ./sslsniff --no-nss     # don't show NSS calls
 """
 parser = argparse.ArgumentParser(
     description="Sniff SSL data",
@@ -37,8 +38,12 @@ parser.add_argument("-o", "--no-openssl", action="store_false", dest="openssl",
                     help="do not show OpenSSL calls.")
 parser.add_argument("-g", "--no-gnutls", action="store_false", dest="gnutls",
                     help="do not show GnuTLS calls.")
+parser.add_argument("-n", "--no-nss", action="store_false", dest="nss",
+                    help="do not show NSS calls.")
 parser.add_argument('-d', '--debug', dest='debug', action='count', default=0,
                     help='debug mode.')
+parser.add_argument("--ebpf", action="store_true",
+                    help=argparse.SUPPRESS)
 args = parser.parse_args()
 
 
@@ -119,8 +124,10 @@ if args.pid:
 else:
     prog = prog.replace('FILTER', '')
 
-if args.debug:
+if args.debug or args.ebpf:
     print(prog)
+    if args.ebpf:
+        exit()
 
 
 b = BPF(text=prog)
@@ -143,6 +150,20 @@ if args.gnutls:
     b.attach_uprobe(name="gnutls", sym="gnutls_record_recv",
                     fn_name="probe_SSL_read_enter", pid=args.pid or -1)
     b.attach_uretprobe(name="gnutls", sym="gnutls_record_recv",
+                       fn_name="probe_SSL_read_exit", pid=args.pid or -1)
+
+if args.nss:
+    b.attach_uprobe(name="nspr4", sym="PR_Write", fn_name="probe_SSL_write",
+                    pid=args.pid or -1)
+    b.attach_uprobe(name="nspr4", sym="PR_Send", fn_name="probe_SSL_write",
+                    pid=args.pid or -1)
+    b.attach_uprobe(name="nspr4", sym="PR_Read", fn_name="probe_SSL_read_enter",
+                    pid=args.pid or -1)
+    b.attach_uretprobe(name="nspr4", sym="PR_Read",
+                       fn_name="probe_SSL_read_exit", pid=args.pid or -1)
+    b.attach_uprobe(name="nspr4", sym="PR_Recv", fn_name="probe_SSL_read_enter",
+                    pid=args.pid or -1)
+    b.attach_uretprobe(name="nspr4", sym="PR_Recv",
                        fn_name="probe_SSL_read_exit", pid=args.pid or -1)
 
 # define output data structure in Python
@@ -199,15 +220,15 @@ def print_event(cpu, data, size, rw):
         e_mark = "-" * 5 + " END DATA (TRUNCATED, " + str(truncated_bytes) + \
                 " bytes lost) " + "-" * 5
 
-    print("%-12s %-18.9f %-16s %-6d %-6d\n%s\n%s\n%s\n\n" % (rw, time_s,
-                                                             event.comm.decode(),
-                                                             event.pid,
-                                                             event.len,
-                                                             s_mark,
-                                                             event.v0.decode(),
-                                                             e_mark))
+    fmt = "%-12s %-18.9f %-16s %-6d %-6d\n%s\n%s\n%s\n\n"
+    print(fmt % (rw, time_s, event.comm.decode('utf-8', 'replace'),
+                 event.pid, event.len, s_mark,
+                 event.v0.decode('utf-8', 'replace'), e_mark))
 
 b["perf_SSL_write"].open_perf_buffer(print_event_write)
 b["perf_SSL_read"].open_perf_buffer(print_event_read)
 while 1:
-    b.kprobe_poll()
+    try:
+        b.perf_buffer_poll()
+    except KeyboardInterrupt:
+        exit()

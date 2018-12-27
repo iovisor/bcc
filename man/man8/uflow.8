@@ -1,23 +1,27 @@
-.TH uflow 8  "2016-11-07" "USER COMMANDS"
+.TH uflow 8  "2018-10-09" "USER COMMANDS"
 .SH NAME
-uflow, javaflow, pythonflow, rubyflow, phpflow \- Print a flow graph of method
+uflow, javaflow, perlflow, phpflow, pythonflow, rubyflow, tclflow \- Print a flow graph of method
 calls in high-level languages.
 .SH SYNOPSIS
 .B javaflow [-h] [-M METHOD] [-C CLAZZ] [-v] pid
+.br
+.B perlflow [-h] [-M METHOD] [-C CLAZZ] [-v] pid
+.br
+.B phpflow [-h] [-M METHOD] [-C CLAZZ] [-v] pid
 .br
 .B pythonflow [-h] [-M METHOD] [-C CLAZZ] [-v] pid
 .br
 .B rubyflow [-h] [-M METHOD] [-C CLAZZ] [-v] pid
 .br
-.B phpflow [-h] [-M METHOD] [-C CLAZZ] [-v] pid
+.B tclflow [-h] [-M METHOD] [-C CLAZZ] [-v] pid
 .br
-.B uflow [-h] [-M METHOD] [-C CLAZZ] [-v] [-l {java,python,ruby,php}] pid
+.B uflow [-h] [-M METHOD] [-C CLAZZ] [-v] [-l {java,perl,php,python,ruby,tcl}] pid
 .SH DESCRIPTION
 uflow traces method calls and prints them in a flow graph that can facilitate
 debugging and diagnostics by following the program's execution (method flow).
 
 This tool relies on USDT probes embedded in many high-level languages, such as
-Java, Python, Ruby, and PHP. It requires a runtime instrumented with these 
+Java, Perl, PHP, Python, Ruby, and Tcl. It requires a runtime instrumented with these
 probes, which in some cases requires building from source with a USDT-specific
 flag, such as "--enable-dtrace" or "--with-dtrace". For Java processes, the
 startup flag "-XX:+ExtendedDTraceProbes" is required. For PHP processes, the
@@ -39,7 +43,7 @@ name interpretation strongly depends on the language. For example, in Java use
 \-v
 Print the resulting BPF program, for debugging purposes.
 .TP
-{java,python,ruby,php}
+{java,perl,php,python,ruby,tcl}
 The language to trace.
 .TP
 pid

@@ -13,7 +13,8 @@ wait its turn.
 This tool measures two types of run queue latency:
 
 1. The time from a task being enqueued on a run queue to its context switch
-and execution. This traces enqueue_task_*() -> finish_task_switch(),
+and execution. This traces ttwu_do_wakeup(), wake_up_new_task() ->
+finish_task_switch() with either raw tracepoints (if supported) or kprobes
 and instruments the run queue latency after a voluntary context switch.
 
 2. The time from when a task was involuntary context switched and still
@@ -109,4 +110,4 @@ Unstable - in development.
 .SH AUTHOR
 Brendan Gregg
 .SH SEE ALSO
-runqlen(8), pidstat(1)
+runqlen(8), runqslower(8), pidstat(1)

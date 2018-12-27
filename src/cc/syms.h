@@ -85,7 +85,8 @@ class ProcSyms : SymbolCache {
     UNKNOWN,
     EXEC,
     SO,
-    PERF_MAP
+    PERF_MAP,
+    VDSO
   };
 
   struct Module {
@@ -99,7 +100,6 @@ class ProcSyms : SymbolCache {
 
     Module(const char *name, ProcMountNS *mount_ns,
            struct bcc_symbol_option *option);
-    bool init();
 
     std::string name_;
     std::vector<Range> ranges_;
@@ -107,6 +107,10 @@ class ProcSyms : SymbolCache {
     ProcMountNS *mount_ns_;
     bcc_symbol_option *symbol_option_;
     ModuleType type_;
+
+    // The file offset within the ELF of the SO's first text section.
+    uint64_t elf_so_offset_;
+    uint64_t elf_so_addr_;
 
     std::unordered_set<std::string> symnames_;
     std::vector<Symbol> syms_;

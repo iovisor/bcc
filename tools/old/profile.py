@@ -139,7 +139,7 @@ struct key_t {
 };
 BPF_HASH(counts, struct key_t);
 BPF_HASH(start, u32);
-BPF_STACK_TRACE(stack_traces, STACK_STORAGE_SIZE)
+BPF_STACK_TRACE(stack_traces, STACK_STORAGE_SIZE);
 
 // This code gets a bit complex. Probably not suitable for casual hacking.
 
@@ -339,7 +339,7 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
         # print folded stack output
         user_stack = list(user_stack)
         kernel_stack = list(kernel_stack)
-        line = [k.name.decode()] + \
+        line = [k.name.decode('utf-8', 'replace')] + \
             [b.sym(addr, k.pid) for addr in reversed(user_stack)] + \
             (do_delimiter and ["-"] or []) + \
             [aksym(addr) for addr in reversed(kernel_stack)]

@@ -7,6 +7,8 @@
 #
 #            For Linux, uses BCC, eBPF. Embedded C.
 #
+# SEE ALSO: perf top -e cache-misses -e cache-references -a -ns pid,cpu,comm
+#
 # REQUIRES: Linux 4.9+ (BPF_PROG_TYPE_PERF_EVENT support).
 #
 # Copyright (c) 2016 Facebook, Inc.
@@ -28,10 +30,12 @@ parser.add_argument(
     help="Sample one in this many number of cache reference / miss events")
 parser.add_argument(
     "duration", nargs="?", default=10, help="Duration, in seconds, to run")
+parser.add_argument("--ebpf", action="store_true",
+    help=argparse.SUPPRESS)
 args = parser.parse_args()
 
 # load BPF program
-b = BPF(text="""
+bpf_text="""
 #include <linux/ptrace.h>
 #include <uapi/linux/bpf_perf_event.h>
 
@@ -54,9 +58,7 @@ int on_cache_miss(struct bpf_perf_event_data *ctx) {
     struct key_t key = {};
     get_key(&key);
 
-    u64 zero = 0, *val;
-    val = miss_count.lookup_or_init(&key, &zero);
-    (*val) += ctx->sample_period;
+    miss_count.increment(key, ctx->sample_period);
 
     return 0;
 }
@@ -65,20 +67,27 @@ int on_cache_ref(struct bpf_perf_event_data *ctx) {
     struct key_t key = {};
     get_key(&key);
 
-    u64 zero = 0, *val;
-    val = ref_count.lookup_or_init(&key, &zero);
-    (*val) += ctx->sample_period;
+    ref_count.increment(key, ctx->sample_period);
 
     return 0;
 }
-""")
+"""
 
-b.attach_perf_event(
-    ev_type=PerfType.HARDWARE, ev_config=PerfHWConfig.CACHE_MISSES,
-    fn_name="on_cache_miss", sample_period=args.sample_period)
-b.attach_perf_event(
-    ev_type=PerfType.HARDWARE, ev_config=PerfHWConfig.CACHE_REFERENCES,
-    fn_name="on_cache_ref", sample_period=args.sample_period)
+if args.ebpf:
+    print(bpf_text)
+    exit()
+
+b = BPF(text=bpf_text)
+try:
+    b.attach_perf_event(
+        ev_type=PerfType.HARDWARE, ev_config=PerfHWConfig.CACHE_MISSES,
+        fn_name="on_cache_miss", sample_period=args.sample_period)
+    b.attach_perf_event(
+        ev_type=PerfType.HARDWARE, ev_config=PerfHWConfig.CACHE_REFERENCES,
+        fn_name="on_cache_ref", sample_period=args.sample_period)
+except:
+    print("Failed to attach to a hardware event. Is this a virtual machine?")
+    exit()
 
 print("Running for {} seconds or hit Ctrl-C to end.".format(args.duration))
 
@@ -104,7 +113,7 @@ for (k, v) in b.get_table('ref_count').items():
     # This happens on some PIDs due to missed counts caused by sampling
     hit = (v.value - miss) if (v.value >= miss) else 0
     print('{:<8d} {:<16s} {:<4d} {:>12d} {:>12d} {:>6.2f}%'.format(
-        k.pid, k.name.decode(), k.cpu, v.value, miss,
+        k.pid, k.name.decode('utf-8', 'replace'), k.cpu, v.value, miss,
         (float(hit) / float(v.value)) * 100.0))
 print('Total References: {} Total Misses: {} Hit Rate: {:.2f}%'.format(
     tot_ref, tot_miss, (float(tot_ref - tot_miss) / float(tot_ref)) * 100.0))

@@ -6,8 +6,9 @@
 #
 # USAGE: tcplife [-h] [-C] [-S] [-p PID] [interval [count]]
 #
-# This uses dynamic tracing of kernel functions, and will need to be updated
-# to match kernel changes.
+# This uses the sock:inet_sock_set_state tracepoint if it exists (added to
+# Linux 4.16, and replacing the earlier tcp:tcp_set_state), else it uses
+# kernel dynamic tracing of tcp_set_state().
 #
 # While throughput counters are emitted, they are fetched in a low-overhead
 # manner: reading members of the tcp_info struct on TCP close. ie, we do not
@@ -19,6 +20,7 @@
 # IDEA: Julia Evans
 #
 # 18-Oct-2016   Brendan Gregg   Created this.
+# 29-Dec-2017      "      "     Added tracepoint support.
 
 from __future__ import print_function
 from bcc import BPF
@@ -50,13 +52,15 @@ parser.add_argument("-t", "--timestamp", action="store_true",
 parser.add_argument("-w", "--wide", action="store_true",
     help="wide column output (fits IPv6 addresses)")
 parser.add_argument("-s", "--csv", action="store_true",
-    help="comma seperated values output")
+    help="comma separated values output")
 parser.add_argument("-p", "--pid",
     help="trace this PID only")
 parser.add_argument("-L", "--localport",
     help="comma-separated list of local ports to trace.")
 parser.add_argument("-D", "--remoteport",
     help="comma-separated list of remote ports to trace.")
+parser.add_argument("--ebpf", action="store_true",
+    help=argparse.SUPPRESS)
 args = parser.parse_args()
 debug = 0
 
@@ -72,11 +76,10 @@ BPF_HASH(birth, struct sock *, u64);
 
 // separate data structs for ipv4 and ipv6
 struct ipv4_data_t {
-    // XXX: switch some to u32's when supported
     u64 ts_us;
-    u64 pid;
-    u64 saddr;
-    u64 daddr;
+    u32 pid;
+    u32 saddr;
+    u32 daddr;
     u64 ports;
     u64 rx_b;
     u64 tx_b;
@@ -87,7 +90,7 @@ BPF_PERF_OUTPUT(ipv4_events);
 
 struct ipv6_data_t {
     u64 ts_us;
-    u64 pid;
+    u32 pid;
     unsigned __int128 saddr;
     unsigned __int128 daddr;
     u64 ports;
@@ -103,7 +106,17 @@ struct id_t {
     char task[TASK_COMM_LEN];
 };
 BPF_HASH(whoami, struct sock *, struct id_t);
+"""
 
+#
+# XXX: The following is temporary code for older kernels, Linux 4.14 and
+# older. It uses kprobes to instrument tcp_set_state(). On Linux 4.16 and
+# later, the sock:inet_sock_set_state tracepoint should be used instead, as
+# is done by the code that follows this. In the distant future (2021?), this
+# kprobe code can be removed. This is why there is so much code
+# duplication: to make removal easier.
+#
+bpf_text_kprobe = """
 int kprobe__tcp_set_state(struct pt_regs *ctx, struct sock *sk, int state)
 {
     u32 pid = bpf_get_current_pid_tgid() >> 32;
@@ -114,6 +127,7 @@ int kprobe__tcp_set_state(struct pt_regs *ctx, struct sock *sk, int state)
 
     // dport is either used in a filter here, or later
     u16 dport = sk->__sk_common.skc_dport;
+    dport = ntohs(dport);
     FILTER_DPORT
 
     /*
@@ -180,14 +194,16 @@ int kprobe__tcp_set_state(struct pt_regs *ctx, struct sock *sk, int state)
     u16 family = sk->__sk_common.skc_family;
 
     if (family == AF_INET) {
-        struct ipv4_data_t data4 = {.span_us = delta_us,
-            .rx_b = rx_b, .tx_b = tx_b};
+        struct ipv4_data_t data4 = {};
+        data4.span_us = delta_us;
+        data4.rx_b = rx_b;
+        data4.tx_b = tx_b;
         data4.ts_us = bpf_ktime_get_ns() / 1000;
         data4.saddr = sk->__sk_common.skc_rcv_saddr;
         data4.daddr = sk->__sk_common.skc_daddr;
         // a workaround until data4 compiles with separate lport/dport
         data4.pid = pid;
-        data4.ports = ntohs(dport) + ((0ULL + lport) << 32);
+        data4.ports = dport + ((0ULL + lport) << 32);
         if (mep == 0) {
             bpf_get_current_comm(&data4.task, sizeof(data4.task));
         } else {
@@ -196,15 +212,17 @@ int kprobe__tcp_set_state(struct pt_regs *ctx, struct sock *sk, int state)
         ipv4_events.perf_submit(ctx, &data4, sizeof(data4));
 
     } else /* 6 */ {
-        struct ipv6_data_t data6 = {.span_us = delta_us,
-            .rx_b = rx_b, .tx_b = tx_b};
+        struct ipv6_data_t data6 = {};
+        data6.span_us = delta_us;
+        data6.rx_b = rx_b;
+        data6.tx_b = tx_b;
         data6.ts_us = bpf_ktime_get_ns() / 1000;
         bpf_probe_read(&data6.saddr, sizeof(data6.saddr),
             sk->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
         bpf_probe_read(&data6.daddr, sizeof(data6.daddr),
             sk->__sk_common.skc_v6_daddr.in6_u.u6_addr32);
         // a workaround until data6 compiles with separate lport/dport
-        data6.ports = ntohs(dport) + ((0ULL + lport) << 32);
+        data6.ports = dport + ((0ULL + lport) << 32);
         data6.pid = pid;
         if (mep == 0) {
             bpf_get_current_comm(&data6.task, sizeof(data6.task));
@@ -221,13 +239,142 @@ int kprobe__tcp_set_state(struct pt_regs *ctx, struct sock *sk, int state)
 }
 """
 
+bpf_text_tracepoint = """
+TRACEPOINT_PROBE(sock, inet_sock_set_state)
+{
+    if (args->protocol != IPPROTO_TCP)
+        return 0;
+
+    u32 pid = bpf_get_current_pid_tgid() >> 32;
+    // sk is mostly used as a UUID, and for two tcp stats:
+    struct sock *sk = (struct sock *)args->skaddr;
+
+    // lport is either used in a filter here, or later
+    u16 lport = args->sport;
+    FILTER_LPORT
+
+    // dport is either used in a filter here, or later
+    u16 dport = args->dport;
+    FILTER_DPORT
+
+    /*
+     * This tool includes PID and comm context. It's best effort, and may
+     * be wrong in some situations. It currently works like this:
+     * - record timestamp on any state < TCP_FIN_WAIT1
+     * - cache task context on:
+     *       TCP_SYN_SENT: tracing from client
+     *       TCP_LAST_ACK: client-closed from server
+     * - do output on TCP_CLOSE:
+     *       fetch task context if cached, or use current task
+     */
+
+    // capture birth time
+    if (args->newstate < TCP_FIN_WAIT1) {
+        /*
+         * Matching just ESTABLISHED may be sufficient, provided no code-path
+         * sets ESTABLISHED without a tcp_set_state() call. Until we know
+         * that for sure, match all early states to increase chances a
+         * timestamp is set.
+         * Note that this needs to be set before the PID filter later on,
+         * since the PID isn't reliable for these early stages, so we must
+         * save all timestamps and do the PID filter later when we can.
+         */
+        u64 ts = bpf_ktime_get_ns();
+        birth.update(&sk, &ts);
+    }
+
+    // record PID & comm on SYN_SENT
+    if (args->newstate == TCP_SYN_SENT || args->newstate == TCP_LAST_ACK) {
+        // now we can PID filter, both here and a little later on for CLOSE
+        FILTER_PID
+        struct id_t me = {.pid = pid};
+        bpf_get_current_comm(&me.task, sizeof(me.task));
+        whoami.update(&sk, &me);
+    }
+
+    if (args->newstate != TCP_CLOSE)
+        return 0;
+
+    // calculate lifespan
+    u64 *tsp, delta_us;
+    tsp = birth.lookup(&sk);
+    if (tsp == 0) {
+        whoami.delete(&sk);     // may not exist
+        return 0;               // missed create
+    }
+    delta_us = (bpf_ktime_get_ns() - *tsp) / 1000;
+    birth.delete(&sk);
+
+    // fetch possible cached data, and filter
+    struct id_t *mep;
+    mep = whoami.lookup(&sk);
+    if (mep != 0)
+        pid = mep->pid;
+    FILTER_PID
+
+    // get throughput stats. see tcp_get_info().
+    u64 rx_b = 0, tx_b = 0, sport = 0;
+    struct tcp_sock *tp = (struct tcp_sock *)sk;
+    rx_b = tp->bytes_received;
+    tx_b = tp->bytes_acked;
+
+    if (args->family == AF_INET) {
+        struct ipv4_data_t data4 = {};
+        data4.span_us = delta_us;
+        data4.rx_b = rx_b;
+        data4.tx_b = tx_b;
+        data4.ts_us = bpf_ktime_get_ns() / 1000;
+        __builtin_memcpy(&data4.saddr, args->saddr, sizeof(data4.saddr));
+        __builtin_memcpy(&data4.daddr, args->daddr, sizeof(data4.daddr));
+        // a workaround until data4 compiles with separate lport/dport
+        data4.ports = dport + ((0ULL + lport) << 32);
+        data4.pid = pid;
+
+        if (mep == 0) {
+            bpf_get_current_comm(&data4.task, sizeof(data4.task));
+        } else {
+            bpf_probe_read(&data4.task, sizeof(data4.task), (void *)mep->task);
+        }
+        ipv4_events.perf_submit(args, &data4, sizeof(data4));
+
+    } else /* 6 */ {
+        struct ipv6_data_t data6 = {};
+        data6.span_us = delta_us;
+        data6.rx_b = rx_b;
+        data6.tx_b = tx_b;
+        data6.ts_us = bpf_ktime_get_ns() / 1000;
+        __builtin_memcpy(&data6.saddr, args->saddr_v6, sizeof(data6.saddr));
+        __builtin_memcpy(&data6.daddr, args->daddr_v6, sizeof(data6.daddr));
+        // a workaround until data6 compiles with separate lport/dport
+        data6.ports = dport + ((0ULL + lport) << 32);
+        data6.pid = pid;
+        if (mep == 0) {
+            bpf_get_current_comm(&data6.task, sizeof(data6.task));
+        } else {
+            bpf_probe_read(&data6.task, sizeof(data6.task), (void *)mep->task);
+        }
+        ipv6_events.perf_submit(args, &data6, sizeof(data6));
+    }
+
+    if (mep != 0)
+        whoami.delete(&sk);
+
+    return 0;
+}
+"""
+
+if (BPF.tracepoint_exists("sock", "inet_sock_set_state")):
+    bpf_text += bpf_text_tracepoint
+else:
+    bpf_text += bpf_text_kprobe
+
 # code substitutions
 if args.pid:
     bpf_text = bpf_text.replace('FILTER_PID',
         'if (pid != %s) { return 0; }' % args.pid)
 if args.remoteport:
     dports = [int(dport) for dport in args.remoteport.split(',')]
-    dports_if = ' && '.join(['dport != %d' % ntohs(dport) for dport in dports])
+    dports_if = ' && '.join(['dport != %d' % dport for dport in dports])
     bpf_text = bpf_text.replace('FILTER_DPORT',
         'if (%s) { birth.delete(&sk); return 0; }' % dports_if)
 if args.localport:
@@ -239,8 +386,10 @@ bpf_text = bpf_text.replace('FILTER_PID', '')
 bpf_text = bpf_text.replace('FILTER_DPORT', '')
 bpf_text = bpf_text.replace('FILTER_LPORT', '')
 
-if debug:
+if debug or args.ebpf:
     print(bpf_text)
+    if args.ebpf:
+        exit()
 
 # event data
 TASK_COMM_LEN = 16      # linux/sched.h
@@ -248,9 +397,9 @@ TASK_COMM_LEN = 16      # linux/sched.h
 class Data_ipv4(ct.Structure):
     _fields_ = [
         ("ts_us", ct.c_ulonglong),
-        ("pid", ct.c_ulonglong),
-        ("saddr", ct.c_ulonglong),
-        ("daddr", ct.c_ulonglong),
+        ("pid", ct.c_uint),
+        ("saddr", ct.c_uint),
+        ("daddr", ct.c_uint),
         ("ports", ct.c_ulonglong),
         ("rx_b", ct.c_ulonglong),
         ("tx_b", ct.c_ulonglong),
@@ -261,7 +410,7 @@ class Data_ipv4(ct.Structure):
 class Data_ipv6(ct.Structure):
     _fields_ = [
         ("ts_us", ct.c_ulonglong),
-        ("pid", ct.c_ulonglong),
+        ("pid", ct.c_uint),
         ("saddr", (ct.c_ulonglong * 2)),
         ("daddr", (ct.c_ulonglong * 2)),
         ("ports", ct.c_ulonglong),
@@ -305,7 +454,7 @@ def print_ipv4_event(cpu, data, size):
             print("%.6f," % delta_s, end="")
         else:
             print("%-9.6f " % delta_s, end="")
-    print(format_string % (event.pid, event.task.decode(),
+    print(format_string % (event.pid, event.task.decode('utf-8', 'replace'),
         "4" if args.wide or args.csv else "",
         inet_ntop(AF_INET, pack("I", event.saddr)), event.ports >> 32,
         inet_ntop(AF_INET, pack("I", event.daddr)), event.ports & 0xffffffff,
@@ -327,7 +476,7 @@ def print_ipv6_event(cpu, data, size):
             print("%.6f," % delta_s, end="")
         else:
             print("%-9.6f " % delta_s, end="")
-    print(format_string % (event.pid, event.task.decode(),
+    print(format_string % (event.pid, event.task.decode('utf-8', 'replace'),
         "6" if args.wide or args.csv else "",
         inet_ntop(AF_INET6, event.saddr), event.ports >> 32,
         inet_ntop(AF_INET6, event.daddr), event.ports & 0xffffffff,
@@ -357,4 +506,7 @@ start_ts = 0
 b["ipv4_events"].open_perf_buffer(print_ipv4_event, page_cnt=64)
 b["ipv6_events"].open_perf_buffer(print_ipv6_event, page_cnt=64)
 while 1:
-    b.kprobe_poll()
+    try:
+        b.perf_buffer_poll()
+    except KeyboardInterrupt:
+        exit()

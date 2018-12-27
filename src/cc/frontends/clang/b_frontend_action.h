@@ -42,6 +42,17 @@ namespace ebpf {
 class BFrontendAction;
 class FuncSource;
 
+// Traces maps with external pointers as values.
+class MapVisitor : public clang::RecursiveASTVisitor<MapVisitor> {
+ public:
+  explicit MapVisitor(std::set<clang::Decl *> &m);
+  bool VisitCallExpr(clang::CallExpr *Call);
+  void set_ptreg(std::tuple<clang::Decl *, int> &pt) { ptregs_.insert(pt); }
+ private:
+  std::set<clang::Decl *> &m_;
+  std::set<std::tuple<clang::Decl *, int>> ptregs_;
+};
+
 // Type visitor and rewriter for B programs.
 // It will look for B-specific features and rewrite them into a valid
 // C program. As part of the processing, open the necessary BPF tables
@@ -59,6 +70,13 @@ class BTypeVisitor : public clang::RecursiveASTVisitor<BTypeVisitor> {
  private:
   clang::SourceRange expansionRange(clang::SourceRange range);
   bool checkFormatSpecifiers(const std::string& fmt, clang::SourceLocation loc);
+  void genParamDirectAssign(clang::FunctionDecl *D, std::string& preamble,
+                            const char **calling_conv_regs);
+  void genParamIndirectAssign(clang::FunctionDecl *D, std::string& preamble,
+                              const char **calling_conv_regs);
+  void rewriteFuncParam(clang::FunctionDecl *D);
+  int64_t getFieldValue(clang::VarDecl *Decl, clang::FieldDecl *FDecl,
+                        int64_t OrigFValue);
   template <unsigned N>
   clang::DiagnosticBuilder error(clang::SourceLocation loc, const char (&fmt)[N]);
   template <unsigned N>
@@ -77,15 +95,25 @@ class BTypeVisitor : public clang::RecursiveASTVisitor<BTypeVisitor> {
 // Do a depth-first search to rewrite all pointers that need to be probed
 class ProbeVisitor : public clang::RecursiveASTVisitor<ProbeVisitor> {
  public:
-  explicit ProbeVisitor(clang::ASTContext &C, clang::Rewriter &rewriter);
+  explicit ProbeVisitor(clang::ASTContext &C, clang::Rewriter &rewriter,
+                        std::set<clang::Decl *> &m, bool track_helpers);
   bool VisitVarDecl(clang::VarDecl *Decl);
+  bool TraverseStmt(clang::Stmt *S);
   bool VisitCallExpr(clang::CallExpr *Call);
+  bool VisitReturnStmt(clang::ReturnStmt *R);
   bool VisitBinaryOperator(clang::BinaryOperator *E);
   bool VisitUnaryOperator(clang::UnaryOperator *E);
   bool VisitMemberExpr(clang::MemberExpr *E);
-  void set_ptreg(clang::Decl *D) { ptregs_.insert(D); }
+  bool VisitArraySubscriptExpr(clang::ArraySubscriptExpr *E);
+  void set_ptreg(std::tuple<clang::Decl *, int> &pt) { ptregs_.insert(pt); }
+  void set_ctx(clang::Decl *D) { ctx_ = D; }
+  std::set<std::tuple<clang::Decl *, int>> get_ptregs() { return ptregs_; }
  private:
+  bool assignsExtPtr(clang::Expr *E, int *nbAddrOf);
+  bool isMemberDereference(clang::Expr *E);
+  bool IsContextMemberExpr(clang::Expr *E);
   clang::SourceRange expansionRange(clang::SourceRange range);
+  clang::SourceLocation expansionLoc(clang::SourceLocation loc);
   template <unsigned N>
   clang::DiagnosticBuilder error(clang::SourceLocation loc, const char (&fmt)[N]);
 
@@ -93,25 +121,28 @@ class ProbeVisitor : public clang::RecursiveASTVisitor<ProbeVisitor> {
   clang::Rewriter &rewriter_;
   std::set<clang::Decl *> fn_visited_;
   std::set<clang::Expr *> memb_visited_;
-  std::set<clang::Decl *> ptregs_;
+  std::set<const clang::Stmt *> whitelist_;
+  std::set<std::tuple<clang::Decl *, int>> ptregs_;
+  std::set<clang::Decl *> &m_;
+  clang::Decl *ctx_;
+  bool track_helpers_;
+  std::list<int> ptregs_returned_;
+  const clang::Stmt *addrof_stmt_;
+  bool is_addrof_;
 };
 
 // A helper class to the frontend action, walks the decls
 class BTypeConsumer : public clang::ASTConsumer {
  public:
-  explicit BTypeConsumer(clang::ASTContext &C, BFrontendAction &fe);
-  bool HandleTopLevelDecl(clang::DeclGroupRef Group) override;
+  explicit BTypeConsumer(clang::ASTContext &C, BFrontendAction &fe,
+                         clang::Rewriter &rewriter, std::set<clang::Decl *> &m);
+  void HandleTranslationUnit(clang::ASTContext &Context) override;
  private:
-  BTypeVisitor visitor_;
-};
-
-// A helper class to the frontend action, walks the decls
-class ProbeConsumer : public clang::ASTConsumer {
- public:
-  ProbeConsumer(clang::ASTContext &C, clang::Rewriter &rewriter);
-  bool HandleTopLevelDecl(clang::DeclGroupRef Group) override;
- private:
-  ProbeVisitor visitor_;
+  BFrontendAction &fe_;
+  MapVisitor map_visitor_;
+  BTypeVisitor btype_visitor_;
+  ProbeVisitor probe_visitor1_;
+  ProbeVisitor probe_visitor2_;
 };
 
 // Create a B program in 2 phases (everything else is normal C frontend):
@@ -122,8 +153,9 @@ class BFrontendAction : public clang::ASTFrontendAction {
   // Initialize with the output stream where the new source file contents
   // should be written.
   BFrontendAction(llvm::raw_ostream &os, unsigned flags, TableStorage &ts,
-                  const std::string &id, FuncSource &func_src,
-                  std::string &mod_src);
+                  const std::string &id, const std::string &main_path,
+                  FuncSource &func_src, std::string &mod_src,
+                  const std::string &maps_ns);
 
   // Called by clang when the AST has been completed, here the output stream
   // will be flushed.
@@ -135,17 +167,23 @@ class BFrontendAction : public clang::ASTFrontendAction {
   clang::Rewriter &rewriter() const { return *rewriter_; }
   TableStorage &table_storage() const { return ts_; }
   std::string id() const { return id_; }
+  std::string maps_ns() const { return maps_ns_; }
+  bool is_rewritable_ext_func(clang::FunctionDecl *D);
+  void DoMiscWorkAround();
 
  private:
   llvm::raw_ostream &os_;
   unsigned flags_;
   TableStorage &ts_;
   std::string id_;
+  std::string maps_ns_;
   std::unique_ptr<clang::Rewriter> rewriter_;
   friend class BTypeVisitor;
   std::map<std::string, clang::SourceRange> func_range_;
+  const std::string &main_path_;
   FuncSource &func_src_;
   std::string &mod_src_;
+  std::set<clang::Decl *> m_;
 };
 
 }  // namespace visitor

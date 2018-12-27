@@ -83,27 +83,26 @@ lib.bpf_open_raw_sock.argtypes = [ct.c_char_p]
 lib.bpf_attach_socket.restype = ct.c_int
 lib.bpf_attach_socket.argtypes = [ct.c_int, ct.c_int]
 lib.bpf_prog_load.restype = ct.c_int
-lib.bpf_prog_load.argtypes = [ct.c_int, ct.c_void_p, ct.c_size_t,
-        ct.c_char_p, ct.c_uint, ct.c_char_p, ct.c_uint]
-lib.bpf_attach_kprobe.restype = ct.c_void_p
-_CB_TYPE = ct.CFUNCTYPE(None, ct.py_object, ct.c_int,
-        ct.c_ulonglong, ct.POINTER(ct.c_ulonglong))
+lib.bpf_prog_load.argtypes = [ct.c_int, ct.c_char_p, ct.c_void_p,
+        ct.c_size_t, ct.c_char_p, ct.c_uint, ct.c_int, ct.c_char_p, ct.c_uint]
 _RAW_CB_TYPE = ct.CFUNCTYPE(None, ct.py_object, ct.c_void_p, ct.c_int)
-_LOST_CB_TYPE = ct.CFUNCTYPE(None, ct.c_ulonglong)
-lib.bpf_attach_kprobe.argtypes = [ct.c_int, ct.c_int, ct.c_char_p, ct.c_char_p, ct.c_int,
-        ct.c_int, ct.c_int, _CB_TYPE, ct.py_object]
+_LOST_CB_TYPE = ct.CFUNCTYPE(None, ct.py_object, ct.c_ulonglong)
+lib.bpf_attach_kprobe.restype = ct.c_int
+lib.bpf_attach_kprobe.argtypes = [ct.c_int, ct.c_int, ct.c_char_p, ct.c_char_p,
+        ct.c_ulonglong]
 lib.bpf_detach_kprobe.restype = ct.c_int
 lib.bpf_detach_kprobe.argtypes = [ct.c_char_p]
-lib.bpf_attach_uprobe.restype = ct.c_void_p
+lib.bpf_attach_uprobe.restype = ct.c_int
 lib.bpf_attach_uprobe.argtypes = [ct.c_int, ct.c_int, ct.c_char_p, ct.c_char_p,
-        ct.c_ulonglong, ct.c_int, ct.c_int, ct.c_int, _CB_TYPE, ct.py_object]
+        ct.c_ulonglong, ct.c_int]
 lib.bpf_detach_uprobe.restype = ct.c_int
 lib.bpf_detach_uprobe.argtypes = [ct.c_char_p]
-lib.bpf_attach_tracepoint.restype = ct.c_void_p
-lib.bpf_attach_tracepoint.argtypes = [ct.c_int, ct.c_char_p, ct.c_char_p, ct.c_int,
-        ct.c_int, ct.c_int, _CB_TYPE, ct.py_object]
+lib.bpf_attach_tracepoint.restype = ct.c_int
+lib.bpf_attach_tracepoint.argtypes = [ct.c_int, ct.c_char_p, ct.c_char_p]
 lib.bpf_detach_tracepoint.restype = ct.c_int
 lib.bpf_detach_tracepoint.argtypes = [ct.c_char_p, ct.c_char_p]
+lib.bpf_attach_raw_tracepoint.restype = ct.c_int
+lib.bpf_attach_raw_tracepoint.argtypes = [ct.c_int, ct.c_char_p]
 lib.bpf_open_perf_buffer.restype = ct.c_void_p
 lib.bpf_open_perf_buffer.argtypes = [_RAW_CB_TYPE, _LOST_CB_TYPE, ct.py_object, ct.c_int, ct.c_int, ct.c_int]
 lib.bpf_open_perf_event.restype = ct.c_int
@@ -179,7 +178,7 @@ lib.bcc_symcache_refresh.restype = None
 lib.bcc_symcache_refresh.argtypes = [ct.c_void_p]
 
 lib.bcc_usdt_new_frompid.restype = ct.c_void_p
-lib.bcc_usdt_new_frompid.argtypes = [ct.c_int]
+lib.bcc_usdt_new_frompid.argtypes = [ct.c_int, ct.c_char_p]
 
 lib.bcc_usdt_new_frompath.restype = ct.c_void_p
 lib.bcc_usdt_new_frompath.argtypes = [ct.c_char_p]
@@ -208,7 +207,8 @@ class bcc_usdt(ct.Structure):
 
 class bcc_usdt_location(ct.Structure):
     _fields_ = [
-            ('address', ct.c_ulonglong)
+            ('address', ct.c_ulonglong),
+            ('bin_path', ct.c_char_p),
         ]
 
 class BCC_USDT_ARGUMENT_FLAGS(object):
@@ -238,11 +238,11 @@ lib.bcc_usdt_foreach.restype = None
 lib.bcc_usdt_foreach.argtypes = [ct.c_void_p, _USDT_CB]
 
 lib.bcc_usdt_get_location.restype = ct.c_int
-lib.bcc_usdt_get_location.argtypes = [ct.c_void_p, ct.c_char_p, ct.c_int,
+lib.bcc_usdt_get_location.argtypes = [ct.c_void_p, ct.c_char_p, ct.c_char_p, ct.c_int,
                                       ct.POINTER(bcc_usdt_location)]
 
 lib.bcc_usdt_get_argument.restype = ct.c_int
-lib.bcc_usdt_get_argument.argtypes = [ct.c_void_p, ct.c_char_p, ct.c_int,
+lib.bcc_usdt_get_argument.argtypes = [ct.c_void_p, ct.c_char_p, ct.c_char_p, ct.c_int,
                                       ct.c_int, ct.POINTER(bcc_usdt_argument)]
 
 _USDT_PROBE_CB = ct.CFUNCTYPE(None, ct.c_char_p, ct.c_char_p,

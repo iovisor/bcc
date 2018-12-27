@@ -1,0 +1,49 @@
+.TH inject 8  "2018-03-16" "USER COMMANDS"
+.SH NAME
+inject \- injects appropriate error into function if input call chain and
+predicates are satisfied. Uses Linux eBPF/bcc.
+.SH SYNOPSIS
+.B inject -h [-I header] [-P probability] [-v] [-C count] mode spec
+.SH DESCRIPTION
+inject injects errors into specified kernel functionality when a given call
+chain and associated predicates are satsified.
+
+WARNING: This tool injects failures into key kernel functions and may crash the
+kernel. You should know what you're doing if you're using this tool.
+
+This makes use of a Linux 4.16 feature (bpf_override_return())
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF, CONFIG_BPF_KPROBE_OVERRIDE, bcc
+.SH OPTIONS
+.TP
+\-h
+Print usage message.
+.TP
+\-v
+Display the generated BPF program, for debugging or modification.
+.TP
+\-I header
+Necessary headers to be included.
+.TP
+\-P probability
+Optional probability of failure, default 1.
+.TP
+\-C count
+Number of errors to inject before stopping, default never stops.
+.SH EXAMPLES
+Please see inject_example.txt
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Howard McLauchlan

@@ -35,6 +35,11 @@ def positive_nonzero_int(val):
         raise argparse.ArgumentTypeError("must be nonzero")
     return ival
 
+def stack_id_err(stack_id):
+    # -EFAULT in get_stackid normally means the stack-trace is not availible,
+    # Such as getting kernel stack trace in userspace code
+    return (stack_id < 0) and (stack_id != -errno.EFAULT)
+
 # arguments
 examples = """examples:
     ./offwaketime             # trace off-CPU + waker stack time until Ctrl-C
@@ -88,6 +93,8 @@ parser.add_argument("-M", "--max-block-time", default=(1 << 64) - 1,
     type=positive_nonzero_int,
     help="the amount of time in microseconds under which we " +
          "store traces (default U64_MAX)")
+parser.add_argument("--ebpf", action="store_true",
+    help=argparse.SUPPRESS)
 args = parser.parse_args()
 folded = args.folded
 duration = int(args.duration)
@@ -112,22 +119,31 @@ struct key_t {
     int t_k_stack_id;
     int t_u_stack_id;
     u32 t_pid;
+    u32 t_tgid;
     u32 w_pid;
-    u32 tgid;
+    u32 w_tgid;
 };
 BPF_HASH(counts, struct key_t);
+
+// Key of this hash is PID of waiting Process,
+// value is timestamp when it went into waiting
 BPF_HASH(start, u32);
+
 struct wokeby_t {
     char name[TASK_COMM_LEN];
     int k_stack_id;
     int u_stack_id;
     int w_pid;
+    int w_tgid;
 };
+// Key of the hash is PID of the Process to be waken, value is information
+// of the Process who wakes it
 BPF_HASH(wokeby, u32, struct wokeby_t);
 
-BPF_STACK_TRACE(stack_traces, STACK_STORAGE_SIZE)
+BPF_STACK_TRACE(stack_traces, STACK_STORAGE_SIZE);
 
 int waker(struct pt_regs *ctx, struct task_struct *p) {
+    // PID and TGID of the target Process to be waken
     u32 pid = p->pid;
     u32 tgid = p->tgid;
 
@@ -135,35 +151,41 @@ int waker(struct pt_regs *ctx, struct task_struct *p) {
         return 0;
     }
 
+    // Construct information about current (the waker) Process
     struct wokeby_t woke = {};
     bpf_get_current_comm(&woke.name, sizeof(woke.name));
-
     woke.k_stack_id = KERNEL_STACK_GET;
     woke.u_stack_id = USER_STACK_GET;
-    woke.w_pid = pid;
+    woke.w_pid = bpf_get_current_pid_tgid();
+    woke.w_tgid = bpf_get_current_pid_tgid() >> 32;
+
     wokeby.update(&pid, &woke);
     return 0;
 }
 
 int oncpu(struct pt_regs *ctx, struct task_struct *p) {
-    u32 pid = p->pid, t_pid=pid;
+    // PID and TGID of the previous Process (Process going into waiting)
+    u32 pid = p->pid;
     u32 tgid = p->tgid;
-    u64 ts, *tsp;
+    u64 *tsp;
+    u64 ts = bpf_ktime_get_ns();
 
-    // record previous thread sleep time
+    // Record timestamp for the previous Process (Process going into waiting)
     if (THREAD_FILTER) {
-        ts = bpf_ktime_get_ns();
         start.update(&pid, &ts);
     }
 
-    // calculate current thread's delta time
+    // Calculate current Process's wait time by finding the timestamp of when
+    // it went into waiting.
+    // pid and tgid are now the PID and TGID of the current (waking) Process.
     pid = bpf_get_current_pid_tgid();
     tgid = bpf_get_current_pid_tgid() >> 32;
     tsp = start.lookup(&pid);
     if (tsp == 0) {
-        return 0;        // missed start or filtered
+        // Missed or filtered when the Process went into waiting
+        return 0;
     }
-    u64 delta = bpf_ktime_get_ns() - *tsp;
+    u64 delta = ts - *tsp;
     start.delete(&pid);
     delta = delta / 1000;
     if ((delta < MINBLOCK_US) || (delta > MAXBLOCK_US)) {
@@ -171,27 +193,26 @@ int oncpu(struct pt_regs *ctx, struct task_struct *p) {
     }
 
     // create map key
-    u64 zero = 0, *val;
     struct key_t key = {};
     struct wokeby_t *woke;
-    bpf_get_current_comm(&key.target, sizeof(key.target));
 
+    bpf_get_current_comm(&key.target, sizeof(key.target));
+    key.t_pid = pid;
+    key.t_tgid = tgid;
     key.t_k_stack_id = KERNEL_STACK_GET;
     key.t_u_stack_id = USER_STACK_GET;
-    key.t_pid = t_pid;
 
     woke = wokeby.lookup(&pid);
     if (woke) {
         key.w_k_stack_id = woke->k_stack_id;
         key.w_u_stack_id = woke->u_stack_id;
         key.w_pid = woke->w_pid;
-        key.tgid = tgid;
+        key.w_tgid = woke->w_tgid;
         __builtin_memcpy(&key.waker, woke->name, TASK_COMM_LEN);
         wokeby.delete(&pid);
     }
 
-    val = counts.lookup_or_init(&key, &zero);
-    (*val) += delta;
+    counts.increment(key, delta);
     return 0;
 }
 """
@@ -221,9 +242,8 @@ bpf_text = bpf_text.replace('MINBLOCK_US_VALUE', str(args.min_block_time))
 bpf_text = bpf_text.replace('MAXBLOCK_US_VALUE', str(args.max_block_time))
 
 # handle stack args
-kernel_stack_get = "stack_traces.get_stackid(ctx, BPF_F_REUSE_STACKID)"
-user_stack_get = \
-    "stack_traces.get_stackid(ctx, BPF_F_REUSE_STACKID | BPF_F_USER_STACK)"
+kernel_stack_get = "stack_traces.get_stackid(ctx, 0)"
+user_stack_get = "stack_traces.get_stackid(ctx, BPF_F_USER_STACK)"
 stack_context = ""
 if args.user_stacks_only:
     stack_context = "user"
@@ -235,6 +255,9 @@ else:
     stack_context = "user + kernel"
 bpf_text = bpf_text.replace('USER_STACK_GET', user_stack_get)
 bpf_text = bpf_text.replace('KERNEL_STACK_GET', kernel_stack_get)
+if args.ebpf:
+    print(bpf_text)
+    exit()
 
 # initialize BPF
 b = BPF(text=bpf_text)
@@ -254,11 +277,13 @@ if not folded:
     else:
         print("... Hit Ctrl-C to end.")
 
-# as cleanup can take many seconds, trap Ctrl-C:
-# print a newline for folded output on Ctrl-C
-signal.signal(signal.SIGINT, signal_ignore)
+try:
+    sleep(duration)
+except KeyboardInterrupt:
+    # as cleanup can take many seconds, trap Ctrl-C:
+    # print a newline for folded output on Ctrl-C
+    signal.signal(signal.SIGINT, signal_ignore)
 
-sleep(duration)
 
 if not folded:
     print()
@@ -267,15 +292,20 @@ missing_stacks = 0
 has_enomem = False
 counts = b.get_table("counts")
 stack_traces = b.get_table("stack_traces")
+need_delimiter = args.delimited and not (args.kernel_stacks_only or
+                                         args.user_stacks_only)
 for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
     # handle get_stackid errors
-    # check for an ENOMEM error
-    if k.w_k_stack_id == -errno.ENOMEM or \
-       k.t_k_stack_id == -errno.ENOMEM or \
-       k.w_u_stack_id == -errno.ENOMEM or \
-       k.t_u_stack_id == -errno.ENOMEM:
-        missing_stacks += 1
-        continue
+    if not args.user_stacks_only:
+        missing_stacks += int(stack_id_err(k.w_k_stack_id))
+        missing_stacks += int(stack_id_err(k.t_k_stack_id))
+        has_enomem = has_enomem or (k.w_k_stack_id == -errno.ENOMEM) or \
+                     (k.t_k_stack_id == -errno.ENOMEM)
+    if not args.kernel_stacks_only:
+        missing_stacks += int(stack_id_err(k.w_u_stack_id))
+        missing_stacks += int(stack_id_err(k.t_u_stack_id))
+        has_enomem = has_enomem or (k.w_u_stack_id == -errno.ENOMEM) or \
+                     (k.t_u_stack_id == -errno.ENOMEM)
 
     waker_user_stack = [] if k.w_u_stack_id < 1 else \
         reversed(list(stack_traces.walk(k.w_u_stack_id))[1:])
@@ -288,47 +318,76 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
 
     if folded:
         # print folded stack output
-        line = \
-            [k.target] + \
-            [b.sym(addr, k.tgid)
-                for addr in reversed(list(target_user_stack)[1:])] + \
-            (["-"] if args.delimited else [""]) + \
-            [b.ksym(addr)
-                for addr in reversed(list(target_kernel_stack)[1:])] + \
-            ["--"] + \
-            [b.ksym(addr)
-                for addr in reversed(list(waker_kernel_stack))] + \
-            (["-"] if args.delimited else [""]) + \
-            [b.sym(addr, k.tgid)
-                for addr in reversed(list(waker_user_stack))] + \
-            [k.waker]
+        line = [k.target.decode('utf-8', 'replace')]
+        if not args.kernel_stacks_only:
+            if stack_id_err(k.t_u_stack_id):
+                line.append("[Missed User Stack]")
+            else:
+                line.extend([b.sym(addr, k.t_tgid)
+                    for addr in reversed(list(target_user_stack)[1:])])
+        if not args.user_stacks_only:
+            line.extend(["-"] if (need_delimiter and k.t_k_stack_id > 0 and k.t_u_stack_id > 0) else [])
+            if stack_id_err(k.t_k_stack_id):
+                line.append("[Missed Kernel Stack]")
+            else:
+                line.extend([b.ksym(addr)
+                    for addr in reversed(list(target_kernel_stack)[1:])])
+        line.append("--")
+        if not args.user_stacks_only:
+            if stack_id_err(k.w_k_stack_id):
+                line.append("[Missed Kernel Stack]")
+            else:
+                line.extend([b.ksym(addr)
+                    for addr in reversed(list(waker_kernel_stack))])
+        if not args.kernel_stacks_only:
+            line.extend(["-"] if (need_delimiter and k.w_u_stack_id > 0 and k.w_k_stack_id > 0) else [])
+            if stack_id_err(k.w_u_stack_id):
+                line.append("[Missed User Stack]")
+            else:
+                line.extend([b.sym(addr, k.w_tgid)
+                    for addr in reversed(list(waker_user_stack))])
+        line.append(k.waker.decode('utf-8', 'replace'))
         print("%s %d" % (";".join(line), v.value))
-
     else:
         # print wakeup name then stack in reverse order
-        print("    %-16s %s %s" % ("waker:", k.waker.decode(), k.t_pid))
-        for addr in waker_user_stack:
-            print("    %s" % b.sym(addr, k.tgid))
-        if args.delimited:
-            print("    -")
-        for addr in waker_kernel_stack:
-            print("    %s" % b.ksym(addr))
+        print("    %-16s %s %s" % ("waker:", k.waker.decode('utf-8', 'replace'), k.t_pid))
+        if not args.kernel_stacks_only:
+            if stack_id_err(k.w_u_stack_id):
+                print("    [Missed User Stack]")
+            else:
+                for addr in waker_user_stack:
+                    print("    %s" % b.sym(addr, k.w_tgid))
+        if not args.user_stacks_only:
+            if need_delimiter and k.w_u_stack_id > 0 and k.w_k_stack_id > 0:
+                print("    -")
+            if stack_id_err(k.w_k_stack_id):
+                print("    [Missed Kernel Stack]")
+            else:
+                for addr in waker_kernel_stack:
+                    print("    %s" % b.ksym(addr))
 
         # print waker/wakee delimiter
         print("    %-16s %s" % ("--", "--"))
 
-        # print default multi-line stack output
-        for addr in target_kernel_stack:
-            print("    %s" % b.ksym(addr))
-        if args.delimited:
-            print("    -")
-        for addr in target_user_stack:
-            print("    %s" % b.sym(addr, k.tgid))
-        print("    %-16s %s %s" % ("target:", k.target.decode(), k.w_pid))
+        if not args.user_stacks_only:
+            if stack_id_err(k.t_k_stack_id):
+                print("    [Missed Kernel Stack]")
+            else:
+                for addr in target_kernel_stack:
+                    print("    %s" % b.ksym(addr))
+        if not args.kernel_stacks_only:
+            if need_delimiter and k.t_u_stack_id > 0 and k.t_k_stack_id > 0:
+                print("    -")
+            if stack_id_err(k.t_u_stack_id):
+                print("    [Missed User Stack]")
+            else:
+                for addr in target_user_stack:
+                    print("    %s" % b.sym(addr, k.t_tgid))
+        print("    %-16s %s %s" % ("target:", k.target.decode('utf-8', 'replace'), k.w_pid))
         print("        %d\n" % v.value)
 
 if missing_stacks > 0:
     enomem_str = " Consider increasing --stack-storage-size."
-    print("WARNING: %d stack traces could not be displayed.%s" %
-        (missing_stacks, enomem_str),
+    print("WARNING: %d stack traces lost and could not be displayed.%s" %
+        (missing_stacks, (enomem_str if has_enomem else "")),
         file=stderr)

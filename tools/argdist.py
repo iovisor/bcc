@@ -559,7 +559,7 @@ argdist -p 1005 -H 'r:c:read()'
 argdist -C 'r::__vfs_read():u32:$PID:$latency > 100000'
         Print frequency of reads by process where the latency was >0.1ms
 
-argdist -H 'r::__vfs_read(void *file, void *buf, size_t count):size_t
+argdist -H 'r::__vfs_read(void *file, void *buf, size_t count):size_t:
             $entry(count):$latency > 1000000'
         Print a histogram of read sizes that were longer than 1ms
 
@@ -590,6 +590,13 @@ argdist -p 2780 -z 120 \\
         -C 'p:c:write(int fd, char* buf, size_t len):char*:buf:fd==1'
         Spy on writes to STDOUT performed by process 2780, up to a string size
         of 120 characters
+
+argdist -I 'kernel/sched/sched.h' \\
+        -C 'p::__account_cfs_rq_runtime(struct cfs_rq *cfs_rq):s64:cfs_rq->runtime_remaining'
+        Trace on the cfs scheduling runqueue remaining runtime. The struct cfs_rq is defined
+        in kernel/sched/sched.h which is in kernel source tree and not in kernel-devel
+        package.  So this command needs to run at the kernel source tree root directory
+        so that the added header file can be found by the compiler.
 """
 
         def __init__(self):
@@ -603,7 +610,9 @@ argdist -p 2780 -z 120 \\
                   type=int,
                   help="maximum string size to read from char* arguments")
                 parser.add_argument("-i", "--interval", default=1, type=int,
-                  help="output interval, in seconds")
+                  help="output interval, in seconds (default 1 second)")
+                parser.add_argument("-d", "--duration", type=int,
+                  help="total duration of trace, in seconds")
                 parser.add_argument("-n", "--number", type=int, dest="count",
                   help="number of outputs")
                 parser.add_argument("-v", "--verbose", action="store_true",
@@ -625,7 +634,9 @@ argdist -p 2780 -z 120 \\
                 parser.add_argument("-I", "--include", action="append",
                   metavar="header",
                   help="additional header files to include in the BPF program "
-                       "as either full path, or relative to '/usr/include'")
+                       "as either full path, "
+                       "or relative to relative to current working directory, "
+                       "or relative to default kernel header search path")
                 self.args = parser.parse_args()
                 self.usdt_ctx = None
 
@@ -670,14 +681,16 @@ struct __string_t { char s[%d]; };
                 for probe in self.probes:
                         probe.attach(self.bpf)
                 if self.args.verbose:
-                        print("open uprobes: %s" % self.bpf.open_uprobes)
-                        print("open kprobes: %s" % self.bpf.open_kprobes)
+                        print("open uprobes: %s" % list(self.bpf.uprobe_fds.keys()))
+                        print("open kprobes: %s" % list(self.bpf.kprobe_fds.keys()))
 
         def _main_loop(self):
                 count_so_far = 0
+                seconds = 0
                 while True:
                         try:
                                 sleep(self.args.interval)
+                                seconds += self.args.interval
                         except KeyboardInterrupt:
                                 exit()
                         print("[%s]" % strftime("%H:%M:%S"))
@@ -686,6 +699,9 @@ struct __string_t { char s[%d]; };
                         count_so_far += 1
                         if self.args.count is not None and \
                            count_so_far >= self.args.count:
+                                exit()
+                        if self.args.duration and \
+                           seconds >= self.args.duration:
                                 exit()
 
         def run(self):

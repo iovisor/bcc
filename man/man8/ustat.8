@@ -1,34 +1,39 @@
-.TH ustat 8  "2016-11-07" "USER COMMANDS"
+.TH ustat 8  "2018-10-09" "USER COMMANDS"
 .SH NAME
-ustat, javastat, pythonstat, rubystat, nodestat, phpstat \- Activity stats from
+ustat, javastat, nodestat, perlstat, phpstat, pythonstat, rubystat, tclstat \- Activity stats from
 high-level languages.
 .SH SYNOPSIS
 .B javastat [-C] [-S {cload,excp,gc,method,objnew,thread}] [-r MAXROWS] [-d] [interval [count]]
+.br
+.B nodestat [-C] [-S {cload,excp,gc,method,objnew,thread}] [-r MAXROWS] [-d] [interval [count]]
+.br
+.B perlstat [-C] [-S {cload,excp,gc,method,objnew,thread}] [-r MAXROWS] [-d] [interval [count]]
+.br
+.B phpstat [-C] [-S {cload,excp,gc,method,objnew,thread}] [-r MAXROWS] [-d] [interval [count]]
 .br
 .B pythonstat [-C] [-S {cload,excp,gc,method,objnew,thread}] [-r MAXROWS] [-d] [interval [count]]
 .br
 .B rubystat [-C] [-S {cload,excp,gc,method,objnew,thread}] [-r MAXROWS] [-d] [interval [count]]
 .br
-.B nodestat [-C] [-S {cload,excp,gc,method,objnew,thread}] [-r MAXROWS] [-d] [interval [count]]
+.B tclstat [-C] [-S {cload,excp,gc,method,objnew,thread}] [-r MAXROWS] [-d] [interval [count]]
 .br
-.B phpstat [-C] [-S {cload,excp,gc,method,objnew,thread}] [-r MAXROWS] [-d] [interval [count]]
-.br
-.B ustat [-l {java,python,ruby,node,php}] [-C] [-S {cload,excp,gc,method,objnew,thread}] [-r MAXROWS] [-d] [interval [count]]
+.B ustat [-l {java,node,perl,php,python,ruby,tcl}] [-C] [-S {cload,excp,gc,method,objnew,thread}] [-r MAXROWS] [-d] [interval [count]]
 .SH DESCRIPTION
 This is "top" for high-level language events, such as garbage collections,
 exceptions, thread creations, object allocations, method calls, and more. The
 events are aggregated for each process and printed in a top-like table, which
-can be sorted by various fields.
+can be sorted by various fields. Not all language runtimes provide the same
+set of details.
 
 This uses in-kernel eBPF maps to store per process summaries for efficiency.
 
 This tool relies on USDT probes embedded in many high-level languages, such as
-Node, Java, Python, Ruby, and PHP. It requires a runtime instrumented with these 
-probes, which in some cases requires building from source with a USDT-specific
-flag, such as "--enable-dtrace" or "--with-dtrace". For Java, some probes are
-not enabled by default, and can be turned on by running the Java process with
-the "-XX:+ExtendedDTraceProbes" flag. For PHP processes, the environment
-variable USE_ZEND_DTRACE must be set to 1.
+Java, Node, Perl, PHP, Python, Ruby, and Tcl. It requires a runtime instrumented with
+these probes, which in some cases requires building from source with a
+USDT-specific flag, such as "--enable-dtrace" or "--with-dtrace". For Java,
+some probes are not enabled by default, and can be turned on by running the Java
+process with the "-XX:+ExtendedDTraceProbes" flag. For PHP processes, the
+environment variable USE_ZEND_DTRACE must be set to 1.
 
 Newly-created processes will only be traced at the next interval. If you run
 this tool with a short interval (say, 1-5 seconds), this should be virtually
@@ -40,7 +45,7 @@ Since this uses BPF, only the root user can use this tool.
 CONFIG_BPF and bcc.
 .SH OPTIONS
 .TP
-\-l {java,python,ruby,node,php}
+\-l {java,node,perl,php,python,ruby,tcl}
 The language to trace. By default, all languages are traced.
 .TP
 \-C
@@ -104,10 +109,10 @@ THR/s
 Count of threads created during interval.
 .SH OVERHEAD
 When using this tool with high-frequency events, such as method calls, a very
-significant slow-down can be expected. However, many of the high-level 
+significant slow-down can be expected. However, many of the high-level
 languages covered by this tool already have a fairly high per-method invocation
-cost, especially when running in interpreted mode. For the lower-frequency 
-events, such as garbage collections or thread creations, the overhead should 
+cost, especially when running in interpreted mode. For the lower-frequency
+events, such as garbage collections or thread creations, the overhead should
 not be significant. Specifically, when probing Java processes and not using the
 "-XX:+ExtendedDTraceProbes" flag, the most expensive probes are not emitted,
 and the overhead should be acceptable.

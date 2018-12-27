@@ -12,7 +12,8 @@
 #
 # This measures two types of run queue latency:
 # 1. The time from a task being enqueued on a run queue to its context switch
-#    and execution. This traces enqueue_task_*() -> finish_task_switch(),
+#    and execution. This traces ttwu_do_wakeup(), wake_up_new_task() ->
+#    finish_task_switch() with either raw tracepoints (if supported) or kprobes
 #    and instruments the run queue latency after a voluntary context switch.
 # 2. The time from when a task was involuntary context switched and still
 #    in the runnable state, to when it next executed. This is instrumented
@@ -58,6 +59,8 @@ parser.add_argument("interval", nargs="?", default=99999999,
     help="output interval, in seconds")
 parser.add_argument("count", nargs="?", default=99999999,
     help="number of outputs")
+parser.add_argument("--ebpf", action="store_true",
+    help=argparse.SUPPRESS)
 args = parser.parse_args()
 countdown = int(args.count)
 debug = 0
@@ -85,16 +88,26 @@ STORAGE
 struct rq;
 
 // record enqueue timestamp
-int trace_enqueue(struct pt_regs *ctx, struct rq *rq, struct task_struct *p,
-    int flags)
+static int trace_enqueue(u32 tgid, u32 pid)
 {
-    u32 tgid = p->tgid;
-    u32 pid = p->pid;
-    if (FILTER)
+    if (FILTER || pid == 0)
         return 0;
     u64 ts = bpf_ktime_get_ns();
     start.update(&pid, &ts);
     return 0;
+}
+"""
+
+bpf_text_kprobe = """
+int trace_wake_up_new_task(struct pt_regs *ctx, struct task_struct *p)
+{
+    return trace_enqueue(p->tgid, p->pid);
+}
+
+int trace_ttwu_do_wakeup(struct pt_regs *ctx, struct rq *rq, struct task_struct *p,
+    int wake_flags)
+{
+    return trace_enqueue(p->tgid, p->pid);
 }
 
 // calculate latency
@@ -106,7 +119,7 @@ int trace_run(struct pt_regs *ctx, struct task_struct *prev)
     if (prev->state == TASK_RUNNING) {
         tgid = prev->tgid;
         pid = prev->pid;
-        if (!(FILTER)) {
+        if (!(FILTER || pid == 0)) {
             u64 ts = bpf_ktime_get_ns();
             start.update(&pid, &ts);
         }
@@ -114,7 +127,7 @@ int trace_run(struct pt_regs *ctx, struct task_struct *prev)
 
     tgid = bpf_get_current_pid_tgid() >> 32;
     pid = bpf_get_current_pid_tgid();
-    if (FILTER)
+    if (FILTER || pid == 0)
         return 0;
     u64 *tsp, delta;
 
@@ -133,6 +146,66 @@ int trace_run(struct pt_regs *ctx, struct task_struct *prev)
     return 0;
 }
 """
+
+bpf_text_raw_tp = """
+RAW_TRACEPOINT_PROBE(sched_wakeup)
+{
+    // TP_PROTO(struct task_struct *p)
+    struct task_struct *p = (struct task_struct *)ctx->args[0];
+    return trace_enqueue(p->tgid, p->pid);
+}
+
+RAW_TRACEPOINT_PROBE(sched_wakeup_new)
+{
+    // TP_PROTO(struct task_struct *p)
+    struct task_struct *p = (struct task_struct *)ctx->args[0];
+    return trace_enqueue(p->tgid, p->pid);
+}
+
+RAW_TRACEPOINT_PROBE(sched_switch)
+{
+    // TP_PROTO(bool preempt, struct task_struct *prev, struct task_struct *next)
+    struct task_struct *prev = (struct task_struct *)ctx->args[1];
+    struct task_struct *next = (struct task_struct *)ctx->args[2];
+    u32 pid, tgid;
+
+    // ivcsw: treat like an enqueue event and store timestamp
+    if (prev->state == TASK_RUNNING) {
+        tgid = prev->tgid;
+        pid = prev->pid;
+        if (!(FILTER || pid == 0)) {
+            u64 ts = bpf_ktime_get_ns();
+            start.update(&pid, &ts);
+        }
+    }
+
+    tgid = next->tgid;
+    pid = next->pid;
+    if (FILTER || pid == 0)
+        return 0;
+    u64 *tsp, delta;
+
+    // fetch timestamp and calculate delta
+    tsp = start.lookup(&pid);
+    if (tsp == 0) {
+        return 0;   // missed enqueue
+    }
+    delta = bpf_ktime_get_ns() - *tsp;
+    FACTOR
+
+    // store as histogram
+    STORE
+
+    start.delete(&pid);
+    return 0;
+}
+"""
+
+is_support_raw_tp = BPF.support_raw_tracepoint()
+if is_support_raw_tp:
+    bpf_text += bpf_text_raw_tp
+else:
+    bpf_text += bpf_text_kprobe
 
 # code substitutions
 if args.pid:
@@ -169,13 +242,17 @@ else:
     bpf_text = bpf_text.replace('STORAGE', 'BPF_HISTOGRAM(dist);')
     bpf_text = bpf_text.replace('STORE',
         'dist.increment(bpf_log2l(delta));')
-if debug:
+if debug or args.ebpf:
     print(bpf_text)
+    if args.ebpf:
+        exit()
 
 # load BPF program
 b = BPF(text=bpf_text)
-b.attach_kprobe(event_re="enqueue_task_*", fn_name="trace_enqueue")
-b.attach_kprobe(event="finish_task_switch", fn_name="trace_run")
+if not is_support_raw_tp:
+    b.attach_kprobe(event="ttwu_do_wakeup", fn_name="trace_ttwu_do_wakeup")
+    b.attach_kprobe(event="wake_up_new_task", fn_name="trace_wake_up_new_task")
+    b.attach_kprobe(event="finish_task_switch", fn_name="trace_run")
 
 print("Tracing run queue latency... Hit Ctrl-C to end.")
 

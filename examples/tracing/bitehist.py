@@ -13,6 +13,7 @@
 #
 # 15-Aug-2015	Brendan Gregg	Created this.
 
+from __future__ import print_function
 from bcc import BPF
 from time import sleep
 
@@ -37,7 +38,7 @@ print("Tracing... Hit Ctrl-C to end.")
 try:
 	sleep(99999999)
 except KeyboardInterrupt:
-	print
+	print()
 
 # output
 b["dist"].print_log2_hist("kbytes")

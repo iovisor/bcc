@@ -7,6 +7,8 @@ import ctypes as ct
 from unittest import main, skipUnless, TestCase
 import os
 import sys
+import socket
+import struct
 from contextlib import contextmanager
 import distutils.version
 
@@ -73,6 +75,66 @@ int count_foo(struct pt_regs *ctx, unsigned long a, unsigned long b) {
 """
         b = BPF(text=text, debug=0)
         fn = b.load_func("count_foo", BPF.KPROBE)
+
+    def test_probe_read3(self):
+        text = """
+#define KBUILD_MODNAME "foo"
+#include <net/tcp.h>
+#define _(P) ({typeof(P) val = 0; bpf_probe_read(&val, sizeof(val), &P); val;})
+int count_tcp(struct pt_regs *ctx, struct sk_buff *skb) {
+    return _(TCP_SKB_CB(skb)->tcp_gso_size);
+}
+"""
+        b = BPF(text=text)
+        fn = b.load_func("count_tcp", BPF.KPROBE)
+
+    def test_probe_read4(self):
+        text = """
+#define KBUILD_MODNAME "foo"
+#include <net/tcp.h>
+#define _(P) ({typeof(P) val = 0; bpf_probe_read(&val, sizeof(val), &P); val;})
+int test(struct pt_regs *ctx, struct sk_buff *skb) {
+    return _(TCP_SKB_CB(skb)->tcp_gso_size) + skb->protocol;
+}
+"""
+        b = BPF(text=text)
+        fn = b.load_func("test", BPF.KPROBE)
+
+    def test_probe_read_whitelist1(self):
+        text = """
+#define KBUILD_MODNAME "foo"
+#include <net/tcp.h>
+int count_tcp(struct pt_regs *ctx, struct sk_buff *skb) {
+    // The below define is in net/tcp.h:
+    //    #define TCP_SKB_CB(__skb)	((struct tcp_skb_cb *)&((__skb)->cb[0]))
+    // Note that it has AddrOf in the macro, which will cause current rewriter
+    // failing below statement
+    // return TCP_SKB_CB(skb)->tcp_gso_size;
+    u16 val = 0;
+    bpf_probe_read(&val, sizeof(val), &(TCP_SKB_CB(skb)->tcp_gso_size));
+    return val;
+}
+"""
+        b = BPF(text=text)
+        fn = b.load_func("count_tcp", BPF.KPROBE)
+
+    def test_probe_read_whitelist2(self):
+        text = """
+#define KBUILD_MODNAME "foo"
+#include <net/tcp.h>
+int count_tcp(struct pt_regs *ctx, struct sk_buff *skb) {
+    // The below define is in net/tcp.h:
+    //    #define TCP_SKB_CB(__skb) ((struct tcp_skb_cb *)&((__skb)->cb[0]))
+    // Note that it has AddrOf in the macro, which will cause current rewriter
+    // failing below statement
+    // return TCP_SKB_CB(skb)->tcp_gso_size;
+    u16 val = 0;
+    bpf_probe_read(&val, sizeof(val), &(TCP_SKB_CB(skb)->tcp_gso_size));
+    return val + skb->protocol;
+}
+"""
+        b = BPF(text=text)
+        fn = b.load_func("count_tcp", BPF.KPROBE)
 
     def test_probe_read_keys(self):
         text = """
@@ -241,6 +303,19 @@ int trace_entry(struct pt_regs *ctx, struct file *file) {
         b = BPF(text=text, debug=0)
         fn = b.load_func("trace_entry", BPF.KPROBE)
 
+    def test_nested_probe_read_deref(self):
+        text = """
+#include <uapi/linux/ptrace.h>
+struct sock {
+    u32 *sk_daddr;
+};
+int test(struct pt_regs *ctx, struct sock *skp) {
+    return *(skp->sk_daddr);
+}
+"""
+        b = BPF(text=text)
+        fn = b.load_func("test", BPF.KPROBE)
+
     def test_char_array_probe(self):
         BPF(text="""#include <linux/blkdev.h>
 int kprobe__blk_update_request(struct pt_regs *ctx, struct request *req) {
@@ -293,7 +368,7 @@ struct args_t {
     int flags;
     int mode;
 };
-int kprobe__sys_open(struct pt_regs *ctx, const char *filename,
+int do_sys_open(struct pt_regs *ctx, const char *filename,
         int flags, int mode) {
     struct args_t args = {};
     args.filename = filename;
@@ -303,6 +378,8 @@ int kprobe__sys_open(struct pt_regs *ctx, const char *filename,
     return 0;
 };
 """)
+        b.attach_kprobe(event=b.get_syscall_fnname("open"),
+                        fn_name="do_sys_open")
 
     def test_task_switch(self):
         b = BPF(text="""
@@ -339,6 +416,45 @@ int kprobe____kmalloc(struct pt_regs *ctx, size_t size) {
     return 0;
 }""")
 
+    def test_probe_simple_member_assign(self):
+        b = BPF(text="""
+#include <uapi/linux/ptrace.h>
+#include <linux/netdevice.h>
+struct leaf { void *ptr; };
+int test(struct pt_regs *ctx, struct sk_buff *skb) {
+    struct leaf l = {};
+    struct leaf *lp = &l;
+    lp->ptr = skb;
+    return 0;
+}""")
+        b.load_func("test", BPF.KPROBE)
+
+    def test_probe_member_expr_deref(self):
+        b = BPF(text="""
+#include <uapi/linux/ptrace.h>
+#include <linux/netdevice.h>
+struct leaf { struct sk_buff *ptr; };
+int test(struct pt_regs *ctx, struct sk_buff *skb) {
+    struct leaf l = {};
+    struct leaf *lp = &l;
+    lp->ptr = skb;
+    return lp->ptr->priority;
+}""")
+        b.load_func("test", BPF.KPROBE)
+
+    def test_probe_member_expr(self):
+        b = BPF(text="""
+#include <uapi/linux/ptrace.h>
+#include <linux/netdevice.h>
+struct leaf { struct sk_buff *ptr; };
+int test(struct pt_regs *ctx, struct sk_buff *skb) {
+    struct leaf l = {};
+    struct leaf *lp = &l;
+    lp->ptr = skb;
+    return l.ptr->priority;
+}""")
+        b.load_func("test", BPF.KPROBE)
+
     def test_unop_probe_read(self):
         text = """
 #include <linux/blkdev.h>
@@ -352,6 +468,90 @@ int trace_entry(struct pt_regs *ctx, struct request *req) {
 """
         b = BPF(text=text)
         fn = b.load_func("trace_entry", BPF.KPROBE)
+
+    def test_probe_read_nested_deref(self):
+        text = """
+#include <net/inet_sock.h>
+int test(struct pt_regs *ctx, struct sock *sk) {
+    struct sock *ptr1;
+    struct sock **ptr2 = &ptr1;
+    *ptr2 = sk;
+    return ((struct sock *)(*ptr2))->sk_daddr;
+}
+"""
+        b = BPF(text=text)
+        fn = b.load_func("test", BPF.KPROBE)
+
+    def test_probe_read_nested_deref2(self):
+        text = """
+#include <net/inet_sock.h>
+int test(struct pt_regs *ctx, struct sock *sk) {
+    struct sock *ptr1;
+    struct sock **ptr2 = &ptr1;
+    struct sock ***ptr3 = &ptr2;
+    *ptr2 = sk;
+    *ptr3 = ptr2;
+    return ((struct sock *)(**ptr3))->sk_daddr;
+}
+"""
+        b = BPF(text=text)
+        fn = b.load_func("test", BPF.KPROBE)
+
+    def test_probe_read_nested_deref_func(self):
+        text = """
+#include <net/inet_sock.h>
+static int subtest(struct sock ***skp) {
+    return ((struct sock *)(**skp))->sk_daddr;
+}
+int test(struct pt_regs *ctx, struct sock *sk) {
+    struct sock *ptr1;
+    struct sock **ptr2 = &ptr1;
+    struct sock ***ptr3 = &ptr2;
+    *ptr2 = sk;
+    *ptr3 = ptr2;
+    return subtest(ptr3);
+}
+"""
+        b = BPF(text=text)
+        fn = b.load_func("test", BPF.KPROBE)
+
+    def test_probe_read_nested_member1(self):
+        text = """
+#include <net/inet_sock.h>
+int test(struct pt_regs *ctx, struct sock *skp) {
+    u32 *daddr = &skp->sk_daddr;
+    return *daddr;
+}
+"""
+        b = BPF(text=text)
+        fn = b.load_func("test", BPF.KPROBE)
+
+    def test_probe_read_nested_member2(self):
+        text = """
+#include <uapi/linux/ptrace.h>
+struct sock {
+    u32 **sk_daddr;
+};
+int test(struct pt_regs *ctx, struct sock *skp) {
+    u32 *daddr = *(skp->sk_daddr);
+    return *daddr;
+}
+"""
+        b = BPF(text=text)
+        fn = b.load_func("test", BPF.KPROBE)
+
+    def test_probe_read_nested_member3(self):
+        text = """
+#include <uapi/linux/ptrace.h>
+struct sock {
+    u32 *sk_daddr;
+};
+int test(struct pt_regs *ctx, struct sock *skp) {
+    return *(&skp->sk_daddr);
+}
+"""
+        b = BPF(text=text)
+        fn = b.load_func("test", BPF.KPROBE)
 
     def test_paren_probe_read(self):
         text = """
@@ -398,6 +598,7 @@ BPF_ARRAY(t3, union emptyu, 1);
     def test_exported_maps(self):
         b1 = BPF(text="""BPF_TABLE_PUBLIC("hash", int, int, table1, 10);""")
         b2 = BPF(text="""BPF_TABLE("extern", int, int, table1, 10);""")
+        t = b2["table1"]
 
     def test_syntax_error(self):
         with self.assertRaises(Exception):
@@ -423,7 +624,7 @@ int many(struct pt_regs *ctx, int a, int b, int c, int d, int e, int f, int g) {
 
     def test_call_macro_arg(self):
         text = """
-BPF_TABLE("prog", u32, u32, jmp, 32);
+BPF_PROG_ARRAY(jmp, 32);
 
 #define JMP_IDX_PIPE (1U << 1)
 
@@ -439,7 +640,7 @@ int process(struct xdp_md *ctx) {
         """
         b = BPF(text=text)
         t = b["jmp"]
-        self.assertEquals(len(t), 32);
+        self.assertEqual(len(t), 32);
 
     def test_update_macro_arg(self):
         text = """
@@ -459,7 +660,125 @@ int process(struct xdp_md *ctx) {
         """
         b = BPF(text=text)
         t = b["act"]
-        self.assertEquals(len(t), 32);
+        self.assertEqual(len(t), 32);
+
+    def test_ext_ptr_maps1(self):
+        bpf_text = """
+#include <uapi/linux/ptrace.h>
+#include <net/sock.h>
+#include <bcc/proto.h>
+
+BPF_HASH(currsock, u32, struct sock *);
+
+int trace_entry(struct pt_regs *ctx, struct sock *sk,
+    struct sockaddr *uaddr, int addr_len) {
+    u32 pid = bpf_get_current_pid_tgid();
+    currsock.update(&pid, &sk);
+    return 0;
+};
+
+int trace_exit(struct pt_regs *ctx) {
+    u32 pid = bpf_get_current_pid_tgid();
+    struct sock **skpp;
+    skpp = currsock.lookup(&pid);
+    if (skpp) {
+        struct sock *skp = *skpp;
+        return skp->__sk_common.skc_dport;
+    }
+    return 0;
+}
+        """
+        b = BPF(text=bpf_text)
+        b.load_func("trace_entry", BPF.KPROBE)
+        b.load_func("trace_exit", BPF.KPROBE)
+
+    def test_ext_ptr_maps2(self):
+        bpf_text = """
+#include <uapi/linux/ptrace.h>
+#include <net/sock.h>
+#include <bcc/proto.h>
+
+BPF_HASH(currsock, u32, struct sock *);
+
+int trace_entry(struct pt_regs *ctx, struct sock *sk,
+    struct sockaddr *uaddr, int addr_len) {
+    u32 pid = bpf_get_current_pid_tgid();
+    currsock.update(&pid, &sk);
+    return 0;
+};
+
+int trace_exit(struct pt_regs *ctx) {
+    u32 pid = bpf_get_current_pid_tgid();
+    struct sock **skpp = currsock.lookup(&pid);
+    if (skpp) {
+        struct sock *skp = *skpp;
+        return skp->__sk_common.skc_dport;
+    }
+    return 0;
+}
+        """
+        b = BPF(text=bpf_text)
+        b.load_func("trace_entry", BPF.KPROBE)
+        b.load_func("trace_exit", BPF.KPROBE)
+
+    def test_ext_ptr_maps_reverse(self):
+        bpf_text = """
+#include <uapi/linux/ptrace.h>
+#include <net/sock.h>
+#include <bcc/proto.h>
+
+BPF_HASH(currsock, u32, struct sock *);
+
+int trace_exit(struct pt_regs *ctx) {
+    u32 pid = bpf_get_current_pid_tgid();
+    struct sock **skpp;
+    skpp = currsock.lookup(&pid);
+    if (skpp) {
+        struct sock *skp = *skpp;
+        return skp->__sk_common.skc_dport;
+    }
+    return 0;
+}
+
+int trace_entry(struct pt_regs *ctx, struct sock *sk) {
+    u32 pid = bpf_get_current_pid_tgid();
+    currsock.update(&pid, &sk);
+    return 0;
+};
+        """
+        b = BPF(text=bpf_text)
+        b.load_func("trace_entry", BPF.KPROBE)
+        b.load_func("trace_exit", BPF.KPROBE)
+
+    def test_ext_ptr_maps_indirect(self):
+        bpf_text = """
+#include <uapi/linux/ptrace.h>
+#include <net/sock.h>
+#include <bcc/proto.h>
+
+BPF_HASH(currsock, u32, struct sock *);
+
+int trace_entry(struct pt_regs *ctx, struct sock *sk) {
+    u32 pid = bpf_get_current_pid_tgid();
+    struct sock **skp = &sk;
+    currsock.update(&pid, skp);
+    return 0;
+};
+
+int trace_exit(struct pt_regs *ctx) {
+    u32 pid = bpf_get_current_pid_tgid();
+    struct sock **skpp;
+    skpp = currsock.lookup(&pid);
+    if (skpp) {
+        struct sock *skp = *skpp;
+        return skp->__sk_common.skc_dport;
+    }
+    return 0;
+}
+        """
+        b = BPF(text=bpf_text)
+        b.load_func("trace_entry", BPF.KPROBE)
+        b.load_func("trace_exit", BPF.KPROBE)
 
     def test_bpf_dins_pkt_rewrite(self):
         text = """
@@ -566,7 +885,7 @@ void do_trace(struct pt_regs *ctx) {
         c_val = ct.c_ulong(1)
         b["dummy"][ct.c_ulong(0)] = c_val
         b["dummy"][ct.c_ulong(1)] = c_val
-        b.attach_kprobe(event="sys_sync", fn_name="do_trace")
+        b.attach_kprobe(event=b.get_syscall_fnname("sync"), fn_name="do_trace")
         libc = ct.CDLL("libc.so.6")
         libc.sync()
         self.assertEqual(1, b["dummy"][ct.c_ulong(0)].value)
@@ -574,7 +893,7 @@ void do_trace(struct pt_regs *ctx) {
 
     def test_prog_array_delete(self):
         text = """
-BPF_TABLE("prog", int, int, dummy, 256);
+BPF_PROG_ARRAY(dummy, 256);
 """
         b1 = BPF(text=text)
         text = """
@@ -612,6 +931,324 @@ struct key_t {
         with self.assertRaises(Exception):
             b = BPF(text=text)
 
+    def test_enumerations(self):
+        text = """
+enum b {
+    CHOICE_A,
+};
+struct a {
+    enum b test;
+};
+BPF_HASH(drops, struct a);
+        """
+        b = BPF(text=text)
+
+    def test_int128_types(self):
+        text = """
+BPF_HASH(table1, unsigned __int128, __int128);
+"""
+        b = BPF(text=text)
+        table = b['table1']
+        self.assertEqual(ct.sizeof(table.Key), 16)
+        self.assertEqual(ct.sizeof(table.Leaf), 16)
+        table[
+            table.Key.from_buffer_copy(
+                socket.inet_pton(socket.AF_INET6, "2001:db8::"))
+        ] = table.Leaf.from_buffer_copy(struct.pack('LL', 42, 123456789))
+        for k, v in table.items():
+            self.assertEqual(v[0], 42)
+            self.assertEqual(v[1], 123456789)
+            self.assertEqual(socket.inet_ntop(socket.AF_INET6,
+                                              struct.pack('LL', k[0], k[1])),
+                             "2001:db8::")
+
+    def test_padding_types(self):
+        text = """
+struct key_t {
+  u32 f1_1;               /* offset 0 */
+  struct {
+    char f2_1;            /* offset 16 */
+    __int128 f2_2;        /* offset 32 */
+  };
+  u8 f1_3;                /* offset 48 */
+  unsigned __int128 f1_4; /* offset 64 */
+  char f1_5;              /* offset 80 */
+};
+struct value_t {
+  u8 src[4] __attribute__ ((aligned (8))); /* offset 0 */
+  u8 dst[4] __attribute__ ((aligned (8))); /* offset 8 */
+};
+BPF_HASH(table1, struct key_t, struct value_t);
+"""
+        b = BPF(text=text)
+        table = b['table1']
+        self.assertEqual(ct.sizeof(table.Key), 96)
+        self.assertEqual(ct.sizeof(table.Leaf), 16)
+
+    @skipUnless(kernel_version_ge(4,7), "requires kernel >= 4.7")
+    def test_probe_read_tracepoint_context(self):
+        text = """
+#include <linux/netdevice.h>
+TRACEPOINT_PROBE(skb, kfree_skb) {
+    struct sk_buff *skb = (struct sk_buff *)args->skbaddr;
+    return skb->protocol;
+}
+"""
+        b = BPF(text=text)
+
+    def test_probe_read_kprobe_ctx(self):
+        text = """
+#include <linux/sched.h>
+#include <net/inet_sock.h>
+int test(struct pt_regs *ctx) {
+    struct sock *sk;
+    sk = (struct sock *)PT_REGS_PARM1(ctx);
+    return sk->sk_dport;
+}
+"""
+        b = BPF(text=text)
+        fn = b.load_func("test", BPF.KPROBE)
+
+    def test_probe_read_ctx_array(self):
+        text = """
+#include <linux/sched.h>
+#include <net/inet_sock.h>
+int test(struct pt_regs *ctx) {
+    struct sock *newsk = (struct sock *)PT_REGS_RC(ctx);
+    return newsk->__sk_common.skc_rcv_saddr;
+}
+"""
+        b = BPF(text=text)
+        fn = b.load_func("test", BPF.KPROBE)
+
+    @skipUnless(kernel_version_ge(4,7), "requires kernel >= 4.7")
+    def test_probe_read_tc_ctx(self):
+        text = """
+#include <uapi/linux/pkt_cls.h>
+#include <linux/if_ether.h>
+int test(struct __sk_buff *ctx) {
+    void* data_end = (void*)(long)ctx->data_end;
+    void* data = (void*)(long)ctx->data;
+    if (data + sizeof(struct ethhdr) > data_end)
+        return TC_ACT_SHOT;
+    struct ethhdr *eh = (struct ethhdr *)data;
+    if (eh->h_proto == 0x1)
+        return TC_ACT_SHOT;
+    return TC_ACT_OK;
+}
+"""
+        b = BPF(text=text)
+        fn = b.load_func("test", BPF.SCHED_CLS)
+
+    def test_probe_read_return(self):
+        text = """
+#define KBUILD_MODNAME "foo"
+#include <uapi/linux/ptrace.h>
+#include <linux/tcp.h>
+static inline unsigned char *my_skb_transport_header(struct sk_buff *skb) {
+    return skb->head + skb->transport_header;
+}
+int test(struct pt_regs *ctx, struct sock *sk, struct sk_buff *skb) {
+    struct tcphdr *th = (struct tcphdr *)my_skb_transport_header(skb);
+    return th->seq;
+}
+"""
+        b = BPF(text=text)
+        fn = b.load_func("test", BPF.KPROBE)
+
+    def test_probe_read_multiple_return(self):
+        text = """
+#define KBUILD_MODNAME "foo"
+#include <uapi/linux/ptrace.h>
+#include <linux/tcp.h>
+static inline u64 error_function() {
+    return 0;
+}
+static inline unsigned char *my_skb_transport_header(struct sk_buff *skb) {
+    if (skb)
+        return skb->head + skb->transport_header;
+    return (unsigned char *)error_function();
+}
+int test(struct pt_regs *ctx, struct sock *sk, struct sk_buff *skb) {
+    struct tcphdr *th = (struct tcphdr *)my_skb_transport_header(skb);
+    return th->seq;
+}
+"""
+        b = BPF(text=text)
+        fn = b.load_func("test", BPF.KPROBE)
+
+    def test_probe_read_return_expr(self):
+        text = """
+#define KBUILD_MODNAME "foo"
+#include <uapi/linux/ptrace.h>
+#include <linux/tcp.h>
+static inline unsigned char *my_skb_transport_header(struct sk_buff *skb) {
+    return skb->head + skb->transport_header;
+}
+int test(struct pt_regs *ctx, struct sock *sk, struct sk_buff *skb) {
+    u32 *seq = (u32 *)my_skb_transport_header(skb) + offsetof(struct tcphdr, seq);
+    return *seq;
+}
+"""
+        b = BPF(text=text)
+        fn = b.load_func("test", BPF.KPROBE)
+
+    def test_probe_read_return_call(self):
+        text = """
+#define KBUILD_MODNAME "foo"
+#include <uapi/linux/ptrace.h>
+#include <linux/tcp.h>
+static inline struct tcphdr *my_skb_transport_header(struct sk_buff *skb) {
+    return (struct tcphdr *)skb->head + skb->transport_header;
+}
+int test(struct pt_regs *ctx, struct sock *sk, struct sk_buff *skb) {
+    return my_skb_transport_header(skb)->seq;
+}
+"""
+        b = BPF(text=text)
+        fn = b.load_func("test", BPF.KPROBE)
+
+    def test_no_probe_read_addrof(self):
+        text = """
+#include <linux/sched.h>
+#include <net/inet_sock.h>
+static inline int test_help(__be16 *addr) {
+    __be16 val = 0;
+    bpf_probe_read(&val, sizeof(val), addr);
+    return val;
+}
+int test(struct pt_regs *ctx) {
+    struct sock *sk;
+    sk = (struct sock *)PT_REGS_PARM1(ctx);
+    return test_help(&sk->sk_dport);
+}
+"""
+        b = BPF(text=text)
+        fn = b.load_func("test", BPF.KPROBE)
+
+    def test_probe_read_array_accesses1(self):
+        text = """
+#include <linux/ptrace.h>
+#include <linux/dcache.h>
+int test(struct pt_regs *ctx, const struct qstr *name) {
+    return name->name[1];
+}
+"""
+        b = BPF(text=text)
+        fn = b.load_func("test", BPF.KPROBE)
+
+    def test_probe_read_array_accesses2(self):
+        text = """
+#include <linux/ptrace.h>
+#include <linux/dcache.h>
+int test(struct pt_regs *ctx, const struct qstr *name) {
+    return name->name  [ 1];
+}
+"""
+        b = BPF(text=text)
+        fn = b.load_func("test", BPF.KPROBE)
+
+    def test_probe_read_array_accesses3(self):
+        text = """
+#include <linux/ptrace.h>
+#include <linux/dcache.h>
+int test(struct pt_regs *ctx, const struct qstr *name) {
+    return (name->name)[1];
+}
+"""
+        b = BPF(text=text)
+        fn = b.load_func("test", BPF.KPROBE)
+
+    def test_probe_read_array_accesses4(self):
+        text = """
+#include <linux/ptrace.h>
+int test(struct pt_regs *ctx, char *name) {
+    return name[1];
+}
+"""
+        b = BPF(text=text)
+        fn = b.load_func("test", BPF.KPROBE)
+
+    def test_probe_read_array_accesses5(self):
+        text = """
+#include <linux/ptrace.h>
+int test(struct pt_regs *ctx, char **name) {
+    return (*name)[1];
+}
+"""
+        b = BPF(text=text)
+        fn = b.load_func("test", BPF.KPROBE)
+
+    def test_probe_read_array_accesses6(self):
+        text = """
+#include <linux/ptrace.h>
+struct test_t {
+    int tab[5];
+};
+int test(struct pt_regs *ctx, struct test_t *t) {
+    return *(&t->tab[1]);
+}
+"""
+        b = BPF(text=text)
+        fn = b.load_func("test", BPF.KPROBE)
+
+    def test_probe_read_array_accesses7(self):
+        text = """
+#include <net/inet_sock.h>
+int test(struct pt_regs *ctx, struct sock *sk) {
+    return sk->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32[0];
+}
+"""
+        b = BPF(text=text)
+        fn = b.load_func("test", BPF.KPROBE)
+
+    def test_probe_read_array_accesses8(self):
+        text = """
+#include <linux/mm_types.h>
+int test(struct pt_regs *ctx, struct mm_struct *mm) {
+    return mm->rss_stat.count[MM_ANONPAGES].counter;
+}
+"""
+        b = BPF(text=text)
+        fn = b.load_func("test", BPF.KPROBE)
+
+    def test_arbitrary_increment_simple(self):
+        b = BPF(text=b"""
+#include <uapi/linux/ptrace.h>
+struct bpf_map;
+BPF_HASH(map);
+int map_delete(struct pt_regs *ctx, struct bpf_map *bpfmap, u64 *k) {
+    map.increment(42, 10);
+    return 0;
+}
+""")
+        b.attach_kprobe(event=b"htab_map_delete_elem", fn_name=b"map_delete")
+        b.cleanup()
+
+    @skipUnless(kernel_version_ge(4,7), "requires kernel >= 4.7")
+    def test_packed_structure(self):
+        b = BPF(text=b"""
+struct test {
+    u16 a;
+    u32 b;
+} __packed;
+BPF_TABLE("hash", u32, struct test, testing, 2);
+TRACEPOINT_PROBE(kmem, kmalloc) {
+    u32 key = 0;
+    struct test info, *entry;
+    entry = testing.lookup(&key);
+    if (entry == NULL) {
+        info.a = 10;
+        info.b = 20;
+        testing.update(&key, &info);
+    }
+    return 0;
+}
+""")
+        if len(b["testing"].items()):
+            st = b["testing"][ct.c_uint(0)]
+            self.assertEqual(st.a, 10)
+            self.assertEqual(st.b, 20)
 
 if __name__ == "__main__":
     main()

@@ -42,6 +42,8 @@ parser.add_argument("-p", "--pid",
     help="trace this PID only")
 parser.add_argument("-P", "--port",
     help="comma-separated list of destination ports to trace.")
+parser.add_argument("--ebpf", action="store_true",
+    help=argparse.SUPPRESS)
 args = parser.parse_args()
 debug = 0
 
@@ -55,24 +57,23 @@ BPF_HASH(currsock, u32, struct sock *);
 
 // separate data structs for ipv4 and ipv6
 struct ipv4_data_t {
-    // XXX: switch some to u32's when supported
     u64 ts_us;
-    u64 pid;
-    u64 saddr;
-    u64 daddr;
+    u32 pid;
+    u32 saddr;
+    u32 daddr;
     u64 ip;
-    u64 dport;
+    u16 dport;
     char task[TASK_COMM_LEN];
 };
 BPF_PERF_OUTPUT(ipv4_events);
 
 struct ipv6_data_t {
     u64 ts_us;
-    u64 pid;
+    u32 pid;
     unsigned __int128 saddr;
     unsigned __int128 daddr;
     u64 ip;
-    u64 dport;
+    u16 dport;
     char task[TASK_COMM_LEN];
 };
 BPF_PERF_OUTPUT(ipv6_events);
@@ -108,18 +109,15 @@ static int trace_connect_return(struct pt_regs *ctx, short ipver)
 
     // pull in details
     struct sock *skp = *skpp;
-    u16 dport = 0;
-    bpf_probe_read(&dport, sizeof(dport), &skp->__sk_common.skc_dport);
+    u16 dport = skp->__sk_common.skc_dport;
 
     FILTER_PORT
 
     if (ipver == 4) {
         struct ipv4_data_t data4 = {.pid = pid, .ip = ipver};
         data4.ts_us = bpf_ktime_get_ns() / 1000;
-        bpf_probe_read(&data4.saddr, sizeof(u32),
-            &skp->__sk_common.skc_rcv_saddr);
-        bpf_probe_read(&data4.daddr, sizeof(u32),
-            &skp->__sk_common.skc_daddr);
+        data4.saddr = skp->__sk_common.skc_rcv_saddr;
+        data4.daddr = skp->__sk_common.skc_daddr;
         data4.dport = ntohs(dport);
         bpf_get_current_comm(&data4.task, sizeof(data4.task));
         ipv4_events.perf_submit(ctx, &data4, sizeof(data4));
@@ -128,9 +126,9 @@ static int trace_connect_return(struct pt_regs *ctx, short ipver)
         struct ipv6_data_t data6 = {.pid = pid, .ip = ipver};
         data6.ts_us = bpf_ktime_get_ns() / 1000;
         bpf_probe_read(&data6.saddr, sizeof(data6.saddr),
-            &skp->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
+            skp->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
         bpf_probe_read(&data6.daddr, sizeof(data6.daddr),
-            &skp->__sk_common.skc_v6_daddr.in6_u.u6_addr32);
+            skp->__sk_common.skc_v6_daddr.in6_u.u6_addr32);
         data6.dport = ntohs(dport);
         bpf_get_current_comm(&data6.task, sizeof(data6.task));
         ipv6_events.perf_submit(ctx, &data6, sizeof(data6));
@@ -165,8 +163,10 @@ if args.port:
 bpf_text = bpf_text.replace('FILTER_PID', '')
 bpf_text = bpf_text.replace('FILTER_PORT', '')
 
-if debug:
+if debug or args.ebpf:
     print(bpf_text)
+    if args.ebpf:
+        exit()
 
 # event data
 TASK_COMM_LEN = 16      # linux/sched.h
@@ -174,22 +174,22 @@ TASK_COMM_LEN = 16      # linux/sched.h
 class Data_ipv4(ct.Structure):
     _fields_ = [
         ("ts_us", ct.c_ulonglong),
-        ("pid", ct.c_ulonglong),
-        ("saddr", ct.c_ulonglong),
-        ("daddr", ct.c_ulonglong),
+        ("pid", ct.c_uint),
+        ("saddr", ct.c_uint),
+        ("daddr", ct.c_uint),
         ("ip", ct.c_ulonglong),
-        ("dport", ct.c_ulonglong),
+        ("dport", ct.c_ushort),
         ("task", ct.c_char * TASK_COMM_LEN)
     ]
 
 class Data_ipv6(ct.Structure):
     _fields_ = [
         ("ts_us", ct.c_ulonglong),
-        ("pid", ct.c_ulonglong),
+        ("pid", ct.c_uint),
         ("saddr", (ct.c_ulonglong * 2)),
         ("daddr", (ct.c_ulonglong * 2)),
         ("ip", ct.c_ulonglong),
-        ("dport", ct.c_ulonglong),
+        ("dport", ct.c_ushort),
         ("task", ct.c_char * TASK_COMM_LEN)
     ]
 
@@ -202,7 +202,7 @@ def print_ipv4_event(cpu, data, size):
             start_ts = event.ts_us
         print("%-9.3f" % ((float(event.ts_us) - start_ts) / 1000000), end="")
     print("%-6d %-12.12s %-2d %-16s %-16s %-4d" % (event.pid,
-        event.task.decode(), event.ip,
+        event.task.decode('utf-8', 'replace'), event.ip,
         inet_ntop(AF_INET, pack("I", event.saddr)),
         inet_ntop(AF_INET, pack("I", event.daddr)), event.dport))
 
@@ -214,8 +214,9 @@ def print_ipv6_event(cpu, data, size):
             start_ts = event.ts_us
         print("%-9.3f" % ((float(event.ts_us) - start_ts) / 1000000), end="")
     print("%-6d %-12.12s %-2d %-16s %-16s %-4d" % (event.pid,
-        event.task.decode(), event.ip, inet_ntop(AF_INET6, event.saddr),
-        inet_ntop(AF_INET6, event.daddr), event.dport))
+        event.task.decode('utf-8', 'replace'), event.ip,
+        inet_ntop(AF_INET6, event.saddr), inet_ntop(AF_INET6, event.daddr),
+        event.dport))
 
 # initialize BPF
 b = BPF(text=bpf_text)
@@ -236,4 +237,7 @@ start_ts = 0
 b["ipv4_events"].open_perf_buffer(print_ipv4_event)
 b["ipv6_events"].open_perf_buffer(print_ipv6_event)
 while 1:
-    b.kprobe_poll()
+    try:
+        b.perf_buffer_poll()
+    except KeyboardInterrupt:
+        exit()

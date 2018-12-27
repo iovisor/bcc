@@ -23,6 +23,7 @@
 #
 # 11-Feb-2016   Brendan Gregg   Created this.
 # 15-Oct-2016   Dina Goldshtein -p to filter by process ID.
+# 13-Jun-2018   Joe Yin modify generic_file_read_iter to ext4_file_read_iter.
 
 from __future__ import print_function
 from bcc import BPF
@@ -51,6 +52,8 @@ parser.add_argument("-p", "--pid",
     help="trace this PID only")
 parser.add_argument("min_ms", nargs="?", default='10',
     help="minimum I/O duration to trace, in ms (default 10)")
+parser.add_argument("--ebpf", action="store_true",
+    help=argparse.SUPPRESS)
 args = parser.parse_args()
 min_ms = int(args.min_ms)
 pid = args.pid
@@ -98,6 +101,9 @@ BPF_PERF_OUTPUT(events);
 // The current ext4 (Linux 4.5) uses generic_file_read_iter(), instead of it's
 // own function, for reads. So we need to trace that and then filter on ext4,
 // which I do by checking file->f_op.
+// The new Linux version (since form 4.10) uses ext4_file_read_iter(), And if the 'CONFIG_FS_DAX' 
+// is not set ,then ext4_file_read_iter() will call generic_file_read_iter(), else it will call 
+// ext4_dax_read_iter(), and trace generic_file_read_iter() will fail.
 int trace_read_entry(struct pt_regs *ctx, struct kiocb *iocb)
 {
     u64 id =  bpf_get_current_pid_tgid();
@@ -217,8 +223,8 @@ static int trace_return(struct pt_regs *ctx, int type)
     // workaround (rewriter should handle file to d_name in one step):
     struct dentry *de = NULL;
     struct qstr qs = {};
-    bpf_probe_read(&de, sizeof(de), &valp->fp->f_path.dentry);
-    bpf_probe_read(&qs, sizeof(qs), (void *)&de->d_name);
+    de = valp->fp->f_path.dentry;
+    qs = de->d_name;
     if (qs.len == 0)
         return 0;
     bpf_probe_read(&data.file, sizeof(data.file), (void *)qs.name);
@@ -262,6 +268,7 @@ with open(kallsyms) as syms:
             break
     if ops == '':
         print("ERROR: no ext4_file_operations in /proc/kallsyms. Exiting.")
+        print("HINT: the kernel should be built with CONFIG_KALLSYMS_ALL.")
         exit()
     bpf_text = bpf_text.replace('EXT4_FILE_OPERATIONS', ops)
 if min_ms == 0:
@@ -273,8 +280,10 @@ if args.pid:
     bpf_text = bpf_text.replace('FILTER_PID', 'pid != %s' % pid)
 else:
     bpf_text = bpf_text.replace('FILTER_PID', '0')
-if debug:
+if debug or args.ebpf:
     print(bpf_text)
+    if args.ebpf:
+        exit()
 
 # kernel->user event data: struct data_t
 DNAME_INLINE_LEN = 32   # linux/dcache.h
@@ -305,22 +314,30 @@ def print_event(cpu, data, size):
 
     if (csv):
         print("%d,%s,%d,%s,%d,%d,%d,%s" % (
-            event.ts_us, event.task.decode(), event.pid, type, event.size,
-            event.offset, event.delta_us, event.file.decode()))
+            event.ts_us, event.task.decode('utf-8', 'replace'), event.pid,
+            type, event.size, event.offset, event.delta_us,
+            event.file.decode('utf-8', 'replace')))
         return
     print("%-8s %-14.14s %-6s %1s %-7s %-8d %7.2f %s" % (strftime("%H:%M:%S"),
-        event.task.decode(), event.pid, type, event.size, event.offset / 1024,
-        float(event.delta_us) / 1000, event.file.decode()))
+        event.task.decode('utf-8', 'replace'), event.pid, type, event.size,
+        event.offset / 1024, float(event.delta_us) / 1000,
+        event.file.decode('utf-8', 'replace')))
 
 # initialize BPF
 b = BPF(text=bpf_text)
 
 # Common file functions. See earlier comment about generic_file_read_iter().
-b.attach_kprobe(event="generic_file_read_iter", fn_name="trace_read_entry")
+if BPF.get_kprobe_functions(b'ext4_file_read_iter'):
+    b.attach_kprobe(event="ext4_file_read_iter", fn_name="trace_read_entry")
+else:
+    b.attach_kprobe(event="generic_file_read_iter", fn_name="trace_read_entry")
 b.attach_kprobe(event="ext4_file_write_iter", fn_name="trace_write_entry")
 b.attach_kprobe(event="ext4_file_open", fn_name="trace_open_entry")
 b.attach_kprobe(event="ext4_sync_file", fn_name="trace_fsync_entry")
-b.attach_kretprobe(event="generic_file_read_iter", fn_name="trace_read_return")
+if BPF.get_kprobe_functions(b'ext4_file_read_iter'):
+    b.attach_kretprobe(event="ext4_file_read_iter", fn_name="trace_read_return")
+else:
+    b.attach_kretprobe(event="generic_file_read_iter", fn_name="trace_read_return")
 b.attach_kretprobe(event="ext4_file_write_iter", fn_name="trace_write_return")
 b.attach_kretprobe(event="ext4_file_open", fn_name="trace_open_return")
 b.attach_kretprobe(event="ext4_sync_file", fn_name="trace_fsync_return")
@@ -339,4 +356,7 @@ else:
 # read events
 b["events"].open_perf_buffer(print_event, page_cnt=64)
 while 1:
-    b.kprobe_poll()
+    try:
+        b.perf_buffer_poll()
+    except KeyboardInterrupt:
+        exit()

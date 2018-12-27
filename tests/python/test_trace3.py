@@ -19,9 +19,9 @@ class TestBlkRequest(TestCase):
         b = BPF(arg1, arg2, debug=0)
         self.latency = b.get_table("latency", c_uint, c_ulong)
         b.attach_kprobe(event="blk_start_request",
-                fn_name="probe_blk_start_request", pid=-1, cpu=0)
+                fn_name="probe_blk_start_request")
         b.attach_kprobe(event="blk_update_request",
-                fn_name="probe_blk_update_request", pid=-1, cpu=0)
+                fn_name="probe_blk_update_request")
 
     def test_blk1(self):
         import subprocess

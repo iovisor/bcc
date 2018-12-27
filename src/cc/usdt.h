@@ -26,6 +26,11 @@
 
 struct bcc_usdt;
 
+namespace ebpf {
+  class BPF;
+  class USDT;
+}
+
 namespace USDT {
 
 using std::experimental::optional;
@@ -74,24 +79,49 @@ public:
   const optional<int> deref_offset() const { return deref_offset_; }
 
   friend class ArgumentParser;
+  friend class ArgumentParser_aarch64;
   friend class ArgumentParser_powerpc64;
   friend class ArgumentParser_x64;
 };
 
 class ArgumentParser {
-protected:
+ protected:
   const char *arg_;
   ssize_t cur_pos_;
 
   void skip_whitespace_from(size_t pos);
   void skip_until_whitespace_from(size_t pos);
   void print_error(ssize_t pos);
+  ssize_t parse_number(ssize_t pos, optional<int> *result) {
+    char *endp;
+    int number = strtol(arg_ + pos, &endp, 0);
+    if (endp > arg_ + pos)
+      *result = number;
+    return endp - arg_;
+  }
+  bool error_return(ssize_t error_start, ssize_t skip_start) {
+    print_error(error_start);
+    skip_until_whitespace_from(skip_start);
+    return false;
+  }
 
-public:
+ public:
   virtual bool parse(Argument *dest) = 0;
   bool done() { return cur_pos_ < 0 || arg_[cur_pos_] == '\0'; }
 
   ArgumentParser(const char *arg) : arg_(arg), cur_pos_(0) {}
+};
+
+class ArgumentParser_aarch64 : public ArgumentParser {
+ private:
+  bool parse_register(ssize_t pos, ssize_t &new_pos, optional<int> *reg_num);
+  bool parse_size(ssize_t pos, ssize_t &new_pos, optional<int> *arg_size);
+  bool parse_mem(ssize_t pos, ssize_t &new_pos, optional<int> *reg_num,
+                 optional<int> *offset);
+
+ public:
+  bool parse(Argument *dest);
+  ArgumentParser_aarch64(const char *arg) : ArgumentParser(arg) {}
 };
 
 class ArgumentParser_powerpc64 : public ArgumentParser {
@@ -131,7 +161,6 @@ private:
   bool normalize_register(std::string *reg, int *reg_size);
   void reg_to_name(std::string *norm, Register reg);
   ssize_t parse_register(ssize_t pos, std::string &name, int &size);
-  ssize_t parse_number(ssize_t pos, optional<int> *number);
   ssize_t parse_identifier(ssize_t pos, optional<std::string> *ident);
   ssize_t parse_base_register(ssize_t pos, Argument *dest);
   ssize_t parse_index_register(ssize_t pos, Argument *dest);
@@ -146,12 +175,13 @@ public:
 
 struct Location {
   uint64_t address_;
+  std::string bin_path_;
   std::vector<Argument> arguments_;
-  Location(uint64_t addr, const char *arg_fmt);
+  Location(uint64_t addr, const std::string &bin_path, const char *arg_fmt);
 };
 
 class Probe {
-  std::string bin_path_;
+  std::string bin_path_; // initial bin_path when Probe is created
   std::string provider_;
   std::string name_;
   uint64_t semaphore_;
@@ -160,7 +190,7 @@ class Probe {
 
   optional<int> pid_;
   ProcMountNS *mount_ns_;
-  optional<bool> in_shared_object_;
+  std::unordered_map<std::string, bool> object_type_map_; // bin_path => is shared lib?
 
   optional<std::string> attached_to_;
   optional<uint64_t> attached_semaphore_;
@@ -168,9 +198,10 @@ class Probe {
   std::string largest_arg_type(size_t arg_n);
 
   bool add_to_semaphore(int16_t val);
-  bool resolve_global_address(uint64_t *global, const uint64_t addr);
+  bool resolve_global_address(uint64_t *global, const std::string &bin_path,
+                              const uint64_t addr);
   bool lookup_semaphore_addr(uint64_t *address);
-  void add_location(uint64_t addr, const char *fmt);
+  void add_location(uint64_t addr, const std::string &bin_path, const char *fmt);
 
 public:
   Probe(const char *bin_path, const char *provider, const char *name,
@@ -181,8 +212,11 @@ public:
   uint64_t semaphore()   const { return semaphore_; }
 
   uint64_t address(size_t n = 0) const { return locations_[n].address_; }
+  const char *location_bin_path(size_t n = 0) const { return locations_[n].bin_path_.c_str(); }
   const Location &location(size_t n) const { return locations_[n]; }
+
   bool usdt_getarg(std::ostream &stream);
+  bool usdt_getarg(std::ostream &stream, const std::string& probe_func);
   std::string get_arg_ctype(int arg_index) {
     return largest_arg_type(arg_index);
   }
@@ -193,12 +227,15 @@ public:
   bool disable();
   bool enabled() const { return !!attached_to_; }
 
-  bool in_shared_object();
+  bool in_shared_object(const std::string &bin_path);
   const std::string &name() { return name_; }
   const std::string &bin_path() { return bin_path_; }
   const std::string &provider() { return provider_; }
 
   friend class Context;
+
+  friend class ::ebpf::BPF;
+  friend class ::ebpf::USDT;
 };
 
 class Context {
@@ -222,6 +259,7 @@ class Context {
 public:
   Context(const std::string &bin_path);
   Context(int pid);
+  Context(int pid, const std::string &bin_path);
   ~Context();
 
   optional<int> pid() const { return pid_; }
@@ -231,6 +269,7 @@ public:
   ino_t inode() const { return mount_ns_instance_->target_ino(); }
 
   Probe *get(const std::string &probe_name);
+  Probe *get(const std::string &provider_name, const std::string &probe_name);
   Probe *get(int pos) { return probes_[pos].get(); }
 
   bool enable_probe(const std::string &probe_name, const std::string &fn_name);
@@ -240,5 +279,8 @@ public:
 
   typedef void (*each_uprobe_cb)(const char *, const char *, uint64_t, int);
   void each_uprobe(each_uprobe_cb callback);
+
+  friend class ::ebpf::BPF;
+  friend class ::ebpf::USDT;
 };
 }

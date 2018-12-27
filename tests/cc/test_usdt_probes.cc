@@ -20,6 +20,7 @@
 
 #include "catch.hpp"
 #include "usdt.h"
+#include "api/BPF.h"
 
 #ifdef HAVE_SDT_HEADER
 /* required to insert USDT probes on this very executable --
@@ -42,7 +43,7 @@ TEST_CASE("test finding a probe in our own process", "[usdt]") {
     auto probe = ctx.get("sample_probe_1");
     REQUIRE(probe);
 
-    REQUIRE(probe->in_shared_object() == false);
+    REQUIRE(probe->in_shared_object(probe->bin_path()) == false);
     REQUIRE(probe->name() == "sample_probe_1");
     REQUIRE(probe->provider() == "libbcc_test");
     REQUIRE(probe->bin_path().find("/test_libbcc") != std::string::npos);
@@ -53,6 +54,34 @@ TEST_CASE("test finding a probe in our own process", "[usdt]") {
 
     REQUIRE(a_probed_function() != 0);
   }
+}
+
+TEST_CASE("test fine a probe in our own binary with C++ API", "[usdt]") {
+    ebpf::BPF bpf;
+    ebpf::USDT u("/proc/self/exe", "libbcc_test", "sample_probe_1", "on_event");
+
+    auto res = bpf.init("int on_event() { return 0; }", {}, {u});
+    REQUIRE(res.code() == 0);
+
+    res = bpf.attach_usdt(u);
+    REQUIRE(res.code() == 0);
+
+    res = bpf.detach_usdt(u);
+    REQUIRE(res.code() == 0);
+}
+
+TEST_CASE("test fine a probe in our Process with C++ API", "[usdt]") {
+    ebpf::BPF bpf;
+    ebpf::USDT u(::getpid(), "libbcc_test", "sample_probe_1", "on_event");
+
+    auto res = bpf.init("int on_event() { return 0; }", {}, {u});
+    REQUIRE(res.code() == 0);
+
+    res = bpf.attach_usdt(u);
+    REQUIRE(res.code() == 0);
+
+    res = bpf.detach_usdt(u);
+    REQUIRE(res.code() == 0);
 }
 #endif  // HAVE_SDT_HEADER
 
@@ -86,6 +115,35 @@ public:
   pid_t pid() const { return pid_; }
 };
 
+extern int cmd_scanf(const char *cmd, const char *fmt, ...);
+
+static int probe_num_locations(const char *bin_path, const char *func_name) {
+  int num_locations;
+  char cmd[512];
+  const char *cmdfmt = "readelf -n %s | grep -c \"Name: %s$\"";
+
+  sprintf(cmd, cmdfmt, bin_path, func_name);
+  if (cmd_scanf(cmd, "%d", &num_locations) != 0) {
+    return -1;
+  }
+
+  return num_locations;
+}
+
+static int probe_num_arguments(const char *bin_path, const char *func_name) {
+  int num_arguments;
+  char cmd[512];
+  const char *cmdfmt = "readelf -n %s | grep -m 1 -A 2 \" %s$\" | " \
+                       "tail -1 | cut -d \" \" -f 6- | wc -w";
+
+  sprintf(cmd, cmdfmt, bin_path, func_name);
+  if (cmd_scanf(cmd, "%d", &num_arguments) != 0) {
+    return -1;
+  }
+
+  return num_arguments;
+}
+
 TEST_CASE("test listing all USDT probes in Ruby/MRI", "[usdt]") {
   size_t mri_probe_count = 0;
 
@@ -99,40 +157,63 @@ TEST_CASE("test listing all USDT probes in Ruby/MRI", "[usdt]") {
     mri_probe_count = ctx.num_probes();
 
     SECTION("GC static probe") {
-      auto probe = ctx.get("gc__mark__begin");
+      auto name = "gc__mark__begin";
+      auto probe = ctx.get(name);
       REQUIRE(probe);
 
-      REQUIRE(probe->in_shared_object() == true);
-      REQUIRE(probe->name() == "gc__mark__begin");
+      REQUIRE(probe->in_shared_object(probe->bin_path()) == true);
+      REQUIRE(probe->name() == name);
       REQUIRE(probe->provider() == "ruby");
-      REQUIRE(probe->bin_path().find("/ruby") != std::string::npos);
 
-      REQUIRE(probe->num_locations() == 1);
-      REQUIRE(probe->num_arguments() == 0);
+      auto bin_path = probe->bin_path();
+      bool bin_path_match =
+            (bin_path.find("/ruby") != std::string::npos) ||
+            (bin_path.find("/libruby") != std::string::npos);
+      REQUIRE(bin_path_match);
+
+      int exp_locations, exp_arguments;
+      exp_locations = probe_num_locations(bin_path.c_str(), name);
+      exp_arguments = probe_num_arguments(bin_path.c_str(), name);
+      REQUIRE(probe->num_locations() == exp_locations);
+      REQUIRE(probe->num_arguments() == exp_arguments);
       REQUIRE(probe->need_enable() == true);
     }
 
     SECTION("object creation probe") {
-      auto probe = ctx.get("object__create");
+      auto name = "object__create";
+      auto probe = ctx.get(name);
       REQUIRE(probe);
 
-      REQUIRE(probe->in_shared_object() == true);
-      REQUIRE(probe->name() == "object__create");
+      REQUIRE(probe->in_shared_object(probe->bin_path()) == true);
+      REQUIRE(probe->name() == name);
       REQUIRE(probe->provider() == "ruby");
-      REQUIRE(probe->bin_path().find("/ruby") != std::string::npos);
 
-      REQUIRE(probe->num_locations() == 1);
-      REQUIRE(probe->num_arguments() == 3);
+      auto bin_path = probe->bin_path();
+      bool bin_path_match =
+            (bin_path.find("/ruby") != std::string::npos) ||
+            (bin_path.find("/libruby") != std::string::npos);
+      REQUIRE(bin_path_match);
+
+      int exp_locations, exp_arguments;
+      exp_locations = probe_num_locations(bin_path.c_str(), name);
+      exp_arguments = probe_num_arguments(bin_path.c_str(), name);
+      REQUIRE(probe->num_locations() == exp_locations);
+      REQUIRE(probe->num_arguments() == exp_arguments);
       REQUIRE(probe->need_enable() == true);
     }
 
     SECTION("array creation probe") {
-      auto probe = ctx.get("array__create");
+      auto name = "array__create";
+      auto probe = ctx.get(name);
       REQUIRE(probe);
-      REQUIRE(probe->name() == "array__create");
+      REQUIRE(probe->name() == name);
 
-      REQUIRE(probe->num_locations() == 7);
-      REQUIRE(probe->num_arguments() == 3);
+      auto bin_path = probe->bin_path().c_str();
+      int exp_locations, exp_arguments;
+      exp_locations = probe_num_locations(bin_path, name);
+      exp_arguments = probe_num_arguments(bin_path, name);
+      REQUIRE(probe->num_locations() == exp_locations);
+      REQUIRE(probe->num_arguments() == exp_arguments);
       REQUIRE(probe->need_enable() == true);
     }
   }
@@ -149,16 +230,25 @@ TEST_CASE("test listing all USDT probes in Ruby/MRI", "[usdt]") {
     REQUIRE(ctx.num_probes() >= mri_probe_count);
 
     SECTION("get probe in running process") {
-      auto probe = ctx.get("gc__mark__begin");
+      auto name = "gc__mark__begin";
+      auto probe = ctx.get(name);
       REQUIRE(probe);
 
-      REQUIRE(probe->in_shared_object() == true);
-      REQUIRE(probe->name() == "gc__mark__begin");
+      REQUIRE(probe->in_shared_object(probe->bin_path()) == true);
+      REQUIRE(probe->name() == name);
       REQUIRE(probe->provider() == "ruby");
-      REQUIRE(probe->bin_path().find("/ruby") != std::string::npos);
 
-      REQUIRE(probe->num_locations() == 1);
-      REQUIRE(probe->num_arguments() == 0);
+      auto bin_path = probe->bin_path();
+      bool bin_path_match =
+            (bin_path.find("/ruby") != std::string::npos) ||
+            (bin_path.find("/libruby") != std::string::npos);
+      REQUIRE(bin_path_match);
+
+      int exp_locations, exp_arguments;
+      exp_locations = probe_num_locations(bin_path.c_str(), name);
+      exp_arguments = probe_num_arguments(bin_path.c_str(), name);
+      REQUIRE(probe->num_locations() == exp_locations);
+      REQUIRE(probe->num_arguments() == exp_arguments);
       REQUIRE(probe->need_enable() == true);
     }
   }

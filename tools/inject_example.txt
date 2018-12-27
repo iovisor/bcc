@@ -1,0 +1,145 @@
+Some examples for inject
+
+inject guarantees the appropriate erroneous return of the specified injection
+mode (kmalloc,bio,etc) given a call chain and an optional set of predicates. You
+can also optionally print out the generated BPF program for
+modification/debugging purposes.
+
+As a simple example, let's say you wanted to fail all mounts. As of 4.17 we can
+fail syscalls directly, so let's do that:
+
+# ./inject.py kmalloc -v 'SyS_mount()'
+
+The first argument indicates the mode (or what to fail). Appropriate headers are
+specified, if necessary. The verbosity flag prints the generated program. Note
+that some syscalls will be available as 'SyS_xyz' and some will be available as
+'sys_xyz'. This is largely dependent on the number of arguments each syscall
+takes.
+
+Trying to mount various filesystems will fail and report an inability to
+allocate memory, as expected.
+
+Whenever a predicate is missing, an implicit "(true)" is inserted. The example
+above can be explicitly written as:
+
+# ./inject.py kmalloc -v '(true) => SyS_mount()(true)'
+
+The "(true)" without an associated function is a predicate for the error
+injection mechanism of the current mode. In the case of kmalloc, the predicate
+would have access to the arguments of:
+
+	int should_failslab(struct kmem_cache *s, gfp_t gfpflags);
+
+The bio mode works similarly, with access to the arguments of:
+	
+	static noinline int should_fail_bio(struct bio *bio)
+
+We also note that it's unnecessary to state the arguments of the function if you
+have no intention to reference them in the associated predicate.
+
+Now let's say we want to be a bit more specific; suppose you want to fail
+kmalloc() from mount_subtree() when called from btrfs_mount(). This will fail
+only btrfs mounts:
+
+# ./inject.py kmalloc -v 'mount_subtree() => btrfs_mount()'
+
+Attempting to mount btrfs filesystem during the execution of this command will
+yield an error, but other filesystems will be fine.
+
+Next, lets say we want to hit one of the BUG_ONs in fs/btrfs. As of 4.16-rc3,
+there is a BUG_ON in btrfs_prepare_close_one_device() at fs/btrfs/volumes.c:1002
+
+To hit this, we can use the following:
+
+# ./inject.py kmalloc -v 'btrfs_alloc_device() => btrfs_close_devices()'
+
+While the script was executing, I mounted and unmounted btrfs, causing a
+segfault on umount(since that satisfied the call path indicated). A look at
+dmesg will confirm that the erroneous return value injected by the script
+tripped the BUG_ON, causing a segfault down the line.
+
+In general, it's worth noting that the required specificity of the call chain is
+dependent on how much granularity you need. The example above might have
+performed as expected without the intermediate btrfs_alloc_device, but might
+have also done something unexpected(an earlier kmalloc could have failed before
+the one we were targetting).
+
+For hot paths, the approach outlined above isn't enough. If a path is traversed
+very often, we can distinguish distinct calls with function arguments. Let's say
+we want to fail the dentry allocation of a file creatively named 'bananas'. We
+can do the following:
+
+# ./inject.py kmalloc -v 'd_alloc_parallel(struct dentry *parent, const struct
+qstr *name)(STRCMP(name->name, 'bananas'))' 
+
+While this script is executing, any operation that would cause a dentry
+allocation where the name is 'bananas' fails, as expected.
+
+Here, since we're referencing a function argument in our predicate, we need to
+provide the function signature up to the argument we're using.
+
+To note, STRCMP is a workaround for some rewriter issues. It will take input of
+the form (x->...->z, 'literal'), and generate some equivalent code that the
+verifier is more friendly about. It's not horribly robust, but works for the
+purposes of making string comparisons a bit easier.
+
+Finally, we briefly demonstrate how to inject bio failures. The mechanism is
+identical, so any information from above will apply.
+
+Let's say we want to fail bio requests when the request is to some specific
+sector. An example use case would be to fail superblock writes in btrfs. For
+btrfs, we know that there must be a superblock at 65536 bytes, or sector 128.
+This allows us to run the following:
+
+# ./inject.py bio -v -I 'linux/blkdev.h'  '(({struct gendisk *d = bio->bi_disk;
+struct disk_part_tbl *tbl = d->part_tbl; struct hd_struct **parts = (void *)tbl +
+sizeof(struct disk_part_tbl); struct hd_struct **partp = parts + bio->bi_partno;
+struct hd_struct *p = *partp; dev_t disk = p->__dev.devt; disk ==
+MKDEV(254,16);}) && bio->bi_iter.bi_sector == 128)'
+
+The predicate in the command above has two parts. The first is a compound
+statement which shortens to "only if the system is btrfs", but is long due
+to rewriter/verifier shenanigans. The major/minor information can be found
+however; I used Python. The second part simply checks the starting
+address of bi_iter. While executing, this script effectively fails superblock
+writes to the superblock at sector 128 without affecting other filesystems.
+
+As an extension to the above, one could easily fail all btrfs superblock writes
+(we only fail the primary) by calculating the sector number of the mirrors and
+amending the predicate accordingly.
+
+Inject also provides a probability option; this allows you to fail the
+path+predicates some percentage of the time. For example, let's say we want to
+fail our mounts half the time:
+
+# ./inject.py kmalloc -v -P 0.01 'SyS_mount()'
+
+USAGE message:
+usage: inject.py [-h] [-I header] [-P probability] [-v] {kmalloc,bio} spec
+
+Fail specified kernel functionality when call chain and predicates are met
+
+positional arguments:
+  {kmalloc,bio}         indicate which base kernel function to fail
+  spec                  specify call chain
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -I header, --include header
+                        additional header files to include in the BPF program
+  -P probability, --probability probability
+                        probability that this call chain will fail
+  -v, --verbose         print BPF program
+
+EXAMPLES:
+# ./inject.py kmalloc -v 'SyS_mount()'
+    Fails all calls to syscall mount
+# ./inject.py kmalloc -v '(true) => SyS_mount()(true)'
+    Explicit rewriting of above
+# ./inject.py kmalloc -v 'mount_subtree() => btrfs_mount()'
+    Fails btrfs mounts only
+# ./inject.py kmalloc -v 'd_alloc_parallel(struct dentry *parent, const struct \
+    qstr *name)(STRCMP(name->name, 'bananas'))'
+    Fails dentry allocations of files named 'bananas'
+# ./inject.py kmalloc -v -P 0.01 'SyS_mount()'
+    Fails calls to syscall mount with 1% probability

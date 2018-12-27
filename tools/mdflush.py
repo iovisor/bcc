@@ -36,8 +36,19 @@ int kprobe__md_flush_request(struct pt_regs *ctx, void *mddev, struct bio *bio)
     u32 pid = bpf_get_current_pid_tgid();
     data.pid = pid;
     bpf_get_current_comm(&data.comm, sizeof(data.comm));
-    bpf_probe_read(&data.disk, sizeof(data.disk),
-        bio->bi_bdev->bd_disk->disk_name);
+/*
+ * The following deals with a kernel version change (in mainline 4.14, although
+ * it may be backported to earlier kernels) with how the disk name is accessed.
+ * We handle both pre- and post-change versions here. Please avoid kernel
+ * version tests like this as much as possible: they inflate the code, test,
+ * and maintenance burden.
+ */
+#ifdef bio_dev
+    struct gendisk *bi_disk = bio->bi_disk;
+#else
+    struct gendisk *bi_disk = bio->bi_bdev->bd_disk;
+#endif
+    bpf_probe_read(&data.disk, sizeof(data.disk), bi_disk->disk_name);
     events.perf_submit(ctx, &data, sizeof(data));
     return 0;
 }
@@ -61,9 +72,13 @@ print("%-8s %-6s %-16s %s" % ("TIME", "PID", "COMM", "DEVICE"))
 def print_event(cpu, data, size):
     event = ct.cast(data, ct.POINTER(Data)).contents
     print("%-8s %-6d %-16s %s" % (strftime("%H:%M:%S"), event.pid,
-        event.comm.decode(), event.disk.decode()))
+        event.comm.decode('utf-8', 'replace'),
+        event.disk.decode('utf-8', 'replace')))
 
 # read events
 b["events"].open_perf_buffer(print_event)
 while 1:
-    b.kprobe_poll()
+    try:
+        b.perf_buffer_poll()
+    except KeyboardInterrupt:
+        exit()

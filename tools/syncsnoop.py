@@ -25,12 +25,14 @@ struct data_t {
 
 BPF_PERF_OUTPUT(events);
 
-void kprobe__sys_sync(void *ctx) {
+void syscall__sync(void *ctx) {
     struct data_t data = {};
     data.ts = bpf_ktime_get_ns() / 1000;
     events.perf_submit(ctx, &data, sizeof(data));
 };
 """)
+b.attach_kprobe(event=b.get_syscall_fnname("sync"),
+                fn_name="syscall__sync")
 
 class Data(ct.Structure):
     _fields_ = [
@@ -48,4 +50,7 @@ def print_event(cpu, data, size):
 # loop with callback to print_event
 b["events"].open_perf_buffer(print_event)
 while 1:
-    b.kprobe_poll()
+    try:
+        b.perf_buffer_poll()
+    except KeyboardInterrupt:
+        exit()

@@ -15,61 +15,42 @@ examples:
     ./cachestat -T 1 5      # include timestamps with interval of one second for five iterations
     
 
-# ./cachestat 1
-    HITS   MISSES  DIRTIES READ_HIT% WRITE_HIT%   BUFFERS_MB  CACHED_MB
-       0       58        0     0.0%   100.0%            0      11334
-  146113        0        0   100.0%     0.0%            0      11334
-  244143        0        0   100.0%     0.0%            0      11334
-  216833        0        0   100.0%     0.0%            0      11334
-  248209        0        0   100.0%     0.0%            0      11334
-  205825        0        0   100.0%     0.0%            0      11334
-  286654        0        0   100.0%     0.0%            0      11334
-  275850        0        0   100.0%     0.0%            0      11334
-  272883        0        0   100.0%     0.0%            0      11334
-  261633        0        0   100.0%     0.0%            0      11334
-  252826        0        0   100.0%     0.0%            0      11334
-  235253       70        3   100.0%     0.0%            0      11335
-  204946        0        0   100.0%     0.0%            0      11335
-       0        0        0     0.0%     0.0%            0      11335
-       0        0        0     0.0%     0.0%            0      11335
-       0        0        0     0.0%     0.0%            0      11335
+Following commands show a 2GB file being read into the page cache.
 
-Above shows the reading of a 12GB file already cached in the OS page cache and again below with timestamps.
+Command used to generate activity:
+# dd if=/root/tmpfile of=/dev/null bs=8192
 
-# ./cachestat -T 1
-TIME         HITS   MISSES  DIRTIES READ_HIT% WRITE_HIT%   BUFFERS_MB  CACHED_MB
-16:07:10        0        0        0     0.0%     0.0%            0      11336
-16:07:11        0        0        0     0.0%     0.0%            0      11336
-16:07:12   117849        0        0   100.0%     0.0%            0      11336
-16:07:13   212558        0        0   100.0%     0.0%            0      11336
-16:07:14   302559        1        0   100.0%     0.0%            0      11336
-16:07:15   309230        0        0   100.0%     0.0%            0      11336
-16:07:16   305701        0        0   100.0%     0.0%            0      11336
-16:07:17   312754        0        0   100.0%     0.0%            0      11336
-16:07:18   308406        0        0   100.0%     0.0%            0      11336
-16:07:19   298185        0        0   100.0%     0.0%            0      11336
-16:07:20   236128        0        0   100.0%     0.0%            0      11336
-16:07:21   257616        0        0   100.0%     0.0%            0      11336
-16:07:22   179792        0        0   100.0%     0.0%            0      11336
+Output from cachestat running simultatenously:
+# ./tools/cachestat.py 1
+   TOTAL   MISSES     HITS  DIRTIES   BUFFERS_MB  CACHED_MB
+       1        0        1        0            8        283
+       0        0        0        0            8        283
+       0        0        0        2            8        283
+       0        0        0        0            8        283
+   10009     9173      836        2            9        369
+  152032   152032        0        0            9       1028
+  157408   157405        3        0            9       1707
+  150432   150432        0        0            9       2331
+       0        0        0        0            9       2331
+       1        1        0        1            9       2331
+       0        0        0        0            9       2331
+       0        0        0        0            9       2331
+       0        0        0        0            9       2331
 
-Command used to generate the activity
-# dd if=/root/mnt2/testfile of=/dev/null bs=8192
-1442795+0 records in
-1442795+0 records out
-11819376640 bytes (12 GB) copied, 3.9301 s, 3.0 GB/s
+The misses counter reflects a 2GB file being read and almost everything being
+a page cache miss.
 
-Below shows the dirty ratio increasing as we add a file to the page cache 
-# ./cachestat.py
-    HITS   MISSES  DIRTIES  READ_HIT% WRITE_HIT%   BUFFERS_MB  CACHED_MB
-    1074       44       13      94.9%       2.9%            1        223
-    2195      170        8      92.5%       6.8%            1        143
-     182       53       56      53.6%       1.3%            1        143
-   62480    40960    20480      40.6%      19.8%            1        223
-       7        2        5      22.2%      22.2%            1        223
-     348        0        0     100.0%       0.0%            1        223
-       0        0        0       0.0%       0.0%            1        223
-       0        0        0       0.0%       0.0%            1        223
-       0        0        0       0.0%       0.0%            1        223
-       0        0        0       0.0%       0.0%            1        223
+Below shows an example of a new 100MB file added to page cache, by using
+the command: dd if=/dev/zero of=/root/tmpfile2 bs=4k count=$((256*100))
 
-The file copied into page cache was named 80m with a size of 83886080 (83886080/4096) = 20480, this matches what we see under dirties
+# ./tools/cachestat.py 1
+   TOTAL   MISSES     HITS  DIRTIES   BUFFERS_MB  CACHED_MB
+       0        0        0        0           15       2440
+       0        0        0        0           15       2440
+       0        0        0        0           15       2440
+    1758        0     1758    25603           15       2540
+       0        0        0        0           15       2540
+       0        0        0        0           15       2541
+
+~25600 pages are being dirtied (writes) which corresponds to the 100MB file
+added to the page cache.

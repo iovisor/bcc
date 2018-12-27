@@ -36,14 +36,15 @@ struct data_t {
 
 BPF_PERF_OUTPUT(events);
 
-void kprobe__oom_kill_process(struct pt_regs *ctx, struct oom_control *oc,
-    struct task_struct *p, unsigned int points, unsigned long totalpages)
+void kprobe__oom_kill_process(struct pt_regs *ctx, struct oom_control *oc, const char *message)
 {
+    unsigned long totalpages;
+    struct task_struct *p = oc->chosen;
     struct data_t data = {};
     u32 pid = bpf_get_current_pid_tgid();
     data.fpid = pid;
     data.tpid = p->pid;
-    data.pages = totalpages;
+    data.pages = oc->totalpages;
     bpf_get_current_comm(&data.fcomm, sizeof(data.fcomm));
     bpf_probe_read(&data.tcomm, sizeof(data.tcomm), p->comm);
     events.perf_submit(ctx, &data, sizeof(data));
@@ -68,12 +69,15 @@ def print_event(cpu, data, size):
         avgline = stats.read().rstrip()
     print(("%s Triggered by PID %d (\"%s\"), OOM kill of PID %d (\"%s\")"
         ", %d pages, loadavg: %s") % (strftime("%H:%M:%S"), event.fpid,
-        event.fcomm.decode(), event.tpid, event.tcomm.decode(), event.pages,
-        avgline))
+        event.fcomm.decode('utf-8', 'replace'), event.tpid,
+        event.tcomm.decode('utf-8', 'replace'), event.pages, avgline))
 
 # initialize BPF
 b = BPF(text=bpf_text)
 print("Tracing OOM kills... Ctrl-C to stop.")
 b["events"].open_perf_buffer(print_event)
 while 1:
-    b.kprobe_poll()
+    try:
+        b.perf_buffer_poll()
+    except KeyboardInterrupt:
+        exit()

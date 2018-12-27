@@ -18,6 +18,8 @@
 
 from __future__ import print_function
 from bcc import BPF
+from bcc.utils import ArgString, printb
+import bcc.utils as utils
 import argparse
 import ctypes as ct
 import re
@@ -29,6 +31,7 @@ examples = """examples:
     ./execsnoop           # trace all exec() syscalls
     ./execsnoop -x        # include failed exec()s
     ./execsnoop -t        # include timestamps
+    ./execsnoop -q        # add "quotemarks" around arguments
     ./execsnoop -n main   # only print command lines containing "main"
     ./execsnoop -l tpkg   # only print command where arguments contains "tpkg"
 """
@@ -40,10 +43,19 @@ parser.add_argument("-t", "--timestamp", action="store_true",
     help="include timestamp on output")
 parser.add_argument("-x", "--fails", action="store_true",
     help="include failed exec()s")
+parser.add_argument("-q", "--quote", action="store_true",
+    help="Add quotemarks (\") around arguments."
+    )
 parser.add_argument("-n", "--name",
+    type=ArgString,
     help="only print commands matching this name (regex), any arg")
 parser.add_argument("-l", "--line",
+    type=ArgString,
     help="only print commands where arg contains this line (regex)")
+parser.add_argument("--max-args", default="20",
+    help="maximum number of arguments parsed and displayed, defaults to 20")
+parser.add_argument("--ebpf", action="store_true",
+    help=argparse.SUPPRESS)
 args = parser.parse_args()
 
 # define BPF program
@@ -52,7 +64,6 @@ bpf_text = """
 #include <linux/sched.h>
 #include <linux/fs.h>
 
-#define MAXARG   20
 #define ARGSIZE  128
 
 enum event_type {
@@ -62,6 +73,7 @@ enum event_type {
 
 struct data_t {
     u32 pid;  // PID as in the userspace term (i.e. task->tgid in kernel)
+    u32 ppid; // Parent PID as in the userspace term (i.e task->real_parent->tgid in kernel)
     char comm[TASK_COMM_LEN];
     enum event_type type;
     char argv[ARGSIZE];
@@ -87,40 +99,34 @@ static int submit_arg(struct pt_regs *ctx, void *ptr, struct data_t *data)
     return 0;
 }
 
-int kprobe__sys_execve(struct pt_regs *ctx, struct filename *filename,
+int syscall__execve(struct pt_regs *ctx,
+    const char __user *filename,
     const char __user *const __user *__argv,
     const char __user *const __user *__envp)
 {
     // create data here and pass to submit_arg to save stack space (#555)
     struct data_t data = {};
+    struct task_struct *task;
+
     data.pid = bpf_get_current_pid_tgid() >> 32;
+
+    task = (struct task_struct *)bpf_get_current_task();
+    // Some kernels, like Ubuntu 4.13.0-generic, return 0
+    // as the real_parent->tgid.
+    // We use the get_ppid function as a fallback in those cases. (#1883)
+    data.ppid = task->real_parent->tgid;
+
     bpf_get_current_comm(&data.comm, sizeof(data.comm));
     data.type = EVENT_ARG;
 
     __submit_arg(ctx, (void *)filename, &data);
 
-    int i = 1;  // skip first arg, as we submitted filename
-
-    // unrolled loop to walk argv[] (MAXARG)
-    if (submit_arg(ctx, (void *)&__argv[i], &data) == 0) goto out; i++;
-    if (submit_arg(ctx, (void *)&__argv[i], &data) == 0) goto out; i++;
-    if (submit_arg(ctx, (void *)&__argv[i], &data) == 0) goto out; i++;
-    if (submit_arg(ctx, (void *)&__argv[i], &data) == 0) goto out; i++;
-    if (submit_arg(ctx, (void *)&__argv[i], &data) == 0) goto out; i++;
-    if (submit_arg(ctx, (void *)&__argv[i], &data) == 0) goto out; i++;
-    if (submit_arg(ctx, (void *)&__argv[i], &data) == 0) goto out; i++;
-    if (submit_arg(ctx, (void *)&__argv[i], &data) == 0) goto out; i++;
-    if (submit_arg(ctx, (void *)&__argv[i], &data) == 0) goto out; i++; // X
-    if (submit_arg(ctx, (void *)&__argv[i], &data) == 0) goto out; i++;
-    if (submit_arg(ctx, (void *)&__argv[i], &data) == 0) goto out; i++;
-    if (submit_arg(ctx, (void *)&__argv[i], &data) == 0) goto out; i++;
-    if (submit_arg(ctx, (void *)&__argv[i], &data) == 0) goto out; i++;
-    if (submit_arg(ctx, (void *)&__argv[i], &data) == 0) goto out; i++;
-    if (submit_arg(ctx, (void *)&__argv[i], &data) == 0) goto out; i++;
-    if (submit_arg(ctx, (void *)&__argv[i], &data) == 0) goto out; i++;
-    if (submit_arg(ctx, (void *)&__argv[i], &data) == 0) goto out; i++;
-    if (submit_arg(ctx, (void *)&__argv[i], &data) == 0) goto out; i++;
-    if (submit_arg(ctx, (void *)&__argv[i], &data) == 0) goto out; i++; // XX
+    // skip first arg, as we submitted filename
+    #pragma unroll
+    for (int i = 1; i < MAXARG; i++) {
+        if (submit_arg(ctx, (void *)&__argv[i], &data) == 0)
+             goto out;
+    }
 
     // handle truncated argument list
     char ellipsis[] = "...";
@@ -129,10 +135,19 @@ out:
     return 0;
 }
 
-int kretprobe__sys_execve(struct pt_regs *ctx)
+int do_ret_sys_execve(struct pt_regs *ctx)
 {
     struct data_t data = {};
+    struct task_struct *task;
+
     data.pid = bpf_get_current_pid_tgid() >> 32;
+
+    task = (struct task_struct *)bpf_get_current_task();
+    // Some kernels, like Ubuntu 4.13.0-generic, return 0
+    // as the real_parent->tgid.
+    // We use the get_ppid function as a fallback in those cases. (#1883)
+    data.ppid = task->real_parent->tgid;
+
     bpf_get_current_comm(&data.comm, sizeof(data.comm));
     data.type = EVENT_RET;
     data.retval = PT_REGS_RC(ctx);
@@ -142,8 +157,16 @@ int kretprobe__sys_execve(struct pt_regs *ctx)
 }
 """
 
+bpf_text = bpf_text.replace("MAXARG", args.max_args)
+if args.ebpf:
+    print(bpf_text)
+    exit()
+
 # initialize BPF
 b = BPF(text=bpf_text)
+execve_fnname = b.get_syscall_fnname("execve")
+b.attach_kprobe(event=execve_fnname, fn_name="syscall__execve")
+b.attach_kretprobe(event=execve_fnname, fn_name="do_ret_sys_execve")
 
 # header
 if args.timestamp:
@@ -156,6 +179,7 @@ ARGSIZE = 128           # should match #define in C above
 class Data(ct.Structure):
     _fields_ = [
         ("pid", ct.c_uint),
+        ("ppid", ct.c_uint),
         ("comm", ct.c_char * TASK_COMM_LEN),
         ("type", ct.c_int),
         ("argv", ct.c_char * ARGSIZE),
@@ -169,9 +193,10 @@ class EventType(object):
 start_ts = time.time()
 argv = defaultdict(list)
 
-# TODO: This is best-effort PPID matching. Short-lived processes may exit
-# before we get a chance to read the PPID. This should be replaced with
-# fetching PPID via C when available (#364).
+# This is best-effort PPID matching. Short-lived processes may exit
+# before we get a chance to read the PPID.
+# This is a fallback for when fetching the PPID from task->real_parent->tgip
+# returns 0, which happens in some kernel versions.
 def get_ppid(pid):
     try:
         with open("/proc/%d/status" % pid) as status:
@@ -191,21 +216,27 @@ def print_event(cpu, data, size):
     if event.type == EventType.EVENT_ARG:
         argv[event.pid].append(event.argv)
     elif event.type == EventType.EVENT_RET:
-        if args.fails and event.retval == 0:
+        if event.retval != 0 and not args.fails:
             skip = True
-        if args.name and not re.search(args.name, event.comm):
+        if args.name and not re.search(bytes(args.name), event.comm):
             skip = True
-        if args.line and not re.search(args.line,
-                                       b' '.join(argv[event.pid]).decode()):
+        if args.line and not re.search(bytes(args.line),
+                                       b' '.join(argv[event.pid])):
             skip = True
+        if args.quote:
+            argv[event.pid] = [
+                "\"" + arg.replace("\"", "\\\"") + "\""
+                for arg in argv[event.pid]
+            ]
 
         if not skip:
             if args.timestamp:
                 print("%-8.3f" % (time.time() - start_ts), end="")
-            ppid = get_ppid(event.pid)
-            print("%-16s %-6s %-6s %3s %s" % (event.comm.decode(), event.pid,
-                    ppid if ppid > 0 else "?", event.retval,
-                    b' '.join(argv[event.pid]).decode()))
+            ppid = event.ppid if event.ppid > 0 else get_ppid(event.pid)
+            ppid = b"%d" % ppid if ppid > 0 else b"?"
+            argv_text = b' '.join(argv[event.pid]).replace(b'\n', b'\\n')
+            printb(b"%-16s %-6d %-6s %3d %s" % (event.comm, event.pid,
+                   ppid, event.retval, argv_text))
         try:
             del(argv[event.pid])
         except Exception:
@@ -215,4 +246,7 @@ def print_event(cpu, data, size):
 # loop with callback to print_event
 b["events"].open_perf_buffer(print_event)
 while 1:
-    b.kprobe_poll()
+    try:
+        b.perf_buffer_poll()
+    except KeyboardInterrupt:
+        exit()

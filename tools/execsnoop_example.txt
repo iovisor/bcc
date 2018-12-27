@@ -79,7 +79,7 @@ rpm              3345452 4146419   0 /bin/rpm -qa testpkg
 USAGE message:
 
 # ./execsnoop -h
-usage: execsnoop [-h] [-t] [-x] [-n NAME]
+usage: execsnoop [-h] [-t] [-x] [-n NAME] [-l LINE] [--max-args MAX_ARGS]
 
 Trace exec() syscalls
 
@@ -91,10 +91,12 @@ optional arguments:
                         arg
   -l LINE, --line LINE  only print commands where arg contains this line
                         (regex)
+  --max-args MAX_ARGS   maximum number of arguments parsed and displayed,
+                        defaults to 20
 
 examples:
     ./execsnoop           # trace all exec() syscalls
-    ./execsnoop -x        # include failed exec()s 
+    ./execsnoop -x        # include failed exec()s
     ./execsnoop -t        # include timestamps
     ./execsnoop -n main   # only print command lines containing "main"
     ./execsnoop -l tpkg   # only print command where arguments contains "tpkg"

@@ -1,0 +1,86 @@
+.TH runqslower 8  "2016-02-07" "USER COMMANDS"
+.SH NAME
+runqlat \- Trace long process scheduling delays.
+.SH SYNOPSIS
+.B runqslower [\-p PID] [min_us]
+.SH DESCRIPTION
+This measures the time a task spends waiting on a run queue (or equivalent
+scheduler data structure) for a turn on-CPU, and shows occurrences of time
+exceeding passed threshold. This time should be small, but a task may need
+to wait its turn due to CPU load. The higher the CPU load, the longer a task
+will generally need to wait its turn.
+
+This tool measures two types of run queue latency:
+
+1. The time from a task being enqueued on a run queue to its context switch
+and execution. This traces ttwu_do_wakeup(), wake_up_new_task() ->
+finish_task_switch() with either raw tracepoints (if supported) or kprobes
+and instruments the run queue latency after a voluntary context switch.
+
+2. The time from when a task was involuntary context switched and still
+in the runnable state, to when it next executed. This is instrumented
+from finish_task_switch() alone.
+
+The overhead of this tool may become significant for some workloads:
+see the OVERHEAD section.
+
+This works by tracing various kernel scheduler functions using dynamic tracing,
+and will need updating to match any changes to these functions.
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH OPTIONS
+.TP
+\-h
+Print usage message.
+.TP
+\-p PID
+Only show this PID (filtered in kernel for efficiency).
+.TP
+min_us
+Minimum scheduling delay in microseconds to output.
+.SH EXAMPLES
+.TP
+Show scheduling delays longer than 10ms:
+#
+.B runqslower
+.TP
+Show scheduling delays longer than 1ms for process with PID 123:
+#
+.B runqslower -p 123 1000
+.SH FIELDS
+.TP
+TIME
+Time of when scheduling event occurred.
+.TP
+COMM
+Process name.
+.TP
+PID
+Process ID.
+.TP
+LAT(us)
+Scheduling latency from time when task was ready to run to the time it was
+assigned to a CPU to run.
+.SH OVERHEAD
+This traces scheduler functions, which can become very frequent. While eBPF
+has very low overhead, and this tool uses in-kernel maps for efficiency, the
+frequency of scheduler events for some workloads may be high enough that the
+overhead of this tool becomes significant. Measure in a lab environment
+to quantify the overhead before use.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Ivan Babrou
+.SH SEE ALSO
+runqlen(8), runqlat(8), pidstat(1)

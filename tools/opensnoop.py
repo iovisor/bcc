@@ -4,7 +4,7 @@
 # opensnoop Trace open() syscalls.
 #           For Linux, uses BCC, eBPF. Embedded C.
 #
-# USAGE: opensnoop [-h] [-T] [-x] [-p PID] [-t TID] [-n NAME]
+# USAGE: opensnoop [-h] [-T] [-x] [-p PID] [-d DURATION] [-t TID] [-n NAME]
 #
 # Copyright (c) 2015 Brendan Gregg.
 # Licensed under the Apache License, Version 2.0 (the "License")
@@ -14,9 +14,10 @@
 # 08-Oct-2016   Dina Goldshtein Support filtering by PID and TID.
 
 from __future__ import print_function
-from bcc import BPF
+from bcc import ArgString, BPF
 import argparse
 import ctypes as ct
+from datetime import datetime, timedelta
 
 # arguments
 examples = """examples:
@@ -25,6 +26,7 @@ examples = """examples:
     ./opensnoop -x        # only show failed opens
     ./opensnoop -p 181    # only trace PID 181
     ./opensnoop -t 123    # only trace TID 123
+    ./opensnoop -d 10     # trace for 10 seconds only
     ./opensnoop -n main   # only print process names containing "main"
 """
 parser = argparse.ArgumentParser(
@@ -39,10 +41,17 @@ parser.add_argument("-p", "--pid",
     help="trace this PID only")
 parser.add_argument("-t", "--tid",
     help="trace this TID only")
+parser.add_argument("-d", "--duration",
+    help="total duration of trace in seconds")
 parser.add_argument("-n", "--name",
+    type=ArgString,
     help="only print process names containing this name")
+parser.add_argument("--ebpf", action="store_true",
+    help=argparse.SUPPRESS)
 args = parser.parse_args()
 debug = 0
+if args.duration:
+    args.duration = timedelta(seconds=int(args.duration))
 
 # define BPF program
 bpf_text = """
@@ -52,7 +61,6 @@ bpf_text = """
 
 struct val_t {
     u64 id;
-    u64 ts;
     char comm[TASK_COMM_LEN];
     const char *fname;
 };
@@ -68,7 +76,7 @@ struct data_t {
 BPF_HASH(infotmp, u64, struct val_t);
 BPF_PERF_OUTPUT(events);
 
-int trace_entry(struct pt_regs *ctx, const char __user *filename)
+int trace_entry(struct pt_regs *ctx, int dfd, const char __user *filename)
 {
     struct val_t val = {};
     u64 id = bpf_get_current_pid_tgid();
@@ -78,7 +86,6 @@ int trace_entry(struct pt_regs *ctx, const char __user *filename)
     FILTER
     if (bpf_get_current_comm(&val.comm, sizeof(val.comm)) == 0) {
         val.id = id;
-        val.ts = bpf_ktime_get_ns();
         val.fname = filename;
         infotmp.update(&id, &val);
     }
@@ -119,13 +126,15 @@ elif args.pid:
         'if (pid != %s) { return 0; }' % args.pid)
 else:
     bpf_text = bpf_text.replace('FILTER', '')
-if debug:
+if debug or args.ebpf:
     print(bpf_text)
+    if args.ebpf:
+        exit()
 
 # initialize BPF
 b = BPF(text=bpf_text)
-b.attach_kprobe(event="sys_open", fn_name="trace_entry")
-b.attach_kretprobe(event="sys_open", fn_name="trace_return")
+b.attach_kprobe(event="do_sys_open", fn_name="trace_entry")
+b.attach_kretprobe(event="do_sys_open", fn_name="trace_return")
 
 TASK_COMM_LEN = 16    # linux/sched.h
 NAME_MAX = 255        # linux/limits.h
@@ -166,7 +175,7 @@ def print_event(cpu, data, size):
     if args.failed and (event.ret >= 0):
         return
 
-    if args.name and args.name not in event.comm:
+    if args.name and bytes(args.name) not in event.comm:
         return
 
     if args.timestamp:
@@ -175,9 +184,14 @@ def print_event(cpu, data, size):
 
     print("%-6d %-16s %4d %3d %s" %
           (event.id & 0xffffffff if args.tid else event.id >> 32,
-           event.comm.decode(), fd_s, err, event.fname.decode()))
+           event.comm.decode('utf-8', 'replace'), fd_s, err,
+           event.fname.decode('utf-8', 'replace')))
 
 # loop with callback to print_event
 b["events"].open_perf_buffer(print_event, page_cnt=64)
-while 1:
-    b.kprobe_poll()
+start_time = datetime.now()
+while not args.duration or datetime.now() - start_time < args.duration:
+    try:
+        b.perf_buffer_poll()
+    except KeyboardInterrupt:
+        exit()

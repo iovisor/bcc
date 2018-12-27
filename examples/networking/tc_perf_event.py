@@ -54,8 +54,8 @@ def print_skb_event(cpu, data, size):
 
     # Only print for echo request
     if icmp_type == 128:
-        src_ip = bytes(skb_event.raw[22:38])
-        dst_ip = bytes(skb_event.raw[38:54])
+        src_ip = bytes(bytearray(skb_event.raw[22:38]))
+        dst_ip = bytes(bytearray(skb_event.raw[38:54]))
         print("%-3s %-32s %-12s 0x%08x" %
               (cpu, socket.inet_ntop(socket.AF_INET6, src_ip),
                socket.inet_ntop(socket.AF_INET6, dst_ip),
@@ -77,9 +77,9 @@ try:
            parent="ffff:fff3", classid=1, direct_action=True)
 
     b["skb_events"].open_perf_buffer(print_skb_event)
-    print('Try: "ping -6 ff02::1%me"\n')
+    print('Try: "ping6 ff02::1%me"\n')
     print("%-3s %-32s %-12s %-10s" % ("CPU", "SRC IP", "DST IP", "Magic"))
     while True:
-        b.kprobe_poll()
+        b.perf_buffer_poll()
 finally:
     if "me" in locals(): ipr.link("del", index=me)

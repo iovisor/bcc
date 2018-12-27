@@ -47,6 +47,8 @@ parser.add_argument("interval", nargs="?", default=1,
     help="output interval, in seconds")
 parser.add_argument("count", nargs="?", default=99999999,
     help="number of outputs")
+parser.add_argument("--ebpf", action="store_true",
+    help=argparse.SUPPRESS)
 args = parser.parse_args()
 interval = int(args.interval)
 countdown = int(args.count)
@@ -98,14 +100,15 @@ static int do_entry(struct pt_regs *ctx, struct file *file,
     // skip I/O lacking a filename
     struct dentry *de = file->f_path.dentry;
     int mode = file->f_inode->i_mode;
-    if (de->d_name.len == 0 || TYPE_FILTER)
+    struct qstr d_name = de->d_name;
+    if (d_name.len == 0 || TYPE_FILTER)
         return 0;
 
     // store counts and sizes by pid & file
     struct info_t info = {.pid = pid};
     bpf_get_current_comm(&info.comm, sizeof(info.comm));
-    info.name_len = de->d_name.len;
-    bpf_probe_read(&info.name, sizeof(info.name), (void *)de->d_name.name);
+    info.name_len = d_name.len;
+    bpf_probe_read(&info.name, sizeof(info.name), d_name.name);
     if (S_ISREG(mode)) {
         info.type = 'R';
     } else if (S_ISSOCK(mode)) {
@@ -149,17 +152,15 @@ if args.all_files:
 else:
     bpf_text = bpf_text.replace('TYPE_FILTER', '!S_ISREG(mode)')
 
-if debug:
+if debug or args.ebpf:
     print(bpf_text)
+    if args.ebpf:
+        exit()
 
 # initialize BPF
 b = BPF(text=bpf_text)
-b.attach_kprobe(event="__vfs_read", fn_name="trace_read_entry")
-try:
-    b.attach_kprobe(event="__vfs_write", fn_name="trace_write_entry")
-except:
-    # older kernels don't have __vfs_write so try vfs_write instead
-    b.attach_kprobe(event="vfs_write", fn_name="trace_write_entry")
+b.attach_kprobe(event="vfs_read", fn_name="trace_read_entry")
+b.attach_kprobe(event="vfs_write", fn_name="trace_write_entry")
 
 DNAME_INLINE_LEN = 32  # linux/dcache.h
 
@@ -189,14 +190,15 @@ while 1:
     for k, v in reversed(sorted(counts.items(),
                                 key=lambda counts:
                                   getattr(counts[1], args.sort))):
-        name = k.name.decode()
+        name = k.name.decode('utf-8', 'replace')
         if k.name_len > DNAME_INLINE_LEN:
             name = name[:-3] + "..."
 
         # print line
         print("%-6d %-16s %-6d %-6d %-7d %-7d %1s %s" % (k.pid,
-            k.comm.decode(), v.reads, v.writes, v.rbytes / 1024,
-            v.wbytes / 1024, k.type.decode(), name))
+            k.comm.decode('utf-8', 'replace'), v.reads, v.writes,
+            v.rbytes / 1024, v.wbytes / 1024,
+            k.type.decode('utf-8', 'replace'), name))
 
         line += 1
         if line >= maxrows:

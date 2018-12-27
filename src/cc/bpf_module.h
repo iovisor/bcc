@@ -33,19 +33,39 @@ class Type;
 }
 
 namespace ebpf {
+
+// Options to enable different debug logging.
+enum {
+  // Debug output compiled LLVM IR.
+  DEBUG_LLVM_IR = 0x1,
+  // Debug output loaded BPF bytecode and register state on branches.
+  DEBUG_BPF = 0x2,
+  // Debug output pre-processor result.
+  DEBUG_PREPROCESSOR = 0x4,
+  // Debug output ASM instructions embedded with source.
+  DEBUG_SOURCE = 0x8,
+  // Debug output register state on all instructions in addition to DEBUG_BPF.
+  DEBUG_BPF_REGISTER_STATE = 0x10,
+};
+
 class TableDesc;
 class TableStorage;
 class BLoader;
 class ClangLoader;
 class FuncSource;
 
+bool bpf_module_rw_engine_enabled(void);
+
 class BPFModule {
  private:
   static const std::string FN_PREFIX;
   int init_engine();
+  void initialize_rw_engine();
+  void cleanup_rw_engine();
   int parse(llvm::Module *mod);
   int finalize();
   int annotate();
+  void annotate_light();
   std::unique_ptr<llvm::ExecutionEngine> finalize_rw(std::unique_ptr<llvm::Module> mod);
   std::string make_reader(llvm::Module *mod, llvm::Type *type);
   std::string make_writer(llvm::Module *mod, llvm::Type *type);
@@ -60,12 +80,14 @@ class BPFModule {
                        const void *val);
 
  public:
-  BPFModule(unsigned flags, TableStorage *ts = nullptr);
+  BPFModule(unsigned flags, TableStorage *ts = nullptr, bool rw_engine_enabled = true,
+            const std::string &maps_ns = "");
   ~BPFModule();
   int load_b(const std::string &filename, const std::string &proto_filename);
   int load_c(const std::string &filename, const char *cflags[], int ncflags);
   int load_string(const std::string &text, const char *cflags[], int ncflags);
   std::string id() const { return id_; }
+  std::string maps_ns() const { return maps_ns_; }
   size_t num_functions() const;
   uint8_t * function_start(size_t id) const;
   uint8_t * function_start(const std::string &name) const;
@@ -105,14 +127,14 @@ class BPFModule {
 
  private:
   unsigned flags_;  // 0x1 for printing
+  bool rw_engine_enabled_;
+  bool used_b_loader_;
   std::string filename_;
   std::string proto_filename_;
   std::unique_ptr<llvm::LLVMContext> ctx_;
   std::unique_ptr<llvm::ExecutionEngine> engine_;
   std::unique_ptr<llvm::ExecutionEngine> rw_engine_;
   std::unique_ptr<llvm::Module> mod_;
-  std::unique_ptr<BLoader> b_loader_;
-  std::unique_ptr<ClangLoader> clang_loader_;
   std::unique_ptr<FuncSource> func_src_;
   std::map<std::string, std::tuple<uint8_t *, uintptr_t>> sections_;
   std::vector<TableDesc *> tables_;
@@ -121,7 +143,9 @@ class BPFModule {
   std::map<llvm::Type *, std::string> readers_;
   std::map<llvm::Type *, std::string> writers_;
   std::string id_;
+  std::string maps_ns_;
   std::string mod_src_;
+  std::map<std::string, std::string> src_dbg_fmap_;
   TableStorage *ts_;
   std::unique_ptr<TableStorage> local_ts_;
 };

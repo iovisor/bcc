@@ -448,20 +448,31 @@ creating your "wakeup time flame graphs".
 USAGE message:
 
 # ./wakeuptime -h
-usage: wakeuptime [-h] [-u] [-p PID] [-v] [-f] [duration]
+usage: wakeuptime [-h] [-u] [-p PID] [-v] [-f]
+                  [--stack-storage-size STACK_STORAGE_SIZE]
+                  [-m MIN_BLOCK_TIME] [-M MAX_BLOCK_TIME]
+                  [duration]
 
 Summarize sleep to wakeup time by waker kernel stack
 
 positional arguments:
-  duration           duration of trace, in seconds
+  duration              duration of trace, in seconds
 
 optional arguments:
-  -h, --help         show this help message and exit
-  -u, --useronly     user threads only (no kernel threads)
-  -p PID, --pid PID  trace this PID only
-  -v, --verbose      show raw addresses
-  -f, --folded       output folded format
-
+  -h, --help            show this help message and exit
+  -u, --useronly        user threads only (no kernel threads)
+  -p PID, --pid PID     trace this PID only
+  -v, --verbose         show raw addresses
+  -f, --folded          output folded format
+  --stack-storage-size STACK_STORAGE_SIZE
+                        the number of unique stack traces that can be stored
+                        and displayed (default 1024)
+  -m MIN_BLOCK_TIME, --min-block-time MIN_BLOCK_TIME
+                        the amount of time in microseconds over which we store
+                        traces (default 1)
+  -M MAX_BLOCK_TIME, --max-block-time MAX_BLOCK_TIME
+                        the amount of time in microseconds under which we
+                        store traces (default U64_MAX)
 examples:
     ./wakeuptime             # trace blocked time with waker stacks
     ./wakeuptime 5           # trace for 5 seconds only

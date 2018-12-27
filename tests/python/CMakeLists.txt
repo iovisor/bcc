@@ -11,7 +11,10 @@ if(NETPERF STREQUAL "NETPERF-NOTFOUND")
 endif()
 find_program(IPERF iperf)
 if(IPERF STREQUAL "IPERF-NOTFOUND")
-  message(WARNING "Recommended test program 'iperf' not found")
+  find_program(IPERF3 iperf3)
+  if(IPERF3 STREQUAL "IPERF3-NOTFOUND")
+    message(WARNING "Recommended test program 'iperf' or 'iperf3' not found")
+  endif()
 endif()
 
 add_test(NAME py_test_stat1_b WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
@@ -46,8 +49,6 @@ add_test(NAME py_test_clang WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   COMMAND ${TEST_WRAPPER} py_clang sudo ${CMAKE_CURRENT_SOURCE_DIR}/test_clang.py)
 add_test(NAME py_test_histogram WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   COMMAND ${TEST_WRAPPER} py_histogram sudo ${CMAKE_CURRENT_SOURCE_DIR}/test_histogram.py)
-add_test(NAME py_test_callchain WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-  COMMAND ${TEST_WRAPPER} py_callchain sudo ${CMAKE_CURRENT_SOURCE_DIR}/test_callchain.py)
 add_test(NAME py_array WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   COMMAND ${TEST_WRAPPER} py_array sudo ${CMAKE_CURRENT_SOURCE_DIR}/test_array.py)
 add_test(NAME py_uprobes WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
@@ -72,3 +73,7 @@ add_test(NAME py_test_usdt WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   COMMAND ${TEST_WRAPPER} py_test_usdt sudo ${CMAKE_CURRENT_SOURCE_DIR}/test_usdt.py)
 add_test(NAME py_test_usdt2 WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   COMMAND ${TEST_WRAPPER} py_test_usdt2 sudo ${CMAKE_CURRENT_SOURCE_DIR}/test_usdt2.py)
+add_test(NAME py_test_usdt3 WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  COMMAND ${TEST_WRAPPER} py_test_usdt3 sudo ${CMAKE_CURRENT_SOURCE_DIR}/test_usdt3.py)
+add_test(NAME py_test_license WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  COMMAND ${TEST_WRAPPER} py_test_license sudo ${CMAKE_CURRENT_SOURCE_DIR}/test_license.py)

@@ -17,19 +17,27 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <stdbool.h>
-#include <string.h>
-#include <stdint.h>
 #include <ctype.h>
-#include <stdio.h>
+#include <fcntl.h>
+#include <limits.h>
 #include <math.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
 #include "bcc_perf_map.h"
 #include "bcc_proc.h"
 #include "bcc_elf.h"
+
+#ifdef __x86_64__
+// https://www.kernel.org/doc/Documentation/x86/x86_64/mm.txt
+const unsigned long long kernelAddrSpace = 0x00ffffffffffffff;
+#else
+const unsigned long long kernelAddrSpace = 0x0;
+#endif
 
 char *bcc_procutils_which(const char *binpath) {
   char buffer[4096];
@@ -71,51 +79,42 @@ int bcc_mapping_is_file_backed(const char *mapname) {
     STARTS_WITH(mapname, "[stack") ||
     STARTS_WITH(mapname, "/SYSV") ||
     STARTS_WITH(mapname, "[heap]") ||
-    STARTS_WITH(mapname, "[vsyscall]") ||
-    STARTS_WITH(mapname, "[vdso]"));
+    STARTS_WITH(mapname, "[vsyscall]"));
 }
 
 int bcc_procutils_each_module(int pid, bcc_procutils_modulecb callback,
                               void *payload) {
   char procmap_filename[128];
   FILE *procmap;
-  int ret;
-
   snprintf(procmap_filename, sizeof(procmap_filename), "/proc/%ld/maps",
            (long)pid);
   procmap = fopen(procmap_filename, "r");
-
   if (!procmap)
     return -1;
 
-  do {
-    char endline[4096];
-    char perm[8], dev[8];
-    long long begin, end, offset, inode;
-
-    ret = fscanf(procmap, "%llx-%llx %s %llx %s %lld", &begin, &end, perm,
-                 &offset, dev, &inode);
-
-    if (!fgets(endline, sizeof(endline), procmap))
+  char buf[PATH_MAX + 1], perm[5], dev[8];
+  char *name;
+  uint64_t begin, end, inode;
+  unsigned long long offset;
+  while (true) {
+    buf[0] = '\0';
+    // From fs/proc/task_mmu.c:show_map_vma
+    if (fscanf(procmap, "%lx-%lx %4s %llx %7s %lu%[^\n]", &begin, &end, perm,
+               &offset, dev, &inode, buf) != 7)
       break;
 
-    if (ret == 6) {
-      char *mapname = endline;
-      char *newline = strchr(endline, '\n');
+    if (perm[2] != 'x')
+      continue;
 
-      if (newline)
-        newline[0] = '\0';
+    name = buf;
+    while (isspace(*name))
+      name++;
+    if (!bcc_mapping_is_file_backed(name))
+      continue;
 
-      while (isspace(mapname[0]))
-        mapname++;
-
-      if (strchr(perm, 'x') && bcc_mapping_is_file_backed(mapname)) {
-        if (callback(mapname, (uint64_t)begin, (uint64_t)end, (uint64_t)offset,
-                     true, payload) < 0)
-          break;
-      }
-    }
-  } while (ret && ret != EOF);
+    if (callback(name, begin, end, (uint64_t)offset, true, payload) < 0)
+      break;
+  }
 
   fclose(procmap);
 
@@ -139,7 +138,9 @@ int bcc_procutils_each_module(int pid, bcc_procutils_modulecb callback,
 
 int bcc_procutils_each_ksym(bcc_procutils_ksymcb callback, void *payload) {
   char line[2048];
+  char *symname, *endsym;
   FILE *kallsyms;
+  unsigned long long addr;
 
   /* root is needed to list ksym addresses */
   if (geteuid() != 0)
@@ -149,21 +150,23 @@ int bcc_procutils_each_ksym(bcc_procutils_ksymcb callback, void *payload) {
   if (!kallsyms)
     return -1;
 
-  if (!fgets(line, sizeof(line), kallsyms)) {
-    fclose(kallsyms);
-    return -1;
-  }
-
   while (fgets(line, sizeof(line), kallsyms)) {
-    char *symname, *endsym;
-    unsigned long long addr;
-
     addr = strtoull(line, &symname, 16);
-    endsym = symname = symname + 3;
+    if (addr == 0 || addr == ULLONG_MAX)
+      continue;
+    if (addr < kernelAddrSpace)
+      continue;
 
+    symname++;
+    // Ignore data symbols
+    if (*symname == 'b' || *symname == 'B' || *symname == 'd' ||
+        *symname == 'D' || *symname == 'r' || *symname =='R')
+      continue;
+
+    endsym = (symname = symname + 2);
     while (*endsym && !isspace(*endsym)) endsym++;
-
     *endsym = '\0';
+
     callback(symname, addr, payload);
   }
 
@@ -308,6 +311,7 @@ static int load_ld_cache(const char *cache_path) {
 #define ABI_X8664_LIB64 0x0300
 #define ABI_S390_LIB64 0x0400
 #define ABI_POWERPC_LIB64 0x0500
+#define ABI_AARCH64_LIB64 0x0a00
 
 static bool match_so_flags(int flags) {
   if ((flags & FLAG_TYPE_MASK) != TYPE_ELF_LIBC6)
@@ -319,6 +323,7 @@ static bool match_so_flags(int flags) {
   case ABI_X8664_LIB64:
   case ABI_S390_LIB64:
   case ABI_POWERPC_LIB64:
+  case ABI_AARCH64_LIB64:
     return (sizeof(void *) == 8);
   }
 
@@ -401,9 +406,9 @@ void bcc_procutils_free(const char *ptr) {
 }
 
 /* Detects the following languages + C. */
-const char *languages[] = {"java", "python", "ruby", "php", "node"};
+const char *languages[] = {"java", "node", "perl", "php", "python", "ruby"};
 const char *language_c = "c";
-const int nb_languages = 5;
+const int nb_languages = 6;
 
 const char *bcc_procutils_language(int pid) {
   char procfilename[24], line[4096], pathname[32], *str;
@@ -441,8 +446,10 @@ const char *bcc_procutils_language(int pid) {
       while (isspace(mapname[0])) mapname++;
       for (i = 0; i < nb_languages; i++) {
         snprintf(pathname, sizeof(pathname), "/lib%s", languages[i]);
-        if (strstr(mapname, pathname))
+        if (strstr(mapname, pathname)) {
+          fclose(procfile);
           return languages[i];
+	}
         if ((str = strstr(mapname, "libc")) &&
             (str[4] == '-' || str[4] == '.'))
           libc = true;

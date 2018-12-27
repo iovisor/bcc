@@ -33,7 +33,7 @@ struct urandom_read_args {
 int printarg(struct urandom_read_args *args) {
     bpf_trace_printk("%d\\n", args->got_bits);
     return 0;
-};
+}
 """
 
 # load BPF program

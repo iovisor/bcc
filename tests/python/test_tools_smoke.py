@@ -52,12 +52,12 @@ class SmokeTests(TestCase):
                         or (rc == 137 and kill), "rc was %d" % rc)
 
     def kmod_loaded(self, mod):
-        mods = open("/proc/modules", "r")
-        reg = re.compile("^%s\s" % mod)
-        for line in mods:
-            if reg.match(line):
-                return 1
-            return 0
+        with open("/proc/modules", "r") as mods:
+            reg = re.compile("^%s\s" % mod)
+            for line in mods:
+                if reg.match(line):
+                    return 1
+                return 0
 
     def setUp(self):
         pass
@@ -66,7 +66,7 @@ class SmokeTests(TestCase):
         pass
 
     def test_argdist(self):
-        self.run_with_duration("argdist.py -C 'p::SyS_open()' -n 1 -i 1")
+        self.run_with_duration("argdist.py -v -C 'p::do_sys_open()' -n 1 -i 1")
 
     @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
     def test_bashreadline(self):
@@ -144,7 +144,7 @@ class SmokeTests(TestCase):
         # self.run_with_int("deadlock_detector.py $(pgrep -n bash)", timeout=10)
         pass
 
-    @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
+    @skipUnless(kernel_version_ge(4,8), "requires kernel >= 4.8")
     def test_execsnoop(self):
         self.run_with_int("execsnoop.py")
 
@@ -240,7 +240,7 @@ class SmokeTests(TestCase):
     def test_offwaketime(self):
         self.run_with_duration("offwaketime.py 1")
 
-    @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
+    @skipUnless(kernel_version_ge(4,9), "requires kernel >= 4.9")
     def test_oomkill(self):
         self.run_with_int("oomkill.py")
 
@@ -261,6 +261,14 @@ class SmokeTests(TestCase):
     @skipUnless(kernel_version_ge(4,9), "requires kernel >= 4.9")
     def test_runqlen(self):
         self.run_with_duration("runqlen.py 1 1")
+
+    @skipUnless(kernel_version_ge(4,8), "requires kernel >= 4.8")
+    def test_shmsnoop(self):
+        self.run_with_int("shmsnoop.py")
+
+    @skipUnless(kernel_version_ge(4,8), "requires kernel >= 4.8")
+    def test_sofdsnoop(self):
+        self.run_with_int("sofdsnoop.py")
 
     def test_slabratetop(self):
         self.run_with_duration("slabratetop.py 1 1")
@@ -308,11 +316,15 @@ class SmokeTests(TestCase):
 
     @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
     def test_tcplife(self):
-        self.run_with_int("tcpconnlat.py")
+        self.run_with_int("tcplife.py")
 
     @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
     def test_tcpretrans(self):
         self.run_with_int("tcpretrans.py")
+
+    @skipUnless(kernel_version_ge(4, 7), "requires kernel >= 4.7")
+    def test_tcpdrop(self):
+        self.run_with_int("tcpdrop.py")
 
     def test_tcptop(self):
         self.run_with_duration("tcptop.py 1 1")
@@ -322,18 +334,15 @@ class SmokeTests(TestCase):
 
     @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
     def test_trace(self):
-        self.run_with_int("trace.py SyS_open")
+        self.run_with_int("trace.py do_sys_open")
 
     @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
     def test_ttysnoop(self):
         self.run_with_int("ttysnoop.py /dev/console")
 
-    @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
+    @skipUnless(kernel_version_ge(4,7), "requires kernel >= 4.7")
     def test_ucalls(self):
-        # This attaches a large number (300+) kprobes, which can be slow,
-        # so use an increased timeout value.
-        self.run_with_int("lib/ucalls.py -l none -S %d" % os.getpid(),
-                          timeout=30, kill_timeout=30)
+        self.run_with_int("lib/ucalls.py -l none -S %d" % os.getpid())
 
     @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
     def test_uflow(self):
@@ -361,11 +370,12 @@ class SmokeTests(TestCase):
         self.run_with_int("lib/uthreads.py %d" % os.getpid())
 
     def test_vfscount(self):
-        self.run_with_int("vfscount.py")
+        self.run_with_int("vfscount.py", timeout=15, kill_timeout=15)
 
     def test_vfsstat(self):
         self.run_with_duration("vfsstat.py 1 1")
 
+    @skipUnless(kernel_version_ge(4,6), "requires kernel >= 4.6")
     def test_wakeuptime(self):
         self.run_with_duration("wakeuptime.py 1")
 

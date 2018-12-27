@@ -22,7 +22,7 @@ typedef struct eth_addr {
 } eth_addr_t;
 
 // Program table definitions for tail calls
-BPF_TABLE("prog", u32, u32, jump, 16);
+BPF_PROG_ARRAY(jump, 16);
 
 // physical endpoint manager (pem) tables which connects to boeht bridge 1 and bridge 2
 // <port_id, bpf_dest>
@@ -70,6 +70,7 @@ int pem(struct __sk_buff *skb) {
         meta.prog_id = meta.rx_port_id = 0;
     } else {
         meta.prog_id = skb->cb[0];
+        asm volatile("" ::: "memory");
         meta.rx_port_id = skb->cb[1];
     }
     if (!meta.prog_id) {
@@ -120,7 +121,7 @@ static int br_common(struct __sk_buff *skb, int which_br) {
     /* handle ethernet packet header */
     {
         dmac.addr = ethernet->dst;
-        /* skb->tc_index may be preserved accross router namespace if router simply rewrite packet
+        /* skb->tc_index may be preserved across router namespace if router simply rewrite packet
          * and send it back.
          */
         if (skb->tc_index == 1) {

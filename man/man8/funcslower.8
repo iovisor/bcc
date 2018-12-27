@@ -1,8 +1,8 @@
 .TH funcslower 8  "2017-03-30" "USER COMMANDS"
 .SH NAME
-fileslower \- Trace slow kernel or user function calls.
+funcslower \- Trace slow kernel or user function calls.
 .SH SYNOPSIS
-.B fileslower [\-h] [\-p PID] [-m MIN_MS] [-u MIN_US] [-a ARGUMENTS] [-T] [-t] [-v] function [function ...]
+.B funcslower [\-hf] [\-p PID] [\-U | \-K] [-m MIN_MS] [-u MIN_US] [-a ARGUMENTS] [-T] [-t] [-v] function [function ...]
 .SH DESCRIPTION
 This script traces a kernel or user function's entry and return points, and
 prints a message when the function's latency exceeded the specified threshold.
@@ -36,6 +36,15 @@ Print a HH:MM:SS timestamp with each entry.
 \-t
 Print a seconds timestamp with each entry, at microsecond resolution.
 .TP
+\-f
+Print output in folded stack format.
+.TP
+\-U
+Show stacks from user space only (no kernel space stacks).
+.TP
+\-K
+Show stacks from kernel space only (no user space stacks).
+.TP
 \-v
 Print the resulting BPF program, for debugging purposes.
 .TP
@@ -61,6 +70,10 @@ Trace both malloc() and free() slower than 10us, in pid 135 only:
 Trace the write syscall and print its first 4 arguments:
 #
 .B funcslower -a 4 SyS_write
+.TP
+Trace opens from libc and print the user and kernel stack frames:
+#
+.B funcslower -UK c:open
 .SH FIELDS
 .TP
 TIME

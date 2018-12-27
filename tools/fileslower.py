@@ -50,6 +50,8 @@ parser.add_argument("-a", "--all-files", action="store_true",
     help="include non-regular file types (sockets, FIFOs, etc)")
 parser.add_argument("min_ms", nargs="?", default='10',
     help="minimum I/O duration to trace, in ms (default 10)")
+parser.add_argument("--ebpf", action="store_true",
+    help=argparse.SUPPRESS)
 args = parser.parse_args()
 min_ms = int(args.min_ms)
 tgid = args.tgid
@@ -109,8 +111,9 @@ static int trace_rw_entry(struct pt_regs *ctx, struct file *file,
     val.sz = count;
     val.ts = bpf_ktime_get_ns();
 
-    val.name_len = de->d_name.len;
-    bpf_probe_read(&val.name, sizeof(val.name), (void *)de->d_name.name);
+    struct qstr d_name = de->d_name;
+    val.name_len = d_name.len;
+    bpf_probe_read(&val.name, sizeof(val.name), d_name.name);
     bpf_get_current_comm(&val.comm, sizeof(val.comm));
     entryinfo.update(&pid, &val);
 
@@ -185,11 +188,13 @@ if args.all_files:
 else:
     bpf_text = bpf_text.replace('TYPE_FILTER', '!S_ISREG(mode)')
 
-if debug:
+if debug or args.ebpf:
     print(bpf_text)
+    if args.ebpf:
+        exit()
 
 # initialize BPF
-b = BPF(text=bpf_text,)
+b = BPF(text=bpf_text)
 
 # I'd rather trace these via new_sync_read/new_sync_write (which used to be
 # do_sync_read/do_sync_write), but those became static. So trace these from
@@ -235,14 +240,17 @@ def print_event(cpu, data, size):
     event = ct.cast(data, ct.POINTER(Data)).contents
 
     ms = float(event.delta_us) / 1000
-    name = event.name.decode()
+    name = event.name.decode('utf-8', 'replace')
     if event.name_len > DNAME_INLINE_LEN:
         name = name[:-3] + "..."
 
     print("%-8.3f %-14.14s %-6s %1s %-7s %7.2f %s" % (
-        time.time() - start_ts, event.comm.decode(), event.pid,
-        mode_s[event.mode], event.sz, ms, name))
+        time.time() - start_ts, event.comm.decode('utf-8', 'replace'),
+        event.pid, mode_s[event.mode], event.sz, ms, name))
 
 b["events"].open_perf_buffer(print_event, page_cnt=64)
 while 1:
-    b.kprobe_poll()
+    try:
+        b.perf_buffer_poll()
+    except KeyboardInterrupt:
+        exit()

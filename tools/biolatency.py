@@ -40,6 +40,8 @@ parser.add_argument("interval", nargs="?", default=99999999,
     help="output interval, in seconds")
 parser.add_argument("count", nargs="?", default=99999999,
     help="number of outputs")
+parser.add_argument("--ebpf", action="store_true",
+    help=argparse.SUPPRESS)
 args = parser.parse_args()
 countdown = int(args.count)
 debug = 0
@@ -97,21 +99,25 @@ if args.disks:
         'BPF_HISTOGRAM(dist, disk_key_t);')
     bpf_text = bpf_text.replace('STORE',
         'disk_key_t key = {.slot = bpf_log2l(delta)}; ' +
-        'bpf_probe_read(&key.disk, sizeof(key.disk), ' +
-        'req->rq_disk->disk_name); dist.increment(key);')
+        'void *__tmp = (void *)req->rq_disk->disk_name; ' +
+        'bpf_probe_read(&key.disk, sizeof(key.disk), __tmp); ' +
+        'dist.increment(key);')
 else:
     bpf_text = bpf_text.replace('STORAGE', 'BPF_HISTOGRAM(dist);')
     bpf_text = bpf_text.replace('STORE',
         'dist.increment(bpf_log2l(delta));')
-if debug:
+if debug or args.ebpf:
     print(bpf_text)
+    if args.ebpf:
+        exit()
 
 # load BPF program
 b = BPF(text=bpf_text)
 if args.queued:
     b.attach_kprobe(event="blk_account_io_start", fn_name="trace_req_start")
 else:
-    b.attach_kprobe(event="blk_start_request", fn_name="trace_req_start")
+    if BPF.get_kprobe_functions(b'blk_start_request'):
+        b.attach_kprobe(event="blk_start_request", fn_name="trace_req_start")
     b.attach_kprobe(event="blk_mq_start_request", fn_name="trace_req_start")
 b.attach_kprobe(event="blk_account_io_completion",
     fn_name="trace_req_completion")

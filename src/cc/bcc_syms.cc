@@ -61,21 +61,25 @@ void KSyms::refresh() {
 bool KSyms::resolve_addr(uint64_t addr, struct bcc_symbol *sym, bool demangle) {
   refresh();
 
-  if (syms_.empty()) {
-    sym->name = nullptr;
-    sym->demangle_name = nullptr;
-    sym->module = nullptr;
-    sym->offset = 0x0;
-    return false;
+  std::vector<Symbol>::iterator it;
+
+  if (syms_.empty())
+    goto unknown_symbol;
+
+  it = std::upper_bound(syms_.begin(), syms_.end(), Symbol("", addr));
+  if (it != syms_.begin()) {
+    it--;
+    sym->name = (*it).name.c_str();
+    if (demangle)
+      sym->demangle_name = sym->name;
+    sym->module = "kernel";
+    sym->offset = addr - (*it).addr;
+    return true;
   }
 
-  auto it = std::upper_bound(syms_.begin(), syms_.end(), Symbol("", addr)) - 1;
-  sym->name = (*it).name.c_str();
-  if (demangle)
-    sym->demangle_name = sym->name;
-  sym->module = "kernel";
-  sym->offset = addr - (*it).addr;
-  return true;
+unknown_symbol:
+  memset(sym, 0, sizeof(struct bcc_symbol));
+  return false;
 }
 
 bool KSyms::resolve_name(const char *_unused, const char *name,
@@ -118,15 +122,13 @@ int ProcSyms::_add_load_sections(uint64_t v_addr, uint64_t mem_sz,
 }
 
 void ProcSyms::load_exe() {
+  ProcMountNSGuard g(mount_ns_instance_.get());
   std::string exe = ebpf::get_pid_exe(pid_);
   Module module(exe.c_str(), mount_ns_instance_.get(), &symbol_option_);
 
-  if (!module.init())
-    return;
   if (module.type_ != ModuleType::EXEC)
     return;
 
-  ProcMountNSGuard g(mount_ns_instance_.get());
 
   bcc_elf_foreach_load_section(exe.c_str(), &_add_load_sections, &module);
 
@@ -156,7 +158,23 @@ int ProcSyms::_add_module(const char *modname, uint64_t start, uint64_t end,
     auto module = Module(
         modname, check_mount_ns ? ps->mount_ns_instance_.get() : nullptr,
         &ps->symbol_option_);
-    if (module.init())
+
+    // pid/maps doesn't account for file_offset of text within the ELF.
+    // It only gives the mmap offset. We need the real offset for symbol
+    // lookup.
+    if (module.type_ == ModuleType::SO) {
+      ProcMountNSGuard g(ps->mount_ns_instance_.get());
+      if (bcc_elf_get_text_scn_info(modname, &module.elf_so_addr_,
+                                    &module.elf_so_offset_) < 0) {
+        fprintf(stderr, "WARNING: Couldn't find .text section in %s\n", modname);
+        fprintf(stderr, "WARNING: BCC can't handle sym look ups for %s", modname);
+      }
+    }
+
+    if (!bcc_is_perf_map(modname) || module.type_ != ModuleType::UNKNOWN)
+      // Always add the module even if we can't read it, so that we could
+      // report correct module name. Unless it's a perf map that we only
+      // add readable ones.
       it = ps->modules_.insert(ps->modules_.end(), std::move(module));
     else
       return 0;
@@ -175,40 +193,40 @@ bool ProcSyms::resolve_addr(uint64_t addr, struct bcc_symbol *sym,
   if (procstat_.is_stale())
     refresh();
 
-  sym->module = nullptr;
-  sym->name = nullptr;
-  sym->demangle_name = nullptr;
-  sym->offset = 0x0;
+  memset(sym, 0, sizeof(struct bcc_symbol));
 
   const char *original_module = nullptr;
   uint64_t offset;
+  bool only_perf_map = false;
   for (Module &mod : modules_) {
+    if (only_perf_map && (mod.type_ != ModuleType::PERF_MAP))
+      continue;
     if (mod.contains(addr, offset)) {
-      bool res = mod.find_addr(offset, sym);
-      if (demangle) {
-        if (sym->name)
-          sym->demangle_name =
-              abi::__cxa_demangle(sym->name, nullptr, nullptr, nullptr);
-        if (!sym->demangle_name)
-          sym->demangle_name = sym->name;
-      }
-      // If we have a match, return right away. But if we don't have a match in
-      // this module, we might have a match in the perf map (even though the
-      // module itself doesn't have symbols). Wait until we see the perf map if
-      // any, but keep the original module name for reporting.
-      if (res) {
-        // If we have already seen this module, report the original name rather
-        // than the perf map name:
-        if (original_module)
-          sym->module = original_module;
-        return res;
+      if (mod.find_addr(offset, sym)) {
+        if (demangle) {
+          if (sym->name && (!strncmp(sym->name, "_Z", 2) || !strncmp(sym->name, "___Z", 4)))
+            sym->demangle_name =
+                abi::__cxa_demangle(sym->name, nullptr, nullptr, nullptr);
+          if (!sym->demangle_name)
+            sym->demangle_name = sym->name;
+        }
+        return true;
       } else if (mod.type_ != ModuleType::PERF_MAP) {
-        // Record the module to which this symbol belongs, so that even if it's
-        // later found using a perf map, we still report the right module name.
+        // In this case, we found the address in the range of a module, but
+        // not able to find a symbol of that address in the module.
+        // Thus, we would try to find the address in perf map, and
+        // save the module's name in case we will need it later.
         original_module = mod.name_.c_str();
+        only_perf_map = true;
       }
     }
   }
+  // If we didn't find the symbol anywhere, the module name is probably
+  // set to be the perf map's name as it would be the last we tried.
+  // In this case, if we have found the address previously in a module,
+  // report the saved original module name instead.
+  if (original_module)
+    sym->module = original_module;
   return false;
 }
 
@@ -230,29 +248,26 @@ ProcSyms::Module::Module(const char *name, ProcMountNS *mount_ns,
       loaded_(false),
       mount_ns_(mount_ns),
       symbol_option_(option),
-      type_(ModuleType::UNKNOWN) {}
-
-bool ProcSyms::Module::init() {
+      type_(ModuleType::UNKNOWN) {
   ProcMountNSGuard g(mount_ns_);
   int elf_type = bcc_elf_get_type(name_.c_str());
+  // The Module is an ELF file
   if (elf_type >= 0) {
-    if (elf_type == ET_EXEC) {
+    if (elf_type == ET_EXEC)
       type_ = ModuleType::EXEC;
-      return true;
-    }
-    if (elf_type == ET_DYN) {
+    else if (elf_type == ET_DYN)
       type_ = ModuleType::SO;
-      return true;
-    }
-    return false;
+    return;
   }
-
-  if (bcc_is_perf_map(name_.c_str()) == 1) {
+  // Other symbol files
+  if (bcc_is_valid_perf_map(name_.c_str()) == 1)
     type_ = ModuleType::PERF_MAP;
-    return true;
-  }
+  else if (bcc_elf_is_vdso(name_.c_str()) == 1)
+    type_ = ModuleType::VDSO;
 
-  return false;
+  // Will be stored later
+  elf_so_offset_ = 0;
+  elf_so_addr_ = 0;
 }
 
 int ProcSyms::Module::_add_symbol(const char *symname, uint64_t start,
@@ -268,24 +283,38 @@ void ProcSyms::Module::load_sym_table() {
     return;
   loaded_ = true;
 
+  if (type_ == ModuleType::UNKNOWN)
+    return;
+
   ProcMountNSGuard g(mount_ns_);
 
   if (type_ == ModuleType::PERF_MAP)
     bcc_perf_map_foreach_sym(name_.c_str(), _add_symbol, this);
   if (type_ == ModuleType::EXEC || type_ == ModuleType::SO)
     bcc_elf_foreach_sym(name_.c_str(), _add_symbol, symbol_option_, this);
+  if (type_ == ModuleType::VDSO)
+    bcc_elf_foreach_vdso_sym(_add_symbol, this);
 
   std::sort(syms_.begin(), syms_.end());
 }
 
 bool ProcSyms::Module::contains(uint64_t addr, uint64_t &offset) const {
-  for (const auto &range : ranges_)
+  for (const auto &range : ranges_) {
     if (addr >= range.start && addr < range.end) {
-      offset = (type_ == ModuleType::SO)
-                   ? (addr - range.start + range.file_offset)
-                   : addr;
+      if (type_ == ModuleType::SO || type_ == ModuleType::VDSO) {
+        // Offset within the mmap
+        offset = addr - range.start + range.file_offset;
+
+        // Offset within the ELF for SO symbol lookup
+        offset += (elf_so_addr_ - elf_so_offset_);
+      } else {
+        offset = addr;
+      }
+
       return true;
     }
+  }
+
   return false;
 }
 
@@ -416,7 +445,7 @@ int bcc_resolve_global_addr(int pid, const char *module, const uint64_t address,
       mod.start == 0x0)
     return -1;
 
-  *global = mod.start + mod.file_offset + address;
+  *global = mod.start - mod.file_offset + address;
   return 0;
 }
 
@@ -471,7 +500,11 @@ int bcc_resolve_symname(const char *module, const char *symname,
   static struct bcc_symbol_option default_option = {
     .use_debug_file = 1,
     .check_debug_file_crc = 1,
+#if defined(__powerpc64__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+    .use_symbol_type = BCC_SYM_ALL_TYPES | (1 << STT_PPC64LE_SYM_LEP),
+#else
     .use_symbol_type = BCC_SYM_ALL_TYPES,
+#endif
   };
 
   if (module == NULL)

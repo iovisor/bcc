@@ -26,7 +26,7 @@ struct alloc_info_t {
 
 BPF_HASH(sizes, u64);
 BPF_HASH(allocs, u64, struct alloc_info_t);
-BPF_STACK_TRACE(stack_traces, 10240)
+BPF_STACK_TRACE(stack_traces, 10240);
 
 int alloc_enter(struct pt_regs *ctx, size_t size)
 {

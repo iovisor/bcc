@@ -19,6 +19,7 @@
 #include <unordered_set>
 
 #include <fcntl.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
 
@@ -31,13 +32,16 @@
 
 namespace USDT {
 
-Location::Location(uint64_t addr, const char *arg_fmt) : address_(addr) {
-#ifdef __powerpc64__
+Location::Location(uint64_t addr, const std::string &bin_path, const char *arg_fmt)
+    : address_(addr),
+      bin_path_(bin_path) {
+
+#ifdef __aarch64__
+  ArgumentParser_aarch64 parser(arg_fmt);
+#elif __powerpc64__
   ArgumentParser_powerpc64 parser(arg_fmt);
-#elif defined(__x86_64__)
-  ArgumentParser_x64 parser(arg_fmt);
 #else
-#error "bcc does not support this platform yet"
+  ArgumentParser_x64 parser(arg_fmt);
 #endif
   while (!parser.done()) {
     Argument arg;
@@ -56,18 +60,19 @@ Probe::Probe(const char *bin_path, const char *provider, const char *name,
       pid_(pid),
       mount_ns_(ns) {}
 
-bool Probe::in_shared_object() {
-  if (!in_shared_object_) {
-    ProcMountNSGuard g(mount_ns_);
-    in_shared_object_ = bcc_elf_is_shared_obj(bin_path_.c_str());
-  }
-  return in_shared_object_.value();
+bool Probe::in_shared_object(const std::string &bin_path) {
+    if (object_type_map_.find(bin_path) == object_type_map_.end()) {
+      ProcMountNSGuard g(mount_ns_);
+      return (object_type_map_[bin_path] = bcc_elf_is_shared_obj(bin_path.c_str()));
+    }
+    return object_type_map_[bin_path];
 }
 
-bool Probe::resolve_global_address(uint64_t *global, const uint64_t addr) {
-  if (in_shared_object()) {
+bool Probe::resolve_global_address(uint64_t *global, const std::string &bin_path,
+                                   const uint64_t addr) {
+  if (in_shared_object(bin_path)) {
     return (pid_ &&
-            !bcc_resolve_global_addr(*pid_, bin_path_.c_str(), addr, global));
+            !bcc_resolve_global_addr(*pid_, bin_path.c_str(), addr, global));
   }
 
   *global = addr;
@@ -79,7 +84,7 @@ bool Probe::add_to_semaphore(int16_t val) {
 
   if (!attached_semaphore_) {
     uint64_t addr;
-    if (!resolve_global_address(&addr, semaphore_))
+    if (!resolve_global_address(&addr, bin_path_, semaphore_))
       return false;
     attached_semaphore_ = addr;
   }
@@ -154,10 +159,14 @@ std::string Probe::largest_arg_type(size_t arg_n) {
 }
 
 bool Probe::usdt_getarg(std::ostream &stream) {
-  const size_t arg_count = locations_[0].arguments_.size();
-
-  if (!attached_to_)
+  if (!attached_to_ || attached_to_->empty())
     return false;
+
+  return usdt_getarg(stream, attached_to_.value());
+}
+
+bool Probe::usdt_getarg(std::ostream &stream, const std::string& probe_func) {
+  const size_t arg_count = locations_[0].arguments_.size();
 
   if (arg_count == 0)
     return true;
@@ -170,12 +179,12 @@ bool Probe::usdt_getarg(std::ostream &stream) {
                 "static __always_inline int _bpf_readarg_%s_%d("
                 "struct pt_regs *ctx, void *dest, size_t len) {\n"
                 "  if (len != sizeof(%s)) return -1;\n",
-                attached_to_.value(), arg_n + 1, ctype);
+                probe_func, arg_n + 1, ctype);
 
     if (locations_.size() == 1) {
       Location &location = locations_.front();
       stream << "  ";
-      if (!location.arguments_[arg_n].assign_to_local(stream, cptr, bin_path_,
+      if (!location.arguments_[arg_n].assign_to_local(stream, cptr, location.bin_path_,
                                                       pid_))
         return false;
       stream << "\n  return 0;\n}\n";
@@ -184,11 +193,12 @@ bool Probe::usdt_getarg(std::ostream &stream) {
       for (Location &location : locations_) {
         uint64_t global_address;
 
-        if (!resolve_global_address(&global_address, location.address_))
+        if (!resolve_global_address(&global_address, location.bin_path_,
+                                    location.address_))
           return false;
 
         tfm::format(stream, "  case 0x%xULL: ", global_address);
-        if (!location.arguments_[arg_n].assign_to_local(stream, cptr, bin_path_,
+        if (!location.arguments_[arg_n].assign_to_local(stream, cptr, location.bin_path_,
                                                         pid_))
           return false;
 
@@ -201,18 +211,18 @@ bool Probe::usdt_getarg(std::ostream &stream) {
   return true;
 }
 
-void Probe::add_location(uint64_t addr, const char *fmt) {
-  locations_.emplace_back(addr, fmt);
+void Probe::add_location(uint64_t addr, const std::string &bin_path, const char *fmt) {
+  locations_.emplace_back(addr, bin_path, fmt);
 }
 
 void Probe::finalize_locations() {
   std::sort(locations_.begin(), locations_.end(),
             [](const Location &a, const Location &b) {
-              return a.address_ < b.address_;
+              return a.bin_path_ < b.bin_path_ || a.address_ < b.address_;
             });
   auto last = std::unique(locations_.begin(), locations_.end(),
                           [](const Location &a, const Location &b) {
-                            return a.address_ == b.address_;
+                            return a.bin_path_ == b.bin_path_ && a.address_ == b.address_;
                           });
   locations_.erase(last, locations_.end());
 }
@@ -239,7 +249,7 @@ int Context::_each_module(const char *modpath, uint64_t, uint64_t, uint64_t,
 void Context::add_probe(const char *binpath, const struct bcc_elf_usdt *probe) {
   for (auto &p : probes_) {
     if (p->provider_ == probe->provider && p->name_ == probe->name) {
-      p->add_location(probe->pc, probe->arg_fmt);
+      p->add_location(probe->pc, binpath, probe->arg_fmt);
       return;
     }
   }
@@ -247,7 +257,7 @@ void Context::add_probe(const char *binpath, const struct bcc_elf_usdt *probe) {
   probes_.emplace_back(
       new Probe(binpath, probe->provider, probe->name, probe->semaphore, pid_,
 	mount_ns_instance_.get()));
-  probes_.back()->add_location(probe->pc, probe->arg_fmt);
+  probes_.back()->add_location(probe->pc, binpath, probe->arg_fmt);
 }
 
 std::string Context::resolve_bin_path(const std::string &bin_path) {
@@ -272,13 +282,39 @@ Probe *Context::get(const std::string &probe_name) {
   return nullptr;
 }
 
+Probe *Context::get(const std::string &provider_name,
+                    const std::string &probe_name) {
+  for (auto &p : probes_) {
+    if (p->provider_ == provider_name && p->name_ == probe_name)
+      return p.get();
+  }
+  return nullptr;
+}
+
 bool Context::enable_probe(const std::string &probe_name,
                            const std::string &fn_name) {
   if (pid_stat_ && pid_stat_->is_stale())
     return false;
 
-  auto p = get(probe_name);
-  return p && p->enable(fn_name);
+  // FIXME: we may have issues here if the context has two same probes's
+  // but different providers. For example, libc:setjmp and rtld:setjmp,
+  // libc:lll_futex_wait and rtld:lll_futex_wait.
+  Probe *found_probe = nullptr;
+  for (auto &p : probes_) {
+    if (p->name_ == probe_name) {
+      if (found_probe != nullptr) {
+         fprintf(stderr, "Two same-name probes (%s) but different providers\n",
+                 probe_name.c_str());
+         return false;
+      }
+      found_probe = p.get();
+    }
+  }
+
+  if (found_probe != nullptr)
+    return found_probe->enable(fn_name);
+
+  return false;
 }
 
 void Context::each(each_cb callback) {
@@ -300,7 +336,7 @@ void Context::each_uprobe(each_uprobe_cb callback) {
       continue;
 
     for (Location &loc : p->locations_) {
-      callback(p->bin_path_.c_str(), p->attached_to_->c_str(), loc.address_,
+      callback(loc.bin_path_.c_str(), p->attached_to_->c_str(), loc.address_,
                pid_.value_or(-1));
     }
   }
@@ -332,6 +368,22 @@ Context::Context(int pid) : pid_(pid), pid_stat_(pid),
     probe->finalize_locations();
 }
 
+Context::Context(int pid, const std::string &bin_path)
+    : pid_(pid), pid_stat_(pid),
+      mount_ns_instance_(new ProcMountNS(pid)), loaded_(false) {
+  std::string full_path = resolve_bin_path(bin_path);
+  if (!full_path.empty()) {
+    if (bcc_elf_foreach_usdt(full_path.c_str(), _each_probe, this) == 0) {
+      cmd_bin_path_ = ebpf::get_pid_exe(pid);
+      if (cmd_bin_path_.empty())
+        return;
+      loaded_ = true;
+    }
+  }
+  for (const auto &probe : probes_)
+    probe->finalize_locations();
+}
+
 Context::~Context() {
   if (pid_stat_ && !pid_stat_->is_stale()) {
     for (auto &p : probes_) p->disable();
@@ -341,8 +393,22 @@ Context::~Context() {
 
 extern "C" {
 
-void *bcc_usdt_new_frompid(int pid) {
-  USDT::Context *ctx = new USDT::Context(pid);
+void *bcc_usdt_new_frompid(int pid, const char *path) {
+  USDT::Context *ctx;
+
+  if (!path) {
+    ctx = new USDT::Context(pid);
+  } else {
+    struct stat buffer;
+    if (strlen(path) >= 1 && path[0] != '/') {
+      fprintf(stderr, "HINT: Binary path should be absolute.\n\n");
+      return nullptr;
+    } else if (stat(path, &buffer) == -1) {
+      fprintf(stderr, "HINT: Specified binary doesn't exist.\n\n");
+      return nullptr;
+    }
+    ctx = new USDT::Context(pid, path);
+  }
   if (!ctx->loaded()) {
     delete ctx;
     return nullptr;
@@ -360,8 +426,10 @@ void *bcc_usdt_new_frompath(const char *path) {
 }
 
 void bcc_usdt_close(void *usdt) {
-  USDT::Context *ctx = static_cast<USDT::Context *>(usdt);
-  delete ctx;
+  if (usdt) {
+    USDT::Context *ctx = static_cast<USDT::Context *>(usdt);
+    delete ctx;
+  }
 }
 
 int bcc_usdt_enable_probe(void *usdt, const char *probe_name,
@@ -408,8 +476,9 @@ const char *bcc_usdt_get_probe_argctype(
   void *ctx, const char* probe_name, const int arg_index
 ) {
   USDT::Probe *p = static_cast<USDT::Context *>(ctx)->get(probe_name);
-  std::string res = p ? p->get_arg_ctype(arg_index) : "";
-  return res.c_str();
+  if (p)
+    return p->get_arg_ctype(arg_index).c_str();
+  return "";
 }
 
 void bcc_usdt_foreach(void *usdt, bcc_usdt_cb callback) {
@@ -417,23 +486,26 @@ void bcc_usdt_foreach(void *usdt, bcc_usdt_cb callback) {
   ctx->each(callback);
 }
 
-int bcc_usdt_get_location(void *usdt, const char *probe_name,
+int bcc_usdt_get_location(void *usdt, const char *provider_name,
+                          const char *probe_name,
                           int index, struct bcc_usdt_location *location) {
   USDT::Context *ctx = static_cast<USDT::Context *>(usdt);
-  USDT::Probe *probe = ctx->get(probe_name);
+  USDT::Probe *probe = ctx->get(provider_name, probe_name);
   if (!probe)
     return -1;
   if (index < 0 || (size_t)index >= probe->num_locations())
     return -1;
   location->address = probe->address(index);
+  location->bin_path = probe->location_bin_path(index);
   return 0;
 }
 
-int bcc_usdt_get_argument(void *usdt, const char *probe_name,
+int bcc_usdt_get_argument(void *usdt, const char *provider_name,
+                          const char *probe_name,
                           int location_index, int argument_index,
                           struct bcc_usdt_argument *argument) {
   USDT::Context *ctx = static_cast<USDT::Context *>(usdt);
-  USDT::Probe *probe = ctx->get(probe_name);
+  USDT::Probe *probe = ctx->get(provider_name, probe_name);
   if (!probe)
     return -1;
   if (argument_index < 0 || (size_t)argument_index >= probe->num_arguments())

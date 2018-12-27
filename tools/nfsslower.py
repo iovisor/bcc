@@ -53,6 +53,8 @@ parser.add_argument("-j", "--csv", action="store_true",
 parser.add_argument("-p", "--pid", help="Trace this pid only")
 parser.add_argument("min_ms", nargs="?", default='10',
                     help="Minimum IO duration to trace in ms (default=10ms)")
+parser.add_argument("--ebpf", action="store_true",
+                    help=argparse.SUPPRESS)
 args = parser.parse_args()
 min_ms = int(args.min_ms)
 pid = args.pid
@@ -236,8 +238,10 @@ if args.pid:
     bpf_text = bpf_text.replace('FILTER_PID', 'pid != %s' % pid)
 else:
     bpf_text = bpf_text.replace('FILTER_PID', '0')
-if debug:
+if debug or args.ebpf:
     print(bpf_text)
+    if args.ebpf:
+        exit()
 
 # kernel->user event data: struct data_t
 DNAME_INLINE_LEN = 32   # linux/dcache.h
@@ -276,13 +280,13 @@ def print_event(cpu, data, size):
         return
     print("%-8s %-14.14s %-6s %1s %-7s %-8d %7.2f %s" %
           (strftime("%H:%M:%S"),
-           event.task.decode(),
+           event.task.decode('utf-8', 'replace'),
            event.pid,
            type,
            event.size,
            event.offset / 1024,
            float(event.delta_us) / 1000,
-           event.file.decode()))
+           event.file.decode('utf-8', 'replace')))
 
 
 # Currently specifically works for NFSv4, the other kprobes are generic
@@ -318,7 +322,10 @@ else:
                                                     "OFF_KB",
                                                     "LAT(ms)",
                                                     "FILENAME"))
-    
+
 b["events"].open_perf_buffer(print_event, page_cnt=64)
 while 1:
-        b.kprobe_poll()
+    try:
+        b.perf_buffer_poll()
+    except KeyboardInterrupt:
+        exit()

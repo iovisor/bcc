@@ -49,9 +49,12 @@ class TestArray(TestCase):
             event = ct.cast(data, ct.POINTER(Data)).contents
             self.counter += 1
 
+        def lost_cb(lost):
+            self.assertGreater(lost, 0)
+
         text = """
 BPF_PERF_OUTPUT(events);
-int kprobe__sys_nanosleep(void *ctx) {
+int do_sys_nanosleep(void *ctx) {
     struct {
         u64 ts;
     } data = {bpf_ktime_get_ns()};
@@ -60,9 +63,11 @@ int kprobe__sys_nanosleep(void *ctx) {
 }
 """
         b = BPF(text=text)
-        b["events"].open_perf_buffer(cb)
-        time.sleep(0.1)
-        b.kprobe_poll()
+        b.attach_kprobe(event=b.get_syscall_fnname("nanosleep"),
+                        fn_name="do_sys_nanosleep")
+        b["events"].open_perf_buffer(cb, lost_cb=lost_cb)
+        subprocess.call(['sleep', '0.1'])
+        b.perf_buffer_poll()
         self.assertGreater(self.counter, 0)
         b.cleanup()
 
@@ -77,9 +82,12 @@ int kprobe__sys_nanosleep(void *ctx) {
             event = ct.cast(data, ct.POINTER(Data)).contents
             self.events.append(event)
 
+        def lost_cb(lost):
+            self.assertGreater(lost, 0)
+
         text = """
 BPF_PERF_OUTPUT(events);
-int kprobe__sys_nanosleep(void *ctx) {
+int do_sys_nanosleep(void *ctx) {
     struct {
         u64 cpu;
     } data = {bpf_get_smp_processor_id()};
@@ -88,11 +96,13 @@ int kprobe__sys_nanosleep(void *ctx) {
 }
 """
         b = BPF(text=text)
-        b["events"].open_perf_buffer(cb)
+        b.attach_kprobe(event=b.get_syscall_fnname("nanosleep"),
+                        fn_name="do_sys_nanosleep")
+        b["events"].open_perf_buffer(cb, lost_cb=lost_cb)
         online_cpus = get_online_cpus()
         for cpu in online_cpus:
             subprocess.call(['taskset', '-c', str(cpu), 'sleep', '0.1'])
-        b.kprobe_poll()
+        b.perf_buffer_poll()
         b.cleanup()
         self.assertGreaterEqual(len(self.events), len(online_cpus), 'Received only {}/{} events'.format(len(self.events), len(online_cpus)))
 

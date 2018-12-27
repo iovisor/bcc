@@ -19,7 +19,7 @@ consecutive sequence of positive integers starting at 1. Arrays are encoded like
 so: `[2, 3, false, "hi"]`. Any other type of Lua table is encoded as a json
 object, encoded like so: `{"key1": 2, "key2": false}`.
 
-Because the Lua nil value cannot be a key, and as a table value is considerd
+Because the Lua nil value cannot be a key, and as a table value is considered
 equivalent to a missing key, there is no way to express the json "null" value in
 a Lua table. The only way this will output "null" is if your entire input obj is
 nil itself.

@@ -82,14 +82,16 @@ class USDTProbeLocation(object):
         self.index = index
         self.num_arguments = probe.num_arguments
         self.address = location.address
+        self.bin_path = location.bin_path
 
     def __str__(self):
-        return "0x%x" % self.address
+        return "%s 0x%x" % (self.bin_path, self.address)
 
     def get_argument(self, index):
         arg = bcc_usdt_argument()
-        res = lib.bcc_usdt_get_argument(self.probe.context, self.probe.name,
-                                        self.index, index, ct.pointer(arg))
+        res = lib.bcc_usdt_get_argument(self.probe.context, self.probe.provider,
+                                        self.probe.name,
+                                        self.index, index, ct.byref(arg))
         if res != 0:
             raise USDTException(
                     "error retrieving probe argument %d location %d" %
@@ -107,16 +109,16 @@ class USDTProbe(object):
         self.num_arguments = probe.num_arguments
 
     def __str__(self):
-        return "%s %s:%s [sema 0x%x]" % \
-               (self.bin_path, self.provider, self.name, self.semaphore)
+        return "%s:%s [sema 0x%x]" % \
+               (self.provider, self.name, self.semaphore)
 
     def short_name(self):
         return "%s:%s" % (self.provider, self.name)
 
     def get_location(self, index):
         loc = bcc_usdt_location()
-        res = lib.bcc_usdt_get_location(self.context, self.name,
-                                        index, ct.pointer(loc))
+        res = lib.bcc_usdt_get_location(self.context, self.provider, self.name,
+                                        index, ct.byref(loc))
         if res != 0:
             raise USDTException("error retrieving probe location %d" % index)
         return USDTProbeLocation(self, index, loc)
@@ -125,7 +127,10 @@ class USDT(object):
     def __init__(self, pid=None, path=None):
         if pid and pid != -1:
             self.pid = pid
-            self.context = lib.bcc_usdt_new_frompid(pid)
+            if path:
+                self.context = lib.bcc_usdt_new_frompid(pid, path.encode('ascii'))
+            else:
+                self.context = lib.bcc_usdt_new_frompid(pid, ct.c_char_p(0))
             if self.context == None:
                 raise USDTException("USDT failed to instrument PID %d" % pid)
         elif path:
@@ -136,6 +141,9 @@ class USDT(object):
         else:
             raise USDTException(
                     "either a pid or a binary path must be specified")
+
+    def __del__(self):
+        lib.bcc_usdt_close(self.context)
 
     def enable_probe(self, probe, fn_name):
         if lib.bcc_usdt_enable_probe(self.context, probe.encode('ascii'),
@@ -160,9 +168,14 @@ tplist tool.""")
     def get_context(self):
         return self.context
 
+    def get_text(self):
+        ctx_array = (ct.c_void_p * 1)()
+        ctx_array[0] = ct.c_void_p(self.context)
+        return lib.bcc_usdt_genargs(ctx_array, 1).decode()
+
     def get_probe_arg_ctype(self, probe_name, arg_index):
         return lib.bcc_usdt_get_probe_argctype(
-            self.context, probe_name, arg_index)
+            self.context, probe_name.encode('ascii'), arg_index).decode()
 
     def enumerate_probes(self):
         probes = []

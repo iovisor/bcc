@@ -110,7 +110,7 @@ class EbpfTableKey(object):
                 ebpfHeader = program.getInstance(instance.name)
                 assert isinstance(ebpfHeader, ebpfInstance.SimpleInstance)
                 basetype = ebpfHeader.type
-                eInstance = program.getInstance(instance.base_name)
+                eInstance = program.getInstance(instance.name)
 
             ebpfField = basetype.getField(fieldname)
             assert isinstance(ebpfField, ebpfStructType.EbpfField)

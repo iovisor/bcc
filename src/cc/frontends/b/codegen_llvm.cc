@@ -425,7 +425,11 @@ StatusTuple CodegenLLVM::visit_string_expr_node(StringExprNode *n) {
   Value *global = B.CreateGlobalString(n->val_);
   Value *ptr = make_alloca(resolve_entry_stack(), B.getInt8Ty(), "",
                            B.getInt64(n->val_.size() + 1));
+#if LLVM_MAJOR_VERSION >= 7
+  B.CreateMemCpy(ptr, 1, global, 1, n->val_.size() + 1);
+#else
   B.CreateMemCpy(ptr, global, n->val_.size() + 1, 1);
+#endif
   expr_ = ptr;
 
   return StatusTuple(0);
@@ -1104,7 +1108,9 @@ StatusTuple CodegenLLVM::visit_table_decl_stmt_node(TableDeclStmtNode *n) {
     decl_gvar->setSection("maps");
     tables_[n] = decl_gvar;
 
-    int map_fd = bpf_create_map(map_type, key->bit_width_ / 8, leaf->bit_width_ / 8, n->size_, 0);
+    int map_fd = bpf_create_map(map_type, n->id_->name_.c_str(),
+                                key->bit_width_ / 8, leaf->bit_width_ / 8,
+                                n->size_, 0);
     if (map_fd >= 0)
       table_fds_[n] = map_fd;
   } else {
@@ -1224,7 +1230,8 @@ StatusTuple CodegenLLVM::visit_func_decl_stmt_node(FuncDeclStmtNode *n) {
   return StatusTuple(0);
 }
 
-StatusTuple CodegenLLVM::visit(Node *root, TableStorage &ts, const string &id) {
+StatusTuple CodegenLLVM::visit(Node *root, TableStorage &ts, const string &id,
+                               const string &maps_ns) {
   scopes_->set_current(scopes_->top_state());
   scopes_->set_current(scopes_->top_var());
 

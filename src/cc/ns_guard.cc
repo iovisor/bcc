@@ -16,10 +16,14 @@
  */
 
 #include <fcntl.h>
+#include <sched.h>
 #include <sys/stat.h>
 #include <string>
 
 #include "ns_guard.h"
+
+// TODO: Remove this when CentOS 6 support is not needed anymore
+#include "setns.h"
 
 ProcMountNS::ProcMountNS(int pid) : target_ino_(0) {
   if (pid < 0)
