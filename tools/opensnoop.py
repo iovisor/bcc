@@ -12,12 +12,14 @@
 # 17-Sep-2015   Brendan Gregg   Created this.
 # 29-Apr-2016   Allan McAleavy  Updated for BPF_PERF_OUTPUT.
 # 08-Oct-2016   Dina Goldshtein Support filtering by PID and TID.
+# 28-Dec-2018   Tim Douglas     Print flags argument, enable filtering
 
 from __future__ import print_function
 from bcc import ArgString, BPF
 import argparse
 import ctypes as ct
 from datetime import datetime, timedelta
+import os
 
 # arguments
 examples = """examples:
@@ -28,6 +30,7 @@ examples = """examples:
     ./opensnoop -t 123    # only trace TID 123
     ./opensnoop -d 10     # trace for 10 seconds only
     ./opensnoop -n main   # only print process names containing "main"
+    ./opensnoop -f O_WRONLY -f O_RDWR  # only print calls for writing
 """
 parser = argparse.ArgumentParser(
     description="Trace open() syscalls",
@@ -48,10 +51,20 @@ parser.add_argument("-n", "--name",
     help="only print process names containing this name")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
+parser.add_argument("-f", "--flag_filter", action="append",
+    help="filter on flags argument (e.g., O_WRONLY)")
 args = parser.parse_args()
 debug = 0
 if args.duration:
     args.duration = timedelta(seconds=int(args.duration))
+flag_filter_mask = 0
+for flag in args.flag_filter or []:
+    if not flag.startswith('O_'):
+        exit("Bad flag: %s" % flag)
+    try:
+        flag_filter_mask |= getattr(os, flag)
+    except AttributeError:
+        exit("Bad flag: %s" % flag)
 
 # define BPF program
 bpf_text = """
@@ -63,6 +76,7 @@ struct val_t {
     u64 id;
     char comm[TASK_COMM_LEN];
     const char *fname;
+    int flags;
 };
 
 struct data_t {
@@ -71,12 +85,13 @@ struct data_t {
     int ret;
     char comm[TASK_COMM_LEN];
     char fname[NAME_MAX];
+    int flags;
 };
 
 BPF_HASH(infotmp, u64, struct val_t);
 BPF_PERF_OUTPUT(events);
 
-int trace_entry(struct pt_regs *ctx, int dfd, const char __user *filename)
+int trace_entry(struct pt_regs *ctx, int dfd, const char __user *filename, int flags)
 {
     struct val_t val = {};
     u64 id = bpf_get_current_pid_tgid();
@@ -87,6 +102,7 @@ int trace_entry(struct pt_regs *ctx, int dfd, const char __user *filename)
     if (bpf_get_current_comm(&val.comm, sizeof(val.comm)) == 0) {
         val.id = id;
         val.fname = filename;
+        val.flags = flags;
         infotmp.update(&id, &val);
     }
 
@@ -110,6 +126,7 @@ int trace_return(struct pt_regs *ctx)
     bpf_probe_read(&data.fname, sizeof(data.fname), (void *)valp->fname);
     data.id = valp->id;
     data.ts = tsp / 1000;
+    data.flags = valp->flags;
     data.ret = PT_REGS_RC(ctx);
 
     events.perf_submit(ctx, &data, sizeof(data));
@@ -145,7 +162,8 @@ class Data(ct.Structure):
         ("ts", ct.c_ulonglong),
         ("ret", ct.c_int),
         ("comm", ct.c_char * TASK_COMM_LEN),
-        ("fname", ct.c_char * NAME_MAX)
+        ("fname", ct.c_char * NAME_MAX),
+        ("flags", ct.c_int),
     ]
 
 initial_ts = 0
@@ -153,8 +171,8 @@ initial_ts = 0
 # header
 if args.timestamp:
     print("%-14s" % ("TIME(s)"), end="")
-print("%-6s %-16s %4s %3s %s" %
-      ("TID" if args.tid else "PID", "COMM", "FD", "ERR", "PATH"))
+print("%-6s %-16s %4s %3s %-8s %s" %
+      ("TID" if args.tid else "PID", "COMM", "FD", "ERR", "FLAGS", "PATH"))
 
 # process event
 def print_event(cpu, data, size):
@@ -178,13 +196,16 @@ def print_event(cpu, data, size):
     if args.name and bytes(args.name) not in event.comm:
         return
 
+    if args.flag_filter and not (event.flags & flag_filter_mask):
+        return
+
     if args.timestamp:
         delta = event.ts - initial_ts
         print("%-14.9f" % (float(delta) / 1000000), end="")
 
-    print("%-6d %-16s %4d %3d %s" %
+    print("%-6d %-16s %4d %3d %08o %s" %
           (event.id & 0xffffffff if args.tid else event.id >> 32,
-           event.comm.decode('utf-8', 'replace'), fd_s, err,
+           event.comm.decode('utf-8', 'replace'), fd_s, err, event.flags,
            event.fname.decode('utf-8', 'replace')))
 
 # loop with callback to print_event
