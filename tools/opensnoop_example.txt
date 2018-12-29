@@ -135,7 +135,7 @@ to the '-n' option.
 The -e option prints out extra columns; for example, the following output
 contains the flags passed to open(2), in octal:
 
-# ./opensnoop.py -e
+# ./opensnoop -e
 PID    COMM               FD ERR FLAGS    PATH
 28512  sshd               10   0 00101101 /proc/self/oom_score_adj
 28512  sshd                3   0 02100000 /etc/ld.so.cache
@@ -150,7 +150,7 @@ PID    COMM               FD ERR FLAGS    PATH
 
 The -f option filters based on flags to the open(2) call, for example:
 
-$ sudo ./opensnoop.py -e -f O_WRONLY -f O_RDWR
+# ./opensnoop -e -f O_WRONLY -f O_RDWR
 PID    COMM               FD ERR FLAGS    PATH
 28084  clear_console       3   0 00100002 /dev/tty
 28084  clear_console      -1  13 00100002 /dev/tty0
@@ -164,8 +164,8 @@ PID    COMM               FD ERR FLAGS    PATH
 USAGE message:
 
 # ./opensnoop -h
-usage: opensnoop.py [-h] [-T] [-x] [-p PID] [-t TID] [-d DURATION] [-n NAME]
-                    [-e] [-f FLAG_FILTER]
+usage: opensnoop [-h] [-T] [-x] [-p PID] [-t TID] [-d DURATION] [-n NAME]
+                 [-e] [-f FLAG_FILTER]
 
 Trace open() syscalls
 
