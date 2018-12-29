@@ -30,6 +30,7 @@ examples = """examples:
     ./opensnoop -t 123    # only trace TID 123
     ./opensnoop -d 10     # trace for 10 seconds only
     ./opensnoop -n main   # only print process names containing "main"
+    ./opensnoop -e        # show extended fields
     ./opensnoop -f O_WRONLY -f O_RDWR  # only print calls for writing
 """
 parser = argparse.ArgumentParser(
@@ -51,6 +52,8 @@ parser.add_argument("-n", "--name",
     help="only print process names containing this name")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
+parser.add_argument("-e", "--extended_fields", action="store_true",
+    help="show extended fields")
 parser.add_argument("-f", "--flag_filter", action="append",
     help="filter on flags argument (e.g., O_WRONLY)")
 args = parser.parse_args()
@@ -76,7 +79,7 @@ struct val_t {
     u64 id;
     char comm[TASK_COMM_LEN];
     const char *fname;
-    int flags;
+    int flags; // EXTENDED_STRUCT_MEMBER
 };
 
 struct data_t {
@@ -85,7 +88,7 @@ struct data_t {
     int ret;
     char comm[TASK_COMM_LEN];
     char fname[NAME_MAX];
-    int flags;
+    int flags; // EXTENDED_STRUCT_MEMBER
 };
 
 BPF_HASH(infotmp, u64, struct val_t);
@@ -98,11 +101,12 @@ int trace_entry(struct pt_regs *ctx, int dfd, const char __user *filename, int f
     u32 pid = id >> 32; // PID is higher part
     u32 tid = id;       // Cast and get the lower part
 
-    FILTER
+    PID_TID_FILTER
+    FLAGS_FILTER
     if (bpf_get_current_comm(&val.comm, sizeof(val.comm)) == 0) {
         val.id = id;
         val.fname = filename;
-        val.flags = flags;
+        val.flags = flags; // EXTENDED_STRUCT_MEMBER
         infotmp.update(&id, &val);
     }
 
@@ -126,7 +130,7 @@ int trace_return(struct pt_regs *ctx)
     bpf_probe_read(&data.fname, sizeof(data.fname), (void *)valp->fname);
     data.id = valp->id;
     data.ts = tsp / 1000;
-    data.flags = valp->flags;
+    data.flags = valp->flags; // EXTENDED_STRUCT_MEMBER
     data.ret = PT_REGS_RC(ctx);
 
     events.perf_submit(ctx, &data, sizeof(data));
@@ -136,13 +140,21 @@ int trace_return(struct pt_regs *ctx)
 }
 """
 if args.tid:  # TID trumps PID
-    bpf_text = bpf_text.replace('FILTER',
+    bpf_text = bpf_text.replace('PID_TID_FILTER',
         'if (tid != %s) { return 0; }' % args.tid)
 elif args.pid:
-    bpf_text = bpf_text.replace('FILTER',
+    bpf_text = bpf_text.replace('PID_TID_FILTER',
         'if (pid != %s) { return 0; }' % args.pid)
 else:
-    bpf_text = bpf_text.replace('FILTER', '')
+    bpf_text = bpf_text.replace('PID_TID_FILTER', '')
+if args.flag_filter:
+    bpf_text = bpf_text.replace('FLAGS_FILTER',
+        'if (!(flags & %d)) { return 0; }' % flag_filter_mask)
+else:
+    bpf_text = bpf_text.replace('FLAGS_FILTER', '')
+if not (args.extended_fields or args.flag_filter):
+    bpf_text = '\n'.join(x for x in bpf_text.split('\n')
+        if 'EXTENDED_STRUCT_MEMBER' not in x)
 if debug or args.ebpf:
     print(bpf_text)
     if args.ebpf:
@@ -171,8 +183,11 @@ initial_ts = 0
 # header
 if args.timestamp:
     print("%-14s" % ("TIME(s)"), end="")
-print("%-6s %-16s %4s %3s %-8s %s" %
-      ("TID" if args.tid else "PID", "COMM", "FD", "ERR", "FLAGS", "PATH"))
+print("%-6s %-16s %4s %3s " %
+      ("TID" if args.tid else "PID", "COMM", "FD", "ERR"), end="")
+if args.extended_fields:
+    print("%-9s" % ("FLAGS"), end="")
+print("PATH")
 
 # process event
 def print_event(cpu, data, size):
@@ -196,17 +211,18 @@ def print_event(cpu, data, size):
     if args.name and bytes(args.name) not in event.comm:
         return
 
-    if args.flag_filter and not (event.flags & flag_filter_mask):
-        return
-
     if args.timestamp:
         delta = event.ts - initial_ts
         print("%-14.9f" % (float(delta) / 1000000), end="")
 
-    print("%-6d %-16s %4d %3d %08o %s" %
+    print("%-6d %-16s %4d %3d " %
           (event.id & 0xffffffff if args.tid else event.id >> 32,
-           event.comm.decode('utf-8', 'replace'), fd_s, err, event.flags,
-           event.fname.decode('utf-8', 'replace')))
+           event.comm.decode('utf-8', 'replace'), fd_s, err), end="")
+
+    if args.extended_fields:
+        print("%08o " % event.flags, end="")
+
+    print(event.fname.decode('utf-8', 'replace'))
 
 # loop with callback to print_event
 b["events"].open_perf_buffer(print_event, page_cnt=64)
