@@ -726,6 +726,164 @@ int bcc_elf_foreach_vdso_sym(bcc_elf_symcb callback, void *payload) {
   return listsymbols(elf, callback, payload, &default_option);
 }
 
+// return value: 0   : success
+//               < 0 : error and no bcc lib found
+//               > 0 : error and bcc lib found
+static int bcc_free_memory_with_file(const char *path) {
+  unsigned long sym_addr = 0, sym_shndx;
+  Elf_Scn *section = NULL;
+  int fd = -1, err;
+  GElf_Shdr header;
+  Elf *e = NULL;
+
+  if ((err = openelf(path, &e, &fd)) < 0)
+    goto exit;
+
+  // get symbol address of "bcc_free_memory", which
+  // will be used to calculate runtime .text address
+  // range, esp. for shared libraries.
+  err = -1;
+  while ((section = elf_nextscn(e, section)) != 0) {
+    Elf_Data *data = NULL;
+    size_t symsize;
+
+    if (!gelf_getshdr(section, &header))
+      continue;
+
+    if (header.sh_type != SHT_SYMTAB && header.sh_type != SHT_DYNSYM)
+      continue;
+
+    /* iterate all symbols */
+    symsize = header.sh_entsize;
+    while ((data = elf_getdata(section, data)) != 0) {
+      size_t i, symcount = data->d_size / symsize;
+
+      for (i = 0; i < symcount; ++i) {
+        GElf_Sym sym;
+
+        if (!gelf_getsym(data, (int)i, &sym))
+          continue;
+
+        if (GELF_ST_TYPE(sym.st_info) != STT_FUNC)
+          continue;
+
+        const char *name;
+        if ((name = elf_strptr(e, header.sh_link, sym.st_name)) == NULL)
+          continue;
+
+        if (strcmp(name, "bcc_free_memory") == 0) {
+          sym_addr = sym.st_value;
+          sym_shndx = sym.st_shndx;
+          break;
+        }
+      }
+    }
+  }
+
+  // Didn't find bcc_free_memory in the ELF file.
+  if (sym_addr == 0)
+    goto exit;
+
+  int sh_idx = 0;
+  section = NULL;
+  err = 1;
+  while ((section = elf_nextscn(e, section)) != 0) {
+    sh_idx++;
+    if (!gelf_getshdr(section, &header))
+      continue;
+
+    if (sh_idx == sym_shndx) {
+      unsigned long saddr, saddr_n, eaddr;
+      long page_size = sysconf(_SC_PAGESIZE);
+
+      saddr = (unsigned long)bcc_free_memory - sym_addr + header.sh_addr;
+      eaddr = saddr + header.sh_size;
+
+      extern unsigned long _start, _fini;
+
+      // adjust saddr and eaddr, start addr needs to be page aligned
+      saddr_n = (saddr + page_size - 1) & ~(page_size - 1);
+      eaddr -= saddr_n - saddr;
+
+      if (madvise((void *)saddr_n, eaddr - saddr_n, MADV_DONTNEED)) {
+        fprintf(stderr, "madvise failed, saddr %lx, eaddr %lx\n", saddr, eaddr);
+        goto exit;
+      }
+
+      err = 0;
+      break;
+    }
+  }
+
+exit:
+  if (e)
+    elf_end(e);
+  if (fd >= 0)
+    close(fd);
+  return err;
+}
+
+// Free bcc mmemory
+//
+// The main purpose of this function is to free llvm/clang text memory
+// through madvise MADV_DONTNEED.
+//
+// bcc could be linked statically or dynamically into the application.
+// If it is static linking, there is no easy way to know which region
+// inside .text section belongs to llvm/clang, so the whole .text section
+// is freed. Otherwise, the process map is searched to find libbcc.so
+// library and the whole .text section for that shared library is
+// freed.
+//
+// Note that the text memory used by bcc (mainly llvm/clang) is reclaimable
+// in the kernel as it is file backed. But the reclaim process
+// may take some time if no memory pressure. So this API is mostly
+// used for application who needs to immediately lowers its RssFile
+// metric right after loading BPF program.
+int bcc_free_memory() {
+  int err;
+
+  // First try whether bcc is statically linked or not
+  err = bcc_free_memory_with_file("/proc/self/exe");
+  if (err >= 0)
+    return -err;
+
+  // Not statically linked, let us find the libbcc.so
+  FILE *maps = fopen("/proc/self/maps", "r");
+  if (!maps)
+    return -1;
+
+  char *line = NULL;
+  size_t size;
+  while (getline(&line, &size, maps) > 0) {
+    char *libbcc = strstr(line, "libbcc.so");
+    if (!libbcc)
+      continue;
+
+    // Parse the line and get the full libbcc.so path
+    unsigned long addr_start, addr_end, offset, inode;
+    int path_start = 0, path_end = 0;
+    unsigned int devmajor, devminor;
+    char perms[8];
+    if (sscanf(line, "%lx-%lx %7s %lx %u:%u %lu %n%*[^\n]%n",
+               &addr_start, &addr_end, perms, &offset,
+               &devmajor, &devminor, &inode,
+               &path_start, &path_end) < 7)
+       break;
+
+    // Free the text in the bcc dynamic library.
+    char libbcc_path[4096];
+    memcpy(libbcc_path, line + path_start, path_end - path_start);
+    libbcc_path[path_end - path_start] = '\0';
+    err = bcc_free_memory_with_file(libbcc_path);
+    err = (err <= 0) ? err : -err;
+  }
+
+  fclose(maps);
+  free(line);
+  return err;
+}
+
 #if 0
 #include <stdio.h>
 
