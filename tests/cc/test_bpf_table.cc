@@ -222,3 +222,59 @@ TEST_CASE("test bpf stack table", "[bpf_stack_table]") {
   REQUIRE(addrs.size() == 0);
 #endif
 }
+
+TEST_CASE("test bpf stack_id table", "[bpf_stack_table]") {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0)
+  const std::string BPF_PROGRAM = R"(
+    BPF_HASH(id, int, int, 1);
+    BPF_STACK_TRACE_BUILDID(stack_traces, 8);
+
+    int on_sys_getuid(void *ctx) {
+      int stack_id = stack_traces.get_stackid(ctx, BPF_F_USER_STACK);
+      int zero = 0, *val;
+      val = id.lookup_or_init(&zero, &stack_id);
+      (*val) = stack_id;
+
+      return 0;
+    }
+  )";
+
+  ebpf::BPF bpf;
+  ebpf::StatusTuple res(0);
+  res = bpf.init(BPF_PROGRAM);
+  REQUIRE(res.code() == 0);
+  std::string getuid_fnname = bpf.get_syscall_fnname("getuid");
+  res = bpf.attach_kprobe(getuid_fnname, "on_sys_getuid");
+  REQUIRE(res.code() == 0);
+  REQUIRE(getuid() >= 0);
+  res = bpf.detach_kprobe(getuid_fnname);
+  REQUIRE(res.code() == 0);
+
+  auto id = bpf.get_hash_table<int, int>("id");
+  auto stack_traces = bpf.get_stackbuildid_table("stack_traces");
+
+  /* libc locations on different distributions are added below*/
+  bpf.add_module("/lib/x86_64-linux-gnu/libc.so.6"); //Location of libc in ubuntu
+  bpf.add_module("/lib64/libc.so.6"); //Location of libc fedora machine
+
+  int stack_id = id[0];
+  REQUIRE(stack_id >= 0);
+
+  auto addrs = stack_traces.get_stack_addr(stack_id);
+  auto symbols = stack_traces.get_stack_symbol(stack_id);
+  REQUIRE(addrs.size() > 0);
+  REQUIRE(addrs.size() == symbols.size());
+  bool found = false;
+  for (const auto &symbol : symbols) {
+    if (symbol.find("getuid") != std::string::npos) {
+      found = true;
+      break;
+    }
+  }
+  REQUIRE(found);
+
+  stack_traces.clear_table_non_atomic();
+  addrs = stack_traces.get_stack_addr(stack_id);
+  REQUIRE(addrs.size()==0);
+#endif
+}

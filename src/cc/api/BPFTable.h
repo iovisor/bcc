@@ -315,6 +315,26 @@ class BPFStackTable : public BPFTableBase<int, stacktrace_t> {
   std::map<int, void*> pid_sym_;
 };
 
+// from src/cc/export/helpers.h
+struct stacktrace_buildid_t {
+  struct bpf_stack_build_id trace[BPF_MAX_STACK_DEPTH];
+};
+
+class BPFStackBuildIdTable : public BPFTableBase<int, stacktrace_buildid_t> {
+ public:
+  BPFStackBuildIdTable(const TableDesc& desc, bool use_debug_file,
+                       bool check_debug_file_crc, void *bsymcache);
+  ~BPFStackBuildIdTable() = default;
+
+  void clear_table_non_atomic();
+  std::vector<bpf_stack_build_id> get_stack_addr(int stack_id);
+  std::vector<std::string> get_stack_symbol(int stack_id);
+
+ private:
+  void *bsymcache_;
+  bcc_symbol_option symbol_option_;
+};
+
 class BPFPerfBuffer : public BPFTableBase<int, int> {
  public:
   BPFPerfBuffer(const TableDesc& desc);
