@@ -668,6 +668,20 @@ int bcc_elf_foreach_vdso_sym(bcc_elf_symcb callback, void *payload) {
   return listsymbols(elf, callback, payload, &default_option);
 }
 
+int bcc_elf_get_buildid(const char *path, char *buildid)
+{
+  Elf *e;
+  int fd;
+
+  if (openelf(path, &e, &fd) < 0)
+    return -1;
+
+  if (!find_buildid(e, buildid))
+    return -1;
+
+  return 0;
+}
+
 #if 0
 #include <stdio.h>
 

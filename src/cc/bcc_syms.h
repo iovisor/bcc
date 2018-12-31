@@ -29,6 +29,27 @@ struct bcc_symbol {
   uint64_t offset;
 };
 
+enum bcc_stack_build_id_status {
+  /* user space need an empty entry to identify end of a trace */
+  BCC_STACK_BUILD_ID_EMPTY = 0,
+  /* with valid build_id and offset */
+  BCC_STACK_BUILD_ID_VALID = 1,
+  /* couldn't get build_id, fallback to ip */
+  BCC_STACK_BUILD_ID_IP = 2,
+
+  BCC_STACK_BUILD_ID_MAX
+};
+
+#define BCC_BUILD_ID_SIZE 20
+struct bcc_stacktrace_build_id {
+  uint32_t status;
+  unsigned char build_id[BCC_BUILD_ID_SIZE];
+  union {
+    uint64_t offset;
+    uint64_t ip;
+  };
+};
+
 typedef int (*SYM_CB)(const char *symname, uint64_t addr);
 
 #ifndef STT_GNU_IFUNC
@@ -60,6 +81,13 @@ void bcc_symcache_refresh(void *resolver);
 int bcc_resolve_global_addr(int pid, const char *module, const uint64_t address,
                             uint64_t *global);
 
+/*bcc APIs for build_id stackmap support*/
+void *bcc_buildsymcache_new(void);
+void bcc_free_buildsymcache(void *symcache);
+int  bcc_buildsymcache_add_module(void *resolver, const char *module_name);
+int bcc_buildsymcache_resolve(void *resolver,
+                              struct bcc_stacktrace_build_id *trace,
+                              struct bcc_symbol *sym);
 // Call cb on every function symbol in the specified module. Uses simpler
 // SYM_CB callback mainly for easier to use in Python API.
 // Will prefer use debug file and check debug file CRC when reading the module.
