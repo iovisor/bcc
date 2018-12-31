@@ -68,7 +68,9 @@ int bcc_elf_get_type(const char *path);
 int bcc_elf_is_shared_obj(const char *path);
 int bcc_elf_is_exe(const char *path);
 int bcc_elf_is_vdso(const char *name);
+
 int bcc_elf_get_buildid(const char *path, char *buildid);
+int bcc_free_memory();
 
 #ifdef __cplusplus
 }

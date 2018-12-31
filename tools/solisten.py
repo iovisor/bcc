@@ -210,4 +210,7 @@ if __name__ == "__main__":
 
     # Read events
     while 1:
-        b.perf_buffer_poll()
+        try:
+            b.perf_buffer_poll()
+        except KeyboardInterrupt:
+            exit()

@@ -7,7 +7,7 @@
   - [Arch](#arch---aur)
   - [Gentoo](#gentoo---portage)
   - [openSUSE](#opensuse---binary)
-  - [RHEL](#redhat---binary)
+  - [RHEL](#rhel---binary)
 * [Source](#source)
   - [Debian](#debian---source)
   - [Ubuntu](#ubuntu---source)
@@ -58,7 +58,7 @@ The stable and the nightly packages are built for Ubuntu Xenial (16.04), Ubuntu 
 
 ```bash
 sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 4052245BD4284CDD
-echo "deb https://repo.iovisor.org/apt/xenial xenial main" | sudo tee /etc/apt/sources.list.d/iovisor.list
+echo "deb https://repo.iovisor.org/apt/$(lsb_release -cs) $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/iovisor.list
 sudo apt-get update
 sudo apt-get install bcc-tools libbcc-examples linux-headers-$(uname -r)
 ```
@@ -148,7 +148,7 @@ sudo zypper in bcc-tools bcc-examples
 
 ## RHEL - Binary
 
-For Redhat 7.6 (Beta) bcc is already included in the official yum repository as bcc-tools. As part of the install the following dependencies are installed: bcc.x86_64 0:0.6.0-3.el7 ,llvm-private.x86_64 0:6.0.1-2.el7 ,python-bcc.x86_64 0:0.6.0-3.el7,python-netaddr.noarch 0:0.7.5-9.el7
+For RHEL 7.6, bcc is already included in the official yum repository as bcc-tools. As part of the install, the following dependencies are installed: bcc.x86_64 0:0.6.1-2.el7 ,llvm-private.x86_64 0:6.0.1-2.el7 ,python-bcc.x86_64 0:0.6.1-2.el7,python-netaddr.noarch 0:0.7.5-9.el7
 
 ```
 yum install bcc-tools
@@ -258,7 +258,11 @@ deb-src http://llvm.org/apt/$VER/ llvm-toolchain-$VER-3.7 main" | \
 wget -O - http://llvm.org/apt/llvm-snapshot.gpg.key | sudo apt-key add -
 sudo apt-get update
 
-# All versions
+# For bionic
+sudo apt-get -y install bison build-essential cmake flex git libedit-dev \
+  libllvm6.0 llvm-6.0-dev libclang-6.0-dev python zlib1g-dev libelf-dev
+
+# For other versions
 sudo apt-get -y install bison build-essential cmake flex git libedit-dev \
   libllvm3.7 llvm-3.7-dev libclang-3.7-dev python zlib1g-dev libelf-dev
 

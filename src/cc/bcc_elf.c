@@ -184,10 +184,49 @@ int bcc_elf_foreach_usdt(const char *path, bcc_elf_probecb callback,
   return res;
 }
 
+static Elf_Scn * get_section(Elf *e, const char *section_name,
+                             GElf_Shdr *section_hdr, size_t *section_idx) {
+  Elf_Scn *section = NULL;
+  GElf_Shdr header;
+  char *name;
+
+  size_t stridx;
+  if (elf_getshdrstrndx(e, &stridx) != 0)
+    return NULL;
+
+  size_t index;
+  for (index = 1; (section = elf_nextscn(e, section)) != 0; index++) {
+    if (!gelf_getshdr(section, &header))
+      continue;
+
+    name = elf_strptr(e, stridx, header.sh_name);
+    if (name && !strcmp(name, section_name)) {
+      if (section_hdr)
+        *section_hdr = header;
+      if (section_idx)
+        *section_idx = index;
+      return section;
+    }
+  }
+
+  return NULL;
+}
+
 static int list_in_scn(Elf *e, Elf_Scn *section, size_t stridx, size_t symsize,
                        struct bcc_symbol_option *option,
                        bcc_elf_symcb callback, void *payload) {
   Elf_Data *data = NULL;
+
+#if defined(__powerpc64__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+  size_t opdidx = 0;
+  Elf_Scn *opdsec = NULL;
+  GElf_Shdr opdshdr = {};
+  Elf_Data *opddata = NULL;
+
+  opdsec = get_section(e, ".opd", &opdshdr, &opdidx);
+  if (opdsec && opdshdr.sh_type == SHT_PROGBITS)
+    opddata = elf_getdata(opdsec, NULL);
+#endif
 
   while ((data = elf_getdata(section, data)) != 0) {
     size_t i, symcount = data->d_size / symsize;
@@ -213,6 +252,40 @@ static int list_in_scn(Elf *e, Elf_Scn *section, size_t stridx, size_t symsize,
       uint32_t st_type = ELF_ST_TYPE(sym.st_info);
       if (!(option->use_symbol_type & (1 << st_type)))
         continue;
+
+#ifdef __powerpc64__
+#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+      if (opddata && sym.st_shndx == opdidx) {
+        size_t offset = sym.st_value - opdshdr.sh_addr;
+        /* Find the function descriptor */
+        uint64_t *descr = opddata->d_buf + offset;
+        /* Read the actual entry point address from the descriptor */
+        sym.st_value = *descr;
+      }
+#elif __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+      if (option->use_symbol_type & (1 << STT_PPC64LE_SYM_LEP)) {
+        /*
+         * The PowerPC 64-bit ELF v2 ABI says that the 3 most significant bits
+         * in the st_other field of the symbol table specifies the number of
+         * instructions between a function's Global Entry Point (GEP) and Local
+         * Entry Point (LEP).
+         */
+        switch (sym.st_other >> 5) {
+          /* GEP and LEP are the same for 0 or 1, usage is reserved for 7 */
+          /* If 2, LEP is 1 instruction past the GEP */
+          case 2: sym.st_value += 4; break;
+          /* If 3, LEP is 2 instructions past the GEP */
+          case 3: sym.st_value += 8; break;
+          /* If 4, LEP is 4 instructions past the GEP */
+          case 4: sym.st_value += 16; break;
+          /* If 5, LEP is 8 instructions past the GEP */
+          case 5: sym.st_value += 32; break;
+          /* If 6, LEP is 16 instructions past the GEP */
+          case 6: sym.st_value += 64; break;
+        }
+      }
+#endif
+#endif
 
       if (callback(name, sym.st_value, sym.st_size, payload) < 0)
         return 1;      // signal termination to caller
@@ -248,24 +321,9 @@ static int listsymbols(Elf *e, bcc_elf_symcb callback, void *payload,
 }
 
 static Elf_Data * get_section_elf_data(Elf *e, const char *section_name) {
-  Elf_Scn *section = NULL;
-  GElf_Shdr header;
-  char *name;
-
-  size_t stridx;
-  if (elf_getshdrstrndx(e, &stridx) != 0)
-    return NULL;
-
-  while ((section = elf_nextscn(e, section)) != 0) {
-    if (!gelf_getshdr(section, &header))
-      continue;
-
-    name = elf_strptr(e, stridx, header.sh_name);
-    if (name && !strcmp(name, section_name)) {
-      return elf_getdata(section, NULL);
-    }
-  }
-
+  Elf_Scn *section = get_section(e, section_name, NULL, NULL);
+  if (section)
+    return elf_getdata(section, NULL);
   return NULL;
 }
 
@@ -680,6 +738,163 @@ int bcc_elf_get_buildid(const char *path, char *buildid)
     return -1;
 
   return 0;
+}
+// return value: 0   : success
+//               < 0 : error and no bcc lib found
+//               > 0 : error and bcc lib found
+static int bcc_free_memory_with_file(const char *path) {
+  unsigned long sym_addr = 0, sym_shndx;
+  Elf_Scn *section = NULL;
+  int fd = -1, err;
+  GElf_Shdr header;
+  Elf *e = NULL;
+
+  if ((err = openelf(path, &e, &fd)) < 0)
+    goto exit;
+
+  // get symbol address of "bcc_free_memory", which
+  // will be used to calculate runtime .text address
+  // range, esp. for shared libraries.
+  err = -1;
+  while ((section = elf_nextscn(e, section)) != 0) {
+    Elf_Data *data = NULL;
+    size_t symsize;
+
+    if (!gelf_getshdr(section, &header))
+      continue;
+
+    if (header.sh_type != SHT_SYMTAB && header.sh_type != SHT_DYNSYM)
+      continue;
+
+    /* iterate all symbols */
+    symsize = header.sh_entsize;
+    while ((data = elf_getdata(section, data)) != 0) {
+      size_t i, symcount = data->d_size / symsize;
+
+      for (i = 0; i < symcount; ++i) {
+        GElf_Sym sym;
+
+        if (!gelf_getsym(data, (int)i, &sym))
+          continue;
+
+        if (GELF_ST_TYPE(sym.st_info) != STT_FUNC)
+          continue;
+
+        const char *name;
+        if ((name = elf_strptr(e, header.sh_link, sym.st_name)) == NULL)
+          continue;
+
+        if (strcmp(name, "bcc_free_memory") == 0) {
+          sym_addr = sym.st_value;
+          sym_shndx = sym.st_shndx;
+          break;
+        }
+      }
+    }
+  }
+
+  // Didn't find bcc_free_memory in the ELF file.
+  if (sym_addr == 0)
+    goto exit;
+
+  int sh_idx = 0;
+  section = NULL;
+  err = 1;
+  while ((section = elf_nextscn(e, section)) != 0) {
+    sh_idx++;
+    if (!gelf_getshdr(section, &header))
+      continue;
+
+    if (sh_idx == sym_shndx) {
+      unsigned long saddr, saddr_n, eaddr;
+      long page_size = sysconf(_SC_PAGESIZE);
+
+      saddr = (unsigned long)bcc_free_memory - sym_addr + header.sh_addr;
+      eaddr = saddr + header.sh_size;
+
+      extern unsigned long _start, _fini;
+
+      // adjust saddr and eaddr, start addr needs to be page aligned
+      saddr_n = (saddr + page_size - 1) & ~(page_size - 1);
+      eaddr -= saddr_n - saddr;
+
+      if (madvise((void *)saddr_n, eaddr - saddr_n, MADV_DONTNEED)) {
+        fprintf(stderr, "madvise failed, saddr %lx, eaddr %lx\n", saddr, eaddr);
+        goto exit;
+      }
+
+      err = 0;
+      break;
+    }
+  }
+
+exit:
+  if (e)
+    elf_end(e);
+  if (fd >= 0)
+    close(fd);
+  return err;
+}
+
+// Free bcc mmemory
+//
+// The main purpose of this function is to free llvm/clang text memory
+// through madvise MADV_DONTNEED.
+//
+// bcc could be linked statically or dynamically into the application.
+// If it is static linking, there is no easy way to know which region
+// inside .text section belongs to llvm/clang, so the whole .text section
+// is freed. Otherwise, the process map is searched to find libbcc.so
+// library and the whole .text section for that shared library is
+// freed.
+//
+// Note that the text memory used by bcc (mainly llvm/clang) is reclaimable
+// in the kernel as it is file backed. But the reclaim process
+// may take some time if no memory pressure. So this API is mostly
+// used for application who needs to immediately lowers its RssFile
+// metric right after loading BPF program.
+int bcc_free_memory() {
+  int err;
+
+  // First try whether bcc is statically linked or not
+  err = bcc_free_memory_with_file("/proc/self/exe");
+  if (err >= 0)
+    return -err;
+
+  // Not statically linked, let us find the libbcc.so
+  FILE *maps = fopen("/proc/self/maps", "r");
+  if (!maps)
+    return -1;
+
+  char *line = NULL;
+  size_t size;
+  while (getline(&line, &size, maps) > 0) {
+    char *libbcc = strstr(line, "libbcc.so");
+    if (!libbcc)
+      continue;
+
+    // Parse the line and get the full libbcc.so path
+    unsigned long addr_start, addr_end, offset, inode;
+    int path_start = 0, path_end = 0;
+    unsigned int devmajor, devminor;
+    char perms[8];
+    if (sscanf(line, "%lx-%lx %7s %lx %u:%u %lu %n%*[^\n]%n",
+               &addr_start, &addr_end, perms, &offset,
+               &devmajor, &devminor, &inode,
+               &path_start, &path_end) < 7)
+       break;
+
+    // Free the text in the bcc dynamic library.
+    char libbcc_path[4096];
+    memcpy(libbcc_path, line + path_start, path_end - path_start);
+    libbcc_path[path_end - path_start] = '\0';
+    err = bcc_free_memory_with_file(libbcc_path);
+    err = (err <= 0) ? err : -err;
+  }
+
+  fclose(maps);
+  free(line);
+  return err;
 }
 
 #if 0

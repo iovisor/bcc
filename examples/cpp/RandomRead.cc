@@ -117,6 +117,12 @@ int main(int argc, char** argv) {
     return 1;
   }
 
+  // done with all initial work, free bcc memory
+  if (bpf->free_bcc_memory()) {
+    std::cerr << "Failed to free llvm/clang memory" << std::endl;
+    return 1;
+  }
+
   signal(SIGINT, signal_handler);
   std::cout << "Started tracing, hit Ctrl-C to terminate." << std::endl;
   while (true)

@@ -3,7 +3,7 @@
 inject \- injects appropriate error into function if input call chain and
 predicates are satisfied. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B inject -h [-I header] [-P probability] [-v] mode spec
+.B inject -h [-I header] [-P probability] [-v] [-C count] mode spec
 .SH DESCRIPTION
 inject injects errors into specified kernel functionality when a given call
 chain and associated predicates are satsified.
@@ -29,6 +29,9 @@ Necessary headers to be included.
 .TP
 \-P probability
 Optional probability of failure, default 1.
+.TP
+\-C count
+Number of errors to inject before stopping, default never stops.
 .SH EXAMPLES
 Please see inject_example.txt
 .SH SOURCE

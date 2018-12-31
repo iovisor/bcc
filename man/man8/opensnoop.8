@@ -41,6 +41,12 @@ Total duration of trace in seconds.
 .TP
 \-n name
 Only print processes where its name partially matches 'name'
+.TP
+\-e
+Show extended fields.
+.TP
+\-f FLAG
+Filter on open() flags, e.g., O_WRONLY.
 .SH EXAMPLES
 .TP
 Trace all open() syscalls:
@@ -66,6 +72,14 @@ Trace PID 181 only:
 Trace all open() syscalls from processes where its name partially matches 'ed':
 #
 .B opensnoop \-n ed
+.TP
+Show extended fields:
+#
+.B opensnoop \-e
+.TP
+Only print calls for writing:
+#
+.B opensnoop \-f O_WRONLY \-f O_RDWR
 .SH FIELDS
 .TP
 TIME(s)
@@ -85,6 +99,9 @@ File descriptor (if success), or -1 (if failed)
 .TP
 ERR
 Error number (see the system's errno.h)
+.TP
+FLAGS
+Flags passed to open(2), in octal
 .TP
 PATH
 Open path

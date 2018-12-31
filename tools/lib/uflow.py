@@ -206,4 +206,7 @@ def print_event(cpu, data, size):
 
 bpf["calls"].open_perf_buffer(print_event)
 while 1:
-    bpf.perf_buffer_poll()
+    try:
+        bpf.perf_buffer_poll()
+    except KeyboardInterrupt:
+        exit()

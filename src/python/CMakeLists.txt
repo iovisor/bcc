@@ -1,7 +1,7 @@
 # Copyright (c) PLUMgrid, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
 
-set(PYTHON_SRC __init__.py perf.py tcp.py utils.py libbcc.py table.py usdt.py)
+set(PYTHON_SRC __init__.py perf.py tcp.py utils.py libbcc.py syscall.py table.py usdt.py)
 
 foreach (PY_SRC ${PYTHON_SRC})
   configure_file(bcc/${PY_SRC} ${CMAKE_CURRENT_BINARY_DIR}/bcc/${PY_SRC} COPYONLY)

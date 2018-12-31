@@ -15,7 +15,8 @@ add_definitions(${LLVM_DEFINITIONS})
 configure_file(libbcc.pc.in ${CMAKE_CURRENT_BINARY_DIR}/libbcc.pc @ONLY)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -DBCC_PROG_TAG_DIR='\"${BCC_PROG_TAG_DIR}\"'")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-result")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC -Wno-unused-result")
 
 string(REGEX MATCH "^([0-9]+).*" _ ${LLVM_PACKAGE_VERSION})
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DLLVM_MAJOR_VERSION=${CMAKE_MATCH_1}")
@@ -33,12 +34,18 @@ if (${LLVM_PACKAGE_VERSION} VERSION_EQUAL 6 OR ${LLVM_PACKAGE_VERSION} VERSION_G
   set(bcc_common_sources ${bcc_common_sources} bcc_debug.cc)
 endif()
 
+if(ENABLE_LLVM_NATIVECODEGEN)
+set(bcc_common_sources ${bcc_common_sources} bpf_module_rw_engine.cc)
+else()
+set(bcc_common_sources ${bcc_common_sources} bpf_module_rw_engine_disabled.cc)
+endif()
+
 set(bcc_table_sources table_storage.cc shared_table.cc bpffs_table.cc json_map_decl_visitor.cc)
 set(bcc_util_sources ns_guard.cc common.cc)
 set(bcc_sym_sources bcc_syms.cc bcc_elf.c bcc_perf_map.c bcc_proc.c)
 set(bcc_common_headers libbpf.h perf_reader.h)
 set(bcc_table_headers file_desc.h table_desc.h table_storage.h)
-set(bcc_api_headers bpf_common.h bpf_module.h bcc_exception.h bcc_syms.h)
+set(bcc_api_headers bpf_common.h bpf_module.h bcc_exception.h bcc_syms.h bcc_elf.h)
 
 if(ENABLE_CLANG_JIT)
 add_library(bcc-shared SHARED

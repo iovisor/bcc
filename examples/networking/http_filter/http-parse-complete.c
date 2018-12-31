@@ -83,7 +83,7 @@ int http_filter(struct __sk_buff *skb) {
 	//e.g. tcp->offset = 5 ; TCP Header Length = 5 x 4 byte = 20 byte
 	tcp_header_length = tcp->offset << 2; //SHL 2 -> *4 multiply
 
-	//calculate patload offset and length
+	//calculate payload offset and length
 	payload_offset = ETH_HLEN + ip_header_length + tcp_header_length;
 	payload_length = ip->tlen - ip_header_length - tcp_header_length;
 
@@ -99,11 +99,8 @@ int http_filter(struct __sk_buff *skb) {
 	//direct access to skb not allowed
 	unsigned long p[7];
 	int i = 0;
-	int j = 0;
-	const int last_index = payload_offset + 7;
-	for (i = payload_offset ; i < last_index ; i++) {
-		p[j] = load_byte(skb , i);
-		j++;
+	for (i = 0; i < 7; i++) {
+		p[i] = load_byte(skb , payload_offset + i);
 	}
 
 	//find a match with an HTTP message
