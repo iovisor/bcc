@@ -435,6 +435,10 @@ static int (*bpf_map_peek_elem)(void *map, void *value) =
   (void *) BPF_FUNC_map_peek_elem;
 static int (*bpf_msg_push_data)(void *skb, u32 start, u32 len, u64 flags) =
   (void *) BPF_FUNC_msg_push_data;
+static int (*bpf_msg_pop_data)(void *msg, u32 start, u32 pop, u64 flags) =
+  (void *) BPF_FUNC_msg_pop_data;
+static int (*bpf_rc_pointer_rel)(void *ctx, s32 rel_x, s32 rel_y) =
+  (void *) BPF_FUNC_rc_pointer_rel;
 
 /* llvm builtin functions that eBPF C program may use to
  * emit BPF_LD_ABS and BPF_LD_IND instructions
