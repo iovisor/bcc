@@ -1195,7 +1195,7 @@ class BPF(object):
 
         #addr is of type stacktrace_build_id
         #so invoke the bsym address resolver
-        if not isinstance(addr, int):
+        if not isinstance(addr, long):
           sym = bcc_symbol()
           b = bcc_stacktrace_build_id()
           b.status = addr.status
