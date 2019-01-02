@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # sslsniff  Captures data on read/recv or write/send functions of OpenSSL,
 #           GnuTLS and NSS
