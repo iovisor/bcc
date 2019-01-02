@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # stacksnoop    Trace a kernel function and print all kernel stack traces.
 #               For Linux, uses BCC, eBPF, and currently x86_64 only. Inline C.
