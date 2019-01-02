@@ -147,6 +147,10 @@ class BPF {
                                 bool use_debug_file = true,
                                 bool check_debug_file_crc = true);
 
+  BPFStackBuildIdTable get_stackbuildid_table(const std::string &name,
+                                              bool use_debug_file = true,
+                                              bool check_debug_file_crc = true);
+
   StatusTuple open_perf_event(const std::string& name, uint32_t type,
                               uint64_t config);
 

@@ -316,6 +316,88 @@ std::vector<std::string> BPFStackTable::get_stack_symbol(int stack_id,
   return res;
 }
 
+BPFStackBuildIdTable::BPFStackBuildIdTable(const TableDesc& desc, bool use_debug_file,
+                             bool check_debug_file_crc)
+    : BPFTableBase<int, stacktrace_buildid_t>(desc) {
+  if (desc.type != BPF_MAP_TYPE_STACK_TRACE)
+    throw std::invalid_argument("Table '" + desc.name +
+                                "' is not a stack table");
+
+  bsymcache_ = bcc_buildsymcache_new();
+  if (bsymcache_ == NULL)
+    throw std::invalid_argument("Table '"+desc.name +
+                                "'Unable to allocate bsymcache");
+
+  symbol_option_ = {.use_debug_file = use_debug_file,
+                    .check_debug_file_crc = check_debug_file_crc,
+                    .use_symbol_type = (1 << STT_FUNC) | (1 << STT_GNU_IFUNC)};
+}
+
+BPFStackBuildIdTable::BPFStackBuildIdTable(BPFStackBuildIdTable&& that)
+    : BPFTableBase<int, stacktrace_buildid_t>(that.desc) {
+    bsymcache_ = bcc_buildsymcache_new();
+    if (bsymcache_ == NULL)
+      throw std::invalid_argument("Table '"+desc.name +
+                                  "'Unable to allocate bsymcache");
+}
+
+BPFStackBuildIdTable::~BPFStackBuildIdTable() {
+  bcc_free_buildsymcache(bsymcache_);
+}
+
+void BPFStackBuildIdTable::clear_table_non_atomic() {
+  for (int i = 0; size_t(i) < capacity(); i++) {
+    remove(&i);
+  }
+}
+
+std::vector<bcc_stacktrace_build_id> BPFStackBuildIdTable::get_stack_addr(int stack_id) {
+  std::vector<bcc_stacktrace_build_id> res;
+  struct stacktrace_buildid_t stack;
+  if (stack_id < 0)
+    return res;
+  if (!lookup(&stack_id, &stack))
+    return res;
+  for (int i = 0; (i < BPF_MAX_STACK_DEPTH) && \
+       (stack.trace[i].status == BCC_STACK_BUILD_ID_VALID);
+       i++) {
+    res.push_back(stack.trace[i]);
+  }
+  return res;
+}
+
+bool BPFStackBuildIdTable::add_module(const std::string module)
+{
+  if (bcc_buildsymcache_add_module(bsymcache_,module.c_str())!=0)
+    throw std::invalid_argument("Unable to add module "+module+
+                                "to bsymcache");
+  return true;
+}
+
+std::vector<std::string> BPFStackBuildIdTable::get_stack_symbol(int stack_id)
+{
+  auto addresses = get_stack_addr(stack_id);
+  std::vector<std::string> res;
+  if (addresses.empty())
+    return res;
+  res.reserve(addresses.size());
+
+  bcc_symbol symbol;
+  struct bcc_stacktrace_build_id trace;
+  for (auto addr : addresses) {
+    memcpy(trace.build_id, addr.build_id, sizeof(trace.build_id));
+    trace.status = addr.status;
+    trace.offset = addr.offset;
+    if (bcc_buildsymcache_resolve(bsymcache_,&trace,&symbol) != 0) {
+      res.emplace_back("[UNKNOWN]");
+    } else {
+      res.push_back(symbol.name);
+      bcc_symbol_free_demangle_name(&symbol);
+    }
+  }
+  return res;
+}
+
 BPFPerfBuffer::BPFPerfBuffer(const TableDesc& desc)
     : BPFTableBase<int, int>(desc), epfd_(-1) {
   if (desc.type != BPF_MAP_TYPE_PERF_EVENT_ARRAY)
