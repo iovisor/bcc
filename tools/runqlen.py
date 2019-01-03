@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # @lint-avoid-python-3-compatibility-imports
 #
 # runqlen    Summarize scheduler run queue length as a histogram.

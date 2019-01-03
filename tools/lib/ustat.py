@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # @lint-avoid-python-3-compatibility-imports
 #
 # ustat  Activity stats from high-level languages, including exceptions,

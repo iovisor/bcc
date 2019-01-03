@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # disksnoop.py	Trace block device I/O: basic version of iosnoop.
 #		For Linux, uses BCC, eBPF. Embedded C.

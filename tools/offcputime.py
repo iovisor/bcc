@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # offcputime    Summarize off-CPU time by stack trace
 #               For Linux, uses BCC, eBPF.

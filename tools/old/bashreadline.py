@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # bashreadline  Print entered bash commands from all running shells.
 #               For Linux, uses BCC, eBPF. Embedded C.

@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # strlen_snoop  Trace strlen() library function for a given PID.
 #               For Linux, uses BCC, eBPF. Embedded C.
