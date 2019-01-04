@@ -16,6 +16,7 @@
 
 from __future__ import print_function
 from bcc import ArgString, BPF
+from bcc.utils import printb
 import argparse
 import ctypes as ct
 from datetime import datetime, timedelta
@@ -222,7 +223,7 @@ def print_event(cpu, data, size):
     if args.extended_fields:
         print("%08o " % event.flags, end="")
 
-    print(event.fname.decode('utf-8', 'replace'))
+    printb(b'%s' % event.fname.decode('utf-8', 'replace'))
 
 # loop with callback to print_event
 b["events"].open_perf_buffer(print_event, page_cnt=64)

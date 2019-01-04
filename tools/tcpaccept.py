@@ -21,6 +21,7 @@ from socket import inet_ntop, AF_INET, AF_INET6
 from struct import pack
 import argparse
 import ctypes as ct
+from bcc.utils import printb
 
 # arguments
 examples = """examples:
@@ -238,7 +239,7 @@ def print_ipv4_event(cpu, data, size):
         if start_ts == 0:
             start_ts = event.ts_us
         print("%-9.3f" % ((float(event.ts_us) - start_ts) / 1000000), end="")
-    print("%-6d %-12.12s %-2d %-16s %-16s %-4d" % (event.pid,
+    printb(b"%-6d %-12.12s %-2d %-16s %-16s %-4d" % (event.pid,
         event.task.decode('utf-8', 'replace'), event.ip,
         inet_ntop(AF_INET, pack("I", event.daddr)),
         inet_ntop(AF_INET, pack("I", event.saddr)), event.lport))
@@ -250,7 +251,7 @@ def print_ipv6_event(cpu, data, size):
         if start_ts == 0:
             start_ts = event.ts_us
         print("%-9.3f" % ((float(event.ts_us) - start_ts) / 1000000), end="")
-    print("%-6d %-12.12s %-2d %-16s %-16s %-4d" % (event.pid,
+    printb(b"%-6d %-12.12s %-2d %-16s %-16s %-4d" % (event.pid,
         event.task.decode('utf-8', 'replace'), event.ip,
         inet_ntop(AF_INET6, event.daddr),inet_ntop(AF_INET6, event.saddr),
         event.lport))
