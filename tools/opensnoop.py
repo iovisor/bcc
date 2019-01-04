@@ -15,7 +15,8 @@
 # 28-Dec-2018   Tim Douglas     Print flags argument, enable filtering
 
 from __future__ import print_function
-from bcc import ArgString, BPF, printb
+from bcc import ArgString, BPF
+from bcc.utils import printb
 import argparse
 import ctypes as ct
 from datetime import datetime, timedelta
