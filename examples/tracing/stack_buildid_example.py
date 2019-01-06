@@ -1,6 +1,21 @@
-
+#!/usr/bin/python
+#
 # An example usage of stack_build_id
 # Most of the code here is borrowed from tools/profile.py
+#
+# Steps for using this code
+# 1) Start ping program in one terminal eg invocation: ping google.com -i0.001
+# 2) Change the path of libc specified in b.add_module() below
+# 3) Invoke the script as 'python stack_buildid_example.py'
+# 4) o/p of the tool is as shown below
+#  python example/tracing/stack_buildid_example.py
+#    sendto
+#    -                ping (5232)
+#        2
+#
+# REQUIRES: Linux 4.17+ (BPF_BUILD_ID support)
+# Licensed under the Apache License, Version 2.0 (the "License")
+# 03-Jan-2019  Vijay Nag
 
 from __future__ import print_function
 from bcc import BPF, PerfType, PerfSWConfig
@@ -9,16 +24,22 @@ from time import sleep
 import argparse
 import signal
 import os
+import subprocess
 import errno
 import multiprocessing
 import ctypes as ct
+
+def Get_libc_path():
+  # A small helper function that returns full path
+  # of libc in the system
+  cmd = 'cat /proc/self/maps | grep libc | awk \'{print $6}\' | uniq'
+  output = subprocess.check_output(cmd, shell=True)
+  return output.split('\n')[0]
 
 bpf_text = """
 #include <uapi/linux/ptrace.h>
 #include <uapi/linux/bpf_perf_event.h>
 #include <linux/sched.h>
-
-#define STACK_STORAGE_SIZE 64 //should be less than 128
 
 struct key_t {
     u32 pid;
@@ -26,13 +47,10 @@ struct key_t {
     char name[TASK_COMM_LEN];
 };
 BPF_HASH(counts, struct key_t);
-BPF_STACK_TRACE_BUILDID(stack_traces, STACK_STORAGE_SIZE);
+BPF_STACK_TRACE_BUILDID(stack_traces, 128);
 
-// This code gets a bit complex. Probably not suitable for casual hacking.
 int do_perf_event(struct bpf_perf_event_data *ctx) {
     u32 pid = bpf_get_current_pid_tgid() >> 32;
-    if (!(1))
-        return 0;
 
     // create map key
     struct key_t key = {.pid = pid};
@@ -52,8 +70,11 @@ b.attach_perf_event(ev_type=PerfType.SOFTWARE,
     ev_config=PerfSWConfig.CPU_CLOCK, fn_name="do_perf_event",
     sample_period=0, sample_freq=49, cpu=0)
 
-#Add the required builds here
-b.add_module("/lib/x86_64-linux-gnu/libc.so.6")
+# Add the list of libraries/executables to the build sym cache for sym resolution
+# Change the libc path if it is different on a different machine.
+# libc.so and ping are added here so that any symbols pertaining to
+# libc or ping are resolved. More executables/libraries can be added here.
+b.add_module(Get_libc_path())
 b.add_module("/usr/sbin/sshd")
 b.add_module("/bin/ping")
 counts = b.get_table("counts")

@@ -653,9 +653,14 @@ BPFStackTable BPF::get_stack_table(const std::string& name, bool use_debug_file,
 BPFStackBuildIdTable BPF::get_stackbuildid_table(const std::string &name, bool use_debug_file,
                                                  bool check_debug_file_crc) {
   TableStorage::iterator it;
+
+  if (bsymcache_ == NULL) {
+    bsymcache_ = bcc_buildsymcache_new();
+  }
+
   if (bpf_module_->table_storage().Find(Path({bpf_module_->id(), name}), it))
-    return BPFStackBuildIdTable(it->second, use_debug_file, check_debug_file_crc);
-  return BPFStackBuildIdTable({}, use_debug_file, check_debug_file_crc);
+    return BPFStackBuildIdTable(it->second, use_debug_file, check_debug_file_crc, bsymcache_);
+  return BPFStackBuildIdTable({}, use_debug_file, check_debug_file_crc, bsymcache_);
 }
 
 std::string BPF::get_uprobe_event(const std::string& binary_path,

@@ -317,32 +317,17 @@ std::vector<std::string> BPFStackTable::get_stack_symbol(int stack_id,
 }
 
 BPFStackBuildIdTable::BPFStackBuildIdTable(const TableDesc& desc, bool use_debug_file,
-                             bool check_debug_file_crc)
-    : BPFTableBase<int, stacktrace_buildid_t>(desc) {
+                                           bool check_debug_file_crc,
+                                           void *bsymcache)
+    : BPFTableBase<int, stacktrace_buildid_t>(desc),
+      bsymcache_(bsymcache) {
   if (desc.type != BPF_MAP_TYPE_STACK_TRACE)
     throw std::invalid_argument("Table '" + desc.name +
                                 "' is not a stack table");
 
-  bsymcache_ = bcc_buildsymcache_new();
-  if (bsymcache_ == NULL)
-    throw std::invalid_argument("Table '"+desc.name +
-                                "'Unable to allocate bsymcache");
-
   symbol_option_ = {.use_debug_file = use_debug_file,
                     .check_debug_file_crc = check_debug_file_crc,
                     .use_symbol_type = (1 << STT_FUNC) | (1 << STT_GNU_IFUNC)};
-}
-
-BPFStackBuildIdTable::BPFStackBuildIdTable(BPFStackBuildIdTable&& that)
-    : BPFTableBase<int, stacktrace_buildid_t>(that.desc) {
-    bsymcache_ = bcc_buildsymcache_new();
-    if (bsymcache_ == NULL)
-      throw std::invalid_argument("Table '"+desc.name +
-                                  "'Unable to allocate bsymcache");
-}
-
-BPFStackBuildIdTable::~BPFStackBuildIdTable() {
-  bcc_free_buildsymcache(bsymcache_);
 }
 
 void BPFStackBuildIdTable::clear_table_non_atomic() {
@@ -361,6 +346,10 @@ std::vector<bcc_stacktrace_build_id> BPFStackBuildIdTable::get_stack_addr(int st
   for (int i = 0; (i < BPF_MAX_STACK_DEPTH) && \
        (stack.trace[i].status == BCC_STACK_BUILD_ID_VALID);
        i++) {
+        /* End of stack marker is BCC_STACK_BUILD_ID_EMPTY or
+         * BCC_STACK_BUILD_IP(fallback) mechanism.
+         * We do not support fallback mechanism
+         */
     res.push_back(stack.trace[i]);
   }
   return res;

@@ -437,7 +437,7 @@ unknown_symbol:
 bool BuildSyms::add_module(const std::string module_name)
 {
   struct stat s;
-  char buildid[128]; //160 bits seems to be default
+  char buildid[BCC_BUILD_ID_SIZE*2+1];
 
   if (stat(module_name.c_str(), &s) < 0)
      return false;
@@ -531,7 +531,7 @@ int bcc_buildsymcache_resolve(void *resolver,
   int idx = 0;
 
   /*cannot resolve in case of fallback*/
-  if (trace->status == BCC_STACK_BUILD_ID_EMPTY or
+  if (trace->status == BCC_STACK_BUILD_ID_EMPTY ||
       trace->status == BCC_STACK_BUILD_ID_IP)
     return 0;
 

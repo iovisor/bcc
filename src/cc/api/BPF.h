@@ -137,6 +137,10 @@ class BPF {
     return BPFPercpuHashTable<KeyType, ValueType>({});
   }
 
+  void* get_bsymcache(void) {
+    return bsymcache_;
+  }
+
   BPFProgTable get_prog_table(const std::string& name);
 
   BPFCgroupArray get_cgroup_array(const std::string& name);
@@ -228,6 +232,8 @@ class BPF {
                                   uint64_t& offset_res);
 
   int flag_;
+
+  void *bsymcache_;
 
   std::unique_ptr<std::string> syscall_prefix_;
 

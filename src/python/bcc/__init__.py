@@ -1293,7 +1293,7 @@ class BPF(object):
       """
       try:
         lib.bcc_buildsymcache_add_module(BPF._bsymcache, modname)
-      except Exception, e:
+      except Exception as e:
         print("Error adding module to build sym cache"+str(e))
 
     def free_bcc_memory(self):
