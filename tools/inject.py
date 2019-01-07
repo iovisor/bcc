@@ -41,6 +41,7 @@ class Probe:
     errno_mapping = {
         "kmalloc": "-ENOMEM",
         "bio": "-EIO",
+        "alloc_page" : "true",
     }
 
     @classmethod
@@ -327,6 +328,7 @@ EXAMPLES:
     error_injection_mapping = {
         "kmalloc": "should_failslab(struct kmem_cache *s, gfp_t gfpflags)",
         "bio": "should_fail_bio(struct bio *bio)",
+        "alloc_page": "should_fail_alloc_page(gfp_t gfp_mask, unsigned int order)",
     }
 
     def __init__(self):
@@ -334,7 +336,7 @@ EXAMPLES:
                 " functionality when call chain and predicates are met",
                 formatter_class=argparse.RawDescriptionHelpFormatter,
                 epilog=Tool.examples)
-        parser.add_argument(dest="mode", choices=['kmalloc','bio'],
+        parser.add_argument(dest="mode", choices=["kmalloc", "bio", "alloc_page"],
                 help="indicate which base kernel function to fail")
         parser.add_argument(metavar="spec", dest="spec",
                 help="specify call chain")
