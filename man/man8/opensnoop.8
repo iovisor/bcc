@@ -27,6 +27,9 @@ Print usage message.
 \-T
 Include a timestamp column.
 .TP
+\-U
+Show UID.
+.TP
 \-x
 Only print failed opens.
 .TP
@@ -35,6 +38,9 @@ Trace this process ID only (filtered in-kernel).
 .TP
 \-t TID
 Trace this thread ID only (filtered in-kernel).
+.TP
+\-u UID
+Trace this UID only (filtered in-kernel).
 .TP
 \-d DURATION
 Total duration of trace in seconds.
@@ -61,6 +67,10 @@ Trace all open() syscalls, and include timestamps:
 #
 .B opensnoop \-T
 .TP
+Show UID:
+#
+.B opensnoop \-U
+.TP
 Trace only open() syscalls that failed:
 #
 .B opensnoop \-x
@@ -68,6 +78,10 @@ Trace only open() syscalls that failed:
 Trace PID 181 only:
 #
 .B opensnoop \-p 181
+.TP
+Trace UID 1000 only:
+#
+.B opensnoop \-u 1000
 .TP
 Trace all open() syscalls from processes where its name partially matches 'ed':
 #
@@ -84,6 +98,9 @@ Only print calls for writing:
 .TP
 TIME(s)
 Time of the call, in seconds.
+.TP
+UID
+User ID
 .TP
 PID
 Process ID
