@@ -186,7 +186,7 @@ void perf_reader_event_read(struct perf_reader *reader) {
       reader->buf = realloc(reader->buf, e->size);
       size_t len = sentinel - begin;
       memcpy(reader->buf, begin, len);
-      memcpy(reader->buf + len, base, e->size - len);
+      memcpy((void *)((unsigned long)reader->buf + len), base, e->size - len);
       ptr = reader->buf;
     }
 
