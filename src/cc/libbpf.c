@@ -981,7 +981,7 @@ int bpf_attach_uprobe(int progfd, enum bpf_probe_attach_type attach_type,
       goto error;
     }
     res = snprintf(buf, sizeof(buf), "%c:%ss/%s %s:0x%lx", attach_type==BPF_PROBE_ENTRY ? 'p' : 'r',
-                   event_type, event_alias, binary_path, offset);
+                   event_type, event_alias, binary_path, (unsigned long)offset);
     if (res < 0 || res >= sizeof(buf)) {
       fprintf(stderr, "Event alias (%s) too long for buffer\n", event_alias);
       goto error;
