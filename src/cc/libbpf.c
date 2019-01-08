@@ -84,6 +84,8 @@
 
 #define min(x, y) ((x) < (y) ? (x) : (y))
 
+#define UNUSED(expr) do { (void)(expr); } while (0)
+
 struct bpf_helper {
   char *name;
   char *required_version;
@@ -1108,6 +1110,8 @@ int bpf_attach_tracepoint(int progfd, const char *tp_category,
 }
 
 int bpf_detach_tracepoint(const char *tp_category, const char *tp_name) {
+  UNUSED(tp_category);
+  UNUSED(tp_name);
   // Right now, there is nothing to do, but it's a good idea to encourage
   // callers to detach anything they attach.
   return 0;
