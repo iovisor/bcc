@@ -63,7 +63,7 @@ More [examples](../tools/execsnoop_example.txt).
 
 ```
 # ./opensnoop
-PID    COMM      FD ERR PATH
+PID    COMM               FD ERR PATH
 1565   redis-server        5   0 /proc/1565/stat
 1565   redis-server        5   0 /proc/1565/stat
 1565   redis-server        5   0 /proc/1565/stat

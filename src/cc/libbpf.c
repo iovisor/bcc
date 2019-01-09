@@ -346,9 +346,9 @@ static void bpf_print_hints(int ret, char *log)
 
   // referencing global/static variables or read only data
   if (strstr(log, "unknown opcode") != NULL) {
-    fprintf(stderr, "HINT: The 'unknown opcode' can happen if you reference"
-      "a global or static variable, or data in read only section. For example,"
-      "'char *p = \"hello\"' will result in p referencing a read only section,"
+    fprintf(stderr, "HINT: The 'unknown opcode' can happen if you reference "
+      "a global or static variable, or data in read-only section. For example,"
+      " 'char *p = \"hello\"' will result in p referencing a read-only section,"
       " and 'char p[] = \"hello\"' will have \"hello\" stored on the stack.\n\n");
   }
 

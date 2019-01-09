@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # cachestat     Count cache kernel function calls.
 #               For Linux, uses BCC, eBPF. See .c file.

@@ -3,6 +3,7 @@
 *.swo
 *.pyc
 .idea
+*~
 
 # Build artifacts
 /build/
