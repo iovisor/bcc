@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # urandomread-explicit  Example of instrumenting a kernel tracepoint.
 #                       For Linux, uses BCC, BPF. Embedded C.

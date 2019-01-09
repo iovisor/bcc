@@ -122,13 +122,13 @@ int ProcSyms::_add_load_sections(uint64_t v_addr, uint64_t mem_sz,
 }
 
 void ProcSyms::load_exe() {
+  ProcMountNSGuard g(mount_ns_instance_.get());
   std::string exe = ebpf::get_pid_exe(pid_);
   Module module(exe.c_str(), mount_ns_instance_.get(), &symbol_option_);
 
   if (module.type_ != ModuleType::EXEC)
     return;
 
-  ProcMountNSGuard g(mount_ns_instance_.get());
 
   bcc_elf_foreach_load_section(exe.c_str(), &_add_load_sections, &module);
 
@@ -163,6 +163,7 @@ int ProcSyms::_add_module(const char *modname, uint64_t start, uint64_t end,
     // It only gives the mmap offset. We need the real offset for symbol
     // lookup.
     if (module.type_ == ModuleType::SO) {
+      ProcMountNSGuard g(ps->mount_ns_instance_.get());
       if (bcc_elf_get_text_scn_info(modname, &module.elf_so_addr_,
                                     &module.elf_so_offset_) < 0) {
         fprintf(stderr, "WARNING: Couldn't find .text section in %s\n", modname);
@@ -499,7 +500,11 @@ int bcc_resolve_symname(const char *module, const char *symname,
   static struct bcc_symbol_option default_option = {
     .use_debug_file = 1,
     .check_debug_file_crc = 1,
+#if defined(__powerpc64__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+    .use_symbol_type = BCC_SYM_ALL_TYPES | (1 << STT_PPC64LE_SYM_LEP),
+#else
     .use_symbol_type = BCC_SYM_ALL_TYPES,
+#endif
   };
 
   if (module == NULL)

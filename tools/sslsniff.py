@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # sslsniff  Captures data on read/recv or write/send functions of OpenSSL,
 #           GnuTLS and NSS
@@ -228,4 +228,7 @@ def print_event(cpu, data, size, rw):
 b["perf_SSL_write"].open_perf_buffer(print_event_write)
 b["perf_SSL_read"].open_perf_buffer(print_event_read)
 while 1:
-    b.perf_buffer_poll()
+    try:
+        b.perf_buffer_poll()
+    except KeyboardInterrupt:
+        exit()

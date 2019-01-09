@@ -43,7 +43,7 @@ typedef void (*perf_reader_raw_cb)(void *cb_cookie, void *raw, int raw_size);
 typedef void (*perf_reader_lost_cb)(void *cb_cookie, uint64_t lost);
 
 int bpf_attach_kprobe(int progfd, int attach_type, const char *ev_name,
-                      const char *fn_name);
+                      const char *fn_name, uint64_t fn_offset);
 
 int bpf_detach_kprobe(const char *ev_name);
 

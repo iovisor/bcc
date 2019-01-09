@@ -65,6 +65,27 @@ This shows the supervise process is opening the status.new file twice every
 second.
 
 
+The -U option include UID on output:
+
+# ./opensnoop -U
+UID   PID    COMM               FD ERR PATH
+0     27063  vminfo              5   0 /var/run/utmp
+103   628    dbus-daemon        -1   2 /usr/local/share/dbus-1/system-services
+103   628    dbus-daemon        18   0 /usr/share/dbus-1/system-services
+103   628    dbus-daemon        -1   2 /lib/dbus-1/system-services
+
+
+The -u option filtering UID:
+
+# ./opensnoop -Uu 1000
+UID   PID    COMM               FD ERR PATH
+1000  30240  ls                  3   0 /etc/ld.so.cache
+1000  30240  ls                  3   0 /lib/x86_64-linux-gnu/libselinux.so.1
+1000  30240  ls                  3   0 /lib/x86_64-linux-gnu/libc.so.6
+1000  30240  ls                  3   0 /lib/x86_64-linux-gnu/libpcre.so.3
+1000  30240  ls                  3   0 /lib/x86_64-linux-gnu/libdl.so.2
+1000  30240  ls                  3   0 /lib/x86_64-linux-gnu/libpthread.so.0
+
 The -x option only prints failed opens:
 
 # ./opensnoop -x
@@ -132,28 +153,68 @@ This caught the 'sed' command because it partially matches 'ed' that's passed
 to the '-n' option.
 
 
+The -e option prints out extra columns; for example, the following output
+contains the flags passed to open(2), in octal:
+
+# ./opensnoop -e
+PID    COMM               FD ERR FLAGS    PATH
+28512  sshd               10   0 00101101 /proc/self/oom_score_adj
+28512  sshd                3   0 02100000 /etc/ld.so.cache
+28512  sshd                3   0 02100000 /lib/x86_64-linux-gnu/libwrap.so.0
+28512  sshd                3   0 02100000 /lib/x86_64-linux-gnu/libaudit.so.1
+28512  sshd                3   0 02100000 /lib/x86_64-linux-gnu/libpam.so.0
+28512  sshd                3   0 02100000 /lib/x86_64-linux-gnu/libselinux.so.1
+28512  sshd                3   0 02100000 /lib/x86_64-linux-gnu/libsystemd.so.0
+28512  sshd                3   0 02100000 /usr/lib/x86_64-linux-gnu/libcrypto.so.1.0.2
+28512  sshd                3   0 02100000 /lib/x86_64-linux-gnu/libutil.so.1
+
+
+The -f option filters based on flags to the open(2) call, for example:
+
+# ./opensnoop -e -f O_WRONLY -f O_RDWR
+PID    COMM               FD ERR FLAGS    PATH
+28084  clear_console       3   0 00100002 /dev/tty
+28084  clear_console      -1  13 00100002 /dev/tty0
+28084  clear_console      -1  13 00100001 /dev/tty0
+28084  clear_console      -1  13 00100002 /dev/console
+28084  clear_console      -1  13 00100001 /dev/console
+28051  sshd                8   0 02100002 /var/run/utmp
+28051  sshd                7   0 00100001 /var/log/wtmp
+
+
 USAGE message:
 
 # ./opensnoop -h
 usage: opensnoop [-h] [-T] [-x] [-p PID] [-t TID] [-d DURATION] [-n NAME]
+                 [-e] [-f FLAG_FILTER]
 
 Trace open() syscalls
 
 optional arguments:
   -h, --help            show this help message and exit
   -T, --timestamp       include timestamp on output
+  -U, --print-uid       include UID on output
   -x, --failed          only show failed opens
   -p PID, --pid PID     trace this PID only
   -t TID, --tid TID     trace this TID only
+  -u UID, --uid UID     trace this UID only
   -d DURATION, --duration DURATION
                         total duration of trace in seconds
   -n NAME, --name NAME  only print process names containing this name
+  -e, --extended_fields
+                        show extended fields
+  -f FLAG_FILTER, --flag_filter FLAG_FILTER
+                        filter on flags argument (e.g., O_WRONLY)
 
 examples:
     ./opensnoop           # trace all open() syscalls
     ./opensnoop -T        # include timestamps
+    ./opensnoop -U        # include UID
     ./opensnoop -x        # only show failed opens
     ./opensnoop -p 181    # only trace PID 181
     ./opensnoop -t 123    # only trace TID 123
+    ./opensnoop -u 1000   # only trace UID 1000
     ./opensnoop -d 10     # trace for 10 seconds only
     ./opensnoop -n main   # only print process names containing "main"
+    ./opensnoop -e        # show extended fields
+    ./opensnoop -f O_WRONLY -f O_RDWR  # only print calls for writing

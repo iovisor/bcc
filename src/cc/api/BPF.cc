@@ -27,6 +27,7 @@
 #include <vector>
 
 #include "bcc_exception.h"
+#include "bcc_elf.h"
 #include "bcc_syms.h"
 #include "bpf_module.h"
 #include "common.h"
@@ -705,6 +706,10 @@ StatusTuple BPF::detach_perf_event_all_cpu(open_probe_t& attr) {
   if (has_error)
     return StatusTuple(-1, err_msg);
   return StatusTuple(0);
+}
+
+int BPF::free_bcc_memory() {
+  return bcc_free_memory();
 }
 
 USDT::USDT(const std::string& binary_path, const std::string& provider,

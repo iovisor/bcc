@@ -47,7 +47,7 @@ class BPF {
   static const int BPF_MAX_STACK_DEPTH = 127;
 
   explicit BPF(unsigned int flag = 0, TableStorage* ts = nullptr,
-               bool rw_engine_enabled = true, const std::string &maps_ns = "")
+               bool rw_engine_enabled = bpf_module_rw_engine_enabled(), const std::string &maps_ns = "")
       : flag_(flag),
       bpf_module_(new BPFModule(flag, ts, rw_engine_enabled, maps_ns)) {}
   StatusTuple init(const std::string& bpf_program,
@@ -175,6 +175,8 @@ class BPF {
   StatusTuple load_func(const std::string& func_name, enum bpf_prog_type type,
                         int& fd);
   StatusTuple unload_func(const std::string& func_name);
+
+  int free_bcc_memory();
 
  private:
   std::string get_kprobe_event(const std::string& kernel_func,

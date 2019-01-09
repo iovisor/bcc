@@ -2,7 +2,7 @@
 .SH NAME
 tcpstates \- Trace TCP session state changes with durations. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B tcpstates [\-h] [\-T] [\-t] [\-w] [\-s] [\-D PORTS] [\-L PORTS]
+.B tcpstates [\-h] [\-T] [\-t] [\-w] [\-s] [\-D PORTS] [\-L PORTS] [\-Y]
 .SH DESCRIPTION
 This tool traces TCP session state changes while tracing, and prints details
 including the duration in each state. This can help explain the latency of
@@ -41,6 +41,9 @@ Comma-separated list of local ports to trace (filtered in-kernel).
 .TP
 \-D PORTS
 Comma-separated list of destination ports to trace (filtered in-kernel).
+.TP
+\-Y
+Log session state changes to the systemd journal.
 .SH EXAMPLES
 .TP
 Trace all TCP sessions, and show all state changes:

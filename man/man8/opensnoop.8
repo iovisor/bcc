@@ -27,6 +27,9 @@ Print usage message.
 \-T
 Include a timestamp column.
 .TP
+\-U
+Show UID.
+.TP
 \-x
 Only print failed opens.
 .TP
@@ -36,11 +39,20 @@ Trace this process ID only (filtered in-kernel).
 \-t TID
 Trace this thread ID only (filtered in-kernel).
 .TP
+\-u UID
+Trace this UID only (filtered in-kernel).
+.TP
 \-d DURATION
 Total duration of trace in seconds.
 .TP
 \-n name
 Only print processes where its name partially matches 'name'
+.TP
+\-e
+Show extended fields.
+.TP
+\-f FLAG
+Filter on open() flags, e.g., O_WRONLY.
 .SH EXAMPLES
 .TP
 Trace all open() syscalls:
@@ -55,6 +67,10 @@ Trace all open() syscalls, and include timestamps:
 #
 .B opensnoop \-T
 .TP
+Show UID:
+#
+.B opensnoop \-U
+.TP
 Trace only open() syscalls that failed:
 #
 .B opensnoop \-x
@@ -63,13 +79,28 @@ Trace PID 181 only:
 #
 .B opensnoop \-p 181
 .TP
+Trace UID 1000 only:
+#
+.B opensnoop \-u 1000
+.TP
 Trace all open() syscalls from processes where its name partially matches 'ed':
 #
 .B opensnoop \-n ed
+.TP
+Show extended fields:
+#
+.B opensnoop \-e
+.TP
+Only print calls for writing:
+#
+.B opensnoop \-f O_WRONLY \-f O_RDWR
 .SH FIELDS
 .TP
 TIME(s)
 Time of the call, in seconds.
+.TP
+UID
+User ID
 .TP
 PID
 Process ID
@@ -85,6 +116,9 @@ File descriptor (if success), or -1 (if failed)
 .TP
 ERR
 Error number (see the system's errno.h)
+.TP
+FLAGS
+Flags passed to open(2), in octal
 .TP
 PATH
 Open path

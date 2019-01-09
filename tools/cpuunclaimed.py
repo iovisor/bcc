@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # @lint-avoid-python-3-compatibility-imports
 #
 # cpuunclaimed   Sample CPU run queues and calculate unclaimed idle CPU.

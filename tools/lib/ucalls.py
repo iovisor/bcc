@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # @lint-avoid-python-3-compatibility-imports
 #
 # ucalls  Summarize method calls in high-level languages and/or system calls.
@@ -14,9 +14,8 @@
 
 from __future__ import print_function
 import argparse
-from bcc import BPF, USDT, utils
 from time import sleep
-import os
+from bcc import BPF, USDT, utils, syscall_name
 
 languages = ["java", "perl", "php", "python", "ruby", "tcl"]
 
@@ -130,7 +129,7 @@ struct info_t {
 };
 struct syscall_entry_t {
     u64 timestamp;
-    u64 ip;
+    u64 id;
 };
 
 #ifndef LATENCY
@@ -198,37 +197,35 @@ int trace_return(struct pt_regs *ctx) {
 #endif  // NOLANG
 
 #ifdef SYSCALLS
-int syscall_entry(struct pt_regs *ctx) {
+TRACEPOINT_PROBE(raw_syscalls, sys_enter) {
     u64 pid = bpf_get_current_pid_tgid();
-    u64 *valp, ip = PT_REGS_IP(ctx), val = 0;
+    u64 *valp, id = args->id, val = 0;
     PID_FILTER
 #ifdef LATENCY
     struct syscall_entry_t data = {};
     data.timestamp = bpf_ktime_get_ns();
-    data.ip = ip;
+    data.id = id;
+    sysentry.update(&pid, &data);
 #endif
 #ifndef LATENCY
-    valp = syscounts.lookup_or_init(&ip, &val);
+    valp = syscounts.lookup_or_init(&id, &val);
     ++(*valp);
-#endif
-#ifdef LATENCY
-    sysentry.update(&pid, &data);
 #endif
     return 0;
 }
 
 #ifdef LATENCY
-int syscall_return(struct pt_regs *ctx) {
+TRACEPOINT_PROBE(raw_syscalls, sys_exit) {
     struct syscall_entry_t *e;
     struct info_t *info, zero = {};
-    u64 pid = bpf_get_current_pid_tgid(), ip;
+    u64 pid = bpf_get_current_pid_tgid(), id;
     PID_FILTER
     e = sysentry.lookup(&pid);
     if (!e) {
         return 0;   // missed the entry event
     }
-    ip = e->ip;
-    info = systimes.lookup_or_init(&ip, &zero);
+    id = e->id;
+    info = systimes.lookup_or_init(&id, &zero);
     info->num_calls += 1;
     info->total_ns += bpf_ktime_get_ns() - e->timestamp;
     sysentry.delete(&pid);
@@ -260,12 +257,7 @@ if args.ebpf or args.verbose:
 
 bpf = BPF(text=program, usdt_contexts=[usdt] if usdt else [])
 if args.syscalls:
-    syscall_regex = "^[Ss]y[Ss]_.*"
-    bpf.attach_kprobe(event_re=syscall_regex, fn_name="syscall_entry")
-    if args.latency:
-        bpf.attach_kretprobe(event_re=syscall_regex, fn_name="syscall_return")
-    print("Attached %d kernel probes for syscall tracing." %
-          bpf.num_open_kprobes())
+    print("Attached kernel tracepoints for syscall tracing.")
 
 def get_data():
     # Will be empty when no language was specified for tracing
@@ -284,12 +276,12 @@ def get_data():
 
     if args.syscalls:
         if args.latency:
-            syscalls = map(lambda kv: (bpf.ksym(kv[0].value),
-                                           (kv[1].num_calls, kv[1].total_ns)),
+            syscalls = map(lambda kv: (syscall_name(kv[0].value).decode('utf-8', 'replace'),
+                                       (kv[1].num_calls, kv[1].total_ns)),
                            bpf["systimes"].items())
             data.extend(syscalls)
         else:
-            syscalls = map(lambda kv: (bpf.ksym(kv[0].value),
+            syscalls = map(lambda kv: (syscall_name(kv[0].value).decode('utf-8', 'replace'),
                                        (kv[1].value, 0)),
                            bpf["syscounts"].items())
             data.extend(syscalls)

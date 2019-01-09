@@ -1,4 +1,5 @@
-#!/usr/bin/python
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 # @lint-avoid-python-3-compatibility-imports
 #
 # tcpstates   Trace the TCP session state changes with durations.
@@ -20,7 +21,8 @@ import argparse
 from socket import inet_ntop, AF_INET, AF_INET6
 from struct import pack
 import ctypes as ct
-from time import strftime
+from time import strftime, time
+from os import getuid
 
 # arguments
 examples = """examples:
@@ -29,6 +31,7 @@ examples = """examples:
     ./tcpstates -T        # include time column (HH:MM:SS)
     ./tcpstates -w        # wider colums (fit IPv6)
     ./tcpstates -stT      # csv output, with times & timestamps
+    ./tcpstates -Y        # log events to the systemd journal
     ./tcpstates -L 80     # only trace local port 80
     ./tcpstates -L 80,81  # only trace local ports 80 and 81
     ./tcpstates -D 80     # only trace remote port 80
@@ -51,6 +54,8 @@ parser.add_argument("-D", "--remoteport",
     help="comma-separated list of remote ports to trace.")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
+parser.add_argument("-Y", "--journal", action="store_true",
+    help="log session state changes to the systemd journal")
 args = parser.parse_args()
 debug = 0
 
@@ -237,6 +242,14 @@ if args.csv:
     header_string = "%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s"
     format_string = "%x,%d,%s,%s,%s,%s,%s,%d,%s,%s,%.3f"
 
+if args.journal:
+    try:
+        from systemd import journal
+    except ImportError:
+        print("ERROR: Journal logging requires the systemd.journal module")
+        exit(1)
+
+
 def tcpstate2str(state):
     # from include/net/tcp_states.h:
     tcpstate = {
@@ -258,6 +271,44 @@ def tcpstate2str(state):
         return tcpstate[state]
     else:
         return str(state)
+
+def journal_fields(event, addr_family):
+    addr_pfx = 'IPV4'
+    if addr_family == AF_INET6:
+        addr_pfx = 'IPV6'
+
+    fields = {
+        # Standard fields described in systemd.journal-fields(7). journal.send
+        # will fill in CODE_LINE, CODE_FILE, and CODE_FUNC for us. If we're
+        # root and specify OBJECT_PID, systemd-journald will add other OBJECT_*
+        # fields for us.
+        'SYSLOG_IDENTIFIER': 'tcpstates',
+        'PRIORITY': 5,
+        '_SOURCE_REALTIME_TIMESTAMP': time() * 1000000,
+        'OBJECT_PID': str(event.pid),
+        'OBJECT_COMM': event.task.decode('utf-8', 'replace'),
+        # Custom fields, aka "stuff we sort of made up".
+        'OBJECT_' + addr_pfx + '_SOURCE_ADDRESS': inet_ntop(addr_family, pack("I", event.saddr)),
+        'OBJECT_TCP_SOURCE_PORT': str(event.ports >> 32),
+        'OBJECT_' + addr_pfx + '_DESTINATION_ADDRESS': inet_ntop(addr_family, pack("I", event.daddr)),
+        'OBJECT_TCP_DESTINATION_PORT': str(event.ports & 0xffffffff),
+        'OBJECT_TCP_OLD_STATE': tcpstate2str(event.oldstate),
+        'OBJECT_TCP_NEW_STATE': tcpstate2str(event.newstate),
+        'OBJECT_TCP_SPAN_TIME': str(event.span_us)
+        }
+
+    msg_format_string = (u"%(OBJECT_COMM)s " +
+        u"%(OBJECT_" + addr_pfx + "_SOURCE_ADDRESS)s " +
+        u"%(OBJECT_TCP_SOURCE_PORT)s → " +
+        u"%(OBJECT_" + addr_pfx + "_DESTINATION_ADDRESS)s " +
+        u"%(OBJECT_TCP_DESTINATION_PORT)s " +
+        u"%(OBJECT_TCP_OLD_STATE)s → %(OBJECT_TCP_NEW_STATE)s")
+    fields['MESSAGE'] = msg_format_string % (fields)
+
+    if getuid() == 0:
+        del fields['OBJECT_COMM'] # Handled by systemd-journald
+
+    return fields
 
 # process event
 def print_ipv4_event(cpu, data, size):
@@ -282,6 +333,8 @@ def print_ipv4_event(cpu, data, size):
         inet_ntop(AF_INET, pack("I", event.daddr)), event.ports & 0xffffffff,
         tcpstate2str(event.oldstate), tcpstate2str(event.newstate),
         float(event.span_us) / 1000))
+    if args.journal:
+        journal.send(**journal_fields(event, AF_INET))
 
 def print_ipv6_event(cpu, data, size):
     event = ct.cast(data, ct.POINTER(Data_ipv6)).contents
@@ -305,6 +358,8 @@ def print_ipv6_event(cpu, data, size):
         inet_ntop(AF_INET6, event.daddr), event.ports & 0xffffffff,
         tcpstate2str(event.oldstate), tcpstate2str(event.newstate),
         float(event.span_us) / 1000))
+    if args.journal:
+        journal.send(**journal_fields(event, AF_INET6))
 
 # initialize BPF
 b = BPF(text=bpf_text)
@@ -331,4 +386,7 @@ start_ts = 0
 b["ipv4_events"].open_perf_buffer(print_ipv4_event, page_cnt=64)
 b["ipv6_events"].open_perf_buffer(print_ipv6_event, page_cnt=64)
 while 1:
-    b.perf_buffer_poll()
+    try:
+        b.perf_buffer_poll()
+    except KeyboardInterrupt:
+        exit()

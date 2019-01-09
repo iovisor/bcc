@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # @lint-avoid-python-3-compatibility-imports
 #
 # funcslower  Trace slow kernel or user function calls.
@@ -94,15 +94,15 @@ struct data_t {
     u64 duration_ns;
     u64 retval;
     char comm[TASK_COMM_LEN];
+#ifdef GRAB_ARGS
+    u64 args[6];
+#endif
 #ifdef USER_STACKS
     int user_stack_id;
 #endif
 #ifdef KERNEL_STACKS
     int kernel_stack_id;
     u64 kernel_ip;
-#endif
-#ifdef GRAB_ARGS
-    u64 args[6];
 #endif
 };
 
@@ -330,4 +330,7 @@ def print_event(cpu, data, size):
 
 b["events"].open_perf_buffer(print_event, page_cnt=64)
 while True:
-    b.perf_buffer_poll()
+    try:
+        b.perf_buffer_poll()
+    except KeyboardInterrupt:
+        exit()

@@ -54,10 +54,14 @@ class BLoader;
 class ClangLoader;
 class FuncSource;
 
+bool bpf_module_rw_engine_enabled(void);
+
 class BPFModule {
  private:
   static const std::string FN_PREFIX;
   int init_engine();
+  void initialize_rw_engine();
+  void cleanup_rw_engine();
   int parse(llvm::Module *mod);
   int finalize();
   int annotate();

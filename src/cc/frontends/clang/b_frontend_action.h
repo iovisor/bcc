@@ -75,6 +75,8 @@ class BTypeVisitor : public clang::RecursiveASTVisitor<BTypeVisitor> {
   void genParamIndirectAssign(clang::FunctionDecl *D, std::string& preamble,
                               const char **calling_conv_regs);
   void rewriteFuncParam(clang::FunctionDecl *D);
+  int64_t getFieldValue(clang::VarDecl *Decl, clang::FieldDecl *FDecl,
+                        int64_t OrigFValue);
   template <unsigned N>
   clang::DiagnosticBuilder error(clang::SourceLocation loc, const char (&fmt)[N]);
   template <unsigned N>
