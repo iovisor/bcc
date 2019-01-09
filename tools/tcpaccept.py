@@ -84,6 +84,8 @@ int kretprobe__inet_csk_accept(struct pt_regs *ctx)
     struct sock *newsk = (struct sock *)PT_REGS_RC(ctx);
     u32 pid = bpf_get_current_pid_tgid();
 
+    ##FILTER_PID##
+
     if (newsk == NULL)
         return 0;
 
@@ -161,6 +163,9 @@ TRACEPOINT_PROBE(sock, inet_sock_set_state)
     if (args->protocol != IPPROTO_TCP)
         return 0;
     u32 pid = bpf_get_current_pid_tgid();
+
+    ##FILTER_PID##
+
     // pull in details
     u16 family = 0, lport = 0;
     family = args->family;
@@ -197,10 +202,10 @@ else:
 
 # code substitutions
 if args.pid:
-    bpf_text = bpf_text.replace('FILTER',
+    bpf_text = bpf_text.replace('##FILTER_PID##',
         'if (pid != %s) { return 0; }' % args.pid)
 else:
-    bpf_text = bpf_text.replace('FILTER', '')
+    bpf_text = bpf_text.replace('##FILTER_PID##', '')
 if debug or args.ebpf:
     print(bpf_text)
     if args.ebpf:
