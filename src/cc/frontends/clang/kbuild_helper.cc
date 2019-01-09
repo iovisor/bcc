@@ -34,35 +34,35 @@ int KBuildHelper::get_flags(const char *uname_machine, vector<string> *cflags) {
   //               -e s/ppc.*/powerpc/ -e s/mips.*/mips/ -e s/sh[234].*/sh/
   //               -e s/aarch64.*/arm64/
 
-  string arch = uname_machine;
-  const char *archenv;
-
-  if (!strncmp(uname_machine, "x86_64", 6)) {
-    arch = "x86";
-  } else if (uname_machine[0] == 'i' && !strncmp(&uname_machine[2], "86", 2)) {
-    arch = "x86";
-  } else if (!strncmp(uname_machine, "arm", 3)) {
-    arch = "arm";
-  } else if (!strncmp(uname_machine, "sa110", 5)) {
-    arch = "arm";
-  } else if (!strncmp(uname_machine, "s390x", 5)) {
-    arch = "s390";
-  } else if (!strncmp(uname_machine, "parisc64", 8)) {
-    arch = "parisc";
-  } else if (!strncmp(uname_machine, "ppc", 3)) {
-    arch = "powerpc";
-  } else if (!strncmp(uname_machine, "mips", 4)) {
-    arch = "mips";
-  } else if (!strncmp(uname_machine, "sh", 2)) {
-    arch = "sh";
-  } else if (!strncmp(uname_machine, "aarch64", 7)) {
-    arch = "arm64";
-  }
-
+  string arch;
+  const char *archenv = getenv("ARCH");
   // If ARCH env is defined, use it over uname
-  archenv = getenv("ARCH");
   if (archenv)
     arch = string(archenv);
+  else
+    arch = string(uname_machine);
+
+  if (!arch.compare(0, 6, "x86_64")) {
+    arch = "x86";
+  } else if (arch[0] == 'i' && !arch.compare(2, 2, "86")) {
+    arch = "x86";
+  } else if (!arch.compare(0, 3, "arm")) {
+    arch = "arm";
+  } else if (!arch.compare(0, 5, "sa110")) {
+    arch = "arm";
+  } else if (!arch.compare(0, 5, "s390x")) {
+    arch = "s390";
+  } else if (!arch.compare(0, 8, "parisc64")) {
+    arch = "parisc";
+  } else if (!arch.compare(0, 3, "ppc")) {
+    arch = "powerpc";
+  } else if (!arch.compare(0, 4, "mips")) {
+    arch = "mips";
+  } else if (!arch.compare(0, 2, "sh")) {
+    arch = "sh";
+  } else if (!arch.compare(0, 7, "aarch64")) {
+    arch = "arm64";
+  }
 
   cflags->push_back("-nostdinc");
   cflags->push_back("-isystem");
