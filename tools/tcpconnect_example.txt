@@ -38,6 +38,24 @@ The output shows some periodic connections (or attempts) from a "local_agent"
 process to various other addresses. A few connections occur every minute.
 
 
+The -U option prints a UID column:
+
+# ./tcpconnect -U
+UID   PID    COMM         IP SADDR            DADDR            DPORT
+0     31333  telnet       6  ::1              ::1              23
+0     31333  telnet       4  127.0.0.1        127.0.0.1        23
+1000  31322  curl         4  127.0.0.1        127.0.0.1        80
+1000  31322  curl         6  ::1              ::1              80
+
+
+The -u option filtering UID:
+
+# ./tcpconnect -Uu 1000
+UID   PID    COMM         IP SADDR            DADDR            DPORT
+1000  31338  telnet       6  ::1              ::1              23
+1000  31338  telnet       4  127.0.0.1        127.0.0.1        23
+
+
 USAGE message:
 
 # ./tcpconnect -h
@@ -51,6 +69,8 @@ optional arguments:
   -p PID, --pid PID  trace this PID only
   -P PORT, --port PORT
                      comma-separated list of destination ports to trace.
+  -U, --print-uid    include UID on output
+  -u UID, --uid UID  trace this UID only
 
 examples:
     ./tcpconnect           # trace all TCP connect()s
@@ -58,3 +78,5 @@ examples:
     ./tcpconnect -p 181    # only trace PID 181
     ./tcpconnect -P 80     # only trace port 80
     ./tcpconnect -P 80,81  # only trace port 80 and 81
+    ./tcpconnect -U        # include UID
+    ./tcpconnect -u 1000   # only trace UID 1000

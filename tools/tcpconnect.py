@@ -16,6 +16,7 @@
 #
 # 25-Sep-2015   Brendan Gregg   Created this.
 # 14-Feb-2016      "      "     Switch to bpf_perf_output.
+# 09-Jan-2019   Takuma Kume     Support filtering by UID
 
 from __future__ import print_function
 from bcc import BPF
@@ -32,6 +33,8 @@ examples = """examples:
     ./tcpconnect -p 181    # only trace PID 181
     ./tcpconnect -P 80     # only trace port 80
     ./tcpconnect -P 80,81  # only trace port 80 and 81
+    ./tcpconnect -U        # include UID
+    ./tcpconnect -u 1000   # only trace UID 1000
 """
 parser = argparse.ArgumentParser(
     description="Trace TCP connects",
@@ -43,6 +46,10 @@ parser.add_argument("-p", "--pid",
     help="trace this PID only")
 parser.add_argument("-P", "--port",
     help="comma-separated list of destination ports to trace.")
+parser.add_argument("-U", "--print-uid", action="store_true",
+    help="include UID on output")
+parser.add_argument("-u", "--uid",
+    help="trace this UID only")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
 args = parser.parse_args()
@@ -60,6 +67,7 @@ BPF_HASH(currsock, u32, struct sock *);
 struct ipv4_data_t {
     u64 ts_us;
     u32 pid;
+    u32 uid;
     u32 saddr;
     u32 daddr;
     u64 ip;
@@ -71,6 +79,7 @@ BPF_PERF_OUTPUT(ipv4_events);
 struct ipv6_data_t {
     u64 ts_us;
     u32 pid;
+    u32 uid;
     unsigned __int128 saddr;
     unsigned __int128 daddr;
     u64 ip;
@@ -83,6 +92,9 @@ int trace_connect_entry(struct pt_regs *ctx, struct sock *sk)
 {
     u32 pid = bpf_get_current_pid_tgid();
     FILTER_PID
+
+    u32 uid = bpf_get_current_uid_gid();
+    FILTER_UID
 
     // stash the sock ptr for lookup on return
     currsock.update(&pid, &sk);
@@ -116,6 +128,7 @@ static int trace_connect_return(struct pt_regs *ctx, short ipver)
 
     if (ipver == 4) {
         struct ipv4_data_t data4 = {.pid = pid, .ip = ipver};
+        data4.uid = bpf_get_current_uid_gid();
         data4.ts_us = bpf_ktime_get_ns() / 1000;
         data4.saddr = skp->__sk_common.skc_rcv_saddr;
         data4.daddr = skp->__sk_common.skc_daddr;
@@ -125,6 +138,7 @@ static int trace_connect_return(struct pt_regs *ctx, short ipver)
 
     } else /* 6 */ {
         struct ipv6_data_t data6 = {.pid = pid, .ip = ipver};
+        data6.uid = bpf_get_current_uid_gid();
         data6.ts_us = bpf_ktime_get_ns() / 1000;
         bpf_probe_read(&data6.saddr, sizeof(data6.saddr),
             skp->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
@@ -160,9 +174,13 @@ if args.port:
     dports_if = ' && '.join(['dport != %d' % ntohs(dport) for dport in dports])
     bpf_text = bpf_text.replace('FILTER_PORT',
         'if (%s) { currsock.delete(&pid); return 0; }' % dports_if)
+if args.uid:
+    bpf_text = bpf_text.replace('FILTER_UID',
+        'if (uid != %s) { return 0; }' % args.uid)
 
 bpf_text = bpf_text.replace('FILTER_PID', '')
 bpf_text = bpf_text.replace('FILTER_PORT', '')
+bpf_text = bpf_text.replace('FILTER_UID', '')
 
 if debug or args.ebpf:
     print(bpf_text)
@@ -176,6 +194,7 @@ class Data_ipv4(ct.Structure):
     _fields_ = [
         ("ts_us", ct.c_ulonglong),
         ("pid", ct.c_uint),
+        ("uid", ct.c_uint),
         ("saddr", ct.c_uint),
         ("daddr", ct.c_uint),
         ("ip", ct.c_ulonglong),
@@ -187,6 +206,7 @@ class Data_ipv6(ct.Structure):
     _fields_ = [
         ("ts_us", ct.c_ulonglong),
         ("pid", ct.c_uint),
+        ("uid", ct.c_uint),
         ("saddr", (ct.c_ulonglong * 2)),
         ("daddr", (ct.c_ulonglong * 2)),
         ("ip", ct.c_ulonglong),
@@ -202,6 +222,8 @@ def print_ipv4_event(cpu, data, size):
         if start_ts == 0:
             start_ts = event.ts_us
         print("%-9.3f" % ((float(event.ts_us) - start_ts) / 1000000), end="")
+    if args.print_uid:
+        print("%-6d" % event.uid, end="")
     printb(b"%-6d %-12.12s %-2d %-16s %-16s %-4d" % (event.pid,
         event.task.decode('utf-8', 'replace'), event.ip,
         inet_ntop(AF_INET, pack("I", event.saddr)),
@@ -214,6 +236,8 @@ def print_ipv6_event(cpu, data, size):
         if start_ts == 0:
             start_ts = event.ts_us
         print("%-9.3f" % ((float(event.ts_us) - start_ts) / 1000000), end="")
+    if args.print_uid:
+        print("%-6d" % event.uid, end="")
     printb(b"%-6d %-12.12s %-2d %-16s %-16s %-4d" % (event.pid,
         event.task.decode('utf-8', 'replace'), event.ip,
         inet_ntop(AF_INET6, event.saddr), inet_ntop(AF_INET6, event.daddr),
@@ -229,6 +253,8 @@ b.attach_kretprobe(event="tcp_v6_connect", fn_name="trace_connect_v6_return")
 # header
 if args.timestamp:
     print("%-9s" % ("TIME(s)"), end="")
+if args.print_uid:
+    print("%-6s" % ("UID"), end="")
 print("%-6s %-12s %-2s %-16s %-16s %-4s" % ("PID", "COMM", "IP", "SADDR",
     "DADDR", "DPORT"))
 

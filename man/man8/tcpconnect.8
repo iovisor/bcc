@@ -32,6 +32,12 @@ Trace this process ID only (filtered in-kernel).
 Comma-separated list of destination ports to trace (filtered in-kernel).
 .SH EXAMPLES
 .TP
+\-U
+Include a UID column.
+.TP
+\-u UID
+Trace this UID only (filtered in-kernel).
+.TP
 Trace all active TCP connections:
 #
 .B tcpconnect
@@ -49,8 +55,21 @@ Trace ports 80 and 81 only:
 .B tcpconnect \-P 80,81
 .SH FIELDS
 .TP
+Trace all TCP connects, and include UID:
+#
+.B tcpconnect \-U
+.SH FIELDS
+.TP
+Trace UID 1000 only:
+#
+.B tcpconnect \-u 1000
+.SH FIELDS
+.TP
 TIME(s)
 Time of the call, in seconds.
+.TP
+UID
+User ID
 .TP
 PID
 Process ID
