@@ -433,11 +433,11 @@ int kprobe__io_ctl_init(void *ctx) {
 
 ### 1. bpf_trace_printk()
 
-Syntax: ```int bpf_trace_printk(const char *fmt, int fmt_size, ...)```
+Syntax: ```int bpf_trace_printk(const char *fmt, ...)```
 
 Return: 0 on success
 
-A simple kernel facility for printf() to the common trace_pipe (/sys/kernel/debug/tracing/trace_pipe). This is ok for some quick examples, but has limitations: 3 args max, 1 %s only, and trace_pipe is globally shared, so concurrent programs will have clashing output. A better interface is via BPF_PERF_OUTPUT().
+A simple kernel facility for printf() to the common trace_pipe (/sys/kernel/debug/tracing/trace_pipe). This is ok for some quick examples, but has limitations: 3 args max, 1 %s only, and trace_pipe is globally shared, so concurrent programs will have clashing output. A better interface is via BPF_PERF_OUTPUT(). Note that calling this helper is made simpler than the original kernel version, which has ```fmt_size``` as the second parameter.
 
 Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=bpf_trace_printk+path%3Aexamples&type=Code),
