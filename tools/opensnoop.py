@@ -245,7 +245,7 @@ def print_event(cpu, data, size):
     if args.extended_fields:
         print("%08o " % event.flags, end="")
 
-    printb(b'%s' % event.fname.decode('utf-8', 'replace'))
+    printb(b'%s' % event.fname)
 
 # loop with callback to print_event
 b["events"].open_perf_buffer(print_event, page_cnt=64)
