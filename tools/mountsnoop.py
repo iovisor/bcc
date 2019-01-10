@@ -110,22 +110,22 @@ int syscall__mount(struct pt_regs *ctx, char __user *source,
     events.perf_submit(ctx, &event, sizeof(event));
 
     event.type = EVENT_MOUNT_SOURCE;
-    memset(event.str, 0, sizeof(event.str));
+    __builtin_memset(event.str, 0, sizeof(event.str));
     bpf_probe_read(event.str, sizeof(event.str), source);
     events.perf_submit(ctx, &event, sizeof(event));
 
     event.type = EVENT_MOUNT_TARGET;
-    memset(event.str, 0, sizeof(event.str));
+    __builtin_memset(event.str, 0, sizeof(event.str));
     bpf_probe_read(event.str, sizeof(event.str), target);
     events.perf_submit(ctx, &event, sizeof(event));
 
     event.type = EVENT_MOUNT_TYPE;
-    memset(event.str, 0, sizeof(event.str));
+    __builtin_memset(event.str, 0, sizeof(event.str));
     bpf_probe_read(event.str, sizeof(event.str), type);
     events.perf_submit(ctx, &event, sizeof(event));
 
     event.type = EVENT_MOUNT_DATA;
-    memset(event.str, 0, sizeof(event.str));
+    __builtin_memset(event.str, 0, sizeof(event.str));
     bpf_probe_read(event.str, sizeof(event.str), data);
     events.perf_submit(ctx, &event, sizeof(event));
 
@@ -165,7 +165,7 @@ int syscall__umount(struct pt_regs *ctx, char __user *target, int flags)
     events.perf_submit(ctx, &event, sizeof(event));
 
     event.type = EVENT_UMOUNT_TARGET;
-    memset(event.str, 0, sizeof(event.str));
+    __builtin_memset(event.str, 0, sizeof(event.str));
     bpf_probe_read(event.str, sizeof(event.str), target);
     events.perf_submit(ctx, &event, sizeof(event));
 
