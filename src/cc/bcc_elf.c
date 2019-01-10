@@ -799,8 +799,6 @@ static int bcc_free_memory_with_file(const char *path) {
       saddr = (unsigned long)bcc_free_memory - sym_addr + header.sh_addr;
       eaddr = saddr + header.sh_size;
 
-      extern unsigned long _start, _fini;
-
       // adjust saddr and eaddr, start addr needs to be page aligned
       saddr_n = (saddr + page_size - 1) & ~(page_size - 1);
       eaddr -= saddr_n - saddr;
