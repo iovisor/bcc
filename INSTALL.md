@@ -62,7 +62,7 @@ echo "deb https://repo.iovisor.org/apt/$(lsb_release -cs) $(lsb_release -cs) mai
 sudo apt-get update
 sudo apt-get install bcc-tools libbcc-examples linux-headers-$(uname -r)
 ```
-(replace `xenial` with `artful` or `bionic` as appropriate)
+(replace `xenial` with `artful` or `bionic` as appropriate). Tools will be installed under /usr/share/bcc/tools.
 
 **Nightly Packages**
 
@@ -72,6 +72,16 @@ sudo apt-get update
 sudo apt-get install bcc-tools libbcc-examples linux-headers-$(uname -r)
 ```
 (replace `xenial` with `artful` or `bionic` as appropriate)
+
+**Ubuntu Packages**
+
+The previous commands will install the latest bcc from the iovisor repositories. It is also available from the standard Ubuntu multiverse repository, under the package name `bpfcc-tools`.
+
+```bash
+sudo apt-get install bpfcc-tools linux-headers-$(uname -r)
+```
+
+The tools are installed in /sbin with a -bpfcc extension. Try running `sudo opensnoop-bpfcc`.
 
 ## Fedora - Binary
 
