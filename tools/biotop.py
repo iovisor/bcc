@@ -53,7 +53,7 @@ loadavg = "/proc/loadavg"
 diskstats = "/proc/diskstats"
 
 # signal handler
-def signal_ignore(signal, frame):
+def signal_ignore(signal_value, frame):
     print()
 
 # load BPF program

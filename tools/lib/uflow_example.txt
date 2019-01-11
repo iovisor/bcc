@@ -48,8 +48,8 @@ CPU PID    TID    TIME(us) METHOD
 3   27722  27731  3.144          <- java/lang/ThreadGroup.checkAccess
 3   27722  27731  3.144          -> java/lang/ThreadGroup.addUnstarted
 3   27722  27731  3.144          <- java/lang/ThreadGroup.addUnstarted
-3   27722  27731  3.145          -> java/lang/Thread.isDaemon     
-3   27722  27731  3.145          <- java/lang/Thread.isDaemon     
+3   27722  27731  3.145          -> java/lang/Thread.isDaemon
+3   27722  27731  3.145          <- java/lang/Thread.isDaemon
 3   27722  27731  3.145          -> java/lang/Thread.getPriority   
 3   27722  27731  3.145          <- java/lang/Thread.getPriority   
 3   27722  27731  3.145          -> java/lang/Thread.getContextClassLoader
