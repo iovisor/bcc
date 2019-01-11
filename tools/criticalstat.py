@@ -319,7 +319,7 @@ def print_event(cpu, data, size):
             print("NO STACK FOUND DUE TO COLLISION")
         print("===================================")
         print("")
-    except:
+    except Exception:
         sys.exit(0)
 
 b["events"].open_perf_buffer(print_event, page_cnt=256)

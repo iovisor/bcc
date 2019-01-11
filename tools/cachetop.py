@@ -40,7 +40,7 @@ FIELDS = (
     "WRITE_HIT%"
 )
 DEFAULT_FIELD = "HITS"
-
+DEFAULT_SORT_FIELD = FIELDS.index(DEFAULT_FIELD)
 
 # signal handler
 def signal_ignore(signal, frame):
@@ -61,7 +61,7 @@ def get_meminfo():
 
 def get_processes_stats(
         bpf,
-        sort_field=FIELDS.index(DEFAULT_FIELD),
+        sort_field=DEFAULT_SORT_FIELD,
         sort_reverse=False):
     '''
     Return a tuple containing:
@@ -223,7 +223,7 @@ def handle_loop(stdscr, args):
             uid = int(stat[1])
             try:
                 username = pwd.getpwuid(uid)[0]
-            except KeyError as ex:
+            except KeyError:
                 # `pwd` throws a KeyError if the user cannot be found. This can
                 # happen e.g. when the process is running in a cgroup that has
                 # different users from the host.

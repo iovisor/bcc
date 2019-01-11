@@ -205,7 +205,7 @@ b.attach_kretprobe(event="__vfs_read", fn_name="trace_read_return")
 try:
     b.attach_kprobe(event="__vfs_write", fn_name="trace_write_entry")
     b.attach_kretprobe(event="__vfs_write", fn_name="trace_write_return")
-except:
+except Exception:
     # older kernels don't have __vfs_write so try vfs_write instead
     b.attach_kprobe(event="vfs_write", fn_name="trace_write_entry")
     b.attach_kretprobe(event="vfs_write", fn_name="trace_write_return")

@@ -60,7 +60,7 @@ debug = 0
 loadavg = "/proc/loadavg"
 
 # signal handler
-def signal_ignore(signal, frame):
+def signal_ignore(signal_value, frame):
     print()
 
 # define BPF program
