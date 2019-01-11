@@ -89,7 +89,7 @@ class MyMemoryManager : public SectionMemoryManager {
 BPFModule::BPFModule(unsigned flags, TableStorage *ts, bool rw_engine_enabled,
                      const std::string &maps_ns)
     : flags_(flags),
-      rw_engine_enabled_(rw_engine_enabled),
+      rw_engine_enabled_(rw_engine_enabled && bpf_module_rw_engine_enabled()),
       used_b_loader_(false),
       ctx_(new LLVMContext),
       id_(std::to_string((uintptr_t)this)),
