@@ -216,8 +216,15 @@ struct bpf_stacktrace {
   u64 ip[BPF_MAX_STACK_DEPTH];
 };
 
+struct bpf_stacktrace_buildid {
+  struct bpf_stack_build_id trace[BPF_MAX_STACK_DEPTH];
+};
+
 #define BPF_STACK_TRACE(_name, _max_entries) \
   BPF_TABLE("stacktrace", int, struct bpf_stacktrace, _name, roundup_pow_of_two(_max_entries))
+
+#define BPF_STACK_TRACE_BUILDID(_name, _max_entries) \
+  BPF_F_TABLE("stacktrace", int, struct bpf_stacktrace_buildid, _name, roundup_pow_of_two(_max_entries), BPF_F_STACK_BUILD_ID)
 
 #define BPF_PROG_ARRAY(_name, _max_entries) \
   BPF_TABLE("prog", u32, u32, _name, _max_entries)

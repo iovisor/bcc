@@ -24,7 +24,7 @@ import errno
 import sys
 basestring = (unicode if sys.version_info[0] < 3 else str)
 
-from .libbcc import lib, bcc_symbol, bcc_symbol_option, _SYM_CB_TYPE
+from .libbcc import lib, bcc_symbol, bcc_symbol_option, bcc_stacktrace_build_id, _SYM_CB_TYPE
 from .table import Table, PerfEventArray
 from .perf import Perf
 from .syscall import syscall_name
@@ -69,6 +69,7 @@ class SymbolCache(object):
         module. If we don't even know the module, return the absolute
         address as the offset.
         """
+
         sym = bcc_symbol()
         if demangle:
             res = lib.bcc_symcache_resolve(self.cache, addr, ct.byref(sym))
@@ -95,6 +96,7 @@ class SymbolCache(object):
                 ct.byref(addr)) < 0:
             return -1
         return addr.value
+
 
 class PerfType:
     # From perf_type_id in uapi/linux/perf_event.h
@@ -158,6 +160,7 @@ class BPF(object):
 
     _probe_repl = re.compile(b"[^a-zA-Z0-9_]")
     _sym_caches = {}
+    _bsymcache =  lib.bcc_buildsymcache_new()
 
     _auto_includes = {
         "linux/time.h": ["time"],
@@ -1189,7 +1192,31 @@ class BPF(object):
         Example output when both show_module and show_offset are False:
             "start_thread"
         """
-        name, offset, module = BPF._sym_cache(pid).resolve(addr, demangle)
+
+        #addr is of type stacktrace_build_id
+        #so invoke the bsym address resolver
+        typeofaddr = str(type(addr))
+        if typeofaddr.find('bpf_stack_build_id') != -1:
+          sym = bcc_symbol()
+          b = bcc_stacktrace_build_id()
+          b.status = addr.status
+          b.build_id = addr.build_id
+          b.u.offset = addr.offset;
+          res = lib.bcc_buildsymcache_resolve(BPF._bsymcache,
+                                              ct.byref(b),
+                                              ct.byref(sym))
+          if res < 0:
+            if sym.module and sym.offset:
+              name,offset,module = (None, sym.offset,
+                        ct.cast(sym.module, ct.c_char_p).value)
+            else:
+              name, offset, module = (None, addr, None)
+          else:
+            name, offset, module = (sym.name, sym.offset,
+                                    ct.cast(sym.module, ct.c_char_p).value)
+        else:
+          name, offset, module = BPF._sym_cache(pid).resolve(addr, demangle)
+
         offset = b"+0x%x" % offset if show_offset and name is not None else b""
         name = name or b"[unknown]"
         name = name + offset
@@ -1261,6 +1288,17 @@ class BPF(object):
 
     def free_bcc_memory(self):
         return lib.bcc_free_memory()
+
+    @staticmethod
+    def add_module(modname):
+      """add_module(modname)
+
+        Add a library or exe to buildsym cache
+      """
+      try:
+        lib.bcc_buildsymcache_add_module(BPF._bsymcache, modname.encode())
+      except Exception as e:
+        print("Error adding module to build sym cache"+str(e))
 
     def donothing(self):
         """the do nothing exit handler"""

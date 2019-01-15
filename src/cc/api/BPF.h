@@ -49,6 +49,7 @@ class BPF {
   explicit BPF(unsigned int flag = 0, TableStorage* ts = nullptr,
                bool rw_engine_enabled = bpf_module_rw_engine_enabled(), const std::string &maps_ns = "")
       : flag_(flag),
+        bsymcache_(NULL),
       bpf_module_(new BPFModule(flag, ts, rw_engine_enabled, maps_ns)) {}
   StatusTuple init(const std::string& bpf_program,
                    const std::vector<std::string>& cflags = {},
@@ -137,6 +138,13 @@ class BPF {
     return BPFPercpuHashTable<KeyType, ValueType>({});
   }
 
+  void* get_bsymcache(void) {
+    if (bsymcache_ == NULL) {
+      bsymcache_ = bcc_buildsymcache_new();
+    }
+    return bsymcache_;
+  }
+
   BPFProgTable get_prog_table(const std::string& name);
 
   BPFCgroupArray get_cgroup_array(const std::string& name);
@@ -146,6 +154,12 @@ class BPF {
   BPFStackTable get_stack_table(const std::string& name,
                                 bool use_debug_file = true,
                                 bool check_debug_file_crc = true);
+
+  BPFStackBuildIdTable get_stackbuildid_table(const std::string &name,
+                                              bool use_debug_file = true,
+                                              bool check_debug_file_crc = true);
+
+  bool add_module(std::string module);
 
   StatusTuple open_perf_event(const std::string& name, uint32_t type,
                               uint64_t config);
@@ -224,6 +238,8 @@ class BPF {
                                   uint64_t& offset_res);
 
   int flag_;
+
+  void *bsymcache_;
 
   std::unique_ptr<std::string> syscall_prefix_;
 

@@ -21,6 +21,7 @@ extern "C" {
 #endif
 
 #include <stdint.h>
+#include <compat/linux/bpf.h>
 
 struct bcc_symbol {
   const char *name;
@@ -67,6 +68,13 @@ void bcc_symcache_refresh(void *resolver);
 int bcc_resolve_global_addr(int pid, const char *module, const uint64_t address,
                             uint64_t *global);
 
+/*bcc APIs for build_id stackmap support*/
+void *bcc_buildsymcache_new(void);
+void bcc_free_buildsymcache(void *symcache);
+int  bcc_buildsymcache_add_module(void *resolver, const char *module_name);
+int bcc_buildsymcache_resolve(void *resolver,
+                              struct bpf_stack_build_id *trace,
+                              struct bcc_symbol *sym);
 // Call cb on every function symbol in the specified module. Uses simpler
 // SYM_CB callback mainly for easier to use in Python API.
 // Will prefer use debug file and check debug file CRC when reading the module.
