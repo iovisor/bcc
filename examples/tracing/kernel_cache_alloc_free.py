@@ -76,6 +76,5 @@ def display_kernel_alloc_free(cpu, data, size):
 b["events_alloc"].open_perf_buffer(display_kernel_alloc_free)
 b["events_free"].open_perf_buffer(display_kernel_alloc_free)
 
-while 1:
-    # read messages from perf buffer 
+while 1: 
 	b.perf_buffer_poll()
