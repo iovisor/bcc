@@ -83,6 +83,7 @@ class BPFModule {
   BPFModule(unsigned flags, TableStorage *ts = nullptr, bool rw_engine_enabled = true,
             const std::string &maps_ns = "");
   ~BPFModule();
+  int free_bcc_memory();
   int load_b(const std::string &filename, const std::string &proto_filename);
   int load_c(const std::string &filename, const char *cflags[], int ncflags);
   int load_string(const std::string &text, const char *cflags[], int ncflags);
