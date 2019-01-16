@@ -88,6 +88,10 @@ popd
 %install
 pushd build
 make install/strip DESTDIR=%{buildroot}
+# mangle shebangs
+find %{buildroot}/usr/share/bcc/{tools,examples} -type f -exec \
+    sed -i -e '1 s|^#!/usr/bin/python$|#!'%{__python}'|' \
+           -e '1 s|^#!/usr/bin/env python$|#!'%{__python}'|' {} \;
 
 %package -n libbcc
 Summary: Shared Library for BPF Compiler Collection (BCC)
