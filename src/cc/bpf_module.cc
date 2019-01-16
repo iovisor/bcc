@@ -35,6 +35,7 @@
 
 #include "common.h"
 #include "bcc_debug.h"
+#include "bcc_elf.h"
 #include "frontends/b/loader.h"
 #include "frontends/clang/loader.h"
 #include "frontends/clang/b_frontend_action.h"
@@ -139,6 +140,10 @@ BPFModule::~BPFModule() {
   func_src_.reset();
 
   ts_->DeletePrefix(Path({id_}));
+}
+
+int BPFModule::free_bcc_memory() {
+  return bcc_free_memory();
 }
 
 // load an entire c file as a module
