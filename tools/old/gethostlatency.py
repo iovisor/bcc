@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python
 #
 # gethostlatency  Show latency for getaddrinfo/gethostbyname[2] calls.
 #                 For Linux, uses BCC, eBPF. Embedded C.

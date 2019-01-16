@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python
 #
 # sync_timing.py    Trace time between syncs.
 #                   For Linux, uses BCC, eBPF. Embedded C.

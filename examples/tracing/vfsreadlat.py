@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python
 #
 # vfsreadlat.py		VFS read latency distribution.
 #			For Linux, uses BCC, eBPF. See .c file.

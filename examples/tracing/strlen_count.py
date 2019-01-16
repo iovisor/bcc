@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python
 #
 # strlen_count  Trace strlen() and print a frequency count of strings.
 #               For Linux, uses BCC, eBPF. Embedded C.
