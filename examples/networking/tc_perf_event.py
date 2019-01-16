@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python
 #
 # tc_perf_event.py  Output skb and meta data through perf event
 #

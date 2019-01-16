@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python
 #
 #Bertrone Matteo - Polytechnic of Turin
 #November 2015

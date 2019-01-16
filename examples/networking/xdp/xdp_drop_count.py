@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python
 #
 # xdp_drop_count.py Drop incoming packets on XDP layer and count for which
 #                   protocol type

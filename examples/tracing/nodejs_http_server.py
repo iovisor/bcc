@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python
 #
 # nodejs_http_server    Basic example of node.js USDT tracing.
 #                       For Linux, uses BCC, BPF. Embedded C.

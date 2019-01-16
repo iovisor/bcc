@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python
 #
 # stackcount    Count kernel function calls and their stack traces.
 #               For Linux, uses BCC, eBPF.

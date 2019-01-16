@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python
 #
 # argdist   Trace a function and display a distribution of its
 #           parameter values as a histogram or frequency count.

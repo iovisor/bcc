@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python
 #
 # xdp_macswap_count.py Swap Source and Destination MAC addresses on
 #                      incoming packets and transmit packets back on
