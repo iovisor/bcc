@@ -104,6 +104,19 @@ TIME     PID    COMM         FUNC             -
 01:23:55 0      swapper/0    block_rq_complete sectors=8
 ^C
 
+Suppose that you want to trace a system-call in a short-lived process, you can use
+the -s option to trace. The option is followed by list of libraries/executables to
+use for symbol resolution.
+# trace -s /lib/x86_64-linux-gnu/libc.so.6,/bin/ping 'p:c:inet_pton' -U
+Note: Kernel bpf will report stack map with ip/build_id
+PID     TID     COMM            FUNC
+4175    4175    ping            inet_pton
+        inet_pton+0x136340 [libc.so.6]
+        getaddrinfo+0xfb510 [libc.so.6]
+        _init+0x2a08 [ping]
+
+During the trace, 'ping -c1 google.com' was executed to obtain the above results
+
 To discover the tracepoint structure format (which you can refer to as the "args"
 pointer variable), use the tplist tool. For example:
 
@@ -268,6 +281,8 @@ optional arguments:
   -v, --verbose         print resulting BPF program code before executing
   -Z STRING_SIZE, --string-size STRING_SIZE
                         maximum size to read from strings
+  -s SYM_FILE_LIST      when collecting stack trace in build id format,
+                        use the coma separated list for symbol resolution
   -S, --include-self    do not filter trace's own pid from the trace
   -M MAX_EVENTS, --max-events MAX_EVENTS
                         number of events to print before quitting
@@ -325,4 +340,7 @@ trace -I 'net/sock.h' \\
         to 53 (DNS; 13568 in big endian order)
 trace -I 'linux/fs_struct.h' 'mntns_install "users = %d", $task->fs->users'
         Trace the number of users accessing the file system of the current task
+trace -s /lib/x86_64-linux-gnu/libc.so.6,/bin/ping 'p:c:inet_pton' -U
+        Trace inet_pton system call and use the specified libraries/executables for
+        symbol resolution.
 "
