@@ -82,7 +82,9 @@
 #define AF_ALG 38
 #endif
 
+#ifndef min
 #define min(x, y) ((x) < (y) ? (x) : (y))
+#endif
 
 #define UNUSED(expr) do { (void)(expr); } while (0)
 
@@ -191,7 +193,7 @@ static uint64_t ptr_to_u64(void *ptr)
   return (uint64_t) (unsigned long) ptr;
 }
 
-int bpf_create_map(enum bpf_map_type map_type, const char *name,
+int bcc_create_map(enum bpf_map_type map_type, const char *name,
                    int key_size, int value_size,
                    int max_entries, int map_flags)
 {
@@ -483,7 +485,7 @@ int bpf_prog_get_tag(int fd, unsigned long long *ptag)
   return 0;
 }
 
-int bpf_prog_load(enum bpf_prog_type prog_type, const char *name,
+int bcc_prog_load(enum bpf_prog_type prog_type, const char *name,
                   const struct bpf_insn *insns, int prog_len,
                   const char *license, unsigned kern_version,
                   int log_level, char *log_buf, unsigned log_buf_size)
@@ -1425,60 +1427,4 @@ int bpf_close_perf_event_fd(int fd) {
     }
   }
   return error;
-}
-
-int bpf_obj_pin(int fd, const char *pathname)
-{
-  union bpf_attr attr;
-
-  memset(&attr, 0, sizeof(attr));
-  attr.pathname = ptr_to_u64((void *)pathname);
-  attr.bpf_fd = fd;
-
-  return syscall(__NR_bpf, BPF_OBJ_PIN, &attr, sizeof(attr));
-}
-
-int bpf_obj_get(const char *pathname)
-{
-  union bpf_attr attr;
-
-  memset(&attr, 0, sizeof(attr));
-  attr.pathname = ptr_to_u64((void *)pathname);
-
-  return syscall(__NR_bpf, BPF_OBJ_GET, &attr, sizeof(attr));
-}
-
-int bpf_prog_get_next_id(uint32_t start_id, uint32_t *next_id)
-{
-  union bpf_attr attr;
-  int err;
-
-  memset(&attr, 0, sizeof(attr));
-  attr.start_id = start_id;
-
-  err = syscall(__NR_bpf, BPF_PROG_GET_NEXT_ID, &attr, sizeof(attr));
-  if (!err)
-    *next_id = attr.next_id;
-
-  return err;
-}
-
-int bpf_prog_get_fd_by_id(uint32_t id)
-{
-  union bpf_attr attr;
-
-  memset(&attr, 0, sizeof(attr));
-  attr.prog_id = id;
-
-  return syscall(__NR_bpf, BPF_PROG_GET_FD_BY_ID, &attr, sizeof(attr));
-}
-
-int bpf_map_get_fd_by_id(uint32_t id)
-{
-  union bpf_attr attr;
-
-  memset(&attr, 0, sizeof(attr));
-  attr.map_id = id;
-
-  return syscall(__NR_bpf, BPF_MAP_GET_FD_BY_ID, &attr, sizeof(attr));
 }

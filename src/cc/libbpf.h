@@ -31,7 +31,7 @@ enum bpf_probe_attach_type {
 	BPF_PROBE_RETURN
 };
 
-int bpf_create_map(enum bpf_map_type map_type, const char *name,
+int bcc_create_map(enum bpf_map_type map_type, const char *name,
                    int key_size, int value_size, int max_entries,
                    int map_flags);
 int bpf_update_elem(int fd, void *key, void *value, unsigned long long flags);
@@ -56,7 +56,7 @@ int bpf_get_next_key(int fd, void *key, void *next_key);
  *     printing, and continue to attempt increase that allocated buffer size if
  *     initial attemp was insufficient in size.
  */
-int bpf_prog_load(enum bpf_prog_type prog_type, const char *name,
+int bcc_prog_load(enum bpf_prog_type prog_type, const char *name,
                   const struct bpf_insn *insns, int insn_len,
                   const char *license, unsigned kern_version,
                   int log_level, char *log_buf, unsigned log_buf_size);

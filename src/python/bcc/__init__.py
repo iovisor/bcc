@@ -365,7 +365,7 @@ class BPF(object):
             log_level = 2
         elif (self.debug & DEBUG_BPF):
             log_level = 1
-        fd = lib.bpf_prog_load(prog_type, func_name,
+        fd = lib.bcc_prog_load(prog_type, func_name,
                 lib.bpf_function_start(self.module, func_name),
                 lib.bpf_function_size(self.module, func_name),
                 lib.bpf_module_license(self.module),

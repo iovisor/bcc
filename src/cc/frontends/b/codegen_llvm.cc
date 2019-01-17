@@ -1108,7 +1108,7 @@ StatusTuple CodegenLLVM::visit_table_decl_stmt_node(TableDeclStmtNode *n) {
     decl_gvar->setSection("maps");
     tables_[n] = decl_gvar;
 
-    int map_fd = bpf_create_map(map_type, n->id_->name_.c_str(),
+    int map_fd = bcc_create_map(map_type, n->id_->name_.c_str(),
                                 key->bit_width_ / 8, leaf->bit_width_ / 8,
                                 n->size_, 0);
     if (map_fd >= 0)
