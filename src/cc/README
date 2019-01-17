@@ -1,0 +1,16 @@
+The libbpf directory is a git submodule for repository
+  https://github.com/libbpf/libbpf
+
+If you have any change in libbpf directory, please upstream to linux
+first as libbpf repo is a mirror of linux/tools/lib/bpf directory.
+
+If any top-commit update of libbpf submodule contains a uapi header
+change, the following are necessary steps to sync properly with
+rest of bcc:
+  1. sync compat/linux/virtual_bpf.h with libbpf/include/uapi/linux/bpf.h
+     as virtual_bpf.h has an extra string wrapper for bpf.h.
+  2. if new bpf.h has new helpers, add corresponding helper func define
+     in bcc:src/cc/export/helpers.h and helper entry for error reporting
+     in bcc:src/cc/libbpf.c.
+  3. if new bpf.h has new map types, program types, update
+     bcc:introspection/bps.c for these new map/program types.
