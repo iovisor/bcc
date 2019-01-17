@@ -21,7 +21,7 @@ extern "C" {
 #endif
 
 #include <stdint.h>
-#include <compat/linux/bpf.h>
+#include "compat/linux/bpf.h"
 
 struct bcc_symbol {
   const char *name;
