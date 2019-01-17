@@ -51,6 +51,8 @@
 // TODO: Remove this when CentOS 6 support is not needed anymore
 #include "setns.h"
 
+#include "libbpf/src/bpf.h"
+
 // TODO: remove these defines when linux-libc-dev exports them properly
 
 #ifndef __NR_bpf
@@ -198,20 +200,14 @@ int bcc_create_map(enum bpf_map_type map_type, const char *name,
                    int max_entries, int map_flags)
 {
   size_t name_len = name ? strlen(name) : 0;
-  union bpf_attr attr;
-  memset(&attr, 0, sizeof(attr));
-  attr.map_type = map_type;
-  attr.key_size = key_size;
-  attr.value_size = value_size;
-  attr.max_entries = max_entries;
-  attr.map_flags = map_flags;
-  memcpy(attr.map_name, name, min(name_len, BPF_OBJ_NAME_LEN - 1));
+  char map_name[BPF_OBJ_NAME_LEN];
 
-  int ret = syscall(__NR_bpf, BPF_MAP_CREATE, &attr, sizeof(attr));
-
+  memcpy(map_name, name, min(name_len, BPF_OBJ_NAME_LEN - 1));
+  int ret = bpf_create_map_name(map_type, map_name, key_size, value_size,
+                                max_entries, map_flags);
   if (ret < 0 && name_len && (errno == E2BIG || errno == EINVAL)) {
-    memset(attr.map_name, 0, BPF_OBJ_NAME_LEN);
-    ret = syscall(__NR_bpf, BPF_MAP_CREATE, &attr, sizeof(attr));
+    ret = bpf_create_map(map_type, key_size, value_size,
+			 max_entries, map_flags);
   }
 
   if (ret < 0 && errno == EPERM) {
@@ -222,7 +218,8 @@ int bcc_create_map(enum bpf_map_type map_type, const char *name,
       rl.rlim_max = RLIM_INFINITY;
       rl.rlim_cur = rl.rlim_max;
       if (setrlimit(RLIMIT_MEMLOCK, &rl) == 0)
-        ret = syscall(__NR_bpf, BPF_MAP_CREATE, &attr, sizeof(attr));
+        ret = bpf_create_map(map_type, key_size, value_size,
+                             max_entries, map_flags);
     }
   }
   return ret;
