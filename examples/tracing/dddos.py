@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #
-# ddos_detector.py	DDOS dectection system.
+# dddos.py	DDOS dectection system.
 #
 # Written as a basic tracing example of using ePBF
 # to detect a potential DDOS attack against a system.

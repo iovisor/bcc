@@ -1,20 +1,20 @@
-Demonstrations of ddos_detector.py, the Linux eBPF/bcc version.
+Demonstrations of dddos.py, the Linux eBPF/bcc version.
 
-This tracks ip_rcv function (using kprobe) and elapsed time 
+This tracks ip_rcv function (using kprobe) and elapsed time
 between received packets to detect potential DDOS attacks.
 
-The following steps illustrates the usage of ddos_detector :
-1 - Start ddos_detector.py :
-# ./ddos_detector.py
+The following steps illustrates the usage of dddos :
+1 - Start dddos.py :
+# ./dddos.py
 DDOS detector started ... Hit Ctrl-C to end!
 TIME(s)            MESSAGE
 
 2 - Launch hping3 (or any other flooder) in another terminal as shown below:
 # hping3 localhost -S -A -V -p 443 -i u100
 
-3 - ddos_detector.py triggers alerts and reports a DDOS attack:
+3 - dddos.py triggers alerts and reports a DDOS attack:
 DDOS detector started ... Hit Ctrl-C to end!
-TIME(s)                    MESSAGE   
+TIME(s)                    MESSAGE
 2019-01-16 11:55:12.600734 DDOS Attack => nb of packets up to now :  1001
 2019-01-16 11:55:12.600845 DDOS Attack => nb of packets up to now :  1002
 2019-01-16 11:55:12.600887 DDOS Attack => nb of packets up to now :  1003
@@ -36,4 +36,4 @@ TIME(s)                    MESSAGE
 2019-01-16 11:55:12.601925 DDOS Attack => nb of packets up to now :  1019
 2019-01-16 11:55:12.602028 DDOS Attack => nb of packets up to now :  1020
 
-Remark : Use Ctrl-C to stop ddos_detector.py
+Remark : Use Ctrl-C to stop dddos.py
