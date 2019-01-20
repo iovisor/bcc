@@ -53,7 +53,7 @@ int detect_ddos(struct pt_regs *ctx, void *skb){
     * test a real case attack using hping3. However; if regular network
     * traffic increases above predefined detection settings, a false
     * positive alert will be triggered (an example would be the
-       case of large file downloads)
+      case of large file downloads).
     */
     rcv_packets_nb_ptr = rcv_packets.lookup(&rcv_packets_nb_index);
     rcv_packets_ts_ptr = rcv_packets.lookup(&rcv_packets_ts_index);
