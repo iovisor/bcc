@@ -1230,7 +1230,7 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
       }
 
       table.type = map_type;
-      table.fd = bpf_create_map(map_type, table.name.c_str(),
+      table.fd = bcc_create_map(map_type, table.name.c_str(),
                                 table.key_size, table.leaf_size,
                                 table.max_entries, table.flags);
     }

@@ -14,9 +14,23 @@ mkdir $TMP/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
 
 llvmver=3.7.1
 
+# populate submodules
+git submodule update --init --recursive
+
 . scripts/git-tag.sh
 
-git archive HEAD --prefix=bcc/ --format=tar.gz -o $TMP/SOURCES/bcc.tar.gz
+git archive HEAD --prefix=bcc/ --format=tar -o $TMP/SOURCES/bcc.tar
+
+# archive submodules
+pushd src/cc/libbpf
+git archive HEAD --prefix=bcc/src/cc/libbpf/ --format=tar -o $TMP/SOURCES/bcc_libbpf.tar
+popd
+
+# merge all archives into bcc.tar.gz
+pushd $TMP/SOURCES
+tar -A -f bcc.tar bcc_libbpf.tar
+gzip bcc.tar
+popd
 
 sed \
   -e "s/^\(Version:\s*\)@REVISION@/\1$revision/" \

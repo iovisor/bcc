@@ -16,11 +16,24 @@ function cleanup() {
 }
 trap cleanup EXIT
 
+# populate submodules
+git submodule update --init --recursive
+
 . scripts/git-tag.sh
 
-git archive HEAD --prefix=bcc/ --format=tar.gz -o $TMP/bcc_$revision.orig.tar.gz
+git archive HEAD --prefix=bcc/ --format=tar -o $TMP/bcc_$revision.orig.tar
+
+# archive submodules
+pushd src/cc/libbpf
+git archive HEAD --prefix=bcc/src/cc/libbpf/ --format=tar -o $TMP/bcc_libbpf_$revision.orig.tar
+popd
 
 pushd $TMP
+
+# merge all archives into bcc_$revision.orig.tar.gz
+tar -A -f bcc_$revision.orig.tar bcc_libbpf_$revision.orig.tar
+gzip bcc_$revision.orig.tar
+
 tar xf bcc_$revision.orig.tar.gz
 cd bcc
 
