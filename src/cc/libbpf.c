@@ -227,54 +227,29 @@ int bcc_create_map(enum bpf_map_type map_type, const char *name,
 
 int bpf_update_elem(int fd, void *key, void *value, unsigned long long flags)
 {
-  union bpf_attr attr;
-  memset(&attr, 0, sizeof(attr));
-  attr.map_fd = fd;
-  attr.key = ptr_to_u64(key);
-  attr.value = ptr_to_u64(value);
-  attr.flags = flags;
-
-  return syscall(__NR_bpf, BPF_MAP_UPDATE_ELEM, &attr, sizeof(attr));
+  return bpf_map_update_elem(fd, key, value, flags);
 }
 
 int bpf_lookup_elem(int fd, void *key, void *value)
 {
-  union bpf_attr attr;
-  memset(&attr, 0, sizeof(attr));
-  attr.map_fd = fd;
-  attr.key = ptr_to_u64(key);
-  attr.value = ptr_to_u64(value);
-
-  return syscall(__NR_bpf, BPF_MAP_LOOKUP_ELEM, &attr, sizeof(attr));
+  return bpf_map_lookup_elem(fd, key, value);
 }
 
 int bpf_delete_elem(int fd, void *key)
 {
-  union bpf_attr attr;
-  memset(&attr, 0, sizeof(attr));
-  attr.map_fd = fd;
-  attr.key = ptr_to_u64(key);
-
-  return syscall(__NR_bpf, BPF_MAP_DELETE_ELEM, &attr, sizeof(attr));
+  return bpf_map_delete_elem(fd, key);
 }
 
 int bpf_get_first_key(int fd, void *key, size_t key_size)
 {
-  union bpf_attr attr;
   int i, res;
-
-  memset(&attr, 0, sizeof(attr));
-  attr.map_fd = fd;
-  attr.key = 0;
-  attr.next_key = ptr_to_u64(key);
 
   // 4.12 and above kernel supports passing NULL to BPF_MAP_GET_NEXT_KEY
   // to get first key of the map. For older kernels, the call will fail.
-  res = syscall(__NR_bpf, BPF_MAP_GET_NEXT_KEY, &attr, sizeof(attr));
+  res = bpf_map_get_next_key(fd, 0, key);
   if (res < 0 && errno == EFAULT) {
     // Fall back to try to find a non-existing key.
     static unsigned char try_values[3] = {0, 0xff, 0x55};
-    attr.key = ptr_to_u64(key);
     for (i = 0; i < 3; i++) {
       memset(key, try_values[i], key_size);
       // We want to check the existence of the key but we don't know the size
@@ -284,11 +259,11 @@ int bpf_get_first_key(int fd, void *key, size_t key_size)
       // trigger a page fault in kernel and affect performance. Hence we use
       // ~0 which will fail and return fast.
       // This should fail since we pass an invalid pointer for value.
-      if (bpf_lookup_elem(fd, key, (void *)~0) >= 0)
+      if (bpf_map_lookup_elem(fd, key, (void *)~0) >= 0)
         return -1;
       // This means the key doesn't exist.
       if (errno == ENOENT)
-        return syscall(__NR_bpf, BPF_MAP_GET_NEXT_KEY, &attr, sizeof(attr));
+        return bpf_map_get_next_key(fd, (void*)&try_values[i], key);
     }
     return -1;
   } else {
@@ -298,13 +273,7 @@ int bpf_get_first_key(int fd, void *key, size_t key_size)
 
 int bpf_get_next_key(int fd, void *key, void *next_key)
 {
-  union bpf_attr attr;
-  memset(&attr, 0, sizeof(attr));
-  attr.map_fd = fd;
-  attr.key = ptr_to_u64(key);
-  attr.next_key = ptr_to_u64(next_key);
-
-  return syscall(__NR_bpf, BPF_MAP_GET_NEXT_KEY, &attr, sizeof(attr));
+  return bpf_map_get_next_key(fd, key, next_key);
 }
 
 static void bpf_print_hints(int ret, char *log)
@@ -373,19 +342,7 @@ static void bpf_print_hints(int ret, char *log)
 
 int bpf_obj_get_info(int prog_map_fd, void *info, uint32_t *info_len)
 {
-  union bpf_attr attr;
-  int err;
-
-  memset(&attr, 0, sizeof(attr));
-  attr.info.bpf_fd = prog_map_fd;
-  attr.info.info_len = *info_len;
-  attr.info.info = ptr_to_u64(info);
-
-  err = syscall(__NR_bpf, BPF_OBJ_GET_INFO_BY_FD, &attr, sizeof(attr));
-  if (!err)
-          *info_len = attr.info.info_len;
-
-  return err;
+  return bpf_obj_get_info_by_fd(prog_map_fd, info, info_len);
 }
 
 int bpf_prog_compute_tag(const struct bpf_insn *insns, int prog_len,
@@ -1118,14 +1075,9 @@ int bpf_detach_tracepoint(const char *tp_category, const char *tp_name) {
 
 int bpf_attach_raw_tracepoint(int progfd, char *tp_name)
 {
-  union bpf_attr attr;
   int ret;
 
-  bzero(&attr, sizeof(attr));
-  attr.raw_tracepoint.name = ptr_to_u64(tp_name);
-  attr.raw_tracepoint.prog_fd = progfd;
-
-  ret = syscall(__NR_bpf, BPF_RAW_TRACEPOINT_OPEN, &attr, sizeof(attr));
+  ret = bpf_raw_tracepoint_open(tp_name, progfd);
   if (ret < 0)
     fprintf(stderr, "bpf_attach_raw_tracepoint (%s): %s\n", tp_name, strerror(errno));
   return ret;
