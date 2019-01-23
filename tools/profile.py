@@ -319,7 +319,7 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
             if stack_id_err(k.kernel_stack_id):
                 line.append("[Missed Kernel Stack]")
             else:
-                line.extend([b.ksym(addr) for addr in reversed(kernel_stack)])
+                line.extend([aksym(addr) for addr in reversed(kernel_stack)])
         print("%s %d" % (b";".join(line).decode('utf-8', 'replace'), v.value))
     else:
         # print default multi-line stack output
