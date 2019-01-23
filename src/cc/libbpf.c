@@ -1191,124 +1191,23 @@ int bpf_open_perf_event(uint32_t type, uint64_t config, int pid, int cpu) {
 }
 
 int bpf_attach_xdp(const char *dev_name, int progfd, uint32_t flags) {
-    struct sockaddr_nl sa;
-    int sock, seq = 0, len, ret = -1;
-    char buf[4096];
-    struct nlattr *nla, *nla_xdp;
-    struct {
-        struct nlmsghdr  nh;
-        struct ifinfomsg ifinfo;
-        char             attrbuf[64];
-    } req;
-    struct nlmsghdr *nh;
-    struct nlmsgerr *err;
-    socklen_t addrlen;
+  int ifindex = if_nametoindex(dev_name);
+  char err_buf[256];
+  int ret = -1;
 
-    memset(&sa, 0, sizeof(sa));
-    sa.nl_family = AF_NETLINK;
+  if (ifindex == 0) {
+    fprintf(stderr, "bpf: Resolving device name to index: %s\n", strerror(errno));
+    return -1;
+  }
 
-    sock = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE);
-    if (sock < 0) {
-        fprintf(stderr, "bpf: opening a netlink socket: %s\n", strerror(errno));
-        return -1;
-    }
+  ret = bpf_set_link_xdp_fd(ifindex, progfd, flags);
+  if (ret) {
+    libbpf_strerror(ret, err_buf, sizeof(err_buf));
+    fprintf(stderr, "bpf: Attaching prog to %s: %s", dev_name, err_buf);
+    return -1;
+  }
 
-    if (bind(sock, (struct sockaddr *)&sa, sizeof(sa)) < 0) {
-        fprintf(stderr, "bpf: bind to netlink: %s\n", strerror(errno));
-        goto cleanup;
-    }
-
-    addrlen = sizeof(sa);
-    if (getsockname(sock, (struct sockaddr *)&sa, &addrlen) < 0) {
-        fprintf(stderr, "bpf: get sock name of netlink: %s\n", strerror(errno));
-        goto cleanup;
-    }
-
-    if (addrlen != sizeof(sa)) {
-        fprintf(stderr, "bpf: wrong netlink address length: %d\n", addrlen);
-        goto cleanup;
-    }
-
-    memset(&req, 0, sizeof(req));
-    req.nh.nlmsg_len = NLMSG_LENGTH(sizeof(struct ifinfomsg));
-    req.nh.nlmsg_flags = NLM_F_REQUEST | NLM_F_ACK;
-    req.nh.nlmsg_type = RTM_SETLINK;
-    req.nh.nlmsg_pid = 0;
-    req.nh.nlmsg_seq = ++seq;
-    req.ifinfo.ifi_family = AF_UNSPEC;
-    req.ifinfo.ifi_index = if_nametoindex(dev_name);
-    if (req.ifinfo.ifi_index == 0) {
-        fprintf(stderr, "bpf: Resolving device name to index: %s\n", strerror(errno));
-        goto cleanup;
-    }
-
-    nla = (struct nlattr *)(((char *)&req)
-                            + NLMSG_ALIGN(req.nh.nlmsg_len));
-    nla->nla_type = NLA_F_NESTED | 43/*IFLA_XDP*/;
-
-    nla_xdp = (struct nlattr *)((char *)nla + NLA_HDRLEN);
-    nla->nla_len = NLA_HDRLEN;
-
-    // we specify the FD passed over by the user
-    nla_xdp->nla_type = 1/*IFLA_XDP_FD*/;
-    nla_xdp->nla_len = NLA_HDRLEN + sizeof(progfd);
-    memcpy((char *)nla_xdp + NLA_HDRLEN, &progfd, sizeof(progfd));
-    nla->nla_len += nla_xdp->nla_len;
-
-    // parse flags as passed by the user
-    if (flags) {
-        nla_xdp = (struct nlattr *)((char *)nla + nla->nla_len);
-        nla_xdp->nla_type = 3/*IFLA_XDP_FLAGS*/;
-        nla_xdp->nla_len = NLA_HDRLEN + sizeof(flags);
-        memcpy((char *)nla_xdp + NLA_HDRLEN, &flags, sizeof(flags));
-        nla->nla_len += nla_xdp->nla_len;
-    }
-
-    req.nh.nlmsg_len += NLA_ALIGN(nla->nla_len);
-
-    if (send(sock, &req, req.nh.nlmsg_len, 0) < 0) {
-        fprintf(stderr, "bpf: send to netlink: %s\n", strerror(errno));
-        goto cleanup;
-    }
-
-    len = recv(sock, buf, sizeof(buf), 0);
-    if (len < 0) {
-        fprintf(stderr, "bpf: recv from netlink: %s\n", strerror(errno));
-        goto cleanup;
-    }
-
-    for (nh = (struct nlmsghdr *)buf; NLMSG_OK(nh, len);
-         nh = NLMSG_NEXT(nh, len)) {
-        if (nh->nlmsg_pid != sa.nl_pid) {
-            fprintf(stderr, "bpf: Wrong pid %u, expected %u\n",
-                   nh->nlmsg_pid, sa.nl_pid);
-            errno = EBADMSG;
-            goto cleanup;
-        }
-        if (nh->nlmsg_seq != seq) {
-            fprintf(stderr, "bpf: Wrong seq %d, expected %d\n",
-                   nh->nlmsg_seq, seq);
-            errno = EBADMSG;
-            goto cleanup;
-        }
-        switch (nh->nlmsg_type) {
-            case NLMSG_ERROR:
-                err = (struct nlmsgerr *)NLMSG_DATA(nh);
-                if (!err->error)
-                    continue;
-                fprintf(stderr, "bpf: nlmsg error %s\n", strerror(-err->error));
-                errno = -err->error;
-                goto cleanup;
-            case NLMSG_DONE:
-                break;
-        }
-    }
-
-    ret = 0;
-
-cleanup:
-    close(sock);
-    return ret;
+  return 0;
 }
 
 int bpf_attach_perf_event_raw(int progfd, void *perf_event_attr, pid_t pid,
