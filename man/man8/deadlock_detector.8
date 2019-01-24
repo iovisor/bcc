@@ -1,14 +1,14 @@
-.TH deadlock_detector 8  "2017-02-01" "USER COMMANDS"
+.TH deadlock 8  "2017-02-01" "USER COMMANDS"
 .SH NAME
-deadlock_detector \- Find potential deadlocks (lock order inversions)
+deadlock \- Find potential deadlocks (lock order inversions)
 in a running program.
 .SH SYNOPSIS
-.B deadlock_detector [\-h] [\--binary BINARY] [\--dump-graph DUMP_GRAPH]
-.B                  [\--verbose] [\--lock-symbols LOCK_SYMBOLS]
-.B                  [\--unlock-symbols UNLOCK_SYMBOLS]
-.B                  pid
+.B deadlock [\-h] [\--binary BINARY] [\--dump-graph DUMP_GRAPH]
+.B          [\--verbose] [\--lock-symbols LOCK_SYMBOLS]
+.B          [\--unlock-symbols UNLOCK_SYMBOLS]
+.B          pid
 .SH DESCRIPTION
-deadlock_detector finds potential deadlocks in a running process. The program
+deadlock finds potential deadlocks in a running process. The program
 attaches uprobes on `pthread_mutex_lock` and `pthread_mutex_unlock` by default
 to build a mutex wait directed graph, and then looks for a cycle in this graph.
 This graph has the following properties:
@@ -65,13 +65,13 @@ Pid to trace
 Find potential deadlocks in PID 181. The --binary argument is not needed for \
 statically-linked binaries.
 #
-.B deadlock_detector 181
+.B deadlock 181
 .TP
 Find potential deadlocks in PID 181. If the process was created from a \
 dynamically-linked executable, the --binary argument is required and must be \
 the path of the pthread library:
 #
-.B deadlock_detector 181 --binary /lib/x86_64-linux-gnu/libpthread.so.0
+.B deadlock 181 --binary /lib/x86_64-linux-gnu/libpthread.so.0
 .TP
 Find potential deadlocks in PID 181. If the process was created from a \
 statically-linked executable, optionally pass the location of the binary. \
@@ -80,19 +80,19 @@ contain `:` in the path cannot be attached with uprobes. As a workaround, we \
 can create a symlink to the binary, and provide the symlink name instead with \
 the `--binary` option:
 #
-.B deadlock_detector 181 --binary /usr/local/bin/lockinversion
+.B deadlock 181 --binary /usr/local/bin/lockinversion
 .TP
 Find potential deadlocks in PID 181 and dump the mutex wait graph to a file:
 #
-.B deadlock_detector 181 --dump-graph graph.json
+.B deadlock 181 --dump-graph graph.json
 .TP
 Find potential deadlocks in PID 181 and print mutex wait graph statistics:
 #
-.B deadlock_detector 181 --verbose
+.B deadlock 181 --verbose
 .TP
 Find potential deadlocks in PID 181 with custom mutexes:
 #
-.B deadlock_detector 181
+.B deadlock 181
 .B      --lock-symbols custom_mutex1_lock,custom_mutex2_lock
 .B      --unlock_symbols custom_mutex1_unlock,custom_mutex2_unlock
 .SH OUTPUT

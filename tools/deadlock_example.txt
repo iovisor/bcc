@@ -1,4 +1,4 @@
-Demonstrations of deadlock_detector.
+Demonstrations of deadlock.
 
 This program detects potential deadlocks on a running process. The program
 attaches uprobes on `pthread_mutex_lock` and `pthread_mutex_unlock` to build
@@ -35,7 +35,7 @@ after the mutex has been created. As a result, this tool will not find
 potential deadlocks that involve only one mutex.
 
 
-# ./deadlock_detector.py 181
+# ./deadlock.py 181
 Tracing... Hit Ctrl-C to end.
 ----------------
 Potential Deadlock Detected!
@@ -239,7 +239,7 @@ uses a similar format as ThreadSanitizer
 (https://github.com/google/sanitizers/wiki/ThreadSanitizerDeadlockDetector).
 
 
-# ./deadlock_detector.py 181 --binary /usr/local/bin/lockinversion
+# ./deadlock.py 181 --binary /usr/local/bin/lockinversion
 
 Tracing... Hit Ctrl-C to end.
 ^C
@@ -253,7 +253,7 @@ cannot be attached with uprobes. As a workaround, we can create a symlink
 to the binary, and provide the symlink name instead to the `--binary` option.
 
 
-# ./deadlock_detector.py 181 --binary /lib/x86_64-linux-gnu/libpthread.so.0
+# ./deadlock.py 181 --binary /lib/x86_64-linux-gnu/libpthread.so.0
 
 Tracing... Hit Ctrl-C to end.
 ^C
@@ -263,7 +263,7 @@ this argument is required and needs to be the path to the pthread shared
 library used by the executable.
 
 
-# ./deadlock_detector.py 181 --dump-graph graph.json --verbose
+# ./deadlock.py 181 --dump-graph graph.json --verbose
 
 Tracing... Hit Ctrl-C to end.
 Mutexes: 0, Edges: 0
@@ -284,7 +284,7 @@ serialize the graph to analyze it later, you can pass the `--dump-graph FILE`
 flag, and the program will serialize the graph in json.
 
 
-# ./deadlock_detector.py 181 --lock-symbols custom_mutex1_lock,custom_mutex2_lock --unlock_symbols custom_mutex1_unlock,custom_mutex2_unlock --verbose
+# ./deadlock.py 181 --lock-symbols custom_mutex1_lock,custom_mutex2_lock --unlock_symbols custom_mutex1_unlock,custom_mutex2_unlock --verbose
 
 Tracing... Hit Ctrl-C to end.
 Mutexes: 0, Edges: 0
@@ -307,12 +307,12 @@ in false positives.
 
 USAGE message:
 
-# ./deadlock_detector.py -h
+# ./deadlock.py -h
 
-usage: deadlock_detector.py [-h] [--binary BINARY] [--dump-graph DUMP_GRAPH]
-                            [--verbose] [--lock-symbols LOCK_SYMBOLS]
-                            [--unlock-symbols UNLOCK_SYMBOLS]
-                            pid
+usage: deadlock.py [-h] [--binary BINARY] [--dump-graph DUMP_GRAPH]
+                   [--verbose] [--lock-symbols LOCK_SYMBOLS]
+                   [--unlock-symbols UNLOCK_SYMBOLS]
+                   pid
 
 Detect potential deadlocks (lock inversions) in a running binary.
 Must be run as root.
@@ -342,24 +342,24 @@ optional arguments:
                         be inlined in the binary.
 
 Examples:
-    deadlock_detector 181        # Analyze PID 181
+    deadlock 181                 # Analyze PID 181
 
-    deadlock_detector 181 --binary /lib/x86_64-linux-gnu/libpthread.so.0
+    deadlock 181 --binary /lib/x86_64-linux-gnu/libpthread.so.0
                                  # Analyze PID 181 and locks from this binary.
                                  # If tracing a process that is running from
                                  # a dynamically-linked binary, this argument
                                  # is required and should be the path to the
                                  # pthread library.
 
-    deadlock_detector 181 --verbose
+    deadlock 181 --verbose
                                  # Analyze PID 181 and print statistics about
                                  # the mutex wait graph.
 
-    deadlock_detector 181 --lock-symbols my_mutex_lock1,my_mutex_lock2 \
+    deadlock 181 --lock-symbols my_mutex_lock1,my_mutex_lock2 \
         --unlock-symbols my_mutex_unlock1,my_mutex_unlock2
                                  # Analyze PID 181 and trace custom mutex
                                  # symbols instead of pthread mutexes.
 
-    deadlock_detector 181 --dump-graph graph.json
+    deadlock 181 --dump-graph graph.json
                                  # Analyze PID 181 and dump the mutex wait
                                  # graph to graph.json.
