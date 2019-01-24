@@ -137,11 +137,11 @@ class SmokeTests(TestCase):
         self.run_with_duration("dcstat.py 1 1")
 
     @skipUnless(kernel_version_ge(4,6), "requires kernel >= 4.6")
-    def test_deadlock_detector(self):
+    def test_deadlock(self):
         # TODO This tool requires a massive BPF stack traces table allocation,
         # which might fail the run or even trigger the oomkiller to kill some
         # other processes. Disabling for now.
-        # self.run_with_int("deadlock_detector.py $(pgrep -n bash)", timeout=10)
+        # self.run_with_int("deadlock.py $(pgrep -n bash)", timeout=10)
         pass
 
     @skipUnless(kernel_version_ge(4,8), "requires kernel >= 4.8")
