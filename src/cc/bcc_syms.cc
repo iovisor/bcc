@@ -424,7 +424,7 @@ bool BuildSyms::Module::resolve_addr(uint64_t offset, struct bcc_symbol* sym,
     sym->name = (*it).name->c_str();
     if (demangle)
       sym->demangle_name = sym->name;
-    sym->offset = (*it).start;
+    sym->offset = offset - (*it).start;
     sym->module = module_name_.c_str();
     return true;
   }
