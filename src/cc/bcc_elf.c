@@ -863,7 +863,7 @@ int bcc_free_memory() {
     int path_start = 0, path_end = 0;
     unsigned int devmajor, devminor;
     char perms[8];
-    if (sscanf(line, "%lx-%lx %7s %lx %u:%u %lu %n%*[^\n]%n",
+    if (sscanf(line, "%lx-%lx %7s %lx %x:%x %lu %n%*[^\n]%n",
                &addr_start, &addr_end, perms, &offset,
                &devmajor, &devminor, &inode,
                &path_start, &path_end) < 7)

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python
 #
 # xdp_redirect_map.py Redirect the incoming packet to another interface
 #                     with the helper: bpf_redirect_map()

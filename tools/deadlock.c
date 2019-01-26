@@ -1,6 +1,6 @@
 /*
- * deadlock_detector.c  Detects potential deadlocks in a running process.
- *                      For Linux, uses BCC, eBPF. See .py file.
+ * deadlock.c  Detects potential deadlocks in a running process.
+ *             For Linux, uses BCC, eBPF. See .py file.
  *
  * Copyright 2017 Facebook, Inc.
  * Licensed under the Apache License, Version 2.0 (the "License")

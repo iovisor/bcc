@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python
 #
 # xdp_redirect_cpu.py Redirect the incoming packet to the specific CPU
 #

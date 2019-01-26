@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python
 #
 # mallocstacks  Trace malloc() calls in a process and print the full
 #               stack trace for all callsites.

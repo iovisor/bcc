@@ -18,7 +18,7 @@
 #include <iostream>
 
 #include "common.h"
-#include "compat/linux/bpf.h"
+#include "linux/bpf.h"
 #include "table_storage.h"
 #include "table_storage_impl.h"
 

@@ -317,6 +317,15 @@ class TableBase(MutableMapping):
             tmp = {}
             f1 = self.Key._fields_[0][0]
             f2 = self.Key._fields_[1][0]
+
+            # The above code assumes that self.Key._fields_[1][0] holds the
+            # slot. But a padding member may have been inserted here, which
+            # breaks the assumption and leads to chaos.
+            # TODO: this is a quick fix. Fixing/working around in the BCC
+            # internal library is the right thing to do.
+            if f2 == '__pad_1' and len(self.Key._fields_) == 3:
+                f2 = self.Key._fields_[2][0]
+
             for k, v in self.items():
                 bucket = getattr(k, f1)
                 if bucket_fn:

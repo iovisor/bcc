@@ -1,0 +1,39 @@
+Demonstrations of dddos.py, the Linux eBPF/bcc version.
+
+This tracks ip_rcv function (using kprobe) and elapsed time
+between received packets to detect potential DDOS attacks.
+
+The following steps illustrates the usage of dddos :
+1 - Start dddos.py :
+# ./dddos.py
+DDOS detector started ... Hit Ctrl-C to end!
+TIME(s)            MESSAGE
+
+2 - Launch hping3 (or any other flooder) in another terminal as shown below:
+# hping3 localhost -S -A -V -p 443 -i u100
+
+3 - dddos.py triggers alerts and reports a DDOS attack:
+DDOS detector started ... Hit Ctrl-C to end!
+TIME(s)                    MESSAGE
+2019-01-16 11:55:12.600734 DDOS Attack => nb of packets up to now :  1001
+2019-01-16 11:55:12.600845 DDOS Attack => nb of packets up to now :  1002
+2019-01-16 11:55:12.600887 DDOS Attack => nb of packets up to now :  1003
+2019-01-16 11:55:12.600971 DDOS Attack => nb of packets up to now :  1004
+2019-01-16 11:55:12.601009 DDOS Attack => nb of packets up to now :  1005
+2019-01-16 11:55:12.601062 DDOS Attack => nb of packets up to now :  1006
+2019-01-16 11:55:12.601096 DDOS Attack => nb of packets up to now :  1007
+2019-01-16 11:55:12.601195 DDOS Attack => nb of packets up to now :  1008
+2019-01-16 11:55:12.601228 DDOS Attack => nb of packets up to now :  1009
+2019-01-16 11:55:12.601331 DDOS Attack => nb of packets up to now :  1010
+2019-01-16 11:55:12.601364 DDOS Attack => nb of packets up to now :  1011
+2019-01-16 11:55:12.601470 DDOS Attack => nb of packets up to now :  1012
+2019-01-16 11:55:12.601505 DDOS Attack => nb of packets up to now :  1013
+2019-01-16 11:55:12.601621 DDOS Attack => nb of packets up to now :  1014
+2019-01-16 11:55:12.601656 DDOS Attack => nb of packets up to now :  1015
+2019-01-16 11:55:12.601757 DDOS Attack => nb of packets up to now :  1016
+2019-01-16 11:55:12.601790 DDOS Attack => nb of packets up to now :  1017
+2019-01-16 11:55:12.601892 DDOS Attack => nb of packets up to now :  1018
+2019-01-16 11:55:12.601925 DDOS Attack => nb of packets up to now :  1019
+2019-01-16 11:55:12.602028 DDOS Attack => nb of packets up to now :  1020
+
+Remark : Use Ctrl-C to stop dddos.py

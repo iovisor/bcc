@@ -9,6 +9,12 @@ endif()
 
 enable_testing()
 
+# populate submodules (libbpf)
+if(NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/cc/libbpf/src)
+  execute_process(COMMAND git submodule update --init --recursive
+                  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+endif()
+
 include(cmake/GetGitRevisionDescription.cmake)
 include(cmake/version.cmake)
 include(CMakeDependentOption)

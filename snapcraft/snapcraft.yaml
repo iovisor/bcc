@@ -101,8 +101,8 @@ apps:
         command: usr/share/bcc/tools/dcsnoop
     dcstat:
         command: usr/share/bcc/tools/dcstat
-    deadlock-detector:
-        command: usr/share/bcc/tools/deadlock_detector
+    deadlock:
+        command: usr/share/bcc/tools/deadlock
     execsnoop:
         command: usr/share/bcc/tools/execsnoop
     ext4dist:

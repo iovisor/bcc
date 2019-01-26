@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python
 #
 # mysqld_qslower    MySQL server queries slower than a threshold.
 #                   For Linux, uses BCC, BPF. Embedded C.

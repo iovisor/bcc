@@ -1,12 +1,12 @@
-#!/usr/bin/env python
+#!/usr/bin/python
 #
-# deadlock_detector  Detects potential deadlocks (lock order inversions)
-#                    on a running process. For Linux, uses BCC, eBPF.
+# deadlock  Detects potential deadlocks (lock order inversions)
+#           on a running process. For Linux, uses BCC, eBPF.
 #
-# USAGE: deadlock_detector.py [-h] [--binary BINARY] [--dump-graph DUMP_GRAPH]
-#                             [--verbose] [--lock-symbols LOCK_SYMBOLS]
-#                             [--unlock-symbols UNLOCK_SYMBOLS]
-#                             pid
+# USAGE: deadlock.py [-h] [--binary BINARY] [--dump-graph DUMP_GRAPH]
+#                    [--verbose] [--lock-symbols LOCK_SYMBOLS]
+#                    [--unlock-symbols UNLOCK_SYMBOLS]
+#                    pid
 #
 # This traces pthread mutex lock and unlock calls to build a directed graph
 # representing the mutex wait graph:
@@ -388,25 +388,25 @@ def strlist(s):
 
 def main():
     examples = '''Examples:
-    deadlock_detector 181        # Analyze PID 181
+    deadlock 181                 # Analyze PID 181
 
-    deadlock_detector 181 --binary /lib/x86_64-linux-gnu/libpthread.so.0
+    deadlock 181 --binary /lib/x86_64-linux-gnu/libpthread.so.0
                                  # Analyze PID 181 and locks from this binary.
                                  # If tracing a process that is running from
                                  # a dynamically-linked binary, this argument
                                  # is required and should be the path to the
                                  # pthread library.
 
-    deadlock_detector 181 --verbose
+    deadlock 181 --verbose
                                  # Analyze PID 181 and print statistics about
                                  # the mutex wait graph.
 
-    deadlock_detector 181 --lock-symbols my_mutex_lock1,my_mutex_lock2 \\
+    deadlock 181 --lock-symbols my_mutex_lock1,my_mutex_lock2 \\
         --unlock-symbols my_mutex_unlock1,my_mutex_unlock2
                                  # Analyze PID 181 and trace custom mutex
                                  # symbols instead of pthread mutexes.
 
-    deadlock_detector 181 --dump-graph graph.json
+    deadlock 181 --dump-graph graph.json
                                  # Analyze PID 181 and dump the mutex wait
                                  # graph to graph.json.
     '''
@@ -465,7 +465,7 @@ def main():
             print('%s. Is the process (pid=%d) running?' % (str(e), args.pid))
             sys.exit(1)
 
-    bpf = BPF(src_file=b'deadlock_detector.c')
+    bpf = BPF(src_file=b'deadlock.c')
 
     # Trace where threads are created
     bpf.attach_kretprobe(event=bpf.get_syscall_fnname('clone'), fn_name='trace_clone')

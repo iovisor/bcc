@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python
 #
 # This is a Hello World example that uses BPF_PERF_OUTPUT.
 

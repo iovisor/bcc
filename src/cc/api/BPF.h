@@ -26,7 +26,7 @@
 #include "bcc_exception.h"
 #include "bcc_syms.h"
 #include "bpf_module.h"
-#include "compat/linux/bpf.h"
+#include "linux/bpf.h"
 #include "libbpf.h"
 #include "table_storage.h"
 

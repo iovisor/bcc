@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python
 #
 # syscount   Summarize syscall counts and latencies.
 #
