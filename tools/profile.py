@@ -9,6 +9,8 @@
 # counting there. Only the unique stacks and counts are passed to user space
 # at the end of the profile, greatly reducing the kernel<->user transfer.
 #
+# By default CPU idle stacks are excluded by simply excluding PID 0.
+#
 # REQUIRES: Linux 4.9+ (BPF_PROG_TYPE_PERF_EVENT support). Under tools/old is
 # a version of this tool that may work on Linux 4.6 - 4.8.
 #
@@ -22,6 +24,7 @@
 #
 # 15-Jul-2016   Brendan Gregg   Created this.
 # 20-Oct-2016      "      "     Switched to use the new 4.9 support.
+# 26-Jan-2019      "      "     Changed to exclude CPU idle by default. 
 
 from __future__ import print_function
 from bcc import BPF, PerfType, PerfSWConfig
@@ -93,6 +96,8 @@ parser.add_argument("-d", "--delimited", action="store_true",
     help="insert delimiter between kernel/user stacks")
 parser.add_argument("-a", "--annotations", action="store_true",
     help="add _[k] annotations to kernel frames")
+parser.add_argument("-I", "--include-idle", action="store_true",
+    help="include CPU idle stacks")
 parser.add_argument("-f", "--folded", action="store_true",
     help="output folded format, one line per stack (for flame graphs)")
 parser.add_argument("--stack-storage-size", default=16384,
@@ -141,6 +146,9 @@ BPF_STACK_TRACE(stack_traces, STACK_STORAGE_SIZE);
 
 int do_perf_event(struct bpf_perf_event_data *ctx) {
     u32 pid = bpf_get_current_pid_tgid() >> 32;
+    if (IDLE_FILTER)
+        return 0;
+
     if (!(THREAD_FILTER))
         return 0;
 
@@ -183,6 +191,12 @@ int do_perf_event(struct bpf_perf_event_data *ctx) {
     return 0;
 }
 """
+
+# set idle filter
+idle_filter = "pid == 0"
+if args.include_idle:
+    idle_filter = "0"
+bpf_text = bpf_text.replace('IDLE_FILTER', idle_filter)
 
 # set thread filter
 thread_context = ""

@@ -41,6 +41,27 @@ Sampling at 49 Hertz of all threads by user + kernel stack... Hit Ctrl-C to end.
     -                func_ab (13549)
         5
 
+The output was long; I truncated some lines ("[...]").
+
+This default output prints stack traces, followed by a line to describe the
+process (a dash, the process name, and a PID in parenthesis), and then an
+integer count of how many times this stack trace was sampled.
+
+The func_ab process is running the func_a() function, called by main(),
+called by __libc_start_main(), and called by "[unknown]" with what looks
+like a bogus address (1st column). That's evidence of a broken stack trace.
+It's common for user-level software that hasn't been compiled with frame
+pointers (in this case, libc).
+
+The dd process has called read(), and then enters the kernel via
+entry_SYSCALL_64_fastpath(), calling sys_read(), and so on. Yes, I'm now
+reading it bottom up. That way follows the code flow.
+
+
+By default, CPU idle stacks are excluded. They can be included with -I:
+
+# ./profile -I
+
 [...]
 
     native_safe_halt
@@ -64,32 +85,16 @@ Sampling at 49 Hertz of all threads by user + kernel stack... Hit Ctrl-C to end.
     -                swapper/1 (0)
         75
 
-The output was long; I truncated some lines ("[...]").
-
-This default output prints stack traces, followed by a line to describe the
-process (a dash, the process name, and a PID in parenthesis), and then an
-integer count of how many times this stack trace was sampled.
-
 The output above shows the most frequent stack was from the "swapper/1"
 process (PID 0), running the native_safe_halt() function, which was called
 by default_idle(), which was called by arch_cpu_idle(), and so on. This is
 the idle thread. Stacks can be read top-down, to follow ancestry: child,
 parent, grandparent, etc.
 
-The func_ab process is running the func_a() function, called by main(),
-called by __libc_start_main(), and called by "[unknown]" with what looks
-like a bogus address (1st column). That's evidence of a broken stack trace.
-It's common for user-level software that hasn't been compiled with frame
-pointers (in this case, libc).
 
-The dd process has called read(), and then enters the kernel via
-entry_SYSCALL_64_fastpath(), calling sys_read(), and so on. Yes, I'm now
-reading it bottom up. That way follows the code flow.
-
-
-The dd process is actually "dd if=/dev/zero of=/dev/null": it's a simple
-workload to analyze that just moves bytes from /dev/zero to /dev/null.
-Profiling just that process:
+The dd process profiled ealrier is actually "dd if=/dev/zero of=/dev/null":
+it's a simple workload to analyze that just moves bytes from /dev/zero to
+/dev/null. Profiling just that process:
 
 # ./profile -p 25036
 Sampling at 49 Hertz of PID 25036 by user + kernel stack... Hit Ctrl-C to end.
@@ -539,6 +544,8 @@ You can increase or decrease the sample frequency. Eg, sampling at 9 Hertz:
 # ./profile -F 9
 Sampling at 9 Hertz of all threads by user + kernel stack... Hit Ctrl-C to end.
 ^C
+[...]
+
     func_b
     main
     __libc_start_main
@@ -547,27 +554,6 @@ Sampling at 9 Hertz of all threads by user + kernel stack... Hit Ctrl-C to end.
         1
 
 [...]
-
-    native_safe_halt
-    default_idle
-    arch_cpu_idle
-    default_idle_call
-    cpu_startup_entry
-    start_secondary
-    -                swapper/3 (0)
-        8
-
-    native_safe_halt
-    default_idle
-    arch_cpu_idle
-    default_idle_call
-    cpu_startup_entry
-    rest_init
-    start_kernel
-    x86_64_start_reservations
-    x86_64_start_kernel
-    -                swapper/0 (0)
-        8
 
 
 You can also restrict profiling to just kernel stacks (-K) or user stacks (-U).
@@ -707,24 +693,6 @@ Sampling at 49 Hertz of all threads by user stack... Hit Ctrl-C to end.
     -                dd (2931)
         14
 
-    -                swapper/7 (0)
-        46
-
-    -                swapper/0 (0)
-        46
-
-    -                swapper/2 (0)
-        46
-
-    -                swapper/1 (0)
-        46
-
-    -                swapper/3 (0)
-        46
-
-    -                swapper/4 (0)
-        46
-
 
 If there are too many unique stack traces for the kernel to save, a warning
 will be printed. Eg:
@@ -739,8 +707,8 @@ Run ./profile -h to see the default.
 USAGE message:
 
 # ./profile -h
-usage: profile [-h] [-p PID] [-U | -K] [-F FREQUENCY | -c COUNT] [-d] [-a]
-                  [-f] [--stack-storage-size STACK_STORAGE_SIZE]
+usage: profile.py [-h] [-p PID] [-U | -K] [-F FREQUENCY | -c COUNT] [-d] [-a]
+                  [-I] [-f] [--stack-storage-size STACK_STORAGE_SIZE] [-C CPU]
                   [duration]
 
 Profile CPU stack traces at a timed interval
@@ -763,11 +731,12 @@ optional arguments:
                         sample period, number of events
   -d, --delimited       insert delimiter between kernel/user stacks
   -a, --annotations     add _[k] annotations to kernel frames
+  -I, --include-idle    include CPU idle stacks
   -f, --folded          output folded format, one line per stack (for flame
                         graphs)
   --stack-storage-size STACK_STORAGE_SIZE
                         the number of unique stack traces that can be stored
-                        and displayed (default 2048)
+                        and displayed (default 16384)
   -C CPU, --cpu CPU     cpu number to run profile on
 
 examples:

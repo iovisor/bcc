@@ -50,6 +50,9 @@ Show stacks from user space only (no kernel space stacks).
 \-K
 Show stacks from kernel space only (no user space stacks).
 .TP
+\-I
+Include CPU idle stacks (by default these are excluded).
+.TP
 \-\-stack-storage-size COUNT
 The maximum number of unique stack traces that the kernel will count (default
 16384). If the sampled count exceeds this, a warning will be printed.
