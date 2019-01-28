@@ -8,6 +8,7 @@
   - [Gentoo](#gentoo---portage)
   - [openSUSE](#opensuse---binary)
   - [RHEL](#rhel---binary)
+  - [Amazon Linux 1](#Amazon-Linux-1---Binary)
 * [Source](#source)
   - [Debian](#debian---source)
   - [Ubuntu](#ubuntu---source)
@@ -162,6 +163,23 @@ For RHEL 7.6, bcc is already included in the official yum repository as bcc-tool
 
 ```
 yum install bcc-tools
+```
+
+## Amazon Linux 1 - Binary
+Use case 1. Install BCC for latest kernel available in repo:
+   Tested on Amazon Linux AMI release 2018.03 (kernel 4.14.88-72.73.amzn1.x86_64)
+```
+sudo yum update kernel
+sudo yum install bcc
+sudo reboot
+```
+
+Use case 2. Install BCC for your AMI's default kernel (no reboot required):
+   Tested on Amazon Linux AMI release 2018.03 (kernel 4.14.77-70.59.amzn1.x86_64)
+```
+sudo yum install kernel-headers-$(uname -r | cut -d'.' -f1-5)
+sudo yum install kernel-devel-$(uname -r | cut -d'.' -f1-5)
+sudo yum install bcc
 ```
 
 # Source
