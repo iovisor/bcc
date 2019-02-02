@@ -453,6 +453,21 @@ static int verify_checksum(const char *file, unsigned int crc) {
   return actual == crc;
 }
 
+// Check if two filenames point to the same file, including hard or soft links.
+static bool same_file(char *a, const char *b)
+{
+	struct stat stat_a, stat_b;
+
+	if (stat(a, &stat_a) || stat(b, &stat_b))
+		return false;
+
+	if ((stat_a.st_dev == stat_b.st_dev) &&
+	    (stat_a.st_ino == stat_b.st_ino))
+		return true;
+	else
+		return false;
+}
+
 static char *find_debug_via_debuglink(Elf *e, const char *binpath,
                                       int check_crc) {
   char fullpath[PATH_MAX];
@@ -473,7 +488,7 @@ static char *find_debug_via_debuglink(Elf *e, const char *binpath,
   // and it might contain poorer symbols (e.g. stripped or partial symbols)
   // than the external debuginfo that might be available elsewhere.
   snprintf(fullpath, sizeof(fullpath),"%s/%s", bindir, name);
-  if (strcmp(fullpath, binpath) != 0 && access(fullpath, F_OK) != -1) {
+  if (same_file(fullpath, binpath) != true && access(fullpath, F_OK) != -1) {
     res = strdup(fullpath);
     goto DONE;
   }
