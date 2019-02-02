@@ -3,15 +3,15 @@
 # bitehist.py	Block I/O size histogram.
 #		For Linux, uses BCC, eBPF. Embedded C.
 #
-# Written as a basic example of using a histogram to show a distribution.
+# Written as a basic example of using histograms to show a distribution.
 #
-# The default interval is 5 seconds. A Ctrl-C will print the partially
-# gathered histogram then exit.
+# A Ctrl-C will print the gathered histogram then exit.
 #
 # Copyright (c) 2015 Brendan Gregg.
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
 # 15-Aug-2015	Brendan Gregg	Created this.
+# 03-Feb-2019   Xiaozhou Liu    added linear histogram.
 
 from __future__ import print_function
 from bcc import BPF
@@ -23,10 +23,12 @@ b = BPF(text="""
 #include <linux/blkdev.h>
 
 BPF_HISTOGRAM(dist);
+BPF_HISTOGRAM(dist_linear);
 
 int kprobe__blk_account_io_completion(struct pt_regs *ctx, struct request *req)
 {
 	dist.increment(bpf_log2l(req->__data_len / 1024));
+	dist_linear.increment(req->__data_len / 1024);
 	return 0;
 }
 """)
@@ -41,4 +43,10 @@ except KeyboardInterrupt:
 	print()
 
 # output
+print("log2 histogram")
+print("~~~~~~~~~~~~~~")
 b["dist"].print_log2_hist("kbytes")
+
+print("\nlinear histogram")
+print("~~~~~~~~~~~~~~~~")
+b["dist_linear"].print_linear_hist("kbytes")
