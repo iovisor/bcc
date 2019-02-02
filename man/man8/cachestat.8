@@ -18,17 +18,13 @@ Since this uses BPF, only the root user can use this tool.
 CONFIG_BPF and bcc.
 .SH EXAMPLES
 .TP
-Print summaries every five second:
+Print summaries every second:
 #
 .B cachestat
 .TP
-Print summaries every five seconds with timestamp:
+Print summaries every second with timestamp:
 #
 .B cachestat -T
-.TP
-Print summaries each second:
-#
-.B cachestat 1
 .TP
 Print output every five seconds, three times:
 #
@@ -50,6 +46,9 @@ Number of page cache misses.
 .TP
 DIRTIES
 Number of dirty pages added to the page cache.
+.TP
+HITRATIO
+The hit ratio as a percentage.
 .TP
 READ_HIT%
 Read hit percent of page cache usage.
