@@ -17,7 +17,7 @@ import sys
 import signal
 from bcc import BPF
 from bcc.utils import printb
-from bcc.syscall import syscall_name
+from bcc.syscall import syscall_name, syscalls
 
 if sys.version_info.major < 3:
     izip_longest = itertools.izip_longest
