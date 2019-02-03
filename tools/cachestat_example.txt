@@ -1,56 +1,91 @@
-# ./cachestat -h
-USAGE: ./cachestat [-T] [ interval [count] ]
+Demonstrations of cachestat, the Linux eBPF/bcc version.
 
-show Linux page cache hit/miss statistics including read and write hit %
+
+cachestat shows hits and misses to the file system page cache. For example:
+
+# cachestat
+    HITS   MISSES  DIRTIES HITRATIO   BUFFERS_MB  CACHED_MB
+    1132        0        4  100.00%          277       4367
+     161        0       36  100.00%          277       4372
+      16        0       28  100.00%          277       4372
+   17154    13750       15   55.51%          277       4422
+      19        0        1  100.00%          277       4422
+      83        0       83  100.00%          277       4421
+      16        0        1  100.00%          277       4423
+^C       0      -19      360    0.00%          277       4423
+Detaching...
+
+While tracing, there was a burst of misses in the fourth second, bringing
+the hit ration down to 55%.
+
+
+This shows a 1 Gbyte uncached file that is read twice:
+
+(root) ~ # ./cachestat.py 
+    HITS   MISSES  DIRTIES HITRATIO   BUFFERS_MB  CACHED_MB
+       1        0        0  100.00%            5        191
+     198    12136        0    1.61%            5        238
+       1    11007        3    0.01%            5        281
+       0     6384        0    0.00%            5        306
+       1    14464        0    0.01%            5        363
+       0    11776        0    0.00%            5        409
+       1    11712        0    0.01%            5        454
+      32    13184        0    0.24%            5        506
+       0    11232        0    0.00%            5        550
+       1    13056        0    0.01%            5        601
+      16    14720        0    0.11%            5        658
+      33     9920        0    0.33%            5        697
+       0    13248        0    0.00%            5        749
+       4    14144        0    0.03%            5        804
+       0     9728        0    0.00%            5        842
+       1    10816        0    0.01%            5        885
+     808    13504        1    5.65%            5        938
+       0    11409        0    0.00%            5        982
+       0    11520        0    0.00%            5       1027
+       0    15616        0    0.00%            5       1088
+       1     9792        0    0.01%            5       1126
+       0     8256        0    0.00%            5       1158
+       1     9600        0    0.01%            5       1196
+     599     4804        0   11.09%            5       1215
+       1        0        0  100.00%            5       1215
+       0        0        0    0.00%            5       1215
+       3        1        0   75.00%            5       1215
+   79536       34        0   99.96%            5       1215
+   87693      274        4   99.69%            6       1214
+   89018     3546        0   96.17%            7       1227
+   33531      201        4   99.40%            7       1228
+      22       44        0   33.33%            8       1228
+       0        0        0    0.00%            8       1228
+      73       21        2   77.66%            8       1228
+
+It took 24 seconds to read the 1 Gbyte file the first time, shown in the output
+by the high MISSES rate and low HITRATIO. The second time it took 4 seconds,
+and the HITRATIO was around 99%.
+
+
+This output shows a 1 Gbyte file being created and added to the page cache:
+
+(root) ~ # ./cachestat.py 
+    HITS   MISSES  DIRTIES HITRATIO   BUFFERS_MB  CACHED_MB
+       1        0        0  100.00%            8        209
+       0        0   165584    0.00%            8        856
+       0        0    96505    0.00%            8       1233
+       0        0        0    0.00%            8       1233
+
+Note the high rate of DIRTIES, and the CACHED_MD size increases by 1024 Mbytes.
+
+
+USAGE message:
+
+# cachestat -h
+usage: cachestat.py [-h] [-T] [interval] [count]
+
+Count cache kernel function calls
+
+positional arguments:
+  interval         output interval, in seconds
+  count            number of outputs
 
 optional arguments:
-  -T              include timestamp on output
-
-examples:
-    ./cachestat             # run with default option of 5 seconds delay
-    ./cachestat -T          # run with default option of 5 seconds delay with timestamps
-    ./cachestat 1           # print every second hit/miss stats
-    ./cachestat -T 1        # include timestamps with one second samples
-    ./cachestat 1 5         # run with interval of one second for five iterations
-    ./cachestat -T 1 5      # include timestamps with interval of one second for five iterations
-    
-
-Following commands show a 2GB file being read into the page cache.
-
-Command used to generate activity:
-# dd if=/root/tmpfile of=/dev/null bs=8192
-
-Output from cachestat running simultatenously:
-# ./tools/cachestat.py 1
-   TOTAL   MISSES     HITS  DIRTIES   BUFFERS_MB  CACHED_MB
-       1        0        1        0            8        283
-       0        0        0        0            8        283
-       0        0        0        2            8        283
-       0        0        0        0            8        283
-   10009     9173      836        2            9        369
-  152032   152032        0        0            9       1028
-  157408   157405        3        0            9       1707
-  150432   150432        0        0            9       2331
-       0        0        0        0            9       2331
-       1        1        0        1            9       2331
-       0        0        0        0            9       2331
-       0        0        0        0            9       2331
-       0        0        0        0            9       2331
-
-The misses counter reflects a 2GB file being read and almost everything being
-a page cache miss.
-
-Below shows an example of a new 100MB file added to page cache, by using
-the command: dd if=/dev/zero of=/root/tmpfile2 bs=4k count=$((256*100))
-
-# ./tools/cachestat.py 1
-   TOTAL   MISSES     HITS  DIRTIES   BUFFERS_MB  CACHED_MB
-       0        0        0        0           15       2440
-       0        0        0        0           15       2440
-       0        0        0        0           15       2440
-    1758        0     1758    25603           15       2540
-       0        0        0        0           15       2540
-       0        0        0        0           15       2541
-
-~25600 pages are being dirtied (writes) which corresponds to the 100MB file
-added to the page cache.
+  -h, --help       show this help message and exit
+  -T, --timestamp  include timestamp on output

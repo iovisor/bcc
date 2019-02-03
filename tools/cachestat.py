@@ -15,6 +15,7 @@
 # 09-Sep-2015   Brendan Gregg   Created this.
 # 06-Nov-2015   Allan McAleavy
 # 13-Jan-2016   Allan McAleavy  run pep8 against program
+# 02-Feb-2019   Brendan Gregg   Column shuffle, bring back %ratio
 
 from __future__ import print_function
 from bcc import BPF
@@ -55,7 +56,7 @@ parser = argparse.ArgumentParser(
     formatter_class=argparse.RawDescriptionHelpFormatter)
 parser.add_argument("-T", "--timestamp", action="store_true",
     help="include timestamp on output")
-parser.add_argument("interval", nargs="?", default=5,
+parser.add_argument("interval", nargs="?", default=1,
     help="output interval, in seconds")
 parser.add_argument("count", nargs="?", default=-1,
     help="number of outputs")
@@ -102,7 +103,7 @@ b.attach_kprobe(event="mark_buffer_dirty", fn_name="do_count")
 if tstamp:
     print("%-8s " % "TIME", end="")
 print("%8s %8s %8s %8s %12s %10s" %
-     ("TOTAL", "MISSES", "HITS", "DIRTIES", "BUFFERS_MB", "CACHED_MB"))
+     ("HITS", "MISSES", "DIRTIES", "HITRATIO", "BUFFERS_MB", "CACHED_MB"))
 
 loop = 0
 exiting = 0
@@ -121,38 +122,36 @@ while 1:
 
     counts = b["counts"]
     for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
-
-        if re.match(b'mark_page_accessed', b.ksym(k.ip)) is not None:
+        func = b.ksym(k.ip)
+        # partial string matches in case of .isra (necessary?)
+        if func.find("mark_page_accessed") == 0:
             mpa = max(0, v.value)
-
-        if re.match(b'mark_buffer_dirty', b.ksym(k.ip)) is not None:
+        if func.find("mark_buffer_dirty") == 0:
             mbd = max(0, v.value)
-
-        if re.match(b'add_to_page_cache_lru', b.ksym(k.ip)) is not None:
+        if func.find("add_to_page_cache_lru") == 0:
             apcl = max(0, v.value)
-
-        if re.match(b'account_page_dirtied', b.ksym(k.ip)) is not None:
+        if func.find("account_page_dirtied") == 0:
             apd = max(0, v.value)
 
-        # total = total cache accesses without counting dirties
-        # misses = total of add to lru because of read misses
-        total = (mpa - mbd)
-        misses = (apcl - apd)
+    # total = total cache accesses without counting dirties
+    # misses = total of add to lru because of read misses
+    total = mpa - mbd
+    misses = apcl - apd
+    if misses < 0:
+        misses = 0
+    if total < 0:
+        total = 0
+    hits = total - misses
 
-        if total < 0:
-            total = 0
-
-        if misses < 0:
-            misses = 0
-
-        hits = total - misses
-
-        # If hits are < 0, then its possible misses are overestimated
-        # due to possibly page cache read ahead adding more pages than
-        # needed. In this case just assume misses as total and reset hits.
-        if hits < 0:
-            misses = total
-            hits = 0
+    # If hits are < 0, then its possible misses are overestimated
+    # due to possibly page cache read ahead adding more pages than
+    # needed. In this case just assume misses as total and reset hits.
+    if hits < 0:
+        misses = total
+        hits = 0
+    ratio = 0
+    if total > 0:
+        ratio = float(hits) / total
 
     if debug:
         print("%d %d %d %d %d %d %d\n" %
@@ -167,18 +166,10 @@ while 1:
 
     if tstamp:
         print("%-8s " % strftime("%H:%M:%S"), end="")
-    print("%8d %8d %8d %8d %12.0f %10.0f" %
-    (total, misses, hits, mbd, buff, cached))
+    print("%8d %8d %8d %7.2f%% %12.0f %10.0f" %
+        (hits, misses, mbd, 100 * ratio, buff, cached))
 
-    mpa = 0
-    mbd = 0
-    apcl = 0
-    apd = 0
-    total = 0
-    misses = 0
-    hits = 0
-    cached = 0
-    buff = 0
+    mpa = mbd = apcl = apd = total = misses = hits = cached = buff = 0
 
     if exiting:
         print("Detaching...")
