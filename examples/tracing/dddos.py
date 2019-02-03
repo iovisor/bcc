@@ -99,4 +99,7 @@ def trigger_alert_event(cpu, data, size):
 # loop with callback to trigger_alert_event
 b["events"].open_perf_buffer(trigger_alert_event)
 while 1:
-    b.perf_buffer_poll()
+    try:
+        b.perf_buffer_poll()
+    except KeyboardInterrupt:
+        exit()

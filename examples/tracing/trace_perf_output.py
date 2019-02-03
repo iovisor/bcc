@@ -53,4 +53,7 @@ def print_counter():
 print("Tracing " + event_name + ", try `dd if=/dev/zero of=/dev/null`")
 print("Tracing... Hit Ctrl-C to end.")
 while 1:
-    b.perf_buffer_poll()
+    try:
+        b.perf_buffer_poll()
+    except KeyboardInterrupt:
+        exit()
