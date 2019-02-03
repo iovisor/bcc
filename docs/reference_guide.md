@@ -23,7 +23,7 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
         - [5. bpf_get_current_uid_gid()](#5-bpf_get_current_uid_gid)
         - [6. bpf_get_current_comm()](#6-bpf_get_current_comm)
         - [7. bpf_get_current_task()](#7-bpf_get_current_task)
-        - [8. bpf_log2l()](#8-bpflog2l)
+        - [8. bpf_log2l()](#8-bpf_log2l)
         - [9. bpf_get_prandom_u32()](#9-bpf_get_prandom_u32)
     - [Debugging](#debugging)
         - [1. bpf_override_return()](#1-bpf_override_return)
