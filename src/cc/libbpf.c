@@ -52,6 +52,7 @@
 #include "setns.h"
 
 #include "libbpf/src/bpf.h"
+#include "libbpf/src/libbpf.h"
 
 // TODO: remove these defines when linux-libc-dev exports them properly
 
