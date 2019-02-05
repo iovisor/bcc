@@ -752,7 +752,8 @@ Syntax: ```map.insert(&key, &val)```
 Associate the value in the second argument to the key, only if there was no previous value.
 
 Examples in situ:
-[search /examples](https://github.com/iovisor/bcc/search?q=insert+path%3Aexamples&type=Code)
+[search /examples](https://github.com/iovisor/bcc/search?q=insert+path%3Aexamples&type=Code),
+[search /tools](https://github.com/iovisor/bcc/search?q=insert+path%3Atools&type=Code)
 
 ### 17. map.increment()
 
@@ -1043,7 +1044,9 @@ b.attach_tracepoint("random:urandom_read", "printarg")
 Notice how the first argument to ```printarg()``` is now our defined struct.
 
 Examples in situ:
-[code](https://github.com/iovisor/bcc/blob/a4159da8c4ea8a05a3c6e402451f530d6e5a8b41/examples/tracing/urandomread-explicit.py#L41)
+[code](https://github.com/iovisor/bcc/blob/a4159da8c4ea8a05a3c6e402451f530d6e5a8b41/examples/tracing/urandomread-explicit.py#L41),
+[search /examples](https://github.com/iovisor/bcc/search?q=attach_tracepoint+path%3Aexamples+language%3Apython&type=Code),
+[search /tools](https://github.com/iovisor/bcc/search?q=attach_tracepoint+path%3Atools+language%3Apython&type=Code)
 
 ### 4. attach_uprobe()
 
@@ -1306,8 +1309,8 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
 This example also uses the ```sorted()``` method to sort by value.
 
 Examples in situ:
-[search /examples](https://github.com/iovisor/bcc/search?q=clear+items%3Aexamples+language%3Apython&type=Code),
-[search /tools](https://github.com/iovisor/bcc/search?q=clear+items%3Atools+language%3Apython&type=Code)
+[search /examples](https://github.com/iovisor/bcc/search?q=items+path%3Aexamples+language%3Apython&type=Code),
+[search /tools](https://github.com/iovisor/bcc/search?q=items+path%3Atools+language%3Apython&type=Code)
 
 ### 4. values()
 
