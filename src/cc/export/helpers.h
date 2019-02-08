@@ -461,6 +461,10 @@ static int (*bpf_msg_pop_data)(void *msg, u32 start, u32 pop, u64 flags) =
   (void *) BPF_FUNC_msg_pop_data;
 static int (*bpf_rc_pointer_rel)(void *ctx, s32 rel_x, s32 rel_y) =
   (void *) BPF_FUNC_rc_pointer_rel;
+static void (*bpf_spin_lock)(struct bpf_spin_lock *lock) =
+  (void *) BPF_FUNC_spin_lock;
+static void (*bpf_spin_unlock)(struct bpf_spin_lock *lock) =
+  (void *) BPF_FUNC_spin_unlock;
 
 /* llvm builtin functions that eBPF C program may use to
  * emit BPF_LD_ABS and BPF_LD_IND instructions
