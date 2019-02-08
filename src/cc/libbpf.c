@@ -454,40 +454,31 @@ int bpf_prog_get_tag(int fd, unsigned long long *ptag)
   return 0;
 }
 
-int bcc_prog_load(enum bpf_prog_type prog_type, const char *name,
-                  const struct bpf_insn *insns, int prog_len,
-                  const char *license, unsigned kern_version,
-                  int log_level, char *log_buf, unsigned log_buf_size)
+int bcc_prog_load_xattr(struct bpf_load_program_attr *attr, int prog_len,
+                        char *log_buf, unsigned log_buf_size)
 {
-  size_t name_len = name ? strlen(name) : 0;
-  union bpf_attr attr;
-  char *tmp_log_buf = NULL;
-  unsigned tmp_log_buf_size = 0;
+  size_t name_len = attr->name ? strlen(attr->name) : 0;
+  char *tmp_log_buf = NULL, *attr_log_buf = NULL;
+  unsigned tmp_log_buf_size = 0, attr_log_buf_size = 0;
   int ret = 0, name_offset = 0;
+  char prog_name[BPF_OBJ_NAME_LEN] = {};
 
-  memset(&attr, 0, sizeof(attr));
-
-  attr.prog_type = prog_type;
-  attr.kern_version = kern_version;
-  attr.license = ptr_to_u64((void *)license);
-
-  attr.insns = ptr_to_u64((void *)insns);
-  attr.insn_cnt = prog_len / sizeof(struct bpf_insn);
-  if (attr.insn_cnt > BPF_MAXINSNS) {
+  unsigned insns_cnt = prog_len / sizeof(struct bpf_insn);
+  if (insns_cnt > BPF_MAXINSNS) {
     errno = EINVAL;
     fprintf(stderr,
             "bpf: %s. Program %s too large (%u insns), at most %d insns\n\n",
-            strerror(errno), name, attr.insn_cnt, BPF_MAXINSNS);
+            strerror(errno), attr->name, insns_cnt, BPF_MAXINSNS);
     return -1;
   }
+  attr->insns_cnt = insns_cnt;
 
-  attr.log_level = log_level;
-  if (attr.log_level > 0) {
+  if (attr->log_level > 0) {
     if (log_buf_size > 0) {
       // Use user-provided log buffer if availiable.
       log_buf[0] = 0;
-      attr.log_buf = ptr_to_u64(log_buf);
-      attr.log_size = log_buf_size;
+      attr_log_buf = log_buf;
+      attr_log_buf_size = log_buf_size;
     } else {
       // Create and use temporary log buffer if user didn't provide one.
       tmp_log_buf_size = LOG_BUF_SIZE;
@@ -495,32 +486,33 @@ int bcc_prog_load(enum bpf_prog_type prog_type, const char *name,
       if (!tmp_log_buf) {
         fprintf(stderr, "bpf: Failed to allocate temporary log buffer: %s\n\n",
                 strerror(errno));
-        attr.log_level = 0;
+        attr->log_level = 0;
       } else {
         tmp_log_buf[0] = 0;
-        attr.log_buf = ptr_to_u64(tmp_log_buf);
-        attr.log_size = tmp_log_buf_size;
+        attr_log_buf = tmp_log_buf;
+        attr_log_buf_size = tmp_log_buf_size;
       }
     }
   }
 
   if (name_len) {
-    if (strncmp(name, "kprobe__", 8) == 0)
+    if (strncmp(attr->name, "kprobe__", 8) == 0)
       name_offset = 8;
-    else if (strncmp(name, "tracepoint__", 12) == 0)
+    else if (strncmp(attr->name, "tracepoint__", 12) == 0)
       name_offset = 12;
-    else if (strncmp(name, "raw_tracepoint__", 16) == 0)
+    else if (strncmp(attr->name, "raw_tracepoint__", 16) == 0)
       name_offset = 16;
-    memcpy(attr.prog_name, name + name_offset,
+    memcpy(prog_name, attr->name + name_offset,
            min(name_len - name_offset, BPF_OBJ_NAME_LEN - 1));
+    attr->name = prog_name;
   }
 
-  ret = syscall(__NR_bpf, BPF_PROG_LOAD, &attr, sizeof(attr));
+  ret = bpf_load_program_xattr(attr, attr_log_buf, attr_log_buf_size);
   // BPF object name is not supported on older Kernels.
   // If we failed due to this, clear the name and try again.
   if (ret < 0 && name_len && (errno == E2BIG || errno == EINVAL)) {
-    memset(attr.prog_name, 0, BPF_OBJ_NAME_LEN);
-    ret = syscall(__NR_bpf, BPF_PROG_LOAD, &attr, sizeof(attr));
+    prog_name[0] = '\0';
+    ret = bpf_load_program_xattr(attr, attr_log_buf, attr_log_buf_size);
   }
 
   if (ret < 0 && errno == EPERM) {
@@ -536,7 +528,7 @@ int bcc_prog_load(enum bpf_prog_type prog_type, const char *name,
       rl.rlim_max = RLIM_INFINITY;
       rl.rlim_cur = rl.rlim_max;
       if (setrlimit(RLIMIT_MEMLOCK, &rl) == 0)
-        ret = syscall(__NR_bpf, BPF_PROG_LOAD, &attr, sizeof(attr));
+        ret = bpf_load_program_xattr(attr, attr_log_buf, attr_log_buf_size);
     }
   }
 
@@ -545,11 +537,9 @@ int bcc_prog_load(enum bpf_prog_type prog_type, const char *name,
     // User has provided a log buffer.
     if (log_buf_size) {
       // If logging is not already enabled, enable it and do the syscall again.
-      if (attr.log_level == 0) {
-        attr.log_level = 1;
-        attr.log_buf = ptr_to_u64(log_buf);
-        attr.log_size = log_buf_size;
-        ret = syscall(__NR_bpf, BPF_PROG_LOAD, &attr, sizeof(attr));
+      if (attr->log_level == 0) {
+        attr->log_level = 1;
+        ret = bpf_load_program_xattr(attr, log_buf, log_buf_size);
       }
       // Print the log message and return.
       bpf_print_hints(ret, log_buf);
@@ -563,8 +553,8 @@ int bcc_prog_load(enum bpf_prog_type prog_type, const char *name,
     if (tmp_log_buf)
       free(tmp_log_buf);
     tmp_log_buf_size = LOG_BUF_SIZE;
-    if (attr.log_level == 0)
-      attr.log_level = 1;
+    if (attr->log_level == 0)
+      attr->log_level = 1;
     for (;;) {
       tmp_log_buf = malloc(tmp_log_buf_size);
       if (!tmp_log_buf) {
@@ -573,10 +563,7 @@ int bcc_prog_load(enum bpf_prog_type prog_type, const char *name,
         goto return_result;
       }
       tmp_log_buf[0] = 0;
-      attr.log_buf = ptr_to_u64(tmp_log_buf);
-      attr.log_size = tmp_log_buf_size;
-
-      ret = syscall(__NR_bpf, BPF_PROG_LOAD, &attr, sizeof(attr));
+      ret = bpf_load_program_xattr(attr, tmp_log_buf, tmp_log_buf_size);
       if (ret < 0 && errno == ENOSPC) {
         // Temporary buffer size is not enough. Double it and try again.
         free(tmp_log_buf);
@@ -590,7 +577,7 @@ int bcc_prog_load(enum bpf_prog_type prog_type, const char *name,
 
   // Check if we should print the log message if log_level is not 0,
   // either specified by user or set due to error.
-  if (attr.log_level > 0) {
+  if (attr->log_level > 0) {
     // Don't print if user enabled logging and provided log buffer,
     // but there is no error.
     if (log_buf && ret < 0)
@@ -603,6 +590,22 @@ return_result:
   if (tmp_log_buf)
     free(tmp_log_buf);
   return ret;
+}
+
+int bcc_prog_load(enum bpf_prog_type prog_type, const char *name,
+                  const struct bpf_insn *insns, int prog_len,
+                  const char *license, unsigned kern_version,
+                  int log_level, char *log_buf, unsigned log_buf_size)
+{
+  struct bpf_load_program_attr attr = {};
+
+  attr.prog_type = prog_type;
+  attr.name = name;
+  attr.insns = insns;
+  attr.license = license;
+  attr.kern_version = kern_version;
+  attr.log_level = log_level;
+  return bcc_prog_load_xattr(&attr, prog_len, log_buf, log_buf_size);
 }
 
 int bpf_open_raw_sock(const char *name)

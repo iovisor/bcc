@@ -27,6 +27,7 @@ extern "C" {
 #endif
 
 struct bpf_create_map_attr;
+struct bpf_load_program_attr;
 
 enum bpf_probe_attach_type {
 	BPF_PROBE_ENTRY,
@@ -60,9 +61,12 @@ int bpf_get_next_key(int fd, void *key, void *next_key);
  *     initial attemp was insufficient in size.
  */
 int bcc_prog_load(enum bpf_prog_type prog_type, const char *name,
-                  const struct bpf_insn *insns, int insn_len,
+                  const struct bpf_insn *insns, int prog_len,
                   const char *license, unsigned kern_version,
                   int log_level, char *log_buf, unsigned log_buf_size);
+int bcc_prog_load_xattr(struct bpf_load_program_attr *attr,
+                        int prog_len, char *log_buf,
+                        unsigned log_buf_size);
 
 int bpf_attach_socket(int sockfd, int progfd);
 
