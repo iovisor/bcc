@@ -60,6 +60,12 @@ int bpf_table_leaf_snprintf(void *program, size_t id, char *buf, size_t buflen, 
 int bpf_table_key_sscanf(void *program, size_t id, const char *buf, void *key);
 int bpf_table_leaf_sscanf(void *program, size_t id, const char *buf, void *leaf);
 
+struct bpf_insn;
+int bcc_func_load(void *program, int prog_type, const char *name,
+                  const struct bpf_insn *insns, int prog_len,
+                  const char *license, unsigned kern_version,
+                  int log_level, char *log_buf, unsigned log_buf_size);
+
 #ifdef __cplusplus
 }
 #endif

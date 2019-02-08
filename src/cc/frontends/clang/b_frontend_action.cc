@@ -1399,11 +1399,17 @@ void BFrontendAction::EndSourceFileAction() {
 
   if (flags_ & DEBUG_PREPROCESSOR)
     rewriter_->getEditBuffer(rewriter_->getSourceMgr().getMainFileID()).write(llvm::errs());
+#if LLVM_MAJOR_VERSION >= 9
+  llvm::raw_string_ostream tmp_os(mod_src_);
+  rewriter_->getEditBuffer(rewriter_->getSourceMgr().getMainFileID())
+      .write(tmp_os);
+#else
   if (flags_ & DEBUG_SOURCE) {
     llvm::raw_string_ostream tmp_os(mod_src_);
     rewriter_->getEditBuffer(rewriter_->getSourceMgr().getMainFileID())
         .write(tmp_os);
   }
+#endif
 
   for (auto func : func_range_) {
     auto f = func.first;
