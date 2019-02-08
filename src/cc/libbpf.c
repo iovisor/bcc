@@ -187,8 +187,10 @@ static struct bpf_helper helpers[] = {
   {"map_pop_elem", "4.20"},
   {"map_peak_elem", "4.20"},
   {"msg_push_data", "4.20"},
-  {"msg_pop_data", "4.21"},
-  {"rc_pointer_rel", "4.21"},
+  {"msg_pop_data", "5.0"},
+  {"rc_pointer_rel", "5.0"},
+  {"spin_lock", "5.1"},
+  {"spin_unlock", "5.1"},
 };
 
 static uint64_t ptr_to_u64(void *ptr)
