@@ -26,6 +26,8 @@
 extern "C" {
 #endif
 
+struct bpf_create_map_attr;
+
 enum bpf_probe_attach_type {
 	BPF_PROBE_ENTRY,
 	BPF_PROBE_RETURN
@@ -34,6 +36,7 @@ enum bpf_probe_attach_type {
 int bcc_create_map(enum bpf_map_type map_type, const char *name,
                    int key_size, int value_size, int max_entries,
                    int map_flags);
+int bcc_create_map_xattr(struct bpf_create_map_attr *attr);
 int bpf_update_elem(int fd, void *key, void *value, unsigned long long flags);
 int bpf_lookup_elem(int fd, void *key, void *value);
 int bpf_delete_elem(int fd, void *key);

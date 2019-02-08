@@ -198,19 +198,17 @@ static uint64_t ptr_to_u64(void *ptr)
   return (uint64_t) (unsigned long) ptr;
 }
 
-int bcc_create_map(enum bpf_map_type map_type, const char *name,
-                   int key_size, int value_size,
-                   int max_entries, int map_flags)
+int bcc_create_map_xattr(struct bpf_create_map_attr *attr)
 {
-  size_t name_len = name ? strlen(name) : 0;
-  char map_name[BPF_OBJ_NAME_LEN];
+  size_t name_len = attr->name ? strlen(attr->name) : 0;
+  char map_name[BPF_OBJ_NAME_LEN] = {};
 
-  memcpy(map_name, name, min(name_len, BPF_OBJ_NAME_LEN - 1));
-  int ret = bpf_create_map_name(map_type, map_name, key_size, value_size,
-                                max_entries, map_flags);
+  memcpy(map_name, attr->name, min(name_len, BPF_OBJ_NAME_LEN - 1));
+  attr->name = map_name;
+  int ret = bpf_create_map_xattr(attr);
   if (ret < 0 && name_len && (errno == E2BIG || errno == EINVAL)) {
-    ret = bpf_create_map(map_type, key_size, value_size,
-			 max_entries, map_flags);
+    map_name[0] = '\0';
+    ret = bpf_create_map_xattr(attr);
   }
 
   if (ret < 0 && errno == EPERM) {
@@ -221,11 +219,25 @@ int bcc_create_map(enum bpf_map_type map_type, const char *name,
       rl.rlim_max = RLIM_INFINITY;
       rl.rlim_cur = rl.rlim_max;
       if (setrlimit(RLIMIT_MEMLOCK, &rl) == 0)
-        ret = bpf_create_map(map_type, key_size, value_size,
-                             max_entries, map_flags);
+        ret = bpf_create_map_xattr(attr);
     }
   }
   return ret;
+}
+
+int bcc_create_map(enum bpf_map_type map_type, const char *name,
+                   int key_size, int value_size,
+                   int max_entries, int map_flags)
+{
+  struct bpf_create_map_attr attr = {};
+
+  attr.map_type = map_type;
+  attr.name = name;
+  attr.key_size = key_size;
+  attr.value_size = value_size;
+  attr.max_entries = max_entries;
+  attr.map_flags = map_flags;
+  return bcc_create_map_xattr(&attr);
 }
 
 int bpf_update_elem(int fd, void *key, void *value, unsigned long long flags)
