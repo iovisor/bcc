@@ -199,4 +199,12 @@ int BTF::get_btf_info(const char *fname,
   return 0;
 }
 
+int BTF::get_map_tids(std::string map_name,
+                      unsigned expected_ksize, unsigned expected_vsize,
+                      unsigned *key_tid, unsigned *value_tid) {
+  return btf__get_map_kv_tids(btf_, map_name.c_str(),
+                              expected_ksize, expected_vsize,
+                              key_tid, value_tid);
+}
+
 } // namespace ebpf

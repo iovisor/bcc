@@ -23,6 +23,7 @@
 #include <vector>
 
 #include "bcc_exception.h"
+#include "table_storage.h"
 
 namespace llvm {
 class ExecutionEngine;
@@ -80,6 +81,7 @@ class BPFModule {
   StatusTuple snprintf(std::string fn_name, char *str, size_t sz,
                        const void *val);
   void load_btf(std::map<std::string, std::tuple<uint8_t *, uintptr_t>> &sections);
+  int load_maps(std::map<std::string, std::tuple<uint8_t *, uintptr_t>> &sections);
 
  public:
   BPFModule(unsigned flags, TableStorage *ts = nullptr, bool rw_engine_enabled = true,
@@ -156,6 +158,7 @@ class BPFModule {
   TableStorage *ts_;
   std::unique_ptr<TableStorage> local_ts_;
   BTF *btf_;
+  fake_fd_map_def fake_fd_map_;
 };
 
 }  // namespace ebpf
