@@ -234,4 +234,16 @@ int bpf_table_leaf_sscanf(void *program, size_t id, const char *buf, void *leaf)
   return mod->table_leaf_scanf(id, buf, leaf);
 }
 
+int bcc_func_load(void *program, int prog_type, const char *name,
+                  const struct bpf_insn *insns, int prog_len,
+                  const char *license, unsigned kern_version,
+                  int log_level, char *log_buf, unsigned log_buf_size) {
+  auto mod = static_cast<ebpf::BPFModule *>(program);
+  if (!mod) return -1;
+  return mod->bcc_func_load(prog_type, name, insns, prog_len,
+                            license, kern_version, log_level,
+                            log_buf, log_buf_size);
+
+}
+
 }

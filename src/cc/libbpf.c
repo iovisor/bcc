@@ -508,6 +508,19 @@ int bcc_prog_load_xattr(struct bpf_load_program_attr *attr, int prog_len,
   }
 
   ret = bpf_load_program_xattr(attr, attr_log_buf, attr_log_buf_size);
+
+  // func_info/line_info may not be supported in old kernels.
+  if (ret < 0 && attr->func_info && errno == EINVAL) {
+    attr->prog_btf_fd = 0;
+    attr->func_info = NULL;
+    attr->func_info_cnt = 0;
+    attr->func_info_rec_size = 0;
+    attr->line_info = NULL;
+    attr->line_info_cnt = 0;
+    attr->line_info_rec_size = 0;
+    ret = bpf_load_program_xattr(attr, attr_log_buf, attr_log_buf_size);
+  }
+
   // BPF object name is not supported on older Kernels.
   // If we failed due to this, clear the name and try again.
   if (ret < 0 && name_len && (errno == E2BIG || errno == EINVAL)) {
