@@ -11,6 +11,7 @@
  */
 
 #include <signal.h>
+#include <sys/resource.h>
 #include <iostream>
 
 #include "BPF.h"
@@ -79,25 +80,45 @@ void signal_handler(int s) {
   exit(0);
 }
 
+void usage(void) {
+  std::cerr << "USAGE: RandomRead [{-r|-u} [cgroup2_path]]" << std::endl;
+}
+
 int main(int argc, char** argv) {
-  if (argc != 1 && argc != 2) {
-    std::cerr << "USAGE: RandomRead [cgroup2_path]" << std::endl;
+  if (argc > 3) {
+    usage();
     return 1;
   }
 
+  bool allow_rlimit = true;
+  if (argc >= 2) {
+    // Set a small rlimit for MEMLOCK
+    struct rlimit rlim_new = {4096, 4096};
+    setrlimit(RLIMIT_MEMLOCK, &rlim_new);
+
+    if (strcmp(argv[1], "-r") == 0) {
+      allow_rlimit = false;
+    } else if (strcmp(argv[1], "-u") == 0) {
+      allow_rlimit = true;
+    } else {
+      usage();
+      return 1;
+    }
+  }
+
   std::vector<std::string> cflags = {};
-  if (argc == 2)
+  if (argc == 3)
     cflags.emplace_back("-DCGROUP_FILTER=1");
 
-  bpf = new ebpf::BPF();
+  bpf = new ebpf::BPF(0, nullptr, true, "", allow_rlimit);
   auto init_res = bpf->init(BPF_PROGRAM, cflags, {});
   if (init_res.code() != 0) {
     std::cerr << init_res.msg() << std::endl;
     return 1;
   }
-  if (argc == 2) {
+  if (argc == 3) {
     auto cgroup_array = bpf->get_cgroup_array("cgroup");
-    auto update_res = cgroup_array.update_value(0, argv[1]);
+    auto update_res = cgroup_array.update_value(0, argv[2]);
     if (update_res.code() != 0) {
       std::cerr << update_res.msg() << std::endl;
       return 1;

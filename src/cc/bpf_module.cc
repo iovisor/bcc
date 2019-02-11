@@ -93,10 +93,11 @@ class MyMemoryManager : public SectionMemoryManager {
 };
 
 BPFModule::BPFModule(unsigned flags, TableStorage *ts, bool rw_engine_enabled,
-                     const std::string &maps_ns)
+                     const std::string &maps_ns, bool allow_rlimit)
     : flags_(flags),
       rw_engine_enabled_(rw_engine_enabled && bpf_module_rw_engine_enabled()),
       used_b_loader_(false),
+      allow_rlimit_(allow_rlimit),
       ctx_(new LLVMContext),
       id_(std::to_string((uintptr_t)this)),
       maps_ns_(maps_ns),
@@ -327,10 +328,10 @@ int BPFModule::load_maps(std::map<std::string, std::tuple<uint8_t *, uintptr_t>>
       attr.btf_value_type_id = map_tids[map_name].second;
     }
 
-    fd = bcc_create_map_xattr(&attr);
+    fd = bcc_create_map_xattr(&attr, allow_rlimit_);
     if (fd < 0) {
-      fprintf(stderr, "could not open bpf map: %s\nis map type enabled in your kernel?\n",
-              map_name);
+      fprintf(stderr, "could not open bpf map: %s, error: %s\n",
+              map_name, strerror(errno));
       return -1;
     }
 
@@ -845,7 +846,7 @@ int BPFModule::bcc_func_load(int prog_type, const char *name,
     }
   }
 
-  ret = bcc_prog_load_xattr(&attr, prog_len, log_buf, log_buf_size);
+  ret = bcc_prog_load_xattr(&attr, prog_len, log_buf, log_buf_size, allow_rlimit_);
   if (btf_) {
     free(func_info);
     free(line_info);

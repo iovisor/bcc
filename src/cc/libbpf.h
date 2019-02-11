@@ -19,6 +19,7 @@
 #define LIBBPF_H
 
 #include "linux/bpf.h"
+#include <stdbool.h>
 #include <stdint.h>
 #include <sys/types.h>
 
@@ -37,7 +38,7 @@ enum bpf_probe_attach_type {
 int bcc_create_map(enum bpf_map_type map_type, const char *name,
                    int key_size, int value_size, int max_entries,
                    int map_flags);
-int bcc_create_map_xattr(struct bpf_create_map_attr *attr);
+int bcc_create_map_xattr(struct bpf_create_map_attr *attr, bool allow_rlimit);
 int bpf_update_elem(int fd, void *key, void *value, unsigned long long flags);
 int bpf_lookup_elem(int fd, void *key, void *value);
 int bpf_delete_elem(int fd, void *key);
@@ -66,7 +67,7 @@ int bcc_prog_load(enum bpf_prog_type prog_type, const char *name,
                   int log_level, char *log_buf, unsigned log_buf_size);
 int bcc_prog_load_xattr(struct bpf_load_program_attr *attr,
                         int prog_len, char *log_buf,
-                        unsigned log_buf_size);
+                        unsigned log_buf_size, bool allow_rlimit);
 
 int bpf_attach_socket(int sockfd, int progfd);
 
