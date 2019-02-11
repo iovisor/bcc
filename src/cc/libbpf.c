@@ -198,7 +198,7 @@ static uint64_t ptr_to_u64(void *ptr)
   return (uint64_t) (unsigned long) ptr;
 }
 
-int bcc_create_map_xattr(struct bpf_create_map_attr *attr)
+int bcc_create_map_xattr(struct bpf_create_map_attr *attr, bool allow_rlimit)
 {
   size_t name_len = attr->name ? strlen(attr->name) : 0;
   char map_name[BPF_OBJ_NAME_LEN] = {};
@@ -222,8 +222,10 @@ int bcc_create_map_xattr(struct bpf_create_map_attr *attr)
   }
 
   if (ret < 0 && errno == EPERM) {
-    // see note below about the rationale for this retry
+    if (!allow_rlimit)
+      return ret;
 
+    // see note below about the rationale for this retry
     struct rlimit rl = {};
     if (getrlimit(RLIMIT_MEMLOCK, &rl) == 0) {
       rl.rlim_max = RLIM_INFINITY;
@@ -247,7 +249,7 @@ int bcc_create_map(enum bpf_map_type map_type, const char *name,
   attr.value_size = value_size;
   attr.max_entries = max_entries;
   attr.map_flags = map_flags;
-  return bcc_create_map_xattr(&attr);
+  return bcc_create_map_xattr(&attr, true);
 }
 
 int bpf_update_elem(int fd, void *key, void *value, unsigned long long flags)
@@ -465,7 +467,7 @@ int bpf_prog_get_tag(int fd, unsigned long long *ptag)
 }
 
 int bcc_prog_load_xattr(struct bpf_load_program_attr *attr, int prog_len,
-                        char *log_buf, unsigned log_buf_size)
+                        char *log_buf, unsigned log_buf_size, bool allow_rlimit)
 {
   size_t name_len = attr->name ? strlen(attr->name) : 0;
   char *tmp_log_buf = NULL, *attr_log_buf = NULL;
@@ -539,6 +541,9 @@ int bcc_prog_load_xattr(struct bpf_load_program_attr *attr, int prog_len,
   }
 
   if (ret < 0 && errno == EPERM) {
+    if (!allow_rlimit)
+      return ret;
+
     // When EPERM is returned, two reasons are possible:
     //  1. user has no permissions for bpf()
     //  2. user has insufficent rlimit for locked memory
@@ -628,7 +633,7 @@ int bcc_prog_load(enum bpf_prog_type prog_type, const char *name,
   attr.license = license;
   attr.kern_version = kern_version;
   attr.log_level = log_level;
-  return bcc_prog_load_xattr(&attr, prog_len, log_buf, log_buf_size);
+  return bcc_prog_load_xattr(&attr, prog_len, log_buf, log_buf_size, true);
 }
 
 int bpf_open_raw_sock(const char *name)

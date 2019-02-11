@@ -270,7 +270,7 @@ class BPF(object):
         return None
 
     def __init__(self, src_file=b"", hdr_file=b"", text=None, debug=0,
-            cflags=[], usdt_contexts=[]):
+            cflags=[], usdt_contexts=[], allow_rlimit=True):
         """Create a new BPF module with the given source code.
 
         Note:
@@ -318,7 +318,7 @@ class BPF(object):
 
         if text:
             self.module = lib.bpf_module_create_c_from_string(text,
-                    self.debug, cflags_array, len(cflags_array))
+                    self.debug, cflags_array, len(cflags_array), allow_rlimit)
             if not self.module:
                 raise Exception("Failed to compile BPF text")
         else:
@@ -329,7 +329,7 @@ class BPF(object):
                         self.debug)
             else:
                 self.module = lib.bpf_module_create_c(src_file, self.debug,
-                        cflags_array, len(cflags_array))
+                        cflags_array, len(cflags_array), allow_rlimit)
             if not self.module:
                 raise Exception("Failed to compile BPF module %s" % src_file)
 

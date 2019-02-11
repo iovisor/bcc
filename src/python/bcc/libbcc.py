@@ -21,10 +21,10 @@ lib.bpf_module_create_b.restype = ct.c_void_p
 lib.bpf_module_create_b.argtypes = [ct.c_char_p, ct.c_char_p, ct.c_uint]
 lib.bpf_module_create_c.restype = ct.c_void_p
 lib.bpf_module_create_c.argtypes = [ct.c_char_p, ct.c_uint,
-        ct.POINTER(ct.c_char_p), ct.c_int]
+        ct.POINTER(ct.c_char_p), ct.c_int, ct.c_bool]
 lib.bpf_module_create_c_from_string.restype = ct.c_void_p
 lib.bpf_module_create_c_from_string.argtypes = [ct.c_char_p, ct.c_uint,
-        ct.POINTER(ct.c_char_p), ct.c_int]
+        ct.POINTER(ct.c_char_p), ct.c_int, ct.c_bool]
 lib.bpf_module_destroy.restype = None
 lib.bpf_module_destroy.argtypes = [ct.c_void_p]
 lib.bpf_module_license.restype = ct.c_char_p

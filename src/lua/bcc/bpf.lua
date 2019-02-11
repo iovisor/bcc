@@ -121,7 +121,7 @@ function Bpf:initialize(args)
 
   if args.text then
     log.info("\n%s\n", args.text)
-    self.module = libbcc.bpf_module_create_c_from_string(args.text, llvm_debug, cflags_ary, #cflags)
+    self.module = libbcc.bpf_module_create_c_from_string(args.text, llvm_debug, cflags_ary, #cflags, true)
   elseif args.src_file then
     local src = _find_file(Bpf.SCRIPT_ROOT, args.src_file)
 
@@ -129,7 +129,7 @@ function Bpf:initialize(args)
       local hdr = _find_file(Bpf.SCRIPT_ROOT, args.hdr_file)
       self.module = libbcc.bpf_module_create_b(src, hdr, llvm_debug)
     else
-      self.module = libbcc.bpf_module_create_c(src, llvm_debug, cflags_ary, #cflags)
+      self.module = libbcc.bpf_module_create_c(src, llvm_debug, cflags_ary, #cflags, true)
     end
   end
 
