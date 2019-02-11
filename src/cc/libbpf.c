@@ -206,6 +206,16 @@ int bcc_create_map_xattr(struct bpf_create_map_attr *attr)
   memcpy(map_name, attr->name, min(name_len, BPF_OBJ_NAME_LEN - 1));
   attr->name = map_name;
   int ret = bpf_create_map_xattr(attr);
+
+  // kernel already supports btf if its loading is successful,
+  // but this map type may not support pretty print yet.
+  if (ret < 0 && attr->btf_key_type_id && errno == 524 /* ENOTSUPP */) {
+    attr->btf_fd = 0;
+    attr->btf_key_type_id = 0;
+    attr->btf_value_type_id = 0;
+    ret = bpf_create_map_xattr(attr);
+  }
+
   if (ret < 0 && name_len && (errno == E2BIG || errno == EINVAL)) {
     map_name[0] = '\0';
     ret = bpf_create_map_xattr(attr);

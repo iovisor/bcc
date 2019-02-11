@@ -53,6 +53,9 @@ class BTF {
                    unsigned *finfo_rec_size,
                    void **line_info, unsigned *line_info_cnt,
                    unsigned *linfo_rec_size);
+  int get_map_tids(std::string map_name,
+                   unsigned expected_ksize, unsigned expected_vsize,
+                   unsigned *key_tid, unsigned *value_tid);
 
  private:
   void adjust(uint8_t *btf_sec, uintptr_t btf_sec_size,

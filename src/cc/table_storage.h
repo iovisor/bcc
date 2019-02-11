@@ -27,6 +27,8 @@
 
 namespace ebpf {
 
+typedef std::map<int, std::tuple<int, std::string, int, int, int, int>> fake_fd_map_def;
+
 class TableStorageImpl;
 class TableStorageIteratorImpl;
 
