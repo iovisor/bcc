@@ -21,6 +21,10 @@
 #include "libbpf/src/btf.h"
 #include <vector>
 
+#define BCC_MAX_ERRNO       4095
+#define BCC_IS_ERR_VALUE(x) ((x) >= (unsigned long)-BCC_MAX_ERRNO)
+#define BCC_IS_ERR(ptr) BCC_IS_ERR_VALUE((unsigned long)ptr)
+
 namespace ebpf {
 
 uint32_t BTFStringTable::addString(std::string S) {
@@ -148,13 +152,13 @@ int BTF::load(uint8_t *btf_sec, uintptr_t btf_sec_size,
   } else {
     btf = btf__new(btf_sec, btf_sec_size);
   }
-  if (!btf) {
+  if (BCC_IS_ERR(btf)) {
     fprintf(stderr, "Processing .BTF section failure\n");
     return -1;
   }
 
   btf_ext = btf_ext__new(btf_ext_sec, btf_ext_sec_size);
-  if (!btf_ext) {
+  if (BCC_IS_ERR(btf_ext)) {
     btf__free(btf);
     fprintf(stderr, "Processing .BTF.ext section failure\n");
     return -1;
