@@ -373,7 +373,12 @@ Context::Context(int pid, const std::string &bin_path)
       mount_ns_instance_(new ProcMountNS(pid)), loaded_(false) {
   std::string full_path = resolve_bin_path(bin_path);
   if (!full_path.empty()) {
-    if (bcc_elf_foreach_usdt(full_path.c_str(), _each_probe, this) == 0) {
+    int res;
+    {
+      ProcMountNSGuard g(mount_ns_instance_.get());
+      res = bcc_elf_foreach_usdt(full_path.c_str(), _each_probe, this);
+    }
+    if (res == 0) {
       cmd_bin_path_ = ebpf::get_pid_exe(pid);
       if (cmd_bin_path_.empty())
         return;
@@ -399,13 +404,16 @@ void *bcc_usdt_new_frompid(int pid, const char *path) {
   if (!path) {
     ctx = new USDT::Context(pid);
   } else {
-    struct stat buffer;
-    if (strlen(path) >= 1 && path[0] != '/') {
-      fprintf(stderr, "HINT: Binary path should be absolute.\n\n");
-      return nullptr;
-    } else if (stat(path, &buffer) == -1) {
-      fprintf(stderr, "HINT: Specified binary doesn't exist.\n\n");
-      return nullptr;
+    {
+      ProcMountNSGuard g(new ProcMountNS(pid));
+      struct stat buffer;
+      if (strlen(path) >= 1 && path[0] != '/') {
+        fprintf(stderr, "HINT: Binary path should be absolute.\n\n");
+        return nullptr;
+      } else if (stat(path, &buffer) == -1) {
+        fprintf(stderr, "HINT: Specified binary doesn't exist.\n\n");
+        return nullptr;
+      }
     }
     ctx = new USDT::Context(pid, path);
   }
