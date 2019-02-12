@@ -279,6 +279,18 @@ int BPFModule::load_maps(std::map<std::string, std::tuple<uint8_t *, uintptr_t>>
         unsigned key_tid = 0, value_tid = 0;
         unsigned expected_ksize = 0, expected_vsize = 0;
 
+        // skip extern maps, which won't be in fake_fd_map_ as they do not
+        // require explicit bpf_create_map.
+        bool is_extern = false;
+        for (auto &t : tables_) {
+          if (t->name == map_name) {
+            is_extern = t->is_extern;
+            break;
+          }
+        }
+        if (is_extern)
+          continue;
+
         for (auto map : fake_fd_map_) {
           std::string name;
 
