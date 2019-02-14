@@ -323,28 +323,28 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
             if stack_id_err(k.t_u_stack_id):
                 line.append("[Missed User Stack]")
             else:
-                line.extend([b.sym(addr, k.t_tgid)
+                line.extend([b.sym(addr, k.t_tgid).decode('utf-8', 'replace')
                     for addr in reversed(list(target_user_stack)[1:])])
         if not args.user_stacks_only:
             line.extend(["-"] if (need_delimiter and k.t_k_stack_id > 0 and k.t_u_stack_id > 0) else [])
             if stack_id_err(k.t_k_stack_id):
                 line.append("[Missed Kernel Stack]")
             else:
-                line.extend([b.ksym(addr)
+                line.extend([b.ksym(addr).decode('utf-8', 'replace')
                     for addr in reversed(list(target_kernel_stack)[1:])])
         line.append("--")
         if not args.user_stacks_only:
             if stack_id_err(k.w_k_stack_id):
                 line.append("[Missed Kernel Stack]")
             else:
-                line.extend([b.ksym(addr)
+                line.extend([b.ksym(addr).decode('utf-8', 'replace')
                     for addr in reversed(list(waker_kernel_stack))])
         if not args.kernel_stacks_only:
             line.extend(["-"] if (need_delimiter and k.w_u_stack_id > 0 and k.w_k_stack_id > 0) else [])
             if stack_id_err(k.w_u_stack_id):
                 line.append("[Missed User Stack]")
             else:
-                line.extend([b.sym(addr, k.w_tgid)
+                line.extend([b.sym(addr, k.w_tgid).decode('utf-8', 'replace')
                     for addr in reversed(list(waker_user_stack))])
         line.append(k.waker.decode('utf-8', 'replace'))
         print("%s %d" % (";".join(line), v.value))
