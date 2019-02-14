@@ -43,6 +43,7 @@ class BTFStringTable {
 
 class BTF {
  public:
+  BTF(bool debug);
   ~BTF();
   int load(uint8_t *btf_sec, uintptr_t btf_sec_size,
            uint8_t *btf_ext_sec, uintptr_t btf_ext_sec_size,
@@ -62,8 +63,10 @@ class BTF {
               uint8_t *btf_ext_sec, uintptr_t btf_ext_sec_size,
               std::map<std::string, std::string> &remapped_sources,
               uint8_t **new_btf_sec, uintptr_t *new_btf_sec_size);
+  void warning(const char *format, ...);
 
  private:
+  bool debug_;
   struct btf *btf_;
   struct btf_ext *btf_ext_;
 };

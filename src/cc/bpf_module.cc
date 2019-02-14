@@ -258,7 +258,7 @@ void BPFModule::load_btf(std::map<std::string, std::tuple<uint8_t *, uintptr_t>>
   remapped_sources["/virtual/main.c"] = mod_src_;
   remapped_sources["/virtual/include/bcc/helpers.h"] = helpers_h->second;
 
-  BTF *btf = new BTF();
+  BTF *btf = new BTF(flags_ & DEBUG_BTF);
   int ret = btf->load(btf_sec, btf_sec_size, btf_ext_sec, btf_ext_sec_size,
                        remapped_sources);
   if (ret) {
