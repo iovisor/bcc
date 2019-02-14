@@ -575,6 +575,7 @@ class PerfEventArray(ArrayBase):
                        'u16'               : ct.c_ushort,
                        'int'               : ct.c_int,
                        's32'               : ct.c_int,
+                       'enum'              : ct.c_int,
                        'unsigned int'      : ct.c_uint,
                        'u32'               : ct.c_uint,
                        'long'              : ct.c_long,
@@ -598,6 +599,9 @@ class PerfEventArray(ArrayBase):
             m = re.match(r"(.*)#(.*)", field)
             field_name = m.group(1)
             field_type = m.group(2)
+
+            if re.match(r"enum .*", field_type):
+                field_type = "enum"
 
             m = array_type.match(field_type)
             try:
