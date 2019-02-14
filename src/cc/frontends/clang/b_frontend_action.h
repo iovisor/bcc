@@ -156,7 +156,8 @@ class BFrontendAction : public clang::ASTFrontendAction {
                   const std::string &id, const std::string &main_path,
                   FuncSource &func_src, std::string &mod_src,
                   const std::string &maps_ns,
-                  fake_fd_map_def &fake_fd_map);
+                  fake_fd_map_def &fake_fd_map,
+                  std::map<std::string, std::vector<std::string>> &perf_events);
 
   // Called by clang when the AST has been completed, here the output stream
   // will be flushed.
@@ -192,6 +193,7 @@ class BFrontendAction : public clang::ASTFrontendAction {
   std::set<clang::Decl *> m_;
   int next_fake_fd_;
   fake_fd_map_def &fake_fd_map_;
+  std::map<std::string, std::vector<std::string>> &perf_events_;
 };
 
 }  // namespace visitor

@@ -109,7 +109,8 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, TableStorage &ts,
                        int ncflags, const std::string &id, FuncSource &func_src,
                        std::string &mod_src,
                        const std::string &maps_ns,
-                       fake_fd_map_def &fake_fd_map) {
+                       fake_fd_map_def &fake_fd_map,
+                       std::map<std::string, std::vector<std::string>> &perf_events) {
   string main_path = "/virtual/main.c";
   unique_ptr<llvm::MemoryBuffer> main_buf;
   struct utsname un;
@@ -206,7 +207,7 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, TableStorage &ts,
 #endif
 
   if (do_compile(mod, ts, in_memory, flags_cstr, flags_cstr_rem, main_path,
-                 main_buf, id, func_src, mod_src, true, maps_ns, fake_fd_map)) {
+                 main_buf, id, func_src, mod_src, true, maps_ns, fake_fd_map, perf_events)) {
 #if BCC_BACKUP_COMPILE != 1
     return -1;
 #else
@@ -218,7 +219,7 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, TableStorage &ts,
     mod_src.clear();
     fake_fd_map.clear();
     if (do_compile(mod, ts, in_memory, flags_cstr, flags_cstr_rem, main_path,
-                   main_buf, id, func_src, mod_src, false, maps_ns, fake_fd_map))
+                   main_buf, id, func_src, mod_src, false, maps_ns, fake_fd_map, perf_events))
       return -1;
 #endif
   }
@@ -266,7 +267,8 @@ int ClangLoader::do_compile(unique_ptr<llvm::Module> *mod, TableStorage &ts,
                             const std::string &id, FuncSource &func_src,
                             std::string &mod_src, bool use_internal_bpfh,
                             const std::string &maps_ns,
-                            fake_fd_map_def &fake_fd_map) {
+                            fake_fd_map_def &fake_fd_map,
+                            std::map<std::string, std::vector<std::string>> &perf_events) {
   using namespace clang;
 
   vector<const char *> flags_cstr = flags_cstr_in;
@@ -380,7 +382,8 @@ int ClangLoader::do_compile(unique_ptr<llvm::Module> *mod, TableStorage &ts,
   // capture the rewritten c file
   string out_str1;
   llvm::raw_string_ostream os1(out_str1);
-  BFrontendAction bact(os1, flags_, ts, id, main_path, func_src, mod_src, maps_ns, fake_fd_map);
+  BFrontendAction bact(os1, flags_, ts, id, main_path, func_src, mod_src,
+                       maps_ns, fake_fd_map, perf_events);
   if (!compiler1.ExecuteAction(bact))
     return -1;
   unique_ptr<llvm::MemoryBuffer> out_buf1 = llvm::MemoryBuffer::getMemBuffer(out_str1);

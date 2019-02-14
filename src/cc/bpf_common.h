@@ -62,6 +62,8 @@ int bpf_table_key_snprintf(void *program, size_t id, char *buf, size_t buflen, c
 int bpf_table_leaf_snprintf(void *program, size_t id, char *buf, size_t buflen, const void *leaf);
 int bpf_table_key_sscanf(void *program, size_t id, const char *buf, void *key);
 int bpf_table_leaf_sscanf(void *program, size_t id, const char *buf, void *leaf);
+size_t bpf_perf_event_fields(void *program, const char *event);
+const char * bpf_perf_event_field(void *program, const char *event, size_t i);
 
 struct bpf_insn;
 int bcc_func_load(void *program, int prog_type, const char *name,

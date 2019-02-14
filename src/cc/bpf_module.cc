@@ -159,7 +159,7 @@ int BPFModule::free_bcc_memory() {
 int BPFModule::load_cfile(const string &file, bool in_memory, const char *cflags[], int ncflags) {
   ClangLoader clang_loader(&*ctx_, flags_);
   if (clang_loader.parse(&mod_, *ts_, file, in_memory, cflags, ncflags, id_,
-                         *func_src_, mod_src_, maps_ns_, fake_fd_map_))
+                         *func_src_, mod_src_, maps_ns_, fake_fd_map_, perf_events_))
     return -1;
   return 0;
 }
@@ -172,7 +172,7 @@ int BPFModule::load_cfile(const string &file, bool in_memory, const char *cflags
 int BPFModule::load_includes(const string &text) {
   ClangLoader clang_loader(&*ctx_, flags_);
   if (clang_loader.parse(&mod_, *ts_, text, true, nullptr, 0, "", *func_src_,
-                         mod_src_, "", fake_fd_map_))
+                         mod_src_, "", fake_fd_map_, perf_events_))
     return -1;
   return 0;
 }
@@ -594,6 +594,20 @@ unsigned BPFModule::kern_version() const {
 }
 
 size_t BPFModule::num_tables() const { return tables_.size(); }
+
+size_t BPFModule::perf_event_fields(const char *event) const {
+  auto it = perf_events_.find(event);
+  if (it == perf_events_.end())
+    return 0;
+  return it->second.size();
+}
+
+const char * BPFModule::perf_event_field(const char *event, size_t i) const {
+  auto it = perf_events_.find(event);
+  if (it == perf_events_.end() || i >= it->second.size())
+    return nullptr;
+  return it->second[i].c_str();
+}
 
 size_t BPFModule::table_id(const string &name) const {
   auto it = table_names_.find(name);
