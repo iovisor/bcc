@@ -15,9 +15,11 @@
  */
 
 #include "bcc_btf.h"
+#include <stdarg.h>
 #include <string.h>
 #include "linux/btf.h"
 #include "libbpf.h"
+#include "libbpf/src/libbpf.h"
 #include "libbpf/src/btf.h"
 #include <vector>
 
@@ -41,9 +43,25 @@ uint32_t BTFStringTable::addString(std::string S) {
   return Offset;
 }
 
+BTF::BTF(bool debug) : debug_(debug), btf_(nullptr), btf_ext_(nullptr) {
+  if (!debug)
+    libbpf_set_print(NULL);
+}
+
 BTF::~BTF() {
   btf__free(btf_);
   btf_ext__free(btf_ext_);
+}
+
+void BTF::warning(const char *format, ...) {
+  va_list args;
+
+  if (!debug_)
+    return;
+
+  va_start(args, format);
+  vfprintf(stderr, format, args);
+  va_end(args);
 }
 
 // The compiler doesn't have source code for remapped files.
@@ -153,14 +171,14 @@ int BTF::load(uint8_t *btf_sec, uintptr_t btf_sec_size,
     btf = btf__new(btf_sec, btf_sec_size);
   }
   if (BCC_IS_ERR(btf)) {
-    fprintf(stderr, "Processing .BTF section failure\n");
+    warning("Processing .BTF section failed\n");
     return -1;
   }
 
   btf_ext = btf_ext__new(btf_ext_sec, btf_ext_sec_size);
   if (BCC_IS_ERR(btf_ext)) {
     btf__free(btf);
-    fprintf(stderr, "Processing .BTF.ext section failure\n");
+    warning("Processing .BTF.ext section failed\n");
     return -1;
   }
 
@@ -189,14 +207,14 @@ int BTF::get_btf_info(const char *fname,
   ret = btf_ext__reloc_func_info(btf_, btf_ext_, fname, 0,
         func_info, func_info_cnt);
   if (ret) {
-    fprintf(stderr, ".BTF.ext reloc func_info not successful\n");
+    warning(".BTF.ext reloc func_info failed\n");
     return ret;
   }
 
   ret = btf_ext__reloc_line_info(btf_, btf_ext_, fname, 0,
         line_info, line_info_cnt);
   if (ret) {
-    fprintf(stderr, ".BTF.ext reloc line_info not successful\n");
+    warning(".BTF.ext reloc line_info failed\n");
     return ret;
   }
 

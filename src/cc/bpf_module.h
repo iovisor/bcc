@@ -47,6 +47,8 @@ enum {
   DEBUG_SOURCE = 0x8,
   // Debug output register state on all instructions in addition to DEBUG_BPF.
   DEBUG_BPF_REGISTER_STATE = 0x10,
+  // Debug BTF.
+  DEBUG_BTF = 0x20,
 };
 
 class TableDesc;
