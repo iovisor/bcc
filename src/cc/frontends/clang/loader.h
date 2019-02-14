@@ -55,7 +55,8 @@ class ClangLoader {
             const std::string &file, bool in_memory, const char *cflags[],
             int ncflags, const std::string &id, FuncSource &func_src,
             std::string &mod_src, const std::string &maps_ns,
-            fake_fd_map_def &fake_fd_map);
+            fake_fd_map_def &fake_fd_map,
+            std::map<std::string, std::vector<std::string>> &perf_events);
 
  private:
   int do_compile(std::unique_ptr<llvm::Module> *mod, TableStorage &ts,
@@ -66,7 +67,8 @@ class ClangLoader {
                  const std::string &id, FuncSource &func_src,
                  std::string &mod_src, bool use_internal_bpfh,
                  const std::string &maps_ns,
-                 fake_fd_map_def &fake_fd_map);
+                 fake_fd_map_def &fake_fd_map,
+                 std::map<std::string, std::vector<std::string>> &perf_events);
 
  private:
   std::map<std::string, std::unique_ptr<llvm::MemoryBuffer>> remapped_headers_;

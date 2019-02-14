@@ -133,6 +133,8 @@ class BPFModule {
                     const struct bpf_insn *insns, int prog_len,
                     const char *license, unsigned kern_version,
                     int log_level, char *log_buf, unsigned log_buf_size);
+  size_t perf_event_fields(const char *) const;
+  const char * perf_event_field(const char *, size_t i) const;
 
  private:
   unsigned flags_;  // 0x1 for printing
@@ -160,6 +162,9 @@ class BPFModule {
   std::unique_ptr<TableStorage> local_ts_;
   BTF *btf_;
   fake_fd_map_def fake_fd_map_;
+
+  // map of events -- key: event name, value: event fields
+  std::map<std::string, std::vector<std::string>> perf_events_;
 };
 
 }  // namespace ebpf
