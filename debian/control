@@ -16,6 +16,8 @@ Homepage: https://github.com/iovisor/bcc
 
 Package: libbcc
 Architecture: all
+Provides: libbpfcc, libbpfcc-dev
+Conflicts: libbpfcc, libbpfcc-dev
 Depends: libc6, libstdc++6, libelf1
 Description: Shared Library for BPF Compiler Collection (BCC)
  Shared Library for BPF Compiler Collection to control BPF programs
@@ -28,20 +30,28 @@ Description: Examples for BPF Compiler Collection (BCC)
 
 Package: python-bcc
 Architecture: all
+Provides: python-bpfcc
+Conflicts: python-bpfcc
 Depends: libbcc (= ${binary:Version}), python, binutils
 Description: Python wrappers for BPF Compiler Collection (BCC)
 
 Package: python3-bcc
 Architecture: all
+Provides: python3-bpfcc
+Conflicts: python3-bpfcc
 Depends: libbcc (= ${binary:Version}), python3, binutils
 Description: Python3 wrappers for BPF Compiler Collection (BCC)
 
 Package: bcc-tools
 Architecture: all
+Provides: bpfcc-tools
+Conflicts: bpfcc-tools
 Depends: python-bcc (= ${binary:Version})
 Description: Command line tools for BPF Compiler Collection (BCC)
 
 Package: bcc-lua
 Architecture: all
+Provides: bpfcc-lua
+Conflicts: bpfcc-lua
 Depends: libbcc (= ${binary:Version})
 Description: Standalone tool to run BCC tracers written in Lua

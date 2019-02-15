@@ -55,7 +55,32 @@ Kernel compile flags can usually be checked by looking at `/proc/config.gz` or
 
 The stable and the nightly packages are built for Ubuntu Xenial (16.04), Ubuntu Artful (17.10) and Ubuntu Bionic (18.04). The steps are very straightforward, no need to upgrade the kernel or compile from source!
 
-**Stable and Signed Packages**
+**Ubuntu Packages**
+
+As of Ubuntu Bionic (18.04), versions of bcc are available in the standard Ubuntu
+multiverse repository. The Ubuntu packages have slightly different names: where iovisor
+packages use `bcc` in the name (e.g. `bcc-tools`), Ubuntu packages use `bpfcc` (e.g.
+`bpfcc-tools`). Source packages and the binary packages produced from them can be
+found at [packages.ubuntu.com](https://packages.ubuntu.com/search?suite=default&section=all&arch=any&keywords=bpfcc&searchon=sourcenames).
+
+```bash
+sudo apt-get install bpfcc-tools linux-headers-$(uname -r)
+```
+
+The tools are installed in `/sbin` with a `-bpfcc` extension. Try running `sudo opensnoop-bpfcc`.
+
+**_Note_**: the Ubuntu packages have different names but the package contents, in most cases, conflict
+and as such _cannot_ be installed alongside upstream packages. Should one choose to use
+Ubuntu's packages instead of the upstream iovisor packages (or vice-versa), the
+conflicting packages will need to be removed.
+
+The iovisor packages _do_ declare they provide the Ubuntu packages and as such may be
+used to satisfy dependencies. For example, should one attempt to install package `foo`
+which declares a dependency on `libbpfcc` while the upstream `libbcc` package is installed,
+`foo` should install without trouble as `libbcc` declares that it provides `libbpfcc`.
+That said, one should always test such a configuration in case of version incompatibilities.
+
+**Upstream Stable and Signed Packages**
 
 ```bash
 sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 4052245BD4284CDD
@@ -65,7 +90,7 @@ sudo apt-get install bcc-tools libbcc-examples linux-headers-$(uname -r)
 ```
 (replace `xenial` with `artful` or `bionic` as appropriate). Tools will be installed under /usr/share/bcc/tools.
 
-**Nightly Packages**
+**Upstream Nightly Packages**
 
 ```bash
 echo "deb [trusted=yes] https://repo.iovisor.org/apt/xenial xenial-nightly main" | sudo tee /etc/apt/sources.list.d/iovisor.list
@@ -73,16 +98,6 @@ sudo apt-get update
 sudo apt-get install bcc-tools libbcc-examples linux-headers-$(uname -r)
 ```
 (replace `xenial` with `artful` or `bionic` as appropriate)
-
-**Ubuntu Packages**
-
-The previous commands will install the latest bcc from the iovisor repositories. It is also available from the standard Ubuntu multiverse repository, under the package name `bpfcc-tools`.
-
-```bash
-sudo apt-get install bpfcc-tools linux-headers-$(uname -r)
-```
-
-The tools are installed in /sbin with a -bpfcc extension. Try running `sudo opensnoop-bpfcc`.
 
 ## Fedora - Binary
 
@@ -379,7 +394,7 @@ Tested on Amazon Linux AMI release 2018.03 (kernel 4.14.47-56.37.amzn1.x86_64)
 
 ### Install packages required for building
 ```
-# enable epel to get iperf, luajit, luajit-devel, cmake3 (cmake3 is required to support c++11) 
+# enable epel to get iperf, luajit, luajit-devel, cmake3 (cmake3 is required to support c++11)
 sudo yum-config-manager --enable epel
 
 sudo yum install -y bison cmake3 ethtool flex git iperf libstdc++-static python-netaddr gcc gcc-c++ make zlib-devel elfutils-libelf-devel
