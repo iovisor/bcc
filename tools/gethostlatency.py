@@ -19,7 +19,6 @@ from __future__ import print_function
 from bcc import BPF
 from time import strftime
 import argparse
-import ctypes as ct
 
 examples = """examples:
     ./gethostlatency           # trace all TCP accept()s
@@ -113,21 +112,11 @@ b.attach_uretprobe(name="c", sym="gethostbyname", fn_name="do_return",
 b.attach_uretprobe(name="c", sym="gethostbyname2", fn_name="do_return",
                    pid=args.pid)
 
-TASK_COMM_LEN = 16    # linux/sched.h
-
-class Data(ct.Structure):
-    _fields_ = [
-        ("pid", ct.c_ulonglong),
-        ("delta", ct.c_ulonglong),
-        ("comm", ct.c_char * TASK_COMM_LEN),
-        ("host", ct.c_char * 80)
-    ]
-
 # header
 print("%-9s %-6s %-16s %10s %s" % ("TIME", "PID", "COMM", "LATms", "HOST"))
 
 def print_event(cpu, data, size):
-    event = ct.cast(data, ct.POINTER(Data)).contents
+    event = b["events"].event(data)
     print("%-9s %-6d %-16s %10.2f %s" % (strftime("%H:%M:%S"), event.pid,
         event.comm.decode('utf-8', 'replace'), (float(event.delta) / 1000000),
         event.host.decode('utf-8', 'replace')))

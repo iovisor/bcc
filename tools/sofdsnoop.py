@@ -15,7 +15,6 @@ from __future__ import print_function
 from bcc import ArgString, BPF
 import os
 import argparse
-import ctypes as ct
 from datetime import datetime, timedelta
 
 # arguments
@@ -279,20 +278,7 @@ b.attach_kprobe(event="__scm_send", fn_name="trace_scm_send_entry")
 b.attach_kprobe(event="scm_detach_fds", fn_name="trace_scm_detach_fds_entry")
 b.attach_kretprobe(event="scm_detach_fds", fn_name="trace_scm_detach_fds_return")
 
-TASK_COMM_LEN = 16    # linux/sched.h
-
 initial_ts = 0
-
-class Data(ct.Structure):
-    _fields_ = [
-        ("id",      ct.c_ulonglong),
-        ("ts",      ct.c_ulonglong),
-        ("action",  ct.c_int),
-        ("sock_fd", ct.c_int),
-        ("fd_cnt",  ct.c_int),
-        ("fd",      ct.c_int  * MAX_FD),
-        ("comm",    ct.c_char * TASK_COMM_LEN),
-    ]
 
 # header
 if args.timestamp:
@@ -309,7 +295,7 @@ def get_file(pid, fd):
 
 # process event
 def print_event(cpu, data, size):
-    event = ct.cast(data, ct.POINTER(Data)).contents
+    event = b["events"].event(data)
     tid = event.id & 0xffffffff;
 
     cnt = min(MAX_FD, event.fd_cnt);

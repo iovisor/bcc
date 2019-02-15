@@ -15,7 +15,6 @@
 from __future__ import print_function
 from bcc import BPF
 import argparse
-import ctypes as ct
 
 # arguments
 examples = """examples:
@@ -129,18 +128,6 @@ if BPF.ksymname(syscall_fnname) != -1:
     b.attach_kprobe(event=syscall_fnname, fn_name="syscall__entry")
     b.attach_kretprobe(event=syscall_fnname, fn_name="trace_return")
 
-TASK_COMM_LEN = 16    # linux/sched.h
-NAME_MAX = 255        # linux/limits.h
-
-class Data(ct.Structure):
-    _fields_ = [
-        ("pid", ct.c_ulonglong),
-        ("ts_ns", ct.c_ulonglong),
-        ("ret", ct.c_int),
-        ("comm", ct.c_char * TASK_COMM_LEN),
-        ("fname", ct.c_char * NAME_MAX)
-    ]
-
 start_ts = 0
 prev_ts = 0
 delta = 0
@@ -152,7 +139,7 @@ print("%-6s %-16s %4s %3s %s" % ("PID", "COMM", "FD", "ERR", "PATH"))
 
 # process event
 def print_event(cpu, data, size):
-    event = ct.cast(data, ct.POINTER(Data)).contents
+    event = b["events"].event(data)
     global start_ts
     global prev_ts
     global delta

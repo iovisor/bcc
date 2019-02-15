@@ -14,7 +14,6 @@
 #
 
 from __future__ import print_function
-import ctypes as ct
 from bcc import BPF
 import argparse
 
@@ -171,17 +170,6 @@ TASK_COMM_LEN = 16  # linux/sched.h
 MAX_BUF_SIZE = 464  # Limited by the BPF stack
 
 
-# Max size of the whole struct: 512 bytes
-class Data(ct.Structure):
-    _fields_ = [
-            ("timestamp_ns", ct.c_ulonglong),
-            ("pid", ct.c_uint),
-            ("comm", ct.c_char * TASK_COMM_LEN),
-            ("v0", ct.c_char * MAX_BUF_SIZE),
-            ("len", ct.c_uint)
-    ]
-
-
 # header
 print("%-12s %-18s %-16s %-6s %-6s" % ("FUNC", "TIME(s)", "COMM", "PID",
                                        "LEN"))
@@ -191,16 +179,16 @@ start = 0
 
 
 def print_event_write(cpu, data, size):
-    print_event(cpu, data, size, "WRITE/SEND")
+    print_event(cpu, data, size, "WRITE/SEND", "perf_SSL_write")
 
 
 def print_event_read(cpu, data, size):
-    print_event(cpu, data, size, "READ/RECV")
+    print_event(cpu, data, size, "READ/RECV", "perf_SSL_read")
 
 
-def print_event(cpu, data, size, rw):
+def print_event(cpu, data, size, rw, evt):
     global start
-    event = ct.cast(data, ct.POINTER(Data)).contents
+    event = b[evt].event(data)
 
     # Filter events by command
     if args.comm:

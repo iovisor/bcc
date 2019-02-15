@@ -32,7 +32,6 @@ from __future__ import print_function
 from bcc import BPF
 import argparse
 from time import strftime
-import ctypes as ct
 
 examples = """
     ./nfsslower         # trace operations slower than 10ms
@@ -243,27 +242,9 @@ if debug or args.ebpf:
     if args.ebpf:
         exit()
 
-# kernel->user event data: struct data_t
-DNAME_INLINE_LEN = 32   # linux/dcache.h
-TASK_COMM_LEN = 16      # linux/sched.h
-
-
-class Data(ct.Structure):
-    _fields_ = [
-        ("ts_us", ct.c_ulonglong),
-        ("type", ct.c_ulonglong),
-        ("size", ct.c_ulonglong),
-        ("offset", ct.c_ulonglong),
-        ("delta_us", ct.c_ulonglong),
-        ("pid", ct.c_ulonglong),
-        ("task", ct.c_char * TASK_COMM_LEN),
-        ("file", ct.c_char * DNAME_INLINE_LEN)
-    ]
-
-
 # process event
 def print_event(cpu, data, size):
-    event = ct.cast(data, ct.POINTER(Data)).contents
+    event = b["events"].event(data)
 
     type = 'R'
     if event.type == 1:

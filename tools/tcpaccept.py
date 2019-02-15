@@ -20,7 +20,6 @@ from bcc import BPF
 from socket import inet_ntop, AF_INET, AF_INET6
 from struct import pack
 import argparse
-import ctypes as ct
 from bcc.utils import printb
 
 # arguments
@@ -211,34 +210,9 @@ if debug or args.ebpf:
     if args.ebpf:
         exit()
 
-# event data
-TASK_COMM_LEN = 16      # linux/sched.h
-
-class Data_ipv4(ct.Structure):
-    _fields_ = [
-        ("ts_us", ct.c_ulonglong),
-        ("pid", ct.c_uint),
-        ("saddr", ct.c_uint),
-        ("daddr", ct.c_uint),
-        ("ip", ct.c_ulonglong),
-        ("lport", ct.c_ushort),
-        ("task", ct.c_char * TASK_COMM_LEN)
-    ]
-
-class Data_ipv6(ct.Structure):
-    _fields_ = [
-        ("ts_us", ct.c_ulonglong),
-        ("pid", ct.c_uint),
-        ("saddr", (ct.c_ulonglong * 2)),
-        ("daddr", (ct.c_ulonglong * 2)),
-        ("ip", ct.c_ulonglong),
-        ("lport", ct.c_ushort),
-        ("task", ct.c_char * TASK_COMM_LEN)
-    ]
-
 # process event
 def print_ipv4_event(cpu, data, size):
-    event = ct.cast(data, ct.POINTER(Data_ipv4)).contents
+    event = b["ipv4_events"].event(data)
     global start_ts
     if args.timestamp:
         if start_ts == 0:
@@ -251,7 +225,7 @@ def print_ipv4_event(cpu, data, size):
         event.lport))
 
 def print_ipv6_event(cpu, data, size):
-    event = ct.cast(data, ct.POINTER(Data_ipv6)).contents
+    event = b["ipv6_events"].event(data)
     global start_ts
     if args.timestamp:
         if start_ts == 0:

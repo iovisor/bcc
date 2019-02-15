@@ -15,7 +15,6 @@
 from __future__ import print_function
 from bcc import BPF
 import argparse
-import ctypes as ct
 import sys
 import subprocess
 import os.path
@@ -271,18 +270,6 @@ else:
 
 b = BPF(text=bpf_text)
 
-TASK_COMM_LEN = 16    # linux/sched.h
-
-class Data(ct.Structure):
-    _fields_ = [
-        ("time", ct.c_ulonglong),
-        ("stack_id", ct.c_longlong),
-        ("cpu", ct.c_int),
-        ("id", ct.c_ulonglong),
-        ("addrs", ct.c_int * 4),
-        ("comm", ct.c_char * TASK_COMM_LEN),
-    ]
-
 def get_syms(kstack):
     syms = []
 
@@ -296,7 +283,7 @@ def get_syms(kstack):
 def print_event(cpu, data, size):
     try:
         global b
-        event = ct.cast(data, ct.POINTER(Data)).contents
+        event = b["events"].event(data)
         stack_traces = b['stack_traces']
         stext = b.ksymname('_stext')
 

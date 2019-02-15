@@ -16,7 +16,6 @@
 
 from bcc import BPF
 from time import strftime
-import ctypes as ct
 
 # linux stats
 loadavg = "/proc/loadavg"
@@ -51,20 +50,9 @@ void kprobe__oom_kill_process(struct pt_regs *ctx, struct oom_control *oc, const
 }
 """
 
-# kernel->user event data: struct data_t
-TASK_COMM_LEN = 16  # linux/sched.h
-class Data(ct.Structure):
-    _fields_ = [
-        ("fpid", ct.c_ulonglong),
-        ("tpid", ct.c_ulonglong),
-        ("pages", ct.c_ulonglong),
-        ("fcomm", ct.c_char * TASK_COMM_LEN),
-        ("tcomm", ct.c_char * TASK_COMM_LEN)
-    ]
-
 # process event
 def print_event(cpu, data, size):
-    event = ct.cast(data, ct.POINTER(Data)).contents
+    event = b["events"].event(data)
     with open(loadavg) as stats:
         avgline = stats.read().rstrip()
     print(("%s Triggered by PID %d (\"%s\"), OOM kill of PID %d (\"%s\")"

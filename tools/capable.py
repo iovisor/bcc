@@ -18,7 +18,6 @@ from bcc import BPF
 import errno
 import argparse
 from time import strftime
-import ctypes as ct
 
 # arguments
 examples = """examples:
@@ -165,19 +164,6 @@ if debug:
 # initialize BPF
 b = BPF(text=bpf_text)
 
-TASK_COMM_LEN = 16    # linux/sched.h
-
-class Data(ct.Structure):
-    _fields_ = [
-        ("tgid", ct.c_uint32),
-        ("pid", ct.c_uint32),
-        ("uid", ct.c_uint32),
-        ("cap", ct.c_int),
-        ("audit", ct.c_int),
-        ("comm", ct.c_char * TASK_COMM_LEN),
-    ] + ([("kernel_stack_id", ct.c_int)] if args.kernel_stack else []) \
-      + ([("user_stack_id", ct.c_int)] if args.user_stack else [])
-
 # header
 print("%-9s %-6s %-6s %-6s %-16s %-4s %-20s %s" % (
     "TIME", "UID", "PID", "TID", "COMM", "CAP", "NAME", "AUDIT"))
@@ -198,7 +184,7 @@ def print_stack(bpf, stack_id, stack_type, tgid):
 
 # process event
 def print_event(bpf, cpu, data, size):
-    event = ct.cast(data, ct.POINTER(Data)).contents
+    event = b["events"].event(data)
 
     if event.cap in capabilities:
         name = capabilities[event.cap]

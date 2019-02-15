@@ -21,7 +21,6 @@ from bcc import BPF
 from bcc.utils import ArgString, printb
 import bcc.utils as utils
 import argparse
-import ctypes as ct
 import re
 import time
 from collections import defaultdict
@@ -173,19 +172,6 @@ if args.timestamp:
     print("%-8s" % ("TIME(s)"), end="")
 print("%-16s %-6s %-6s %3s %s" % ("PCOMM", "PID", "PPID", "RET", "ARGS"))
 
-TASK_COMM_LEN = 16      # linux/sched.h
-ARGSIZE = 128           # should match #define in C above
-
-class Data(ct.Structure):
-    _fields_ = [
-        ("pid", ct.c_uint),
-        ("ppid", ct.c_uint),
-        ("comm", ct.c_char * TASK_COMM_LEN),
-        ("type", ct.c_int),
-        ("argv", ct.c_char * ARGSIZE),
-        ("retval", ct.c_int),
-    ]
-
 class EventType(object):
     EVENT_ARG = 0
     EVENT_RET = 1
@@ -209,8 +195,7 @@ def get_ppid(pid):
 
 # process event
 def print_event(cpu, data, size):
-    event = ct.cast(data, ct.POINTER(Data)).contents
-
+    event = b["events"].event(data)
     skip = False
 
     if event.type == EventType.EVENT_ARG:
