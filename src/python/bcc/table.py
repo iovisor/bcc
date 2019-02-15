@@ -45,6 +45,25 @@ BPF_MAP_TYPE_CPUMAP = 16
 BPF_MAP_TYPE_XSKMAP = 17
 BPF_MAP_TYPE_SOCKHASH = 18
 
+map_type_name = {BPF_MAP_TYPE_HASH: "HASH",
+                 BPF_MAP_TYPE_ARRAY: "ARRAY",
+                 BPF_MAP_TYPE_PROG_ARRAY: "PROG_ARRAY",
+                 BPF_MAP_TYPE_PERF_EVENT_ARRAY: "PERF_EVENT_ARRAY",
+                 BPF_MAP_TYPE_PERCPU_HASH: "PERCPU_HASH",
+                 BPF_MAP_TYPE_PERCPU_ARRAY: "PERCPU_ARRAY",
+                 BPF_MAP_TYPE_STACK_TRACE: "STACK_TRACE",
+                 BPF_MAP_TYPE_CGROUP_ARRAY: "CGROUP_ARRAY",
+                 BPF_MAP_TYPE_LRU_HASH: "LRU_HASH",
+                 BPF_MAP_TYPE_LRU_PERCPU_HASH: "LRU_PERCPU_HASH",
+                 BPF_MAP_TYPE_LPM_TRIE: "LPM_TRIE",
+                 BPF_MAP_TYPE_ARRAY_OF_MAPS: "ARRAY_OF_MAPS",
+                 BPF_MAP_TYPE_HASH_OF_MAPS: "HASH_OF_MAPS",
+                 BPF_MAP_TYPE_DEVMAP: "DEVMAP",
+                 BPF_MAP_TYPE_SOCKMAP: "SOCKMAP",
+                 BPF_MAP_TYPE_CPUMAP: "CPUMAP",
+                 BPF_MAP_TYPE_XSKMAP: "XSKMAP",
+                 BPF_MAP_TYPE_SOCKHASH: "SOCKHASH",}
+
 stars_max = 40
 log2_index_max = 65
 linear_index_max = 1025
@@ -121,6 +140,13 @@ def _print_linear_hist(vals, val_type):
         val = vals[i]
         print(body % (i, val, stars,
                       _stars(val, val_max, stars)))
+
+
+def get_table_type_name(ttype):
+    try:
+        return map_type_name[ttype]
+    except KeyError:
+        return "<unknown>"
 
 
 def Table(bpf, map_id, map_fd, keytype, leaftype, name, **kwargs):

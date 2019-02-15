@@ -30,6 +30,7 @@ from .perf import Perf
 from .syscall import syscall_name
 from .utils import get_online_cpus, printb, _assert_is_bytes, ArgString
 from .version import __version__
+from .disassembler import disassemble_prog, decode_map
 
 _probe_limit = 1000
 _num_open_probes = 0
@@ -399,6 +400,15 @@ class BPF(object):
         start, = lib.bpf_function_start(self.module, func_name),
         size, = lib.bpf_function_size(self.module, func_name),
         return ct.string_at(start, size)
+
+    def disassemble_func(self, func_name):
+        bpfstr = self.dump_func(func_name)
+        disassemble_prog(func_name, bpfstr)
+
+    def decode_table(self, table_name, sizeinfo=False):
+        table_obj = self[table_name]
+        table_type = lib.bpf_table_type_id(self.module, table_obj.map_id)
+        decode_map(table_name, table_obj, table_type, sizeinfo=sizeinfo)
 
     str2ctype = {
         u"_Bool": ct.c_bool,
