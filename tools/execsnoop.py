@@ -210,7 +210,7 @@ def print_event(cpu, data, size):
             skip = True
         if args.quote:
             argv[event.pid] = [
-                "\"" + arg.replace("\"", "\\\"") + "\""
+                b"\"" + arg.replace(b"\"", b"\\\"") + b"\""
                 for arg in argv[event.pid]
             ]
 

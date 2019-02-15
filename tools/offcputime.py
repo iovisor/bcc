@@ -288,13 +288,15 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
             if stack_id_err(k.user_stack_id):
                 line.append("[Missed User Stack]")
             else:
-                line.extend([b.sym(addr, k.tgid) for addr in reversed(user_stack)])
+                line.extend([b.sym(addr, k.tgid).decode('utf-8', 'replace')
+                    for addr in reversed(user_stack)])
         if not args.user_stacks_only:
             line.extend(["-"] if (need_delimiter and k.kernel_stack_id >= 0 and k.user_stack_id >= 0) else [])
             if stack_id_err(k.kernel_stack_id):
                 line.append("[Missed Kernel Stack]")
             else:
-                line.extend([b.ksym(addr) for addr in reversed(kernel_stack)])
+                line.extend([b.ksym(addr).decode('utf-8', 'replace')
+                    for addr in reversed(kernel_stack)])
         print("%s %d" % (";".join(line), v.value))
     else:
         # print default multi-line stack output
