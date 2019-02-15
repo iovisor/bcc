@@ -209,6 +209,20 @@ int bcc_create_map_xattr(struct bpf_create_map_attr *attr, bool allow_rlimit)
   attr->name = map_name;
   int ret = bpf_create_map_xattr(attr);
 
+  if (ret < 0 && errno == EPERM) {
+    if (!allow_rlimit)
+      return ret;
+
+    // see note below about the rationale for this retry
+    struct rlimit rl = {};
+    if (getrlimit(RLIMIT_MEMLOCK, &rl) == 0) {
+      rl.rlim_max = RLIM_INFINITY;
+      rl.rlim_cur = rl.rlim_max;
+      if (setrlimit(RLIMIT_MEMLOCK, &rl) == 0)
+        ret = bpf_create_map_xattr(attr);
+    }
+  }
+
   // kernel already supports btf if its loading is successful,
   // but this map type may not support pretty print yet.
   if (ret < 0 && attr->btf_key_type_id && errno == 524 /* ENOTSUPP */) {
