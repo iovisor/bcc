@@ -27,7 +27,6 @@
 from bcc import BPF, USDT
 import argparse
 import re
-import ctypes as ct
 import subprocess
 
 examples = """examples:
@@ -203,18 +202,10 @@ if args.verbose or args.ebpf:
     if args.ebpf:
         exit()
 
-class Data(ct.Structure):
-    _fields_ = [
-        ("pid", ct.c_ulonglong),
-        ("timestamp", ct.c_ulonglong),
-        ("delta", ct.c_ulonglong),
-        ("query", ct.c_char * 256)
-    ]
-
 start = BPF.monotonic_time()
 
 def print_event(cpu, data, size):
-    event = ct.cast(data, ct.POINTER(Data)).contents
+    event = bpf["events"].event(data)
     print("%-14.6f %-6d %8.3f %s" % (
         float(event.timestamp - start) / 1000000000,
         event.pid, float(event.delta) / 1000000, event.query))

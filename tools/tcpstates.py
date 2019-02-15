@@ -20,7 +20,6 @@ from bcc import BPF
 import argparse
 from socket import inet_ntop, AF_INET, AF_INET6
 from struct import pack
-import ctypes as ct
 from time import strftime, time
 from os import getuid
 
@@ -191,37 +190,6 @@ if debug or args.ebpf:
     if args.ebpf:
         exit()
 
-# event data
-TASK_COMM_LEN = 16      # linux/sched.h
-
-class Data_ipv4(ct.Structure):
-    _fields_ = [
-        ("ts_us", ct.c_ulonglong),
-        ("skaddr", ct.c_ulonglong),
-        ("saddr", ct.c_uint),
-        ("daddr", ct.c_uint),
-        ("span_us", ct.c_ulonglong),
-        ("pid", ct.c_uint),
-        ("ports", ct.c_uint),
-        ("oldstate", ct.c_uint),
-        ("newstate", ct.c_uint),
-        ("task", ct.c_char * TASK_COMM_LEN)
-    ]
-
-class Data_ipv6(ct.Structure):
-    _fields_ = [
-        ("ts_us", ct.c_ulonglong),
-        ("skaddr", ct.c_ulonglong),
-        ("saddr", (ct.c_ulonglong * 2)),
-        ("daddr", (ct.c_ulonglong * 2)),
-        ("span_us", ct.c_ulonglong),
-        ("pid", ct.c_uint),
-        ("ports", ct.c_uint),
-        ("oldstate", ct.c_uint),
-        ("newstate", ct.c_uint),
-        ("task", ct.c_char * TASK_COMM_LEN)
-    ]
-
 #
 # Setup output formats
 #
@@ -312,7 +280,7 @@ def journal_fields(event, addr_family):
 
 # process event
 def print_ipv4_event(cpu, data, size):
-    event = ct.cast(data, ct.POINTER(Data_ipv4)).contents
+    event = b["ipv4_events"].event(data)
     global start_ts
     if args.time:
         if args.csv:
@@ -337,7 +305,7 @@ def print_ipv4_event(cpu, data, size):
         journal.send(**journal_fields(event, AF_INET))
 
 def print_ipv6_event(cpu, data, size):
-    event = ct.cast(data, ct.POINTER(Data_ipv6)).contents
+    event = b["ipv6_events"].event(data)
     global start_ts
     if args.time:
         if args.csv:

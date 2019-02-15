@@ -31,7 +31,6 @@
 from __future__ import print_function
 from bcc import BPF
 import argparse
-import ctypes as ct
 import time
 
 # arguments
@@ -210,20 +209,6 @@ except Exception:
     b.attach_kprobe(event="vfs_write", fn_name="trace_write_entry")
     b.attach_kretprobe(event="vfs_write", fn_name="trace_write_return")
 
-TASK_COMM_LEN = 16  # linux/sched.h
-DNAME_INLINE_LEN = 32  # linux/dcache.h
-
-class Data(ct.Structure):
-    _fields_ = [
-        ("mode", ct.c_int),
-        ("pid", ct.c_uint),
-        ("sz", ct.c_uint),
-        ("delta_us", ct.c_ulonglong),
-        ("name_len", ct.c_uint),
-        ("name", ct.c_char * DNAME_INLINE_LEN),
-        ("comm", ct.c_char * TASK_COMM_LEN),
-    ]
-
 mode_s = {
     0: 'R',
     1: 'W',
@@ -237,7 +222,7 @@ print("%-8s %-14s %-6s %1s %-7s %7s %s" % ("TIME(s)", "COMM", "TID", "D",
 start_ts = time.time()
 
 def print_event(cpu, data, size):
-    event = ct.cast(data, ct.POINTER(Data)).contents
+    event = b["events"].event(data)
 
     ms = float(event.delta_us) / 1000
     name = event.name.decode('utf-8', 'replace')

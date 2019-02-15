@@ -17,7 +17,6 @@ from bcc import BPF
 from bcc.utils import ArgString, printb
 import argparse
 from time import strftime
-import ctypes as ct
 
 # arguments
 examples = """examples:
@@ -116,25 +115,13 @@ kill_fnname = b.get_syscall_fnname("kill")
 b.attach_kprobe(event=kill_fnname, fn_name="syscall__kill")
 b.attach_kretprobe(event=kill_fnname, fn_name="do_ret_sys_kill")
 
-
-TASK_COMM_LEN = 16    # linux/sched.h
-
-class Data(ct.Structure):
-    _fields_ = [
-        ("pid", ct.c_ulonglong),
-        ("tpid", ct.c_int),
-        ("sig", ct.c_int),
-        ("ret", ct.c_int),
-        ("comm", ct.c_char * TASK_COMM_LEN)
-    ]
-
 # header
 print("%-9s %-6s %-16s %-4s %-6s %s" % (
     "TIME", "PID", "COMM", "SIG", "TPID", "RESULT"))
 
 # process event
 def print_event(cpu, data, size):
-    event = ct.cast(data, ct.POINTER(Data)).contents
+    event = b["events"].event(data)
 
     if (args.failed and (event.ret >= 0)):
         return

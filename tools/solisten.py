@@ -22,7 +22,6 @@ from socket import inet_ntop, AF_INET, AF_INET6, SOCK_STREAM, SOCK_DGRAM
 from struct import pack
 import argparse
 from bcc import BPF
-import ctypes as ct
 from bcc.utils import printb
 
 # Arguments
@@ -123,27 +122,13 @@ int kprobe__inet_listen(struct pt_regs *ctx, struct socket *sock, int backlog)
 };
 """
 
-# event data
-TASK_COMM_LEN = 16      # linux/sched.h
-class ListenEvt(ct.Structure):
-    _fields_ = [
-        ("ts_us", ct.c_ulonglong),
-        ("pid_tgid", ct.c_ulonglong),
-        ("backlog", ct.c_ulonglong),
-        ("netns", ct.c_ulonglong),
-        ("proto", ct.c_ulonglong),
-        ("lport", ct.c_ulonglong),
-        ("laddr", ct.c_ulonglong * 2),
-        ("task", ct.c_char * TASK_COMM_LEN)
-    ]
-
     # TODO: properties to unpack protocol / ip / pid / tgid ...
 
 # Format output
 def event_printer(show_netns):
     def print_event(cpu, data, size):
         # Decode event
-        event = ct.cast(data, ct.POINTER(ListenEvt)).contents
+        event = b["listen_evt"].event(data)
 
         pid = event.pid_tgid & 0xffffffff
         proto_family = event.proto & 0xff

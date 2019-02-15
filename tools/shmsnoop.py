@@ -14,7 +14,6 @@
 from __future__ import print_function
 from bcc import ArgString, BPF
 import argparse
-import ctypes as ct
 from datetime import datetime, timedelta
 
 # arguments
@@ -207,22 +206,6 @@ SYS_SHMCTL = 3
 
 initial_ts = 0
 
-class Data(ct.Structure):
-    _fields_ = [
-        ("id",      ct.c_ulonglong),
-        ("ts",      ct.c_ulonglong),
-        ("sys",     ct.c_int),
-        ("key",     ct.c_ulong),
-        ("size",    ct.c_ulong),
-        ("shmflg",  ct.c_ulong),
-        ("shmid",   ct.c_ulong),
-        ("cmd",     ct.c_ulong),
-        ("buf",     ct.c_ulong),
-        ("shmaddr", ct.c_ulong),
-        ("ret",     ct.c_ulong),
-        ("comm",    ct.c_char * TASK_COMM_LEN),
-    ]
-
 # header
 if args.timestamp:
     print("%-14s" % ("TIME(s)"), end="")
@@ -281,7 +264,7 @@ def shmflg_str(val, flags):
 
 # process event
 def print_event(cpu, data, size):
-    event = ct.cast(data, ct.POINTER(Data)).contents
+    event = b["events"].event(data)
     global initial_ts
 
     if not initial_ts:

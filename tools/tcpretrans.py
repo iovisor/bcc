@@ -21,7 +21,6 @@ import argparse
 from time import strftime
 from socket import inet_ntop, AF_INET, AF_INET6
 from struct import pack
-import ctypes as ct
 from time import sleep
 
 # arguments
@@ -199,31 +198,6 @@ if debug or args.ebpf:
     if args.ebpf:
         exit()
 
-# event data
-class Data_ipv4(ct.Structure):
-    _fields_ = [
-        ("pid", ct.c_uint),
-        ("ip", ct.c_ulonglong),
-        ("saddr", ct.c_uint),
-        ("daddr", ct.c_uint),
-        ("lport", ct.c_ushort),
-        ("dport", ct.c_ushort),
-        ("state", ct.c_ulonglong),
-        ("type", ct.c_ulonglong)
-    ]
-
-class Data_ipv6(ct.Structure):
-    _fields_ = [
-        ("pid", ct.c_uint),
-        ("ip", ct.c_ulonglong),
-        ("saddr", (ct.c_ulonglong * 2)),
-        ("daddr", (ct.c_ulonglong * 2)),
-        ("lport", ct.c_ushort),
-        ("dport", ct.c_ushort),
-        ("state", ct.c_ulonglong),
-        ("type", ct.c_ulonglong)
-    ]
-
 # from bpf_text:
 type = {}
 type[1] = 'R'
@@ -246,7 +220,7 @@ tcpstate[12] = 'NEW_SYN_RECV'
 
 # process event
 def print_ipv4_event(cpu, data, size):
-    event = ct.cast(data, ct.POINTER(Data_ipv4)).contents
+    event = b["ipv4_events"].event(data)
     print("%-8s %-6d %-2d %-20s %1s> %-20s %s" % (
         strftime("%H:%M:%S"), event.pid, event.ip,
         "%s:%d" % (inet_ntop(AF_INET, pack('I', event.saddr)), event.lport),
@@ -255,7 +229,7 @@ def print_ipv4_event(cpu, data, size):
         tcpstate[event.state]))
 
 def print_ipv6_event(cpu, data, size):
-    event = ct.cast(data, ct.POINTER(Data_ipv6)).contents
+    event = b["ipv6_events"].event(data)
     print("%-8s %-6d %-2d %-20s %1s> %-20s %s" % (
         strftime("%H:%M:%S"), event.pid, event.ip,
         "%s:%d" % (inet_ntop(AF_INET6, event.saddr), event.lport),

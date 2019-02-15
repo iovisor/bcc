@@ -23,7 +23,6 @@ import argparse
 from time import strftime
 from socket import inet_ntop, AF_INET, AF_INET6
 from struct import pack
-import ctypes as ct
 from time import sleep
 from bcc import tcp
 
@@ -151,36 +150,9 @@ if debug or args.ebpf:
     if args.ebpf:
         exit()
 
-# event data
-class Data_ipv4(ct.Structure):
-    _fields_ = [
-        ("pid", ct.c_uint),
-        ("ip", ct.c_ulonglong),
-        ("saddr", ct.c_uint),
-        ("daddr", ct.c_uint),
-        ("sport", ct.c_ushort),
-        ("dport", ct.c_ushort),
-        ("state", ct.c_ubyte),
-        ("tcpflags", ct.c_ubyte),
-        ("stack_id", ct.c_ulong)
-    ]
-
-class Data_ipv6(ct.Structure):
-    _fields_ = [
-        ("pid", ct.c_uint),
-        ("ip", ct.c_ulonglong),
-        ("saddr", (ct.c_ulonglong * 2)),
-        ("daddr", (ct.c_ulonglong * 2)),
-        ("sport", ct.c_ushort),
-        ("dport", ct.c_ushort),
-        ("state", ct.c_ubyte),
-        ("tcpflags", ct.c_ubyte),
-        ("stack_id", ct.c_ulong)
-    ]
-
 # process event
 def print_ipv4_event(cpu, data, size):
-    event = ct.cast(data, ct.POINTER(Data_ipv4)).contents
+    event = b["ipv4_events"].event(data)
     print("%-8s %-6d %-2d %-20s > %-20s %s (%s)" % (
         strftime("%H:%M:%S"), event.pid, event.ip,
         "%s:%d" % (inet_ntop(AF_INET, pack('I', event.saddr)), event.sport),
@@ -192,7 +164,7 @@ def print_ipv4_event(cpu, data, size):
     print("")
 
 def print_ipv6_event(cpu, data, size):
-    event = ct.cast(data, ct.POINTER(Data_ipv6)).contents
+    event = b["ipv6_events"].event(data)
     print("%-8s %-6d %-2d %-20s > %-20s %s (%s)" % (
         strftime("%H:%M:%S"), event.pid, event.ip,
         "%s:%d" % (inet_ntop(AF_INET6, event.saddr), event.sport),

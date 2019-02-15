@@ -18,7 +18,6 @@
 from __future__ import print_function
 from bcc import BPF, USDT
 import sys
-import ctypes as ct
 
 # arguments
 def usage():
@@ -109,19 +108,11 @@ print("Tracing MySQL server queries for PID %d slower than %s ms..." % (pid,
     min_ms_text))
 print("%-14s %-6s %8s %s" % ("TIME(s)", "PID", "MS", "QUERY"))
 
-class Data(ct.Structure):
-    _fields_ = [
-        ("pid", ct.c_ulonglong),
-        ("ts", ct.c_ulonglong),
-        ("delta", ct.c_ulonglong),
-        ("query", ct.c_char * QUERY_MAX)
-    ]
-
 # process event
 start = 0
 def print_event(cpu, data, size):
     global start
-    event = ct.cast(data, ct.POINTER(Data)).contents
+    event = b["events"].event(data)
     if start == 0:
         start = event.ts
     print("%-14.6f %-6d %8.3f %s" % (float(event.ts - start) / 1000000000,

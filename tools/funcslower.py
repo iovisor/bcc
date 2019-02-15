@@ -24,7 +24,6 @@
 from __future__ import print_function
 from bcc import BPF
 import argparse
-import ctypes as ct
 import time
 
 examples = """examples:
@@ -241,20 +240,6 @@ for i, function in enumerate(args.functions):
         b.attach_kprobe(event=function, fn_name="trace_%d" % i)
         b.attach_kretprobe(event=function, fn_name="trace_return")
 
-TASK_COMM_LEN = 16  # linux/sched.h
-
-class Data(ct.Structure):
-    _fields_ = [
-        ("id", ct.c_ulonglong),
-        ("tgid_pid", ct.c_ulonglong),
-        ("start_ns", ct.c_ulonglong),
-        ("duration_ns", ct.c_ulonglong),
-        ("retval", ct.c_ulonglong),
-        ("comm", ct.c_char * TASK_COMM_LEN)
-    ] + ([("args", ct.c_ulonglong * 6)] if args.arguments else []) + \
-            ([("user_stack_id", ct.c_int)] if args.user_stack else []) + \
-            ([("kernel_stack_id", ct.c_int),("kernel_ip", ct.c_ulonglong)] if args.kernel_stack else [])
-
 time_designator = "us" if args.min_us else "ms"
 time_value = args.min_us or args.min_ms or 1
 time_multiplier = 1000 if args.min_us else 1000000
@@ -319,7 +304,7 @@ def print_stack(event):
             print("    %s" % b.sym(addr, event.tgid_pid))
 
 def print_event(cpu, data, size):
-    event = ct.cast(data, ct.POINTER(Data)).contents
+    event = b["events"].event(data)
     ts = float(event.duration_ns) / time_multiplier
     if not args.folded:
         print((time_str(event) + "%-14.14s %-6s %7.2f %16x %s %s") %

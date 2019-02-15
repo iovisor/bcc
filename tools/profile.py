@@ -35,7 +35,6 @@ import signal
 import os
 import errno
 import multiprocessing
-import ctypes as ct
 
 #
 # Process Arguments

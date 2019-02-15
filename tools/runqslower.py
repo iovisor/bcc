@@ -33,7 +33,6 @@ from __future__ import print_function
 from bcc import BPF
 import argparse
 from time import strftime
-import ctypes as ct
 
 # arguments
 examples = """examples:
@@ -226,19 +225,9 @@ if debug or args.ebpf:
     if args.ebpf:
         exit()
 
-# kernel->user event data: struct data_t
-DNAME_INLINE_LEN = 32   # linux/dcache.h
-TASK_COMM_LEN = 16      # linux/sched.h
-class Data(ct.Structure):
-    _fields_ = [
-        ("pid", ct.c_uint),
-        ("task", ct.c_char * TASK_COMM_LEN),
-        ("delta_us", ct.c_ulonglong),
-    ]
-
 # process event
 def print_event(cpu, data, size):
-    event = ct.cast(data, ct.POINTER(Data)).contents
+    event = b["events"].event(data)
     print("%-8s %-16s %-6s %14s" % (strftime("%H:%M:%S"), event.task, event.pid, event.delta_us))
 
 # load BPF program

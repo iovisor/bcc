@@ -18,7 +18,6 @@ from __future__ import print_function
 from bcc import BPF
 
 import argparse as ap
-import ctypes
 from socket import inet_ntop, AF_INET, AF_INET6
 from struct import pack
 
@@ -493,45 +492,12 @@ int trace_accept_return(struct pt_regs *ctx)
 }
 """
 
-TASK_COMM_LEN = 16   # linux/sched.h
-
-
-class TCPIPV4Evt(ctypes.Structure):
-    _fields_ = [
-            ("ts_ns", ctypes.c_ulonglong),
-            ("type", ctypes.c_uint),
-            ("pid", ctypes.c_uint),
-            ("comm", ctypes.c_char * TASK_COMM_LEN),
-            ("ip", ctypes.c_ubyte),
-            ("saddr", ctypes.c_uint),
-            ("daddr", ctypes.c_uint),
-            ("sport", ctypes.c_ushort),
-            ("dport", ctypes.c_ushort),
-            ("netns", ctypes.c_uint)
-    ]
-
-
-class TCPIPV6Evt(ctypes.Structure):
-    _fields_ = [
-            ("ts_ns", ctypes.c_ulonglong),
-            ("type", ctypes.c_uint),
-            ("pid", ctypes.c_uint),
-            ("comm", ctypes.c_char * TASK_COMM_LEN),
-            ("ip", ctypes.c_ubyte),
-            ("saddr", (ctypes.c_ulong * 2)),
-            ("daddr", (ctypes.c_ulong * 2)),
-            ("sport", ctypes.c_ushort),
-            ("dport", ctypes.c_ushort),
-            ("netns", ctypes.c_uint)
-    ]
-
-
 verbose_types = {"C": "connect", "A": "accept",
                  "X": "close", "U": "unknown"}
 
 
 def print_ipv4_event(cpu, data, size):
-    event = ctypes.cast(data, ctypes.POINTER(TCPIPV4Evt)).contents
+    event = b["tcp_ipv4_event"].event(data)
     global start_ts
 
     if args.timestamp:
@@ -569,7 +535,7 @@ def print_ipv4_event(cpu, data, size):
 
 
 def print_ipv6_event(cpu, data, size):
-    event = ctypes.cast(data, ctypes.POINTER(TCPIPV6Evt)).contents
+    event = b["tcp_ipv6_event"].event(data)
     global start_ts
     if args.timestamp:
         if start_ts == 0:

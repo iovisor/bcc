@@ -15,7 +15,6 @@
 
 from __future__ import print_function
 from bcc import BPF
-import ctypes as ct
 import re
 
 # load BPF program
@@ -128,21 +127,6 @@ b.attach_kprobe(event="blk_mq_start_request", fn_name="trace_req_start")
 b.attach_kprobe(event="blk_account_io_completion",
     fn_name="trace_req_completion")
 
-TASK_COMM_LEN = 16  # linux/sched.h
-DISK_NAME_LEN = 32  # linux/genhd.h
-
-class Data(ct.Structure):
-    _fields_ = [
-        ("pid", ct.c_ulonglong),
-        ("rwflag", ct.c_ulonglong),
-        ("delta", ct.c_ulonglong),
-        ("sector", ct.c_ulonglong),
-        ("len", ct.c_ulonglong),
-        ("ts", ct.c_ulonglong),
-        ("disk_name", ct.c_char * DISK_NAME_LEN),
-        ("name", ct.c_char * TASK_COMM_LEN)
-    ]
-
 # header
 print("%-14s %-14s %-6s %-7s %-2s %-9s %-7s %7s" % ("TIME(s)", "COMM", "PID",
     "DISK", "T", "SECTOR", "BYTES", "LAT(ms)"))
@@ -154,7 +138,7 @@ delta = 0
 
 # process event
 def print_event(cpu, data, size):
-    event = ct.cast(data, ct.POINTER(Data)).contents
+    event = b["events"].event(data)
 
     val = -1
     global start_ts

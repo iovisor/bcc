@@ -19,7 +19,6 @@ from bcc import BPF
 from socket import inet_ntop, AF_INET, AF_INET6
 from struct import pack
 import argparse
-import ctypes as ct
 
 # arg validation
 def positive_float(val):
@@ -199,38 +198,11 @@ b.attach_kprobe(event="tcp_v6_connect", fn_name="trace_connect")
 b.attach_kprobe(event="tcp_rcv_state_process",
     fn_name="trace_tcp_rcv_state_process")
 
-# event data
-TASK_COMM_LEN = 16      # linux/sched.h
-
-class Data_ipv4(ct.Structure):
-    _fields_ = [
-        ("ts_us", ct.c_ulonglong),
-        ("pid", ct.c_uint),
-        ("saddr", ct.c_uint),
-        ("daddr", ct.c_uint),
-        ("ip", ct.c_ulonglong),
-        ("dport", ct.c_ushort),
-        ("delta_us", ct.c_ulonglong),
-        ("task", ct.c_char * TASK_COMM_LEN)
-    ]
-
-class Data_ipv6(ct.Structure):
-    _fields_ = [
-        ("ts_us", ct.c_ulonglong),
-        ("pid", ct.c_uint),
-        ("saddr", (ct.c_ulonglong * 2)),
-        ("daddr", (ct.c_ulonglong * 2)),
-        ("ip", ct.c_ulonglong),
-        ("dport", ct.c_ushort),
-        ("delta_us", ct.c_ulonglong),
-        ("task", ct.c_char * TASK_COMM_LEN)
-    ]
-
 # process event
 start_ts = 0
 
 def print_ipv4_event(cpu, data, size):
-    event = ct.cast(data, ct.POINTER(Data_ipv4)).contents
+    event = b["ipv4_events"].event(data)
     global start_ts
     if args.timestamp:
         if start_ts == 0:
@@ -243,7 +215,7 @@ def print_ipv4_event(cpu, data, size):
         float(event.delta_us) / 1000))
 
 def print_ipv6_event(cpu, data, size):
-    event = ct.cast(data, ct.POINTER(Data_ipv6)).contents
+    event = b["ipv6_events"].event(data)
     global start_ts
     if args.timestamp:
         if start_ts == 0:
