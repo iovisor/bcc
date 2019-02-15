@@ -191,6 +191,8 @@ static struct bpf_helper helpers[] = {
   {"rc_pointer_rel", "5.0"},
   {"spin_lock", "5.1"},
   {"spin_unlock", "5.1"},
+  {"sk_fullsock", "5.1"},
+  {"tcp_sock", "5.1"},
 };
 
 static uint64_t ptr_to_u64(void *ptr)
