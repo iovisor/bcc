@@ -18,9 +18,12 @@ from time import strftime
 # load BPF program
 bpf_text = """
 #include <uapi/linux/ptrace.h>
+// include <linux/sched.h>
 
 struct str_t {
     u64 pid;
+ // If you use Arch Linux, you may need this field to filter info
+ // char comm[TASK_COMM_LEN];
     char str[80];
 };
 
@@ -34,6 +37,7 @@ int printret(struct pt_regs *ctx) {
     pid = bpf_get_current_pid_tgid();
     data.pid = pid;
     bpf_probe_read(&data.str, sizeof(data.str), (void *)PT_REGS_RC(ctx));
+ // bpf_get_current_comm(&data.comm, sizeof(data.comm));
     events.perf_submit(ctx,&data,sizeof(data));
 
     return 0;
@@ -41,6 +45,8 @@ int printret(struct pt_regs *ctx) {
 """
 
 b = BPF(text=bpf_text)
+# if you run this script on Arch Linux, change the value of name parameter
+# to `/lib/libreadline.so` and get `comm` field of processes to filter info
 b.attach_uretprobe(name="/bin/bash", sym="readline", fn_name="printret")
 
 # header
