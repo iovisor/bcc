@@ -81,24 +81,7 @@ int trace_entry(struct pt_regs *ctx)
     return 0;
 }
 
-// The current ext4 (Linux 4.5) uses generic_file_read_iter(), instead of it's
-// own function, for reads. So we need to trace that and then filter on ext4,
-// which I do by checking file->f_op.
-int trace_read_entry(struct pt_regs *ctx, struct kiocb *iocb)
-{
-    u32 pid = bpf_get_current_pid_tgid();
-    if (FILTER_PID)
-        return 0;
-
-    // ext4 filter on file->f_op == ext4_file_operations
-    struct file *fp = iocb->ki_filp;
-    if ((u64)fp->f_op != EXT4_FILE_OPERATIONS)
-        return 0;
-
-    u64 ts = bpf_ktime_get_ns();
-    start.update(&pid, &ts);
-    return 0;
-}
+EXT4_TRACE_READ_CODE
 
 static int trace_return(struct pt_regs *ctx, const char *op)
 {
@@ -152,20 +135,51 @@ int trace_fsync_return(struct pt_regs *ctx)
 }
 """
 
+# Starting from Linux 4.10 ext4_file_operations.read_iter has been changed from
+# using generic_file_read_iter() to its own ext4_file_read_iter().
+#
+# To detect the proper function to trace check if ext4_file_read_iter() is
+# defined in /proc/kallsyms, if it's defined attach to that function, otherwise
+# use generic_file_read_iter() and inside the trace hook filter on ext4 read
+# events (checking if file->f_op == ext4_file_operations).
+if BPF.get_kprobe_functions(b'ext4_file_read_iter'):
+    ext4_read_fn = 'ext4_file_read_iter'
+    ext4_trace_read_fn = 'trace_entry'
+    ext4_trace_read_code = ''
+else:
+    ext4_read_fn = 'generic_file_read_iter'
+    ext4_trace_read_fn = 'trace_read_entry'
+    ext4_file_ops_addr = ''
+    with open(kallsyms) as syms:
+        for line in syms:
+            (addr, size, name) = line.rstrip().split(" ", 2)
+            name = name.split("\t")[0]
+            if name == "ext4_file_operations":
+                ext4_file_ops_addr = "0x" + addr
+                break
+        if ext4_file_ops_addr == '':
+            print("ERROR: no ext4_file_operations in /proc/kallsyms. Exiting.")
+            print("HINT: the kernel should be built with CONFIG_KALLSYMS_ALL.")
+            exit()
+    ext4_trace_read_code = """
+int trace_read_entry(struct pt_regs *ctx, struct kiocb *iocb)
+{
+    u32 pid = bpf_get_current_pid_tgid();
+    if (FILTER_PID)
+        return 0;
+
+    // ext4 filter on file->f_op == ext4_file_operations
+    struct file *fp = iocb->ki_filp;
+    if ((u64)fp->f_op != %s)
+        return 0;
+
+    u64 ts = bpf_ktime_get_ns();
+    start.update(&pid, &ts);
+    return 0;
+}""" % ext4_file_ops_addr
+
 # code replacements
-with open(kallsyms) as syms:
-    ops = ''
-    for line in syms:
-        (addr, size, name) = line.rstrip().split(" ", 2)
-        name = name.split("\t")[0]
-        if name == "ext4_file_operations":
-            ops = "0x" + addr
-            break
-    if ops == '':
-        print("ERROR: no ext4_file_operations in /proc/kallsyms. Exiting.")
-        print("HINT: the kernel should be built with CONFIG_KALLSYMS_ALL.")
-        exit()
-    bpf_text = bpf_text.replace('EXT4_FILE_OPERATIONS', ops)
+bpf_text = bpf_text.replace('EXT4_TRACE_READ_CODE', ext4_trace_read_code)
 bpf_text = bpf_text.replace('FACTOR', str(factor))
 if args.pid:
     bpf_text = bpf_text.replace('FILTER_PID', 'pid != %s' % pid)
@@ -179,21 +193,11 @@ if debug or args.ebpf:
 # load BPF program
 b = BPF(text=bpf_text)
 
-# Common file functions. See earlier comment about generic_file_read_iter().
-# Comment by Joe Yin 
-# From Linux 4.10, the function .read_iter at the ext4_file_operations has 
-# changed to ext4_file_read_iter.
-# So, I add get_kprobe_functions(b'ext4_file_read_iter'),it will first to attach ext4_file_read_iter,
-# if fails and will attach the generic_file_read_iter which used to pre-4.10.
-
-if BPF.get_kprobe_functions(b'ext4_file_read_iter'):
-	b.attach_kprobe(event="ext4_file_read_iter", fn_name="trace_entry")
-else:
-	b.attach_kprobe(event="generic_file_read_iter", fn_name="trace_read_entry")
+b.attach_kprobe(event=ext4_read_fn, fn_name=ext4_trace_read_fn)
 b.attach_kprobe(event="ext4_file_write_iter", fn_name="trace_entry")
 b.attach_kprobe(event="ext4_file_open", fn_name="trace_entry")
 b.attach_kprobe(event="ext4_sync_file", fn_name="trace_entry")
-b.attach_kretprobe(event="generic_file_read_iter", fn_name="trace_read_return")
+b.attach_kretprobe(event=ext4_read_fn, fn_name='trace_read_return')
 b.attach_kretprobe(event="ext4_file_write_iter", fn_name="trace_write_return")
 b.attach_kretprobe(event="ext4_file_open", fn_name="trace_open_return")
 b.attach_kretprobe(event="ext4_sync_file", fn_name="trace_fsync_return")
