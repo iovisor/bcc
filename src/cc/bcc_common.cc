@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "bpf_common.h"
+#include "bcc_common.h"
 #include "bpf_module.h"
 
 extern "C" {

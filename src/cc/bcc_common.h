@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef BPF_COMMON_H
-#define BPF_COMMON_H
+#ifndef BCC_COMMON_H
+#define BCC_COMMON_H
 
 #include <stdbool.h>
 #include <stdint.h>

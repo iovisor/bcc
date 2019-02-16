@@ -35,7 +35,7 @@ add_library(bpf-shared SHARED libbpf.c perf_reader.c ${libbpf_sources})
 set_target_properties(bpf-shared PROPERTIES VERSION ${REVISION_LAST} SOVERSION 0)
 set_target_properties(bpf-shared PROPERTIES OUTPUT_NAME bpf)
 
-set(bcc_common_sources bpf_common.cc bpf_module.cc bcc_btf.cc exported_files.cc)
+set(bcc_common_sources bcc_common.cc bpf_module.cc bcc_btf.cc exported_files.cc)
 if (${LLVM_PACKAGE_VERSION} VERSION_EQUAL 6 OR ${LLVM_PACKAGE_VERSION} VERSION_GREATER 6)
   set(bcc_common_sources ${bcc_common_sources} bcc_debug.cc)
 endif()
@@ -51,7 +51,7 @@ set(bcc_util_sources ns_guard.cc common.cc)
 set(bcc_sym_sources bcc_syms.cc bcc_elf.c bcc_perf_map.c bcc_proc.c)
 set(bcc_common_headers libbpf.h perf_reader.h)
 set(bcc_table_headers file_desc.h table_desc.h table_storage.h)
-set(bcc_api_headers bpf_common.h bpf_module.h bcc_exception.h bcc_syms.h)
+set(bcc_api_headers bcc_common.h bpf_module.h bcc_exception.h bcc_syms.h)
 
 if(ENABLE_CLANG_JIT)
 add_library(bcc-shared SHARED
