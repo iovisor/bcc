@@ -105,7 +105,7 @@ int do_trace(struct pt_regs *ctx) {
 
         # Run the application
         self.app = Popen([m_bin], env=dict(os.environ, LD_LIBRARY_PATH=self.tmp_dir))
-        # os.system("tplist.py -vvv -p " + str(self.app.pid))
+        os.system("../../tools/tplist.py -vvv -p " + str(self.app.pid))
 
     def test_attach1(self):
         # enable USDT probe from given PID and verifier generated BPF programs
