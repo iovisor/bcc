@@ -1263,7 +1263,7 @@ while 1:
     b.perf_buffer_poll()
 ```
 
-Note that the data structure transferred will need to be declared in C in the BPF program, and in Python. For example:
+Note that the data structure transferred will need to be declared in C in the BPF program. For example:
 
 ```C
 // define output data structure in C
@@ -1272,7 +1272,19 @@ struct data_t {
     u64 ts;
     char comm[TASK_COMM_LEN];
 };
+BPF_PERF_OUTPUT(events);
+[...]
 ```
+
+In Python, you can either let bcc generate the data structure from C declaration automatically (recommanded):
+
+```Python
+def print_event(cpu, data, size):
+    event = b["events"].event(data)
+[...]
+```
+
+or define it manually:
 
 ```Python
 # define output data structure in Python
@@ -1281,9 +1293,11 @@ class Data(ct.Structure):
     _fields_ = [("pid", ct.c_ulonglong),
                 ("ts", ct.c_ulonglong),
                 ("comm", ct.c_char * TASK_COMM_LEN)]
-```
 
-Perhaps in a future bcc version, the Python data structure will be automatically generated from the C declaration.
+def print_event(cpu, data, size):
+    event = ct.cast(data, ct.POINTER(Data)).contents
+[...]
+```
 
 Examples in situ:
 [code](https://github.com/iovisor/bcc/blob/08fbceb7e828f0e3e77688497727c5b2405905fd/examples/tracing/hello_perf_output.py#L59),
