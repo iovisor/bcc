@@ -157,11 +157,11 @@ else:
             if name == "ext4_file_operations":
                 ext4_file_ops_addr = "0x" + addr
                 break
-        if ext4_trace_read_code == '':
+        if ext4_file_ops_addr == '':
             print("ERROR: no ext4_file_operations in /proc/kallsyms. Exiting.")
             print("HINT: the kernel should be built with CONFIG_KALLSYMS_ALL.")
             exit()
-        ext4_trace_read_code = """
+    ext4_trace_read_code = """
 int trace_read_entry(struct pt_regs *ctx, struct kiocb *iocb)
 {
     u32 pid = bpf_get_current_pid_tgid();
