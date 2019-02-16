@@ -1,5 +1,5 @@
 set(EXAMPLE_PROGRAMS hello_world.py)
-install(PROGRAMS ${EXAMPLE_PROGRAMS} DESTINATION share/bcc/examples)
+install(PROGRAMS ${EXAMPLE_PROGRAMS} DESTINATION share/doc/bcc/examples)
 
 if(ENABLE_CLANG_JIT)
 if(ENABLE_USDT)
