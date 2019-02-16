@@ -175,6 +175,12 @@ int BTF::load(uint8_t *btf_sec, uintptr_t btf_sec_size,
     return -1;
   }
 
+  if (btf__load(btf)) {
+    btf__free(btf);
+    warning("Loading .BTF section failed\n");
+    return -1;
+  }
+
   btf_ext = btf_ext__new(btf_ext_sec, btf_ext_sec_size);
   if (BCC_IS_ERR(btf_ext)) {
     btf__free(btf);

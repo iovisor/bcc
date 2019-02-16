@@ -191,6 +191,8 @@ static struct bpf_helper helpers[] = {
   {"rc_pointer_rel", "5.0"},
   {"spin_lock", "5.1"},
   {"spin_unlock", "5.1"},
+  {"sk_fullsock", "5.1"},
+  {"tcp_sock", "5.1"},
 };
 
 static uint64_t ptr_to_u64(void *ptr)
@@ -206,6 +208,20 @@ int bcc_create_map_xattr(struct bpf_create_map_attr *attr, bool allow_rlimit)
   memcpy(map_name, attr->name, min(name_len, BPF_OBJ_NAME_LEN - 1));
   attr->name = map_name;
   int ret = bpf_create_map_xattr(attr);
+
+  if (ret < 0 && errno == EPERM) {
+    if (!allow_rlimit)
+      return ret;
+
+    // see note below about the rationale for this retry
+    struct rlimit rl = {};
+    if (getrlimit(RLIMIT_MEMLOCK, &rl) == 0) {
+      rl.rlim_max = RLIM_INFINITY;
+      rl.rlim_cur = rl.rlim_max;
+      if (setrlimit(RLIMIT_MEMLOCK, &rl) == 0)
+        ret = bpf_create_map_xattr(attr);
+    }
+  }
 
   // kernel already supports btf if its loading is successful,
   // but this map type may not support pretty print yet.
