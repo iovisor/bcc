@@ -381,10 +381,7 @@ try:
     out = out.split(b'\n',1)[1]
     syscalls = dict(map(_parse_syscall, out.strip().split(b'\n')))
 except Exception as e:
-    if platform.machine() == "x86_64":
-        pass
-    else:
-        raise Exception("ausyscall: command not found")
+    pass
 
 def syscall_name(syscall_num):
     """Return the syscall name for the particular syscall number."""
