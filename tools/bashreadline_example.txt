@@ -14,6 +14,16 @@ TIME      PID    COMMAND
 05:29:04  3059   echo another shell
 05:29:13  21176  echo first shell again
 
+When running the script on Arch Linux, you may need to specify the location
+of libreadline.so library:
+
+# ./bashreadline -s /lib/libreadline.so
+TIME      PID    COMMAND
+11:17:34  28796  whoami
+11:17:41  28796  ps -ef
+11:17:51  28796  echo "Hello eBPF!"
+
+
 The entered command may fail. This is just showing what command lines were
 entered interactively for bash to process.
 
