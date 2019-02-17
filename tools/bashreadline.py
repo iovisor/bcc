@@ -24,8 +24,10 @@ import argparse
 parser = argparse.ArgumentParser(
         description="Print entered bash commands from all running shells",
         formatter_class=argparse.RawDescriptionHelpFormatter)
-parser.add_argument("-s", "--shared",
-        help="specify the location of libreadline.so library")
+parser.add_argument("-s", "--shared", nargs="?",
+        const="/lib/libreadline.so", type=str,
+        help="specify the location of libreadline.so library.\
+              Default is /lib/libreadline.so")
 args = parser.parse_args()
 
 name = args.shared if args.shared else "/bin/bash"
