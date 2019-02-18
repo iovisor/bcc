@@ -403,12 +403,12 @@ class BPF(object):
 
     def disassemble_func(self, func_name):
         bpfstr = self.dump_func(func_name)
-        disassemble_prog(func_name, bpfstr)
+        return disassemble_prog(func_name, bpfstr)
 
     def decode_table(self, table_name, sizeinfo=False):
         table_obj = self[table_name]
         table_type = lib.bpf_table_type_id(self.module, table_obj.map_id)
-        decode_map(table_name, table_obj, table_type, sizeinfo=sizeinfo)
+        return decode_map(table_name, table_obj, table_type, sizeinfo=sizeinfo)
 
     str2ctype = {
         u"_Bool": ct.c_bool,
