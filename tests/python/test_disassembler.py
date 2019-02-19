@@ -138,16 +138,31 @@ class TestDisassembler(TestCase):
     
     def test_func(self):
         b = BPF(text="""
-            int entry(void)
+            struct key_t {int a; short b; struct {int c:4; int d:8;} e;} __attribute__((__packed__));
+            BPF_HASH(test_map, struct key_t);
+            int test_func(void)
             {
                 return 1;
             }""")
 
         self.assertEqual(
-            """Disassemble of BPF program entry:
+            """Disassemble of BPF program test_func:
    0: (b7) r0 = 1
    1: (95) exit""",
-            b.disassemble_func("entry"))
+            b.disassemble_func("test_func"))
+        
+        self.assertEqual(
+            """Layout of BPF map test_map (type HASH, FD 3, ID 0):
+  struct {
+    int a;
+    short b;
+    struct {
+      int c:4;
+      int d:8;
+    } e;
+  } key;
+  unsigned long long value;""",
+            b.decode_table("test_map"))
     
     def test_bpf_isa(self):
         for op, instr_fmt in self.opcodes.iteritems():
