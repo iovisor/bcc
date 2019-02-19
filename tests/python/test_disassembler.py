@@ -1,8 +1,8 @@
 #!/usr/bin/env python
-# Copyright (c) PLUMgrid, Inc.
+# Copyright (c) Clevernet
 # Licensed under the Apache License, Version 2.0 (the "License")
 
-# test program for the 'dump_func' method
+# test program for the 'disassemble_func' and 'decode_table' methods
 
 from bcc import BPF
 from bcc import disassembler
