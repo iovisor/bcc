@@ -1,0 +1,132 @@
+Demonstrations of drsnoop, the Linux eBPF/bcc version.
+
+
+drsnoop traces the direct reclaim system-wide, and prints various details.
+Example output:
+
+# ./drsnoop
+COMM           PID      LAT(ms)          PAGES
+summond        17678    0.196455           143
+summond        17669    0.559810           313
+summond        17669    0.154161           145
+summond        17669    0.277360           237
+summond        17669    0.481790           111
+summond        17669    0.162021            75
+head           17821    0.295695           339
+head           17825    0.173481           109
+summond        17669    0.142193            73
+summond        17496    104.844713          40
+summond        17678    0.325780           167
+summond        17678    0.144275           106
+summond        17678    0.161093            67
+summond        17678    0.299772           267
+summond        17678    0.275058            69
+summond        17678    0.326456            46
+base64         17816    0.162288            85
+summond        17678    0.434826           283
+summond        17678    0.144080           182
+head           17736    0.576638           135
+^C
+
+While tracing, the processes alloc pages，due to insufficient memory available
+in the system, direct reclaim events happened, which will increase the waiting
+delay of the processes.
+
+drsnoop can be useful for discovering when allocstall(/proc/vmstat) continues to increase,
+whether it is caused by some critical processes or not.
+
+The -p option can be used to filter on a PID, which is filtered in-kernel. Here
+I've used it with -T to print timestamps:
+
+# ./drsnoop -Tp
+TIME(s)       COMM           PID      LAT(ms)          PAGES
+107.364115000 summond        17491    0.247998            50
+107.364550000 summond        17491    0.269251            38
+107.365266000 summond        17491    0.366303            72
+107.365753000 summond        17491    0.226899            49
+^C
+
+This shows the summond process allocs pages, and direct reclaim events happening,
+and the delays are not affected much.
+
+The -U option include UID on output:
+
+# ./drsnoop -U
+UID   COMM           PID      LAT(ms)          PAGES
+1000  summond        17678    0.326456            46
+0     base64         17816    0.162288            85
+1000  summond        17678    0.434826           283
+1000  summond        17678    0.144080           182
+0     head           17821    0.295695           339
+0     head           17825    0.173481           109
+^C
+
+The -u option filtering UID:
+
+# ./drsnoop -Uu 1000
+UID   COMM           PID      LAT(ms)          PAGES
+1000  summond        17678    0.196455           143
+1000  summond        17669    0.559810           313
+1000  summond        17669    0.154161           145
+1000  summond        17669    0.277360           237
+1000  summond        17669    0.481790           111
+1000  summond        17669    0.162021            75
+1000  summond        17669    0.142193            73
+1000  summond        17678    0.325780           167
+^C
+
+A maximum tracing duration can be set with the -d option. For example, to trace
+for 2 seconds:
+
+# ./drsnoop -d 2
+COMM           PID      LAT(ms)          PAGES
+head           21715    0.157206           195
+
+The -n option can be used to filter on process name using partial matches:
+
+# ./drsnoop -n mond
+COMM           PID      LAT(ms)          PAGES
+summond       10271    0.033625            51
+summond       10271    0.039136            51
+summond       10259    0.056814            51
+summond       10269    319.412902          37
+summond       10270    111.731993          35
+summond       10270    0.110062            78
+summond       10270    0.123946            71
+summond       10270    0.036795            35
+summond       10277    111.626401          41
+summond       10277    0.084324            45
+summond       10277    0.062731            32
+^C
+
+This caught the 'summond' command because it partially matches 'mond' that's passed
+to the '-n' option.
+
+USAGE message:
+
+# ./drsnoop -h
+usage: drsnoop.py [-h] [-T] [-U] [-p PID] [-t TID] [-u UID] [-d DURATION]
+                  [-n NAME]
+
+Trace direct reclaim
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -T, --timestamp       include timestamp on output
+  -U, --print-uid       print UID column
+  -p PID, --pid PID     trace this PID only
+  -t TID, --tid TID     trace this TID only
+  -u UID, --uid UID     trace this UID only
+  -d DURATION, --duration DURATION
+                        total duration of trace in seconds
+  -n NAME, --name NAME  only print process names containing this name
+
+examples:
+    ./drsnoop           # trace all direct reclaim
+    ./drsnoop -T        # include timestamps
+    ./drsnoop -U        # include UID
+    ./drsnoop -P 181    # only trace PID 181
+    ./drsnoop -t 123    # only trace TID 123
+    ./drsnoop -u 1000   # only trace UID 1000
+    ./drsnoop -d 10     # trace for 10 seconds only
+    ./drsnoop -n main   # only print process names containing "main"
