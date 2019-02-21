@@ -37,6 +37,8 @@ add_test(NAME py_test_trace3_c WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   COMMAND ${TEST_WRAPPER} py_trace3_c sudo ${CMAKE_CURRENT_SOURCE_DIR}/test_trace3.py test_trace3.c)
 add_test(NAME py_test_trace4 WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   COMMAND ${TEST_WRAPPER} py_trace4 sudo ${CMAKE_CURRENT_SOURCE_DIR}/test_trace4.py)
+add_test(NAME py_test_trace_maxactive WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  COMMAND ${TEST_WRAPPER} py_trace_maxactive sudo ${CMAKE_CURRENT_SOURCE_DIR}/test_trace_maxactive.py)
 add_test(NAME py_test_probe_count WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   COMMAND ${TEST_WRAPPER} py_probe_count sudo ${CMAKE_CURRENT_SOURCE_DIR}/test_probe_count.py)
 add_test(NAME py_test_debuginfo WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}

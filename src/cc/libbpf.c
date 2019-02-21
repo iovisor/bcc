@@ -856,47 +856,100 @@ static int bpf_attach_tracing_event(int progfd, const char *event_path, int pid,
   return 0;
 }
 
+static int create_kprobe_event(char *buf, const char *ev_name,
+                               enum bpf_probe_attach_type attach_type,
+                               const char *fn_name, uint64_t fn_offset,
+                               int maxactive)
+{
+  int kfd;
+  char ev_alias[128];
+  static unsigned int buf_size = 256;
+
+  kfd = open("/sys/kernel/debug/tracing/kprobe_events", O_WRONLY | O_APPEND, 0);
+  if (kfd < 0) {
+    fprintf(stderr, "open(/sys/kernel/debug/tracing/kprobe_events): %s\n", buf,
+            strerror(errno));
+    return -1;
+  }
+
+  snprintf(ev_alias, sizeof(ev_alias), "%s_bcc_%d", ev_name, getpid());
+
+  if (fn_offset > 0 && attach_type == BPF_PROBE_ENTRY)
+    snprintf(buf, buf_size, "p:kprobes/%s %s+%"PRIu64,
+             ev_alias, fn_name, fn_offset);
+  else if (maxactive > 0 && attach_type == BPF_PROBE_RETURN)
+    snprintf(buf, buf_size, "r%d:kprobes/%s %s",
+             maxactive, ev_alias, fn_name);
+  else
+    snprintf(buf, buf_size, "%c:kprobes/%s %s",
+             attach_type == BPF_PROBE_ENTRY ? 'p' : 'r',
+             ev_alias, fn_name);
+
+  if (write(kfd, buf, strlen(buf)) < 0) {
+    if (errno == ENOENT)
+      fprintf(stderr, "cannot attach kprobe, probe entry may not exist\n");
+    else
+      fprintf(stderr, "cannot attach kprobe, %s\n", strerror(errno));
+    close(kfd);
+    return -1;
+  }
+  close(kfd);
+  snprintf(buf, buf_size, "/sys/kernel/debug/tracing/events/kprobes/%s",
+           ev_alias);
+  return 0;
+}
+
 int bpf_attach_kprobe(int progfd, enum bpf_probe_attach_type attach_type,
-                      const char *ev_name, const char *fn_name, uint64_t fn_offset)
+                      const char *ev_name, const char *fn_name, uint64_t fn_offset,
+                      int maxactive)
 {
   int kfd, pfd = -1;
-  char buf[256];
-  char event_alias[128];
-  static char *event_type = "kprobe";
+  char buf[256], fname[256];
 
-  // Try create the kprobe Perf Event with perf_event_open API.
-  pfd = bpf_try_perf_event_open_with_probe(fn_name, fn_offset, -1, event_type,
-                                           attach_type != BPF_PROBE_ENTRY);
+  if (maxactive <= 0)
+    // Try create the kprobe Perf Event with perf_event_open API.
+    pfd = bpf_try_perf_event_open_with_probe(fn_name, fn_offset, -1, "kprobe",
+                                             attach_type != BPF_PROBE_ENTRY);
+
   // If failed, most likely Kernel doesn't support the new perf_event_open API
   // yet. Try create the event using debugfs.
   if (pfd < 0) {
-    snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/%s_events", event_type);
-    kfd = open(buf, O_WRONLY | O_APPEND, 0);
-    if (kfd < 0) {
-      fprintf(stderr, "open(%s): %s\n", buf, strerror(errno));
+    if (create_kprobe_event(buf, ev_name, attach_type, fn_name, fn_offset,
+                            maxactive) < 0)
       goto error;
+
+    // If we're using maxactive, we need to check that the event was created
+    // under the expected name.  If debugfs doesn't support maxactive yet
+    // (kernel < 4.12), the event is created under a different name; we need to
+    // delete that event and start again without maxactive.
+    if (maxactive > 0 && attach_type == BPF_PROBE_RETURN) {
+      snprintf(fname, sizeof(fname), "%s/id", buf);
+      if (access(fname, F_OK) == -1) {
+        // Deleting kprobe event with incorrect name.
+        kfd = open("/sys/kernel/debug/tracing/kprobe_events",
+                   O_WRONLY | O_APPEND, 0);
+        if (kfd < 0) {
+          fprintf(stderr, "open(/sys/kernel/debug/tracing/kprobe_events): %s\n",
+                  strerror(errno));
+          return -1;
+        }
+        snprintf(fname, sizeof(fname), "-:kprobes/%s_0", ev_name);
+        if (write(kfd, fname, strlen(fname)) < 0) {
+          if (errno == ENOENT)
+            fprintf(stderr, "cannot detach kprobe, probe entry may not exist\n");
+          else
+            fprintf(stderr, "cannot detach kprobe, %s\n", strerror(errno));
+          close(kfd);
+          goto error;
+        }
+        close(kfd);
+
+        // Re-creating kprobe event without maxactive.
+        if (create_kprobe_event(buf, ev_name, attach_type, fn_name,
+                                fn_offset, 0) < 0)
+          goto error;
+      }
     }
-
-    snprintf(event_alias, sizeof(event_alias), "%s_bcc_%d", ev_name, getpid());
-
-    if (fn_offset > 0 && attach_type == BPF_PROBE_ENTRY)
-      snprintf(buf, sizeof(buf), "p:%ss/%s %s+%"PRIu64,
-               event_type, event_alias, fn_name, fn_offset);
-    else
-      snprintf(buf, sizeof(buf), "%c:%ss/%s %s",
-               attach_type == BPF_PROBE_ENTRY ? 'p' : 'r',
-               event_type, event_alias, fn_name);
-
-    if (write(kfd, buf, strlen(buf)) < 0) {
-      if (errno == ENOENT)
-         fprintf(stderr, "cannot attach kprobe, probe entry may not exist\n");
-      else
-         fprintf(stderr, "cannot attach kprobe, %s\n", strerror(errno));
-      close(kfd);
-      goto error;
-    }
-    close(kfd);
-    snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/events/%ss/%s", event_type, event_alias);
   }
   // If perf_event_open succeeded, bpf_attach_tracing_event will use the created
   // Perf Event FD directly and buf would be empty and unused.

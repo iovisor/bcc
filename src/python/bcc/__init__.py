@@ -629,14 +629,14 @@ class BPF(object):
         self._check_probe_quota(1)
         fn = self.load_func(fn_name, BPF.KPROBE)
         ev_name = b"p_" + event.replace(b"+", b"_").replace(b".", b"_")
-        fd = lib.bpf_attach_kprobe(fn.fd, 0, ev_name, event, event_off)
+        fd = lib.bpf_attach_kprobe(fn.fd, 0, ev_name, event, event_off, 0)
         if fd < 0:
             raise Exception("Failed to attach BPF program %s to kprobe %s" %
                             (fn_name, event))
         self._add_kprobe_fd(ev_name, fd)
         return self
 
-    def attach_kretprobe(self, event=b"", fn_name=b"", event_re=b""):
+    def attach_kretprobe(self, event=b"", fn_name=b"", event_re=b"", maxactive=0):
         event = _assert_is_bytes(event)
         fn_name = _assert_is_bytes(fn_name)
         event_re = _assert_is_bytes(event_re)
@@ -645,7 +645,8 @@ class BPF(object):
         if event_re:
             for line in BPF.get_kprobe_functions(event_re):
                 try:
-                    self.attach_kretprobe(event=line, fn_name=fn_name)
+                    self.attach_kretprobe(event=line, fn_name=fn_name,
+                                          maxactive=maxactive)
                 except:
                     pass
             return
@@ -653,7 +654,7 @@ class BPF(object):
         self._check_probe_quota(1)
         fn = self.load_func(fn_name, BPF.KPROBE)
         ev_name = b"r_" + event.replace(b"+", b"_").replace(b".", b"_")
-        fd = lib.bpf_attach_kprobe(fn.fd, 1, ev_name, event, 0)
+        fd = lib.bpf_attach_kprobe(fn.fd, 1, ev_name, event, 0, maxactive)
         if fd < 0:
             raise Exception("Failed to attach BPF program %s to kretprobe %s" %
                             (fn_name, event))
