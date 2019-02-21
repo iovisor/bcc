@@ -987,7 +987,7 @@ Examples in situ:
 
 ### 2. attach_kretprobe()
 
-Syntax: ```BPF.attach_kretprobe(event="event", fn_name="name")```
+Syntax: ```BPF.attach_kretprobe(event="event", fn_name="name" [, maxactive=int])```
 
 Instruments the return of the kernel function ```event()``` using kernel dynamic tracing of the function return, and attaches our C defined function ```name()``` to be called when the kernel function returns.
 
@@ -1000,6 +1000,8 @@ b.attach_kretprobe(event="vfs_read", fn_name="do_return")
 This will instrument the kernel ```vfs_read()``` function, which will then run our BPF defined ```do_return()``` function each time it is called.
 
 You can call attach_kretprobe() more than once, and attach your BPF function to multiple kernel function returns.
+
+When a kretprobe is installed on a kernel function, there is a limit on how many parallel calls it can catch. You can change that limit with ```maxactive```. See the kprobes documentation for its default value.
 
 See the previous kretprobes section for how to instrument the return value from BPF.
 
