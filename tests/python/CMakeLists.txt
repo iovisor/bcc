@@ -67,6 +67,8 @@ add_test(NAME py_test_percpu WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   COMMAND ${TEST_WRAPPER} py_test_percpu sudo ${CMAKE_CURRENT_SOURCE_DIR}/test_percpu.py)
 add_test(NAME py_test_dump_func WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   COMMAND ${TEST_WRAPPER} py_dump_func simple ${CMAKE_CURRENT_SOURCE_DIR}/test_dump_func.py)
+add_test(NAME py_test_disassembler WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  COMMAND ${TEST_WRAPPER} py_test_disassembler sudo ${CMAKE_CURRENT_SOURCE_DIR}/test_disassembler.py)
 add_test(NAME py_test_tools_smoke WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   COMMAND ${TEST_WRAPPER} py_test_tools_smoke sudo ${CMAKE_CURRENT_SOURCE_DIR}/test_tools_smoke.py)
 add_test(NAME py_test_tools_memleak WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
