@@ -311,7 +311,7 @@ def disassemble_instruction(i, w0, w1=None):
 
 def disassemble_str(bpfstr):
     ptr = ct.cast(ct.c_char_p(bpfstr), ct.POINTER(BPFInstr))
-    numinstr = len(bpfstr) / 8
+    numinstr = int(len(bpfstr) / 8)
     w0 = ptr[0]
     skip = 0
     instr_list = []
