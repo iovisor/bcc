@@ -250,7 +250,6 @@ Code is [examples/tracing/hello_perf_output.py](../examples/tracing/hello_perf_o
 
 ```Python
 from bcc import BPF
-import ctypes as ct
 
 # define BPF program
 prog = """
@@ -281,13 +280,6 @@ int hello(struct pt_regs *ctx) {
 b = BPF(text=prog)
 b.attach_kprobe(event=b.get_syscall_fnname("clone"), fn_name="hello")
 
-# define output data structure in Python
-TASK_COMM_LEN = 16    # linux/sched.h
-class Data(ct.Structure):
-    _fields_ = [("pid", ct.c_uint),
-                ("ts", ct.c_ulonglong),
-                ("comm", ct.c_char * TASK_COMM_LEN)]
-
 # header
 print("%-18s %-16s %-6s %s" % ("TIME(s)", "COMM", "PID", "MESSAGE"))
 
@@ -295,7 +287,7 @@ print("%-18s %-16s %-6s %s" % ("TIME(s)", "COMM", "PID", "MESSAGE"))
 start = 0
 def print_event(cpu, data, size):
     global start
-    event = ct.cast(data, ct.POINTER(Data)).contents
+    event = b["events"].event(data)
     if start == 0:
             start = event.ts
     time_s = (float(event.ts - start)) / 1000000000
@@ -316,8 +308,8 @@ Things to learn:
 1. ```bpf_get_current_pid_tgid()```: Returns the process ID in the lower 32 bits (kernel's view of the PID, which in user space is usually presented as the thread ID), and the thread group ID in the upper 32 bits (what user space often thinks of as the PID). By directly setting this to a u32, we discard the upper 32 bits. Should you be presenting the PID or the TGID? For a multi-threaded app, the TGID will be the same, so you need the PID to differentiate them, if that's what you want. It's also a question of expectations for the end user.
 1. ```bpf_get_current_comm()```: Populates the first argument address with the current process name.
 1. ```events.perf_submit()```: Submit the event for user space to read via a perf ring buffer.
-1. ```class Data(ct.Structure)```: Now define the Python version of the C data structure.
 1. ```def print_event()```: Define a Python function that will handle reading events from the ```events``` stream.
+1. ```b["events"].event(data)```: Now get the event as a Python object.
 1. ```b["events"].open_perf_buffer(print_event)```: Associate the Python ```print_event``` function with the ```events``` stream.
 1. ```while 1: b.perf_buffer_poll()```: Block waiting for events.
 
