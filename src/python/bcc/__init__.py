@@ -565,7 +565,7 @@ class BPF(object):
                 elif fn.startswith(b'__perf') or fn.startswith(b'perf_'):
                     continue
                 # Exclude all gcc 8's extra .cold functions
-                elif re.match('^.*\.cold\.\d+$', fn):
+                elif re.match(b'^.*\.cold\.\d+$', fn):
                     continue
                 if (t.lower() in [b't', b'w']) and re.match(event_re, fn) \
                     and fn not in blacklist:
