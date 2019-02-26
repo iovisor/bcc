@@ -41,3 +41,5 @@ if(INSTALL_CPP_EXAMPLES)
   install (TARGETS FollyRequestContextSwitch DESTINATION share/bcc/examples/cpp)
   install (TARGETS UseExternalMap DESTINATION share/bcc/examples/cpp)
 endif(INSTALL_CPP_EXAMPLES)
+
+add_subdirectory(pyperf)
