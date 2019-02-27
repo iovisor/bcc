@@ -52,4 +52,6 @@ while 1:
     except ValueError:
         print("value error")
         continue
+    except KeyboardInterrupt:
+        exit()
     printb(b"%-18.9f %-16s %-6d %s" % (ts, task, pid, msg))

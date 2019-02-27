@@ -94,6 +94,8 @@ while 1:
 	except ValueError:
 	    # Ignore messages from other tracers
 	    continue
+	except KeyboardInterrupt:
+	    exit()
 
 	# Ignore messages from other tracers
 	if _tag != "trace_tcp4connect":

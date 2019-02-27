@@ -45,8 +45,11 @@ print("Tracing for quick sync's... Ctrl-C to end")
 # format output
 start = 0
 while 1:
-    (task, pid, cpu, flags, ts, ms) = b.trace_fields()
-    if start == 0:
-        start = ts
-    ts = ts - start
-    printb(b"At time %.2f s: multiple syncs detected, last %s ms ago" % (ts, ms))
+    try:
+        (task, pid, cpu, flags, ts, ms) = b.trace_fields()
+        if start == 0:
+            start = ts
+        ts = ts - start
+        printb(b"At time %.2f s: multiple syncs detected, last %s ms ago" % (ts, ms))
+    except KeyboardInterrupt:
+        exit()
