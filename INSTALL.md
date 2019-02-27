@@ -67,7 +67,7 @@ found at [packages.ubuntu.com](https://packages.ubuntu.com/search?suite=default&
 sudo apt-get install bpfcc-tools linux-headers-$(uname -r)
 ```
 
-The tools are installed in `/sbin` with a `-bpfcc` extension. Try running `sudo opensnoop-bpfcc`.
+The tools are installed in `/sbin` (`/usr/sbin` in Ubuntu 18.04) with a `-bpfcc` extension. Try running `sudo opensnoop-bpfcc`.
 
 **_Note_**: the Ubuntu packages have different names but the package contents, in most cases, conflict
 and as such _cannot_ be installed alongside upstream packages. Should one choose to use
