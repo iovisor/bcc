@@ -13,6 +13,7 @@
 
 from __future__ import print_function
 from bcc import BPF
+from bcc.utils import printb
 
 # load BPF program
 b = BPF(text="""
@@ -32,4 +33,4 @@ while 1:
         (task, pid, cpu, flags, ts, msg) = b.trace_fields()
     except ValueError:
         continue
-    print("%-18.9f %-16s %-6d %s" % (ts, task, pid, msg))
+    printb(b"%-18.9f %-16s %-6d %s" % (ts, task, pid, msg))

@@ -12,6 +12,7 @@
 
 from __future__ import print_function
 from bcc import BPF
+from bcc.utils import printb
 from time import sleep
 import sys
 
@@ -56,4 +57,4 @@ stack_traces = b.get_table("stack_traces")
 for k, v in reversed(sorted(calls.items(), key=lambda c: c[1].value)):
     print("%d bytes allocated at:" % v.value)
     for addr in stack_traces.walk(k.value):
-        print("\t%s" % b.sym(addr, pid, show_offset=True))
+        printb(b"\t%s" % b.sym(addr, pid, show_offset=True))

@@ -12,6 +12,7 @@
 
 from __future__ import print_function
 from bcc import BPF
+from bcc.utils import printb
 from time import sleep
 
 # load BPF program
@@ -52,4 +53,4 @@ except KeyboardInterrupt:
 print("%10s %s" % ("COUNT", "STRING"))
 counts = b.get_table("counts")
 for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
-    print("%10d \"%s\"" % (v.value, k.c.encode('string-escape')))
+    printb(b"%10d \"%s\"" % (v.value, k.c))
