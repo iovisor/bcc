@@ -650,12 +650,19 @@ int bcc_resolve_symname(const char *module, const char *symname,
 
   sym->name = symname;
   sym->offset = addr;
+  // Exactly one of symbol name or file offset should be provided
+  if (!((sym->name != NULL) ^ (sym->offset != 0x0)))
+    goto invalid_module;
+
+  // If user provided file offset, we are done here
+  if (sym->offset != 0x0)
+    return 0;
+
+  // Otherwise, we need to resolve the symbol name
   if (option == NULL)
     option = &default_option;
-
-  if (sym->name && sym->offset == 0x0)
-    if (bcc_elf_foreach_sym(sym->module, _find_sym, option, sym) < 0)
-      goto invalid_module;
+  if (bcc_elf_foreach_sym(sym->module, _find_sym, option, sym) < 0)
+    goto invalid_module;
   if (sym->offset == 0x0)
     goto invalid_module;
 
@@ -674,6 +681,7 @@ int bcc_resolve_symname(const char *module, const char *symname,
       goto invalid_module;
     sym->offset = addr.binary_addr;
   }
+
   return 0;
 
 invalid_module:

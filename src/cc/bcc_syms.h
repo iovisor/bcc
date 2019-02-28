@@ -80,18 +80,26 @@ int bcc_buildsymcache_resolve(void *resolver,
 // Will prefer use debug file and check debug file CRC when reading the module.
 int bcc_foreach_function_symbol(const char *module, SYM_CB cb);
 
-// Find the offset of a symbol in a module binary. If addr is not zero, will
-// calculate the offset using the provided addr and the module's load address.
+// Resolve address of symbol in binary.
 //
-// If pid is provided, will use it to help lookup the module in the Process and
-// enter the Process's mount Namespace.
+// module is binary path or module name. If path is provided, it will be used
+// as-is, otherwise the module name would be attempted to be resolved.
+//
+// Exactly one of symname and addr should be non-zero. If addr is non-zero, it
+// will be returned in result as-is. Otherwise will attempt to resolve symname.
+//
+// If pid is provided, will use it to help resolve module name in the Process
+// and enter the Process's Mount Namespace when accessing the binary.
 //
 // If option is not NULL, will respect the specified options for lookup.
 // Otherwise default option will apply, which is to use debug file, verify
 // checksum, and try all types of symbols.
 //
-// Return 0 on success and -1 on failure. Output will be write to sym. After
-// use, sym->module need to be freed if it's not empty.
+// Return 0 on success and -1 on failure. Output will be write to sym.
+// sym->module contains the provided or resolved binary path, and sym->offset
+// contains the provided addr, or the file offset of provided symbol name.
+//
+// sym->module need to be freed by caller if it's not empty.
 int bcc_resolve_symname(const char *module, const char *symname,
                         const uint64_t addr, int pid,
                         struct bcc_symbol_option* option,

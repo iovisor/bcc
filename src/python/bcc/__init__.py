@@ -967,19 +967,21 @@ class BPF(object):
         """attach_uprobe(name="", sym="", sym_re="", addr=None, fn_name=""
                          pid=-1)
 
-        Run the bpf function denoted by fn_name every time the symbol sym in
-        the library or binary 'name' is encountered. The real address addr may
-        be supplied in place of sym. Optional parameters pid, cpu, and group_fd
-        can be used to filter the probe.
+        Create uprobe for a binary at locations of certain symbols or specific
+        address, and attach the BPF function denoted by fn_name to it.
+        Every time these locations are reached, the BPF function would run.
 
-        Instead of a symbol name, a regular expression can be provided in
-        sym_re. The uprobe will then attach to symbols that match the provided
-        regular expression.
+        Shared library binaries can be given through the name argument without
+        lib prefix or with the full path (/usr/lib/...).
+        If pid is provided, the uprobe will be created for the library binary
+        used by that Process.
+        Executable binaries can be given only with the full path (/bin/sh).
 
-        Libraries can be given in the name argument without the lib prefix, or
-        with the full path (/usr/lib/...). Binaries can be given only with the
-        full path (/bin/sh). If a PID is given, the uprobe will attach to the
-        version of the library used by the process.
+        Exactly one of (sym|sym_re) and addr should be provided.
+        If addr is provided, it should be the file offset of the intended
+        probing location in the binary.
+        If (sym|sym_re) is provided, the uprobe will be created at location
+        of symbol with that name or symbols whose name match the provided regex.
 
         Example: BPF(text).attach_uprobe("c", "malloc")
                  BPF(text).attach_uprobe("/usr/bin/python", "main")
