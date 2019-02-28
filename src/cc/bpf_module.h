@@ -35,6 +35,8 @@ class Type;
 
 namespace ebpf {
 
+typedef std::map<std::string, std::tuple<uint8_t *, uintptr_t, unsigned>> sec_map_def;
+
 // Options to enable different debug logging.
 enum {
   // Debug output compiled LLVM IR.
@@ -82,8 +84,8 @@ class BPFModule {
   StatusTuple sscanf(std::string fn_name, const char *str, void *val);
   StatusTuple snprintf(std::string fn_name, char *str, size_t sz,
                        const void *val);
-  void load_btf(std::map<std::string, std::tuple<uint8_t *, uintptr_t>> &sections);
-  int load_maps(std::map<std::string, std::tuple<uint8_t *, uintptr_t>> &sections);
+  void load_btf(sec_map_def &sections);
+  int load_maps(sec_map_def &sections);
 
  public:
   BPFModule(unsigned flags, TableStorage *ts = nullptr, bool rw_engine_enabled = true,
@@ -150,7 +152,7 @@ class BPFModule {
   std::unique_ptr<llvm::ExecutionEngine> rw_engine_;
   std::unique_ptr<llvm::Module> mod_;
   std::unique_ptr<FuncSource> func_src_;
-  std::map<std::string, std::tuple<uint8_t *, uintptr_t>> sections_;
+  sec_map_def sections_;
   std::vector<TableDesc *> tables_;
   std::map<std::string, size_t> table_names_;
   std::vector<std::string> function_names_;

@@ -183,6 +183,7 @@ void SourceDebugger::dump() {
       uint64_t Size;
       uint8_t *FuncStart = get<0>(section.second);
       uint64_t FuncSize = get<1>(section.second);
+      unsigned SectionID = get<2>(section.second);
       ArrayRef<uint8_t> Data(FuncStart, FuncSize);
       uint32_t CurrentSrcLine = 0;
       string func_name = section.first.substr(fn_prefix_.size());
@@ -201,8 +202,14 @@ void SourceDebugger::dump() {
           break;
         } else {
           DILineInfo LineInfo;
+
           LineTable->getFileLineInfoForAddress(
-              (uint64_t)FuncStart + Index, CU->getCompilationDir(),
+#if LLVM_MAJOR_VERSION >= 9
+              {(uint64_t)FuncStart + Index, SectionID},
+#else
+              (uint64_t)FuncStart + Index,
+#endif
+              CU->getCompilationDir(),
               DILineInfoSpecifier::FileLineInfoKind::AbsoluteFilePath,
               LineInfo);
 
