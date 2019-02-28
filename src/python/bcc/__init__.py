@@ -858,7 +858,8 @@ class BPF(object):
     @staticmethod
     def support_raw_tracepoint():
         # kernel symbol "bpf_find_raw_tracepoint" indicates raw_tracepint support
-        if BPF.ksymname("bpf_find_raw_tracepoint") != -1:
+        if BPF.ksymname("bpf_find_raw_tracepoint") != -1 or \
+           BPF.ksymname("bpf_get_raw_tracepoint") != -1:
             return True
         return False
 
