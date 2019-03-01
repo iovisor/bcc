@@ -16,7 +16,6 @@
 from __future__ import print_function
 from bcc import ArgString, BPF
 import argparse
-import ctypes as ct
 from datetime import datetime, timedelta
 
 # arguments
@@ -156,20 +155,6 @@ b.attach_tracepoint(tp="vmscan:mm_vmscan_direct_reclaim_begin",
 b.attach_tracepoint(tp="vmscan:mm_vmscan_direct_reclaim_end",
                     fn_name="trace_direct_reclaim_end")
 
-TASK_COMM_LEN = 16  # linux/sched.h
-
-
-class Data(ct.Structure):
-    _fields_ = [
-        ("id", ct.c_ulonglong),
-        ("uid", ct.c_uint32),
-        ("nr_reclaimed", ct.c_ulonglong),
-        ("delta", ct.c_ulonglong),
-        ("ts", ct.c_ulonglong),
-        ("name", ct.c_char * TASK_COMM_LEN)
-    ]
-
-
 initial_ts = 0
 
 # header
@@ -184,7 +169,7 @@ print("%-14s %-8s %-14s %7s" %
 
 
 def print_event(cpu, data, size):
-    event = ct.cast(data, ct.POINTER(Data)).contents
+    event = b["events"].event(data)
 
     global initial_ts
 
