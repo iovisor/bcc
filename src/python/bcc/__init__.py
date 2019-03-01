@@ -968,9 +968,13 @@ class BPF(object):
                          pid=-1)
 
         Run the bpf function denoted by fn_name every time the symbol sym in
-        the library or binary 'name' is encountered. The real address addr may
-        be supplied in place of sym. Optional parameters pid, cpu, and group_fd
-        can be used to filter the probe.
+        the library or binary 'name' is encountered. Optional parameters pid,
+        cpu, and group_fd can be used to filter the probe.
+
+        The real address addr may be supplied in place of sym, in which case sym
+        must be set to its default value. If the file is a non-PIE executable,
+        addr must be a virtual address, otherwise it must be an offset relative
+        to the file load address.
 
         Instead of a symbol name, a regular expression can be provided in
         sym_re. The uprobe will then attach to symbols that match the provided
