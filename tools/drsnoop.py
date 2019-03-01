@@ -162,7 +162,7 @@ if args.timestamp:
     print("%-14s" % ("TIME(s)"), end="")
 if args.print_uid:
     print("%-6s" % ("UID"), end="")
-print("%-14s %-8s %-14s %7s" %
+print("%-14s %-6s %8s %5s" %
       ("COMM", "TID" if args.tid else "PID", "LAT(ms)", "PAGES"))
 
 # process event
@@ -186,7 +186,7 @@ def print_event(cpu, data, size):
     if args.print_uid:
         print("%-6d" % event.uid, end="")
 
-    print("%-14.14s %-8s %-14f %7s" %
+    print("%-14.14s %-6s %8.2f %5d" %
           (event.name.decode('utf-8', 'replace'),
            event.id & 0xffffffff if args.tid else event.id >> 32,
            float(event.delta) / 1000000, event.nr_reclaimed))
