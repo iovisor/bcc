@@ -166,8 +166,6 @@ print("%-14s %-6s %8s %5s" %
       ("COMM", "TID" if args.tid else "PID", "LAT(ms)", "PAGES"))
 
 # process event
-
-
 def print_event(cpu, data, size):
     event = b["events"].event(data)
 
