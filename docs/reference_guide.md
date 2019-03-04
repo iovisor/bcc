@@ -15,6 +15,7 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
         - [5. uretprobes](#5-uretprobes)
         - [6. USDT probes](#6-usdt-probes)
         - [7. Raw Tracepoints](#7-raw-tracepoints)
+        - [8. system call tracepoints](#8-system-call-tracepoints)
     - [Data](#data)
         - [1. bpf_probe_read()](#1-bpf_probe_read)
         - [2. bpf_probe_read_str()](#2-bpf_probe_read_str)
@@ -276,6 +277,40 @@ This instruments the sched:sched_switch tracepoint, and prints the prev and next
 
 Examples in situ:
 [search /tools](https://github.com/iovisor/bcc/search?q=RAW_TRACEPOINT_PROBE+path%3Atools&type=Code)
+
+### 8. system call tracepoints
+
+Syntax: ```syscall__SYSCALLNAME```
+
+```syscall__``` is a special prefix that creates a kprobe for the system call name provided as the remainder. You can use it by declaring a normal C function, then using the Python ```BPF.get_syscall_name(SYSCALLNAME)``` and ```BPF.attach_kprobe()``` to associate it.
+
+Arguments are specified on the function declaration: ```syscall__SYSCALLNAME(struct pt_regs *ctx, [, argument1 ...])```.
+
+For example:
+```C
+int syscall__execve(struct pt_regs *ctx,
+    const char __user *filename,
+    const char __user *const __user *__argv,
+    const char __user *const __user *__envp)
+{
+    [...]
+}
+```
+
+This instruments the execve system call.
+
+The first argument is always ```struct pt_regs *```, the remainder are the arguments to the function (they don't need to be specified, if you don't intend to use them).
+
+Corresponding Python code:
+```Python
+b = BPF(text=bpf_text)
+execve_fnname = b.get_syscall_name("execve")
+b.attach_kprobe(event=execve_fnname, fn_name="syscall__execve")
+```
+
+Examples in situ:
+[code](https://github.com/iovisor/bcc/blob/552658edda09298afdccc8a4b5e17311a2d8a771/tools/execsnoop.py#L101) ([output](https://github.com/iovisor/bcc/blob/552658edda09298afdccc8a4b5e17311a2d8a771/tools/execsnoop_example.txt#L8))
+
 
 ## Data
 
