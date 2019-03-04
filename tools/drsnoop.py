@@ -78,8 +78,7 @@ struct data_t {
 BPF_HASH(start, u64, struct val_t);
 BPF_PERF_OUTPUT(events);
 
-int trace_direct_reclaim_begin(void)
-{
+TRACEPOINT_PROBE(vmscan, mm_vmscan_direct_reclaim_begin) {
     struct val_t val = {};
     u64 id = bpf_get_current_pid_tgid();
     u32 pid = id >> 32; // PID is higher part
@@ -97,15 +96,7 @@ int trace_direct_reclaim_begin(void)
     return 0;
 }
 
-struct reclaimed_args {
-    // from /sys/kernel/debug/tracing/events/vmscan/mm_vmscan_direct_reclaim_-
-    // end/format
-    u64 __unused__;
-    u64 nr_reclaimed;
-};
-
-int trace_direct_reclaim_end(struct reclaimed_args *args)
-{
+TRACEPOINT_PROBE(vmscan, mm_vmscan_direct_reclaim_end) {
     u64 id = bpf_get_current_pid_tgid();
     struct val_t *valp;
     struct data_t data = {};
@@ -150,10 +141,6 @@ if debug or args.ebpf:
 
 # initialize BPF
 b = BPF(text=bpf_text)
-b.attach_tracepoint(tp="vmscan:mm_vmscan_direct_reclaim_begin",
-                    fn_name="trace_direct_reclaim_begin")
-b.attach_tracepoint(tp="vmscan:mm_vmscan_direct_reclaim_end",
-                    fn_name="trace_direct_reclaim_end")
 
 initial_ts = 0
 
