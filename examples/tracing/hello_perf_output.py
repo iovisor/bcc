@@ -3,7 +3,6 @@
 # This is a Hello World example that uses BPF_PERF_OUTPUT.
 
 from bcc import BPF
-import ctypes as ct
 
 # define BPF program
 prog = """
@@ -34,13 +33,6 @@ int hello(struct pt_regs *ctx) {
 b = BPF(text=prog)
 b.attach_kprobe(event=b.get_syscall_fnname("clone"), fn_name="hello")
 
-# define output data structure in Python
-TASK_COMM_LEN = 16    # linux/sched.h
-class Data(ct.Structure):
-    _fields_ = [("pid", ct.c_uint),
-                ("ts", ct.c_ulonglong),
-                ("comm", ct.c_char * TASK_COMM_LEN)]
-
 # header
 print("%-18s %-16s %-6s %s" % ("TIME(s)", "COMM", "PID", "MESSAGE"))
 
@@ -48,7 +40,7 @@ print("%-18s %-16s %-6s %s" % ("TIME(s)", "COMM", "PID", "MESSAGE"))
 start = 0
 def print_event(cpu, data, size):
     global start
-    event = ct.cast(data, ct.POINTER(Data)).contents
+    event = b["events"].event(data)
     if start == 0:
             start = event.ts
     time_s = (float(event.ts - start)) / 1000000000

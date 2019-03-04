@@ -63,7 +63,7 @@ const string BPFModule::FN_PREFIX = BPF_FN_PREFIX;
 class MyMemoryManager : public SectionMemoryManager {
  public:
 
-  explicit MyMemoryManager(map<string, tuple<uint8_t *, uintptr_t>> *sections)
+  explicit MyMemoryManager(sec_map_def *sections)
       : sections_(sections) {
   }
 
@@ -75,7 +75,7 @@ class MyMemoryManager : public SectionMemoryManager {
     uint8_t *Addr = SectionMemoryManager::allocateDataSection(Size, Alignment, SectionID, SectionName, false);
     //printf("allocateDataSection: %s Addr %p Size %ld Alignment %d SectionID %d\n",
     //       SectionName.str().c_str(), (void *)Addr, Size, Alignment, SectionID);
-    (*sections_)[SectionName.str()] = make_tuple(Addr, Size);
+    (*sections_)[SectionName.str()] = make_tuple(Addr, Size, SectionID);
     return Addr;
   }
   uint8_t *allocateDataSection(uintptr_t Size, unsigned Alignment,
@@ -86,10 +86,10 @@ class MyMemoryManager : public SectionMemoryManager {
     uint8_t *Addr = SectionMemoryManager::allocateDataSection(Size, Alignment, SectionID, SectionName, false);
     //printf("allocateDataSection: %s Addr %p Size %ld Alignment %d SectionID %d\n",
     //       SectionName.str().c_str(), (void *)Addr, Size, Alignment, SectionID);
-    (*sections_)[SectionName.str()] = make_tuple(Addr, Size);
+    (*sections_)[SectionName.str()] = make_tuple(Addr, Size, SectionID);
     return Addr;
   }
-  map<string, tuple<uint8_t *, uintptr_t>> *sections_;
+  sec_map_def *sections_;
 };
 
 BPFModule::BPFModule(unsigned flags, TableStorage *ts, bool rw_engine_enabled,
@@ -223,7 +223,7 @@ int BPFModule::run_pass_manager(Module &mod) {
   return 0;
 }
 
-void BPFModule::load_btf(std::map<std::string, std::tuple<uint8_t *, uintptr_t>> &sections) {
+void BPFModule::load_btf(sec_map_def &sections) {
   uint8_t *btf_sec = nullptr, *btf_ext_sec = nullptr;
   uintptr_t btf_sec_size = 0, btf_ext_sec_size = 0;
 
@@ -268,7 +268,7 @@ void BPFModule::load_btf(std::map<std::string, std::tuple<uint8_t *, uintptr_t>>
   btf_ = btf;
 }
 
-int BPFModule::load_maps(std::map<std::string, std::tuple<uint8_t *, uintptr_t>> &sections) {
+int BPFModule::load_maps(sec_map_def &sections) {
   // find .maps.<table_name> sections and retrieve all map key/value type id's
   std::map<std::string, std::pair<int, int>> map_tids;
   if (btf_) {
@@ -386,7 +386,7 @@ int BPFModule::load_maps(std::map<std::string, std::tuple<uint8_t *, uintptr_t>>
 
 int BPFModule::finalize() {
   Module *mod = &*mod_;
-  std::map<std::string, std::tuple<uint8_t *, uintptr_t>> tmp_sections,
+  sec_map_def tmp_sections,
       *sections_p;
 
   mod->setTargetTriple("bpf-pc-linux");
@@ -443,7 +443,7 @@ int BPFModule::finalize() {
         tmp_p = new uint8_t[size];
         memcpy(tmp_p, addr, size);
       }
-      sections_[fname] = make_tuple(tmp_p, size);
+      sections_[fname] = make_tuple(tmp_p, size, get<2>(section.second));
     }
     engine_.reset();
     ctx_.reset();

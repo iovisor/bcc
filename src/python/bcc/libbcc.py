@@ -16,7 +16,7 @@ import ctypes as ct
 
 lib = ct.CDLL("libbcc.so.0", use_errno=True)
 
-# keep in sync with bpf_common.h
+# keep in sync with bcc_common.h
 lib.bpf_module_create_b.restype = ct.c_void_p
 lib.bpf_module_create_b.argtypes = [ct.c_char_p, ct.c_char_p, ct.c_uint]
 lib.bpf_module_create_c.restype = ct.c_void_p
@@ -93,7 +93,7 @@ _RAW_CB_TYPE = ct.CFUNCTYPE(None, ct.py_object, ct.c_void_p, ct.c_int)
 _LOST_CB_TYPE = ct.CFUNCTYPE(None, ct.py_object, ct.c_ulonglong)
 lib.bpf_attach_kprobe.restype = ct.c_int
 lib.bpf_attach_kprobe.argtypes = [ct.c_int, ct.c_int, ct.c_char_p, ct.c_char_p,
-        ct.c_ulonglong]
+        ct.c_ulonglong, ct.c_int]
 lib.bpf_detach_kprobe.restype = ct.c_int
 lib.bpf_detach_kprobe.argtypes = [ct.c_char_p]
 lib.bpf_attach_uprobe.restype = ct.c_int

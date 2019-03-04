@@ -64,7 +64,8 @@ class BPF {
   StatusTuple attach_kprobe(const std::string& kernel_func,
                             const std::string& probe_func,
                             uint64_t kernel_func_offset = 0,
-                            bpf_probe_attach_type = BPF_PROBE_ENTRY);
+                            bpf_probe_attach_type = BPF_PROBE_ENTRY,
+                            int maxactive = 0);
   StatusTuple detach_kprobe(
       const std::string& kernel_func,
       bpf_probe_attach_type attach_type = BPF_PROBE_ENTRY);

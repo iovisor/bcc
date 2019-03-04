@@ -14,6 +14,7 @@
   - [Ubuntu](#ubuntu---source)
   - [Fedora](#fedora---source)
   - [openSUSE](#opensuse---source)
+  - [Centos](#centos---source)
   - [Amazon Linux](#amazon-linux---source)
 * [Older Instructions](#older-instructions)
 
@@ -67,7 +68,7 @@ found at [packages.ubuntu.com](https://packages.ubuntu.com/search?suite=default&
 sudo apt-get install bpfcc-tools linux-headers-$(uname -r)
 ```
 
-The tools are installed in `/sbin` with a `-bpfcc` extension. Try running `sudo opensnoop-bpfcc`.
+The tools are installed in `/sbin` (`/usr/sbin` in Ubuntu 18.04) with a `-bpfcc` extension. Try running `sudo opensnoop-bpfcc`.
 
 **_Note_**: the Ubuntu packages have different names but the package contents, in most cases, conflict
 and as such _cannot_ be installed alongside upstream packages. Should one choose to use
@@ -386,6 +387,55 @@ pushd src/python/
 make
 sudo make install
 popd
+```
+
+## Centos - Source
+
+For Centos 7.6 only
+
+### Install build dependencies
+
+```
+sudo yum install -y epel-release
+sudo yum update -y
+sudo yum groupinstall -y "Development tools"
+sudo yum install -y elfutils-libelf-devel cmake3
+sudo yum install -y luajit luajit-devel  # for Lua support
+```
+
+### Install and compile LLVM
+
+```
+curl  -LO  http://releases.llvm.org/7.0.1/llvm-7.0.1.src.tar.xz
+curl  -LO  http://releases.llvm.org/7.0.1/cfe-7.0.1.src.tar.xz
+tar -xf cfe-7.0.1.src.tar.xz
+tar -xf llvm-7.0.1.src.tar.xz
+
+mkdir clang-build
+mkdir llvm-build
+
+cd llvm-build
+cmake3 -G "Unix Makefiles" -DLLVM_TARGETS_TO_BUILD="BPF;X86" \
+  -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr ../llvm-7.0.1.src
+make
+sudo make install
+
+cd ../clang-build
+cmake3 -G "Unix Makefiles" -DLLVM_TARGETS_TO_BUILD="BPF;X86" \
+  -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr ../cfe-7.0.1.src
+make
+sudo make install
+cd ..
+```
+
+### Install and compile BCC
+
+```
+git clone https://github.com/iovisor/bcc.git
+mkdir bcc/build; cd bcc/build
+cmake .. -DCMAKE_INSTALL_PREFIX=/usr
+make
+sudo make install
 ```
 
 ## Amazon Linux - Source

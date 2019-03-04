@@ -161,6 +161,8 @@ TRACEPOINT_PROBE(sock, inet_sock_set_state)
 {
     if (args->protocol != IPPROTO_TCP)
         return 0;
+    if (args->oldstate != TCP_SYN_RECV || args->newstate != TCP_ESTABLISHED)
+        return 0;
     u32 pid = bpf_get_current_pid_tgid();
 
     ##FILTER_PID##

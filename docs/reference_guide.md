@@ -452,7 +452,7 @@ This is used for targeted error injection.
 
 bpf_override_return will only work when the kprobed function is whitelisted to
 allow error injections. Whitelisting entails tagging a function with
-`BPF_ALLOW_ERROR_INJECTION()` in the kernel source tree; see `io_ctl_init` for
+`ALLOW_ERROR_INJECTION()` in the kernel source tree; see `io_ctl_init` for
 an example. If the kprobed function is not whitelisted, the bpf program will
 fail to attach with ` ioctl(PERF_EVENT_IOC_SET_BPF): Invalid argument`
 
@@ -1022,7 +1022,7 @@ Examples in situ:
 
 ### 2. attach_kretprobe()
 
-Syntax: ```BPF.attach_kretprobe(event="event", fn_name="name")```
+Syntax: ```BPF.attach_kretprobe(event="event", fn_name="name" [, maxactive=int])```
 
 Instruments the return of the kernel function ```event()``` using kernel dynamic tracing of the function return, and attaches our C defined function ```name()``` to be called when the kernel function returns.
 
@@ -1035,6 +1035,8 @@ b.attach_kretprobe(event="vfs_read", fn_name="do_return")
 This will instrument the kernel ```vfs_read()``` function, which will then run our BPF defined ```do_return()``` function each time it is called.
 
 You can call attach_kretprobe() more than once, and attach your BPF function to multiple kernel function returns.
+
+When a kretprobe is installed on a kernel function, there is a limit on how many parallel calls it can catch. You can change that limit with ```maxactive```. See the kprobes documentation for its default value.
 
 See the previous kretprobes section for how to instrument the return value from BPF.
 
@@ -1298,7 +1300,7 @@ while 1:
     b.perf_buffer_poll()
 ```
 
-Note that the data structure transferred will need to be declared in C in the BPF program, and in Python. For example:
+Note that the data structure transferred will need to be declared in C in the BPF program. For example:
 
 ```C
 // define output data structure in C
@@ -1307,7 +1309,19 @@ struct data_t {
     u64 ts;
     char comm[TASK_COMM_LEN];
 };
+BPF_PERF_OUTPUT(events);
+[...]
 ```
+
+In Python, you can either let bcc generate the data structure from C declaration automatically (recommanded):
+
+```Python
+def print_event(cpu, data, size):
+    event = b["events"].event(data)
+[...]
+```
+
+or define it manually:
 
 ```Python
 # define output data structure in Python
@@ -1316,9 +1330,11 @@ class Data(ct.Structure):
     _fields_ = [("pid", ct.c_ulonglong),
                 ("ts", ct.c_ulonglong),
                 ("comm", ct.c_char * TASK_COMM_LEN)]
-```
 
-Perhaps in a future bcc version, the Python data structure will be automatically generated from the C declaration.
+def print_event(cpu, data, size):
+    event = ct.cast(data, ct.POINTER(Data)).contents
+[...]
+```
 
 Examples in situ:
 [code](https://github.com/iovisor/bcc/blob/08fbceb7e828f0e3e77688497727c5b2405905fd/examples/tracing/hello_perf_output.py#L59),

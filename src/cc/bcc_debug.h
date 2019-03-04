@@ -13,13 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+#include "bpf_module.h"
+
 namespace ebpf {
 
 class SourceDebugger {
  public:
   SourceDebugger(
       llvm::Module *mod,
-      std::map<std::string, std::tuple<uint8_t *, uintptr_t>> &sections,
+      sec_map_def &sections,
       const std::string &fn_prefix, const std::string &mod_src,
       std::map<std::string, std::string> &src_dbg_fmap)
       : mod_(mod),
@@ -52,7 +55,7 @@ class SourceDebugger {
 
  private:
   llvm::Module *mod_;
-  const std::map<std::string, std::tuple<uint8_t *, uintptr_t>> &sections_;
+  const sec_map_def &sections_;
   const std::string &fn_prefix_;
   const std::string &mod_src_;
   std::map<std::string, std::string> &src_dbg_fmap_;
