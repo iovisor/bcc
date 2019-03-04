@@ -12,6 +12,7 @@
 
 from __future__ import print_function
 from bcc import BPF
+from bcc.utils import printb
 
 REQ_WRITE = 1		# from include/linux/blk_types.h
 
@@ -56,13 +57,13 @@ while 1:
 		(bytes_s, bflags_s, us_s) = msg.split()
 
 		if int(bflags_s, 16) & REQ_WRITE:
-			type_s = "W"
+			type_s = b"W"
 		elif bytes_s == "0":	# see blk_fill_rwbs() for logic
-			type_s = "M"
+			type_s = b"M"
 		else:
-			type_s = "R"
+			type_s = b"R"
 		ms = float(int(us_s, 10)) / 1000
 
-		print("%-18.9f %-2s %-7s %8.2f" % (ts, type_s, bytes_s, ms))
+		printb(b"%-18.9f %-2s %-7s %8.2f" % (ts, type_s, bytes_s, ms))
 	except KeyboardInterrupt:
 		exit()
