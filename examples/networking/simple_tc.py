@@ -16,7 +16,7 @@ int hello(struct __sk_buff *skb) {
 try:
     b = BPF(text=text, debug=0)
     fn = b.load_func("hello", BPF.SCHED_CLS)
-    ipr.link_create(ifname="t1a", kind="veth", peer="t1b")
+    ipr.link("add", ifname="t1a", kind="veth", peer="t1b")
     idx = ipr.link_lookup(ifname="t1a")[0]
 
     ipr.tc("add", "ingress", idx, "ffff:")
@@ -26,5 +26,5 @@ try:
     ipr.tc("add-filter", "bpf", idx, ":1", fd=fn.fd,
            name=fn.name, parent="1:", action="ok", classid=1)
 finally:
-    if "idx" in locals(): ipr.link_remove(idx)
+    if "idx" in locals(): ipr.link("del", index=idx)
 print("BPF tc functionality - SCHED_CLS: OK")
