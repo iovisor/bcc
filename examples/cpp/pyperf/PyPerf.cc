@@ -16,6 +16,7 @@
 #include <string>
 #include <vector>
 
+#include "PyPerfDefaultPrinter.h"
 #include "PyPerfLoggingHelper.h"
 #include "PyPerfUtil.h"
 
@@ -69,7 +70,9 @@ int main(int argc, char** argv) {
 
   ebpf::pyperf::PyPerfUtil util;
   util.init();
-  util.profile(sampleRate, durationMs);
+
+  ebpf::pyperf::PyPerfDefaultPrinter printer;
+  util.profile(sampleRate, durationMs, &printer);
 
   return 0;
 }

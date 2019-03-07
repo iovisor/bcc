@@ -9,7 +9,6 @@
 #include <cstdio>
 #include <cstring>
 #include <exception>
-#include <unordered_map>
 
 #include <dirent.h>
 #include <linux/elf.h>
@@ -29,10 +28,6 @@ namespace pyperf {
 extern OffsetConfig kPy36OffsetConfig;
 extern std::string PYPERF_BPF_PROGRAM;
 
-const static std::string kLostSymbol = "[Lost Symbol]";
-const static std::string kIncompleteStack = "[Truncated Stack]";
-const static std::string kErrorStack = "[Stack Error]";
-const static std::string kNonPythonStack = "[Non-Python Code]";
 const static int kPerfBufSizePages = 32;
 
 const static std::string kPidCfgTableName("pid_config");
@@ -107,7 +102,8 @@ int findPythonPathCallback(const char* name, uint64_t st, uint64_t en, uint64_t,
     file = file.substr(pos + 1);
   }
   if (file.find(kPy36LibName) == 0) {
-    logInfo(1, "Found Python library %s loaded at %lx-%lx for PID %d\n", name, st, en, helper->pid);
+    logInfo(1, "Found Python library %s loaded at %lx-%lx for PID %d\n", name,
+            st, en, helper->pid);
     helper->found = true;
     helper->st = st;
     helper->en = en;
@@ -239,7 +235,8 @@ void PyPerfUtil::handleSample(const void* data, int dataSize) {
 void PyPerfUtil::handleLostSamples(int lostCnt) { lostSamples_ += lostCnt; }
 
 PyPerfUtil::PyPerfResult PyPerfUtil::profile(int64_t sampleRate,
-                                             int64_t durationMs) {
+                                             int64_t durationMs,
+                                             PyPerfSampleProcessor* processor) {
   if (!initCompleted_) {
     std::fprintf(stderr, "PyPerfUtil::init not invoked or failed\n");
     return PyPerfResult::NO_INIT;
@@ -285,7 +282,12 @@ PyPerfUtil::PyPerfResult PyPerfUtil::profile(int64_t sampleRate,
   }
   logInfo(2, "Finished draining remaining samples\n");
 
-  // Get symbol names and output samples
+  processor->processSamples(samples_, this);
+
+  return PyPerfResult::SUCCESS;
+}
+
+std::unordered_map<int32_t, std::string> PyPerfUtil::getSymbolMapping() {
   auto symbolTable = bpf_.get_hash_table<Symbol, int32_t>("symbols");
   std::unordered_map<int32_t, std::string> symbols;
   for (auto& x : symbolTable.get_table_offline()) {
@@ -294,47 +296,7 @@ PyPerfUtil::PyPerfResult PyPerfUtil::profile(int64_t sampleRate,
     symbols.emplace(x.second, std::move(symbolName));
   }
   logInfo(1, "Total %d unique Python symbols\n", symbols.size());
-
-  for (auto& sample : samples_) {
-    if (sample.threadStateMatch != THREAD_STATE_THIS_THREAD_NULL &&
-        sample.threadStateMatch != THREAD_STATE_BOTH_NULL) {
-      for (const auto stackId : sample.pyStackIds) {
-        auto symbIt = symbols.find(stackId);
-        if (symbIt != symbols.end()) {
-          std::printf("    %s\n", symbIt->second.c_str());
-        } else {
-          std::printf("    %s\n", kLostSymbol.c_str());
-          lostSymbols_++;
-        }
-      }
-      switch (sample.stackStatus) {
-      case STACK_STATUS_TRUNCATED:
-        std::printf("    %s\n", kIncompleteStack.c_str());
-        truncatedStack_++;
-        break;
-      case STACK_STATUS_ERROR:
-        std::printf("    %s\n", kErrorStack.c_str());
-        break;
-      default:
-        break;
-      }
-    } else {
-      std::printf("    %s\n", kNonPythonStack.c_str());
-    }
-
-    std::printf("PID: %d TID: %d (%s)\n", sample.pid, sample.tid,
-                sample.comm.c_str());
-    std::printf("GIL State: %d Thread State: %d PthreadID Match State: %d\n\n",
-                sample.threadStateMatch, sample.gilState,
-                sample.pthreadIDMatch);
-  }
-
-  logInfo(0, "%d samples collected\n", totalSamples_);
-  logInfo(0, "%d samples lost\n", lostSamples_);
-  logInfo(0, "%d samples with truncated stack\n", truncatedStack_);
-  logInfo(0, "%d times Python symbol lost\n", lostSymbols_);
-
-  return PyPerfResult::SUCCESS;
+  return symbols;
 }
 
 std::string PyPerfUtil::getSymbolName(Symbol& sym) const {
@@ -378,18 +340,23 @@ bool PyPerfUtil::tryTargetPid(int pid, PidData& data) {
   }
 
   if (!getAddrOfPythonBinary(path, data)) {
-    std::fprintf(stderr, "Failed getting addresses in potential Python library in PID %d\n", pid);
+    std::fprintf(
+        stderr,
+        "Failed getting addresses in potential Python library in PID %d\n",
+        pid);
     return false;
   }
   data.offsets = kPy36OffsetConfig;
   data.current_state_addr += helper.st;
-  logInfo(2, "PID %d has _PyThreadState_Current at %lx\n", pid, data.current_state_addr);
+  logInfo(2, "PID %d has _PyThreadState_Current at %lx\n", pid,
+          data.current_state_addr);
   data.tls_key_addr += helper.st;
   logInfo(2, "PID %d has autoTLSKey at %lx\n", pid, data.current_state_addr);
   data.gil_locked_addr += helper.st;
   logInfo(2, "PID %d has gil_locked at %lx\n", pid, data.current_state_addr);
   data.gil_last_holder_addr += helper.st;
-  logInfo(2, "PID %d has gil_last_holder at %lx\n", pid, data.current_state_addr);
+  logInfo(2, "PID %d has gil_last_holder at %lx\n", pid,
+          data.current_state_addr);
 
   return true;
 }
