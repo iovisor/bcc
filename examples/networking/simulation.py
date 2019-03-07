@@ -49,7 +49,7 @@ class Simulation(object):
         else:
             # delete the potentially leaf-over veth interfaces
             ipr = IPRoute()
-            for i in ipr.link_lookup(ifname='%sa' % ifc_base_name): ipr.link_remove(i)
+            for i in ipr.link_lookup(ifname='%sa' % ifc_base_name): ipr.link("del", index=i)
             ipr.close()
             try:
                 out_ifc = self.ipdb.create(ifname="%sa" % ifc_base_name, kind="veth",
