@@ -17,6 +17,38 @@ const static std::string kIncompleteStack = "[Truncated Stack]";
 const static std::string kErrorStack = "[Stack Error]";
 const static std::string kNonPythonStack = "[Non-Python Code]";
 
+const static std::map<int, const char*> kGILStateValues = {
+    {GIL_STATE_NO_INFO, "No GIL Info"},
+    {GIL_STATE_ERROR, "Error Reading GIL State"},
+    {GIL_STATE_UNINITIALIZED, "GIL Uninitialized"},
+    {GIL_STATE_NOT_LOCKED, "GIL Not Locked"},
+    {GIL_STATE_THIS_THREAD, "GIL on This Thread"},
+    {GIL_STATE_GLOBAL_CURRENT_THREAD,
+     "GIL on Global _PyThreadState_Current Thread"},
+    {GIL_STATE_OTHER_THREAD, "GIL on Unexpected Thread"},
+    {GIL_STATE_NULL, "GIL State Empty"}};
+
+const static std::map<int, const char*> kThreadStateValues = {
+    {THREAD_STATE_UNKNOWN, "ThreadState Unknown"},
+    {THREAD_STATE_MATCH, "TLS ThreadState is Global _PyThreadState_Current"},
+    {THREAD_STATE_MISMATCH,
+     "TLS ThreadState is not Global _PyThreadState_Current"},
+    {THREAD_STATE_THIS_THREAD_NULL, "TLS ThreadState is NULL"},
+    {THREAD_STATE_GLOBAL_CURRENT_THREAD_NULL,
+     "Global _PyThreadState_Current is NULL"},
+    {THREAD_STATE_BOTH_NULL,
+     "Both TLS ThreadState and Global _PyThreadState_Current is NULL"},
+};
+
+const static std::map<int, const char*> kPthreadIDStateValues = {
+    {PTHREAD_ID_UNKNOWN, "Pthread ID Unknown"},
+    {PTHREAD_ID_MATCH, "System Pthread ID is Python ThreadState Pthread ID"},
+    {PTHREAD_ID_MISMATCH,
+     "System Pthread ID is not Python ThreadState Pthread ID"},
+    {PTHREAD_ID_THREAD_STATE_NULL, "No Pthread ID: TLS ThreadState is NULL"},
+    {PTHREAD_ID_NULL, "Pthread ID on TLS ThreadState is NULL"},
+    {PTHREAD_ID_ERROR, "Error Reading System Pthread ID"}};
+
 void PyPerfDefaultPrinter::processSamples(
     const std::vector<PyPerfSample>& samples, PyPerfUtil* util) {
   auto symbols = util->getSymbolMapping();
@@ -52,9 +84,16 @@ void PyPerfDefaultPrinter::processSamples(
 
     std::printf("PID: %d TID: %d (%s)\n", sample.pid, sample.tid,
                 sample.comm.c_str());
-    std::printf("GIL State: %d Thread State: %d PthreadID Match State: %d\n\n",
-                sample.threadStateMatch, sample.gilState,
-                sample.pthreadIDMatch);
+    if (showGILState_)
+      std::printf("GIL State: %s\n", kGILStateValues.at(sample.gilState));
+    if (showThreadState_)
+      std::printf("Thread State: %s\n",
+                  kThreadStateValues.at(sample.threadStateMatch));
+    if (showPthreadIDState_)
+      std::printf("Pthread ID State: %s\n",
+                  kPthreadIDStateValues.at(sample.pthreadIDMatch));
+
+    std::printf("\n");
   }
 
   std::printf("%d samples collected\n", util->getTotalSamples());

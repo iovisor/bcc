@@ -12,8 +12,19 @@ namespace pyperf {
 
 class PyPerfDefaultPrinter : public PyPerfSampleProcessor {
  public:
+  PyPerfDefaultPrinter(bool showGILState, bool showThreadState,
+                       bool showPthreadIDState)
+      : showGILState_(showGILState),
+        showThreadState_(showThreadState),
+        showPthreadIDState_(showPthreadIDState) {}
+
   void processSamples(const std::vector<PyPerfSample>& samples,
                       PyPerfUtil* util) override;
+
+ private:
+  bool showGILState_;
+  bool showThreadState_;
+  bool showPthreadIDState_;
 };
 
 }  // namespace pyperf
