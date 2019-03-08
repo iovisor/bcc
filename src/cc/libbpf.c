@@ -867,7 +867,7 @@ static int create_kprobe_event(char *buf, const char *ev_name,
 
   kfd = open("/sys/kernel/debug/tracing/kprobe_events", O_WRONLY | O_APPEND, 0);
   if (kfd < 0) {
-    fprintf(stderr, "open(/sys/kernel/debug/tracing/kprobe_events): %s\n", buf,
+    fprintf(stderr, "open(/sys/kernel/debug/tracing/kprobe_events): %s\n",
             strerror(errno));
     return -1;
   }
