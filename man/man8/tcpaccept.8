@@ -1,8 +1,8 @@
-.TH tcpaccept 8  "2015-08-25" "USER COMMANDS"
+.TH tcpaccept 8  "2019-03-08" "USER COMMANDS"
 .SH NAME
 tcpaccept \- Trace TCP passive connections (accept()). Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B tcpaccept [\-h] [\-t] [\-x] [\-p PID]
+.B tcpaccept [\-h] [\-T] [\-t] [\-p PID] [\-P PORTS]
 .SH DESCRIPTION
 This tool traces passive TCP connections (eg, via an accept() syscall;
 connect() are active connections). This can be useful for general
@@ -22,11 +22,17 @@ CONFIG_BPF and bcc.
 \-h
 Print usage message.
 .TP
+\-T
+Include a time column on output (HH:MM:SS).
+.TP
 \-t
 Include a timestamp column.
 .TP
 \-p PID
 Trace this process ID only (filtered in-kernel).
+.TP
+\-P PORTS
+Comma-separated list of local ports to trace (filtered in-kernel).
 .SH EXAMPLES
 .TP
 Trace all passive TCP connections (accept()s):
@@ -37,10 +43,17 @@ Trace all TCP accepts, and include timestamps:
 #
 .B tcpaccept \-t
 .TP
+Trace connections to local ports 80 and 81 only:
+#
+.B tcpaccept \-P 80,81
+.TP
 Trace PID 181 only:
 #
 .B tcpaccept \-p 181
 .SH FIELDS
+.TP
+TIME
+Time of the event, in HH:MM:SS format.
 .TP
 TIME(s)
 Time of the event, in seconds.
@@ -56,6 +69,9 @@ IP address family (4 or 6)
 .TP
 RADDR
 Remote IP address.
+.TP
+RPORT
+Remote port
 .TP
 LADDR
 Local IP address.
