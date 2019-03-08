@@ -3,7 +3,12 @@
  * Licensed under the Apache License, Version 2.0 (the "License")
  */
 
+#pragma once
+
+#include <sys/types.h>
 #include <cstdint>
+#include <string>
+#include <vector>
 
 #define PYTHON_STACK_FRAMES_PER_PROG 25
 #define PYTHON_STACK_PROG_CNT 3
@@ -98,6 +103,27 @@ typedef struct {
   int64_t stack_len;
   int32_t stack[STACK_MAX_LEN];
 } Event;
+
+struct PyPerfSample {
+  pid_t pid;
+  pid_t tid;
+  std::string comm;
+  uint8_t threadStateMatch;
+  uint8_t gilState;
+  uint8_t pthreadIDMatch;
+  uint8_t stackStatus;
+  std::vector<int32_t> pyStackIds;
+
+  explicit PyPerfSample(const Event* raw, int rawSize)
+      : pid(raw->pid),
+        tid(raw->tid),
+        comm(raw->comm),
+        threadStateMatch(raw->thread_state_match),
+        gilState(raw->gil_state),
+        pthreadIDMatch(raw->pthread_id_match),
+        stackStatus(raw->stack_status),
+        pyStackIds(raw->stack, raw->stack + raw->stack_len) {}
+};
 
 }  // namespace pyperf
 }  // namespace ebpf

@@ -6,12 +6,14 @@
 #pragma once
 
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include <linux/perf_event.h>
 #include <sys/types.h>
 
 #include "BPF.h"
+#include "PyPerfSampleProcessor.h"
 #include "PyPerfType.h"
 
 namespace ebpf {
@@ -28,37 +30,23 @@ class PyPerfUtil {
     EVENT_DETACH_FAIL
   };
 
-  struct Sample {
-    pid_t pid;
-    pid_t tid;
-    std::string comm;
-    uint8_t threadStateMatch;
-    uint8_t gilState;
-    uint8_t pthreadIDMatch;
-    uint8_t stackStatus;
-    std::vector<int32_t> pyStackIds;
-
-    explicit Sample(const Event* raw, int rawSize)
-        : pid(raw->pid),
-          tid(raw->tid),
-          comm(raw->comm),
-          threadStateMatch(raw->thread_state_match),
-          gilState(raw->gil_state),
-          pthreadIDMatch(raw->pthread_id_match),
-          stackStatus(raw->stack_status),
-          pyStackIds(raw->stack, raw->stack + raw->stack_len) {}
-  };
-
   // init must be invoked exactly once before invoking profile
   PyPerfResult init();
 
-  PyPerfResult profile(int64_t sampleRate, int64_t durationMs);
+  PyPerfResult profile(int64_t sampleRate, int64_t durationMs,
+                       PyPerfSampleProcessor* processor);
+
+  std::unordered_map<int32_t, std::string> getSymbolMapping();
+
+  uint32_t getTotalSamples() const { return totalSamples_; }
+
+  uint32_t getLostSamples() const { return lostSamples_; }
 
  private:
-  uint32_t lostSymbols_ = 0, totalSamples_ = 0, lostSamples_ = 0, truncatedStack_ = 0;
+  uint32_t totalSamples_ = 0, lostSamples_ = 0;
 
   ebpf::BPF bpf_{0, nullptr, false, "", true};
-  std::vector<Sample> samples_;
+  std::vector<PyPerfSample> samples_;
   bool initCompleted_{false};
 
   void handleSample(const void* data, int dataSize);

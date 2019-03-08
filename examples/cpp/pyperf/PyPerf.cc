@@ -16,10 +16,12 @@
 #include <string>
 #include <vector>
 
+#include "PyPerfDefaultPrinter.h"
 #include "PyPerfLoggingHelper.h"
 #include "PyPerfUtil.h"
 
 int main(int argc, char** argv) {
+  // Argument parsing helpers
   int pos = 1;
 
   auto parseIntArg = [&](std::vector<std::string> argNames, uint64_t& target) {
@@ -45,9 +47,29 @@ int main(int argc, char** argv) {
     return false;
   };
 
+  auto parseBoolArg = [&](std::vector<std::string> argNames, bool& target) {
+    std::string arg(argv[pos]);
+    for (const auto& name : argNames) {
+      if (arg == ("--" + name)) {
+        target = true;
+        return true;
+      }
+      if (arg == "--no-" + name) {
+        target = false;
+        return true;
+      }
+    }
+    return false;
+  };
+
+  // Default argument values
   uint64_t sampleRate = 1000000;
   uint64_t durationMs = 1000;
   uint64_t verbosityLevel = 0;
+  bool showGILState = true;
+  bool showThreadState = true;
+  bool showPthreadIDState = false;
+
   while (true) {
     if (pos >= argc) {
       break;
@@ -56,6 +78,10 @@ int main(int argc, char** argv) {
     found = found || parseIntArg({"-c", "--sample-rate"}, sampleRate);
     found = found || parseIntArg({"-d", "--duration"}, durationMs);
     found = found || parseIntArg({"-v", "--verbose"}, verbosityLevel);
+    found = found || parseBoolArg({"show-gil-state"}, showGILState);
+    found = found || parseBoolArg({"show-thread-state"}, showThreadState);
+    found =
+        found || parseBoolArg({"show-pthread-id-state"}, showPthreadIDState);
     if (!found) {
       std::fprintf(stderr, "Unexpected argument: %s\n", argv[pos]);
       std::exit(1);
@@ -66,10 +92,17 @@ int main(int argc, char** argv) {
   ebpf::pyperf::setVerbosity(verbosityLevel);
   ebpf::pyperf::logInfo(1, "Profiling Sample Rate: %" PRIu64 "\n", sampleRate);
   ebpf::pyperf::logInfo(1, "Profiling Duration: %" PRIu64 "ms\n", durationMs);
+  ebpf::pyperf::logInfo(1, "Showing GIL state: %d\n", showGILState);
+  ebpf::pyperf::logInfo(1, "Showing Thread state: %d\n", showThreadState);
+  ebpf::pyperf::logInfo(1, "Showing Pthread ID state: %d\n",
+                        showPthreadIDState);
 
   ebpf::pyperf::PyPerfUtil util;
   util.init();
-  util.profile(sampleRate, durationMs);
+
+  ebpf::pyperf::PyPerfDefaultPrinter printer(showGILState, showThreadState,
+                                             showPthreadIDState);
+  util.profile(sampleRate, durationMs, &printer);
 
   return 0;
 }
