@@ -18,6 +18,8 @@ from __future__ import print_function
 from bcc import ArgString, BPF
 import argparse
 from datetime import datetime, timedelta
+import os
+import math
 
 # symbols
 kallsyms = "/proc/kallsyms"
@@ -63,7 +65,6 @@ if args.duration:
 
 
 # vm_stat
-
 vm_stat_addr = ''
 with open(kallsyms) as syms:
     for line in syms:
@@ -82,7 +83,8 @@ with open(kallsyms) as syms:
 
 NR_FREE_PAGES = 0
 
-PAGE_SHIFT = 12    # defined in page_types.h
+PAGE_SIZE = os.sysconf("SC_PAGE_SIZE")
+PAGE_SHIFT = int(math.log(PAGE_SIZE) / math.log(2))
 
 def K(x):
     return x << (PAGE_SHIFT - 10)
