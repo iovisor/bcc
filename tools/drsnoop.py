@@ -12,11 +12,15 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
 # 20-Feb-2019   Ethercflow   Created this.
+# 09-Mar-2019   Ethercflow   Updated for show sys mem info.
 
 from __future__ import print_function
 from bcc import ArgString, BPF
 import argparse
 from datetime import datetime, timedelta
+
+# symbols
+kallsyms = "/proc/kallsyms"
 
 # arguments
 examples = """examples:
@@ -48,6 +52,8 @@ parser.add_argument("-d", "--duration",
 parser.add_argument("-n", "--name",
                     type=ArgString,
                     help="only print process names containing this name")
+parser.add_argument("-v", "--verbose", action="store_true",
+                    help="show system memory state")
 parser.add_argument("--ebpf", action="store_true",
                     help=argparse.SUPPRESS)
 args = parser.parse_args()
@@ -55,15 +61,43 @@ debug = 0
 if args.duration:
     args.duration = timedelta(seconds=int(args.duration))
 
+
+# vm_stat
+
+vm_stat_addr = ''
+with open(kallsyms) as syms:
+    for line in syms:
+        (addr, size, name) = line.rstrip().split(" ", 2)
+        name = name.split("\t")[0]
+        if name == "vm_stat":
+            vm_stat_addr = "0x" + addr
+            break
+        if name == "vm_zone_stat":
+            vm_stat_addr = "0x" + addr
+            break
+    if vm_stat_addr == '':
+        print("ERROR: no vm_stat or vm_zone_stat in /proc/kallsyms. Exiting.")
+        print("HINT: the kernel should be built with CONFIG_KALLSYMS_ALL.")
+        exit()
+
+NR_FREE_PAGES = 0
+
+PAGE_SHIFT = 12    # defined in page_types.h
+
+def K(x):
+    return x << (PAGE_SHIFT - 10)
+
 # load BPF program
 bpf_text = """
 #include <uapi/linux/ptrace.h>
 #include <linux/sched.h>
+#include <linux/mmzone.h>
 
 struct val_t {
     u64 id;
     u64 ts; // start time
     char name[TASK_COMM_LEN];
+    u64 vm_stat[NR_VM_ZONE_STAT_ITEMS];
 };
 
 struct data_t {
@@ -73,6 +107,7 @@ struct data_t {
     u64 delta;
     u64 ts;    // end time
     char name[TASK_COMM_LEN];
+    u64 vm_stat[NR_VM_ZONE_STAT_ITEMS];
 };
 
 BPF_HASH(start, u64, struct val_t);
@@ -91,6 +126,7 @@ TRACEPOINT_PROBE(vmscan, mm_vmscan_direct_reclaim_begin) {
     if (bpf_get_current_comm(&val.name, sizeof(val.name)) == 0) {
         val.id = id;
         val.ts = bpf_ktime_get_ns();
+        bpf_probe_read(&val.vm_stat, sizeof(val.vm_stat), (const void *)%s);
         start.update(&id, &val);
     }
     return 0;
@@ -113,6 +149,7 @@ TRACEPOINT_PROBE(vmscan, mm_vmscan_direct_reclaim_end) {
     data.id = valp->id;
     data.uid = bpf_get_current_uid_gid();
     bpf_probe_read(&data.name, sizeof(data.name), valp->name);
+    bpf_probe_read(&data.vm_stat, sizeof(data.vm_stat), valp->vm_stat);
     data.nr_reclaimed = args->nr_reclaimed;
 
     events.perf_submit(args, &data, sizeof(data));
@@ -120,7 +157,8 @@ TRACEPOINT_PROBE(vmscan, mm_vmscan_direct_reclaim_end) {
 
     return 0;
 }
-"""
+""" % vm_stat_addr
+
 if args.tid:  # TID trumps PID
     bpf_text = bpf_text.replace('PID_TID_FILTER',
                                 'if (tid != %s) { return 0; }' % args.tid)
@@ -150,7 +188,11 @@ if args.timestamp:
 if args.print_uid:
     print("%-6s" % ("UID"), end="")
 print("%-14s %-6s %8s %5s" %
-      ("COMM", "TID" if args.tid else "PID", "LAT(ms)", "PAGES"))
+      ("COMM", "TID" if args.tid else "PID", "LAT(ms)", "PAGES"), end="")
+if args.verbose:
+    print("%10s" % ("FREE(KB)"))
+else:
+    print("")
 
 # process event
 def print_event(cpu, data, size):
@@ -174,7 +216,11 @@ def print_event(cpu, data, size):
     print("%-14.14s %-6s %8.2f %5d" %
           (event.name.decode('utf-8', 'replace'),
            event.id & 0xffffffff if args.tid else event.id >> 32,
-           float(event.delta) / 1000000, event.nr_reclaimed))
+           float(event.delta) / 1000000, event.nr_reclaimed), end="")
+    if args.verbose:
+        print("%10d" % K(event.vm_stat[NR_FREE_PAGES]))
+    else:
+        print("")
 
 
 # loop with callback to print_event

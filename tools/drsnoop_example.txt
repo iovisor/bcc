@@ -102,6 +102,23 @@ summond       10277       0.06    32
 This caught the 'summond' command because it partially matches 'mond' that's passed
 to the '-n' option.
 
+
+The -v option can be used to show system memory state (now only free mem) at 
+the beginning of direct reclaiming:
+
+# ./drsnoop.py -v
+COMM           PID     LAT(ms) PAGES  FREE(KB)
+base64         34924      0.23   151     86260
+base64         34962      0.26   149     86260
+head           34931      0.24   150     86260
+base64         34902      0.19   148     86260
+head           34963      0.19   151     86228
+base64         34959      0.17   151     86228
+head           34965      0.29   190     86228
+base64         34957      0.24   152     86228
+summond        34870      0.15   151     86080
+summond        34870      0.12   115     86184
+
 USAGE message:
 
 # ./drsnoop -h
