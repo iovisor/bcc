@@ -560,8 +560,10 @@ StatusTuple BPF::load_func(const std::string& func_name, bpf_prog_type type,
   if (fd < 0)
     return StatusTuple(-1, "Failed to load %s: %d", func_name.c_str(), fd);
 
-  bpf_module_->annotate_prog_tag(
+  int ret = bpf_module_->annotate_prog_tag(
       func_name, fd, reinterpret_cast<struct bpf_insn*>(func_start), func_size);
+  if (ret < 0)
+    fprintf(stderr, "WARNING: cannot get prog tag, ignore saving source with program tag\n");
   funcs_[func_name] = fd;
   return StatusTuple(0);
 }
