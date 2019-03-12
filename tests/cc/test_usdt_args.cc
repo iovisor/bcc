@@ -58,6 +58,8 @@ TEST_CASE("test usdt argument parsing", "[usdt]") {
     USDT::ArgumentParser_aarch64 parser("4@[x32,200]");
 #elif __powerpc64__
     USDT::ArgumentParser_powerpc64 parser("4@-12(42)");
+#elif __s390x__
+    USDT::ArgumentParser_s390x parser("4@-12(%r42)");
 #elif defined(__x86_64__)
     USDT::ArgumentParser_x64 parser("4@i%ra+1r");
 #endif
@@ -121,6 +123,50 @@ TEST_CASE("test usdt argument parsing", "[usdt]") {
     verify_register(parser, 2, 1097);
     verify_register(parser, 4, "gpr[30]", 108);
     verify_register(parser, -2, "gpr[31]", -4);
+#elif __s390x__
+    USDT::ArgumentParser_s390x parser(
+        "-4@%r0 8@%r0 8@0 4@0(%r0) -2@0(%r0) "
+        "1@%r0 -2@%r3 -8@9 -1@0(%r4) -4@16(%r6) "
+        "2@%r7 4@%r11 4@-67 8@-16(%r15) 1@-52(%r11) "
+        "-8@%r4 -8@%r14 2@-11 -2@14(%r13) -8@-32(%r12) "
+        "4@%r5 2@%r11 -8@-693 -1@-23(%r10) 4@28(%r9) "
+        "-2@%r3 -4@%r8 2@1097 4@108(%r7) -2@-4(%r6)");
+
+    verify_register(parser, -4, "gprs[0]");
+    verify_register(parser, 8, "gprs[0]");
+    verify_register(parser, 8, 0);
+    verify_register(parser, 4, "gprs[0]", 0);
+    verify_register(parser, -2, "gprs[0]", 0);
+
+    verify_register(parser, 1, "gprs[0]");
+    verify_register(parser, -2, "gprs[3]");
+    verify_register(parser, -8, 9);
+    verify_register(parser, -1, "gprs[4]", 0);
+    verify_register(parser, -4, "gprs[6]", 16);
+
+    verify_register(parser, 2, "gprs[7]");
+    verify_register(parser, 4, "gprs[11]");
+    verify_register(parser, 4, -67);
+    verify_register(parser, 8, "gprs[15]", -16);
+    verify_register(parser, 1, "gprs[11]", -52);
+
+    verify_register(parser, -8, "gprs[4]");
+    verify_register(parser, -8, "gprs[14]");
+    verify_register(parser, 2, -11);
+    verify_register(parser, -2, "gprs[13]", 14);
+    verify_register(parser, -8, "gprs[12]", -32);
+
+    verify_register(parser, 4, "gprs[5]");
+    verify_register(parser, 2, "gprs[11]");
+    verify_register(parser, -8, -693);
+    verify_register(parser, -1, "gprs[10]", -23);
+    verify_register(parser, 4, "gprs[9]", 28);
+
+    verify_register(parser, -2, "gprs[3]");
+    verify_register(parser, -4, "gprs[8]");
+    verify_register(parser, 2, 1097);
+    verify_register(parser, 4, "gprs[7]", 108);
+    verify_register(parser, -2, "gprs[6]", -4);
 #elif defined(__x86_64__)
     USDT::ArgumentParser_x64 parser(
         "-4@$0 8@$1234 %rdi %rax %rsi "
