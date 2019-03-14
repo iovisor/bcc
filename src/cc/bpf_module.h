@@ -33,6 +33,8 @@ class Module;
 class Type;
 }
 
+struct bpf_insn;
+
 namespace ebpf {
 
 typedef std::map<std::string, std::tuple<uint8_t *, uintptr_t, unsigned>> sec_map_def;
