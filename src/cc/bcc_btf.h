@@ -31,14 +31,15 @@ namespace ebpf {
 class BTFStringTable {
  private:
   uint32_t Size;
+  uint32_t OrigTblLen;
   std::map<uint32_t, uint32_t> OffsetToIdMap;
   std::vector<std::string> Table;
 
  public:
-  BTFStringTable(): Size(0) {}
+  BTFStringTable(uint32_t TblLen): Size(0), OrigTblLen(TblLen) {}
   uint32_t getSize() { return Size; }
   std::vector<std::string> &getTable() { return Table; }
-  uint32_t addString(std::string Str);
+  int32_t addString(std::string Str);
 };
 
 class BTF {
