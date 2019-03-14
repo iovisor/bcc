@@ -29,12 +29,17 @@
 
 namespace ebpf {
 
-uint32_t BTFStringTable::addString(std::string S) {
+int32_t BTFStringTable::addString(std::string S) {
   // Check whether the string already exists.
   for (auto &OffsetM : OffsetToIdMap) {
     if (Table[OffsetM.second] == S)
       return OffsetM.first;
   }
+
+  // Make sure we do not overflow the string table.
+  if (OrigTblLen + Size + S.size() + 1 >= BTF_MAX_NAME_OFFSET)
+    return -1;
+
   // Not find, add to the string table.
   uint32_t Offset = Size;
   OffsetToIdMap[Offset] = Table.size();
@@ -108,18 +113,26 @@ void BTF::adjust(uint8_t *btf_sec, uintptr_t btf_sec_size,
   // Go through all line info. For any line number whose line is in the LineCaches,
   // Correct the line_off and record the corresponding source line in BTFStringTable,
   // which later will be merged into .BTF string section.
-  BTFStringTable new_strings;
-  while (linfo_len) {
+  BTFStringTable new_strings(orig_strings_len);
+  bool overflow = false;
+  while (!overflow && linfo_len) {
     unsigned num_recs = linfo_s[1];
     linfo_s += 2;
-    for (unsigned i = 0; i < num_recs; i++) {
+    for (unsigned i = 0; !overflow && i < num_recs; i++) {
       struct bpf_line_info *linfo = (struct bpf_line_info *)linfo_s;
       if (linfo->line_off == 0) {
         for (auto it = LineCaches.begin(); it != LineCaches.end(); ++it) {
           if (strcmp(strings + linfo->file_name_off, it->first.c_str()) == 0) {
             unsigned line_num = BPF_LINE_INFO_LINE_NUM(linfo->line_col);
-            if (line_num > 0 && line_num <= it->second.size())
-               linfo->line_off = orig_strings_len + new_strings.addString(it->second[line_num - 1]);
+            if (line_num > 0 && line_num <= it->second.size()) {
+               int offset = new_strings.addString(it->second[line_num - 1]);
+               if (offset < 0) {
+                 overflow = true;
+                 warning(".BTF string table overflowed, some lines missing\n");
+                 break;
+               }
+               linfo->line_off = orig_strings_len + offset;
+            }
           }
         }
       }
