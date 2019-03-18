@@ -16,7 +16,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 #
 name: bcc
-version: 0.7.0-20181122-2831-166fba57
+version: 0.9.0-20190318-2991-6cf63612
 summary: BPF Compiler Collection (BCC)
 description: A toolkit for creating efficient kernel tracing and manipulation programs
 confinement: strict
@@ -25,7 +25,8 @@ plugs:
     mount-observe: null
     system-observe: null
     system-trace: null
-assumes: [snapd2.23]
+assumes: [snapd2.37]
+base: core18
 
 parts:
     bcc:
@@ -34,6 +35,12 @@ parts:
             - '-DCMAKE_INSTALL_PREFIX=/usr'
         source: ..
         source-type: git
+        stage-packages:
+            - libbz2-1.0
+            - liblzma5
+            - libncursesw5
+            - libtinfo5
+            - libzzip-0-13
         build-packages:
             - bison
             - build-essential
@@ -47,227 +54,229 @@ parts:
             - zlib1g-dev
             - libelf-dev
             - iperf
-        stage-packages:
-            - libc6
         prime:
             - usr/share/bcc/tools
-            - usr/lib/*/lib*.so*
             - usr/lib/python2.7
-
+            - usr/lib/*/lib*.so*
             - -usr/share/bcc/tools/doc
 
     python-deps:
         plugin: python
         python-version: python2
-        stage-packages:
-            - libc6
+
+    wrapper:
+        plugin: dump
+        after: [bcc]
+        source: .
+        organize:
+            wrapper: bin/bcc-wrapper
 
 apps:
     argdist:
-        command: usr/share/bcc/tools/argdist
+        command: bcc-wrapper argdist
     bashreadline:
-        command: usr/share/bcc/tools/bashreadline
+        command: bcc-wrapper bashreadline
     biolatency:
-        command: usr/share/bcc/tools/biolatency
+        command: bcc-wrapper biolatency
     biosnoop:
-        command: usr/share/bcc/tools/biosnoop
+        command: bcc-wrapper biosnoop
     biotop:
-        command: usr/share/bcc/tools/biotop
+        command: bcc-wrapper biotop
     bitesize:
-        command: usr/share/bcc/tools/bitesize
+        command: bcc-wrapper bitesize
     bpflist:
-        command: usr/share/bcc/tools/bpflist
+        command: bcc-wrapper bpflist
     btrfsdist:
-        command: usr/share/bcc/tools/btrfsdist
+        command: bcc-wrapper btrfsdist
     btrfsslower:
-        command: usr/share/bcc/tools/btrfsslower
+        command: bcc-wrapper btrfsslower
     cachestat:
-        command: usr/share/bcc/tools/cachestat
+        command: bcc-wrapper cachestat
     cachetop:
-        command: usr/share/bcc/tools/cachetop
+        command: bcc-wrapper cachetop
     capable:
-        command: usr/share/bcc/tools/capable
+        command: bcc-wrapper capable
     cobjnew:
-        command: usr/share/bcc/tools/cobjnew
+        command: bcc-wrapper cobjnew
     cpudist:
-        command: usr/share/bcc/tools/cpudist
+        command: bcc-wrapper cpudist
     cpuunclaimed:
-        command: usr/share/bcc/tools/cpuunclaimed
+        command: bcc-wrapper cpuunclaimed
     dbslower:
-        command: usr/share/bcc/tools/dbslower
+        command: bcc-wrapper dbslower
     dbstat:
-        command: usr/share/bcc/tools/dbstat
+        command: bcc-wrapper dbstat
     dcsnoop:
-        command: usr/share/bcc/tools/dcsnoop
+        command: bcc-wrapper dcsnoop
     dcstat:
-        command: usr/share/bcc/tools/dcstat
+        command: bcc-wrapper dcstat
     deadlock:
-        command: usr/share/bcc/tools/deadlock
+        command: bcc-wrapper deadlock
     execsnoop:
-        command: usr/share/bcc/tools/execsnoop
+        command: bcc-wrapper execsnoop
     ext4dist:
-        command: usr/share/bcc/tools/ext4dist
+        command: bcc-wrapper ext4dist
     ext4slower:
-        command: usr/share/bcc/tools/ext4slower
+        command: bcc-wrapper ext4slower
     filelife:
-        command: usr/share/bcc/tools/filelife
+        command: bcc-wrapper filelife
     fileslower:
-        command: usr/share/bcc/tools/fileslower
+        command: bcc-wrapper fileslower
     filetop:
-        command: usr/share/bcc/tools/filetop
+        command: bcc-wrapper filetop
     funccount:
-        command: usr/share/bcc/tools/funccount
+        command: bcc-wrapper funccount
     funclatency:
-        command: usr/share/bcc/tools/funclatency
+        command: bcc-wrapper funclatency
     funcslower:
-        command: usr/share/bcc/tools/funcslower
+        command: bcc-wrapper funcslower
     gethostlatency:
-        command: usr/share/bcc/tools/gethostlatency
+        command: bcc-wrapper gethostlatency
     hardirqs:
-        command: usr/share/bcc/tools/hardirqs
+        command: bcc-wrapper hardirqs
     javacalls:
-        command: usr/share/bcc/tools/javacalls
+        command: bcc-wrapper javacalls
     javaflow:
-        command: usr/share/bcc/tools/javaflow
+        command: bcc-wrapper javaflow
     javagc:
-        command: usr/share/bcc/tools/javagc
+        command: bcc-wrapper javagc
     javaobjnew:
-        command: usr/share/bcc/tools/javaobjnew
+        command: bcc-wrapper javaobjnew
     javastat:
-        command: usr/share/bcc/tools/javastat
+        command: bcc-wrapper javastat
     javathreads:
-        command: usr/share/bcc/tools/javathreads
+        command: bcc-wrapper javathreads
     killsnoop:
-        command: usr/share/bcc/tools/killsnoop
+        command: bcc-wrapper killsnoop
     llcstat:
-        command: usr/share/bcc/tools/llcstat
+        command: bcc-wrapper llcstat
     mdflush:
-        command: usr/share/bcc/tools/mdflush
+        command: bcc-wrapper mdflush
     memleak:
-        command: usr/share/bcc/tools/memleak
+        command: bcc-wrapper memleak
     mountsnoop:
-        command: usr/share/bcc/tools/mountsnoop
+        command: bcc-wrapper mountsnoop
     mysqld-qslower:
-        command: usr/share/bcc/tools/mysqld_qslower
+        command: bcc-wrapper mysqld_qslower
     nfsdist:
-        command: usr/share/bcc/tools/nfsdist
+        command: bcc-wrapper nfsdist
     nfsslower:
-        command: usr/share/bcc/tools/nfsslower
+        command: bcc-wrapper nfsslower
     nodegc:
-        command: usr/share/bcc/tools/nodegc
+        command: bcc-wrapper nodegc
     nodestat:
-        command: usr/share/bcc/tools/nodestat
+        command: bcc-wrapper nodestat
     offcputime:
-        command: usr/share/bcc/tools/offcputime
+        command: bcc-wrapper offcputime
     offwaketime:
-        command: usr/share/bcc/tools/offwaketime
+        command: bcc-wrapper offwaketime
     oomkill:
-        command: usr/share/bcc/tools/oomkill
+        command: bcc-wrapper oomkill
     opensnoop:
-        command: usr/share/bcc/tools/opensnoop
+        command: bcc-wrapper opensnoop
     perlcalls:
-        command: usr/share/bcc/tools/perlcalls
+        command: bcc-wrapper perlcalls
     perlflow:
-        command: usr/share/bcc/tools/perlflow
+        command: bcc-wrapper perlflow
     perlstat:
-        command: usr/share/bcc/tools/perlstat
+        command: bcc-wrapper perlstat
     shmsnoop:
-        command: usr/share/bcc/tools/shmsnoop
+        command: bcc-wrapper shmsnoop
     sofdsnoop:
-        command: usr/share/bcc/tools/sofdsnoop
+        command: bcc-wrapper sofdsnoop
     phpcalls:
-        command: usr/share/bcc/tools/phpcalls
+        command: bcc-wrapper phpcalls
     phpflow:
-        command: usr/share/bcc/tools/phpflow
+        command: bcc-wrapper phpflow
     phpstat:
-        command: usr/share/bcc/tools/phpstat
+        command: bcc-wrapper phpstat
     pidpersec:
-        command: usr/share/bcc/tools/pidpersec
+        command: bcc-wrapper pidpersec
     profile:
-        command: usr/share/bcc/tools/profile
+        command: bcc-wrapper profile
     pythoncalls:
-        command: usr/share/bcc/tools/pythoncalls
+        command: bcc-wrapper pythoncalls
     pythonflow:
-        command: usr/share/bcc/tools/pythonflow
+        command: bcc-wrapper pythonflow
     pythongc:
-        command: usr/share/bcc/tools/pythongc
+        command: bcc-wrapper pythongc
     pythonstat:
-        command: usr/share/bcc/tools/pythonstat
+        command: bcc-wrapper pythonstat
     rubycalls:
-        command: usr/share/bcc/tools/rubycalls
+        command: bcc-wrapper rubycalls
     rubyflow:
-        command: usr/share/bcc/tools/rubyflow
+        command: bcc-wrapper rubyflow
     rubygc:
-        command: usr/share/bcc/tools/rubygc
+        command: bcc-wrapper rubygc
     rubyobjnew:
-        command: usr/share/bcc/tools/rubyobjnew
+        command: bcc-wrapper rubyobjnew
     rubystat:
-        command: usr/share/bcc/tools/rubystat
+        command: bcc-wrapper rubystat
     runqlat:
-        command: usr/share/bcc/tools/runqlat
+        command: bcc-wrapper runqlat
     runqlen:
-        command: usr/share/bcc/tools/runqlen
+        command: bcc-wrapper runqlen
     slabratetop:
-        command: usr/share/bcc/tools/slabratetop
+        command: bcc-wrapper slabratetop
     softirqs:
-        command: usr/share/bcc/tools/softirqs
+        command: bcc-wrapper softirqs
     solisten:
-        command: usr/share/bcc/tools/solisten
+        command: bcc-wrapper solisten
     sslsniff:
-        command: usr/share/bcc/tools/sslsniff
+        command: bcc-wrapper sslsniff
     stackcount:
-        command: usr/share/bcc/tools/stackcount
+        command: bcc-wrapper stackcount
     statsnoop:
-        command: usr/share/bcc/tools/statsnoop
+        command: bcc-wrapper statsnoop
     syncsnoop:
-        command: usr/share/bcc/tools/syncsnoop
+        command: bcc-wrapper syncsnoop
     syscount:
-        command: usr/share/bcc/tools/syscount
+        command: bcc-wrapper syscount
     tcpaccept:
-        command: usr/share/bcc/tools/tcpaccept
+        command: bcc-wrapper tcpaccept
     tcpconnect:
-        command: usr/share/bcc/tools/tcpconnect
+        command: bcc-wrapper tcpconnect
     tcpconnlat:
-        command: usr/share/bcc/tools/tcpconnlat
+        command: bcc-wrapper tcpconnlat
     tcplife:
-        command: usr/share/bcc/tools/tcplife
+        command: bcc-wrapper tcplife
     tcpretrans:
-        command: usr/share/bcc/tools/tcpretrans
+        command: bcc-wrapper tcpretrans
     tcptop:
-        command: usr/share/bcc/tools/tcptop
+        command: bcc-wrapper tcptop
     tcptracer:
-        command: usr/share/bcc/tools/tcptracer
+        command: bcc-wrapper tcptracer
     tplist:
-        command: usr/share/bcc/tools/tplist
+        command: bcc-wrapper tplist
     trace:
-        command: usr/share/bcc/tools/trace
+        command: bcc-wrapper trace
     ttysnoop:
-        command: usr/share/bcc/tools/ttysnoop
+        command: bcc-wrapper ttysnoop
     ucalls:
-        command: usr/share/bcc/tools/lib/ucalls
+        command: bcc-wrapper lib/ucalls
     uflow:
-        command: usr/share/bcc/tools/lib/uflow
+        command: bcc-wrapper lib/uflow
     ugc:
-        command: usr/share/bcc/tools/lib/ugc
+        command: bcc-wrapper lib/ugc
     uobjnew:
-        command: usr/share/bcc/tools/lib/uobjnew
+        command: bcc-wrapper lib/uobjnew
     ustat:
-        command: usr/share/bcc/tools/lib/ustat
+        command: bcc-wrapper lib/ustat
     uthreads:
-        command: usr/share/bcc/tools/lib/uthreads
+        command: bcc-wrapper lib/uthreads
     vfscount:
-        command: usr/share/bcc/tools/vfscount
+        command: bcc-wrapper vfscount
     vfsstat:
-        command: usr/share/bcc/tools/vfsstat
+        command: bcc-wrapper vfsstat
     wakeuptime:
-        command: usr/share/bcc/tools/wakeuptime
+        command: bcc-wrapper wakeuptime
     xfsdist:
-        command: usr/share/bcc/tools/xfsdist
+        command: bcc-wrapper xfsdist
     xfsslower:
-        command: usr/share/bcc/tools/xfsslower
+        command: bcc-wrapper xfsslower
     zfsdist:
-        command: usr/share/bcc/tools/zfsdist
+        command: bcc-wrapper zfsdist
     zfsslower:
-        command: usr/share/bcc/tools/zfsslower
+        command: bcc-wrapper zfsslower
 
 # vim: set ai et sts=4 tabstop=4 sw=4:
