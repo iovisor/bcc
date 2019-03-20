@@ -5,22 +5,22 @@ biosnoop traces block device I/O (disk I/O), and prints a line of output
 per I/O. Example:
 
 # ./biosnoop
-TIME(s)        COMM           PID    DISK    T  SECTOR    BYTES   LAT(ms)
-0.000004001    supervise      1950   xvda1   W  13092560  4096       0.74
-0.000178002    supervise      1950   xvda1   W  13092432  4096       0.61
-0.001469001    supervise      1956   xvda1   W  13092440  4096       1.24
-0.001588002    supervise      1956   xvda1   W  13115128  4096       1.09
-1.022346001    supervise      1950   xvda1   W  13115272  4096       0.98
-1.022568002    supervise      1950   xvda1   W  13188496  4096       0.93
-1.023534000    supervise      1956   xvda1   W  13188520  4096       0.79
-1.023585003    supervise      1956   xvda1   W  13189512  4096       0.60
-2.003920000    xfsaild/md0    456    xvdc    W  62901512  8192       0.23
-2.003931001    xfsaild/md0    456    xvdb    W  62901513  512        0.25
-2.004034001    xfsaild/md0    456    xvdb    W  62901520  8192       0.35
-2.004042000    xfsaild/md0    456    xvdb    W  63542016  4096       0.36
-2.004204001    kworker/0:3    26040  xvdb    W  41950344  65536      0.34
-2.044352002    supervise      1950   xvda1   W  13192672  4096       0.65
-2.044574000    supervise      1950   xvda1   W  13189072  4096       0.58
+TIME(s)     COMM           PID    DISK    T SECTOR     BYTES   LAT(ms)
+0.000004    supervise      1950   xvda1   W 13092560   4096       0.74
+0.000178    supervise      1950   xvda1   W 13092432   4096       0.61
+0.001469    supervise      1956   xvda1   W 13092440   4096       1.24
+0.001588    supervise      1956   xvda1   W 13115128   4096       1.09
+1.022346    supervise      1950   xvda1   W 13115272   4096       0.98
+1.022568    supervise      1950   xvda1   W 13188496   4096       0.93
+1.023534    supervise      1956   xvda1   W 13188520   4096       0.79
+1.023585    supervise      1956   xvda1   W 13189512   4096       0.60
+2.003920    xfsaild/md0    456    xvdc    W 62901512   8192       0.23
+2.003931    xfsaild/md0    456    xvdb    W 62901513   512        0.25
+2.004034    xfsaild/md0    456    xvdb    W 62901520   8192       0.35
+2.004042    xfsaild/md0    456    xvdb    W 63542016   4096       0.36
+2.004204    kworker/0:3    26040  xvdb    W 41950344   65536      0.34
+2.044352    supervise      1950   xvda1   W 13192672   4096       0.65
+2.044574    supervise      1950   xvda1   W 13189072   4096       0.58
 
 This includes the PID and comm (process name) that were on-CPU at the time of
 issue (which usually means the process responsible).
@@ -47,3 +47,31 @@ There are 4 write IOPS.
 The output of biosnoop identifies the reason: multiple supervise processes are
 issuing writes to the xvda1 disk. I can now drill down on supervise using other
 tools to understand its file system workload.
+
+
+The -Q option includes a column to show the time spent queued in the OS:
+
+# biosnoop.py -Q
+TIME(s)     COMM           PID    DISK    T SECTOR     BYTES  QUE(ms) LAT(ms)
+0.000000    kworker/u72:1  13379  nvme1n1 W 1142400    4096      0.01    0.55
+0.000771    sync           22177  nvme1n1 W 41963894   3072      0.11    0.47
+5.332998    xfsaild/nvme1n 1061   nvme1n1 W 545728     16384     0.01    0.61
+5.333044    xfsaild/nvme1n 1061   nvme1n1 W 2349728    16384     0.02    0.64
+5.333065    xfsaild/nvme1n 1061   nvme1n1 W 20971521   512       0.02    0.65
+5.333067    xfsaild/nvme1n 1061   nvme1n1 W 20971528   8192      0.00    0.65
+[...]
+
+
+USAGE message:
+
+usage: biosnoop.py [-h] [-Q]
+
+Trace block I/O
+
+optional arguments:
+  -h, --help   show this help message and exit
+  -Q, --queue  include OS queued time
+
+examples:
+    ./biosnoop           # trace all block I/O
+    ./biosnoop -Q        # include OS queued time

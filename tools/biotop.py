@@ -93,7 +93,7 @@ int trace_pid_start(struct pt_regs *ctx, struct request *req)
     struct who_t who = {};
 
     if (bpf_get_current_comm(&who.name, sizeof(who.name)) == 0) {
-        who.pid = bpf_get_current_pid_tgid();
+        who.pid = bpf_get_current_pid_tgid() >> 32;
         whobyreq.update(&req, &who);
     }
 

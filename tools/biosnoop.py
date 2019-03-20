@@ -2,7 +2,7 @@
 # @lint-avoid-python-3-compatibility-imports
 #
 # biosnoop  Trace block device I/O and print details including issuing PID.
-#       For Linux, uses BCC, eBPF.
+#           For Linux, uses BCC, eBPF.
 #
 # This uses in-kernel eBPF maps to cache process details (PID and comm) by I/O
 # request, as well as a starting timestamp for calculating I/O latency.
@@ -16,13 +16,31 @@
 from __future__ import print_function
 from bcc import BPF
 import re
+import argparse
 
-# load BPF program
-b = BPF(text="""
+# arguments
+examples = """examples:
+    ./biosnoop           # trace all block I/O
+    ./biosnoop -Q        # include OS queued time
+"""
+parser = argparse.ArgumentParser(
+    description="Trace block I/O",
+    formatter_class=argparse.RawDescriptionHelpFormatter,
+    epilog=examples)
+parser.add_argument("-Q", "--queue", action="store_true",
+    help="include OS queued time")
+parser.add_argument("--ebpf", action="store_true",
+    help=argparse.SUPPRESS)
+args = parser.parse_args()
+debug = 0
+
+# define BPF program
+bpf_text="""
 #include <uapi/linux/ptrace.h>
 #include <linux/blkdev.h>
 
 struct val_t {
+    u64 ts;
     u32 pid;
     char name[TASK_COMM_LEN];
 };
@@ -31,6 +49,7 @@ struct data_t {
     u32 pid;
     u64 rwflag;
     u64 delta;
+    u64 qdelta;
     u64 sector;
     u64 len;
     u64 ts;
@@ -46,9 +65,13 @@ BPF_PERF_OUTPUT(events);
 int trace_pid_start(struct pt_regs *ctx, struct request *req)
 {
     struct val_t val = {};
+    u64 ts;
 
     if (bpf_get_current_comm(&val.name, sizeof(val.name)) == 0) {
-        val.pid = bpf_get_current_pid_tgid();
+        val.pid = bpf_get_current_pid_tgid() >> 32;
+        if (##QUEUE##) {
+            val.ts = bpf_ktime_get_ns();
+        }
         infobyreq.update(&req, &val);
     }
     return 0;
@@ -58,18 +81,15 @@ int trace_pid_start(struct pt_regs *ctx, struct request *req)
 int trace_req_start(struct pt_regs *ctx, struct request *req)
 {
     u64 ts;
-
     ts = bpf_ktime_get_ns();
     start.update(&req, &ts);
-
     return 0;
 }
 
 // output
 int trace_req_completion(struct pt_regs *ctx, struct request *req)
 {
-    u64 *tsp, delta;
-    u32 *pidp = 0;
+    u64 *tsp;
     struct val_t *valp;
     struct data_t data = {};
     u64 ts;
@@ -83,12 +103,16 @@ int trace_req_completion(struct pt_regs *ctx, struct request *req)
     ts = bpf_ktime_get_ns();
     data.delta = ts - *tsp;
     data.ts = ts / 1000;
+    data.qdelta = 0;
 
     valp = infobyreq.lookup(&req);
     if (valp == 0) {
         data.len = req->__data_len;
         strcpy(data.name, "?");
     } else {
+        if (##QUEUE##) {
+            data.qdelta = *tsp - valp->ts;
+        }
         data.pid = valp->pid;
         data.len = req->__data_len;
         data.sector = req->__sector;
@@ -119,7 +143,18 @@ int trace_req_completion(struct pt_regs *ctx, struct request *req)
 
     return 0;
 }
-""", debug=0)
+"""
+if args.queue:
+    bpf_text = bpf_text.replace('##QUEUE##', '1')
+else:
+    bpf_text = bpf_text.replace('##QUEUE##', '0')
+if debug or args.ebpf:
+    print(bpf_text)
+    if args.ebpf:
+        exit()
+
+# initialize BPF
+b = BPF(text=bpf_text)
 b.attach_kprobe(event="blk_account_io_start", fn_name="trace_pid_start")
 if BPF.get_kprobe_functions(b'blk_start_request'):
     b.attach_kprobe(event="blk_start_request", fn_name="trace_req_start")
@@ -128,8 +163,11 @@ b.attach_kprobe(event="blk_account_io_completion",
     fn_name="trace_req_completion")
 
 # header
-print("%-14s %-14s %-6s %-7s %-2s %-9s %-7s %7s" % ("TIME(s)", "COMM", "PID",
-    "DISK", "T", "SECTOR", "BYTES", "LAT(ms)"))
+print("%-11s %-14s %-6s %-7s %-1s %-10s %-7s" % ("TIME(s)", "COMM", "PID",
+    "DISK", "T", "SECTOR", "BYTES"), end="")
+if args.queue:
+    print("%7s " % ("QUE(ms)"), end="")
+print("%7s" % "LAT(ms)")
 
 rwflg = ""
 start_ts = 0
@@ -140,33 +178,24 @@ delta = 0
 def print_event(cpu, data, size):
     event = b["events"].event(data)
 
-    val = -1
     global start_ts
-    global prev_ts
-    global delta
+    if start_ts == 0:
+        start_ts = event.ts
 
     if event.rwflag == 1:
         rwflg = "W"
-
-    if event.rwflag == 0:
+    else:
         rwflg = "R"
 
-    if not re.match(b'\?', event.name):
-        val = event.sector
+    delta = float(event.ts) - start_ts
 
-    if start_ts == 0:
-        prev_ts = start_ts
-
-    if start_ts == 1:
-        delta = float(delta) + (event.ts - prev_ts)
-
-    print("%-14.9f %-14.14s %-6s %-7s %-2s %-9s %-7s %7.2f" % (
+    print("%-11.6f %-14.14s %-6s %-7s %-1s %-10s %-7s" % (
         delta / 1000000, event.name.decode('utf-8', 'replace'), event.pid,
-        event.disk_name.decode('utf-8', 'replace'), rwflg, val,
-        event.len, float(event.delta) / 1000000))
-
-    prev_ts = event.ts
-    start_ts = 1
+        event.disk_name.decode('utf-8', 'replace'), rwflg, event.sector,
+        event.len), end="")
+    if args.queue:
+        print("%7.2f " % (float(event.qdelta) / 1000000), end="")
+    print("%7.2f" % (float(event.delta) / 1000000))
 
 # loop with callback to print_event
 b["events"].open_perf_buffer(print_event, page_cnt=64)
