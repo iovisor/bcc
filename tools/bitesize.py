@@ -11,6 +11,7 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
 # 05-Feb-2016 Allan McAleavy ran pep8 against file
+# 19-Mar-2019 Brendan Gregg  Switched to use tracepoints.
 
 from bcc import BPF
 from time import sleep
@@ -24,47 +25,21 @@ struct proc_key_t {
     u64 slot;
 };
 
-struct val_t {
-    char name[TASK_COMM_LEN];
-};
-
 BPF_HISTOGRAM(dist, struct proc_key_t);
-BPF_HASH(commbyreq, struct request *, struct val_t);
 
-int trace_pid_start(struct pt_regs *ctx, struct request *req)
+TRACEPOINT_PROBE(block, block_rq_insert)
 {
-    struct val_t val = {};
-
-    if (bpf_get_current_comm(&val.name, sizeof(val.name)) == 0) {
-        commbyreq.update(&req, &val);
-    }
-    return 0;
-}
-
-int do_count(struct pt_regs *ctx, struct request *req)
-{
-    struct val_t *valp;
-
-    valp = commbyreq.lookup(&req);
-    if (valp == 0) {
-       return 0;
-    }
-
-    if (req->__data_len > 0) {
-        struct proc_key_t key = {.slot = bpf_log2l(req->__data_len / 1024)};
-        bpf_probe_read(&key.name, sizeof(key.name),valp->name);
-        dist.increment(key);
-    }
+    struct proc_key_t key = {.slot = bpf_log2l(args->bytes / 1024)};
+    bpf_probe_read(&key.name, sizeof(key.name), args->comm);
+    dist.increment(key);
     return 0;
 }
 """
 
 # load BPF program
 b = BPF(text=bpf_text)
-b.attach_kprobe(event="blk_account_io_start", fn_name="trace_pid_start")
-b.attach_kprobe(event="blk_account_io_completion", fn_name="do_count")
 
-print("Tracing... Hit Ctrl-C to end.")
+print("Tracing block I/O... Hit Ctrl-C to end.")
 
 # trace until Ctrl-C
 dist = b.get_table("dist")
