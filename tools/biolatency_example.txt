@@ -198,10 +198,105 @@ This output sows that xvda1 has much higher latency, usually between 0.5 ms
 and 32 ms, whereas xvdc is usually between 0.2 ms and 4 ms.
 
 
+The -F option prints a separate histogram for each unique set of request
+flags. For example:
+
+./biolatency.py -Fm
+Tracing block device I/O... Hit Ctrl-C to end.
+^C
+
+flags = Read
+     msecs               : count     distribution
+         0 -> 1          : 180      |*************                           |
+         2 -> 3          : 519      |****************************************|
+         4 -> 7          : 60       |****                                    |
+         8 -> 15         : 123      |*********                               |
+        16 -> 31         : 68       |*****                                   |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 2        |                                        |
+       128 -> 255        : 12       |                                        |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 1        |                                        |
+
+flags = Sync-Write
+     msecs               : count     distribution
+         0 -> 1          : 5        |****************************************|
+
+flags = Flush
+     msecs               : count     distribution
+         0 -> 1          : 2        |****************************************|
+
+flags = Metadata-Read
+     msecs               : count     distribution
+         0 -> 1          : 3        |****************************************|
+         2 -> 3          : 2        |**************************              |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 1        |*************                           |
+        16 -> 31         : 1        |*************                           |
+
+flags = Write
+     msecs               : count     distribution
+         0 -> 1          : 103      |*******************************         |
+         2 -> 3          : 106      |********************************        |
+         4 -> 7          : 130      |****************************************|
+         8 -> 15         : 79       |************************                |
+        16 -> 31         : 5        |*                                       |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 1        |                                        |
+
+flags = NoMerge-Read
+     msecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 5        |****************************************|
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 1        |********                                |
+
+flags = NoMerge-Write
+     msecs               : count     distribution
+         0 -> 1          : 30       |**                                      |
+         2 -> 3          : 293      |********************                    |
+         4 -> 7          : 564      |****************************************|
+         8 -> 15         : 463      |********************************        |
+        16 -> 31         : 21       |*                                       |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 5        |                                        |
+
+flags = Priority-Metadata-Read
+     msecs               : count     distribution
+         0 -> 1          : 1        |****************************************|
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 1        |****************************************|
+         8 -> 15         : 1        |****************************************|
+
+flags = ForcedUnitAccess-Metadata-Sync-Write
+     msecs               : count     distribution
+         0 -> 1          : 2        |****************************************|
+
+flags = ReadAhead-Read
+     msecs               : count     distribution
+         0 -> 1          : 15       |***************************             |
+         2 -> 3          : 22       |****************************************|
+         4 -> 7          : 14       |*************************               |
+         8 -> 15         : 8        |**************                          |
+        16 -> 31         : 1        |*                                       |
+
+flags = Priority-Metadata-Write
+     msecs               : count     distribution
+         0 -> 1          : 9        |****************************************|
+
+These can be handled differently by the storage device, and this mode lets us
+examine their performance in isolation.
+
+
 USAGE message:
 
 # ./biolatency -h
-usage: biolatency [-h] [-T] [-Q] [-m] [-D] [interval] [count]
+usage: biolatency [-h] [-T] [-Q] [-m] [-D] [-F] [interval] [count]
 
 Summarize block device I/O latency as a histogram
 
@@ -215,6 +310,7 @@ optional arguments:
   -Q, --queued        include OS queued time in I/O time
   -m, --milliseconds  millisecond histogram
   -D, --disks         print a histogram per disk device
+  -F, --flags         print a histogram per set of I/O flags
 
 examples:
     ./biolatency            # summarize block I/O latency as a histogram
@@ -222,3 +318,4 @@ examples:
     ./biolatency -mT 1      # 1s summaries, milliseconds, and timestamps
     ./biolatency -Q         # include OS queued time in I/O time
     ./biolatency -D         # show each disk device separately
+    ./biolatency -F         # show I/O flags separately
