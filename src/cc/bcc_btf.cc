@@ -179,7 +179,7 @@ int BTF::load(uint8_t *btf_sec, uintptr_t btf_sec_size,
 
   if (new_btf_sec) {
     btf = btf__new(new_btf_sec, new_btf_sec_size);
-    delete new_btf_sec;
+    delete[] new_btf_sec;
   } else {
     btf = btf__new(btf_sec, btf_sec_size);
   }
