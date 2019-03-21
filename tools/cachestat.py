@@ -124,13 +124,13 @@ while 1:
     for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
         func = b.ksym(k.ip)
         # partial string matches in case of .isra (necessary?)
-        if func.find("mark_page_accessed") == 0:
+        if func.find(b"mark_page_accessed") == 0:
             mpa = max(0, v.value)
-        if func.find("mark_buffer_dirty") == 0:
+        if func.find(b"mark_buffer_dirty") == 0:
             mbd = max(0, v.value)
-        if func.find("add_to_page_cache_lru") == 0:
+        if func.find(b"add_to_page_cache_lru") == 0:
             apcl = max(0, v.value)
-        if func.find("account_page_dirtied") == 0:
+        if func.find(b"account_page_dirtied") == 0:
             apd = max(0, v.value)
 
     # total = total cache accesses without counting dirties
