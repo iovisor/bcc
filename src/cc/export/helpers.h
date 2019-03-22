@@ -735,6 +735,9 @@ int bpf_usdt_readarg_p(int argc, struct pt_regs *ctx, void *buf, u64 len) asm("l
 #elif defined(__TARGET_ARCH_s930x)
 #define bpf_target_s930x
 #define bpf_target_defined
+#elif defined(__TARGET_ARCH_arm)
+#define bpf_target_arm
+#define bpf_target_defined
 #elif defined(__TARGET_ARCH_arm64)
 #define bpf_target_arm64
 #define bpf_target_defined
@@ -751,6 +754,8 @@ int bpf_usdt_readarg_p(int argc, struct pt_regs *ctx, void *buf, u64 len) asm("l
 #define bpf_target_x86
 #elif defined(__s390x__)
 #define bpf_target_s930x
+#elif defined(__arm__)
+#define bpf_target_arm
 #elif defined(__aarch64__)
 #define bpf_target_arm64
 #elif defined(__powerpc__)
@@ -791,6 +796,17 @@ int bpf_usdt_readarg_p(int argc, struct pt_regs *ctx, void *buf, u64 len) asm("l
 #define PT_REGS_RC(ctx)		((ctx)->ax)
 #define PT_REGS_IP(ctx)		((ctx)->ip)
 #define PT_REGS_SP(ctx)		((ctx)->sp)
+#elif defined(bpf_target_arm)
+#define PT_REGS_PARM1(x) ((x)->uregs[0])
+#define PT_REGS_PARM2(x) ((x)->uregs[1])
+#define PT_REGS_PARM3(x) ((x)->uregs[2])
+#define PT_REGS_PARM4(x) ((x)->uregs[3])
+#define PT_REGS_PARM5(x) ((x)->uregs[4])
+#define PT_REGS_RET(x) ((x)->uregs[14])
+#define PT_REGS_FP(x) ((x)->uregs[11]) /* Works only with CONFIG_FRAME_POINTER */
+#define PT_REGS_RC(x) ((x)->uregs[0])
+#define PT_REGS_SP(x) ((x)->uregs[13])
+#define PT_REGS_IP(x) ((x)->uregs[12])
 #elif defined(bpf_target_arm64)
 #define PT_REGS_PARM1(x)	((x)->regs[0])
 #define PT_REGS_PARM2(x)	((x)->regs[1])
