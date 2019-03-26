@@ -46,6 +46,8 @@ int KBuildHelper::get_flags(const char *uname_machine, vector<string> *cflags) {
     arch = "x86";
   } else if (arch[0] == 'i' && !arch.compare(2, 2, "86")) {
     arch = "x86";
+  } else if (!arch.compare(0, 7, "aarch64") || !arch.compare(0, 5, "arm64")) {
+    arch = "arm64";
   } else if (!arch.compare(0, 3, "arm")) {
     arch = "arm";
   } else if (!arch.compare(0, 5, "sa110")) {
@@ -60,8 +62,6 @@ int KBuildHelper::get_flags(const char *uname_machine, vector<string> *cflags) {
     arch = "mips";
   } else if (!arch.compare(0, 2, "sh")) {
     arch = "sh";
-  } else if (!arch.compare(0, 7, "aarch64")) {
-    arch = "arm64";
   }
 
   cflags->push_back("-nostdinc");
