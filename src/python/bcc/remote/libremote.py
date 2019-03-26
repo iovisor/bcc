@@ -21,6 +21,7 @@ import os
 
 from .shell import ShellRemote
 from .adb import AdbRemote
+from .ssh import SshRemote
 
 class BpfCreateMapAttr(ct.Structure):
     _fields_ = [("name", ct.c_char_p),
