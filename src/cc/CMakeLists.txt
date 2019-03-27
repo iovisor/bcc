@@ -30,10 +30,10 @@ include(static_libstdc++)
 
 file(GLOB libbpf_sources "libbpf/src/*.c")
 add_library(bpf-static STATIC libbpf.c perf_reader.c ${libbpf_sources})
-set_target_properties(bpf-static PROPERTIES OUTPUT_NAME bpf)
+set_target_properties(bpf-static PROPERTIES OUTPUT_NAME bcc_bpf)
 add_library(bpf-shared SHARED libbpf.c perf_reader.c ${libbpf_sources})
 set_target_properties(bpf-shared PROPERTIES VERSION ${REVISION_LAST} SOVERSION 0)
-set_target_properties(bpf-shared PROPERTIES OUTPUT_NAME bpf)
+set_target_properties(bpf-shared PROPERTIES OUTPUT_NAME bcc_bpf)
 
 set(bcc_common_sources bcc_common.cc bpf_module.cc bcc_btf.cc exported_files.cc)
 if (${LLVM_PACKAGE_VERSION} VERSION_EQUAL 6 OR ${LLVM_PACKAGE_VERSION} VERSION_GREATER 6)
