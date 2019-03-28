@@ -420,7 +420,7 @@ Examples in situ:
 
 ### 8. bpf_log2l()
 
-Syntax: ```unsigned int bpf_log2l(unsigned long v)```
+Syntax: ```unsigned int bpf_log2l(unsigned long long v)```
 
 Returns the log-2 of the provided value. This is often used to create indexes for histograms, to construct power-of-2 histograms.
 

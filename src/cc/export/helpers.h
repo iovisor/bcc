@@ -534,10 +534,12 @@ u64 bpf_ntohll(u64 val) {
   return __builtin_bswap64(val);
 }
 
+#ifdef __SIZEOF_INT128__
 static inline __attribute__((always_inline))
 unsigned __int128 bpf_ntoh128(unsigned __int128 val) {
   return (((unsigned __int128)bpf_ntohll(val) << 64) | (u64)bpf_ntohll(val >> 64));
 }
+#endif
 
 static inline __attribute__((always_inline))
 u16 bpf_htons(u16 val) {
@@ -554,10 +556,12 @@ u64 bpf_htonll(u64 val) {
   return bpf_ntohll(val);
 }
 
+#ifdef __SIZEOF_INT128__
 static inline __attribute__((always_inline))
 unsigned __int128 bpf_hton128(unsigned __int128 val) {
   return bpf_ntoh128(val);
 }
+#endif
 
 static inline __attribute__((always_inline))
 u64 load_dword(void *skb, u64 off) {
@@ -576,7 +580,9 @@ bpf_store_dword(void *skb, u64 off, u64 val) {
 }
 
 #define MASK(_n) ((_n) < 64 ? (1ull << (_n)) - 1 : ((u64)-1LL))
+#ifdef __SIZEOF_INT128__
 #define MASK128(_n) ((_n) < 128 ? ((unsigned __int128)1 << (_n)) - 1 : ((unsigned __int128)-1))
+#endif
 
 static inline __attribute__((always_inline))
 unsigned int bpf_log2(unsigned int v)
@@ -593,7 +599,7 @@ unsigned int bpf_log2(unsigned int v)
 }
 
 static inline __attribute__((always_inline))
-unsigned int bpf_log2l(unsigned long v)
+unsigned int bpf_log2l(unsigned long long v)
 {
   unsigned int hi = v >> 32;
   if (hi)

@@ -100,6 +100,11 @@ int KBuildHelper::get_flags(const char *uname_machine, vector<string> *cflags) {
   if (archenv)
 	cflags->push_back("-D__TARGET_ARCH_" + arch);
 
+  // Linux enables cmpxchg instructions unconditionally on arm64, but on normal
+  // arm they're hidden behind an #if __LINUX_ARM_ARCH__ >= 6 test so define it
+  if (!arch.compare(0, 3, "arm") && arch.compare(0, 5, "arm64") < 0)
+	cflags->push_back("-D__LINUX_ARM_ARCH__=6");
+
   cflags->push_back("-Wno-unused-value");
   cflags->push_back("-Wno-pointer-sign");
   cflags->push_back("-fno-stack-protector");

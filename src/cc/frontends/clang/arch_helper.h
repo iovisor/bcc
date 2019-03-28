@@ -21,6 +21,7 @@ typedef enum {
   BCC_ARCH_PPC,
   BCC_ARCH_PPC_LE,
   BCC_ARCH_S390X,
+  BCC_ARCH_ARM,
   BCC_ARCH_ARM64,
   BCC_ARCH_X86
 } bcc_arch_t;
@@ -41,6 +42,8 @@ static void *run_arch_callback(arch_callback_t fn)
 #endif
 #elif defined(__s390x__)
     return fn(BCC_ARCH_S390X);
+#elif defined(__arm__)
+    return fn(BCC_ARCH_ARM);
 #elif defined(__aarch64__)
     return fn(BCC_ARCH_ARM64);
 #else
@@ -59,6 +62,8 @@ static void *run_arch_callback(arch_callback_t fn)
     return fn(BCC_ARCH_S390X);
   } else if (!strcmp(archenv, "arm64")) {
     return fn(BCC_ARCH_ARM64);
+  } else if (!strcmp(archenv, "arm")) {
+    return fn(BCC_ARCH_ARM);
   } else {
     return fn(BCC_ARCH_X86);
   }
