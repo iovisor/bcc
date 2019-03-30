@@ -81,7 +81,6 @@ Command line tools for BPF Compiler Collection (BCC)
 
 %package -n bpfd
 Summary: Proxy daemon for remote target devices
-Requires: libbcc = %{version}-%{release}
 %description -n bpfd
 Proxy daemon for remote target devices
 
