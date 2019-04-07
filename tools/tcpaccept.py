@@ -89,7 +89,7 @@ bpf_text_kprobe = """
 int kretprobe__inet_csk_accept(struct pt_regs *ctx)
 {
     struct sock *newsk = (struct sock *)PT_REGS_RC(ctx);
-    u32 pid = bpf_get_current_pid_tgid();
+    u32 pid = bpf_get_current_pid_tgid() >> 32;
 
     ##FILTER_PID##
 
@@ -177,7 +177,7 @@ TRACEPOINT_PROBE(sock, inet_sock_set_state)
         return 0;
     if (args->oldstate != TCP_SYN_RECV || args->newstate != TCP_ESTABLISHED)
         return 0;
-    u32 pid = bpf_get_current_pid_tgid();
+    u32 pid = bpf_get_current_pid_tgid() >> 32;
 
     ##FILTER_PID##
 
