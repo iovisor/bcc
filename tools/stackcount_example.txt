@@ -843,8 +843,8 @@ This folded output can be piped directly into flamegraph.pl (the Perl version).
 USAGE message:
 
 # ./stackcount -h
-usage: stackcount [-h] [-p PID] [-i INTERVAL] [-D DURATION] [-T] [-r] [-s]
-                  [-P] [-K] [-U] [-v] [-d] [-f] [--debug]
+usage: stackcount [-h] [-p PID] [-c CPU] [-i INTERVAL] [-D DURATION] [-T] [-r]
+                  [-s] [-P] [-K] [-U] [-v] [-d] [-f] [--debug]
                   pattern
 
 Count events and their stack traces
@@ -855,6 +855,7 @@ positional arguments:
 optional arguments:
   -h, --help            show this help message and exit
   -p PID, --pid PID     trace this PID only
+  -c CPU, --cpu CPU     trace this CPU only
   -i INTERVAL, --interval INTERVAL
                         summary interval, seconds
   -D DURATION, --duration DURATION
@@ -886,5 +887,6 @@ examples:
     ./stackcount -p 185 c:malloc    # count stacks for malloc in PID 185
     ./stackcount t:sched:sched_fork # count stacks for sched_fork tracepoint
     ./stackcount -p 185 u:node:*    # count stacks for all USDT probes in node
+    ./stackcount -c 1 put_prev_entity   # count put_prev_entity stacks for CPU 1 only
     ./stackcount -K t:sched:sched_switch   # kernel stacks only
     ./stackcount -U t:sched:sched_switch   # user stacks only

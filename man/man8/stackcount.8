@@ -2,8 +2,8 @@
 .SH NAME
 stackcount \- Count function calls and their stack traces. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B stackcount [\-h] [\-p PID] [\-i INTERVAL] [\-D DURATION] [\-T] [\-r] [\-s]
-              [\-P] [\-K] [\-U] [\-v] [\-d] [\-f] pattern
+.B stackcount [\-h] [\-p PID] [\-c CPU] [\-i INTERVAL] [\-D DURATION] [\-T] [\-r]
+              [\-s] [\-P] [\-K] [\-U] [\-v] [\-d] [\-f] pattern
 .SH DESCRIPTION
 stackcount traces functions and frequency counts them with their entire
 stack trace, kernel stack and user stack, summarized in-kernel for efficiency.
@@ -54,6 +54,9 @@ Folded output format.
 \-p PID
 Trace this process ID only (filtered in-kernel).
 .TP
+\-c CPU
+Trace this CPU only (filtered in-kernel).
+.TP
 .TP
 pattern
 A function name, or a search pattern. Can include wildcards ("*"). If the
@@ -103,6 +106,10 @@ Output every 5 seconds, with timestamps:
 Only count stacks when PID 185 is on-CPU:
 #
 .B stackcount \-p 185 ip_output
+.TP
+Only count stacks for CPU 1:
+#
+.B stackcount \-c 1 put_prev_entity
 .TP
 Count user stacks for dynamic heap allocations with malloc in PID 185:
 #
