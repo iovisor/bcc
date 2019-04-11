@@ -195,6 +195,8 @@ static struct bpf_helper helpers[] = {
   {"tcp_sock", "5.1"},
   {"skb_ecn_set_ce", "5.1"},
   {"get_listener_sock", "5.1"},
+  {"skc_lookup_tcp", "5.2"},
+  {"tcp_check_syncookie", "5.2"},
 };
 
 static uint64_t ptr_to_u64(void *ptr)
