@@ -341,10 +341,17 @@ static int (*bpf_skb_adjust_room)(void *ctx, int len_diff, u32 mode, u64 flags) 
   (void *) BPF_FUNC_skb_adjust_room;
 static int (*bpf_skb_under_cgroup)(void *ctx, void *map, int index) =
   (void *) BPF_FUNC_skb_under_cgroup;
+static struct bpf_sock *(*bpf_skc_lookup_tcp)(void *ctx, struct bpf_sock_tuple *tuple, int size,
+                                              unsigned long long netns_id,
+                                              unsigned long long flags) =
+  (void *) BPF_FUNC_skc_lookup_tcp;
 static int (*bpf_sk_redirect_map)(void *ctx, void *map, int key, int flags) =
   (void *) BPF_FUNC_sk_redirect_map;
 static int (*bpf_sock_map_update)(void *map, void *key, void *value, unsigned long long flags) =
   (void *) BPF_FUNC_sock_map_update;
+static int (*bpf_tcp_check_syncookie)(struct bpf_sock *sk, void *ip, int ip_len, void *tcp,
+                                      int tcp_len) =
+  (void *) BPF_FUNC_tcp_check_syncookie;
 static int (*bpf_xdp_adjust_meta)(void *ctx, int offset) =
   (void *) BPF_FUNC_xdp_adjust_meta;
 
