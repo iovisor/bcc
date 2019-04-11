@@ -304,35 +304,17 @@ bool Context::enable_probe(const std::string &provider_name,
   if (pid_stat_ && pid_stat_->is_stale())
     return false;
 
-  unsigned int matches = 0;
   Probe *found_probe = nullptr;
   for (auto &p : probes_) {
-    if (p->name_ == probe_name) {
-      if (found_probe == nullptr && provider_name == "")
-      {
-        found_probe = p.get();
-        matches++;
+    if (p->name_ == probe_name &&
+        (provider_name.empty() || p->provider() == provider_name)) {
+      if (found_probe != nullptr) {
+        fprintf(stderr, "Two same-name probes (%s) but different providers\n",
+                probe_name.c_str());
+        return false;
       }
-      else if (found_probe != nullptr && provider_name == "")
-      {
-        fprintf(stderr, "Found duplicate provider (%s) for underspecified probe (%s)\n",
-                p->provider().c_str(), p->name().c_str());
-        matches++;
-      } else if (provider_name != "" && p->provider() == provider_name)
-      {
-        found_probe = p.get();
-        matches++;
-      }
+      found_probe = p.get();
     }
-  }
-
-  if (matches > 1) {
-    fprintf(stderr, "Found %i duplicate providers for underpecified probe (%s)\n",
-                matches, fn_name.c_str());
-    return false;
-  } else if(matches < 1) {
-    fprintf(stderr, "No matches found for probe (%s)\n", fn_name.c_str());
-    return false;
   }
 
   if (found_probe != nullptr)
@@ -470,8 +452,7 @@ int bcc_usdt_enable_probe(void *usdt, const char *probe_name,
   return ctx->enable_probe(probe_name, fn_name) ? 0 : -1;
 }
 
-int bcc_usdt_enable_fully_specified_probe(void *usdt,
-                                          const char *provider_name,
+int bcc_usdt_enable_fully_specified_probe(void *usdt, const char *provider_name,
                                           const char *probe_name,
                                           const char *fn_name) {
   USDT::Context *ctx = static_cast<USDT::Context *>(usdt);

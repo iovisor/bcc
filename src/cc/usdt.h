@@ -280,7 +280,8 @@ public:
   Probe *get(int pos) { return probes_[pos].get(); }
 
   bool enable_probe(const std::string &probe_name, const std::string &fn_name);
-  bool enable_probe(const std::string &provider_name, const std::string &probe_name, const std::string &fn_name);
+  bool enable_probe(const std::string &provider_name,
+                    const std::string &probe_name, const std::string &fn_name);
 
   typedef void (*each_cb)(struct bcc_usdt *);
   void each(each_cb callback);
