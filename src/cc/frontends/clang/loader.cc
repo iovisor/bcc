@@ -120,6 +120,7 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, TableStorage &ts,
   const char *version_override = ::getenv("BCC_LINUX_VERSION_CODE");
   bool has_kpath_source = false;
   string vmacro;
+  std::string tmpdir;
 
   if (kpath_env) {
     kpath = string(kpath_env);
@@ -128,6 +129,13 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, TableStorage &ts,
     auto kernel_path_info = get_kernel_path_info(kdir);
     has_kpath_source = kernel_path_info.first;
     kpath = kdir + "/" + kernel_path_info.second;
+  }
+
+  // If all attempts to obtain kheaders fail, check for /proc/kheaders.tar.xz
+  if (!is_dir(kpath)) {
+    int ret = get_proc_kheaders(tmpdir);
+    if (!ret)
+      kpath = tmpdir;
   }
 
   if (flags_ & DEBUG_PREPROCESSOR)
