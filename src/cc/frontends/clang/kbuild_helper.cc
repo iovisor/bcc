@@ -13,9 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#include <fstream>
+#include <iostream>
+
+#include <dirent.h>
 #include <fcntl.h>
 #include <stdlib.h>
-#include <iostream>
+#include <sys/utsname.h>
+#include <unistd.h>
+
 #include "kbuild_helper.h"
 
 namespace ebpf {
@@ -105,6 +111,84 @@ int KBuildHelper::get_flags(const char *uname_machine, vector<string> *cflags) {
   cflags->push_back("-fno-stack-protector");
 
   return 0;
+}
+
+static inline int file_exists(const char *f)
+{
+  struct stat buffer;
+  return (stat(f, &buffer) == 0);
+}
+
+static inline int proc_kheaders_exists(void)
+{
+  return file_exists(PROC_KHEADERS_PATH);
+}
+
+static inline int extract_kheaders(const std::string &dirpath,
+                                   const struct utsname &uname_data)
+{
+  char tar_cmd[256], dirpath_tmp[256];
+  int ret;
+  bool module = false;
+
+  if (!proc_kheaders_exists()) {
+    ret = system("modprobe kheaders");
+    if (ret)
+      return ret;
+    module = true;
+    if (!proc_kheaders_exists()) {
+      ret = -1;
+      goto cleanup;
+    }
+  }
+
+  snprintf(dirpath_tmp, 256, "/tmp/kheaders-%s-XXXXXX", uname_data.release);
+  if (mkdtemp(dirpath_tmp) == NULL) {
+    ret = -1;
+    goto cleanup;
+  }
+
+  snprintf(tar_cmd, 256, "tar -xf %s -C %s", PROC_KHEADERS_PATH, dirpath_tmp);
+  ret = system(tar_cmd);
+  if (ret) {
+    system(("rm -rf " + std::string(dirpath_tmp)).c_str());
+    goto cleanup;
+  }
+
+  /*
+   * If the new directory exists, it could have raced with a parallel
+   * extraction, in this case just delete the old directory and ignore.
+   */
+  ret = rename(dirpath_tmp, dirpath.c_str());
+  if (ret)
+    ret = system(("rm -rf " + std::string(dirpath_tmp)).c_str());
+
+cleanup:
+  if (module) {
+    int ret1 = system("rmmod kheaders");
+    if (ret1)
+      return ret1;
+  }
+
+  return ret;
+}
+
+int get_proc_kheaders(std::string &dirpath)
+{
+  struct utsname uname_data;
+  char dirpath_tmp[256];
+
+  if (uname(&uname_data))
+    return -errno;
+
+  snprintf(dirpath_tmp, 256, "/tmp/kheaders-%s", uname_data.release);
+  dirpath = std::string(dirpath_tmp);
+
+  if (file_exists(dirpath_tmp))
+    return 0;
+
+  // First time so extract it
+  return extract_kheaders(dirpath, uname_data);
 }
 
 }  // namespace ebpf
