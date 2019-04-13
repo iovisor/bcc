@@ -163,16 +163,14 @@ BPF_STACK_TRACE(stack_traces, 1024);
 
         trace_count_text = trace_count_text.replace('FILTER', '\n    '.join(filter_text))
 
-        # We need per-pid statistics when tracing a user-space process, because
-        # the meaning of the symbols depends on the pid. We also need them if
-        # per-pid statistics were requested with -P, or for user stacks.
-        if self.per_pid or not self.is_kernel_probe() or self.user_stack:
+        # Do per-pid statistics iff -P is provided
+        if self.per_pid:
             trace_count_text = trace_count_text.replace('GET_TGID',
                                         'bpf_get_current_pid_tgid() >> 32')
             trace_count_text = trace_count_text.replace('STORE_COMM',
                         'bpf_get_current_comm(&key.name, sizeof(key.name));')
         else:
-            # kernel stacks only. skip splitting on PID so these aggregate
+            # skip splitting on PID so these aggregate
             # together, and don't store the process name.
             trace_count_text = trace_count_text.replace(
                                     'GET_TGID', '0xffffffff')
