@@ -2,8 +2,8 @@
 .SH NAME
 stackcount \- Count function calls and their stack traces. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B stackcount [\-h] [\-p PID] [\-c CPU] [\-i INTERVAL] [\-D DURATION] [\-T] [\-r]
-              [\-s] [\-P] [\-K] [\-U] [\-v] [\-d] [\-f] pattern
+.B stackcount [\-h] [\-p PID] [\-c CPU] [\-i INTERVAL] [\-D DURATION] [\-T]
+              [\-r] [\-s] [\-P] [\-K] [\-U] [\-v] [\-d] [\-f] [\-\-debug] pattern
 .SH DESCRIPTION
 stackcount traces functions and frequency counts them with their entire
 stack trace, kernel stack and user stack, summarized in-kernel for efficiency.
@@ -30,6 +30,15 @@ wildcards only.
 .TP
 \-s
 Show address offsets.
+.TP
+\-P
+Display stacks separately for each process.
+.TP
+\-K
+Show kernel stack only.
+.TP
+\-U
+Show user stack only.
 .TP
 \-T
 Include a timestamp with interval output.
