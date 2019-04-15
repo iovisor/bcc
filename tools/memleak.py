@@ -100,6 +100,8 @@ parser.add_argument("-O", "--obj", type=str, default="c",
         help="attach to allocator functions in the specified object")
 parser.add_argument("--ebpf", action="store_true",
         help=argparse.SUPPRESS)
+parser.add_argument("--percpu", default=False, action="store_true",
+        help="trace percpu allocations")
 
 args = parser.parse_args()
 
@@ -365,8 +367,23 @@ TRACEPOINT_PROBE(kmem, mm_page_free) {
 }
 """
 
+bpf_source_percpu = """
+
+TRACEPOINT_PROBE(percpu, percpu_alloc_percpu) {
+        gen_alloc_enter((struct pt_regs *)args, args->size);
+        return gen_alloc_exit2((struct pt_regs *)args, (size_t)args->ptr);
+}
+
+TRACEPOINT_PROBE(percpu, percpu_free_percpu) {
+        return gen_free_enter((struct pt_regs *)args, (void *)args->ptr);
+}
+"""
+
 if kernel_trace:
-        bpf_source += bpf_source_kernel
+        if args.percpu:
+                bpf_source += bpf_source_percpu
+        else:
+                bpf_source += bpf_source_kernel
 
 bpf_source = bpf_source.replace("SHOULD_PRINT", "1" if trace_all else "0")
 bpf_source = bpf_source.replace("SAMPLE_EVERY_N", str(sample_every_n))
