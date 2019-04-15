@@ -2,7 +2,7 @@
 .SH NAME
 profile \- Profile CPU usage by sampling stack traces. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B profile [\-adfh] [\-p PID] [\-U | \-K] [\-F FREQUENCY | \-c COUNT]
+.B profile [\-adfh] [\-p PID | \-L TID] [\-U | \-K] [\-F FREQUENCY | \-c COUNT]
 .B [\-\-stack\-storage\-size COUNT] [duration]
 .SH DESCRIPTION
 This is a CPU profiler. It works by taking samples of stack traces at timed
@@ -28,8 +28,10 @@ for an older version that may work on Linux 4.6 - 4.8.
 Print usage message.
 .TP
 \-p PID
-Trace this process ID only (filtered in-kernel). Without this, all CPUs are
-profiled.
+Trace this process ID only (filtered in-kernel).
+.TP
+\-L TID
+Trace this thread ID only (filtered in-kernel).
 .TP
 \-F frequency
 Frequency to sample stacks.
@@ -80,9 +82,13 @@ Profile 1 in a million events for 5 seconds only:
 #
 .B profile -c 1000000 5
 .TP
-Profile PID 181 only:
+Profile process with PID 181 only:
 #
 .B profile -p 181
+.TP
+Profile thread with TID 181 only:
+#
+.B profile -L 181
 .TP
 Profile for 5 seconds and output in folded stack format (suitable as input for flame graphs), including a delimiter between kernel and user stacks:
 #
