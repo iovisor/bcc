@@ -34,7 +34,6 @@ import argparse
 import signal
 import os
 import errno
-import multiprocessing
 
 #
 # Process Arguments
@@ -69,7 +68,8 @@ examples = """examples:
     ./profile -c 1000000  # profile stack traces every 1 in a million events
     ./profile 5           # profile at 49 Hertz for 5 seconds only
     ./profile -f 5        # output in folded format for flame graphs
-    ./profile -p 185      # only profile threads for PID 185
+    ./profile -p 185      # only profile process with PID 185
+    ./profile -L 185      # only profile thread with TID 185
     ./profile -U          # only show user space stacks (no kernel)
     ./profile -K          # only show kernel space stacks (no user)
 """
@@ -79,7 +79,9 @@ parser = argparse.ArgumentParser(
     epilog=examples)
 thread_group = parser.add_mutually_exclusive_group()
 thread_group.add_argument("-p", "--pid", type=positive_int,
-    help="profile this PID only")
+    help="profile process with this PID only")
+thread_group.add_argument("-L", "--tid", type=positive_int,
+    help="profile thread with this TID only")
 # TODO: add options for user/kernel threads only
 stack_group = parser.add_mutually_exclusive_group()
 stack_group.add_argument("-U", "--user-stacks-only", action="store_true",
@@ -144,7 +146,10 @@ BPF_STACK_TRACE(stack_traces, STACK_STORAGE_SIZE);
 // This code gets a bit complex. Probably not suitable for casual hacking.
 
 int do_perf_event(struct bpf_perf_event_data *ctx) {
-    u32 pid = bpf_get_current_pid_tgid() >> 32;
+    u64 id = bpf_get_current_pid_tgid();
+    u32 tgid = id >> 32;
+    u32 pid = id;
+
     if (IDLE_FILTER)
         return 0;
 
@@ -152,7 +157,7 @@ int do_perf_event(struct bpf_perf_event_data *ctx) {
         return 0;
 
     // create map key
-    struct key_t key = {.pid = pid};
+    struct key_t key = {.pid = tgid};
     bpf_get_current_comm(&key.name, sizeof(key.name));
 
     // get stacks
@@ -197,13 +202,14 @@ if args.include_idle:
     idle_filter = "0"
 bpf_text = bpf_text.replace('IDLE_FILTER', idle_filter)
 
-# set thread filter
+# set process/thread filter
 thread_context = ""
-perf_filter = "-a"
 if args.pid is not None:
     thread_context = "PID %s" % args.pid
-    thread_filter = 'pid == %s' % args.pid
-    perf_filter = '-p %s' % args.pid
+    thread_filter = 'tgid == %s' % args.pid
+elif args.tid is not None:
+    thread_context = "TID %s" % args.tid
+    thread_filter = 'pid == %s' % args.tid
 else:
     thread_context = "all threads"
     thread_filter = '1'

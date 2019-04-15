@@ -707,7 +707,7 @@ Run ./profile -h to see the default.
 USAGE message:
 
 # ./profile -h
-usage: profile.py [-h] [-p PID] [-U | -K] [-F FREQUENCY | -c COUNT] [-d] [-a]
+usage: profile.py [-h] [-p PID | -L TID] [-U | -K] [-F FREQUENCY | -c COUNT] [-d] [-a]
                   [-I] [-f] [--stack-storage-size STACK_STORAGE_SIZE] [-C CPU]
                   [duration]
 
@@ -718,7 +718,8 @@ positional arguments:
 
 optional arguments:
   -h, --help            show this help message and exit
-  -p PID, --pid PID     profile this PID only
+  -p PID, --pid PID     profile process with this PID only
+  -L TID, --tid TID     profile thread with this TID only
   -U, --user-stacks-only
                         show stacks from user space only (no kernel space
                         stacks)
@@ -745,6 +746,7 @@ examples:
     ./profile -c 1000000  # profile stack traces every 1 in a million events
     ./profile 5           # profile at 49 Hertz for 5 seconds only
     ./profile -f 5        # output in folded format for flame graphs
-    ./profile -p 185      # only profile threads for PID 185
+    ./profile -p 185      # only profile process with PID 185
+    ./profile -L 185      # only profile thread with TID 185
     ./profile -U          # only show user space stacks (no kernel)
     ./profile -K          # only show kernel space stacks (no user)
