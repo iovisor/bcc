@@ -86,7 +86,7 @@ int bcc_mapping_is_file_backed(const char *mapname) {
 /*
 Finds a file descriptor for a given inode if it's a memory-backed fd.
 */
-static char *_procutils_memfd_path(int pid, uint64_t inum) {
+static char *_procutils_memfd_path(const int pid, const uint64_t inum) {
   char path_buffer[PATH_MAX + 1];
   char *path = NULL;
   char *dirstr;
