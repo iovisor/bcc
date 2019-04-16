@@ -95,18 +95,20 @@ static char *_procutils_memfd_path(const int pid, const uint64_t inum) {
   struct dirent *dent;
 
   snprintf(path_buffer, (PATH_MAX + 1), "/proc/%d/fd", pid);
-  dirstr = malloc(sizeof(char) * (strlen(path_buffer) + 1));
+  dirstr = malloc(strlen(path_buffer) + 1);
   strcpy(dirstr, path_buffer);
   dirstream = opendir(dirstr);
 
-  while (path == NULL && dirstream != NULL &&
-         (dent = readdir(dirstream)) != NULL) {
+  if (dirstream == NULL)
+    return NULL;
+
+  while (path == NULL && (dent = readdir(dirstream)) != NULL) {
     snprintf(path_buffer, (PATH_MAX + 1), "%s/%s", dirstr, dent->d_name);
     if (stat(path_buffer, &sb) == -1)
       continue;
 
     if (sb.st_ino == inum) {
-      char *pid_fd_path = malloc(sizeof(char) * (strlen(path_buffer) + 1));
+      char *pid_fd_path = malloc(strlen(path_buffer) + 1);
       strcpy(pid_fd_path, path_buffer);
       path = pid_fd_path;
     }
