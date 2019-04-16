@@ -14,10 +14,8 @@
  * limitations under the License.
  */
 
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <sys/mman.h>
 #include <ctype.h>
+#include <dirent.h>
 #include <fcntl.h>
 #include <limits.h>
 #include <math.h>
@@ -26,6 +24,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <unistd.h>
 
 #include "bcc_perf_map.h"
@@ -82,6 +83,42 @@ int bcc_mapping_is_file_backed(const char *mapname) {
     STARTS_WITH(mapname, "[vsyscall]"));
 }
 
+/*
+Finds a file descriptor for a given inode if it's a memory-backed fd.
+*/
+static char *_procutils_memfd_path(const int pid, const uint64_t inum) {
+  char path_buffer[PATH_MAX + 1];
+  char *path = NULL;
+  char *dirstr;
+  DIR *dirstream;
+  struct stat sb;
+  struct dirent *dent;
+
+  snprintf(path_buffer, (PATH_MAX + 1), "/proc/%d/fd", pid);
+  dirstr = malloc(strlen(path_buffer) + 1);
+  strcpy(dirstr, path_buffer);
+  dirstream = opendir(dirstr);
+
+  if (dirstream == NULL)
+    return NULL;
+
+  while (path == NULL && (dent = readdir(dirstream)) != NULL) {
+    snprintf(path_buffer, (PATH_MAX + 1), "%s/%s", dirstr, dent->d_name);
+    if (stat(path_buffer, &sb) == -1)
+      continue;
+
+    if (sb.st_ino == inum) {
+      char *pid_fd_path = malloc(strlen(path_buffer) + 1);
+      strcpy(pid_fd_path, path_buffer);
+      path = pid_fd_path;
+    }
+  }
+  closedir(dirstream);
+  free(dirstr);
+
+  return path;
+}
+
 int bcc_procutils_each_module(int pid, bcc_procutils_modulecb callback,
                               void *payload) {
   char procmap_filename[128];
@@ -111,6 +148,15 @@ int bcc_procutils_each_module(int pid, bcc_procutils_modulecb callback,
       name++;
     if (!bcc_mapping_is_file_backed(name))
       continue;
+
+    if (strstr(name, "/memfd:")) {
+      char *memfd_name = _procutils_memfd_path(pid, inode);
+      if (memfd_name != NULL) {
+        strcpy(buf, memfd_name);
+        free(memfd_name);
+        name = buf;
+      }
+    }
 
     if (callback(name, begin, end, (uint64_t)offset, true, payload) < 0)
       break;
