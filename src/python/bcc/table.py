@@ -622,7 +622,7 @@ class PerfEventArray(ArrayBase):
         i = 0
         while i < num_fields:
             field = lib.bpf_perf_event_field(self.bpf.module, self._name, i).decode()
-            m = re.match(r"(.*)#(.*)", field)
+            m = re.match(r"(.*)#(.*)", field.decode())
             field_name = m.group(1)
             field_type = m.group(2)
 
