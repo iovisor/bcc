@@ -769,7 +769,7 @@ class BPF(object):
                 evt_dir = os.path.join(cat_dir, event)
                 if os.path.isdir(evt_dir):
                     tp = ("%s:%s" % (category, event))
-                    if re.match(tp_re, tp):
+                    if re.match(tp_re.decode(), tp):
                         results.append(tp)
         return results
 
