@@ -218,17 +218,17 @@ def print_event(cpu, data, size):
 
     if args.timestamp:
         delta = event.ts - initial_ts
-        print("%-14.9f" % (float(delta) / 1000000), end="")
+        printb(b"%-14.9f" % (float(delta) / 1000000), nl="")
 
     if args.print_uid:
-        print("%-6d" % event.uid, end="")
+        printb(b"%-6d" % event.uid, nl="")
 
-    print("%-6d %-16s %4d %3d " %
-          (event.id & 0xffffffff if args.tid else event.id >> 32,
-           event.comm.decode('utf-8', 'replace'), fd_s, err), end="")
+    printb(b"%-6d %-16s %4d %3d " %
+           (event.id & 0xffffffff if args.tid else event.id >> 32,
+            event.comm, fd_s, err), nl="")
 
     if args.extended_fields:
-        print("%08o " % event.flags, end="")
+        printb(b"%08o " % event.flags, nl="")
 
     printb(b'%s' % event.fname)
 

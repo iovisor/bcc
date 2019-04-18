@@ -196,11 +196,11 @@ def print_ipv4_event(cpu, data, size):
     event = b["ipv4_events"].event(data)
     global start_ts
     if args.time:
-        print("%-9s" % strftime("%H:%M:%S"), end="")
+        printb(b"%-9s" % strftime("%H:%M:%S").encode('ascii'), nl="")
     if args.timestamp:
         if start_ts == 0:
             start_ts = event.ts_us
-        print("%-9.3f" % ((float(event.ts_us) - start_ts) / 1000000), end="")
+        printb(b"%-9.3f" % ((float(event.ts_us) - start_ts) / 1000000), nl="")
     printb(b"%-7d %-12.12s %-2d %-16s %-5d %-16s %-5d" % (event.pid,
         event.task, event.ip,
         inet_ntop(AF_INET, pack("I", event.daddr)).encode(),
@@ -212,11 +212,11 @@ def print_ipv6_event(cpu, data, size):
     event = b["ipv6_events"].event(data)
     global start_ts
     if args.time:
-        print("%-9s" % strftime("%H:%M:%S"), end="")
+        printb(b"%-9s" % strftime("%H:%M:%S").encode('ascii'), nl="")
     if args.timestamp:
         if start_ts == 0:
             start_ts = event.ts_us
-        print("%-9.3f" % ((float(event.ts_us) - start_ts) / 1000000), end="")
+        printb(b"%-9.3f" % ((float(event.ts_us) - start_ts) / 1000000), nl="")
     printb(b"%-7d %-12.12s %-2d %-16s %-5d %-16s %-5d" % (event.pid,
         event.task, event.ip,
         inet_ntop(AF_INET6, event.daddr).encode(),

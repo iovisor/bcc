@@ -216,7 +216,7 @@ def print_event(cpu, data, size):
 
         if not skip:
             if args.timestamp:
-                print("%-8.3f" % (time.time() - start_ts), end="")
+                printb(b"%-8.3f" % (time.time() - start_ts), nl="")
             ppid = event.ppid if event.ppid > 0 else get_ppid(event.pid)
             ppid = b"%d" % ppid if ppid > 0 else b"?"
             argv_text = b' '.join(argv[event.pid]).replace(b'\n', b'\\n')
