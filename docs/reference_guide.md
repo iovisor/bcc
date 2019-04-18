@@ -1248,7 +1248,7 @@ Syntax: ```BPF.perf_buffer_poll([timeout])```
 
 This polls from all open perf ring buffers, calling the callback function that was provided when calling open_perf_buffer for each entry.
 
-The timeout parameter is optional and measured in milliseconds.
+The timeout parameter is optional and measured in milliseconds. In its absence, polling continues indefinitely.
 
 Example:
 
