@@ -1244,9 +1244,11 @@ Normal output from a BPF program is either:
 
 ### 1. perf_buffer_poll()
 
-Syntax: ```BPF.perf_buffer_poll()```
+Syntax: ```BPF.perf_buffer_poll([timeout])```
 
 This polls from all open perf ring buffers, calling the callback function that was provided when calling open_perf_buffer for each entry.
+
+The timeout parameter is optional and measured in milliseconds.
 
 Example:
 
