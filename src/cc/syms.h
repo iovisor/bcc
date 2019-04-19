@@ -23,9 +23,9 @@
 #include <unordered_set>
 #include <vector>
 
+#include "bcc_proc.h"
 #include "bcc_syms.h"
 #include "file_desc.h"
-#include "ns_guard.h"
 
 class ProcStat {
   std::string procfs_;
@@ -98,13 +98,12 @@ class ProcSyms : SymbolCache {
           : start(s), end(e), file_offset(f) {}
     };
 
-    Module(const char *name, ProcMountNS *mount_ns,
-           struct bcc_symbol_option *option);
+    Module(const char *name, const char *path, struct bcc_symbol_option *option);
 
     std::string name_;
+    std::string path_;
     std::vector<Range> ranges_;
     bool loaded_;
-    ProcMountNS *mount_ns_;
     bcc_symbol_option *symbol_option_;
     ModuleType type_;
 
@@ -130,13 +129,11 @@ class ProcSyms : SymbolCache {
   int pid_;
   std::vector<Module> modules_;
   ProcStat procstat_;
-  std::unique_ptr<ProcMountNS> mount_ns_instance_;
   bcc_symbol_option symbol_option_;
 
   static int _add_load_sections(uint64_t v_addr, uint64_t mem_sz,
                                 uint64_t file_offset, void *payload);
-  static int _add_module(const char *, uint64_t, uint64_t, uint64_t, bool,
-                         void *);
+  static int _add_module(mod_info *, int, void *);
   void load_exe();
   void load_modules();
 

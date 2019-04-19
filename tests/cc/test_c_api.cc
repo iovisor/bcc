@@ -439,6 +439,133 @@ TEST_CASE("resolve symbols using /tmp/perf-pid.map", "[c_api]") {
   munmap(map_addr, map_sz);
 }
 
+// must match exactly the defitinion of mod_search in bcc_syms.cc
+struct mod_search {
+  const char *name;
+  uint64_t inode;
+  uint64_t dev_major;
+  uint64_t dev_minor;
+  uint64_t addr;
+  uint8_t inode_match_only;
+
+  uint64_t start;
+  uint64_t file_offset;
+};
+
+TEST_CASE("searching for modules in /proc/[pid]/maps", "[c_api]") {
+  FILE *dummy_maps = fopen("dummy_proc_map.txt", "r");
+  REQUIRE(dummy_maps != NULL);
+
+  SECTION("name match") {
+    fseek(dummy_maps, 0, SEEK_SET);
+
+    struct mod_search search;
+    memset(&search, 0, sizeof(struct mod_search));
+    search.name = "/some/other/path/tolibs/lib/libutil-2.26.so";
+    search.addr = 0x1;
+    int res =  _procfs_maps_each_module(dummy_maps, 42, _bcc_syms_find_module,
+                                        &search);
+    REQUIRE(res == 0);
+    REQUIRE(search.start == 0x7f1515bad000);
+  }
+
+  SECTION("expected failure to match (name only search)") {
+    fseek(dummy_maps, 0, SEEK_SET);
+
+    struct mod_search search;
+    memset(&search, 0, sizeof(struct mod_search));
+    search.name = "/lib/that/isnt/in/maps/libdoesntexist.so";
+    search.addr = 0x1;
+    int res =  _procfs_maps_each_module(dummy_maps, 42, _bcc_syms_find_module,
+                                        &search);
+    REQUIRE(res == -1);
+  }
+
+  SECTION("inode+dev match, names different") {
+    fseek(dummy_maps, 0, SEEK_SET);
+
+    struct mod_search search;
+    memset(&search, 0, sizeof(struct mod_search));
+    search.name = "/proc/5/root/some/other/path/tolibs/lib/libz.so.1.2.8";
+    search.inode = 72809538;
+    search.dev_major = 0x00;
+    search.dev_minor = 0x1b;
+    search.addr = 0x2;
+    int res =  _procfs_maps_each_module(dummy_maps, 42, _bcc_syms_find_module,
+                                        &search);
+    REQUIRE(res == 0);
+    REQUIRE(search.start == 0x7f15164b5000);
+  }
+
+  SECTION("inode+dev don't match, names same") {
+    fseek(dummy_maps, 0, SEEK_SET);
+
+    struct mod_search search;
+    memset(&search, 0, sizeof(struct mod_search));
+    search.name = "/some/other/path/tolibs/lib/libutil-2.26.so";
+    search.inode = 9999999;
+    search.dev_major = 0x42;
+    search.dev_minor = 0x1b;
+    search.addr = 0x2;
+    int res =  _procfs_maps_each_module(dummy_maps, 42, _bcc_syms_find_module,
+                                        &search);
+    REQUIRE(res == -1);
+  }
+
+  SECTION("inodes match, dev_major/minor don't, expected failure") {
+    fseek(dummy_maps, 0, SEEK_SET);
+
+    struct mod_search search;
+    memset(&search, 0, sizeof(struct mod_search));
+    search.name = "/some/other/path/tolibs/lib/libutil-2.26.so";
+    search.inode = 72809526;
+    search.dev_major = 0x11;
+    search.dev_minor = 0x11;
+    search.addr = 0x2;
+    int res =  _procfs_maps_each_module(dummy_maps, 42, _bcc_syms_find_module,
+                                        &search);
+    REQUIRE(res == -1);
+  }
+
+  SECTION("inodes match, dev_major/minor don't, match inode only") {
+    fseek(dummy_maps, 0, SEEK_SET);
+
+    struct mod_search search;
+    memset(&search, 0, sizeof(struct mod_search));
+    search.name = "/some/other/path/tolibs/lib/libutil-2.26.so";
+    search.inode = 72809526;
+    search.dev_major = 0x11;
+    search.dev_minor = 0x11;
+    search.addr = 0x2;
+    search.inode_match_only = 1;
+    int res =  _procfs_maps_each_module(dummy_maps, 42, _bcc_syms_find_module,
+                                        &search);
+    REQUIRE(res == 0);
+    REQUIRE(search.start == 0x7f1515bad000);
+  }
+
+  fclose(dummy_maps);
+}
+
+TEST_CASE("resolve global addr in libc in this process", "[c_api]") {
+  int pid = getpid();
+  char *sopath = bcc_procutils_which_so("c", pid);
+  uint64_t local_addr = 0x15;
+  uint64_t global_addr;
+
+  struct mod_search search;
+  memset(&search, 0, sizeof(struct mod_search));
+  search.name = sopath;
+
+  int res = bcc_procutils_each_module(pid, _bcc_syms_find_module,
+                                      &search);
+  REQUIRE(res == 0);
+  REQUIRE(search.start != 0);
+
+  res = bcc_resolve_global_addr(pid, sopath, local_addr, 0, &global_addr);
+  REQUIRE(res == 0);
+  REQUIRE(global_addr == (search.start + local_addr - search.file_offset));
+}
 
 TEST_CASE("get online CPUs", "[c_api]") {
 	std::vector<int> cpus = ebpf::get_online_cpus();

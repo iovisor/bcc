@@ -22,6 +22,7 @@ extern "C" {
 
 #include <stdint.h>
 #include "linux/bpf.h"
+#include "bcc_proc.h"
 
 struct bcc_symbol {
   const char *name;
@@ -65,8 +66,9 @@ int bcc_symcache_resolve_name(void *resolver, const char *module,
                               const char *name, uint64_t *addr);
 void bcc_symcache_refresh(void *resolver);
 
+int _bcc_syms_find_module(struct mod_info *info, int enter_ns, void *p);
 int bcc_resolve_global_addr(int pid, const char *module, const uint64_t address,
-                            uint64_t *global);
+                            uint8_t inode_match_only, uint64_t *global);
 
 /*bcc APIs for build_id stackmap support*/
 void *bcc_buildsymcache_new(void);

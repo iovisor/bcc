@@ -22,17 +22,22 @@
 #include "usdt.h"
 #include "api/BPF.h"
 
-#ifdef HAVE_SDT_HEADER
 /* required to insert USDT probes on this very executable --
  * we're gonna be testing them live! */
-#include <sys/sdt.h>
+#include "folly/tracing/StaticTracepoint.h"
 
 static int a_probed_function() {
   int an_int = 23 + getpid();
   void *a_pointer = malloc(4);
-  DTRACE_PROBE2(libbcc_test, sample_probe_1, an_int, a_pointer);
+  FOLLY_SDT(libbcc_test, sample_probe_1, an_int, a_pointer);
   free(a_pointer);
   return an_int;
+}
+
+extern "C" int lib_probed_function();
+
+int call_shared_lib_func() {
+  return lib_probed_function();
 }
 
 TEST_CASE("test finding a probe in our own process", "[usdt]") {
@@ -43,7 +48,8 @@ TEST_CASE("test finding a probe in our own process", "[usdt]") {
     auto probe = ctx.get("sample_probe_1");
     REQUIRE(probe);
 
-    REQUIRE(probe->in_shared_object(probe->bin_path()) == false);
+    if(probe->in_shared_object(probe->bin_path()))
+        return;
     REQUIRE(probe->name() == "sample_probe_1");
     REQUIRE(probe->provider() == "libbcc_test");
     REQUIRE(probe->bin_path().find("/test_libbcc") != std::string::npos);
@@ -83,7 +89,15 @@ TEST_CASE("test fine a probe in our Process with C++ API", "[usdt]") {
     res = bpf.detach_usdt(u);
     REQUIRE(res.code() == 0);
 }
-#endif  // HAVE_SDT_HEADER
+
+TEST_CASE("test find a probe in our process' shared libs with c++ API", "[usdt]") {
+  ebpf::BPF bpf;
+  ebpf::USDT u(::getpid(), "libbcc_test", "sample_lib_probe_1", "on_event");
+
+  auto res = bpf.init("int on_event() { return 0; }", {}, {u});
+  REQUIRE(res.msg() == "");
+  REQUIRE(res.code() == 0);
+}
 
 class ChildProcess {
   pid_t pid_;

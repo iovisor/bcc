@@ -740,7 +740,8 @@ USDT::USDT(const std::string& binary_path, const std::string& provider,
       pid_(-1),
       provider_(provider),
       name_(name),
-      probe_func_(probe_func) {}
+      probe_func_(probe_func),
+      mod_match_inode_only_(0) {}
 
 USDT::USDT(pid_t pid, const std::string& provider, const std::string& name,
            const std::string& probe_func)
@@ -749,7 +750,8 @@ USDT::USDT(pid_t pid, const std::string& provider, const std::string& name,
       pid_(pid),
       provider_(provider),
       name_(name),
-      probe_func_(probe_func) {}
+      probe_func_(probe_func),
+      mod_match_inode_only_(0) {}
 
 USDT::USDT(const std::string& binary_path, pid_t pid,
            const std::string& provider, const std::string& name,
@@ -759,7 +761,8 @@ USDT::USDT(const std::string& binary_path, pid_t pid,
       pid_(pid),
       provider_(provider),
       name_(name),
-      probe_func_(probe_func) {}
+      probe_func_(probe_func),
+      mod_match_inode_only_(0) {}
 
 USDT::USDT(const USDT& usdt)
     : initialized_(false),
@@ -767,7 +770,8 @@ USDT::USDT(const USDT& usdt)
       pid_(usdt.pid_),
       provider_(usdt.provider_),
       name_(usdt.name_),
-      probe_func_(usdt.probe_func_) {}
+      probe_func_(usdt.probe_func_),
+      mod_match_inode_only_(usdt.mod_match_inode_only_) {}
 
 USDT::USDT(USDT&& usdt) noexcept
     : initialized_(usdt.initialized_),
@@ -777,7 +781,8 @@ USDT::USDT(USDT&& usdt) noexcept
       name_(std::move(usdt.name_)),
       probe_func_(std::move(usdt.probe_func_)),
       probe_(std::move(usdt.probe_)),
-      program_text_(std::move(usdt.program_text_)) {
+      program_text_(std::move(usdt.program_text_)),
+      mod_match_inode_only_(usdt.mod_match_inode_only_) {
   usdt.initialized_ = false;
 }
 
@@ -787,14 +792,22 @@ bool USDT::operator==(const USDT& other) const {
          (probe_func_ == other.probe_func_);
 }
 
+int USDT::set_probe_matching_kludge(uint8_t kludge) {
+  if (kludge != 0 && kludge != 1)
+    return -1;
+
+  mod_match_inode_only_ = kludge;
+  return 0;
+}
+
 StatusTuple USDT::init() {
   std::unique_ptr<::USDT::Context> ctx;
   if (!binary_path_.empty() && pid_ > 0)
-    ctx.reset(new ::USDT::Context(pid_, binary_path_));
+    ctx.reset(new ::USDT::Context(pid_, binary_path_, mod_match_inode_only_));
   else if (!binary_path_.empty())
-    ctx.reset(new ::USDT::Context(binary_path_));
+    ctx.reset(new ::USDT::Context(binary_path_, mod_match_inode_only_));
   else if (pid_ > 0)
-    ctx.reset(new ::USDT::Context(pid_));
+    ctx.reset(new ::USDT::Context(pid_, mod_match_inode_only_));
   else
     return StatusTuple(-1, "No valid Binary Path or PID provided");
 
