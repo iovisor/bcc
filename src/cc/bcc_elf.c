@@ -684,17 +684,17 @@ int bcc_elf_is_vdso(const char *name) {
 // >0: Initialized
 static int vdso_image_fd = -1;
 
-static int find_vdso(const char *name, uint64_t st, uint64_t en,
-                     uint64_t offset, bool enter_ns, void *payload) {
+static int find_vdso(struct mod_info *info, int enter_ns, void *payload) {
   int fd;
   char tmpfile[128];
-  if (!bcc_elf_is_vdso(name))
+  if (!bcc_elf_is_vdso(info->name))
     return 0;
 
-  void *image = malloc(en - st);
+  uint64_t sz = info->end_addr - info->start_addr;
+  void *image = malloc(sz);
   if (!image)
     goto on_error;
-  memcpy(image, (void *)st, en - st);
+  memcpy(image, (void *)info->start_addr, sz);
 
   snprintf(tmpfile, sizeof(tmpfile), "/tmp/bcc_%d_vdso_image_XXXXXX", getpid());
   fd = mkostemp(tmpfile, O_CLOEXEC);
@@ -706,7 +706,7 @@ static int find_vdso(const char *name, uint64_t st, uint64_t en,
   if (unlink(tmpfile) == -1)
     fprintf(stderr, "Unlink %s failed: %s\n", tmpfile, strerror(errno));
 
-  if (write(fd, image, en - st) == -1) {
+  if (write(fd, image, sz) == -1) {
     fprintf(stderr, "Failed to write to vDSO image: %s\n", strerror(errno));
     close(fd);
     goto on_error;

@@ -47,11 +47,11 @@ set(bcc_common_sources ${bcc_common_sources} bpf_module_rw_engine_disabled.cc)
 endif()
 
 set(bcc_table_sources table_storage.cc shared_table.cc bpffs_table.cc json_map_decl_visitor.cc)
-set(bcc_util_sources ns_guard.cc common.cc)
+set(bcc_util_sources common.cc)
 set(bcc_sym_sources bcc_syms.cc bcc_elf.c bcc_perf_map.c bcc_proc.c)
 set(bcc_common_headers libbpf.h perf_reader.h)
 set(bcc_table_headers file_desc.h table_desc.h table_storage.h)
-set(bcc_api_headers bcc_common.h bpf_module.h bcc_exception.h bcc_syms.h bcc_elf.h)
+set(bcc_api_headers bcc_common.h bpf_module.h bcc_exception.h bcc_syms.h bcc_proc.h bcc_elf.h)
 
 if(ENABLE_CLANG_JIT)
 add_library(bcc-shared SHARED

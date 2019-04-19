@@ -287,6 +287,19 @@ class USDT {
                << usdt.probe_func_;
   }
 
+  // When the kludge flag is set to 1, we will only match on inode
+  // when searching for modules in /proc/PID/maps that might contain the
+  // tracepoint we're looking for. Normally match is on inode and
+  // (dev_major, dev_minor), which is a more accurate way to uniquely
+  // identify a file.
+  //
+  // This hack exists because btrfs reports different device numbers for files
+  // in /proc/PID/maps vs stat syscall. Don't use it unless you're using btrfs
+  //
+  // set_probe_matching_kludge(1) must be called before USDTs are submitted to
+  // BPF::init()
+  int set_probe_matching_kludge(uint8_t kludge);
+
  private:
   bool initialized_;
 
@@ -299,6 +312,8 @@ class USDT {
 
   std::unique_ptr<void, std::function<void(void*)>> probe_;
   std::string program_text_;
+
+  uint8_t mod_match_inode_only_;
 
   friend class BPF;
 };

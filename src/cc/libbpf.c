@@ -941,7 +941,7 @@ static int create_probe_event(char *buf, const char *ev_name,
                               const char *event_type, pid_t pid, int maxactive)
 {
   int kfd = -1, res = -1, ns_fd = -1;
-  char ev_alias[128];
+  char ev_alias[256];
   bool is_kprobe = strncmp("kprobe", event_type, 6) == 0;
 
   snprintf(buf, PATH_MAX, "/sys/kernel/debug/tracing/%s_events", event_type);
