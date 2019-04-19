@@ -99,8 +99,10 @@ static char *_procutils_memfd_path(const int pid, const uint64_t inum) {
   strcpy(dirstr, path_buffer);
   dirstream = opendir(dirstr);
 
-  if (dirstream == NULL)
+  if (dirstream == NULL) {
+    free(dirstr);
     return NULL;
+  }
 
   while (path == NULL && (dent = readdir(dirstream)) != NULL) {
     snprintf(path_buffer, (PATH_MAX + 1), "%s/%s", dirstr, dent->d_name);
