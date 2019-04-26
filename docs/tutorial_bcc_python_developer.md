@@ -309,11 +309,9 @@ Things to learn:
 1. ```bpf_get_current_comm()```: Populates the first argument address with the current process name.
 1. ```events.perf_submit()```: Submit the event for user space to read via a perf ring buffer.
 1. ```def print_event()```: Define a Python function that will handle reading events from the ```events``` stream.
-1. ```b["events"].event(data)```: Now get the event as a Python object.
+1. ```b["events"].event(data)```: Now get the event as a Python object, auto-generated from the C declaration.
 1. ```b["events"].open_perf_buffer(print_event)```: Associate the Python ```print_event``` function with the ```events``` stream.
 1. ```while 1: b.perf_buffer_poll()```: Block waiting for events.
-
-This may be improved in future bcc versions. Eg, the Python data struct could be auto-generated from the C code.
 
 ### Lesson 8. sync_perf_output.py
 
