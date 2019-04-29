@@ -197,6 +197,12 @@ static struct bpf_helper helpers[] = {
   {"get_listener_sock", "5.1"},
   {"skc_lookup_tcp", "5.2"},
   {"tcp_check_syncookie", "5.2"},
+  {"sysctl_get_name", "5.2"},
+  {"sysctl_get_current_value", "5.2"},
+  {"sysctl_get_new_value", "5.2"},
+  {"sysctl_set_new_value", "5.2"},
+  {"strtol", "5.2"},
+  {"strtoul", "5.2"},
 };
 
 static uint64_t ptr_to_u64(void *ptr)

@@ -349,6 +349,18 @@ static int (*bpf_sk_redirect_map)(void *ctx, void *map, int key, int flags) =
   (void *) BPF_FUNC_sk_redirect_map;
 static int (*bpf_sock_map_update)(void *map, void *key, void *value, unsigned long long flags) =
   (void *) BPF_FUNC_sock_map_update;
+static int (*bpf_strtol)(const char *buf, size_t buf_len, u64 flags, long *res) =
+  (void *) BPF_FUNC_strtol;
+static int (*bpf_strtoul)(const char *buf, size_t buf_len, u64 flags, unsigned long *res) =
+  (void *) BPF_FUNC_strtoul;
+static int (*bpf_sysctl_get_current_value)(struct bpf_sysctl *ctx, char *buf, size_t buf_len) =
+  (void *) BPF_FUNC_sysctl_get_current_value;
+static int (*bpf_sysctl_get_name)(struct bpf_sysctl *ctx, char *buf, size_t buf_len, u64 flags) =
+  (void *) BPF_FUNC_sysctl_get_name;
+static int (*bpf_sysctl_get_new_value)(struct bpf_sysctl *ctx, char *buf, size_t buf_len) =
+  (void *) BPF_FUNC_sysctl_get_new_value;
+static int (*bpf_sysctl_set_new_value)(struct bpf_sysctl *ctx, const char *buf, size_t buf_len) =
+  (void *) BPF_FUNC_sysctl_set_new_value;
 static int (*bpf_tcp_check_syncookie)(struct bpf_sock *sk, void *ip, int ip_len, void *tcp,
                                       int tcp_len) =
   (void *) BPF_FUNC_tcp_check_syncookie;
