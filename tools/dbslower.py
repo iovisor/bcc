@@ -208,7 +208,7 @@ def print_event(cpu, data, size):
     event = bpf["events"].event(data)
     print("%-14.6f %-6d %8.3f %s" % (
         float(event.timestamp - start) / 1000000000,
-        event.pid, float(event.delta) / 1000000, event.query))
+        event.pid, float(event.duration) / 1000000, event.query))
 
 if mode.startswith("MYSQL"):
     print("Tracing database queries for application %s slower than %d ms..." %
