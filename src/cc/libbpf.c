@@ -25,6 +25,7 @@
 #include <linux/bpf.h>
 #include <linux/bpf_common.h>
 #include <linux/if_packet.h>
+#include <linux/types.h>
 #include <linux/perf_event.h>
 #include <linux/pkt_cls.h>
 #include <linux/rtnetlink.h>
