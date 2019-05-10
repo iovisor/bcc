@@ -14,7 +14,19 @@
 from __future__ import print_function
 from bcc import BPF
 from time import sleep
+from sys import argv
+def usage():
+    print("USAGE: %s [time]" % argv[0])
+    exit()
 
+interval = 99999999
+if len(argv) > 1:
+    try:
+        interval = int(argv[1])
+        if interval == 0:
+            raise
+    except:  # also catches -h, --help
+        usage()
 # load BPF program
 b = BPF(text="""
 #include <uapi/linux/ptrace.h>
@@ -39,9 +51,10 @@ print("Tracing... Ctrl-C to end.")
 
 # output
 try:
-    sleep(99999999)
+    sleep(interval)
 except KeyboardInterrupt:
     pass
+    exit()
 
 print("\n%-16s %-26s %8s" % ("ADDR", "FUNC", "COUNT"))
 counts = b.get_table("counts")

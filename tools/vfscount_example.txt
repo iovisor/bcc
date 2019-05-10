@@ -1,8 +1,8 @@
 Demonstrations of vfscount, the Linux eBPF/bcc version.
 
 
-This counts VFS calls, by tracing all kernel functions beginning with "vfs_":
-
+This counts VFS calls  during time, by tracing all kernel functions beginning 
+with "vfs_", By defaults, the time is 99999999s
 # ./vfscount
 Tracing... Ctrl-C to end.
 ^C
@@ -20,7 +20,36 @@ ffffffff811ec9f1 vfs_getattr_nosec               704
 ffffffff811e80a1 vfs_write                      1764
 ffffffff811e7f71 vfs_read                       2283
 
+Here we are using an output in 10 seconds, and printing 10 seconds summaries
+# ./vfscount 10
+Tracing... Ctrl-C to end.
+
+ADDR             FUNC                          COUNT
+ffffffffa1283671 vfs_rename                        1
+ffffffffa129f471 vfs_setxattr                      1
+ffffffffa12831c1 vfs_mkdir                         1
+ffffffffa1282a51 vfs_rmdir                        10
+ffffffffa1283f31 vfs_unlink                       28
+ffffffffa1273e61 vfs_writev                       53
+ffffffffa12ae061 vfs_statfs                       55
+ffffffffa129e971 vfs_getxattr                    138
+ffffffffa1288561 vfs_readlink                    157
+ffffffffa12d6311 vfs_lock_file                   223
+ffffffffa1274da1 vfs_write                       537
+ffffffffa12798f1 vfs_statx_fd                   2337
+ffffffffa1279971 vfs_statx                      3064
+ffffffffa1271ba1 vfs_open                       4334
+ffffffffa12798b1 vfs_getattr                    4823
+ffffffffa1279821 vfs_getattr_nosec              4823
+ffffffffa1274af1 vfs_read                       9060
+
+
 This can be useful for workload characterization, to see what types of
 operations are in use.
 
 You can edit the script to customize what kernel functions are matched.
+
+Full usage:
+
+# ./vfsstat -h
+USAGE: ./vfsstat [time]
