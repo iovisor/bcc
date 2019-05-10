@@ -18,7 +18,7 @@ ffffffff811ecb51 vfs_fstatat                     488
 ffffffff811ecac1 vfs_getattr                     704
 ffffffff811ec9f1 vfs_getattr_nosec               704
 ffffffff811e80a1 vfs_write                      1764
-ffffffff811e7f71 vfs_read          []             2283
+ffffffff811e7f71 vfs_read                       2283
 
 Here we are using an output in 10 seconds, and printing 10 seconds summaries
 # ./vfscount 10
