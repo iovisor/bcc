@@ -12,7 +12,7 @@ The following example shows the termination of the 'sleep' and 'bash' commands
 when run in a loop that is interrupted with Ctrl-C from the terminal:
 
 # ./exitsnoop.py > exitlog &
-[1] 12827
+[1] 18766
 # for((i=65;i<100;++i)); do bash -c "sleep 0.25;exit $i";done
 ^C
 # fg
@@ -20,55 +20,50 @@ when run in a loop that is interrupted with Ctrl-C from the terminal:
 ^C
 # cat exitlog
 COMM             PID    PPID   EXIT_CODE
-sleep            12829  12828  0
-bash             12828  12713  FAIL: exit_code=65
-sleep            12831  12830  0
-bash             12830  12713  FAIL: exit_code=66
-sleep            12833  12832  0
-bash             12832  12713  FAIL: exit_code=67
-sleep            12835  12834  0
-bash             12834  12713  FAIL: exit_code=68
-sleep            12837  12836  0
-bash             12836  12713  FAIL: exit_code=69
-sleep            12839  12838  0
-bash             12838  12713  FAIL: exit_code=70
-sleep            12841  12840  0
-bash             12840  12713  FAIL: exit_code=71
-sleep            12843  12842  0
-bash             12842  12713  FAIL: exit_code=72
-sleep            12845  12844  0
-bash             12844  12713  FAIL: exit_code=73
-sleep            12847  12846  KILL: signal=2
-bash             12846  12713  KILL: signal=2
+sleep            18777  18776  0
+bash             18776  18676  FAIL: exit_code: 65
+sleep            18779  18778  0
+bash             18778  18676  FAIL: exit_code: 66
+sleep            18782  18781  0
+bash             18781  18676  FAIL: exit_code: 67
+sleep            18784  18783  0
+bash             18783  18676  FAIL: exit_code: 68
+sleep            18786  18785  0
+bash             18785  18676  FAIL: exit_code: 69
+sleep            18788  18787  0
+bash             18787  18676  FAIL: exit_code: 70
+sleep            18790  18789  KILL: signal: 2 (INT)
+bash             18789  18676  KILL: signal: 2 (INT)
 
 The output shows the process/command name (COMM), the PID,
 the process that will be notified (PPID) and the reason for
 the process exit (EXIT_CODE).
 
 A -t option can be used to include a timestamp column, it shows local time
-followed by time since exitsnoop started in milliseconds with microsecond resolution,
-and a -x option to show only fails, which excludes processes that exit with 0 code:
+followed by time since exitsnoop started in seconds and a -x option to show
+only fails, which excludes processes that exit with 0 code:
 
-# ./exitsnoop.py -t -x > onlyfails &
-[1] 13302
+# ./exitsnoop.py -t -x > exitlog &
+[1] 19104
 # for((i=65;i<100;++i)); do bash -c "sleep 0.25;exit $i";done
 ^C
-]# fg
+# fg
 ./exitsnoop.py -t -x > onlyfails
 ^C
 # cat onlyfails
-TIME(s)           COMM             PID    PPID   EXIT_CODE
-05:06:04 0.000    bash             13303  13230  FAIL: exit_code=65
-05:06:04 259.137  bash             13305  13230  FAIL: exit_code=66
-05:06:04 515.748  bash             13307  13230  FAIL: exit_code=67
-05:06:05 775.823  bash             13309  13230  FAIL: exit_code=68
-05:06:05 1035.565 bash             13311  13230  FAIL: exit_code=69
-05:06:05 1290.964 bash             13313  13230  FAIL: exit_code=70
-05:06:05 1548.424 bash             13315  13230  FAIL: exit_code=71
-05:06:06 1804.127 bash             13317  13230  FAIL: exit_code=72
-05:06:06 2058.884 bash             13319  13230  FAIL: exit_code=73
-05:06:06 2145.938 sleep            13322  13321  KILL: signal=2
-05:06:06 2146.218 bash             13321  13230  KILL: signal=2
+TIME:CDT TIME(s)  COMM             PID    PPID   EXIT_CODE
+18:10:40 0.00     bash             19110  18676  FAIL: exit_code: 65
+18:10:40 0.26     bash             19113  18676  FAIL: exit_code: 66
+18:10:40 0.51     bash             19115  18676  FAIL: exit_code: 67
+18:10:40 0.77     bash             19117  18676  FAIL: exit_code: 68
+18:10:41 1.03     bash             19119  18676  FAIL: exit_code: 69
+18:10:41 1.29     bash             19121  18676  FAIL: exit_code: 70
+18:10:41 1.39     sleep            19125  19124  KILL: signal: 2 (INT)
+18:10:41 1.39     bash             19124  18676  KILL: signal: 2 (INT)
+
+The output shows the local time and zone (TIME:CDT), followed by the
+time since exitsnoop started in seconds with hundredth of a second
+resolution.  Successful exits are excluded.
 
 
 USAGE message:

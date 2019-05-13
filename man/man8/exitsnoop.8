@@ -48,8 +48,12 @@ Trace PID 181 only:
 .B exitsnoop \-p 181
 .SH FIELDS
 .TP
+TIME:<TZ>
+Local time of process termination HH:MM:SS, the local time zone is in
+the header.
+.TP
 TIME(s)
-Local time of process termination HH:MM:SS followed by time in milliseconds with microsecond resolution since exitsnoop started.
+Time in seconds with hundredth of a second resolution since exitsnoop started.
 .TP
 COMM
 Process/command name.

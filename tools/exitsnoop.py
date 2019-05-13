@@ -39,8 +39,13 @@ import argparse
 from bcc import BPF
 from time import strftime
 import ctypes as ct
+import signal
+import re
 import os
 import sys
+
+SIGNUM_TO_SIGNAME = dict((v, re.sub("^SIG", "", k))
+    for k,v in signal.__dict__.items() if re.match("^SIG[A-Z]+$", k))
 
 # =============================
 # parse arguments
@@ -51,7 +56,7 @@ parser = argparse.ArgumentParser(
     epilog=examples)
 
 a = parser.add_argument
-a("-t", "--timestamp", action="store_true", help="include timestamp on output")
+a("-t", "--timestamp", action="store_true", help="include timestamp in output")
 a("-p", "--pid",                            help="trace this PID only")
 a(      "--ebpf",      action="store_true", help=argparse.SUPPRESS)
 a("-x", "--failed",    action="store_true", help="trace fails, exclude exit(0)")
@@ -138,7 +143,7 @@ if args.ebpf:
 # =============================
 def print_header():
     if args.timestamp:
-        print("%-18s" % ("TIME(s)"), end="")
+        print("%-8s %-8s " % ("TIME:%s" % strftime("%Z"), "TIME(s)"), end="")
     print("%-16s %-6s %-6s %-10s" % ("COMM", "PID", "PPID", "EXIT_CODE"))
 
 def print_event(cpu, data, size): # callback
@@ -147,14 +152,16 @@ def print_event(cpu, data, size): # callback
     if args.timestamp:
         if start_ts == 0:
             start_ts = e.ts
-        print("%-8s %-8.3f " % (strftime("%H:%M:%S"),
-                                    float(e.ts - start_ts) / 1000000), end="")
+        print("%-8s %-8.2f " % (strftime("%H:%M:%S"),
+                                    float(e.ts - start_ts) / 1e9), end="")
     print("%-16s %-6d %-6d " % (e.task.decode(), e.pid, e.ppid), end="")
     if e.sig_info == 0:
-        print("0" if e.exit_code == 0 else "FAIL: exit_code=%d" % e.exit_code)
+        print("0" if e.exit_code == 0 else "FAIL: exit_code: %d" % e.exit_code)
     else:
-        if e.sig_info & 0x7F:
-            print("KILL: signal=%d" % (e.sig_info & 0x7F), end="")
+        signum = e.sig_info & 0x7F
+        if signum:
+            signame = SIGNUM_TO_SIGNAME.get(signum, "unknown")
+            print("KILL: signal: %d (%s)" % (signum,signame), end="")
         if e.sig_info & 0x80:
             print(", core dumped ", end="")
         print()
