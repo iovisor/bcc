@@ -5,7 +5,7 @@ from __future__ import print_function
 # exitsnoop Trace all process termination (exit, fatal signal)
 #           For Linux, uses BCC, eBPF. Embedded C.
 #
-# USAGE: sudo exitsnoop [-h] [-xf] [-t] [-p PID]
+# USAGE: sudo exitsnoop [-h] [-x] [-t] [-p PID]
 #
 examples = """examples:
     sudo exitsnoop           # trace all process termination
