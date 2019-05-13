@@ -1,0 +1,151 @@
+Demonstrations of exitsnoop.
+
+This Linux tool traces all process terminations and reason, it
+    - is implemented using BPF, which requires CAP_SYS_ADMIN and
+      should therefore be invoked with sudo
+    - traces sched_process_exit tracepoint in kernel/exit.c
+    - includes processes by root and all users
+    - includes processes in containers
+    - includes processes that become zombie
+
+The following example shows the termination of the 'sleep' and 'bash' commands
+when run in a loop that is interrupted with Ctrl-C from the terminal:
+
+# ./exitsnoop.py > exitlog &
+[1] 12827
+# for((i=65;i<100;++i)); do bash -c "sleep 0.25;exit $i";done
+^C
+# fg
+./exitsnoop.py > exitlog
+^C
+# cat exitlog
+COMM             PID    PPID   EXIT_CODE
+sleep            12829  12828  0
+bash             12828  12713  FAIL: exit_code=65
+sleep            12831  12830  0
+bash             12830  12713  FAIL: exit_code=66
+sleep            12833  12832  0
+bash             12832  12713  FAIL: exit_code=67
+sleep            12835  12834  0
+bash             12834  12713  FAIL: exit_code=68
+sleep            12837  12836  0
+bash             12836  12713  FAIL: exit_code=69
+sleep            12839  12838  0
+bash             12838  12713  FAIL: exit_code=70
+sleep            12841  12840  0
+bash             12840  12713  FAIL: exit_code=71
+sleep            12843  12842  0
+bash             12842  12713  FAIL: exit_code=72
+sleep            12845  12844  0
+bash             12844  12713  FAIL: exit_code=73
+sleep            12847  12846  KILL: signal=2
+bash             12846  12713  KILL: signal=2
+
+The output shows the process/command name (COMM), the PID,
+the process that will be notified (PPID) and the reason for
+the process exit (EXIT_CODE).
+
+A -t option can be used to include a timestamp column, it shows local time
+followed by time since exitsnoop started in milliseconds with microsecond resolution,
+and a -x option to show only fails, which excludes processes that exit with 0 code:
+
+# ./exitsnoop.py -t -x > onlyfails &
+[1] 13302
+# for((i=65;i<100;++i)); do bash -c "sleep 0.25;exit $i";done
+^C
+]# fg
+./exitsnoop.py -t -x > onlyfails
+^C
+# cat onlyfails
+TIME(s)           COMM             PID    PPID   EXIT_CODE
+05:06:04 0.000    bash             13303  13230  FAIL: exit_code=65
+05:06:04 259.137  bash             13305  13230  FAIL: exit_code=66
+05:06:04 515.748  bash             13307  13230  FAIL: exit_code=67
+05:06:05 775.823  bash             13309  13230  FAIL: exit_code=68
+05:06:05 1035.565 bash             13311  13230  FAIL: exit_code=69
+05:06:05 1290.964 bash             13313  13230  FAIL: exit_code=70
+05:06:05 1548.424 bash             13315  13230  FAIL: exit_code=71
+05:06:06 1804.127 bash             13317  13230  FAIL: exit_code=72
+05:06:06 2058.884 bash             13319  13230  FAIL: exit_code=73
+05:06:06 2145.938 sleep            13322  13321  KILL: signal=2
+05:06:06 2146.218 bash             13321  13230  KILL: signal=2
+
+
+USAGE message:
+
+# ./exitsnoop.py -h
+usage: exitsnoop.py [-h] [-t] [-p PID] [-x]
+
+Trace all process termination (exit, fatal signal)
+
+optional arguments:
+  -h, --help         show this help message and exit
+  -t, --timestamp    include timestamp on output
+  -p PID, --pid PID  trace this PID only
+  -x, --failed       trace fails, exclude exit(0)
+
+examples:
+    sudo exitsnoop           # trace all process termination
+    sudo exitsnoop -x        # trace only fails, exclude exit(0)
+    sudo exitsnoop -t        # include timestamps
+    sudo exitsnoop -p 181    # only trace PID 181
+
+Exit status:
+
+    0 EX_OK        Success
+    2              argparse error
+   70 EX_SOFTWARE  syntax error detected by compiler, or
+                   verifier error from kernel
+   77 EX_NOPERM    Need sudo (CAP_SYS_ADMIN) for BPF() system call
+
+About process termination in Linux
+----------------------------------
+
+A program/process on Linux terminates normally
+    - by explicitly invoking the exit( int ) system call
+    - in C/C++ by returning an int from main(),
+      ...which is then used as the value for exit()
+    - by reaching the end of main() without a return
+      ...which is equivalent to return 0 (C99 and C++)
+  Notes:
+    - Linux keeps only the least significant eight bits of the exit value
+    - an exit value of 0 means success
+    - an exit value of 1-255 means an error
+
+A process terminates abnormally if it
+    - receives a signal which is not ignored or blocked and has no handler
+      ... the default action is to terminate with optional core dump
+    - is selected by the kernel's "Out of Memory Killer",
+      equivalent to being sent SIGKILL (9), which cannot be ignored or blocked
+  Notes:
+    - any signal can be sent asynchronously via the kill() system call
+    - synchronous signals are the result of the CPU detecting
+      a fault or trap during execution of the program, a kernel handler
+      is dispatched which determines the cause and the corresponding
+      signal, examples are
+        - attempting to fetch data or instructions at invalid or
+          privileged addresses,
+        - attempting to divide by zero, unmasked floating point exceptions
+        - hitting a breakpoint
+
+Linux keeps process termination information in 'exit_code', an int
+within struct 'task_struct' defined in <linux/sched.c>
+    - if the process terminated normally:
+        - the exit value is in bits 15:8
+        - the least significant 8 bits of exit_code are zero (bits 7:0)
+    - if the process terminates abnormally:
+        - the signal number (>= 1) is in bits 6:0
+        - bit 7 indicates a 'core dump' action, whether a core dump was
+          actually done depends on ulimit.
+
+Success is indicated with an exit value of zero.
+The meaning of a non zero exit value depends on the program.
+Some programs document their exit values and their meaning.
+This script uses exit values as defined in <include/sysexits.h>
+
+References:
+
+   https://github.com/torvalds/linux/blob/master/kernel/exit.c
+   https://github.com/torvalds/linux/blob/master/arch/x86/include/uapi/asm/signal.h
+   https://code.woboq.org/userspace/glibc/misc/sysexits.h.html
+
