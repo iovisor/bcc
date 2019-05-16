@@ -1409,7 +1409,7 @@ union bpf_attr {
  *
  * 		::
  *
- * 			SEC("kprobe/sys_open")
+ * 			BCC_SEC("kprobe/sys_open")
  * 			void bpf_sys_open(struct pt_regs *ctx)
  * 			{
  * 			        char buf[PATHLEN]; // PATHLEN is defined to 256

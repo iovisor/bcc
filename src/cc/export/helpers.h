@@ -51,7 +51,7 @@ R"********(
  * different sections in elf_bpf file. Section names
  * are interpreted by elf_bpf loader
  */
-#define SEC(NAME) __attribute__((section(NAME), used))
+#define BCC_SEC(NAME) __attribute__((section(NAME), used))
 
 // Associate map with its key/value types
 #define BPF_ANNOTATE_KV_PAIR(name, type_key, type_val)	\
@@ -262,9 +262,9 @@ struct _name##_table_t _name = { .max_entries = (_max_entries) }
   ({ void *_tmp = _cursor; _cursor += _len; _tmp; })
 
 #ifdef LINUX_VERSION_CODE_OVERRIDE
-unsigned _version SEC("version") = LINUX_VERSION_CODE_OVERRIDE;
+unsigned _version BCC_SEC("version") = LINUX_VERSION_CODE_OVERRIDE;
 #else
-unsigned _version SEC("version") = LINUX_VERSION_CODE;
+unsigned _version BCC_SEC("version") = LINUX_VERSION_CODE;
 #endif
 
 /* helper functions called from eBPF programs written in C */
@@ -629,7 +629,7 @@ unsigned int bpf_log2l(unsigned long v)
 struct bpf_context;
 
 static inline __attribute__((always_inline))
-SEC("helpers")
+BCC_SEC("helpers")
 u64 bpf_dext_pkt(void *pkt, u64 off, u64 bofs, u64 bsz) {
   if (bofs == 0 && bsz == 8) {
     return load_byte(pkt, off);
@@ -652,7 +652,7 @@ u64 bpf_dext_pkt(void *pkt, u64 off, u64 bofs, u64 bsz) {
 }
 
 static inline __attribute__((always_inline))
-SEC("helpers")
+BCC_SEC("helpers")
 void bpf_dins_pkt(void *pkt, u64 off, u64 bofs, u64 bsz, u64 val) {
   // The load_xxx function does a bswap before returning the short/word/dword,
   // so the value in register will always be host endian. However, the bytes
@@ -695,25 +695,25 @@ void bpf_dins_pkt(void *pkt, u64 off, u64 bofs, u64 bsz, u64 val) {
 }
 
 static inline __attribute__((always_inline))
-SEC("helpers")
+BCC_SEC("helpers")
 void * bpf_map_lookup_elem_(uintptr_t map, void *key) {
   return bpf_map_lookup_elem((void *)map, key);
 }
 
 static inline __attribute__((always_inline))
-SEC("helpers")
+BCC_SEC("helpers")
 int bpf_map_update_elem_(uintptr_t map, void *key, void *value, u64 flags) {
   return bpf_map_update_elem((void *)map, key, value, flags);
 }
 
 static inline __attribute__((always_inline))
-SEC("helpers")
+BCC_SEC("helpers")
 int bpf_map_delete_elem_(uintptr_t map, void *key) {
   return bpf_map_delete_elem((void *)map, key);
 }
 
 static inline __attribute__((always_inline))
-SEC("helpers")
+BCC_SEC("helpers")
 int bpf_l3_csum_replace_(void *ctx, u64 off, u64 from, u64 to, u64 flags) {
   switch (flags & 0xf) {
     case 2:
@@ -729,7 +729,7 @@ int bpf_l3_csum_replace_(void *ctx, u64 off, u64 from, u64 to, u64 flags) {
 }
 
 static inline __attribute__((always_inline))
-SEC("helpers")
+BCC_SEC("helpers")
 int bpf_l4_csum_replace_(void *ctx, u64 off, u64 from, u64 to, u64 flags) {
   switch (flags & 0xf) {
     case 2:
