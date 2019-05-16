@@ -31,6 +31,9 @@ base: core18
 parts:
     bcc:
         plugin: cmake
+        override-pull: |
+            snapcraftctl pull
+            find . -type f -exec sed -i 's|^#\!/usr/bin/python|#\!/usr/bin/env python|' {} \;
         configflags:
             - '-DCMAKE_INSTALL_PREFIX=/usr'
         source: ..
