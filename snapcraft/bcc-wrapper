@@ -7,7 +7,7 @@
 cmd="$1"
 if [ `id -u` = 0 ] ; then
 	shift
-	stdbuf -oL $SNAP/usr/bin/python2.7 "$SNAP/usr/share/bcc/tools/$cmd" $@
+	stdbuf -oL $SNAP/usr/share/bcc/tools/$cmd $@
 else
 	echo "Need to run $cmd as root (use sudo $@)"
 	exit 1
