@@ -23,6 +23,6 @@ R"********(
 #define ___LICENSE(s) #s
 #define __LICENSE(s) ___LICENSE(s)
 #define _LICENSE __LICENSE(BPF_LICENSE)
-char _license[] SEC("license") = _LICENSE;
+char _license[] BCC_SEC("license") = _LICENSE;
 
 )********"
