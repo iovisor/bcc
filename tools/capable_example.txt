@@ -5,33 +5,50 @@ capable traces calls to the kernel cap_capable() function, which does security
 capability checks, and prints details for each call. For example:
 
 # ./capable.py 
-TIME      UID    PID    COMM             CAP  NAME                 AUDIT
-22:11:23  114    2676   snmpd            12   CAP_NET_ADMIN        1
-22:11:23  0      6990   run              24   CAP_SYS_RESOURCE     1
-22:11:23  0      7003   chmod            3    CAP_FOWNER           1
-22:11:23  0      7003   chmod            4    CAP_FSETID           1
-22:11:23  0      7005   chmod            4    CAP_FSETID           1
-22:11:23  0      7005   chmod            4    CAP_FSETID           1
-22:11:23  0      7006   chown            4    CAP_FSETID           1
-22:11:23  0      7006   chown            4    CAP_FSETID           1
-22:11:23  0      6990   setuidgid        6    CAP_SETGID           1
-22:11:23  0      6990   setuidgid        6    CAP_SETGID           1
-22:11:23  0      6990   setuidgid        7    CAP_SETUID           1
-22:11:24  0      7013   run              24   CAP_SYS_RESOURCE     1
-22:11:24  0      7026   chmod            3    CAP_FOWNER           1
-22:11:24  0      7026   chmod            4    CAP_FSETID           1
-22:11:24  0      7028   chmod            4    CAP_FSETID           1
-22:11:24  0      7028   chmod            4    CAP_FSETID           1
-22:11:24  0      7029   chown            4    CAP_FSETID           1
-22:11:24  0      7029   chown            4    CAP_FSETID           1
-22:11:24  0      7013   setuidgid        6    CAP_SETGID           1
-22:11:24  0      7013   setuidgid        6    CAP_SETGID           1
-22:11:24  0      7013   setuidgid        7    CAP_SETUID           1
-22:11:25  0      7036   run              24   CAP_SYS_RESOURCE     1
-22:11:25  0      7049   chmod            3    CAP_FOWNER           1
-22:11:25  0      7049   chmod            4    CAP_FSETID           1
-22:11:25  0      7051   chmod            4    CAP_FSETID           1
-22:11:25  0      7051   chmod            4    CAP_FSETID           1
+TIME      UID    PID    COMM             CAP  NAME                 AUDIT  INSETID
+22:11:23  114    2676   snmpd            12   CAP_NET_ADMIN        1      N/A
+22:11:23  0      6990   run              24   CAP_SYS_RESOURCE     1      N/A
+22:11:23  0      7003   chmod            3    CAP_FOWNER           1      N/A
+22:11:23  0      7003   chmod            4    CAP_FSETID           1      N/A
+22:11:23  0      7005   chmod            4    CAP_FSETID           1      N/A
+22:11:23  0      7005   chmod            4    CAP_FSETID           1      N/A
+22:11:23  0      7006   chown            4    CAP_FSETID           1      N/A
+22:11:23  0      7006   chown            4    CAP_FSETID           1      N/A
+22:11:23  0      6990   setuidgid        6    CAP_SETGID           1      N/A
+22:11:23  0      6990   setuidgid        6    CAP_SETGID           1      N/A
+22:11:23  0      6990   setuidgid        7    CAP_SETUID           1      N/A
+22:11:24  0      7013   run              24   CAP_SYS_RESOURCE     1      N/A
+22:11:24  0      7026   chmod            3    CAP_FOWNER           1      N/A
+22:11:24  0      7026   chmod            4    CAP_FSETID           1      N/A
+22:11:24  0      7028   chmod            4    CAP_FSETID           1      N/A
+22:11:24  0      7028   chmod            4    CAP_FSETID           1      N/A
+22:11:24  0      7029   chown            4    CAP_FSETID           1      N/A
+22:11:24  0      7029   chown            4    CAP_FSETID           1      N/A
+22:11:24  0      7013   setuidgid        6    CAP_SETGID           1      N/A
+22:11:24  0      7013   setuidgid        6    CAP_SETGID           1      N/A
+22:11:24  0      7013   setuidgid        7    CAP_SETUID           1      N/A
+22:11:25  0      7036   run              24   CAP_SYS_RESOURCE     1      N/A
+22:11:25  0      7049   chmod            3    CAP_FOWNER           1      N/A
+22:11:25  0      7049   chmod            4    CAP_FSETID           1      N/A
+22:11:25  0      7051   chmod            4    CAP_FSETID           1      N/A
+22:11:25  0      7051   chmod            4    CAP_FSETID           1      N/A
+
+A recent kernel version >= 5.1 also reports the INSETID bit to cap_capable():
+
+# ./capable.py
+TIME      UID    PID    TID    COMM             CAP  NAME                 AUDIT  INSETID
+08:22:36  0      12869  12869  chown            0    CAP_CHOWN            1      0
+08:22:36  0      12869  12869  chown            0    CAP_CHOWN            1      0
+08:22:36  0      12869  12869  chown            0    CAP_CHOWN            1      0
+08:23:02  0      13036  13036  setuidgid        6    CAP_SETGID           1      0
+08:23:02  0      13036  13036  setuidgid        6    CAP_SETGID           1      0
+08:23:02  0      13036  13036  setuidgid        7    CAP_SETUID           1      1
+08:23:13  0      13085  13085  chmod            3    CAP_FOWNER           1      0
+08:23:13  0      13085  13085  chmod            4    CAP_FSETID           1      0
+08:23:13  0      13085  13085  chmod            3    CAP_FOWNER           1      0
+08:23:13  0      13085  13085  chmod            4    CAP_FSETID           1      0
+08:23:13  0      13085  13085  chmod            4    CAP_FSETID           1      0
+08:24:27  0      13522  13522  ping             13   CAP_NET_RAW          1      0
 [...]
 
 This can be useful for general debugging, and also security enforcement:

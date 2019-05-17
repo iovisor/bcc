@@ -54,6 +54,8 @@ Capability name. See capabilities(7) for descriptions.
 .TP
 AUDIT
 Whether this was an audit event. Use \-v to include non-audit events.
+INSETID
+Whether the INSETID bit was set (Linux >= 5.1).
 .SH OVERHEAD
 This adds low-overhead instrumentation to capability checks, which are expected
 to be low frequency, however, that depends on the application. Test in a lab

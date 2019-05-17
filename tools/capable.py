@@ -99,6 +99,7 @@ StackType = Enum(("Kernel", "User",))
 bpf_text = """
 #include <uapi/linux/ptrace.h>
 #include <linux/sched.h>
+#include <linux/security.h>
 
 struct data_t {
    u32 tgid;
@@ -106,6 +107,7 @@ struct data_t {
    u32 uid;
    int cap;
    int audit;
+   int insetid;
    char comm[TASK_COMM_LEN];
 #ifdef KERNEL_STACKS
    int kernel_stack_id;
@@ -122,17 +124,28 @@ BPF_STACK_TRACE(stacks, 2048);
 #endif
 
 int kprobe__cap_capable(struct pt_regs *ctx, const struct cred *cred,
-    struct user_namespace *targ_ns, int cap, int audit)
+    struct user_namespace *targ_ns, int cap, int cap_opt)
 {
     u64 __pid_tgid = bpf_get_current_pid_tgid();
     u32 tgid = __pid_tgid >> 32;
     u32 pid = __pid_tgid;
+    int audit;
+    int insetid;
+
+  #ifdef CAP_OPT_NONE
+    audit = (cap_opt & 0b10) == 0;
+    insetid = (cap_opt & 0b100) != 0;
+  #else
+    audit = cap_opt;
+    insetid = -1;
+  #endif
+
     FILTER1
     FILTER2
     FILTER3
 
     u32 uid = bpf_get_current_uid_gid();
-    struct data_t data = {.tgid = tgid, .pid = pid, .uid = uid, .cap = cap, .audit = audit};
+    struct data_t data = {.tgid = tgid, .pid = pid, .uid = uid, .cap = cap, .audit = audit, .insetid = insetid};
 #ifdef KERNEL_STACKS
     data.kernel_stack_id = stacks.get_stackid(ctx, 0);
 #endif
@@ -165,8 +178,8 @@ if debug:
 b = BPF(text=bpf_text)
 
 # header
-print("%-9s %-6s %-6s %-6s %-16s %-4s %-20s %s" % (
-    "TIME", "UID", "PID", "TID", "COMM", "CAP", "NAME", "AUDIT"))
+print("%-9s %-6s %-6s %-6s %-16s %-4s %-20s %-6s %s" % (
+    "TIME", "UID", "PID", "TID", "COMM", "CAP", "NAME", "AUDIT", "INSETID"))
 
 def stack_id_err(stack_id):
     # -EFAULT in get_stackid normally means the stack-trace is not availible,
@@ -190,9 +203,9 @@ def print_event(bpf, cpu, data, size):
         name = capabilities[event.cap]
     else:
         name = "?"
-    print("%-9s %-6d %-6d %-6d %-16s %-4d %-20s %d" % (strftime("%H:%M:%S"),
+    print("%-9s %-6d %-6d %-6d %-16s %-4d %-20s %-6d %s" % (strftime("%H:%M:%S"),
         event.uid, event.pid, event.tgid, event.comm.decode('utf-8', 'replace'),
-        event.cap, name, event.audit))
+        event.cap, name, event.audit, str(event.insetid) if event.insetid != -1 else "N/A"))
     if args.kernel_stack:
         print_stack(bpf, event.kernel_stack_id, StackType.Kernel, -1)
     if args.user_stack:
