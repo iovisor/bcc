@@ -73,6 +73,10 @@ AF_XDP | 4.18 |  [`fbfc504a24f5`](https://git.kernel.org/cgit/linux/kernel/git/d
 bpfilter | 4.18 |  [`d2ba09c17a06`](https://git.kernel.org/cgit/linux/kernel/git/davem/net-next.git/commit/?id=d2ba09c17a0647f899d6c20a11bab9e6d3382f07)
 End.BPF action for seg6local LWT | 4.18 |  [`004d4b274e2a`](https://git.kernel.org/cgit/linux/kernel/git/davem/net-next.git/commit/?id=004d4b274e2a1a895a0e5dc66158b90a7d463d44)
 BPF attached to LIRC devices | 4.18 |  [`f4364dcfc86d`](https://git.kernel.org/cgit/linux/kernel/git/bpf/bpf-next.git/commit/?id=f4364dcfc86df7c1ca47b256eaf6b6d0cdd0d936)
+BPF socket reuseport | 4.19 | [`2dbb9b9e6df6`](https://github.com/torvalds/linux/commit/2dbb9b9e6df67d444fbe425c7f6014858d337adf)
+BPF flow dissector | 4.20 | [`d58e468b1112`](https://github.com/torvalds/linux/commit/d58e468b1112dcd1d5193c0a89ff9f98b5a3e8b9)
+BPF cgroup sysctl | 5.2 | [`7b146cebe30c`](https://github.com/torvalds/linux/commit/7b146cebe30cb481b0f70d85779da938da818637)
+BPF raw tracepoint writable | 5.2 | [`9df1c28bb752`](https://github.com/torvalds/linux/commit/9df1c28bb75217b244257152ab7d788bb2a386d0)
 
 ## Tables (_a.k.a._ Maps)
 
@@ -107,6 +111,7 @@ reuseport sockarray | 4.19 | [`5dc4c4b7d4e8`](https://github.com/torvalds/linux/
 precpu cgroup storage | 4.20 | [`b741f1630346`](https://github.com/torvalds/linux/commit/b741f1630346defcbc8cc60f1a2bdae8b3b0036f)
 queue | 4.20 | [`f1a2e44a3aec`](https://github.com/torvalds/linux/commit/f1a2e44a3aeccb3ff18d3ccc0b0203e70b95bd92)
 stack | 4.20 | [`f1a2e44a3aec`](https://github.com/torvalds/linux/commit/f1a2e44a3aeccb3ff18d3ccc0b0203e70b95bd92)
+socket local storage | 5.2 | [`6ac99e8f23d4`](https://github.com/torvalds/linux/commit/6ac99e8f23d4b10258406ca0dd7bffca5f31da9d)
 
 ## XDP
 
@@ -215,6 +220,8 @@ Helper | Kernel version | License | Commit |
 `BPF_FUNC_sk_redirect_map()` | 4.14 |  | [`174a79ff9515`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=174a79ff9515f400b9a6115643dafd62a635b7e6)
 `BPF_FUNC_sk_release()` | 4.20 |  | [`6acc9b432e67`](https://github.com/torvalds/linux/commit/6acc9b432e6714d72d7d77ec7c27f6f8358d0c71)
 `BPF_FUNC_sk_select_reuseport()` | 4.19 |  | [`2dbb9b9e6df6`](https://github.com/torvalds/linux/commit/2dbb9b9e6df67d444fbe425c7f6014858d337adf)
+`BPF_FUNC_sk_storage_delete()` | 5.2 |  | [`6ac99e8f23d4`](https://github.com/torvalds/linux/commit/6ac99e8f23d4b10258406ca0dd7bffca5f31da9d)
+`BPF_FUNC_sk_storage_get()` | 5.2 |  | [`6ac99e8f23d4`](https://github.com/torvalds/linux/commit/6ac99e8f23d4b10258406ca0dd7bffca5f31da9d)
 `BPF_FUNC_skb_adjust_room()` | 4.13 |  | [`2be7e212d541`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=2be7e212d5419a400d051c84ca9fdd083e5aacac)
 `BPF_FUNC_skb_ancestor_cgroup_id()` | 4.19 |  | [`7723628101aa`](https://github.com/torvalds/linux/commit/7723628101aaeb1d723786747529b4ea65c5b5c5)
 `BPF_FUNC_skb_change_head()` | 4.10 |  | [`3a0af8fd61f9`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=3a0af8fd61f90920f6fa04e4f1e9a6a73c1b4fd2)

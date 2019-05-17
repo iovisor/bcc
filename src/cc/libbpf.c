@@ -204,6 +204,8 @@ static struct bpf_helper helpers[] = {
   {"sysctl_set_new_value", "5.2"},
   {"strtol", "5.2"},
   {"strtoul", "5.2"},
+  {"sk_storage_get", "5.2"},
+  {"sk_storage_delete", "5.2"},
 };
 
 static uint64_t ptr_to_u64(void *ptr)
