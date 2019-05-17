@@ -503,6 +503,11 @@ static int (*bpf_skb_ecn_set_ce)(void *ctx) =
   (void *) BPF_FUNC_skb_ecn_set_ce;
 static struct bpf_sock *(*bpf_get_listener_sock)(struct bpf_sock *sk) =
   (void *) BPF_FUNC_get_listener_sock;
+static void *(*bpf_sk_storage_get)(void *map, struct bpf_sock *sk,
+                                   void *value, __u64 flags) =
+  (void *) BPF_FUNC_sk_storage_get;
+static int (*bpf_sk_storage_delete)(void *map, struct bpf_sock *sk) =
+  (void *)BPF_FUNC_sk_storage_delete;
 
 /* llvm builtin functions that eBPF C program may use to
  * emit BPF_LD_ABS and BPF_LD_IND instructions
