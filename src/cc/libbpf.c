@@ -751,9 +751,9 @@ static int bpf_get_retprobe_bit(const char *event_type)
 }
 
 /*
- * new kernel API allows creating [k,u]probe with perf_event_open, which
- * makes it easier to clean up the [k,u]probe. This function tries to
- * create pfd with the new API.
+ * Kernel API with e12f03d ("perf/core: Implement the 'perf_kprobe' PMU") allows
+ * creating [k,u]probe with perf_event_open, which makes it easier to clean up
+ * the [k,u]probe. This function tries to create pfd with the perf_kprobe PMU.
  */
 static int bpf_try_perf_event_open_with_probe(const char *name, uint64_t offs,
              int pid, const char *event_type, int is_return)
@@ -941,7 +941,6 @@ static int create_probe_event(char *buf, const char *ev_name,
   bool is_kprobe = strncmp("kprobe", event_type, 6) == 0;
 
   snprintf(buf, PATH_MAX, "/sys/kernel/debug/tracing/%s_events", event_type);
-
   kfd = open(buf, O_WRONLY | O_APPEND, 0);
   if (kfd < 0) {
     fprintf(stderr, "%s: open(%s): %s\n", __func__, buf,
@@ -1013,8 +1012,9 @@ static int bpf_attach_probe(int progfd, enum bpf_probe_attach_type attach_type,
     pfd = bpf_try_perf_event_open_with_probe(config1, offset, pid, event_type,
                                              attach_type != BPF_PROBE_ENTRY);
 
-  // If failed, most likely Kernel doesn't support the new perf_event_open API
-  // yet. Try create the event using debugfs.
+  // If failed, most likely Kernel doesn't support the perf_kprobe PMU
+  // (e12f03d "perf/core: Implement the 'perf_kprobe' PMU") yet.
+  // Try create the event using debugfs.
   if (pfd < 0) {
     if (create_probe_event(buf, ev_name, attach_type, config1, offset,
                            event_type, pid, maxactive) < 0)
