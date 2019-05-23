@@ -14,6 +14,7 @@ from __future__ import print_function
 from bcc import BPF, USDT
 from functools import partial
 from time import sleep, strftime
+import time
 import argparse
 import re
 import ctypes as ct
@@ -27,7 +28,9 @@ class Probe(object):
         max_events = None
         event_count = 0
         first_ts = 0
+        first_ts_real = None
         print_time = False
+        print_unix_timestamp = False
         use_localtime = True
         time_field = False
         print_cpu = False
@@ -41,11 +44,13 @@ class Probe(object):
         def configure(cls, args):
                 cls.max_events = args.max_events
                 cls.print_time = args.timestamp or args.time
+                cls.print_unix_timestamp = args.unix_timestamp
                 cls.use_localtime = not args.timestamp
                 cls.time_field = cls.print_time and (not cls.use_localtime)
                 cls.print_cpu = args.print_cpu
                 cls.print_address = args.address
                 cls.first_ts = BPF.monotonic_time()
+                cls.first_ts_real = time.time()
                 cls.tgid = args.tgid or -1
                 cls.pid = args.pid or -1
                 cls.page_cnt = args.buffer_pages
@@ -512,7 +517,11 @@ BPF_PERF_OUTPUT(%s);
 
         @classmethod
         def _time_off_str(cls, timestamp_ns):
-                return "%.6f" % (1e-9 * (timestamp_ns - cls.first_ts))
+            offset = 1e-9 * (timestamp_ns - cls.first_ts)
+            if cls.print_unix_timestamp:
+                return "%.6f" % (offset + cls.first_ts_real)
+            else:
+                return "%.6f" % offset
 
         def _display_function(self):
                 if self.probe_type == 'p' or self.probe_type == 'r':
@@ -558,7 +567,10 @@ BPF_PERF_OUTPUT(%s);
                 if Probe.print_time:
                     time = strftime("%H:%M:%S") if Probe.use_localtime else \
                            Probe._time_off_str(event.timestamp_ns)
-                    print("%-8s " % time[:8], end="")
+                    if Probe.print_unix_timestamp:
+                        print("%-17s " % time[:17], end="")
+                    else:
+                        print("%-8s " % time[:8], end="")
                 if Probe.print_cpu:
                     print("%-3s " % event.cpu, end="")
                 print("%-7d %-7d %-15s %-16s %s" %
@@ -691,6 +703,8 @@ trace -I 'linux/fs_struct.h' 'mntns_install "users = %d", $task->fs->users'
                   help="number of events to print before quitting")
                 parser.add_argument("-t", "--timestamp", action="store_true",
                   help="print timestamp column (offset from trace start)")
+                parser.add_argument("-u", "--unix-timestamp", action="store_true",
+                  help="print UNIX timestamp instead of offset from trace start, requires -t")
                 parser.add_argument("-T", "--time", action="store_true",
                   help="print time column")
                 parser.add_argument("-C", "--print_cpu", action="store_true",
@@ -779,7 +793,8 @@ trace -I 'linux/fs_struct.h' 'mntns_install "users = %d", $task->fs->users'
 
                 # Print header
                 if self.args.timestamp or self.args.time:
-                    print("%-8s " % "TIME", end="");
+                    col_fmt = "%-17s " if self.args.unix_timestamp else "%-8s "
+                    print(col_fmt % "TIME", end="");
                 if self.args.print_cpu:
                     print("%-3s " % "CPU", end="");
                 print("%-7s %-7s %-15s %-16s %s" %
