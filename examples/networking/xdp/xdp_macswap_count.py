@@ -141,7 +141,7 @@ int xdp_prog1(struct CTXTYPE *ctx) {
     else
         index = 0;
 
-    if (h_proto == IPPROTO_UDP) {
+    if (index == IPPROTO_UDP) {
         swap_src_dst_mac(data);
         rc = XDP_TX;
     }
