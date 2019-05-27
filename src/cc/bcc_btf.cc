@@ -119,6 +119,13 @@ void BTF::fixup_datasec(uint8_t *type_sec, uintptr_t type_sec_size,
       if (sections_.find(secname) != sections_.end()) {
         t->size = std::get<1>(sections_[secname]);
       }
+      // For section name, the kernel does not accept '/'.
+      // So change DataSec name here to please the kenerl
+      // as we do not really use DataSec yet.
+      // This change can be removed if the kernel is
+      // changed to accpet '/' in section names.
+      if (strncmp(strings + t->name_off, "maps/", 5) == 0)
+        t->name_off += 5;
       next_type += vlen * sizeof(struct btf_var_secinfo);
       break;
     default:
