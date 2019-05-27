@@ -48,7 +48,8 @@ int32_t BTFStringTable::addString(std::string S) {
   return Offset;
 }
 
-BTF::BTF(bool debug) : debug_(debug), btf_(nullptr), btf_ext_(nullptr) {
+BTF::BTF(bool debug, sec_map_def &sections) : debug_(debug),
+    btf_(nullptr), btf_ext_(nullptr), sections_(sections) {
   if (!debug)
     libbpf_set_print(NULL);
 }
@@ -67,6 +68,64 @@ void BTF::warning(const char *format, ...) {
   va_start(args, format);
   vfprintf(stderr, format, args);
   va_end(args);
+}
+
+// Adjust datasec types. The compiler is not able to determine
+// the datasec size, so we need to set the value properly based
+// on actual section size.
+void BTF::fixup_datasec(uint8_t *type_sec, uintptr_t type_sec_size,
+                        char *strings) {
+  uint8_t *next_type = type_sec;
+  uint8_t *end_type = type_sec + type_sec_size;
+  int base_size = sizeof(struct btf_type);
+  char *secname;
+
+  while (next_type < end_type) {
+    struct btf_type *t = (struct btf_type *)next_type;
+    unsigned short vlen = BTF_INFO_VLEN(t->info);
+
+    next_type += base_size;
+
+    switch(BTF_INFO_KIND(t->info)) {
+    case BTF_KIND_FWD:
+    case BTF_KIND_CONST:
+    case BTF_KIND_VOLATILE:
+    case BTF_KIND_RESTRICT:
+    case BTF_KIND_PTR:
+    case BTF_KIND_TYPEDEF:
+    case BTF_KIND_FUNC:
+      break;
+    case BTF_KIND_INT:
+      next_type += sizeof(uint32_t);
+      break;
+    case BTF_KIND_ENUM:
+      next_type += vlen * sizeof(struct btf_enum);
+      break;
+    case BTF_KIND_ARRAY:
+      next_type += sizeof(struct btf_array);
+      break;
+    case BTF_KIND_STRUCT:
+    case BTF_KIND_UNION:
+      next_type += vlen * sizeof(struct btf_member);
+      break;
+    case BTF_KIND_FUNC_PROTO:
+      next_type += vlen * sizeof(struct btf_param);
+      break;
+    case BTF_KIND_VAR:
+      next_type += sizeof(struct btf_var);
+      break;
+    case BTF_KIND_DATASEC:
+      secname = strings + t->name_off;
+      if (sections_.find(secname) != sections_.end()) {
+        t->size = std::get<1>(sections_[secname]);
+      }
+      next_type += vlen * sizeof(struct btf_var_secinfo);
+      break;
+    default:
+      // Something not understood
+      return;
+    }
+  }
 }
 
 // The compiler doesn't have source code for remapped files.
@@ -98,11 +157,14 @@ void BTF::adjust(uint8_t *btf_sec, uintptr_t btf_sec_size,
     LineCaches[it->first] = std::move(LineCache);
   }
 
-  // Check the LineInfo table and add missing lines
-
   struct btf_header *hdr = (struct btf_header *)btf_sec;
   struct btf_ext_header *ehdr = (struct btf_ext_header *)btf_ext_sec;
 
+  // Fixup datasec.
+  fixup_datasec(btf_sec + hdr->hdr_len + hdr->type_off, hdr->type_len,
+                (char *)(btf_sec + hdr->hdr_len + hdr->str_off));
+
+  // Check the LineInfo table and add missing lines
   char *strings = (char *)(btf_sec + hdr->hdr_len + hdr->str_off);
   unsigned orig_strings_len = hdr->str_len;
   unsigned *linfo_s = (unsigned *)(btf_ext_sec + ehdr->hdr_len + ehdr->line_info_off);
