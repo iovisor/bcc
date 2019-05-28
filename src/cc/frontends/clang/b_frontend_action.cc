@@ -34,6 +34,7 @@
 #include "loader.h"
 #include "table_storage.h"
 #include "arch_helper.h"
+#include "libbpf/src/bpf.h"
 
 #include "libbpf.h"
 
@@ -1168,46 +1169,66 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
       ++i;
     }
 
+    std::string section_attr = A->getName();
+    size_t pinned_path_pos = section_attr.find(":");
+    unsigned int pinned_id = 0; // 0 is not a valid map ID, they start with 1
+
+    if (pinned_path_pos != std::string::npos) {
+      std::string pinned = section_attr.substr(pinned_path_pos + 1);
+      section_attr = section_attr.substr(0, pinned_path_pos);
+      int fd = bpf_obj_get(pinned.c_str());
+      struct bpf_map_info info = {};
+      unsigned int info_len = sizeof(info);
+
+      if (bpf_obj_get_info_by_fd(fd, &info, &info_len)) {
+        error(GET_BEGINLOC(Decl), "map not found: %0") << pinned;
+        return false;
+      }
+
+      close(fd);
+      pinned_id = info.id;
+    }
+
     bpf_map_type map_type = BPF_MAP_TYPE_UNSPEC;
-    if (A->getName() == "maps/hash") {
+    if (section_attr == "maps/hash") {
       map_type = BPF_MAP_TYPE_HASH;
-    } else if (A->getName() == "maps/array") {
+    } else if (section_attr == "maps/array") {
       map_type = BPF_MAP_TYPE_ARRAY;
-    } else if (A->getName() == "maps/percpu_hash") {
+    } else if (section_attr == "maps/percpu_hash") {
       map_type = BPF_MAP_TYPE_PERCPU_HASH;
-    } else if (A->getName() == "maps/percpu_array") {
+    } else if (section_attr == "maps/percpu_array") {
       map_type = BPF_MAP_TYPE_PERCPU_ARRAY;
-    } else if (A->getName() == "maps/lru_hash") {
+    } else if (section_attr == "maps/lru_hash") {
       map_type = BPF_MAP_TYPE_LRU_HASH;
-    } else if (A->getName() == "maps/lru_percpu_hash") {
+    } else if (section_attr == "maps/lru_percpu_hash") {
       map_type = BPF_MAP_TYPE_LRU_PERCPU_HASH;
-    } else if (A->getName() == "maps/lpm_trie") {
+    } else if (section_attr == "maps/lpm_trie") {
       map_type = BPF_MAP_TYPE_LPM_TRIE;
-    } else if (A->getName() == "maps/histogram") {
+    } else if (section_attr == "maps/histogram") {
       map_type = BPF_MAP_TYPE_HASH;
       if (key_type->isSpecificBuiltinType(BuiltinType::Int))
         map_type = BPF_MAP_TYPE_ARRAY;
       if (!leaf_type->isSpecificBuiltinType(BuiltinType::ULongLong))
         error(GET_BEGINLOC(Decl), "histogram leaf type must be u64, got %0") << leaf_type;
-    } else if (A->getName() == "maps/prog") {
+    } else if (section_attr == "maps/prog") {
       map_type = BPF_MAP_TYPE_PROG_ARRAY;
-    } else if (A->getName() == "maps/perf_output") {
+    } else if (section_attr == "maps/perf_output") {
       map_type = BPF_MAP_TYPE_PERF_EVENT_ARRAY;
       int numcpu = get_possible_cpus().size();
       if (numcpu <= 0)
         numcpu = 1;
       table.max_entries = numcpu;
-    } else if (A->getName() == "maps/perf_array") {
+    } else if (section_attr == "maps/perf_array") {
       map_type = BPF_MAP_TYPE_PERF_EVENT_ARRAY;
-    } else if (A->getName() == "maps/cgroup_array") {
+    } else if (section_attr == "maps/cgroup_array") {
       map_type = BPF_MAP_TYPE_CGROUP_ARRAY;
-    } else if (A->getName() == "maps/stacktrace") {
+    } else if (section_attr == "maps/stacktrace") {
       map_type = BPF_MAP_TYPE_STACK_TRACE;
-    } else if (A->getName() == "maps/devmap") {
+    } else if (section_attr == "maps/devmap") {
       map_type = BPF_MAP_TYPE_DEVMAP;
-    } else if (A->getName() == "maps/cpumap") {
+    } else if (section_attr == "maps/cpumap") {
       map_type = BPF_MAP_TYPE_CPUMAP;
-    } else if (A->getName() == "maps/extern") {
+    } else if (section_attr == "maps/extern") {
       if (!fe_.table_storage().Find(maps_ns_path, table_it)) {
         if (!fe_.table_storage().Find(global_path, table_it)) {
           error(GET_BEGINLOC(Decl), "reference to undefined table");
@@ -1216,7 +1237,7 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
       }
       table = table_it->second.dup();
       table.is_extern = true;
-    } else if (A->getName() == "maps/export") {
+    } else if (section_attr == "maps/export") {
       if (table.name.substr(0, 2) == "__")
         table.name = table.name.substr(2);
       Path local_path({fe_.id(), table.name});
@@ -1227,7 +1248,7 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
       }
       fe_.table_storage().Insert(global_path, table_it->second.dup());
       return true;
-    } else if(A->getName() == "maps/shared") {
+    } else if(section_attr == "maps/shared") {
       if (table.name.substr(0, 2) == "__")
         table.name = table.name.substr(2);
       Path local_path({fe_.id(), table.name});
@@ -1242,7 +1263,7 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
 
     if (!table.is_extern) {
       if (map_type == BPF_MAP_TYPE_UNSPEC) {
-        error(GET_BEGINLOC(Decl), "unsupported map type: %0") << A->getName();
+        error(GET_BEGINLOC(Decl), "unsupported map type: %0") << section_attr;
         return false;
       }
 
@@ -1250,7 +1271,7 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
       table.fake_fd = fe_.get_next_fake_fd();
       fe_.add_map_def(table.fake_fd, std::make_tuple((int)map_type, std::string(table.name),
                       (int)table.key_size, (int)table.leaf_size,
-                      (int)table.max_entries, table.flags));
+                      (int)table.max_entries, table.flags, pinned_id));
     }
 
     if (!table.is_extern)

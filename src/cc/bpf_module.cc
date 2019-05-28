@@ -317,6 +317,7 @@ int BPFModule::load_maps(sec_map_def &sections) {
   for (auto map : fake_fd_map_) {
     int fd, fake_fd, map_type, key_size, value_size, max_entries, map_flags;
     const char *map_name;
+    unsigned int pinned_id;
 
     fake_fd     = map.first;
     map_type    = get<0>(map.second);
@@ -325,22 +326,28 @@ int BPFModule::load_maps(sec_map_def &sections) {
     value_size  = get<3>(map.second);
     max_entries = get<4>(map.second);
     map_flags   = get<5>(map.second);
+    pinned_id   = get<6>(map.second);
 
-    struct bpf_create_map_attr attr = {};
-    attr.map_type = (enum bpf_map_type)map_type;
-    attr.name = map_name;
-    attr.key_size = key_size;
-    attr.value_size = value_size;
-    attr.max_entries = max_entries;
-    attr.map_flags = map_flags;
+    if (pinned_id) {
+        fd = bpf_map_get_fd_by_id(pinned_id);
+    } else {
+        struct bpf_create_map_attr attr = {};
+        attr.map_type = (enum bpf_map_type)map_type;
+        attr.name = map_name;
+        attr.key_size = key_size;
+        attr.value_size = value_size;
+        attr.max_entries = max_entries;
+        attr.map_flags = map_flags;
 
-    if (map_tids.find(map_name) != map_tids.end()) {
-      attr.btf_fd = btf_->get_fd();
-      attr.btf_key_type_id = map_tids[map_name].first;
-      attr.btf_value_type_id = map_tids[map_name].second;
+        if (map_tids.find(map_name) != map_tids.end()) {
+          attr.btf_fd = btf_->get_fd();
+          attr.btf_key_type_id = map_tids[map_name].first;
+          attr.btf_value_type_id = map_tids[map_name].second;
+        }
+
+        fd = bcc_create_map_xattr(&attr, allow_rlimit_);
     }
 
-    fd = bcc_create_map_xattr(&attr, allow_rlimit_);
     if (fd < 0) {
       fprintf(stderr, "could not open bpf map: %s, error: %s\n",
               map_name, strerror(errno));
