@@ -50,7 +50,6 @@ class TracepointTypeVisitor :
   std::string GenerateTracepointStruct(clang::SourceLocation loc,
           std::string const& category, std::string const& event);
 
-  clang::ASTContext &C;
   clang::DiagnosticsEngine &diag_;
   clang::Rewriter &rewriter_;
   llvm::raw_ostream &out_;

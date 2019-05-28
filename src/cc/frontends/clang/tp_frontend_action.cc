@@ -46,7 +46,7 @@ using std::ifstream;
 using namespace clang;
 
 TracepointTypeVisitor::TracepointTypeVisitor(ASTContext &C, Rewriter &rewriter)
-    : C(C), diag_(C.getDiagnostics()), rewriter_(rewriter), out_(llvm::errs()) {
+    : diag_(C.getDiagnostics()), rewriter_(rewriter), out_(llvm::errs()) {
 }
 
 enum class field_kind_t {
