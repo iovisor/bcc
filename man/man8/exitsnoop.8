@@ -2,7 +2,7 @@
 .SH NAME
 exitsnoop \- Trace all process termination (exit, fatal signal). Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B exitsnoop [\-h] [\-t] [\-u] [\-x] [\-p PID] [\-\-label LABEL]
+.B exitsnoop [\-h] [\-t] [\-\-utc] [\-x] [\-p PID] [\-\-label LABEL]
 .SH DESCRIPTION
 exitsnoop traces process termination, showing the command name and reason for
 termination, either an exit or a fatal signal.
@@ -24,7 +24,7 @@ Print usage message.
 \-t
 Include a timestamp column.
 .TP
-\-u
+\-\-utc
 Include a timestamp column, use UTC timezone.
 .TP
 \-x
@@ -60,7 +60,7 @@ Label each output line with 'EXIT':
 .TP
 TIME-TZ
 Time of process termination HH:MM:SS.sss with milliseconds, where TZ is
-the local time zone, 'UTC' with \-u option.
+the local time zone, 'UTC' with \-\-utc option.
 .TP
 LABEL
 The optional label if \-\-label option is used.  This is useful with the
