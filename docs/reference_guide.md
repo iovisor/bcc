@@ -543,6 +543,17 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=BPF_TABLE+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=BPF_TABLE+path%3Atools&type=Code)
 
+#### Pinned Maps
+
+Maps that were pinned to the BPF filesystem can be accessed through an extended syntax: ```BPF_TABLE_PINNED(_table_type, _key_type, _leaf_type, _name, _max_entries, "/sys/fs/bpf/xyz")```
+The type information is not enforced and the actual map type depends on the map that got pinned to the location.
+
+For example:
+
+```C
+BPF_TABLE_PINNED("hash", u64, u64, ids, 1024, "/sys/fs/bpf/ids");
+```
+
 ### 2. BPF_HASH
 
 Syntax: ```BPF_HASH(name [, key_type [, leaf_type [, size]]])```
