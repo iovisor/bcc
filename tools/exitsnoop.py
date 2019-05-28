@@ -24,7 +24,7 @@ _examples = """examples:
     exitsnoop                # trace all process termination
     exitsnoop -x             # trace only fails, exclude exit(0)
     exitsnoop -t             # include timestamps (local time)
-    exitsnoop -u             # include timestamps (UTC)
+    exitsnoop --utc          # include timestamps (UTC)
     exitsnoop -p 181         # only trace PID 181
     exitsnoop --label=exit   # label each output line with 'exit'
 """
@@ -58,7 +58,7 @@ def _getParser():
         epilog=_examples)
     a=parser.add_argument
     a("-t", "--timestamp", action="store_true", help="include timestamp (local time default)")
-    a("-u", "--utc",       action="store_true", help="include timestamp in UTC (-t implied)")
+    a("--utc",             action="store_true", help="include timestamp in UTC (-t implied)")
     a("-p", "--pid",                            help="trace this PID only")
     a("--label",                                help="label each line")
     a("-x", "--failed",    action="store_true", help="trace only fails, exclude exit(0)")

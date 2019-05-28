@@ -37,7 +37,7 @@ of the process with hundredth of a second resolution, and the reason for
 the process exit (EXIT_CODE).
 
 A -t option can be used to include a timestamp column, it shows local time
-by default.  The -u option shows the time in UTC.  The --label
+by default.  The --utc option shows the time in UTC.  The --label
 option adds a column indicating the tool that generated the output,
 'exit' by default.  If other tools follow this format their outputs
 can be merged into a single trace with a simple lexical sort
@@ -46,12 +46,12 @@ e.g. 'exec', 'open', 'exit', etc.  Time is displayed with millisecond
 resolution. The -x option will show only non-zero exits and fatal
 signals, which excludes processes that exit with 0 code:
 
-# ./exitsnoop.py -t -u -x --label= > exitlog &
+# ./exitsnoop.py -t --utc -x --label= > exitlog &
 [1] 18289
 # for((i=65;i<100;i+=5)); do bash -c "sleep 1.$i;exit $i"; done
 ^C
 # fg
-./exitsnoop.py -t -u -x --label= > exitlog
+./exitsnoop.py -t --utc -x --label= > exitlog
 ^C
 # cat exitlog
 TIME-UTC     LABEL PCOMM            PID    PPID   TID    AGE(s)  EXIT_CODE
@@ -67,14 +67,14 @@ TIME-UTC     LABEL PCOMM            PID    PPID   TID    AGE(s)  EXIT_CODE
 USAGE message:
 
 # ./exitsnoop.py -h
-usage: exitsnoop.py [-h] [-t] [-u] [-p PID] [--label LABEL] [-x]
+usage: exitsnoop.py [-h] [-t] [--utc] [-p PID] [--label LABEL] [-x]
 
 Trace all process termination (exit, fatal signal)
 
 optional arguments:
   -h, --help         show this help message and exit
   -t, --timestamp    include timestamp (local time default)
-  -u, --utc          include timestamp in UTC (-t implied)
+  --utc              include timestamp in UTC (-t implied)
   -p PID, --pid PID  trace this PID only
   --label LABEL      label each line
   -x, --failed       trace only fails, exclude exit(0)
@@ -83,7 +83,7 @@ examples:
     exitsnoop                # trace all process termination
     exitsnoop -x             # trace only fails, exclude exit(0)
     exitsnoop -t             # include timestamps (local time)
-    exitsnoop -u             # include timestamps (UTC)
+    exitsnoop --utc          # include timestamps (UTC)
     exitsnoop -p 181         # only trace PID 181
     exitsnoop --label=exit   # label each output line with 'exit'
 
