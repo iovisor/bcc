@@ -588,7 +588,7 @@ Things to learn:
 
 ### Lesson 15. nodejs_http_server.py
 
-This program instruments a user-defined static tracing (USDT) probe, which is the user-level version of a kernel tracepoint. Sample output:
+This program instruments a user statically-defined tracing (USDT) probe, which is the user-level version of a kernel tracepoint. Sample output:
 
 ```
 # ./nodejs_http_server.py 24728
