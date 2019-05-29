@@ -206,6 +206,7 @@ static struct bpf_helper helpers[] = {
   {"strtoul", "5.2"},
   {"sk_storage_get", "5.2"},
   {"sk_storage_delete", "5.2"},
+  {"send_signal", "5.3"},
 };
 
 static uint64_t ptr_to_u64(void *ptr)
