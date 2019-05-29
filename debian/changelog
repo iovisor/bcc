@@ -1,3 +1,15 @@
+bcc (0.10.0-1) unstable; urgency=low
+
+  * Support for kernel up to 5.1
+  * corresponding libbpf submodule release is v0.0.3
+  * support for reading kernel headers from /proc
+  * libbpf.{a,so} renamed to libcc_bpf.{a,so}
+  * new common options for some tools
+  * new tool: drsnoop
+  * s390 USDT support
+
+ -- Brenden Blanco <bblanco@gmail.com>  Tue, 28 May 2019 17:00:00 +0000
+
 bcc (0.9.0-1) unstable; urgency=low
 
   * Adds support for BTF
