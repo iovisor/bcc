@@ -22,15 +22,14 @@
 #include "usdt.h"
 #include "api/BPF.h"
 
-#ifdef HAVE_SDT_HEADER
 /* required to insert USDT probes on this very executable --
  * we're gonna be testing them live! */
-#include <sys/sdt.h>
+#include "folly/tracing/StaticTracepoint.h"
 
 static int a_probed_function() {
   int an_int = 23 + getpid();
   void *a_pointer = malloc(4);
-  DTRACE_PROBE2(libbcc_test, sample_probe_1, an_int, a_pointer);
+  FOLLY_SDT(libbcc_test, sample_probe_1, an_int, a_pointer);
   free(a_pointer);
   return an_int;
 }
@@ -83,7 +82,6 @@ TEST_CASE("test fine a probe in our Process with C++ API", "[usdt]") {
     res = bpf.detach_usdt(u);
     REQUIRE(res.code() == 0);
 }
-#endif  // HAVE_SDT_HEADER
 
 class ChildProcess {
   pid_t pid_;
