@@ -142,13 +142,16 @@ static inline int extract_kheaders(const std::string &dirpath,
     }
   }
 
-  snprintf(dirpath_tmp, 256, "/tmp/kheaders-%s-XXXXXX", uname_data.release);
+  snprintf(dirpath_tmp, sizeof(dirpath_tmp), "/tmp/kheaders-%s-XXXXXX", uname_data.release);
   if (mkdtemp(dirpath_tmp) == NULL) {
     ret = -1;
     goto cleanup;
   }
 
-  snprintf(tar_cmd, 256, "tar -xf %s -C %s", PROC_KHEADERS_PATH, dirpath_tmp);
+  if ((size_t)snprintf(tar_cmd, sizeof(tar_cmd), "tar -xf %s -C %s", PROC_KHEADERS_PATH, dirpath_tmp) >= sizeof(tar_cmd)) {
+    ret = -1;
+    goto cleanup;
+  }
   ret = system(tar_cmd);
   if (ret) {
     system(("rm -rf " + std::string(dirpath_tmp)).c_str());
