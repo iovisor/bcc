@@ -932,6 +932,9 @@ static void exit_mount_ns(int fd) {
   close(fd);
 }
 
+/* Creates an [uk]probe using debugfs.
+ * On success, the path to the probe is placed in buf (which is assumed to be of size PATH_MAX).
+ */
 static int create_probe_event(char *buf, const char *ev_name,
                               enum bpf_probe_attach_type attach_type,
                               const char *config1, uint64_t offset,
@@ -1026,7 +1029,10 @@ static int bpf_attach_probe(int progfd, enum bpf_probe_attach_type attach_type,
     // (kernel < 4.12), the event is created under a different name; we need to
     // delete that event and start again without maxactive.
     if (is_kprobe && maxactive > 0 && attach_type == BPF_PROBE_RETURN) {
-      snprintf(fname, sizeof(fname), "%s/id", buf);
+      if (snprintf(fname, sizeof(fname), "%s/id", buf) >= sizeof(fname)) {
+	fprintf(stderr, "filename (%s) is too long for buffer\n", buf);
+	goto error;
+      }
       if (access(fname, F_OK) == -1) {
         // Deleting kprobe event with incorrect name.
         kfd = open("/sys/kernel/debug/tracing/kprobe_events",
