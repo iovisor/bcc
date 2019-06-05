@@ -26,6 +26,7 @@ examples = """examples:
     ./capable -p 181      # only trace PID 181
     ./capable -K          # add kernel stacks to trace
     ./capable -U          # add user-space stacks to trace
+    ./capable -x          # extra fields: show TID and INSETID columns
 """
 parser = argparse.ArgumentParser(
     description="Trace security capability checks",
@@ -39,6 +40,8 @@ parser.add_argument("-K", "--kernel-stack", action="store_true",
     help="output kernel stack trace")
 parser.add_argument("-U", "--user-stack", action="store_true",
     help="output user stack trace")
+parser.add_argument("-x", "--extra", action="store_true",
+    help="show extra fields in TID and INSETID columns")
 args = parser.parse_args()
 debug = 0
 
@@ -178,8 +181,12 @@ if debug:
 b = BPF(text=bpf_text)
 
 # header
-print("%-9s %-6s %-6s %-6s %-16s %-4s %-20s %-6s %s" % (
-    "TIME", "UID", "PID", "TID", "COMM", "CAP", "NAME", "AUDIT", "INSETID"))
+if args.extra:
+    print("%-9s %-6s %-6s %-6s %-16s %-4s %-20s %-6s %s" % (
+        "TIME", "UID", "PID", "TID", "COMM", "CAP", "NAME", "AUDIT", "INSETID"))
+else:
+    print("%-9s %-6s %-6s %-16s %-4s %-20s %-6s" % (
+        "TIME", "UID", "PID", "COMM", "CAP", "NAME", "AUDIT"))
 
 def stack_id_err(stack_id):
     # -EFAULT in get_stackid normally means the stack-trace is not availible,
@@ -203,9 +210,14 @@ def print_event(bpf, cpu, data, size):
         name = capabilities[event.cap]
     else:
         name = "?"
-    print("%-9s %-6d %-6d %-6d %-16s %-4d %-20s %-6d %s" % (strftime("%H:%M:%S"),
-        event.uid, event.pid, event.tgid, event.comm.decode('utf-8', 'replace'),
-        event.cap, name, event.audit, str(event.insetid) if event.insetid != -1 else "N/A"))
+    if args.extra:
+        print("%-9s %-6d %-6d %-6d %-16s %-4d %-20s %-6d %s" % (strftime("%H:%M:%S"),
+            event.uid, event.pid, event.tgid, event.comm.decode('utf-8', 'replace'),
+            event.cap, name, event.audit, str(event.insetid) if event.insetid != -1 else "N/A"))
+    else:
+        print("%-9s %-6d %-6d %-16s %-4d %-20s %-6d" % (strftime("%H:%M:%S"),
+            event.uid, event.pid, event.comm.decode('utf-8', 'replace'),
+            event.cap, name, event.audit))
     if args.kernel_stack:
         print_stack(bpf, event.kernel_stack_id, StackType.Kernel, -1)
     if args.user_stack:
