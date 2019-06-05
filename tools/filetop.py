@@ -89,7 +89,7 @@ struct val_t {
 BPF_HASH(counts, struct info_t, struct val_t);
 
 static int do_entry(struct pt_regs *ctx, struct file *file,
-    char __user *buf, size_t count, int is_read)
+    char __user *buf, size_t count, loff_t *pos, int is_read)
 {
     u32 tgid = bpf_get_current_pid_tgid() >> 32;
     if (TGID_FILTER)
@@ -108,7 +108,7 @@ static int do_entry(struct pt_regs *ctx, struct file *file,
     struct info_t info = {.pid = pid};
     bpf_get_current_comm(&info.comm, sizeof(info.comm));
     info.name_len = d_name.len;
-    bpf_probe_read(&info.name, sizeof(info.name), d_name.name);
+    bpf_probe_read_str(&info.name, sizeof(info.name), d_name.name);
     if (S_ISREG(mode)) {
         info.type = 'R';
     } else if (S_ISSOCK(mode)) {
@@ -121,7 +121,7 @@ static int do_entry(struct pt_regs *ctx, struct file *file,
     valp = counts.lookup_or_init(&info, &zero);
     if (is_read) {
         valp->reads++;
-        valp->rbytes += count;
+        valp->rbytes = *pos;
     } else {
         valp->writes++;
         valp->wbytes += count;
@@ -131,15 +131,15 @@ static int do_entry(struct pt_regs *ctx, struct file *file,
 }
 
 int trace_read_entry(struct pt_regs *ctx, struct file *file,
-    char __user *buf, size_t count)
+    char __user *buf, size_t count, loff_t *pos)
 {
-    return do_entry(ctx, file, buf, count, 1);
+    return do_entry(ctx, file, buf, count, pos, 1);
 }
 
 int trace_write_entry(struct pt_regs *ctx, struct file *file,
-    char __user *buf, size_t count)
+    char __user *buf, size_t count, loff_t *pos)
 {
-    return do_entry(ctx, file, buf, count, 0);
+    return do_entry(ctx, file, buf, count, pos, 0);
 }
 
 """
