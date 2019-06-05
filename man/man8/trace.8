@@ -3,7 +3,7 @@
 trace \- Trace a function and print its arguments or return value, optionally evaluating a filter. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
 .B trace [-h] [-b BUFFER_PAGES] [-p PID] [-L TID] [-v] [-Z STRING_SIZE] [-S] [-s SYM_FILE_LIST]
-         [-M MAX_EVENTS] [-t] [-T] [-C] [-K] [-U] [-a] [-I header]
+         [-M MAX_EVENTS] [-t] [-u] [-T] [-C] [-K] [-U] [-a] [-I header]
          probe [probe ...]
 .SH DESCRIPTION
 trace probes functions you specify and displays trace messages if a particular
@@ -45,6 +45,9 @@ Print up to MAX_EVENTS trace messages and then exit.
 .TP
 \-t
 Print times relative to the beginning of the trace (offsets), in seconds.
+.TP
+\-u
+Print UNIX timestamps instead of offsets from trace beginning, requires -t.
 .TP
 \-T
 Print the time column.
