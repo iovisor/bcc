@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import print_function
 from collections import MutableMapping
 import ctypes as ct
 from functools import reduce
@@ -82,7 +83,7 @@ def _stars(val, val_max, width):
     return text
 
 
-def _print_log2_hist(vals, val_type, strip_leading_zero):
+def _print_log2_hist(vals, val_type, strip_leading_zero, print=print):
     global stars_max
     log2_dist_max = 64
     idx_max = -1
@@ -120,7 +121,7 @@ def _print_log2_hist(vals, val_type, strip_leading_zero):
             print(body % (low, high, val, stars,
                           _stars(val, val_max, stars)))
 
-def _print_linear_hist(vals, val_type):
+def _print_linear_hist(vals, val_type, print=print):
     global stars_max
     log2_dist_max = 64
     idx_max = -1
@@ -321,7 +322,7 @@ class TableBase(MutableMapping):
 
     def print_log2_hist(self, val_type="value", section_header="Bucket ptr",
             section_print_fn=None, bucket_fn=None, strip_leading_zero=None,
-            bucket_sort_fn=None):
+            bucket_sort_fn=None, print=print):
         """print_log2_hist(val_type="value", section_header="Bucket ptr",
                            section_print_fn=None, bucket_fn=None,
                            strip_leading_zero=None, bucket_sort_fn=None):
@@ -373,15 +374,15 @@ class TableBase(MutableMapping):
                         section_print_fn(bucket)))
                 else:
                     print("\n%s = %r" % (section_header, bucket))
-                _print_log2_hist(vals, val_type, strip_leading_zero)
+                _print_log2_hist(vals, val_type, strip_leading_zero, print)
         else:
             vals = [0] * log2_index_max
             for k, v in self.items():
                 vals[k.value] = v.value
-            _print_log2_hist(vals, val_type, strip_leading_zero)
+            _print_log2_hist(vals, val_type, strip_leading_zero, print)
 
     def print_linear_hist(self, val_type="value", section_header="Bucket ptr",
-            section_print_fn=None, bucket_fn=None, bucket_sort_fn=None):
+            section_print_fn=None, bucket_fn=None, bucket_sort_fn=None, print=print):
         """print_linear_hist(val_type="value", section_header="Bucket ptr",
                            section_print_fn=None, bucket_fn=None,
                            bucket_sort_fn=None)
@@ -422,7 +423,7 @@ class TableBase(MutableMapping):
                         section_print_fn(bucket)))
                 else:
                     print("\n%s = %r" % (section_header, bucket))
-                _print_linear_hist(vals, val_type)
+                _print_linear_hist(vals, val_type, print)
         else:
             vals = [0] * linear_index_max
             for k, v in self.items():
@@ -433,7 +434,7 @@ class TableBase(MutableMapping):
                     # function be rewritten to avoid having one.
                     raise IndexError(("Index in print_linear_hist() of %d " +
                         "exceeds max of %d.") % (k.value, linear_index_max))
-            _print_linear_hist(vals, val_type)
+            _print_linear_hist(vals, val_type, print)
 
 
 class HashTable(TableBase):
