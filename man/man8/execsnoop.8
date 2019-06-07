@@ -2,7 +2,8 @@
 .SH NAME
 execsnoop \- Trace new processes via exec() syscalls. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B execsnoop [\-h] [\-t] [\-x] [\-n NAME] [\-l LINE]
+.B execsnoop [\-h] [\-T] [\-t] [\-x] [\-q] [\-n NAME] [\-l LINE]
+.B           [\-\-max-args MAX_ARGS]
 .SH DESCRIPTION
 execsnoop traces new processes, showing the filename executed and argument
 list.
@@ -23,6 +24,9 @@ CONFIG_BPF and bcc.
 .TP
 \-h
 Print usage message.
+.TP
+\-T
+Include a time column (HH:MM:SS).
 .TP
 \-t
 Include a timestamp column.
@@ -69,6 +73,9 @@ Only trace exec()s where argument's line contains "testpkg":
 .B execsnoop \-l testpkg
 .SH FIELDS
 .TP
+TIME
+Time of exec() return, in HH:MM:SS format.
+.TP
 TIME(s)
 Time of exec() return, in seconds.
 .TP
@@ -77,6 +84,9 @@ Parent process/command name.
 .TP
 PID
 Process ID
+.TP
+PPID
+Parent process ID
 .TP
 RET
 Return value of exec(). 0 == successs. Failures are only shown when using the

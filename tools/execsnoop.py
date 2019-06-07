@@ -4,7 +4,8 @@
 # execsnoop Trace new processes via exec() syscalls.
 #           For Linux, uses BCC, eBPF. Embedded C.
 #
-# USAGE: execsnoop [-h] [-t] [-x] [-n NAME]
+# USAGE: execsnoop [-h] [-T] [-t] [-x] [-q] [-n NAME] [-l LINE]
+#                  [--max-args MAX_ARGS]
 #
 # This currently will print up to a maximum of 19 arguments, plus the process
 # name, so 20 fields in total (MAXARG).
@@ -24,11 +25,13 @@ import argparse
 import re
 import time
 from collections import defaultdict
+from time import strftime
 
 # arguments
 examples = """examples:
     ./execsnoop           # trace all exec() syscalls
     ./execsnoop -x        # include failed exec()s
+    ./execsnoop -T        # include time (HH:MM:SS)
     ./execsnoop -t        # include timestamps
     ./execsnoop -q        # add "quotemarks" around arguments
     ./execsnoop -n main   # only print command lines containing "main"
@@ -38,6 +41,8 @@ parser = argparse.ArgumentParser(
     description="Trace exec() syscalls",
     formatter_class=argparse.RawDescriptionHelpFormatter,
     epilog=examples)
+parser.add_argument("-T", "--time", action="store_true",
+    help="include time column on output (HH:MM:SS)")
 parser.add_argument("-t", "--timestamp", action="store_true",
     help="include timestamp on output")
 parser.add_argument("-x", "--fails", action="store_true",
@@ -168,6 +173,8 @@ b.attach_kprobe(event=execve_fnname, fn_name="syscall__execve")
 b.attach_kretprobe(event=execve_fnname, fn_name="do_ret_sys_execve")
 
 # header
+if args.time:
+    print("%-9s" % ("TIME"), end="")
 if args.timestamp:
     print("%-8s" % ("TIME(s)"), end="")
 print("%-16s %-6s %-6s %3s %s" % ("PCOMM", "PID", "PPID", "RET", "ARGS"))
@@ -215,6 +222,8 @@ def print_event(cpu, data, size):
             ]
 
         if not skip:
+            if args.time:
+                printb(b"%-9s" % strftime("%H:%M:%S").encode('ascii'), nl="")
             if args.timestamp:
                 printb(b"%-8.3f" % (time.time() - start_ts), nl="")
             ppid = event.ppid if event.ppid > 0 else get_ppid(event.pid)
