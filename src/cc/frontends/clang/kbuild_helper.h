@@ -21,7 +21,7 @@
 #include <errno.h>
 #include <ftw.h>
 
-#define PROC_KHEADERS_PATH "/proc/kheaders.tar.xz"
+#define PROC_KHEADERS_PATH "/sys/kernel/kheaders.tar.xz"
 
 namespace ebpf {
 
