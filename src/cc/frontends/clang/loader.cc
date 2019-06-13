@@ -131,11 +131,15 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, TableStorage &ts,
     kpath = kdir + "/" + kernel_path_info.second;
   }
 
-  // If all attempts to obtain kheaders fail, check for /proc/kheaders.tar.xz
+  // If all attempts to obtain kheaders fail, check for kheaders.tar.xz in sysfs
   if (!is_dir(kpath)) {
     int ret = get_proc_kheaders(tmpdir);
-    if (!ret)
+    if (!ret) {
       kpath = tmpdir;
+    } else {
+      std::cout << "Unable to find kernel headers. ";
+      std::cout << "Try rebuilding kernel with CONFIG_IKHEADERS=m (module)\n";
+    }
   }
 
   if (flags_ & DEBUG_PREPROCESSOR)
