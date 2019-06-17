@@ -80,7 +80,7 @@ pair of .c and .py files, and some are directories of files.
 - examples/tracing/[kvm_hypercall.py](examples/tracing/kvm_hypercall.py): Conditional static kernel tracepoints for KVM entry, exit and hypercall [Examples](examples/tracing/kvm_hypercall.txt).
 
 #### Tools:
-<center><a href="images/bcc_tracing_tools_2017.png"><img src="images/bcc_tracing_tools_2017.png" border=0 width=700></a></center>
+<center><a href="images/bcc_tracing_tools_2019.png"><img src="images/bcc_tracing_tools_2019.png" border=0 width=700></a></center>
 
 
 - tools/[argdist](tools/argdist.py): Display function parameter values as a histogram or frequency count. [Examples](tools/argdist_example.txt).
