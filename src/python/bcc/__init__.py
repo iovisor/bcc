@@ -24,12 +24,13 @@ import errno
 import sys
 basestring = (unicode if sys.version_info[0] < 3 else str)
 
-from .libbcc import lib, bcc_symbol, bcc_symbol_option, bcc_stacktrace_build_id, _SYM_CB_TYPE
+from .libbcc import lib, bcc_symbol, bcc_symbol_option, bcc_stacktrace_build_id, _SYM_CB_TYPE, _MAP_CB_TYPE
 from .table import Table, PerfEventArray
 from .perf import Perf
 from .utils import get_online_cpus, printb, _assert_is_bytes, ArgString
 from .version import __version__
 from .disassembler import disassemble_prog, decode_map
+from .remote import libremote, remote_utils
 
 _probe_limit = 1000
 _num_open_probes = 0
@@ -160,6 +161,7 @@ class BPF(object):
     XDP_TX = 3
     XDP_REDIRECT = 4
 
+    _libremote = None
     _probe_repl = re.compile(b"[^a-zA-Z0-9_]")
     _sym_caches = {}
     _bsymcache =  lib.bcc_buildsymcache_new()
@@ -271,6 +273,16 @@ class BPF(object):
                     return exe_file
         return None
 
+    @staticmethod
+    def comm_for_pid(pid):
+        if BPF._libremote:
+            return BPF._libremote.comm_for_pid(pid)
+        else:
+            try:
+                return open("/proc/%d/comm" % pid, "rb").read().strip()
+            except Exception:
+                return b"[unknown]"
+
     def __init__(self, src_file=b"", hdr_file=b"", text=None, debug=0,
             cflags=[], usdt_contexts=[], allow_rlimit=True):
         """Create a new BPF module with the given source code.
@@ -286,6 +298,9 @@ class BPF(object):
             debug (Optional[int]): Flags used for debug prints, can be |'d together
                                    See "Debug flags" for explanation
         """
+
+        if BPF._should_run_on_remote_target():
+            BPF._libremote = BPF._open_connection_to_remote_target()
 
         src_file = _assert_is_bytes(src_file)
         hdr_file = _assert_is_bytes(hdr_file)
@@ -320,7 +335,8 @@ class BPF(object):
 
         if text:
             self.module = lib.bpf_module_create_c_from_string(text,
-                    self.debug, cflags_array, len(cflags_array), allow_rlimit)
+                    self.debug, cflags_array, len(cflags_array), allow_rlimit,
+                    _MAP_CB_TYPE(BPF._bpf_create_map_cb))
             if not self.module:
                 raise Exception("Failed to compile BPF text")
         else:
@@ -331,7 +347,8 @@ class BPF(object):
                         self.debug)
             else:
                 self.module = lib.bpf_module_create_c(src_file, self.debug,
-                        cflags_array, len(cflags_array), allow_rlimit)
+                        cflags_array, len(cflags_array), allow_rlimit,
+                        _MAP_CB_TYPE(BPF._bpf_create_map_cb))
             if not self.module:
                 raise Exception("Failed to compile BPF module %s" % src_file)
 
@@ -342,6 +359,14 @@ class BPF(object):
         # prefixed functions were defined,
         # they will be loaded and attached here.
         self._trace_autoload()
+
+    @staticmethod
+    def _should_run_on_remote_target():
+        return "BCC_REMOTE" in os.environ
+
+    @staticmethod
+    def _open_connection_to_remote_target():
+        return libremote.LibRemote(os.environ.get("BCC_REMOTE"), os.environ.get("BCC_REMOTE_ARGS"))
 
     def load_funcs(self, prog_type=KPROBE):
         """load_funcs(prog_type=KPROBE)
@@ -367,21 +392,30 @@ class BPF(object):
             log_level = 2
         elif (self.debug & DEBUG_BPF):
             log_level = 1
-        fd = lib.bcc_func_load(self.module, prog_type, func_name,
-                lib.bpf_function_start(self.module, func_name),
-                lib.bpf_function_size(self.module, func_name),
-                lib.bpf_module_license(self.module),
-                lib.bpf_module_kern_version(self.module),
-                log_level, None, 0);
 
-        if fd < 0:
-            atexit.register(self.donothing)
-            if ct.get_errno() == errno.EPERM:
-                raise Exception("Need super-user privileges to run")
+        func_start = lib.bpf_function_start(self.module, func_name)
+        func_size  = lib.bpf_function_size(self.module, func_name)
+        func_str = ct.string_at(func_start, func_size)
+        license_str = ct.string_at(lib.bpf_module_license(self.module))
+        kern_version = lib.bpf_module_kern_version(self.module)
 
-            errstr = os.strerror(ct.get_errno())
-            raise Exception("Failed to load BPF program %s: %s" %
-                            (func_name, errstr))
+        if BPF._libremote:
+            fd = BPF._libremote.bpf_prog_load(prog_type, func_name, func_str,
+                                              license_str, kern_version)
+            if fd < 0:
+                raise Exception("Failed to load BPF program from remote")
+        else:
+            fd = lib.bcc_func_load(self.module, prog_type, func_name,
+                                   func_start, func_size, license_str,
+                                   kern_version, log_level, None, 0);
+            if fd < 0:
+                atexit.register(self.donothing)
+                if ct.get_errno() == errno.EPERM:
+                    raise Exception("Need super-user privileges to run")
+
+                errstr = os.strerror(ct.get_errno())
+                raise Exception("Failed to load BPF program %s: %s" %
+                                (func_name, errstr))
 
         fn = BPF.Function(self, func_name, fd)
         self.funcs[func_name] = fn
@@ -488,7 +522,8 @@ class BPF(object):
             if not leaf_desc:
                 raise Exception("Failed to load BPF Table %s leaf desc" % name)
             leaftype = BPF._decode_table_type(json.loads(leaf_desc))
-        return Table(self, map_id, map_fd, keytype, leaftype, name, reducer=reducer)
+        return Table(self, map_id, map_fd, keytype, leaftype, name, reducer=reducer,
+                     libremote=BPF._libremote)
 
     def __getitem__(self, key):
         if key not in self.tables:
@@ -508,6 +543,13 @@ class BPF(object):
         return self.tables.__iter__()
 
     @staticmethod
+    def _bpf_create_map_cb(data, allow_rlimit):
+        if BPF._libremote:
+            return BPF._libremote.bpf_create_map(data, allow_rlimit)
+        else:
+            return lib.bcc_create_map_xattr(data, allow_rlimit)
+
+    @staticmethod
     def attach_raw_socket(fn, dev):
         dev = _assert_is_bytes(dev)
         if not isinstance(fn, BPF.Function):
@@ -525,52 +567,65 @@ class BPF(object):
 
     @staticmethod
     def get_kprobe_functions(event_re):
-        with open("%s/../kprobes/blacklist" % TRACEFS, "rb") as blacklist_f:
-            blacklist = set([line.rstrip().split()[1] for line in blacklist_f])
-        fns = []
+        if BPF._libremote:
+            blacklist = BPF._libremote.kprobes_blacklist(TRACEFS)
+        else:
+            with open("%s/../kprobes/blacklist" % TRACEFS, "rb") as blacklist_f:
+                blacklist = set([line.rstrip().split()[1] for line in blacklist_f])
 
+        if BPF._libremote:
+            kallsyms = BPF._libremote.kallsyms()
+            fns = BPF._get_kprobe_funcs_from_kallsyms(kallsyms)
+        else:
+            with open("/proc/kallsyms", "rb") as kallsyms:
+                fns = BPF._get_kprobe_funcs_from_kallsyms(kallsyms)
+
+        fns = [fn for fn in fns if (re.match(event_re, fn) and fn not in blacklist)]
+        return set(fns)     # Some functions may appear more than once
+
+    @staticmethod
+    def _get_kprobe_funcs_from_kallsyms(avail_file):
+        fns = []
         in_init_section = 0
         in_irq_section = 0
-        with open("/proc/kallsyms", "rb") as avail_file:
-            for line in avail_file:
-                (t, fn) = line.rstrip().split()[1:3]
-                # Skip all functions defined between __init_begin and
-                # __init_end
-                if in_init_section == 0:
-                    if fn == b'__init_begin':
-                        in_init_section = 1
-                        continue
-                elif in_init_section == 1:
-                    if fn == b'__init_end':
-                        in_init_section = 2
+        for line in avail_file:
+            (t, fn) = line.rstrip().split()[1:3]
+            # Skip all functions defined between __init_begin and
+            # __init_end
+            if in_init_section == 0:
+                if fn == b'__init_begin':
+                    in_init_section = 1
                     continue
-                # Skip all functions defined between __irqentry_text_start and
-                # __irqentry_text_end
-                if in_irq_section == 0:
-                    if fn == b'__irqentry_text_start':
-                        in_irq_section = 1
-                        continue
-                elif in_irq_section == 1:
-                    if fn == b'__irqentry_text_end':
-                        in_irq_section = 2
+            elif in_init_section == 1:
+                if fn == b'__init_end':
+                    in_init_section = 2
+                continue
+            # Skip all functions defined between __irqentry_text_start and
+            # __irqentry_text_end
+            if in_irq_section == 0:
+                if fn == b'__irqentry_text_start':
+                    in_irq_section = 1
                     continue
-                # All functions defined as NOKPROBE_SYMBOL() start with the
-                # prefix _kbl_addr_*, blacklisting them by looking at the name
-                # allows to catch also those symbols that are defined in kernel
-                # modules.
-                if fn.startswith(b'_kbl_addr_'):
-                    continue
-                # Explicitly blacklist perf-related functions, they are all
-                # non-attachable.
-                elif fn.startswith(b'__perf') or fn.startswith(b'perf_'):
-                    continue
-                # Exclude all gcc 8's extra .cold functions
-                elif re.match(b'^.*\.cold\.\d+$', fn):
-                    continue
-                if (t.lower() in [b't', b'w']) and re.match(event_re, fn) \
-                    and fn not in blacklist:
-                    fns.append(fn)
-        return set(fns)     # Some functions may appear more than once
+            elif in_irq_section == 1:
+                if fn == b'__irqentry_text_end':
+                    in_irq_section = 2
+                continue
+            # All functions defined as NOKPROBE_SYMBOL() start with the
+            # prefix _kbl_addr_*, blacklisting them by looking at the name
+            # allows to catch also those symbols that are defined in kernel
+            # modules.
+            if fn.startswith(b'_kbl_addr_'):
+                continue
+            # Explicitly blacklist perf-related functions, they are all
+            # non-attachable.
+            elif fn.startswith(b'__perf') or fn.startswith(b'perf_'):
+                continue
+            # Exclude all gcc 8's extra .cold functions
+            elif re.match(b'^.*\.cold\.\d+$', fn):
+                continue
+            if t.lower() in [b't', b'w']:
+                fns.append(fn)
+        return fns
 
     def _check_probe_quota(self, num_new_probes):
         global _num_open_probes
@@ -623,6 +678,18 @@ class BPF(object):
                 return self.get_syscall_fnname(name[len(prefix):])
         return name
        
+    @staticmethod
+    def _bpf_close_perf_event_fd(fd):
+        if BPF._libremote:
+            return BPF._libremote.bpf_close_perf_event_fd(fd)
+        return lib.bpf_close_perf_event_fd(fd)
+
+    @staticmethod
+    def _bpf_detach_kprobe(ev_name):
+        if BPF._libremote:
+            return BPF._libremote.bpf_detach_kprobe(ev_name)
+        return lib.bpf_detach_kprobe(ev_name)
+
     def attach_kprobe(self, event=b"", event_off=0, fn_name=b"", event_re=b""):
         event = _assert_is_bytes(event)
         fn_name = _assert_is_bytes(fn_name)
@@ -642,6 +709,15 @@ class BPF(object):
         self._check_probe_quota(1)
         fn = self.load_func(fn_name, BPF.KPROBE)
         ev_name = b"p_" + event.replace(b"+", b"_").replace(b".", b"_")
+
+        if BPF._libremote:
+            fd = BPF._libremote.bpf_attach_kprobe(fn.fd, 0, ev_name, event,
+                                                  event_off, 0)
+            if fd < 0:
+                raise Exception("Failed to attach BPF to kprobe")
+            self._add_kprobe_fd(ev_name, fd)
+            return self
+
         fd = lib.bpf_attach_kprobe(fn.fd, 0, ev_name, event, event_off, 0)
         if fd < 0:
             raise Exception("Failed to attach BPF program %s to kprobe %s" %
@@ -667,6 +743,15 @@ class BPF(object):
         self._check_probe_quota(1)
         fn = self.load_func(fn_name, BPF.KPROBE)
         ev_name = b"r_" + event.replace(b"+", b"_").replace(b".", b"_")
+
+        if BPF._libremote:
+            fd = BPF._libremote.bpf_attach_kprobe(fn.fd, 1, ev_name, event, 0,
+                                                  maxactive)
+            if fd < 0:
+                raise Exception("Failed to attach BPF to kprobe")
+            self._add_kprobe_fd(ev_name, fd)
+            return self
+
         fd = lib.bpf_attach_kprobe(fn.fd, 1, ev_name, event, 0, maxactive)
         if fd < 0:
             raise Exception("Failed to attach BPF program %s to kretprobe %s" %
@@ -677,10 +762,10 @@ class BPF(object):
     def detach_kprobe_event(self, ev_name):
         if ev_name not in self.kprobe_fds:
             raise Exception("Kprobe %s is not attached" % ev_name)
-        res = lib.bpf_close_perf_event_fd(self.kprobe_fds[ev_name])
+        res = BPF._bpf_close_perf_event_fd(self.kprobe_fds[ev_name])
         if res < 0:
             raise Exception("Failed to close kprobe FD")
-        res = lib.bpf_detach_kprobe(ev_name)
+        res = BPF._bpf_detach_kprobe(ev_name)
         if res < 0:
             raise Exception("Failed to detach BPF from kprobe")
         self._del_kprobe_fd(ev_name)
@@ -760,6 +845,14 @@ class BPF(object):
     @staticmethod
     def get_tracepoints(tp_re):
         results = []
+        if BPF._libremote:
+            for category in BPF._libremote.get_trace_events_categories(TRACEFS):
+                for event in BPF_.libremote.get_trace_events(TRACEFS, category):
+                    tp = ("%s:%s" % (category, event))
+                    if re.match(tp_re, tp):
+                        results.append(tp)
+            return results
+
         events_dir = os.path.join(TRACEFS, "events")
         for category in os.listdir(events_dir):
             cat_dir = os.path.join(events_dir, category)
@@ -809,6 +902,14 @@ class BPF(object):
 
         fn = self.load_func(fn_name, BPF.TRACEPOINT)
         (tp_category, tp_name) = tp.split(b':')
+
+        if BPF._libremote:
+            fd = BPF._libremote.bpf_attach_tracepoint(fn.fd, tp_category, tp_name)
+            if fd < 0:
+                raise Exception("Failed to attach BPF to tracepoint")
+            self.tracepoint_fds[tp] = fd
+            return self
+
         fd = lib.bpf_attach_tracepoint(fn.fd, tp_category, tp_name)
         if fd < 0:
             raise Exception("Failed to attach BPF program %s to tracepoint %s" %
@@ -875,19 +976,28 @@ class BPF(object):
         tp = _assert_is_bytes(tp)
         if tp not in self.tracepoint_fds:
             raise Exception("Tracepoint %s is not attached" % tp)
-        res = lib.bpf_close_perf_event_fd(self.tracepoint_fds[tp])
+        res = BPF._bpf_close_perf_event_fd(self.tracepoint_fds[tp])
         if res < 0:
             raise Exception("Failed to detach BPF from tracepoint")
+
         (tp_category, tp_name) = tp.split(b':')
-        res = lib.bpf_detach_tracepoint(tp_category, tp_name)
+        if BPF._libremote:
+            res = BPF._libremote.bpf_detach_tracepoint(tp_category, tp_name)
+        else:
+            res = lib.bpf_detach_tracepoint(tp_category, tp_name)
         if res < 0:
             raise Exception("Failed to detach BPF from tracepoint")
+
         del self.tracepoint_fds[tp]
 
     def _attach_perf_event(self, progfd, ev_type, ev_config,
             sample_period, sample_freq, pid, cpu, group_fd):
-        res = lib.bpf_attach_perf_event(progfd, ev_type, ev_config,
-                sample_period, sample_freq, pid, cpu, group_fd)
+        if BPF._libremote:
+            res = BPF._libremote.bpf_attach_perf_event(progfd, ev_type,
+                    ev_config, sample_period, sample_freq, pid, cpu, group_fd)
+        else:
+            res = lib.bpf_attach_perf_event(progfd, ev_type, ev_config,
+                    sample_period, sample_freq, pid, cpu, group_fd)
         if res < 0:
             raise Exception("Failed to attach BPF to perf event")
         return res
@@ -915,7 +1025,7 @@ class BPF(object):
 
         res = 0
         for fd in fds.values():
-            res = lib.bpf_close_perf_event_fd(fd) or res
+            res = BPF._bpf_close_perf_event_fd(fd) or res
         if res != 0:
             raise Exception("Failed to detach BPF from perf event")
         del self.open_perf_events[(ev_type, ev_config)]
@@ -1007,6 +1117,14 @@ class BPF(object):
         self._check_probe_quota(1)
         fn = self.load_func(fn_name, BPF.KPROBE)
         ev_name = self._get_uprobe_evname(b"p", path, addr, pid)
+
+        if BPF._libremote:
+            fd = BPF._libremote.bpf_attach_uprobe(fn.fd, 0, ev_name, path, addr, pid)
+            if fd < 0:
+                raise Exception("Failed to attach BPF to uprobe")
+            self._add_uprobe_fd(ev_name, fd)
+            return self
+
         fd = lib.bpf_attach_uprobe(fn.fd, 0, ev_name, path, addr, pid)
         if fd < 0:
             raise Exception("Failed to attach BPF to uprobe")
@@ -1039,6 +1157,14 @@ class BPF(object):
         self._check_probe_quota(1)
         fn = self.load_func(fn_name, BPF.KPROBE)
         ev_name = self._get_uprobe_evname(b"r", path, addr, pid)
+
+        if BPF._libremote:
+            fd = BPF._libremote.bpf_attach_uprobe(fn.fd, 1, ev_name, path, addr, pid)
+            if fd < 0 :
+                raise Exception("Failed to attach BPF to uprobe")
+            self._add_uprobe_fd(ev_name, fd)
+            return self
+
         fd = lib.bpf_attach_uprobe(fn.fd, 1, ev_name, path, addr, pid)
         if fd < 0:
             raise Exception("Failed to attach BPF to uretprobe")
@@ -1048,10 +1174,15 @@ class BPF(object):
     def detach_uprobe_event(self, ev_name):
         if ev_name not in self.uprobe_fds:
             raise Exception("Uprobe %s is not attached" % ev_name)
-        res = lib.bpf_close_perf_event_fd(self.uprobe_fds[ev_name])
+
+        res = BPF._bpf_close_perf_event_fd(self.uprobe_fds[ev_name])
         if res < 0:
             raise Exception("Failed to detach BPF from uprobe")
-        res = lib.bpf_detach_uprobe(ev_name)
+
+        if BPF._libremote:
+            res = BPF._libremote.bpf_detach_uprobe(ev_name)
+        else:
+            res = lib.bpf_detach_uprobe(ev_name)
         if res < 0:
             raise Exception("Failed to detach BPF from uprobe")
         self._del_uprobe_fd(ev_name)
@@ -1234,8 +1365,10 @@ class BPF(object):
           else:
             name, offset, module = (sym.name, sym.offset,
                                     ct.cast(sym.module, ct.c_char_p).value)
+        elif BPF._libremote:
+            name, offset, module = BPF._libremote.sym(pid, addr, demangle)
         else:
-          name, offset, module = BPF._sym_cache(pid).resolve(addr, demangle)
+            name, offset, module = BPF._sym_cache(pid).resolve(addr, demangle)
 
         offset = b"+0x%x" % offset if show_offset and name is not None else b""
         name = name or b"[unknown]"
@@ -1264,7 +1397,10 @@ class BPF(object):
 
         Translate a kernel name into an address. This is the reverse of
         ksym. Returns -1 when the function name is unknown."""
-        return BPF._sym_cache(-1).resolve_name(None, name)
+        if BPF._libremote:
+            return BPF._libremote.ksymname(name)
+        else:
+            return BPF._sym_cache(-1).resolve_name(None, name)
 
     def num_open_kprobes(self):
         """num_open_kprobes()
@@ -1294,6 +1430,21 @@ class BPF(object):
         Poll from all open perf ring buffers, calling the callback that was
         provided when calling open_perf_buffer for each entry.
         """
+        if BPF._libremote:
+            fd_callbacks = []
+            for k, v in iter(self.perf_buffers.items()):
+                # Only support polling for per-cpu perf buffers
+                # { (PerfEventArray-Obj, cpu) -> fd }
+                if v and type(k) == tuple:
+                    t_id = k[0]
+                    t_obj = ct.cast(t_id, ct.py_object).value
+                    cpu = k[1]
+                    cbs = t_obj._cbs[cpu]
+                    fd_callbacks.append((v, cbs))
+            if fd_callbacks:
+                BPF._libremote.perf_reader_poll(fd_callbacks, timeout)
+            return
+
         readers = (ct.c_void_p * len(self.perf_buffers))()
         for i, v in enumerate(self.perf_buffers.values()):
             readers[i] = v

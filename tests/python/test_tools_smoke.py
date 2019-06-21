@@ -21,8 +21,7 @@ def kernel_version_ge(major, minor):
         return False
     return True
 
-@skipUnless(kernel_version_ge(4,1), "requires kernel >= 4.1")
-class SmokeTests(TestCase):
+class ToolTestRunner(object):
     # Use this for commands that have a built-in timeout, so they only need
     # to be killed in case of a hard hang.
     def run_with_duration(self, command, timeout=10):
@@ -51,6 +50,8 @@ class SmokeTests(TestCase):
         self.assertTrue((rc == 0 and allow_early) or rc == 124
                         or (rc == 137 and kill), "rc was %d" % rc)
 
+@skipUnless(kernel_version_ge(4,1), "requires kernel >= 4.1")
+class SmokeTests(TestCase, ToolTestRunner):
     def kmod_loaded(self, mod):
         with open("/proc/modules", "r") as mods:
             reg = re.compile("^%s\s" % mod)

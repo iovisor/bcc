@@ -13,5 +13,5 @@ setup(name='bcc',
       author='Brenden Blanco',
       author_email='bblanco@plumgrid.com',
       url='https://github.com/iovisor/bcc',
-      packages=['bcc'],
+      packages=['bcc', 'bcc.remote'],
       platforms=['Linux'])

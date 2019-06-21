@@ -23,7 +23,19 @@
 extern "C" {
 #endif
 
-struct perf_reader;
+struct perf_reader {
+  perf_reader_raw_cb raw_cb;
+  perf_reader_lost_cb lost_cb;
+  void *cb_cookie;  // to be returned in the cb
+  void *buf;        // for keeping segmented data
+  size_t buf_size;
+  void *base;
+  int rb_use_state;
+  pid_t rb_read_tid;
+  int page_size;
+  int page_cnt;
+  int fd;
+};
 
 struct perf_reader * perf_reader_new(perf_reader_raw_cb raw_cb,
                                      perf_reader_lost_cb lost_cb,

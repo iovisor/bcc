@@ -43,6 +43,7 @@
 #include "exported_files.h"
 #include "libbpf.h"
 #include "bcc_btf.h"
+#include "bcc_common.h"
 #include "libbpf/src/bpf.h"
 
 namespace ebpf {
@@ -340,7 +341,10 @@ int BPFModule::load_maps(sec_map_def &sections) {
       attr.btf_value_type_id = map_tids[map_name].second;
     }
 
-    fd = bcc_create_map_xattr(&attr, allow_rlimit_);
+    if (bpf_create_map_cb)
+      fd = bpf_create_map_cb(&attr, allow_rlimit_);
+    else
+      fd = bcc_create_map_xattr(&attr, allow_rlimit_);
     if (fd < 0) {
       fprintf(stderr, "could not open bpf map: %s, error: %s\n",
               map_name, strerror(errno));
