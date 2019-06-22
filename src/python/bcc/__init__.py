@@ -291,6 +291,8 @@ class BPF(object):
         hdr_file = _assert_is_bytes(hdr_file)
         text = _assert_is_bytes(text)
 
+        assert not (text and src_file)
+
         self.kprobe_fds = {}
         self.uprobe_fds = {}
         self.tracepoint_fds = {}
@@ -306,7 +308,21 @@ class BPF(object):
         self.module = None
         cflags_array = (ct.c_char_p * len(cflags))()
         for i, s in enumerate(cflags): cflags_array[i] = bytes(ArgString(s))
-        if text:
+
+        if src_file:
+            src_file = BPF._find_file(src_file)
+            hdr_file = BPF._find_file(hdr_file)
+
+        # files that end in ".b" are treated as B files. Everything else is a (BPF-)C file
+        if src_file.endswith(b".b"):
+            self.module = lib.bpf_module_create_b(src_file, hdr_file, self.debug)
+        else:
+            if src_file:
+                # Read the BPF C source file into the text variable. This ensures,
+                # that files and inline text are treated equally.
+                with open(src_file, mode="rb") as file:
+                    text = file.read()
+
             ctx_array = (ct.c_void_p * len(usdt_contexts))()
             for i, usdt in enumerate(usdt_contexts):
                 ctx_array[i] = ct.c_void_p(usdt.get_context())
@@ -318,22 +334,13 @@ class BPF(object):
                                 "locations")
             text = usdt_text + text
 
-        if text:
+
             self.module = lib.bpf_module_create_c_from_string(text,
-                    self.debug, cflags_array, len(cflags_array), allow_rlimit)
-            if not self.module:
-                raise Exception("Failed to compile BPF text")
-        else:
-            src_file = BPF._find_file(src_file)
-            hdr_file = BPF._find_file(hdr_file)
-            if src_file.endswith(b".b"):
-                self.module = lib.bpf_module_create_b(src_file, hdr_file,
-                        self.debug)
-            else:
-                self.module = lib.bpf_module_create_c(src_file, self.debug,
-                        cflags_array, len(cflags_array), allow_rlimit)
-            if not self.module:
-                raise Exception("Failed to compile BPF module %s" % src_file)
+                                                              self.debug,
+                                                              cflags_array, len(cflags_array),
+                                                              allow_rlimit)
+        if not self.module:
+            raise Exception("Failed to compile BPF module %s" % (src_file or "<text>"))
 
         for usdt_context in usdt_contexts:
             usdt_context.attach_uprobes(self)
