@@ -124,6 +124,7 @@ int bpf_prog_get_tag(int fd, unsigned long long *tag);
 int bpf_prog_get_next_id(uint32_t start_id, uint32_t *next_id);
 int bpf_prog_get_fd_by_id(uint32_t id);
 int bpf_map_get_fd_by_id(uint32_t id);
+int bpf_obj_get_info_by_fd(int prog_fd, void *info, uint32_t *info_len);
 
 #define LOG_BUF_SIZE 65536
 
