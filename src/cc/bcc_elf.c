@@ -672,6 +672,7 @@ int bcc_elf_is_exe(const char *path) {
 }
 
 int bcc_elf_is_shared_obj(const char *path) {
+  printf("DAVEMARCHEVSKY: elf type of %s is %d\n", path, bcc_elf_get_type(path)); 
   return bcc_elf_get_type(path) == ET_DYN;
 }
 
