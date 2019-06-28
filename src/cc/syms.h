@@ -69,10 +69,24 @@ public:
 };
 
 class ProcSyms : SymbolCache {
+  struct NameIdx {
+    size_t section_idx;
+    size_t str_table_idx;
+    size_t str_len;
+  };
+
   struct Symbol {
     Symbol(const std::string *name, uint64_t start, uint64_t size)
         : name(name), start(start), size(size) {}
-    const std::string *name;
+    Symbol(size_t section_idx, size_t str_table_idx, size_t str_len, uint64_t start,
+           uint64_t size)
+        : start(start), size(size) {
+      name_idx.section_idx = section_idx;
+      name_idx.str_table_idx = str_table_idx;
+      name_idx.str_len = str_len;
+    }
+    struct NameIdx name_idx;
+    const std::string *name{nullptr};
     uint64_t start;
     uint64_t size;
 
@@ -124,6 +138,9 @@ class ProcSyms : SymbolCache {
 
     static int _add_symbol(const char *symname, uint64_t start, uint64_t size,
                            void *p);
+    static int _add_symbol_lazy(size_t section_idx, size_t str_table_idx,
+                                size_t str_len, uint64_t start, uint64_t size,
+                                void *p);
   };
 
   int pid_;
