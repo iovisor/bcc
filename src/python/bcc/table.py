@@ -726,7 +726,7 @@ class PerCpuHash(HashTable):
         self.total_cpu = len(get_possible_cpus())
         # This needs to be 8 as hard coded into the linux kernel.
         self.alignment = ct.sizeof(self.sLeaf) % 8
-        if self.alignment is 0:
+        if self.alignment == 0:
             self.Leaf = self.sLeaf * self.total_cpu
         else:
             # Currently Float, Char, un-aligned structs are not supported
@@ -739,7 +739,7 @@ class PerCpuHash(HashTable):
 
     def getvalue(self, key):
         result = super(PerCpuHash, self).__getitem__(key)
-        if self.alignment is 0:
+        if self.alignment == 0:
             ret = result
         else:
             ret = (self.sLeaf * self.total_cpu)()
@@ -782,7 +782,7 @@ class PerCpuArray(ArrayBase):
         self.total_cpu = len(get_possible_cpus())
         # This needs to be 8 as hard coded into the linux kernel.
         self.alignment = ct.sizeof(self.sLeaf) % 8
-        if self.alignment is 0:
+        if self.alignment == 0:
             self.Leaf = self.sLeaf * self.total_cpu
         else:
             # Currently Float, Char, un-aligned structs are not supported
@@ -795,7 +795,7 @@ class PerCpuArray(ArrayBase):
 
     def getvalue(self, key):
         result = super(PerCpuArray, self).__getitem__(key)
-        if self.alignment is 0:
+        if self.alignment == 0:
             ret = result
         else:
             ret = (self.sLeaf * self.total_cpu)()
