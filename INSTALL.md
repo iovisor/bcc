@@ -402,11 +402,13 @@ For Centos 7.6 only
 sudo yum install -y epel-release
 sudo yum update -y
 sudo yum groupinstall -y "Development tools"
-sudo yum install -y elfutils-libelf-devel cmake3
+sudo yum install -y elfutils-libelf-devel cmake3 git bison flex ncurses-devel
 sudo yum install -y luajit luajit-devel  # for Lua support
 ```
 
 ### Install and compile LLVM
+
+You could compile LLVM from source code
 
 ```
 curl  -LO  http://releases.llvm.org/7.0.1/llvm-7.0.1.src.tar.xz
@@ -430,6 +432,17 @@ make
 sudo make install
 cd ..
 ```
+
+or install from centos-release-scl
+
+```
+yum install -y centos-release-scl
+yum-config-manager --enable rhel-server-rhscl-7-rpms
+yum install -y devtoolset-7 llvm-toolset-7 llvm-toolset-7-llvm-devel llvm-toolset-7-llvm-static llvm-toolset-7-clang-devel
+source scl_source enable devtoolset-7 llvm-toolset-7
+```
+
+For permanently enable scl environment, please check https://access.redhat.com/solutions/527703.
 
 ### Install and compile BCC
 
