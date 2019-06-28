@@ -23,11 +23,15 @@
 
 namespace ebpf {
 
+#ifdef __cpp_lib_make_unique
+using std::make_unique;
+#else
 template <class T, class... Args>
 typename std::enable_if<!std::is_array<T>::value, std::unique_ptr<T>>::type
 make_unique(Args &&... args) {
   return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
 }
+#endif
 
 std::vector<int> get_online_cpus();
 
