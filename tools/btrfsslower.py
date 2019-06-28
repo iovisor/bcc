@@ -4,7 +4,7 @@
 # btrfsslower  Trace slow btrfs operations.
 #              For Linux, uses BCC, eBPF.
 #
-# USAGE: btrfsslower [-h] [-j] [-p PID] [min_ms] [-s]
+# USAGE: btrfsslower [-h] [-j] [-p PID] [min_ms] [-d DURATION]
 #
 # This script traces common btrfs file operations: reads, writes, opens, and
 # syncs. It measures the time spent in these operations, and prints details
@@ -27,7 +27,7 @@
 from __future__ import print_function
 from bcc import BPF
 import argparse
-import signal
+from datetime import datetime, timedelta
 from time import strftime
 
 # symbols
@@ -40,6 +40,7 @@ examples = """examples:
     ./btrfsslower -j 1        # ... 1 ms, parsable output (csv)
     ./btrfsslower 0           # trace all operations (warning: verbose)
     ./btrfsslower -p 185      # trace PID 185 only
+    ./btrfsslower -d 10       # trace for 10 seconds only
 """
 parser = argparse.ArgumentParser(
     description="Trace common btrfs file operations slower than a threshold",
@@ -53,8 +54,8 @@ parser.add_argument("min_ms", nargs="?", default='10',
     help="minimum I/O duration to trace, in ms (default 10)")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
-parser.add_argument("-s", "--sec", type=int, default=None,
-    help="total time the trace should run")
+parser.add_argument("-d", "--duration",
+    help="total duration of trace in seconds")
 args = parser.parse_args()
 min_ms = int(args.min_ms)
 pid = args.pid
@@ -338,24 +339,9 @@ else:
 
 # read events
 b["events"].open_perf_buffer(print_event, page_cnt=64)
-sec = args.sec
-# no time duration specified, run indefinitely
-if not args.sec:
-    while 1:
-        try:
-            b.perf_buffer_poll()
-        except KeyboardInterrupt:
-            exit()
-# run until time duration expires or sigint
-else:
-    def handler(signum, frame):
-        raise Exception("end of time")
-    signal.signal(signal.SIGALRM, handler)
-    signal.alarm(sec)
-    while 1:
-        try:
-            b.perf_buffer_poll()
-        except KeyboardInterrupt:
-            exit()
-        except Exception:
-            exit()
+start_time = datetime.now()
+while not args.duration or datetime.now() - start_time < args.duration:
+    try:
+        b.perf_buffer_poll(timeout=1000)
+    except KeyboardInterrupt:
+        exit()
