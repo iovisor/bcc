@@ -275,6 +275,14 @@ int ProcSyms::Module::_add_symbol(const char *symname, uint64_t start,
   return 0;
 }
 
+int ProcSyms::Module::_add_symbol_lazy(size_t section_idx, size_t str_table_idx,
+                                       size_t str_len, uint64_t start,
+                                       uint64_t size, void *p) {
+  Module *m = static_cast<Module *>(p);
+  m->syms_.emplace_back(section_idx, str_table_idx, str_len, start, size);
+  return 0;
+}
+
 void ProcSyms::Module::load_sym_table() {
   if (loaded_)
     return;
@@ -286,7 +294,7 @@ void ProcSyms::Module::load_sym_table() {
   if (type_ == ModuleType::PERF_MAP)
     bcc_perf_map_foreach_sym(path_.c_str(), _add_symbol, this);
   if (type_ == ModuleType::EXEC || type_ == ModuleType::SO)
-    bcc_elf_foreach_sym(path_.c_str(), _add_symbol, symbol_option_, this);
+    bcc_elf_foreach_sym_lazy(path_.c_str(), _add_symbol_lazy, symbol_option_, this);
   if (type_ == ModuleType::VDSO)
     bcc_elf_foreach_vdso_sym(_add_symbol, this);
 
@@ -359,6 +367,16 @@ bool ProcSyms::Module::find_addr(uint64_t offset, struct bcc_symbol *sym) {
   uint64_t limit = it->start;
   for (; offset >= it->start; --it) {
     if (offset < it->start + it->size) {
+      // Resolve and cache the symbol name if necessary
+      if (!it->name) {
+        std::string sym_name(it->name_idx.str_len + 1, '\0');
+        if (bcc_elf_symbol_str(name_.c_str(), it->name_idx.section_idx,
+              it->name_idx.str_table_idx, &sym_name[0], sym_name.size()))
+          break;
+
+        it->name = &*(symnames_.emplace(std::move(sym_name)).first);
+      }
+
       sym->name = it->name->c_str();
       sym->offset = (offset - it->start);
       return true;

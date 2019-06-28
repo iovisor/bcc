@@ -214,7 +214,8 @@ static Elf_Scn * get_section(Elf *e, const char *section_name,
 
 static int list_in_scn(Elf *e, Elf_Scn *section, size_t stridx, size_t symsize,
                        struct bcc_symbol_option *option,
-                       bcc_elf_symcb callback, void *payload) {
+                       bcc_elf_symcb callback, bcc_elf_symcb_lazy callback_lazy,
+                       void *payload) {
   Elf_Data *data = NULL;
 
 #if defined(__powerpc64__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
@@ -237,6 +238,7 @@ static int list_in_scn(Elf *e, Elf_Scn *section, size_t stridx, size_t symsize,
     for (i = 0; i < symcount; ++i) {
       GElf_Sym sym;
       const char *name;
+      size_t name_len;
 
       if (!gelf_getsym(data, (int)i, &sym))
         continue;
@@ -245,6 +247,7 @@ static int list_in_scn(Elf *e, Elf_Scn *section, size_t stridx, size_t symsize,
         continue;
       if (name[0] == 0)
         continue;
+      name_len = strlen(name);
 
       if (sym.st_value == 0)
         continue;
@@ -287,7 +290,13 @@ static int list_in_scn(Elf *e, Elf_Scn *section, size_t stridx, size_t symsize,
 #endif
 #endif
 
-      if (callback(name, sym.st_value, sym.st_size, payload) < 0)
+      int ret;
+      if (callback_lazy)
+        ret = callback_lazy(stridx, sym.st_name, name_len, sym.st_value,
+                            sym.st_size, payload);
+      else
+        ret = callback(name, sym.st_value, sym.st_size, payload);
+      if (ret < 0)
         return 1;      // signal termination to caller
     }
   }
@@ -295,7 +304,8 @@ static int list_in_scn(Elf *e, Elf_Scn *section, size_t stridx, size_t symsize,
   return 0;
 }
 
-static int listsymbols(Elf *e, bcc_elf_symcb callback, void *payload,
+static int listsymbols(Elf *e, bcc_elf_symcb callback,
+                       bcc_elf_symcb_lazy callback_lazy, void *payload,
                        struct bcc_symbol_option *option) {
   Elf_Scn *section = NULL;
 
@@ -309,7 +319,7 @@ static int listsymbols(Elf *e, bcc_elf_symcb callback, void *payload,
       continue;
 
     int rc = list_in_scn(e, section, header.sh_link, header.sh_entsize,
-                         option, callback, payload);
+                         option, callback, callback_lazy, payload);
     if (rc == 1)
       break;    // callback signaled termination
 
@@ -537,6 +547,7 @@ static char *find_debug_via_buildid(Elf *e) {
 }
 
 static int foreach_sym_core(const char *path, bcc_elf_symcb callback,
+                            bcc_elf_symcb_lazy callback_lazy,
                             struct bcc_symbol_option *option, void *payload,
                             int is_debug_file) {
   Elf *e;
@@ -561,12 +572,12 @@ static int foreach_sym_core(const char *path, bcc_elf_symcb callback,
       debug_file = find_debug_via_debuglink(e, path,
                                             option->check_debug_file_crc);
     if (debug_file) {
-      foreach_sym_core(debug_file, callback, option, payload, 1);
+      foreach_sym_core(debug_file, callback, callback_lazy, option, payload, 1);
       free(debug_file);
     }
   }
 
-  res = listsymbols(e, callback, payload, option);
+  res = listsymbols(e, callback, callback_lazy, payload, option);
   elf_end(e);
   close(fd);
   return res;
@@ -575,7 +586,13 @@ static int foreach_sym_core(const char *path, bcc_elf_symcb callback,
 int bcc_elf_foreach_sym(const char *path, bcc_elf_symcb callback,
                         void *option, void *payload) {
   return foreach_sym_core(
-      path, callback, (struct bcc_symbol_option*)option, payload, 0);
+      path, callback, NULL, (struct bcc_symbol_option*)option, payload, 0);
+}
+
+int bcc_elf_foreach_sym_lazy(const char *path, bcc_elf_symcb_lazy callback,
+                        void *option, void *payload) {
+  return foreach_sym_core(path, NULL, callback,
+      (struct bcc_symbol_option*)option, payload, 0);
 }
 
 int bcc_elf_get_text_scn_info(const char *path, uint64_t *addr,
@@ -738,7 +755,7 @@ int bcc_elf_foreach_vdso_sym(bcc_elf_symcb callback, void *payload) {
   if (openelf_fd(vdso_image_fd, &elf) == -1)
     return -1;
 
-  return listsymbols(elf, callback, payload, &default_option);
+  return listsymbols(elf, callback, NULL, payload, &default_option);
 }
 
 // return value: 0   : success
@@ -909,6 +926,32 @@ int bcc_elf_get_buildid(const char *path, char *buildid)
     return -1;
 
   return 0;
+}
+
+int bcc_elf_symbol_str(const char *path, size_t section_idx,
+                       size_t str_table_idx, char *out, size_t len)
+{
+  Elf *e;
+  int fd, err = 0;
+  const char *name;
+
+  if (!out || !len)
+    return -1;
+
+  if (openelf(path, &e, &fd) < 0)
+    return -1;
+
+  if ((name = elf_strptr(e, section_idx, str_table_idx)) == NULL) {
+    err = -1;
+    goto exit;
+  }
+
+  strncpy(out, name, len);
+
+exit:
+  elf_end(e);
+  close(fd);
+  return err;
 }
 
 #if 0
