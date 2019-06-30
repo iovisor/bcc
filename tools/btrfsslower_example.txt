@@ -126,7 +126,7 @@ patterns.
 USAGE message:
 
 # ./btrfsslower -h
-usage: btrfsslower [-h] [-j] [-p PID] [min_ms]
+usage: btrfsslower [-h] [-j] [-p PID] [min_ms] [-d DURATION]
 
 Trace common btrfs file operations slower than a threshold
 
@@ -137,6 +137,8 @@ optional arguments:
   -h, --help         show this help message and exit
   -j, --csv          just print fields: comma-separated values
   -p PID, --pid PID  trace this PID only
+  -d DURATION, --duration DURATION
+                     total duration of trace in seconds
 
 examples:
     ./btrfsslower             # trace operations slower than 10 ms (default)
@@ -144,3 +146,5 @@ examples:
     ./btrfsslower -j 1        # ... 1 ms, parsable output (csv)
     ./btrfsslower 0           # trace all operations (warning: verbose)
     ./btrfsslower -p 185      # trace PID 185 only
+    ./btrfsslower -d 10       # trace for 10 seconds only
+
