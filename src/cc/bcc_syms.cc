@@ -322,15 +322,43 @@ bool ProcSyms::Module::contains(uint64_t addr, uint64_t &offset) const {
 }
 
 bool ProcSyms::Module::find_name(const char *symname, uint64_t *addr) {
-  load_sym_table();
+  struct Payload {
+    const char *symname;
+    uint64_t *out;
+    bool found;
+  };
 
-  for (Symbol &s : syms_) {
-    if (*(s.name) == symname) {
-      *addr = type_ == ModuleType::SO ? start() + s.start : s.start;
-      return true;
+  Payload payload;
+  payload.symname = symname;
+  payload.out = addr;
+  payload.found = false;
+
+  auto cb = [](const char *name, uint64_t start, uint64_t size, void *p) {
+    Payload *payload = static_cast<Payload*>(p);
+
+    if (!strcmp(payload->symname, name)) {
+      payload->found = true;
+      *(payload->out) = start;
+      return -1;  // Stop iteration
     }
-  }
-  return false;
+
+    return 0;
+  };
+
+  if (type_ == ModuleType::PERF_MAP)
+    bcc_perf_map_foreach_sym(name_.c_str(), cb, &payload);
+  if (type_ == ModuleType::EXEC || type_ == ModuleType::SO)
+    bcc_elf_foreach_sym(name_.c_str(), cb, symbol_option_, &payload);
+  if (type_ == ModuleType::VDSO)
+    bcc_elf_foreach_vdso_sym(cb, &payload);
+
+  if (!payload.found)
+    return false;
+
+  if (type_ == ModuleType::SO)
+    *(payload.out) += start();
+
+  return true;
 }
 
 bool ProcSyms::Module::find_addr(uint64_t offset, struct bcc_symbol *sym) {
