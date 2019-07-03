@@ -1,0 +1,71 @@
+[flake8]
+count = True
+# max-complexity should be 10
+max-complexity = 30
+# max-line-length should be 79 (pep8) or 88 (python/black) or 127 (GitHub editor)
+max-line-length = 370
+show_source = True
+statistics = True
+ignore =
+    E101,  # indentation contains mixed spaces and tabs
+    E111,  # indentation is not a multiple of four
+    E114,  # indentation is not a multiple of four (comment)
+    E116,  # unexpected indentation (comment)
+    E117,  # over-indented
+    E121,  # continuation line under-indented for hanging indent
+    E122,  # continuation line missing indentation or outdented
+    E123,  # closing bracket does not match indentation of opening bracket's line
+    E124,  # closing bracket does not match visual indentation
+    E125,  # continuation line with same indent as next logical line
+    E126,  # continuation line over-indented for hanging indent
+    E127,  # continuation line over-indented for visual indent
+    E128,  # continuation line under-indented for visual indent
+    E129,  # visually indented line with same indent as next logical line
+    E131,  # continuation line unaligned for hanging indent
+    E201,  # whitespace after '('
+    E202,  # whitespace before ')'
+    E203,  # whitespace before ','
+    E211,  # whitespace before '('
+    E221,  # multiple spaces before operator
+    E222,  # multiple spaces after operator
+    E225,  # missing whitespace around operator
+    E226,  # missing whitespace around arithmetic operator
+    E227,  # missing whitespace around bitwise or shift operator
+    E231,  # missing whitespace after ','
+    E241,  # multiple spaces after ','
+    E251,  # unexpected spaces around keyword / parameter equals
+    E261,  # at least two spaces before inline comment
+    E262,  # inline comment should start with '# '
+    E265,  # block comment should start with '# '
+    E266,  # too many leading '#' for block comment
+    E272,  # multiple spaces before keyword
+    E301,  # expected 1 blank line, found 0
+    E302,  # expected 2 blank lines, found 1
+    E303,  # too many blank lines (2)
+    E305,  # expected 2 blank lines after class or function definition, found 1
+    E306,  # expected 1 blank line before a nested definition, found 0
+    E401,  # multiple imports on one line
+    E402,  # module level import not at top of file
+    E502,  # the backslash is redundant between brackets
+    E701,  # multiple statements on one line (colon)
+    E702,  # multiple statements on one line (semicolon)
+    E703,  # statement ends with a semicolon
+    E704,  # multiple statements on one line (def)
+    E711,  # comparison to None should be 'if cond is not None:'
+    E713,  # test for membership should be 'not in'
+    E722,  # do not use bare 'except'
+    E741,  # ambiguous variable name 'l'
+    F401,  # 'pyroute2.NetNS' imported but unused
+    F403,  # 'from ctypes import *' used; unable to detect undefined names
+    F405,  # 'c_ubyte' may be undefined, or defined from star imports: ctypes
+    F632,  # use ==/!= to compare str, bytes, and int literals
+    F811,  # redefinition of unused 'os' from line 11
+    F821,  # undefined name 'signal_ignore'
+    F841,  # local variable 'available_ips' is assigned to but never used
+    W191,  # indentation contains tabs
+    W291,  # trailing whitespace
+    W293,  # blank line contains whitespace
+    W391,  # blank line at end of file
+    W503,  # line break before binary operator
+    W504,  # line break after binary operator
+    W605,  # invalid escape sequence '\.'
