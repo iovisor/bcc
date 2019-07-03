@@ -33,9 +33,9 @@ examples = """examples:
 parser = argparse.ArgumentParser(
     description="Trace TCP drops by the kernel",
     formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog=examples)
-parser.add_argument("--ebpf", action="store_true",
-    help=argparse.SUPPRESS)
+    epilog=examples,
+)
+parser.add_argument("--ebpf", action="store_true", help=argparse.SUPPRESS)
 args = parser.parse_args()
 debug = 0
 
@@ -153,41 +153,61 @@ if debug or args.ebpf:
 # process event
 def print_ipv4_event(cpu, data, size):
     event = b["ipv4_events"].event(data)
-    print("%-8s %-6d %-2d %-20s > %-20s %s (%s)" % (
-        strftime("%H:%M:%S"), event.pid, event.ip,
-        "%s:%d" % (inet_ntop(AF_INET, pack('I', event.saddr)), event.sport),
-        "%s:%s" % (inet_ntop(AF_INET, pack('I', event.daddr)), event.dport),
-        tcp.tcpstate[event.state], tcp.flags2str(event.tcpflags)))
+    print(
+        "%-8s %-6d %-2d %-20s > %-20s %s (%s)"
+        % (
+            strftime("%H:%M:%S"),
+            event.pid,
+            event.ip,
+            "%s:%d" % (inet_ntop(AF_INET, pack("I", event.saddr)), event.sport),
+            "%s:%s" % (inet_ntop(AF_INET, pack("I", event.daddr)), event.dport),
+            tcp.tcpstate[event.state],
+            tcp.flags2str(event.tcpflags),
+        )
+    )
     for addr in stack_traces.walk(event.stack_id):
         sym = b.ksym(addr, show_offset=True)
         print("\t%s" % sym)
     print("")
 
+
 def print_ipv6_event(cpu, data, size):
     event = b["ipv6_events"].event(data)
-    print("%-8s %-6d %-2d %-20s > %-20s %s (%s)" % (
-        strftime("%H:%M:%S"), event.pid, event.ip,
-        "%s:%d" % (inet_ntop(AF_INET6, event.saddr), event.sport),
-        "%s:%d" % (inet_ntop(AF_INET6, event.daddr), event.dport),
-        tcp.tcpstate[event.state], tcp.flags2str(event.tcpflags)))
+    print(
+        "%-8s %-6d %-2d %-20s > %-20s %s (%s)"
+        % (
+            strftime("%H:%M:%S"),
+            event.pid,
+            event.ip,
+            "%s:%d" % (inet_ntop(AF_INET6, event.saddr), event.sport),
+            "%s:%d" % (inet_ntop(AF_INET6, event.daddr), event.dport),
+            tcp.tcpstate[event.state],
+            tcp.flags2str(event.tcpflags),
+        )
+    )
     for addr in stack_traces.walk(event.stack_id):
         sym = b.ksym(addr, show_offset=True)
         print("\t%s" % sym)
     print("")
+
 
 # initialize BPF
 b = BPF(text=bpf_text)
 if b.get_kprobe_functions(b"tcp_drop"):
     b.attach_kprobe(event="tcp_drop", fn_name="trace_tcp_drop")
 else:
-    print("ERROR: tcp_drop() kernel function not found or traceable. "
-        "Older kernel versions not supported.")
+    print(
+        "ERROR: tcp_drop() kernel function not found or traceable. "
+        "Older kernel versions not supported."
+    )
     exit()
 stack_traces = b.get_table("stack_traces")
 
 # header
-print("%-8s %-6s %-2s %-20s > %-20s %s (%s)" % ("TIME", "PID", "IP",
-    "SADDR:SPORT", "DADDR:DPORT", "STATE", "FLAGS"))
+print(
+    "%-8s %-6s %-2s %-20s > %-20s %s (%s)"
+    % ("TIME", "PID", "IP", "SADDR:SPORT", "DADDR:DPORT", "STATE", "FLAGS")
+)
 
 # read events
 b["ipv4_events"].open_perf_buffer(print_ipv4_event)

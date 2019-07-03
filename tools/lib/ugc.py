@@ -28,20 +28,36 @@ examples = """examples:
 parser = argparse.ArgumentParser(
     description="Summarize garbage collection events in high-level languages.",
     formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog=examples)
-parser.add_argument("-l", "--language", choices=languages,
-    help="language to trace")
+    epilog=examples,
+)
+parser.add_argument("-l", "--language", choices=languages, help="language to trace")
 parser.add_argument("pid", type=int, help="process id to attach to")
-parser.add_argument("-v", "--verbose", action="store_true",
-    help="verbose mode: print the BPF program (for debugging purposes)")
-parser.add_argument("-m", "--milliseconds", action="store_true",
-    help="report times in milliseconds (default is microseconds)")
-parser.add_argument("-M", "--minimum", type=int, default=0,
-    help="display only GCs longer than this many milliseconds")
-parser.add_argument("-F", "--filter", type=str,
-    help="display only GCs whose description contains this text")
-parser.add_argument("--ebpf", action="store_true",
-    help=argparse.SUPPRESS)
+parser.add_argument(
+    "-v",
+    "--verbose",
+    action="store_true",
+    help="verbose mode: print the BPF program (for debugging purposes)",
+)
+parser.add_argument(
+    "-m",
+    "--milliseconds",
+    action="store_true",
+    help="report times in milliseconds (default is microseconds)",
+)
+parser.add_argument(
+    "-M",
+    "--minimum",
+    type=int,
+    default=0,
+    help="display only GCs longer than this many milliseconds",
+)
+parser.add_argument(
+    "-F",
+    "--filter",
+    type=str,
+    help="display only GCs whose description contains this text",
+)
+parser.add_argument("--ebpf", action="store_true", help=argparse.SUPPRESS)
 args = parser.parse_args()
 
 usdt = USDT(pid=args.pid)
@@ -66,6 +82,7 @@ struct entry_t {
 BPF_PERF_OUTPUT(gcs);
 BPF_HASH(entry, u64, struct entry_t);
 """
+
 
 class Probe(object):
     def __init__(self, begin, end, begin_save, end_save, formatter):
@@ -103,8 +120,13 @@ int trace_%s(struct pt_regs *ctx) {
     gcs.perf_submit(ctx, &event, sizeof(event));
     return 0;
 }
-        """ % (self.begin, self.begin_save, self.end,
-               args.minimum * 1000000, self.end_save)
+        """ % (
+            self.begin,
+            self.begin_save,
+            self.end,
+            args.minimum * 1000000,
+            self.end_save,
+        )
         return text
 
     def attach(self):
@@ -113,6 +135,7 @@ int trace_%s(struct pt_regs *ctx) {
 
     def format(self, data):
         return self.formatter(data)
+
 
 probes = []
 
@@ -145,12 +168,27 @@ if language == "java":
     """
 
     def formatter(e):
-        "%s %s used=%d->%d max=%d->%d" % \
-            (e.string1, e.string2, e.field1, e.field3, e.field2, e.field4)
-    probes.append(Probe("mem__pool__gc__begin", "mem__pool__gc__end",
-                        begin_save, end_save, formatter))
-    probes.append(Probe("gc__begin", "gc__end",
-                        "", "", lambda _: "no additional info available"))
+        "%s %s used=%d->%d max=%d->%d" % (
+            e.string1,
+            e.string2,
+            e.field1,
+            e.field3,
+            e.field2,
+            e.field4,
+        )
+
+    probes.append(
+        Probe(
+            "mem__pool__gc__begin",
+            "mem__pool__gc__end",
+            begin_save,
+            end_save,
+            formatter,
+        )
+    )
+    probes.append(
+        Probe("gc__begin", "gc__end", "", "", lambda _: "no additional info available")
+    )
 #
 # Node
 #
@@ -160,12 +198,23 @@ elif language == "node":
     bpf_usdt_readarg(1, ctx, &gc_type);
     event.field1 = gc_type;
     """
-    descs = {"GC scavenge": 1, "GC mark-sweep-compact": 2,
-             "GC incremental mark": 4, "GC weak callbacks": 8}
-    probes.append(Probe("gc__start", "gc__done", "", end_save,
-                  lambda e: str.join(", ",
-                                     [desc for desc, val in descs.items()
-                                      if e.field1 & val != 0])))
+    descs = {
+        "GC scavenge": 1,
+        "GC mark-sweep-compact": 2,
+        "GC incremental mark": 4,
+        "GC weak callbacks": 8,
+    }
+    probes.append(
+        Probe(
+            "gc__start",
+            "gc__done",
+            "",
+            end_save,
+            lambda e: str.join(
+                ", ", [desc for desc, val in descs.items() if e.field1 & val != 0]
+            ),
+        )
+    )
 #
 # Python
 #
@@ -183,19 +232,20 @@ elif language == "python":
     """
 
     def formatter(event):
-        "gen %d GC collected %d objects" % \
-            (event.field1, event.field2)
-    probes.append(Probe("gc__start", "gc__done",
-                        begin_save, end_save, formatter))
+        "gen %d GC collected %d objects" % (event.field1, event.field2)
+
+    probes.append(Probe("gc__start", "gc__done", begin_save, end_save, formatter))
 #
 # Ruby
 #
 elif language == "ruby":
     # Ruby GC probes do not have any additional information available.
-    probes.append(Probe("gc__mark__begin", "gc__mark__end",
-                        "", "", lambda _: "GC mark stage"))
-    probes.append(Probe("gc__sweep__begin", "gc__sweep__end",
-                        "", "", lambda _: "GC sweep stage"))
+    probes.append(
+        Probe("gc__mark__begin", "gc__mark__end", "", "", lambda _: "GC mark stage")
+    )
+    probes.append(
+        Probe("gc__sweep__begin", "gc__sweep__end", "", "", lambda _: "GC sweep stage")
+    )
 
 else:
     print("No language detected; use -l to trace a language.")
@@ -214,10 +264,13 @@ if args.ebpf or args.verbose:
         exit()
 
 bpf = BPF(text=program, usdt_contexts=[usdt])
-print("Tracing garbage collections in %s process %d... Ctrl-C to quit." %
-      (language, args.pid))
+print(
+    "Tracing garbage collections in %s process %d... Ctrl-C to quit."
+    % (language, args.pid)
+)
 time_col = "TIME (ms)" if args.milliseconds else "TIME (us)"
 print("%-8s %-8s %-40s" % ("START", time_col, "DESCRIPTION"))
+
 
 class GCEvent(ct.Structure):
     _fields_ = [
@@ -228,19 +281,23 @@ class GCEvent(ct.Structure):
         ("field3", ct.c_ulonglong),
         ("field4", ct.c_ulonglong),
         ("string1", ct.c_char * 32),
-        ("string2", ct.c_char * 32)
-        ]
+        ("string2", ct.c_char * 32),
+    ]
+
 
 start_ts = time.time()
 
+
 def print_event(cpu, data, size):
     event = ct.cast(data, ct.POINTER(GCEvent)).contents
-    elapsed = event.elapsed_ns / 1000000 if args.milliseconds else \
-              event.elapsed_ns / 1000
+    elapsed = (
+        event.elapsed_ns / 1000000 if args.milliseconds else event.elapsed_ns / 1000
+    )
     description = probes[event.probe_index].format(event)
     if args.filter and args.filter not in description:
         return
     print("%-8.3f %-8.2f %s" % (time.time() - start_ts, elapsed, description))
+
 
 bpf["gcs"].open_perf_buffer(print_event)
 while 1:

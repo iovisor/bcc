@@ -28,6 +28,7 @@ else:
 def signal_ignore(signal, frame):
     print()
 
+
 def handle_errno(errstr):
     try:
         return abs(int(errstr))
@@ -40,29 +41,52 @@ def handle_errno(errstr):
         raise argparse.ArgumentTypeError("couldn't map %s to an errno" % errstr)
 
 
-parser = argparse.ArgumentParser(
-    description="Summarize syscall counts and latencies.")
+parser = argparse.ArgumentParser(description="Summarize syscall counts and latencies.")
 parser.add_argument("-p", "--pid", type=int, help="trace only this pid")
-parser.add_argument("-i", "--interval", type=int,
-    help="print summary at this interval (seconds)")
-parser.add_argument("-d", "--duration", type=int,
-    help="total duration of trace, in seconds")
-parser.add_argument("-T", "--top", type=int, default=10,
-    help="print only the top syscalls by count or latency")
-parser.add_argument("-x", "--failures", action="store_true",
-    help="trace only failed syscalls (return < 0)")
-parser.add_argument("-e", "--errno", type=handle_errno,
-    help="trace only syscalls that return this error (numeric or EPERM, etc.)")
-parser.add_argument("-L", "--latency", action="store_true",
-    help="collect syscall latency")
-parser.add_argument("-m", "--milliseconds", action="store_true",
-    help="display latency in milliseconds (default: microseconds)")
-parser.add_argument("-P", "--process", action="store_true",
-    help="count by process and not by syscall")
-parser.add_argument("-l", "--list", action="store_true",
-    help="print list of recognized syscalls and exit")
-parser.add_argument("--ebpf", action="store_true",
-    help=argparse.SUPPRESS)
+parser.add_argument(
+    "-i", "--interval", type=int, help="print summary at this interval (seconds)"
+)
+parser.add_argument(
+    "-d", "--duration", type=int, help="total duration of trace, in seconds"
+)
+parser.add_argument(
+    "-T",
+    "--top",
+    type=int,
+    default=10,
+    help="print only the top syscalls by count or latency",
+)
+parser.add_argument(
+    "-x",
+    "--failures",
+    action="store_true",
+    help="trace only failed syscalls (return < 0)",
+)
+parser.add_argument(
+    "-e",
+    "--errno",
+    type=handle_errno,
+    help="trace only syscalls that return this error (numeric or EPERM, etc.)",
+)
+parser.add_argument(
+    "-L", "--latency", action="store_true", help="collect syscall latency"
+)
+parser.add_argument(
+    "-m",
+    "--milliseconds",
+    action="store_true",
+    help="display latency in milliseconds (default: microseconds)",
+)
+parser.add_argument(
+    "-P", "--process", action="store_true", help="count by process and not by syscall"
+)
+parser.add_argument(
+    "-l",
+    "--list",
+    action="store_true",
+    help="print list of recognized syscalls and exit",
+)
+parser.add_argument("--ebpf", action="store_true", help=argparse.SUPPRESS)
 args = parser.parse_args()
 if args.duration and not args.interval:
     args.interval = args.duration
@@ -160,14 +184,17 @@ if args.ebpf:
 
 bpf = BPF(text=text)
 
+
 def print_stats():
     if args.latency:
         print_latency_stats()
     else:
         print_count_stats()
 
+
 agg_colname = "PID    COMM" if args.process else "SYSCALL"
 time_colname = "TIME (ms)" if args.milliseconds else "TIME (us)"
+
 
 def comm_for_pid(pid):
     try:
@@ -175,39 +202,45 @@ def comm_for_pid(pid):
     except Exception:
         return b"[unknown]"
 
+
 def agg_colval(key):
     if args.process:
         return b"%-6d %-15s" % (key.value, comm_for_pid(key.value))
     else:
         return syscall_name(key.value)
 
+
 def print_count_stats():
     data = bpf["data"]
     print("[%s]" % strftime("%H:%M:%S"))
     print("%-22s %8s" % (agg_colname, "COUNT"))
-    for k, v in sorted(data.items(), key=lambda kv: -kv[1].value)[:args.top]:
+    for k, v in sorted(data.items(), key=lambda kv: -kv[1].value)[: args.top]:
         if k.value == 0xFFFFFFFF:
-            continue    # happens occasionally, we don't need it
+            continue  # happens occasionally, we don't need it
         printb(b"%-22s %8d" % (agg_colval(k), v.value))
     print("")
     data.clear()
+
 
 def print_latency_stats():
     data = bpf["data"]
     print("[%s]" % strftime("%H:%M:%S"))
     print("%-22s %8s %16s" % (agg_colname, "COUNT", time_colname))
-    for k, v in sorted(data.items(),
-                       key=lambda kv: -kv[1].total_ns)[:args.top]:
+    for k, v in sorted(data.items(), key=lambda kv: -kv[1].total_ns)[: args.top]:
         if k.value == 0xFFFFFFFF:
-            continue    # happens occasionally, we don't need it
-        printb((b"%-22s %8d " + (b"%16.6f" if args.milliseconds else b"%16.3f")) %
-               (agg_colval(k), v.count,
-                v.total_ns / (1e6 if args.milliseconds else 1e3)))
+            continue  # happens occasionally, we don't need it
+        printb(
+            (b"%-22s %8d " + (b"%16.6f" if args.milliseconds else b"%16.3f"))
+            % (agg_colval(k), v.count, v.total_ns / (1e6 if args.milliseconds else 1e3))
+        )
     print("")
     data.clear()
 
-print("Tracing %ssyscalls, printing top %d... Ctrl+C to quit." %
-      ("failed " if args.failures else "", args.top))
+
+print(
+    "Tracing %ssyscalls, printing top %d... Ctrl+C to quit."
+    % ("failed " if args.failures else "", args.top)
+)
 exiting = 0 if args.interval else 1
 seconds = 0
 while True:

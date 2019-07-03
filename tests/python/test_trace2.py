@@ -24,6 +24,7 @@ int count_sched(struct pt_regs *ctx) {
 }
 """
 
+
 class TestTracingEvent(TestCase):
     def setUp(self):
         b = BPF(text=text, debug=0)
@@ -35,6 +36,7 @@ class TestTracingEvent(TestCase):
             sleep(0.01)
         for key, leaf in self.stats.items():
             print("ptr %x:" % key.ptr, "stat1 (%d %d)" % (leaf.stat1[1], leaf.stat1[0]))
+
 
 if __name__ == "__main__":
     main()

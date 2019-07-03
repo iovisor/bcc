@@ -30,11 +30,10 @@ examples = """examples:
 parser = argparse.ArgumentParser(
     description="Trace stat() syscalls",
     formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog=examples)
-parser.add_argument("-p", "--pid",
-    help="trace this PID only")
-parser.add_argument("--ebpf", action="store_true",
-    help=argparse.SUPPRESS)
+    epilog=examples,
+)
+parser.add_argument("-p", "--pid", help="trace this PID only")
+parser.add_argument("--ebpf", action="store_true", help=argparse.SUPPRESS)
 args = parser.parse_args()
 debug = 0
 
@@ -100,10 +99,9 @@ int trace_unlink(struct pt_regs *ctx, struct inode *dir, struct dentry *dentry)
 """
 
 if args.pid:
-    bpf_text = bpf_text.replace('FILTER',
-        'if (pid != %s) { return 0; }' % args.pid)
+    bpf_text = bpf_text.replace("FILTER", "if (pid != %s) { return 0; }" % args.pid)
 else:
-    bpf_text = bpf_text.replace('FILTER', '')
+    bpf_text = bpf_text.replace("FILTER", "")
 if debug or args.ebpf:
     print(bpf_text)
     if args.ebpf:
@@ -123,9 +121,17 @@ print("%-8s %-6s %-16s %-7s %s" % ("TIME", "PID", "COMM", "AGE(s)", "FILE"))
 # process event
 def print_event(cpu, data, size):
     event = b["events"].event(data)
-    print("%-8s %-6d %-16s %-7.2f %s" % (strftime("%H:%M:%S"), event.pid,
-        event.comm.decode('utf-8', 'replace'), float(event.delta) / 1000,
-        event.fname.decode('utf-8', 'replace')))
+    print(
+        "%-8s %-6d %-16s %-7.2f %s"
+        % (
+            strftime("%H:%M:%S"),
+            event.pid,
+            event.comm.decode("utf-8", "replace"),
+            float(event.delta) / 1000,
+            event.fname.decode("utf-8", "replace"),
+        )
+    )
+
 
 b["events"].open_perf_buffer(print_event)
 while 1:

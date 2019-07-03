@@ -26,6 +26,7 @@ import sys
 from subprocess import call
 from time import sleep, strftime
 
+
 class Category(object):
     THREAD = "THREAD"
     METHOD = "METHOD"
@@ -33,6 +34,7 @@ class Category(object):
     CLOAD = "CLOAD"
     EXCP = "EXCP"
     GC = "GC"
+
 
 class Probe(object):
     def __init__(self, language, procnames, events):
@@ -50,15 +52,15 @@ class Probe(object):
     def _find_targets(self):
         """Find pids where the comm is one of the specified list"""
         self.targets = {}
-        all_pids = [int(pid) for pid in os.listdir('/proc') if pid.isdigit()]
+        all_pids = [int(pid) for pid in os.listdir("/proc") if pid.isdigit()]
         for pid in all_pids:
             try:
-                comm = open('/proc/%d/comm' % pid).read().strip()
+                comm = open("/proc/%d/comm" % pid).read().strip()
                 if comm in self.procnames:
-                    cmdline = open('/proc/%d/cmdline' % pid).read()
-                    self.targets[pid] = cmdline.replace('\0', ' ')
+                    cmdline = open("/proc/%d/cmdline" % pid).read()
+                    self.targets[pid] = cmdline.replace("\0", " ")
             except IOError:
-                continue    # process may already have terminated
+                continue  # process may already have terminated
 
     def _enable_probes(self):
         self.usdts = []
@@ -85,8 +87,7 @@ class Probe(object):
         text = """
 BPF_HASH(%s_%s_counts, u32, u64);   // pid to event count
         """
-        return str.join('', [text % (self.language, event)
-                             for event in self.events])
+        return str.join("", [text % (self.language, event) for event in self.events])
 
     def _generate_functions(self):
         text = """
@@ -99,8 +100,9 @@ int %s_%s(void *ctx) {
 }
         """
         lang = self.language
-        return str.join('', [text % (lang, event, lang, event)
-                             for event in self.events])
+        return str.join(
+            "", [text % (lang, event, lang, event) for event in self.events]
+        )
 
     def get_program(self):
         self._find_targets()
@@ -127,6 +129,7 @@ int %s_%s(void *ctx) {
     def cleanup(self):
         self.usdts = None
 
+
 class Tool(object):
     def _parse_args(self):
         examples = """examples:
@@ -139,54 +142,84 @@ class Tool(object):
         parser = argparse.ArgumentParser(
             description="Activity stats from high-level languages.",
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            epilog=examples)
-        parser.add_argument("-l", "--language",
+            epilog=examples,
+        )
+        parser.add_argument(
+            "-l",
+            "--language",
             choices=["java", "node", "perl", "php", "python", "ruby", "tcl"],
-            help="language to trace (default: all languages)")
-        parser.add_argument("-C", "--noclear", action="store_true",
-            help="don't clear the screen")
-        parser.add_argument("-S", "--sort",
+            help="language to trace (default: all languages)",
+        )
+        parser.add_argument(
+            "-C", "--noclear", action="store_true", help="don't clear the screen"
+        )
+        parser.add_argument(
+            "-S",
+            "--sort",
             choices=[cat.lower() for cat in dir(Category) if cat.isupper()],
-            help="sort by this field (descending order)")
-        parser.add_argument("-r", "--maxrows", default=20, type=int,
-            help="maximum rows to print, default 20")
-        parser.add_argument("-d", "--debug", action="store_true",
-            help="Print the resulting BPF program (for debugging purposes)")
-        parser.add_argument("interval", nargs="?", default=1, type=int,
-            help="output interval, in seconds")
-        parser.add_argument("count", nargs="?", default=99999999, type=int,
-            help="number of outputs")
-        parser.add_argument("--ebpf", action="store_true",
-            help=argparse.SUPPRESS)
+            help="sort by this field (descending order)",
+        )
+        parser.add_argument(
+            "-r",
+            "--maxrows",
+            default=20,
+            type=int,
+            help="maximum rows to print, default 20",
+        )
+        parser.add_argument(
+            "-d",
+            "--debug",
+            action="store_true",
+            help="Print the resulting BPF program (for debugging purposes)",
+        )
+        parser.add_argument(
+            "interval",
+            nargs="?",
+            default=1,
+            type=int,
+            help="output interval, in seconds",
+        )
+        parser.add_argument(
+            "count", nargs="?", default=99999999, type=int, help="number of outputs"
+        )
+        parser.add_argument("--ebpf", action="store_true", help=argparse.SUPPRESS)
         self.args = parser.parse_args()
 
     def _create_probes(self):
         probes_by_lang = {
-                "java": Probe("java", ["java"], {
+            "java": Probe(
+                "java",
+                ["java"],
+                {
                     "gc__begin": Category.GC,
                     "mem__pool__gc__begin": Category.GC,
                     "thread__start": Category.THREAD,
                     "class__loaded": Category.CLOAD,
                     "object__alloc": Category.OBJNEW,
                     "method__entry": Category.METHOD,
-                    "ExceptionOccurred__entry": Category.EXCP
-                    }),
-                "node": Probe("node", ["node"], {
-                    "gc__start": Category.GC
-                    }),
-                "perl": Probe("perl", ["perl"], {
-                    "sub__entry": Category.METHOD
-                    }),
-                "php": Probe("php", ["php"], {
+                    "ExceptionOccurred__entry": Category.EXCP,
+                },
+            ),
+            "node": Probe("node", ["node"], {"gc__start": Category.GC}),
+            "perl": Probe("perl", ["perl"], {"sub__entry": Category.METHOD}),
+            "php": Probe(
+                "php",
+                ["php"],
+                {
                     "function__entry": Category.METHOD,
                     "compile__file__entry": Category.CLOAD,
-                    "exception__thrown": Category.EXCP
-                    }),
-                "python": Probe("python", ["python"], {
-                    "function__entry": Category.METHOD,
-                    "gc__start": Category.GC
-                    }),
-                "ruby": Probe("ruby", ["ruby", "irb"], {
+                    "exception__thrown": Category.EXCP,
+                },
+            ),
+            "python": Probe(
+                "python",
+                ["python"],
+                {"function__entry": Category.METHOD, "gc__start": Category.GC},
+            ),
+            "ruby": Probe(
+                "ruby",
+                ["ruby", "irb"],
+                {
                     "method__entry": Category.METHOD,
                     "cmethod__entry": Category.METHOD,
                     "gc__mark__begin": Category.GC,
@@ -197,13 +230,15 @@ class Tool(object):
                     "array__create": Category.OBJNEW,
                     "require__entry": Category.CLOAD,
                     "load__entry": Category.CLOAD,
-                    "raise": Category.EXCP
-                    }),
-                "tcl": Probe("tcl", ["tclsh", "wish"], {
-                    "proc__entry": Category.METHOD,
-                    "obj__create": Category.OBJNEW
-                    }),
-                }
+                    "raise": Category.EXCP,
+                },
+            ),
+            "tcl": Probe(
+                "tcl",
+                ["tclsh", "wish"],
+                {"proc__entry": Category.METHOD, "obj__create": Category.OBJNEW},
+            ),
+        }
 
         if self.args.language:
             self.probes = [probes_by_lang[self.args.language]]
@@ -211,14 +246,16 @@ class Tool(object):
             self.probes = probes_by_lang.values()
 
     def _attach_probes(self):
-        program = str.join('\n', [p.get_program() for p in self.probes])
+        program = str.join("\n", [p.get_program() for p in self.probes])
         if self.args.debug or self.args.ebpf:
             print(program)
             if self.args.ebpf:
                 exit()
             for probe in self.probes:
-                print("Attached to %s processes:" % probe.language,
-                        str.join(', ', map(str, probe.targets)))
+                print(
+                    "Attached to %s processes:" % probe.language,
+                    str.join(", ", map(str, probe.targets)),
+                )
         self.bpf = BPF(text=program)
         usdts = [usdt for probe in self.probes for usdt in probe.get_usdts()]
         # Filter out duplicates when we have multiple processes with the same
@@ -228,16 +265,20 @@ class Tool(object):
         # process from some language, we end up attaching more than once to the
         # same uprobe (albeit with different pids), which is not allowed.
         # Instead, we use a global attach (with pid=-1).
-        uprobes = set([(path, func, addr) for usdt in usdts
-                       for (path, func, addr, _)
-                       in usdt.enumerate_active_probes()])
+        uprobes = set(
+            [
+                (path, func, addr)
+                for usdt in usdts
+                for (path, func, addr, _) in usdt.enumerate_active_probes()
+            ]
+        )
         for (path, func, addr) in uprobes:
             self.bpf.attach_uprobe(name=path, fn_name=func, addr=addr, pid=-1)
 
     def _detach_probes(self):
         for probe in self.probes:
-            probe.cleanup()     # Cleans up USDT contexts
-        self.bpf.cleanup()      # Cleans up all attached probes
+            probe.cleanup()  # Cleans up USDT contexts
+        self.bpf.cleanup()  # Cleans up all attached probes
         self.bpf = None
 
     def _loop_iter(self):
@@ -253,9 +294,19 @@ class Tool(object):
             print()
         with open("/proc/loadavg") as stats:
             print("%-8s loadavg: %s" % (strftime("%H:%M:%S"), stats.read()))
-        print("%-6s %-20s %-10s %-6s %-10s %-8s %-6s %-6s" % (
-            "PID", "CMDLINE", "METHOD/s", "GC/s", "OBJNEW/s",
-            "CLOAD/s", "EXC/s", "THR/s"))
+        print(
+            "%-6s %-20s %-10s %-6s %-10s %-8s %-6s %-6s"
+            % (
+                "PID",
+                "CMDLINE",
+                "METHOD/s",
+                "GC/s",
+                "OBJNEW/s",
+                "CLOAD/s",
+                "EXC/s",
+                "THR/s",
+            )
+        )
 
         line = 0
         counts = {}
@@ -265,20 +316,23 @@ class Tool(object):
             targets.update(probe.targets)
         if self.args.sort:
             sort_field = self.args.sort.upper()
-            counts = sorted(counts.items(),
-                            key=lambda kv: -kv[1].get(sort_field, 0))
+            counts = sorted(counts.items(), key=lambda kv: -kv[1].get(sort_field, 0))
         else:
             counts = sorted(counts.items(), key=lambda kv: kv[0])
         for pid, stats in counts:
-            print("%-6d %-20s %-10d %-6d %-10d %-8d %-6d %-6d" % (
-                  pid, targets[pid][:20],
-                  stats.get(Category.METHOD, 0) / self.args.interval,
-                  stats.get(Category.GC, 0) / self.args.interval,
-                  stats.get(Category.OBJNEW, 0) / self.args.interval,
-                  stats.get(Category.CLOAD, 0) / self.args.interval,
-                  stats.get(Category.EXCP, 0) / self.args.interval,
-                  stats.get(Category.THREAD, 0) / self.args.interval
-                  ))
+            print(
+                "%-6d %-20s %-10d %-6d %-10d %-8d %-6d %-6d"
+                % (
+                    pid,
+                    targets[pid][:20],
+                    stats.get(Category.METHOD, 0) / self.args.interval,
+                    stats.get(Category.GC, 0) / self.args.interval,
+                    stats.get(Category.OBJNEW, 0) / self.args.interval,
+                    stats.get(Category.CLOAD, 0) / self.args.interval,
+                    stats.get(Category.EXCP, 0) / self.args.interval,
+                    stats.get(Category.THREAD, 0) / self.args.interval,
+                )
+            )
             line += 1
             if line >= self.args.maxrows:
                 break
@@ -287,8 +341,7 @@ class Tool(object):
     def run(self):
         self._parse_args()
         self._create_probes()
-        print('Tracing... Output every %d secs. Hit Ctrl-C to end' %
-              self.args.interval)
+        print("Tracing... Output every %d secs. Hit Ctrl-C to end" % self.args.interval)
         countdown = self.args.count
         self.exiting = False
         while True:
@@ -297,6 +350,7 @@ class Tool(object):
             if self.exiting or countdown == 0:
                 print("Detaching...")
                 exit()
+
 
 if __name__ == "__main__":
     try:

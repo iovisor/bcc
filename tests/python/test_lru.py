@@ -8,6 +8,7 @@ import unittest
 from bcc import BPF
 import multiprocessing
 
+
 class TestLru(unittest.TestCase):
     def test_lru_hash(self):
         b = BPF(text="""BPF_TABLE("lru_hash", int, u64, lru, 1024);""")
@@ -18,7 +19,7 @@ class TestLru(unittest.TestCase):
             self.assertEqual(v.value, i.value)
         # BPF_MAP_TYPE_LRU_HASH eviction happens in batch and we expect less
         # items than specified size.
-        self.assertLess(len(t), 1024);
+        self.assertLess(len(t), 1024)
 
     def test_lru_percpu_hash(self):
         test_prog1 = """
@@ -39,22 +40,23 @@ class TestLru(unittest.TestCase):
         for i in range(0, multiprocessing.cpu_count()):
             ini[i] = 0
         # First initialize with key 1
-        stats_map[ stats_map.Key(1) ] = ini
+        stats_map[stats_map.Key(1)] = ini
         # Then initialize with key 0
-        stats_map[ stats_map.Key(0) ] = ini
+        stats_map[stats_map.Key(0)] = ini
         # Key 1 should have been evicted
         with self.assertRaises(KeyError):
-            val = stats_map[ stats_map.Key(1) ]
+            val = stats_map[stats_map.Key(1)]
         f = os.popen("hostname")
         f.close()
-        self.assertEqual(len(stats_map),1)
-        val = stats_map[ stats_map.Key(0) ]
+        self.assertEqual(len(stats_map), 1)
+        val = stats_map[stats_map.Key(0)]
         sum = stats_map.sum(stats_map.Key(0))
         avg = stats_map.average(stats_map.Key(0))
         max = stats_map.max(stats_map.Key(0))
-        self.assertGreater(sum.value, 0L)
-        self.assertGreater(max.value, 0L)
+        self.assertGreater(sum.value, 0)
+        self.assertGreater(max.value, 0)
         b.detach_kprobe(event_name)
+
 
 if __name__ == "__main__":
     unittest.main()

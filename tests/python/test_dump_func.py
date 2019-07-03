@@ -7,18 +7,22 @@
 from bcc import BPF
 from unittest import main, TestCase
 
+
 class TestDumpFunc(TestCase):
     def test_return(self):
-        b = BPF(text="""
+        b = BPF(
+            text="""
             int entry(void)
             {
                 return 1;
-            }""")
+            }"""
+        )
 
         self.assertEqual(
-            b"\xb7\x00\x00\x00\x01\x00\x00\x00" +
-            b"\x95\x00\x00\x00\x00\x00\x00\x00",
-            b.dump_func("entry"))
+            b"\xb7\x00\x00\x00\x01\x00\x00\x00" + b"\x95\x00\x00\x00\x00\x00\x00\x00",
+            b.dump_func("entry"),
+        )
+
 
 if __name__ == "__main__":
     main()

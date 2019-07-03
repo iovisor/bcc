@@ -33,17 +33,19 @@ examples = """examples:
 parser = argparse.ArgumentParser(
     description="Kernel SLAB/SLUB memory cache allocation rate top",
     formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog=examples)
-parser.add_argument("-C", "--noclear", action="store_true",
-    help="don't clear the screen")
-parser.add_argument("-r", "--maxrows", default=20,
-    help="maximum rows to print, default 20")
-parser.add_argument("interval", nargs="?", default=1,
-    help="output interval, in seconds")
-parser.add_argument("count", nargs="?", default=99999999,
-    help="number of outputs")
-parser.add_argument("--ebpf", action="store_true",
-    help=argparse.SUPPRESS)
+    epilog=examples,
+)
+parser.add_argument(
+    "-C", "--noclear", action="store_true", help="don't clear the screen"
+)
+parser.add_argument(
+    "-r", "--maxrows", default=20, help="maximum rows to print, default 20"
+)
+parser.add_argument(
+    "interval", nargs="?", default=1, help="output interval, in seconds"
+)
+parser.add_argument("count", nargs="?", default=99999999, help="number of outputs")
+parser.add_argument("--ebpf", action="store_true", help=argparse.SUPPRESS)
 args = parser.parse_args()
 interval = int(args.interval)
 countdown = int(args.count)
@@ -57,6 +59,7 @@ loadavg = "/proc/loadavg"
 # signal handler
 def signal_ignore(signal, frame):
     print()
+
 
 # define BPF program
 bpf_text = """
@@ -106,7 +109,7 @@ if debug or args.ebpf:
 # initialize BPF
 b = BPF(text=bpf_text)
 
-print('Tracing... Output every %d secs. Hit Ctrl-C to end' % interval)
+print("Tracing... Output every %d secs. Hit Ctrl-C to end" % interval)
 
 # output
 exiting = 0
@@ -128,8 +131,7 @@ while 1:
     # by-TID output
     counts = b.get_table("counts")
     line = 0
-    for k, v in reversed(sorted(counts.items(),
-                                key=lambda counts: counts[1].size)):
+    for k, v in reversed(sorted(counts.items(), key=lambda counts: counts[1].size)):
         printb(b"%-32s %6d %10d" % (k.name, v.count, v.size))
 
         line += 1

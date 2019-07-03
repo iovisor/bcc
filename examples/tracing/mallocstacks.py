@@ -22,7 +22,8 @@ if len(sys.argv) < 2:
 pid = int(sys.argv[1])
 
 # load BPF program
-b = BPF(text="""
+b = BPF(
+    text="""
 #include <uapi/linux/ptrace.h>
 
 BPF_HASH(calls, int);
@@ -40,7 +41,8 @@ int alloc_enter(struct pt_regs *ctx, size_t size) {
     (*val) += size;
     return 0;
 };
-""")
+"""
+)
 
 b.attach_uprobe(name="c", sym="malloc", fn_name="alloc_enter", pid=pid)
 print("Attaching to malloc in pid %d, Ctrl+C to quit." % pid)

@@ -14,28 +14,32 @@ class TargetConfig(object):
         return ""
 
     def serializeLookup(self, serializer, tableName, key, value):
-        serializer.appendFormat("{0} = bpf_map_lookup_elem(&{1}, &{2});",
-                                value, tableName, key)
+        serializer.appendFormat(
+            "{0} = bpf_map_lookup_elem(&{1}, &{2});", value, tableName, key
+        )
 
     def serializeUpdate(self, serializer, tableName, key, value):
         serializer.appendFormat(
-            "bpf_map_update_elem(&{0}, &{1}, &{2}, BPF_ANY);",
-            tableName, key, value)
+            "bpf_map_update_elem(&{0}, &{1}, &{2}, BPF_ANY);", tableName, key, value
+        )
 
     def serializeLicense(self, serializer, licenseString):
         assert isinstance(serializer, ProgramSerializer)
         serializer.emitIndent()
         serializer.appendFormat(
-            "char _license[] {0}(\"license\") = \"{1}\";",
-            self.config.section, licenseString)
+            'char _license[] {0}("license") = "{1}";',
+            self.config.section,
+            licenseString,
+        )
         serializer.newline()
 
     def serializeCodeSection(self, serializer):
         assert isinstance(serializer, ProgramSerializer)
-        serializer.appendFormat("{0}(\"{1}\")", self.section, self.entrySection)
+        serializer.appendFormat('{0}("{1}")', self.section, self.entrySection)
 
-    def serializeTableDeclaration(self, serializer, tableName,
-                                  isHash, keyType, valueType, size):
+    def serializeTableDeclaration(
+        self, serializer, tableName, isHash, keyType, valueType, size
+    ):
         assert isinstance(serializer, ProgramSerializer)
         assert isinstance(tableName, str)
         assert isinstance(isHash, bool)
@@ -44,8 +48,9 @@ class TargetConfig(object):
         assert isinstance(size, int)
 
         serializer.emitIndent()
-        serializer.appendFormat("struct {0} {1}(\"maps\") {2} = ",
-                                self.tableName, self.section, tableName)
+        serializer.appendFormat(
+            'struct {0} {1}("maps") {2} = ', self.tableName, self.section, tableName
+        )
         serializer.blockStart()
 
         serializer.emitIndent()
@@ -56,13 +61,15 @@ class TargetConfig(object):
             serializer.appendLine("BPF_MAP_TYPE_ARRAY,")
 
         serializer.emitIndent()
-        serializer.appendFormat(".{0} = sizeof(struct {1}), ",
-                                self.tableKeyAttribute, keyType)
+        serializer.appendFormat(
+            ".{0} = sizeof(struct {1}), ", self.tableKeyAttribute, keyType
+        )
         serializer.newline()
 
         serializer.emitIndent()
-        serializer.appendFormat(".{0} = sizeof(struct {1}), ",
-                                self.tableValueAttribute, valueType)
+        serializer.appendFormat(
+            ".{0} = sizeof(struct {1}), ", self.tableValueAttribute, valueType
+        )
         serializer.newline()
 
         serializer.emitIndent()
@@ -74,15 +81,18 @@ class TargetConfig(object):
 
     def generateDword(self, serializer):
         serializer.appendFormat(
-            "static inline {0}64 load_dword(void *skb, {0}64 off)",
-            self.uprefix)
+            "static inline {0}64 load_dword(void *skb, {0}64 off)", self.uprefix
+        )
         serializer.newline()
         serializer.blockStart()
         serializer.emitIndent()
         serializer.appendFormat(
-            ("return (({0}64)load_word(skb, off) << 32) | " +
-             "load_word(skb, off + 4);"),
-            self.uprefix)
+            (
+                "return (({0}64)load_word(skb, off) << 32) | "
+                + "load_word(skb, off + 4);"
+            ),
+            self.uprefix,
+        )
         serializer.newline()
         serializer.blockEnd(True)
 
@@ -122,8 +132,9 @@ class BccConfig(TargetConfig):
         self.iprefix = "i"
         self.postamble = ""
 
-    def serializeTableDeclaration(self, serializer, tableName,
-                                  isHash, keyType, valueType, size):
+    def serializeTableDeclaration(
+        self, serializer, tableName, isHash, keyType, valueType, size
+    ):
         assert isinstance(serializer, ProgramSerializer)
         assert isinstance(tableName, str)
         assert isinstance(isHash, bool)
@@ -137,17 +148,20 @@ class BccConfig(TargetConfig):
         else:
             kind = "array"
         serializer.appendFormat(
-            "BPF_TABLE(\"{0}\", {1}, {2}, {3}, {4});",
-            kind, keyType, valueType, tableName, size)
+            'BPF_TABLE("{0}", {1}, {2}, {3}, {4});',
+            kind,
+            keyType,
+            valueType,
+            tableName,
+            size,
+        )
         serializer.newline()
 
     def serializeLookup(self, serializer, tableName, key, value):
-        serializer.appendFormat("{0} = {1}.lookup(&{2});",
-                                value, tableName, key)
+        serializer.appendFormat("{0} = {1}.lookup(&{2});", value, tableName, key)
 
     def serializeUpdate(self, serializer, tableName, key, value):
-        serializer.appendFormat("{0}.update(&{1}, &{2});",
-                                tableName, key, value)
+        serializer.appendFormat("{0}.update(&{1}, &{2});", tableName, key, value)
 
     def generateDword(self, serializer):
         pass

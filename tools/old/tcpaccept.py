@@ -31,11 +31,12 @@ examples = """examples:
 parser = argparse.ArgumentParser(
     description="Trace TCP accepts",
     formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog=examples)
-parser.add_argument("-t", "--timestamp", action="store_true",
-    help="include timestamp on output")
-parser.add_argument("-p", "--pid",
-    help="trace this PID only")
+    epilog=examples,
+)
+parser.add_argument(
+    "-t", "--timestamp", action="store_true", help="include timestamp on output"
+)
+parser.add_argument("-p", "--pid", help="trace this PID only")
 args = parser.parse_args()
 debug = 0
 
@@ -92,10 +93,9 @@ int kretprobe__inet_csk_accept(struct pt_regs *ctx)
 
 # code substitutions
 if args.pid:
-    bpf_text = bpf_text.replace('FILTER',
-        'if (pid != %s) { return 0; }' % args.pid)
+    bpf_text = bpf_text.replace("FILTER", "if (pid != %s) { return 0; }" % args.pid)
 else:
-    bpf_text = bpf_text.replace('FILTER', '')
+    bpf_text = bpf_text.replace("FILTER", "")
 if debug:
     print(bpf_text)
 
@@ -105,19 +105,23 @@ b = BPF(text=bpf_text)
 # header
 if args.timestamp:
     print("%-9s" % ("TIME(s)"), end="")
-print("%-6s %-12s %-2s %-16s %-16s %-4s" % ("PID", "COMM", "IP", "RADDR",
-    "LADDR", "LPORT"))
+print(
+    "%-6s %-12s %-2s %-16s %-16s %-4s"
+    % ("PID", "COMM", "IP", "RADDR", "LADDR", "LPORT")
+)
 
 start_ts = 0
 
+
 def inet_ntoa(addr):
-    dq = ''
+    dq = ""
     for i in range(0, 4):
-        dq = dq + str(addr & 0xff)
-        if (i != 3):
-            dq = dq + '.'
+        dq = dq + str(addr & 0xFF)
+        if i != 3:
+            dq = dq + "."
         addr = addr >> 8
     return dq
+
 
 # format output
 while 1:
@@ -128,7 +132,14 @@ while 1:
         if start_ts == 0:
             start_ts = ts
         print("%-9.3f" % (ts - start_ts), end="")
-    print("%-6d %-12.12s %-2s %-16s %-16s %-4s" % (pid, task, ip_s,
-        inet_ntoa(int(raddr_hs, 16)) if ip_s == "4" else "..." + raddr_hs,
-        inet_ntoa(int(laddr_hs, 16)) if ip_s == "4" else "..." + laddr_hs,
-        lport_s))
+    print(
+        "%-6d %-12.12s %-2s %-16s %-16s %-4s"
+        % (
+            pid,
+            task,
+            ip_s,
+            inet_ntoa(int(raddr_hs, 16)) if ip_s == "4" else "..." + raddr_hs,
+            inet_ntoa(int(laddr_hs, 16)) if ip_s == "4" else "..." + laddr_hs,
+            lport_s,
+        )
+    )

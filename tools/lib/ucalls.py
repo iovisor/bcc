@@ -33,24 +33,46 @@ examples = """examples:
 parser = argparse.ArgumentParser(
     description="Summarize method calls in high-level languages.",
     formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog=examples)
+    epilog=examples,
+)
 parser.add_argument("pid", type=int, help="process id to attach to")
-parser.add_argument("interval", type=int, nargs='?',
-    help="print every specified number of seconds")
-parser.add_argument("-l", "--language", choices=languages + ["none"],
-    help="language to trace (if none, trace syscalls only)")
-parser.add_argument("-T", "--top", type=int,
-    help="number of most frequent/slow calls to print")
-parser.add_argument("-L", "--latency", action="store_true",
-    help="record method latency from enter to exit (except recursive calls)")
-parser.add_argument("-S", "--syscalls", action="store_true",
-    help="record syscall latency (adds overhead)")
-parser.add_argument("-v", "--verbose", action="store_true",
-    help="verbose mode: print the BPF program (for debugging purposes)")
-parser.add_argument("-m", "--milliseconds", action="store_true",
-    help="report times in milliseconds (default is microseconds)")
-parser.add_argument("--ebpf", action="store_true",
-    help=argparse.SUPPRESS)
+parser.add_argument(
+    "interval", type=int, nargs="?", help="print every specified number of seconds"
+)
+parser.add_argument(
+    "-l",
+    "--language",
+    choices=languages + ["none"],
+    help="language to trace (if none, trace syscalls only)",
+)
+parser.add_argument(
+    "-T", "--top", type=int, help="number of most frequent/slow calls to print"
+)
+parser.add_argument(
+    "-L",
+    "--latency",
+    action="store_true",
+    help="record method latency from enter to exit (except recursive calls)",
+)
+parser.add_argument(
+    "-S",
+    "--syscalls",
+    action="store_true",
+    help="record syscall latency (adds overhead)",
+)
+parser.add_argument(
+    "-v",
+    "--verbose",
+    action="store_true",
+    help="verbose mode: print the BPF program (for debugging purposes)",
+)
+parser.add_argument(
+    "-m",
+    "--milliseconds",
+    action="store_true",
+    help="report times in milliseconds (default is microseconds)",
+)
+parser.add_argument("--ebpf", action="store_true", help=argparse.SUPPRESS)
 args = parser.parse_args()
 
 language = args.language
@@ -69,24 +91,28 @@ if language == "java":
     return_probe = "method__return"
     read_class = "bpf_usdt_readarg(2, ctx, &clazz);"
     read_method = "bpf_usdt_readarg(4, ctx, &method);"
-    extra_message = ("If you do not see any results, make sure you ran java"
-                     " with option -XX:+ExtendedDTraceProbes")
+    extra_message = (
+        "If you do not see any results, make sure you ran java"
+        " with option -XX:+ExtendedDTraceProbes"
+    )
 elif language == "perl":
     entry_probe = "sub__entry"
     return_probe = "sub__return"
-    read_class = "bpf_usdt_readarg(2, ctx, &clazz);"    # filename really
+    read_class = "bpf_usdt_readarg(2, ctx, &clazz);"  # filename really
     read_method = "bpf_usdt_readarg(1, ctx, &method);"
 elif language == "php":
     entry_probe = "function__entry"
     return_probe = "function__return"
     read_class = "bpf_usdt_readarg(4, ctx, &clazz);"
     read_method = "bpf_usdt_readarg(1, ctx, &method);"
-    extra_message = ("If you do not see any results, make sure the environment"
-                     " variable USE_ZEND_DTRACE is set to 1")
+    extra_message = (
+        "If you do not see any results, make sure the environment"
+        " variable USE_ZEND_DTRACE is set to 1"
+    )
 elif language == "python":
     entry_probe = "function__entry"
     return_probe = "function__return"
-    read_class = "bpf_usdt_readarg(1, ctx, &clazz);"    # filename really
+    read_class = "bpf_usdt_readarg(1, ctx, &clazz);"  # filename really
     read_method = "bpf_usdt_readarg(2, ctx, &method);"
 elif language == "ruby":
     # TODO Also probe cmethod__entry and cmethod__return with same arguments
@@ -108,7 +134,8 @@ elif not language or language == "none":
     if language:
         language = None
 
-program = """
+program = (
+    """
 #include <linux/ptrace.h>
 
 #define MAX_STRING_LENGTH 80
@@ -234,12 +261,15 @@ TRACEPOINT_PROBE(raw_syscalls, sys_exit) {
 }
 #endif  // LATENCY
 #endif  // SYSCALLS
-""".replace("READ_CLASS", read_class) \
-   .replace("READ_METHOD", read_method) \
-   .replace("PID_FILTER", "if ((pid >> 32) != %d) { return 0; }" % args.pid) \
-   .replace("DEFINE_NOLANG", "#define NOLANG" if not language else "") \
-   .replace("DEFINE_LATENCY", "#define LATENCY" if args.latency else "") \
-   .replace("DEFINE_SYSCALLS", "#define SYSCALLS" if args.syscalls else "")
+""".replace(
+        "READ_CLASS", read_class
+    )
+    .replace("READ_METHOD", read_method)
+    .replace("PID_FILTER", "if ((pid >> 32) != %d) { return 0; }" % args.pid)
+    .replace("DEFINE_NOLANG", "#define NOLANG" if not language else "")
+    .replace("DEFINE_LATENCY", "#define LATENCY" if args.latency else "")
+    .replace("DEFINE_SYSCALLS", "#define SYSCALLS" if args.syscalls else "")
+)
 
 if language:
     usdt = USDT(pid=args.pid)
@@ -260,34 +290,56 @@ bpf = BPF(text=program, usdt_contexts=[usdt] if usdt else [])
 if args.syscalls:
     print("Attached kernel tracepoints for syscall tracing.")
 
+
 def get_data():
     # Will be empty when no language was specified for tracing
     if args.latency:
-        data = list(map(lambda kv: (kv[0].clazz.decode('utf-8', 'replace') \
-                                    + "." + \
-                                    kv[0].method.decode('utf-8', 'replace'),
-                                   (kv[1].num_calls, kv[1].total_ns)),
-                   bpf["times"].items()))
+        data = list(
+            map(
+                lambda kv: (
+                    kv[0].clazz.decode("utf-8", "replace")
+                    + "."
+                    + kv[0].method.decode("utf-8", "replace"),
+                    (kv[1].num_calls, kv[1].total_ns),
+                ),
+                bpf["times"].items(),
+            )
+        )
     else:
-        data = list(map(lambda kv: (kv[0].clazz.decode('utf-8', 'replace') \
-                                    + "." + \
-                                    kv[0].method.decode('utf-8', 'replace'),
-                                   (kv[1].value, 0)),
-                   bpf["counts"].items()))
+        data = list(
+            map(
+                lambda kv: (
+                    kv[0].clazz.decode("utf-8", "replace")
+                    + "."
+                    + kv[0].method.decode("utf-8", "replace"),
+                    (kv[1].value, 0),
+                ),
+                bpf["counts"].items(),
+            )
+        )
 
     if args.syscalls:
         if args.latency:
-            syscalls = map(lambda kv: (syscall_name(kv[0].value).decode('utf-8', 'replace'),
-                                       (kv[1].num_calls, kv[1].total_ns)),
-                           bpf["systimes"].items())
+            syscalls = map(
+                lambda kv: (
+                    syscall_name(kv[0].value).decode("utf-8", "replace"),
+                    (kv[1].num_calls, kv[1].total_ns),
+                ),
+                bpf["systimes"].items(),
+            )
             data.extend(syscalls)
         else:
-            syscalls = map(lambda kv: (syscall_name(kv[0].value).decode('utf-8', 'replace'),
-                                       (kv[1].value, 0)),
-                           bpf["syscounts"].items())
+            syscalls = map(
+                lambda kv: (
+                    syscall_name(kv[0].value).decode("utf-8", "replace"),
+                    (kv[1].value, 0),
+                ),
+                bpf["syscounts"].items(),
+            )
             data.extend(syscalls)
 
     return sorted(data, key=lambda kv: kv[1][1 if args.latency else 0])
+
 
 def clear_data():
     if args.latency:
@@ -301,9 +353,12 @@ def clear_data():
         else:
             bpf["syscounts"].clear()
 
+
 exit_signaled = False
-print("Tracing calls in process %d (language: %s)... Ctrl-C to quit." %
-      (args.pid, language or "none"))
+print(
+    "Tracing calls in process %d (language: %s)... Ctrl-C to quit."
+    % (args.pid, language or "none")
+)
 if extra_message:
     print(extra_message)
 while True:
@@ -312,18 +367,17 @@ while True:
     except KeyboardInterrupt:
         exit_signaled = True
     print()
-    data = get_data()   # [(function, (num calls, latency in ns))]
+    data = get_data()  # [(function, (num calls, latency in ns))]
     if args.latency:
         time_col = "TIME (ms)" if args.milliseconds else "TIME (us)"
         print("%-50s %8s %8s" % ("METHOD", "# CALLS", time_col))
     else:
         print("%-50s %8s" % ("METHOD", "# CALLS"))
     if args.top:
-        data = data[-args.top:]
+        data = data[-args.top :]
     for key, value in data:
         if args.latency:
-            time = value[1] / 1000000.0 if args.milliseconds else \
-                   value[1] / 1000.0
+            time = value[1] / 1000000.0 if args.milliseconds else value[1] / 1000.0
             print("%-50s %8d %6.2f" % (key, value[0], time))
         else:
             print("%-50s %8d" % (key, value[0]))

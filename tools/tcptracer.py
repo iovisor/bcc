@@ -21,18 +21,23 @@ import argparse as ap
 from socket import inet_ntop, AF_INET, AF_INET6
 from struct import pack
 
-parser = ap.ArgumentParser(description="Trace TCP connections",
-                           formatter_class=ap.RawDescriptionHelpFormatter)
-parser.add_argument("-t", "--timestamp", action="store_true",
-                    help="include timestamp on output")
-parser.add_argument("-p", "--pid", default=0, type=int,
-                    help="trace this PID only")
-parser.add_argument("-N", "--netns", default=0, type=int,
-                    help="trace this Network Namespace only")
-parser.add_argument("-v", "--verbose", action="store_true",
-                    help="include Network Namespace in the output")
-parser.add_argument("--ebpf", action="store_true",
-                    help=ap.SUPPRESS)
+parser = ap.ArgumentParser(
+    description="Trace TCP connections", formatter_class=ap.RawDescriptionHelpFormatter
+)
+parser.add_argument(
+    "-t", "--timestamp", action="store_true", help="include timestamp on output"
+)
+parser.add_argument("-p", "--pid", default=0, type=int, help="trace this PID only")
+parser.add_argument(
+    "-N", "--netns", default=0, type=int, help="trace this Network Namespace only"
+)
+parser.add_argument(
+    "-v",
+    "--verbose",
+    action="store_true",
+    help="include Network Namespace in the output",
+)
+parser.add_argument("--ebpf", action="store_true", help=ap.SUPPRESS)
 args = parser.parse_args()
 
 bpf_text = """
@@ -492,8 +497,7 @@ int trace_accept_return(struct pt_regs *ctx)
 }
 """
 
-verbose_types = {"C": "connect", "A": "accept",
-                 "X": "close", "U": "unknown"}
+verbose_types = {"C": "connect", "A": "accept", "X": "close", "U": "unknown"}
 
 
 def print_ipv4_event(cpu, data, size):
@@ -521,13 +525,19 @@ def print_ipv4_event(cpu, data, size):
     else:
         print("%-2s " % (type_str), end="")
 
-    print("%-6d %-16s %-2d %-16s %-16s %-6d %-6d" %
-          (event.pid, event.comm.decode('utf-8', 'replace'),
-           event.ip,
-           inet_ntop(AF_INET, pack("I", event.saddr)),
-           inet_ntop(AF_INET, pack("I", event.daddr)),
-           event.sport,
-           event.dport), end="")
+    print(
+        "%-6d %-16s %-2d %-16s %-16s %-6d %-6d"
+        % (
+            event.pid,
+            event.comm.decode("utf-8", "replace"),
+            event.ip,
+            inet_ntop(AF_INET, pack("I", event.saddr)),
+            inet_ntop(AF_INET, pack("I", event.daddr)),
+            event.sport,
+            event.dport,
+        ),
+        end="",
+    )
     if args.verbose and not args.netns:
         print(" %-8d" % event.netns)
     else:
@@ -558,13 +568,19 @@ def print_ipv6_event(cpu, data, size):
     else:
         print("%-2s " % (type_str), end="")
 
-    print("%-6d %-16s %-2d %-16s %-16s %-6d %-6d" %
-          (event.pid, event.comm.decode('utf-8', 'replace'),
-           event.ip,
-           "[" + inet_ntop(AF_INET6, event.saddr) + "]",
-           "[" + inet_ntop(AF_INET6, event.daddr) + "]",
-           event.sport,
-           event.dport), end="")
+    print(
+        "%-6d %-16s %-2d %-16s %-16s %-6d %-6d"
+        % (
+            event.pid,
+            event.comm.decode("utf-8", "replace"),
+            event.ip,
+            "[" + inet_ntop(AF_INET6, event.saddr) + "]",
+            "[" + inet_ntop(AF_INET6, event.daddr) + "]",
+            event.sport,
+            event.dport,
+        ),
+        end="",
+    )
     if args.verbose and not args.netns:
         print(" %-8d" % event.netns)
     else:
@@ -575,12 +591,12 @@ pid_filter = ""
 netns_filter = ""
 
 if args.pid:
-    pid_filter = 'if (pid >> 32 != %d) { return 0; }' % args.pid
+    pid_filter = "if (pid >> 32 != %d) { return 0; }" % args.pid
 if args.netns:
-    netns_filter = 'if (net_ns_inum != %d) { return 0; }' % args.netns
+    netns_filter = "if (net_ns_inum != %d) { return 0; }" % args.netns
 
-bpf_text = bpf_text.replace('##FILTER_PID##', pid_filter)
-bpf_text = bpf_text.replace('##FILTER_NETNS##', netns_filter)
+bpf_text = bpf_text.replace("##FILTER_PID##", pid_filter)
+bpf_text = bpf_text.replace("##FILTER_NETNS##", netns_filter)
 
 if args.ebpf:
     print(bpf_text)
@@ -602,25 +618,31 @@ print("Tracing TCP established connections. Ctrl-C to end.")
 if args.verbose:
     if args.timestamp:
         print("%-14s" % ("TIME(ns)"), end="")
-    print("%-12s %-6s %-16s %-2s %-16s %-16s %-6s %-7s" % ("TYPE",
-          "PID", "COMM", "IP", "SADDR", "DADDR", "SPORT", "DPORT"), end="")
+    print(
+        "%-12s %-6s %-16s %-2s %-16s %-16s %-6s %-7s"
+        % ("TYPE", "PID", "COMM", "IP", "SADDR", "DADDR", "SPORT", "DPORT"),
+        end="",
+    )
     if not args.netns:
         print("%-8s" % "NETNS", end="")
     print()
 else:
     if args.timestamp:
         print("%-9s" % ("TIME(s)"), end="")
-    print("%-2s %-6s %-16s %-2s %-16s %-16s %-6s %-6s" %
-          ("T", "PID", "COMM", "IP", "SADDR", "DADDR", "SPORT", "DPORT"))
+    print(
+        "%-2s %-6s %-16s %-2s %-16s %-16s %-6s %-6s"
+        % ("T", "PID", "COMM", "IP", "SADDR", "DADDR", "SPORT", "DPORT")
+    )
 
 start_ts = 0
 
+
 def inet_ntoa(addr):
-    dq = ''
+    dq = ""
     for i in range(0, 4):
-        dq = dq + str(addr & 0xff)
-        if (i != 3):
-            dq = dq + '.'
+        dq = dq + str(addr & 0xFF)
+        if i != 3:
+            dq = dq + "."
         addr = addr >> 8
     return dq
 

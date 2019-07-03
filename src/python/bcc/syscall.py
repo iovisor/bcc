@@ -373,18 +373,20 @@ def _parse_syscall(line):
     parts = line.split()
     return (int(parts[0]), parts[1].strip())
 
+
 try:
     # Skip the first line, which is a header. The rest of the lines are simply
     # SYSCALL_NUM\tSYSCALL_NAME pairs.
-    out = subprocess.check_output(['ausyscall', '--dump'], stderr=subprocess.STDOUT)
+    out = subprocess.check_output(["ausyscall", "--dump"], stderr=subprocess.STDOUT)
     # remove the first line of expected output
-    out = out.split(b'\n',1)[1]
-    syscalls = dict(map(_parse_syscall, out.strip().split(b'\n')))
+    out = out.split(b"\n", 1)[1]
+    syscalls = dict(map(_parse_syscall, out.strip().split(b"\n")))
 except Exception as e:
-   if platform.machine() == "x86_64":
-       pass
-   else:
-       raise Exception("ausyscall: command not found")
+    if platform.machine() == "x86_64":
+        pass
+    else:
+        raise Exception("ausyscall: command not found")
+
 
 def syscall_name(syscall_num):
     """Return the syscall name for the particular syscall number."""

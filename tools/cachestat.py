@@ -29,16 +29,18 @@ from sys import argv
 def signal_ignore(signal, frame):
     print()
 
+
 # Function to gather data from /proc/meminfo
 # return dictionary for quicker lookup of both values
 def get_meminfo():
     result = dict()
 
-    for line in open('/proc/meminfo'):
-        k = line.split(':', 3)
+    for line in open("/proc/meminfo"):
+        k = line.split(":", 3)
         v = k[1].split()
         result[k[0]] = int(v[0])
     return result
+
 
 # set global variables
 mpa = 0
@@ -53,15 +55,16 @@ debug = 0
 # arguments
 parser = argparse.ArgumentParser(
     description="Count cache kernel function calls",
-    formatter_class=argparse.RawDescriptionHelpFormatter)
-parser.add_argument("-T", "--timestamp", action="store_true",
-    help="include timestamp on output")
-parser.add_argument("interval", nargs="?", default=1,
-    help="output interval, in seconds")
-parser.add_argument("count", nargs="?", default=-1,
-    help="number of outputs")
-parser.add_argument("--ebpf", action="store_true",
-    help=argparse.SUPPRESS)
+    formatter_class=argparse.RawDescriptionHelpFormatter,
+)
+parser.add_argument(
+    "-T", "--timestamp", action="store_true", help="include timestamp on output"
+)
+parser.add_argument(
+    "interval", nargs="?", default=1, help="output interval, in seconds"
+)
+parser.add_argument("count", nargs="?", default=-1, help="number of outputs")
+parser.add_argument("--ebpf", action="store_true", help=argparse.SUPPRESS)
 args = parser.parse_args()
 count = int(args.count)
 tstamp = args.timestamp
@@ -102,8 +105,10 @@ b.attach_kprobe(event="mark_buffer_dirty", fn_name="do_count")
 # header
 if tstamp:
     print("%-8s " % "TIME", end="")
-print("%8s %8s %8s %8s %12s %10s" %
-     ("HITS", "MISSES", "DIRTIES", "HITRATIO", "BUFFERS_MB", "CACHED_MB"))
+print(
+    "%8s %8s %8s %8s %12s %10s"
+    % ("HITS", "MISSES", "DIRTIES", "HITRATIO", "BUFFERS_MB", "CACHED_MB")
+)
 
 loop = 0
 exiting = 0
@@ -154,8 +159,7 @@ while 1:
         ratio = float(hits) / total
 
     if debug:
-        print("%d %d %d %d %d %d %d\n" %
-        (mpa, mbd, apcl, apd, total, misses, hits))
+        print("%d %d %d %d %d %d %d\n" % (mpa, mbd, apcl, apd, total, misses, hits))
 
     counts.clear()
 
@@ -166,8 +170,10 @@ while 1:
 
     if tstamp:
         print("%-8s " % strftime("%H:%M:%S"), end="")
-    print("%8d %8d %8d %7.2f%% %12.0f %10.0f" %
-        (hits, misses, mbd, 100 * ratio, buff, cached))
+    print(
+        "%8d %8d %8d %7.2f%% %12.0f %10.0f"
+        % (hits, misses, mbd, 100 * ratio, buff, cached)
+    )
 
     mpa = mbd = apcl = apd = total = misses = hits = cached = buff = 0
 

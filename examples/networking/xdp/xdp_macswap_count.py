@@ -16,11 +16,14 @@ import time
 import sys
 
 flags = 0
+
+
 def usage():
     print("Usage: {0} [-S] <ifdev>".format(sys.argv[0]))
     print("       -S: use skb mode\n")
     print("e.g.: {0} eth0\n".format(sys.argv[0]))
     exit(1)
+
 
 if len(sys.argv) < 2 or len(sys.argv) > 3:
     usage()
@@ -39,7 +42,7 @@ if len(sys.argv) == 3:
         device = sys.argv[1]
 
 mode = BPF.XDP
-#mode = BPF.SCHED_CLS
+# mode = BPF.SCHED_CLS
 
 if mode == BPF.XDP:
     ret = "XDP_TX"
@@ -49,7 +52,8 @@ else:
     ctxtype = "__sk_buff"
 
 # load BPF program
-b = BPF(text = """
+b = BPF(
+    text="""
 #define KBUILD_MODNAME "foo"
 #include <uapi/linux/bpf.h>
 #include <linux/in.h>
@@ -152,7 +156,9 @@ int xdp_prog1(struct CTXTYPE *ctx) {
 
     return rc;
 }
-""", cflags=["-w", "-DRETURNCODE=%s" % ret, "-DCTXTYPE=%s" % ctxtype])
+""",
+    cflags=["-w", "-DRETURNCODE=%s" % ret, "-DCTXTYPE=%s" % ctxtype],
+)
 
 fn = b.load_func("xdp_prog1", mode)
 
@@ -163,8 +169,17 @@ else:
     ipdb = pyroute2.IPDB(nl=ip)
     idx = ipdb.interfaces[device].index
     ip.tc("add", "clsact", idx)
-    ip.tc("add-filter", "bpf", idx, ":1", fd=fn.fd, name=fn.name,
-          parent="ffff:fff2", classid=1, direct_action=True)
+    ip.tc(
+        "add-filter",
+        "bpf",
+        idx,
+        ":1",
+        fd=fn.fd,
+        name=fn.name,
+        parent="ffff:fff2",
+        classid=1,
+        direct_action=True,
+    )
 
 dropcnt = b.get_table("dropcnt")
 prev = [0] * 256
@@ -181,7 +196,7 @@ while 1:
         time.sleep(1)
     except KeyboardInterrupt:
         print("Removing filter from device")
-        break;
+        break
 
 if mode == BPF.XDP:
     b.remove_xdp(device, flags)

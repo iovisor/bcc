@@ -41,6 +41,7 @@ def range_check(string):
         raise argparse.ArgumentTypeError(msg)
     return value
 
+
 examples = """examples:
     ./tcptop           # trace TCP send/recv by host
     ./tcptop -C        # don't clear the screen
@@ -49,19 +50,26 @@ examples = """examples:
 parser = argparse.ArgumentParser(
     description="Summarize TCP send/recv throughput by host",
     formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog=examples)
-parser.add_argument("-C", "--noclear", action="store_true",
-    help="don't clear the screen")
-parser.add_argument("-S", "--nosummary", action="store_true",
-    help="skip system summary line")
-parser.add_argument("-p", "--pid",
-    help="trace this PID only")
-parser.add_argument("interval", nargs="?", default=1, type=range_check,
-    help="output interval, in seconds (default 1)")
-parser.add_argument("count", nargs="?", default=-1, type=range_check,
-    help="number of outputs")
-parser.add_argument("--ebpf", action="store_true",
-    help=argparse.SUPPRESS)
+    epilog=examples,
+)
+parser.add_argument(
+    "-C", "--noclear", action="store_true", help="don't clear the screen"
+)
+parser.add_argument(
+    "-S", "--nosummary", action="store_true", help="skip system summary line"
+)
+parser.add_argument("-p", "--pid", help="trace this PID only")
+parser.add_argument(
+    "interval",
+    nargs="?",
+    default=1,
+    type=range_check,
+    help="output interval, in seconds (default 1)",
+)
+parser.add_argument(
+    "count", nargs="?", default=-1, type=range_check, help="number of outputs"
+)
+parser.add_argument("--ebpf", action="store_true", help=argparse.SUPPRESS)
 args = parser.parse_args()
 debug = 0
 
@@ -170,16 +178,16 @@ int kprobe__tcp_cleanup_rbuf(struct pt_regs *ctx, struct sock *sk, int copied)
 
 # code substitutions
 if args.pid:
-    bpf_text = bpf_text.replace('FILTER',
-        'if (pid != %s) { return 0; }' % args.pid)
+    bpf_text = bpf_text.replace("FILTER", "if (pid != %s) { return 0; }" % args.pid)
 else:
-    bpf_text = bpf_text.replace('FILTER', '')
+    bpf_text = bpf_text.replace("FILTER", "")
 if debug or args.ebpf:
     print(bpf_text)
     if args.ebpf:
         exit()
 
-TCPSessionKey = namedtuple('TCPSession', ['pid', 'laddr', 'lport', 'daddr', 'dport'])
+TCPSessionKey = namedtuple("TCPSession", ["pid", "laddr", "lport", "daddr", "dport"])
+
 
 def pid_to_comm(pid):
     try:
@@ -188,19 +196,26 @@ def pid_to_comm(pid):
     except IOError:
         return str(pid)
 
+
 def get_ipv4_session_key(k):
-    return TCPSessionKey(pid=k.pid,
-                         laddr=inet_ntop(AF_INET, pack("I", k.saddr)),
-                         lport=k.lport,
-                         daddr=inet_ntop(AF_INET, pack("I", k.daddr)),
-                         dport=k.dport)
+    return TCPSessionKey(
+        pid=k.pid,
+        laddr=inet_ntop(AF_INET, pack("I", k.saddr)),
+        lport=k.lport,
+        daddr=inet_ntop(AF_INET, pack("I", k.daddr)),
+        dport=k.dport,
+    )
+
 
 def get_ipv6_session_key(k):
-    return TCPSessionKey(pid=k.pid,
-                         laddr=inet_ntop(AF_INET6, k.saddr),
-                         lport=k.lport,
-                         daddr=inet_ntop(AF_INET6, k.daddr),
-                         dport=k.dport)
+    return TCPSessionKey(
+        pid=k.pid,
+        laddr=inet_ntop(AF_INET6, k.saddr),
+        lport=k.lport,
+        daddr=inet_ntop(AF_INET6, k.daddr),
+        dport=k.dport,
+    )
+
 
 # initialize BPF
 b = BPF(text=bpf_text)
@@ -210,7 +225,7 @@ ipv4_recv_bytes = b["ipv4_recv_bytes"]
 ipv6_send_bytes = b["ipv6_send_bytes"]
 ipv6_recv_bytes = b["ipv6_recv_bytes"]
 
-print('Tracing... Output every %s secs. Hit Ctrl-C to end' % args.interval)
+print("Tracing... Output every %s secs. Hit Ctrl-C to end" % args.interval)
 
 # output
 i = 0
@@ -243,18 +258,26 @@ while i != args.count and not exiting:
     ipv4_recv_bytes.clear()
 
     if ipv4_throughput:
-        print("%-6s %-12s %-21s %-21s %6s %6s" % ("PID", "COMM",
-            "LADDR", "RADDR", "RX_KB", "TX_KB"))
+        print(
+            "%-6s %-12s %-21s %-21s %6s %6s"
+            % ("PID", "COMM", "LADDR", "RADDR", "RX_KB", "TX_KB")
+        )
 
     # output
-    for k, (send_bytes, recv_bytes) in sorted(ipv4_throughput.items(),
-                                              key=lambda kv: sum(kv[1]),
-                                              reverse=True):
-        print("%-6d %-12.12s %-21s %-21s %6d %6d" % (k.pid,
-            pid_to_comm(k.pid),
-            k.laddr + ":" + str(k.lport),
-            k.daddr + ":" + str(k.dport),
-            int(recv_bytes / 1024), int(send_bytes / 1024)))
+    for k, (send_bytes, recv_bytes) in sorted(
+        ipv4_throughput.items(), key=lambda kv: sum(kv[1]), reverse=True
+    ):
+        print(
+            "%-6d %-12.12s %-21s %-21s %6d %6d"
+            % (
+                k.pid,
+                pid_to_comm(k.pid),
+                k.laddr + ":" + str(k.lport),
+                k.daddr + ":" + str(k.dport),
+                int(recv_bytes / 1024),
+                int(send_bytes / 1024),
+            )
+        )
 
     # IPv6: build dict of all seen keys
     ipv6_throughput = defaultdict(lambda: [0, 0])
@@ -270,17 +293,25 @@ while i != args.count and not exiting:
 
     if ipv6_throughput:
         # more than 80 chars, sadly.
-        print("\n%-6s %-12s %-32s %-32s %6s %6s" % ("PID", "COMM",
-            "LADDR6", "RADDR6", "RX_KB", "TX_KB"))
+        print(
+            "\n%-6s %-12s %-32s %-32s %6s %6s"
+            % ("PID", "COMM", "LADDR6", "RADDR6", "RX_KB", "TX_KB")
+        )
 
     # output
-    for k, (send_bytes, recv_bytes) in sorted(ipv6_throughput.items(),
-                                              key=lambda kv: sum(kv[1]),
-                                              reverse=True):
-        print("%-6d %-12.12s %-32s %-32s %6d %6d" % (k.pid,
-            pid_to_comm(k.pid),
-            k.laddr + ":" + str(k.lport),
-            k.daddr + ":" + str(k.dport),
-            int(recv_bytes / 1024), int(send_bytes / 1024)))
+    for k, (send_bytes, recv_bytes) in sorted(
+        ipv6_throughput.items(), key=lambda kv: sum(kv[1]), reverse=True
+    ):
+        print(
+            "%-6d %-12.12s %-32s %-32s %6d %6d"
+            % (
+                k.pid,
+                pid_to_comm(k.pid),
+                k.laddr + ":" + str(k.lport),
+                k.daddr + ":" + str(k.dport),
+                int(recv_bytes / 1024),
+                int(send_bytes / 1024),
+            )
+        )
 
     i += 1

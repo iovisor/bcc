@@ -7,6 +7,7 @@ import subprocess
 from bcc import SymbolCache, BPF
 from unittest import main, TestCase
 
+
 class TestKSyms(TestCase):
     def grab_sym(self):
         address = ""
@@ -42,14 +43,14 @@ class TestKSyms(TestCase):
         found = sym in aliases
         self.assertTrue(found)
 
+
 class Harness(TestCase):
     def setUp(self):
         self.build_command()
-        subprocess.check_output('objcopy --only-keep-debug dummy dummy.debug'
-                                .split())
+        subprocess.check_output("objcopy --only-keep-debug dummy dummy.debug".split())
         self.debug_command()
-        subprocess.check_output('strip dummy'.split())
-        self.process = subprocess.Popen('./dummy', stdout=subprocess.PIPE)
+        subprocess.check_output("strip dummy".split())
+        self.process = subprocess.Popen("./dummy", stdout=subprocess.PIPE)
         # The process prints out the address of some symbol, which we then
         # try to resolve in the test.
         self.addr = int(self.process.stdout.readline().strip(), 16)
@@ -65,73 +66,85 @@ class Harness(TestCase):
         sym, offset, module = self.syms.resolve(self.addr, False)
         self.assertEqual(sym, self.mangled_name)
         self.assertEqual(offset, 0)
-        self.assertTrue(module[-5:] == b'dummy')
+        self.assertTrue(module[-5:] == b"dummy")
         sym, offset, module = self.syms.resolve(self.addr, True)
-        self.assertEqual(sym, b'some_namespace::some_function(int, int)')
+        self.assertEqual(sym, b"some_namespace::some_function(int, int)")
         self.assertEqual(offset, 0)
-        self.assertTrue(module[-5:] == b'dummy')
-
+        self.assertTrue(module[-5:] == b"dummy")
 
     def resolve_name(self):
         script_dir = os.path.dirname(os.path.realpath(__file__).encode("utf8"))
-        addr = self.syms.resolve_name(os.path.join(script_dir, b'dummy'),
-                                      self.mangled_name)
+        addr = self.syms.resolve_name(
+            os.path.join(script_dir, b"dummy"), self.mangled_name
+        )
         self.assertEqual(addr, self.addr)
         pass
 
+
 class TestDebuglink(Harness):
     def build_command(self):
-        subprocess.check_output('g++ -o dummy dummy.cc'.split())
-        lines = subprocess.check_output('nm dummy'.split()).splitlines()
+        subprocess.check_output("g++ -o dummy dummy.cc".split())
+        lines = subprocess.check_output("nm dummy".split()).splitlines()
         for line in lines:
             if b"some_function" in line:
-                self.mangled_name = line.split(b' ')[2]
+                self.mangled_name = line.split(b" ")[2]
                 break
         self.assertTrue(self.mangled_name)
 
     def debug_command(self):
-        subprocess.check_output('objcopy --add-gnu-debuglink=dummy.debug dummy'
-                                .split())
+        subprocess.check_output("objcopy --add-gnu-debuglink=dummy.debug dummy".split())
 
     def tearDown(self):
         super(TestDebuglink, self).tearDown()
-        subprocess.check_output('rm dummy dummy.debug'.split())
+        subprocess.check_output("rm dummy dummy.debug".split())
 
     def test_resolve_addr(self):
         self.resolve_addr()
 
     def test_resolve_name(self):
         self.resolve_name()
+
 
 class TestBuildid(Harness):
     def build_command(self):
-        subprocess.check_output(('g++ -o dummy -Xlinker ' + \
-               '--build-id=0x123456789abcdef0123456789abcdef012345678 dummy.cc')
-               .split())
-        lines = subprocess.check_output('nm dummy'.split()).splitlines()
+        subprocess.check_output(
+            (
+                "g++ -o dummy -Xlinker "
+                + "--build-id=0x123456789abcdef0123456789abcdef012345678 dummy.cc"
+            ).split()
+        )
+        lines = subprocess.check_output("nm dummy".split()).splitlines()
         for line in lines:
             if b"some_function" in line:
-                self.mangled_name = line.split(b' ')[2]
+                self.mangled_name = line.split(b" ")[2]
                 break
         self.assertTrue(self.mangled_name)
 
-
     def debug_command(self):
-        subprocess.check_output('mkdir -p /usr/lib/debug/.build-id/12'.split())
-        subprocess.check_output(('mv dummy.debug /usr/lib/debug/.build-id' + \
-            '/12/3456789abcdef0123456789abcdef012345678.debug').split())
+        subprocess.check_output("mkdir -p /usr/lib/debug/.build-id/12".split())
+        subprocess.check_output(
+            (
+                "mv dummy.debug /usr/lib/debug/.build-id"
+                + "/12/3456789abcdef0123456789abcdef012345678.debug"
+            ).split()
+        )
 
     def tearDown(self):
         super(TestBuildid, self).tearDown()
-        subprocess.check_output('rm dummy'.split())
-        subprocess.check_output(('rm /usr/lib/debug/.build-id/12' +
-            '/3456789abcdef0123456789abcdef012345678.debug').split())
+        subprocess.check_output("rm dummy".split())
+        subprocess.check_output(
+            (
+                "rm /usr/lib/debug/.build-id/12"
+                + "/3456789abcdef0123456789abcdef012345678.debug"
+            ).split()
+        )
 
     def test_resolve_name(self):
         self.resolve_addr()
 
     def test_resolve_addr(self):
         self.resolve_name()
+
 
 if __name__ == "__main__":
     main()

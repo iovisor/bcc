@@ -22,7 +22,6 @@ num_locals = 2
 
 # class to build the simulation network
 class SharedNetSimulation(Simulation):
-
     def __init__(self, ipdb):
         super(SharedNetSimulation, self).__init__(ipdb)
 
@@ -30,12 +29,36 @@ class SharedNetSimulation(Simulation):
         # inbound (download) traffic
         wan_if = self._create_ns("wan0", ipaddr="172.16.1.5/24")[1]
         ipr.tc("add", "ingress", wan_if["index"], "ffff:")
-        ipr.tc("add-filter", "bpf", wan_if["index"], ":1", fd=wan_fn.fd,
-               prio=1, name=wan_fn.name, parent="ffff:", action="drop",
-               classid=1, rate="128kbit", burst=1024 * 32, mtu=16 * 1024)
-        ipr.tc("add-filter", "bpf", wan_if["index"], ":2", fd=pass_fn.fd,
-               prio=2, name=pass_fn.name, parent="ffff:", action="drop",
-               classid=2, rate="1024kbit", burst=1024 * 32, mtu=16 * 1024)
+        ipr.tc(
+            "add-filter",
+            "bpf",
+            wan_if["index"],
+            ":1",
+            fd=wan_fn.fd,
+            prio=1,
+            name=wan_fn.name,
+            parent="ffff:",
+            action="drop",
+            classid=1,
+            rate="128kbit",
+            burst=1024 * 32,
+            mtu=16 * 1024,
+        )
+        ipr.tc(
+            "add-filter",
+            "bpf",
+            wan_if["index"],
+            ":2",
+            fd=pass_fn.fd,
+            prio=2,
+            name=pass_fn.name,
+            parent="ffff:",
+            action="drop",
+            classid=2,
+            rate="1024kbit",
+            burst=1024 * 32,
+            mtu=16 * 1024,
+        )
         self.wan_if = wan_if
 
     # start the namespaces that compose the network, interconnect them with the
@@ -46,13 +69,13 @@ class SharedNetSimulation(Simulation):
         cmd = ["netserver", "-D"]
         for i in range(0, num_neighbors):
             ipaddr = "172.16.1.%d/24" % (i + 100)
-            ret = self._create_ns("neighbor%d" % i, ipaddr=ipaddr,
-                                  fn=neighbor_fn, cmd=cmd)
+            ret = self._create_ns(
+                "neighbor%d" % i, ipaddr=ipaddr, fn=neighbor_fn, cmd=cmd
+            )
             neighbor_list.append(ret)
         for i in range(0, num_locals):
             ipaddr = "172.16.1.%d/24" % (i + 150)
-            ret = self._create_ns("local%d" % i, ipaddr=ipaddr,
-                                  fn=pass_fn, cmd=cmd)
+            ret = self._create_ns("local%d" % i, ipaddr=ipaddr, fn=pass_fn, cmd=cmd)
             local_list.append(ret)
 
         with ipdb.create(ifname="br100", kind="bridge") as br100:
@@ -63,17 +86,20 @@ class SharedNetSimulation(Simulation):
             br100.add_port(self.wan_if)
             br100.up()
 
+
 try:
     sim = SharedNetSimulation(ipdb)
     sim.start()
     print("Network ready. Create a shell in the wan0 namespace and test with netperf")
-    print("   (Neighbors are 172.16.1.100-%d, and LAN clients are 172.16.1.150-%d)"
-            % (100 + num_neighbors - 1, 150 + num_locals - 1))
+    print(
+        "   (Neighbors are 172.16.1.100-%d, and LAN clients are 172.16.1.150-%d)"
+        % (100 + num_neighbors - 1, 150 + num_locals - 1)
+    )
     print(" e.g.: ip netns exec wan0 netperf -H 172.16.1.100 -l 2")
     input("Press enter when finished: ")
 finally:
-    if "sim" in locals(): sim.release()
-    if "br100" in ipdb.interfaces: ipdb.interfaces.br100.remove().commit()
+    if "sim" in locals():
+        sim.release()
+    if "br100" in ipdb.interfaces:
+        ipdb.interfaces.br100.remove().commit()
     ipdb.release()
-
-

@@ -31,17 +31,24 @@ examples = """examples:
 parser = argparse.ArgumentParser(
     description="Trace security capability checks",
     formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog=examples)
-parser.add_argument("-v", "--verbose", action="store_true",
-    help="include non-audit checks")
-parser.add_argument("-p", "--pid",
-    help="trace this PID only")
-parser.add_argument("-K", "--kernel-stack", action="store_true",
-    help="output kernel stack trace")
-parser.add_argument("-U", "--user-stack", action="store_true",
-    help="output user stack trace")
-parser.add_argument("-x", "--extra", action="store_true",
-    help="show extra fields in TID and INSETID columns")
+    epilog=examples,
+)
+parser.add_argument(
+    "-v", "--verbose", action="store_true", help="include non-audit checks"
+)
+parser.add_argument("-p", "--pid", help="trace this PID only")
+parser.add_argument(
+    "-K", "--kernel-stack", action="store_true", help="output kernel stack trace"
+)
+parser.add_argument(
+    "-U", "--user-stack", action="store_true", help="output user stack trace"
+)
+parser.add_argument(
+    "-x",
+    "--extra",
+    action="store_true",
+    help="show extra fields in TID and INSETID columns",
+)
 args = parser.parse_args()
 debug = 0
 
@@ -89,14 +96,16 @@ capabilities = {
     37: "CAP_AUDIT_READ",
 }
 
+
 class Enum(set):
     def __getattr__(self, name):
         if name in self:
             return name
         raise AttributeError
 
+
 # Stack trace types
-StackType = Enum(("Kernel", "User",))
+StackType = Enum(("Kernel", "User"))
 
 # define BPF program
 bpf_text = """
@@ -162,18 +171,16 @@ int kprobe__cap_capable(struct pt_regs *ctx, const struct cred *cred,
 };
 """
 if args.pid:
-    bpf_text = bpf_text.replace('FILTER1',
-        'if (pid != %s) { return 0; }' % args.pid)
+    bpf_text = bpf_text.replace("FILTER1", "if (pid != %s) { return 0; }" % args.pid)
 if not args.verbose:
-    bpf_text = bpf_text.replace('FILTER2', 'if (audit == 0) { return 0; }')
+    bpf_text = bpf_text.replace("FILTER2", "if (audit == 0) { return 0; }")
 if args.kernel_stack:
     bpf_text = "#define KERNEL_STACKS\n" + bpf_text
 if args.user_stack:
     bpf_text = "#define USER_STACKS\n" + bpf_text
-bpf_text = bpf_text.replace('FILTER1', '')
-bpf_text = bpf_text.replace('FILTER2', '')
-bpf_text = bpf_text.replace('FILTER3',
-    'if (pid == %s) { return 0; }' % getpid())
+bpf_text = bpf_text.replace("FILTER1", "")
+bpf_text = bpf_text.replace("FILTER2", "")
+bpf_text = bpf_text.replace("FILTER3", "if (pid == %s) { return 0; }" % getpid())
 if debug:
     print(bpf_text)
 
@@ -182,16 +189,22 @@ b = BPF(text=bpf_text)
 
 # header
 if args.extra:
-    print("%-9s %-6s %-6s %-6s %-16s %-4s %-20s %-6s %s" % (
-        "TIME", "UID", "PID", "TID", "COMM", "CAP", "NAME", "AUDIT", "INSETID"))
+    print(
+        "%-9s %-6s %-6s %-6s %-16s %-4s %-20s %-6s %s"
+        % ("TIME", "UID", "PID", "TID", "COMM", "CAP", "NAME", "AUDIT", "INSETID")
+    )
 else:
-    print("%-9s %-6s %-6s %-16s %-4s %-20s %-6s" % (
-        "TIME", "UID", "PID", "COMM", "CAP", "NAME", "AUDIT"))
+    print(
+        "%-9s %-6s %-6s %-16s %-4s %-20s %-6s"
+        % ("TIME", "UID", "PID", "COMM", "CAP", "NAME", "AUDIT")
+    )
+
 
 def stack_id_err(stack_id):
     # -EFAULT in get_stackid normally means the stack-trace is not availible,
     # Such as getting kernel stack trace in userspace code
     return (stack_id < 0) and (stack_id != -errno.EFAULT)
+
 
 def print_stack(bpf, stack_id, stack_type, tgid):
     if stack_id_err(stack_id):
@@ -202,6 +215,7 @@ def print_stack(bpf, stack_id, stack_type, tgid):
         print("        ", end="")
         print("%s" % (bpf.sym(addr, tgid, show_module=True, show_offset=True)))
 
+
 # process event
 def print_event(bpf, cpu, data, size):
     event = b["events"].event(data)
@@ -211,17 +225,38 @@ def print_event(bpf, cpu, data, size):
     else:
         name = "?"
     if args.extra:
-        print("%-9s %-6d %-6d %-6d %-16s %-4d %-20s %-6d %s" % (strftime("%H:%M:%S"),
-            event.uid, event.pid, event.tgid, event.comm.decode('utf-8', 'replace'),
-            event.cap, name, event.audit, str(event.insetid) if event.insetid != -1 else "N/A"))
+        print(
+            "%-9s %-6d %-6d %-6d %-16s %-4d %-20s %-6d %s"
+            % (
+                strftime("%H:%M:%S"),
+                event.uid,
+                event.pid,
+                event.tgid,
+                event.comm.decode("utf-8", "replace"),
+                event.cap,
+                name,
+                event.audit,
+                str(event.insetid) if event.insetid != -1 else "N/A",
+            )
+        )
     else:
-        print("%-9s %-6d %-6d %-16s %-4d %-20s %-6d" % (strftime("%H:%M:%S"),
-            event.uid, event.pid, event.comm.decode('utf-8', 'replace'),
-            event.cap, name, event.audit))
+        print(
+            "%-9s %-6d %-6d %-16s %-4d %-20s %-6d"
+            % (
+                strftime("%H:%M:%S"),
+                event.uid,
+                event.pid,
+                event.comm.decode("utf-8", "replace"),
+                event.cap,
+                name,
+                event.audit,
+            )
+        )
     if args.kernel_stack:
         print_stack(bpf, event.kernel_stack_id, StackType.Kernel, -1)
     if args.user_stack:
         print_stack(bpf, event.user_stack_id, StackType.User, event.tgid)
+
 
 # loop with callback to print_event
 callback = partial(print_event, b)

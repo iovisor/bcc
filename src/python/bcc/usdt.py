@@ -14,12 +14,19 @@
 
 import ctypes as ct
 import os, sys
-from .libbcc import lib, _USDT_CB, _USDT_PROBE_CB, \
-                    bcc_usdt_location, bcc_usdt_argument, \
-                    BCC_USDT_ARGUMENT_FLAGS
+from .libbcc import (
+    lib,
+    _USDT_CB,
+    _USDT_PROBE_CB,
+    bcc_usdt_location,
+    bcc_usdt_argument,
+    BCC_USDT_ARGUMENT_FLAGS,
+)
+
 
 class USDTException(Exception):
     pass
+
 
 class USDTProbeArgument(object):
     def __init__(self, argument):
@@ -40,8 +47,7 @@ class USDTProbeArgument(object):
             self.scale = argument.scale
 
     def _size_prefix(self):
-        return "%d %s bytes" % \
-                (self.size, "signed  " if self.signed else "unsigned")
+        return "%d %s bytes" % (self.size, "signed  " if self.signed else "unsigned")
 
     def _format(self):
         # This mimics the logic in cc/usdt_args.cc that gives meaning to the
@@ -50,24 +56,31 @@ class USDTProbeArgument(object):
             return "%d" % self.constant
         if self.valid & BCC_USDT_ARGUMENT_FLAGS.DEREF_OFFSET == 0:
             return "%s" % self.base_register_name
-        if self.valid & BCC_USDT_ARGUMENT_FLAGS.DEREF_OFFSET != 0 and \
-           self.valid & BCC_USDT_ARGUMENT_FLAGS.DEREF_IDENT == 0:
+        if (
+            self.valid & BCC_USDT_ARGUMENT_FLAGS.DEREF_OFFSET != 0
+            and self.valid & BCC_USDT_ARGUMENT_FLAGS.DEREF_IDENT == 0
+        ):
             if self.valid & BCC_USDT_ARGUMENT_FLAGS.INDEX_REGISTER_NAME != 0:
                 index_offset = " + %s" % self.index_register_name
                 if self.valid & BCC_USDT_ARGUMENT_FLAGS.SCALE != 0:
                     index_offset += " * %d" % self.scale
             else:
                 index_offset = ""
-            sign = '+' if self.deref_offset >= 0 else '-'
-            return "*(%s %s %d%s)" % (self.base_register_name,
-                                    sign, abs(self.deref_offset), index_offset)
-        if self.valid & BCC_USDT_ARGUMENT_FLAGS.DEREF_OFFSET != 0 and \
-           self.valid & BCC_USDT_ARGUMENT_FLAGS.DEREF_IDENT != 0 and \
-           self.valid & BCC_USDT_ARGUMENT_FLAGS.BASE_REGISTER_NAME != 0 and \
-           self.base_register_name == "ip":
-            sign = '+' if self.deref_offset >= 0 else '-'
-            return "*(&%s %s %d)" % (self.deref_ident,
-                                     sign, abs(self.deref_offset))
+            sign = "+" if self.deref_offset >= 0 else "-"
+            return "*(%s %s %d%s)" % (
+                self.base_register_name,
+                sign,
+                abs(self.deref_offset),
+                index_offset,
+            )
+        if (
+            self.valid & BCC_USDT_ARGUMENT_FLAGS.DEREF_OFFSET != 0
+            and self.valid & BCC_USDT_ARGUMENT_FLAGS.DEREF_IDENT != 0
+            and self.valid & BCC_USDT_ARGUMENT_FLAGS.BASE_REGISTER_NAME != 0
+            and self.base_register_name == "ip"
+        ):
+            sign = "+" if self.deref_offset >= 0 else "-"
+            return "*(&%s %s %d)" % (self.deref_ident, sign, abs(self.deref_offset))
         # If we got here, this is an unrecognized case. Doesn't mean it's
         # necessarily bad, so just provide the raw data. It just means that
         # other tools won't be able to work with this argument.
@@ -75,6 +88,7 @@ class USDTProbeArgument(object):
 
     def __str__(self):
         return "%s @ %s" % (self._size_prefix(), self._format())
+
 
 class USDTProbeLocation(object):
     def __init__(self, probe, index, location):
@@ -89,14 +103,20 @@ class USDTProbeLocation(object):
 
     def get_argument(self, index):
         arg = bcc_usdt_argument()
-        res = lib.bcc_usdt_get_argument(self.probe.context, self.probe.provider,
-                                        self.probe.name,
-                                        self.index, index, ct.byref(arg))
+        res = lib.bcc_usdt_get_argument(
+            self.probe.context,
+            self.probe.provider,
+            self.probe.name,
+            self.index,
+            index,
+            ct.byref(arg),
+        )
         if res != 0:
             raise USDTException(
-                    "error retrieving probe argument %d location %d" %
-                    (index, self.index))
+                "error retrieving probe argument %d location %d" % (index, self.index)
+            )
         return USDTProbeArgument(arg)
+
 
 class USDTProbe(object):
     def __init__(self, context, probe):
@@ -109,60 +129,71 @@ class USDTProbe(object):
         self.num_arguments = probe.num_arguments
 
     def __str__(self):
-        return "%s:%s [sema 0x%x]" % \
-               (self.provider, self.name, self.semaphore)
+        return "%s:%s [sema 0x%x]" % (self.provider, self.name, self.semaphore)
 
     def short_name(self):
         return "%s:%s" % (self.provider, self.name)
 
     def get_location(self, index):
         loc = bcc_usdt_location()
-        res = lib.bcc_usdt_get_location(self.context, self.provider, self.name,
-                                        index, ct.byref(loc))
+        res = lib.bcc_usdt_get_location(
+            self.context, self.provider, self.name, index, ct.byref(loc)
+        )
         if res != 0:
             raise USDTException("error retrieving probe location %d" % index)
         return USDTProbeLocation(self, index, loc)
+
 
 class USDT(object):
     def __init__(self, pid=None, path=None):
         if pid and pid != -1:
             self.pid = pid
             if path:
-                self.context = lib.bcc_usdt_new_frompid(pid, path.encode('ascii'))
+                self.context = lib.bcc_usdt_new_frompid(pid, path.encode("ascii"))
             else:
                 self.context = lib.bcc_usdt_new_frompid(pid, ct.c_char_p(0))
             if self.context == None:
                 raise USDTException("USDT failed to instrument PID %d" % pid)
         elif path:
             self.path = path
-            self.context = lib.bcc_usdt_new_frompath(path.encode('ascii'))
+            self.context = lib.bcc_usdt_new_frompath(path.encode("ascii"))
             if self.context == None:
                 raise USDTException("USDT failed to instrument path %s" % path)
         else:
-            raise USDTException(
-                    "either a pid or a binary path must be specified")
+            raise USDTException("either a pid or a binary path must be specified")
 
     def __del__(self):
         lib.bcc_usdt_close(self.context)
 
     def enable_probe(self, probe, fn_name):
-        if lib.bcc_usdt_enable_probe(self.context, probe.encode('ascii'),
-                fn_name.encode('ascii')) != 0:
+        if (
+            lib.bcc_usdt_enable_probe(
+                self.context, probe.encode("ascii"), fn_name.encode("ascii")
+            )
+            != 0
+        ):
             raise USDTException(
-                    ("failed to enable probe '%s'; a possible cause " +
-                     "can be that the probe requires a pid to enable") %
-                     probe
-                  )
+                (
+                    "failed to enable probe '%s'; a possible cause "
+                    + "can be that the probe requires a pid to enable"
+                )
+                % probe
+            )
 
     def enable_probe_or_bail(self, probe, fn_name):
-        if lib.bcc_usdt_enable_probe(self.context, probe.encode('ascii'),
-                fn_name.encode('ascii')) != 0:
+        if (
+            lib.bcc_usdt_enable_probe(
+                self.context, probe.encode("ascii"), fn_name.encode("ascii")
+            )
+            != 0
+        ):
             print(
-"""Error attaching USDT probes: the specified pid might not contain the
+                """Error attaching USDT probes: the specified pid might not contain the
 given language's runtime, or the runtime was not built with the required
 USDT probes. Look for a configure flag similar to --with-dtrace or
 --enable-dtrace. To check which probes are present in the process, use the
-tplist tool.""")
+tplist tool."""
+            )
             sys.exit(1)
 
     def get_context(self):
@@ -175,10 +206,12 @@ tplist tool.""")
 
     def get_probe_arg_ctype(self, probe_name, arg_index):
         return lib.bcc_usdt_get_probe_argctype(
-            self.context, probe_name.encode('ascii'), arg_index).decode()
+            self.context, probe_name.encode("ascii"), arg_index
+        ).decode()
 
     def enumerate_probes(self):
         probes = []
+
         def _add_probe(probe):
             probes.append(USDTProbe(self.context, probe.contents))
 
@@ -190,11 +223,13 @@ tplist tool.""")
     def attach_uprobes(self, bpf):
         probes = self.enumerate_active_probes()
         for (binpath, fn_name, addr, pid) in probes:
-            bpf.attach_uprobe(name=binpath.decode(), fn_name=fn_name.decode(),
-                              addr=addr, pid=pid)
+            bpf.attach_uprobe(
+                name=binpath.decode(), fn_name=fn_name.decode(), addr=addr, pid=pid
+            )
 
     def enumerate_active_probes(self):
         probes = []
+
         def _add_probe(binpath, fn_name, addr, pid):
             probes.append((binpath, fn_name, addr, pid))
 

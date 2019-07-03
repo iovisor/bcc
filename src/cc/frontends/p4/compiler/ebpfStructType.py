@@ -17,14 +17,15 @@ class EbpfField(object):
             signed = True
         if P4_SATURATING in attributes:
             raise NotSupportedException(
-                "{0}.{1}: Saturated types", self.hlirType, self.name)
+                "{0}.{1}: Saturated types", self.hlirType, self.name
+            )
 
         try:
-            self.type = EbpfScalarType(
-                self.hlirType, widthInBits, signed, config)
-        except CompilationException, e:
+            self.type = EbpfScalarType(self.hlirType, widthInBits, signed, config)
+        except CompilationException as e:
             raise CompilationException(
-                e.isBug, "{0}.{1}: {2}", hlirParentType, self.name, e.show())
+                e.isBug, "{0}.{1}: {2}", hlirParentType, self.name, e.show()
+            )
 
     def widthInBits(self):
         return self.width
@@ -40,8 +41,7 @@ class EbpfStructType(EbpfType):
 
         for (fieldName, fieldSize) in self.hlirType.layout.items():
             attributes = self.hlirType.attributes[fieldName]
-            field = EbpfField(
-                hlirHeader, fieldName, fieldSize, attributes, config)
+            field = EbpfField(hlirHeader, fieldName, fieldSize, attributes, config)
             self.fields.append(field)
 
     def serialize(self, serializer):
@@ -80,8 +80,7 @@ class EbpfStructType(EbpfType):
             assert isinstance(f, EbpfField)
             if f.name == name:
                 return f
-        raise CompilationException(
-            True, "Could not locate field {0}.{1}", self, name)
+        raise CompilationException(True, "Could not locate field {0}.{1}", self, name)
 
 
 class EbpfHeaderType(EbpfStructType):
@@ -92,9 +91,8 @@ class EbpfHeaderType(EbpfStructType):
         for f in self.fields:
             if f.name == "valid":
                 raise CompilationException(
-                    True,
-                    "Header type contains a field named `valid': {0}",
-                    f)
+                    True, "Header type contains a field named `valid': {0}", f
+                )
         self.fields.append(validField)
 
     def emitInitializer(self, serializer):
@@ -106,8 +104,7 @@ class EbpfHeaderType(EbpfStructType):
 
     def declareArray(self, serializer, identifier, size):
         assert isinstance(serializer, ProgramSerializer)
-        serializer.appendFormat(
-            "struct {0} {1}[{2}]", self.name, identifier, size)
+        serializer.appendFormat("struct {0} {1}[{2}]", self.name, identifier, size)
 
 
 class EbpfMetadataType(EbpfStructType):

@@ -30,24 +30,23 @@ examples = """examples:
 parser = argparse.ArgumentParser(
     description="Trace file descriptors passed via socket",
     formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog=examples)
-parser.add_argument("-T", "--timestamp", action="store_true",
-    help="include timestamp on output")
-parser.add_argument("-p", "--pid",
-    help="trace this PID only")
-parser.add_argument("-t", "--tid",
-    help="trace this TID only")
-parser.add_argument("-n", "--name",
-    type=ArgString,
-    help="only print process names containing this name")
-parser.add_argument("-d", "--duration",
-    help="total duration of trace in seconds")
+    epilog=examples,
+)
+parser.add_argument(
+    "-T", "--timestamp", action="store_true", help="include timestamp on output"
+)
+parser.add_argument("-p", "--pid", help="trace this PID only")
+parser.add_argument("-t", "--tid", help="trace this TID only")
+parser.add_argument(
+    "-n", "--name", type=ArgString, help="only print process names containing this name"
+)
+parser.add_argument("-d", "--duration", help="total duration of trace in seconds")
 args = parser.parse_args()
 debug = 0
 
-ACTION_SEND=0
-ACTION_RECV=1
-MAX_FD=10
+ACTION_SEND = 0
+ACTION_RECV = 1
+MAX_FD = 10
 
 if args.duration:
     args.duration = timedelta(seconds=int(args.duration))
@@ -253,13 +252,11 @@ int trace_recvmsg_return(struct pt_regs *ctx)
 """
 
 if args.tid:  # TID trumps PID
-    bpf_text = bpf_text.replace('FILTER',
-        'if (tid != %s) { return 0; }' % args.tid)
+    bpf_text = bpf_text.replace("FILTER", "if (tid != %s) { return 0; }" % args.tid)
 elif args.pid:
-    bpf_text = bpf_text.replace('FILTER',
-        'if (pid != %s) { return 0; }' % args.pid)
+    bpf_text = bpf_text.replace("FILTER", "if (pid != %s) { return 0; }" % args.pid)
 else:
-    bpf_text = bpf_text.replace('FILTER', '')
+    bpf_text = bpf_text.replace("FILTER", "")
 
 # initialize BPF
 b = BPF(text=bpf_text)
@@ -283,8 +280,10 @@ initial_ts = 0
 # header
 if args.timestamp:
     print("%-14s" % ("TIME(s)"), end="")
-print("%-6s %-6s %-16s %-25s %-5s %s" %
-      ("ACTION", "TID", "COMM", "SOCKET", "FD", "NAME"))
+print(
+    "%-6s %-6s %-16s %-25s %-5s %s" % ("ACTION", "TID", "COMM", "SOCKET", "FD", "NAME")
+)
+
 
 def get_file(pid, fd):
     proc = "/proc/%d/fd/%d" % (pid, fd)
@@ -293,12 +292,13 @@ def get_file(pid, fd):
     except OSError as err:
         return "N/A"
 
+
 # process event
 def print_event(cpu, data, size):
     event = b["events"].event(data)
-    tid = event.id & 0xffffffff;
+    tid = event.id & 0xFFFFFFFF
 
-    cnt = min(MAX_FD, event.fd_cnt);
+    cnt = min(MAX_FD, event.fd_cnt)
 
     if args.name and bytes(args.name) not in event.comm:
         return
@@ -313,16 +313,23 @@ def print_event(cpu, data, size):
             delta = event.ts - initial_ts
             print("%-14.9f" % (float(delta) / 1000000), end="")
 
-        print("%-6s %-6d %-16s " %
-              ("SEND" if event.action == ACTION_SEND else "RECV",
-               tid, event.comm.decode()), end = '')
+        print(
+            "%-6s %-6d %-16s "
+            % (
+                "SEND" if event.action == ACTION_SEND else "RECV",
+                tid,
+                event.comm.decode(),
+            ),
+            end="",
+        )
 
         sock = "%d:%s" % (event.sock_fd, get_file(tid, event.sock_fd))
-        print("%-25s " % sock, end = '')
+        print("%-25s " % sock, end="")
 
         fd = event.fd[i]
         fd_file = get_file(tid, fd) if event.action == ACTION_SEND else ""
         print("%-5d %s" % (fd, fd_file))
+
 
 # loop with callback to print_event
 b["events"].open_perf_buffer(print_event, page_cnt=64)

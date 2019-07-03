@@ -9,6 +9,7 @@ import os
 import time
 import unittest
 
+
 class TestPerfCounter(unittest.TestCase):
     def test_cycles(self):
         text = """
@@ -38,8 +39,9 @@ int do_ret_sys_getuid(void *ctx) {
     return 0;
 }
 """
-        b = bcc.BPF(text=text, debug=0,
-                cflags=["-DNUM_CPUS=%d" % multiprocessing.cpu_count()])
+        b = bcc.BPF(
+            text=text, debug=0, cflags=["-DNUM_CPUS=%d" % multiprocessing.cpu_count()]
+        )
         event_name = b.get_syscall_fnname("getuid")
         b.attach_kprobe(event=event_name, fn_name="do_sys_getuid")
         b.attach_kretprobe(event=event_name, fn_name="do_ret_sys_getuid")
@@ -53,6 +55,7 @@ int do_ret_sys_getuid(void *ctx) {
         for i in range(0, 100):
             os.getuid()
         b["dist"].print_log2_hist()
+
 
 if __name__ == "__main__":
     unittest.main()

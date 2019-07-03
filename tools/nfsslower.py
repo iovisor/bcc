@@ -45,15 +45,20 @@ parser = argparse.ArgumentParser(
 and GETATTR NFS calls slower than a threshold,\
 supports NFSv{3,4}""",
     formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog=examples)
+    epilog=examples,
+)
 
-parser.add_argument("-j", "--csv", action="store_true",
-                    help="just print fields: comma-separated values")
+parser.add_argument(
+    "-j", "--csv", action="store_true", help="just print fields: comma-separated values"
+)
 parser.add_argument("-p", "--pid", help="Trace this pid only")
-parser.add_argument("min_ms", nargs="?", default='10',
-                    help="Minimum IO duration to trace in ms (default=10ms)")
-parser.add_argument("--ebpf", action="store_true",
-                    help=argparse.SUPPRESS)
+parser.add_argument(
+    "min_ms",
+    nargs="?",
+    default="10",
+    help="Minimum IO duration to trace in ms (default=10ms)",
+)
+parser.add_argument("--ebpf", action="store_true", help=argparse.SUPPRESS)
 args = parser.parse_args()
 min_ms = int(args.min_ms)
 pid = args.pid
@@ -229,14 +234,13 @@ int trace_getattr_return(struct pt_regs *ctx)
 
 """
 if min_ms == 0:
-    bpf_text = bpf_text.replace('FILTER_US', '0')
+    bpf_text = bpf_text.replace("FILTER_US", "0")
 else:
-    bpf_text = bpf_text.replace('FILTER_US',
-                                'delta_us <= %s' % str(min_ms * 1000))
+    bpf_text = bpf_text.replace("FILTER_US", "delta_us <= %s" % str(min_ms * 1000))
 if args.pid:
-    bpf_text = bpf_text.replace('FILTER_PID', 'pid != %s' % pid)
+    bpf_text = bpf_text.replace("FILTER_PID", "pid != %s" % pid)
 else:
-    bpf_text = bpf_text.replace('FILTER_PID', '0')
+    bpf_text = bpf_text.replace("FILTER_PID", "0")
 if debug or args.ebpf:
     print(bpf_text)
     if args.ebpf:
@@ -246,28 +250,42 @@ if debug or args.ebpf:
 def print_event(cpu, data, size):
     event = b["events"].event(data)
 
-    type = 'R'
+    type = "R"
     if event.type == 1:
-        type = 'W'
+        type = "W"
     elif event.type == 2:
-        type = 'O'
+        type = "O"
     elif event.type == 3:
-        type = 'G'
+        type = "G"
 
-    if(csv):
-        print("%d,%s,%d,%s,%d,%d,%d,%s" % (
-            event.ts_us, event.task, event.pid, type, event.size,
-            event.offset, event.delta_us, event.file))
+    if csv:
+        print(
+            "%d,%s,%d,%s,%d,%d,%d,%s"
+            % (
+                event.ts_us,
+                event.task,
+                event.pid,
+                type,
+                event.size,
+                event.offset,
+                event.delta_us,
+                event.file,
+            )
+        )
         return
-    print("%-8s %-14.14s %-6s %1s %-7s %-8d %7.2f %s" %
-          (strftime("%H:%M:%S"),
-           event.task.decode('utf-8', 'replace'),
-           event.pid,
-           type,
-           event.size,
-           event.offset / 1024,
-           float(event.delta_us) / 1000,
-           event.file.decode('utf-8', 'replace')))
+    print(
+        "%-8s %-14.14s %-6s %1s %-7s %-8d %7.2f %s"
+        % (
+            strftime("%H:%M:%S"),
+            event.task.decode("utf-8", "replace"),
+            event.pid,
+            type,
+            event.size,
+            event.offset / 1024,
+            float(event.delta_us) / 1000,
+            event.file.decode("utf-8", "replace"),
+        )
+    )
 
 
 # Currently specifically works for NFSv4, the other kprobes are generic
@@ -286,23 +304,21 @@ b.attach_kretprobe(event="nfs4_file_open", fn_name="trace_file_open_return")
 b.attach_kretprobe(event="nfs_file_open", fn_name="trace_file_open_return")
 b.attach_kretprobe(event="nfs_getattr", fn_name="trace_getattr_return")
 
-if(csv):
+if csv:
     print("ENDTIME_us,TASK,PID,TYPE,BYTES,OFFSET_b,LATENCY_us,FILE")
 else:
     if min_ms == 0:
         print("Tracing NFS operations... Ctrl-C to quit")
     else:
-        print("""Tracing NFS operations that are slower than \
+        print(
+            """Tracing NFS operations that are slower than \
 %d ms... Ctrl-C to quit"""
-              % min_ms)
-    print("%-8s %-14s %-6s %1s %-7s %-8s %7s %s" % ("TIME",
-                                                    "COMM",
-                                                    "PID",
-                                                    "T",
-                                                    "BYTES",
-                                                    "OFF_KB",
-                                                    "LAT(ms)",
-                                                    "FILENAME"))
+            % min_ms
+        )
+    print(
+        "%-8s %-14s %-6s %1s %-7s %-8s %7s %s"
+        % ("TIME", "COMM", "PID", "T", "BYTES", "OFF_KB", "LAT(ms)", "FILENAME")
+    )
 
 b["events"].open_perf_buffer(print_event, page_cnt=64)
 while 1:

@@ -12,10 +12,13 @@ from multiprocessing import cpu_count
 import ctypes as ct
 
 flags = 0
+
+
 def usage():
     print("Usage: {0} <in ifdev> <CPU id>".format(sys.argv[0]))
     print("e.g.: {0} eth0 2\n".format(sys.argv[0]))
     exit(1)
+
 
 if len(sys.argv) != 3:
     usage()
@@ -24,12 +27,13 @@ in_if = sys.argv[1]
 cpu_id = int(sys.argv[2])
 
 max_cpu = cpu_count()
-if (cpu_id > max_cpu):
+if cpu_id > max_cpu:
     print("Invalid CPU id")
     exit(1)
 
 # load BPF program
-b = BPF(text = """
+b = BPF(
+    text="""
 #define KBUILD_MODNAME "foo"
 #include <uapi/linux/bpf.h>
 #include <linux/in.h>
@@ -66,7 +70,10 @@ int xdp_redirect_cpu(struct xdp_md *ctx) {
 int xdp_dummy(struct xdp_md *ctx) {
     return XDP_PASS;
 }
-""", cflags=["-w", "-D__MAX_CPU__=%u" % max_cpu], debug=0)
+""",
+    cflags=["-w", "-D__MAX_CPU__=%u" % max_cpu],
+    debug=0,
+)
 
 dest = b.get_table("dest")
 dest[0] = ct.c_uint32(cpu_id)

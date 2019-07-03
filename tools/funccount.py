@@ -27,11 +27,14 @@ import traceback
 
 debug = False
 
+
 def verify_limit(num):
     probe_limit = 1000
     if num > probe_limit:
-        raise Exception("maximum of %d probes allowed, attempted %d" %
-                        (probe_limit, num))
+        raise Exception(
+            "maximum of %d probes allowed, attempted %d" % (probe_limit, num)
+        )
+
 
 class Probe(object):
     def __init__(self, pattern, use_regex=False, pid=None):
@@ -49,7 +52,7 @@ class Probe(object):
             t:cat:event     -- probe a kernel tracepoint
             u:lib:probe     -- probe a USDT tracepoint
         """
-        parts = bytes(pattern).split(b':')
+        parts = bytes(pattern).split(b":")
         if len(parts) == 1:
             parts = [b"p", b"", parts[0]]
         elif len(parts) == 2:
@@ -58,16 +61,14 @@ class Probe(object):
             if parts[0] == b"t":
                 parts = [b"t", b"", b"%s:%s" % tuple(parts[1:])]
             if parts[0] not in [b"p", b"t", b"u"]:
-                raise Exception("Type must be 'p', 't', or 'u', but got %s" %
-                                parts[0])
+                raise Exception("Type must be 'p', 't', or 'u', but got %s" % parts[0])
         else:
-            raise Exception("Too many ':'-separated components in pattern %s" %
-                            pattern)
+            raise Exception("Too many ':'-separated components in pattern %s" % pattern)
 
         (self.type, self.library, self.pattern) = parts
         if not use_regex:
-            self.pattern = self.pattern.replace(b'*', b'.*')
-            self.pattern = b'^' + self.pattern + b'$'
+            self.pattern = self.pattern.replace(b"*", b".*")
+            self.pattern = b"^" + self.pattern + b"$"
 
         if (self.type == b"p" and self.library) or self.type == b"u":
             libpath = BPF.find_library(self.library)
@@ -80,7 +81,7 @@ class Probe(object):
 
         self.pid = pid
         self.matched = 0
-        self.trace_functions = {}   # map location number to function name
+        self.trace_functions = {}  # map location number to function name
 
     def is_kernel_probe(self):
         return self.type == b"t" or (self.type == b"p" and self.library == b"")
@@ -88,23 +89,22 @@ class Probe(object):
     def attach(self):
         if self.type == b"p" and not self.library:
             for index, function in self.trace_functions.items():
-                self.bpf.attach_kprobe(
-                        event=function,
-                        fn_name="trace_count_%d" % index)
+                self.bpf.attach_kprobe(event=function, fn_name="trace_count_%d" % index)
         elif self.type == b"p" and self.library:
             for index, function in self.trace_functions.items():
                 self.bpf.attach_uprobe(
-                        name=self.library,
-                        sym=function,
-                        fn_name="trace_count_%d" % index,
-                        pid=self.pid or -1)
+                    name=self.library,
+                    sym=function,
+                    fn_name="trace_count_%d" % index,
+                    pid=self.pid or -1,
+                )
         elif self.type == b"t":
             for index, function in self.trace_functions.items():
                 self.bpf.attach_tracepoint(
-                        tp=function,
-                        fn_name="trace_count_%d" % index)
+                    tp=function, fn_name="trace_count_%d" % index
+                )
         elif self.type == b"u":
-            pass    # Nothing to do -- attach already happened in `load`
+            pass  # Nothing to do -- attach already happened in `load`
 
     def _add_function(self, template, probe_name):
         new_func = b"trace_count_%d" % self.matched
@@ -131,7 +131,8 @@ class Probe(object):
             # that may repeat multiple times with different addresses.
             addresses, functions = (set(), set())
             functions_and_addresses = BPF.get_user_functions_and_addresses(
-                                        self.library, self.pattern)
+                self.library, self.pattern
+            )
             verify_limit(len(functions_and_addresses))
             for function, address in functions_and_addresses:
                 if address in addresses or function in functions:
@@ -182,25 +183,25 @@ BPF_ARRAY(counts, u64, NUMLOCATIONS);
         # We really mean the tgid from the kernel's perspective, which is in
         # the top 32 bits of bpf_get_current_pid_tgid().
         if self.pid:
-            trace_count_text = trace_count_text.replace(b'FILTER',
+            trace_count_text = trace_count_text.replace(
+                b"FILTER",
                 b"""u32 pid = bpf_get_current_pid_tgid() >> 32;
-                   if (pid != %d) { return 0; }""" % self.pid)
+                   if (pid != %d) { return 0; }"""
+                % self.pid,
+            )
         else:
-            trace_count_text = trace_count_text.replace(b'FILTER', b'')
+            trace_count_text = trace_count_text.replace(b"FILTER", b"")
 
         bpf_text += self._generate_functions(trace_count_text)
-        bpf_text = bpf_text.replace(b"NUMLOCATIONS",
-                                    b"%d" % len(self.trace_functions))
+        bpf_text = bpf_text.replace(b"NUMLOCATIONS", b"%d" % len(self.trace_functions))
         if debug:
             print(bpf_text)
 
         if self.matched == 0:
-            raise Exception("No functions matched by pattern %s" %
-                            self.pattern)
+            raise Exception("No functions matched by pattern %s" % self.pattern)
 
-        self.bpf = BPF(text=bpf_text,
-                       usdt_contexts=[self.usdt] if self.usdt else [])
-        self.clear()    # Initialize all array items to zero
+        self.bpf = BPF(text=bpf_text, usdt_contexts=[self.usdt] if self.usdt else [])
+        self.clear()  # Initialize all array items to zero
 
     def counts(self):
         return self.bpf["counts"]
@@ -209,6 +210,7 @@ BPF_ARRAY(counts, u64, NUMLOCATIONS);
         counts = self.bpf["counts"]
         for location, _ in list(self.trace_functions.items()):
             counts[counts.Key(location)] = counts.Leaf()
+
 
 class Tool(object):
     def __init__(self):
@@ -228,22 +230,29 @@ class Tool(object):
         parser = argparse.ArgumentParser(
             description="Count functions, tracepoints, and USDT probes",
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            epilog=examples)
-        parser.add_argument("-p", "--pid", type=int,
-            help="trace this PID only")
-        parser.add_argument("-i", "--interval",
-            help="summary interval, seconds")
-        parser.add_argument("-d", "--duration",
-            help="total duration of trace, seconds")
-        parser.add_argument("-T", "--timestamp", action="store_true",
-            help="include timestamp on output")
-        parser.add_argument("-r", "--regexp", action="store_true",
-            help="use regular expressions. Default is \"*\" wildcards only.")
-        parser.add_argument("-D", "--debug", action="store_true",
-            help="print BPF program before starting (for debugging purposes)")
-        parser.add_argument("pattern",
-            type=ArgString,
-            help="search expression for events")
+            epilog=examples,
+        )
+        parser.add_argument("-p", "--pid", type=int, help="trace this PID only")
+        parser.add_argument("-i", "--interval", help="summary interval, seconds")
+        parser.add_argument("-d", "--duration", help="total duration of trace, seconds")
+        parser.add_argument(
+            "-T", "--timestamp", action="store_true", help="include timestamp on output"
+        )
+        parser.add_argument(
+            "-r",
+            "--regexp",
+            action="store_true",
+            help='use regular expressions. Default is "*" wildcards only.',
+        )
+        parser.add_argument(
+            "-D",
+            "--debug",
+            action="store_true",
+            help="print BPF program before starting (for debugging purposes)",
+        )
+        parser.add_argument(
+            "pattern", type=ArgString, help="search expression for events"
+        )
         self.args = parser.parse_args()
         global debug
         debug = self.args.debug
@@ -260,8 +269,10 @@ class Tool(object):
     def run(self):
         self.probe.load()
         self.probe.attach()
-        print("Tracing %d functions for \"%s\"... Hit Ctrl-C to end." %
-              (self.probe.matched, bytes(self.args.pattern)))
+        print(
+            'Tracing %d functions for "%s"... Hit Ctrl-C to end.'
+            % (self.probe.matched, bytes(self.args.pattern))
+        )
         exiting = 0 if self.args.interval else 1
         seconds = 0
         while True:
@@ -281,18 +292,17 @@ class Tool(object):
 
             print("%-36s %8s" % ("FUNC", "COUNT"))
             counts = self.probe.counts()
-            for k, v in sorted(counts.items(),
-                               key=lambda counts: counts[1].value):
+            for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
                 if v.value == 0:
                     continue
-                print("%-36s %8d" %
-                      (self.probe.trace_functions[k.value], v.value))
+                print("%-36s %8d" % (self.probe.trace_functions[k.value], v.value))
 
             if exiting:
                 print("Detaching...")
                 exit()
             else:
                 self.probe.clear()
+
 
 if __name__ == "__main__":
     try:

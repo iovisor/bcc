@@ -26,19 +26,24 @@ examples = """examples:
 parser = argparse.ArgumentParser(
     description="Summarize soft irq event time as histograms",
     formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog=examples)
-parser.add_argument("-T", "--timestamp", action="store_true",
-    help="include timestamp on output")
-parser.add_argument("-N", "--nanoseconds", action="store_true",
-    help="output in nanoseconds")
-parser.add_argument("-d", "--dist", action="store_true",
-    help="show distributions as histograms")
-parser.add_argument("-C", "--bycpu", action="store_true",
-    help="break down softirqs to individual cpus")
-parser.add_argument("interval", nargs="?", default=99999999,
-    help="output interval, in seconds")
-parser.add_argument("count", nargs="?", default=99999999,
-    help="number of outputs")
+    epilog=examples,
+)
+parser.add_argument(
+    "-T", "--timestamp", action="store_true", help="include timestamp on output"
+)
+parser.add_argument(
+    "-N", "--nanoseconds", action="store_true", help="output in nanoseconds"
+)
+parser.add_argument(
+    "-d", "--dist", action="store_true", help="show distributions as histograms"
+)
+parser.add_argument(
+    "-C", "--bycpu", action="store_true", help="break down softirqs to individual cpus"
+)
+parser.add_argument(
+    "interval", nargs="?", default=99999999, help="output interval, in seconds"
+)
+parser.add_argument("count", nargs="?", default=99999999, help="number of outputs")
 args = parser.parse_args()
 countdown = int(args.count)
 if args.nanoseconds:
@@ -132,22 +137,26 @@ else:
     """
 
 # code substitutions
-bpf_text = bpf_text.replace('COMMON',
-        """if (tsp == 0) {
+bpf_text = bpf_text.replace(
+    "COMMON",
+    """if (tsp == 0) {
             return 0;   // missed start
         }
         delta = bpf_ktime_get_ns() - *tsp;
-        """)
+        """,
+)
 
 if args.dist:
-    bpf_text = bpf_text.replace('STORE',
-        '.slot = bpf_log2l(delta)};' +
-        'dist.increment(key);')
+    bpf_text = bpf_text.replace(
+        "STORE", ".slot = bpf_log2l(delta)};" + "dist.increment(key);"
+    )
 else:
-    bpf_text = bpf_text.replace('STORE',
-        ' .ip = ip, .slot = 0 /* ignore */};' +
-        'u64 zero = 0, *vp = dist.lookup_or_init(&key, &zero);' +
-        '(*vp) += delta;')
+    bpf_text = bpf_text.replace(
+        "STORE",
+        " .ip = ip, .slot = 0 /* ignore */};"
+        + "u64 zero = 0, *vp = dist.lookup_or_init(&key, &zero);"
+        + "(*vp) += delta;",
+    )
 if debug:
     print(bpf_text)
 
@@ -157,10 +166,17 @@ b = BPF(text=bpf_text)
 # this should really use irq:softirq_entry/exit tracepoints; for now the
 # soft irq functions are individually traced (search your kernel for
 # open_softirq() calls, and adjust the following list as needed).
-for softirqfunc in ("blk_iopoll_softirq", "blk_done_softirq",
-        "rcu_process_callbacks", "run_rebalance_domains", "tasklet_action",
-        "tasklet_hi_action", "run_timer_softirq", "net_tx_action",
-        "net_rx_action"):
+for softirqfunc in (
+    "blk_iopoll_softirq",
+    "blk_done_softirq",
+    "rcu_process_callbacks",
+    "run_rebalance_domains",
+    "tasklet_action",
+    "tasklet_hi_action",
+    "run_timer_softirq",
+    "net_tx_action",
+    "net_rx_action",
+):
     if args.bycpu:
         b.attach_kprobe(event=softirqfunc, fn_name="trace_start_cpu")
         b.attach_kretprobe(event=softirqfunc, fn_name="trace_completion_cpu")
@@ -173,7 +189,7 @@ print("Tracing soft irq event time... Hit Ctrl-C to end.")
 # output
 exiting = 0 if args.interval else 1
 dist = b.get_table("dist")
-while (1):
+while 1:
     try:
         sleep(int(args.interval))
     except KeyboardInterrupt:

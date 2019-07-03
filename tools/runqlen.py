@@ -37,19 +37,22 @@ examples = """examples:
 parser = argparse.ArgumentParser(
     description="Summarize scheduler run queue length as a histogram",
     formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog=examples)
-parser.add_argument("-T", "--timestamp", action="store_true",
-    help="include timestamp on output")
-parser.add_argument("-O", "--runqocc", action="store_true",
-    help="report run queue occupancy")
-parser.add_argument("-C", "--cpus", action="store_true",
-    help="print output for each CPU separately")
-parser.add_argument("interval", nargs="?", default=99999999,
-    help="output interval, in seconds")
-parser.add_argument("count", nargs="?", default=99999999,
-    help="number of outputs")
-parser.add_argument("--ebpf", action="store_true",
-    help=argparse.SUPPRESS)
+    epilog=examples,
+)
+parser.add_argument(
+    "-T", "--timestamp", action="store_true", help="include timestamp on output"
+)
+parser.add_argument(
+    "-O", "--runqocc", action="store_true", help="report run queue occupancy"
+)
+parser.add_argument(
+    "-C", "--cpus", action="store_true", help="print output for each CPU separately"
+)
+parser.add_argument(
+    "interval", nargs="?", default=99999999, help="output interval, in seconds"
+)
+parser.add_argument("count", nargs="?", default=99999999, help="number of outputs")
+parser.add_argument("--ebpf", action="store_true", help=argparse.SUPPRESS)
 args = parser.parse_args()
 countdown = int(args.count)
 debug = 0
@@ -90,7 +93,7 @@ unsigned long dummy(struct sched_entity *entity)
 
     # Get a temporary file name
     tmp_file = NamedTemporaryFile(delete=False)
-    tmp_file.close();
+    tmp_file.close()
 
     # Duplicate and close stderr (fd = 2)
     old_stderr = dup(2)
@@ -162,20 +165,23 @@ int do_perf_event()
 
 # code substitutions
 if args.cpus:
-    bpf_text = bpf_text.replace('STORAGE',
-        'BPF_HISTOGRAM(dist, cpu_key_t);')
-    bpf_text = bpf_text.replace('STORE', 'cpu_key_t key = {.slot = len}; ' +
-        'key.cpu = bpf_get_smp_processor_id(); ' +
-        'dist.increment(key);')
+    bpf_text = bpf_text.replace("STORAGE", "BPF_HISTOGRAM(dist, cpu_key_t);")
+    bpf_text = bpf_text.replace(
+        "STORE",
+        "cpu_key_t key = {.slot = len}; "
+        + "key.cpu = bpf_get_smp_processor_id(); "
+        + "dist.increment(key);",
+    )
 else:
-    bpf_text = bpf_text.replace('STORAGE',
-        'BPF_HISTOGRAM(dist, unsigned int);')
-    bpf_text = bpf_text.replace('STORE', 'dist.increment(len);')
+    bpf_text = bpf_text.replace("STORAGE", "BPF_HISTOGRAM(dist, unsigned int);")
+    bpf_text = bpf_text.replace("STORE", "dist.increment(len);")
 
 if check_runnable_weight_field():
-    bpf_text = bpf_text.replace('RUNNABLE_WEIGHT_FIELD', 'unsigned long runnable_weight;')
+    bpf_text = bpf_text.replace(
+        "RUNNABLE_WEIGHT_FIELD", "unsigned long runnable_weight;"
+    )
 else:
-    bpf_text = bpf_text.replace('RUNNABLE_WEIGHT_FIELD', '')
+    bpf_text = bpf_text.replace("RUNNABLE_WEIGHT_FIELD", "")
 
 if debug or args.ebpf:
     print(bpf_text)
@@ -184,16 +190,20 @@ if debug or args.ebpf:
 
 # initialize BPF & perf_events
 b = BPF(text=bpf_text)
-b.attach_perf_event(ev_type=PerfType.SOFTWARE,
-    ev_config=PerfSWConfig.CPU_CLOCK, fn_name="do_perf_event",
-    sample_period=0, sample_freq=frequency)
+b.attach_perf_event(
+    ev_type=PerfType.SOFTWARE,
+    ev_config=PerfSWConfig.CPU_CLOCK,
+    fn_name="do_perf_event",
+    sample_period=0,
+    sample_freq=frequency,
+)
 
 print("Sampling run queue length... Hit Ctrl-C to end.")
 
 # output
 exiting = 0 if args.interval else 1
 dist = b.get_table("dist")
-while (1):
+while 1:
     try:
         sleep(int(args.interval))
     except KeyboardInterrupt:

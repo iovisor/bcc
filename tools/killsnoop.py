@@ -27,13 +27,13 @@ examples = """examples:
 parser = argparse.ArgumentParser(
     description="Trace signals issued by the kill() syscall",
     formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog=examples)
-parser.add_argument("-x", "--failed", action="store_true",
-    help="only show failed kill syscalls")
-parser.add_argument("-p", "--pid",
-    help="trace this PID only")
-parser.add_argument("--ebpf", action="store_true",
-    help=argparse.SUPPRESS)
+    epilog=examples,
+)
+parser.add_argument(
+    "-x", "--failed", action="store_true", help="only show failed kill syscalls"
+)
+parser.add_argument("-p", "--pid", help="trace this PID only")
+parser.add_argument("--ebpf", action="store_true", help=argparse.SUPPRESS)
 args = parser.parse_args()
 debug = 0
 
@@ -100,10 +100,9 @@ int do_ret_sys_kill(struct pt_regs *ctx)
 }
 """
 if args.pid:
-    bpf_text = bpf_text.replace('FILTER',
-        'if (pid != %s) { return 0; }' % args.pid)
+    bpf_text = bpf_text.replace("FILTER", "if (pid != %s) { return 0; }" % args.pid)
 else:
-    bpf_text = bpf_text.replace('FILTER', '')
+    bpf_text = bpf_text.replace("FILTER", "")
 if debug or args.ebpf:
     print(bpf_text)
     if args.ebpf:
@@ -116,18 +115,27 @@ b.attach_kprobe(event=kill_fnname, fn_name="syscall__kill")
 b.attach_kretprobe(event=kill_fnname, fn_name="do_ret_sys_kill")
 
 # header
-print("%-9s %-6s %-16s %-4s %-6s %s" % (
-    "TIME", "PID", "COMM", "SIG", "TPID", "RESULT"))
+print("%-9s %-6s %-16s %-4s %-6s %s" % ("TIME", "PID", "COMM", "SIG", "TPID", "RESULT"))
 
 # process event
 def print_event(cpu, data, size):
     event = b["events"].event(data)
 
-    if (args.failed and (event.ret >= 0)):
+    if args.failed and (event.ret >= 0):
         return
 
-    printb(b"%-9s %-6d %-16s %-4d %-6d %d" % (strftime("%H:%M:%S").encode('ascii'),
-        event.pid, event.comm, event.sig, event.tpid, event.ret))
+    printb(
+        b"%-9s %-6d %-16s %-4d %-6d %d"
+        % (
+            strftime("%H:%M:%S").encode("ascii"),
+            event.pid,
+            event.comm,
+            event.sig,
+            event.tpid,
+            event.ret,
+        )
+    )
+
 
 # loop with callback to print_event
 b["events"].open_perf_buffer(print_event)

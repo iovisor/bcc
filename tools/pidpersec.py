@@ -18,7 +18,8 @@ from ctypes import c_int
 from time import sleep, strftime
 
 # load BPF program
-b = BPF(text="""
+b = BPF(
+    text="""
 #include <uapi/linux/ptrace.h>
 
 enum stat_types {
@@ -34,7 +35,8 @@ static void stats_increment(int key) {
 }
 
 void do_count(struct pt_regs *ctx) { stats_increment(S_COUNT); }
-""")
+"""
+)
 b.attach_kprobe(event="sched_fork", fn_name="do_count")
 
 # stat indexes
@@ -44,12 +46,11 @@ S_COUNT = c_int(1)
 print("Tracing... Ctrl-C to end.")
 
 # output
-while (1):
+while 1:
     try:
         sleep(1)
     except KeyboardInterrupt:
         exit()
 
-    print("%s: PIDs/sec: %d" % (strftime("%H:%M:%S"),
-        b["stats"][S_COUNT].value))
+    print("%s: PIDs/sec: %d" % (strftime("%H:%M:%S"), b["stats"][S_COUNT].value))
     b["stats"].clear()

@@ -25,13 +25,15 @@ examples = """examples:
 parser = argparse.ArgumentParser(
     description="Trace signals issued by the kill() syscall",
     formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog=examples)
-parser.add_argument("-t", "--timestamp", action="store_true",
-    help="include timestamp on output")
-parser.add_argument("-x", "--failed", action="store_true",
-    help="only show failed opens")
-parser.add_argument("-p", "--pid",
-    help="trace this PID only")
+    epilog=examples,
+)
+parser.add_argument(
+    "-t", "--timestamp", action="store_true", help="include timestamp on output"
+)
+parser.add_argument(
+    "-x", "--failed", action="store_true", help="only show failed opens"
+)
+parser.add_argument("-p", "--pid", help="trace this PID only")
 args = parser.parse_args()
 debug = 0
 
@@ -72,10 +74,9 @@ int kretprobe__sys_kill(struct pt_regs *ctx)
 }
 """
 if args.pid:
-    bpf_text = bpf_text.replace('FILTER',
-        'if (pid != %s) { return 0; }' % args.pid)
+    bpf_text = bpf_text.replace("FILTER", "if (pid != %s) { return 0; }" % args.pid)
 else:
-    bpf_text = bpf_text.replace('FILTER', '')
+    bpf_text = bpf_text.replace("FILTER", "")
 if debug:
     print(bpf_text)
 
@@ -95,7 +96,7 @@ while 1:
     (tpid_s, sig_s, ret_s) = msg.split(" ")
 
     ret = int(ret_s)
-    if (args.failed and (ret >= 0)):
+    if args.failed and (ret >= 0):
         continue
 
     # print columns

@@ -38,23 +38,36 @@ examples = """examples:
 parser = argparse.ArgumentParser(
     description="Trace TCP session state changes and durations",
     formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog=examples)
-parser.add_argument("-T", "--time", action="store_true",
-    help="include time column on output (HH:MM:SS)")
-parser.add_argument("-t", "--timestamp", action="store_true",
-    help="include timestamp on output (seconds)")
-parser.add_argument("-w", "--wide", action="store_true",
-    help="wide column output (fits IPv6 addresses)")
-parser.add_argument("-s", "--csv", action="store_true",
-    help="comma separated values output")
-parser.add_argument("-L", "--localport",
-    help="comma-separated list of local ports to trace.")
-parser.add_argument("-D", "--remoteport",
-    help="comma-separated list of remote ports to trace.")
-parser.add_argument("--ebpf", action="store_true",
-    help=argparse.SUPPRESS)
-parser.add_argument("-Y", "--journal", action="store_true",
-    help="log session state changes to the systemd journal")
+    epilog=examples,
+)
+parser.add_argument(
+    "-T", "--time", action="store_true", help="include time column on output (HH:MM:SS)"
+)
+parser.add_argument(
+    "-t",
+    "--timestamp",
+    action="store_true",
+    help="include timestamp on output (seconds)",
+)
+parser.add_argument(
+    "-w", "--wide", action="store_true", help="wide column output (fits IPv6 addresses)"
+)
+parser.add_argument(
+    "-s", "--csv", action="store_true", help="comma separated values output"
+)
+parser.add_argument(
+    "-L", "--localport", help="comma-separated list of local ports to trace."
+)
+parser.add_argument(
+    "-D", "--remoteport", help="comma-separated list of remote ports to trace."
+)
+parser.add_argument("--ebpf", action="store_true", help=argparse.SUPPRESS)
+parser.add_argument(
+    "-Y",
+    "--journal",
+    action="store_true",
+    help="log session state changes to the systemd journal",
+)
 args = parser.parse_args()
 debug = 0
 
@@ -166,24 +179,28 @@ TRACEPOINT_PROBE(sock, inet_sock_set_state)
 }
 """
 
-if (not BPF.tracepoint_exists("sock", "inet_sock_set_state")):
-    print("ERROR: tracepoint sock:inet_sock_set_state missing "
-        "(added in Linux 4.16). Exiting")
+if not BPF.tracepoint_exists("sock", "inet_sock_set_state"):
+    print(
+        "ERROR: tracepoint sock:inet_sock_set_state missing "
+        "(added in Linux 4.16). Exiting"
+    )
     exit()
 
 # code substitutions
 if args.remoteport:
-    dports = [int(dport) for dport in args.remoteport.split(',')]
-    dports_if = ' && '.join(['dport != %d' % dport for dport in dports])
-    bpf_text = bpf_text.replace('FILTER_DPORT',
-        'if (%s) { last.delete(&sk); return 0; }' % dports_if)
+    dports = [int(dport) for dport in args.remoteport.split(",")]
+    dports_if = " && ".join(["dport != %d" % dport for dport in dports])
+    bpf_text = bpf_text.replace(
+        "FILTER_DPORT", "if (%s) { last.delete(&sk); return 0; }" % dports_if
+    )
 if args.localport:
-    lports = [int(lport) for lport in args.localport.split(',')]
-    lports_if = ' && '.join(['lport != %d' % lport for lport in lports])
-    bpf_text = bpf_text.replace('FILTER_LPORT',
-        'if (%s) { last.delete(&sk); return 0; }' % lports_if)
-bpf_text = bpf_text.replace('FILTER_DPORT', '')
-bpf_text = bpf_text.replace('FILTER_LPORT', '')
+    lports = [int(lport) for lport in args.localport.split(",")]
+    lports_if = " && ".join(["lport != %d" % lport for lport in lports])
+    bpf_text = bpf_text.replace(
+        "FILTER_LPORT", "if (%s) { last.delete(&sk); return 0; }" % lports_if
+    )
+bpf_text = bpf_text.replace("FILTER_DPORT", "")
+bpf_text = bpf_text.replace("FILTER_LPORT", "")
 
 if debug or args.ebpf:
     print(bpf_text)
@@ -199,13 +216,14 @@ if debug or args.ebpf:
 # adding an extended mode (-x) to included those columns.
 #
 header_string = "%-16s %-5s %-10.10s %s%-15s %-5s %-15s %-5s %-11s -> %-11s %s"
-format_string = ("%-16x %-5d %-10.10s %s%-15s %-5d %-15s %-5d %-11s " +
-    "-> %-11s %.3f")
+format_string = "%-16x %-5d %-10.10s %s%-15s %-5d %-15s %-5d %-11s " + "-> %-11s %.3f"
 if args.wide:
-    header_string = ("%-16s %-5s %-16.16s %-2s %-26s %-5s %-26s %-5s %-11s " +
-        "-> %-11s %s")
-    format_string = ("%-16x %-5d %-16.16s %-2s %-26s %-5s %-26s %-5d %-11s " +
-        "-> %-11s %.3f")
+    header_string = (
+        "%-16s %-5s %-16.16s %-2s %-26s %-5s %-26s %-5s %-11s " + "-> %-11s %s"
+    )
+    format_string = (
+        "%-16x %-5d %-16.16s %-2s %-26s %-5s %-26s %-5d %-11s " + "-> %-11s %.3f"
+    )
 if args.csv:
     header_string = "%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s"
     format_string = "%x,%d,%s,%s,%s,%s,%s,%d,%s,%s,%.3f"
@@ -240,43 +258,55 @@ def tcpstate2str(state):
     else:
         return str(state)
 
+
 def journal_fields(event, addr_family):
-    addr_pfx = 'IPV4'
+    addr_pfx = "IPV4"
     if addr_family == AF_INET6:
-        addr_pfx = 'IPV6'
+        addr_pfx = "IPV6"
 
     fields = {
         # Standard fields described in systemd.journal-fields(7). journal.send
         # will fill in CODE_LINE, CODE_FILE, and CODE_FUNC for us. If we're
         # root and specify OBJECT_PID, systemd-journald will add other OBJECT_*
         # fields for us.
-        'SYSLOG_IDENTIFIER': 'tcpstates',
-        'PRIORITY': 5,
-        '_SOURCE_REALTIME_TIMESTAMP': time() * 1000000,
-        'OBJECT_PID': str(event.pid),
-        'OBJECT_COMM': event.task.decode('utf-8', 'replace'),
+        "SYSLOG_IDENTIFIER": "tcpstates",
+        "PRIORITY": 5,
+        "_SOURCE_REALTIME_TIMESTAMP": time() * 1000000,
+        "OBJECT_PID": str(event.pid),
+        "OBJECT_COMM": event.task.decode("utf-8", "replace"),
         # Custom fields, aka "stuff we sort of made up".
-        'OBJECT_' + addr_pfx + '_SOURCE_ADDRESS': inet_ntop(addr_family, pack("I", event.saddr)),
-        'OBJECT_TCP_SOURCE_PORT': str(event.ports >> 16),
-        'OBJECT_' + addr_pfx + '_DESTINATION_ADDRESS': inet_ntop(addr_family, pack("I", event.daddr)),
-        'OBJECT_TCP_DESTINATION_PORT': str(event.ports & 0xffff),
-        'OBJECT_TCP_OLD_STATE': tcpstate2str(event.oldstate),
-        'OBJECT_TCP_NEW_STATE': tcpstate2str(event.newstate),
-        'OBJECT_TCP_SPAN_TIME': str(event.span_us)
-        }
+        "OBJECT_"
+        + addr_pfx
+        + "_SOURCE_ADDRESS": inet_ntop(addr_family, pack("I", event.saddr)),
+        "OBJECT_TCP_SOURCE_PORT": str(event.ports >> 16),
+        "OBJECT_"
+        + addr_pfx
+        + "_DESTINATION_ADDRESS": inet_ntop(addr_family, pack("I", event.daddr)),
+        "OBJECT_TCP_DESTINATION_PORT": str(event.ports & 0xFFFF),
+        "OBJECT_TCP_OLD_STATE": tcpstate2str(event.oldstate),
+        "OBJECT_TCP_NEW_STATE": tcpstate2str(event.newstate),
+        "OBJECT_TCP_SPAN_TIME": str(event.span_us),
+    }
 
-    msg_format_string = (u"%(OBJECT_COMM)s " +
-        u"%(OBJECT_" + addr_pfx + "_SOURCE_ADDRESS)s " +
-        u"%(OBJECT_TCP_SOURCE_PORT)s → " +
-        u"%(OBJECT_" + addr_pfx + "_DESTINATION_ADDRESS)s " +
-        u"%(OBJECT_TCP_DESTINATION_PORT)s " +
-        u"%(OBJECT_TCP_OLD_STATE)s → %(OBJECT_TCP_NEW_STATE)s")
-    fields['MESSAGE'] = msg_format_string % (fields)
+    msg_format_string = (
+        u"%(OBJECT_COMM)s "
+        + u"%(OBJECT_"
+        + addr_pfx
+        + "_SOURCE_ADDRESS)s "
+        + u"%(OBJECT_TCP_SOURCE_PORT)s → "
+        + u"%(OBJECT_"
+        + addr_pfx
+        + "_DESTINATION_ADDRESS)s "
+        + u"%(OBJECT_TCP_DESTINATION_PORT)s "
+        + u"%(OBJECT_TCP_OLD_STATE)s → %(OBJECT_TCP_NEW_STATE)s"
+    )
+    fields["MESSAGE"] = msg_format_string % (fields)
 
     if getuid() == 0:
-        del fields['OBJECT_COMM'] # Handled by systemd-journald
+        del fields["OBJECT_COMM"]  # Handled by systemd-journald
 
     return fields
+
 
 # process event
 def print_ipv4_event(cpu, data, size):
@@ -295,14 +325,25 @@ def print_ipv4_event(cpu, data, size):
             print("%.6f," % delta_s, end="")
         else:
             print("%-9.6f " % delta_s, end="")
-    print(format_string % (event.skaddr, event.pid, event.task.decode('utf-8', 'replace'),
-        "4" if args.wide or args.csv else "",
-        inet_ntop(AF_INET, pack("I", event.saddr)), event.ports >> 16,
-        inet_ntop(AF_INET, pack("I", event.daddr)), event.ports & 0xffff,
-        tcpstate2str(event.oldstate), tcpstate2str(event.newstate),
-        float(event.span_us) / 1000))
+    print(
+        format_string
+        % (
+            event.skaddr,
+            event.pid,
+            event.task.decode("utf-8", "replace"),
+            "4" if args.wide or args.csv else "",
+            inet_ntop(AF_INET, pack("I", event.saddr)),
+            event.ports >> 16,
+            inet_ntop(AF_INET, pack("I", event.daddr)),
+            event.ports & 0xFFFF,
+            tcpstate2str(event.oldstate),
+            tcpstate2str(event.newstate),
+            float(event.span_us) / 1000,
+        )
+    )
     if args.journal:
         journal.send(**journal_fields(event, AF_INET))
+
 
 def print_ipv6_event(cpu, data, size):
     event = b["ipv6_events"].event(data)
@@ -320,14 +361,25 @@ def print_ipv6_event(cpu, data, size):
             print("%.6f," % delta_s, end="")
         else:
             print("%-9.6f " % delta_s, end="")
-    print(format_string % (event.skaddr, event.pid, event.task.decode('utf-8', 'replace'),
-        "6" if args.wide or args.csv else "",
-        inet_ntop(AF_INET6, event.saddr), event.ports >> 16,
-        inet_ntop(AF_INET6, event.daddr), event.ports & 0xffff,
-        tcpstate2str(event.oldstate), tcpstate2str(event.newstate),
-        float(event.span_us) / 1000))
+    print(
+        format_string
+        % (
+            event.skaddr,
+            event.pid,
+            event.task.decode("utf-8", "replace"),
+            "6" if args.wide or args.csv else "",
+            inet_ntop(AF_INET6, event.saddr),
+            event.ports >> 16,
+            inet_ntop(AF_INET6, event.daddr),
+            event.ports & 0xFFFF,
+            tcpstate2str(event.oldstate),
+            tcpstate2str(event.newstate),
+            float(event.span_us) / 1000,
+        )
+    )
     if args.journal:
         journal.send(**journal_fields(event, AF_INET6))
+
 
 # initialize BPF
 b = BPF(text=bpf_text)
@@ -343,10 +395,22 @@ if args.timestamp:
         print("%s," % ("TIME(s)"), end="")
     else:
         print("%-9s " % ("TIME(s)"), end="")
-print(header_string % ("SKADDR", "C-PID", "C-COMM",
-    "IP" if args.wide or args.csv else "",
-    "LADDR", "LPORT", "RADDR", "RPORT",
-    "OLDSTATE", "NEWSTATE", "MS"))
+print(
+    header_string
+    % (
+        "SKADDR",
+        "C-PID",
+        "C-COMM",
+        "IP" if args.wide or args.csv else "",
+        "LADDR",
+        "LPORT",
+        "RADDR",
+        "RPORT",
+        "OLDSTATE",
+        "NEWSTATE",
+        "MS",
+    )
+)
 
 start_ts = 0
 

@@ -9,15 +9,19 @@
 from __future__ import print_function
 from bcc import BPF
 import os, sys
-sys.path.append("../compiler") # To get hold of p4toEbpf
-                               # We want to run it without installing it
+
+sys.path.append("../compiler")  # To get hold of p4toEbpf
+# We want to run it without installing it
 import p4toEbpf
 import os
+
 
 def drop_extension(filename):
     return os.path.splitext(os.path.basename(filename))[0]
 
+
 filesFailed = {}  # map error kind -> list[ (file, error) ]
+
 
 def set_error(kind, file, error):
     if kind in filesFailed:
@@ -25,9 +29,11 @@ def set_error(kind, file, error):
     else:
         filesFailed[kind] = [(file, error)]
 
+
 def is_root():
     # Is this code portable?
     return os.getuid() == 0
+
 
 def main():
     testpath = "testprograms"

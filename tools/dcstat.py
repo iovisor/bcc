@@ -21,9 +21,11 @@ from ctypes import c_int
 from time import sleep, strftime
 from sys import argv
 
+
 def usage():
     print("USAGE: %s [interval [count]]" % argv[0])
     exit()
+
 
 # arguments
 interval = 1
@@ -95,11 +97,7 @@ b.attach_kprobe(event="lookup_fast", fn_name="count_fast")
 b.attach_kretprobe(event="d_lookup", fn_name="count_lookup")
 
 # stat column labels and indexes
-stats = {
-    "REFS": 1,
-    "SLOW": 2,
-    "MISS": 3
-}
+stats = {"REFS": 1, "SLOW": 2, "MISS": 3}
 
 # header
 print("%-8s  " % "TIME", end="")
@@ -109,7 +107,7 @@ print(" %8s" % "HIT%")
 
 # output
 i = 0
-while (1):
+while 1:
     if count > 0:
         i += 1
         if i > count:

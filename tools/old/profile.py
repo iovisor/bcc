@@ -62,11 +62,13 @@ def positive_int(val):
         raise argparse.ArgumentTypeError("must be positive")
     return ival
 
+
 def positive_nonzero_int(val):
     ival = positive_int(val)
     if ival == 0:
         raise argparse.ArgumentTypeError("must be nonzero")
     return ival
+
 
 # arguments
 examples = """examples:
@@ -82,33 +84,72 @@ examples = """examples:
 parser = argparse.ArgumentParser(
     description="Profile CPU stack traces at a timed interval",
     formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog=examples)
+    epilog=examples,
+)
 thread_group = parser.add_mutually_exclusive_group()
-thread_group.add_argument("-p", "--pid", type=positive_int,
-    help="profile this PID only")
+thread_group.add_argument(
+    "-p", "--pid", type=positive_int, help="profile this PID only"
+)
 # TODO: add options for user/kernel threads only
 stack_group = parser.add_mutually_exclusive_group()
-stack_group.add_argument("-U", "--user-stacks-only", action="store_true",
-    help="show stacks from user space only (no kernel space stacks)")
-stack_group.add_argument("-K", "--kernel-stacks-only", action="store_true",
-    help="show stacks from kernel space only (no user space stacks)")
-parser.add_argument("-F", "--frequency", type=positive_int, default=49,
-    help="sample frequency, Hertz (default 49)")
-parser.add_argument("-d", "--delimited", action="store_true",
-    help="insert delimiter between kernel/user stacks")
-parser.add_argument("-a", "--annotations", action="store_true",
-    help="add _[k] annotations to kernel frames")
-parser.add_argument("-f", "--folded", action="store_true",
-    help="output folded format, one line per stack (for flame graphs)")
-parser.add_argument("--stack-storage-size", default=2048,
+stack_group.add_argument(
+    "-U",
+    "--user-stacks-only",
+    action="store_true",
+    help="show stacks from user space only (no kernel space stacks)",
+)
+stack_group.add_argument(
+    "-K",
+    "--kernel-stacks-only",
+    action="store_true",
+    help="show stacks from kernel space only (no user space stacks)",
+)
+parser.add_argument(
+    "-F",
+    "--frequency",
+    type=positive_int,
+    default=49,
+    help="sample frequency, Hertz (default 49)",
+)
+parser.add_argument(
+    "-d",
+    "--delimited",
+    action="store_true",
+    help="insert delimiter between kernel/user stacks",
+)
+parser.add_argument(
+    "-a",
+    "--annotations",
+    action="store_true",
+    help="add _[k] annotations to kernel frames",
+)
+parser.add_argument(
+    "-f",
+    "--folded",
+    action="store_true",
+    help="output folded format, one line per stack (for flame graphs)",
+)
+parser.add_argument(
+    "--stack-storage-size",
+    default=2048,
     type=positive_nonzero_int,
     help="the number of unique stack traces that can be stored and "
-        "displayed (default 2048)")
-parser.add_argument("-S", "--kernel-skip", type=positive_int, default=0,
-    help="skip this many kernel frames (default 3)")
-parser.add_argument("duration", nargs="?", default=99999999,
+    "displayed (default 2048)",
+)
+parser.add_argument(
+    "-S",
+    "--kernel-skip",
+    type=positive_int,
+    default=0,
+    help="skip this many kernel frames (default 3)",
+)
+parser.add_argument(
+    "duration",
+    nargs="?",
+    default=99999999,
     type=positive_nonzero_int,
-    help="duration of trace, in seconds")
+    help="duration of trace, in seconds",
+)
 
 # option logic
 args = parser.parse_args()
@@ -116,8 +157,9 @@ skip = args.kernel_skip
 pid = int(args.pid) if args.pid is not None else -1
 duration = int(args.duration)
 debug = 0
-need_delimiter = args.delimited and not (args.kernel_stacks_only or
-    args.user_stacks_only)
+need_delimiter = args.delimited and not (
+    args.kernel_stacks_only or args.user_stacks_only
+)
 # TODO: add stack depth, and interval
 
 #
@@ -195,21 +237,21 @@ thread_context = ""
 perf_filter = "-a"
 if args.pid is not None:
     thread_context = "PID %s" % args.pid
-    thread_filter = 'pid == %s' % args.pid
-    perf_filter = '-p %s' % args.pid
+    thread_filter = "pid == %s" % args.pid
+    perf_filter = "-p %s" % args.pid
 else:
     thread_context = "all threads"
-    thread_filter = '1'
-bpf_text = bpf_text.replace('THREAD_FILTER', thread_filter)
+    thread_filter = "1"
+bpf_text = bpf_text.replace("THREAD_FILTER", thread_filter)
 
 # set stack storage size
-bpf_text = bpf_text.replace('STACK_STORAGE_SIZE', str(args.stack_storage_size))
+bpf_text = bpf_text.replace("STACK_STORAGE_SIZE", str(args.stack_storage_size))
 
 # handle stack args
-kernel_stack_get = "stack_traces.get_stackid(args, " \
-    "%d | BPF_F_REUSE_STACKID)" % skip
-user_stack_get = \
+kernel_stack_get = "stack_traces.get_stackid(args, " "%d | BPF_F_REUSE_STACKID)" % skip
+user_stack_get = (
     "stack_traces.get_stackid(args, BPF_F_REUSE_STACKID | BPF_F_USER_STACK)"
+)
 stack_context = ""
 if args.user_stacks_only:
     stack_context = "user"
@@ -219,28 +261,32 @@ elif args.kernel_stacks_only:
     user_stack_get = "-1"
 else:
     stack_context = "user + kernel"
-bpf_text = bpf_text.replace('USER_STACK_GET', user_stack_get)
-bpf_text = bpf_text.replace('KERNEL_STACK_GET', kernel_stack_get)
+bpf_text = bpf_text.replace("USER_STACK_GET", user_stack_get)
+bpf_text = bpf_text.replace("KERNEL_STACK_GET", kernel_stack_get)
 if skip:
     # don't record the rip, as we won't use it
-    bpf_text = bpf_text.replace('DO_KERNEL_RIP', '0')
+    bpf_text = bpf_text.replace("DO_KERNEL_RIP", "0")
 else:
     # rip is used to skip interrupt infrastructure frames
-    bpf_text = bpf_text.replace('DO_KERNEL_RIP', '1')
+    bpf_text = bpf_text.replace("DO_KERNEL_RIP", "1")
 
 # header
 if not args.folded:
-    print("Sampling at %d Hertz of %s by %s stack" %
-        (args.frequency, thread_context, stack_context), end="")
+    print(
+        "Sampling at %d Hertz of %s by %s stack"
+        % (args.frequency, thread_context, stack_context),
+        end="",
+    )
     if duration < 99999999:
         print(" for %d secs." % duration)
     else:
         print("... Hit Ctrl-C to end.")
 
 # kprobe perf_misc_flags()
-bpf_text = bpf_text.replace('PERF_TRACE_EVENT',
-    'int kprobe__perf_misc_flags(struct pt_regs *args)')
-bpf_text = bpf_text.replace('REGS_LOCATION', 'PT_REGS_PARM1(args)')
+bpf_text = bpf_text.replace(
+    "PERF_TRACE_EVENT", "int kprobe__perf_misc_flags(struct pt_regs *args)"
+)
+bpf_text = bpf_text.replace("REGS_LOCATION", "PT_REGS_PARM1(args)")
 if debug:
     print(bpf_text)
 
@@ -248,14 +294,17 @@ if debug:
 try:
     b = BPF(text=bpf_text)
 except:
-    print("BPF initialization failed. perf_misc_flags() may be inlined in " +
-        "your kernel build.\nThis tool will be updated in the future to " +
-        "support Linux 4.9, which has reliable profiling support. Exiting.")
+    print(
+        "BPF initialization failed. perf_misc_flags() may be inlined in "
+        + "your kernel build.\nThis tool will be updated in the future to "
+        + "support Linux 4.9, which has reliable profiling support. Exiting."
+    )
     exit()
 
 # signal handler
 def signal_ignore(signal, frame):
     print()
+
 
 #
 # Setup perf_events
@@ -263,13 +312,15 @@ def signal_ignore(signal, frame):
 
 # use perf_events to sample
 try:
-    Perf.perf_event_open(0, pid=-1, ptype=Perf.PERF_TYPE_SOFTWARE,
-        freq=args.frequency)
+    Perf.perf_event_open(0, pid=-1, ptype=Perf.PERF_TYPE_SOFTWARE, freq=args.frequency)
 except:
-    print("ERROR: initializing perf_events for sampling.\n"
+    print(
+        "ERROR: initializing perf_events for sampling.\n"
         "To debug this, try running the following command:\n"
         "    perf record -F 49 -e cpu-clock %s -- sleep 1\n"
-        "If that also doesn't work, fix it first." % perf_filter, file=stderr)
+        "If that also doesn't work, fix it first." % perf_filter,
+        file=stderr,
+    )
     exit(0)
 
 #
@@ -286,11 +337,13 @@ except KeyboardInterrupt:
 if not args.folded:
     print()
 
+
 def aksym(addr):
     if args.annotations:
         return b.ksym(addr) + "_[k]"
     else:
         return b.ksym(addr)
+
 
 # output stacks
 missing_stacks = 0
@@ -299,20 +352,22 @@ counts = b.get_table("counts")
 stack_traces = b.get_table("stack_traces")
 for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
     # handle get_stackid erorrs
-    if (not args.user_stacks_only and k.kernel_stack_id < 0 and
-            k.kernel_stack_id != -errno.EFAULT) or \
-            (not args.kernel_stacks_only and k.user_stack_id < 0 and
-            k.user_stack_id != -errno.EFAULT):
+    if (
+        not args.user_stacks_only
+        and k.kernel_stack_id < 0
+        and k.kernel_stack_id != -errno.EFAULT
+    ) or (
+        not args.kernel_stacks_only
+        and k.user_stack_id < 0
+        and k.user_stack_id != -errno.EFAULT
+    ):
         missing_stacks += 1
         # check for an ENOMEM error
-        if k.kernel_stack_id == -errno.ENOMEM or \
-                k.user_stack_id == -errno.ENOMEM:
+        if k.kernel_stack_id == -errno.ENOMEM or k.user_stack_id == -errno.ENOMEM:
             has_enomem = True
 
-    user_stack = [] if k.user_stack_id < 0 else \
-        stack_traces.walk(k.user_stack_id)
-    kernel_tmp = [] if k.kernel_stack_id < 0 else \
-        stack_traces.walk(k.kernel_stack_id)
+    user_stack = [] if k.user_stack_id < 0 else stack_traces.walk(k.user_stack_id)
+    kernel_tmp = [] if k.kernel_stack_id < 0 else stack_traces.walk(k.kernel_stack_id)
 
     # fix kernel stack
     kernel_stack = []
@@ -339,10 +394,12 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
         # print folded stack output
         user_stack = list(user_stack)
         kernel_stack = list(kernel_stack)
-        line = [k.name.decode('utf-8', 'replace')] + \
-            [b.sym(addr, k.pid) for addr in reversed(user_stack)] + \
-            (do_delimiter and ["-"] or []) + \
-            [aksym(addr) for addr in reversed(kernel_stack)]
+        line = (
+            [k.name.decode("utf-8", "replace")]
+            + [b.sym(addr, k.pid) for addr in reversed(user_stack)]
+            + (do_delimiter and ["-"] or [])
+            + [aksym(addr) for addr in reversed(kernel_stack)]
+        )
         print("%s %d" % (";".join(line), v.value))
     else:
         # print default multi-line stack output.
@@ -357,8 +414,9 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
 
 # check missing
 if missing_stacks > 0:
-    enomem_str = "" if not has_enomem else \
-        " Consider increasing --stack-storage-size."
-    print("WARNING: %d stack traces could not be displayed.%s" %
-        (missing_stacks, enomem_str),
-        file=stderr)
+    enomem_str = "" if not has_enomem else " Consider increasing --stack-storage-size."
+    print(
+        "WARNING: %d stack traces could not be displayed.%s"
+        % (missing_stacks, enomem_str),
+        file=stderr,
+    )

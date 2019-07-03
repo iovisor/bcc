@@ -13,7 +13,8 @@ from bcc import BPF
 from bcc.utils import printb
 
 # load BPF program
-b = BPF(text="""
+b = BPF(
+    text="""
 #include <uapi/linux/ptrace.h>
 
 BPF_HASH(last);
@@ -37,7 +38,8 @@ int do_trace(struct pt_regs *ctx) {
     last.update(&key, &ts);
     return 0;
 }
-""")
+"""
+)
 
 b.attach_kprobe(event=b.get_syscall_fnname("sync"), fn_name="do_trace")
 print("Tracing for quick sync's... Ctrl-C to end")

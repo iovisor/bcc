@@ -28,20 +28,18 @@ examples = """examples:
 parser = argparse.ArgumentParser(
     description="Trace shm*() syscalls",
     formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog=examples)
-parser.add_argument("-T", "--timestamp", action="store_true",
-    help="include timestamp on output")
-parser.add_argument("-p", "--pid",
-    help="trace this PID only")
-parser.add_argument("-t", "--tid",
-    help="trace this TID only")
-parser.add_argument("-d", "--duration",
-    help="total duration of trace in seconds")
-parser.add_argument("-n", "--name",
-    type=ArgString,
-    help="only print process names containing this name")
-parser.add_argument("--ebpf", action="store_true",
-    help=argparse.SUPPRESS)
+    epilog=examples,
+)
+parser.add_argument(
+    "-T", "--timestamp", action="store_true", help="include timestamp on output"
+)
+parser.add_argument("-p", "--pid", help="trace this PID only")
+parser.add_argument("-t", "--tid", help="trace this TID only")
+parser.add_argument("-d", "--duration", help="total duration of trace in seconds")
+parser.add_argument(
+    "-n", "--name", type=ArgString, help="only print process names containing this name"
+)
+parser.add_argument("--ebpf", action="store_true", help=argparse.SUPPRESS)
 args = parser.parse_args()
 debug = 0
 if args.duration:
@@ -161,13 +159,11 @@ int syscall__shmctl(struct pt_regs *ctx, u64 shmid, u64 cmd, u64 buf)
 
 """
 if args.tid:  # TID trumps PID
-    bpf_text = bpf_text.replace('FILTER',
-        'if (tid != %s) { return 0; }' % args.tid)
+    bpf_text = bpf_text.replace("FILTER", "if (tid != %s) { return 0; }" % args.tid)
 elif args.pid:
-    bpf_text = bpf_text.replace('FILTER',
-        'if (pid != %s) { return 0; }' % args.pid)
+    bpf_text = bpf_text.replace("FILTER", "if (pid != %s) { return 0; }" % args.pid)
 else:
-    bpf_text = bpf_text.replace('FILTER', '')
+    bpf_text = bpf_text.replace("FILTER", "")
 
 if debug or args.ebpf:
     print(bpf_text)
@@ -197,11 +193,11 @@ if BPF.ksymname(syscall_fnname) != -1:
     b.attach_kprobe(event=syscall_fnname, fn_name="syscall__shmctl")
     b.attach_kretprobe(event=syscall_fnname, fn_name="trace_return")
 
-TASK_COMM_LEN = 16    # linux/sched.h
+TASK_COMM_LEN = 16  # linux/sched.h
 
 SYS_SHMGET = 0
-SYS_SHMAT  = 1
-SYS_SHMDT  = 2
+SYS_SHMAT = 1
+SYS_SHMDT = 2
 SYS_SHMCTL = 3
 
 initial_ts = 0
@@ -209,40 +205,42 @@ initial_ts = 0
 # header
 if args.timestamp:
     print("%-14s" % ("TIME(s)"), end="")
-print("%-6s %-16s %6s %16s ARGs" %
-      ("TID" if args.tid else "PID", "COMM", "SYS", "RET"))
+print("%-6s %-16s %6s %16s ARGs" % ("TID" if args.tid else "PID", "COMM", "SYS", "RET"))
+
 
 def sys_name(sys):
     switcher = {
         SYS_SHMGET: "SHMGET",
-        SYS_SHMAT:  "SHMAT",
-        SYS_SHMDT:  "SHMDT",
+        SYS_SHMAT: "SHMAT",
+        SYS_SHMDT: "SHMDT",
         SYS_SHMCTL: "SHMCTL",
     }
     return switcher.get(sys, "N/A")
 
+
 shmget_flags = [
-  { 'name' : 'IPC_CREAT',     'value' :    0o1000 },
-  { 'name' : 'IPC_EXCL',      'value' :    0o2000 },
-  { 'name' : 'SHM_HUGETLB',   'value' :    0o4000 },
-  { 'name' : 'SHM_HUGE_2MB',  'value' :  21 << 26 },
-  { 'name' : 'SHM_HUGE_1GB',  'value' :  30 << 26 },
-  { 'name' : 'SHM_NORESERVE', 'value' :   0o10000 },
-  { 'name' : 'SHM_EXEC',      'value' :  0o100000 }
+    {"name": "IPC_CREAT", "value": 0o1000},
+    {"name": "IPC_EXCL", "value": 0o2000},
+    {"name": "SHM_HUGETLB", "value": 0o4000},
+    {"name": "SHM_HUGE_2MB", "value": 21 << 26},
+    {"name": "SHM_HUGE_1GB", "value": 30 << 26},
+    {"name": "SHM_NORESERVE", "value": 0o10000},
+    {"name": "SHM_EXEC", "value": 0o100000},
 ]
 
 shmat_flags = [
-  { 'name' : 'SHM_RDONLY', 'value' :  0o10000 },
-  { 'name' : 'SHM_RND',    'value' :  0o20000 },
-  { 'name' : 'SHM_REMAP',  'value' :  0o40000 },
-  { 'name' : 'SHM_EXEC',   'value' : 0o100000 },
+    {"name": "SHM_RDONLY", "value": 0o10000},
+    {"name": "SHM_RND", "value": 0o20000},
+    {"name": "SHM_REMAP", "value": 0o40000},
+    {"name": "SHM_EXEC", "value": 0o100000},
 ]
 
+
 def shmflg_str(val, flags):
-    cur = filter(lambda x : x['value'] & val, flags)
+    cur = filter(lambda x: x["value"] & val, flags)
     str = "0x%x" % val
 
-    if (not val):
+    if not val:
         return str
 
     str += " ("
@@ -250,8 +248,8 @@ def shmflg_str(val, flags):
     for x in cur:
         if cnt:
             str += "|"
-        str +=  x['name']
-        val &= ~x['value']
+        str += x["name"]
+        val &= ~x["value"]
         cnt += 1
 
     if val != 0 or not cnt:
@@ -261,6 +259,7 @@ def shmflg_str(val, flags):
 
     str += ")"
     return str
+
 
 # process event
 def print_event(cpu, data, size):
@@ -277,23 +276,35 @@ def print_event(cpu, data, size):
         delta = event.ts - initial_ts
         print("%-14.9f" % (float(delta) / 1000000), end="")
 
-    print("%-6d %-16s %6s %16lx " %
-          (event.id & 0xffffffff if args.tid else event.id >> 32,
-           event.comm.decode(), sys_name(event.sys), event.ret), end = '')
+    print(
+        "%-6d %-16s %6s %16lx "
+        % (
+            event.id & 0xFFFFFFFF if args.tid else event.id >> 32,
+            event.comm.decode(),
+            sys_name(event.sys),
+            event.ret,
+        ),
+        end="",
+    )
 
     if event.sys == SYS_SHMGET:
-        print("key: 0x%lx, size: %lu, shmflg: %s" %
-              (event.key, event.size, shmflg_str(event.shmflg, shmget_flags)))
+        print(
+            "key: 0x%lx, size: %lu, shmflg: %s"
+            % (event.key, event.size, shmflg_str(event.shmflg, shmget_flags))
+        )
 
     if event.sys == SYS_SHMAT:
-        print("shmid: 0x%lx, shmaddr: 0x%lx, shmflg: %s" %
-              (event.shmid, event.shmaddr, shmflg_str(event.shmflg, shmat_flags)))
+        print(
+            "shmid: 0x%lx, shmaddr: 0x%lx, shmflg: %s"
+            % (event.shmid, event.shmaddr, shmflg_str(event.shmflg, shmat_flags))
+        )
 
     if event.sys == SYS_SHMDT:
         print("shmaddr: 0x%lx" % (event.shmaddr))
 
     if event.sys == SYS_SHMCTL:
         print("shmid: 0x%lx, cmd: %lu, buf: 0x%x" % (event.shmid, event.cmd, event.buf))
+
 
 # loop with callback to print_event
 b["events"].open_perf_buffer(print_event, page_cnt=64)

@@ -16,7 +16,8 @@ from __future__ import print_function
 from bcc import BPF
 
 # load BPF program
-b = BPF(text="""
+b = BPF(
+    text="""
 #include <uapi/linux/ptrace.h>
 #include <linux/blkdev.h>
 
@@ -94,16 +95,19 @@ int trace_req_completion(struct pt_regs *ctx, struct request *req)
 
     return 0;
 }
-""", debug=0)
+""",
+    debug=0,
+)
 b.attach_kprobe(event="blk_account_io_start", fn_name="trace_pid_start")
 b.attach_kprobe(event="blk_start_request", fn_name="trace_req_start")
 b.attach_kprobe(event="blk_mq_start_request", fn_name="trace_req_start")
-b.attach_kprobe(event="blk_account_io_completion",
-    fn_name="trace_req_completion")
+b.attach_kprobe(event="blk_account_io_completion", fn_name="trace_req_completion")
 
 # header
-print("%-14s %-14s %-6s %-7s %-2s %-9s %-7s %7s" % ("TIME(s)", "COMM", "PID",
-    "DISK", "T", "SECTOR", "BYTES", "LAT(ms)"))
+print(
+    "%-14s %-14s %-6s %-7s %-2s %-9s %-7s %7s"
+    % ("TIME(s)", "COMM", "PID", "DISK", "T", "SECTOR", "BYTES", "LAT(ms)")
+)
 
 start_ts = 0
 
@@ -119,11 +123,11 @@ while 1:
         (real_pid, real_comm, bytes_s) = (args[1], args[2], args[3])
         continue
     else:
-        (type_s, disk_s, sector_s, us_s) = (args[1], args[2], args[3],
-            args[4])
+        (type_s, disk_s, sector_s, us_s) = (args[1], args[2], args[3], args[4])
 
     ms = float(int(us_s, 10)) / 1000
 
-    print("%-14.9f %-14.14s %-6s %-7s %-2s %-9s %-7s %7.2f" % (
-        ts - start_ts, real_comm, real_pid, disk_s, type_s, sector_s,
-        bytes_s, ms))
+    print(
+        "%-14.9f %-14.14s %-6s %-7s %-2s %-9s %-7s %7.2f"
+        % (ts - start_ts, real_comm, real_pid, disk_s, type_s, sector_s, bytes_s, ms)
+    )

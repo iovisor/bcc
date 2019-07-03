@@ -30,12 +30,12 @@ end = """
            return 0;
         }
       """
-for i in range(0,300):
+for i in range(0, 300):
     text += repeat
 text += end
 
-class TestBPFProgLoad(TestCase):
 
+class TestBPFProgLoad(TestCase):
     def setUp(self):
         self.fp = tempfile.TemporaryFile()
         os.dup2(self.fp.fileno(), sys.stderr.fileno())
@@ -43,21 +43,19 @@ class TestBPFProgLoad(TestCase):
     def tearDown(self):
         self.fp.close()
 
-
     def test_log_debug(self):
         b = BPF(text=text, debug=2)
         try:
-            ingress = b.load_func("sim_port",BPF.SCHED_CLS)
+            ingress = b.load_func("sim_port", BPF.SCHED_CLS)
         except Exception:
             self.fp.flush()
             self.fp.seek(0)
             self.assertEqual(error_msg in self.fp.read().decode(), True)
 
-
     def test_log_no_debug(self):
         b = BPF(text=text, debug=0)
         try:
-            ingress = b.load_func("sim_port",BPF.SCHED_CLS)
+            ingress = b.load_func("sim_port", BPF.SCHED_CLS)
         except Exception:
             self.fp.flush()
             self.fp.seek(0)
@@ -66,5 +64,3 @@ class TestBPFProgLoad(TestCase):
 
 if __name__ == "__main__":
     main()
-
-

@@ -28,28 +28,50 @@ examples = """
 parser = argparse.ArgumentParser(
     description="",
     formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog=examples)
-parser.add_argument("-v", "--verbose", action="store_true",
-    help="print the BPF program")
-parser.add_argument("db", choices=["mysql", "postgres"],
-    help="the database engine to use")
-parser.add_argument("-p", "--pid", type=int, nargs='*',
-    dest="pids", metavar="PID", help="the pid(s) to trace")
-parser.add_argument("-m", "--threshold", type=int, default=0,
-    help="trace queries slower than this threshold (ms)")
-parser.add_argument("-u", "--microseconds", action="store_true",
-    help="display query latencies in microseconds (default: milliseconds)")
-parser.add_argument("-i", "--interval", type=int, default=99999999999,
-    help="print summary at this interval (seconds)")
+    epilog=examples,
+)
+parser.add_argument(
+    "-v", "--verbose", action="store_true", help="print the BPF program"
+)
+parser.add_argument(
+    "db", choices=["mysql", "postgres"], help="the database engine to use"
+)
+parser.add_argument(
+    "-p",
+    "--pid",
+    type=int,
+    nargs="*",
+    dest="pids",
+    metavar="PID",
+    help="the pid(s) to trace",
+)
+parser.add_argument(
+    "-m",
+    "--threshold",
+    type=int,
+    default=0,
+    help="trace queries slower than this threshold (ms)",
+)
+parser.add_argument(
+    "-u",
+    "--microseconds",
+    action="store_true",
+    help="display query latencies in microseconds (default: milliseconds)",
+)
+parser.add_argument(
+    "-i",
+    "--interval",
+    type=int,
+    default=99999999999,
+    help="print summary at this interval (seconds)",
+)
 args = parser.parse_args()
 
 if not args.pids or len(args.pids) == 0:
     if args.db == "mysql":
-        args.pids = map(int, subprocess.check_output(
-                                        "pidof mysqld".split()).split())
+        args.pids = map(int, subprocess.check_output("pidof mysqld".split()).split())
     elif args.db == "postgres":
-        args.pids = map(int, subprocess.check_output(
-                                        "pidof postgres".split()).split())
+        args.pids = map(int, subprocess.check_output("pidof postgres".split()).split())
 
 program = """
 #include <uapi/linux/ptrace.h>
@@ -80,8 +102,12 @@ int probe_end(struct pt_regs *ctx) {
 }
 """
 program = program.replace("SCALE", str(1000 if args.microseconds else 1000000))
-program = program.replace("FILTER", "" if args.threshold == 0 else
-        "if (delta / 1000000 < %d) { return 0; }" % args.threshold)
+program = program.replace(
+    "FILTER",
+    ""
+    if args.threshold == 0
+    else "if (delta / 1000000 < %d) { return 0; }" % args.threshold,
+)
 
 usdts = map(lambda pid: USDT(pid=pid), args.pids)
 for usdt in usdts:
@@ -89,22 +115,27 @@ for usdt in usdts:
     usdt.enable_probe("query__done", "probe_end")
 
 if args.verbose:
-    print('\n'.join(map(lambda u: u.get_text(), usdts)))
+    print("\n".join(map(lambda u: u.get_text(), usdts)))
     print(program)
 
 bpf = BPF(text=program, usdt_contexts=usdts)
 
-print("Tracing database queries for pids %s slower than %d ms..." %
-      (', '.join(map(str, args.pids)), args.threshold))
+print(
+    "Tracing database queries for pids %s slower than %d ms..."
+    % (", ".join(map(str, args.pids)), args.threshold)
+)
 
 latencies = bpf["latency"]
 
+
 def print_hist():
     print("[%s]" % strftime("%H:%M:%S"))
-    latencies.print_log2_hist("query latency (%s)" %
-                              ("us" if args.microseconds else "ms"))
+    latencies.print_log2_hist(
+        "query latency (%s)" % ("us" if args.microseconds else "ms")
+    )
     print("")
     latencies.clear()
+
 
 while True:
     try:

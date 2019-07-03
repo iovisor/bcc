@@ -29,14 +29,16 @@ import errno
 import multiprocessing
 import ctypes as ct
 
+
 def Get_libc_path():
-  # A small helper function that returns full path
-  # of libc in the system
-  cmd = 'cat /proc/self/maps | grep libc | awk \'{print $6}\' | uniq'
-  output = subprocess.check_output(cmd, shell=True)
-  if not isinstance(output, str):
-    output = output.decode()
-  return output.split('\n')[0]
+    # A small helper function that returns full path
+    # of libc in the system
+    cmd = "cat /proc/self/maps | grep libc | awk '{print $6}' | uniq"
+    output = subprocess.check_output(cmd, shell=True)
+    if not isinstance(output, str):
+        output = output.decode()
+    return output.split("\n")[0]
+
 
 bpf_text = """
 #include <uapi/linux/ptrace.h>
@@ -68,9 +70,14 @@ int do_perf_event(struct bpf_perf_event_data *ctx) {
 """
 
 b = BPF(text=bpf_text)
-b.attach_perf_event(ev_type=PerfType.SOFTWARE,
-    ev_config=PerfSWConfig.CPU_CLOCK, fn_name="do_perf_event",
-    sample_period=0, sample_freq=49, cpu=0)
+b.attach_perf_event(
+    ev_type=PerfType.SOFTWARE,
+    ev_config=PerfSWConfig.CPU_CLOCK,
+    fn_name="do_perf_event",
+    sample_period=0,
+    sample_freq=49,
+    cpu=0,
+)
 
 # Add the list of libraries/executables to the build sym cache for sym resolution
 # Change the libc path if it is different on a different machine.
@@ -83,8 +90,10 @@ counts = b.get_table("counts")
 stack_traces = b.get_table("stack_traces")
 duration = 2
 
+
 def signal_handler(signal, frame):
-  print()
+    print()
+
 
 try:
     sleep(duration)
@@ -92,14 +101,12 @@ except KeyboardInterrupt:
     # as cleanup can take some time, trap Ctrl-C:
     signal.signal(signal.SIGINT, signal_ignore)
 
-user_stack=[]
-for k,v in sorted(counts.items(), key=lambda counts: counts[1].value):
-  user_stack = [] if k.user_stack_id < 0 else \
-      stack_traces.walk(k.user_stack_id)
+user_stack = []
+for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
+    user_stack = [] if k.user_stack_id < 0 else stack_traces.walk(k.user_stack_id)
 
-  user_stack=list(user_stack)
-  for addr in user_stack:
-    print("    %s" % b.sym(addr, k.pid).decode('utf-8', 'replace'))
-  print("    %-16s %s (%d)" % ("-", k.name.decode('utf-8', 'replace'), k.pid))
-  print("        %d\n" % v.value)
-
+    user_stack = list(user_stack)
+    for addr in user_stack:
+        print("    %s" % b.sym(addr, k.pid).decode("utf-8", "replace"))
+    print("    %-16s %s (%d)" % ("-", k.name.decode("utf-8", "replace"), k.pid))
+    print("        %d\n" % v.value)

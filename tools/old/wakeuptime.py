@@ -33,22 +33,25 @@ examples = """examples:
 parser = argparse.ArgumentParser(
     description="Summarize sleep to wakeup time by waker kernel stack",
     formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog=examples)
-parser.add_argument("-u", "--useronly", action="store_true",
-    help="user threads only (no kernel threads)")
-parser.add_argument("-p", "--pid",
-    help="trace this PID only")
-parser.add_argument("-v", "--verbose", action="store_true",
-    help="show raw addresses")
-parser.add_argument("-f", "--folded", action="store_true",
-    help="output folded format")
-parser.add_argument("duration", nargs="?", default=99999999,
-    help="duration of trace, in seconds")
+    epilog=examples,
+)
+parser.add_argument(
+    "-u",
+    "--useronly",
+    action="store_true",
+    help="user threads only (no kernel threads)",
+)
+parser.add_argument("-p", "--pid", help="trace this PID only")
+parser.add_argument("-v", "--verbose", action="store_true", help="show raw addresses")
+parser.add_argument("-f", "--folded", action="store_true", help="output folded format")
+parser.add_argument(
+    "duration", nargs="?", default=99999999, help="duration of trace, in seconds"
+)
 args = parser.parse_args()
 folded = args.folded
 duration = int(args.duration)
 debug = 0
-maxdepth = 20    # and MAXDEPTH
+maxdepth = 20  # and MAXDEPTH
 if args.pid and args.useronly:
     print("ERROR: use either -p or -u.")
     exit()
@@ -56,6 +59,7 @@ if args.pid and args.useronly:
 # signal handler
 def signal_ignore(signal, frame):
     print()
+
 
 # define BPF program
 bpf_text = """
@@ -159,12 +163,12 @@ out:
 }
 """
 if args.pid:
-    filter = 'pid != %s' % args.pid
+    filter = "pid != %s" % args.pid
 elif args.useronly:
-    filter = 'p->flags & PF_KTHREAD'
+    filter = "p->flags & PF_KTHREAD"
 else:
-    filter = '0'
-bpf_text = bpf_text.replace('FILTER', filter)
+    filter = "0"
+bpf_text = bpf_text.replace("FILTER", filter)
 if debug:
     print(bpf_text)
 
@@ -186,7 +190,7 @@ if not folded:
         print("... Hit Ctrl-C to end.")
 
 # output
-while (1):
+while 1:
     try:
         sleep(duration)
     except KeyboardInterrupt:
@@ -199,23 +203,22 @@ while (1):
     for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
         if folded:
             # print folded stack output
-            line = k.waker.decode('utf-8', 'replace') + ";"
+            line = k.waker.decode("utf-8", "replace") + ";"
             for i in reversed(range(0, maxdepth)):
                 if k.ret[i] == 0:
                     continue
                 line = line + b.ksym(k.ret[i])
                 if i != 0:
                     line = line + ";"
-            print("%s;%s %d" % (line, k.target.decode('utf-8', 'replace'), v.value))
+            print("%s;%s %d" % (line, k.target.decode("utf-8", "replace"), v.value))
         else:
             # print default multi-line stack output
-            print("    %-16s %s" % ("target:", k.target.decode('utf-8', 'replace')))
+            print("    %-16s %s" % ("target:", k.target.decode("utf-8", "replace")))
             for i in range(0, maxdepth):
                 if k.ret[i] == 0:
                     break
-                print("    %-16x %s" % (k.ret[i],
-                    b.ksym(k.ret[i])))
-            print("    %-16s %s" % ("waker:", k.waker.decode('utf-8', 'replace')))
+                print("    %-16x %s" % (k.ret[i], b.ksym(k.ret[i])))
+            print("    %-16s %s" % ("waker:", k.waker.decode("utf-8", "replace")))
             print("        %d\n" % v.value)
     counts.clear()
 

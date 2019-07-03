@@ -1,10 +1,18 @@
 # Copyright (c) Barefoot Networks, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
 
-from p4_hlir.hlir import parse_call, p4_field, p4_parse_value_set, \
-    P4_DEFAULT, p4_parse_state, p4_table, \
-    p4_conditional_node, p4_parser_exception, \
-    p4_header_instance, P4_NEXT
+from p4_hlir.hlir import (
+    parse_call,
+    p4_field,
+    p4_parse_value_set,
+    P4_DEFAULT,
+    p4_parse_state,
+    p4_table,
+    p4_conditional_node,
+    p4_parser_exception,
+    p4_header_instance,
+    P4_NEXT,
+)
 import ebpfProgram
 import ebpfStructType
 import ebpfInstance
@@ -27,8 +35,9 @@ class EbpfParser(object):
         for op in self.parser.call_sequence:
             self.serializeOperation(serializer, op, program)
 
-        self.serializeBranch(serializer, self.parser.branch_on,
-                             self.parser.branch_to, program)
+        self.serializeBranch(
+            serializer, self.parser.branch_on, self.parser.branch_to, program
+        )
 
         serializer.blockEnd(True)
 
@@ -55,8 +64,9 @@ class EbpfParser(object):
                     elif instance.index is P4_NEXT:
                         index = "[" + ebpfStack.indexVar + "]"
                     else:
-                        raise CompilationException(True,
-                            "Unexpected index for array {0}", instance.index)
+                        raise CompilationException(
+                            True, "Unexpected index for array {0}", instance.index
+                        )
                     basetype = ebpfStack.basetype
                     name = ebpfStack.name
                 else:
@@ -69,28 +79,30 @@ class EbpfParser(object):
                 assert isinstance(ebpfField, ebpfStructType.EbpfField)
 
                 totalWidth += ebpfField.widthInBits()
-                fieldReference = (program.headerStructName + "." + name +
-                                  index + "." + ebpfField.name)
+                fieldReference = (
+                    program.headerStructName + "." + name + index + "." + ebpfField.name
+                )
 
                 if switchValue == "":
                     switchValue = fieldReference
                 else:
-                    switchValue = ("(" + switchValue + " << " +
-                                   str(ebpfField.widthInBits()) + ")")
+                    switchValue = (
+                        "(" + switchValue + " << " + str(ebpfField.widthInBits()) + ")"
+                    )
                     switchValue = switchValue + " | " + fieldReference
             elif isinstance(e, tuple):
                 switchValue = self.currentReferenceAsString(e, program)
             else:
-                raise CompilationException(
-                    True, "Unexpected element in match {0}", e)
+                raise CompilationException(True, "Unexpected element in match {0}", e)
 
         if totalWidth > 32:
-            raise NotSupportedException("{0}: Matching on {1}-bit value",
-                                        branch_on, totalWidth)
+            raise NotSupportedException(
+                "{0}: Matching on {1}-bit value", branch_on, totalWidth
+            )
         serializer.emitIndent()
-        serializer.appendFormat("{0}32 {1} = {2};",
-                                program.config.uprefix,
-                                selectVarName, switchValue)
+        serializer.appendFormat(
+            "{0}32 {1} = {2};", program.config.uprefix, selectVarName, switchValue
+        )
         serializer.newline()
 
     def generatePacketLoad(self, startBit, width, alignment, program):
@@ -128,7 +140,8 @@ class EbpfParser(object):
 
         readtype = program.config.uprefix + str(loadSize)
         loadInstruction = "{0}({1}, ({2} + {3}) / 8)".format(
-            load, program.packetName, program.offsetVariableName, startBit)
+            load, program.packetName, program.offsetVariableName, startBit
+        )
         shift = loadSize - alignment - width
         load = "(({0}) >> ({1}))".format(loadInstruction, shift)
         if width != loadSize:
@@ -145,12 +158,14 @@ class EbpfParser(object):
         assert isinstance(tpl, tuple)
         if len(tpl) != 2:
             raise CompilationException(
-                True, "{0} Expected a tuple with 2 elements", tpl)
+                True, "{0} Expected a tuple with 2 elements", tpl
+            )
 
         minIndex = tpl[0]
         totalWidth = tpl[1]
         result = self.generatePacketLoad(
-            minIndex, totalWidth, 0, program) # alignment is 0
+            minIndex, totalWidth, 0, program
+        )  # alignment is 0
         return result
 
     def serializeCases(self, selectVarName, serializer, branch_to, program):
@@ -168,7 +183,8 @@ class EbpfParser(object):
                 serializer.appendFormat("if ({0} == {1})", selectVarName, e)
             elif isinstance(e, tuple):
                 serializer.appendFormat(
-                    "if (({0} & {1}) == {2})", selectVarName, e[0], e[1])
+                    "if (({0} & {1}) == {2})", selectVarName, e[0], e[1]
+                )
             elif isinstance(e, p4_parse_value_set):
                 raise NotSupportedException("{0}: Parser value sets", e)
             elif e is P4_DEFAULT:
@@ -177,7 +193,8 @@ class EbpfParser(object):
                     serializer.append("else")
             else:
                 raise CompilationException(
-                    True, "Unexpected element in match case {0}", e)
+                    True, "Unexpected element in match case {0}", e
+                )
 
             branches += 1
             serializer.newline()
@@ -196,7 +213,8 @@ class EbpfParser(object):
                 raise CompilationException(True, "Not yet implemented")
             else:
                 raise CompilationException(
-                    True, "Unexpected element in match case {0}", value)
+                    True, "Unexpected element in match case {0}", value
+                )
 
             serializer.decreaseIndent()
             serializer.newline()
@@ -204,8 +222,7 @@ class EbpfParser(object):
         # Must create default if it is missing
         if not seenDefault:
             serializer.emitIndent()
-            serializer.appendFormat(
-                "{0} = p4_pe_unhandled_select;", program.errorName)
+            serializer.appendFormat("{0} = p4_pe_unhandled_select;", program.errorName)
             serializer.newline()
             serializer.emitIndent()
             serializer.appendFormat("default: goto end;")
@@ -226,8 +243,7 @@ class EbpfParser(object):
             self.serializeSelect(tmpvar, serializer, branch_on, program)
             self.serializeCases(tmpvar, serializer, branch_to, program)
         else:
-            raise CompilationException(
-                True, "Unexpected branch_on {0}", branch_on)
+            raise CompilationException(True, "Unexpected branch_on {0}", branch_on)
 
     def serializeOperation(self, serializer, op, program):
         assert isinstance(serializer, programSerializer.ProgramSerializer)
@@ -239,11 +255,11 @@ class EbpfParser(object):
         elif operation is parse_call.set:
             self.serializeMetadataSet(serializer, op[1], op[2], program)
         else:
-            raise CompilationException(
-                True, "Unexpected operation in parser {0}", op)
+            raise CompilationException(True, "Unexpected operation in parser {0}", op)
 
-    def serializeFieldExtract(self, serializer, headerInstanceName,
-                              index, field, alignment, program):
+    def serializeFieldExtract(
+        self, serializer, headerInstanceName, index, field, alignment, program
+    ):
         assert isinstance(index, str)
         assert isinstance(headerInstanceName, str)
         assert isinstance(field, ebpfStructType.EbpfField)
@@ -257,17 +273,20 @@ class EbpfParser(object):
         width = field.widthInBits()
         if field.name == "valid":
             serializer.appendFormat(
-                "{0}.{1} = 1;", program.headerStructName, fieldToExtractTo)
+                "{0}.{1} = 1;", program.headerStructName, fieldToExtractTo
+            )
             serializer.newline()
             return
 
-        serializer.appendFormat("if ({0}->len < BYTES({1} + {2})) ",
-                                program.packetName,
-                                program.offsetVariableName, width)
+        serializer.appendFormat(
+            "if ({0}->len < BYTES({1} + {2})) ",
+            program.packetName,
+            program.offsetVariableName,
+            width,
+        )
         serializer.blockStart()
         serializer.emitIndent()
-        serializer.appendFormat("{0} = p4_pe_header_too_short;",
-                                program.errorName)
+        serializer.appendFormat("{0} = p4_pe_header_too_short;", program.errorName)
         serializer.newline()
         serializer.emitIndent()
         serializer.appendLine("goto end;")
@@ -278,9 +297,9 @@ class EbpfParser(object):
             serializer.emitIndent()
             load = self.generatePacketLoad(0, width, alignment, program)
 
-            serializer.appendFormat("{0}.{1} = {2};",
-                                    program.headerStructName,
-                                    fieldToExtractTo, load)
+            serializer.appendFormat(
+                "{0}.{1} = {2};", program.headerStructName, fieldToExtractTo, load
+            )
             serializer.newline()
         else:
             # Destination is bigger than 4 bytes and
@@ -298,22 +317,30 @@ class EbpfParser(object):
             b = (width + 7) / 8
             for i in range(0, b):
                 serializer.emitIndent()
-                serializer.appendFormat("{0}.{1}[{2}] = ({3}8)",
-                                        program.headerStructName,
-                                        fieldToExtractTo, i,
-                                        program.config.uprefix)
-                serializer.appendFormat("(({0}({1}, ({2} / 8) + {3}) >> {4})",
-                                        method, program.packetName,
-                                        program.offsetVariableName, i, shift)
+                serializer.appendFormat(
+                    "{0}.{1}[{2}] = ({3}8)",
+                    program.headerStructName,
+                    fieldToExtractTo,
+                    i,
+                    program.config.uprefix,
+                )
+                serializer.appendFormat(
+                    "(({0}({1}, ({2} / 8) + {3}) >> {4})",
+                    method,
+                    program.packetName,
+                    program.offsetVariableName,
+                    i,
+                    shift,
+                )
                 if (i == b - 1) and (width % 8 != 0):
-                    serializer.appendFormat(" & EBPF_MASK({0}8, {1})",
-                                            program.config.uprefix, width % 8)
+                    serializer.appendFormat(
+                        " & EBPF_MASK({0}8, {1})", program.config.uprefix, width % 8
+                    )
                 serializer.append(")")
                 serializer.endOfStatement(True)
 
         serializer.emitIndent()
-        serializer.appendFormat("{0} += {1};",
-                                program.offsetVariableName, width)
+        serializer.appendFormat("{0} += {1};", program.offsetVariableName, width)
         serializer.newline()
 
     def serializeExtract(self, serializer, headerInstance, program):
@@ -327,12 +354,14 @@ class EbpfParser(object):
 
             # write bounds check
             serializer.emitIndent()
-            serializer.appendFormat("if ({0} >= {1}) ",
-                                    ebpfStack.indexVar, ebpfStack.arraySize)
+            serializer.appendFormat(
+                "if ({0} >= {1}) ", ebpfStack.indexVar, ebpfStack.arraySize
+            )
             serializer.blockStart()
             serializer.emitIndent()
-            serializer.appendFormat("{0} = p4_pe_index_out_of_bounds;",
-                                    program.errorName)
+            serializer.appendFormat(
+                "{0} = p4_pe_index_out_of_bounds;", program.errorName
+            )
             serializer.newline()
             serializer.emitIndent()
             serializer.appendLine("goto end;")
@@ -344,8 +373,8 @@ class EbpfParser(object):
                 index = "[" + ebpfStack.indexVar + "]"
             else:
                 raise CompilationException(
-                    True, "Unexpected index for array {0}",
-                    headerInstance.index)
+                    True, "Unexpected index for array {0}", headerInstance.index
+                )
             basetype = ebpfStack.basetype
         else:
             ebpfHeader = program.getHeaderInstance(headerInstance.name)
@@ -357,8 +386,9 @@ class EbpfParser(object):
         for field in basetype.fields:
             assert isinstance(field, ebpfStructType.EbpfField)
 
-            self.serializeFieldExtract(serializer, headerInstance.base_name,
-                                       index, field, alignment, program)
+            self.serializeFieldExtract(
+                serializer, headerInstance.base_name, index, field, alignment, program
+            )
             alignment += field.widthInBits()
             alignment = alignment % 8
 
@@ -390,21 +420,22 @@ class EbpfParser(object):
                 raise CompilationException(
                     True,
                     "{0}: Not implemented: wide field w. sz not multiple of 8",
-                    field)
+                    field,
+                )
         else:
             useMemcpy = False
-            bytesToCopy = None # not needed, but compiler is confused
+            bytesToCopy = None  # not needed, but compiler is confused
 
         serializer.emitIndent()
         destination = "{0}.{1}.{2}".format(
-            program.metadataStructName, dest.name, destField.name)
+            program.metadataStructName, dest.name, destField.name
+        )
         if isinstance(value, int):
             source = str(value)
             if useMemcpy:
                 raise CompilationException(
-                    True,
-                    "{0}: Not implemented: copying from wide constant",
-                    value)
+                    True, "{0}: Not implemented: copying from wide constant", value
+                )
         elif isinstance(value, tuple):
             source = self.currentReferenceAsString(value, program)
         elif isinstance(value, p4_field):
@@ -416,11 +447,13 @@ class EbpfParser(object):
             source = "{0}.{1}.{2}".format(sourceStruct, source.name, value.name)
         else:
             raise CompilationException(
-                True, "Unexpected type for parse_call.set {0}", value)
+                True, "Unexpected type for parse_call.set {0}", value
+            )
 
         if useMemcpy:
-            serializer.appendFormat("memcpy(&{0}, &{1}, {2})",
-                                    destination, source, bytesToCopy)
+            serializer.appendFormat(
+                "memcpy(&{0}, &{1}, {2})", destination, source, bytesToCopy
+            )
         else:
             serializer.appendFormat("{0} = {1}", destination, source)
 

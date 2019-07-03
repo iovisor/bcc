@@ -7,13 +7,14 @@ import unittest
 from bcc import BPF
 from netaddr import IPAddress
 
+
 class KeyV4(ct.Structure):
-    _fields_ = [("prefixlen", ct.c_uint),
-                ("data", ct.c_ubyte * 4)]
+    _fields_ = [("prefixlen", ct.c_uint), ("data", ct.c_ubyte * 4)]
+
 
 class KeyV6(ct.Structure):
-    _fields_ = [("prefixlen", ct.c_uint),
-                ("data", ct.c_ushort * 8)]
+    _fields_ = [("prefixlen", ct.c_uint), ("data", ct.c_ushort * 8)]
+
 
 class TestLpmTrie(unittest.TestCase):
     def test_lpm_trie_v4(self):
@@ -52,23 +53,24 @@ class TestLpmTrie(unittest.TestCase):
         b = BPF(text=test_prog1)
         t = b["trie"]
 
-        k1 = KeyV6(64, IPAddress('2a00:1450:4001:814:200e::').words)
+        k1 = KeyV6(64, IPAddress("2a00:1450:4001:814:200e::").words)
         v1 = ct.c_int(64)
         t[k1] = v1
 
-        k2 = KeyV6(96, IPAddress('2a00:1450:4001:814::200e').words)
+        k2 = KeyV6(96, IPAddress("2a00:1450:4001:814::200e").words)
         v2 = ct.c_int(96)
         t[k2] = v2
 
-        k = KeyV6(128, IPAddress('2a00:1450:4001:814::1024').words)
+        k = KeyV6(128, IPAddress("2a00:1450:4001:814::1024").words)
         self.assertEqual(t[k].value, 96)
 
-        k = KeyV6(128, IPAddress('2a00:1450:4001:814:2046::').words)
+        k = KeyV6(128, IPAddress("2a00:1450:4001:814:2046::").words)
         self.assertEqual(t[k].value, 64)
 
         with self.assertRaises(KeyError):
-            k = KeyV6(128, IPAddress('2a00:ffff::').words)
+            k = KeyV6(128, IPAddress("2a00:ffff::").words)
             v = t[k]
+
 
 if __name__ == "__main__":
     unittest.main()

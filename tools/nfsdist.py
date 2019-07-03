@@ -21,21 +21,23 @@ examples = """examples:
     ./nfsdist -m 5       # 5s summaries, milliseconds
 """
 parser = argparse.ArgumentParser(
-        description="Summarize NFS operation latency",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=examples)
-parser.add_argument("-T", "--notimestamp", action="store_true",
-                    help="don't include timestamp on interval output")
-parser.add_argument("-m", "--milliseconds", action="store_true",
-                    help="output in milliseconds")
-parser.add_argument("-p", "--pid",
-                    help="trace this PID only")
-parser.add_argument("interval", nargs="?",
-                    help="output interval, in seconds")
-parser.add_argument("count", nargs="?", default=99999999,
-                    help="number of outputs")
-parser.add_argument("--ebpf", action="store_true",
-                    help=argparse.SUPPRESS)
+    description="Summarize NFS operation latency",
+    formatter_class=argparse.RawDescriptionHelpFormatter,
+    epilog=examples,
+)
+parser.add_argument(
+    "-T",
+    "--notimestamp",
+    action="store_true",
+    help="don't include timestamp on interval output",
+)
+parser.add_argument(
+    "-m", "--milliseconds", action="store_true", help="output in milliseconds"
+)
+parser.add_argument("-p", "--pid", help="trace this PID only")
+parser.add_argument("interval", nargs="?", help="output interval, in seconds")
+parser.add_argument("count", nargs="?", default=99999999, help="number of outputs")
+parser.add_argument("--ebpf", action="store_true", help=argparse.SUPPRESS)
 args = parser.parse_args()
 pid = args.pid
 countdown = int(args.count)
@@ -121,11 +123,11 @@ int trace_getattr_return(struct pt_regs *ctx)
     return trace_return(ctx, op);
 }
 """
-bpf_text = bpf_text.replace('FACTOR', str(factor))
+bpf_text = bpf_text.replace("FACTOR", str(factor))
 if args.pid:
-    bpf_text = bpf_text.replace('FILTER_PID', 'pid != %s' % pid)
+    bpf_text = bpf_text.replace("FILTER_PID", "pid != %s" % pid)
 else:
-    bpf_text = bpf_text.replace('FILTER_PID', '0')
+    bpf_text = bpf_text.replace("FILTER_PID", "0")
 if debug or args.ebpf:
     print(bpf_text)
     if args.ebpf:
@@ -152,7 +154,7 @@ print("Tracing NFS operation latency... Hit Ctrl-C to end.")
 # output
 exiting = 0
 dist = b.get_table("dist")
-while (1):
+while 1:
     try:
         if args.interval:
             sleep(int(args.interval))

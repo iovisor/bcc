@@ -3,6 +3,7 @@
 
 from compilationException import CompilationException
 
+
 class EbpfType(object):
     __doc__ = "Base class for representing a P4 type"
 

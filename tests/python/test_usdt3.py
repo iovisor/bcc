@@ -12,6 +12,7 @@ from subprocess import Popen, PIPE
 import ctypes as ct
 import inspect, os, tempfile
 
+
 class TestUDST(TestCase):
     def setUp(self):
         common_h = b"""
@@ -87,7 +88,10 @@ int do_trace(struct pt_regs *ctx) {
 
         # Compilation
         # the usdt test:probe exists in liba.so, libb.so and a.out
-        include_path = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))) + "/include"
+        include_path = (
+            os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+            + "/include"
+        )
         a_src = self.tmp_dir + "/a.c"
         a_obj = self.tmp_dir + "/a.o"
         a_lib = self.tmp_dir + "/liba.so"
@@ -97,11 +101,22 @@ int do_trace(struct pt_regs *ctx) {
         m_src = self.tmp_dir + "/m.c"
         m_bin = self.tmp_dir + "/a.out"
         m_linker_opt = " -L" + self.tmp_dir + " -la -lb"
-        self.assertEqual(os.system("gcc -I" + include_path + " -fpic -c -o " + a_obj + " " + a_src), 0)
-        self.assertEqual(os.system("gcc -I" + include_path + " -fpic -c -o " + b_obj + " " + b_src), 0)
+        self.assertEqual(
+            os.system("gcc -I" + include_path + " -fpic -c -o " + a_obj + " " + a_src),
+            0,
+        )
+        self.assertEqual(
+            os.system("gcc -I" + include_path + " -fpic -c -o " + b_obj + " " + b_src),
+            0,
+        )
         self.assertEqual(os.system("gcc -shared -o " + a_lib + " " + a_obj), 0)
         self.assertEqual(os.system("gcc -shared -o " + b_lib + " " + b_obj), 0)
-        self.assertEqual(os.system("gcc -I" + include_path + " " + m_src + " -o " + m_bin + m_linker_opt), 0)
+        self.assertEqual(
+            os.system(
+                "gcc -I" + include_path + " " + m_src + " -o " + m_bin + m_linker_opt
+            ),
+            0,
+        )
 
         # Run the application
         self.app = Popen([m_bin], env=dict(os.environ, LD_LIBRARY_PATH=self.tmp_dir))
@@ -132,13 +147,15 @@ int do_trace(struct pt_regs *ctx) {
 
         b["event"].open_perf_buffer(print_event)
         for i in range(100):
-            if (self.probe_value_1 == 0 or
-                self.probe_value_2 == 0 or
-                self.probe_value_3 == 0 or
-                self.probe_value_other != 0):
+            if (
+                self.probe_value_1 == 0
+                or self.probe_value_2 == 0
+                or self.probe_value_3 == 0
+                or self.probe_value_other != 0
+            ):
                 b.perf_buffer_poll()
             else:
-                break;
+                break
 
         self.assertTrue(self.probe_value_1 != 0)
         self.assertTrue(self.probe_value_2 != 0)
@@ -150,6 +167,7 @@ int do_trace(struct pt_regs *ctx) {
         self.app.kill()
         self.app.wait()
         os.system("rm -rf " + self.tmp_dir)
+
 
 if __name__ == "__main__":
     main()

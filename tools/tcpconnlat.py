@@ -31,6 +31,7 @@ def positive_float(val):
         raise argparse.ArgumentTypeError("must be positive")
     return ival
 
+
 # arguments
 examples = """examples:
     ./tcpconnlat           # trace all TCP connect()s
@@ -42,25 +43,33 @@ examples = """examples:
 parser = argparse.ArgumentParser(
     description="Trace TCP connects and show connection latency",
     formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog=examples)
-parser.add_argument("-t", "--timestamp", action="store_true",
-    help="include timestamp on output")
-parser.add_argument("-p", "--pid",
-    help="trace this PID only")
-parser.add_argument("duration_ms", nargs="?", default=0,
+    epilog=examples,
+)
+parser.add_argument(
+    "-t", "--timestamp", action="store_true", help="include timestamp on output"
+)
+parser.add_argument("-p", "--pid", help="trace this PID only")
+parser.add_argument(
+    "duration_ms",
+    nargs="?",
+    default=0,
     type=positive_float,
-    help="minimum duration to trace (ms)")
-parser.add_argument("-v", "--verbose", action="store_true",
-    help="print the BPF program for debugging purposes")
-parser.add_argument("--ebpf", action="store_true",
-    help=argparse.SUPPRESS)
+    help="minimum duration to trace (ms)",
+)
+parser.add_argument(
+    "-v",
+    "--verbose",
+    action="store_true",
+    help="print the BPF program for debugging purposes",
+)
+parser.add_argument("--ebpf", action="store_true", help=argparse.SUPPRESS)
 args = parser.parse_args()
 
 if args.duration_ms:
     # support fractions but round to nearest microsecond
     duration_us = int(args.duration_ms * 1000)
 else:
-    duration_us = 0   # default is show all
+    duration_us = 0  # default is show all
 
 debug = 0
 
@@ -178,14 +187,13 @@ int trace_tcp_rcv_state_process(struct pt_regs *ctx, struct sock *skp)
 
 if duration_us > 0:
     bpf_text = "#define MIN_LATENCY\n" + bpf_text
-    bpf_text = bpf_text.replace('DURATION_US', str(duration_us))
+    bpf_text = bpf_text.replace("DURATION_US", str(duration_us))
 
 # code substitutions
 if args.pid:
-    bpf_text = bpf_text.replace('FILTER',
-        'if (pid != %s) { return 0; }' % args.pid)
+    bpf_text = bpf_text.replace("FILTER", "if (pid != %s) { return 0; }" % args.pid)
 else:
-    bpf_text = bpf_text.replace('FILTER', '')
+    bpf_text = bpf_text.replace("FILTER", "")
 if debug or args.verbose or args.ebpf:
     print(bpf_text)
     if args.ebpf:
@@ -195,11 +203,11 @@ if debug or args.verbose or args.ebpf:
 b = BPF(text=bpf_text)
 b.attach_kprobe(event="tcp_v4_connect", fn_name="trace_connect")
 b.attach_kprobe(event="tcp_v6_connect", fn_name="trace_connect")
-b.attach_kprobe(event="tcp_rcv_state_process",
-    fn_name="trace_tcp_rcv_state_process")
+b.attach_kprobe(event="tcp_rcv_state_process", fn_name="trace_tcp_rcv_state_process")
 
 # process event
 start_ts = 0
+
 
 def print_ipv4_event(cpu, data, size):
     event = b["ipv4_events"].event(data)
@@ -208,11 +216,19 @@ def print_ipv4_event(cpu, data, size):
         if start_ts == 0:
             start_ts = event.ts_us
         print("%-9.3f" % ((float(event.ts_us) - start_ts) / 1000000), end="")
-    print("%-6d %-12.12s %-2d %-16s %-16s %-5d %.2f" % (event.pid,
-        event.task.decode('utf-8', 'replace'), event.ip,
-        inet_ntop(AF_INET, pack("I", event.saddr)),
-        inet_ntop(AF_INET, pack("I", event.daddr)), event.dport,
-        float(event.delta_us) / 1000))
+    print(
+        "%-6d %-12.12s %-2d %-16s %-16s %-5d %.2f"
+        % (
+            event.pid,
+            event.task.decode("utf-8", "replace"),
+            event.ip,
+            inet_ntop(AF_INET, pack("I", event.saddr)),
+            inet_ntop(AF_INET, pack("I", event.daddr)),
+            event.dport,
+            float(event.delta_us) / 1000,
+        )
+    )
+
 
 def print_ipv6_event(cpu, data, size):
     event = b["ipv6_events"].event(data)
@@ -221,16 +237,27 @@ def print_ipv6_event(cpu, data, size):
         if start_ts == 0:
             start_ts = event.ts_us
         print("%-9.3f" % ((float(event.ts_us) - start_ts) / 1000000), end="")
-    print("%-6d %-12.12s %-2d %-16s %-16s %-5d %.2f" % (event.pid,
-        event.task.decode('utf-8', 'replace'), event.ip,
-        inet_ntop(AF_INET6, event.saddr), inet_ntop(AF_INET6, event.daddr),
-        event.dport, float(event.delta_us) / 1000))
+    print(
+        "%-6d %-12.12s %-2d %-16s %-16s %-5d %.2f"
+        % (
+            event.pid,
+            event.task.decode("utf-8", "replace"),
+            event.ip,
+            inet_ntop(AF_INET6, event.saddr),
+            inet_ntop(AF_INET6, event.daddr),
+            event.dport,
+            float(event.delta_us) / 1000,
+        )
+    )
+
 
 # header
 if args.timestamp:
     print("%-9s" % ("TIME(s)"), end="")
-print("%-6s %-12s %-2s %-16s %-16s %-5s %s" % ("PID", "COMM", "IP", "SADDR",
-    "DADDR", "DPORT", "LAT(ms)"))
+print(
+    "%-6s %-12s %-2s %-16s %-16s %-5s %s"
+    % ("PID", "COMM", "IP", "SADDR", "DADDR", "DPORT", "LAT(ms)")
+)
 
 # read events
 b["ipv4_events"].open_perf_buffer(print_ipv4_event)

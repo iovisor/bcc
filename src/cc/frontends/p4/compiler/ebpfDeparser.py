@@ -2,10 +2,18 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 
 from collections import defaultdict, OrderedDict
-from p4_hlir.hlir import parse_call, p4_field, p4_parse_value_set, \
-    P4_DEFAULT, p4_parse_state, p4_table, \
-    p4_conditional_node, p4_parser_exception, \
-    p4_header_instance, P4_NEXT
+from p4_hlir.hlir import (
+    parse_call,
+    p4_field,
+    p4_parse_value_set,
+    P4_DEFAULT,
+    p4_parse_state,
+    p4_table,
+    p4_conditional_node,
+    p4_parser_exception,
+    p4_header_instance,
+    P4_NEXT,
+)
 
 import ebpfProgram
 import ebpfInstance
@@ -14,12 +22,13 @@ import ebpfStructType
 from topoSorting import Graph
 from programSerializer import ProgramSerializer
 
+
 def produce_parser_topo_sorting(hlir):
     # This function is copied from the P4 behavioral model implementation
     header_graph = Graph()
 
     def walk_rec(hlir, parse_state, prev_hdr_node, tag_stacks_index):
-        assert(isinstance(parse_state, p4_parse_state))
+        assert isinstance(parse_state, p4_parse_state)
         for call in parse_state.call_sequence:
             call_type = call[0]
             if call_type == parse_call.extract:
@@ -58,6 +67,7 @@ def produce_parser_topo_sorting(hlir):
 
     return header_topo_sorting
 
+
 class EbpfDeparser(object):
     def __init__(self, hlir):
         header_topo_sorting = produce_parser_topo_sorting(hlir)
@@ -87,8 +97,9 @@ class EbpfDeparser(object):
         assert isinstance(p4header, p4_header_instance)
 
         serializer.emitIndent()
-        serializer.appendFormat("if ({0}.{1}.valid) ",
-                                program.headerStructName, header.name)
+        serializer.appendFormat(
+            "if ({0}.{1}.valid) ", program.headerStructName, header.name
+        )
         serializer.blockStart()
 
         if ebpfProgram.EbpfProgram.isArrayElementInstance(p4header):
@@ -101,8 +112,8 @@ class EbpfDeparser(object):
                 index = "[" + ebpfStack.indexVar + "]"
             else:
                 raise CompilationException(
-                    True, "Unexpected index for array {0}",
-                    p4header.index)
+                    True, "Unexpected index for array {0}", p4header.index
+                )
             basetype = ebpfStack.basetype
         else:
             ebpfHeader = program.getHeaderInstance(p4header.name)
@@ -113,14 +124,14 @@ class EbpfDeparser(object):
         for field in basetype.fields:
             assert isinstance(field, ebpfStructType.EbpfField)
 
-            self.serializeFieldEmit(serializer, p4header.base_name,
-                                    index, field, alignment, program)
+            self.serializeFieldEmit(
+                serializer, p4header.base_name, index, field, alignment, program
+            )
             alignment += field.widthInBits()
             alignment = alignment % 8
         serializer.blockEnd(True)
 
-    def serializeFieldEmit(self, serializer, name, index,
-                           field, alignment, program):
+    def serializeFieldEmit(self, serializer, name, index, field, alignment, program):
         assert isinstance(index, str)
         assert isinstance(name, str)
         assert isinstance(field, ebpfStructType.EbpfField)
@@ -131,12 +142,10 @@ class EbpfDeparser(object):
         if field.name == "valid":
             return
 
-        fieldToEmit = (program.headerStructName + "." + name +
-                       index + "." + field.name)
+        fieldToEmit = program.headerStructName + "." + name + index + "." + field.name
         width = field.widthInBits()
         if width <= 32:
-            store = self.generatePacketStore(fieldToEmit, 0, alignment,
-                                             width, program)
+            store = self.generatePacketStore(fieldToEmit, 0, alignment, width, program)
             serializer.emitIndent()
             serializer.appendLine(store)
         else:
@@ -145,15 +154,13 @@ class EbpfDeparser(object):
             b = (width + 7) / 8
             for i in range(0, b):
                 serializer.emitIndent()
-                store = self.generatePacketStore(fieldToEmit + "["+str(i)+"]",
-                                                 i,
-                                                 alignment,
-                                                 8, program)
+                store = self.generatePacketStore(
+                    fieldToEmit + "[" + str(i) + "]", i, alignment, 8, program
+                )
                 serializer.appendLine(store)
 
         serializer.emitIndent()
-        serializer.appendFormat("{0} += {1};",
-                                program.offsetVariableName, width)
+        serializer.appendFormat("{0} += {1};", program.offsetVariableName, width)
         serializer.newline()
 
     def generatePacketStore(self, value, offset, alignment, width, program):
@@ -168,5 +175,5 @@ class EbpfDeparser(object):
             offset,
             alignment,
             width,
-            value
+            value,
         )

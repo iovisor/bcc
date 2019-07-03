@@ -1,8 +1,13 @@
 # Copyright (c) Barefoot Networks, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
 
-from p4_hlir.hlir import p4_header_instance, p4_table, \
-     p4_conditional_node, p4_action, p4_parse_state
+from p4_hlir.hlir import (
+    p4_header_instance,
+    p4_table,
+    p4_conditional_node,
+    p4_action,
+    p4_parse_state,
+)
 from p4_hlir.main import HLIR
 import typeFactory
 import ebpfTable
@@ -44,7 +49,7 @@ class EbpfProgram(object):
 
         self.errorName = self.reservedPrefix + "error"
         self.functionName = self.reservedPrefix + "filter"
-        self.egressPortName = "egress_port" # Hardwired in P4 definition
+        self.egressPortName = "egress_port"  # Hardwired in P4 definition
 
         self.typeFactory = typeFactory.EbpfTypeFactory(config)
         self.errorCodes = [
@@ -54,20 +59,21 @@ class EbpfProgram(object):
             "p4_pe_header_too_long",
             "p4_pe_header_too_short",
             "p4_pe_unhandled_select",
-            "p4_pe_checksum"]
+            "p4_pe_checksum",
+        ]
 
         self.actions = []
         self.conditionals = []
         self.tables = []
-        self.headers = []   # header instances
+        self.headers = []  # header instances
         self.metadata = []  # metadata instances
-        self.stacks = []    # header stack instances EbpfHeaderStack
-        self.parsers = []   # all parsers
+        self.stacks = []  # header stack instances EbpfHeaderStack
+        self.parsers = []  # all parsers
         self.deparser = None
         self.entryPoints = []  # control-flow entry points from parser
         self.counters = []
         self.entryPointLabels = {}  # maps p4_node from entryPoints
-                                    # to labels in the C program
+        # to labels in the C program
         self.egressEntry = None
 
         self.construct()
@@ -81,7 +87,8 @@ class EbpfProgram(object):
         if len(self.hlir.p4_field_list_calculations) > 0:
             raise NotSupportedException(
                 "{0} calculated field",
-                self.hlir.p4_field_list_calculations.values()[0].name)
+                self.hlir.p4_field_list_calculations.values()[0].name,
+            )
 
         for h in self.hlir.p4_header_instances.values():
             if h.max_index is not None:
@@ -90,7 +97,8 @@ class EbpfProgram(object):
                     # header stack; allocate only for zero-th index
                     indexVarName = self.generateNewName(h.base_name + "_index")
                     stack = ebpfInstance.EbpfHeaderStack(
-                        h, indexVarName, self.typeFactory)
+                        h, indexVarName, self.typeFactory
+                    )
                     self.stacks.append(stack)
             elif h.metadata:
                 metadata = ebpfInstance.EbpfMetadata(h, self.typeFactory)
@@ -154,8 +162,9 @@ class EbpfProgram(object):
         self.config.serializeCodeSection(serializer)
         serializer.newline()
         serializer.emitIndent()
-        serializer.appendFormat("int {0}(struct __sk_buff* {1}) ",
-                                self.functionName, self.packetName)
+        serializer.appendFormat(
+            "int {0}(struct __sk_buff* {1}) ", self.functionName, self.packetName
+        )
         serializer.blockStart()
 
         self.generateHeaderInstance(serializer)
@@ -194,23 +203,26 @@ class EbpfProgram(object):
                 serializer.emitIndent()
                 serializer.appendFormat(
                     "bpf_clone_redirect({0}, {1}.standard_metadata.{2}, 0);",
-                    self.packetName, self.metadataStructName,
-                    self.egressPortName)
+                    self.packetName,
+                    self.metadataStructName,
+                    self.egressPortName,
+                )
                 serializer.newline()
                 serializer.decreaseIndent()
 
                 serializer.emitIndent()
                 serializer.appendLine(
-                    "return TC_ACT_SHOT /* drop packet; clone is forwarded */;")
+                    "return TC_ACT_SHOT /* drop packet; clone is forwarded */;"
+                )
             else:
                 serializer.appendFormat(
-                    "return {1} ? TC_ACT_SHOT : TC_ACT_PIPE;",
-                    self.dropBit)
+                    "return {1} ? TC_ACT_SHOT : TC_ACT_PIPE;", self.dropBit
+                )
                 serializer.newline()
         else:
             raise CompilationException(
-                True, "Unexpected target configuration {0}",
-                self.config.targetName)
+                True, "Unexpected target configuration {0}", self.config.targetName
+            )
         serializer.blockEnd(True)
 
         self.generateLicense(serializer)
@@ -252,8 +264,7 @@ class EbpfProgram(object):
         serializer.endOfStatement(True)
         serializer.newline()
 
-        serializer.appendLine(
-            "#define EBPF_MASK(t, w) ((((t)(1)) << (w)) - (t)1)")
+        serializer.appendLine("#define EBPF_MASK(t, w) ((((t)(1)) << (w)) - (t)1)")
         serializer.appendLine("#define BYTES(w) ((w + 7) / 8)")
 
         self.config.generateDword(serializer)
@@ -318,7 +329,8 @@ class EbpfProgram(object):
 
         serializer.emitIndent()
         serializer.appendFormat(
-            "struct {0} {1}", self.headersStructTypeName, self.headerStructName)
+            "struct {0} {1}", self.headersStructTypeName, self.headerStructName
+        )
 
     def generateInitializeHeaders(self, serializer):
         assert isinstance(serializer, programSerializer.ProgramSerializer)
@@ -336,9 +348,8 @@ class EbpfProgram(object):
 
         serializer.emitIndent()
         serializer.appendFormat(
-            "struct {0} {1}",
-            self.metadataStructTypeName,
-            self.metadataStructName)
+            "struct {0} {1}", self.metadataStructTypeName, self.metadataStructName
+        )
 
     def generateDeparser(self, serializer):
         self.deparser.serialize(serializer, self)
@@ -362,24 +373,20 @@ class EbpfProgram(object):
         serializer.newline()
 
         serializer.emitIndent()
-        serializer.appendFormat(
-            "enum ErrorCode {0} = p4_pe_no_error;", self.errorName)
+        serializer.appendFormat("enum ErrorCode {0} = p4_pe_no_error;", self.errorName)
         serializer.newline()
 
         serializer.emitIndent()
-        serializer.appendFormat(
-            "{0}8 {1} = 0;", self.config.uprefix, self.dropBit)
+        serializer.appendFormat("{0}8 {1} = 0;", self.config.uprefix, self.dropBit)
         serializer.newline()
 
         serializer.emitIndent()
-        serializer.appendFormat(
-            "{0} {1} = 0;", self.arrayIndexType, self.zeroKeyName)
+        serializer.appendFormat("{0} {1} = 0;", self.arrayIndexType, self.zeroKeyName)
         serializer.newline()
 
         for h in self.stacks:
             serializer.emitIndent()
-            serializer.appendFormat(
-                "{0}8 {0} = 0;", self.config.uprefix, h.indexVar)
+            serializer.appendFormat("{0}8 {0} = 0;", self.config.uprefix, h.indexVar)
             serializer.newline()
 
     def getStackInstance(self, name):
@@ -390,7 +397,8 @@ class EbpfProgram(object):
                 assert isinstance(h, ebpfInstance.EbpfHeaderStack)
                 return h
         raise CompilationException(
-            True, "Could not locate header stack named {0}", name)
+            True, "Could not locate header stack named {0}", name
+        )
 
     def getHeaderInstance(self, name):
         assert isinstance(name, str)
@@ -400,7 +408,8 @@ class EbpfProgram(object):
                 assert isinstance(h, ebpfInstance.EbpfHeader)
                 return h
         raise CompilationException(
-            True, "Could not locate header instance named {0}", name)
+            True, "Could not locate header instance named {0}", name
+        )
 
     def getInstance(self, name):
         assert isinstance(name, str)
@@ -411,8 +420,7 @@ class EbpfProgram(object):
         for h in self.metadata:
             if h.name == name:
                 return h
-        raise CompilationException(
-            True, "Could not locate instance named {0}", name)
+        raise CompilationException(True, "Could not locate instance named {0}", name)
 
     def getAction(self, p4action):
         assert isinstance(p4action, p4_action)
@@ -429,24 +437,21 @@ class EbpfProgram(object):
         for t in self.tables:
             if t.name == name:
                 return t
-        raise CompilationException(
-            True, "Could not locate table named {0}", name)
+        raise CompilationException(True, "Could not locate table named {0}", name)
 
     def getCounter(self, name):
         assert isinstance(name, str)
         for t in self.counters:
             if t.name == name:
                 return t
-        raise CompilationException(
-            True, "Could not locate counters named {0}", name)
+        raise CompilationException(True, "Could not locate counters named {0}", name)
 
     def getConditional(self, name):
         assert isinstance(name, str)
         for c in self.conditionals:
             if c.name == name:
                 return c
-        raise CompilationException(
-            True, "Could not locate conditional named {0}", name)
+        raise CompilationException(True, "Could not locate conditional named {0}", name)
 
     def generateParser(self, serializer):
         assert isinstance(serializer, programSerializer.ProgramSerializer)
@@ -473,8 +478,7 @@ class EbpfProgram(object):
             assert isinstance(conditional, ebpfConditional.EbpfConditional)
             conditional.generateCode(serializer, self, nextEntryPoint)
         else:
-            raise CompilationException(
-                True, "{0} Unexpected control flow node ", node)
+            raise CompilationException(True, "{0} Unexpected control flow node ", node)
 
     def generatePipelineInternal(self, serializer, nodestoadd, nextEntryPoint):
         assert isinstance(serializer, programSerializer.ProgramSerializer)

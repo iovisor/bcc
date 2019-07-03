@@ -26,16 +26,15 @@ examples = """examples:
 parser = argparse.ArgumentParser(
     description="Trace block I/O",
     formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog=examples)
-parser.add_argument("-Q", "--queue", action="store_true",
-    help="include OS queued time")
-parser.add_argument("--ebpf", action="store_true",
-    help=argparse.SUPPRESS)
+    epilog=examples,
+)
+parser.add_argument("-Q", "--queue", action="store_true", help="include OS queued time")
+parser.add_argument("--ebpf", action="store_true", help=argparse.SUPPRESS)
 args = parser.parse_args()
 debug = 0
 
 # define BPF program
-bpf_text="""
+bpf_text = """
 #include <uapi/linux/ptrace.h>
 #include <linux/blkdev.h>
 
@@ -145,9 +144,9 @@ int trace_req_completion(struct pt_regs *ctx, struct request *req)
 }
 """
 if args.queue:
-    bpf_text = bpf_text.replace('##QUEUE##', '1')
+    bpf_text = bpf_text.replace("##QUEUE##", "1")
 else:
-    bpf_text = bpf_text.replace('##QUEUE##', '0')
+    bpf_text = bpf_text.replace("##QUEUE##", "0")
 if debug or args.ebpf:
     print(bpf_text)
     if args.ebpf:
@@ -156,15 +155,17 @@ if debug or args.ebpf:
 # initialize BPF
 b = BPF(text=bpf_text)
 b.attach_kprobe(event="blk_account_io_start", fn_name="trace_pid_start")
-if BPF.get_kprobe_functions(b'blk_start_request'):
+if BPF.get_kprobe_functions(b"blk_start_request"):
     b.attach_kprobe(event="blk_start_request", fn_name="trace_req_start")
 b.attach_kprobe(event="blk_mq_start_request", fn_name="trace_req_start")
-b.attach_kprobe(event="blk_account_io_completion",
-    fn_name="trace_req_completion")
+b.attach_kprobe(event="blk_account_io_completion", fn_name="trace_req_completion")
 
 # header
-print("%-11s %-14s %-6s %-7s %-1s %-10s %-7s" % ("TIME(s)", "COMM", "PID",
-    "DISK", "T", "SECTOR", "BYTES"), end="")
+print(
+    "%-11s %-14s %-6s %-7s %-1s %-10s %-7s"
+    % ("TIME(s)", "COMM", "PID", "DISK", "T", "SECTOR", "BYTES"),
+    end="",
+)
 if args.queue:
     print("%7s " % ("QUE(ms)"), end="")
 print("%7s" % "LAT(ms)")
@@ -189,13 +190,23 @@ def print_event(cpu, data, size):
 
     delta = float(event.ts) - start_ts
 
-    print("%-11.6f %-14.14s %-6s %-7s %-1s %-10s %-7s" % (
-        delta / 1000000, event.name.decode('utf-8', 'replace'), event.pid,
-        event.disk_name.decode('utf-8', 'replace'), rwflg, event.sector,
-        event.len), end="")
+    print(
+        "%-11.6f %-14.14s %-6s %-7s %-1s %-10s %-7s"
+        % (
+            delta / 1000000,
+            event.name.decode("utf-8", "replace"),
+            event.pid,
+            event.disk_name.decode("utf-8", "replace"),
+            rwflg,
+            event.sector,
+            event.len,
+        ),
+        end="",
+    )
     if args.queue:
         print("%7.2f " % (float(event.qdelta) / 1000000), end="")
     print("%7.2f" % (float(event.delta) / 1000000))
+
 
 # loop with callback to print_event
 b["events"].open_perf_buffer(print_event, page_cnt=64)

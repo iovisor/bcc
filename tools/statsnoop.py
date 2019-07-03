@@ -26,15 +26,16 @@ examples = """examples:
 parser = argparse.ArgumentParser(
     description="Trace stat() syscalls",
     formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog=examples)
-parser.add_argument("-t", "--timestamp", action="store_true",
-    help="include timestamp on output")
-parser.add_argument("-x", "--failed", action="store_true",
-    help="only show failed stats")
-parser.add_argument("-p", "--pid",
-    help="trace this PID only")
-parser.add_argument("--ebpf", action="store_true",
-    help=argparse.SUPPRESS)
+    epilog=examples,
+)
+parser.add_argument(
+    "-t", "--timestamp", action="store_true", help="include timestamp on output"
+)
+parser.add_argument(
+    "-x", "--failed", action="store_true", help="only show failed stats"
+)
+parser.add_argument("-p", "--pid", help="trace this PID only")
+parser.add_argument("--ebpf", action="store_true", help=argparse.SUPPRESS)
 args = parser.parse_args()
 debug = 0
 
@@ -97,10 +98,9 @@ int trace_return(struct pt_regs *ctx)
 }
 """
 if args.pid:
-    bpf_text = bpf_text.replace('FILTER',
-        'if (pid != %s) { return 0; }' % args.pid)
+    bpf_text = bpf_text.replace("FILTER", "if (pid != %s) { return 0; }" % args.pid)
 else:
-    bpf_text = bpf_text.replace('FILTER', '')
+    bpf_text = bpf_text.replace("FILTER", "")
 if debug or args.ebpf:
     print(bpf_text)
     if args.ebpf:
@@ -151,7 +151,7 @@ def print_event(cpu, data, size):
         err = 0
     else:
         fd_s = -1
-        err = - event.ret
+        err = -event.ret
 
     if start_ts == 0:
         start_ts = event.ts_ns
@@ -159,9 +159,17 @@ def print_event(cpu, data, size):
     if args.timestamp:
         print("%-14.9f" % (float(event.ts_ns - start_ts) / 1000000000), end="")
 
-    print("%-6d %-16s %4d %3d %s" % (event.pid,
-        event.comm.decode('utf-8', 'replace'), fd_s, err,
-        event.fname.decode('utf-8', 'replace')))
+    print(
+        "%-6d %-16s %4d %3d %s"
+        % (
+            event.pid,
+            event.comm.decode("utf-8", "replace"),
+            fd_s,
+            err,
+            event.fname.decode("utf-8", "replace"),
+        )
+    )
+
 
 # loop with callback to print_event
 b["events"].open_perf_buffer(print_event, page_cnt=64)

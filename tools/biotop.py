@@ -31,17 +31,19 @@ examples = """examples:
 parser = argparse.ArgumentParser(
     description="Block device (disk) I/O by process",
     formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog=examples)
-parser.add_argument("-C", "--noclear", action="store_true",
-    help="don't clear the screen")
-parser.add_argument("-r", "--maxrows", default=20,
-    help="maximum rows to print, default 20")
-parser.add_argument("interval", nargs="?", default=1,
-    help="output interval, in seconds")
-parser.add_argument("count", nargs="?", default=99999999,
-    help="number of outputs")
-parser.add_argument("--ebpf", action="store_true",
-    help=argparse.SUPPRESS)
+    epilog=examples,
+)
+parser.add_argument(
+    "-C", "--noclear", action="store_true", help="don't clear the screen"
+)
+parser.add_argument(
+    "-r", "--maxrows", default=20, help="maximum rows to print, default 20"
+)
+parser.add_argument(
+    "interval", nargs="?", default=1, help="output interval, in seconds"
+)
+parser.add_argument("count", nargs="?", default=99999999, help="number of outputs")
+parser.add_argument("--ebpf", action="store_true", help=argparse.SUPPRESS)
 args = parser.parse_args()
 interval = int(args.interval)
 countdown = int(args.count)
@@ -55,6 +57,7 @@ diskstats = "/proc/diskstats"
 # signal handler
 def signal_ignore(signal_value, frame):
     print()
+
 
 # load BPF program
 bpf_text = """
@@ -173,13 +176,12 @@ if args.ebpf:
 
 b = BPF(text=bpf_text)
 b.attach_kprobe(event="blk_account_io_start", fn_name="trace_pid_start")
-if BPF.get_kprobe_functions(b'blk_start_request'):
+if BPF.get_kprobe_functions(b"blk_start_request"):
     b.attach_kprobe(event="blk_start_request", fn_name="trace_req_start")
 b.attach_kprobe(event="blk_mq_start_request", fn_name="trace_req_start")
-b.attach_kprobe(event="blk_account_io_completion",
-    fn_name="trace_req_completion")
+b.attach_kprobe(event="blk_account_io_completion", fn_name="trace_req_completion")
 
-print('Tracing... Output every %d secs. Hit Ctrl-C to end' % interval)
+print("Tracing... Output every %d secs. Hit Ctrl-C to end" % interval)
 
 # cache disk major,minor -> diskname
 disklookup = {}
@@ -203,14 +205,15 @@ while 1:
         print()
     with open(loadavg) as stats:
         print("%-8s loadavg: %s" % (strftime("%H:%M:%S"), stats.read()))
-    print("%-6s %-16s %1s %-3s %-3s %-8s %5s %7s %6s" % ("PID", "COMM",
-        "D", "MAJ", "MIN", "DISK", "I/O", "Kbytes", "AVGms"))
+    print(
+        "%-6s %-16s %1s %-3s %-3s %-8s %5s %7s %6s"
+        % ("PID", "COMM", "D", "MAJ", "MIN", "DISK", "I/O", "Kbytes", "AVGms")
+    )
 
     # by-PID output
     counts = b.get_table("counts")
     line = 0
-    for k, v in reversed(sorted(counts.items(),
-                                key=lambda counts: counts[1].bytes)):
+    for k, v in reversed(sorted(counts.items(), key=lambda counts: counts[1].bytes)):
 
         # lookup disk
         disk = str(k.major) + "," + str(k.minor)
@@ -221,9 +224,20 @@ while 1:
 
         # print line
         avg_ms = (float(v.us) / 1000) / v.io
-        print("%-6d %-16s %1s %-3d %-3d %-8s %5s %7s %6.2f" % (k.pid,
-            k.name.decode('utf-8', 'replace'), "W" if k.rwflag else "R",
-            k.major, k.minor, diskname, v.io, v.bytes / 1024, avg_ms))
+        print(
+            "%-6d %-16s %1s %-3d %-3d %-8s %5s %7s %6.2f"
+            % (
+                k.pid,
+                k.name.decode("utf-8", "replace"),
+                "W" if k.rwflag else "R",
+                k.major,
+                k.minor,
+                diskname,
+                v.io,
+                v.bytes / 1024,
+                avg_ms,
+            )
+        )
 
         line += 1
         if line >= maxrows:

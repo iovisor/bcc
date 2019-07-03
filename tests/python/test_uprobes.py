@@ -11,6 +11,7 @@ import shutil
 import time
 import unittest
 
+
 class TestUprobes(unittest.TestCase):
     def test_simple_library(self):
         text = """
@@ -108,7 +109,7 @@ int count(struct pt_regs *ctx) {
                 raise OSError(e, errno.errorcode[e])
 
             # Remount root MS_REC|MS_PRIVATE
-            if libc.mount(None, b"/", None, (1<<14)|(1<<18) , None) == -1:
+            if libc.mount(None, b"/", None, (1 << 14) | (1 << 18), None) == -1:
                 e = ctypes.get_errno()
                 raise OSError(e, errno.errorcode[e])
 
@@ -135,6 +136,7 @@ int count(struct pt_regs *ctx) {
         b.detach_uretprobe(name=libname, sym=symname, pid=child_pid)
         b.detach_uprobe(name=libname, sym=symname, pid=child_pid)
         os.wait()
+
 
 if __name__ == "__main__":
     unittest.main()

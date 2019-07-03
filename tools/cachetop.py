@@ -14,6 +14,7 @@
 
 from __future__ import absolute_import
 from __future__ import division
+
 # Do not import unicode_literals until #623 is fixed
 # from __future__ import unicode_literals
 from __future__ import print_function
@@ -29,16 +30,7 @@ import re
 import signal
 from time import sleep
 
-FIELDS = (
-    "PID",
-    "UID",
-    "CMD",
-    "HITS",
-    "MISSES",
-    "DIRTIES",
-    "READ_HIT%",
-    "WRITE_HIT%"
-)
+FIELDS = ("PID", "UID", "CMD", "HITS", "MISSES", "DIRTIES", "READ_HIT%", "WRITE_HIT%")
 DEFAULT_FIELD = "HITS"
 DEFAULT_SORT_FIELD = FIELDS.index(DEFAULT_FIELD)
 
@@ -52,27 +44,26 @@ def signal_ignore(signal, frame):
 def get_meminfo():
     result = {}
 
-    for line in open('/proc/meminfo'):
-        k = line.split(':', 3)
+    for line in open("/proc/meminfo"):
+        k = line.split(":", 3)
         v = k[1].split()
         result[k[0]] = int(v[0])
     return result
 
 
-def get_processes_stats(
-        bpf,
-        sort_field=DEFAULT_SORT_FIELD,
-        sort_reverse=False):
-    '''
+def get_processes_stats(bpf, sort_field=DEFAULT_SORT_FIELD, sort_reverse=False):
+    """
     Return a tuple containing:
     buffer
     cached
     list of tuple with per process cache stats
-    '''
+    """
     counts = bpf.get_table("counts")
     stats = defaultdict(lambda: defaultdict(int))
     for k, v in counts.items():
-        stats["%d-%d-%s" % (k.pid, k.uid, k.comm.decode('utf-8', 'replace'))][k.ip] = v.value
+        stats["%d-%d-%s" % (k.pid, k.uid, k.comm.decode("utf-8", "replace"))][
+            k.ip
+        ] = v.value
     stats_list = []
 
     for pid, count in sorted(stats.items(), key=lambda stat: stat[0]):
@@ -88,23 +79,23 @@ def get_processes_stats(
         whits = 0
 
         for k, v in count.items():
-            if re.match(b'mark_page_accessed', bpf.ksym(k)) is not None:
+            if re.match(b"mark_page_accessed", bpf.ksym(k)) is not None:
                 mpa = max(0, v)
 
-            if re.match(b'mark_buffer_dirty', bpf.ksym(k)) is not None:
+            if re.match(b"mark_buffer_dirty", bpf.ksym(k)) is not None:
                 mbd = max(0, v)
 
-            if re.match(b'add_to_page_cache_lru', bpf.ksym(k)) is not None:
+            if re.match(b"add_to_page_cache_lru", bpf.ksym(k)) is not None:
                 apcl = max(0, v)
 
-            if re.match(b'account_page_dirtied', bpf.ksym(k)) is not None:
+            if re.match(b"account_page_dirtied", bpf.ksym(k)) is not None:
                 apd = max(0, v)
 
             # access = total cache access incl. reads(mpa) and writes(mbd)
             # misses = total of add to lru which we do when we write(mbd)
             # and also the mark the page dirty(same as mbd)
-            access = (mpa + mbd)
-            misses = (apcl + apd)
+            access = mpa + mbd
+            misses = apcl + apd
 
             # rtaccess is the read hit % during the sample period.
             # wtaccess is the write hit % during the smaple period.
@@ -118,11 +109,8 @@ def get_processes_stats(
             if rtaccess != 0:
                 rhits = 100 * rtaccess
 
-        _pid, uid, comm = pid.split('-', 2)
-        stats_list.append(
-            (int(_pid), uid, comm,
-             access, misses, mbd,
-             rhits, whits))
+        _pid, uid, comm = pid.split("-", 2)
+        stats_list.append((int(_pid), uid, comm, access, misses, mbd, rhits, whits))
 
     stats_list = sorted(
         stats_list, key=lambda stat: stat[sort_field], reverse=sort_reverse
@@ -176,13 +164,13 @@ def handle_loop(stdscr, args):
 
     while 1:
         s = stdscr.getch()
-        if s == ord('q'):
+        if s == ord("q"):
             exiting = 1
-        elif s == ord('r'):
+        elif s == ord("r"):
             sort_reverse = not sort_reverse
-        elif s == ord('<'):
+        elif s == ord("<"):
             sort_field = max(0, sort_field - 1)
-        elif s == ord('>'):
+        elif s == ord(">"):
             sort_field = min(len(FIELDS) - 1, sort_field + 1)
         try:
             sleep(args.interval)
@@ -197,26 +185,29 @@ def handle_loop(stdscr, args):
         buff = int(mem["Buffers"]) / 1024
 
         process_stats = get_processes_stats(
-            b,
-            sort_field=sort_field,
-            sort_reverse=sort_reverse)
+            b, sort_field=sort_field, sort_reverse=sort_reverse
+        )
         stdscr.clear()
         stdscr.addstr(
-            0, 0,
+            0,
+            0,
             "%-8s Buffers MB: %.0f / Cached MB: %.0f "
-            "/ Sort: %s / Order: %s" % (
-                strftime("%H:%M:%S"), buff, cached, FIELDS[sort_field],
-                sort_reverse and "descending" or "ascending"
-            )
+            "/ Sort: %s / Order: %s"
+            % (
+                strftime("%H:%M:%S"),
+                buff,
+                cached,
+                FIELDS[sort_field],
+                sort_reverse and "descending" or "ascending",
+            ),
         )
 
         # header
         stdscr.addstr(
-            1, 0,
-            "{0:8} {1:8} {2:16} {3:8} {4:8} {5:8} {6:10} {7:10}".format(
-                *FIELDS
-            ),
-            curses.A_REVERSE
+            1,
+            0,
+            "{0:8} {1:8} {2:16} {3:8} {4:8} {5:8} {6:10} {7:10}".format(*FIELDS),
+            curses.A_REVERSE,
         )
         (height, width) = stdscr.getmaxyx()
         for i, stat in enumerate(process_stats):
@@ -227,14 +218,13 @@ def handle_loop(stdscr, args):
                 # `pwd` throws a KeyError if the user cannot be found. This can
                 # happen e.g. when the process is running in a cgroup that has
                 # different users from the host.
-                username = 'UNKNOWN({})'.format(uid)
+                username = "UNKNOWN({})".format(uid)
 
             stdscr.addstr(
-                i + 2, 0,
+                i + 2,
+                0,
                 "{0:8} {username:8.8} {2:16} {3:8} {4:8} "
-                "{5:8} {6:9.1f}% {7:9.1f}%".format(
-                    *stat, username=username
-                )
+                "{5:8} {6:9.1f}% {7:9.1f}%".format(*stat, username=username),
             )
             if i > height - 4:
                 break
@@ -246,16 +236,16 @@ def handle_loop(stdscr, args):
 
 def parse_arguments():
     parser = argparse.ArgumentParser(
-        description='show Linux page cache hit/miss statistics including read '
-                    'and write hit % per processes in a UI like top.'
+        description="show Linux page cache hit/miss statistics including read "
+        "and write hit % per processes in a UI like top."
     )
     parser.add_argument(
-        'interval', type=int, default=5, nargs='?',
-        help='Interval between probes.'
+        "interval", type=int, default=5, nargs="?", help="Interval between probes."
     )
 
     args = parser.parse_args()
     return args
+
 
 args = parse_arguments()
 curses.wrapper(handle_loop, args)

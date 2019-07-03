@@ -18,32 +18,38 @@ import warnings
 
 from .libbcc import lib
 
+
 def _read_cpu_range(path):
     cpus = []
-    with open(path, 'r') as f:
+    with open(path, "r") as f:
         cpus_range_str = f.read()
-        for cpu_range in cpus_range_str.split(','):
-            rangeop = cpu_range.find('-')
+        for cpu_range in cpus_range_str.split(","):
+            rangeop = cpu_range.find("-")
             if rangeop == -1:
                 cpus.append(int(cpu_range))
             else:
                 start = int(cpu_range[:rangeop])
-                end = int(cpu_range[rangeop+1:])
-                cpus.extend(range(start, end+1))
+                end = int(cpu_range[rangeop + 1 :])
+                cpus.extend(range(start, end + 1))
     return cpus
 
+
 def get_online_cpus():
-    return _read_cpu_range('/sys/devices/system/cpu/online')
+    return _read_cpu_range("/sys/devices/system/cpu/online")
+
 
 def get_possible_cpus():
-    return _read_cpu_range('/sys/devices/system/cpu/possible')
+    return _read_cpu_range("/sys/devices/system/cpu/possible")
+
 
 def detect_language(candidates, pid):
     res = lib.bcc_procutils_language(pid)
     language = ct.cast(res, ct.c_char_p).value.decode()
     return language if language in candidates else None
 
+
 FILESYSTEMENCODING = sys.getfilesystemencoding()
+
 
 def printb(s, file=sys.stdout, nl=1):
     """
@@ -58,6 +64,7 @@ def printb(s, file=sys.stdout, nl=1):
         buf.write(b"\n")
     file.flush()
 
+
 class ArgString(object):
     """
     ArgString(arg)
@@ -66,6 +73,7 @@ class ArgString(object):
     object, which is better for comparing to kernel or probe data (which should
     never be en/decode()'ed).
     """
+
     def __init__(self, arg):
         if sys.version_info[0] >= 3:
             self.s = arg
@@ -78,15 +86,19 @@ class ArgString(object):
     def __str__(self):
         return self.__bytes__()
 
+
 def warn_with_traceback(message, category, filename, lineno, file=None, line=None):
     log = file if hasattr(file, "write") else sys.stderr
     traceback.print_stack(f=sys._getframe(2), file=log)
     log.write(warnings.formatwarning(message, category, filename, lineno, line))
 
+
 # uncomment to get full tracebacks for invalid uses of python3+str in arguments
-#warnings.showwarning = warn_with_traceback
+# warnings.showwarning = warn_with_traceback
 
 _strict_bytes = False
+
+
 def _assert_is_bytes(arg):
     if arg is None:
         return arg
@@ -96,4 +108,3 @@ def _assert_is_bytes(arg):
         warnings.warn("not a bytes object: %r" % arg, DeprecationWarning, 2)
         return ArgString(arg).__bytes__()
     return arg
-

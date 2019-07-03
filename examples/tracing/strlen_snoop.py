@@ -40,7 +40,7 @@ int printarg(struct pt_regs *ctx) {
     return 0;
 };
 """
-bpf_text = bpf_text.replace('PID', pid)
+bpf_text = bpf_text.replace("PID", pid)
 b = BPF(text=bpf_text)
 b.attach_uprobe(name="c", sym="strlen", fn_name="printarg")
 

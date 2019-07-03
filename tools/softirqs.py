@@ -27,19 +27,22 @@ examples = """examples:
 parser = argparse.ArgumentParser(
     description="Summarize soft irq event time as histograms.",
     formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog=examples)
-parser.add_argument("-T", "--timestamp", action="store_true",
-    help="include timestamp on output")
-parser.add_argument("-N", "--nanoseconds", action="store_true",
-    help="output in nanoseconds")
-parser.add_argument("-d", "--dist", action="store_true",
-    help="show distributions as histograms")
-parser.add_argument("interval", nargs="?", default=99999999,
-    help="output interval, in seconds")
-parser.add_argument("count", nargs="?", default=99999999,
-    help="number of outputs")
-parser.add_argument("--ebpf", action="store_true",
-    help=argparse.SUPPRESS)
+    epilog=examples,
+)
+parser.add_argument(
+    "-T", "--timestamp", action="store_true", help="include timestamp on output"
+)
+parser.add_argument(
+    "-N", "--nanoseconds", action="store_true", help="output in nanoseconds"
+)
+parser.add_argument(
+    "-d", "--dist", action="store_true", help="show distributions as histograms"
+)
+parser.add_argument(
+    "interval", nargs="?", default=99999999, help="output interval, in seconds"
+)
+parser.add_argument("count", nargs="?", default=99999999, help="number of outputs")
+parser.add_argument("--ebpf", action="store_true", help=argparse.SUPPRESS)
 args = parser.parse_args()
 countdown = int(args.count)
 if args.nanoseconds:
@@ -104,13 +107,15 @@ TRACEPOINT_PROBE(irq, softirq_exit)
 
 # code substitutions
 if args.dist:
-    bpf_text = bpf_text.replace('STORE',
-        'key.vec = vec; key.slot = bpf_log2l(delta / %d); ' % factor +
-        'dist.increment(key);')
+    bpf_text = bpf_text.replace(
+        "STORE",
+        "key.vec = vec; key.slot = bpf_log2l(delta / %d); " % factor
+        + "dist.increment(key);",
+    )
 else:
-    bpf_text = bpf_text.replace('STORE',
-        'key.vec = valp->vec; ' +
-        'dist.increment(key, delta);')
+    bpf_text = bpf_text.replace(
+        "STORE", "key.vec = valp->vec; " + "dist.increment(key, delta);"
+    )
 if debug or args.ebpf:
     print(bpf_text)
     if args.ebpf:
@@ -119,18 +124,30 @@ if debug or args.ebpf:
 # load BPF program
 b = BPF(text=bpf_text)
 
+
 def vec_to_name(vec):
     # copied from softirq_to_name() in kernel/softirq.c
     # may need updates if new softirq handlers are added
-    return ["hi", "timer", "net_tx", "net_rx", "block", "irq_poll",
-            "tasklet", "sched", "hrtimer", "rcu"][vec]
+    return [
+        "hi",
+        "timer",
+        "net_tx",
+        "net_rx",
+        "block",
+        "irq_poll",
+        "tasklet",
+        "sched",
+        "hrtimer",
+        "rcu",
+    ][vec]
+
 
 print("Tracing soft irq event time... Hit Ctrl-C to end.")
 
 # output
 exiting = 0 if args.interval else 1
 dist = b.get_table("dist")
-while (1):
+while 1:
     try:
         sleep(int(args.interval))
     except KeyboardInterrupt:

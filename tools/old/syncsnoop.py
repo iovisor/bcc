@@ -16,11 +16,13 @@ from __future__ import print_function
 from bcc import BPF
 
 # load BPF program
-b = BPF(text="""
+b = BPF(
+    text="""
 void kprobe__sys_sync(void *ctx) {
     bpf_trace_printk("sync()\\n");
 };
-""")
+"""
+)
 
 # header
 print("%-18s %s" % ("TIME(s)", "CALL"))

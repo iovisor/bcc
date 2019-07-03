@@ -22,9 +22,11 @@ from sys import argv
 import sys
 from os import stat
 
+
 def usage():
     print("USAGE: %s [-Ch] {PTS | /dev/ttydev}  # try -h for help" % argv[0])
     exit()
+
 
 # arguments
 examples = """examples:
@@ -36,13 +38,15 @@ examples = """examples:
 parser = argparse.ArgumentParser(
     description="Snoop output from a pts or tty device, eg, a shell",
     formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog=examples)
-parser.add_argument("-C", "--noclear", action="store_true",
-    help="don't clear the screen")
-parser.add_argument("device", default="-1",
-    help="path to a tty device (eg, /dev/tty0) or pts number")
-parser.add_argument("--ebpf", action="store_true",
-    help=argparse.SUPPRESS)
+    epilog=examples,
+)
+parser.add_argument(
+    "-C", "--noclear", action="store_true", help="don't clear the screen"
+)
+parser.add_argument(
+    "device", default="-1", help="path to a tty device (eg, /dev/tty0) or pts number"
+)
+parser.add_argument("--ebpf", action="store_true", help=argparse.SUPPRESS)
 args = parser.parse_args()
 debug = 0
 
@@ -50,7 +54,7 @@ if args.device == "-1":
     usage()
 
 path = args.device
-if path.find('/') != 0:
+if path.find("/") != 0:
     path = "/dev/pts/" + path
 try:
     pi = stat(path)
@@ -91,7 +95,7 @@ int kprobe__tty_write(struct pt_regs *ctx, struct file *file,
 };
 """
 
-bpf_text = bpf_text.replace('PTS', str(pi.st_ino))
+bpf_text = bpf_text.replace("PTS", str(pi.st_ino))
 if debug or args.ebpf:
     print(bpf_text)
     if args.ebpf:
@@ -106,8 +110,9 @@ if not args.noclear:
 # process event
 def print_event(cpu, data, size):
     event = b["events"].event(data)
-    print("%s" % event.buf[0:event.count].decode('utf-8', 'replace'), end="")
+    print("%s" % event.buf[0 : event.count].decode("utf-8", "replace"), end="")
     sys.stdout.flush()
+
 
 # loop with callback to print_event
 b["events"].open_perf_buffer(print_event)

@@ -9,6 +9,7 @@ from programSerializer import ProgramSerializer
 
 class EbpfScalarType(EbpfType):
     __doc__ = "Represents a scalar type"
+
     def __init__(self, parent, widthInBits, isSigned, config):
         super(EbpfScalarType, self).__init__(None)
         assert isinstance(widthInBits, int)
@@ -57,8 +58,7 @@ class EbpfScalarType(EbpfType):
         serializer.append(self.asString())
 
     def declareArray(self, serializer, identifier, size):
-        raise CompilationException(
-            True, "Arrays of base type not expected in P4")
+        raise CompilationException(True, "Arrays of base type not expected in P4")
 
     def declare(self, serializer, identifier, asPointer):
         assert isinstance(serializer, ProgramSerializer)
@@ -76,8 +76,10 @@ class EbpfScalarType(EbpfType):
                 serializer.append("char*")
             else:
                 serializer.appendFormat(
-                    "char {0}[{1}]", identifier,
-                    EbpfScalarType.bytesRequired(self.width))
+                    "char {0}[{1}]",
+                    identifier,
+                    EbpfScalarType.bytesRequired(self.width),
+                )
 
     def emitInitializer(self, serializer):
         assert isinstance(serializer, ProgramSerializer)

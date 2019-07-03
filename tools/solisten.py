@@ -35,15 +35,14 @@ examples = """Examples:
 parser = argparse.ArgumentParser(
     description="Stream sockets listen",
     formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog=examples)
-parser.add_argument("--show-netns", action="store_true",
-    help="show network namespace")
-parser.add_argument("-p", "--pid", default=0, type=int,
-    help="trace this PID only")
-parser.add_argument("-n", "--netns", default=0, type=int,
-    help="trace this Network Namespace only")
-parser.add_argument("--ebpf", action="store_true",
-    help=argparse.SUPPRESS)
+    epilog=examples,
+)
+parser.add_argument("--show-netns", action="store_true", help="show network namespace")
+parser.add_argument("-p", "--pid", default=0, type=int, help="trace this PID only")
+parser.add_argument(
+    "-n", "--netns", default=0, type=int, help="trace this Network Namespace only"
+)
+parser.add_argument("--ebpf", action="store_true", help=argparse.SUPPRESS)
 
 
 # BPF Program
@@ -122,7 +121,7 @@ int kprobe__inet_listen(struct pt_regs *ctx, struct socket *sock, int backlog)
 };
 """
 
-    # TODO: properties to unpack protocol / ip / pid / tgid ...
+# TODO: properties to unpack protocol / ip / pid / tgid ...
 
 # Format output
 def event_printer(show_netns):
@@ -130,9 +129,9 @@ def event_printer(show_netns):
         # Decode event
         event = b["listen_evt"].event(data)
 
-        pid = event.pid_tgid & 0xffffffff
-        proto_family = event.proto & 0xff
-        proto_type = event.proto >> 16 & 0xff
+        pid = event.pid_tgid & 0xFFFFFFFF
+        proto_family = event.proto & 0xFF
+        proto_type = event.proto >> 16 & 0xFF
 
         if proto_family == SOCK_STREAM:
             protocol = "TCP"
@@ -151,17 +150,26 @@ def event_printer(show_netns):
 
         # Display
         if show_netns:
-            printb(b"%-6d %-12.12s %-12s %-6s %-8s %-5s %-39s" % (
-                pid, event.task, event.netns, protocol, event.backlog,
-                event.lport, address,
-            ))
+            printb(
+                b"%-6d %-12.12s %-12s %-6s %-8s %-5s %-39s"
+                % (
+                    pid,
+                    event.task,
+                    event.netns,
+                    protocol,
+                    event.backlog,
+                    event.lport,
+                    address,
+                )
+            )
         else:
-            printb(b"%-6d %-12.12s %-6s %-8s %-5s %-39s" % (
-                pid, event.task, protocol, event.backlog,
-                event.lport, address,
-            ))
+            printb(
+                b"%-6d %-12.12s %-6s %-8s %-5s %-39s"
+                % (pid, event.task, protocol, event.backlog, event.lport, address)
+            )
 
     return print_event
+
 
 if __name__ == "__main__":
     # Parse arguments
@@ -188,11 +196,15 @@ if __name__ == "__main__":
 
     # Print headers
     if args.show_netns:
-        print("%-6s %-12s %-12s %-6s %-8s %-5s %-39s" %
-              ("PID", "COMM", "NETNS", "PROTO", "BACKLOG", "PORT", "ADDR"))
+        print(
+            "%-6s %-12s %-12s %-6s %-8s %-5s %-39s"
+            % ("PID", "COMM", "NETNS", "PROTO", "BACKLOG", "PORT", "ADDR")
+        )
     else:
-        print("%-6s %-12s %-6s %-8s %-5s %-39s" %
-              ("PID", "COMM", "PROTO", "BACKLOG", "PORT", "ADDR"))
+        print(
+            "%-6s %-12s %-6s %-8s %-5s %-39s"
+            % ("PID", "COMM", "PROTO", "BACKLOG", "PORT", "ADDR")
+        )
 
     # Read events
     while 1:

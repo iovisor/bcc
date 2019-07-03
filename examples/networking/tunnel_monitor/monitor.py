@@ -28,11 +28,30 @@ parser[c_int(2)] = c_int(inner_fn.fd)
 ifc = ipdb.interfaces.eth0
 
 ipr.tc("add", "ingress", ifc.index, "ffff:")
-ipr.tc("add-filter", "bpf", ifc.index, ":1", fd=ingress_fn.fd,
-       name=ingress_fn.name, parent="ffff:", action="ok", classid=1)
+ipr.tc(
+    "add-filter",
+    "bpf",
+    ifc.index,
+    ":1",
+    fd=ingress_fn.fd,
+    name=ingress_fn.name,
+    parent="ffff:",
+    action="ok",
+    classid=1,
+)
 ipr.tc("add", "sfq", ifc.index, "1:")
-ipr.tc("add-filter", "bpf", ifc.index, ":1", fd=egress_fn.fd,
-       name=egress_fn.name, parent="1:", action="ok", classid=1)
+ipr.tc(
+    "add-filter",
+    "bpf",
+    ifc.index,
+    ":1",
+    fd=egress_fn.fd,
+    name=egress_fn.name,
+    parent="1:",
+    action="ok",
+    classid=1,
+)
+
 
 def stats2json(k, v):
     return {
@@ -41,16 +60,31 @@ def stats2json(k, v):
         "outer_dip": str(IPAddress(k.outer_dip)),
         "inner_sip": str(IPAddress(k.inner_sip)),
         "inner_dip": str(IPAddress(k.inner_dip)),
-        "tx_pkts": v.tx_pkts, "tx_bytes": v.tx_bytes,
-        "rx_pkts": v.rx_pkts, "rx_bytes": v.rx_bytes,
+        "tx_pkts": v.tx_pkts,
+        "tx_bytes": v.tx_bytes,
+        "rx_pkts": v.rx_pkts,
+        "rx_bytes": v.rx_bytes,
     }
 
+
 def delta_stats(v, oldv):
-    return stats.Leaf(v.tx_pkts - oldv.tx_pkts, v.rx_pkts - oldv.rx_pkts,
-                      v.tx_bytes - oldv.tx_bytes, v.rx_bytes - oldv.rx_bytes)
+    return stats.Leaf(
+        v.tx_pkts - oldv.tx_pkts,
+        v.rx_pkts - oldv.rx_pkts,
+        v.tx_bytes - oldv.tx_bytes,
+        v.rx_bytes - oldv.rx_bytes,
+    )
+
+
 def key2str(k):
-    return "%s,%s,%d,%s,%s" % (IPAddress(k.outer_sip), IPAddress(k.outer_dip), k.vni,
-                               IPAddress(k.inner_sip), IPAddress(k.inner_dip))
+    return "%s,%s,%d,%s,%s" % (
+        IPAddress(k.outer_sip),
+        IPAddress(k.outer_dip),
+        k.vni,
+        IPAddress(k.inner_sip),
+        IPAddress(k.inner_dip),
+    )
+
 
 prev = {}
 
@@ -71,10 +105,15 @@ while True:
 
     with open("./chord-transitions/data/tunnel.json.new", "w") as f:
         json.dump(result_total, f)
-    rename("./chord-transitions/data/tunnel.json.new", "./chord-transitions/data/tunnel.json")
+    rename(
+        "./chord-transitions/data/tunnel.json.new",
+        "./chord-transitions/data/tunnel.json",
+    )
     with open("./chord-transitions/data/tunnel-delta.json.new", "w") as f:
         json.dump(result_delta, f)
-    rename("./chord-transitions/data/tunnel-delta.json.new", "./chord-transitions/data/tunnel-delta.json")
+    rename(
+        "./chord-transitions/data/tunnel-delta.json.new",
+        "./chord-transitions/data/tunnel-delta.json",
+    )
     sleep(5)
 ipdb.release()
-

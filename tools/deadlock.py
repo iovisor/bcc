@@ -44,9 +44,7 @@
 #
 # 01-Feb-2017   Kenny Yu   Created this.
 
-from __future__ import (
-    absolute_import, division, unicode_literals, print_function
-)
+from __future__ import absolute_import, division, unicode_literals, print_function
 from bcc import BPF
 from collections import defaultdict
 import argparse
@@ -58,10 +56,10 @@ import time
 
 
 class DiGraph(object):
-    '''
+    """
     Adapted from networkx: http://networkx.github.io/
     Represents a directed graph. Edges can store (key, value) attributes.
-    '''
+    """
 
     def __init__(self):
         # Map of node -> set of nodes
@@ -108,36 +106,36 @@ class DiGraph(object):
         return graph
 
     def node_link_data(self):
-        '''
+        """
         Returns the graph as a dictionary in a format that can be
         serialized.
-        '''
+        """
         data = {
-            'directed': True,
-            'multigraph': False,
-            'graph': {},
-            'links': [],
-            'nodes': [],
+            "directed": True,
+            "multigraph": False,
+            "graph": {},
+            "links": [],
+            "nodes": [],
         }
 
         # Do one pass to build a map of node -> position in nodes
         node_to_number = {}
         for node in self.adjacency_map.keys():
-            node_to_number[node] = len(data['nodes'])
-            data['nodes'].append({'id': node})
+            node_to_number[node] = len(data["nodes"])
+            data["nodes"].append({"id": node})
 
         # Do another pass to build the link information
         for node, neighbors in self.adjacency_map.items():
             for neighbor in neighbors:
                 link = self.attributes_map[(node, neighbor)].copy()
-                link['source'] = node_to_number[node]
-                link['target'] = node_to_number[neighbor]
-                data['links'].append(link)
+                link["source"] = node_to_number[node]
+                link["target"] = node_to_number[neighbor]
+                data["links"].append(link)
         return data
 
 
 def strongly_connected_components(G):
-    '''
+    """
     Adapted from networkx: http://networkx.github.io/
     Parameters
     ----------
@@ -147,7 +145,7 @@ def strongly_connected_components(G):
     comp : generator of sets
         A generator of sets of nodes, one for each strongly connected
         component of G.
-    '''
+    """
     preorder = {}
     lowlink = {}
     scc_found = {}
@@ -180,9 +178,7 @@ def strongly_connected_components(G):
                     if lowlink[v] == preorder[v]:
                         scc_found[v] = True
                         scc = {v}
-                        while (
-                            scc_queue and preorder[scc_queue[-1]] > preorder[v]
-                        ):
+                        while scc_queue and preorder[scc_queue[-1]] > preorder[v]:
                             k = scc_queue.pop()
                             scc_found[k] = True
                             scc.add(k)
@@ -192,7 +188,7 @@ def strongly_connected_components(G):
 
 
 def simple_cycles(G):
-    '''
+    """
     Adapted from networkx: http://networkx.github.io/
     Parameters
     ----------
@@ -202,7 +198,7 @@ def simple_cycles(G):
     cycle_generator: generator
        A generator that produces elementary cycles of the graph.
        Each cycle is represented by a list of nodes along the cycle.
-    '''
+    """
 
     def _unblock(thisnode, blocked, B):
         stack = set([thisnode])
@@ -262,12 +258,12 @@ def simple_cycles(G):
 
 
 def find_cycle(graph):
-    '''
+    """
     Looks for a cycle in the graph. If found, returns the first cycle.
     If nodes a1, a2, ..., an are in a cycle, then this returns:
         [(a1,a2), (a2,a3), ... (an-1,an), (an, a1)]
     Otherwise returns an empty list.
-    '''
+    """
     cycles = list(simple_cycles(graph))
     if cycles:
         nodes = cycles[0]
@@ -283,7 +279,7 @@ def find_cycle(graph):
 
 
 def print_cycle(binary, graph, edges, thread_info, print_stack_trace_fn):
-    '''
+    """
     Prints the cycle in the mutex graph in the following format:
 
     Potential Deadlock Detected!
@@ -300,7 +296,7 @@ def print_cycle(binary, graph, edges, thread_info, print_stack_trace_fn):
     for T in all threads:
         Thread T was created here:
             [ stack trace ]
-    '''
+    """
 
     # List of mutexes in the cycle, first and last repeated
     nodes_in_order = []
@@ -311,14 +307,14 @@ def print_cycle(binary, graph, edges, thread_info, print_stack_trace_fn):
         # For global or static variables, try to symbolize the mutex address.
         symbol = symbolize_with_objdump(binary, m)
         if symbol:
-            symbol += ' '
-        node_addr_to_name[m] = 'Mutex M%d (%s0x%016x)' % (counter, symbol, m)
+            symbol += " "
+        node_addr_to_name[m] = "Mutex M%d (%s0x%016x)" % (counter, symbol, m)
     nodes_in_order.append(nodes_in_order[0])
 
-    print('----------------\nPotential Deadlock Detected!\n')
+    print("----------------\nPotential Deadlock Detected!\n")
     print(
-        'Cycle in lock order graph: %s\n' %
-        (' => '.join([node_addr_to_name[n] for n in nodes_in_order]))
+        "Cycle in lock order graph: %s\n"
+        % (" => ".join([node_addr_to_name[n] for n in nodes_in_order]))
     )
 
     # Set of threads involved in the lock inversion
@@ -326,25 +322,23 @@ def print_cycle(binary, graph, edges, thread_info, print_stack_trace_fn):
 
     # For each edge in the cycle, print where the two mutexes were held
     for (m, n) in edges:
-        thread_pid = graph.attributes(m, n)['thread_pid']
-        thread_comm = graph.attributes(m, n)['thread_comm']
-        first_mutex_stack_id = graph.attributes(m, n)['first_mutex_stack_id']
-        second_mutex_stack_id = graph.attributes(m, n)['second_mutex_stack_id']
+        thread_pid = graph.attributes(m, n)["thread_pid"]
+        thread_comm = graph.attributes(m, n)["thread_comm"]
+        first_mutex_stack_id = graph.attributes(m, n)["first_mutex_stack_id"]
+        second_mutex_stack_id = graph.attributes(m, n)["second_mutex_stack_id"]
         thread_pids.add(thread_pid)
         print(
-            '%s acquired here while holding %s in Thread %d (%s):' % (
-                node_addr_to_name[n], node_addr_to_name[m], thread_pid,
-                thread_comm
-            )
+            "%s acquired here while holding %s in Thread %d (%s):"
+            % (node_addr_to_name[n], node_addr_to_name[m], thread_pid, thread_comm)
         )
         print_stack_trace_fn(second_mutex_stack_id)
-        print('')
+        print("")
         print(
-            '%s previously acquired by the same Thread %d (%s) here:' %
-            (node_addr_to_name[m], thread_pid, thread_comm)
+            "%s previously acquired by the same Thread %d (%s) here:"
+            % (node_addr_to_name[m], thread_pid, thread_comm)
         )
         print_stack_trace_fn(first_mutex_stack_id)
-        print('')
+        print("")
 
     # Print where the threads were created, if available
     for thread_pid in thread_pids:
@@ -353,41 +347,38 @@ def print_cycle(binary, graph, edges, thread_info, print_stack_trace_fn):
         )
         if parent_pid:
             print(
-                'Thread %d created by Thread %d (%s) here: ' %
-                (thread_pid, parent_pid, parent_comm)
+                "Thread %d created by Thread %d (%s) here: "
+                % (thread_pid, parent_pid, parent_comm)
             )
             print_stack_trace_fn(stack_id)
         else:
-            print(
-                'Could not find stack trace where Thread %d was created' %
-                thread_pid
-            )
-        print('')
+            print("Could not find stack trace where Thread %d was created" % thread_pid)
+        print("")
 
 
 def symbolize_with_objdump(binary, addr):
-    '''
+    """
     Searches the binary for the address using objdump. Returns the symbol if
     it is found, otherwise returns empty string.
-    '''
+    """
     try:
-        command = (
-            'objdump -tT %s | grep %x | awk {\'print $NF\'} | c++filt' %
-            (binary, addr)
+        command = "objdump -tT %s | grep %x | awk {'print $NF'} | c++filt" % (
+            binary,
+            addr,
         )
         output = subprocess.check_output(command, shell=True)
-        return output.decode('utf-8').strip()
+        return output.decode("utf-8").strip()
     except subprocess.CalledProcessError:
-        return ''
+        return ""
 
 
 def strlist(s):
-    '''Given a comma-separated string, returns a list of substrings'''
-    return s.strip().split(',')
+    """Given a comma-separated string, returns a list of substrings"""
+    return s.strip().split(",")
 
 
 def main():
-    examples = '''Examples:
+    examples = """Examples:
     deadlock 181                 # Analyze PID 181
 
     deadlock 181 --binary /lib/x86_64-linux-gnu/libpthread.so.0
@@ -409,66 +400,66 @@ def main():
     deadlock 181 --dump-graph graph.json
                                  # Analyze PID 181 and dump the mutex wait
                                  # graph to graph.json.
-    '''
+    """
     parser = argparse.ArgumentParser(
         description=(
-            'Detect potential deadlocks (lock inversions) in a running binary.'
-            '\nMust be run as root.'
+            "Detect potential deadlocks (lock inversions) in a running binary."
+            "\nMust be run as root."
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=examples,
     )
-    parser.add_argument('pid', type=int, help='Pid to trace')
+    parser.add_argument("pid", type=int, help="Pid to trace")
     # Binaries with `:` in the path will fail to attach uprobes on kernels
     # running without this patch: https://lkml.org/lkml/2017/1/13/585.
     # Symlinks to the binary without `:` in the path can get around this issue.
     parser.add_argument(
-        '--binary',
+        "--binary",
         type=str,
-        default='',
-        help='If set, trace the mutexes from the binary at this path. '
-        'For statically-linked binaries, this argument is not required. '
-        'For dynamically-linked binaries, this argument is required and '
-        'should be the path of the pthread library the binary is using. '
-        'Example: /lib/x86_64-linux-gnu/libpthread.so.0',
+        default="",
+        help="If set, trace the mutexes from the binary at this path. "
+        "For statically-linked binaries, this argument is not required. "
+        "For dynamically-linked binaries, this argument is required and "
+        "should be the path of the pthread library the binary is using. "
+        "Example: /lib/x86_64-linux-gnu/libpthread.so.0",
     )
     parser.add_argument(
-        '--dump-graph',
+        "--dump-graph",
         type=str,
-        default='',
-        help='If set, this will dump the mutex graph to the specified file.',
+        default="",
+        help="If set, this will dump the mutex graph to the specified file.",
     )
     parser.add_argument(
-        '--verbose',
-        action='store_true',
-        help='Print statistics about the mutex wait graph.',
+        "--verbose",
+        action="store_true",
+        help="Print statistics about the mutex wait graph.",
     )
     parser.add_argument(
-        '--lock-symbols',
+        "--lock-symbols",
         type=strlist,
-        default=['pthread_mutex_lock'],
-        help='Comma-separated list of lock symbols to trace. Default is '
-        'pthread_mutex_lock. These symbols cannot be inlined in the binary.',
+        default=["pthread_mutex_lock"],
+        help="Comma-separated list of lock symbols to trace. Default is "
+        "pthread_mutex_lock. These symbols cannot be inlined in the binary.",
     )
     parser.add_argument(
-        '--unlock-symbols',
+        "--unlock-symbols",
         type=strlist,
-        default=['pthread_mutex_unlock'],
-        help='Comma-separated list of unlock symbols to trace. Default is '
-        'pthread_mutex_unlock. These symbols cannot be inlined in the binary.',
+        default=["pthread_mutex_unlock"],
+        help="Comma-separated list of unlock symbols to trace. Default is "
+        "pthread_mutex_unlock. These symbols cannot be inlined in the binary.",
     )
     args = parser.parse_args()
     if not args.binary:
         try:
-            args.binary = os.readlink('/proc/%d/exe' % args.pid)
+            args.binary = os.readlink("/proc/%d/exe" % args.pid)
         except OSError as e:
-            print('%s. Is the process (pid=%d) running?' % (str(e), args.pid))
+            print("%s. Is the process (pid=%d) running?" % (str(e), args.pid))
             sys.exit(1)
 
-    bpf = BPF(src_file=b'deadlock.c')
+    bpf = BPF(src_file=b"deadlock.c")
 
     # Trace where threads are created
-    bpf.attach_kretprobe(event=bpf.get_syscall_fnname('clone'), fn_name='trace_clone')
+    bpf.attach_kretprobe(event=bpf.get_syscall_fnname("clone"), fn_name="trace_clone")
 
     # We must trace unlock first, otherwise in the time we attached the probe
     # on lock() and have not yet attached the probe on unlock(), a thread can
@@ -479,72 +470,69 @@ def main():
             bpf.attach_uprobe(
                 name=args.binary,
                 sym=symbol,
-                fn_name='trace_mutex_release',
+                fn_name="trace_mutex_release",
                 pid=args.pid,
             )
         except Exception as e:
-            print('%s. Failed to attach to symbol: %s' % (str(e), symbol))
+            print("%s. Failed to attach to symbol: %s" % (str(e), symbol))
             sys.exit(1)
     for symbol in args.lock_symbols:
         try:
             bpf.attach_uprobe(
                 name=args.binary,
                 sym=symbol,
-                fn_name='trace_mutex_acquire',
+                fn_name="trace_mutex_acquire",
                 pid=args.pid,
             )
         except Exception as e:
-            print('%s. Failed to attach to symbol: %s' % (str(e), symbol))
+            print("%s. Failed to attach to symbol: %s" % (str(e), symbol))
             sys.exit(1)
 
     def print_stack_trace(stack_id):
-        '''Closure that prints the symbolized stack trace.'''
-        for addr in bpf.get_table('stack_traces').walk(stack_id):
+        """Closure that prints the symbolized stack trace."""
+        for addr in bpf.get_table("stack_traces").walk(stack_id):
             line = bpf.sym(addr, args.pid)
             # Try to symbolize with objdump if we cannot with bpf.
-            if line == '[unknown]':
+            if line == "[unknown]":
                 symbol = symbolize_with_objdump(args.binary, addr)
                 if symbol:
                     line = symbol
-            print('@ %016x %s' % (addr, line))
+            print("@ %016x %s" % (addr, line))
 
-    print('Tracing... Hit Ctrl-C to end.')
+    print("Tracing... Hit Ctrl-C to end.")
     while True:
         try:
             # Map of child thread pid -> parent info
             thread_info = {
                 child.value: (parent.parent_pid, parent.stack_id, parent.comm)
-                for child, parent in bpf.get_table('thread_to_parent').items()
+                for child, parent in bpf.get_table("thread_to_parent").items()
             }
 
             # Mutex wait directed graph. Nodes are mutexes. Edge (A,B) exists
             # if there exists some thread T where lock(A) was called and
             # lock(B) was called before unlock(A) was called.
             graph = DiGraph()
-            for key, leaf in bpf.get_table('edges').items():
+            for key, leaf in bpf.get_table("edges").items():
                 graph.add_edge(
                     key.mutex1,
                     key.mutex2,
                     thread_pid=leaf.thread_pid,
-                    thread_comm=leaf.comm.decode('utf-8'),
+                    thread_comm=leaf.comm.decode("utf-8"),
                     first_mutex_stack_id=leaf.mutex1_stack_id,
                     second_mutex_stack_id=leaf.mutex2_stack_id,
                 )
             if args.verbose:
                 print(
-                    'Mutexes: %d, Edges: %d' %
-                    (len(graph.nodes()), len(graph.edges()))
+                    "Mutexes: %d, Edges: %d" % (len(graph.nodes()), len(graph.edges()))
                 )
             if args.dump_graph:
-                with open(args.dump_graph, 'w') as f:
+                with open(args.dump_graph, "w") as f:
                     data = graph.node_link_data()
                     f.write(json.dumps(data, indent=2))
 
             cycle = find_cycle(graph)
             if cycle:
-                print_cycle(
-                    args.binary, graph, cycle, thread_info, print_stack_trace
-                )
+                print_cycle(args.binary, graph, cycle, thread_info, print_stack_trace)
                 sys.exit(1)
 
             time.sleep(1)
@@ -552,5 +540,5 @@ def main():
             break
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

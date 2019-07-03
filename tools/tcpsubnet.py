@@ -46,26 +46,40 @@ examples = """examples:
     ./tcpsubnet -J              # Format the output in JSON.
 """
 
-default_subnets = "127.0.0.1/32,10.0.0.0/8," \
-    "172.16.0.0/12,192.168.0.0/16,0.0.0.0/0"
+default_subnets = "127.0.0.1/32,10.0.0.0/8," "172.16.0.0/12,192.168.0.0/16,0.0.0.0/0"
 
 parser = argparse.ArgumentParser(
     description="Summarize TCP send and aggregate by subnet",
     formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog=examples)
-parser.add_argument("subnets", help="comma separated list of subnets",
-    type=str, nargs="?", default=default_subnets)
-parser.add_argument("-v", "--verbose", action="store_true",
-    help="output debug statements")
-parser.add_argument("-J", "--json", action="store_true",
-    help="format output in JSON")
-parser.add_argument("--ebpf", action="store_true",
-    help=argparse.SUPPRESS)
-parser.add_argument("-f", "--format", default="B",
-    help="[bkmBKM] format to report: bits, Kbits, Mbits, bytes, " +
-    "KBytes, MBytes (default B)", choices=["b", "k", "m", "B", "K", "M"])
-parser.add_argument("-i", "--interval", default=1, type=int,
-    help="output interval, in seconds (default 1)")
+    epilog=examples,
+)
+parser.add_argument(
+    "subnets",
+    help="comma separated list of subnets",
+    type=str,
+    nargs="?",
+    default=default_subnets,
+)
+parser.add_argument(
+    "-v", "--verbose", action="store_true", help="output debug statements"
+)
+parser.add_argument("-J", "--json", action="store_true", help="format output in JSON")
+parser.add_argument("--ebpf", action="store_true", help=argparse.SUPPRESS)
+parser.add_argument(
+    "-f",
+    "--format",
+    default="B",
+    help="[bkmBKM] format to report: bits, Kbits, Mbits, bytes, "
+    + "KBytes, MBytes (default B)",
+    choices=["b", "k", "m", "B", "K", "M"],
+)
+parser.add_argument(
+    "-i",
+    "--interval",
+    default=1,
+    type=int,
+    help="output interval, in seconds (default 1)",
+)
 args = parser.parse_args()
 
 level = logging.INFO
@@ -91,7 +105,7 @@ formats = {
     "m": lambda x: ((x * 8) / pow(1024, 2)),
     "B": lambda x: x,
     "K": lambda x: x / 1024,
-    "M": lambda x: x / pow(1024, 2)
+    "M": lambda x: x / pow(1024, 2),
 }
 
 # Let's swap the string with the actual numeric value
@@ -131,6 +145,7 @@ int kprobe__tcp_sendmsg(struct pt_regs *ctx, struct sock *sk,
 def mask_to_int(n):
     return ((1 << n) - 1) << (32 - n)
 
+
 # Takes in a list of subnets and returns a list
 # of tuple-3 containing:
 # - The subnet info at index 0
@@ -154,8 +169,9 @@ def parse_subnets(subnets):
         try:
             netaddr_int = struct.unpack("!I", socket.inet_aton(parts[0]))[0]
         except:
-            msg = ("Invalid net address in subnet [%s], " +
-                "please refer to the examples.") % s
+            msg = (
+                "Invalid net address in subnet [%s], " + "please refer to the examples."
+            ) % s
             raise ValueError(msg)
         try:
             mask_int = int(parts[1])
@@ -163,12 +179,14 @@ def parse_subnets(subnets):
             msg = "Invalid mask in subnet [%s]. Mask must be an int" % s
             raise ValueError(msg)
         if mask_int < 0 or mask_int > 32:
-            msg = ("Invalid mask in subnet [%s]. Must be an " +
-                "int between 0 and 32.") % s
+            msg = (
+                "Invalid mask in subnet [%s]. Must be an " + "int between 0 and 32."
+            ) % s
             raise ValueError(msg)
         mask_int = mask_to_int(int(parts[1]))
         m.append([s, netaddr_int, mask_int])
     return m
+
 
 def generate_bpf_subnets(subnets):
     template = """
@@ -179,7 +197,7 @@ def generate_bpf_subnets(subnets):
           categorized = 1;
         }
     """
-    bpf = ''
+    bpf = ""
     for i, s in enumerate(subnets):
         branch = template
         branch = branch.replace("__NET_ADDR__", str(socket.htonl(s[1])))
@@ -187,6 +205,7 @@ def generate_bpf_subnets(subnets):
         branch = branch.replace("__POS__", str(i))
         bpf += branch
     return bpf
+
 
 subnets = []
 if args.subnets:
@@ -202,8 +221,9 @@ bpf_subnets = generate_bpf_subnets(subnets)
 # initialize BPF
 bpf_text = bpf_text.replace("__SUBNETS__", bpf_subnets)
 
-logging.debug("Done preprocessing the BPF program, " +
-        "this is what will actually get executed:")
+logging.debug(
+    "Done preprocessing the BPF program, " + "this is what will actually get executed:"
+)
 logging.debug(bpf_text)
 
 if args.ebpf:
@@ -219,7 +239,7 @@ if not args.json:
 
 # output
 exiting = 0
-while (1):
+while 1:
 
     try:
         sleep(args.interval)
@@ -237,11 +257,11 @@ while (1):
 
     # output
     now = dt.now()
-    data['date'] = now.strftime('%x')
-    data['time'] = now.strftime('%X')
-    data['entries'] = {}
+    data["date"] = now.strftime("%x")
+    data["time"] = now.strftime("%X")
+    data["entries"] = {}
     if not args.json:
-        print(now.strftime('[%x %X]'))
+        print(now.strftime("[%x %X]"))
     for k, v in reversed(sorted(keys.items(), key=lambda keys: keys[1].value)):
         send_bytes = 0
         if k in ipv4_send_bytes:
@@ -249,7 +269,7 @@ while (1):
         subnet = subnets[k.index][0]
         send = formatFn(send_bytes)
         if args.json:
-            data['entries'][subnet] = send
+            data["entries"][subnet] = send
         else:
             print("%-21s %6d" % (subnet, send))
 

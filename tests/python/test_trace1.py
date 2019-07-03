@@ -12,16 +12,18 @@ from unittest import main, TestCase
 arg1 = sys.argv.pop(1)
 arg2 = ""
 if len(sys.argv) > 1:
-  arg2 = sys.argv.pop(1)
+    arg2 = sys.argv.pop(1)
 
 Key = None
 Leaf = None
 if arg1.endswith(".b"):
+
     class Key(Structure):
         _fields_ = [("fd", c_ulong)]
+
     class Leaf(Structure):
-        _fields_ = [("stat1", c_ulong),
-                    ("stat2", c_ulong)]
+        _fields_ = [("stat1", c_ulong), ("stat2", c_ulong)]
+
 
 class TestKprobe(TestCase):
     def setUp(self):
@@ -40,6 +42,7 @@ class TestKprobe(TestCase):
                 os.read(f.fileno(), 1)
         for key, leaf in self.stats.items():
             print("fd %x:" % key.fd, "stat1 %d" % leaf.stat1, "stat2 %d" % leaf.stat2)
+
 
 if __name__ == "__main__":
     main()

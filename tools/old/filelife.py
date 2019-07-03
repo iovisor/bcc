@@ -29,9 +29,9 @@ examples = """examples:
 parser = argparse.ArgumentParser(
     description="Trace stat() syscalls",
     formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog=examples)
-parser.add_argument("-p", "--pid",
-    help="trace this PID only")
+    epilog=examples,
+)
+parser.add_argument("-p", "--pid", help="trace this PID only")
 args = parser.parse_args()
 debug = 0
 
@@ -77,10 +77,9 @@ int trace_unlink(struct pt_regs *ctx, struct inode *dir, struct dentry *dentry)
 }
 """
 if args.pid:
-    bpf_text = bpf_text.replace('FILTER',
-        'if (pid != %s) { return 0; }' % args.pid)
+    bpf_text = bpf_text.replace("FILTER", "if (pid != %s) { return 0; }" % args.pid)
 else:
-    bpf_text = bpf_text.replace('FILTER', '')
+    bpf_text = bpf_text.replace("FILTER", "")
 if debug:
     print(bpf_text)
 
@@ -100,5 +99,7 @@ while 1:
     (delta, filename) = msg.split(" ", 1)
 
     # print columns
-    print("%-8s %-6d %-16s %-7.2f %s" % (strftime("%H:%M:%S"), pid, task,
-        float(delta) / 1000, filename))
+    print(
+        "%-8s %-6d %-16s %-7.2f %s"
+        % (strftime("%H:%M:%S"), pid, task, float(delta) / 1000, filename)
+    )

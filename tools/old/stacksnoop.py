@@ -31,15 +31,12 @@ examples = """examples:
 parser = argparse.ArgumentParser(
     description="Trace and print kernel stack traces for a kernel function",
     formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog=examples)
-parser.add_argument("-p", "--pid",
-    help="trace this PID only")
-parser.add_argument("-s", "--offset", action="store_true",
-    help="show address offsets")
-parser.add_argument("-v", "--verbose", action="store_true",
-    help="print more fields")
-parser.add_argument("function",
-    help="kernel function name")
+    epilog=examples,
+)
+parser.add_argument("-p", "--pid", help="trace this PID only")
+parser.add_argument("-s", "--offset", action="store_true", help="show address offsets")
+parser.add_argument("-v", "--verbose", action="store_true", help="print more fields")
+parser.add_argument("function", help="kernel function name")
 args = parser.parse_args()
 function = args.function
 offset = args.offset
@@ -91,11 +88,13 @@ void trace_stack(struct pt_regs *ctx) {
 };
 """
 if args.pid:
-    bpf_text = bpf_text.replace('FILTER',
-        ('u32 pid; pid = bpf_get_current_pid_tgid(); ' +
-        'if (pid != %s) { return; }') % (args.pid))
+    bpf_text = bpf_text.replace(
+        "FILTER",
+        ("u32 pid; pid = bpf_get_current_pid_tgid(); " + "if (pid != %s) { return; }")
+        % (args.pid),
+    )
 else:
-    bpf_text = bpf_text.replace('FILTER', '')
+    bpf_text = bpf_text.replace("FILTER", "")
 if debug:
     print(bpf_text)
 
@@ -104,13 +103,12 @@ b = BPF(text=bpf_text)
 b.attach_kprobe(event=function, fn_name="trace_stack")
 matched = b.num_open_kprobes()
 if matched == 0:
-    print("Function \"%s\" not found. Exiting." % function)
+    print('Function "%s" not found. Exiting.' % function)
     exit()
 
 # header
 if verbose:
-    print("%-18s %-12s %-6s %-3s %s" % ("TIME(s)", "COMM", "PID", "CPU",
-        "STACK"))
+    print("%-18s %-12s %-6s %-3s %s" % ("TIME(s)", "COMM", "PID", "CPU", "STACK"))
 else:
     print("%-18s %s" % ("TIME(s)", "STACK"))
 

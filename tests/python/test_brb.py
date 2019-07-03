@@ -76,17 +76,18 @@ ipr = IPRoute()
 ipdb = IPDB(nl=ipr)
 sim = Simulation(ipdb)
 
+
 class TestBPFSocket(TestCase):
     def set_default_const(self):
-        self.ns1            = "ns1"
-        self.ns2            = "ns2"
-        self.ns_router      = "ns_router"
-        self.vm1_ip         = "100.1.1.1"
-        self.vm2_ip         = "200.1.1.1"
-        self.vm1_rtr_ip     = "100.1.1.254"
-        self.vm2_rtr_ip     = "200.1.1.254"
-        self.vm1_rtr_mask   = "100.1.1.0/24"
-        self.vm2_rtr_mask   = "200.1.1.0/24"
+        self.ns1 = "ns1"
+        self.ns2 = "ns2"
+        self.ns_router = "ns_router"
+        self.vm1_ip = "100.1.1.1"
+        self.vm2_ip = "200.1.1.1"
+        self.vm1_rtr_ip = "100.1.1.254"
+        self.vm2_rtr_ip = "200.1.1.254"
+        self.vm1_rtr_mask = "100.1.1.0/24"
+        self.vm2_rtr_mask = "200.1.1.0/24"
 
     def get_table(self, b):
         self.jump = b.get_table("jump")
@@ -104,9 +105,21 @@ class TestBPFSocket(TestCase):
         self.br2_mac = b.get_table("br2_mac")
         self.br2_rtr = b.get_table("br2_rtr")
 
-    def connect_ports(self, prog_id_pem, prog_id_br, curr_pem_pid, curr_br_pid,
-                      br_dest_map, br_mac_map, ifindex, vm_mac, vm_ip):
-        self.pem_dest[c_uint(curr_pem_pid)] = self.pem_dest.Leaf(prog_id_br, curr_br_pid)
+    def connect_ports(
+        self,
+        prog_id_pem,
+        prog_id_br,
+        curr_pem_pid,
+        curr_br_pid,
+        br_dest_map,
+        br_mac_map,
+        ifindex,
+        vm_mac,
+        vm_ip,
+    ):
+        self.pem_dest[c_uint(curr_pem_pid)] = self.pem_dest.Leaf(
+            prog_id_br, curr_br_pid
+        )
         br_dest_map[c_uint(curr_br_pid)] = br_dest_map.Leaf(prog_id_pem, curr_pem_pid)
         self.pem_port[c_uint(curr_pem_pid)] = c_uint(ifindex)
         self.pem_ifindex[c_uint(ifindex)] = c_uint(curr_pem_pid)
@@ -132,16 +145,32 @@ class TestBPFSocket(TestCase):
         # connect pem and br1
         curr_pem_pid = curr_pem_pid + 1
         curr_br1_pid = curr_br1_pid + 1
-        self.connect_ports(prog_id_pem, prog_id_br1, curr_pem_pid, curr_br1_pid,
-                      self.br1_dest, self.br1_mac,
-                      self.ns1_eth_out.index, self.vm1_mac, self.vm1_ip)
+        self.connect_ports(
+            prog_id_pem,
+            prog_id_br1,
+            curr_pem_pid,
+            curr_br1_pid,
+            self.br1_dest,
+            self.br1_mac,
+            self.ns1_eth_out.index,
+            self.vm1_mac,
+            self.vm1_ip,
+        )
 
         # connect pem and br2
         curr_pem_pid = curr_pem_pid + 1
         curr_br2_pid = curr_br2_pid + 1
-        self.connect_ports(prog_id_pem, prog_id_br2, curr_pem_pid, curr_br2_pid,
-                      self.br2_dest, self.br2_mac,
-                      self.ns2_eth_out.index, self.vm2_mac, self.vm2_ip)
+        self.connect_ports(
+            prog_id_pem,
+            prog_id_br2,
+            curr_pem_pid,
+            curr_br2_pid,
+            self.br2_dest,
+            self.br2_mac,
+            self.ns2_eth_out.index,
+            self.vm2_mac,
+            self.vm2_ip,
+        )
 
         # connect <br1, rtr> and <br2, rtr>
         self.br1_rtr[c_uint(0)] = c_uint(self.nsrtr_eth0_out.index)
@@ -157,59 +186,103 @@ class TestBPFSocket(TestCase):
 
             # set up the topology
             self.set_default_const()
-            (ns1_ipdb, self.ns1_eth_out, _) = sim._create_ns(self.ns1, ipaddr=self.vm1_ip+'/24',
-                                                             fn=self.pem_fn, action='drop',
-                                                             disable_ipv6=True)
-            (ns2_ipdb, self.ns2_eth_out, _) = sim._create_ns(self.ns2, ipaddr=self.vm2_ip+'/24',
-                                                             fn=self.pem_fn, action='drop',
-                                                             disable_ipv6=True)
-            ns1_ipdb.routes.add({'dst': self.vm2_rtr_mask, 'gateway': self.vm1_rtr_ip}).commit()
-            ns2_ipdb.routes.add({'dst': self.vm1_rtr_mask, 'gateway': self.vm2_rtr_ip}).commit()
-            self.vm1_mac = ns1_ipdb.interfaces['eth0'].address
-            self.vm2_mac = ns2_ipdb.interfaces['eth0'].address
+            (ns1_ipdb, self.ns1_eth_out, _) = sim._create_ns(
+                self.ns1,
+                ipaddr=self.vm1_ip + "/24",
+                fn=self.pem_fn,
+                action="drop",
+                disable_ipv6=True,
+            )
+            (ns2_ipdb, self.ns2_eth_out, _) = sim._create_ns(
+                self.ns2,
+                ipaddr=self.vm2_ip + "/24",
+                fn=self.pem_fn,
+                action="drop",
+                disable_ipv6=True,
+            )
+            ns1_ipdb.routes.add(
+                {"dst": self.vm2_rtr_mask, "gateway": self.vm1_rtr_ip}
+            ).commit()
+            ns2_ipdb.routes.add(
+                {"dst": self.vm1_rtr_mask, "gateway": self.vm2_rtr_ip}
+            ).commit()
+            self.vm1_mac = ns1_ipdb.interfaces["eth0"].address
+            self.vm2_mac = ns2_ipdb.interfaces["eth0"].address
 
-            (_, self.nsrtr_eth0_out, _) = sim._create_ns(self.ns_router, ipaddr=self.vm1_rtr_ip+'/24',
-                                                         fn=self.br1_fn, action='drop',
-                                                         disable_ipv6=True)
-            (rt_ipdb, self.nsrtr_eth1_out, _) = sim._ns_add_ifc(self.ns_router, "eth1", "ns_router2",
-                                                                ipaddr=self.vm2_rtr_ip+'/24',
-                                                                fn=self.br2_fn, action='drop',
-                                                                disable_ipv6=True)
+            (_, self.nsrtr_eth0_out, _) = sim._create_ns(
+                self.ns_router,
+                ipaddr=self.vm1_rtr_ip + "/24",
+                fn=self.br1_fn,
+                action="drop",
+                disable_ipv6=True,
+            )
+            (rt_ipdb, self.nsrtr_eth1_out, _) = sim._ns_add_ifc(
+                self.ns_router,
+                "eth1",
+                "ns_router2",
+                ipaddr=self.vm2_rtr_ip + "/24",
+                fn=self.br2_fn,
+                action="drop",
+                disable_ipv6=True,
+            )
             nsp = NSPopen(rt_ipdb.nl.netns, ["sysctl", "-w", "net.ipv4.ip_forward=1"])
-            nsp.wait(); nsp.release()
+            nsp.wait()
+            nsp.release()
 
             # configure maps
             self.config_maps()
 
             # our bridge is not smart enough, so send arping for router learning to prevent router
             # from sending out arp request
-            nsp = NSPopen(ns1_ipdb.nl.netns,
-                          ["arping", "-w", "1", "-c", "1", "-I", "eth0", self.vm1_rtr_ip])
-            nsp.wait(); nsp.release()
-            nsp = NSPopen(ns2_ipdb.nl.netns,
-                          ["arping", "-w", "1", "-c", "1", "-I", "eth0", self.vm2_rtr_ip])
-            nsp.wait(); nsp.release()
+            nsp = NSPopen(
+                ns1_ipdb.nl.netns,
+                ["arping", "-w", "1", "-c", "1", "-I", "eth0", self.vm1_rtr_ip],
+            )
+            nsp.wait()
+            nsp.release()
+            nsp = NSPopen(
+                ns2_ipdb.nl.netns,
+                ["arping", "-w", "1", "-c", "1", "-I", "eth0", self.vm2_rtr_ip],
+            )
+            nsp.wait()
+            nsp.release()
 
             # ping
             nsp = NSPopen(ns1_ipdb.nl.netns, ["ping", self.vm2_ip, "-c", "2"])
-            nsp.wait(); nsp.release()
+            nsp.wait()
+            nsp.release()
             # pem_stats only counts pem->bridge traffic, each VM has 4: arping/arp request/2 icmp request
             # total 8 packets should be counted
             self.assertEqual(self.pem_stats[c_uint(0)].value, 8)
 
             nsp_server = NSPopenWithCheck(ns2_ipdb.nl.netns, ["iperf", "-s", "-xSC"])
             sleep(1)
-            nsp = NSPopen(ns1_ipdb.nl.netns, ["iperf", "-c", self.vm2_ip, "-t", "1", "-xSC"])
-            nsp.wait(); nsp.release()
-            nsp_server.kill(); nsp_server.wait(); nsp_server.release()
+            nsp = NSPopen(
+                ns1_ipdb.nl.netns, ["iperf", "-c", self.vm2_ip, "-t", "1", "-xSC"]
+            )
+            nsp.wait()
+            nsp.release()
+            nsp_server.kill()
+            nsp_server.wait()
+            nsp_server.release()
 
             nsp_server = NSPopenWithCheck(ns2_ipdb.nl.netns, ["netserver", "-D"])
             sleep(1)
-            nsp = NSPopenWithCheck(ns1_ipdb.nl.netns, ["netperf", "-l", "1", "-H", self.vm2_ip, "--", "-m", "65160"])
-            nsp.wait(); nsp.release()
-            nsp = NSPopen(ns1_ipdb.nl.netns, ["netperf", "-l", "1", "-H", self.vm2_ip, "-t", "TCP_RR"])
-            nsp.wait(); nsp.release()
-            nsp_server.kill(); nsp_server.wait(); nsp_server.release()
+            nsp = NSPopenWithCheck(
+                ns1_ipdb.nl.netns,
+                ["netperf", "-l", "1", "-H", self.vm2_ip, "--", "-m", "65160"],
+            )
+            nsp.wait()
+            nsp.release()
+            nsp = NSPopen(
+                ns1_ipdb.nl.netns,
+                ["netperf", "-l", "1", "-H", self.vm2_ip, "-t", "TCP_RR"],
+            )
+            nsp.wait()
+            nsp.release()
+            nsp_server.kill()
+            nsp_server.wait()
+            nsp_server.release()
 
         finally:
             sim.release()

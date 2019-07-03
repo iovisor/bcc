@@ -5,6 +5,7 @@
 import unittest
 from bcc import BPF
 
+
 class TestLru(unittest.TestCase):
     def test_lru_map_flags(self):
         test_prog1 = """
@@ -12,7 +13,7 @@ class TestLru(unittest.TestCase):
         """
         b = BPF(text=test_prog1)
         t = b["lru"]
-        self.assertEqual(t.flags, 2);
+        self.assertEqual(t.flags, 2)
 
     def test_hash_map_flags(self):
         test_prog1 = """
@@ -20,7 +21,8 @@ class TestLru(unittest.TestCase):
         """
         b = BPF(text=test_prog1)
         t = b["hash"]
-        self.assertEqual(t.flags, 1);
+        self.assertEqual(t.flags, 1)
+
 
 if __name__ == "__main__":
     unittest.main()

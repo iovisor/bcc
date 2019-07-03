@@ -37,8 +37,7 @@ class EbpfConditional(object):
             header = program.getInstance(node.name)
             assert isinstance(header, ebpfInstance.EbpfHeader)
             # TODO: stacks?
-            serializer.appendFormat(
-                "{0}.{1}", program.headerStructName, header.name)
+            serializer.appendFormat("{0}.{1}", program.headerStructName, header.name)
         elif isinstance(node, p4_field):
             instance = node.instance
             einstance = program.getInstance(instance.name)
@@ -46,8 +45,7 @@ class EbpfConditional(object):
                 base = program.headerStructName
             else:
                 base = program.metadataStructName
-            serializer.appendFormat(
-                "{0}.{1}.{2}", base, einstance.name, node.name)
+            serializer.appendFormat("{0}.{1}.{2}", base, einstance.name, node.name)
         else:
             raise CompilationException(True, "{0} Unexpected expression ", node)
 
@@ -95,8 +93,7 @@ class EbpfConditional(object):
 
         serializer.emitIndent()
         serializer.append("if (")
-        self.emitExpression(
-            self.hlirconditional.condition, serializer, program, True)
+        self.emitExpression(self.hlirconditional.condition, serializer, program, True)
         serializer.appendLine(")")
 
         serializer.increaseIndent()

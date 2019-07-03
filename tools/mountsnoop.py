@@ -187,41 +187,41 @@ int do_ret_sys_umount(struct pt_regs *ctx)
 """
 
 # sys/mount.h
-MS_MGC_VAL = 0xc0ed0000
-MS_MGC_MSK = 0xffff0000
+MS_MGC_VAL = 0xC0ED0000
+MS_MGC_MSK = 0xFFFF0000
 MOUNT_FLAGS = [
-    ('MS_RDONLY', 1),
-    ('MS_NOSUID', 2),
-    ('MS_NODEV', 4),
-    ('MS_NOEXEC', 8),
-    ('MS_SYNCHRONOUS', 16),
-    ('MS_REMOUNT', 32),
-    ('MS_MANDLOCK', 64),
-    ('MS_DIRSYNC', 128),
-    ('MS_NOATIME', 1024),
-    ('MS_NODIRATIME', 2048),
-    ('MS_BIND', 4096),
-    ('MS_MOVE', 8192),
-    ('MS_REC', 16384),
-    ('MS_SILENT', 32768),
-    ('MS_POSIXACL', 1 << 16),
-    ('MS_UNBINDABLE', 1 << 17),
-    ('MS_PRIVATE', 1 << 18),
-    ('MS_SLAVE', 1 << 19),
-    ('MS_SHARED', 1 << 20),
-    ('MS_RELATIME', 1 << 21),
-    ('MS_KERNMOUNT', 1 << 22),
-    ('MS_I_VERSION', 1 << 23),
-    ('MS_STRICTATIME', 1 << 24),
-    ('MS_LAZYTIME', 1 << 25),
-    ('MS_ACTIVE', 1 << 30),
-    ('MS_NOUSER', 1 << 31),
+    ("MS_RDONLY", 1),
+    ("MS_NOSUID", 2),
+    ("MS_NODEV", 4),
+    ("MS_NOEXEC", 8),
+    ("MS_SYNCHRONOUS", 16),
+    ("MS_REMOUNT", 32),
+    ("MS_MANDLOCK", 64),
+    ("MS_DIRSYNC", 128),
+    ("MS_NOATIME", 1024),
+    ("MS_NODIRATIME", 2048),
+    ("MS_BIND", 4096),
+    ("MS_MOVE", 8192),
+    ("MS_REC", 16384),
+    ("MS_SILENT", 32768),
+    ("MS_POSIXACL", 1 << 16),
+    ("MS_UNBINDABLE", 1 << 17),
+    ("MS_PRIVATE", 1 << 18),
+    ("MS_SLAVE", 1 << 19),
+    ("MS_SHARED", 1 << 20),
+    ("MS_RELATIME", 1 << 21),
+    ("MS_KERNMOUNT", 1 << 22),
+    ("MS_I_VERSION", 1 << 23),
+    ("MS_STRICTATIME", 1 << 24),
+    ("MS_LAZYTIME", 1 << 25),
+    ("MS_ACTIVE", 1 << 30),
+    ("MS_NOUSER", 1 << 31),
 ]
 UMOUNT_FLAGS = [
-    ('MNT_FORCE', 1),
-    ('MNT_DETACH', 2),
-    ('MNT_EXPIRE', 4),
-    ('UMOUNT_NOFOLLOW', 8),
+    ("MNT_FORCE", 1),
+    ("MNT_DETACH", 2),
+    ("MNT_EXPIRE", 4),
+    ("UMOUNT_NOFOLLOW", 8),
 ]
 
 
@@ -243,26 +243,26 @@ class EventType(object):
 
 class EnterData(ctypes.Structure):
     _fields_ = [
-        ('mnt_ns', ctypes.c_uint),
-        ('comm', ctypes.c_char * TASK_COMM_LEN),
-        ('flags', ctypes.c_ulong),
+        ("mnt_ns", ctypes.c_uint),
+        ("comm", ctypes.c_char * TASK_COMM_LEN),
+        ("flags", ctypes.c_ulong),
     ]
 
 
 class DataUnion(ctypes.Union):
     _fields_ = [
-        ('enter', EnterData),
-        ('str', ctypes.c_char * MAX_STR_LEN),
-        ('retval', ctypes.c_int),
+        ("enter", EnterData),
+        ("str", ctypes.c_char * MAX_STR_LEN),
+        ("retval", ctypes.c_int),
     ]
 
 
 class Event(ctypes.Structure):
     _fields_ = [
-        ('type', ctypes.c_uint),
-        ('pid', ctypes.c_uint),
-        ('tgid', ctypes.c_uint),
-        ('union', DataUnion),
+        ("type", ctypes.c_uint),
+        ("pid", ctypes.c_uint),
+        ("tgid", ctypes.c_uint),
+        ("union", DataUnion),
     ]
 
 
@@ -273,21 +273,21 @@ def _decode_flags(flags, flag_list):
             str_flags.append(flag)
         flags &= ~bit
     if flags or not str_flags:
-        str_flags.append('0x{:x}'.format(flags))
+        str_flags.append("0x{:x}".format(flags))
     return str_flags
 
 
 def decode_flags(flags, flag_list):
-    return '|'.join(_decode_flags(flags, flag_list))
+    return "|".join(_decode_flags(flags, flag_list))
 
 
 def decode_mount_flags(flags):
     str_flags = []
     if flags & MS_MGC_MSK == MS_MGC_VAL:
         flags &= ~MS_MGC_MSK
-        str_flags.append('MS_MGC_VAL')
+        str_flags.append("MS_MGC_VAL")
     str_flags.extend(_decode_flags(flags, MOUNT_FLAGS))
-    return '|'.join(str_flags)
+    return "|".join(str_flags)
 
 
 def decode_umount_flags(flags):
@@ -296,21 +296,21 @@ def decode_umount_flags(flags):
 
 def decode_errno(retval):
     try:
-        return '-' + errno.errorcode[-retval]
+        return "-" + errno.errorcode[-retval]
     except KeyError:
         return str(retval)
 
 
 _escape_chars = {
-    ord('\a'): '\\a',
-    ord('\b'): '\\b',
-    ord('\t'): '\\t',
-    ord('\n'): '\\n',
-    ord('\v'): '\\v',
-    ord('\f'): '\\f',
-    ord('\r'): '\\r',
+    ord("\a"): "\\a",
+    ord("\b"): "\\b",
+    ord("\t"): "\\t",
+    ord("\n"): "\\n",
+    ord("\v"): "\\v",
+    ord("\f"): "\\f",
+    ord("\r"): "\\r",
     ord('"'): '\\"',
-    ord('\\'): '\\\\',
+    ord("\\"): "\\\\",
 }
 
 
@@ -318,18 +318,22 @@ def escape_character(c):
     try:
         return _escape_chars[c]
     except KeyError:
-        if 0x20 <= c <= 0x7e:
+        if 0x20 <= c <= 0x7E:
             return chr(c)
         else:
-            return '\\x{:02x}'.format(c)
+            return "\\x{:02x}".format(c)
 
 
 if sys.version_info.major < 3:
+
     def decode_mount_string(s):
-        return '"{}"'.format(''.join(escape_character(ord(c)) for c in s))
+        return '"{}"'.format("".join(escape_character(ord(c)) for c in s))
+
+
 else:
+
     def decode_mount_string(s):
-        return '"{}"'.format(''.join(escape_character(c) for c in s))
+        return '"{}"'.format("".join(escape_character(c) for c in s))
 
 
 def print_event(mounts, umounts, cpu, data, size):
@@ -338,63 +342,71 @@ def print_event(mounts, umounts, cpu, data, size):
     try:
         if event.type == EventType.EVENT_MOUNT:
             mounts[event.pid] = {
-                'pid': event.pid,
-                'tgid': event.tgid,
-                'mnt_ns': event.union.enter.mnt_ns,
-                'comm': event.union.enter.comm,
-                'flags': event.union.enter.flags,
+                "pid": event.pid,
+                "tgid": event.tgid,
+                "mnt_ns": event.union.enter.mnt_ns,
+                "comm": event.union.enter.comm,
+                "flags": event.union.enter.flags,
             }
         elif event.type == EventType.EVENT_MOUNT_SOURCE:
-            mounts[event.pid]['source'] = event.union.str
+            mounts[event.pid]["source"] = event.union.str
         elif event.type == EventType.EVENT_MOUNT_TARGET:
-            mounts[event.pid]['target'] = event.union.str
+            mounts[event.pid]["target"] = event.union.str
         elif event.type == EventType.EVENT_MOUNT_TYPE:
-            mounts[event.pid]['type'] = event.union.str
+            mounts[event.pid]["type"] = event.union.str
         elif event.type == EventType.EVENT_MOUNT_DATA:
             # XXX: data is not always a NUL-terminated string
-            mounts[event.pid]['data'] = event.union.str
+            mounts[event.pid]["data"] = event.union.str
         elif event.type == EventType.EVENT_UMOUNT:
             umounts[event.pid] = {
-                'pid': event.pid,
-                'tgid': event.tgid,
-                'mnt_ns': event.union.enter.mnt_ns,
-                'comm': event.union.enter.comm,
-                'flags': event.union.enter.flags,
+                "pid": event.pid,
+                "tgid": event.tgid,
+                "mnt_ns": event.union.enter.mnt_ns,
+                "comm": event.union.enter.comm,
+                "flags": event.union.enter.flags,
             }
         elif event.type == EventType.EVENT_UMOUNT_TARGET:
-            umounts[event.pid]['target'] = event.union.str
-        elif (event.type == EventType.EVENT_MOUNT_RET or
-              event.type == EventType.EVENT_UMOUNT_RET):
+            umounts[event.pid]["target"] = event.union.str
+        elif (
+            event.type == EventType.EVENT_MOUNT_RET
+            or event.type == EventType.EVENT_UMOUNT_RET
+        ):
             if event.type == EventType.EVENT_MOUNT_RET:
                 syscall = mounts.pop(event.pid)
-                call = ('mount({source}, {target}, {type}, {flags}, {data}) ' +
-                        '= {retval}').format(
-                    source=decode_mount_string(syscall['source']),
-                    target=decode_mount_string(syscall['target']),
-                    type=decode_mount_string(syscall['type']),
-                    flags=decode_mount_flags(syscall['flags']),
-                    data=decode_mount_string(syscall['data']),
-                    retval=decode_errno(event.union.retval))
+                call = (
+                    "mount({source}, {target}, {type}, {flags}, {data}) " + "= {retval}"
+                ).format(
+                    source=decode_mount_string(syscall["source"]),
+                    target=decode_mount_string(syscall["target"]),
+                    type=decode_mount_string(syscall["type"]),
+                    flags=decode_mount_flags(syscall["flags"]),
+                    data=decode_mount_string(syscall["data"]),
+                    retval=decode_errno(event.union.retval),
+                )
             else:
                 syscall = umounts.pop(event.pid)
-                call = 'umount({target}, {flags}) = {retval}'.format(
-                    target=decode_mount_string(syscall['target']),
-                    flags=decode_umount_flags(syscall['flags']),
-                    retval=decode_errno(event.union.retval))
-            print('{:16} {:<7} {:<7} {:<11} {}'.format(
-                syscall['comm'].decode('utf-8', 'replace'), syscall['tgid'],
-                syscall['pid'], syscall['mnt_ns'], call))
+                call = "umount({target}, {flags}) = {retval}".format(
+                    target=decode_mount_string(syscall["target"]),
+                    flags=decode_umount_flags(syscall["flags"]),
+                    retval=decode_errno(event.union.retval),
+                )
+            print(
+                "{:16} {:<7} {:<7} {:<11} {}".format(
+                    syscall["comm"].decode("utf-8", "replace"),
+                    syscall["tgid"],
+                    syscall["pid"],
+                    syscall["mnt_ns"],
+                    call,
+                )
+            )
     except KeyError:
         # This might happen if we lost an event.
         pass
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description='trace mount() and umount() syscalls'
-    )
-    parser.add_argument("--ebpf", action="store_true",
-        help=argparse.SUPPRESS)
+    parser = argparse.ArgumentParser(description="trace mount() and umount() syscalls")
+    parser.add_argument("--ebpf", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
 
     mounts = {}
@@ -409,10 +421,8 @@ def main():
     umount_fnname = b.get_syscall_fnname("umount")
     b.attach_kprobe(event=umount_fnname, fn_name="syscall__umount")
     b.attach_kretprobe(event=umount_fnname, fn_name="do_ret_sys_umount")
-    b['events'].open_perf_buffer(
-        functools.partial(print_event, mounts, umounts))
-    print('{:16} {:<7} {:<7} {:<11} {}'.format(
-        'COMM', 'PID', 'TID', 'MNT_NS', 'CALL'))
+    b["events"].open_perf_buffer(functools.partial(print_event, mounts, umounts))
+    print("{:16} {:<7} {:<7} {:<11} {}".format("COMM", "PID", "TID", "MNT_NS", "CALL"))
     while True:
         try:
             b.perf_buffer_poll()
@@ -420,6 +430,5 @@ def main():
             exit()
 
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

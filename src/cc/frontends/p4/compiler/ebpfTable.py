@@ -44,26 +44,31 @@ class EbpfTableKeyField(object):
             base = program.headerStructName
 
         if isinstance(self.instance, ebpfInstance.SimpleInstance):
-            source = "{0}.{1}.{2}".format(
-                base, self.instance.name, self.field.name)
+            source = "{0}.{1}.{2}".format(base, self.instance.name, self.field.name)
         else:
             assert isinstance(self.instance, ebpfInstance.EbpfHeaderStack)
             source = "{0}.{1}[{2}].{3}".format(
-                base, self.instance.name,
-                self.instance.hlirInstance.index, self.field.name)
+                base,
+                self.instance.name,
+                self.instance.hlirInstance.index,
+                self.field.name,
+            )
         destination = "{0}.{1}".format(keyName, self.keyFieldName)
         size = self.field.widthInBits()
 
         serializer.emitIndent()
         if size <= 32:
-            serializer.appendFormat("{0} = ({1}){2};",
-                                    destination, source, maskExpression)
+            serializer.appendFormat(
+                "{0} = ({1}){2};", destination, source, maskExpression
+            )
         else:
             if maskExpression != "":
                 raise NotSupportedException(
-                    "{0} Mask wider than 32 bits", self.field.hlirType)
+                    "{0} Mask wider than 32 bits", self.field.hlirType
+                )
             serializer.appendFormat(
-                "memcpy(&{0}, &{1}, {2});", destination, source, size / 8)
+                "memcpy(&{0}, &{1}, {2});", destination, source, size / 8
+            )
 
         serializer.newline()
 
@@ -84,11 +89,12 @@ class EbpfTableKey(object):
             matchType = f[1]
             mask = f[2]
 
-            if ((matchType is p4_match_type.P4_MATCH_TERNARY) or
-                (matchType is p4_match_type.P4_MATCH_LPM) or
-                (matchType is p4_match_type.P4_MATCH_RANGE)):
-                raise NotSupportedException(
-                    False, "Match type {0}", matchType)
+            if (
+                (matchType is p4_match_type.P4_MATCH_TERNARY)
+                or (matchType is p4_match_type.P4_MATCH_LPM)
+                or (matchType is p4_match_type.P4_MATCH_RANGE)
+            ):
+                raise NotSupportedException(False, "Match type {0}", matchType)
 
             if matchType is p4_match_type.P4_MATCH_VALID:
                 # we should be really checking the valid field;
@@ -137,8 +143,7 @@ class EbpfTableKey(object):
         # there is no padding.
         # Padding may cause the ebpf verification to fail,
         # since padding fields are not initalized
-        fieldOrder = sorted(
-            self.fields, key=EbpfTableKey.fieldRank, reverse=True)
+        fieldOrder = sorted(self.fields, key=EbpfTableKey.fieldRank, reverse=True)
         for f in fieldOrder:
             assert isinstance(f, EbpfTableKeyField)
             f.serializeType(serializer)
@@ -164,13 +169,13 @@ class EbpfTable(object):
         self.hlirtable = hlirtable
         self.config = config
 
-        self.defaultActionMapName = (program.reservedPrefix +
-                                     self.name + "_miss")
+        self.defaultActionMapName = program.reservedPrefix + self.name + "_miss"
         self.key = EbpfTableKey(hlirtable.match_fields, program)
         self.size = hlirtable.max_size
         if self.size is None:
             program.emitWarning(
-                "{0} does not specify a max_size; using 1024", hlirtable)
+                "{0} does not specify a max_size; using 1024", hlirtable
+            )
             self.size = 1024
         self.isHash = True  # TODO: try to guess arrays when possible
         self.dataMapName = self.name
@@ -180,23 +185,27 @@ class EbpfTable(object):
         self.actions = []
 
         if hlirtable.action_profile is not None:
-            raise NotSupportedException("{0}: action_profile tables",
-                                        hlirtable)
+            raise NotSupportedException("{0}: action_profile tables", hlirtable)
         if hlirtable.support_timeout:
-            program.emitWarning("{0}: table timeout {1}; ignoring",
-                                hlirtable, NotSupportedException.archError)
+            program.emitWarning(
+                "{0}: table timeout {1}; ignoring",
+                hlirtable,
+                NotSupportedException.archError,
+            )
 
         self.counters = []
-        if (hlirtable.attached_counters is not None):
+        if hlirtable.attached_counters is not None:
             for c in hlirtable.attached_counters:
                 ctr = program.getCounter(c.name)
                 assert isinstance(ctr, ebpfCounter.EbpfCounter)
                 self.counters.append(ctr)
 
-        if (len(hlirtable.attached_meters) > 0 or
-            len(hlirtable.attached_registers) > 0):
-            program.emitWarning("{0}: meters/registers {1}; ignored",
-                                hlirtable, NotSupportedException.archError)
+        if len(hlirtable.attached_meters) > 0 or len(hlirtable.attached_registers) > 0:
+            program.emitWarning(
+                "{0}: meters/registers {1}; ignored",
+                hlirtable,
+                NotSupportedException.archError,
+            )
 
         for a in hlirtable.actions:
             action = program.getAction(a)
@@ -233,10 +242,9 @@ class EbpfTable(object):
         serializer.blockStart()
 
         serializer.emitIndent()
-        #serializer.appendFormat("enum {0} action;", self.actionEnumName)
+        # serializer.appendFormat("enum {0} action;", self.actionEnumName)
         # teporary workaround bcc bug
-        serializer.appendFormat("{0}32 action;",
-                                self.config.uprefix)
+        serializer.appendFormat("{0}32 action;", self.config.uprefix)
         serializer.newline()
 
         serializer.emitIndent()
@@ -260,12 +268,21 @@ class EbpfTable(object):
         self.serializeValueType(serializer)
 
         self.config.serializeTableDeclaration(
-            serializer, self.dataMapName, self.isHash,
+            serializer,
+            self.dataMapName,
+            self.isHash,
             "struct " + self.keyTypeName,
-            "struct " + self.valueTypeName, self.size)
+            "struct " + self.valueTypeName,
+            self.size,
+        )
         self.config.serializeTableDeclaration(
-            serializer, self.defaultActionMapName, False,
-            program.arrayIndexType, "struct " + self.valueTypeName, 1)
+            serializer,
+            self.defaultActionMapName,
+            False,
+            program.arrayIndexType,
+            "struct " + self.valueTypeName,
+            1,
+        )
 
     def serializeCode(self, serializer, program, nextNode):
         assert isinstance(serializer, ProgramSerializer)
@@ -292,8 +309,7 @@ class EbpfTable(object):
         serializer.newline()
 
         serializer.emitIndent()
-        serializer.appendFormat(
-            "struct {0} *{1};", self.valueTypeName, valueName)
+        serializer.appendFormat("struct {0} *{1};", self.valueTypeName, valueName)
         serializer.newline()
 
         self.key.serializeConstruction(serializer, keyname, program)
@@ -305,8 +321,7 @@ class EbpfTable(object):
         serializer.emitIndent()
         serializer.appendLine("/* perform lookup */")
         serializer.emitIndent()
-        program.config.serializeLookup(
-            serializer, self.dataMapName, keyname, valueName)
+        program.config.serializeLookup(serializer, self.dataMapName, keyname, valueName)
         serializer.newline()
 
         serializer.emitIndent()
@@ -321,8 +336,8 @@ class EbpfTable(object):
         serializer.appendLine("/* miss; find default action */")
         serializer.emitIndent()
         program.config.serializeLookup(
-            serializer, self.defaultActionMapName,
-            program.zeroKeyName, valueName)
+            serializer, self.defaultActionMapName, program.zeroKeyName, valueName
+        )
         serializer.newline()
         serializer.blockEnd(True)
 

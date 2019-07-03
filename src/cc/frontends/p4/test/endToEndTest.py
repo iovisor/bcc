@@ -19,6 +19,7 @@ from netaddr import IPAddress
 
 ### This part is a simple generic network simulaton toolkit
 
+
 class Base(object):
     def __init__(self):
         self.verbose = True
@@ -74,7 +75,7 @@ class Node(Base):
         return ns
 
     def remove(self):
-        ns = self.get_ns();
+        ns = self.get_ns()
         ns.close()
         ns.remove()
 
@@ -90,8 +91,7 @@ class Node(Base):
 
     def set_arp(self, destination):
         assert isinstance(destination, Endpoint)
-        command = ["arp", "-s", str(destination.ipaddress),
-                   str(destination.mac_addr)]
+        command = ["arp", "-s", str(destination.ipaddress), str(destination.mac_addr)]
         self.execute(command)
 
 
@@ -125,10 +125,16 @@ class NetworkBase(Base):
             return
 
         assert isinstance(node, Node)
-        command = ["ip", "addr", "add", str(address) + "/" + str(mask),
-                   "dev", str(ifname)]
+        command = [
+            "ip",
+            "addr",
+            "add",
+            str(address) + "/" + str(mask),
+            "dev",
+            str(ifname),
+        ]
         result = node.execute(command)
-        assert(result == 0)
+        assert result == 0
 
     def create_link(self, src, dest):
         assert isinstance(src, Endpoint)
@@ -144,22 +150,20 @@ class NetworkBase(Base):
         ix = self.get_interface(ifname)
         self.ipr.link("set", index=ix, address=src.mac_addr)
         # push source endpoint into source namespace
-        self.ipr.link("set", index=ix,
-                      net_ns_fd=src.parent.get_ns_name(), state="up")
+        self.ipr.link("set", index=ix, net_ns_fd=src.parent.get_ns_name(), state="up")
         # Set interface ip address; seems to be
         # lost of set prior to moving to namespace
-        self.set_interface_ipaddress(
-            src.parent, ifname, src.ipaddress , src.prefixlen)
+        self.set_interface_ipaddress(src.parent, ifname, src.ipaddress, src.prefixlen)
 
         # Sef destination endpoint information
         ix = self.get_interface(destname)
         self.ipr.link("set", index=ix, address=dest.mac_addr)
         # push destination endpoint into the destination namespace
-        self.ipr.link("set", index=ix,
-                      net_ns_fd=dest.parent.get_ns_name(), state="up")
+        self.ipr.link("set", index=ix, net_ns_fd=dest.parent.get_ns_name(), state="up")
         # Set interface ip address
-        self.set_interface_ipaddress(dest.parent, destname,
-                                     dest.ipaddress, dest.prefixlen)
+        self.set_interface_ipaddress(
+            dest.parent, destname, dest.ipaddress, dest.prefixlen
+        )
 
     def show_interfaces(self, node):
         cmd = ["ip", "addr"]
@@ -191,6 +195,7 @@ class NetworkBase(Base):
 #      ----------                 --------                ---------
 #       10.0.0.11                                         10.0.0.10
 #
+
 
 class SimulatedNetwork(NetworkBase):
     def __init__(self):
@@ -260,14 +265,32 @@ class SimulatedNetwork(NetworkBase):
         interfname = self.get_interface_name(self.switch, self.server)
         sw_srv_idx = self.get_interface(interfname)
         self.ipr.tc("add", "ingress", sw_srv_idx, "ffff:")
-        self.ipr.tc("add-filter", "bpf", sw_srv_idx, ":1", fd=fn.fd,
-                    name=fn.name, parent="ffff:", action="ok", classid=1)
+        self.ipr.tc(
+            "add-filter",
+            "bpf",
+            sw_srv_idx,
+            ":1",
+            fd=fn.fd,
+            name=fn.name,
+            parent="ffff:",
+            action="ok",
+            classid=1,
+        )
 
         interfname = self.get_interface_name(self.switch, self.client)
         sw_clt_idx = self.get_interface(interfname)
         self.ipr.tc("add", "ingress", sw_clt_idx, "ffff:")
-        self.ipr.tc("add-filter", "bpf", sw_clt_idx, ":1", fd=fn.fd,
-                    name=fn.name, parent="ffff:", action="ok", classid=1)
+        self.ipr.tc(
+            "add-filter",
+            "bpf",
+            sw_clt_idx,
+            ":1",
+            fd=fn.fd,
+            name=fn.name,
+            parent="ffff:",
+            action="ok",
+            classid=1,
+        )
 
         self.message("Populating tables from the control plane")
         cltip = self.client_endpoint.get_ip_address()
@@ -284,26 +307,22 @@ class SimulatedNetwork(NetworkBase):
             _fields_ = []
 
         class Union(ctypes.Union):
-            _fields_ = [("nop", Nop),
-                        ("forward", Forward)]
+            _fields_ = [("nop", Nop), ("forward", Forward)]
 
         class Value(ctypes.Structure):
-            _fields_ = [("action", ctypes.c_uint),
-                        ("u", Union)]
+            _fields_ = [("action", ctypes.c_uint), ("u", Union)]
 
         if False:
             # This is how it should ideally be done, but it does not work
-            routing_tbl[routing_tbl.Key(int(cltip))] = routing_tbl.Leaf(
-                1, sw_clt_idx)
-            routing_tbl[routing_tbl.Key(int(srvip))] = routing_tbl.Leaf(
-                1, sw_srv_idx)
+            routing_tbl[routing_tbl.Key(int(cltip))] = routing_tbl.Leaf(1, sw_clt_idx)
+            routing_tbl[routing_tbl.Key(int(srvip))] = routing_tbl.Leaf(1, sw_srv_idx)
         else:
             v1 = Value()
             v1.action = 1
             v1.u.forward.port = sw_clt_idx
 
             v2 = Value()
-            v2.action = 1;
+            v2.action = 1
             v2.u.forward.port = sw_srv_idx
 
             routing_tbl[routing_tbl.Key(int(cltip))] = v1
@@ -311,8 +330,9 @@ class SimulatedNetwork(NetworkBase):
 
         self.message("Dumping table contents")
         for key, leaf in routing_tbl.items():
-            self.message(str(IPAddress(key.key_field_0)),
-                         leaf.action, leaf.u.forward.port)
+            self.message(
+                str(IPAddress(key.key_field_0)), leaf.action, leaf.u.forward.port
+            )
 
     def run(self):
         self.message("Pinging server from client")
@@ -335,8 +355,8 @@ class SimulatedNetwork(NetworkBase):
 def compile(source, destination):
     try:
         status = subprocess.call(
-            "../compiler/p4toEbpf.py " + source + " -o " + destination,
-            shell=True)
+            "../compiler/p4toEbpf.py " + source + " -o " + destination, shell=True
+        )
         if status < 0:
             print("Child was terminated by signal", -status, file=sys.stderr)
         else:
@@ -344,6 +364,7 @@ def compile(source, destination):
     except OSError as e:
         print("Execution failed:", e, file=sys.stderr)
         raise e
+
 
 def start_simulation():
     compile("testprograms/simple.p4", "simple.c")
@@ -353,6 +374,7 @@ def start_simulation():
     network.run()
     network.delete()
     os.remove("simple.c")
+
 
 def main(argv):
     print(str(argv))
@@ -370,6 +392,6 @@ def main(argv):
         method = getattr(network, methodname)
         method(*arguments)
 
-if __name__ == '__main__':
-    main(sys.argv)
 
+if __name__ == "__main__":
+    main(sys.argv)

@@ -75,24 +75,33 @@ examples = """examples:
 parser = argparse.ArgumentParser(
     description="Sample CPU run queues and calculate unclaimed idle CPU",
     formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog=examples)
-parser.add_argument("-j", "--csv", action="store_true",
-    help="print sample summaries (verbose) as comma-separated values")
-parser.add_argument("-J", "--fullcsv", action="store_true",
-    help="print sample summaries with extra fields: CPU sample offsets")
-parser.add_argument("-T", "--timestamp", action="store_true",
-    help="include timestamp on output")
-parser.add_argument("interval", nargs="?", default=-1,
-    help="output interval, in seconds")
-parser.add_argument("count", nargs="?", default=99999999,
-    help="number of outputs")
-parser.add_argument("--ebpf", action="store_true",
-    help=argparse.SUPPRESS)
+    epilog=examples,
+)
+parser.add_argument(
+    "-j",
+    "--csv",
+    action="store_true",
+    help="print sample summaries (verbose) as comma-separated values",
+)
+parser.add_argument(
+    "-J",
+    "--fullcsv",
+    action="store_true",
+    help="print sample summaries with extra fields: CPU sample offsets",
+)
+parser.add_argument(
+    "-T", "--timestamp", action="store_true", help="include timestamp on output"
+)
+parser.add_argument(
+    "interval", nargs="?", default=-1, help="output interval, in seconds"
+)
+parser.add_argument("count", nargs="?", default=99999999, help="number of outputs")
+parser.add_argument("--ebpf", action="store_true", help=argparse.SUPPRESS)
 args = parser.parse_args()
 countdown = int(args.count)
 frequency = 99
 dobind = 1
-wakeup_hz = 10                      # frequency to read buffers
+wakeup_hz = 10  # frequency to read buffers
 wakeup_s = float(1) / wakeup_hz
 ncpu = multiprocessing.cpu_count()  # assume all are online
 debug = 0
@@ -132,7 +141,7 @@ unsigned long dummy(struct sched_entity *entity)
 
     # Get a temporary file name
     tmp_file = NamedTemporaryFile(delete=False)
-    tmp_file.close();
+    tmp_file.close()
 
     # Duplicate and close stderr (fd = 2)
     old_stderr = dup(2)
@@ -217,9 +226,11 @@ int do_perf_event(struct bpf_perf_event_data *ctx)
 """
 
 if check_runnable_weight_field():
-    bpf_text = bpf_text.replace('RUNNABLE_WEIGHT_FIELD', 'unsigned long runnable_weight;')
+    bpf_text = bpf_text.replace(
+        "RUNNABLE_WEIGHT_FIELD", "unsigned long runnable_weight;"
+    )
 else:
-    bpf_text = bpf_text.replace('RUNNABLE_WEIGHT_FIELD', '')
+    bpf_text = bpf_text.replace("RUNNABLE_WEIGHT_FIELD", "")
 
 # code substitutions
 if debug or args.ebpf:
@@ -230,9 +241,13 @@ if debug or args.ebpf:
 # initialize BPF & perf_events
 b = BPF(text=bpf_text)
 # TODO: check for HW counters first and use if more accurate
-b.attach_perf_event(ev_type=PerfType.SOFTWARE,
-    ev_config=PerfSWConfig.TASK_CLOCK, fn_name="do_perf_event",
-    sample_period=0, sample_freq=frequency)
+b.attach_perf_event(
+    ev_type=PerfType.SOFTWARE,
+    ev_config=PerfSWConfig.TASK_CLOCK,
+    fn_name="do_perf_event",
+    sample_period=0,
+    sample_freq=frequency,
+)
 
 if args.csv:
     if args.timestamp:
@@ -244,8 +259,10 @@ if args.csv:
         print(",".join("OFFSET_ns_CPU" + str(c) for c in range(ncpu)), end="")
     print()
 else:
-    print(("Sampling run queues... Output every %s seconds. " +
-          "Hit Ctrl-C to end.") % args.interval)
+    print(
+        ("Sampling run queues... Output every %s seconds. " + "Hit Ctrl-C to end.")
+        % args.interval
+    )
 
 samples = {}
 group = {}
@@ -255,8 +272,9 @@ last = 0
 def print_event(cpu, data, size):
     event = b["events"].event(data)
     samples[event.ts] = {}
-    samples[event.ts]['cpu'] = event.cpu
-    samples[event.ts]['len'] = event.len
+    samples[event.ts]["cpu"] = event.cpu
+    samples[event.ts]["len"] = event.len
+
 
 exiting = 0 if args.interval else 1
 slept = float(0)
@@ -280,7 +298,7 @@ while 1:
     b.perf_buffer_poll()
     slept += wakeup_s
 
-    if slept < 0.999 * interval:   # floating point workaround
+    if slept < 0.999 * interval:  # floating point workaround
         continue
     slept = 0
 
@@ -291,9 +309,16 @@ while 1:
         print("DEBUG: begin samples loop, count %d" % len(samples))
     for e in sorted(samples):
         if debug >= 2:
-            print("DEBUG: ts %d cpu %d len %d delta %d trig %d" % (e,
-                  samples[e]['cpu'], samples[e]['len'], e - last,
-                  e - last > trigger))
+            print(
+                "DEBUG: ts %d cpu %d len %d delta %d trig %d"
+                % (
+                    e,
+                    samples[e]["cpu"],
+                    samples[e]["len"],
+                    e - last,
+                    e - last > trigger,
+                )
+            )
 
         # look for time jumps to identify a new sample group
         if e - last > trigger:
@@ -311,10 +336,10 @@ while 1:
                 lens = [0] * ncpu
                 offs = [0] * ncpu
                 for ge in sorted(group):
-                    lens[samples[ge]['cpu']] = samples[ge]['len']
+                    lens[samples[ge]["cpu"]] = samples[ge]["len"]
                     if args.fullcsv:
-                        offs[samples[ge]['cpu']] = ge - g_time
-                if g_time > 0:      # else first sample
+                        offs[samples[ge]["cpu"]] = ge - g_time
+                if g_time > 0:  # else first sample
                     if args.timestamp:
                         print("%-8s" % strftime("%H:%M:%S"), end=",")
                     print("%d" % g_time, end=",")
@@ -329,10 +354,10 @@ while 1:
                 g_running = 0
                 g_queued = 0
                 for ge in group:
-                    if samples[ge]['len'] > 0:
+                    if samples[ge]["len"] > 0:
                         g_running += 1
-                    if samples[ge]['len'] > 1:
-                        g_queued += samples[ge]['len'] - 1
+                    if samples[ge]["len"] > 1:
+                        g_queued += samples[ge]["len"] - 1
                 g_idle = ncpu - g_running
 
                 # calculate the number of threads that could have run as the
@@ -362,11 +387,16 @@ while 1:
                 # In the case of a power down, if it's detectable, perhaps
                 # the tool could reinitialize the timers (although exiting
                 # is simple and works).
-                print(("ERROR: CPU samples arrived at skewed offsets " +
-                      "(CPUs may have powered down when idle), " +
-                      "spanning %d ns (expected < %d ns). Debug with -J, " +
-                      "and see the man page. As output may begin to be " +
-                      "unreliable, exiting.") % (g_range, trigger / 2))
+                print(
+                    (
+                        "ERROR: CPU samples arrived at skewed offsets "
+                        + "(CPUs may have powered down when idle), "
+                        + "spanning %d ns (expected < %d ns). Debug with -J, "
+                        + "and see the man page. As output may begin to be "
+                        + "unreliable, exiting."
+                    )
+                    % (g_range, trigger / 2)
+                )
                 exit()
 
             # these are done, remove
@@ -385,8 +415,10 @@ while 1:
         unclaimed = util = 0
 
         if debug:
-            print("DEBUG: hit %d running %d idle %d total %d buffered %d" % (
-                  positive, running, idle, total, len(samples)))
+            print(
+                "DEBUG: hit %d running %d idle %d total %d buffered %d"
+                % (positive, running, idle, total, len(samples))
+            )
 
         if args.timestamp:
             print("%-8s " % strftime("%H:%M:%S"), end="")
@@ -395,8 +427,7 @@ while 1:
         if total:
             unclaimed = float(positive) / total
             util = float(running) / total
-        print("%%CPU %6.2f%%, unclaimed idle %0.2f%%" % (100 * util,
-              100 * unclaimed))
+        print("%%CPU %6.2f%%, unclaimed idle %0.2f%%" % (100 * util, 100 * unclaimed))
 
     countdown -= 1
     if exiting or countdown == 0:

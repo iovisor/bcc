@@ -23,17 +23,17 @@ class EbpfCounter(object):
             self.valueTypeName = program.config.uprefix + "64"
         else:
             raise NotSupportedException(
-                "{0}: Counters with {1} bits", hlircounter, width)
+                "{0}: Counters with {1} bits", hlircounter, width
+            )
 
         self.dataMapName = self.name
 
-        if ((hlircounter.binding is None) or
-            (hlircounter.binding[0] != P4_DIRECT)):
-            raise NotSupportedException(
-                "{0}: counter which is not direct", hlircounter)
+        if (hlircounter.binding is None) or (hlircounter.binding[0] != P4_DIRECT):
+            raise NotSupportedException("{0}: counter which is not direct", hlircounter)
 
-        self.autoIncrement = (hlircounter.binding != None and
-                              hlircounter.binding[0] == P4_DIRECT)
+        self.autoIncrement = (
+            hlircounter.binding != None and hlircounter.binding[0] == P4_DIRECT
+        )
 
         if hlircounter.type is P4_COUNTER_BYTES:
             self.increment = "{0}->len".format(program.packetName)
@@ -46,7 +46,8 @@ class EbpfCounter(object):
         if self.autoIncrement:
             return self.getTable(program).size
         program.emitWarning(
-            "{0} does not specify a max_size; using 1024", self.hlircounter)
+            "{0} does not specify a max_size; using 1024", self.hlircounter
+        )
         return 1024
 
     def getTable(self, program):
@@ -64,8 +65,13 @@ class EbpfCounter(object):
         else:
             keyTypeName = program.config.uprefix + "32"
         program.config.serializeTableDeclaration(
-            serializer, self.dataMapName, True, keyTypeName,
-            self.valueTypeName, self.getSize(program))
+            serializer,
+            self.dataMapName,
+            True,
+            keyTypeName,
+            self.valueTypeName,
+            self.getSize(program),
+        )
 
     def serializeCode(self, keyname, serializer, program):
         assert isinstance(serializer, ProgramSerializer)
@@ -88,8 +94,7 @@ class EbpfCounter(object):
         serializer.emitIndent()
         serializer.appendLine("/* perform lookup */")
         serializer.emitIndent()
-        program.config.serializeLookup(
-            serializer, self.dataMapName, keyname, valueName)
+        program.config.serializeLookup(serializer, self.dataMapName, keyname, valueName)
         serializer.newline()
 
         serializer.emitIndent()
@@ -97,8 +102,9 @@ class EbpfCounter(object):
         serializer.newline()
         serializer.increaseIndent()
         serializer.emitIndent()
-        serializer.appendFormat("__sync_fetch_and_add({0}, {1});",
-                                valueName, self.increment)
+        serializer.appendFormat(
+            "__sync_fetch_and_add({0}, {1});", valueName, self.increment
+        )
         serializer.newline()
         serializer.decreaseIndent()
         serializer.emitIndent()
@@ -111,6 +117,7 @@ class EbpfCounter(object):
 
         serializer.emitIndent()
         program.config.serializeUpdate(
-            serializer, self.dataMapName, keyname, initValuename)
+            serializer, self.dataMapName, keyname, initValuename
+        )
         serializer.newline()
         serializer.blockEnd(True)

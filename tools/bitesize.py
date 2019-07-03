@@ -47,5 +47,4 @@ dist = b.get_table("dist")
 try:
     sleep(99999999)
 except KeyboardInterrupt:
-    dist.print_log2_hist("Kbytes", "Process Name",
-            section_print_fn=bytes.decode)
+    dist.print_log2_hist("Kbytes", "Process Name", section_print_fn=bytes.decode)

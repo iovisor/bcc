@@ -12,10 +12,11 @@ import struct
 from contextlib import contextmanager
 import distutils.version
 
+
 @contextmanager
 def redirect_stderr(to):
     stderr_fd = sys.stderr.fileno()
-    with os.fdopen(os.dup(stderr_fd), 'wb') as copied, os.fdopen(to, 'w') as to:
+    with os.fdopen(os.dup(stderr_fd), "wb") as copied, os.fdopen(to, "w") as to:
         sys.stderr.flush()
         os.dup2(to.fileno(), stderr_fd)
         try:
@@ -23,6 +24,7 @@ def redirect_stderr(to):
         finally:
             sys.stderr.flush()
             os.dup2(copied.fileno(), stderr_fd)
+
 
 def kernel_version_ge(major, minor):
     # True if running kernel is >= X.Y
@@ -35,10 +37,12 @@ def kernel_version_ge(major, minor):
         return False
     return True
 
+
 class TestClang(TestCase):
     def test_complex(self):
         b = BPF(src_file="test_clang_complex.c", debug=0)
         fn = b.load_func("handle_packet", BPF.SCHED_CLS)
+
     def test_printk(self):
         text = """
 #include <bcc/proto.h>
@@ -187,7 +191,7 @@ BPF_HASH(stats, int, struct { u32 a[3]; u32 b; }, 10);
         t = b.get_table("stats")
         s1 = t.key_sprintf(t.Key(2))
         self.assertEqual(s1, b"0x2")
-        s2 = t.leaf_sprintf(t.Leaf((ct.c_uint * 3)(1,2,3), 4))
+        s2 = t.leaf_sprintf(t.Leaf((ct.c_uint * 3)(1, 2, 3), 4))
         self.assertEqual(s2, b"{ [ 0x1 0x2 0x3 ] 0x4 }")
         l = t.leaf_scanf(s2)
         self.assertEqual(l.a[0], 1)
@@ -219,8 +223,7 @@ BPF_TABLE("array", int, struct Event, comms, 1);
         l.stack[0].name = name
         l.stack[0].path = path
         s2 = t.leaf_sprintf(l)
-        self.assertEqual(s2,
-                b'{ 0x1 0x2 [ { "%s" "%s" }%s ] }' % (name, path, fill))
+        self.assertEqual(s2, b'{ 0x1 0x2 [ { "%s" "%s" }%s ] }' % (name, path, fill))
         l = t.leaf_scanf(s2)
         self.assertEqual(l.pid, 1)
         self.assertEqual(l.tid, 2)
@@ -317,14 +320,17 @@ int test(struct pt_regs *ctx, struct sock *skp) {
         fn = b.load_func("test", BPF.KPROBE)
 
     def test_char_array_probe(self):
-        BPF(text="""#include <linux/blkdev.h>
+        BPF(
+            text="""#include <linux/blkdev.h>
 int kprobe__blk_update_request(struct pt_regs *ctx, struct request *req) {
     bpf_trace_printk("%s\\n", req->rq_disk->disk_name);
     return 0;
-}""")
+}"""
+        )
 
     def test_probe_read_helper(self):
-        b = BPF(text="""
+        b = BPF(
+            text="""
 #include <linux/fs.h>
 static void print_file_name(struct file *file) {
     if (!file) return;
@@ -342,7 +348,8 @@ int trace_entry2(struct pt_regs *ctx, int unused, struct file *file) {
     print_file_name2(unused, file);
     return 0;
 }
-""")
+"""
+        )
         fn = b.load_func("trace_entry1", BPF.KPROBE)
         fn = b.load_func("trace_entry2", BPF.KPROBE)
 
@@ -361,7 +368,8 @@ int trace(struct pt_regs *ctx, struct page *page) {
             pass
 
     def test_probe_struct_assign(self):
-        b = BPF(text = """
+        b = BPF(
+            text="""
 #include <uapi/linux/ptrace.h>
 struct args_t {
     const char *filename;
@@ -377,12 +385,13 @@ int do_sys_open(struct pt_regs *ctx, const char *filename,
     bpf_trace_printk("%s\\n", args.filename);
     return 0;
 };
-""")
-        b.attach_kprobe(event=b.get_syscall_fnname("open"),
-                        fn_name="do_sys_open")
+"""
+        )
+        b.attach_kprobe(event=b.get_syscall_fnname("open"), fn_name="do_sys_open")
 
     def test_task_switch(self):
-        b = BPF(text="""
+        b = BPF(
+            text="""
 #include <uapi/linux/ptrace.h>
 #include <linux/sched.h>
 struct key_t {
@@ -400,10 +409,12 @@ int kprobe__finish_task_switch(struct pt_regs *ctx, struct task_struct *prev) {
   (*val)++;
   return 0;
 }
-""")
+"""
+        )
 
     def test_probe_simple_assign(self):
-        b = BPF(text="""
+        b = BPF(
+            text="""
 #include <uapi/linux/ptrace.h>
 #include <linux/gfp.h>
 struct leaf { size_t size; };
@@ -414,10 +425,12 @@ int kprobe____kmalloc(struct pt_regs *ctx, size_t size) {
     if (leaf)
         leaf->size += size;
     return 0;
-}""")
+}"""
+        )
 
     def test_probe_simple_member_assign(self):
-        b = BPF(text="""
+        b = BPF(
+            text="""
 #include <uapi/linux/ptrace.h>
 #include <linux/netdevice.h>
 struct leaf { void *ptr; };
@@ -426,11 +439,13 @@ int test(struct pt_regs *ctx, struct sk_buff *skb) {
     struct leaf *lp = &l;
     lp->ptr = skb;
     return 0;
-}""")
+}"""
+        )
         b.load_func("test", BPF.KPROBE)
 
     def test_probe_member_expr_deref(self):
-        b = BPF(text="""
+        b = BPF(
+            text="""
 #include <uapi/linux/ptrace.h>
 #include <linux/netdevice.h>
 struct leaf { struct sk_buff *ptr; };
@@ -439,11 +454,13 @@ int test(struct pt_regs *ctx, struct sk_buff *skb) {
     struct leaf *lp = &l;
     lp->ptr = skb;
     return lp->ptr->priority;
-}""")
+}"""
+        )
         b.load_func("test", BPF.KPROBE)
 
     def test_probe_member_expr(self):
-        b = BPF(text="""
+        b = BPF(
+            text="""
 #include <uapi/linux/ptrace.h>
 #include <linux/netdevice.h>
 struct leaf { struct sk_buff *ptr; };
@@ -452,7 +469,8 @@ int test(struct pt_regs *ctx, struct sk_buff *skb) {
     struct leaf *lp = &l;
     lp->ptr = skb;
     return l.ptr->priority;
-}""")
+}"""
+        )
         b.load_func("test", BPF.KPROBE)
 
     def test_unop_probe_read(self):
@@ -640,7 +658,7 @@ int process(struct xdp_md *ctx) {
         """
         b = BPF(text=text)
         t = b["jmp"]
-        self.assertEqual(len(t), 32);
+        self.assertEqual(len(t), 32)
 
     def test_update_macro_arg(self):
         text = """
@@ -660,7 +678,7 @@ int process(struct xdp_md *ctx) {
         """
         b = BPF(text=text)
         t = b["act"]
-        self.assertEqual(len(t), 32);
+        self.assertEqual(len(t), 32)
 
     def test_ext_ptr_maps1(self):
         bpf_text = """
@@ -796,7 +814,7 @@ int dns_test(struct __sk_buff *skb) {
         """
         b = BPF(text=text)
 
-    @skipUnless(kernel_version_ge(4,8), "requires kernel >= 4.8")
+    @skipUnless(kernel_version_ge(4, 8), "requires kernel >= 4.8")
     def test_ext_ptr_from_helper(self):
         text = """
 #include <linux/sched.h>
@@ -905,7 +923,7 @@ int do_next(struct pt_regs *ctx) {
         fn = b2.load_func("do_next", BPF.KPROBE)
         c_key = ct.c_int(0)
         b1["dummy"][c_key] = ct.c_int(fn.fd)
-        b1["dummy"].__delitem__(c_key);
+        b1["dummy"].__delitem__(c_key)
         with self.assertRaises(KeyError):
             b1["dummy"][c_key]
 
@@ -948,19 +966,19 @@ BPF_HASH(drops, struct a);
 BPF_HASH(table1, unsigned __int128, __int128);
 """
         b = BPF(text=text)
-        table = b['table1']
+        table = b["table1"]
         self.assertEqual(ct.sizeof(table.Key), 16)
         self.assertEqual(ct.sizeof(table.Leaf), 16)
         table[
-            table.Key.from_buffer_copy(
-                socket.inet_pton(socket.AF_INET6, "2001:db8::"))
-        ] = table.Leaf.from_buffer_copy(struct.pack('LL', 42, 123456789))
+            table.Key.from_buffer_copy(socket.inet_pton(socket.AF_INET6, "2001:db8::"))
+        ] = table.Leaf.from_buffer_copy(struct.pack("LL", 42, 123456789))
         for k, v in table.items():
             self.assertEqual(v[0], 42)
             self.assertEqual(v[1], 123456789)
-            self.assertEqual(socket.inet_ntop(socket.AF_INET6,
-                                              struct.pack('LL', k[0], k[1])),
-                             "2001:db8::")
+            self.assertEqual(
+                socket.inet_ntop(socket.AF_INET6, struct.pack("LL", k[0], k[1])),
+                "2001:db8::",
+            )
 
     def test_padding_types(self):
         text = """
@@ -981,11 +999,11 @@ struct value_t {
 BPF_HASH(table1, struct key_t, struct value_t);
 """
         b = BPF(text=text)
-        table = b['table1']
+        table = b["table1"]
         self.assertEqual(ct.sizeof(table.Key), 96)
         self.assertEqual(ct.sizeof(table.Leaf), 16)
 
-    @skipUnless(kernel_version_ge(4,7), "requires kernel >= 4.7")
+    @skipUnless(kernel_version_ge(4, 7), "requires kernel >= 4.7")
     def test_probe_read_tracepoint_context(self):
         text = """
 #include <linux/netdevice.h>
@@ -1021,7 +1039,7 @@ int test(struct pt_regs *ctx) {
         b = BPF(text=text)
         fn = b.load_func("test", BPF.KPROBE)
 
-    @skipUnless(kernel_version_ge(4,7), "requires kernel >= 4.7")
+    @skipUnless(kernel_version_ge(4, 7), "requires kernel >= 4.7")
     def test_probe_read_tc_ctx(self):
         text = """
 #include <uapi/linux/pkt_cls.h>
@@ -1213,7 +1231,8 @@ int test(struct pt_regs *ctx, struct mm_struct *mm) {
         fn = b.load_func("test", BPF.KPROBE)
 
     def test_arbitrary_increment_simple(self):
-        b = BPF(text=b"""
+        b = BPF(
+            text=b"""
 #include <uapi/linux/ptrace.h>
 struct bpf_map;
 BPF_HASH(map);
@@ -1221,13 +1240,15 @@ int map_delete(struct pt_regs *ctx, struct bpf_map *bpfmap, u64 *k) {
     map.increment(42, 10);
     return 0;
 }
-""")
+"""
+        )
         b.attach_kprobe(event=b"htab_map_delete_elem", fn_name=b"map_delete")
         b.cleanup()
 
-    @skipUnless(kernel_version_ge(4,7), "requires kernel >= 4.7")
+    @skipUnless(kernel_version_ge(4, 7), "requires kernel >= 4.7")
     def test_packed_structure(self):
-        b = BPF(text=b"""
+        b = BPF(
+            text=b"""
 struct test {
     u16 a;
     u32 b;
@@ -1244,11 +1265,13 @@ TRACEPOINT_PROBE(kmem, kmalloc) {
     }
     return 0;
 }
-""")
+"""
+        )
         if len(b["testing"].items()):
             st = b["testing"][ct.c_uint(0)]
             self.assertEqual(st.a, 10)
             self.assertEqual(st.b, 20)
+
 
 if __name__ == "__main__":
     main()

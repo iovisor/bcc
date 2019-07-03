@@ -20,11 +20,30 @@ try:
     idx = ipr.link_lookup(ifname="t1a")[0]
 
     ipr.tc("add", "ingress", idx, "ffff:")
-    ipr.tc("add-filter", "bpf", idx, ":1", fd=fn.fd,
-           name=fn.name, parent="ffff:", action="ok", classid=1)
+    ipr.tc(
+        "add-filter",
+        "bpf",
+        idx,
+        ":1",
+        fd=fn.fd,
+        name=fn.name,
+        parent="ffff:",
+        action="ok",
+        classid=1,
+    )
     ipr.tc("add", "sfq", idx, "1:")
-    ipr.tc("add-filter", "bpf", idx, ":1", fd=fn.fd,
-           name=fn.name, parent="1:", action="ok", classid=1)
+    ipr.tc(
+        "add-filter",
+        "bpf",
+        idx,
+        ":1",
+        fd=fn.fd,
+        name=fn.name,
+        parent="1:",
+        action="ok",
+        classid=1,
+    )
 finally:
-    if "idx" in locals(): ipr.link("del", index=idx)
+    if "idx" in locals():
+        ipr.link("del", index=idx)
 print("BPF tc functionality - SCHED_CLS: OK")

@@ -36,23 +36,26 @@ examples = """examples:
 parser = argparse.ArgumentParser(
     description="Summarize blocked time by kernel stack trace + waker stack",
     formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog=examples)
-parser.add_argument("-u", "--useronly", action="store_true",
-    help="user threads only (no kernel threads)")
-parser.add_argument("-p", "--pid",
-    help="trace this PID only")
-parser.add_argument("-v", "--verbose", action="store_true",
-    help="show raw addresses")
-parser.add_argument("-f", "--folded", action="store_true",
-    help="output folded format")
-parser.add_argument("duration", nargs="?", default=99999999,
-    help="duration of trace, in seconds")
+    epilog=examples,
+)
+parser.add_argument(
+    "-u",
+    "--useronly",
+    action="store_true",
+    help="user threads only (no kernel threads)",
+)
+parser.add_argument("-p", "--pid", help="trace this PID only")
+parser.add_argument("-v", "--verbose", action="store_true", help="show raw addresses")
+parser.add_argument("-f", "--folded", action="store_true", help="output folded format")
+parser.add_argument(
+    "duration", nargs="?", default=99999999, help="duration of trace, in seconds"
+)
 args = parser.parse_args()
 folded = args.folded
 duration = int(args.duration)
 debug = 0
-maxwdepth = 10    # and MAXWDEPTH
-maxtdepth = 20    # and MAXTDEPTH
+maxwdepth = 10  # and MAXWDEPTH
+maxtdepth = 20  # and MAXTDEPTH
 if args.pid and args.useronly:
     print("ERROR: use either -p or -u.")
     exit()
@@ -60,6 +63,7 @@ if args.pid and args.useronly:
 # signal handler
 def signal_ignore(signal, frame):
     print()
+
 
 # define BPF program
 bpf_text = """
@@ -194,12 +198,12 @@ out:
 }
 """
 if args.pid:
-    filter = 'pid == %s' % args.pid
+    filter = "pid == %s" % args.pid
 elif args.useronly:
-    filter = '!(p->flags & PF_KTHREAD)'
+    filter = "!(p->flags & PF_KTHREAD)"
 else:
-    filter = '1'
-bpf_text = bpf_text.replace('FILTER', filter)
+    filter = "1"
+bpf_text = bpf_text.replace("FILTER", filter)
 if debug:
     print(bpf_text)
 
@@ -214,15 +218,14 @@ if matched == 0:
 
 # header
 if not folded:
-    print("Tracing blocked time (us) by kernel off-CPU and waker stack",
-        end="")
+    print("Tracing blocked time (us) by kernel off-CPU and waker stack", end="")
     if duration < 99999999:
         print(" for %d secs." % duration)
     else:
         print("... Hit Ctrl-C to end.")
 
 # output
-while (1):
+while 1:
     try:
         sleep(duration)
     except KeyboardInterrupt:
@@ -263,8 +266,7 @@ while (1):
             for i in reversed(range(0, maxwdepth)):
                 if k.wret[i] == 0:
                     continue
-                print("    %-16x %s" % (k.wret[i],
-                    b.ksym(k.wret[i])))
+                print("    %-16x %s" % (k.wret[i], b.ksym(k.wret[i])))
 
             # print delimiter
             print("    %-16s %s" % ("-", "-"))
@@ -273,8 +275,7 @@ while (1):
             for i in range(0, maxtdepth):
                 if k.tret[i] == 0:
                     break
-                print("    %-16x %s" % (k.tret[i],
-                    b.ksym(k.tret[i])))
+                print("    %-16x %s" % (k.tret[i], b.ksym(k.tret[i])))
             print("    %-16s %s" % ("target:", k.target))
             print("        %d\n" % v.value)
     counts.clear()

@@ -42,15 +42,24 @@ examples = """examples:
 parser = argparse.ArgumentParser(
     description="Trace slow synchronous file reads and writes",
     formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog=examples)
-parser.add_argument("-p", "--pid", type=int, metavar="PID", dest="tgid",
-    help="trace this PID only")
-parser.add_argument("-a", "--all-files", action="store_true",
-    help="include non-regular file types (sockets, FIFOs, etc)")
-parser.add_argument("min_ms", nargs="?", default='10',
-    help="minimum I/O duration to trace, in ms (default 10)")
-parser.add_argument("--ebpf", action="store_true",
-    help=argparse.SUPPRESS)
+    epilog=examples,
+)
+parser.add_argument(
+    "-p", "--pid", type=int, metavar="PID", dest="tgid", help="trace this PID only"
+)
+parser.add_argument(
+    "-a",
+    "--all-files",
+    action="store_true",
+    help="include non-regular file types (sockets, FIFOs, etc)",
+)
+parser.add_argument(
+    "min_ms",
+    nargs="?",
+    default="10",
+    help="minimum I/O duration to trace, in ms (default 10)",
+)
+parser.add_argument("--ebpf", action="store_true", help=argparse.SUPPRESS)
 args = parser.parse_args()
 min_ms = int(args.min_ms)
 tgid = args.tgid
@@ -177,15 +186,15 @@ int trace_write_return(struct pt_regs *ctx)
 }
 
 """
-bpf_text = bpf_text.replace('MIN_US', str(min_ms * 1000))
+bpf_text = bpf_text.replace("MIN_US", str(min_ms * 1000))
 if args.tgid:
-    bpf_text = bpf_text.replace('TGID_FILTER', 'tgid != %d' % tgid)
+    bpf_text = bpf_text.replace("TGID_FILTER", "tgid != %d" % tgid)
 else:
-    bpf_text = bpf_text.replace('TGID_FILTER', '0')
+    bpf_text = bpf_text.replace("TGID_FILTER", "0")
 if args.all_files:
-    bpf_text = bpf_text.replace('TYPE_FILTER', '0')
+    bpf_text = bpf_text.replace("TYPE_FILTER", "0")
 else:
-    bpf_text = bpf_text.replace('TYPE_FILTER', '!S_ISREG(mode)')
+    bpf_text = bpf_text.replace("TYPE_FILTER", "!S_ISREG(mode)")
 
 if debug or args.ebpf:
     print(bpf_text)
@@ -209,29 +218,40 @@ except Exception:
     b.attach_kprobe(event="vfs_write", fn_name="trace_write_entry")
     b.attach_kretprobe(event="vfs_write", fn_name="trace_write_return")
 
-mode_s = {
-    0: 'R',
-    1: 'W',
-}
+mode_s = {0: "R", 1: "W"}
 
 # header
 print("Tracing sync read/writes slower than %d ms" % min_ms)
-print("%-8s %-14s %-6s %1s %-7s %7s %s" % ("TIME(s)", "COMM", "TID", "D",
-    "BYTES", "LAT(ms)", "FILENAME"))
+print(
+    "%-8s %-14s %-6s %1s %-7s %7s %s"
+    % ("TIME(s)", "COMM", "TID", "D", "BYTES", "LAT(ms)", "FILENAME")
+)
 
 start_ts = time.time()
-DNAME_INLINE_LEN = 32 
+DNAME_INLINE_LEN = 32
+
+
 def print_event(cpu, data, size):
     event = b["events"].event(data)
 
     ms = float(event.delta_us) / 1000
-    name = event.name.decode('utf-8', 'replace')
+    name = event.name.decode("utf-8", "replace")
     if event.name_len > DNAME_INLINE_LEN:
         name = name[:-3] + "..."
 
-    print("%-8.3f %-14.14s %-6s %1s %-7s %7.2f %s" % (
-        time.time() - start_ts, event.comm.decode('utf-8', 'replace'),
-        event.pid, mode_s[event.mode], event.sz, ms, name))
+    print(
+        "%-8.3f %-14.14s %-6s %1s %-7s %7.2f %s"
+        % (
+            time.time() - start_ts,
+            event.comm.decode("utf-8", "replace"),
+            event.pid,
+            mode_s[event.mode],
+            event.sz,
+            ms,
+            name,
+        )
+    )
+
 
 b["events"].open_perf_buffer(print_event, page_cnt=64)
 while 1:

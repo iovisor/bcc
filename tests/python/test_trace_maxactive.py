@@ -7,9 +7,11 @@ import os
 import sys
 from unittest import main, TestCase
 
+
 class TestKprobeMaxactive(TestCase):
     def setUp(self):
-        self.b = BPF(text=b"""
+        self.b = BPF(
+            text=b"""
         typedef struct { int idx; } Key;
         typedef struct { u64 val; } Val;
         BPF_HASH(stats, Key, Val, 3);
@@ -21,17 +23,23 @@ class TestKprobeMaxactive(TestCase):
           stats.lookup_or_init(&(Key){2}, &(Val){0})->val++;
           return 0;
         }
-        """)
-        self.b.attach_kprobe(event_re=self.b.get_syscall_prefix() + b"bpf",
-                             fn_name=b"hello")
-        self.b.attach_kretprobe(event_re=self.b.get_syscall_prefix() + b"bpf",
-                                fn_name=b"goodbye", maxactive=128)
+        """
+        )
+        self.b.attach_kprobe(
+            event_re=self.b.get_syscall_prefix() + b"bpf", fn_name=b"hello"
+        )
+        self.b.attach_kretprobe(
+            event_re=self.b.get_syscall_prefix() + b"bpf",
+            fn_name=b"goodbye",
+            maxactive=128,
+        )
 
     def test_send1(self):
         k1 = self.b[b"stats"].Key(1)
         k2 = self.b[b"stats"].Key(2)
         self.assertTrue(self.b[b"stats"][k1].val >= 2)
         self.assertTrue(self.b[b"stats"][k2].val == 1)
+
 
 if __name__ == "__main__":
     main()

@@ -16,7 +16,8 @@ from bcc.utils import printb
 from time import sleep
 
 # load BPF program
-b = BPF(text="""
+b = BPF(
+    text="""
 #include <uapi/linux/ptrace.h>
 
 struct key_t {
@@ -37,7 +38,8 @@ int count(struct pt_regs *ctx) {
     (*val)++;
     return 0;
 };
-""")
+"""
+)
 b.attach_uprobe(name="c", sym="strlen", fn_name="count")
 
 # header
@@ -53,4 +55,4 @@ except KeyboardInterrupt:
 print("%10s %s" % ("COUNT", "STRING"))
 counts = b.get_table("counts")
 for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
-    printb(b"%10d \"%s\"" % (v.value, k.c))
+    printb(b'%10d "%s"' % (v.value, k.c))

@@ -38,11 +38,7 @@ from bcc import BPF
 
 
 class Probe:
-    errno_mapping = {
-        "kmalloc": "-ENOMEM",
-        "bio": "-EIO",
-        "alloc_page" : "true",
-    }
+    errno_mapping = {"kmalloc": "-ENOMEM", "bio": "-EIO", "alloc_page": "true"}
 
     @classmethod
     def configure(cls, mode, probability, count):
@@ -58,8 +54,7 @@ class Probe:
         self.is_entry = entry
 
     def _bail(self, err):
-        raise ValueError("error in probe '%s': %s" %
-                (self.spec, err))
+        raise ValueError("error in probe '%s': %s" % (self.spec, err))
 
     def _get_err(self):
         return Probe.errno_mapping[Probe.mode]
@@ -73,11 +68,14 @@ class Probe:
         if Probe.probability == 1:
             early_pred = "false"
         else:
-            early_pred = "bpf_get_prandom_u32() > %s" % str(int((1<<32)*Probe.probability))
+            early_pred = "bpf_get_prandom_u32() > %s" % str(
+                int((1 << 32) * Probe.probability)
+            )
         # init the map
         # dont do an early exit here so the singular case works automatically
         # have an early exit for probability option
-        enter = """
+        enter = (
+            """
         /*
          * Early exit for probability case
          */
@@ -88,7 +86,9 @@ class Probe:
          */
         struct pid_struct p_struct = {0, 0};
         m.insert(&pid, &p_struct);
-        """ % early_pred
+        """
+            % early_pred
+        )
 
         # kill the entry
         exit = """
@@ -114,7 +114,7 @@ class Probe:
 
         # assume theres something in there, no guarantee its well formed
         if right > left + 1 and self.is_entry:
-            func_sig += ", " + self.func[left + 1:right]
+            func_sig += ", " + self.func[left + 1 : right]
 
         return "int %s(%s)" % (self.func_name, func_sig)
 
@@ -128,8 +128,12 @@ class Probe:
                 p->stack[%s] = p->curr_call;
                 p->conds_met++;
         }"""
-        text = text % (self.length, self.preds[0][1], self.preds[0][0],
-                self.preds[0][1])
+        text = text % (
+            self.length,
+            self.preds[0][1],
+            self.preds[0][0],
+            self.preds[0][1],
+        )
 
         # for each additional pred
         for tup in self.preds[1:]:
@@ -138,11 +142,17 @@ class Probe:
                 p->stack[%s] = p->curr_call;
                 p->conds_met++;
         }
-            """ % (tup[1], tup[0], tup[1])
+            """ % (
+                tup[1],
+                tup[0],
+                tup[1],
+            )
         return text
 
     def _generate_entry(self):
-        prog = self._get_heading() + """
+        prog = (
+            self._get_heading()
+            + """
 {
         u32 pid = bpf_get_current_pid_tgid();
         %s
@@ -165,6 +175,7 @@ class Probe:
 
         return 0;
 }"""
+        )
 
         prog = prog % (self._get_if_top(), self.prep, self._get_entry_logic())
         return prog
@@ -181,7 +192,9 @@ class Probe:
         return text % str(self.length + 1)
 
     def _generate_exit(self):
-        prog = self._get_heading() + """
+        prog = (
+            self._get_heading()
+            + """
 {
         u32 pid = bpf_get_current_pid_tgid();
 
@@ -199,6 +212,7 @@ class Probe:
         %s
         return 0;
 }"""
+        )
 
         prog = prog % (self._get_exit_logic(), self._get_if_top())
 
@@ -207,7 +221,9 @@ class Probe:
     # Special case for should_fail_whatever
     def _generate_bottom(self):
         pred = self.preds[0][0]
-        text = self._get_heading() + """
+        text = (
+            self._get_heading()
+            + """
 {
         u32 overriden = 0;
         int zero = 0;
@@ -245,9 +261,18 @@ class Probe:
         }
         return 0;
 }"""
-        return text % (self.prep, self.length, pred, Probe.count,
-                self._get_err(), self.length - 1, pred, Probe.count,
-                self._get_err())
+        )
+        return text % (
+            self.prep,
+            self.length,
+            pred,
+            Probe.count,
+            self._get_err(),
+            self.length - 1,
+            pred,
+            Probe.count,
+            self._get_err(),
+        )
 
     # presently parses and replaces STRCMP
     # STRCMP exists because string comparison is inconvenient and somewhat buggy
@@ -268,7 +293,7 @@ class Probe:
                 start = pred.find(")", start + 7) + 1
 
                 # then ind ... start is STRCMP(...)
-                ptr, literal = pred[ind + 7:start - 1].split(",")
+                ptr, literal = pred[ind + 7 : start - 1].split(",")
                 literal = literal.strip()
 
                 # x->y->z, some string literal
@@ -277,13 +302,17 @@ class Probe:
                 unique_bool = "is_true_%s" % uuid
                 self.prep += """
         char *str_%s = %s;
-        bool %s = true;\n""" % (uuid, ptr.strip(), unique_bool)
+        bool %s = true;\n""" % (
+                    uuid,
+                    ptr.strip(),
+                    unique_bool,
+                )
 
                 check = "\t%s &= *(str_%s++) == '%%s';\n" % (unique_bool, uuid)
 
                 for ch in literal:
                     self.prep += check % ch
-                self.prep += check % r'\0'
+                self.prep += check % r"\0"
                 new_pred += unique_bool
 
             new_pred += pred[start:]
@@ -301,16 +330,14 @@ class Probe:
 
     def attach(self, bpf):
         if self.is_entry:
-            bpf.attach_kprobe(event=self.event,
-                    fn_name=self.func_name)
+            bpf.attach_kprobe(event=self.event, fn_name=self.func_name)
         else:
-            bpf.attach_kretprobe(event=self.event,
-                    fn_name=self.func_name)
+            bpf.attach_kretprobe(event=self.event, fn_name=self.func_name)
 
 
 class Tool:
 
-    examples ="""
+    examples = """
 EXAMPLES:
 # ./inject.py kmalloc -v 'SyS_mount()'
     Fails all calls to syscall mount
@@ -332,24 +359,43 @@ EXAMPLES:
     }
 
     def __init__(self):
-        parser = argparse.ArgumentParser(description="Fail specified kernel" +
-                " functionality when call chain and predicates are met",
-                formatter_class=argparse.RawDescriptionHelpFormatter,
-                epilog=Tool.examples)
-        parser.add_argument(dest="mode", choices=["kmalloc", "bio", "alloc_page"],
-                help="indicate which base kernel function to fail")
-        parser.add_argument(metavar="spec", dest="spec",
-                help="specify call chain")
-        parser.add_argument("-I", "--include", action="append",
-                metavar="header",
-                help="additional header files to include in the BPF program")
-        parser.add_argument("-P", "--probability", default=1,
-                metavar="probability", type=float,
-                help="probability that this call chain will fail")
-        parser.add_argument("-v", "--verbose", action="store_true",
-                help="print BPF program")
-        parser.add_argument("-c", "--count", action="store", default=-1,
-                help="Number of fails before bypassing the override")
+        parser = argparse.ArgumentParser(
+            description="Fail specified kernel"
+            + " functionality when call chain and predicates are met",
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+            epilog=Tool.examples,
+        )
+        parser.add_argument(
+            dest="mode",
+            choices=["kmalloc", "bio", "alloc_page"],
+            help="indicate which base kernel function to fail",
+        )
+        parser.add_argument(metavar="spec", dest="spec", help="specify call chain")
+        parser.add_argument(
+            "-I",
+            "--include",
+            action="append",
+            metavar="header",
+            help="additional header files to include in the BPF program",
+        )
+        parser.add_argument(
+            "-P",
+            "--probability",
+            default=1,
+            metavar="probability",
+            type=float,
+            help="probability that this call chain will fail",
+        )
+        parser.add_argument(
+            "-v", "--verbose", action="store_true", help="print BPF program"
+        )
+        parser.add_argument(
+            "-c",
+            "--count",
+            action="store",
+            default=-1,
+            help="Number of fails before bypassing the override",
+        )
         self.args = parser.parse_args()
 
         self.program = ""
@@ -378,7 +424,7 @@ EXAMPLES:
 
     def _parse_frames(self):
         # sentinel
-        data = self.spec + '\0'
+        data = self.spec + "\0"
         start, count = 0, 0
 
         frames = []
@@ -391,33 +437,33 @@ EXAMPLES:
             if count < 0:
                 raise Exception("Check your parentheses")
             c = data[i]
-            count += c == '('
-            count -= c == ')'
+            count += c == "("
+            count -= c == ")"
             if not count:
-                if c == '\0' or (c == '=' and data[i + 1] == '>'):
+                if c == "\0" or (c == "=" and data[i + 1] == ">"):
                     # This block is closing a chunk. This means cur_frame must
                     # have something in it.
                     if not cur_frame:
                         raise Exception("Cannot parse spec, missing parens")
                     if len(cur_frame) == 2:
                         frame = tuple(cur_frame)
-                    elif cur_frame[0][0] == '(':
+                    elif cur_frame[0][0] == "(":
                         frame = self.key, cur_frame[0]
                     else:
-                        frame = cur_frame[0], '(true)'
+                        frame = cur_frame[0], "(true)"
                     frames.append(frame)
                     del cur_frame[:]
                     i += 1
                     start = i + 1
-                elif c == ')':
-                    cur_frame.append(data[start:i + 1].strip())
+                elif c == ")":
+                    cur_frame.append(data[start : i + 1].strip())
                     start = i + 1
                     last_frame_added = start
             i += 1
 
         # We only permit spaces after the last frame
         if self.spec[last_frame_added:].strip():
-            raise Exception("Invalid characters found after last frame");
+            raise Exception("Invalid characters found after last frame")
         # improper input
         if count:
             raise Exception("Check your parentheses")
@@ -446,7 +492,7 @@ EXAMPLES:
             absolute_order += 1
 
         if self.key not in self.map:
-            self.map[self.key] = [('(true)', absolute_order)]
+            self.map[self.key] = [("(true)", absolute_order)]
             absolute_order += 1
 
         self.length = absolute_order
@@ -456,7 +502,7 @@ EXAMPLES:
         # identifier validity here.
         paren_index = func.find("(")
         potential_id = func[:paren_index]
-        pattern = '[_a-zA-z][_a-zA-Z0-9]*$'
+        pattern = "[_a-zA-z][_a-zA-Z0-9]*$"
         if re.match(pattern, potential_id):
             return True
         return False
@@ -477,13 +523,16 @@ EXAMPLES:
         return True
 
     def _def_pid_struct(self):
-        text = """
+        text = (
+            """
 struct pid_struct {
     u64 curr_call; /* book keeping to handle recursion */
     u64 conds_met; /* stack pointer */
     u64 stack[%s];
 };
-""" % self.length
+"""
+            % self.length
+        )
         return text
 
     def _attach_probes(self):
@@ -493,8 +542,8 @@ struct pid_struct {
 
     def _generate_program(self):
         # leave out auto includes for now
-        self.program += '#include <linux/mm.h>\n'
-        for include in (self.args.include or []):
+        self.program += "#include <linux/mm.h>\n"
+        for include in self.args.include or []:
             self.program += "#include <%s>\n" % include
 
         self.program += self._def_pid_struct()

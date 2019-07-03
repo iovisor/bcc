@@ -32,21 +32,37 @@ mcast = IPAddress("239.1.1.1")
 # ifcs to cleanup at the end
 ifc_gc = []
 
+
 def run():
     ipdb.routes.add({"dst": "224.0.0.0/4", "oif": ifc.index}).commit()
-    with ipdb.create(ifname="vxlan0", kind="vxlan", vxlan_id=0,
-                     vxlan_link=ifc, vxlan_port=4789,
-                     vxlan_group=str(mcast), vxlan_flowbased=True,
-                     vxlan_collect_metadata=True,
-                     vxlan_learning=False) as vx:
+    with ipdb.create(
+        ifname="vxlan0",
+        kind="vxlan",
+        vxlan_id=0,
+        vxlan_link=ifc,
+        vxlan_port=4789,
+        vxlan_group=str(mcast),
+        vxlan_flowbased=True,
+        vxlan_collect_metadata=True,
+        vxlan_learning=False,
+    ) as vx:
         vx.up()
         ifc_gc.append(vx.ifname)
 
     conf[c_int(1)] = c_int(vx.index)
 
     ipr.tc("add", "ingress", vx.index, "ffff:")
-    ipr.tc("add-filter", "bpf", vx.index, ":1", fd=ingress_fn.fd,
-           name=ingress_fn.name, parent="ffff:", action="drop", classid=1)
+    ipr.tc(
+        "add-filter",
+        "bpf",
+        vx.index,
+        ":1",
+        fd=ingress_fn.fd,
+        name=ingress_fn.name,
+        parent="ffff:",
+        action="drop",
+        classid=1,
+    )
 
     for i in range(0, 2):
         vni = 10000 + i
@@ -57,8 +73,17 @@ def run():
             mac2host[mcast_key] = mcast_leaf
 
             ipr.tc("add", "sfq", v.index, "1:")
-            ipr.tc("add-filter", "bpf", v.index, ":1", fd=egress_fn.fd,
-                   name=egress_fn.name, parent="1:", action="drop", classid=1)
+            ipr.tc(
+                "add-filter",
+                "bpf",
+                v.index,
+                ":1",
+                fd=egress_fn.fd,
+                name=egress_fn.name,
+                parent="1:",
+                action="drop",
+                classid=1,
+            )
             br.add_port(v)
             br.up()
             ifc_gc.append(v.ifname)
@@ -67,13 +92,21 @@ def run():
             ipaddr = "99.1.%d.%d/24" % (i, host_id + 1)
             br.add_ip(ipaddr)
 
+
 try:
     run()
     ipdb.release()
     input("")
     print("---")
     for k, v in mac2host.items():
-        print(EUI(k.mac), k.ifindex, IPAddress(v.remote_ipv4),
-              v.tunnel_id, v.rx_pkts, v.tx_pkts)
+        print(
+            EUI(k.mac),
+            k.ifindex,
+            IPAddress(v.remote_ipv4),
+            v.tunnel_id,
+            v.rx_pkts,
+            v.tx_pkts,
+        )
 finally:
-    for v in ifc_gc: call(["ip", "link", "del", v])
+    for v in ifc_gc:
+        call(["ip", "link", "del", v])

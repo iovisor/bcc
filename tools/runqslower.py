@@ -43,13 +43,18 @@ examples = """examples:
 parser = argparse.ArgumentParser(
     description="Trace high run queue latency",
     formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog=examples)
-parser.add_argument("-p", "--pid", type=int, metavar="PID", dest="pid",
-    help="trace this PID only")
-parser.add_argument("min_us", nargs="?", default='10000',
-    help="minimum run queue latecy to trace, in ms (default 10000)")
-parser.add_argument("--ebpf", action="store_true",
-    help=argparse.SUPPRESS)
+    epilog=examples,
+)
+parser.add_argument(
+    "-p", "--pid", type=int, metavar="PID", dest="pid", help="trace this PID only"
+)
+parser.add_argument(
+    "min_us",
+    nargs="?",
+    default="10000",
+    help="minimum run queue latecy to trace, in ms (default 10000)",
+)
+parser.add_argument("--ebpf", action="store_true", help=argparse.SUPPRESS)
 args = parser.parse_args()
 min_us = int(args.min_us)
 debug = 0
@@ -213,13 +218,13 @@ else:
 
 # code substitutions
 if min_us == 0:
-    bpf_text = bpf_text.replace('FILTER_US', '0')
+    bpf_text = bpf_text.replace("FILTER_US", "0")
 else:
-    bpf_text = bpf_text.replace('FILTER_US', 'delta_us <= %s' % str(min_us))
+    bpf_text = bpf_text.replace("FILTER_US", "delta_us <= %s" % str(min_us))
 if args.pid:
-    bpf_text = bpf_text.replace('FILTER_PID', 'pid != %s' % args.pid)
+    bpf_text = bpf_text.replace("FILTER_PID", "pid != %s" % args.pid)
 else:
-    bpf_text = bpf_text.replace('FILTER_PID', '0')
+    bpf_text = bpf_text.replace("FILTER_PID", "0")
 if debug or args.ebpf:
     print(bpf_text)
     if args.ebpf:
@@ -228,7 +233,11 @@ if debug or args.ebpf:
 # process event
 def print_event(cpu, data, size):
     event = b["events"].event(data)
-    print("%-8s %-16s %-6s %14s" % (strftime("%H:%M:%S"), event.task, event.pid, event.delta_us))
+    print(
+        "%-8s %-16s %-6s %14s"
+        % (strftime("%H:%M:%S"), event.task, event.pid, event.delta_us)
+    )
+
 
 # load BPF program
 b = BPF(text=bpf_text)

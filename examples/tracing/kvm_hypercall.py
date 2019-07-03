@@ -18,7 +18,8 @@ from __future__ import print_function
 from bcc import BPF
 
 # load BPF program
-b = BPF(text="""
+b = BPF(
+    text="""
 #define EXIT_REASON 18
 BPF_HASH(start, u8, u8);
 
@@ -52,7 +53,8 @@ TRACEPOINT_PROBE(kvm, kvm_hypercall) {
     }
     return 0;
 };
-""")
+"""
+)
 
 # header
 print("%-18s %-16s %-6s %s" % ("TIME(s)", "COMM", "PID", "EVENT"))
@@ -64,4 +66,3 @@ while 1:
     except ValueError:
         continue
     print("%-18.9f %-16s %-6d %s" % (ts, task, pid, msg))
-

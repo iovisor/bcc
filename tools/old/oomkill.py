@@ -52,24 +52,39 @@ void kprobe__oom_kill_process(struct pt_regs *ctx, struct oom_control *oc,
 
 # kernel->user event data: struct data_t
 TASK_COMM_LEN = 16  # linux/sched.h
+
+
 class Data(ct.Structure):
     _fields_ = [
         ("fpid", ct.c_ulonglong),
         ("tpid", ct.c_ulonglong),
         ("pages", ct.c_ulonglong),
         ("fcomm", ct.c_char * TASK_COMM_LEN),
-        ("tcomm", ct.c_char * TASK_COMM_LEN)
+        ("tcomm", ct.c_char * TASK_COMM_LEN),
     ]
+
 
 # process event
 def print_event(cpu, data, size):
     event = ct.cast(data, ct.POINTER(Data)).contents
     with open(loadavg) as stats:
         avgline = stats.read().rstrip()
-    print(("%s Triggered by PID %d (\"%s\"), OOM kill of PID %d (\"%s\")"
-        ", %d pages, loadavg: %s") % (strftime("%H:%M:%S"), event.fpid,
-        event.fcomm.decode('utf-8', 'replace'), event.tpid,
-        event.tcomm.decode('utf-8', 'replace'), event.pages, avgline))
+    print(
+        (
+            '%s Triggered by PID %d ("%s"), OOM kill of PID %d ("%s")'
+            ", %d pages, loadavg: %s"
+        )
+        % (
+            strftime("%H:%M:%S"),
+            event.fpid,
+            event.fcomm.decode("utf-8", "replace"),
+            event.tpid,
+            event.tcomm.decode("utf-8", "replace"),
+            event.pages,
+            avgline,
+        )
+    )
+
 
 # initialize BPF
 b = BPF(text=bpf_text)

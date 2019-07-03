@@ -28,21 +28,25 @@ examples = """examples:
 parser = argparse.ArgumentParser(
     description="Summarize hard irq event time as histograms",
     formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog=examples)
-parser.add_argument("-T", "--timestamp", action="store_true",
-    help="include timestamp on output")
-parser.add_argument("-N", "--nanoseconds", action="store_true",
-    help="output in nanoseconds")
-parser.add_argument("-C", "--count", action="store_true",
-    help="show event counts instead of timing")
-parser.add_argument("-d", "--dist", action="store_true",
-    help="show distributions as histograms")
-parser.add_argument("interval", nargs="?", default=99999999,
-    help="output interval, in seconds")
-parser.add_argument("outputs", nargs="?", default=99999999,
-    help="number of outputs")
-parser.add_argument("--ebpf", action="store_true",
-    help=argparse.SUPPRESS)
+    epilog=examples,
+)
+parser.add_argument(
+    "-T", "--timestamp", action="store_true", help="include timestamp on output"
+)
+parser.add_argument(
+    "-N", "--nanoseconds", action="store_true", help="output in nanoseconds"
+)
+parser.add_argument(
+    "-C", "--count", action="store_true", help="show event counts instead of timing"
+)
+parser.add_argument(
+    "-d", "--dist", action="store_true", help="show distributions as histograms"
+)
+parser.add_argument(
+    "interval", nargs="?", default=99999999, help="output interval, in seconds"
+)
+parser.add_argument("outputs", nargs="?", default=99999999, help="number of outputs")
+parser.add_argument("--ebpf", action="store_true", help=argparse.SUPPRESS)
 args = parser.parse_args()
 countdown = int(args.outputs)
 if args.count and (args.dist or args.nanoseconds):
@@ -127,15 +131,19 @@ int trace_completion(struct pt_regs *ctx)
 
 # code substitutions
 if args.dist:
-    bpf_text = bpf_text.replace('STORE',
-        'irq_key_t key = {.slot = bpf_log2l(delta / %d)};' % factor +
-        'bpf_probe_read(&key.name, sizeof(key.name), name);' +
-        'dist.increment(key);')
+    bpf_text = bpf_text.replace(
+        "STORE",
+        "irq_key_t key = {.slot = bpf_log2l(delta / %d)};" % factor
+        + "bpf_probe_read(&key.name, sizeof(key.name), name);"
+        + "dist.increment(key);",
+    )
 else:
-    bpf_text = bpf_text.replace('STORE',
-        'irq_key_t key = {.slot = 0 /* ignore */};' +
-        'bpf_probe_read(&key.name, sizeof(key.name), name);' +
-        'dist.increment(key, delta);')
+    bpf_text = bpf_text.replace(
+        "STORE",
+        "irq_key_t key = {.slot = 0 /* ignore */};"
+        + "bpf_probe_read(&key.name, sizeof(key.name), name);"
+        + "dist.increment(key, delta);",
+    )
 if debug or args.ebpf:
     print(bpf_text)
     if args.ebpf:
@@ -150,14 +158,13 @@ if args.count:
     print("Tracing hard irq events... Hit Ctrl-C to end.")
 else:
     b.attach_kprobe(event="handle_irq_event_percpu", fn_name="trace_start")
-    b.attach_kretprobe(event="handle_irq_event_percpu",
-        fn_name="trace_completion")
+    b.attach_kretprobe(event="handle_irq_event_percpu", fn_name="trace_completion")
     print("Tracing hard irq event time... Hit Ctrl-C to end.")
 
 # output
 exiting = 0 if args.interval else 1
 dist = b.get_table("dist")
-while (1):
+while 1:
     try:
         sleep(int(args.interval))
     except KeyboardInterrupt:
@@ -172,7 +179,7 @@ while (1):
     else:
         print("%-26s %11s" % ("HARDIRQ", "TOTAL_" + label))
         for k, v in sorted(dist.items(), key=lambda dist: dist[1].value):
-            print("%-26s %11d" % (k.name.decode('utf-8', 'replace'), v.value / factor))
+            print("%-26s %11d" % (k.name.decode("utf-8", "replace"), v.value / factor))
     dist.clear()
 
     countdown -= 1

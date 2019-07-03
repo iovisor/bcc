@@ -44,10 +44,13 @@ int handle_egress(struct __sk_buff *skb)
 	return TC_ACT_OK;
 }"""
 
+
 def print_skb_event(cpu, data, size):
     class SkbEvent(ct.Structure):
-        _fields_ =  [ ("magic", ct.c_uint32),
-                      ("raw", ct.c_ubyte * (size - ct.sizeof(ct.c_uint32))) ]
+        _fields_ = [
+            ("magic", ct.c_uint32),
+            ("raw", ct.c_ubyte * (size - ct.sizeof(ct.c_uint32))),
+        ]
 
     skb_event = ct.cast(data, ct.POINTER(SkbEvent)).contents
     icmp_type = int(skb_event.raw[54])
@@ -56,10 +59,16 @@ def print_skb_event(cpu, data, size):
     if icmp_type == 128:
         src_ip = bytes(bytearray(skb_event.raw[22:38]))
         dst_ip = bytes(bytearray(skb_event.raw[38:54]))
-        print("%-3s %-32s %-12s 0x%08x" %
-              (cpu, socket.inet_ntop(socket.AF_INET6, src_ip),
-               socket.inet_ntop(socket.AF_INET6, dst_ip),
-               skb_event.magic))
+        print(
+            "%-3s %-32s %-12s 0x%08x"
+            % (
+                cpu,
+                socket.inet_ntop(socket.AF_INET6, src_ip),
+                socket.inet_ntop(socket.AF_INET6, dst_ip),
+                skb_event.magic,
+            )
+        )
+
 
 try:
     b = BPF(text=bpf_txt)
@@ -70,11 +79,20 @@ try:
     me = ipr.link_lookup(ifname="me")[0]
     you = ipr.link_lookup(ifname="you")[0]
     for idx in (me, you):
-        ipr.link('set', index=idx, state='up')
+        ipr.link("set", index=idx, state="up")
 
     ipr.tc("add", "clsact", me)
-    ipr.tc("add-filter", "bpf", me, ":1", fd=fn.fd, name=fn.name,
-           parent="ffff:fff3", classid=1, direct_action=True)
+    ipr.tc(
+        "add-filter",
+        "bpf",
+        me,
+        ":1",
+        fd=fn.fd,
+        name=fn.name,
+        parent="ffff:fff3",
+        classid=1,
+        direct_action=True,
+    )
 
     b["skb_events"].open_perf_buffer(print_skb_event)
     print('Try: "ping6 ff02::1%me"\n')
@@ -85,4 +103,5 @@ try:
     except KeyboardInterrupt:
         pass
 finally:
-    if "me" in locals(): ipr.link("del", index=me)
+    if "me" in locals():
+        ipr.link("del", index=me)

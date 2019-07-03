@@ -7,13 +7,16 @@ import os
 import sys
 from unittest import main, TestCase
 
+
 class TestKprobeCnt(TestCase):
     def setUp(self):
-        self.b = BPF(text="""
+        self.b = BPF(
+            text="""
         int wololo(void *ctx) {
           return 0;
         }
-        """)
+        """
+        )
         self.b.attach_kprobe(event_re="^vfs_.*", fn_name="wololo")
 
     def test_attach1(self):
@@ -47,10 +50,12 @@ class TestProbeGlobalCnt(TestCase):
 
 class TestAutoKprobe(TestCase):
     def setUp(self):
-        self.b = BPF(text="""
+        self.b = BPF(
+            text="""
         int kprobe__schedule(void *ctx) { return 0; }
         int kretprobe__schedule(void *ctx) { return 0; }
-        """)
+        """
+        )
 
     def test_count(self):
         self.assertEqual(2, self.b.num_open_kprobes())

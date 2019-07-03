@@ -23,13 +23,19 @@ from programSerializer import ProgramSerializer
 
 
 def get_parser():
-    parser = argparse.ArgumentParser(description='p4toEbpf arguments')
-    parser.add_argument('source', metavar='source', type=str,
-                        help='a P4 source file to compile')
-    parser.add_argument('-g', dest='generated', default="router",
-                        help="kind of output produced: filter or router")
-    parser.add_argument('-o', dest='output_file', default="output.c",
-                        help="generated C file name")
+    parser = argparse.ArgumentParser(description="p4toEbpf arguments")
+    parser.add_argument(
+        "source", metavar="source", type=str, help="a P4 source file to compile"
+    )
+    parser.add_argument(
+        "-g",
+        dest="generated",
+        default="router",
+        help="kind of output produced: filter or router",
+    )
+    parser.add_argument(
+        "-o", dest="output_file", default="output.c", help="generated C file name"
+    )
     return parser
 
 
@@ -89,15 +95,15 @@ def compileP4(inputFile, gen_file, isRouter, preprocessor_args):
         e = EbpfProgram(basename, h, isRouter, config)
         serializer = ProgramSerializer()
         e.toC(serializer)
-        f = open(gen_file, 'w')
+        f = open(gen_file, "w")
         f.write(serializer.toString())
         return CompileResult("OK", "")
-    except CompilationException, e:
+    except CompilationException as e:
         prefix = ""
         if e.isBug:
             prefix = "### Compiler bug: "
         return CompileResult("bug", prefix + e.show())
-    except NotSupportedException, e:
+    except NotSupportedException as e:
         return CompileResult("not supported", e.show())
     except:
         return CompileResult("exception", traceback.format_exc())

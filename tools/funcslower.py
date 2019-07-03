@@ -39,31 +39,49 @@ examples = """examples:
 parser = argparse.ArgumentParser(
     description="Trace slow kernel or user function calls.",
     formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog=examples)
-parser.add_argument("-p", "--pid", type=int, metavar="PID", dest="tgid",
-    help="trace this PID only")
-parser.add_argument("-m", "--min-ms", type=float, dest="min_ms",
-    help="minimum duration to trace (ms)")
-parser.add_argument("-u", "--min-us", type=float, dest="min_us",
-    help="minimum duration to trace (us)")
-parser.add_argument("-a", "--arguments", type=int,
-    help="print this many entry arguments, as hex")
-parser.add_argument("-T", "--time", action="store_true",
-    help="show HH:MM:SS timestamp")
-parser.add_argument("-t", "--timestamp", action="store_true",
-    help="show timestamp in seconds at us resolution")
-parser.add_argument("-v", "--verbose", action="store_true",
-    help="print the BPF program for debugging purposes")
-parser.add_argument(metavar="function", nargs="+", dest="functions",
-    help="function(s) to trace")
-parser.add_argument("--ebpf", action="store_true",
-    help=argparse.SUPPRESS)
-parser.add_argument("-f", "--folded", action="store_true",
-    help="output folded format, one line per stack (for flame graphs)")
-parser.add_argument("-U", "--user-stack",
-  action="store_true", help="output user stack trace")
-parser.add_argument("-K", "--kernel-stack",
-  action="store_true", help="output kernel stack trace")
+    epilog=examples,
+)
+parser.add_argument(
+    "-p", "--pid", type=int, metavar="PID", dest="tgid", help="trace this PID only"
+)
+parser.add_argument(
+    "-m", "--min-ms", type=float, dest="min_ms", help="minimum duration to trace (ms)"
+)
+parser.add_argument(
+    "-u", "--min-us", type=float, dest="min_us", help="minimum duration to trace (us)"
+)
+parser.add_argument(
+    "-a", "--arguments", type=int, help="print this many entry arguments, as hex"
+)
+parser.add_argument("-T", "--time", action="store_true", help="show HH:MM:SS timestamp")
+parser.add_argument(
+    "-t",
+    "--timestamp",
+    action="store_true",
+    help="show timestamp in seconds at us resolution",
+)
+parser.add_argument(
+    "-v",
+    "--verbose",
+    action="store_true",
+    help="print the BPF program for debugging purposes",
+)
+parser.add_argument(
+    metavar="function", nargs="+", dest="functions", help="function(s) to trace"
+)
+parser.add_argument("--ebpf", action="store_true", help=argparse.SUPPRESS)
+parser.add_argument(
+    "-f",
+    "--folded",
+    action="store_true",
+    help="output folded format, one line per stack (for flame graphs)",
+)
+parser.add_argument(
+    "-U", "--user-stack", action="store_true", help="output user stack trace"
+)
+parser.add_argument(
+    "-K", "--kernel-stack", action="store_true", help="output kernel stack trace"
+)
 
 args = parser.parse_args()
 # fractions are allowed, but rounded to an integer nanosecond
@@ -72,7 +90,7 @@ if args.min_ms:
 elif args.min_us:
     duration_ns = int(args.min_us * 1000)
 else:
-    duration_ns = 1000000   # default to 1ms
+    duration_ns = 1000000  # default to 1ms
 
 bpf_text = """
 #include <uapi/linux/ptrace.h>
@@ -205,7 +223,7 @@ int trace_return(struct pt_regs *ctx)
 }
 """
 
-bpf_text = bpf_text.replace('DURATION_NS', str(duration_ns))
+bpf_text = bpf_text.replace("DURATION_NS", str(duration_ns))
 if args.arguments:
     bpf_text = "#define GRAB_ARGS\n" + bpf_text
 if args.user_stack:
@@ -213,16 +231,19 @@ if args.user_stack:
 if args.kernel_stack:
     bpf_text = "#define KERNEL_STACKS\n" + bpf_text
 if args.tgid:
-    bpf_text = bpf_text.replace('TGID_FILTER', 'tgid != %d' % args.tgid)
+    bpf_text = bpf_text.replace("TGID_FILTER", "tgid != %d" % args.tgid)
 else:
-    bpf_text = bpf_text.replace('TGID_FILTER', '0')
+    bpf_text = bpf_text.replace("TGID_FILTER", "0")
 
 for i in range(len(args.functions)):
     bpf_text += """
 int trace_%d(struct pt_regs *ctx) {
     return trace_entry(ctx, %d);
 }
-""" % (i, i)
+""" % (
+        i,
+        i,
+    )
 
 if args.verbose or args.ebpf:
     print(bpf_text)
@@ -247,13 +268,23 @@ time_col = args.time or args.timestamp
 
 # Do not print header when folded
 if not args.folded:
-    print("Tracing function calls slower than %g %s... Ctrl+C to quit." %
-          (time_value, time_designator))
-    print((("%-10s " % "TIME" if time_col else "") + "%-14s %-6s %7s %16s %s") %
-        ("COMM", "PID", "LAT(%s)" % time_designator, "RVAL",
-        "FUNC" + (" ARGS" if args.arguments else "")))
+    print(
+        "Tracing function calls slower than %g %s... Ctrl+C to quit."
+        % (time_value, time_designator)
+    )
+    print(
+        (("%-10s " % "TIME" if time_col else "") + "%-14s %-6s %7s %16s %s")
+        % (
+            "COMM",
+            "PID",
+            "LAT(%s)" % time_designator,
+            "RVAL",
+            "FUNC" + (" ARGS" if args.arguments else ""),
+        )
+    )
 
 earliest_ts = 0
+
 
 def time_str(event):
     if args.time:
@@ -265,10 +296,12 @@ def time_str(event):
         return "%-10.6f " % ((event.start_ns - earliest_ts) / 1000000000.0)
     return ""
 
+
 def args_str(event):
     if not args.arguments:
         return ""
-    return str.join(" ", ["0x%x" % arg for arg in event.args[:args.arguments]])
+    return str.join(" ", ["0x%x" % arg for arg in event.args[: args.arguments]])
+
 
 def print_stack(event):
     user_stack = []
@@ -291,10 +324,12 @@ def print_stack(event):
         # print folded stack output
         user_stack = list(user_stack)
         kernel_stack = list(kernel_stack)
-        line = [event.comm.decode('utf-8', 'replace')] + \
-            [b.sym(addr, event.tgid_pid) for addr in reversed(user_stack)] + \
-            (do_delimiter and ["-"] or []) + \
-            [b.ksym(addr) for addr in reversed(kernel_stack)]
+        line = (
+            [event.comm.decode("utf-8", "replace")]
+            + [b.sym(addr, event.tgid_pid) for addr in reversed(user_stack)]
+            + (do_delimiter and ["-"] or [])
+            + [b.ksym(addr) for addr in reversed(kernel_stack)]
+        )
         print("%s %d" % (";".join(line), 1))
     else:
         # print default multi-line stack output.
@@ -303,15 +338,25 @@ def print_stack(event):
         for addr in user_stack:
             print("    %s" % b.sym(addr, event.tgid_pid))
 
+
 def print_event(cpu, data, size):
     event = b["events"].event(data)
     ts = float(event.duration_ns) / time_multiplier
     if not args.folded:
-        print((time_str(event) + "%-14.14s %-6s %7.2f %16x %s %s") %
-            (event.comm.decode('utf-8', 'replace'), event.tgid_pid >> 32,
-             ts, event.retval, args.functions[event.id], args_str(event)))
+        print(
+            (time_str(event) + "%-14.14s %-6s %7.2f %16x %s %s")
+            % (
+                event.comm.decode("utf-8", "replace"),
+                event.tgid_pid >> 32,
+                ts,
+                event.retval,
+                args.functions[event.id],
+                args_str(event),
+            )
+        )
     if args.user_stack or args.kernel_stack:
         print_stack(event)
+
 
 b["events"].open_perf_buffer(print_event, page_cnt=64)
 while True:

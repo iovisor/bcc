@@ -15,6 +15,7 @@ import inspect
 import os
 import signal
 
+
 class TestUDST(TestCase):
     def setUp(self):
         # Application, minimum, to define three trace points
@@ -131,9 +132,22 @@ int do_trace5(struct pt_regs *ctx) {
         # Compile and run the application
         self.ftemp = NamedTemporaryFile(delete=False)
         self.ftemp.close()
-        comp = Popen(["gcc", "-I", "%s/include" % os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))),
-                      "-x", "c", "-o", self.ftemp.name, "-"],
-                     stdin=PIPE)
+        comp = Popen(
+            [
+                "gcc",
+                "-I",
+                "%s/include"
+                % os.path.dirname(
+                    os.path.abspath(inspect.getfile(inspect.currentframe()))
+                ),
+                "-x",
+                "c",
+                "-o",
+                self.ftemp.name,
+                "-",
+            ],
+            stdin=PIPE,
+        )
         comp.stdin.write(app_text)
         comp.stdin.close()
         self.assertEqual(comp.wait(), 0)
@@ -158,39 +172,40 @@ int do_trace5(struct pt_regs *ctx) {
 
         # define output data structure in Python
         class Data1(ct.Structure):
-            _fields_ = [("v1", ct.c_char),
-                        ("v2", ct.c_int)]
+            _fields_ = [("v1", ct.c_char), ("v2", ct.c_int)]
 
         class Data2(ct.Structure):
-            _fields_ = [("v1", ct.c_int),
-                        ("v2", ct.c_char)]
+            _fields_ = [("v1", ct.c_int), ("v2", ct.c_char)]
 
         class Data3(ct.Structure):
-            _fields_ = [("v1", ct.c_int),
-                        ("v2", ct.c_int)]
+            _fields_ = [("v1", ct.c_int), ("v2", ct.c_int)]
 
         class Data4(ct.Structure):
-            _fields_ = [("v1", ct.c_ulonglong),
-                        ("v2", ct.c_char * 64)]
+            _fields_ = [("v1", ct.c_ulonglong), ("v2", ct.c_char * 64)]
 
         class Data5(ct.Structure):
-            _fields_ = [("v1", ct.c_char * 64),
-                        ("v2", ct.c_ulonglong)]
+            _fields_ = [("v1", ct.c_char * 64), ("v2", ct.c_ulonglong)]
 
         def check_event_val(event, event_state, v1, v2, v3, v4):
-            if ((event.v1 == v1 and event.v2 == v2) or (event.v1 == v3 and event.v2 == v4)):
-                if (event_state == 0 or event_state == 1):
+            if (event.v1 == v1 and event.v2 == v2) or (
+                event.v1 == v3 and event.v2 == v4
+            ):
+                if event_state == 0 or event_state == 1:
                     return 1
             return 2
 
         def print_event1(cpu, data, size):
             event = ct.cast(data, ct.POINTER(Data1)).contents
-            self.evt_st_1 = check_event_val(event, self.evt_st_1, b'\x0d', 40, b'\x08', 200)
+            self.evt_st_1 = check_event_val(
+                event, self.evt_st_1, b"\x0d", 40, b"\x08", 200
+            )
 
         def print_event2(cpu, data, size):
             event = ct.cast(data, ct.POINTER(Data2)).contents
             # pretend we have two identical probe points to simplify the code
-            self.evt_st_2 = check_event_val(event, self.evt_st_2, 5, b'\x04', 5, b'\x04')
+            self.evt_st_2 = check_event_val(
+                event, self.evt_st_2, 5, b"\x04", 5, b"\x04"
+            )
 
         def print_event3(cpu, data, size):
             event = ct.cast(data, ct.POINTER(Data3)).contents
@@ -214,13 +229,16 @@ int do_trace5(struct pt_regs *ctx) {
         # three iterations to make sure we get some probes and have time to process them
         for i in range(3):
             b.perf_buffer_poll()
-        self.assertTrue(self.evt_st_1 == 1 and self.evt_st_2 == 1 and self.evt_st_3 == 1)
+        self.assertTrue(
+            self.evt_st_1 == 1 and self.evt_st_2 == 1 and self.evt_st_3 == 1
+        )
 
     def tearDown(self):
         # kill the subprocess, clean the environment
         self.app.kill()
         self.app.wait()
         os.unlink(self.ftemp.name)
+
 
 if __name__ == "__main__":
     main()

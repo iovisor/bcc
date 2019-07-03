@@ -26,15 +26,12 @@ examples = """examples:
 parser = argparse.ArgumentParser(
     description="Trace and print kernel stack traces for a kernel function",
     formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog=examples)
-parser.add_argument("-p", "--pid",
-    help="trace this PID only")
-parser.add_argument("-s", "--offset", action="store_true",
-    help="show address offsets")
-parser.add_argument("-v", "--verbose", action="store_true",
-    help="print more fields")
-parser.add_argument("function",
-    help="kernel function name")
+    epilog=examples,
+)
+parser.add_argument("-p", "--pid", help="trace this PID only")
+parser.add_argument("-s", "--offset", action="store_true", help="show address offsets")
+parser.add_argument("-v", "--verbose", action="store_true", help="print more fields")
+parser.add_argument("function", help="kernel function name")
 args = parser.parse_args()
 function = args.function
 offset = args.offset
@@ -66,10 +63,9 @@ void trace_stack(struct pt_regs *ctx) {
 }
 """
 if args.pid:
-    bpf_text = bpf_text.replace('FILTER',
-        'if (pid != %s) { return; }' % args.pid)
+    bpf_text = bpf_text.replace("FILTER", "if (pid != %s) { return; }" % args.pid)
 else:
-    bpf_text = bpf_text.replace('FILTER', '')
+    bpf_text = bpf_text.replace("FILTER", "")
 if debug:
     print(bpf_text)
 
@@ -79,6 +75,7 @@ b.attach_kprobe(event=function, fn_name="trace_stack")
 
 TASK_COMM_LEN = 16  # linux/sched.h
 
+
 class Data(ct.Structure):
     _fields_ = [
         ("stack_id", ct.c_ulonglong),
@@ -86,9 +83,10 @@ class Data(ct.Structure):
         ("comm", ct.c_char * TASK_COMM_LEN),
     ]
 
+
 matched = b.num_open_kprobes()
 if matched == 0:
-    print("Function \"%s\" not found. Exiting." % function)
+    print('Function "%s" not found. Exiting.' % function)
     exit()
 
 stack_traces = b.get_table("stack_traces")
@@ -96,10 +94,10 @@ start_ts = time.time()
 
 # header
 if verbose:
-    print("%-18s %-12s %-6s %-3s %s" %
-            ("TIME(s)", "COMM", "PID", "CPU", "FUNCTION"))
+    print("%-18s %-12s %-6s %-3s %s" % ("TIME(s)", "COMM", "PID", "CPU", "FUNCTION"))
 else:
     print("%-18s %s" % ("TIME(s)", "FUNCTION"))
+
 
 def print_event(cpu, data, size):
     event = ct.cast(data, ct.POINTER(Data)).contents
@@ -107,8 +105,10 @@ def print_event(cpu, data, size):
     ts = time.time() - start_ts
 
     if verbose:
-        print("%-18.9f %-12.12s %-6d %-3d %s" %
-              (ts, event.comm.decode(), event.pid, cpu, function))
+        print(
+            "%-18.9f %-12.12s %-6d %-3d %s"
+            % (ts, event.comm.decode(), event.pid, cpu, function)
+        )
     else:
         print("%-18.9f %s" % (ts, function))
 
@@ -117,6 +117,7 @@ def print_event(cpu, data, size):
         print("\t%s" % sym)
 
     print()
+
 
 b["events"].open_perf_buffer(print_event)
 while 1:

@@ -18,6 +18,7 @@ S_ETHER = 2
 S_ARP = 3
 S_IP = 4
 
+
 class TestBPFSocket(TestCase):
     def setUp(self):
         b = BPF(src_file=arg1, debug=0)
@@ -28,8 +29,17 @@ class TestBPFSocket(TestCase):
         ip = IPRoute()
         ifindex = ip.link_lookup(ifname="eth0")[0]
         ip.tc("add", "sfq", ifindex, "1:")
-        ip.tc("add-filter", "bpf", ifindex, ":1", fd=ether_fn.fd,
-              name=ether_fn.name, parent="1:", action="ok", classid=1)
+        ip.tc(
+            "add-filter",
+            "bpf",
+            ifindex,
+            ":1",
+            fd=ether_fn.fd,
+            name=ether_fn.name,
+            parent="1:",
+            action="ok",
+            classid=1,
+        )
         self.jump = b.get_table("jump", c_int, c_int)
         self.jump[c_int(S_ARP)] = c_int(arp_fn.fd)
         self.jump[c_int(S_IP)] = c_int(ip_fn.fd)
@@ -43,6 +53,7 @@ class TestBPFSocket(TestCase):
         self.assertGreater(self.stats[c_int(S_IP)].value, 0)
         self.assertGreater(self.stats[c_int(S_ARP)].value, 0)
         self.assertGreater(self.stats[c_int(S_EOP)].value, 1)
+
 
 if __name__ == "__main__":
     main()

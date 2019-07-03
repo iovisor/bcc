@@ -8,12 +8,31 @@ import inspect
 import os
 
 # Parse command line arguments
-parser = argparse.ArgumentParser(description="Trace the latency distribution of an operation using usdt probes.",
-    formatter_class=argparse.RawDescriptionHelpFormatter)
+parser = argparse.ArgumentParser(
+    description="Trace the latency distribution of an operation using usdt probes.",
+    formatter_class=argparse.RawDescriptionHelpFormatter,
+)
 parser.add_argument("-p", "--pid", type=int, help="The id of the process to trace.")
-parser.add_argument("-i", "--interval", type=int, help="The interval in seconds on which to report the latency distribution.")
-parser.add_argument("-f", "--filterstr", type=str, default="", help="The prefix filter for the operation input. If specified, only operations for which the input string starts with the filterstr are traced.")
-parser.add_argument("-v", "--verbose", dest="verbose", action="store_true", help="If true, will output verbose logging information.")
+parser.add_argument(
+    "-i",
+    "--interval",
+    type=int,
+    help="The interval in seconds on which to report the latency distribution.",
+)
+parser.add_argument(
+    "-f",
+    "--filterstr",
+    type=str,
+    default="",
+    help="The prefix filter for the operation input. If specified, only operations for which the input string starts with the filterstr are traced.",
+)
+parser.add_argument(
+    "-v",
+    "--verbose",
+    dest="verbose",
+    action="store_true",
+    help="If true, will output verbose logging information.",
+)
 parser.set_defaults(verbose=False)
 args = parser.parse_args()
 this_pid = int(args.pid)
@@ -24,13 +43,15 @@ if this_interval < 1:
     print("Invalid value for interval, using 1.")
     this_interval = 1
 
-debugLevel=0
+debugLevel = 0
 if args.verbose:
-    debugLevel=4
+    debugLevel = 4
 
 # BPF program
-bpf_text_shared = "%s/bpf_text_shared.c" % os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
-bpf_text = open(bpf_text_shared, 'r').read()
+bpf_text_shared = "%s/bpf_text_shared.c" % os.path.dirname(
+    os.path.abspath(inspect.getfile(inspect.currentframe()))
+)
+bpf_text = open(bpf_text_shared, "r").read()
 bpf_text += """
 
 /**
@@ -74,7 +95,9 @@ int trace_operation_end(struct pt_regs* ctx)
 
 bpf_text = bpf_text.replace("FILTER_STRING", this_filter)
 if this_filter:
-    bpf_text = bpf_text.replace("FILTER", "if (!filter(start_data.input)) { return 0; }")
+    bpf_text = bpf_text.replace(
+        "FILTER", "if (!filter(start_data.input)) { return 0; }"
+    )
 else:
     bpf_text = bpf_text.replace("FILTER", "")
 
@@ -89,7 +112,7 @@ bpf_ctx = BPF(text=bpf_text, usdt_contexts=[usdt_ctx], debug=debugLevel)
 
 start = 0
 dist = bpf_ctx.get_table("dist")
-while (1):
+while 1:
     try:
         sleep(this_interval)
     except KeyboardInterrupt:

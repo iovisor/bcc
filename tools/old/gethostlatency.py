@@ -73,5 +73,6 @@ while 1:
         continue
     (delta, host) = msg.split(" ")
     deltams = int(delta) / 1000
-    print("%-9s %-6d %-12.12s %6.2f %s" % (strftime("%H:%M:%S"), pid, task,
-        deltams, host))
+    print(
+        "%-9s %-6d %-12.12s %6.2f %s" % (strftime("%H:%M:%S"), pid, task, deltams, host)
+    )

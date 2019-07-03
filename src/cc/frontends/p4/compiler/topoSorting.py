@@ -22,13 +22,14 @@
 
 from __future__ import print_function
 
+
 class Node(object):
     def __init__(self, n):
         self.n = n
         self.edges = set()
 
     def add_edge_to(self, other):
-        assert(isinstance(other, Node))
+        assert isinstance(other, Node)
         self.edges.add(other)
 
     def __str__(self):
@@ -41,7 +42,7 @@ class Graph(object):
         self.root = None
 
     def add_node(self, node):
-        assert(node not in self.nodes)
+        assert node not in self.nodes
         self.nodes[node] = Node(node)
 
     def __contains__(self, node):

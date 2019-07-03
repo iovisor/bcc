@@ -45,24 +45,26 @@ BPF_MAP_TYPE_CPUMAP = 16
 BPF_MAP_TYPE_XSKMAP = 17
 BPF_MAP_TYPE_SOCKHASH = 18
 
-map_type_name = {BPF_MAP_TYPE_HASH: "HASH",
-                 BPF_MAP_TYPE_ARRAY: "ARRAY",
-                 BPF_MAP_TYPE_PROG_ARRAY: "PROG_ARRAY",
-                 BPF_MAP_TYPE_PERF_EVENT_ARRAY: "PERF_EVENT_ARRAY",
-                 BPF_MAP_TYPE_PERCPU_HASH: "PERCPU_HASH",
-                 BPF_MAP_TYPE_PERCPU_ARRAY: "PERCPU_ARRAY",
-                 BPF_MAP_TYPE_STACK_TRACE: "STACK_TRACE",
-                 BPF_MAP_TYPE_CGROUP_ARRAY: "CGROUP_ARRAY",
-                 BPF_MAP_TYPE_LRU_HASH: "LRU_HASH",
-                 BPF_MAP_TYPE_LRU_PERCPU_HASH: "LRU_PERCPU_HASH",
-                 BPF_MAP_TYPE_LPM_TRIE: "LPM_TRIE",
-                 BPF_MAP_TYPE_ARRAY_OF_MAPS: "ARRAY_OF_MAPS",
-                 BPF_MAP_TYPE_HASH_OF_MAPS: "HASH_OF_MAPS",
-                 BPF_MAP_TYPE_DEVMAP: "DEVMAP",
-                 BPF_MAP_TYPE_SOCKMAP: "SOCKMAP",
-                 BPF_MAP_TYPE_CPUMAP: "CPUMAP",
-                 BPF_MAP_TYPE_XSKMAP: "XSKMAP",
-                 BPF_MAP_TYPE_SOCKHASH: "SOCKHASH",}
+map_type_name = {
+    BPF_MAP_TYPE_HASH: "HASH",
+    BPF_MAP_TYPE_ARRAY: "ARRAY",
+    BPF_MAP_TYPE_PROG_ARRAY: "PROG_ARRAY",
+    BPF_MAP_TYPE_PERF_EVENT_ARRAY: "PERF_EVENT_ARRAY",
+    BPF_MAP_TYPE_PERCPU_HASH: "PERCPU_HASH",
+    BPF_MAP_TYPE_PERCPU_ARRAY: "PERCPU_ARRAY",
+    BPF_MAP_TYPE_STACK_TRACE: "STACK_TRACE",
+    BPF_MAP_TYPE_CGROUP_ARRAY: "CGROUP_ARRAY",
+    BPF_MAP_TYPE_LRU_HASH: "LRU_HASH",
+    BPF_MAP_TYPE_LRU_PERCPU_HASH: "LRU_PERCPU_HASH",
+    BPF_MAP_TYPE_LPM_TRIE: "LPM_TRIE",
+    BPF_MAP_TYPE_ARRAY_OF_MAPS: "ARRAY_OF_MAPS",
+    BPF_MAP_TYPE_HASH_OF_MAPS: "HASH_OF_MAPS",
+    BPF_MAP_TYPE_DEVMAP: "DEVMAP",
+    BPF_MAP_TYPE_SOCKMAP: "SOCKMAP",
+    BPF_MAP_TYPE_CPUMAP: "CPUMAP",
+    BPF_MAP_TYPE_XSKMAP: "XSKMAP",
+    BPF_MAP_TYPE_SOCKHASH: "SOCKHASH",
+}
 
 stars_max = 40
 log2_index_max = 65
@@ -72,7 +74,7 @@ linear_index_max = 1025
 def _stars(val, val_max, width):
     i = 0
     text = ""
-    while (1):
+    while 1:
         if (i > (width * val / val_max) - 1) or (i > width - 1):
             break
         text += "*"
@@ -89,8 +91,10 @@ def _print_log2_hist(vals, val_type, strip_leading_zero):
     val_max = 0
 
     for i, v in enumerate(vals):
-        if v > 0: idx_max = i
-        if v > val_max: val_max = v
+        if v > 0:
+            idx_max = i
+        if v > val_max:
+            val_max = v
 
     if idx_max <= 32:
         header = "     %-19s : count     distribution"
@@ -107,18 +111,17 @@ def _print_log2_hist(vals, val_type, strip_leading_zero):
     for i in range(1, idx_max + 1):
         low = (1 << i) >> 1
         high = (1 << i) - 1
-        if (low == high):
+        if low == high:
             low -= 1
         val = vals[i]
 
         if strip_leading_zero:
             if val:
-                print(body % (low, high, val, stars,
-                              _stars(val, val_max, stars)))
+                print(body % (low, high, val, stars, _stars(val, val_max, stars)))
                 strip_leading_zero = False
         else:
-            print(body % (low, high, val, stars,
-                          _stars(val, val_max, stars)))
+            print(body % (low, high, val, stars, _stars(val, val_max, stars)))
+
 
 def _print_linear_hist(vals, val_type):
     global stars_max
@@ -127,19 +130,20 @@ def _print_linear_hist(vals, val_type):
     val_max = 0
 
     for i, v in enumerate(vals):
-        if v > 0: idx_max = i
-        if v > val_max: val_max = v
+        if v > 0:
+            idx_max = i
+        if v > val_max:
+            val_max = v
 
     header = "     %-13s : count     distribution"
     body = "        %-10d : %-8d |%-*s|"
     stars = stars_max
 
     if idx_max >= 0:
-        print(header % val_type);
+        print(header % val_type)
     for i in range(0, idx_max + 1):
         val = vals[i]
-        print(body % (i, val, stars,
-                      _stars(val, val_max, stars)))
+        print(body % (i, val, stars, _stars(val, val_max, stars)))
 
 
 def get_table_type_name(ttype):
@@ -188,7 +192,6 @@ def Table(bpf, map_id, map_fd, keytype, leaftype, name, **kwargs):
 
 
 class TableBase(MutableMapping):
-
     def __init__(self, bpf, map_id, map_fd, keytype, leaftype, name=None):
         self.bpf = bpf
         self.map_id = map_id
@@ -202,32 +205,36 @@ class TableBase(MutableMapping):
 
     def key_sprintf(self, key):
         buf = ct.create_string_buffer(ct.sizeof(self.Key) * 8)
-        res = lib.bpf_table_key_snprintf(self.bpf.module, self.map_id, buf,
-                                         len(buf), ct.byref(key))
+        res = lib.bpf_table_key_snprintf(
+            self.bpf.module, self.map_id, buf, len(buf), ct.byref(key)
+        )
         if res < 0:
             raise Exception("Could not printf key")
         return buf.value
 
     def leaf_sprintf(self, leaf):
         buf = ct.create_string_buffer(ct.sizeof(self.Leaf) * 8)
-        res = lib.bpf_table_leaf_snprintf(self.bpf.module, self.map_id, buf,
-                                          len(buf), ct.byref(leaf))
+        res = lib.bpf_table_leaf_snprintf(
+            self.bpf.module, self.map_id, buf, len(buf), ct.byref(leaf)
+        )
         if res < 0:
             raise Exception("Could not printf leaf")
         return buf.value
 
     def key_scanf(self, key_str):
         key = self.Key()
-        res = lib.bpf_table_key_sscanf(self.bpf.module, self.map_id, key_str,
-                                       ct.byref(key))
+        res = lib.bpf_table_key_sscanf(
+            self.bpf.module, self.map_id, key_str, ct.byref(key)
+        )
         if res < 0:
             raise Exception("Could not scanf key")
         return key
 
     def leaf_scanf(self, leaf_str):
         leaf = self.Leaf()
-        res = lib.bpf_table_leaf_sscanf(self.bpf.module, self.map_id, leaf_str,
-                                        ct.byref(leaf))
+        res = lib.bpf_table_leaf_sscanf(
+            self.bpf.module, self.map_id, leaf_str, ct.byref(leaf)
+        )
         if res < 0:
             raise Exception("Could not scanf leaf")
         return leaf
@@ -290,17 +297,23 @@ class TableBase(MutableMapping):
     def __iter__(self):
         return TableBase.Iter(self)
 
-    def iter(self): return self.__iter__()
-    def keys(self): return self.__iter__()
+    def iter(self):
+        return self.__iter__()
+
+    def keys(self):
+        return self.__iter__()
 
     class Iter(object):
         def __init__(self, table):
             self.table = table
             self.key = None
+
         def __iter__(self):
             return self
+
         def __next__(self):
             return self.next()
+
         def next(self):
             self.key = self.table.next(self.key)
             return self.key
@@ -309,19 +322,25 @@ class TableBase(MutableMapping):
         next_key = self.Key()
 
         if key is None:
-            res = lib.bpf_get_first_key(self.map_fd, ct.byref(next_key),
-                                        ct.sizeof(self.Key))
+            res = lib.bpf_get_first_key(
+                self.map_fd, ct.byref(next_key), ct.sizeof(self.Key)
+            )
         else:
-            res = lib.bpf_get_next_key(self.map_fd, ct.byref(key),
-                                       ct.byref(next_key))
+            res = lib.bpf_get_next_key(self.map_fd, ct.byref(key), ct.byref(next_key))
 
         if res < 0:
             raise StopIteration()
         return next_key
 
-    def print_log2_hist(self, val_type="value", section_header="Bucket ptr",
-            section_print_fn=None, bucket_fn=None, strip_leading_zero=None,
-            bucket_sort_fn=None):
+    def print_log2_hist(
+        self,
+        val_type="value",
+        section_header="Bucket ptr",
+        section_print_fn=None,
+        bucket_fn=None,
+        strip_leading_zero=None,
+        bucket_sort_fn=None,
+    ):
         """print_log2_hist(val_type="value", section_header="Bucket ptr",
                            section_print_fn=None, bucket_fn=None,
                            strip_leading_zero=None, bucket_sort_fn=None):
@@ -351,7 +370,7 @@ class TableBase(MutableMapping):
             # breaks the assumption and leads to chaos.
             # TODO: this is a quick fix. Fixing/working around in the BCC
             # internal library is the right thing to do.
-            if f2 == '__pad_1' and len(self.Key._fields_) == 3:
+            if f2 == "__pad_1" and len(self.Key._fields_) == 3:
                 f2 = self.Key._fields_[2][0]
 
             for k, v in self.items():
@@ -369,8 +388,7 @@ class TableBase(MutableMapping):
             for bucket in buckets:
                 vals = tmp[bucket]
                 if section_print_fn:
-                    print("\n%s = %s" % (section_header,
-                        section_print_fn(bucket)))
+                    print("\n%s = %s" % (section_header, section_print_fn(bucket)))
                 else:
                     print("\n%s = %r" % (section_header, bucket))
                 _print_log2_hist(vals, val_type, strip_leading_zero)
@@ -380,8 +398,14 @@ class TableBase(MutableMapping):
                 vals[k.value] = v.value
             _print_log2_hist(vals, val_type, strip_leading_zero)
 
-    def print_linear_hist(self, val_type="value", section_header="Bucket ptr",
-            section_print_fn=None, bucket_fn=None, bucket_sort_fn=None):
+    def print_linear_hist(
+        self,
+        val_type="value",
+        section_header="Bucket ptr",
+        section_print_fn=None,
+        bucket_fn=None,
+        bucket_sort_fn=None,
+    ):
         """print_linear_hist(val_type="value", section_header="Bucket ptr",
                            section_print_fn=None, bucket_fn=None,
                            bucket_sort_fn=None)
@@ -418,8 +442,7 @@ class TableBase(MutableMapping):
             for bucket in buckets:
                 vals = tmp[bucket]
                 if section_print_fn:
-                    print("\n%s = %s" % (section_header,
-                        section_print_fn(bucket)))
+                    print("\n%s = %s" % (section_header, section_print_fn(bucket)))
                 else:
                     print("\n%s = %r" % (section_header, bucket))
                 _print_linear_hist(vals, val_type)
@@ -431,8 +454,10 @@ class TableBase(MutableMapping):
                 except IndexError:
                     # Improve error text. If the limit proves a nusiance, this
                     # function be rewritten to avoid having one.
-                    raise IndexError(("Index in print_linear_hist() of %d " +
-                        "exceeds max of %d.") % (k.value, linear_index_max))
+                    raise IndexError(
+                        ("Index in print_linear_hist() of %d " + "exceeds max of %d.")
+                        % (k.value, linear_index_max)
+                    )
             _print_linear_hist(vals, val_type)
 
 
@@ -442,18 +467,22 @@ class HashTable(TableBase):
 
     def __len__(self):
         i = 0
-        for k in self: i += 1
+        for k in self:
+            i += 1
         return i
+
 
 class LruHash(HashTable):
     def __init__(self, *args, **kwargs):
         super(LruHash, self).__init__(*args, **kwargs)
 
+
 class ArrayBase(TableBase):
     def __init__(self, *args, **kwargs):
         super(ArrayBase, self).__init__(*args, **kwargs)
-        self.max_entries = int(lib.bpf_table_max_entries_id(self.bpf.module,
-                self.map_id))
+        self.max_entries = int(
+            lib.bpf_table_max_entries_id(self.bpf.module, self.map_id)
+        )
 
     def _normalize_key(self, key):
         if isinstance(key, int):
@@ -499,13 +528,16 @@ class ArrayBase(TableBase):
 
         def __iter__(self):
             return self
+
         def __next__(self):
             return self.next()
+
         def next(self):
             self.i += 1
             if self.i == len(self.table):
                 raise StopIteration()
             return self.Key(self.i)
+
 
 class Array(ArrayBase):
     def __init__(self, *args, **kwargs):
@@ -514,6 +546,7 @@ class Array(ArrayBase):
     def __delitem__(self, key):
         # Delete in Array type does not have an effect, so zero out instead
         self.clearitem(key)
+
 
 class ProgArray(ArrayBase):
     def __init__(self, *args, **kwargs):
@@ -525,6 +558,7 @@ class ProgArray(ArrayBase):
         if isinstance(leaf, self.bpf.Function):
             leaf = self.Leaf(leaf.fd)
         super(ProgArray, self).__setitem__(key, leaf)
+
 
 class FileDesc:
     def __init__(self, fd):
@@ -546,6 +580,7 @@ class FileDesc:
     def __exit__(self, *args, **kwargs):
         self.clean_up()
 
+
 class CgroupArray(ArrayBase):
     def __init__(self, *args, **kwargs):
         super(CgroupArray, self).__init__(*args, **kwargs)
@@ -560,8 +595,8 @@ class CgroupArray(ArrayBase):
         else:
             raise Exception("Cgroup array key must be either FD or cgroup path")
 
-class PerfEventArray(ArrayBase):
 
+class PerfEventArray(ArrayBase):
     def __init__(self, *args, **kwargs):
         super(PerfEventArray, self).__init__(*args, **kwargs)
         self._open_key_fds = {}
@@ -589,30 +624,32 @@ class PerfEventArray(ArrayBase):
         del self._open_key_fds[key]
 
     def _get_event_class(self):
-        ct_mapping = { 'char'              : ct.c_char,
-                       's8'                : ct.c_char,
-                       'unsigned char'     : ct.c_ubyte,
-                       'u8'                : ct.c_ubyte,
-                       'u8 *'              : ct.c_char_p,
-                       'char *'            : ct.c_char_p,
-                       'short'             : ct.c_short,
-                       's16'               : ct.c_short,
-                       'unsigned short'    : ct.c_ushort,
-                       'u16'               : ct.c_ushort,
-                       'int'               : ct.c_int,
-                       's32'               : ct.c_int,
-                       'enum'              : ct.c_int,
-                       'unsigned int'      : ct.c_uint,
-                       'u32'               : ct.c_uint,
-                       'long'              : ct.c_long,
-                       'unsigned long'     : ct.c_ulong,
-                       'long long'         : ct.c_longlong,
-                       's64'               : ct.c_longlong,
-                       'unsigned long long': ct.c_ulonglong,
-                       'u64'               : ct.c_ulonglong,
-                       '__int128'          : (ct.c_longlong * 2),
-                       'unsigned __int128' : (ct.c_ulonglong * 2),
-                       'void *'            : ct.c_void_p }
+        ct_mapping = {
+            "char": ct.c_char,
+            "s8": ct.c_char,
+            "unsigned char": ct.c_ubyte,
+            "u8": ct.c_ubyte,
+            "u8 *": ct.c_char_p,
+            "char *": ct.c_char_p,
+            "short": ct.c_short,
+            "s16": ct.c_short,
+            "unsigned short": ct.c_ushort,
+            "u16": ct.c_ushort,
+            "int": ct.c_int,
+            "s32": ct.c_int,
+            "enum": ct.c_int,
+            "unsigned int": ct.c_uint,
+            "u32": ct.c_uint,
+            "long": ct.c_long,
+            "unsigned long": ct.c_ulong,
+            "long long": ct.c_longlong,
+            "s64": ct.c_longlong,
+            "unsigned long long": ct.c_ulonglong,
+            "u64": ct.c_ulonglong,
+            "__int128": (ct.c_longlong * 2),
+            "unsigned __int128": (ct.c_ulonglong * 2),
+            "void *": ct.c_void_p,
+        }
 
         # handle array types e.g. "int [16] foo"
         array_type = re.compile(r"(.+) \[([0-9]+)\]$")
@@ -632,15 +669,19 @@ class PerfEventArray(ArrayBase):
             m = array_type.match(field_type)
             try:
                 if m:
-                    fields.append((field_name, ct_mapping[m.group(1)] * int(m.group(2))))
+                    fields.append(
+                        (field_name, ct_mapping[m.group(1)] * int(m.group(2)))
+                    )
                 else:
                     fields.append((field_name, ct_mapping[field_type]))
             except KeyError:
-                print("Type: '%s' not recognized. Please define the data with ctypes manually."
-                      % field_type)
+                print(
+                    "Type: '%s' not recognized. Please define the data with ctypes manually."
+                    % field_type
+                )
                 exit()
             i += 1
-        return type('', (ct.Structure,), {'_fields_': fields})
+        return type("", (ct.Structure,), {"_fields_": fields})
 
     def event(self, data):
         """event(data)
@@ -679,6 +720,7 @@ class PerfEventArray(ArrayBase):
                     exit()
                 else:
                     raise e
+
         def lost_cb_(_, lost):
             try:
                 lost_cb(lost)
@@ -687,6 +729,7 @@ class PerfEventArray(ArrayBase):
                     exit()
                 else:
                     raise e
+
         fn = _RAW_CB_TYPE(raw_cb_)
         lost_fn = _LOST_CB_TYPE(lost_cb_) if lost_cb else ct.cast(None, _LOST_CB_TYPE)
         reader = lib.bpf_open_perf_buffer(fn, lost_fn, None, -1, cpu, page_cnt)
@@ -770,9 +813,11 @@ class PerCpuHash(HashTable):
         result = self.sum(key)
         return result.value / self.total_cpu
 
+
 class LruPerCpuHash(PerCpuHash):
     def __init__(self, *args, **kwargs):
         super(LruPerCpuHash, self).__init__(*args, **kwargs)
+
 
 class PerCpuArray(ArrayBase):
     def __init__(self, *args, **kwargs):
@@ -804,7 +849,7 @@ class PerCpuArray(ArrayBase):
         return ret
 
     def __getitem__(self, key):
-        if (self.reducer):
+        if self.reducer:
             return reduce(self.reducer, self.getvalue(key))
         else:
             return self.getvalue(key)
@@ -830,6 +875,7 @@ class PerCpuArray(ArrayBase):
         result = self.sum(key)
         return result.value / self.total_cpu
 
+
 class LpmTrie(TableBase):
     def __init__(self, *args, **kwargs):
         super(LpmTrie, self).__init__(*args, **kwargs)
@@ -840,10 +886,10 @@ class LpmTrie(TableBase):
 
 class StackTrace(TableBase):
     MAX_DEPTH = 127
-    BPF_F_STACK_BUILD_ID = (1<<5)
-    BPF_STACK_BUILD_ID_EMPTY =  0 #can't get stacktrace
-    BPF_STACK_BUILD_ID_VALID = 1 #valid build-id,ip
-    BPF_STACK_BUILD_ID_IP = 2 #fallback to ip
+    BPF_F_STACK_BUILD_ID = 1 << 5
+    BPF_STACK_BUILD_ID_EMPTY = 0  # can't get stacktrace
+    BPF_STACK_BUILD_ID_VALID = 1  # valid build-id,ip
+    BPF_STACK_BUILD_ID_IP = 2  # fallback to ip
 
     def __init__(self, *args, **kwargs):
         super(StackTrace, self).__init__(*args, **kwargs)
@@ -867,14 +913,16 @@ class StackTrace(TableBase):
                 raise StopIteration()
 
             if self.flags & StackTrace.BPF_F_STACK_BUILD_ID:
-              addr = self.stack.trace[self.n]
-              if addr.status == StackTrace.BPF_STACK_BUILD_ID_IP or \
-                 addr.status == StackTrace.BPF_STACK_BUILD_ID_EMPTY:
-                  raise StopIteration()
+                addr = self.stack.trace[self.n]
+                if (
+                    addr.status == StackTrace.BPF_STACK_BUILD_ID_IP
+                    or addr.status == StackTrace.BPF_STACK_BUILD_ID_EMPTY
+                ):
+                    raise StopIteration()
             else:
-              addr = self.stack.ip[self.n]
+                addr = self.stack.ip[self.n]
 
-            if addr == 0 :
+            if addr == 0:
                 raise StopIteration()
 
             return self.resolve(addr) if self.resolve else addr
@@ -884,15 +932,18 @@ class StackTrace(TableBase):
 
     def __len__(self):
         i = 0
-        for k in self: i += 1
+        for k in self:
+            i += 1
         return i
 
     def clear(self):
         pass
 
+
 class DevMap(ArrayBase):
     def __init__(self, *args, **kwargs):
         super(DevMap, self).__init__(*args, **kwargs)
+
 
 class CpuMap(ArrayBase):
     def __init__(self, *args, **kwargs):

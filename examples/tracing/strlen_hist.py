@@ -43,7 +43,7 @@ int count(struct pt_regs *ctx) {
 """
 
 b = bcc.BPF(text=text)
-sym="strlen"
+sym = "strlen"
 b.attach_uretprobe(name="c", sym=sym, fn_name="count")
 
 dist = b["dist"]

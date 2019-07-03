@@ -23,6 +23,8 @@ import sys
 def usage():
     print("USAGE: mysqld_latency PID [min_ms]")
     exit()
+
+
 if len(sys.argv) < 2:
     usage()
 if sys.argv[1][0:1] == "-":
@@ -37,10 +39,13 @@ debug = 0
 QUERY_MAX = 128
 
 # load BPF program
-bpf_text = """
+bpf_text = (
+    """
 #include <uapi/linux/ptrace.h>
 
-#define QUERY_MAX	""" + str(QUERY_MAX) + """
+#define QUERY_MAX	"""
+    + str(QUERY_MAX)
+    + """
 
 struct start_t {
     u64 ts;
@@ -78,7 +83,9 @@ int do_done(struct pt_regs *ctx) {
 
     // check if query exceeded our threshold
     u64 delta = bpf_ktime_get_ns() - sp->ts;
-    if (delta >= """ + str(min_ns) + """) {
+    if (delta >= """
+    + str(min_ns)
+    + """) {
         // populate and emit data struct
         struct data_t data = {.pid = pid, .ts = sp->ts, .delta = delta};
         bpf_probe_read(&data.query, sizeof(data.query), (void *)sp->query);
@@ -91,6 +98,7 @@ int do_done(struct pt_regs *ctx) {
 };
 
 """
+)
 
 # enable USDT probe from given PID
 u = USDT(pid=pid)
@@ -104,19 +112,30 @@ if debug:
 b = BPF(text=bpf_text, usdt_contexts=[u])
 
 # header
-print("Tracing MySQL server queries for PID %d slower than %s ms..." % (pid,
-    min_ms_text))
+print(
+    "Tracing MySQL server queries for PID %d slower than %s ms..." % (pid, min_ms_text)
+)
 print("%-14s %-6s %8s %s" % ("TIME(s)", "PID", "MS", "QUERY"))
 
 # process event
 start = 0
+
+
 def print_event(cpu, data, size):
     global start
     event = b["events"].event(data)
     if start == 0:
         start = event.ts
-    print("%-14.6f %-6d %8.3f %s" % (float(event.ts - start) / 1000000000,
-        event.pid, float(event.delta) / 1000000, event.query))
+    print(
+        "%-14.6f %-6d %8.3f %s"
+        % (
+            float(event.ts - start) / 1000000000,
+            event.pid,
+            float(event.delta) / 1000000,
+            event.query,
+        )
+    )
+
 
 # loop with callback to print_event
 b["events"].open_perf_buffer(print_event, page_cnt=64)

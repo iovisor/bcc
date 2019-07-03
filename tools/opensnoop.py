@@ -39,37 +39,39 @@ examples = """examples:
 parser = argparse.ArgumentParser(
     description="Trace open() syscalls",
     formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog=examples)
-parser.add_argument("-T", "--timestamp", action="store_true",
-    help="include timestamp on output")
-parser.add_argument("-U", "--print-uid", action="store_true",
-    help="print UID column")
-parser.add_argument("-x", "--failed", action="store_true",
-    help="only show failed opens")
-parser.add_argument("-p", "--pid",
-    help="trace this PID only")
-parser.add_argument("-t", "--tid",
-    help="trace this TID only")
-parser.add_argument("-u", "--uid",
-    help="trace this UID only")
-parser.add_argument("-d", "--duration",
-    help="total duration of trace in seconds")
-parser.add_argument("-n", "--name",
-    type=ArgString,
-    help="only print process names containing this name")
-parser.add_argument("--ebpf", action="store_true",
-    help=argparse.SUPPRESS)
-parser.add_argument("-e", "--extended_fields", action="store_true",
-    help="show extended fields")
-parser.add_argument("-f", "--flag_filter", action="append",
-    help="filter on flags argument (e.g., O_WRONLY)")
+    epilog=examples,
+)
+parser.add_argument(
+    "-T", "--timestamp", action="store_true", help="include timestamp on output"
+)
+parser.add_argument("-U", "--print-uid", action="store_true", help="print UID column")
+parser.add_argument(
+    "-x", "--failed", action="store_true", help="only show failed opens"
+)
+parser.add_argument("-p", "--pid", help="trace this PID only")
+parser.add_argument("-t", "--tid", help="trace this TID only")
+parser.add_argument("-u", "--uid", help="trace this UID only")
+parser.add_argument("-d", "--duration", help="total duration of trace in seconds")
+parser.add_argument(
+    "-n", "--name", type=ArgString, help="only print process names containing this name"
+)
+parser.add_argument("--ebpf", action="store_true", help=argparse.SUPPRESS)
+parser.add_argument(
+    "-e", "--extended_fields", action="store_true", help="show extended fields"
+)
+parser.add_argument(
+    "-f",
+    "--flag_filter",
+    action="append",
+    help="filter on flags argument (e.g., O_WRONLY)",
+)
 args = parser.parse_args()
 debug = 0
 if args.duration:
     args.duration = timedelta(seconds=int(args.duration))
 flag_filter_mask = 0
 for flag in args.flag_filter or []:
-    if not flag.startswith('O_'):
+    if not flag.startswith("O_"):
         exit("Bad flag: %s" % flag)
     try:
         flag_filter_mask |= getattr(os, flag)
@@ -151,26 +153,29 @@ int trace_return(struct pt_regs *ctx)
 }
 """
 if args.tid:  # TID trumps PID
-    bpf_text = bpf_text.replace('PID_TID_FILTER',
-        'if (tid != %s) { return 0; }' % args.tid)
+    bpf_text = bpf_text.replace(
+        "PID_TID_FILTER", "if (tid != %s) { return 0; }" % args.tid
+    )
 elif args.pid:
-    bpf_text = bpf_text.replace('PID_TID_FILTER',
-        'if (pid != %s) { return 0; }' % args.pid)
+    bpf_text = bpf_text.replace(
+        "PID_TID_FILTER", "if (pid != %s) { return 0; }" % args.pid
+    )
 else:
-    bpf_text = bpf_text.replace('PID_TID_FILTER', '')
+    bpf_text = bpf_text.replace("PID_TID_FILTER", "")
 if args.uid:
-    bpf_text = bpf_text.replace('UID_FILTER',
-        'if (uid != %s) { return 0; }' % args.uid)
+    bpf_text = bpf_text.replace("UID_FILTER", "if (uid != %s) { return 0; }" % args.uid)
 else:
-    bpf_text = bpf_text.replace('UID_FILTER', '')
+    bpf_text = bpf_text.replace("UID_FILTER", "")
 if args.flag_filter:
-    bpf_text = bpf_text.replace('FLAGS_FILTER',
-        'if (!(flags & %d)) { return 0; }' % flag_filter_mask)
+    bpf_text = bpf_text.replace(
+        "FLAGS_FILTER", "if (!(flags & %d)) { return 0; }" % flag_filter_mask
+    )
 else:
-    bpf_text = bpf_text.replace('FLAGS_FILTER', '')
+    bpf_text = bpf_text.replace("FLAGS_FILTER", "")
 if not (args.extended_fields or args.flag_filter):
-    bpf_text = '\n'.join(x for x in bpf_text.split('\n')
-        if 'EXTENDED_STRUCT_MEMBER' not in x)
+    bpf_text = "\n".join(
+        x for x in bpf_text.split("\n") if "EXTENDED_STRUCT_MEMBER" not in x
+    )
 if debug or args.ebpf:
     print(bpf_text)
     if args.ebpf:
@@ -188,8 +193,9 @@ if args.timestamp:
     print("%-14s" % ("TIME(s)"), end="")
 if args.print_uid:
     print("%-6s" % ("UID"), end="")
-print("%-6s %-16s %4s %3s " %
-      ("TID" if args.tid else "PID", "COMM", "FD", "ERR"), end="")
+print(
+    "%-6s %-16s %4s %3s " % ("TID" if args.tid else "PID", "COMM", "FD", "ERR"), end=""
+)
 if args.extended_fields:
     print("%-9s" % ("FLAGS"), end="")
 print("PATH")
@@ -205,7 +211,7 @@ def print_event(cpu, data, size):
         err = 0
     else:
         fd_s = -1
-        err = - event.ret
+        err = -event.ret
 
     if not initial_ts:
         initial_ts = event.ts
@@ -223,14 +229,22 @@ def print_event(cpu, data, size):
     if args.print_uid:
         printb(b"%-6d" % event.uid, nl="")
 
-    printb(b"%-6d %-16s %4d %3d " %
-           (event.id & 0xffffffff if args.tid else event.id >> 32,
-            event.comm, fd_s, err), nl="")
+    printb(
+        b"%-6d %-16s %4d %3d "
+        % (
+            event.id & 0xFFFFFFFF if args.tid else event.id >> 32,
+            event.comm,
+            fd_s,
+            err,
+        ),
+        nl="",
+    )
 
     if args.extended_fields:
         printb(b"%08o " % event.flags, nl="")
 
-    printb(b'%s' % event.fname)
+    printb(b"%s" % event.fname)
+
 
 # loop with callback to print_event
 b["events"].open_perf_buffer(print_event, page_cnt=64)

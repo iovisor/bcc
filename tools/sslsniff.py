@@ -29,20 +29,31 @@ examples = """examples:
 parser = argparse.ArgumentParser(
     description="Sniff SSL data",
     formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog=examples)
+    epilog=examples,
+)
 parser.add_argument("-p", "--pid", type=int, help="sniff this PID only.")
-parser.add_argument("-c", "--comm",
-                    help="sniff only commands matching string.")
-parser.add_argument("-o", "--no-openssl", action="store_false", dest="openssl",
-                    help="do not show OpenSSL calls.")
-parser.add_argument("-g", "--no-gnutls", action="store_false", dest="gnutls",
-                    help="do not show GnuTLS calls.")
-parser.add_argument("-n", "--no-nss", action="store_false", dest="nss",
-                    help="do not show NSS calls.")
-parser.add_argument('-d', '--debug', dest='debug', action='count', default=0,
-                    help='debug mode.')
-parser.add_argument("--ebpf", action="store_true",
-                    help=argparse.SUPPRESS)
+parser.add_argument("-c", "--comm", help="sniff only commands matching string.")
+parser.add_argument(
+    "-o",
+    "--no-openssl",
+    action="store_false",
+    dest="openssl",
+    help="do not show OpenSSL calls.",
+)
+parser.add_argument(
+    "-g",
+    "--no-gnutls",
+    action="store_false",
+    dest="gnutls",
+    help="do not show GnuTLS calls.",
+)
+parser.add_argument(
+    "-n", "--no-nss", action="store_false", dest="nss", help="do not show NSS calls."
+)
+parser.add_argument(
+    "-d", "--debug", dest="debug", action="count", default=0, help="debug mode."
+)
+parser.add_argument("--ebpf", action="store_true", help=argparse.SUPPRESS)
 args = parser.parse_args()
 
 
@@ -119,9 +130,9 @@ int probe_SSL_read_exit(struct pt_regs *ctx, void *ssl, void *buf, int num) {
 """
 
 if args.pid:
-    prog = prog.replace('FILTER', 'if (pid != %d) { return 0; }' % args.pid)
+    prog = prog.replace("FILTER", "if (pid != %d) { return 0; }" % args.pid)
 else:
-    prog = prog.replace('FILTER', '')
+    prog = prog.replace("FILTER", "")
 
 if args.debug or args.ebpf:
     print(prog)
@@ -136,34 +147,55 @@ b = BPF(text=prog)
 # on its exit (Mark Drayton)
 #
 if args.openssl:
-    b.attach_uprobe(name="ssl", sym="SSL_write", fn_name="probe_SSL_write",
-                    pid=args.pid or -1)
-    b.attach_uprobe(name="ssl", sym="SSL_read", fn_name="probe_SSL_read_enter",
-                    pid=args.pid or -1)
-    b.attach_uretprobe(name="ssl", sym="SSL_read",
-                       fn_name="probe_SSL_read_exit", pid=args.pid or -1)
+    b.attach_uprobe(
+        name="ssl", sym="SSL_write", fn_name="probe_SSL_write", pid=args.pid or -1
+    )
+    b.attach_uprobe(
+        name="ssl", sym="SSL_read", fn_name="probe_SSL_read_enter", pid=args.pid or -1
+    )
+    b.attach_uretprobe(
+        name="ssl", sym="SSL_read", fn_name="probe_SSL_read_exit", pid=args.pid or -1
+    )
 
 if args.gnutls:
-    b.attach_uprobe(name="gnutls", sym="gnutls_record_send",
-                    fn_name="probe_SSL_write", pid=args.pid or -1)
-    b.attach_uprobe(name="gnutls", sym="gnutls_record_recv",
-                    fn_name="probe_SSL_read_enter", pid=args.pid or -1)
-    b.attach_uretprobe(name="gnutls", sym="gnutls_record_recv",
-                       fn_name="probe_SSL_read_exit", pid=args.pid or -1)
+    b.attach_uprobe(
+        name="gnutls",
+        sym="gnutls_record_send",
+        fn_name="probe_SSL_write",
+        pid=args.pid or -1,
+    )
+    b.attach_uprobe(
+        name="gnutls",
+        sym="gnutls_record_recv",
+        fn_name="probe_SSL_read_enter",
+        pid=args.pid or -1,
+    )
+    b.attach_uretprobe(
+        name="gnutls",
+        sym="gnutls_record_recv",
+        fn_name="probe_SSL_read_exit",
+        pid=args.pid or -1,
+    )
 
 if args.nss:
-    b.attach_uprobe(name="nspr4", sym="PR_Write", fn_name="probe_SSL_write",
-                    pid=args.pid or -1)
-    b.attach_uprobe(name="nspr4", sym="PR_Send", fn_name="probe_SSL_write",
-                    pid=args.pid or -1)
-    b.attach_uprobe(name="nspr4", sym="PR_Read", fn_name="probe_SSL_read_enter",
-                    pid=args.pid or -1)
-    b.attach_uretprobe(name="nspr4", sym="PR_Read",
-                       fn_name="probe_SSL_read_exit", pid=args.pid or -1)
-    b.attach_uprobe(name="nspr4", sym="PR_Recv", fn_name="probe_SSL_read_enter",
-                    pid=args.pid or -1)
-    b.attach_uretprobe(name="nspr4", sym="PR_Recv",
-                       fn_name="probe_SSL_read_exit", pid=args.pid or -1)
+    b.attach_uprobe(
+        name="nspr4", sym="PR_Write", fn_name="probe_SSL_write", pid=args.pid or -1
+    )
+    b.attach_uprobe(
+        name="nspr4", sym="PR_Send", fn_name="probe_SSL_write", pid=args.pid or -1
+    )
+    b.attach_uprobe(
+        name="nspr4", sym="PR_Read", fn_name="probe_SSL_read_enter", pid=args.pid or -1
+    )
+    b.attach_uretprobe(
+        name="nspr4", sym="PR_Read", fn_name="probe_SSL_read_exit", pid=args.pid or -1
+    )
+    b.attach_uprobe(
+        name="nspr4", sym="PR_Recv", fn_name="probe_SSL_read_enter", pid=args.pid or -1
+    )
+    b.attach_uretprobe(
+        name="nspr4", sym="PR_Recv", fn_name="probe_SSL_read_exit", pid=args.pid or -1
+    )
 
 # define output data structure in Python
 TASK_COMM_LEN = 16  # linux/sched.h
@@ -171,8 +203,7 @@ MAX_BUF_SIZE = 464  # Limited by the BPF stack
 
 
 # header
-print("%-12s %-18s %-16s %-6s %-6s" % ("FUNC", "TIME(s)", "COMM", "PID",
-                                       "LEN"))
+print("%-12s %-18s %-16s %-6s %-6s" % ("FUNC", "TIME(s)", "COMM", "PID", "LEN"))
 
 # process event
 start = 0
@@ -205,13 +236,29 @@ def print_event(cpu, data, size, rw, evt):
 
     truncated_bytes = event.len - MAX_BUF_SIZE
     if truncated_bytes > 0:
-        e_mark = "-" * 5 + " END DATA (TRUNCATED, " + str(truncated_bytes) + \
-                " bytes lost) " + "-" * 5
+        e_mark = (
+            "-" * 5
+            + " END DATA (TRUNCATED, "
+            + str(truncated_bytes)
+            + " bytes lost) "
+            + "-" * 5
+        )
 
     fmt = "%-12s %-18.9f %-16s %-6d %-6d\n%s\n%s\n%s\n\n"
-    print(fmt % (rw, time_s, event.comm.decode('utf-8', 'replace'),
-                 event.pid, event.len, s_mark,
-                 event.v0.decode('utf-8', 'replace'), e_mark))
+    print(
+        fmt
+        % (
+            rw,
+            time_s,
+            event.comm.decode("utf-8", "replace"),
+            event.pid,
+            event.len,
+            s_mark,
+            event.v0.decode("utf-8", "replace"),
+            e_mark,
+        )
+    )
+
 
 b["perf_SSL_write"].open_perf_buffer(print_event_write)
 b["perf_SSL_read"].open_perf_buffer(print_event_read)

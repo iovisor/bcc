@@ -1,8 +1,10 @@
 # Copyright (c) Barefoot Networks, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
 
+
 class CompilationException(Exception):
     """Signals an error during compilation"""
+
     def __init__(self, isBug, format, *message):
         # isBug: indicates that this is a compiler bug
         super(CompilationException, self).__init__()
@@ -30,5 +32,4 @@ class NotSupportedException(Exception):
 
     def show(self):
         # TODO: format this message nicely
-        return (self.format + NotSupportedException.archError).format(
-            *self.message)
+        return (self.format + NotSupportedException.archError).format(*self.message)

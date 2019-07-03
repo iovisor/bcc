@@ -8,23 +8,39 @@ import inspect
 import os
 
 # Parse command line arguments
-parser = argparse.ArgumentParser(description="Trace the latency of an operation using usdt probes.",
-    formatter_class=argparse.RawDescriptionHelpFormatter)
+parser = argparse.ArgumentParser(
+    description="Trace the latency of an operation using usdt probes.",
+    formatter_class=argparse.RawDescriptionHelpFormatter,
+)
 parser.add_argument("-p", "--pid", type=int, help="The id of the process to trace.")
-parser.add_argument("-f", "--filterstr", type=str, default="", help="The prefix filter for the operation input. If specified, only operations for which the input string starts with the filterstr are traced.")
-parser.add_argument("-v", "--verbose", dest="verbose", action="store_true", help="If true, will output verbose logging information.")
+parser.add_argument(
+    "-f",
+    "--filterstr",
+    type=str,
+    default="",
+    help="The prefix filter for the operation input. If specified, only operations for which the input string starts with the filterstr are traced.",
+)
+parser.add_argument(
+    "-v",
+    "--verbose",
+    dest="verbose",
+    action="store_true",
+    help="If true, will output verbose logging information.",
+)
 parser.set_defaults(verbose=False)
 args = parser.parse_args()
 this_pid = int(args.pid)
 this_filter = str(args.filterstr)
 
-debugLevel=0
+debugLevel = 0
 if args.verbose:
-    debugLevel=4
+    debugLevel = 4
 
 # BPF program
-bpf_text_shared = "%s/bpf_text_shared.c" % os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
-bpf_text = open(bpf_text_shared, 'r').read()
+bpf_text_shared = "%s/bpf_text_shared.c" % os.path.dirname(
+    os.path.abspath(inspect.getfile(inspect.currentframe()))
+)
+bpf_text = open(bpf_text_shared, "r").read()
 bpf_text += """
 
 /**
@@ -76,7 +92,9 @@ int trace_operation_end(struct pt_regs* ctx)
 
 bpf_text = bpf_text.replace("FILTER_STRING", this_filter)
 if this_filter:
-    bpf_text = bpf_text.replace("FILTER", "if (!filter(start_data.input)) { return 0; }")
+    bpf_text = bpf_text.replace(
+        "FILTER", "if (!filter(start_data.input)) { return 0; }"
+    )
 else:
     bpf_text = bpf_text.replace("FILTER", "")
 
@@ -91,26 +109,46 @@ bpf_ctx = BPF(text=bpf_text, usdt_contexts=[usdt_ctx], debug=debugLevel)
 
 # Define latency event and print function
 class OperationEventData(ct.Structure):
-  _fields_ = [("operation_id", ct.c_ulonglong),
-              ("input", ct.c_char * 64),
-              ("output", ct.c_char * 64),
-              ("start", ct.c_ulonglong),
-              ("end", ct.c_ulonglong),
-              ("duration", ct.c_ulonglong)]
+    _fields_ = [
+        ("operation_id", ct.c_ulonglong),
+        ("input", ct.c_char * 64),
+        ("output", ct.c_char * 64),
+        ("start", ct.c_ulonglong),
+        ("end", ct.c_ulonglong),
+        ("duration", ct.c_ulonglong),
+    ]
+
 
 start = 0
+
+
 def print_event(cpu, data, size):
     global start
     event = ct.cast(data, ct.POINTER(OperationEventData)).contents
     if start == 0:
         start = event.start
     time_s = (float(event.start - start)) / 1000000000
-    latency = (float(event.duration) / 1000)
-    print("%-18.9f %-10d %-32s %-32s %16d %16d %16d" % (time_s, event.operation_id, event.input, event.output, event.start, event.end, latency))
+    latency = float(event.duration) / 1000
+    print(
+        "%-18.9f %-10d %-32s %-32s %16d %16d %16d"
+        % (
+            time_s,
+            event.operation_id,
+            event.input,
+            event.output,
+            event.start,
+            event.end,
+            latency,
+        )
+    )
+
 
 # Print header
 print("Tracing... Hit Ctrl-C to end.")
-print("%-18s %-10s %-32s %-32s %16s %16s %16s" % ("time(s)", "id", "input", "output", "start (ns)", "end (ns)", "duration (us)"))
+print(
+    "%-18s %-10s %-32s %-32s %16s %16s %16s"
+    % ("time(s)", "id", "input", "output", "start (ns)", "end (ns)", "duration (us)")
+)
 
 # Output latency events
 bpf_ctx["operation_event"].open_perf_buffer(print_event)

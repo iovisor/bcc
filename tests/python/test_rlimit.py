@@ -11,6 +11,7 @@ from unittest import main, skipUnless, TestCase
 import distutils.version
 import os, resource
 
+
 class TestRlimitMemlock(TestCase):
     def testRlimitMemlock(self):
         text = """
@@ -36,6 +37,7 @@ int test() { return 0; }
 
         # reset to the original memlock limits
         resource.setrlimit(resource.RLIMIT_MEMLOCK, memlock_limit)
+
 
 if __name__ == "__main__":
     main()

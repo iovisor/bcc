@@ -31,24 +31,35 @@ examples = """examples:
 parser = argparse.ArgumentParser(
     description="File reads and writes by process",
     formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog=examples)
-parser.add_argument("-a", "--all-files", action="store_true",
-    help="include non-regular file types (sockets, FIFOs, etc)")
-parser.add_argument("-C", "--noclear", action="store_true",
-    help="don't clear the screen")
-parser.add_argument("-r", "--maxrows", default=20,
-    help="maximum rows to print, default 20")
-parser.add_argument("-s", "--sort", default="all",
+    epilog=examples,
+)
+parser.add_argument(
+    "-a",
+    "--all-files",
+    action="store_true",
+    help="include non-regular file types (sockets, FIFOs, etc)",
+)
+parser.add_argument(
+    "-C", "--noclear", action="store_true", help="don't clear the screen"
+)
+parser.add_argument(
+    "-r", "--maxrows", default=20, help="maximum rows to print, default 20"
+)
+parser.add_argument(
+    "-s",
+    "--sort",
+    default="all",
     choices=["all", "reads", "writes", "rbytes", "wbytes"],
-    help="sort column, default rbytes")
-parser.add_argument("-p", "--pid", type=int, metavar="PID", dest="tgid",
-    help="trace this PID only")
-parser.add_argument("interval", nargs="?", default=1,
-    help="output interval, in seconds")
-parser.add_argument("count", nargs="?", default=99999999,
-    help="number of outputs")
-parser.add_argument("--ebpf", action="store_true",
-    help=argparse.SUPPRESS)
+    help="sort column, default rbytes",
+)
+parser.add_argument(
+    "-p", "--pid", type=int, metavar="PID", dest="tgid", help="trace this PID only"
+)
+parser.add_argument(
+    "interval", nargs="?", default=1, help="output interval, in seconds"
+)
+parser.add_argument("count", nargs="?", default=99999999, help="number of outputs")
+parser.add_argument("--ebpf", action="store_true", help=argparse.SUPPRESS)
 args = parser.parse_args()
 interval = int(args.interval)
 countdown = int(args.count)
@@ -62,6 +73,7 @@ loadavg = "/proc/loadavg"
 # signal handler
 def signal_ignore(signal_value, frame):
     print()
+
 
 # define BPF program
 bpf_text = """
@@ -144,13 +156,13 @@ int trace_write_entry(struct pt_regs *ctx, struct file *file,
 
 """
 if args.tgid:
-    bpf_text = bpf_text.replace('TGID_FILTER', 'tgid != %d' % args.tgid)
+    bpf_text = bpf_text.replace("TGID_FILTER", "tgid != %d" % args.tgid)
 else:
-    bpf_text = bpf_text.replace('TGID_FILTER', '0')
+    bpf_text = bpf_text.replace("TGID_FILTER", "0")
 if args.all_files:
-    bpf_text = bpf_text.replace('TYPE_FILTER', '0')
+    bpf_text = bpf_text.replace("TYPE_FILTER", "0")
 else:
-    bpf_text = bpf_text.replace('TYPE_FILTER', '!S_ISREG(mode)')
+    bpf_text = bpf_text.replace("TYPE_FILTER", "!S_ISREG(mode)")
 
 if debug or args.ebpf:
     print(bpf_text)
@@ -164,13 +176,15 @@ b.attach_kprobe(event="vfs_write", fn_name="trace_write_entry")
 
 DNAME_INLINE_LEN = 32  # linux/dcache.h
 
-print('Tracing... Output every %d secs. Hit Ctrl-C to end' % interval)
+print("Tracing... Output every %d secs. Hit Ctrl-C to end" % interval)
+
 
 def sort_fn(counts):
     if args.sort == "all":
-        return (counts[1].rbytes + counts[1].wbytes + counts[1].reads + counts[1].writes)
+        return counts[1].rbytes + counts[1].wbytes + counts[1].reads + counts[1].writes
     else:
         return getattr(counts[1], args.sort)
+
 
 # output
 exiting = 0
@@ -187,23 +201,33 @@ while 1:
         print()
     with open(loadavg) as stats:
         print("%-8s loadavg: %s" % (strftime("%H:%M:%S"), stats.read()))
-    print("%-6s %-16s %-6s %-6s %-7s %-7s %1s %s" % ("TID", "COMM",
-        "READS", "WRITES", "R_Kb", "W_Kb", "T", "FILE"))
+    print(
+        "%-6s %-16s %-6s %-6s %-7s %-7s %1s %s"
+        % ("TID", "COMM", "READS", "WRITES", "R_Kb", "W_Kb", "T", "FILE")
+    )
 
     # by-TID output
     counts = b.get_table("counts")
     line = 0
-    for k, v in reversed(sorted(counts.items(),
-                                key=sort_fn)):
-        name = k.name.decode('utf-8', 'replace')
+    for k, v in reversed(sorted(counts.items(), key=sort_fn)):
+        name = k.name.decode("utf-8", "replace")
         if k.name_len > DNAME_INLINE_LEN:
             name = name[:-3] + "..."
 
         # print line
-        print("%-6d %-16s %-6d %-6d %-7d %-7d %1s %s" % (k.pid,
-            k.comm.decode('utf-8', 'replace'), v.reads, v.writes,
-            v.rbytes / 1024, v.wbytes / 1024,
-            k.type.decode('utf-8', 'replace'), name))
+        print(
+            "%-6d %-16s %-6d %-6d %-7d %-7d %1s %s"
+            % (
+                k.pid,
+                k.comm.decode("utf-8", "replace"),
+                v.reads,
+                v.writes,
+                v.rbytes / 1024,
+                v.wbytes / 1024,
+                k.type.decode("utf-8", "replace"),
+                name,
+            )
+        )
 
         line += 1
         if line >= maxrows:

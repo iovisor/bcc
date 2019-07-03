@@ -29,20 +29,32 @@ examples = """examples:
 parser = argparse.ArgumentParser(
     description="Summarize object allocations in high-level languages.",
     formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog=examples)
-parser.add_argument("-l", "--language", choices=languages,
-    help="language to trace")
+    epilog=examples,
+)
+parser.add_argument("-l", "--language", choices=languages, help="language to trace")
 parser.add_argument("pid", type=int, help="process id to attach to")
-parser.add_argument("interval", type=int, nargs='?',
-    help="print every specified number of seconds")
-parser.add_argument("-C", "--top-count", type=int,
-    help="number of most frequently allocated types to print")
-parser.add_argument("-S", "--top-size", type=int,
-    help="number of largest types by allocated bytes to print")
-parser.add_argument("-v", "--verbose", action="store_true",
-    help="verbose mode: print the BPF program (for debugging purposes)")
-parser.add_argument("--ebpf", action="store_true",
-    help=argparse.SUPPRESS)
+parser.add_argument(
+    "interval", type=int, nargs="?", help="print every specified number of seconds"
+)
+parser.add_argument(
+    "-C",
+    "--top-count",
+    type=int,
+    help="number of most frequently allocated types to print",
+)
+parser.add_argument(
+    "-S",
+    "--top-size",
+    type=int,
+    help="number of largest types by allocated bytes to print",
+)
+parser.add_argument(
+    "-v",
+    "--verbose",
+    action="store_true",
+    help="verbose mode: print the BPF program (for debugging purposes)",
+)
+parser.add_argument("--ebpf", action="store_true", help=argparse.SUPPRESS)
 args = parser.parse_args()
 
 language = args.language
@@ -66,7 +78,9 @@ struct val_t {
 };
 
 BPF_HASH(allocs, struct key_t, struct val_t);
-""".replace("MALLOC_TRACING", "1" if language == "c" else "0")
+""".replace(
+    "MALLOC_TRACING", "1" if language == "c" else "0"
+)
 
 usdt = USDT(pid=args.pid)
 
@@ -135,8 +149,7 @@ int object_alloc_entry(struct pt_regs *ctx) {
     usdt.enable_probe_or_bail("object__create", "object_alloc_entry")
     for thing in ["string", "hash", "array"]:
         program += create_template.replace("THETHING", thing)
-        usdt.enable_probe_or_bail("%s__create" % thing,
-                                  "%s_alloc_entry" % thing)
+        usdt.enable_probe_or_bail("%s__create" % thing, "%s_alloc_entry" % thing)
 #
 # Tcl
 #
@@ -165,12 +178,13 @@ if args.ebpf or args.verbose:
 
 bpf = BPF(text=program, usdt_contexts=[usdt])
 if language == "c":
-    bpf.attach_uprobe(name="c", sym="malloc", fn_name="alloc_entry",
-                      pid=args.pid)
+    bpf.attach_uprobe(name="c", sym="malloc", fn_name="alloc_entry", pid=args.pid)
 
 exit_signaled = False
-print("Tracing allocations in process %d (language: %s)... Ctrl-C to quit." %
-      (args.pid, language or "none"))
+print(
+    "Tracing allocations in process %d (language: %s)... Ctrl-C to quit."
+    % (args.pid, language or "none")
+)
 while True:
     try:
         sleep(args.interval or 99999999)
@@ -180,10 +194,10 @@ while True:
     data = bpf["allocs"]
     if args.top_count:
         data = sorted(data.items(), key=lambda kv: kv[1].num_allocs)
-        data = data[-args.top_count:]
+        data = data[-args.top_count :]
     elif args.top_size:
         data = sorted(data.items(), key=lambda kv: kv[1].total_size)
-        data = data[-args.top_size:]
+        data = data[-args.top_size :]
     else:
         data = sorted(data.items(), key=lambda kv: kv[1].total_size)
     print("%-30s %8s %12s" % ("NAME/TYPE", "# ALLOCS", "# BYTES"))
@@ -192,8 +206,7 @@ while True:
             obj_type = "block size %d" % key.size
         else:
             obj_type = key.name
-        print("%-30s %8d %12d" %
-              (obj_type, value.num_allocs, value.total_size))
+        print("%-30s %8d %12d" % (obj_type, value.num_allocs, value.total_size))
     if args.interval and not exit_signaled:
         bpf["allocs"].clear()
     else:

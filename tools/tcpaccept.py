@@ -33,17 +33,17 @@ examples = """examples:
 parser = argparse.ArgumentParser(
     description="Trace TCP accepts",
     formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog=examples)
-parser.add_argument("-T", "--time", action="store_true",
-    help="include time column on output (HH:MM:SS)")
-parser.add_argument("-t", "--timestamp", action="store_true",
-    help="include timestamp on output")
-parser.add_argument("-p", "--pid",
-    help="trace this PID only")
-parser.add_argument("-P", "--port",
-    help="comma-separated list of local ports to trace")
-parser.add_argument("--ebpf", action="store_true",
-    help=argparse.SUPPRESS)
+    epilog=examples,
+)
+parser.add_argument(
+    "-T", "--time", action="store_true", help="include time column on output (HH:MM:SS)"
+)
+parser.add_argument(
+    "-t", "--timestamp", action="store_true", help="include timestamp on output"
+)
+parser.add_argument("-p", "--pid", help="trace this PID only")
+parser.add_argument("-P", "--port", help="comma-separated list of local ports to trace")
+parser.add_argument("--ebpf", action="store_true", help=argparse.SUPPRESS)
 args = parser.parse_args()
 debug = 0
 
@@ -175,54 +175,68 @@ bpf_text += bpf_text_kprobe
 
 # code substitutions
 if args.pid:
-    bpf_text = bpf_text.replace('##FILTER_PID##',
-        'if (pid != %s) { return 0; }' % args.pid)
+    bpf_text = bpf_text.replace(
+        "##FILTER_PID##", "if (pid != %s) { return 0; }" % args.pid
+    )
 else:
-    bpf_text = bpf_text.replace('##FILTER_PID##', '')
+    bpf_text = bpf_text.replace("##FILTER_PID##", "")
 if args.port:
-    lports = [int(lport) for lport in args.port.split(',')]
-    lports_if = ' && '.join(['lport != %d' % lport for lport in lports])
-    bpf_text = bpf_text.replace('##FILTER_PORT##',
-        'if (%s) { return 0; }' % lports_if)
+    lports = [int(lport) for lport in args.port.split(",")]
+    lports_if = " && ".join(["lport != %d" % lport for lport in lports])
+    bpf_text = bpf_text.replace("##FILTER_PORT##", "if (%s) { return 0; }" % lports_if)
 if debug or args.ebpf:
     print(bpf_text)
     if args.ebpf:
         exit()
 
-bpf_text = bpf_text.replace('##FILTER_PORT##', '')
+bpf_text = bpf_text.replace("##FILTER_PORT##", "")
 
 # process event
 def print_ipv4_event(cpu, data, size):
     event = b["ipv4_events"].event(data)
     global start_ts
     if args.time:
-        printb(b"%-9s" % strftime("%H:%M:%S").encode('ascii'), nl="")
+        printb(b"%-9s" % strftime("%H:%M:%S").encode("ascii"), nl="")
     if args.timestamp:
         if start_ts == 0:
             start_ts = event.ts_us
         printb(b"%-9.3f" % ((float(event.ts_us) - start_ts) / 1000000), nl="")
-    printb(b"%-7d %-12.12s %-2d %-16s %-5d %-16s %-5d" % (event.pid,
-        event.task, event.ip,
-        inet_ntop(AF_INET, pack("I", event.daddr)).encode(),
-        event.dport,
-        inet_ntop(AF_INET, pack("I", event.saddr)).encode(),
-        event.lport))
+    printb(
+        b"%-7d %-12.12s %-2d %-16s %-5d %-16s %-5d"
+        % (
+            event.pid,
+            event.task,
+            event.ip,
+            inet_ntop(AF_INET, pack("I", event.daddr)).encode(),
+            event.dport,
+            inet_ntop(AF_INET, pack("I", event.saddr)).encode(),
+            event.lport,
+        )
+    )
+
 
 def print_ipv6_event(cpu, data, size):
     event = b["ipv6_events"].event(data)
     global start_ts
     if args.time:
-        printb(b"%-9s" % strftime("%H:%M:%S").encode('ascii'), nl="")
+        printb(b"%-9s" % strftime("%H:%M:%S").encode("ascii"), nl="")
     if args.timestamp:
         if start_ts == 0:
             start_ts = event.ts_us
         printb(b"%-9.3f" % ((float(event.ts_us) - start_ts) / 1000000), nl="")
-    printb(b"%-7d %-12.12s %-2d %-16s %-5d %-16s %-5d" % (event.pid,
-        event.task, event.ip,
-        inet_ntop(AF_INET6, event.daddr).encode(),
-        event.dport,
-        inet_ntop(AF_INET6, event.saddr).encode(),
-        event.lport))
+    printb(
+        b"%-7d %-12.12s %-2d %-16s %-5d %-16s %-5d"
+        % (
+            event.pid,
+            event.task,
+            event.ip,
+            inet_ntop(AF_INET6, event.daddr).encode(),
+            event.dport,
+            inet_ntop(AF_INET6, event.saddr).encode(),
+            event.lport,
+        )
+    )
+
 
 # initialize BPF
 b = BPF(text=bpf_text)
@@ -232,8 +246,10 @@ if args.time:
     print("%-9s" % ("TIME"), end="")
 if args.timestamp:
     print("%-9s" % ("TIME(s)"), end="")
-print("%-7s %-12s %-2s %-16s %-5s %-16s %-5s" % ("PID", "COMM", "IP", "RADDR",
-    "RPORT", "LADDR", "LPORT"))
+print(
+    "%-7s %-12s %-2s %-16s %-5s %-16s %-5s"
+    % ("PID", "COMM", "IP", "RADDR", "RPORT", "LADDR", "LPORT")
+)
 
 start_ts = 0
 

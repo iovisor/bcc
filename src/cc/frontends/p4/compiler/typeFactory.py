@@ -4,6 +4,7 @@
 from p4_hlir.hlir import p4_header
 from ebpfStructType import *
 
+
 class EbpfTypeFactory(object):
     def __init__(self, config):
         self.type_map = {}
@@ -13,11 +14,12 @@ class EbpfTypeFactory(object):
         name = hlirType.name
         if hlirType.name in self.type_map:
             retval = self.type_map[name]
-            if ((not asMetadata and isinstance(retval, EbpfMetadataType)) or
-                (asMetadata and isinstance(retval, EbpfHeaderType))):
+            if (not asMetadata and isinstance(retval, EbpfMetadataType)) or (
+                asMetadata and isinstance(retval, EbpfHeaderType)
+            ):
                 raise CompilationException(
-                    True, "Same type used both as a header and metadata {0}",
-                    hlirType)
+                    True, "Same type used both as a header and metadata {0}", hlirType
+                )
 
         if isinstance(hlirType, p4_header):
             if asMetadata:

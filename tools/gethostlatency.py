@@ -27,11 +27,10 @@ examples = """examples:
 parser = argparse.ArgumentParser(
     description="Show latency for getaddrinfo/gethostbyname[2] calls",
     formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog=examples)
-parser.add_argument("-p", "--pid", help="trace this PID only", type=int,
-    default=-1)
-parser.add_argument("--ebpf", action="store_true",
-    help=argparse.SUPPRESS)
+    epilog=examples,
+)
+parser.add_argument("-p", "--pid", help="trace this PID only", type=int, default=-1)
+parser.add_argument("--ebpf", action="store_true", help=argparse.SUPPRESS)
 args = parser.parse_args()
 
 # load BPF program
@@ -101,25 +100,29 @@ if args.ebpf:
 
 b = BPF(text=bpf_text)
 b.attach_uprobe(name="c", sym="getaddrinfo", fn_name="do_entry", pid=args.pid)
-b.attach_uprobe(name="c", sym="gethostbyname", fn_name="do_entry",
-                pid=args.pid)
-b.attach_uprobe(name="c", sym="gethostbyname2", fn_name="do_entry",
-                pid=args.pid)
-b.attach_uretprobe(name="c", sym="getaddrinfo", fn_name="do_return",
-                   pid=args.pid)
-b.attach_uretprobe(name="c", sym="gethostbyname", fn_name="do_return",
-                   pid=args.pid)
-b.attach_uretprobe(name="c", sym="gethostbyname2", fn_name="do_return",
-                   pid=args.pid)
+b.attach_uprobe(name="c", sym="gethostbyname", fn_name="do_entry", pid=args.pid)
+b.attach_uprobe(name="c", sym="gethostbyname2", fn_name="do_entry", pid=args.pid)
+b.attach_uretprobe(name="c", sym="getaddrinfo", fn_name="do_return", pid=args.pid)
+b.attach_uretprobe(name="c", sym="gethostbyname", fn_name="do_return", pid=args.pid)
+b.attach_uretprobe(name="c", sym="gethostbyname2", fn_name="do_return", pid=args.pid)
 
 # header
 print("%-9s %-6s %-16s %10s %s" % ("TIME", "PID", "COMM", "LATms", "HOST"))
 
+
 def print_event(cpu, data, size):
     event = b["events"].event(data)
-    print("%-9s %-6d %-16s %10.2f %s" % (strftime("%H:%M:%S"), event.pid,
-        event.comm.decode('utf-8', 'replace'), (float(event.delta) / 1000000),
-        event.host.decode('utf-8', 'replace')))
+    print(
+        "%-9s %-6d %-16s %10.2f %s"
+        % (
+            strftime("%H:%M:%S"),
+            event.pid,
+            event.comm.decode("utf-8", "replace"),
+            (float(event.delta) / 1000000),
+            event.host.decode("utf-8", "replace"),
+        )
+    )
+
 
 # loop with callback to print_event
 b["events"].open_perf_buffer(print_event)

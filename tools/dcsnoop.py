@@ -34,11 +34,12 @@ examples = """examples:
 parser = argparse.ArgumentParser(
     description="Trace directory entry cache (dcache) lookups",
     formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog=examples)
-parser.add_argument("-a", "--all", action="store_true",
-    help="trace all lookups (default is fails only)")
-parser.add_argument("--ebpf", action="store_true",
-    help=argparse.SUPPRESS)
+    epilog=examples,
+)
+parser.add_argument(
+    "-a", "--all", action="store_true", help="trace all lookups (default is fails only)"
+)
+parser.add_argument("--ebpf", action="store_true", help=argparse.SUPPRESS)
 args = parser.parse_args()
 
 # define BPF program
@@ -131,19 +132,24 @@ b = BPF(text=bpf_text)
 if args.all:
     b.attach_kprobe(event="lookup_fast", fn_name="trace_fast")
 
-mode_s = {
-    0: 'M',
-    1: 'R',
-}
+mode_s = {0: "M", 1: "R"}
 
 start_ts = time.time()
 
+
 def print_event(cpu, data, size):
     event = b["events"].event(data)
-    print("%-11.6f %-6d %-16s %1s %s" % (
-            time.time() - start_ts, event.pid,
-            event.comm.decode('utf-8', 'replace'), mode_s[event.type],
-            event.filename.decode('utf-8', 'replace')))
+    print(
+        "%-11.6f %-6d %-16s %1s %s"
+        % (
+            time.time() - start_ts,
+            event.pid,
+            event.comm.decode("utf-8", "replace"),
+            mode_s[event.type],
+            event.filename.decode("utf-8", "replace"),
+        )
+    )
+
 
 # header
 print("%-11s %-6s %-16s %1s %s" % ("TIME(s)", "PID", "COMM", "T", "FILE"))

@@ -15,9 +15,12 @@ from __future__ import print_function
 from bcc import BPF
 from time import sleep
 from sys import argv
+
+
 def usage():
     print("USAGE: %s [time]" % argv[0])
     exit()
+
 
 interval = 99999999
 if len(argv) > 1:
@@ -28,7 +31,8 @@ if len(argv) > 1:
     except:  # also catches -h, --help
         usage()
 # load BPF program
-b = BPF(text="""
+b = BPF(
+    text="""
 #include <uapi/linux/ptrace.h>
 
 struct key_t {
@@ -43,7 +47,8 @@ int do_count(struct pt_regs *ctx) {
     counts.increment(key);
     return 0;
 }
-""")
+"""
+)
 b.attach_kprobe(event_re="^vfs_.*", fn_name="do_count")
 
 # header

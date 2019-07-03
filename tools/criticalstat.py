@@ -19,21 +19,31 @@ import sys
 import subprocess
 import os.path
 
-examples=""
+examples = ""
 
 parser = argparse.ArgumentParser(
     description="Trace long critical sections",
     formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog=examples)
+    epilog=examples,
+)
 
-parser.add_argument("-p", "--preemptoff", action="store_true",
-                    help="Find long sections where preemption was off")
+parser.add_argument(
+    "-p",
+    "--preemptoff",
+    action="store_true",
+    help="Find long sections where preemption was off",
+)
 
-parser.add_argument("-i", "--irqoff", action="store_true",
-                    help="Find long sections where IRQ was off")
+parser.add_argument(
+    "-i", "--irqoff", action="store_true", help="Find long sections where IRQ was off"
+)
 
-parser.add_argument("-d", "--duration", default=100,
-                    help="Duration in uS (microseconds) below which we filter")
+parser.add_argument(
+    "-d",
+    "--duration",
+    default=100,
+    help="Duration in uS (microseconds) below which we filter",
+)
 
 args = parser.parse_args()
 
@@ -47,25 +57,34 @@ elif args.preemptoff:
     preemptoff = True
     irqoff = False
 
-debugfs_path = subprocess.Popen ("cat /proc/mounts | grep -w debugfs" +
-    " | awk '{print $2}'",
-    shell=True,
-    stdout=subprocess.PIPE).stdout.read().split(b"\n")[0]
+debugfs_path = (
+    subprocess.Popen(
+        "cat /proc/mounts | grep -w debugfs" + " | awk '{print $2}'",
+        shell=True,
+        stdout=subprocess.PIPE,
+    )
+    .stdout.read()
+    .split(b"\n")[0]
+)
 
 if debugfs_path == "":
-    print("ERROR: Unable to find debugfs mount point");
-    sys.exit(0);
+    print("ERROR: Unable to find debugfs mount point")
+    sys.exit(0)
 
-trace_path = debugfs_path + b"/tracing/events/preemptirq/";
+trace_path = debugfs_path + b"/tracing/events/preemptirq/"
 
-if (not os.path.exists(trace_path + b"irq_disable") or
-   not os.path.exists(trace_path + b"irq_enable") or
-   not os.path.exists(trace_path + b"preempt_disable") or
-   not os.path.exists(trace_path + b"preempt_enable")):
-    print("ERROR: required tracing events are not available\n" +
-        "Make sure the kernel is built with CONFIG_DEBUG_PREEMPT " +
-        "and CONFIG_PREEMPTIRQ_EVENTS enabled. Also please disable " +
-        "CONFIG_PROVE_LOCKING and CONFIG_LOCKDEP on older kernels.")
+if (
+    not os.path.exists(trace_path + b"irq_disable")
+    or not os.path.exists(trace_path + b"irq_enable")
+    or not os.path.exists(trace_path + b"preempt_disable")
+    or not os.path.exists(trace_path + b"preempt_enable")
+):
+    print(
+        "ERROR: required tracing events are not available\n"
+        + "Make sure the kernel is built with CONFIG_DEBUG_PREEMPT "
+        + "and CONFIG_PREEMPTIRQ_EVENTS enabled. Also please disable "
+        + "CONFIG_PROVE_LOCKING and CONFIG_LOCKDEP on older kernels."
+    )
     sys.exit(0)
 
 bpf_text = """
@@ -261,14 +280,15 @@ TRACEPOINT_PROBE(preemptirq, TYPE_enable)
     return 0;
 }
 """
-bpf_text = bpf_text.replace('DURATION', '{}'.format(int(args.duration) * 1000))
+bpf_text = bpf_text.replace("DURATION", "{}".format(int(args.duration) * 1000))
 
 if preemptoff:
-    bpf_text = bpf_text.replace('TYPE', 'preempt')
+    bpf_text = bpf_text.replace("TYPE", "preempt")
 else:
-    bpf_text = bpf_text.replace('TYPE', 'irq')
+    bpf_text = bpf_text.replace("TYPE", "irq")
 
 b = BPF(text=bpf_text)
+
 
 def get_syms(kstack):
     syms = []
@@ -279,19 +299,36 @@ def get_syms(kstack):
 
     return syms
 
+
 # process event
 def print_event(cpu, data, size):
     try:
         global b
         event = b["events"].event(data)
-        stack_traces = b['stack_traces']
-        stext = b.ksymname('_stext')
+        stack_traces = b["stack_traces"]
+        stext = b.ksymname("_stext")
 
         print("===================================")
-        print("TASK: %s (pid %5d tid %5d) Total Time: %-9.3fus\n\n" % (event.comm, \
-            (event.id >> 32), (event.id & 0xffffffff), float(event.time) / 1000), end="")
-        print("Section start: {} -> {}".format(b.ksym(stext + event.addrs[0]), b.ksym(stext + event.addrs[1])))
-        print("Section end:   {} -> {}".format(b.ksym(stext + event.addrs[2]), b.ksym(stext + event.addrs[3])))
+        print(
+            "TASK: %s (pid %5d tid %5d) Total Time: %-9.3fus\n\n"
+            % (
+                event.comm,
+                (event.id >> 32),
+                (event.id & 0xFFFFFFFF),
+                float(event.time) / 1000,
+            ),
+            end="",
+        )
+        print(
+            "Section start: {} -> {}".format(
+                b.ksym(stext + event.addrs[0]), b.ksym(stext + event.addrs[1])
+            )
+        )
+        print(
+            "Section end:   {} -> {}".format(
+                b.ksym(stext + event.addrs[2]), b.ksym(stext + event.addrs[3])
+            )
+        )
 
         if event.stack_id >= 0:
             kstack = stack_traces.walk(event.stack_id)
@@ -309,10 +346,14 @@ def print_event(cpu, data, size):
     except Exception:
         sys.exit(0)
 
+
 b["events"].open_perf_buffer(print_event, page_cnt=256)
 
-print("Finding critical section with {} disabled for > {}us".format(
-    ('preempt' if preemptoff else 'IRQ'), args.duration))
+print(
+    "Finding critical section with {} disabled for > {}us".format(
+        ("preempt" if preemptoff else "IRQ"), args.duration
+    )
+)
 
 while 1:
     try:

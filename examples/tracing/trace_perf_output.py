@@ -11,17 +11,21 @@ from bcc import BPF
 from bcc.utils import printb
 import ctypes as ct
 
+
 class Data(ct.Structure):
-    _fields_ = [("ts", ct.c_ulonglong),
-                ("magic", ct.c_ulonglong)]
+    _fields_ = [("ts", ct.c_ulonglong), ("magic", ct.c_ulonglong)]
+
 
 counter = 0
+
+
 def cb(cpu, data, size):
     assert size >= ct.sizeof(Data)
     event = ct.cast(data, ct.POINTER(Data)).contents
     print("[%0d] %f: %x" % (cpu, float(event.ts) / 1000000, event.magic))
     global counter
     counter += 1
+
 
 prog = """
 BPF_PERF_OUTPUT(events);
@@ -45,11 +49,13 @@ event_name = b.get_syscall_fnname("clone")
 b.attach_kprobe(event=event_name, fn_name="do_sys_clone")
 b["events"].open_perf_buffer(cb)
 
+
 @atexit.register
 def print_counter():
     global counter
     global b
     print("counter = %d vs %d" % (counter, b["counters"][ct.c_int(0)].value))
+
 
 printb(b"Tracing " + event_name + b", try `dd if=/dev/zero of=/dev/null`")
 print("Tracing... Hit Ctrl-C to end.")

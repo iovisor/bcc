@@ -44,15 +44,19 @@ examples = """examples:
 parser = argparse.ArgumentParser(
     description="Trace common ext4 file operations slower than a threshold",
     formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog=examples)
-parser.add_argument("-j", "--csv", action="store_true",
-    help="just print fields: comma-separated values")
-parser.add_argument("-p", "--pid",
-    help="trace this PID only")
-parser.add_argument("min_ms", nargs="?", default='10',
-    help="minimum I/O duration to trace, in ms (default 10)")
-parser.add_argument("--ebpf", action="store_true",
-    help=argparse.SUPPRESS)
+    epilog=examples,
+)
+parser.add_argument(
+    "-j", "--csv", action="store_true", help="just print fields: comma-separated values"
+)
+parser.add_argument("-p", "--pid", help="trace this PID only")
+parser.add_argument(
+    "min_ms",
+    nargs="?",
+    default="10",
+    help="minimum I/O duration to trace, in ms (default 10)",
+)
+parser.add_argument("--ebpf", action="store_true", help=argparse.SUPPRESS)
 args = parser.parse_args()
 min_ms = int(args.min_ms)
 pid = args.pid
@@ -258,27 +262,26 @@ int trace_fsync_return(struct pt_regs *ctx)
 
 # code replacements
 with open(kallsyms) as syms:
-    ops = ''
+    ops = ""
     for line in syms:
         (addr, size, name) = line.rstrip().split(" ", 2)
         name = name.split("\t")[0]
         if name == "ext4_file_operations":
             ops = "0x" + addr
             break
-    if ops == '':
+    if ops == "":
         print("ERROR: no ext4_file_operations in /proc/kallsyms. Exiting.")
         print("HINT: the kernel should be built with CONFIG_KALLSYMS_ALL.")
         exit()
-    bpf_text = bpf_text.replace('EXT4_FILE_OPERATIONS', ops)
+    bpf_text = bpf_text.replace("EXT4_FILE_OPERATIONS", ops)
 if min_ms == 0:
-    bpf_text = bpf_text.replace('FILTER_US', '0')
+    bpf_text = bpf_text.replace("FILTER_US", "0")
 else:
-    bpf_text = bpf_text.replace('FILTER_US',
-        'delta_us <= %s' % str(min_ms * 1000))
+    bpf_text = bpf_text.replace("FILTER_US", "delta_us <= %s" % str(min_ms * 1000))
 if args.pid:
-    bpf_text = bpf_text.replace('FILTER_PID', 'pid != %s' % pid)
+    bpf_text = bpf_text.replace("FILTER_PID", "pid != %s" % pid)
 else:
-    bpf_text = bpf_text.replace('FILTER_PID', '0')
+    bpf_text = bpf_text.replace("FILTER_PID", "0")
 if debug or args.ebpf:
     print(bpf_text)
     if args.ebpf:
@@ -288,37 +291,56 @@ if debug or args.ebpf:
 def print_event(cpu, data, size):
     event = b["events"].event(data)
 
-    type = 'R'
+    type = "R"
     if event.type == 1:
-        type = 'W'
+        type = "W"
     elif event.type == 2:
-        type = 'O'
+        type = "O"
     elif event.type == 3:
-        type = 'S'
+        type = "S"
 
-    if (csv):
-        print("%d,%s,%d,%s,%d,%d,%d,%s" % (
-            event.ts_us, event.task.decode('utf-8', 'replace'), event.pid,
-            type, event.size, event.offset, event.delta_us,
-            event.file.decode('utf-8', 'replace')))
+    if csv:
+        print(
+            "%d,%s,%d,%s,%d,%d,%d,%s"
+            % (
+                event.ts_us,
+                event.task.decode("utf-8", "replace"),
+                event.pid,
+                type,
+                event.size,
+                event.offset,
+                event.delta_us,
+                event.file.decode("utf-8", "replace"),
+            )
+        )
         return
-    print("%-8s %-14.14s %-6s %1s %-7s %-8d %7.2f %s" % (strftime("%H:%M:%S"),
-        event.task.decode('utf-8', 'replace'), event.pid, type, event.size,
-        event.offset / 1024, float(event.delta_us) / 1000,
-        event.file.decode('utf-8', 'replace')))
+    print(
+        "%-8s %-14.14s %-6s %1s %-7s %-8d %7.2f %s"
+        % (
+            strftime("%H:%M:%S"),
+            event.task.decode("utf-8", "replace"),
+            event.pid,
+            type,
+            event.size,
+            event.offset / 1024,
+            float(event.delta_us) / 1000,
+            event.file.decode("utf-8", "replace"),
+        )
+    )
+
 
 # initialize BPF
 b = BPF(text=bpf_text)
 
 # Common file functions. See earlier comment about generic_file_read_iter().
-if BPF.get_kprobe_functions(b'ext4_file_read_iter'):
+if BPF.get_kprobe_functions(b"ext4_file_read_iter"):
     b.attach_kprobe(event="ext4_file_read_iter", fn_name="trace_read_entry")
 else:
     b.attach_kprobe(event="generic_file_read_iter", fn_name="trace_read_entry")
 b.attach_kprobe(event="ext4_file_write_iter", fn_name="trace_write_entry")
 b.attach_kprobe(event="ext4_file_open", fn_name="trace_open_entry")
 b.attach_kprobe(event="ext4_sync_file", fn_name="trace_fsync_entry")
-if BPF.get_kprobe_functions(b'ext4_file_read_iter'):
+if BPF.get_kprobe_functions(b"ext4_file_read_iter"):
     b.attach_kretprobe(event="ext4_file_read_iter", fn_name="trace_read_return")
 else:
     b.attach_kretprobe(event="generic_file_read_iter", fn_name="trace_read_return")
@@ -327,15 +349,17 @@ b.attach_kretprobe(event="ext4_file_open", fn_name="trace_open_return")
 b.attach_kretprobe(event="ext4_sync_file", fn_name="trace_fsync_return")
 
 # header
-if (csv):
+if csv:
     print("ENDTIME_us,TASK,PID,TYPE,BYTES,OFFSET_b,LATENCY_us,FILE")
 else:
     if min_ms == 0:
         print("Tracing ext4 operations")
     else:
         print("Tracing ext4 operations slower than %d ms" % min_ms)
-    print("%-8s %-14s %-6s %1s %-7s %-8s %7s %s" % ("TIME", "COMM", "PID", "T",
-        "BYTES", "OFF_KB", "LAT(ms)", "FILENAME"))
+    print(
+        "%-8s %-14s %-6s %1s %-7s %-8s %7s %s"
+        % ("TIME", "COMM", "PID", "T", "BYTES", "OFF_KB", "LAT(ms)", "FILENAME")
+    )
 
 # read events
 b["events"].open_perf_buffer(print_event, page_cnt=64)

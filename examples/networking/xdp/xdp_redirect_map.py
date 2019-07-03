@@ -13,10 +13,13 @@ import sys
 import ctypes as ct
 
 flags = 0
+
+
 def usage():
     print("Usage: {0} <in ifdev> <out ifdev>".format(sys.argv[0]))
     print("e.g.: {0} eth0 eth1\n".format(sys.argv[0]))
     exit(1)
+
 
 if len(sys.argv) != 3:
     usage()
@@ -28,7 +31,8 @@ ip = pyroute2.IPRoute()
 out_idx = ip.link_lookup(ifname=out_if)[0]
 
 # load BPF program
-b = BPF(text = """
+b = BPF(
+    text="""
 #define KBUILD_MODNAME "foo"
 #include <uapi/linux/bpf.h>
 #include <linux/in.h>
@@ -77,7 +81,9 @@ int xdp_redirect_map(struct xdp_md *ctx) {
 int xdp_dummy(struct xdp_md *ctx) {
     return XDP_PASS;
 }
-""", cflags=["-w"])
+""",
+    cflags=["-w"],
+)
 
 tx_port = b.get_table("tx_port")
 tx_port[0] = ct.c_int(out_idx)
@@ -101,7 +107,7 @@ while 1:
         time.sleep(1)
     except KeyboardInterrupt:
         print("Removing filter from device")
-        break;
+        break
 
 b.remove_xdp(in_if, flags)
 b.remove_xdp(out_if, flags)

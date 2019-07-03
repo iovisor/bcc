@@ -45,40 +45,55 @@ examples = """examples:
 parser = argparse.ArgumentParser(
     description="Time functions and print latency as a histogram",
     formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog=examples)
-parser.add_argument("-p", "--pid", type=int,
-    help="trace this PID only")
-parser.add_argument("-i", "--interval", type=int,
-    help="summary interval, in seconds")
-parser.add_argument("-d", "--duration", type=int,
-    help="total duration of trace, in seconds")
-parser.add_argument("-T", "--timestamp", action="store_true",
-    help="include timestamp on output")
-parser.add_argument("-u", "--microseconds", action="store_true",
-    help="microsecond histogram")
-parser.add_argument("-m", "--milliseconds", action="store_true",
-    help="millisecond histogram")
-parser.add_argument("-F", "--function", action="store_true",
-    help="show a separate histogram per function")
-parser.add_argument("-r", "--regexp", action="store_true",
-    help="use regular expressions. Default is \"*\" wildcards only.")
-parser.add_argument("-v", "--verbose", action="store_true",
-    help="print the BPF program (for debugging purposes)")
-parser.add_argument("pattern",
-    help="search expression for functions")
-parser.add_argument("--ebpf", action="store_true",
-    help=argparse.SUPPRESS)
+    epilog=examples,
+)
+parser.add_argument("-p", "--pid", type=int, help="trace this PID only")
+parser.add_argument("-i", "--interval", type=int, help="summary interval, in seconds")
+parser.add_argument(
+    "-d", "--duration", type=int, help="total duration of trace, in seconds"
+)
+parser.add_argument(
+    "-T", "--timestamp", action="store_true", help="include timestamp on output"
+)
+parser.add_argument(
+    "-u", "--microseconds", action="store_true", help="microsecond histogram"
+)
+parser.add_argument(
+    "-m", "--milliseconds", action="store_true", help="millisecond histogram"
+)
+parser.add_argument(
+    "-F",
+    "--function",
+    action="store_true",
+    help="show a separate histogram per function",
+)
+parser.add_argument(
+    "-r",
+    "--regexp",
+    action="store_true",
+    help='use regular expressions. Default is "*" wildcards only.',
+)
+parser.add_argument(
+    "-v",
+    "--verbose",
+    action="store_true",
+    help="print the BPF program (for debugging purposes)",
+)
+parser.add_argument("pattern", help="search expression for functions")
+parser.add_argument("--ebpf", action="store_true", help=argparse.SUPPRESS)
 args = parser.parse_args()
 if args.duration and not args.interval:
     args.interval = args.duration
 if not args.interval:
     args.interval = 99999999
 
+
 def bail(error):
     print("Error: " + error)
     exit(1)
 
-parts = args.pattern.split(':')
+
+parts = args.pattern.split(":")
 if len(parts) == 1:
     library = None
     pattern = args.pattern
@@ -93,8 +108,8 @@ else:
     bail("unrecognized pattern format '%s'" % pattern)
 
 if not args.regexp:
-    pattern = pattern.replace('*', '.*')
-    pattern = '^' + pattern + '$'
+    pattern = pattern.replace("*", ".*")
+    pattern = "^" + pattern + "$"
 
 # define BPF program
 bpf_text = """
@@ -155,27 +170,29 @@ need_key = args.function or (library and not args.pid)
 
 # code substitutions
 if args.pid:
-    bpf_text = bpf_text.replace('FILTER',
-        'if (tgid != %d) { return 0; }' % args.pid)
+    bpf_text = bpf_text.replace("FILTER", "if (tgid != %d) { return 0; }" % args.pid)
 else:
-    bpf_text = bpf_text.replace('FILTER', '')
+    bpf_text = bpf_text.replace("FILTER", "")
 if args.milliseconds:
-    bpf_text = bpf_text.replace('FACTOR', 'delta /= 1000000;')
+    bpf_text = bpf_text.replace("FACTOR", "delta /= 1000000;")
     label = "msecs"
 elif args.microseconds:
-    bpf_text = bpf_text.replace('FACTOR', 'delta /= 1000;')
+    bpf_text = bpf_text.replace("FACTOR", "delta /= 1000;")
     label = "usecs"
 else:
-    bpf_text = bpf_text.replace('FACTOR', '')
+    bpf_text = bpf_text.replace("FACTOR", "")
     label = "nsecs"
 if need_key:
-    bpf_text = bpf_text.replace('STORAGE', 'BPF_HASH(ipaddr, u32);\n' +
-        'BPF_HISTOGRAM(dist, hist_key_t);')
+    bpf_text = bpf_text.replace(
+        "STORAGE", "BPF_HASH(ipaddr, u32);\n" + "BPF_HISTOGRAM(dist, hist_key_t);"
+    )
     # stash the IP on entry, as on return it's kretprobe_trampoline:
-    bpf_text = bpf_text.replace('ENTRYSTORE',
-        'u64 ip = PT_REGS_IP(ctx); ipaddr.update(&pid, &ip);')
-    pid = '-1' if not library else 'tgid'
-    bpf_text = bpf_text.replace('STORE',
+    bpf_text = bpf_text.replace(
+        "ENTRYSTORE", "u64 ip = PT_REGS_IP(ctx); ipaddr.update(&pid, &ip);"
+    )
+    pid = "-1" if not library else "tgid"
+    bpf_text = bpf_text.replace(
+        "STORE",
         """
     u64 ip, *ipp = ipaddr.lookup(&pid);
     if (ipp) {
@@ -187,12 +204,13 @@ if need_key:
         dist.increment(key);
         ipaddr.delete(&pid);
     }
-        """ % pid)
+        """
+        % pid,
+    )
 else:
-    bpf_text = bpf_text.replace('STORAGE', 'BPF_HISTOGRAM(dist);')
-    bpf_text = bpf_text.replace('ENTRYSTORE', '')
-    bpf_text = bpf_text.replace('STORE',
-        'dist.increment(bpf_log2l(delta));')
+    bpf_text = bpf_text.replace("STORAGE", "BPF_HISTOGRAM(dist);")
+    bpf_text = bpf_text.replace("ENTRYSTORE", "")
+    bpf_text = bpf_text.replace("STORE", "dist.increment(bpf_log2l(delta));")
 if args.verbose or args.ebpf:
     print(bpf_text)
     if args.ebpf:
@@ -201,6 +219,7 @@ if args.verbose or args.ebpf:
 # signal handler
 def signal_ignore(signal, frame):
     print()
+
 
 # load BPF program
 b = BPF(text=bpf_text)
@@ -211,19 +230,22 @@ if not library:
     b.attach_kretprobe(event_re=pattern, fn_name="trace_func_return")
     matched = b.num_open_kprobes()
 else:
-    b.attach_uprobe(name=library, sym_re=pattern, fn_name="trace_func_entry",
-                    pid=args.pid or -1)
-    b.attach_uretprobe(name=library, sym_re=pattern,
-                       fn_name="trace_func_return", pid=args.pid or -1)
+    b.attach_uprobe(
+        name=library, sym_re=pattern, fn_name="trace_func_entry", pid=args.pid or -1
+    )
+    b.attach_uretprobe(
+        name=library, sym_re=pattern, fn_name="trace_func_return", pid=args.pid or -1
+    )
     matched = b.num_open_uprobes()
 
 if matched == 0:
-    print("0 functions matched by \"%s\". Exiting." % args.pattern)
+    print('0 functions matched by "%s". Exiting.' % args.pattern)
     exit()
 
 # header
-print("Tracing %d functions for \"%s\"... Hit Ctrl-C to end." %
-    (matched / 2, args.pattern))
+print(
+    'Tracing %d functions for "%s"... Hit Ctrl-C to end.' % (matched / 2, args.pattern)
+)
 
 # output
 def print_section(key):
@@ -232,10 +254,11 @@ def print_section(key):
     else:
         return "%s [%d]" % (BPF.sym(key[0], key[1]), key[1])
 
+
 exiting = 0 if args.interval else 1
 seconds = 0
 dist = b.get_table("dist")
-while (1):
+while 1:
     try:
         sleep(args.interval)
         seconds += args.interval
@@ -251,8 +274,12 @@ while (1):
         print("%-8s\n" % strftime("%H:%M:%S"), end="")
 
     if need_key:
-        dist.print_log2_hist(label, "Function", section_print_fn=print_section,
-            bucket_fn=lambda k: (k.ip, k.pid))
+        dist.print_log2_hist(
+            label,
+            "Function",
+            section_print_fn=print_section,
+            bucket_fn=lambda k: (k.ip, k.pid),
+        )
     else:
         dist.print_log2_hist(label)
     dist.clear()

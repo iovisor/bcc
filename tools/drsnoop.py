@@ -38,26 +38,23 @@ examples = """examples:
 parser = argparse.ArgumentParser(
     description="Trace direct reclaim",
     formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog=examples)
-parser.add_argument("-T", "--timestamp", action="store_true",
-                    help="include timestamp on output")
-parser.add_argument("-U", "--print-uid", action="store_true",
-                    help="print UID column")
-parser.add_argument("-p", "--pid",
-                    help="trace this PID only")
-parser.add_argument("-t", "--tid",
-                    help="trace this TID only")
-parser.add_argument("-u", "--uid",
-                    help="trace this UID only")
-parser.add_argument("-d", "--duration",
-                    help="total duration of trace in seconds")
-parser.add_argument("-n", "--name",
-                    type=ArgString,
-                    help="only print process names containing this name")
-parser.add_argument("-v", "--verbose", action="store_true",
-                    help="show system memory state")
-parser.add_argument("--ebpf", action="store_true",
-                    help=argparse.SUPPRESS)
+    epilog=examples,
+)
+parser.add_argument(
+    "-T", "--timestamp", action="store_true", help="include timestamp on output"
+)
+parser.add_argument("-U", "--print-uid", action="store_true", help="print UID column")
+parser.add_argument("-p", "--pid", help="trace this PID only")
+parser.add_argument("-t", "--tid", help="trace this TID only")
+parser.add_argument("-u", "--uid", help="trace this UID only")
+parser.add_argument("-d", "--duration", help="total duration of trace in seconds")
+parser.add_argument(
+    "-n", "--name", type=ArgString, help="only print process names containing this name"
+)
+parser.add_argument(
+    "-v", "--verbose", action="store_true", help="show system memory state"
+)
+parser.add_argument("--ebpf", action="store_true", help=argparse.SUPPRESS)
 args = parser.parse_args()
 debug = 0
 if args.duration:
@@ -65,7 +62,7 @@ if args.duration:
 
 
 # vm_stat
-vm_stat_addr = ''
+vm_stat_addr = ""
 with open(kallsyms) as syms:
     for line in syms:
         (addr, size, name) = line.rstrip().split(" ", 2)
@@ -76,7 +73,7 @@ with open(kallsyms) as syms:
         if name == "vm_zone_stat":
             vm_stat_addr = "0x" + addr
             break
-    if vm_stat_addr == '':
+    if vm_stat_addr == "":
         print("ERROR: no vm_stat or vm_zone_stat in /proc/kallsyms. Exiting.")
         print("HINT: the kernel should be built with CONFIG_KALLSYMS_ALL.")
         exit()
@@ -86,11 +83,14 @@ NR_FREE_PAGES = 0
 PAGE_SIZE = os.sysconf("SC_PAGE_SIZE")
 PAGE_SHIFT = int(math.log(PAGE_SIZE) / math.log(2))
 
+
 def K(x):
     return x << (PAGE_SHIFT - 10)
 
+
 # load BPF program
-bpf_text = """
+bpf_text = (
+    """
 #include <uapi/linux/ptrace.h>
 #include <linux/sched.h>
 #include <linux/mmzone.h>
@@ -159,21 +159,24 @@ TRACEPOINT_PROBE(vmscan, mm_vmscan_direct_reclaim_end) {
 
     return 0;
 }
-""" % vm_stat_addr
+"""
+    % vm_stat_addr
+)
 
 if args.tid:  # TID trumps PID
-    bpf_text = bpf_text.replace('PID_TID_FILTER',
-                                'if (tid != %s) { return 0; }' % args.tid)
+    bpf_text = bpf_text.replace(
+        "PID_TID_FILTER", "if (tid != %s) { return 0; }" % args.tid
+    )
 elif args.pid:
-    bpf_text = bpf_text.replace('PID_TID_FILTER',
-                                'if (pid != %s) { return 0; }' % args.pid)
+    bpf_text = bpf_text.replace(
+        "PID_TID_FILTER", "if (pid != %s) { return 0; }" % args.pid
+    )
 else:
-    bpf_text = bpf_text.replace('PID_TID_FILTER', '')
+    bpf_text = bpf_text.replace("PID_TID_FILTER", "")
 if args.uid:
-    bpf_text = bpf_text.replace('UID_FILTER',
-                                'if (uid != %s) { return 0; }' % args.uid)
+    bpf_text = bpf_text.replace("UID_FILTER", "if (uid != %s) { return 0; }" % args.uid)
 else:
-    bpf_text = bpf_text.replace('UID_FILTER', '')
+    bpf_text = bpf_text.replace("UID_FILTER", "")
 if debug or args.ebpf:
     print(bpf_text)
     if args.ebpf:
@@ -189,8 +192,10 @@ if args.timestamp:
     print("%-14s" % ("TIME(s)"), end="")
 if args.print_uid:
     print("%-6s" % ("UID"), end="")
-print("%-14s %-6s %8s %5s" %
-      ("COMM", "TID" if args.tid else "PID", "LAT(ms)", "PAGES"), end="")
+print(
+    "%-14s %-6s %8s %5s" % ("COMM", "TID" if args.tid else "PID", "LAT(ms)", "PAGES"),
+    end="",
+)
 if args.verbose:
     print("%10s" % ("FREE(KB)"))
 else:
@@ -215,10 +220,16 @@ def print_event(cpu, data, size):
     if args.print_uid:
         print("%-6d" % event.uid, end="")
 
-    print("%-14.14s %-6s %8.2f %5d" %
-          (event.name.decode('utf-8', 'replace'),
-           event.id & 0xffffffff if args.tid else event.id >> 32,
-           float(event.delta) / 1000000, event.nr_reclaimed), end="")
+    print(
+        "%-14.14s %-6s %8.2f %5d"
+        % (
+            event.name.decode("utf-8", "replace"),
+            event.id & 0xFFFFFFFF if args.tid else event.id >> 32,
+            float(event.delta) / 1000000,
+            event.nr_reclaimed,
+        ),
+        end="",
+    )
     if args.verbose:
         print("%10d" % K(event.vm_stat[NR_FREE_PAGES]))
     else:

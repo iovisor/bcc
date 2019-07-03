@@ -42,15 +42,25 @@ class EbpfActionBase(object):
 class EbpfAction(EbpfActionBase):
     unsupported = [
         # The following cannot be done in EBPF
-        "add_header", "remove_header", "execute_meter",
+        "add_header",
+        "remove_header",
+        "execute_meter",
         "clone_ingress_pkt_to_egress",
-        "clone_egress_pkt_to_egress", "generate_digest", "resubmit",
-        "modify_field_with_hash_based_offset", "truncate", "push", "pop",
+        "clone_egress_pkt_to_egress",
+        "generate_digest",
+        "resubmit",
+        "modify_field_with_hash_based_offset",
+        "truncate",
+        "push",
+        "pop",
         # The following could be done, but are not yet implemented
         # The situation with copy_header is complicated,
         # because we don't do checksums
-        "copy_header", "count",
-        "register_read", "register_write"]
+        "copy_header",
+        "count",
+        "register_read",
+        "register_write",
+    ]
 
     # noinspection PyUnresolvedReferences
     def __init__(self, p4action, program):
@@ -60,7 +70,7 @@ class EbpfAction(EbpfActionBase):
 
         self.builtin = False
         self.invalid = False  # a leaf action which is never
-                              # called from a table can be invalid.
+        # called from a table can be invalid.
 
         for i in range(0, len(p4action.signature)):
             param = p4action.signature[i]
@@ -68,16 +78,19 @@ class EbpfAction(EbpfActionBase):
             if width is None:
                 self.invalid = True
                 return
-            argtype = ebpfScalarType.EbpfScalarType(p4action, width,
-                                                    False, program.config)
+            argtype = ebpfScalarType.EbpfScalarType(
+                p4action, width, False, program.config
+            )
             actionData = EbpfActionData(param, argtype)
             self.arguments.append(actionData)
 
     def serializeArgumentsAsStruct(self, serializer):
         if self.invalid:
-            raise CompilationException(True,
+            raise CompilationException(
+                True,
                 "{0} Attempting to generate code for an invalid action",
-                                       self.hliraction)
+                self.hliraction,
+            )
 
         # Build a struct containing all action arguments.
         serializer.emitIndent()
@@ -98,9 +111,11 @@ class EbpfAction(EbpfActionBase):
 
     def serializeBody(self, serializer, dataContainer, program):
         if self.invalid:
-            raise CompilationException(True,
+            raise CompilationException(
+                True,
                 "{0} Attempting to generate code for an invalid action",
-                                       self.hliraction)
+                self.hliraction,
+            )
 
         # TODO: generate PARALLEL implementation
         # dataContainer is a string containing the variable name
@@ -114,8 +129,9 @@ class EbpfAction(EbpfActionBase):
             assert isinstance(action, p4_action)
             arguments = e[1]
             assert isinstance(arguments, list)
-            self.serializeCallee(self, action, arguments, serializer,
-                                 dataContainer, program)
+            self.serializeCallee(
+                self, action, arguments, serializer, dataContainer, program
+            )
 
     def checkSize(self, call, args, program):
         size = None
@@ -127,7 +143,10 @@ class EbpfAction(EbpfActionBase):
             elif a != size:
                 program.emitWarning(
                     "{0}: Arguments do not have the same size {1} and {2}",
-                    call, size, a)
+                    call,
+                    size,
+                    a,
+                )
         return size
 
     @staticmethod
@@ -143,12 +162,11 @@ class EbpfAction(EbpfActionBase):
         elif actionName == "subtract" or actionName == "subtract_from_field":
             return "-"
         else:
-            raise CompilationException(True,
-                                       "Unexpected primitive action {0}",
-                                       actionName)
+            raise CompilationException(
+                True, "Unexpected primitive action {0}", actionName
+            )
 
-    def serializeCount(self, caller, arguments, serializer,
-                       dataContainer, program):
+    def serializeCount(self, caller, arguments, serializer, dataContainer, program):
         assert isinstance(serializer, ProgramSerializer)
         assert isinstance(program, ebpfProgram.EbpfProgram)
         assert isinstance(arguments, list)
@@ -172,13 +190,15 @@ class EbpfAction(EbpfActionBase):
 
         serializer.blockEnd(True)
 
-    def serializeCallee(self, caller, callee, arguments,
-                        serializer, dataContainer, program):
+    def serializeCallee(
+        self, caller, callee, arguments, serializer, dataContainer, program
+    ):
         if self.invalid:
             raise CompilationException(
                 True,
                 "{0} Attempting to generate code for an invalid action",
-                self.hliraction)
+                self.hliraction,
+            )
 
         assert isinstance(serializer, ProgramSerializer)
         assert isinstance(program, ebpfProgram.EbpfProgram)
@@ -189,91 +209,83 @@ class EbpfAction(EbpfActionBase):
             raise NotSupportedException("{0}", callee)
 
         # This is not yet ready
-        #if callee.name == "count":
+        # if callee.name == "count":
         #    self.serializeCount(caller, arguments,
         #                        serializer, dataContainer, program)
         #    return
 
         serializer.emitIndent()
-        args = self.transformArguments(arguments, caller,
-                                       dataContainer, program)
+        args = self.transformArguments(arguments, caller, dataContainer, program)
         if callee.name == "modify_field":
             dst = args[0]
             src = args[1]
 
-            size = self.checkSize(callee,
-                                  [a.widthInBits() for a in args],
-                                  program)
+            size = self.checkSize(callee, [a.widthInBits() for a in args], program)
             if size is None:
                 raise CompilationException(
-                    True, "Cannot infer width for arguments {0}",
-                    callee)
+                    True, "Cannot infer width for arguments {0}", callee
+                )
             elif size <= 32:
-                serializer.appendFormat("{0} = {1};",
-                                        dst.asString,
-                                        src.asString)
+                serializer.appendFormat("{0} = {1};", dst.asString, src.asString)
             else:
                 if not dst.isLvalue:
                     raise NotSupportedException(
                         "Constants wider than 32-bit: {0}({1})",
-                        dst.caller, dst.asString)
+                        dst.caller,
+                        dst.asString,
+                    )
                 if not src.isLvalue:
                     raise NotSupportedException(
                         "Constants wider than 32-bit: {0}({1})",
-                        src.caller, src.asString)
-                serializer.appendFormat("memcpy(&{0}, &{1}, {2});",
-                                        dst.asString,
-                                        src.asString,
-                                        size / 8)
-        elif (callee.name == "add" or
-             callee.name == "bit_and" or
-             callee.name == "bit_or" or
-             callee.name == "bit_xor" or
-             callee.name == "subtract"):
-            size = self.checkSize(callee,
-                                  [a.widthInBits() for a in args],
-                                  program)
+                        src.caller,
+                        src.asString,
+                    )
+                serializer.appendFormat(
+                    "memcpy(&{0}, &{1}, {2});", dst.asString, src.asString, size / 8
+                )
+        elif (
+            callee.name == "add"
+            or callee.name == "bit_and"
+            or callee.name == "bit_or"
+            or callee.name == "bit_xor"
+            or callee.name == "subtract"
+        ):
+            size = self.checkSize(callee, [a.widthInBits() for a in args], program)
             if size is None:
                 raise CompilationException(
-                    True,
-                    "Cannot infer width for arguments {0}",
-                    callee)
+                    True, "Cannot infer width for arguments {0}", callee
+                )
             if size > 32:
-                raise NotSupportedException("{0}: Arithmetic on {1}-bits",
-                                            callee, size)
+                raise NotSupportedException("{0}: Arithmetic on {1}-bits", callee, size)
             op = EbpfAction.translateActionToOperator(callee.name)
-            serializer.appendFormat("{0} = {1} {2} {3};",
-                                    args[0].asString,
-                                    args[1].asString,
-                                    op,
-                                    args[2].asString)
-        elif (callee.name == "add_to_field" or
-              callee.name == "subtract_from_field"):
-            size = self.checkSize(callee,
-                                  [a.widthInBits() for a in args],
-                                  program)
+            serializer.appendFormat(
+                "{0} = {1} {2} {3};",
+                args[0].asString,
+                args[1].asString,
+                op,
+                args[2].asString,
+            )
+        elif callee.name == "add_to_field" or callee.name == "subtract_from_field":
+            size = self.checkSize(callee, [a.widthInBits() for a in args], program)
             if size is None:
                 raise CompilationException(
-                    True, "Cannot infer width for arguments {0}", callee)
+                    True, "Cannot infer width for arguments {0}", callee
+                )
             if size > 32:
-                raise NotSupportedException(
-                    "{0}: Arithmetic on {1}-bits", callee, size)
+                raise NotSupportedException("{0}: Arithmetic on {1}-bits", callee, size)
 
             op = EbpfAction.translateActionToOperator(callee.name)
-            serializer.appendFormat("{0} = {0} {1} {2};",
-                                    args[0].asString,
-                                    op,
-                                    args[1].asString)
+            serializer.appendFormat(
+                "{0} = {0} {1} {2};", args[0].asString, op, args[1].asString
+            )
         elif callee.name == "no_op":
             serializer.append("/* noop */")
         elif callee.name == "drop":
             serializer.appendFormat("{0} = 1;", program.dropBit)
         elif callee.name == "push" or callee.name == "pop":
-            raise CompilationException(
-                True, "{0} push/pop not yet implemented", callee)
+            raise CompilationException(True, "{0} push/pop not yet implemented", callee)
         else:
-            raise CompilationException(
-                True, "Unexpected primitive action {0}", callee)
+            raise CompilationException(True, "Unexpected primitive action {0}", callee)
         serializer.newline()
 
     def transformArguments(self, arguments, caller, dataContainer, program):
@@ -318,23 +330,20 @@ class ArgInfo(object):
             self.isLvalue = False
             # size is unknown
         elif isinstance(argument, p4_field):
-            if ebpfProgram.EbpfProgram.isArrayElementInstance(
-                    argument.instance):
+            if ebpfProgram.EbpfProgram.isArrayElementInstance(argument.instance):
                 if isinstance(argument.instance.index, int):
                     index = "[" + str(argument.instance.index) + "]"
                 else:
                     raise CompilationException(
-                        True,
-                        "Unexpected index for array {0}",
-                        argument.instance.index)
-                stackInstance = program.getStackInstance(
-                    argument.instance.base_name)
+                        True, "Unexpected index for array {0}", argument.instance.index
+                    )
+                stackInstance = program.getStackInstance(argument.instance.base_name)
                 assert isinstance(stackInstance, ebpfInstance.EbpfHeaderStack)
                 fieldtype = stackInstance.basetype.getField(argument.name)
                 self.width = fieldtype.widthInBits()
                 self.asString = "{0}.{1}{3}.{2}".format(
-                    program.headerStructName,
-                    stackInstance.name, argument.name, index)
+                    program.headerStructName, stackInstance.name, argument.name, index
+                )
             else:
                 instance = program.getInstance(argument.instance.base_name)
                 if isinstance(instance, ebpfInstance.EbpfHeader):
@@ -344,11 +353,13 @@ class ArgInfo(object):
                 fieldtype = instance.type.getField(argument.name)
                 self.width = fieldtype.widthInBits()
                 self.asString = "{0}.{1}.{2}".format(
-                    parent, instance.name, argument.name)
+                    parent, instance.name, argument.name
+                )
         elif isinstance(argument, p4_signature_ref):
             refarg = caller.arguments[argument.idx]
             self.asString = "{0}->u.{1}.{2}".format(
-                dataContainer, caller.name, refarg.name)
+                dataContainer, caller.name, refarg.name
+            )
             self.width = caller.arguments[argument.idx].argtype.widthInBits()
         elif isinstance(argument, p4_header_instance):
             # This could be a header array element
@@ -360,23 +371,24 @@ class ArgInfo(object):
                     index = "[" + str(argument.index) + "]"
                 else:
                     raise CompilationException(
-                        True,
-                        "Unexpected index for array {0}", argument.index)
+                        True, "Unexpected index for array {0}", argument.index
+                    )
                 stackInstance = program.getStackInstance(argument.base_name)
                 assert isinstance(stackInstance, ebpfInstance.EbpfHeaderStack)
                 fieldtype = stackInstance.basetype
                 self.width = fieldtype.widthInBits()
                 self.asString = "{0}.{1}{2}".format(
-                    program.headerStructName, stackInstance.name, index)
+                    program.headerStructName, stackInstance.name, index
+                )
             else:
                 instance = program.getInstance(argument.name)
                 instancetype = instance.type
                 self.width = instancetype.widthInBits()
                 self.asString = "{0}.{1}".format(
-                    program.headerStructName, argument.name)
+                    program.headerStructName, argument.name
+                )
         else:
-            raise CompilationException(
-                True, "Unexpected action argument {0}", argument)
+            raise CompilationException(True, "Unexpected action argument {0}", argument)
 
     def widthInBits(self):
         return self.width

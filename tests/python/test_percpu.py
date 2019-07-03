@@ -7,8 +7,8 @@ import unittest
 from bcc import BPF
 import multiprocessing
 
-class TestPercpu(unittest.TestCase):
 
+class TestPercpu(unittest.TestCase):
     def setUp(self):
         try:
             b = BPF(text='BPF_TABLE("percpu_array", u32, u32, stub, 1);')
@@ -41,11 +41,11 @@ class TestPercpu(unittest.TestCase):
         ini = stats_map.Leaf()
         for i in range(0, multiprocessing.cpu_count()):
             ini[i] = 0
-        stats_map[ stats_map.Key(0) ] = ini
+        stats_map[stats_map.Key(0)] = ini
         f = os.popen("hostname")
         f.close()
-        self.assertEqual(len(stats_map),1)
-        val = stats_map[ stats_map.Key(0) ]
+        self.assertEqual(len(stats_map), 1)
+        val = stats_map[stats_map.Key(0)]
         sum = stats_map.sum(stats_map.Key(0))
         avg = stats_map.average(stats_map.Key(0))
         max = stats_map.max(stats_map.Key(0))
@@ -71,11 +71,11 @@ class TestPercpu(unittest.TestCase):
         ini = stats_map.Leaf()
         for i in range(0, multiprocessing.cpu_count()):
             ini[i] = 0
-        stats_map[ stats_map.Key(0) ] = ini
+        stats_map[stats_map.Key(0)] = ini
         f = os.popen("hostname")
         f.close()
-        self.assertEqual(len(stats_map),1)
-        val = stats_map[ stats_map.Key(0) ]
+        self.assertEqual(len(stats_map), 1)
+        val = stats_map[stats_map.Key(0)]
         sum = stats_map.sum(stats_map.Key(0))
         avg = stats_map.average(stats_map.Key(0))
         max = stats_map.max(stats_map.Key(0))
@@ -100,18 +100,19 @@ class TestPercpu(unittest.TestCase):
         }
         """
         bpf_code = BPF(text=test_prog2)
-        stats_map = bpf_code.get_table("stats",
-                reducer=lambda x,y: stats_map.sLeaf(x.c1+y.c1))
+        stats_map = bpf_code.get_table(
+            "stats", reducer=lambda x, y: stats_map.sLeaf(x.c1 + y.c1)
+        )
         event_name = bpf_code.get_syscall_fnname("clone")
         bpf_code.attach_kprobe(event=event_name, fn_name="hello_world")
         ini = stats_map.Leaf()
         for i in ini:
-            i = stats_map.sLeaf(0,0)
-        stats_map[ stats_map.Key(0) ] = ini
+            i = stats_map.sLeaf(0, 0)
+        stats_map[stats_map.Key(0)] = ini
         f = os.popen("hostname")
         f.close()
-        self.assertEqual(len(stats_map),1)
-        k = stats_map[ stats_map.Key(0) ]
+        self.assertEqual(len(stats_map), 1)
+        k = stats_map[stats_map.Key(0)]
         self.assertGreater(k.c1, int(0))
         bpf_code.detach_kprobe(event_name)
 

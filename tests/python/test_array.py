@@ -10,6 +10,7 @@ import subprocess
 from bcc.utils import get_online_cpus
 from unittest import main, TestCase
 
+
 class TestArray(TestCase):
     def test_simple(self):
         b = BPF(text="""BPF_ARRAY(table1, u64, 128);""")
@@ -63,10 +64,11 @@ int do_sys_nanosleep(void *ctx) {
 }
 """
         b = BPF(text=text)
-        b.attach_kprobe(event=b.get_syscall_fnname("nanosleep"),
-                        fn_name="do_sys_nanosleep")
+        b.attach_kprobe(
+            event=b.get_syscall_fnname("nanosleep"), fn_name="do_sys_nanosleep"
+        )
         b["events"].open_perf_buffer(cb, lost_cb=lost_cb)
-        subprocess.call(['sleep', '0.1'])
+        subprocess.call(["sleep", "0.1"])
         b.perf_buffer_poll()
         self.assertGreater(self.counter, 0)
         b.cleanup()
@@ -96,15 +98,21 @@ int do_sys_nanosleep(void *ctx) {
 }
 """
         b = BPF(text=text)
-        b.attach_kprobe(event=b.get_syscall_fnname("nanosleep"),
-                        fn_name="do_sys_nanosleep")
+        b.attach_kprobe(
+            event=b.get_syscall_fnname("nanosleep"), fn_name="do_sys_nanosleep"
+        )
         b["events"].open_perf_buffer(cb, lost_cb=lost_cb)
         online_cpus = get_online_cpus()
         for cpu in online_cpus:
-            subprocess.call(['taskset', '-c', str(cpu), 'sleep', '0.1'])
+            subprocess.call(["taskset", "-c", str(cpu), "sleep", "0.1"])
         b.perf_buffer_poll()
         b.cleanup()
-        self.assertGreaterEqual(len(self.events), len(online_cpus), 'Received only {}/{} events'.format(len(self.events), len(online_cpus)))
+        self.assertGreaterEqual(
+            len(self.events),
+            len(online_cpus),
+            "Received only {}/{} events".format(len(self.events), len(online_cpus)),
+        )
+
 
 if __name__ == "__main__":
     main()

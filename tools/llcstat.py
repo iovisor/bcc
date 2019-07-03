@@ -24,18 +24,23 @@ from time import sleep
 
 parser = argparse.ArgumentParser(
     description="Summarize cache references and misses by PID",
-    formatter_class=argparse.RawDescriptionHelpFormatter)
+    formatter_class=argparse.RawDescriptionHelpFormatter,
+)
 parser.add_argument(
-    "-c", "--sample_period", type=int, default=100,
-    help="Sample one in this many number of cache reference / miss events")
+    "-c",
+    "--sample_period",
+    type=int,
+    default=100,
+    help="Sample one in this many number of cache reference / miss events",
+)
 parser.add_argument(
-    "duration", nargs="?", default=10, help="Duration, in seconds, to run")
-parser.add_argument("--ebpf", action="store_true",
-    help=argparse.SUPPRESS)
+    "duration", nargs="?", default=10, help="Duration, in seconds, to run"
+)
+parser.add_argument("--ebpf", action="store_true", help=argparse.SUPPRESS)
 args = parser.parse_args()
 
 # load BPF program
-bpf_text="""
+bpf_text = """
 #include <linux/ptrace.h>
 #include <uapi/linux/bpf_perf_event.h>
 
@@ -80,11 +85,17 @@ if args.ebpf:
 b = BPF(text=bpf_text)
 try:
     b.attach_perf_event(
-        ev_type=PerfType.HARDWARE, ev_config=PerfHWConfig.CACHE_MISSES,
-        fn_name="on_cache_miss", sample_period=args.sample_period)
+        ev_type=PerfType.HARDWARE,
+        ev_config=PerfHWConfig.CACHE_MISSES,
+        fn_name="on_cache_miss",
+        sample_period=args.sample_period,
+    )
     b.attach_perf_event(
-        ev_type=PerfType.HARDWARE, ev_config=PerfHWConfig.CACHE_REFERENCES,
-        fn_name="on_cache_ref", sample_period=args.sample_period)
+        ev_type=PerfType.HARDWARE,
+        ev_config=PerfHWConfig.CACHE_REFERENCES,
+        fn_name="on_cache_ref",
+        sample_period=args.sample_period,
+    )
 except Exception:
     print("Failed to attach to a hardware event. Is this a virtual machine?")
     exit()
@@ -97,13 +108,13 @@ except KeyboardInterrupt:
     signal.signal(signal.SIGINT, lambda signal, frame: print())
 
 miss_count = {}
-for (k, v) in b.get_table('miss_count').items():
+for (k, v) in b.get_table("miss_count").items():
     miss_count[(k.pid, k.cpu, k.name)] = v.value
 
-print('PID      NAME             CPU     REFERENCE         MISS    HIT%')
+print("PID      NAME             CPU     REFERENCE         MISS    HIT%")
 tot_ref = 0
 tot_miss = 0
-for (k, v) in b.get_table('ref_count').items():
+for (k, v) in b.get_table("ref_count").items():
     try:
         miss = miss_count[(k.pid, k.cpu, k.name)]
     except KeyError:
@@ -112,8 +123,18 @@ for (k, v) in b.get_table('ref_count').items():
     tot_miss += miss
     # This happens on some PIDs due to missed counts caused by sampling
     hit = (v.value - miss) if (v.value >= miss) else 0
-    print('{:<8d} {:<16s} {:<4d} {:>12d} {:>12d} {:>6.2f}%'.format(
-        k.pid, k.name.decode('utf-8', 'replace'), k.cpu, v.value, miss,
-        (float(hit) / float(v.value)) * 100.0))
-print('Total References: {} Total Misses: {} Hit Rate: {:.2f}%'.format(
-    tot_ref, tot_miss, (float(tot_ref - tot_miss) / float(tot_ref)) * 100.0))
+    print(
+        "{:<8d} {:<16s} {:<4d} {:>12d} {:>12d} {:>6.2f}%".format(
+            k.pid,
+            k.name.decode("utf-8", "replace"),
+            k.cpu,
+            v.value,
+            miss,
+            (float(hit) / float(v.value)) * 100.0,
+        )
+    )
+print(
+    "Total References: {} Total Misses: {} Hit Rate: {:.2f}%".format(
+        tot_ref, tot_miss, (float(tot_ref - tot_miss) / float(tot_ref)) * 100.0
+    )
+)

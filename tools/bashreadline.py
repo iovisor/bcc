@@ -22,12 +22,18 @@ from time import strftime
 import argparse
 
 parser = argparse.ArgumentParser(
-        description="Print entered bash commands from all running shells",
-        formatter_class=argparse.RawDescriptionHelpFormatter)
-parser.add_argument("-s", "--shared", nargs="?",
-        const="/lib/libreadline.so", type=str,
-        help="specify the location of libreadline.so library.\
-              Default is /lib/libreadline.so")
+    description="Print entered bash commands from all running shells",
+    formatter_class=argparse.RawDescriptionHelpFormatter,
+)
+parser.add_argument(
+    "-s",
+    "--shared",
+    nargs="?",
+    const="/lib/libreadline.so",
+    type=str,
+    help="specify the location of libreadline.so library.\
+              Default is /lib/libreadline.so",
+)
 args = parser.parse_args()
 
 name = args.shared if args.shared else "/bin/bash"
@@ -63,10 +69,14 @@ b.attach_uretprobe(name=name, sym="readline", fn_name="printret")
 # header
 print("%-9s %-6s %s" % ("TIME", "PID", "COMMAND"))
 
+
 def print_event(cpu, data, size):
     event = b["events"].event(data)
-    print("%-9s %-6d %s" % (strftime("%H:%M:%S"), event.pid,
-                            event.str.decode('utf-8', 'replace')))
+    print(
+        "%-9s %-6d %s"
+        % (strftime("%H:%M:%S"), event.pid, event.str.decode("utf-8", "replace"))
+    )
+
 
 b["events"].open_perf_buffer(print_event)
 while 1:

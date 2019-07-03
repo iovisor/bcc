@@ -30,11 +30,13 @@ def positive_int(val):
         raise argparse.ArgumentTypeError("must be positive")
     return ival
 
+
 def positive_nonzero_int(val):
     ival = positive_int(val)
     if ival == 0:
         raise argparse.ArgumentTypeError("must be nonzero")
     return ival
+
 
 # arguments
 examples = """examples:
@@ -47,33 +49,48 @@ examples = """examples:
 parser = argparse.ArgumentParser(
     description="Summarize sleep to wakeup time by waker kernel stack",
     formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog=examples)
-parser.add_argument("-u", "--useronly", action="store_true",
-    help="user threads only (no kernel threads)")
-parser.add_argument("-p", "--pid",
-    type=positive_int,
-    help="trace this PID only")
-parser.add_argument("-v", "--verbose", action="store_true",
-    help="show raw addresses")
-parser.add_argument("-f", "--folded", action="store_true",
-    help="output folded format")
-parser.add_argument("--stack-storage-size", default=1024,
+    epilog=examples,
+)
+parser.add_argument(
+    "-u",
+    "--useronly",
+    action="store_true",
+    help="user threads only (no kernel threads)",
+)
+parser.add_argument("-p", "--pid", type=positive_int, help="trace this PID only")
+parser.add_argument("-v", "--verbose", action="store_true", help="show raw addresses")
+parser.add_argument("-f", "--folded", action="store_true", help="output folded format")
+parser.add_argument(
+    "--stack-storage-size",
+    default=1024,
     type=positive_nonzero_int,
     help="the number of unique stack traces that can be stored and "
-         "displayed (default 1024)")
-parser.add_argument("duration", nargs="?", default=99999999,
+    "displayed (default 1024)",
+)
+parser.add_argument(
+    "duration",
+    nargs="?",
+    default=99999999,
     type=positive_nonzero_int,
-    help="duration of trace, in seconds")
-parser.add_argument("-m", "--min-block-time", default=1,
+    help="duration of trace, in seconds",
+)
+parser.add_argument(
+    "-m",
+    "--min-block-time",
+    default=1,
     type=positive_nonzero_int,
-    help="the amount of time in microseconds over which we " +
-         "store traces (default 1)")
-parser.add_argument("-M", "--max-block-time", default=(1 << 64) - 1,
+    help="the amount of time in microseconds over which we "
+    + "store traces (default 1)",
+)
+parser.add_argument(
+    "-M",
+    "--max-block-time",
+    default=(1 << 64) - 1,
     type=positive_nonzero_int,
-    help="the amount of time in microseconds under which we " +
-         "store traces (default U64_MAX)")
-parser.add_argument("--ebpf", action="store_true",
-    help=argparse.SUPPRESS)
+    help="the amount of time in microseconds under which we "
+    + "store traces (default U64_MAX)",
+)
+parser.add_argument("--ebpf", action="store_true", help=argparse.SUPPRESS)
 args = parser.parse_args()
 folded = args.folded
 duration = int(args.duration)
@@ -84,6 +101,7 @@ if args.pid and args.useronly:
 # signal handler
 def signal_ignore(signal, frame):
     print()
+
 
 # define BPF program
 bpf_text = """
@@ -144,17 +162,17 @@ int waker(struct pt_regs *ctx, struct task_struct *p) {
 }
 """
 if args.pid:
-    filter = 'pid != %s' % args.pid
+    filter = "pid != %s" % args.pid
 elif args.useronly:
-    filter = 'p->flags & PF_KTHREAD'
+    filter = "p->flags & PF_KTHREAD"
 else:
-    filter = '0'
-bpf_text = bpf_text.replace('FILTER', filter)
+    filter = "0"
+bpf_text = bpf_text.replace("FILTER", filter)
 
 # set stack storage size
-bpf_text = bpf_text.replace('STACK_STORAGE_SIZE', str(args.stack_storage_size))
-bpf_text = bpf_text.replace('MINBLOCK_US_VALUE', str(args.min_block_time))
-bpf_text = bpf_text.replace('MAXBLOCK_US_VALUE', str(args.max_block_time))
+bpf_text = bpf_text.replace("STACK_STORAGE_SIZE", str(args.stack_storage_size))
+bpf_text = bpf_text.replace("MINBLOCK_US_VALUE", str(args.min_block_time))
+bpf_text = bpf_text.replace("MAXBLOCK_US_VALUE", str(args.max_block_time))
 
 if debug or args.ebpf:
     print(bpf_text)
@@ -179,7 +197,7 @@ if not folded:
         print("... Hit Ctrl-C to end.")
 
 # output
-while (1):
+while 1:
     try:
         sleep(duration)
     except KeyboardInterrupt:
@@ -199,16 +217,19 @@ while (1):
             missing_stacks += 1
             continue
 
-        waker_kernel_stack = [] if k.w_k_stack_id < 1 else \
-            reversed(list(stack_traces.walk(k.w_k_stack_id))[1:])
+        waker_kernel_stack = (
+            []
+            if k.w_k_stack_id < 1
+            else reversed(list(stack_traces.walk(k.w_k_stack_id))[1:])
+        )
 
         if folded:
             # print folded stack output
-            line = \
-                [k.waker] + \
-                [b.ksym(addr)
-                    for addr in reversed(list(waker_kernel_stack))] + \
-                [k.target]
+            line = (
+                [k.waker]
+                + [b.ksym(addr) for addr in reversed(list(waker_kernel_stack))]
+                + [k.target]
+            )
             printb(b"%s %d" % (b";".join(line), v.value))
         else:
             # print default multi-line stack output
@@ -221,9 +242,11 @@ while (1):
 
     if missing_stacks > 0:
         enomem_str = " Consider increasing --stack-storage-size."
-        print("WARNING: %d stack traces could not be displayed.%s" %
-            (missing_stacks, enomem_str),
-            file=stderr)
+        print(
+            "WARNING: %d stack traces could not be displayed.%s"
+            % (missing_stacks, enomem_str),
+            file=stderr,
+        )
 
     if not folded:
         print("Detaching...")

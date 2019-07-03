@@ -9,6 +9,7 @@ import distutils.version
 import os
 import subprocess
 
+
 def kernel_version_ge(major, minor):
     # True if running kernel is >= X.Y
     version = distutils.version.LooseVersion(os.uname()[2]).version
@@ -20,7 +21,8 @@ def kernel_version_ge(major, minor):
         return False
     return True
 
-@unittest.skipUnless(kernel_version_ge(4,7), "requires kernel >= 4.7")
+
+@unittest.skipUnless(kernel_version_ge(4, 7), "requires kernel >= 4.7")
 class TestTracepoint(unittest.TestCase):
     def test_tracepoint(self):
         text = """
@@ -40,7 +42,8 @@ class TestTracepoint(unittest.TestCase):
             total_switches += v.value
         self.assertNotEqual(0, total_switches)
 
-@unittest.skipUnless(kernel_version_ge(4,7), "requires kernel >= 4.7")
+
+@unittest.skipUnless(kernel_version_ge(4, 7), "requires kernel >= 4.7")
 class TestTracepointDataLoc(unittest.TestCase):
     def test_tracepoint_data_loc(self):
         text = """
@@ -61,8 +64,8 @@ class TestTracepointDataLoc(unittest.TestCase):
         b = bcc.BPF(text=text)
         subprocess.check_output(["/bin/ls"])
         sleep(1)
-        self.assertTrue("/bin/ls" in [v.filename.decode()
-                                      for v in b["execs"].values()])
+        self.assertTrue("/bin/ls" in [v.filename.decode() for v in b["execs"].values()])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -38,33 +38,58 @@ ifc_gc = []
 d_serv = []
 d_client = []
 
+
 def run():
     if gretap:
-        with ipdb.create(ifname="gretap1", kind="gretap", gre_ikey=0, gre_okey=0,
-                         gre_local='172.16.1.%d' % (100 + host_id),
-                         gre_ttl=16, gre_collect_metadata=1) as vx:
+        with ipdb.create(
+            ifname="gretap1",
+            kind="gretap",
+            gre_ikey=0,
+            gre_okey=0,
+            gre_local="172.16.1.%d" % (100 + host_id),
+            gre_ttl=16,
+            gre_collect_metadata=1,
+        ) as vx:
             vx.up()
             ifc_gc.append(vx.ifname)
     else:
-        with ipdb.create(ifname="vxlan0", kind="vxlan", vxlan_id=0,
-                         vxlan_link=ifc, vxlan_port=4789,
-                         vxlan_collect_metadata=True,
-                         vxlan_learning=False) as vx:
+        with ipdb.create(
+            ifname="vxlan0",
+            kind="vxlan",
+            vxlan_id=0,
+            vxlan_link=ifc,
+            vxlan_port=4789,
+            vxlan_collect_metadata=True,
+            vxlan_learning=False,
+        ) as vx:
             vx.up()
             ifc_gc.append(vx.ifname)
 
     conf[c_int(1)] = c_int(vx.index)
 
     ipr.tc("add", "ingress", vx.index, "ffff:")
-    ipr.tc("add-filter", "bpf", vx.index, ":1", fd=ingress_fn.fd,
-           name=ingress_fn.name, parent="ffff:", action="drop", classid=1)
+    ipr.tc(
+        "add-filter",
+        "bpf",
+        vx.index,
+        ":1",
+        fd=ingress_fn.fd,
+        name=ingress_fn.name,
+        parent="ffff:",
+        action="drop",
+        classid=1,
+    )
 
     for j in range(0, 2):
         vni = 10000 + j
         with ipdb.create(ifname="br%d" % j, kind="bridge") as br:
             for i in range(0, num_hosts):
                 if i != host_id:
-                    v = ipdb.create(ifname="dummy%d%d" % (j , i), kind="dummy").up().commit()
+                    v = (
+                        ipdb.create(ifname="dummy%d%d" % (j, i), kind="dummy")
+                        .up()
+                        .commit()
+                    )
                     ipaddr = "172.16.1.%d" % (100 + i)
                     tunkey2if_key = tunkey2if.Key(vni)
                     tunkey2if_key.remote_ipv4 = IPAddress(ipaddr)
@@ -77,8 +102,17 @@ def run():
                     if2tunkey[if2tunkey_key] = if2tunkey_leaf
 
                     ipr.tc("add", "sfq", v.index, "1:")
-                    ipr.tc("add-filter", "bpf", v.index, ":1", fd=egress_fn.fd,
-                       name=egress_fn.name, parent="1:", action="drop", classid=1)
+                    ipr.tc(
+                        "add-filter",
+                        "bpf",
+                        v.index,
+                        ":1",
+                        fd=egress_fn.fd,
+                        name=egress_fn.name,
+                        parent="1:",
+                        action="drop",
+                        classid=1,
+                    )
                     br.add_port(v)
                     br.up()
                     ifc_gc.append(v.ifname)
@@ -94,19 +128,26 @@ def run():
             v2 = "dhcp%d_v2" % j
             br = ipdb.interfaces["br%d" % j]
             with ipdb.create(ifname=v1, kind="veth", peer=v2) as v:
-                    v.up()
+                v.up()
             br.add_port(ipdb.interfaces[v1]).commit()
             dhcp_v2 = ipdb.interfaces[v2]
             dhcp_v2.add_ip("99.1.%d.1/24" % j).up().commit()
 
             call(["/bin/rm", "-f", "/tmp/dnsmasq.%d.leases" % j])
-            cmd = ["dnsmasq", "-d", "--bind-interfaces", "--strict-order",
-                   "--conf-file=",
-                   "--dhcp-range", "99.1.%d.2,99.1.%d.254,255.255.255.0,12h" % (j, j),
-                   "--dhcp-no-override", "--except-interface=lo",
-                   "--interface=dhcp%d_v2" % j,
-                   "--dhcp-authoritative",
-                   "--dhcp-leasefile=/tmp/dnsmasq.%d.leases" % j]
+            cmd = [
+                "dnsmasq",
+                "-d",
+                "--bind-interfaces",
+                "--strict-order",
+                "--conf-file=",
+                "--dhcp-range",
+                "99.1.%d.2,99.1.%d.254,255.255.255.0,12h" % (j, j),
+                "--dhcp-no-override",
+                "--except-interface=lo",
+                "--interface=dhcp%d_v2" % j,
+                "--dhcp-authoritative",
+                "--dhcp-leasefile=/tmp/dnsmasq.%d.leases" % j,
+            ]
             d_serv.append(Popen(cmd, stdout=PIPE, stderr=PIPE))
 
     # dhcp client to assign ip address for each bridge
@@ -116,24 +157,36 @@ def run():
             call(["mkdir", "/tmp/dhcp_%d_%d" % (host_id, j)])
             call(["touch", "/tmp/dhcp_%d_%d/dhclient.conf" % (host_id, j)])
             call(["touch", "/tmp/dhcp_%d_%d/dhclient.lease" % (host_id, j)])
-            cmd = ["dhclient", "-d", "br%d" % j,
-                   "-cf", "/tmp/dhcp_%d_%d/dhclient.conf" % (host_id, j),
-                   "-lf", "/tmp/dhcp_%d_%d/dhclient.lease" % (host_id, j)]
+            cmd = [
+                "dhclient",
+                "-d",
+                "br%d" % j,
+                "-cf",
+                "/tmp/dhcp_%d_%d/dhclient.conf" % (host_id, j),
+                "-lf",
+                "/tmp/dhcp_%d_%d/dhclient.lease" % (host_id, j),
+            ]
             d_client.append(Popen(cmd, stdout=PIPE, stderr=PIPE))
 
             # make sure we get address for eth0
             retry = -1
             while retry < 0:
-                check = Popen(["ip", "addr", "show", "br%d" % j], stdout=PIPE, stderr=PIPE)
+                check = Popen(
+                    ["ip", "addr", "show", "br%d" % j], stdout=PIPE, stderr=PIPE
+                )
                 out = check.stdout.read()
                 checkip = b"99.1.%d" % j
                 retry = out.find(checkip)
+
 
 try:
     run()
     input("")
 finally:
-    for v in ifc_gc: call(["ip", "link", "del", v])
+    for v in ifc_gc:
+        call(["ip", "link", "del", v])
     ipdb.release()
-    for p in d_client: p.kill()
-    for p in d_serv: p.kill()
+    for p in d_client:
+        p.kill()
+    for p in d_serv:
+        p.kill()

@@ -40,27 +40,31 @@ examples = """examples:
 parser = argparse.ArgumentParser(
     description="Summarize run queue (scheduler) latency as a histogram",
     formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog=examples)
-parser.add_argument("-T", "--timestamp", action="store_true",
-    help="include timestamp on output")
-parser.add_argument("-m", "--milliseconds", action="store_true",
-    help="millisecond histogram")
-parser.add_argument("-P", "--pids", action="store_true",
-    help="print a histogram per process ID")
+    epilog=examples,
+)
+parser.add_argument(
+    "-T", "--timestamp", action="store_true", help="include timestamp on output"
+)
+parser.add_argument(
+    "-m", "--milliseconds", action="store_true", help="millisecond histogram"
+)
+parser.add_argument(
+    "-P", "--pids", action="store_true", help="print a histogram per process ID"
+)
 # PID options are --pid and --pids, so namespaces should be --pidns (not done
 # yet) and --pidnss:
-parser.add_argument("--pidnss", action="store_true",
-    help="print a histogram per PID namespace")
-parser.add_argument("-L", "--tids", action="store_true",
-    help="print a histogram per thread ID")
-parser.add_argument("-p", "--pid",
-    help="trace this PID only")
-parser.add_argument("interval", nargs="?", default=99999999,
-    help="output interval, in seconds")
-parser.add_argument("count", nargs="?", default=99999999,
-    help="number of outputs")
-parser.add_argument("--ebpf", action="store_true",
-    help=argparse.SUPPRESS)
+parser.add_argument(
+    "--pidnss", action="store_true", help="print a histogram per PID namespace"
+)
+parser.add_argument(
+    "-L", "--tids", action="store_true", help="print a histogram per thread ID"
+)
+parser.add_argument("-p", "--pid", help="trace this PID only")
+parser.add_argument(
+    "interval", nargs="?", default=99999999, help="output interval, in seconds"
+)
+parser.add_argument("count", nargs="?", default=99999999, help="number of outputs")
+parser.add_argument("--ebpf", action="store_true", help=argparse.SUPPRESS)
 args = parser.parse_args()
 countdown = int(args.count)
 debug = 0
@@ -210,14 +214,14 @@ else:
 # code substitutions
 if args.pid:
     # pid from userspace point of view is thread group from kernel pov
-    bpf_text = bpf_text.replace('FILTER', 'tgid != %s' % args.pid)
+    bpf_text = bpf_text.replace("FILTER", "tgid != %s" % args.pid)
 else:
-    bpf_text = bpf_text.replace('FILTER', '0')
+    bpf_text = bpf_text.replace("FILTER", "0")
 if args.milliseconds:
-    bpf_text = bpf_text.replace('FACTOR', 'delta /= 1000000;')
+    bpf_text = bpf_text.replace("FACTOR", "delta /= 1000000;")
     label = "msecs"
 else:
-    bpf_text = bpf_text.replace('FACTOR', 'delta /= 1000;')
+    bpf_text = bpf_text.replace("FACTOR", "delta /= 1000;")
     label = "usecs"
 if args.pids or args.tids:
     section = "pid"
@@ -225,23 +229,27 @@ if args.pids or args.tids:
     if args.tids:
         pid = "pid"
         section = "tid"
-    bpf_text = bpf_text.replace('STORAGE',
-        'BPF_HISTOGRAM(dist, pid_key_t);')
-    bpf_text = bpf_text.replace('STORE',
-        'pid_key_t key = {.id = ' + pid + ', .slot = bpf_log2l(delta)}; ' +
-        'dist.increment(key);')
+    bpf_text = bpf_text.replace("STORAGE", "BPF_HISTOGRAM(dist, pid_key_t);")
+    bpf_text = bpf_text.replace(
+        "STORE",
+        "pid_key_t key = {.id = "
+        + pid
+        + ", .slot = bpf_log2l(delta)}; "
+        + "dist.increment(key);",
+    )
 elif args.pidnss:
     section = "pidns"
-    bpf_text = bpf_text.replace('STORAGE',
-        'BPF_HISTOGRAM(dist, pidns_key_t);')
-    bpf_text = bpf_text.replace('STORE', 'pidns_key_t key = ' +
-        '{.id = prev->nsproxy->pid_ns_for_children->ns.inum, ' +
-        '.slot = bpf_log2l(delta)}; dist.increment(key);')
+    bpf_text = bpf_text.replace("STORAGE", "BPF_HISTOGRAM(dist, pidns_key_t);")
+    bpf_text = bpf_text.replace(
+        "STORE",
+        "pidns_key_t key = "
+        + "{.id = prev->nsproxy->pid_ns_for_children->ns.inum, "
+        + ".slot = bpf_log2l(delta)}; dist.increment(key);",
+    )
 else:
     section = ""
-    bpf_text = bpf_text.replace('STORAGE', 'BPF_HISTOGRAM(dist);')
-    bpf_text = bpf_text.replace('STORE',
-        'dist.increment(bpf_log2l(delta));')
+    bpf_text = bpf_text.replace("STORAGE", "BPF_HISTOGRAM(dist);")
+    bpf_text = bpf_text.replace("STORE", "dist.increment(bpf_log2l(delta));")
 if debug or args.ebpf:
     print(bpf_text)
     if args.ebpf:
@@ -259,7 +267,7 @@ print("Tracing run queue latency... Hit Ctrl-C to end.")
 # output
 exiting = 0 if args.interval else 1
 dist = b.get_table("dist")
-while (1):
+while 1:
     try:
         sleep(int(args.interval))
     except KeyboardInterrupt:

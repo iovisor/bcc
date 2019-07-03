@@ -6,6 +6,7 @@ import ctypes as ct
 import unittest
 from bcc import BPF
 
+
 class TestSharedTable(unittest.TestCase):
     def test_close_extern(self):
         b1 = BPF(text="""BPF_TABLE_PUBLIC("array", int, int, table1, 10);""")
@@ -18,6 +19,7 @@ class TestSharedTable(unittest.TestCase):
         t1 = b1["table1"]
         self.assertEqual(t1[ct.c_int(1)].value, 10)
         self.assertEqual(len(t1), 10)
+
 
 if __name__ == "__main__":
     unittest.main()

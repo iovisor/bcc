@@ -19,9 +19,11 @@ from ctypes import c_int
 from time import sleep, strftime
 from sys import argv
 
+
 def usage():
     print("USAGE: %s [interval [count]]" % argv[0])
     exit()
+
 
 # arguments
 interval = 1
@@ -37,7 +39,8 @@ if len(argv) > 1:
         usage()
 
 # load BPF program
-b = BPF(text="""
+b = BPF(
+    text="""
 #include <uapi/linux/ptrace.h>
 
 enum stat_types {
@@ -61,7 +64,8 @@ void do_write(struct pt_regs *ctx) { stats_increment(S_WRITE); }
 void do_fsync(struct pt_regs *ctx) { stats_increment(S_FSYNC); }
 void do_open(struct pt_regs *ctx) { stats_increment(S_OPEN); }
 void do_create(struct pt_regs *ctx) { stats_increment(S_CREATE); }
-""")
+"""
+)
 b.attach_kprobe(event="vfs_read", fn_name="do_read")
 b.attach_kprobe(event="vfs_write", fn_name="do_write")
 b.attach_kprobe(event="vfs_fsync", fn_name="do_fsync")
@@ -69,13 +73,7 @@ b.attach_kprobe(event="vfs_open", fn_name="do_open")
 b.attach_kprobe(event="vfs_create", fn_name="do_create")
 
 # stat column labels and indexes
-stat_types = {
-    "READ": 1,
-    "WRITE": 2,
-    "FSYNC": 3,
-    "OPEN": 4,
-    "CREATE": 5
-}
+stat_types = {"READ": 1, "WRITE": 2, "FSYNC": 3, "OPEN": 4, "CREATE": 5}
 
 # header
 print("%-8s  " % "TIME", end="")
@@ -86,7 +84,7 @@ print("")
 
 # output
 i = 0
-while (1):
+while 1:
     if count > 0:
         i += 1
         if i > count:

@@ -5,6 +5,7 @@
 import unittest
 from bcc import BPF
 
+
 class TestLicense(unittest.TestCase):
     gpl_only_text = """
 #include <uapi/linux/ptrace.h>
@@ -49,9 +50,11 @@ int license_program(struct pt_regs *ctx) {
 """
 
     def license(self, lic):
-        return '''
+        return """
 #define BPF_LICENSE %s
-''' % (lic)
+""" % (
+            lic
+        )
 
     def load_bpf_code(self, bpf_code):
         event_name = bpf_code.get_syscall_fnname("read")
@@ -63,19 +66,19 @@ int license_program(struct pt_regs *ctx) {
         self.load_bpf_code(b)
 
     def test_gpl_helper_macro(self):
-        b = BPF(text=self.gpl_only_text + self.license('GPL'))
+        b = BPF(text=self.gpl_only_text + self.license("GPL"))
         self.load_bpf_code(b)
 
     def test_proprietary_macro(self):
-        b = BPF(text=self.proprietary_text + self.license('Proprietary'))
+        b = BPF(text=self.proprietary_text + self.license("Proprietary"))
         self.load_bpf_code(b)
 
     def test_gpl_compatible_macro(self):
-        b = BPF(text=self.gpl_only_text + self.license('Dual BSD/GPL'))
+        b = BPF(text=self.gpl_only_text + self.license("Dual BSD/GPL"))
         self.load_bpf_code(b)
 
     def test_proprietary_words_macro(self):
-        b = BPF(text=self.proprietary_text + self.license('Proprietary license'))
+        b = BPF(text=self.proprietary_text + self.license("Proprietary license"))
         self.load_bpf_code(b)
 
     @unittest.expectedFailure
@@ -85,23 +88,26 @@ int license_program(struct pt_regs *ctx) {
 
     @unittest.expectedFailure
     def test_cflags_macro_fail(self):
-        b = BPF(text=self.gpl_only_text + self.license('GPL'), cflags=["-DBPF_LICENSE=GPL"])
+        b = BPF(
+            text=self.gpl_only_text + self.license("GPL"), cflags=["-DBPF_LICENSE=GPL"]
+        )
         self.load_bpf_code(b)
 
     @unittest.expectedFailure
     def test_empty_fail_macro(self):
-        b = BPF(text=self.gpl_only_text + self.license(''))
+        b = BPF(text=self.gpl_only_text + self.license(""))
         self.load_bpf_code(b)
 
     @unittest.expectedFailure
     def test_proprietary_fail_macro(self):
-        b = BPF(text=self.gpl_only_text + self.license('Proprietary license'))
+        b = BPF(text=self.gpl_only_text + self.license("Proprietary license"))
         self.load_bpf_code(b)
 
     @unittest.expectedFailure
     def test_proprietary_cflags_fail(self):
         b = BPF(text=self.proprietary_text, cflags=["-DBPF_LICENSE=Proprietary"])
         self.load_bpf_code(b)
+
 
 if __name__ == "__main__":
     unittest.main()

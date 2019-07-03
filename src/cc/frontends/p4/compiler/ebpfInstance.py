@@ -28,6 +28,7 @@ class SimpleInstance(EbpfInstanceBase):
 
 class EbpfHeader(SimpleInstance):
     """ Represents a header instance from a P4 program """
+
     def __init__(self, hlirHeaderInstance, factory):
         super(EbpfHeader, self).__init__(hlirHeaderInstance, factory, False)
         if hlirHeaderInstance.metadata:
@@ -38,15 +39,17 @@ class EbpfHeader(SimpleInstance):
 
 class EbpfMetadata(SimpleInstance):
     """Represents a metadata instance from a P4 program"""
+
     def __init__(self, hlirMetadataInstance, factory):
         super(EbpfMetadata, self).__init__(hlirMetadataInstance, factory, True)
         if not hlirMetadataInstance.metadata:
             raise CompilationException(
-                True, "Header instance passed to EpbfMetadata {0}",
-                hlirMetadataInstance)
+                True, "Header instance passed to EpbfMetadata {0}", hlirMetadataInstance
+            )
         if hlirMetadataInstance.index is not None:
             raise CompilationException(
-                True, "Unexpected metadata array {0}", self.hlirInstance)
+                True, "Unexpected metadata array {0}", self.hlirInstance
+            )
         if hasattr(hlirMetadataInstance, "initializer"):
             self.initializer = hlirMetadataInstance.initializer
         else:
@@ -58,14 +61,14 @@ class EbpfMetadata(SimpleInstance):
             self.type.emitInitializer(serializer)
         else:
             for key in self.initializer.keys():
-                serializer.appendFormat(
-                    ".{0} = {1},", key, self.initializer[key])
+                serializer.appendFormat(".{0} = {1},", key, self.initializer[key])
 
 
 class EbpfHeaderStack(EbpfInstanceBase):
     """Represents a header stack instance; there is one instance of
     this class for each STACK, and not for each
     element of the stack, as in the HLIR"""
+
     def __init__(self, hlirInstance, indexVar, factory):
         super(EbpfHeaderStack, self).__init__()
 

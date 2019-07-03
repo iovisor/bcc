@@ -33,12 +33,12 @@ def kernel_version_ge(major, minor):
 
 def setUpModule():
     # Build the memory leaking application.
-    c_src = 'test_tools_memleak_leaker_app.c'
-    tmp_dir = tempfile.mkdtemp(prefix='bcc-test-memleak-')
+    c_src = "test_tools_memleak_leaker_app.c"
+    tmp_dir = tempfile.mkdtemp(prefix="bcc-test-memleak-")
     c_src_full = os.path.dirname(sys.argv[0]) + os.path.sep + c_src
-    exec_dst = tmp_dir + os.path.sep + 'leaker_app'
+    exec_dst = tmp_dir + os.path.sep + "leaker_app"
 
-    if subprocess.call(['gcc', '-g', '-O0', '-o', exec_dst, c_src_full]) != 0:
+    if subprocess.call(["gcc", "-g", "-O0", "-o", exec_dst, c_src_full]) != 0:
         print("can't compile the leaking application")
         raise Exception
 
@@ -49,21 +49,26 @@ def setUpModule():
     # Helper utilities "timeout" and "setbuf" are used to limit overall running
     # time, and to disable buffering.
     cfg.cmd_format = (
-        'stdbuf -o 0 -i 0 timeout -s KILL 10s ' + TOOLS_DIR +
-        'memleak.py -c "{} {{}} {}" -T 1 1 2'.format(exec_dst,
-                                                     cfg.leaking_amount))
+        "stdbuf -o 0 -i 0 timeout -s KILL 10s "
+        + TOOLS_DIR
+        + 'memleak.py -c "{} {{}} {}" -T 1 1 2'.format(exec_dst, cfg.leaking_amount)
+    )
 
 
 @skipUnless(kernel_version_ge(4, 6), "requires kernel >= 4.6")
 class MemleakToolTests(TestCase):
     def tearDown(self):
         if self.p:
-            del(self.p)
+            del self.p
+
     def run_leaker(self, leak_kind):
         # Starting memleak.py, which in turn launches the leaking application.
-        self.p = subprocess.Popen(cfg.cmd_format.format(leak_kind),
-                                  stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                  shell=True)
+        self.p = subprocess.Popen(
+            cfg.cmd_format.format(leak_kind),
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            shell=True,
+        )
 
         # Waiting for the first report.
         while True:
@@ -82,15 +87,17 @@ class MemleakToolTests(TestCase):
         # If there were memory leaks, they are in the output. Filter the lines
         # containing "byte" substring. Every interesting line is expected to
         # start with "N bytes from"
-        x = [x for x in out.split(b'\n') if b'byte' in x]
+        x = [x for x in out.split(b"\n") if b"byte" in x]
 
-        self.assertTrue(len(x) >= 1,
-                        msg="At least one line should have 'byte' substring.")
+        self.assertTrue(
+            len(x) >= 1, msg="At least one line should have 'byte' substring."
+        )
 
         # Taking last report.
         x = x[-1].split()
-        self.assertTrue(len(x) >= 1,
-                        msg="There should be at least one word in the line.")
+        self.assertTrue(
+            len(x) >= 1, msg="There should be at least one word in the line."
+        )
 
         # First word is the leak amount in bytes.
         return int(x[0])

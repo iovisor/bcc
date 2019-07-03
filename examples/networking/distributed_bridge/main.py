@@ -32,6 +32,7 @@ ipdb = IPDB(nl=ipr)
 num_hosts = 3
 null = open("/dev/null", "w")
 
+
 class TunnelSimulation(Simulation):
     def __init__(self, ipdb):
         super(TunnelSimulation, self).__init__(ipdb)
@@ -42,16 +43,25 @@ class TunnelSimulation(Simulation):
         for i in range(0, num_hosts):
             print("Launching host %i of %i" % (i + 1, num_hosts))
             ipaddr = "172.16.1.%d/24" % (100 + i)
-            host_info.append(self._create_ns("host%d" % i, ipaddr=ipaddr,
-                disable_ipv6=True))
+            host_info.append(
+                self._create_ns("host%d" % i, ipaddr=ipaddr, disable_ipv6=True)
+            )
             if multicast:
-              cmd = ["python", "tunnel.py", str(i)]
+                cmd = ["python", "tunnel.py", str(i)]
             else:
-              cmd = ["python", "tunnel_mesh.py", str(num_hosts), str(i), str(dhcp), str(gretap)]
+                cmd = [
+                    "python",
+                    "tunnel_mesh.py",
+                    str(num_hosts),
+                    str(i),
+                    str(dhcp),
+                    str(gretap),
+                ]
             p = NSPopen(host_info[i][0].nl.netns, cmd, stdin=PIPE)
             self.processes.append(p)
         with self.ipdb.create(ifname="br-fabric", kind="bridge") as br:
-            for host in host_info: br.add_port(host[1])
+            for host in host_info:
+                br.add_port(host[1])
             br.up()
 
         # get host0 bridge ip's
@@ -61,8 +71,9 @@ class TunnelSimulation(Simulation):
             for j in range(0, 2):
                 interface = host_info[0][0].interfaces["br%d" % j]
                 interface.wait_ip("99.1.0.0", 16, timeout=60)
-                host0_br_ips = [x[0] for x in interface.ipaddr
-                                if x[0].startswith("99.1")]
+                host0_br_ips = [
+                    x[0] for x in interface.ipaddr if x[0].startswith("99.1")
+                ]
         else:
             host0_br_ips.append("99.1.0.1")
             host0_br_ips.append("99.1.1.1")
@@ -74,19 +85,39 @@ class TunnelSimulation(Simulation):
                 interface = host_info[i][0].interfaces["br%d" % j]
                 interface.wait_ip("99.1.0.0", 16, timeout=60)
                 print("VNI%d between host0 and host%d" % (10000 + j, i))
-                call(["ip", "netns", "exec", "host%d" % i,
-                      "ping", host0_br_ips[j], "-c", "3", "-i", "0.2", "-q"])
+                call(
+                    [
+                        "ip",
+                        "netns",
+                        "exec",
+                        "host%d" % i,
+                        "ping",
+                        host0_br_ips[j],
+                        "-c",
+                        "3",
+                        "-i",
+                        "0.2",
+                        "-q",
+                    ]
+                )
+
 
 try:
     sim = TunnelSimulation(ipdb)
     sim.start()
     input("Press enter to quit:")
-    for p in sim.processes: p.communicate(b"\n")
+    for p in sim.processes:
+        p.communicate(b"\n")
 except:
     if "sim" in locals():
-        for p in sim.processes: p.kill(); p.wait(); p.release()
+        for p in sim.processes:
+            p.kill()
+            p.wait()
+            p.release()
 finally:
-    if "br-fabric" in ipdb.interfaces: ipdb.interfaces["br-fabric"].remove().commit()
-    if "sim" in locals(): sim.release()
+    if "br-fabric" in ipdb.interfaces:
+        ipdb.interfaces["br-fabric"].remove().commit()
+    if "sim" in locals():
+        sim.release()
     ipdb.release()
     null.close()

@@ -12,6 +12,7 @@ from subprocess import Popen, PIPE
 import distutils.version
 import os
 
+
 def kernel_version_ge(major, minor):
     # True if running kernel is >= X.Y
     version = distutils.version.LooseVersion(os.uname()[2]).version
@@ -23,21 +24,21 @@ def kernel_version_ge(major, minor):
         return False
     return True
 
+
 class TestFreeLLVMMemory(TestCase):
     def getRssFile(self):
-        p = Popen(["cat", "/proc/" + str(os.getpid()) + "/status"],
-                  stdout=PIPE)
+        p = Popen(["cat", "/proc/" + str(os.getpid()) + "/status"], stdout=PIPE)
         rss = None
         unit = None
         for line in p.stdout.readlines():
-            if (line.find(b'RssFile') >= 0):
-                rss  = line.split(b' ')[-2]
-                unit = line.split(b' ')[-1].rstrip()
+            if line.find(b"RssFile") >= 0:
+                rss = line.split(b" ")[-2]
+                unit = line.split(b" ")[-1].rstrip()
                 break
 
         return [rss, unit]
 
-    @skipUnless(kernel_version_ge(4,5), "requires kernel >= 4.5")
+    @skipUnless(kernel_version_ge(4, 5), "requires kernel >= 4.5")
     def testFreeLLVMMemory(self):
         text = "int test() { return 0; }"
         b = BPF(text=text)
@@ -58,6 +59,7 @@ class TestFreeLLVMMemory(TestCase):
         print("Before freeing llvm memory: RssFile: ", rss1, unit1)
         print("After  freeing llvm memory: RssFile: ", rss2, unit2)
         self.assertTrue(rss1 > rss2)
+
 
 if __name__ == "__main__":
     main()

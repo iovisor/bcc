@@ -39,14 +39,19 @@ print("%-18s %-16s %-6s %s" % ("TIME(s)", "COMM", "PID", "MESSAGE"))
 
 # process event
 start = 0
+
+
 def print_event(cpu, data, size):
     global start
     event = b["events"].event(data)
     if start == 0:
-            start = event.ts
+        start = event.ts
     time_s = (float(event.ts - start)) / 1000000000
-    printb(b"%-18.9f %-16s %-6d %s" % (time_s, event.comm, event.pid,
-        b"Hello, perf_output!"))
+    printb(
+        b"%-18.9f %-16s %-6d %s"
+        % (time_s, event.comm, event.pid, b"Hello, perf_output!")
+    )
+
 
 # loop with callback to print_event
 b["events"].open_perf_buffer(print_event)

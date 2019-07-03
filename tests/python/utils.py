@@ -1,11 +1,13 @@
 from pyroute2 import NSPopen
 from distutils.spawn import find_executable
 
+
 def has_executable(name):
     path = find_executable(name)
     if path is None:
         raise Exception(name + ": command not found")
     return path
+
 
 class NSPopenWithCheck(NSPopen):
     """

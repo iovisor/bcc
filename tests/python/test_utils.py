@@ -7,6 +7,7 @@ import multiprocessing
 import unittest
 import os
 
+
 class TestUtils(unittest.TestCase):
     def test_get_online_cpus(self):
         online_cpus = get_online_cpus()
@@ -18,6 +19,7 @@ class TestUtils(unittest.TestCase):
         candidates = ["c", "java", "perl", "php", "node", "ruby", "python"]
         language = detect_language(candidates, os.getpid())
         self.assertEqual(language, "python")
+
 
 if __name__ == "__main__":
     unittest.main()

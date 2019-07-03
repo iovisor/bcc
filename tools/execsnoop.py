@@ -40,26 +40,36 @@ examples = """examples:
 parser = argparse.ArgumentParser(
     description="Trace exec() syscalls",
     formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog=examples)
-parser.add_argument("-T", "--time", action="store_true",
-    help="include time column on output (HH:MM:SS)")
-parser.add_argument("-t", "--timestamp", action="store_true",
-    help="include timestamp on output")
-parser.add_argument("-x", "--fails", action="store_true",
-    help="include failed exec()s")
-parser.add_argument("-q", "--quote", action="store_true",
-    help="Add quotemarks (\") around arguments."
-    )
-parser.add_argument("-n", "--name",
+    epilog=examples,
+)
+parser.add_argument(
+    "-T", "--time", action="store_true", help="include time column on output (HH:MM:SS)"
+)
+parser.add_argument(
+    "-t", "--timestamp", action="store_true", help="include timestamp on output"
+)
+parser.add_argument("-x", "--fails", action="store_true", help="include failed exec()s")
+parser.add_argument(
+    "-q", "--quote", action="store_true", help='Add quotemarks (") around arguments.'
+)
+parser.add_argument(
+    "-n",
+    "--name",
     type=ArgString,
-    help="only print commands matching this name (regex), any arg")
-parser.add_argument("-l", "--line",
+    help="only print commands matching this name (regex), any arg",
+)
+parser.add_argument(
+    "-l",
+    "--line",
     type=ArgString,
-    help="only print commands where arg contains this line (regex)")
-parser.add_argument("--max-args", default="20",
-    help="maximum number of arguments parsed and displayed, defaults to 20")
-parser.add_argument("--ebpf", action="store_true",
-    help=argparse.SUPPRESS)
+    help="only print commands where arg contains this line (regex)",
+)
+parser.add_argument(
+    "--max-args",
+    default="20",
+    help="maximum number of arguments parsed and displayed, defaults to 20",
+)
+parser.add_argument("--ebpf", action="store_true", help=argparse.SUPPRESS)
 args = parser.parse_args()
 
 # define BPF program
@@ -179,9 +189,11 @@ if args.timestamp:
     print("%-8s" % ("TIME(s)"), end="")
 print("%-16s %-6s %-6s %3s %s" % ("PCOMM", "PID", "PPID", "RET", "ARGS"))
 
+
 class EventType(object):
     EVENT_ARG = 0
     EVENT_RET = 1
+
 
 start_ts = time.time()
 argv = defaultdict(list)
@@ -200,6 +212,7 @@ def get_ppid(pid):
         pass
     return 0
 
+
 # process event
 def print_event(cpu, data, size):
     event = b["events"].event(data)
@@ -212,27 +225,27 @@ def print_event(cpu, data, size):
             skip = True
         if args.name and not re.search(bytes(args.name), event.comm):
             skip = True
-        if args.line and not re.search(bytes(args.line),
-                                       b' '.join(argv[event.pid])):
+        if args.line and not re.search(bytes(args.line), b" ".join(argv[event.pid])):
             skip = True
         if args.quote:
             argv[event.pid] = [
-                b"\"" + arg.replace(b"\"", b"\\\"") + b"\""
-                for arg in argv[event.pid]
+                b'"' + arg.replace(b'"', b'\\"') + b'"' for arg in argv[event.pid]
             ]
 
         if not skip:
             if args.time:
-                printb(b"%-9s" % strftime("%H:%M:%S").encode('ascii'), nl="")
+                printb(b"%-9s" % strftime("%H:%M:%S").encode("ascii"), nl="")
             if args.timestamp:
                 printb(b"%-8.3f" % (time.time() - start_ts), nl="")
             ppid = event.ppid if event.ppid > 0 else get_ppid(event.pid)
             ppid = b"%d" % ppid if ppid > 0 else b"?"
-            argv_text = b' '.join(argv[event.pid]).replace(b'\n', b'\\n')
-            printb(b"%-16s %-6d %-6s %3d %s" % (event.comm, event.pid,
-                   ppid, event.retval, argv_text))
+            argv_text = b" ".join(argv[event.pid]).replace(b"\n", b"\\n")
+            printb(
+                b"%-16s %-6d %-6s %3d %s"
+                % (event.comm, event.pid, ppid, event.retval, argv_text)
+            )
         try:
-            del(argv[event.pid])
+            del argv[event.pid]
         except Exception:
             pass
 
