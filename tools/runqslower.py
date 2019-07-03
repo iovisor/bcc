@@ -167,7 +167,7 @@ RAW_TRACEPOINT_PROBE(sched_switch)
     long state;
 
     // ivcsw: treat like an enqueue event and store timestamp
-    bpf_probe_read(&state, sizeof(long), &prev->state);
+    bpf_probe_read(&state, sizeof(long), (const void *)&prev->state);
     if (state == TASK_RUNNING) {
         bpf_probe_read(&tgid, sizeof(prev->tgid), &prev->tgid);
         bpf_probe_read(&pid, sizeof(prev->pid), &prev->pid);
