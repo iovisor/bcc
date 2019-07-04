@@ -13,8 +13,8 @@ matrix:
       python: 3.7
       install: pip install flake8
       script: flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-  allow_failures:
-    - python: 3.7
+  #allow_failures:
+  #  - python: 3.7
 install:
   - sudo apt-get install -y python-pip
   - sudo pip install pep8
