@@ -15,7 +15,7 @@ matrix:
 install:
   - pip install pep8
 script:
-  - set -euo pipefail
+  #- set -euo pipefail
   - echo "0"
   - ./scripts/py-style-check.sh
   - echo "1"
