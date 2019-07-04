@@ -16,5 +16,10 @@ install:
   - pip install pep8
 script:
   - set -euo pipefail
-  - ./scripts/check-helpers.sh
+  - echo "0"
   - ./scripts/py-style-check.sh
+  - echo "1"
+  - ./scripts/check-helpers.sh
+  - echo "2"
+  - ./scripts/py-style-check.sh
+  - echo "3"
