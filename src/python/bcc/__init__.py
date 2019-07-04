@@ -22,7 +22,6 @@ import re
 import struct
 import errno
 import sys
-basestring = (unicode if sys.version_info[0] < 3 else str)
 
 from .libbcc import lib, bcc_symbol, bcc_symbol_option, bcc_stacktrace_build_id, _SYM_CB_TYPE
 from .table import Table, PerfEventArray
@@ -30,6 +29,11 @@ from .perf import Perf
 from .utils import get_online_cpus, printb, _assert_is_bytes, ArgString
 from .version import __version__
 from .disassembler import disassemble_prog, decode_map
+
+try:
+    basestring
+except NameError:  # Python 3
+    basestring = str
 
 _probe_limit = 1000
 _num_open_probes = 0
