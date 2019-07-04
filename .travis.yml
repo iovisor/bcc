@@ -18,5 +18,6 @@ install:
   - sudo pip install pep8
 script:
   - set -euo pipefail
+  - ./scripts/py-style-check.sh
   - ./scripts/check-helpers.sh
   - ./scripts/py-style-check.sh
