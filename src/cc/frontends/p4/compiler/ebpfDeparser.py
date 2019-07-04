@@ -96,7 +96,7 @@ class EbpfDeparser(object):
             assert isinstance(ebpfStack, ebpfInstance.EbpfHeaderStack)
 
             if isinstance(p4header.index, int):
-                index = "[" + str(headerInstance.index) + "]"
+                index = "[" + str(p4header.index) + "]"
             elif p4header.index is P4_NEXT:
                 index = "[" + ebpfStack.indexVar + "]"
             else:
