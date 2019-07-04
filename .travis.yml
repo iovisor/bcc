@@ -1,23 +1,20 @@
+language: python
 matrix:
   include:
     - name: "generic tests"
-      language: generic
-    - name: "flake8 lint on Python 2.7"
-      language: python
+      python: 2.7
+    - name: "flake8 lint on Python 2.7"      
       python: 2.7
       install: pip install flake8
       script: flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
     - name: "flake8 lint on Python 3.7"
       dist: xenial  # required for Python >= 3.7
-      language: python
       python: 3.7
       install: pip install flake8
       script: flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
 install:
-  - sudo apt-get install -y python-pip
-  - sudo pip install pep8
+  - pip install pep8
 script:
   - set -euo pipefail
-  - ./scripts/py-style-check.sh
   - ./scripts/check-helpers.sh
   - ./scripts/py-style-check.sh
