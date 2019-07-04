@@ -3,6 +3,6 @@ install:
   - sudo apt-get install -y python-pip
   - sudo pip install flake8
 script:
-  - set -euo pipefail
+  #- set -euo pipefail
   - ./scripts/check-helpers.sh
   - ./scripts/py-style-check.sh
