@@ -1,8 +1,12 @@
 language: python
 matrix:
   include:
-    - name: "generic tests on Python 2.7"
+    - name: "Check helpers on Python 2.7"
       python: 2.7
+      script: ./scripts/check-helpers.sh
+    - name: "Python style check on Python 2.7"
+      python: 2.7
+      script: ./scripts/py-style-check.sh
     - name: "flake8 lint on Python 2.7"      
       python: 2.7
       script: flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
@@ -10,9 +14,7 @@ matrix:
       dist: xenial  # required for Python >= 3.7
       python: 3.7
       script: flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+  allow_failures:
+    - name: "Check helpers on Python 2.7"
 before_install: pip install --upgrade pip
 install: pip install flake8
-script:
-  #- set -euo pipefail
-  - ./scripts/check-helpers.sh
-  - ./scripts/py-style-check.sh
