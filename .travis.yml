@@ -1,7 +1,7 @@
-language: generic
 matrix:
   include:
     - name: "generic tests"
+      language: generic
     - name: "flake8 lint on Python 2.7"
       language: python
       python: 2.7
