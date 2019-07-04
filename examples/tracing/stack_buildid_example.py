@@ -90,7 +90,7 @@ try:
     sleep(duration)
 except KeyboardInterrupt:
     # as cleanup can take some time, trap Ctrl-C:
-    signal.signal(signal.SIGINT, signal_ignore)
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
 
 user_stack=[]
 for k,v in sorted(counts.items(), key=lambda counts: counts[1].value):
