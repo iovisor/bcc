@@ -52,8 +52,8 @@ class TestLru(unittest.TestCase):
         sum = stats_map.sum(stats_map.Key(0))
         avg = stats_map.average(stats_map.Key(0))
         max = stats_map.max(stats_map.Key(0))
-        self.assertGreater(sum.value, 0L)
-        self.assertGreater(max.value, 0L)
+        self.assertGreater(sum.value, 0)
+        self.assertGreater(max.value, 0)
         b.detach_kprobe(event_name)
 
 if __name__ == "__main__":
