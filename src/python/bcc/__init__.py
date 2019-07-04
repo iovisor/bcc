@@ -929,7 +929,7 @@ class BPF(object):
 
     @staticmethod
     def get_user_functions(name, sym_re):
-        return set([name for (name, _) in
+        return set([name_ for (name_, _) in
                     BPF.get_user_functions_and_addresses(name, sym_re)])
 
     @staticmethod
