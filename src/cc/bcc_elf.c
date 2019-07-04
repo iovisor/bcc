@@ -630,7 +630,7 @@ int bcc_elf_foreach_load_section(const char *path,
   for (i = 0; i < nhdrs; i++) {
     if (!gelf_getphdr(e, (int)i, &header))
       continue;
-    if (header.p_type != PT_LOAD || !(header.p_flags & PF_X))
+    if (header.p_type != PT_LOAD)
       continue;
     res = callback(header.p_vaddr, header.p_memsz, header.p_offset, payload);
     if (res < 0) {
