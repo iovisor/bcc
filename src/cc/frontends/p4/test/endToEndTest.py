@@ -8,7 +8,7 @@
 # This program exercises the simple.c EBPF program
 # generated from the simple.p4 source file.
 
-from__future__ import print_function
+from __future__ import print_function
 import subprocess
 import ctypes
 import time
