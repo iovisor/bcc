@@ -47,6 +47,8 @@ static const uint32_t BCC_SYM_ALL_TYPES = 65535;
 struct bcc_symbol_option {
   int use_debug_file;
   int check_debug_file_crc;
+  // Symbolize on-demand or symbolize everything ahead of time
+  int lazy_symbolize;
   // Bitmask flags indicating what types of ELF symbols to use
   uint32_t use_symbol_type;
 };

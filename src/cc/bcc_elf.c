@@ -291,7 +291,7 @@ static int list_in_scn(Elf *e, Elf_Scn *section, size_t stridx, size_t symsize,
 #endif
 
       int ret;
-      if (callback_lazy)
+      if (option->lazy_symbolize)
         ret = callback_lazy(stridx, sym.st_name, name_len, sym.st_value,
                             sym.st_size, debugfile, payload);
       else
@@ -585,14 +585,16 @@ static int foreach_sym_core(const char *path, bcc_elf_symcb callback,
 
 int bcc_elf_foreach_sym(const char *path, bcc_elf_symcb callback,
                         void *option, void *payload) {
-  return foreach_sym_core(
-      path, callback, NULL, (struct bcc_symbol_option*)option, payload, 0);
+  struct bcc_symbol_option *o = option;
+  o->lazy_symbolize = 0;
+  return foreach_sym_core(path, callback, NULL, o, payload, 0);
 }
 
 int bcc_elf_foreach_sym_lazy(const char *path, bcc_elf_symcb_lazy callback,
                         void *option, void *payload) {
-  return foreach_sym_core(path, NULL, callback,
-      (struct bcc_symbol_option*)option, payload, 0);
+  struct bcc_symbol_option *o = option;
+  o->lazy_symbolize = 1;
+  return foreach_sym_core(path, NULL, callback, o, payload, 0);
 }
 
 int bcc_elf_get_text_scn_info(const char *path, uint64_t *addr,
