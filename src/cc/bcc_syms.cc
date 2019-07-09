@@ -346,6 +346,8 @@ bool ProcSyms::Module::find_name(const char *symname, uint64_t *addr) {
     return 0;
   };
 
+  ProcMountNSGuard g(mount_ns_);
+
   if (type_ == ModuleType::PERF_MAP)
     bcc_perf_map_foreach_sym(name_.c_str(), cb, &payload);
   if (type_ == ModuleType::EXEC || type_ == ModuleType::SO)
@@ -398,6 +400,7 @@ bool ProcSyms::Module::find_addr(uint64_t offset, struct bcc_symbol *sym) {
     if (offset < it->start + it->size) {
       // Resolve and cache the symbol name if necessary
       if (!it->name) {
+        ProcMountNSGuard g(mount_ns_);
         std::string sym_name(it->name_idx.str_len + 1, '\0');
         if (bcc_elf_symbol_str(name_.c_str(), it->name_idx.section_idx,
               it->name_idx.str_table_idx, &sym_name[0], sym_name.size(),
