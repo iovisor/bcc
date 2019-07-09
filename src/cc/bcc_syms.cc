@@ -110,6 +110,7 @@ ProcSyms::ProcSyms(int pid, struct bcc_symbol_option *option)
     symbol_option_ = {
       .use_debug_file = 1,
       .check_debug_file_crc = 1,
+      .lazy_symbolize = 0,
       .use_symbol_type = (1 << STT_FUNC) | (1 << STT_GNU_IFUNC)
     };
   load_modules();
@@ -294,8 +295,12 @@ void ProcSyms::Module::load_sym_table() {
 
   if (type_ == ModuleType::PERF_MAP)
     bcc_perf_map_foreach_sym(path_.c_str(), _add_symbol, this);
-  if (type_ == ModuleType::EXEC || type_ == ModuleType::SO)
-    bcc_elf_foreach_sym_lazy(path_.c_str(), _add_symbol_lazy, symbol_option_, this);
+  if (type_ == ModuleType::EXEC || type_ == ModuleType::SO) {
+    if (symbol_option_->lazy_symbolize)
+      bcc_elf_foreach_sym_lazy(path_.c_str(), _add_symbol_lazy, symbol_option_, this);
+    else
+      bcc_elf_foreach_sym(path_.c_str(), _add_symbol, symbol_option_, this);
+  }
   if (type_ == ModuleType::VDSO)
     bcc_elf_foreach_vdso_sym(_add_symbol, this);
 
@@ -399,18 +404,19 @@ bool ProcSyms::Module::find_addr(uint64_t offset, struct bcc_symbol *sym) {
   for (; offset >= it->start; --it) {
     if (offset < it->start + it->size) {
       // Resolve and cache the symbol name if necessary
-      if (!it->name) {
+      if (!it->is_name_resolved) {
         ProcMountNSGuard g(mount_ns_);
-        std::string sym_name(it->name_idx.str_len + 1, '\0');
-        if (bcc_elf_symbol_str(name_.c_str(), it->name_idx.section_idx,
-              it->name_idx.str_table_idx, &sym_name[0], sym_name.size(),
-              it->name_idx.debugfile))
+        std::string sym_name(it->data.name_idx.str_len + 1, '\0');
+        if (bcc_elf_symbol_str(name_.c_str(), it->data.name_idx.section_idx,
+              it->data.name_idx.str_table_idx, &sym_name[0], sym_name.size(),
+              it->data.name_idx.debugfile))
           break;
 
-        it->name = &*(symnames_.emplace(std::move(sym_name)).first);
+        it->data.name = &*(symnames_.emplace(std::move(sym_name)).first);
+        it->is_name_resolved = true;
       }
 
-      sym->name = it->name->c_str();
+      sym->name = it->data.name->c_str();
       sym->offset = (offset - it->start);
       return true;
     }
@@ -667,6 +673,7 @@ int bcc_foreach_function_symbol(const char *module, SYM_CB cb) {
   static struct bcc_symbol_option default_option = {
     .use_debug_file = 1,
     .check_debug_file_crc = 1,
+    .lazy_symbolize = 0,
     .use_symbol_type = (1 << STT_FUNC) | (1 << STT_GNU_IFUNC)
   };
 
@@ -705,6 +712,7 @@ int bcc_resolve_symname(const char *module, const char *symname,
   static struct bcc_symbol_option default_option = {
     .use_debug_file = 1,
     .check_debug_file_crc = 1,
+    .lazy_symbolize = 0,
 #if defined(__powerpc64__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
     .use_symbol_type = BCC_SYM_ALL_TYPES | (1 << STT_PPC64LE_SYM_LEP),
 #else

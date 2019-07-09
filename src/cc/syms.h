@@ -78,17 +78,22 @@ class ProcSyms : SymbolCache {
 
   struct Symbol {
     Symbol(const std::string *name, uint64_t start, uint64_t size)
-        : name(name), start(start), size(size) {}
+        : is_name_resolved(true), start(start), size(size) {
+      data.name = name;
+    }
     Symbol(size_t section_idx, size_t str_table_idx, size_t str_len, uint64_t start,
            uint64_t size, bool debugfile)
-        : start(start), size(size) {
-      name_idx.section_idx = section_idx;
-      name_idx.str_table_idx = str_table_idx;
-      name_idx.str_len = str_len;
-      name_idx.debugfile = debugfile;
+        : is_name_resolved(false), start(start), size(size) {
+      data.name_idx.section_idx = section_idx;
+      data.name_idx.str_table_idx = str_table_idx;
+      data.name_idx.str_len = str_len;
+      data.name_idx.debugfile = debugfile;
     }
-    struct NameIdx name_idx;
-    const std::string *name{nullptr};
+    bool is_name_resolved;
+    union {
+      struct NameIdx name_idx;
+      const std::string *name{nullptr};
+    } data;
     uint64_t start;
     uint64_t size;
 
