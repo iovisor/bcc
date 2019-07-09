@@ -931,26 +931,53 @@ int bcc_elf_get_buildid(const char *path, char *buildid)
 int bcc_elf_symbol_str(const char *path, size_t section_idx,
                        size_t str_table_idx, char *out, size_t len)
 {
-  Elf *e;
-  int fd, err = 0;
+  Elf *e = NULL, *d = NULL;
+  int fd = -1, dfd = -1, err = 0;
   const char *name;
+  char *debug_file = NULL;
 
-  if (!out || !len)
+  if (!out)
     return -1;
 
   if (openelf(path, &e, &fd) < 0)
     return -1;
 
   if ((name = elf_strptr(e, section_idx, str_table_idx)) == NULL) {
-    err = -1;
-    goto exit;
+    // The binary did not have the symbol information, try the debuginfo
+    // file as backup.
+    debug_file = find_debug_via_buildid(e);
+    if (!debug_file)
+      debug_file = find_debug_via_debuglink(e, path, 0); // No crc for speed
+
+    if (!debug_file) {
+      err = -1;
+      goto exit;
+    }
+
+    if (openelf(debug_file, &d, &dfd) < 0) {
+      err = -1;
+      goto exit;
+    }
+
+    if ((name = elf_strptr(d, section_idx, str_table_idx)) == NULL) {
+      err = -1;
+      goto exit;
+    }
   }
 
   strncpy(out, name, len);
 
 exit:
-  elf_end(e);
-  close(fd);
+  if (debug_file)
+    free(debug_file);
+  if (e)
+    elf_end(e);
+  if (d)
+    elf_end(d);
+  if (fd >= 0)
+    close(fd);
+  if (dfd >= 0)
+    close(dfd);
   return err;
 }
 
