@@ -277,9 +277,10 @@ int ProcSyms::Module::_add_symbol(const char *symname, uint64_t start,
 
 int ProcSyms::Module::_add_symbol_lazy(size_t section_idx, size_t str_table_idx,
                                        size_t str_len, uint64_t start,
-                                       uint64_t size, void *p) {
+                                       uint64_t size, int debugfile, void *p) {
   Module *m = static_cast<Module *>(p);
-  m->syms_.emplace_back(section_idx, str_table_idx, str_len, start, size);
+  m->syms_.emplace_back(
+      section_idx, str_table_idx, str_len, start, size, debugfile);
   return 0;
 }
 
@@ -399,7 +400,8 @@ bool ProcSyms::Module::find_addr(uint64_t offset, struct bcc_symbol *sym) {
       if (!it->name) {
         std::string sym_name(it->name_idx.str_len + 1, '\0');
         if (bcc_elf_symbol_str(name_.c_str(), it->name_idx.section_idx,
-              it->name_idx.str_table_idx, &sym_name[0], sym_name.size()))
+              it->name_idx.str_table_idx, &sym_name[0], sym_name.size(),
+              it->name_idx.debugfile))
           break;
 
         it->name = &*(symnames_.emplace(std::move(sym_name)).first);
