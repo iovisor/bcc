@@ -215,7 +215,7 @@ static Elf_Scn * get_section(Elf *e, const char *section_name,
 static int list_in_scn(Elf *e, Elf_Scn *section, size_t stridx, size_t symsize,
                        struct bcc_symbol_option *option,
                        bcc_elf_symcb callback, bcc_elf_symcb_lazy callback_lazy,
-                       void *payload) {
+                       void *payload, bool debugfile) {
   Elf_Data *data = NULL;
 
 #if defined(__powerpc64__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
@@ -293,7 +293,7 @@ static int list_in_scn(Elf *e, Elf_Scn *section, size_t stridx, size_t symsize,
       int ret;
       if (callback_lazy)
         ret = callback_lazy(stridx, sym.st_name, name_len, sym.st_value,
-                            sym.st_size, payload);
+                            sym.st_size, debugfile, payload);
       else
         ret = callback(name, sym.st_value, sym.st_size, payload);
       if (ret < 0)
@@ -306,7 +306,7 @@ static int list_in_scn(Elf *e, Elf_Scn *section, size_t stridx, size_t symsize,
 
 static int listsymbols(Elf *e, bcc_elf_symcb callback,
                        bcc_elf_symcb_lazy callback_lazy, void *payload,
-                       struct bcc_symbol_option *option) {
+                       struct bcc_symbol_option *option, bool debugfile) {
   Elf_Scn *section = NULL;
 
   while ((section = elf_nextscn(e, section)) != 0) {
@@ -319,7 +319,7 @@ static int listsymbols(Elf *e, bcc_elf_symcb callback,
       continue;
 
     int rc = list_in_scn(e, section, header.sh_link, header.sh_entsize,
-                         option, callback, callback_lazy, payload);
+                         option, callback, callback_lazy, payload, debugfile);
     if (rc == 1)
       break;    // callback signaled termination
 
@@ -577,7 +577,7 @@ static int foreach_sym_core(const char *path, bcc_elf_symcb callback,
     }
   }
 
-  res = listsymbols(e, callback, callback_lazy, payload, option);
+  res = listsymbols(e, callback, callback_lazy, payload, option, is_debug_file);
   elf_end(e);
   close(fd);
   return res;
@@ -755,7 +755,7 @@ int bcc_elf_foreach_vdso_sym(bcc_elf_symcb callback, void *payload) {
   if (openelf_fd(vdso_image_fd, &elf) == -1)
     return -1;
 
-  return listsymbols(elf, callback, NULL, payload, &default_option);
+  return listsymbols(elf, callback, NULL, payload, &default_option, 0);
 }
 
 // return value: 0   : success
@@ -929,7 +929,8 @@ int bcc_elf_get_buildid(const char *path, char *buildid)
 }
 
 int bcc_elf_symbol_str(const char *path, size_t section_idx,
-                       size_t str_table_idx, char *out, size_t len)
+                       size_t str_table_idx, char *out, size_t len,
+                       int debugfile)
 {
   Elf *e = NULL, *d = NULL;
   int fd = -1, dfd = -1, err = 0;
@@ -942,9 +943,7 @@ int bcc_elf_symbol_str(const char *path, size_t section_idx,
   if (openelf(path, &e, &fd) < 0)
     return -1;
 
-  if ((name = elf_strptr(e, section_idx, str_table_idx)) == NULL) {
-    // The binary did not have the symbol information, try the debuginfo
-    // file as backup.
+  if (debugfile) {
     debug_file = find_debug_via_buildid(e);
     if (!debug_file)
       debug_file = find_debug_via_debuglink(e, path, 0); // No crc for speed
@@ -960,6 +959,11 @@ int bcc_elf_symbol_str(const char *path, size_t section_idx,
     }
 
     if ((name = elf_strptr(d, section_idx, str_table_idx)) == NULL) {
+      err = -1;
+      goto exit;
+    }
+  } else {
+    if ((name = elf_strptr(e, section_idx, str_table_idx)) == NULL) {
       err = -1;
       goto exit;
     }
