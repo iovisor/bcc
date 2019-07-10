@@ -200,9 +200,22 @@ extern int cmd_scanf(const char *cmd, const char *fmt, ...);
 
 TEST_CASE("resolve symbol addresses for a given PID", "[c_api]") {
   struct bcc_symbol sym;
+  struct bcc_symbol lazy_sym;
+  static struct bcc_symbol_option lazy_opt{
+    .use_debug_file = 1,
+    .check_debug_file_crc = 1,
+    .lazy_symbolize = 1,
+#if defined(__powerpc64__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+    .use_symbol_type = BCC_SYM_ALL_TYPES | (1 << STT_PPC64LE_SYM_LEP),
+#else
+    .use_symbol_type = BCC_SYM_ALL_TYPES,
+#endif
+  };
   void *resolver = bcc_symcache_new(getpid(), nullptr);
+  void *lazy_resolver = bcc_symcache_new(getpid(), &lazy_opt);
 
   REQUIRE(resolver);
+  REQUIRE(lazy_resolver);
 
   SECTION("resolve in our own binary memory space") {
     REQUIRE(bcc_symcache_resolve(resolver, (uint64_t)&_a_test_function, &sym) ==
@@ -213,6 +226,11 @@ TEST_CASE("resolve symbol addresses for a given PID", "[c_api]") {
     free(this_exe);
 
     REQUIRE(string("_a_test_function") == sym.name);
+
+    REQUIRE(bcc_symcache_resolve(lazy_resolver, (uint64_t)&_a_test_function, &lazy_sym) ==
+            0);
+    REQUIRE(string(lazy_sym.name) == sym.name);
+    REQUIRE(string(lazy_sym.module) == sym.module);
   }
 
   SECTION("resolve in libbcc.so") {
@@ -225,6 +243,10 @@ TEST_CASE("resolve symbol addresses for a given PID", "[c_api]") {
     REQUIRE(bcc_symcache_resolve(resolver, (uint64_t)libbcc_fptr, &sym) == 0);
     REQUIRE(string(sym.module).find("libbcc.so") != string::npos);
     REQUIRE(string("bcc_resolve_symname") == sym.name);
+
+    REQUIRE(bcc_symcache_resolve(lazy_resolver, (uint64_t)libbcc_fptr, &lazy_sym) == 0);
+    REQUIRE(string(lazy_sym.module) == sym.module);
+    REQUIRE(string(lazy_sym.name) == sym.name);
   }
 
   SECTION("resolve in libc") {
@@ -235,6 +257,10 @@ TEST_CASE("resolve symbol addresses for a given PID", "[c_api]") {
     REQUIRE(sym.module);
     REQUIRE(sym.module[0] == '/');
     REQUIRE(string(sym.module).find("libc") != string::npos);
+
+    REQUIRE(bcc_symcache_resolve(lazy_resolver, (uint64_t)libc_fptr, &lazy_sym) == 0);
+    REQUIRE(string(lazy_sym.module) == sym.module);
+    REQUIRE(string(lazy_sym.name) == sym.name);
 
     // In some cases, a symbol may have multiple aliases. Since
     // bcc_symcache_resolve() returns only the first alias of a
@@ -266,6 +292,7 @@ TEST_CASE("resolve symbol addresses for a given PID", "[c_api]") {
   SECTION("resolve in separate mount namespace") {
     pid_t child;
     uint64_t addr = 0;
+    uint64_t lazy_addr = 0;
 
     child = spawn_child(0, true, true, mntns_func);
     REQUIRE(child > 0);
@@ -276,6 +303,12 @@ TEST_CASE("resolve symbol addresses for a given PID", "[c_api]") {
     REQUIRE(bcc_symcache_resolve_name(resolver, "/tmp/libz.so.1", "zlibVersion",
         &addr) == 0);
     REQUIRE(addr != 0);
+
+    void *lazy_resolver = bcc_symcache_new(child, &lazy_opt);
+    REQUIRE(lazy_resolver);
+    REQUIRE(bcc_symcache_resolve_name(lazy_resolver, "/tmp/libz.so.1", "zlibVersion",
+        &lazy_addr) == 0);
+    REQUIRE(lazy_addr == addr);
   }
 }
 
