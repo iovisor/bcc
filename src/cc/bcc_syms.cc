@@ -438,6 +438,7 @@ bool BuildSyms::Module::load_sym_table()
   symbol_option_ = {
     .use_debug_file = 1,
     .check_debug_file_crc = 1,
+    .lazy_symbolize = 0,
     .use_symbol_type = (1 << STT_FUNC) | (1 << STT_GNU_IFUNC)
   };
 
