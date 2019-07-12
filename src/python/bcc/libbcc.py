@@ -96,10 +96,8 @@ lib.bpf_attach_kprobe.argtypes = [ct.c_int, ct.c_int, ct.c_char_p, ct.c_char_p,
         ct.c_ulonglong, ct.c_int]
 lib.bpf_detach_kprobe.restype = ct.c_int
 lib.bpf_detach_kprobe.argtypes = [ct.c_char_p]
-
 lib.bpf_attach_breakpoint.restype = ct.c_void_p
 lib.bpf_attach_breakpoint.argtypes = [ct.c_int, ct.c_int, ct.c_int, ct.c_int]
-
 lib.bpf_attach_uprobe.restype = ct.c_int
 lib.bpf_attach_uprobe.argtypes = [ct.c_int, ct.c_int, ct.c_char_p, ct.c_char_p,
         ct.c_ulonglong, ct.c_int]

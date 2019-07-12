@@ -51,7 +51,7 @@ int func(struct pt_regs *ctx) {
   val = counts.lookup_or_init(&key, &zero);
   (*val)++;
 
-  bpf_trace_printk("Hello, World! Here I did a func call!\\n");
+  bpf_trace_printk("Hello World, Here I accessed the address!\\n");
 
   return 0;
 
