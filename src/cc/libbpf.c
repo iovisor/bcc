@@ -216,7 +216,7 @@ static uint64_t ptr_to_u64(void *ptr)
 
 int bcc_create_map_xattr(struct bpf_create_map_attr *attr, bool allow_rlimit)
 {
-  size_t name_len = attr->name ? strlen(attr->name) : 0;
+  unsigned name_len = attr->name ? strlen(attr->name) : 0;
   char map_name[BPF_OBJ_NAME_LEN] = {};
 
   memcpy(map_name, attr->name, min(name_len, BPF_OBJ_NAME_LEN - 1));
@@ -499,7 +499,7 @@ int bpf_prog_get_tag(int fd, unsigned long long *ptag)
 int bcc_prog_load_xattr(struct bpf_load_program_attr *attr, int prog_len,
                         char *log_buf, unsigned log_buf_size, bool allow_rlimit)
 {
-  size_t name_len = attr->name ? strlen(attr->name) : 0;
+  unsigned name_len = attr->name ? strlen(attr->name) : 0;
   char *tmp_log_buf = NULL, *attr_log_buf = NULL;
   unsigned tmp_log_buf_size = 0, attr_log_buf_size = 0;
   int ret = 0, name_offset = 0;

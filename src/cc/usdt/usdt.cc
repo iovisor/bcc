@@ -483,7 +483,6 @@ const char *bcc_usdt_genargs(void **usdt_array, int len) {
     for (size_t j = 0; j < ctx->num_probes(); j++) {
       USDT::Probe *p = ctx->get(j);
       if (p->enabled()) {
-        auto pid = ctx->pid();
         std::string key = ctx->cmd_bin_path() + "*" + p->provider() + "*" + p->name();
         if (generated_probes.find(key) != generated_probes.end())
           continue;

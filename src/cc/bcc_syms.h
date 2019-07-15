@@ -32,6 +32,7 @@ struct bcc_symbol {
 };
 
 typedef int (*SYM_CB)(const char *symname, uint64_t addr);
+struct mod_info;
 
 #ifndef STT_GNU_IFUNC
 #define STT_GNU_IFUNC 10
