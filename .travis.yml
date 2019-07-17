@@ -1,9 +1,20 @@
-language: generic
-install:
-  - sudo apt-get install -y python-pip
-  - sudo pip install flake8
-script:
-  #- set -euo pipefail
-  # TODO: Fix check-helpers.sh and remove the || true
-  - ./scripts/check-helpers.sh || true
-  - ./scripts/py-style-check.sh
+language: python
+matrix:
+  include:
+    - name: "Check helpers on Python 2.7"
+      python: 2.7
+      script: ./scripts/check-helpers.sh
+    - name: "Python style check on Python 2.7"
+      python: 2.7
+      script: ./scripts/py-style-check.sh
+    - name: "flake8 lint on Python 2.7"      
+      python: 2.7
+      script: flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+    - name: "flake8 lint on Python 3.7"
+      dist: xenial  # required for Python >= 3.7
+      python: 3.7
+      script: flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+  allow_failures:
+    - name: "Check helpers on Python 2.7"
+before_install: pip install --upgrade pip
+install: pip install flake8

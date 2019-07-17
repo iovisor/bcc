@@ -22,6 +22,7 @@ extern "C" {
 
 #include <stdint.h>
 #include "linux/bpf.h"
+#include "bcc_proc.h"
 
 struct bcc_symbol {
   const char *name;
@@ -31,6 +32,7 @@ struct bcc_symbol {
 };
 
 typedef int (*SYM_CB)(const char *symname, uint64_t addr);
+struct mod_info;
 
 #ifndef STT_GNU_IFUNC
 #define STT_GNU_IFUNC 10
@@ -46,6 +48,8 @@ static const uint32_t BCC_SYM_ALL_TYPES = 65535;
 struct bcc_symbol_option {
   int use_debug_file;
   int check_debug_file_crc;
+  // Symbolize on-demand or symbolize everything ahead of time
+  int lazy_symbolize;
   // Bitmask flags indicating what types of ELF symbols to use
   uint32_t use_symbol_type;
 };
@@ -65,8 +69,9 @@ int bcc_symcache_resolve_name(void *resolver, const char *module,
                               const char *name, uint64_t *addr);
 void bcc_symcache_refresh(void *resolver);
 
+int _bcc_syms_find_module(struct mod_info *info, int enter_ns, void *p);
 int bcc_resolve_global_addr(int pid, const char *module, const uint64_t address,
-                            uint64_t *global);
+                            uint8_t inode_match_only, uint64_t *global);
 
 /*bcc APIs for build_id stackmap support*/
 void *bcc_buildsymcache_new(void);

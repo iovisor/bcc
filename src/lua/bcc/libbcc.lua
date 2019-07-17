@@ -116,6 +116,7 @@ struct bcc_symbol {
 struct bcc_symbol_option {
   int use_debug_file;
   int check_debug_file_crc;
+  int lazy_symbolize;
   uint32_t use_symbol_type;
 };
 

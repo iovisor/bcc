@@ -93,20 +93,19 @@ typedef struct {
 
 const static std::string kPy36LibName = "libpython3.6";
 
-int findPythonPathCallback(const char* name, uint64_t st, uint64_t en, uint64_t,
-                           bool, void* payload) {
+int findPythonPathCallback(mod_info *mod, int, void* payload) {
   auto helper = static_cast<FindPythonPathHelper*>(payload);
-  std::string file = name;
+  std::string file = mod->name;
   auto pos = file.rfind("/");
   if (pos != std::string::npos) {
     file = file.substr(pos + 1);
   }
   if (file.find(kPy36LibName) == 0) {
-    logInfo(1, "Found Python library %s loaded at %lx-%lx for PID %d\n", name,
-            st, en, helper->pid);
+    logInfo(1, "Found Python library %s loaded at %lx-%lx for PID %d\n", mod->name,
+            mod->start_addr, mod->end_addr, helper->pid);
     helper->found = true;
-    helper->st = st;
-    helper->en = en;
+    helper->st = mod->start_addr;
+    helper->en = mod->end_addr;
     return -1;
   }
   return 0;
@@ -143,6 +142,7 @@ bool getAddrOfPythonBinary(const std::string& path, PidData& data) {
 
   struct bcc_symbol_option option = {.use_debug_file = 0,
                                      .check_debug_file_crc = 0,
+                                     .lazy_symbolize = 0,
                                      .use_symbol_type = (1 << STT_OBJECT)};
 
   bcc_elf_foreach_sym(path.c_str(), &getAddrOfPythonBinaryCallback, &option,

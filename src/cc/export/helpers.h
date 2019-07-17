@@ -18,7 +18,7 @@ R"********(
 #define __BPF_HELPERS_H
 
 /* Before bpf_helpers.h is included, uapi bpf.h has been
- * included, which references linux/types.h. This will bring
+ * included, which references linux/types.h. This may bring
  * in asm_volatile_goto definition if permitted based on
  * compiler setup and kernel configs.
  *
@@ -29,8 +29,8 @@ R"********(
  */
 #ifdef asm_volatile_goto
 #undef asm_volatile_goto
-#define asm_volatile_goto(x...) asm volatile("invalid use of asm_volatile_goto")
 #endif
+#define asm_volatile_goto(x...) asm volatile("invalid use of asm_volatile_goto")
 
 #include <uapi/linux/bpf.h>
 #include <uapi/linux/if_packet.h>

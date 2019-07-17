@@ -23,9 +23,9 @@
 #include <unordered_set>
 #include <vector>
 
+#include "bcc_proc.h"
 #include "bcc_syms.h"
 #include "file_desc.h"
-#include "ns_guard.h"
 
 class ProcStat {
   std::string procfs_;
@@ -69,10 +69,31 @@ public:
 };
 
 class ProcSyms : SymbolCache {
+  struct NameIdx {
+    size_t section_idx;
+    size_t str_table_idx;
+    size_t str_len;
+    bool debugfile;
+  };
+
   struct Symbol {
     Symbol(const std::string *name, uint64_t start, uint64_t size)
-        : name(name), start(start), size(size) {}
-    const std::string *name;
+        : is_name_resolved(true), start(start), size(size) {
+      data.name = name;
+    }
+    Symbol(size_t section_idx, size_t str_table_idx, size_t str_len, uint64_t start,
+           uint64_t size, bool debugfile)
+        : is_name_resolved(false), start(start), size(size) {
+      data.name_idx.section_idx = section_idx;
+      data.name_idx.str_table_idx = str_table_idx;
+      data.name_idx.str_len = str_len;
+      data.name_idx.debugfile = debugfile;
+    }
+    bool is_name_resolved;
+    union {
+      struct NameIdx name_idx;
+      const std::string *name{nullptr};
+    } data;
     uint64_t start;
     uint64_t size;
 
@@ -98,13 +119,12 @@ class ProcSyms : SymbolCache {
           : start(s), end(e), file_offset(f) {}
     };
 
-    Module(const char *name, ProcMountNS *mount_ns,
-           struct bcc_symbol_option *option);
+    Module(const char *name, const char *path, struct bcc_symbol_option *option);
 
     std::string name_;
+    std::string path_;
     std::vector<Range> ranges_;
     bool loaded_;
-    ProcMountNS *mount_ns_;
     bcc_symbol_option *symbol_option_;
     ModuleType type_;
 
@@ -125,18 +145,19 @@ class ProcSyms : SymbolCache {
 
     static int _add_symbol(const char *symname, uint64_t start, uint64_t size,
                            void *p);
+    static int _add_symbol_lazy(size_t section_idx, size_t str_table_idx,
+                                size_t str_len, uint64_t start, uint64_t size,
+                                int debugfile, void *p);
   };
 
   int pid_;
   std::vector<Module> modules_;
   ProcStat procstat_;
-  std::unique_ptr<ProcMountNS> mount_ns_instance_;
   bcc_symbol_option symbol_option_;
 
   static int _add_load_sections(uint64_t v_addr, uint64_t mem_sz,
                                 uint64_t file_offset, void *payload);
-  static int _add_module(const char *, uint64_t, uint64_t, uint64_t, bool,
-                         void *);
+  static int _add_module(mod_info *, int, void *);
   void load_exe();
   void load_modules();
 
