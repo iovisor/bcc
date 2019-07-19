@@ -1475,7 +1475,7 @@ local tracepoint_mt = {
 				prog = compile(prog, {proto.type(t.type, {source='ptr_to_probe'})})
 			end
 			-- Load the BPF program
-			local prog_fd, err, log = S.bcc_prog_load(S.c.BPF_PROG.TRACEPOINT, prog.insn, prog.pc)
+			local prog_fd, err, log = S.bpf_prog_load(S.c.BPF_PROG.TRACEPOINT, prog.insn, prog.pc)
 			assert(prog_fd, tostring(err)..': '..tostring(log))
 			-- Open tracepoint and attach
 			t.reader:setbpf(prog_fd:getfd())
@@ -1499,7 +1499,7 @@ local function trace_bpf(ptype, pname, pdef, retprobe, prog, pid, cpu, group_fd)
 	if type(prog) ~= 'table' then
 		prog = compile(prog, {proto.pt_regs})
 	end
-	local prog_fd, err, log = S.bcc_prog_load(S.c.BPF_PROG.KPROBE, prog.insn, prog.pc)
+	local prog_fd, err, log = S.bpf_prog_load(S.c.BPF_PROG.KPROBE, prog.insn, prog.pc)
 	assert(prog_fd, tostring(err)..': '..tostring(log))
 	-- Open tracepoint and attach
 	local tp, err = S.perf_probe(ptype, pname, pdef, retprobe)
@@ -1580,7 +1580,7 @@ return setmetatable({
 		if type(prog) ~= 'table' then
 			prog = compile(prog, {proto.skb})
 		end
-		local prog_fd, err, log = S.bcc_prog_load(S.c.BPF_PROG.SOCKET_FILTER, prog.insn, prog.pc)
+		local prog_fd, err, log = S.bpf_prog_load(S.c.BPF_PROG.SOCKET_FILTER, prog.insn, prog.pc)
 		assert(prog_fd, tostring(err)..': '..tostring(log))
 		assert(sock:setsockopt('socket', 'attach_bpf', prog_fd:getfd()))
 		return prog_fd, err
