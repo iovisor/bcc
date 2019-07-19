@@ -167,6 +167,7 @@ class SmokeTests(TestCase):
     def test_fileslower(self):
         self.run_with_int("fileslower.py")
 
+    @skipUnless(kernel_version_ge(4,11), "requires kernel >= 4.11")
     def test_filetop(self):
         self.run_with_duration("filetop.py 1 1")
 
