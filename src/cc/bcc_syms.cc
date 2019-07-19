@@ -47,9 +47,9 @@ bool ProcStat::is_stale() {
 ProcStat::ProcStat(int pid)
     : procfs_(tfm::format("/proc/%d/exe", pid)), inode_(getinode_()) {}
 
-void KSyms::_add_symbol(const char *symname, uint64_t addr, void *p) {
+void KSyms::_add_symbol(const char *symname, const char *modname, uint64_t addr, void *p) {
   KSyms *ks = static_cast<KSyms *>(p);
-  ks->syms_.emplace_back(symname, addr);
+  ks->syms_.emplace_back(symname, modname, addr);
 }
 
 void KSyms::refresh() {
@@ -67,13 +67,13 @@ bool KSyms::resolve_addr(uint64_t addr, struct bcc_symbol *sym, bool demangle) {
   if (syms_.empty())
     goto unknown_symbol;
 
-  it = std::upper_bound(syms_.begin(), syms_.end(), Symbol("", addr));
+  it = std::upper_bound(syms_.begin(), syms_.end(), Symbol("", "", addr));
   if (it != syms_.begin()) {
     it--;
     sym->name = (*it).name.c_str();
     if (demangle)
       sym->demangle_name = sym->name;
-    sym->module = "kernel";
+    sym->module = (*it).mod.c_str();
     sym->offset = addr - (*it).addr;
     return true;
   }
