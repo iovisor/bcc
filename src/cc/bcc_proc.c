@@ -208,7 +208,7 @@ done:
 
 int bcc_procutils_each_ksym(bcc_procutils_ksymcb callback, void *payload) {
   char line[2048];
-  char *symname, *endsym;
+  char *symname, *endsym, *modname, *endmod = NULL;
   FILE *kallsyms;
   unsigned long long addr;
 
@@ -237,7 +237,23 @@ int bcc_procutils_each_ksym(bcc_procutils_ksymcb callback, void *payload) {
     while (*endsym && !isspace(*endsym)) endsym++;
     *endsym = '\0';
 
-    callback(symname, addr, payload);
+    // Parse module name if it's available
+    modname = endsym + 1;
+    while (*modname && isspace(*endsym)) modname++;
+
+    if (*modname && *modname == '[') {
+      endmod = ++modname;
+      while (*endmod && *endmod != ']') endmod++;
+      if (*endmod)
+        *(endmod) = '\0';
+      else
+        endmod = NULL;
+    }
+
+    if (!endmod)
+      modname = "kernel";
+
+    callback(symname, modname, addr, payload);
   }
 
   fclose(kallsyms);

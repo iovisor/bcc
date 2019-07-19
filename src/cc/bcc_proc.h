@@ -42,7 +42,7 @@ typedef struct mod_info {
 typedef int (*bcc_procutils_modulecb)(mod_info *, int, void *);
 
 // Symbol name, address, payload
-typedef void (*bcc_procutils_ksymcb)(const char *, uint64_t, void *);
+typedef void (*bcc_procutils_ksymcb)(const char *, const char *, uint64_t, void *);
 
 char *bcc_procutils_which_so(const char *libname, int pid);
 char *bcc_procutils_which(const char *binpath);

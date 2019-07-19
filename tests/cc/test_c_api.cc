@@ -67,7 +67,7 @@ TEST_CASE("binary resolution with `which`", "[c_api]") {
   free(ld);
 }
 
-static void _test_ksym(const char *sym, uint64_t addr, void *_) {
+static void _test_ksym(const char *sym, const char *mod, uint64_t addr, void *_) {
   if (!strcmp(sym, "startup_64"))
     REQUIRE(addr != 0x0ull);
 }

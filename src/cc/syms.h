@@ -50,8 +50,9 @@ public:
 
 class KSyms : SymbolCache {
   struct Symbol {
-    Symbol(const char *name, uint64_t addr) : name(name), addr(addr) {}
+    Symbol(const char *name, const char *mod, uint64_t addr) : name(name), mod(mod), addr(addr) {}
     std::string name;
+    std::string mod;
     uint64_t addr;
 
     bool operator<(const Symbol &rhs) const { return addr < rhs.addr; }
@@ -59,7 +60,7 @@ class KSyms : SymbolCache {
 
   std::vector<Symbol> syms_;
   std::unordered_map<std::string, uint64_t> symnames_;
-  static void _add_symbol(const char *, uint64_t, void *);
+  static void _add_symbol(const char *, const char *, uint64_t, void *);
 
 public:
   virtual bool resolve_addr(uint64_t addr, struct bcc_symbol *sym, bool demangle = true) override;
