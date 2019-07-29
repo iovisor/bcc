@@ -1,0 +1,49 @@
+.TH SOLISTEN 8 "2019-07-29" "USER COMMANDS"
+.SH NAME
+solisten \- Trace listening socket
+.SH SYNOPSIS
+usage: solisten [\-h] [\-\-show\-netns] [\-p PID] [\-n NETNS]
+.SH DESCRIPTION
+All IPv4 and IPv6 listen attempts are traced, even if they ultimately
+fail or the listening program is not willing to accept().
+.SS "optional arguments:"
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+show this help message and exit
+.TP
+\fB\-\-show\-netns\fR
+show network namespace
+.TP
+\fB\-p\fR PID, \fB\-\-pid\fR PID
+trace this PID only
+.TP
+\fB\-n\fR NETNS, \fB\-\-netns\fR NETNS
+trace this Network Namespace only
+.SH EXAMPLES
+.TP
+Stream socket listen:
+#
+.B solisten
+.TP
+Stream socket listen for specified PID only
+#
+.B solisten \-p 1234
+.TP
+Stream socket listen for the specified network namespace ID only
+#
+.B solisten \-\-netns 4242
+.TP
+Show network ns ID (useful for containers)
+#
+.B solisten \-\-show\-netns
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.

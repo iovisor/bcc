@@ -19,7 +19,7 @@ from datetime import datetime, timedelta
 
 # arguments
 examples = """examples:
-    ./sofdsnoop           # trace file descriptors passes
+    ./sofdsnoop           # trace passed file descriptors
     ./sofdsnoop -T        # include timestamps
     ./sofdsnoop -p 181    # only trace PID 181
     ./sofdsnoop -t 123    # only trace TID 123
