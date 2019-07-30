@@ -142,7 +142,7 @@ bool getAddrOfPythonBinary(const std::string& path, PidData& data) {
 
   struct bcc_symbol_option option = {.use_debug_file = 0,
                                      .check_debug_file_crc = 0,
-                                     .lazy_symbolize = 0,
+                                     .lazy_symbolize = 1,
                                      .use_symbol_type = (1 << STT_OBJECT)};
 
   bcc_elf_foreach_sym(path.c_str(), &getAddrOfPythonBinaryCallback, &option,

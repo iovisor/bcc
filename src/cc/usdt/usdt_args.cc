@@ -39,7 +39,7 @@ bool Argument::get_global_address(uint64_t *address, const std::string &binpath,
     static struct bcc_symbol_option default_option = {
       .use_debug_file = 1,
       .check_debug_file_crc = 1,
-      .lazy_symbolize = 0,
+      .lazy_symbolize = 1,
       .use_symbol_type = BCC_SYM_ALL_TYPES
     };
     return ProcSyms(*pid, &default_option)
