@@ -55,18 +55,33 @@ std::string sanitize_str(std::string str, bool (*validator)(char),
   return str;
 }
 
+StatusTuple BPF::init_usdt(const USDT& usdt) {
+  USDT u(usdt);
+  StatusTuple init_stp = u.init();
+  if (init_stp.code() != 0) {
+    return init_stp;
+  }
+
+  usdt_.push_back(std::move(u));
+  all_bpf_program_ += usdt_.back().program_text_;
+  return StatusTuple(0);
+}
+
+void BPF::init_fail_reset() {
+  usdt_.clear();
+  all_bpf_program_ = "";
+}
+
 StatusTuple BPF::init(const std::string& bpf_program,
                       const std::vector<std::string>& cflags,
                       const std::vector<USDT>& usdt) {
-  std::string all_bpf_program;
-
   usdt_.reserve(usdt.size());
   for (const auto& u : usdt) {
-    usdt_.emplace_back(u);
-  }
-  for (auto& u : usdt_) {
-    TRY2(u.init());
-    all_bpf_program += u.program_text_;
+    StatusTuple init_stp = init_usdt(u);
+    if (init_stp.code() != 0) {
+      init_fail_reset();
+      return init_stp;
+    }
   }
 
   auto flags_len = cflags.size();
@@ -74,9 +89,11 @@ StatusTuple BPF::init(const std::string& bpf_program,
   for (size_t i = 0; i < flags_len; i++)
     flags[i] = cflags[i].c_str();
 
-  all_bpf_program += bpf_program;
-  if (bpf_module_->load_string(all_bpf_program, flags, flags_len) != 0)
+  all_bpf_program_ += bpf_program;
+  if (bpf_module_->load_string(all_bpf_program_, flags, flags_len) != 0) {
+    init_fail_reset();
     return StatusTuple(-1, "Unable to initialize BPF program");
+  }
 
   return StatusTuple(0);
 };

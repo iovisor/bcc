@@ -245,6 +245,8 @@ int do_trace(struct pt_regs *ctx) {
 
 This reads the sixth USDT argument, and then pulls it in as a string to ```path```.
 
+When initializing USDTs via the third argument of ```BPF::init``` in the C API, if any USDT fails to ```init```, entire ```BPF::init``` will fail. If you're OK with some USDTs failing to ```init```, use ```BPF::init_usdt``` before calling ```BPF::init```.
+
 Examples in situ:
 [code](https://github.com/iovisor/bcc/commit/4f88a9401357d7b75e917abd994aa6ea97dda4d3#diff-04a7cad583be5646080970344c48c1f4R24),
 [search /examples](https://github.com/iovisor/bcc/search?q=bpf_usdt_readarg+path%3Aexamples&type=Code),

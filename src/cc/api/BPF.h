@@ -58,6 +58,8 @@ class BPF {
                    const std::vector<std::string>& cflags = {},
                    const std::vector<USDT>& usdt = {});
 
+  StatusTuple init_usdt(const USDT& usdt);
+
   ~BPF();
   StatusTuple detach_all();
 
@@ -244,6 +246,8 @@ class BPF {
                                   uint64_t& offset_res,
                                   uint64_t symbol_offset = 0);
 
+  void init_fail_reset();
+
   int flag_;
 
   void *bsymcache_;
@@ -255,6 +259,7 @@ class BPF {
   std::map<std::string, int> funcs_;
 
   std::vector<USDT> usdt_;
+  std::string all_bpf_program_;
 
   std::map<std::string, open_probe_t> kprobes_;
   std::map<std::string, open_probe_t> uprobes_;
