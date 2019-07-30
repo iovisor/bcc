@@ -110,7 +110,7 @@ ProcSyms::ProcSyms(int pid, struct bcc_symbol_option *option)
     symbol_option_ = {
       .use_debug_file = 1,
       .check_debug_file_crc = 1,
-      .lazy_symbolize = 0,
+      .lazy_symbolize = 1,
       .use_symbol_type = (1 << STT_FUNC) | (1 << STT_GNU_IFUNC)
     };
   load_modules();
@@ -435,7 +435,7 @@ bool BuildSyms::Module::load_sym_table()
   symbol_option_ = {
     .use_debug_file = 1,
     .check_debug_file_crc = 1,
-    .lazy_symbolize = 0,
+    .lazy_symbolize = 1,
     .use_symbol_type = (1 << STT_FUNC) | (1 << STT_GNU_IFUNC)
   };
 
@@ -671,7 +671,7 @@ int bcc_foreach_function_symbol(const char *module, SYM_CB cb) {
   static struct bcc_symbol_option default_option = {
     .use_debug_file = 1,
     .check_debug_file_crc = 1,
-    .lazy_symbolize = 0,
+    .lazy_symbolize = 1,
     .use_symbol_type = (1 << STT_FUNC) | (1 << STT_GNU_IFUNC)
   };
 
@@ -710,7 +710,7 @@ int bcc_resolve_symname(const char *module, const char *symname,
   static struct bcc_symbol_option default_option = {
     .use_debug_file = 1,
     .check_debug_file_crc = 1,
-    .lazy_symbolize = 0,
+    .lazy_symbolize = 1,
 #if defined(__powerpc64__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
     .use_symbol_type = BCC_SYM_ALL_TYPES | (1 << STT_PPC64LE_SYM_LEP),
 #else

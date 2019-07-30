@@ -257,7 +257,7 @@ BPFStackTable::BPFStackTable(const TableDesc& desc, bool use_debug_file,
 
   symbol_option_ = {.use_debug_file = use_debug_file,
                     .check_debug_file_crc = check_debug_file_crc,
-                    .lazy_symbolize = 0,
+                    .lazy_symbolize = 1,
                     .use_symbol_type = (1 << STT_FUNC) | (1 << STT_GNU_IFUNC)};
 }
 
@@ -328,7 +328,7 @@ BPFStackBuildIdTable::BPFStackBuildIdTable(const TableDesc& desc, bool use_debug
 
   symbol_option_ = {.use_debug_file = use_debug_file,
                     .check_debug_file_crc = check_debug_file_crc,
-                    .lazy_symbolize = 0,
+                    .lazy_symbolize = 1,
                     .use_symbol_type = (1 << STT_FUNC) | (1 << STT_GNU_IFUNC)};
 }
 
