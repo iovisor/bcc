@@ -99,6 +99,32 @@ TEST_CASE("test find a probe in our process' shared libs with c++ API", "[usdt]"
   REQUIRE(res.code() == 0);
 }
 
+TEST_CASE("test usdt partial init w/ fail init_usdt", "[usdt]") {
+  ebpf::BPF bpf;
+  ebpf::USDT u(::getpid(), "libbcc_test", "sample_lib_probe_nonexistent", "on_event");
+  ebpf::USDT p(::getpid(), "libbcc_test", "sample_lib_probe_1", "on_event");
+
+  // We should be able to fail initialization and subsequently do bpf.init w/o USDT
+  // successfully
+  auto res = bpf.init_usdt(u);
+  REQUIRE(res.msg() != "");
+  REQUIRE(res.code() != 0);
+
+  // Shouldn't be necessary to re-init bpf object either after failure to init w/
+  // bad USDT
+  res = bpf.init("int on_event() { return 0; }", {}, {u});
+  REQUIRE(res.msg() != "");
+  REQUIRE(res.code() != 0);
+
+  res = bpf.init_usdt(p);
+  REQUIRE(res.msg() == "");
+  REQUIRE(res.code() == 0);
+
+  res = bpf.init("int on_event() { return 0; }", {}, {});
+  REQUIRE(res.msg() == "");
+  REQUIRE(res.code() == 0);
+}
+
 class ChildProcess {
   pid_t pid_;
 
