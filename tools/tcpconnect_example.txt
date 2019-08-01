@@ -55,22 +55,35 @@ UID   PID    COMM         IP SADDR            DADDR            DPORT
 1000  31338  telnet       6  ::1              ::1              23
 1000  31338  telnet       4  127.0.0.1        127.0.0.1        23
 
+To spot heavy outbound connections quickly one can use the -c flag. It will
+count all active connections per source ip and destination ip/port.
+
+# ./tcpconnect.py -c
+Tracing connect ... Hit Ctrl-C to end
+^C
+LADDR                 RADDR                      RPORT             CONNECTS
+192.168.10.50         172.217.21.194             443               70
+192.168.10.50         172.213.11.195             443               34
+192.168.10.50         172.212.22.194             443               21
+[...]
+
 
 USAGE message:
 
 # ./tcpconnect -h
-usage: tcpconnect [-h] [-t] [-p PID] [-P PORT]
+usage: tcpconnect [-h] [-c] [-t] [-p PID] [-P PORT]
 
 Trace TCP connects
 
 optional arguments:
-  -h, --help         show this help message and exit
-  -t, --timestamp    include timestamp on output
-  -p PID, --pid PID  trace this PID only
+  -h, --help            show this help message and exit
+  -t, --timestamp       include timestamp on output
+  -p PID, --pid PID     trace this PID only
   -P PORT, --port PORT
-                     comma-separated list of destination ports to trace.
-  -U, --print-uid    include UID on output
-  -u UID, --uid UID  trace this UID only
+                        comma-separated list of destination ports to trace.
+  -U, --print-uid       include UID on output
+  -u UID, --uid UID     trace this UID only
+  -c, --count           count connects per src ip and dest ip/port
 
 examples:
     ./tcpconnect           # trace all TCP connect()s
@@ -80,3 +93,4 @@ examples:
     ./tcpconnect -P 80,81  # only trace port 80 and 81
     ./tcpconnect -U        # include UID
     ./tcpconnect -u 1000   # only trace UID 1000
+    ./tcpconnect -c        # count connects per src ip and dest ip/port

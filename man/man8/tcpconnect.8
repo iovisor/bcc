@@ -2,7 +2,7 @@
 .SH NAME
 tcpconnect \- Trace TCP active connections (connect()). Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B tcpconnect [\-h] [\-t] [\-x] [\-p PID] [-P PORT]
+.B tcpconnect [\-h] [\-c] [\-t] [\-x] [\-p PID] [-P PORT]
 .SH DESCRIPTION
 This tool traces active TCP connections (eg, via a connect() syscall;
 accept() are passive connections). This can be useful for general
@@ -24,6 +24,9 @@ Print usage message.
 .TP
 \-t
 Include a timestamp column.
+.TP
+\-c
+Count connects per src ip and dest ip/port.
 .TP
 \-p PID
 Trace this process ID only (filtered in-kernel).
@@ -53,16 +56,18 @@ Trace PID 181 only:
 Trace ports 80 and 81 only:
 #
 .B tcpconnect \-P 80,81
-.SH FIELDS
 .TP
 Trace all TCP connects, and include UID:
 #
 .B tcpconnect \-U
-.SH FIELDS
 .TP
 Trace UID 1000 only:
 #
 .B tcpconnect \-u 1000
+.TP
+Count connects per src ip and dest ip/port:
+#
+.B tcpconnect \-c
 .SH FIELDS
 .TP
 TIME(s)
@@ -88,11 +93,14 @@ Destination IP address.
 .TP
 DPORT
 Destination port
+.TP
+CONNECTS
+Accumulated active connections since start.
 .SH OVERHEAD
 This traces the kernel tcp_v[46]_connect functions and prints output for each
 event. As the rate of this is generally expected to be low (< 1000/s), the
 overhead is also expected to be negligible. If you have an application that
-is calling a high rate of connects()s, such as a proxy server, then test and
+is calling a high rate of connect()s, such as a proxy server, then test and
 understand this overhead before use.
 .SH SOURCE
 This is from bcc.
