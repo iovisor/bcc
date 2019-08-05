@@ -546,6 +546,54 @@ static char *find_debug_via_buildid(Elf *e) {
   return NULL;
 }
 
+static char *find_debug_via_symfs(Elf *e, const char* path) {
+  char fullpath[PATH_MAX];
+  char buildid[128];
+  char symfs_buildid[128];
+  int check_build_id;
+  char *symfs;
+  Elf *symfs_e = NULL;
+  int symfs_fd = -1;
+  char *result = NULL;
+
+  symfs = getenv("BCC_SYMFS");
+  if (!symfs || !*symfs)
+    goto out;
+
+  check_build_id = find_buildid(e, buildid);
+
+  snprintf(fullpath, sizeof(fullpath), "%s/%s", symfs, path);
+  if (access(fullpath, F_OK) == -1)
+    goto out;
+
+  if (openelf(fullpath, &symfs_e, &symfs_fd) < 0) {
+    symfs_e = NULL;
+    symfs_fd = -1;
+    goto out;
+  }
+
+  if (check_build_id) {
+    if (!find_buildid(symfs_e, symfs_buildid))
+      goto out;
+
+    if (strncmp(buildid, symfs_buildid, sizeof(buildid)))
+      goto out;
+  }
+
+  result = strdup(fullpath);
+
+out:
+  if (symfs_e) {
+    elf_end(symfs_e);
+  }
+
+  if (symfs_fd != -1) {
+    close(symfs_fd);
+  }
+
+  return result;
+}
+
 static int foreach_sym_core(const char *path, bcc_elf_symcb callback,
                             bcc_elf_symcb_lazy callback_lazy,
                             struct bcc_symbol_option *option, void *payload,
@@ -561,13 +609,17 @@ static int foreach_sym_core(const char *path, bcc_elf_symcb callback,
     return -1;
 
   // If there is a separate debuginfo file, try to locate and read it, first
-  // using the build-id section, then using the debuglink section. These are
-  // also the rules that GDB folows.
-  // See: https://sourceware.org/gdb/onlinedocs/gdb/Separate-Debug-Files.html
+  // using symfs, then using the build-id section, finally using the debuglink
+  // section. These rules are what perf and gdb follow.
+  // See:
+  // - https://github.com/torvalds/linux/blob/v5.2/tools/perf/Documentation/perf-report.txt#L325
+  // - https://sourceware.org/gdb/onlinedocs/gdb/Separate-Debug-Files.html
   if (option->use_debug_file && !is_debug_file) {
     // The is_debug_file argument helps avoid infinitely resolving debuginfo
     // files for debuginfo files and so on.
-    debug_file = find_debug_via_buildid(e);
+    debug_file = find_debug_via_symfs(e, path);
+    if (!debug_file)
+      debug_file = find_debug_via_buildid(e);
     if (!debug_file)
       debug_file = find_debug_via_debuglink(e, path,
                                             option->check_debug_file_crc);
