@@ -2,7 +2,7 @@
 .SH NAME
 vfscount \- Count VFS calls ("vfs_*"). Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B vfscount
+.B vfscount [duration]
 .SH DESCRIPTION
 This counts VFS calls. This can be useful for general workload
 characterization of these operations.
@@ -14,6 +14,10 @@ Edit the script to customize which functions to trace.
 Since this uses BPF, only the root user can use this tool.
 .SH REQUIREMENTS
 CONFIG_BPF and bcc.
+.SH OPTIONS
+.TP
+duration
+duration of the trace in seconds.
 .SH EXAMPLES
 .TP
 Count some VFS calls until Ctrl-C is hit:
