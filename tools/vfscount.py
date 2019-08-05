@@ -54,7 +54,6 @@ try:
     sleep(interval)
 except KeyboardInterrupt:
     pass
-    exit()
 
 print("\n%-16s %-26s %8s" % ("ADDR", "FUNC", "COUNT"))
 counts = b.get_table("counts")
