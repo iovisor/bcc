@@ -1,0 +1,62 @@
+.TH SOFDSNOOP 8 "2019-07-29" "USER COMMANDS"
+.SH NAME
+sofdsnoop \- traces FDs passed by sockets
+.SH SYNOPSIS
+usage: sofdsnoop [\-h] [\-T] [\-p PID] [\-t TID] [\-n NAME] [\-d DURATION]
+.SH DESCRIPTION
+Trace file descriptors passed via socket
+.SS "optional arguments:"
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+show this help message and exit
+.TP
+\fB\-T\fR, \fB\-\-timestamp\fR
+include timestamp on output
+.TP
+\fB\-p\fR PID, \fB\-\-pid\fR PID
+trace this PID only
+.TP
+\fB\-t\fR TID, \fB\-\-tid\fR TID
+trace this TID only
+.TP
+\fB\-n\fR NAME, \fB\-\-name\fR NAME
+only print process names containing this name
+.TP
+\fB\-d\fR DURATION, \fB\-\-duration\fR DURATION
+total duration of trace in seconds
+.SH EXAMPLES
+.TP
+Trace passed file descriptors
+#
+.B sofdsnoop
+.TP
+Include timestamps
+#
+.B sofdsnoop \fB\-T\fR
+.TP
+Only trace PID 181
+#
+.B sofdsnoop \fB\-p\fR 181
+.TP
+Only trace TID 123
+#
+.B sofdsnoop \fB\-t\fR 123
+.TP
+Trace for 10 seconds only
+#
+.B sofdsnoop \fB\-d\fR 10
+.TP
+Only print process names containing "main"
+#
+.B sofdsnoop \fB\-n\fR main
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.

@@ -7,7 +7,7 @@
 # This provides information such as packet details, socket state, and kernel
 # stack trace for packets/segments that were dropped via tcp_drop().
 #
-# USAGE: tcpdrop [-c] [-h] [-l]
+# USAGE: tcpdrop [-h]
 #
 # This uses dynamic tracing of kernel functions, and will need to be updated
 # to match kernel changes.

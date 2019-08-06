@@ -9,8 +9,8 @@
 # It could be useful in scenarios where load balancers needs to be updated
 # dynamically as application is fully initialized.
 #
-# All IPv4 listen attempts are traced, even if they ultimately fail or the
-# the listening program is not willing to accept().
+# All IPv4 and IPv6 listen attempts are traced, even if they ultimately fail
+# or the the listening program is not willing to accept().
 #
 # Copyright (c) 2016 Jean-Tiare Le Bigot.
 # Licensed under the Apache License, Version 2.0 (the "License")
