@@ -279,7 +279,7 @@ std::string Context::resolve_bin_path(const std::string &bin_path) {
     ::free(which_so);
   }
 
-  if (!result.empty() && pid_ && *pid_ != -1) {
+  if (!result.empty() && pid_ && *pid_ != -1 && result.find("/proc") != 0) {
     result = tfm::format("/proc/%d/root%s", *pid_, result);
   }
 
