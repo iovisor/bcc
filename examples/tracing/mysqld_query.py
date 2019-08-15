@@ -34,7 +34,8 @@ int do_trace(struct pt_regs *ctx) {
      * see: https://dev.mysql.com/doc/refman/5.7/en/dba-dtrace-ref-query.html
      */
     bpf_usdt_readarg(1, ctx, &addr);
-    bpf_trace_printk("%s\\n", addr);
+    bpf_probe_read(&query, sizeof(query), (void *)addr);
+    bpf_trace_printk("%s\\n", query);
     return 0;
 };
 """
