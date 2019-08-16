@@ -1146,8 +1146,8 @@ This will instrument ```strlen()``` function from libc, and call our BPF functio
 Other examples:
 
 ```Python
-b.attach_uprobe(name="c", sym="getaddrinfo", fn_name="do_entry")
-b.attach_uprobe(name="/usr/bin/python", sym="main", fn_name="do_main")
+b.attach_uretprobe(name="c", sym="getaddrinfo", fn_name="do_return")
+b.attach_uretprobe(name="/usr/bin/python", sym="main", fn_name="do_main")
 ```
 
 You can call attach_uretprobe() more than once, and attach your BPF function to multiple user-level functions.
