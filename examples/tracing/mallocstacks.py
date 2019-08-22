@@ -17,16 +17,20 @@ from time import sleep
 import sys
 
 if len(sys.argv) < 2:
-    print("USAGE: mallocstacks PID")
+    print("USAGE: mallocstacks PID [NUM_STACKS=1024]")
     exit()
 pid = int(sys.argv[1])
+if len(sys.argv) == 3:
+    stacks = sys.argv[2]
+else:
+    stacks = "1024"
 
 # load BPF program
 b = BPF(text="""
 #include <uapi/linux/ptrace.h>
 
 BPF_HASH(calls, int);
-BPF_STACK_TRACE(stack_traces, 1024);
+BPF_STACK_TRACE(stack_traces, """ + stacks + """);
 
 int alloc_enter(struct pt_regs *ctx, size_t size) {
     int key = stack_traces.get_stackid(ctx,
