@@ -21,6 +21,12 @@ if len(sys.argv) < 2:
     exit()
 pid = int(sys.argv[1])
 if len(sys.argv) == 3:
+    try:
+        assert int(sys.argv[2]) > 0, ""
+    except (ValueError, AssertionError) as e:
+        print("USAGE: mallocstacks PID [NUM_STACKS=1024]")
+        print("NUM_STACKS must be a non-zero, positive integer")
+        exit()
     stacks = sys.argv[2]
 else:
     stacks = "1024"
