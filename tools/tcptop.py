@@ -97,7 +97,7 @@ BPF_HASH(ipv6_recv_bytes, struct ipv6_key_t);
 int kprobe__tcp_sendmsg(struct pt_regs *ctx, struct sock *sk,
     struct msghdr *msg, size_t size)
 {
-    u32 pid = bpf_get_current_pid_tgid();
+    u32 pid = bpf_get_current_pid_tgid() >> 32;
     FILTER
     u16 dport = 0, family = sk->__sk_common.skc_family;
 
@@ -134,7 +134,7 @@ int kprobe__tcp_sendmsg(struct pt_regs *ctx, struct sock *sk,
  */
 int kprobe__tcp_cleanup_rbuf(struct pt_regs *ctx, struct sock *sk, int copied)
 {
-    u32 pid = bpf_get_current_pid_tgid();
+    u32 pid = bpf_get_current_pid_tgid() >> 32;
     FILTER
     u16 dport = 0, family = sk->__sk_common.skc_family;
     u64 *val, zero = 0;
