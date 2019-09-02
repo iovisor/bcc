@@ -1220,6 +1220,8 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
       table.max_entries = numcpu;
     } else if (section_attr == "maps/perf_array") {
       map_type = BPF_MAP_TYPE_PERF_EVENT_ARRAY;
+    } else if (section_attr == "maps/xskmap") {
+      map_type = BPF_MAP_TYPE_XSKMAP;
     } else if (section_attr == "maps/cgroup_array") {
       map_type = BPF_MAP_TYPE_CGROUP_ARRAY;
     } else if (section_attr == "maps/stacktrace") {
