@@ -16,24 +16,29 @@ flags = 0
 def usage():
     print("Usage: {0} [-S] <ifdev>".format(sys.argv[0]))
     print("       -S: use skb mode\n")
+    print("       -H: use hardware offload mode\n")
     print("e.g.: {0} eth0\n".format(sys.argv[0]))
     exit(1)
 
 if len(sys.argv) < 2 or len(sys.argv) > 3:
     usage()
 
+offload_device = None
 if len(sys.argv) == 2:
     device = sys.argv[1]
+elif len(sys.argv) == 3:
+    device = sys.argv[2]
 
+maptype = "percpu_array"
 if len(sys.argv) == 3:
     if "-S" in sys.argv:
         # XDP_FLAGS_SKB_MODE
-        flags |= 2 << 0
-
-    if "-S" == sys.argv[1]:
-        device = sys.argv[2]
-    else:
-        device = sys.argv[1]
+        flags |= (1 << 1)
+    if "-H" in sys.argv:
+        # XDP_FLAGS_HW_MODE
+        maptype = "array"
+        offload_device = device
+        flags |= (1 << 3)
 
 mode = BPF.XDP
 #mode = BPF.SCHED_CLS
@@ -56,8 +61,7 @@ b = BPF(text = """
 #include <linux/ip.h>
 #include <linux/ipv6.h>
 
-
-BPF_TABLE("percpu_array", uint32_t, long, dropcnt, 256);
+BPF_TABLE(MAPTYPE, uint32_t, long, dropcnt, 256);
 
 static inline int parse_ipv4(void *data, u64 nh_off, void *data_end) {
     struct iphdr *iph = data + nh_off;
@@ -119,13 +123,15 @@ int xdp_prog1(struct CTXTYPE *ctx) {
 
     value = dropcnt.lookup(&index);
     if (value)
-        *value += 1;
+        __sync_fetch_and_add(value, 1);
 
     return rc;
 }
-""", cflags=["-w", "-DRETURNCODE=%s" % ret, "-DCTXTYPE=%s" % ctxtype])
+""", cflags=["-w", "-DRETURNCODE=%s" % ret, "-DCTXTYPE=%s" % ctxtype,
+			 "-DMAPTYPE=\"%s\"" % maptype],
+     device=offload_device)
 
-fn = b.load_func("xdp_prog1", mode)
+fn = b.load_func("xdp_prog1", mode, offload_device)
 
 if mode == BPF.XDP:
     b.attach_xdp(device, fn, flags)
@@ -143,7 +149,7 @@ print("Printing drops per IP protocol-number, hit CTRL+C to stop")
 while 1:
     try:
         for k in dropcnt.keys():
-            val = dropcnt.sum(k).value
+            val = dropcnt[k].value if maptype == "array" else dropcnt.sum(k).value
             i = k.value
             if val:
                 delta = val - prev[i]

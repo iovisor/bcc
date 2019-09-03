@@ -276,7 +276,7 @@ class BPF(object):
         return None
 
     def __init__(self, src_file=b"", hdr_file=b"", text=None, debug=0,
-            cflags=[], usdt_contexts=[], allow_rlimit=True):
+            cflags=[], usdt_contexts=[], allow_rlimit=True, device=None):
         """Create a new BPF module with the given source code.
 
         Note:
@@ -319,7 +319,7 @@ class BPF(object):
 
         # files that end in ".b" are treated as B files. Everything else is a (BPF-)C file
         if src_file.endswith(b".b"):
-            self.module = lib.bpf_module_create_b(src_file, hdr_file, self.debug)
+            self.module = lib.bpf_module_create_b(src_file, hdr_file, self.debug, device)
         else:
             if src_file:
                 # Read the BPF C source file into the text variable. This ensures,
@@ -342,7 +342,7 @@ class BPF(object):
             self.module = lib.bpf_module_create_c_from_string(text,
                                                               self.debug,
                                                               cflags_array, len(cflags_array),
-                                                              allow_rlimit)
+                                                              allow_rlimit, device)
         if not self.module:
             raise Exception("Failed to compile BPF module %s" % (src_file or "<text>"))
 
@@ -367,7 +367,7 @@ class BPF(object):
 
         return fns
 
-    def load_func(self, func_name, prog_type):
+    def load_func(self, func_name, prog_type, device = None):
         func_name = _assert_is_bytes(func_name)
         if func_name in self.funcs:
             return self.funcs[func_name]
@@ -383,7 +383,7 @@ class BPF(object):
                 lib.bpf_function_size(self.module, func_name),
                 lib.bpf_module_license(self.module),
                 lib.bpf_module_kern_version(self.module),
-                log_level, None, 0);
+                log_level, None, 0, device);
 
         if fd < 0:
             atexit.register(self.donothing)

@@ -20,6 +20,7 @@
 #include <unistd.h>
 #include <vector>
 #include <linux/bpf.h>
+#include <net/if.h>
 
 #include <llvm/ExecutionEngine/MCJIT.h>
 #include <llvm/ExecutionEngine/SectionMemoryManager.h>
@@ -93,7 +94,8 @@ class MyMemoryManager : public SectionMemoryManager {
 };
 
 BPFModule::BPFModule(unsigned flags, TableStorage *ts, bool rw_engine_enabled,
-                     const std::string &maps_ns, bool allow_rlimit)
+                     const std::string &maps_ns, bool allow_rlimit,
+                     const char *dev_name)
     : flags_(flags),
       rw_engine_enabled_(rw_engine_enabled && bpf_module_rw_engine_enabled()),
       used_b_loader_(false),
@@ -102,6 +104,7 @@ BPFModule::BPFModule(unsigned flags, TableStorage *ts, bool rw_engine_enabled,
       id_(std::to_string((uintptr_t)this)),
       maps_ns_(maps_ns),
       ts_(ts), btf_(nullptr) {
+  ifindex_ = dev_name ? if_nametoindex(dev_name) : 0;
   initialize_rw_engine();
   LLVMInitializeBPFTarget();
   LLVMInitializeBPFTargetMC();
@@ -338,6 +341,7 @@ int BPFModule::load_maps(sec_map_def &sections) {
         attr.value_size = value_size;
         attr.max_entries = max_entries;
         attr.map_flags = map_flags;
+        attr.map_ifindex = ifindex_;
 
         if (map_tids.find(map_name) != map_tids.end()) {
           attr.btf_fd = btf_->get_fd();
@@ -847,7 +851,8 @@ int BPFModule::load_string(const string &text, const char *cflags[], int ncflags
 int BPFModule::bcc_func_load(int prog_type, const char *name,
                 const struct bpf_insn *insns, int prog_len,
                 const char *license, unsigned kern_version,
-                int log_level, char *log_buf, unsigned log_buf_size) {
+                int log_level, char *log_buf, unsigned log_buf_size,
+                const char *dev_name) {
   struct bpf_load_program_attr attr = {};
   unsigned func_info_cnt, line_info_cnt, finfo_rec_size, linfo_rec_size;
   void *func_info = NULL, *line_info = NULL;
@@ -859,6 +864,8 @@ int BPFModule::bcc_func_load(int prog_type, const char *name,
   attr.license = license;
   attr.kern_version = kern_version;
   attr.log_level = log_level;
+  if (dev_name)
+    attr.prog_ifindex = if_nametoindex(dev_name);
 
   if (btf_) {
     int btf_fd = btf_->get_fd();
