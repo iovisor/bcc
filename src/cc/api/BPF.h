@@ -64,8 +64,19 @@ class BPF {
   StatusTuple attach_kprobe(const std::string& kernel_func,
                             const std::string& probe_func,
                             uint64_t kernel_func_offset = 0,
-                            bpf_probe_attach_type = BPF_PROBE_ENTRY,
-                            int maxactive = 0);
+                            bpf_probe_attach_type type = BPF_PROBE_ENTRY,
+                            int maxactive = 0) {
+    return attach_kprobe_(kernel_func, probe_func, "", kernel_func_offset, type, maxactive);
+  }
+
+  StatusTuple attach_kprobe_cgroup(const std::string& kernel_func,
+                            const std::string& probe_func,
+                            const std::string& cgroup_name,
+                            uint64_t kernel_func_offset = 0,
+                            bpf_probe_attach_type type = BPF_PROBE_ENTRY,
+                            int maxactive = 0) {
+    return attach_kprobe_(kernel_func, probe_func, cgroup_name, kernel_func_offset, type, maxactive);
+  }
   StatusTuple detach_kprobe(
       const std::string& kernel_func,
       bpf_probe_attach_type attach_type = BPF_PROBE_ENTRY);
@@ -197,6 +208,12 @@ class BPF {
   int free_bcc_memory();
 
  private:
+  StatusTuple attach_kprobe_(const std::string& kernel_func,
+                             const std::string& probe_func,
+                             const std::string& cgroup_name,
+                             uint64_t kernel_func_offset = 0,
+                             bpf_probe_attach_type = BPF_PROBE_ENTRY,
+                             int maxactive = 0);
   std::string get_kprobe_event(const std::string& kernel_func,
                                bpf_probe_attach_type type);
   std::string get_uprobe_event(const std::string& binary_path, uint64_t offset,

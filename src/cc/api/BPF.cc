@@ -26,6 +26,10 @@
 #include <utility>
 #include <vector>
 
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
 #include "bcc_exception.h"
 #include "bcc_elf.h"
 #include "bcc_syms.h"
@@ -164,11 +168,12 @@ StatusTuple BPF::detach_all() {
     return StatusTuple(0);
 }
 
-StatusTuple BPF::attach_kprobe(const std::string& kernel_func,
-                               const std::string& probe_func,
-                               uint64_t kernel_func_offset,
-                               bpf_probe_attach_type attach_type,
-                               int maxactive) {
+StatusTuple BPF::attach_kprobe_(const std::string& kernel_func,
+                                const std::string& probe_func,
+                                const std::string& cgroup_name,
+                                uint64_t kernel_func_offset,
+                                bpf_probe_attach_type attach_type,
+                                int maxactive) {
   std::string probe_event = get_kprobe_event(kernel_func, attach_type);
   if (kprobes_.find(probe_event) != kprobes_.end())
     return StatusTuple(-1, "kprobe %s already attached", probe_event.c_str());
@@ -176,10 +181,24 @@ StatusTuple BPF::attach_kprobe(const std::string& kernel_func,
   int probe_fd;
   TRY2(load_func(probe_func, BPF_PROG_TYPE_KPROBE, probe_fd));
 
+  int cgroup_fd = -1;
+  if (!cgroup_name.empty()) {
+    // Compose a full path of cgroup
+    std::string cgroup_path = "/sys/fs/cgroup/perf_event/" + cgroup_name;
+
+    cgroup_fd = open(cgroup_path.c_str(), O_RDONLY | O_DIRECTORY);
+    if (cgroup_fd < 0) {
+      TRY2(unload_func(probe_func));
+      return StatusTuple(-1, "Wrong cgroup path %s specified", cgroup_name.c_str());
+    }
+  }
+
   int res_fd = bpf_attach_kprobe(probe_fd, attach_type, probe_event.c_str(),
                                  kernel_func.c_str(), kernel_func_offset,
-                                 maxactive);
+                                 maxactive, cgroup_fd);
 
+  if (cgroup_fd >= 0)
+    close(cgroup_fd);
   if (res_fd < 0) {
     TRY2(unload_func(probe_func));
     return StatusTuple(-1, "Unable to attach %skprobe for %s using %s",

@@ -757,12 +757,13 @@ static int bpf_get_retprobe_bit(const char *event_type)
  * the [k,u]probe. This function tries to create pfd with the perf_kprobe PMU.
  */
 static int bpf_try_perf_event_open_with_probe(const char *name, uint64_t offs,
-             int pid, const char *event_type, int is_return)
+             int pid, const char *event_type, int is_return, int cgroup_fd)
 {
   struct perf_event_attr attr = {};
   int type = bpf_find_probe_type(event_type);
   int is_return_bit = bpf_get_retprobe_bit(event_type);
   int cpu = 0;
+  int flags = PERF_FLAG_FD_CLOEXEC;
 
   if (type < 0 || is_return_bit < 0)
     return -1;
@@ -796,15 +797,18 @@ static int bpf_try_perf_event_open_with_probe(const char *name, uint64_t offs,
   /* config1 here is kprobe_func or  uprobe_path */
   attr.config1 = ptr_to_u64((void *)name);
   // PID filter is only possible for uprobe events.
-  if (pid < 0)
+  if (cgroup_fd >= 0) {
+    flags |= PERF_FLAG_PID_CGROUP;
+    pid = cgroup_fd;
+  } else if (pid < 0)
     pid = -1;
   // perf_event_open API doesn't allow both pid and cpu to be -1.
   // So only set it to -1 when PID is not -1.
   // Tracing events do not do CPU filtering in any cases.
-  if (pid != -1)
+  if (pid != -1 && !(flags & PERF_FLAG_PID_CGROUP))
     cpu = -1;
   return syscall(__NR_perf_event_open, &attr, pid, cpu, -1 /* group_fd */,
-                 PERF_FLAG_FD_CLOEXEC);
+		 flags);
 }
 
 // When a valid Perf Event FD provided through pfd, it will be used to enable
@@ -1005,7 +1009,7 @@ error:
 // see bpf_try_perf_event_open_with_probe().
 static int bpf_attach_probe(int progfd, enum bpf_probe_attach_type attach_type,
                             const char *ev_name, const char *config1, const char* event_type,
-                            uint64_t offset, pid_t pid, int maxactive)
+                            uint64_t offset, pid_t pid, int maxactive, int cgroup_fd)
 {
   int kfd, pfd = -1;
   char buf[PATH_MAX], fname[256];
@@ -1014,7 +1018,11 @@ static int bpf_attach_probe(int progfd, enum bpf_probe_attach_type attach_type,
   if (maxactive <= 0)
     // Try create the [k,u]probe Perf Event with perf_event_open API.
     pfd = bpf_try_perf_event_open_with_probe(config1, offset, pid, event_type,
-                                             attach_type != BPF_PROBE_ENTRY);
+                                             attach_type != BPF_PROBE_ENTRY, cgroup_fd);
+  // cgroup can only be supported with e12f03d ("perf/core: Implement the 'perf_kprobe' PMU")
+  // available.
+  if(cgroup_fd >= 0 && pfd < 0)
+    goto error;
 
   // If failed, most likely Kernel doesn't support the perf_kprobe PMU
   // (e12f03d "perf/core: Implement the 'perf_kprobe' PMU") yet.
@@ -1074,11 +1082,11 @@ error:
 
 int bpf_attach_kprobe(int progfd, enum bpf_probe_attach_type attach_type,
                       const char *ev_name, const char *fn_name,
-                      uint64_t fn_offset, int maxactive)
+                      uint64_t fn_offset, int maxactive, int cgroup_fd)
 {
   return bpf_attach_probe(progfd, attach_type,
                           ev_name, fn_name, "kprobe",
-                          fn_offset, -1, maxactive);
+                          fn_offset, -1, maxactive, cgroup_fd);
 }
 
 int bpf_attach_uprobe(int progfd, enum bpf_probe_attach_type attach_type,
@@ -1088,7 +1096,7 @@ int bpf_attach_uprobe(int progfd, enum bpf_probe_attach_type attach_type,
 
   return bpf_attach_probe(progfd, attach_type,
                           ev_name, binary_path, "uprobe",
-                          offset, pid, -1);
+                          offset, pid, -1, -1);
 }
 
 static int bpf_detach_probe(const char *ev_name, const char *event_type)

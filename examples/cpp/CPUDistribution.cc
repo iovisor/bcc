@@ -66,18 +66,20 @@ int main(int argc, char** argv) {
     return 1;
   }
 
+  int probe_time = 10;
+  if (argc >= 2) {
+    probe_time = atoi(argv[1]);
+  }
+
+  std::string path{argc > 2 ? argv[2] : ""};
   auto attach_res =
-      bpf.attach_kprobe("finish_task_switch", "task_switch_event");
+      bpf.attach_kprobe_cgroup("finish_task_switch", "task_switch_event", path);
   if (attach_res.code() != 0) {
     std::cerr << attach_res.msg() << std::endl;
     return 1;
   }
 
-  int probe_time = 10;
-  if (argc == 2) {
-    probe_time = atoi(argv[1]);
-  }
-  std::cout << "Probing for " << probe_time << " seconds" << std::endl;
+  std::cout << "Probing for " << probe_time << " seconds, cgroup: " << path << std::endl;
   sleep(probe_time);
 
   auto table = bpf.get_hash_table<int, uint64_t>("cpu_time");
