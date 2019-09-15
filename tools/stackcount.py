@@ -346,10 +346,10 @@ class Tool(object):
                     user_stack = list(user_stack)
                     kernel_stack = list(kernel_stack)
                     line = [k.name.decode('utf-8', 'replace')] + \
-                        [b.sym(addr, k.tgid) for addr in
+                        [b.sym(addr, k.tgid).decode('utf-8', 'replace') for addr in
                         reversed(user_stack)] + \
                         (self.need_delimiter and ["-"] or []) + \
-                        [b.ksym(addr) for addr in reversed(kernel_stack)]
+                        [b.ksym(addr).decode('utf-8', 'replace') for addr in reversed(kernel_stack)]
                     print("%s %d" % (";".join(line), v.value))
                 else:
                     # print multi-line stack output
