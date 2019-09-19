@@ -185,7 +185,9 @@ PERF_TRACE_EVENT {
     }
 
     val = counts.lookup_or_init(&key, &zero);
-    (*val)++;
+    if (val) {
+        (*val)++;
+    }
     return 0;
 }
 """

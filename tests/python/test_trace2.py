@@ -19,7 +19,10 @@ int count_sched(struct pt_regs *ctx) {
   struct Counters zleaf;
 
   memset(&zleaf, 0, sizeof(zleaf));
-  stats.lookup_or_init(&key, &zleaf)->stat1++;
+  struct Counters *val = stats.lookup_or_init(&key, &zleaf);
+  if (val) {
+    val->stat1++;
+  }
   return 0;
 }
 """

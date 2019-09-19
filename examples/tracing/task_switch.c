@@ -16,6 +16,8 @@ int count_sched(struct pt_regs *ctx, struct task_struct *prev) {
 
     // could also use `stats.increment(key);`
     val = stats.lookup_or_init(&key, &zero);
-    (*val)++;
+    if (val) {
+        (*val)++;
+    }
     return 0;
 }

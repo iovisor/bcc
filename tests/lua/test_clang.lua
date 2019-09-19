@@ -244,7 +244,9 @@ int kprobe__finish_task_switch(struct pt_regs *ctx, struct task_struct *prev) {
   key.prev_pid = prev->pid;
 
   val = stats.lookup_or_init(&key, &zero);
-  (*val)++;
+  if (val) {
+    (*val)++;
+  }
   return 0;
 }
 ]]}

@@ -48,8 +48,10 @@ int on_packet(struct __sk_buff *skb) {
     }
     struct IPLeaf zleaf = {0};
     struct IPLeaf *leaf = stats.lookup_or_init(&key, &zleaf);
-    lock_xadd(&leaf->rx_pkts, rx);
-    lock_xadd(&leaf->tx_pkts, tx);
+    if (leaf) {
+      lock_xadd(&leaf->rx_pkts, rx);
+      lock_xadd(&leaf->tx_pkts, tx);
+    }
   }
 
 EOP:

@@ -30,7 +30,9 @@ class TestPercpu(unittest.TestCase):
             u32 key=0;
             u64 value = 0, *val;
             val = stats.lookup_or_init(&key, &value);
-            *val += 1;
+            if (val) {
+                *val += 1;
+            }
             return 0;
         }
         """
@@ -60,7 +62,9 @@ class TestPercpu(unittest.TestCase):
             u32 key=0;
             u32 value = 0, *val;
             val = stats.lookup_or_init(&key, &value);
-            *val += 1;
+            if (val) {
+                *val += 1;
+            }
             return 0;
         }
         """
@@ -94,8 +98,10 @@ class TestPercpu(unittest.TestCase):
             u32 key=0;
             counter value = {0,0}, *val;
             val = stats.lookup_or_init(&key, &value);
-            val->c1 += 1;
-            val->c2 += 1;
+            if (val) {
+                val->c1 += 1;
+                val->c2 += 1;
+            }
             return 0;
         }
         """

@@ -43,7 +43,9 @@ int on_cache_miss(struct bpf_perf_event_data *ctx) {
 
     u64 zero = 0, *val;
     val = miss_count.lookup_or_init(&key, &zero);
-    (*val) += ctx->sample_period;
+    if (val) {
+        (*val) += ctx->sample_period;
+    }
 
     return 0;
 }
@@ -54,7 +56,9 @@ int on_cache_ref(struct bpf_perf_event_data *ctx) {
 
     u64 zero = 0, *val;
     val = ref_count.lookup_or_init(&key, &zero);
-    (*val) += ctx->sample_period;
+    if (val) {
+        (*val) += ctx->sample_period;
+    }
 
     return 0;
 }

@@ -119,12 +119,14 @@ static int do_entry(struct pt_regs *ctx, struct file *file,
 
     struct val_t *valp, zero = {};
     valp = counts.lookup_or_init(&info, &zero);
-    if (is_read) {
-        valp->reads++;
-        valp->rbytes += count;
-    } else {
-        valp->writes++;
-        valp->wbytes += count;
+    if (valp) {
+        if (is_read) {
+            valp->reads++;
+            valp->rbytes += count;
+        } else {
+            valp->writes++;
+            valp->wbytes += count;
+        }
     }
 
     return 0;
