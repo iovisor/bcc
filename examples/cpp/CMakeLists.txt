@@ -31,6 +31,9 @@ target_link_libraries(FollyRequestContextSwitch bcc-static)
 add_executable(UseExternalMap UseExternalMap.cc)
 target_link_libraries(UseExternalMap bcc-static)
 
+add_executable(CGroupTest CGroupTest.cc)
+target_link_libraries(CGroupTest bcc-static)
+
 if(INSTALL_CPP_EXAMPLES)
   install (TARGETS HelloWorld DESTINATION share/bcc/examples/cpp)
   install (TARGETS CPUDistribution DESTINATION share/bcc/examples/cpp)
@@ -40,6 +43,7 @@ if(INSTALL_CPP_EXAMPLES)
   install (TARGETS LLCStat DESTINATION share/bcc/examples/cpp)
   install (TARGETS FollyRequestContextSwitch DESTINATION share/bcc/examples/cpp)
   install (TARGETS UseExternalMap DESTINATION share/bcc/examples/cpp)
+  install (TARGETS CGroupTest DESTINATION share/bcc/examples/cpp)
 endif(INSTALL_CPP_EXAMPLES)
 
 add_subdirectory(pyperf)
