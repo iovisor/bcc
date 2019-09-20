@@ -65,7 +65,9 @@ int oncpu(struct pt_regs *ctx, struct task_struct *prev) {
     key.stack_id = stack_traces.get_stackid(ctx, stack_flags);
 
     val = counts.lookup_or_init(&key, &zero);
-    (*val) += delta;
+    if (val) {
+        (*val) += delta;
+    }
     return 0;
 }
 ]]

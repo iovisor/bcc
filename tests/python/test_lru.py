@@ -27,7 +27,9 @@ class TestLru(unittest.TestCase):
             u32 key=0;
             u32 value = 0, *val;
             val = stats.lookup_or_init(&key, &value);
-            *val += 1;
+            if (val) {
+                *val += 1;
+            }
             return 0;
         }
         """

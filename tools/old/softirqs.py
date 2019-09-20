@@ -147,7 +147,7 @@ else:
     bpf_text = bpf_text.replace('STORE',
         ' .ip = ip, .slot = 0 /* ignore */};' +
         'u64 zero = 0, *vp = dist.lookup_or_init(&key, &zero);' +
-        '(*vp) += delta;')
+        'if (vp) { (*vp) += delta; }')
 if debug:
     print(bpf_text)
 

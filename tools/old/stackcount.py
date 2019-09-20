@@ -118,7 +118,9 @@ int trace_count(struct pt_regs *ctx) {
 
 out:
     val = counts.lookup_or_init(&key, &zero);
-    (*val)++;
+    if (val) {
+        (*val)++;
+    }
     return 0;
 }
 """

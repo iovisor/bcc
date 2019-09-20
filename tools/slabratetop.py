@@ -92,8 +92,10 @@ int kprobe__kmem_cache_alloc(struct pt_regs *ctx, struct kmem_cache *cachep)
 
     struct val_t *valp, zero = {};
     valp = counts.lookup_or_init(&info, &zero);
-    valp->count++;
-    valp->size += cachep->size;
+    if (valp) {
+        valp->count++;
+        valp->size += cachep->size;
+    }
 
     return 0;
 }

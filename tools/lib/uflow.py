@@ -89,6 +89,9 @@ int NAME(struct pt_regs *ctx) {
 
     data.pid = bpf_get_current_pid_tgid();
     depth = entry.lookup_or_init(&data.pid, &zero);
+    if (!depth) {
+        depth = &zero;
+    }
     data.depth = DEPTH;
     UPDATE
 

@@ -133,12 +133,16 @@ TRACEPOINT_PROBE(raw_syscalls, sys_exit) {
         return 0;
 
     val = data.lookup_or_init(&key, &zero);
-    val->count++;
-    val->total_ns += bpf_ktime_get_ns() - *start_ns;
+    if (val) {
+        val->count++;
+        val->total_ns += bpf_ktime_get_ns() - *start_ns;
+    }
 #else
     u64 *val, zero = 0;
     val = data.lookup_or_init(&key, &zero);
-    ++(*val);
+    if (val) {
+        ++(*val);
+    }
 #endif
     return 0;
 }

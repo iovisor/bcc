@@ -155,10 +155,12 @@ int trace_req_completion(struct pt_regs *ctx, struct request *req)
         valp = counts.lookup_or_init(&info, &zero);
     }
 
-    // save stats
-    valp->us += delta_us;
-    valp->bytes += req->__data_len;
-    valp->io++;
+    if (valp) {
+        // save stats
+        valp->us += delta_us;
+        valp->bytes += req->__data_len;
+        valp->io++;
+    }
 
     start.delete(&req);
     whobyreq.delete(&req);

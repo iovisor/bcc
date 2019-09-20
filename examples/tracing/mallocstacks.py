@@ -47,7 +47,9 @@ int alloc_enter(struct pt_regs *ctx, size_t size) {
     // could also use `calls.increment(key, size);`
     u64 zero = 0, *val;
     val = calls.lookup_or_init(&key, &zero);
-    (*val) += size;
+    if (val) {
+      (*val) += size;
+    }
     return 0;
 };
 """)

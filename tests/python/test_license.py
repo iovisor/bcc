@@ -43,7 +43,9 @@ int license_program(struct pt_regs *ctx) {
     bpf_get_current_comm(&(key.comm), 16);
 
     val = counts.lookup_or_init(&key, &zero);  // update counter
-    (*val)++;
+    if (val) {
+        (*val)++;
+    }
     return 0;
 }
 """

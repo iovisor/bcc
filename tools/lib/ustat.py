@@ -94,7 +94,9 @@ int %s_%s(void *ctx) {
     u64 *valp, zero = 0;
     u32 tgid = bpf_get_current_pid_tgid() >> 32;
     valp = %s_%s_counts.lookup_or_init(&tgid, &zero);
-    ++(*valp);
+    if (valp) {
+        ++(*valp);
+    }
     return 0;
 }
         """

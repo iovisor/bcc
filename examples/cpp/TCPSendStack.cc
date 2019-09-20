@@ -39,7 +39,9 @@ int on_tcp_send(struct pt_regs *ctx) {
 
   u64 zero = 0, *val;
   val = counts.lookup_or_init(&key, &zero);
-  (*val)++;
+  if (val) {
+    (*val)++;
+  }
 
   return 0;
 }

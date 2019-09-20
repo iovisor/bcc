@@ -182,7 +182,9 @@ TEST_CASE("test bpf stack table", "[bpf_stack_table]") {
       int stack_id = stack_traces.get_stackid(ctx, BPF_F_REUSE_STACKID);
       int zero = 0, *val;
       val = id.lookup_or_init(&zero, &stack_id);
-      (*val) = stack_id;
+      if (val) {
+        (*val) = stack_id;
+      }
 
       return 0;
     }
@@ -233,7 +235,9 @@ TEST_CASE("test bpf stack_id table", "[bpf_stack_table]") {
       int stack_id = stack_traces.get_stackid(ctx, BPF_F_USER_STACK);
       int zero = 0, *val;
       val = id.lookup_or_init(&zero, &stack_id);
-      (*val) = stack_id;
+      if (val) {
+        (*val) = stack_id;
+      }
 
       return 0;
     }

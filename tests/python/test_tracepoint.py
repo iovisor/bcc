@@ -29,7 +29,9 @@ class TestTracepoint(unittest.TestCase):
             u64 val = 0;
             u32 pid = args->next_pid;
             u64 *existing = switches.lookup_or_init(&pid, &val);
-            (*existing)++;
+            if (existing) {
+                (*existing)++;
+            }
             return 0;
         }
         """
@@ -53,8 +55,10 @@ class TestTracepointDataLoc(unittest.TestCase):
             char fn[64];
             u32 pid = args->pid;
             struct value_t *existing = execs.lookup_or_init(&pid, &val);
-            TP_DATA_LOC_READ_CONST(fn, filename, 64);
-            __builtin_memcpy(existing->filename, fn, 64);
+            if (existing) {
+                TP_DATA_LOC_READ_CONST(fn, filename, 64);
+                __builtin_memcpy(existing->filename, fn, 64);
+            }
             return 0;
         }
         """

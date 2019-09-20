@@ -80,8 +80,10 @@ int alloc_entry(struct pt_regs *ctx, size_t size) {
     struct val_t *valp, zero = {};
     key.size = size;
     valp = allocs.lookup_or_init(&key, &zero);
-    valp->total_size += size;
-    valp->num_allocs += 1;
+    if (valp) {
+        valp->total_size += size;
+        valp->num_allocs += 1;
+    }
     return 0;
 }
     """
@@ -98,8 +100,10 @@ int alloc_entry(struct pt_regs *ctx) {
     bpf_usdt_readarg(4, ctx, &size);
     bpf_probe_read(&key.name, sizeof(key.name), (void *)classptr);
     valp = allocs.lookup_or_init(&key, &zero);
-    valp->total_size += size;
-    valp->num_allocs += 1;
+    if (valp) {
+        valp->total_size += size;
+        valp->num_allocs += 1;
+    }
     return 0;
 }
     """
@@ -115,8 +119,10 @@ int THETHING_alloc_entry(struct pt_regs *ctx) {
     u64 size = 0;
     bpf_usdt_readarg(1, ctx, &size);
     valp = allocs.lookup_or_init(&key, &zero);
-    valp->total_size += size;
-    valp->num_allocs += 1;
+    if (valp) {
+        valp->total_size += size;
+        valp->num_allocs += 1;
+    }
     return 0;
 }
     """
@@ -128,7 +134,9 @@ int object_alloc_entry(struct pt_regs *ctx) {
     bpf_usdt_readarg(1, ctx, &classptr);
     bpf_probe_read(&key.name, sizeof(key.name), (void *)classptr);
     valp = allocs.lookup_or_init(&key, &zero);
-    valp->num_allocs += 1;  // We don't know the size, unfortunately
+    if (valp) {
+        valp->num_allocs += 1;  // We don't know the size, unfortunately
+    }
     return 0;
 }
     """
@@ -146,7 +154,9 @@ int alloc_entry(struct pt_regs *ctx) {
     struct key_t key = { .name = "<ALL>" };
     struct val_t *valp, zero = {};
     valp = allocs.lookup_or_init(&key, &zero);
-    valp->num_allocs += 1;
+    if (valp) {
+        valp->num_allocs += 1;
+    }
     return 0;
 }
     """

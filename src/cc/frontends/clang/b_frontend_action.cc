@@ -782,7 +782,6 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
           txt += "if (!leaf) {";
           txt += " " + update + ", " + arg0 + ", " + arg1 + ", BPF_NOEXIST);";
           txt += " leaf = " + lookup + ", " + arg0 + ");";
-          txt += " if (!leaf) return 0;";
           txt += "}";
           txt += "leaf;})";
         } else if (memb_name == "increment") {

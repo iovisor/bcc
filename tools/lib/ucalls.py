@@ -164,7 +164,9 @@ int trace_entry(struct pt_regs *ctx) {
                    (void *)method);
 #ifndef LATENCY
     valp = counts.lookup_or_init(&data.method, &val);
-    ++(*valp);
+    if (valp) {
+        ++(*valp);
+    }
 #endif
 #ifdef LATENCY
     entry.update(&data, &timestamp);
@@ -189,8 +191,10 @@ int trace_return(struct pt_regs *ctx) {
         return 0;   // missed the entry event
     }
     info = times.lookup_or_init(&data.method, &zero);
-    info->num_calls += 1;
-    info->total_ns += bpf_ktime_get_ns() - *entry_timestamp;
+    if (info) {
+        info->num_calls += 1;
+        info->total_ns += bpf_ktime_get_ns() - *entry_timestamp;
+    }
     entry.delete(&data);
     return 0;
 }
@@ -210,7 +214,9 @@ TRACEPOINT_PROBE(raw_syscalls, sys_enter) {
 #endif
 #ifndef LATENCY
     valp = syscounts.lookup_or_init(&id, &val);
-    ++(*valp);
+    if (valp) {
+        ++(*valp);
+    }
 #endif
     return 0;
 }
@@ -227,8 +233,10 @@ TRACEPOINT_PROBE(raw_syscalls, sys_exit) {
     }
     id = e->id;
     info = systimes.lookup_or_init(&id, &zero);
-    info->num_calls += 1;
-    info->total_ns += bpf_ktime_get_ns() - e->timestamp;
+    if (info) {
+        info->num_calls += 1;
+        info->total_ns += bpf_ktime_get_ns() - e->timestamp;
+    }
     sysentry.delete(&pid);
     return 0;
 }
