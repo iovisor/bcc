@@ -660,6 +660,12 @@ class BPF(object):
         self._add_kprobe_fd(ev_name, fd)
         return self
 
+    def attach_breakpoint(self, symbol_addr, pid, fn_name, bp_type):
+        fn_name = _assert_is_bytes(fn_name)
+        fn = self.load_func(fn_name, BPF.PERF_EVENT)
+        lib.bpf_attach_breakpoint(symbol_addr, pid, fn.fd, bp_type)
+        return self
+
     def attach_kretprobe(self, event=b"", fn_name=b"", event_re=b"", maxactive=0):
         event = _assert_is_bytes(event)
         fn_name = _assert_is_bytes(fn_name)

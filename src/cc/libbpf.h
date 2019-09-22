@@ -83,6 +83,8 @@ int bpf_attach_kprobe(int progfd, enum bpf_probe_attach_type attach_type,
                       int maxactive);
 int bpf_detach_kprobe(const char *ev_name);
 
+void bpf_attach_breakpoint(uint64_t symbol_addr, int pid, int progfd, int bp_type);
+
 int bpf_attach_uprobe(int progfd, enum bpf_probe_attach_type attach_type,
                       const char *ev_name, const char *binary_path,
                       uint64_t offset, pid_t pid);
@@ -124,7 +126,6 @@ int bpf_prog_get_tag(int fd, unsigned long long *tag);
 int bpf_prog_get_next_id(uint32_t start_id, uint32_t *next_id);
 int bpf_prog_get_fd_by_id(uint32_t id);
 int bpf_map_get_fd_by_id(uint32_t id);
-int bpf_obj_get_info_by_fd(int prog_fd, void *info, uint32_t *info_len);
 
 #define LOG_BUF_SIZE 65536
 

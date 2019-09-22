@@ -70,6 +70,11 @@ class BPF {
       const std::string& kernel_func,
       bpf_probe_attach_type attach_type = BPF_PROBE_ENTRY);
 
+  StatusTuple attach_breakpoint(uint64_t symbol_addr, int pid, 
+                                const std::string& probe_func, 
+                                int bp_type);
+  StatusTuple detach_breakpoint(const std::string& probe_func);
+  
   StatusTuple attach_uprobe(const std::string& binary_path,
                             const std::string& symbol,
                             const std::string& probe_func,

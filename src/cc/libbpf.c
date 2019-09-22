@@ -17,6 +17,7 @@
 #define _GNU_SOURCE
 #endif
 
+#include <assert.h>
 #include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -45,6 +46,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <linux/if_alg.h>
+#include <linux/hw_breakpoint.h>
+#include <sys/ioctl.h>
 
 #include "libbpf.h"
 #include "perf_reader.h"
@@ -208,6 +211,8 @@ static struct bpf_helper helpers[] = {
   {"sk_storage_delete", "5.2"},
   {"send_signal", "5.3"},
 };
+
+volatile long stuff[256];
 
 static uint64_t ptr_to_u64(void *ptr)
 {
@@ -932,9 +937,6 @@ static void exit_mount_ns(int fd) {
   close(fd);
 }
 
-/* Creates an [uk]probe using debugfs.
- * On success, the path to the probe is placed in buf (which is assumed to be of size PATH_MAX).
- */
 static int create_probe_event(char *buf, const char *ev_name,
                               enum bpf_probe_attach_type attach_type,
                               const char *config1, uint64_t offset,
@@ -1029,10 +1031,7 @@ static int bpf_attach_probe(int progfd, enum bpf_probe_attach_type attach_type,
     // (kernel < 4.12), the event is created under a different name; we need to
     // delete that event and start again without maxactive.
     if (is_kprobe && maxactive > 0 && attach_type == BPF_PROBE_RETURN) {
-      if (snprintf(fname, sizeof(fname), "%s/id", buf) >= sizeof(fname)) {
-	fprintf(stderr, "filename (%s) is too long for buffer\n", buf);
-	goto error;
-      }
+      snprintf(fname, sizeof(fname), "%s/id", buf);
       if (access(fname, F_OK) == -1) {
         // Deleting kprobe event with incorrect name.
         kfd = open("/sys/kernel/debug/tracing/kprobe_events",
@@ -1394,4 +1393,60 @@ int bpf_close_perf_event_fd(int fd) {
     }
   }
   return error;
+}
+
+static void check_on_each_cpu(int cpu, struct perf_event_attr *attr, int fd, int pid) {
+  cpu_set_t set;
+  __u64 value;
+  
+  /* Move to target CPU */
+  CPU_ZERO(&set);
+  CPU_SET(cpu, &set);
+  assert(sched_setaffinity(0, sizeof(set), &set) == 0);
+  
+  enum bpf_prog_type prog_type = BPF_PROG_TYPE_PERF_EVENT;
+	int efd = syscall(__NR_perf_event_open, attr, pid, cpu, -1, PERF_FLAG_FD_CLOEXEC);
+	if (efd < 0) {
+    printf("event fd %d err %s\n", efd, strerror(errno));
+    return;
+  }
+
+  int err;
+  err = ioctl(efd, PERF_EVENT_IOC_RESET,0);
+  if (err < 0) {
+    printf("ioctl PERF_EVENT_IOC_RESET failed err number:%d %s\n", errno, strerror(errno));
+    return;
+  }
+
+  err = ioctl(efd, PERF_EVENT_IOC_ENABLE, 0);
+  if (err < 0) {
+    printf("ioctl PERF_EVENT_IOC_ENABLE failed err number:%d %s\n", errno, strerror(errno));
+    return;
+  }
+
+  err = ioctl(efd, PERF_EVENT_IOC_SET_BPF, fd);
+  if (err < 0) {
+    printf("ioctl PERF_EVENT_IOC_SET_BPF failed err number:%d %s\n", errno, strerror(errno));
+    return;
+  }
+}
+
+void bpf_attach_breakpoint(uint64_t symbol_addr, int pid, int progfd, int bp_type) {
+	struct perf_event_attr attr = {};
+  
+  memset(&attr, 0, sizeof(attr));
+  attr.size = sizeof(attr);
+  attr.type = PERF_TYPE_BREAKPOINT;
+  attr.bp_len = HW_BREAKPOINT_LEN_4;
+  attr.bp_addr = symbol_addr;
+	attr.bp_type = (__u32)bp_type;
+  attr.sample_period = 1;
+  attr.precise_ip = 2; // request synchronous delivery
+  attr.wakeup_events = 1;
+
+	int i, nr_cpus = sysconf(_SC_NPROCESSORS_CONF);
+
+  for (i=0; i<nr_cpus; i++) {
+    check_on_each_cpu(i, &attr, progfd, pid);
+  }
 }

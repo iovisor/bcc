@@ -194,6 +194,17 @@ StatusTuple BPF::attach_kprobe(const std::string& kernel_func,
   return StatusTuple(0);
 }
 
+StatusTuple BPF::attach_breakpoint(uint64_t symbol_addr, int pid, 
+                                  const std::string& probe_func, 
+                                  int bp_type) {
+  int probe_fd;
+
+  TRY2(load_func(probe_func, BPF_PROG_TYPE_PERF_EVENT, probe_fd));
+  bpf_attach_breakpoint(symbol_addr, pid, probe_fd, bp_type);
+
+  return StatusTuple(0);
+}
+
 StatusTuple BPF::attach_uprobe(const std::string& binary_path,
                                const std::string& symbol,
                                const std::string& probe_func,
@@ -393,6 +404,14 @@ StatusTuple BPF::detach_kprobe(const std::string& kernel_func,
 
   TRY2(detach_kprobe_event(it->first, it->second));
   kprobes_.erase(it);
+  return StatusTuple(0);
+}
+
+StatusTuple BPF::detach_breakpoint(const std::string& probe_func) {
+
+  TRY2(unload_func(probe_func));
+  detach_perf_event(PERF_TYPE_BREAKPOINT, 0);
+  
   return StatusTuple(0);
 }
 
