@@ -102,6 +102,19 @@ std::pair<bool, string> get_kernel_path_info(const string kdir)
   return std::make_pair(false, "build");
 }
 
+static int CreateFromArgs(clang::CompilerInvocation &invocation,
+                          const llvm::opt::ArgStringList &ccargs,
+                          clang::DiagnosticsEngine &diags)
+{
+#if LLVM_MAJOR_VERSION >= 10
+  return clang::CompilerInvocation::CreateFromArgs(invocation, ccargs, diags);
+#else
+  return clang::CompilerInvocation::CreateFromArgs(
+              invocation, const_cast<const char **>(ccargs.data()),
+              const_cast<const char **>(ccargs.data()) + ccargs.size(), diags);
+#endif
+}
+
 }
 
 int ClangLoader::parse(unique_ptr<llvm::Module> *mod, TableStorage &ts,
@@ -339,9 +352,7 @@ int ClangLoader::do_compile(unique_ptr<llvm::Module> *mod, TableStorage &ts,
   // pre-compilation pass for generating tracepoint structures
   CompilerInstance compiler0;
   CompilerInvocation &invocation0 = compiler0.getInvocation();
-  if (!CompilerInvocation::CreateFromArgs(
-          invocation0, const_cast<const char **>(ccargs.data()),
-          const_cast<const char **>(ccargs.data()) + ccargs.size(), diags))
+  if (!CreateFromArgs(invocation0, ccargs, diags))
     return -1;
 
   invocation0.getPreprocessorOpts().RetainRemappedFileBuffers = true;
@@ -370,9 +381,7 @@ int ClangLoader::do_compile(unique_ptr<llvm::Module> *mod, TableStorage &ts,
   // first pass
   CompilerInstance compiler1;
   CompilerInvocation &invocation1 = compiler1.getInvocation();
-  if (!CompilerInvocation::CreateFromArgs(
-          invocation1, const_cast<const char **>(ccargs.data()),
-          const_cast<const char **>(ccargs.data()) + ccargs.size(), diags))
+  if (!CreateFromArgs( invocation1, ccargs, diags))
     return -1;
 
   // This option instructs clang whether or not to free the file buffers that we
@@ -403,10 +412,9 @@ int ClangLoader::do_compile(unique_ptr<llvm::Module> *mod, TableStorage &ts,
   // second pass, clear input and take rewrite buffer
   CompilerInstance compiler2;
   CompilerInvocation &invocation2 = compiler2.getInvocation();
-  if (!CompilerInvocation::CreateFromArgs(
-          invocation2, const_cast<const char **>(ccargs.data()),
-          const_cast<const char **>(ccargs.data()) + ccargs.size(), diags))
+  if (!CreateFromArgs(invocation2, ccargs, diags))
     return -1;
+
   invocation2.getPreprocessorOpts().RetainRemappedFileBuffers = true;
   for (const auto &f : remapped_headers_)
     invocation2.getPreprocessorOpts().addRemappedFile(f.first, &*f.second);
