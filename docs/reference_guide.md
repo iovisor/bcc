@@ -669,6 +669,9 @@ Syntax: ```BPF_PERCPU_ARRAY(name [, leaf_type [, size]])```
 
 Creates NUM_CPU int-indexed arrays which are optimized for fastest lookup and update, named ```name```, with optional parameters. Each CPU will have a separate copy of this array. The copies are not kept synchronized in any way.
 
+Note that due to limits defined in the kernel (in linux/mm/percpu.c), the ```leaf_type``` cannot have a size of more than 32KB.
+In other words, ```BPF_PERCPU_ARRAY``` elements cannot be larger than 32KB in size.
+
 
 Defaults: ```BPF_PERCPU_ARRAY(name, leaf_type=u64, size=10240)```
 
