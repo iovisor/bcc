@@ -114,6 +114,13 @@ You can install them via
 sudo dnf install bcc
 ```
 
+**Note**: if you keep getting `Failed to load program: Operation not permitted` when
+trying to run the `hello_world.py` example as root then you might need to lift
+the so-called kernel lockdown (cf. 
+[FAQ](https://github.com/iovisor/bcc/blob/c00d10d4552f647491395e326d2e4400f3a0b6c5/FAQ.txt#L24),
+[background article](https://gehrcke.de/2019/09/running-an-ebpf-program-may-require-lifting-the-kernel-lockdown)).
+
+
 ### Fedora 29 and older
 
 Ensure that you are running a 4.2+ kernel with `uname -r`. If not, install a 4.2+ kernel from
