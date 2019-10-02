@@ -69,6 +69,7 @@ static const char * const map_type_strings[] = {
   [BPF_MAP_TYPE_QUEUE] = "queue",
   [BPF_MAP_TYPE_STACK] = "stack",
   [BPF_MAP_TYPE_SK_STORAGE] = "sk_storage",
+  [BPF_MAP_TYPE_DEVMAP_HASH] = "devmap_hash",
 };
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof(*(x)))
