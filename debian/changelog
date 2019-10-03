@@ -1,3 +1,15 @@
+bcc (0.11.0-1) unstable; urgency=low
+
+  * Support for kernel up to 5.3
+  * Corresponding libbpf submodule release is v0.0.5
+  * Fix USDT issue with multi-threaded applications
+  * Fixed the early return behavior of lookup_or_init
+  * Support for nic hardware offload
+  * Fixed and Enabled Travis CI
+  * A lot of tools change with added new options, etc.
+
+ -- Yonghong Song <ys114321@gmail.com>  Tue, 03 Oct 2019 17:00:00 +0000
+
 bcc (0.10.0-1) unstable; urgency=low
 
   * Support for kernel up to 5.1
