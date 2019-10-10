@@ -34,6 +34,8 @@ R"********(
 
 #include <uapi/linux/bpf.h>
 #include <uapi/linux/if_packet.h>
+#include <linux/sched.h>
+#include <linux/fdtable.h>
 #include <linux/version.h>
 #include <linux/log2.h>
 
@@ -749,6 +751,27 @@ int bpf_l4_csum_replace_(void *ctx, u64 off, u64 from, u64 to, u64 flags) {
       {}
   }
   return bpf_l4_csum_replace(ctx, off, from, to, flags);
+}
+
+static inline __attribute__((always_inline))
+BCC_SEC("helpers")
+const char *fd2path(unsigned int fd) {
+  struct files_struct *files = NULL;
+  struct fdtable *fdt = NULL;
+  struct file **fds = NULL;
+  struct file *f = NULL;
+  struct dentry *de = NULL;
+  struct qstr dn = {};
+  struct task_struct *curr = (struct task_struct *)bpf_get_current_task();
+
+  bpf_probe_read(&files, sizeof(files), &curr->files);
+  bpf_probe_read(&fdt, sizeof(fdt), &files->fdt);
+  bpf_probe_read(&fds, sizeof(fds), &fdt->fd);
+  bpf_probe_read(&f, sizeof(f), &fds[fd]);
+  bpf_probe_read(&de, sizeof(de), &f->f_path.dentry);
+  bpf_probe_read(&dn, sizeof(dn), &de->d_name);
+
+  return dn.name;
 }
 
 int incr_cksum_l3(void *off, u64 oldval, u64 newval) asm("llvm.bpf.extra");
