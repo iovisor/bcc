@@ -17,6 +17,14 @@ R"********(
 #ifndef __BPF_HELPERS_H
 #define __BPF_HELPERS_H
 
+/* In Linux 5.4 asm_inline was introduced, but it's not supported by clang.
+ * Redefine it to just asm to enable successful compilation.
+ */
+#ifdef asm_inline
+#undef asm_inline
+#define asm_inline asm
+#endif
+
 /* Before bpf_helpers.h is included, uapi bpf.h has been
  * included, which references linux/types.h. This may bring
  * in asm_volatile_goto definition if permitted based on
