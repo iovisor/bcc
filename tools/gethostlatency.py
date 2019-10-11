@@ -21,7 +21,7 @@ from time import strftime
 import argparse
 
 examples = """examples:
-    ./gethostlatency           # trace all TCP accept()s
+    ./gethostlatency           # time getaddrinfo/gethostbyname[2] calls
     ./gethostlatency -p 181    # only trace PID 181
 """
 parser = argparse.ArgumentParser(
