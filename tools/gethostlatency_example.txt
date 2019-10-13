@@ -33,5 +33,5 @@ optional arguments:
   -p PID, --pid PID  trace this PID only
 
 examples:
-    ./gethostlatency           # trace all TCP accept()s
+    ./gethostlatency           # time getaddrinfo/gethostbyname[2] calls
     ./gethostlatency -p 181    # only trace PID 181
