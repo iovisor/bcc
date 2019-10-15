@@ -245,7 +245,7 @@ Already pumped up to commit some code? Here are some resources to join the
 discussions in the [IOVisor](https://www.iovisor.org/) community and see
 what you want to work on.
 
-* _Mailing List:_ http://lists.iovisor.org/mailman/listinfo/iovisor-dev
+* _Mailing List:_ https://lists.iovisor.org/mailman/listinfo/iovisor-dev
 * _IRC:_ #iovisor at irc.oftc.net
 * _BCC Issue Tracker:_ [Github Issues](https://github.com/iovisor/bcc/issues)
 * _A guide for contributing scripts:_ [CONTRIBUTING-SCRIPTS.md](CONTRIBUTING-SCRIPTS.md)
