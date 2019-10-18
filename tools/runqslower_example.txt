@@ -37,7 +37,7 @@ usage: runqslower.py [-h] [-p PID] [min_us]
 Trace high run queue latency
 
 positional arguments:
-  min_us             minimum run queue latecy to trace, in ms (default 10000)
+  min_us             minimum run queue latecy to trace, in us (default 10000)
 
 optional arguments:
   -h, --help         show this help message and exit

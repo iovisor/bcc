@@ -38,7 +38,7 @@ whether it is caused by some critical processes or not.
 The -p option can be used to filter on a PID, which is filtered in-kernel. Here
 I've used it with -T to print timestamps:
 
-# ./drsnoop -Tp
+# ./drsnoop -Tp 17491
 TIME(s)       COMM           PID     LAT(ms) PAGES
 107.364115000 summond        17491      0.24    50
 107.364550000 summond        17491      0.26    38
@@ -142,7 +142,7 @@ examples:
     ./drsnoop           # trace all direct reclaim
     ./drsnoop -T        # include timestamps
     ./drsnoop -U        # include UID
-    ./drsnoop -P 181    # only trace PID 181
+    ./drsnoop -p 181    # only trace PID 181
     ./drsnoop -t 123    # only trace TID 123
     ./drsnoop -u 1000   # only trace UID 1000
     ./drsnoop -d 10     # trace for 10 seconds only
