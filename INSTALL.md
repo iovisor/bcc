@@ -221,6 +221,16 @@ sudo yum install bcc
 
 # Source
 
+## libbpf Submodule
+
+Since release v0.10.0, bcc starts to leverage libbpf repo (https://github.com/libbpf/libbpf)
+to provide wrapper functions to the kernel for bpf syscalls, uapi headers bpf.h/btf.h etc.
+Unfortunately, the default github release source code does not contain libbpf submodule
+source code and this will cause build issues.
+
+To alleviate this problem, starting at release v0.11.0, source code with corresponding
+libbpf submodule codes will be released as well. See https://github.com/iovisor/bcc/releases.
+
 ## Debian - Source
 ### Jessie
 #### Repositories
