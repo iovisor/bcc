@@ -114,7 +114,7 @@ void BTF::fixup_datasec(uint8_t *type_sec, uintptr_t type_sec_size,
     case BTF_KIND_VAR:
       next_type += sizeof(struct btf_var);
       break;
-    case BTF_KIND_DATASEC:
+    case BTF_KIND_DATASEC: {
       secname = strings + t->name_off;
       if (sections_.find(secname) != sections_.end()) {
         t->size = std::get<1>(sections_[secname]);
@@ -126,8 +126,21 @@ void BTF::fixup_datasec(uint8_t *type_sec, uintptr_t type_sec_size,
       // changed to accpet '/' in section names.
       if (strncmp(strings + t->name_off, "maps/", 5) == 0)
         t->name_off += 5;
+
+      // fill in the in-section offset as JIT did not
+      // do relocations. Did not cross-verify correctness with
+      // symbol table as we do not use it yet.
+      struct btf_var_secinfo *var_info = (struct btf_var_secinfo *)next_type;
+      uint32_t offset = 0;
+      for (int index = 0; index < vlen; index++) {
+        var_info->offset = offset;
+        offset += var_info->size;
+        var_info++;
+      }
+
       next_type += vlen * sizeof(struct btf_var_secinfo);
       break;
+    }
     default:
       // Something not understood
       return;
