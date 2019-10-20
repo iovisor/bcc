@@ -324,6 +324,9 @@ trace 'u:pthread:pthread_create (arg4 != 0)'
         Trace the USDT probe pthread_create when its 4th argument is non-zero
 trace 'p::SyS_nanosleep(struct timespec *ts) "sleep for %lld ns", ts->tv_nsec'
         Trace the nanosleep syscall and print the sleep duration in ns
+trace -c /sys/fs/cgroup/system.slice/workload.service '__x64_sys_nanosleep' '__x64_sys_clone'
+        Trace nanosleep/clone syscall calls only under workload.service
+        cgroup hierarchy.
 trace -I 'linux/fs.h' \
       'p::uprobe_register(struct inode *inode) "a_ops = %llx", inode->i_mapping->a_ops'
         Trace the uprobe_register inode mapping ops, and the symbol can be found

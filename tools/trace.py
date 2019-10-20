@@ -3,7 +3,7 @@
 # trace         Trace a function and print a trace message based on its
 #               parameters, with an optional filter.
 #
-# usage: trace [-h] [-p PID] [-L TID] [-v] [-Z STRING_SIZE] [-S]
+# usage: trace [-h] [-p PID] [-L TID] [-v] [-Z STRING_SIZE] [-S] [-c cgroup_path]
 #              [-M MAX_EVENTS] [-s SYMBOLFILES] [-T] [-t] [-K] [-U] [-a] [-I header]
 #              probe [probe ...]
 #
@@ -57,7 +57,8 @@ class Probe(object):
                 cls.bin_cmp = args.bin_cmp
                 cls.build_id_enabled = args.sym_file_list is not None
 
-        def __init__(self, probe, string_size, kernel_stack, user_stack):
+        def __init__(self, probe, string_size, kernel_stack, user_stack,
+                     cgroup_map_name):
                 self.usdt = None
                 self.streq_functions = ""
                 self.raw_probe = probe
@@ -71,6 +72,7 @@ class Probe(object):
                                 (self._display_function(), self.probe_num)
                 self.probe_name = re.sub(r'[^A-Za-z0-9_]', '_',
                                          self.probe_name)
+                self.cgroup_map_name = cgroup_map_name
 
                 # compiler can generate proper codes for function
                 # signatures with "syscall__" prefix
@@ -453,6 +455,13 @@ BPF_PERF_OUTPUT(%s);
                 else:
                         pid_filter = ""
 
+                if self.cgroup_map_name is not None:
+                        cgroup_filter = """
+        if (%s.check_current_task(0) <= 0) { return 0; }
+                """ % self.cgroup_map_name
+                else:
+                        cgroup_filter = ""
+
                 prefix = ""
                 signature = "struct pt_regs *ctx"
                 if self.signature:
@@ -494,6 +503,7 @@ BPF_PERF_OUTPUT(%s);
         %s
         %s
         %s
+        %s
         if (!(%s)) return 0;
 
         struct %s __data = {0};
@@ -508,7 +518,7 @@ BPF_PERF_OUTPUT(%s);
         return 0;
 }
 """
-                text = text % (pid_filter, prefix,
+                text = text % (pid_filter, cgroup_filter, prefix,
                                self._generate_usdt_filter_read(), self.filter,
                                self.struct_name, time_str, cpu_str, data_fields,
                                stack_trace, self.events_name, ctx_name)
@@ -659,6 +669,9 @@ trace 'u:pthread:pthread_create (arg4 != 0)'
         Trace the USDT probe pthread_create when its 4th argument is non-zero
 trace 'p::SyS_nanosleep(struct timespec *ts) "sleep for %lld ns", ts->tv_nsec'
         Trace the nanosleep syscall and print the sleep duration in ns
+trace -c /sys/fs/cgroup/system.slice/workload.service '__x64_sys_nanosleep' '__x64_sys_clone'
+        Trace nanosleep/clone syscall calls only under workload.service
+        cgroup hierarchy.
 trace -I 'linux/fs.h' \\
       'p::uprobe_register(struct inode *inode) "a_ops = %llx", inode->i_mapping->a_ops'
         Trace the uprobe_register inode mapping ops, and the symbol can be found
@@ -709,6 +722,9 @@ trace -I 'linux/fs_struct.h' 'mntns_install "users = %d", $task->fs->users'
                   help="print time column")
                 parser.add_argument("-C", "--print_cpu", action="store_true",
                   help="print CPU id")
+                parser.add_argument("-c", "--cgroup-path", type=str, \
+                  metavar="CGROUP_PATH", dest="cgroup_path", \
+                  help="cgroup path")
                 parser.add_argument("-B", "--bin_cmp", action="store_true",
                   help="allow to use STRCMP with binary values")
                 parser.add_argument('-s', "--sym_file_list", type=str, \
@@ -734,6 +750,10 @@ trace -I 'linux/fs_struct.h' 'mntns_install "users = %d", $task->fs->users'
                 self.args = parser.parse_args()
                 if self.args.tgid and self.args.pid:
                         parser.error("only one of -p and -L may be specified")
+                if self.args.cgroup_path is not None:
+                        self.cgroup_map_name = "__cgroup"
+                else:
+                        self.cgroup_map_name = None
 
         def _create_probes(self):
                 Probe.configure(self.args)
@@ -741,7 +761,8 @@ trace -I 'linux/fs_struct.h' 'mntns_install "users = %d", $task->fs->users'
                 for probe_spec in self.args.probes:
                         self.probes.append(Probe(
                                 probe_spec, self.args.string_size,
-                                self.args.kernel_stack, self.args.user_stack))
+                                self.args.kernel_stack, self.args.user_stack,
+                                self.cgroup_map_name))
 
         def _generate_program(self):
                 self.program = """
@@ -757,6 +778,9 @@ trace -I 'linux/fs_struct.h' 'mntns_install "users = %d", $task->fs->users'
                                 self.program += "#include <%s>\n" % include
                 self.program += BPF.generate_auto_includes(
                         map(lambda p: p.raw_probe, self.probes))
+                if self.cgroup_map_name is not None:
+                        self.program += "BPF_CGROUP_ARRAY(%s, 1);\n" % \
+                                        self.cgroup_map_name
                 for probe in self.probes:
                         self.program += probe.generate_program(
                                         self.args.include_self)
@@ -782,6 +806,12 @@ trace -I 'linux/fs_struct.h' 'mntns_install "users = %d", $task->fs->users'
                 if self.args.sym_file_list is not None:
                   print("Note: Kernel bpf will report stack map with ip/build_id")
                   map(lambda x: self.bpf.add_module(x), self.args.sym_file_list.split(','))
+
+                # if cgroup filter is requested, update the cgroup array map
+                if self.cgroup_map_name is not None:
+                        cgroup_array = self.bpf.get_table(self.cgroup_map_name)
+                        cgroup_array[0] = self.args.cgroup_path
+
                 for probe in self.probes:
                         if self.args.verbose:
                                 print(probe)
