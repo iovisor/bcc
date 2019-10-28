@@ -117,7 +117,12 @@ void SourceDebugger::dump() {
     errs() << "Debug Error: cannot get register info\n";
     return;
   }
+#if LLVM_MAJOR_VERSION >= 10
+  MCTargetOptions MCOptions;
+  std::unique_ptr<MCAsmInfo> MAI(T->createMCAsmInfo(*MRI, TripleStr, MCOptions));
+#else
   std::unique_ptr<MCAsmInfo> MAI(T->createMCAsmInfo(*MRI, TripleStr));
+#endif
   if (!MAI) {
     errs() << "Debug Error: cannot get assembly info\n";
     return;
