@@ -88,7 +88,7 @@ int NAME(struct pt_regs *ctx) {
     FILTER_METHOD
 
     data.pid = bpf_get_current_pid_tgid();
-    depth = entry.lookup_or_init(&data.pid, &zero);
+    depth = entry.lookup_or_try_init(&data.pid, &zero);
     if (!depth) {
         depth = &zero;
     }

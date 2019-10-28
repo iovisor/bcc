@@ -291,7 +291,8 @@ bool ProbeVisitor::assignsExtPtr(Expr *E, int *nbAddrOf) {
           if (!A->getName().startswith("maps"))
             return false;
 
-          if (memb_name == "lookup" || memb_name == "lookup_or_init") {
+          if (memb_name == "lookup" || memb_name == "lookup_or_init" ||
+              memb_name == "lookup_or_try_init") {
             if (m_.find(Ref->getDecl()) != m_.end()) {
               // Retrieved an ext. pointer from a map, mark LHS as ext. pointer.
               // Pointers from maps always need a single dereference to get the
@@ -772,7 +773,7 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
         string txt;
         auto rewrite_start = GET_BEGINLOC(Call);
         auto rewrite_end = GET_ENDLOC(Call);
-        if (memb_name == "lookup_or_init") {
+        if (memb_name == "lookup_or_init" || memb_name == "lookup_or_try_init") {
           string name = Ref->getDecl()->getName();
           string arg0 = rewriter_.getRewrittenText(expansionRange(Call->getArg(0)->getSourceRange()));
           string arg1 = rewriter_.getRewrittenText(expansionRange(Call->getArg(1)->getSourceRange()));
@@ -782,6 +783,11 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
           txt += "if (!leaf) {";
           txt += " " + update + ", " + arg0 + ", " + arg1 + ", BPF_NOEXIST);";
           txt += " leaf = " + lookup + ", " + arg0 + ");";
+          if (memb_name == "lookup_or_init") {
+            warning(GET_BEGINLOC(Call), "lookup_or_init() may cause return from the function, "
+                                        "use lookup_or_try_init() instead.");
+            txt += " if (!leaf) return 0;";
+          }
           txt += "}";
           txt += "leaf;})";
         } else if (memb_name == "increment") {

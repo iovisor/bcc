@@ -148,11 +148,11 @@ int trace_req_completion(struct pt_regs *ctx, struct request *req)
     whop = whobyreq.lookup(&req);
     if (whop == 0) {
         // missed pid who, save stats as pid 0
-        valp = counts.lookup_or_init(&info, &zero);
+        valp = counts.lookup_or_try_init(&info, &zero);
     } else {
         info.pid = whop->pid;
         __builtin_memcpy(&info.name, whop->name, sizeof(info.name));
-        valp = counts.lookup_or_init(&info, &zero);
+        valp = counts.lookup_or_try_init(&info, &zero);
     }
 
     if (valp) {

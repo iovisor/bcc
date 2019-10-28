@@ -125,7 +125,7 @@ finish:
   if (key.outer_dip < key.outer_sip)
     swap_ipkey(&key);
   struct counters zleaf = {0};
-  struct counters *leaf = stats.lookup_or_init(&key, &zleaf);
+  struct counters *leaf = stats.lookup_or_try_init(&key, &zleaf);
   if (leaf) {
     if (is_ingress) {
       lock_xadd(&leaf->rx_pkts, 1);

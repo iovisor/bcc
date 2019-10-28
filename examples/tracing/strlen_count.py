@@ -33,7 +33,7 @@ int count(struct pt_regs *ctx) {
 
     bpf_probe_read(&key.c, sizeof(key.c), (void *)PT_REGS_PARM1(ctx));
     // could also use `counts.increment(key)`
-    val = counts.lookup_or_init(&key, &zero);
+    val = counts.lookup_or_try_init(&key, &zero);
     if (val) {
       (*val)++;
     }

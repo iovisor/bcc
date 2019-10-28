@@ -141,7 +141,7 @@ int http_filter(struct __sk_buff *skb) {
 	//keep the packet and send it to userspace retruning -1
 	HTTP_MATCH:
 	//if not already present, insert into map <Key, Leaf>
-	sessions.lookup_or_init(&key,&zero);
+	sessions.lookup_or_try_init(&key,&zero);
 
 	//send packet to userspace returning -1
 	KEEP:

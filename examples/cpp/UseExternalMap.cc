@@ -55,7 +55,7 @@ int on_sched_switch(struct tracepoint__sched__sched_switch *args) {
   key.next_pid = args->next_pid;
   __builtin_memcpy(&key.prev_comm, args->prev_comm, 16);
   __builtin_memcpy(&key.next_comm, args->next_comm, 16);
-  val = counts.lookup_or_init(&key, &zero);
+  val = counts.lookup_or_try_init(&key, &zero);
   if (val) {
     (*val)++;
   }
