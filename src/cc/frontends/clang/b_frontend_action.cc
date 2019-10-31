@@ -784,8 +784,6 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
           txt += " " + update + ", " + arg0 + ", " + arg1 + ", BPF_NOEXIST);";
           txt += " leaf = " + lookup + ", " + arg0 + ");";
           if (memb_name == "lookup_or_init") {
-            warning(GET_BEGINLOC(Call), "lookup_or_init() may cause return from the function, "
-                                        "use lookup_or_try_init() instead.");
             txt += " if (!leaf) return 0;";
           }
           txt += "}";
