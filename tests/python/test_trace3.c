@@ -47,7 +47,7 @@ int probe_blk_update_request(struct pt_regs *ctx) {
     index = SLOTS - 1;
 
   u64 zero = 0;
-  u64 *val = latency.lookup_or_init(&index, &zero);
+  u64 *val = latency.lookup_or_try_init(&index, &zero);
   if (val) {
     lock_xadd(val, 1);
   }

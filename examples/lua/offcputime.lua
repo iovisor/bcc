@@ -64,7 +64,7 @@ int oncpu(struct pt_regs *ctx, struct task_struct *prev) {
     bpf_get_current_comm(&key.name, sizeof(key.name));
     key.stack_id = stack_traces.get_stackid(ctx, stack_flags);
 
-    val = counts.lookup_or_init(&key, &zero);
+    val = counts.lookup_or_try_init(&key, &zero);
     if (val) {
         (*val) += delta;
     }

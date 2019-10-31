@@ -38,7 +38,7 @@ int on_tcp_send(struct pt_regs *ctx) {
   key.user_stack = stack_traces.get_stackid(ctx, BPF_F_USER_STACK);
 
   u64 zero = 0, *val;
-  val = counts.lookup_or_init(&key, &zero);
+  val = counts.lookup_or_try_init(&key, &zero);
   if (val) {
     (*val)++;
   }

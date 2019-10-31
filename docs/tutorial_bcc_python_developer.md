@@ -558,7 +558,7 @@ int count(struct pt_regs *ctx) {
 
     bpf_probe_read(&key.c, sizeof(key.c), (void *)PT_REGS_PARM1(ctx));
     // could also use `counts.increment(key)`
-    val = counts.lookup_or_init(&key, &zero);
+    val = counts.lookup_or_try_init(&key, &zero);
     if (val) {
       (*val)++;
     }
@@ -679,7 +679,7 @@ int count_sched(struct pt_regs *ctx, struct task_struct *prev) {
     key.prev_pid = prev->pid;
 
     // could also use `stats.increment(key);`
-    val = stats.lookup_or_init(&key, &zero);
+    val = stats.lookup_or_try_init(&key, &zero);
     if (val) {
       (*val)++;
     }

@@ -45,7 +45,7 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
         - [10. BPF_DEVMAP](#10-bpf_devmap)
         - [11. BPF_CPUMAP](#11-bpf_cpumap)
         - [12. map.lookup()](#12-maplookup)
-        - [13. map.lookup_or_init()](#13-maplookup_or_init)
+        - [13. map.lookup_or_try_init()](#13-maplookup_or_try_init)
         - [14. map.delete()](#14-mapdelete)
         - [15. map.update()](#15-mapupdate)
         - [16. map.insert()](#16-mapinsert)
@@ -537,7 +537,7 @@ Syntax: ```BPF_TABLE(_table_type, _key_type, _leaf_type, _name, _max_entries)```
 
 Creates a map named ```_name```. Most of the time this will be used via higher-level macros, like BPF_HASH, BPF_HIST, etc.
 
-Methods (covered later): map.lookup(), map.lookup_or_init(), map.delete(), map.update(), map.insert(), map.increment().
+Methods (covered later): map.lookup(), map.lookup_or_try_init(), map.delete(), map.update(), map.insert(), map.increment().
 
 Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=BPF_TABLE+path%3Aexamples&type=Code),
@@ -570,7 +570,7 @@ BPF_HASH(start, struct request *);
 
 This creates a hash named ```start``` where the key is a ```struct request *```, and the value defaults to u64. This hash is used by the disksnoop.py example for saving timestamps for each I/O request, where the key is the pointer to struct request, and the value is the timestamp.
 
-Methods (covered later): map.lookup(), map.lookup_or_init(), map.delete(), map.update(), map.insert(), map.increment().
+Methods (covered later): map.lookup(), map.lookup_or_try_init(), map.delete(), map.update(), map.insert(), map.increment().
 
 Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=BPF_HASH+path%3Aexamples&type=Code),
@@ -705,7 +705,7 @@ BPF_LPM_TRIE(trie, struct key_v6);
 
 This creates an LPM trie map named `trie` where the key is a `struct key_v6`, and the value defaults to u64.
 
-Methods (covered later): map.lookup(), map.lookup_or_init(), map.delete(), map.update(), map.insert(), map.increment().
+Methods (covered later): map.lookup(), map.lookup_or_try_init(), map.delete(), map.update(), map.insert(), map.increment().
 
 Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=BPF_LPM_TRIE+path%3Aexamples&type=Code),
@@ -766,15 +766,18 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=lookup+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=lookup+path%3Atools&type=Code)
 
-### 13. map.lookup_or_init()
+### 13. map.lookup_or_try_init()
 
-Syntax: ```*val map.lookup_or_init(&key, &zero)```
+Syntax: ```*val map.lookup_or_try_init(&key, &zero)```
 
 Lookup the key in the map, and return a pointer to its value if it exists, else initialize the key's value to the second argument. This is often used to initialize values to zero. If the key cannot be inserted (e.g. the map is full) then NULL is returned.
 
 Examples in situ:
-[search /examples](https://github.com/iovisor/bcc/search?q=lookup_or_init+path%3Aexamples&type=Code),
-[search /tools](https://github.com/iovisor/bcc/search?q=lookup_or_init+path%3Atools&type=Code)
+[search /examples](https://github.com/iovisor/bcc/search?q=lookup_or_try_init+path%3Aexamples&type=Code),
+[search /tools](https://github.com/iovisor/bcc/search?q=lookup_or_try_init+path%3Atools&type=Code)
+
+Note: The old map.lookup_or_init() may cause return from the function, so lookup_or_try_init() is recommended as it
+does not have this side effect.
 
 ### 14. map.delete()
 

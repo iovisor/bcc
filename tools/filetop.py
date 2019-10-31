@@ -118,7 +118,7 @@ static int do_entry(struct pt_regs *ctx, struct file *file,
     }
 
     struct val_t *valp, zero = {};
-    valp = counts.lookup_or_init(&info, &zero);
+    valp = counts.lookup_or_try_init(&info, &zero);
     if (valp) {
         if (is_read) {
             valp->reads++;

@@ -36,7 +36,7 @@ int handle_ingress(struct __sk_buff *skb) {
   if (ifindex) {
     //bpf_trace_printk("ingress tunnel_id=%d ifindex=%d\n", tkey.tunnel_id, *ifindex);
     struct vni_key vk = {ethernet->src, *ifindex, 0};
-    struct host *src_host = mac2host.lookup_or_init(&vk,
+    struct host *src_host = mac2host.lookup_or_try_init(&vk,
         &(struct host){tkey.tunnel_id, tkey.remote_ipv4, 0, 0});
     if (src_host) {
       lock_xadd(&src_host->rx_pkts, 1);

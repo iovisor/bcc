@@ -32,7 +32,7 @@ int handle_phys2virt(struct __sk_buff *skb) {
       // auto-program reverse direction table
       int out_ifindex = leaf->out_ifindex;
       struct ifindex_leaf_t zleaf = {0};
-      struct ifindex_leaf_t *out_leaf = egress.lookup_or_init(&out_ifindex, &zleaf);
+      struct ifindex_leaf_t *out_leaf = egress.lookup_or_try_init(&out_ifindex, &zleaf);
       if (out_leaf) {
 	// to capture potential configuration changes
 	out_leaf->out_ifindex = skb->ifindex;
