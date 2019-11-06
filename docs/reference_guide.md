@@ -1106,9 +1106,14 @@ Examples in situ:
 
 ### 4. attach_uprobe()
 
-Syntax: ```BPF.attach_uprobe(name="location", sym="symbol", fn_name="name")```
+Syntax: ```BPF.attach_uprobe(name="location", sym="symbol", fn_name="name" [, sym_off=int])```, ```BPF.attach_uprobe(name="location", sym_re="regex", fn_name="name")```, ```BPF.attach_uprobe(name="location", addr=int, fn_name="name")```
 
-Instruments the user-level function ```symbol()``` from either the library or binary named by ```location``` using user-level dynamic tracing of the function entry, and attach our C defined function ```name()``` to be called whenever the user-level function is called.
+
+Instruments the user-level function ```symbol()``` from either the library or binary named by ```location``` using user-level dynamic tracing of the function entry, and attach our C defined function ```name()``` to be called whenever the user-level function is called. If ```sym_off``` is given, the function is attached to the offset within the symbol.
+
+The real address ```addr``` may be supplied in place of ```sym```, in which case ```sym``` must be set to its default value. If the file is a non-PIE executable, ```addr``` must be a virtual address, otherwise it must be an offset relative to the file load address.
+
+Instead of a symbol name, a regular expression can be provided in ```sym_re```. The uprobe will then attach to symbols that match the provided regular expression.
 
 Libraries can be given in the name argument without the lib prefix, or with the full path (/usr/lib/...). Binaries can be given only with the full path (/bin/sh).
 
