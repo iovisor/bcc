@@ -32,9 +32,10 @@ local function create_cache(pid)
   }
 end
 
-local function check_path_symbol(module, symname, addr, pid)
+local function check_path_symbol(module, symname, addr, pid, sym_off)
   local sym = SYM()
   local module_path
+  local new_addr
   if libbcc.bcc_resolve_symname(module, symname, addr or 0x0, pid or 0, nil, sym) < 0 then
     if sym[0].module == nil then
       error("could not find library '%s' in the library path" % module)
@@ -45,9 +46,10 @@ local function check_path_symbol(module, symname, addr, pid)
         symname, module_path})
     end
   end
+  new_addr = sym[0].offset + (sym_off or 0)
   module_path = ffi.string(sym[0].module)
   libbcc.bcc_procutils_free(sym[0].module)
-  return module_path, sym[0].offset
+  return module_path, new_addr
 end
 
 return { create_cache=create_cache, check_path_symbol=check_path_symbol }

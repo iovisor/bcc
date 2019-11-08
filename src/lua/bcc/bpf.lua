@@ -189,7 +189,7 @@ end
 function Bpf:attach_uprobe(args)
   Bpf.check_probe_quota(1)
 
-  local path, addr = Sym.check_path_symbol(args.name, args.sym, args.addr, args.pid)
+  local path, addr = Sym.check_path_symbol(args.name, args.sym, args.addr, args.pid, args.sym_off)
   local fn = self:load_func(args.fn_name, 'BPF_PROG_TYPE_KPROBE')
   local ptype = args.retprobe and "r" or "p"
   local ev_name = string.format("%s_%s_0x%p", ptype, path:gsub("[^%a%d]", "_"), addr)

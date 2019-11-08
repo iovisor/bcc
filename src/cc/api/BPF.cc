@@ -198,10 +198,18 @@ StatusTuple BPF::attach_uprobe(const std::string& binary_path,
                                const std::string& symbol,
                                const std::string& probe_func,
                                uint64_t symbol_addr,
-                               bpf_probe_attach_type attach_type, pid_t pid) {
+                               bpf_probe_attach_type attach_type, pid_t pid,
+                               uint64_t symbol_offset) {
+
+  if (symbol_addr != 0 && symbol_offset != 0)
+    return StatusTuple(-1,
+             "Attachng uprobe with addr %lx and offset %lx is not supported",
+             symbol_addr, symbol_offset);
+
   std::string module;
   uint64_t offset;
-  TRY2(check_binary_symbol(binary_path, symbol, symbol_addr, module, offset));
+  TRY2(check_binary_symbol(binary_path, symbol, symbol_addr, module, offset,
+                           symbol_offset));
 
   std::string probe_event = get_uprobe_event(module, offset, attach_type, pid);
   if (uprobes_.find(probe_event) != uprobes_.end())
@@ -217,9 +225,10 @@ StatusTuple BPF::attach_uprobe(const std::string& binary_path,
     TRY2(unload_func(probe_func));
     return StatusTuple(
         -1,
-        "Unable to attach %suprobe for binary %s symbol %s addr %lx using %s\n",
+        "Unable to attach %suprobe for binary %s symbol %s addr %lx "
+        "offset %lx using %s\n",
         attach_type_debug(attach_type).c_str(), binary_path.c_str(),
-        symbol.c_str(), symbol_addr, probe_func.c_str());
+        symbol.c_str(), symbol_addr, symbol_offset, probe_func.c_str());
   }
 
   open_probe_t p = {};
@@ -398,10 +407,12 @@ StatusTuple BPF::detach_kprobe(const std::string& kernel_func,
 
 StatusTuple BPF::detach_uprobe(const std::string& binary_path,
                                const std::string& symbol, uint64_t symbol_addr,
-                               bpf_probe_attach_type attach_type, pid_t pid) {
+                               bpf_probe_attach_type attach_type, pid_t pid,
+                               uint64_t symbol_offset) {
   std::string module;
   uint64_t offset;
-  TRY2(check_binary_symbol(binary_path, symbol, symbol_addr, module, offset));
+  TRY2(check_binary_symbol(binary_path, symbol, symbol_addr, module, offset,
+                           symbol_offset));
 
   std::string event = get_uprobe_event(module, offset, attach_type, pid);
   auto it = uprobes_.find(event);
@@ -601,7 +612,8 @@ StatusTuple BPF::check_binary_symbol(const std::string& binary_path,
                                      const std::string& symbol,
                                      uint64_t symbol_addr,
                                      std::string& module_res,
-                                     uint64_t& offset_res) {
+                                     uint64_t& offset_res,
+                                     uint64_t symbol_offset) {
   bcc_symbol output;
   int res = bcc_resolve_symname(binary_path.c_str(), symbol.c_str(),
                                 symbol_addr, -1, nullptr, &output);
@@ -616,7 +628,7 @@ StatusTuple BPF::check_binary_symbol(const std::string& binary_path,
   } else {
     module_res = "";
   }
-  offset_res = output.offset;
+  offset_res = output.offset + symbol_offset;
   return StatusTuple(0);
 }
 
