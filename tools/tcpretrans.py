@@ -91,7 +91,9 @@ struct ipv6_flow_key_t {
     u16 dport;
 };
 BPF_HASH(ipv6_count, struct ipv6_flow_key_t);
+"""
 
+bpf_text_kprobe = """
 static int trace_event(struct pt_regs *ctx, struct sock *skp, int type)
 {
     if (skp == NULL)
@@ -115,16 +117,39 @@ static int trace_event(struct pt_regs *ctx, struct sock *skp, int type)
 
     return 0;
 }
+"""
 
+bpf_text_kprobe_retransmit = """
 int trace_retransmit(struct pt_regs *ctx, struct sock *sk)
 {
     trace_event(ctx, sk, RETRANSMIT);
     return 0;
 }
+"""
 
+bpf_text_kprobe_tlp = """
 int trace_tlp(struct pt_regs *ctx, struct sock *sk)
 {
     trace_event(ctx, sk, TLP);
+    return 0;
+}
+"""
+
+bpf_text_tracepoint = """
+TRACEPOINT_PROBE(tcp, tcp_retransmit_skb)
+{
+    u32 pid = bpf_get_current_pid_tgid() >> 32;
+    const struct sock *skp = (const struct sock *)args->skaddr;
+    u16 lport = args->sport;
+    u16 dport = args->dport;
+    char state = skp->__sk_common.skc_state;
+    u16 family = skp->__sk_common.skc_family;
+
+    if (family == AF_INET) {
+        IPV4_CODE
+    } else if (family == AF_INET6) {
+        IPV6_CODE
+    }
     return 0;
 }
 """
@@ -178,20 +203,81 @@ struct_init = { 'ipv4':
                 }
         }
 
+struct_init_tracepoint = { 'ipv4':
+        { 'count' : """
+               struct ipv4_flow_key_t flow_key = {};
+               __builtin_memcpy(&flow_key.saddr, args->saddr, sizeof(flow_key.saddr));
+               __builtin_memcpy(&flow_key.daddr, args->daddr, sizeof(flow_key.daddr));
+               flow_key.lport = lport;
+               flow_key.dport = dport;
+               ipv4_count.increment(flow_key);
+               """,
+          'trace' : """
+               struct ipv4_data_t data4 = {};
+               data4.pid = pid;
+               data4.lport = lport;
+               data4.dport = dport;
+               data4.type = RETRANSMIT;
+               data4.ip = 4;
+               data4.state = state;
+               __builtin_memcpy(&data4.saddr, args->saddr, sizeof(data4.saddr));
+               __builtin_memcpy(&data4.daddr, args->daddr, sizeof(data4.daddr));
+               ipv4_events.perf_submit(args, &data4, sizeof(data4));
+               """
+               },
+        'ipv6':
+        { 'count' : """
+               struct ipv6_flow_key_t flow_key = {};
+               __builtin_memcpy(&flow_key.saddr, args->saddr_v6, sizeof(flow_key.saddr));
+               __builtin_memcpy(&flow_key.daddr, args->daddr_v6, sizeof(flow_key.daddr));
+               flow_key.lport = lport;
+               flow_key.dport = dport;
+               ipv6_count.increment(flow_key);
+               """,
+          'trace' : """
+               struct ipv6_data_t data6 = {};
+               data6.pid = pid;
+               data6.lport = lport;
+               data6.dport = dport;
+               data6.type = RETRANSMIT;
+               data6.ip = 6;
+               data6.state = state;
+               __builtin_memcpy(&data6.saddr, args->saddr_v6, sizeof(data6.saddr));
+               __builtin_memcpy(&data6.daddr, args->daddr_v6, sizeof(data6.daddr));
+               ipv6_events.perf_submit(args, &data6, sizeof(data6));
+               """
+               }
+        }
+
 count_core_base = """
         COUNT_STRUCT.increment(flow_key);
 """
 
-if args.count:
-    bpf_text = bpf_text.replace("IPV4_INIT", struct_init['ipv4']['count'])
-    bpf_text = bpf_text.replace("IPV6_INIT", struct_init['ipv6']['count'])
-    bpf_text = bpf_text.replace("IPV4_CORE", count_core_base.replace("COUNT_STRUCT", 'ipv4_count'))
-    bpf_text = bpf_text.replace("IPV6_CORE", count_core_base.replace("COUNT_STRUCT", 'ipv6_count'))
-else:
-    bpf_text = bpf_text.replace("IPV4_INIT", struct_init['ipv4']['trace'])
-    bpf_text = bpf_text.replace("IPV6_INIT", struct_init['ipv6']['trace'])
-    bpf_text = bpf_text.replace("IPV4_CORE", "ipv4_events.perf_submit(ctx, &data4, sizeof(data4));")
-    bpf_text = bpf_text.replace("IPV6_CORE", "ipv6_events.perf_submit(ctx, &data6, sizeof(data6));")
+if BPF.tracepoint_exists("tcp", "tcp_retransmit_skb"):
+    if args.count:
+        bpf_text_tracepoint = bpf_text_tracepoint.replace("IPV4_CODE", struct_init_tracepoint['ipv4']['count'])
+        bpf_text_tracepoint = bpf_text_tracepoint.replace("IPV6_CODE", struct_init_tracepoint['ipv6']['count'])
+    else:
+        bpf_text_tracepoint = bpf_text_tracepoint.replace("IPV4_CODE", struct_init_tracepoint['ipv4']['trace'])
+        bpf_text_tracepoint = bpf_text_tracepoint.replace("IPV6_CODE", struct_init_tracepoint['ipv6']['trace'])
+    bpf_text += bpf_text_tracepoint
+
+if args.lossprobe or not BPF.tracepoint_exists("tcp", "tcp_retransmit_skb"):
+    bpf_text += bpf_text_kprobe
+    if args.count:
+        bpf_text = bpf_text.replace("IPV4_INIT", struct_init['ipv4']['count'])
+        bpf_text = bpf_text.replace("IPV6_INIT", struct_init['ipv6']['count'])
+        bpf_text = bpf_text.replace("IPV4_CORE", count_core_base.replace("COUNT_STRUCT", 'ipv4_count'))
+        bpf_text = bpf_text.replace("IPV6_CORE", count_core_base.replace("COUNT_STRUCT", 'ipv6_count'))
+    else:
+        bpf_text = bpf_text.replace("IPV4_INIT", struct_init['ipv4']['trace'])
+        bpf_text = bpf_text.replace("IPV6_INIT", struct_init['ipv6']['trace'])
+        bpf_text = bpf_text.replace("IPV4_CORE", "ipv4_events.perf_submit(ctx, &data4, sizeof(data4));")
+        bpf_text = bpf_text.replace("IPV6_CORE", "ipv6_events.perf_submit(ctx, &data6, sizeof(data6));")
+    if args.lossprobe:
+        bpf_text += bpf_text_kprobe_tlp
+    if not BPF.tracepoint_exists("tcp", "tcp_retransmit_skb"):
+        bpf_text += bpf_text_kprobe_retransmit
 
 if debug or args.ebpf:
     print(bpf_text)
@@ -252,7 +338,8 @@ def depict_cnt(counts_tab, l3prot='ipv4'):
 
 # initialize BPF
 b = BPF(text=bpf_text)
-b.attach_kprobe(event="tcp_retransmit_skb", fn_name="trace_retransmit")
+if not BPF.tracepoint_exists("tcp", "tcp_retransmit_skb"):
+    b.attach_kprobe(event="tcp_retransmit_skb", fn_name="trace_retransmit")
 if args.lossprobe:
     b.attach_kprobe(event="tcp_send_loss_probe", fn_name="trace_tlp")
 
