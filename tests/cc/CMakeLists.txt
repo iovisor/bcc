@@ -31,7 +31,10 @@ add_executable(test_libbcc
 file(COPY dummy_proc_map.txt DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 add_library(usdt_test_lib SHARED usdt_test_lib.c)
 
-target_link_libraries(test_libbcc bcc-shared dl usdt_test_lib)
+add_dependencies(test_libbcc bcc-shared)
+target_link_libraries(test_libbcc ${PROJECT_BINARY_DIR}/src/cc/libbcc.so dl usdt_test_lib)
+set_target_properties(test_libbcc PROPERTIES INSTALL_RPATH ${PROJECT_BINARY_DIR}/src/cc)
+
 add_test(NAME test_libbcc COMMAND ${TEST_WRAPPER} c_test_all sudo ${CMAKE_CURRENT_BINARY_DIR}/test_libbcc)
 
 endif(ENABLE_USDT)
