@@ -1593,6 +1593,23 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=num_open_kprobes+path%3Aexamples+language%3Apython&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=num_open_kprobes+path%3Atools+language%3Apython&type=Code)
 
+### 5. get_syscall_fnname()
+
+Syntax: ```BPF.get_syscall_fnname(name : str)```
+
+Return the corresponding kernel function name of the syscall. This helper function will try different prefixes and use the right one to concatenate with the syscall name. Note that the return value may vary in different versions of linux kernel and sometimes it will causing trouble. (see #2590)
+
+Example:
+
+```Python
+print("Kernel function name of %s" % b.get_syscall_fnname("clone"))
+# sys_clone or __x64_sys_clone or ...
+```
+
+Examples in situ:
+[search /examples](https://github.com/iovisor/bcc/search?q=get_syscall_fnname+path%3Aexamples+language%3Apython&type=Code),
+[search /tools](https://github.com/iovisor/bcc/search?q=get_syscall_fnname+path%3Atools+language%3Apython&type=Code)
+
 # BPF Errors
 
 See the "Understanding eBPF verifier messages" section in the kernel source under Documentation/networking/filter.txt.
