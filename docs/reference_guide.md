@@ -86,6 +86,7 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
         - [2. ksymname()](#2-ksymname)
         - [3. sym()](#3-sym)
         - [4. num_open_kprobes()](#4-num_open_kprobes)
+        - [5. get_syscall_fnname()](#5-get_syscall_fnname)
 
 - [BPF Errors](#bpf-errors)
     - [1. Invalid mem access](#1-invalid-mem-access)
@@ -1597,12 +1598,12 @@ Examples in situ:
 
 Syntax: ```BPF.get_syscall_fnname(name : str)```
 
-Return the corresponding kernel function name of the syscall. This helper function will try different prefixes and use the right one to concatenate with the syscall name. Note that the return value may vary in different versions of linux kernel and sometimes it will causing trouble. (see #2590)
+Return the corresponding kernel function name of the syscall. This helper function will try different prefixes and use the right one to concatenate with the syscall name. Note that the return value may vary in different versions of linux kernel and sometimes it will causing trouble. (see [#2590](https://github.com/iovisor/bcc/issues/2590))
 
 Example:
 
 ```Python
-print("Kernel function name of %s" % b.get_syscall_fnname("clone"))
+print("The function name of %s in kernel is %s" % ("clone", b.get_syscall_fnname("clone")))
 # sys_clone or __x64_sys_clone or ...
 ```
 
