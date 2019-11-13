@@ -208,6 +208,11 @@ static struct bpf_helper helpers[] = {
   {"sk_storage_delete", "5.2"},
   {"send_signal", "5.3"},
   {"tcp_gen_syncookie", "5.3"},
+  {"skb_output", "5.5"},
+  {"probe_read_user", "5.5"},
+  {"probe_read_kernel", "5.5"},
+  {"probe_read_user_str", "5.5"},
+  {"probe_read_kernel_str", "5.5"},
 };
 
 static uint64_t ptr_to_u64(void *ptr)
