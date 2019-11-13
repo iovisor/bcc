@@ -15,7 +15,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-result")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-unused-result")
 
 if(ENABLE_USDT)
-add_executable(test_libbcc
+set(TEST_LIBBCC_SOURCES
 	test_libbcc.cc
 	test_c_api.cc
 	test_array_table.cc
@@ -28,10 +28,28 @@ add_executable(test_libbcc
 	test_usdt_args.cc
 	test_usdt_probes.cc
 	utils.cc)
+
+add_executable(test_libbcc ${TEST_LIBBCC_SOURCES})
+
 file(COPY dummy_proc_map.txt DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 add_library(usdt_test_lib SHARED usdt_test_lib.c)
 
-target_link_libraries(test_libbcc bcc-shared dl usdt_test_lib)
+add_dependencies(test_libbcc bcc-shared)
+target_link_libraries(test_libbcc ${PROJECT_BINARY_DIR}/src/cc/libbcc.so dl usdt_test_lib)
+set_target_properties(test_libbcc PROPERTIES INSTALL_RPATH ${PROJECT_BINARY_DIR}/src/cc)
+target_compile_definitions(test_libbcc PRIVATE -DLIBBCC_NAME=\"libbcc.so\")
+
 add_test(NAME test_libbcc COMMAND ${TEST_WRAPPER} c_test_all sudo ${CMAKE_CURRENT_BINARY_DIR}/test_libbcc)
+
+if(LIBBPF_FOUND)
+  add_executable(test_libbcc_no_libbpf ${TEST_LIBBCC_SOURCES})
+  add_dependencies(test_libbcc_no_libbpf bcc-shared-no-libbpf)
+
+  target_link_libraries(test_libbcc_no_libbpf ${PROJECT_BINARY_DIR}/src/cc/libbcc-no-libbpf.so dl usdt_test_lib bpf)
+  set_target_properties(test_libbcc_no_libbpf PROPERTIES INSTALL_RPATH ${PROJECT_BINARY_DIR}/src/cc)
+  target_compile_definitions(test_libbcc_no_libbpf PRIVATE -DLIBBCC_NAME=\"libbcc-no-libbpf.so\")
+
+  add_test(NAME test_libbcc_no_libbpf COMMAND ${TEST_WRAPPER} c_test_all_no_libbpf sudo ${CMAKE_CURRENT_BINARY_DIR}/test_libbcc_no_libbpf)
+endif()
 
 endif(ENABLE_USDT)
