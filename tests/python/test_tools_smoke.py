@@ -117,6 +117,10 @@ class SmokeTests(TestCase):
     def test_cpuunclaimed(self):
         self.run_with_duration("cpuunclaimed.py 1 1")
 
+    @skipUnless(kernel_version_ge(4,17), "requires kernel >= 4.17")
+    def test_compactsnoop(self):
+        self.run_with_int("compactsnoop.py")
+
     @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
     def test_dbslower(self):
         # Deliberately left empty -- dbslower requires an instance of either

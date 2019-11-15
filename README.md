@@ -95,6 +95,7 @@ pair of .c and .py files, and some are directories of files.
 - tools/[capable](tools/capable.py): Trace security capability checks. [Examples](tools/capable_example.txt).
 - tools/[cachestat](tools/cachestat.py): Trace page cache hit/miss ratio. [Examples](tools/cachestat_example.txt).
 - tools/[cachetop](tools/cachetop.py): Trace page cache hit/miss ratio by processes. [Examples](tools/cachetop_example.txt).
+- tools/[compactsnoop](tools/compactsnoop.py): Trace compact zone events with PID and latency. [Examples](tools/compactsnoop_example.txt).
 - tools/[cpudist](tools/cpudist.py): Summarize on- and off-CPU time per task as a histogram. [Examples](tools/cpudist_example.txt)
 - tools/[cpuunclaimed](tools/cpuunclaimed.py): Sample CPU run queues and calculate unclaimed idle CPU. [Examples](tools/cpuunclaimed_example.txt)
 - tools/[criticalstat](tools/criticalstat.py): Trace and report long atomic critical sections in the kernel. [Examples](tools/criticalstat_example.txt)
