@@ -199,6 +199,10 @@ class SmokeTests(TestCase):
         # a traceback but will not exit.
         self.run_with_int("killsnoop.py", kill=True)
 
+    @skipUnless(kernel_version_ge(4,18), "requires kernel >= 4.18")
+    def test_lockstat(self):
+        self.run_with_int("lockstat.py")
+
     @skipUnless(kernel_version_ge(4,9), "requires kernel >= 4.9")
     def test_llcstat(self):
         # Requires PMU, which is not available in virtual machines.

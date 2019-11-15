@@ -151,6 +151,8 @@ apps:
         command: bcc-wrapper javathreads
     killsnoop:
         command: bcc-wrapper killsnoop
+    lockstat:
+        command: bcc-wrapper lockstat
     llcstat:
         command: bcc-wrapper llcstat
     mdflush:

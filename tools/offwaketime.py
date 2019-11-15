@@ -140,7 +140,7 @@ struct wokeby_t {
 // of the Process who wakes it
 BPF_HASH(wokeby, u32, struct wokeby_t);
 
-BPF_STACK_TRACE(stack_traces, STACK_STORAGE_SIZE);
+BPF_STACK_TRACE(stack_traces, 2);
 
 int waker(struct pt_regs *ctx, struct task_struct *p) {
     // PID and TGID of the target Process to be waken
@@ -321,7 +321,7 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
         line = [k.target.decode('utf-8', 'replace')]
         if not args.kernel_stacks_only:
             if stack_id_err(k.t_u_stack_id):
-                line.append("[Missed User Stack]")
+                line.append("[Missed User Stack] %d" % k.t_u_stack_id)
             else:
                 line.extend([b.sym(addr, k.t_tgid).decode('utf-8', 'replace')
                     for addr in reversed(list(target_user_stack)[1:])])
@@ -353,7 +353,7 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
         print("    %-16s %s %s" % ("waker:", k.waker.decode('utf-8', 'replace'), k.w_pid))
         if not args.kernel_stacks_only:
             if stack_id_err(k.w_u_stack_id):
-                print("    [Missed User Stack]")
+                print("    [Missed User Stack] %d" % k.w_u_stack_id)
             else:
                 for addr in waker_user_stack:
                     print("    %s" % b.sym(addr, k.w_tgid))
