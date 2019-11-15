@@ -140,6 +140,10 @@ Intel `i40e` driver | 4.13 | [`0c8493d90b6b`](https://git.kernel.org/pub/scm/lin
 Action: redirect | 4.14 | [`6453073987ba`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=6453073987ba392510ab6c8b657844a9312c67f7)
 Support for tap | 4.14 | [`761876c857cb`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=761876c857cb2ef8489fbee01907151da902af91)
 Support for veth | 4.14 | [`d445516966dc`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=d445516966dcb2924741b13b27738b54df2af01a)
+Intel `ixgbevf` driver | 4.17 | [`c7aec59657b6`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=c7aec59657b60f3a29fc7d3274ebefd698879301)
+Freescale `dpaa2` driver | 5.0 | [`7e273a8ebdd3`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=7e273a8ebdd3b83f94eb8b49fc8ee61464f47cc2)
+Socionext `netsec` driver | 5.3 | [`ba2b232108d3`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=ba2b232108d3c2951bab02930a00f23b0cffd5af)
+TI `cpsw` driver | 5.3 | [`9ed4050c0d75`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=9ed4050c0d75768066a07cf66eef4f8dc9d79b52)
 Intel `e1000` driver | | [Not upstream yet](https://git.kernel.org/pub/scm/linux/kernel/git/ast/bpf.git/commit/?h=xdp&id=0afee87cfc800bf3317f4dc8847e6f36539b820c)
 Intel `e1000e` driver | | [Not planned for upstream at this time](https://github.com/adjavon/e1000e_xdp)
 
