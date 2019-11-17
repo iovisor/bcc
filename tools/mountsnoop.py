@@ -88,10 +88,8 @@ BPF_PERF_OUTPUT(events);
 
 int syscall__mount(struct pt_regs *ctx, char __user *source,
                       char __user *target, char __user *type,
-                      unsigned long flags)
+                      unsigned long flags, char __user *data)
 {
-    /* sys_mount takes too many arguments */
-    char __user *data = (char __user *)PT_REGS_PARM5(ctx);
     struct data_t event = {};
     struct task_struct *task;
     struct nsproxy *nsproxy;
