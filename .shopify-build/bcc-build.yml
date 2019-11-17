@@ -1,0 +1,35 @@
+containers:
+  eoan:
+    docker: ubuntu:19.10
+  packagecloud:
+    docker: gcr.io/shopify-docker-images/ci-branches/ci/packagecloud:97c5a43ff3b5dc0658d8618afcbc91a694365477
+
+steps:
+- label: Build debs
+  timeout: 60m
+  container: eoan
+  git:
+    history: true
+  run:
+  - apt-get -qq update
+  - apt-get -y install pbuilder aptitude git python python3 python-dev python3-dev
+  - git fetch --tags --all
+  - /usr/lib/pbuilder/pbuilder-satisfydepends
+  - ./scripts/build-deb.sh
+  - mkdir -p /artifacts
+  - cp /app/*.deb /artifacts/
+  artifact_paths:
+  - /artifacts
+
+- wait
+
+- label: Publish to Packagecloud
+  timeout: 5m
+  container: packagecloud
+  run:
+  - ls -l debs
+  - FLAVOUR=ubuntu publish_debs debs eoan shopify/public
+  import_artifacts:
+  - pattern: '*.deb'
+    into: debs
+  branches: master
