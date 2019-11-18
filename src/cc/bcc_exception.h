@@ -49,12 +49,12 @@ private:
   std::string msg_;
 };
 
-#define TRY2(CMD)              \
-  do {                         \
-    StatusTuple __stp = (CMD); \
-    if (__stp.code() != 0) {   \
-      return __stp;            \
-    }                          \
+#define TRY2(CMD)                    \
+  do {                               \
+    ebpf::StatusTuple __stp = (CMD); \
+    if (__stp.code() != 0) {         \
+      return __stp;                  \
+    }                                \
   } while (0)
 
 }  // namespace ebpf
