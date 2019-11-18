@@ -40,9 +40,9 @@ public:
     msg_ += msg;
   }
 
-  int code() { return ret_; }
+  int code() const { return ret_; }
 
-  std::string msg() { return msg_; }
+  const std::string& msg() const { return msg_; }
 
 private:
   int ret_;
