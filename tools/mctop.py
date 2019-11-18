@@ -64,33 +64,27 @@ struct keyhit_t {
     char keystr[MAX_STRING_LENGTH];
 };
 
-BPF_HASH(keyhits, struct keyhit_t, u64);
-BPF_HASH(mc_ops, memcached_op_t, u64);
-BPF_HASH(bytecount, struct keyhit_t, u64);
+struct value_t {
+    u64 count;
+    u64 bytecount;
+};
+
+BPF_HASH(keyhits, struct keyhit_t, struct value_t);
 
 
 int trace_entry(struct pt_regs *ctx) {
-    u64 keystr = 0, bytes = 0, val = 0;
-    u64 *valp;
+    u64 keystr = 0, bytecount = 0;
     struct keyhit_t keyhit = {0};
+    struct value_t *valp, zero = {};
 
     bpf_usdt_readarg(2, ctx, &keystr);
+    bpf_usdt_readarg(4, ctx, &bytecount);
 
     bpf_probe_read(&keyhit.keystr, sizeof(keyhit.keystr), (void *)keystr);
 
-    valp = keyhits.lookup_or_init(&keyhit, &val);
-    ++(*valp);
-
-    // FIXME only do this if opp supports it
-    //bpf_probe_read(&data.bytes, sizeof(data.bytes),
-    //               (void *)bytes);
-
-
-    //mc_ops.lookup_or_init(&op, &val)
-    //++(*valp);
-
-    //bytes.lookup_or_init(&data.keystr, &val); // FIXME not all commands have bytes
-    //(*valp) = &data.bytes;
+    valp = keyhits.lookup_or_init(&keyhit, &zero);
+    valp->count += 1;
+    valp->bytecount = bytecount;
 
     return 0;
 }
@@ -121,14 +115,13 @@ while 1:
 
     print("%-30s %10s %10s" % ("MEMCACHED KEY", "CALLS", "OBJSIZE") )
 
-    # by-PID output
     keyhits = bpf.get_table("keyhits")
-    bytecount = bpf.get_table("bytecount")
     line = 0
     for k, v in keyhits.items(): # FIXME sort this
 
         # print line
-        print("%-30s %10d" % (k.keystr.decode('utf-8', 'replace'), v.value))
+        print("%-30s %10d %10d" % (k.keystr.decode('utf-8', 'replace'), v.count,
+                                   v.bytecount) )
 
         line += 1
         if line >= maxrows:
