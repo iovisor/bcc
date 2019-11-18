@@ -28,6 +28,10 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
 # 02-May-2018   Ivan Babrou   Created this.
+# 18-Nov-2019   Gergely Bod   BUG fix: Use bpf_probe_read_str() to extract the
+#                               process name from 'task_struct* next' in raw tp code.
+#                               bpf_get_current_comm() operates on the current task
+#                               which might already be different than 'next'.
 
 from __future__ import print_function
 from bcc import BPF
@@ -163,13 +167,12 @@ RAW_TRACEPOINT_PROBE(sched_switch)
     // TP_PROTO(bool preempt, struct task_struct *prev, struct task_struct *next)
     struct task_struct *prev = (struct task_struct *)ctx->args[1];
     struct task_struct *next= (struct task_struct *)ctx->args[2];
-    u32 pid, tgid;
+    u32 pid;
     long state;
 
     // ivcsw: treat like an enqueue event and store timestamp
     bpf_probe_read(&state, sizeof(long), (const void *)&prev->state);
     if (state == TASK_RUNNING) {
-        bpf_probe_read(&tgid, sizeof(prev->tgid), &prev->tgid);
         bpf_probe_read(&pid, sizeof(prev->pid), &prev->pid);
         if (!(FILTER_PID || pid == 0)) {
             u64 ts = bpf_ktime_get_ns();
@@ -177,7 +180,6 @@ RAW_TRACEPOINT_PROBE(sched_switch)
         }
     }
 
-    bpf_probe_read(&tgid, sizeof(next->tgid), &next->tgid);
     bpf_probe_read(&pid, sizeof(next->pid), &next->pid);
 
     u64 *tsp, delta_us;
@@ -195,7 +197,7 @@ RAW_TRACEPOINT_PROBE(sched_switch)
     struct data_t data = {};
     data.pid = pid;
     data.delta_us = delta_us;
-    bpf_get_current_comm(&data.task, sizeof(data.task));
+    bpf_probe_read_str(&data.task, sizeof(data.task), next->comm);
 
     // output
     events.perf_submit(ctx, &data, sizeof(data));
