@@ -532,12 +532,12 @@ sudo /usr/share/bcc/tools/execsnoop
 ## Build LLVM and Clang development libs
 
 ```
-git clone http://llvm.org/git/llvm.git
-cd llvm/tools; git clone http://llvm.org/git/clang.git
-cd ..; mkdir -p build/install; cd build
-cmake -G "Unix Makefiles" -DLLVM_TARGETS_TO_BUILD="BPF;X86" \
+git clone https://github.com/llvm/llvm-project.git
+mkdir -p llvm-project/llvm/build/install
+cd llvm-project/llvm/build
+cmake -G "Ninja" -DLLVM_TARGETS_TO_BUILD="BPF;X86" \
+  -DLLVM_ENABLE_PROJECTS="clang" \
   -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$PWD/install ..
-make
-make install
+ninja && ninja install
 export PATH=$PWD/install/bin:$PATH
 ```
