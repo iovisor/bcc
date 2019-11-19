@@ -85,6 +85,8 @@ int trace_entry(struct pt_regs *ctx) {
 
     bpf_probe_read_str(&keyhit.keystr, sizeof(keyhit.keystr), (void *)keystr);
 
+    bpf_trace_printk("key %s\\n", keyhit.keystr); // fixme - remove debugging
+
     valp = keyhits.lookup_or_init(&keyhit, &zero);
     valp->count += 1;
     valp->bytecount = bytecount;
