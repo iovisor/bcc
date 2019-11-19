@@ -18,7 +18,7 @@
 # see https://codeascraft.com/2012/12/13/mctop-a-tool-for-analyzing-memcache-get-traffic/
 
 from __future__ import print_function
-from time import sleep, strftime
+from time import sleep, strftime, monotonic
 from bcc import BPF, USDT, utils
 import argparse
 from subprocess import call
@@ -67,28 +67,33 @@ struct keyhit_t {
 struct value_t {
     u64 count;
     u64 bytecount;
+    u64 totalbytes;
+    u64 timestamp;
 };
 
 BPF_HASH(keyhits, struct keyhit_t, struct value_t);
 
 
 int trace_entry(struct pt_regs *ctx) {
-    u64 keystr = 0, bytecount = 0;
+    u64 keystr = 0;
+    int32_t bytecount = 0; // type is -4@%eax in stap notes, which is int32
     struct keyhit_t keyhit = {0};
     struct value_t *valp, zero = {};
 
     bpf_usdt_readarg(2, ctx, &keystr);
     bpf_usdt_readarg(4, ctx, &bytecount);
 
-    bpf_probe_read(&keyhit.keystr, sizeof(keyhit.keystr), (void *)keystr);
+    bpf_probe_read_str(&keyhit.keystr, sizeof(keyhit.keystr), (void *)keystr);
 
     valp = keyhits.lookup_or_init(&keyhit, &zero);
     valp->count += 1;
     valp->bytecount = bytecount;
+    valp->totalbytes += bytecount;
+    valp->timestamp = bpf_ktime_get_ns();
+
 
     return 0;
 }
-
 """
 
 if args.ebpf:
@@ -102,6 +107,7 @@ bpf = BPF(text=bpf_text, usdt_contexts=[usdt])
 
 print('Tracing... Output every %d secs. Hit Ctrl-C to end' % interval)
 
+start = monotonic();
 exiting = 0
 while 1:
     try:
@@ -113,19 +119,23 @@ while 1:
     if clear:
         call("clear")
 
-    print("%-30s %10s %10s" % ("MEMCACHED KEY", "CALLS", "OBJSIZE") )
 
+    print("%-30s %10s %10s %10s %10s %10s" % ("MEMCACHED KEY", "CALLS", "OBJSIZE", "REQ/SEC", "BW(kbps)", "TOTAL_BYTES") )
     keyhits = bpf.get_table("keyhits")
     line = 0
+    interval = monotonic() - start;
     for k, v in keyhits.items(): # FIXME sort this
 
-        # print line
-        print("%-30s %10d %10d" % (k.keystr.decode('utf-8', 'replace'), v.count,
-                                   v.bytecount) )
+        cps = v.count / interval;
+        bw  = (v.totalbytes / 1000) / interval;
+        print("%-30s %10d %10d %10f %10f %10d" % (k.keystr.decode('utf-8', 'replace'), v.count,
+                                   v.bytecount, cps, bw, v.totalbytes) )
 
         line += 1
         if line >= maxrows:
             break
+
+    # fixme - implement purging mechanism that also resets start time
     #keyhits.clear()
 
     if exiting:
