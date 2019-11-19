@@ -53,9 +53,10 @@ pid = args.pid
 # load BPF program
 bpf_text = """
 #include <uapi/linux/ptrace.h>
+#include <bcc/proto.h>
 
 
-#define MAX_STRING_LENGTH 80
+#define MAX_STRING_LENGTH 250
 
 // Must match python definitions
 typedef enum {START, END, GET, ADD, SET, REPLACE, PREPEND, APPEND,
@@ -68,6 +69,7 @@ struct value_t {
     u64 count;
     u64 bytecount;
     u64 totalbytes;
+    u64 keysize;
     u64 timestamp;
 };
 
@@ -77,19 +79,29 @@ BPF_HASH(keyhits, struct keyhit_t, struct value_t);
 int trace_entry(struct pt_regs *ctx) {
     u64 keystr = 0;
     int32_t bytecount = 0; // type is -4@%eax in stap notes, which is int32
+    uint8_t keysize = 0; // type is 1@%cl, which should be uint8
     struct keyhit_t keyhit = {0};
     struct value_t *valp, zero = {};
 
     bpf_usdt_readarg(2, ctx, &keystr);
+    bpf_usdt_readarg(3, ctx, &keysize);
     bpf_usdt_readarg(4, ctx, &bytecount);
 
-    bpf_probe_read_str(&keyhit.keystr, sizeof(keyhit.keystr), (void *)keystr);
 
-    bpf_trace_printk("key %s\\n", keyhit.keystr); // fixme - remove debugging
+    int bytesread = bpf_probe_read_str(&keyhit.keystr, sizeof(keyhit.keystr), (void *)keystr);
+
+    // There is an issue where too many bytes can be (and often are) read
+    // this may be a bug in memcached (if it doesn't null-terminate these), or
+    // in these bcc helpers, and there is no elegant way to chomp this to the
+    // correct size in bpf land yet.
+    // see fix_keys below
+    if (bytesread > (keysize+1))
+      bpf_trace_printk("key: %s size: %d read bytes: %d\\n", keyhit.keystr, keysize, bytesread); // fixme - remove debugging
 
     valp = keyhits.lookup_or_init(&keyhit, &zero);
     valp->count += 1;
     valp->bytecount = bytecount;
+    valp->keysize = keysize;
     valp->totalbytes += bytecount;
     valp->timestamp = bpf_ktime_get_ns();
 
@@ -97,6 +109,26 @@ int trace_entry(struct pt_regs *ctx) {
     return 0;
 }
 """
+
+# Since it is possible that we read the keys incorrectly, we need to fix the
+# hash keys and combine their values intelligently here, producing a new hash
+def fix_keys(bpf_map):
+
+  new_map = {}
+
+  for k,v in bpf_map.items():
+      shortkey = k.keystr[:v.keysize].decode('utf-8', 'replace')
+
+      if shortkey in new_map:
+          new_map[shortkey].count += v.count
+          new_map[shortkey].totalbytes += v.totalbytes
+          if v.timestamp > new_map[shortkey].timestamp:
+              new_map[shortkey].bytecount = v.totalbytes
+              new_map[shortkey].bytecount = v.timestamp
+      else:
+          new_map[shortkey] = v
+
+  return new_map
 
 if args.ebpf:
     print(bpf_text)
@@ -126,11 +158,13 @@ while 1:
     keyhits = bpf.get_table("keyhits")
     line = 0
     interval = monotonic() - start;
-    for k, v in keyhits.items(): # FIXME sort this
+
+    fixed_map = fix_keys(keyhits)
+    for k, v in fixed_map.items(): # FIXME sort this
 
         cps = v.count / interval;
         bw  = (v.totalbytes / 1000) / interval;
-        print("%-30s %10d %10d %10f %10f %10d" % (k.keystr.decode('utf-8', 'replace'), v.count,
+        print("%-30s %10d %10d %10f %10f %10d" % (k, v.count,
                                    v.bytecount, cps, bw, v.totalbytes) )
 
         line += 1
