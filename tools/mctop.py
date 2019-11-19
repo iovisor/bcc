@@ -123,8 +123,8 @@ def fix_keys(bpf_map):
           new_map[shortkey].count += v.count
           new_map[shortkey].totalbytes += v.totalbytes
           if v.timestamp > new_map[shortkey].timestamp:
-              new_map[shortkey].bytecount = v.totalbytes
-              new_map[shortkey].bytecount = v.timestamp
+              new_map[shortkey].bytecount = v.bytecount
+              new_map[shortkey].timestamp = v.timestamp
       else:
           new_map[shortkey] = v
 
