@@ -14,8 +14,9 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
 # 17-Nov-2019   Dale Hamel   Created this.
-# Insipried by the ruby tool of the same name by Marcus Barczak in 2012,
+# Inspired by the ruby tool of the same name by Marcus Barczak in 2012,
 # see https://codeascraft.com/2012/12/13/mctop-a-tool-for-analyzing-memcache-get-traffic/
+# see also https://github.com/tumblr/memkeys
 
 from __future__ import print_function
 from time import sleep, strftime, monotonic
@@ -95,6 +96,7 @@ int trace_entry(struct pt_regs *ctx) {
     // in these bcc helpers, and there is no elegant way to chomp this to the
     // correct size in bpf land yet.
     // see fix_keys below
+    // see https://github.com/memcached/memcached/issues/576
     if (bytesread > (keysize+1))
       bpf_trace_printk("key: %s size: %d read bytes: %d\\n", keyhit.keystr, keysize, bytesread); // fixme - remove debugging
 
@@ -112,6 +114,7 @@ int trace_entry(struct pt_regs *ctx) {
 
 # Since it is possible that we read the keys incorrectly, we need to fix the
 # hash keys and combine their values intelligently here, producing a new hash
+# see https://github.com/memcached/memcached/issues/576
 def fix_keys(bpf_map):
 
   new_map = {}
