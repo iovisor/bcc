@@ -21,8 +21,14 @@
 from __future__ import print_function
 from time import sleep, strftime, monotonic
 from bcc import BPF, USDT, utils
-import argparse
 from subprocess import call
+import argparse
+import sys
+import select
+import tty
+import termios
+
+import enum # FIXME use or remove
 
 # arguments
 examples = """examples:
@@ -34,6 +40,9 @@ parser = argparse.ArgumentParser(
     formatter_class=argparse.RawDescriptionHelpFormatter,
     epilog=examples)
 parser.add_argument("-p", "--pid", type=int, help="process id to attach to")
+parser.add_argument("-s", "--save", action="store_true",
+    help="save eBPF map when dump command is issued")
+
 parser.add_argument("-C", "--noclear", action="store_true",
     help="don't clear the screen")
 parser.add_argument("-r", "--maxrows", default=20,
@@ -44,12 +53,34 @@ parser.add_argument("count", nargs="?", default=99999999,
     help="number of outputs")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
+
+# FIXME clean this up
 args = parser.parse_args()
 interval = int(args.interval)
 countdown = int(args.count)
 maxrows = int(args.maxrows)
 clear = not int(args.noclear)
 pid = args.pid
+
+old_settings = termios.tcgetattr(sys.stdin)
+sort_mode = "calls"
+sort_ascending = True
+exiting = 0
+first_loop = True
+
+sort_modes = {
+    "C" : "calls",
+    "S" : "size",
+    "R" : "requests/sec",
+    "B" : "bandwidth",
+    "N" : "timestamp"
+}
+
+commands = {
+    "T" : "toggle", # sorting by ascending / descending order
+    "D" : "dump",   # clear eBPF maps and dump to disk (if set)
+    "Q" : "quit"
+}
 
 # load BPF program
 bpf_text = """
@@ -88,17 +119,11 @@ int trace_entry(struct pt_regs *ctx) {
     bpf_usdt_readarg(3, ctx, &keysize);
     bpf_usdt_readarg(4, ctx, &bytecount);
 
-
-    int bytesread = bpf_probe_read_str(&keyhit.keystr, sizeof(keyhit.keystr), (void *)keystr);
-
-    // There is an issue where too many bytes can be (and often are) read
-    // this may be a bug in memcached (if it doesn't null-terminate these), or
-    // in these bcc helpers, and there is no elegant way to chomp this to the
-    // correct size in bpf land yet.
-    // see fix_keys below
     // see https://github.com/memcached/memcached/issues/576
-    if (bytesread > (keysize+1))
-      bpf_trace_printk("key: %s size: %d read bytes: %d\\n", keyhit.keystr, keysize, bytesread); // fixme - remove debugging
+    // ideally per https://github.com/iovisor/bcc/issues/1260 we should be able to
+    // read just the size we need, but this doesn't seem possible and throws a
+    // verifier error
+    bpf_probe_read(&keyhit.keystr, sizeof(keyhit.keystr), (void *)keystr);
 
     valp = keyhits.lookup_or_init(&keyhit, &zero);
     valp->count += 1;
@@ -115,8 +140,10 @@ int trace_entry(struct pt_regs *ctx) {
 # Since it is possible that we read the keys incorrectly, we need to fix the
 # hash keys and combine their values intelligently here, producing a new hash
 # see https://github.com/memcached/memcached/issues/576
+# A possible solution may be in flagging to the verifier that the size given
+# by a usdt argument is less than the buffer size,
+# see https://github.com/iovisor/bcc/issues/1260#issuecomment-406365168
 def fix_keys(bpf_map):
-
   new_map = {}
 
   for k,v in bpf_map.items():
@@ -133,29 +160,52 @@ def fix_keys(bpf_map):
 
   return new_map
 
+def sort_output(unsorted_map, mode, sort_ascending):
+    output = unsorted_map
+    if mode == "calls":
+        output = sorted(output.items(), key=lambda x: x[1].count)
+
+    if sort_ascending:
+        output = reversed(output)
+
+    return output
+
+# Set stdin to non-blocking reads so we can poll for chars
+def readKey(interval):
+    new_settings = termios.tcgetattr(sys.stdin)
+    new_settings[3] = new_settings[3] & ~(termios.ECHO | termios.ICANON)
+    tty.setcbreak(sys.stdin.fileno())
+    if select.select([sys.stdin], [], [], 5) == ([sys.stdin], [], []):
+        key = sys.stdin.read(1).lower()
+
+        if key == 't':
+            global sort_ascending
+            sort_ascending = not sort_ascending
+        if key == 'd':
+            keyhits.clear() # FIXME save to file first
+
 if args.ebpf:
     print(bpf_text)
     exit()
 
 usdt = USDT(pid=pid)
 usdt.enable_probe(probe="command__set", fn_name="trace_entry") # FIXME use fully specified version, port this to python
-
 bpf = BPF(text=bpf_text, usdt_contexts=[usdt])
 
-print('Tracing... Output every %d secs. Hit Ctrl-C to end' % interval)
+start = monotonic(); # FIXME would prefer monotonic_ns, if 3.7+
 
-start = monotonic();
-exiting = 0
 while 1:
     try:
-        sleep(interval)
+        if not first_loop:
+            readKey(interval)
+        else:
+            first_loop = False
     except KeyboardInterrupt:
         exiting = 1
 
     # header
     if clear:
-        call("clear")
-
+        print("\033c", end="")
 
     print("%-30s %10s %10s %10s %10s %10s" % ("MEMCACHED KEY", "CALLS", "OBJSIZE", "REQ/SEC", "BW(kbps)", "TOTAL_BYTES") )
     keyhits = bpf.get_table("keyhits")
@@ -163,7 +213,9 @@ while 1:
     interval = monotonic() - start;
 
     fixed_map = fix_keys(keyhits)
-    for k, v in fixed_map.items(): # FIXME sort this
+    sorted_map = sort_output(fixed_map, sort_mode, sort_ascending)
+    for i, tup in enumerate(sorted_map): # FIXME sort this
+        k = tup[0]; v = tup[1]
 
         cps = v.count / interval;
         bw  = (v.totalbytes / 1000) / interval;
@@ -174,9 +226,11 @@ while 1:
         if line >= maxrows:
             break
 
-    # fixme - implement purging mechanism that also resets start time
-    #keyhits.clear()
+    print((maxrows - line) * "\r\n")
+    print("Sort mode: %s" % (sort_mode))
+    print("\033[%d;%dH" % (0, 0))
 
     if exiting:
         print("Detaching...")
+        termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
         exit()
