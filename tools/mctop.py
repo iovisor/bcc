@@ -63,23 +63,23 @@ clear = not int(args.noclear)
 pid = args.pid
 
 old_settings = termios.tcgetattr(sys.stdin)
-sort_mode = "calls"
+sort_mode = "C"
 sort_ascending = True
 exiting = 0
 first_loop = True
 
 sort_modes = {
-    "C" : "calls",
-    "S" : "size",
-    "R" : "requests/sec",
-    "B" : "bandwidth",
-    "N" : "timestamp"
+    "C" : "calls", # total calls to key
+    "S" : "size",  # latest size of key
+    "R" : "req/s", # requests per second to this key
+    "B" : "bw",    # total bytes accesses on this key
+    "N" : "ts"     # timestamp of the latest access
 }
 
 commands = {
     "T" : "toggle", # sorting by ascending / descending order
     "D" : "dump",   # clear eBPF maps and dump to disk (if set)
-    "Q" : "quit"
+    "Q" : "quit"    # exit mctop
 }
 
 # load BPF program
@@ -143,15 +143,18 @@ int trace_entry(struct pt_regs *ctx) {
 # A possible solution may be in flagging to the verifier that the size given
 # by a usdt argument is less than the buffer size,
 # see https://github.com/iovisor/bcc/issues/1260#issuecomment-406365168
-def fix_keys(bpf_map):
+def reconcile_keys(bpf_map):
   new_map = {}
 
   for k,v in bpf_map.items():
       shortkey = k.keystr[:v.keysize].decode('utf-8', 'replace')
-
       if shortkey in new_map:
+
+          # Sum counts on key collision
           new_map[shortkey].count += v.count
           new_map[shortkey].totalbytes += v.totalbytes
+
+          # If there is a key collision, take the data for the latest one
           if v.timestamp > new_map[shortkey].timestamp:
               new_map[shortkey].bytecount = v.bytecount
               new_map[shortkey].timestamp = v.timestamp
@@ -160,10 +163,21 @@ def fix_keys(bpf_map):
 
   return new_map
 
-def sort_output(unsorted_map, mode, sort_ascending):
+def sort_output(unsorted_map):
+    global sort_mode
+    global sort_ascending
+
     output = unsorted_map
-    if mode == "calls":
+    if sort_mode == "C":
         output = sorted(output.items(), key=lambda x: x[1].count)
+    elif sort_mode == "S":
+        output = sorted(output.items(), key=lambda x: x[1].bytecount)
+    elif sort_mode == "R":
+        output = sorted(output.items(), key=lambda x: x[1].count)
+    elif sort_mode == "B":
+        output = sorted(output.items(), key=lambda x: x[1].count)
+    elif sort_mode == "N":
+        output = sorted(output.items(), key=lambda x: x[1].timestamp)
 
     if sort_ascending:
         output = reversed(output)
@@ -177,12 +191,26 @@ def readKey(interval):
     tty.setcbreak(sys.stdin.fileno())
     if select.select([sys.stdin], [], [], 5) == ([sys.stdin], [], []):
         key = sys.stdin.read(1).lower()
+        global sort_mode
 
         if key == 't':
             global sort_ascending
             sort_ascending = not sort_ascending
-        if key == 'd':
+        elif key == 'c':
+            sort_mode= 'C'
+        elif key == 's':
+            sort_mode= 'S'
+        elif key == 'r':
+            sort_mode= 'R'
+        elif key == 'b':
+            sort_mode= 'B'
+        elif key == 'n':
+            sort_mode= 'N'
+        elif key == 'd':
             keyhits.clear() # FIXME save to file first
+        elif key == 'q':
+            global exiting
+            exiting = 1
 
 if args.ebpf:
     print(bpf_text)
@@ -207,19 +235,21 @@ while 1:
     if clear:
         print("\033c", end="")
 
-    print("%-30s %10s %10s %10s %10s %10s" % ("MEMCACHED KEY", "CALLS", "OBJSIZE", "REQ/SEC", "BW(kbps)", "TOTAL_BYTES") )
+    print("%-30s %9s %9s %9s %9s %9s" %  ("MEMCACHED KEY", "CALLS",
+                                               "OBJSIZE", "REQ/S",
+                                               "BW(kbps)", "TOTAL") )
     keyhits = bpf.get_table("keyhits")
     line = 0
     interval = monotonic() - start;
 
-    fixed_map = fix_keys(keyhits)
-    sorted_map = sort_output(fixed_map, sort_mode, sort_ascending)
+    fixed_map = reconcile_keys(keyhits)
+    sorted_map = sort_output(fixed_map)
     for i, tup in enumerate(sorted_map): # FIXME sort this
         k = tup[0]; v = tup[1]
 
         cps = v.count / interval;
         bw  = (v.totalbytes / 1000) / interval;
-        print("%-30s %10d %10d %10f %10f %10d" % (k, v.count,
+        print("%-30s %9d %9d %9f %9f %9d" % (k, v.count,
                                    v.bytecount, cps, bw, v.totalbytes) )
 
         line += 1
@@ -227,10 +257,24 @@ while 1:
             break
 
     print((maxrows - line) * "\r\n")
-    print("Sort mode: %s" % (sort_mode))
+    sys.stdout.write("[Curr: %s/%s Opt: %s:%s|%s:%s|%s:%s|%s:%s|%s:%s]" %
+                                        (sort_mode,
+                                        "Asc" if sort_ascending else "Desc",
+                                        'C', sort_modes['C'],
+                                        'S', sort_modes['S'],
+                                        'R', sort_modes['R'],
+                                        'B', sort_modes['B'],
+                                        'N', sort_modes['N']
+                                        ))
+
+    sys.stdout.write("[%s:%s %s:%s %s:%s]" %  (
+                                        'T', commands['T'],
+                                        'D', commands['D'],
+                                        'Q', commands['Q']
+                                        ))
     print("\033[%d;%dH" % (0, 0))
 
     if exiting:
-        print("Detaching...")
         termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
+        print("\033c", end="")
         exit()
