@@ -4,7 +4,7 @@
 # mctop   Memcached key operation analysis tool
 #         For Linux, uses BCC, eBPF.
 #
-# USAGE: mctop.py  // FIXME detailed usage
+# USAGE: mctop.py  -p PID
 #
 # This uses in-kernel eBPF maps to trace and analyze key access rates and
 # objects. This can help to spot hot keys, and tune memcached usage for
@@ -27,21 +27,21 @@ import sys
 import select
 import tty
 import termios
+import pickle
 
-import enum # FIXME use or remove
-
+# FIXME better help
 # arguments
 examples = """examples:
     ./mctop -p PID          # memcached usage top, 1 second refresh
 """
-# FIXME add sort-by functionality
+
 parser = argparse.ArgumentParser(
     description="Memcached top key analysis",
     formatter_class=argparse.RawDescriptionHelpFormatter,
     epilog=examples)
 parser.add_argument("-p", "--pid", type=int, help="process id to attach to")
-parser.add_argument("-s", "--save", action="store_true",
-    help="save eBPF map when dump command is issued")
+parser.add_argument("-o", "--output", action="store",
+    help="save map data to pickle file dump command is issued") # FIXME make this JSON
 
 parser.add_argument("-C", "--noclear", action="store_true",
     help="don't clear the screen")
@@ -60,6 +60,7 @@ interval = int(args.interval)
 countdown = int(args.count)
 maxrows = int(args.maxrows)
 clear = not int(args.noclear)
+outfile = args.output
 pid = args.pid
 
 old_settings = termios.tcgetattr(sys.stdin)
@@ -82,13 +83,14 @@ commands = {
     "Q" : "quit"    # exit mctop
 }
 
+# FIXME have helper to generate per  type?
 # load BPF program
 bpf_text = """
 #include <uapi/linux/ptrace.h>
 #include <bcc/proto.h>
 
 
-#define MAX_STRING_LENGTH 250
+#define MAX_STRING_LENGTH 80
 
 // Must match python definitions
 typedef enum {START, END, GET, ADD, SET, REPLACE, PREPEND, APPEND,
@@ -126,7 +128,7 @@ int trace_entry(struct pt_regs *ctx) {
     bpf_probe_read(&keyhit.keystr, sizeof(keyhit.keystr), (void *)keystr);
 
     valp = keyhits.lookup_or_init(&keyhit, &zero);
-    valp->count += 1;
+    valp->count++;
     valp->bytecount = bytecount;
     valp->keysize = keysize;
     valp->totalbytes += bytecount;
@@ -151,16 +153,20 @@ def reconcile_keys(bpf_map):
       if shortkey in new_map:
 
           # Sum counts on key collision
-          new_map[shortkey].count += v.count
-          new_map[shortkey].totalbytes += v.totalbytes
+          new_map[shortkey]['count'] += v.count
+          new_map[shortkey]['totalbytes'] += v.totalbytes
 
           # If there is a key collision, take the data for the latest one
-          if v.timestamp > new_map[shortkey].timestamp:
-              new_map[shortkey].bytecount = v.bytecount
-              new_map[shortkey].timestamp = v.timestamp
+          if v.timestamp > new_map[shortkey]['timestamp']:
+              new_map[shortkey]['bytecount'] = v.bytecount
+              new_map[shortkey]['timestamp'] = v.timestamp
       else:
-          new_map[shortkey] = v
-
+          new_map[shortkey] = {
+              "count": v.count,
+              "bytecount": v.bytecount,
+              "totalbytes": v.totalbytes,
+              "timestamp": v.timestamp,
+          }
   return new_map
 
 def sort_output(unsorted_map):
@@ -169,15 +175,15 @@ def sort_output(unsorted_map):
 
     output = unsorted_map
     if sort_mode == "C":
-        output = sorted(output.items(), key=lambda x: x[1].count)
+        output = sorted(output.items(), key=lambda x: x[1]['count'])
     elif sort_mode == "S":
-        output = sorted(output.items(), key=lambda x: x[1].bytecount)
+        output = sorted(output.items(), key=lambda x: x[1]['bytecount'])
     elif sort_mode == "R":
-        output = sorted(output.items(), key=lambda x: x[1].count)
+        output = sorted(output.items(), key=lambda x: x[1]['bandwidth'])
     elif sort_mode == "B":
-        output = sorted(output.items(), key=lambda x: x[1].count)
+        output = sorted(output.items(), key=lambda x: x[1]['cps'])
     elif sort_mode == "N":
-        output = sorted(output.items(), key=lambda x: x[1].timestamp)
+        output = sorted(output.items(), key=lambda x: x[1]['timestamp'])
 
     if sort_ascending:
         output = reversed(output)
@@ -207,7 +213,14 @@ def readKey(interval):
         elif key == 'n':
             sort_mode= 'N'
         elif key == 'd':
-            keyhits.clear() # FIXME save to file first
+            global outfile
+            global bpf
+            global sorted_output
+            keyhits = bpf.get_table("keyhits")
+            out = open ('/tmp/%s.mcdump' % outfile, 'wb')
+            pickle.dump(sorted_output, out)
+            out.close
+            keyhits.clear()
         elif key == 'q':
             global exiting
             exiting = 1
@@ -243,14 +256,18 @@ while 1:
     interval = monotonic() - start;
 
     fixed_map = reconcile_keys(keyhits)
-    sorted_map = sort_output(fixed_map)
-    for i, tup in enumerate(sorted_map): # FIXME sort this
-        k = tup[0]; v = tup[1]
 
-        cps = v.count / interval;
-        bw  = (v.totalbytes / 1000) / interval;
-        print("%-30s %9d %9d %9f %9f %9d" % (k, v.count,
-                                   v.bytecount, cps, bw, v.totalbytes) )
+    for k,v in fixed_map.items():
+        fixed_map[k]['cps'] = v['count'] / interval;
+        fixed_map[k]['bandwidth']  = (v['totalbytes'] / 1000) / interval;
+
+
+    sorted_output = sort_output(fixed_map)
+    for i, tup in enumerate(sorted_output): # FIXME sort this
+        k = tup[0]; v = tup[1]
+        print("%-30s %9d %9d %9f %9f %9d" % (k, v['count'],  v['bytecount'],
+                                             v['cps'], v['bandwidth'],
+                                             v['totalbytes']) )
 
         line += 1
         if line >= maxrows:
