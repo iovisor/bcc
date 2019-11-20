@@ -83,6 +83,9 @@ commands = {
     "Q" : "quit"    # exit mctop
 }
 
+#/typedef enum {START, END, GET, ADD, SET, REPLACE, PREPEND, APPEND,
+#                       TOUCH, CAS, INCR, DECR, DELETE} memcached_op_t;
+
 # FIXME have helper to generate per  type?
 # load BPF program
 bpf_text = """
@@ -90,11 +93,7 @@ bpf_text = """
 #include <bcc/proto.h>
 
 
-#define MAX_STRING_LENGTH 80
-
-// Must match python definitions
-typedef enum {START, END, GET, ADD, SET, REPLACE, PREPEND, APPEND,
-                       TOUCH, CAS, INCR, DECR, DELETE} memcached_op_t;
+#define MAX_STRING_LENGTH 0xff
 struct keyhit_t {
     char keystr[MAX_STRING_LENGTH];
 };
@@ -122,10 +121,11 @@ int trace_entry(struct pt_regs *ctx) {
     bpf_usdt_readarg(4, ctx, &bytecount);
 
     // see https://github.com/memcached/memcached/issues/576
-    // ideally per https://github.com/iovisor/bcc/issues/1260 we should be able to
-    // read just the size we need, but this doesn't seem possible and throws a
-    // verifier error
-    bpf_probe_read(&keyhit.keystr, sizeof(keyhit.keystr), (void *)keystr);
+    // as well as https://github.com/iovisor/bcc/issues/1260
+    // we can convince the verifier the arbitrary read is safe using this
+    // bitwise &, but only because our max buffer size happens to be 0xff,
+    // which is the maximum key size for memcached anyways
+    bpf_probe_read(&keyhit.keystr, keysize & MAX_STRING_LENGTH, (void *)keystr);
 
     valp = keyhits.lookup_or_init(&keyhit, &zero);
     valp->count++;
@@ -138,36 +138,6 @@ int trace_entry(struct pt_regs *ctx) {
     return 0;
 }
 """
-
-# Since it is possible that we read the keys incorrectly, we need to fix the
-# hash keys and combine their values intelligently here, producing a new hash
-# see https://github.com/memcached/memcached/issues/576
-# A possible solution may be in flagging to the verifier that the size given
-# by a usdt argument is less than the buffer size,
-# see https://github.com/iovisor/bcc/issues/1260#issuecomment-406365168
-def reconcile_keys(bpf_map):
-  new_map = {}
-
-  for k,v in bpf_map.items():
-      shortkey = k.keystr[:v.keysize].decode('utf-8', 'replace')
-      if shortkey in new_map:
-
-          # Sum counts on key collision
-          new_map[shortkey]['count'] += v.count
-          new_map[shortkey]['totalbytes'] += v.totalbytes
-
-          # If there is a key collision, take the data for the latest one
-          if v.timestamp > new_map[shortkey]['timestamp']:
-              new_map[shortkey]['bytecount'] = v.bytecount
-              new_map[shortkey]['timestamp'] = v.timestamp
-      else:
-          new_map[shortkey] = {
-              "count": v.count,
-              "bytecount": v.bytecount,
-              "totalbytes": v.totalbytes,
-              "timestamp": v.timestamp,
-          }
-  return new_map
 
 def sort_output(unsorted_map):
     global sort_mode
@@ -255,14 +225,19 @@ while 1:
     line = 0
     interval = monotonic() - start;
 
-    fixed_map = reconcile_keys(keyhits)
+    data_map = {}
+    for k,v in keyhits.items():
+        shortkey = k.keystr[:v.keysize].decode('utf-8', 'replace')
+        data_map[shortkey] = {
+            "count": v.count,
+            "bytecount": v.bytecount,
+            "totalbytes": v.totalbytes,
+            "timestamp": v.timestamp,
+            "cps": v.count / interval,
+            "bandwidth": (v.totalbytes / 1000) / interval
+        }
 
-    for k,v in fixed_map.items():
-        fixed_map[k]['cps'] = v['count'] / interval;
-        fixed_map[k]['bandwidth']  = (v['totalbytes'] / 1000) / interval;
-
-
-    sorted_output = sort_output(fixed_map)
+    sorted_output = sort_output(data_map)
     for i, tup in enumerate(sorted_output): # FIXME sort this
         k = tup[0]; v = tup[1]
         print("%-30s %8d %8d %8f %8f %8d" % (k, v['count'],  v['bytecount'],
