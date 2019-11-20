@@ -248,7 +248,7 @@ while 1:
     if clear:
         print("\033c", end="")
 
-    print("%-30s %9s %9s %9s %9s %9s" %  ("MEMCACHED KEY", "CALLS",
+    print("%-30s %8s %8s %8s %8s %8s" %  ("MEMCACHED KEY", "CALLS",
                                                "OBJSIZE", "REQ/S",
                                                "BW(kbps)", "TOTAL") )
     keyhits = bpf.get_table("keyhits")
@@ -265,7 +265,7 @@ while 1:
     sorted_output = sort_output(fixed_map)
     for i, tup in enumerate(sorted_output): # FIXME sort this
         k = tup[0]; v = tup[1]
-        print("%-30s %9d %9d %9f %9f %9d" % (k, v['count'],  v['bytecount'],
+        print("%-30s %8d %8d %8f %8f %8d" % (k, v['count'],  v['bytecount'],
                                              v['cps'], v['bandwidth'],
                                              v['totalbytes']) )
 
@@ -276,7 +276,7 @@ while 1:
     print((maxrows - line) * "\r\n")
     sys.stdout.write("[Curr: %s/%s Opt: %s:%s|%s:%s|%s:%s|%s:%s|%s:%s]" %
                                         (sort_mode,
-                                        "Asc" if sort_ascending else "Desc",
+                                        "Asc" if sort_ascending else "Dsc",
                                         'C', sort_modes['C'],
                                         'S', sort_modes['S'],
                                         'R', sort_modes['R'],
