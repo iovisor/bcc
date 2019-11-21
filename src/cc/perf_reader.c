@@ -25,6 +25,7 @@
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <linux/stddef.h> // Not alphabetical - Get required macro definitions
 #include <linux/types.h>
 #include <linux/perf_event.h>
 

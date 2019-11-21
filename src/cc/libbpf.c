@@ -22,6 +22,7 @@
 #include <fcntl.h>
 #include <inttypes.h>
 #include <limits.h>
+#include <linux/stddef.h> // Not alphabetical - Get required macro definitions
 #include <linux/bpf.h>
 #include <linux/bpf_common.h>
 #include <linux/if_packet.h>
