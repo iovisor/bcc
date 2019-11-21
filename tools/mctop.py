@@ -13,7 +13,7 @@
 # Copyright 2019 Shopify, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
-# 17-Nov-2019   Dale Hamel   Created this.
+# 20-Nov-2019   Dale Hamel   Created this.
 # Inspired by the ruby tool of the same name by Marcus Barczak in 2012,
 # see https://codeascraft.com/2012/12/13/mctop-a-tool-for-analyzing-memcache-get-traffic/
 # see also https://github.com/tumblr/memkeys
@@ -63,11 +63,13 @@ clear = not int(args.noclear)
 outfile = args.output
 pid = args.pid
 
-old_settings = termios.tcgetattr(sys.stdin)
+# Globals
+exiting = 0
 sort_mode = "C"
 sort_ascending = True
-exiting = 0
-first_loop = True
+bpf = None
+sorted_output = None
+
 
 sort_modes = {
     "C" : "calls", # total calls to key
@@ -183,90 +185,105 @@ def readKey(interval):
         elif key == 'n':
             sort_mode= 'N'
         elif key == 'd':
+            global args
             global outfile
             global bpf
             global sorted_output
-            keyhits = bpf.get_table("keyhits")
-            out = open ('/tmp/%s.mcdump' % outfile, 'wb')
-            pickle.dump(sorted_output, out)
-            out.close
-            keyhits.clear()
+
+            if args.output != None:
+                keyhits = bpf.get_table("keyhits")
+                out = open ('/tmp/%s.mcdump' % outfile, 'wb')
+                pickle.dump(sorted_output, out)
+                out.close
+                keyhits.clear()
         elif key == 'q':
+            print("QUITTING")
             global exiting
             exiting = 1
+def run():
+    global bpf
+    global args
+    global exiting
+    global ebpf_text
 
-if args.ebpf:
-    print(bpf_text)
-    exit()
-
-usdt = USDT(pid=pid)
-usdt.enable_probe(probe="command__set", fn_name="trace_entry") # FIXME use fully specified version, port this to python
-bpf = BPF(text=bpf_text, usdt_contexts=[usdt])
-
-start = monotonic(); # FIXME would prefer monotonic_ns, if 3.7+
-
-while 1:
-    try:
-        if not first_loop:
-            readKey(interval)
-        else:
-            first_loop = False
-    except KeyboardInterrupt:
-        exiting = 1
-
-    # header
-    if clear:
-        print("\033c", end="")
-
-    print("%-30s %8s %8s %8s %8s %8s" %  ("MEMCACHED KEY", "CALLS",
-                                               "OBJSIZE", "REQ/S",
-                                               "BW(kbps)", "TOTAL") )
-    keyhits = bpf.get_table("keyhits")
-    line = 0
-    interval = monotonic() - start;
-
-    data_map = {}
-    for k,v in keyhits.items():
-        shortkey = k.keystr[:v.keysize].decode('utf-8', 'replace')
-        data_map[shortkey] = {
-            "count": v.count,
-            "bytecount": v.bytecount,
-            "totalbytes": v.totalbytes,
-            "timestamp": v.timestamp,
-            "cps": v.count / interval,
-            "bandwidth": (v.totalbytes / 1000) / interval
-        }
-
-    sorted_output = sort_output(data_map)
-    for i, tup in enumerate(sorted_output): # FIXME sort this
-        k = tup[0]; v = tup[1]
-        print("%-30s %8d %8d %8f %8f %8d" % (k, v['count'],  v['bytecount'],
-                                             v['cps'], v['bandwidth'],
-                                             v['totalbytes']) )
-
-        line += 1
-        if line >= maxrows:
-            break
-
-    print((maxrows - line) * "\r\n")
-    sys.stdout.write("[Curr: %s/%s Opt: %s:%s|%s:%s|%s:%s|%s:%s|%s:%s]" %
-                                        (sort_mode,
-                                        "Asc" if sort_ascending else "Dsc",
-                                        'C', sort_modes['C'],
-                                        'S', sort_modes['S'],
-                                        'R', sort_modes['R'],
-                                        'B', sort_modes['B'],
-                                        'N', sort_modes['N']
-                                        ))
-
-    sys.stdout.write("[%s:%s %s:%s %s:%s]" %  (
-                                        'T', commands['T'],
-                                        'D', commands['D'],
-                                        'Q', commands['Q']
-                                        ))
-    print("\033[%d;%dH" % (0, 0))
-
-    if exiting:
-        termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
-        print("\033c", end="")
+    if args.ebpf:
+        print(bpf_text)
         exit()
+
+    usdt = USDT(pid=pid)
+    usdt.enable_probe(probe="command__set", fn_name="trace_entry") # FIXME use fully specified version, port this to python
+    bpf = BPF(text=bpf_text, usdt_contexts=[usdt])
+
+    old_settings = termios.tcgetattr(sys.stdin)
+    first_loop = True
+
+    start = monotonic(); # FIXME would prefer monotonic_ns, if 3.7+
+
+    print("HERE")
+    while 1:
+        try:
+            if not first_loop:
+                readKey(interval)
+            else:
+                first_loop = False
+        except KeyboardInterrupt:
+            exiting = 1
+
+        # header
+        if clear:
+            print("\033c", end="")
+
+        print("%-30s %8s %8s %8s %8s %8s" %  ("MEMCACHED KEY", "CALLS",
+                                                   "OBJSIZE", "REQ/S",
+                                                   "BW(kbps)", "TOTAL") )
+        keyhits = bpf.get_table("keyhits")
+        line = 0
+        interval = monotonic() - start;
+
+        data_map = {}
+        for k,v in keyhits.items():
+            shortkey = k.keystr[:v.keysize].decode('utf-8', 'replace')
+            data_map[shortkey] = {
+                "count": v.count,
+                "bytecount": v.bytecount,
+                "totalbytes": v.totalbytes,
+                "timestamp": v.timestamp,
+                "cps": v.count / interval,
+                "bandwidth": (v.totalbytes / 1000) / interval
+            }
+
+        sorted_output = sort_output(data_map)
+        for i, tup in enumerate(sorted_output): # FIXME sort this
+            k = tup[0]; v = tup[1]
+            print("%-30s %8d %8d %8f %8f %8d" % (k, v['count'],  v['bytecount'],
+                                                 v['cps'], v['bandwidth'],
+                                                 v['totalbytes']) )
+
+            line += 1
+            if line >= maxrows:
+                break
+
+        print((maxrows - line) * "\r\n")
+        sys.stdout.write("[Curr: %s/%s Opt: %s:%s|%s:%s|%s:%s|%s:%s|%s:%s]" %
+                                            (sort_mode,
+                                            "Asc" if sort_ascending else "Dsc",
+                                            'C', sort_modes['C'],
+                                            'S', sort_modes['S'],
+                                            'R', sort_modes['R'],
+                                            'B', sort_modes['B'],
+                                            'N', sort_modes['N']
+                                            ))
+
+        sys.stdout.write("[%s:%s %s:%s %s:%s]" %  (
+                                            'T', commands['T'],
+                                            'D', commands['D'],
+                                            'Q', commands['Q']
+                                            ))
+        print("\033[%d;%dH" % (0, 0))
+
+        if exiting:
+            termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
+            print("\033c", end="")
+            exit()
+
+run()
