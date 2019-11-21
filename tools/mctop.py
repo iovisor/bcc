@@ -27,7 +27,7 @@ import sys
 import select
 import tty
 import termios
-import pickle
+import json
 
 # FIXME better help
 # arguments
@@ -160,7 +160,7 @@ def sort_output(unsorted_map):
     if sort_ascending:
         output = reversed(output)
 
-    return output
+    return list(output)
 
 # Set stdin to non-blocking reads so we can poll for chars
 def readKey(interval):
@@ -192,8 +192,10 @@ def readKey(interval):
 
             if args.output != None:
                 keyhits = bpf.get_table("keyhits")
-                out = open ('/tmp/%s.mcdump' % outfile, 'wb')
-                pickle.dump(sorted_output, out)
+                out = open ('/tmp/%s.json' % outfile, 'w')
+                json_str = json.dumps(sorted_output)
+                print(json_str)
+                out.write(json_str)
                 out.close
                 keyhits.clear()
         elif key == 'q':
@@ -205,6 +207,7 @@ def run():
     global args
     global exiting
     global ebpf_text
+    global sorted_output
 
     if args.ebpf:
         print(bpf_text)
