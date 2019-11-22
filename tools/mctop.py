@@ -186,22 +186,25 @@ def readKey(interval):
             sort_mode= 'N'
         elif key == 'd':
             global args
-            global outfile
-            global bpf
-            global sorted_output
-
             if args.output != None:
-                keyhits = bpf.get_table("keyhits")
-                out = open ('/tmp/%s.json' % outfile, 'w')
-                json_str = json.dumps(sorted_output)
-                print(json_str)
-                out.write(json_str)
-                out.close
-                keyhits.clear()
+                dump_map()
         elif key == 'q':
             print("QUITTING")
             global exiting
             exiting = 1
+
+def dump_map():
+     global outfile
+     global bpf
+     global sorted_output
+
+     keyhits = bpf.get_table("keyhits")
+     out = open ('/tmp/%s.json' % outfile, 'w')
+     json_str = json.dumps(sorted_output)
+     out.write(json_str)
+     out.close
+     keyhits.clear()
+
 def run():
     global bpf
     global args
