@@ -14,8 +14,8 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
 # 20-Nov-2019   Dale Hamel   Created this.
-# Inspired by the ruby tool of the same name by Marcus Barczak in 2012,
-# see https://codeascraft.com/2012/12/13/mctop-a-tool-for-analyzing-memcache-get-traffic/
+# Inspired by the ruby tool of the same name by Marcus Barczak in 2012, see
+# see also https://github.com/etsy/mctop
 # see also https://github.com/tumblr/memkeys
 
 from __future__ import print_function
@@ -40,19 +40,22 @@ parser = argparse.ArgumentParser(
     formatter_class=argparse.RawDescriptionHelpFormatter,
     epilog=examples)
 parser.add_argument("-p", "--pid", type=int, help="process id to attach to")
-parser.add_argument("-o", "--output", action="store",
-    help="save map data to pickle file dump command is issued") # FIXME make this JSON
+parser.add_argument(
+    "-o",
+    "--output",
+    action="store",
+    help="save map data to /top/OUTPUT.json if 'D' is issued to dump the map")
 
 parser.add_argument("-C", "--noclear", action="store_true",
-    help="don't clear the screen")
+                    help="don't clear the screen")
 parser.add_argument("-r", "--maxrows", default=20,
-    help="maximum rows to print, default 20")
+                    help="maximum rows to print, default 20")
 parser.add_argument("interval", nargs="?", default=1,
-    help="output interval, in seconds")
+                    help="output interval, in seconds")
 parser.add_argument("count", nargs="?", default=99999999,
-    help="number of outputs")
+                    help="number of outputs")
 parser.add_argument("--ebpf", action="store_true",
-    help=argparse.SUPPRESS)
+                    help=argparse.SUPPRESS)
 
 # FIXME clean this up
 args = parser.parse_args()
@@ -72,20 +75,20 @@ sorted_output = None
 
 
 sort_modes = {
-    "C" : "calls", # total calls to key
-    "S" : "size",  # latest size of key
-    "R" : "req/s", # requests per second to this key
-    "B" : "bw",    # total bytes accesses on this key
-    "N" : "ts"     # timestamp of the latest access
+    "C": "calls",  # total calls to key
+    "S": "size",  # latest size of key
+    "R": "req/s",  # requests per second to this key
+    "B": "bw",    # total bytes accesses on this key
+    "N": "ts"     # timestamp of the latest access
 }
 
 commands = {
-    "T" : "toggle", # sorting by ascending / descending order
-    "D" : "dump",   # clear eBPF maps and dump to disk (if set)
-    "Q" : "quit"    # exit mctop
+    "T": "toggle",  # sorting by ascending / descending order
+    "D": "dump",   # clear eBPF maps and dump to disk (if set)
+    "Q": "quit"    # exit mctop
 }
 
-#/typedef enum {START, END, GET, ADD, SET, REPLACE, PREPEND, APPEND,
+# /typedef enum {START, END, GET, ADD, SET, REPLACE, PREPEND, APPEND,
 #                       TOUCH, CAS, INCR, DECR, DELETE} memcached_op_t;
 
 # FIXME have helper to generate per  type?
@@ -95,9 +98,9 @@ bpf_text = """
 #include <bcc/proto.h>
 
 
-#define MAX_STRING_LENGTH 0xff
+#define READ_MASK 0xff // allow buffer reads up to 256 bytes
 struct keyhit_t {
-    char keystr[MAX_STRING_LENGTH];
+    char keystr[READ_MASK];
 };
 
 struct value_t {
@@ -126,8 +129,8 @@ int trace_entry(struct pt_regs *ctx) {
     // as well as https://github.com/iovisor/bcc/issues/1260
     // we can convince the verifier the arbitrary read is safe using this
     // bitwise &, but only because our max buffer size happens to be 0xff,
-    // which is the maximum key size for memcached anyways
-    bpf_probe_read(&keyhit.keystr, keysize & MAX_STRING_LENGTH, (void *)keystr);
+    // which corresponds roughly to the the maximum key size
+    bpf_probe_read(&keyhit.keystr, keysize & READ_MASK, (void *)keystr);
 
     valp = keyhits.lookup_or_init(&keyhit, &zero);
     valp->count++;
@@ -140,6 +143,7 @@ int trace_entry(struct pt_regs *ctx) {
     return 0;
 }
 """
+
 
 def sort_output(unsorted_map):
     global sort_mode
@@ -163,6 +167,8 @@ def sort_output(unsorted_map):
     return list(output)
 
 # Set stdin to non-blocking reads so we can poll for chars
+
+
 def readKey(interval):
     new_settings = termios.tcgetattr(sys.stdin)
     new_settings[3] = new_settings[3] & ~(termios.ECHO | termios.ICANON)
@@ -175,35 +181,37 @@ def readKey(interval):
             global sort_ascending
             sort_ascending = not sort_ascending
         elif key == 'c':
-            sort_mode= 'C'
+            sort_mode = 'C'
         elif key == 's':
-            sort_mode= 'S'
+            sort_mode = 'S'
         elif key == 'r':
-            sort_mode= 'R'
+            sort_mode = 'R'
         elif key == 'b':
-            sort_mode= 'B'
+            sort_mode = 'B'
         elif key == 'n':
-            sort_mode= 'N'
+            sort_mode = 'N'
         elif key == 'd':
             global args
-            if args.output != None:
+            if args.output is not None:
                 dump_map()
         elif key == 'q':
             print("QUITTING")
             global exiting
             exiting = 1
 
-def dump_map():
-     global outfile
-     global bpf
-     global sorted_output
 
-     keyhits = bpf.get_table("keyhits")
-     out = open ('/tmp/%s.json' % outfile, 'w')
-     json_str = json.dumps(sorted_output)
-     out.write(json_str)
-     out.close
-     keyhits.clear()
+def dump_map():
+    global outfile
+    global bpf
+    global sorted_output
+
+    keyhits = bpf.get_table("keyhits")
+    out = open('/tmp/%s.json' % outfile, 'w')
+    json_str = json.dumps(sorted_output)
+    out.write(json_str)
+    out.close
+    keyhits.clear()
+
 
 def run():
     global bpf
@@ -217,16 +225,17 @@ def run():
         exit()
 
     usdt = USDT(pid=pid)
-    usdt.enable_probe(probe="command__set", fn_name="trace_entry") # FIXME use fully specified version, port this to python
+    # FIXME use fully specified version, port this to python
+    usdt.enable_probe(probe="command__set", fn_name="trace_entry")
     bpf = BPF(text=bpf_text, usdt_contexts=[usdt])
 
     old_settings = termios.tcgetattr(sys.stdin)
     first_loop = True
 
-    start = monotonic(); # FIXME would prefer monotonic_ns, if 3.7+
+    start = monotonic()  # FIXME would prefer monotonic_ns, if 3.7+
 
     print("HERE")
-    while 1:
+    while True:
         try:
             if not first_loop:
                 readKey(interval)
@@ -239,15 +248,15 @@ def run():
         if clear:
             print("\033c", end="")
 
-        print("%-30s %8s %8s %8s %8s %8s" %  ("MEMCACHED KEY", "CALLS",
-                                                   "OBJSIZE", "REQ/S",
-                                                   "BW(kbps)", "TOTAL") )
+        print("%-30s %8s %8s %8s %8s %8s" % ("MEMCACHED KEY", "CALLS",
+                                             "OBJSIZE", "REQ/S",
+                                             "BW(kbps)", "TOTAL"))
         keyhits = bpf.get_table("keyhits")
         line = 0
-        interval = monotonic() - start;
+        interval = monotonic() - start
 
         data_map = {}
-        for k,v in keyhits.items():
+        for k, v in keyhits.items():
             shortkey = k.keystr[:v.keysize].decode('utf-8', 'replace')
             data_map[shortkey] = {
                 "count": v.count,
@@ -259,11 +268,12 @@ def run():
             }
 
         sorted_output = sort_output(data_map)
-        for i, tup in enumerate(sorted_output): # FIXME sort this
-            k = tup[0]; v = tup[1]
-            print("%-30s %8d %8d %8f %8f %8d" % (k, v['count'],  v['bytecount'],
+        for i, tup in enumerate(sorted_output):  # FIXME sort this
+            k = tup[0]
+            v = tup[1]
+            print("%-30s %8d %8d %8f %8f %8d" % (k, v['count'], v['bytecount'],
                                                  v['cps'], v['bandwidth'],
-                                                 v['totalbytes']) )
+                                                 v['totalbytes']))
 
             line += 1
             if line >= maxrows:
@@ -271,25 +281,26 @@ def run():
 
         print((maxrows - line) * "\r\n")
         sys.stdout.write("[Curr: %s/%s Opt: %s:%s|%s:%s|%s:%s|%s:%s|%s:%s]" %
-                                            (sort_mode,
-                                            "Asc" if sort_ascending else "Dsc",
-                                            'C', sort_modes['C'],
-                                            'S', sort_modes['S'],
-                                            'R', sort_modes['R'],
-                                            'B', sort_modes['B'],
-                                            'N', sort_modes['N']
-                                            ))
+                         (sort_mode,
+                          "Asc" if sort_ascending else "Dsc",
+                          'C', sort_modes['C'],
+                          'S', sort_modes['S'],
+                          'R', sort_modes['R'],
+                          'B', sort_modes['B'],
+                          'N', sort_modes['N']
+                          ))
 
-        sys.stdout.write("[%s:%s %s:%s %s:%s]" %  (
-                                            'T', commands['T'],
-                                            'D', commands['D'],
-                                            'Q', commands['Q']
-                                            ))
+        sys.stdout.write("[%s:%s %s:%s %s:%s]" % (
+            'T', commands['T'],
+            'D', commands['D'],
+            'Q', commands['Q']
+        ))
         print("\033[%d;%dH" % (0, 0))
 
         if exiting:
             termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
             print("\033c", end="")
             exit()
+
 
 run()
