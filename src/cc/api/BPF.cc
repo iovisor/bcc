@@ -694,6 +694,13 @@ BPFStackBuildIdTable BPF::get_stackbuildid_table(const std::string &name, bool u
   return BPFStackBuildIdTable({}, use_debug_file, check_debug_file_crc, get_bsymcache());
 }
 
+BPFMapInMapTable BPF::get_map_in_map_table(const std::string& name) {
+  TableStorage::iterator it;
+  if (bpf_module_->table_storage().Find(Path({bpf_module_->id(), name}), it))
+    return BPFMapInMapTable(it->second);
+  return BPFMapInMapTable({});
+}
+
 bool BPF::add_module(std::string module)
 {
   return bcc_buildsymcache_add_module(get_bsymcache(), module.c_str()) != 0 ?

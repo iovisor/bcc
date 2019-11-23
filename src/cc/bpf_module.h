@@ -88,6 +88,10 @@ class BPFModule {
                        const void *val);
   void load_btf(sec_map_def &sections);
   int load_maps(sec_map_def &sections);
+  int create_maps(std::map<std::string, std::pair<int, int>> &map_tids,
+                  std::map<int, int> &map_fds,
+                  std::map<std::string, int> &inner_map_fds,
+                  bool for_inner_map);
 
  public:
   BPFModule(unsigned flags, TableStorage *ts = nullptr, bool rw_engine_enabled = true,
