@@ -21,6 +21,7 @@ set(TEST_LIBBCC_SOURCES
 	test_array_table.cc
 	test_bpf_table.cc
 	test_hash_table.cc
+	test_map_in_map.cc
 	test_perf_event.cc
 	test_pinned_table.cc
 	test_prog_table.cc

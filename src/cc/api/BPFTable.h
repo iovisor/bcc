@@ -399,7 +399,14 @@ public:
   StatusTuple update_value(const int& index, const int& value);
   StatusTuple get_value(const int& index, int& value);
   StatusTuple remove_value(const int& index);
+};
 
+class BPFMapInMapTable : public BPFTableBase<int, int> {
+public:
+  BPFMapInMapTable(const TableDesc& desc);
+
+  StatusTuple update_value(const int& index, const int& inner_map_fd);
+  StatusTuple remove_value(const int& index);
 };
 
 }  // namespace ebpf

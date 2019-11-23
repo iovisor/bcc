@@ -1192,6 +1192,19 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
       pinned_id = info.id;
     }
 
+    // Additional map specific information
+    size_t map_info_pos = section_attr.find("$");
+    std::string inner_map_name;
+
+    if (map_info_pos != std::string::npos) {
+      std::string map_info = section_attr.substr(map_info_pos + 1);
+      section_attr = section_attr.substr(0, map_info_pos);
+      if (section_attr == "maps/array_of_maps" ||
+          section_attr == "maps/hash_of_maps") {
+        inner_map_name = map_info;
+      }
+    }
+
     bpf_map_type map_type = BPF_MAP_TYPE_UNSPEC;
     if (section_attr == "maps/hash") {
       map_type = BPF_MAP_TYPE_HASH;
@@ -1231,6 +1244,10 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
       map_type = BPF_MAP_TYPE_DEVMAP;
     } else if (section_attr == "maps/cpumap") {
       map_type = BPF_MAP_TYPE_CPUMAP;
+    } else if (section_attr == "maps/hash_of_maps") {
+      map_type = BPF_MAP_TYPE_HASH_OF_MAPS;
+    } else if (section_attr == "maps/array_of_maps") {
+      map_type = BPF_MAP_TYPE_ARRAY_OF_MAPS;
     } else if (section_attr == "maps/extern") {
       if (!fe_.table_storage().Find(maps_ns_path, table_it)) {
         if (!fe_.table_storage().Find(global_path, table_it)) {
@@ -1274,7 +1291,8 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
       table.fake_fd = fe_.get_next_fake_fd();
       fe_.add_map_def(table.fake_fd, std::make_tuple((int)map_type, std::string(table.name),
                       (int)table.key_size, (int)table.leaf_size,
-                      (int)table.max_entries, table.flags, pinned_id));
+                      (int)table.max_entries, table.flags, pinned_id,
+                      inner_map_name));
     }
 
     if (!table.is_extern)
