@@ -23,12 +23,28 @@ from time import sleep, strftime, monotonic
 from bcc import BPF, USDT, utils
 from subprocess import call
 from math import floor
+from enum import Enum
 import argparse
 import sys
 import select
 import tty
 import termios
 import json
+
+class McCommand(Enum):
+   START = 1
+   END = 2
+   GET = 3
+   ADD = 4
+   SET = 5
+   REPLACE = 6
+   PREPEND = 7
+   APPEND = 8
+   TOUCH = 9
+   CAS = 10
+   INRC = 11
+   DECR = 12
+   DELETE = 13
 
 # FIXME better help
 # arguments
@@ -80,6 +96,10 @@ match_key = None
 bpf = None
 histogram_bpf = None
 sorted_output = []
+traced_commands = [ McCommand.GET, McCommand.ADD, McCommand.SET, \
+            McCommand.REPLACE, McCommand.PREPEND, McCommand.APPEND, \
+            McCommand.TOUCH, McCommand.CAS ]#, McCommand.INRC, McCommand.DECR, \
+            #McCommand.DELETE ]
 
 SELECTED_LINE_UP = 1
 SELECTED_LINE_DOWN = -1
@@ -102,7 +122,6 @@ commands = {
     "W": "dmp",  # clear eBPF maps and dump to disk (if set)
     "Q": "quit"  # exit mctop
 }
-
 # /typedef enum {START, END, GET, ADD, SET, REPLACE, PREPEND, APPEND,
 #                       TOUCH, CAS, INCR, DECR, DELETE} memcached_op_t;
 
@@ -112,32 +131,6 @@ bpf_text = """
 #include <uapi/linux/ptrace.h>
 #include <bcc/proto.h>
 
-// #define FOREACH_MEMCACHED_CMD(MEMCACHED_CMD_INDEX) \
-//         MEMCACHED_CMD_INDEX(MC_CMD_START)   \
-//         MEMCACHED_CMD_INDEX(MC_CMD_END)   \
-// 
-//         MEMCACHED_CMD_INDEX(MC_GET)   \
-//         MEMCACHED_CMD_INDEX(MC_ADD)   \
-//         MEMCACHED_CMD_INDEX(MC_SET)   \
-//         MEMCACHED_CMD_INDEX(MC_REPLACE)   \
-//         MEMCACHED_CMD_INDEX(MC_PREPEND)   \
-//         MEMCACHED_CMD_INDEX(MC_APPEND)   \
-//         MEMCACHED_CMD_INDEX(MC_TOUCH)   \
-//         MEMCACHED_CMD_INDEX(MC_CAS)   \
-// 
-//         MEMCACHED_CMD_INDEX(MC_INCR)   \
-//         MEMCACHED_CMD_INDEX(MC_DECR)   \
-//         MEMCACHED_CMD_INDEX(MC_DELETE)   \
-// 
-// 
-// #define GENERATE_ENUM(ENUM) ENUM,
-// #define GENERATE_STRING(STRING) #STRING,
-// 
-// // Generate enum for sem indices
-// enum MEMCACHED_CMD_INDEX_ENUM {
-//     FOREACH_MEMCACHED_CMD(GENERATE_ENUM)
-// };
-
 #define READ_MASK 0xff // allow buffer reads up to 256 bytes
 struct keyhit_t {
     char keystr[READ_MASK];
@@ -145,11 +138,14 @@ struct keyhit_t {
 
 struct value_t {
     u64 count;
+    u64 gets;
+    u64 sets;
     u64 bytecount;
     u64 totalbytes;
     u64 keysize;
     u64 timestamp;
     u64 latency;
+    uint8_t optype;
 };
 
 BPF_HASH(keyhits, struct keyhit_t, struct value_t);
@@ -220,15 +216,34 @@ int trace_command_end(struct pt_regs *ctx) {
     return 0;
 }
 
-int trace_entry(struct pt_regs *ctx) {
+"""
+
+
+# FIXME USDT args don't all use same types
+trace_command_ebpf="""
+int trace_command_COMMAND_NAME(struct pt_regs *ctx) {
     u64 keystr = 0;
     int32_t bytecount = 0; // type is -4@%eax in stap notes, which is int32
+
     uint8_t keysize = 0; // type is 1@%cl, which should be uint8
     struct keyhit_t keyhit = {0};
     struct value_t *valp, zero = {};
+    char command_type_str[] = "COMMAND_NAME\\0";
+
+    if (COMMAND_ENUM_ID == 3) {
+        bpf_usdt_readarg(3, ctx, &keysize);
+        if (keysize == 0) {
+            // GET command is annoying and has both int64 and int8 signatures
+            u64 widekey = 0; // type on get command is 8@-32(%rbp), should be u64
+            bpf_usdt_readarg(3, ctx, &widekey);
+            keysize = widekey;
+        }
+    }
+    else {
+        bpf_usdt_readarg(3, ctx, &keysize);
+    }
 
     bpf_usdt_readarg(2, ctx, &keystr);
-    bpf_usdt_readarg(3, ctx, &keysize);
     bpf_usdt_readarg(4, ctx, &bytecount);
 
     // see https://github.com/memcached/memcached/issues/576
@@ -241,17 +256,30 @@ int trace_entry(struct pt_regs *ctx) {
     u64 lastkey_id = 0;
     lastkey.update(&lastkey_id, &keyhit);
 
+    bpf_trace_printk("COMMAND: %s\\n", command_type_str);
+    bpf_trace_printk("KEY: '%s' KEYSIZE: %d BYTES %d\\n", keyhit.keystr, keysize, bytecount);
+
     valp = keyhits.lookup_or_init(&keyhit, &zero);
     valp->count++;
-    valp->bytecount = bytecount;
     valp->keysize = keysize;
     valp->totalbytes += bytecount;
     valp->timestamp = bpf_ktime_get_ns();
+    valp->optype = COMMAND_ENUM_ID;
 
+    if (bytecount > 0)
+        valp->bytecount = bytecount;
 
+    // FIXME check all commands that should update bytecount
+    if (COMMAND_ENUM_ID == 5)
+        valp->sets++;
+    else if (COMMAND_ENUM_ID == 3)
+        valp->gets++;
+
+    bpf_trace_printk("KEY: '%s' GETS: %d BYTE %d\\n", keyhit.keystr, valp->gets, bytecount);
     return 0;
 }
 """
+
 def sort_output(unsorted_map):
     global sort_mode
     global sort_ascending
@@ -279,7 +307,10 @@ def sort_output(unsorted_map):
 
 def update_selected_key():
     global selected_key
-    selected_key = sorted_output[selected_line][0]
+    global selected_line
+
+    if len(sorted_output) > 0 and len(sorted_output[selected_line]) > 0:
+        selected_key = sorted_output[selected_line][0]
 
 def change_selected_line(direction):
     global selected_line
@@ -299,7 +330,10 @@ def change_selected_line(direction):
         return
 
     if direction > 0 and (selected_line + direction) >= len(sorted_output):
-        selected_line = len(sorted_output) - 1
+        if len(sorted_output) > 0:
+            selected_line = len(sorted_output) - 1
+        else:
+            selected_line = 0
     elif direction < 0 and (selected_line + direction) <= 0:
         selected_line = 0
         selected_page = 0
@@ -314,10 +348,18 @@ def readKey(interval):
     old_settings = termios.tcgetattr(fd)
     try:
         tty.setcbreak(sys.stdin.fileno())
-        if select.select([sys.stdin], [], [], 5) == ([sys.stdin], [], []):
+        if select.select([sys.stdin], [], [], interval) == ([sys.stdin], [], []):
             key = sys.stdin.read(1)
             global sort_mode
 
+            # TO DO - support "op types" here for histogram mode, lowercase
+            #         will toggle to off, uppercase to on for collection
+            #         eg, lowercase s in histogram mode to toggle the set
+            #         command not to record histogram data, S to toggle it to
+            #         on. Dump the histogram when these parameters are changed
+
+            # FIXME allow for lower and uppercase to toggle into histogram mode
+            # If no key is selected, latency should be recorded for all keys
             if key.lower() == 't':
                 global sort_ascending
                 sort_ascending = not sort_ascending
@@ -331,14 +373,17 @@ def readKey(interval):
                 sort_mode = 'B'
             elif key == 'L':
                 sort_mode = 'L'
+            elif key == 'I':
+                pass
+                # TO DO - implement "inspect key', showing all data for the key
             elif key == 'H':
                 global view_mode
-                if view_mode == 2:
+                if view_mode == 2: # FIXME make this a named enum
                     view_mode = 1
+                    bpf_init(False)
                 else:
                     view_mode = 2
-                if histogram_bpf == None:
-                    histogram_init()
+                    histogram_init(False)
             elif key.lower() == 'j':
                 change_selected_line(SELECTED_LINE_UP)
             elif key.lower() == 'k':
@@ -382,6 +427,7 @@ def dump_map():
         json_str = json.dumps(sorted_output)
         out.write(json_str)
         out.close
+
     bpf.get_table("keyhits").clear() # FIXME clear other maps
     sorted_output.clear()
     selected_line = 0
@@ -389,43 +435,70 @@ def dump_map():
 
 # FIXME build from probe definition?
 def build_probes(render_only):
-    global bpf_text
-    global usdt
     global pid
-
+    global usdt
+    global bpf_text
+    global start_time
+    global traced_commands
+    global trace_command_ebpf
     rendered_text = bpf_text.replace("DEFINE_KEY_MATCH", "#define KEY_MATCH" if match_key != None else "") \
-                             .replace("KEY_STRING", match_key if match_key != None else "")
+                            .replace("KEY_STRING", match_key if match_key != None else "")
+
+
+    for _, val in enumerate(traced_commands):
+        rendered_text += "\n" + trace_command_ebpf.replace('COMMAND_NAME',
+                                                             val.name.lower())\
+                                                  .replace('COMMAND_ENUM_ID',
+                                                             str(val.value))
+
     if render_only:
         print(rendered_text)
         exit()
 
     usdt = USDT(pid=pid)
     # FIXME use fully specified version, port this to python
-    usdt.enable_probe(probe="command__set", fn_name="trace_entry")
+
+    # FIXME code generation for each command type
+    for _, val in enumerate(traced_commands):
+        usdt.enable_probe(probe="command__%s" % (val.name.lower()),
+                              fn_name="trace_command_%s" % (val.name.lower()))
     usdt.enable_probe(probe="process__command__start",
                                             fn_name="trace_command_start")
     usdt.enable_probe(probe="process__command__end",
                                             fn_name="trace_command_end")
-    return BPF(text=rendered_text, usdt_contexts=[usdt])
+    bpf = BPF(text=rendered_text, usdt_contexts=[usdt])
+    start_time = bpf.monotonic_time()
+    return bpf
 
-def histogram_init():
+def teardown_bpf():
+    global bpf
+    if bpf != None:
+        dump_map()
+        bpf.cleanup()
+        del bpf
+
+def histogram_init(dump_ebpf):
     global match_key
     global selected_key
-    global histogram_bpf
-
     global bpf
-    bpf.cleanup() # FIXME need to make these clean each other up
-
+    teardown_bpf()
     match_key = selected_key
-    histogram_bpf = build_probes(False)
+    bpf = build_probes(dump_ebpf)
 
+def bpf_init(dump_ebpf):
+    global match_key
+    global bpf
+    teardown_bpf() # FIXME - avoid tearing down until a new match_key is selected?
+    match_key = None
+    bpf = build_probes(dump_ebpf)
 
 def print_histogram():
-    global histogram_bpf
+    global bpf
     global match_key
-
     print("Latency histogram for key %s" % (match_key))
-    histogram_bpf["cmd_latency"].print_log2_hist("nsec")
+    bpf["cmd_latency"].print_log2_hist("nsec") # FIXME detect if this printed to buffer for footer?
+
+    print("HISTOGRAM FOOTER")
 
 def print_keylist():
     global bpf
@@ -439,7 +512,8 @@ def print_keylist():
                                          "OBJSIZE", "REQ/S",
                                          "BW(kbps)", "LAT(MS)"))
     keyhits = bpf.get_table("keyhits")
-    interval = bpf.monotonic_time() - start_time
+    interval = (bpf.monotonic_time() - start_time) / 1000000000
+    print ("INTERVAL %f" % (interval))
 
     data_map = {}
     for k, v in keyhits.items():
@@ -450,7 +524,7 @@ def print_keylist():
             "totalbytes": v.totalbytes,
             "timestamp": v.timestamp,
             "cps": v.count / interval,
-            "bandwidth": (v.totalbytes / 1000) / interval,
+            "bandwidth": 0, #(v.totalbytes / 1000) /interval if v.totalbytes > 0 else 0,
             "latency": v.latency,
             "call_lat": (v.latency / v.count) / 1000,
         }
@@ -514,8 +588,7 @@ def run():
     global view_mode
     global interval
 
-
-    bpf = build_probes(args.ebpf)
+    bpf_init(args.ebpf)
     first_loop = True
 
     start_time = bpf.monotonic_time()
