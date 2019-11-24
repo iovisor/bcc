@@ -63,13 +63,13 @@ args = parser.parse_args()
 interval = int(args.interval)
 countdown = int(args.count)
 maxrows = int(args.maxrows)
-clear = not int(args.noclear)
+clear = not int(args.noclear) # FIXME ensure it still works with clear disabled
 outfile = args.output
 pid = args.pid
 
 # Globals
 exiting = 0
-sort_mode = "C"
+sort_mode = "C"  # FIXME allow specifying at runtime
 selected_line = 0
 selected_page = 0
 sort_ascending = True
@@ -84,17 +84,18 @@ SELECTED_LINE_START = "start"
 SELECTED_LINE_END = "end"
 
 sort_modes = {
-    "C": "calls",  # total calls to key
+    "C": "calls", # total calls to key
     "S": "size",  # latest size of key
-    "R": "req/s",  # requests per second to this key
+    "R": "req/s", # requests per second to this key
     "B": "bw",    # total bytes accesses on this key
-    "N": "ts"     # timestamp of the latest access
+    "L": "lat"    # aggregate call latency for this key
 }
 
 commands = {
-    "T": "t",  # sorting by ascending / descending order
-    "W": "dump",   # clear eBPF maps and dump to disk (if set)
-    "Q": "quit"    # exit mctop
+    "I": "insp", # inspect the latency of commands processing this key
+    "T": "tgl",  # toggle sorting by ascending / descending order
+    "W": "dmp",  # clear eBPF maps and dump to disk (if set)
+    "Q": "quit"  # exit mctop
 }
 
 # /typedef enum {START, END, GET, ADD, SET, REPLACE, PREPEND, APPEND,
@@ -143,10 +144,53 @@ struct value_t {
     u64 totalbytes;
     u64 keysize;
     u64 timestamp;
+    u64 latency;
 };
 
 BPF_HASH(keyhits, struct keyhit_t, struct value_t);
+BPF_HASH(comm_start, int32_t, u64);
+BPF_HASH(lastkey, u64, struct keyhit_t);
+BPF_HISTOGRAM(cmd_latency);
 
+
+int trace_command_start(struct pt_regs *ctx) {
+    //u64 tid  = bpf_get_current_pid_tgid();
+    int32_t conn_id = 0;
+    bpf_usdt_readarg(1, ctx, &conn_id);
+    u64 nsec = bpf_ktime_get_ns();
+    comm_start.update(&conn_id, &nsec);
+    return 0;
+}
+
+int trace_command_end(struct pt_regs *ctx) {
+
+    struct keyhit_t *key;
+    struct value_t *valp;
+    int32_t conn_id = 0;
+    u64 nsec = bpf_ktime_get_ns();
+    bpf_usdt_readarg(1, ctx, &conn_id);
+
+    u64 *start = comm_start.lookup(&conn_id);
+
+    u64 lastkey_id = 0;
+
+    if (start != NULL ) {
+        u64 call_lat = nsec - *start;
+        key = lastkey.lookup(&lastkey_id);
+
+        if (key != NULL ) {
+          valp = keyhits.lookup(key);
+          if (valp) {
+              valp->latency += call_lat;
+          }
+          //if(match_key(last_key.keystr)) {
+          //  // lookup time for thread id
+          //  // add log2 difference to histogram
+          //}
+        }
+    }
+    return 0;
+}
 
 int trace_entry(struct pt_regs *ctx) {
     u64 keystr = 0;
@@ -166,6 +210,9 @@ int trace_entry(struct pt_regs *ctx) {
     // which corresponds roughly to the the maximum key size
     bpf_probe_read(&keyhit.keystr, keysize & READ_MASK, (void *)keystr);
 
+    u64 lastkey_id = 0;
+    lastkey.update(&lastkey_id, &keyhit);
+
     valp = keyhits.lookup_or_init(&keyhit, &zero);
     valp->count++;
     valp->bytecount = bytecount;
@@ -177,6 +224,29 @@ int trace_entry(struct pt_regs *ctx) {
     return 0;
 }
 """
+
+#    // fixme
+def render_probe_template(key):
+
+    matchkey_inline = """
+static inline bool match_key(uintptr_t str) { return false; }
+"""
+    if key != None:
+        matchkey_inline = """
+static inline bool match_key(uintptr_t str) {
+    char needle[] = %s;
+    char haystack[sizeof(needle)];
+    bpf_probe_read(&haystack, sizeof(haystack), (void *)str);
+    for (int i = 0; i < sizeof(needle) - 1; ++i) {
+            if (needle[i] != haystack[i]) {
+                    return false;
+            }
+    }
+    return true;
+}
+                """ % (key, str)
+
+    return matchkey_inline
 
 def sort_output(unsorted_map):
     global sort_mode
@@ -193,6 +263,8 @@ def sort_output(unsorted_map):
         output = sorted(output.items(), key=lambda x: x[1]['cps'])
     elif sort_mode == "N":
         output = sorted(output.items(), key=lambda x: x[1]['timestamp'])
+    elif sort_mode == "L":
+        output = sorted(output.items(), key=lambda x: x[1]['call_lat'])
 
     if sort_ascending:
         output = reversed(output)
@@ -247,6 +319,8 @@ def readKey(interval):
                 sort_mode = 'B'
             elif key.lower() == 'n':
                 sort_mode = 'N'
+            elif key.lower() == 'l':
+                sort_mode = 'L'
             elif key.lower() == 'j':
                 change_selected_line(SELECTED_LINE_UP)
             elif key.lower() == 'k':
@@ -303,12 +377,16 @@ def run():
     usdt = USDT(pid=pid)
     # FIXME use fully specified version, port this to python
     usdt.enable_probe(probe="command__set", fn_name="trace_entry")
+    usdt.enable_probe(probe="process__command__start",
+                                            fn_name="trace_command_start")
+    usdt.enable_probe(probe="process__command__end",
+                                            fn_name="trace_command_end")
     bpf = BPF(text=bpf_text, usdt_contexts=[usdt])
 
     old_settings = termios.tcgetattr(sys.stdin)
     first_loop = True
 
-    start = monotonic()  # FIXME would prefer monotonic_ns, if 3.7+
+    start = monotonic()  # FIXME would prefer monotonic_ns, if 3.7+ // FIXME PYTHON2 COMPATIBILITY
 
     while True:
         try:
@@ -325,7 +403,7 @@ def run():
 
         print("%-30s %8s %8s %8s %8s %8s" % ("MEMCACHED KEY", "CALLS",
                                              "OBJSIZE", "REQ/S",
-                                             "BW(kbps)", "TOTAL"))
+                                             "BW(kbps)", "LAT(MS)"))
         keyhits = bpf.get_table("keyhits")
         interval = monotonic() - start
 
@@ -338,7 +416,9 @@ def run():
                 "totalbytes": v.totalbytes,
                 "timestamp": v.timestamp,
                 "cps": v.count / interval,
-                "bandwidth": (v.totalbytes / 1000) / interval
+                "bandwidth": (v.totalbytes / 1000) / interval,
+                "latency": v.latency,
+                "call_lat": (v.latency / v.count) / 1000,
             }
 
         sorted_output = sort_output(data_map)
@@ -366,7 +446,7 @@ def run():
 
             print("%s%-30s %8d %8d %8f %8f %8d%s" % (fmt_start, k, v['count'], v['bytecount'],
                                                  v['cps'], v['bandwidth'],
-                                                 v['totalbytes'], fmt_end) )
+                                                 v['call_lat'], fmt_end) )
             printed_lines += 1
 
             if printed_lines >= maxrows:
@@ -381,7 +461,7 @@ def run():
                           'S', sort_modes['S'],
                           'R', sort_modes['R'],
                           'B', sort_modes['B'],
-                          'N', sort_modes['N']
+                          'L', sort_modes['L']
                           ))
 
         sys.stdout.write("[%s:%s %s:%s %s:%s](%d/%d)" % (
