@@ -72,8 +72,13 @@ exiting = 0
 sort_mode = "C"  # FIXME allow specifying at runtime
 selected_line = 0
 selected_page = 0
+selected_key  = ""
+start_time    = 0
 sort_ascending = True
+view_mode = 1 # 1 - index, 2 - histogram
+match_key = None
 bpf = None
+histogram_bpf = None
 sorted_output = []
 
 SELECTED_LINE_UP = 1
@@ -152,6 +157,26 @@ BPF_HASH(comm_start, int32_t, u64);
 BPF_HASH(lastkey, u64, struct keyhit_t);
 BPF_HISTOGRAM(cmd_latency);
 
+// FIXME this should use bitwise & over the 4 x 64 bit ints of the char buffer
+static inline bool match_key(const char * str) {
+    DEFINE_KEY_MATCH
+
+#ifdef KEY_MATCH
+    char needle[] = "KEY_STRING";
+    char haystack[sizeof(needle)];
+    bpf_probe_read(&haystack, sizeof(haystack), (void *)str);
+    for (int i = 0; i < sizeof(needle) - 1; ++i) {
+            if (needle[i] != haystack[i]) {
+                    return false;
+            }
+    }
+    return true;
+
+#else
+    return false;
+#endif // KEY_MATCH
+}
+
 
 int trace_command_start(struct pt_regs *ctx) {
     //u64 tid  = bpf_get_current_pid_tgid();
@@ -183,10 +208,13 @@ int trace_command_end(struct pt_regs *ctx) {
           if (valp) {
               valp->latency += call_lat;
           }
-          //if(match_key(last_key.keystr)) {
-          //  // lookup time for thread id
-          //  // add log2 difference to histogram
-          //}
+          DEFINE_KEY_MATCH
+#ifdef KEY_MATCH
+          if(match_key(key->keystr)) {
+              bpf_trace_printk("KEY HIT on %s LAT: %d\\n", key->keystr, call_lat);
+              cmd_latency.increment(bpf_log2l(call_lat));
+          }
+#endif // KEY_MATCH
         }
     }
     return 0;
@@ -224,30 +252,6 @@ int trace_entry(struct pt_regs *ctx) {
     return 0;
 }
 """
-
-#    // fixme
-def render_probe_template(key):
-
-    matchkey_inline = """
-static inline bool match_key(uintptr_t str) { return false; }
-"""
-    if key != None:
-        matchkey_inline = """
-static inline bool match_key(uintptr_t str) {
-    char needle[] = %s;
-    char haystack[sizeof(needle)];
-    bpf_probe_read(&haystack, sizeof(haystack), (void *)str);
-    for (int i = 0; i < sizeof(needle) - 1; ++i) {
-            if (needle[i] != haystack[i]) {
-                    return false;
-            }
-    }
-    return true;
-}
-                """ % (key, str)
-
-    return matchkey_inline
-
 def sort_output(unsorted_map):
     global sort_mode
     global sort_ascending
@@ -273,6 +277,10 @@ def sort_output(unsorted_map):
 
 # Set stdin to non-blocking reads so we can poll for chars
 
+def update_selected_key():
+    global selected_key
+    selected_key = sorted_output[selected_line][0]
+
 def change_selected_line(direction):
     global selected_line
     global selected_page
@@ -282,10 +290,12 @@ def change_selected_line(direction):
     if direction == SELECTED_LINE_START:
         selected_line = 0
         selected_page = 0
+        update_selected_key()
         return
     elif direction == SELECTED_LINE_END:
         selected_line = len(sorted_output) -1
         selected_page = floor(selected_line / maxrows)
+        update_selected_key()
         return
 
     if direction > 0 and (selected_line + direction) >= len(sorted_output):
@@ -296,6 +306,8 @@ def change_selected_line(direction):
     else:
         selected_line += direction
         selected_page = floor(selected_line / maxrows)
+
+    update_selected_key()
 
 def readKey(interval):
     fd = sys.stdin.fileno()
@@ -309,22 +321,34 @@ def readKey(interval):
             if key.lower() == 't':
                 global sort_ascending
                 sort_ascending = not sort_ascending
-            elif key.lower() == 'c':
+            elif key == 'C':
                 sort_mode = 'C'
-            elif key.lower() == 's':
+            elif key == 'S':
                 sort_mode = 'S'
-            elif key.lower() == 'r':
+            elif key == 'R':
                 sort_mode = 'R'
-            elif key.lower() == 'b':
+            elif key == 'B':
                 sort_mode = 'B'
-            elif key.lower() == 'n':
-                sort_mode = 'N'
-            elif key.lower() == 'l':
+            elif key == 'L':
                 sort_mode = 'L'
+            elif key == 'H':
+                global view_mode
+                if view_mode == 2:
+                    view_mode = 1
+                else:
+                    view_mode = 2
+                if histogram_bpf == None:
+                    histogram_init()
             elif key.lower() == 'j':
                 change_selected_line(SELECTED_LINE_UP)
             elif key.lower() == 'k':
                 change_selected_line(SELECTED_LINE_DOWN)
+            elif key.lower() == 'h': # Reserved for shifting print of key
+                pass
+                #ROTATE_KEY_LEFT
+            elif key.lower() == 'l': # Reserved for shifting print of key
+                pass
+                #ROTATE_KEY_RIGHT
             elif key.lower() == 'u':
                 change_selected_line(SELECTED_LINE_PAGE_UP)
             elif key.lower() == 'd':
@@ -343,6 +367,8 @@ def readKey(interval):
         termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
 
 
+# FIXME this should dump a full representation of the eBPF data in a reasonable
+# schema
 def dump_map():
     global outfile
     global bpf
@@ -350,28 +376,27 @@ def dump_map():
     global selected_line
     global selected_page
 
-    print("DUMPING MAP")
+    print("DUMPING DATA")
     if outfile is not None:
         out = open('/tmp/%s.json' % outfile, 'w')
         json_str = json.dumps(sorted_output)
         out.write(json_str)
         out.close
-    bpf.get_table("keyhits").clear()
+    bpf.get_table("keyhits").clear() # FIXME clear other maps
     sorted_output.clear()
     selected_line = 0
     selected_page = 0
 
+# FIXME build from probe definition?
+def build_probes(render_only):
+    global bpf_text
+    global usdt
+    global pid
 
-def run():
-    global bpf
-    global args
-    global maxrows
-    global exiting
-    global ebpf_text
-    global sorted_output
-
-    if args.ebpf:
-        print(bpf_text)
+    rendered_text = bpf_text.replace("DEFINE_KEY_MATCH", "#define KEY_MATCH" if match_key != None else "") \
+                             .replace("KEY_STRING", match_key if match_key != None else "")
+    if render_only:
+        print(rendered_text)
         exit()
 
     usdt = USDT(pid=pid)
@@ -381,12 +406,119 @@ def run():
                                             fn_name="trace_command_start")
     usdt.enable_probe(probe="process__command__end",
                                             fn_name="trace_command_end")
-    bpf = BPF(text=bpf_text, usdt_contexts=[usdt])
+    return BPF(text=rendered_text, usdt_contexts=[usdt])
 
-    old_settings = termios.tcgetattr(sys.stdin)
+def histogram_init():
+    global match_key
+    global selected_key
+    global histogram_bpf
+
+    global bpf
+    bpf.cleanup() # FIXME need to make these clean each other up
+
+    match_key = selected_key
+    histogram_bpf = build_probes(False)
+
+
+def print_histogram():
+    global histogram_bpf
+    global match_key
+
+    print("Latency histogram for key %s" % (match_key))
+    histogram_bpf["cmd_latency"].print_log2_hist("nsec")
+
+def print_keylist():
+    global bpf
+    global maxrows
+    global sorted_output
+    global start_time
+    global selected_key
+
+    # FIXME better calculate the key width so that it can be shifted with h/l
+    print("%-30s %8s %8s %8s %8s %8s" % ("MEMCACHED KEY", "CALLS",
+                                         "OBJSIZE", "REQ/S",
+                                         "BW(kbps)", "LAT(MS)"))
+    keyhits = bpf.get_table("keyhits")
+    interval = bpf.monotonic_time() - start_time
+
+    data_map = {}
+    for k, v in keyhits.items():
+        shortkey = k.keystr[:v.keysize].decode('utf-8', 'replace')
+        data_map[shortkey] = {
+            "count": v.count,
+            "bytecount": v.bytecount,
+            "totalbytes": v.totalbytes,
+            "timestamp": v.timestamp,
+            "cps": v.count / interval,
+            "bandwidth": (v.totalbytes / 1000) / interval,
+            "latency": v.latency,
+            "call_lat": (v.latency / v.count) / 1000,
+        }
+
+    sorted_output = sort_output(data_map)
+
+    max_pages = floor(len(sorted_output) / maxrows)
+
+    printed_lines = 0
+    for i, tup in enumerate(sorted_output):  # FIXME sort this
+        global selected_line
+        global selected_page
+
+        k = tup[0]
+        v = tup[1]
+        fmt_start = ""
+        fmt_end   = ""
+
+        page = floor(int(i) / int(maxrows))
+
+        if page != selected_page:
+            continue
+
+        if i == selected_line:
+            fmt_start = "\033[1;30;47m" # White background, black text
+            fmt_end   = "\033[1;0;0;0m"
+
+        print("%s%-30s %8d %8d %8f %8f %8d%s" % (fmt_start, k, v['count'], v['bytecount'],
+                                             v['cps'], v['bandwidth'],
+                                             v['call_lat'], fmt_end) )
+        printed_lines += 1
+
+        if printed_lines >= maxrows:
+            break
+
+    print((maxrows - printed_lines) * "\r\n")
+    print("[Selected key: %s ]" % selected_key )
+    sys.stdout.write("[Curr: %s/%s Opt: %s:%s|%s:%s|%s:%s|%s:%s|%s:%s]" %
+                     (sort_mode,
+                      "Asc" if sort_ascending else "Dsc",
+                      'C', sort_modes['C'],
+                      'S', sort_modes['S'],
+                      'R', sort_modes['R'],
+                      'B', sort_modes['B'],
+                      'L', sort_modes['L']
+                      ))
+
+    sys.stdout.write("[%s:%s %s:%s %s:%s](%d/%d)" % (
+        'T', commands['T'],
+        'W', commands['W'],
+        'Q', commands['Q'],
+        selected_page + 1,
+        max_pages + 1
+    ))
+
+def run():
+    global args
+    global exiting
+    global bpf
+    global start_time
+    global view_mode
+    global interval
+
+
+    bpf = build_probes(args.ebpf)
     first_loop = True
 
-    start = monotonic()  # FIXME would prefer monotonic_ns, if 3.7+ // FIXME PYTHON2 COMPATIBILITY
+    start_time = bpf.monotonic_time()
 
     while True:
         try:
@@ -401,76 +533,10 @@ def run():
         if clear:
             print("\033c", end="")
 
-        print("%-30s %8s %8s %8s %8s %8s" % ("MEMCACHED KEY", "CALLS",
-                                             "OBJSIZE", "REQ/S",
-                                             "BW(kbps)", "LAT(MS)"))
-        keyhits = bpf.get_table("keyhits")
-        interval = monotonic() - start
-
-        data_map = {}
-        for k, v in keyhits.items():
-            shortkey = k.keystr[:v.keysize].decode('utf-8', 'replace')
-            data_map[shortkey] = {
-                "count": v.count,
-                "bytecount": v.bytecount,
-                "totalbytes": v.totalbytes,
-                "timestamp": v.timestamp,
-                "cps": v.count / interval,
-                "bandwidth": (v.totalbytes / 1000) / interval,
-                "latency": v.latency,
-                "call_lat": (v.latency / v.count) / 1000,
-            }
-
-        sorted_output = sort_output(data_map)
-
-        max_pages = floor(len(sorted_output) / maxrows)
-
-        printed_lines = 0
-        for i, tup in enumerate(sorted_output):  # FIXME sort this
-            global selected_line
-            global selected_page
-
-            k = tup[0]
-            v = tup[1]
-            fmt_start = ""
-            fmt_end   = ""
-
-            page = floor(int(i) / int(maxrows))
-
-            if page != selected_page:
-                continue
-
-            if i == selected_line:
-                fmt_start = "\033[1;30;47m" # White background, black text
-                fmt_end   = "\033[1;0;0;0m"
-
-            print("%s%-30s %8d %8d %8f %8f %8d%s" % (fmt_start, k, v['count'], v['bytecount'],
-                                                 v['cps'], v['bandwidth'],
-                                                 v['call_lat'], fmt_end) )
-            printed_lines += 1
-
-            if printed_lines >= maxrows:
-                break
-
-
-        print((maxrows - printed_lines) * "\r\n")
-        sys.stdout.write("[Curr: %s/%s Opt: %s:%s|%s:%s|%s:%s|%s:%s|%s:%s]" %
-                         (sort_mode,
-                          "Asc" if sort_ascending else "Dsc",
-                          'C', sort_modes['C'],
-                          'S', sort_modes['S'],
-                          'R', sort_modes['R'],
-                          'B', sort_modes['B'],
-                          'L', sort_modes['L']
-                          ))
-
-        sys.stdout.write("[%s:%s %s:%s %s:%s](%d/%d)" % (
-            'T', commands['T'],
-            'W', commands['W'],
-            'Q', commands['Q'],
-            selected_page + 1,
-            max_pages + 1
-        ))
+        if view_mode == 1:
+            print_keylist()
+        elif view_mode == 2:
+            print_histogram()
         print("\033[%d;%dH" % (0, 0))
 
         if exiting:
