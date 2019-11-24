@@ -22,6 +22,7 @@ from __future__ import print_function
 from time import sleep, strftime, monotonic
 from bcc import BPF, USDT, utils
 from subprocess import call
+from math import floor
 import argparse
 import sys
 import select
@@ -69,10 +70,18 @@ pid = args.pid
 # Globals
 exiting = 0
 sort_mode = "C"
+selected_line = 0
+selected_page = 0
 sort_ascending = True
 bpf = None
-sorted_output = None
+sorted_output = []
 
+SELECTED_LINE_UP = 1
+SELECTED_LINE_DOWN = -1
+SELECTED_LINE_PAGE_UP = maxrows * -1
+SELECTED_LINE_PAGE_DOWN = maxrows
+SELECTED_LINE_START = "start"
+SELECTED_LINE_END = "end"
 
 sort_modes = {
     "C": "calls",  # total calls to key
@@ -83,8 +92,8 @@ sort_modes = {
 }
 
 commands = {
-    "T": "toggle",  # sorting by ascending / descending order
-    "D": "dump",   # clear eBPF maps and dump to disk (if set)
+    "T": "t",  # sorting by ascending / descending order
+    "W": "dump",   # clear eBPF maps and dump to disk (if set)
     "Q": "quit"    # exit mctop
 }
 
@@ -97,6 +106,31 @@ bpf_text = """
 #include <uapi/linux/ptrace.h>
 #include <bcc/proto.h>
 
+// #define FOREACH_MEMCACHED_CMD(MEMCACHED_CMD_INDEX) \
+//         MEMCACHED_CMD_INDEX(MC_CMD_START)   \
+//         MEMCACHED_CMD_INDEX(MC_CMD_END)   \
+// 
+//         MEMCACHED_CMD_INDEX(MC_GET)   \
+//         MEMCACHED_CMD_INDEX(MC_ADD)   \
+//         MEMCACHED_CMD_INDEX(MC_SET)   \
+//         MEMCACHED_CMD_INDEX(MC_REPLACE)   \
+//         MEMCACHED_CMD_INDEX(MC_PREPEND)   \
+//         MEMCACHED_CMD_INDEX(MC_APPEND)   \
+//         MEMCACHED_CMD_INDEX(MC_TOUCH)   \
+//         MEMCACHED_CMD_INDEX(MC_CAS)   \
+// 
+//         MEMCACHED_CMD_INDEX(MC_INCR)   \
+//         MEMCACHED_CMD_INDEX(MC_DECR)   \
+//         MEMCACHED_CMD_INDEX(MC_DELETE)   \
+// 
+// 
+// #define GENERATE_ENUM(ENUM) ENUM,
+// #define GENERATE_STRING(STRING) #STRING,
+// 
+// // Generate enum for sem indices
+// enum MEMCACHED_CMD_INDEX_ENUM {
+//     FOREACH_MEMCACHED_CMD(GENERATE_ENUM)
+// };
 
 #define READ_MASK 0xff // allow buffer reads up to 256 bytes
 struct keyhit_t {
@@ -144,7 +178,6 @@ int trace_entry(struct pt_regs *ctx) {
 }
 """
 
-
 def sort_output(unsorted_map):
     global sort_mode
     global sort_ascending
@@ -168,54 +201,97 @@ def sort_output(unsorted_map):
 
 # Set stdin to non-blocking reads so we can poll for chars
 
+def change_selected_line(direction):
+    global selected_line
+    global selected_page
+    global sorted_output
+    global maxrows
+
+    if direction == SELECTED_LINE_START:
+        selected_line = 0
+        selected_page = 0
+        return
+    elif direction == SELECTED_LINE_END:
+        selected_line = len(sorted_output) -1
+        selected_page = floor(selected_line / maxrows)
+        return
+
+    if direction > 0 and (selected_line + direction) >= len(sorted_output):
+        selected_line = len(sorted_output) - 1
+    elif direction < 0 and (selected_line + direction) <= 0:
+        selected_line = 0
+        selected_page = 0
+    else:
+        selected_line += direction
+        selected_page = floor(selected_line / maxrows)
 
 def readKey(interval):
-    new_settings = termios.tcgetattr(sys.stdin)
-    new_settings[3] = new_settings[3] & ~(termios.ECHO | termios.ICANON)
-    tty.setcbreak(sys.stdin.fileno())
-    if select.select([sys.stdin], [], [], 5) == ([sys.stdin], [], []):
-        key = sys.stdin.read(1).lower()
-        global sort_mode
+    fd = sys.stdin.fileno()
+    old_settings = termios.tcgetattr(fd)
+    try:
+        tty.setcbreak(sys.stdin.fileno())
+        if select.select([sys.stdin], [], [], 5) == ([sys.stdin], [], []):
+            key = sys.stdin.read(1)
+            global sort_mode
 
-        if key == 't':
-            global sort_ascending
-            sort_ascending = not sort_ascending
-        elif key == 'c':
-            sort_mode = 'C'
-        elif key == 's':
-            sort_mode = 'S'
-        elif key == 'r':
-            sort_mode = 'R'
-        elif key == 'b':
-            sort_mode = 'B'
-        elif key == 'n':
-            sort_mode = 'N'
-        elif key == 'd':
-            global args
-            if args.output is not None:
-                dump_map()
-        elif key == 'q':
-            print("QUITTING")
-            global exiting
-            exiting = 1
+            if key.lower() == 't':
+                global sort_ascending
+                sort_ascending = not sort_ascending
+            elif key.lower() == 'c':
+                sort_mode = 'C'
+            elif key.lower() == 's':
+                sort_mode = 'S'
+            elif key.lower() == 'r':
+                sort_mode = 'R'
+            elif key.lower() == 'b':
+                sort_mode = 'B'
+            elif key.lower() == 'n':
+                sort_mode = 'N'
+            elif key.lower() == 'j':
+                change_selected_line(SELECTED_LINE_UP)
+            elif key.lower() == 'k':
+                change_selected_line(SELECTED_LINE_DOWN)
+            elif key.lower() == 'u':
+                change_selected_line(SELECTED_LINE_PAGE_UP)
+            elif key.lower() == 'd':
+                change_selected_line(SELECTED_LINE_PAGE_DOWN)
+            elif key == 'g':
+                change_selected_line(SELECTED_LINE_START)
+            elif key == 'G':
+                change_selected_line(SELECTED_LINE_END)
+            elif key.lower() == 'w':
+                 dump_map()
+            elif key.lower() == 'q':
+                print("QUITTING")
+                global exiting
+                exiting = 1
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
 
 
 def dump_map():
     global outfile
     global bpf
     global sorted_output
+    global selected_line
+    global selected_page
 
-    keyhits = bpf.get_table("keyhits")
-    out = open('/tmp/%s.json' % outfile, 'w')
-    json_str = json.dumps(sorted_output)
-    out.write(json_str)
-    out.close
-    keyhits.clear()
+    print("DUMPING MAP")
+    if outfile is not None:
+        out = open('/tmp/%s.json' % outfile, 'w')
+        json_str = json.dumps(sorted_output)
+        out.write(json_str)
+        out.close
+    bpf.get_table("keyhits").clear()
+    sorted_output.clear()
+    selected_line = 0
+    selected_page = 0
 
 
 def run():
     global bpf
     global args
+    global maxrows
     global exiting
     global ebpf_text
     global sorted_output
@@ -234,7 +310,6 @@ def run():
 
     start = monotonic()  # FIXME would prefer monotonic_ns, if 3.7+
 
-    print("HERE")
     while True:
         try:
             if not first_loop:
@@ -252,7 +327,6 @@ def run():
                                              "OBJSIZE", "REQ/S",
                                              "BW(kbps)", "TOTAL"))
         keyhits = bpf.get_table("keyhits")
-        line = 0
         interval = monotonic() - start
 
         data_map = {}
@@ -268,18 +342,38 @@ def run():
             }
 
         sorted_output = sort_output(data_map)
+
+        max_pages = floor(len(sorted_output) / maxrows)
+
+        printed_lines = 0
         for i, tup in enumerate(sorted_output):  # FIXME sort this
+            global selected_line
+            global selected_page
+
             k = tup[0]
             v = tup[1]
-            print("%-30s %8d %8d %8f %8f %8d" % (k, v['count'], v['bytecount'],
-                                                 v['cps'], v['bandwidth'],
-                                                 v['totalbytes']))
+            fmt_start = ""
+            fmt_end   = ""
 
-            line += 1
-            if line >= maxrows:
+            page = floor(int(i) / int(maxrows))
+
+            if page != selected_page:
+                continue
+
+            if i == selected_line:
+                fmt_start = "\033[1;30;47m" # White background, black text
+                fmt_end   = "\033[1;0;0;0m"
+
+            print("%s%-30s %8d %8d %8f %8f %8d%s" % (fmt_start, k, v['count'], v['bytecount'],
+                                                 v['cps'], v['bandwidth'],
+                                                 v['totalbytes'], fmt_end) )
+            printed_lines += 1
+
+            if printed_lines >= maxrows:
                 break
 
-        print((maxrows - line) * "\r\n")
+
+        print((maxrows - printed_lines) * "\r\n")
         sys.stdout.write("[Curr: %s/%s Opt: %s:%s|%s:%s|%s:%s|%s:%s|%s:%s]" %
                          (sort_mode,
                           "Asc" if sort_ascending else "Dsc",
@@ -290,17 +384,17 @@ def run():
                           'N', sort_modes['N']
                           ))
 
-        sys.stdout.write("[%s:%s %s:%s %s:%s]" % (
+        sys.stdout.write("[%s:%s %s:%s %s:%s](%d/%d)" % (
             'T', commands['T'],
-            'D', commands['D'],
-            'Q', commands['Q']
+            'W', commands['W'],
+            'Q', commands['Q'],
+            selected_page + 1,
+            max_pages + 1
         ))
         print("\033[%d;%dH" % (0, 0))
 
         if exiting:
-            termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
             print("\033c", end="")
             exit()
-
 
 run()

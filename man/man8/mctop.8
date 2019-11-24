@@ -40,29 +40,48 @@ Save map data to a file when the DUMP command is issued:
 .B mctop -p MEMCACHED_PID -o FILENAME
 .SH COMMANDS
 .TP
-C
+c/C
 Sort by count of calls to the key.
 .TP
-S
+s/S
 Sort by last reported size of data associated with this key.
 .TP
-R
+r/R
 Sort by realtime rate of calls to this key.
 .TP
-B
+b/B
 Sort by realtime bandwidth computed for this key.
 .TP
-N
+n/N
 Sort by most recently accessed key.
 .TP
-T
+t/T
 Toggle between ascending and descending sort.
 .TP
-D
-Dump the map data to a file and clear all stored data. // FIXME
+w/W
+Dump the map data to a file and clear all stored data.
 .TP
-Q
+q/Q
 Exit mctop tracing session and detach from memcached process.
+.SH NAVIGATION
+.TP
+g
+Move selected line to first line
+.TP
+G
+Move selected line to last line
+.TP
+j/J
+Move selected line downward
+.TP
+k/K
+Move selected line upward
+.TP
+d/D
+Move selected line one page down
+.TP
+u/U
+Move selected line one page up
 .SH FIELDS
 .TP
 MEMCACHED KEY
