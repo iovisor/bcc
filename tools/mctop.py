@@ -69,7 +69,7 @@ parser.add_argument("-C", "--noclear", action="store_true",
                     help="don't clear the screen")
 parser.add_argument("-r", "--maxrows", default=20,
                     help="maximum rows to print, default 20")
-parser.add_argument('-c','--commands', action='append',
+parser.add_argument('-c','--commands', action='append', default=[],
                     choices=[McCommand.GET.name, McCommand.ADD.name,
                        McCommand.SET.name, McCommand.REPLACE.name,
                        McCommand.PREPEND.name, McCommand.APPEND.name,
@@ -166,6 +166,7 @@ BPF_HASH(lastkey, u64, struct keyhit_t);
 BPF_HISTOGRAM(cmd_latency);
 
 // FIXME this should use bitwise & over the 4 x 64 bit ints of the char buffer
+// FIXME this is currently a prefix match
 static inline bool match_key(const char * str) {
     DEFINE_KEY_MATCH
 
@@ -289,7 +290,7 @@ int trace_command_COMMAND_NAME(struct pt_regs *ctx) {
     else if (COMMAND_ENUM_ID == 3)
         valp->gets++;
 
-    bpf_trace_printk("KEY: '%s' GETS: %d BYTE %d\\n", keyhit.keystr, valp->gets, bytecount);
+    bpf_trace_printk("KEY: '%s' GETS: %d SETS %d\\n", keyhit.keystr, valp->gets, valp->sets);
     return 0;
 }
 """
@@ -565,7 +566,7 @@ def print_keylist():
             fmt_start = "\033[1;30;47m" # White background, black text
             fmt_end   = "\033[1;0;0;0m"
 
-        print("%s%-30s %8d %8d %8f %8f %8d%s" % (fmt_start, k, v['count'], v['bytecount'],
+        print("%s%-30s %8d %8d %8.2f %8.2f %8.2f%s" % (fmt_start, k, v['count'], v['bytecount'],
                                              v['cps'], v['bandwidth'],
                                              v['call_lat'], fmt_end) )
         printed_lines += 1
