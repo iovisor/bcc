@@ -31,6 +31,8 @@ import tty
 import termios
 import json
 
+# FIXME refactor globals into class vars or explicit global singleton classes
+
 class McCommand(Enum):
    START = 1
    END = 2
@@ -67,6 +69,12 @@ parser.add_argument("-C", "--noclear", action="store_true",
                     help="don't clear the screen")
 parser.add_argument("-r", "--maxrows", default=20,
                     help="maximum rows to print, default 20")
+parser.add_argument('-c','--commands', action='append',
+                    choices=[McCommand.GET.name, McCommand.ADD.name,
+                       McCommand.SET.name, McCommand.REPLACE.name,
+                       McCommand.PREPEND.name, McCommand.APPEND.name,
+                       McCommand.TOUCH.name, McCommand.CAS.name ],
+                    help="Command to trace")
 parser.add_argument("interval", nargs="?", default=1,
                     help="output interval, in seconds")
 parser.add_argument("count", nargs="?", default=99999999,
@@ -76,6 +84,13 @@ parser.add_argument("--ebpf", action="store_true",
 
 # FIXME clean this up
 args = parser.parse_args()
+if len(args.commands) == 0:
+    command_names = [McCommand.GET.name, McCommand.ADD.name,
+               McCommand.SET.name, McCommand.REPLACE.name,
+               McCommand.PREPEND.name, McCommand.APPEND.name,
+               McCommand.TOUCH.name, McCommand.CAS.name ]
+else:
+    command_names = args.commands
 interval = int(args.interval)
 countdown = int(args.count)
 maxrows = int(args.maxrows)
@@ -96,10 +111,7 @@ match_key = None
 bpf = None
 histogram_bpf = None
 sorted_output = []
-traced_commands = [ McCommand.GET, McCommand.ADD, McCommand.SET, \
-            McCommand.REPLACE, McCommand.PREPEND, McCommand.APPEND, \
-            McCommand.TOUCH, McCommand.CAS ]#, McCommand.INRC, McCommand.DECR, \
-            #McCommand.DELETE ]
+traced_commands = [McCommand[cmd] for cmd in command_names]
 
 SELECTED_LINE_UP = 1
 SELECTED_LINE_DOWN = -1
@@ -230,6 +242,7 @@ int trace_command_COMMAND_NAME(struct pt_regs *ctx) {
     struct value_t *valp, zero = {};
     char command_type_str[] = "COMMAND_NAME\\0";
 
+    // FIXME should this always try the multi-read if 0?
     if (COMMAND_ENUM_ID == 3) {
         bpf_usdt_readarg(3, ctx, &keysize);
         if (keysize == 0) {
@@ -262,12 +275,13 @@ int trace_command_COMMAND_NAME(struct pt_regs *ctx) {
     valp = keyhits.lookup_or_init(&keyhit, &zero);
     valp->count++;
     valp->keysize = keysize;
-    valp->totalbytes += bytecount;
     valp->timestamp = bpf_ktime_get_ns();
     valp->optype = COMMAND_ENUM_ID;
 
-    if (bytecount > 0)
+    if (bytecount > 0) {
         valp->bytecount = bytecount;
+        valp->totalbytes += bytecount;
+    }
 
     // FIXME check all commands that should update bytecount
     if (COMMAND_ENUM_ID == 5)
@@ -290,11 +304,9 @@ def sort_output(unsorted_map):
     elif sort_mode == "S":
         output = sorted(output.items(), key=lambda x: x[1]['bytecount'])
     elif sort_mode == "R":
-        output = sorted(output.items(), key=lambda x: x[1]['bandwidth'])
-    elif sort_mode == "B":
         output = sorted(output.items(), key=lambda x: x[1]['cps'])
-    elif sort_mode == "N":
-        output = sorted(output.items(), key=lambda x: x[1]['timestamp'])
+    elif sort_mode == "B":
+        output = sorted(output.items(), key=lambda x: x[1]['bandwidth'])
     elif sort_mode == "L":
         output = sorted(output.items(), key=lambda x: x[1]['call_lat'])
 
@@ -360,6 +372,7 @@ def readKey(interval):
 
             # FIXME allow for lower and uppercase to toggle into histogram mode
             # If no key is selected, latency should be recorded for all keys
+            # FIXME implement Pause command
             if key.lower() == 't':
                 global sort_ascending
                 sort_ascending = not sort_ascending
@@ -428,6 +441,7 @@ def dump_map():
         out.write(json_str)
         out.close
 
+    # FIXME null check?
     bpf.get_table("keyhits").clear() # FIXME clear other maps
     sorted_output.clear()
     selected_line = 0
@@ -513,7 +527,6 @@ def print_keylist():
                                          "BW(kbps)", "LAT(MS)"))
     keyhits = bpf.get_table("keyhits")
     interval = (bpf.monotonic_time() - start_time) / 1000000000
-    print ("INTERVAL %f" % (interval))
 
     data_map = {}
     for k, v in keyhits.items():
@@ -524,7 +537,7 @@ def print_keylist():
             "totalbytes": v.totalbytes,
             "timestamp": v.timestamp,
             "cps": v.count / interval,
-            "bandwidth": 0, #(v.totalbytes / 1000) /interval if v.totalbytes > 0 else 0,
+            "bandwidth": (v.totalbytes / 1000) /interval if v.totalbytes > 0 else 0,
             "latency": v.latency,
             "call_lat": (v.latency / v.count) / 1000,
         }
@@ -615,5 +628,4 @@ def run():
         if exiting:
             print("\033c", end="")
             exit()
-
 run()
