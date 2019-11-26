@@ -43,6 +43,7 @@ class BMapDeclVisitor : public clang::RecursiveASTVisitor<BMapDeclVisitor> {
   bool VisitPointerType(const clang::PointerType *T);
   bool VisitEnumConstantDecl(clang::EnumConstantDecl *D);
   bool VisitEnumDecl(clang::EnumDecl *D);
+  bool VisitAttr(clang::Attr *A);
 
  private:
   bool shouldSkipPadding(const RecordDecl *D);
@@ -183,6 +184,7 @@ bool BMapDeclVisitor::VisitBuiltinType(const BuiltinType *T) {
   result_ += "\"";
   return true;
 }
+bool BMapDeclVisitor::VisitAttr(clang::Attr *A) { return false; }
 
 class JsonMapTypesVisitor : public virtual MapTypesVisitor {
  public:
