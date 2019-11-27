@@ -209,9 +209,9 @@ bpf_text = bpf_text.replace('STACK_STORAGE_SIZE', str(args.stack_storage_size))
 
 # handle stack args
 kernel_stack_get = "stack_traces.get_stackid(args, " \
-    "%d | BPF_F_REUSE_STACKID)" % skip
+    "%d)" % skip
 user_stack_get = \
-    "stack_traces.get_stackid(args, BPF_F_REUSE_STACKID | BPF_F_USER_STACK)"
+    "stack_traces.get_stackid(args, BPF_F_USER_STACK)"
 stack_context = ""
 if args.user_stacks_only:
     stack_context = "user"

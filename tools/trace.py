@@ -487,12 +487,12 @@ BPF_PERF_OUTPUT(%s);
                 if self.user_stack:
                         stack_trace += """
         __data.user_stack_id = %s.get_stackid(
-          %s, BPF_F_REUSE_STACKID | BPF_F_USER_STACK
+          %s, BPF_F_USER_STACK
         );""" % (self.stacks_name, ctx_name)
                 if self.kernel_stack:
                         stack_trace += """
         __data.kernel_stack_id = %s.get_stackid(
-          %s, BPF_F_REUSE_STACKID
+          %s, 0
         );""" % (self.stacks_name, ctx_name)
 
                 text = heading + """
