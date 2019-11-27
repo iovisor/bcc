@@ -95,7 +95,7 @@ int trace_mutex_acquire(struct pt_regs *ctx, void *mutex_addr) {
   }
 
   u64 stack_id =
-      stack_traces.get_stackid(ctx, BPF_F_USER_STACK | BPF_F_REUSE_STACKID);
+      stack_traces.get_stackid(ctx, BPF_F_USER_STACK);
 
   int added_mutex = 0;
   #pragma unroll
@@ -190,7 +190,7 @@ int trace_clone(struct pt_regs *ctx, unsigned long flags, void *child_stack,
   struct thread_created_leaf_t thread_created_leaf = {};
   thread_created_leaf.parent_pid = bpf_get_current_pid_tgid();
   thread_created_leaf.stack_id =
-      stack_traces.get_stackid(ctx, BPF_F_USER_STACK | BPF_F_REUSE_STACKID);
+      stack_traces.get_stackid(ctx, BPF_F_USER_STACK);
   bpf_get_current_comm(&thread_created_leaf.comm,
                        sizeof(thread_created_leaf.comm));
 

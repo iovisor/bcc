@@ -135,7 +135,7 @@ int waker(struct pt_regs *ctx, struct task_struct *p) {
 
     struct key_t key = {};
 
-    key.w_k_stack_id = stack_traces.get_stackid(ctx, BPF_F_REUSE_STACKID);
+    key.w_k_stack_id = stack_traces.get_stackid(ctx, 0);
     bpf_probe_read(&key.target, sizeof(key.target), p->comm);
     bpf_get_current_comm(&key.waker, sizeof(key.waker));
 
