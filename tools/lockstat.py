@@ -271,13 +271,14 @@ int mutex_lock_return(struct pt_regs *ctx)
     if (!stackid)
         return 0;
 
+    int stackid_ = *stackid;
     u64 cur = bpf_ktime_get_ns();
 
     if (cur > *aq) {
         int val = cur - *aq;
-        update_aq_report_count(stackid);
-        update_aq_report_max(stackid, val);
-        update_aq_report_total(stackid, val);
+        update_aq_report_count(&stackid_);
+        update_aq_report_max(&stackid_, val);
+        update_aq_report_total(&stackid_, val);
     }
 
     time_held.update(&did, &cur);
@@ -314,13 +315,15 @@ int mutex_unlock_enter(struct pt_regs *ctx)
     if (!stackid)
         return 0;
 
+
+    int stackid_ = *stackid;
     u64 cur = bpf_ktime_get_ns();
 
     if (cur > *held) {
         u64 val = cur - *held;
-        update_hl_report_count(stackid);
-        update_hl_report_max(stackid, val);
-        update_hl_report_total(stackid, val);
+        update_hl_report_count(&stackid_);
+        update_hl_report_max(&stackid_, val);
+        update_hl_report_total(&stackid_, val);
     }
 
     stack.delete(&did);
