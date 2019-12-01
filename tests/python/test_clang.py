@@ -944,6 +944,7 @@ struct a {
 BPF_HASH(drops, struct a);
         """
         b = BPF(text=text)
+        t = b['drops']
 
     def test_int128_types(self):
         text = """
