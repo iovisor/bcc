@@ -21,7 +21,7 @@ import sys
 
 # arguments
 def usage():
-    print("USAGE: mysqld_latency PID [min_ms]")
+    print("USAGE: mysqld_qslower PID [min_ms]")
     exit()
 if len(sys.argv) < 2:
     usage()
