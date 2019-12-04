@@ -50,6 +50,17 @@ The individual reads are visible, with the custom format message printed for
 each read. The parenthesized expression "(arg3 > 20000)" is a filter that is
 evaluated for each invocation of the probe before printing anything.
 
+Process name filter is porting from tools/opensnoop
+
+# trace 'do_sys_open "%s", arg2' -UK -n out
+PID     TID     COMM            FUNC             -
+9557    9557    a.out           do_sys_open      temp.1
+        do_sys_open+0x1 [kernel]
+        do_syscall_64+0x5b [kernel]
+        entry_SYSCALL_64_after_hwframe+0x44 [kernel]
+        __open_nocancel+0x7 [libc-2.17.so]
+        __libc_start_main+0xf5 [libc-2.17.so]
+
 You can also trace user functions. For example, let's simulate the bashreadline
 script, which attaches to the readline function in bash and prints its return
 value, effectively snooping all bash shell input across the system:
@@ -288,6 +299,7 @@ optional arguments:
                         number of events to print before quitting
   -t, --timestamp       print timestamp column (offset from trace start)
   -T, --time            print time column
+  -n NAME, --name NAME  only print process names containing this name
   -C, --print_cpu       print CPU id
   -B, --bin_cmp         allow to use STRCMP with binary values
   -K, --kernel-stack    output kernel stack trace
@@ -304,6 +316,8 @@ trace do_sys_open
         Trace the open syscall and print a default trace message when entered
 trace 'do_sys_open "%s", arg2'
         Trace the open syscall and print the filename being opened
+trace 'do_sys_open "%s", arg2' -n main
+        Trace the open syscall and only print event that process names containing "main"
 trace 'sys_read (arg3 > 20000) "read %d bytes", arg3'
         Trace the read syscall and print a message for reads >20000 bytes
 trace 'r::do_sys_open "%llx", retval'
