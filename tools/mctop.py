@@ -54,6 +54,9 @@ examples = """examples:
     ./mctop -p PID          # memcached usage top, 1 second refresh
 """
 
+supported_commands = [McCommand.GET, McCommand.ADD, McCommand.SET,
+                      McCommand.REPLACE, McCommand.PREPEND,
+                      McCommand.APPEND, McCommand.TOUCH, McCommand.CAS]
 parser = argparse.ArgumentParser(
     description="Memcached top key analysis",
     formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -65,32 +68,29 @@ parser.add_argument(
     action="store",
     help="save map data to /top/OUTPUT.json if 'D' is issued to dump the map")
 
-parser.add_argument("-C", "--noclear", action="store_true",
+parser.add_argument("-C", "--noclear", action="store_true", # Implies --no-footer?
                     help="don't clear the screen")
 parser.add_argument("-r", "--maxrows", default=20,
                     help="maximum rows to print, default 20")
 parser.add_argument('-c','--commands', action='append', default=[],
-                    choices=[McCommand.GET.name, McCommand.ADD.name,
-                       McCommand.SET.name, McCommand.REPLACE.name,
-                       McCommand.PREPEND.name, McCommand.APPEND.name,
-                       McCommand.TOUCH.name, McCommand.CAS.name ],
-                    help="Command to trace")
+                    choices=[ cmd.name for cmd in supported_commands],
+                    help="Command to trace, can specify many. Default is all." )
 parser.add_argument("interval", nargs="?", default=1,
                     help="output interval, in seconds")
 parser.add_argument("count", nargs="?", default=99999999,
                     help="number of outputs")
 parser.add_argument("--ebpf", action="store_true",
                     help=argparse.SUPPRESS)
+parser.add_argument("--debug", action="store_true",
+                    help="Enable printk debugging for eBPF probes")
+
 
 # FIXME clean this up
 args = parser.parse_args()
-if len(args.commands) == 0:
-    command_names = [McCommand.GET.name, McCommand.ADD.name,
-               McCommand.SET.name, McCommand.REPLACE.name,
-               McCommand.PREPEND.name, McCommand.APPEND.name,
-               McCommand.TOUCH.name, McCommand.CAS.name ]
-else:
-    command_names = args.commands
+traced_commands = args.commands
+if len(traced_commands) == 0:
+    traced_commands=[cmd.name for cmd in supported_commands]
+
 interval = int(args.interval)
 countdown = int(args.count)
 maxrows = int(args.maxrows)
@@ -111,7 +111,6 @@ match_key = None
 bpf = None
 histogram_bpf = None
 sorted_output = []
-traced_commands = [McCommand[cmd] for cmd in command_names]
 
 SELECTED_LINE_UP = 1
 SELECTED_LINE_DOWN = -1
@@ -134,9 +133,6 @@ commands = {
     "W": "dmp",  # clear eBPF maps and dump to disk (if set)
     "Q": "quit"  # exit mctop
 }
-# /typedef enum {START, END, GET, ADD, SET, REPLACE, PREPEND, APPEND,
-#                       TOUCH, CAS, INCR, DECR, DELETE} memcached_op_t;
-
 # FIXME have helper to generate per  type?
 # load BPF program
 bpf_text = """
@@ -148,21 +144,29 @@ struct keyhit_t {
     char keystr[READ_MASK];
 };
 
+struct opcount_t {
+    u64 get;
+    u64 set;
+};
+
 struct value_t {
     u64 count;
-    u64 gets;
-    u64 sets;
     u64 bytecount;
     u64 totalbytes;
     u64 keysize;
     u64 timestamp;
     u64 latency;
-    uint8_t optype;
+    struct opcount_t opcount;
 };
+
+DEFINE_BPF_PRINTK_DEBUG
+DEFINE_MC_COMMAND_ENUM
 
 BPF_HASH(keyhits, struct keyhit_t, struct value_t);
 BPF_HASH(comm_start, int32_t, u64);
 BPF_HASH(lastkey, u64, struct keyhit_t);
+BPF_HASH(calls_traced, u64, u64);
+BPF_HASH(processed_commands, u64, u64);
 BPF_HISTOGRAM(cmd_latency);
 
 // FIXME this should use bitwise & over the 4 x 64 bit ints of the char buffer
@@ -186,7 +190,6 @@ static inline bool match_key(const char * str) {
 #endif // KEY_MATCH
 }
 
-
 int trace_command_start(struct pt_regs *ctx) {
     //u64 tid  = bpf_get_current_pid_tgid();
     int32_t conn_id = 0;
@@ -197,16 +200,16 @@ int trace_command_start(struct pt_regs *ctx) {
 }
 
 int trace_command_end(struct pt_regs *ctx) {
-
     struct keyhit_t *key;
     struct value_t *valp;
     int32_t conn_id = 0;
+    u64 lastkey_id = 0;
     u64 nsec = bpf_ktime_get_ns();
     bpf_usdt_readarg(1, ctx, &conn_id);
 
     u64 *start = comm_start.lookup(&conn_id);
 
-    u64 lastkey_id = 0;
+    processed_commands.increment(lastkey_id);
 
     if (start != NULL ) {
         u64 call_lat = nsec - *start;
@@ -220,7 +223,11 @@ int trace_command_end(struct pt_regs *ctx) {
           DEFINE_KEY_MATCH
 #ifdef KEY_MATCH
           if(match_key(key->keystr)) {
+
+#ifdef BPF_PRINTK_DEBUG
               bpf_trace_printk("KEY HIT on %s LAT: %d\\n", key->keystr, call_lat);
+#endif // BPF_PRINTK_DEBUG
+
               cmd_latency.increment(bpf_log2l(call_lat));
           }
 #endif // KEY_MATCH
@@ -243,8 +250,9 @@ int trace_command_COMMAND_NAME(struct pt_regs *ctx) {
     struct value_t *valp, zero = {};
     char command_type_str[] = "COMMAND_NAME\\0";
 
-    // FIXME should this always try the multi-read if 0?
-    if (COMMAND_ENUM_ID == 3) {
+    // GET and TOUCH selected because they sometimes use 64 bit int for keysize
+    if ((COMMAND_ENUM_ID == MC_CMD_GET) ||
+        (COMMAND_ENUM_ID == MC_CMD_TOUCH)) {
         bpf_usdt_readarg(3, ctx, &keysize);
         if (keysize == 0) {
             // GET command is annoying and has both int64 and int8 signatures
@@ -264,20 +272,24 @@ int trace_command_COMMAND_NAME(struct pt_regs *ctx) {
     // as well as https://github.com/iovisor/bcc/issues/1260
     // we can convince the verifier the arbitrary read is safe using this
     // bitwise &, but only because our max buffer size happens to be 0xff,
-    // which corresponds roughly to the the maximum key size
-    bpf_probe_read(&keyhit.keystr, keysize & READ_MASK, (void *)keystr);
+    // which corresponds roughly to the the maximum key size of 250.
+    // Since 256 bits is guaranteed to hold the key of 250, 0xff can be masked
+    bpf_probe_read(&keyhit.keystr, keysize, (void *)keystr);
 
     u64 lastkey_id = 0;
     lastkey.update(&lastkey_id, &keyhit);
 
+#ifdef BPF_PRINTK_DEBUG
     bpf_trace_printk("COMMAND: %s\\n", command_type_str);
     bpf_trace_printk("KEY: '%s' KEYSIZE: %d BYTES %d\\n", keyhit.keystr, keysize, bytecount);
+#endif // BPF_PRINTK_DEBUG
 
     valp = keyhits.lookup_or_init(&keyhit, &zero);
     valp->count++;
     valp->keysize = keysize;
     valp->timestamp = bpf_ktime_get_ns();
-    valp->optype = COMMAND_ENUM_ID;
+
+    calls_traced.increment(lastkey_id);
 
     if (bytecount > 0) {
         valp->bytecount = bytecount;
@@ -285,12 +297,14 @@ int trace_command_COMMAND_NAME(struct pt_regs *ctx) {
     }
 
     // FIXME check all commands that should update bytecount
-    if (COMMAND_ENUM_ID == 5)
-        valp->sets++;
-    else if (COMMAND_ENUM_ID == 3)
-        valp->gets++;
+    if (COMMAND_ENUM_ID == MC_CMD_SET)
+        valp->opcount.set++;
+    else if (COMMAND_ENUM_ID == MC_CMD_GET)
+        valp->opcount.get++;
 
-    bpf_trace_printk("KEY: '%s' GETS: %d SETS %d\\n", keyhit.keystr, valp->gets, valp->sets);
+#ifdef BPF_PRINTK_DEBUG
+    bpf_trace_printk("KEY: '%s' GETS: %d SETS %d\\n", keyhit.keystr, valp->opcount.get, valp->opcount.set);
+#endif // BPF_PRINTK_DEBUG
     return 0;
 }
 """
@@ -361,6 +375,8 @@ def readKey(interval):
     old_settings = termios.tcgetattr(fd)
     try:
         tty.setcbreak(sys.stdin.fileno())
+        new_settings = termios.tcgetattr(fd)
+        new_settings[3] = new_settings[3] & ~(termios.ECHO | termios.ICANON)
         if select.select([sys.stdin], [], [], interval) == ([sys.stdin], [], []):
             key = sys.stdin.read(1)
             global sort_mode
@@ -380,7 +396,7 @@ def readKey(interval):
             elif key == 'C':
                 sort_mode = 'C'
             elif key == 'S':
-                sort_mode = 'S'
+                sort_mode = 'S' # FIXME make lowercase s 'select' to select key
             elif key == 'R':
                 sort_mode = 'R'
             elif key == 'B':
@@ -451,6 +467,7 @@ def dump_map():
 # FIXME build from probe definition?
 def build_probes(render_only):
     global pid
+    global args
     global usdt
     global bpf_text
     global start_time
@@ -459,12 +476,16 @@ def build_probes(render_only):
     rendered_text = bpf_text.replace("DEFINE_KEY_MATCH", "#define KEY_MATCH" if match_key != None else "") \
                             .replace("KEY_STRING", match_key if match_key != None else "")
 
-
     for _, val in enumerate(traced_commands):
         rendered_text += "\n" + trace_command_ebpf.replace('COMMAND_NAME',
-                                                             val.name.lower())\
+                                                             val.lower())\
                                                   .replace('COMMAND_ENUM_ID',
-                                                             str(val.value))
+                                                            "MC_CMD_%s"%(val))
+
+
+    enum_text = "\n".join(["#define MC_CMD_%s %d" % (cmd.name, cmd.value) for cmd in McCommand])
+    rendered_text = rendered_text.replace('DEFINE_MC_COMMAND_ENUM', enum_text)
+    rendered_text = rendered_text.replace('DEFINE_BPF_PRINTK_DEBUG', '#define BPF_PRINTK_DEBUG 1' if args.debug else "")
 
     if render_only:
         print(rendered_text)
@@ -473,10 +494,9 @@ def build_probes(render_only):
     usdt = USDT(pid=pid)
     # FIXME use fully specified version, port this to python
 
-    # FIXME code generation for each command type
     for _, val in enumerate(traced_commands):
-        usdt.enable_probe(probe="command__%s" % (val.name.lower()),
-                              fn_name="trace_command_%s" % (val.name.lower()))
+        usdt.enable_probe(probe="command__%s" % (val.lower()),
+                              fn_name="trace_command_%s" % (val.lower()))
     usdt.enable_probe(probe="process__command__start",
                                             fn_name="trace_command_start")
     usdt.enable_probe(probe="process__command__end",
@@ -575,7 +595,9 @@ def print_keylist():
             break
 
     print((maxrows - printed_lines) * "\r\n")
-    print("[Selected key: %s ]" % selected_key )
+    calls_traced = bpf["calls_traced"].values()[0].value if len(bpf["calls_traced"].values()) > 0 else 0
+    processed_commands= bpf["processed_commands"].values()[0].value if len(bpf["processed_commands"].values()) > 0 else 0
+    print("[Selected key: %s | %d | %d]" % (selected_key, calls_traced, processed_commands) )
     sys.stdout.write("[Curr: %s/%s Opt: %s:%s|%s:%s|%s:%s|%s:%s|%s:%s]" %
                      (sort_mode,
                       "Asc" if sort_ascending else "Dsc",
