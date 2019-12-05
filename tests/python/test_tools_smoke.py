@@ -200,8 +200,8 @@ class SmokeTests(TestCase):
         self.run_with_int("killsnoop.py", kill=True)
 
     @skipUnless(kernel_version_ge(4,18), "requires kernel >= 4.18")
-    def test_lockstat(self):
-        self.run_with_int("lockstat.py")
+    def test_klockstat(self):
+        self.run_with_int("klockstat.py")
 
     @skipUnless(kernel_version_ge(4,9), "requires kernel >= 4.9")
     def test_llcstat(self):
