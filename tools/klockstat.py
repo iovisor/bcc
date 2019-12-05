@@ -1,8 +1,8 @@
 #!/usr/bin/python
 #
-# lockstats traces lock events and display locks statistics.
+# klockstat traces lock events and display locks statistics.
 #
-# USAGE: lockstats
+# USAGE: klockstat
 #
 
 from __future__ import print_function
@@ -16,17 +16,17 @@ import errno
 from sys import stderr
 
 examples = """
-    lockstats                           # trace system wide
-    lockstats -d 5                      # trace for 5 seconds only
-    lockstats -i 5                      # display stats every 5 seconds
-    lockstats -p 123                    # trace locks for PID 123
-    lockstats -t 321                    # trace locks for PID 321
-    lockstats -c pipe_                  # display stats only for lock callers with 'pipe_' substring
-    lockstats -S acq_count              # sort lock acquired results on acquired count
-    lockstats -S hld_total              # sort lock held results on total held time
-    lockstats -S acq_count,hld_total    # combination of above
-    lockstats -n 3                      # display 3 locks
-    lockstats -s 3                      # display 3 levels of stack
+    klockstat                           # trace system wide
+    klockstat -d 5                      # trace for 5 seconds only
+    klockstat -i 5                      # display stats every 5 seconds
+    klockstat -p 123                    # trace locks for PID 123
+    klockstat -t 321                    # trace locks for PID 321
+    klockstat -c pipe_                  # display stats only for lock callers with 'pipe_' substring
+    klockstat -S acq_count              # sort lock acquired results on acquired count
+    klockstat -S hld_total              # sort lock held results on total held time
+    klockstat -S acq_count,hld_total    # combination of above
+    klockstat -n 3                      # display 3 locks
+    klockstat -s 3                      # display 3 levels of stack
 """
 
 # arg validation

@@ -1,8 +1,8 @@
-Demonstrations of lockstat, the Linux eBPF/bcc version.
+Demonstrations of klockstat, the Linux eBPF/bcc version.
 
-lockstats traces kernel mutex lock events and display locks statistics
+klockstat traces kernel mutex lock events and display locks statistics
 
-# lockstat.py
+# klockstat.py
 Tracing lock events... Hit Ctrl-C to end.
 ^C
                                   Caller   Avg Spin  Count   Max spin Total spin
@@ -50,7 +50,7 @@ lock stats in maps and processing them in the python part.
 
 An -i option can be used to display stats in interval (5 seconds in example below):
 
-# lockstat.py -i 5
+# klockstat.py -i 5
 Tracing lock events... Hit Ctrl-C to end.
 
                                   Caller   Avg Spin  Count   Max spin Total spin
@@ -73,7 +73,7 @@ Tracing lock events... Hit Ctrl-C to end.
 
 A -p option can be used to trace only selected process:
 
-# lockstat.py -p 883
+# klockstat.py -p 883
 Tracing lock events... Hit Ctrl-C to end.
 ^C
                                   Caller   Avg Spin  Count   Max spin Total spin
@@ -89,7 +89,7 @@ Tracing lock events... Hit Ctrl-C to end.
 
 A -c option can be used to display only callers with specific substring:
 
-# lockstat.py  -c pipe_
+# klockstat.py  -c pipe_
 Tracing lock events... Hit Ctrl-C to end.
 ^C
                                   Caller   Avg Spin  Count   Max spin Total spin
@@ -105,7 +105,7 @@ Tracing lock events... Hit Ctrl-C to end.
 
 An -n option can be used to display only specific number of callers:
 
-# lockstat.py -n 3
+# klockstat.py -n 3
 Tracing lock events... Hit Ctrl-C to end.
 ^C
                                   Caller   Avg Spin  Count   Max spin Total spin
@@ -121,7 +121,7 @@ Tracing lock events... Hit Ctrl-C to end.
 
 An -s option can be used to display number of callers backtrace entries:
 
-# lockstat.py -n 1 -s 3
+# klockstat.py -n 1 -s 3
 Tracing lock events... Hit Ctrl-C to end.
 ^C
                                   Caller   Avg Spin  Count   Max spin Total spin
@@ -139,7 +139,7 @@ Output can be sorted by using -S <fields> option on various
 fields, the acq_total will force the acquired table to be
 sorted on 'Total spin' column:
 
-# lockstat.py -S acq_total
+# klockstat.py -S acq_total
 Tracing lock events... Hit Ctrl-C to end.
 ^C
                                   Caller   Avg Spin  Count   Max spin Total spin
