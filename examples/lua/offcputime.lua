@@ -54,7 +54,7 @@ int oncpu(struct pt_regs *ctx, struct task_struct *prev) {
     // create map key
     u64 zero = 0, *val;
     struct key_t key = {};
-    int stack_flags = BPF_F_REUSE_STACKID;
+    int stack_flags = 0;
 
     /*
     if (!(prev->flags & PF_KTHREAD))
