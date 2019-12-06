@@ -58,7 +58,7 @@ class Probe(object):
                 cls.build_id_enabled = args.sym_file_list is not None
 
         def __init__(self, probe, string_size, kernel_stack, user_stack,
-                     cgroup_map_name, name):
+                     cgroup_map_name, name, msg_filter):
                 self.usdt = None
                 self.streq_functions = ""
                 self.raw_probe = probe
@@ -74,6 +74,7 @@ class Probe(object):
                                          self.probe_name)
                 self.cgroup_map_name = cgroup_map_name
                 self.name = name
+                self.msg_filter = msg_filter
                 # compiler can generate proper codes for function
                 # signatures with "syscall__" prefix
                 if self.is_syscall_kprobe:
@@ -576,6 +577,8 @@ BPF_PERF_OUTPUT(%s);
                 values = map(lambda i: getattr(event, "v%d" % i),
                              range(0, len(self.values)))
                 msg = self._format_message(bpf, event.tgid, values)
+                if self.msg_filter and bytes(self.msg_filter) not in msg:
+                    return
                 if Probe.print_time:
                     time = strftime("%H:%M:%S") if Probe.use_localtime else \
                            Probe._time_off_str(event.timestamp_ns)
@@ -653,6 +656,8 @@ trace 'do_sys_open "%s", arg2'
         Trace the open syscall and print the filename being opened
 trace 'do_sys_open "%s", arg2' -n main
         Trace the open syscall and only print event that process names containing "main"
+trace 'do_sys_open "%s", arg2' -f config
+        Trace the open syscall and print the filename being opened filtered by "config"
 trace 'sys_read (arg3 > 20000) "read %d bytes", arg3'
         Trace the read syscall and print a message for reads >20000 bytes
 trace 'r::do_sys_open "%llx", retval'
@@ -731,6 +736,8 @@ trace -I 'linux/fs_struct.h' 'mntns_install "users = %d", $task->fs->users'
                   help="cgroup path")
                 parser.add_argument("-n", "--name", type=str,
                                     help="only print process names containing this name")
+                parser.add_argument("-f", "--msg-filter", type=str, dest="msg_filter",
+                                    help="only print the msg of event containing this string")
                 parser.add_argument("-B", "--bin_cmp", action="store_true",
                   help="allow to use STRCMP with binary values")
                 parser.add_argument('-s', "--sym_file_list", type=str, \
@@ -768,7 +775,7 @@ trace -I 'linux/fs_struct.h' 'mntns_install "users = %d", $task->fs->users'
                         self.probes.append(Probe(
                                 probe_spec, self.args.string_size,
                                 self.args.kernel_stack, self.args.user_stack,
-                                self.cgroup_map_name, self.args.name))
+                                self.cgroup_map_name, self.args.name, self.args.msg_filter))
 
         def _generate_program(self):
                 self.program = """
