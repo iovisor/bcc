@@ -101,6 +101,8 @@ apps:
         command: bcc-wrapper capable
     cobjnew:
         command: bcc-wrapper cobjnew
+    compactsnoop:
+        command: bcc-wrapper compactsnoop
     cpudist:
         command: bcc-wrapper cpudist
     cpuunclaimed:
