@@ -182,6 +182,14 @@ PID    COMM               FD ERR FLAGS    PATH
 28051  sshd                7   0 00100001 /var/log/wtmp
 
 
+The --cgroupmap option filters based on a cgroup set. It is meant to be used
+with an externally created map.
+
+# ./opensnoop --cgroupmap /sys/fs/bpf/test01
+
+For more details, see docs/filtering_by_cgroups.md
+
+
 USAGE message:
 
 # ./opensnoop -h

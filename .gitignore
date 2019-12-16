@@ -10,3 +10,4 @@
 cmake-build-debug
 debian/**/*.log
 obj-x86_64-linux-gnu
+examples/cgroupid/cgroupid
