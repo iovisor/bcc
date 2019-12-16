@@ -363,7 +363,7 @@ def display(sort, maxs, totals, counts):
             stack  = list(stack_traces.walk(k.value))
             caller = b.ksym(stack[1], show_offset=True)
 
-            if (args.caller and caller.find(args.caller)):
+            if (args.caller and caller.find(args.caller.encode())):
                 continue
 
         avg = totals[k].value / counts[k].value
