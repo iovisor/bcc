@@ -35,12 +35,14 @@ if(LIBBPF_FOUND)
 
   include_directories(${LIBBPF_INCLUDE_DIR}/bpf)
 
-  file(GLOB libbpf_sources "${LIBBPF_SOURCE_DIR}/src/*.c")
-  set(libbpf_uapi ${LIBBPF_SOURCE_DIR}/include/uapi/linux)
+  set(extract_dir ${CMAKE_CURRENT_BINARY_DIR}/libbpf_a_extract)
+  execute_process(COMMAND sh -c "mkdir -p ${extract_dir} && cd ${extract_dir} && ${CMAKE_AR} x ${LIBBPF_STATIC_LIBRARIES}")
+  file(GLOB libbpf_sources "${extract_dir}/*.o")
 else()
   file(GLOB libbpf_sources "libbpf/src/*.c")
-  set(libbpf_uapi libbpf/include/uapi/linux})
 endif()
+
+set(libbpf_uapi libbpf/include/uapi/linux})
 
 add_library(bpf-static STATIC libbpf.c perf_reader.c ${libbpf_sources})
 set_target_properties(bpf-static PROPERTIES OUTPUT_NAME bcc_bpf)

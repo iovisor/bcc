@@ -759,7 +759,33 @@ Methods (covered later): map.redirect_map().
 Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=BPF_CPUMAP+path%3Aexamples&type=Code),
 
-### 12. map.lookup()
+### 12. BPF_ARRAY_OF_MAPS
+
+Syntax: ```BPF_ARRAY_OF_MAPS(name, inner_map_name, size)```
+
+This creates an array map with a map-in-map type (BPF_MAP_TYPE_HASH_OF_MAPS) map named ```name``` with ```size``` entries. The inner map meta data is provided by map ```inner_map_name``` and can be most of array or hash maps except ```BPF_MAP_TYPE_PROG_ARRAY```, ```BPF_MAP_TYPE_CGROUP_STORAGE``` and ```BPF_MAP_TYPE_PERCPU_CGROUP_STORAGE```.
+
+For example:
+```C
+BPF_TABLE("hash", int, int, ex1, 1024);
+BPF_TABLE("hash", int, int, ex2, 1024);
+BPF_ARRAY_OF_MAPS(maps_array, "ex1", 10);
+```
+
+### 13. BPF_HASH_OF_MAPS
+
+Syntax: ```BPF_HASH_OF_MAPS(name, inner_map_name, size)```
+
+This creates a hash map with a map-in-map type (BPF_MAP_TYPE_HASH_OF_MAPS) map named ```name``` with ```size``` entries. The inner map meta data is provided by map ```inner_map_name``` and can be most of array or hash maps except ```BPF_MAP_TYPE_PROG_ARRAY```, ```BPF_MAP_TYPE_CGROUP_STORAGE``` and ```BPF_MAP_TYPE_PERCPU_CGROUP_STORAGE```.
+
+For example:
+```C
+BPF_ARRAY(ex1, int, 1024);
+BPF_ARRAY(ex2, int, 1024);
+BPF_HASH_OF_MAPS(maps_hash, "ex1", 10);
+```
+
+### 14. map.lookup()
 
 Syntax: ```*val map.lookup(&key)```
 
@@ -769,7 +795,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=lookup+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=lookup+path%3Atools&type=Code)
 
-### 13. map.lookup_or_try_init()
+### 15. map.lookup_or_try_init()
 
 Syntax: ```*val map.lookup_or_try_init(&key, &zero)```
 
@@ -782,7 +808,7 @@ Examples in situ:
 Note: The old map.lookup_or_init() may cause return from the function, so lookup_or_try_init() is recommended as it
 does not have this side effect.
 
-### 14. map.delete()
+### 16. map.delete()
 
 Syntax: ```map.delete(&key)```
 
@@ -792,7 +818,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=delete+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=delete+path%3Atools&type=Code)
 
-### 15. map.update()
+### 17. map.update()
 
 Syntax: ```map.update(&key, &val)```
 
@@ -802,7 +828,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=update+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=update+path%3Atools&type=Code)
 
-### 16. map.insert()
+### 18. map.insert()
 
 Syntax: ```map.insert(&key, &val)```
 
@@ -812,7 +838,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=insert+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=insert+path%3Atools&type=Code)
 
-### 17. map.increment()
+### 19. map.increment()
 
 Syntax: ```map.increment(key[, increment_amount])```
 
@@ -822,7 +848,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=increment+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=increment+path%3Atools&type=Code)
 
-### 18. map.get_stackid()
+### 20. map.get_stackid()
 
 Syntax: ```int map.get_stackid(void *ctx, u64 flags)```
 
@@ -832,7 +858,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=get_stackid+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=get_stackid+path%3Atools&type=Code)
 
-### 19. map.perf_read()
+### 21. map.perf_read()
 
 Syntax: ```u64 map.perf_read(u32 cpu)```
 
@@ -841,7 +867,7 @@ This returns the hardware performance counter as configured in [5. BPF_PERF_ARRA
 Examples in situ:
 [search /tests](https://github.com/iovisor/bcc/search?q=perf_read+path%3Atests&type=Code)
 
-### 20. map.call()
+### 22. map.call()
 
 Syntax: ```void map.call(void *ctx, int index)```
 
@@ -880,7 +906,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?l=C&q=call+path%3Aexamples&type=Code),
 [search /tests](https://github.com/iovisor/bcc/search?l=C&q=call+path%3Atests&type=Code)
 
-### 21. map.redirect_map()
+### 23. map.redirect_map()
 
 Syntax: ```int map.redirect_map(int index, int flags)```
 

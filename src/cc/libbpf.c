@@ -512,13 +512,6 @@ int bcc_prog_load_xattr(struct bpf_load_program_attr *attr, int prog_len,
   char prog_name[BPF_OBJ_NAME_LEN] = {};
 
   unsigned insns_cnt = prog_len / sizeof(struct bpf_insn);
-  if (insns_cnt > BPF_MAXINSNS) {
-    errno = EINVAL;
-    fprintf(stderr,
-            "bpf: %s. Program %s too large (%u insns), at most %d insns\n\n",
-            strerror(errno), attr->name, insns_cnt, BPF_MAXINSNS);
-    return -1;
-  }
   attr->insns_cnt = insns_cnt;
 
   if (attr->log_level > 0) {
@@ -594,6 +587,13 @@ int bcc_prog_load_xattr(struct bpf_load_program_attr *attr, int prog_len,
       if (setrlimit(RLIMIT_MEMLOCK, &rl) == 0)
         ret = bpf_load_program_xattr(attr, attr_log_buf, attr_log_buf_size);
     }
+  }
+
+  if (ret < 0 && errno == E2BIG) {
+    fprintf(stderr,
+            "bpf: %s. Program %s too large (%u insns), at most %d insns\n\n",
+            strerror(errno), attr->name, insns_cnt, BPF_MAXINSNS);
+    return -1;
   }
 
   // The load has failed. Handle log message.

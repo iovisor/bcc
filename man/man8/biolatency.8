@@ -1,4 +1,4 @@
-.TH biolatency 8  "2015-08-20" "USER COMMANDS"
+.TH biolatency 8  "2019-12-12" "USER COMMANDS"
 .SH NAME
 biolatency \- Summarize block device I/O latency as a histogram.
 .SH SYNOPSIS
@@ -8,8 +8,8 @@ biolatency traces block device I/O (disk I/O), and records the distribution
 of I/O latency (time). This is printed as a histogram either on Ctrl-C, or
 after a given interval in seconds.
 
-The latency of the disk I/O is measured from the issue to the device to its
-completion. A \-Q option can be used to include time queued in the kernel.
+The latency of disk I/O operations is measured from when requests are issued to the device
+up to completion. A \-Q option can be used to include time queued in the kernel.
 
 This tool uses in-kernel eBPF maps for storing timestamps and the histogram,
 for efficiency.

@@ -1,10 +1,10 @@
-.TH lockstat 8  "2019-10-22" "USER COMMANDS"
+.TH klockstat 8  "2019-10-22" "USER COMMANDS"
 .SH NAME
-lockstat \- Traces kernel mutex lock events and display locks statistics. Uses Linux eBPF/bcc.
+klockstat \- Traces kernel mutex lock events and display locks statistics. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B lockstat [\-h] [\-i] [\-n] [\-s] [\-c] [\-S FIELDS] [\-p] [\-t] [\-d DURATION]
+.B klockstat [\-h] [\-i] [\-n] [\-s] [\-c] [\-S FIELDS] [\-p] [\-t] [\-d DURATION]
 .SH DESCRIPTION
-lockstats traces kernel mutex lock events and display locks statistics
+klockstat traces kernel mutex lock events and display locks statistics
 and displays following data:
 
                                   Caller   Avg Spin  Count   Max spin Total spin
@@ -101,57 +101,57 @@ Change the number of unique stack traces that can be stored and displayed.
 .TP
 Sort lock acquired results on acquired count:
 #
-.B lockstats -S acq_count
+.B klockstat -S acq_count
 
 .TP
 Sort lock held results on total held time:
 #
-.B lockstats -S hld_total
+.B klockstat -S hld_total
 
 .TP
 Combination of above:
 #
-.B lockstats -S acq_count,hld_total
+.B klockstat -S acq_count,hld_total
 
 .TP
 Trace system wide:
 #
-.B lockstats
+.B klockstat
 
 .TP
 Trace for 5 seconds only:
 #
-.B lockstats -d 5
+.B klockstat -d 5
 
 .TP
 Display stats every 5 seconds
 #
-.B lockstats -i 5
+.B klockstat -i 5
 
 .TP
 Trace locks for PID 123:
 #
-.B lockstats -p 123
+.B klockstat -p 123
 
 .TP
 Trace locks for PID 321:
 #
-.B lockstats -t 321
+.B klockstat -t 321
 
 .TP
 Display stats only for lock callers with 'pipe_' substring
 #
-.B lockstats -c pipe_
+.B klockstat -c pipe_
 
 .TP
 Display 3 locks:
 #
-.B lockstats -n 3
+.B klockstat -n 3
 
 .TP
 Display 10 levels of stack for the most expensive lock:
 #
-.B lockstats -n 1 -s 10
+.B klockstat -n 1 -s 10
 
 Tracing lock events... Hit Ctrl-C to end.
 ^C

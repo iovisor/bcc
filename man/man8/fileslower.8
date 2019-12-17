@@ -73,7 +73,7 @@ measure of the latency suffered by applications performing file system I/O,
 than to measure this down at the block device interface.
 .TP
 FILENAME
-A cached kernel file name (comes from dentry->d_iname).
+A cached kernel file name (comes from dentry->d_name.name).
 .SH OVERHEAD
 Depending on the frequency of application reads and writes, overhead can become
 severe, in the worst case slowing applications by 2x. In the best case, the

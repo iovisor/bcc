@@ -110,14 +110,14 @@ class Probe(object):
         if self.user_stack:
                 stack_trace += """
                     key.user_stack_id = stack_traces.get_stackid(
-                      %s, BPF_F_REUSE_STACKID | BPF_F_USER_STACK
+                      %s, BPF_F_USER_STACK
                     );""" % (ctx_name)
         else:
                 stack_trace += "key.user_stack_id = -1;"
         if self.kernel_stack:
                 stack_trace += """
                     key.kernel_stack_id = stack_traces.get_stackid(
-                      %s, BPF_F_REUSE_STACKID
+                      %s, 0
                     );""" % (ctx_name)
         else:
                 stack_trace += "key.kernel_stack_id = -1;"

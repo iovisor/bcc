@@ -113,7 +113,7 @@ return function(BPF, utils)
     size_filter = "if (size > %d) return 0;" % args.max_size
   end
 
-  local stack_flags = "BPF_F_REUSE_STACKID"
+  local stack_flags = "0"
   if args.pid then
     stack_flags = stack_flags .. "|BPF_F_USER_STACK"
   end

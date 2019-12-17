@@ -40,7 +40,7 @@ parser.add_argument("-r", "--maxrows", default=20,
     help="maximum rows to print, default 20")
 parser.add_argument("-s", "--sort", default="all",
     choices=["all", "reads", "writes", "rbytes", "wbytes"],
-    help="sort column, default rbytes")
+    help="sort column, default all")
 parser.add_argument("-p", "--pid", type=int, metavar="PID", dest="tgid",
     help="trace this PID only")
 parser.add_argument("interval", nargs="?", default=1,
