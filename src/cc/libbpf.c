@@ -539,6 +539,8 @@ int bcc_prog_load_xattr(struct bpf_load_program_attr *attr, int prog_len,
   if (name_len) {
     if (strncmp(attr->name, "kprobe__", 8) == 0)
       name_offset = 8;
+    else if (strncmp(attr->name, "kretprobe__", 11) == 0)
+      name_offset = 11;
     else if (strncmp(attr->name, "tracepoint__", 12) == 0)
       name_offset = 12;
     else if (strncmp(attr->name, "raw_tracepoint__", 16) == 0)
