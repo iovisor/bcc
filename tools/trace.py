@@ -604,6 +604,7 @@ BPF_PERF_OUTPUT(%s);
                 if Probe.max_events is not None and \
                    Probe.event_count >= Probe.max_events:
                         exit()
+                sys.stdout.flush()
 
         def attach(self, bpf, verbose):
                 if len(self.library) == 0:
@@ -843,6 +844,7 @@ trace -I 'linux/fs_struct.h' 'mntns_install "users = %d", $task->fs->users'
                 print("%-7s %-7s %-15s %-16s %s" %
                       ("PID", "TID", "COMM", "FUNC",
                       "-" if not all_probes_trivial else ""))
+                sys.stdout.flush()
 
                 while True:
                         self.bpf.perf_buffer_poll()
