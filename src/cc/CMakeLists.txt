@@ -91,7 +91,7 @@ if(ENABLE_USDT)
 endif()
 
 add_library(bcc-loader-static STATIC ${bcc_sym_sources} ${bcc_util_sources})
-target_link_libraries(bcc-loader-static elf)
+target_link_libraries(bcc-loader-static elf z)
 add_library(bcc-static STATIC
   ${bcc_common_sources} ${bcc_table_sources} ${bcc_util_sources} ${bcc_usdt_sources} ${bcc_sym_sources} ${bcc_util_sources})
 set_target_properties(bcc-static PROPERTIES OUTPUT_NAME bcc)
