@@ -83,6 +83,7 @@ struct val_t {
     u32 io;
 };
 
+BPF_ARRAY(dropped, u64, 1);
 BPF_HASH(start, struct request *);
 BPF_HASH(whobyreq, struct request *, struct who_t);
 BPF_HASH(counts, struct info_t, struct val_t);
@@ -127,6 +128,7 @@ int trace_req_completion(struct pt_regs *ctx, struct request *req)
     delta = bpf_ktime_get_ns() - *tsp;
     // check if time isn't going backwards
     if ((s64)delta < 0) {
+        dropped.increment(0);
         start.delete(&req);
         whobyreq.delete(&req);
         return 0;
@@ -198,6 +200,7 @@ with open(diskstats) as stats:
 
 # output
 exiting = 0
+dropped = b.get_table("dropped")
 while 1:
     try:
         sleep(interval)
@@ -210,7 +213,11 @@ while 1:
     else:
         print()
     with open(loadavg) as stats:
-        print("%-8s loadavg: %s" % (strftime("%H:%M:%S"), stats.read()))
+        print("%-8s loadavg: %s" % (strftime("%H:%M:%S"), stats.read()), end='')
+    if dropped[0].value > 0:
+        print("%-8s dropped %d events due to backwards time" % (" ",dropped[0].value), end='')
+        dropped.clear()
+    print()
     print("%-6s %-16s %1s %-3s %-3s %-8s %5s %7s %6s" % ("PID", "COMM",
         "D", "MAJ", "MIN", "DISK", "I/O", "Kbytes", "AVGms"))
 
