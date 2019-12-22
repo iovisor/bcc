@@ -114,7 +114,7 @@ int trace_req_start(struct pt_regs *ctx, struct request *req)
 // output
 int trace_req_completion(struct pt_regs *ctx, struct request *req)
 {
-    u64 *tsp;
+    u64 *tsp, delta;
 
     // fetch timestamp and calculate delta
     tsp = start.lookup(&req);
@@ -124,8 +124,14 @@ int trace_req_completion(struct pt_regs *ctx, struct request *req)
 
     struct who_t *whop;
     struct val_t *valp, zero = {};
-    u64 delta_us = (bpf_ktime_get_ns() - *tsp) / 1000;
-
+    delta = bpf_ktime_get_ns() - *tsp;
+    // check if time isn't going backwards
+    if ((s64)delta < 0) {
+        start.delete(&req);
+        whobyreq.delete(&req);
+        return 0;
+    }
+    
     // setup info_t key
     struct info_t info = {};
     info.major = req->rq_disk->major;
@@ -157,7 +163,7 @@ int trace_req_completion(struct pt_regs *ctx, struct request *req)
 
     if (valp) {
         // save stats
-        valp->us += delta_us;
+        valp->us += delta * 1000;
         valp->bytes += req->__data_len;
         valp->io++;
     }
