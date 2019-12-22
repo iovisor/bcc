@@ -98,6 +98,8 @@ int bpf_detach_kfunc(int prog_fd, char *func);
 
 int bpf_attach_kfunc(int prog_fd);
 
+bool bpf_has_kernel_btf(void);
+
 void * bpf_open_perf_buffer(perf_reader_raw_cb raw_cb,
                             perf_reader_lost_cb lost_cb, void *cb_cookie,
                             int pid, int cpu, int page_cnt);
