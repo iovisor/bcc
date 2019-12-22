@@ -163,7 +163,7 @@ int trace_req_completion(struct pt_regs *ctx, struct request *req)
 
     if (valp) {
         // save stats
-        valp->us += delta * 1000;
+        valp->us += delta / 1000;
         valp->bytes += req->__data_len;
         valp->io++;
     }
