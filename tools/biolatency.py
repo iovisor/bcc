@@ -89,6 +89,11 @@ int trace_req_done(struct pt_regs *ctx, struct request *req)
         return 0;   // missed issue
     }
     delta = bpf_ktime_get_ns() - *tsp;
+    // check if time isn't going backwards
+    if ((s64)delta < 0) {
+        start.delete(&req);
+        return 0;
+    }
     FACTOR
 
     // store as histogram
