@@ -882,6 +882,15 @@ class BPF(object):
             name = prefix + name
         return name
 
+    @staticmethod
+    def support_kfunc():
+        if not lib.bpf_has_kernel_btf():
+            return False;
+        # kernel symbol "bpf_trampoline_link_prog" indicates kfunc support
+        if BPF.ksymname("bpf_trampoline_link_prog") != -1:
+            return True
+        return False
+
     def detach_kfunc(self, fn_name=b""):
         fn_name = _assert_is_bytes(fn_name)
         fn_name = BPF.add_prefix(b"kfunc__", fn_name)

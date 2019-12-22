@@ -1160,6 +1160,11 @@ int bpf_attach_raw_tracepoint(int progfd, const char *tp_name)
   return ret;
 }
 
+bool bpf_has_kernel_btf(void)
+{
+  return libbpf_find_vmlinux_btf_id("bpf_prog_put", 0);
+}
+
 int bpf_detach_kfunc(int prog_fd, char *func)
 {
   UNUSED(prog_fd);
