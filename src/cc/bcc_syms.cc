@@ -683,7 +683,7 @@ static int _find_sym(const char *symname, uint64_t addr, uint64_t,
                      void *payload) {
   struct bcc_symbol *sym = (struct bcc_symbol *)payload;
   if (!strcmp(sym->name, symname)) {
-    sym->offset = addr;
+    sym->offset = addr - sym->base_address;
     return -1;
   }
   return 0;
@@ -738,6 +738,10 @@ int bcc_resolve_symname(const char *module, const char *symname,
 
   sym->name = symname;
   sym->offset = addr;
+
+  if ((sym->base_address = bcc_elf_get_base_address(sym->module)) < 0)
+      goto invalid_module;
+
   if (option == NULL)
     option = &default_option;
 
