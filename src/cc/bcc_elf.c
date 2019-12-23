@@ -738,6 +738,24 @@ int bcc_elf_get_type(const char *path) {
     return hdr.e_type;
 }
 
+uint64_t bcc_elf_get_base_address(const char *path) {
+  Elf *e;
+  GElf_Phdr phdr;
+  GElf_Addr base_address;
+  int fd;
+
+  if (openelf(path, &e, &fd) < 0)
+    return -1;
+
+  gelf_getphdr(e, 0, &phdr);
+
+  base_address = phdr.p_vaddr-phdr.p_offset;
+
+  elf_end(e);
+  close(fd);
+  return base_address;
+}
+
 int bcc_elf_is_exe(const char *path) {
   return (bcc_elf_get_type(path) != -1) && (access(path, X_OK) == 0);
 }
