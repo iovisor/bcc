@@ -370,7 +370,7 @@ def display(sort, maxs, totals, counts):
 
         print("%40s %10lu %6lu %10lu %10lu" % (caller, avg, counts[k].value, maxs[k].value, totals[k].value))
 
-        for addr in stack[1:args.stacks]:
+        for addr in stack[2:args.stacks]:
             print("%40s" %  b.ksym(addr, show_offset=True))
 
 
