@@ -73,7 +73,6 @@ int bcc_elf_get_text_scn_info(const char *path, uint64_t *addr,
                               uint64_t *offset);
 
 int bcc_elf_get_type(const char *path);
-uint64_t bcc_elf_get_base_address(const char *path);
 int bcc_elf_is_shared_obj(const char *path);
 int bcc_elf_is_exe(const char *path);
 int bcc_elf_is_vdso(const char *name);

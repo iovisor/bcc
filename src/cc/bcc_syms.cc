@@ -689,6 +689,16 @@ static int _find_sym(const char *symname, uint64_t addr, uint64_t,
   return 0;
 }
 
+static int _get_base_address(uint64_t v_addr, uint64_t mem_sz, uint64_t file_offset,
+                       void *payload) {
+  struct bcc_symbol *sym = (struct bcc_symbol *)payload;
+  if ( v_addr >= file_offset) {
+    sym->base_address = v_addr - file_offset;
+    return -1;
+  }
+  return 0;
+}
+
 struct load_addr_t {
   uint64_t target_addr;
   uint64_t binary_addr;
@@ -739,7 +749,7 @@ int bcc_resolve_symname(const char *module, const char *symname,
   sym->name = symname;
   sym->offset = addr;
 
-  if ((sym->base_address = bcc_elf_get_base_address(sym->module)) < 0)
+  if (bcc_elf_foreach_load_section(sym->module, _get_base_address, sym) < 0)
       goto invalid_module;
 
   if (option == NULL)
