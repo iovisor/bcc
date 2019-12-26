@@ -409,4 +409,33 @@ public:
   StatusTuple remove_value(const int& index);
 };
 
+template <class ValueType>
+class BPFSkStorageTable : public BPFTableBase<int, ValueType> {
+ public:
+  BPFSkStorageTable(const TableDesc& desc) : BPFTableBase<int, ValueType>(desc) {
+    if (desc.type != BPF_MAP_TYPE_SK_STORAGE)
+      throw std::invalid_argument("Table '" + desc.name +
+                                  "' is not a sk_storage table");
+  }
+
+  virtual StatusTuple get_value(const int& sock_fd, ValueType& value) {
+    if (!this->lookup(const_cast<int*>(&sock_fd), get_value_addr(value)))
+      return StatusTuple(-1, "Error getting value: %s", std::strerror(errno));
+    return StatusTuple(0);
+  }
+
+  virtual StatusTuple update_value(const int& sock_fd, const ValueType& value) {
+    if (!this->update(const_cast<int*>(&sock_fd),
+                      get_value_addr(const_cast<ValueType&>(value))))
+      return StatusTuple(-1, "Error updating value: %s", std::strerror(errno));
+    return StatusTuple(0);
+  }
+
+  virtual StatusTuple remove_value(const int& sock_fd) {
+    if (!this->remove(const_cast<int*>(&sock_fd)))
+      return StatusTuple(-1, "Error removing value: %s", std::strerror(errno));
+    return StatusTuple(0);
+  }
+};
+
 }  // namespace ebpf

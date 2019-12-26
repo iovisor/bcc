@@ -275,6 +275,18 @@ struct _name##_table_t _name = { .max_entries = (_max_entries) }
 #define BPF_HASH_OF_MAPS(_name, _inner_map_name, _max_entries) \
   BPF_TABLE("hash_of_maps$" _inner_map_name, int, int, _name, _max_entries)
 
+#define BPF_SK_STORAGE(_name, _leaf_type) \
+struct _name##_table_t { \
+  int key; \
+  _leaf_type leaf; \
+  void * (*sk_storage_get) (void *, void *, int); \
+  int (*sk_storage_delete) (void *); \
+  u32 flags; \
+}; \
+__attribute__((section("maps/sk_storage"))) \
+struct _name##_table_t _name = { .flags = BPF_F_NO_PREALLOC }; \
+BPF_ANNOTATE_KV_PAIR(_name, int, _leaf_type)
+
 // packet parsing state machine helpers
 #define cursor_advance(_cursor, _len) \
   ({ void *_tmp = _cursor; _cursor += _len; _tmp; })

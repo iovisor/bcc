@@ -146,6 +146,14 @@ class BPF {
     return BPFPercpuHashTable<KeyType, ValueType>({});
   }
 
+  template <class ValueType>
+  BPFSkStorageTable<ValueType> get_sk_storage_table(const std::string& name) {
+    TableStorage::iterator it;
+    if (bpf_module_->table_storage().Find(Path({bpf_module_->id(), name}), it))
+      return BPFSkStorageTable<ValueType>(it->second);
+    return BPFSkStorageTable<ValueType>({});
+  }
+
   void* get_bsymcache(void) {
     if (bsymcache_ == NULL) {
       bsymcache_ = bcc_buildsymcache_new();
