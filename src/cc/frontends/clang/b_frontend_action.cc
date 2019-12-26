@@ -887,6 +887,12 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
           } else if (memb_name == "redirect_map") {
             prefix = "bpf_redirect_map";
             suffix = ")";
+          } else if (memb_name == "sk_storage_get") {
+            prefix = "bpf_sk_storage_get";
+            suffix = ")";
+          } else if (memb_name == "sk_storage_delete") {
+            prefix = "bpf_sk_storage_delete";
+            suffix = ")";
           } else {
             error(GET_BEGINLOC(Call), "invalid bpf_table operation %0") << memb_name;
             return false;
@@ -1248,6 +1254,8 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
       map_type = BPF_MAP_TYPE_HASH_OF_MAPS;
     } else if (section_attr == "maps/array_of_maps") {
       map_type = BPF_MAP_TYPE_ARRAY_OF_MAPS;
+    } else if (section_attr == "maps/sk_storage") {
+      map_type = BPF_MAP_TYPE_SK_STORAGE;
     } else if (section_attr == "maps/extern") {
       if (!fe_.table_storage().Find(maps_ns_path, table_it)) {
         if (!fe_.table_storage().Find(global_path, table_it)) {
