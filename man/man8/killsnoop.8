@@ -11,8 +11,8 @@ is sending signals.
 This works by tracing the kernel sys_kill() function using dynamic tracing, and
 will need updating to match any changes to this function.
 
-This makes use of a Linux 4.5 feature (bpf_perf_event_output());
-for kernels older than 4.5, see the version under tools/old,
+This makes use of a Linux 4.4 feature (bpf_perf_event_output());
+for kernels older than 4.4, see the version under tools/old,
 which uses an older mechanism.
 
 Since this uses BPF, only the root user can use this tool.
