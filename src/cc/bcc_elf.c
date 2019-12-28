@@ -738,7 +738,6 @@ int bcc_elf_get_type(const char *path) {
     return hdr.e_type;
 }
 
-
 int bcc_elf_is_exe(const char *path) {
   return (bcc_elf_get_type(path) != -1) && (access(path, X_OK) == 0);
 }
