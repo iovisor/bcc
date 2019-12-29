@@ -42,7 +42,7 @@ else()
   file(GLOB libbpf_sources "libbpf/src/*.c")
 endif()
 
-set(libbpf_uapi libbpf/include/uapi/linux})
+set(libbpf_uapi libbpf/include/uapi/linux/)
 
 add_library(bpf-static STATIC libbpf.c perf_reader.c ${libbpf_sources})
 set_target_properties(bpf-static PROPERTIES OUTPUT_NAME bcc_bpf)
