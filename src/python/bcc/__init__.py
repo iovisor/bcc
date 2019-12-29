@@ -156,6 +156,7 @@ class BPF(object):
     SK_MSG = 16
     RAW_TRACEPOINT = 17
     CGROUP_SOCK_ADDR = 18
+    TRACING = 26
 
     # from xdp_action uapi/linux/bpf.h
     XDP_ABORTED = 0
@@ -163,6 +164,10 @@ class BPF(object):
     XDP_PASS = 2
     XDP_TX = 3
     XDP_REDIRECT = 4
+
+    # from bpf_attach_type uapi/linux/bpf.h
+    TRACE_FENTRY = 24
+    TRACE_FEXIT  = 25
 
     _probe_repl = re.compile(b"[^a-zA-Z0-9_]")
     _sym_caches = {}
@@ -303,6 +308,8 @@ class BPF(object):
         self.uprobe_fds = {}
         self.tracepoint_fds = {}
         self.raw_tracepoint_fds = {}
+        self.kfunc_entry_fds = {}
+        self.kfunc_exit_fds = {}
         self.perf_buffers = {}
         self.open_perf_events = {}
         self.tracefile = None
@@ -870,6 +877,58 @@ class BPF(object):
         del self.raw_tracepoint_fds[tp]
 
     @staticmethod
+    def add_prefix(prefix, name):
+        if not name.startswith(prefix):
+            name = prefix + name
+        return name
+
+    def detach_kfunc(self, fn_name=b""):
+        fn_name = _assert_is_bytes(fn_name)
+        fn_name = BPF.add_prefix(b"kfunc__", fn_name)
+
+        if fn_name not in self.kfunc_entry_fds:
+            raise Exception("Kernel entry func %s is not attached" % fn_name)
+        os.close(self.kfunc_entry_fds[fn_name])
+        del self.kfunc_entry_fds[fn_name]
+
+    def detach_kretfunc(self, fn_name=b""):
+        fn_name = _assert_is_bytes(fn_name)
+        fn_name = BPF.add_prefix(b"kretfunc__", fn_name)
+
+        if fn_name not in self.kfunc_exit_fds:
+            raise Exception("Kernel exit func %s is not attached" % fn_name)
+        os.close(self.kfunc_exit_fds[fn_name])
+        del self.kfunc_exit_fds[fn_name]
+
+    def attach_kfunc(self, fn_name=b""):
+        fn_name = _assert_is_bytes(fn_name)
+        fn_name = BPF.add_prefix(b"kfunc__", fn_name)
+
+        if fn_name in self.kfunc_entry_fds:
+            raise Exception("Kernel entry func %s has been attached" % fn_name)
+
+        fn = self.load_func(fn_name, BPF.TRACING)
+        fd = lib.bpf_attach_kfunc(fn.fd)
+        if fd < 0:
+            raise Exception("Failed to attach BPF to entry kernel func")
+        self.kfunc_entry_fds[fn_name] = fd;
+        return self
+
+    def attach_kretfunc(self, fn_name=b""):
+        fn_name = _assert_is_bytes(fn_name)
+        fn_name = BPF.add_prefix(b"kretfunc__", fn_name)
+
+        if fn_name in self.kfunc_exit_fds:
+            raise Exception("Kernel exit func %s has been attached" % fn_name)
+
+        fn = self.load_func(fn_name, BPF.TRACING)
+        fd = lib.bpf_attach_kfunc(fn.fd)
+        if fd < 0:
+            raise Exception("Failed to attach BPF to exit kernel func")
+        self.kfunc_exit_fds[fn_name] = fd;
+        return self
+
+    @staticmethod
     def support_raw_tracepoint():
         # kernel symbol "bpf_find_raw_tracepoint" indicates raw_tracepoint support
         if BPF.ksymname("bpf_find_raw_tracepoint") != -1 or \
@@ -1124,6 +1183,10 @@ class BPF(object):
                 fn = self.load_func(func_name, BPF.RAW_TRACEPOINT)
                 tp = fn.name[len(b"raw_tracepoint__"):]
                 self.attach_raw_tracepoint(tp=tp, fn_name=fn.name)
+            elif func_name.startswith(b"kfunc__"):
+                self.attach_kfunc(fn_name=func_name)
+            elif func_name.startswith(b"kretfunc__"):
+                self.attach_kretfunc(fn_name=func_name)
 
     def trace_open(self, nonblocking=False):
         """trace_open(nonblocking=False)
@@ -1353,6 +1416,10 @@ class BPF(object):
             self.detach_tracepoint(k)
         for k, v in list(self.raw_tracepoint_fds.items()):
             self.detach_raw_tracepoint(k)
+        for k, v in list(self.kfunc_entry_fds.items()):
+            self.detach_kfunc(k)
+        for k, v in list(self.kfunc_exit_fds.items()):
+            self.detach_kretfunc(k)
 
         # Clean up opened perf ring buffer and perf events
         table_keys = list(self.tables.keys())

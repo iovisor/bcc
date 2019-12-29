@@ -16,6 +16,8 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
         - [6. USDT probes](#6-usdt-probes)
         - [7. Raw Tracepoints](#7-raw-tracepoints)
         - [8. system call tracepoints](#8-system-call-tracepoints)
+        - [9. kfuncs](#9-kfuncs)
+        - [10. kretfuncs](#9-kretfuncs)
     - [Data](#data)
         - [1. bpf_probe_read()](#1-bpf_probe_read)
         - [2. bpf_probe_read_str()](#2-bpf_probe_read_str)
@@ -316,6 +318,50 @@ b.attach_kprobe(event=execve_fnname, fn_name="syscall__execve")
 
 Examples in situ:
 [code](https://github.com/iovisor/bcc/blob/552658edda09298afdccc8a4b5e17311a2d8a771/tools/execsnoop.py#L101) ([output](https://github.com/iovisor/bcc/blob/552658edda09298afdccc8a4b5e17311a2d8a771/tools/execsnoop_example.txt#L8))
+
+### 9. kfuncs
+
+Syntax: KFUNC_PROBE(*function*, typeof(arg1) arg1, typeof(arg2) arge ...)
+
+This is a macro that instruments the kernel function via trampoline
+*before* the function is executed. It's defined by *function* name and
+the function arguments defined as *argX*.
+
+For example:
+```C
+KFUNC_PROBE(do_sys_open, int dfd, const char *filename, int flags, int mode)
+{
+    ...
+```
+
+This instruments the do_sys_open kernel function and make its arguments
+accessible as standard argument values.
+
+Examples in situ:
+[search /tools](https://github.com/iovisor/bcc/search?q=KFUNC_PROBE+path%3Atools&type=Code)
+
+### 10. kretfuncs
+
+Syntax: KRETFUNC_PROBE(*event*, typeof(arg1) arg1, typeof(arg2) arge ..., int ret)
+
+This is a macro that instruments the kernel function via trampoline
+*after* the function is executed. It's defined by *function* name and
+the function arguments defined as *argX*.
+
+The last argument of the probe is the return value of the instrumented function.
+
+For example:
+```C
+KFUNC_PROBE(do_sys_open, int dfd, const char *filename, int flags, int mode, int ret)
+{
+    ...
+```
+
+This instruments the do_sys_open kernel function and make its arguments
+accessible as standard argument values together with its return value.
+
+Examples in situ:
+[search /tools](https://github.com/iovisor/bcc/search?q=KRETFUNC_PROBE+path%3Atools&type=Code)
 
 
 ## Data

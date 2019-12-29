@@ -945,6 +945,51 @@ int tracepoint__##category##__##event(struct tracepoint__##category##__##event *
 #define RAW_TRACEPOINT_PROBE(event) \
 int raw_tracepoint__##event(struct bpf_raw_tracepoint_args *ctx)
 
+/* BPF_PROG macro allows to define trampoline function,
+ * borrowed from kernel bpf selftest code.
+ */
+#define ___bpf_concat(a, b) a ## b
+#define ___bpf_apply(fn, n) ___bpf_concat(fn, n)
+#define ___bpf_nth(_, _1, _2, _3, _4, _5, _6, _7, _8, _9, _a, _b, _c, N, ...) N
+#define ___bpf_narg(...) \
+        ___bpf_nth(_, ##__VA_ARGS__, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
+
+#define ___bpf_ctx_cast0() ctx
+#define ___bpf_ctx_cast1(x) ___bpf_ctx_cast0(), (void *)ctx[0]
+#define ___bpf_ctx_cast2(x, args...) ___bpf_ctx_cast1(args), (void *)ctx[1]
+#define ___bpf_ctx_cast3(x, args...) ___bpf_ctx_cast2(args), (void *)ctx[2]
+#define ___bpf_ctx_cast4(x, args...) ___bpf_ctx_cast3(args), (void *)ctx[3]
+#define ___bpf_ctx_cast5(x, args...) ___bpf_ctx_cast4(args), (void *)ctx[4]
+#define ___bpf_ctx_cast6(x, args...) ___bpf_ctx_cast5(args), (void *)ctx[5]
+#define ___bpf_ctx_cast7(x, args...) ___bpf_ctx_cast6(args), (void *)ctx[6]
+#define ___bpf_ctx_cast8(x, args...) ___bpf_ctx_cast7(args), (void *)ctx[7]
+#define ___bpf_ctx_cast9(x, args...) ___bpf_ctx_cast8(args), (void *)ctx[8]
+#define ___bpf_ctx_cast10(x, args...) ___bpf_ctx_cast9(args), (void *)ctx[9]
+#define ___bpf_ctx_cast11(x, args...) ___bpf_ctx_cast10(args), (void *)ctx[10]
+#define ___bpf_ctx_cast12(x, args...) ___bpf_ctx_cast11(args), (void *)ctx[11]
+#define ___bpf_ctx_cast(args...) \
+        ___bpf_apply(___bpf_ctx_cast, ___bpf_narg(args))(args)
+
+#define BPF_PROG(name, args...)                                 \
+int name(unsigned long long *ctx);                              \
+__attribute__((always_inline))                                  \
+static void ____##name(unsigned long long *ctx, ##args);        \
+int name(unsigned long long *ctx)                               \
+{                                                               \
+        _Pragma("GCC diagnostic push")                          \
+        _Pragma("GCC diagnostic ignored \"-Wint-conversion\"")  \
+        ____##name(___bpf_ctx_cast(args));                      \
+        _Pragma("GCC diagnostic pop")                           \
+        return 0;                                               \
+}                                                               \
+static void ____##name(unsigned long long *ctx, ##args)
+
+#define KFUNC_PROBE(event, args...) \
+        BPF_PROG(kfunc__ ## event, args)
+
+#define KRETFUNC_PROBE(event, args...) \
+        BPF_PROG(kretfunc__ ## event, args)
+
 #define TP_DATA_LOC_READ_CONST(dst, field, length)                        \
         do {                                                              \
             unsigned short __offset = args->data_loc_##field & 0xFFFF;    \
