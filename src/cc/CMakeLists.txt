@@ -142,7 +142,7 @@ if(LIBBPF_FOUND)
   install(TARGETS bcc-shared-no-libbpf LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
 endif()
 
-install(TARGETS bcc-shared LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
+install(TARGETS bcc-shared bcc-static bcc-loader-static bpf-static LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
 install(FILES ${bcc_table_headers} DESTINATION include/bcc)
 install(FILES ${bcc_api_headers} DESTINATION include/bcc)
 install(DIRECTORY ${libbpf_uapi} DESTINATION include/bcc/compat/linux FILES_MATCHING PATTERN "*.h")
