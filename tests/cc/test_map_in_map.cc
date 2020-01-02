@@ -22,7 +22,6 @@
 #include "catch.hpp"
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
-typedef unsigned long long __u64;
 
 TEST_CASE("test hash of maps", "[hash_of_maps]") {
   {
@@ -67,7 +66,7 @@ TEST_CASE("test hash of maps", "[hash_of_maps]") {
     auto t = bpf.get_map_in_map_table("maps_hash");
     auto ex1_table = bpf.get_array_table<int>("ex1");
     auto ex2_table = bpf.get_array_table<int>("ex2");
-    auto ex3_table = bpf.get_array_table<__u64>("ex3");
+    auto ex3_table = bpf.get_array_table<unsigned long long>("ex3");
     int ex1_fd = ex1_table.get_fd();
     int ex2_fd = ex2_table.get_fd();
     int ex3_fd = ex3_table.get_fd();
@@ -162,7 +161,8 @@ TEST_CASE("test array of maps", "[array_of_maps]") {
     auto t = bpf.get_map_in_map_table("maps_array");
     auto ex1_table = bpf.get_hash_table<int, int>("ex1");
     auto ex2_table = bpf.get_hash_table<int, int>("ex2");
-    auto ex3_table = bpf.get_hash_table<__u64, __u64>("ex3");
+    auto ex3_table =
+        bpf.get_hash_table<unsigned long long, unsigned long long>("ex3");
     int ex1_fd = ex1_table.get_fd();
     int ex2_fd = ex2_table.get_fd();
     int ex3_fd = ex3_table.get_fd();
