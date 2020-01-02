@@ -48,11 +48,11 @@ positional arguments:
 
 optional arguments:
   -h, --help         show this help message and exit
-  -p PID, --pid PID  trace this PID and its children threads
+  -p PID, --pid PID  trace this PID
   -t TID, --tid TID  trace this TID only
 
 examples:
     ./runqslower         # trace run queue latency higher than 10000 us (default)
     ./runqslower 1000    # trace run queue latency higher than 1000 us
-    ./runqslower -p 123  # trace pid 123 and its children
+    ./runqslower -p 123  # trace pid 123
     ./runqslower -t 123  # trace tid (thread) 123

@@ -42,7 +42,7 @@ from time import strftime
 examples = """examples:
     ./runqslower         # trace run queue latency higher than 10000 us (default)
     ./runqslower 1000    # trace run queue latency higher than 1000 us
-    ./runqslower -p 123  # trace pid 123 and its children threads
+    ./runqslower -p 123  # trace pid 123
     ./runqslower -t 123  # trace tid 123 (use for threads only)
 """
 parser = argparse.ArgumentParser(
@@ -50,7 +50,7 @@ parser = argparse.ArgumentParser(
     formatter_class=argparse.RawDescriptionHelpFormatter,
     epilog=examples)
 parser.add_argument("-p", "--pid", type=int, metavar="PID", dest="pid",
-    help="trace this PID and its children")
+    help="trace this PID")
 parser.add_argument("-t", "--tid", type=int, metavar="TID", dest="tid",
     help="trace this TID only")
 parser.add_argument("min_us", nargs="?", default='10000',
