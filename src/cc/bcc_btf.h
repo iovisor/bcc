@@ -62,7 +62,7 @@ class BTF {
                    unsigned *key_tid, unsigned *value_tid);
 
  private:
-  void fixup_datasec(uint8_t *type_sec, uintptr_t type_sec_size, char *strings);
+  void fixup_btf(uint8_t *type_sec, uintptr_t type_sec_size, char *strings);
   void adjust(uint8_t *btf_sec, uintptr_t btf_sec_size,
               uint8_t *btf_ext_sec, uintptr_t btf_ext_sec_size,
               std::map<std::string, std::string> &remapped_sources,

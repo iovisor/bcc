@@ -70,8 +70,8 @@ void BTF::warning(const char *format, ...) {
   va_end(args);
 }
 
-void BTF::fixup_datasec(uint8_t *type_sec, uintptr_t type_sec_size,
-                        char *strings) {
+void BTF::fixup_btf(uint8_t *type_sec, uintptr_t type_sec_size,
+                    char *strings) {
   uint8_t *next_type = type_sec;
   uint8_t *end_type = type_sec + type_sec_size;
   int base_size = sizeof(struct btf_type);
@@ -89,7 +89,11 @@ void BTF::fixup_datasec(uint8_t *type_sec, uintptr_t type_sec_size,
     case BTF_KIND_RESTRICT:
     case BTF_KIND_PTR:
     case BTF_KIND_TYPEDEF:
+      break;
     case BTF_KIND_FUNC:
+      // sanitize vlen to be 0 since bcc does not
+      // care about func scope (static, global, extern) yet.
+      t->info &= ~0xffff;
       break;
     case BTF_KIND_INT:
       next_type += sizeof(uint32_t);
@@ -184,9 +188,9 @@ void BTF::adjust(uint8_t *btf_sec, uintptr_t btf_sec_size,
   struct btf_header *hdr = (struct btf_header *)btf_sec;
   struct btf_ext_header *ehdr = (struct btf_ext_header *)btf_ext_sec;
 
-  // Fixup datasec.
-  fixup_datasec(btf_sec + hdr->hdr_len + hdr->type_off, hdr->type_len,
-                (char *)(btf_sec + hdr->hdr_len + hdr->str_off));
+  // Fixup btf for old kernels or kernel requirements.
+  fixup_btf(btf_sec + hdr->hdr_len + hdr->type_off, hdr->type_len,
+            (char *)(btf_sec + hdr->hdr_len + hdr->str_off));
 
   // Check the LineInfo table and add missing lines
   char *strings = (char *)(btf_sec + hdr->hdr_len + hdr->str_off);
