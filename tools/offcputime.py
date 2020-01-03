@@ -99,8 +99,6 @@ parser.add_argument("--state", type=positive_int,
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
 args = parser.parse_args()
-if args.pid and args.tgid:
-    parser.error("specify only one of -p and -t")
 folded = args.folded
 duration = int(args.duration)
 debug = 0
