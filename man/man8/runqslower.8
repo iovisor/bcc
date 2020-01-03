@@ -2,7 +2,7 @@
 .SH NAME
 runqslower \- Trace long process scheduling delays.
 .SH SYNOPSIS
-.B runqslower [\-p PID] [min_us]
+.B runqslower [\-p PID] [\-t TID] [min_us]
 .SH DESCRIPTION
 This measures the time a task spends waiting on a run queue (or equivalent
 scheduler data structure) for a turn on-CPU, and shows occurrences of time
@@ -37,6 +37,9 @@ Print usage message.
 .TP
 \-p PID
 Only show this PID (filtered in kernel for efficiency).
+.TP
+\-t TID
+Only show this TID (filtered in kernel for efficiency).
 .TP
 min_us
 Minimum scheduling delay in microseconds to output.
