@@ -7,7 +7,7 @@
 # This script traces high scheduling delays between tasks being
 # ready to run and them running on CPU after that.
 #
-# USAGE: runqslower [-p PID] [min_us]
+# USAGE: runqslower [-p PID] [-t TID] [min_us]
 #
 # REQUIRES: Linux 4.9+ (BPF_PROG_TYPE_PERF_EVENT support).
 #
@@ -42,19 +42,25 @@ from time import strftime
 examples = """examples:
     ./runqslower         # trace run queue latency higher than 10000 us (default)
     ./runqslower 1000    # trace run queue latency higher than 1000 us
-    ./runqslower -p 123  # trace pid 123 only
+    ./runqslower -p 123  # trace pid 123
+    ./runqslower -t 123  # trace tid 123 (use for threads only)
 """
 parser = argparse.ArgumentParser(
     description="Trace high run queue latency",
     formatter_class=argparse.RawDescriptionHelpFormatter,
     epilog=examples)
-parser.add_argument("-p", "--pid", type=int, metavar="PID", dest="pid",
-    help="trace this PID only")
 parser.add_argument("min_us", nargs="?", default='10000',
     help="minimum run queue latecy to trace, in ms (default 10000)")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
+
+thread_group = parser.add_mutually_exclusive_group()
+thread_group.add_argument("-p", "--pid", metavar="PID", dest="pid",
+    help="trace this PID only", type=int)
+thread_group.add_argument("-t", "--tid", metavar="TID", dest="tid",
+    help="trace this TID only", type=int)
 args = parser.parse_args()
+
 min_us = int(args.min_us)
 debug = 0
 
@@ -80,7 +86,7 @@ BPF_PERF_OUTPUT(events);
 // record enqueue timestamp
 static int trace_enqueue(u32 tgid, u32 pid)
 {
-    if (FILTER_PID || pid == 0)
+    if (FILTER_PID || FILTER_TGID || pid == 0)
         return 0;
     u64 ts = bpf_ktime_get_ns();
     start.update(&pid, &ts);
@@ -109,13 +115,14 @@ int trace_run(struct pt_regs *ctx, struct task_struct *prev)
     if (prev->state == TASK_RUNNING) {
         tgid = prev->tgid;
         pid = prev->pid;
-        if (!(FILTER_PID || pid == 0)) {
-            u64 ts = bpf_ktime_get_ns();
-            start.update(&pid, &ts);
+        u64 ts = bpf_ktime_get_ns();
+        if (pid != 0) {
+            if (!(FILTER_PID) && !(FILTER_TGID)) {
+                start.update(&pid, &ts);
+            }
         }
     }
 
-    tgid = bpf_get_current_pid_tgid() >> 32;
     pid = bpf_get_current_pid_tgid();
 
     u64 *tsp, delta_us;
@@ -167,17 +174,21 @@ RAW_TRACEPOINT_PROBE(sched_switch)
     // TP_PROTO(bool preempt, struct task_struct *prev, struct task_struct *next)
     struct task_struct *prev = (struct task_struct *)ctx->args[1];
     struct task_struct *next= (struct task_struct *)ctx->args[2];
-    u32 pid;
+    u32 tgid, pid;
     long state;
 
     // ivcsw: treat like an enqueue event and store timestamp
     bpf_probe_read(&state, sizeof(long), (const void *)&prev->state);
     if (state == TASK_RUNNING) {
+        bpf_probe_read(&tgid, sizeof(prev->tgid), &prev->tgid);
         bpf_probe_read(&pid, sizeof(prev->pid), &prev->pid);
-        if (!(FILTER_PID || pid == 0)) {
-            u64 ts = bpf_ktime_get_ns();
-            start.update(&pid, &ts);
+        u64 ts = bpf_ktime_get_ns();
+        if (pid != 0) {
+            if (!(FILTER_PID) && !(FILTER_TGID)) {
+                start.update(&pid, &ts);
+            }
         }
+
     }
 
     bpf_probe_read(&pid, sizeof(next->pid), &next->pid);
@@ -218,10 +229,17 @@ if min_us == 0:
     bpf_text = bpf_text.replace('FILTER_US', '0')
 else:
     bpf_text = bpf_text.replace('FILTER_US', 'delta_us <= %s' % str(min_us))
-if args.pid:
-    bpf_text = bpf_text.replace('FILTER_PID', 'pid != %s' % args.pid)
+
+if args.tid:
+    bpf_text = bpf_text.replace('FILTER_PID', 'pid != %s' % args.tid)
 else:
     bpf_text = bpf_text.replace('FILTER_PID', '0')
+
+if args.pid:
+    bpf_text = bpf_text.replace('FILTER_TGID', 'tgid != %s' % args.pid)
+else:
+    bpf_text = bpf_text.replace('FILTER_TGID', '0')
+
 if debug or args.ebpf:
     print(bpf_text)
     if args.ebpf:
@@ -240,7 +258,7 @@ if not is_support_raw_tp:
     b.attach_kprobe(event="finish_task_switch", fn_name="trace_run")
 
 print("Tracing run queue latency higher than %d us" % min_us)
-print("%-8s %-16s %-6s %14s" % ("TIME", "COMM", "PID", "LAT(us)"))
+print("%-8s %-16s %-6s %14s" % ("TIME", "COMM", "TID", "LAT(us)"))
 
 # read events
 b["events"].open_perf_buffer(print_event, page_cnt=64)

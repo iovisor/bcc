@@ -5,8 +5,15 @@ runqslower shows high latency scheduling times between tasks being
 ready to run and them running on CPU after that. For example:
 
 # runqslower
-Tracing run queue latency higher than 10000 us
-TIME     COMM             PID           LAT(us)
+
+Note: Showing TID (thread id) in the report column. The smallest
+execution unit becomes a TID when using the --pid flag as
+in that case the tool reports not only the parent pid but
+its children threads as well.
+
+Tracing run queue latency higher than 10000 us.
+
+TIME     COMM             TID           LAT(us)
 04:16:32 cc1              12924           12739
 04:16:32 sh               13640           12118
 04:16:32 make             13639           12730
@@ -32,7 +39,7 @@ These delays can be analyzed in depth with "perf sched" tool, see:
 USAGE message:
 
 # ./runqslower -h
-usage: runqslower.py [-h] [-p PID] [min_us]
+usage: runqslower.py [-h] [-p PID | -t TID] [min_us]
 
 Trace high run queue latency
 
@@ -41,9 +48,11 @@ positional arguments:
 
 optional arguments:
   -h, --help         show this help message and exit
-  -p PID, --pid PID  trace this PID only
+  -p PID, --pid PID  trace this PID
+  -t TID, --tid TID  trace this TID only
 
 examples:
     ./runqslower         # trace run queue latency higher than 10000 us (default)
     ./runqslower 1000    # trace run queue latency higher than 1000 us
-    ./runqslower -p 123  # trace pid 123 only
+    ./runqslower -p 123  # trace pid 123
+    ./runqslower -t 123  # trace tid (thread) 123
