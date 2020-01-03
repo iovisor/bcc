@@ -218,10 +218,6 @@ RAW_TRACEPOINT_PROBE(sched_switch)
 }
 """
 
-
-if args.pid and args.tid:
-    parser.error("specify only one of -p and -t")
-
 is_support_raw_tp = BPF.support_raw_tracepoint()
 if is_support_raw_tp:
     bpf_text += bpf_text_raw_tp
