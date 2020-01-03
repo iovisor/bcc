@@ -49,15 +49,18 @@ parser = argparse.ArgumentParser(
     description="Trace high run queue latency",
     formatter_class=argparse.RawDescriptionHelpFormatter,
     epilog=examples)
-parser.add_argument("-p", "--pid", type=int, metavar="PID", dest="pid",
-    help="trace this PID")
-parser.add_argument("-t", "--tid", type=int, metavar="TID", dest="tid",
-    help="trace this TID only")
 parser.add_argument("min_us", nargs="?", default='10000',
     help="minimum run queue latecy to trace, in ms (default 10000)")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
+
+thread_group = parser.add_mutually_exclusive_group()
+thread_group.add_argument("-p", "--pid", metavar="PID", dest="pid",
+    help="trace this PID only", type=int)
+thread_group.add_argument("-t", "--tid", metavar="TID", dest="tid",
+    help="trace this TID only", type=int)
 args = parser.parse_args()
+
 min_us = int(args.min_us)
 debug = 0
 
@@ -215,6 +218,10 @@ RAW_TRACEPOINT_PROBE(sched_switch)
 }
 """
 
+
+if args.pid and args.tid:
+    parser.error("specify only one of -p and -t")
+
 is_support_raw_tp = BPF.support_raw_tracepoint()
 if is_support_raw_tp:
     bpf_text += bpf_text_raw_tp
@@ -226,11 +233,6 @@ if min_us == 0:
     bpf_text = bpf_text.replace('FILTER_US', '0')
 else:
     bpf_text = bpf_text.replace('FILTER_US', 'delta_us <= %s' % str(min_us))
-
-if args.tid and args.pid:
-    print("Can not specify both pid and tid!")
-    print(examples)
-    exit(-1)
 
 if args.tid:
     bpf_text = bpf_text.replace('FILTER_PID', 'pid != %s' % args.tid)
