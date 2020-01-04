@@ -117,7 +117,11 @@ class ProbeChecker : public RecursiveASTVisitor<ProbeChecker> {
       for(auto p : ptregs_) {
         if (std::get<0>(p) == E->getDirectCallee()) {
           needs_probe_ = true;
-          nb_derefs_ += std::get<1>(p);
+          // ptregs_ stores the number of dereferences needed to get the external
+          // pointer, while nb_derefs_ stores the number of dereferences
+          // encountered.  So, any dereference encountered is one less
+          // dereference needed to get the external pointer.
+          nb_derefs_ -= std::get<1>(p);
           return false;
         }
       }
@@ -179,7 +183,11 @@ class ProbeChecker : public RecursiveASTVisitor<ProbeChecker> {
       for(auto p : ptregs_) {
         if (std::get<0>(p) == E->getDecl()) {
           needs_probe_ = true;
-          nb_derefs_ += std::get<1>(p);
+          // ptregs_ stores the number of dereferences needed to get the external
+          // pointer, while nb_derefs_ stores the number of dereferences
+          // encountered.  So, any dereference encountered is one less
+          // dereference needed to get the external pointer.
+          nb_derefs_ -= std::get<1>(p);
           return false;
         }
       }
@@ -207,8 +215,8 @@ class ProbeChecker : public RecursiveASTVisitor<ProbeChecker> {
 // Visit a piece of the AST and mark it as needing probe reads
 class ProbeSetter : public RecursiveASTVisitor<ProbeSetter> {
  public:
-  explicit ProbeSetter(set<tuple<Decl *, int>> *ptregs, int nb_addrof)
-      : ptregs_(ptregs), nb_derefs_(-nb_addrof) {}
+  explicit ProbeSetter(set<tuple<Decl *, int>> *ptregs, int nb_derefs)
+      : ptregs_(ptregs), nb_derefs_(nb_derefs) {}
   bool VisitDeclRefExpr(DeclRefExpr *E) {
     tuple<Decl *, int> pt = make_tuple(E->getDecl(), nb_derefs_);
     ptregs_->insert(pt);
@@ -259,9 +267,9 @@ ProbeVisitor::ProbeVisitor(ASTContext &C, Rewriter &rewriter,
   C(C), rewriter_(rewriter), m_(m), track_helpers_(track_helpers),
   addrof_stmt_(nullptr), is_addrof_(false) {}
 
-bool ProbeVisitor::assignsExtPtr(Expr *E, int *nbAddrOf) {
+bool ProbeVisitor::assignsExtPtr(Expr *E, int *nbDerefs) {
   if (IsContextMemberExpr(E)) {
-    *nbAddrOf = 0;
+    *nbDerefs = 0;
     return true;
   }
 
@@ -278,7 +286,7 @@ bool ProbeVisitor::assignsExtPtr(Expr *E, int *nbAddrOf) {
     // an assignment, if we went through n addrof before getting the external
     // pointer, then we'll need n dereferences on the left-hand side variable
     // to get to the external pointer.
-    *nbAddrOf = -checker.get_nb_derefs();
+    *nbDerefs = -checker.get_nb_derefs();
     return true;
   }
 
@@ -300,7 +308,7 @@ bool ProbeVisitor::assignsExtPtr(Expr *E, int *nbAddrOf) {
               // be a pointer to an external pointer as the verifier prohibits
               // storing known pointers (to map values, context, the stack, or
               // the packet) in maps.
-              *nbAddrOf = 1;
+              *nbDerefs = 1;
               return true;
             }
           }
@@ -312,10 +320,10 @@ bool ProbeVisitor::assignsExtPtr(Expr *E, int *nbAddrOf) {
 }
 bool ProbeVisitor::VisitVarDecl(VarDecl *D) {
   if (Expr *E = D->getInit()) {
-    int nbAddrOf;
-    if (assignsExtPtr(E, &nbAddrOf)) {
+    int nbDerefs;
+    if (assignsExtPtr(E, &nbDerefs)) {
       // The negative of the number of addrof is the number of dereferences.
-      tuple<Decl *, int> pt = make_tuple(D, -nbAddrOf);
+      tuple<Decl *, int> pt = make_tuple(D, nbDerefs);
       set_ptreg(pt);
     }
   }
@@ -351,7 +359,7 @@ bool ProbeVisitor::VisitCallExpr(CallExpr *Call) {
                                             true);
         if (checker.needs_probe()) {
           tuple<Decl *, int> pt = make_tuple(F->getParamDecl(i),
-                                             checker.get_nb_derefs());
+                                             -checker.get_nb_derefs());
           ptregs_.insert(pt);
         }
         ++i;
@@ -391,12 +399,13 @@ bool ProbeVisitor::VisitReturnStmt(ReturnStmt *R) {
                                       track_helpers_, true);
   if (checker.needs_probe()) {
     int curr_nb_derefs = ptregs_returned_.back();
+    int nb_derefs = -checker.get_nb_derefs();
     /* If the function returns external pointers with different levels of
      * indirection, we handle the case with the highest level of indirection
      * and leave it to the user to manually handle other cases. */
-    if (checker.get_nb_derefs() > curr_nb_derefs) {
+    if (nb_derefs > curr_nb_derefs) {
       ptregs_returned_.pop_back();
-      ptregs_returned_.push_back(checker.get_nb_derefs());
+      ptregs_returned_.push_back(nb_derefs);
     }
   }
   return true;
@@ -406,9 +415,9 @@ bool ProbeVisitor::VisitBinaryOperator(BinaryOperator *E) {
     return true;
 
   // copy probe attribute from RHS to LHS if present
-  int nbAddrOf;
-  if (assignsExtPtr(E->getRHS(), &nbAddrOf)) {
-    ProbeSetter setter(&ptregs_, nbAddrOf);
+  int nbDerefs;
+  if (assignsExtPtr(E->getRHS(), &nbDerefs)) {
+    ProbeSetter setter(&ptregs_, nbDerefs);
     setter.TraverseStmt(E->getLHS());
   }
   return true;
