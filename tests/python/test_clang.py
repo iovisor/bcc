@@ -499,7 +499,34 @@ int test(struct pt_regs *ctx, struct sock *sk) {
         b = BPF(text=text)
         fn = b.load_func("test", BPF.KPROBE)
 
-    def test_probe_read_nested_deref_func(self):
+    def test_probe_read_nested_deref3(self):
+        text = """
+#include <net/inet_sock.h>
+int test(struct pt_regs *ctx, struct sock *sk) {
+    struct sock **ptr1, **ptr2 = &sk;
+    ptr1 = &sk;
+    return (*ptr1)->sk_daddr + (*ptr2)->sk_daddr;
+}
+"""
+        b = BPF(text=text)
+        fn = b.load_func("test", BPF.KPROBE)
+
+    def test_probe_read_nested_deref_func1(self):
+        text = """
+#include <net/inet_sock.h>
+static struct sock **subtest(struct sock **sk) {
+    return sk;
+}
+int test(struct pt_regs *ctx, struct sock *sk) {
+    struct sock **ptr1, **ptr2 = subtest(&sk);
+    ptr1 = subtest(&sk);
+    return (*ptr1)->sk_daddr + (*ptr2)->sk_daddr;
+}
+"""
+        b = BPF(text=text)
+        fn = b.load_func("test", BPF.KPROBE)
+
+    def test_probe_read_nested_deref_func2(self):
         text = """
 #include <net/inet_sock.h>
 static int subtest(struct sock ***skp) {
