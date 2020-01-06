@@ -767,7 +767,7 @@ int bcc_resolve_symname(const char *module, const char *symname,
   // already be physical address in the binary file.
   if (bcc_elf_get_type(sym->module) == ET_EXEC) {
     struct load_addr_t addr = {
-      .target_addr = sym->offset,
+      .target_addr = sym->offset + sym->base_address,
       .binary_addr = 0x0,
     };
     if (bcc_elf_foreach_load_section(sym->module, &_find_load, &addr) < 0)
