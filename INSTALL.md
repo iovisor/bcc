@@ -71,6 +71,10 @@ found at [packages.ubuntu.com](https://packages.ubuntu.com/search?suite=default&
 sudo apt-get install bpfcc-tools linux-headers-$(uname -r)
 ```
 
+In Ubuntu Eon (19.10) some of the BCC tools are currently broken due to outdated packages. This is a
+[known bug](https://bugs.launchpad.net/ubuntu/+source/bpfcc/+bug/1848137). Upstream packages are currently also unavailable for Eon.
+Therefore [building from source](#ubuntu---source) is currently the only way to get fully working tools.
+
 The tools are installed in `/sbin` (`/usr/sbin` in Ubuntu 18.04) with a `-bpfcc` extension. Try running `sudo opensnoop-bpfcc`.
 
 **_Note_**: the Ubuntu packages have different names but the package contents, in most cases, conflict
