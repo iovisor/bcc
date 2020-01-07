@@ -255,10 +255,11 @@ BPFStackTable::BPFStackTable(const TableDesc& desc, bool use_debug_file,
     throw std::invalid_argument("Table '" + desc.name +
                                 "' is not a stack table");
 
+  uint32_t use_symbol_type = (1 << STT_FUNC) | (1 << STT_GNU_IFUNC);
   symbol_option_ = {.use_debug_file = use_debug_file,
                     .check_debug_file_crc = check_debug_file_crc,
                     .lazy_symbolize = 1,
-                    .use_symbol_type = (1 << STT_FUNC) | (1 << STT_GNU_IFUNC)};
+                    .use_symbol_type = use_symbol_type};
 }
 
 BPFStackTable::BPFStackTable(BPFStackTable&& that)
