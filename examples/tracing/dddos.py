@@ -43,7 +43,7 @@ int detect_ddos(struct pt_regs *ctx, void *skb){
     * timestamp between 2 successive packets is so small
     * (which is not like regular applications behaviour).
     * This script looks for this difference in time and if it sees
-    * more than MAX_NB_PACKETS succesive packets with a difference
+    * more than MAX_NB_PACKETS successive packets with a difference
     * of timestamp between each one of them less than
     * LEGAL_DIFF_TIMESTAMP_PACKETS ns,
     * ------------------ It Triggers an ALERT -----------------

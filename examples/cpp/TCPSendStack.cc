@@ -101,7 +101,7 @@ int main(int argc, char** argv) {
       for (auto sym : syms)
         std::cout << "    " << sym << std::endl;
     } else {
-      // -EFAULT normally means the stack is not availiable and not an error
+      // -EFAULT normally means the stack is not available and not an error
       if (it.first.kernel_stack != -EFAULT) {
         lost_stacks++;
         std::cout << "    [Lost Kernel Stack" << it.first.kernel_stack << "]"
@@ -114,7 +114,7 @@ int main(int argc, char** argv) {
       for (auto sym : syms)
         std::cout << "    " << sym << std::endl;
     } else {
-      // -EFAULT normally means the stack is not availiable and not an error
+      // -EFAULT normally means the stack is not available and not an error
       if (it.first.user_stack != -EFAULT) {
         lost_stacks++;
         std::cout << "    [Lost User Stack " << it.first.user_stack << "]"
