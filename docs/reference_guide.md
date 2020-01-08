@@ -1374,7 +1374,7 @@ BPF_PERF_OUTPUT(events);
 [...]
 ```
 
-In Python, you can either let bcc generate the data structure from C declaration automatically (recommanded):
+In Python, you can either let bcc generate the data structure from C declaration automatically (recommended):
 
 ```Python
 def print_event(cpu, data, size):
