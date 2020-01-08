@@ -189,7 +189,7 @@ else:
         "TIME", "UID", "PID", "COMM", "CAP", "NAME", "AUDIT"))
 
 def stack_id_err(stack_id):
-    # -EFAULT in get_stackid normally means the stack-trace is not availible,
+    # -EFAULT in get_stackid normally means the stack-trace is not available,
     # Such as getting kernel stack trace in userspace code
     return (stack_id < 0) and (stack_id != -errno.EFAULT)
 

@@ -28,7 +28,7 @@ examples = """examples:
     ./tcpstates           # trace all TCP state changes
     ./tcpstates -t        # include timestamp column
     ./tcpstates -T        # include time column (HH:MM:SS)
-    ./tcpstates -w        # wider colums (fit IPv6)
+    ./tcpstates -w        # wider columns (fit IPv6)
     ./tcpstates -stT      # csv output, with times & timestamps
     ./tcpstates -Y        # log events to the systemd journal
     ./tcpstates -L 80     # only trace local port 80

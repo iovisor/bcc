@@ -107,7 +107,7 @@ def get_processes_stats(
             misses = (apcl + apd)
 
             # rtaccess is the read hit % during the sample period.
-            # wtaccess is the write hit % during the smaple period.
+            # wtaccess is the write hit % during the sample period.
             if mpa > 0:
                 rtaccess = float(mpa) / (access + misses)
             if apcl > 0:

@@ -19,7 +19,7 @@ A  28978  nc               4  10.202.210.1     10.202.109.12    8080   59160
 X  28978  nc               4  10.202.210.1     10.202.109.12    8080   59160
 ```
 
-This output shows three conections, one outgoing from a "telnet" process, one
+This output shows three connections, one outgoing from a "telnet" process, one
 outgoing from "curl" to a local netcat, and one incoming received by the "nc"
 process. The output details show the kind of event (C for connection, X for
 close and A for accept), PID, IP version, source address, destination address,

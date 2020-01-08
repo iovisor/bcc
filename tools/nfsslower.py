@@ -22,7 +22,7 @@
 #
 # This tool uses kprobes to instrument the kernel for entry and exit
 # information, in the future a preferred way would be to use tracepoints.
-# Currently there are'nt any tracepoints available for nfs_read_file,
+# Currently there aren't any tracepoints available for nfs_read_file,
 # nfs_write_file and nfs_open_file, nfs_getattr does have entry and exit
 # tracepoints but we chose to use kprobes for consistency
 #
