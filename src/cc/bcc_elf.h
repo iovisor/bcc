@@ -56,7 +56,7 @@ int bcc_elf_foreach_load_section(const char *path,
                                  bcc_elf_load_sectioncb callback,
                                  void *payload);
 // Iterate over symbol table of a binary module
-// Parameter "option" points to a bcc_symbol_option struct to indicate wheather
+// Parameter "option" points to a bcc_symbol_option struct to indicate whether
 // and how to use debuginfo file, and what types of symbols to load.
 // Returns -1 on error, and 0 on success or stopped by callback
 int bcc_elf_foreach_sym(const char *path, bcc_elf_symcb callback, void *option,

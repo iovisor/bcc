@@ -213,9 +213,9 @@ block
   ;
 
 enter_varscope : /* empty */ { $$ = parser.scopes_->enter_var_scope(); } ;
-exit_varscope : /* emtpy */ { $$ = parser.scopes_->exit_var_scope(); } ;
+exit_varscope : /* empty */ { $$ = parser.scopes_->exit_var_scope(); } ;
 enter_statescope : /* empty */ { $$ = parser.scopes_->enter_state_scope(); } ;
-exit_statescope : /* emtpy */ { $$ = parser.scopes_->exit_state_scope(); } ;
+exit_statescope : /* empty */ { $$ = parser.scopes_->exit_state_scope(); } ;
 
 struct_decl
   : TSTRUCT ident TLBRACE struct_decl_stmts TRBRACE

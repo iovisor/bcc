@@ -854,7 +854,7 @@ StatusTuple USDT::init() {
   for (auto& p : ctx->probes_) {
     if (p->provider_ == provider_ && p->name_ == name_) {
       // Take ownership of the probe that we are interested in, and avoid it
-      // being destrcuted when we destruct the USDT::Context instance
+      // being destructed when we destruct the USDT::Context instance
       probe_ = std::unique_ptr<void, std::function<void(void*)>>(p.release(),
                                                                  deleter);
       p.swap(ctx->probes_.back());
