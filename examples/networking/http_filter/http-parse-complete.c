@@ -27,7 +27,7 @@ BPF_HASH(sessions, struct Key, struct Leaf, 1024);
   AND ALL the other packets having same (src_ip,dst_ip,src_port,dst_port)
   this means belonging to the same "session"
   this additional check avoids url truncation, if url is too long
-  userspace script, if necessary, reassembles urls splitted in 2 or more packets.
+  userspace script, if necessary, reassembles urls split in 2 or more packets.
   if the program is loaded as PROG_TYPE_SOCKET_FILTER
   and attached to a socket
   return  0 -> DROP the packet

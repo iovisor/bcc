@@ -93,7 +93,7 @@ function checkfile {
         contents=$(grep -v '^#' $file)
 	if [[ "$contents" != "$expected" ]]; then
 		echo "Noticed unrelated tracing file $PWD/$file isn't set as" \
-		    "expected. Not reseting (-F to force, -v for verbose)."
+		    "expected. Not resetting (-F to force, -v for verbose)."
 		vecho "Contents of $file is (line enumerated):"
 		(( opt_verbose )) && cat -nv $file
 		vecho "Expected \"$expected\"."
@@ -113,7 +113,7 @@ done
 shift $(( $OPTIND - 1 ))
 
 ### reset tracing state
-vecho "Reseting tracing state..."
+vecho "Resetting tracing state..."
 vecho
 cd $tracing || die "ERROR: accessing tracing. Root user? /sys/kernel/debug?"
 

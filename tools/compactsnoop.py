@@ -329,10 +329,10 @@ def compact_result_to_str(status):
         # COMPACT_CONTINUE: compaction should continue to another pageblock
         4: "continue",
         # COMPACT_COMPLETE: The full zone was compacted scanned but wasn't
-        # successfull to compact suitable pages.
+        # successful to compact suitable pages.
         5: "complete",
         # COMPACT_PARTIAL_SKIPPED: direct compaction has scanned part of the
-        # zone but wasn't successfull to compact suitable pages.
+        # zone but wasn't successful to compact suitable pages.
         6: "partial_skipped",
         # COMPACT_CONTENDED: compaction terminated prematurely due to lock
         # contentions

@@ -25,7 +25,7 @@
 TEST_CASE("test read perf event", "[bpf_perf_event]") {
 // The basic bpf_perf_event_read is supported since Kernel 4.3. However in that
 // version it only supported HARDWARE and RAW events. On the other hand, our
-// tests running on Jenkins won't have availiable HARDWARE counters since they
+// tests running on Jenkins won't have available HARDWARE counters since they
 // are running on VMs. The support of other types of events such as SOFTWARE are
 // only added since Kernel 4.13, hence we can only run the test since that.
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 13, 0)

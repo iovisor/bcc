@@ -104,7 +104,7 @@ BPF_TABLE(_table_type, _key_type, _leaf_type, _name, _max_entries); \
 __attribute__((section("maps/export"))) \
 struct _name##_table_t __##_name
 
-// define a table that is shared accross the programs in the same namespace
+// define a table that is shared across the programs in the same namespace
 #define BPF_TABLE_SHARED(_table_type, _key_type, _leaf_type, _name, _max_entries) \
 BPF_TABLE(_table_type, _key_type, _leaf_type, _name, _max_entries); \
 __attribute__((section("maps/shared"))) \

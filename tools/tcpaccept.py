@@ -82,7 +82,7 @@ BPF_PERF_OUTPUT(ipv6_events);
 #
 # The following code uses kprobes to instrument inet_csk_accept().
 # On Linux 4.16 and later, we could use sock:inet_sock_set_state
-# tracepoint for efficency, but it may output wrong PIDs. This is
+# tracepoint for efficiency, but it may output wrong PIDs. This is
 # because sock:inet_sock_set_state may run outside of process context.
 # Hence, we stick to kprobes until we find a proper solution.
 #

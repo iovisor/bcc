@@ -516,7 +516,7 @@ int bcc_prog_load_xattr(struct bpf_load_program_attr *attr, int prog_len,
 
   if (attr->log_level > 0) {
     if (log_buf_size > 0) {
-      // Use user-provided log buffer if availiable.
+      // Use user-provided log buffer if available.
       log_buf[0] = 0;
       attr_log_buf = log_buf;
       attr_log_buf_size = log_buf_size;

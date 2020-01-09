@@ -5,10 +5,10 @@ criticalstat \- A tracer to find and report long atomic critical sections in ker
 .B criticalstat [\-h] [\-p] [\-i] [\-d DURATION]
 .SH DESCRIPTION
 
-criticalstat traces and reports occurences of atomic critical sections in the
+criticalstat traces and reports occurrences of atomic critical sections in the
 kernel with useful stacktraces showing the origin of them. Such critical
 sections frequently occur due to use of spinlocks, or if interrupts or
-preemption were explicity disabled by a driver. IRQ routines in Linux are also
+preemption were explicitly disabled by a driver. IRQ routines in Linux are also
 executed with interrupts disabled. There are many reasons. Such critical
 sections are a source of long latency/responsive issues for real-time systems.
 

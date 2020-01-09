@@ -203,7 +203,7 @@ local arg_time = false
 local examples = [[examples:
     ./tcplife           # trace all TCP connect()s
     ./tcplife -t        # include time column (HH:MM:SS)
-    ./tcplife -w        # wider colums (fit IPv6)
+    ./tcplife -w        # wider columns (fit IPv6)
     ./tcplife -stT      # csv output, with times & timestamps
     ./tcplife -p 181    # only trace PID 181
     ./tcplife -L 80     # only trace local port 80

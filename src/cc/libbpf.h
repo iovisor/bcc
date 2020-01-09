@@ -59,7 +59,7 @@ int bpf_get_next_key(int fd, void *key, void *next_key);
  *     it will not to any additional memory allocation.
  *   - Otherwise, it will allocate an internal temporary buffer for log message
  *     printing, and continue to attempt increase that allocated buffer size if
- *     initial attemp was insufficient in size.
+ *     initial attempt was insufficient in size.
  */
 int bcc_prog_load(enum bpf_prog_type prog_type, const char *name,
                   const struct bpf_insn *insns, int prog_len,

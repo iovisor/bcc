@@ -399,7 +399,7 @@ StatusTuple CodegenLLVM::visit_packet_expr_node(PacketExprNode *n) {
         expr_ = B.CreateCall(load_fn, vector<Value *>({skb_ptr8, skb_hdr_offset,
                                                       B.getInt64(bit_offset & 0x7), B.getInt64(bit_width)}));
         // this generates extra trunc insns whereas the bpf.load fns already
-        // trunc the values internally in the bpf interpeter
+        // trunc the values internally in the bpf interpreter
         //expr_ = B.CreateTrunc(pop_expr(), B.getIntNTy(bit_width));
       }
     } else {

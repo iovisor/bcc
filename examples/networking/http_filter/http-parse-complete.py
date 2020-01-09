@@ -254,13 +254,13 @@ while 1:
     #check if the packet belong to a session saved in bpf_sessions
     if (current_Key in bpf_sessions):
       #check id the packet belong to a session saved in local_dictionary
-      #(local_dictionary mantains HTTP GET/POST url not printed yet because splitted in N packets)
+      #(local_dictionary maintains HTTP GET/POST url not printed yet because split in N packets)
       if (binascii.hexlify(current_Key) in local_dictionary):
         #first part of the HTTP GET/POST url is already present in local dictionary (prev_payload_string)
         prev_payload_string = local_dictionary[binascii.hexlify(current_Key)]
         #looking for CR+LF in current packet.
         if (crlf in payload_string):
-          #last packet. containing last part of HTTP GET/POST url splitted in N packets.
+          #last packet. containing last part of HTTP GET/POST url split in N packets.
           #append current payload
           prev_payload_string += payload_string
           #print HTTP GET/POST url
@@ -272,7 +272,7 @@ while 1:
           except:
             print ("error deleting from map or dictionary")
         else:
-          #NOT last packet. containing part of HTTP GET/POST url splitted in N packets.
+          #NOT last packet. containing part of HTTP GET/POST url split in N packets.
           #append current payload
           prev_payload_string += payload_string
           #check if not size exceeding (usually HTTP GET/POST url < 8K )
