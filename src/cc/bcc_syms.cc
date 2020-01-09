@@ -773,7 +773,7 @@ int bcc_resolve_symname(const char *module, const char *symname,
       .binary_addr = 0x0,
     };
 	if(update_flag)
-		addr.target_addr += sym->base_address
+		addr.target_addr += sym->base_address;
 	
     if (bcc_elf_foreach_load_section(sym->module, &_find_load, &addr) < 0)
       goto invalid_module;
