@@ -727,7 +727,7 @@ int bcc_resolve_symname(const char *module, const char *symname,
     .use_symbol_type = BCC_SYM_ALL_TYPES,
 #endif
   };
-
+  int update_flag = 0;
   if (module == NULL)
     return -1;
 
@@ -755,9 +755,11 @@ int bcc_resolve_symname(const char *module, const char *symname,
   if (option == NULL)
     option = &default_option;
 
-  if (sym->name && sym->offset == 0x0)
+  if (sym->name && sym->offset == 0x0){
     if (bcc_elf_foreach_sym(sym->module, _find_sym, option, sym) < 0)
       goto invalid_module;
+    update_flag = 1;
+  }
   if (sym->offset == 0x0)
     goto invalid_module;
 
@@ -767,9 +769,12 @@ int bcc_resolve_symname(const char *module, const char *symname,
   // already be physical address in the binary file.
   if (bcc_elf_get_type(sym->module) == ET_EXEC) {
     struct load_addr_t addr = {
-      .target_addr = sym->offset + sym->base_address,
+      .target_addr = sym->offset,
       .binary_addr = 0x0,
     };
+	if(update_flag)
+		addr.target_addr += sym->base_address
+	
     if (bcc_elf_foreach_load_section(sym->module, &_find_load, &addr) < 0)
       goto invalid_module;
     if (!addr.binary_addr)
