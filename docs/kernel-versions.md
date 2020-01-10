@@ -267,6 +267,7 @@ Helper | Kernel version | License | Commit |
 `BPF_FUNC_tail_call()` | 4.2 |  | [`04fd61ab36ec`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=04fd61ab36ec065e194ab5e74ae34a5240d992bb)
 `BPF_FUNC_tcp_check_syncookie()` | 5.2 |  | [`399040847084`](https://kernel.googlesource.com/pub/scm/linux/kernel/git/davem/net-next/+/399040847084a69f345e0a52fd62f04654e0fce3)
 `BPF_FUNC_tcp_gen_syncookie()` | 5.3 |  | [`70d66244317e`](https://github.com/torvalds/linux/commit/70d66244317e958092e9c971b08dd5b7fd29d9cb#diff-05da4bf36c7fbcd176254e1615d98b28)
+`BPF_FUNC_tcp_send_ack()` | 5.5 | | [`206057fe020a`](https://git.kernel.org/pub/scm/linux/kernel/git/bpf/bpf-next.git/commit/?id=206057fe020ac5c037d5e2dd6562a9bd216ec765)
 `BPF_FUNC_tcp_sock()` | 5.1 |  | [`655a51e536c0`](https://git.kernel.org/pub/scm/linux/kernel/git/bpf/bpf-next.git/commit/?id=655a51e536c09d15ffa3603b1b6fce2b45b85a1f)
 `BPF_FUNC_trace_printk()` | 4.1 | GPL | [`9c959c863f82`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=9c959c863f8217a2ff3d7c296e8223654d240569)
 `BPF_FUNC_xdp_adjust_head()` | 4.10 |  | [`17bedab27231`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=17bedab2723145d17b14084430743549e6943d03)
