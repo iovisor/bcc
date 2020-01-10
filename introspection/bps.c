@@ -43,6 +43,7 @@ static const char * const prog_type_strings[] = {
   [BPF_PROG_TYPE_RAW_TRACEPOINT_WRITABLE] = "raw_tracepoint_writable",
   [BPF_PROG_TYPE_CGROUP_SOCKOPT] = "cgroup_sockopt",
   [BPF_PROG_TYPE_TRACING] = "tracing",
+  [BPF_PROG_TYPE_STRUCT_OPS] = "struct_ops",
 };
 
 static const char * const map_type_strings[] = {
@@ -71,6 +72,7 @@ static const char * const map_type_strings[] = {
   [BPF_MAP_TYPE_STACK] = "stack",
   [BPF_MAP_TYPE_SK_STORAGE] = "sk_storage",
   [BPF_MAP_TYPE_DEVMAP_HASH] = "devmap_hash",
+  [BPF_MAP_TYPE_STRUCT_OPS] = "struct_ops",
 };
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof(*(x)))
