@@ -65,7 +65,7 @@ def find_bpf_fds(pid):
             link = os.readlink(os.path.join(root, fd))
         except OSError:
             continue
-        match = re.match('.*bpf-(\\w+)', link)
+        match = re.match('anon_inode:bpf-([\\w-]+)', link)
         if match:
             tup = (pid, match.group(1))
             counts[tup] = counts.get(tup, 0) + 1
