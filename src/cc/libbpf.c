@@ -214,6 +214,7 @@ static struct bpf_helper helpers[] = {
   {"probe_read_user_str", "5.5"},
   {"probe_read_kernel_str", "5.5"},
   {"tcp_send_ack", "5.5"},
+  {"send_signal_thread", "5.5"},
 };
 
 static uint64_t ptr_to_u64(void *ptr)
