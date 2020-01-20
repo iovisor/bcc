@@ -32,15 +32,15 @@ function ns_run() {
   sudo ip netns exec $ns ethtool -K eth0 tx off
   sudo ip addr add dev $ns.out 172.16.1.1/24
   sudo ip link set $ns.out up
-  sudo bash -c "PYTHONPATH=$PYTHONPATH LD_LIBRARY_PATH=$LD_LIBRARY_PATH ip netns exec $ns $cmd $1 $2"
+  sudo bash -c "PYTHONPATH=$PYTHONPATH PYTHON_TEST_LOGFILE=$PYTHON_TEST_LOGFILE LD_LIBRARY_PATH=$LD_LIBRARY_PATH ip netns exec $ns $cmd $1 $2"
   return $?
 }
 function sudo_run() {
-  sudo bash -c "PYTHONPATH=$PYTHONPATH LD_LIBRARY_PATH=$LD_LIBRARY_PATH $cmd $1 $2"
+  sudo bash -c "PYTHONPATH=$PYTHONPATH PYTHON_TEST_LOGFILE=$PYTHON_TEST_LOGFILE LD_LIBRARY_PATH=$LD_LIBRARY_PATH $cmd $1 $2"
   return $?
 }
 function simple_run() {
-  PYTHONPATH=$PYTHONPATH LD_LIBRARY_PATH=$LD_LIBRARY_PATH $cmd $1 $2
+  PYTHONPATH=$PYTHONPATH PYTHON_TEST_LOGFILE=$PYTHON_TEST_LOGFILE LD_LIBRARY_PATH=$LD_LIBRARY_PATH $cmd $1 $2
   return $?
 }
 

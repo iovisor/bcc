@@ -485,7 +485,7 @@ struct mod_search {
   uint64_t file_offset;
 };
 
-TEST_CASE("searching for modules in /proc/[pid]/maps", "[c_api]") {
+TEST_CASE("searching for modules in /proc/[pid]/maps", "[c_api][!mayfail]") {
   FILE *dummy_maps = fopen("dummy_proc_map.txt", "r");
   REQUIRE(dummy_maps != NULL);
 
@@ -580,7 +580,7 @@ TEST_CASE("searching for modules in /proc/[pid]/maps", "[c_api]") {
   fclose(dummy_maps);
 }
 
-TEST_CASE("resolve global addr in libc in this process", "[c_api]") {
+TEST_CASE("resolve global addr in libc in this process", "[c_api][!mayfail]") {
   int pid = getpid();
   char *sopath = bcc_procutils_which_so("c", pid);
   uint64_t local_addr = 0x15;
