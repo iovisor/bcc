@@ -57,7 +57,7 @@
 from ctypes import c_uint
 from bcc import BPF
 from pyroute2 import IPRoute, NetNS, IPDB, NSPopen
-from utils import NSPopenWithCheck
+from utils import NSPopenWithCheck, mayFail
 import sys
 from time import sleep
 from unittest import main, TestCase
@@ -136,6 +136,7 @@ class TestBPFSocket(TestCase):
         self.attach_filter(self.veth_br1_2_pem, self.pem_fn.fd, self.pem_fn.name)
         self.attach_filter(self.veth_br2_2_pem, self.pem_fn.fd, self.pem_fn.name)
 
+    @mayFail("This fails on github actions environment, and needs to be fixed")
     def test_brb2(self):
         try:
             b = BPF(src_file=arg1, debug=0)
