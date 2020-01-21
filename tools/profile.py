@@ -330,13 +330,13 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
         # hash collision (-EEXIST), we still print a placeholder for consistency
         if not args.kernel_stacks_only:
             if stack_id_err(k.user_stack_id):
-                line.append("[Missed User Stack]")
+                line.append(b"[Missed User Stack]")
             else:
                 line.extend([b.sym(addr, k.pid) for addr in reversed(user_stack)])
         if not args.user_stacks_only:
-            line.extend(["-"] if (need_delimiter and k.kernel_stack_id >= 0 and k.user_stack_id >= 0) else [])
+            line.extend(b["-"] if (need_delimiter and k.kernel_stack_id >= 0 and k.user_stack_id >= 0) else [])
             if stack_id_err(k.kernel_stack_id):
-                line.append("[Missed Kernel Stack]")
+                line.append(b"[Missed Kernel Stack]")
             else:
                 line.extend([aksym(addr) for addr in reversed(kernel_stack)])
         print("%s %d" % (b";".join(line).decode('utf-8', 'replace'), v.value))
