@@ -880,68 +880,6 @@ static int bpf_attach_tracing_event(int progfd, const char *event_path, int pid,
   return 0;
 }
 
-static int enter_mount_ns(int pid) {
-  struct stat self_stat, target_stat;
-  int self_fd = -1, target_fd = -1;
-  char buf[64];
-
-  if (pid < 0)
-    return -1;
-
-  if ((size_t)snprintf(buf, sizeof(buf), "/proc/%d/ns/mnt", pid) >= sizeof(buf))
-    return -1;
-
-  self_fd = open("/proc/self/ns/mnt", O_RDONLY);
-  if (self_fd < 0) {
-    perror("open(/proc/self/ns/mnt)");
-    return -1;
-  }
-
-  target_fd = open(buf, O_RDONLY);
-  if (target_fd < 0) {
-    perror("open(/proc/<pid>/ns/mnt)");
-    goto error;
-  }
-
-  if (fstat(self_fd, &self_stat)) {
-    perror("fstat(self_fd)");
-    goto error;
-  }
-
-  if (fstat(target_fd, &target_stat)) {
-    perror("fstat(target_fd)");
-    goto error;
-  }
-
-  // both target and current ns are same, avoid setns and close all fds
-  if (self_stat.st_ino == target_stat.st_ino)
-    goto error;
-
-  if (setns(target_fd, CLONE_NEWNS)) {
-    perror("setns(target)");
-    goto error;
-  }
-
-  close(target_fd);
-  return self_fd;
-
-error:
-  if (self_fd >= 0)
-    close(self_fd);
-  if (target_fd >= 0)
-    close(target_fd);
-  return -1;
-}
-
-static void exit_mount_ns(int fd) {
-  if (fd < 0)
-    return;
-
-  if (setns(fd, CLONE_NEWNS))
-    perror("setns");
-  close(fd);
-}
-
 /* Creates an [uk]probe using debugfs.
  * On success, the path to the probe is placed in buf (which is assumed to be of size PATH_MAX).
  */
@@ -950,7 +888,7 @@ static int create_probe_event(char *buf, const char *ev_name,
                               const char *config1, uint64_t offset,
                               const char *event_type, pid_t pid, int maxactive)
 {
-  int kfd = -1, res = -1, ns_fd = -1;
+  int kfd = -1, res = -1;
   char ev_alias[256];
   bool is_kprobe = strncmp("kprobe", event_type, 6) == 0;
 
@@ -988,7 +926,6 @@ static int create_probe_event(char *buf, const char *ev_name,
       close(kfd);
       return -1;
     }
-    ns_fd = enter_mount_ns(pid);
   }
 
   if (write(kfd, buf, strlen(buf)) < 0) {
@@ -1000,14 +937,10 @@ static int create_probe_event(char *buf, const char *ev_name,
     goto error;
   }
   close(kfd);
-  if (!is_kprobe)
-    exit_mount_ns(ns_fd);
   snprintf(buf, PATH_MAX, "/sys/kernel/debug/tracing/events/%ss/%s",
            event_type, ev_alias);
   return 0;
 error:
-  if (!is_kprobe)
-    exit_mount_ns(ns_fd);
   return -1;
 }
 
