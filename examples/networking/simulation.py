@@ -65,7 +65,17 @@ class Simulation(object):
                 raise
 
         if out_ifc: out_ifc.up().commit()
-        ns_ipdb.interfaces.lo.up().commit()
+
+        # this is a workaround for fc31 and possible other disto's.
+        # when interface 'lo' is already up, do another 'up().commit()'
+        # has issues in fc31.
+        # the workaround may become permanent if we upgrade pyroute2
+        # in all machines.
+        if 'state' in ns_ipdb.interfaces.lo.keys():
+            if ns_ipdb.interfaces.lo['state'] != 'up':
+                ns_ipdb.interfaces.lo.up().commit()
+        else:
+            ns_ipdb.interfaces.lo.up().commit()
         ns_ipdb.initdb()
         in_ifc = ns_ipdb.interfaces[in_ifname]
         with in_ifc as v:
