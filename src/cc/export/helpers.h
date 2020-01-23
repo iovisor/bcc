@@ -78,6 +78,7 @@ struct _name##_table_t { \
   _leaf_type leaf; \
   _leaf_type * (*lookup) (_key_type *); \
   _leaf_type * (*lookup_or_init) (_key_type *, _leaf_type *); \
+  _leaf_type * (*lookup_or_try_init) (_key_type *, _leaf_type *); \
   int (*update) (_key_type *, _leaf_type *); \
   int (*insert) (_key_type *, _leaf_type *); \
   int (*delete) (_key_type *); \
@@ -103,7 +104,7 @@ BPF_TABLE(_table_type, _key_type, _leaf_type, _name, _max_entries); \
 __attribute__((section("maps/export"))) \
 struct _name##_table_t __##_name
 
-// define a table that is shared accross the programs in the same namespace
+// define a table that is shared across the programs in the same namespace
 #define BPF_TABLE_SHARED(_table_type, _key_type, _leaf_type, _name, _max_entries) \
 BPF_TABLE(_table_type, _key_type, _leaf_type, _name, _max_entries); \
 __attribute__((section("maps/shared"))) \
@@ -267,6 +268,24 @@ struct _name##_table_t _name = { .max_entries = (_max_entries) }
 
 #define BPF_CPUMAP(_name, _max_entries) \
   BPF_XDP_REDIRECT_MAP("cpumap", u32, _name, _max_entries)
+
+#define BPF_ARRAY_OF_MAPS(_name, _inner_map_name, _max_entries) \
+  BPF_TABLE("array_of_maps$" _inner_map_name, int, int, _name, _max_entries)
+
+#define BPF_HASH_OF_MAPS(_name, _inner_map_name, _max_entries) \
+  BPF_TABLE("hash_of_maps$" _inner_map_name, int, int, _name, _max_entries)
+
+#define BPF_SK_STORAGE(_name, _leaf_type) \
+struct _name##_table_t { \
+  int key; \
+  _leaf_type leaf; \
+  void * (*sk_storage_get) (void *, void *, int); \
+  int (*sk_storage_delete) (void *); \
+  u32 flags; \
+}; \
+__attribute__((section("maps/sk_storage"))) \
+struct _name##_table_t _name = { .flags = BPF_F_NO_PREALLOC }; \
+BPF_ANNOTATE_KV_PAIR(_name, int, _leaf_type)
 
 // packet parsing state machine helpers
 #define cursor_advance(_cursor, _len) \
@@ -523,6 +542,21 @@ static int (*bpf_send_signal)(unsigned sig) = (void *)BPF_FUNC_send_signal;
 static long long (*bpf_tcp_gen_syncookie)(struct bpf_sock *sk, void *ip,
                                           int ip_len, void *tcp, int tcp_len) =
   (void *) BPF_FUNC_tcp_gen_syncookie;
+static int (*bpf_skb_output)(void *ctx, void *map, __u64 flags, void *data,
+                             __u64 size) =
+  (void *)BPF_FUNC_skb_output;
+static int (*bpf_probe_read_user)(void *dst, __u32 size,
+                                  const void *unsafe_ptr) =
+  (void *)BPF_FUNC_probe_read_user;
+static int (*bpf_probe_read_kernel)(void *dst, __u32 size,
+                                    const void *unsafe_ptr) =
+  (void *)BPF_FUNC_probe_read_kernel;
+static int (*bpf_probe_read_user_str)(void *dst, __u32 size,
+            const void *unsafe_ptr) =
+  (void *)BPF_FUNC_probe_read_user_str;
+static int (*bpf_probe_read_kernel_str)(void *dst, __u32 size,
+            const void *unsafe_ptr) =
+  (void *)BPF_FUNC_probe_read_kernel_str;
 
 /* llvm builtin functions that eBPF C program may use to
  * emit BPF_LD_ABS and BPF_LD_IND instructions

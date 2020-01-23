@@ -1,0 +1,203 @@
+Demonstrations of compactstall, the Linux eBPF/bcc version.
+
+
+compactsnoop traces the compact zone system-wide, and print various details.
+Example output (manual trigger by echo 1 > /proc/sys/vm/compact_memory):
+
+# ./compactsnoop
+COMM           PID    NODE ZONE         ORDER MODE      LAT(ms)           STATUS
+zsh            23685  0    ZONE_DMA     -1    SYNC        0.025         complete
+zsh            23685  0    ZONE_DMA32   -1    SYNC        3.925         complete
+zsh            23685  0    ZONE_NORMAL  -1    SYNC      113.975         complete
+zsh            23685  1    ZONE_NORMAL  -1    SYNC        81.57         complete
+zsh            23685  0    ZONE_DMA     -1    SYNC         0.02         complete
+zsh            23685  0    ZONE_DMA32   -1    SYNC        4.631         complete
+zsh            23685  0    ZONE_NORMAL  -1    SYNC      113.975         complete
+zsh            23685  1    ZONE_NORMAL  -1    SYNC       80.647         complete
+zsh            23685  0    ZONE_DMA     -1    SYNC        0.020         complete
+zsh            23685  0    ZONE_DMA32   -1    SYNC        3.367         complete
+zsh            23685  0    ZONE_NORMAL  -1    SYNC       115.18         complete
+zsh            23685  1    ZONE_NORMAL  -1    SYNC       81.766         complete
+zsh            23685  0    ZONE_DMA     -1    SYNC        0.025         complete
+zsh            23685  0    ZONE_DMA32   -1    SYNC        4.346         complete
+zsh            23685  0    ZONE_NORMAL  -1    SYNC      114.570         complete
+zsh            23685  1    ZONE_NORMAL  -1    SYNC       80.820         complete
+zsh            23685  0    ZONE_DMA     -1    SYNC        0.026         complete
+zsh            23685  0    ZONE_DMA32   -1    SYNC        4.611         complete
+zsh            23685  0    ZONE_NORMAL  -1    SYNC      113.993         complete
+zsh            23685  1    ZONE_NORMAL  -1    SYNC       80.928         complete
+zsh            23685  0    ZONE_DMA     -1    SYNC         0.02         complete
+zsh            23685  0    ZONE_DMA32   -1    SYNC        3.889         complete
+zsh            23685  0    ZONE_NORMAL  -1    SYNC      113.776         complete
+zsh            23685  1    ZONE_NORMAL  -1    SYNC       80.727         complete
+^C
+
+While tracing, the processes alloc pages due to memory fragmentation is too
+serious to meet contiguous memory requirements in the system, compact zone
+events happened, which will increase the waiting delay of the processes.
+
+compactsnoop can be useful for discovering when compact_stall(/proc/vmstat)
+continues to increase, whether it is caused by some critical processes or not.
+
+The STATUS include (CentOS 7.6's kernel)
+
+    compact_status = {
+        # COMPACT_SKIPPED: compaction didn't start as it was not possible or direct reclaim was more suitable
+        0: "skipped",
+        # COMPACT_CONTINUE: compaction should continue to another pageblock
+        1: "continue",
+        # COMPACT_PARTIAL: direct compaction partially compacted a zone and there are suitable pages
+        2: "partial",
+        # COMPACT_COMPLETE: The full zone was compacted
+        3: "complete",
+    }
+
+or (kernel 4.7 and above)
+
+    compact_status = {
+        # COMPACT_NOT_SUITABLE_ZONE: For more detailed tracepoint output - internal to compaction
+        0: "not_suitable_zone",
+        # COMPACT_SKIPPED: compaction didn't start as it was not possible or direct reclaim was more suitable
+        1: "skipped",
+        # COMPACT_DEFERRED: compaction didn't start as it was deferred due to past failures
+        2: "deferred",
+        # COMPACT_NOT_SUITABLE_PAGE: For more detailed tracepoint output - internal to compaction
+        3: "no_suitable_page",
+        # COMPACT_CONTINUE: compaction should continue to another pageblock
+        4: "continue",
+        # COMPACT_COMPLETE: The full zone was compacted scanned but wasn't successful to compact suitable pages.
+        5: "complete",
+        # COMPACT_PARTIAL_SKIPPED: direct compaction has scanned part of the zone but wasn't successful to compact suitable pages.
+        6: "partial_skipped",
+        # COMPACT_CONTENDED: compaction terminated prematurely due to lock contentions
+        7: "contended",
+        # COMPACT_SUCCESS: direct compaction terminated after concluding that the allocation should now succeed
+        8: "success",
+    }
+
+The -p option can be used to filter on a PID, which is filtered in-kernel. Here
+I've used it with -T to print timestamps:
+
+# ./compactsnoop -Tp 24376
+TIME(s)         COMM           PID    NODE ZONE         ORDER MODE      LAT(ms)           STATUS
+101.364115000   zsh            24376  0    ZONE_DMA     -1    SYNC        0.025         complete
+101.364555000   zsh            24376  0    ZONE_DMA32   -1    SYNC        3.925         complete
+^C
+
+This shows the zsh process allocs pages, and compact zone events happening,
+and the delays are not affected much.
+
+A maximum tracing duration can be set with the -d option. For example, to trace
+for 2 seconds:
+
+# ./compactsnoop -d 2
+COMM           PID    NODE ZONE         ORDER MODE       LAT(ms)           STATUS
+zsh            26385  0    ZONE_DMA     -1    SYNC      0.025444         complete
+^C
+
+The -e option prints out extra columns
+
+# ./compactsnoop -e
+COMM           PID    NODE ZONE         ORDER MODE    FRAGIDX  MIN      LOW      HIGH     FREE       LAT(ms)           STATUS
+summ           28276  1    ZONE_NORMAL  3     ASYNC   0.728    11284    14105    16926    14193         3.58          partial
+summ           28276  0    ZONE_NORMAL  2     ASYNC   -1.000   11043    13803    16564    14479          0.0         complete
+summ           28276  1    ZONE_NORMAL  2     ASYNC   -1.000   11284    14105    16926    14785        0.019         complete
+summ           28276  0    ZONE_NORMAL  2     ASYNC   -1.000   11043    13803    16564    15199        0.006          partial
+summ           28276  1    ZONE_NORMAL  2     ASYNC   -1.000   11284    14105    16926    17360        0.030         complete
+summ           28276  0    ZONE_NORMAL  2     ASYNC   -1.000   11043    13803    16564    15443        0.024         complete
+summ           28276  1    ZONE_NORMAL  2     ASYNC   -1.000   11284    14105    16926    15634        0.018         complete
+summ           28276  1    ZONE_NORMAL  3     ASYNC   0.832    11284    14105    16926    15301        0.006          partial
+summ           28276  0    ZONE_NORMAL  2     ASYNC   -1.000   11043    13803    16564    14774        0.005          partial
+summ           28276  1    ZONE_NORMAL  3     ASYNC   0.733    11284    14105    16926    19888        0.012          partial
+^C
+
+The FRAGIDX is short for fragmentation index, which only makes sense if an
+allocation of a requested size would fail. If that is true, the fragmentation
+index indicates whether external fragmentation or a lack of memory was the
+problem. The value can be used to determine if page reclaim or compaction
+should be used.
+
+Index is between 0 and 1 so return within 3 decimal places
+
+0 => allocation would fail due to lack of memory
+1 => allocation would fail due to fragmentation
+
+We can see the whole buddy's fragmentation index from /sys/kernel/debug/extfrag/extfrag_index
+
+The MIN/LOW/HIGH shows the watermarks of the zone, which can also get from
+/proc/zoneinfo, and FREE means nr_free_pages (can be found in /proc/zoneinfo too).
+
+
+The -K option prints out kernel stack
+
+# ./compactsnoop -K -e
+
+summ           28276  0    ZONE_NORMAL  3     ASYNC   0.528    11043    13803    16564    22654       13.258          partial
+               kretprobe_trampoline+0x0
+               try_to_compact_pages+0x121
+               __alloc_pages_direct_compact+0xac
+               __alloc_pages_slowpath+0x3e9
+               __alloc_pages_nodemask+0x404
+               alloc_pages_current+0x98
+               new_slab+0x2c5
+               ___slab_alloc+0x3ac
+               __slab_alloc+0x40
+               kmem_cache_alloc_node+0x8b
+               copy_process+0x18e
+               do_fork+0x91
+               sys_clone+0x16
+               stub_clone+0x44
+
+summ           28276  1    ZONE_NORMAL  3     ASYNC   -1.000   11284    14105    16926    22074        0.008          partial
+               kretprobe_trampoline+0x0
+               try_to_compact_pages+0x121
+               __alloc_pages_direct_compact+0xac
+               __alloc_pages_slowpath+0x3e9
+               __alloc_pages_nodemask+0x404
+               alloc_pages_current+0x98
+               new_slab+0x2c5
+               ___slab_alloc+0x3ac
+               __slab_alloc+0x40
+               kmem_cache_alloc_node+0x8b
+               copy_process+0x18e
+               do_fork+0x91
+               sys_clone+0x16
+               stub_clone+0x44
+
+summ           28276  0    ZONE_NORMAL  3     ASYNC   0.527    11043    13803    16564    25653        9.812          partial
+               kretprobe_trampoline+0x0
+               try_to_compact_pages+0x121
+               __alloc_pages_direct_compact+0xac
+               __alloc_pages_slowpath+0x3e9
+               __alloc_pages_nodemask+0x404
+               alloc_pages_current+0x98
+               new_slab+0x2c5
+               ___slab_alloc+0x3ac
+               __slab_alloc+0x40
+               kmem_cache_alloc_node+0x8b
+               copy_process+0x18e
+               do_fork+0x91
+               sys_clone+0x16
+               stub_clone+0x44
+
+# ./compactsnoop -h
+usage: compactsnoop.py [-h] [-T] [-p PID] [-d DURATION] [-K] [-e]
+
+Trace compact zone
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -T, --timestamp       include timestamp on output
+  -p PID, --pid PID     trace this PID only
+  -d DURATION, --duration DURATION
+                        total duration of trace in seconds
+  -K, --kernel-stack    output kernel stack trace
+  -e, --extended_fields
+                        show system memory state
+
+examples:
+    ./compactsnoop          # trace all compact stall
+    ./compactsnoop -T       # include timestamps
+    ./compactsnoop -d 10    # trace for 10 seconds only
+    ./compactsnoop -K       # output kernel stack trace
+    ./compactsnoop -e       # show extended fields

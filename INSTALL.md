@@ -71,6 +71,10 @@ found at [packages.ubuntu.com](https://packages.ubuntu.com/search?suite=default&
 sudo apt-get install bpfcc-tools linux-headers-$(uname -r)
 ```
 
+In Ubuntu Eon (19.10) some of the BCC tools are currently broken due to outdated packages. This is a
+[known bug](https://bugs.launchpad.net/ubuntu/+source/bpfcc/+bug/1848137). Upstream packages are currently also unavailable for Eon.
+Therefore [building from source](#ubuntu---source) is currently the only way to get fully working tools.
+
 The tools are installed in `/sbin` (`/usr/sbin` in Ubuntu 18.04) with a `-bpfcc` extension. Try running `sudo opensnoop-bpfcc`.
 
 **_Note_**: the Ubuntu packages have different names but the package contents, in most cases, conflict
@@ -159,7 +163,7 @@ Upgrade the kernel to minimum 4.3.1-1 first; the ```CONFIG_BPF_SYSCALL=y``` conf
 
 Install these packages using any AUR helper such as [pacaur](https://aur.archlinux.org/packages/pacaur), [yaourt](https://aur.archlinux.org/packages/yaourt), [cower](https://aur.archlinux.org/packages/cower), etc.:
 ```
-bcc bcc-tools python-bcc python2-bcc
+bcc bcc-tools python-bcc
 ```
 All build and install dependencies are listed [in the PKGBUILD](https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=bcc) and should install automatically.
 
@@ -325,7 +329,7 @@ To build the toolchain from source, one needs:
 
 ### Install build dependencies
 ```
-# Trusty and older
+# Trusty (14.04 LTS) and older
 VER=trusty
 echo "deb http://llvm.org/apt/$VER/ llvm-toolchain-$VER-3.7 main
 deb-src http://llvm.org/apt/$VER/ llvm-toolchain-$VER-3.7 main" | \
@@ -333,9 +337,13 @@ deb-src http://llvm.org/apt/$VER/ llvm-toolchain-$VER-3.7 main" | \
 wget -O - http://llvm.org/apt/llvm-snapshot.gpg.key | sudo apt-key add -
 sudo apt-get update
 
-# For bionic
+# For Bionic (18.04 LTS)
 sudo apt-get -y install bison build-essential cmake flex git libedit-dev \
   libllvm6.0 llvm-6.0-dev libclang-6.0-dev python zlib1g-dev libelf-dev
+
+# For Eon (19.10)
+sudo apt install -y bison build-essential cmake flex git libedit-dev \
+  libllvm7 llvm-7-dev libclang-7-dev python zlib1g-dev libelf-dev
 
 # For other versions
 sudo apt-get -y install bison build-essential cmake flex git libedit-dev \
@@ -532,12 +540,12 @@ sudo /usr/share/bcc/tools/execsnoop
 ## Build LLVM and Clang development libs
 
 ```
-git clone http://llvm.org/git/llvm.git
-cd llvm/tools; git clone http://llvm.org/git/clang.git
-cd ..; mkdir -p build/install; cd build
-cmake -G "Unix Makefiles" -DLLVM_TARGETS_TO_BUILD="BPF;X86" \
+git clone https://github.com/llvm/llvm-project.git
+mkdir -p llvm-project/llvm/build/install
+cd llvm-project/llvm/build
+cmake -G "Ninja" -DLLVM_TARGETS_TO_BUILD="BPF;X86" \
+  -DLLVM_ENABLE_PROJECTS="clang" \
   -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$PWD/install ..
-make
-make install
+ninja && ninja install
 export PATH=$PWD/install/bin:$PATH
 ```

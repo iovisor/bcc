@@ -36,7 +36,7 @@ def positive_nonzero_int(val):
     return ival
 
 def stack_id_err(stack_id):
-    # -EFAULT in get_stackid normally means the stack-trace is not availible,
+    # -EFAULT in get_stackid normally means the stack-trace is not available,
     # Such as getting kernel stack trace in userspace code
     return (stack_id < 0) and (stack_id != -errno.EFAULT)
 
@@ -99,8 +99,6 @@ parser.add_argument("--state", type=positive_int,
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
 args = parser.parse_args()
-if args.pid and args.tgid:
-    parser.error("specify only one of -p and -t")
 folded = args.folded
 duration = int(args.duration)
 debug = 0

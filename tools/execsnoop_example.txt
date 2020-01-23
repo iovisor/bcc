@@ -77,6 +77,15 @@ python           3345086 4146419   0 /usr/local/bin/python /usr/local/bin/yum in
 yum              3345086 4146419   0 /usr/bin/yum install testpkg
 rpm              3345452 4146419   0 /bin/rpm -qa testpkg
 
+
+The --cgroupmap option filters based on a cgroup set. It is meant to be used
+with an externally created map.
+
+# ./execsnoop --cgroupmap /sys/fs/bpf/test01
+
+For more details, see docs/filtering_by_cgroups.md
+
+
 USAGE message:
 
 # ./execsnoop -h

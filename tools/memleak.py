@@ -399,7 +399,7 @@ elif max_size is not None:
         size_filter = "if (size > %d) return 0;" % max_size
 bpf_source = bpf_source.replace("SIZE_FILTER", size_filter)
 
-stack_flags = "BPF_F_REUSE_STACKID"
+stack_flags = "0"
 if not kernel_trace:
         stack_flags += "|BPF_F_USER_STACK"
 bpf_source = bpf_source.replace("STACK_FLAGS", stack_flags)

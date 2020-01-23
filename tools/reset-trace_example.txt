@@ -27,7 +27,7 @@ That's it.
 You can use -v to see what it does:
 
 # ./reset-trace.sh -v
-Reseting tracing state...
+Resetting tracing state...
 
 Checking /sys/kernel/debug/tracing/kprobe_events
 Checking /sys/kernel/debug/tracing/uprobe_events
@@ -132,7 +132,7 @@ Ok, so the process is now gone, but it did leave tracing in a semi-enabled
 state. Using reset-trace:
 
 # ./reset-trace.sh -v
-Reseting tracing state...
+Resetting tracing state...
 
 Checking /sys/kernel/debug/tracing/kprobe_events
 Checking /sys/kernel/debug/tracing/uprobe_events
@@ -186,19 +186,19 @@ And again with quiet:
 Here is an example of reset-trace detecting an unrelated tracing session:
 
 # ./reset-trace.sh 
-Noticed unrelated tracing file /sys/kernel/debug/tracing/set_ftrace_filter isn't set as expected. Not reseting (-F to force, -v for verbose).
+Noticed unrelated tracing file /sys/kernel/debug/tracing/set_ftrace_filter isn't set as expected. Not resetting (-F to force, -v for verbose).
 
 And verbose:
 
 # ./reset-trace.sh -v
-Reseting tracing state...
+Resetting tracing state...
 
 Checking /sys/kernel/debug/tracing/kprobe_events
 Checking /sys/kernel/debug/tracing/uprobe_events
 Checking /sys/kernel/debug/tracing/trace
 Checking /sys/kernel/debug/tracing/current_tracer
 Checking /sys/kernel/debug/tracing/set_ftrace_filter
-Noticed unrelated tracing file /sys/kernel/debug/tracing/set_ftrace_filter isn't set as expected. Not reseting (-F to force, -v for verbose).
+Noticed unrelated tracing file /sys/kernel/debug/tracing/set_ftrace_filter isn't set as expected. Not resetting (-F to force, -v for verbose).
 Contents of set_ftrace_filter is (line enumerated):
      1	tcp_send_mss
      2	tcp_sendpage

@@ -38,7 +38,7 @@ int on_tcp_send(struct pt_regs *ctx) {
   key.user_stack = stack_traces.get_stackid(ctx, BPF_F_USER_STACK);
 
   u64 zero = 0, *val;
-  val = counts.lookup_or_init(&key, &zero);
+  val = counts.lookup_or_try_init(&key, &zero);
   if (val) {
     (*val)++;
   }
@@ -101,7 +101,7 @@ int main(int argc, char** argv) {
       for (auto sym : syms)
         std::cout << "    " << sym << std::endl;
     } else {
-      // -EFAULT normally means the stack is not availiable and not an error
+      // -EFAULT normally means the stack is not available and not an error
       if (it.first.kernel_stack != -EFAULT) {
         lost_stacks++;
         std::cout << "    [Lost Kernel Stack" << it.first.kernel_stack << "]"
@@ -114,7 +114,7 @@ int main(int argc, char** argv) {
       for (auto sym : syms)
         std::cout << "    " << sym << std::endl;
     } else {
-      // -EFAULT normally means the stack is not availiable and not an error
+      // -EFAULT normally means the stack is not available and not an error
       if (it.first.user_stack != -EFAULT) {
         lost_stacks++;
         std::cout << "    [Lost User Stack " << it.first.user_stack << "]"

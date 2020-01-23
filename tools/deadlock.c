@@ -75,7 +75,7 @@ int trace_mutex_acquire(struct pt_regs *ctx, void *mutex_addr) {
 
   struct thread_to_held_mutex_leaf_t empty_leaf = {};
   struct thread_to_held_mutex_leaf_t *leaf =
-      thread_to_held_mutexes.lookup_or_init(&pid, &empty_leaf);
+      thread_to_held_mutexes.lookup_or_try_init(&pid, &empty_leaf);
   if (!leaf) {
     bpf_trace_printk(
         "could not add thread_to_held_mutex key, thread: %d, mutex: %p\n", pid,
@@ -95,7 +95,7 @@ int trace_mutex_acquire(struct pt_regs *ctx, void *mutex_addr) {
   }
 
   u64 stack_id =
-      stack_traces.get_stackid(ctx, BPF_F_USER_STACK | BPF_F_REUSE_STACKID);
+      stack_traces.get_stackid(ctx, BPF_F_USER_STACK);
 
   int added_mutex = 0;
   #pragma unroll
@@ -190,12 +190,12 @@ int trace_clone(struct pt_regs *ctx, unsigned long flags, void *child_stack,
   struct thread_created_leaf_t thread_created_leaf = {};
   thread_created_leaf.parent_pid = bpf_get_current_pid_tgid();
   thread_created_leaf.stack_id =
-      stack_traces.get_stackid(ctx, BPF_F_USER_STACK | BPF_F_REUSE_STACKID);
+      stack_traces.get_stackid(ctx, BPF_F_USER_STACK);
   bpf_get_current_comm(&thread_created_leaf.comm,
                        sizeof(thread_created_leaf.comm));
 
   struct thread_created_leaf_t *insert_result =
-      thread_to_parent.lookup_or_init(&child_pid, &thread_created_leaf);
+      thread_to_parent.lookup_or_try_init(&child_pid, &thread_created_leaf);
   if (!insert_result) {
     bpf_trace_printk(
         "could not add thread_created_key, child: %d, parent: %d\n", child_pid,

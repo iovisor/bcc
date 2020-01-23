@@ -117,7 +117,11 @@ class ProbeChecker : public RecursiveASTVisitor<ProbeChecker> {
       for(auto p : ptregs_) {
         if (std::get<0>(p) == E->getDirectCallee()) {
           needs_probe_ = true;
-          nb_derefs_ += std::get<1>(p);
+          // ptregs_ stores the number of dereferences needed to get the external
+          // pointer, while nb_derefs_ stores the number of dereferences
+          // encountered.  So, any dereference encountered is one less
+          // dereference needed to get the external pointer.
+          nb_derefs_ -= std::get<1>(p);
           return false;
         }
       }
@@ -179,7 +183,11 @@ class ProbeChecker : public RecursiveASTVisitor<ProbeChecker> {
       for(auto p : ptregs_) {
         if (std::get<0>(p) == E->getDecl()) {
           needs_probe_ = true;
-          nb_derefs_ += std::get<1>(p);
+          // ptregs_ stores the number of dereferences needed to get the external
+          // pointer, while nb_derefs_ stores the number of dereferences
+          // encountered.  So, any dereference encountered is one less
+          // dereference needed to get the external pointer.
+          nb_derefs_ -= std::get<1>(p);
           return false;
         }
       }
@@ -207,8 +215,8 @@ class ProbeChecker : public RecursiveASTVisitor<ProbeChecker> {
 // Visit a piece of the AST and mark it as needing probe reads
 class ProbeSetter : public RecursiveASTVisitor<ProbeSetter> {
  public:
-  explicit ProbeSetter(set<tuple<Decl *, int>> *ptregs, int nb_addrof)
-      : ptregs_(ptregs), nb_derefs_(-nb_addrof) {}
+  explicit ProbeSetter(set<tuple<Decl *, int>> *ptregs, int nb_derefs)
+      : ptregs_(ptregs), nb_derefs_(nb_derefs) {}
   bool VisitDeclRefExpr(DeclRefExpr *E) {
     tuple<Decl *, int> pt = make_tuple(E->getDecl(), nb_derefs_);
     ptregs_->insert(pt);
@@ -259,9 +267,9 @@ ProbeVisitor::ProbeVisitor(ASTContext &C, Rewriter &rewriter,
   C(C), rewriter_(rewriter), m_(m), track_helpers_(track_helpers),
   addrof_stmt_(nullptr), is_addrof_(false) {}
 
-bool ProbeVisitor::assignsExtPtr(Expr *E, int *nbAddrOf) {
+bool ProbeVisitor::assignsExtPtr(Expr *E, int *nbDerefs) {
   if (IsContextMemberExpr(E)) {
-    *nbAddrOf = 0;
+    *nbDerefs = 0;
     return true;
   }
 
@@ -278,7 +286,7 @@ bool ProbeVisitor::assignsExtPtr(Expr *E, int *nbAddrOf) {
     // an assignment, if we went through n addrof before getting the external
     // pointer, then we'll need n dereferences on the left-hand side variable
     // to get to the external pointer.
-    *nbAddrOf = -checker.get_nb_derefs();
+    *nbDerefs = -checker.get_nb_derefs();
     return true;
   }
 
@@ -291,7 +299,8 @@ bool ProbeVisitor::assignsExtPtr(Expr *E, int *nbAddrOf) {
           if (!A->getName().startswith("maps"))
             return false;
 
-          if (memb_name == "lookup" || memb_name == "lookup_or_init") {
+          if (memb_name == "lookup" || memb_name == "lookup_or_init" ||
+              memb_name == "lookup_or_try_init") {
             if (m_.find(Ref->getDecl()) != m_.end()) {
               // Retrieved an ext. pointer from a map, mark LHS as ext. pointer.
               // Pointers from maps always need a single dereference to get the
@@ -299,7 +308,7 @@ bool ProbeVisitor::assignsExtPtr(Expr *E, int *nbAddrOf) {
               // be a pointer to an external pointer as the verifier prohibits
               // storing known pointers (to map values, context, the stack, or
               // the packet) in maps.
-              *nbAddrOf = 1;
+              *nbDerefs = 1;
               return true;
             }
           }
@@ -311,10 +320,10 @@ bool ProbeVisitor::assignsExtPtr(Expr *E, int *nbAddrOf) {
 }
 bool ProbeVisitor::VisitVarDecl(VarDecl *D) {
   if (Expr *E = D->getInit()) {
-    int nbAddrOf;
-    if (assignsExtPtr(E, &nbAddrOf)) {
+    int nbDerefs;
+    if (assignsExtPtr(E, &nbDerefs)) {
       // The negative of the number of addrof is the number of dereferences.
-      tuple<Decl *, int> pt = make_tuple(D, -nbAddrOf);
+      tuple<Decl *, int> pt = make_tuple(D, nbDerefs);
       set_ptreg(pt);
     }
   }
@@ -350,7 +359,7 @@ bool ProbeVisitor::VisitCallExpr(CallExpr *Call) {
                                             true);
         if (checker.needs_probe()) {
           tuple<Decl *, int> pt = make_tuple(F->getParamDecl(i),
-                                             checker.get_nb_derefs());
+                                             -checker.get_nb_derefs());
           ptregs_.insert(pt);
         }
         ++i;
@@ -390,12 +399,13 @@ bool ProbeVisitor::VisitReturnStmt(ReturnStmt *R) {
                                       track_helpers_, true);
   if (checker.needs_probe()) {
     int curr_nb_derefs = ptregs_returned_.back();
+    int nb_derefs = -checker.get_nb_derefs();
     /* If the function returns external pointers with different levels of
      * indirection, we handle the case with the highest level of indirection
      * and leave it to the user to manually handle other cases. */
-    if (checker.get_nb_derefs() > curr_nb_derefs) {
+    if (nb_derefs > curr_nb_derefs) {
       ptregs_returned_.pop_back();
-      ptregs_returned_.push_back(checker.get_nb_derefs());
+      ptregs_returned_.push_back(nb_derefs);
     }
   }
   return true;
@@ -405,9 +415,9 @@ bool ProbeVisitor::VisitBinaryOperator(BinaryOperator *E) {
     return true;
 
   // copy probe attribute from RHS to LHS if present
-  int nbAddrOf;
-  if (assignsExtPtr(E->getRHS(), &nbAddrOf)) {
-    ProbeSetter setter(&ptregs_, nbAddrOf);
+  int nbDerefs;
+  if (assignsExtPtr(E->getRHS(), &nbDerefs)) {
+    ProbeSetter setter(&ptregs_, nbDerefs);
     setter.TraverseStmt(E->getLHS());
   }
   return true;
@@ -772,7 +782,7 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
         string txt;
         auto rewrite_start = GET_BEGINLOC(Call);
         auto rewrite_end = GET_ENDLOC(Call);
-        if (memb_name == "lookup_or_init") {
+        if (memb_name == "lookup_or_init" || memb_name == "lookup_or_try_init") {
           string name = Ref->getDecl()->getName();
           string arg0 = rewriter_.getRewrittenText(expansionRange(Call->getArg(0)->getSourceRange()));
           string arg1 = rewriter_.getRewrittenText(expansionRange(Call->getArg(1)->getSourceRange()));
@@ -782,6 +792,9 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
           txt += "if (!leaf) {";
           txt += " " + update + ", " + arg0 + ", " + arg1 + ", BPF_NOEXIST);";
           txt += " leaf = " + lookup + ", " + arg0 + ");";
+          if (memb_name == "lookup_or_init") {
+            txt += " if (!leaf) return 0;";
+          }
           txt += "}";
           txt += "leaf;})";
         } else if (memb_name == "increment") {
@@ -882,6 +895,12 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
             suffix = ")";
           } else if (memb_name == "redirect_map") {
             prefix = "bpf_redirect_map";
+            suffix = ")";
+          } else if (memb_name == "sk_storage_get") {
+            prefix = "bpf_sk_storage_get";
+            suffix = ")";
+          } else if (memb_name == "sk_storage_delete") {
+            prefix = "bpf_sk_storage_delete";
             suffix = ")";
           } else {
             error(GET_BEGINLOC(Call), "invalid bpf_table operation %0") << memb_name;
@@ -1188,6 +1207,19 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
       pinned_id = info.id;
     }
 
+    // Additional map specific information
+    size_t map_info_pos = section_attr.find("$");
+    std::string inner_map_name;
+
+    if (map_info_pos != std::string::npos) {
+      std::string map_info = section_attr.substr(map_info_pos + 1);
+      section_attr = section_attr.substr(0, map_info_pos);
+      if (section_attr == "maps/array_of_maps" ||
+          section_attr == "maps/hash_of_maps") {
+        inner_map_name = map_info;
+      }
+    }
+
     bpf_map_type map_type = BPF_MAP_TYPE_UNSPEC;
     if (section_attr == "maps/hash") {
       map_type = BPF_MAP_TYPE_HASH;
@@ -1227,6 +1259,12 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
       map_type = BPF_MAP_TYPE_DEVMAP;
     } else if (section_attr == "maps/cpumap") {
       map_type = BPF_MAP_TYPE_CPUMAP;
+    } else if (section_attr == "maps/hash_of_maps") {
+      map_type = BPF_MAP_TYPE_HASH_OF_MAPS;
+    } else if (section_attr == "maps/array_of_maps") {
+      map_type = BPF_MAP_TYPE_ARRAY_OF_MAPS;
+    } else if (section_attr == "maps/sk_storage") {
+      map_type = BPF_MAP_TYPE_SK_STORAGE;
     } else if (section_attr == "maps/extern") {
       if (!fe_.table_storage().Find(maps_ns_path, table_it)) {
         if (!fe_.table_storage().Find(global_path, table_it)) {
@@ -1270,7 +1308,8 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
       table.fake_fd = fe_.get_next_fake_fd();
       fe_.add_map_def(table.fake_fd, std::make_tuple((int)map_type, std::string(table.name),
                       (int)table.key_size, (int)table.leaf_size,
-                      (int)table.max_entries, table.flags, pinned_id));
+                      (int)table.max_entries, table.flags, pinned_id,
+                      inner_map_name));
     }
 
     if (!table.is_extern)

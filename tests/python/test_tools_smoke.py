@@ -117,6 +117,10 @@ class SmokeTests(TestCase):
     def test_cpuunclaimed(self):
         self.run_with_duration("cpuunclaimed.py 1 1")
 
+    @skipUnless(kernel_version_ge(4,17), "requires kernel >= 4.17")
+    def test_compactsnoop(self):
+        self.run_with_int("compactsnoop.py")
+
     @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
     def test_dbslower(self):
         # Deliberately left empty -- dbslower requires an instance of either
@@ -198,6 +202,10 @@ class SmokeTests(TestCase):
         # `kill -s SIGINT $(pidof python)`. As a result, killsnoop will print
         # a traceback but will not exit.
         self.run_with_int("killsnoop.py", kill=True)
+
+    @skipUnless(kernel_version_ge(4,18), "requires kernel >= 4.18")
+    def test_klockstat(self):
+        self.run_with_int("klockstat.py")
 
     @skipUnless(kernel_version_ge(4,9), "requires kernel >= 4.9")
     def test_llcstat(self):

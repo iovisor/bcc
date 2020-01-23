@@ -15,16 +15,12 @@ class TestKprobeMaxactive(TestCase):
         BPF_HASH(stats, Key, Val, 3);
         int hello(void *ctx) {
           Val *val = stats.lookup_or_init(&(Key){1}, &(Val){0});
-          if (val) {
-            val->val++;
-          }
+          val->val++;
           return 0;
         }
         int goodbye(void *ctx) {
           Val *val = stats.lookup_or_init(&(Key){2}, &(Val){0});
-          if (val) {
-            val->val++;
-          }
+          val->val++;
           return 0;
         }
         """)

@@ -208,6 +208,13 @@ static struct bpf_helper helpers[] = {
   {"sk_storage_delete", "5.2"},
   {"send_signal", "5.3"},
   {"tcp_gen_syncookie", "5.3"},
+  {"skb_output", "5.5"},
+  {"probe_read_user", "5.5"},
+  {"probe_read_kernel", "5.5"},
+  {"probe_read_user_str", "5.5"},
+  {"probe_read_kernel_str", "5.5"},
+  {"tcp_send_ack", "5.5"},
+  {"send_signal_thread", "5.5"},
 };
 
 static uint64_t ptr_to_u64(void *ptr)
@@ -507,18 +514,11 @@ int bcc_prog_load_xattr(struct bpf_load_program_attr *attr, int prog_len,
   char prog_name[BPF_OBJ_NAME_LEN] = {};
 
   unsigned insns_cnt = prog_len / sizeof(struct bpf_insn);
-  if (insns_cnt > BPF_MAXINSNS) {
-    errno = EINVAL;
-    fprintf(stderr,
-            "bpf: %s. Program %s too large (%u insns), at most %d insns\n\n",
-            strerror(errno), attr->name, insns_cnt, BPF_MAXINSNS);
-    return -1;
-  }
   attr->insns_cnt = insns_cnt;
 
   if (attr->log_level > 0) {
     if (log_buf_size > 0) {
-      // Use user-provided log buffer if availiable.
+      // Use user-provided log buffer if available.
       log_buf[0] = 0;
       attr_log_buf = log_buf;
       attr_log_buf_size = log_buf_size;
@@ -541,6 +541,8 @@ int bcc_prog_load_xattr(struct bpf_load_program_attr *attr, int prog_len,
   if (name_len) {
     if (strncmp(attr->name, "kprobe__", 8) == 0)
       name_offset = 8;
+    else if (strncmp(attr->name, "kretprobe__", 11) == 0)
+      name_offset = 11;
     else if (strncmp(attr->name, "tracepoint__", 12) == 0)
       name_offset = 12;
     else if (strncmp(attr->name, "raw_tracepoint__", 16) == 0)
@@ -589,6 +591,13 @@ int bcc_prog_load_xattr(struct bpf_load_program_attr *attr, int prog_len,
       if (setrlimit(RLIMIT_MEMLOCK, &rl) == 0)
         ret = bpf_load_program_xattr(attr, attr_log_buf, attr_log_buf_size);
     }
+  }
+
+  if (ret < 0 && errno == E2BIG) {
+    fprintf(stderr,
+            "bpf: %s. Program %s too large (%u insns), at most %d insns\n\n",
+            strerror(errno), attr->name, insns_cnt, BPF_MAXINSNS);
+    return -1;
   }
 
   // The load has failed. Handle log message.
@@ -871,68 +880,6 @@ static int bpf_attach_tracing_event(int progfd, const char *event_path, int pid,
   return 0;
 }
 
-static int enter_mount_ns(int pid) {
-  struct stat self_stat, target_stat;
-  int self_fd = -1, target_fd = -1;
-  char buf[64];
-
-  if (pid < 0)
-    return -1;
-
-  if ((size_t)snprintf(buf, sizeof(buf), "/proc/%d/ns/mnt", pid) >= sizeof(buf))
-    return -1;
-
-  self_fd = open("/proc/self/ns/mnt", O_RDONLY);
-  if (self_fd < 0) {
-    perror("open(/proc/self/ns/mnt)");
-    return -1;
-  }
-
-  target_fd = open(buf, O_RDONLY);
-  if (target_fd < 0) {
-    perror("open(/proc/<pid>/ns/mnt)");
-    goto error;
-  }
-
-  if (fstat(self_fd, &self_stat)) {
-    perror("fstat(self_fd)");
-    goto error;
-  }
-
-  if (fstat(target_fd, &target_stat)) {
-    perror("fstat(target_fd)");
-    goto error;
-  }
-
-  // both target and current ns are same, avoid setns and close all fds
-  if (self_stat.st_ino == target_stat.st_ino)
-    goto error;
-
-  if (setns(target_fd, CLONE_NEWNS)) {
-    perror("setns(target)");
-    goto error;
-  }
-
-  close(target_fd);
-  return self_fd;
-
-error:
-  if (self_fd >= 0)
-    close(self_fd);
-  if (target_fd >= 0)
-    close(target_fd);
-  return -1;
-}
-
-static void exit_mount_ns(int fd) {
-  if (fd < 0)
-    return;
-
-  if (setns(fd, CLONE_NEWNS))
-    perror("setns");
-  close(fd);
-}
-
 /* Creates an [uk]probe using debugfs.
  * On success, the path to the probe is placed in buf (which is assumed to be of size PATH_MAX).
  */
@@ -941,7 +888,7 @@ static int create_probe_event(char *buf, const char *ev_name,
                               const char *config1, uint64_t offset,
                               const char *event_type, pid_t pid, int maxactive)
 {
-  int kfd = -1, res = -1, ns_fd = -1;
+  int kfd = -1, res = -1;
   char ev_alias[256];
   bool is_kprobe = strncmp("kprobe", event_type, 6) == 0;
 
@@ -979,7 +926,6 @@ static int create_probe_event(char *buf, const char *ev_name,
       close(kfd);
       return -1;
     }
-    ns_fd = enter_mount_ns(pid);
   }
 
   if (write(kfd, buf, strlen(buf)) < 0) {
@@ -991,14 +937,10 @@ static int create_probe_event(char *buf, const char *ev_name,
     goto error;
   }
   close(kfd);
-  if (!is_kprobe)
-    exit_mount_ns(ns_fd);
   snprintf(buf, PATH_MAX, "/sys/kernel/debug/tracing/events/%ss/%s",
            event_type, ev_alias);
   return 0;
 error:
-  if (!is_kprobe)
-    exit_mount_ns(ns_fd);
   return -1;
 }
 

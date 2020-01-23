@@ -117,7 +117,12 @@ void SourceDebugger::dump() {
     errs() << "Debug Error: cannot get register info\n";
     return;
   }
+#if LLVM_MAJOR_VERSION >= 10
+  MCTargetOptions MCOptions;
+  std::unique_ptr<MCAsmInfo> MAI(T->createMCAsmInfo(*MRI, TripleStr, MCOptions));
+#else
   std::unique_ptr<MCAsmInfo> MAI(T->createMCAsmInfo(*MRI, TripleStr));
+#endif
   if (!MAI) {
     errs() << "Debug Error: cannot get assembly info\n";
     return;
@@ -196,8 +201,13 @@ void SourceDebugger::dump() {
       string src_dbg_str;
       llvm::raw_string_ostream os(src_dbg_str);
       for (uint64_t Index = 0; Index < FuncSize; Index += Size) {
+#if LLVM_MAJOR_VERSION >= 10
+        S = DisAsm->getInstruction(Inst, Size, Data.slice(Index), Index,
+                                   nulls());
+#else
         S = DisAsm->getInstruction(Inst, Size, Data.slice(Index), Index,
                                    nulls(), nulls());
+#endif
         if (S != MCDisassembler::Success) {
           os << "Debug Error: disassembler failed: " << std::to_string(S)
              << '\n';
@@ -220,7 +230,11 @@ void SourceDebugger::dump() {
                       CurrentSrcLine, os);
           os << format("%4" PRIu64 ":", Index >> 3) << '\t';
           dumpBytes(Data.slice(Index, Size), os);
+#if LLVM_MAJOR_VERSION >= 10
+          IP->printInst(&Inst, 0, "", *STI, os);
+#else
           IP->printInst(&Inst, os, "", *STI);
+#endif
           os << '\n';
         }
       }

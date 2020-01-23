@@ -58,6 +58,8 @@ class BPF {
                    const std::vector<std::string>& cflags = {},
                    const std::vector<USDT>& usdt = {});
 
+  StatusTuple init_usdt(const USDT& usdt);
+
   ~BPF();
   StatusTuple detach_all();
 
@@ -75,11 +77,13 @@ class BPF {
                             const std::string& probe_func,
                             uint64_t symbol_addr = 0,
                             bpf_probe_attach_type attach_type = BPF_PROBE_ENTRY,
-                            pid_t pid = -1);
+                            pid_t pid = -1,
+                            uint64_t symbol_offset = 0);
   StatusTuple detach_uprobe(const std::string& binary_path,
                             const std::string& symbol, uint64_t symbol_addr = 0,
                             bpf_probe_attach_type attach_type = BPF_PROBE_ENTRY,
-                            pid_t pid = -1);
+                            pid_t pid = -1,
+                            uint64_t symbol_offset = 0);
   StatusTuple attach_usdt(const USDT& usdt, pid_t pid = -1);
   StatusTuple detach_usdt(const USDT& usdt, pid_t pid = -1);
 
@@ -142,6 +146,14 @@ class BPF {
     return BPFPercpuHashTable<KeyType, ValueType>({});
   }
 
+  template <class ValueType>
+  BPFSkStorageTable<ValueType> get_sk_storage_table(const std::string& name) {
+    TableStorage::iterator it;
+    if (bpf_module_->table_storage().Find(Path({bpf_module_->id(), name}), it))
+      return BPFSkStorageTable<ValueType>(it->second);
+    return BPFSkStorageTable<ValueType>({});
+  }
+
   void* get_bsymcache(void) {
     if (bsymcache_ == NULL) {
       bsymcache_ = bcc_buildsymcache_new();
@@ -162,6 +174,8 @@ class BPF {
   BPFStackBuildIdTable get_stackbuildid_table(const std::string &name,
                                               bool use_debug_file = true,
                                               bool check_debug_file_crc = true);
+
+  BPFMapInMapTable get_map_in_map_table(const std::string& name);
 
   bool add_module(std::string module);
 
@@ -239,7 +253,10 @@ class BPF {
   StatusTuple check_binary_symbol(const std::string& binary_path,
                                   const std::string& symbol,
                                   uint64_t symbol_addr, std::string& module_res,
-                                  uint64_t& offset_res);
+                                  uint64_t& offset_res,
+                                  uint64_t symbol_offset = 0);
+
+  void init_fail_reset();
 
   int flag_;
 
@@ -252,6 +269,7 @@ class BPF {
   std::map<std::string, int> funcs_;
 
   std::vector<USDT> usdt_;
+  std::string all_bpf_program_;
 
   std::map<std::string, open_probe_t> kprobes_;
   std::map<std::string, open_probe_t> uprobes_;

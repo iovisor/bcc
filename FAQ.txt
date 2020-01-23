@@ -29,6 +29,13 @@ A: The so-called Kernel lockdown might be the root cause. Try disabling it with 
        echo 1 > /proc/sys/kernel/sysrq
        echo x > /proc/sysrq-trigger
    Also see https://github.com/iovisor/bcc/issues/2525
+   
+   If you have Secure Boot enabled you need to press Alt-PrintScr-x on the keyboard instead:
+   ```
+   This sysrq operation is disabled from userspace.
+   sysrq: Disabling Secure Boot restrictions
+   Lifting lockdown
+   ```
 
 Q: How do I fulfill the Linux kernel version requirement?
 A: You need to obtain a recent version of the Linux source code

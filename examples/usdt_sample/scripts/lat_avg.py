@@ -78,7 +78,7 @@ int trace_operation_end(struct pt_regs* ctx)
     start_hash.delete(&operation_id);
 
     struct hash_leaf_t zero = {};
-    struct hash_leaf_t* hash_leaf = lat_hash.lookup_or_init(&hash_key, &zero);
+    struct hash_leaf_t* hash_leaf = lat_hash.lookup_or_try_init(&hash_key, &zero);
     if (0 == hash_leaf) {
         return 0;
     }

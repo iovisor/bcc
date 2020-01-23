@@ -399,7 +399,7 @@ StatusTuple CodegenLLVM::visit_packet_expr_node(PacketExprNode *n) {
         expr_ = B.CreateCall(load_fn, vector<Value *>({skb_ptr8, skb_hdr_offset,
                                                       B.getInt64(bit_offset & 0x7), B.getInt64(bit_width)}));
         // this generates extra trunc insns whereas the bpf.load fns already
-        // trunc the values internally in the bpf interpeter
+        // trunc the values internally in the bpf interpreter
         //expr_ = B.CreateTrunc(pop_expr(), B.getIntNTy(bit_width));
       }
     } else {
@@ -821,7 +821,11 @@ StatusTuple CodegenLLVM::visit_table_index_expr_node(TableIndexExprNode *n) {
     // var Leaf leaf {0}
     Value *leaf_ptr = B.CreateBitCast(
         make_alloca(resolve_entry_stack(), leaf_type), B.getInt8PtrTy());
+#if LLVM_MAJOR_VERSION >= 10
+    B.CreateMemSet(leaf_ptr, B.getInt8(0), B.getInt64(n->table_->leaf_id()->bit_width_ >> 3), MaybeAlign(1));
+#else
     B.CreateMemSet(leaf_ptr, B.getInt8(0), B.getInt64(n->table_->leaf_id()->bit_width_ >> 3), 1);
+#endif
     // update(key, leaf)
     B.CreateCall(update_fn, vector<Value *>({pseudo_map_fd, key_ptr, leaf_ptr, B.getInt64(BPF_NOEXIST)}));
 
@@ -1003,7 +1007,11 @@ StatusTuple CodegenLLVM::visit_struct_variable_decl_stmt_node(StructVariableDecl
         B.CreateStore(const_null, ptr_a);
       }
     } else {
+#if LLVM_MAJOR_VERSION >= 10
+      B.CreateMemSet(ptr_a, B.getInt8(0), B.getInt64(decl->bit_width_ >> 3), MaybeAlign(1));
+#else
       B.CreateMemSet(ptr_a, B.getInt8(0), B.getInt64(decl->bit_width_ >> 3), 1);
+#endif
       if (!n->init_.empty()) {
         for (auto it = n->init_.begin(); it != n->init_.end(); ++it)
           TRY2((*it)->accept(this));

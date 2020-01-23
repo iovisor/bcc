@@ -28,7 +28,22 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DLLVM_MAJOR_VERSION=${CMAKE_MATCH_1}")
 
 include(static_libstdc++)
 
-file(GLOB libbpf_sources "libbpf/src/*.c")
+if(LIBBPF_FOUND)
+  # We need to include the libbpf packaged source to get the
+  # headers location, becaseu they are installed under 'bpf'
+  # directory, but the libbpf code references them localy
+
+  include_directories(${LIBBPF_INCLUDE_DIR}/bpf)
+
+  set(extract_dir ${CMAKE_CURRENT_BINARY_DIR}/libbpf_a_extract)
+  execute_process(COMMAND sh -c "mkdir -p ${extract_dir} && cd ${extract_dir} && ${CMAKE_AR} x ${LIBBPF_STATIC_LIBRARIES}")
+  file(GLOB libbpf_sources "${extract_dir}/*.o")
+else()
+  file(GLOB libbpf_sources "libbpf/src/*.c")
+endif()
+
+set(libbpf_uapi libbpf/include/uapi/linux/)
+
 add_library(bpf-static STATIC libbpf.c perf_reader.c ${libbpf_sources})
 set_target_properties(bpf-static PROPERTIES OUTPUT_NAME bcc_bpf)
 add_library(bpf-shared SHARED libbpf.c perf_reader.c ${libbpf_sources})
@@ -60,13 +75,23 @@ add_library(bcc-shared SHARED
 set_target_properties(bcc-shared PROPERTIES VERSION ${REVISION_LAST} SOVERSION 0)
 set_target_properties(bcc-shared PROPERTIES OUTPUT_NAME bcc)
 
+# If there's libbpf detected we build the libbcc-no-libbpf.so library, that
+# dynamicaly links libbpf.so, in comparison to static link in libbcc.so.
+if(LIBBPF_FOUND)
+  add_library(bcc-shared-no-libbpf SHARED
+    link_all.cc ${bcc_common_sources} ${bcc_table_sources} ${bcc_sym_sources}
+    ${bcc_util_sources} libbpf.c perf_reader.c)
+  set_target_properties(bcc-shared-no-libbpf PROPERTIES VERSION ${REVISION_LAST} SOVERSION 0)
+  set_target_properties(bcc-shared-no-libbpf PROPERTIES OUTPUT_NAME bcc-no-libbpf)
+endif()
+
 if(ENABLE_USDT)
   set(bcc_usdt_sources usdt/usdt.cc usdt/usdt_args.cc)
   # else undefined
 endif()
 
 add_library(bcc-loader-static STATIC ${bcc_sym_sources} ${bcc_util_sources})
-target_link_libraries(bcc-loader-static elf)
+target_link_libraries(bcc-loader-static elf z)
 add_library(bcc-static STATIC
   ${bcc_common_sources} ${bcc_table_sources} ${bcc_util_sources} ${bcc_usdt_sources} ${bcc_sym_sources} ${bcc_util_sources})
 set_target_properties(bcc-static PROPERTIES OUTPUT_NAME bcc)
@@ -79,10 +104,12 @@ set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${llvm_lib_exclude_f
 
 # bcc_common_libs_for_a for archive libraries
 # bcc_common_libs_for_s for shared libraries
-set(bcc_common_libs_for_a b_frontend clang_frontend bpf-static
+set(bcc_common_libs b_frontend clang_frontend
   -Wl,--whole-archive ${clang_libs} ${llvm_libs} -Wl,--no-whole-archive
   ${LIBELF_LIBRARIES})
-set(bcc_common_libs_for_s ${bcc_common_libs_for_a})
+set(bcc_common_libs_for_a ${bcc_common_libs} bpf-static)
+set(bcc_common_libs_for_s ${bcc_common_libs} bpf-static)
+set(bcc_common_libs_for_n ${bcc_common_libs})
 set(bcc_common_libs_for_lua b_frontend clang_frontend bpf-static
   ${clang_libs} ${llvm_libs} ${LIBELF_LIBRARIES})
 
@@ -91,6 +118,7 @@ if(ENABLE_CPP_API)
   list(APPEND bcc_common_libs_for_a api-static)
   # Keep all API functions
   list(APPEND bcc_common_libs_for_s -Wl,--whole-archive api-static -Wl,--no-whole-archive)
+  list(APPEND bcc_common_libs_for_n -Wl,--whole-archive api-static -Wl,--no-whole-archive)
 endif()
 
 if(ENABLE_USDT)
@@ -98,6 +126,7 @@ if(ENABLE_USDT)
   add_subdirectory(usdt)
   list(APPEND bcc_common_libs_for_a usdt-static)
   list(APPEND bcc_common_libs_for_s usdt-static)
+  list(APPEND bcc_common_libs_for_n usdt-static)
   list(APPEND bcc_common_libs_for_lua usdt-static)
 endif()
 
@@ -108,10 +137,15 @@ target_link_libraries(bcc-shared ${bcc_common_libs_for_s})
 target_link_libraries(bcc-static ${bcc_common_libs_for_a} bcc-loader-static)
 set(bcc-lua-static ${bcc-lua-static} ${bcc_common_libs_for_lua})
 
-install(TARGETS bcc-shared LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
+if(LIBBPF_FOUND)
+  target_link_libraries(bcc-shared-no-libbpf ${bcc_common_libs_for_n} ${LIBBPF_LIBRARIES})
+  install(TARGETS bcc-shared-no-libbpf LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
+endif()
+
+install(TARGETS bcc-shared bcc-static bcc-loader-static bpf-static LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
 install(FILES ${bcc_table_headers} DESTINATION include/bcc)
 install(FILES ${bcc_api_headers} DESTINATION include/bcc)
-install(DIRECTORY libbpf/include/uapi/linux/ DESTINATION include/bcc/compat/linux FILES_MATCHING PATTERN "*.h")
+install(DIRECTORY ${libbpf_uapi} DESTINATION include/bcc/compat/linux FILES_MATCHING PATTERN "*.h")
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libbcc.pc DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
 endif(ENABLE_CLANG_JIT)
 install(FILES ${bcc_common_headers} DESTINATION include/bcc)

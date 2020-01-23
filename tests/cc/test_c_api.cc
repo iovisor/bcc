@@ -104,7 +104,7 @@ TEST_CASE("resolve symbol name in external library using loaded libraries", "[c_
   struct bcc_symbol sym;
 
   REQUIRE(bcc_resolve_symname("bcc", "bcc_procutils_which", 0x0, getpid(), nullptr, &sym) == 0);
-  REQUIRE(string(sym.module).find("libbcc.so") != string::npos);
+  REQUIRE(string(sym.module).find(LIBBCC_NAME) != string::npos);
   REQUIRE(sym.module[0] == '/');
   REQUIRE(sym.offset != 0);
   bcc_procutils_free(sym.module);
@@ -233,15 +233,15 @@ TEST_CASE("resolve symbol addresses for a given PID", "[c_api]") {
     REQUIRE(string(lazy_sym.module) == sym.module);
   }
 
-  SECTION("resolve in libbcc.so") {
-    void *libbcc = dlopen("libbcc.so", RTLD_LAZY | RTLD_NOLOAD);
+  SECTION("resolve in " LIBBCC_NAME) {
+    void *libbcc = dlopen(LIBBCC_NAME, RTLD_LAZY | RTLD_NOLOAD);
     REQUIRE(libbcc);
 
     void *libbcc_fptr = dlsym(libbcc, "bcc_resolve_symname");
     REQUIRE(libbcc_fptr);
 
     REQUIRE(bcc_symcache_resolve(resolver, (uint64_t)libbcc_fptr, &sym) == 0);
-    REQUIRE(string(sym.module).find("libbcc.so") != string::npos);
+    REQUIRE(string(sym.module).find(LIBBCC_NAME) != string::npos);
     REQUIRE(string("bcc_resolve_symname") == sym.name);
 
     REQUIRE(bcc_symcache_resolve(lazy_resolver, (uint64_t)libbcc_fptr, &lazy_sym) == 0);

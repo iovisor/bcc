@@ -19,7 +19,7 @@
 # wrong, note that the first line is the IP, and then the (skipped) stack.
 #
 # Note: if another perf-based sampling session is active, the output may become
-# polluted with their events. On older kernels, the ouptut may also become
+# polluted with their events. On older kernels, the output may also become
 # polluted with tracing sessions (when the kprobe is used instead of the
 # tracepoint). If this becomes a problem, logic can be added to filter events.
 #
@@ -209,9 +209,9 @@ bpf_text = bpf_text.replace('STACK_STORAGE_SIZE', str(args.stack_storage_size))
 
 # handle stack args
 kernel_stack_get = "stack_traces.get_stackid(args, " \
-    "%d | BPF_F_REUSE_STACKID)" % skip
+    "%d)" % skip
 user_stack_get = \
-    "stack_traces.get_stackid(args, BPF_F_REUSE_STACKID | BPF_F_USER_STACK)"
+    "stack_traces.get_stackid(args, BPF_F_USER_STACK)"
 stack_context = ""
 if args.user_stacks_only:
     stack_context = "user"
@@ -300,7 +300,7 @@ has_enomem = False
 counts = b.get_table("counts")
 stack_traces = b.get_table("stack_traces")
 for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
-    # handle get_stackid erorrs
+    # handle get_stackid errors
     if (not args.user_stacks_only and k.kernel_stack_id < 0 and
             k.kernel_stack_id != -errno.EFAULT) or \
             (not args.kernel_stacks_only and k.user_stack_id < 0 and

@@ -70,15 +70,11 @@ void BTF::warning(const char *format, ...) {
   va_end(args);
 }
 
-// Adjust datasec types. The compiler is not able to determine
-// the datasec size, so we need to set the value properly based
-// on actual section size.
-void BTF::fixup_datasec(uint8_t *type_sec, uintptr_t type_sec_size,
-                        char *strings) {
+void BTF::fixup_btf(uint8_t *type_sec, uintptr_t type_sec_size,
+                    char *strings) {
   uint8_t *next_type = type_sec;
   uint8_t *end_type = type_sec + type_sec_size;
   int base_size = sizeof(struct btf_type);
-  char *secname;
 
   while (next_type < end_type) {
     struct btf_type *t = (struct btf_type *)next_type;
@@ -93,7 +89,11 @@ void BTF::fixup_datasec(uint8_t *type_sec, uintptr_t type_sec_size,
     case BTF_KIND_RESTRICT:
     case BTF_KIND_PTR:
     case BTF_KIND_TYPEDEF:
+      break;
     case BTF_KIND_FUNC:
+      // sanitize vlen to be 0 since bcc does not
+      // care about func scope (static, global, extern) yet.
+      t->info &= ~0xffff;
       break;
     case BTF_KIND_INT:
       next_type += sizeof(uint32_t);
@@ -111,31 +111,39 @@ void BTF::fixup_datasec(uint8_t *type_sec, uintptr_t type_sec_size,
     case BTF_KIND_FUNC_PROTO:
       next_type += vlen * sizeof(struct btf_param);
       break;
-    case BTF_KIND_VAR:
+    case BTF_KIND_VAR: {
+      // BTF_KIND_VAR is not used by bcc, so
+      // a sanitization to convert it to an int.
+      // One extra __u32 after btf_type.
+      if (sizeof(struct btf_var) == 4) {
+        t->name_off = 0;
+        t->info = BTF_KIND_INT << 24;
+        t->size = 4;
+
+        unsigned *intp = (unsigned *)next_type;
+        *intp = BTF_INT_BITS(t->size << 3);
+      }
+
       next_type += sizeof(struct btf_var);
       break;
+    }
     case BTF_KIND_DATASEC: {
-      secname = strings + t->name_off;
-      if (sections_.find(secname) != sections_.end()) {
-        t->size = std::get<1>(sections_[secname]);
-      }
-      // For section name, the kernel does not accept '/'.
-      // So change DataSec name here to please the kenerl
-      // as we do not really use DataSec yet.
-      // This change can be removed if the kernel is
-      // changed to accpet '/' in section names.
-      if (strncmp(strings + t->name_off, "maps/", 5) == 0)
-        t->name_off += 5;
+      // bcc does not use BTF_KIND_DATASEC, so
+      // a sanitization here to convert it to a list
+      // of void pointers.
+      // btf_var_secinfo is 3 __u32's for each var.
+      if (sizeof(struct btf_var_secinfo) == 12) {
+        t->name_off = 0;
+        t->info = BTF_KIND_PTR << 24;
+        t->type = 0;
 
-      // fill in the in-section offset as JIT did not
-      // do relocations. Did not cross-verify correctness with
-      // symbol table as we do not use it yet.
-      struct btf_var_secinfo *var_info = (struct btf_var_secinfo *)next_type;
-      uint32_t offset = 0;
-      for (int index = 0; index < vlen; index++) {
-        var_info->offset = offset;
-        offset += var_info->size;
-        var_info++;
+        struct btf_type *typep = (struct btf_type *)next_type;
+        for (int i = 0; i < vlen; i++) {
+          typep->name_off = 0;
+          typep->info = BTF_KIND_PTR << 24;
+          typep->type = 0;
+          typep++;
+        }
       }
 
       next_type += vlen * sizeof(struct btf_var_secinfo);
@@ -180,9 +188,9 @@ void BTF::adjust(uint8_t *btf_sec, uintptr_t btf_sec_size,
   struct btf_header *hdr = (struct btf_header *)btf_sec;
   struct btf_ext_header *ehdr = (struct btf_ext_header *)btf_ext_sec;
 
-  // Fixup datasec.
-  fixup_datasec(btf_sec + hdr->hdr_len + hdr->type_off, hdr->type_len,
-                (char *)(btf_sec + hdr->hdr_len + hdr->str_off));
+  // Fixup btf for old kernels or kernel requirements.
+  fixup_btf(btf_sec + hdr->hdr_len + hdr->type_off, hdr->type_len,
+            (char *)(btf_sec + hdr->hdr_len + hdr->str_off));
 
   // Check the LineInfo table and add missing lines
   char *strings = (char *)(btf_sec + hdr->hdr_len + hdr->str_off);

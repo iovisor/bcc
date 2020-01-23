@@ -136,7 +136,7 @@ class EbpfTableKey(object):
         # Sort fields in decreasing size; this will ensure that
         # there is no padding.
         # Padding may cause the ebpf verification to fail,
-        # since padding fields are not initalized
+        # since padding fields are not initialized
         fieldOrder = sorted(
             self.fields, key=EbpfTableKey.fieldRank, reverse=True)
         for f in fieldOrder:

@@ -36,6 +36,7 @@ examples = """examples:
     ./execsnoop -q        # add "quotemarks" around arguments
     ./execsnoop -n main   # only print command lines containing "main"
     ./execsnoop -l tpkg   # only print command where arguments contains "tpkg"
+    ./opensnoop --cgroupmap ./mappath  # only trace cgroups in this BPF map
 """
 parser = argparse.ArgumentParser(
     description="Trace exec() syscalls",
@@ -47,6 +48,8 @@ parser.add_argument("-t", "--timestamp", action="store_true",
     help="include timestamp on output")
 parser.add_argument("-x", "--fails", action="store_true",
     help="include failed exec()s")
+parser.add_argument("--cgroupmap",
+    help="trace cgroups in this BPF map only")
 parser.add_argument("-q", "--quote", action="store_true",
     help="Add quotemarks (\") around arguments."
     )
@@ -84,6 +87,9 @@ struct data_t {
     int retval;
 };
 
+#if CGROUPSET
+BPF_TABLE_PINNED("hash", u64, u64, cgroupset, 1024, "CGROUPPATH");
+#endif
 BPF_PERF_OUTPUT(events);
 
 static int __submit_arg(struct pt_regs *ctx, void *ptr, struct data_t *data)
@@ -108,6 +114,13 @@ int syscall__execve(struct pt_regs *ctx,
     const char __user *const __user *__argv,
     const char __user *const __user *__envp)
 {
+#if CGROUPSET
+    u64 cgroupid = bpf_get_current_cgroup_id();
+    if (cgroupset.lookup(&cgroupid) == NULL) {
+      return 0;
+    }
+#endif
+
     // create data here and pass to submit_arg to save stack space (#555)
     struct data_t data = {};
     struct task_struct *task;
@@ -141,6 +154,13 @@ out:
 
 int do_ret_sys_execve(struct pt_regs *ctx)
 {
+#if CGROUPSET
+    u64 cgroupid = bpf_get_current_cgroup_id();
+    if (cgroupset.lookup(&cgroupid) == NULL) {
+      return 0;
+    }
+#endif
+
     struct data_t data = {};
     struct task_struct *task;
 
@@ -162,6 +182,11 @@ int do_ret_sys_execve(struct pt_regs *ctx)
 """
 
 bpf_text = bpf_text.replace("MAXARG", args.max_args)
+if args.cgroupmap:
+    bpf_text = bpf_text.replace('CGROUPSET', '1')
+    bpf_text = bpf_text.replace('CGROUPPATH', args.cgroupmap)
+else:
+    bpf_text = bpf_text.replace('CGROUPSET', '0')
 if args.ebpf:
     print(bpf_text)
     exit()

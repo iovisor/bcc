@@ -1,0 +1,190 @@
+.TH klockstat 8  "2019-10-22" "USER COMMANDS"
+.SH NAME
+klockstat \- Traces kernel mutex lock events and display locks statistics. Uses Linux eBPF/bcc.
+.SH SYNOPSIS
+.B klockstat [\-h] [\-i] [\-n] [\-s] [\-c] [\-S FIELDS] [\-p] [\-t] [\-d DURATION]
+.SH DESCRIPTION
+klockstat traces kernel mutex lock events and display locks statistics
+and displays following data:
+
+                                  Caller   Avg Spin  Count   Max spin Total spin
+                      psi_avgs_work+0x2e       3675      5       5468      18379
+                     flush_to_ldisc+0x22       2833      2       4210       5667
+                       n_tty_write+0x30c       3914      1       3914       3914
+                               isig+0x5d       2390      1       2390       2390
+                   tty_buffer_flush+0x2a       1604      1       1604       1604
+                      commit_echoes+0x22       1400      1       1400       1400
+          n_tty_receive_buf_common+0x3b9       1399      1       1399       1399
+
+                                  Caller   Avg Hold  Count   Max hold Total hold
+                     flush_to_ldisc+0x22      42558      2      76135      85116
+                      psi_avgs_work+0x2e      14821      5      20446      74106
+          n_tty_receive_buf_common+0x3b9      12300      1      12300      12300
+                       n_tty_write+0x30c      10712      1      10712      10712
+                               isig+0x5d       3362      1       3362       3362
+                   tty_buffer_flush+0x2a       3078      1       3078       3078
+                      commit_echoes+0x22       3017      1       3017       3017
+
+
+Every caller to using kernel's mutex is displayed on every line.
+
+First portion of lines show the lock acquiring data, showing the
+amount of time it took to acquired given lock.
+
+  'Caller'       - symbol acquiring the mutex
+  'Average Spin' - average time to acquire the mutex
+  'Count'        - number of times mutex was acquired
+  'Max spin'     - maximum time to acquire the mutex
+  'Total spin'   - total time spent in acquiring the mutex
+
+Second portion of lines show the lock holding data, showing the
+amount of time it took to hold given lock.
+
+  'Caller'       - symbol holding the mutex
+  'Average Hold' - average time mutex was held
+  'Count'        - number of times mutex was held
+  'Max hold'     - maximum time mutex was held
+  'Total hold'   - total time spent in holding the mutex
+
+This works by tracing mutex_lock/unlock kprobes, updating the
+lock stats in maps and processing them in the python part.
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH OPTIONS
+.TP
+\-h
+Print usage message.
+.TP
+\-i SEC
+print summary at this interval (seconds)
+.TP
+\-c CALLER
+print locks taken by given caller filter (e.g., pipe_)
+.TP
+\-S FIELDS
+sort data on specific columns defined by FIELDS string (by default the data is sorted by Max columns)
+
+FIELDS string contains 1 or 2 fields describing columns to sort on
+for both acquiring and holding data. Following fields are available:
+
+  acq_max      for 'Max spin' column
+  acq_total    for 'Total spin' column
+  acq_count    for 'Count' column
+
+  hld_max      for 'Max hold' column
+  hld_total    for 'Total hold' column
+  hld_count    for 'Count' column
+
+See EXAMPLES.
+
+.TP
+\-n COUNT
+print COUNT number of locks
+.TP
+\-s COUNT
+print COUNT number of stack entries
+.TP
+\-p PID
+Trace this process ID only (filtered in-kernel).
+.TP
+\-t TID
+Trace this thread ID only (filtered in-kernel).
+.TP
+\-d DURATION
+Total duration of trace in seconds.
+.TP
+\-\-stack-storage-size STACK_STORAGE_SIZE
+Change the number of unique stack traces that can be stored and displayed.
+.SH EXAMPLES
+.TP
+Sort lock acquired results on acquired count:
+#
+.B klockstat -S acq_count
+
+.TP
+Sort lock held results on total held time:
+#
+.B klockstat -S hld_total
+
+.TP
+Combination of above:
+#
+.B klockstat -S acq_count,hld_total
+
+.TP
+Trace system wide:
+#
+.B klockstat
+
+.TP
+Trace for 5 seconds only:
+#
+.B klockstat -d 5
+
+.TP
+Display stats every 5 seconds
+#
+.B klockstat -i 5
+
+.TP
+Trace locks for PID 123:
+#
+.B klockstat -p 123
+
+.TP
+Trace locks for PID 321:
+#
+.B klockstat -t 321
+
+.TP
+Display stats only for lock callers with 'pipe_' substring
+#
+.B klockstat -c pipe_
+
+.TP
+Display 3 locks:
+#
+.B klockstat -n 3
+
+.TP
+Display 10 levels of stack for the most expensive lock:
+#
+.B klockstat -n 1 -s 10
+
+Tracing lock events... Hit Ctrl-C to end.
+^C
+                                  Caller   Avg Spin  Count   Max spin Total spin
+                          pipe_wait+0xa9        670 397691      17273  266775437
+                          pipe_wait+0xa9
+                         pipe_read+0x206
+                     new_sync_read+0x12a
+                           vfs_read+0x9d
+                          ksys_read+0x5f
+                      do_syscall_64+0x5b
+     entry_SYSCALL_64_after_hwframe+0x44
+
+                                  Caller   Avg Hold  Count   Max hold Total hold
+                     flush_to_ldisc+0x22      28381      3      65484      85144
+                     flush_to_ldisc+0x22
+                  process_one_work+0x1b0
+                      worker_thread+0x50
+                            kthread+0xfb
+                      ret_from_fork+0x35
+
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH CREDITS
+This tool is based on work of David Valin <dvalin@redhat.com> and his script.
+.SH AUTHOR
+Jiri Olsa

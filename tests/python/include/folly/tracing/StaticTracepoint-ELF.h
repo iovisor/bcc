@@ -52,7 +52,7 @@
 #define FOLLY_SDT_ARGSIZE(x)  (FOLLY_SDT_ISARRAY(x) ? sizeof(void*) : sizeof(x))
 
 // Format of each probe arguments as operand.
-// Size of the arugment tagged with FOLLY_SDT_Sn, with "n" constraint.
+// Size of the argument tagged with FOLLY_SDT_Sn, with "n" constraint.
 // Value of the argument tagged with FOLLY_SDT_An, with configured constraint.
 #define FOLLY_SDT_ARG(n, x)                                                    \
   [FOLLY_SDT_S##n] "n"                ((size_t)FOLLY_SDT_ARGSIZE(x)),          \

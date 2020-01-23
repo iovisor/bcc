@@ -42,7 +42,7 @@ int on_cache_miss(struct bpf_perf_event_data *ctx) {
     get_key(&key);
 
     u64 zero = 0, *val;
-    val = miss_count.lookup_or_init(&key, &zero);
+    val = miss_count.lookup_or_try_init(&key, &zero);
     if (val) {
         (*val) += ctx->sample_period;
     }
@@ -55,7 +55,7 @@ int on_cache_ref(struct bpf_perf_event_data *ctx) {
     get_key(&key);
 
     u64 zero = 0, *val;
-    val = ref_count.lookup_or_init(&key, &zero);
+    val = ref_count.lookup_or_try_init(&key, &zero);
     if (val) {
         (*val) += ctx->sample_period;
     }

@@ -182,6 +182,10 @@ def Table(bpf, map_id, map_fd, keytype, leaftype, name, **kwargs):
         t = DevMap(bpf, map_id, map_fd, keytype, leaftype)
     elif ttype == BPF_MAP_TYPE_CPUMAP:
         t = CpuMap(bpf, map_id, map_fd, keytype, leaftype)
+    elif ttype == BPF_MAP_TYPE_ARRAY_OF_MAPS:
+        t = MapInMapArray(bpf, map_id, map_fd, keytype, leaftype)
+    elif ttype == BPF_MAP_TYPE_HASH_OF_MAPS:
+        t = MapInMapHash(bpf, map_id, map_fd, keytype, leaftype)
     if t == None:
         raise Exception("Unknown table type %d" % ttype)
     return t
@@ -199,6 +203,9 @@ class TableBase(MutableMapping):
         self.flags = lib.bpf_table_flags_id(self.bpf.module, self.map_id)
         self._cbs = {}
         self._name = name
+
+    def get_fd(self):
+        return self.map_fd
 
     def key_sprintf(self, key):
         buf = ct.create_string_buffer(ct.sizeof(self.Key) * 8)
@@ -897,3 +904,11 @@ class DevMap(ArrayBase):
 class CpuMap(ArrayBase):
     def __init__(self, *args, **kwargs):
         super(CpuMap, self).__init__(*args, **kwargs)
+
+class MapInMapArray(ArrayBase):
+    def __init__(self, *args, **kwargs):
+        super(MapInMapArray, self).__init__(*args, **kwargs)
+
+class MapInMapHash(HashTable):
+    def __init__(self, *args, **kwargs):
+        super(MapInMapHash, self).__init__(*args, **kwargs)
