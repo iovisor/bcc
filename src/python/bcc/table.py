@@ -182,6 +182,8 @@ def Table(bpf, map_id, map_fd, keytype, leaftype, name, **kwargs):
         t = DevMap(bpf, map_id, map_fd, keytype, leaftype)
     elif ttype == BPF_MAP_TYPE_CPUMAP:
         t = CpuMap(bpf, map_id, map_fd, keytype, leaftype)
+    elif ttype == BPF_MAP_TYPE_XSKMAP:
+        t = XskMap(bpf, map_id, map_fd, keytype, leaftype)
     elif ttype == BPF_MAP_TYPE_ARRAY_OF_MAPS:
         t = MapInMapArray(bpf, map_id, map_fd, keytype, leaftype)
     elif ttype == BPF_MAP_TYPE_HASH_OF_MAPS:
@@ -904,6 +906,10 @@ class DevMap(ArrayBase):
 class CpuMap(ArrayBase):
     def __init__(self, *args, **kwargs):
         super(CpuMap, self).__init__(*args, **kwargs)
+
+class XskMap(ArrayBase):
+    def __init__(self, *args, **kwargs):
+        super(XskMap, self).__init__(*args, **kwargs)
 
 class MapInMapArray(ArrayBase):
     def __init__(self, *args, **kwargs):
