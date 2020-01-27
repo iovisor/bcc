@@ -183,6 +183,7 @@ Helper | Kernel version | License | Commit |
 `BPF_FUNC_get_stack()` | 4.18 | GPL | [`de2ff05f48af`](https://git.kernel.org/cgit/linux/kernel/git/davem/net-next.git/commit/?id=de2ff05f48afcde816ff4edb217417f62f624ab5)
 `BPF_FUNC_get_stackid()` | 4.6 | GPL | [`d5a3b1f69186`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=d5a3b1f691865be576c2bffa708549b8cdccda19)
 `BPF_FUNC_getsockopt()` | 4.15 |  | [`cd86d1fd2102`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=cd86d1fd21025fdd6daf23d1288da405e7ad0ec6)
+`BPF_FUNC_jiffies64()` | 5.5 |  | [`5576b991e9c1`](https://git.kernel.org/pub/scm/linux/kernel/git/bpf/bpf-next.git/commit/?id=5576b991e9c1a11d2cc21c4b94fc75ec27603896)
 `BPF_FUNC_ktime_get_ns()` | 4.1 | GPL | [`d9847d310ab4`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=d9847d310ab4003725e6ed1822682e24bd406908)
 `BPF_FUNC_l3_csum_replace()` | 4.1 |  | [`91bc4822c3d6`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=91bc4822c3d61b9bb7ef66d3b77948a4f9177954)
 `BPF_FUNC_l4_csum_replace()` | 4.1 |  | [`91bc4822c3d6`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=91bc4822c3d61b9bb7ef66d3b77948a4f9177954)

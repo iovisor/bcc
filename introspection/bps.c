@@ -44,6 +44,7 @@ static const char * const prog_type_strings[] = {
   [BPF_PROG_TYPE_CGROUP_SOCKOPT] = "cgroup_sockopt",
   [BPF_PROG_TYPE_TRACING] = "tracing",
   [BPF_PROG_TYPE_STRUCT_OPS] = "struct_ops",
+  [BPF_PROG_TYPE_EXT] = "ext",
 };
 
 static const char * const map_type_strings[] = {
