@@ -777,7 +777,7 @@ USDT::USDT(const std::string& binary_path, const std::string& provider,
       provider_(provider),
       name_(name),
       probe_func_(probe_func),
-      mod_match_inode_only_(0) {}
+      mod_match_inode_only_(1) {}
 
 USDT::USDT(pid_t pid, const std::string& provider, const std::string& name,
            const std::string& probe_func)
@@ -787,7 +787,7 @@ USDT::USDT(pid_t pid, const std::string& provider, const std::string& name,
       provider_(provider),
       name_(name),
       probe_func_(probe_func),
-      mod_match_inode_only_(0) {}
+      mod_match_inode_only_(1) {}
 
 USDT::USDT(const std::string& binary_path, pid_t pid,
            const std::string& provider, const std::string& name,
@@ -798,7 +798,7 @@ USDT::USDT(const std::string& binary_path, pid_t pid,
       provider_(provider),
       name_(name),
       probe_func_(probe_func),
-      mod_match_inode_only_(0) {}
+      mod_match_inode_only_(1) {}
 
 USDT::USDT(const USDT& usdt)
     : initialized_(false),
