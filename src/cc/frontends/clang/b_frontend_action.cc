@@ -34,7 +34,6 @@
 #include "loader.h"
 #include "table_storage.h"
 #include "arch_helper.h"
-#include "libbpf/src/bpf.h"
 
 #include "libbpf.h"
 

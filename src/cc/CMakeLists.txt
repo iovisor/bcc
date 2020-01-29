@@ -28,13 +28,15 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DLLVM_MAJOR_VERSION=${CMAKE_MATCH_1}")
 
 include(static_libstdc++)
 
+if(LIBBPF_INCLUDE_DIR)
+  # Add user libbpf include and notify compilation
+  # that we are using external libbpf. It's checked
+  # in src/cc/libbpf.h and proper files are included.
+  include_directories(${LIBBPF_INCLUDE_DIR})
+  add_definitions(-DHAVE_EXTERNAL_LIBBPF)
+endif()
+
 if(LIBBPF_FOUND)
-  # We need to include the libbpf packaged source to get the
-  # headers location, becaseu they are installed under 'bpf'
-  # directory, but the libbpf code references them localy
-
-  include_directories(${LIBBPF_INCLUDE_DIR}/bpf)
-
   set(extract_dir ${CMAKE_CURRENT_BINARY_DIR}/libbpf_a_extract)
   execute_process(COMMAND sh -c "mkdir -p ${extract_dir} && cd ${extract_dir} && ${CMAKE_AR} x ${LIBBPF_STATIC_LIBRARIES}")
   file(GLOB libbpf_sources "${extract_dir}/*.o")
