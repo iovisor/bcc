@@ -8,7 +8,6 @@
 from __future__ import print_function
 from bcc import BPF, USDT
 from unittest import main, TestCase
-from utils import mayFail
 from subprocess import Popen, PIPE
 from tempfile import NamedTemporaryFile
 import ctypes as ct
@@ -95,7 +94,6 @@ int do_trace3(struct pt_regs *ctx) {
         self.app2 = Popen([self.ftemp.name, "11"])
         self.app3 = Popen([self.ftemp.name, "21"])
 
-    @mayFail("This fails on github actions environment, and needs to be fixed")
     def test_attach1(self):
         # Enable USDT probe from given PID and verifier generated BPF programs.
         u = USDT(pid=int(self.app.pid))

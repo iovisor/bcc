@@ -212,7 +212,7 @@ class Probe {
 
 public:
   Probe(const char *bin_path, const char *provider, const char *name,
-        uint64_t semaphore, const optional<int> &pid, uint8_t mod_match_inode_only = 0);
+        uint64_t semaphore, const optional<int> &pid, uint8_t mod_match_inode_only = 1);
 
   size_t num_locations() const { return locations_.size(); }
   size_t num_arguments() const { return locations_.front().arguments_.size(); }
@@ -265,10 +265,10 @@ private:
   uint8_t mod_match_inode_only_;
 
 public:
-  Context(const std::string &bin_path, uint8_t mod_match_inode_only = 0);
-  Context(int pid, uint8_t mod_match_inode_only = 0);
+  Context(const std::string &bin_path, uint8_t mod_match_inode_only = 1);
+  Context(int pid, uint8_t mod_match_inode_only = 1);
   Context(int pid, const std::string &bin_path,
-          uint8_t mod_match_inode_only = 0);
+          uint8_t mod_match_inode_only = 1);
   ~Context();
 
   optional<int> pid() const { return pid_; }
