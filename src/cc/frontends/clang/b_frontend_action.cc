@@ -707,7 +707,7 @@ bool BTypeVisitor::VisitFunctionDecl(FunctionDecl *D) {
   // extracted by the MemoryManager
   auto real_start_loc = rewriter_.getSourceMgr().getFileLoc(GET_BEGINLOC(D));
   if (fe_.is_rewritable_ext_func(D)) {
-    current_fn_ = D->getName();
+    current_fn_ = string(D->getName());
     string bd = rewriter_.getRewrittenText(expansionRange(D->getSourceRange()));
     fe_.func_src_.set_src(current_fn_, bd);
     fe_.func_range_[current_fn_] = expansionRange(D->getSourceRange());
@@ -769,8 +769,8 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
 
         // find the table fd, which was opened at declaration time
         TableStorage::iterator desc;
-        Path local_path({fe_.id(), Ref->getDecl()->getName()});
-        Path global_path({Ref->getDecl()->getName()});
+        Path local_path({fe_.id(), string(Ref->getDecl()->getName())});
+        Path global_path({string(Ref->getDecl()->getName())});
         if (!fe_.table_storage().Find(local_path, desc)) {
           if (!fe_.table_storage().Find(global_path, desc)) {
             error(GET_ENDLOC(Ref), "bpf_table %0 failed to open") << Ref->getDecl()->getName();
@@ -783,7 +783,7 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
         auto rewrite_start = GET_BEGINLOC(Call);
         auto rewrite_end = GET_ENDLOC(Call);
         if (memb_name == "lookup_or_init" || memb_name == "lookup_or_try_init") {
-          string name = Ref->getDecl()->getName();
+          string name = string(Ref->getDecl()->getName());
           string arg0 = rewriter_.getRewrittenText(expansionRange(Call->getArg(0)->getSourceRange()));
           string arg1 = rewriter_.getRewrittenText(expansionRange(Call->getArg(1)->getSourceRange()));
           string lookup = "bpf_map_lookup_elem_(bpf_pseudo_fd(1, " + fd + ")";
@@ -798,7 +798,7 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
           txt += "}";
           txt += "leaf;})";
         } else if (memb_name == "increment") {
-          string name = Ref->getDecl()->getName();
+          string name = string(Ref->getDecl()->getName());
           string arg0 = rewriter_.getRewrittenText(expansionRange(Call->getArg(0)->getSourceRange()));
 
           string increment_value = "1";
@@ -820,7 +820,7 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
           }
           txt += "})";
         } else if (memb_name == "perf_submit") {
-          string name = Ref->getDecl()->getName();
+          string name = string(Ref->getDecl()->getName());
           string arg0 = rewriter_.getRewrittenText(expansionRange(Call->getArg(0)->getSourceRange()));
           string args_other = rewriter_.getRewrittenText(expansionRange(SourceRange(GET_BEGINLOC(Call->getArg(1)),
                                                            GET_ENDLOC(Call->getArg(2)))));
@@ -1151,7 +1151,7 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
 
     TableDesc table;
     TableStorage::iterator table_it;
-    table.name = Decl->getName();
+    table.name = string(Decl->getName());
     Path local_path({fe_.id(), table.name});
     Path maps_ns_path({"ns", fe_.maps_ns(), table.name});
     Path global_path({table.name});
@@ -1187,7 +1187,7 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
       ++i;
     }
 
-    std::string section_attr = A->getName();
+    std::string section_attr = string(A->getName());
     size_t pinned_path_pos = section_attr.find(":");
     unsigned int pinned_id = 0; // 0 is not a valid map ID, they start with 1
 
