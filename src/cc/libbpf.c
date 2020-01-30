@@ -671,7 +671,8 @@ int bcc_prog_load(enum bpf_prog_type prog_type, const char *name,
   attr.name = name;
   attr.insns = insns;
   attr.license = license;
-  attr.kern_version = kern_version;
+  if (prog_type != BPF_PROG_TYPE_TRACING && prog_type != BPF_PROG_TYPE_EXT)
+    attr.kern_version = kern_version;
   attr.log_level = log_level;
   return bcc_prog_load_xattr(&attr, prog_len, log_buf, log_buf_size, true);
 }
