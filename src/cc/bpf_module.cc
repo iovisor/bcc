@@ -907,7 +907,10 @@ int BPFModule::bcc_func_load(int prog_type, const char *name,
   attr.name = name;
   attr.insns = insns;
   attr.license = license;
-  attr.kern_version = kern_version;
+  if (attr.prog_type != BPF_PROG_TYPE_TRACING &&
+      attr.prog_type != BPF_PROG_TYPE_EXT) {
+    attr.kern_version = kern_version;
+  }
   attr.log_level = log_level;
   if (dev_name)
     attr.prog_ifindex = if_nametoindex(dev_name);
