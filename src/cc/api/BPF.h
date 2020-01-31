@@ -167,6 +167,8 @@ class BPF {
 
   BPFDevmapTable get_devmap_table(const std::string& name);
 
+  BPFXskmapTable get_xskmap_table(const std::string& name);
+
   BPFStackTable get_stack_table(const std::string& name,
                                 bool use_debug_file = true,
                                 bool check_debug_file_crc = true);

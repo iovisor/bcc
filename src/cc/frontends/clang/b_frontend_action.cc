@@ -1259,6 +1259,8 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
       map_type = BPF_MAP_TYPE_DEVMAP;
     } else if (section_attr == "maps/cpumap") {
       map_type = BPF_MAP_TYPE_CPUMAP;
+    } else if (section_attr == "maps/xskmap") {
+      map_type = BPF_MAP_TYPE_XSKMAP;
     } else if (section_attr == "maps/hash_of_maps") {
       map_type = BPF_MAP_TYPE_HASH_OF_MAPS;
     } else if (section_attr == "maps/array_of_maps") {

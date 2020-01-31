@@ -269,6 +269,18 @@ struct _name##_table_t _name = { .max_entries = (_max_entries) }
 #define BPF_CPUMAP(_name, _max_entries) \
   BPF_XDP_REDIRECT_MAP("cpumap", u32, _name, _max_entries)
 
+#define BPF_XSKMAP(_name, _max_entries) \
+struct _name##_table_t { \
+  u32 key; \
+  int leaf; \
+  int * (*lookup) (int *); \
+  /* xdp_act = map.redirect_map(index, flag) */ \
+  u64 (*redirect_map) (int, int); \
+  u32 max_entries; \
+}; \
+__attribute__((section("maps/xskmap"))) \
+struct _name##_table_t _name = { .max_entries = (_max_entries) }
+
 #define BPF_ARRAY_OF_MAPS(_name, _inner_map_name, _max_entries) \
   BPF_TABLE("array_of_maps$" _inner_map_name, int, int, _name, _max_entries)
 
