@@ -44,16 +44,17 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
         - [9. BPF_PROG_ARRAY](#9-bpf_prog_array)
         - [10. BPF_DEVMAP](#10-bpf_devmap)
         - [11. BPF_CPUMAP](#11-bpf_cpumap)
-        - [12. map.lookup()](#12-maplookup)
-        - [13. map.lookup_or_try_init()](#13-maplookup_or_try_init)
-        - [14. map.delete()](#14-mapdelete)
-        - [15. map.update()](#15-mapupdate)
-        - [16. map.insert()](#16-mapinsert)
-        - [17. map.increment()](#17-mapincrement)
-        - [18. map.get_stackid()](#18-mapget_stackid)
-        - [19. map.perf_read()](#19-mapperf_read)
-        - [20. map.call()](#20-mapcall)
-        - [21. map.redirect_map()](#21-mapredirect_map)
+        - [12. BPF_XSKMAP](#12-bpf_xskmap)
+        - [13. map.lookup()](#13-maplookup)
+        - [14. map.lookup_or_try_init()](#14-maplookup_or_try_init)
+        - [15. map.delete()](#15-mapdelete)
+        - [16. map.update()](#16-mapupdate)
+        - [17. map.insert()](#17-mapinsert)
+        - [18. map.increment()](#18-mapincrement)
+        - [19. map.get_stackid()](#19-mapget_stackid)
+        - [20. map.perf_read()](#20-mapperf_read)
+        - [21. map.call()](#21-mapcall)
+        - [22. map.redirect_map()](#22-mapredirect_map)
     - [Licensing](#licensing)
 
 - [bcc Python](#bcc-python)
@@ -759,7 +760,23 @@ Methods (covered later): map.redirect_map().
 Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=BPF_CPUMAP+path%3Aexamples&type=Code),
 
-### 12. BPF_ARRAY_OF_MAPS
+### 12. BPF_XSKMAP
+
+Syntax: ```BPF_XSKMAP(name, size)```
+
+This creates a xsk map named ```name``` with ```size``` entries. Each entry represents one NIC's queue id. This map is only used in XDP to redirect packet to an AF_XDP socket. If the AF_XDP socket is binded to a queue which is different than the current packet's queue id, the packet will be dropped. For kernel v5.3 and latter, `lookup` method is available and can be used to check whether and AF_XDP socket is available for the current packet's queue id. More details at [AF_XDP](https://www.kernel.org/doc/html/latest/networking/af_xdp.html).
+
+For example:
+```C
+BPF_XSKMAP(xsks_map, 8);
+```
+
+Methods (covered later): map.redirect_map(). map.lookup()
+
+Examples in situ:
+[search /examples](https://github.com/iovisor/bcc/search?q=BPF_XSKMAP+path%3Aexamples&type=Code),
+
+### 13. BPF_ARRAY_OF_MAPS
 
 Syntax: ```BPF_ARRAY_OF_MAPS(name, inner_map_name, size)```
 
@@ -772,7 +789,7 @@ BPF_TABLE("hash", int, int, ex2, 1024);
 BPF_ARRAY_OF_MAPS(maps_array, "ex1", 10);
 ```
 
-### 13. BPF_HASH_OF_MAPS
+### 14. BPF_HASH_OF_MAPS
 
 Syntax: ```BPF_HASH_OF_MAPS(name, inner_map_name, size)```
 
@@ -785,7 +802,7 @@ BPF_ARRAY(ex2, int, 1024);
 BPF_HASH_OF_MAPS(maps_hash, "ex1", 10);
 ```
 
-### 14. map.lookup()
+### 15. map.lookup()
 
 Syntax: ```*val map.lookup(&key)```
 
@@ -795,7 +812,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=lookup+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=lookup+path%3Atools&type=Code)
 
-### 15. map.lookup_or_try_init()
+### 16. map.lookup_or_try_init()
 
 Syntax: ```*val map.lookup_or_try_init(&key, &zero)```
 
@@ -808,7 +825,7 @@ Examples in situ:
 Note: The old map.lookup_or_init() may cause return from the function, so lookup_or_try_init() is recommended as it
 does not have this side effect.
 
-### 16. map.delete()
+### 17. map.delete()
 
 Syntax: ```map.delete(&key)```
 
@@ -818,7 +835,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=delete+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=delete+path%3Atools&type=Code)
 
-### 17. map.update()
+### 18. map.update()
 
 Syntax: ```map.update(&key, &val)```
 
@@ -828,7 +845,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=update+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=update+path%3Atools&type=Code)
 
-### 18. map.insert()
+### 19. map.insert()
 
 Syntax: ```map.insert(&key, &val)```
 
@@ -838,7 +855,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=insert+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=insert+path%3Atools&type=Code)
 
-### 19. map.increment()
+### 20. map.increment()
 
 Syntax: ```map.increment(key[, increment_amount])```
 
@@ -848,7 +865,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=increment+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=increment+path%3Atools&type=Code)
 
-### 20. map.get_stackid()
+### 21. map.get_stackid()
 
 Syntax: ```int map.get_stackid(void *ctx, u64 flags)```
 
@@ -858,7 +875,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=get_stackid+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=get_stackid+path%3Atools&type=Code)
 
-### 21. map.perf_read()
+### 22. map.perf_read()
 
 Syntax: ```u64 map.perf_read(u32 cpu)```
 
@@ -867,7 +884,7 @@ This returns the hardware performance counter as configured in [5. BPF_PERF_ARRA
 Examples in situ:
 [search /tests](https://github.com/iovisor/bcc/search?q=perf_read+path%3Atests&type=Code)
 
-### 22. map.call()
+### 23. map.call()
 
 Syntax: ```void map.call(void *ctx, int index)```
 
@@ -906,11 +923,11 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?l=C&q=call+path%3Aexamples&type=Code),
 [search /tests](https://github.com/iovisor/bcc/search?l=C&q=call+path%3Atests&type=Code)
 
-### 23. map.redirect_map()
+### 24. map.redirect_map()
 
 Syntax: ```int map.redirect_map(int index, int flags)```
 
-This redirects the incoming packets based on the ```index``` entry. If the map is [10. BPF_DEVMAP](#10-bpf_devmap), the packet will be sent to the transmit queue of the network interface that the entry points to. If the map is [11. BPF_CPUMAP](#11-bpf_cpumap), the packet will be sent to the ring buffer of the ```index``` CPU and be processed by the CPU later.
+This redirects the incoming packets based on the ```index``` entry. If the map is [10. BPF_DEVMAP](#10-bpf_devmap), the packet will be sent to the transmit queue of the network interface that the entry points to. If the map is [11. BPF_CPUMAP](#11-bpf_cpumap), the packet will be sent to the ring buffer of the ```index``` CPU and be processed by the CPU later. If the map is [12. BPF_XSKMAP](#12-bpf_xskmap), the packet will be sent to the AF_XDP socket attached to the queue.
 
 If the packet is redirected successfully, the function will return XDP_REDIRECT. Otherwise, it will return XDP_ABORTED to discard the packet.
 
