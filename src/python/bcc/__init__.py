@@ -1366,6 +1366,7 @@ class BPF(object):
             self.tracefile = None
         for name, fn in list(self.funcs.items()):
             os.close(fn.fd)
+            del self.funcs[name]
         if self.module:
             lib.bpf_module_destroy(self.module)
             self.module = None
