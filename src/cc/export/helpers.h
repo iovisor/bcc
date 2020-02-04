@@ -40,6 +40,13 @@ R"********(
 #endif
 #define asm_volatile_goto(x...) asm volatile("invalid use of asm_volatile_goto")
 
+/* In 4.18 and later, when CONFIG_FUNCTION_TRACER is defined, kernel Makefile adds
+ * -DCC_USING_FENTRY. Let do the same for bpf programs.
+ */
+#if defined(CONFIG_FUNCTION_TRACER)
+#define CC_USING_FENTRY
+#endif
+
 #include <uapi/linux/bpf.h>
 #include <uapi/linux/if_packet.h>
 #include <linux/version.h>
