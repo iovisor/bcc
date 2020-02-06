@@ -490,6 +490,10 @@ bool ProbeVisitor::VisitMemberExpr(MemberExpr *E) {
   if (!ProbeChecker(base, ptregs_, track_helpers_).needs_probe())
     return true;
 
+  // If the base is an array, we will skip rewriting. See issue #2352.
+  if (E->getType()->isArrayType())
+    return true;
+
   string rhs = rewriter_.getRewrittenText(expansionRange(SourceRange(rhs_start, GET_ENDLOC(E))));
   string base_type = base->getType()->getPointeeType().getAsString();
   string pre, post;
@@ -507,6 +511,10 @@ bool ProbeVisitor::VisitArraySubscriptExpr(ArraySubscriptExpr *E) {
 
   // Parent expr has addrof, skip the rewrite.
   if (is_addrof_)
+    return true;
+
+  // If the base is an array, we will skip rewriting. See issue #2352.
+  if (E->getType()->isArrayType())
     return true;
 
   if (!rewriter_.isRewritable(GET_BEGINLOC(E)))
