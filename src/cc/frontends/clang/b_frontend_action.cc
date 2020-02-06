@@ -534,6 +534,20 @@ bool ProbeVisitor::VisitArraySubscriptExpr(ArraySubscriptExpr *E) {
   LangOptions opts;
   SourceLocation lbracket_start, lbracket_end;
   SourceRange lbracket_range;
+
+  /* For cases like daddr->s6_addr[4], clang encodes the end location of "base"
+   * as "]". This makes it hard to rewrite the expression like
+   * "daddr->s6_addr  [ 4 ]" since we do not know the end location
+   * of "addr->s6_addr". Let us abort the operation if this is the case.
+   */
+  lbracket_start = Lexer::getLocForEndOfToken(GET_ENDLOC(base), 1,
+                                              rewriter_.getSourceMgr(),
+                                              opts).getLocWithOffset(1);
+  lbracket_end = GET_BEGINLOC(idx).getLocWithOffset(-1);
+  lbracket_range = expansionRange(SourceRange(lbracket_start, lbracket_end));
+  if (rewriter_.getRewrittenText(lbracket_range).size() == 0)
+    return true;
+
   pre = "({ typeof(" + E->getType().getAsString() + ") _val; __builtin_memset(&_val, 0, sizeof(_val));";
   pre += " bpf_probe_read(&_val, sizeof(_val), (u64)((";
   if (isMemberDereference(base)) {
@@ -549,11 +563,6 @@ bool ProbeVisitor::VisitArraySubscriptExpr(ArraySubscriptExpr *E) {
    * a method to retrieve the left bracket, replace everything from the end of
    * the base to the start of the index. */
   lbracket = ") + (";
-  lbracket_start = Lexer::getLocForEndOfToken(GET_ENDLOC(base), 1,
-                                              rewriter_.getSourceMgr(),
-                                              opts).getLocWithOffset(1);
-  lbracket_end = GET_BEGINLOC(idx).getLocWithOffset(-1);
-  lbracket_range = expansionRange(SourceRange(lbracket_start, lbracket_end));
   rewriter_.ReplaceText(lbracket_range, lbracket);
 
   rbracket = "))); _val; })";
