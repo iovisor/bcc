@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2016 Canonical
+# Copyright (C) 2016,2020 Canonical
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -16,7 +16,6 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 #
 name: bcc
-version: 0.9.0-20190318-2991-6cf63612
 summary: BPF Compiler Collection (BCC)
 description: A toolkit for creating efficient kernel tracing and manipulation programs
 confinement: strict
@@ -27,52 +26,70 @@ plugs:
     system-trace: null
 assumes: [snapd2.37]
 base: core18
+adopt-info: bcc
 
 parts:
     bcc:
         plugin: cmake
         override-pull: |
             snapcraftctl pull
-            find . -type f -exec sed -i 's|^#\!/usr/bin/python|#\!/usr/bin/env python|' {} \;
+
+            find . -type f -exec sed -i 's|^#\!/usr/bin/python|#\!/usr/bin/env python3|' {} \;
+
+            version=$(git tag | sort -V | tail -1 | cut -c2-)
+            commits=$(git log --oneline | wc -l)
+            sha=$(git log -1 --oneline | cut -d' ' -f1)
+            date=$(date +'%Y%m%d')
+            snapcraftctl set-version "$version-$date-$commits-$sha"
         configflags:
             - '-DCMAKE_INSTALL_PREFIX=/usr'
-        source: ..
-        source-type: git
+            - '-DPYTHON_CMD=$SNAPCRAFT_STAGE/usr/bin/python3'
+            - '-DCMAKE_VERBOSE_MAKEFILE=ON'
+        source: .
+        build-packages:
+            - bison
+            - build-essential
+            - flex
+            - git
+            - iperf
+            - libclang-4.0-dev
+            - libedit-dev
+            - libelf-dev
+            - libllvm4.0
+            - llvm-4.0-dev
+            - zlib1g-dev
+        prime:
+            - -usr/share/bcc/tools/doc
+            - usr/lib/*/lib*.so*
+            - usr/lib/python3
+            - usr/lib/python3.6*
+            - usr/share/bcc/tools
+        after:
+          - stage
+
+    stage:
+        plugin: nil
         stage-packages:
             - libbz2-1.0
             - liblzma5
             - libncursesw5
             - libtinfo5
             - libzzip-0-13
-        build-packages:
-            - bison
-            - build-essential
-            - cmake
-            - flex
-            - libedit-dev
-            - libllvm4.0
-            - llvm-4.0-dev
-            - libclang-4.0-dev
-            - python
-            - zlib1g-dev
-            - libelf-dev
-            - iperf
+            - python3
+            - python3-distutils
+            - python3-distutils-extra
+            - python3-pip
+            - python3-setuptools
         prime:
-            - usr/share/bcc/tools
-            - usr/lib/python2.7
-            - usr/lib/*/lib*.so*
-            - -usr/share/bcc/tools/doc
-
-    python-deps:
-        plugin: python
-        python-version: python2
+            - -usr/lib/*/perl
+            - -usr/lib/*/perl5
+            - usr/bin
+            - usr/lib
 
     wrapper:
         plugin: dump
         after: [bcc]
-        source: .
-        organize:
-            wrapper: bin/bcc-wrapper
+        source: snap/local
 
 apps:
     argdist:

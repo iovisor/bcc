@@ -5,31 +5,28 @@ creating efficient kernel tracing and manipulation programs.
 
 First, install snapcraft, e.g. on Ubuntu:
 
-sudo apt install snapcraft
+sudo snap install snapcraft --classic
 
 Clone the bcc repo (if you haven't done so already) and create the snap:
 
-git clone https://github.com/iovisor/bcc.git
-cd snapcraft
-make
+    git clone https://github.com/iovisor/bcc.git
+    snapcraft
 
-Note: running `make` just gets the version from the current bcc gito
-repository and uses this in the snapcraft yaml file to version the bcc
-snap. The Makefile basically runs snapcraft to snap up bcc.
+Install the snap by running (`--dangerous` is required as the snap is
+not coming from the Snap Store):
 
-Install the snap by running:
+    sudo snap install --dangerous bcc_*.snap
 
-sudo snap install --devmode bcc_*.snap
+One may need to ensure the snap interfaces are connected for the snap
+using:
 
-One may need to ensure the snap plugins are enabled for the snap using:
-
-sudo snap connect bcc:mount-observe
-sudo snap connect bcc:system-observe
-sudo snap connect bcc:system-trace
+    sudo snap connect bcc:mount-observe
+    sudo snap connect bcc:system-observe
+    sudo snap connect bcc:system-trace
 
 Now run a bcc tool, for example, to run opensnoop use:
 
-sudo bcc.opensnoop
+    sudo bcc.opensnoop
 
 Note that this may fail to build and run if you do not have the kernel
 headers installed or perhaps the kernel config is not set up correctly.
