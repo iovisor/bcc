@@ -882,6 +882,12 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
               error(GET_BEGINLOC(Call), "get_stackid only available on stacktrace maps");
               return false;
             }
+        } else if (memb_name == "sock_map_update" || memb_name == "sock_hash_update") {
+          string ctx = rewriter_.getRewrittenText(expansionRange(Call->getArg(0)->getSourceRange()));
+          string keyp = rewriter_.getRewrittenText(expansionRange(Call->getArg(1)->getSourceRange()));
+          string flag = rewriter_.getRewrittenText(expansionRange(Call->getArg(2)->getSourceRange()));
+          txt = "bpf_" + string(memb_name) + "(" + ctx + ", " +
+            "bpf_pseudo_fd(1, " + fd + "), " + keyp + ", " + flag + ");";
         } else {
           if (memb_name == "lookup") {
             prefix = "bpf_map_lookup_elem";
@@ -918,6 +924,9 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
             suffix = ")";
           } else if (memb_name == "sk_storage_delete") {
             prefix = "bpf_sk_storage_delete";
+            suffix = ")";
+          } else if (memb_name == "get_local_storage") {
+            prefix = "bpf_get_local_storage";
             suffix = ")";
           } else {
             error(GET_BEGINLOC(Call), "invalid bpf_table operation %0") << memb_name;
@@ -1284,6 +1293,14 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
       map_type = BPF_MAP_TYPE_ARRAY_OF_MAPS;
     } else if (section_attr == "maps/sk_storage") {
       map_type = BPF_MAP_TYPE_SK_STORAGE;
+    } else if (section_attr == "maps/sockmap") {
+      map_type = BPF_MAP_TYPE_SOCKMAP;
+    } else if (section_attr == "maps/sockhash") {
+      map_type = BPF_MAP_TYPE_SOCKHASH;
+    } else if (section_attr == "maps/cgroup_storage") {
+      map_type = BPF_MAP_TYPE_CGROUP_STORAGE;
+    } else if (section_attr == "maps/percpu_cgroup_storage") {
+      map_type = BPF_MAP_TYPE_PERCPU_CGROUP_STORAGE;
     } else if (section_attr == "maps/extern") {
       if (!fe_.table_storage().Find(maps_ns_path, table_it)) {
         if (!fe_.table_storage().Find(global_path, table_it)) {

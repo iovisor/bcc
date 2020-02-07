@@ -306,6 +306,44 @@ __attribute__((section("maps/sk_storage"))) \
 struct _name##_table_t _name = { .flags = BPF_F_NO_PREALLOC }; \
 BPF_ANNOTATE_KV_PAIR(_name, int, _leaf_type)
 
+#define BPF_SOCKMAP_COMMON(_name, _max_entries, _kind, _helper_name) \
+struct _name##_table_t { \
+  u32 key; \
+  int leaf; \
+  int (*update) (u32 *, int *); \
+  int (*delete) (int *); \
+  /* ret = map.sock_map_update(ctx, key, flag) */ \
+  int (* _helper_name) (void *, void *, u64); \
+  u32 max_entries; \
+}; \
+__attribute__((section("maps/" _kind))) \
+struct _name##_table_t _name = { .max_entries = (_max_entries) }; \
+BPF_ANNOTATE_KV_PAIR(_name, u32, int)
+
+#define BPF_SOCKMAP(_name, _max_entries) \
+  BPF_SOCKMAP_COMMON(_name, _max_entries, "sockmap", sock_map_update)
+
+#define BPF_SOCKHASH(_name, _max_entries) \
+  BPF_SOCKMAP_COMMON(_name, _max_entries, "sockhash", sock_hash_update)
+
+#define BPF_CGROUP_STORAGE_COMMON(_name, _leaf_type, _kind) \
+struct _name##_table_t { \
+  struct bpf_cgroup_storage_key key; \
+  _leaf_type leaf; \
+  _leaf_type * (*lookup) (struct bpf_cgroup_storage_key *); \
+  int (*update) (struct bpf_cgroup_storage_key *, _leaf_type *); \
+  int (*get_local_storage) (u64); \
+}; \
+__attribute__((section("maps/" _kind))) \
+struct _name##_table_t _name = { 0 }; \
+BPF_ANNOTATE_KV_PAIR(_name, struct bpf_cgroup_storage_key, _leaf_type)
+
+#define BPF_CGROUP_STORAGE(_name, _leaf_type) \
+  BPF_CGROUP_STORAGE_COMMON(_name, _leaf_type, "cgroup_storage")
+
+#define BPF_PERCPU_CGROUP_STORAGE(_name, _leaf_type) \
+  BPF_CGROUP_STORAGE_COMMON(_name, _leaf_type, "percpu_cgroup_storage")
+
 // packet parsing state machine helpers
 #define cursor_advance(_cursor, _len) \
   ({ void *_tmp = _cursor; _cursor += _len; _tmp; })

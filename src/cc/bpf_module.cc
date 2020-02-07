@@ -940,4 +940,16 @@ int BPFModule::bcc_func_load(int prog_type, const char *name,
   return ret;
 }
 
+int BPFModule::bcc_func_attach(int prog_fd, int attachable_fd,
+                               int attach_type, unsigned int flags) {
+  return bpf_prog_attach(prog_fd, attachable_fd,
+                         (enum bpf_attach_type)attach_type, flags);
+}
+
+int BPFModule::bcc_func_detach(int prog_fd, int attachable_fd,
+                               int attach_type) {
+  return bpf_prog_detach2(prog_fd, attachable_fd,
+                          (enum bpf_attach_type)attach_type);
+}
+
 } // namespace ebpf
