@@ -140,7 +140,7 @@ struct wokeby_t {
 // of the Process who wakes it
 BPF_HASH(wokeby, u32, struct wokeby_t);
 
-BPF_STACK_TRACE(stack_traces, 2);
+BPF_STACK_TRACE(stack_traces, STACK_STORAGE_SIZE);
 
 int waker(struct pt_regs *ctx, struct task_struct *p) {
     // PID and TGID of the target Process to be waken
