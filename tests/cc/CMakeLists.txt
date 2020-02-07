@@ -20,6 +20,7 @@ set(TEST_LIBBCC_SOURCES
 	test_c_api.cc
 	test_array_table.cc
 	test_bpf_table.cc
+	test_cg_storage.cc
 	test_hash_table.cc
 	test_map_in_map.cc
 	test_perf_event.cc
@@ -27,6 +28,7 @@ set(TEST_LIBBCC_SOURCES
 	test_prog_table.cc
 	test_shared_table.cc
 	test_sk_storage.cc
+	test_sock_table.cc
 	test_usdt_args.cc
 	test_usdt_probes.cc
 	utils.cc)

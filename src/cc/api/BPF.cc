@@ -609,6 +609,29 @@ StatusTuple BPF::unload_func(const std::string& func_name) {
   return StatusTuple(0);
 }
 
+StatusTuple BPF::attach_func(int prog_fd, int attachable_fd,
+                             enum bpf_attach_type attach_type,
+                             uint64_t flags) {
+  int res = bpf_module_->bcc_func_attach(prog_fd, attachable_fd, attach_type, flags);
+  if (res != 0)
+    return StatusTuple(-1, "Can't attach for prog_fd %d, attachable_fd %d, "
+                           "attach_type %d, flags %ld: error %d",
+                       prog_fd, attachable_fd, attach_type, flags, res);
+
+  return StatusTuple(0);
+}
+
+StatusTuple BPF::detach_func(int prog_fd, int attachable_fd,
+                             enum bpf_attach_type attach_type) {
+  int res = bpf_module_->bcc_func_detach(prog_fd, attachable_fd, attach_type);
+  if (res != 0)
+    return StatusTuple(-1, "Can't detach for prog_fd %d, attachable_fd %d, "
+                           "attach_type %d: error %d",
+                       prog_fd, attachable_fd, attach_type, res);
+
+  return StatusTuple(0);
+}
+
 std::string BPF::get_syscall_fnname(const std::string& name) {
   if (syscall_prefix_ == nullptr) {
     KSyms ksym;
@@ -706,6 +729,20 @@ BPFMapInMapTable BPF::get_map_in_map_table(const std::string& name) {
   if (bpf_module_->table_storage().Find(Path({bpf_module_->id(), name}), it))
     return BPFMapInMapTable(it->second);
   return BPFMapInMapTable({});
+}
+
+BPFSockmapTable BPF::get_sockmap_table(const std::string& name) {
+  TableStorage::iterator it;
+  if (bpf_module_->table_storage().Find(Path({bpf_module_->id(), name}), it))
+    return BPFSockmapTable(it->second);
+  return BPFSockmapTable({});
+}
+
+BPFSockhashTable BPF::get_sockhash_table(const std::string& name) {
+  TableStorage::iterator it;
+  if (bpf_module_->table_storage().Find(Path({bpf_module_->id(), name}), it))
+    return BPFSockhashTable(it->second);
+  return BPFSockhashTable({});
 }
 
 bool BPF::add_module(std::string module)

@@ -154,6 +154,22 @@ class BPF {
     return BPFSkStorageTable<ValueType>({});
   }
 
+  template <class ValueType>
+  BPFCgStorageTable<ValueType> get_cg_storage_table(const std::string& name) {
+    TableStorage::iterator it;
+    if (bpf_module_->table_storage().Find(Path({bpf_module_->id(), name}), it))
+      return BPFCgStorageTable<ValueType>(it->second);
+    return BPFCgStorageTable<ValueType>({});
+  }
+
+  template <class ValueType>
+  BPFPercpuCgStorageTable<ValueType> get_percpu_cg_storage_table(const std::string& name) {
+    TableStorage::iterator it;
+    if (bpf_module_->table_storage().Find(Path({bpf_module_->id(), name}), it))
+      return BPFPercpuCgStorageTable<ValueType>(it->second);
+    return BPFPercpuCgStorageTable<ValueType>({});
+  }
+
   void* get_bsymcache(void) {
     if (bsymcache_ == NULL) {
       bsymcache_ = bcc_buildsymcache_new();
@@ -168,6 +184,10 @@ class BPF {
   BPFDevmapTable get_devmap_table(const std::string& name);
 
   BPFXskmapTable get_xskmap_table(const std::string& name);
+
+  BPFSockmapTable get_sockmap_table(const std::string& name);
+
+  BPFSockhashTable get_sockhash_table(const std::string& name);
 
   BPFStackTable get_stack_table(const std::string& name,
                                 bool use_debug_file = true,
@@ -209,6 +229,12 @@ class BPF {
   StatusTuple load_func(const std::string& func_name, enum bpf_prog_type type,
                         int& fd);
   StatusTuple unload_func(const std::string& func_name);
+
+  StatusTuple attach_func(int prog_fd, int attachable_fd,
+                          enum bpf_attach_type attach_type,
+                          uint64_t flags);
+  StatusTuple detach_func(int prog_fd, int attachable_fd,
+                          enum bpf_attach_type attach_type);
 
   int free_bcc_memory();
 
