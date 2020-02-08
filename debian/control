@@ -15,7 +15,7 @@ Build-Depends: debhelper (>= 9), cmake,
 Homepage: https://github.com/iovisor/bcc
 
 Package: libbcc
-Architecture: all
+Architecture: any
 Provides: libbpfcc, libbpfcc-dev
 Conflicts: libbpfcc, libbpfcc-dev
 Depends: libc6, libstdc++6, libelf1
