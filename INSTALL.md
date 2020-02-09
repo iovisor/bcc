@@ -57,11 +57,9 @@ Kernel compile flags can usually be checked by looking at `/proc/config.gz` or
 
 ## Ubuntu - Binary
 
-The stable and the nightly packages are built for Ubuntu Xenial (16.04), Ubuntu Artful (17.10) and Ubuntu Bionic (18.04). The steps are very straightforward, no need to upgrade the kernel or compile from source!
-
 **Ubuntu Packages**
 
-As of Ubuntu Bionic (18.04), versions of bcc are available in the standard Ubuntu
+Versions of bcc are available in the standard Ubuntu
 multiverse repository. The Ubuntu packages have slightly different names: where iovisor
 packages use `bcc` in the name (e.g. `bcc-tools`), Ubuntu packages use `bpfcc` (e.g.
 `bpfcc-tools`). Source packages and the binary packages produced from them can be
@@ -71,8 +69,8 @@ found at [packages.ubuntu.com](https://packages.ubuntu.com/search?suite=default&
 sudo apt-get install bpfcc-tools linux-headers-$(uname -r)
 ```
 
-In Ubuntu Eon (19.10) some of the BCC tools are currently broken due to outdated packages. This is a
-[known bug](https://bugs.launchpad.net/ubuntu/+source/bpfcc/+bug/1848137). Upstream packages are currently also unavailable for Eon.
+Some of the BCC tools are currently broken due to outdated packages. This is a
+[known bug](https://bugs.launchpad.net/ubuntu/+source/bpfcc/+bug/1848137).
 Therefore [building from source](#ubuntu---source) is currently the only way to get fully working tools.
 
 The tools are installed in `/sbin` (`/usr/sbin` in Ubuntu 18.04) with a `-bpfcc` extension. Try running `sudo opensnoop-bpfcc`.
