@@ -43,6 +43,11 @@ find_package(LLVM REQUIRED CONFIG)
 message(STATUS "Found LLVM: ${LLVM_INCLUDE_DIRS} ${LLVM_PACKAGE_VERSION}")
 find_package(LibElf REQUIRED)
 
+if(CLANG_DIR)
+  set(CMAKE_FIND_ROOT_PATH "${CLANG_DIR}")
+  include_directories("${CLANG_DIR}/include")
+endif()
+
 # clang is linked as a library, but the library path searching is
 # primitively supported, unlike libLLVM
 set(CLANG_SEARCH "/opt/local/llvm/lib;/usr/lib/llvm-3.7/lib;${LLVM_LIBRARY_DIRS}")
