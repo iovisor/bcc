@@ -1,0 +1,54 @@
+Demonstrations of runqslower, the Linux BPF CO-RE version.
+
+
+runqslower shows high latency scheduling times between tasks being
+ready to run and them running on CPU after that. For example:
+
+# runqslower
+
+Tracing run queue latency higher than 10000 us.
+
+TIME     COMM             TID           LAT(us)
+04:16:32 cc1              12924           12739
+04:16:32 sh               13640           12118
+04:16:32 make             13639           12730
+04:16:32 bash             13655           12047
+04:16:32 bash             13657           12744
+04:16:32 bash             13656           12880
+04:16:32 sh               13660           10846
+04:16:32 gcc              13663           12681
+04:16:32 make             13668           10814
+04:16:32 make             13670           12988
+04:16:32 gcc              13677           11770
+04:16:32 gcc              13678           23519
+04:16:32 as               12999           20541
+[...]
+
+This shows various processes waiting for available CPU during a Linux kernel
+build. By default the output contains delays for more than 10ms.
+
+These delays can be analyzed in depth with "perf sched" tool, see:
+
+* http://www.brendangregg.com/blog/2017-03-16/perf-sched.html
+
+USAGE message:
+
+# runqslower --help
+Trace high run queue latency.
+
+USAGE: runqslower [--help] [-p PID] [-t TID] [min_us]
+
+EXAMPLES:
+    runqslower         # trace latency higher than 10000 us (default)
+    runqslower 1000    # trace latency higher than 1000 us
+    runqslower -p 123  # trace pid 123
+    runqslower -t 123  # trace tid 123 (use for threads only)
+
+  -p, --pid=PID              Process PID to trace
+  -t, --tid=TID              Thread TID to trace
+  -v, --verbose              Verbose debug output
+  -?, --help                 Give this help list
+      --usage                Give a short usage message
+  -V, --version              Print program version
+
+Report bugs to <bpf@vger.kernel.org>.
