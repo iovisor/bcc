@@ -1,14 +1,14 @@
 #!/usr/bin/env bcc-py
 #
-# tcpbind       Trace TCP binds()s.
+# tcpbind       Trace binds()s.
 #               For Linux, uses BCC, eBPF. Embedded C.
 #
 # based on tcpconnect utility from Brendan Gregg's suite.
 #
-# USAGE: trace_bind [-h] [-c] [-t] [-E] [-p PID] [-P PORT [PORT ...]]
+# USAGE: bindsnoop [-h] [--count] [-t] [-E] [-p PID] [-P PORT [PORT ...]]
 #
-# it is reporting socket options set before the bins call
-# impacting system call behavior:
+# bindsnoop reports socket options set before the bind call
+# that would impact this system call behavior:
 # SOL_IP     IP_FREEBIND              F....
 # SOL_IP     IP_TRANSPARENT           .T...
 # SOL_IP     IP_BIND_ADDRESS_NO_PORT  ..N..
@@ -31,15 +31,15 @@ from time import sleep
 
 # arguments
 examples = """examples:
-    ./trace_bind           # trace all TCP bind()s
-    ./trace_bind -t        # include timestamps
-    ./trace_bind -p 181    # only trace PID 181
-    ./trace_bind -P 80     # only trace port 80
-    ./trace_bind -P 80,81  # only trace port 80 and 81
-    ./trace_bind -U        # include UID
-    ./trace_bind -u 1000   # only trace UID 1000
-    ./trace_bind -E        # report bind errors
-    ./trace_bind -c        # count bind per src ip
+    ./bindsnoop           # trace all TCP bind()s
+    ./bindsnoop -t        # include timestamps
+    ./bindsnoop -p 181    # only trace PID 181
+    ./bindsnoop -P 80     # only trace port 80
+    ./bindsnoop -P 80,81  # only trace port 80 and 81
+    ./bindsnoop -U        # include UID
+    ./bindsnoop -u 1000   # only trace UID 1000
+    ./bindsnoop -E        # report bind errors
+    ./bindsnoop --count   # count bind per src ip
 
 it is reporting socket options set before the bins call
 impacting system call behavior:
@@ -67,7 +67,7 @@ parser.add_argument("-U", "--print-uid", action="store_true",
     help="include UID on output")
 parser.add_argument("-u", "--uid",
     help="trace this UID only")
-parser.add_argument("-c", "--count", action="store_true",
+parser.add_argument("--count", action="store_true",
     help="count binds per src ip and port")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
@@ -86,7 +86,6 @@ bpf_text = """
 #include <net/inet_sock.h>
 #include <net/net_namespace.h>
 #include <bcc/proto.h>
-
 
 BPF_HASH(currsock, u32, struct socket *);
 
@@ -146,7 +145,7 @@ union bind_options {
 };
 
 // TODO: add reporting for the original bind arguments
-int trace_bind_entry(struct pt_regs *ctx, struct socket *socket)
+int bindsnoop_entry(struct pt_regs *ctx, struct socket *socket)
 {
     u64 pid_tgid = bpf_get_current_pid_tgid();
     u32 pid = pid_tgid >> 32;
@@ -164,7 +163,7 @@ int trace_bind_entry(struct pt_regs *ctx, struct socket *socket)
 };
 
 
-static int trace_bind_return(struct pt_regs *ctx, short ipver)
+static int bindsnoop_return(struct pt_regs *ctx, short ipver)
 {
     int ret = PT_REGS_RC(ctx);
     u64 pid_tgid = bpf_get_current_pid_tgid();
@@ -231,14 +230,14 @@ static int trace_bind_return(struct pt_regs *ctx, short ipver)
     return 0;
 }
 
-int trace_bind_v4_return(struct pt_regs *ctx)
+int bindsnoop_v4_return(struct pt_regs *ctx)
 {
-    return trace_bind_return(ctx, 4);
+    return bindsnoop_return(ctx, 4);
 }
 
-int trace_bind_v6_return(struct pt_regs *ctx)
+int bindsnoop_v6_return(struct pt_regs *ctx)
 {
-    return trace_bind_return(ctx, 6);
+    return bindsnoop_return(ctx, 6);
 }
 """
 
@@ -388,10 +387,10 @@ def depict_cnt(counts_tab, l3prot='ipv4'):
 
 # initialize BPF
 b = BPF(text=bpf_text)
-b.attach_kprobe(event="inet_bind", fn_name="trace_bind_entry")
-b.attach_kprobe(event="inet6_bind", fn_name="trace_bind_entry")
-b.attach_kretprobe(event="inet_bind", fn_name="trace_bind_v4_return")
-b.attach_kretprobe(event="inet6_bind", fn_name="trace_bind_v6_return")
+b.attach_kprobe(event="inet_bind", fn_name="bindsnoop_entry")
+b.attach_kprobe(event="inet6_bind", fn_name="bindsnoop_entry")
+b.attach_kretprobe(event="inet_bind", fn_name="bindsnoop_v4_return")
+b.attach_kretprobe(event="inet6_bind", fn_name="bindsnoop_v6_return")
 
 print("Tracing binds ... Hit Ctrl-C to end")
 if args.count:

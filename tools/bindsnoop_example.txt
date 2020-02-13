@@ -1,4 +1,4 @@
-Demonstrations of trace_bind, the Linux eBPF/bcc version.
+Demonstrations of bindsnoop, the Linux eBPF/bcc version.
 
 This tool traces the kernel function performing socket binding and 
 print socket options set before the system call invocation that might
@@ -10,7 +10,7 @@ SOL_SOCKET SO_REUSEADDR             ...R.
 SOL_SOCKET SO_REUSEPORT             ....r
 
 
-# ./trace_bind.py
+# ./bindsnoop.py
 Tracing binds ... Hit Ctrl-C to end
        PID  COMM         IP  SADDR                            SPORT   OPTS    BOUND_IF
    2822730  fetch         6  fe80::2000:bff:fe82:3ac          41231  .....           0
@@ -24,7 +24,7 @@ one with IP_FREEBIND and SO_REUSEADDR, and another with IP_FREEBIND and SO_REUSE
 
 The -t option prints a timestamp column
 
-# ./trace_bind.py -t
+# ./bindsnoop.py -t
 TIME(s)         PID  COMM         IP  SADDR                            SPORT   OPTS    BOUND_IF
 0.000       2881566  Acceptor Thr  6  ::                               44563  ...R.           0
 0.004       2881566  Acceptor Thr  6  ::                               34835  ...R.           0
@@ -33,7 +33,7 @@ TIME(s)         PID  COMM         IP  SADDR                            SPORT   O
 
 The -U option prints a UID column:
 
-# ./trace_bind.py -U
+# ./bindsnoop.py -U
 UID          PID  COMM         IP  SADDR                            SPORT   OPTS    BOUND_IF
 127072   2871634  test_bind_op  4  192.168.1.102                    41331  F...r           0
 127072   2908234  Acceptor Thr  6  ::                               46567  ...R.           0
@@ -41,7 +41,7 @@ UID          PID  COMM         IP  SADDR                            SPORT   OPTS
 
 The -u option filtering UID:
 
-# ./trace_bind.py -Uu 0
+# ./bindsnoop.py -Uu 0
 Tracing binds ... Hit Ctrl-C to end
 UID          PID  COMM         IP  SADDR                            SPORT   OPTS    BOUND_IF
 0        2924152  fetch         6  fe80::2000:bff:fe82:3ac          49397  .....           0
@@ -51,10 +51,9 @@ UID          PID  COMM         IP  SADDR                            SPORT   OPTS
 
 
 
-In order to track heavy bind usage one can use -c option
-# ./trace_bind.py -c
+In order to track heavy bind usage one can use --count option
+# ./bindsnoop.py --count
 Tracing binds ... Hit Ctrl-C to end
-^C
 LADDR                                           LPORT     BINDS
 0.0.0.0                                          6771     4
 0.0.0.0                                          4433     4
@@ -62,8 +61,8 @@ LADDR                                           LPORT     BINDS
 
 
 Usage message:
-# ./trace_bind.py -h
-usage: trace_bind.py [-h] [-t] [-p PID] [-P PORT] [-E] [-U] [-u UID] [-c]
+# ./bindsnoop.py -h
+usage: bindsnoop.py [-h] [-t] [-p PID] [-P PORT] [-E] [-U] [-u UID] [--count]
 
 Trace TCP binds
 
@@ -75,18 +74,18 @@ optional arguments:
   -E, --errors          include errors in the output.
   -U, --print-uid       include UID on output
   -u UID, --uid UID     trace this UID only
-  -c, --count           count binds per src ip and port
+  --count               count binds per src ip and port
 
 examples:
-    ./trace_bind           # trace all TCP bind()s
-    ./trace_bind -t        # include timestamps
-    ./trace_bind -p 181    # only trace PID 181
-    ./trace_bind -P 80     # only trace port 80
-    ./trace_bind -P 80,81  # only trace port 80 and 81
-    ./trace_bind -U        # include UID
-    ./trace_bind -u 1000   # only trace UID 1000
-    ./trace_bind -E        # report bind errors
-    ./trace_bind -c        # count bind per src ip
+    ./bindsnoop           # trace all TCP bind()s
+    ./bindsnoop -t        # include timestamps
+    ./bindsnoop -p 181    # only trace PID 181
+    ./bindsnoop -P 80     # only trace port 80
+    ./bindsnoop -P 80,81  # only trace port 80 and 81
+    ./bindsnoop -U        # include UID
+    ./bindsnoop -u 1000   # only trace UID 1000
+    ./bindsnoop -E        # report bind errors
+    ./bindsnoop --count   # count bind per src ip
 
 it is reporting socket options set before the bins call
 impacting system call behavior:
