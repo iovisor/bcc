@@ -697,6 +697,42 @@ exit:
   return err;
 }
 
+uint64_t bcc_elf_usdt_probe_section_offset(const char *path) {
+  Elf *e = NULL;
+  Elf_Scn *section = NULL;
+  int fd;
+  size_t stridx;
+  uint64_t probe_section_offset = 0;
+
+  if (openelf(path, &e, &fd) < 0)
+    goto exit;
+
+  if (elf_getshdrstrndx(e, &stridx) != 0)
+    goto exit;
+
+  // Find the probe section offset
+  while ((section = elf_nextscn(e, section)) != 0) {
+    GElf_Shdr header;
+    char *name;
+
+    if (!gelf_getshdr(section, &header))
+      continue;
+
+    name = elf_strptr(e, stridx, header.sh_name);
+    if (name && !strcmp(name, ".probes")) {
+      probe_section_offset = header.sh_addr - header.sh_offset;
+    }
+  }
+
+exit:
+  if (e)
+    elf_end(e);
+  if (fd >= 0)
+    close(fd);
+
+  return probe_section_offset;
+}
+
 int bcc_elf_foreach_load_section(const char *path,
                                  bcc_elf_load_sectioncb callback,
                                  void *payload) {

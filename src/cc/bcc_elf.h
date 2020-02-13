@@ -50,6 +50,10 @@ typedef int (*bcc_elf_load_sectioncb)(uint64_t, uint64_t, uint64_t, void *);
 // Returns -1 on error, and 0 on success
 int bcc_elf_foreach_usdt(const char *path, bcc_elf_probecb callback,
                          void *payload);
+
+// Find the offset of probe section in virtual memory
+uint64_t bcc_elf_usdt_probe_section_offset(const char *path);
+
 // Iterate over all executable load sections of an ELF
 // Returns -1 on error, 1 if stopped by callback, and 0 on success
 int bcc_elf_foreach_load_section(const char *path,

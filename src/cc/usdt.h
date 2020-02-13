@@ -193,7 +193,6 @@ class Probe {
   std::string bin_path_; // initial bin_path when Probe is created
   std::string provider_;
   std::string name_;
-  bool ref_ctr_offset_supported_;
   uint64_t semaphore_;
 
   std::vector<Location> locations_;
@@ -204,6 +203,7 @@ class Probe {
   optional<std::string> attached_to_;
   optional<uint64_t> attached_semaphore_;
   uint8_t mod_match_inode_only_;
+  bool ref_ctr_offset_supported_;
 
   std::string largest_arg_type(size_t arg_n);
 
@@ -214,15 +214,17 @@ class Probe {
   void add_location(uint64_t addr, const std::string &bin_path, const char *fmt);
 
 public:
-  Probe(const char *bin_path, const char *provider, const char *name,
-        uint64_t semaphore, const optional<int> &pid, uint8_t mod_match_inode_only = 1);
+ Probe(const char *bin_path, const char *provider, const char *name,
+       uint64_t semaphore, const optional<int> &pid,
+       uint8_t mod_match_inode_only = 1);
 
-  size_t num_locations() const { return locations_.size(); }
-  size_t num_arguments() const { return locations_.front().arguments_.size(); }
-  uint64_t semaphore()   const { return semaphore_; }
+ size_t num_locations() const { return locations_.size(); }
+ size_t num_arguments() const { return locations_.front().arguments_.size(); }
+ uint64_t semaphore() const { return semaphore_; }
 
-  uint64_t address(size_t n = 0) const { return locations_[n].address_; }
-  const char *location_bin_path(size_t n = 0) const { return locations_[n].bin_path_.c_str(); }
+ uint64_t address(size_t n = 0) const { return locations_[n].address_; }
+ const char *location_bin_path(size_t n = 0) const {
+   return locations_[n].bin_path_.c_str(); }
   const Location &location(size_t n) const { return locations_[n]; }
 
   bool usdt_getarg(std::ostream &stream);
@@ -255,7 +257,9 @@ class Context {
   optional<int> pid_;
   optional<ProcStat> pid_stat_;
   std::string cmd_bin_path_;
+  uint64_t probe_section_offset_;
   bool loaded_;
+  bool ref_ctr_offset_supported_;
 
   static void _each_probe(const char *binpath, const struct bcc_elf_usdt *probe,
                           void *p);

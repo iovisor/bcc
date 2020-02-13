@@ -862,8 +862,9 @@ static int bpf_try_perf_event_open_with_probe(const char *name, uint64_t offs,
   // the ref_ctr_offset must be packed in the top 32 bits of the 64 bit storage
   // this supports incrementing the reference counter directly from mm_struct
   // rather than seeking /proc/PID/mem in userspace
-  if (ref_ctr_offset > 0)
+  if (ref_ctr_offset > 0) {
     attr.config |= ref_ctr_offset << PERF_UPROBE_REF_CTR_OFFSET_SHIFT;
+  }
 
   /*
    * struct perf_event_attr in latest perf_event.h has the following
