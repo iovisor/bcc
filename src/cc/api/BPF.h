@@ -79,6 +79,13 @@ class BPF {
                             bpf_probe_attach_type attach_type = BPF_PROBE_ENTRY,
                             pid_t pid = -1,
                             uint64_t symbol_offset = 0);
+
+  StatusTuple attach_uprobe(const std::string& binary_path,
+                            const std::string& symbol,
+                            const std::string& probe_func, uint64_t symbol_addr,
+                            bpf_probe_attach_type attach_type, pid_t pid,
+                            uint64_t symbol_offset, uint32_t ref_ctr_offset);
+
   StatusTuple detach_uprobe(const std::string& binary_path,
                             const std::string& symbol, uint64_t symbol_addr = 0,
                             bpf_probe_attach_type attach_type = BPF_PROBE_ENTRY,

@@ -91,6 +91,8 @@
 
 #define UNUSED(expr) do { (void)(expr); } while (0)
 
+#define NO_REF_CTR 0
+
 struct bpf_helper {
   char *name;
   char *required_version;
@@ -837,9 +839,12 @@ static int bpf_get_retprobe_bit(const char *event_type)
  * creating [k,u]probe with perf_event_open, which makes it easier to clean up
  * the [k,u]probe. This function tries to create pfd with the perf_kprobe PMU.
  */
+
+#define PERF_UPROBE_REF_CTR_OFFSET_SHIFT 32  // from linux/trace_events.h
 static int bpf_try_perf_event_open_with_probe(const char *name, uint64_t offs,
-             int pid, const char *event_type, int is_return)
-{
+                                              uint64_t ref_ctr_offset, int pid,
+                                              const char *event_type,
+                                              int is_return) {
   struct perf_event_attr attr = {};
   int type = bpf_find_probe_type(event_type);
   int is_return_bit = bpf_get_retprobe_bit(event_type);
@@ -851,6 +856,14 @@ static int bpf_try_perf_event_open_with_probe(const char *name, uint64_t offs,
   attr.wakeup_events = 1;
   if (is_return)
     attr.config |= 1 << is_return_bit;
+
+  // Per bcc#2230, a6ca88b introduces a ref_ctr_offset to uprobes to set
+  // semaphores directly through uprobe call, rather than seek to memory
+  // the ref_ctr_offset must be packed in the top 32 bits of the 64 bit storage
+  // this supports incrementing the reference counter directly from mm_struct
+  // rather than seeking /proc/PID/mem in userspace
+  if (ref_ctr_offset > 0)
+    attr.config |= ref_ctr_offset << PERF_UPROBE_REF_CTR_OFFSET_SHIFT;
 
   /*
    * struct perf_event_attr in latest perf_event.h has the following
@@ -1018,16 +1031,17 @@ error:
 // config1 could be either kprobe_func or uprobe_path,
 // see bpf_try_perf_event_open_with_probe().
 static int bpf_attach_probe(int progfd, enum bpf_probe_attach_type attach_type,
-                            const char *ev_name, const char *config1, const char* event_type,
-                            uint64_t offset, pid_t pid, int maxactive)
-{
+                            const char *ev_name, const char *config1,
+                            const char *event_type, uint64_t offset,
+                            uint64_t ref_ctr_offset, pid_t pid, int maxactive) {
   int kfd, pfd = -1;
   char buf[PATH_MAX], fname[256];
   bool is_kprobe = strncmp("kprobe", event_type, 6) == 0;
 
   if (maxactive <= 0)
     // Try create the [k,u]probe Perf Event with perf_event_open API.
-    pfd = bpf_try_perf_event_open_with_probe(config1, offset, pid, event_type,
+    pfd = bpf_try_perf_event_open_with_probe(config1, offset, ref_ctr_offset,
+                                             pid, event_type,
                                              attach_type != BPF_PROBE_ENTRY);
 
   // If failed, most likely Kernel doesn't support the perf_kprobe PMU
@@ -1090,19 +1104,23 @@ int bpf_attach_kprobe(int progfd, enum bpf_probe_attach_type attach_type,
                       const char *ev_name, const char *fn_name,
                       uint64_t fn_offset, int maxactive)
 {
-  return bpf_attach_probe(progfd, attach_type,
-                          ev_name, fn_name, "kprobe",
-                          fn_offset, -1, maxactive);
+  return bpf_attach_probe(progfd, attach_type, ev_name, fn_name, "kprobe",
+                          fn_offset, NO_REF_CTR, -1, maxactive);
 }
 
 int bpf_attach_uprobe(int progfd, enum bpf_probe_attach_type attach_type,
                       const char *ev_name, const char *binary_path,
                       uint64_t offset, pid_t pid)
 {
+  return bpf_attach_probe(progfd, attach_type, ev_name, binary_path, "uprobe",
+                          offset, NO_REF_CTR, pid, -1);
+}
 
-  return bpf_attach_probe(progfd, attach_type,
-                          ev_name, binary_path, "uprobe",
-                          offset, pid, -1);
+int bpf_attach_usdt_probe(int progfd, enum bpf_probe_attach_type attach_type,
+                          const char *ev_name, const char *binary_path,
+                          uint64_t offset, uint64_t ref_ctr_offset, pid_t pid) {
+  return bpf_attach_probe(progfd, attach_type, ev_name, binary_path, "uprobe",
+                          offset, ref_ctr_offset, pid, -1);
 }
 
 static int bpf_detach_probe(const char *ev_name, const char *event_type)

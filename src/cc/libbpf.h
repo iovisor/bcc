@@ -87,6 +87,11 @@ int bpf_detach_kprobe(const char *ev_name);
 int bpf_attach_uprobe(int progfd, enum bpf_probe_attach_type attach_type,
                       const char *ev_name, const char *binary_path,
                       uint64_t offset, pid_t pid);
+
+int bpf_attach_usdt_probe(int progfd, enum bpf_probe_attach_type attach_type,
+                          const char *ev_name, const char *binary_path,
+                          uint64_t offset, uint64_t ref_ctr_offset, pid_t pid);
+
 int bpf_detach_uprobe(const char *ev_name);
 
 int bpf_attach_tracepoint(int progfd, const char *tp_category,

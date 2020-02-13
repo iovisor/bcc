@@ -193,6 +193,7 @@ class Probe {
   std::string bin_path_; // initial bin_path when Probe is created
   std::string provider_;
   std::string name_;
+  bool ref_ctr_offset_supported_;
   uint64_t semaphore_;
 
   std::vector<Location> locations_;
@@ -294,7 +295,8 @@ public:
   typedef void (*each_cb)(struct bcc_usdt *);
   void each(each_cb callback);
 
-  typedef void (*each_uprobe_cb)(const char *, const char *, uint64_t, int);
+  typedef void (*each_uprobe_cb)(const char *, const char *, uint64_t, uint64_t,
+                                 int);
   void each_uprobe(each_uprobe_cb callback);
 
   friend class ::ebpf::BPF;

@@ -61,8 +61,9 @@ Probe::Probe(const char *bin_path, const char *provider, const char *name,
       name_(name),
       semaphore_(semaphore),
       pid_(pid),
-      mod_match_inode_only_(mod_match_inode_only)
-      {}
+      mod_match_inode_only_(mod_match_inode_only) {
+  ref_ctr_offset_supported_ = bcc_usdt_ref_ctr_offset_supported();
+}
 
 bool Probe::in_shared_object(const std::string &bin_path) {
     if (object_type_map_.find(bin_path) == object_type_map_.end()) {
@@ -127,7 +128,7 @@ bool Probe::enable(const std::string &fn_name) {
     if (!pid_)
       return false;
 
-    if (!add_to_semaphore(+1))
+    if (!ref_ctr_offset_supported_ && !add_to_semaphore(+1))
       return false;
   }
 
@@ -143,7 +144,8 @@ bool Probe::disable() {
 
   if (need_enable()) {
     assert(pid_);
-    return add_to_semaphore(-1);
+    if (!ref_ctr_offset_supported_)
+      return add_to_semaphore(-1);
   }
   return true;
 }
@@ -376,7 +378,7 @@ void Context::each_uprobe(each_uprobe_cb callback) {
 
     for (Location &loc : p->locations_) {
       callback(loc.bin_path_.c_str(), p->attached_to_->c_str(), loc.address_,
-               pid_.value_or(-1));
+               p->semaphore_, pid_.value_or(-1));
     }
   }
 }
@@ -500,6 +502,36 @@ int bcc_usdt_addsem_fully_specified_probe(void *usdt, const char *provider_name,
   return ctx->addsem_probe(provider_name, probe_name, fn_name, val) ? 0 : -1;
 }
 
+/*
+Kernels ~4.20 and later support specifying the ref_ctr_offset as an argument to
+attaching a uprobe, which negates the need to seek to this memory offset in
+userspace to manage semaphores, as the kernel will do it for us.
+
+This helper function checks if this support is available by reading the
+uprobe format for this value, added in a6ca88b241d5e929e6e60b12ad8cd288f0ffa256
+*/
+bool bcc_usdt_ref_ctr_offset_supported() {
+  const char *ref_ctr_pmu_path =
+      "/sys/bus/event_source/devices/uprobe/format/ref_ctr_offset";
+  const char *ref_ctr_pmu_expected = "config:32-63\0";
+  char ref_ctr_pmu_fmt[64];  // in Linux source this buffer is compared vs
+                             // PAGE_SIZE, but 64 is probably ample
+  int fd = open(ref_ctr_pmu_path, O_RDONLY);
+  if (fd < 0)
+    return false;
+
+  int ret = read(fd, ref_ctr_pmu_fmt, sizeof(ref_ctr_pmu_fmt));
+  close(fd);
+  if (ret < 0) {
+    return false;
+  }
+  if (strncmp(ref_ctr_pmu_expected, ref_ctr_pmu_fmt,
+              strlen(ref_ctr_pmu_expected)) == 0) {
+    return true;
+  }
+  return false;
+}
+
 const char *bcc_usdt_genargs(void **usdt_array, int len) {
   static std::string storage_;
   std::ostringstream stream;
@@ -566,6 +598,7 @@ int bcc_usdt_get_location(void *usdt, const char *provider_name,
   if (index < 0 || (size_t)index >= probe->num_locations())
     return -1;
   location->address = probe->address(index);
+  location->ref_ctr_offset = probe->semaphore();
   location->bin_path = probe->location_bin_path(index);
   return 0;
 }

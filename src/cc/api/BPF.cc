@@ -226,7 +226,17 @@ StatusTuple BPF::attach_uprobe(const std::string& binary_path,
                                uint64_t symbol_addr,
                                bpf_probe_attach_type attach_type, pid_t pid,
                                uint64_t symbol_offset) {
+  return attach_uprobe(binary_path, symbol, probe_func, symbol_addr,
+                       attach_type, pid, symbol_offset, 0);
+}
 
+StatusTuple BPF::attach_uprobe(const std::string& binary_path,
+                               const std::string& symbol,
+                               const std::string& probe_func,
+                               uint64_t symbol_addr,
+                               bpf_probe_attach_type attach_type, pid_t pid,
+                               uint64_t symbol_offset,
+                               uint32_t ref_ctr_offset) {
   if (symbol_addr != 0 && symbol_offset != 0)
     return StatusTuple(-1,
              "Attachng uprobe with addr %lx and offset %lx is not supported",
@@ -244,17 +254,25 @@ StatusTuple BPF::attach_uprobe(const std::string& binary_path,
   int probe_fd;
   TRY2(load_func(probe_func, BPF_PROG_TYPE_KPROBE, probe_fd));
 
-  int res_fd = bpf_attach_uprobe(probe_fd, attach_type, probe_event.c_str(),
-                                 binary_path.c_str(), offset, pid);
+  int res_fd;
+  printf("Using ref_ctr_offset %08X\n", ref_ctr_offset);
+  if (ref_ctr_offset != 0) {
+    res_fd =
+        bpf_attach_usdt_probe(probe_fd, attach_type, probe_event.c_str(),
+                              binary_path.c_str(), offset, pid, ref_ctr_offset);
+  } else
+    res_fd = bpf_attach_uprobe(probe_fd, attach_type, probe_event.c_str(),
+                               binary_path.c_str(), offset, pid);
 
   if (res_fd < 0) {
     TRY2(unload_func(probe_func));
     return StatusTuple(
         -1,
         "Unable to attach %suprobe for binary %s symbol %s addr %lx "
-        "offset %lx using %s\n",
+        "offset %lx ref_ctr_offset %lx using %s\n",
         attach_type_debug(attach_type).c_str(), binary_path.c_str(),
-        symbol.c_str(), symbol_addr, symbol_offset, probe_func.c_str());
+        symbol.c_str(), symbol_addr, symbol_offset, ref_ctr_offset,
+        probe_func.c_str());
   }
 
   open_probe_t p = {};
