@@ -100,6 +100,9 @@ lib.bpf_detach_kprobe.argtypes = [ct.c_char_p]
 lib.bpf_attach_uprobe.restype = ct.c_int
 lib.bpf_attach_uprobe.argtypes = [ct.c_int, ct.c_int, ct.c_char_p, ct.c_char_p,
         ct.c_ulonglong, ct.c_int]
+lib.bpf_attach_usdt_probe.restype = ct.c_int
+lib.bpf_attach_usdt_probe.argtypes = [ct.c_int, ct.c_int, ct.c_char_p, ct.c_char_p,
+        ct.c_ulonglong, ct.c_ulonglong, ct.c_int]
 lib.bpf_detach_uprobe.restype = ct.c_int
 lib.bpf_detach_uprobe.argtypes = [ct.c_char_p]
 lib.bpf_attach_tracepoint.restype = ct.c_int
@@ -304,7 +307,7 @@ lib.bcc_usdt_get_argument.argtypes = [ct.c_void_p, ct.c_char_p, ct.c_char_p, ct.
                                       ct.c_int, ct.POINTER(bcc_usdt_argument)]
 
 _USDT_PROBE_CB = ct.CFUNCTYPE(None, ct.c_char_p, ct.c_char_p,
-                              ct.c_ulonglong, ct.c_int)
+                              ct.c_ulonglong, ct.c_ulonglong, ct.c_int)
 
 lib.bcc_usdt_foreach_uprobe.restype = None
 lib.bcc_usdt_foreach_uprobe.argtypes = [ct.c_void_p, _USDT_PROBE_CB]

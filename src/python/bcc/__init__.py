@@ -1096,9 +1096,9 @@ class BPF(object):
             return b"%s_%s_0x%x_%d" % (prefix, self._probe_repl.sub(b"_", path), addr, pid)
 
     def attach_uprobe(self, name=b"", sym=b"", sym_re=b"", addr=None,
-            fn_name=b"", pid=-1, sym_off=0):
+            fn_name=b"", ref_ctr_offset=0, pid=-1, sym_off=0):
         """attach_uprobe(name="", sym="", sym_re="", addr=None, fn_name=""
-                         pid=-1, sym_off=0)
+                         ref_ctr_offset=0, pid=-1, sym_off=0)
 
         Run the bpf function denoted by fn_name every time the symbol sym in
         the library or binary 'name' is encountered. Optional parameters pid,
@@ -1119,6 +1119,10 @@ class BPF(object):
         with the full path (/usr/lib/...). Binaries can be given only with the
         full path (/bin/sh). If a PID is given, the uprobe will attach to the
         version of the library used by the process.
+
+        If the uprobe is a USDT probe and the kernel supports it, the semaphore
+        used to track access located at ref_ctr_offset will be managed by the
+        kernel instead of by BCC.
 
         Example: BPF(text).attach_uprobe("c", "malloc")
                  BPF(text).attach_uprobe("/usr/bin/python", "main")
@@ -1146,7 +1150,10 @@ class BPF(object):
         self._check_probe_quota(1)
         fn = self.load_func(fn_name, BPF.KPROBE)
         ev_name = self._get_uprobe_evname(b"p", path, addr, pid)
-        fd = lib.bpf_attach_uprobe(fn.fd, 0, ev_name, path, addr, pid)
+        if(ref_ctr_offset > 0):
+          fd = lib.bpf_attach_usdt_probe(fn.fd, 0, ev_name, path, addr, ref_ctr_offset, pid)
+        else:
+          fd = lib.bpf_attach_uprobe(fn.fd, 0, ev_name, path, addr, pid)
         if fd < 0:
             raise Exception("Failed to attach BPF to uprobe")
         self._add_uprobe_fd(ev_name, fd)
