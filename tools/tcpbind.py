@@ -21,6 +21,10 @@
 # This uses dynamic tracing of kernel functions, and will need to be updated
 # to match kernel changes.
 #
+# Copyright (c) 2020-present Facebook.
+# Licensed under the Apache License, Version 2.0 (the "License")
+#
+# 14-Feb-2020   Pavel Dubovitsky   Created this.
 
 from __future__ import print_function, absolute_import, unicode_literals
 from bcc import BPF, DEBUG_SOURCE
