@@ -322,6 +322,10 @@ class SmokeTests(TestCase):
         self.run_with_int("tcpaccept.py")
 
     @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
+    def test_tcpbind(self):
+        self.run_with_int("tcpbind.py")
+
+    @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
     def test_tcpconnect(self):
         self.run_with_int("tcpconnect.py")
 

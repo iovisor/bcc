@@ -1,0 +1,119 @@
+Demonstrations of tcpbind, the Linux eBPF/bcc version.
+
+This tool traces the kernel function performing socket binding and
+print socket options set before the system call invocation that might
+impact bind behavior and bound interface:
+SOL_IP     IP_FREEBIND              F....
+SOL_IP     IP_TRANSPARENT           .T...
+SOL_IP     IP_BIND_ADDRESS_NO_PORT  ..N..
+SOL_SOCKET SO_REUSEADDR             ...R.
+SOL_SOCKET SO_REUSEPORT             ....r
+
+
+# ./tcpbind.py
+Tracing binds ... Hit Ctrl-C to end
+  PID COMM         IP ADDR            PORT   OPTS IF
+12553 test_bind_op 4  192.168.1.100       0 F.N..  0
+23912 Acceptor Thr 6  ::              38055 ...R.  0
+14339 test_bind_op 4  192.168.1.101       0 F.NR.  0
+13747 dig          6  ::              56022 .....  0
+
+The output shows four bind system calls:
+two "test_bind_op" instances, one with IP_FREEBIND and IP_BIND_ADDRESS_NO_PORT
+options, another with IP_FREEBIND, IP_BIND_ADDRESS_NO_PORT, and SO_REUSEADDR;
+Acceptor is using SO_REUSEADDR, and the dig process with no socket options set
+
+
+The -t option prints a timestamp column
+
+# ./tcpbind.py -t
+TIME(s)     PID COMM         IP ADDR            PORT   OPTS IF
+0.000000  78512 Acceptor Thr 6  ::              45239 ...R.  0
+0.214219  78463 fetch        4  0.0.0.0         43953 ...R.  0
+0.215896  78463 fetch        6  ::              43953 ...R.  0
+0.220005  78463 fetch        6  fe80::2000:bff:  6884 ...R.  0
+0.220990  78463 fetch        4  127.0.0.1       38276 .....  0
+2.826720  64339 test_bind_op 4  192.168.1.101       0 F.NR.  0
+
+
+The -U option prints a UID column:
+
+# ./tcpbind.py -U
+Tracing binds ... Hit Ctrl-C to end
+   UID   PID COMM         IP ADDR            PORT   OPTS IF
+     0 78826 fetch        6  fe80::2000:bff: 62459 .....  0
+127072 64339 test_bind_op 4  192.168.1.101       0 F.NR.  0
+127072 90425 Acceptor Thr 6  ::              37595 ...R.  0
+127072 90895 test_bind_op 4  192.168.1.102       0 F.N.r  0
+
+
+The -u option filtering UID:
+
+# ./tcpbind.py -Uu 0
+Tracing binds ... Hit Ctrl-C to end
+UID   PID COMM         IP ADDR            PORT   OPTS IF
+  0 10224 python3.7    6  ::1             47331 .....  0
+  0 10336 Acceptor Thr 6  ::              43401 ...R.  0
+  0 10336 Acceptor Thr 6  ::              39623 ...R.  0
+  0 10224 fetch        4  0.0.0.0         42091 ...R.  0
+
+
+The --cgroupmap option filters based on a cgroup set.
+It is meant to be used with an externally created map.
+
+# ./tcpbind.py --cgroupmap /sys/fs/bpf/test01
+
+For more details, see docs/filtering_by_cgroups.md
+
+
+In order to track heavy bind usage one can use --count option
+# ./tcpbind.py --count
+Tracing binds ... Hit Ctrl-C to end
+LADDR                                           LPORT     BINDS
+0.0.0.0                                          6771     4
+0.0.0.0                                          4433     4
+127.0.0.1                                       33665     1
+
+
+Usage message:
+# ./tcpbind.py -h
+usage: tcpbind.py [-h] [-t] [-w] [-p PID] [-P PORT] [-E] [-U] [-u UID]
+                  [--count] [--cgroupmap CGROUPMAP]
+
+Trace TCP binds
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -t, --timestamp       include timestamp on output
+  -w, --wide            wide column output (fits IPv6 addresses)
+  -p PID, --pid PID     trace this PID only
+  -P PORT, --port PORT  comma-separated list of ports to trace.
+  -E, --errors          include errors in the output.
+  -U, --print-uid       include UID on output
+  -u UID, --uid UID     trace this UID only
+  --count               count binds per src ip and port
+  --cgroupmap CGROUPMAP
+                        trace cgroups in this BPF map only
+
+examples:
+    ./tcpbind           # trace all TCP bind()s
+    ./tcpbind -t        # include timestamps
+    ./tcplife -w        # wider columns (fit IPv6)
+    ./tcpbind -p 181    # only trace PID 181
+    ./tcpbind -P 80     # only trace port 80
+    ./tcpbind -P 80,81  # only trace port 80 and 81
+    ./tcpbind -U        # include UID
+    ./tcpbind -u 1000   # only trace UID 1000
+    ./tcpbind -E        # report bind errors
+    ./tcpbind --count   # count bind per src ip
+    ./tcpbind --cgroupmap mappath  # only trace cgroups in this BPF map
+
+    it is reporting socket options set before the bins call
+    impacting system call behavior:
+     SOL_IP     IP_FREEBIND              F....
+     SOL_IP     IP_TRANSPARENT           .T...
+     SOL_IP     IP_BIND_ADDRESS_NO_PORT  ..N..
+     SOL_SOCKET SO_REUSEADDR             ...R.
+     SOL_SOCKET SO_REUSEPORT             ....r
+
+     SO_BINDTODEVICE interface is reported as "IF" index

@@ -1,13 +1,14 @@
-#!/usr/bin/env bcc-py
+#!/usr/bin/python
 #
-# tcpbind       Trace binds()s.
+# tcpbind       Trace IPv4 and IPv6 binds()s.
 #               For Linux, uses BCC, eBPF. Embedded C.
 #
 # based on tcpconnect utility from Brendan Gregg's suite.
 #
-# USAGE: bindsnoop [-h] [--count] [-t] [-E] [-p PID] [-P PORT [PORT ...]]
+# USAGE: tcpbind [-h] [-t] [-E] [-p PID] [-P PORT [PORT ...]] [-w]
+#             [--count] [--cgroupmap mappath]
 #
-# bindsnoop reports socket options set before the bind call
+# tcpbind reports socket options set before the bind call
 # that would impact this system call behavior:
 # SOL_IP     IP_FREEBIND              F....
 # SOL_IP     IP_TRANSPARENT           .T...
@@ -21,7 +22,7 @@
 # to match kernel changes.
 #
 
-from __future__ import print_function
+from __future__ import print_function, absolute_import, unicode_literals
 from bcc import BPF, DEBUG_SOURCE
 from bcc.utils import printb
 import argparse
@@ -31,15 +32,17 @@ from time import sleep
 
 # arguments
 examples = """examples:
-    ./bindsnoop           # trace all TCP bind()s
-    ./bindsnoop -t        # include timestamps
-    ./bindsnoop -p 181    # only trace PID 181
-    ./bindsnoop -P 80     # only trace port 80
-    ./bindsnoop -P 80,81  # only trace port 80 and 81
-    ./bindsnoop -U        # include UID
-    ./bindsnoop -u 1000   # only trace UID 1000
-    ./bindsnoop -E        # report bind errors
-    ./bindsnoop --count   # count bind per src ip
+    ./tcpbind           # trace all TCP bind()s
+    ./tcpbind -t        # include timestamps
+    ./tcplife -w        # wider columns (fit IPv6)
+    ./tcpbind -p 181    # only trace PID 181
+    ./tcpbind -P 80     # only trace port 80
+    ./tcpbind -P 80,81  # only trace port 80 and 81
+    ./tcpbind -U        # include UID
+    ./tcpbind -u 1000   # only trace UID 1000
+    ./tcpbind -E        # report bind errors
+    ./tcpbind --count   # count bind per src ip
+    ./tcpbind --cgroupmap mappath  # only trace cgroups in this BPF map
 
 it is reporting socket options set before the bins call
 impacting system call behavior:
@@ -49,7 +52,7 @@ impacting system call behavior:
  SOL_SOCKET SO_REUSEADDR             ...R.
  SOL_SOCKET SO_REUSEPORT             ....r
 
- SO_BINDTODEVICE interface is reported as "BOUND_IF" index
+ SO_BINDTODEVICE interface is reported as "IF" index
 """
 parser = argparse.ArgumentParser(
     description="Trace TCP binds",
@@ -57,6 +60,8 @@ parser = argparse.ArgumentParser(
     epilog=examples)
 parser.add_argument("-t", "--timestamp", action="store_true",
     help="include timestamp on output")
+parser.add_argument("-w", "--wide", action="store_true",
+    help="wide column output (fits IPv6 addresses)")
 parser.add_argument("-p", "--pid",
     help="trace this PID only")
 parser.add_argument("-P", "--port",
@@ -69,12 +74,13 @@ parser.add_argument("-u", "--uid",
     help="trace this UID only")
 parser.add_argument("--count", action="store_true",
     help="count binds per src ip and port")
+parser.add_argument("--cgroupmap",
+    help="trace cgroups in this BPF map only")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
 parser.add_argument("--debug-source", action="store_true",
     help=argparse.SUPPRESS)
 args = parser.parse_args()
-debug = 0
 
 # define BPF program
 bpf_text = """
@@ -132,6 +138,8 @@ struct ipv6_flow_key_t {
 };
 BPF_HASH(ipv6_count, struct ipv6_flow_key_t);
 
+CGROUP_MAP
+
 // bind options for event reporting
 union bind_options {
     u8 data;
@@ -145,7 +153,7 @@ union bind_options {
 };
 
 // TODO: add reporting for the original bind arguments
-int bindsnoop_entry(struct pt_regs *ctx, struct socket *socket)
+int tcpbind_entry(struct pt_regs *ctx, struct socket *socket)
 {
     u64 pid_tgid = bpf_get_current_pid_tgid();
     u32 pid = pid_tgid >> 32;
@@ -156,6 +164,8 @@ int bindsnoop_entry(struct pt_regs *ctx, struct socket *socket)
 
     FILTER_UID
 
+    FILTER_CGROUP
+
     // stash the sock ptr for lookup on return
     currsock.update(&tid, &socket);
 
@@ -163,7 +173,7 @@ int bindsnoop_entry(struct pt_regs *ctx, struct socket *socket)
 };
 
 
-static int bindsnoop_return(struct pt_regs *ctx, short ipver)
+static int tcpbind_return(struct pt_regs *ctx, short ipver)
 {
     int ret = PT_REGS_RC(ctx);
     u64 pid_tgid = bpf_get_current_pid_tgid();
@@ -230,29 +240,30 @@ static int bindsnoop_return(struct pt_regs *ctx, short ipver)
     return 0;
 }
 
-int bindsnoop_v4_return(struct pt_regs *ctx)
+int tcpbind_v4_return(struct pt_regs *ctx)
 {
-    return bindsnoop_return(ctx, 4);
+    return tcpbind_return(ctx, 4);
 }
 
-int bindsnoop_v6_return(struct pt_regs *ctx)
+int tcpbind_v6_return(struct pt_regs *ctx)
 {
-    return bindsnoop_return(ctx, 6);
+    return tcpbind_return(ctx, 6);
 }
 """
 
 struct_init = {
     'ipv4': {
-        'count' : """
+        'count': """
                struct ipv4_flow_key_t flow_key = {};
                flow_key.saddr = skp->__sk_common.skc_rcv_saddr;
                flow_key.sport = sport;
                ipv4_count.increment(flow_key);""",
-        'trace' : """
+        'trace': """
                struct ipv4_bind_data_t data4 = {.pid = pid, .ip = ipver};
                data4.uid = bpf_get_current_uid_gid();
                data4.ts_us = bpf_ktime_get_ns() / 1000;
-               bpf_probe_read(&data4.saddr, sizeof(data4.saddr), &sockp->inet_saddr);
+               bpf_probe_read(
+                 &data4.saddr, sizeof(data4.saddr), &sockp->inet_saddr);
                data4.return_code = ret;
                data4.sport = sport;
                data4.bound_dev_if = skp->__sk_common.skc_bound_dev_if;
@@ -261,13 +272,13 @@ struct_init = {
                ipv4_bind_events.perf_submit(ctx, &data4, sizeof(data4));"""
     },
     'ipv6': {
-        'count' : """
+        'count': """
                struct ipv6_flow_key_t flow_key = {};
                bpf_probe_read(&flow_key.saddr, sizeof(flow_key.saddr),
                    skp->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
                flow_key.sport = sport;
                ipv6_count.increment(flow_key);""",
-        'trace' : """
+        'trace': """
                struct ipv6_bind_data_t data6 = {.pid = pid, .ip = ipver};
                data6.uid = bpf_get_current_uid_gid();
                data6.ts_us = bpf_ktime_get_ns() / 1000;
@@ -279,7 +290,12 @@ struct_init = {
                data6.socket_options = opts.data;
                bpf_get_current_comm(&data6.task, sizeof(data6.task));
                ipv6_bind_events.perf_submit(ctx, &data6, sizeof(data6));"""
-    }
+    },
+    'filter_cgroup': """
+    u64 cgroupid = bpf_get_current_cgroup_id();
+    if (cgroupset.lookup(&cgroupid) == NULL) {
+      return 0;
+    }""",
 }
 
 # code substitutions
@@ -303,16 +319,33 @@ if args.uid:
         'if (uid != %s) { return 0; }' % args.uid)
 if args.errors:
     bpf_text = bpf_text.replace('FILTER_ERRORS', 'ignore_errors = 0;')
+if args.cgroupmap:
+    bpf_text = bpf_text.replace('FILTER_CGROUP', struct_init['filter_cgroup'])
+    bpf_text = bpf_text.replace(
+        'CGROUP_MAP',
+        (
+            'BPF_TABLE_PINNED("hash", u64, u64, cgroupset, 1024, "%s");' %
+            args.cgroupmap
+        )
+    )
 
 bpf_text = bpf_text.replace('FILTER_PID', '')
 bpf_text = bpf_text.replace('FILTER_PORT', '')
 bpf_text = bpf_text.replace('FILTER_UID', '')
 bpf_text = bpf_text.replace('FILTER_ERRORS', '')
+bpf_text = bpf_text.replace('FILTER_CGROUP', '')
+bpf_text = bpf_text.replace('CGROUP_MAP', '')
 
-if debug or args.ebpf:
+# selecting output format - 80 characters or wide, fitting IPv6 addresses
+header_fmt = "%5s %-12.12s %-2s %-15s %-5s %5s %2s"
+output_fmt = b"%5d %-12.12s %-2d %-15.15s %5d %-5s %2d"
+if args.wide:
+    header_fmt = "%10s %-12.12s %-2s %-39s %-5s %5s %2s"
+    output_fmt = b"%10d %-12.12s %-2d %-39s %5d %-5s %2d"
+
+if args.ebpf:
     print(bpf_text)
-    if args.ebpf:
-        exit()
+    exit()
 
 if args.debug_source:
     b = BPF(text=bpf_text, debug=DEBUG_SOURCE)
@@ -341,13 +374,12 @@ def print_ipv4_bind_event(cpu, data, size):
     if args.timestamp:
         if start_ts == 0:
             start_ts = event.ts_us
-        printb(b"%-9.3f" % ((float(event.ts_us) - start_ts) / 1000000), nl="")
+        printb(b"%-9.6f " % ((float(event.ts_us) - start_ts) / 1000000), nl="")
     if args.print_uid:
-        printb(b"%-6d" % event.uid, nl="")
+        printb(b"%6d " % event.uid, nl="")
     if args.errors:
-        printb(b"%8d " % event.return_code, nl="")
-    printb(b"%10d  %-12.12s  %-2d %-32s %5d  %-8s %8d" % (event.pid,
-        event.task, event.ip,
+        printb(b"%3d " % event.return_code, nl="")
+    printb(output_fmt % (event.pid, event.task, event.ip,
         inet_ntop(AF_INET, pack("I", event.saddr)).encode(),
         event.sport, opts2str(event.socket_options), event.bound_dev_if))
 
@@ -358,13 +390,12 @@ def print_ipv6_bind_event(cpu, data, size):
     if args.timestamp:
         if start_ts == 0:
             start_ts = event.ts_us
-        printb(b"%-9.3f" % ((float(event.ts_us) - start_ts) / 1000000), nl="")
+        printb(b"%-9.6f " % ((float(event.ts_us) - start_ts) / 1000000), nl="")
     if args.print_uid:
-        printb(b"%-6d" % event.uid, nl="")
+        printb(b"%6d " % event.uid, nl="")
     if args.errors:
-        printb(b"%8d " % event.return_code, nl="")
-    printb(b"%10d  %-12.12s  %-2d %-32s %5d  %-8s %8d" % (event.pid,
-        event.task, event.ip,
+        printb(b"%3d " % event.return_code, nl="")
+    printb(output_fmt % (event.pid, event.task, event.ip,
         inet_ntop(AF_INET6, event.saddr).encode(),
         event.sport, opts2str(event.socket_options), event.bound_dev_if))
 
@@ -387,10 +418,10 @@ def depict_cnt(counts_tab, l3prot='ipv4'):
 
 # initialize BPF
 b = BPF(text=bpf_text)
-b.attach_kprobe(event="inet_bind", fn_name="bindsnoop_entry")
-b.attach_kprobe(event="inet6_bind", fn_name="bindsnoop_entry")
-b.attach_kretprobe(event="inet_bind", fn_name="bindsnoop_v4_return")
-b.attach_kretprobe(event="inet6_bind", fn_name="bindsnoop_v6_return")
+b.attach_kprobe(event="inet_bind", fn_name="tcpbind_entry")
+b.attach_kprobe(event="inet6_bind", fn_name="tcpbind_entry")
+b.attach_kretprobe(event="inet_bind", fn_name="tcpbind_v4_return")
+b.attach_kretprobe(event="inet6_bind", fn_name="tcpbind_v6_return")
 
 print("Tracing binds ... Hit Ctrl-C to end")
 if args.count:
@@ -409,13 +440,12 @@ if args.count:
 else:
     # header
     if args.timestamp:
-        print("%-9s" % ("TIME(s)"), end="")
+        print("%-9s " % ("TIME(s)"), end="")
     if args.print_uid:
-        print("%-6s" % ("UID"), end="")
+        print("%6s " % ("UID"), end="")
     if args.errors:
-        print("%8s " % ("RET_CODE"), end="")
-    print("%10s  %-12s %-2s  %-32s %-5s  %5s    %8s" % (
-        "PID", "COMM", "IP", "SADDR", "SPORT", "OPTS", "BOUND_IF"))
+        print("%2s " % ("RC"), end="")
+    print(header_fmt % ("PID", "COMM", "IP", "ADDR", "PORT", "OPTS", "IF"))
 
     start_ts = 0
 

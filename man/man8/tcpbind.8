@@ -1,10 +1,10 @@
-.TH bindsnoop 8  "12 February 2020" "" ""
+.TH tcpbind 8  "12 February 2020" "" ""
 .SH NAME
-bindsnoop \- Trace bind() system calls.
+tcpbind \- Trace bind() system calls.
 .SH SYNOPSIS
-.B bindsnoop.py [\fB-h\fP] [\fB-t\fP] [\fB-p\fP PID] [\fB-P\fP PORT] [\fB-E\fP] [\fB-U\fP] [\fB-u\fP UID] [\fB--count\fP]
+.B tcpbind.py [\fB-h\fP] [\fB-w\fP] [\fB-t\fP] [\fB-p\fP PID] [\fB-P\fP PORT] [\fB-E\fP] [\fB-U\fP] [\fB-u\fP UID] [\fB--count\fP] [\fB--cgroupmap MAP\fP]
 .SH DESCRIPTION
-bindsnoop reports socket options set before the bind call that would impact this system call behavior.
+tcpbind reports socket options set before the bind call that would impact this system call behavior.
 .PP
 .SH REQUIREMENTS
 CONFIG_BPF and bcc.
@@ -22,6 +22,11 @@ Include timestamp on output:
 .B
 \fB-t\fP, \fB--timestamp\fP
 .TP
+Wider columns (fit IPv6):
+.TP
+.B
+\fB-w\fP, \fB--wide\fP
+.TP
 Trace this PID only:
 .TP
 .B
@@ -31,6 +36,11 @@ Comma-separated list of ports to trace:
 .TP
 .B
 \fB-P\fP PORT, \fB--port\fP PORT
+.TP
+Trace cgroups in this BPF map:
+.TP
+.B
+\fB--cgroupmap\fP MAP
 .TP
 Include errors in the output:
 .TP
@@ -60,51 +70,50 @@ EXAMPLES:
 Trace all TCP \fBbind\fP()s
 .TP
 .B
-bindsnoop
+tcpbind
 .TP
 Include timestamps
 .TP
 .B
-bindsnoop \fB-t\fP
+tcpbind \fB-t\fP
 .TP
 Trace PID 181
 .TP
 .B
-bindsnoop \fB-p\fP 181
+tcpbind \fB-p\fP 181
 .TP
 Trace port 80
 .TP
 .B
-bindsnoop \fB-P\fP 80
+tcpbind \fB-P\fP 80
 .TP
 Trace port 80 and 81
 .TP
 .B
-bindsnoop \fB-P\fP 80,81
+tcpbind \fB-P\fP 80,81
 .TP
 Include UID
 .TP
 .B
-bindsnoop \fB-U\fP
+tcpbind \fB-U\fP
 .TP
 Trace UID 1000
 .TP
 .B
-bindsnoop \fB-u\fP 1000
+tcpbind \fB-u\fP 1000
 .TP
 Report bind errors
 .TP
 .B
-bindsnoop \fB-E\fP
+tcpbind \fB-E\fP
 .TP
 Count bind per src ip
 .TP
 .B
-bindsnoop \fB--count\fP
+tcpbind \fB--count\fP
 .RE
 .PP
-It is reporting socket options set before the bins call
-impacting system call behavior:
+Trace IPv4 and IPv6 bind system calls and report socket options that would impact bind call behavior:
 .RS
 .TP
 SOL_IP IP_FREEBIND              F\.\.\.\.
@@ -117,7 +126,7 @@ SOL_SOCKET SO_REUSEADDR         \.\.\.R.
 .TP
 SOL_SOCKET SO_REUSEPORT         \.\.\.\.r
 .PP
-SO_BINDTODEVICE interface is reported as "BOUND_IF" index
+SO_BINDTODEVICE interface is reported as "IF" index
 .SH SOURCE
 This is from bcc.
 .IP
