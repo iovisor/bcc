@@ -105,7 +105,7 @@ BPF_PERF_OUTPUT(ipv6_events);
 
 int trace_connect(struct pt_regs *ctx, struct sock *sk)
 {
-    u32 pid = bpf_get_current_pid_tgid();
+    u32 pid = bpf_get_current_pid_tgid() >> 32;
     FILTER
     struct info_t info = {.pid = pid};
     info.ts = bpf_ktime_get_ns();
