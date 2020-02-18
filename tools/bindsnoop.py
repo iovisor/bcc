@@ -210,13 +210,12 @@ static int bindsnoop_return(struct pt_regs *ctx, short ipver)
 
     struct inet_sock *sockp = (struct inet_sock *)skp;
 
-    u16 sport;
+    u16 sport = 0;
     bpf_probe_read(&sport, sizeof(sport), &sockp->inet_sport);
     sport = ntohs(sport);
 
     FILTER_PORT
 
-    // u8 opts = 0;
     union bind_options opts = {0};
     u8 bitfield;
     // fetching freebind, transparent, and bind_address_no_port bitfields
