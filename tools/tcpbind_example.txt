@@ -12,50 +12,46 @@ SOL_SOCKET SO_REUSEPORT             ....r
 
 # ./tcpbind.py
 Tracing binds ... Hit Ctrl-C to end
-  PID COMM         IP ADDR            PORT   OPTS IF
-12553 test_bind_op 4  192.168.1.100       0 F.N..  0
-23912 Acceptor Thr 6  ::              38055 ...R.  0
-14339 test_bind_op 4  192.168.1.101       0 F.NR.  0
-13747 dig          6  ::              56022 .....  0
+PID COMM         PROT ADDR            PORT   OPTS IF
+3941081 test_bind_op TCP  192.168.1.102       0 F.N..  0
+3940194 dig          TCP  ::              62087 .....  0
+3940219 dig          UDP  ::              48665 .....  0
+3940893 Acceptor Thr TCP  ::              35343 ...R.  0
 
 The output shows four bind system calls:
 two "test_bind_op" instances, one with IP_FREEBIND and IP_BIND_ADDRESS_NO_PORT
-options, another with IP_FREEBIND, IP_BIND_ADDRESS_NO_PORT, and SO_REUSEADDR;
-Acceptor is using SO_REUSEADDR, and the dig process with no socket options set
+options, dig process called bind for TCP and UDP sockets,
+and Acceptor called bind for TCP with SO_REUSEADDR option set.
 
 
 The -t option prints a timestamp column
 
 # ./tcpbind.py -t
-TIME(s)     PID COMM         IP ADDR            PORT   OPTS IF
-0.000000  78512 Acceptor Thr 6  ::              45239 ...R.  0
-0.214219  78463 fetch        4  0.0.0.0         43953 ...R.  0
-0.215896  78463 fetch        6  ::              43953 ...R.  0
-0.220005  78463 fetch        6  fe80::2000:bff:  6884 ...R.  0
-0.220990  78463 fetch        4  127.0.0.1       38276 .....  0
-2.826720  64339 test_bind_op 4  192.168.1.101       0 F.NR.  0
+TIME(s)        PID COMM         PROT ADDR            PORT   OPTS IF
+0.000000   3956801 dig          TCP  ::              49611 .....  0
+0.011045   3956822 dig          UDP  ::              56343 .....  0
+2.310629   3956498 test_bind_op TCP  192.168.1.102   39609 F...r  0
 
 
 The -U option prints a UID column:
 
 # ./tcpbind.py -U
 Tracing binds ... Hit Ctrl-C to end
-   UID   PID COMM         IP ADDR            PORT   OPTS IF
-     0 78826 fetch        6  fe80::2000:bff: 62459 .....  0
-127072 64339 test_bind_op 4  192.168.1.101       0 F.NR.  0
-127072 90425 Acceptor Thr 6  ::              37595 ...R.  0
-127072 90895 test_bind_op 4  192.168.1.102       0 F.N.r  0
+   UID      PID COMM         PROT ADDR            PORT   OPTS IF
+127072  3956498 test_bind_op TCP  192.168.1.102   44491 F...r  0
+127072  3960261 Acceptor Thr TCP  ::              48869 ...R.  0
+     0  3960729 Acceptor Thr TCP  ::              44637 ...R.  0
+     0  3959075 chef-client  UDP  ::              61722 .....  0
 
 
 The -u option filtering UID:
 
 # ./tcpbind.py -Uu 0
 Tracing binds ... Hit Ctrl-C to end
-UID   PID COMM         IP ADDR            PORT   OPTS IF
-  0 10224 python3.7    6  ::1             47331 .....  0
-  0 10336 Acceptor Thr 6  ::              43401 ...R.  0
-  0 10336 Acceptor Thr 6  ::              39623 ...R.  0
-  0 10224 fetch        4  0.0.0.0         42091 ...R.  0
+   UID      PID COMM         PROT ADDR            PORT   OPTS IF
+     0  3966330 Acceptor Thr TCP  ::              39319 ...R.  0
+     0  3968044 python3.7    TCP  ::1             59371 .....  0
+     0    10224 fetch        TCP  0.0.0.0         42091 ...R.  0
 
 
 The --cgroupmap option filters based on a cgroup set.

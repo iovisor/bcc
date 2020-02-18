@@ -5,7 +5,7 @@
 #
 # based on tcpconnect utility from Brendan Gregg's suite.
 #
-# USAGE: tcpbind [-h] [-t] [-E] [-p PID] [-P PORT [PORT ...]] [-w]
+# USAGE: tcpbind [-h] [-t] [-E] [-p PID] [-P PORT[,PORT ...]] [-w]
 #             [--count] [--cgroupmap mappath]
 #
 # tcpbind reports socket options set before the bind call
@@ -30,7 +30,11 @@ from __future__ import print_function, absolute_import, unicode_literals
 from bcc import BPF, DEBUG_SOURCE
 from bcc.utils import printb
 import argparse
-from socket import inet_ntop, AF_INET, AF_INET6
+import re
+from os import strerror
+from socket import (
+    inet_ntop, AF_INET, AF_INET6, __all__ as socket_all, __dict__ as socket_dct
+)
 from struct import pack
 from time import sleep
 
@@ -110,6 +114,7 @@ struct ipv4_bind_data_t {
     int return_code;
     u16 sport;
     u8 socket_options;
+    u8 protocol;
     char task[TASK_COMM_LEN];
 };
 BPF_PERF_OUTPUT(ipv4_bind_events);
@@ -125,6 +130,7 @@ struct ipv6_bind_data_t {
     int return_code;
     u16 sport;
     u8 socket_options;
+    u8 protocol;
     char task[TASK_COMM_LEN];
 };
 BPF_PERF_OUTPUT(ipv6_bind_events);
@@ -203,7 +209,7 @@ static int tcpbind_return(struct pt_regs *ctx, short ipver)
     struct sock *skp = skp_->sk;
 
     struct inet_sock *sockp = (struct inet_sock *)skp;
-    // struct inet_sock *sockp = inet_sk(skp);
+
     u16 sport;
     bpf_probe_read(&sport, sizeof(sport), &sockp->inet_sport);
     sport = ntohs(sport);
@@ -232,6 +238,27 @@ static int tcpbind_return(struct pt_regs *ctx, short ipver)
     opts.fields.reuseaddress = bitfield & 0x0F;
     // SO_REUSEPORT (skp->reuseport)
     opts.fields.reuseport = bitfield >> 4 & 0x01;
+
+    // workaround for reading the sk_protocol bitfield (from tcpaccept.py):
+    u8 protocol;
+    int gso_max_segs_offset = offsetof(struct sock, sk_gso_max_segs);
+    int sk_lingertime_offset = offsetof(struct sock, sk_lingertime);
+    if (sk_lingertime_offset - gso_max_segs_offset == 4)
+        // 4.10+ with little endian
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+        protocol = *(u8 *)((u64)&skp->sk_gso_max_segs - 3);
+    else
+        // pre-4.10 with little endian
+        protocol = *(u8 *)((u64)&skp->sk_wmem_queued - 3);
+#elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+        // 4.10+ with big endian
+        protocol = *(u8 *)((u64)&skp->sk_gso_max_segs - 1);
+    else
+        // pre-4.10 with big endian
+        protocol = *(u8 *)((u64)&skp->sk_wmem_queued - 1);
+#else
+# error "Fix your compiler's __BYTE_ORDER__?!"
+#endif
 
     if (ipver == 4) {
         IPV4_CODE
@@ -272,6 +299,7 @@ struct_init = {
                data4.sport = sport;
                data4.bound_dev_if = skp->__sk_common.skc_bound_dev_if;
                data4.socket_options = opts.data;
+               data4.protocol = protocol;
                bpf_get_current_comm(&data4.task, sizeof(data4.task));
                ipv4_bind_events.perf_submit(ctx, &data4, sizeof(data4));"""
     },
@@ -292,6 +320,7 @@ struct_init = {
                data6.sport = sport;
                data6.bound_dev_if = skp->__sk_common.skc_bound_dev_if;
                data6.socket_options = opts.data;
+               data6.protocol = protocol;
                bpf_get_current_comm(&data6.task, sizeof(data6.task));
                ipv6_bind_events.perf_submit(ctx, &data6, sizeof(data6));"""
     },
@@ -341,20 +370,36 @@ bpf_text = bpf_text.replace('FILTER_CGROUP', '')
 bpf_text = bpf_text.replace('CGROUP_MAP', '')
 
 # selecting output format - 80 characters or wide, fitting IPv6 addresses
-header_fmt = "%5s %-12.12s %-2s %-15s %-5s %5s %2s"
-output_fmt = b"%5d %-12.12s %-2d %-15.15s %5d %-5s %2d"
+header_fmt = "%8s %-12.12s %-4s %-15s %-5s %5s %2s"
+output_fmt = b"%8d %-12.12s %-4.4s %-15.15s %5d %-5s %2d"
+error_header_fmt = "%3s "
+error_output_fmt = b"%3s "
+error_value_fmt = str
 if args.wide:
-    header_fmt = "%10s %-12.12s %-2s %-39s %-5s %5s %2s"
-    output_fmt = b"%10d %-12.12s %-2d %-39s %5d %-5s %2d"
+    header_fmt = "%10s %-12.12s %-4s %-39s %-5s %5s %2s"
+    output_fmt = b"%10d %-12.12s %-4s %-39s %5d %-5s %2d"
+    error_header_fmt = "%-25s "
+    error_output_fmt = b"%-25s "
+    error_value_fmt = strerror
 
 if args.ebpf:
     print(bpf_text)
     exit()
 
-if args.debug_source:
-    b = BPF(text=bpf_text, debug=DEBUG_SOURCE)
-    exit()
+# L4 protocol resolver
+class L4Proto:
+    def __init__(self):
+        self.num2str = {}
+        proto_re = re.compile("IPPROTO_(.*)")
+        for attr in socket_all:
+            proto_match = proto_re.match(attr)
+            if proto_match:
+                self.num2str[socket_dct[attr]] = proto_match.group(1)
 
+    def proto2str(self, proto: int) -> str:
+        return self.num2str.get(proto, "UNKNOWN")
+
+l4 = L4Proto()
 
 # bind options:
 # SOL_IP     IP_FREEBIND              F....
@@ -382,8 +427,12 @@ def print_ipv4_bind_event(cpu, data, size):
     if args.print_uid:
         printb(b"%6d " % event.uid, nl="")
     if args.errors:
-        printb(b"%3d " % event.return_code, nl="")
-    printb(output_fmt % (event.pid, event.task, event.ip,
+        printb(
+            error_output_fmt % error_value_fmt(event.return_code).encode(),
+            nl="",
+        )
+    printb(output_fmt % (event.pid, event.task,
+        l4.proto2str(event.protocol).encode(),
         inet_ntop(AF_INET, pack("I", event.saddr)).encode(),
         event.sport, opts2str(event.socket_options), event.bound_dev_if))
 
@@ -398,8 +447,12 @@ def print_ipv6_bind_event(cpu, data, size):
     if args.print_uid:
         printb(b"%6d " % event.uid, nl="")
     if args.errors:
-        printb(b"%3d " % event.return_code, nl="")
-    printb(output_fmt % (event.pid, event.task, event.ip,
+        printb(
+            error_output_fmt % error_value_fmt(event.return_code).encode(),
+            nl="",
+        )
+    printb(output_fmt % (event.pid, event.task,
+        l4.proto2str(event.protocol).encode(),
         inet_ntop(AF_INET6, event.saddr).encode(),
         event.sport, opts2str(event.socket_options), event.bound_dev_if))
 
@@ -448,8 +501,8 @@ else:
     if args.print_uid:
         print("%6s " % ("UID"), end="")
     if args.errors:
-        print("%2s " % ("RC"), end="")
-    print(header_fmt % ("PID", "COMM", "IP", "ADDR", "PORT", "OPTS", "IF"))
+        print(error_header_fmt % ("RC"), end="")
+    print(header_fmt % ("PID", "COMM", "PROT", "ADDR", "PORT", "OPTS", "IF"))
 
     start_ts = 0
 
