@@ -53,7 +53,7 @@ int detect_ddos(struct pt_regs *ctx, void *skb){
     * test a real case attack using hping3. However; if regular network
     * traffic increases above predefined detection settings, a false
     * positive alert will be triggered (an example would be the
-      case of large file downloads).
+    * case of large file downloads).
     */
     rcv_packets_nb_ptr = rcv_packets.lookup(&rcv_packets_nb_index);
     rcv_packets_ts_ptr = rcv_packets.lookup(&rcv_packets_ts_index);
@@ -86,7 +86,7 @@ b.attach_kprobe(event="ip_rcv", fn_name="detect_ddos")
 class DetectionTimestamp(ct.Structure):
     _fields_ = [("nb_ddos_packets", ct.c_ulonglong)]
 
-# Show message when ePBF stats
+# Show message when ePBF starts
 print("DDOS detector started ... Hit Ctrl-C to end!")
 
 print("%-26s %-10s" % ("TIME(s)", "MESSAGE"))
