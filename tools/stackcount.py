@@ -275,6 +275,12 @@ class Tool(object):
             self.kernel_stack = self.args.kernel_stacks_only
             self.user_stack = self.args.user_stacks_only
 
+        # For tracing single processes in isolation, explicitly set perpid
+        # to True, if not already set. This is required to generate the correct
+        # BPF program that can store pid in the tgid field of the key_t object.
+        if self.args.pid is not None and self.args.pid > 0:
+            self.args.perpid = True
+
         self.probe = Probe(self.args.pattern,
                            self.kernel_stack, self.user_stack,
                            self.args.regexp, self.args.pid, self.args.perpid, self.args.cpu)

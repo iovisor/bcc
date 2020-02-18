@@ -487,7 +487,7 @@ User-space functions can also be traced if a library name is provided. For
 example, to quickly identify code locations that allocate heap memory for
 PID 4902 (using -p), by tracing malloc from libc ("c:malloc"):
 
-# ./stackcount -P -p 4902 c:malloc
+# ./stackcount -p 4902 c:malloc
 Tracing 1 functions for "malloc"... Hit Ctrl-C to end.
 ^C
   malloc
