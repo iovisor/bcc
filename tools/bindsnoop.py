@@ -396,7 +396,7 @@ class L4Proto:
             if proto_match:
                 self.num2str[socket_dct[attr]] = proto_match.group(1)
 
-    def proto2str(self, proto: int) -> str:
+    def proto2str(self, proto):
         return self.num2str.get(proto, "UNKNOWN")
 
 l4 = L4Proto()
