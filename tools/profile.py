@@ -118,8 +118,9 @@ args = parser.parse_args()
 pid = int(args.pid) if args.pid is not None else -1
 duration = int(args.duration)
 debug = 0
-need_delimiter = args.delimited and not (args.kernel_stacks_only or
-    args.user_stacks_only)
+need_delimiter = args.delimited and not any([args.folded,
+                                         args.kernel_stacks_only,
+                                         args.user_stacks_only])
 # TODO: add stack depth, and interval
 
 #
@@ -296,8 +297,6 @@ missing_stacks = 0
 has_enomem = False
 counts = b.get_table("counts")
 stack_traces = b.get_table("stack_traces")
-need_delimiter = args.delimited and not (args.kernel_stacks_only or
-                                         args.user_stacks_only)
 for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
     # handle get_stackid errors
     if not args.user_stacks_only and stack_id_err(k.kernel_stack_id):
