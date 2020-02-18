@@ -1,14 +1,14 @@
 #!/usr/bin/python
 #
-# tcpbind       Trace IPv4 and IPv6 binds()s.
+# bindsnoop       Trace IPv4 and IPv6 binds()s.
 #               For Linux, uses BCC, eBPF. Embedded C.
 #
 # based on tcpconnect utility from Brendan Gregg's suite.
 #
-# USAGE: tcpbind [-h] [-t] [-E] [-p PID] [-P PORT[,PORT ...]] [-w]
+# USAGE: bindsnoop [-h] [-t] [-E] [-p PID] [-P PORT[,PORT ...]] [-w]
 #             [--count] [--cgroupmap mappath]
 #
-# tcpbind reports socket options set before the bind call
+# bindsnoop reports socket options set before the bind call
 # that would impact this system call behavior:
 # SOL_IP     IP_FREEBIND              F....
 # SOL_IP     IP_TRANSPARENT           .T...
@@ -40,17 +40,17 @@ from time import sleep
 
 # arguments
 examples = """examples:
-    ./tcpbind           # trace all TCP bind()s
-    ./tcpbind -t        # include timestamps
+    ./bindsnoop           # trace all TCP bind()s
+    ./bindsnoop -t        # include timestamps
     ./tcplife -w        # wider columns (fit IPv6)
-    ./tcpbind -p 181    # only trace PID 181
-    ./tcpbind -P 80     # only trace port 80
-    ./tcpbind -P 80,81  # only trace port 80 and 81
-    ./tcpbind -U        # include UID
-    ./tcpbind -u 1000   # only trace UID 1000
-    ./tcpbind -E        # report bind errors
-    ./tcpbind --count   # count bind per src ip
-    ./tcpbind --cgroupmap mappath  # only trace cgroups in this BPF map
+    ./bindsnoop -p 181    # only trace PID 181
+    ./bindsnoop -P 80     # only trace port 80
+    ./bindsnoop -P 80,81  # only trace port 80 and 81
+    ./bindsnoop -U        # include UID
+    ./bindsnoop -u 1000   # only trace UID 1000
+    ./bindsnoop -E        # report bind errors
+    ./bindsnoop --count   # count bind per src ip
+    ./bindsnoop --cgroupmap mappath  # only trace cgroups in this BPF map
 
 it is reporting socket options set before the bins call
 impacting system call behavior:
@@ -163,7 +163,7 @@ union bind_options {
 };
 
 // TODO: add reporting for the original bind arguments
-int tcpbind_entry(struct pt_regs *ctx, struct socket *socket)
+int bindsnoop_entry(struct pt_regs *ctx, struct socket *socket)
 {
     u64 pid_tgid = bpf_get_current_pid_tgid();
     u32 pid = pid_tgid >> 32;
@@ -183,7 +183,7 @@ int tcpbind_entry(struct pt_regs *ctx, struct socket *socket)
 };
 
 
-static int tcpbind_return(struct pt_regs *ctx, short ipver)
+static int bindsnoop_return(struct pt_regs *ctx, short ipver)
 {
     int ret = PT_REGS_RC(ctx);
     u64 pid_tgid = bpf_get_current_pid_tgid();
@@ -271,14 +271,14 @@ static int tcpbind_return(struct pt_regs *ctx, short ipver)
     return 0;
 }
 
-int tcpbind_v4_return(struct pt_regs *ctx)
+int bindsnoop_v4_return(struct pt_regs *ctx)
 {
-    return tcpbind_return(ctx, 4);
+    return bindsnoop_return(ctx, 4);
 }
 
-int tcpbind_v6_return(struct pt_regs *ctx)
+int bindsnoop_v6_return(struct pt_regs *ctx)
 {
-    return tcpbind_return(ctx, 6);
+    return bindsnoop_return(ctx, 6);
 }
 """
 
@@ -475,10 +475,10 @@ def depict_cnt(counts_tab, l3prot='ipv4'):
 
 # initialize BPF
 b = BPF(text=bpf_text)
-b.attach_kprobe(event="inet_bind", fn_name="tcpbind_entry")
-b.attach_kprobe(event="inet6_bind", fn_name="tcpbind_entry")
-b.attach_kretprobe(event="inet_bind", fn_name="tcpbind_v4_return")
-b.attach_kretprobe(event="inet6_bind", fn_name="tcpbind_v6_return")
+b.attach_kprobe(event="inet_bind", fn_name="bindsnoop_entry")
+b.attach_kprobe(event="inet6_bind", fn_name="bindsnoop_entry")
+b.attach_kretprobe(event="inet_bind", fn_name="bindsnoop_v4_return")
+b.attach_kretprobe(event="inet6_bind", fn_name="bindsnoop_v6_return")
 
 print("Tracing binds ... Hit Ctrl-C to end")
 if args.count:

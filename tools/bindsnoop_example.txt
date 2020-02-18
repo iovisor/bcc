@@ -1,4 +1,4 @@
-Demonstrations of tcpbind, the Linux eBPF/bcc version.
+Demonstrations of bindsnoop, the Linux eBPF/bcc version.
 
 This tool traces the kernel function performing socket binding and
 print socket options set before the system call invocation that might
@@ -10,7 +10,7 @@ SOL_SOCKET SO_REUSEADDR             ...R.
 SOL_SOCKET SO_REUSEPORT             ....r
 
 
-# ./tcpbind.py
+# ./bindsnoop.py
 Tracing binds ... Hit Ctrl-C to end
 PID COMM         PROT ADDR            PORT   OPTS IF
 3941081 test_bind_op TCP  192.168.1.102       0 F.N..  0
@@ -26,7 +26,7 @@ and Acceptor called bind for TCP with SO_REUSEADDR option set.
 
 The -t option prints a timestamp column
 
-# ./tcpbind.py -t
+# ./bindsnoop.py -t
 TIME(s)        PID COMM         PROT ADDR            PORT   OPTS IF
 0.000000   3956801 dig          TCP  ::              49611 .....  0
 0.011045   3956822 dig          UDP  ::              56343 .....  0
@@ -35,7 +35,7 @@ TIME(s)        PID COMM         PROT ADDR            PORT   OPTS IF
 
 The -U option prints a UID column:
 
-# ./tcpbind.py -U
+# ./bindsnoop.py -U
 Tracing binds ... Hit Ctrl-C to end
    UID      PID COMM         PROT ADDR            PORT   OPTS IF
 127072  3956498 test_bind_op TCP  192.168.1.102   44491 F...r  0
@@ -46,7 +46,7 @@ Tracing binds ... Hit Ctrl-C to end
 
 The -u option filtering UID:
 
-# ./tcpbind.py -Uu 0
+# ./bindsnoop.py -Uu 0
 Tracing binds ... Hit Ctrl-C to end
    UID      PID COMM         PROT ADDR            PORT   OPTS IF
      0  3966330 Acceptor Thr TCP  ::              39319 ...R.  0
@@ -57,13 +57,13 @@ Tracing binds ... Hit Ctrl-C to end
 The --cgroupmap option filters based on a cgroup set.
 It is meant to be used with an externally created map.
 
-# ./tcpbind.py --cgroupmap /sys/fs/bpf/test01
+# ./bindsnoop.py --cgroupmap /sys/fs/bpf/test01
 
 For more details, see docs/filtering_by_cgroups.md
 
 
 In order to track heavy bind usage one can use --count option
-# ./tcpbind.py --count
+# ./bindsnoop.py --count
 Tracing binds ... Hit Ctrl-C to end
 LADDR                                           LPORT     BINDS
 0.0.0.0                                          6771     4
@@ -72,8 +72,8 @@ LADDR                                           LPORT     BINDS
 
 
 Usage message:
-# ./tcpbind.py -h
-usage: tcpbind.py [-h] [-t] [-w] [-p PID] [-P PORT] [-E] [-U] [-u UID]
+# ./bindsnoop.py -h
+usage: bindsnoop.py [-h] [-t] [-w] [-p PID] [-P PORT] [-E] [-U] [-u UID]
                   [--count] [--cgroupmap CGROUPMAP]
 
 Trace TCP binds
@@ -92,17 +92,17 @@ optional arguments:
                         trace cgroups in this BPF map only
 
 examples:
-    ./tcpbind           # trace all TCP bind()s
-    ./tcpbind -t        # include timestamps
-    ./tcplife -w        # wider columns (fit IPv6)
-    ./tcpbind -p 181    # only trace PID 181
-    ./tcpbind -P 80     # only trace port 80
-    ./tcpbind -P 80,81  # only trace port 80 and 81
-    ./tcpbind -U        # include UID
-    ./tcpbind -u 1000   # only trace UID 1000
-    ./tcpbind -E        # report bind errors
-    ./tcpbind --count   # count bind per src ip
-    ./tcpbind --cgroupmap mappath  # only trace cgroups in this BPF map
+    ./bindsnoop           # trace all TCP bind()s
+    ./bindsnoop -t        # include timestamps
+    ./bindsnoop -w        # wider columns (fit IPv6)
+    ./bindsnoop -p 181    # only trace PID 181
+    ./bindsnoop -P 80     # only trace port 80
+    ./bindsnoop -P 80,81  # only trace port 80 and 81
+    ./bindsnoop -U        # include UID
+    ./bindsnoop -u 1000   # only trace UID 1000
+    ./bindsnoop -E        # report bind errors
+    ./bindsnoop --count   # count bind per src ip
+    ./bindsnoop --cgroupmap mappath  # only trace cgroups in this BPF map
 
     it is reporting socket options set before the bins call
     impacting system call behavior:

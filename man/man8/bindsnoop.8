@@ -1,10 +1,10 @@
-.TH tcpbind 8  "12 February 2020" "" ""
+.TH bindsnoop 8  "12 February 2020" "" ""
 .SH NAME
-tcpbind \- Trace bind() system calls.
+bindsnoop \- Trace bind() system calls.
 .SH SYNOPSIS
-.B tcpbind.py [\fB-h\fP] [\fB-w\fP] [\fB-t\fP] [\fB-p\fP PID] [\fB-P\fP PORT] [\fB-E\fP] [\fB-U\fP] [\fB-u\fP UID] [\fB--count\fP] [\fB--cgroupmap MAP\fP]
+.B bindsnoop.py [\fB-h\fP] [\fB-w\fP] [\fB-t\fP] [\fB-p\fP PID] [\fB-P\fP PORT] [\fB-E\fP] [\fB-U\fP] [\fB-u\fP UID] [\fB--count\fP] [\fB--cgroupmap MAP\fP]
 .SH DESCRIPTION
-tcpbind reports socket options set before the bind call that would impact this system call behavior.
+bindsnoop reports socket options set before the bind call that would impact this system call behavior.
 .PP
 .SH REQUIREMENTS
 CONFIG_BPF and bcc.
@@ -67,50 +67,50 @@ Count binds per src ip and port:
 EXAMPLES:
 .RS
 .TP
-Trace all TCP \fBbind\fP()s
+Trace all IPv4 and IPv6 \fBbind\fP()s
 .TP
 .B
-tcpbind
+bindsnoop
 .TP
 Include timestamps
 .TP
 .B
-tcpbind \fB-t\fP
+bindsnoop \fB-t\fP
 .TP
 Trace PID 181
 .TP
 .B
-tcpbind \fB-p\fP 181
+bindsnoop \fB-p\fP 181
 .TP
 Trace port 80
 .TP
 .B
-tcpbind \fB-P\fP 80
+bindsnoop \fB-P\fP 80
 .TP
 Trace port 80 and 81
 .TP
 .B
-tcpbind \fB-P\fP 80,81
+bindsnoop \fB-P\fP 80,81
 .TP
 Include UID
 .TP
 .B
-tcpbind \fB-U\fP
+bindsnoop \fB-U\fP
 .TP
 Trace UID 1000
 .TP
 .B
-tcpbind \fB-u\fP 1000
+bindsnoop \fB-u\fP 1000
 .TP
 Report bind errors
 .TP
 .B
-tcpbind \fB-E\fP
+bindsnoop \fB-E\fP
 .TP
 Count bind per src ip
 .TP
 .B
-tcpbind \fB--count\fP
+bindsnoop \fB--count\fP
 .RE
 .PP
 Trace IPv4 and IPv6 bind system calls and report socket options that would impact bind call behavior:
