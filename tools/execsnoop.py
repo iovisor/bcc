@@ -36,7 +36,7 @@ examples = """examples:
     ./execsnoop -q        # add "quotemarks" around arguments
     ./execsnoop -n main   # only print command lines containing "main"
     ./execsnoop -l tpkg   # only print command where arguments contains "tpkg"
-    ./opensnoop --cgroupmap ./mappath  # only trace cgroups in this BPF map
+    ./execsnoop --cgroupmap ./mappath  # only trace cgroups in this BPF map
 """
 parser = argparse.ArgumentParser(
     description="Trace exec() syscalls",
