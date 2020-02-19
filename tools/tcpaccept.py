@@ -29,6 +29,7 @@ examples = """examples:
     ./tcpaccept -t        # include timestamps
     ./tcpaccept -P 80,81  # only trace port 80 and 81
     ./tcpaccept -p 181    # only trace PID 181
+    ./tcpaccept --cgroupmap ./mappath  # only trace cgroups in this BPF map
 """
 parser = argparse.ArgumentParser(
     description="Trace TCP accepts",
@@ -42,6 +43,8 @@ parser.add_argument("-p", "--pid",
     help="trace this PID only")
 parser.add_argument("-P", "--port",
     help="comma-separated list of local ports to trace")
+parser.add_argument("--cgroupmap",
+    help="trace cgroups in this BPF map only")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
 args = parser.parse_args()
@@ -77,6 +80,11 @@ struct ipv6_data_t {
     char task[TASK_COMM_LEN];
 };
 BPF_PERF_OUTPUT(ipv6_events);
+
+#if CGROUPSET
+BPF_TABLE_PINNED("hash", u64, u64, cgroupset, 1024, "CGROUPPATH");
+#endif
+
 """
 
 #
@@ -89,6 +97,13 @@ BPF_PERF_OUTPUT(ipv6_events);
 bpf_text_kprobe = """
 int kretprobe__inet_csk_accept(struct pt_regs *ctx)
 {
+#if CGROUPSET
+    u64 cgroupid = bpf_get_current_cgroup_id();
+    if (cgroupset.lookup(&cgroupid) == NULL) {
+        return 0;
+    }
+#endif
+
     struct sock *newsk = (struct sock *)PT_REGS_RC(ctx);
     u32 pid = bpf_get_current_pid_tgid() >> 32;
 
@@ -184,6 +199,11 @@ if args.port:
     lports_if = ' && '.join(['lport != %d' % lport for lport in lports])
     bpf_text = bpf_text.replace('##FILTER_PORT##',
         'if (%s) { return 0; }' % lports_if)
+if args.cgroupmap:
+    bpf_text = bpf_text.replace('CGROUPSET', '1')
+    bpf_text = bpf_text.replace('CGROUPPATH', args.cgroupmap)
+else:
+    bpf_text = bpf_text.replace('CGROUPSET', '0')
 if debug or args.ebpf:
     print(bpf_text)
     if args.ebpf:
