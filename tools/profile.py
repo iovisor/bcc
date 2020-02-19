@@ -296,8 +296,6 @@ missing_stacks = 0
 has_enomem = False
 counts = b.get_table("counts")
 stack_traces = b.get_table("stack_traces")
-need_delimiter = args.delimited and not (args.kernel_stacks_only or
-                                         args.user_stacks_only)
 for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
     # handle get_stackid errors
     if not args.user_stacks_only and stack_id_err(k.kernel_stack_id):
@@ -334,7 +332,7 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
             else:
                 line.extend([b.sym(addr, k.pid) for addr in reversed(user_stack)])
         if not args.user_stacks_only:
-            line.extend(b["-"] if (need_delimiter and k.kernel_stack_id >= 0 and k.user_stack_id >= 0) else [])
+            line.extend([b"-"] if (need_delimiter and k.kernel_stack_id >= 0 and k.user_stack_id >= 0) else [])
             if stack_id_err(k.kernel_stack_id):
                 line.append(b"[Missed Kernel Stack]")
             else:
