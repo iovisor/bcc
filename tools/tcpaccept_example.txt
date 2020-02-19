@@ -33,22 +33,33 @@ TIME(s)  PID    COMM         IP RADDR            RPORT LADDR            LPORT
 1.984    907    sshd         4  127.0.0.1        51250 127.0.0.1        22
 
 
+The --cgroupmap option filters based on a cgroup set. It is meant to be used
+with an externally created map.
+
+# ./tcpaccept --cgroupmap /sys/fs/bpf/test01
+
+For more details, see docs/filtering_by_cgroups.md
+
+
 USAGE message:
 
 # ./tcpaccept -h
-usage: tcpaccept [-h] [-T] [-t] [-p PID] [-P PORTS]
+usage: tcpaccept.py [-h] [-T] [-t] [-p PID] [-P PORT] [--cgroupmap CGROUPMAP]
 
 Trace TCP accepts
 
 optional arguments:
-  -h, --help              show this help message and exit
-  -T, --time              include time column on output (HH:MM:SS)
-  -t, --timestamp         include timestamp on output
-  -p PID, --pid PID       trace this PID only
-  -P PORTS, --port PORTS  comma-separated list of local ports to trace
+  -h, --help            show this help message and exit
+  -T, --time            include time column on output (HH:MM:SS)
+  -t, --timestamp       include timestamp on output
+  -p PID, --pid PID     trace this PID only
+  -P PORT, --port PORT  comma-separated list of local ports to trace
+  --cgroupmap CGROUPMAP
+                        trace cgroups in this BPF map only
 
 examples:
     ./tcpaccept           # trace all TCP accept()s
     ./tcpaccept -t        # include timestamps
     ./tcpaccept -P 80,81  # only trace port 80 and 81
     ./tcpaccept -p 181    # only trace PID 181
+    ./tcpaccept --cgroupmap ./mappath  # only trace cgroups in this BPF map

@@ -8,6 +8,9 @@ Examples of commands:
 ```
 # ./opensnoop --cgroupmap /sys/fs/bpf/test01
 # ./execsnoop --cgroupmap /sys/fs/bpf/test01
+# ./tcpconnect --cgroupmap /sys/fs/bpf/test01
+# ./tcpaccept --cgroupmap /sys/fs/bpf/test01
+# ./tcptracer --cgroupmap /sys/fs/bpf/test01
 ```
 
 The commands above will only display results from processes that belong to one

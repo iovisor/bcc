@@ -35,3 +35,11 @@ TIME(s)  T  PID    COMM             IP SADDR            DADDR            SPORT  
 3.546    C    748  curl             6  [::1]            [::1]            42592  80
 4.294    X  31002  telnet           4  192.168.1.2      192.168.1.1      42590  23
 ```
+
+
+The --cgroupmap option filters based on a cgroup set. It is meant to be used
+with an externally created map.
+
+# ./tcptracer --cgroupmap /sys/fs/bpf/test01
+
+For more details, see docs/filtering_by_cgroups.md
