@@ -118,9 +118,8 @@ args = parser.parse_args()
 pid = int(args.pid) if args.pid is not None else -1
 duration = int(args.duration)
 debug = 0
-need_delimiter = args.delimited and not any([args.folded,
-                                         args.kernel_stacks_only,
-                                         args.user_stacks_only])
+need_delimiter = args.delimited and not (args.kernel_stacks_only or
+    args.user_stacks_only)
 # TODO: add stack depth, and interval
 
 #
@@ -333,7 +332,7 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
             else:
                 line.extend([b.sym(addr, k.pid) for addr in reversed(user_stack)])
         if not args.user_stacks_only:
-            line.extend(b["-"] if (need_delimiter and k.kernel_stack_id >= 0 and k.user_stack_id >= 0) else [])
+            line.extend([b"-"] if (need_delimiter and k.kernel_stack_id >= 0 and k.user_stack_id >= 0) else [])
             if stack_id_err(k.kernel_stack_id):
                 line.append(b"[Missed Kernel Stack]")
             else:

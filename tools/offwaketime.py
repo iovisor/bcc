@@ -98,9 +98,6 @@ parser.add_argument("--ebpf", action="store_true",
 args = parser.parse_args()
 folded = args.folded
 duration = int(args.duration)
-need_delimiter = args.delimited and not any([args.folded,
-                                         args.kernel_stacks_only,
-                                         args.user_stacks_only])
 
 # signal handler
 def signal_ignore(signal, frame):
@@ -295,6 +292,8 @@ missing_stacks = 0
 has_enomem = False
 counts = b.get_table("counts")
 stack_traces = b.get_table("stack_traces")
+need_delimiter = args.delimited and not (args.kernel_stacks_only or
+                                         args.user_stacks_only)
 for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
     # handle get_stackid errors
     if not args.user_stacks_only:
