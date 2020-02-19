@@ -74,6 +74,10 @@ class SmokeTests(TestCase):
     def test_bashreadline(self):
         self.run_with_int("bashreadline.py")
 
+    @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
+    def test_bindsnoop(self):
+        self.run_with_int("bindsnoop.py")
+
     def test_biolatency(self):
         self.run_with_duration("biolatency.py 1 1")
 
