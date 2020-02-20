@@ -91,6 +91,10 @@ class BPF {
                                 const std::string& probe_func);
   StatusTuple detach_tracepoint(const std::string& tracepoint);
 
+  StatusTuple attach_raw_tracepoint(const std::string& tracepoint,
+                                    const std::string& probe_func);
+  StatusTuple detach_raw_tracepoint(const std::string& tracepoint);
+
   StatusTuple attach_perf_event(uint32_t ev_type, uint32_t ev_config,
                                 const std::string& probe_func,
                                 uint64_t sample_period, uint64_t sample_freq,
@@ -248,6 +252,8 @@ class BPF {
   StatusTuple detach_uprobe_event(const std::string& event, open_probe_t& attr);
   StatusTuple detach_tracepoint_event(const std::string& tracepoint,
                                       open_probe_t& attr);
+  StatusTuple detach_raw_tracepoint_event(const std::string& tracepoint,
+                                          open_probe_t& attr);
   StatusTuple detach_perf_event_all_cpu(open_probe_t& attr);
 
   std::string attach_type_debug(bpf_probe_attach_type type) {
@@ -302,6 +308,7 @@ class BPF {
   std::map<std::string, open_probe_t> kprobes_;
   std::map<std::string, open_probe_t> uprobes_;
   std::map<std::string, open_probe_t> tracepoints_;
+  std::map<std::string, open_probe_t> raw_tracepoints_;
   std::map<std::string, BPFPerfBuffer*> perf_buffers_;
   std::map<std::string, BPFPerfEventArray*> perf_event_arrays_;
   std::map<std::pair<uint32_t, uint32_t>, open_probe_t> perf_events_;

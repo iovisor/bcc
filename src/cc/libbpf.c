@@ -1136,7 +1136,7 @@ int bpf_detach_tracepoint(const char *tp_category, const char *tp_name) {
   return 0;
 }
 
-int bpf_attach_raw_tracepoint(int progfd, char *tp_name)
+int bpf_attach_raw_tracepoint(int progfd, const char *tp_name)
 {
   int ret;
 
