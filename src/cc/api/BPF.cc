@@ -138,6 +138,15 @@ StatusTuple BPF::detach_all() {
     }
   }
 
+  for (auto& it : raw_tracepoints_) {
+    auto res = detach_raw_tracepoint_event(it.first, it.second);
+    if (res.code() != 0) {
+      error_msg += "Failed to detach Raw tracepoint " + it.first + ": ";
+      error_msg += res.msg() + "\n";
+      has_error = true;
+    }
+  }
+
   for (auto& it : perf_buffers_) {
     auto res = it.second->close_all_cpu();
     if (res.code() != 0) {
@@ -326,6 +335,29 @@ StatusTuple BPF::attach_tracepoint(const std::string& tracepoint,
   return StatusTuple(0);
 }
 
+StatusTuple BPF::attach_raw_tracepoint(const std::string& tracepoint, const std::string& probe_func) {
+  if (raw_tracepoints_.find(tracepoint) != raw_tracepoints_.end())
+    return StatusTuple(-1, "Raw tracepoint %s already attached",
+                       tracepoint.c_str());
+
+  int probe_fd;
+  TRY2(load_func(probe_func, BPF_PROG_TYPE_RAW_TRACEPOINT, probe_fd));
+
+  int res_fd = bpf_attach_raw_tracepoint(probe_fd, tracepoint.c_str());
+
+  if (res_fd < 0) {
+    TRY2(unload_func(probe_func));
+    return StatusTuple(-1, "Unable to attach Raw tracepoint %s using %s",
+                       tracepoint.c_str(), probe_func.c_str());
+  }
+
+  open_probe_t p = {};
+  p.perf_event_fd = res_fd;
+  p.func = probe_func;
+  raw_tracepoints_[tracepoint] = std::move(p);
+  return StatusTuple(0);
+}
+
 StatusTuple BPF::attach_perf_event(uint32_t ev_type, uint32_t ev_config,
                                    const std::string& probe_func,
                                    uint64_t sample_period, uint64_t sample_freq,
@@ -482,6 +514,16 @@ StatusTuple BPF::detach_tracepoint(const std::string& tracepoint) {
 
   TRY2(detach_tracepoint_event(it->first, it->second));
   tracepoints_.erase(it);
+  return StatusTuple(0);
+}
+
+StatusTuple BPF::detach_raw_tracepoint(const std::string& tracepoint) {
+  auto it = raw_tracepoints_.find(tracepoint);
+  if (it == raw_tracepoints_.end())
+    return StatusTuple(-1, "No open Raw tracepoint %s", tracepoint.c_str());
+
+  TRY2(detach_raw_tracepoint_event(it->first, it->second));
+  raw_tracepoints_.erase(it);
   return StatusTuple(0);
 }
 
@@ -786,6 +828,14 @@ StatusTuple BPF::detach_tracepoint_event(const std::string& tracepoint,
   TRY2(unload_func(attr.func));
 
   // TODO: bpf_detach_tracepoint currently does nothing.
+  return StatusTuple(0);
+}
+
+StatusTuple BPF::detach_raw_tracepoint_event(const std::string& tracepoint,
+                                             open_probe_t& attr) {
+  TRY2(close(attr.perf_event_fd));
+  TRY2(unload_func(attr.func));
+
   return StatusTuple(0);
 }
 
