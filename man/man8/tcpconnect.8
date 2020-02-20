@@ -1,8 +1,8 @@
-.TH tcpconnect 8  "2015-08-25" "USER COMMANDS"
+.TH tcpconnect 8  "2020-02-20" "USER COMMANDS"
 .SH NAME
 tcpconnect \- Trace TCP active connections (connect()). Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B tcpconnect [\-h] [\-c] [\-t] [\-x] [\-p PID] [-P PORT]
+.B tcpconnect [\-h] [\-c] [\-t] [\-x] [\-p PID] [-P PORT] [\-\-cgroupmap MAPPATH]
 .SH DESCRIPTION
 This tool traces active TCP connections (eg, via a connect() syscall;
 accept() are passive connections). This can be useful for general
@@ -33,6 +33,9 @@ Trace this process ID only (filtered in-kernel).
 .TP
 \-P PORT
 Comma-separated list of destination ports to trace (filtered in-kernel).
+.TP
+\-\-cgroupmap MAPPATH
+Trace cgroups in this BPF map only (filtered in-kernel).
 .SH EXAMPLES
 .TP
 \-U
@@ -68,6 +71,10 @@ Trace UID 1000 only:
 Count connects per src ip and dest ip/port:
 #
 .B tcpconnect \-c
+.TP
+Trace a set of cgroups only (see filtering_by_cgroups.md from bcc sources for more details):
+#
+.B tcpconnect \-\-cgroupmap /sys/fs/bpf/test01
 .SH FIELDS
 .TP
 TIME(s)
@@ -116,4 +123,4 @@ Unstable - in development.
 .SH AUTHOR
 Brendan Gregg
 .SH SEE ALSO
-tcpaccept(8), funccount(8), tcpdump(8)
+tcptracer(8), tcpaccept(8), funccount(8), tcpdump(8)
