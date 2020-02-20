@@ -1,8 +1,8 @@
-.TH tcptracer 8  "2017-03-27" "USER COMMANDS"
+.TH tcptracer 8  "2020-02-20" "USER COMMANDS"
 .SH NAME
 tcptracer \- Trace TCP established connections. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B tcptracer [\-h] [\-v] [\-p PID] [\-N NETNS]
+.B tcptracer [\-h] [\-v] [\-p PID] [\-N NETNS] [\-\-cgroupmap MAPPATH]
 .SH DESCRIPTION
 This tool traces established TCP connections that open and close while tracing,
 and prints a line of output per connect, accept and close events. This includes
@@ -29,6 +29,8 @@ Trace this process ID only (filtered in-kernel).
 \-N NETNS
 Trace this network namespace only (filtered in-kernel).
 .TP
+\-\-cgroupmap MAPPATH
+Trace cgroups in this BPF map only (filtered in-kernel).
 .SH EXAMPLES
 .TP
 Trace all TCP established connections:
@@ -46,6 +48,10 @@ Trace PID 181 only:
 Trace connections in network namespace 4026531969 only:
 #
 .B tcptracer \-N 4026531969
+.TP
+Trace a set of cgroups only (see filtering_by_cgroups.md from bcc sources for more details):
+#
+.B tcptracer \-\-cgroupmap /sys/fs/bpf/test01
 .SH FIELDS
 .TP
 TYPE
