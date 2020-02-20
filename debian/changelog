@@ -1,3 +1,16 @@
+bcc (0.13.0-1) unstable; urgency=low
+
+  * Support for kernel up to 5.5
+  * bindsnoop tool to track tcp/udp bind information
+  * added compile-once run-everywhere based libbpf-tools, currently
+    only runqslower is implemented.
+  * new map support: sockhash, sockmap, sk_storage, cgroup_storage
+  * enable to run github actions on the diff
+  * cgroupmap based cgroup filtering for opensnoop, execsnoop and bindsnoop.
+  * lots of bug fixes.
+
+ -- Yonghong Song <ys114321@gmail.com>  Wed, 19 Feb 2020 17:00:00 +0000
+
 bcc (0.12.0-1) unstable; urgency=low
 
   * Support for kernel up to 5.4
