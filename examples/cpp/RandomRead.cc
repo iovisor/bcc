@@ -24,14 +24,6 @@ const std::string BPF_PROGRAM = R"(
 #define CGROUP_FILTER 0
 #endif
 
-struct urandom_read_args {
-  // See /sys/kernel/debug/tracing/events/random/urandom_read/format
-  uint64_t common__unused;
-  int got_bits;
-  int pool_left;
-  int input_left;
-};
-
 struct event_t {
   int pid;
   char comm[16];
@@ -42,7 +34,7 @@ struct event_t {
 BPF_PERF_OUTPUT(events);
 BPF_CGROUP_ARRAY(cgroup, 1);
 
-int on_urandom_read(struct urandom_read_args* attr) {
+int on_urandom_read(struct bpf_raw_tracepoint_args *ctx) {
   if (CGROUP_FILTER && (cgroup.check_current_task(0) != 1))
     return 0;
 
@@ -50,9 +42,11 @@ int on_urandom_read(struct urandom_read_args* attr) {
   event.pid = bpf_get_current_pid_tgid();
   bpf_get_current_comm(&event.comm, sizeof(event.comm));
   event.cpu = bpf_get_smp_processor_id();
-  event.got_bits = attr->got_bits;
+  // from include/trace/events/random.h:
+  //    TP_PROTO(int got_bits, int pool_left, int input_left)
+  event.got_bits = ctx->args[0];
 
-  events.perf_submit(attr, &event, sizeof(event));
+  events.perf_submit(ctx, &event, sizeof(event));
   return 0;
 }
 )";
@@ -126,7 +120,7 @@ int main(int argc, char** argv) {
   }
 
   auto attach_res =
-      bpf->attach_tracepoint("random:urandom_read", "on_urandom_read");
+      bpf->attach_raw_tracepoint("urandom_read", "on_urandom_read");
   if (attach_res.code() != 0) {
     std::cerr << attach_res.msg() << std::endl;
     return 1;
