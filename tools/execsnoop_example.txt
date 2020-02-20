@@ -85,11 +85,32 @@ with an externally created map.
 
 For more details, see docs/filtering_by_cgroups.md
 
+The -U option include UID on output:
+
+# ./execsnoop -U
+
+UID   PCOMM            PID    PPID   RET ARGS
+1000  ls               171318 133702   0 /bin/ls --color=auto
+1000  w                171322 133702   0 /usr/bin/w
+
+The -u options filters output based process UID. You also can use username as
+argument, in that cause UID will be looked up using getpwnam (see man 3 getpwnam).
+
+# ./execsnoop -Uu 1000
+UID   PCOMM            PID    PPID   RET ARGS
+1000  ls               171335 133702   0 /bin/ls --color=auto
+1000  man              171340 133702   0 /usr/bin/man getpwnam
+1000  bzip2            171341 171340   0 /bin/bzip2 -dc
+1000  bzip2            171342 171340   0 /bin/bzip2 -dc
+1000  bzip2            171345 171340   0 /bin/bzip2 -dc
+1000  manpager         171355 171340   0 /usr/bin/manpager
+1000  less             171355 171340   0 /usr/bin/less
 
 USAGE message:
 
 # ./execsnoop -h
-usage: execsnoop [-h] [-T] [-t] [-x] [-q] [-n NAME] [-l LINE] [--max-args MAX_ARGS]
+usage: execsnoop.py [-h] [-T] [-t] [-x] [--cgroupmap CGROUPMAP] [-u USER] [-q]
+                    [-n NAME] [-l LINE] [-U] [--max-args MAX_ARGS]
 
 Trace exec() syscalls
 
@@ -98,11 +119,15 @@ optional arguments:
   -T, --time            include time column on output (HH:MM:SS)
   -t, --timestamp       include timestamp on output
   -x, --fails           include failed exec()s
-  -q, --quote           Add quotemarks (") around arguments
+  --cgroupmap CGROUPMAP
+                        trace cgroups in this BPF map only
+  -u USER, --uid USER   trace this UID only
+  -q, --quote           Add quotemarks (") around arguments.
   -n NAME, --name NAME  only print commands matching this name (regex), any
                         arg
   -l LINE, --line LINE  only print commands where arg contains this line
                         (regex)
+  -U, --print-uid       print UID column
   --max-args MAX_ARGS   maximum number of arguments parsed and displayed,
                         defaults to 20
 
@@ -110,7 +135,11 @@ examples:
     ./execsnoop           # trace all exec() syscalls
     ./execsnoop -x        # include failed exec()s
     ./execsnoop -T        # include time (HH:MM:SS)
+    ./execsnoop -U        # include UID
+    ./execsnoop -u 1000   # only trace UID 1000
+    ./execsnoop -u root   # get root UID and trace only this
     ./execsnoop -t        # include timestamps
     ./execsnoop -q        # add "quotemarks" around arguments
     ./execsnoop -n main   # only print command lines containing "main"
     ./execsnoop -l tpkg   # only print command where arguments contains "tpkg"
+    ./execsnoop --cgroupmap ./mappath  # only trace cgroups in this BPF map

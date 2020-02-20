@@ -2,8 +2,8 @@
 .SH NAME
 execsnoop \- Trace new processes via exec() syscalls. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B execsnoop [\-h] [\-T] [\-t] [\-x] [\-q] [\-n NAME] [\-l LINE]
-.B           [\-\-max-args MAX_ARGS]  [\-\-cgroupmap MAPPATH]
+.B execsnoop [\-h] [\-T] [\-t] [\-x] [\-\-cgroupmap CGROUPMAP] [\-u USER]
+.B           [\-q] [\-n NAME] [\-l LINE] [\-U] [\-\-max-args MAX_ARGS]
 .SH DESCRIPTION
 execsnoop traces new processes, showing the filename executed and argument
 list.
@@ -28,8 +28,14 @@ Print usage message.
 \-T
 Include a time column (HH:MM:SS).
 .TP
+\-U
+Include UID column.
+.TP
 \-t
 Include a timestamp column.
+.TP
+\-u USER
+Filter by UID (or username)
 .TP
 \-x
 Include failed exec()s
@@ -59,6 +65,18 @@ Trace all exec() syscalls, and include timestamps:
 #
 .B execsnoop \-t
 .TP
+Display process UID:
+#
+.B execsnoop \-U
+.TP
+Trace only UID 1000:
+#
+.B execsnoop \-u 1000
+.TP
+Trace only processes launched by root and display UID column:
+#
+.B execsnoop \-Uu root
+.TP
 Include failed exec()s:
 #
 .B execsnoop \-x
@@ -85,6 +103,9 @@ Time of exec() return, in HH:MM:SS format.
 .TP
 TIME(s)
 Time of exec() return, in seconds.
+.TP
+UID
+User ID
 .TP
 PCOMM
 Parent process/command name.
