@@ -26,8 +26,8 @@ bpf_text = """
 #include <linux/oom.h>
 
 struct data_t {
-    u64 fpid;
-    u64 tpid;
+    u32 fpid;
+    u32 tpid;
     u64 pages;
     char fcomm[TASK_COMM_LEN];
     char tcomm[TASK_COMM_LEN];
@@ -40,7 +40,7 @@ void kprobe__oom_kill_process(struct pt_regs *ctx, struct oom_control *oc, const
     unsigned long totalpages;
     struct task_struct *p = oc->chosen;
     struct data_t data = {};
-    u32 pid = bpf_get_current_pid_tgid();
+    u32 pid = bpf_get_current_pid_tgid() >> 32;
     data.fpid = pid;
     data.tpid = p->pid;
     data.pages = oc->totalpages;
