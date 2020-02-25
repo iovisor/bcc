@@ -1,0 +1,144 @@
+Content-type: text/html; charset=UTF-8
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML><HEAD><TITLE>Man page of btrfsdist</TITLE>
+</HEAD><BODY>
+<H1>btrfsdist</H1>
+Section: Maintenance Commands (8)<BR>Updated: 2016-02-15<BR><A HREF="#index">Index</A>
+<A HREF="https://iovisor.github.io/bcc">Return to Main Contents</A><HR>
+
+<A NAME="lbAB">&nbsp;</A>
+<H2>NAME</H2>
+
+btrfsdist - Summarize btrfs operation latency. Uses Linux eBPF/bcc.
+<A NAME="lbAC">&nbsp;</A>
+<H2>SYNOPSIS</H2>
+
+<B>btrfsdist [-h] [-T] [-N] [-d] [interval] [count]</B>
+
+<A NAME="lbAD">&nbsp;</A>
+<H2>DESCRIPTION</H2>
+
+This tool summarizes time (latency) spent in common btrfs file operations:
+reads, writes, opens, and syncs, and presents it as a power-of-2 histogram. It
+uses an in-kernel eBPF map to store the histogram for efficiency.
+<P>
+Since this works by tracing the btrfs_file_operations interface functions, it
+will need updating to match any changes to these functions.
+<P>
+Since this uses BPF, only the root user can use this tool.
+<A NAME="lbAE">&nbsp;</A>
+<H2>REQUIREMENTS</H2>
+
+CONFIG_BPF and bcc.
+<A NAME="lbAF">&nbsp;</A>
+<H2>OPTIONS</H2>
+
+<DL COMPACT>
+<DT>-h<DD>
+Print usage message.
+<DT>-T<DD>
+Don't include timestamps on interval output.
+<DT>-m<DD>
+Output in milliseconds.
+<DT>-p PID<DD>
+Trace this PID only.
+</DL>
+<A NAME="lbAG">&nbsp;</A>
+<H2>EXAMPLES</H2>
+
+<DL COMPACT>
+<DT>Trace btrfs operation time, and print a summary on Ctrl-C:<DD>
+#
+<B>btrfsdist</B>
+
+<DT>Trace PID 181 only:<DD>
+#
+<B>btrfsdist -p 181</B>
+
+<DT>Print 1 second summaries, 10 times:<DD>
+#
+<B>btrfsdist 1 10</B>
+
+<DT>1 second summaries, printed in milliseconds<DD>
+#
+<B>btrfsdist -m 1</B>
+
+</DL>
+<A NAME="lbAH">&nbsp;</A>
+<H2>FIELDS</H2>
+
+<DL COMPACT>
+<DT>msecs<DD>
+Range of milliseconds for this bucket.
+<DT>usecs<DD>
+Range of microseconds for this bucket.
+<DT>count<DD>
+Number of operations in this time range.
+<DT>distribution<DD>
+ASCII representation of the distribution (the count column).
+</DL>
+<A NAME="lbAI">&nbsp;</A>
+<H2>OVERHEAD</H2>
+
+This adds low-overhead instrumentation to btrfs writes and fsyncs, as well
+as all system reads and opens (due to the current implementation of the
+btrfs_file_operations interface). Particularly, all reads and writes from
+the file system cache will incur extra overhead while tracing. Such reads and
+writes can be very frequent (depending on the workload; eg, 1M/sec), at which
+point the overhead of this tool may become noticeable.
+Measure and quantify before use.
+<A NAME="lbAJ">&nbsp;</A>
+<H2>SOURCE</H2>
+
+This is from bcc.
+<DL COMPACT>
+<DT><DD>
+<A HREF="https://github.com/iovisor/bcc">https://github.com/iovisor/bcc</A>
+</DL>
+<P>
+
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+<A NAME="lbAK">&nbsp;</A>
+<H2>OS</H2>
+
+Linux
+<A NAME="lbAL">&nbsp;</A>
+<H2>STABILITY</H2>
+
+Unstable - in development.
+<A NAME="lbAM">&nbsp;</A>
+<H2>AUTHOR</H2>
+
+Brendan Gregg
+<A NAME="lbAN">&nbsp;</A>
+<H2>SEE ALSO</H2>
+
+<A HREF="https://iovisor.github.io/bcc?8+btrfsslower">btrfsslower</A>(8)
+<P>
+
+<HR>
+<A NAME="index">&nbsp;</A><H2>Index</H2>
+<DL>
+<DT><A HREF="#lbAB">NAME</A><DD>
+<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
+<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
+<DT><A HREF="#lbAE">REQUIREMENTS</A><DD>
+<DT><A HREF="#lbAF">OPTIONS</A><DD>
+<DT><A HREF="#lbAG">EXAMPLES</A><DD>
+<DT><A HREF="#lbAH">FIELDS</A><DD>
+<DT><A HREF="#lbAI">OVERHEAD</A><DD>
+<DT><A HREF="#lbAJ">SOURCE</A><DD>
+<DT><A HREF="#lbAK">OS</A><DD>
+<DT><A HREF="#lbAL">STABILITY</A><DD>
+<DT><A HREF="#lbAM">AUTHOR</A><DD>
+<DT><A HREF="#lbAN">SEE ALSO</A><DD>
+</DL>
+<HR>
+This document was created by
+<A HREF="https://iovisor.github.io/bcc">man2html</A>,
+using the manual pages.<BR>
+Time: 17:11:49 GMT, February 25, 2020
+</BODY>
+</HTML>

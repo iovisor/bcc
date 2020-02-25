@@ -1,0 +1,247 @@
+Content-type: text/html; charset=UTF-8
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML><HEAD><TITLE>Man page of compactsnoop</TITLE>
+</HEAD><BODY>
+<H1>compactsnoop</H1>
+Section: Maintenance Commands (8)<BR>Updated: 2019-11-1<BR><A HREF="#index">Index</A>
+<A HREF="https://iovisor.github.io/bcc">Return to Main Contents</A><HR>
+
+<A NAME="lbAB">&nbsp;</A>
+<H2>NAME</H2>
+
+compactstall - Trace compact zone events. Uses Linux eBPF/bcc.
+<A NAME="lbAC">&nbsp;</A>
+<H2>SYNOPSIS</H2>
+
+<B>compactsnoop.py [-h] [-T] [-p PID] [-d DURATION] [-K] [-e]</B>
+
+<A NAME="lbAD">&nbsp;</A>
+<H2>DESCRIPTION</H2>
+
+compactsnoop traces the compact zone events, showing which processes are
+allocing pages with memory compaction. This can be useful for discovering
+when compact_stall (/proc/vmstat) continues to increase, whether it is
+caused by some critical processes or not.
+<P>
+This works by tracing the compact zone events using raw_tracepoints and one
+kretprobe.
+<P>
+For the Centos 7.6 (3.10.x kernel), see the version under tools/old, which 
+uses an older memory compaction mechanism.
+<P>
+Since this uses BPF, only the root user can use this tool.
+<A NAME="lbAE">&nbsp;</A>
+<H2>REQUIREMENTS</H2>
+
+CONFIG_BPF and bcc.
+<A NAME="lbAF">&nbsp;</A>
+<H2>OPTIONS</H2>
+
+<DL COMPACT>
+<DT>-h<DD>
+Print usage message.
+<DT>-T<DD>
+Include a timestamp column.
+<DT>-p PID<DD>
+Trace this process ID only (filtered in-kernel).
+<DT>-d DURATION<DD>
+Total duration of trace in seconds.
+<DT>-K<DD>
+Output kernel stack trace
+<DT>-e<DD>
+Show extended fields.
+</DL>
+<A NAME="lbAG">&nbsp;</A>
+<H2>EXAMPLES</H2>
+
+<DL COMPACT>
+<DT>Trace all compact zone events:<DD>
+#
+<B>compactsnoop</B>
+
+<DT>Trace all compact zone events, for 10 seconds only:<DD>
+#
+<B>compactsnoop -d 10</B>
+
+</DL>
+<A NAME="lbAH">&nbsp;</A>
+<H2>FIELDS</H2>
+
+<DL COMPACT>
+<DT>TIME(s)<DD>
+Time of the call, in seconds.
+<DT>COMM<DD>
+Process name
+<DT>PID<DD>
+Process ID
+<DT>NODE<DD>
+Memory node
+<DT>ZONE<DD>
+Zone of the node (such as DMA, DMA32, NORMAL eg)
+<DT>ORDER<DD>
+Shows which order alloc cause memory compaction, -1 means all orders (eg: write
+to /proc/sys/vm/compact_memory)
+<DT>MODE<DD>
+SYNC OR ASYNC
+<DT>FRAGIDX (extra column)<DD>
+The FRAGIDX is short for fragmentation index, which only makes sense if an
+allocation of a requested size would fail. If that is true, the fragmentation
+index indicates whether external fragmentation or a lack of memory was the
+problem. The value can be used to determine if page reclaim or compaction
+should be used.
+</DL>
+<P>
+
+
+Index is between 0 and 1 so return within 3 decimal places
+<P>
+
+
+0 =&gt; allocation would fail due to lack of memory
+<P>
+
+
+1 =&gt; allocation would fail due to fragmentation
+<DL COMPACT>
+<DT>MIN (extra column)<DD>
+The min watermark of the zone
+<DT>LOW (extra column)<DD>
+The low watermark of the zone
+<DT>HIGH (extra column)<DD>
+The high watermark of the zone
+<DT>FREE (extra column)<DD>
+The nr_free_pages of the zone
+<DT>LAT(ms)<DD>
+compact zone's latency
+<DT>STATUS<DD>
+The compaction's result.
+</DL>
+<P>
+
+
+For (CentOS 7.6's kernel), the status include:
+<P>
+
+
+&quot;skipped&quot; (COMPACT_SKIPPED): compaction didn't start as it was not possible or 
+direct reclaim was more suitable
+<P>
+
+
+&quot;continue&quot; (COMPACT_CONTINUE): compaction should continue to another pageblock
+<P>
+
+
+&quot;partial&quot; (COMPACT_PARTIAL): direct compaction partially compacted a zone and 
+there are suitable pages
+<P>
+
+
+&quot;complete&quot; (COMPACT_COMPLETE): The full zone was compacted
+<P>
+
+
+For (kernel 4.7 and above):
+<P>
+
+
+&quot;not_suitable_zone&quot; (COMPACT_NOT_SUITABLE_ZONE): For more detailed tracepoint 
+output - internal to compaction
+<P>
+
+
+&quot;skipped&quot; (COMPACT_SKIPPED): compaction didn't start as it was not possible or 
+direct reclaim was more suitable
+<P>
+
+
+&quot;deferred&quot; (COMPACT_DEFERRED): compaction didn't start as it was deferred due 
+to past failures
+<P>
+
+
+&quot;no_suitable_page&quot; (COMPACT_NOT_SUITABLE_PAGE): For more detailed tracepoint 
+output - internal to compaction
+<P>
+
+
+&quot;continue&quot; (COMPACT_CONTINUE): compaction should continue to another pageblock
+<P>
+
+
+&quot;complete&quot; (COMPACT_COMPLETE): The full zone was compacted scanned but wasn't
+successful to compact suitable pages.
+<P>
+
+
+&quot;partial_skipped&quot; (COMPACT_PARTIAL_SKIPPED): direct compaction has scanned part
+of the zone but wasn't successful to compact suitable pages.
+<P>
+
+
+&quot;contended&quot; (COMPACT_CONTENDED): compaction terminated prematurely due to lock
+contentions
+<P>
+
+
+&quot;success&quot; (COMPACT_SUCCESS): direct compaction terminated after concluding that 
+the allocation should now succeed
+<P>
+
+
+<A NAME="lbAI">&nbsp;</A>
+<H2>OVERHEAD</H2>
+
+This traces the kernel compact zone kprobe/kretprobe or raw_tracepoints and
+prints output for each event. As the rate of this is generally expected to be
+low (&lt; 1000/s), the overhead is also expected to be negligible.
+<A NAME="lbAJ">&nbsp;</A>
+<H2>SOURCE</H2>
+
+This is from bcc.
+<DL COMPACT>
+<DT><DD>
+<A HREF="https://github.com/iovisor/bcc">https://github.com/iovisor/bcc</A>
+</DL>
+<P>
+
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+<A NAME="lbAK">&nbsp;</A>
+<H2>OS</H2>
+
+Linux
+<A NAME="lbAL">&nbsp;</A>
+<H2>STABILITY</H2>
+
+Unstable - in development.
+<A NAME="lbAM">&nbsp;</A>
+<H2>AUTHOR</H2>
+
+Ethercflow
+<P>
+
+<HR>
+<A NAME="index">&nbsp;</A><H2>Index</H2>
+<DL>
+<DT><A HREF="#lbAB">NAME</A><DD>
+<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
+<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
+<DT><A HREF="#lbAE">REQUIREMENTS</A><DD>
+<DT><A HREF="#lbAF">OPTIONS</A><DD>
+<DT><A HREF="#lbAG">EXAMPLES</A><DD>
+<DT><A HREF="#lbAH">FIELDS</A><DD>
+<DT><A HREF="#lbAI">OVERHEAD</A><DD>
+<DT><A HREF="#lbAJ">SOURCE</A><DD>
+<DT><A HREF="#lbAK">OS</A><DD>
+<DT><A HREF="#lbAL">STABILITY</A><DD>
+<DT><A HREF="#lbAM">AUTHOR</A><DD>
+</DL>
+<HR>
+This document was created by
+<A HREF="https://iovisor.github.io/bcc">man2html</A>,
+using the manual pages.<BR>
+Time: 17:11:49 GMT, February 25, 2020
+</BODY>
+</HTML>

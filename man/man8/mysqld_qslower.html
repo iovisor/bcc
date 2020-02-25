@@ -1,0 +1,131 @@
+Content-type: text/html; charset=UTF-8
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML><HEAD><TITLE>Man page of mysqld_qslower</TITLE>
+</HEAD><BODY>
+<H1>mysqld_qslower</H1>
+Section: Maintenance Commands (8)<BR>Updated: 2016-08-01<BR><A HREF="#index">Index</A>
+<A HREF="https://iovisor.github.io/bcc">Return to Main Contents</A><HR>
+
+<A NAME="lbAB">&nbsp;</A>
+<H2>NAME</H2>
+
+mysqld_qslower - Trace MySQL server queries slower than a threshold.
+<A NAME="lbAC">&nbsp;</A>
+<H2>SYNOPSIS</H2>
+
+<B>mysqld_qslower PID [min_ms]</B>
+
+<A NAME="lbAD">&nbsp;</A>
+<H2>DESCRIPTION</H2>
+
+This traces queries served by a MySQL server, and prints those that exceed a
+custom latency (query duration) threshold. By default, a minimum threshold of 1
+millisecond is used. If a threshold of 0 is used, all queries are printed.
+<P>
+This uses User Statically-Defined Tracing (USDT) probes, a feature added to
+MySQL for DTrace support, but which may not be enabled on a given MySQL
+installation. See requirements.
+<P>
+Since this uses BPF, only the root user can use this tool.
+<A NAME="lbAE">&nbsp;</A>
+<H2>REQUIREMENTS</H2>
+
+CONFIG_BPF, bcc, and MySQL server with USDT probe support (when configuring
+the build: -DENABLE_DTRACE=1).
+<A NAME="lbAF">&nbsp;</A>
+<H2>OPTIONS</H2>
+
+PID
+Trace this mysqld PID.
+<DL COMPACT>
+<DT>min_ms<DD>
+Minimum query latency (duration) to trace, in milliseconds. Default is 1 ms.
+</DL>
+<A NAME="lbAG">&nbsp;</A>
+<H2>EXAMPLES</H2>
+
+<DL COMPACT>
+<DT>Trace MySQL server queries slower than 1 ms for PID 1981:<DD>
+#
+<B>mysqld_qslower 1981</B>
+
+<DT>Trace slower than 10 ms for PID 1981:<DD>
+#
+<B>mysqld_qslower 1981 10</B>
+
+</DL>
+<A NAME="lbAH">&nbsp;</A>
+<H2>FIELDS</H2>
+
+<DL COMPACT>
+<DT>TIME(s)<DD>
+Time of query start, in seconds.
+<DT>PID<DD>
+Process ID of the traced server.
+<DT>MS<DD>
+Milliseconds for the query, from start to end.
+<DT>QUERY<DD>
+Query string, truncated to 128 characters.
+</DL>
+<A NAME="lbAI">&nbsp;</A>
+<H2>OVERHEAD</H2>
+
+This adds low-overhead instrumentation to MySQL queries, and only emits output
+data from kernel to user-level if they query exceeds the threshold. If the
+server query rate is less than 1,000/sec, the overhead is expected to be
+negligible. If the query rate is higher, test to gauge overhead.
+<A NAME="lbAJ">&nbsp;</A>
+<H2>SOURCE</H2>
+
+This is from bcc.
+<DL COMPACT>
+<DT><DD>
+<A HREF="https://github.com/iovisor/bcc">https://github.com/iovisor/bcc</A>
+</DL>
+<P>
+
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+<A NAME="lbAK">&nbsp;</A>
+<H2>OS</H2>
+
+Linux
+<A NAME="lbAL">&nbsp;</A>
+<H2>STABILITY</H2>
+
+Unstable - in development.
+<A NAME="lbAM">&nbsp;</A>
+<H2>AUTHOR</H2>
+
+Brendan Gregg
+<A NAME="lbAN">&nbsp;</A>
+<H2>SEE ALSO</H2>
+
+<A HREF="https://iovisor.github.io/bcc?8+biosnoop">biosnoop</A>(8)
+<P>
+
+<HR>
+<A NAME="index">&nbsp;</A><H2>Index</H2>
+<DL>
+<DT><A HREF="#lbAB">NAME</A><DD>
+<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
+<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
+<DT><A HREF="#lbAE">REQUIREMENTS</A><DD>
+<DT><A HREF="#lbAF">OPTIONS</A><DD>
+<DT><A HREF="#lbAG">EXAMPLES</A><DD>
+<DT><A HREF="#lbAH">FIELDS</A><DD>
+<DT><A HREF="#lbAI">OVERHEAD</A><DD>
+<DT><A HREF="#lbAJ">SOURCE</A><DD>
+<DT><A HREF="#lbAK">OS</A><DD>
+<DT><A HREF="#lbAL">STABILITY</A><DD>
+<DT><A HREF="#lbAM">AUTHOR</A><DD>
+<DT><A HREF="#lbAN">SEE ALSO</A><DD>
+</DL>
+<HR>
+This document was created by
+<A HREF="https://iovisor.github.io/bcc">man2html</A>,
+using the manual pages.<BR>
+Time: 17:11:49 GMT, February 25, 2020
+</BODY>
+</HTML>

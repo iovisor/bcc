@@ -1,0 +1,152 @@
+Content-type: text/html; charset=UTF-8
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML><HEAD><TITLE>Man page of softirqs</TITLE>
+</HEAD><BODY>
+<H1>softirqs</H1>
+Section: Maintenance Commands (8)<BR>Updated: 2015-10-20<BR><A HREF="#index">Index</A>
+<A HREF="https://iovisor.github.io/bcc">Return to Main Contents</A><HR>
+
+<A NAME="lbAB">&nbsp;</A>
+<H2>NAME</H2>
+
+softirqs - Measure soft IRQ (soft interrupt) event time. Uses Linux eBPF/bcc.
+<A NAME="lbAC">&nbsp;</A>
+<H2>SYNOPSIS</H2>
+
+<B>softirqs [-h] [-T] [-N] [-d] [interval] [count]</B>
+
+<A NAME="lbAD">&nbsp;</A>
+<H2>DESCRIPTION</H2>
+
+This summarizes the time spent servicing soft IRQs (soft interrupts), and can
+show this time as either totals or histogram distributions. A system-wide
+summary of this time is shown by the %soft column of <A HREF="https://iovisor.github.io/bcc?1+mpstat">mpstat</A>(1), and soft IRQ
+event counts (but not times) are available in /proc/softirqs.
+<P>
+This tool uses the irq:softirq_enter and irq:softirq_exit kernel tracepoints,
+which is a stable tracing mechanism. BPF programs can attach to tracepoints
+from Linux 4.7 only. An older version of this tool is available in tools/old,
+and uses kprobes instead of tracepoints.
+<P>
+Since this uses BPF, only the root user can use this tool.
+<A NAME="lbAE">&nbsp;</A>
+<H2>REQUIREMENTS</H2>
+
+CONFIG_BPF and bcc.
+<A NAME="lbAF">&nbsp;</A>
+<H2>OPTIONS</H2>
+
+<DL COMPACT>
+<DT>-h<DD>
+Print usage message.
+<DT>-T<DD>
+Include timestamps on output.
+<DT>-N<DD>
+Output in nanoseconds
+<DT>-d<DD>
+Show IRQ time distribution as histograms
+</DL>
+<A NAME="lbAG">&nbsp;</A>
+<H2>EXAMPLES</H2>
+
+<DL COMPACT>
+<DT>Sum soft IRQ event time until Ctrl-C:<DD>
+#
+<B>softirqs</B>
+
+<DT>Show soft IRQ event time as histograms:<DD>
+#
+<B>softirqs -d</B>
+
+<DT>Print 1 second summaries, 10 times:<DD>
+#
+<B>softirqs 1 10</B>
+
+<DT>1 second summaries, printed in nanoseconds, with timestamps:<DD>
+#
+<B>softirqs -NT 1</B>
+
+</DL>
+<A NAME="lbAH">&nbsp;</A>
+<H2>FIELDS</H2>
+
+<DL COMPACT>
+<DT>SOFTIRQ<DD>
+The kernel function name that performs the soft IRQ action.
+<DT>TOTAL_usecs<DD>
+Total time spent in this soft IRQ function in microseconds.
+<DT>TOTAL_nsecs<DD>
+Total time spent in this soft IRQ function in nanoseconds.
+<DT>usecs<DD>
+Range of microseconds for this bucket.
+<DT>nsecs<DD>
+Range of nanoseconds for this bucket.
+<DT>count<DD>
+Number of soft IRQs in this time range.
+<DT>distribution<DD>
+ASCII representation of the distribution (the count column).
+</DL>
+<A NAME="lbAI">&nbsp;</A>
+<H2>OVERHEAD</H2>
+
+This traces kernel functions and maintains in-kernel counts, which
+are asynchronously copied to user-space. While the rate of interrupts
+be very high (&gt;1M/sec), this is a relatively efficient way to trace these
+events, and so the overhead is expected to be small for normal workloads, but
+could become noticeable for heavy workloads. Measure in a test environment
+before use.
+<A NAME="lbAJ">&nbsp;</A>
+<H2>SOURCE</H2>
+
+This is from bcc.
+<DL COMPACT>
+<DT><DD>
+<A HREF="https://github.com/iovisor/bcc">https://github.com/iovisor/bcc</A>
+</DL>
+<P>
+
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+<A NAME="lbAK">&nbsp;</A>
+<H2>OS</H2>
+
+Linux
+<A NAME="lbAL">&nbsp;</A>
+<H2>STABILITY</H2>
+
+Unstable - in development.
+<A NAME="lbAM">&nbsp;</A>
+<H2>AUTHORS</H2>
+
+Brendan Gregg, Sasha Goldshtein
+<A NAME="lbAN">&nbsp;</A>
+<H2>SEE ALSO</H2>
+
+<A HREF="https://iovisor.github.io/bcc?8+hardirqs">hardirqs</A>(8)
+<P>
+
+<HR>
+<A NAME="index">&nbsp;</A><H2>Index</H2>
+<DL>
+<DT><A HREF="#lbAB">NAME</A><DD>
+<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
+<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
+<DT><A HREF="#lbAE">REQUIREMENTS</A><DD>
+<DT><A HREF="#lbAF">OPTIONS</A><DD>
+<DT><A HREF="#lbAG">EXAMPLES</A><DD>
+<DT><A HREF="#lbAH">FIELDS</A><DD>
+<DT><A HREF="#lbAI">OVERHEAD</A><DD>
+<DT><A HREF="#lbAJ">SOURCE</A><DD>
+<DT><A HREF="#lbAK">OS</A><DD>
+<DT><A HREF="#lbAL">STABILITY</A><DD>
+<DT><A HREF="#lbAM">AUTHORS</A><DD>
+<DT><A HREF="#lbAN">SEE ALSO</A><DD>
+</DL>
+<HR>
+This document was created by
+<A HREF="https://iovisor.github.io/bcc">man2html</A>,
+using the manual pages.<BR>
+Time: 17:11:49 GMT, February 25, 2020
+</BODY>
+</HTML>

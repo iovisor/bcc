@@ -1,0 +1,169 @@
+Content-type: text/html; charset=UTF-8
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML><HEAD><TITLE>Man page of offcputime</TITLE>
+</HEAD><BODY>
+<H1>offcputime</H1>
+Section: Maintenance Commands (8)<BR>Updated: 2016-01-14<BR><A HREF="#index">Index</A>
+<A HREF="https://iovisor.github.io/bcc">Return to Main Contents</A><HR>
+
+<A NAME="lbAB">&nbsp;</A>
+<H2>NAME</H2>
+
+offcputime - Summarize off-CPU time by kernel stack trace. Uses Linux eBPF/bcc.
+<A NAME="lbAC">&nbsp;</A>
+<H2>SYNOPSIS</H2>
+
+<B>offcputime [-h] [-p PID | -t TID | -u | -k] [-U | -K] [-d] [-f] [--stack-storage-size STACK_STORAGE_SIZE] [-m MIN_BLOCK_TIME] [-M MAX_BLOCK_TIME] [--state STATE] [duration]</B>
+
+<A NAME="lbAD">&nbsp;</A>
+<H2>DESCRIPTION</H2>
+
+This program shows stack traces and task names that were blocked and &quot;off-CPU&quot;,
+and the total duration they were not running: their &quot;off-CPU time&quot;.
+It works by tracing when threads block and when they return to CPU, measuring
+both the time they were off-CPU and the blocked stack trace and the task name.
+This data is summarized in the kernel using an eBPF map, and by summing the
+off-CPU time by unique stack trace and task name.
+<P>
+The output summary will help you identify reasons why threads were blocking,
+and quantify the time they were off-CPU. This spans all types of blocking
+activity: disk I/O, network I/O, locks, page faults, involuntary context
+switches, etc.
+<P>
+This is complementary to CPU profiling (e.g., CPU flame graphs) which shows
+the time spent on-CPU. This shows the time spent off-CPU, and the output,
+especially the -f format, can be used to generate an &quot;off-CPU time flame graph&quot;.
+<P>
+See <A HREF="http://www.brendangregg.com/FlameGraphs/offcpuflamegraphs.html">http://www.brendangregg.com/FlameGraphs/offcpuflamegraphs.html</A>
+<P>
+This tool only works on Linux 4.6+. It uses the new `BPF_STACK_TRACE` table
+APIs to generate the in-kernel stack traces.
+For kernels older than 4.6, see the version under tools/old.
+<P>
+Note: this tool only traces off-CPU times that began and ended while tracing.
+<A NAME="lbAE">&nbsp;</A>
+<H2>REQUIREMENTS</H2>
+
+CONFIG_BPF and bcc.
+<A NAME="lbAF">&nbsp;</A>
+<H2>OPTIONS</H2>
+
+<DL COMPACT>
+<DT>-h<DD>
+Print usage message.
+<DT>-p PID<DD>
+Trace this process ID only (filtered in-kernel).
+<DT>-t TID<DD>
+Trace this thread ID only (filtered in-kernel).
+<DT>-u<DD>
+Only trace user threads (no kernel threads).
+<DT>-k<DD>
+Only trace kernel threads (no user threads).
+<DT>-U<DD>
+Show stacks from user space only (no kernel space stacks).
+<DT>-K<DD>
+Show stacks from kernel space only (no user space stacks).
+<DT>-d<DD>
+Insert delimiter between kernel/user stacks.
+<DT>-f<DD>
+Print output in folded stack format.
+<DT>--stack-storage-size STACK_STORAGE_SIZE<DD>
+Change the number of unique stack traces that can be stored and displayed.
+<DT>-m MIN_BLOCK_TIME<DD>
+The minimum time in microseconds over which we store traces (default 1)
+<DT>-M MAX_BLOCK_TIME<DD>
+The maximum time in microseconds under which we store traces (default U64_MAX)
+<DT>--state<DD>
+Filter on this thread state bitmask (eg, 2 == TASK_UNINTERRUPTIBLE).
+See include/linux/sched.h for states.
+<DT>duration<DD>
+Duration to trace, in seconds.
+</DL>
+<A NAME="lbAG">&nbsp;</A>
+<H2>EXAMPLES</H2>
+
+<DL COMPACT>
+<DT>Trace all thread blocking events, and summarize (in-kernel) by kernel stack trace and total off-CPU time:<DD>
+#
+<B>offcputime</B>
+
+<DT>Trace for 5 seconds only:<DD>
+#
+<B>offcputime 5</B>
+
+<DT>Trace for 5 seconds, and emit output in folded stack format (suitable for flame graphs):<DD>
+#
+<B>offcputime -f 5</B>
+
+<DT>Trace PID 185 only:<DD>
+#
+<B>offcputime -p 185</B>
+
+</DL>
+<A NAME="lbAH">&nbsp;</A>
+<H2>OVERHEAD</H2>
+
+This summarizes unique stack traces in-kernel for efficiency, allowing it to
+trace a higher rate of events than methods that post-process in user space. The
+stack trace and time data is only copied to user space once, when the output is
+printed. While these techniques greatly lower overhead, scheduler events are
+still a high frequency event, as they can exceed 1 million events per second,
+and so caution should still be used. Test before production use.
+<P>
+If the overhead is still a problem, take a look at the MINBLOCK_US tunable in
+the code. If your aim is to chase down longer blocking events, then this could
+be increased to filter shorter blocking events, further lowering overhead.
+<A NAME="lbAI">&nbsp;</A>
+<H2>SOURCE</H2>
+
+This is from bcc.
+<DL COMPACT>
+<DT><DD>
+<A HREF="https://github.com/iovisor/bcc">https://github.com/iovisor/bcc</A>
+</DL>
+<P>
+
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+<A NAME="lbAJ">&nbsp;</A>
+<H2>OS</H2>
+
+Linux
+<A NAME="lbAK">&nbsp;</A>
+<H2>STABILITY</H2>
+
+Unstable - in development.
+<A NAME="lbAL">&nbsp;</A>
+<H2>AUTHOR</H2>
+
+Brendan Gregg
+<A NAME="lbAM">&nbsp;</A>
+<H2>SEE ALSO</H2>
+
+<A HREF="https://iovisor.github.io/bcc?8+stackcount">stackcount</A>(8)
+<P>
+
+<HR>
+<A NAME="index">&nbsp;</A><H2>Index</H2>
+<DL>
+<DT><A HREF="#lbAB">NAME</A><DD>
+<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
+<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
+<DT><A HREF="#lbAE">REQUIREMENTS</A><DD>
+<DT><A HREF="#lbAF">OPTIONS</A><DD>
+<DT><A HREF="#lbAG">EXAMPLES</A><DD>
+<DT><A HREF="#lbAH">OVERHEAD</A><DD>
+<DT><A HREF="#lbAI">SOURCE</A><DD>
+<DT><A HREF="#lbAJ">OS</A><DD>
+<DT><A HREF="#lbAK">STABILITY</A><DD>
+<DT><A HREF="#lbAL">AUTHOR</A><DD>
+<DT><A HREF="#lbAM">SEE ALSO</A><DD>
+</DL>
+<HR>
+This document was created by
+<A HREF="https://iovisor.github.io/bcc">man2html</A>,
+using the manual pages.<BR>
+Time: 17:11:49 GMT, February 25, 2020
+</BODY>
+</HTML>

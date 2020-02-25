@@ -1,0 +1,171 @@
+Content-type: text/html; charset=UTF-8
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML><HEAD><TITLE>Man page of cpuunclaimed</TITLE>
+</HEAD><BODY>
+<H1>cpuunclaimed</H1>
+Section: Maintenance Commands (8)<BR>Updated: 2016-12-21<BR><A HREF="#index">Index</A>
+<A HREF="https://iovisor.github.io/bcc">Return to Main Contents</A><HR>
+
+<A NAME="lbAB">&nbsp;</A>
+<H2>NAME</H2>
+
+cpuunclaimed - Sample CPU run queues and calculate unclaimed idle CPU. Uses Linux eBPF/bcc.
+<A NAME="lbAC">&nbsp;</A>
+<H2>SYNOPSIS</H2>
+
+<B>cpuunclaimed</B>
+
+[-T] [-j] [-J] [interval [count]]
+<A NAME="lbAD">&nbsp;</A>
+<H2>DESCRIPTION</H2>
+
+This tool samples the length of the run queues and determine when there are idle
+CPUs, yet queued threads waiting their turn. It reports the amount of idle
+(yet unclaimed by waiting threads) CPU as a system-wide percentage.
+<P>
+This situation can happen for a number of reasons:
+<DL COMPACT>
+<DT>-<DD>
+An application has been bound to some, but not all, CPUs, and has runnable
+threads that cannot migrate to other CPUs due to this configuration.
+<DT>-<DD>
+CPU affinity: an optimization that leaves threads on CPUs where the CPU
+caches are warm, even if this means short periods of waiting while other
+CPUs are idle. The wait period is tunale (see sysctl, kernel.sched*).
+<DT>-<DD>
+Scheduler bugs.
+</DL>
+<P>
+
+An unclaimed idle of &lt; 1% is likely to be CPU affinity, and not usually a
+cause for concern. By leaving the CPU idle, overall throughput of the system
+may be improved. This tool is best for identifying larger issues, &gt; 2%, due
+to the coarseness of its 99 Hertz samples.
+<P>
+This is an experimental tool that currently works by use of sampling to
+keep overheads low. Tool assumptions:
+<DL COMPACT>
+<DT>-<DD>
+CPU samples consistently fire around the same offset. There will sometimes
+be a lag as a sample is delayed by higher-priority interrupts, but it is
+assumed the subsequent samples will catch up to the expected offsets (as
+is seen in practice). You can use -J to inspect sample offsets. Some
+systems can power down CPUs when idle, and when they wake up again they
+may begin firing at a skewed offset: this tool will detect the skew, print
+an error, and exit.
+<DT>-<DD>
+All CPUs are online (see ncpu).
+</DL>
+<P>
+
+If this identifies unclaimed CPU, you can double check it by dumping raw
+samples (-j), as well as using other tracing tools to instrument scheduler
+events (although this latter approach has much higher overhead).
+<P>
+Since this uses BPF, only the root user can use this tool.
+<A NAME="lbAE">&nbsp;</A>
+<H2>REQUIREMENTS</H2>
+
+CONFIG_BPF and bcc.
+<A NAME="lbAF">&nbsp;</A>
+<H2>EXAMPLES</H2>
+
+<DL COMPACT>
+<DT>Sample and calculate unclaimed idle CPUs, output every 1 second (default:<DD>
+#
+<B>cpuunclaimed</B>
+
+<DT>Print 5 second summaries, 10 times:<DD>
+#
+<B>cpuunclaimed 5 10</B>
+
+<DT>Print 1 second summaries with timestamps:<DD>
+#
+<B>cpuunclaimed -T 1</B>
+
+<DT>Raw dump of all samples (verbose), as comma-separated values:<DD>
+#
+<B>cpuunclaimed -j</B>
+
+</DL>
+<A NAME="lbAG">&nbsp;</A>
+<H2>FIELDS</H2>
+
+<DL COMPACT>
+<DT>%CPU<DD>
+CPU utilization as a system-wide percentage.
+<DT>unclaimed idle<DD>
+Percentage of CPU resources that were idle when work was queued on other CPUs,
+as a system-wide percentage.
+<DT>TIME<DD>
+Time (HH:MM:SS)
+<DT>TIMESTAMP_ns<DD>
+Timestamp, nanoseconds.
+<DT>CPU#<DD>
+CPU ID.
+<DT>OFFSET_ns_CPU#<DD>
+Time offset that a sample fired within a sample group for this CPU.
+</DL>
+<A NAME="lbAH">&nbsp;</A>
+<H2>OVERHEAD</H2>
+
+The overhead is expected to be low/negligible as this tool uses sampling at
+99 Hertz (on all CPUs), which has a fixed and low cost, rather than sampling
+every scheduler event as many other approaches use (which can involve
+instrumenting millions of events per second). Sampled CPUs, run queue lengths,
+and timestamps are written to ring buffers that are periodically read by
+user space for reporting. Measure overhead in a test environment.
+<A NAME="lbAI">&nbsp;</A>
+<H2>SOURCE</H2>
+
+This is from bcc.
+<DL COMPACT>
+<DT><DD>
+<A HREF="https://github.com/iovisor/bcc">https://github.com/iovisor/bcc</A>
+</DL>
+<P>
+
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+<A NAME="lbAJ">&nbsp;</A>
+<H2>OS</H2>
+
+Linux
+<A NAME="lbAK">&nbsp;</A>
+<H2>STABILITY</H2>
+
+Unstable - in development.
+<A NAME="lbAL">&nbsp;</A>
+<H2>AUTHOR</H2>
+
+Brendan Gregg
+<A NAME="lbAM">&nbsp;</A>
+<H2>SEE ALSO</H2>
+
+<A HREF="https://iovisor.github.io/bcc?8+runqlen">runqlen</A>(8)
+<P>
+
+<HR>
+<A NAME="index">&nbsp;</A><H2>Index</H2>
+<DL>
+<DT><A HREF="#lbAB">NAME</A><DD>
+<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
+<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
+<DT><A HREF="#lbAE">REQUIREMENTS</A><DD>
+<DT><A HREF="#lbAF">EXAMPLES</A><DD>
+<DT><A HREF="#lbAG">FIELDS</A><DD>
+<DT><A HREF="#lbAH">OVERHEAD</A><DD>
+<DT><A HREF="#lbAI">SOURCE</A><DD>
+<DT><A HREF="#lbAJ">OS</A><DD>
+<DT><A HREF="#lbAK">STABILITY</A><DD>
+<DT><A HREF="#lbAL">AUTHOR</A><DD>
+<DT><A HREF="#lbAM">SEE ALSO</A><DD>
+</DL>
+<HR>
+This document was created by
+<A HREF="https://iovisor.github.io/bcc">man2html</A>,
+using the manual pages.<BR>
+Time: 17:11:49 GMT, February 25, 2020
+</BODY>
+</HTML>

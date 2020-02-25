@@ -1,0 +1,122 @@
+Content-type: text/html; charset=UTF-8
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML><HEAD><TITLE>Man page of dcstat</TITLE>
+</HEAD><BODY>
+<H1>dcstat</H1>
+Section: Maintenance Commands (8)<BR>Updated: 2016-02-09<BR><A HREF="#index">Index</A>
+<A HREF="https://iovisor.github.io/bcc">Return to Main Contents</A><HR>
+
+<A NAME="lbAB">&nbsp;</A>
+<H2>NAME</H2>
+
+dcstat - Directory entry cache (dcache) stats. Uses Linux eBPF/bcc.
+<A NAME="lbAC">&nbsp;</A>
+<H2>SYNOPSIS</H2>
+
+<B>dcstat</B>
+
+[interval [count]]
+<A NAME="lbAD">&nbsp;</A>
+<H2>DESCRIPTION</H2>
+
+The Linux directory entry cache (dcache) improves the performance of file and
+directory name lookups. This tool provides per-second summary statistics of
+dcache performance.
+<P>
+This uses kernel dynamic tracing of kernel functions, lookup_fast() and
+d_lookup(), which will need to be modified to match kernel changes.
+<P>
+Since this uses BPF, only the root user can use this tool.
+<A NAME="lbAE">&nbsp;</A>
+<H2>REQUIREMENTS</H2>
+
+CONFIG_BPF and bcc.
+<A NAME="lbAF">&nbsp;</A>
+<H2>EXAMPLES</H2>
+
+<DL COMPACT>
+<DT>Print summaries each second:<DD>
+#
+<B>dcstat</B>
+
+<DT>Print output every five seconds, three times:<DD>
+#
+<B>dcstat 5 3</B>
+
+</DL>
+<A NAME="lbAG">&nbsp;</A>
+<H2>FIELDS</H2>
+
+<DL COMPACT>
+<DT>REFS/s<DD>
+Number dcache lookups (references) per second.
+<DT>SLOW/s<DD>
+Number of dcache lookups that failed the lookup_fast() path and executed the
+lookup_slow() path instead.
+<DT>MISS/s<DD>
+Number of dcache misses (failed both fast and slow lookups).
+<DT>HIT%<DD>
+Percentage of dcache hits over total references.
+</DL>
+<A NAME="lbAH">&nbsp;</A>
+<H2>OVERHEAD</H2>
+
+The overhead depends on the frequency of file and directory name lookups.
+While the per-event overhead is low, some applications may make over 100k
+lookups per second, and the low per-event overhead will begin to add up, and
+could begin to be measurable (over 10% CPU usage). Measure in a test
+environment.
+<A NAME="lbAI">&nbsp;</A>
+<H2>SOURCE</H2>
+
+This is from bcc.
+<DL COMPACT>
+<DT><DD>
+<A HREF="https://github.com/iovisor/bcc">https://github.com/iovisor/bcc</A>
+</DL>
+<P>
+
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+<A NAME="lbAJ">&nbsp;</A>
+<H2>OS</H2>
+
+Linux
+<A NAME="lbAK">&nbsp;</A>
+<H2>STABILITY</H2>
+
+Unstable - in development.
+<A NAME="lbAL">&nbsp;</A>
+<H2>AUTHOR</H2>
+
+Brendan Gregg
+<A NAME="lbAM">&nbsp;</A>
+<H2>SEE ALSO</H2>
+
+<A HREF="https://iovisor.github.io/bcc?8+dcsnoop">dcsnoop</A>(8)
+<P>
+
+<HR>
+<A NAME="index">&nbsp;</A><H2>Index</H2>
+<DL>
+<DT><A HREF="#lbAB">NAME</A><DD>
+<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
+<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
+<DT><A HREF="#lbAE">REQUIREMENTS</A><DD>
+<DT><A HREF="#lbAF">EXAMPLES</A><DD>
+<DT><A HREF="#lbAG">FIELDS</A><DD>
+<DT><A HREF="#lbAH">OVERHEAD</A><DD>
+<DT><A HREF="#lbAI">SOURCE</A><DD>
+<DT><A HREF="#lbAJ">OS</A><DD>
+<DT><A HREF="#lbAK">STABILITY</A><DD>
+<DT><A HREF="#lbAL">AUTHOR</A><DD>
+<DT><A HREF="#lbAM">SEE ALSO</A><DD>
+</DL>
+<HR>
+This document was created by
+<A HREF="https://iovisor.github.io/bcc">man2html</A>,
+using the manual pages.<BR>
+Time: 17:11:49 GMT, February 25, 2020
+</BODY>
+</HTML>

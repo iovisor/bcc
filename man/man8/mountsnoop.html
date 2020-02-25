@@ -1,0 +1,110 @@
+Content-type: text/html; charset=UTF-8
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML><HEAD><TITLE>Man page of mountsnoop</TITLE>
+</HEAD><BODY>
+<H1>mountsnoop</H1>
+Section: Maintenance Commands (8)<BR>Updated: 2016-10-14<BR><A HREF="#index">Index</A>
+<A HREF="https://iovisor.github.io/bcc">Return to Main Contents</A><HR>
+
+<A NAME="lbAB">&nbsp;</A>
+<H2>NAME</H2>
+
+mountsnoop - Trace mount() and umount() syscalls. Uses Linux eBPF/bcc.
+<A NAME="lbAC">&nbsp;</A>
+<H2>SYNOPSIS</H2>
+
+<B>mountsnoop</B>
+
+<A NAME="lbAD">&nbsp;</A>
+<H2>DESCRIPTION</H2>
+
+mountsnoop traces the mount() and umount() syscalls, showing which processes
+are mounting and unmounting filesystems in what mount namespaces. This can be
+useful for troubleshooting system and container setup.
+<P>
+This works by tracing the kernel sys_mount() and sys_umount() functions using
+dynamic tracing, and will need updating to match any changes to this function.
+<P>
+This makes use of a Linux 4.8 feature (bpf_get_current_task()).
+<P>
+Since this uses BPF, only the root user can use this tool.
+<A NAME="lbAE">&nbsp;</A>
+<H2>REQUIREMENTS</H2>
+
+CONFIG_BPF and bcc.
+<A NAME="lbAF">&nbsp;</A>
+<H2>FIELDS</H2>
+
+<DL COMPACT>
+<DT>COMM<DD>
+Process name
+<DT>PID<DD>
+Process ID
+<DT>TID<DD>
+Thread ID
+<DT>MNT_NS<DD>
+Mount namespace inode number
+<DT>CALL<DD>
+System call, arguments, and return value
+</DL>
+<A NAME="lbAG">&nbsp;</A>
+<H2>OVERHEAD</H2>
+
+This traces the kernel mount and umount functions and prints output for each
+event. As the rate of these calls is generally expected to be very low, the
+overhead is also expected to be negligible. If your system calls mount() and
+umount() at a high rate, then test and understand overhead before use.
+<A NAME="lbAH">&nbsp;</A>
+<H2>SOURCE</H2>
+
+This is from bcc.
+<DL COMPACT>
+<DT><DD>
+<A HREF="https://github.com/iovisor/bcc">https://github.com/iovisor/bcc</A>
+</DL>
+<P>
+
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+<A NAME="lbAI">&nbsp;</A>
+<H2>OS</H2>
+
+Linux
+<A NAME="lbAJ">&nbsp;</A>
+<H2>STABILITY</H2>
+
+Unstable - in development.
+<A NAME="lbAK">&nbsp;</A>
+<H2>AUTHOR</H2>
+
+Omar Sandoval
+<A NAME="lbAL">&nbsp;</A>
+<H2>SEE ALSO</H2>
+
+<A HREF="https://iovisor.github.io/bcc?2+mount">mount</A>(2)
+<A HREF="https://iovisor.github.io/bcc?2+umount">umount</A>(2)
+<P>
+
+<HR>
+<A NAME="index">&nbsp;</A><H2>Index</H2>
+<DL>
+<DT><A HREF="#lbAB">NAME</A><DD>
+<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
+<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
+<DT><A HREF="#lbAE">REQUIREMENTS</A><DD>
+<DT><A HREF="#lbAF">FIELDS</A><DD>
+<DT><A HREF="#lbAG">OVERHEAD</A><DD>
+<DT><A HREF="#lbAH">SOURCE</A><DD>
+<DT><A HREF="#lbAI">OS</A><DD>
+<DT><A HREF="#lbAJ">STABILITY</A><DD>
+<DT><A HREF="#lbAK">AUTHOR</A><DD>
+<DT><A HREF="#lbAL">SEE ALSO</A><DD>
+</DL>
+<HR>
+This document was created by
+<A HREF="https://iovisor.github.io/bcc">man2html</A>,
+using the manual pages.<BR>
+Time: 17:11:49 GMT, February 25, 2020
+</BODY>
+</HTML>

@@ -1,0 +1,189 @@
+Content-type: text/html; charset=UTF-8
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML><HEAD><TITLE>Man page of bindsnoop</TITLE>
+</HEAD><BODY>
+<H1>bindsnoop</H1>
+Section:  (8)<BR>Updated: 12 February 2020<BR><A HREF="#index">Index</A>
+<A HREF="https://iovisor.github.io/bcc">Return to Main Contents</A><HR>
+
+<A NAME="lbAB">&nbsp;</A>
+<H2>NAME</H2>
+
+bindsnoop - Trace bind() system calls.
+<A NAME="lbAC">&nbsp;</A>
+<H2>SYNOPSIS</H2>
+
+<B>bindsnoop.py [-h</B>] [<B>-w</B>] [<B>-t</B>] [<B>-p</B> PID] [<B>-P</B> PORT] [<B>-E</B>] [<B>-U</B>] [<B>-u</B> UID] [<B>--count</B>] [<B>--cgroupmap MAP</B>]
+
+<A NAME="lbAD">&nbsp;</A>
+<H2>DESCRIPTION</H2>
+
+bindsnoop reports socket options set before the bind call that would impact this system call behavior.
+<P>
+
+<A NAME="lbAE">&nbsp;</A>
+<H2>REQUIREMENTS</H2>
+
+CONFIG_BPF and bcc.
+<A NAME="lbAF">&nbsp;</A>
+<H2>OPTIONS:</H2>
+
+<DL COMPACT><DT><DD>
+<DL COMPACT>
+<DT>Show help message and exit:<DD>
+<DT><B>-h</B>, <B>--help</B>
+
+<DD>
+<DT>Include timestamp on output:<DD>
+<DT><B>-t</B>, <B>--timestamp</B>
+
+<DD>
+<DT>Wider columns (fit IPv6):<DD>
+<DT><B>-w</B>, <B>--wide</B>
+
+<DD>
+<DT>Trace this PID only:<DD>
+<DT><B>-p</B> PID, <B>--pid</B> PID
+
+<DD>
+<DT>Comma-separated list of ports to trace:<DD>
+<DT><B>-P</B> PORT, <B>--port</B> PORT
+
+<DD>
+<DT>Trace cgroups in this BPF map:<DD>
+<DT><B>--cgroupmap</B> MAP
+
+<DD>
+<DT>Include errors in the output:<DD>
+<DT><B>-E</B>, <B>--errors</B>
+
+<DD>
+<DT>Include UID on output:<DD>
+<DT><B>-U</B>, <B>--print-uid</B>
+
+<DD>
+<DT>Trace this UID only:<DD>
+<DT><B>-u</B> UID, <B>--uid</B> UID
+
+<DD>
+<DT>Count binds per src ip and port:<DD>
+<DT><B>--count</B>
+
+<DD>
+</DL>
+</DL>
+
+<P>
+
+<A NAME="lbAG">&nbsp;</A>
+<H2>EXAMPLES:</H2>
+
+<DL COMPACT><DT><DD>
+<DL COMPACT>
+<DT>Trace all IPv4 and IPv6 <B>bind</B>()s<DD>
+<DT><B>bindsnoop</B>
+
+<DD>
+<DT>Include timestamps<DD>
+<DT><B>bindsnoop -t</B>
+
+<DD>
+<DT>Trace PID 181<DD>
+<DT><B>bindsnoop -p</B> 181
+
+<DD>
+<DT>Trace port 80<DD>
+<DT><B>bindsnoop -P</B> 80
+
+<DD>
+<DT>Trace port 80 and 81<DD>
+<DT><B>bindsnoop -P</B> 80,81
+
+<DD>
+<DT>Include UID<DD>
+<DT><B>bindsnoop -U</B>
+
+<DD>
+<DT>Trace UID 1000<DD>
+<DT><B>bindsnoop -u</B> 1000
+
+<DD>
+<DT>Report bind errors<DD>
+<DT><B>bindsnoop -E</B>
+
+<DD>
+<DT>Count bind per src ip<DD>
+<DT><B>bindsnoop --count</B>
+
+<DD>
+</DL>
+</DL>
+
+<P>
+
+Trace IPv4 and IPv6 bind system calls and report socket options that would impact bind call behavior:
+<DL COMPACT><DT><DD>
+<DL COMPACT>
+<DT>SOL_IP IP_FREEBIND              F....<DD>
+<DT>SOL_IP IP_TRANSPARENT           .T...<DD>
+<DT>SOL_IP IP_BIND_ADDRESS_NO_PORT  ..N..<DD>
+<DT>SOL_SOCKET SO_REUSEADDR         ...R.<DD>
+<DT>SOL_SOCKET SO_REUSEPORT         ....r<DD>
+</DL>
+<P>
+
+SO_BINDTODEVICE interface is reported as &quot;IF&quot; index
+</DL>
+<A NAME="lbAH">&nbsp;</A>
+<H2>SOURCE</H2>
+
+This is from bcc.
+<DL COMPACT>
+<DT><DD>
+<A HREF="https://github.com/iovisor/bcc">https://github.com/iovisor/bcc</A>
+</DL>
+<P>
+
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+<A NAME="lbAI">&nbsp;</A>
+<H2>OS</H2>
+
+Linux
+<A NAME="lbAJ">&nbsp;</A>
+<H2>STABILITY</H2>
+
+Unstable - in development.
+<A NAME="lbAK">&nbsp;</A>
+<H2>AUTHOR</H2>
+
+Pavel Dubovitsky
+<A NAME="lbAL">&nbsp;</A>
+<H2>SEE ALSO</H2>
+
+<A HREF="https://iovisor.github.io/bcc?8+tcpaccept">tcpaccept</A>(8)
+<P>
+
+<HR>
+<A NAME="index">&nbsp;</A><H2>Index</H2>
+<DL>
+<DT><A HREF="#lbAB">NAME</A><DD>
+<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
+<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
+<DT><A HREF="#lbAE">REQUIREMENTS</A><DD>
+<DT><A HREF="#lbAF">OPTIONS:</A><DD>
+<DT><A HREF="#lbAG">EXAMPLES:</A><DD>
+<DT><A HREF="#lbAH">SOURCE</A><DD>
+<DT><A HREF="#lbAI">OS</A><DD>
+<DT><A HREF="#lbAJ">STABILITY</A><DD>
+<DT><A HREF="#lbAK">AUTHOR</A><DD>
+<DT><A HREF="#lbAL">SEE ALSO</A><DD>
+</DL>
+<HR>
+This document was created by
+<A HREF="https://iovisor.github.io/bcc">man2html</A>,
+using the manual pages.<BR>
+Time: 17:11:49 GMT, February 25, 2020
+</BODY>
+</HTML>

@@ -1,0 +1,113 @@
+Content-type: text/html; charset=UTF-8
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML><HEAD><TITLE>Man page of tplist</TITLE>
+</HEAD><BODY>
+<H1>tplist</H1>
+Section: Maintenance Commands (8)<BR>Updated: 2016-03-20<BR><A HREF="#index">Index</A>
+<A HREF="https://iovisor.github.io/bcc">Return to Main Contents</A><HR>
+
+<A NAME="lbAB">&nbsp;</A>
+<H2>NAME</H2>
+
+tplist - Display kernel tracepoints or USDT probes and their formats.
+<A NAME="lbAC">&nbsp;</A>
+<H2>SYNOPSIS</H2>
+
+<B>tplist [-p PID] [-l LIB] [-v] [filter]</B>
+
+<A NAME="lbAD">&nbsp;</A>
+<H2>DESCRIPTION</H2>
+
+tplist lists all kernel tracepoints, and can optionally print out the tracepoint
+format; namely, the variables that you can trace when the tracepoint is hit. 
+tplist can also list USDT probes embedded in a specific library or executable,
+and can list USDT probes for all the libraries loaded by a specific process.
+These features are usually used in conjunction with the argdist and/or trace tools.
+<P>
+On a typical system, accessing the tracepoint list and format requires root.
+However, accessing USDT probes does not require root.
+<A NAME="lbAE">&nbsp;</A>
+<H2>OPTIONS</H2>
+
+<DL COMPACT>
+<DT>-p PID<DD>
+Display the USDT probes from all the libraries loaded by the specified process.
+<DT>-l LIB<DD>
+Display the USDT probes from the specified library or executable. If the librar
+or executable can be found in the standard paths, a full path is not required.
+<DT>-v<DD>
+Increase the verbosity level. Can be used to display the variables, locations,
+and arguments of tracepoints and USDT probes.
+<DT>[filter]<DD>
+A wildcard expression that specifies which tracepoints or probes to print.
+For example, block:* will print all block tracepoints (block:block_rq_complete,
+etc.). Regular expressions are not supported.
+</DL>
+<A NAME="lbAF">&nbsp;</A>
+<H2>EXAMPLES</H2>
+
+<DL COMPACT>
+<DT>Print all kernel tracepoints:<DD>
+#
+<B>tplist</B>
+
+<DT>Print all net tracepoints with their format:<DD>
+#
+<B>tplist -v 'net:*'</B>
+
+<DT>Print all USDT probes in libpthread:<DD>
+$ 
+<B>tplist -l pthread</B>
+
+<DT>Print all USDT probes in process 4717 from the libc provider:<DD>
+$
+<B>tplist -p 4717 'libc:*'</B>
+
+<DT>Print all the USDT probes in the node executable:<DD>
+$
+<B>tplist -l node</B>
+
+</DL>
+<A NAME="lbAG">&nbsp;</A>
+<H2>SOURCE</H2>
+
+This is from bcc.
+<DL COMPACT>
+<DT><DD>
+<A HREF="https://github.com/iovisor/bcc">https://github.com/iovisor/bcc</A>
+</DL>
+<A NAME="lbAH">&nbsp;</A>
+<H2>OS</H2>
+
+Linux
+<A NAME="lbAI">&nbsp;</A>
+<H2>STABILITY</H2>
+
+Unstable - in development.
+<A NAME="lbAJ">&nbsp;</A>
+<H2>AUTHOR</H2>
+
+Sasha Goldshtein
+<P>
+
+<HR>
+<A NAME="index">&nbsp;</A><H2>Index</H2>
+<DL>
+<DT><A HREF="#lbAB">NAME</A><DD>
+<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
+<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
+<DT><A HREF="#lbAE">OPTIONS</A><DD>
+<DT><A HREF="#lbAF">EXAMPLES</A><DD>
+<DT><A HREF="#lbAG">SOURCE</A><DD>
+<DT><A HREF="#lbAH">OS</A><DD>
+<DT><A HREF="#lbAI">STABILITY</A><DD>
+<DT><A HREF="#lbAJ">AUTHOR</A><DD>
+</DL>
+<HR>
+This document was created by
+<A HREF="https://iovisor.github.io/bcc">man2html</A>,
+using the manual pages.<BR>
+Time: 17:11:49 GMT, February 25, 2020
+</BODY>
+</HTML>

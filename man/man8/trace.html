@@ -1,0 +1,267 @@
+Content-type: text/html; charset=UTF-8
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML><HEAD><TITLE>Man page of trace</TITLE>
+</HEAD><BODY>
+<H1>trace</H1>
+Section: Maintenance Commands (8)<BR>Updated: 2016-02-18<BR><A HREF="#index">Index</A>
+<A HREF="https://iovisor.github.io/bcc">Return to Main Contents</A><HR>
+
+<A NAME="lbAB">&nbsp;</A>
+<H2>NAME</H2>
+
+trace - Trace a function and print its arguments or return value, optionally evaluating a filter. Uses Linux eBPF/bcc.
+<A NAME="lbAC">&nbsp;</A>
+<H2>SYNOPSIS</H2>
+
+<B>trace [-h] [-b BUFFER_PAGES] [-p PID] [-L TID] [-v] [-Z STRING_SIZE] [-S] [-s SYM_FILE_LIST]</B>
+
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[-M&nbsp;MAX_EVENTS]&nbsp;[-t]&nbsp;[-u]&nbsp;[-T]&nbsp;[-C]&nbsp;[-K]&nbsp;[-U]&nbsp;[-a]&nbsp;[-I&nbsp;header]
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;probe&nbsp;[probe&nbsp;...]
+<A NAME="lbAD">&nbsp;</A>
+<H2>DESCRIPTION</H2>
+
+trace probes functions you specify and displays trace messages if a particular
+condition is met. You can control the message format to display function 
+arguments and return values. 
+<P>
+Since this uses BPF, only the root user can use this tool.
+<A NAME="lbAE">&nbsp;</A>
+<H2>REQUIREMENTS</H2>
+
+CONFIG_BPF and bcc.
+<A NAME="lbAF">&nbsp;</A>
+<H2>OPTIONS</H2>
+
+<DL COMPACT>
+<DT>-h<DD>
+Print usage message.
+<DT>-p PID<DD>
+Trace only functions in the process PID.
+<DT>-L TID<DD>
+Trace only functions in the thread TID.
+<DT>-v<DD>
+Display the generated BPF program, for debugging purposes.
+<DT>-z STRING_SIZE<DD>
+When collecting string arguments (of type char*), collect up to STRING_SIZE
+characters. Longer strings will be truncated.
+<DT>-s SYM_FILE_LIST<DD>
+When collecting stack trace in build id format, use the coma separated list for
+symbol resolution.
+<DT>-S<DD>
+If set, trace messages from trace's own process. By default, this is off to
+avoid tracing storms -- for example, if you trace the write system call, and
+consider that trace is writing to the standard output.
+<DT>-M MAX_EVENTS<DD>
+Print up to MAX_EVENTS trace messages and then exit.
+<DT>-t<DD>
+Print times relative to the beginning of the trace (offsets), in seconds.
+<DT>-u<DD>
+Print UNIX timestamps instead of offsets from trace beginning, requires -t.
+<DT>-T<DD>
+Print the time column.
+<DT>-C<DD>
+Print CPU id.
+<DT>-c CGROUP_PATH<DD>
+Trace only functions in processes under CGROUP_PATH hierarchy.
+<DT>-n NAME<DD>
+Only print process names containing this name.
+<DT>-f MSG_FILTER<DD>
+Only print message of event containing this string.
+<DT>-B<DD>
+Treat argument of STRCMP helper as a binary value
+<DT>-K<DD>
+Print the kernel stack for each event.
+<DT>-U<DD>
+Print the user stack for each event.
+-a
+Print virtual address in kernel and user stacks.
+<DT>-I header<DD>
+Additional header files to include in the BPF program. This is needed if your
+filter or print expressions use types or data structures that are not available
+in the standard headers. For example: 'linux/mm.h'
+<DT>probe [probe ...]<DD>
+One or more probes that attach to functions, filter conditions, and print
+information. See PROBE SYNTAX below.
+</DL>
+<A NAME="lbAG">&nbsp;</A>
+<H2>PROBE SYNTAX</H2>
+
+The general probe syntax is as follows:
+<P>
+<B>[{p,r}]:[library]:function[(signature)] [(predicate)] [format string[, arguments]]</B>
+
+<P>
+<B>{t:category:event,u:library:probe} [(predicate)] [format string[, arguments]]</B>
+
+<DL COMPACT>
+<DT><B>{[{p,r}],t,u}</B>
+
+<DD>
+Probe type - &quot;p&quot; for function entry, &quot;r&quot; for function return, &quot;t&quot; for kernel
+tracepoint, &quot;u&quot; for USDT probe. The default probe type is &quot;p&quot;.
+<DT><B>[library]</B>
+
+<DD>
+Library containing the probe.
+Specify the full path to the .so or executable file where the function to probe
+resides. Alternatively, you can specify just the lib name: for example, &quot;c&quot;
+refers to libc. If no library name is specified, the kernel is assumed. Also,
+you can specify an executable name (without a full path) if it is in the PATH.
+For example, &quot;bash&quot;.
+<DT><B>category</B>
+
+<DD>
+The tracepoint category. For example, &quot;sched&quot; or &quot;irq&quot;.
+<DT><B>function</B>
+
+<DD>
+The function to probe.
+<DT><B>signature</B>
+
+<DD>
+The optional signature of the function to probe. This can make it easier to
+access the function's arguments, instead of using the &quot;arg1&quot;, &quot;arg2&quot; etc.
+argument specifiers. For example, &quot;(struct timespec *ts)&quot; in the signature
+position lets you use &quot;ts&quot; in the filter or print expressions.
+<DT><B>event</B>
+
+<DD>
+The tracepoint event. For example, &quot;block_rq_complete&quot;.
+<DT><B>probe</B>
+
+<DD>
+The USDT probe name. For example, &quot;pthread_create&quot;.
+<DT><B>[(predicate)]</B>
+
+<DD>
+The filter applied to the captured data. Only if the filter evaluates as true,
+the trace message will be printed. The filter can use any valid C expression
+that refers to the argument values: arg1, arg2, etc., or to the return value
+retval in a return probe. If necessary, use C cast operators to coerce the
+arguments to the desired type. For example, if arg1 is of type int, use the
+expression ((int)arg1 &lt; 0) to trace only invocations where arg1 is negative.
+Note that only arg1-arg6 are supported, and only if the function is using the
+standard x86_64 convention where the first six arguments are in the RDI, RSI, 
+RDX, RCX, R8, R9 registers. If no predicate is specified, all function 
+invocations are traced.
+<P>
+The predicate expression may also use the STRCMP pseudo-function to compare
+a predefined string to a string argument. For example: STRCMP(&quot;test&quot;, arg1).
+The order of arguments is important: the first argument MUST be a quoted
+literal string, and the second argument can be a runtime string, most typically
+an argument. 
+<DT><B>[format string[, arguments]]</B>
+
+<DD>
+A printf-style format string that will be used for the trace message. You can
+use the following format specifiers: %s, %d, %u, %lld, %llu, %hd, %hu, %c,
+%x, %llx -- with the same semantics as printf's. Make sure to pass the exact
+number of arguments as there are placeholders in the format string. The
+format specifier replacements may be any C expressions, and may refer to the
+same special keywords as in the predicate (arg1, arg2, etc.).
+<P>
+In addition to the above format specifiers, you can also use %K and %U when
+the expression is an address that potentially points to executable code (i.e.,
+a symbol). trace will resolve %K specifiers to a kernel symbol, such as
+vfs__read, and will resolve %U specifiers to a user-space symbol in that
+process, such as sprintf.
+<P>
+In tracepoints, both the predicate and the arguments may refer to the tracepoint
+format structure, which is stored in the special &quot;args&quot; variable. For example, the
+block:block_rq_complete tracepoint can print or filter by args-&gt;nr_sector. To 
+discover the format of your tracepoint, use the tplist tool. 
+<P>
+In USDT probes, the arg1, ..., argN variables refer to the probe's arguments.
+To determine which arguments your probe has, use the tplist tool.
+<P>
+The predicate expression and the format specifier replacements for printing
+may also use the following special keywords: $pid, $tgid to refer to the 
+current process' pid and tgid; $uid, $gid to refer to the current user's
+uid and gid; $cpu to refer to the current processor number.
+</DL>
+<A NAME="lbAH">&nbsp;</A>
+<H2>EXAMPLES</H2>
+
+<DL COMPACT>
+<DT>Trace all invocations of the open system call with the name of the file being opened:<DD>
+#
+<B>trace '::do_sys_open %s, arg2'</B>
+
+<DT>Trace all invocations of the read system call where the number of bytes requested is greater than 20,000:<DD>
+#
+<B>trace '::sys_read (arg3 &gt; 20000) read %d bytes, arg3'</B>
+
+<DT>Trace all malloc calls and print the size of the requested allocation:<DD>
+#
+<B>trace ':c:malloc size = %d, arg1'</B>
+
+<DT>Trace returns from the readline function in bash and print the return value as a string:<DD>
+#
+<B>trace 'r:bash:readline %s, retval' </B>
+
+<DT>Trace the block:block_rq_complete tracepoint and print the number of sectors completed:<DD>
+#
+<B>trace 't:block:block_rq_complete %d sectors, args-&gt;nr_sector'</B>
+
+<DT>Trace the pthread_create USDT probe from the pthread library and print the address of the thread's start function:<DD>
+#
+<B>trace 'u:pthread:pthread_create start addr = %llx, arg3'</B>
+
+<DT>Trace the nanosleep system call and print the sleep duration in nanoseconds:<DD>
+#
+<B>trace 'p::SyS_nanosleep(struct timespec *ts) sleep for %lld ns, ts-&gt;tv_nsec'</B>
+
+<DT>Trace the inet_pton system call using build id mechanism and print the stack<DD>
+#
+<B>trace -s /lib/x86_64-linux-gnu/libc.so.6,/bin/ping 'p:c:inet_pton' -U</B>
+
+</DL>
+<A NAME="lbAI">&nbsp;</A>
+<H2>SOURCE</H2>
+
+This is from bcc.
+<DL COMPACT>
+<DT><DD>
+<A HREF="https://github.com/iovisor/bcc">https://github.com/iovisor/bcc</A>
+</DL>
+<P>
+
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+<A NAME="lbAJ">&nbsp;</A>
+<H2>OS</H2>
+
+Linux
+<A NAME="lbAK">&nbsp;</A>
+<H2>STABILITY</H2>
+
+Unstable - in development.
+<A NAME="lbAL">&nbsp;</A>
+<H2>AUTHOR</H2>
+
+Sasha Goldshtein
+<P>
+
+<HR>
+<A NAME="index">&nbsp;</A><H2>Index</H2>
+<DL>
+<DT><A HREF="#lbAB">NAME</A><DD>
+<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
+<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
+<DT><A HREF="#lbAE">REQUIREMENTS</A><DD>
+<DT><A HREF="#lbAF">OPTIONS</A><DD>
+<DT><A HREF="#lbAG">PROBE SYNTAX</A><DD>
+<DT><A HREF="#lbAH">EXAMPLES</A><DD>
+<DT><A HREF="#lbAI">SOURCE</A><DD>
+<DT><A HREF="#lbAJ">OS</A><DD>
+<DT><A HREF="#lbAK">STABILITY</A><DD>
+<DT><A HREF="#lbAL">AUTHOR</A><DD>
+</DL>
+<HR>
+This document was created by
+<A HREF="https://iovisor.github.io/bcc">man2html</A>,
+using the manual pages.<BR>
+Time: 17:11:49 GMT, February 25, 2020
+</BODY>
+</HTML>

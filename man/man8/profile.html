@@ -1,0 +1,205 @@
+Content-type: text/html; charset=UTF-8
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML><HEAD><TITLE>Man page of profile</TITLE>
+</HEAD><BODY>
+<H1>profile</H1>
+Section: Maintenance Commands (8)<BR>Updated: 2016-07-17<BR><A HREF="#index">Index</A>
+<A HREF="https://iovisor.github.io/bcc">Return to Main Contents</A><HR>
+
+<A NAME="lbAB">&nbsp;</A>
+<H2>NAME</H2>
+
+profile - Profile CPU usage by sampling stack traces. Uses Linux eBPF/bcc.
+<A NAME="lbAC">&nbsp;</A>
+<H2>SYNOPSIS</H2>
+
+<B>profile [-adfh] [-p PID | -L TID] [-U | -K] [-F FREQUENCY | -c COUNT]</B>
+
+<B>[--stack-storage-size COUNT] [duration]</B>
+
+<A NAME="lbAD">&nbsp;</A>
+<H2>DESCRIPTION</H2>
+
+This is a CPU profiler. It works by taking samples of stack traces at timed
+intervals. It will help you understand and quantify CPU usage: which code is
+executing, and by how much, including both user-level and kernel code.
+<P>
+By default this samples at 49 Hertz (samples per second), across all CPUs.
+This frequency can be tuned using a command line option. The reason for 49, and
+not 50, is to avoid lock-step sampling.
+<P>
+This is also an efficient profiler, as stack traces are frequency counted in
+kernel context, rather than passing each stack to user space for frequency
+counting there. Only the unique stacks and counts are passed to user space
+at the end of the profile, greatly reducing the kernel&lt;-&gt;user transfer.
+<A NAME="lbAE">&nbsp;</A>
+<H2>REQUIREMENTS</H2>
+
+CONFIG_BPF and bcc.
+<P>
+This also requires Linux 4.9+ (BPF_PROG_TYPE_PERF_EVENT support). See tools/old
+for an older version that may work on Linux 4.6 - 4.8.
+<A NAME="lbAF">&nbsp;</A>
+<H2>OPTIONS</H2>
+
+<DL COMPACT>
+<DT>-h<DD>
+Print usage message.
+<DT>-p PID<DD>
+Trace this process ID only (filtered in-kernel).
+<DT>-L TID<DD>
+Trace this thread ID only (filtered in-kernel).
+<DT>-F frequency<DD>
+Frequency to sample stacks.
+<DT>-c count<DD>
+Sample stacks every one in this many events.
+<DT>-f<DD>
+Print output in folded stack format.
+<DT>-d<DD>
+Include an output delimiter between kernel and user stacks (either &quot;--&quot;, or,
+in folded mode, &quot;-&quot;).
+<DT>-U<DD>
+Show stacks from user space only (no kernel space stacks).
+<DT>-K<DD>
+Show stacks from kernel space only (no user space stacks).
+<DT>-I<DD>
+Include CPU idle stacks (by default these are excluded).
+<DT>--stack-storage-size COUNT<DD>
+The maximum number of unique stack traces that the kernel will count (default
+16384). If the sampled count exceeds this, a warning will be printed.
+<DT>-C cpu<DD>
+Collect stacks only from specified cpu.
+<DT>duration<DD>
+Duration to trace, in seconds.
+</DL>
+<A NAME="lbAG">&nbsp;</A>
+<H2>EXAMPLES</H2>
+
+<DL COMPACT>
+<DT>Profile (sample) stack traces system-wide at 49 Hertz (samples per second) until Ctrl-C:<DD>
+#
+<B>profile</B>
+
+<DT>Profile for 5 seconds only:<DD>
+#
+<B>profile 5</B>
+
+<DT>Profile at 99 Hertz for 5 seconds only:<DD>
+#
+<B>profile -F 99 5</B>
+
+<DT>Profile 1 in a million events for 5 seconds only:<DD>
+#
+<B>profile -c 1000000 5</B>
+
+<DT>Profile process with PID 181 only:<DD>
+#
+<B>profile -p 181</B>
+
+<DT>Profile thread with TID 181 only:<DD>
+#
+<B>profile -L 181</B>
+
+<DT>Profile for 5 seconds and output in folded stack format (suitable as input for flame graphs), including a delimiter between kernel and user stacks:<DD>
+#
+<B>profile -df 5</B>
+
+<DT>Profile kernel stacks only:<DD>
+#
+<B>profile -K</B>
+
+</DL>
+<A NAME="lbAH">&nbsp;</A>
+<H2>DEBUGGING</H2>
+
+See &quot;[unknown]&quot; frames with bogus addresses? This can happen for different
+reasons. Your best approach is to get Linux perf to work first, and then to
+try this tool. Eg, &quot;perf record -F 49 -a -g -- sleep 1; perf script&quot;, and
+to check for unknown frames there.
+<P>
+The most common reason for &quot;[unknown]&quot; frames is that the target software has
+not been compiled
+with frame pointers, and so we can't use that simple method for walking the
+stack. The fix in that case is to use software that does have frame pointers,
+eg, gcc -fno-omit-frame-pointer, or Java's -XX:+PreserveFramePointer.
+<P>
+Another reason for &quot;[unknown]&quot; frames is JIT compilers, which don't use a
+traditional symbol table. The fix in that case is to populate a
+/tmp/perf-PID.map file with the symbols, which this tool should read. How you
+do this depends on the runtime (Java, Node.js).
+<P>
+If you seem to have unrelated samples in the output, check for other
+sampling or tracing tools that may be running. The current version of this
+tool can include their events if profiling happened concurrently. Those
+samples may be filtered in a future version.
+<A NAME="lbAI">&nbsp;</A>
+<H2>OVERHEAD</H2>
+
+This is an efficient profiler, as stack traces are frequency counted in
+kernel context, and only the unique stacks and their counts are passed to
+user space. Contrast this with the current &quot;perf record -F 99 -a&quot; method
+of profiling, which writes each sample to user space (via a ring buffer),
+and then to the file system (perf.data), which must be post-processed.
+<P>
+This uses perf_event_open to setup a timer which is instrumented by BPF,
+and for efficiency it does not initialize the perf ring buffer, so the
+redundant perf samples are not collected.
+<P>
+It's expected that the overhead while sampling at 49 Hertz (the default),
+across all CPUs, should be negligible. If you increase the sample rate, the
+overhead might begin to be measurable.
+<A NAME="lbAJ">&nbsp;</A>
+<H2>SOURCE</H2>
+
+This is from bcc.
+<DL COMPACT>
+<DT><DD>
+<A HREF="https://github.com/iovisor/bcc">https://github.com/iovisor/bcc</A>
+</DL>
+<P>
+
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+<A NAME="lbAK">&nbsp;</A>
+<H2>OS</H2>
+
+Linux
+<A NAME="lbAL">&nbsp;</A>
+<H2>STABILITY</H2>
+
+Unstable - in development.
+<A NAME="lbAM">&nbsp;</A>
+<H2>AUTHOR</H2>
+
+Brendan Gregg
+<A NAME="lbAN">&nbsp;</A>
+<H2>SEE ALSO</H2>
+
+<A HREF="https://iovisor.github.io/bcc?8+offcputime">offcputime</A>(8)
+<P>
+
+<HR>
+<A NAME="index">&nbsp;</A><H2>Index</H2>
+<DL>
+<DT><A HREF="#lbAB">NAME</A><DD>
+<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
+<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
+<DT><A HREF="#lbAE">REQUIREMENTS</A><DD>
+<DT><A HREF="#lbAF">OPTIONS</A><DD>
+<DT><A HREF="#lbAG">EXAMPLES</A><DD>
+<DT><A HREF="#lbAH">DEBUGGING</A><DD>
+<DT><A HREF="#lbAI">OVERHEAD</A><DD>
+<DT><A HREF="#lbAJ">SOURCE</A><DD>
+<DT><A HREF="#lbAK">OS</A><DD>
+<DT><A HREF="#lbAL">STABILITY</A><DD>
+<DT><A HREF="#lbAM">AUTHOR</A><DD>
+<DT><A HREF="#lbAN">SEE ALSO</A><DD>
+</DL>
+<HR>
+This document was created by
+<A HREF="https://iovisor.github.io/bcc">man2html</A>,
+using the manual pages.<BR>
+Time: 17:11:49 GMT, February 25, 2020
+</BODY>
+</HTML>

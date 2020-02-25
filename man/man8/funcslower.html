@@ -1,0 +1,180 @@
+Content-type: text/html; charset=UTF-8
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML><HEAD><TITLE>Man page of funcslower</TITLE>
+</HEAD><BODY>
+<H1>funcslower</H1>
+Section: Maintenance Commands (8)<BR>Updated: 2017-03-30<BR><A HREF="#index">Index</A>
+<A HREF="https://iovisor.github.io/bcc">Return to Main Contents</A><HR>
+
+<A NAME="lbAB">&nbsp;</A>
+<H2>NAME</H2>
+
+funcslower - Trace slow kernel or user function calls.
+<A NAME="lbAC">&nbsp;</A>
+<H2>SYNOPSIS</H2>
+
+<B>funcslower [-hf] [-p PID] [-U | -K] [-m MIN_MS] [-u MIN_US] [-a ARGUMENTS] [-T] [-t] [-v] function [function ...]</B>
+
+<A NAME="lbAD">&nbsp;</A>
+<H2>DESCRIPTION</H2>
+
+This script traces a kernel or user function's entry and return points, and
+prints a message when the function's latency exceeded the specified threshold.
+Multiple functions are supported, and you can mix kernel functions with user
+functions in different libraries.
+<P>
+WARNING: See the OVERHEAD section.
+<P>
+By default, a minimum millisecond threshold of 1 is used. Recursive functions
+are not supported: only the inner-most recursive invocation will be traced.
+<P>
+Since this uses BPF, only the root user can use this tool.
+<A NAME="lbAE">&nbsp;</A>
+<H2>REQUIREMENTS</H2>
+
+CONFIG_BPF and bcc.
+<A NAME="lbAF">&nbsp;</A>
+<H2>OPTIONS</H2>
+
+-p PID
+Trace this PID only.
+<DL COMPACT>
+<DT>-m MIN_NS<DD>
+Minimum duration to trace, in milliseconds. Default is 1 ms.
+<DT>-u MIN_US<DD>
+Minimum duration to trace, in microseconds.
+<DT>-a ARGUMENTS<DD>
+Print the function's arguments, up to 6.
+<DT>-T<DD>
+Print a HH:MM:SS timestamp with each entry.
+<DT>-t<DD>
+Print a seconds timestamp with each entry, at microsecond resolution.
+<DT>-f<DD>
+Print output in folded stack format.
+<DT>-U<DD>
+Show stacks from user space only (no kernel space stacks).
+<DT>-K<DD>
+Show stacks from kernel space only (no user space stacks).
+<DT>-v<DD>
+Print the resulting BPF program, for debugging purposes.
+<DT>function<DD>
+The function to trace -- multiple functions are supported. If a plain function
+name is provided, the function is assumed to be a kernel function. For user
+functions, provide the library name and the function name, e.g. bash:readline
+or c:malloc.
+</DL>
+<A NAME="lbAG">&nbsp;</A>
+<H2>EXAMPLES</H2>
+
+<DL COMPACT>
+<DT>Trace vfs_write calls slower than 1ms:<DD>
+#
+<B>funcslower vfs_write</B>
+
+<DT>Trace open() calls in libc slower than 10us:<DD>
+#
+<B>funcslower -u 10 c:open</B>
+
+<DT>Trace both malloc() and free() slower than 10us, in pid 135 only:<DD>
+#
+<B>funcslower -p 135 -u 10 c:malloc c:free</B>
+
+<DT>Trace the write syscall and print its first 4 arguments:<DD>
+#
+<B>funcslower -a 4 SyS_write</B>
+
+<DT>Trace opens from libc and print the user and kernel stack frames:<DD>
+#
+<B>funcslower -UK c:open</B>
+
+</DL>
+<A NAME="lbAH">&nbsp;</A>
+<H2>FIELDS</H2>
+
+<DL COMPACT>
+<DT>TIME<DD>
+Time of the event as a human-readable HH:MM:SS format, or a timestamp in seconds
+at microsecond-accuracy from the first event seen.
+<DT>COMM<DD>
+Process name.
+<DT>PID<DD>
+Process ID.
+<DT>LAT<DD>
+Latency of the operation in either microseconds (us) or milliseconds (ms).
+<DT>RVAL<DD>
+The return value from the function. Often useful for diagnosing a relationship
+between slow and failed function calls.
+<DT>FUNC<DD>
+The function name, followed by its arguments if requested.
+</DL>
+<A NAME="lbAI">&nbsp;</A>
+<H2>OVERHEAD</H2>
+
+Depending on the function(s) being traced, overhead can become severe. For 
+example, tracing a common function like malloc() can slow down a C/C++ program
+by a factor of 2 or more. On the other hand, tracing a low-frequency event like
+the SyS_setreuid() function will probably not be as prohibitive, and in fact
+negligible for functions that are called up to 100-1000 times per second.
+<P>
+You should first use the funclatency and argdist tools for investigation, 
+because they summarize data in-kernel and have a much lower overhead than this
+tool. To get a general idea of the number of times a particular function is
+called (and estimate the overhead), use the funccount tool, e.g.:
+<P>
+
+# funccount c:open
+<A NAME="lbAJ">&nbsp;</A>
+<H2>SOURCE</H2>
+
+This is from bcc.
+<DL COMPACT>
+<DT><DD>
+<A HREF="https://github.com/iovisor/bcc">https://github.com/iovisor/bcc</A>
+</DL>
+<P>
+
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+<A NAME="lbAK">&nbsp;</A>
+<H2>OS</H2>
+
+Linux
+<A NAME="lbAL">&nbsp;</A>
+<H2>STABILITY</H2>
+
+Unstable - in development.
+<A NAME="lbAM">&nbsp;</A>
+<H2>AUTHOR</H2>
+
+Sasha Goldshtein
+<A NAME="lbAN">&nbsp;</A>
+<H2>SEE ALSO</H2>
+
+<A HREF="https://iovisor.github.io/bcc?8+funccount">funccount</A>(8), <A HREF="https://iovisor.github.io/bcc?8+funclatency">funclatency</A>(8), <A HREF="https://iovisor.github.io/bcc?8+argdist">argdist</A>(8), <A HREF="https://iovisor.github.io/bcc?8+trace">trace</A>(8)
+<P>
+
+<HR>
+<A NAME="index">&nbsp;</A><H2>Index</H2>
+<DL>
+<DT><A HREF="#lbAB">NAME</A><DD>
+<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
+<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
+<DT><A HREF="#lbAE">REQUIREMENTS</A><DD>
+<DT><A HREF="#lbAF">OPTIONS</A><DD>
+<DT><A HREF="#lbAG">EXAMPLES</A><DD>
+<DT><A HREF="#lbAH">FIELDS</A><DD>
+<DT><A HREF="#lbAI">OVERHEAD</A><DD>
+<DT><A HREF="#lbAJ">SOURCE</A><DD>
+<DT><A HREF="#lbAK">OS</A><DD>
+<DT><A HREF="#lbAL">STABILITY</A><DD>
+<DT><A HREF="#lbAM">AUTHOR</A><DD>
+<DT><A HREF="#lbAN">SEE ALSO</A><DD>
+</DL>
+<HR>
+This document was created by
+<A HREF="https://iovisor.github.io/bcc">man2html</A>,
+using the manual pages.<BR>
+Time: 17:11:49 GMT, February 25, 2020
+</BODY>
+</HTML>

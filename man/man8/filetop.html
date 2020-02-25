@@ -1,0 +1,178 @@
+Content-type: text/html; charset=UTF-8
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML><HEAD><TITLE>Man page of filetop</TITLE>
+</HEAD><BODY>
+<H1>filetop</H1>
+Section: Maintenance Commands (8)<BR>Updated: 2016-02-08<BR><A HREF="#index">Index</A>
+<A HREF="https://iovisor.github.io/bcc">Return to Main Contents</A><HR>
+
+<A NAME="lbAB">&nbsp;</A>
+<H2>NAME</H2>
+
+filetop - File reads and writes by filename and process. Top for files.
+<A NAME="lbAC">&nbsp;</A>
+<H2>SYNOPSIS</H2>
+
+<B>filetop [-h] [-C] [-r MAXROWS] [-s {reads,writes,rbytes,wbytes}] [-p PID] [interval] [count]</B>
+
+<A NAME="lbAD">&nbsp;</A>
+<H2>DESCRIPTION</H2>
+
+This is top for files.
+<P>
+This traces file reads and writes, and prints a per-file summary every interval
+(by default, 1 second). By default the summary is sorted on the highest read
+throughput (Kbytes). Sorting order can be changed via -s option. By default only
+IO on regular files is shown. The -a option will list all file types (sockets,
+FIFOs, etc).
+<P>
+This uses in-kernel eBPF maps to store per process summaries for efficiency.
+<P>
+This script works by tracing the __vfs_read() and __vfs_write() functions using
+kernel dynamic tracing, which instruments explicit read and write calls. If
+files are read or written using another means (eg, via mmap()), then they
+will not be visible using this tool. Also, this tool will need updating to
+match any code changes to those vfs functions.
+<P>
+This should be useful for file system workload characterization when analyzing
+the performance of applications.
+<P>
+Note that tracing VFS level reads and writes can be a frequent activity, and
+this tool can begin to cost measurable overhead at high I/O rates.
+<P>
+Since this uses BPF, only the root user can use this tool.
+<A NAME="lbAE">&nbsp;</A>
+<H2>REQUIREMENTS</H2>
+
+CONFIG_BPF and bcc.
+<A NAME="lbAF">&nbsp;</A>
+<H2>OPTIONS</H2>
+
+<DL COMPACT>
+<DT>-a<DD>
+Include non-regular file types (sockets, FIFOs, etc).
+<DT>-C<DD>
+Don't clear the screen.
+<DT>-r MAXROWS<DD>
+Maximum number of rows to print. Default is 20.
+<DT>-s {reads,writes,rbytes,wbytes}<DD>
+Sort column. Default is rbytes (read throughput).
+<DT>-p PID<DD>
+Trace this PID only.
+<DT>interval<DD>
+Interval between updates, seconds.
+<DT>count<DD>
+Number of interval summaries.
+<P>
+</DL>
+<A NAME="lbAG">&nbsp;</A>
+<H2>EXAMPLES</H2>
+
+<DL COMPACT>
+<DT>Summarize block device I/O by process, 1 second screen refresh:<DD>
+#
+<B>filetop</B>
+
+<DT>Don't clear the screen, and top 8 rows only:<DD>
+#
+<B>filetop -Cr 8</B>
+
+<DT>5 second summaries, 10 times only:<DD>
+#
+<B>filetop 5 10</B>
+
+</DL>
+<A NAME="lbAH">&nbsp;</A>
+<H2>FIELDS</H2>
+
+<DL COMPACT>
+<DT>loadavg:<DD>
+The contents of /proc/loadavg
+<DT>PID<DD>
+Process ID.
+<DT>COMM<DD>
+Process name.
+<DT>READS<DD>
+Count of reads during interval.
+<DT>WRITES<DD>
+Count of writes during interval.
+<DT>R_Kb<DD>
+Total read Kbytes during interval.
+<DT>W_Kb<DD>
+Total write Kbytes during interval.
+<DT>T<DD>
+Type of file: R == regular, S == socket, O == other (pipe, etc).
+<DT>FILE<DD>
+Filename.
+</DL>
+<A NAME="lbAI">&nbsp;</A>
+<H2>OVERHEAD</H2>
+
+Depending on the frequency of application reads and writes, overhead can become
+significant, in the worst case slowing applications by over 50%. Hopefully for
+real world workloads the overhead is much less -- test before use. The reason
+for the high overhead is that VFS reads and writes can be a frequent event, and
+despite the eBPF overhead being very small per event, if you multiply this
+small overhead by a million events per second, it becomes a million times
+worse. Literally. You can gauge the number of reads and writes using the
+<A HREF="https://iovisor.github.io/bcc?8+vfsstat">vfsstat</A>(8) tool, also from bcc.
+<A NAME="lbAJ">&nbsp;</A>
+<H2>SOURCE</H2>
+
+This is from bcc.
+<DL COMPACT>
+<DT><DD>
+<A HREF="https://github.com/iovisor/bcc">https://github.com/iovisor/bcc</A>
+</DL>
+<P>
+
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+<A NAME="lbAK">&nbsp;</A>
+<H2>OS</H2>
+
+Linux
+<A NAME="lbAL">&nbsp;</A>
+<H2>STABILITY</H2>
+
+Unstable - in development.
+<A NAME="lbAM">&nbsp;</A>
+<H2>AUTHOR</H2>
+
+Brendan Gregg
+<A NAME="lbAN">&nbsp;</A>
+<H2>INSPIRATION</H2>
+
+<A HREF="https://iovisor.github.io/bcc?1+top">top</A>(1) by William LeFebvre
+<A NAME="lbAO">&nbsp;</A>
+<H2>SEE ALSO</H2>
+
+<A HREF="https://iovisor.github.io/bcc?8+vfsstat">vfsstat</A>(8), <A HREF="https://iovisor.github.io/bcc?8+vfscount">vfscount</A>(8), <A HREF="https://iovisor.github.io/bcc?8+fileslower">fileslower</A>(8)
+<P>
+
+<HR>
+<A NAME="index">&nbsp;</A><H2>Index</H2>
+<DL>
+<DT><A HREF="#lbAB">NAME</A><DD>
+<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
+<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
+<DT><A HREF="#lbAE">REQUIREMENTS</A><DD>
+<DT><A HREF="#lbAF">OPTIONS</A><DD>
+<DT><A HREF="#lbAG">EXAMPLES</A><DD>
+<DT><A HREF="#lbAH">FIELDS</A><DD>
+<DT><A HREF="#lbAI">OVERHEAD</A><DD>
+<DT><A HREF="#lbAJ">SOURCE</A><DD>
+<DT><A HREF="#lbAK">OS</A><DD>
+<DT><A HREF="#lbAL">STABILITY</A><DD>
+<DT><A HREF="#lbAM">AUTHOR</A><DD>
+<DT><A HREF="#lbAN">INSPIRATION</A><DD>
+<DT><A HREF="#lbAO">SEE ALSO</A><DD>
+</DL>
+<HR>
+This document was created by
+<A HREF="https://iovisor.github.io/bcc">man2html</A>,
+using the manual pages.<BR>
+Time: 17:11:49 GMT, February 25, 2020
+</BODY>
+</HTML>

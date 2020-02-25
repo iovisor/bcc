@@ -1,0 +1,157 @@
+Content-type: text/html; charset=UTF-8
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML><HEAD><TITLE>Man page of uobjnew</TITLE>
+</HEAD><BODY>
+<H1>uobjnew</H1>
+Section: Maintenance Commands (8)<BR>Updated: 2018-10-09<BR><A HREF="#index">Index</A>
+<A HREF="https://iovisor.github.io/bcc">Return to Main Contents</A><HR>
+
+<A NAME="lbAB">&nbsp;</A>
+<H2>NAME</H2>
+
+uobjnew, cobjnew, javaobjnew, rubyobjnew, tclobjnew - Summarize object allocations in
+high-level languages.
+<A NAME="lbAC">&nbsp;</A>
+<H2>SYNOPSIS</H2>
+
+<B>cobjnew [-h] [-C TOP_COUNT] [-S TOP_SIZE] [-v] pid [interval]</B>
+
+<BR>
+
+<B>javaobjnew [-h] [-C TOP_COUNT] [-S TOP_SIZE] [-v] pid [interval]</B>
+
+<BR>
+
+<B>rubyobjnew [-h] [-C TOP_COUNT] [-S TOP_SIZE] [-v] pid [interval]</B>
+
+<BR>
+
+<B>tclobjnew [-h] [-C TOP_COUNT] [-S TOP_SIZE] [-v] pid [interval]</B>
+
+<BR>
+
+<B>uobjnew [-h] [-C TOP_COUNT] [-S TOP_SIZE] [-v] [-l {c,java,ruby,tcl}] pid [interval]</B>
+
+<A NAME="lbAD">&nbsp;</A>
+<H2>DESCRIPTION</H2>
+
+uobjnew traces object allocations in high-level languages (including &quot;malloc&quot;)
+and prints summaries of the most frequently allocated types by number of
+objects or number of bytes.
+<P>
+This tool relies on USDT probes embedded in many high-level languages, such as
+C, Java, Ruby, and Tcl. It requires a runtime instrumented with these
+probes, which in some cases requires building from source with a USDT-specific
+flag, such as &quot;--enable-dtrace&quot; or &quot;--with-dtrace&quot;. For Java, the Java process
+must be started with the &quot;-XX:+ExtendedDTraceProbes&quot; flag.
+<P>
+Since this uses BPF, only the root user can use this tool.
+<A NAME="lbAE">&nbsp;</A>
+<H2>REQUIREMENTS</H2>
+
+CONFIG_BPF and bcc.
+<A NAME="lbAF">&nbsp;</A>
+<H2>OPTIONS</H2>
+
+<DL COMPACT>
+<DT>-C TOP_COUNT<DD>
+Print the top object types sorted by number of instances.
+<DT>-S TOP_SIZE<DD>
+Print the top object types sorted by size.
+<DT>-v<DD>
+Print the resulting BPF program, for debugging purposes.
+<DT>{c,java,ruby,tcl}<DD>
+The language to trace.
+<DT>pid<DD>
+The process id to trace.
+<DT>interval<DD>
+Wait this many seconds and then print the summary and exit. By default, wait
+for Ctrl+C to exit.
+</DL>
+<A NAME="lbAG">&nbsp;</A>
+<H2>EXAMPLES</H2>
+
+<DL COMPACT>
+<DT>Trace object allocations in a Ruby process:<DD>
+#
+<B>uobjnew ruby 148</B>
+
+<DT>Trace object allocations from &quot;malloc&quot; and print the top 10 by total size:<DD>
+#
+<B>uobjnew -S 10 c 1788</B>
+
+</DL>
+<A NAME="lbAH">&nbsp;</A>
+<H2>FIELDS</H2>
+
+<DL COMPACT>
+<DT>TYPE<DD>
+The object type being allocated. For C (malloc), this is the block size.
+<DT>ALLOCS<DD>
+The number of objects allocated.
+<DT>BYTES<DD>
+The number of bytes allocated.
+</DL>
+<A NAME="lbAI">&nbsp;</A>
+<H2>OVERHEAD</H2>
+
+Object allocation events are quite frequent, and therefore the overhead from
+running this tool can be considerable. Use with caution and make sure to 
+test before using in a production environment. Nonetheless, even thousands of
+allocations per second will likely produce a reasonable overhead when 
+investigating a problem.
+<A NAME="lbAJ">&nbsp;</A>
+<H2>SOURCE</H2>
+
+This is from bcc.
+<DL COMPACT>
+<DT><DD>
+<A HREF="https://github.com/iovisor/bcc">https://github.com/iovisor/bcc</A>
+</DL>
+<P>
+
+Also look in the bcc distribution for a companion _example.txt file containing
+example usage, output, and commentary for this tool.
+<A NAME="lbAK">&nbsp;</A>
+<H2>OS</H2>
+
+Linux
+<A NAME="lbAL">&nbsp;</A>
+<H2>STABILITY</H2>
+
+Unstable - in development.
+<A NAME="lbAM">&nbsp;</A>
+<H2>AUTHOR</H2>
+
+Sasha Goldshtein
+<A NAME="lbAN">&nbsp;</A>
+<H2>SEE ALSO</H2>
+
+<A HREF="https://iovisor.github.io/bcc?8+ustat">ustat</A>(8), <A HREF="https://iovisor.github.io/bcc?8+ugc">ugc</A>(8), <A HREF="https://iovisor.github.io/bcc?8+memleak">memleak</A>(8)
+<P>
+
+<HR>
+<A NAME="index">&nbsp;</A><H2>Index</H2>
+<DL>
+<DT><A HREF="#lbAB">NAME</A><DD>
+<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
+<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
+<DT><A HREF="#lbAE">REQUIREMENTS</A><DD>
+<DT><A HREF="#lbAF">OPTIONS</A><DD>
+<DT><A HREF="#lbAG">EXAMPLES</A><DD>
+<DT><A HREF="#lbAH">FIELDS</A><DD>
+<DT><A HREF="#lbAI">OVERHEAD</A><DD>
+<DT><A HREF="#lbAJ">SOURCE</A><DD>
+<DT><A HREF="#lbAK">OS</A><DD>
+<DT><A HREF="#lbAL">STABILITY</A><DD>
+<DT><A HREF="#lbAM">AUTHOR</A><DD>
+<DT><A HREF="#lbAN">SEE ALSO</A><DD>
+</DL>
+<HR>
+This document was created by
+<A HREF="https://iovisor.github.io/bcc">man2html</A>,
+using the manual pages.<BR>
+Time: 17:11:49 GMT, February 25, 2020
+</BODY>
+</HTML>

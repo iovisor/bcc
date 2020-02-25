@@ -1,0 +1,257 @@
+Content-type: text/html; charset=UTF-8
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML><HEAD><TITLE>Man page of argdist</TITLE>
+</HEAD><BODY>
+<H1>argdist</H1>
+Section: Maintenance Commands (8)<BR>Updated: 2016-02-11<BR><A HREF="#index">Index</A>
+<A HREF="https://iovisor.github.io/bcc">Return to Main Contents</A><HR>
+
+<A NAME="lbAB">&nbsp;</A>
+<H2>NAME</H2>
+
+argdist - Trace a function and display a histogram or frequency count of its parameter values. Uses Linux eBPF/bcc.
+<A NAME="lbAC">&nbsp;</A>
+<H2>SYNOPSIS</H2>
+
+<B>argdist [-h] [-p PID] [-z STRING_SIZE] [-i INTERVAL] [-d DURATION] [-n COUNT] [-v] [-T TOP] [-H specifier] [-C specifier] [-I header]</B>
+
+<A NAME="lbAD">&nbsp;</A>
+<H2>DESCRIPTION</H2>
+
+argdist attaches to function entry and exit points, collects specified parameter
+values, and stores them in a histogram or a frequency collection that counts
+the number of times a parameter value occurred. It can also filter parameter
+values and instrument multiple entry points at once.
+<P>
+Since this uses BPF, only the root user can use this tool.
+<A NAME="lbAE">&nbsp;</A>
+<H2>REQUIREMENTS</H2>
+
+CONFIG_BPF and bcc.
+<A NAME="lbAF">&nbsp;</A>
+<H2>OPTIONS</H2>
+
+<DL COMPACT>
+<DT>-h<DD>
+Print usage message.
+<DT>-p PID<DD>
+Trace only functions in the process PID.
+<DT>-z STRING_SIZE<DD>
+When collecting string arguments (of type char*), collect up to STRING_SIZE 
+characters. Longer strings will be truncated.
+<DT>-i INTERVAL<DD>
+Print the collected data every INTERVAL seconds. The default is 1 second.
+<DT>-d DURATION<DD>
+Total duration of trace in seconds.
+<DT>-n NUMBER<DD>
+Print the collected data COUNT times and then exit.
+<DT>-v<DD>
+Display the generated BPF program, for debugging purposes.
+<DT>-T TOP<DD>
+When collecting frequency counts, display only the top TOP entries.
+<DT>-H specifiers, -C specifiers<DD>
+One or more probe specifications that instruct argdist which functions to
+probe, which parameters to collect, how to aggregate them, and whether to perform
+any filtering. See SPECIFIER SYNTAX below.
+<DT>-I header<DD>
+One or more header files that should be included in the BPF program. This 
+enables the use of structure definitions, enumerations, and constants that
+are available in these headers. You should provide the same path you would
+include in the BPF program, e.g. 'linux/blkdev.h' or 'linux/time.h'. Note: in
+many cases, argdist will deduce the necessary header files automatically. 
+</DL>
+<A NAME="lbAG">&nbsp;</A>
+<H2>SPECIFIER SYNTAX</H2>
+
+The general specifier syntax is as follows:
+<P>
+<B>{p,r,t,u}:{[library],category}:function(signature)[:type[,type...]:expr[,expr...][:filter]][#label]</B>
+
+<DL COMPACT>
+<DT><B>{p,r,t,u}</B>
+
+<DD>
+Probe type - &quot;p&quot; for function entry, &quot;r&quot; for function return, &quot;t&quot; for kernel
+tracepoint, &quot;u&quot; for USDT probe; -H for histogram collection, -C for frequency count.
+Indicates where to place the probe and whether the probe should collect frequency
+count information, or aggregate the collected values into a histogram. Counting 
+probes will collect the number of times every parameter value was observed,
+whereas histogram probes will collect the parameter values into a histogram.
+Only integral types can be used with histogram probes; there is no such limitation
+for counting probes.
+<DT><B>[library]</B>
+
+<DD>
+Library containing the probe.
+Specify the full path to the .so or executable file where the function to probe
+resides. Alternatively, you can specify just the lib name: for example, &quot;c&quot;
+refers to libc. If no library name is specified, the kernel is assumed.
+<DT><B>category</B>
+
+<DD>
+The category of the kernel tracepoint. For example: net, sched, block.
+<DT><B>function(signature)</B>
+
+<DD>
+The function to probe, and its signature.
+The function name must match exactly for the probe to be placed. The signature,
+on the other hand, is only required if you plan to collect parameter values 
+based on that signature. For example, if you only want to collect the first
+parameter, you don't have to specify the rest of the parameters in the signature.
+When capturing kernel tracepoints, this should be the name of the event, e.g.
+net_dev_start_xmit. The signature for kernel tracepoints should be empty. When
+capturing USDT probes, this should be the name of the probe, e.g. reloc_complete.
+The signature for USDT probes should be empty.
+<DT><B>[type[,type...]]</B>
+
+<DD>
+The type(s) of the expression(s) to capture.
+This is the type of the keys in the histogram or raw event collection that are
+collected by the probes.
+<DT><B>[expr[,expr...]]</B>
+
+<DD>
+The expression(s) to capture.
+These are the values that are assigned to the histogram or raw event collection.
+You may use the parameters directly, or valid C expressions that involve the
+parameters, such as &quot;size % 10&quot;.
+Tracepoints may access a special structure called &quot;args&quot; that is formatted
+according to the tracepoint format (which you can obtain using tplist).
+For example, the block:block_rq_complete tracepoint can access args-&gt;nr_sector.
+USDT probes may access the arguments defined by the tracing program in the 
+special arg1, arg2, ... variables. To obtain their types, use the tplist tool.
+Return probes can use the argument values received by the
+function when it was entered, through the $entry(paramname) special variable.
+Return probes can also access the function's return value in $retval, and the
+function's execution time in nanoseconds in $latency. Note that adding the
+$latency or $entry(paramname) variables to the expression will introduce an
+additional probe at the function's entry to collect this data, and therefore
+introduce additional overhead.
+<DT><B>[filter]</B>
+
+<DD>
+The filter applied to the captured data.
+Only parameter values that pass the filter will be collected. This is any valid
+C expression that refers to the parameter values, such as &quot;fd == 1 &amp;&amp; length &gt; 16&quot;.
+The $entry, $retval, and $latency variables can be used here as well, in return
+probes.
+The filter expression may also use the STRCMP pseudo-function to compare
+a predefined string to a string argument. For example: STRCMP(&quot;test.txt&quot;, file).
+The order of arguments is important: the first argument MUST be a quoted
+literal string, and the second argument can be a runtime string.
+<DT><B>[label]</B>
+
+<DD>
+The label that will be displayed when printing the probed values. By default,
+this is the probe specifier. 
+</DL>
+<A NAME="lbAH">&nbsp;</A>
+<H2>EXAMPLES</H2>
+
+<DL COMPACT>
+<DT>Print a histogram of allocation sizes passed to kmalloc:<DD>
+#
+<B>argdist -H 'p::__kmalloc(u64 size):u64:size'</B>
+
+<DT>Print a count of how many times process 1005 called malloc with an allocation size of 16 bytes:<DD>
+#
+<B>argdist -p 1005 -C 'p:c:malloc(size_t size):size_t:size:size==16'</B>
+
+<DT>Snoop on all strings returned by gets():<DD>
+#
+<B>argdist -C 'r:c:gets():char*:$retval'</B>
+
+<DT>Print a histogram of read sizes that were longer than 1ms:<DD>
+#
+<B>argdist -H 'r::__vfs_read(void *file, void *buf, size_t count):size_t:$entry(count):$latency &gt; 1000000'</B>
+
+<DT>Print frequency counts of how many times writes were issued to a particular file descriptor number, in process 1005:<DD>
+#
+<B>argdist -p 1005 -C 'p:c:write(int fd):int:fd'</B>
+
+<DT>Print a histogram of error codes returned by read() in process 1005:<DD>
+#
+<B>argdist -p 1005 -H 'r:c:read()'</B>
+
+<DT>Print a histogram of buffer sizes passed to write() across all processes, where the file descriptor was 1 (STDOUT):<DD>
+#
+<B>argdist -H 'p:c:write(int fd, const void *buf, size_t count):size_t:count:fd==1'</B>
+
+<DT>Count fork() calls in libc across all processes, grouped by pid:<DD>
+#
+<B>argdist -C 'p:c:fork():int:$PID;fork per process'</B>
+
+<DT>Print histogram of number of sectors in completing block I/O requests:<DD>
+#
+<B>argdist -H 't:block:block_rq_complete():u32:nr_sector'</B>
+
+<DT>Aggregate interrupts by interrupt request (IRQ):<DD>
+#
+<B>argdist -C 't:irq:irq_handler_entry():int:irq'</B>
+
+<DT>Print the functions used as thread entry points and how common they are:<DD>
+#
+<B>argdist -C 'u:pthread:pthread_start():u64:arg2' -p 1337</B>
+
+<DT>Print histograms of sleep() and nanosleep() parameter values:<DD>
+#
+<B>argdist -H 'p:c:sleep(u32 seconds):u32:seconds' -H 'p:c:nanosleep(struct timespec *req):long:req-&gt;tv_nsec'</B>
+
+<DT>Spy on writes to STDOUT performed by process 2780, up to a string size of 120 characters:<DD>
+#
+<B>argdist -p 2780 -z 120 -C 'p:c:write(int fd, char* buf, size_t len):char*:buf:fd==1'</B>
+
+<DT>Group files being read from and the read sizes from __vfs_read:<DD>
+#
+<B>argdist -C 'p::__vfs_read(struct file *file, void *buf, size_t count):char*,size_t:file-&gt;f_path.dentry-&gt;d_iname,count:file-&gt;f_path.dentry-&gt;d_iname[0]!=0'</B>
+
+</DL>
+<A NAME="lbAI">&nbsp;</A>
+<H2>SOURCE</H2>
+
+This is from bcc.
+<DL COMPACT>
+<DT><DD>
+<A HREF="https://github.com/iovisor/bcc">https://github.com/iovisor/bcc</A>
+</DL>
+<P>
+
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+<A NAME="lbAJ">&nbsp;</A>
+<H2>OS</H2>
+
+Linux
+<A NAME="lbAK">&nbsp;</A>
+<H2>STABILITY</H2>
+
+Unstable - in development.
+<A NAME="lbAL">&nbsp;</A>
+<H2>AUTHOR</H2>
+
+Sasha Goldshtein
+<P>
+
+<HR>
+<A NAME="index">&nbsp;</A><H2>Index</H2>
+<DL>
+<DT><A HREF="#lbAB">NAME</A><DD>
+<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
+<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
+<DT><A HREF="#lbAE">REQUIREMENTS</A><DD>
+<DT><A HREF="#lbAF">OPTIONS</A><DD>
+<DT><A HREF="#lbAG">SPECIFIER SYNTAX</A><DD>
+<DT><A HREF="#lbAH">EXAMPLES</A><DD>
+<DT><A HREF="#lbAI">SOURCE</A><DD>
+<DT><A HREF="#lbAJ">OS</A><DD>
+<DT><A HREF="#lbAK">STABILITY</A><DD>
+<DT><A HREF="#lbAL">AUTHOR</A><DD>
+</DL>
+<HR>
+This document was created by
+<A HREF="https://iovisor.github.io/bcc">man2html</A>,
+using the manual pages.<BR>
+Time: 17:11:49 GMT, February 25, 2020
+</BODY>
+</HTML>

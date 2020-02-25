@@ -1,0 +1,110 @@
+Content-type: text/html; charset=UTF-8
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML><HEAD><TITLE>Man page of SOFDSNOOP</TITLE>
+</HEAD><BODY>
+<H1>SOFDSNOOP</H1>
+Section: Maintenance Commands (8)<BR>Updated: 2019-07-29<BR><A HREF="#index">Index</A>
+<A HREF="https://iovisor.github.io/bcc">Return to Main Contents</A><HR>
+
+<A NAME="lbAB">&nbsp;</A>
+<H2>NAME</H2>
+
+sofdsnoop - traces FDs passed by sockets
+<A NAME="lbAC">&nbsp;</A>
+<H2>SYNOPSIS</H2>
+
+usage: sofdsnoop [-h] [-T] [-p PID] [-t TID] [-n NAME] [-d DURATION]
+<A NAME="lbAD">&nbsp;</A>
+<H2>DESCRIPTION</H2>
+
+Trace file descriptors passed via socket
+<A NAME="lbAE">&nbsp;</A>
+<H3>optional arguments:</H3>
+
+<DL COMPACT>
+<DT><B>-h</B>, <B>--help</B><DD>
+show this help message and exit
+<DT><B>-T</B>, <B>--timestamp</B><DD>
+include timestamp on output
+<DT><B>-p</B> PID, <B>--pid</B> PID<DD>
+trace this PID only
+<DT><B>-t</B> TID, <B>--tid</B> TID<DD>
+trace this TID only
+<DT><B>-n</B> NAME, <B>--name</B> NAME<DD>
+only print process names containing this name
+<DT><B>-d</B> DURATION, <B>--duration</B> DURATION<DD>
+total duration of trace in seconds
+</DL>
+<A NAME="lbAF">&nbsp;</A>
+<H2>EXAMPLES</H2>
+
+<DL COMPACT>
+<DT>Trace passed file descriptors<DD>
+#
+<B>sofdsnoop</B>
+
+<DT>Include timestamps<DD>
+#
+<B>sofdsnoop -T</B>
+
+<DT>Only trace PID 181<DD>
+#
+<B>sofdsnoop -p</B> 181
+
+<DT>Only trace TID 123<DD>
+#
+<B>sofdsnoop -t</B> 123
+
+<DT>Trace for 10 seconds only<DD>
+#
+<B>sofdsnoop -d</B> 10
+
+<DT>Only print process names containing &quot;main&quot;<DD>
+#
+<B>sofdsnoop -n</B> main
+
+</DL>
+<A NAME="lbAG">&nbsp;</A>
+<H2>SOURCE</H2>
+
+This is from bcc.
+<DL COMPACT>
+<DT><DD>
+<A HREF="https://github.com/iovisor/bcc">https://github.com/iovisor/bcc</A>
+</DL>
+<P>
+
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+<A NAME="lbAH">&nbsp;</A>
+<H2>OS</H2>
+
+Linux
+<A NAME="lbAI">&nbsp;</A>
+<H2>STABILITY</H2>
+
+Unstable - in development.
+<P>
+
+<HR>
+<A NAME="index">&nbsp;</A><H2>Index</H2>
+<DL>
+<DT><A HREF="#lbAB">NAME</A><DD>
+<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
+<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
+<DL>
+<DT><A HREF="#lbAE">optional arguments:</A><DD>
+</DL>
+<DT><A HREF="#lbAF">EXAMPLES</A><DD>
+<DT><A HREF="#lbAG">SOURCE</A><DD>
+<DT><A HREF="#lbAH">OS</A><DD>
+<DT><A HREF="#lbAI">STABILITY</A><DD>
+</DL>
+<HR>
+This document was created by
+<A HREF="https://iovisor.github.io/bcc">man2html</A>,
+using the manual pages.<BR>
+Time: 17:11:49 GMT, February 25, 2020
+</BODY>
+</HTML>

@@ -1,0 +1,108 @@
+Content-type: text/html; charset=UTF-8
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML><HEAD><TITLE>Man page of sslsniff</TITLE>
+</HEAD><BODY>
+<H1>sslsniff</H1>
+Section: Maintenance Commands (8)<BR>Updated: 2016-08-16<BR><A HREF="#index">Index</A>
+<A HREF="https://iovisor.github.io/bcc">Return to Main Contents</A><HR>
+
+<A NAME="lbAB">&nbsp;</A>
+<H2>NAME</H2>
+
+sslsniff - Print data passed to OpenSSL, GnuTLS or NSS. Uses Linux eBPF/bcc.
+<A NAME="lbAC">&nbsp;</A>
+<H2>SYNOPSIS</H2>
+
+<B>sslsniff [-h] [-p PID] [-c COMM] [-o] [-g] [-n] [-d]</B>
+
+<A NAME="lbAD">&nbsp;</A>
+<H2>DESCRIPTION</H2>
+
+sslsniff prints data sent to write/send and read/recv functions of
+OpenSSL, GnuTLS and NSS, allowing us to read plain text content before
+encryption (when writing) and after decryption (when reading).
+<P>
+This works reading the second parameter of both functions (*buf).
+<P>
+Since this uses BPF, only the root user can use this tool.
+<A NAME="lbAE">&nbsp;</A>
+<H2>REQUIREMENTS</H2>
+
+CONFIG_BPF and bcc.
+<A NAME="lbAF">&nbsp;</A>
+<H2>EXAMPLES</H2>
+
+<DL COMPACT>
+<DT>Print all calls to SSL write/send and read/recv system-wide:<DD>
+#
+<B>sslsniff</B>
+
+</DL>
+<A NAME="lbAG">&nbsp;</A>
+<H2>FIELDS</H2>
+
+<DL COMPACT>
+<DT>FUNC<DD>
+Which function is being called (write/send or read/recv)
+<DT>TIME<DD>
+Time of the command, in seconds.
+<DT>COMM<DD>
+Entered command.
+<DT>PID<DD>
+Process ID calling SSL.
+<DT>LEN<DD>
+Bytes written or read by SSL functions.
+</DL>
+<A NAME="lbAH">&nbsp;</A>
+<H2>SOURCE</H2>
+
+This is from bcc.
+<DL COMPACT>
+<DT><DD>
+<A HREF="https://github.com/iovisor/bcc">https://github.com/iovisor/bcc</A>
+</DL>
+<P>
+
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+<A NAME="lbAI">&nbsp;</A>
+<H2>OS</H2>
+
+Linux
+<A NAME="lbAJ">&nbsp;</A>
+<H2>STABILITY</H2>
+
+Unstable - in development.
+<A NAME="lbAK">&nbsp;</A>
+<H2>AUTHORS</H2>
+
+Adrian Lopez and Mark Drayton
+<A NAME="lbAL">&nbsp;</A>
+<H2>SEE ALSO</H2>
+
+<A HREF="https://iovisor.github.io/bcc?8+trace">trace</A>(8)
+<P>
+
+<HR>
+<A NAME="index">&nbsp;</A><H2>Index</H2>
+<DL>
+<DT><A HREF="#lbAB">NAME</A><DD>
+<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
+<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
+<DT><A HREF="#lbAE">REQUIREMENTS</A><DD>
+<DT><A HREF="#lbAF">EXAMPLES</A><DD>
+<DT><A HREF="#lbAG">FIELDS</A><DD>
+<DT><A HREF="#lbAH">SOURCE</A><DD>
+<DT><A HREF="#lbAI">OS</A><DD>
+<DT><A HREF="#lbAJ">STABILITY</A><DD>
+<DT><A HREF="#lbAK">AUTHORS</A><DD>
+<DT><A HREF="#lbAL">SEE ALSO</A><DD>
+</DL>
+<HR>
+This document was created by
+<A HREF="https://iovisor.github.io/bcc">man2html</A>,
+using the manual pages.<BR>
+Time: 17:11:49 GMT, February 25, 2020
+</BODY>
+</HTML>
