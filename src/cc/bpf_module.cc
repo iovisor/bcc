@@ -45,7 +45,7 @@
 #include "exported_files.h"
 #include "libbpf.h"
 #include "bcc_btf.h"
-#include "libbpf/src/bpf.h"
+#include "bcc_libbpf_inc.h"
 
 namespace ebpf {
 
