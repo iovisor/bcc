@@ -74,11 +74,14 @@ TEST_CASE("test usdt argument parsing", "[usdt]") {
   }
   SECTION("argument examples from the Python implementation") {
 #ifdef __aarch64__
-    USDT::ArgumentParser_aarch64 parser("-1@x0 4@5 8@[x12] -4@[x31,-40]");
+    USDT::ArgumentParser_aarch64 parser(
+        "-1@x0 4@5 8@[x12] -4@[x30,-40] -4@[x31,-40] 8@[sp, 120]");
     verify_register(parser, -1, "regs[0]");
     verify_register(parser, 4, 5);
     verify_register(parser, 8, "regs[12]", 0);
-    verify_register(parser, -4, "regs[31]", -40);
+    verify_register(parser, -4, "regs[30]", -40);
+    verify_register(parser, -4, "sp", -40);
+    verify_register(parser, 8, "sp", 120);
 #elif __powerpc64__
     USDT::ArgumentParser_powerpc64 parser(
         "-4@0 8@%r0 8@i0 4@0(%r0) -2@0(0) "
