@@ -1,0 +1,208 @@
+Content-type: text/html; charset=UTF-8
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML><HEAD><TITLE>Man page of stackcount</TITLE>
+</HEAD><BODY>
+<H1>stackcount</H1>
+Section: Maintenance Commands (8)<BR>Updated: 2016-01-14<BR><A HREF="#index">Index</A>
+<A HREF="https://iovisor.github.io/bcc">Return to Main Contents</A><HR>
+
+<A NAME="lbAB">&nbsp;</A>
+<H2>NAME</H2>
+
+stackcount - Count function calls and their stack traces. Uses Linux eBPF/bcc.
+<A NAME="lbAC">&nbsp;</A>
+<H2>SYNOPSIS</H2>
+
+<B>stackcount [-h] [-p PID] [-c CPU] [-i INTERVAL] [-D DURATION] [-T]</B>
+
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[-r]&nbsp;[-s]&nbsp;[-P]&nbsp;[-K]&nbsp;[-U]&nbsp;[-v]&nbsp;[-d]&nbsp;[-f]&nbsp;[--debug]&nbsp;pattern
+<A NAME="lbAD">&nbsp;</A>
+<H2>DESCRIPTION</H2>
+
+stackcount traces functions and frequency counts them with their entire
+stack trace, kernel stack and user stack, summarized in-kernel for efficiency.
+This allows higher frequency events to be studied. The output consists of
+unique stack traces, and their occurrence counts. In addition to kernel and
+user functions, kernel tracepoints and USDT tracepoint are also supported.
+<P>
+The pattern is a string with optional '*' wildcards, similar to file globbing.
+If you'd prefer to use regular expressions, use the -r option.
+<P>
+This tool only works on Linux 4.6+. Stack traces are obtained using the new `BPF_STACK_TRACE` APIs.
+For kernels older than 4.6, see the version under tools/old.
+<P>
+<A NAME="lbAE">&nbsp;</A>
+<H2>REQUIREMENTS</H2>
+
+CONFIG_BPF and bcc.
+<A NAME="lbAF">&nbsp;</A>
+<H2>OPTIONS</H2>
+
+<DL COMPACT>
+<DT>-h<DD>
+Print usage message.
+<DT>-r<DD>
+Allow regular expressions for the search pattern. The default allows &quot;*&quot;
+wildcards only.
+<DT>-s<DD>
+Show address offsets.
+<DT>-P<DD>
+Display stacks separately for each process.
+<DT>-K<DD>
+Show kernel stack only.
+<DT>-U<DD>
+Show user stack only.
+<DT>-T<DD>
+Include a timestamp with interval output.
+<DT>-v<DD>
+Show raw addresses.
+<DT>-d<DD>
+Print a delimiter (&quot;--&quot;) in-between the kernel and user stacks.
+<DT>--debug<DD>
+Print the source of the BPF program when loading it (for debugging purposes).
+<DT>-i interval<DD>
+Summary interval, in seconds.
+<DT>-D duration<DD>
+Total duration of trace, in seconds.
+-f
+Folded output format.
+<DT>-p PID<DD>
+Trace this process ID only (filtered in-kernel).
+<DT>-c CPU<DD>
+Trace this CPU only (filtered in-kernel).
+<DT><DT>pattern<DD>
+<DD>
+A function name, or a search pattern. Can include wildcards (&quot;*&quot;). If the
+-r option is used, can include regular expressions.
+</DL>
+<A NAME="lbAG">&nbsp;</A>
+<H2>EXAMPLES</H2>
+
+<DL COMPACT>
+<DT>Count kernel and user stack traces for submit_bio():<DD>
+#
+<B>stackcount submit_bio</B>
+
+<DT>Count stacks with a delimiter for submit_bio():<DD>
+#
+<B>stackcount -d submit_bio</B>
+
+<DT>Count kernel stack trace only for submit_bio():<DD>
+#
+<B>stackcount -K submit_bio</B>
+
+<DT>Count user stack trace only for submit_bio():<DD>
+#
+<B>stackcount -U submit_bio</B>
+
+<DT>Count stack traces for ip_output():<DD>
+#
+<B>stackcount ip_output</B>
+
+<DT>Show symbol offsets:<DD>
+#
+<B>stackcount -s ip_output</B>
+
+<DT>Show offsets and raw addresses (verbose):<DD>
+#
+<B>stackcount -sv ip_output</B>
+
+<DT>Count stacks for kernel functions matching tcp_send*:<DD>
+#
+<B>stackcount 'tcp_send*'</B>
+
+<DT>Same as previous, but using regular expressions:<DD>
+#
+<B>stackcount -r '^tcp_send.*'</B>
+
+<DT>Output every 5 seconds, with timestamps:<DD>
+#
+<B>stackcount -Ti 5 ip_output</B>
+
+<DT>Only count stacks when PID 185 is on-CPU:<DD>
+#
+<B>stackcount -p 185 ip_output</B>
+
+<DT>Only count stacks for CPU 1:<DD>
+#
+<B>stackcount -c 1 put_prev_entity</B>
+
+<DT>Count user stacks for dynamic heap allocations with malloc in PID 185:<DD>
+#
+<B>stackcount -p 185 c:malloc</B>
+
+<DT>Count user stacks for thread creation (USDT tracepoint) in PID 185:<DD>
+#
+<B>stackcount -p 185 u:pthread:pthread_create</B>
+
+<DT>Count stacks for context switch events using a kernel tracepoint:<DD>
+#
+<B>stackcount t:sched:sched_switch</B>
+
+</DL>
+<A NAME="lbAH">&nbsp;</A>
+<H2>OVERHEAD</H2>
+
+This summarizes unique stack traces in-kernel for efficiency, allowing it to
+trace a higher rate of function calls than methods that post-process in user
+space. The stack trace data is only copied to user space when the output is
+printed, which usually only happens once. The stack walking also happens in an
+optimized code path in the kernel thanks to the new BPF_STACK_TRACE table APIs,
+which should be more efficient than the manual walker in the eBPF tracer which
+older versions of this script used. With this in mind, call rates of &lt;
+10,000/sec would incur negligible overhead. Test before production use. You can
+also use funccount to get a handle on function call rates first.
+<A NAME="lbAI">&nbsp;</A>
+<H2>SOURCE</H2>
+
+This is from bcc.
+<DL COMPACT>
+<DT><DD>
+<A HREF="https://github.com/iovisor/bcc">https://github.com/iovisor/bcc</A>
+</DL>
+<P>
+
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+<A NAME="lbAJ">&nbsp;</A>
+<H2>OS</H2>
+
+Linux
+<A NAME="lbAK">&nbsp;</A>
+<H2>STABILITY</H2>
+
+Unstable - in development.
+<A NAME="lbAL">&nbsp;</A>
+<H2>AUTHOR</H2>
+
+Brendan Gregg, Sasha Goldshtein
+<A NAME="lbAM">&nbsp;</A>
+<H2>SEE ALSO</H2>
+
+<A HREF="https://iovisor.github.io/bcc?8+stacksnoop">stacksnoop</A>(8), <A HREF="https://iovisor.github.io/bcc?8+funccount">funccount</A>(8)
+<P>
+
+<HR>
+<A NAME="index">&nbsp;</A><H2>Index</H2>
+<DL>
+<DT><A HREF="#lbAB">NAME</A><DD>
+<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
+<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
+<DT><A HREF="#lbAE">REQUIREMENTS</A><DD>
+<DT><A HREF="#lbAF">OPTIONS</A><DD>
+<DT><A HREF="#lbAG">EXAMPLES</A><DD>
+<DT><A HREF="#lbAH">OVERHEAD</A><DD>
+<DT><A HREF="#lbAI">SOURCE</A><DD>
+<DT><A HREF="#lbAJ">OS</A><DD>
+<DT><A HREF="#lbAK">STABILITY</A><DD>
+<DT><A HREF="#lbAL">AUTHOR</A><DD>
+<DT><A HREF="#lbAM">SEE ALSO</A><DD>
+</DL>
+<HR>
+This document was created by
+<A HREF="https://iovisor.github.io/bcc">man2html</A>,
+using the manual pages.<BR>
+Time: 17:11:49 GMT, February 25, 2020
+</BODY>
+</HTML>

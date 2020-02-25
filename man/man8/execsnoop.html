@@ -1,0 +1,197 @@
+Content-type: text/html; charset=UTF-8
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML><HEAD><TITLE>Man page of execsnoop</TITLE>
+</HEAD><BODY>
+<H1>execsnoop</H1>
+Section: Maintenance Commands (8)<BR>Updated: 2020-02-20<BR><A HREF="#index">Index</A>
+<A HREF="https://iovisor.github.io/bcc">Return to Main Contents</A><HR>
+
+<A NAME="lbAB">&nbsp;</A>
+<H2>NAME</H2>
+
+execsnoop - Trace new processes via exec() syscalls. Uses Linux eBPF/bcc.
+<A NAME="lbAC">&nbsp;</A>
+<H2>SYNOPSIS</H2>
+
+<B>execsnoop [-h] [-T] [-t] [-x] [--cgroupmap CGROUPMAP] [-u USER]</B>
+
+<B>[-q] [-n NAME] [-l LINE] [-U] [--max-args MAX_ARGS]</B>
+
+<A NAME="lbAD">&nbsp;</A>
+<H2>DESCRIPTION</H2>
+
+execsnoop traces new processes, showing the filename executed and argument
+list.
+<P>
+It works by traces the execve() system call (commonly used exec() variant).
+This catches new processes that follow the fork-&gt;exec sequence, as well as
+processes that re-exec() themselves. Some applications fork() but do not
+exec(), eg, for worker processes, which won't be included in the execsnoop
+output.
+<P>
+This works by tracing the kernel sys_execve() function using dynamic tracing,
+and will need updating to match any changes to this function.
+<P>
+Since this uses BPF, only the root user can use this tool.
+<A NAME="lbAE">&nbsp;</A>
+<H2>REQUIREMENTS</H2>
+
+CONFIG_BPF and bcc.
+<A NAME="lbAF">&nbsp;</A>
+<H2>OPTIONS</H2>
+
+<DL COMPACT>
+<DT>-h<DD>
+Print usage message.
+<DT>-T<DD>
+Include a time column (HH:MM:SS).
+<DT>-U<DD>
+Include UID column.
+<DT>-t<DD>
+Include a timestamp column.
+<DT>-u USER<DD>
+Filter by UID (or username)
+<DT>-x<DD>
+Include failed exec()s
+<DT>-q<DD>
+Add &quot;quotemarks&quot; around arguments. Escape quotemarks in arguments with a
+backslash. For tracing empty arguments or arguments that contain whitespace. 
+<DT>-n NAME<DD>
+Only print command lines matching this name (regex)
+<DT>-l LINE<DD>
+Only print commands where arg contains this line (regex)
+<DT>--max-args MAXARGS<DD>
+Maximum number of arguments parsed and displayed, defaults to 20
+<DT>--cgroupmap MAPPATH<DD>
+Trace cgroups in this BPF map only (filtered in-kernel).
+</DL>
+<A NAME="lbAG">&nbsp;</A>
+<H2>EXAMPLES</H2>
+
+<DL COMPACT>
+<DT>Trace all exec() syscalls:<DD>
+#
+<B>execsnoop</B>
+
+<DT>Trace all exec() syscalls, and include timestamps:<DD>
+#
+<B>execsnoop -t</B>
+
+<DT>Display process UID:<DD>
+#
+<B>execsnoop -U</B>
+
+<DT>Trace only UID 1000:<DD>
+#
+<B>execsnoop -u 1000</B>
+
+<DT>Trace only processes launched by root and display UID column:<DD>
+#
+<B>execsnoop -Uu root</B>
+
+<DT>Include failed exec()s:<DD>
+#
+<B>execsnoop -x</B>
+
+<DT>Put quotemarks around arguments. <DD>
+#
+<B>execsnoop -q</B>
+
+<DT>Only trace exec()s where the filename contains &quot;mount&quot;:<DD>
+#
+<B>execsnoop -n mount</B>
+
+<DT>Only trace exec()s where argument's line contains &quot;testpkg&quot;:<DD>
+#
+<B>execsnoop -l testpkg</B>
+
+<DT>Trace a set of cgroups only (see filtering_by_cgroups.md from bcc sources for more details):<DD>
+#
+<B>execsnoop --cgroupmap /sys/fs/bpf/test01</B>
+
+</DL>
+<A NAME="lbAH">&nbsp;</A>
+<H2>FIELDS</H2>
+
+<DL COMPACT>
+<DT>TIME<DD>
+Time of exec() return, in HH:MM:SS format.
+<DT>TIME(s)<DD>
+Time of exec() return, in seconds.
+<DT>UID<DD>
+User ID
+<DT>PCOMM<DD>
+Parent process/command name.
+<DT>PID<DD>
+Process ID
+<DT>PPID<DD>
+Parent process ID
+<DT>RET<DD>
+Return value of exec(). 0 == successs. Failures are only shown when using the
+-x option.
+<DT>ARGS<DD>
+Filename for the exec(), followed be up to 19 arguments. An ellipsis &quot;...&quot; is
+shown if the argument list is known to be truncated.
+</DL>
+<A NAME="lbAI">&nbsp;</A>
+<H2>OVERHEAD</H2>
+
+This traces the kernel execve function and prints output for each event. As the
+rate of this is generally expected to be low (&lt; 1000/s), the overhead is also
+expected to be negligible. If you have an application that is calling a high
+rate of exec()s, then test and understand overhead before use.
+<A NAME="lbAJ">&nbsp;</A>
+<H2>SOURCE</H2>
+
+This is from bcc.
+<DL COMPACT>
+<DT><DD>
+<A HREF="https://github.com/iovisor/bcc">https://github.com/iovisor/bcc</A>
+</DL>
+<P>
+
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+<A NAME="lbAK">&nbsp;</A>
+<H2>OS</H2>
+
+Linux
+<A NAME="lbAL">&nbsp;</A>
+<H2>STABILITY</H2>
+
+Unstable - in development.
+<A NAME="lbAM">&nbsp;</A>
+<H2>AUTHOR</H2>
+
+Brendan Gregg
+<A NAME="lbAN">&nbsp;</A>
+<H2>SEE ALSO</H2>
+
+<A HREF="https://iovisor.github.io/bcc?1+opensnoop">opensnoop</A>(1)
+<P>
+
+<HR>
+<A NAME="index">&nbsp;</A><H2>Index</H2>
+<DL>
+<DT><A HREF="#lbAB">NAME</A><DD>
+<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
+<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
+<DT><A HREF="#lbAE">REQUIREMENTS</A><DD>
+<DT><A HREF="#lbAF">OPTIONS</A><DD>
+<DT><A HREF="#lbAG">EXAMPLES</A><DD>
+<DT><A HREF="#lbAH">FIELDS</A><DD>
+<DT><A HREF="#lbAI">OVERHEAD</A><DD>
+<DT><A HREF="#lbAJ">SOURCE</A><DD>
+<DT><A HREF="#lbAK">OS</A><DD>
+<DT><A HREF="#lbAL">STABILITY</A><DD>
+<DT><A HREF="#lbAM">AUTHOR</A><DD>
+<DT><A HREF="#lbAN">SEE ALSO</A><DD>
+</DL>
+<HR>
+This document was created by
+<A HREF="https://iovisor.github.io/bcc">man2html</A>,
+using the manual pages.<BR>
+Time: 17:11:49 GMT, February 25, 2020
+</BODY>
+</HTML>

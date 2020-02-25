@@ -1,0 +1,167 @@
+Content-type: text/html; charset=UTF-8
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML><HEAD><TITLE>Man page of ucalls</TITLE>
+</HEAD><BODY>
+<H1>ucalls</H1>
+Section: Maintenance Commands (8)<BR>Updated: 2018-10-09<BR><A HREF="#index">Index</A>
+<A HREF="https://iovisor.github.io/bcc">Return to Main Contents</A><HR>
+
+<A NAME="lbAB">&nbsp;</A>
+<H2>NAME</H2>
+
+ucalls, javacalls, perlcalls, phpcalls, pythoncalls, rubycalls, tclcalls - Summarize method calls
+from high-level languages and Linux syscalls.
+<A NAME="lbAC">&nbsp;</A>
+<H2>SYNOPSIS</H2>
+
+<B>javacalls [-h] [-T TOP] [-L] [-S] [-v] [-m] pid [interval]</B>
+
+<BR>
+
+<B>perlcalls [-h] [-T TOP] [-L] [-S] [-v] [-m] pid [interval]</B>
+
+<BR>
+
+<B>phpcalls [-h] [-T TOP] [-L] [-S] [-v] [-m] pid [interval]</B>
+
+<BR>
+
+<B>pythoncalls [-h] [-T TOP] [-L] [-S] [-v] [-m] pid [interval]</B>
+
+<BR>
+
+<B>rubycalls [-h] [-T TOP] [-L] [-S] [-v] [-m] pid [interval]</B>
+
+<BR>
+
+<B>tclcalls [-h] [-T TOP] [-L] [-S] [-v] [-m] pid [interval]</B>
+
+<BR>
+
+<B>ucalls [-l {java,perl,php,python,ruby}] [-h] [-T TOP] [-L] [-S] [-v] [-m] pid [interval]</B>
+
+<A NAME="lbAD">&nbsp;</A>
+<H2>DESCRIPTION</H2>
+
+This tool summarizes method calls from high-level languages such as Java, Perl,
+PHP, Python, Ruby, and Tcl. It can also trace Linux system calls. Whenever a method
+is invoked, ucalls records the call count and optionally the method's execution
+time (latency) and displays a summary.
+<P>
+This uses in-kernel eBPF maps to store per process summaries for efficiency.
+<P>
+This tool relies on USDT probes embedded in many high-level languages, such as
+Java, Perl, PHP, Python, Ruby, and Tcl. It requires a runtime instrumented with these
+probes, which in some cases requires building from source with a USDT-specific
+flag, such as &quot;--enable-dtrace&quot; or &quot;--with-dtrace&quot;. For Java, method probes are
+not enabled by default, and can be turned on by running the Java process with
+the &quot;-XX:+ExtendedDTraceProbes&quot; flag. For PHP processes, the environment
+variable USE_ZEND_DTRACE must be set to 1.
+<P>
+Since this uses BPF, only the root user can use this tool.
+<A NAME="lbAE">&nbsp;</A>
+<H2>REQUIREMENTS</H2>
+
+CONFIG_BPF and bcc.
+<A NAME="lbAF">&nbsp;</A>
+<H2>OPTIONS</H2>
+
+<DL COMPACT>
+<DT>-l {java,perl,php,python,ruby,tcl}<DD>
+The language to trace. If not provided, only syscalls are traced (when the -S
+option is used).
+<DT>-T TOP<DD>
+Print only the top methods by frequency or latency.
+<DT>-L<DD>
+Collect method invocation latency (duration).
+<DT>-S<DD>
+Collect Linux syscalls frequency and timing.
+<DT>-v<DD>
+Print the resulting BPF program, for debugging purposes.
+<DT>-m<DD>
+Print times in milliseconds (the default is microseconds).
+<DT>pid<DD>
+The process id to trace.
+<DT>interval<DD>
+Print summary after this number of seconds and then exit. By default, wait for
+Ctrl+C to terminate.
+</DL>
+<A NAME="lbAG">&nbsp;</A>
+<H2>EXAMPLES</H2>
+
+<DL COMPACT>
+<DT>Trace the top 10 Ruby method calls:<DD>
+#
+<B>ucalls -T 10 -l ruby 1344</B>
+
+<DT>Trace Python method calls and Linux syscalls including latency in milliseconds:<DD>
+#
+<B>ucalls -l python -mL 2020</B>
+
+<DT>Trace only syscalls and print a summary after 10 seconds:<DD>
+#
+<B>ucalls -S 788 10</B>
+
+</DL>
+<A NAME="lbAH">&nbsp;</A>
+<H2>OVERHEAD</H2>
+
+Tracing individual method calls will produce a considerable overhead in all
+high-level languages. For languages with just-in-time compilation, such as
+Java, the overhead can be more considerable than for interpreted languages.
+On the other hand, syscall tracing will typically be tolerable for most
+processes, unless they have a very unusual rate of system calls.
+<A NAME="lbAI">&nbsp;</A>
+<H2>SOURCE</H2>
+
+This is from bcc.
+<DL COMPACT>
+<DT><DD>
+<A HREF="https://github.com/iovisor/bcc">https://github.com/iovisor/bcc</A>
+</DL>
+<P>
+
+Also look in the bcc distribution for a companion _example.txt file containing
+example usage, output, and commentary for this tool.
+<A NAME="lbAJ">&nbsp;</A>
+<H2>OS</H2>
+
+Linux
+<A NAME="lbAK">&nbsp;</A>
+<H2>STABILITY</H2>
+
+Unstable - in development.
+<A NAME="lbAL">&nbsp;</A>
+<H2>AUTHOR</H2>
+
+Sasha Goldshtein
+<A NAME="lbAM">&nbsp;</A>
+<H2>SEE ALSO</H2>
+
+<A HREF="https://iovisor.github.io/bcc?8+ustat">ustat</A>(8), <A HREF="https://iovisor.github.io/bcc?8+argdist">argdist</A>(8)
+<P>
+
+<HR>
+<A NAME="index">&nbsp;</A><H2>Index</H2>
+<DL>
+<DT><A HREF="#lbAB">NAME</A><DD>
+<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
+<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
+<DT><A HREF="#lbAE">REQUIREMENTS</A><DD>
+<DT><A HREF="#lbAF">OPTIONS</A><DD>
+<DT><A HREF="#lbAG">EXAMPLES</A><DD>
+<DT><A HREF="#lbAH">OVERHEAD</A><DD>
+<DT><A HREF="#lbAI">SOURCE</A><DD>
+<DT><A HREF="#lbAJ">OS</A><DD>
+<DT><A HREF="#lbAK">STABILITY</A><DD>
+<DT><A HREF="#lbAL">AUTHOR</A><DD>
+<DT><A HREF="#lbAM">SEE ALSO</A><DD>
+</DL>
+<HR>
+This document was created by
+<A HREF="https://iovisor.github.io/bcc">man2html</A>,
+using the manual pages.<BR>
+Time: 17:11:49 GMT, February 25, 2020
+</BODY>
+</HTML>

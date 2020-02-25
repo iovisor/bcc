@@ -1,0 +1,119 @@
+Content-type: text/html; charset=UTF-8
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML><HEAD><TITLE>Man page of bpflist</TITLE>
+</HEAD><BODY>
+<H1>bpflist</H1>
+Section: Maintenance Commands (8)<BR>Updated: 2017-03-09<BR><A HREF="#index">Index</A>
+<A HREF="https://iovisor.github.io/bcc">Return to Main Contents</A><HR>
+
+<A NAME="lbAB">&nbsp;</A>
+<H2>NAME</H2>
+
+bpflist - Display processes currently using BPF programs and maps.
+<A NAME="lbAC">&nbsp;</A>
+<H2>SYNOPSIS</H2>
+
+<B>bpflist [-v]</B>
+
+<A NAME="lbAD">&nbsp;</A>
+<H2>DESCRIPTION</H2>
+
+This tool displays processes currently using BPF programs and maps, and
+optionally also kprobes and uprobes on the system. This is useful to understand
+which BPF programs are loaded on the system.
+<P>
+Currently, for lack of a better alternative, this tool pipes into 'ls' and
+parses its output to snoop for BPF file descriptors in all running processes.
+In the future, when BPF accounting is provided by the kernel, this tool should
+use these accounting features.
+<P>
+Only the root user can use this tool, because it accesses debugfs.
+<A NAME="lbAE">&nbsp;</A>
+<H2>REQUIREMENTS</H2>
+
+bcc, debugfs
+<A NAME="lbAF">&nbsp;</A>
+<H2>OPTIONS</H2>
+
+-h
+Print usage message.
+<DL COMPACT>
+<DT>-v<DD>
+Count kprobes and uprobes as well as BPF programs. Repeating verbose mode twice
+also prints the kprobe and uprobe definitions in addition to counting them.
+</DL>
+<A NAME="lbAG">&nbsp;</A>
+<H2>EXAMPLES</H2>
+
+<DL COMPACT>
+<DT>Display processes currently using BPF programs:<DD>
+#
+<B>bpflist</B>
+
+<DT>Also count kprobes and uprobes:<DD>
+#
+<B>bpflist -v</B>
+
+</DL>
+<A NAME="lbAH">&nbsp;</A>
+<H2>FIELDS</H2>
+
+<DL COMPACT>
+<DT>PID<DD>
+Process ID.
+<DT>COMM<DD>
+Process comm.
+<DT>TYPE<DD>
+The type of the data displayed: BPF program, BPF map, kprobe, or uprobe.
+<DT>COUNT<DD>
+The number of items of this type that belong to the specified process.
+</DL>
+<A NAME="lbAI">&nbsp;</A>
+<H2>SOURCE</H2>
+
+This is from bcc.
+<DL COMPACT>
+<DT><DD>
+<A HREF="https://github.com/iovisor/bcc">https://github.com/iovisor/bcc</A>
+</DL>
+<P>
+
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+<A NAME="lbAJ">&nbsp;</A>
+<H2>OS</H2>
+
+Linux
+<A NAME="lbAK">&nbsp;</A>
+<H2>STABILITY</H2>
+
+Unstable - in development.
+<A NAME="lbAL">&nbsp;</A>
+<H2>AUTHOR</H2>
+
+Sasha Goldshtein
+<P>
+
+<HR>
+<A NAME="index">&nbsp;</A><H2>Index</H2>
+<DL>
+<DT><A HREF="#lbAB">NAME</A><DD>
+<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
+<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
+<DT><A HREF="#lbAE">REQUIREMENTS</A><DD>
+<DT><A HREF="#lbAF">OPTIONS</A><DD>
+<DT><A HREF="#lbAG">EXAMPLES</A><DD>
+<DT><A HREF="#lbAH">FIELDS</A><DD>
+<DT><A HREF="#lbAI">SOURCE</A><DD>
+<DT><A HREF="#lbAJ">OS</A><DD>
+<DT><A HREF="#lbAK">STABILITY</A><DD>
+<DT><A HREF="#lbAL">AUTHOR</A><DD>
+</DL>
+<HR>
+This document was created by
+<A HREF="https://iovisor.github.io/bcc">man2html</A>,
+using the manual pages.<BR>
+Time: 17:11:49 GMT, February 25, 2020
+</BODY>
+</HTML>

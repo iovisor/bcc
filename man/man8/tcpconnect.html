@@ -1,0 +1,179 @@
+Content-type: text/html; charset=UTF-8
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML><HEAD><TITLE>Man page of tcpconnect</TITLE>
+</HEAD><BODY>
+<H1>tcpconnect</H1>
+Section: Maintenance Commands (8)<BR>Updated: 2020-02-20<BR><A HREF="#index">Index</A>
+<A HREF="https://iovisor.github.io/bcc">Return to Main Contents</A><HR>
+
+<A NAME="lbAB">&nbsp;</A>
+<H2>NAME</H2>
+
+tcpconnect - Trace TCP active connections (connect()). Uses Linux eBPF/bcc.
+<A NAME="lbAC">&nbsp;</A>
+<H2>SYNOPSIS</H2>
+
+<B>tcpconnect [-h] [-c] [-t] [-x] [-p PID] [-P PORT] [--cgroupmap MAPPATH]</B>
+
+<A NAME="lbAD">&nbsp;</A>
+<H2>DESCRIPTION</H2>
+
+This tool traces active TCP connections (eg, via a connect() syscall;
+accept() are passive connections). This can be useful for general
+troubleshooting to see what connections are initiated by the local server.
+<P>
+All connection attempts are traced, even if they ultimately fail.
+<P>
+This works by tracing the kernel tcp_v4_connect() and tcp_v6_connect() functions
+using dynamic tracing, and will need updating to match any changes to these
+functions.
+<P>
+Since this uses BPF, only the root user can use this tool.
+<A NAME="lbAE">&nbsp;</A>
+<H2>REQUIREMENTS</H2>
+
+CONFIG_BPF and bcc.
+<A NAME="lbAF">&nbsp;</A>
+<H2>OPTIONS</H2>
+
+<DL COMPACT>
+<DT>-h<DD>
+Print usage message.
+<DT>-t<DD>
+Include a timestamp column.
+<DT>-c<DD>
+Count connects per src ip and dest ip/port.
+<DT>-p PID<DD>
+Trace this process ID only (filtered in-kernel).
+<DT>-P PORT<DD>
+Comma-separated list of destination ports to trace (filtered in-kernel).
+<DT>--cgroupmap MAPPATH<DD>
+Trace cgroups in this BPF map only (filtered in-kernel).
+</DL>
+<A NAME="lbAG">&nbsp;</A>
+<H2>EXAMPLES</H2>
+
+<DL COMPACT>
+<DT>-U<DD>
+Include a UID column.
+<DT>-u UID<DD>
+Trace this UID only (filtered in-kernel).
+<DT>Trace all active TCP connections:<DD>
+#
+<B>tcpconnect</B>
+
+<DT>Trace all TCP connects, and include timestamps:<DD>
+#
+<B>tcpconnect -t</B>
+
+<DT>Trace PID 181 only:<DD>
+#
+<B>tcpconnect -p 181</B>
+
+<DT>Trace ports 80 and 81 only:<DD>
+#
+<B>tcpconnect -P 80,81</B>
+
+<DT>Trace all TCP connects, and include UID:<DD>
+#
+<B>tcpconnect -U</B>
+
+<DT>Trace UID 1000 only:<DD>
+#
+<B>tcpconnect -u 1000</B>
+
+<DT>Count connects per src ip and dest ip/port:<DD>
+#
+<B>tcpconnect -c</B>
+
+<DT>Trace a set of cgroups only (see filtering_by_cgroups.md from bcc sources for more details):<DD>
+#
+<B>tcpconnect --cgroupmap /sys/fs/bpf/test01</B>
+
+</DL>
+<A NAME="lbAH">&nbsp;</A>
+<H2>FIELDS</H2>
+
+<DL COMPACT>
+<DT>TIME(s)<DD>
+Time of the call, in seconds.
+<DT>UID<DD>
+User ID
+<DT>PID<DD>
+Process ID
+<DT>COMM<DD>
+Process name
+<DT>IP<DD>
+IP address family (4 or 6)
+<DT>SADDR<DD>
+Source IP address.
+<DT>DADDR<DD>
+Destination IP address.
+<DT>DPORT<DD>
+Destination port
+<DT>CONNECTS<DD>
+Accumulated active connections since start.
+</DL>
+<A NAME="lbAI">&nbsp;</A>
+<H2>OVERHEAD</H2>
+
+This traces the kernel tcp_v[46]_connect functions and prints output for each
+event. As the rate of this is generally expected to be low (&lt; 1000/s), the
+overhead is also expected to be negligible. If you have an application that
+is calling a high rate of connect()s, such as a proxy server, then test and
+understand this overhead before use.
+<A NAME="lbAJ">&nbsp;</A>
+<H2>SOURCE</H2>
+
+This is from bcc.
+<DL COMPACT>
+<DT><DD>
+<A HREF="https://github.com/iovisor/bcc">https://github.com/iovisor/bcc</A>
+</DL>
+<P>
+
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+<A NAME="lbAK">&nbsp;</A>
+<H2>OS</H2>
+
+Linux
+<A NAME="lbAL">&nbsp;</A>
+<H2>STABILITY</H2>
+
+Unstable - in development.
+<A NAME="lbAM">&nbsp;</A>
+<H2>AUTHOR</H2>
+
+Brendan Gregg
+<A NAME="lbAN">&nbsp;</A>
+<H2>SEE ALSO</H2>
+
+<A HREF="https://iovisor.github.io/bcc?8+tcptracer">tcptracer</A>(8), <A HREF="https://iovisor.github.io/bcc?8+tcpaccept">tcpaccept</A>(8), <A HREF="https://iovisor.github.io/bcc?8+funccount">funccount</A>(8), <A HREF="https://iovisor.github.io/bcc?8+tcpdump">tcpdump</A>(8)
+<P>
+
+<HR>
+<A NAME="index">&nbsp;</A><H2>Index</H2>
+<DL>
+<DT><A HREF="#lbAB">NAME</A><DD>
+<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
+<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
+<DT><A HREF="#lbAE">REQUIREMENTS</A><DD>
+<DT><A HREF="#lbAF">OPTIONS</A><DD>
+<DT><A HREF="#lbAG">EXAMPLES</A><DD>
+<DT><A HREF="#lbAH">FIELDS</A><DD>
+<DT><A HREF="#lbAI">OVERHEAD</A><DD>
+<DT><A HREF="#lbAJ">SOURCE</A><DD>
+<DT><A HREF="#lbAK">OS</A><DD>
+<DT><A HREF="#lbAL">STABILITY</A><DD>
+<DT><A HREF="#lbAM">AUTHOR</A><DD>
+<DT><A HREF="#lbAN">SEE ALSO</A><DD>
+</DL>
+<HR>
+This document was created by
+<A HREF="https://iovisor.github.io/bcc">man2html</A>,
+using the manual pages.<BR>
+Time: 17:11:49 GMT, February 25, 2020
+</BODY>
+</HTML>

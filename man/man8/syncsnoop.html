@@ -1,0 +1,116 @@
+Content-type: text/html; charset=UTF-8
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML><HEAD><TITLE>Man page of syncsnoop</TITLE>
+</HEAD><BODY>
+<H1>syncsnoop</H1>
+Section: Maintenance Commands (8)<BR>Updated: 2015-08-18<BR><A HREF="#index">Index</A>
+<A HREF="https://iovisor.github.io/bcc">Return to Main Contents</A><HR>
+
+<A NAME="lbAB">&nbsp;</A>
+<H2>NAME</H2>
+
+syncsnoop - Trace sync() syscall. Uses Linux eBPF/bcc.
+<A NAME="lbAC">&nbsp;</A>
+<H2>SYNOPSIS</H2>
+
+<B>syncsnoop</B>
+
+<A NAME="lbAD">&nbsp;</A>
+<H2>DESCRIPTION</H2>
+
+syncsnoop traces calls to sync(), which flushes file system buffers to
+storage devices. These calls can cause performance perturbations, and it can
+be useful to know if they are happening and how frequently.
+<P>
+This works by tracing the kernel sys_sync() function using dynamic tracing, and
+will need updating to match any changes to this function.
+<P>
+This makes use of a Linux 4.4 feature (bpf_perf_event_output());
+for kernels older than 4.4, see the version under tools/old,
+which uses an older mechanism.
+<P>
+This program is also a basic example of eBPF/bcc.
+<P>
+Since this uses BPF, only the root user can use this tool.
+<A NAME="lbAE">&nbsp;</A>
+<H2>REQUIREMENTS</H2>
+
+CONFIG_BPF and bcc.
+<A NAME="lbAF">&nbsp;</A>
+<H2>EXAMPLES</H2>
+
+<DL COMPACT>
+<DT>Trace calls to sync():<DD>
+#
+<B>syncsnoop</B>
+
+</DL>
+<A NAME="lbAG">&nbsp;</A>
+<H2>FIELDS</H2>
+
+<DL COMPACT>
+<DT>TIME(s)<DD>
+Time of the call, in seconds.
+<DT>CALL<DD>
+Call traced.
+</DL>
+<A NAME="lbAH">&nbsp;</A>
+<H2>OVERHEAD</H2>
+
+This traces the kernel sync function and prints output for each event. As the
+rate of this is generally expected to be low (&lt;&lt; 100/s), the overhead is also
+expected to be negligible.
+<A NAME="lbAI">&nbsp;</A>
+<H2>SOURCE</H2>
+
+This is from bcc.
+<DL COMPACT>
+<DT><DD>
+<A HREF="https://github.com/iovisor/bcc">https://github.com/iovisor/bcc</A>
+</DL>
+<P>
+
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+<A NAME="lbAJ">&nbsp;</A>
+<H2>OS</H2>
+
+Linux
+<A NAME="lbAK">&nbsp;</A>
+<H2>STABILITY</H2>
+
+Unstable - in development.
+<A NAME="lbAL">&nbsp;</A>
+<H2>AUTHOR</H2>
+
+Brendan Gregg
+<A NAME="lbAM">&nbsp;</A>
+<H2>SEE ALSO</H2>
+
+<A HREF="https://iovisor.github.io/bcc?1+iostat">iostat</A>(1)
+<P>
+
+<HR>
+<A NAME="index">&nbsp;</A><H2>Index</H2>
+<DL>
+<DT><A HREF="#lbAB">NAME</A><DD>
+<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
+<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
+<DT><A HREF="#lbAE">REQUIREMENTS</A><DD>
+<DT><A HREF="#lbAF">EXAMPLES</A><DD>
+<DT><A HREF="#lbAG">FIELDS</A><DD>
+<DT><A HREF="#lbAH">OVERHEAD</A><DD>
+<DT><A HREF="#lbAI">SOURCE</A><DD>
+<DT><A HREF="#lbAJ">OS</A><DD>
+<DT><A HREF="#lbAK">STABILITY</A><DD>
+<DT><A HREF="#lbAL">AUTHOR</A><DD>
+<DT><A HREF="#lbAM">SEE ALSO</A><DD>
+</DL>
+<HR>
+This document was created by
+<A HREF="https://iovisor.github.io/bcc">man2html</A>,
+using the manual pages.<BR>
+Time: 17:11:49 GMT, February 25, 2020
+</BODY>
+</HTML>

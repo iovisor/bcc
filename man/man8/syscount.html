@@ -1,0 +1,165 @@
+Content-type: text/html; charset=UTF-8
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML><HEAD><TITLE>Man page of syscount</TITLE>
+</HEAD><BODY>
+<H1>syscount</H1>
+Section: Maintenance Commands (8)<BR>Updated: 2017-02-15<BR><A HREF="#index">Index</A>
+<A HREF="https://iovisor.github.io/bcc">Return to Main Contents</A><HR>
+
+<A NAME="lbAB">&nbsp;</A>
+<H2>NAME</H2>
+
+syscount - Summarize syscall counts and latencies.
+<A NAME="lbAC">&nbsp;</A>
+<H2>SYNOPSIS</H2>
+
+<B>syscount [-h] [-p PID] [-i INTERVAL] [-d DURATION] [-T TOP] [-x] [-e ERRNO] [-L] [-m] [-P] [-l]</B>
+
+<A NAME="lbAD">&nbsp;</A>
+<H2>DESCRIPTION</H2>
+
+This tool traces syscall entry and exit tracepoints and summarizes either the
+number of syscalls of each type, or the number of syscalls per process. It can
+also collect latency (invocation time) for each syscall or each process.
+<P>
+Since this uses BPF, only the root user can use this tool.
+<A NAME="lbAE">&nbsp;</A>
+<H2>REQUIREMENTS</H2>
+
+CONFIG_BPF and bcc. Linux 4.7+ is required to attach a BPF program to the
+raw_syscalls:sys_{enter,exit} tracepoints, used by this tool.
+<A NAME="lbAF">&nbsp;</A>
+<H2>OPTIONS</H2>
+
+<DL COMPACT>
+<DT>-h<DD>
+Print usage message.
+<DT>-p PID<DD>
+Trace only this process.
+<DT>-i INTERVAL<DD>
+Print the summary at the specified interval (in seconds).
+<DT>-d DURATION<DD>
+Total duration of trace (in seconds).
+<DT>-T TOP<DD>
+Print only this many entries. Default: 10.
+<DT>-x<DD>
+Trace only failed syscalls (i.e., the return value from the syscall was &lt; 0).
+<DT>-e ERRNO<DD>
+Trace only syscalls that failed with that error (e.g. -e EPERM or -e 1).
+<DT>-m<DD>
+Display times in milliseconds. Default: microseconds.
+<DT>-P<DD>
+Summarize by process and not by syscall.
+<DT>-l<DD>
+List the syscalls recognized by the tool (hard-coded list). Syscalls beyond this
+list will still be displayed, as &quot;[unknown: nnn]&quot; where nnn is the syscall
+number.
+</DL>
+<A NAME="lbAG">&nbsp;</A>
+<H2>EXAMPLES</H2>
+
+<DL COMPACT>
+<DT>Summarize all syscalls by syscall:<DD>
+#
+<B>syscount</B>
+
+<DT>Summarize all syscalls by process:<DD>
+#
+<B>syscount -P</B>
+
+<DT>Summarize only failed syscalls:<DD>
+#
+<B>syscount -x</B>
+
+<DT>Summarize only syscalls that failed with EPERM:<DD>
+#
+<B>syscount -e EPERM</B>
+
+<DT>Trace PID 181 only:<DD>
+#
+<B>syscount -p 181</B>
+
+<DT>Summarize syscalls counts and latencies:<DD>
+#
+<B>syscount -L</B>
+
+</DL>
+<A NAME="lbAH">&nbsp;</A>
+<H2>FIELDS</H2>
+
+<DL COMPACT>
+<DT>PID<DD>
+Process ID
+<DT>COMM<DD>
+Process name
+<DT>SYSCALL<DD>
+Syscall name, or &quot;[unknown: nnn]&quot; for syscalls that aren't recognized
+<DT>COUNT<DD>
+The number of events
+<DT>TIME<DD>
+The total elapsed time (in us or ms)
+</DL>
+<A NAME="lbAI">&nbsp;</A>
+<H2>OVERHEAD</H2>
+
+For most applications, the overhead should be manageable if they perform 1000's
+or even 10,000's of syscalls per second. For higher rates, the overhead may
+become considerable. For example, tracing a loop of 4 million calls to geteuid(),
+slows it down by 1.85x when tracing only syscall counts, and slows it down by
+more than 5x when tracing syscall counts and latencies. However, this represents
+a rate of &gt;3.5 million syscalls per second, which should not be typical.
+<A NAME="lbAJ">&nbsp;</A>
+<H2>SOURCE</H2>
+
+This is from bcc.
+<DL COMPACT>
+<DT><DD>
+<A HREF="https://github.com/iovisor/bcc">https://github.com/iovisor/bcc</A>
+</DL>
+<P>
+
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+<A NAME="lbAK">&nbsp;</A>
+<H2>OS</H2>
+
+Linux
+<A NAME="lbAL">&nbsp;</A>
+<H2>STABILITY</H2>
+
+Unstable - in development.
+<A NAME="lbAM">&nbsp;</A>
+<H2>AUTHOR</H2>
+
+Sasha Goldshtein
+<A NAME="lbAN">&nbsp;</A>
+<H2>SEE ALSO</H2>
+
+<A HREF="https://iovisor.github.io/bcc?8+funccount">funccount</A>(8), <A HREF="https://iovisor.github.io/bcc?8+ucalls">ucalls</A>(8), <A HREF="https://iovisor.github.io/bcc?8+argdist">argdist</A>(8), <A HREF="https://iovisor.github.io/bcc?8+trace">trace</A>(8), <A HREF="https://iovisor.github.io/bcc?8+funclatency">funclatency</A>(8)
+<P>
+
+<HR>
+<A NAME="index">&nbsp;</A><H2>Index</H2>
+<DL>
+<DT><A HREF="#lbAB">NAME</A><DD>
+<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
+<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
+<DT><A HREF="#lbAE">REQUIREMENTS</A><DD>
+<DT><A HREF="#lbAF">OPTIONS</A><DD>
+<DT><A HREF="#lbAG">EXAMPLES</A><DD>
+<DT><A HREF="#lbAH">FIELDS</A><DD>
+<DT><A HREF="#lbAI">OVERHEAD</A><DD>
+<DT><A HREF="#lbAJ">SOURCE</A><DD>
+<DT><A HREF="#lbAK">OS</A><DD>
+<DT><A HREF="#lbAL">STABILITY</A><DD>
+<DT><A HREF="#lbAM">AUTHOR</A><DD>
+<DT><A HREF="#lbAN">SEE ALSO</A><DD>
+</DL>
+<HR>
+This document was created by
+<A HREF="https://iovisor.github.io/bcc">man2html</A>,
+using the manual pages.<BR>
+Time: 17:11:49 GMT, February 25, 2020
+</BODY>
+</HTML>

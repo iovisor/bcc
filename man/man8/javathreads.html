@@ -1,0 +1,133 @@
+Content-type: text/html; charset=UTF-8
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML><HEAD><TITLE>Man page of uthreads</TITLE>
+</HEAD><BODY>
+<H1>uthreads</H1>
+Section: Maintenance Commands (8)<BR>Updated: 2018-10-09<BR><A HREF="#index">Index</A>
+<A HREF="https://iovisor.github.io/bcc">Return to Main Contents</A><HR>
+
+<A NAME="lbAB">&nbsp;</A>
+<H2>NAME</H2>
+
+uthreads, cthreads, javathreads - Trace thread creation events in Java or pthreads.
+<A NAME="lbAC">&nbsp;</A>
+<H2>SYNOPSIS</H2>
+
+<B>cthreads [-h] [-v] pid</B>
+
+
+<B>javathreads [-h] [-v] pid</B>
+
+
+<B>uthreads [-h] [-l {c,java,none}] [-v] pid</B>
+
+<A NAME="lbAD">&nbsp;</A>
+<H2>DESCRIPTION</H2>
+
+This traces thread creation events in Java processes, or pthread creation
+events in any process. When a thread is created, its name or start address
+is printed.
+<P>
+Since this uses BPF, only the root user can use this tool.
+<A NAME="lbAE">&nbsp;</A>
+<H2>REQUIREMENTS</H2>
+
+CONFIG_BPF and bcc.
+<A NAME="lbAF">&nbsp;</A>
+<H2>OPTIONS</H2>
+
+<DL COMPACT>
+<DT>-l {c,java,none}<DD>
+The language to trace. C and none select tracing pthreads only, regardless
+of the runtime being traced.
+<DT>-v<DD>
+Print the resulting BPF program, for debugging purposes.
+<DT>pid<DD>
+The process id to trace.
+</DL>
+<A NAME="lbAG">&nbsp;</A>
+<H2>EXAMPLES</H2>
+
+<DL COMPACT>
+<DT>Trace Java thread creations:<DD>
+#
+<B>uthreads -l java 148</B>
+
+<DT>Trace pthread creations:<DD>
+#
+<B>uthreads 1802</B>
+
+</DL>
+<A NAME="lbAH">&nbsp;</A>
+<H2>FIELDS</H2>
+
+<DL COMPACT>
+<DT>TIME<DD>
+The event's time in seconds from the beginning of the trace.
+<DT>ID<DD>
+The thread's ID. The information in this column depends on the runtime.
+<DT>TYPE<DD>
+Event type -- thread start, stop, or pthread event.
+<DT>DESCRIPTION<DD>
+The thread's name or start address function name.
+</DL>
+<A NAME="lbAI">&nbsp;</A>
+<H2>OVERHEAD</H2>
+
+Thread start and stop events are usually not very frequent, which makes this
+tool's overhead negligible.
+<A NAME="lbAJ">&nbsp;</A>
+<H2>SOURCE</H2>
+
+This is from bcc.
+<DL COMPACT>
+<DT><DD>
+<A HREF="https://github.com/iovisor/bcc">https://github.com/iovisor/bcc</A>
+</DL>
+<P>
+
+Also look in the bcc distribution for a companion _example.txt file containing
+example usage, output, and commentary for this tool.
+<A NAME="lbAK">&nbsp;</A>
+<H2>OS</H2>
+
+Linux
+<A NAME="lbAL">&nbsp;</A>
+<H2>STABILITY</H2>
+
+Unstable - in development.
+<A NAME="lbAM">&nbsp;</A>
+<H2>AUTHOR</H2>
+
+Sasha Goldshtein
+<A NAME="lbAN">&nbsp;</A>
+<H2>SEE ALSO</H2>
+
+<A HREF="https://iovisor.github.io/bcc?8+ustat">ustat</A>(8), <A HREF="https://iovisor.github.io/bcc?8+trace">trace</A>(8)
+<P>
+
+<HR>
+<A NAME="index">&nbsp;</A><H2>Index</H2>
+<DL>
+<DT><A HREF="#lbAB">NAME</A><DD>
+<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
+<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
+<DT><A HREF="#lbAE">REQUIREMENTS</A><DD>
+<DT><A HREF="#lbAF">OPTIONS</A><DD>
+<DT><A HREF="#lbAG">EXAMPLES</A><DD>
+<DT><A HREF="#lbAH">FIELDS</A><DD>
+<DT><A HREF="#lbAI">OVERHEAD</A><DD>
+<DT><A HREF="#lbAJ">SOURCE</A><DD>
+<DT><A HREF="#lbAK">OS</A><DD>
+<DT><A HREF="#lbAL">STABILITY</A><DD>
+<DT><A HREF="#lbAM">AUTHOR</A><DD>
+<DT><A HREF="#lbAN">SEE ALSO</A><DD>
+</DL>
+<HR>
+This document was created by
+<A HREF="https://iovisor.github.io/bcc">man2html</A>,
+using the manual pages.<BR>
+Time: 17:11:49 GMT, February 25, 2020
+</BODY>
+</HTML>

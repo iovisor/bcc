@@ -1,0 +1,140 @@
+Content-type: text/html; charset=UTF-8
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML><HEAD><TITLE>Man page of cachestat</TITLE>
+</HEAD><BODY>
+<H1>cachestat</H1>
+Section: Maintenance Commands (8)<BR>Updated: 2016-01-30<BR><A HREF="#index">Index</A>
+<A HREF="https://iovisor.github.io/bcc">Return to Main Contents</A><HR>
+
+<A NAME="lbAB">&nbsp;</A>
+<H2>NAME</H2>
+
+cachestat - Statistics for linux page cache hit/miss ratios. Uses Linux eBPF/bcc.
+<A NAME="lbAC">&nbsp;</A>
+<H2>SYNOPSIS</H2>
+
+<B>cachestat</B>
+
+[-T] [interval [count]]
+<A NAME="lbAD">&nbsp;</A>
+<H2>DESCRIPTION</H2>
+
+This traces four kernel functions and prints per-second summaries. This can
+be useful for general workload characterization, and looking for patterns
+in operation usage over time.
+<P>
+This works by tracing kernel page cache functions using dynamic tracing, and will
+need updating to match any changes to these functions. Edit the script to
+customize which functions are traced.
+<P>
+Since this uses BPF, only the root user can use this tool.
+<A NAME="lbAE">&nbsp;</A>
+<H2>REQUIREMENTS</H2>
+
+CONFIG_BPF and bcc.
+<A NAME="lbAF">&nbsp;</A>
+<H2>EXAMPLES</H2>
+
+<DL COMPACT>
+<DT>Print summaries every second:<DD>
+#
+<B>cachestat</B>
+
+<DT>Print summaries every second with timestamp:<DD>
+#
+<B>cachestat -T</B>
+
+<DT>Print output every five seconds, three times:<DD>
+#
+<B>cachestat 5 3</B>
+
+<DT>Print output with timestamp every five seconds, three times:<DD>
+#
+<B>cachestat -T 5 3</B>
+
+</DL>
+<A NAME="lbAG">&nbsp;</A>
+<H2>FIELDS</H2>
+
+<DL COMPACT>
+<DT>TIME<DD>
+Timestamp.
+<DT>HITS<DD>
+Number of page cache hits.
+<DT>MISSES<DD>
+Number of page cache misses.
+<DT>DIRTIES<DD>
+Number of dirty pages added to the page cache.
+<DT>HITRATIO<DD>
+The hit ratio as a percentage.
+<DT>READ_HIT%<DD>
+Read hit percent of page cache usage.
+<DT>WRITE_HIT%<DD>
+Write hit percent of page cache usage.
+<DT>BUFFERS_MB<DD>
+Buffers size taken from /proc/meminfo.
+<DT>CACHED_MB<DD>
+Cached amount of data in current page cache taken from /proc/meminfo.
+</DL>
+<A NAME="lbAH">&nbsp;</A>
+<H2>OVERHEAD</H2>
+
+This traces various kernel page cache functions and maintains in-kernel counts, which
+are asynchronously copied to user-space. While the rate of operations can
+be very high (&gt;1G/sec) we can have up to 34% overhead, this is still a relatively efficient way to trace 
+these events, and so the overhead is expected to be small for normal workloads.
+Measure in a test environment.
+<A NAME="lbAI">&nbsp;</A>
+<H2>SOURCE</H2>
+
+This is from bcc.
+<DL COMPACT>
+<DT><DD>
+<A HREF="https://github.com/iovisor/bcc">https://github.com/iovisor/bcc</A>
+</DL>
+<P>
+
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+<A NAME="lbAJ">&nbsp;</A>
+<H2>OS</H2>
+
+Linux
+<A NAME="lbAK">&nbsp;</A>
+<H2>STABILITY</H2>
+
+Unstable - in development.
+<A NAME="lbAL">&nbsp;</A>
+<H2>AUTHOR</H2>
+
+Allan McAleavy
+<A NAME="lbAM">&nbsp;</A>
+<H2>SEE ALSO</H2>
+
+<A HREF="https://github.com/brendangregg/perf-tools/blob/master/fs/cachestat">https://github.com/brendangregg/perf-tools/blob/master/fs/cachestat</A>
+<P>
+
+<HR>
+<A NAME="index">&nbsp;</A><H2>Index</H2>
+<DL>
+<DT><A HREF="#lbAB">NAME</A><DD>
+<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
+<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
+<DT><A HREF="#lbAE">REQUIREMENTS</A><DD>
+<DT><A HREF="#lbAF">EXAMPLES</A><DD>
+<DT><A HREF="#lbAG">FIELDS</A><DD>
+<DT><A HREF="#lbAH">OVERHEAD</A><DD>
+<DT><A HREF="#lbAI">SOURCE</A><DD>
+<DT><A HREF="#lbAJ">OS</A><DD>
+<DT><A HREF="#lbAK">STABILITY</A><DD>
+<DT><A HREF="#lbAL">AUTHOR</A><DD>
+<DT><A HREF="#lbAM">SEE ALSO</A><DD>
+</DL>
+<HR>
+This document was created by
+<A HREF="https://iovisor.github.io/bcc">man2html</A>,
+using the manual pages.<BR>
+Time: 17:11:49 GMT, February 25, 2020
+</BODY>
+</HTML>

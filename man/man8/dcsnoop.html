@@ -1,0 +1,140 @@
+Content-type: text/html; charset=UTF-8
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML><HEAD><TITLE>Man page of dcsnoop</TITLE>
+</HEAD><BODY>
+<H1>dcsnoop</H1>
+Section: Maintenance Commands (8)<BR>Updated: 2016-02-10<BR><A HREF="#index">Index</A>
+<A HREF="https://iovisor.github.io/bcc">Return to Main Contents</A><HR>
+
+<A NAME="lbAB">&nbsp;</A>
+<H2>NAME</H2>
+
+dcsnoop - Trace directory entry cache (dcache) lookups. Uses Linux eBPF/bcc.
+<A NAME="lbAC">&nbsp;</A>
+<H2>SYNOPSIS</H2>
+
+<B>dcsnoop [-h] [-a]</B>
+
+<A NAME="lbAD">&nbsp;</A>
+<H2>DESCRIPTION</H2>
+
+By default, this traces every failed dcache lookup (cache miss), and shows the
+process performing the lookup and the filename requested. A -a option can be
+used to show all lookups, not just failed ones.
+<P>
+The output of this tool can be verbose, and is intended for further
+investigations of dcache performance beyond <A HREF="https://iovisor.github.io/bcc?8+dcstat">dcstat</A>(8), which prints
+per-second summaries.
+<P>
+This uses kernel dynamic tracing of the d_lookup() function, and will need
+and will need updating to match any changes to this function.
+<P>
+Since this uses BPF, only the root user can use this tool.
+<A NAME="lbAE">&nbsp;</A>
+<H2>REQUIREMENTS</H2>
+
+CONFIG_BPF and bcc.
+<A NAME="lbAF">&nbsp;</A>
+<H2>OPTIONS</H2>
+
+<DL COMPACT>
+<DT>-h<DD>
+Print usage message.
+<DT>-a<DD>
+Trace references, not just failed lookups.
+</DL>
+<A NAME="lbAG">&nbsp;</A>
+<H2>EXAMPLES</H2>
+
+<DL COMPACT>
+<DT>Trace failed dcache lookups:<DD>
+#
+<B>dcsnoop</B>
+
+<DT>Trace all dcache lookups:<DD>
+#
+<B>dcsnoop -a</B>
+
+</DL>
+<A NAME="lbAH">&nbsp;</A>
+<H2>FIELDS</H2>
+
+<DL COMPACT>
+<DT>TIME(s)<DD>
+Time of lookup, in seconds.
+<DT>PID<DD>
+Process ID.
+<DT>COMM<DD>
+Process name.
+<DT>T<DD>
+Type: R == reference (only visible with -a), M == miss. A miss will print two
+lines, one for the reference, and one for the miss.
+<DT>FILE<DD>
+The file name component that was being looked up. This contains trailing
+pathname components (after '/'), which will be the subject of subsequent
+lookups.
+</DL>
+<A NAME="lbAI">&nbsp;</A>
+<H2>OVERHEAD</H2>
+
+File name lookups can be frequent (depending on the workload), and this tool
+prints a line for each failed lookup, and with -a, each reference as well. The
+output may be verbose, and the incurred overhead, while optimized to some
+extent, may still be from noticeable to significant. This is only really
+intended for deeper investigations beyond <A HREF="https://iovisor.github.io/bcc?8+dcstat">dcstat</A>(8), when absolutely necessary.
+Measure and quantify the overhead in a test environment before use.
+<A NAME="lbAJ">&nbsp;</A>
+<H2>SOURCE</H2>
+
+This is from bcc.
+<DL COMPACT>
+<DT><DD>
+<A HREF="https://github.com/iovisor/bcc">https://github.com/iovisor/bcc</A>
+</DL>
+<P>
+
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+<A NAME="lbAK">&nbsp;</A>
+<H2>OS</H2>
+
+Linux
+<A NAME="lbAL">&nbsp;</A>
+<H2>STABILITY</H2>
+
+Unstable - in development.
+<A NAME="lbAM">&nbsp;</A>
+<H2>AUTHOR</H2>
+
+Brendan Gregg
+<A NAME="lbAN">&nbsp;</A>
+<H2>SEE ALSO</H2>
+
+<A HREF="https://iovisor.github.io/bcc?1+dcstat">dcstat</A>(1)
+<P>
+
+<HR>
+<A NAME="index">&nbsp;</A><H2>Index</H2>
+<DL>
+<DT><A HREF="#lbAB">NAME</A><DD>
+<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
+<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
+<DT><A HREF="#lbAE">REQUIREMENTS</A><DD>
+<DT><A HREF="#lbAF">OPTIONS</A><DD>
+<DT><A HREF="#lbAG">EXAMPLES</A><DD>
+<DT><A HREF="#lbAH">FIELDS</A><DD>
+<DT><A HREF="#lbAI">OVERHEAD</A><DD>
+<DT><A HREF="#lbAJ">SOURCE</A><DD>
+<DT><A HREF="#lbAK">OS</A><DD>
+<DT><A HREF="#lbAL">STABILITY</A><DD>
+<DT><A HREF="#lbAM">AUTHOR</A><DD>
+<DT><A HREF="#lbAN">SEE ALSO</A><DD>
+</DL>
+<HR>
+This document was created by
+<A HREF="https://iovisor.github.io/bcc">man2html</A>,
+using the manual pages.<BR>
+Time: 17:11:49 GMT, February 25, 2020
+</BODY>
+</HTML>

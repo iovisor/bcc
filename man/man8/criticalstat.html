@@ -1,0 +1,135 @@
+Content-type: text/html; charset=UTF-8
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML><HEAD><TITLE>Man page of criticalstat</TITLE>
+</HEAD><BODY>
+<H1>criticalstat</H1>
+Section: Maintenance Commands (8)<BR>Updated: 2018-06-07<BR><A HREF="#index">Index</A>
+<A HREF="https://iovisor.github.io/bcc">Return to Main Contents</A><HR>
+
+<A NAME="lbAB">&nbsp;</A>
+<H2>NAME</H2>
+
+criticalstat - A tracer to find and report long atomic critical sections in kernel
+<A NAME="lbAC">&nbsp;</A>
+<H2>SYNOPSIS</H2>
+
+<B>criticalstat [-h] [-p] [-i] [-d DURATION]</B>
+
+<A NAME="lbAD">&nbsp;</A>
+<H2>DESCRIPTION</H2>
+
+<P>
+criticalstat traces and reports occurrences of atomic critical sections in the
+kernel with useful stacktraces showing the origin of them. Such critical
+sections frequently occur due to use of spinlocks, or if interrupts or
+preemption were explicitly disabled by a driver. IRQ routines in Linux are also
+executed with interrupts disabled. There are many reasons. Such critical
+sections are a source of long latency/responsive issues for real-time systems.
+<P>
+This works by probing the preempt/irq and cpuidle tracepoints in the kernel.
+Since this uses BPF, only the root user can use this tool. Further, the kernel
+has to be built with certain CONFIG options enabled. See below.
+<P>
+<A NAME="lbAE">&nbsp;</A>
+<H2>REQUIREMENTS</H2>
+
+Enable CONFIG_PREEMPTIRQ_EVENTS and CONFIG_DEBUG_PREEMPT. Additionally, the
+following options should be DISABLED on older kernels: CONFIG_PROVE_LOCKING,
+CONFIG_LOCKDEP.
+<A NAME="lbAF">&nbsp;</A>
+<H2>OPTIONS</H2>
+
+<DL COMPACT>
+<DT>-h<DD>
+Print usage message.
+<DT>-p<DD>
+Find long sections where preemption was disabled on local CPU.
+<DT>-i<DD>
+Find long sections where interrupt was disabled on local CPU.
+<DT>-d DURATION<DD>
+Only identify sections that are longer than DURATION in microseconds.
+</DL>
+<A NAME="lbAG">&nbsp;</A>
+<H2>EXAMPLES</H2>
+
+<DL COMPACT>
+<DT>Run with default options: irq disabled for more than 100 uS<DD>
+#
+<B>criticalstat</B>
+
+<DT>Find sections with preemption disabled for more than 100 uS.<DD>
+#
+<B>criticalstat -p</B>
+
+<DT>Find sections with IRQ disabled for more than 500 uS.<DD>
+#
+<B>criticalstat -d 500</B>
+
+<DT>Find sections with preemption disabled for more than 500 uS.<DD>
+#
+<B>criticalstat -p -d 500</B>
+
+</DL>
+<A NAME="lbAH">&nbsp;</A>
+<H2>OVERHEAD</H2>
+
+This tool can cause overhead if the application is spending a lot of time in
+kernel mode. The overhead is variable but can be 2-4% of performance
+degradation. If overhead is seen to be too much, please pass a higher DURATION
+to the -d option to filter more aggressively.
+<P>
+<A NAME="lbAI">&nbsp;</A>
+<H2>SOURCE</H2>
+
+This is from bcc.
+<DL COMPACT>
+<DT><DD>
+<A HREF="https://github.com/iovisor/bcc">https://github.com/iovisor/bcc</A>
+</DL>
+<P>
+
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+<A NAME="lbAJ">&nbsp;</A>
+<H2>OS</H2>
+
+Linux
+<A NAME="lbAK">&nbsp;</A>
+<H2>STABILITY</H2>
+
+Unstable - in development.
+<A NAME="lbAL">&nbsp;</A>
+<H2>AUTHOR</H2>
+
+Joel Fernandes
+<A NAME="lbAM">&nbsp;</A>
+<H2>SEE ALSO</H2>
+
+Linux kernel's preemptoff and irqoff tracers.
+<P>
+<P>
+
+<HR>
+<A NAME="index">&nbsp;</A><H2>Index</H2>
+<DL>
+<DT><A HREF="#lbAB">NAME</A><DD>
+<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
+<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
+<DT><A HREF="#lbAE">REQUIREMENTS</A><DD>
+<DT><A HREF="#lbAF">OPTIONS</A><DD>
+<DT><A HREF="#lbAG">EXAMPLES</A><DD>
+<DT><A HREF="#lbAH">OVERHEAD</A><DD>
+<DT><A HREF="#lbAI">SOURCE</A><DD>
+<DT><A HREF="#lbAJ">OS</A><DD>
+<DT><A HREF="#lbAK">STABILITY</A><DD>
+<DT><A HREF="#lbAL">AUTHOR</A><DD>
+<DT><A HREF="#lbAM">SEE ALSO</A><DD>
+</DL>
+<HR>
+This document was created by
+<A HREF="https://iovisor.github.io/bcc">man2html</A>,
+using the manual pages.<BR>
+Time: 17:11:49 GMT, February 25, 2020
+</BODY>
+</HTML>

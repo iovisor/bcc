@@ -1,0 +1,181 @@
+Content-type: text/html; charset=UTF-8
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML><HEAD><TITLE>Man page of tcpstates</TITLE>
+</HEAD><BODY>
+<H1>tcpstates</H1>
+Section: Maintenance Commands (8)<BR>Updated: 2018-03-20<BR><A HREF="#index">Index</A>
+<A HREF="https://iovisor.github.io/bcc">Return to Main Contents</A><HR>
+
+<A NAME="lbAB">&nbsp;</A>
+<H2>NAME</H2>
+
+tcpstates - Trace TCP session state changes with durations. Uses Linux eBPF/bcc.
+<A NAME="lbAC">&nbsp;</A>
+<H2>SYNOPSIS</H2>
+
+<B>tcpstates [-h] [-T] [-t] [-w] [-s] [-D PORTS] [-L PORTS] [-Y]</B>
+
+<A NAME="lbAD">&nbsp;</A>
+<H2>DESCRIPTION</H2>
+
+This tool traces TCP session state changes while tracing, and prints details
+including the duration in each state. This can help explain the latency of
+TCP connections: whether the time is spent in the ESTABLISHED state (data
+transfer), or initialization state (SYN_SENT), etc.
+<P>
+This tool works using the sock:inet_sock_set_state tracepoint, which was
+added to Linux 4.16. Linux 4.16 also included extra state transitions so that
+all TCP transitions could be observed by this tracepoint.
+<P>
+Only TCP state changes are traced, so it is expected that the
+overhead of this tool is much lower than typical send/receive tracing.
+<P>
+Since this uses BPF, only the root user can use this tool.
+<A NAME="lbAE">&nbsp;</A>
+<H2>REQUIREMENTS</H2>
+
+CONFIG_BPF and bcc, and the sock:inet_sock_set_state tracepoint.
+<A NAME="lbAF">&nbsp;</A>
+<H2>OPTIONS</H2>
+
+<DL COMPACT>
+<DT>-h<DD>
+Print usage message.
+<DT>-s<DD>
+Comma separated values output (parseable).
+<DT>-t<DD>
+Include a timestamp column (seconds).
+<DT>-T<DD>
+Include a time column (HH:MM:SS).
+<DT>-w<DD>
+Wide column output (fits IPv6 addresses).
+<DT>-L PORTS<DD>
+Comma-separated list of local ports to trace (filtered in-kernel).
+<DT>-D PORTS<DD>
+Comma-separated list of destination ports to trace (filtered in-kernel).
+<DT>-Y<DD>
+Log session state changes to the systemd journal.
+</DL>
+<A NAME="lbAG">&nbsp;</A>
+<H2>EXAMPLES</H2>
+
+<DL COMPACT>
+<DT>Trace all TCP sessions, and show all state changes:<DD>
+#
+<B>tcpstates</B>
+
+<DT>Include a timestamp column, and wide column output:<DD>
+#
+<B>tcpstates -tw</B>
+
+<DT>Trace connections to local ports 80 and 81 only:<DD>
+#
+<B>tcpstates -L 80,81</B>
+
+<DT>Trace connections to remote port 80 only:<DD>
+#
+<B>tcpstates -D 80</B>
+
+</DL>
+<A NAME="lbAH">&nbsp;</A>
+<H2>FIELDS</H2>
+
+<DL COMPACT>
+<DT>TIME<DD>
+Time of the change, in HH:MM:SS format.
+<DT>TIME(s)<DD>
+Time of the change, in seconds.
+<DT>C-PID<DD>
+The current on-CPU process ID. This may show the process that owns the TCP
+session if the state change executes in synchronous process context, else it
+is likely to show the kernel (asynchronous state change).
+<DT>C-COMM<DD>
+The current on-CPU process name. This may show the process that owns the TCP
+session if the state change executes in synchronous process context, else it
+is likely to show the kernel (asynchronous state change).
+<DT>IP<DD>
+IP address family (4 or 6)
+<DT>LADDR<DD>
+Local IP address.
+<DT>RADDR<DD>
+Remote IP address.
+<DT>LPORT<DD>
+Local port.
+<DT>RPORT<DD>
+Remote port.
+<DT>OLDSTATE<DD>
+Previous TCP state.
+<DT>NEWSTATE<DD>
+New TCP state.
+<DT>MS<DD>
+Duration of this state.
+</DL>
+<A NAME="lbAI">&nbsp;</A>
+<H2>OVERHEAD</H2>
+
+This traces the kernel TCP set state function, which should be called much
+less often than send/receive tracing, and therefore have lower overhead. The
+overhead of the tool is relative to the rate of new TCP sessions: if this is
+high, over 10,000 per second, then there may be noticeable overhead just to
+print out 10k lines of formatted output per second.
+<P>
+You can find out the rate of new TCP sessions using &quot;sar -n TCP 1&quot;, and
+adding the active/s and passive/s columns.
+<P>
+As always, test and understand this tools overhead for your types of
+workloads before production use.
+<A NAME="lbAJ">&nbsp;</A>
+<H2>SOURCE</H2>
+
+This is from bcc.
+<DL COMPACT>
+<DT><DD>
+<A HREF="https://github.com/iovisor/bcc">https://github.com/iovisor/bcc</A>
+</DL>
+<P>
+
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+<A NAME="lbAK">&nbsp;</A>
+<H2>OS</H2>
+
+Linux
+<A NAME="lbAL">&nbsp;</A>
+<H2>STABILITY</H2>
+
+Unstable - in development.
+<A NAME="lbAM">&nbsp;</A>
+<H2>AUTHOR</H2>
+
+Brendan Gregg
+<A NAME="lbAN">&nbsp;</A>
+<H2>SEE ALSO</H2>
+
+<A HREF="https://iovisor.github.io/bcc?8+tcpaccept">tcpaccept</A>(8), <A HREF="https://iovisor.github.io/bcc?8+tcpconnect">tcpconnect</A>(8), <A HREF="https://iovisor.github.io/bcc?8+tcptop">tcptop</A>(8), <A HREF="https://iovisor.github.io/bcc?8+tcplife">tcplife</A>(8)
+<P>
+
+<HR>
+<A NAME="index">&nbsp;</A><H2>Index</H2>
+<DL>
+<DT><A HREF="#lbAB">NAME</A><DD>
+<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
+<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
+<DT><A HREF="#lbAE">REQUIREMENTS</A><DD>
+<DT><A HREF="#lbAF">OPTIONS</A><DD>
+<DT><A HREF="#lbAG">EXAMPLES</A><DD>
+<DT><A HREF="#lbAH">FIELDS</A><DD>
+<DT><A HREF="#lbAI">OVERHEAD</A><DD>
+<DT><A HREF="#lbAJ">SOURCE</A><DD>
+<DT><A HREF="#lbAK">OS</A><DD>
+<DT><A HREF="#lbAL">STABILITY</A><DD>
+<DT><A HREF="#lbAM">AUTHOR</A><DD>
+<DT><A HREF="#lbAN">SEE ALSO</A><DD>
+</DL>
+<HR>
+This document was created by
+<A HREF="https://iovisor.github.io/bcc">man2html</A>,
+using the manual pages.<BR>
+Time: 17:11:49 GMT, February 25, 2020
+</BODY>
+</HTML>

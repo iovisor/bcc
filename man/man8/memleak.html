@@ -1,0 +1,185 @@
+Content-type: text/html; charset=UTF-8
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML><HEAD><TITLE>Man page of memleak</TITLE>
+</HEAD><BODY>
+<H1>memleak</H1>
+Section: Maintenance Commands (8)<BR>Updated: 2016-01-14<BR><A HREF="#index">Index</A>
+<A HREF="https://iovisor.github.io/bcc">Return to Main Contents</A><HR>
+
+<A NAME="lbAB">&nbsp;</A>
+<H2>NAME</H2>
+
+memleak - Print a summary of outstanding allocations and their call stacks to detect memory leaks. Uses Linux eBPF/bcc.
+<A NAME="lbAC">&nbsp;</A>
+<H2>SYNOPSIS</H2>
+
+<B>memleak [-h] [-p PID] [-t] [-a] [-o OLDER] [-c COMMAND] [--combined-only]</B>
+
+[-s SAMPLE_RATE] [-T TOP] [-z MIN_SIZE] [-Z MAX_SIZE] [-O OBJ] [INTERVAL]
+[COUNT]
+<A NAME="lbAD">&nbsp;</A>
+<H2>DESCRIPTION</H2>
+
+memleak traces and matches memory allocation and deallocation requests, and
+collects call stacks for each allocation. memleak can then print a summary
+of which call stacks performed allocations that weren't subsequently freed.
+<P>
+When tracing a specific process, memleak instruments a list of allocation
+functions from libc, specifically: malloc, calloc, realloc, posix_memalign,
+valloc, memalign, pvalloc, aligned_alloc, and free.
+When tracing all processes, memleak instruments kmalloc/kfree,
+kmem_cache_alloc/kmem_cache_free, and also page allocations made by
+get_free_pages/free_pages.
+<P>
+memleak may introduce significant overhead when tracing processes that allocate
+and free many blocks very quickly. See the OVERHEAD section below.
+<P>
+This tool only works on Linux 4.6+. Stack traces are obtained using the new BPF_STACK_TRACE` APIs.
+For kernels older than 4.6, see the version under tools/old.
+Kernel memory allocations are intercepted through tracepoints, which are
+available on Linux 4.7+.
+<P>
+<A NAME="lbAE">&nbsp;</A>
+<H2>REQUIREMENTS</H2>
+
+CONFIG_BPF and bcc.
+<A NAME="lbAF">&nbsp;</A>
+<H2>OPTIONS</H2>
+
+<DL COMPACT>
+<DT>-h<DD>
+Print usage message.
+<DT>-p PID<DD>
+Trace this process ID only (filtered in-kernel). This traces libc allocator.
+<DT>-t<DD>
+Print a trace of all allocation and free requests and results.
+<DT>-a<DD>
+Print a list of allocations that weren't freed (and their sizes) in addition to their call stacks.
+<DT>-o OLDER<DD>
+Print only allocations older than OLDER milliseconds. Useful to remove false positives.
+The default value is 500 milliseconds.
+<DT>-c COMMAND<DD>
+Run the specified command and trace its allocations only. This traces libc allocator.
+<DT>--combined-only<DD>
+Use statistics precalculated in kernel space. Amount of data to be pulled from
+kernel significantly decreases, at the cost of losing capabilities of time-based
+false positives filtering (-o).
+<DT>-s SAMPLE_RATE<DD>
+Record roughly every SAMPLE_RATE-th allocation to reduce overhead.
+<DT>-t TOP<DD>
+Print only the top TOP stacks (sorted by size).
+The default value is 10.
+<DT>-z MIN_SIZE<DD>
+Capture only allocations that are larger than or equal to MIN_SIZE bytes.
+<DT>-Z MAX_SIZE<DD>
+Capture only allocations that are smaller than or equal to MAX_SIZE bytes.
+<DT>-O OBJ<DD>
+Attach to allocation functions in specified object instead of resolving libc. Ignored when kernel allocations are profiled.
+<DT>INTERVAL<DD>
+Print a summary of outstanding allocations and their call stacks every INTERVAL seconds.
+The default interval is 5 seconds.
+<DT>COUNT<DD>
+Print the outstanding allocations summary COUNT times and then exit.
+</DL>
+<A NAME="lbAG">&nbsp;</A>
+<H2>EXAMPLES</H2>
+
+<DL COMPACT>
+<DT>Print outstanding kernel allocation stacks every 3 seconds:<DD>
+#
+<B>memleak 3</B>
+
+<DT>Print user outstanding allocation stacks and allocation details for the process 1005:<DD>
+#
+<B>memleak -p 1005 -a</B>
+
+<DT>Sample roughly every 5th allocation (~20%) of the call stacks and print the top 5<DD>
+stacks 10 times before quitting.
+#
+<B>memleak -s 5 --top=5 10</B>
+
+<DT>Run ./allocs and print outstanding allocation stacks for that process: <DD>
+#
+<B>memleak -c ./allocs</B>
+
+<DT>Capture only allocations between 16 and 32 bytes in size:<DD>
+#
+<B>memleak -z 16 -Z 32</B>
+
+</DL>
+<A NAME="lbAH">&nbsp;</A>
+<H2>OVERHEAD</H2>
+
+memleak can have significant overhead if the target process or kernel performs
+allocations at a very high rate. Pathological cases may exhibit up to 100x
+degradation in running time. Most of the time, however, memleak shouldn't cause
+a significant slowdown. You can use the -s switch to reduce the overhead
+further by capturing only every N-th allocation. The -z and -Z switches can
+also reduce overhead by capturing only allocations of specific sizes.
+<P>
+Additionally, option --combined-only saves processing time by reusing already
+calculated allocation statistics from kernel. It's faster, but lacks information
+about particular allocations.
+<P>
+To determine the rate at which your application is calling malloc/free, or the
+rate at which your kernel is calling kmalloc/kfree, place a probe with perf and
+collect statistics. For example, to determine how many calls to __kmalloc are
+placed in a typical period of 10 seconds:
+<P>
+#
+<B>perf probe '__kmalloc'</B>
+
+<P>
+#
+<B>perf stat -a -e 'probe:__kmalloc' -- sleep 10</B>
+
+<P>
+<A NAME="lbAI">&nbsp;</A>
+<H2>SOURCE</H2>
+
+This is from bcc.
+<DL COMPACT>
+<DT><DD>
+<A HREF="https://github.com/iovisor/bcc">https://github.com/iovisor/bcc</A>
+</DL>
+<P>
+
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+<A NAME="lbAJ">&nbsp;</A>
+<H2>OS</H2>
+
+Linux
+<A NAME="lbAK">&nbsp;</A>
+<H2>STABILITY</H2>
+
+Unstable - in development.
+<A NAME="lbAL">&nbsp;</A>
+<H2>AUTHOR</H2>
+
+Sasha Goldshtein
+<P>
+
+<HR>
+<A NAME="index">&nbsp;</A><H2>Index</H2>
+<DL>
+<DT><A HREF="#lbAB">NAME</A><DD>
+<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
+<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
+<DT><A HREF="#lbAE">REQUIREMENTS</A><DD>
+<DT><A HREF="#lbAF">OPTIONS</A><DD>
+<DT><A HREF="#lbAG">EXAMPLES</A><DD>
+<DT><A HREF="#lbAH">OVERHEAD</A><DD>
+<DT><A HREF="#lbAI">SOURCE</A><DD>
+<DT><A HREF="#lbAJ">OS</A><DD>
+<DT><A HREF="#lbAK">STABILITY</A><DD>
+<DT><A HREF="#lbAL">AUTHOR</A><DD>
+</DL>
+<HR>
+This document was created by
+<A HREF="https://iovisor.github.io/bcc">man2html</A>,
+using the manual pages.<BR>
+Time: 17:11:49 GMT, February 25, 2020
+</BODY>
+</HTML>

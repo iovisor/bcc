@@ -1,0 +1,201 @@
+Content-type: text/html; charset=UTF-8
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML><HEAD><TITLE>Man page of ustat</TITLE>
+</HEAD><BODY>
+<H1>ustat</H1>
+Section: Maintenance Commands (8)<BR>Updated: 2018-10-09<BR><A HREF="#index">Index</A>
+<A HREF="https://iovisor.github.io/bcc">Return to Main Contents</A><HR>
+
+<A NAME="lbAB">&nbsp;</A>
+<H2>NAME</H2>
+
+ustat, javastat, nodestat, perlstat, phpstat, pythonstat, rubystat, tclstat - Activity stats from
+high-level languages.
+<A NAME="lbAC">&nbsp;</A>
+<H2>SYNOPSIS</H2>
+
+<B>javastat [-C] [-S {cload,excp,gc,method,objnew,thread}] [-r MAXROWS] [-d] [interval [count]]</B>
+
+<BR>
+
+<B>nodestat [-C] [-S {cload,excp,gc,method,objnew,thread}] [-r MAXROWS] [-d] [interval [count]]</B>
+
+<BR>
+
+<B>perlstat [-C] [-S {cload,excp,gc,method,objnew,thread}] [-r MAXROWS] [-d] [interval [count]]</B>
+
+<BR>
+
+<B>phpstat [-C] [-S {cload,excp,gc,method,objnew,thread}] [-r MAXROWS] [-d] [interval [count]]</B>
+
+<BR>
+
+<B>pythonstat [-C] [-S {cload,excp,gc,method,objnew,thread}] [-r MAXROWS] [-d] [interval [count]]</B>
+
+<BR>
+
+<B>rubystat [-C] [-S {cload,excp,gc,method,objnew,thread}] [-r MAXROWS] [-d] [interval [count]]</B>
+
+<BR>
+
+<B>tclstat [-C] [-S {cload,excp,gc,method,objnew,thread}] [-r MAXROWS] [-d] [interval [count]]</B>
+
+<BR>
+
+<B>ustat [-l {java,node,perl,php,python,ruby,tcl}] [-C] [-S {cload,excp,gc,method,objnew,thread}] [-r MAXROWS] [-d] [interval [count]]</B>
+
+<A NAME="lbAD">&nbsp;</A>
+<H2>DESCRIPTION</H2>
+
+This is &quot;top&quot; for high-level language events, such as garbage collections,
+exceptions, thread creations, object allocations, method calls, and more. The
+events are aggregated for each process and printed in a top-like table, which
+can be sorted by various fields. Not all language runtimes provide the same
+set of details.
+<P>
+This uses in-kernel eBPF maps to store per process summaries for efficiency.
+<P>
+This tool relies on USDT probes embedded in many high-level languages, such as
+Java, Node, Perl, PHP, Python, Ruby, and Tcl. It requires a runtime instrumented with
+these probes, which in some cases requires building from source with a
+USDT-specific flag, such as &quot;--enable-dtrace&quot; or &quot;--with-dtrace&quot;. For Java,
+some probes are not enabled by default, and can be turned on by running the Java
+process with the &quot;-XX:+ExtendedDTraceProbes&quot; flag. For PHP processes, the
+environment variable USE_ZEND_DTRACE must be set to 1.
+<P>
+Newly-created processes will only be traced at the next interval. If you run
+this tool with a short interval (say, 1-5 seconds), this should be virtually
+unnoticeable. For longer intervals, you might miss processes that were started
+and terminated during the interval window.
+<P>
+Since this uses BPF, only the root user can use this tool.
+<A NAME="lbAE">&nbsp;</A>
+<H2>REQUIREMENTS</H2>
+
+CONFIG_BPF and bcc.
+<A NAME="lbAF">&nbsp;</A>
+<H2>OPTIONS</H2>
+
+<DL COMPACT>
+<DT>-l {java,node,perl,php,python,ruby,tcl}<DD>
+The language to trace. By default, all languages are traced.
+<DT>-C<DD>
+Do not clear the screen between updates.
+<DT>-S {cload,excp,gc,method,objnew,thread}<DD>
+Sort the output by the specified field.
+<DT>-r MAXROWS<DD>
+Do not print more than this number of rows.
+<DT>-d<DD>
+Print the resulting BPF program, for debugging purposes.
+<DT>interval<DD>
+Interval between updates, seconds.
+<DT>count<DD>
+Number of interval summaries.
+</DL>
+<A NAME="lbAG">&nbsp;</A>
+<H2>EXAMPLES</H2>
+
+<DL COMPACT>
+<DT>Summarize activity in high-level languages, 1 second refresh:<DD>
+#
+<B>ustat</B>
+
+<DT>Don't clear the screen, and top 8 rows only:<DD>
+#
+<B>ustat -Cr 8</B>
+
+<DT>5 second summaries, 10 times only:<DD>
+#
+<B>ustat 5 10</B>
+
+</DL>
+<A NAME="lbAH">&nbsp;</A>
+<H2>FIELDS</H2>
+
+<DL COMPACT>
+<DT>loadavg<DD>
+The contents of /proc/loadavg
+<DT>PID<DD>
+Process ID.
+<DT>CMDLINE<DD>
+Process command line (often the second and following arguments will give you a
+hint as to which application is being run.
+<DT>METHOD/s<DD>
+Count of method invocations during interval.
+<DT>GC/s<DD>
+Count of garbage collections during interval.
+<DT>OBJNEW/s<DD>
+Count of objects allocated during interval.
+<DT>CLOAD/s<DD>
+Count of classes loaded during interval.
+<DT>EXC/s<DD>
+Count of exceptions thrown during interval.
+<DT>THR/s<DD>
+Count of threads created during interval.
+</DL>
+<A NAME="lbAI">&nbsp;</A>
+<H2>OVERHEAD</H2>
+
+When using this tool with high-frequency events, such as method calls, a very
+significant slow-down can be expected. However, many of the high-level
+languages covered by this tool already have a fairly high per-method invocation
+cost, especially when running in interpreted mode. For the lower-frequency
+events, such as garbage collections or thread creations, the overhead should
+not be significant. Specifically, when probing Java processes and not using the
+&quot;-XX:+ExtendedDTraceProbes&quot; flag, the most expensive probes are not emitted,
+and the overhead should be acceptable.
+<A NAME="lbAJ">&nbsp;</A>
+<H2>SOURCE</H2>
+
+This is from bcc.
+<DL COMPACT>
+<DT><DD>
+<A HREF="https://github.com/iovisor/bcc">https://github.com/iovisor/bcc</A>
+</DL>
+<P>
+
+Also look in the bcc distribution for a companion _example.txt file containing
+example usage, output, and commentary for this tool.
+<A NAME="lbAK">&nbsp;</A>
+<H2>OS</H2>
+
+Linux
+<A NAME="lbAL">&nbsp;</A>
+<H2>STABILITY</H2>
+
+Unstable - in development.
+<A NAME="lbAM">&nbsp;</A>
+<H2>AUTHOR</H2>
+
+Sasha Goldshtein
+<A NAME="lbAN">&nbsp;</A>
+<H2>SEE ALSO</H2>
+
+<A HREF="https://iovisor.github.io/bcc?8+trace">trace</A>(8), <A HREF="https://iovisor.github.io/bcc?8+argdist">argdist</A>(8), <A HREF="https://iovisor.github.io/bcc?8+tplist">tplist</A>(8)
+<P>
+
+<HR>
+<A NAME="index">&nbsp;</A><H2>Index</H2>
+<DL>
+<DT><A HREF="#lbAB">NAME</A><DD>
+<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
+<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
+<DT><A HREF="#lbAE">REQUIREMENTS</A><DD>
+<DT><A HREF="#lbAF">OPTIONS</A><DD>
+<DT><A HREF="#lbAG">EXAMPLES</A><DD>
+<DT><A HREF="#lbAH">FIELDS</A><DD>
+<DT><A HREF="#lbAI">OVERHEAD</A><DD>
+<DT><A HREF="#lbAJ">SOURCE</A><DD>
+<DT><A HREF="#lbAK">OS</A><DD>
+<DT><A HREF="#lbAL">STABILITY</A><DD>
+<DT><A HREF="#lbAM">AUTHOR</A><DD>
+<DT><A HREF="#lbAN">SEE ALSO</A><DD>
+</DL>
+<HR>
+This document was created by
+<A HREF="https://iovisor.github.io/bcc">man2html</A>,
+using the manual pages.<BR>
+Time: 17:11:49 GMT, February 25, 2020
+</BODY>
+</HTML>

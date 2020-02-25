@@ -1,0 +1,151 @@
+Content-type: text/html; charset=UTF-8
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML><HEAD><TITLE>Man page of statsnoop</TITLE>
+</HEAD><BODY>
+<H1>statsnoop</H1>
+Section: Maintenance Commands (8)<BR>Updated: 2016-02-08<BR><A HREF="#index">Index</A>
+<A HREF="https://iovisor.github.io/bcc">Return to Main Contents</A><HR>
+
+<A NAME="lbAB">&nbsp;</A>
+<H2>NAME</H2>
+
+statsnoop - Trace stat() syscalls. Uses Linux eBPF/bcc.
+<A NAME="lbAC">&nbsp;</A>
+<H2>SYNOPSIS</H2>
+
+<B>statsnoop [-h] [-t] [-x] [-p PID]</B>
+
+<A NAME="lbAD">&nbsp;</A>
+<H2>DESCRIPTION</H2>
+
+statsnoop traces the different stat() syscalls, showing which processes are
+attempting to read information about which files. This can be useful for
+determining the location of config and log files, or for troubleshooting
+applications that are failing, especially on startup.
+<P>
+This works by tracing various kernel sys_stat() functions using dynamic
+tracing, and will need updating to match any changes to these functions.
+<P>
+This makes use of a Linux 4.4 feature (bpf_perf_event_output());
+for kernels older than 4.4, see the version under tools/old,
+which uses an older mechanism.
+<P>
+Since this uses BPF, only the root user can use this tool.
+<A NAME="lbAE">&nbsp;</A>
+<H2>REQUIREMENTS</H2>
+
+CONFIG_BPF and bcc.
+<A NAME="lbAF">&nbsp;</A>
+<H2>OPTIONS</H2>
+
+<DL COMPACT>
+<DT>-h<DD>
+Print usage message.
+<DT>-t<DD>
+Include a timestamp column: in seconds since the first event, with decimal
+places.
+<DT>-x<DD>
+Only print failed stats.
+<DT>-p PID<DD>
+Trace this process ID only (filtered in-kernel).
+</DL>
+<A NAME="lbAG">&nbsp;</A>
+<H2>EXAMPLES</H2>
+
+<DL COMPACT>
+<DT>Trace all stat() syscalls:<DD>
+#
+<B>statsnoop</B>
+
+<DT>Trace all stat() syscalls, and include timestamps:<DD>
+#
+<B>statsnoop -t</B>
+
+<DT>Trace only stat() syscalls that failed:<DD>
+#
+<B>statsnoop -x</B>
+
+<DT>Trace PID 181 only:<DD>
+#
+<B>statsnoop -p 181</B>
+
+</DL>
+<A NAME="lbAH">&nbsp;</A>
+<H2>FIELDS</H2>
+
+<DL COMPACT>
+<DT>TIME(s)<DD>
+Time of the call, in seconds.
+<DT>PID<DD>
+Process ID
+<DT>COMM<DD>
+Process name
+<DT>FD<DD>
+File descriptor (if success), or -1 (if failed)
+<DT>ERR<DD>
+Error number (see the system's errno.h)
+<DT>PATH<DD>
+Open path
+</DL>
+<A NAME="lbAI">&nbsp;</A>
+<H2>OVERHEAD</H2>
+
+This traces the kernel stat function and prints output for each event. As the
+rate of this is generally expected to be low (&lt; 1000/s), the overhead is also
+expected to be negligible. If you have an application that is calling a high
+rate of stat()s, then test and understand overhead before use.
+<A NAME="lbAJ">&nbsp;</A>
+<H2>SOURCE</H2>
+
+This is from bcc.
+<DL COMPACT>
+<DT><DD>
+<A HREF="https://github.com/iovisor/bcc">https://github.com/iovisor/bcc</A>
+</DL>
+<P>
+
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+<A NAME="lbAK">&nbsp;</A>
+<H2>OS</H2>
+
+Linux
+<A NAME="lbAL">&nbsp;</A>
+<H2>STABILITY</H2>
+
+Unstable - in development.
+<A NAME="lbAM">&nbsp;</A>
+<H2>AUTHOR</H2>
+
+Brendan Gregg
+<A NAME="lbAN">&nbsp;</A>
+<H2>SEE ALSO</H2>
+
+<A HREF="https://iovisor.github.io/bcc?1+opensnoop">opensnoop</A>(1)
+<P>
+
+<HR>
+<A NAME="index">&nbsp;</A><H2>Index</H2>
+<DL>
+<DT><A HREF="#lbAB">NAME</A><DD>
+<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
+<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
+<DT><A HREF="#lbAE">REQUIREMENTS</A><DD>
+<DT><A HREF="#lbAF">OPTIONS</A><DD>
+<DT><A HREF="#lbAG">EXAMPLES</A><DD>
+<DT><A HREF="#lbAH">FIELDS</A><DD>
+<DT><A HREF="#lbAI">OVERHEAD</A><DD>
+<DT><A HREF="#lbAJ">SOURCE</A><DD>
+<DT><A HREF="#lbAK">OS</A><DD>
+<DT><A HREF="#lbAL">STABILITY</A><DD>
+<DT><A HREF="#lbAM">AUTHOR</A><DD>
+<DT><A HREF="#lbAN">SEE ALSO</A><DD>
+</DL>
+<HR>
+This document was created by
+<A HREF="https://iovisor.github.io/bcc">man2html</A>,
+using the manual pages.<BR>
+Time: 17:11:49 GMT, February 25, 2020
+</BODY>
+</HTML>

@@ -1,0 +1,144 @@
+Content-type: text/html; charset=UTF-8
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML><HEAD><TITLE>Man page of killsnoop</TITLE>
+</HEAD><BODY>
+<H1>killsnoop</H1>
+Section: Maintenance Commands (8)<BR>Updated: 2015-08-20<BR><A HREF="#index">Index</A>
+<A HREF="https://iovisor.github.io/bcc">Return to Main Contents</A><HR>
+
+<A NAME="lbAB">&nbsp;</A>
+<H2>NAME</H2>
+
+killsnoop - Trace signals issued by the kill() syscall. Uses Linux eBPF/bcc.
+<A NAME="lbAC">&nbsp;</A>
+<H2>SYNOPSIS</H2>
+
+<B>killsnoop [-h] [-x] [-p PID]</B>
+
+<A NAME="lbAD">&nbsp;</A>
+<H2>DESCRIPTION</H2>
+
+killsnoop traces the kill() syscall, to show signals sent via this method. This
+may be useful to troubleshoot failing applications, where an unknown mechanism
+is sending signals.
+<P>
+This works by tracing the kernel sys_kill() function using dynamic tracing, and
+will need updating to match any changes to this function.
+<P>
+This makes use of a Linux 4.4 feature (bpf_perf_event_output());
+for kernels older than 4.4, see the version under tools/old,
+which uses an older mechanism.
+<P>
+Since this uses BPF, only the root user can use this tool.
+<A NAME="lbAE">&nbsp;</A>
+<H2>REQUIREMENTS</H2>
+
+CONFIG_BPF and bcc.
+<A NAME="lbAF">&nbsp;</A>
+<H2>OPTIONS</H2>
+
+<DL COMPACT>
+<DT>-h<DD>
+Print usage message.
+<DT>-x<DD>
+Only print failed kill() syscalls.
+<DT>-p PID<DD>
+Trace this process ID only (filtered in-kernel).
+</DL>
+<A NAME="lbAG">&nbsp;</A>
+<H2>EXAMPLES</H2>
+
+<DL COMPACT>
+<DT>Trace all kill() syscalls:<DD>
+#
+<B>killsnoop</B>
+
+<DT>Trace only kill() syscalls that failed:<DD>
+#
+<B>killsnoop -x</B>
+
+<DT>Trace PID 181 only:<DD>
+#
+<B>killsnoop -p 181</B>
+
+</DL>
+<A NAME="lbAH">&nbsp;</A>
+<H2>FIELDS</H2>
+
+<DL COMPACT>
+<DT>TIME<DD>
+Time of the kill call.
+<DT>PID<DD>
+Source process ID
+<DT>COMM<DD>
+Source process name
+<DT>SIG<DD>
+Signal number. See <A HREF="https://iovisor.github.io/bcc?7+signal">signal</A>(7).
+<DT>TPID<DD>
+Target process ID
+<DT>RES<DD>
+Result. 0 == success, a negative value (of the error code) for failure.
+</DL>
+<A NAME="lbAI">&nbsp;</A>
+<H2>OVERHEAD</H2>
+
+This traces the kernel kill function and prints output for each event. As the
+rate of this is generally expected to be low (&lt; 100/s), the overhead is also
+expected to be negligible. If you have an application that is calling a very
+high rate of kill()s for some reason, then test and understand overhead before
+use.
+<A NAME="lbAJ">&nbsp;</A>
+<H2>SOURCE</H2>
+
+This is from bcc.
+<DL COMPACT>
+<DT><DD>
+<A HREF="https://github.com/iovisor/bcc">https://github.com/iovisor/bcc</A>
+</DL>
+<P>
+
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+<A NAME="lbAK">&nbsp;</A>
+<H2>OS</H2>
+
+Linux
+<A NAME="lbAL">&nbsp;</A>
+<H2>STABILITY</H2>
+
+Unstable - in development.
+<A NAME="lbAM">&nbsp;</A>
+<H2>AUTHOR</H2>
+
+Brendan Gregg
+<A NAME="lbAN">&nbsp;</A>
+<H2>SEE ALSO</H2>
+
+<A HREF="https://iovisor.github.io/bcc?8+opensnoop">opensnoop</A>(8), <A HREF="https://iovisor.github.io/bcc?8+funccount">funccount</A>(8)
+<P>
+
+<HR>
+<A NAME="index">&nbsp;</A><H2>Index</H2>
+<DL>
+<DT><A HREF="#lbAB">NAME</A><DD>
+<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
+<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
+<DT><A HREF="#lbAE">REQUIREMENTS</A><DD>
+<DT><A HREF="#lbAF">OPTIONS</A><DD>
+<DT><A HREF="#lbAG">EXAMPLES</A><DD>
+<DT><A HREF="#lbAH">FIELDS</A><DD>
+<DT><A HREF="#lbAI">OVERHEAD</A><DD>
+<DT><A HREF="#lbAJ">SOURCE</A><DD>
+<DT><A HREF="#lbAK">OS</A><DD>
+<DT><A HREF="#lbAL">STABILITY</A><DD>
+<DT><A HREF="#lbAM">AUTHOR</A><DD>
+<DT><A HREF="#lbAN">SEE ALSO</A><DD>
+</DL>
+<HR>
+This document was created by
+<A HREF="https://iovisor.github.io/bcc">man2html</A>,
+using the manual pages.<BR>
+Time: 17:11:49 GMT, February 25, 2020
+</BODY>
+</HTML>

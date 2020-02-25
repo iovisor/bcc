@@ -1,0 +1,164 @@
+Content-type: text/html; charset=UTF-8
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML><HEAD><TITLE>Man page of drsnoop</TITLE>
+</HEAD><BODY>
+<H1>drsnoop</H1>
+Section: Maintenance Commands (8)<BR>Updated: 2019-02-20<BR><A HREF="#index">Index</A>
+<A HREF="https://iovisor.github.io/bcc">Return to Main Contents</A><HR>
+
+<A NAME="lbAB">&nbsp;</A>
+<H2>NAME</H2>
+
+drsnoop - Trace direct reclaim events. Uses Linux eBPF/bcc.
+<A NAME="lbAC">&nbsp;</A>
+<H2>SYNOPSIS</H2>
+
+<B>drsnoop.py [-h] [-T] [-U] [-p PID] [-t TID] [-u UID] [-d DURATION] [-n name] [-v]</B>
+
+<A NAME="lbAD">&nbsp;</A>
+<H2>DESCRIPTION</H2>
+
+drsnoop trace direct reclaim events, showing which processes are allocing pages 
+with direct reclaiming. This can be useful for discovering when allocstall (/p-
+roc/vmstat) continues to increase, whether it is caused by some critical proc-
+esses or not.
+<P>
+This works by tracing the direct reclaim events using kernel tracepoints. 
+<P>
+This makes use of a Linux 4.4 feature (bpf_perf_event_output());
+for kernels older than 4.4, see the version under tools/old,
+which uses an older mechanism.
+<P>
+Since this uses BPF, only the root user can use this tool.
+<A NAME="lbAE">&nbsp;</A>
+<H2>REQUIREMENTS</H2>
+
+CONFIG_BPF and bcc.
+<A NAME="lbAF">&nbsp;</A>
+<H2>OPTIONS</H2>
+
+<DL COMPACT>
+<DT>-h<DD>
+Print usage message.
+<DT>-T<DD>
+Include a timestamp column.
+<DT>-U<DD>
+Show UID.
+<DT>-p PID<DD>
+Trace this process ID only (filtered in-kernel).
+<DT>-t TID<DD>
+Trace this thread ID only (filtered in-kernel).
+<DT>-u UID<DD>
+Trace this UID only (filtered in-kernel).
+<DT>-d DURATION<DD>
+Total duration of trace in seconds.
+<DT>-n name<DD>
+Only print processes where its name partially matches 'name'
+-v verbose         
+Run in verbose mode. Will output system memory state
+</DL>
+<A NAME="lbAG">&nbsp;</A>
+<H2>EXAMPLES</H2>
+
+<DL COMPACT>
+<DT>Trace all direct reclaim events:<DD>
+#
+<B>drsnoop</B>
+
+<DT>Trace all direct reclaim events, for 10 seconds only:<DD>
+#
+<B>drsnoop -d 10</B>
+
+<DT>Trace all direct reclaim events, and include timestamps:<DD>
+#
+<B>drsnoop -T</B>
+
+<DT>Show UID:<DD>
+#
+<B>drsnoop -U</B>
+
+<DT>Trace PID 181 only:<DD>
+#
+<B>drsnoop -p 181</B>
+
+<DT>Trace UID 1000 only:<DD>
+#
+<B>drsnoop -u 1000</B>
+
+<DT>Trace all direct reclaim events from processes where its name partially match-<DD>
+es 'mond':
+#
+<B>drnsnoop -n mond</B>
+
+</DL>
+<A NAME="lbAH">&nbsp;</A>
+<H2>FIELDS</H2>
+
+<DL COMPACT>
+<DT>TIME(s)<DD>
+Time of the call, in seconds.
+<DT>UID<DD>
+User ID
+<DT>PID<DD>
+Process ID
+<DT>TID<DD>
+Thread ID
+<DT>COMM<DD>
+Process name
+</DL>
+<A NAME="lbAI">&nbsp;</A>
+<H2>OVERHEAD</H2>
+
+This traces the kernel direct reclaim tracepoints and prints output for each 
+event. As the rate of this is generally expected to be low (&lt; 1000/s), the 
+overhead is also expected to be negligible. 
+<A NAME="lbAJ">&nbsp;</A>
+<H2>SOURCE</H2>
+
+This is from bcc.
+<DL COMPACT>
+<DT><DD>
+<A HREF="https://github.com/iovisor/bcc">https://github.com/iovisor/bcc</A>
+</DL>
+<P>
+
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+<A NAME="lbAK">&nbsp;</A>
+<H2>OS</H2>
+
+Linux
+<A NAME="lbAL">&nbsp;</A>
+<H2>STABILITY</H2>
+
+Unstable - in development.
+<A NAME="lbAM">&nbsp;</A>
+<H2>AUTHOR</H2>
+
+Ethercflow
+<P>
+
+<HR>
+<A NAME="index">&nbsp;</A><H2>Index</H2>
+<DL>
+<DT><A HREF="#lbAB">NAME</A><DD>
+<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
+<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
+<DT><A HREF="#lbAE">REQUIREMENTS</A><DD>
+<DT><A HREF="#lbAF">OPTIONS</A><DD>
+<DT><A HREF="#lbAG">EXAMPLES</A><DD>
+<DT><A HREF="#lbAH">FIELDS</A><DD>
+<DT><A HREF="#lbAI">OVERHEAD</A><DD>
+<DT><A HREF="#lbAJ">SOURCE</A><DD>
+<DT><A HREF="#lbAK">OS</A><DD>
+<DT><A HREF="#lbAL">STABILITY</A><DD>
+<DT><A HREF="#lbAM">AUTHOR</A><DD>
+</DL>
+<HR>
+This document was created by
+<A HREF="https://iovisor.github.io/bcc">man2html</A>,
+using the manual pages.<BR>
+Time: 17:11:49 GMT, February 25, 2020
+</BODY>
+</HTML>

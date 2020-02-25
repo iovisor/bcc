@@ -1,0 +1,181 @@
+Content-type: text/html; charset=UTF-8
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML><HEAD><TITLE>Man page of inject</TITLE>
+</HEAD><BODY>
+<H1>inject</H1>
+Section: Maintenance Commands (8)<BR>Updated: 2018-03-16<BR><A HREF="#index">Index</A>
+<A HREF="https://iovisor.github.io/bcc">Return to Main Contents</A><HR>
+
+<P>
+<P>
+<A NAME="lbAB">&nbsp;</A>
+<H2>NAME</H2>
+
+inject - injects appropriate error into function if input call chain and
+predicates are satisfied. Uses Linux eBPF/bcc.
+<P>
+<P>
+<A NAME="lbAC">&nbsp;</A>
+<H2>SYNOPSIS</H2>
+
+<B>inject -h [-I header] [-P probability] [-v] [-c count] &lt;mode&gt; &lt;spec&gt;</B>
+
+<P>
+<P>
+<A NAME="lbAD">&nbsp;</A>
+<H2>DESCRIPTION</H2>
+
+inject injects errors into specified kernel functionality when a given call
+chain and associated predicates are satisfied.
+<P>
+WARNING: This tool injects failures into key kernel functions and may crash the
+kernel. You should know what you're doing if you're using this tool.
+<P>
+This makes use of a Linux 4.16 feature (bpf_override_return())
+<P>
+Since this uses BPF, only the root user can use this tool.
+<P>
+<P>
+<A NAME="lbAE">&nbsp;</A>
+<H2>OPTIONS</H2>
+
+<DL COMPACT>
+<DT>-h<DD>
+Print usage message.
+<DT>-v<DD>
+Display the generated BPF program, for debugging or modification.
+<DT>-I header<DD>
+Necessary headers to be included.
+<DT>-P probability<DD>
+Optional probability of failure, default 1.
+<DT>-c count<DD>
+Number of errors to inject before stopping, default never stops.
+<P>
+<P>
+</DL>
+<A NAME="lbAF">&nbsp;</A>
+<H2>MODE</H2>
+
+<P>
+<DL COMPACT>
+<DT><B>kmalloc</B><DD>
+Make the following function indicate failure
+<DL COMPACT><DT><DD>
+int should_failslab(struct kmem_cache *s, gfp_t gfpflags)
+</DL>
+
+<P>
+<DT><B>bio</B><DD>
+Make the following function indicate failure
+<DL COMPACT><DT><DD>
+int should_fail_bio(struct bio *bio)
+</DL>
+
+<P>
+<DT><B>alloc_page</B><DD>
+Make the following function indicate failure
+<DL COMPACT><DT><DD>
+bool should_fail_alloc_page(gfp_t gfp_mask, unsigned int order)
+</DL>
+
+<P>
+<P>
+</DL>
+<A NAME="lbAG">&nbsp;</A>
+<H2>SPEC</H2>
+
+<B>FUNCTION([ARGS])[(TEST)] [=&gt; ...]</B>
+
+<P>
+A list of predicates separated by &quot;=&gt;&quot;. A predicate is a function signature
+(name and arguments) in a call stack and a test on the function's arguments.
+<P>
+Missing predicates are implicitly true. Missing tests are implicitly true.
+Specifying the function arguments is optional if the test does not use them.
+If the error injection function is not listed as the first predicate, it is
+implicitly added.
+<P>
+Functions are listed in the reverse order that they are called, ie. if a()
+calls b(), the spec would be &quot;b() =&gt; a()&quot;.
+<P>
+<P>
+<A NAME="lbAH">&nbsp;</A>
+<H2>REQUIREMENTS</H2>
+
+CONFIG_BPF, CONFIG_BPF_KPROBE_OVERRIDE, bcc
+<P>
+<P>
+<A NAME="lbAI">&nbsp;</A>
+<H2>EXAMPLES</H2>
+
+
+inject kmalloc -v 'SyS_mount()'
+
+<P>
+
+inject kmalloc -v 'mount_subtree() =&gt; btrfs_mount()'
+
+<P>
+
+inject -P 0.5 -c 100 alloc_page &quot;should_fail_alloc_page(gfp_t gfp_mask, unsigned int order) (order == 1) =&gt; qlge_refill_bq()&quot;
+
+<P>
+Please see the output of '-h' and tools/inject_example.txt for more examples.
+<P>
+<P>
+<A NAME="lbAJ">&nbsp;</A>
+<H2>SOURCE</H2>
+
+This is from bcc.
+<DL COMPACT>
+<DT><DD>
+<A HREF="https://github.com/iovisor/bcc">https://github.com/iovisor/bcc</A>
+</DL>
+<P>
+
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+<P>
+<P>
+<A NAME="lbAK">&nbsp;</A>
+<H2>OS</H2>
+
+Linux
+<P>
+<P>
+<A NAME="lbAL">&nbsp;</A>
+<H2>STABILITY</H2>
+
+Unstable - in development.
+<P>
+<P>
+<A NAME="lbAM">&nbsp;</A>
+<H2>AUTHOR</H2>
+
+Howard McLauchlan
+<P>
+
+<HR>
+<A NAME="index">&nbsp;</A><H2>Index</H2>
+<DL>
+<DT><A HREF="#lbAB">NAME</A><DD>
+<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
+<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
+<DT><A HREF="#lbAE">OPTIONS</A><DD>
+<DT><A HREF="#lbAF">MODE</A><DD>
+<DT><A HREF="#lbAG">SPEC</A><DD>
+<DT><A HREF="#lbAH">REQUIREMENTS</A><DD>
+<DT><A HREF="#lbAI">EXAMPLES</A><DD>
+<DT><A HREF="#lbAJ">SOURCE</A><DD>
+<DT><A HREF="#lbAK">OS</A><DD>
+<DT><A HREF="#lbAL">STABILITY</A><DD>
+<DT><A HREF="#lbAM">AUTHOR</A><DD>
+</DL>
+<HR>
+This document was created by
+<A HREF="https://iovisor.github.io/bcc">man2html</A>,
+using the manual pages.<BR>
+Time: 17:11:49 GMT, February 25, 2020
+</BODY>
+</HTML>

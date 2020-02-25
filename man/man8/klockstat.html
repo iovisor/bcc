@@ -1,0 +1,242 @@
+Content-type: text/html; charset=UTF-8
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML><HEAD><TITLE>Man page of klockstat</TITLE>
+</HEAD><BODY>
+<H1>klockstat</H1>
+Section: Maintenance Commands (8)<BR>Updated: 2019-10-22<BR><A HREF="#index">Index</A>
+<A HREF="https://iovisor.github.io/bcc">Return to Main Contents</A><HR>
+
+<A NAME="lbAB">&nbsp;</A>
+<H2>NAME</H2>
+
+klockstat - Traces kernel mutex lock events and display locks statistics. Uses Linux eBPF/bcc.
+<A NAME="lbAC">&nbsp;</A>
+<H2>SYNOPSIS</H2>
+
+<B>klockstat [-h] [-i] [-n] [-s] [-c] [-S FIELDS] [-p] [-t] [-d DURATION]</B>
+
+<A NAME="lbAD">&nbsp;</A>
+<H2>DESCRIPTION</H2>
+
+klockstat traces kernel mutex lock events and display locks statistics
+and displays following data:
+<P>
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Caller&nbsp;&nbsp;&nbsp;Avg&nbsp;Spin&nbsp;&nbsp;Count&nbsp;&nbsp;&nbsp;Max&nbsp;spin&nbsp;Total&nbsp;spin
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;psi_avgs_work+0x2e&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;3675&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;5&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;5468&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;18379
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;flush_to_ldisc+0x22&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2833&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;4210&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;5667
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;n_tty_write+0x30c&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;3914&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;3914&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;3914
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;isig+0x5d&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2390&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2390&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2390
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;tty_buffer_flush+0x2a&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1604&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1604&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1604
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;commit_echoes+0x22&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1400&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1400&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1400
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;n_tty_receive_buf_common+0x3b9&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1399&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1399&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1399
+<P>
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Caller&nbsp;&nbsp;&nbsp;Avg&nbsp;Hold&nbsp;&nbsp;Count&nbsp;&nbsp;&nbsp;Max&nbsp;hold&nbsp;Total&nbsp;hold
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;flush_to_ldisc+0x22&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;42558&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;76135&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;85116
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;psi_avgs_work+0x2e&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;14821&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;5&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;20446&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;74106
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;n_tty_receive_buf_common+0x3b9&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;12300&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;12300&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;12300
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;n_tty_write+0x30c&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;10712&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;10712&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;10712
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;isig+0x5d&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;3362&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;3362&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;3362
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;tty_buffer_flush+0x2a&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;3078&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;3078&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;3078
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;commit_echoes+0x22&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;3017&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;3017&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;3017
+<P>
+<P>
+Every caller to using kernel's mutex is displayed on every line.
+<P>
+First portion of lines show the lock acquiring data, showing the
+amount of time it took to acquired given lock.
+<P>
+<BR>&nbsp;&nbsp;'Caller'&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;symbol&nbsp;acquiring&nbsp;the&nbsp;mutex
+<BR>&nbsp;&nbsp;'Average&nbsp;Spin'&nbsp;-&nbsp;average&nbsp;time&nbsp;to&nbsp;acquire&nbsp;the&nbsp;mutex
+<BR>&nbsp;&nbsp;'Count'&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;number&nbsp;of&nbsp;times&nbsp;mutex&nbsp;was&nbsp;acquired
+<BR>&nbsp;&nbsp;'Max&nbsp;spin'&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;maximum&nbsp;time&nbsp;to&nbsp;acquire&nbsp;the&nbsp;mutex
+<BR>&nbsp;&nbsp;'Total&nbsp;spin'&nbsp;&nbsp;&nbsp;-&nbsp;total&nbsp;time&nbsp;spent&nbsp;in&nbsp;acquiring&nbsp;the&nbsp;mutex
+<P>
+Second portion of lines show the lock holding data, showing the
+amount of time it took to hold given lock.
+<P>
+<BR>&nbsp;&nbsp;'Caller'&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;symbol&nbsp;holding&nbsp;the&nbsp;mutex
+<BR>&nbsp;&nbsp;'Average&nbsp;Hold'&nbsp;-&nbsp;average&nbsp;time&nbsp;mutex&nbsp;was&nbsp;held
+<BR>&nbsp;&nbsp;'Count'&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;number&nbsp;of&nbsp;times&nbsp;mutex&nbsp;was&nbsp;held
+<BR>&nbsp;&nbsp;'Max&nbsp;hold'&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;maximum&nbsp;time&nbsp;mutex&nbsp;was&nbsp;held
+<BR>&nbsp;&nbsp;'Total&nbsp;hold'&nbsp;&nbsp;&nbsp;-&nbsp;total&nbsp;time&nbsp;spent&nbsp;in&nbsp;holding&nbsp;the&nbsp;mutex
+<P>
+This works by tracing mutex_lock/unlock kprobes, updating the
+lock stats in maps and processing them in the python part.
+<P>
+Since this uses BPF, only the root user can use this tool.
+<A NAME="lbAE">&nbsp;</A>
+<H2>REQUIREMENTS</H2>
+
+CONFIG_BPF and bcc.
+<A NAME="lbAF">&nbsp;</A>
+<H2>OPTIONS</H2>
+
+<DL COMPACT>
+<DT>-h<DD>
+Print usage message.
+<DT>-i SEC<DD>
+print summary at this interval (seconds)
+<DT>-c CALLER<DD>
+print locks taken by given caller filter (e.g., pipe_)
+<DT>-S FIELDS<DD>
+sort data on specific columns defined by FIELDS string (by default the data is sorted by Max columns)
+<P>
+FIELDS string contains 1 or 2 fields describing columns to sort on
+for both acquiring and holding data. Following fields are available:
+<P>
+<BR>&nbsp;&nbsp;acq_max&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;for&nbsp;'Max&nbsp;spin'&nbsp;column
+<BR>&nbsp;&nbsp;acq_total&nbsp;&nbsp;&nbsp;&nbsp;for&nbsp;'Total&nbsp;spin'&nbsp;column
+<BR>&nbsp;&nbsp;acq_count&nbsp;&nbsp;&nbsp;&nbsp;for&nbsp;'Count'&nbsp;column
+<P>
+<BR>&nbsp;&nbsp;hld_max&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;for&nbsp;'Max&nbsp;hold'&nbsp;column
+<BR>&nbsp;&nbsp;hld_total&nbsp;&nbsp;&nbsp;&nbsp;for&nbsp;'Total&nbsp;hold'&nbsp;column
+<BR>&nbsp;&nbsp;hld_count&nbsp;&nbsp;&nbsp;&nbsp;for&nbsp;'Count'&nbsp;column
+<P>
+See EXAMPLES.
+<P>
+<DT>-n COUNT<DD>
+print COUNT number of locks
+<DT>-s COUNT<DD>
+print COUNT number of stack entries
+<DT>-p PID<DD>
+Trace this process ID only (filtered in-kernel).
+<DT>-t TID<DD>
+Trace this thread ID only (filtered in-kernel).
+<DT>-d DURATION<DD>
+Total duration of trace in seconds.
+<DT>--stack-storage-size STACK_STORAGE_SIZE<DD>
+Change the number of unique stack traces that can be stored and displayed.
+</DL>
+<A NAME="lbAG">&nbsp;</A>
+<H2>EXAMPLES</H2>
+
+<DL COMPACT>
+<DT>Sort lock acquired results on acquired count:<DD>
+#
+<B>klockstat -S acq_count</B>
+
+<P>
+<DT>Sort lock held results on total held time:<DD>
+#
+<B>klockstat -S hld_total</B>
+
+<P>
+<DT>Combination of above:<DD>
+#
+<B>klockstat -S acq_count,hld_total</B>
+
+<P>
+<DT>Trace system wide:<DD>
+#
+<B>klockstat</B>
+
+<P>
+<DT>Trace for 5 seconds only:<DD>
+#
+<B>klockstat -d 5</B>
+
+<P>
+<DT>Display stats every 5 seconds<DD>
+#
+<B>klockstat -i 5</B>
+
+<P>
+<DT>Trace locks for PID 123:<DD>
+#
+<B>klockstat -p 123</B>
+
+<P>
+<DT>Trace locks for PID 321:<DD>
+#
+<B>klockstat -t 321</B>
+
+<P>
+<DT>Display stats only for lock callers with 'pipe_' substring<DD>
+#
+<B>klockstat -c pipe_</B>
+
+<P>
+<DT>Display 3 locks:<DD>
+#
+<B>klockstat -n 3</B>
+
+<P>
+<DT>Display 10 levels of stack for the most expensive lock:<DD>
+#
+<B>klockstat -n 1 -s 10</B>
+
+<P>
+Tracing lock events... Hit Ctrl-C to end.
+^C
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Caller&nbsp;&nbsp;&nbsp;Avg&nbsp;Spin&nbsp;&nbsp;Count&nbsp;&nbsp;&nbsp;Max&nbsp;spin&nbsp;Total&nbsp;spin
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;pipe_wait+0xa9&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;670&nbsp;397691&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;17273&nbsp;&nbsp;266775437
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;pipe_wait+0xa9
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;pipe_read+0x206
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;new_sync_read+0x12a
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;vfs_read+0x9d
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ksys_read+0x5f
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;do_syscall_64+0x5b
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;entry_SYSCALL_64_after_hwframe+0x44
+<P>
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Caller&nbsp;&nbsp;&nbsp;Avg&nbsp;Hold&nbsp;&nbsp;Count&nbsp;&nbsp;&nbsp;Max&nbsp;hold&nbsp;Total&nbsp;hold
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;flush_to_ldisc+0x22&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;28381&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;3&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;65484&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;85144
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;flush_to_ldisc+0x22
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;process_one_work+0x1b0
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;worker_thread+0x50
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;kthread+0xfb
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ret_from_fork+0x35
+<P>
+</DL>
+<A NAME="lbAH">&nbsp;</A>
+<H2>SOURCE</H2>
+
+This is from bcc.
+<DL COMPACT>
+<DT><DD>
+<A HREF="https://github.com/iovisor/bcc">https://github.com/iovisor/bcc</A>
+</DL>
+<P>
+
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+<A NAME="lbAI">&nbsp;</A>
+<H2>OS</H2>
+
+Linux
+<A NAME="lbAJ">&nbsp;</A>
+<H2>STABILITY</H2>
+
+Unstable - in development.
+<A NAME="lbAK">&nbsp;</A>
+<H2>CREDITS</H2>
+
+This tool is based on work of David Valin &lt;<A HREF="mailto:dvalin@redhat.com">dvalin@redhat.com</A>&gt; and his script.
+<A NAME="lbAL">&nbsp;</A>
+<H2>AUTHOR</H2>
+
+Jiri Olsa
+<P>
+
+<HR>
+<A NAME="index">&nbsp;</A><H2>Index</H2>
+<DL>
+<DT><A HREF="#lbAB">NAME</A><DD>
+<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
+<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
+<DT><A HREF="#lbAE">REQUIREMENTS</A><DD>
+<DT><A HREF="#lbAF">OPTIONS</A><DD>
+<DT><A HREF="#lbAG">EXAMPLES</A><DD>
+<DT><A HREF="#lbAH">SOURCE</A><DD>
+<DT><A HREF="#lbAI">OS</A><DD>
+<DT><A HREF="#lbAJ">STABILITY</A><DD>
+<DT><A HREF="#lbAK">CREDITS</A><DD>
+<DT><A HREF="#lbAL">AUTHOR</A><DD>
+</DL>
+<HR>
+This document was created by
+<A HREF="https://iovisor.github.io/bcc">man2html</A>,
+using the manual pages.<BR>
+Time: 17:11:49 GMT, February 25, 2020
+</BODY>
+</HTML>

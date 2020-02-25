@@ -1,0 +1,167 @@
+Content-type: text/html; charset=UTF-8
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML><HEAD><TITLE>Man page of ugc</TITLE>
+</HEAD><BODY>
+<H1>ugc</H1>
+Section: Maintenance Commands (8)<BR>Updated: 2018-10-09<BR><A HREF="#index">Index</A>
+<A HREF="https://iovisor.github.io/bcc">Return to Main Contents</A><HR>
+
+<A NAME="lbAB">&nbsp;</A>
+<H2>NAME</H2>
+
+ugc, javagc, nodegc, pythongc, rubygc - Trace garbage collection events in
+high-level languages.
+<A NAME="lbAC">&nbsp;</A>
+<H2>SYNOPSIS</H2>
+
+<B>javagc [-h] [-v] [-m] [-M MINIMUM] [-F FILTER] pid</B>
+
+<BR>
+
+<B>nodegc [-h] [-v] [-m] [-M MINIMUM] [-F FILTER] pid</B>
+
+<BR>
+
+<B>pythongc [-h] [-v] [-m] [-M MINIMUM] [-F FILTER] pid</B>
+
+<BR>
+
+<B>rubygc [-h] [-v] [-m] [-M MINIMUM] [-F FILTER] pid</B>
+
+<BR>
+
+<B>ugc [-h] [-v] [-m] [-M MINIMUM] [-F FILTER] [-l {java,node,python,ruby}] pid</B>
+
+<A NAME="lbAD">&nbsp;</A>
+<H2>DESCRIPTION</H2>
+
+This traces garbage collection events as they occur, including their duration
+and any additional information (such as generation collected or type of GC)
+provided by the respective language's runtime.
+<P>
+This tool relies on USDT probes embedded in many high-level languages, such as
+Java, Node, Python, and Ruby. It requires a runtime instrumented with these
+probes, which in some cases requires building from source with a USDT-specific
+flag, such as &quot;--enable-dtrace&quot; or &quot;--with-dtrace&quot;.
+<P>
+Since this uses BPF, only the root user can use this tool.
+<A NAME="lbAE">&nbsp;</A>
+<H2>REQUIREMENTS</H2>
+
+CONFIG_BPF and bcc.
+<A NAME="lbAF">&nbsp;</A>
+<H2>OPTIONS</H2>
+
+<DL COMPACT>
+<DT>-v<DD>
+Print the resulting BPF program, for debugging purposes.
+<DT>-m<DD>
+Print times in milliseconds. The default is microseconds.
+<DT>-M MINIMUM<DD>
+Display only collections that are longer than this threshold. The value is
+given in milliseconds. The default is to display all collections.
+<DT>-F FILTER<DD>
+Display only collections whose textual description matches (contains) this
+string. The default is to display all collections. Note that the filtering here
+is performed in user-space, and not as part of the BPF program. This means that
+if you have thousands of collection events, specifying this filter will not
+reduce the amount of data that has to be transferred from the BPF program to
+the user-space script.
+<DT>{java,node,python,ruby}<DD>
+The language to trace.
+<DT>pid<DD>
+The process id to trace.
+</DL>
+<A NAME="lbAG">&nbsp;</A>
+<H2>EXAMPLES</H2>
+
+<DL COMPACT>
+<DT>Trace garbage collections in a specific Node process:<DD>
+#
+<B>ugc node 148</B>
+
+<DT>Trace garbage collections in a specific Java process, and print GC times in<DD>
+milliseconds:
+#
+<B>ugc -m java 6004</B>
+
+<DT>Trace garbage collections in a specific Java process, and display them only if<DD>
+they are longer than 10ms and have the string &quot;Tenured&quot; in their detailed
+description:
+#
+<B>ugc -M 10 -F Tenured java 6004</B>
+
+</DL>
+<A NAME="lbAH">&nbsp;</A>
+<H2>FIELDS</H2>
+
+<DL COMPACT>
+<DT>START<DD>
+The start time of the GC, in seconds from the beginning of the trace.
+<DT>TIME<DD>
+The duration of the garbage collection event.
+<DT>DESCRIPTION<DD>
+The runtime-provided description of this garbage collection event.
+</DL>
+<A NAME="lbAI">&nbsp;</A>
+<H2>OVERHEAD</H2>
+
+Garbage collection events, even if frequent, should not produce a considerable
+overhead when traced because they are still not very common. Even hundreds of 
+GCs per second (which is a very high rate) will still produce a fairly 
+negligible overhead.
+<A NAME="lbAJ">&nbsp;</A>
+<H2>SOURCE</H2>
+
+This is from bcc.
+<DL COMPACT>
+<DT><DD>
+<A HREF="https://github.com/iovisor/bcc">https://github.com/iovisor/bcc</A>
+</DL>
+<P>
+
+Also look in the bcc distribution for a companion _example.txt file containing
+example usage, output, and commentary for this tool.
+<A NAME="lbAK">&nbsp;</A>
+<H2>OS</H2>
+
+Linux
+<A NAME="lbAL">&nbsp;</A>
+<H2>STABILITY</H2>
+
+Unstable - in development.
+<A NAME="lbAM">&nbsp;</A>
+<H2>AUTHOR</H2>
+
+Sasha Goldshtein
+<A NAME="lbAN">&nbsp;</A>
+<H2>SEE ALSO</H2>
+
+<A HREF="https://iovisor.github.io/bcc?8+trace">trace</A>(8), <A HREF="https://iovisor.github.io/bcc?8+ustat">ustat</A>(8), <A HREF="https://iovisor.github.io/bcc?8+uobjnew">uobjnew</A>(8)
+<P>
+
+<HR>
+<A NAME="index">&nbsp;</A><H2>Index</H2>
+<DL>
+<DT><A HREF="#lbAB">NAME</A><DD>
+<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
+<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
+<DT><A HREF="#lbAE">REQUIREMENTS</A><DD>
+<DT><A HREF="#lbAF">OPTIONS</A><DD>
+<DT><A HREF="#lbAG">EXAMPLES</A><DD>
+<DT><A HREF="#lbAH">FIELDS</A><DD>
+<DT><A HREF="#lbAI">OVERHEAD</A><DD>
+<DT><A HREF="#lbAJ">SOURCE</A><DD>
+<DT><A HREF="#lbAK">OS</A><DD>
+<DT><A HREF="#lbAL">STABILITY</A><DD>
+<DT><A HREF="#lbAM">AUTHOR</A><DD>
+<DT><A HREF="#lbAN">SEE ALSO</A><DD>
+</DL>
+<HR>
+This document was created by
+<A HREF="https://iovisor.github.io/bcc">man2html</A>,
+using the manual pages.<BR>
+Time: 17:11:49 GMT, February 25, 2020
+</BODY>
+</HTML>

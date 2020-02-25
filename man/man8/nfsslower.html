@@ -1,0 +1,180 @@
+Content-type: text/html; charset=UTF-8
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML><HEAD><TITLE>Man page of nfsslower</TITLE>
+</HEAD><BODY>
+<H1>nfsslower</H1>
+Section: Maintenance Commands (8)<BR>Updated: 2017-09-01<BR><A HREF="#index">Index</A>
+<A HREF="https://iovisor.github.io/bcc">Return to Main Contents</A><HR>
+
+<A NAME="lbAB">&nbsp;</A>
+<H2>NAME</H2>
+
+nfsslower - Trace slow NFS file operations, with per-event details.
+<A NAME="lbAC">&nbsp;</A>
+<H2>SYNOPSIS</H2>
+
+<B>nfsslower [-h] [-j] [-p PID] [min_ms]</B>
+
+<A NAME="lbAD">&nbsp;</A>
+<H2>DESCRIPTION</H2>
+
+This tool traces common NFSv3 &amp; NFSv4 file operations: reads, writes, opens, and
+getattrs. It measures the time spent in these operations, and prints details
+for each that exceeded a threshold.
+<P>
+WARNING: See the OVERHEAD section.
+<P>
+By default, a minimum millisecond threshold of 10 is used. If a threshold of 0
+is used, all events are printed (warning: verbose).
+<P>
+Since this works by tracing the nfs_file_operations interface functions, it
+will need updating to match any changes to these functions.
+<P>
+This tool uses kprobes to instrument the kernel for entry and exit
+information, in the future a preferred way would be to use tracepoints.
+Currently there aren't any tracepoints available for nfs_read_file,
+nfs_write_file and nfs_open_file, nfs_getattr does have entry and exit
+tracepoints but we chose to use kprobes for consistency
+<P>
+Since this uses BPF, only the root user can use this tool.
+<A NAME="lbAE">&nbsp;</A>
+<H2>REQUIREMENTS</H2>
+
+CONFIG_BPF and bcc.
+<A NAME="lbAF">&nbsp;</A>
+<H2>OPTIONS</H2>
+
+-p PID
+Trace this PID only.
+<DL COMPACT>
+<DT>-j<DD>
+Trace output in CSV format.
+<DT>min_ms<DD>
+Minimum I/O latency (duration) to trace, in milliseconds. Default is 10 ms.
+</DL>
+<A NAME="lbAG">&nbsp;</A>
+<H2>EXAMPLES</H2>
+
+<DL COMPACT>
+<DT>Trace synchronous file reads and writes slower than 10 ms:<DD>
+#
+<B>nfsslower</B>
+
+<DT>Trace slower than 1 ms:<DD>
+#
+<B>nfsslower 1</B>
+
+<DT>Trace slower than 1 ms, and output just the fields in parsable format (CSV):<DD>
+#
+<B>nfsslower -j 1</B>
+
+<DT>Trace all file reads and writes (warning: the output will be verbose):<DD>
+#
+<B>nfsslower 0</B>
+
+<DT>Trace slower than 1 ms, for PID 181 only:<DD>
+#
+<B>nfsslower -p 181 1</B>
+
+</DL>
+<A NAME="lbAH">&nbsp;</A>
+<H2>FIELDS</H2>
+
+<DL COMPACT>
+<DT>TIME(s)<DD>
+Time of I/O completion since the first I/O seen, in seconds.
+<DT>COMM<DD>
+Process name.
+<DT>PID<DD>
+Process ID.
+<DT>T<DD>
+Type of operation. R == read, W == write, O == open, G == getattr.
+<DT>OFF_KB<DD>
+File offset for the I/O, in Kbytes.
+<DT>BYTES<DD>
+Size of I/O, in bytes.
+<DT>LAT(ms)<DD>
+Latency (duration) of I/O, measured from when it was issued by VFS to the
+filesystem, to when it completed. This time is inclusive of RPC latency,
+network latency, cache lookup, remote fileserver processing latency, etc. 
+Its a more accurate measure of the latency suffered by applications performing
+NFS read/write calls to a fileserver.
+<DT>FILENAME<DD>
+A cached kernel file name (comes from dentry-&gt;d_name.name).
+<DT>ENDTIME_us<DD>
+Completion timestamp, microseconds (-j only).
+<DT>OFFSET_b<DD>
+File offset, bytes (-j only).
+<DT>LATENCY_us<DD>
+Latency (duration) of the I/O, in microseconds (-j only).
+</DL>
+<A NAME="lbAI">&nbsp;</A>
+<H2>OVERHEAD</H2>
+
+This adds low-overhead instrumentation to NFS operations,
+including reads and writes from the file system cache. Such read, writes and
+particularly getattrs can be very frequent (depending on the workload; eg, 1M/sec),
+at which point the overhead of this tool (even if it prints no &quot;slower&quot; events) can
+begin to become significant. Measure and quantify before use. If this
+continues to be a problem, consider switching to a tool that prints in-kernel
+summaries only. This tool has been tested with NFSv3 &amp; NVSv4, but it might work
+with NFSv{1,2}, since it is tracing the generic functions from nfs_file_operations.
+<P>
+
+Note that the overhead of this tool should be less than <A HREF="https://iovisor.github.io/bcc?8+fileslower">fileslower</A>(8), as
+this tool targets NFS functions only, and not all file read/write paths.
+<A NAME="lbAJ">&nbsp;</A>
+<H2>SOURCE</H2>
+
+This is from bcc.
+<DL COMPACT>
+<DT><DD>
+<A HREF="https://github.com/iovisor/bcc">https://github.com/iovisor/bcc</A>
+</DL>
+<P>
+
+Also look in the bcc distribution for a companion nfsslower_examples.txt file containing
+example usage, output, and commentary for this tool.
+<A NAME="lbAK">&nbsp;</A>
+<H2>OS</H2>
+
+Linux
+<A NAME="lbAL">&nbsp;</A>
+<H2>STABILITY</H2>
+
+Unstable - in development.
+<A NAME="lbAM">&nbsp;</A>
+<H2>AUTHOR</H2>
+
+Samuel Nair
+<A NAME="lbAN">&nbsp;</A>
+<H2>SEE ALSO</H2>
+
+<A HREF="https://iovisor.github.io/bcc?8+biosnoop">biosnoop</A>(8), <A HREF="https://iovisor.github.io/bcc?8+funccount">funccount</A>(8), <A HREF="https://iovisor.github.io/bcc?8+fileslower">fileslower</A>(8)
+<P>
+
+<HR>
+<A NAME="index">&nbsp;</A><H2>Index</H2>
+<DL>
+<DT><A HREF="#lbAB">NAME</A><DD>
+<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
+<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
+<DT><A HREF="#lbAE">REQUIREMENTS</A><DD>
+<DT><A HREF="#lbAF">OPTIONS</A><DD>
+<DT><A HREF="#lbAG">EXAMPLES</A><DD>
+<DT><A HREF="#lbAH">FIELDS</A><DD>
+<DT><A HREF="#lbAI">OVERHEAD</A><DD>
+<DT><A HREF="#lbAJ">SOURCE</A><DD>
+<DT><A HREF="#lbAK">OS</A><DD>
+<DT><A HREF="#lbAL">STABILITY</A><DD>
+<DT><A HREF="#lbAM">AUTHOR</A><DD>
+<DT><A HREF="#lbAN">SEE ALSO</A><DD>
+</DL>
+<HR>
+This document was created by
+<A HREF="https://iovisor.github.io/bcc">man2html</A>,
+using the manual pages.<BR>
+Time: 17:11:49 GMT, February 25, 2020
+</BODY>
+</HTML>

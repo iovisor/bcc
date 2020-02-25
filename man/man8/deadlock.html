@@ -1,0 +1,197 @@
+Content-type: text/html; charset=UTF-8
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML><HEAD><TITLE>Man page of deadlock</TITLE>
+</HEAD><BODY>
+<H1>deadlock</H1>
+Section: Maintenance Commands (8)<BR>Updated: 2017-02-01<BR><A HREF="#index">Index</A>
+<A HREF="https://iovisor.github.io/bcc">Return to Main Contents</A><HR>
+
+<A NAME="lbAB">&nbsp;</A>
+<H2>NAME</H2>
+
+deadlock - Find potential deadlocks (lock order inversions)
+in a running program.
+<A NAME="lbAC">&nbsp;</A>
+<H2>SYNOPSIS</H2>
+
+<B>deadlock [-h] [--binary BINARY] [--dump-graph DUMP_GRAPH]</B>
+
+<B>[--verbose] [--lock-symbols LOCK_SYMBOLS]</B>
+
+<B>[--unlock-symbols UNLOCK_SYMBOLS]</B>
+
+<B>pid</B>
+
+<A NAME="lbAD">&nbsp;</A>
+<H2>DESCRIPTION</H2>
+
+deadlock finds potential deadlocks in a running process. The program
+attaches uprobes on `pthread_mutex_lock` and `pthread_mutex_unlock` by default
+to build a mutex wait directed graph, and then looks for a cycle in this graph.
+This graph has the following properties:
+<P>
+- Nodes in the graph represent mutexes.
+<P>
+- Edge (A, B) exists if there exists some thread T where lock(A) was called
+and lock(B) was called before unlock(A) was called.
+<P>
+If there is a cycle in this graph, this indicates that there is a lock order
+inversion (potential deadlock). If the program finds a lock order inversion, the
+program will dump the cycle of mutexes, dump the stack traces where each mutex
+was acquired, and then exit.
+<P>
+This program can only find potential deadlocks that occur while the program is
+tracing the process. It cannot find deadlocks that may have occurred before the
+program was attached to the process.
+<P>
+This tool does not work for shared mutexes or recursive mutexes.
+<P>
+Since this uses BPF, only the root user can use this tool.
+<A NAME="lbAE">&nbsp;</A>
+<H2>REQUIREMENTS</H2>
+
+CONFIG_BPF and bcc
+<A NAME="lbAF">&nbsp;</A>
+<H2>OPTIONS</H2>
+
+<DL COMPACT>
+<DT>-h, --help<DD>
+show this help message and exit
+<DT>--binary BINARY<DD>
+If set, trace the mutexes from the binary at this path. For
+statically-linked binaries, this argument is not required.
+For dynamically-linked binaries, this argument is required and should be the
+path of the pthread library the binary is using.
+Example: /lib/x86_64-linux-gnu/libpthread.so.0
+<DT>--dump-graph DUMP_GRAPH<DD>
+If set, this will dump the mutex graph to the specified file.
+<DT>--verbose<DD>
+Print statistics about the mutex wait graph.
+<DT>--lock-symbols LOCK_SYMBOLS<DD>
+Comma-separated list of lock symbols to trace. Default is pthread_mutex_lock.
+These symbols cannot be inlined in the binary.
+<DT>--unlock-symbols UNLOCK_SYMBOLS<DD>
+Comma-separated list of unlock symbols to trace. Default is
+pthread_mutex_unlock. These symbols cannot be inlined in the binary.
+<DT>pid<DD>
+Pid to trace
+</DL>
+<A NAME="lbAG">&nbsp;</A>
+<H2>EXAMPLES</H2>
+
+<DL COMPACT>
+<DT>Find potential deadlocks in PID 181. The --binary argument is not needed for statically-linked binaries.<DD>
+#
+<B>deadlock 181</B>
+
+<DT>Find potential deadlocks in PID 181. If the process was created from a dynamically-linked executable, the --binary argument is required and must be the path of the pthread library:<DD>
+#
+<B>deadlock 181 --binary /lib/x86_64-linux-gnu/libpthread.so.0</B>
+
+<DT>Find potential deadlocks in PID 181. If the process was created from a statically-linked executable, optionally pass the location of the binary. On older kernels without <A HREF="https://lkml.org/lkml/2017/1/13/585,">https://lkml.org/lkml/2017/1/13/585,</A> binaries that contain `:` in the path cannot be attached with uprobes. As a workaround, we can create a symlink to the binary, and provide the symlink name instead with the `--binary` option:<DD>
+#
+<B>deadlock 181 --binary /usr/local/bin/lockinversion</B>
+
+<DT>Find potential deadlocks in PID 181 and dump the mutex wait graph to a file:<DD>
+#
+<B>deadlock 181 --dump-graph graph.json</B>
+
+<DT>Find potential deadlocks in PID 181 and print mutex wait graph statistics:<DD>
+#
+<B>deadlock 181 --verbose</B>
+
+<DT>Find potential deadlocks in PID 181 with custom mutexes:<DD>
+#
+<B>deadlock 181</B>
+
+<B>--lock-symbols custom_mutex1_lock,custom_mutex2_lock</B>
+
+<B>--unlock_symbols custom_mutex1_unlock,custom_mutex2_unlock</B>
+
+</DL>
+<A NAME="lbAH">&nbsp;</A>
+<H2>OUTPUT</H2>
+
+This program does not output any fields. Rather, it will keep running until
+it finds a potential deadlock, or the user hits Ctrl-C. If the program finds
+a potential deadlock, it will output the stack traces and lock order inversion
+in the following format and exit:
+<DL COMPACT>
+<DT>Potential Deadlock Detected!<DD>
+<DT>Cycle in lock order graph: Mutex M0 =&gt; Mutex M1 =&gt; Mutex M0<DD>
+<DT>Mutex M1 acquired here while holding Mutex M0 in Thread T:<DD>
+<B>[stack trace]</B>
+
+<DT>Mutex M0 previously acquired by the same Thread T here:<DD>
+<B>[stack trace]</B>
+
+<DT>Mutex M0 acquired here while holding Mutex M1 in Thread S:<DD>
+<B>[stack trace]</B>
+
+<DT>Mutex M1 previously acquired by the same Thread S here:<DD>
+<B>[stack trace]</B>
+
+<DT>Thread T created by Thread R here:<DD>
+<B>[stack trace]</B>
+
+<DT>Thread S created by Thread Q here:<DD>
+<B>[stack trace]</B>
+
+</DL>
+<A NAME="lbAI">&nbsp;</A>
+<H2>OVERHEAD</H2>
+
+This traces all mutex lock and unlock events and all thread creation events
+on the traced process. The overhead of this can be high if the process has many
+threads and mutexes. You should only run this on a process where the slowdown
+is acceptable.
+<A NAME="lbAJ">&nbsp;</A>
+<H2>SOURCE</H2>
+
+This is from bcc.
+<DL COMPACT>
+<DT><DD>
+<A HREF="https://github.com/iovisor/bcc">https://github.com/iovisor/bcc</A>
+</DL>
+<P>
+
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+<A NAME="lbAK">&nbsp;</A>
+<H2>OS</H2>
+
+Linux
+<A NAME="lbAL">&nbsp;</A>
+<H2>STABILITY</H2>
+
+Unstable - in development.
+<A NAME="lbAM">&nbsp;</A>
+<H2>AUTHOR</H2>
+
+Kenny Yu
+<P>
+
+<HR>
+<A NAME="index">&nbsp;</A><H2>Index</H2>
+<DL>
+<DT><A HREF="#lbAB">NAME</A><DD>
+<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
+<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
+<DT><A HREF="#lbAE">REQUIREMENTS</A><DD>
+<DT><A HREF="#lbAF">OPTIONS</A><DD>
+<DT><A HREF="#lbAG">EXAMPLES</A><DD>
+<DT><A HREF="#lbAH">OUTPUT</A><DD>
+<DT><A HREF="#lbAI">OVERHEAD</A><DD>
+<DT><A HREF="#lbAJ">SOURCE</A><DD>
+<DT><A HREF="#lbAK">OS</A><DD>
+<DT><A HREF="#lbAL">STABILITY</A><DD>
+<DT><A HREF="#lbAM">AUTHOR</A><DD>
+</DL>
+<HR>
+This document was created by
+<A HREF="https://iovisor.github.io/bcc">man2html</A>,
+using the manual pages.<BR>
+Time: 17:11:49 GMT, February 25, 2020
+</BODY>
+</HTML>
