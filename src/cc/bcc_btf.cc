@@ -19,8 +19,7 @@
 #include <string.h>
 #include "linux/btf.h"
 #include "libbpf.h"
-#include "libbpf/src/libbpf.h"
-#include "libbpf/src/btf.h"
+#include "bcc_libbpf_inc.h"
 #include <vector>
 
 #define BCC_MAX_ERRNO       4095

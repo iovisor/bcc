@@ -52,8 +52,7 @@
 // TODO: Remove this when CentOS 6 support is not needed anymore
 #include "setns.h"
 
-#include "libbpf/src/bpf.h"
-#include "libbpf/src/libbpf.h"
+#include "bcc_libbpf_inc.h"
 
 // TODO: remove these defines when linux-libc-dev exports them properly
 
