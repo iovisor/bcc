@@ -118,7 +118,7 @@ sudo dnf install bcc
 
 **Note**: if you keep getting `Failed to load program: Operation not permitted` when
 trying to run the `hello_world.py` example as root then you might need to lift
-the so-called kernel lockdown (cf. 
+the so-called kernel lockdown (cf.
 [FAQ](https://github.com/iovisor/bcc/blob/c00d10d4552f647491395e326d2e4400f3a0b6c5/FAQ.txt#L24),
 [background article](https://gehrcke.de/2019/09/running-an-ebpf-program-may-require-lifting-the-kernel-lockdown)).
 
@@ -352,12 +352,18 @@ sudo apt-get -y install luajit luajit-5.1-dev
 ```
 
 ### Install and compile BCC
+
 ```
 git clone https://github.com/iovisor/bcc.git
 mkdir bcc/build; cd bcc/build
 cmake .. -DCMAKE_INSTALL_PREFIX=/usr
 make
 sudo make install
+cmake -DPYTHON_CMD=python3 .. # build python3 binding
+pushd src/python/
+make
+sudo make install
+popd
 ```
 
 ## Fedora - Source
