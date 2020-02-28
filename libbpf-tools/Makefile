@@ -8,7 +8,7 @@ LIBBPF_OBJ := $(abspath $(OUTPUT)/libbpf.a)
 INCLUDES := -I$(OUTPUT)
 CFLAGS := -g -Wall
 
-APPS = runqslower
+APPS = runqslower opensnoop
 
 .PHONY: all
 all: $(APPS)
