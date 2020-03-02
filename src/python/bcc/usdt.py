@@ -149,20 +149,18 @@ class USDT(object):
         if lib.bcc_usdt_enable_probe(self.context, probe.encode('ascii'),
                 fn_name.encode('ascii')) != 0:
             raise USDTException(
-                    ("failed to enable probe '%s'; a possible cause " +
-                     "can be that the probe requires a pid to enable") %
-                     probe
-                  )
+"""Failed to enable USDT probe '%s':
+the specified pid might not contain the given language's runtime,
+or the runtime was not built with the required USDT probes. Look
+for a configure flag similar to --with-dtrace or --enable-dtrace.
+To check which probes are present in the process, use the tplist tool.
+""" % probe)
 
     def enable_probe_or_bail(self, probe, fn_name):
-        if lib.bcc_usdt_enable_probe(self.context, probe.encode('ascii'),
-                fn_name.encode('ascii')) != 0:
-            print(
-"""Error attaching USDT probes: the specified pid might not contain the
-given language's runtime, or the runtime was not built with the required
-USDT probes. Look for a configure flag similar to --with-dtrace or
---enable-dtrace. To check which probes are present in the process, use the
-tplist tool.""")
+        try:
+            self.enable_probe(probe, fn_name)
+        except USDTException as e:
+            print(e)
             sys.exit(1)
 
     def get_context(self):
