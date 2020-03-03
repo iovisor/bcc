@@ -12,13 +12,13 @@ struct args_t {
 
 struct event {
 	/* user terminology for pid: */
-	pid_t pid;
 	__u64 ts;
+	pid_t pid;
 	uid_t uid;
 	int ret;
+	int flags;
 	char comm[TASK_COMM_LEN];
 	char fname[NAME_MAX];
-	int flags;
 };
 
 #endif /* __OPENSNOOP_H */

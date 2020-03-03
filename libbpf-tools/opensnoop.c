@@ -2,7 +2,7 @@
 // Copyright (c) 2019 Facebook
 // Copyright (c) 2020 Netflix
 //
-// Based on opensnoop(8) from BCC.
+// Based on opensnoop(8) from BCC by Brendan Gregg and others.
 // 14-Feb-2020   Brendan Gregg   Created this.
 #include <argp.h>
 #include <stdio.h>
@@ -11,12 +11,24 @@
 #include <sys/resource.h>
 #include <sys/time.h>
 #include <time.h>
+#include <unistd.h>
 #include <bpf/libbpf.h>
 #include <bpf/bpf.h>
 #include "opensnoop.h"
 #include "opensnoop.skel.h"
 
-struct env {
+/* Tune the buffer size and wakeup rate. These settings cope with roughly
+ * 50k opens/sec.
+ */
+#define PERF_BUFFER_PAGES	64
+#define PERF_BUFFER_TIME_MS	10
+
+/* Set the poll timeout when no events occur. This can affect -d accuracy. */
+#define PERF_POLL_TIMEOUT_MS	100
+
+#define NSEC_PER_SEC		1000000000ULL
+
+static struct env {
 	pid_t pid;
 	pid_t tid;
 	uid_t uid;
@@ -27,9 +39,7 @@ struct env {
 	bool extended;
 	bool failed;
 	char *name;
-} env = {
-	.duration = 0,
-};
+} env = {};
 
 const char *argp_program_version = "opensnoop 0.1";
 const char *argp_program_bug_address = "<bpf@vger.kernel.org>";
@@ -199,7 +209,14 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 
 void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
 {
-	printf("Lost %llu events on CPU #%d!\n", lost_cnt, cpu);
+	fprintf(stderr, "Lost %llu events on CPU #%d!\n", lost_cnt, cpu);
+}
+
+__u64 gettimens()
+{
+	struct timespec ts = {};
+	clock_gettime(CLOCK_MONOTONIC, &ts);
+	return (ts.tv_sec * NSEC_PER_SEC + ts.tv_nsec);
 }
 
 int main(int argc, char **argv)
@@ -212,7 +229,7 @@ int main(int argc, char **argv)
 	struct perf_buffer_opts pb_opts;
 	struct perf_buffer *pb = NULL;
 	struct opensnoop_bpf *obj;
-	struct timeval time_now = {}, time_duration = {}, time_end = {};
+	__u64 time_end;
 	int err;
 
 	err = argp_parse(&argp, argc, argv, 0, NULL, NULL);
@@ -264,7 +281,8 @@ int main(int argc, char **argv)
 	/* setup event callbacks */
 	pb_opts.sample_cb = handle_event;
 	pb_opts.lost_cb = handle_lost_events;
-	pb = perf_buffer__new(bpf_map__fd(obj->maps.events), 64, &pb_opts);
+	pb = perf_buffer__new(bpf_map__fd(obj->maps.events), PERF_BUFFER_PAGES,
+			      &pb_opts);
 	err = libbpf_get_error(pb);
 	if (err) {
 		pb = NULL;
@@ -273,17 +291,16 @@ int main(int argc, char **argv)
 	}
 
 	/* setup duration */
-	if (env.duration) {
-		gettimeofday(&time_now, NULL);
-		time_duration.tv_sec = env.duration;
-		timeradd(&time_now, &time_duration, &time_end);
-	}
+	if (env.duration)
+		time_end = gettimens() + env.duration * NSEC_PER_SEC;
 
 	/* main: poll */
-	while ((err = perf_buffer__poll(pb, 100)) >= 0) {
+	while (1) {
+		usleep(PERF_BUFFER_TIME_MS * 1000);
+		if ((err = perf_buffer__poll(pb, PERF_POLL_TIMEOUT_MS)) < 0)
+			break;
 		if (env.duration) {
-			gettimeofday(&time_now, NULL);
-			if (timercmp(&time_now, &time_end, >)) {
+			if (gettimens() > time_end) {
 				goto cleanup;
 			}
 		}
