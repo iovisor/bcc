@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import print_function
 import ctypes as ct
 import os, sys
 from .libbcc import lib, _USDT_CB, _USDT_PROBE_CB, \
@@ -160,7 +161,7 @@ To check which probes are present in the process, use the tplist tool.
         try:
             self.enable_probe(probe, fn_name)
         except USDTException as e:
-            print(e)
+            print(e, file=sys.stderr)
             sys.exit(1)
 
     def get_context(self):
