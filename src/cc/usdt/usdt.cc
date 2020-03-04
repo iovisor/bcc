@@ -454,7 +454,15 @@ void bcc_usdt_close(void *usdt) {
 int bcc_usdt_enable_probe(void *usdt, const char *probe_name,
                           const char *fn_name) {
   USDT::Context *ctx = static_cast<USDT::Context *>(usdt);
-  return ctx->enable_probe(probe_name, fn_name) ? 0 : -1;
+
+  const char *sep = std::strchr(probe_name, ':');
+  if (sep != nullptr) {
+    const std::string provider_name(probe_name, sep);
+    const std::string probe_base_name(sep+1);
+    return ctx->enable_probe(provider_name, probe_base_name, fn_name) ? 0 : -1;
+  } else {
+    return ctx->enable_probe(probe_name, fn_name) ? 0 : -1;
+  }
 }
 
 int bcc_usdt_enable_fully_specified_probe(void *usdt, const char *provider_name,
