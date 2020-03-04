@@ -8,11 +8,11 @@
 # direct reclaim begin, as well as a starting timestamp for calculating
 # latency.
 #
-# Copyright (c) 2019 Ethercflow
+# Copyright (c) 2019 Wenbo Zhang
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
-# 20-Feb-2019   Ethercflow   Created this.
-# 09-Mar-2019   Ethercflow   Updated for show sys mem info.
+# 20-Feb-2019   Wenbo Zhang   Created this.
+# 09-Mar-2019   Wenbo Zhang   Updated for show sys mem info.
 
 from __future__ import print_function
 from bcc import ArgString, BPF

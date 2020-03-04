@@ -135,6 +135,8 @@ apps:
         command: bcc-wrapper dcstat
     deadlock:
         command: bcc-wrapper deadlock
+    drsnoop:
+        command: bcc-wrapper drsnoop
     execsnoop:
         command: bcc-wrapper execsnoop
     ext4dist:
