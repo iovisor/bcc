@@ -10,4 +10,7 @@ COPY ./ /root/bcc
 WORKDIR /root/bcc
 
 RUN /usr/lib/pbuilder/pbuilder-satisfydepends && \
-    ./scripts/build-deb.sh
+    ./scripts/build-deb.sh && \
+  apt-get update -y && \
+  DEBIAN_FRONTEND=noninteractive apt-get install -y python python3 binutils libelf1 && \
+  dpkg -i /root/bcc/*.deb
