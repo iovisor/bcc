@@ -92,3 +92,38 @@ jobs:
 #     https://github.com/marketplace/actions/debugging-with-tmate
 #    - name: Setup tmate session
 #      uses: mxschmitt/action-tmate@v1
+
+  # Optionally publish container images, guarded by the GitHub secret
+  # DOCKER_PUBLISH.
+  # GitHub secrets can be configured as follows:
+  #   - DOCKER_PUBLISH = 1
+  #   - DOCKER_IMAGE = docker.io/myorg/bcc
+  #   - DOCKER_USERNAME = username
+  #   - DOCKER_PASSWORD = password
+  publish:
+    name: Publish
+    runs-on: ubuntu-latest
+    steps:
+
+    - uses: actions/checkout@v1
+
+    - name: Initialize workflow variables
+      id: vars
+      shell: bash
+      run: |
+          echo ::set-output name=DOCKER_PUBLISH::${DOCKER_PUBLISH}
+      env:
+        DOCKER_PUBLISH: "${{ secrets.DOCKER_PUBLISH }}"
+
+    - name: Build container image and publish to registry
+      id: publish-registry
+      uses: elgohr/Publish-Docker-Github-Action@2.8
+      if: ${{ steps.vars.outputs.DOCKER_PUBLISH }}
+      with:
+        name: ${{ secrets.DOCKER_IMAGE }}
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+        workdir: .
+        dockerfile: Dockerfile.ubuntu
+        snapshot: true
+        cache: ${{ github.event_name != 'schedule' }}
