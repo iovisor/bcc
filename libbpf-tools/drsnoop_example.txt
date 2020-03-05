@@ -1,0 +1,71 @@
+Demonstrations of drsnoop, the Linux BPF CO-RE version.
+
+
+drsnoop traces the direct reclaim system-wide, and prints various details.
+Example output:
+
+# drsnoop
+
+Tracing direct reclaim events... Hit Ctrl-C to end.
+TIME     COMM             TID     LAT(ms) PAGES
+14:56:43 in:imklog        268     106.637    39
+14:56:43 systemd-udevd    232     110.708    53
+14:56:43 systemd-journal  19531   106.083    62
+^C
+
+While tracing, the processes alloc pages due to insufficient memory available
+in the system, direct reclaim events happened, which will increase the waiting
+delay of the processes.
+
+drsnoop can be useful for discovering when allocstall(/proc/vmstat) continues
+to increase, whether it is caused by some critical processes or not.
+
+The -p option can be used to filter on a PID, which is filtered in-kernel.
+
+# drsnoop -p 17491
+
+Tracing direct reclaim events... Hit Ctrl-C to end.
+TIME     COMM             TID     LAT(ms) PAGES
+14:59:56 summond          17491      0.24    50
+14:59:56 summond          17491      0.26    38
+14:59:56 summond          17491      0.36    72
+^C
+
+This shows the summond process allocs pages, and direct reclaim events happening,
+and the delays are not affected much.
+
+A maximum tracing duration can be set with the -d option. For example, to trace
+for 2 seconds:
+
+# drsnoop -d 2
+
+Tracing direct reclaim events for 2 secs.
+TIME     COMM             TID     LAT(ms) PAGES
+15:02:16 head             21715      0.15   195
+
+USAGE message:
+
+# drsnoop --help
+
+Usage: drsnoop [OPTION...]
+Trace direct reclaim latency.
+
+USAGE: drsnoop [--help] [-p PID] [-t TID] [-d DURATION] [-e]
+
+EXAMPLES:
+    drsnoop         # trace all direct reclaim events
+    drsnoop -p 123  # trace pid 123
+    drsnoop -t 123  # trace tid 123 (use for threads only)
+    drsnoop -d 10   # trace for 10 seconds only
+    drsnoop -e      # trace all direct reclaim events with extended faileds
+
+  -d, --duration=DURATION    Total duration of trace in seconds
+  -e, --extended             Extended fields output
+  -p, --pid=PID              Process PID to trace
+  -t, --tid=TID              Thread TID to trace
+  -v, --verbose              Verbose debug output
+  -?, --help                 Give this help list
+      --usage                Give a short usage message
+  -V, --version              Print program version
+
+Report bugs to <ethercflow@gmail.com>.
