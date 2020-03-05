@@ -5,150 +5,136 @@
 #include <stdbool.h>
 #include "trace_helpers.h"
 
-#define MAX_SYMS 300000
+struct ksyms {
+	struct ksym *syms;
+	int syms_sz;
+	int syms_cap;
+	char *strs;
+	int strs_sz;
+	int strs_cap;
+};
 
-static int ksyms__insert_symbol(struct ksyms *ksyms, long addr,
-				const char *name)
+static int ksyms__add_symbol(struct ksyms *ksyms, const char *name, unsigned long addr)
 {
-	struct ksym *ksym = &ksyms->syms[ksyms->syms_cnt++];
-	size_t len = strlen(name) + 1;
+	size_t new_cap, name_len = strlen(name) + 1;
+	struct ksym *ksym;
+	void *tmp;
 
-	ksym->name = malloc(len);
-	if (!ksym->name)
-		return -1;
+	if (ksyms->strs_sz + name_len > ksyms->strs_cap) {
+		new_cap = ksyms->strs_cap * 4 / 3;
+		if (new_cap < ksyms->strs_sz + name_len)
+			new_cap = ksyms->strs_sz + name_len;
+		if (new_cap < 1024)
+			new_cap = 1024;
+		tmp = realloc(ksyms->strs, new_cap);
+		if (!tmp)
+			return -1;
+		ksyms->strs = tmp;
+		ksyms->strs_cap = new_cap;
+	}
+	if (ksyms->syms_sz + 1 > ksyms->syms_cap) {
+		new_cap = ksyms->syms_cap * 4 / 3;
+		if (new_cap < 1024)
+			new_cap = 1024;
+		tmp = realloc(ksyms->syms, sizeof(*ksyms->syms) * new_cap);
+		if (!tmp)
+			return -1;
+		ksyms->syms = tmp;
+		ksyms->syms_cap = new_cap;
+	}
 
-	memcpy((void*)ksym->name, name, len);
+	ksym = &ksyms->syms[ksyms->syms_sz];
+	/* while constructing, re-use pointer as just a plain offset */
+	ksym->name = (void *)(unsigned long)ksyms->strs_sz;
 	ksym->addr = addr;
+
+	memcpy(ksyms->strs + ksyms->strs_sz, name, name_len);
+	ksyms->strs_sz += name_len;
+	ksyms->syms_sz++;
+
 	return 0;
-}
-
-static struct ksyms *ksyms__new(void)
-{
-	struct ksyms *ksyms = malloc(sizeof(*ksyms));
-
-	if (!ksyms)
-		return NULL;
-
-	ksyms->syms_cnt = 0;
-	ksyms->syms = malloc(MAX_SYMS * sizeof(struct ksym));
-	if (!ksyms->syms)
-		return NULL;
-	return ksyms;
 }
 
 static int ksym_cmp(const void *p1, const void *p2)
 {
-	long cmp = ((struct ksym *)p1)->addr - ((struct ksym *)p2)->addr;
+	const struct ksym *s1 = p1, *s2 = p2;
 
-	if (cmp < 0)
-		return -1;
-	else if (cmp > 0)
-		return 1;
-	else
-		return 0;
-}
-
-static int hex2long(const char *ptr, long *long_val)
-{
-	char *p;
-
-	*long_val = strtoul(ptr, &p, 16);
-	return p - ptr;
+	if (s1->addr == s2->addr)
+		return strcmp(s1->name, s2->name);
+	return s1->addr < s2->addr ? -1 : 1;
 }
 
 struct ksyms *ksyms__load(void)
 {
-	FILE *f = fopen("/proc/kallsyms", "r");
-	const char *symbol_name;
+	char sym_type, sym_name[256];
 	struct ksyms *ksyms;
-	char *line = NULL;
-	long symbol_addr;
-	int line_len;
-	int parsed;
-	size_t n;
-	int err;
+	unsigned long sym_addr;
+	int i, ret;
+	FILE *f;
 
+	f = fopen("/proc/kallsyms", "r");
 	if (!f)
 		return NULL;
 
-	ksyms = ksyms__new();
+	ksyms = calloc(1, sizeof(*ksyms));
 	if (!ksyms)
-		goto cleanup;
+		goto err_out;
 
-	while (!feof(f)) {
-		line_len = getline(&line, &n, f);
-		if (line_len < 0 || !line)
+	while (true) {
+		ret = fscanf(f, "%lx %c %s%*[^\n]\n",
+			     &sym_addr, &sym_type, sym_name);
+		if (ret == EOF && feof(f))
 			break;
-
-		line[--line_len] = '\0'; /* \n */
-
-		parsed = hex2long(line, &symbol_addr);
-
-		/* Skip the line if we failed to parse the address. */
-		if (!parsed)
-			continue;
-
-		parsed++;
-		if (parsed + 2 >= line_len)
-			continue;
-
-		parsed += 2;	/* ignore symbol type */
-		symbol_name = line + parsed;
-		parsed = line_len - parsed;
-
-		err = ksyms__insert_symbol(ksyms, symbol_addr, symbol_name);
-		if (err)
-			goto cleanup;
+		if (ret != 3)
+			goto err_out;
+		if (ksyms__add_symbol(ksyms, sym_name, sym_addr))
+			goto err_out;
 	}
 
-	qsort(ksyms->syms, ksyms->syms_cnt, sizeof(struct ksym), ksym_cmp);
+	/* now when strings are finalized, adjust pointers properly */
+	for (i = 0; i < ksyms->syms_sz; i++)
+		ksyms->syms[i].name += (unsigned long)ksyms->strs;
+
+	qsort(ksyms->syms, ksyms->syms_sz, sizeof(*ksyms->syms), ksym_cmp);
+
+	fclose(f);
 	return ksyms;
 
-cleanup:
-	free(line);
+err_out:
+	ksyms__free(ksyms);
 	fclose(f);
 	return NULL;
 }
 
 void ksyms__free(struct ksyms *ksyms)
 {
-	int i;
-
 	if (!ksyms)
 		return;
 
-	for (i = 0; i < ksyms->syms_cnt; i++) {
-		free((void*)ksyms->syms[i].name);
-	}
+	free(ksyms->syms);
+	free(ksyms->strs);
 	free(ksyms);
 }
 
-const struct ksym *ksyms__map_addr(const struct ksyms *ksyms, long addr)
+const struct ksym *ksyms__map_addr(const struct ksyms *ksyms,
+				   unsigned long addr)
 {
-	int start = 0, end = ksyms->syms_cnt;
-	long result;
+	int start = 0, end = ksyms->syms_sz - 1, mid;
+	unsigned long sym_addr;
 
-	/* kallsyms not loaded. return NULL */
-	if (ksyms->syms_cnt == 0)
-		return NULL;
-
+	/* find largest sym_addr <= addr using binary search */
 	while (start < end) {
-		size_t mid = start + (end - start) / 2;
+		mid = start + (end - start + 1) / 2;
+		sym_addr = ksyms->syms[mid].addr;
 
-		result = addr - ksyms->syms[mid].addr;
-		if (result < 0)
-			end = mid;
-		else if (result > 0)
-			start = mid + 1;
+		if (sym_addr <= addr)
+			start = mid;
 		else
-			return &ksyms->syms[mid];
+			end = mid - 1;
 	}
 
-	if (start >= 1 && ksyms->syms[start - 1].addr < addr &&
-	    addr < ksyms->syms[start].addr)
-		/* valid ksym */
-		return &ksyms->syms[start - 1];
-
+	if (start == end && ksyms->syms[start].addr <= addr)
+		return &ksyms->syms[start];
 	return NULL;
 }
 
@@ -157,7 +143,7 @@ const struct ksym *ksyms__get_symbol(const struct ksyms *ksyms,
 {
 	int i;
 
-	for (i = 0; i < ksyms->syms_cnt; i++) {
+	for (i = 0; i < ksyms->syms_sz; i++) {
 		if (strcmp(ksyms->syms[i].name, name) == 0)
 			return &ksyms->syms[i];
 	}
