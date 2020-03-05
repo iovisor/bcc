@@ -6,7 +6,7 @@ BPFTOOL ?= bin/bpftool
 LIBBPF_SRC := $(abspath ../src/cc/libbpf/src)
 LIBBPF_OBJ := $(abspath $(OUTPUT)/libbpf.a)
 INCLUDES := -I$(OUTPUT)
-CFLAGS := -g -Wall
+CFLAGS := -g -O2 -Wall
 
 APPS = drsnoop runqslower
 
