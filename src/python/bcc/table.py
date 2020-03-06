@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import print_function
 from collections import MutableMapping
 import ctypes as ct
 from functools import reduce
@@ -19,6 +20,7 @@ import multiprocessing
 import os
 import errno
 import re
+import sys
 
 from .libbcc import lib, _RAW_CB_TYPE, _LOST_CB_TYPE
 from .perf import Perf
@@ -645,9 +647,11 @@ class PerfEventArray(ArrayBase):
                 else:
                     fields.append((field_name, ct_mapping[field_type]))
             except KeyError:
+                # Using print+sys.exit instead of raising exceptions,
+                # because exceptions are caught by the caller.
                 print("Type: '%s' not recognized. Please define the data with ctypes manually."
-                      % field_type)
-                exit()
+                      % field_type, file=sys.stderr)
+                sys.exit(1)
             i += 1
         return type('', (ct.Structure,), {'_fields_': fields})
 
