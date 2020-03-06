@@ -433,7 +433,7 @@ StatusTuple BPFModule::snprintf(string fn_name, char *str, size_t sz,
     return StatusTuple(rc, "error in snprintf: %s", std::strerror(errno));
   if ((size_t)rc == sz)
     return StatusTuple(-1, "buffer of size %zd too small", sz);
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 } // namespace ebpf

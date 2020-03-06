@@ -38,7 +38,7 @@ StatusTuple Printer::visit_block_stmt_node(BlockStmtNode* n) {
     --indent_;
   }
   fprintf(out_, "%*s}", indent_, "");
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple Printer::visit_if_stmt_node(IfStmtNode* n) {
@@ -50,7 +50,7 @@ StatusTuple Printer::visit_if_stmt_node(IfStmtNode* n) {
     fprintf(out_, " else ");
     TRY2(n->false_block_->accept(this));
   }
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple Printer::visit_onvalid_stmt_node(OnValidStmtNode* n) {
@@ -62,7 +62,7 @@ StatusTuple Printer::visit_onvalid_stmt_node(OnValidStmtNode* n) {
     fprintf(out_, " else ");
     TRY2(n->else_block_->accept(this));
   }
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple Printer::visit_switch_stmt_node(SwitchStmtNode* n) {
@@ -70,7 +70,7 @@ StatusTuple Printer::visit_switch_stmt_node(SwitchStmtNode* n) {
   TRY2(n->cond_->accept(this));
   fprintf(out_, ") ");
   TRY2(n->block_->accept(this));
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple Printer::visit_case_stmt_node(CaseStmtNode* n) {
@@ -81,7 +81,7 @@ StatusTuple Printer::visit_case_stmt_node(CaseStmtNode* n) {
     fprintf(out_, "default");
   }
   TRY2(n->block_->accept(this));
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple Printer::visit_ident_expr_node(IdentExprNode* n) {
@@ -92,37 +92,37 @@ StatusTuple Printer::visit_ident_expr_node(IdentExprNode* n) {
   if (n->sub_name_.size()) {
     fprintf(out_, ".%s", n->sub_name_.c_str());
   }
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple Printer::visit_assign_expr_node(AssignExprNode* n) {
   TRY2(n->lhs_->accept(this));
   fprintf(out_, " = ");
   TRY2(n->rhs_->accept(this));
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple Printer::visit_packet_expr_node(PacketExprNode* n) {
   fprintf(out_, "$");
   TRY2(n->id_->accept(this));
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple Printer::visit_integer_expr_node(IntegerExprNode* n) {
   fprintf(out_, "%s:%zu", n->val_.c_str(), n->bits_);
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple Printer::visit_string_expr_node(StringExprNode *n) {
   fprintf(out_, "%s", n->val_.c_str());
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple Printer::visit_binop_expr_node(BinopExprNode* n) {
   TRY2(n->lhs_->accept(this));
   fprintf(out_, "%d", n->op_);
   TRY2(n->rhs_->accept(this));
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple Printer::visit_unop_expr_node(UnopExprNode* n) {
@@ -135,25 +135,25 @@ StatusTuple Printer::visit_unop_expr_node(UnopExprNode* n) {
   }
   fprintf(out_, "%s", s);
   TRY2(n->expr_->accept(this));
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple Printer::visit_bitop_expr_node(BitopExprNode* n) {
 
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple Printer::visit_return_expr_node(ReturnExprNode* n) {
   fprintf(out_, "return ");
   TRY2(n->expr_->accept(this));
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple Printer::visit_goto_expr_node(GotoExprNode* n) {
   const char* s = n->is_continue_ ? "continue " : "goto ";
   fprintf(out_, "%s", s);
   TRY2(n->id_->accept(this));
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple Printer::visit_method_call_expr_node(MethodCallExprNode* n) {
@@ -177,19 +177,19 @@ StatusTuple Printer::visit_method_call_expr_node(MethodCallExprNode* n) {
     --indent_;
     fprintf(out_, "%*s}", indent_, "");
   }
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple Printer::visit_table_index_expr_node(TableIndexExprNode *n) {
   fprintf(out_, "%s[", n->id_->c_str());
   TRY2(n->index_->accept(this));
   fprintf(out_, "]");
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple Printer::visit_expr_stmt_node(ExprStmtNode* n) {
   TRY2(n->expr_->accept(this));
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple Printer::visit_struct_variable_decl_stmt_node(StructVariableDeclStmtNode* n) {
@@ -207,7 +207,7 @@ StatusTuple Printer::visit_struct_variable_decl_stmt_node(StructVariableDeclStmt
     }
     fprintf(out_, "}");
   }
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple Printer::visit_integer_variable_decl_stmt_node(IntegerVariableDeclStmtNode* n) {
@@ -218,7 +218,7 @@ StatusTuple Printer::visit_integer_variable_decl_stmt_node(IntegerVariableDeclSt
     fprintf(out_, "; ");
     TRY2(n->init_[0]->accept(this));
   }
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple Printer::visit_struct_decl_stmt_node(StructDeclStmtNode* n) {
@@ -233,12 +233,12 @@ StatusTuple Printer::visit_struct_decl_stmt_node(StructDeclStmtNode* n) {
   }
   --indent_;
   fprintf(out_, "%*s}", indent_, "");
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple Printer::visit_state_decl_stmt_node(StateDeclStmtNode* n) {
   if (!n->id_) {
-    return StatusTuple(0);
+    return StatusTuple::OK();
   }
   fprintf(out_, "state ");
   TRY2(n->id_->accept(this));
@@ -249,11 +249,11 @@ StatusTuple Printer::visit_state_decl_stmt_node(StateDeclStmtNode* n) {
   //  TRY2(n->id2_->accept(this));
   //}
   //TRY2(n->block_->accept(this));
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple Printer::visit_parser_state_stmt_node(ParserStateStmtNode* n) {
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple Printer::visit_match_decl_stmt_node(MatchDeclStmtNode* n) {
@@ -268,7 +268,7 @@ StatusTuple Printer::visit_match_decl_stmt_node(MatchDeclStmtNode* n) {
   }
   fprintf(out_, ") ");
   TRY2(n->block_->accept(this));
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple Printer::visit_miss_decl_stmt_node(MissDeclStmtNode* n) {
@@ -283,7 +283,7 @@ StatusTuple Printer::visit_miss_decl_stmt_node(MissDeclStmtNode* n) {
   }
   fprintf(out_, ") ");
   TRY2(n->block_->accept(this));
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple Printer::visit_failure_decl_stmt_node(FailureDeclStmtNode* n) {
@@ -298,7 +298,7 @@ StatusTuple Printer::visit_failure_decl_stmt_node(FailureDeclStmtNode* n) {
   }
   fprintf(out_, ") ");
   TRY2(n->block_->accept(this));
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple Printer::visit_table_decl_stmt_node(TableDeclStmtNode* n) {
@@ -313,7 +313,7 @@ StatusTuple Printer::visit_table_decl_stmt_node(TableDeclStmtNode* n) {
   fprintf(out_, "> ");
   TRY2(n->id_->accept(this));
   fprintf(out_, "(%zu)", n->size_);
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple Printer::visit_func_decl_stmt_node(FuncDeclStmtNode *n) {
@@ -328,7 +328,7 @@ StatusTuple Printer::visit_func_decl_stmt_node(FuncDeclStmtNode *n) {
   }
   fprintf(out_, ") ");
   TRY2(n->block_->accept(this));
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 }  // namespace cc
