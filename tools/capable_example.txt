@@ -88,19 +88,30 @@ TIME      UID    PID    COMM             CAP  NAME                 AUDIT
 Similarly, it is possible to include user-space stack with -U (or they can be
 used both at the same time to include user and kernel stack).
 
+The --cgroupmap option filters based on a cgroup set. It is meant to be used
+with an externally created map.
+
+# ./capable.py --cgroupmap /sys/fs/bpf/test01
+
+For more details, see docs/filtering_by_cgroups.md
+
+
 USAGE:
 
 # ./capable.py -h
-usage: capable.py [-h] [-v] [-p PID] [-K] [-U]
+usage: capable.py [-h] [-v] [-p PID] [-K] [-U] [-x] [--cgroupmap CGROUPMAP]
 
 Trace security capability checks
 
 optional arguments:
-  -h, --help          show this help message and exit
-  -v, --verbose       include non-audit checks
-  -p PID, --pid PID   trace this PID only
-  -K, --kernel-stack  output kernel stack trace
-  -U, --user-stack    output user stack trace
+  -h, --help            show this help message and exit
+  -v, --verbose         include non-audit checks
+  -p PID, --pid PID     trace this PID only
+  -K, --kernel-stack    output kernel stack trace
+  -U, --user-stack      output user stack trace
+  -x, --extra           show extra fields in TID and INSETID columns
+  --cgroupmap CGROUPMAP
+                        trace cgroups in this BPF map only
 
 examples:
     ./capable             # trace capability checks
@@ -108,3 +119,5 @@ examples:
     ./capable -p 181      # only trace PID 181
     ./capable -K          # add kernel stacks to trace
     ./capable -U          # add user-space stacks to trace
+    ./capable -x          # extra fields: show TID and INSETID columns
+    ./capable --cgroupmap ./mappath  # only trace cgroups in this BPF map
