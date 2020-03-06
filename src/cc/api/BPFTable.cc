@@ -78,7 +78,7 @@ StatusTuple BPFTable::get_value(const std::string& key_str,
     if (r.code() != 0)
       return r;
   }
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple BPFTable::update_value(const std::string& key_str,
@@ -99,7 +99,7 @@ StatusTuple BPFTable::update_value(const std::string& key_str,
   if (!update(key, value))
     return StatusTuple(-1, "error updating element");
 
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple BPFTable::update_value(const std::string& key_str,
@@ -126,7 +126,7 @@ StatusTuple BPFTable::update_value(const std::string& key_str,
   if (!update(key, value))
     return StatusTuple(-1, "error updating element");
 
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple BPFTable::remove_value(const std::string& key_str) {
@@ -141,7 +141,7 @@ StatusTuple BPFTable::remove_value(const std::string& key_str) {
   if (!remove(key))
     return StatusTuple(-1, "error removing element");
 
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple BPFTable::clear_table_non_atomic() {
@@ -177,7 +177,7 @@ StatusTuple BPFTable::clear_table_non_atomic() {
                        desc.name.c_str());
   }
 
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple BPFTable::get_table_offline(
@@ -225,7 +225,7 @@ StatusTuple BPFTable::get_table_offline(
     res.clear();
     // For other maps, try to use the first() and next() interfaces
     if (!this->first(key.get()))
-      return StatusTuple(0);
+      return StatusTuple::OK();
 
     while (true) {
       if (!this->lookup(key.get(), value.get()))
@@ -243,7 +243,7 @@ StatusTuple BPFTable::get_table_offline(
     }
   }
 
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 size_t BPFTable::get_possible_cpu_count() { return get_possible_cpus().size(); }
@@ -417,7 +417,7 @@ StatusTuple BPFPerfBuffer::open_on_cpu(perf_reader_raw_cb cb,
   }
 
   cpu_readers_[cpu] = reader;
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple BPFPerfBuffer::open_all_cpu(perf_reader_raw_cb cb,
@@ -437,18 +437,18 @@ StatusTuple BPFPerfBuffer::open_all_cpu(perf_reader_raw_cb cb,
       return res;
     }
   }
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple BPFPerfBuffer::close_on_cpu(int cpu) {
   auto it = cpu_readers_.find(cpu);
   if (it == cpu_readers_.end())
-    return StatusTuple(0);
+    return StatusTuple::OK();
   perf_reader_free(static_cast<void*>(it->second));
   if (!remove(const_cast<int*>(&(it->first))))
     return StatusTuple(-1, "Unable to close perf buffer on CPU %d", it->first);
   cpu_readers_.erase(it);
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple BPFPerfBuffer::close_all_cpu() {
@@ -479,7 +479,7 @@ StatusTuple BPFPerfBuffer::close_all_cpu() {
 
   if (has_error)
     return StatusTuple(-1, errors);
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 int BPFPerfBuffer::poll(int timeout_ms) {
@@ -519,7 +519,7 @@ StatusTuple BPFPerfEventArray::open_all_cpu(uint32_t type, uint64_t config) {
       return res;
     }
   }
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple BPFPerfEventArray::close_all_cpu() {
@@ -540,7 +540,7 @@ StatusTuple BPFPerfEventArray::close_all_cpu() {
 
   if (has_error)
     return StatusTuple(-1, errors);
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple BPFPerfEventArray::open_on_cpu(int cpu, uint32_t type,
@@ -558,17 +558,17 @@ StatusTuple BPFPerfEventArray::open_on_cpu(int cpu, uint32_t type,
                        std::strerror(errno));
   }
   cpu_fds_[cpu] = fd;
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple BPFPerfEventArray::close_on_cpu(int cpu) {
   auto it = cpu_fds_.find(cpu);
   if (it == cpu_fds_.end()) {
-    return StatusTuple(0);
+    return StatusTuple::OK();
   }
   bpf_close_perf_event_fd(it->second);
   cpu_fds_.erase(it);
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 BPFPerfEventArray::~BPFPerfEventArray() {
@@ -589,13 +589,13 @@ BPFProgTable::BPFProgTable(const TableDesc& desc)
 StatusTuple BPFProgTable::update_value(const int& index, const int& prog_fd) {
   if (!this->update(const_cast<int*>(&index), const_cast<int*>(&prog_fd)))
     return StatusTuple(-1, "Error updating value: %s", std::strerror(errno));
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple BPFProgTable::remove_value(const int& index) {
   if (!this->remove(const_cast<int*>(&index)))
     return StatusTuple(-1, "Error removing value: %s", std::strerror(errno));
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 BPFCgroupArray::BPFCgroupArray(const TableDesc& desc)
@@ -609,7 +609,7 @@ StatusTuple BPFCgroupArray::update_value(const int& index,
                                          const int& cgroup2_fd) {
   if (!this->update(const_cast<int*>(&index), const_cast<int*>(&cgroup2_fd)))
     return StatusTuple(-1, "Error updating value: %s", std::strerror(errno));
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple BPFCgroupArray::update_value(const int& index,
@@ -618,13 +618,13 @@ StatusTuple BPFCgroupArray::update_value(const int& index,
   if ((int)f < 0)
     return StatusTuple(-1, "Unable to open %s", cgroup2_path.c_str());
   TRY2(update_value(index, (int)f));
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple BPFCgroupArray::remove_value(const int& index) {
   if (!this->remove(const_cast<int*>(&index)))
     return StatusTuple(-1, "Error removing value: %s", std::strerror(errno));
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 BPFDevmapTable::BPFDevmapTable(const TableDesc& desc)
@@ -638,20 +638,20 @@ StatusTuple BPFDevmapTable::update_value(const int& index,
                                          const int& value) {
     if (!this->update(const_cast<int*>(&index), const_cast<int*>(&value)))
       return StatusTuple(-1, "Error updating value: %s", std::strerror(errno));
-    return StatusTuple(0);
+    return StatusTuple::OK();
 }
 
 StatusTuple BPFDevmapTable::get_value(const int& index,
                                       int& value) {
     if (!this->lookup(const_cast<int*>(&index), &value))
       return StatusTuple(-1, "Error getting value: %s", std::strerror(errno));
-    return StatusTuple(0);
+    return StatusTuple::OK();
 }
 
 StatusTuple BPFDevmapTable::remove_value(const int& index) {
     if (!this->remove(const_cast<int*>(&index)))
       return StatusTuple(-1, "Error removing value: %s", std::strerror(errno));
-    return StatusTuple(0);
+    return StatusTuple::OK();
 }
 
 BPFXskmapTable::BPFXskmapTable(const TableDesc& desc)
@@ -665,20 +665,20 @@ StatusTuple BPFXskmapTable::update_value(const int& index,
                                          const int& value) {
     if (!this->update(const_cast<int*>(&index), const_cast<int*>(&value)))
       return StatusTuple(-1, "Error updating value: %s", std::strerror(errno));
-    return StatusTuple(0);
+    return StatusTuple::OK();
 }
 
 StatusTuple BPFXskmapTable::get_value(const int& index,
                                       int& value) {
     if (!this->lookup(const_cast<int*>(&index), &value))
       return StatusTuple(-1, "Error getting value: %s", std::strerror(errno));
-    return StatusTuple(0);
+    return StatusTuple::OK();
 }
 
 StatusTuple BPFXskmapTable::remove_value(const int& index) {
     if (!this->remove(const_cast<int*>(&index)))
       return StatusTuple(-1, "Error removing value: %s", std::strerror(errno));
-    return StatusTuple(0);
+    return StatusTuple::OK();
 }
 
 BPFMapInMapTable::BPFMapInMapTable(const TableDesc& desc)
@@ -693,13 +693,13 @@ StatusTuple BPFMapInMapTable::update_value(const int& index,
                                            const int& inner_map_fd) {
     if (!this->update(const_cast<int*>(&index), const_cast<int*>(&inner_map_fd)))
       return StatusTuple(-1, "Error updating value: %s", std::strerror(errno));
-    return StatusTuple(0);
+    return StatusTuple::OK();
 }
 
 StatusTuple BPFMapInMapTable::remove_value(const int& index) {
     if (!this->remove(const_cast<int*>(&index)))
       return StatusTuple(-1, "Error removing value: %s", std::strerror(errno));
-    return StatusTuple(0);
+    return StatusTuple::OK();
 }
 
 BPFSockmapTable::BPFSockmapTable(const TableDesc& desc)
@@ -713,13 +713,13 @@ StatusTuple BPFSockmapTable::update_value(const int& index,
                                          const int& value) {
     if (!this->update(const_cast<int*>(&index), const_cast<int*>(&value)))
       return StatusTuple(-1, "Error updating value: %s", std::strerror(errno));
-    return StatusTuple(0);
+    return StatusTuple::OK();
 }
 
 StatusTuple BPFSockmapTable::remove_value(const int& index) {
     if (!this->remove(const_cast<int*>(&index)))
       return StatusTuple(-1, "Error removing value: %s", std::strerror(errno));
-    return StatusTuple(0);
+    return StatusTuple::OK();
 }
 
 BPFSockhashTable::BPFSockhashTable(const TableDesc& desc)
@@ -733,13 +733,13 @@ StatusTuple BPFSockhashTable::update_value(const int& key,
                                          const int& value) {
     if (!this->update(const_cast<int*>(&key), const_cast<int*>(&value)))
       return StatusTuple(-1, "Error updating value: %s", std::strerror(errno));
-    return StatusTuple(0);
+    return StatusTuple::OK();
 }
 
 StatusTuple BPFSockhashTable::remove_value(const int& key) {
     if (!this->remove(const_cast<int*>(&key)))
       return StatusTuple(-1, "Error removing value: %s", std::strerror(errno));
-    return StatusTuple(0);
+    return StatusTuple::OK();
 }
 
 }  // namespace ebpf

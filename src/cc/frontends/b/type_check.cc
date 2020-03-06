@@ -37,7 +37,7 @@ StatusTuple TypeCheck::visit_block_stmt_node(BlockStmtNode *n) {
 
   if (n->scope_)
     scopes_->pop_var();
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple TypeCheck::visit_if_stmt_node(IfStmtNode *n) {
@@ -48,7 +48,7 @@ StatusTuple TypeCheck::visit_if_stmt_node(IfStmtNode *n) {
   if (n->false_block_) {
     TRY2(n->false_block_->accept(this));
   }
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple TypeCheck::visit_onvalid_stmt_node(OnValidStmtNode *n) {
@@ -60,7 +60,7 @@ StatusTuple TypeCheck::visit_onvalid_stmt_node(OnValidStmtNode *n) {
   if (n->else_block_) {
     TRY2(n->else_block_->accept(this));
   }
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple TypeCheck::visit_switch_stmt_node(SwitchStmtNode *n) {
@@ -71,7 +71,7 @@ StatusTuple TypeCheck::visit_switch_stmt_node(SwitchStmtNode *n) {
   for (auto it = n->block_->stmts_.begin(); it != n->block_->stmts_.end(); ++it) {
     /// @todo check for duplicates
   }
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple TypeCheck::visit_case_stmt_node(CaseStmtNode *n) {
@@ -81,7 +81,7 @@ StatusTuple TypeCheck::visit_case_stmt_node(CaseStmtNode *n) {
       return mkstatus_(n, "Switch condition must be a numeric type");
   }
   TRY2(n->block_->accept(this));
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple TypeCheck::visit_ident_expr_node(IdentExprNode *n) {
@@ -131,7 +131,7 @@ StatusTuple TypeCheck::visit_ident_expr_node(IdentExprNode *n) {
     n->bit_width_ = n->sub_decl_->bit_width_;
     n->flags_[ExprNode::WRITE] = true;
   }
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple TypeCheck::visit_assign_expr_node(AssignExprNode *n) {
@@ -151,7 +151,7 @@ StatusTuple TypeCheck::visit_assign_expr_node(AssignExprNode *n) {
       return mkstatus_(n, "Right-hand side of assignment must be a numeric type");
   }
   n->typeof_ = ExprNode::VOID;
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple TypeCheck::visit_packet_expr_node(PacketExprNode *n) {
@@ -172,20 +172,20 @@ StatusTuple TypeCheck::visit_packet_expr_node(PacketExprNode *n) {
       n->bit_width_ = sub_decl->bit_width_;
   }
   n->flags_[ExprNode::WRITE] = true;
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple TypeCheck::visit_integer_expr_node(IntegerExprNode *n) {
   n->typeof_ = ExprNode::INTEGER;
   n->bit_width_ = n->bits_;
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple TypeCheck::visit_string_expr_node(StringExprNode *n) {
   n->typeof_ = ExprNode::STRING;
   n->flags_[ExprNode::IS_REF] = true;
   n->bit_width_ = n->val_.size() << 3;
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple TypeCheck::visit_binop_expr_node(BinopExprNode *n) {
@@ -208,7 +208,7 @@ StatusTuple TypeCheck::visit_binop_expr_node(BinopExprNode *n) {
     default:
       n->bit_width_ = std::max(n->lhs_->bit_width_, n->rhs_->bit_width_);
   }
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple TypeCheck::visit_unop_expr_node(UnopExprNode *n) {
@@ -216,26 +216,26 @@ StatusTuple TypeCheck::visit_unop_expr_node(UnopExprNode *n) {
   if (n->expr_->typeof_ != ExprNode::INTEGER)
     return mkstatus_(n, "Unary operand must be a numeric type");
   n->copy_type(*n->expr_);
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple TypeCheck::visit_bitop_expr_node(BitopExprNode *n) {
   if (n->expr_->typeof_ != ExprNode::INTEGER)
     return mkstatus_(n, "Bitop [] can only operate on numeric types");
   n->typeof_ = ExprNode::INTEGER;
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple TypeCheck::visit_goto_expr_node(GotoExprNode *n) {
   //n->id_->accept(this);
   n->typeof_ = ExprNode::VOID;
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple TypeCheck::visit_return_expr_node(ReturnExprNode *n) {
   TRY2(n->expr_->accept(this));
   n->typeof_ = ExprNode::VOID;
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple TypeCheck::expect_method_arg(MethodCallExprNode *n, size_t num, size_t num_def_args = 0) {
@@ -248,7 +248,7 @@ StatusTuple TypeCheck::expect_method_arg(MethodCallExprNode *n, size_t num, size
       return mkstatus_(n, "%s expected %d argument%s (%d default), %zu given", n->id_->sub_name_.c_str(),
                       num, num == 1 ? "" : "s", num_def_args, n->args_.size());
   }
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple TypeCheck::check_lookup_method(MethodCallExprNode *n) {
@@ -264,7 +264,7 @@ StatusTuple TypeCheck::check_lookup_method(MethodCallExprNode *n) {
     n->block_->scope_->add("_result", result.get());
     n->block_->stmts_.insert(n->block_->stmts_.begin(), move(result));
   }
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple TypeCheck::check_update_method(MethodCallExprNode *n) {
@@ -275,7 +275,7 @@ StatusTuple TypeCheck::check_update_method(MethodCallExprNode *n) {
     TRY2(expect_method_arg(n, 2));
   else if (table->type_id()->name_ == "LPM")
     TRY2(expect_method_arg(n, 3));
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple TypeCheck::check_delete_method(MethodCallExprNode *n) {
@@ -286,7 +286,7 @@ StatusTuple TypeCheck::check_delete_method(MethodCallExprNode *n) {
     TRY2(expect_method_arg(n, 1));
   else if (table->type_id()->name_ == "LPM")
     {}
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple TypeCheck::visit_method_call_expr_node(MethodCallExprNode *n) {
@@ -339,7 +339,7 @@ StatusTuple TypeCheck::visit_method_call_expr_node(MethodCallExprNode *n) {
       return mkstatus_(n, "%s does not allow trailing block statements", n->id_->full_name().c_str());
     TRY2(n->block_->accept(this));
   }
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple TypeCheck::visit_table_index_expr_node(TableIndexExprNode *n) {
@@ -359,12 +359,12 @@ StatusTuple TypeCheck::visit_table_index_expr_node(TableIndexExprNode *n) {
     n->flags_[ExprNode::IS_REF] = true;
     n->struct_type_ = n->table_->leaf_type_;
   }
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple TypeCheck::visit_expr_stmt_node(ExprStmtNode *n) {
   TRY2(n->expr_->accept(this));
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple TypeCheck::visit_struct_variable_decl_stmt_node(StructVariableDeclStmtNode *n) {
@@ -399,7 +399,7 @@ StatusTuple TypeCheck::visit_struct_variable_decl_stmt_node(StructVariableDeclSt
       TRY2((*it)->accept(this));
     }
   }
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple TypeCheck::visit_integer_variable_decl_stmt_node(IntegerVariableDeclStmtNode *n) {
@@ -407,7 +407,7 @@ StatusTuple TypeCheck::visit_integer_variable_decl_stmt_node(IntegerVariableDecl
   if (!n->init_.empty()) {
     TRY2(n->init_[0]->accept(this));
   }
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple TypeCheck::visit_struct_decl_stmt_node(StructDeclStmtNode *n) {
@@ -415,16 +415,16 @@ StatusTuple TypeCheck::visit_struct_decl_stmt_node(StructDeclStmtNode *n) {
   for (auto it = n->stmts_.begin(); it != n->stmts_.end(); ++it) {
     TRY2((*it)->accept(this));
   }
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple TypeCheck::visit_parser_state_stmt_node(ParserStateStmtNode *n) {
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple TypeCheck::visit_state_decl_stmt_node(StateDeclStmtNode *n) {
   if (!n->id_) {
-    return StatusTuple(0);
+    return StatusTuple::OK();
   }
   auto s1 = proto_scopes_->top_state()->lookup(n->id_->name_, true);
   if (s1) {
@@ -479,7 +479,7 @@ StatusTuple TypeCheck::visit_state_decl_stmt_node(StateDeclStmtNode *n) {
 
     scopes_->pop_state();
   }
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple TypeCheck::visit_match_decl_stmt_node(MatchDeclStmtNode *n) {
@@ -488,7 +488,7 @@ StatusTuple TypeCheck::visit_match_decl_stmt_node(MatchDeclStmtNode *n) {
     TRY2((*it)->accept(this));
   }
   TRY2(n->block_->accept(this));
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple TypeCheck::visit_miss_decl_stmt_node(MissDeclStmtNode *n) {
@@ -497,7 +497,7 @@ StatusTuple TypeCheck::visit_miss_decl_stmt_node(MissDeclStmtNode *n) {
     TRY2((*it)->accept(this));
   }
   TRY2(n->block_->accept(this));
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple TypeCheck::visit_failure_decl_stmt_node(FailureDeclStmtNode *n) {
@@ -506,7 +506,7 @@ StatusTuple TypeCheck::visit_failure_decl_stmt_node(FailureDeclStmtNode *n) {
     TRY2((*it)->accept(this));
   }
   TRY2(n->block_->accept(this));
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple TypeCheck::visit_table_decl_stmt_node(TableDeclStmtNode *n) {
@@ -524,7 +524,7 @@ StatusTuple TypeCheck::visit_table_decl_stmt_node(TableDeclStmtNode *n) {
   }
   if (n->policy_id()->name_ != "AUTO" && n->policy_id()->name_ != "NONE")
     return mkstatus_(n, "Unsupported policy type %s", n->policy_id()->c_str());
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple TypeCheck::visit_func_decl_stmt_node(FuncDeclStmtNode *n) {
@@ -539,7 +539,7 @@ StatusTuple TypeCheck::visit_func_decl_stmt_node(FuncDeclStmtNode *n) {
   scopes_->push_state(n->scope_);
   TRY2(n->block_->accept(this));
   scopes_->pop_state();
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple TypeCheck::visit(Node *root) {
@@ -580,7 +580,7 @@ StatusTuple TypeCheck::visit(Node *root) {
     }
     return StatusTuple(-1, errors_.begin()->c_str());
   }
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 }  // namespace cc
