@@ -27,6 +27,7 @@ examples = """examples:
     ./capable -K          # add kernel stacks to trace
     ./capable -U          # add user-space stacks to trace
     ./capable -x          # extra fields: show TID and INSETID columns
+    ./capable --cgroupmap ./mappath  # only trace cgroups in this BPF map
 """
 parser = argparse.ArgumentParser(
     description="Trace security capability checks",
@@ -42,6 +43,8 @@ parser.add_argument("-U", "--user-stack", action="store_true",
     help="output user stack trace")
 parser.add_argument("-x", "--extra", action="store_true",
     help="show extra fields in TID and INSETID columns")
+parser.add_argument("--cgroupmap",
+    help="trace cgroups in this BPF map only")
 args = parser.parse_args()
 debug = 0
 
@@ -122,6 +125,10 @@ struct data_t {
 
 BPF_PERF_OUTPUT(events);
 
+#if CGROUPSET
+BPF_TABLE_PINNED("hash", u64, u64, cgroupset, 1024, "CGROUPPATH");
+#endif
+
 #if defined(USER_STACKS) || defined(KERNEL_STACKS)
 BPF_STACK_TRACE(stacks, 2048);
 #endif
@@ -146,6 +153,12 @@ int kprobe__cap_capable(struct pt_regs *ctx, const struct cred *cred,
     FILTER1
     FILTER2
     FILTER3
+#if CGROUPSET
+    u64 cgroupid = bpf_get_current_cgroup_id();
+    if (cgroupset.lookup(&cgroupid) == NULL) {
+        return 0;
+    }
+#endif
 
     u32 uid = bpf_get_current_uid_gid();
     struct data_t data = {.tgid = tgid, .pid = pid, .uid = uid, .cap = cap, .audit = audit, .insetid = insetid};
@@ -174,6 +187,11 @@ bpf_text = bpf_text.replace('FILTER1', '')
 bpf_text = bpf_text.replace('FILTER2', '')
 bpf_text = bpf_text.replace('FILTER3',
     'if (pid == %s) { return 0; }' % getpid())
+if args.cgroupmap:
+    bpf_text = bpf_text.replace('CGROUPSET', '1')
+    bpf_text = bpf_text.replace('CGROUPPATH', args.cgroupmap)
+else:
+    bpf_text = bpf_text.replace('CGROUPSET', '0')
 if debug:
     print(bpf_text)
 
