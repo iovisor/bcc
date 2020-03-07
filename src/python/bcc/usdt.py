@@ -147,8 +147,17 @@ class USDT(object):
         lib.bcc_usdt_close(self.context)
 
     def enable_probe(self, probe, fn_name):
-        if lib.bcc_usdt_enable_probe(self.context, probe.encode('ascii'),
-                fn_name.encode('ascii')) != 0:
+        probe_parts = probe.split(":", 1)
+        if len(probe_parts) == 1:
+            ret = lib.bcc_usdt_enable_probe(
+                self.context, probe.encode('ascii'), fn_name.encode('ascii'))
+        else:
+            (provider_name, probe_name) = probe_parts
+            ret = lib.bcc_usdt_enable_fully_specified_probe(
+                self.context, provider_name.encode('ascii'), probe_name.encode('ascii'),
+                fn_name.encode('ascii'))
+
+        if ret != 0:
             raise USDTException(
 """Failed to enable USDT probe '%s':
 the specified pid might not contain the given language's runtime,
