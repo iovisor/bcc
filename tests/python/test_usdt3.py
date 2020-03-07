@@ -20,6 +20,7 @@ class TestUDST(TestCase):
 static inline void record_val(int val)
 {
   FOLLY_SDT(test, probe, val);
+  FOLLY_SDT(test_dup_name, probe, val);
 }
 
 extern void record_a(int val);
@@ -110,7 +111,7 @@ int do_trace(struct pt_regs *ctx) {
     def test_attach1(self):
         # enable USDT probe from given PID and verifier generated BPF programs
         u = USDT(pid=int(self.app.pid))
-        u.enable_probe(probe="probe", fn_name="do_trace")
+        u.enable_probe(probe="test:probe", fn_name="do_trace")
         b = BPF(text=self.bpf_text, usdt_contexts=[u])
 
         # processing events
