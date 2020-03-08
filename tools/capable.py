@@ -27,6 +27,7 @@ examples = """examples:
     ./capable -K          # add kernel stacks to trace
     ./capable -U          # add user-space stacks to trace
     ./capable -x          # extra fields: show TID and INSETID columns
+    ./capable --unique    # don't repeat stacks for the same pid or cgroup
     ./capable --cgroupmap ./mappath  # only trace cgroups in this BPF map
 """
 parser = argparse.ArgumentParser(
@@ -45,6 +46,8 @@ parser.add_argument("-x", "--extra", action="store_true",
     help="show extra fields in TID and INSETID columns")
 parser.add_argument("--cgroupmap",
     help="trace cgroups in this BPF map only")
+parser.add_argument("--unique", action="store_true",
+    help="don't repeat stacks for the same pid or cgroup")
 args = parser.parse_args()
 debug = 0
 
@@ -125,6 +128,23 @@ struct data_t {
 
 BPF_PERF_OUTPUT(events);
 
+#if UNIQUESET
+struct repeat_t {
+   int cap;
+   u32 tgid;
+#if CGROUPSET
+   u64 cgroupid;
+#endif
+#ifdef KERNEL_STACKS
+   int kernel_stack_id;
+#endif
+#ifdef USER_STACKS
+   int user_stack_id;
+#endif
+};
+BPF_HASH(seen, struct repeat_t, u64);
+#endif
+
 #if CGROUPSET
 BPF_TABLE_PINNED("hash", u64, u64, cgroupset, 1024, "CGROUPPATH");
 #endif
@@ -168,6 +188,28 @@ int kprobe__cap_capable(struct pt_regs *ctx, const struct cred *cred,
 #ifdef USER_STACKS
     data.user_stack_id = stacks.get_stackid(ctx, BPF_F_USER_STACK);
 #endif
+
+#if UNIQUESET
+    struct repeat_t repeat = {0,};
+    repeat.cap = cap;
+#if CGROUPSET
+    repeat.cgroupid = bpf_get_current_cgroup_id(),
+#else
+    repeat.tgid = tgid;
+#endif
+#ifdef KERNEL_STACKS
+    repeat.kernel_stack_id = data.kernel_stack_id;
+#endif
+#ifdef USER_STACKS
+    repeat.user_stack_id = data.user_stack_id;
+#endif
+    if (seen.lookup(&repeat) != NULL) {
+        return 0;
+    }
+    u64 zero = 0;
+    seen.update(&repeat, &zero);
+#endif
+
     bpf_get_current_comm(&data.comm, sizeof(data.comm));
     events.perf_submit(ctx, &data, sizeof(data));
 
@@ -192,6 +234,10 @@ if args.cgroupmap:
     bpf_text = bpf_text.replace('CGROUPPATH', args.cgroupmap)
 else:
     bpf_text = bpf_text.replace('CGROUPSET', '0')
+if args.unique:
+    bpf_text = bpf_text.replace('UNIQUESET', '1')
+else:
+    bpf_text = bpf_text.replace('UNIQUESET', '0')
 if debug:
     print(bpf_text)
 

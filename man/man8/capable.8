@@ -1,8 +1,9 @@
-.TH capable 8  "2020-03-06" "USER COMMANDS"
+.TH capable 8  "2020-03-08" "USER COMMANDS"
 .SH NAME
 capable \- Trace security capability checks (cap_capable()).
 .SH SYNOPSIS
 .B capable [\-h] [\-v] [\-p PID] [\-K] [\-U] [\-x] [\-\-cgroupmap MAPPATH]
+           [--unique]
 .SH DESCRIPTION
 This traces security capability checks in the kernel, and prints details for
 each call. This can be useful for general debugging, and also security
@@ -31,6 +32,9 @@ Show extra fields in TID and INSETID columns.
 .TP
 \-\-cgroupmap MAPPATH
 Trace cgroups in this BPF map only (filtered in-kernel).
+.TP
+\-\-unique
+Don't repeat stacks for the same PID or cgroup.
 .SH EXAMPLES
 .TP
 Trace all capability checks system-wide:
