@@ -160,8 +160,9 @@ class Probe(object):
                         self.library = ""       # kernel
                         self.function = ""      # from TRACEPOINT_PROBE
                 elif self.probe_type == "u":
-                        self.library = ':'.join(parts[1:-1])
-                        self.usdt_name = parts[-1]
+                        # u:<library>[:<provider>]:<probe> where :<provider> is optional
+                        self.library = parts[1]
+                        self.usdt_name = ":".join(parts[2:])
                         self.function = ""      # no function, just address
                         # We will discover the USDT provider by matching on
                         # the USDT name in the specified library
@@ -180,8 +181,17 @@ class Probe(object):
                 target = Probe.pid if Probe.pid and Probe.pid != -1 \
                                    else Probe.tgid
                 self.usdt = USDT(path=self.library, pid=target)
+
+                parts = self.usdt_name.split(":")
+                if len(parts) == 1:
+                        provider_name = None
+                        usdt_name = parts[0].encode("ascii")
+                else:
+                        provider_name = parts[0].encode("ascii")
+                        usdt_name = parts[1].encode("ascii")
                 for probe in self.usdt.enumerate_probes():
-                        if probe.name == self.usdt_name.encode('ascii'):
+                        if ((not provider_name or probe.provider == provider_name)
+                                        and probe.name == usdt_name):
                                 return  # Found it, will enable later
                 self._bail("unrecognized USDT probe %s" % self.usdt_name)
 
@@ -677,6 +687,8 @@ trace 't:block:block_rq_complete "sectors=%d", args->nr_sector'
         Trace the block_rq_complete kernel tracepoint and print # of tx sectors
 trace 'u:pthread:pthread_create (arg4 != 0)'
         Trace the USDT probe pthread_create when its 4th argument is non-zero
+trace 'u:pthread:libpthread:pthread_create (arg4 != 0)'
+        Ditto, but the provider name "libpthread" is specified.
 trace 'p::SyS_nanosleep(struct timespec *ts) "sleep for %lld ns", ts->tv_nsec'
         Trace the nanosleep syscall and print the sleep duration in ns
 trace -c /sys/fs/cgroup/system.slice/workload.service '__x64_sys_nanosleep' '__x64_sys_clone'
