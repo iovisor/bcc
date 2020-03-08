@@ -45,6 +45,7 @@ examples = """examples:
     ./tcptop           # trace TCP send/recv by host
     ./tcptop -C        # don't clear the screen
     ./tcptop -p 181    # only trace PID 181
+    ./tcptop --cgroupmap ./mappath  # only trace cgroups in this BPF map
 """
 parser = argparse.ArgumentParser(
     description="Summarize TCP send/recv throughput by host",
@@ -60,6 +61,8 @@ parser.add_argument("interval", nargs="?", default=1, type=range_check,
     help="output interval, in seconds (default 1)")
 parser.add_argument("count", nargs="?", default=-1, type=range_check,
     help="number of outputs")
+parser.add_argument("--cgroupmap",
+    help="trace cgroups in this BPF map only")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
 args = parser.parse_args()
@@ -94,11 +97,21 @@ struct ipv6_key_t {
 BPF_HASH(ipv6_send_bytes, struct ipv6_key_t);
 BPF_HASH(ipv6_recv_bytes, struct ipv6_key_t);
 
+#if CGROUPSET
+BPF_TABLE_PINNED("hash", u64, u64, cgroupset, 1024, "CGROUPPATH");
+#endif
+
 int kprobe__tcp_sendmsg(struct pt_regs *ctx, struct sock *sk,
     struct msghdr *msg, size_t size)
 {
     u32 pid = bpf_get_current_pid_tgid() >> 32;
     FILTER
+#if CGROUPSET
+    u64 cgroupid = bpf_get_current_cgroup_id();
+    if (cgroupset.lookup(&cgroupid) == NULL) {
+        return 0;
+    }
+#endif
     u16 dport = 0, family = sk->__sk_common.skc_family;
 
     if (family == AF_INET) {
@@ -136,6 +149,12 @@ int kprobe__tcp_cleanup_rbuf(struct pt_regs *ctx, struct sock *sk, int copied)
 {
     u32 pid = bpf_get_current_pid_tgid() >> 32;
     FILTER
+#if CGROUPSET
+    u64 cgroupid = bpf_get_current_cgroup_id();
+    if (cgroupset.lookup(&cgroupid) == NULL) {
+        return 0;
+    }
+#endif
     u16 dport = 0, family = sk->__sk_common.skc_family;
     u64 *val, zero = 0;
 
@@ -174,6 +193,11 @@ if args.pid:
         'if (pid != %s) { return 0; }' % args.pid)
 else:
     bpf_text = bpf_text.replace('FILTER', '')
+if args.cgroupmap:
+    bpf_text = bpf_text.replace('CGROUPSET', '1')
+    bpf_text = bpf_text.replace('CGROUPPATH', args.cgroupmap)
+else:
+    bpf_text = bpf_text.replace('CGROUPSET', '0')
 if debug or args.ebpf:
     print(bpf_text)
     if args.ebpf:

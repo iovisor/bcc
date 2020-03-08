@@ -92,25 +92,36 @@ PID    COMM         LADDR                 RADDR                  RX_KB  TX_KB
 
 You can disable the loadavg summary line with -S if needed.
 
+The --cgroupmap option filters based on a cgroup set. It is meant to be used
+with an externally created map.
+
+# tcptop --cgroupmap /sys/fs/bpf/test01
+
+For more details, see docs/filtering_by_cgroups.md
+
 
 USAGE:
 
 # tcptop -h
-usage: tcptop.py [-h] [-C] [-S] [-p PID] [interval] [count]
+usage: tcptop.py [-h] [-C] [-S] [-p PID] [--cgroupmap CGROUPMAP]
+                 [interval] [count]
 
 Summarize TCP send/recv throughput by host
 
 positional arguments:
-  interval           output interval, in seconds (default 1)
-  count              number of outputs
+  interval              output interval, in seconds (default 1)
+  count                 number of outputs
 
 optional arguments:
-  -h, --help         show this help message and exit
-  -C, --noclear      don't clear the screen
-  -S, --nosummary    skip system summary line
-  -p PID, --pid PID  trace this PID only
+  -h, --help            show this help message and exit
+  -C, --noclear         don't clear the screen
+  -S, --nosummary       skip system summary line
+  -p PID, --pid PID     trace this PID only
+  --cgroupmap CGROUPMAP
+                        trace cgroups in this BPF map only
 
 examples:
     ./tcptop           # trace TCP send/recv by host
     ./tcptop -C        # don't clear the screen
     ./tcptop -p 181    # only trace PID 181
+    ./tcptop --cgroupmap ./mappath  # only trace cgroups in this BPF map
