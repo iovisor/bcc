@@ -356,7 +356,7 @@ sudo apt-get -y install luajit luajit-5.1-dev
 ```
 git clone https://github.com/iovisor/bcc.git
 mkdir bcc/build; cd bcc/build
-cmake .. -DCMAKE_INSTALL_PREFIX=/usr
+cmake ..
 make
 sudo make install
 cmake -DPYTHON_CMD=python3 .. # build python3 binding
@@ -399,7 +399,7 @@ sudo dnf install -y clang clang-devel llvm llvm-devel llvm-static ncurses-devel
 ```
 git clone https://github.com/iovisor/bcc.git
 mkdir bcc/build; cd bcc/build
-cmake .. -DCMAKE_INSTALL_PREFIX=/usr
+cmake ..
 make
 sudo make install
 ```
@@ -420,8 +420,7 @@ sudo zypper in lua51-luajit-devel # for lua support in openSUSE Tumbleweed
 ```
 git clone https://github.com/iovisor/bcc.git
 mkdir bcc/build; cd bcc/build
-cmake -DCMAKE_INSTALL_PREFIX=/usr \
-      -DLUAJIT_INCLUDE_DIR=`pkg-config --variable=includedir luajit` \ # for lua support
+cmake -DLUAJIT_INCLUDE_DIR=`pkg-config --variable=includedir luajit` \ # for lua support
       ..
 make
 sudo make install
@@ -461,13 +460,13 @@ mkdir llvm-build
 
 cd llvm-build
 cmake3 -G "Unix Makefiles" -DLLVM_TARGETS_TO_BUILD="BPF;X86" \
-  -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr ../llvm-7.0.1.src
+  -DCMAKE_BUILD_TYPE=Release ../llvm-7.0.1.src
 make
 sudo make install
 
 cd ../clang-build
 cmake3 -G "Unix Makefiles" -DLLVM_TARGETS_TO_BUILD="BPF;X86" \
-  -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr ../cfe-7.0.1.src
+  -DCMAKE_BUILD_TYPE=Release ../cfe-7.0.1.src
 make
 sudo make install
 cd ..
@@ -489,7 +488,7 @@ For permanently enable scl environment, please check https://access.redhat.com/s
 ```
 git clone https://github.com/iovisor/bcc.git
 mkdir bcc/build; cd bcc/build
-cmake .. -DCMAKE_INSTALL_PREFIX=/usr
+cmake ..
 make
 sudo make install
 ```
@@ -522,7 +521,7 @@ tar xf clang*
 git clone https://github.com/iovisor/bcc.git
 pushd .
 mkdir bcc/build; cd bcc/build
-cmake3 .. -DCMAKE_INSTALL_PREFIX=/usr
+cmake3 ..
 time make
 sudo make install
 popd
