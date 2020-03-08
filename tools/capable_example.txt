@@ -88,6 +88,13 @@ TIME      UID    PID    COMM             CAP  NAME                 AUDIT
 Similarly, it is possible to include user-space stack with -U (or they can be
 used both at the same time to include user and kernel stack).
 
+Some processes can do a lot of security capability checks, generating a lot of
+ouput. In this case, the --unique option is useful to only print once the same
+set of capability, pid (or cgroup if --cgroupmap is used) and kernel/user
+stacks (if -K or -U are used).
+
+# ./capable.py -K -U --unique
+
 The --cgroupmap option filters based on a cgroup set. It is meant to be used
 with an externally created map.
 
@@ -100,6 +107,7 @@ USAGE:
 
 # ./capable.py -h
 usage: capable.py [-h] [-v] [-p PID] [-K] [-U] [-x] [--cgroupmap CGROUPMAP]
+                  [--unique]
 
 Trace security capability checks
 
@@ -112,6 +120,7 @@ optional arguments:
   -x, --extra           show extra fields in TID and INSETID columns
   --cgroupmap CGROUPMAP
                         trace cgroups in this BPF map only
+  --unique              don't repeat stacks for the same pid or cgroup
 
 examples:
     ./capable             # trace capability checks
@@ -120,4 +129,5 @@ examples:
     ./capable -K          # add kernel stacks to trace
     ./capable -U          # add user-space stacks to trace
     ./capable -x          # extra fields: show TID and INSETID columns
+    ./capable --unique    # don't repeat stacks for the same pid or cgroup
     ./capable --cgroupmap ./mappath  # only trace cgroups in this BPF map
