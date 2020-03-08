@@ -506,6 +506,15 @@ const char *bcc_usdt_get_probe_argctype(
   return "";
 }
 
+const char *bcc_usdt_get_fully_specified_probe_argctype(
+  void *ctx, const char* provider_name, const char* probe_name, const int arg_index
+) {
+  USDT::Probe *p = static_cast<USDT::Context *>(ctx)->get(provider_name, probe_name);
+  if (p)
+    return p->get_arg_ctype(arg_index).c_str();
+  return "";
+}
+
 void bcc_usdt_foreach(void *usdt, bcc_usdt_cb callback) {
   USDT::Context *ctx = static_cast<USDT::Context *>(usdt);
   ctx->each(callback);

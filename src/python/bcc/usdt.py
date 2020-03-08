@@ -182,8 +182,14 @@ To check which probes are present in the process, use the tplist tool.
         return lib.bcc_usdt_genargs(ctx_array, 1).decode()
 
     def get_probe_arg_ctype(self, probe_name, arg_index):
-        return lib.bcc_usdt_get_probe_argctype(
-            self.context, probe_name.encode('ascii'), arg_index).decode()
+        probe_parts = probe_name.split(":", 1)
+        if len(probe_parts) == 1:
+            return lib.bcc_usdt_get_probe_argctype(
+                self.context, probe_name.encode('ascii'), arg_index).decode()
+        else:
+            (provider_name, probe) = probe_parts
+            return lib.bcc_usdt_get_fully_specified_probe_argctype(
+                self.context, provider_name.encode('ascii'), probe.encode('ascii'), arg_index).decode()
 
     def enumerate_probes(self):
         probes = []
