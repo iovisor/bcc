@@ -67,12 +67,14 @@ enum class field_kind_t {
     common,
     data_loc,
     regular,
-    invalid
+    invalid,
+    pad,
 };
 
 static inline field_kind_t _get_field_kind(std::string const& line,
                                            std::string& field_type,
-                                           std::string& field_name) {
+                                           std::string& field_name,
+                                           int *last_offset) {
   auto field_pos = line.find("field:");
   if (field_pos == std::string::npos)
     return field_kind_t::invalid;
@@ -89,6 +91,10 @@ static inline field_kind_t _get_field_kind(std::string const& line,
   if (semi_pos == std::string::npos)
     return field_kind_t::invalid;
 
+  auto offset_str = line.substr(offset_pos + 7,
+                              semi_pos - offset_pos - 7);
+  int offset = std::stoi(offset_str, nullptr);
+
   auto size_pos = line.find("size:", semi_pos);
   if (size_pos == std::string::npos)
     return field_kind_t::invalid;
@@ -100,6 +106,13 @@ static inline field_kind_t _get_field_kind(std::string const& line,
   auto size_str = line.substr(size_pos + 5,
                               semi_pos - size_pos - 5);
   int size = std::stoi(size_str, nullptr);
+
+  if (*last_offset < offset) {
+    *last_offset += 1;
+    return field_kind_t::pad;
+  }
+
+  *last_offset = offset + size;
 
   auto field = line.substr(field_pos + 6/*"field:"*/,
                            field_semi_pos - field_pos - 6);
@@ -152,19 +165,29 @@ std::string parse_tracepoint(std::istream &input, std::string const& category,
                              std::string const& event) {
   std::string tp_struct = "struct tracepoint__" + category + "__" + event + " {\n";
   tp_struct += "\tu64 __do_not_use__;\n";
+  int last_offset = 0;
   for (std::string line; getline(input, line); ) {
     std::string field_type, field_name;
-    switch (_get_field_kind(line, field_type, field_name)) {
-    case field_kind_t::invalid:
-    case field_kind_t::common:
-        continue;
-    case field_kind_t::data_loc:
-        tp_struct += "\tint data_loc_" + field_name + ";\n";
-        break;
-    case field_kind_t::regular:
-        tp_struct += "\t" + field_type + " " + field_name + ";\n";
-        break;
-    }
+    field_kind_t kind;
+
+    do {
+      kind = _get_field_kind(line, field_type, field_name, &last_offset);
+
+      switch (kind) {
+      case field_kind_t::invalid:
+      case field_kind_t::common:
+          continue;
+      case field_kind_t::data_loc:
+          tp_struct += "\tint data_loc_" + field_name + ";\n";
+          break;
+      case field_kind_t::regular:
+          tp_struct += "\t" + field_type + " " + field_name + ";\n";
+          break;
+      case field_kind_t::pad:
+          tp_struct += "\tchar __pad_" + std::to_string(last_offset - 1) + ";\n";
+          break;
+      }
+    } while (kind == field_kind_t::pad);
   }
 
   tp_struct += "};\n";
