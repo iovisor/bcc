@@ -31,7 +31,8 @@ set(TEST_LIBBCC_SOURCES
 	test_sock_table.cc
 	test_usdt_args.cc
 	test_usdt_probes.cc
-	utils.cc)
+	utils.cc
+	test_parse_tracepoint.cc)
 
 add_executable(test_libbcc ${TEST_LIBBCC_SOURCES})
 
