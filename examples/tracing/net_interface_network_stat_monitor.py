@@ -79,22 +79,11 @@ tester_send = ''
 
 OUTPUT_INTERVAL = 1
 
-def print_skb_event(cpu, data, size):
-    global tester_send
-    class SkbEvent(ct.Structure):
-#        _fields_ = [ ("magic", ct.c_uint32),("magic2", ct.c_uint32)]
-        _fields_ = [("magic", ct.c_uint32)]
-        
-    skb_event = ct.cast(data, ct.POINTER(SkbEvent)).contents
-    
-
 bpf = BPF(text=bpf_text)
 
 function_skb_matching = bpf.load_func("packet_monitor", BPF.SOCKET_FILTER)
 
 BPF.attach_raw_socket(function_skb_matching, INTERFACE)
-
-bpf["skb_events"].open_perf_buffer(print_skb_event)
 
     # retrieeve packet_cnt map
 packet_cnt = bpf.get_table('packet_cnt')    # retrieeve packet_cnt map
@@ -115,12 +104,9 @@ print("=========================packet monitor=============================\n")
 
 try:
     while True :
-#        print("this is tester send")
         time.sleep(OUTPUT_INTERVAL)
         packet_cnt_output = packet_cnt.items()
-#        print(packet_cnt_output)
         output_len = len(packet_cnt_output)
-#        print(output_len)
         print('\n')
         for i in range(0,output_len):
             tester = int(str(packet_cnt_output[i][0])[8:-2]) # initial output omitted from the kernel space program
