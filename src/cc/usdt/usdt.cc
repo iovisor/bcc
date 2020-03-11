@@ -274,6 +274,7 @@ void Context::add_probe(const char *binpath, const struct bcc_elf_usdt *probe) {
   // from the address, so that only the file offset, and not vmaddr is used.
   uint64_t semaphore_offset = probe->semaphore;
   if (ref_ctr_offset_supported_) {
+    // FIXME only hit on python path?
     semaphore_offset -= probe_section_offset_;
     printf("Ref counter offset supported, using it\n");
   }
