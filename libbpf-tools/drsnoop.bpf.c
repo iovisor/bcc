@@ -4,9 +4,6 @@
 #include <bpf/bpf_helpers.h>
 #include "drsnoop.h"
 
-#define BPF_F_INDEX_MASK		0xffffffffULL
-#define BPF_F_CURRENT_CPU		BPF_F_INDEX_MASK
-
 const volatile pid_t targ_pid = 0;
 const volatile pid_t targ_tgid = 0;
 const volatile __u64 vm_zone_stat_kaddr = 0;
