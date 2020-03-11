@@ -74,4 +74,38 @@ TEST_CASE("test tracepoint parser", "[TracepointParser]") {
     std::string result = ebpf::parse_tracepoint(input, "signal", "signal_deliver");
     REQUIRE(expected == result);
   }
+
+  format =
+    " field:unsigned short common_type;       offset:0;       size:2; signed:0;\n"
+    " field:unsigned char common_flags;       offset:2;       size:1; signed:0;\n"
+    " field:unsigned char common_preempt_count;       offset:3;       size:1; signed:0;\n"
+    " field:int common_pid;   offset:4;       size:4; signed:1;\n"
+    " field:unsigned char common_migrate_disable;     offset:8;       size:1; signed:0;\n"
+    " field:unsigned char common_preempt_lazy_count;  offset:9;       size:1; signed:0;\n"
+
+    " field:char comm[16];    offset:12;      size:16;        signed:1;\n"
+    " field:pid_t pid;        offset:28;      size:4; signed:1;\n"
+    " field:int prio; offset:32;      size:4; signed:1;\n"
+    " field:int success;      offset:36;      size:4; signed:1;\n"
+    " field:int target_cpu;   offset:40;      size:4; signed:1;\n";
+
+  expected =
+    "struct tracepoint__sched__sched_wakeup {\n"
+    "\tu64 __do_not_use__;\n"
+    "\tchar __do_not_use__8;\n"
+    "\tchar __do_not_use__9;\n"
+    "\tchar __pad_10;\n"
+    "\tchar __pad_11;\n"
+    "\tchar comm[16];\n"
+    "\tpid_t pid;\n"
+    "\tint prio;\n"
+    "\tint success;\n"
+    "\tint target_cpu;\n"
+    "};\n";
+
+  {
+    std::istringstream input(format);
+    std::string result = ebpf::parse_tracepoint(input, "sched", "sched_wakeup");
+    REQUIRE(expected == result);
+  }
 }
