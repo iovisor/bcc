@@ -70,10 +70,6 @@ import socket
 import os
 import struct
 
-# define a function to output perf output
-
-tester_send = ''
-
 OUTPUT_INTERVAL = 1
 
 bpf = BPF(text=bpf_text)
@@ -84,8 +80,6 @@ BPF.attach_raw_socket(function_skb_matching, INTERFACE)
 
     # retrieeve packet_cnt map
 packet_cnt = bpf.get_table('packet_cnt')    # retrieeve packet_cnt map
-
-#sys.stdout = open('myoutput.txt','w')
 
 def decimal_to_human(input_value):
     input_value = int(input_value)
@@ -106,10 +100,12 @@ try:
         output_len = len(packet_cnt_output)
         print('\n')
         for i in range(0,output_len):
-            tester = int(str(packet_cnt_output[i][0])[8:-2]) # initial output omitted from the kernel space program
-            tester = int(str(bin(tester))[2:]) # raw file
-            src = int(str(tester)[:32],2) # part1 
-            dst = int(str(tester)[32:],2)
+            if (len(str(packet_cnt_output[i][0]))) != 30:
+                continue
+            temp = int(str(packet_cnt_output[i][0])[8:-2]) # initial output omitted from the kernel space program
+            temp = int(str(bin(temp))[2:]) # raw file
+            src = int(str(temp)[:32],2) # part1 
+            dst = int(str(temp)[32:],2)
             pkt_num = str(packet_cnt_output[i][1])[7:-1]
 
             monitor_result = 'source address : ' + decimal_to_human(str(src)) + ' ' + 'destination address : ' + decimal_to_human(str(dst)) + ' ' + pkt_num + ' ' + 'time : ' + str(time.localtime()[0])+';'+str(time.localtime()[1]).zfill(2)+';'+str(time.localtime()[2]).zfill(2)+';'+str(time.localtime()[3]).zfill(2)+';'+str(time.localtime()[4]).zfill(2)+';'+str(time.localtime()[5]).zfill(2)
