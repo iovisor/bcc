@@ -165,7 +165,7 @@ std::string parse_tracepoint(std::istream &input, std::string const& category,
                              std::string const& event) {
   std::string tp_struct = "struct tracepoint__" + category + "__" + event + " {\n";
   tp_struct += "\tu64 __do_not_use__;\n";
-  int last_offset = 0;
+  int last_offset = 0, common_offset = 8;
   for (std::string line; getline(input, line); ) {
     std::string field_type, field_name;
     field_kind_t kind;
@@ -175,7 +175,12 @@ std::string parse_tracepoint(std::istream &input, std::string const& category,
 
       switch (kind) {
       case field_kind_t::invalid:
+          continue;
       case field_kind_t::common:
+            for (;common_offset < last_offset; common_offset++)
+            {
+              tp_struct += "\tchar __do_not_use__" + std::to_string(common_offset) + ";\n";
+            }
           continue;
       case field_kind_t::data_loc:
           tp_struct += "\tint data_loc_" + field_name + ";\n";
