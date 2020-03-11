@@ -229,7 +229,7 @@ int main(int argc, char **argv)
 	struct perf_buffer_opts pb_opts;
 	struct perf_buffer *pb = NULL;
 	struct opensnoop_bpf *obj;
-	__u64 time_end;
+	__u64 time_end = 0;
 	int err;
 
 	err = argp_parse(&argp, argc, argv, 0, NULL, NULL);
