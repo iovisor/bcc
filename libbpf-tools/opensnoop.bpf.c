@@ -10,7 +10,7 @@
 const volatile __u64 min_us = 0;
 const volatile pid_t targ_pid = 0;
 const volatile pid_t targ_tgid = 0;
-const volatile pid_t targ_uid = 0;
+const volatile uid_t targ_uid = 0;
 const volatile bool targ_failed = false;
 
 struct {
@@ -26,6 +26,10 @@ struct {
 	__uint(value_size, sizeof(u32));
 } events SEC(".maps");
 
+static __always_inline bool valid_uid(uid_t uid) {
+	return uid != INVALID_UID;
+}
+
 static __always_inline
 int trace_filtered(u32 tgid, u32 pid)
 {
@@ -36,8 +40,8 @@ int trace_filtered(u32 tgid, u32 pid)
 		return 1;
 	if (targ_pid && targ_pid != pid)
 		return 1;
-	if (targ_uid) {
-		uid = bpf_get_current_uid_gid();
+	if (valid_uid(targ_uid)) {
+		uid = (u32)bpf_get_current_uid_gid();
 		if (targ_uid != uid) {
 			return 1;
 		}
