@@ -9,7 +9,7 @@ INCLUDES := -I$(OUTPUT)
 CFLAGS := -g -O2 -Wall
 ARCH := $(shell uname -m | sed 's/x86_64/x86/')
 
-APPS = drsnoop filelife opensnoop runqslower vfsstat xfsslower
+APPS = drsnoop execsnoop filelife opensnoop runqslower vfsstat xfsslower
 
 .PHONY: all
 all: $(APPS)
