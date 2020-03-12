@@ -39,7 +39,9 @@ static struct env {
 	bool extended;
 	bool failed;
 	char *name;
-} env = {};
+} env = {
+	.uid = INVALID_UID
+};
 
 const char *argp_program_version = "opensnoop 0.1";
 const char *argp_program_bug_address = "<bpf@vger.kernel.org>";
@@ -79,7 +81,7 @@ static const struct argp_option opts[] = {
 static error_t parse_arg(int key, char *arg, struct argp_state *state)
 {
 	static int pos_args;
-	int pid, uid, duration;
+	long int pid, uid, duration;
 
 	switch (key) {
 	case 'e':
@@ -134,7 +136,7 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 	case 'u':
 		errno = 0;
 		uid = strtol(arg, NULL, 10);
-		if (errno || uid <= 0) {
+		if (errno || uid < 0 || uid >= INVALID_UID) {
 			fprintf(stderr, "Invalid UID %s\n", arg);
 			argp_usage(state);
 		}
