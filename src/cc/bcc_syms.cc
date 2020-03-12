@@ -730,7 +730,7 @@ int bcc_resolve_symname(const char *module, const char *symname,
   }
   if (sym->module == NULL)
     return -1;
-  if (pid != 0 && pid != -1) {
+  if (pid != 0 && pid != -1 && strstr(sym->module, "/proc") != sym->module){
     char *temp = (char*)sym->module;
     sym->module = strdup(tfm::format("/proc/%d/root%s", pid, sym->module).c_str());
     free(temp);
