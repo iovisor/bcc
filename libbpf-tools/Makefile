@@ -7,6 +7,7 @@ LIBBPF_SRC := $(abspath ../src/cc/libbpf/src)
 LIBBPF_OBJ := $(abspath $(OUTPUT)/libbpf.a)
 INCLUDES := -I$(OUTPUT)
 CFLAGS := -g -O2 -Wall
+ARCH := $(shell uname -m | sed 's/x86_64/x86/')
 
 APPS = drsnoop opensnoop runqslower
 
@@ -47,8 +48,8 @@ $(OUTPUT)/%.skel.h: $(OUTPUT)/%.bpf.o | $(OUTPUT)
 
 $(OUTPUT)/%.bpf.o: %.bpf.c $(LIBBPF_OBJ) $(wildcard %.h) vmlinux.h | $(OUTPUT)
 	$(call msg,BPF,$@)
-	$(Q)$(CLANG) -g -O2 -target bpf $(INCLUDES)			      \
-		 -c $(filter %.c,$^) -o $@ &&				      \
+	$(Q)$(CLANG) -g -O2 -target bpf -D__TARGET_ARCH_$(ARCH)		      \
+		     $(INCLUDES) -c $(filter %.c,$^) -o $@ &&		      \
 	$(LLVM_STRIP) -g $@
 
 # Build libbpf.a
