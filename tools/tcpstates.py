@@ -59,7 +59,7 @@ args = parser.parse_args()
 debug = 0
 
 # define BPF program
-bpf_text = """
+bpf_header = """
 #include <uapi/linux/ptrace.h>
 #define KBUILD_MODNAME "foo"
 #include <linux/tcp.h>
@@ -101,7 +101,8 @@ struct id_t {
     u32 pid;
     char task[TASK_COMM_LEN];
 };
-
+"""
+bpf_text_tracepoint = """
 TRACEPOINT_PROBE(sock, inet_sock_set_state)
 {
     if (args->protocol != IPPROTO_TCP)
@@ -166,10 +167,113 @@ TRACEPOINT_PROBE(sock, inet_sock_set_state)
 }
 """
 
-if (not BPF.tracepoint_exists("sock", "inet_sock_set_state")):
-    print("ERROR: tracepoint sock:inet_sock_set_state missing "
-        "(added in Linux 4.16). Exiting")
-    exit()
+bpf_text_kprobe = """
+int kprobe__tcp_set_state(struct pt_regs *ctx, struct sock *sk, int state)
+{
+    // check this is TCP
+    u8 protocol = 0;
+
+    // Following comments add by Joe Yin:
+    // Unfortunately,it can not work since Linux 4.10,
+    // because the sk_wmem_queued is not following the bitfield of sk_protocol.
+    // And the following member is sk_gso_max_segs.
+    // So, we can use this:
+    // bpf_probe_read(&protocol, 1, (void *)((u64)&newsk->sk_gso_max_segs) - 3);
+    // In order to  diff the pre-4.10 and 4.10+ ,introduce the variables gso_max_segs_offset,sk_lingertime,
+    // sk_lingertime is closed to the gso_max_segs_offset,and
+    // the offset between the two members is 4
+
+    int gso_max_segs_offset = offsetof(struct sock, sk_gso_max_segs);
+    int sk_lingertime_offset = offsetof(struct sock, sk_lingertime);
+
+    if (sk_lingertime_offset - gso_max_segs_offset == 4)
+        // 4.10+ with little endian
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+        bpf_probe_read(&protocol, 1, (void *)((u64)&sk->sk_gso_max_segs) - 3);
+else
+        // pre-4.10 with little endian
+        bpf_probe_read(&protocol, 1, (void *)((u64)&sk->sk_wmem_queued) - 3);
+#elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+        // 4.10+ with big endian
+        bpf_probe_read(&protocol, 1, (void *)((u64)&sk->sk_gso_max_segs) - 1);
+else
+        // pre-4.10 with big endian
+        bpf_probe_read(&protocol, 1, (void *)((u64)&sk->sk_wmem_queued) - 1);
+#else
+# error "Fix your compiler's __BYTE_ORDER__?!"
+#endif
+
+    if (protocol != IPPROTO_TCP)
+        return 0;
+
+    u32 pid = bpf_get_current_pid_tgid() >> 32;
+    // sk is used as a UUID
+
+    // lport is either used in a filter here, or later
+    u16 lport = sk->__sk_common.skc_num;
+    FILTER_LPORT
+
+    // dport is either used in a filter here, or later
+    u16 dport = sk->__sk_common.skc_dport;
+    FILTER_DPORT
+
+    // calculate delta
+    u64 *tsp, delta_us;
+    tsp = last.lookup(&sk);
+    if (tsp == 0)
+        delta_us = 0;
+    else
+        delta_us = (bpf_ktime_get_ns() - *tsp) / 1000;
+
+    u16 family = sk->__sk_common.skc_family;
+
+    if (family == AF_INET) {
+        struct ipv4_data_t data4 = {
+            .span_us = delta_us,
+            .oldstate = sk->__sk_common.skc_state,
+            .newstate = state };
+        data4.skaddr = (u64)sk;
+        data4.ts_us = bpf_ktime_get_ns() / 1000;
+        data4.saddr = sk->__sk_common.skc_rcv_saddr;
+        data4.daddr = sk->__sk_common.skc_daddr;
+        // a workaround until data4 compiles with separate lport/dport
+        data4.ports = dport + ((0ULL + lport) << 16);
+        data4.pid = pid;
+
+        bpf_get_current_comm(&data4.task, sizeof(data4.task));
+        ipv4_events.perf_submit(ctx, &data4, sizeof(data4));
+
+    } else /* 6 */ {
+        struct ipv6_data_t data6 = {
+            .span_us = delta_us,
+            .oldstate = sk->__sk_common.skc_state,
+            .newstate = state };
+        data6.skaddr = (u64)sk;
+        data6.ts_us = bpf_ktime_get_ns() / 1000;
+        bpf_probe_read(&data6.saddr, sizeof(data6.saddr),
+            sk->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
+        bpf_probe_read(&data6.daddr, sizeof(data6.daddr),
+            sk->__sk_common.skc_v6_daddr.in6_u.u6_addr32);
+        // a workaround until data6 compiles with separate lport/dport
+        data6.ports = dport + ((0ULL + lport) << 16);
+        data6.pid = pid;
+        bpf_get_current_comm(&data6.task, sizeof(data6.task));
+        ipv6_events.perf_submit(ctx, &data6, sizeof(data6));
+    }
+
+    u64 ts = bpf_ktime_get_ns();
+    last.update(&sk, &ts);
+
+    return 0;
+
+};
+"""
+
+bpf_text = bpf_header
+if (BPF.tracepoint_exists("sock", "inet_sock_set_state")):
+    bpf_text += bpf_text_tracepoint
+else:
+    bpf_text += bpf_text_kprobe
 
 # code substitutions
 if args.remoteport:
