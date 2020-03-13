@@ -105,6 +105,7 @@ pair of .c and .py files, and some are directories of files.
 - tools/[dcsnoop](tools/dcsnoop.py): Trace directory entry cache (dcache) lookups. [Examples](tools/dcsnoop_example.txt).
 - tools/[dcstat](tools/dcstat.py): Directory entry cache (dcache) stats. [Examples](tools/dcstat_example.txt).
 - tools/[deadlock](tools/deadlock.py): Detect potential deadlocks on a running process. [Examples](tools/deadlock_example.txt).
+- tools/[dirtop](tools/dirtop.py): File reads and writes by directory. Top for directories. [Examples](tools/dirtop_example.txt).
 - tools/[drsnoop](tools/drsnoop.py): Trace direct reclaim events with PID and latency. [Examples](tools/drsnoop_example.txt).
 - tools/[execsnoop](tools/execsnoop.py): Trace new processes via exec() syscalls. [Examples](tools/execsnoop_example.txt).
 - tools/[exitsnoop](tools/exitsnoop.py): Trace process termination (exit and fatal signals). [Examples](tools/exitsnoop_example.txt).

@@ -1,0 +1,108 @@
+Demonstrations of dirtop, the Linux eBPF/bcc version.
+
+
+dirtop shows reads and writes by directory. For example:
+
+# ./dirtop.py -d '/hdfs/uuid/*/yarn'
+Tracing... Output every 1 secs. Hit Ctrl-C to end
+
+14:28:12 loadavg: 25.00 22.85 21.22 31/2921 66450
+
+READS  WRITES R_Kb     W_Kb     PATH
+1030   2852   8        147341   /hdfs/uuid/c11da291-28de-4a77-873e-44bb452d238b/yarn
+3308   2459   10980    24893    /hdfs/uuid/bf829d08-1455-45b8-81fa-05c3303e8c45/yarn
+2227   7165   6484     11157    /hdfs/uuid/76dc0b77-e2fd-4476-818f-2b5c3c452396/yarn
+1985   9576   6431     6616     /hdfs/uuid/99c178d5-a209-4af2-8467-7382c7f03c1b/yarn
+1986   398    6474     6486     /hdfs/uuid/7d512fe7-b20d-464c-a75a-dbf8b687ee1c/yarn
+764    3685   5        7069     /hdfs/uuid/250b21c8-1714-45fe-8c08-d45d0271c6bd/yarn
+432    1603   259      6402     /hdfs/uuid/4a833770-767e-43b3-b696-dc98901bce26/yarn
+993    5856   320      129      /hdfs/uuid/b94cbf3f-76b1-4ced-9043-02d450b9887c/yarn
+612    5645   4        249      /hdfs/uuid/8138a53b-b942-44d3-82df-51575f1a3901/yarn
+818    21     6        166      /hdfs/uuid/fada8004-53ff-48df-9396-165d8e42925b/yarn
+174    23     1        171      /hdfs/uuid/d04fccd8-bc72-4ed9-bda4-c5b6893f1405/yarn
+376    6281   2        97       /hdfs/uuid/0cc3683f-4800-4c73-8075-8d77dc7cf116/yarn
+370    4588   2        96       /hdfs/uuid/a78f846a-58c4-4d10-a9f5-42f16a6134a0/yarn
+190    6420   1        86       /hdfs/uuid/2c6a7223-cb18-4916-a1b6-8cd02bda1d31/yarn
+178    123    1        17       /hdfs/uuid/b3b2a2ed-f6c1-4641-86bf-2989dd932411/yarn
+[...]
+
+This shows various directories read and written when hadoop runs.
+By default the output is sorted by the total read size in Kbytes (R_Kb).
+Sorting order can be changed via -s option.
+This is instrumenting at the VFS interface, so this is reads and writes that
+may return entirely from the file system cache (page cache).
+
+While not printed, the average read and write size can be calculated by
+dividing R_Kb by READS, and the same for writes.
+
+This script works by tracing the vfs_read() and vfs_write() functions using
+kernel dynamic tracing, which instruments explicit read and write calls. If
+files are read or written using another means (eg, via mmap()), then they
+will not be visible using this tool.
+
+This should be useful for file system workload characterization when analyzing
+the performance of applications.
+
+Note that tracing VFS level reads and writes can be a frequent activity, and
+this tool can begin to cost measurable overhead at high I/O rates.
+
+
+A -C option will stop clearing the screen, and -r with a number will restrict
+the output to that many rows (20 by default). For example, not clearing
+the screen and showing the top 5 only:
+
+# ./dirtop -d '/hdfs/uuid/*/yarn' -Cr 5
+Tracing... Output every 1 secs. Hit Ctrl-C to end
+
+14:29:08 loadavg: 25.66 23.42 21.51 17/2850 67167
+
+READS  WRITES R_Kb     W_Kb     PATH
+100    8429   0        48243    /hdfs/uuid/b94cbf3f-76b1-4ced-9043-02d450b9887c/yarn
+2066   4091   8176     26457    /hdfs/uuid/d04fccd8-bc72-4ed9-bda4-c5b6893f1405/yarn
+10     2043   0        8172     /hdfs/uuid/b3b2a2ed-f6c1-4641-86bf-2989dd932411/yarn
+38     1368   0        2652     /hdfs/uuid/a78f846a-58c4-4d10-a9f5-42f16a6134a0/yarn
+86     19     0        123      /hdfs/uuid/c11da291-28de-4a77-873e-44bb452d238b/yarn
+
+14:29:09 loadavg: 25.66 23.42 21.51 15/2849 67170
+
+READS  WRITES R_Kb     W_Kb     PATH
+1204   5619   4388     33767    /hdfs/uuid/b94cbf3f-76b1-4ced-9043-02d450b9887c/yarn
+2208   3511   8744     22992    /hdfs/uuid/d04fccd8-bc72-4ed9-bda4-c5b6893f1405/yarn
+62     4010   0        21181    /hdfs/uuid/8138a53b-b942-44d3-82df-51575f1a3901/yarn
+22     2187   0        8748     /hdfs/uuid/b3b2a2ed-f6c1-4641-86bf-2989dd932411/yarn
+74     1097   0        4388     /hdfs/uuid/4a833770-767e-43b3-b696-dc98901bce26/yarn
+
+[..]
+
+
+
+USAGE message:
+
+# ./dirtop.py  -h
+usage: dirtop.py [-h] [-C] [-r MAXROWS] [-s {all,reads,writes,rbytes,wbytes}]
+                 [-p PID] -d ROOTDIRS
+                 [interval] [count]
+
+File reads and writes by process
+
+positional arguments:
+  interval              output interval, in seconds
+  count                 number of outputs
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -C, --noclear         don't clear the screen
+  -r MAXROWS, --maxrows MAXROWS
+                        maximum rows to print, default 20
+  -s {all,reads,writes,rbytes,wbytes}, --sort {all,reads,writes,rbytes,wbytes}
+                        sort column, default all
+  -p PID, --pid PID     trace this PID only
+  -d ROOTDIRS, --root-directories ROOTDIRS
+                        select the directories to observe, separated by commas
+
+examples:
+    ./dirtop -d '/hdfs/uuid/*/yarn'       # directory I/O top, 1 second refresh
+    ./dirtop -d '/hdfs/uuid/*/yarn' -C    # don't clear the screen
+    ./dirtop -d '/hdfs/uuid/*/yarn' 5     # 5 second summaries
+    ./dirtop -d '/hdfs/uuid/*/yarn' 5 10  # 5 second summaries, 10 times only
+    ./dirtop -d '/hdfs/uuid/*/yarn,/hdfs/uuid/*/data' # Running dirtop on two set of directories
