@@ -1,10 +1,24 @@
+#!/usr/bin/python
+#
+# net_monitor.py Aggregate incoming network traffic status
+# net_monitor.py <net_interface> to execute
+#
+# Copyright (c) 2020 YoungEun Choe
+
 from bcc import BPF
 import time
 from ast import literal_eval
+import sys
 
-# To run this progrm, change the INTERFACE NAME below and run this program
+def help():
+    print("execute: {0} <net_interface>".format(sys.argv[0]))
+    print("e.g.: {0} eno1\n".format(sys.argv[0]))
+    exit(1)
 
-INTERFACE = "br-mellanox"
+if len(sys.argv) != 2:
+    help()
+elif len(sys.argv) == 2:
+    INTERFACE = sys.argv[1]
 
 bpf_text = """
 
@@ -23,16 +37,12 @@ BPF_HASH(packet_cnt, u64, long, 256);
 
 int packet_monitor(struct __sk_buff *skb) {
     u8 *cursor = 0;
-    u32 saddr;
-    u32 daddr;
+    u32 saddr, daddr;
     long* count = 0;
     long one = 1;
     u64 pass_value = 0;
     
     struct ethernet_t *ethernet = cursor_advance(cursor, sizeof(*ethernet));
-    if (!(ethernet -> type == 0x0800)) {    
-        return 0; // drop
-    }
 
     struct ip_t *ip = cursor_advance(cursor, sizeof(*ip));
     if (ip->nextp != IP_TCP) 
@@ -91,8 +101,6 @@ def decimal_to_human(input_value):
     result = str(pt0)+'.'+str(pt1)+'.'+str(pt2)+'.'+str(pt3)
     return result
 
-print("=========================packet monitor=============================\n")
-
 try:
     while True :
         time.sleep(OUTPUT_INTERVAL)
@@ -108,7 +116,11 @@ try:
             dst = int(str(temp)[32:],2)
             pkt_num = str(packet_cnt_output[i][1])[7:-1]
 
-            monitor_result = 'source address : ' + decimal_to_human(str(src)) + ' ' + 'destination address : ' + decimal_to_human(str(dst)) + ' ' + pkt_num + ' ' + 'time : ' + str(time.localtime()[0])+';'+str(time.localtime()[1]).zfill(2)+';'+str(time.localtime()[2]).zfill(2)+';'+str(time.localtime()[3]).zfill(2)+';'+str(time.localtime()[4]).zfill(2)+';'+str(time.localtime()[5]).zfill(2)
+            monitor_result = 'source address : ' + decimal_to_human(str(src)) + ' ' + 'destination address : ' + \
+            decimal_to_human(str(dst)) + ' ' + pkt_num + ' ' + 'time : ' + str(time.localtime()[0])+\
+            ';'+str(time.localtime()[1]).zfill(2)+';'+str(time.localtime()[2]).zfill(2)+';'+\
+            str(time.localtime()[3]).zfill(2)+';'+str(time.localtime()[4]).zfill(2)+';'+\
+            str(time.localtime()[5]).zfill(2)
             print(monitor_result)
 
             # time.time() outputs time elapsed since 00:00 hours, 1st, Jan., 1970.
