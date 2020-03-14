@@ -1,8 +1,9 @@
 #!/usr/bin/python
 #
-# net_monitor.py Aggregate incoming network traffic status
-# net_monitor.py <net_interface> to execute
-##
+# net_monitor.py Aggregates incoming network traffic
+# outputs source ip, destination ip, the number of their network traffic, and current time
+# how to use : net_monitor.py <net_interface> 
+# 
 # Copyright (c) 2020 YoungEun Choe
 
 from bcc import BPF
