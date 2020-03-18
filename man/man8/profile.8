@@ -1,9 +1,9 @@
-.TH profile 8  "2016-07-17" "USER COMMANDS"
+.TH profile 8  "2020-03-18" "USER COMMANDS"
 .SH NAME
 profile \- Profile CPU usage by sampling stack traces. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
 .B profile [\-adfh] [\-p PID | \-L TID] [\-U | \-K] [\-F FREQUENCY | \-c COUNT]
-.B [\-\-stack\-storage\-size COUNT] [duration]
+.B [\-\-stack\-storage\-size COUNT] [\-\-cgroupmap CGROUPMAP] [duration]
 .SH DESCRIPTION
 This is a CPU profiler. It works by taking samples of stack traces at timed
 intervals. It will help you understand and quantify CPU usage: which code is
@@ -62,6 +62,9 @@ The maximum number of unique stack traces that the kernel will count (default
 \-C cpu
 Collect stacks only from specified cpu.
 .TP
+\-\-cgroupmap MAPPATH
+Profile cgroups in this BPF map only (filtered in-kernel).
+.TP
 duration
 Duration to trace, in seconds.
 .SH EXAMPLES
@@ -97,6 +100,10 @@ Profile for 5 seconds and output in folded stack format (suitable as input for f
 Profile kernel stacks only:
 #
 .B profile -K
+.TP
+Profile a set of cgroups only (see filtering_by_cgroups.md from bcc sources for more details):
+#
+.B profile \-\-cgroupmap /sys/fs/bpf/test01
 .SH DEBUGGING
 See "[unknown]" frames with bogus addresses? This can happen for different
 reasons. Your best approach is to get Linux perf to work first, and then to
