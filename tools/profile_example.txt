@@ -703,12 +703,21 @@ WARNING: 8 stack traces could not be displayed. Consider increasing --stack-stor
 
 Run ./profile -h to see the default.
 
+The --cgroupmap option filters based on a cgroup set. It is meant to be used
+with an externally created map.
+
+# ./profile --cgroupmap /sys/fs/bpf/test01
+
+For more details, see docs/filtering_by_cgroups.md
+
 
 USAGE message:
 
 # ./profile -h
-usage: profile.py [-h] [-p PID | -L TID] [-U | -K] [-F FREQUENCY | -c COUNT] [-d] [-a]
-                  [-I] [-f] [--stack-storage-size STACK_STORAGE_SIZE] [-C CPU]
+usage: profile.py [-h] [-p PID | -L TID] [-U | -K] [-F FREQUENCY | -c COUNT]
+                  [-d] [-a] [-I] [-f]
+                  [--stack-storage-size STACK_STORAGE_SIZE] [-C CPU]
+                  [--cgroupmap CGROUPMAP]
                   [duration]
 
 Profile CPU stack traces at a timed interval
@@ -739,6 +748,8 @@ optional arguments:
                         the number of unique stack traces that can be stored
                         and displayed (default 16384)
   -C CPU, --cpu CPU     cpu number to run profile on
+  --cgroupmap CGROUPMAP
+                        trace cgroups in this BPF map only
 
 examples:
     ./profile             # profile stack traces at 49 Hertz until Ctrl-C
@@ -750,3 +761,4 @@ examples:
     ./profile -L 185      # only profile thread with TID 185
     ./profile -U          # only show user space stacks (no kernel)
     ./profile -K          # only show kernel space stacks (no user)
+    ./profile --cgroupmap ./mappath  # only trace cgroups in this BPF map
