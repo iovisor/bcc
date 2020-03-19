@@ -88,11 +88,12 @@ BPF_HASH(ipv4_send_bytes, struct ipv4_key_t);
 BPF_HASH(ipv4_recv_bytes, struct ipv4_key_t);
 
 struct ipv6_key_t {
-    u32 pid;
     unsigned __int128 saddr;
     unsigned __int128 daddr;
+    u32 pid;
     u16 lport;
     u16 dport;
+    u64 __pad__;
 };
 BPF_HASH(ipv6_send_bytes, struct ipv6_key_t);
 BPF_HASH(ipv6_recv_bytes, struct ipv6_key_t);
