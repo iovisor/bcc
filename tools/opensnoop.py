@@ -177,6 +177,12 @@ KRETFUNC_PROBE(do_sys_open, int dfd, const char *filename, int flags, int mode, 
     PID_TID_FILTER
     UID_FILTER
     FLAGS_FILTER
+#if CGROUPSET
+    u64 cgroupid = bpf_get_current_cgroup_id();
+    if (cgroupset.lookup(&cgroupid) == NULL) {
+      return 0;
+    }
+#endif
 
     struct data_t data = {};
     bpf_get_current_comm(&data.comm, sizeof(data.comm));
