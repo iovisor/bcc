@@ -15,6 +15,7 @@ from __future__ import print_function
 from os import getpid
 from functools import partial
 from bcc import BPF
+from bcc.containers import filter_by_containers
 import errno
 import argparse
 from time import strftime
@@ -28,7 +29,8 @@ examples = """examples:
     ./capable -U          # add user-space stacks to trace
     ./capable -x          # extra fields: show TID and INSETID columns
     ./capable --unique    # don't repeat stacks for the same pid or cgroup
-    ./capable --cgroupmap ./mappath  # only trace cgroups in this BPF map
+    ./capable --cgroupmap mappath  # only trace cgroups in this BPF map
+    ./capable --mntnsmap mappath   # only trace mount namespaces in the map
 """
 parser = argparse.ArgumentParser(
     description="Trace security capability checks",
@@ -46,6 +48,8 @@ parser.add_argument("-x", "--extra", action="store_true",
     help="show extra fields in TID and INSETID columns")
 parser.add_argument("--cgroupmap",
     help="trace cgroups in this BPF map only")
+parser.add_argument("--mntnsmap",
+    help="trace mount namespaces in this BPF map only")
 parser.add_argument("--unique", action="store_true",
     help="don't repeat stacks for the same pid or cgroup")
 args = parser.parse_args()
@@ -145,10 +149,6 @@ struct repeat_t {
 BPF_HASH(seen, struct repeat_t, u64);
 #endif
 
-#if CGROUPSET
-BPF_TABLE_PINNED("hash", u64, u64, cgroupset, 1024, "CGROUPPATH");
-#endif
-
 #if defined(USER_STACKS) || defined(KERNEL_STACKS)
 BPF_STACK_TRACE(stacks, 2048);
 #endif
@@ -173,12 +173,10 @@ int kprobe__cap_capable(struct pt_regs *ctx, const struct cred *cred,
     FILTER1
     FILTER2
     FILTER3
-#if CGROUPSET
-    u64 cgroupid = bpf_get_current_cgroup_id();
-    if (cgroupset.lookup(&cgroupid) == NULL) {
+
+    if (container_should_be_filtered()) {
         return 0;
     }
-#endif
 
     u32 uid = bpf_get_current_uid_gid();
     struct data_t data = {.tgid = tgid, .pid = pid, .uid = uid, .cap = cap, .audit = audit, .insetid = insetid};
@@ -192,7 +190,7 @@ int kprobe__cap_capable(struct pt_regs *ctx, const struct cred *cred,
 #if UNIQUESET
     struct repeat_t repeat = {0,};
     repeat.cap = cap;
-#if CGROUPSET
+#if CGROUP_ID_SET
     repeat.cgroupid = bpf_get_current_cgroup_id();
 #else
     repeat.tgid = tgid;
@@ -229,11 +227,7 @@ bpf_text = bpf_text.replace('FILTER1', '')
 bpf_text = bpf_text.replace('FILTER2', '')
 bpf_text = bpf_text.replace('FILTER3',
     'if (pid == %s) { return 0; }' % getpid())
-if args.cgroupmap:
-    bpf_text = bpf_text.replace('CGROUPSET', '1')
-    bpf_text = bpf_text.replace('CGROUPPATH', args.cgroupmap)
-else:
-    bpf_text = bpf_text.replace('CGROUPSET', '0')
+bpf_text = filter_by_containers(args) + bpf_text
 if args.unique:
     bpf_text = bpf_text.replace('UNIQUESET', '1')
 else:

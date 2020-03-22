@@ -38,7 +38,7 @@ with an externally created map.
 
 # ./tcpaccept --cgroupmap /sys/fs/bpf/test01
 
-For more details, see docs/filtering_by_cgroups.md
+For more details, see docs/special_filtering.md
 
 
 USAGE message:
@@ -62,4 +62,5 @@ examples:
     ./tcpaccept -t        # include timestamps
     ./tcpaccept -P 80,81  # only trace port 80 and 81
     ./tcpaccept -p 181    # only trace PID 181
-    ./tcpaccept --cgroupmap ./mappath  # only trace cgroups in this BPF map
+    ./tcpaccept --cgroupmap mappath  # only trace cgroups in this BPF map
+    ./tcpaccept --mntnsmap mappath   # only trace mount namespaces in the map

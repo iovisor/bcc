@@ -3,7 +3,7 @@
 capable \- Trace security capability checks (cap_capable()).
 .SH SYNOPSIS
 .B capable [\-h] [\-v] [\-p PID] [\-K] [\-U] [\-x] [\-\-cgroupmap MAPPATH]
-           [--unique]
+           [\-\-mntnsmap MAPPATH] [--unique]
 .SH DESCRIPTION
 This traces security capability checks in the kernel, and prints details for
 each call. This can be useful for general debugging, and also security
@@ -33,6 +33,9 @@ Show extra fields in TID and INSETID columns.
 \-\-cgroupmap MAPPATH
 Trace cgroups in this BPF map only (filtered in-kernel).
 .TP
+\-\-mntnsmap  MAPPATH
+Trace mount namespaces in this BPF map only (filtered in-kernel).
+.TP
 \-\-unique
 Don't repeat stacks for the same PID or cgroup.
 .SH EXAMPLES
@@ -45,7 +48,7 @@ Trace capability checks for PID 181:
 #
 .B capable \-p 181
 .TP
-Trace capability checks in a set of cgroups only (see filtering_by_cgroups.md
+Trace capability checks in a set of cgroups only (see special_filtering.md
 from bcc sources for more details):
 #
 .B capable \-\-cgroupmap /sys/fs/bpf/test01

@@ -3,7 +3,7 @@
 tcptop \- Summarize TCP send/recv throughput by host. Top for TCP.
 .SH SYNOPSIS
 .B tcptop [\-h] [\-C] [\-S] [\-p PID] [\-\-cgroupmap MAPPATH]
-          [interval] [count]
+          [--mntnsmap MAPPATH] [interval] [count]
 .SH DESCRIPTION
 This is top for TCP sessions.
 
@@ -39,6 +39,9 @@ Trace this PID only.
 \-\-cgroupmap MAPPATH
 Trace cgroups in this BPF map only (filtered in-kernel).
 .TP
+\--mntnsmap  MAPPATH
+Trace mount namespaces in this BPF map only (filtered in-kernel).
+.TP
 interval
 Interval between updates, seconds (default 1).
 .TP
@@ -58,7 +61,7 @@ Trace PID 181 only, and don't clear the screen:
 #
 .B tcptop \-Cp 181
 .TP
-Trace a set of cgroups only (see filtering_by_cgroups.md from bcc sources for more details):
+Trace a set of cgroups only (see special_filtering.md from bcc sources for more details):
 #
 .B tcptop \-\-cgroupmap /sys/fs/bpf/test01
 .SH FIELDS

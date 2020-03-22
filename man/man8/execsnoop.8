@@ -2,8 +2,8 @@
 .SH NAME
 execsnoop \- Trace new processes via exec() syscalls. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B execsnoop [\-h] [\-T] [\-t] [\-x] [\-\-cgroupmap CGROUPMAP] [\-u USER]
-.B           [\-q] [\-n NAME] [\-l LINE] [\-U] [\-\-max-args MAX_ARGS]
+.B execsnoop [\-h] [\-T] [\-t] [\-x] [\-\-cgroupmap CGROUPMAP] [\-\-mntnsmap MAPPATH]
+.B           [\-u USER] [\-q] [\-n NAME] [\-l LINE] [\-U] [\-\-max-args MAX_ARGS]
 .SH DESCRIPTION
 execsnoop traces new processes, showing the filename executed and argument
 list.
@@ -42,7 +42,7 @@ Include failed exec()s
 .TP
 \-q
 Add "quotemarks" around arguments. Escape quotemarks in arguments with a
-backslash. For tracing empty arguments or arguments that contain whitespace. 
+backslash. For tracing empty arguments or arguments that contain whitespace.
 .TP
 \-n NAME
 Only print command lines matching this name (regex)
@@ -55,6 +55,10 @@ Maximum number of arguments parsed and displayed, defaults to 20
 .TP
 \-\-cgroupmap MAPPATH
 Trace cgroups in this BPF map only (filtered in-kernel).
+.TP
+\-\-mntnsmap  MAPPATH
+Trace mount namespaces in this BPF map only (filtered in-kernel).
+.TP
 .SH EXAMPLES
 .TP
 Trace all exec() syscalls:
@@ -81,7 +85,7 @@ Include failed exec()s:
 #
 .B execsnoop \-x
 .TP
-Put quotemarks around arguments. 
+Put quotemarks around arguments.
 #
 .B execsnoop \-q
 .TP
@@ -93,7 +97,7 @@ Only trace exec()s where argument's line contains "testpkg":
 #
 .B execsnoop \-l testpkg
 .TP
-Trace a set of cgroups only (see filtering_by_cgroups.md from bcc sources for more details):
+Trace a set of cgroups only (see special_filtering.md from bcc sources for more details):
 #
 .B execsnoop \-\-cgroupmap /sys/fs/bpf/test01
 .SH FIELDS

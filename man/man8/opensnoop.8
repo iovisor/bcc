@@ -4,7 +4,7 @@ opensnoop \- Trace open() syscalls. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
 .B opensnoop.py [\-h] [\-T] [\-U] [\-x] [\-p PID] [\-t TID] [\-u UID]
              [\-d DURATION] [\-n NAME] [\-e] [\-f FLAG_FILTER]
-             [--cgroupmap MAPPATH]
+             [--cgroupmap MAPPATH] [--mntnsmap MAPPATH]
 .SH DESCRIPTION
 opensnoop traces the open() syscall, showing which processes are attempting
 to open which files. This can be useful for determining the location of config
@@ -58,6 +58,9 @@ Filter on open() flags, e.g., O_WRONLY.
 .TP
 \--cgroupmap MAPPATH
 Trace cgroups in this BPF map only (filtered in-kernel).
+.TP
+\--mntnsmap  MAPPATH
+Trace mount namespaces in this BPF map only (filtered in-kernel).
 .SH EXAMPLES
 .TP
 Trace all open() syscalls:
@@ -100,7 +103,7 @@ Only print calls for writing:
 #
 .B opensnoop \-f O_WRONLY \-f O_RDWR
 .TP
-Trace a set of cgroups only (see filtering_by_cgroups.md from bcc sources for more details):
+Trace a set of cgroups only (see special_filtering.md from bcc sources for more details):
 #
 .B opensnoop \-\-cgroupmap /sys/fs/bpf/test01
 .SH FIELDS

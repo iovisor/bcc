@@ -26,6 +26,7 @@
 
 from __future__ import print_function
 from bcc import BPF
+from bcc.containers import filter_by_containers
 import argparse
 from socket import inet_ntop, AF_INET, AF_INET6
 from struct import pack
@@ -45,7 +46,8 @@ examples = """examples:
     ./tcptop           # trace TCP send/recv by host
     ./tcptop -C        # don't clear the screen
     ./tcptop -p 181    # only trace PID 181
-    ./tcptop --cgroupmap ./mappath  # only trace cgroups in this BPF map
+    ./tcptop --cgroupmap mappath  # only trace cgroups in this BPF map
+    ./tcptop --mntnsmap mappath   # only trace mount namespaces in the map
 """
 parser = argparse.ArgumentParser(
     description="Summarize TCP send/recv throughput by host",
@@ -63,6 +65,8 @@ parser.add_argument("count", nargs="?", default=-1, type=range_check,
     help="number of outputs")
 parser.add_argument("--cgroupmap",
     help="trace cgroups in this BPF map only")
+parser.add_argument("--mntnsmap",
+    help="trace mount namespaces in this BPF map only")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
 args = parser.parse_args()
@@ -98,21 +102,16 @@ struct ipv6_key_t {
 BPF_HASH(ipv6_send_bytes, struct ipv6_key_t);
 BPF_HASH(ipv6_recv_bytes, struct ipv6_key_t);
 
-#if CGROUPSET
-BPF_TABLE_PINNED("hash", u64, u64, cgroupset, 1024, "CGROUPPATH");
-#endif
-
 int kprobe__tcp_sendmsg(struct pt_regs *ctx, struct sock *sk,
     struct msghdr *msg, size_t size)
 {
-    u32 pid = bpf_get_current_pid_tgid() >> 32;
-    FILTER
-#if CGROUPSET
-    u64 cgroupid = bpf_get_current_cgroup_id();
-    if (cgroupset.lookup(&cgroupid) == NULL) {
+    if (container_should_be_filtered()) {
         return 0;
     }
-#endif
+
+    u32 pid = bpf_get_current_pid_tgid() >> 32;
+    FILTER_PID
+
     u16 dport = 0, family = sk->__sk_common.skc_family;
 
     if (family == AF_INET) {
@@ -148,14 +147,13 @@ int kprobe__tcp_sendmsg(struct pt_regs *ctx, struct sock *sk,
  */
 int kprobe__tcp_cleanup_rbuf(struct pt_regs *ctx, struct sock *sk, int copied)
 {
-    u32 pid = bpf_get_current_pid_tgid() >> 32;
-    FILTER
-#if CGROUPSET
-    u64 cgroupid = bpf_get_current_cgroup_id();
-    if (cgroupset.lookup(&cgroupid) == NULL) {
+    if (container_should_be_filtered()) {
         return 0;
     }
-#endif
+
+    u32 pid = bpf_get_current_pid_tgid() >> 32;
+    FILTER_PID
+
     u16 dport = 0, family = sk->__sk_common.skc_family;
     u64 *val, zero = 0;
 
@@ -190,15 +188,11 @@ int kprobe__tcp_cleanup_rbuf(struct pt_regs *ctx, struct sock *sk, int copied)
 
 # code substitutions
 if args.pid:
-    bpf_text = bpf_text.replace('FILTER',
+    bpf_text = bpf_text.replace('FILTER_PID',
         'if (pid != %s) { return 0; }' % args.pid)
 else:
-    bpf_text = bpf_text.replace('FILTER', '')
-if args.cgroupmap:
-    bpf_text = bpf_text.replace('CGROUPSET', '1')
-    bpf_text = bpf_text.replace('CGROUPPATH', args.cgroupmap)
-else:
-    bpf_text = bpf_text.replace('CGROUPSET', '0')
+    bpf_text = bpf_text.replace('FILTER_PID', '')
+bpf_text = filter_by_containers(args) + bpf_text
 if debug or args.ebpf:
     print(bpf_text)
     if args.ebpf:

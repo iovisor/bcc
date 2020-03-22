@@ -4,7 +4,7 @@ Demonstrations of capable, the Linux eBPF/bcc version.
 capable traces calls to the kernel cap_capable() function, which does security
 capability checks, and prints details for each call. For example:
 
-# ./capable.py 
+# ./capable.py
 TIME      UID    PID    COMM             CAP  NAME                 AUDIT
 22:11:23  114    2676   snmpd            12   CAP_NET_ADMIN        1
 22:11:23  0      6990   run              24   CAP_SYS_RESOURCE     1
@@ -100,14 +100,14 @@ with an externally created map.
 
 # ./capable.py --cgroupmap /sys/fs/bpf/test01
 
-For more details, see docs/filtering_by_cgroups.md
+For more details, see docs/special_filtering.md
 
 
 USAGE:
 
 # ./capable.py -h
 usage: capable.py [-h] [-v] [-p PID] [-K] [-U] [-x] [--cgroupmap CGROUPMAP]
-                  [--unique]
+                  [--mntnsmap MNTNSMAP] [--unique]
 
 Trace security capability checks
 
@@ -120,6 +120,7 @@ optional arguments:
   -x, --extra           show extra fields in TID and INSETID columns
   --cgroupmap CGROUPMAP
                         trace cgroups in this BPF map only
+  --mntnsmap MNTNSMAP   trace mount namespaces in this BPF map only
   --unique              don't repeat stacks for the same pid or cgroup
 
 examples:
@@ -130,4 +131,5 @@ examples:
     ./capable -U          # add user-space stacks to trace
     ./capable -x          # extra fields: show TID and INSETID columns
     ./capable --unique    # don't repeat stacks for the same pid or cgroup
-    ./capable --cgroupmap ./mappath  # only trace cgroups in this BPF map
+    ./capable --cgroupmap mappath  # only trace cgroups in this BPF map
+    ./capable --mntnsmap mappath   # only trace mount namespaces in the map

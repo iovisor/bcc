@@ -97,13 +97,14 @@ with an externally created map.
 
 # tcptop --cgroupmap /sys/fs/bpf/test01
 
-For more details, see docs/filtering_by_cgroups.md
+For more details, see docs/special_filtering.md
 
 
 USAGE:
 
 # tcptop -h
 usage: tcptop.py [-h] [-C] [-S] [-p PID] [--cgroupmap CGROUPMAP]
+                 [--mntnsmap MNTNSMAP]
                  [interval] [count]
 
 Summarize TCP send/recv throughput by host
@@ -125,3 +126,4 @@ examples:
     ./tcptop -C        # don't clear the screen
     ./tcptop -p 181    # only trace PID 181
     ./tcptop --cgroupmap ./mappath  # only trace cgroups in this BPF map
+    ./tcptop --mntnsmap mappath   # only trace mount namespaces in the map

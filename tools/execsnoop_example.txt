@@ -83,7 +83,7 @@ with an externally created map.
 
 # ./execsnoop --cgroupmap /sys/fs/bpf/test01
 
-For more details, see docs/filtering_by_cgroups.md
+For more details, see docs/special_filtering.md
 
 The -U option include UID on output:
 
@@ -121,6 +121,7 @@ optional arguments:
   -x, --fails           include failed exec()s
   --cgroupmap CGROUPMAP
                         trace cgroups in this BPF map only
+  --mntnsmap MNTNSMAP   trace mount namespaces in this BPF map only
   -u USER, --uid USER   trace this UID only
   -q, --quote           Add quotemarks (") around arguments.
   -n NAME, --name NAME  only print commands matching this name (regex), any
@@ -142,4 +143,5 @@ examples:
     ./execsnoop -q        # add "quotemarks" around arguments
     ./execsnoop -n main   # only print command lines containing "main"
     ./execsnoop -l tpkg   # only print command where arguments contains "tpkg"
-    ./execsnoop --cgroupmap ./mappath  # only trace cgroups in this BPF map
+    ./execsnoop --cgroupmap mappath  # only trace cgroups in this BPF map
+    ./execsnoop --mntnsmap mappath   # only trace mount namespaces in the map

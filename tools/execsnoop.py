@@ -19,6 +19,7 @@
 
 from __future__ import print_function
 from bcc import BPF
+from bcc.containers import filter_by_containers
 from bcc.utils import ArgString, printb
 import bcc.utils as utils
 import argparse
@@ -57,7 +58,8 @@ examples = """examples:
     ./execsnoop -q        # add "quotemarks" around arguments
     ./execsnoop -n main   # only print command lines containing "main"
     ./execsnoop -l tpkg   # only print command where arguments contains "tpkg"
-    ./execsnoop --cgroupmap ./mappath  # only trace cgroups in this BPF map
+    ./execsnoop --cgroupmap mappath  # only trace cgroups in this BPF map
+    ./execsnoop --mntnsmap mappath   # only trace mount namespaces in the map
 """
 parser = argparse.ArgumentParser(
     description="Trace exec() syscalls",
@@ -71,6 +73,8 @@ parser.add_argument("-x", "--fails", action="store_true",
     help="include failed exec()s")
 parser.add_argument("--cgroupmap",
     help="trace cgroups in this BPF map only")
+parser.add_argument("--mntnsmap",
+    help="trace mount namespaces in this BPF map only")
 parser.add_argument("-u", "--uid", type=parse_uid, metavar='USER',
     help="trace this UID only")
 parser.add_argument("-q", "--quote", action="store_true",
@@ -113,9 +117,6 @@ struct data_t {
     int retval;
 };
 
-#if CGROUPSET
-BPF_TABLE_PINNED("hash", u64, u64, cgroupset, 1024, "CGROUPPATH");
-#endif
 BPF_PERF_OUTPUT(events);
 
 static int __submit_arg(struct pt_regs *ctx, void *ptr, struct data_t *data)
@@ -145,12 +146,9 @@ int syscall__execve(struct pt_regs *ctx,
 
     UID_FILTER
 
-#if CGROUPSET
-    u64 cgroupid = bpf_get_current_cgroup_id();
-    if (cgroupset.lookup(&cgroupid) == NULL) {
-      return 0;
+    if (container_should_be_filtered()) {
+        return 0;
     }
-#endif
 
     // create data here and pass to submit_arg to save stack space (#555)
     struct data_t data = {};
@@ -185,12 +183,9 @@ out:
 
 int do_ret_sys_execve(struct pt_regs *ctx)
 {
-#if CGROUPSET
-    u64 cgroupid = bpf_get_current_cgroup_id();
-    if (cgroupset.lookup(&cgroupid) == NULL) {
-      return 0;
+    if (container_should_be_filtered()) {
+        return 0;
     }
-#endif
 
     struct data_t data = {};
     struct task_struct *task;
@@ -223,11 +218,7 @@ if args.uid:
         'if (uid != %s) { return 0; }' % args.uid)
 else:
     bpf_text = bpf_text.replace('UID_FILTER', '')
-if args.cgroupmap:
-    bpf_text = bpf_text.replace('CGROUPSET', '1')
-    bpf_text = bpf_text.replace('CGROUPPATH', args.cgroupmap)
-else:
-    bpf_text = bpf_text.replace('CGROUPSET', '0')
+bpf_text = filter_by_containers(args) + bpf_text
 if args.ebpf:
     print(bpf_text)
     exit()
