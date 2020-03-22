@@ -16,6 +16,7 @@
 # 14-Feb-2016      "      "     Switch to bpf_perf_output.
 
 from __future__ import print_function
+from bcc.containers import filter_by_containers
 from bcc import BPF
 from socket import inet_ntop, AF_INET, AF_INET6
 from struct import pack
@@ -29,7 +30,8 @@ examples = """examples:
     ./tcpaccept -t        # include timestamps
     ./tcpaccept -P 80,81  # only trace port 80 and 81
     ./tcpaccept -p 181    # only trace PID 181
-    ./tcpaccept --cgroupmap ./mappath  # only trace cgroups in this BPF map
+    ./tcpaccept --cgroupmap mappath  # only trace cgroups in this BPF map
+    ./tcpaccept --mntnsmap mappath   # only trace mount namespaces in the map
 """
 parser = argparse.ArgumentParser(
     description="Trace TCP accepts",
@@ -45,6 +47,8 @@ parser.add_argument("-P", "--port",
     help="comma-separated list of local ports to trace")
 parser.add_argument("--cgroupmap",
     help="trace cgroups in this BPF map only")
+parser.add_argument("--mntnsmap",
+    help="trace mount namespaces in this BPF map only")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
 args = parser.parse_args()
@@ -80,11 +84,6 @@ struct ipv6_data_t {
     char task[TASK_COMM_LEN];
 };
 BPF_PERF_OUTPUT(ipv6_events);
-
-#if CGROUPSET
-BPF_TABLE_PINNED("hash", u64, u64, cgroupset, 1024, "CGROUPPATH");
-#endif
-
 """
 
 #
@@ -97,12 +96,9 @@ BPF_TABLE_PINNED("hash", u64, u64, cgroupset, 1024, "CGROUPPATH");
 bpf_text_kprobe = """
 int kretprobe__inet_csk_accept(struct pt_regs *ctx)
 {
-#if CGROUPSET
-    u64 cgroupid = bpf_get_current_cgroup_id();
-    if (cgroupset.lookup(&cgroupid) == NULL) {
+    if (container_should_be_filtered()) {
         return 0;
     }
-#endif
 
     struct sock *newsk = (struct sock *)PT_REGS_RC(ctx);
     u32 pid = bpf_get_current_pid_tgid() >> 32;
@@ -115,21 +111,21 @@ int kretprobe__inet_csk_accept(struct pt_regs *ctx)
     // check this is TCP
     u8 protocol = 0;
     // workaround for reading the sk_protocol bitfield:
-    
+
     // Following comments add by Joe Yin:
     // Unfortunately,it can not work since Linux 4.10,
     // because the sk_wmem_queued is not following the bitfield of sk_protocol.
     // And the following member is sk_gso_max_segs.
     // So, we can use this:
     // bpf_probe_read(&protocol, 1, (void *)((u64)&newsk->sk_gso_max_segs) - 3);
-    // In order to  diff the pre-4.10 and 4.10+ ,introduce the variables gso_max_segs_offset,sk_lingertime, 
-    // sk_lingertime is closed to the gso_max_segs_offset,and  
-    // the offset between the two members is 4 
+    // In order to  diff the pre-4.10 and 4.10+ ,introduce the variables gso_max_segs_offset,sk_lingertime,
+    // sk_lingertime is closed to the gso_max_segs_offset,and
+    // the offset between the two members is 4
 
     int gso_max_segs_offset = offsetof(struct sock, sk_gso_max_segs);
     int sk_lingertime_offset = offsetof(struct sock, sk_lingertime);
 
-    if (sk_lingertime_offset - gso_max_segs_offset == 4) 
+    if (sk_lingertime_offset - gso_max_segs_offset == 4)
         // 4.10+ with little endian
 #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
         protocol = *(u8 *)((u64)&newsk->sk_gso_max_segs - 3);
@@ -199,11 +195,7 @@ if args.port:
     lports_if = ' && '.join(['lport != %d' % lport for lport in lports])
     bpf_text = bpf_text.replace('##FILTER_PORT##',
         'if (%s) { return 0; }' % lports_if)
-if args.cgroupmap:
-    bpf_text = bpf_text.replace('CGROUPSET', '1')
-    bpf_text = bpf_text.replace('CGROUPPATH', args.cgroupmap)
-else:
-    bpf_text = bpf_text.replace('CGROUPSET', '0')
+bpf_text = filter_by_containers(args) + bpf_text
 if debug or args.ebpf:
     print(bpf_text)
     if args.ebpf:

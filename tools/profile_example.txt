@@ -708,7 +708,7 @@ with an externally created map.
 
 # ./profile --cgroupmap /sys/fs/bpf/test01
 
-For more details, see docs/filtering_by_cgroups.md
+For more details, see docs/special_filtering.md
 
 
 USAGE message:
@@ -717,7 +717,7 @@ USAGE message:
 usage: profile.py [-h] [-p PID | -L TID] [-U | -K] [-F FREQUENCY | -c COUNT]
                   [-d] [-a] [-I] [-f]
                   [--stack-storage-size STACK_STORAGE_SIZE] [-C CPU]
-                  [--cgroupmap CGROUPMAP]
+                  [--cgroupmap CGROUPMAP] [--mntnsmap MNTNSMAP]
                   [duration]
 
 Profile CPU stack traces at a timed interval
@@ -750,6 +750,7 @@ optional arguments:
   -C CPU, --cpu CPU     cpu number to run profile on
   --cgroupmap CGROUPMAP
                         trace cgroups in this BPF map only
+  --mntnsmap MNTNSMAP   trace mount namespaces in this BPF map only
 
 examples:
     ./profile             # profile stack traces at 49 Hertz until Ctrl-C
@@ -761,4 +762,5 @@ examples:
     ./profile -L 185      # only profile thread with TID 185
     ./profile -U          # only show user space stacks (no kernel)
     ./profile -K          # only show kernel space stacks (no user)
-    ./profile --cgroupmap ./mappath  # only trace cgroups in this BPF map
+    ./profile --cgroupmap mappath  # only trace cgroups in this BPF map
+    ./profile --mntnsmap mappath   # only trace mount namespaces in the map

@@ -6,7 +6,7 @@
 # based on tcpconnect utility from Brendan Gregg's suite.
 #
 # USAGE: bindsnoop [-h] [-t] [-E] [-p PID] [-P PORT[,PORT ...]] [-w]
-#             [--count] [--cgroupmap mappath]
+#             [--count] [--cgroupmap mappath] [--mntnsmap mappath]
 #
 # bindsnoop reports socket options set before the bind call
 # that would impact this system call behavior:
@@ -28,6 +28,7 @@
 
 from __future__ import print_function, absolute_import, unicode_literals
 from bcc import BPF, DEBUG_SOURCE
+from bcc.containers import filter_by_containers
 from bcc.utils import printb
 import argparse
 import re
@@ -51,6 +52,7 @@ examples = """examples:
     ./bindsnoop -E        # report bind errors
     ./bindsnoop --count   # count bind per src ip
     ./bindsnoop --cgroupmap mappath  # only trace cgroups in this BPF map
+    ./bindsnoop --mntnsmap  mappath  # only trace mount namespaces in the map
 
 it is reporting socket options set before the bins call
 impacting system call behavior:
@@ -84,6 +86,8 @@ parser.add_argument("--count", action="store_true",
     help="count binds per src ip and port")
 parser.add_argument("--cgroupmap",
     help="trace cgroups in this BPF map only")
+parser.add_argument("--mntnsmap",
+    help="trace mount namespaces in this BPF map only")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
 parser.add_argument("--debug-source", action="store_true",
@@ -148,8 +152,6 @@ struct ipv6_flow_key_t {
 };
 BPF_HASH(ipv6_count, struct ipv6_flow_key_t);
 
-CGROUP_MAP
-
 // bind options for event reporting
 union bind_options {
     u8 data;
@@ -174,7 +176,9 @@ int bindsnoop_entry(struct pt_regs *ctx, struct socket *socket)
 
     FILTER_UID
 
-    FILTER_CGROUP
+    if (container_should_be_filtered()) {
+        return 0;
+    }
 
     // stash the sock ptr for lookup on return
     currsock.update(&tid, &socket);
@@ -323,11 +327,6 @@ struct_init = {
                bpf_get_current_comm(&data6.task, sizeof(data6.task));
                ipv6_bind_events.perf_submit(ctx, &data6, sizeof(data6));"""
     },
-    'filter_cgroup': """
-    u64 cgroupid = bpf_get_current_cgroup_id();
-    if (cgroupset.lookup(&cgroupid) == NULL) {
-      return 0;
-    }""",
 }
 
 # code substitutions
@@ -351,22 +350,11 @@ if args.uid:
         'if (uid != %s) { return 0; }' % args.uid)
 if args.errors:
     bpf_text = bpf_text.replace('FILTER_ERRORS', 'ignore_errors = 0;')
-if args.cgroupmap:
-    bpf_text = bpf_text.replace('FILTER_CGROUP', struct_init['filter_cgroup'])
-    bpf_text = bpf_text.replace(
-        'CGROUP_MAP',
-        (
-            'BPF_TABLE_PINNED("hash", u64, u64, cgroupset, 1024, "%s");' %
-            args.cgroupmap
-        )
-    )
-
+bpf_text = filter_by_containers(args) + bpf_text
 bpf_text = bpf_text.replace('FILTER_PID', '')
 bpf_text = bpf_text.replace('FILTER_PORT', '')
 bpf_text = bpf_text.replace('FILTER_UID', '')
 bpf_text = bpf_text.replace('FILTER_ERRORS', '')
-bpf_text = bpf_text.replace('FILTER_CGROUP', '')
-bpf_text = bpf_text.replace('CGROUP_MAP', '')
 
 # selecting output format - 80 characters or wide, fitting IPv6 addresses
 header_fmt = "%8s %-12.12s %-4s %-15s %-5s %5s %2s"

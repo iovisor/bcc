@@ -21,6 +21,7 @@
 
 from __future__ import print_function
 from bcc import BPF
+from bcc.containers import filter_by_containers
 from bcc.utils import printb
 import argparse
 from socket import inet_ntop, ntohs, AF_INET, AF_INET6
@@ -37,7 +38,8 @@ examples = """examples:
     ./tcpconnect -U        # include UID
     ./tcpconnect -u 1000   # only trace UID 1000
     ./tcpconnect -c        # count connects per src ip and dest ip/port
-    ./tcpconnect --cgroupmap ./mappath  # only trace cgroups in this BPF map
+    ./tcpconnect --cgroupmap mappath  # only trace cgroups in this BPF map
+    ./tcpconnect --mntnsmap mappath   # only trace mount namespaces in the map
 """
 parser = argparse.ArgumentParser(
     description="Trace TCP connects",
@@ -57,6 +59,8 @@ parser.add_argument("-c", "--count", action="store_true",
     help="count connects per src ip and dest ip/port")
 parser.add_argument("--cgroupmap",
     help="trace cgroups in this BPF map only")
+parser.add_argument("--mntnsmap",
+    help="trace mount namespaces in this BPF map only")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
 args = parser.parse_args()
@@ -69,10 +73,6 @@ bpf_text = """
 #include <bcc/proto.h>
 
 BPF_HASH(currsock, u32, struct sock *);
-
-#if CGROUPSET
-BPF_TABLE_PINNED("hash", u64, u64, cgroupset, 1024, "CGROUPPATH");
-#endif
 
 // separate data structs for ipv4 and ipv6
 struct ipv4_data_t {
@@ -116,12 +116,9 @@ BPF_HASH(ipv6_count, struct ipv6_flow_key_t);
 
 int trace_connect_entry(struct pt_regs *ctx, struct sock *sk)
 {
-#if CGROUPSET
-    u64 cgroupid = bpf_get_current_cgroup_id();
-    if (cgroupset.lookup(&cgroupid) == NULL) {
-      return 0;
+    if (container_should_be_filtered()) {
+        return 0;
     }
-#endif
 
     u64 pid_tgid = bpf_get_current_pid_tgid();
     u32 pid = pid_tgid >> 32;
@@ -248,11 +245,7 @@ if args.port:
 if args.uid:
     bpf_text = bpf_text.replace('FILTER_UID',
         'if (uid != %s) { return 0; }' % args.uid)
-if args.cgroupmap:
-    bpf_text = bpf_text.replace('CGROUPSET', '1')
-    bpf_text = bpf_text.replace('CGROUPPATH', args.cgroupmap)
-else:
-    bpf_text = bpf_text.replace('CGROUPSET', '0')
+bpf_text = filter_by_containers(args) + bpf_text
 
 bpf_text = bpf_text.replace('FILTER_PID', '')
 bpf_text = bpf_text.replace('FILTER_PORT', '')

@@ -42,4 +42,4 @@ with an externally created map.
 
 # ./tcptracer --cgroupmap /sys/fs/bpf/test01
 
-For more details, see docs/filtering_by_cgroups.md
+For more details, see docs/special_filtering.md
