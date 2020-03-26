@@ -144,7 +144,7 @@ while 1:
   #print first line of the HTTP GET/POST request
   #line ends with 0xOD 0xOA (\r\n)
   #(if we want to print all the header print until \r\n\r\n)
-  for i in range (payload_offset-1,len(packet_bytearray)-1):
+  for i in range (payload_offset,len(packet_bytearray)-1):
     if (packet_bytearray[i]== 0x0A):
       if (packet_bytearray[i-1] == 0x0D):
         break
