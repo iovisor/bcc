@@ -193,7 +193,7 @@ int kprobe__cap_capable(struct pt_regs *ctx, const struct cred *cred,
     struct repeat_t repeat = {0,};
     repeat.cap = cap;
 #if CGROUPSET
-    repeat.cgroupid = bpf_get_current_cgroup_id(),
+    repeat.cgroupid = bpf_get_current_cgroup_id();
 #else
     repeat.tgid = tgid;
 #endif
