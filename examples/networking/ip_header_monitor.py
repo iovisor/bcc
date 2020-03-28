@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # ip_header_monitor outputs every value in the ip header
-# how to use : net_monitor.py <net_interface> 
+# how to use : ip_header_monitor.py <net_interface> 
 # 
 # Copyright 2020 YoungEun Choe
 
