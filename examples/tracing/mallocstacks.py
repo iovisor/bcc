@@ -67,5 +67,6 @@ stack_traces = b.get_table("stack_traces")
 
 for k, v in reversed(sorted(calls.items(), key=lambda c: c[1].value)):
     print("%d bytes allocated at:" % v.value)
-    for addr in stack_traces.walk(k.value):
-        printb(b"\t%s" % b.sym(addr, pid, show_offset=True))
+    if k.value > 0 :
+        for addr in stack_traces.walk(k.value):
+            printb(b"\t%s" % b.sym(addr, pid, show_offset=True))
