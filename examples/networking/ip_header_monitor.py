@@ -39,21 +39,10 @@ bpf_text = """
 BPF_PERF_OUTPUT(skb_events);    
 
 struct ip_hdr { 
-    u32 ip_src;
-    u32 ip_dst;  
-    u16 ip_ttl;
-    u16 ip_hchecksum;
-    u16 ip_ver;
-    u16 ip_hlen;
-    u16 ip_tos;
-    u16 ip_tlen;
-    u16 ip_identification;
-    u16 ip_nextp;
-    u16 ip_ffo_unused;
-    u16 ip_df;
-    u16 ip_mf;
-    u16 ip_foffset;
+    u32 ip_src, ip_dst;
+    u16 ip_ttl, ip_hchecksum, ip_ver, ip_hlen, ip_tos, ip_tlen, ip_identification, ip_nextp, ip_ffo_unused, ip_df, ip_mf, ip_foffset;
 };
+
 
 int ip_header_monitor(struct __sk_buff *skb) {
     u8 *cursor = 0;
