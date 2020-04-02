@@ -98,7 +98,7 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-  auto attach_res = bpf->attach_usdt(u);
+  auto attach_res = bpf->attach_usdt();
   if (attach_res.code() != 0) {
     std::cerr << attach_res.msg() << std::endl;
     return 1;
