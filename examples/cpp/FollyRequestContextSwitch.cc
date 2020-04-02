@@ -114,7 +114,7 @@ int main(int argc, char** argv) {
 
   shutdown_handler = [&](int s) {
     std::cerr << "Terminating..." << std::endl;
-    bpf->detach_usdt(u);
+    bpf->detach_usdt();
     delete bpf;
     exit(0);
   };

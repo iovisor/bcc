@@ -86,7 +86,7 @@ TEST_CASE("test fine probes in our own binary with C++ API", "[usdt]") {
     res = bpf.attach_usdt();
     REQUIRE(res.ok());
 
-    res = bpf.detach_all();
+    res = bpf.detach_usdt();
     REQUIRE(res.ok());
 }
 

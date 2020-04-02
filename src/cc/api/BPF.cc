@@ -490,36 +490,51 @@ StatusTuple BPF::detach_uprobe(const std::string& binary_path,
   return StatusTuple::OK();
 }
 
+StatusTuple BPF::detach_usdt_without_validation(const USDT& u, pid_t pid) {
+  auto& probe = *static_cast<::USDT::Probe*>(u.probe_.get());
+  bool failed = false;
+  std::string err_msg;
+  for (const auto& loc : probe.locations_) {
+    auto res = detach_uprobe(loc.bin_path_, std::string(), loc.address_,
+                             BPF_PROBE_ENTRY, pid);
+    if (!res.ok()) {
+      failed = true;
+      err_msg += "USDT " + u.print_name() + " at " + loc.bin_path_ +
+                  " address " + std::to_string(loc.address_);
+      err_msg += ": " + res.msg() + "\n";
+    }
+  }
+
+  if (!probe.disable()) {
+    failed = true;
+    err_msg += "Unable to disable USDT " + u.print_name();
+  }
+
+  if (failed)
+    return StatusTuple(-1, err_msg);
+  else
+    return StatusTuple::OK();
+}
+
 StatusTuple BPF::detach_usdt(const USDT& usdt, pid_t pid) {
   for (const auto& u : usdt_) {
     if (u == usdt) {
-      auto& probe = *static_cast<::USDT::Probe*>(u.probe_.get());
-      bool failed = false;
-      std::string err_msg;
-      for (const auto& loc : probe.locations_) {
-        auto res = detach_uprobe(loc.bin_path_, std::string(), loc.address_,
-                                 BPF_PROBE_ENTRY, pid);
-        if (res.code() != 0) {
-          failed = true;
-          err_msg += "USDT " + u.print_name() + " at " + loc.bin_path_ +
-                     " address " + std::to_string(loc.address_);
-          err_msg += ": " + res.msg() + "\n";
-        }
-      }
-
-      if (!probe.disable()) {
-        failed = true;
-        err_msg += "Unable to disable USDT " + u.print_name();
-      }
-
-      if (failed)
-        return StatusTuple(-1, err_msg);
-      else
-        return StatusTuple::OK();
+      return detach_usdt_without_validation(u, pid);
     }
   }
 
   return StatusTuple(-1, "USDT %s not found", usdt.print_name().c_str());
+}
+
+StatusTuple BPF::detach_usdt() {
+  for (const auto& u : usdt_) {
+    auto ret = detach_usdt_without_validation(u, -1);
+    if (!ret.ok()) {
+      return ret;
+    }
+  }
+
+  return StatusTuple::OK();
 }
 
 StatusTuple BPF::detach_tracepoint(const std::string& tracepoint) {
