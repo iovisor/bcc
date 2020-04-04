@@ -76,6 +76,20 @@ TEST_CASE("test fine a probe in our own binary with C++ API", "[usdt]") {
     REQUIRE(res.code() == 0);
 }
 
+TEST_CASE("test fine probes in our own binary with C++ API", "[usdt]") {
+    ebpf::BPF bpf;
+    ebpf::USDT u("/proc/self/exe", "libbcc_test", "sample_probe_1", "on_event");
+
+    auto res = bpf.init("int on_event() { return 0; }", {}, {u});
+    REQUIRE(res.ok());
+
+    res = bpf.attach_usdt_all();
+    REQUIRE(res.ok());
+
+    res = bpf.detach_usdt_all();
+    REQUIRE(res.ok());
+}
+
 TEST_CASE("test fine a probe in our Process with C++ API", "[usdt]") {
     ebpf::BPF bpf;
     ebpf::USDT u(::getpid(), "libbcc_test", "sample_probe_1", "on_event");
