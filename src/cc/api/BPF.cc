@@ -307,7 +307,7 @@ StatusTuple BPF::attach_usdt(const USDT& usdt, pid_t pid) {
   return StatusTuple(-1, "USDT %s not found", usdt.print_name().c_str());
 }
 
-StatusTuple BPF::attach_usdt() {
+StatusTuple BPF::attach_usdt_all() {
   for (const auto& u : usdt_) {
     auto res = attach_usdt_without_validation(u, -1);
     if (!res.ok()) {
@@ -526,7 +526,7 @@ StatusTuple BPF::detach_usdt(const USDT& usdt, pid_t pid) {
   return StatusTuple(-1, "USDT %s not found", usdt.print_name().c_str());
 }
 
-StatusTuple BPF::detach_usdt() {
+StatusTuple BPF::detach_usdt_all() {
   for (const auto& u : usdt_) {
     auto ret = detach_usdt_without_validation(u, -1);
     if (!ret.ok()) {

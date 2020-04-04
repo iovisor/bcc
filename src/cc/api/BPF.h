@@ -85,9 +85,9 @@ class BPF {
                             pid_t pid = -1,
                             uint64_t symbol_offset = 0);
   StatusTuple attach_usdt(const USDT& usdt, pid_t pid = -1);
-  StatusTuple attach_usdt();
+  StatusTuple attach_usdt_all();
   StatusTuple detach_usdt(const USDT& usdt, pid_t pid = -1);
-  StatusTuple detach_usdt();
+  StatusTuple detach_usdt_all();
 
   StatusTuple attach_tracepoint(const std::string& tracepoint,
                                 const std::string& probe_func);
