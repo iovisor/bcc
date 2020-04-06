@@ -290,7 +290,7 @@ Examples in situ:
 
 Syntax: ```syscall__SYSCALLNAME```
 
-```syscall__``` is a special prefix that creates a kprobe for the system call name provided as the remainder. You can use it by declaring a normal C function, then using the Python ```BPF.get_syscall_name(SYSCALLNAME)``` and ```BPF.attach_kprobe()``` to associate it.
+```syscall__``` is a special prefix that creates a kprobe for the system call name provided as the remainder. You can use it by declaring a normal C function, then using the Python ```BPF.get_syscall_fnname(SYSCALLNAME)``` and ```BPF.attach_kprobe()``` to associate it.
 
 Arguments are specified on the function declaration: ```syscall__SYSCALLNAME(struct pt_regs *ctx, [, argument1 ...])```.
 
@@ -312,7 +312,7 @@ The first argument is always ```struct pt_regs *```, the remainder are the argum
 Corresponding Python code:
 ```Python
 b = BPF(text=bpf_text)
-execve_fnname = b.get_syscall_name("execve")
+execve_fnname = b.get_syscall_fnname("execve")
 b.attach_kprobe(event=execve_fnname, fn_name="syscall__execve")
 ```
 
