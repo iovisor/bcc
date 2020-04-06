@@ -446,10 +446,18 @@ int BPFModule::finalize() {
       *sections_p;
 
   mod->setTargetTriple("bpf-pc-linux");
+#if LLVM_MAJOR_VERSION >= 11
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+  mod->setDataLayout("e-m:e-p:64:64-i64:64-i128:128-n32:64-S128");
+#else
+  mod->setDataLayout("E-m:e-p:64:64-i64:64-i128:128-n32:64-S128");
+#endif
+#else
 #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
   mod->setDataLayout("e-m:e-p:64:64-i64:64-n32:64-S128");
 #else
   mod->setDataLayout("E-m:e-p:64:64-i64:64-n32:64-S128");
+#endif
 #endif
   sections_p = rw_engine_enabled_ ? &sections_ : &tmp_sections;
 
