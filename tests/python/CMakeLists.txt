@@ -85,3 +85,5 @@ add_test(NAME py_test_free_bcc_memory WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_D
   COMMAND ${TEST_WRAPPER} py_test_free_bcc_memory sudo ${CMAKE_CURRENT_SOURCE_DIR}/test_free_bcc_memory.py)
 add_test(NAME py_test_rlimit WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   COMMAND ${TEST_WRAPPER} py_test_rlimit sudo ${CMAKE_CURRENT_SOURCE_DIR}/test_rlimit.py)
+add_test(NAME py_test_lpm_trie WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  COMMAND ${TEST_WRAPPER} py_test_lpm_trie sudo ${CMAKE_CURRENT_SOURCE_DIR}/test_lpm_trie.py)
