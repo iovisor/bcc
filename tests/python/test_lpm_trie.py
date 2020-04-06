@@ -3,9 +3,22 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 
 import ctypes as ct
-import unittest
+import distutils.version
+import os
+from unittest import main, skipUnless, TestCase
 from bcc import BPF
 from netaddr import IPAddress
+
+def kernel_version_ge(major, minor):
+    # True if running kernel is >= X.Y
+    version = distutils.version.LooseVersion(os.uname()[2]).version
+    if version[0] > major:
+        return True
+    if version[0] < major:
+        return False
+    if minor and version[1] < minor:
+        return False
+    return True
 
 class KeyV4(ct.Structure):
     _fields_ = [("prefixlen", ct.c_uint),
@@ -15,10 +28,15 @@ class KeyV6(ct.Structure):
     _fields_ = [("prefixlen", ct.c_uint),
                 ("data", ct.c_ushort * 8)]
 
-class TestLpmTrie(unittest.TestCase):
+@skipUnless(kernel_version_ge(4, 11), "requires kernel >= 4.11")
+class TestLpmTrie(TestCase):
     def test_lpm_trie_v4(self):
         test_prog1 = """
-        BPF_LPM_TRIE(trie, u64, int, 16);
+        struct key_v4 {
+            u32 prefixlen;
+            u32 data[4];
+        };
+        BPF_LPM_TRIE(trie, struct key_v4, int, 16);
         """
         b = BPF(text=test_prog1)
         t = b["trie"]
@@ -71,4 +89,4 @@ class TestLpmTrie(unittest.TestCase):
             v = t[k]
 
 if __name__ == "__main__":
-    unittest.main()
+    main()
