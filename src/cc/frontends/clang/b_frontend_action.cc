@@ -37,6 +37,7 @@
 #include "bcc_libbpf_inc.h"
 
 #include "libbpf.h"
+#include "bcc_syms.h"
 
 namespace ebpf {
 
@@ -80,6 +81,30 @@ const char **get_call_conv(void) {
 
   ret = (const char **)run_arch_callback(get_call_conv_cb);
   return ret;
+}
+
+static std::string check_bpf_probe_read_user(llvm::StringRef probe) {
+  if (probe.str() == "bpf_probe_read_user" ||
+      probe.str() == "bpf_probe_read_user_str") {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 5, 0)
+    return probe.str();
+#else
+    // Check for probe_user symbols in backported kernels before fallback
+    void *resolver = bcc_symcache_new(-1, nullptr);
+    uint64_t addr = 0;
+    bool found = bcc_symcache_resolve_name(resolver, nullptr,
+                  "bpf_probe_read_user", &addr) >= 0 ? true: false;
+    if (found)
+      return probe.str();
+
+    if (probe.str() == "bpf_probe_read_user") {
+      return "bpf_probe_read";
+    } else {
+      return "bpf_probe_read_str";
+    }
+#endif
+  }
+  return "";
 }
 
 using std::map;
@@ -947,6 +972,22 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
   } else if (Call->getCalleeDecl()) {
     NamedDecl *Decl = dyn_cast<NamedDecl>(Call->getCalleeDecl());
     if (!Decl) return true;
+
+    string text;
+
+    std::string probe = check_bpf_probe_read_user(Decl->getName());
+    if (probe != "") {
+      vector<string> probe_args;
+
+      for (auto arg : Call->arguments())
+        probe_args.push_back(
+            rewriter_.getRewrittenText(expansionRange(arg->getSourceRange())));
+
+      text = probe + "(" + probe_args[0] + ", " + probe_args[1] + ", " +
+             probe_args[2] + ")";
+      rewriter_.ReplaceText(expansionRange(Call->getSourceRange()), text);
+    }
+
     if (AsmLabelAttr *A = Decl->getAttr<AsmLabelAttr>()) {
       // Functions with the tag asm("llvm.bpf.extra") are implemented in the
       // rewriter rather than as a macro since they may also include nested
@@ -959,10 +1000,10 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
         }
 
         vector<string> args;
+
         for (auto arg : Call->arguments())
           args.push_back(rewriter_.getRewrittenText(expansionRange(arg->getSourceRange())));
 
-        string text;
         if (Decl->getName() == "incr_cksum_l3") {
           text = "bpf_l3_csum_replace_(" + fn_args_[0]->getName().str() + ", (u64)";
           text += args[0] + ", " + args[1] + ", " + args[2] + ", sizeof(" + args[2] + "))";
@@ -994,8 +1035,10 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
           text = "({ u64 __addr = 0x0; ";
           text += "_bpf_readarg_" + current_fn_ + "_" + args[0] + "(" +
                   args[1] + ", &__addr, sizeof(__addr));";
-          text += "bpf_probe_read(" + args[2] + ", " + args[3] +
-                  ", (void *)__addr);";
+
+          text += check_bpf_probe_read_user(StringRef("bpf_probe_read_user"));
+
+          text += "(" + args[2] + ", " + args[3] + ", (void *)__addr);";
           text += "})";
           rewriter_.ReplaceText(expansionRange(Call->getSourceRange()), text);
         } else if (Decl->getName() == "bpf_usdt_readarg") {
