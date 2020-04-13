@@ -8,7 +8,7 @@
 #include <iostream>
 #include <string>
 
-#include "bcc/bcc_version.h"
+#include "bcc_version.h"
 #include "BPF.h"
 
 const std::string BPF_PROGRAM = R"(
