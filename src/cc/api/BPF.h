@@ -330,6 +330,12 @@ class USDT {
   USDT(const USDT& usdt);
   USDT(USDT&& usdt) noexcept;
 
+  const std::string &binary_path() const { return binary_path_; }
+  pid_t pid() const { return pid_; }
+  const std::string &provider() const { return provider_; }
+  const std::string &name() const { return name_; }
+  const std::string &probe_func() const { return probe_func_; }
+
   StatusTuple init();
 
   bool operator==(const USDT& other) const;
