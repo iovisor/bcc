@@ -1,0 +1,68 @@
+Demonstrations of biolatpcts, the Linux eBPF/bcc version.
+
+
+biolatpcts traces block device I/O (disk I/O), and prints the latency
+percentiles per I/O type. Example:
+
+# ./biolatpcts.py /dev/nvme0n1
+nvme0n1    p1    p5   p10   p16   p25   p50   p75   p84   p90   p95   p99  p100
+read     95us 175us 305us 515us 895us 985us 995us 1.5ms 2.5ms 3.5ms 4.5ms  10ms
+write     5us   5us   5us  15us  25us 135us 765us 855us 885us 895us 965us 1.5ms
+discard   5us   5us   5us   5us 135us 145us 165us 205us 385us 875us 1.5ms 2.5ms
+flush     5us   5us   5us   5us   5us   5us   5us   5us   5us 1.5ms 4.5ms 5.5ms
+[...]
+
+Unless changed with the -i option, the latency percentiles are printed every 3
+seconds.
+
+
+Any number of custom percentiles can be requested with the -p option:
+
+# ./biolatpcts.py /dev/nvme0n1 -p 01,90.0,99.9,99.99,100.0
+
+nvme0n1    01  90.0  99.9 99.99 100.0
+read      5us 4.5ms  16ms  22ms  26ms
+write    15us 255us 365us 515us 2.5ms
+discard     -     -     -     -     -
+flush     5us   5us   5us   5us  24ms
+[...]
+
+Note that the target percentile strings are preserved as-is to facilitate
+exact key matching when the output is consumed by another program.
+
+
+When the output is consumed by another program, parsing can be tedious. The -j
+option makes biolatpcts output results in json, one line per interval.
+
+# ./tools/biolatpcts.py /dev/nvme0n1 -j
+{"read": {"1": 2.5e-05, "5": 3.5e-05, "10": 4.5e-05, "16": 0.000145, "25": 0.000195, "50": 0.000355, "75": 0.000605, "84": 0.000775, "90": 0.000965, "95": 0.0015, "99": 0.0025, "100": 0.0235}, "write": {"1": 5e-06, "5": 5e-06, "10": 5e-06, "16": 5e-06, "25": 1.5e-05, "50": 2.5e-05, "75": 4.5e-05, "84": 7.5e-05, "90": 0.000195, "95": 0.000665, "99": 0.0015, "100": 0.0035}, "discard": {"1": 0.0, "5": 0.0, "10": 0.0, "16": 0.0, "25": 0.0, "50": 0.0, "75": 0.0, "84": 0.0, "90": 0.0, "95": 0.0, "99": 0.0, "100": 0.0}, "flush": {"1": 0.0, "5": 0.0, "10": 0.0, "16": 0.0, "25": 0.0, "50": 0.0, "75": 0.0, "84": 0.0, "90": 0.0, "95": 0.0, "99": 0.0, "100": 0.0}}
+[...]
+
+
+By default biolatpcts measures the duration each IO was on the device. It can
+be changed using the -w option.
+
+
+USAGE message:
+
+usage: biolatpcts.py [-h] [-i INTERVAL]
+                     [-w {from-rq-alloc,after-rq-alloc,on-device}]
+                     [-p PCT,...] [-j] [--verbose]
+                     DEV
+
+Monitor IO latency distribution of a block device
+
+positional arguments:
+  DEV                   Target block device (/dev/DEVNAME, DEVNAME or MAJ:MIN)
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -i INTERVAL, --interval INTERVAL
+                        Report interval (default: 3)
+  -w {from-rq-alloc,after-rq-alloc,on-device}, --which {from-rq-alloc,after-rq-alloc,on-device}
+                        Which latency to measure (default: on-device)
+  -p PCT,..., --pcts PCT,...
+                        Percentiles to calculate (default:
+                        1,5,10,16,25,50,75,84,90,95,99,100)
+  -j, --json            Output in json (default: False)
+  --verbose, -v
