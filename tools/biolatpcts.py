@@ -31,8 +31,8 @@ parser.add_argument('-i', '--interval', type=int, default=3,
                     help='Report interval')
 parser.add_argument('-w', '--which', choices=['from-rq-alloc', 'after-rq-alloc', 'on-device'],
                     default='on-device', help='Which latency to measure')
-parser.add_argument('-p', '--pcts', metavar='PCT', type=float, nargs='+',
-                    default=[1, 5, 10, 16, 25, 50, 75, 84, 90, 95, 99, 100],
+parser.add_argument('-p', '--pcts', metavar='PCT,...', type=str,
+                    default='1,5,10,16,25,50,75,84,90,95,99,100',
                     help='Percentiles to calculate')
 parser.add_argument('-j', '--json', action='store_true',
                     help='Output in json')
@@ -97,7 +97,8 @@ void kprobe_blk_account_io_done(struct pt_regs *ctx, struct request *rq, u64 now
 """
 
 args = parser.parse_args()
-args.pcts.sort()
+args.pcts = args.pcts.split(',')
+args.pcts.sort(key=lambda x: float(x))
 
 if args.which == 'from-rq-alloc':
     start_time_field = 'alloc_time_ns'
@@ -157,7 +158,7 @@ def calc_lat_pct(req_pcts, total, lat_100ms, lat_1ms, lat_10us):
     counted = 0
 
     for pct_idx in reversed(range(len(req_pcts))):
-        req = req_pcts[pct_idx]
+        req = float(req_pcts[pct_idx])
         while True:
             last_counted = counted
             (gran, slots) = data[data_sel]
@@ -238,9 +239,8 @@ while True:
         print('\n{:<7}'.format(args.devno), end='')
         widths = []
         for pct in args.pcts:
-            pct_str = 'p{:g}'.format(pct)
-            widths.append(max(len(pct_str), 5))
-            print(' {:>5}'.format(pct_str), end='')
+            widths.append(max(len(pct), 5))
+            print(' {:>5}'.format(pct), end='')
         print()
         for iot in range(4):
             print('{:7}'.format(io_type[iot]), end='')
