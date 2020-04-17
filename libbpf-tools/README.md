@@ -77,11 +77,11 @@ changed in favor of using pre-packaged version of bpftool.
 
 Re-compiling your Kernel with CONFIG_DEBUG_INFO_BTF=y
 -----------------------------------------------------
-libbpf probes to see if your sys fs exports the file `/sys/kernel/btf/vmlinux` (from Kernel 5.5+) or if you have the ELF version in your system [bpf_find_kernel_btf](https://github.com/libbpf/libbpf/blob/master/src/btf.c)
+libbpf probes to see if your sys fs exports the file `/sys/kernel/btf/vmlinux` (from Kernel 5.5+) or if you have the ELF version in your system [`bpf_find_kernel_btf`](https://github.com/libbpf/libbpf/blob/master/src/btf.c)
 Please note the ELF file could exist without the BTF info in it. Your Kconfig should contain the options below
 
 1. Compile options
-```config
+```code
 CONFIG_DEBUG_INFO_BTF=y
 CONFIG_DEBUG_INFO=y
 ```
