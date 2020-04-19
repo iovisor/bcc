@@ -46,7 +46,7 @@ For more reproducible builds, vmlinux.h header file is pre-generated and
 checked in along the other sources. This is done to avoid dependency on
 specific user/build server's kernel configuration, because vmlinux.h
 generation depends on having a kernel with BTF type information built-in
-(which is enabled by `CONFIG_DEBUG_INFO_BTF=y` Kconfig option).
+(which is enabled by `CONFIG_DEBUG_INFO_BTF=y` Kconfig option See below).
 
 vmlinux.h is generated from upstream Linux version at particular minor
 version tag. E.g., `vmlinux_505.h` is generated from v5.5 tag. Exact set of
@@ -73,3 +73,19 @@ Given bpftool package can't yet be expected to be available widely across many
 distributions, bpftool binary is checked in into BCC repository in bin/
 subdirectory. Once bpftool package is more widely available, this can be
 changed in favor of using pre-packaged version of bpftool.
+
+
+Re-compiling your Kernel with CONFIG_DEBUG_INFO_BTF=y
+-----------------------------------------------------
+libbpf probes to see if your sys fs exports the file `/sys/kernel/btf/vmlinux` (from Kernel 5.5+) or if you have the ELF version in your system [`code`](https://github.com/libbpf/libbpf/blob/master/src/btf.c)
+Please note the ELF file could exist without the BTF info in it. Your Kconfig should contain the options below
+
+1. Compile options
+```code
+CONFIG_DEBUG_INFO_BTF=y
+CONFIG_DEBUG_INFO=y
+```
+2. Also, make sure that you have pahole 1.13 (or preferably 1.16+) during the
+kernel build (it comes from dwarves package). Without it, BTF won't be
+generated, and on older kernels you'd get only warning, but still would
+build kernel successfully
