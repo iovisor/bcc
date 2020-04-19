@@ -1,9 +1,9 @@
-#!/usr/bin/python3
+#!/usr/bin/python
 #
-# io_latencies.py  Monitor IO latency distribution of a block device.
+# biolatpcts.py  Monitor IO latency distribution of a block device.
 #
-#  $ ./io_latencies.py 259:0
-#  259:0      p1    p5   p10   p16   p25   p50   p75   p84   p90   p95   p99  p100
+#  $ ./biolatpcts.py /dev/nvme0n1
+#  nvme0n1    p1    p5   p10   p16   p25   p50   p75   p84   p90   p95   p99  p100
 #  read     95us 175us 305us 515us 895us 985us 995us 1.5ms 2.5ms 3.5ms 4.5ms  10ms
 #  write     5us   5us   5us  15us  25us 135us 765us 855us 885us 895us 965us 1.5ms
 #  discard   5us   5us   5us   5us 135us 145us 165us 205us 385us 875us 1.5ms 2.5ms
@@ -18,6 +18,7 @@ from time import sleep
 import argparse
 import json
 import sys
+import os
 
 description = """
 Monitor IO latency distribution of a block device
@@ -25,14 +26,14 @@ Monitor IO latency distribution of a block device
 
 parser = argparse.ArgumentParser(description = description,
                                  formatter_class = argparse.ArgumentDefaultsHelpFormatter)
-parser.add_argument('devno', metavar='MAJ:MIN', type=str,
-                    help='Target block device number')
+parser.add_argument('dev', metavar='DEV', type=str,
+                    help='Target block device (/dev/DEVNAME, DEVNAME or MAJ:MIN)')
 parser.add_argument('-i', '--interval', type=int, default=3,
                     help='Report interval')
 parser.add_argument('-w', '--which', choices=['from-rq-alloc', 'after-rq-alloc', 'on-device'],
                     default='on-device', help='Which latency to measure')
-parser.add_argument('-p', '--pcts', metavar='PCT', type=float, nargs='+',
-                    default=[1, 5, 10, 16, 25, 50, 75, 84, 90, 95, 99, 100],
+parser.add_argument('-p', '--pcts', metavar='PCT,...', type=str,
+                    default='1,5,10,16,25,50,75,84,90,95,99,100',
                     help='Percentiles to calculate')
 parser.add_argument('-j', '--json', action='store_true',
                     help='Output in json')
@@ -97,7 +98,20 @@ void kprobe_blk_account_io_done(struct pt_regs *ctx, struct request *rq, u64 now
 """
 
 args = parser.parse_args()
-args.pcts.sort()
+args.pcts = args.pcts.split(',')
+args.pcts.sort(key=lambda x: float(x))
+
+try:
+    major = int(args.dev.split(':')[0])
+    minor = int(args.dev.split(':')[1])
+except Exception:
+    if '/' in args.dev:
+        stat = os.stat(args.dev)
+    else:
+        stat = os.stat('/dev/' + args.dev)
+
+    major = os.major(stat.st_rdev)
+    minor = os.minor(stat.st_rdev)
 
 if args.which == 'from-rq-alloc':
     start_time_field = 'alloc_time_ns'
@@ -109,8 +123,8 @@ else:
     die()
 
 bpf_source = bpf_source.replace('__START_TIME_FIELD__', start_time_field)
-bpf_source = bpf_source.replace('__MAJOR__', str(int(args.devno.split(':')[0])))
-bpf_source = bpf_source.replace('__MINOR__', str(int(args.devno.split(':')[1])))
+bpf_source = bpf_source.replace('__MAJOR__', str(major))
+bpf_source = bpf_source.replace('__MINOR__', str(minor))
 
 bpf = BPF(text=bpf_source)
 bpf.attach_kprobe(event="blk_account_io_done", fn_name="kprobe_blk_account_io_done")
@@ -157,7 +171,7 @@ def calc_lat_pct(req_pcts, total, lat_100ms, lat_1ms, lat_10us):
     counted = 0
 
     for pct_idx in reversed(range(len(req_pcts))):
-        req = req_pcts[pct_idx]
+        req = float(req_pcts[pct_idx])
         while True:
             last_counted = counted
             (gran, slots) = data[data_sel]
@@ -235,12 +249,11 @@ while True:
             result[io_type[iot]] = lats
         print(json.dumps(result), flush=True)
     else:
-        print('\n{:<7}'.format(args.devno), end='')
+        print('\n{:<7}'.format(os.path.basename(args.dev)), end='')
         widths = []
         for pct in args.pcts:
-            pct_str = 'p{:g}'.format(pct)
-            widths.append(max(len(pct_str), 5))
-            print(' {:>5}'.format(pct_str), end='')
+            widths.append(max(len(pct), 5))
+            print(' {:>5}'.format(pct), end='')
         print()
         for iot in range(4):
             print('{:7}'.format(io_type[iot]), end='')
