@@ -108,7 +108,8 @@ int trace_req_completion(struct pt_regs *ctx, struct request *req)
     valp = infobyreq.lookup(&req);
     if (valp == 0) {
         data.len = req->__data_len;
-        strcpy(data.name, "?");
+        data.name[0] = '?';
+        data.name[1] = 0;
     } else {
         if (##QUEUE##) {
             data.qdelta = *tsp - valp->ts;

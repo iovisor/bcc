@@ -158,9 +158,9 @@ int trace_entry(struct pt_regs *ctx) {
 #endif
     READ_CLASS
     READ_METHOD
-    bpf_probe_read(&data.method.clazz, sizeof(data.method.clazz),
+    bpf_probe_read_user(&data.method.clazz, sizeof(data.method.clazz),
                    (void *)clazz);
-    bpf_probe_read(&data.method.method, sizeof(data.method.method),
+    bpf_probe_read_user(&data.method.method, sizeof(data.method.method),
                    (void *)method);
 #ifndef LATENCY
     valp = counts.lookup_or_try_init(&data.method, &val);
@@ -182,9 +182,9 @@ int trace_return(struct pt_regs *ctx) {
     data.pid = bpf_get_current_pid_tgid();
     READ_CLASS
     READ_METHOD
-    bpf_probe_read(&data.method.clazz, sizeof(data.method.clazz),
+    bpf_probe_read_user(&data.method.clazz, sizeof(data.method.clazz),
                    (void *)clazz);
-    bpf_probe_read(&data.method.method, sizeof(data.method.method),
+    bpf_probe_read_user(&data.method.method, sizeof(data.method.method),
                    (void *)method);
     entry_timestamp = entry.lookup(&data);
     if (!entry_timestamp) {

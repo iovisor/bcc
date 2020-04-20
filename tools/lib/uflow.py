@@ -81,8 +81,8 @@ int NAME(struct pt_regs *ctx) {
 
     READ_CLASS
     READ_METHOD
-    bpf_probe_read(&data.clazz, sizeof(data.clazz), (void *)clazz);
-    bpf_probe_read(&data.method, sizeof(data.method), (void *)method);
+    bpf_probe_read_user(&data.clazz, sizeof(data.clazz), (void *)clazz);
+    bpf_probe_read_user(&data.method, sizeof(data.method), (void *)method);
 
     FILTER_CLASS
     FILTER_METHOD

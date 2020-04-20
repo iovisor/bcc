@@ -152,7 +152,7 @@ int trace_return(struct pt_regs *ctx)
         return 0;
     }
     bpf_probe_read(&data.comm, sizeof(data.comm), valp->comm);
-    bpf_probe_read(&data.fname, sizeof(data.fname), (void *)valp->fname);
+    bpf_probe_read_user(&data.fname, sizeof(data.fname), (void *)valp->fname);
     data.id = valp->id;
     data.ts = tsp / 1000;
     data.uid = bpf_get_current_uid_gid();
@@ -167,7 +167,7 @@ int trace_return(struct pt_regs *ctx)
 """
 
 bpf_text_kfunc= """
-KRETFUNC_PROBE(do_sys_open, int dfd, const char *filename, int flags, int mode, int ret)
+KRETFUNC_PROBE(do_sys_open, int dfd, const char __user *filename, int flags, int mode, int ret)
 {
     u64 id = bpf_get_current_pid_tgid();
     u32 pid = id >> 32; // PID is higher part
@@ -189,7 +189,7 @@ KRETFUNC_PROBE(do_sys_open, int dfd, const char *filename, int flags, int mode, 
 
     u64 tsp = bpf_ktime_get_ns();
 
-    bpf_probe_read(&data.fname, sizeof(data.fname), (void *)filename);
+    bpf_probe_read_user(&data.fname, sizeof(data.fname), (void *)filename);
     data.id    = id;
     data.ts    = tsp / 1000;
     data.uid   = bpf_get_current_uid_gid();

@@ -80,7 +80,7 @@ int %s(struct pt_regs *ctx) {
     bpf_usdt_readarg(1, ctx, &nameptr);
     bpf_usdt_readarg(3, ctx, &id);
     bpf_usdt_readarg(4, ctx, &native_id);
-    bpf_probe_read(&te.name, sizeof(te.name), (void *)nameptr);
+    bpf_probe_read_user(&te.name, sizeof(te.name), (void *)nameptr);
     te.runtime_id = id;
     te.native_id = native_id;
     __builtin_memcpy(&te.type, type, sizeof(te.type));

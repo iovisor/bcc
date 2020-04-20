@@ -140,8 +140,8 @@ if language == "java":
     u64 manager = 0, pool = 0;
     bpf_usdt_readarg(1, ctx, &manager);        // ptr to manager name
     bpf_usdt_readarg(3, ctx, &pool);           // ptr to pool name
-    bpf_probe_read(&event.string1, sizeof(event.string1), (void *)manager);
-    bpf_probe_read(&event.string2, sizeof(event.string2), (void *)pool);
+    bpf_probe_read_user(&event.string1, sizeof(event.string1), (void *)manager);
+    bpf_probe_read_user(&event.string2, sizeof(event.string2), (void *)pool);
     """
 
     def formatter(e):

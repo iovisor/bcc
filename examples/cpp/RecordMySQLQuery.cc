@@ -34,7 +34,7 @@ int probe_mysql_query(struct pt_regs *ctx, void* thd, char* query, size_t len) {
     key.ts = bpf_ktime_get_ns();
     key.pid = bpf_get_current_pid_tgid();
 
-    bpf_probe_read_str(&key.query, sizeof(key.query), query);
+    bpf_probe_read_user_str(&key.query, sizeof(key.query), query);
 
     int one = 1;
     queries.update(&key, &one);

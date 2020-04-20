@@ -72,7 +72,7 @@ int probe_SSL_write(struct pt_regs *ctx, void *ssl, void *buf, int num) {
         bpf_get_current_comm(&__data.comm, sizeof(__data.comm));
 
         if ( buf != 0) {
-                bpf_probe_read(&__data.v0, sizeof(__data.v0), buf);
+                bpf_probe_read_user(&__data.v0, sizeof(__data.v0), buf);
         }
 
         perf_SSL_write.perf_submit(ctx, &__data, sizeof(__data));
@@ -108,7 +108,7 @@ int probe_SSL_read_exit(struct pt_regs *ctx, void *ssl, void *buf, int num) {
         bpf_get_current_comm(&__data.comm, sizeof(__data.comm));
 
         if (bufp != 0) {
-                bpf_probe_read(&__data.v0, sizeof(__data.v0), (char *)*bufp);
+                bpf_probe_read_user(&__data.v0, sizeof(__data.v0), (char *)*bufp);
         }
 
         bufs.delete(&pid);
