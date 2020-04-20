@@ -726,7 +726,7 @@ void BTypeVisitor::rewriteFuncParam(FunctionDecl *D) {
     // it in case of "syscall__" for other architectures.
     if (strncmp(D->getName().str().c_str(), "syscall__", 9) == 0 ||
         strncmp(D->getName().str().c_str(), "kprobe____x64_sys_", 18) == 0) {
-      preamble += "#ifdef CONFIG_ARCH_HAS_SYSCALL_WRAPPER\n";
+      preamble += "#if defined(CONFIG_ARCH_HAS_SYSCALL_WRAPPER) && !defined(__s390x__)\n";
       genParamIndirectAssign(D, preamble, calling_conv_regs);
       preamble += "\n#else\n";
       genParamDirectAssign(D, preamble, calling_conv_regs);
