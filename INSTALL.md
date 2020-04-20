@@ -58,21 +58,23 @@ Kernel compile flags can usually be checked by looking at `/proc/config.gz` or
 
 ## Ubuntu - Binary
 
-**Ubuntu Packages**
-
 Versions of bcc are available in the standard Ubuntu
-multiverse repository. The Ubuntu packages have slightly different names: where iovisor
+Universe repository, as well in iovisor's PPA. The Ubuntu packages have slightly different names: where iovisor
 packages use `bcc` in the name (e.g. `bcc-tools`), Ubuntu packages use `bpfcc` (e.g.
-`bpfcc-tools`). Source packages and the binary packages produced from them can be
+`bpfcc-tools`).
+
+Currently, BCC packages for both the Ubuntu Universe, and the iovisor builds are outdated. This is a known and tracked in:
+- [Universe - Ubuntu Launchpad](https://bugs.launchpad.net/ubuntu/+source/bpfcc/+bug/1848137)
+- [iovisor - BCC GitHub Issues](https://github.com/iovisor/bcc/issues/2678)
+Curently, [building from source](#ubuntu---source) is currently the only way to get up to date packaged version of bcc.
+
+**Ubuntu Packages**
+Source packages and the binary packages produced from them can be
 found at [packages.ubuntu.com](https://packages.ubuntu.com/search?suite=default&section=all&arch=any&keywords=bpfcc&searchon=sourcenames).
 
 ```bash
 sudo apt-get install bpfcc-tools linux-headers-$(uname -r)
 ```
-
-Some of the BCC tools are currently broken due to outdated packages. This is a
-[known bug](https://bugs.launchpad.net/ubuntu/+source/bpfcc/+bug/1848137).
-Therefore [building from source](#ubuntu---source) is currently the only way to get fully working tools.
 
 The tools are installed in `/sbin` (`/usr/sbin` in Ubuntu 18.04) with a `-bpfcc` extension. Try running `sudo opensnoop-bpfcc`.
 
@@ -87,7 +89,7 @@ which declares a dependency on `libbpfcc` while the upstream `libbcc` package is
 `foo` should install without trouble as `libbcc` declares that it provides `libbpfcc`.
 That said, one should always test such a configuration in case of version incompatibilities.
 
-**Upstream Stable and Signed Packages**
+**iovisor packages (Upstream Stable and Signed Packages)**
 
 ```bash
 sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 4052245BD4284CDD
