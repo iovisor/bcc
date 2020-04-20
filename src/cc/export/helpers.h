@@ -614,11 +614,36 @@ static int (*bpf_probe_read_user_str)(void *dst, __u32 size,
 static int (*bpf_probe_read_kernel_str)(void *dst, __u32 size,
             const void *unsafe_ptr) =
   (void *)BPF_FUNC_probe_read_kernel_str;
+static int (*bpf_tcp_send_ack)(void *tp, __u32 rcv_nxt) =
+  (void *)BPF_FUNC_tcp_send_ack;
+static int (*bpf_send_signal_thread)(__u32 sig) =
+  (void *)BPF_FUNC_send_signal_thread;
+static __u64 (*bpf_jiffies64)(void) = (void *)BPF_FUNC_jiffies64;
+
+struct bpf_perf_event_data;
+static int (*bpf_read_branch_records)(struct bpf_perf_event_data *ctx, void *buf,
+                                      __u32 size, __u64 flags) =
+  (void *)BPF_FUNC_read_branch_records;
+static int (*bpf_get_ns_current_pid_tgid)(__u64 dev, __u64 ino,
+                                          struct bpf_pidns_info *nsdata,
+                                          __u32 size) =
+  (void *)BPF_FUNC_get_ns_current_pid_tgid;
+
+struct bpf_map;
+static int (*bpf_xdp_output)(void *ctx, struct bpf_map *map, __u64 flags,
+                             void *data, __u64 size) =
+  (void *)BPF_FUNC_xdp_output;
+static __u64 (*bpf_get_netns_cookie)(void *ctx) = (void *)BPF_FUNC_get_netns_cookie;
+static __u64 (*bpf_get_current_ancestor_cgroup_id)(int ancestor_level) =
+  (void *)BPF_FUNC_get_current_ancestor_cgroup_id;
+
+struct sk_buff;
+static int (*bpf_sk_assign)(struct sk_buff *skb, struct bpf_sock *sk, __u64 flags) =
+  (void *)BPF_FUNC_sk_assign;
 
 /* llvm builtin functions that eBPF C program may use to
  * emit BPF_LD_ABS and BPF_LD_IND instructions
  */
-struct sk_buff;
 unsigned long long load_byte(void *skb,
   unsigned long long off) asm("llvm.bpf.load.byte");
 unsigned long long load_half(void *skb,

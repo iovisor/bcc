@@ -215,6 +215,12 @@ static struct bpf_helper helpers[] = {
   {"tcp_send_ack", "5.5"},
   {"send_signal_thread", "5.5"},
   {"jiffies64", "5.5"},
+  {"read_branch_records", "5.6"},
+  {"get_ns_current_pid_tgid", "5.6"},
+  {"xdp_output", "5.6"},
+  {"get_netns_cookie", "5.6"},
+  {"get_current_ancestor_cgroup_id", "5.6"},
+  {"sk_assign", "5.6"},
 };
 
 static uint64_t ptr_to_u64(void *ptr)
