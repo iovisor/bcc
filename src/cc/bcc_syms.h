@@ -38,10 +38,10 @@ struct mod_info;
 #define STT_GNU_IFUNC 10
 #endif
 
-#if defined(__powerpc64__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+#if defined(__powerpc64__) && defined(_CALL_ELF) && _CALL_ELF == 2
 // Indicate if the Local Entry Point (LEP) should be used as a symbol's
 // start address
-#define STT_PPC64LE_SYM_LEP 31
+#define STT_PPC64_ELFV2_SYM_LEP 31
 #endif
 
 static const uint32_t BCC_SYM_ALL_TYPES = 65535;
