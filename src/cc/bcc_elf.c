@@ -257,16 +257,8 @@ static int list_in_scn(Elf *e, Elf_Scn *section, size_t stridx, size_t symsize,
         continue;
 
 #ifdef __powerpc64__
-#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-      if (opddata && sym.st_shndx == opdidx) {
-        size_t offset = sym.st_value - opdshdr.sh_addr;
-        /* Find the function descriptor */
-        uint64_t *descr = opddata->d_buf + offset;
-        /* Read the actual entry point address from the descriptor */
-        sym.st_value = *descr;
-      }
-#elif __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-      if (option->use_symbol_type & (1 << STT_PPC64LE_SYM_LEP)) {
+#if defined(_CALL_ELF) && _CALL_ELF == 2
+      if (option->use_symbol_type & (1 << STT_PPC64_ELFV2_SYM_LEP)) {
         /*
          * The PowerPC 64-bit ELF v2 ABI says that the 3 most significant bits
          * in the st_other field of the symbol table specifies the number of
@@ -286,6 +278,14 @@ static int list_in_scn(Elf *e, Elf_Scn *section, size_t stridx, size_t symsize,
           /* If 6, LEP is 16 instructions past the GEP */
           case 6: sym.st_value += 64; break;
         }
+      }
+#else
+      if (opddata && sym.st_shndx == opdidx) {
+        size_t offset = sym.st_value - opdshdr.sh_addr;
+        /* Find the function descriptor */
+        uint64_t *descr = opddata->d_buf + offset;
+        /* Read the actual entry point address from the descriptor */
+        sym.st_value = *descr;
       }
 #endif
 #endif

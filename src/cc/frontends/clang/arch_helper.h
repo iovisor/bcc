@@ -34,7 +34,7 @@ static void *run_arch_callback(arch_callback_t fn)
   /* If ARCH is not set, detect from local arch clang is running on */
   if (!archenv) {
 #if defined(__powerpc64__)
-#if defined(_CALL_ELF) && _CALL_ELF == 2
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
     return fn(BCC_ARCH_PPC_LE);
 #else
     return fn(BCC_ARCH_PPC);
@@ -50,7 +50,7 @@ static void *run_arch_callback(arch_callback_t fn)
 
   /* Otherwise read it from ARCH */
   if (!strcmp(archenv, "powerpc")) {
-#if defined(_CALL_ELF) && _CALL_ELF == 2
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
     return fn(BCC_ARCH_PPC_LE);
 #else
     return fn(BCC_ARCH_PPC);
