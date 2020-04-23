@@ -556,7 +556,7 @@ int count(struct pt_regs *ctx) {
     struct key_t key = {};
     u64 zero = 0, *val;
 
-    bpf_probe_read(&key.c, sizeof(key.c), (void *)PT_REGS_PARM1(ctx));
+    bpf_probe_read_user(&key.c, sizeof(key.c), (void *)PT_REGS_PARM1(ctx));
     // could also use `counts.increment(key)`
     val = counts.lookup_or_try_init(&key, &zero);
     if (val) {
@@ -620,7 +620,7 @@ int do_trace(struct pt_regs *ctx) {
     uint64_t addr;
     char path[128]={0};
     bpf_usdt_readarg(6, ctx, &addr);
-    bpf_probe_read(&path, sizeof(path), (void *)addr);
+    bpf_probe_read_user(&path, sizeof(path), (void *)addr);
     bpf_trace_printk("path:%s\\n", path);
     return 0;
 };
@@ -640,7 +640,7 @@ b = BPF(text=bpf_text, usdt_contexts=[u])
 Things to learn:
 
 1. ```bpf_usdt_readarg(6, ctx, &addr)```: Read the address of argument 6 from the USDT probe into ```addr```.
-1. ```bpf_probe_read(&path, sizeof(path), (void *)addr)```: Now the string ```addr``` points to into our ```path``` variable.
+1. ```bpf_probe_read_user(&path, sizeof(path), (void *)addr)```: Now the string ```addr``` points to into our ```path``` variable.
 1. ```u = USDT(pid=int(pid))```: Initialize USDT tracing for the given PID.
 1. ```u.enable_probe(probe="http__server__request", fn_name="do_trace")```: Attach our ```do_trace()``` BPF C function to the Node.js ```http__server__request``` USDT probe.
 1. ```b = BPF(text=bpf_text, usdt_contexts=[u])```: Need to pass in our USDT object, ```u```, to BPF object creation.

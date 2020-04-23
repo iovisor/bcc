@@ -28,6 +28,8 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
         - [7. bpf_get_current_task()](#7-bpf_get_current_task)
         - [8. bpf_log2l()](#8-bpf_log2l)
         - [9. bpf_get_prandom_u32()](#9-bpf_get_prandom_u32)
+        - [10. bpf_probe_read_user()](#10-bpf_probe_read_user)
+        - [11. bpf_probe_read_user_str()](#11-bpf_probe_read_user_str)
     - [Debugging](#debugging)
         - [1. bpf_override_return()](#1-bpf_override_return)
     - [Output](#output)
@@ -196,7 +198,7 @@ For example:
 ```C
 int count(struct pt_regs *ctx) {
     char buf[64];
-    bpf_probe_read(&buf, sizeof(buf), (void *)PT_REGS_PARM1(ctx));
+    bpf_probe_read_user(&buf, sizeof(buf), (void *)PT_REGS_PARM1(ctx));
     bpf_trace_printk("%s %d", buf, PT_REGS_PARM2(ctx));
     return(0);
 }
@@ -242,7 +244,7 @@ int do_trace(struct pt_regs *ctx) {
     uint64_t addr;
     char path[128];
     bpf_usdt_readarg(6, ctx, &addr);
-    bpf_probe_read(&path, sizeof(path), (void *)addr);
+    bpf_probe_read_user(&path, sizeof(path), (void *)addr);
     bpf_trace_printk("path:%s\\n", path);
     return 0;
 };
@@ -372,7 +374,7 @@ Syntax: ```int bpf_probe_read(void *dst, int size, const void *src)```
 
 Return: 0 on success
 
-This copies a memory location to the BPF stack, so that BPF can later operate on it. For safety, all memory reads must pass through bpf_probe_read(). This happens automatically in some cases, such as dereferencing kernel variables, as bcc will rewrite the BPF program to include the necessary bpf_probe_reads().
+This copies size bytes from kernel address space to the BPF stack, so that BPF can later operate on it. For safety, all kernel memory reads must pass through bpf_probe_read(). This happens automatically in some cases, such as dereferencing kernel variables, as bcc will rewrite the BPF program to include the necessary bpf_probe_read().
 
 Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=bpf_probe_read+path%3Aexamples&type=Code),
@@ -386,7 +388,7 @@ Return:
   - \> 0 length of the string including the trailing NULL on success
   - \< 0 error
 
-This copies a `NULL` terminated string from memory location to BPF stack, so that BPF can later operate on it. In case the string length is smaller than size, the target is not padded with further `NULL` bytes. In case the string length is larger than size, just `size - 1` bytes are copied and the last byte is set to `NULL`.
+This copies a `NULL` terminated string from kernel address space to the BPF stack, so that BPF can later operate on it. In case the string length is smaller than size, the target is not padded with further `NULL` bytes. In case the string length is larger than size, just `size - 1` bytes are copied and the last byte is set to `NULL`.
 
 Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=bpf_probe_read_str+path%3Aexamples&type=Code),
@@ -489,6 +491,32 @@ Returns a pseudo-random u32.
 Example in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=bpf_get_prandom_u32+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=bpf_get_prandom_u32+path%3Atools&type=Code)
+
+### 10. bpf_probe_read_user()
+
+Syntax: ```int bpf_probe_read_user(void *dst, int size, const void *src)```
+
+Return: 0 on success
+
+This attempts to safely read size bytes from user address space to the BPF stack, so that BPF can later operate on it. For safety, all user address space memory reads must pass through bpf_probe_read_user().
+
+Examples in situ:
+[search /examples](https://github.com/iovisor/bcc/search?q=bpf_probe_read_user+path%3Aexamples&type=Code),
+[search /tools](https://github.com/iovisor/bcc/search?q=bpf_probe_read_user+path%3Atools&type=Code)
+
+### 11. bpf_probe_read_user_str()
+
+Syntax: ```int bpf_probe_read_user_str(void *dst, int size, const void *src)```
+
+Return:
+  - \> 0 length of the string including the trailing NULL on success
+  - \< 0 error
+
+This copies a `NULL` terminated string from user address space to the BPF stack, so that BPF can later operate on it. In case the string length is smaller than size, the target is not padded with further `NULL` bytes. In case the string length is larger than size, just `size - 1` bytes are copied and the last byte is set to `NULL`.
+
+Examples in situ:
+[search /examples](https://github.com/iovisor/bcc/search?q=bpf_probe_read_user_str+path%3Aexamples&type=Code),
+[search /tools](https://github.com/iovisor/bcc/search?q=bpf_probe_read_user_str+path%3Atools&type=Code)
 
 ## Debugging
 
@@ -1721,7 +1749,7 @@ See the "Understanding eBPF verifier messages" section in the kernel source unde
 
 ## 1. Invalid mem access
 
-This can be due to trying to read memory directly, instead of operating on memory on the BPF stack. All memory reads must be passed via bpf_probe_read() to copy memory into the BPF stack, which can be automatic by the bcc rewriter in some cases of simple dereferencing. bpf_probe_read() does all the required checks.
+This can be due to trying to read memory directly, instead of operating on memory on the BPF stack. All kernel memory reads must be passed via bpf_probe_read() to copy kernel memory into the BPF stack, which can be automatic by the bcc rewriter in some cases of simple dereferencing. bpf_probe_read() does all the required checks.
 
 Example:
 
