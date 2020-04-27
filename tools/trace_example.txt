@@ -54,7 +54,7 @@ Event message filter is useful while you only interesting the specific event.
 Like the program open thousands file and you only want to see the "temp" file
 and print stack.
 
-# trace 'do_sys_open "%s", arg2' -UK -f temp
+# trace 'do_sys_open "%s", arg2@user' -UK -f temp
 PID     TID     COMM            FUNC             -
 9557    9557    a.out           do_sys_open      temp.1
         do_sys_open+0x1 [kernel]
@@ -71,7 +71,7 @@ PID     TID     COMM            FUNC             -
 
 Process name filter is porting from tools/opensnoop
 
-# trace 'do_sys_open "%s", arg2' -UK -n out
+# trace 'do_sys_open "%s", arg2@user' -UK -n out
 PID     TID     COMM            FUNC             -
 9557    9557    a.out           do_sys_open      temp.1
         do_sys_open+0x1 [kernel]
@@ -241,7 +241,7 @@ so it always includes this header file.
 As a final example, let's trace open syscalls for a specific process. By
 default, tracing is system-wide, but the -p switch overrides this:
 
-# trace -p 2740 'do_sys_open "%s", arg2' -T
+# trace -p 2740 'do_sys_open "%s", arg2@user' -T
 TIME     PID    COMM         FUNC             -
 05:36:16 15872  ls           do_sys_open      /etc/ld.so.cache
 05:36:16 15872  ls           do_sys_open      /lib64/libselinux.so.1
@@ -335,11 +335,14 @@ EXAMPLES:
 
 trace do_sys_open
         Trace the open syscall and print a default trace message when entered
-trace 'do_sys_open "%s", arg2'
-        Trace the open syscall and print the filename being opened
-trace 'do_sys_open "%s", arg2' -n main
+trace 'do_sys_open "%s", arg2@user'
+        Trace the open syscall and print the filename being opened. @user is
+        added to arg2 in kprobes to ensure that char * should be copied from
+        the userspace stack to the bpf stack. If not specified, previous
+        behaviour is expected.
+trace 'do_sys_open "%s", arg2@user' -n main
         Trace the open syscall and only print event that process names containing "main"
-trace 'do_sys_open "%s", arg2' -f config
+trace 'do_sys_open "%s", arg2@user' -f config
         Trace the open syscall and print the filename being opened filtered by "config"
 trace 'sys_read (arg3 > 20000) "read %d bytes", arg3'
         Trace the read syscall and print a message for reads >20000 bytes

@@ -11,7 +11,7 @@
 # Copyright (C) 2016 Sasha Goldshtein.
 
 from __future__ import print_function
-from bcc import BPF, USDT
+from bcc import BPF, USDT, StrcmpRewrite
 from functools import partial
 from time import sleep, strftime
 import time
@@ -65,6 +65,7 @@ class Probe(object):
                 self.string_size = string_size
                 self.kernel_stack = kernel_stack
                 self.user_stack = user_stack
+                self.probe_user_list = set()
                 Probe.probe_count += 1
                 self._parse_probe()
                 self.probe_num = Probe.probe_count
@@ -260,47 +261,33 @@ class Probe(object):
                 "$task" : "((struct task_struct *)bpf_get_current_task())"
         }
 
-        def _generate_streq_function(self, string):
-                fname = "streq_%d" % Probe.streq_index
-                Probe.streq_index += 1
-                self.streq_functions += """
-static inline bool %s(char const *ignored, uintptr_t str) {
-        char needle[] = %s;
-        char haystack[sizeof(needle)];
-        bpf_probe_read(&haystack, sizeof(haystack), (void *)str);
-        for (int i = 0; i < sizeof(needle) - 1; ++i) {
-                if (needle[i] != haystack[i]) {
-                        return false;
-                }
-        }
-        return true;
-}
-                """ % (fname, string)
-                return fname
-
         def _rewrite_expr(self, expr):
-                if self.is_syscall_kprobe:
-                    for alias, replacement in Probe.aliases_indarg.items():
-                        expr = expr.replace(alias, replacement)
-                else:
-                    for alias, replacement in Probe.aliases_arg.items():
-                        # For USDT probes, we replace argN values with the
-                        # actual arguments for that probe obtained using
-                        # bpf_readarg_N macros emitted at BPF construction.
-                        if self.probe_type == "u":
-                                continue
+                # Find the occurances of any arg[1-6]@user. Use it later to
+                # identify bpf_probe_read_user
+                for matches in re.finditer(r'(arg[1-6])(@user)', expr):
+                    if matches.group(1).strip() not in self.probe_user_list:
+                        self.probe_user_list.add(matches.group(1).strip())
+                # Remove @user occurrences from arg before resolving to its
+                # corresponding aliases.
+                expr = re.sub(r'(arg[1-6])@user', r'\1', expr)
+                rdict = StrcmpRewrite.rewrite_expr(expr,
+                            self.bin_cmp, self.library,
+                            self.probe_user_list, self.streq_functions,
+                            Probe.streq_index)
+                expr = rdict["expr"]
+                self.streq_functions = rdict["streq_functions"]
+                Probe.streq_index = rdict["probeid"]
+                alias_to_check = Probe.aliases_indarg \
+                                    if self.is_syscall_kprobe \
+                                    else Probe.aliases_arg
+                # For USDT probes, we replace argN values with the
+                # actual arguments for that probe obtained using
+                # bpf_readarg_N macros emitted at BPF construction.
+                if not self.probe_type == "u":
+                    for alias, replacement in alias_to_check.items():
                         expr = expr.replace(alias, replacement)
                 for alias, replacement in Probe.aliases_common.items():
                     expr = expr.replace(alias, replacement)
-                if self.bin_cmp:
-                    STRCMP_RE = 'STRCMP\\(\"([^"]+)\\"'
-                else:
-                    STRCMP_RE = 'STRCMP\\(("[^"]+\\")'
-                matches = re.finditer(STRCMP_RE, expr)
-                for match in matches:
-                        string = match.group(1)
-                        fname = self._generate_streq_function(string)
-                        expr = expr.replace("STRCMP", fname, 1)
                 return expr
 
         p_type = {"u": ct.c_uint, "d": ct.c_int, "lu": ct.c_ulong,
@@ -412,14 +399,24 @@ BPF_PERF_OUTPUT(%s);
                         text = ("        %s %s = 0;\n" +
                                 "        bpf_usdt_readarg(%s, ctx, &%s);\n") \
                                 % (arg_ctype, expr, expr[3], expr)
-
+                probe_read_func = "bpf_probe_read"
                 if field_type == "s":
+                        if self.library:
+                            probe_read_func = "bpf_probe_read_user"
+                        else:
+                            alias_to_check = Probe.aliases_indarg \
+                                                if self.is_syscall_kprobe \
+                                                else Probe.aliases_arg
+                            for arg, alias in alias_to_check.items():
+                                if alias == expr and arg in self.probe_user_list:
+                                    probe_read_func = "bpf_probe_read_user"
+                                    break
                         return text + """
         if (%s != 0) {
                 void *__tmp = (void *)%s;
-                bpf_probe_read(&__data.v%d, sizeof(__data.v%d), __tmp);
+                %s(&__data.v%d, sizeof(__data.v%d), __tmp);
         }
-                """ % (expr, expr, idx, idx)
+                """ % (expr, expr, probe_read_func, idx, idx)
                 if field_type in Probe.fmt_types:
                         return text + "        __data.v%d = (%s)%s;\n" % \
                                         (idx, Probe.c_type[field_type], expr)
