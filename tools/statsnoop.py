@@ -84,7 +84,7 @@ int trace_return(struct pt_regs *ctx)
     }
 
     struct data_t data = {.pid = pid};
-    bpf_probe_read(&data.fname, sizeof(data.fname), (void *)valp->fname);
+    bpf_probe_read_user(&data.fname, sizeof(data.fname), (void *)valp->fname);
     bpf_get_current_comm(&data.comm, sizeof(data.comm));
     data.ts_ns = bpf_ktime_get_ns();
     data.ret = PT_REGS_RC(ctx);

@@ -52,7 +52,7 @@ int printret(struct pt_regs *ctx) {
         return 0;
     pid = bpf_get_current_pid_tgid();
     data.pid = pid;
-    bpf_probe_read(&data.str, sizeof(data.str), (void *)PT_REGS_RC(ctx));
+    bpf_probe_read_user(&data.str, sizeof(data.str), (void *)PT_REGS_RC(ctx));
 
     bpf_get_current_comm(&comm, sizeof(comm));
     if (comm[0] == 'b' && comm[1] == 'a' && comm[2] == 's' && comm[3] == 'h' && comm[4] == 0 ) {

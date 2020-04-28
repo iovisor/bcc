@@ -22,7 +22,7 @@ int trace_method(struct pt_regs *ctx) {
   bpf_usdt_readarg(2, ctx, &addr);
 
   char fn_name[128] = {};
-  bpf_probe_read(&fn_name, sizeof(fn_name), (void *)addr);
+  bpf_probe_read_user(&fn_name, sizeof(fn_name), (void *)addr);
 
   bpf_trace_printk("%s(...)\n", fn_name);
   return 0;

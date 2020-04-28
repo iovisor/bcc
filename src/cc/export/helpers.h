@@ -602,6 +602,7 @@ static long long (*bpf_tcp_gen_syncookie)(struct bpf_sock *sk, void *ip,
 static int (*bpf_skb_output)(void *ctx, void *map, __u64 flags, void *data,
                              __u64 size) =
   (void *)BPF_FUNC_skb_output;
+
 static int (*bpf_probe_read_user)(void *dst, __u32 size,
                                   const void *unsafe_ptr) =
   (void *)BPF_FUNC_probe_read_user;
@@ -887,8 +888,8 @@ int bpf_usdt_readarg_p(int argc, struct pt_regs *ctx, void *buf, u64 len) asm("l
 #if defined(__TARGET_ARCH_x86)
 #define bpf_target_x86
 #define bpf_target_defined
-#elif defined(__TARGET_ARCH_s930x)
-#define bpf_target_s930x
+#elif defined(__TARGET_ARCH_s390x)
+#define bpf_target_s390x
 #define bpf_target_defined
 #elif defined(__TARGET_ARCH_arm64)
 #define bpf_target_arm64
@@ -905,7 +906,7 @@ int bpf_usdt_readarg_p(int argc, struct pt_regs *ctx, void *buf, u64 len) asm("l
 #if defined(__x86_64__)
 #define bpf_target_x86
 #elif defined(__s390x__)
-#define bpf_target_s930x
+#define bpf_target_s390x
 #elif defined(__aarch64__)
 #define bpf_target_arm64
 #elif defined(__powerpc__)
@@ -923,7 +924,7 @@ int bpf_usdt_readarg_p(int argc, struct pt_regs *ctx, void *buf, u64 len) asm("l
 #define PT_REGS_RC(ctx)		((ctx)->gpr[3])
 #define PT_REGS_IP(ctx)		((ctx)->nip)
 #define PT_REGS_SP(ctx)		((ctx)->gpr[1])
-#elif defined(bpf_target_s930x)
+#elif defined(bpf_target_s390x)
 #define PT_REGS_PARM1(x) ((x)->gprs[2])
 #define PT_REGS_PARM2(x) ((x)->gprs[3])
 #define PT_REGS_PARM3(x) ((x)->gprs[4])

@@ -120,7 +120,7 @@ BPF_PERF_OUTPUT(events);
 
 static int __submit_arg(struct pt_regs *ctx, void *ptr, struct data_t *data)
 {
-    bpf_probe_read(data->argv, sizeof(data->argv), ptr);
+    bpf_probe_read_user(data->argv, sizeof(data->argv), ptr);
     events.perf_submit(ctx, data, sizeof(struct data_t));
     return 1;
 }
@@ -128,7 +128,7 @@ static int __submit_arg(struct pt_regs *ctx, void *ptr, struct data_t *data)
 static int submit_arg(struct pt_regs *ctx, void *ptr, struct data_t *data)
 {
     const char *argp = NULL;
-    bpf_probe_read(&argp, sizeof(argp), ptr);
+    bpf_probe_read_user(&argp, sizeof(argp), ptr);
     if (argp) {
         return __submit_arg(ctx, (void *)(argp), data);
     }

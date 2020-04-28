@@ -82,7 +82,11 @@ struct entry_t {
     u64 id;
     u64 start_ns;
 #ifdef GRAB_ARGS
+#ifndef __s390x__
     u64 args[6];
+#else
+    u64 args[5];
+#endif
 #endif
 };
 
@@ -94,7 +98,11 @@ struct data_t {
     u64 retval;
     char comm[TASK_COMM_LEN];
 #ifdef GRAB_ARGS
+#ifndef __s390x__
     u64 args[6];
+#else
+    u64 args[5];
+#endif
 #endif
 #ifdef USER_STACKS
     int user_stack_id;
@@ -130,7 +138,9 @@ static int trace_entry(struct pt_regs *ctx, int id)
     entry.args[2] = PT_REGS_PARM3(ctx);
     entry.args[3] = PT_REGS_PARM4(ctx);
     entry.args[4] = PT_REGS_PARM5(ctx);
+#ifndef __s390x__
     entry.args[5] = PT_REGS_PARM6(ctx);
+#endif
 #endif
 
     entryinfo.update(&tgid_pid, &entry);
