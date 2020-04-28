@@ -478,8 +478,8 @@ static bool same_file(char *a, const char *b)
 		return false;
 }
 
-static char *find_debug_via_debuglink(Elf *e, const char *binpath,
-                                      int check_crc) {
+static char *__find_debug_via_debuglink(Elf *e, const char *binpath,
+                                        int check_crc, const char *prefix) {
   char fullpath[PATH_MAX];
   char *tmppath;
   char *bindir = NULL;
@@ -511,7 +511,7 @@ static char *find_debug_via_debuglink(Elf *e, const char *binpath,
   }
 
   // Search for the file in the global debug directory /usr/lib/debug/'binpath'
-  snprintf(fullpath, sizeof(fullpath), "/usr/lib/debug%s/%s", bindir, name);
+  snprintf(fullpath, sizeof(fullpath), "%s/usr/lib/debug%s/%s", prefix, bindir, name);
   if (access(fullpath, F_OK) != -1) {
     res = strdup(fullpath);
     goto DONE;
@@ -526,7 +526,7 @@ DONE:
   return res;
 }
 
-static char *find_debug_via_buildid(Elf *e) {
+static char *__find_debug_via_buildid(Elf *e, const char *prefix) {
   char fullpath[PATH_MAX];
   char buildid[128];  // currently 40 seems to be default, let's be safe
 
@@ -537,16 +537,15 @@ static char *find_debug_via_buildid(Elf *e) {
   //    mm/nnnnnn...nnnn.debug
   // Where mm are the first two characters of the buildid, and nnnn are the
   // rest of the build id, followed by .debug.
-  snprintf(fullpath, sizeof(fullpath), "/usr/lib/debug/.build-id/%c%c/%s.debug",
-          buildid[0], buildid[1], buildid + 2);
+  snprintf(fullpath, sizeof(fullpath), "%s/usr/lib/debug/.build-id/%c%c/%s.debug",
+          prefix, buildid[0], buildid[1], buildid + 2);
   if (access(fullpath, F_OK) != -1) {
     return strdup(fullpath);
   }
-
   return NULL;
 }
 
-static char *find_debug_via_symfs(Elf *e, const char* path) {
+static char *__find_debug_via_symfs(Elf *e, const char* path, const char *prefix) {
   char fullpath[PATH_MAX];
   char buildid[128];
   char symfs_buildid[128];
@@ -562,7 +561,7 @@ static char *find_debug_via_symfs(Elf *e, const char* path) {
 
   check_build_id = find_buildid(e, buildid);
 
-  snprintf(fullpath, sizeof(fullpath), "%s/%s", symfs, path);
+  snprintf(fullpath, sizeof(fullpath), "%s%s/%s", prefix, symfs, path);
   if (access(fullpath, F_OK) == -1)
     goto out;
 
@@ -594,6 +593,45 @@ out:
   return result;
 }
 
+static int extract_ns_prefix(const char *path, char *prefix, size_t len) {
+  pid_t pid;
+  if (1 != sscanf(path, "/proc/%d/", &pid))
+    return -1;
+  snprintf(prefix, len, "/proc/%d/root", pid);
+  return 0;
+}
+
+static char *find_debug_via_debuglink(Elf *e, const char *binpath,
+                                      int check_crc) {
+  char ns_prefix[128];
+  char *res = NULL;
+  if (!extract_ns_prefix(binpath, ns_prefix, 128))
+    res = __find_debug_via_debuglink(e, binpath, check_crc, ns_prefix);
+  if (!res)
+    res = __find_debug_via_debuglink(e, binpath, check_crc, "");
+  return res;
+}
+
+static char *find_debug_via_symfs(Elf *e, const char* path) {
+  char ns_prefix[128];
+  char *res = NULL;
+  if (!extract_ns_prefix(path, ns_prefix, 128))
+    res =  __find_debug_via_symfs(e, path, ns_prefix);
+  if (!res)
+    res = __find_debug_via_symfs(e, path, "");
+  return res;
+}
+
+static char *find_debug_via_buildid(Elf *e, const char *path) {
+  char ns_prefix[128];
+  char *res = NULL;
+  if (!extract_ns_prefix(path, ns_prefix, 128))
+    res =  __find_debug_via_buildid(e, ns_prefix);
+  if (!res)
+    res = __find_debug_via_buildid(e, "");
+  return res;
+}
+
 static int foreach_sym_core(const char *path, bcc_elf_symcb callback,
                             bcc_elf_symcb_lazy callback_lazy,
                             struct bcc_symbol_option *option, void *payload,
@@ -619,7 +657,7 @@ static int foreach_sym_core(const char *path, bcc_elf_symcb callback,
     // files for debuginfo files and so on.
     debug_file = find_debug_via_symfs(e, path);
     if (!debug_file)
-      debug_file = find_debug_via_buildid(e);
+      debug_file = find_debug_via_buildid(e, path);
     if (!debug_file)
       debug_file = find_debug_via_debuglink(e, path,
                                             option->check_debug_file_crc);
@@ -998,7 +1036,7 @@ int bcc_elf_symbol_str(const char *path, size_t section_idx,
     return -1;
 
   if (debugfile) {
-    debug_file = find_debug_via_buildid(e);
+    debug_file = find_debug_via_buildid(e, path);
     if (!debug_file)
       debug_file = find_debug_via_debuglink(e, path, 0); // No crc for speed
 
