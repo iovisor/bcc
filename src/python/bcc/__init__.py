@@ -26,7 +26,7 @@ import sys
 from .libbcc import lib, bcc_symbol, bcc_symbol_option, bcc_stacktrace_build_id, _SYM_CB_TYPE
 from .table import Table, PerfEventArray
 from .perf import Perf
-from .utils import get_online_cpus, printb, _assert_is_bytes, ArgString
+from .utils import get_online_cpus, printb, _assert_is_bytes, ArgString, StrcmpRewrite
 from .version import __version__
 from .disassembler import disassemble_prog, decode_map
 

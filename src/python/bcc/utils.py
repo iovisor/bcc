@@ -15,6 +15,7 @@ import ctypes as ct
 import sys
 import traceback
 import warnings
+import re
 
 from .libbcc import lib
 
@@ -97,3 +98,50 @@ def _assert_is_bytes(arg):
         return ArgString(arg).__bytes__()
     return arg
 
+class StrcmpRewrite(object):
+    @staticmethod
+    def _generate_streq_function(string, probe_read_func, streq_functions,
+                                probeid):
+        fname = "streq_%d" % probeid
+        streq_functions += """
+static inline bool %s(char const *ignored, uintptr_t str) {
+        char needle[] = %s;
+        char haystack[sizeof(needle)];
+        %s(&haystack, sizeof(haystack), (void *)str);
+        for (int i = 0; i < sizeof(needle) - 1; ++i) {
+                if (needle[i] != haystack[i]) {
+                        return false;
+                }
+        }
+        return true;
+}
+        """ % (fname, string, probe_read_func)
+        return fname, streq_functions
+
+    @staticmethod
+    def rewrite_expr(expr, bin_cmp, is_user, probe_user_list, streq_functions,
+                    probeid):
+        if bin_cmp:
+            STRCMP_RE = 'STRCMP\\(\"([^"]+)\\",(.+?)\\)'
+        else:
+            STRCMP_RE = 'STRCMP\\(("[^"]+\\"),(.+?)\\)'
+        matches = re.finditer(STRCMP_RE, expr)
+        for match in matches:
+            string = match.group(1)
+            probe_read_func = "bpf_probe_read"
+            # if user probe or @user tag is specified, use
+            # bpf_probe_read_user for char* read
+            if is_user or \
+                match.group(2).strip() in probe_user_list:
+                    probe_read_func = "bpf_probe_read_user"
+            fname, streq_functions = StrcmpRewrite._generate_streq_function(
+                                            string, probe_read_func,
+                                            streq_functions, probeid)
+            probeid += 1
+            expr = expr.replace("STRCMP", fname, 1)
+        rdict = {
+            "expr" : expr,
+            "streq_functions" : streq_functions,
+            "probeid" : probeid
+        }
+        return rdict
