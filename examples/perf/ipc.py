@@ -3,11 +3,7 @@
 # uprobes
 # 24-Apr-2020	Saleem Ahmad	Created this.
 
-from __future__ import print_function
-from bcc import BPF, USDT, Perf
-from bcc.utils import printb
-from time import sleep
-import sys
+from bcc import BPF, utils
 from optparse import OptionParser
 
 # load BPF program
@@ -20,10 +16,12 @@ struct perf_delta {
     u64 time_delta;
 };
 
-// Perf Arrays to read counter values for open
-// perf events.
-BPF_PERF_ARRAY(clk, 16);
-BPF_PERF_ARRAY(inst, 16);
+/*
+Perf Arrays to read counter values for open
+perf events.
+*/
+BPF_PERF_ARRAY(clk, MAX_CPUS);
+BPF_PERF_ARRAY(inst, MAX_CPUS);
 
 // Perf Output
 BPF_PERF_OUTPUT(output);
@@ -37,6 +35,15 @@ void trace_start(struct pt_regs *ctx) {
     u32 time = 2;
 
     int cpu = bpf_get_smp_processor_id();
+    /*
+    perf_read may return negative values for errors.
+    If cpu id is greater than BPF_PERF_ARRAY size,
+    counters values will be very large negative number.
+    NOTE: Use bpf_perf_event_value is recommended over
+    bpf_perf_event_read or map.perf_read() due to
+    issues in ABI. map.perf_read_value() need to be
+    implemented in future.
+    */
     u64 clk_start = clk.perf_read(cpu);
     u64 inst_start = inst.perf_read(cpu);
     u64 time_start = bpf_ktime_get_ns();
@@ -70,35 +77,45 @@ void trace_end(struct pt_regs* ctx) {
     u32 time = 2;
 
     int cpu = bpf_get_smp_processor_id();
+    /*
+    perf_read may return negative values for errors.
+    If cpu id is greater than BPF_PERF_ARRAY size,
+    counters values will be very large negative number.
+    NOTE: Use bpf_perf_event_value is recommended over
+    bpf_perf_event_read or map.perf_read() due to
+    issues in ABI. map.perf_read_value() need to be
+    implemented in future.
+    */
     u64 clk_end = clk.perf_read(cpu);
     u64 inst_end = inst.perf_read(cpu);
     u64 time_end = bpf_ktime_get_ns();
     
     struct perf_delta perf_data = {} ;
-    bool submit = true;
     u64* kptr = NULL;
     kptr = data.lookup(&clk_k);
+
+    // Find elements in map, if not found return
     if (kptr) {
         perf_data.clk_delta = clk_end - *kptr;
+    } else {
+        return;
     }
     
     kptr = data.lookup(&inst_k);
     if (kptr) {
         perf_data.inst_delta = inst_end - *kptr;
     } else {
-        submit = false;
+        return;
     }
 
     kptr = data.lookup(&time);
     if (kptr) {
         perf_data.time_delta = time_end - *kptr;
     } else {
-        submit = false;
+        return;
     }
 
-    if (submit) {
-        output.perf_submit(ctx, &perf_data, sizeof(struct perf_delta));
-    }
+    output.perf_submit(ctx, &perf_data, sizeof(struct perf_delta));
 }
 """
 
@@ -112,7 +129,9 @@ if (not options.lib_name or not options.sym):
     parser.print_help()
     exit()
 
-b = BPF(text=code)
+num_cpus = len(utils.get_online_cpus())
+
+b = BPF(text=code, cflags=['-DMAX_CPUS=%s' % str(num_cpus)])
 
 # Attach Probes at start and end of the trace function
 # NOTE: When attaching to a function for tracing, during runtime relocation
@@ -127,14 +146,11 @@ b.attach_uretprobe(name=options.lib_name, sym=options.sym, fn_name="trace_end")
 
 def print_data(cpu, data, size):
     e = b["output"].event(data)
-    try:
-        print("%-8d %-8d %-8.2f %-8s %d" % (e.clk_delta, e.inst_delta, 
-            1.0* e.inst_delta/e.clk_delta, str(round(e.time_delta * 1e-3, 2)) + ' us', cpu))
-    except Exception as e:
-        print(e)
+    print("%-8d %-12d %-8.2f %-8s %d" % (e.clk_delta, e.inst_delta, 
+        1.0* e.inst_delta/e.clk_delta, str(round(e.time_delta * 1e-3, 2)) + ' us', cpu))
 
 print("Counters Data")
-print("%-8s %-8s %-8s %-8s %s" % ('CLK', 'INST', 'IPC', 'TIME', 'CPU'))
+print("%-8s %-12s %-8s %-8s %s" % ('CLOCK', 'INSTRUCTION', 'IPC', 'TIME', 'CPU'))
 
 b["output"].open_perf_buffer(print_data)
 
@@ -142,12 +158,16 @@ b["output"].open_perf_buffer(print_data)
 # combination of event, umask and cmask. Read Intel
 # Doc to find the event and cmask. Or use 
 # perf list --details to get event, umask and cmask
-
-PERF_EVENT_RAW = 4
+# NOTE: Events can be multiplexed by kernel in case the
+# number of counters is greater than supported by CPU
+# performance monitoring unit, which can result in inaccurate
+# results. Counter values need to be normalized for a more
+# accurate value.
+PERF_TYPE_RAW = 4
 # Unhalted Clock Cycles
-b["clk"].open_perf_event(PERF_EVENT_RAW, 0x0000003C)
+b["clk"].open_perf_event(PERF_TYPE_RAW, 0x0000003C)
 # Instruction Retired
-b["inst"].open_perf_event(PERF_EVENT_RAW, 0x000000C0)
+b["inst"].open_perf_event(PERF_TYPE_RAW, 0x000000C0)
 
 while True:
 	try:
