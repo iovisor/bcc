@@ -29,10 +29,14 @@ BPF_PERF_OUTPUT(output);
 // Per Cpu Data to store start values
 BPF_PERCPU_ARRAY(data, u64);
 
+#define CLOCK_ID 0
+#define INSTRUCTION_ID 1
+#define TIME_ID 2
+
 void trace_start(struct pt_regs *ctx) {
-    u32 clk_k = 0;
-    u32 inst_k = 1;
-    u32 time = 2;
+    u32 clk_k = CLOCK_ID;
+    u32 inst_k = INSTRUCTION_ID;
+    u32 time = TIME_ID;
 
     int cpu = bpf_get_smp_processor_id();
     /*
@@ -72,9 +76,9 @@ void trace_start(struct pt_regs *ctx) {
 }
 
 void trace_end(struct pt_regs* ctx) {
-    u32 clk_k = 0;
-    u32 inst_k = 1;
-    u32 time = 2;
+    u32 clk_k = CLOCK_ID;
+    u32 inst_k = INSTRUCTION_ID;
+    u32 time = TIME_ID;
 
     int cpu = bpf_get_smp_processor_id();
     /*
