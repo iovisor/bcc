@@ -420,10 +420,10 @@ void *bcc_usdt_new_frompid(int pid, const char *path) {
   } else {
     struct stat buffer;
     if (strlen(path) >= 1 && path[0] != '/') {
-      fprintf(stderr, "HINT: Binary path should be absolute.\n\n");
+      fprintf(stderr, "HINT: Binary path %s should be absolute.\n\n", path);
       return nullptr;
     } else if (stat(path, &buffer) == -1) {
-      fprintf(stderr, "HINT: Specified binary doesn't exist.\n\n");
+      fprintf(stderr, "HINT: Specified binary %s doesn't exist.\n\n", path);
       return nullptr;
     }
     ctx = new USDT::Context(pid, path);

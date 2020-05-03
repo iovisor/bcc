@@ -93,6 +93,11 @@ input
 	4          arg2 = pf_6
 	4          arg2 = pf_23
 	5          arg2 = pf_24
+
+Should that command fail with the error message "HINT: Binary path usdt_sample_lib1 should be absolute", try instead:
+
+sudo python tools/argdist.py -p 47575 -i 5 -C 'u:ABSOLUTE-PATH-TO-BCC-REPO/bcc/examples/usdt_sample/build/usdt_sample_lib1/libusdt_sample_lib1.so:operation_start():char*:arg2#input' -z 32
+
 ```
 
 Use latency.py to trace the operation latencies:
