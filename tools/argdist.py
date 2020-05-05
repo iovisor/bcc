@@ -9,7 +9,7 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 # Copyright (C) 2016 Sasha Goldshtein.
 
-from bcc import BPF, USDT
+from bcc import BPF, USDT, StrcmpRewrite
 from time import sleep, strftime
 import argparse
 import re
@@ -41,6 +41,10 @@ class Probe(object):
                         param_type = param[0:index + 1].strip()
                         param_name = param[index + 1:].strip()
                         self.param_types[param_name] = param_type
+                        # Maintain list of user params. Then later decide to
+                        # switch to bpf_probe_read or bpf_probe_read_user.
+                        if "__user" in param_type.split():
+                                self.probe_user_list.add(param_name)
 
         def _generate_entry(self):
                 self.entry_probe_func = self.probe_func_name + "_entry"
@@ -182,6 +186,8 @@ u64 __time = bpf_ktime_get_ns();
                 self.pid = tool.args.pid
                 self.cumulative = tool.args.cumulative or False
                 self.raw_spec = specifier
+                self.probe_user_list = set()
+                self.bin_cmp = False
                 self._validate_specifier()
 
                 spec_and_label = specifier.split('#')
@@ -250,32 +256,16 @@ u64 __time = bpf_ktime_get_ns();
                 self.usdt_ctx.enable_probe(
                         self.function, self.probe_func_name)
 
-        def _generate_streq_function(self, string):
-                fname = "streq_%d" % Probe.streq_index
-                Probe.streq_index += 1
-                self.streq_functions += """
-static inline bool %s(char const *ignored, char const *str) {
-        char needle[] = %s;
-        char haystack[sizeof(needle)];
-        bpf_probe_read(&haystack, sizeof(haystack), (void *)str);
-        for (int i = 0; i < sizeof(needle) - 1; ++i) {
-                if (needle[i] != haystack[i]) {
-                        return false;
-                }
-        }
-        return true;
-}
-                """ % (fname, string)
-                return fname
-
         def _substitute_exprs(self):
                 def repl(expr):
                         expr = self._substitute_aliases(expr)
-                        matches = re.finditer('STRCMP\\(("[^"]+\\")', expr)
-                        for match in matches:
-                                string = match.group(1)
-                                fname = self._generate_streq_function(string)
-                                expr = expr.replace("STRCMP", fname, 1)
+                        rdict = StrcmpRewrite.rewrite_expr(expr,
+                                self.bin_cmp, self.library,
+                                self.probe_user_list, self.streq_functions,
+                                Probe.streq_index)
+                        expr = rdict["expr"]
+                        self.streq_functions = rdict["streq_functions"]
+                        Probe.streq_index = rdict["probeid"]
                         return expr.replace("$retval", "PT_REGS_RC(ctx)")
                 for i in range(0, len(self.exprs)):
                         self.exprs[i] = repl(self.exprs[i])
@@ -305,9 +295,14 @@ static inline bool %s(char const *ignored, char const *str) {
         def _generate_field_assignment(self, i):
                 text = self._generate_usdt_arg_assignment(i)
                 if self._is_string(self.expr_types[i]):
-                        return (text + "        bpf_probe_read(&__key.v%d.s," +
+                        if self.is_user or \
+                            self.exprs[i] in self.probe_user_list:
+                                probe_readfunc = "bpf_probe_read_user"
+                        else:
+                                probe_readfunc = "bpf_probe_read"
+                        return (text + "        %s(&__key.v%d.s," +
                                 " sizeof(__key.v%d.s), (void *)%s);\n") % \
-                                (i, i, self.exprs[i])
+                                (probe_readfunc, i, i, self.exprs[i])
                 else:
                         return text + "        __key.v%d = %s;\n" % \
                                (i, self.exprs[i])

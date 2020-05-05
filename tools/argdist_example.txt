@@ -449,3 +449,12 @@ argdist -I 'kernel/sched/sched.h' \
         in kernel/sched/sched.h which is in kernel source tree and not in kernel-devel
         package.  So this command needs to run at the kernel source tree root directory
         so that the added header file can be found by the compiler.
+
+argdist -C 'p::do_sys_open(int dfd, const char __user *filename, int flags,
+            umode_t mode):char*:filename:STRCMP("sample.txt", filename)'
+        Trace open of the file "sample.txt". It should be noted that 'filename'
+        passed to the do_sys_open is a char * user pointer. Hence parameter
+        'filename' should be tagged with __user for kprobes (const char __user
+        *filename).  This information distinguishes if the 'filename' should be
+        copied from userspace to the bpf stack or from kernel space to the bpf
+        stack.
