@@ -500,7 +500,7 @@ For permanently enable scl environment, please check https://access.redhat.com/s
 ```
 git clone https://github.com/iovisor/bcc.git
 mkdir bcc/build; cd bcc/build
-cmake ..
+cmake3 ..
 make
 sudo make install
 ```
