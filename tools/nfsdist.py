@@ -15,10 +15,10 @@ import argparse
 
 # arguments
 examples = """examples:
-    ./nfsdist            # show operation latency as a histogram
-    ./nfsdist -p 181     # trace PID 181 only
-    ./nfsdist 1 10       # print 1 second summaries, 10 times
-    ./nfsdist -m 5       # 5s summaries, milliseconds
+    ./nfsdist             # show operation latency as a histogram
+    ./nfsdist -p 181      # trace PID 181 only
+    ./nfsdist 1 10        # print 1 second summaries, 10 times
+    ./nfsdist -m 5        # 5s summaries, milliseconds
 """
 parser = argparse.ArgumentParser(
         description="Summarize NFS operation latency",
@@ -137,15 +137,20 @@ b = BPF(text=bpf_text)
 # common file functions
 b.attach_kprobe(event="nfs_file_read", fn_name="trace_entry")
 b.attach_kprobe(event="nfs_file_write", fn_name="trace_entry")
-b.attach_kprobe(event="nfs4_file_open", fn_name="trace_entry")
 b.attach_kprobe(event="nfs_file_open", fn_name="trace_entry")
 b.attach_kprobe(event="nfs_getattr", fn_name="trace_entry")
 
 b.attach_kretprobe(event="nfs_file_read", fn_name="trace_read_return")
 b.attach_kretprobe(event="nfs_file_write", fn_name="trace_write_return")
-b.attach_kretprobe(event="nfs4_file_open", fn_name="trace_open_return")
 b.attach_kretprobe(event="nfs_file_open", fn_name="trace_open_return")
 b.attach_kretprobe(event="nfs_getattr", fn_name="trace_getattr_return")
+
+if BPF.get_kprobe_functions(b'nfs4_file_open'):
+    b.attach_kprobe(event="nfs4_file_open", fn_name="trace_entry")
+    b.attach_kretprobe(event="nfs4_file_open", fn_name="trace_open_return")
+else:
+    b.attach_kprobe(event="nfs_file_open", fn_name="trace_entry")
+    b.attach_kretprobe(event="nfs_file_open", fn_name="trace_open_return")
 
 print("Tracing NFS operation latency... Hit Ctrl-C to end.")
 
