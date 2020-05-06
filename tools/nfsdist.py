@@ -15,10 +15,10 @@ import argparse
 
 # arguments
 examples = """examples:
-    ./nfsdist             # show operation latency as a histogram
-    ./nfsdist -p 181      # trace PID 181 only
-    ./nfsdist 1 10        # print 1 second summaries, 10 times
-    ./nfsdist -m 5        # 5s summaries, milliseconds
+    ./nfsdist            # show operation latency as a histogram
+    ./nfsdist -p 181     # trace PID 181 only
+    ./nfsdist 1 10       # print 1 second summaries, 10 times
+    ./nfsdist -m 5       # 5s summaries, milliseconds
 """
 parser = argparse.ArgumentParser(
         description="Summarize NFS operation latency",
