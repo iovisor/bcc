@@ -362,8 +362,8 @@ DATA_DECL
         u32 __tgid     = __pid_tgid >> 32;  // upper 32 bits
         PID_FILTER
         PREFIX
-        if (!(FILTER)) return 0;
         KEY_EXPR
+        if (!(FILTER)) return 0;
         COLLECT
         return 0;
 }
