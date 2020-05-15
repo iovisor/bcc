@@ -192,7 +192,7 @@ int main(int argc, char **argv)
 
 	obj = xfsslower_bpf__open();
 	if (!obj) {
-		fprintf(stderr, "failed to open and/or load BPF ojbect\n");
+		fprintf(stderr, "failed to open and/or load BPF object\n");
 		return 1;
 	}
 
