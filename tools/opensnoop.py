@@ -111,7 +111,8 @@ BPF_PERF_OUTPUT(events);
 bpf_text_kprobe = """
 BPF_HASH(infotmp, u64, struct val_t);
 
-int trace_entry(struct pt_regs *ctx, int dfd, const char __user *filename, int flags)
+int trace_entry(struct pt_regs *ctx, int dfd, const char __user *filename,
+    int flags)
 {
     struct val_t val = {};
     u64 id = bpf_get_current_pid_tgid();
@@ -166,8 +167,9 @@ int trace_return(struct pt_regs *ctx)
 }
 """
 
-bpf_text_kfunc= """
-KRETFUNC_PROBE(do_sys_open, int dfd, const char __user *filename, int flags, int mode, int ret)
+bpf_text_kfunc = """
+KRETFUNC_PROBE(do_sys_open, int dfd, const char __user *filename,
+    int flags, int mode, int ret)
 {
     u64 id = bpf_get_current_pid_tgid();
     u32 pid = id >> 32; // PID is higher part
