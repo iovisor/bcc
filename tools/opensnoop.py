@@ -182,7 +182,7 @@ KRETFUNC_PROBE(do_sys_open, int dfd, const char __user *filename,
 #if CGROUPSET
     u64 cgroupid = bpf_get_current_cgroup_id();
     if (cgroupset.lookup(&cgroupid) == NULL) {
-      return 0;
+      return;
     }
 #endif
 
@@ -208,17 +208,19 @@ if is_support_kfunc:
 else:
     bpf_text += bpf_text_kprobe
 
+return_value = "" if is_support_kfunc else "0"
+
 if args.tid:  # TID trumps PID
     bpf_text = bpf_text.replace('PID_TID_FILTER',
-        'if (tid != %s) { return 0; }' % args.tid)
+        'if (tid != %s) { return %s; }' % (args.tid, return_value))
 elif args.pid:
     bpf_text = bpf_text.replace('PID_TID_FILTER',
-        'if (pid != %s) { return 0; }' % args.pid)
+        'if (pid != %s) { return %s; }' % (args.tid, return_value))
 else:
     bpf_text = bpf_text.replace('PID_TID_FILTER', '')
 if args.uid:
     bpf_text = bpf_text.replace('UID_FILTER',
-        'if (uid != %s) { return 0; }' % args.uid)
+        'if (uid != %s) { return %s; }' % (args.tid, return_value))
 else:
     bpf_text = bpf_text.replace('UID_FILTER', '')
 if args.cgroupmap:
@@ -228,7 +230,7 @@ else:
     bpf_text = bpf_text.replace('CGROUPSET', '0')
 if args.flag_filter:
     bpf_text = bpf_text.replace('FLAGS_FILTER',
-        'if (!(flags & %d)) { return 0; }' % flag_filter_mask)
+        'if (!(flags & %d)) { return %s; }' % (flag_filter_mask, return_value))
 else:
     bpf_text = bpf_text.replace('FLAGS_FILTER', '')
 if not (args.extended_fields or args.flag_filter):
