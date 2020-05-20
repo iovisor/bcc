@@ -19,8 +19,8 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
         - [9. kfuncs](#9-kfuncs)
         - [10. kretfuncs](#9-kretfuncs)
     - [Data](#data)
-        - [1. bpf_probe_read()](#1-bpf_probe_read)
-        - [2. bpf_probe_read_str()](#2-bpf_probe_read_str)
+        - [1. bpf_probe_read_kernel()](#1-bpf_probe_read_kernel)
+        - [2. bpf_probe_read_kernel_str()](#2-bpf_probe_read_kernel_str)
         - [3. bpf_ktime_get_ns()](#3-bpf_ktime_get_ns)
         - [4. bpf_get_current_pid_tgid()](#4-bpf_get_current_pid_tgid)
         - [5. bpf_get_current_uid_gid()](#5-bpf_get_current_uid_gid)
@@ -277,8 +277,8 @@ RAW_TRACEPOINT_PROBE(sched_switch)
     struct task_struct *next= (struct task_struct *)ctx->args[2];
     s32 prev_tgid, next_tgid;
 
-    bpf_probe_read(&prev_tgid, sizeof(prev->tgid), &prev->tgid);
-    bpf_probe_read(&next_tgid, sizeof(next->tgid), &next->tgid);
+    bpf_probe_read_kernel(&prev_tgid, sizeof(prev->tgid), &prev->tgid);
+    bpf_probe_read_kernel(&next_tgid, sizeof(next->tgid), &next->tgid);
     bpf_trace_printk("%d -> %d\\n", prev_tgid, next_tgid);
 }
 ```
@@ -368,21 +368,21 @@ Examples in situ:
 
 ## Data
 
-### 1. bpf_probe_read()
+### 1. bpf_probe_read_kernel()
 
-Syntax: ```int bpf_probe_read(void *dst, int size, const void *src)```
+Syntax: ```int bpf_probe_read_kernel(void *dst, int size, const void *src)```
 
 Return: 0 on success
 
-This copies size bytes from kernel address space to the BPF stack, so that BPF can later operate on it. For safety, all kernel memory reads must pass through bpf_probe_read(). This happens automatically in some cases, such as dereferencing kernel variables, as bcc will rewrite the BPF program to include the necessary bpf_probe_read().
+This copies size bytes from kernel address space to the BPF stack, so that BPF can later operate on it. For safety, all kernel memory reads must pass through bpf_probe_read_kernel(). This happens automatically in some cases, such as dereferencing kernel variables, as bcc will rewrite the BPF program to include the necessary bpf_probe_read_kernel().
 
 Examples in situ:
-[search /examples](https://github.com/iovisor/bcc/search?q=bpf_probe_read+path%3Aexamples&type=Code),
-[search /tools](https://github.com/iovisor/bcc/search?q=bpf_probe_read+path%3Atools&type=Code)
+[search /examples](https://github.com/iovisor/bcc/search?q=bpf_probe_read_kernel+path%3Aexamples&type=Code),
+[search /tools](https://github.com/iovisor/bcc/search?q=bpf_probe_read_kernel+path%3Atools&type=Code)
 
-### 2. bpf_probe_read_str()
+### 2. bpf_probe_read_kernel_str()
 
-Syntax: ```int bpf_probe_read_str(void *dst, int size, const void *src)```
+Syntax: ```int bpf_probe_read_kernel_str(void *dst, int size, const void *src)```
 
 Return:
   - \> 0 length of the string including the trailing NULL on success
@@ -391,8 +391,8 @@ Return:
 This copies a `NULL` terminated string from kernel address space to the BPF stack, so that BPF can later operate on it. In case the string length is smaller than size, the target is not padded with further `NULL` bytes. In case the string length is larger than size, just `size - 1` bytes are copied and the last byte is set to `NULL`.
 
 Examples in situ:
-[search /examples](https://github.com/iovisor/bcc/search?q=bpf_probe_read_str+path%3Aexamples&type=Code),
-[search /tools](https://github.com/iovisor/bcc/search?q=bpf_probe_read_str+path%3Atools&type=Code)
+[search /examples](https://github.com/iovisor/bcc/search?q=bpf_probe_read_kernel_str+path%3Aexamples&type=Code),
+[search /tools](https://github.com/iovisor/bcc/search?q=bpf_probe_read_kernel_str+path%3Atools&type=Code)
 
 ### 3. bpf_ktime_get_ns()
 
@@ -1749,7 +1749,7 @@ See the "Understanding eBPF verifier messages" section in the kernel source unde
 
 ## 1. Invalid mem access
 
-This can be due to trying to read memory directly, instead of operating on memory on the BPF stack. All kernel memory reads must be passed via bpf_probe_read() to copy kernel memory into the BPF stack, which can be automatic by the bcc rewriter in some cases of simple dereferencing. bpf_probe_read() does all the required checks.
+This can be due to trying to read memory directly, instead of operating on memory on the BPF stack. All kernel memory reads must be passed via bpf_probe_read_kernel() to copy kernel memory into the BPF stack, which can be automatic by the bcc rewriter in some cases of simple dereferencing. bpf_probe_read_kernel() does all the required checks.
 
 Example:
 
