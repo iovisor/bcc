@@ -92,7 +92,7 @@ bool Argument::assign_to_local(std::ostream &stream,
     tfm::format(stream, " %s ", COMPILER_BARRIER);
     tfm::format(stream,
                 "%s __res = 0x0; "
-                "bpf_probe_read(&__res, sizeof(__res), (void *)__addr); "
+                "bpf_probe_read_user(&__res, sizeof(__res), (void *)__addr); "
                 "%s = __res; }",
                 ctype(), local_name);
     return true;
@@ -105,7 +105,7 @@ bool Argument::assign_to_local(std::ostream &stream,
 
     tfm::format(stream,
                 "{ u64 __addr = 0x%xull + %d; %s __res = 0x0; "
-                "bpf_probe_read(&__res, sizeof(__res), (void *)__addr); "
+                "bpf_probe_read_user(&__res, sizeof(__res), (void *)__addr); "
                 "%s = __res; }",
                 global_address, *deref_offset_, ctype(), local_name);
     return true;

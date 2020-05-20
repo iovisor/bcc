@@ -139,7 +139,7 @@ static inline __attribute__((__always_inline__)) void* get_thread_state(
   //  p *(PyThreadState*)((struct pthread*)pthread_self())->
   //    specific_1stblock[autoTLSkey]->data
   int key;
-  bpf_probe_read(&key, sizeof(key), (void*)pid_data->tls_key_addr);
+  bpf_probe_read_user(&key, sizeof(key), (void*)pid_data->tls_key_addr);
   // This assumes autoTLSkey < 32, which means that the TLS is stored in
   //   pthread->specific_1stblock[autoTLSkey]
   // 0x310 is offsetof(struct pthread, specific_1stblock),
@@ -148,7 +148,7 @@ static inline __attribute__((__always_inline__)) void* get_thread_state(
   // 'struct pthread' is not in the public API so we have to hardcode
   // the offsets here
   void* thread_state;
-  bpf_probe_read(
+  bpf_probe_read_user(
       &thread_state,
       sizeof(thread_state),
       tls_base + 0x310 + key * 0x10 + 0x08);
@@ -206,7 +206,7 @@ static inline __attribute__((__always_inline__)) int get_gil_state(
 
   int gil_locked = 0;
   void* gil_thread_state = 0;
-  if (bpf_probe_read(
+  if (bpf_probe_read_user(
           &gil_locked, sizeof(gil_locked), (void*)pid_data->gil_locked_addr)) {
     return GIL_STATE_ERROR;
   }
@@ -218,7 +218,7 @@ static inline __attribute__((__always_inline__)) int get_gil_state(
       return GIL_STATE_NOT_LOCKED;
     case 1:
       // GIL is held by some Thread
-      bpf_probe_read(
+      bpf_probe_read_user(
           &gil_thread_state,
           sizeof(void*),
           (void*)pid_data->gil_last_holder_addr);
@@ -244,7 +244,7 @@ get_pthread_id_match(void* thread_state, void* tls_base, PidData* pid_data) {
 
   uint64_t pthread_self, pthread_created;
 
-  bpf_probe_read(
+  bpf_probe_read_user(
       &pthread_created,
       sizeof(pthread_created),
       thread_state + pid_data->offsets.PyThreadState_thread);
@@ -253,7 +253,7 @@ get_pthread_id_match(void* thread_state, void* tls_base, PidData* pid_data) {
   }
 
   // 0x10 = offsetof(struct pthread, header.self)
-  bpf_probe_read(&pthread_self, sizeof(pthread_self), tls_base + 0x10);
+  bpf_probe_read_user(&pthread_self, sizeof(pthread_self), tls_base + 0x10);
   if (pthread_self == 0) {
     return PTHREAD_ID_ERROR;
   }
@@ -287,7 +287,7 @@ int on_event(struct pt_regs* ctx) {
   // Get pointer of global PyThreadState, which should belong to the Thread
   // currently holds the GIL
   void* global_current_thread = (void*)0;
-  bpf_probe_read(
+  bpf_probe_read_user(
       &global_current_thread,
       sizeof(global_current_thread),
       (void*)pid_data->current_state_addr);
@@ -331,7 +331,7 @@ int on_event(struct pt_regs* ctx) {
 
   if (thread_state != 0) {
     // Get pointer to top frame from PyThreadState
-    bpf_probe_read(
+    bpf_probe_read_user(
         &state->frame_ptr,
         sizeof(void*),
         thread_state + pid_data->offsets.PyThreadState_frame);
@@ -356,11 +356,11 @@ static inline __attribute__((__always_inline__)) void get_names(
   // the name. This is not perfect but there is no better way to figure this
   // out from the code object.
   void* args_ptr;
-  bpf_probe_read(
+  bpf_probe_read_user(
       &args_ptr, sizeof(void*), code_ptr + offsets->PyCodeObject_varnames);
-  bpf_probe_read(
+  bpf_probe_read_user(
       &args_ptr, sizeof(void*), args_ptr + offsets->PyTupleObject_item);
-  bpf_probe_read_str(
+  bpf_probe_read_user_str(
       &symbol->name, sizeof(symbol->name), args_ptr + offsets->String_data);
 
   // compare strings as ints to save instructions
@@ -382,26 +382,26 @@ static inline __attribute__((__always_inline__)) void get_names(
   // Read class name from $frame->f_localsplus[0]->ob_type->tp_name.
   if (first_self || first_cls) {
     void* ptr;
-    bpf_probe_read(
+    bpf_probe_read_user(
         &ptr, sizeof(void*), cur_frame + offsets->PyFrameObject_localsplus);
     if (first_self) {
       // we are working with an instance, first we need to get type
-      bpf_probe_read(&ptr, sizeof(void*), ptr + offsets->PyObject_type);
+      bpf_probe_read_user(&ptr, sizeof(void*), ptr + offsets->PyObject_type);
     }
-    bpf_probe_read(&ptr, sizeof(void*), ptr + offsets->PyTypeObject_name);
-    bpf_probe_read_str(&symbol->classname, sizeof(symbol->classname), ptr);
+    bpf_probe_read_user(&ptr, sizeof(void*), ptr + offsets->PyTypeObject_name);
+    bpf_probe_read_user_str(&symbol->classname, sizeof(symbol->classname), ptr);
   }
 
   void* pystr_ptr;
   // read PyCodeObject's filename into symbol
-  bpf_probe_read(
+  bpf_probe_read_user(
       &pystr_ptr, sizeof(void*), code_ptr + offsets->PyCodeObject_filename);
-  bpf_probe_read_str(
+  bpf_probe_read_user_str(
       &symbol->file, sizeof(symbol->file), pystr_ptr + offsets->String_data);
   // read PyCodeObject's name into symbol
-  bpf_probe_read(
+  bpf_probe_read_user(
       &pystr_ptr, sizeof(void*), code_ptr + offsets->PyCodeObject_name);
-  bpf_probe_read_str(
+  bpf_probe_read_user_str(
       &symbol->name, sizeof(symbol->name), pystr_ptr + offsets->String_data);
 }
 
@@ -419,7 +419,7 @@ static inline __attribute__((__always_inline__)) bool get_frame_data(
   }
   void* code_ptr;
   // read PyCodeObject first, if that fails, then no point reading next frame
-  bpf_probe_read(
+  bpf_probe_read_user(
       &code_ptr, sizeof(void*), cur_frame + offsets->PyFrameObject_code);
   if (!code_ptr) {
     return false;
@@ -428,7 +428,7 @@ static inline __attribute__((__always_inline__)) bool get_frame_data(
   get_names(cur_frame, code_ptr, offsets, symbol, ctx);
 
   // read next PyFrameObject pointer, update in place
-  bpf_probe_read(
+  bpf_probe_read_user(
       frame_ptr, sizeof(void*), cur_frame + offsets->PyFrameObject_back);
 
   return true;
