@@ -205,9 +205,9 @@ struct_init = { 'ipv4':
         { 'count' :
                """
                struct ipv6_flow_key_t flow_key = {};
-               bpf_probe_read(&flow_key.saddr, sizeof(flow_key.saddr),
+               bpf_probe_read_kernel(&flow_key.saddr, sizeof(flow_key.saddr),
                    skp->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
-               bpf_probe_read(&flow_key.daddr, sizeof(flow_key.daddr),
+               bpf_probe_read_kernel(&flow_key.daddr, sizeof(flow_key.daddr),
                    skp->__sk_common.skc_v6_daddr.in6_u.u6_addr32);
                flow_key.dport = ntohs(dport);
                ipv6_count.increment(flow_key);""",
@@ -216,9 +216,9 @@ struct_init = { 'ipv4':
                struct ipv6_data_t data6 = {.pid = pid, .ip = ipver};
                data6.uid = bpf_get_current_uid_gid();
                data6.ts_us = bpf_ktime_get_ns() / 1000;
-               bpf_probe_read(&data6.saddr, sizeof(data6.saddr),
+               bpf_probe_read_kernel(&data6.saddr, sizeof(data6.saddr),
                    skp->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
-               bpf_probe_read(&data6.daddr, sizeof(data6.daddr),
+               bpf_probe_read_kernel(&data6.daddr, sizeof(data6.daddr),
                    skp->__sk_common.skc_v6_daddr.in6_u.u6_addr32);
                data6.dport = ntohs(dport);
                bpf_get_current_comm(&data6.task, sizeof(data6.task));

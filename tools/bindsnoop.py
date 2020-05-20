@@ -215,7 +215,7 @@ static int bindsnoop_return(struct pt_regs *ctx, short ipver)
     struct inet_sock *sockp = (struct inet_sock *)skp;
 
     u16 sport = 0;
-    bpf_probe_read(&sport, sizeof(sport), &sockp->inet_sport);
+    bpf_probe_read_kernel(&sport, sizeof(sport), &sockp->inet_sport);
     sport = ntohs(sport);
 
     FILTER_PORT
@@ -296,7 +296,7 @@ struct_init = {
                struct ipv4_bind_data_t data4 = {.pid = pid, .ip = ipver};
                data4.uid = bpf_get_current_uid_gid();
                data4.ts_us = bpf_ktime_get_ns() / 1000;
-               bpf_probe_read(
+               bpf_probe_read_kernel(
                  &data4.saddr, sizeof(data4.saddr), &sockp->inet_saddr);
                data4.return_code = ret;
                data4.sport = sport;
@@ -309,7 +309,7 @@ struct_init = {
     'ipv6': {
         'count': """
                struct ipv6_flow_key_t flow_key = {};
-               bpf_probe_read(&flow_key.saddr, sizeof(flow_key.saddr),
+               bpf_probe_read_kernel(&flow_key.saddr, sizeof(flow_key.saddr),
                    skp->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
                flow_key.sport = sport;
                ipv6_count.increment(flow_key);""",
@@ -317,7 +317,7 @@ struct_init = {
                struct ipv6_bind_data_t data6 = {.pid = pid, .ip = ipver};
                data6.uid = bpf_get_current_uid_gid();
                data6.ts_us = bpf_ktime_get_ns() / 1000;
-               bpf_probe_read(&data6.saddr, sizeof(data6.saddr),
+               bpf_probe_read_kernel(&data6.saddr, sizeof(data6.saddr),
                    skp->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
                data6.return_code = ret;
                data6.sport = sport;

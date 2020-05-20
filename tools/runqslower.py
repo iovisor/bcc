@@ -28,7 +28,7 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
 # 02-May-2018   Ivan Babrou   Created this.
-# 18-Nov-2019   Gergely Bod   BUG fix: Use bpf_probe_read_str() to extract the
+# 18-Nov-2019   Gergely Bod   BUG fix: Use bpf_probe_read_kernel_str() to extract the
 #                               process name from 'task_struct* next' in raw tp code.
 #                               bpf_get_current_comm() operates on the current task
 #                               which might already be different than 'next'.
@@ -164,8 +164,8 @@ RAW_TRACEPOINT_PROBE(sched_wakeup_new)
     struct task_struct *p = (struct task_struct *)ctx->args[0];
     u32 tgid, pid;
 
-    bpf_probe_read(&tgid, sizeof(tgid), &p->tgid);
-    bpf_probe_read(&pid, sizeof(pid), &p->pid);
+    bpf_probe_read_kernel(&tgid, sizeof(tgid), &p->tgid);
+    bpf_probe_read_kernel(&pid, sizeof(pid), &p->pid);
     return trace_enqueue(tgid, pid);
 }
 
@@ -178,10 +178,10 @@ RAW_TRACEPOINT_PROBE(sched_switch)
     long state;
 
     // ivcsw: treat like an enqueue event and store timestamp
-    bpf_probe_read(&state, sizeof(long), (const void *)&prev->state);
+    bpf_probe_read_kernel(&state, sizeof(long), (const void *)&prev->state);
     if (state == TASK_RUNNING) {
-        bpf_probe_read(&tgid, sizeof(prev->tgid), &prev->tgid);
-        bpf_probe_read(&pid, sizeof(prev->pid), &prev->pid);
+        bpf_probe_read_kernel(&tgid, sizeof(prev->tgid), &prev->tgid);
+        bpf_probe_read_kernel(&pid, sizeof(prev->pid), &prev->pid);
         u64 ts = bpf_ktime_get_ns();
         if (pid != 0) {
             if (!(FILTER_PID) && !(FILTER_TGID)) {
@@ -191,7 +191,7 @@ RAW_TRACEPOINT_PROBE(sched_switch)
 
     }
 
-    bpf_probe_read(&pid, sizeof(next->pid), &next->pid);
+    bpf_probe_read_kernel(&pid, sizeof(next->pid), &next->pid);
 
     u64 *tsp, delta_us;
 
@@ -208,7 +208,7 @@ RAW_TRACEPOINT_PROBE(sched_switch)
     struct data_t data = {};
     data.pid = pid;
     data.delta_us = delta_us;
-    bpf_probe_read_str(&data.task, sizeof(data.task), next->comm);
+    bpf_probe_read_kernel_str(&data.task, sizeof(data.task), next->comm);
 
     // output
     events.perf_submit(ctx, &data, sizeof(data));

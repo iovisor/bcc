@@ -87,7 +87,7 @@ int do_ret_sys_kill(struct pt_regs *ctx)
         return 0;
     }
 
-    bpf_probe_read(&data.comm, sizeof(data.comm), valp->comm);
+    bpf_probe_read_kernel(&data.comm, sizeof(data.comm), valp->comm);
     data.pid = pid;
     data.tpid = valp->tpid;
     data.ret = PT_REGS_RC(ctx);

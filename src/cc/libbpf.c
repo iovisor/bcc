@@ -385,8 +385,8 @@ static void bpf_print_hints(int ret, char *log)
   if (strstr(log, "invalid mem access 'inv'") != NULL) {
     fprintf(stderr, "HINT: The invalid mem access 'inv' error can happen "
       "if you try to dereference memory without first using "
-      "bpf_probe_read() to copy it to the BPF stack. Sometimes the "
-      "bpf_probe_read is automatic by the bcc rewriter, other times "
+      "bpf_probe_read_kernel() to copy it to the BPF stack. Sometimes the "
+      "bpf_probe_read_kernel() is automatic by the bcc rewriter, other times "
       "you'll need to be explicit.\n\n");
   }
 

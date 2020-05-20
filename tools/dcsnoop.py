@@ -84,7 +84,7 @@ void submit_event(struct pt_regs *ctx, void *name, int type, u32 pid)
         .type = type,
     };
     bpf_get_current_comm(&data.comm, sizeof(data.comm));
-    bpf_probe_read(&data.filename, sizeof(data.filename), name);
+    bpf_probe_read_kernel(&data.filename, sizeof(data.filename), name);
     events.perf_submit(ctx, &data, sizeof(data));
 }
 
@@ -102,7 +102,7 @@ int kprobe__d_lookup(struct pt_regs *ctx, const struct dentry *parent,
     struct entry_t entry = {};
     const char *fname = name->name;
     if (fname) {
-        bpf_probe_read(&entry.name, sizeof(entry.name), (void *)fname);
+        bpf_probe_read_kernel(&entry.name, sizeof(entry.name), (void *)fname);
     }
     entrybypid.update(&pid, &entry);
     return 0;

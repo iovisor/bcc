@@ -83,7 +83,7 @@ int count_only(struct pt_regs *ctx, struct irq_desc *desc)
     char *name = (char *)action->name;
 
     irq_key_t key = {.slot = 0 /* ignore */};
-    bpf_probe_read(&key.name, sizeof(key.name), name);
+    bpf_probe_read_kernel(&key.name, sizeof(key.name), name);
     dist.increment(key);
 
     return 0;
@@ -129,12 +129,12 @@ int trace_completion(struct pt_regs *ctx)
 if args.dist:
     bpf_text = bpf_text.replace('STORE',
         'irq_key_t key = {.slot = bpf_log2l(delta / %d)};' % factor +
-        'bpf_probe_read(&key.name, sizeof(key.name), name);' +
+        'bpf_probe_read_kernel(&key.name, sizeof(key.name), name);' +
         'dist.increment(key);')
 else:
     bpf_text = bpf_text.replace('STORE',
         'irq_key_t key = {.slot = 0 /* ignore */};' +
-        'bpf_probe_read(&key.name, sizeof(key.name), name);' +
+        'bpf_probe_read_kernel(&key.name, sizeof(key.name), name);' +
         'dist.increment(key, delta);')
 if debug or args.ebpf:
     print(bpf_text)

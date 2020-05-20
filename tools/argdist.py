@@ -42,7 +42,7 @@ class Probe(object):
                         param_name = param[index + 1:].strip()
                         self.param_types[param_name] = param_type
                         # Maintain list of user params. Then later decide to
-                        # switch to bpf_probe_read or bpf_probe_read_user.
+                        # switch to bpf_probe_read_kernel or bpf_probe_read_user.
                         if "__user" in param_type.split():
                                 self.probe_user_list.add(param_name)
 
@@ -299,7 +299,7 @@ u64 __time = bpf_ktime_get_ns();
                             self.exprs[i] in self.probe_user_list:
                                 probe_readfunc = "bpf_probe_read_user"
                         else:
-                                probe_readfunc = "bpf_probe_read"
+                                probe_readfunc = "bpf_probe_read_kernel"
                         return (text + "        %s(&__key.v%d.s," +
                                 " sizeof(__key.v%d.s), (void *)%s);\n") % \
                                 (probe_readfunc, i, i, self.exprs[i])

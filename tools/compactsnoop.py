@@ -108,7 +108,7 @@ BPF_STACK_TRACE(stack_traces, 2048);
 static inline int zone_to_nid_(struct zone *zone)
 {
     int node;
-    bpf_probe_read(&node, sizeof(node), &zone->node);
+    bpf_probe_read_kernel(&node, sizeof(node), &zone->node);
     return node;
 }
 #else
@@ -122,7 +122,7 @@ static inline int zone_to_nid_(struct zone *zone)
 static inline int zone_idx_(struct zone *zone)
 {
     struct pglist_data *zone_pgdat = NULL;
-    bpf_probe_read(&zone_pgdat, sizeof(zone_pgdat), &zone->zone_pgdat);
+    bpf_probe_read_kernel(&zone_pgdat, sizeof(zone_pgdat), &zone->zone_pgdat);
     return zone - zone_pgdat->node_zones;
 }
 
@@ -132,13 +132,13 @@ static inline void get_all_wmark_pages(struct zone *zone, struct val_t *valp)
     u64 _watermark[NR_WMARK] = {};
     u64 watermark_boost = 0;
 
-    bpf_probe_read(&_watermark, sizeof(_watermark), &zone->_watermark);
-    bpf_probe_read(&watermark_boost, sizeof(watermark_boost),
+    bpf_probe_read_kernel(&_watermark, sizeof(_watermark), &zone->_watermark);
+    bpf_probe_read_kernel(&watermark_boost, sizeof(watermark_boost),
                     &zone->watermark_boost);
     valp->min = _watermark[WMARK_MIN] + watermark_boost;
     valp->low = _watermark[WMARK_LOW] + watermark_boost;
     valp->high = _watermark[WMARK_HIGH] + watermark_boost;
-    bpf_probe_read(&valp->free, sizeof(valp->free),
+    bpf_probe_read_kernel(&valp->free, sizeof(valp->free),
                     &zone->vm_stat[NR_FREE_PAGES]);
 }
 #endif

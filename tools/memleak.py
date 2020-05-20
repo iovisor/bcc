@@ -287,7 +287,7 @@ int posix_memalign_exit(struct pt_regs *ctx) {
 
         memptrs.delete(&pid);
 
-        if (bpf_probe_read(&addr, sizeof(void*), (void*)(size_t)*memptr64))
+        if (bpf_probe_read_user(&addr, sizeof(void*), (void*)(size_t)*memptr64))
                 return 0;
 
         u64 addr64 = (u64)(size_t)addr;
