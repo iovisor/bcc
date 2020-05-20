@@ -104,7 +104,7 @@ int trace_exit(struct trace_event_raw_sys_exit* ctx)
 	event.pid = bpf_get_current_pid_tgid() >> 32;
 	event.uid = bpf_get_current_uid_gid();
 	bpf_get_current_comm(&event.comm, sizeof(event.comm));
-	bpf_probe_read_str(&event.fname, sizeof(event.fname), ap->fname);
+	bpf_probe_read_user_str(&event.fname, sizeof(event.fname), ap->fname);
 	event.flags = ap->flags;
 	event.ret = ret;
 
