@@ -115,7 +115,7 @@ probe_exit(struct pt_regs *ctx, char type, ssize_t size)
 	dentry = BPF_CORE_READ(fp, f_path.dentry);
 	qs_len = BPF_CORE_READ(dentry, d_name.len);
 	qs_name_ptr = BPF_CORE_READ(dentry, d_name.name);
-	bpf_probe_read_str(&event.file, sizeof(event.file), qs_name_ptr);
+	bpf_probe_read_kernel_str(&event.file, sizeof(event.file), qs_name_ptr);
 	bpf_get_current_comm(&event.task, sizeof(event.task));
 	event.delta_us = delta_us;
 	event.end_ns = end_ns;
