@@ -83,7 +83,7 @@ const char **get_call_conv(void) {
   return ret;
 }
 
-/* Use resolver only once */
+/* Use resolver only once per translation */
 static void *kresolver = NULL;
 static void *get_symbol_resolver(void) {
   if (!kresolver)
@@ -492,7 +492,7 @@ bool ProbeVisitor::VisitUnaryOperator(UnaryOperator *E) {
   memb_visited_.insert(E);
   string pre, post;
   pre = "({ typeof(" + E->getType().getAsString() + ") _val; __builtin_memset(&_val, 0, sizeof(_val));";
-  pre += " " + check_bpf_probe_read_kernel() + "(&_val, sizeof(_val), (u64)";
+  pre += " bpf_probe_read_kernel(&_val, sizeof(_val), (u64)";
   post = "); _val; })";
   rewriter_.ReplaceText(expansionLoc(E->getOperatorLoc()), 1, pre);
   rewriter_.InsertTextAfterToken(expansionLoc(GET_ENDLOC(sub)), post);
@@ -553,7 +553,7 @@ bool ProbeVisitor::VisitMemberExpr(MemberExpr *E) {
   string base_type = base->getType()->getPointeeType().getAsString();
   string pre, post;
   pre = "({ typeof(" + E->getType().getAsString() + ") _val; __builtin_memset(&_val, 0, sizeof(_val));";
-  pre += " " + check_bpf_probe_read_kernel() + "(&_val, sizeof(_val), (u64)&";
+  pre += " bpf_probe_read_kernel(&_val, sizeof(_val), (u64)&";
   post = rhs + "); _val; })";
   rewriter_.InsertText(expansionLoc(GET_BEGINLOC(E)), pre);
   rewriter_.ReplaceText(expansionRange(SourceRange(member, GET_ENDLOC(E))), post);
@@ -604,7 +604,7 @@ bool ProbeVisitor::VisitArraySubscriptExpr(ArraySubscriptExpr *E) {
     return true;
 
   pre = "({ typeof(" + E->getType().getAsString() + ") _val; __builtin_memset(&_val, 0, sizeof(_val));";
-  pre += " " + check_bpf_probe_read_kernel() + "(&_val, sizeof(_val), (u64)((";
+  pre += " bpf_probe_read_kernel(&_val, sizeof(_val), (u64)((";
   if (isMemberDereference(base)) {
     pre += "&";
     // If the base of the array subscript is a member dereference, we'll rewrite
@@ -737,7 +737,7 @@ void BTypeVisitor::genParamIndirectAssign(FunctionDecl *D, string& preamble,
       size_t d = idx - 1;
       const char *reg = calling_conv_regs[d];
       preamble += "\n " + text + ";";
-      preamble += " " + check_bpf_probe_read_kernel();
+      preamble += " bpf_probe_read_kernel";
       preamble += "(&" + arg->getName().str() + ", sizeof(" +
                   arg->getName().str() + "), &" + new_ctx + "->" +
                   string(reg) + ");";
@@ -1005,24 +1005,15 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
     if (!Decl) return true;
 
     string text;
- 
+
+    // Bail out when bpf_probe_read_user is unavailable for overlapping address
+    // space arch.
     bool overlap_addr = false;
     std::string probe = check_bpf_probe_read_user(Decl->getName(),
                           overlap_addr);
     if (overlap_addr) {
       error(GET_BEGINLOC(Call), "bpf_probe_read_user not found. Use latest kernel");
       return false;
-    }
-    if (probe != "") {
-      vector<string> probe_args;
-
-      for (auto arg : Call->arguments())
-        probe_args.push_back(
-            rewriter_.getRewrittenText(expansionRange(arg->getSourceRange())));
-
-      text = probe + "(" + probe_args[0] + ", " + probe_args[1] + ", " +
-             probe_args[2] + ")";
-      rewriter_.ReplaceText(expansionRange(Call->getSourceRange()), text);
     }
 
     if (AsmLabelAttr *A = Decl->getAttr<AsmLabelAttr>()) {
@@ -1540,8 +1531,6 @@ void BTypeConsumer::HandleTranslationUnit(ASTContext &Context) {
     btype_visitor_.TraverseDecl(D);
   }
 
-  if (kresolver)
-    bcc_free_symcache(kresolver, -1);
 }
 
 BFrontendAction::BFrontendAction(llvm::raw_ostream &os, unsigned flags,
@@ -1577,8 +1566,21 @@ void BFrontendAction::DoMiscWorkAround() {
   // to guard certain fields. The workaround here intends to define
   // CONFIG_CC_STACKPROTECTOR properly based on other configs, so it relieved any bpf
   // program (using task_struct, etc.) of patching the below code.
-  rewriter_->getEditBuffer(rewriter_->getSourceMgr().getMainFileID()).InsertText(0,
-    "#if defined(BPF_LICENSE)\n"
+  std::string probefunc = check_bpf_probe_read_kernel();
+  if (kresolver) {
+    bcc_free_symcache(kresolver, -1);
+    kresolver = NULL;
+  }
+  if (probefunc == "bpf_probe_read") {
+    probefunc = "#define bpf_probe_read_kernel bpf_probe_read\n"
+      "#define bpf_probe_read_kernel_str bpf_probe_read_str\n"
+      "#define bpf_probe_read_user bpf_probe_read\n"
+      "#define bpf_probe_read_user_str bpf_probe_read_str\n";
+  }
+  else {
+    probefunc = "";
+  }
+  std::string prologue = "#if defined(BPF_LICENSE)\n"
     "#error BPF_LICENSE cannot be specified through cflags\n"
     "#endif\n"
     "#if !defined(CONFIG_CC_STACKPROTECTOR)\n"
@@ -1587,7 +1589,10 @@ void BFrontendAction::DoMiscWorkAround() {
     "    || defined(CONFIG_CC_STACKPROTECTOR_STRONG)\n"
     "#define CONFIG_CC_STACKPROTECTOR\n"
     "#endif\n"
-    "#endif\n",
+    "#endif\n";
+  prologue = prologue + probefunc;
+  rewriter_->getEditBuffer(rewriter_->getSourceMgr().getMainFileID()).InsertText(0,
+    prologue,
     false);
 
   rewriter_->getEditBuffer(rewriter_->getSourceMgr().getMainFileID()).InsertTextAfter(
