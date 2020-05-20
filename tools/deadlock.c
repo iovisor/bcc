@@ -164,7 +164,7 @@ int trace_mutex_release(struct pt_regs *ctx, void *mutex_addr) {
   // invalid memory access on `leaf->held_mutexes[i]` below. On newer kernels,
   // we can avoid making this extra copy in `value` and use `leaf` directly.
   struct thread_to_held_mutex_leaf_t value = {};
-  bpf_probe_read(&value, sizeof(struct thread_to_held_mutex_leaf_t), leaf);
+  bpf_probe_read_user(&value, sizeof(struct thread_to_held_mutex_leaf_t), leaf);
 
   #pragma unroll
   for (int i = 0; i < MAX_HELD_MUTEXES; ++i) {

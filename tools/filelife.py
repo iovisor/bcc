@@ -90,7 +90,7 @@ int trace_unlink(struct pt_regs *ctx, struct inode *dir, struct dentry *dentry)
     if (bpf_get_current_comm(&data.comm, sizeof(data.comm)) == 0) {
         data.pid = pid;
         data.delta = delta;
-        bpf_probe_read(&data.fname, sizeof(data.fname), d_name.name);
+        bpf_probe_read_kernel(&data.fname, sizeof(data.fname), d_name.name);
     }
 
     events.perf_submit(ctx, &data, sizeof(data));

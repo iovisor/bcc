@@ -128,7 +128,7 @@ TRACEPOINT_PROBE(vmscan, mm_vmscan_direct_reclaim_begin) {
     if (bpf_get_current_comm(&val.name, sizeof(val.name)) == 0) {
         val.id = id;
         val.ts = bpf_ktime_get_ns();
-        bpf_probe_read(&val.vm_stat, sizeof(val.vm_stat), (const void *)%s);
+        bpf_probe_read_kernel(&val.vm_stat, sizeof(val.vm_stat), (const void *)%s);
         start.update(&id, &val);
     }
     return 0;
@@ -150,8 +150,8 @@ TRACEPOINT_PROBE(vmscan, mm_vmscan_direct_reclaim_end) {
     data.ts = ts / 1000;
     data.id = valp->id;
     data.uid = bpf_get_current_uid_gid();
-    bpf_probe_read(&data.name, sizeof(data.name), valp->name);
-    bpf_probe_read(&data.vm_stat, sizeof(data.vm_stat), valp->vm_stat);
+    bpf_probe_read_kernel(&data.name, sizeof(data.name), valp->name);
+    bpf_probe_read_kernel(&data.vm_stat, sizeof(data.vm_stat), valp->vm_stat);
     data.nr_reclaimed = args->nr_reclaimed;
 
     events.perf_submit(args, &data, sizeof(data));

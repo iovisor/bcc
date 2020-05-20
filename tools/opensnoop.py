@@ -151,7 +151,7 @@ int trace_return(struct pt_regs *ctx)
         // missed entry
         return 0;
     }
-    bpf_probe_read(&data.comm, sizeof(data.comm), valp->comm);
+    bpf_probe_read_kernel(&data.comm, sizeof(data.comm), valp->comm);
     bpf_probe_read_user(&data.fname, sizeof(data.fname), (void *)valp->fname);
     data.id = valp->id;
     data.ts = tsp / 1000;

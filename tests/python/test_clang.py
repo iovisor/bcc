@@ -80,7 +80,7 @@ int count_foo(struct pt_regs *ctx, unsigned long a, unsigned long b) {
         text = """
 #define KBUILD_MODNAME "foo"
 #include <net/tcp.h>
-#define _(P) ({typeof(P) val = 0; bpf_probe_read(&val, sizeof(val), &P); val;})
+#define _(P) ({typeof(P) val = 0; bpf_probe_read_kernel(&val, sizeof(val), &P); val;})
 int count_tcp(struct pt_regs *ctx, struct sk_buff *skb) {
     return _(TCP_SKB_CB(skb)->tcp_gso_size);
 }
@@ -92,7 +92,7 @@ int count_tcp(struct pt_regs *ctx, struct sk_buff *skb) {
         text = """
 #define KBUILD_MODNAME "foo"
 #include <net/tcp.h>
-#define _(P) ({typeof(P) val = 0; bpf_probe_read(&val, sizeof(val), &P); val;})
+#define _(P) ({typeof(P) val = 0; bpf_probe_read_kernel(&val, sizeof(val), &P); val;})
 int test(struct pt_regs *ctx, struct sk_buff *skb) {
     return _(TCP_SKB_CB(skb)->tcp_gso_size) + skb->protocol;
 }
@@ -111,7 +111,7 @@ int count_tcp(struct pt_regs *ctx, struct sk_buff *skb) {
     // failing below statement
     // return TCP_SKB_CB(skb)->tcp_gso_size;
     u16 val = 0;
-    bpf_probe_read(&val, sizeof(val), &(TCP_SKB_CB(skb)->tcp_gso_size));
+    bpf_probe_read_kernel(&val, sizeof(val), &(TCP_SKB_CB(skb)->tcp_gso_size));
     return val;
 }
 """
@@ -129,7 +129,7 @@ int count_tcp(struct pt_regs *ctx, struct sk_buff *skb) {
     // failing below statement
     // return TCP_SKB_CB(skb)->tcp_gso_size;
     u16 val = 0;
-    bpf_probe_read(&val, sizeof(val), &(TCP_SKB_CB(skb)->tcp_gso_size));
+    bpf_probe_read_kernel(&val, sizeof(val), &(TCP_SKB_CB(skb)->tcp_gso_size));
     return val + skb->protocol;
 }
 """
@@ -1144,7 +1144,7 @@ int test(struct pt_regs *ctx, struct sock *sk, struct sk_buff *skb) {
 #include <net/inet_sock.h>
 static inline int test_help(__be16 *addr) {
     __be16 val = 0;
-    bpf_probe_read(&val, sizeof(val), addr);
+    bpf_probe_read_kernel(&val, sizeof(val), addr);
     return val;
 }
 int test(struct pt_regs *ctx) {

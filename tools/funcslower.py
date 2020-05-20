@@ -206,7 +206,7 @@ int trace_return(struct pt_regs *ctx)
 #endif
 
 #ifdef GRAB_ARGS
-    bpf_probe_read(&data.args[0], sizeof(data.args), entryp->args);
+    bpf_probe_read_kernel(&data.args[0], sizeof(data.args), entryp->args);
 #endif
     bpf_get_current_comm(&data.comm, sizeof(data.comm));
     events.perf_submit(ctx, &data, sizeof(data));

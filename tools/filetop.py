@@ -108,7 +108,7 @@ static int do_entry(struct pt_regs *ctx, struct file *file,
     struct info_t info = {.pid = pid};
     bpf_get_current_comm(&info.comm, sizeof(info.comm));
     info.name_len = d_name.len;
-    bpf_probe_read(&info.name, sizeof(info.name), d_name.name);
+    bpf_probe_read_kernel(&info.name, sizeof(info.name), d_name.name);
     if (S_ISREG(mode)) {
         info.type = 'R';
     } else if (S_ISSOCK(mode)) {

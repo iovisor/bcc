@@ -112,7 +112,7 @@ if args.disks:
     bpf_text = bpf_text.replace('STORE',
         'disk_key_t key = {.slot = bpf_log2l(delta)}; ' +
         'void *__tmp = (void *)req->rq_disk->disk_name; ' +
-        'bpf_probe_read(&key.disk, sizeof(key.disk), __tmp); ' +
+        'bpf_probe_read_kernel(&key.disk, sizeof(key.disk), __tmp); ' +
         'dist.increment(key);')
 elif args.flags:
     bpf_text = bpf_text.replace('STORAGE',

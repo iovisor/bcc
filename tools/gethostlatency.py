@@ -86,8 +86,8 @@ int do_return(struct pt_regs *ctx) {
     if (valp == 0)
         return 0;       // missed start
 
-    bpf_probe_read(&data.comm, sizeof(data.comm), valp->comm);
-    bpf_probe_read(&data.host, sizeof(data.host), (void *)valp->host);
+    bpf_probe_read_kernel(&data.comm, sizeof(data.comm), valp->comm);
+    bpf_probe_read_kernel(&data.host, sizeof(data.host), (void *)valp->host);
     data.pid = valp->pid;
     data.delta = tsp - valp->ts;
     events.perf_submit(ctx, &data, sizeof(data));

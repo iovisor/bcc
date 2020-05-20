@@ -111,7 +111,7 @@ int kprobe__inet_listen(struct pt_regs *ctx, struct socket *sock, int backlog)
         if (family == AF_INET) {
             evt.laddr[0] = inet->inet_rcv_saddr;
         } else if (family == AF_INET6) {
-            bpf_probe_read(evt.laddr, sizeof(evt.laddr),
+            bpf_probe_read_kernel(evt.laddr, sizeof(evt.laddr),
                            sk->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
         }
 

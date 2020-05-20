@@ -149,9 +149,9 @@ static int read_ipv6_tuple(struct ipv6_tuple_t *tuple, struct sock *skp)
 #ifdef CONFIG_NET_NS
   net_ns_inum = skp->__sk_common.skc_net.net->ns.inum;
 #endif
-  bpf_probe_read(&saddr, sizeof(saddr),
+  bpf_probe_read_kernel(&saddr, sizeof(saddr),
                  skp->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
-  bpf_probe_read(&daddr, sizeof(daddr),
+  bpf_probe_read_kernel(&daddr, sizeof(daddr),
                  skp->__sk_common.skc_v6_daddr.in6_u.u6_addr32);
 
   ##FILTER_NETNS##
@@ -491,9 +491,9 @@ int trace_accept_return(struct pt_regs *ctx)
       evt6.pid = pid >> 32;
       evt6.ip = ipver;
 
-      bpf_probe_read(&evt6.saddr, sizeof(evt6.saddr),
+      bpf_probe_read_kernel(&evt6.saddr, sizeof(evt6.saddr),
                      newsk->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
-      bpf_probe_read(&evt6.daddr, sizeof(evt6.daddr),
+      bpf_probe_read_kernel(&evt6.daddr, sizeof(evt6.daddr),
                      newsk->__sk_common.skc_v6_daddr.in6_u.u6_addr32);
 
       evt6.sport = lport;

@@ -160,9 +160,9 @@ int trace_tcp_rcv_state_process(struct pt_regs *ctx, struct sock *skp)
     } else /* AF_INET6 */ {
         struct ipv6_data_t data6 = {.pid = infop->pid, .ip = 6};
         data6.ts_us = now / 1000;
-        bpf_probe_read(&data6.saddr, sizeof(data6.saddr),
+        bpf_probe_read_kernel(&data6.saddr, sizeof(data6.saddr),
             skp->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
-        bpf_probe_read(&data6.daddr, sizeof(data6.daddr),
+        bpf_probe_read_kernel(&data6.daddr, sizeof(data6.daddr),
             skp->__sk_common.skc_v6_daddr.in6_u.u6_addr32);
         data6.dport = ntohs(dport);
         data6.delta_us = delta_us;

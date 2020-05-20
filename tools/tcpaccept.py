@@ -117,7 +117,7 @@ int kretprobe__inet_csk_accept(struct pt_regs *ctx)
     // because the sk_wmem_queued is not following the bitfield of sk_protocol.
     // And the following member is sk_gso_max_segs.
     // So, we can use this:
-    // bpf_probe_read(&protocol, 1, (void *)((u64)&newsk->sk_gso_max_segs) - 3);
+    // bpf_probe_read_kernel(&protocol, 1, (void *)((u64)&newsk->sk_gso_max_segs) - 3);
     // In order to  diff the pre-4.10 and 4.10+ ,introduce the variables gso_max_segs_offset,sk_lingertime,
     // sk_lingertime is closed to the gso_max_segs_offset,and
     // the offset between the two members is 4
@@ -167,9 +167,9 @@ int kretprobe__inet_csk_accept(struct pt_regs *ctx)
     } else if (family == AF_INET6) {
         struct ipv6_data_t data6 = {.pid = pid, .ip = 6};
         data6.ts_us = bpf_ktime_get_ns() / 1000;
-        bpf_probe_read(&data6.saddr, sizeof(data6.saddr),
+        bpf_probe_read_kernel(&data6.saddr, sizeof(data6.saddr),
             &newsk->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
-        bpf_probe_read(&data6.daddr, sizeof(data6.daddr),
+        bpf_probe_read_kernel(&data6.daddr, sizeof(data6.daddr),
             &newsk->__sk_common.skc_v6_daddr.in6_u.u6_addr32);
         data6.lport = lport;
         data6.dport = dport;

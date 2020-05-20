@@ -158,8 +158,8 @@ int query_end(struct pt_regs *ctx) {
         data.timestamp = tempp->timestamp;
         data.duration = delta;
 #if defined(MYSQL56) || defined(MYSQL57)
-	// We already copied string to the bpf stack. Hence use bpf_probe_read()
-        bpf_probe_read(&data.query, sizeof(data.query), tempp->query);
+	// We already copied string to the bpf stack. Hence use bpf_probe_read_kernel()
+        bpf_probe_read_kernel(&data.query, sizeof(data.query), tempp->query);
 #else
 	// USDT - we didnt copy string to the bpf stack before.
         bpf_probe_read_user(&data.query, sizeof(data.query), tempp->query);

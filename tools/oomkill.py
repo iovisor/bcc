@@ -45,7 +45,7 @@ void kprobe__oom_kill_process(struct pt_regs *ctx, struct oom_control *oc, const
     data.tpid = p->pid;
     data.pages = oc->totalpages;
     bpf_get_current_comm(&data.fcomm, sizeof(data.fcomm));
-    bpf_probe_read(&data.tcomm, sizeof(data.tcomm), p->comm);
+    bpf_probe_read_kernel(&data.tcomm, sizeof(data.tcomm), p->comm);
     events.perf_submit(ctx, &data, sizeof(data));
 }
 """
