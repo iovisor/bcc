@@ -83,25 +83,55 @@ const char **get_call_conv(void) {
   return ret;
 }
 
-static std::string check_bpf_probe_read_user(llvm::StringRef probe) {
+/* Use resolver only once */
+static void *kresolver = NULL;
+static void *get_symbol_resolver(void) {
+  if (!kresolver)
+    kresolver = bcc_symcache_new(-1, nullptr);
+  return kresolver;
+}
+
+static std::string check_bpf_probe_read_kernel(void) {
+  bool is_probe_read_kernel;
+  void *resolver = get_symbol_resolver();
+  uint64_t addr = 0;
+  is_probe_read_kernel = bcc_symcache_resolve_name(resolver, nullptr,
+                          "bpf_probe_read_kernel", &addr) >= 0 ? true: false;
+
+  /* If bpf_probe_read is not found (ARCH_HAS_NON_OVERLAPPING_ADDRESS_SPACE) is
+   * not set in newer kernel, then bcc would anyway fail */
+  if (is_probe_read_kernel)
+    return "bpf_probe_read_kernel";
+  else
+    return "bpf_probe_read";
+}
+
+static std::string check_bpf_probe_read_user(llvm::StringRef probe,
+        bool& overlap_addr) {
   if (probe.str() == "bpf_probe_read_user" ||
       probe.str() == "bpf_probe_read_user_str") {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 5, 0)
     return probe.str();
 #else
-    // Check for probe_user symbols in backported kernels before fallback
-    void *resolver = bcc_symcache_new(-1, nullptr);
+    // Check for probe_user symbols in backported kernel before fallback
+    void *resolver = get_symbol_resolver();
     uint64_t addr = 0;
     bool found = bcc_symcache_resolve_name(resolver, nullptr,
                   "bpf_probe_read_user", &addr) >= 0 ? true: false;
     if (found)
       return probe.str();
 
-    if (probe.str() == "bpf_probe_read_user") {
+    /* For arch with overlapping address space, dont use bpf_probe_read for
+     * user read. Just error out */
+#if defined(__s390x__)
+    overlap_addr = true;
+    return "";
+#endif
+
+    if (probe.str() == "bpf_probe_read_user")
       return "bpf_probe_read";
-    } else {
+    else
       return "bpf_probe_read_str";
-    }
 #endif
   }
   return "";
@@ -462,7 +492,7 @@ bool ProbeVisitor::VisitUnaryOperator(UnaryOperator *E) {
   memb_visited_.insert(E);
   string pre, post;
   pre = "({ typeof(" + E->getType().getAsString() + ") _val; __builtin_memset(&_val, 0, sizeof(_val));";
-  pre += " bpf_probe_read(&_val, sizeof(_val), (u64)";
+  pre += " " + check_bpf_probe_read_kernel() + "(&_val, sizeof(_val), (u64)";
   post = "); _val; })";
   rewriter_.ReplaceText(expansionLoc(E->getOperatorLoc()), 1, pre);
   rewriter_.InsertTextAfterToken(expansionLoc(GET_ENDLOC(sub)), post);
@@ -523,7 +553,7 @@ bool ProbeVisitor::VisitMemberExpr(MemberExpr *E) {
   string base_type = base->getType()->getPointeeType().getAsString();
   string pre, post;
   pre = "({ typeof(" + E->getType().getAsString() + ") _val; __builtin_memset(&_val, 0, sizeof(_val));";
-  pre += " bpf_probe_read(&_val, sizeof(_val), (u64)&";
+  pre += " " + check_bpf_probe_read_kernel() + "(&_val, sizeof(_val), (u64)&";
   post = rhs + "); _val; })";
   rewriter_.InsertText(expansionLoc(GET_BEGINLOC(E)), pre);
   rewriter_.ReplaceText(expansionRange(SourceRange(member, GET_ENDLOC(E))), post);
@@ -574,7 +604,7 @@ bool ProbeVisitor::VisitArraySubscriptExpr(ArraySubscriptExpr *E) {
     return true;
 
   pre = "({ typeof(" + E->getType().getAsString() + ") _val; __builtin_memset(&_val, 0, sizeof(_val));";
-  pre += " bpf_probe_read(&_val, sizeof(_val), (u64)((";
+  pre += " " + check_bpf_probe_read_kernel() + "(&_val, sizeof(_val), (u64)((";
   if (isMemberDereference(base)) {
     pre += "&";
     // If the base of the array subscript is a member dereference, we'll rewrite
@@ -707,7 +737,8 @@ void BTypeVisitor::genParamIndirectAssign(FunctionDecl *D, string& preamble,
       size_t d = idx - 1;
       const char *reg = calling_conv_regs[d];
       preamble += "\n " + text + ";";
-      preamble += " bpf_probe_read(&" + arg->getName().str() + ", sizeof(" +
+      preamble += " " + check_bpf_probe_read_kernel();
+      preamble += "(&" + arg->getName().str() + ", sizeof(" +
                   arg->getName().str() + "), &" + new_ctx + "->" +
                   string(reg) + ");";
     }
@@ -974,8 +1005,14 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
     if (!Decl) return true;
 
     string text;
-
-    std::string probe = check_bpf_probe_read_user(Decl->getName());
+ 
+    bool overlap_addr = false;
+    std::string probe = check_bpf_probe_read_user(Decl->getName(),
+                          overlap_addr);
+    if (overlap_addr) {
+      error(GET_BEGINLOC(Call), "bpf_probe_read_user not found. Use latest kernel");
+      return false;
+    }
     if (probe != "") {
       vector<string> probe_args;
 
@@ -1036,7 +1073,13 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
           text += "_bpf_readarg_" + current_fn_ + "_" + args[0] + "(" +
                   args[1] + ", &__addr, sizeof(__addr));";
 
-          text += check_bpf_probe_read_user(StringRef("bpf_probe_read_user"));
+          bool overlap_addr = false;
+          text += check_bpf_probe_read_user(StringRef("bpf_probe_read_user"),
+                  overlap_addr);
+          if (overlap_addr) {
+            error(GET_BEGINLOC(Call), "bpf_probe_read_user not found. Use latest kernel");
+            return false;
+          }
 
           text += "(" + args[2] + ", " + args[3] + ", (void *)__addr);";
           text += "})";
@@ -1496,6 +1539,9 @@ void BTypeConsumer::HandleTranslationUnit(ASTContext &Context) {
 
     btype_visitor_.TraverseDecl(D);
   }
+
+  if (kresolver)
+    bcc_free_symcache(kresolver, -1);
 }
 
 BFrontendAction::BFrontendAction(llvm::raw_ostream &os, unsigned flags,
