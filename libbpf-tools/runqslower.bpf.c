@@ -89,7 +89,7 @@ int handle__sched_switch(u64 *ctx)
 
 	event.pid = pid;
 	event.delta_us = delta_us;
-	bpf_probe_read_str(&event.task, sizeof(event.task), next->comm);
+	bpf_probe_read_kernel_str(&event.task, sizeof(event.task), next->comm);
 
 	/* output */
 	bpf_perf_event_output(ctx, &events, BPF_F_CURRENT_CPU,

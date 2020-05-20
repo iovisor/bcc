@@ -42,7 +42,7 @@ int handle__mm_vmscan_direct_reclaim_begin(u64 *ctx)
 
 	piddata.ts = bpf_ktime_get_ns();
 	if (vm_zone_stat_kaddrp) {
-		bpf_probe_read(&piddata.nr_free_pages,
+		bpf_probe_read_kernel(&piddata.nr_free_pages,
 			       sizeof(*vm_zone_stat_kaddrp),
 			       &vm_zone_stat_kaddrp[NR_FREE_PAGES]);
 	}
