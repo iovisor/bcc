@@ -352,17 +352,17 @@ int mutex_lock_enter(struct pt_regs *ctx)
 program_kfunc = """
 KFUNC_PROBE(mutex_unlock, void *lock)
 {
-    do_mutex_unlock_enter();
+    return do_mutex_unlock_enter();
 }
 
 KRETFUNC_PROBE(mutex_lock, void *lock, int ret)
 {
-    do_mutex_lock_return();
+    return do_mutex_lock_return();
 }
 
 KFUNC_PROBE(mutex_lock, void *lock)
 {
-    do_mutex_lock_enter(ctx, 3);
+    return do_mutex_lock_enter(ctx, 3);
 }
 
 """
