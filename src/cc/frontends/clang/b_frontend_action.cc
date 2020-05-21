@@ -110,9 +110,6 @@ static std::string check_bpf_probe_read_user(llvm::StringRef probe,
         bool& overlap_addr) {
   if (probe.str() == "bpf_probe_read_user" ||
       probe.str() == "bpf_probe_read_user_str") {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 5, 0)
-    return probe.str();
-#else
     // Check for probe_user symbols in backported kernel before fallback
     void *resolver = get_symbol_resolver();
     uint64_t addr = 0;
@@ -132,7 +129,6 @@ static std::string check_bpf_probe_read_user(llvm::StringRef probe,
       return "bpf_probe_read";
     else
       return "bpf_probe_read_str";
-#endif
   }
   return "";
 }
