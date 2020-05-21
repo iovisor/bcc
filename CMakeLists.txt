@@ -19,6 +19,14 @@ if(NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/cc/libbpf/src)
                   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 endif()
 
+# It's possible to use other kernel headers with
+# KERNEL_INCLUDE_DIRS build variable, like:
+#  $ cd <kernel-dir>
+#  $ make INSTALL_HDR_PATH=/tmp/headers headers_install
+#  $ cd <bcc-dir>
+#  $ cmake -DKERNEL_INCLUDE_DIRS=/tmp/headers/include/ ...
+include_directories(${KERNEL_INCLUDE_DIRS})
+
 include(cmake/GetGitRevisionDescription.cmake)
 include(cmake/version.cmake)
 include(CMakeDependentOption)
