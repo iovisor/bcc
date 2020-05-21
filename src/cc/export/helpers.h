@@ -1012,7 +1012,7 @@ int raw_tracepoint__##event(struct bpf_raw_tracepoint_args *ctx)
 #define BPF_PROG(name, args...)                                 \
 int name(unsigned long long *ctx);                              \
 __attribute__((always_inline))                                  \
-static void ____##name(unsigned long long *ctx, ##args);        \
+static int ____##name(unsigned long long *ctx, ##args);         \
 int name(unsigned long long *ctx)                               \
 {                                                               \
         _Pragma("GCC diagnostic push")                          \
@@ -1021,7 +1021,7 @@ int name(unsigned long long *ctx)                               \
         _Pragma("GCC diagnostic pop")                           \
         return 0;                                               \
 }                                                               \
-static void ____##name(unsigned long long *ctx, ##args)
+static int ____##name(unsigned long long *ctx, ##args)
 
 #define KFUNC_PROBE(event, args...) \
         BPF_PROG(kfunc__ ## event, args)

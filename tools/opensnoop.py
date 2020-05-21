@@ -197,6 +197,8 @@ KRETFUNC_PROBE(do_sys_open, int dfd, const char __user *filename, int flags, int
     data.ret   = ret;
 
     events.perf_submit(ctx, &data, sizeof(data));
+
+    return 0:
 }
 """
 
