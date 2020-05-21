@@ -221,6 +221,11 @@ static struct bpf_helper helpers[] = {
   {"get_netns_cookie", "5.6"},
   {"get_current_ancestor_cgroup_id", "5.6"},
   {"sk_assign", "5.6"},
+  {"ktime_get_boot_ns", "5.7"},
+  {"seq_printf", "5.7"},
+  {"seq_write", "5.7"},
+  {"sk_cgroup_id", "5.7"},
+  {"sk_ancestor_cgroup_id", "5.7"},
 };
 
 static uint64_t ptr_to_u64(void *ptr)
