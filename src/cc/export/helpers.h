@@ -642,6 +642,19 @@ struct sk_buff;
 static int (*bpf_sk_assign)(struct sk_buff *skb, struct bpf_sock *sk, __u64 flags) =
   (void *)BPF_FUNC_sk_assign;
 
+static __u64 (*bpf_ktime_get_boot_ns)(void) = (void *)BPF_FUNC_ktime_get_boot_ns;
+
+struct seq_file;
+static int (*bpf_seq_printf)(struct seq_file *m, const char *fmt, __u32 fmt_size,
+			     const void *data, __u32 data_len) =
+  (void *)BPF_FUNC_seq_printf;
+static int (*bpf_seq_write)(struct seq_file *m, const void *data, __u32 len) =
+  (void *)BPF_FUNC_seq_write;
+
+static __u64 (*bpf_sk_cgroup_id)(struct bpf_sock *sk) = (void *)BPF_FUNC_sk_cgroup_id;
+static __u64 (*bpf_sk_ancestor_cgroup_id)(struct bpf_sock *sk, int ancestor_level) =
+  (void *)BPF_FUNC_sk_ancestor_cgroup_id;
+
 /* llvm builtin functions that eBPF C program may use to
  * emit BPF_LD_ABS and BPF_LD_IND instructions
  */
