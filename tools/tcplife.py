@@ -32,7 +32,7 @@ from time import strftime
 # arguments
 examples = """examples:
     ./tcplife           # trace all TCP connect()s
-    ./tcplife -t        # include time column (HH:MM:SS)
+    ./tcplife -T        # include time column (HH:MM:SS)
     ./tcplife -w        # wider columns (fit IPv6)
     ./tcplife -stT      # csv output, with times & timestamps
     ./tcplife -p 181    # only trace PID 181
