@@ -1029,6 +1029,9 @@ static int ____##name(unsigned long long *ctx, ##args)
 #define KRETFUNC_PROBE(event, args...) \
         BPF_PROG(kretfunc__ ## event, args)
 
+#define LSM_PROBE(event, args...) \
+        BPF_PROG(lsm__ ## event, args)
+
 #define TP_DATA_LOC_READ_CONST(dst, field, length)                        \
         do {                                                              \
             unsigned short __offset = args->data_loc_##field & 0xFFFF;    \

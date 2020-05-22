@@ -564,9 +564,13 @@ int bcc_prog_load_xattr(struct bpf_load_program_attr *attr, int prog_len,
     } else if (strncmp(attr->name, "kretfunc__", 10) == 0) {
       name_offset = 10;
       expected_attach_type = BPF_TRACE_FEXIT;
+    } else if (strncmp(attr->name, "lsm__", 5) == 0) {
+      name_offset = 5;
+      expected_attach_type = BPF_LSM_MAC;
     }
 
-    if (attr->prog_type == BPF_PROG_TYPE_TRACING) {
+    if (attr->prog_type == BPF_PROG_TYPE_TRACING ||
+        attr->prog_type == BPF_PROG_TYPE_LSM) {
       attr->attach_btf_id = libbpf_find_vmlinux_btf_id(attr->name + name_offset,
                                                        expected_attach_type);
       attr->expected_attach_type = expected_attach_type;
