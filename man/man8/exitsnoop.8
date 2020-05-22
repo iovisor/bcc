@@ -2,7 +2,7 @@
 .SH NAME
 exitsnoop \- Trace all process termination (exit, fatal signal). Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B exitsnoop [\-h] [\-t] [\-\-utc] [\-x] [\-p PID] [\-\-label LABEL]
+.B exitsnoop [\-h] [\-t] [\-\-utc] [\-x] [\-p PID] [\-\-label LABEL] [\-\-per\-thread]
 .SH DESCRIPTION
 exitsnoop traces process termination, showing the command name and reason for
 termination, either an exit or a fatal signal.
@@ -35,6 +35,9 @@ Trace this process ID only (filtered in-kernel).
 .TP
 \-\-label LABEL
 Label each line with LABEL (default 'exit') in first column (2nd if timestamp is present).
+.TP
+\-\-per\-thread
+Trace per thread termination
 .SH EXAMPLES
 .TP
 Trace all process termination
@@ -56,6 +59,10 @@ Trace PID 181 only:
 Label each output line with 'EXIT':
 #
 .B exitsnoop \-\-label EXIT
+.TP
+Trace per thread termination
+#
+.B exitsnoop \-\-per\-thread
 .SH FIELDS
 .TP
 TIME-TZ
