@@ -20,6 +20,7 @@
 #include <cstdio>
 #include <cstring>
 #include <exception>
+#include <fstream>
 #include <iostream>
 #include <memory>
 #include <sstream>
@@ -205,6 +206,15 @@ StatusTuple BPF::attach_kprobe(const std::string& kernel_func,
   int res_fd = bpf_attach_kprobe(probe_fd, attach_type, probe_event.c_str(),
                                  kernel_func.c_str(), kernel_func_offset,
                                  maxactive);
+
+  if (res_fd < 0) {
+    const std::string* isra_kfunc = find_isra(kernel_func);
+    if (isra_kfunc != nullptr) {
+      res_fd =
+          bpf_attach_kprobe(probe_fd, attach_type, probe_event.c_str(),
+                            isra_kfunc->c_str(), kernel_func_offset, maxactive);
+    }
+  }
 
   if (res_fd < 0) {
     TRY2(unload_func(probe_func));
@@ -893,6 +903,17 @@ int BPF::free_bcc_memory() {
   return bcc_free_memory();
 }
 
+const std::string* BPF::find_isra(const std::string& symbol) {
+  if (!have_isra_) {
+    have_isra_ = true;
+    std::ifstream kallsyms("/proc/kallsyms");
+    if (kallsyms) {
+      isra_.init(kallsyms);
+    }
+  }
+  return isra_.find(symbol);
+}
+
 USDT::USDT(const std::string& binary_path, const std::string& provider,
            const std::string& name, const std::string& probe_func)
     : initialized_(false),
@@ -999,6 +1020,44 @@ StatusTuple USDT::init() {
 
   initialized_ = true;
   return StatusTuple::OK();
+}
+
+void Isra::init(std::istream& in) {
+  assert(syms_.empty());
+
+  // Gather all symbols of type t containing the string ".isra." in isras_
+  for (std::string line; std::getline(in, line);) {
+    std::string piece;
+    std::istringstream is(line);
+    is >> piece;
+    is >> piece;
+    if (piece != "t") {
+      continue;
+    }
+    is >> piece;
+    auto pos = piece.find(".isra.");
+    if (pos != std::string::npos) {
+      syms_.push_back(piece);
+    }
+  }
+
+  // Sort and de-dupe
+  std::sort(syms_.begin(), syms_.end());
+  syms_.erase(std::unique(syms_.begin(), syms_.end()), syms_.end());
+}
+
+const std::string* Isra::find(const std::string& symbol) {
+  auto pos = std::lower_bound(syms_.begin(), syms_.end(), symbol);
+  if (pos == syms_.end()) {
+    return nullptr;
+  }
+
+  // If the found position is of the form symbol + ".isra." we have a match
+  std::string match = symbol + ".isra.";
+  if (pos->substr(0, match.size()) == match) {
+    return &*pos;
+  }
+  return nullptr;
 }
 
 }  // namespace ebpf

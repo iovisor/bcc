@@ -40,6 +40,22 @@ struct open_probe_t {
   std::vector<std::pair<int, int>>* per_cpu_fd;
 };
 
+// Helper class to detect isra renaming.
+class Isra {
+ public:
+  Isra() = default;
+  Isra(const Isra& other) = delete;
+
+  // Initialize the internal symbol list.
+  void init(std::istream& in);
+
+  // Try to find a string; returns nullptr if no match was found.
+  const std::string* find(const std::string& symbol);
+
+ private:
+  std::vector<std::string> syms_;
+};
+
 class USDT;
 
 class BPF {
@@ -297,6 +313,10 @@ class BPF {
 
   void init_fail_reset();
 
+  // Find the .isra. version of a symbol from isras_, returns nullptr if no
+  // symbol could be found.
+  const std::string* find_isra(const std::string& symbol);
+
   int flag_;
 
   void *bsymcache_;
@@ -317,6 +337,9 @@ class BPF {
   std::map<std::string, BPFPerfBuffer*> perf_buffers_;
   std::map<std::string, BPFPerfEventArray*> perf_event_arrays_;
   std::map<std::pair<uint32_t, uint32_t>, open_probe_t> perf_events_;
+
+  bool have_isra_{false};  // have we initialized isra_?
+  Isra isra_;              // the isra map
 };
 
 class USDT {
