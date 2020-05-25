@@ -51,7 +51,7 @@ class Lexer : public yyFlexLexer {
   }
   std::string text(const position& begin, const position& end) const {
     std::string result;
-    for (size_t i = begin.line; i <= end.line; ++i) {
+    for (auto i = begin.line; i <= end.line; ++i) {
       if (i == begin.line && i == end.line) {
         result += lines_.at(i - 1).substr(begin.column - 1, end.column - begin.column);
       } else if (i == begin.line && i < end.line) {
