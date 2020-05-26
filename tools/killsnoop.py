@@ -23,7 +23,7 @@ examples = """examples:
     ./killsnoop           # trace all kill() signals
     ./killsnoop -x        # only show failed kills
     ./killsnoop -p 181    # only trace PID 181
-    ./killsnoop -s 13     # only trace signal 13
+    ./killsnoop -s 9      # only trace signal 9
 """
 parser = argparse.ArgumentParser(
     description="Trace signals issued by the kill() syscall",
