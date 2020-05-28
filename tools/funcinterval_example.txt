@@ -1,0 +1,163 @@
+Demonstrations of funcinterval, the Linux eBPF/bcc version.
+
+eBPF/bcc is very suitable for platform performance tuning.
+By funclatency, we can profile specific functions to know how latency
+this function costs. However, sometimes performance drop is not about the 
+latency of function but the interval between function calls.
+funcinterval is born for this purpose.
+
+Another story, hardware performance tuning on the platform we will use
+protocol analyzer to analyze performance, but most protocol analyzers lack
+the distribution feature. Using a protocol analyzer you need a lot of time
+to check every detail latency. By funcinterval, we can save a lot of time
+by distribution feature.
+
+For example:
+
+# ./funcinterval xhci_ring_ep_doorbell -d 2 -u
+Tracing 1 functions for "xhci_ring_ep_doorbell"... Hit Ctrl-C to end.
+
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 134      |                                        |
+        64 -> 127        : 2862     |********************                    |
+       128 -> 255        : 5552     |****************************************|
+       256 -> 511        : 216      |*                                       |
+       512 -> 1023       : 2        |                                        |
+Detaching...
+
+This example output shows that the interval latency of xhci_ring_ep_doorbell
+took between 64 and 255 microseconds. USB MAC will start its job after USB
+doorbell register ringing, above information that can help hardware engineer to
+analyze, the performance drop is because software rings the doorbell too
+late or just slowly hardware DMA.
+
+# ./funcinterval blk_start_request -i 2 -u
+Tracing 1 functions for "blk_start_request"... Hit Ctrl-C to end.
+
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 5        |*                                       |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 1        |                                        |
+        64 -> 127        : 2        |                                        |
+       128 -> 255        : 1        |                                        |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 1        |                                        |
+      1024 -> 2047       : 1        |                                        |
+      2048 -> 4095       : 117      |****************************************|
+      4096 -> 8191       : 13       |****                                    |
+      8192 -> 16383      : 1        |                                        |
+
+If using biolatency tool that has no difference between two platforms.
+Maybe the problem is related to the interval time instead of block
+device I/O latency.
+
+# ./funcinterval ion_ioctl -i 2 -m
+Tracing 1 functions for "ion_ioctl"... Hit Ctrl-C to end.
+
+     msecs               : count     distribution
+         0 -> 1          : 215      |****************************************|
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 4        |                                        |
+         8 -> 15         : 5        |                                        |
+        16 -> 31         : 29       |*****                                   |
+
+You can also check the ion_ioctl. By the above output, we know the activity
+frequency of ion_ioctl() is high mostly(less than 1 ms), but has 29 times low
+frequency.
+
+# ./funcinterval t:block:block_bio_queue -d 30 -u
+Tracing tracepoint for "block:block_bio_queue"... Hit Ctrl-C to end.
+
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 2        |                                        |
+        16 -> 31         : 262      |                                        |
+        32 -> 63         : 9075     |*******************                     |
+        64 -> 127        : 18668    |****************************************|
+       128 -> 255        : 1492     |***                                     |
+       256 -> 511        : 2616     |*****                                   |
+       512 -> 1023       : 7226     |***************                         |
+      1024 -> 2047       : 8982     |*******************                     |
+      2048 -> 4095       : 2394     |*****                                   |
+      4096 -> 8191       : 163      |                                        |
+      8192 -> 16383      : 42       |                                        |
+     16384 -> 32767      : 2        |                                        |
+     32768 -> 65535      : 0        |                                        |
+     65536 -> 131071     : 0        |                                        |
+    131072 -> 262143     : 0        |                                        |
+    262144 -> 524287     : 0        |                                        |
+    524288 -> 1048575    : 1        |                                        |
+Detaching...
+
+# ./funcinterval t:block:block_rq_issue -d 30 -u
+Tracing tracepoint for "block:block_rq_issue"... Hit Ctrl-C to end.
+
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 5        |                                        |
+        32 -> 63         : 18       |                                        |
+        64 -> 127        : 32       |                                        |
+       128 -> 255        : 95       |                                        |
+       256 -> 511        : 2194     |******                                  |
+       512 -> 1023       : 13830    |****************************************|
+      1024 -> 2047       : 9001     |**************************              |
+      2048 -> 4095       : 1569     |****                                    |
+      4096 -> 8191       : 96       |                                        |
+      8192 -> 16383      : 17       |                                        |
+Detaching...
+
+funcinterval also supports tracepoint filter. The above two cases are under EMMC
+throughput testing, by those results you know which layer has a slower interval
+time. In our case, mmc-cmdqd is slower than block layer.
+
+
+USAGE message:
+
+# ./funcinterval -h
+usage: funcinterval [-h] [-p PID] [-i INTERVAL] [-d DURATION] [-T] [-u] [-m]
+                    [-v]
+                    pattern
+
+Time interval and print latency as a histogram
+
+positional arguments:
+  pattern             Function name for tracing
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -p PID, --pid PID     trace this PID only
+  -i INTERVAL, --interval INTERVAL
+                        summary interval, in seconds
+  -d DURATION, --duration DURATION
+                        total duration of trace, in seconds
+  -T, --timestamp       include timestamp on output
+  -u, --microseconds    microsecond histogram
+  -m, --milliseconds    millisecond histogram
+  -v, --verbose         print the BPF program (for debugging purposes)
+
+examples:
+    # time the interval of do_sys_open()
+    ./funcinterval do_sys_open
+    # time the interval of xhci_ring_ep_doorbell(), in microseconds
+    ./funcinterval -u xhci_ring_ep_doorbell
+    # time the interval of do_nanosleep(), in milliseconds
+    ./funcinterval -m do_nanosleep
+    # output every 5 seconds, with timestamps
+    ./funcinterval -mTi 5 vfs_read
+    # time process 181 only
+    ./funcinterval -p 181 vfs_read
+    # time the interval of mm_vmscan_direct_reclaim_begin tracepoint
+    ./funcinterval t:vmscan:mm_vmscan_direct_reclaim_begin

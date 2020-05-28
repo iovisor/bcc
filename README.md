@@ -115,6 +115,7 @@ pair of .c and .py files, and some are directories of files.
 - tools/[fileslower](tools/fileslower.py): Trace slow synchronous file reads and writes. [Examples](tools/fileslower_example.txt).
 - tools/[filetop](tools/filetop.py): File reads and writes by filename and process. Top for files. [Examples](tools/filetop_example.txt).
 - tools/[funccount](tools/funccount.py): Count kernel function calls. [Examples](tools/funccount_example.txt).
+- tools/[funcinterval](tools/funcinterval.py): Time interval between the same function as a histogram. [Examples](tools/funcinterval_example.txt).
 - tools/[funclatency](tools/funclatency.py): Time functions and show their latency distribution. [Examples](tools/funclatency_example.txt).
 - tools/[funcslower](tools/funcslower.py): Trace slow kernel or user function calls. [Examples](tools/funcslower_example.txt).
 - tools/[gethostlatency](tools/gethostlatency.py): Show latency for getaddrinfo/gethostbyname[2] calls. [Examples](tools/gethostlatency_example.txt).
