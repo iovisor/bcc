@@ -546,8 +546,15 @@ class BPF(object):
 
     @staticmethod
     def get_kprobe_functions(event_re):
-        with open("%s/../kprobes/blacklist" % TRACEFS, "rb") as blacklist_f:
-            blacklist = set([line.rstrip().split()[1] for line in blacklist_f])
+        blacklist_file = "%s/../kprobes/blacklist" % TRACEFS
+        try:
+            with open(blacklist_file, "rb") as blacklist_f:
+                blacklist = set([line.rstrip().split()[1] for line in blacklist_f])
+        except IOError as e:
+            if e.errno != errno.EPERM:
+                raise e
+            blacklist = set([])
+
         fns = []
 
         in_init_section = 0
@@ -607,7 +614,7 @@ class BPF(object):
         global _num_open_probes
         del self.kprobe_fds[name]
         _num_open_probes -= 1
- 
+
     def _add_uprobe_fd(self, name, fd):
         global _num_open_probes
         self.uprobe_fds[name] = fd
@@ -643,7 +650,7 @@ class BPF(object):
             if name.startswith(prefix):
                 return self.get_syscall_fnname(name[len(prefix):])
         return name
-       
+
     def attach_kprobe(self, event=b"", event_off=0, fn_name=b"", event_re=b""):
         event = _assert_is_bytes(event)
         fn_name = _assert_is_bytes(fn_name)
