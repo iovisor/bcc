@@ -311,6 +311,7 @@ optional arguments:
   -m, --milliseconds  millisecond histogram
   -D, --disks         print a histogram per disk device
   -F, --flags         print a histogram per set of I/O flags
+  -p, --pid           trace this PID only
 
 examples:
     ./biolatency            # summarize block I/O latency as a histogram
