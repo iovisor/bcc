@@ -93,6 +93,9 @@ parser.add_argument("-M", "--max-block-time", default=(1 << 64) - 1,
     type=positive_nonzero_int,
     help="the amount of time in microseconds under which we " +
          "store traces (default U64_MAX)")
+parser.add_argument("--state", type=positive_int,
+    help="filter on this thread state bitmask (eg, 2 == TASK_UNINTERRUPTIBLE" +
+         ") see include/linux/sched.h")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
 args = parser.parse_args()
@@ -147,7 +150,7 @@ int waker(struct pt_regs *ctx, struct task_struct *p) {
     u32 pid = p->pid;
     u32 tgid = p->tgid;
 
-    if (!(THREAD_FILTER)) {
+    if (!((THREAD_FILTER) && (STATE_FILTER))) {
         return 0;
     }
 
@@ -171,7 +174,7 @@ int oncpu(struct pt_regs *ctx, struct task_struct *p) {
     u64 ts = bpf_ktime_get_ns();
 
     // Record timestamp for the previous Process (Process going into waiting)
-    if (THREAD_FILTER) {
+    if ((THREAD_FILTER) && (STATE_FILTER)) {
         start.update(&pid, &ts);
     }
 
@@ -234,7 +237,15 @@ elif args.kernel_threads_only:
 else:
     thread_context = "all threads"
     thread_filter = '1'
+if args.state == 0:
+    state_filter = 'p->state == 0'
+elif args.state:
+    # these states are sometimes bitmask checked
+    state_filter = 'p->state & %d' % args.state
+else:
+    state_filter = '1'
 bpf_text = bpf_text.replace('THREAD_FILTER', thread_filter)
+bpf_text = bpf_text.replace('STATE_FILTER', state_filter)
 
 # set stack storage size
 bpf_text = bpf_text.replace('STACK_STORAGE_SIZE', str(args.stack_storage_size))
