@@ -190,6 +190,43 @@ static void print_timestamp()
 		warn("localtime_r: %s", strerror(errno));
 }
 
+static bool batch_map_ops = true; /* hope for the best */
+
+static bool read_vals_batch(int fd, struct data_ext_t *vals, __u32 *count)
+{
+	struct data_t orig_vals[*count];
+	void *in = NULL, *out;
+	__u32 n, n_read = 0;
+	__u32 keys[*count];
+	int err = 0;
+
+	while (n_read < *count && !err) {
+		n = *count - n_read;
+		err = bpf_map_lookup_and_delete_batch(fd, &in, &out,
+				keys + n_read, orig_vals + n_read, &n, NULL);
+		if (err && errno != ENOENT) {
+			/* we want to propagate EINVAL upper, so that
+			 * the batch_map_ops flag is set to false */
+			if (errno != EINVAL)
+				warn("bpf_map_lookup_and_delete_batch: %s\n",
+				     strerror(-err));
+			return false;
+		}
+		n_read += n;
+		in = out;
+	}
+
+	for (__u32 i = 0; i < n_read; i++) {
+		vals[i].count = orig_vals[i].count;
+		vals[i].total_ns = orig_vals[i].total_ns;
+		vals[i].key = keys[i];
+		strncpy(vals[i].comm, orig_vals[i].comm, TASK_COMM_LEN);
+	}
+
+	*count = n_read;
+	return true;
+}
+
 static bool read_vals(int fd, struct data_ext_t *vals, __u32 *count)
 {
 	__u32 keys[MAX_ENTRIES];
@@ -198,6 +235,16 @@ static bool read_vals(int fd, struct data_ext_t *vals, __u32 *count)
 	__u32 next_key;
 	int i = 0;
 	int err;
+
+	if (batch_map_ops) {
+		bool ok = read_vals_batch(fd, vals, count);
+		if (!ok && errno == EINVAL) {
+			/* fall back to a racy variant */
+			batch_map_ops = false;
+		} else {
+			return ok;
+		}
+	}
 
 	if (!vals || !count || !*count)
 		return true;
@@ -222,7 +269,7 @@ static bool read_vals(int fd, struct data_ext_t *vals, __u32 *count)
 		vals[j].count = val.count;
 		vals[j].total_ns = val.total_ns;
 		vals[j].key = keys[j];
-		strncpy(vals[j].comm, val.comm, TASK_COMM_LEN);
+		memcpy(vals[j].comm, val.comm, TASK_COMM_LEN);
 	}
 
 	/* There is a race here: system calls which are represented by keys
