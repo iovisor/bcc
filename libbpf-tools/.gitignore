@@ -1,4 +1,5 @@
 /.output
+/cpudist
 /drsnoop
 /execsnoop
 /filelife

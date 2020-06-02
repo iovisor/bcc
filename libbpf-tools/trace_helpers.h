@@ -16,4 +16,6 @@ const struct ksym *ksyms__map_addr(const struct ksyms *ksyms,
 const struct ksym *ksyms__get_symbol(const struct ksyms *ksyms,
 				     const char *name);
 
+void print_log2_hist(unsigned int *vals, int vals_size, char *val_type);
+
 #endif /* __TRACE_HELPERS_H */
