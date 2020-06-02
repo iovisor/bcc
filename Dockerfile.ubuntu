@@ -19,5 +19,5 @@ COPY --from=builder /root/bcc/*.deb /root/bcc/
 
 RUN \
   apt-get update -y && \
-  DEBIAN_FRONTEND=noninteractive apt-get install -y python python3 binutils libelf1 && \
+  DEBIAN_FRONTEND=noninteractive apt-get install -y python python3 binutils libelf1 kmod && \
   dpkg -i /root/bcc/*.deb
