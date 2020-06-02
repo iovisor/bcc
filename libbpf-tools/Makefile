@@ -10,6 +10,7 @@ CFLAGS := -g -O2 -Wall
 ARCH := $(shell uname -m | sed 's/x86_64/x86/')
 
 APPS = \
+	cpudist \
 	drsnoop \
 	execsnoop \
 	filelife \
