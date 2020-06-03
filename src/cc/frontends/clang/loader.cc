@@ -316,6 +316,11 @@ int ClangLoader::do_compile(unique_ptr<llvm::Module> *mod, TableStorage &ts,
   string target_triple = get_clang_target();
   driver::Driver drv("", target_triple, diags);
 
+#if LLVM_MAJOR_VERSION >= 4
+  if (target_triple == "x86_64-unknown-linux-gnu")
+    flags_cstr.push_back("-fno-jump-tables");
+#endif
+
   drv.setTitle("bcc-clang-driver");
   drv.setCheckInputsExist(false);
 
