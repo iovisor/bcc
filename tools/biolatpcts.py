@@ -120,7 +120,8 @@ elif args.which == 'after-rq-alloc':
 elif args.which == 'on-device':
     start_time_field = 'io_start_time_ns'
 else:
-    die()
+    print("Invalid latency measurement {}".format(args.which))
+    exit()
 
 bpf_source = bpf_source.replace('__START_TIME_FIELD__', start_time_field)
 bpf_source = bpf_source.replace('__MAJOR__', str(major))
