@@ -1292,5 +1292,53 @@ TRACEPOINT_PROBE(kmem, kmalloc) {
             self.assertEqual(st.a, 10)
             self.assertEqual(st.b, 20)
 
+    @skipUnless(kernel_version_ge(4,14), "requires kernel >= 4.14")
+    def test_jump_table(self):
+        text = """
+#include <linux/blk_types.h>
+#include <linux/blkdev.h>
+#include <linux/time64.h>
+
+BPF_PERCPU_ARRAY(rwdf_100ms, u64, 400);
+
+int do_request(struct pt_regs *ctx, struct request *rq) {
+    u32 cmd_flags;
+    u64 base, dur, slot, now = 100000;
+
+    if (!rq->start_time_ns)
+      return 0;
+
+    if (!rq->rq_disk || rq->rq_disk->major != 5 ||
+        rq->rq_disk->first_minor != 6)
+      return 0;
+
+    cmd_flags = rq->cmd_flags;
+    switch (cmd_flags & REQ_OP_MASK) {
+    case REQ_OP_READ:
+      base = 0;
+      break;
+    case REQ_OP_WRITE:
+      base = 100;
+      break;
+    case REQ_OP_DISCARD:
+      base = 200;
+      break;
+    case REQ_OP_FLUSH:
+      base = 300;
+      break;
+    default:
+      return 0;
+    }
+
+    dur = now - rq->start_time_ns;
+    slot = min_t(size_t, div_u64(dur, 100 * NSEC_PER_MSEC), 99);
+    rwdf_100ms.increment(base + slot);
+
+    return 0;
+}
+"""
+        b = BPF(text=text)
+        fns = b.load_funcs(BPF.KPROBE)
+
 if __name__ == "__main__":
     main()
