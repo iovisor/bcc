@@ -50,7 +50,7 @@ parser = argparse.ArgumentParser(
     formatter_class=argparse.RawDescriptionHelpFormatter,
     epilog=examples)
 parser.add_argument("min_us", nargs="?", default='10000',
-    help="minimum run queue latecy to trace, in ms (default 10000)")
+    help="minimum run queue latency to trace, in us (default 10000)")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
 
