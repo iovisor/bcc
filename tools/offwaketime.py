@@ -20,6 +20,16 @@ from sys import stderr
 
 # arg validation
 def positive_int(val):
+    dest = []
+    # Filter up to 5 pids, arbitrary
+    args_list = val.split(",", 5)
+    pids_to_add = min(len(args_list), 5)
+    for i in range(pids_to_add):
+        dest.append(_positive_int(args_list[i]))
+
+    return dest
+
+def _positive_int(val):
     try:
         ival = int(val)
     except ValueError:
@@ -30,10 +40,20 @@ def positive_int(val):
     return ival
 
 def positive_nonzero_int(val):
-    ival = positive_int(val)
+    ival = _positive_int(val)
     if ival == 0:
         raise argparse.ArgumentTypeError("must be nonzero")
     return ival
+
+def build_filter(filter_name, values):
+    filter_string = "((%s == %d)" % (filter_name, values[0])
+
+    for val in values[1:]:
+        filter_string += " || (%s == %d )" % (filter_name , val)
+
+    filter_string += ")"
+
+    return filter_string
 
 def stack_id_err(stack_id):
     # -EFAULT in get_stackid normally means the stack-trace is not available,
@@ -61,10 +81,12 @@ parser = argparse.ArgumentParser(
 thread_group = parser.add_mutually_exclusive_group()
 # Note: this script provides --pid and --tid flags but their arguments are
 # referred to internally using kernel nomenclature: TGID and PID.
-thread_group.add_argument("-p", "--pid", metavar="PID", dest="tgid",
-    help="trace this PID only", type=positive_int)
-thread_group.add_argument("-t", "--tid", metavar="TID", dest="pid",
-    help="trace this TID only", type=positive_int)
+thread_group.add_argument("-p", "--pid", metavar="PIDS", dest="tgid",
+     type=positive_int,
+     help="trace these PIDS only. Can be a comma separated list of PIDS.")
+thread_group.add_argument("-t", "--tid", metavar="TIDS", dest="pid",
+    type=positive_int,
+    help="trace these TIDS only. Can be a comma separated list of TIDS.")
 thread_group.add_argument("-u", "--user-threads-only", action="store_true",
     help="user threads only (no kernel threads)")
 thread_group.add_argument("-k", "--kernel-threads-only", action="store_true",
@@ -93,7 +115,7 @@ parser.add_argument("-M", "--max-block-time", default=(1 << 64) - 1,
     type=positive_nonzero_int,
     help="the amount of time in microseconds under which we " +
          "store traces (default U64_MAX)")
-parser.add_argument("--state", type=positive_int,
+parser.add_argument("--state", type=_positive_int,
     help="filter on this thread state bitmask (eg, 2 == TASK_UNINTERRUPTIBLE" +
          ") see include/linux/sched.h")
 parser.add_argument("--ebpf", action="store_true",
@@ -221,21 +243,15 @@ int oncpu(struct pt_regs *ctx, struct task_struct *p) {
 """
 
 # set thread filter
-thread_context = ""
 if args.tgid is not None:
-    thread_context = "PID %d" % args.tgid
-    thread_filter = 'tgid == %d' % args.tgid
+    thread_filter = build_filter("tgid", args.tgid)
 elif args.pid is not None:
-    thread_context = "TID %d" % args.pid
-    thread_filter = 'pid == %d' % args.pid
+    thread_filter = build_filter("pid", args.pid)
 elif args.user_threads_only:
-    thread_context = "user threads"
     thread_filter = '!(p->flags & PF_KTHREAD)'
 elif args.kernel_threads_only:
-    thread_context = "kernel threads"
     thread_filter = 'p->flags & PF_KTHREAD'
 else:
-    thread_context = "all threads"
     thread_filter = '1'
 if args.state == 0:
     state_filter = 'p->state == 0'
