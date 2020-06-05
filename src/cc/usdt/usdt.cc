@@ -308,11 +308,10 @@ bool Context::enable_probe(const std::string &probe_name,
   return enable_probe("", probe_name, fn_name);
 }
 
-bool Context::enable_probe(const std::string &provider_name,
-                           const std::string &probe_name,
-                           const std::string &fn_name) {
+Probe *Context::get_checked(const std::string &provider_name,
+                            const std::string &probe_name) {
   if (pid_stat_ && pid_stat_->is_stale())
-    return false;
+    return nullptr;
 
   Probe *found_probe = nullptr;
   for (auto &p : probes_) {
@@ -321,11 +320,19 @@ bool Context::enable_probe(const std::string &provider_name,
       if (found_probe != nullptr) {
         fprintf(stderr, "Two same-name probes (%s) but different providers\n",
                 probe_name.c_str());
-        return false;
+        return nullptr;
       }
       found_probe = p.get();
     }
   }
+
+  return found_probe;
+}
+
+bool Context::enable_probe(const std::string &provider_name,
+                           const std::string &probe_name,
+                           const std::string &fn_name) {
+  Probe *found_probe = get_checked(provider_name, probe_name);
 
   if (found_probe != nullptr)
     return found_probe->enable(fn_name);
@@ -344,6 +351,18 @@ void Context::each(each_cb callback) {
     info.num_arguments = probe->num_arguments();
     callback(&info);
   }
+}
+
+bool Context::addsem_probe(const std::string &provider_name,
+                           const std::string &probe_name,
+                           const std::string &fn_name,
+                           int16_t val) {
+  Probe *found_probe = get_checked(provider_name, probe_name);
+
+  if (found_probe != nullptr)
+    return found_probe->add_to_semaphore(val);
+
+  return false;
 }
 
 void Context::each_uprobe(each_uprobe_cb callback) {
@@ -457,11 +476,24 @@ int bcc_usdt_enable_probe(void *usdt, const char *probe_name,
   return ctx->enable_probe(probe_name, fn_name) ? 0 : -1;
 }
 
+int bcc_usdt_addsem_probe(void *usdt, const char *probe_name,
+                          const char *fn_name, int16_t val) {
+  USDT::Context *ctx = static_cast<USDT::Context *>(usdt);
+  return ctx->addsem_probe("", probe_name, fn_name, val) ? 0 : -1;
+}
+
 int bcc_usdt_enable_fully_specified_probe(void *usdt, const char *provider_name,
                                           const char *probe_name,
                                           const char *fn_name) {
   USDT::Context *ctx = static_cast<USDT::Context *>(usdt);
   return ctx->enable_probe(provider_name, probe_name, fn_name) ? 0 : -1;
+}
+
+int bcc_usdt_addsem_fully_specified_probe(void *usdt, const char *provider_name,
+                                          const char *probe_name,
+                                          const char *fn_name, int16_t val) {
+  USDT::Context *ctx = static_cast<USDT::Context *>(usdt);
+  return ctx->addsem_probe(provider_name, probe_name, fn_name, val) ? 0 : -1;
 }
 
 const char *bcc_usdt_genargs(void **usdt_array, int len) {
