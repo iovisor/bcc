@@ -359,8 +359,12 @@ bool Context::addsem_probe(const std::string &provider_name,
                            int16_t val) {
   Probe *found_probe = get_checked(provider_name, probe_name);
 
-  if (found_probe != nullptr)
-    return found_probe->add_to_semaphore(val);
+  if (found_probe != nullptr) {
+    if (found_probe->need_enable())
+      return found_probe->add_to_semaphore(val);
+
+    return true;
+  }
 
   return false;
 }
