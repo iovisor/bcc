@@ -278,7 +278,7 @@ class BPF(object):
         else:
             for path in os.environ["PATH"].split(os.pathsep):
                 path = path.strip('"')
-                exe_file = os.path.join(path, bin_path)
+                exe_file = os.path.join(path.encode(), bin_path)
                 if is_exe(exe_file):
                     return exe_file
         return None
