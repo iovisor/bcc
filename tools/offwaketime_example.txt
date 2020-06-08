@@ -317,8 +317,10 @@ positional arguments:
 
 optional arguments:
   -h, --help            show this help message and exit
-  -p PID, --pid PID     trace this PID only
-  -t TID, --tid TID     trace this TID only
+  -p PID, --pid PID     trace these PIDS only. Can be a comma separated list of
+  					    PID.
+  -t TID, --tid TID     trace these TIDS only. Can be a comma separated list of
+  						TIDS.
   -u, --user-threads-only
                         user threads only (no kernel threads)
   -k, --kernel-threads-only
