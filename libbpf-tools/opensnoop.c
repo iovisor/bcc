@@ -8,7 +8,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/resource.h>
 #include <sys/time.h>
 #include <time.h>
 #include <unistd.h>
@@ -16,6 +15,7 @@
 #include <bpf/bpf.h>
 #include "opensnoop.h"
 #include "opensnoop.skel.h"
+#include "trace_helpers.h"
 
 /* Tune the buffer size and wakeup rate. These settings cope with roughly
  * 50k opens/sec.
@@ -164,16 +164,6 @@ int libbpf_print_fn(enum libbpf_print_level level,
 	return vfprintf(stderr, format, args);
 }
 
-static int bump_memlock_rlimit(void)
-{
-	struct rlimit rlim_new = {
-		.rlim_cur	= RLIM_INFINITY,
-		.rlim_max	= RLIM_INFINITY,
-	};
-
-	return setrlimit(RLIMIT_MEMLOCK, &rlim_new);
-}
-
 void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 {
 	const struct event *e = data;
@@ -212,13 +202,6 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
 {
 	fprintf(stderr, "Lost %llu events on CPU #%d!\n", lost_cnt, cpu);
-}
-
-__u64 gettimens()
-{
-	struct timespec ts = {};
-	clock_gettime(CLOCK_MONOTONIC, &ts);
-	return (ts.tv_sec * NSEC_PER_SEC + ts.tv_nsec);
 }
 
 int main(int argc, char **argv)
@@ -294,18 +277,15 @@ int main(int argc, char **argv)
 
 	/* setup duration */
 	if (env.duration)
-		time_end = gettimens() + env.duration * NSEC_PER_SEC;
+		time_end = get_ktime_ns() + env.duration * NSEC_PER_SEC;
 
 	/* main: poll */
 	while (1) {
 		usleep(PERF_BUFFER_TIME_MS * 1000);
 		if ((err = perf_buffer__poll(pb, PERF_POLL_TIMEOUT_MS)) < 0)
 			break;
-		if (env.duration) {
-			if (gettimens() > time_end) {
-				goto cleanup;
-			}
-		}
+		if (env.duration && get_ktime_ns() > time_end)
+			goto cleanup;
 	}
 	printf("Error polling perf buffer: %d\n", err);
 

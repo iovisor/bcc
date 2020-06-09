@@ -6,7 +6,6 @@
 #include <argp.h>
 #include <signal.h>
 #include <stdio.h>
-#include <sys/resource.h>
 #include <unistd.h>
 #include <time.h>
 #include <bpf/libbpf.h>
@@ -122,21 +121,11 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 }
 
 int libbpf_print_fn(enum libbpf_print_level level,
-		const char *format, va_list args)
+		    const char *format, va_list args)
 {
 	if (level == LIBBPF_DEBUG && !env.verbose)
 		return 0;
 	return vfprintf(stderr, format, args);
-}
-
-static int bump_memlock_rlimit(void)
-{
-	struct rlimit rlim_new = {
-		.rlim_cur	= RLIM_INFINITY,
-		.rlim_max	= RLIM_INFINITY,
-	};
-
-	return setrlimit(RLIMIT_MEMLOCK, &rlim_new);
 }
 
 static int get_pid_max(void)

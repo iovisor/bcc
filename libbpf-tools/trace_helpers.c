@@ -3,7 +3,15 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include <sys/resource.h>
+#include <time.h>
 #include "trace_helpers.h"
+
+#define min(x, y) ({				 \
+	typeof(x) _min1 = (x);			 \
+	typeof(y) _min2 = (y);			 \
+	(void) (&_min1 == &_min2);		 \
+	_min1 < _min2 ? _min1 : _min2; })
 
 struct ksyms {
 	struct ksym *syms;
@@ -151,12 +159,6 @@ const struct ksym *ksyms__get_symbol(const struct ksyms *ksyms,
 	return NULL;
 }
 
-#define min(x, y) ({				 \
-	typeof(x) _min1 = (x);			 \
-	typeof(y) _min2 = (y);			 \
-	(void) (&_min1 == &_min2);		 \
-	_min1 < _min2 ? _min1 : _min2; })
-
 static void print_stars(unsigned int val, unsigned int val_max, int width)
 {
 	int num_stars, num_spaces, i;
@@ -211,4 +213,22 @@ void print_log2_hist(unsigned int *vals, int vals_size, char *val_type)
 		print_stars(val, val_max, stars);
 		printf("|\n");
 	}
+}
+
+unsigned long long get_ktime_ns(void)
+{
+	struct timespec ts;
+
+	clock_gettime(CLOCK_MONOTONIC, &ts);
+	return ts.tv_sec * NSEC_PER_SEC + ts.tv_nsec;
+}
+
+int bump_memlock_rlimit(void)
+{
+	struct rlimit rlim_new = {
+		.rlim_cur	= RLIM_INFINITY,
+		.rlim_max	= RLIM_INFINITY,
+	};
+
+	return setrlimit(RLIMIT_MEMLOCK, &rlim_new);
 }

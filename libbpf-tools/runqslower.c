@@ -7,12 +7,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/resource.h>
 #include <time.h>
 #include <bpf/libbpf.h>
 #include <bpf/bpf.h>
 #include "runqslower.h"
 #include "runqslower.skel.h"
+#include "trace_helpers.h"
 
 struct env {
 	pid_t pid;
@@ -97,16 +97,6 @@ int libbpf_print_fn(enum libbpf_print_level level,
 	if (level == LIBBPF_DEBUG && !env.verbose)
 		return 0;
 	return vfprintf(stderr, format, args);
-}
-
-static int bump_memlock_rlimit(void)
-{
-	struct rlimit rlim_new = {
-		.rlim_cur	= RLIM_INFINITY,
-		.rlim_max	= RLIM_INFINITY,
-	};
-
-	return setrlimit(RLIMIT_MEMLOCK, &rlim_new);
 }
 
 void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)

@@ -2,6 +2,8 @@
 #ifndef __TRACE_HELPERS_H
 #define __TRACE_HELPERS_H
 
+#define NSEC_PER_SEC		1000000000ULL
+
 struct ksym {
 	const char *name;
 	unsigned long addr;
@@ -17,5 +19,8 @@ const struct ksym *ksyms__get_symbol(const struct ksyms *ksyms,
 				     const char *name);
 
 void print_log2_hist(unsigned int *vals, int vals_size, char *val_type);
+
+unsigned long long get_ktime_ns(void);
+int bump_memlock_rlimit(void);
 
 #endif /* __TRACE_HELPERS_H */
