@@ -9,7 +9,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/resource.h>
 #include <unistd.h>
 #include <time.h>
 #include <bpf/libbpf.h>
@@ -22,7 +21,6 @@
 #define PERF_BUFFER_TIME_MS	10
 #define PERF_POLL_TIMEOUT_MS	100
 
-#define NSEC_PER_SEC		1000000000ULL
 
 static struct env {
 	pid_t pid;
@@ -106,21 +104,11 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 }
 
 int libbpf_print_fn(enum libbpf_print_level level,
-		const char *format, va_list args)
+		    const char *format, va_list args)
 {
 	if (level == LIBBPF_DEBUG && !env.verbose)
 		return 0;
 	return vfprintf(stderr, format, args);
-}
-
-static int bump_memlock_rlimit(void)
-{
-	struct rlimit rlim_new = {
-		.rlim_cur	= RLIM_INFINITY,
-		.rlim_max	= RLIM_INFINITY,
-	};
-
-	return setrlimit(RLIMIT_MEMLOCK, &rlim_new);
 }
 
 void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
@@ -155,14 +143,6 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
 {
 	fprintf(stderr, "lost %llu events on CPU #%d\n", lost_cnt, cpu);
-}
-
-uint64_t get_ktime_ns(void)
-{
-	struct timespec ts;
-
-	clock_gettime(CLOCK_MONOTONIC, &ts);
-	return ts.tv_sec * NSEC_PER_SEC + ts.tv_nsec;
 }
 
 int main(int argc, char **argv)

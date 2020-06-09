@@ -6,10 +6,10 @@
 #define TASK_COMM_LEN    16
 
 struct event {
-	__u64 delta_ns;
-	pid_t tgid;
 	char file[DNAME_INLINE_LEN];
 	char task[TASK_COMM_LEN];
+	__u64 delta_ns;
+	pid_t tgid;
 };
 
 #endif /* __FILELIFE_H */

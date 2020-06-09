@@ -4,7 +4,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/resource.h>
 #include <sys/time.h>
 #include <time.h>
 #include <unistd.h>
@@ -12,9 +11,9 @@
 #include <bpf/bpf.h>
 #include "execsnoop.h"
 #include "execsnoop.skel.h"
+#include "trace_helpers.h"
 
 #define PERF_BUFFER_PAGES   64
-#define NSEC_PER_SEC 1000000000L
 #define NSEC_PRECISION (NSEC_PER_SEC / 1000)
 #define MAX_ARGS_KEY 259
 
@@ -128,18 +127,8 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 	return 0;
 }
 
-static int bump_memlock_rlimit(void)
-{
-	struct rlimit rlim_new = {
-		.rlim_cur	= RLIM_INFINITY,
-		.rlim_max	= RLIM_INFINITY,
-	};
-
-	return setrlimit(RLIMIT_MEMLOCK, &rlim_new);
-}
-
 int libbpf_print_fn(enum libbpf_print_level level,
-            const char *format, va_list args)
+		    const char *format, va_list args)
 {
 	if (level == LIBBPF_DEBUG && !env.verbose)
 		return 0;

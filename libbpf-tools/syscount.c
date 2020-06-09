@@ -2,7 +2,6 @@
 // Copyright (c) 2020 Anton Protopopov
 //
 // Based on syscount(8) from BCC by Sasha Goldshtein
-#include <sys/resource.h>
 #include <unistd.h>
 #include <signal.h>
 #include <fcntl.h>
@@ -13,6 +12,7 @@
 #include "syscount.skel.h"
 #include "errno_helpers.h"
 #include "syscall_helpers.h"
+#include "trace_helpers.h"
 
 /* This structure extends data_t by adding a key item which should be sorted
  * together with the count and total_ns fields */
@@ -93,22 +93,12 @@ static int get_int(const char *arg, int *ret, int min, int max)
 }
 
 static int libbpf_print_fn(enum libbpf_print_level level,
-		const char *format, va_list args)
+			   const char *format, va_list args)
 {
 	if (level == LIBBPF_DEBUG && !env.verbose)
 		return 0;
 
 	return vfprintf(stderr, format, args);
-}
-
-static int bump_memlock_rlimit(void)
-{
-	struct rlimit rlim_new = {
-		.rlim_cur	= RLIM_INFINITY,
-		.rlim_max	= RLIM_INFINITY,
-	};
-
-	return setrlimit(RLIMIT_MEMLOCK, &rlim_new);
 }
 
 static int compar_count(const void *dx, const void *dy)

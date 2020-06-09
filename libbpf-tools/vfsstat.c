@@ -2,13 +2,13 @@
 // Copyright (c) 2020 Anton Protopopov
 //
 // Based on vfsstat(8) from BCC by Brendan Gregg
-#include <sys/resource.h>
 #include <argp.h>
 #include <unistd.h>
 #include <time.h>
 #include <bpf/bpf.h>
 #include "vfsstat.h"
 #include "vfsstat.skel.h"
+#include "trace_helpers.h"
 
 const char *argp_program_version = "vfsstat 0.1";
 const char *argp_program_bug_address = "<bpf@vger.kernel.org>";
@@ -74,21 +74,11 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 }
 
 static int libbpf_print_fn(enum libbpf_print_level level,
-		const char *format, va_list args)
+			   const char *format, va_list args)
 {
 	if (level == LIBBPF_DEBUG && !env.verbose)
 		return 0;
 	return vfprintf(stderr, format, args);
-}
-
-static int bump_memlock_rlimit(void)
-{
-	struct rlimit rlim_new = {
-		.rlim_cur	= RLIM_INFINITY,
-		.rlim_max	= RLIM_INFINITY,
-	};
-
-	return setrlimit(RLIMIT_MEMLOCK, &rlim_new);
 }
 
 static const char *strftime_now(char *s, size_t max, const char *format)
