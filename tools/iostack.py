@@ -31,6 +31,7 @@ int _generic_make_request(struct pt_regs *ctx, struct bio *bio) {
 #ifdef KERNEL_STACK
     data.kernel_stack_id = stack_traces.get_stackid(ctx, 0);
 #endif
+
 #ifdef USER_STACK
     data.user_stack_id = stack_traces.get_stackid(ctx, BPF_F_USER_STACK);
     data.tgid_pid = bpf_get_current_pid_tgid();
@@ -132,7 +133,7 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
         # print folded stack output
         user_stack = list(user_stack)
         kernel_stack = list(kernel_stack)
-        line = [b.sym(addr, k.tgid).decode('utf-8', 'replace') for addr in
+        line = [b.sym(addr, k.tgid_pid).decode('utf-8', 'replace') for addr in
                 reversed(user_stack)] + \
                (do_delimiter and ["-"] or []) + \
                [b.ksym(addr).decode('utf-8', 'replace') for addr in
