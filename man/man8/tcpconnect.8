@@ -2,7 +2,7 @@
 .SH NAME
 tcpconnect \- Trace TCP active connections (connect()). Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B tcpconnect [\-h] [\-c] [\-t] [\-x] [\-p PID] [-P PORT] [\-\-cgroupmap MAPPATH] [\-\-mntnsmap MAPPATH]
+.B tcpconnect [\-h] [\-c] [\-t] [\-p PID] [-P PORT] [\-\-cgroupmap MAPPATH] [\-\-mntnsmap MAPPATH]
 .SH DESCRIPTION
 This tool traces active TCP connections (eg, via a connect() syscall;
 accept() are passive connections). This can be useful for general
