@@ -194,7 +194,7 @@ else:
             args.pids = map(int, subprocess.check_output(
                                             "pidof postgres".split()).split())
 
-    usdts = map(lambda pid: USDT(pid=pid), args.pids)
+    usdts = list(map(lambda pid: USDT(pid=pid), args.pids))
     for usdt in usdts:
         usdt.enable_probe("query__start", "query_start")
         usdt.enable_probe("query__done", "query_end")
