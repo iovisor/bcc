@@ -483,7 +483,7 @@ def main():
                 pid=args.pid,
             )
         except Exception as e:
-            print('%s. Failed to attach to symbol: %s' % (str(e), symbol))
+            print('%s. Failed to attach to symbol: %s\nIs --binary argument missing?' % (str(e), symbol))
             sys.exit(1)
     for symbol in args.lock_symbols:
         try:
