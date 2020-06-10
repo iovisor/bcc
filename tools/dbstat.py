@@ -83,7 +83,7 @@ program = program.replace("SCALE", str(1000 if args.microseconds else 1000000))
 program = program.replace("FILTER", "" if args.threshold == 0 else
         "if (delta / 1000000 < %d) { return 0; }" % args.threshold)
 
-usdts = map(lambda pid: USDT(pid=pid), args.pids)
+usdts = list(map(lambda pid: USDT(pid=pid), args.pids))
 for usdt in usdts:
     usdt.enable_probe("query__start", "probe_start")
     usdt.enable_probe("query__done", "probe_end")
