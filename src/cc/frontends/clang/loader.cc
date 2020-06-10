@@ -151,7 +151,8 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, TableStorage &ts,
       kpath = tmpdir;
     } else {
       std::cout << "Unable to find kernel headers. ";
-      std::cout << "Try rebuilding kernel with CONFIG_IKHEADERS=m (module)\n";
+      std::cout << "Try rebuilding kernel with CONFIG_IKHEADERS=m (module) ";
+      std::cout <<  "or installing the kernel development package for your running kernel version.\n";
     }
   }
 
