@@ -61,7 +61,7 @@ time_group.add_argument("-d", "--duration", type=int,
     help="total duration of trace in seconds")
 time_group.add_argument("-i", "--interval", type=int,
     help="print summary at this interval (seconds)")
-parser.add_argument("-n", "--locks", type=int, default=999999999,
+parser.add_argument("-n", "--locks", type=int, default=99999999,
     help="print given number of locks")
 parser.add_argument("-s", "--stacks", type=int, default=1,
     help="print given number of stack entries")
@@ -452,7 +452,7 @@ print("Tracing lock events... Hit Ctrl-C to end.")
 exiting = 0 if args.interval else 1
 exiting = 1 if args.duration else 0
 
-seconds = 999999999
+seconds = 99999999
 if args.interval:
     seconds = args.interval
 if args.duration:
