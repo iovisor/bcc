@@ -39,7 +39,7 @@ parser.add_argument("-m", "--threshold", type=int, default=0,
     help="trace queries slower than this threshold (ms)")
 parser.add_argument("-u", "--microseconds", action="store_true",
     help="display query latencies in microseconds (default: milliseconds)")
-parser.add_argument("-i", "--interval", type=int, default=99999999999,
+parser.add_argument("-i", "--interval", type=int, default=99999999,
     help="print summary at this interval (seconds)")
 args = parser.parse_args()
 
