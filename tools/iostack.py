@@ -12,18 +12,19 @@ bpf_text = """
 #include <linux/blk_types.h>
 
 // define output data structure in C
-struct data_t {
+struct disk_data_t {
     char disk_name[DISK_NAME_LEN];
     int kernel_stack_id;
     int user_stack_id;
     u64 tgid_pid;
+    char comm_name[TASK_COMM_LEN];
 };
 
-BPF_HASH(counts, struct data_t);
+BPF_HASH(counts, struct disk_data_t);
 BPF_STACK_TRACE(stack_traces, 16384);
 
 int _generic_make_request(struct pt_regs *ctx, struct bio *bio) {
-    struct data_t data = {};
+    struct disk_data_t data = {};
 
     struct gendisk *bio_disk = bio->bi_disk;
     bpf_probe_read_kernel(&data.disk_name, sizeof(data.disk_name),
@@ -34,9 +35,10 @@ int _generic_make_request(struct pt_regs *ctx, struct bio *bio) {
 
 #ifdef USER_STACK
     data.user_stack_id = stack_traces.get_stackid(ctx, BPF_F_USER_STACK);
-    data.tgid_pid = bpf_get_current_pid_tgid();
 #endif
-
+    data.tgid_pid = bpf_get_current_pid_tgid();
+    bpf_get_current_comm(&data.comm_name, sizeof(data.comm_name));
+    
     counts.increment(data, bio->bi_iter.bi_size);
 
     return 0;
@@ -68,7 +70,7 @@ parser.add_argument("-p", "--pid", type=int,
 parser.add_argument("-i", "--interval",
                     help="summary interval, seconds")
 parser.add_argument("-D", "--duration",
-                    help="total duration of trace, seconds")
+                    help="total duration of trace, seconds",default=99999999)
 parser.add_argument("-K", "--kernel-stack",
                     action="store_true", help="kernel stack only")
 parser.add_argument("-U", "--user-stack",
@@ -133,7 +135,8 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
         # print folded stack output
         user_stack = list(user_stack)
         kernel_stack = list(kernel_stack)
-        line = [b.sym(addr, k.tgid_pid).decode('utf-8', 'replace') for addr in
+        line = [k.comm_name.decode('utf-8', 'replace')] + \
+                [b.sym(addr, k.tgid_pid).decode('utf-8', 'replace') for addr in
                 reversed(user_stack)] + \
                (do_delimiter and ["-"] or []) + \
                [b.ksym(addr).decode('utf-8', 'replace') for addr in
@@ -149,5 +152,5 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
             print("    --")
         for addr in user_stack:
             print("    %s" % b.sym(addr, k.tgid_pid).decode('utf-8', 'replace'))
-
+        print("    %s [%d]" % (k.comm_name).decode('utf-8', 'replace'))
         print("        %d\n" % v.value)
