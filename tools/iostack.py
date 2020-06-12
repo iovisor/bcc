@@ -11,7 +11,6 @@ bpf_text = """
 #include <linux/blkdev.h>
 #include <linux/blk_types.h>
 
-// define output data structure in C
 struct disk_data_t {
     char disk_name[DISK_NAME_LEN];
     int kernel_stack_id;
@@ -46,29 +45,17 @@ int _generic_make_request(struct pt_regs *ctx, struct bio *bio) {
 """
 
 examples = """examples:
-    ./stackcount submit_bio         # count kernel stack traces for submit_bio
-    ./stackcount -d ip_output       # include a user/kernel stack delimiter
-    ./stackcount -s ip_output       # show symbol offsets
-    ./stackcount -sv ip_output      # show offsets and raw addresses (verbose)
-    ./stackcount 'tcp_send*'        # count stacks for funcs matching tcp_send*
-    ./stackcount -r '^tcp_send.*'   # same as above, using regular expressions
-    ./stackcount -Ti 5 ip_output    # output every 5 seconds, with timestamps
-    ./stackcount -p 185 ip_output   # count ip_output stacks for PID 185 only
-    ./stackcount -c 1 put_prev_entity   # count put_prev_entity stacks for CPU 1 only
-    ./stackcount -p 185 c:malloc    # count stacks for malloc in PID 185
-    ./stackcount t:sched:sched_fork # count stacks for sched_fork tracepoint
-    ./stackcount -p 185 u:node:*    # count stacks for all USDT probes in node
-    ./stackcount -K t:sched:sched_switch   # kernel stacks only
-    ./stackcount -U t:sched:sched_switch   # user stacks only
+    ./iostack       # count bytes read or written by processes for all devices
+    ./iostack -D 5  # trace only for 5 seconds
+    ./iostack -K    # include kernel stacks
+    ./iostack -U    # include user stacks
+    ./iostack -K -f # Output in folded format for flame graphs
         """
 parser = argparse.ArgumentParser(
     description="Count events and their stack traces",
     formatter_class=argparse.RawDescriptionHelpFormatter,
     epilog=examples)
-parser.add_argument("-p", "--pid", type=int,
-                    help="trace this PID only")
-parser.add_argument("-i", "--interval",
-                    help="summary interval, seconds")
+
 parser.add_argument("-D", "--duration",
                     help="total duration of trace, seconds",default=99999999)
 parser.add_argument("-K", "--kernel-stack",
@@ -77,12 +64,8 @@ parser.add_argument("-U", "--user-stack",
                     action="store_true", help="user stack only")
 parser.add_argument("-f", "--folded", action="store_true",
                     help="output folded format")
-parser.add_argument("--debug", action="store_true",
-                    help="print BPF program before starting (for debugging purposes)")
 
 args = parser.parse_args()
-
-folded = True
 
 if args.user_stack:
     bpf_text = "#define USER_STACK\n" + bpf_text
@@ -100,7 +83,7 @@ if matched == 0:
 duration = int(args.duration)
 # header
 if not args.folded:
-    print("Tracing total io sizes (bytes) of %s by %s stack", end="")
+    print("Tracing total io sizes (bytes)", end="")
     if duration < 99999999:
         print(" for %d secs." % duration)
     else:
