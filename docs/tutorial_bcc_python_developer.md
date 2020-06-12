@@ -128,7 +128,7 @@ int do_trace(struct pt_regs *ctx) {
 
     // attempt to read stored timestamp
     tsp = last.lookup(&key);
-    if (tsp != 0) {
+    if (tsp != NULL) {
         delta = bpf_ktime_get_ns() - *tsp;
         if (delta < 1000000000) {
             // output if time is less than 1 second
@@ -163,6 +163,7 @@ Things to learn:
 1. ```BPF_HASH(last)```: Creates a BPF map object that is a hash (associative array), called "last". We didn't specify any further arguments, so it defaults to key and value types of u64.
 1. ```key = 0```: We'll only store one key/value pair in this hash, where the key is hardwired to zero.
 1. ```last.lookup(&key)```: Lookup the key in the hash, and return a pointer to its value if it exists, else NULL. We pass the key in as an address to a pointer.
+1. ```if (tsp != NULL) {```: The verifier requires that pointer values derived from a map lookup must be checked for a null value before they can be dereferenced and used.
 1. ```last.delete(&key)```: Delete the key from the hash. This is currently required because of [a kernel bug in `.update()`](https://git.kernel.org/cgit/linux/kernel/git/davem/net.git/commit/?id=a6ed3ea65d9868fdf9eff84e6fe4f666b8d14b02).
 1. ```last.update(&key, &ts)```: Associate the value in the 2nd argument to the key, overwriting any previous value. This records the timestamp.
 
