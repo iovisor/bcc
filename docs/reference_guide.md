@@ -17,7 +17,7 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
         - [7. Raw Tracepoints](#7-raw-tracepoints)
         - [8. system call tracepoints](#8-system-call-tracepoints)
         - [9. kfuncs](#9-kfuncs)
-        - [10. kretfuncs](#9-kretfuncs)
+        - [10. kretfuncs](#10-kretfuncs)
     - [Data](#data)
         - [1. bpf_probe_read_kernel()](#1-bpf_probe_read_kernel)
         - [2. bpf_probe_read_kernel_str()](#2-bpf_probe_read_kernel_str)
@@ -354,7 +354,7 @@ The last argument of the probe is the return value of the instrumented function.
 
 For example:
 ```C
-KFUNC_PROBE(do_sys_open, int dfd, const char *filename, int flags, int mode, int ret)
+KRETFUNC_PROBE(do_sys_open, int dfd, const char *filename, int flags, int mode, int ret)
 {
     ...
 ```
