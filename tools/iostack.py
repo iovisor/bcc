@@ -152,5 +152,5 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
             print("    --")
         for addr in user_stack:
             print("    %s" % b.sym(addr, k.tgid_pid).decode('utf-8', 'replace'))
-        print("    %s [%d]" % (k.comm_name).decode('utf-8', 'replace'))
+        print("    %s" % (k.comm_name.decode('utf-8', 'replace')))
         print("        %d\n" % v.value)
