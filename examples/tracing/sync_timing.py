@@ -23,7 +23,7 @@ int do_trace(struct pt_regs *ctx) {
 
     // attempt to read stored timestamp
     tsp = last.lookup(&key);
-    if (tsp != 0) {
+    if (tsp != NULL) {
         delta = bpf_ktime_get_ns() - *tsp;
         if (delta < 1000000000) {
             // output if time is less than 1 second
