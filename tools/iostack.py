@@ -54,7 +54,7 @@ int _generic_make_request(struct pt_regs *ctx, struct bio *bio) {
         if (dir == READ)
             lock_xadd(&leaf->r_cnt, bi_size);
 #endif
-#if defined(TRACE_READ) || defined(TRACE_RW) 
+#if defined(TRACE_WRITE) || defined(TRACE_RW) 
         if (dir == WRITE)
             lock_xadd(&leaf->w_cnt, bi_size);
 #endif
@@ -141,7 +141,12 @@ except KeyboardInterrupt:
 counts = b.get_table("counts")
 stack_traces = b.get_table("stack_traces")
 
-for k, v in sorted(counts.items(), key=lambda counts: counts[1].r_cnt+counts[1].w_cnt):
+for k, v in sorted(counts.items(),
+                   key=lambda counts: counts[1].r_cnt + counts[1].w_cnt):
+    total_io_cnt = v.r_cnt + v.w_cnt
+    if total_io_cnt == 0:
+        continue
+
     user_stack = []
 
     if args.user_stack and k.user_stack_id > 0:
@@ -164,7 +169,7 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].r_cnt+counts[1].
                [b.ksym(addr).decode('utf-8', 'replace') for addr in
                 reversed(kernel_stack)] + \
                [k.disk_name.decode('utf-8', 'replace')]
-        print("%s %d" % (";".join(line), v.value))
+        print("%s %d" % (";".join(line), total_io_cnt))
     else:
         print("disk %s" % k.disk_name.decode('utf-8', 'replace'))
         # print default multi-line stack output.
@@ -180,4 +185,4 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].r_cnt+counts[1].
                                    k.tgid_pid))
         else:
             print("        %s" % (k.comm_name.decode('utf-8', 'replace')))
-        print("        %d\n" % v.value)
+        print("        R: %d, W: %d\n" % (v.r_cnt, v.w_cnt))
