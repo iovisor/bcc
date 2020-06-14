@@ -79,7 +79,7 @@ examples = """examples:
     ./iostack -K -io r  # Trace only reads
         """
 parser = argparse.ArgumentParser(
-    description="Count events and their stack traces",
+    description="Count io sizes and their stack traces to block devices",
     formatter_class=argparse.RawDescriptionHelpFormatter,
     epilog=examples)
 
