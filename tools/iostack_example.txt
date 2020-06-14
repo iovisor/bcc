@@ -1,0 +1,583 @@
+Demonstrations of iostack, the Linux eBPF/bcc version.
+
+
+This program traces io to block devices counts their sizes with their entire
+stack trace, summarized in-kernel for efficiency. For example, total io
+issued to all  block devices:
+# ./iostack.py
+Tracing io (bytes) to block devices... Hit Ctrl-C to end.
+^Cdisk sdc
+        md1_raid1
+        R: 0, W: 1024
+
+disk sdb
+        md1_raid1
+        R: 0, W: 1024
+
+disk sdd
+        md1_raid1
+        R: 0, W: 1024
+
+disk sdb
+        mdadm
+        R: 24576, W: 0
+
+disk sdd
+        systemd-udevd
+        R: 380928, W: 0
+
+disk dm-0
+        kworker/u8:2
+        R: 0, W: 581632
+
+disk sda
+        kworker/u8:2
+        R: 0, W: 581632
+
+disk sdc
+        systemd-udevd
+        R: 1048576, W: 0
+
+disk sdb
+        systemd-udevd
+        R: 1794048, W: 0
+
+disk md1
+        systemd-udevd
+        R: 3223552, W: 0
+
+disk sdc
+        fio
+        R: 0, W: 838860800
+
+disk md1
+        fio
+        R: 0, W: 838860800
+
+disk sdb
+        fio
+        R: 0, W: 838860800
+
+disk sdd
+        fio
+        R: 0, W: 838860800
+
+This showed the io byte counts to all the devices while the main workload was
+performed by fio with 16 KiB random write in 8 io threads with iodepth 32 to
+Linux mdraid level=1 created over 3 devices. The total io size of each device in raid
+equals to the size of io issued to the raid since it is level 1. Also, some udev
+activity could be seen here.
+
+Now adding -K option to see the kernel stack traces (i.e. datapath here) for each
+block device:
+# ./iostack.py -K
+Tracing io (bytes) to block devices... Hit Ctrl-C to end.
+^Cdisk sdc
+    generic_make_request
+    md_update_sb.part.0
+    md_check_recovery
+    raid5d
+    md_thread
+    kthread
+    ret_from_fork
+        md5_raid5
+        R: 0, W: 1024
+
+disk sde
+    generic_make_request
+    md_update_sb.part.0
+    md_check_recovery
+    raid5d
+    md_thread
+    kthread
+    ret_from_fork
+        md5_raid5
+        R: 0, W: 1024
+
+disk sdd
+    generic_make_request
+    md_update_sb.part.0
+    md_check_recovery
+    raid5d
+    md_thread
+    kthread
+    ret_from_fork
+        md5_raid5
+        R: 0, W: 1024
+
+disk sdb
+    generic_make_request
+    md_update_sb.part.0
+    md_check_recovery
+    raid5d
+    md_thread
+    kthread
+    ret_from_fork
+        md5_raid5
+        R: 0, W: 1024
+
+//// udev ios are removed for short
+
+disk sde
+    generic_make_request
+    ops_run_io
+    handle_stripe
+    handle_active_stripes.constprop.0
+    raid5d
+    md_thread
+    kthread
+    ret_from_fork
+        md5_raid5
+        R: 407093248, W: 416231424
+
+disk sdb
+    generic_make_request
+    ops_run_io
+    handle_stripe
+    handle_active_stripes.constprop.0
+    raid5d
+    md_thread
+    kthread
+    ret_from_fork
+        md5_raid5
+        R: 407719936, W: 415830016
+
+disk sdd
+    generic_make_request
+    ops_run_io
+    handle_stripe
+    handle_active_stripes.constprop.0
+    raid5d
+    md_thread
+    kthread
+    ret_from_fork
+        md5_raid5
+        R: 407404544, W: 416198656
+
+disk sdc
+    generic_make_request
+    ops_run_io
+    handle_stripe
+    handle_active_stripes.constprop.0
+    raid5d
+    md_thread
+    kthread
+    ret_from_fork
+        md5_raid5
+        R: 407535616, W: 416112640
+
+disk md5
+    generic_make_request
+    blkdev_direct_IO
+    generic_file_direct_write
+    __generic_file_write_iter
+    blkdev_write_iter
+    aio_write
+    io_submit_one
+    __x64_sys_io_submit
+    do_syscall_64
+    entry_SYSCALL_64_after_hwframe
+        fio
+        R: 0, W: 838860800
+The example is more complex. It shows the same fio pattern with 16 KiB
+random write in 8 io threads with iodepth 32. But this time it is Linux mdraid
+level 5 so we can see that read and write io size counts are different on raid
+block devicesand underlying devices due to RMW for parity updates. And we can
+distinguish that io to raid block device are submitted from fio whereas to
+underlying devices they come from mdraid threads.
+
+One can add -U flag to add user-level traces, but usually, there are a lot of
+"[unknown]" there. Since in most cases applications are compiled without frame pointers.
+"It's a common compiler optimization, but it breaks frame pointer-based stack
+walkers. Similar broken stacks will be seen by other profilers and debuggers
+that use frame pointers. Hopefully your application preserves them so that
+the user-level stack trace is visible. So how does one get frame pointers, if
+your application doesn't have them to start with? For the current bcc (until
+it supports other stack walkers), you need to be running an application binaries
+that preserves frame pointers, eg, using gcc's -fno-omit-frame-pointer. That's
+about all I'll say here: this is a big topic that is not bcc/BPF specific." (Brendan Gregg)
+
+In the next example, I add -P flag to trace io per process and run fio with numjobs=2,
+also limit the duration of tracing by 10 sec with -D 10 flag.
+
+# ./iostack.py -K -P -D 10
+Tracing io (bytes) to block devices for 10 secs.
+disk sdd
+    generic_make_request
+    md_update_sb.part.0
+    md_check_recovery
+    raid5d
+    md_thread
+    kthread
+    ret_from_fork
+        md5_raid5 [29410]
+        R: 0, W: 1024
+
+disk sde
+    generic_make_request
+    md_update_sb.part.0
+    md_check_recovery
+    raid5d
+    md_thread
+    kthread
+    ret_from_fork
+        md5_raid5 [29410]
+        R: 0, W: 1024
+
+disk sdb
+    generic_make_request
+    md_update_sb.part.0
+    md_check_recovery
+    raid5d
+    md_thread
+    kthread
+    ret_from_fork
+        md5_raid5 [29410]
+        R: 0, W: 1024
+
+disk sdc
+    generic_make_request
+    md_update_sb.part.0
+    md_check_recovery
+    raid5d
+    md_thread
+    kthread
+    ret_from_fork
+        md5_raid5 [29410]
+        R: 0, W: 1024
+
+disk sdb
+    generic_make_request
+    __blkdev_direct_IO_simple
+    generic_file_read_iter
+    new_sync_read
+    vfs_read
+    ksys_read
+    do_syscall_64
+    entry_SYSCALL_64_after_hwframe
+        mdadm [29632]
+        R: 4096, W: 0
+
+disk sdb
+    generic_make_request
+    __blkdev_direct_IO_simple
+    generic_file_read_iter
+    new_sync_read
+    vfs_read
+    ksys_read
+    do_syscall_64
+    entry_SYSCALL_64_after_hwframe
+        mdadm [29626]
+        R: 4096, W: 0
+
+disk sdb
+    generic_make_request
+    __blkdev_direct_IO_simple
+    generic_file_read_iter
+    new_sync_read
+    vfs_read
+    ksys_read
+    do_syscall_64
+    entry_SYSCALL_64_after_hwframe
+        mdadm [29620]
+        R: 4096, W: 0
+
+disk sdb
+    generic_make_request
+    __blkdev_direct_IO_simple
+    generic_file_read_iter
+    new_sync_read
+    vfs_read
+    ksys_read
+    do_syscall_64
+    entry_SYSCALL_64_after_hwframe
+        mdadm [29630]
+        R: 4096, W: 0
+
+disk sdb
+    generic_make_request
+    __blkdev_direct_IO_simple
+    generic_file_read_iter
+    new_sync_read
+    vfs_read
+    ksys_read
+    do_syscall_64
+    entry_SYSCALL_64_after_hwframe
+        mdadm [29628]
+        R: 4096, W: 0
+
+disk sdb
+    generic_make_request
+    __blkdev_direct_IO_simple
+    generic_file_read_iter
+    new_sync_read
+    vfs_read
+    ksys_read
+    do_syscall_64
+    entry_SYSCALL_64_after_hwframe
+        mdadm [29624]
+        R: 4096, W: 0
+
+disk sdb
+    generic_make_request
+    __blkdev_direct_IO_simple
+    generic_file_read_iter
+    new_sync_read
+    vfs_read
+    ksys_read
+    do_syscall_64
+    entry_SYSCALL_64_after_hwframe
+        mdadm [29636]
+        R: 4096, W: 0
+
+disk sdb
+    generic_make_request
+    __blkdev_direct_IO_simple
+    generic_file_read_iter
+    new_sync_read
+    vfs_read
+    ksys_read
+    do_syscall_64
+    entry_SYSCALL_64_after_hwframe
+        mdadm [29634]
+        R: 4096, W: 0
+
+//// udev is removed from output
+
+disk md5
+    generic_make_request
+    blkdev_direct_IO
+    generic_file_direct_write
+    __generic_file_write_iter
+    blkdev_write_iter
+    aio_write
+    io_submit_one
+    __x64_sys_io_submit
+    do_syscall_64
+    entry_SYSCALL_64_after_hwframe
+        fio [29622]
+        R: 0, W: 104857600
+
+disk md5
+    generic_make_request
+    blkdev_direct_IO
+    generic_file_direct_write
+    __generic_file_write_iter
+    blkdev_write_iter
+    aio_write
+    io_submit_one
+    __x64_sys_io_submit
+    do_syscall_64
+    entry_SYSCALL_64_after_hwframe
+        fio [29621]
+        R: 0, W: 104857600
+
+disk sdd
+    generic_make_request
+    ops_run_io
+    handle_stripe
+    handle_active_stripes.constprop.0
+    raid5d
+    md_thread
+    kthread
+    ret_from_fork
+        md5_raid5 [29410]
+        R: 98938880, W: 103481344
+
+disk sdb
+    generic_make_request
+    ops_run_io
+    handle_stripe
+    handle_active_stripes.constprop.0
+    raid5d
+    md_thread
+    kthread
+    ret_from_fork
+        md5_raid5 [29410]
+        R: 99295232, W: 103256064
+
+disk sdc
+    generic_make_request
+    ops_run_io
+    handle_stripe
+    handle_active_stripes.constprop.0
+    raid5d
+    md_thread
+    kthread
+    ret_from_fork
+        md5_raid5 [29410]
+        R: 99438592, W: 103170048
+
+disk sde
+    generic_make_request
+    ops_run_io
+    handle_stripe
+    handle_active_stripes.constprop.0
+    raid5d
+    md_thread
+    kthread
+    ret_from_fork
+        md5_raid5 [29410]
+        R: 99168256, W: 103473152
+We can see both fio threads PID submitting io to mdraid block device whereas
+io to underlying devices are still comes from mdraid threads.
+
+
+We can define which types of io (reads, writes, or both) should be counted by
+using the flag -io with possible values of "r", "w" or "rw" which is the default.
+It could be useful for researching the SSD endurance and counting
+drive writes per day (DWPD).
+
+# ./iostack.py -K -D 86400 -io w
+Tracing io (bytes) to block devices for 86400 secs.
+^Cdisk sde
+    generic_make_request
+    md_update_sb.part.0
+    md_check_recovery
+    raid5d
+    md_thread
+    kthread
+    ret_from_fork
+        md5_raid5
+        R: 0, W: 1024
+
+disk sdc
+    generic_make_request
+    md_update_sb.part.0
+    md_check_recovery
+    raid5d
+    md_thread
+    kthread
+    ret_from_fork
+        md5_raid5
+        R: 0, W: 1024
+
+disk sdb
+    generic_make_request
+    md_update_sb.part.0
+    md_check_recovery
+    raid5d
+    md_thread
+    kthread
+    ret_from_fork
+        md5_raid5
+        R: 0, W: 1024
+
+disk sdd
+    generic_make_request
+    md_update_sb.part.0
+    md_check_recovery
+    raid5d
+    md_thread
+    kthread
+    ret_from_fork
+        md5_raid5
+        R: 0, W: 1024
+
+disk sdc
+    generic_make_request
+    ops_run_io
+    handle_stripe
+    handle_active_stripes.constprop.0
+    raid5d
+    md_thread
+    kthread
+    ret_from_fork
+        md5_raid5
+        R: 0, W: 103280640
+
+disk sdb
+    generic_make_request
+    ops_run_io
+    handle_stripe
+    handle_active_stripes.constprop.0
+    raid5d
+    md_thread
+    kthread
+    ret_from_fork
+        md5_raid5
+        R: 0, W: 103350272
+
+disk sde
+    generic_make_request
+    ops_run_io
+    handle_stripe
+    handle_active_stripes.constprop.0
+    raid5d
+    md_thread
+    kthread
+    ret_from_fork
+        md5_raid5
+        R: 0, W: 103460864
+
+disk sdd
+    generic_make_request
+    ops_run_io
+    handle_stripe
+    handle_active_stripes.constprop.0
+    raid5d
+    md_thread
+    kthread
+    ret_from_fork
+        md5_raid5
+        R: 0, W: 103546880
+
+disk md5
+    generic_make_request
+    blkdev_direct_IO
+    generic_file_direct_write
+    __generic_file_write_iter
+    blkdev_write_iter
+    aio_write
+    io_submit_one
+    __x64_sys_io_submit
+    do_syscall_64
+    entry_SYSCALL_64_after_hwframe
+        fio
+        R: 0, W: 209715200
+In this example I Ctrl+C earlier than a day run.
+
+The -f option will emit folded output, which can be used as input to other
+tools including flame graphs. In this example, I run tracing of fio randwrite
+workload run to multiple files of mounted xfs created over lvm on raid5:
+
+# ./iostack.py -K -f > stack
+^C
+I found the most informative flame graph created in reverse order since this way we
+summarize io per device and see the datapath from processes.
+# flamegraph.pl --reverse stack  --countname "bytes" > out.svg
+
+In other cases, it may be  useful to see from the processes perspective
+# flamegraph.pl stack  --countname "bytes" > out.svg
+
+Flame graphs visualize stack traces. For information about them and links
+to open source software, see http://www.brendangregg.com/flamegraphs.html .
+This folded output can be piped directly into flamegraph.pl (the Perl version).
+
+
+USAGE message:
+
+# ./iostack.py -h
+usage: iostack.py [-h] [-D DURATION] [-K] [-U] [-f] [-P] [-io {r,w,rw}]
+
+Count io sizes and their stack traces to block devices
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -D DURATION, --duration DURATION
+                        total duration of trace, seconds
+  -K, --kernel-stack    kernel stack only
+  -U, --user-stack      user stack only
+  -f, --folded          output folded format
+  -P, --perpid          display stacks separately for each process
+  -io {r,w,rw}, --iodir {r,w,rw}
+                        io dir to trace
+
+examples:
+    ./iostack           # count bytes read or written by processes for all devices
+    ./iostack -D 5      # trace only for 5 seconds
+    ./iostack -K        # include kernel stacks
+    ./iostack -U        # include user stacks
+    ./iostack -K -f     # Output in folded format for flame graphs
+    ./iostack -P        # Display stacks separately for each process
+    ./iostack -K -io r  # Trace only reads
