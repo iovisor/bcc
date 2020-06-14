@@ -31,7 +31,8 @@ BPF_STACK_TRACE(stack_traces, 16384);
 
 int _generic_make_request(struct pt_regs *ctx, struct bio *bio) {
     struct disk_data_t data = {};
-    int dir = (bio)->bi_opf & REQ_OP_MASK;
+    int dir = op_is_write((bio)->bi_opf & REQ_OP_MASK) ? WRITE : READ;
+    
     u32 bi_size = bio->bi_iter.bi_size;
     
     struct gendisk *bio_disk = bio->bi_disk;
@@ -76,7 +77,7 @@ examples = """examples:
     ./iostack -U        # include user stacks
     ./iostack -K -f     # Output in folded format for flame graphs
     ./iostack -P        # Display stacks separately for each process
-    ./iostack -io r -K  # Trace only reads
+    ./iostack -K -io r  # Trace only reads
         """
 parser = argparse.ArgumentParser(
     description="Count events and their stack traces",
