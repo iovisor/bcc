@@ -44,7 +44,12 @@ int _generic_make_request(struct pt_regs *ctx, struct bio *bio) {
 #ifdef USER_STACK
     data.user_stack_id = stack_traces.get_stackid(ctx, BPF_F_USER_STACK);
 #endif
-    data.tgid_pid = GET_TGID;
+
+#ifdef PERPID
+    data.tgid_pid = bpf_get_current_pid_tgid() >> 32;
+#else 
+    data.tgid_pid = 0xffffffff;
+#endif
     bpf_get_current_comm(&data.comm_name, sizeof(data.comm_name));
     
     struct io_cnt zleaf = {0};
@@ -65,12 +70,13 @@ int _generic_make_request(struct pt_regs *ctx, struct bio *bio) {
 """
 
 examples = """examples:
-    ./iostack       # count bytes read or written by processes for all devices
-    ./iostack -D 5  # trace only for 5 seconds
-    ./iostack -K    # include kernel stacks
-    ./iostack -U    # include user stacks
-    ./iostack -K -f # Output in folded format for flame graphs
-    ./iostack -P    # Display stacks separately for each process
+    ./iostack           # count bytes read or written by processes for all devices
+    ./iostack -D 5      # trace only for 5 seconds
+    ./iostack -K        # include kernel stacks
+    ./iostack -U        # include user stacks
+    ./iostack -K -f     # Output in folded format for flame graphs
+    ./iostack -P        # Display stacks separately for each process
+    ./iostack -io r -K  # Trace only reads
         """
 parser = argparse.ArgumentParser(
     description="Count events and their stack traces",
@@ -97,9 +103,7 @@ if args.user_stack:
 if args.kernel_stack:
     bpf_text = "#define KERNEL_STACK\n" + bpf_text
 if args.perpid:
-    bpf_text = bpf_text.replace('GET_TGID', 'bpf_get_current_pid_tgid() >> 32')
-else:
-    bpf_text = bpf_text.replace('GET_TGID', '0xffffffff')
+    bpf_text = "#define PER_PID\n" + bpf_text
 if args.iodir == "r":
     bpf_text = "#define TRACE_READ\n" + bpf_text
 if args.iodir == "w":
