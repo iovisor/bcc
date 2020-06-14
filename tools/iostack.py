@@ -33,7 +33,7 @@ int _generic_make_request(struct pt_regs *ctx, struct bio *bio) {
     struct disk_data_t data = {};
     int dir = op_is_write((bio)->bi_opf & REQ_OP_MASK) ? WRITE : READ;
     u32 bi_size = bio->bi_iter.bi_size;
-    
+
     struct gendisk *bio_disk = bio->bi_disk;
     bpf_probe_read_kernel(&data.disk_name, sizeof(data.disk_name),
                        bio_disk->disk_name);
@@ -47,19 +47,19 @@ int _generic_make_request(struct pt_regs *ctx, struct bio *bio) {
 
 #ifdef PER_PID
     data.tgid_pid = bpf_get_current_pid_tgid() >> 32;
-#else 
+#else
     data.tgid_pid = 0xffffffff;
 #endif
     bpf_get_current_comm(&data.comm_name, sizeof(data.comm_name));
-    
+
     struct io_cnt zleaf = {0};
     struct io_cnt *leaf = counts.lookup_or_try_init(&data, &zleaf);
     if (leaf) {
-#if defined(TRACE_READ) || defined(TRACE_RW) 
+#if defined(TRACE_READ) || defined(TRACE_RW)
         if (dir == READ)
             lock_xadd(&leaf->r_cnt, bi_size);
 #endif
-#if defined(TRACE_WRITE) || defined(TRACE_RW) 
+#if defined(TRACE_WRITE) || defined(TRACE_RW)
         if (dir == WRITE)
             lock_xadd(&leaf->w_cnt, bi_size);
 #endif
