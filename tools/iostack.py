@@ -32,7 +32,6 @@ BPF_STACK_TRACE(stack_traces, 16384);
 int _generic_make_request(struct pt_regs *ctx, struct bio *bio) {
     struct disk_data_t data = {};
     int dir = op_is_write((bio)->bi_opf & REQ_OP_MASK) ? WRITE : READ;
-    
     u32 bi_size = bio->bi_iter.bi_size;
     
     struct gendisk *bio_disk = bio->bi_disk;
@@ -125,7 +124,7 @@ duration = int(args.duration)
 
 # header
 if not args.folded:
-    print("Tracing total io sizes (bytes) to block devices", end="")
+    print("Tracing io (bytes) to block devices", end="")
     if duration < 99999999:
         print(" for %d secs." % duration)
     else:
