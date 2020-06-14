@@ -35,7 +35,7 @@ int _generic_make_request(struct pt_regs *ctx, struct bio *bio) {
 #ifdef USER_STACK
     data.user_stack_id = stack_traces.get_stackid(ctx, BPF_F_USER_STACK);
 #endif
-    data.tgid_pid = bpf_get_current_pid_tgid();
+    data.tgid_pid = GET_TGID;bpf_get_current_pid_tgid();
     bpf_get_current_comm(&data.comm_name, sizeof(data.comm_name));
     
     //counts.increment(data, bio->bi_iter.bi_size);
@@ -68,6 +68,8 @@ parser.add_argument("-U", "--user-stack",
                     action="store_true", help="user stack only")
 parser.add_argument("-f", "--folded", action="store_true",
                     help="output folded format")
+parser.add_argument("-P", "--perpid", action="store_true",
+                    help="display stacks separately for each process")
 
 args = parser.parse_args()
 
@@ -78,6 +80,10 @@ if args.kernel_stack:
 
 # load BPF program
 b = BPF(text=bpf_text)
+if args.perpid:
+    bpf_text = bpf_text.replace('GET_TGID', 'bpf_get_current_pid_tgid() >> 32')
+else:
+    bpf_text = bpf_text.replace('GET_TGID', '0xffffffff')
 b.attach_kprobe(event="generic_make_request", fn_name="_generic_make_request")
 matched = b.num_open_kprobes()
 if matched == 0:
@@ -87,7 +93,7 @@ if matched == 0:
 duration = int(args.duration)
 # header
 if not args.folded:
-    print("Tracing total io sizes (bytes)", end="")
+    print("Tracing total io sizes (bytes) to block devices", end="")
     if duration < 99999999:
         print(" for %d secs." % duration)
     else:
@@ -139,5 +145,9 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
             print("    --")
         for addr in user_stack:
             print("    %s" % b.sym(addr, k.tgid_pid).decode('utf-8', 'replace'))
-        print("    %s" % (k.comm_name.decode('utf-8', 'replace')))
+
+        if k.tgid_pid != 0xffffffff:
+            print("    %s [%d]" % (k.comm_name.decode('utf-8', 'replace'), k.tgid_pid))
+        else:
+            print("    %s" % (k.comm_name.decode('utf-8', 'replace')))
         print("        %d\n" % v.value)
