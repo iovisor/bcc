@@ -24,7 +24,7 @@ BPF_STACK_TRACE(stack_traces, 16384);
 
 int _generic_make_request(struct pt_regs *ctx, struct bio *bio) {
     struct disk_data_t data = {};
-
+    u32 bi_size = bio->bi_iter.bi_size;
     struct gendisk *bio_disk = bio->bi_disk;
     bpf_probe_read_kernel(&data.disk_name, sizeof(data.disk_name),
                        bio_disk->disk_name);
@@ -38,7 +38,11 @@ int _generic_make_request(struct pt_regs *ctx, struct bio *bio) {
     data.tgid_pid = bpf_get_current_pid_tgid();
     bpf_get_current_comm(&data.comm_name, sizeof(data.comm_name));
     
-    counts.increment(data, bio->bi_iter.bi_size);
+    //counts.increment(data, bio->bi_iter.bi_size);
+    u64 zleaf = 0;
+    u64 *leaf = counts.lookup_or_try_init(&data, &zleaf);
+    if (leaf)
+        lock_xadd(leaf, bi_size);
 
     return 0;
 }
