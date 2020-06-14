@@ -10,6 +10,8 @@ from sys import stderr
 bpf_text = """
 #include <linux/blkdev.h>
 #include <linux/blk_types.h>
+#include <linux/kernel.h>
+#include <linux/bio.h>
 
 struct disk_data_t {
     char disk_name[DISK_NAME_LEN];
@@ -19,12 +21,19 @@ struct disk_data_t {
     char comm_name[TASK_COMM_LEN];
 };
 
-BPF_HASH(counts, struct disk_data_t);
+struct io_cnt {
+    u64 r_cnt;
+    u64 w_cnt;
+};
+
+BPF_HASH(counts, struct disk_data_t, struct io_cnt);
 BPF_STACK_TRACE(stack_traces, 16384);
 
 int _generic_make_request(struct pt_regs *ctx, struct bio *bio) {
     struct disk_data_t data = {};
+    int dir = (bio)->bi_opf & REQ_OP_MASK;
     u32 bi_size = bio->bi_iter.bi_size;
+    
     struct gendisk *bio_disk = bio->bi_disk;
     bpf_probe_read_kernel(&data.disk_name, sizeof(data.disk_name),
                        bio_disk->disk_name);
@@ -38,11 +47,18 @@ int _generic_make_request(struct pt_regs *ctx, struct bio *bio) {
     data.tgid_pid = GET_TGID;
     bpf_get_current_comm(&data.comm_name, sizeof(data.comm_name));
     
-    //counts.increment(data, bio->bi_iter.bi_size);
-    u64 zleaf = 0;
-    u64 *leaf = counts.lookup_or_try_init(&data, &zleaf);
-    if (leaf)
-        lock_xadd(leaf, bi_size);
+    struct io_cnt zleaf = {0};
+    struct io_cnt *leaf = counts.lookup_or_try_init(&data, &zleaf);
+    if (leaf) {
+#if defined(TRACE_READ) || defined(TRACE_RW) 
+        if (dir == READ)
+            lock_xadd(&leaf->r_cnt, bi_size);
+#endif
+#if defined(TRACE_READ) || defined(TRACE_RW) 
+        if (dir == WRITE)
+            lock_xadd(&leaf->w_cnt, bi_size);
+#endif
+    }
 
     return 0;
 }
@@ -71,6 +87,8 @@ parser.add_argument("-f", "--folded", action="store_true",
                     help="output folded format")
 parser.add_argument("-P", "--perpid", action="store_true",
                     help="display stacks separately for each process")
+parser.add_argument("-io", "--iodir", action="store", choices=["r", "w", "rw"],
+                    default="rw", help="io dir to trace")
 
 args = parser.parse_args()
 
@@ -82,6 +100,12 @@ if args.perpid:
     bpf_text = bpf_text.replace('GET_TGID', 'bpf_get_current_pid_tgid() >> 32')
 else:
     bpf_text = bpf_text.replace('GET_TGID', '0xffffffff')
+if args.iodir == "r":
+    bpf_text = "#define TRACE_READ\n" + bpf_text
+if args.iodir == "w":
+    bpf_text = "#define TRACE_WRITE\n" + bpf_text
+if args.iodir == "rw":
+    bpf_text = "#define TRACE_RW\n" + bpf_text
 
 # load BPF program
 b = BPF(text=bpf_text)
@@ -93,6 +117,7 @@ if matched == 0:
     exit(1)
 
 duration = int(args.duration)
+
 # header
 if not args.folded:
     print("Tracing total io sizes (bytes) to block devices", end="")
@@ -116,7 +141,7 @@ except KeyboardInterrupt:
 counts = b.get_table("counts")
 stack_traces = b.get_table("stack_traces")
 
-for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
+for k, v in sorted(counts.items(), key=lambda counts: counts[1].r_cnt+counts[1].w_cnt):
     user_stack = []
 
     if args.user_stack and k.user_stack_id > 0:
