@@ -45,7 +45,7 @@ int _generic_make_request(struct pt_regs *ctx, struct bio *bio) {
     data.user_stack_id = stack_traces.get_stackid(ctx, BPF_F_USER_STACK);
 #endif
 
-#ifdef PERPID
+#ifdef PER_PID
     data.tgid_pid = bpf_get_current_pid_tgid() >> 32;
 #else 
     data.tgid_pid = 0xffffffff;
