@@ -35,7 +35,7 @@ int _generic_make_request(struct pt_regs *ctx, struct bio *bio) {
 #ifdef USER_STACK
     data.user_stack_id = stack_traces.get_stackid(ctx, BPF_F_USER_STACK);
 #endif
-    data.tgid_pid = GET_TGID;bpf_get_current_pid_tgid();
+    data.tgid_pid = GET_TGID;
     bpf_get_current_comm(&data.comm_name, sizeof(data.comm_name));
     
     //counts.increment(data, bio->bi_iter.bi_size);
@@ -54,6 +54,7 @@ examples = """examples:
     ./iostack -K    # include kernel stacks
     ./iostack -U    # include user stacks
     ./iostack -K -f # Output in folded format for flame graphs
+    ./iostack -P    # Display stacks separately for each process
         """
 parser = argparse.ArgumentParser(
     description="Count events and their stack traces",
@@ -61,7 +62,7 @@ parser = argparse.ArgumentParser(
     epilog=examples)
 
 parser.add_argument("-D", "--duration",
-                    help="total duration of trace, seconds",default=99999999)
+                    help="total duration of trace, seconds", default=99999999)
 parser.add_argument("-K", "--kernel-stack",
                     action="store_true", help="kernel stack only")
 parser.add_argument("-U", "--user-stack",
@@ -77,13 +78,14 @@ if args.user_stack:
     bpf_text = "#define USER_STACK\n" + bpf_text
 if args.kernel_stack:
     bpf_text = "#define KERNEL_STACK\n" + bpf_text
-
-# load BPF program
-b = BPF(text=bpf_text)
 if args.perpid:
     bpf_text = bpf_text.replace('GET_TGID', 'bpf_get_current_pid_tgid() >> 32')
 else:
     bpf_text = bpf_text.replace('GET_TGID', '0xffffffff')
+
+# load BPF program
+b = BPF(text=bpf_text)
+
 b.attach_kprobe(event="generic_make_request", fn_name="_generic_make_request")
 matched = b.num_open_kprobes()
 if matched == 0:
@@ -99,9 +101,11 @@ if not args.folded:
     else:
         print("... Hit Ctrl-C to end.")
 
+
 # signal handler
 def signal_ignore(signal, frame):
     print()
+
 
 try:
     sleep(duration)
@@ -129,7 +133,7 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
         user_stack = list(user_stack)
         kernel_stack = list(kernel_stack)
         line = [k.comm_name.decode('utf-8', 'replace')] + \
-                [b.sym(addr, k.tgid_pid).decode('utf-8', 'replace') for addr in
+               [b.sym(addr, k.tgid_pid).decode('utf-8', 'replace') for addr in
                 reversed(user_stack)] + \
                (do_delimiter and ["-"] or []) + \
                [b.ksym(addr).decode('utf-8', 'replace') for addr in
@@ -147,7 +151,8 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
             print("    %s" % b.sym(addr, k.tgid_pid).decode('utf-8', 'replace'))
 
         if k.tgid_pid != 0xffffffff:
-            print("    %s [%d]" % (k.comm_name.decode('utf-8', 'replace'), k.tgid_pid))
+            print("    %s [%d]" % (k.comm_name.decode('utf-8', 'replace'),
+                                   k.tgid_pid))
         else:
             print("    %s" % (k.comm_name.decode('utf-8', 'replace')))
         print("        %d\n" % v.value)
