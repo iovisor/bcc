@@ -226,6 +226,12 @@ static struct bpf_helper helpers[] = {
   {"seq_write", "5.7"},
   {"sk_cgroup_id", "5.7"},
   {"sk_ancestor_cgroup_id", "5.7"},
+  {"ringbuf_output", "5.7"},
+  {"ringbuf_reserve", "5.7"},
+  {"ringbuf_submit", "5.7"},
+  {"ringbuf_discard", "5.7"},
+  {"ringbuf_query", "5.7"},
+  {"csum_level", "5.7"},
 };
 
 static uint64_t ptr_to_u64(void *ptr)

@@ -655,6 +655,20 @@ static __u64 (*bpf_sk_cgroup_id)(struct bpf_sock *sk) = (void *)BPF_FUNC_sk_cgro
 static __u64 (*bpf_sk_ancestor_cgroup_id)(struct bpf_sock *sk, int ancestor_level) =
   (void *)BPF_FUNC_sk_ancestor_cgroup_id;
 
+static int (*bpf_ringbuf_output)(void *ringbuf, void *data, __u64 size, __u64 flags) =
+  (void *)BPF_FUNC_ringbuf_output;
+static void *(*bpf_ringbuf_reserve)(void *ringbuf, __u64 size, __u64 flags) =
+  (void *)BPF_FUNC_ringbuf_reserve;
+static void (*bpf_ringbuf_submit)(void *data, __u64 flags) =
+  (void *)BPF_FUNC_ringbuf_submit;
+static void (*bpf_ringbuf_discard)(void *data, __u64 flags) =
+  (void *)BPF_FUNC_ringbuf_discard;
+static __u64 (*bpf_ringbuf_query)(void *ringbuf, __u64 flags) =
+  (void *)BPF_FUNC_ringbuf_query;
+
+static int (*bpf_csum_level)(struct __sk_buff *skb, __u64 level) =
+  (void *)BPF_FUNC_csum_level;
+
 /* llvm builtin functions that eBPF C program may use to
  * emit BPF_LD_ABS and BPF_LD_IND instructions
  */

@@ -75,6 +75,7 @@ static const char * const map_type_strings[] = {
   [BPF_MAP_TYPE_SK_STORAGE] = "sk_storage",
   [BPF_MAP_TYPE_DEVMAP_HASH] = "devmap_hash",
   [BPF_MAP_TYPE_STRUCT_OPS] = "struct_ops",
+  [BPF_MAP_TYPE_RINGBUF] = "ringbuf",
 };
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof(*(x)))
