@@ -19,6 +19,7 @@ APPS = \
 	syscount \
 	vfsstat \
 	xfsslower \
+	task_detector \
 	#
 
 COMMON_OBJ = \
