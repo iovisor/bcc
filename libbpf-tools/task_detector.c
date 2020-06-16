@@ -1,7 +1,12 @@
 // SPDX-Licence-Identifier: GPL-2.0
-// Copyright (c) 2020 Wenhao Qu
+// Copyright (c) 2020 Alibaba Cloud
 //
-// Based on task_detector by Yun Wang
+// Based on task_detector by Michael Wang
+// Created by Wenhao Qu
+//
+// Maintainers:
+// Michael Wang <yun.wang@linux.alibaba.com>
+// Wenhao Qu <quxi.qwh@alibaba-inc.com>
 #include <argp.h>
 #include <stdio.h>
 #include <signal.h>
@@ -24,15 +29,15 @@
 #include "task_detector.skel.h"
 
 const char *argp_program_version = "task_detector 0.1";
-const char *argp_program_bug_address = "<yun.wang@xxxxxxxxxxxxxxxxx>";
+const char *argp_program_bug_address = "<bpf@vger.kernel.org>";
 static const char argp_program_doc[] =
 "Trace the related schedule events of a specified task.\n"
 "\n"
 "USAGE: task_detector -p PID [-s]\n"
 "\n"
 "EXAMPLES:\n"
-"    runqslower -p 49870       	# trace pid 49870\n"
-"    runqslower -p 49870 -s    	# trace pid 49870 and system call\n";
+"    task_detector -p 49870       	# trace pid 49870\n"
+"    task_detector -p 49870 -s    	# trace pid 49870 and system call\n";
 
 static const struct argp_option opts[] = {
 	{ "pid", 'p', "PID", 0, "Process PID to trace"},
