@@ -66,7 +66,6 @@ debug = 0
 # define BPF program
 bpf_text = """
 #include <uapi/linux/ptrace.h>
-#define KBUILD_MODNAME "foo"
 #include <linux/tcp.h>
 #include <net/sock.h>
 #include <bcc/proto.h>

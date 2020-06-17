@@ -12,7 +12,6 @@ import time
 from bcc import BPF
 
 BPF_SRC = """
-#define KBUILD_MODNAME "bpf_hook_nflatency"
 #include <linux/ip.h>
 #include <linux/ipv6.h>
 #include <linux/tcp.h>

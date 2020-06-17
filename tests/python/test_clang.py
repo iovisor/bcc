@@ -78,7 +78,6 @@ int count_foo(struct pt_regs *ctx, unsigned long a, unsigned long b) {
 
     def test_probe_read3(self):
         text = """
-#define KBUILD_MODNAME "foo"
 #include <net/tcp.h>
 #define _(P) ({typeof(P) val = 0; bpf_probe_read_kernel(&val, sizeof(val), &P); val;})
 int count_tcp(struct pt_regs *ctx, struct sk_buff *skb) {
@@ -90,7 +89,6 @@ int count_tcp(struct pt_regs *ctx, struct sk_buff *skb) {
 
     def test_probe_read4(self):
         text = """
-#define KBUILD_MODNAME "foo"
 #include <net/tcp.h>
 #define _(P) ({typeof(P) val = 0; bpf_probe_read_kernel(&val, sizeof(val), &P); val;})
 int test(struct pt_regs *ctx, struct sk_buff *skb) {
@@ -102,7 +100,6 @@ int test(struct pt_regs *ctx, struct sk_buff *skb) {
 
     def test_probe_read_whitelist1(self):
         text = """
-#define KBUILD_MODNAME "foo"
 #include <net/tcp.h>
 int count_tcp(struct pt_regs *ctx, struct sk_buff *skb) {
     // The below define is in net/tcp.h:
@@ -120,7 +117,6 @@ int count_tcp(struct pt_regs *ctx, struct sk_buff *skb) {
 
     def test_probe_read_whitelist2(self):
         text = """
-#define KBUILD_MODNAME "foo"
 #include <net/tcp.h>
 int count_tcp(struct pt_regs *ctx, struct sk_buff *skb) {
     // The below define is in net/tcp.h:
@@ -1084,7 +1080,6 @@ int test(struct __sk_buff *ctx) {
 
     def test_probe_read_return(self):
         text = """
-#define KBUILD_MODNAME "foo"
 #include <uapi/linux/ptrace.h>
 #include <linux/tcp.h>
 static inline unsigned char *my_skb_transport_header(struct sk_buff *skb) {
@@ -1100,7 +1095,6 @@ int test(struct pt_regs *ctx, struct sock *sk, struct sk_buff *skb) {
 
     def test_probe_read_multiple_return(self):
         text = """
-#define KBUILD_MODNAME "foo"
 #include <uapi/linux/ptrace.h>
 #include <linux/tcp.h>
 static inline u64 error_function() {
@@ -1121,7 +1115,6 @@ int test(struct pt_regs *ctx, struct sock *sk, struct sk_buff *skb) {
 
     def test_probe_read_return_expr(self):
         text = """
-#define KBUILD_MODNAME "foo"
 #include <uapi/linux/ptrace.h>
 #include <linux/tcp.h>
 static inline unsigned char *my_skb_transport_header(struct sk_buff *skb) {
@@ -1137,7 +1130,6 @@ int test(struct pt_regs *ctx, struct sock *sk, struct sk_buff *skb) {
 
     def test_probe_read_return_call(self):
         text = """
-#define KBUILD_MODNAME "foo"
 #include <uapi/linux/ptrace.h>
 #include <linux/tcp.h>
 static inline struct tcphdr *my_skb_transport_header(struct sk_buff *skb) {

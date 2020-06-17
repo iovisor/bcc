@@ -25,7 +25,6 @@ uint16_t ntohs(uint16_t netshort);
 
 local program = [[
 #include <uapi/linux/ptrace.h>
-#define KBUILD_MODNAME "foo"
 #include <linux/tcp.h>
 #include <net/sock.h>
 #include <bcc/proto.h>
