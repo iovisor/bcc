@@ -29,7 +29,6 @@ out_idx = ip.link_lookup(ifname=out_if)[0]
 
 # load BPF program
 b = BPF(text = """
-#define KBUILD_MODNAME "foo"
 #include <uapi/linux/bpf.h>
 #include <linux/in.h>
 #include <linux/if_ether.h>
