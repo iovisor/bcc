@@ -101,6 +101,7 @@ int KBuildHelper::get_flags(const char *uname_machine, vector<string> *cflags) {
   cflags->push_back("-D__HAVE_BUILTIN_BSWAP16__");
   cflags->push_back("-D__HAVE_BUILTIN_BSWAP32__");
   cflags->push_back("-D__HAVE_BUILTIN_BSWAP64__");
+  cflags->push_back("-DKBUILD_MODNAME=\"bcc\"");
 
   // If ARCH env variable is set, pass this along.
   if (archenv)
