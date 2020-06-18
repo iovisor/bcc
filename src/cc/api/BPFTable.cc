@@ -145,7 +145,7 @@ StatusTuple BPFTable::remove_value(const std::string& key_str) {
 }
 
 StatusTuple BPFTable::clear_table_non_atomic() {
-  if (desc.type == BPF_MAP_TYPE_HASH || desc.type == BPF_MAP_TYPE_PERCPU_HASH ||
+  if (desc.type == BPF_MAP_TYPE_HASH ||
       desc.type == BPF_MAP_TYPE_LRU_HASH ||
       desc.type == BPF_MAP_TYPE_PERCPU_HASH ||
       desc.type == BPF_MAP_TYPE_HASH_OF_MAPS) {
