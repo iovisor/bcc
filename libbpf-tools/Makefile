@@ -16,10 +16,10 @@ APPS = \
 	filelife \
 	opensnoop \
 	runqslower \
+	schedsnoop \
 	syscount \
 	vfsstat \
 	xfsslower \
-	task_detector \
 	#
 
 COMMON_OBJ = \
