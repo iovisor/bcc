@@ -1186,13 +1186,6 @@ bool bpf_has_kernel_btf(void)
   return libbpf_find_vmlinux_btf_id("bpf_prog_put", 0) > 0;
 }
 
-int bpf_detach_kfunc(int prog_fd, char *func)
-{
-  UNUSED(prog_fd);
-  UNUSED(func);
-  return 0;
-}
-
 int bpf_attach_kfunc(int prog_fd)
 {
   int ret;
@@ -1200,6 +1193,16 @@ int bpf_attach_kfunc(int prog_fd)
   ret = bpf_raw_tracepoint_open(NULL, prog_fd);
   if (ret < 0)
     fprintf(stderr, "bpf_attach_raw_tracepoint (kfunc): %s\n", strerror(errno));
+  return ret;
+}
+
+int bpf_attach_lsm(int prog_fd)
+{
+  int ret;
+
+  ret = bpf_raw_tracepoint_open(NULL, prog_fd);
+  if (ret < 0)
+    fprintf(stderr, "bpf_attach_raw_tracepoint (lsm): %s\n", strerror(errno));
   return ret;
 }
 

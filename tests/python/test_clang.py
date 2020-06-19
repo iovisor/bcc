@@ -321,15 +321,13 @@ int kprobe__blk_update_request(struct pt_regs *ctx, struct request *req) {
 
     @skipUnless(kernel_version_ge(5,7), "requires kernel >= 5.7")
     def test_lsm_probe(self):
+        # Skip if the kernel is not compiled with CONFIG_BPF_LSM
+        if not BPF.support_lsm():
+            return
         b = BPF(text="""
 LSM_PROBE(bpf, int cmd, union bpf_attr *uattr, unsigned int size) {
     return 0;
 }""")
-        # depending on CONFIG_BPF_LSM being compiled in
-        try:
-            b.load_func("lsm__bpf", BPF.LSM)
-        except:
-            pass
 
     def test_probe_read_helper(self):
         b = BPF(text="""

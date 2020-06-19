@@ -311,6 +311,7 @@ class BPF(object):
         self.raw_tracepoint_fds = {}
         self.kfunc_entry_fds = {}
         self.kfunc_exit_fds = {}
+        self.lsm_fds = {}
         self.perf_buffers = {}
         self.open_perf_events = {}
         self.tracefile = None
@@ -899,6 +900,15 @@ class BPF(object):
             return True
         return False
 
+    @staticmethod
+    def support_lsm():
+        if not lib.bpf_has_kernel_btf():
+            return False
+        # kernel symbol "bpf_lsm_bpf" indicates BPF LSM support
+        if BPF.ksymname(b"bpf_lsm_bpf") != -1:
+            return True
+        return False
+
     def detach_kfunc(self, fn_name=b""):
         fn_name = _assert_is_bytes(fn_name)
         fn_name = BPF.add_prefix(b"kfunc__", fn_name)
@@ -943,6 +953,29 @@ class BPF(object):
         if fd < 0:
             raise Exception("Failed to attach BPF to exit kernel func")
         self.kfunc_exit_fds[fn_name] = fd;
+        return self
+
+    def detach_lsm(self, fn_name=b""):
+        fn_name = _assert_is_bytes(fn_name)
+        fn_name = BPF.add_prefix(b"lsm__", fn_name)
+
+        if fn_name not in self.lsm_fds:
+            raise Exception("LSM %s is not attached" % fn_name)
+        os.close(self.lsm_fds[fn_name])
+        del self.lsm_fds[fn_name]
+
+    def attach_lsm(self, fn_name=b""):
+        fn_name = _assert_is_bytes(fn_name)
+        fn_name = BPF.add_prefix(b"lsm__", fn_name)
+
+        if fn_name in self.lsm_fds:
+            raise Exception("LSM %s has been attached" % fn_name)
+
+        fn = self.load_func(fn_name, BPF.LSM)
+        fd = lib.bpf_attach_lsm(fn.fd)
+        if fd < 0:
+            raise Exception("Failed to attach LSM")
+        self.lsm_fds[fn_name] = fd;
         return self
 
     @staticmethod
@@ -1204,6 +1237,8 @@ class BPF(object):
                 self.attach_kfunc(fn_name=func_name)
             elif func_name.startswith(b"kretfunc__"):
                 self.attach_kretfunc(fn_name=func_name)
+            elif func_name.startswith(b"lsm__"):
+                self.attach_lsm(fn_name=func_name)
 
     def trace_open(self, nonblocking=False):
         """trace_open(nonblocking=False)
