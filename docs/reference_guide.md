@@ -18,6 +18,7 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
         - [8. system call tracepoints](#8-system-call-tracepoints)
         - [9. kfuncs](#9-kfuncs)
         - [10. kretfuncs](#10-kretfuncs)
+        - [11. lsm probes](#11-lsm-probes)
     - [Data](#data)
         - [1. bpf_probe_read_kernel()](#1-bpf_probe_read_kernel)
         - [2. bpf_probe_read_kernel_str()](#2-bpf_probe_read_kernel_str)
@@ -364,6 +365,45 @@ accessible as standard argument values together with its return value.
 
 Examples in situ:
 [search /tools](https://github.com/iovisor/bcc/search?q=KRETFUNC_PROBE+path%3Atools&type=Code)
+
+
+### 11. LSM Probes
+
+Syntax: LSM_PROBE(*hook*, typeof(arg1) arg1, typeof(arg2) arg2 ...)
+
+This is a macro that instruments an LSM hook as a BPF program. It can be
+used to audit security events and implement MAC security policies in BPF.
+It is defined by specifying the hook name followed by its arguments.
+
+Hook names can be found in
+[include/linux/security.h](https://github.com/torvalds/linux/tree/master/include/linux/security.h#L254)
+by taking functions like `security_hookname` and taking just the `hookname` part.
+For example, `security_bpf` would simply become `bpf`.
+
+Unlike other BPF program types, the return value specified in an LSM probe
+matters. A return value of 0 allows the hook to succeed, whereas
+any non-zero return value will cause the hook to fail and deny the
+security operation.
+
+The following example instruments a hook that denies all future BPF operations:
+```C
+LSM_PROBE(bpf, int cmd, union bpf_attr *attr, unsigned int size)
+{
+    return -EPERM;
+}
+```
+
+This instruments the `security_bpf` hook and causes it to return `-EPERM`.
+Changing `return -EPERM` to `return 0` would cause the BPF program
+to allow the operation instead.
+
+LSM probes require at least a 5.7+ kernel with the following configuation options set:
+- `CONFIG_BPF_LSM=y`
+- `CONFIG_LSM` comma separated string must contain "bpf" (for example,
+  `CONFIG_LSM="lockdown,yama,bpf"`)
+
+Examples in situ:
+[search /tests](https://github.com/iovisor/bcc/search?q=LSM_PROBE+path%3Atests&type=Code)
 
 
 ## Data
