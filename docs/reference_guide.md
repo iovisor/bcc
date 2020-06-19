@@ -397,7 +397,7 @@ This instruments the `security_bpf` hook and causes it to return `-EPERM`.
 Changing `return -EPERM` to `return 0` would cause the BPF program
 to allow the operation instead.
 
-LSM probes require a kernel with the following configuation options set:
+LSM probes require at least a 5.7+ kernel with the following configuation options set:
 - `CONFIG_BPF_LSM=y`
 - `CONFIG_LSM` comma separated string must contain "bpf" (for example,
   `CONFIG_LSM="lockdown,yama,bpf"`)
