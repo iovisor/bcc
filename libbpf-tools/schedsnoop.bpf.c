@@ -8,8 +8,8 @@
 #define TASK_RUNNING 0x0000
 #define TASK_REPORT_MAX 0x0100
 
-const volatile pid_t targ_pid = 0;
-const volatile int trace_syscall = 0;
+const volatile pid_t targ_tid = 0;
+const volatile bool trace_syscall = false;
 bool targ_exit = false;
 int trace_on = -1;
 
@@ -74,7 +74,7 @@ static __always_inline void emit_and_update(void *ctx, struct trace_info* ti,
 SEC("tp_btf/sched_process_exit")
 int BPF_PROG(handle__sched_process_exit, struct task_struct *p)
 {
-	if (targ_pid && targ_pid == p->pid)
+	if (targ_tid == p->pid)
 		targ_exit = true;
 
 	return 0;
@@ -83,12 +83,12 @@ int BPF_PROG(handle__sched_process_exit, struct task_struct *p)
 SEC("tp_btf/sched_migrate_task")
 int BPF_PROG(handle__sched_migrate_task, struct task_struct *p, int dest_cpu)
 {
-	if (targ_pid != p->pid)
+	if (targ_tid != p->pid)
 		return 0;
 
 	struct trace_info ti = {
 		.cpu = dest_cpu,
-		.pid = p->pid,
+		.tid = p->pid,
 		.type = TYPE_MIGRATE,
 	};
 
@@ -104,12 +104,12 @@ int BPF_PROG(handle__sched_migrate_task, struct task_struct *p, int dest_cpu)
 SEC("tp_btf/sched_wakeup")
 int BPF_PROG(handle__sched_wakeup, struct task_struct *p)
 {
-	if (targ_pid != p->pid)
+	if (targ_tid != p->pid)
 		return 0;
 
 	struct trace_info ti = {
 		.cpu = p->wake_cpu,
-		.pid = p->pid,
+		.tid = p->pid,
 		.type = TYPE_ENQUEUE,
 	};
 
@@ -139,13 +139,13 @@ int BPF_PROG(handle__sched_switch, bool preempt, struct task_struct *prev, struc
 	 * when the situation discussed above happens.
 	 */
 	if (!should_trace(ti.cpu)) {
-		if (targ_pid != prev->pid &&
-		    targ_pid != next->pid)
+		if (targ_tid != prev->pid &&
+		    targ_tid != next->pid)
 			return 0;
 
 		set_trace_on(ti.cpu);
 
-		ti.pid = targ_pid;
+		ti.tid = targ_tid;
 		ti.type = TYPE_MIGRATE;
 		bpf_probe_read_kernel_str(&ti.comm, sizeof(ti.comm), prev->comm);
 		emit_trace(ctx, &ti);
@@ -164,14 +164,14 @@ int BPF_PROG(handle__sched_switch, bool preempt, struct task_struct *prev, struc
 	 */
 	if (prev->state != TASK_RUNNING &&
 	    prev->state != TASK_REPORT_MAX) {
-		if (targ_pid == prev->pid)
+		if (targ_tid == prev->pid)
 			set_trace_off();
 		ti.type = TYPE_DEQUEUE;
 	} else {
 		ti.type = TYPE_WAIT;
 	}
 
-	ti.pid = prev->pid;
+	ti.tid = prev->pid;
 	bpf_probe_read_kernel_str(&ti.comm, sizeof(ti.comm), prev->comm);
 	emit_trace(ctx, &ti);
 
@@ -179,7 +179,7 @@ int BPF_PROG(handle__sched_switch, bool preempt, struct task_struct *prev, struc
 		return 0;
 
 	ti.type = TYPE_EXECUTE;
-	ti.pid = next->pid;
+	ti.tid = next->pid;
 	bpf_probe_read_kernel_str(&ti.comm, sizeof(ti.comm), next->comm);
 	emit_trace(ctx, &ti);
 
@@ -189,12 +189,14 @@ int BPF_PROG(handle__sched_switch, bool preempt, struct task_struct *prev, struc
 SEC("tracepoint/raw_syscalls/sys_enter")
 int bpf_trace_sys_enter(struct trace_event_raw_sys_enter *args)
 {
-	int cpu = bpf_get_smp_processor_id();
+	if(!args->id || !trace_syscall)
+		return 0;
 
-	if (args->id && trace_syscall && should_trace(cpu)) {
+	int cpu = bpf_get_smp_processor_id();
+	if (should_trace(cpu)) {
 		struct trace_info ti = {
 			.cpu = cpu,
-			.pid = bpf_get_current_pid_tgid(),
+			.tid = bpf_get_current_pid_tgid(),
 			.type = TYPE_SYSCALL_ENTER,
 			.syscall = args->id,
 		};
@@ -202,7 +204,7 @@ int bpf_trace_sys_enter(struct trace_event_raw_sys_enter *args)
 
 		struct si_key sik = {
 			.cpu = cpu,
-			.pid = ti.pid,
+			.pid = ti.tid,
 			.syscall = args->id,
 		};
 
@@ -215,12 +217,14 @@ int bpf_trace_sys_enter(struct trace_event_raw_sys_enter *args)
 SEC("tracepoint/raw_syscalls/sys_exit")
 int bpf_trace_sys_exit(struct trace_event_raw_sys_exit *args)
 {
-	int cpu = bpf_get_smp_processor_id();
+	if(!args->id || !trace_syscall)
+		return 0;
 
-	if (args->id && trace_syscall && should_trace(cpu)) {
+	int cpu = bpf_get_smp_processor_id();
+	if (should_trace(cpu)) {
 		struct trace_info ti = {
 			.cpu = cpu,
-			.pid = bpf_get_current_pid_tgid(),
+			.tid = bpf_get_current_pid_tgid(),
 			.type = TYPE_SYSCALL_EXIT,
 			.syscall = args->id,
 		};
@@ -228,7 +232,7 @@ int bpf_trace_sys_exit(struct trace_event_raw_sys_exit *args)
 
 		struct si_key sik = {
 			.cpu = cpu,
-			.pid = ti.pid,
+			.pid = ti.tid,
 			.syscall = args->id,
 		};
 

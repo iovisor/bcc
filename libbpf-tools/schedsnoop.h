@@ -20,7 +20,7 @@ struct trace_info {
 	int type;
 	int cpu;
 	int syscall;
-	pid_t pid;
+	pid_t tid;
 	__u64 ts;
 	__u64 duration;
 	char comm[TASK_COMM_LEN];

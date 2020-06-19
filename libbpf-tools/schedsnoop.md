@@ -3,44 +3,55 @@ Task Detector
 
 This is a tool to trace the related schedule events of a specified task, eg the migration, sched in/out, wakeup and sleep/block.
 
-The event was translated into sentence to be more readable, by execute command 'task_detector -p 24104' we continually tracing the schedule events related to 'top' like:
+The event was translated into sentence to be more readable, by execute command 'schedsnoop -t 4314', we continually trace the schedule events related to 'test' like:
 
 ```Shell
-# task_detector -p 24104
+# schedsnoop -t 4314
 Start tracing schedule events 
-Target task pid 24104
+Target thread ID 4314
 ----------------------------
-102770938643193            CPU=1      PID=24104  COMM=top                 ENQUEUE                                               
-102770938684071            CPU=1      PID=0      COMM=IDLE                PREEMPTED                            40us             
-102770938684854            CPU=1      PID=24104  COMM=top                 EXECUTE AFTER WAITED                 41us             
-102770949149591            CPU=1      PID=24104  COMM=top                 WAIT AFTER EXECUTED                  10464us          
-102770949149957            CPU=1      PID=24190  COMM=kworker/1:5-mm_     PREEMPT                                               
-102770949153368            CPU=1      PID=24190  COMM=kworker/1:5-mm_     DEQUEUE AFTER PREEMPTED              3411ns           
-102770949153470            CPU=1      PID=24104  COMM=top                 EXECUTE AFTER WAITED                 3879ns           
-102770949277377            CPU=1      PID=24104  COMM=top                 DEQUEUE AFTER EXECUTED               123us    
+2020-06-19 16:27:07.947329      CPU=2      TID=4314   COMM=test                ENQUEUE                                               
+2020-06-19 16:27:07.947421      CPU=2      TID=0      COMM=swapper/2           PREEMPTED                            92us             
+2020-06-19 16:27:07.947429      CPU=2      TID=4314   COMM=test                EXECUTE AFTER WAITED                 100us            
+2020-06-19 16:27:08.143353      CPU=2      TID=4314   COMM=test                WAIT AFTER EXECUTED                  195ms            
+2020-06-19 16:27:08.143356      CPU=2      TID=24009  COMM=kworker/2:1         PREEMPT                                               
+2020-06-19 16:27:08.143368      CPU=2      TID=24009  COMM=kworker/2:1         DEQUEUE AFTER PREEMPTED              12us             
+2020-06-19 16:27:08.143370      CPU=2      TID=4314   COMM=test                EXECUTE AFTER WAITED                 17us             
 ----------------------------
 ```
 
-This could be helpful on debugging the competition on CPU resource, to find out who has stolen the CPU and how much it stolen.
+This could be helpful on debugging the competition on CPU resource, to find out when and who has stolen the CPU for how long.
 
 It can also tracing the syscall by append options -s.
 
 ```Shell
+# schedsnoop -t 4314 -s
 Start tracing schedule events (include SYSCALL)
-Target task pid 24104
+Target thread ID 4314
 ----------------------------
-104043332442246            CPU=2      PID=24104  COMM=top                 ENQUEUE                                               
-104043332475329            CPU=2      PID=0      COMM=IDLE                PREEMPTED                            33us             
-104043332476101            CPU=2      PID=24104  COMM=top                 EXECUTE AFTER WAITED                 33us             
-104043332525807            CPU=2      PID=24104  COMM=top                 SC [257:openat] ENTER                                 
-104043332570577            CPU=2      PID=24104  COMM=top                 SC [257:openat] TAKE 44us TO EXIT                     
-104043332577193            CPU=2      PID=24104  COMM=top                 SC [5:fstat] ENTER                                    
-104043332582304            CPU=2      PID=24104  COMM=top                 SC [5:fstat] TAKE 5111ns TO EXIT                      
-104043332599968            CPU=2      PID=24104  COMM=top                 SC [3:close] ENTER                                    
-104043332602472            CPU=2      PID=24104  COMM=top                 SC [3:close] TAKE 2504ns TO EXIT                      
-104043332618210            CPU=2      PID=24104  COMM=top                 SC [8:lseek] ENTER                                    
-104043332624106            CPU=2      PID=24104  COMM=top                 SC [8:lseek] TAKE 5896ns TO EXIT                      
-104043332716699            CPU=2      PID=24104  COMM=top                 SC [257:openat] ENTER                                 
-104043332744398            CPU=2      PID=24104  COMM=top                 SC [257:openat] TAKE 27us TO EXIT                    
+2020-06-19 16:27:22.850918      CPU=2      TID=4314   COMM=test                ENQUEUE                                               
+2020-06-19 16:27:22.850947      CPU=2      TID=0      COMM=swapper/2           PREEMPTED                            29us             
+2020-06-19 16:27:22.850950      CPU=2      TID=4314   COMM=test                EXECUTE AFTER WAITED                 31us             
+2020-06-19 16:27:22.850967      CPU=2      TID=4314   COMM=test                SC [1:write] ENTER                                    
+2020-06-19 16:27:22.850984      CPU=2      TID=4314   COMM=test                SC [1:write] TAKE 17us TO EXIT                        
+2020-06-19 16:27:23.118601      CPU=2      TID=4314   COMM=test                WAIT AFTER EXECUTED                  267ms            
+2020-06-19 16:27:23.118606      CPU=2      TID=24009  COMM=kworker/2:1         PREEMPT                                               
+...
+```
+
+Add debug option -d could print raw timestamp
+
+```Shell
+# schedsnoop -t 4314 -d
+Start tracing schedule events 
+Target thread ID 4314
+----------------------------
+400231700673269      CPU=2      TID=4314   COMM=test                ENQUEUE                                               
+400231700742401      CPU=2      TID=0      COMM=swapper/2           PREEMPTED                            69us             
+400231700747527      CPU=2      TID=24009  COMM=kworker/2:1         PREEMPT                                               
+400231701020508      CPU=2      TID=24009  COMM=kworker/2:1         DEQUEUE AFTER PREEMPTED              272us            
+400231701028563      CPU=2      TID=24114  COMM=kworker/2:0         PREEMPT                                               
+400231701090181      CPU=2      TID=24114  COMM=kworker/2:0         DEQUEUE AFTER PREEMPTED              61us             
+400231701095608      CPU=2      TID=4314   COMM=test                EXECUTE AFTER WAITED                 422us            
 ...
 ``` 

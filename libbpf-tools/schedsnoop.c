@@ -15,6 +15,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <locale.h>
+#include <time.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/time.h>
@@ -38,44 +39,53 @@ const char *argp_program_bug_address = "<bpf@vger.kernel.org>";
 static const char argp_program_doc[] =
 "Trace the related schedule events of a specified task.\n"
 "\n"
-"USAGE: schedsnoop -p PID [-s]\n"
+"USAGE: schedsnoop -t TID [-s] [-d]\n"
 "\n"
 "EXAMPLES:\n"
-"    schedsnoop -p 49870       	# trace pid 49870\n"
-"    schedsnoop -p 49870 -s    	# trace pid 49870 and system call\n";
+"    schedsnoop -t 49870       	# trace tid 49870\n"
+"    schedsnoop -t 49870 -s    	# trace tid 49870 and system call\n"
+"    schedsnoop -t 49870 -d	# debug mode, output raw timestamp\n";
 
 static const struct argp_option opts[] = {
-	{ "pid", 'p', "PID", 0, "Process PID to trace"},
-	{ "syscall", 's', NULL, 0, "Trace SYSCALL Info"},
+	{ "tid", 't', "TID", 0, "Thread ID to trace"},
+	{ "syscall", 's', NULL, 0, "Trace SYSCALL info"},
+	{ "debug", 'd', NULL, 0, "Debug: output raw timestamp"},
 	{},
 };
 
 static struct env {
-	int trace_syscall;
-	int targ_pid;
-} env;
+	int targ_tid;
+	bool trace_syscall;
+	bool debug;
+} env = {
+	.trace_syscall = false,
+	.debug = false,
+};
 
-int volatile si_map_fd;
 bool volatile exiting = false;
+struct timespec start_ts;
+struct timespec real_ts;
 
 static error_t parse_arg(int key, char *arg, struct argp_state *state)
 {
-	int pid;
+	int tid;
 	switch (key) {
-	case 'p':
-		pid = strtol(arg, NULL, 10);
-		if (pid <= 0) {
-			fprintf(stderr, "Invalid PID: %s\n", arg);
+	case 't':
+		tid = strtol(arg, NULL, 10);
+		if (tid <= 0) {
+			fprintf(stderr, "Invalid thread ID: %s\n", arg);
 			argp_usage(state);
 		}
-		env.targ_pid = pid;
+		env.targ_tid = tid;
 		break;
 	case 's':
-		env.trace_syscall = 1;
+		env.trace_syscall = true;
 		break;
+	case 'd':
+		env.debug = true;
 	case ARGP_KEY_END:
-		if (!env.targ_pid) {
-			fprintf(stderr, "Target PID is required!\n");
+		if (!env.targ_tid) {
+			fprintf(stderr, "Target thread ID is required!\n");
 			argp_usage(state);
 		}
 		break;
@@ -99,13 +109,44 @@ static inline int time_to_str(__u64 ns, char *buf, size_t len)
 	return 0;
 }
 
+static inline int time_to_real_time(__u64 ns, char *buf, size_t len)
+{
+	__u64 real_ns, tmp = ns % NS_IN_SEC + real_ts.tv_nsec;
+	time_t real_s = ns / NS_IN_SEC + real_ts.tv_sec - start_ts.tv_sec;
+	if(tmp > start_ts.tv_nsec){
+		real_ns = tmp - start_ts.tv_nsec;
+	} else {
+		real_ns = start_ts.tv_nsec - tmp;
+		real_s -= 1;
+	}
+	while (real_ns > NS_IN_SEC) {
+		real_ns -= NS_IN_SEC;
+		real_s += 1;
+	}
+
+	struct tm *real_tm = localtime(&real_s);
+	char date[20];
+	strftime(date, sizeof(date), "%Y-%m-%d %H:%M:%S", real_tm);
+		
+	snprintf(buf, len, "%s.%06llu", date, real_ns / 1000);
+
+	return 0;
+}
+
 static inline void pr_ti(struct trace_info *ti, char *opt, char *delay)
 {
-	char buf[27];
-	snprintf(buf, sizeof(buf), "%lluus", ti->ts / NS_IN_US);
-	printf("%-27sCPU=%-7dPID=%-7dCOMM=%-20s%-37s%-17s\n",
-				buf, ti->cpu, ti->pid, ti->comm, opt,
+	char buf[32];
+	if (env.debug) {
+		snprintf(buf, sizeof(buf), "%llu", ti->ts);
+		printf("%-20sCPU=%-7dTID=%-7dCOMM=%-20s%-37s%-17s\n",
+				buf, ti->cpu, ti->tid, ti->comm, opt,
 				delay ? delay : "");
+	} else {
+		time_to_real_time(ti->ts, buf, sizeof(buf));
+		printf("%-32sCPU=%-7dTID=%-7dCOMM=%-20s%-37s%-17s\n",
+				buf, ti->cpu, ti->tid, ti->comm, opt,
+				delay ? delay : "");
+	}
 }
 
 void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
@@ -129,7 +170,7 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 		pr_ti(ti, "ENQUEUE", NULL);
 		break;
 	case TYPE_WAIT:
-		if (ti->pid == env.targ_pid) {
+		if (ti->tid == env.targ_tid) {
 			w_start = ti->ts;
 			pr_ti(ti, "WAIT AFTER EXECUTED", d_str);
 		} else {
@@ -139,7 +180,7 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 		}
 		break;
 	case TYPE_EXECUTE:
-		if (ti->pid == env.targ_pid) {
+		if (ti->tid == env.targ_tid) {
 			time_to_str(ti->ts - w_start,
 					d_str, sizeof(d_str));
 			pr_ti(ti, "EXECUTE AFTER WAITED", d_str);
@@ -149,7 +190,7 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 		}
 		break;
 	case TYPE_DEQUEUE:
-		if (ti->pid == env.targ_pid)
+		if (ti->tid == env.targ_tid)
 			pr_ti(ti, "DEQUEUE AFTER EXECUTED", d_str);
 		else {
 			time_to_str(ti->ts - p_start,
@@ -220,7 +261,7 @@ int main(int argc, char **argv)
 	}
 
 	/* initialize global data (filtering options) */
-	obj->rodata->targ_pid = env.targ_pid;
+	obj->rodata->targ_tid = env.targ_tid;
 	obj->rodata->trace_syscall = env.trace_syscall;
 	
 	/* Load bpf program */
@@ -231,14 +272,15 @@ int main(int argc, char **argv)
 	}
 	
 	/* Attach bpf program */
+	if (!env.debug) {
+		clock_gettime(CLOCK_REALTIME, &real_ts);
+		clock_gettime(CLOCK_MONOTONIC, &start_ts);
+	}
 	err = schedsnoop_bpf__attach(obj);
 	if (err) {
 		fprintf(stderr, "failed to attach BPF programs\n");
 		goto cleanup;
 	}
-	
-	/* Setup global map fd */
-	si_map_fd = bpf_map__fd(obj->maps.syscall_info_maps);
 	
 	signal(SIGINT, int_exit);
 	signal(SIGTERM, int_exit);
@@ -246,15 +288,16 @@ int main(int argc, char **argv)
 	printf("Start tracing schedule events ");
 	if (env.trace_syscall)
 		printf("(include SYSCALL)");
-	printf("\nTarget task pid %d\n", env.targ_pid);
+	printf("\nTarget thread ID %d\n", env.targ_tid);
 	
 	/* setup event callbacks */
 	pb_opts.sample_cb = handle_event;
+	pb_opts.lost_cb = handle_lost_events;
 	pb = perf_buffer__new(bpf_map__fd(obj->maps.events), PERF_BUFFER_PAGES, &pb_opts);
 	err = libbpf_get_error(pb);
 	if (err) {
 		pb = NULL;
-		fprintf(stderr, "failed to open perf buffer: %d\n", err);
+		fprintf(stderr, "Failed to open perf buffer: %d\n", err);
 		goto cleanup;
 	}
 	
@@ -264,7 +307,7 @@ int main(int argc, char **argv)
 	if (exiting)
 		goto cleanup;
 	if (obj->bss->targ_exit) {
-		printf("Target %d Exited!\n", env.targ_pid);
+		printf("Target %d Exited!\n", env.targ_tid);
 		goto cleanup;
 	}
 	printf("Error polling perf buffer: %d\n", err);
