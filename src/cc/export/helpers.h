@@ -1029,11 +1029,13 @@ __attribute__((always_inline))                                  \
 static int ____##name(unsigned long long *ctx, ##args);         \
 int name(unsigned long long *ctx)                               \
 {                                                               \
+        int __ret;                                              \
+                                                                \
         _Pragma("GCC diagnostic push")                          \
         _Pragma("GCC diagnostic ignored \"-Wint-conversion\"")  \
-        ____##name(___bpf_ctx_cast(args));                      \
+        __ret = ____##name(___bpf_ctx_cast(args));              \
         _Pragma("GCC diagnostic pop")                           \
-        return 0;                                               \
+        return __ret;                                           \
 }                                                               \
 static int ____##name(unsigned long long *ctx, ##args)
 
