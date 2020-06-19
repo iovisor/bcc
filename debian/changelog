@@ -1,3 +1,19 @@
+bcc (0.15.0-1) unstable; urgency=low
+
+  * Support for kernel up to 5.7
+  * new tools: funcinterval.py, dirtop.py
+  * support lsm bpf programs
+  * support multiple pid/tids for offwaketime
+  * usdt: add helpers to set semaphore values
+  * turn off x86 jump table optimization during jit compilation
+  * add support to use bpf_probe_read[_str_}{_user,kernel} in all bpf
+  *    programs, fail back to old bpf_probe_read[_str] for old kernels
+  * tools: add filtering by mount namespace
+  * libbpf-tools: cpudist, syscount, execsnoop, vfsstat
+  * lots of bug fixes and a few additional arguments for tools
+
+ -- Yonghong Song <ys114321@gmail.com>  Mon, 19 Jun 2020 17:00:00 +0000
+
 bcc (0.14.0-1) unstable; urgency=low
 
   * Support for kernel up to 5.6
