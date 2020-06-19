@@ -1186,13 +1186,6 @@ bool bpf_has_kernel_btf(void)
   return libbpf_find_vmlinux_btf_id("bpf_prog_put", 0) > 0;
 }
 
-int bpf_detach_kfunc(int prog_fd, char *func)
-{
-  UNUSED(prog_fd);
-  UNUSED(func);
-  return 0;
-}
-
 int bpf_attach_kfunc(int prog_fd)
 {
   int ret;

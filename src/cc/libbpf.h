@@ -94,8 +94,6 @@ int bpf_detach_tracepoint(const char *tp_category, const char *tp_name);
 
 int bpf_attach_raw_tracepoint(int progfd, const char *tp_name);
 
-int bpf_detach_kfunc(int prog_fd, char *func);
-
 int bpf_attach_kfunc(int prog_fd);
 
 int bpf_attach_lsm(int prog_fd);
