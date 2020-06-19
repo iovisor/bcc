@@ -51,40 +51,31 @@ static const struct argp_option opts[] = {
 };
 
 static struct env {
-	int nr_cpus;
 	int trace_syscall;
-	int target;
+	int targ_pid;
 } env;
 
-int ti_map_fd;
-int si_map_fd;
-int start_map_fd;
-int end_map_fd;
-bool exiting = false;
+int volatile si_map_fd;
+bool volatile exiting = false;
 
 static error_t parse_arg(int key, char *arg, struct argp_state *state)
 {
 	int pid;
 	switch (key) {
 	case 'p':
-		if(arg == NULL) {
-			fprintf(stderr, "PID is required\n");
+		pid = strtol(arg, NULL, 10);
+		if (pid <= 0) {
+			fprintf(stderr, "Invalid PID: %s\n", arg);
 			argp_usage(state);
-		} else {
-			pid = strtol(arg, NULL, 10);
-			if (pid <= 0) {
-				fprintf(stderr, "Invalid PID: %s\n", arg);
-				argp_usage(state);
-			}
-			env.target = pid;
 		}
+		env.targ_pid = pid;
 		break;
 	case 's':
 		env.trace_syscall = 1;
 		break;
 	case ARGP_KEY_END:
-		if (!env.target) {
-			fprintf(stderr, "No target PID\n");
+		if (!env.targ_pid) {
+			fprintf(stderr, "Target PID is required!\n");
 			argp_usage(state);
 		}
 		break;
@@ -94,14 +85,13 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 	return 0;
 }
 
-static inline int time_to_str(u64 ns, char *buf, size_t len)
+static inline int time_to_str(__u64 ns, char *buf, size_t len)
 {
-
-	if (ns > 10 * NS_IN_SEC)
+	if (ns >= 10 * NS_IN_SEC)
 		snprintf(buf, len, "%llus", ns / NS_IN_SEC);
-	else if (ns > 10 * NS_IN_MS)
+	else if (ns >= 10 * NS_IN_MS)
 		snprintf(buf, len, "%llums", ns / NS_IN_MS);
-	else if (ns > 10 * NS_IN_US)
+	else if (ns >= 10 * NS_IN_US)
 		snprintf(buf, len, "%lluus", ns / NS_IN_US);
 	else
 		snprintf(buf, len, "%lluns", ns);
@@ -125,9 +115,8 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	char comm_buf[2 * TASK_COMM_LEN];
 	char func[80];
 	struct si_key sik;
-	u64 siv;
-	static u64 w_start, p_start, last_time;
-
+	__u64 siv;
+	static __u64 w_start, p_start, last_time;
 
 	time_to_str(ti->ts - last_time, d_str, sizeof(d_str));
 
@@ -142,7 +131,7 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 		pr_ti(ti, "ENQUEUE", NULL);
 		break;
 	case TYPE_WAIT:
-		if (ti->pid == env.target) {
+		if (ti->pid == env.targ_pid) {
 			w_start = ti->ts;
 			pr_ti(ti, "WAIT AFTER EXECUTED", d_str);
 		} else {
@@ -152,7 +141,7 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 		}
 		break;
 	case TYPE_EXECUTE:
-		if (ti->pid == env.target) {
+		if (ti->pid == env.targ_pid) {
 			time_to_str(ti->ts - w_start,
 					d_str, sizeof(d_str));
 			pr_ti(ti, "EXECUTE AFTER WAITED", d_str);
@@ -162,7 +151,7 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 		}
 		break;
 	case TYPE_DEQUEUE:
-		if (ti->pid == env.target)
+		if (ti->pid == env.targ_pid)
 			pr_ti(ti, "DEQUEUE AFTER EXECUTED", d_str);
 		else {
 			time_to_str(ti->ts - p_start,
@@ -229,13 +218,6 @@ int main(int argc, char **argv)
 
 	init_syscall_names();
 	
-	/* Check cpu number */
-	env.nr_cpus = sysconf(_SC_NPROCESSORS_CONF);
-	if (env.nr_cpus > NR_CPU_MAX) {
-		printf("Support Maximum %d cpus\n", NR_CPU_MAX);
-		goto freename;
-	}
-	
 	/* Increase rlimit */
 	err = bump_memlock_rlimit();
 	if (err) {
@@ -251,7 +233,7 @@ int main(int argc, char **argv)
 	}
 
 	/* initialize global data (filtering options) */
-	obj->rodata->targ_pid = env.target;
+	obj->rodata->targ_pid = env.targ_pid;
 	obj->rodata->trace_syscall = env.trace_syscall;
 	
 	/* Load bpf program */
@@ -277,7 +259,7 @@ int main(int argc, char **argv)
 	printf("Start tracing schedule events ");
 	if (env.trace_syscall)
 		printf("(include SYSCALL)");
-	printf("\nTarget task pid %d\n", env.target);
+	printf("\nTarget task pid %d\n", env.targ_pid);
 	
 	/* setup event callbacks */
 	pb_opts.sample_cb = handle_event;
@@ -290,12 +272,12 @@ int main(int argc, char **argv)
 	}
 	
 	/* main: poll */
-	while (!exiting && !obj->bss->targ_exit && \
+	while (!exiting && !obj->bss->targ_exit && 
 			(err = perf_buffer__poll(pb, 100)) >= 0);
 	if (exiting)
 		goto cleanup;
 	if (obj->bss->targ_exit) {
-		printf("Target %d Destroyed!\n", env.target);
+		printf("Target %d Exited!\n", env.targ_pid);
 		goto cleanup;
 	}
 	printf("Error polling perf buffer: %d\n", err);

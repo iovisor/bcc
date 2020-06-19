@@ -4,12 +4,7 @@
 #define SCHEDSNOOP_H
 
 #define NR_ENTRY_MAX		10000
-#define NR_CPU_MAX		512
 #define TASK_COMM_LEN		16
-
-
-typedef unsigned long long u64;
-typedef int pid_t;
 
 enum {
 	TYPE_MIGRATE,
@@ -26,7 +21,7 @@ struct trace_info {
 	int cpu;
 	int syscall;
 	pid_t pid;
-	u64 ts;
+	__u64 ts;
 	char comm[TASK_COMM_LEN];
 };
 
