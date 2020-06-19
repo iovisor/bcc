@@ -47,6 +47,30 @@ static __always_inline void emit_trace(void *ctx, struct trace_info* ti)
 	bpf_perf_event_output(ctx, &events, BPF_F_CURRENT_CPU, ti, sizeof(*ti));
 }
 
+static __always_inline void emit_and_update(void *ctx, struct trace_info* ti,
+	       	struct si_key* sik)
+{
+	__u64 *last_ts;
+	__u64 ts = bpf_ktime_get_ns();
+	switch (ti->type) {
+	case TYPE_SYSCALL_ENTER:
+		bpf_map_update_elem(&syscall_info_maps, sik, &ts, BPF_ANY);
+		break;
+	case TYPE_SYSCALL_EXIT:
+		last_ts = bpf_map_lookup_elem(&syscall_info_maps, sik);
+		if(!last_ts)
+			return;
+		ti->duration = ts - *last_ts;
+		bpf_map_delete_elem(&syscall_info_maps, sik);
+		break;
+	default:
+		break;
+	}
+
+	ti->ts = ts;
+	bpf_perf_event_output(ctx, &events, BPF_F_CURRENT_CPU, ti, sizeof(*ti));
+}
+
 SEC("tp_btf/sched_process_exit")
 int BPF_PROG(handle__sched_process_exit, struct task_struct *p)
 {
@@ -176,7 +200,13 @@ int bpf_trace_sys_enter(struct trace_event_raw_sys_enter *args)
 		};
 		bpf_get_current_comm(&ti.comm, sizeof(ti.comm));
 
-		emit_trace(args, &ti);
+		struct si_key sik = {
+			.cpu = cpu,
+			.pid = ti.pid,
+			.syscall = args->id,
+		};
+
+		emit_and_update(args, &ti, &sik);
 	}
 
 	return 0;
@@ -196,7 +226,13 @@ int bpf_trace_sys_exit(struct trace_event_raw_sys_exit *args)
 		};
 		bpf_get_current_comm(&ti.comm, sizeof(ti.comm));
 
-		emit_trace(args, &ti);
+		struct si_key sik = {
+			.cpu = cpu,
+			.pid = ti.pid,
+			.syscall = args->id,
+		};
+
+		emit_and_update(args, &ti, &sik);
 	}
 
 	return 0;

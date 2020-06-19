@@ -22,6 +22,7 @@ struct trace_info {
 	int syscall;
 	pid_t pid;
 	__u64 ts;
+	__u64 duration;
 	char comm[TASK_COMM_LEN];
 };
 

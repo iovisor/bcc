@@ -114,8 +114,6 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	char d_str[16];
 	char comm_buf[2 * TASK_COMM_LEN];
 	char func[80];
-	struct si_key sik;
-	__u64 siv;
 	static __u64 w_start, p_start, last_time;
 
 	time_to_str(ti->ts - last_time, d_str, sizeof(d_str));
@@ -160,24 +158,13 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 		}
 		break;
 	case TYPE_SYSCALL_ENTER:
-		siv = ti->ts;
-		sik.cpu = ti->cpu;
-		sik.pid = ti->pid;
-		sik.syscall = ti->syscall;
-		bpf_map_update_elem(si_map_fd, &sik, &siv, BPF_ANY);
 		syscall_name(ti->syscall, comm_buf, sizeof(comm_buf));
 		snprintf(func, sizeof(func), "SC [%d:%s] ENTER",
 				ti->syscall, comm_buf);
 		pr_ti(ti, func, NULL);
 		break;
 	case TYPE_SYSCALL_EXIT:
-		sik.cpu = ti->cpu;
-		sik.pid = ti->pid;
-		sik.syscall = ti->syscall;
-		if (bpf_map_lookup_elem(si_map_fd, &sik, &siv))
-			break;
-		time_to_str(ti->ts - siv, d_str, sizeof(d_str));
-		bpf_map_delete_elem(si_map_fd, &sik);
+		time_to_str(ti->duration, d_str, sizeof(d_str));
 		syscall_name(ti->syscall, comm_buf, sizeof(comm_buf));
 		snprintf(func, sizeof(func), "SC [%d:%s] TAKE %s TO EXIT",
 				ti->syscall, comm_buf, d_str);
