@@ -98,8 +98,6 @@ int bpf_detach_kfunc(int prog_fd, char *func);
 
 int bpf_attach_kfunc(int prog_fd);
 
-int bpf_detach_lsm(int prog_fd, char *func);
-
 int bpf_attach_lsm(int prog_fd);
 
 bool bpf_has_kernel_btf(void);

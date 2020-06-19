@@ -1203,13 +1203,6 @@ int bpf_attach_kfunc(int prog_fd)
   return ret;
 }
 
-int bpf_detach_lsm(int prog_fd, char *func)
-{
-  UNUSED(prog_fd);
-  UNUSED(func);
-  return 0;
-}
-
 int bpf_attach_lsm(int prog_fd)
 {
   int ret;
