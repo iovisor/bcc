@@ -1203,6 +1203,23 @@ int bpf_attach_kfunc(int prog_fd)
   return ret;
 }
 
+int bpf_detach_lsm(int prog_fd, char *func)
+{
+  UNUSED(prog_fd);
+  UNUSED(func);
+  return 0;
+}
+
+int bpf_attach_lsm(int prog_fd)
+{
+  int ret;
+
+  ret = bpf_raw_tracepoint_open(NULL, prog_fd);
+  if (ret < 0)
+    fprintf(stderr, "bpf_attach_raw_tracepoint (lsm): %s\n", strerror(errno));
+  return ret;
+}
+
 void * bpf_open_perf_buffer(perf_reader_raw_cb raw_cb,
                             perf_reader_lost_cb lost_cb, void *cb_cookie,
                             int pid, int cpu, int page_cnt) {
