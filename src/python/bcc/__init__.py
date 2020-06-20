@@ -1472,6 +1472,8 @@ class BPF(object):
             self.detach_kfunc(k)
         for k, v in list(self.kfunc_exit_fds.items()):
             self.detach_kretfunc(k)
+        for k, v in list(self.lsm_fds.items()):
+            self.detach_lsm(k)
 
         # Clean up opened perf ring buffer and perf events
         table_keys = list(self.tables.keys())
