@@ -6,7 +6,6 @@
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_tracing.h>
 #include <bpf/bpf_core_read.h>
-#include <string.h>
 #include "syscount.h"
 
 const volatile bool count_by_process = false;
