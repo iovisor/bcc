@@ -18,6 +18,7 @@ APPS = \
 	opensnoop \
 	runqslower \
 	syscount \
+	tcpconnect \
 	vfsstat \
 	xfsslower \
 	#
@@ -26,6 +27,7 @@ COMMON_OBJ = \
 	$(OUTPUT)/trace_helpers.o \
 	$(OUTPUT)/syscall_helpers.o \
 	$(OUTPUT)/errno_helpers.o \
+	$(OUTPUT)/map_helpers.o \
 	#
 
 .PHONY: all
