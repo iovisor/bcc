@@ -1356,6 +1356,8 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
       if (numcpu <= 0)
         numcpu = 1;
       table.max_entries = numcpu;
+    } else if (section_attr == "maps/ringbuf") {
+      map_type = BPF_MAP_TYPE_RINGBUF;
     } else if (section_attr == "maps/perf_array") {
       map_type = BPF_MAP_TYPE_PERF_EVENT_ARRAY;
     } else if (section_attr == "maps/cgroup_array") {

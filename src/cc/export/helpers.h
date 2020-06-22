@@ -128,7 +128,7 @@ struct _name##_table_t __##_name
 #endif
 #endif
 
-// Table for pushing custom events to userspace via ring buffer
+// Table for pushing custom events to userspace via perf ring buffer
 #define BPF_PERF_OUTPUT(_name) \
 struct _name##_table_t { \
   int key; \
@@ -140,6 +140,15 @@ struct _name##_table_t { \
 }; \
 __attribute__((section("maps/perf_output"))) \
 struct _name##_table_t _name = { .max_entries = 0 }
+
+// Table for pushing custom events to userspace via ring buffer
+#define BPF_RINGBUF_OUTPUT(_name, _max_entries) \
+struct _name##_table_t { \
+  int (*ringbuf_submit) (void *, u64, u64); \
+  u32 max_entries; \
+}; \
+__attribute__((section("maps/ringbuf"))) \
+struct _name##_table_t _name = { .max_entries = (_max_entries) }
 
 // Table for reading hw perf cpu counters
 #define BPF_PERF_ARRAY(_name, _max_entries) \
