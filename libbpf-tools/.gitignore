@@ -1,4 +1,5 @@
 /.output
+/bitesize
 /cpudist
 /drsnoop
 /execsnoop
