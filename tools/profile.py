@@ -305,17 +305,18 @@ def aksym(addr):
 
 # output stacks
 missing_stacks = 0
-has_enomem = False
+has_collision = False
 counts = b.get_table("counts")
 stack_traces = b.get_table("stack_traces")
 for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
     # handle get_stackid errors
     if not args.user_stacks_only and stack_id_err(k.kernel_stack_id):
         missing_stacks += 1
-        has_enomem = has_enomem or k.kernel_stack_id == -errno.ENOMEM
+        # hash collision (-EEXIST) suggests that the map size may be too small
+        has_collision = has_collision or k.kernel_stack_id == -errno.EEXIST
     if not args.kernel_stacks_only and stack_id_err(k.user_stack_id):
         missing_stacks += 1
-        has_enomem = has_enomem or k.user_stack_id == -errno.ENOMEM
+        has_collision = has_collision or k.user_stack_id == -errno.EEXIST
 
     user_stack = [] if k.user_stack_id < 0 else \
         stack_traces.walk(k.user_stack_id)
@@ -371,7 +372,7 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
 
 # check missing
 if missing_stacks > 0:
-    enomem_str = "" if not has_enomem else \
+    enomem_str = "" if not has_collision else \
         " Consider increasing --stack-storage-size."
     print("WARNING: %d stack traces could not be displayed.%s" %
         (missing_stacks, enomem_str),
