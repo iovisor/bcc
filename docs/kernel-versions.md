@@ -113,6 +113,7 @@ precpu cgroup storage | 4.20 | [`b741f1630346`](https://github.com/torvalds/linu
 queue | 4.20 | [`f1a2e44a3aec`](https://github.com/torvalds/linux/commit/f1a2e44a3aeccb3ff18d3ccc0b0203e70b95bd92)
 stack | 4.20 | [`f1a2e44a3aec`](https://github.com/torvalds/linux/commit/f1a2e44a3aeccb3ff18d3ccc0b0203e70b95bd92)
 socket local storage | 5.2 | [`6ac99e8f23d4`](https://github.com/torvalds/linux/commit/6ac99e8f23d4b10258406ca0dd7bffca5f31da9d)
+ringbuf | 5.8 | [`457f44363a88`](https://github.com/torvalds/linux/commit/457f44363a8894135c85b7a9afd2bd8196db24ab)
 
 ## XDP
 
@@ -159,7 +160,7 @@ Alphabetical order
 
 Helper | Kernel version | License | Commit |
 -------|----------------|---------|--------|
-`BPF_FUNC_bind()` | 4.17 |  | [`d74bad4e74ee`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=d74bad4e74ee373787a9ae24197c17b7cdc428d5) | 
+`BPF_FUNC_bind()` | 4.17 |  | [`d74bad4e74ee`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=d74bad4e74ee373787a9ae24197c17b7cdc428d5) |
 `BPF_FUNC_clone_redirect()` | 4.2 |  | [`3896d655f4d4`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=3896d655f4d491c67d669a15f275a39f713410f8)
 `BPF_FUNC_csum_diff()` | 4.6 |  | [`7d672345ed29`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=7d672345ed295b1356a5d9f7111da1d1d7d65867)
 `BPF_FUNC_csum_level()` | 5.7 |  | [`7cdec54f9713`](https://github.com/torvalds/linux/commit/7cdec54f9713256bb170873a1fc5c75c9127c9d2)
@@ -226,11 +227,11 @@ Helper | Kernel version | License | Commit |
 `BPF_FUNC_read_branch_records()` | 5.6 | GPL | [`fff7b64355ea`](https://github.com/torvalds/linux/commit/fff7b64355eac6e29b50229ad1512315bc04b44e)
 `BPF_FUNC_redirect()` | 4.4 |  | [`27b29f63058d`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=27b29f63058d26c6c1742f1993338280d5a41dc6)
 `BPF_FUNC_redirect_map()` | 4.14 |  | [`97f91a7cf04f`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=97f91a7cf04ff605845c20948b8a80e54cbd3376)
-`BPF_FUNC_ringbuf_discard()` | 5.7 |  | [`457f44363a88`](https://github.com/torvalds/linux/commit/457f44363a8894135c85b7a9afd2bd8196db24ab)
-`BPF_FUNC_ringbuf_output()` | 5.7 |  | [`457f44363a88`](https://github.com/torvalds/linux/commit/457f44363a8894135c85b7a9afd2bd8196db24ab)
-`BPF_FUNC_ringbuf_query()` | 5.7 |  | [`457f44363a88`](https://github.com/torvalds/linux/commit/457f44363a8894135c85b7a9afd2bd8196db24ab)
-`BPF_FUNC_ringbuf_reserve()` | 5.7 |  | [`457f44363a88`](https://github.com/torvalds/linux/commit/457f44363a8894135c85b7a9afd2bd8196db24ab)
-`BPF_FUNC_ringbuf_submit()` | 5.7 |  | [`457f44363a88`](https://github.com/torvalds/linux/commit/457f44363a8894135c85b7a9afd2bd8196db24ab)
+`BPF_FUNC_ringbuf_discard()` | 5.8 |  | [`457f44363a88`](https://github.com/torvalds/linux/commit/457f44363a8894135c85b7a9afd2bd8196db24ab)
+`BPF_FUNC_ringbuf_output()` | 5.8 |  | [`457f44363a88`](https://github.com/torvalds/linux/commit/457f44363a8894135c85b7a9afd2bd8196db24ab)
+`BPF_FUNC_ringbuf_query()` | 5.8 |  | [`457f44363a88`](https://github.com/torvalds/linux/commit/457f44363a8894135c85b7a9afd2bd8196db24ab)
+`BPF_FUNC_ringbuf_reserve()` | 5.8 |  | [`457f44363a88`](https://github.com/torvalds/linux/commit/457f44363a8894135c85b7a9afd2bd8196db24ab)
+`BPF_FUNC_ringbuf_submit()` | 5.8 |  | [`457f44363a88`](https://github.com/torvalds/linux/commit/457f44363a8894135c85b7a9afd2bd8196db24ab)
 `BPF_FUNC_send_signal()` | 5.3 |  | [`8b401f9ed244`](https://git.kernel.org/pub/scm/linux/kernel/git/bpf/bpf-next.git/commit/?id=8b401f9ed2441ad9e219953927a842d24ed051fc)
 `BPF_FUNC_send_signal_thread()` | 5.5 |  | [`8482941f0906`](https://git.kernel.org/pub/scm/linux/kernel/git/bpf/bpf-next.git/commit/?id=8482941f09067da42f9c3362e15bfb3f3c19d610)
 `BPF_FUNC_seq_printf()` | 5.7 | GPL | [`492e639f0c22`](https://kernel.googlesource.com/pub/scm/linux/kernel/git/bpf/bpf-next/+/492e639f0c222784e2e0f121966375f641c61b15)
