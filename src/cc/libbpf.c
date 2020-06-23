@@ -1412,10 +1412,11 @@ void bpf_free_ringbuf(struct ring_buffer *rb) {
     ring_buffer__free(rb);
 }
 
+/* Add a new ring buffer associated with map_fd to the ring buffer manager rb,
+ * associating it with callback sample_cb. */
 int bpf_add_ringbuf(struct ring_buffer *rb, int map_fd,
-                    ring_buffer_sample_fn sample_cb, void *ctx) {
-    //return ring_buffer__add
-    return 0;
+                    ring_buffer_sample_fn sample_cb) {
+    return ring_buffer__add(rb, map_fd, sample_cb, NULL);
 }
 
 /* Poll for available data and consume, if data is available.  Returns number
