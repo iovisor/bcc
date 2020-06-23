@@ -1444,9 +1444,24 @@ class BPF(object):
         for v in self.ring_buffers.values():
             ringbuf = ct.c_void_p(v)
             ret = 1
-            # Consume until empty
+            # Poll and consume until empty
             while ret > 0:
                 ret = lib.bpf_poll_ringbuf(ringbuf, timeout)
+
+    def ring_buffer_consume(self):
+        """ring_buffer_consume(self)
+
+        Consume all open ringbuf buffers, regardless of whether or not
+        they currently contain events data. This is best for use cases
+        where low latency is desired, but it can impact performance.
+        If you are unsure, use ring_buffer_poll instead.
+        """
+        for v in self.ring_buffers.values():
+            ringbuf = ct.c_void_p(v)
+            ret = 1
+            # Consume until empty
+            while ret > 0:
+                ret = lib.bpf_consume_ringbuf(ringbuf)
 
     def kprobe_poll(self, timeout = -1):
         """kprobe_poll(self)

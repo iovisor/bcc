@@ -140,6 +140,8 @@ lib.bpf_new_ringbuf.restype = ct.c_void_p
 lib.bpf_new_ringbuf.argtypes = [ct.c_int, _RINGBUF_CB_TYPE]
 lib.bpf_poll_ringbuf.restype = ct.c_int
 lib.bpf_poll_ringbuf.argtypes = [ct.c_void_p, ct.c_int]
+lib.bpf_consume_ringbuf.restype = ct.c_int
+lib.bpf_consume_ringbuf.argtypes = [ct.c_void_p]
 
 # bcc symbol helpers
 class bcc_symbol(ct.Structure):
