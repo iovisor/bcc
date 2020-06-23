@@ -1447,6 +1447,7 @@ class BPF(object):
             # Poll and consume until empty
             while ret > 0:
                 ret = lib.bpf_poll_ringbuf(ringbuf, timeout)
+                print("retval is", ret)
 
     def ring_buffer_consume(self):
         """ring_buffer_consume(self)
@@ -1462,6 +1463,7 @@ class BPF(object):
             # Consume until empty
             while ret > 0:
                 ret = lib.bpf_consume_ringbuf(ringbuf)
+                print("retval is", ret)
 
     def kprobe_poll(self, timeout = -1):
         """kprobe_poll(self)

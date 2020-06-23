@@ -135,7 +135,7 @@ lib.bpf_attach_perf_event.argtype = [ct.c_int, ct.c_uint, ct.c_uint, ct.c_ulongl
 lib.bpf_close_perf_event_fd.restype = ct.c_int
 lib.bpf_close_perf_event_fd.argtype = [ct.c_int]
 
-_RINGBUF_CB_TYPE = ct.CFUNCTYPE(None, ct.c_void_p, ct.c_void_p, ct.c_int)
+_RINGBUF_CB_TYPE = ct.CFUNCTYPE(ct.c_int, ct.c_void_p, ct.c_void_p, ct.c_int)
 lib.bpf_new_ringbuf.restype = ct.c_void_p
 lib.bpf_new_ringbuf.argtypes = [ct.c_int, _RINGBUF_CB_TYPE]
 lib.bpf_poll_ringbuf.restype = ct.c_int

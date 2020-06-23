@@ -963,12 +963,20 @@ class RingBuf(EventArrayBase):
 
         def ringbuf_cb_(ctx, data, size):
             try:
-                callback(ctx, data, size)
+                ret = callback(ctx, data, size)
+                # Callback for ringbufs should _always_ return an integer.
+                # If the function the user registers does not,
+                # simply fall back to returning 0.
+                try:
+                    ret = int(ret)
+                except:
+                    ret = 0
             except IOError as e:
                 if e.errno == errno.EPIPE:
                     exit()
                 else:
                     raise e
+            return ret
 
         fn = _RINGBUF_CB_TYPE(ringbuf_cb_)
         ringbuf = lib.bpf_new_ringbuf(self.map_fd, fn)
