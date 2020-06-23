@@ -142,13 +142,17 @@ __attribute__((section("maps/perf_output"))) \
 struct _name##_table_t _name = { .max_entries = 0 }
 
 // Table for pushing custom events to userspace via ring buffer
-#define BPF_RINGBUF_OUTPUT(_name, _max_entries) \
+#define BPF_RINGBUF_OUTPUT(_name) \
 struct _name##_table_t { \
-  int (*ringbuf_submit) (void *, u64, u64); \
+  int key; \
+  u32 leaf; \
+  /* map.perf_submit(ctx, data, data_size) */ \
+  int (*perf_submit) (void *, void *, u32); \
+  int (*perf_submit_skb) (void *, u32, void *, u32); \
   u32 max_entries; \
 }; \
 __attribute__((section("maps/ringbuf"))) \
-struct _name##_table_t _name = { .max_entries = (_max_entries) }
+struct _name##_table_t _name = { .max_entries = 0 }
 
 // Table for reading hw perf cpu counters
 #define BPF_PERF_ARRAY(_name, _max_entries) \
