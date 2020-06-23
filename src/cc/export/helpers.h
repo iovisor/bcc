@@ -146,8 +146,8 @@ struct _name##_table_t _name = { .max_entries = 0 }
 struct _name##_table_t { \
   int key; \
   u32 leaf; \
-  /* map.output(data, data_size, flags) */ \
-  int (*output) (void *, u64, u64); \
+  /* map.ringbuf_output(data, data_size, flags) */ \
+  int (*ringbuf_output) (void *, u64, u64); \
   u32 max_entries; \
 }; \
 __attribute__((section("maps/ringbuf"))) \

@@ -22,7 +22,7 @@ import errno
 import re
 import sys
 
-from .libbcc import lib, _RAW_CB_TYPE, _LOST_CB_TYPE
+from .libbcc import lib, _RAW_CB_TYPE, _LOST_CB_TYPE, _RINGBUF_CB_TYPE
 from .perf import Perf
 from .utils import get_online_cpus
 from .utils import get_possible_cpus
@@ -944,4 +944,31 @@ class MapInMapHash(HashTable):
         super(MapInMapHash, self).__init__(*args, **kwargs)
 
 class RingBuf(ArrayBase):
-    pass
+
+    def __init__(self, *args, **kwargs):
+        super(RingBuf, self).__init__(*args, **kwargs)
+
+    def open_ring_buffer(self, callback):
+        """open_ring_buffer(callback)
+
+        Opens a ring buffer to receive custom event data from the bpf program.
+        The callback will be invoked for each event submitted from the kernel,
+        up to millions per second.
+        """
+
+        def ringbuf_cb_(ctx, data, size):
+            try:
+                callback(ctx, data, size)
+            except IOError as e:
+                if e.errno == errno.EPIPE:
+                    exit()
+                else:
+                    raise e
+
+        fn = _RINGBUF_CB_TYPE(ringbuf_cb_)
+        ringbuf = lib.bpf_open_ringbuf(self.map_fd, fn)
+        if not ringbuf:
+            raise Exception("Could not open ring buffer")
+        self.bpf.ring_buffers[id(self)] = ringbuf
+        # keep a refcnt
+        self._cbs[0] = fn

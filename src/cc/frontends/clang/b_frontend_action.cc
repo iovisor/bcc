@@ -940,6 +940,30 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
           string flag = rewriter_.getRewrittenText(expansionRange(Call->getArg(2)->getSourceRange()));
           txt = "bpf_" + string(memb_name) + "(" + ctx + ", " +
             "bpf_pseudo_fd(1, " + fd + "), " + keyp + ", " + flag + ");";
+        } else if (memb_name == "ringbuf_output") {
+          string name = string(Ref->getDecl()->getName());
+          string args = rewriter_.getRewrittenText(expansionRange(SourceRange(GET_BEGINLOC(Call->getArg(0)),
+                                                           GET_ENDLOC(Call->getArg(2)))));
+          //bpf_ringbuf_output((void *)bpf_pseudo_fd(1, 4), &event, sizeof(event), 0);
+          txt = "bpf_ringbuf_output(bpf_pseudo_fd(1, " + fd + ")";
+          txt += ", " + args + ")";
+
+          // e.g.
+          // struct data_t { u32 pid; }; data_t data;
+          // events.perf_submit(ctx, &data, sizeof(data));
+          // ...
+          //                       &data   ->     data    ->  typeof(data)        ->   data_t
+          auto type_arg0 = Call->getArg(0)->IgnoreCasts()->getType().getTypePtr()->getPointeeType().getTypePtr();
+          if (type_arg0->isStructureType()) {
+            auto event_type = type_arg0->getAsTagDecl();
+            const auto *r = dyn_cast<RecordDecl>(event_type);
+            std::vector<std::string> perf_event;
+
+            for (auto it = r->field_begin(); it != r->field_end(); ++it) {
+              perf_event.push_back(it->getNameAsString() + "#" + it->getType().getAsString()); //"pid#u32"
+            }
+            fe_.perf_events_[name] = perf_event;
+          }
         } else {
           if (memb_name == "lookup") {
             prefix = "bpf_map_lookup_elem";

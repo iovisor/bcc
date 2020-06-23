@@ -314,6 +314,7 @@ class BPF(object):
         self.lsm_fds = {}
         self.perf_buffers = {}
         self.open_perf_events = {}
+        self.ring_buffers = {}
         self.tracefile = None
         atexit.register(self.cleanup)
 
@@ -1433,6 +1434,19 @@ class BPF(object):
         for i, v in enumerate(self.perf_buffers.values()):
             readers[i] = v
         lib.perf_reader_poll(len(readers), readers, timeout)
+
+    def ring_buffer_poll(self, timeout = -1):
+        """ring_buffer_poll(self)
+
+        Poll from all open ringbuf buffers, calling the callback that was
+        provided when calling open_ring_buffer for each entry.
+        """
+        for v in self.ring_buffers.values():
+            ringbuf = ct.c_void_p(v)
+            ret = 1
+            # Consume until empty
+            while ret > 0:
+                ret = lib.bpf_poll_ringbuf(ringbuf, timeout)
 
     def kprobe_poll(self, timeout = -1):
         """kprobe_poll(self)

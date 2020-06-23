@@ -121,6 +121,10 @@ int bpf_open_perf_event(uint32_t type, uint64_t config, int pid, int cpu);
 
 int bpf_close_perf_event_fd(int fd);
 
+typedef int (*ring_buffer_sample_fn)(void *ctx, void *data, size_t size);
+
+void * bpf_open_ringbuf(int map_fd, ring_buffer_sample_fn sample_cb);
+
 int bpf_obj_pin(int fd, const char *pathname);
 int bpf_obj_get(const char *pathname);
 int bpf_obj_get_info(int prog_map_fd, void *info, uint32_t *info_len);

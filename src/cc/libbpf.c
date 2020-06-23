@@ -1399,3 +1399,25 @@ int bpf_close_perf_event_fd(int fd) {
   }
   return error;
 }
+
+// TODO: document this function
+// FIXME: maybe rename to new_ringbuf? and then make python side changes
+void * bpf_open_ringbuf(int map_fd, ring_buffer_sample_fn sample_cb) {
+    return ring_buffer__new(map_fd, sample_cb, (void *)(long)1, NULL);
+}
+
+/* Poll for available data and consume, if data is available.
+ * Returns number of records consumed, or a negative number if
+ * any callbacks returned an error. */
+int bpf_poll_ringbuf(struct ring_buffer *rb, int timeout_ms) {
+    return ring_buffer__poll(rb, timeout_ms);
+}
+
+/* Consume available data _without_ polling. Good for use cases
+ * where low latency is desired over performance impact.
+ * Returns number of records consumed, or a negative number if
+ * any callbacks returned an error. */
+// TODO implement python side
+int bpf_consume_ringbuf(struct ring_buffer *rb) {
+    return ring_buffer__consume(rb);
+}
