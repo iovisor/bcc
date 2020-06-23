@@ -148,6 +148,12 @@ struct _name##_table_t { \
   u32 leaf; \
   /* map.ringbuf_output(data, data_size, flags) */ \
   int (*ringbuf_output) (void *, u64, u64); \
+  /* map.ringbuf_reserve(data_size) */ \
+  void* (*ringbuf_reserve) (u64); \
+  /* map.ringbuf_discard(data, flags) */ \
+  void (*ringbuf_discard) (void *, u64); \
+  /* map.ringbuf_submit(data, flags) */ \
+  void (*ringbuf_submit) (void *, u64); \
   u32 max_entries; \
 }; \
 __attribute__((section("maps/ringbuf"))) \
