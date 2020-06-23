@@ -950,7 +950,7 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
 
           // e.g.
           // struct data_t { u32 pid; }; data_t data;
-          // events.perf_submit(ctx, &data, sizeof(data));
+          // events.ringbuf_output(&data, sizeof(data), 0);
           // ...
           //                       &data   ->     data    ->  typeof(data)        ->   data_t
           auto type_arg0 = Call->getArg(0)->IgnoreCasts()->getType().getTypePtr()->getPointeeType().getTypePtr();

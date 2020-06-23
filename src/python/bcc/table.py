@@ -209,7 +209,7 @@ def Table(bpf, map_id, map_fd, keytype, leaftype, name, **kwargs):
     elif ttype == BPF_MAP_TYPE_HASH_OF_MAPS:
         t = MapInMapHash(bpf, map_id, map_fd, keytype, leaftype)
     elif ttype == BPF_MAP_TYPE_RINGBUF:
-        t = RingBuf(bpf, map_id, map_fd, keytype, leaftype)
+        t = RingBuf(bpf, map_id, map_fd, keytype, leaftype, name)
     if t == None:
         raise Exception("Unknown table type %d" % ttype)
     return t
@@ -591,33 +591,11 @@ class CgroupArray(ArrayBase):
         else:
             raise Exception("Cgroup array key must be either FD or cgroup path")
 
-class PerfEventArray(ArrayBase):
+class EventArrayBase(ArrayBase):
 
     def __init__(self, *args, **kwargs):
-        super(PerfEventArray, self).__init__(*args, **kwargs)
-        self._open_key_fds = {}
+        super(EventArrayBase, self).__init__(*args, **kwargs)
         self._event_class = None
-
-    def __del__(self):
-        keys = list(self._open_key_fds.keys())
-        for key in keys:
-            del self[key]
-
-    def __delitem__(self, key):
-        if key not in self._open_key_fds:
-            return
-        # Delete entry from the array
-        super(PerfEventArray, self).__delitem__(key)
-        key_id = (id(self), key)
-        if key_id in self.bpf.perf_buffers:
-            # The key is opened for perf ring buffer
-            lib.perf_reader_free(self.bpf.perf_buffers[key_id])
-            del self.bpf.perf_buffers[key_id]
-            del self._cbs[key]
-        else:
-            # The key is opened for perf event read
-            lib.bpf_close_perf_event_fd(self._open_key_fds[key])
-        del self._open_key_fds[key]
 
     def _get_event_class(self):
         ct_mapping = { 'char'              : ct.c_char,
@@ -686,6 +664,33 @@ class PerfEventArray(ArrayBase):
         if self._event_class == None:
             self._event_class = self._get_event_class()
         return ct.cast(data, ct.POINTER(self._event_class)).contents
+
+class PerfEventArray(EventArrayBase):
+
+    def __init__(self, *args, **kwargs):
+        super(PerfEventArray, self).__init__(*args, **kwargs)
+        self._open_key_fds = {}
+
+    def __del__(self):
+        keys = list(self._open_key_fds.keys())
+        for key in keys:
+            del self[key]
+
+    def __delitem__(self, key):
+        if key not in self._open_key_fds:
+            return
+        # Delete entry from the array
+        super(PerfEventArray, self).__delitem__(key)
+        key_id = (id(self), key)
+        if key_id in self.bpf.perf_buffers:
+            # The key is opened for perf ring buffer
+            lib.perf_reader_free(self.bpf.perf_buffers[key_id])
+            del self.bpf.perf_buffers[key_id]
+            del self._cbs[key]
+        else:
+            # The key is opened for perf event read
+            lib.bpf_close_perf_event_fd(self._open_key_fds[key])
+        del self._open_key_fds[key]
 
     def open_perf_buffer(self, callback, page_cnt=8, lost_cb=None):
         """open_perf_buffers(callback)
@@ -943,7 +948,7 @@ class MapInMapHash(HashTable):
     def __init__(self, *args, **kwargs):
         super(MapInMapHash, self).__init__(*args, **kwargs)
 
-class RingBuf(ArrayBase):
+class RingBuf(EventArrayBase):
 
     def __init__(self, *args, **kwargs):
         super(RingBuf, self).__init__(*args, **kwargs)
