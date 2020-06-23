@@ -971,7 +971,7 @@ class RingBuf(EventArrayBase):
                     raise e
 
         fn = _RINGBUF_CB_TYPE(ringbuf_cb_)
-        ringbuf = lib.bpf_open_ringbuf(self.map_fd, fn)
+        ringbuf = lib.bpf_new_ringbuf(self.map_fd, fn)
         if not ringbuf:
             raise Exception("Could not open ring buffer")
         self.bpf.ring_buffers[id(self)] = ringbuf

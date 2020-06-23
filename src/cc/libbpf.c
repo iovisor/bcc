@@ -1402,7 +1402,7 @@ int bpf_close_perf_event_fd(int fd) {
 
 // TODO: document this function
 // FIXME: maybe rename to new_ringbuf? and then make python side changes
-void * bpf_open_ringbuf(int map_fd, ring_buffer_sample_fn sample_cb) {
+void * bpf_new_ringbuf(int map_fd, ring_buffer_sample_fn sample_cb) {
     return ring_buffer__new(map_fd, sample_cb, (void *)(long)1, NULL);
 }
 
