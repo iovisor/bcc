@@ -24,7 +24,7 @@ import errno
 import sys
 
 from .libbcc import lib, bcc_symbol, bcc_symbol_option, bcc_stacktrace_build_id, _SYM_CB_TYPE
-from .table import Table, PerfEventArray
+from .table import Table, PerfEventArray, RingBuf
 from .perf import Perf
 from .utils import get_online_cpus, printb, _assert_is_bytes, ArgString, StrcmpRewrite
 from .version import __version__
@@ -1507,7 +1507,8 @@ class BPF(object):
         # Clean up opened perf ring buffer and perf events
         table_keys = list(self.tables.keys())
         for key in table_keys:
-            if isinstance(self.tables[key], PerfEventArray):
+            if isinstance(self.tables[key], PerfEventArray) or \
+                isinstance(self.tables[key], RingBuf):
                 del self.tables[key]
         for (ev_type, ev_config) in list(self.open_perf_events.keys()):
             self.detach_perf_event(ev_type, ev_config)

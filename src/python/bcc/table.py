@@ -953,6 +953,9 @@ class RingBuf(EventArrayBase):
     def __init__(self, *args, **kwargs):
         super(RingBuf, self).__init__(*args, **kwargs)
 
+    def __del__(self):
+        del self.bpf.ring_buffers[id(self)]
+
     def open_ring_buffer(self, callback):
         """open_ring_buffer(callback)
 
@@ -979,9 +982,9 @@ class RingBuf(EventArrayBase):
             return ret
 
         fn = _RINGBUF_CB_TYPE(ringbuf_cb_)
-        ringbuf = lib.bpf_new_ringbuf(self.map_fd, fn)
-        if not ringbuf:
+        self.ringbuf = lib.bpf_new_ringbuf(self.map_fd, fn)
+        if not self.ringbuf:
             raise Exception("Could not open ring buffer")
-        self.bpf.ring_buffers[id(self)] = ringbuf
+        self.bpf.ring_buffers[id(self)] = self.ringbuf
         # keep a refcnt
         self._cbs[0] = fn

@@ -980,8 +980,9 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
           txt = "bpf_ringbuf_submit(" + args + ")";
 
           // e.g.
-          // struct data_t { u32 pid; }; data_t data;
-          // events.ringbuf_output(&data, sizeof(data), 0);
+          // struct data_t { u32 pid; };
+          // data_t *data = events.ringbuf_reserve(sizeof(data_t));
+          // events.ringbuf_submit(data, 0);
           // ...
           //                       &data   ->     data    ->  typeof(data)        ->   data_t
           auto type_arg0 = Call->getArg(0)->IgnoreCasts()->getType().getTypePtr()->getPointeeType().getTypePtr();
