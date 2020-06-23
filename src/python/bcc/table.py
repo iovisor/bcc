@@ -46,6 +46,15 @@ BPF_MAP_TYPE_SOCKMAP = 15
 BPF_MAP_TYPE_CPUMAP = 16
 BPF_MAP_TYPE_XSKMAP = 17
 BPF_MAP_TYPE_SOCKHASH = 18
+BPF_MAP_TYPE_CGROUP_STORAGE = 19
+BPF_MAP_TYPE_REUSEPORT_SOCKARRAY = 20
+BPF_MAP_TYPE_PERCPU_CGROUP_STORAGE = 21
+BPF_MAP_TYPE_QUEUE = 22
+BPF_MAP_TYPE_STACK = 23
+BPF_MAP_TYPE_SK_STORAGE = 24
+BPF_MAP_TYPE_DEVMAP_HASH = 25
+BPF_MAP_TYPE_STRUCT_OPS = 26
+BPF_MAP_TYPE_RINGBUF = 27
 
 map_type_name = {BPF_MAP_TYPE_HASH: "HASH",
                  BPF_MAP_TYPE_ARRAY: "ARRAY",
@@ -64,7 +73,16 @@ map_type_name = {BPF_MAP_TYPE_HASH: "HASH",
                  BPF_MAP_TYPE_SOCKMAP: "SOCKMAP",
                  BPF_MAP_TYPE_CPUMAP: "CPUMAP",
                  BPF_MAP_TYPE_XSKMAP: "XSKMAP",
-                 BPF_MAP_TYPE_SOCKHASH: "SOCKHASH",}
+                 BPF_MAP_TYPE_SOCKHASH: "SOCKHASH",
+                 BPF_MAP_TYPE_CGROUP_STORAGE: "CGROUP_STORAGE",
+                 BPF_MAP_TYPE_REUSEPORT_SOCKARRAY: "REUSEPORT_SOCKARRAY",
+                 BPF_MAP_TYPE_PERCPU_CGROUP_STORAGE: "PERCPU_CGROUP_STORAGE",
+                 BPF_MAP_TYPE_QUEUE: "QUEUE",
+                 BPF_MAP_TYPE_STACK: "STACK",
+                 BPF_MAP_TYPE_SK_STORAGE: "SK_STORAGE",
+                 BPF_MAP_TYPE_DEVMAP_HASH: "DEVMAP_HASH",
+                 BPF_MAP_TYPE_STRUCT_OPS: "STRUCT_OPS",
+                 BPF_MAP_TYPE_RINGBUF: "RINGBUF",}
 
 stars_max = 40
 log2_index_max = 65
@@ -190,6 +208,8 @@ def Table(bpf, map_id, map_fd, keytype, leaftype, name, **kwargs):
         t = MapInMapArray(bpf, map_id, map_fd, keytype, leaftype)
     elif ttype == BPF_MAP_TYPE_HASH_OF_MAPS:
         t = MapInMapHash(bpf, map_id, map_fd, keytype, leaftype)
+    elif ttype == BPF_MAP_TYPE_RINGBUF:
+        t = RingBuf(bpf, map_id, map_fd, keytype, leaftype)
     if t == None:
         raise Exception("Unknown table type %d" % ttype)
     return t
@@ -922,3 +942,6 @@ class MapInMapArray(ArrayBase):
 class MapInMapHash(HashTable):
     def __init__(self, *args, **kwargs):
         super(MapInMapHash, self).__init__(*args, **kwargs)
+
+class RingBuf(ArrayBase):
+    pass
