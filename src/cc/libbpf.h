@@ -123,7 +123,6 @@ int bpf_close_perf_event_fd(int fd);
 
 typedef int (*ring_buffer_sample_fn)(void *ctx, void *data, size_t size);
 
-struct ring;
 struct ring_buffer;
 
 void * bpf_new_ringbuf(int map_fd, ring_buffer_sample_fn sample_cb);
