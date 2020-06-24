@@ -648,13 +648,7 @@ class CgroupArray(ArrayBase):
         else:
             raise Exception("Cgroup array key must be either FD or cgroup path")
 
-class EventArrayBase(ArrayBase):
-
-    def __init__(self, *args, **kwargs):
-        super(EventArrayBase, self).__init__(*args, **kwargs)
-        self._event_class = None
-
-class PerfEventArray(EventArrayBase):
+class PerfEventArray(ArrayBase):
 
     def __init__(self, *args, **kwargs):
         super(PerfEventArray, self).__init__(*args, **kwargs)
@@ -957,19 +951,13 @@ class RingBuf(TableBase):
         self._event_class = None
 
     def __delitem(self, key):
-        return
+        pass
 
     def __del__(self):
-        if self._ringbuf:
-            lib.bpf_free_ringbuf(self._ringbuf)
-        try:
-            del self.bpf.ring_buffers[id(self)]
-        except KeyError:
-            pass
+        pass
 
     def __len__(self):
-        # TODO
-        return 1
+        return 0
 
     def event(self, data):
         """event(data)
@@ -983,7 +971,7 @@ class RingBuf(TableBase):
             self._event_class = _get_event_class(self)
         return ct.cast(data, ct.POINTER(self._event_class)).contents
 
-    def open_ring_buffer(self, callback):
+    def open_ring_buffer(self, callback, ctx=None):
         """open_ring_buffer(callback)
 
         Opens a ring buffer to receive custom event data from the bpf program.
@@ -1009,9 +997,6 @@ class RingBuf(TableBase):
             return ret
 
         fn = _RINGBUF_CB_TYPE(ringbuf_cb_)
-        self._ringbuf = lib.bpf_new_ringbuf(self.map_fd, fn, None)
-        if not self._ringbuf:
-            raise Exception("Could not open ring buffer")
-        self.bpf.ring_buffers[id(self)] = self._ringbuf
+        self.bpf._open_ring_buffer(self.map_fd, fn, ctx)
         # keep a refcnt
         self._cbs[0] = fn

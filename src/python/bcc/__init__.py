@@ -314,7 +314,7 @@ class BPF(object):
         self.lsm_fds = {}
         self.perf_buffers = {}
         self.open_perf_events = {}
-        self.ring_buffers = {}
+        self._ringbuf_manager = None
         self.tracefile = None
         atexit.register(self.cleanup)
 
@@ -1435,18 +1435,33 @@ class BPF(object):
             readers[i] = v
         lib.perf_reader_poll(len(readers), readers, timeout)
 
+    def kprobe_poll(self, timeout = -1):
+        """kprobe_poll(self)
+
+        Deprecated. Use perf_buffer_poll instead.
+        """
+        self.perf_buffer_poll(timeout)
+
+    def _open_ring_buffer(self, map_fd, fn, ctx=None):
+        if not self._ringbuf_manager:
+            self._ringbuf_manager = lib.bpf_new_ringbuf(map_fd, fn, ctx)
+            print(self._ringbuf_manager)
+            if not self._ringbuf_manager:
+                raise Exception("Could not open ring buffer")
+        else:
+            ret = lib.bpf_add_ringbuf(self._ringbuf_manager, map_fd, fn, ctx)
+            if ret < 0:
+                raise Exception("Could not open ring buffer")
+
     def ring_buffer_poll(self, timeout = -1):
         """ring_buffer_poll(self)
 
         Poll from all open ringbuf buffers, calling the callback that was
         provided when calling open_ring_buffer for each entry.
         """
-        for v in self.ring_buffers.values():
-            ringbuf = ct.c_void_p(v)
-            ret = 1
-            # Poll and consume until empty
-            while ret > 0:
-                ret = lib.bpf_poll_ringbuf(ringbuf, timeout)
+        ret = 1
+        while ret > 0:
+            ret = lib.bpf_poll_ringbuf(self._ringbuf_manager, timeout)
 
     def ring_buffer_consume(self):
         """ring_buffer_consume(self)
@@ -1456,19 +1471,9 @@ class BPF(object):
         where low latency is desired, but it can impact performance.
         If you are unsure, use ring_buffer_poll instead.
         """
-        for v in self.ring_buffers.values():
-            ringbuf = ct.c_void_p(v)
-            ret = 1
-            # Consume until empty
-            while ret > 0:
-                ret = lib.bpf_consume_ringbuf(ringbuf)
-
-    def kprobe_poll(self, timeout = -1):
-        """kprobe_poll(self)
-
-        Deprecated. Use perf_buffer_poll instead.
-        """
-        self.perf_buffer_poll(timeout)
+        ret = 1
+        while ret > 0:
+            ret = lib.bpf_consume_ringbuf(self._ringbuf_manager)
 
     def free_bcc_memory(self):
         return lib.bcc_free_memory()
@@ -1507,8 +1512,7 @@ class BPF(object):
         # Clean up opened perf ring buffer and perf events
         table_keys = list(self.tables.keys())
         for key in table_keys:
-            if isinstance(self.tables[key], PerfEventArray) or \
-                isinstance(self.tables[key], RingBuf):
+            if isinstance(self.tables[key], PerfEventArray):
                 del self.tables[key]
         for (ev_type, ev_config) in list(self.open_perf_events.keys()):
             self.detach_perf_event(ev_type, ev_config)
@@ -1521,6 +1525,10 @@ class BPF(object):
         if self.module:
             lib.bpf_module_destroy(self.module)
             self.module = None
+
+        # Clean up ringbuf
+        if self._ringbuf_manager:
+            lib.bpf_free_ringbuf(self._ringbuf_manager)
 
     def __enter__(self):
         return self
