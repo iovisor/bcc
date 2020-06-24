@@ -1417,7 +1417,6 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
       // values from libbpf/src/libbpf_probes.c
       table.key_size = 0;
       table.leaf_size = 0;
-      table.max_entries = 4096;
     } else if (section_attr == "maps/perf_array") {
       map_type = BPF_MAP_TYPE_PERF_EVENT_ARRAY;
     } else if (section_attr == "maps/cgroup_array") {

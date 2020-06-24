@@ -51,6 +51,7 @@ R"********(
 #include <uapi/linux/if_packet.h>
 #include <linux/version.h>
 #include <linux/log2.h>
+#include <asm/page.h>
 
 #ifndef CONFIG_BPF_SYSCALL
 #error "CONFIG_BPF_SYSCALL is undefined, please check your .config or ask your Linux distro to enable this feature"
@@ -142,7 +143,7 @@ __attribute__((section("maps/perf_output"))) \
 struct _name##_table_t _name = { .max_entries = 0 }
 
 // Table for pushing custom events to userspace via ring buffer
-#define BPF_RINGBUF_OUTPUT(_name) \
+#define BPF_RINGBUF_OUTPUT(_name, _num_pages) \
 struct _name##_table_t { \
   int key; \
   u32 leaf; \
@@ -157,7 +158,7 @@ struct _name##_table_t { \
   u32 max_entries; \
 }; \
 __attribute__((section("maps/ringbuf"))) \
-struct _name##_table_t _name = { .max_entries = 0 }
+struct _name##_table_t _name = { .max_entries = ((_num_pages) * PAGE_SIZE) }
 
 // Table for reading hw perf cpu counters
 #define BPF_PERF_ARRAY(_name, _max_entries) \
