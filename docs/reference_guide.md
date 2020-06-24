@@ -750,23 +750,42 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=ringbuf_reserve+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=ringbuf_reserve+path%3Atools&type=Code)
 
-### 5. ringbuf_output()
+### 7. ringbuf_submit()
 
-Syntax: ```int ringbuf_output((void *)data, u64 data_size, u64 flags)```
+Syntax: ```void ringbuf_submit((void *)data, u64 flags)```
 
-Return: 0 on success
+Return: Nothing, always succeeds
 
 Flags:
  - ```BPF_RB_NO_WAKEUP```: Do not sent notification of new data availability
  - ```BPF_RB_FORCE_WAKEUP```: Send notification of new data availability unconditionally
 
-A method of the BPF_RINGBUF_OUTPUT table, for submitting custom event data to user space. This method works like ```perf_submit()```,
-although it does not require a ctx argument.
+A method of the BPF_RINGBUF_OUTPUT table, for submitting custom event data to user space. Must be preceded by a call to
+```ringbuf_reserve()``` to reserve space for the data.
 
 Examples in situ:
 <!-- TODO -->
-[search /examples](https://github.com/iovisor/bcc/search?q=ringbuf_output+path%3Aexamples&type=Code),
-[search /tools](https://github.com/iovisor/bcc/search?q=ringbuf_output+path%3Atools&type=Code)
+[search /examples](https://github.com/iovisor/bcc/search?q=ringbuf_submit+path%3Aexamples&type=Code),
+[search /tools](https://github.com/iovisor/bcc/search?q=ringbuf_submit+path%3Atools&type=Code)
+
+### 8. ringbuf_discard()
+
+Syntax: ```void ringbuf_discard((void *)data, u64 flags)```
+
+Return: Nothing, always succeeds
+
+Flags:
+ - ```BPF_RB_NO_WAKEUP```: Do not sent notification of new data availability
+ - ```BPF_RB_FORCE_WAKEUP```: Send notification of new data availability unconditionally
+
+A method of the BPF_RINGBUF_OUTPUT table, for discarding custom event data; userspace
+ignores the data associated with the discarded event. Must be preceded by a call to
+```ringbuf_reserve()``` to reserve space for the data.
+
+Examples in situ:
+<!-- TODO -->
+[search /examples](https://github.com/iovisor/bcc/search?q=ringbuf_submit+path%3Aexamples&type=Code),
+[search /tools](https://github.com/iovisor/bcc/search?q=ringbuf_submit+path%3Atools&type=Code)
 
 ## Maps
 
