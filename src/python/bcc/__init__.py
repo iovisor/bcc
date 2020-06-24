@@ -1445,7 +1445,6 @@ class BPF(object):
     def _open_ring_buffer(self, map_fd, fn, ctx=None):
         if not self._ringbuf_manager:
             self._ringbuf_manager = lib.bpf_new_ringbuf(map_fd, fn, ctx)
-            print(self._ringbuf_manager)
             if not self._ringbuf_manager:
                 raise Exception("Could not open ring buffer")
         else:
