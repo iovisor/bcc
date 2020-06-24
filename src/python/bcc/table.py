@@ -953,7 +953,11 @@ class RingBuf(EventArrayBase):
     def __init__(self, *args, **kwargs):
         super(RingBuf, self).__init__(*args, **kwargs)
 
+    def __delitem(self, key):
+        return
+
     def __del__(self):
+        lib.bpf_free_ringbuf(self.ringbuf)
         del self.bpf.ring_buffers[id(self)]
 
     def open_ring_buffer(self, callback):
