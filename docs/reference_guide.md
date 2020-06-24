@@ -671,7 +671,7 @@ Creates a BPF table for pushing out custom event data to user space via a ringbu
 
 Starting in Linux 5.8, this should be the preferred method for pushing per-event data to user space.
 
-For example:
+Example of both APIs:
 
 ```C
 struct data_t {
@@ -683,7 +683,19 @@ struct data_t {
 // Creates a ringbuf called events with 8 pages of space, shared across all CPUs
 BPF_RINGBUF_OUTPUT(events, 8);
 
-int hello(struct pt_regs *ctx) {
+int first_api_example(struct pt_regs *ctx) {
+    struct data_t data = {};
+
+    data.pid = bpf_get_current_pid_tgid();
+    data.ts = bpf_ktime_get_ns();
+    bpf_get_current_comm(&data.comm, sizeof(data.comm));
+
+    events.ringbuf_output(&data, sizeof(data), 0 /* flags */);
+
+    return 0;
+}
+
+int second_api_example(struct pt_regs *ctx) {
     struct data_t *data = events.ringbuf_reserve(sizeof(struct data_t));
     if (!data) { // Failed to reserve space
         return 1;
@@ -716,7 +728,7 @@ Flags:
  - ```BPF_RB_NO_WAKEUP```: Do not sent notification of new data availability
  - ```BPF_RB_FORCE_WAKEUP```: Send notification of new data availability unconditionally
 
-A method of a BPF_RINGBUF_OUTPUT table, for submitting custom event data to user space. This method works like ```perf_submit()```,
+A method of the BPF_RINGBUF_OUTPUT table, for submitting custom event data to user space. This method works like ```perf_submit()```,
 although it does not require a ctx argument.
 
 Examples in situ:
@@ -730,7 +742,7 @@ Syntax: ```void* ringbuf_reserve(u64 data_size)```
 
 Return: Pointer to data struct on success, NULL on failure
 
-A method of a BPF_RINGBUF_OUTPUT table, for reserving space in the ring buffer and simultaenously
+A method of the BPF_RINGBUF_OUTPUT table, for reserving space in the ring buffer and simultaenously
 allocating a data struct for output. Must be used with one of ```ringbuf_submit``` or ```ringbuf_discard```.
 
 Examples in situ:
@@ -748,7 +760,7 @@ Flags:
  - ```BPF_RB_NO_WAKEUP```: Do not sent notification of new data availability
  - ```BPF_RB_FORCE_WAKEUP```: Send notification of new data availability unconditionally
 
-A method of a BPF_RINGBUF_OUTPUT table, for submitting custom event data to user space. This method works like ```perf_submit()```,
+A method of the BPF_RINGBUF_OUTPUT table, for submitting custom event data to user space. This method works like ```perf_submit()```,
 although it does not require a ctx argument.
 
 Examples in situ:
