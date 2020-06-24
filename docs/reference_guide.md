@@ -666,6 +666,7 @@ Creates a BPF table for pushing out custom event data to user space via a ringbu
       split the process of reserving buffer space and submitting events into two steps
       (covered in [ringbuf_reserve](#6-ringbuf_reserve), [ringbuf_submit](#7-ringbuf_submit), [ringbuf_discard](#8-ringbuf_submit))
 - Superior performance and latency in userspace thanks to a shared ring buffer manager
+- Supports two ways of consuming data in userspace
 
 Starting in Linux 5.8, this should be the preferred method for pushing per-event data to user space.
 
@@ -677,26 +678,30 @@ struct data_t {
     u64 ts;
     char comm[TASK_COMM_LEN];
 };
-BPF_PERF_OUTPUT(events);
+BPF_RINGBUF_OUTPUT(events, 8);
 
 int hello(struct pt_regs *ctx) {
-    struct data_t data = {};
+    struct data_t *data = events.ringbuf_reserve(sizeof(struct data_t));
+    if (!data) { // Failed to reserve space
+        return 1;
+    }
 
-    data.pid = bpf_get_current_pid_tgid();
-    data.ts = bpf_ktime_get_ns();
-    bpf_get_current_comm(&data.comm, sizeof(data.comm));
+    data->pid = bpf_get_current_pid_tgid();
+    data->ts = bpf_ktime_get_ns();
+    bpf_get_current_comm(&data->comm, sizeof(data->comm));
 
-    events.perf_submit(ctx, &data, sizeof(data));
+    events.ringbuf_submit(data, 0 /* flags */);
 
     return 0;
 }
 ```
 
-The output table is named ```events```, and data is pushed to it via ```events.perf_submit()```.
+The output table is named ```events```. Data is allocated via ```events.ringbuf_reserve()``` and pushed to it via ```events.ringbuf_submit()```.
 
 Examples in situ:
-[search /examples](https://github.com/iovisor/bcc/search?q=BPF_PERF_OUTPUT+path%3Aexamples&type=Code),
-[search /tools](https://github.com/iovisor/bcc/search?q=BPF_PERF_OUTPUT+path%3Atools&type=Code)
+<!-- TODO -->
+[search /examples](https://github.com/iovisor/bcc/search?q=BPF_RINGBUF_OUTPUT+path%3Aexamples&type=Code),
+[search /tools](https://github.com/iovisor/bcc/search?q=BPF_RINGBUF_OUTPUT+path%3Atools&type=Code)
 
 ### 3. perf_submit()
 
