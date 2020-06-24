@@ -1009,7 +1009,7 @@ class RingBuf(TableBase):
             return ret
 
         fn = _RINGBUF_CB_TYPE(ringbuf_cb_)
-        self._ringbuf = lib.bpf_new_ringbuf(self.map_fd, fn)
+        self._ringbuf = lib.bpf_new_ringbuf(self.map_fd, fn, None)
         if not self._ringbuf:
             raise Exception("Could not open ring buffer")
         self.bpf.ring_buffers[id(self)] = self._ringbuf

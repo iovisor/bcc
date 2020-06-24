@@ -1402,9 +1402,8 @@ int bpf_close_perf_event_fd(int fd) {
 
 /* Create a new ringbuf manager to manage ringbuf associated with
  * map_fd, associating it with callback sample_cb. */
-void * bpf_new_ringbuf(int map_fd, ring_buffer_sample_fn sample_cb) {
-    //return ring_buffer__new(map_fd, sample_cb, (void *)(long)1, NULL);
-    return ring_buffer__new(map_fd, sample_cb, NULL, NULL);
+void * bpf_new_ringbuf(int map_fd, ring_buffer_sample_fn sample_cb, void *ctx) {
+    return ring_buffer__new(map_fd, sample_cb, ctx, NULL);
 }
 
 /* Free the ringbuf manager rb and all ring buffers associated with it. */
@@ -1415,8 +1414,8 @@ void bpf_free_ringbuf(struct ring_buffer *rb) {
 /* Add a new ring buffer associated with map_fd to the ring buffer manager rb,
  * associating it with callback sample_cb. */
 int bpf_add_ringbuf(struct ring_buffer *rb, int map_fd,
-                    ring_buffer_sample_fn sample_cb) {
-    return ring_buffer__add(rb, map_fd, sample_cb, NULL);
+                    ring_buffer_sample_fn sample_cb, void *ctx) {
+    return ring_buffer__add(rb, map_fd, sample_cb, ctx);
 }
 
 /* Poll for available data and consume, if data is available.  Returns number

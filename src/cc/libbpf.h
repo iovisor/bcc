@@ -125,10 +125,10 @@ typedef int (*ring_buffer_sample_fn)(void *ctx, void *data, size_t size);
 
 struct ring_buffer;
 
-void * bpf_new_ringbuf(int map_fd, ring_buffer_sample_fn sample_cb);
+void * bpf_new_ringbuf(int map_fd, ring_buffer_sample_fn sample_cb, void *ctx);
 void bpf_free_ringbuf(struct ring_buffer *rb);
 int bpf_add_ringbuf(struct ring_buffer *rb, int map_fd,
-                    ring_buffer_sample_fn sample_cb);
+                    ring_buffer_sample_fn sample_cb, void *ctx);
 int bpf_poll_ringbuf(struct ring_buffer *rb, int timeout_ms);
 int bpf_consume_ringbuf(struct ring_buffer *rb);
 
