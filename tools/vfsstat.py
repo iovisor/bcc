@@ -66,11 +66,11 @@ void do_create(struct pt_regs *ctx) { stats_increment(S_CREATE); }
 """
 
 bpf_text_kfunc = """
-KFUNC_PROBE(vfs_read, int unused)   { stats_increment(S_READ); }
-KFUNC_PROBE(vfs_write, int unused)  { stats_increment(S_WRITE); }
-KFUNC_PROBE(vfs_fsync, int unused)  { stats_increment(S_FSYNC); }
-KFUNC_PROBE(vfs_open, int unused)   { stats_increment(S_OPEN); }
-KFUNC_PROBE(vfs_create, int unused) { stats_increment(S_CREATE); }
+KFUNC_PROBE(vfs_read, int unused)   { stats_increment(S_READ); return 0; }
+KFUNC_PROBE(vfs_write, int unused)  { stats_increment(S_WRITE); return 0; }
+KFUNC_PROBE(vfs_fsync, int unused)  { stats_increment(S_FSYNC); return 0; }
+KFUNC_PROBE(vfs_open, int unused)   { stats_increment(S_OPEN); return 0; }
+KFUNC_PROBE(vfs_create, int unused) { stats_increment(S_CREATE); return 0; }
 """
 
 is_support_kfunc = BPF.support_kfunc()
