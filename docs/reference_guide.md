@@ -37,6 +37,11 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
         - [1. bpf_trace_printk()](#1-bpf_trace_printk)
         - [2. BPF_PERF_OUTPUT](#2-bpf_perf_output)
         - [3. perf_submit()](#3-perf_submit)
+        - [4. BPF_RINGBUF_OUTPUT](#4-bpf_ringbuf_output)
+        - [5. ringbuf_output()](#5-ringbuf_output)
+        - [6. ringbuf_reserve()](#6-ringbuf_reserve)
+        - [7. ringbuf_submit()](#7-ringbuf_submit)
+        - [8. ringbuf_discard()](#8-ringbuf_submit)
     - [Maps](#maps)
         - [1. BPF_TABLE](#1-bpf_table)
         - [2. BPF_HASH](#2-bpf_hash)
@@ -603,6 +608,66 @@ Examples in situ:
 Syntax: ```BPF_PERF_OUTPUT(name)```
 
 Creates a BPF table for pushing out custom event data to user space via a perf ring buffer. This is the preferred method for pushing per-event data to user space.
+
+For example:
+
+```C
+struct data_t {
+    u32 pid;
+    u64 ts;
+    char comm[TASK_COMM_LEN];
+};
+BPF_PERF_OUTPUT(events);
+
+int hello(struct pt_regs *ctx) {
+    struct data_t data = {};
+
+    data.pid = bpf_get_current_pid_tgid();
+    data.ts = bpf_ktime_get_ns();
+    bpf_get_current_comm(&data.comm, sizeof(data.comm));
+
+    events.perf_submit(ctx, &data, sizeof(data));
+
+    return 0;
+}
+```
+
+The output table is named ```events```, and data is pushed to it via ```events.perf_submit()```.
+
+Examples in situ:
+[search /examples](https://github.com/iovisor/bcc/search?q=BPF_PERF_OUTPUT+path%3Aexamples&type=Code),
+[search /tools](https://github.com/iovisor/bcc/search?q=BPF_PERF_OUTPUT+path%3Atools&type=Code)
+
+### 3. perf_submit()
+
+Syntax: ```int perf_submit((void *)ctx, (void *)data, u32 data_size)```
+
+Return: 0 on success
+
+A method of a BPF_PERF_OUTPUT table, for submitting custom event data to user space. See the BPF_PERF_OUTPUT entry. (This ultimately calls bpf_perf_event_output().)
+
+The ```ctx``` parameter is provided in [kprobes](#1-kprobes) or [kretprobes](#2-kretprobes). For ```SCHED_CLS``` or ```SOCKET_FILTER``` programs, the ```struct __sk_buff *skb``` must be used instead.
+
+Examples in situ:
+[search /examples](https://github.com/iovisor/bcc/search?q=perf_submit+path%3Aexamples&type=Code),
+[search /tools](https://github.com/iovisor/bcc/search?q=perf_submit+path%3Atools&type=Code)
+
+### 4. BPF_RINGBUF_OUTPUT
+
+Syntax: ```BPF_RINGBUF_OUTPUT(name, page_cnt)```
+
+Creates a BPF table for pushing out custom event data to user space via a ringbuf ring buffer.
+```BPF_RINGBUF_OUTPUT``` has several advantages over ```BPF_PERF_OUTPUT```, summarized as follows:
+
+- Buffer is shared across all CPUs, meaning no per-CPU allocation
+- Supports two APIs for BPF programs
+    - ```map.ringbuf_output()``` works like ```map.perf_submit()``` (covered in [ringbuf_output](#5-ringbuf_output))
+    - ```map.ringbuf_reserve()```/```map.ringbuf_submit()```/```map.ringbuf_discard()```
+      split the process of reserving buffer space and submitting events into two steps
+      (covered in [ringbuf_reserve](#6-ringbuf_reserve), [ringbuf_submit](#7-ringbuf_submit), [ringbuf_discard](#8-ringbuf_submit))
+- Superior performance and latency in userspace thanks to a shared ring buffer manager
+
+Starting in Linux 5.8, this should be the preferred method for pushing per-event data to user space.
 
 For example:
 
