@@ -1891,7 +1891,7 @@ def print_event(ctx, data, size):
     [...]
 
 # loop with callback to print_event
-b["events"].open_perf_buffer(print_event)
+b["events"].open_ring_buffer(print_event)
 while 1:
     try:
         b.ring_buffer_poll()
