@@ -86,8 +86,8 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
         - [2. trace_fields()](#2-trace_fields)
     - [Output](#output)
         - [1. perf_buffer_poll()](#1-perf_buffer_poll)
-        - [2. perf_buffer_poll()](#2-perf_buffer_poll)
-        - [3. perf_buffer_poll()](#3-perf_buffer_poll)
+        - [2. ring_buffer_poll()](#2-ring_buffer_poll)
+        - [3. ring_buffer_consume()](#3-ring_buffer_consume)
     - [Maps](#maps)
         - [1. get_table()](#1-get_table)
         - [2. open_perf_buffer()](#2-open_perf_buffer)
@@ -1582,6 +1582,55 @@ Examples in situ:
 [code](https://github.com/iovisor/bcc/blob/v0.9.0/examples/tracing/hello_perf_output.py#L55),
 [search /examples](https://github.com/iovisor/bcc/search?q=perf_buffer_poll+path%3Aexamples+language%3Apython&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=perf_buffer_poll+path%3Atools+language%3Apython&type=Code)
+
+### 2. ring_buffer_poll()
+
+Syntax: ```BPF.ring_buffer_poll(timeout=T)```
+
+This polls from all open ringbuf ring buffers, calling the callback function that was provided when calling open_ring_buffer for each entry.
+
+The timeout parameter is optional and measured in milliseconds. In its absence, polling continues until
+there is no more data or the callback returns a negative value.
+
+Example:
+
+```Python
+# loop with callback to print_event
+b["events"].open_ring_buffer(print_event)
+while 1:
+    try:
+        b.ring_buffer_poll(30)
+    except KeyboardInterrupt:
+        exit();
+```
+
+Examples in situ:
+[search /examples](https://github.com/iovisor/bcc/search?q=ring_buffer_poll+path%3Aexamples+language%3Apython&type=Code),
+
+### 3. ring_buffer_consume()
+
+Syntax: ```BPF.ring_buffer_consume()```
+
+This consumes from all open ringbuf ring buffers, calling the callback function that was provided when calling open_ring_buffer for each entry.
+
+Unlike ```ring_buffer_poll```, this method **does not poll for data** before attempting to consume.
+This reduces latency at the expense of higher CPU consumption. If you are unsure which to use,
+use ```ring_buffer_poll```.
+
+Example:
+
+```Python
+# loop with callback to print_event
+b["events"].open_ring_buffer(print_event)
+while 1:
+    try:
+        b.ring_buffer_consume()
+    except KeyboardInterrupt:
+        exit();
+```
+
+Examples in situ:
+[search /examples](https://github.com/iovisor/bcc/search?q=ring_buffer_consume+path%3Aexamples+language%3Apython&type=Code),
 
 ## Maps
 
