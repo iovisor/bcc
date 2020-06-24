@@ -169,6 +169,63 @@ def get_table_type_name(ttype):
         return "<unknown>"
 
 
+def _get_event_class(event_map):
+    ct_mapping = { 'char'              : ct.c_char,
+                   's8'                : ct.c_char,
+                   'unsigned char'     : ct.c_ubyte,
+                   'u8'                : ct.c_ubyte,
+                   'u8 *'              : ct.c_char_p,
+                   'char *'            : ct.c_char_p,
+                   'short'             : ct.c_short,
+                   's16'               : ct.c_short,
+                   'unsigned short'    : ct.c_ushort,
+                   'u16'               : ct.c_ushort,
+                   'int'               : ct.c_int,
+                   's32'               : ct.c_int,
+                   'enum'              : ct.c_int,
+                   'unsigned int'      : ct.c_uint,
+                   'u32'               : ct.c_uint,
+                   'long'              : ct.c_long,
+                   'unsigned long'     : ct.c_ulong,
+                   'long long'         : ct.c_longlong,
+                   's64'               : ct.c_longlong,
+                   'unsigned long long': ct.c_ulonglong,
+                   'u64'               : ct.c_ulonglong,
+                   '__int128'          : (ct.c_longlong * 2),
+                   'unsigned __int128' : (ct.c_ulonglong * 2),
+                   'void *'            : ct.c_void_p }
+
+    # handle array types e.g. "int [16] foo"
+    array_type = re.compile(r"(.+) \[([0-9]+)\]$")
+
+    fields = []
+    num_fields = lib.bpf_perf_event_fields(event_map.bpf.module, event_map._name)
+    i = 0
+    while i < num_fields:
+        field = lib.bpf_perf_event_field(event_map.bpf.module, event_map._name, i).decode()
+        m = re.match(r"(.*)#(.*)", field)
+        field_name = m.group(1)
+        field_type = m.group(2)
+
+        if re.match(r"enum .*", field_type):
+            field_type = "enum"
+
+        m = array_type.match(field_type)
+        try:
+            if m:
+                fields.append((field_name, ct_mapping[m.group(1)] * int(m.group(2))))
+            else:
+                fields.append((field_name, ct_mapping[field_type]))
+        except KeyError:
+            # Using print+sys.exit instead of raising exceptions,
+            # because exceptions are caught by the caller.
+            print("Type: '%s' not recognized. Please define the data with ctypes manually."
+                  % field_type, file=sys.stderr)
+            sys.exit(1)
+        i += 1
+    return type('', (ct.Structure,), {'_fields_': fields})
+
+
 def Table(bpf, map_id, map_fd, keytype, leaftype, name, **kwargs):
     """Table(bpf, map_id, map_fd, keytype, leaftype, **kwargs)
 
@@ -597,79 +654,12 @@ class EventArrayBase(ArrayBase):
         super(EventArrayBase, self).__init__(*args, **kwargs)
         self._event_class = None
 
-    def _get_event_class(self):
-        ct_mapping = { 'char'              : ct.c_char,
-                       's8'                : ct.c_char,
-                       'unsigned char'     : ct.c_ubyte,
-                       'u8'                : ct.c_ubyte,
-                       'u8 *'              : ct.c_char_p,
-                       'char *'            : ct.c_char_p,
-                       'short'             : ct.c_short,
-                       's16'               : ct.c_short,
-                       'unsigned short'    : ct.c_ushort,
-                       'u16'               : ct.c_ushort,
-                       'int'               : ct.c_int,
-                       's32'               : ct.c_int,
-                       'enum'              : ct.c_int,
-                       'unsigned int'      : ct.c_uint,
-                       'u32'               : ct.c_uint,
-                       'long'              : ct.c_long,
-                       'unsigned long'     : ct.c_ulong,
-                       'long long'         : ct.c_longlong,
-                       's64'               : ct.c_longlong,
-                       'unsigned long long': ct.c_ulonglong,
-                       'u64'               : ct.c_ulonglong,
-                       '__int128'          : (ct.c_longlong * 2),
-                       'unsigned __int128' : (ct.c_ulonglong * 2),
-                       'void *'            : ct.c_void_p }
-
-        # handle array types e.g. "int [16] foo"
-        array_type = re.compile(r"(.+) \[([0-9]+)\]$")
-
-        fields = []
-        num_fields = lib.bpf_perf_event_fields(self.bpf.module, self._name)
-        i = 0
-        while i < num_fields:
-            field = lib.bpf_perf_event_field(self.bpf.module, self._name, i).decode()
-            m = re.match(r"(.*)#(.*)", field)
-            field_name = m.group(1)
-            field_type = m.group(2)
-
-            if re.match(r"enum .*", field_type):
-                field_type = "enum"
-
-            m = array_type.match(field_type)
-            try:
-                if m:
-                    fields.append((field_name, ct_mapping[m.group(1)] * int(m.group(2))))
-                else:
-                    fields.append((field_name, ct_mapping[field_type]))
-            except KeyError:
-                # Using print+sys.exit instead of raising exceptions,
-                # because exceptions are caught by the caller.
-                print("Type: '%s' not recognized. Please define the data with ctypes manually."
-                      % field_type, file=sys.stderr)
-                sys.exit(1)
-            i += 1
-        return type('', (ct.Structure,), {'_fields_': fields})
-
-    def event(self, data):
-        """event(data)
-
-        When ring buffers are opened to receive custom perf event,
-        the underlying event data struct which is defined in C in
-        the BPF program can be deduced via this function. This avoids
-        redundant definitions in Python.
-        """
-        if self._event_class == None:
-            self._event_class = self._get_event_class()
-        return ct.cast(data, ct.POINTER(self._event_class)).contents
-
 class PerfEventArray(EventArrayBase):
 
     def __init__(self, *args, **kwargs):
         super(PerfEventArray, self).__init__(*args, **kwargs)
         self._open_key_fds = {}
+        self._event_class = None
 
     def __del__(self):
         keys = list(self._open_key_fds.keys())
@@ -691,6 +681,18 @@ class PerfEventArray(EventArrayBase):
             # The key is opened for perf event read
             lib.bpf_close_perf_event_fd(self._open_key_fds[key])
         del self._open_key_fds[key]
+
+    def event(self, data):
+        """event(data)
+
+        When perf buffers are opened to receive custom perf event,
+        the underlying event data struct which is defined in C in
+        the BPF program can be deduced via this function. This avoids
+        redundant definitions in Python.
+        """
+        if self._event_class == None:
+            self._event_class = _get_event_class(self)
+        return ct.cast(data, ct.POINTER(self._event_class)).contents
 
     def open_perf_buffer(self, callback, page_cnt=8, lost_cb=None):
         """open_perf_buffers(callback)
@@ -948,17 +950,38 @@ class MapInMapHash(HashTable):
     def __init__(self, *args, **kwargs):
         super(MapInMapHash, self).__init__(*args, **kwargs)
 
-class RingBuf(EventArrayBase):
-
+class RingBuf(TableBase):
     def __init__(self, *args, **kwargs):
         super(RingBuf, self).__init__(*args, **kwargs)
+        self._ringbuf = None
+        self._event_class = None
 
     def __delitem(self, key):
         return
 
     def __del__(self):
-        lib.bpf_free_ringbuf(self.ringbuf)
-        del self.bpf.ring_buffers[id(self)]
+        if self._ringbuf:
+            lib.bpf_free_ringbuf(self._ringbuf)
+        try:
+            del self.bpf.ring_buffers[id(self)]
+        except KeyError:
+            pass
+
+    def __len__(self):
+        # TODO
+        return 1
+
+    def event(self, data):
+        """event(data)
+
+        When ring buffers are opened to receive custom event,
+        the underlying event data struct which is defined in C in
+        the BPF program can be deduced via this function. This avoids
+        redundant definitions in Python.
+        """
+        if self._event_class == None:
+            self._event_class = _get_event_class(self)
+        return ct.cast(data, ct.POINTER(self._event_class)).contents
 
     def open_ring_buffer(self, callback):
         """open_ring_buffer(callback)
@@ -986,9 +1009,9 @@ class RingBuf(EventArrayBase):
             return ret
 
         fn = _RINGBUF_CB_TYPE(ringbuf_cb_)
-        self.ringbuf = lib.bpf_new_ringbuf(self.map_fd, fn)
-        if not self.ringbuf:
+        self._ringbuf = lib.bpf_new_ringbuf(self.map_fd, fn)
+        if not self._ringbuf:
             raise Exception("Could not open ring buffer")
-        self.bpf.ring_buffers[id(self)] = self.ringbuf
+        self.bpf.ring_buffers[id(self)] = self._ringbuf
         # keep a refcnt
         self._cbs[0] = fn
