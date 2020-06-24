@@ -706,19 +706,55 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=BPF_RINGBUF_OUTPUT+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=BPF_RINGBUF_OUTPUT+path%3Atools&type=Code)
 
-### 3. perf_submit()
+### 5. ringbuf_output()
 
-Syntax: ```int perf_submit((void *)ctx, (void *)data, u32 data_size)```
+Syntax: ```int ringbuf_output((void *)data, u64 data_size, u64 flags)```
 
 Return: 0 on success
 
-A method of a BPF_PERF_OUTPUT table, for submitting custom event data to user space. See the BPF_PERF_OUTPUT entry. (This ultimately calls bpf_perf_event_output().)
+Flags:
+ - ```BPF_RB_NO_WAKEUP```: Do not sent notification of new data availability
+ - ```BPF_RB_FORCE_WAKEUP```: Send notification of new data availability unconditionally
 
-The ```ctx``` parameter is provided in [kprobes](#1-kprobes) or [kretprobes](#2-kretprobes). For ```SCHED_CLS``` or ```SOCKET_FILTER``` programs, the ```struct __sk_buff *skb``` must be used instead.
+A method of a BPF_RINGBUF_OUTPUT table, for submitting custom event data to user space. This method works like ```perf_submit()```,
+although it does not require a ctx argument.
 
 Examples in situ:
-[search /examples](https://github.com/iovisor/bcc/search?q=perf_submit+path%3Aexamples&type=Code),
-[search /tools](https://github.com/iovisor/bcc/search?q=perf_submit+path%3Atools&type=Code)
+<!-- TODO -->
+[search /examples](https://github.com/iovisor/bcc/search?q=ringbuf_output+path%3Aexamples&type=Code),
+[search /tools](https://github.com/iovisor/bcc/search?q=ringbuf_output+path%3Atools&type=Code)
+
+### 6. ringbuf_reserve()
+
+Syntax: ```void* ringbuf_reserve(u64 data_size)```
+
+Return: Pointer to data struct on success, NULL on failure
+
+A method of a BPF_RINGBUF_OUTPUT table, for reserving space in the ring buffer and simultaenously
+allocating a data struct for output. Must be used with one of ```ringbuf_submit``` or ```ringbuf_discard```.
+
+Examples in situ:
+<!-- TODO -->
+[search /examples](https://github.com/iovisor/bcc/search?q=ringbuf_reserve+path%3Aexamples&type=Code),
+[search /tools](https://github.com/iovisor/bcc/search?q=ringbuf_reserve+path%3Atools&type=Code)
+
+### 5. ringbuf_output()
+
+Syntax: ```int ringbuf_output((void *)data, u64 data_size, u64 flags)```
+
+Return: 0 on success
+
+Flags:
+ - ```BPF_RB_NO_WAKEUP```: Do not sent notification of new data availability
+ - ```BPF_RB_FORCE_WAKEUP```: Send notification of new data availability unconditionally
+
+A method of a BPF_RINGBUF_OUTPUT table, for submitting custom event data to user space. This method works like ```perf_submit()```,
+although it does not require a ctx argument.
+
+Examples in situ:
+<!-- TODO -->
+[search /examples](https://github.com/iovisor/bcc/search?q=ringbuf_output+path%3Aexamples&type=Code),
+[search /tools](https://github.com/iovisor/bcc/search?q=ringbuf_output+path%3Atools&type=Code)
 
 ## Maps
 
