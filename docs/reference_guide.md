@@ -665,6 +665,7 @@ Creates a BPF table for pushing out custom event data to user space via a ringbu
     - ```map.ringbuf_reserve()```/```map.ringbuf_submit()```/```map.ringbuf_discard()```
       split the process of reserving buffer space and submitting events into two steps
       (covered in [ringbuf_reserve](#6-ringbuf_reserve), [ringbuf_submit](#7-ringbuf_submit), [ringbuf_discard](#8-ringbuf_submit))
+- BPF APIs do not require access to a CPU ctx argument
 - Superior performance and latency in userspace thanks to a shared ring buffer manager
 - Supports two ways of consuming data in userspace
 
