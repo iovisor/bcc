@@ -96,6 +96,7 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
         - [5. clear()](#5-clear)
         - [6. print_log2_hist()](#6-print_log2_hist)
         - [7. print_linear_hist()](#6-print_linear_hist)
+        - [8. open_ring_buffer()](#8-open_ring_buffer)
     - [Helpers](#helpers)
         - [1. ksym()](#1-ksym)
         - [2. ksymname()](#2-ksymname)
@@ -1874,6 +1875,68 @@ This is an efficient way to summarize data, as the summarization is performed in
 Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=print_linear_hist+path%3Aexamples+language%3Apython&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=print_linear_hist+path%3Atools+language%3Apython&type=Code)
+
+### 8. open_ring_buffer()
+
+Syntax: ```table.open_ring_buffer(callback, ctx=None)```
+
+This operates on a table as defined in BPF as BPF_RINGBUF_OUTPUT(), and associates the callback Python function ```callback``` to be called when data is available in the ringbuf ring buffer. This is part of the new (Linux 5.8+) recommended mechanism for transferring per-event data from kernel to user space. Unlike perf buffers, ringbuf sizes are specified within the BPF program, as part of the ```BPF_RINGBUF_OUTPUT``` macro. If the callback is not processing data fast enough, some submitted data may be lost. In this case, the events should be polled more frequently and/or the size of the ring buffer should be increased.
+
+Example:
+
+```Python
+# process event
+def print_event(ctx, data, size):
+    event = ct.cast(data, ct.POINTER(Data)).contents
+    [...]
+
+# loop with callback to print_event
+b["events"].open_perf_buffer(print_event)
+while 1:
+    try:
+        b.ring_buffer_poll()
+    except KeyboardInterrupt:
+        exit()
+```
+
+Note that the data structure transferred will need to be declared in C in the BPF program. For example:
+
+```C
+// define output data structure in C
+struct data_t {
+    u32 pid;
+    u64 ts;
+    char comm[TASK_COMM_LEN];
+};
+BPF_RINGBUF_OUTPUT(events, 8);
+[...]
+```
+
+In Python, you can either let bcc generate the data structure from C declaration automatically (recommended):
+
+```Python
+def print_event(ctx, data, size):
+    event = b["events"].event(data)
+[...]
+```
+
+or define it manually:
+
+```Python
+# define output data structure in Python
+TASK_COMM_LEN = 16    # linux/sched.h
+class Data(ct.Structure):
+    _fields_ = [("pid", ct.c_ulonglong),
+                ("ts", ct.c_ulonglong),
+                ("comm", ct.c_char * TASK_COMM_LEN)]
+
+def print_event(ctx, data, size):
+    event = ct.cast(data, ct.POINTER(Data)).contents
+[...]
+```
+
+Examples in situ:
+[search /examples](https://github.com/iovisor/bcc/search?q=open_ring_buffer+path%3Aexamples+language%3Apython&type=Code),
 
 ## Helpers
 
