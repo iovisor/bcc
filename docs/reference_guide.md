@@ -678,6 +678,8 @@ struct data_t {
     u64 ts;
     char comm[TASK_COMM_LEN];
 };
+
+// Creates a ringbuf called events with 8 pages of space, shared across all CPUs
 BPF_RINGBUF_OUTPUT(events, 8);
 
 int hello(struct pt_regs *ctx) {
