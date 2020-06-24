@@ -86,6 +86,8 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
         - [2. trace_fields()](#2-trace_fields)
     - [Output](#output)
         - [1. perf_buffer_poll()](#1-perf_buffer_poll)
+        - [2. perf_buffer_poll()](#2-perf_buffer_poll)
+        - [3. perf_buffer_poll()](#3-perf_buffer_poll)
     - [Maps](#maps)
         - [1. get_table()](#1-get_table)
         - [2. open_perf_buffer()](#2-open_perf_buffer)
@@ -713,10 +715,8 @@ int second_api_example(struct pt_regs *ctx) {
 
 The output table is named ```events```. Data is allocated via ```events.ringbuf_reserve()``` and pushed to it via ```events.ringbuf_submit()```.
 
-Examples in situ:
-<!-- TODO -->
+Examples in situ: <!-- TODO -->
 [search /examples](https://github.com/iovisor/bcc/search?q=BPF_RINGBUF_OUTPUT+path%3Aexamples&type=Code),
-[search /tools](https://github.com/iovisor/bcc/search?q=BPF_RINGBUF_OUTPUT+path%3Atools&type=Code)
 
 ### 5. ringbuf_output()
 
@@ -731,10 +731,8 @@ Flags:
 A method of the BPF_RINGBUF_OUTPUT table, for submitting custom event data to user space. This method works like ```perf_submit()```,
 although it does not require a ctx argument.
 
-Examples in situ:
-<!-- TODO -->
+Examples in situ: <!-- TODO -->
 [search /examples](https://github.com/iovisor/bcc/search?q=ringbuf_output+path%3Aexamples&type=Code),
-[search /tools](https://github.com/iovisor/bcc/search?q=ringbuf_output+path%3Atools&type=Code)
 
 ### 6. ringbuf_reserve()
 
@@ -745,10 +743,8 @@ Return: Pointer to data struct on success, NULL on failure
 A method of the BPF_RINGBUF_OUTPUT table, for reserving space in the ring buffer and simultaenously
 allocating a data struct for output. Must be used with one of ```ringbuf_submit``` or ```ringbuf_discard```.
 
-Examples in situ:
-<!-- TODO -->
+Examples in situ: <!-- TODO -->
 [search /examples](https://github.com/iovisor/bcc/search?q=ringbuf_reserve+path%3Aexamples&type=Code),
-[search /tools](https://github.com/iovisor/bcc/search?q=ringbuf_reserve+path%3Atools&type=Code)
 
 ### 7. ringbuf_submit()
 
@@ -763,10 +759,8 @@ Flags:
 A method of the BPF_RINGBUF_OUTPUT table, for submitting custom event data to user space. Must be preceded by a call to
 ```ringbuf_reserve()``` to reserve space for the data.
 
-Examples in situ:
-<!-- TODO -->
+Examples in situ: <!-- TODO -->
 [search /examples](https://github.com/iovisor/bcc/search?q=ringbuf_submit+path%3Aexamples&type=Code),
-[search /tools](https://github.com/iovisor/bcc/search?q=ringbuf_submit+path%3Atools&type=Code)
 
 ### 8. ringbuf_discard()
 
@@ -782,10 +776,8 @@ A method of the BPF_RINGBUF_OUTPUT table, for discarding custom event data; user
 ignores the data associated with the discarded event. Must be preceded by a call to
 ```ringbuf_reserve()``` to reserve space for the data.
 
-Examples in situ:
-<!-- TODO -->
+Examples in situ: <!-- TODO -->
 [search /examples](https://github.com/iovisor/bcc/search?q=ringbuf_submit+path%3Aexamples&type=Code),
-[search /tools](https://github.com/iovisor/bcc/search?q=ringbuf_submit+path%3Atools&type=Code)
 
 ## Maps
 
