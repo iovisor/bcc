@@ -1460,9 +1460,7 @@ class BPF(object):
         """
         if not self._ringbuf_manager:
             raise Exception("No ring buffers to poll")
-        ret = 1
-        while ret > 0:
-            ret = lib.bpf_poll_ringbuf(self._ringbuf_manager, timeout)
+        lib.bpf_poll_ringbuf(self._ringbuf_manager, timeout)
 
     def ring_buffer_consume(self):
         """ring_buffer_consume(self)
@@ -1474,9 +1472,7 @@ class BPF(object):
         """
         if not self._ringbuf_manager:
             raise Exception("No ring buffers to poll")
-        ret = 1
-        while ret > 0:
-            ret = lib.bpf_consume_ringbuf(self._ringbuf_manager)
+        lib.bpf_consume_ringbuf(self._ringbuf_manager)
 
     def free_bcc_memory(self):
         return lib.bcc_free_memory()
