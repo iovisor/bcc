@@ -1458,6 +1458,8 @@ class BPF(object):
         Poll from all open ringbuf buffers, calling the callback that was
         provided when calling open_ring_buffer for each entry.
         """
+        if not self._ringbuf_manager:
+            raise Exception("No ring buffers to poll")
         ret = 1
         while ret > 0:
             ret = lib.bpf_poll_ringbuf(self._ringbuf_manager, timeout)
@@ -1470,6 +1472,8 @@ class BPF(object):
         where low latency is desired, but it can impact performance.
         If you are unsure, use ring_buffer_poll instead.
         """
+        if not self._ringbuf_manager:
+            raise Exception("No ring buffers to poll")
         ret = 1
         while ret > 0:
             ret = lib.bpf_consume_ringbuf(self._ringbuf_manager)
@@ -1528,6 +1532,7 @@ class BPF(object):
         # Clean up ringbuf
         if self._ringbuf_manager:
             lib.bpf_free_ringbuf(self._ringbuf_manager)
+            self._ringbuf_manager = None
 
     def __enter__(self):
         return self
