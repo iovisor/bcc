@@ -30,6 +30,7 @@ TRACEPOINT_PROBE(syscalls, sys_enter_openat) {
     event->mode = args->mode;
 
     buffer.ringbuf_submit(event, 0);
+    // or, to discard: buffer.ringbuf_discard(event, 0);
 
     return 0;
 }

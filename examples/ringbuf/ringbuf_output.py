@@ -46,7 +46,8 @@ print("%-16s %10s %10s %10s" % ("FILENAME", "DIR_FD", "FLAGS", "MODE"))
 
 try:
     while 1:
-        b.ring_buffer_consume()
+        b.ring_buffer_poll()
+        # or b.ring_buffer_consume()
         time.sleep(0.5)
 except KeyboardInterrupt:
     sys.exit()
