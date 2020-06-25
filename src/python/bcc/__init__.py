@@ -24,7 +24,7 @@ import errno
 import sys
 
 from .libbcc import lib, bcc_symbol, bcc_symbol_option, bcc_stacktrace_build_id, _SYM_CB_TYPE
-from .table import Table, PerfEventArray
+from .table import Table, PerfEventArray, RingBuf
 from .perf import Perf
 from .utils import get_online_cpus, printb, _assert_is_bytes, ArgString, StrcmpRewrite
 from .version import __version__
@@ -314,6 +314,7 @@ class BPF(object):
         self.lsm_fds = {}
         self.perf_buffers = {}
         self.open_perf_events = {}
+        self._ringbuf_manager = None
         self.tracefile = None
         atexit.register(self.cleanup)
 
@@ -1441,6 +1442,38 @@ class BPF(object):
         """
         self.perf_buffer_poll(timeout)
 
+    def _open_ring_buffer(self, map_fd, fn, ctx=None):
+        if not self._ringbuf_manager:
+            self._ringbuf_manager = lib.bpf_new_ringbuf(map_fd, fn, ctx)
+            if not self._ringbuf_manager:
+                raise Exception("Could not open ring buffer")
+        else:
+            ret = lib.bpf_add_ringbuf(self._ringbuf_manager, map_fd, fn, ctx)
+            if ret < 0:
+                raise Exception("Could not open ring buffer")
+
+    def ring_buffer_poll(self, timeout = -1):
+        """ring_buffer_poll(self)
+
+        Poll from all open ringbuf buffers, calling the callback that was
+        provided when calling open_ring_buffer for each entry.
+        """
+        if not self._ringbuf_manager:
+            raise Exception("No ring buffers to poll")
+        lib.bpf_poll_ringbuf(self._ringbuf_manager, timeout)
+
+    def ring_buffer_consume(self):
+        """ring_buffer_consume(self)
+
+        Consume all open ringbuf buffers, regardless of whether or not
+        they currently contain events data. This is best for use cases
+        where low latency is desired, but it can impact performance.
+        If you are unsure, use ring_buffer_poll instead.
+        """
+        if not self._ringbuf_manager:
+            raise Exception("No ring buffers to poll")
+        lib.bpf_consume_ringbuf(self._ringbuf_manager)
+
     def free_bcc_memory(self):
         return lib.bcc_free_memory()
 
@@ -1491,6 +1524,11 @@ class BPF(object):
         if self.module:
             lib.bpf_module_destroy(self.module)
             self.module = None
+
+        # Clean up ringbuf
+        if self._ringbuf_manager:
+            lib.bpf_free_ringbuf(self._ringbuf_manager)
+            self._ringbuf_manager = None
 
     def __enter__(self):
         return self

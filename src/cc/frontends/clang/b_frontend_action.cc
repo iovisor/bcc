@@ -940,6 +940,62 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
           string flag = rewriter_.getRewrittenText(expansionRange(Call->getArg(2)->getSourceRange()));
           txt = "bpf_" + string(memb_name) + "(" + ctx + ", " +
             "bpf_pseudo_fd(1, " + fd + "), " + keyp + ", " + flag + ");";
+        } else if (memb_name == "ringbuf_output") {
+          string name = string(Ref->getDecl()->getName());
+          string args = rewriter_.getRewrittenText(expansionRange(SourceRange(GET_BEGINLOC(Call->getArg(0)),
+                                                           GET_ENDLOC(Call->getArg(2)))));
+          txt = "bpf_ringbuf_output(bpf_pseudo_fd(1, " + fd + ")";
+          txt += ", " + args + ")";
+
+          // e.g.
+          // struct data_t { u32 pid; }; data_t data;
+          // events.ringbuf_output(&data, sizeof(data), 0);
+          // ...
+          //                       &data   ->     data    ->  typeof(data)        ->   data_t
+          auto type_arg0 = Call->getArg(0)->IgnoreCasts()->getType().getTypePtr()->getPointeeType().getTypePtr();
+          if (type_arg0->isStructureType()) {
+            auto event_type = type_arg0->getAsTagDecl();
+            const auto *r = dyn_cast<RecordDecl>(event_type);
+            std::vector<std::string> perf_event;
+
+            for (auto it = r->field_begin(); it != r->field_end(); ++it) {
+              perf_event.push_back(it->getNameAsString() + "#" + it->getType().getAsString()); //"pid#u32"
+            }
+            fe_.perf_events_[name] = perf_event;
+          }
+        } else if (memb_name == "ringbuf_reserve") {
+          string name = string(Ref->getDecl()->getName());
+          string arg0 = rewriter_.getRewrittenText(expansionRange(Call->getArg(0)->getSourceRange()));
+          txt = "bpf_ringbuf_reserve(bpf_pseudo_fd(1, " + fd + ")";
+          txt += ", " + arg0 + ", 0)"; // Flags in reserve are meaningless
+        } else if (memb_name == "ringbuf_discard") {
+          string name = string(Ref->getDecl()->getName());
+          string args = rewriter_.getRewrittenText(expansionRange(SourceRange(GET_BEGINLOC(Call->getArg(0)),
+                                                           GET_ENDLOC(Call->getArg(1)))));
+          txt = "bpf_ringbuf_discard(" + args + ")";
+        } else if (memb_name == "ringbuf_submit") {
+          string name = string(Ref->getDecl()->getName());
+          string args = rewriter_.getRewrittenText(expansionRange(SourceRange(GET_BEGINLOC(Call->getArg(0)),
+                                                           GET_ENDLOC(Call->getArg(1)))));
+          txt = "bpf_ringbuf_submit(" + args + ")";
+
+          // e.g.
+          // struct data_t { u32 pid; };
+          // data_t *data = events.ringbuf_reserve(sizeof(data_t));
+          // events.ringbuf_submit(data, 0);
+          // ...
+          //                       &data   ->     data    ->  typeof(data)        ->   data_t
+          auto type_arg0 = Call->getArg(0)->IgnoreCasts()->getType().getTypePtr()->getPointeeType().getTypePtr();
+          if (type_arg0->isStructureType()) {
+            auto event_type = type_arg0->getAsTagDecl();
+            const auto *r = dyn_cast<RecordDecl>(event_type);
+            std::vector<std::string> perf_event;
+
+            for (auto it = r->field_begin(); it != r->field_end(); ++it) {
+              perf_event.push_back(it->getNameAsString() + "#" + it->getType().getAsString()); //"pid#u32"
+            }
+            fe_.perf_events_[name] = perf_event;
+          }
         } else {
           if (memb_name == "lookup") {
             prefix = "bpf_map_lookup_elem";
@@ -1356,6 +1412,11 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
       if (numcpu <= 0)
         numcpu = 1;
       table.max_entries = numcpu;
+    } else if (section_attr == "maps/ringbuf") {
+      map_type = BPF_MAP_TYPE_RINGBUF;
+      // values from libbpf/src/libbpf_probes.c
+      table.key_size = 0;
+      table.leaf_size = 0;
     } else if (section_attr == "maps/perf_array") {
       map_type = BPF_MAP_TYPE_PERF_EVENT_ARRAY;
     } else if (section_attr == "maps/cgroup_array") {

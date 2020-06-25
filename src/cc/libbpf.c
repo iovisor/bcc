@@ -1399,3 +1399,35 @@ int bpf_close_perf_event_fd(int fd) {
   }
   return error;
 }
+
+/* Create a new ringbuf manager to manage ringbuf associated with
+ * map_fd, associating it with callback sample_cb. */
+void * bpf_new_ringbuf(int map_fd, ring_buffer_sample_fn sample_cb, void *ctx) {
+    return ring_buffer__new(map_fd, sample_cb, ctx, NULL);
+}
+
+/* Free the ringbuf manager rb and all ring buffers associated with it. */
+void bpf_free_ringbuf(struct ring_buffer *rb) {
+    ring_buffer__free(rb);
+}
+
+/* Add a new ring buffer associated with map_fd to the ring buffer manager rb,
+ * associating it with callback sample_cb. */
+int bpf_add_ringbuf(struct ring_buffer *rb, int map_fd,
+                    ring_buffer_sample_fn sample_cb, void *ctx) {
+    return ring_buffer__add(rb, map_fd, sample_cb, ctx);
+}
+
+/* Poll for available data and consume, if data is available.  Returns number
+ * of records consumed, or a negative number if any callbacks returned an
+ * error. */
+int bpf_poll_ringbuf(struct ring_buffer *rb, int timeout_ms) {
+    return ring_buffer__poll(rb, timeout_ms);
+}
+
+/* Consume available data _without_ polling. Good for use cases where low
+ * latency is desired over performance impact.  Returns number of records
+ * consumed, or a negative number if any callbacks returned an error. */
+int bpf_consume_ringbuf(struct ring_buffer *rb) {
+    return ring_buffer__consume(rb);
+}

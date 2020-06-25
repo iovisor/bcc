@@ -37,6 +37,11 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
         - [1. bpf_trace_printk()](#1-bpf_trace_printk)
         - [2. BPF_PERF_OUTPUT](#2-bpf_perf_output)
         - [3. perf_submit()](#3-perf_submit)
+        - [4. BPF_RINGBUF_OUTPUT](#4-bpf_ringbuf_output)
+        - [5. ringbuf_output()](#5-ringbuf_output)
+        - [6. ringbuf_reserve()](#6-ringbuf_reserve)
+        - [7. ringbuf_submit()](#7-ringbuf_submit)
+        - [8. ringbuf_discard()](#8-ringbuf_submit)
     - [Maps](#maps)
         - [1. BPF_TABLE](#1-bpf_table)
         - [2. BPF_HASH](#2-bpf_hash)
@@ -81,6 +86,8 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
         - [2. trace_fields()](#2-trace_fields)
     - [Output](#output)
         - [1. perf_buffer_poll()](#1-perf_buffer_poll)
+        - [2. ring_buffer_poll()](#2-ring_buffer_poll)
+        - [3. ring_buffer_consume()](#3-ring_buffer_consume)
     - [Maps](#maps)
         - [1. get_table()](#1-get_table)
         - [2. open_perf_buffer()](#2-open_perf_buffer)
@@ -89,6 +96,7 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
         - [5. clear()](#5-clear)
         - [6. print_log2_hist()](#6-print_log2_hist)
         - [7. print_linear_hist()](#6-print_linear_hist)
+        - [8. open_ring_buffer()](#8-open_ring_buffer)
     - [Helpers](#helpers)
         - [1. ksym()](#1-ksym)
         - [2. ksymname()](#2-ksymname)
@@ -646,6 +654,131 @@ The ```ctx``` parameter is provided in [kprobes](#1-kprobes) or [kretprobes](#2-
 Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=perf_submit+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=perf_submit+path%3Atools&type=Code)
+
+### 4. BPF_RINGBUF_OUTPUT
+
+Syntax: ```BPF_RINGBUF_OUTPUT(name, page_cnt)```
+
+Creates a BPF table for pushing out custom event data to user space via a ringbuf ring buffer.
+```BPF_RINGBUF_OUTPUT``` has several advantages over ```BPF_PERF_OUTPUT```, summarized as follows:
+
+- Buffer is shared across all CPUs, meaning no per-CPU allocation
+- Supports two APIs for BPF programs
+    - ```map.ringbuf_output()``` works like ```map.perf_submit()``` (covered in [ringbuf_output](#5-ringbuf_output))
+    - ```map.ringbuf_reserve()```/```map.ringbuf_submit()```/```map.ringbuf_discard()```
+      split the process of reserving buffer space and submitting events into two steps
+      (covered in [ringbuf_reserve](#6-ringbuf_reserve), [ringbuf_submit](#7-ringbuf_submit), [ringbuf_discard](#8-ringbuf_submit))
+- BPF APIs do not require access to a CPU ctx argument
+- Superior performance and latency in userspace thanks to a shared ring buffer manager
+- Supports two ways of consuming data in userspace
+
+Starting in Linux 5.8, this should be the preferred method for pushing per-event data to user space.
+
+Example of both APIs:
+
+```C
+struct data_t {
+    u32 pid;
+    u64 ts;
+    char comm[TASK_COMM_LEN];
+};
+
+// Creates a ringbuf called events with 8 pages of space, shared across all CPUs
+BPF_RINGBUF_OUTPUT(events, 8);
+
+int first_api_example(struct pt_regs *ctx) {
+    struct data_t data = {};
+
+    data.pid = bpf_get_current_pid_tgid();
+    data.ts = bpf_ktime_get_ns();
+    bpf_get_current_comm(&data.comm, sizeof(data.comm));
+
+    events.ringbuf_output(&data, sizeof(data), 0 /* flags */);
+
+    return 0;
+}
+
+int second_api_example(struct pt_regs *ctx) {
+    struct data_t *data = events.ringbuf_reserve(sizeof(struct data_t));
+    if (!data) { // Failed to reserve space
+        return 1;
+    }
+
+    data->pid = bpf_get_current_pid_tgid();
+    data->ts = bpf_ktime_get_ns();
+    bpf_get_current_comm(&data->comm, sizeof(data->comm));
+
+    events.ringbuf_submit(data, 0 /* flags */);
+
+    return 0;
+}
+```
+
+The output table is named ```events```. Data is allocated via ```events.ringbuf_reserve()``` and pushed to it via ```events.ringbuf_submit()```.
+
+Examples in situ: <!-- TODO -->
+[search /examples](https://github.com/iovisor/bcc/search?q=BPF_RINGBUF_OUTPUT+path%3Aexamples&type=Code),
+
+### 5. ringbuf_output()
+
+Syntax: ```int ringbuf_output((void *)data, u64 data_size, u64 flags)```
+
+Return: 0 on success
+
+Flags:
+ - ```BPF_RB_NO_WAKEUP```: Do not sent notification of new data availability
+ - ```BPF_RB_FORCE_WAKEUP```: Send notification of new data availability unconditionally
+
+A method of the BPF_RINGBUF_OUTPUT table, for submitting custom event data to user space. This method works like ```perf_submit()```,
+although it does not require a ctx argument.
+
+Examples in situ: <!-- TODO -->
+[search /examples](https://github.com/iovisor/bcc/search?q=ringbuf_output+path%3Aexamples&type=Code),
+
+### 6. ringbuf_reserve()
+
+Syntax: ```void* ringbuf_reserve(u64 data_size)```
+
+Return: Pointer to data struct on success, NULL on failure
+
+A method of the BPF_RINGBUF_OUTPUT table, for reserving space in the ring buffer and simultaenously
+allocating a data struct for output. Must be used with one of ```ringbuf_submit``` or ```ringbuf_discard```.
+
+Examples in situ: <!-- TODO -->
+[search /examples](https://github.com/iovisor/bcc/search?q=ringbuf_reserve+path%3Aexamples&type=Code),
+
+### 7. ringbuf_submit()
+
+Syntax: ```void ringbuf_submit((void *)data, u64 flags)```
+
+Return: Nothing, always succeeds
+
+Flags:
+ - ```BPF_RB_NO_WAKEUP```: Do not sent notification of new data availability
+ - ```BPF_RB_FORCE_WAKEUP```: Send notification of new data availability unconditionally
+
+A method of the BPF_RINGBUF_OUTPUT table, for submitting custom event data to user space. Must be preceded by a call to
+```ringbuf_reserve()``` to reserve space for the data.
+
+Examples in situ: <!-- TODO -->
+[search /examples](https://github.com/iovisor/bcc/search?q=ringbuf_submit+path%3Aexamples&type=Code),
+
+### 8. ringbuf_discard()
+
+Syntax: ```void ringbuf_discard((void *)data, u64 flags)```
+
+Return: Nothing, always succeeds
+
+Flags:
+ - ```BPF_RB_NO_WAKEUP```: Do not sent notification of new data availability
+ - ```BPF_RB_FORCE_WAKEUP```: Send notification of new data availability unconditionally
+
+A method of the BPF_RINGBUF_OUTPUT table, for discarding custom event data; userspace
+ignores the data associated with the discarded event. Must be preceded by a call to
+```ringbuf_reserve()``` to reserve space for the data.
+
+Examples in situ: <!-- TODO -->
+[search /examples](https://github.com/iovisor/bcc/search?q=ringbuf_submit+path%3Aexamples&type=Code),
 
 ## Maps
 
@@ -1451,6 +1584,55 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=perf_buffer_poll+path%3Aexamples+language%3Apython&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=perf_buffer_poll+path%3Atools+language%3Apython&type=Code)
 
+### 2. ring_buffer_poll()
+
+Syntax: ```BPF.ring_buffer_poll(timeout=T)```
+
+This polls from all open ringbuf ring buffers, calling the callback function that was provided when calling open_ring_buffer for each entry.
+
+The timeout parameter is optional and measured in milliseconds. In its absence, polling continues until
+there is no more data or the callback returns a negative value.
+
+Example:
+
+```Python
+# loop with callback to print_event
+b["events"].open_ring_buffer(print_event)
+while 1:
+    try:
+        b.ring_buffer_poll(30)
+    except KeyboardInterrupt:
+        exit();
+```
+
+Examples in situ:
+[search /examples](https://github.com/iovisor/bcc/search?q=ring_buffer_poll+path%3Aexamples+language%3Apython&type=Code),
+
+### 3. ring_buffer_consume()
+
+Syntax: ```BPF.ring_buffer_consume()```
+
+This consumes from all open ringbuf ring buffers, calling the callback function that was provided when calling open_ring_buffer for each entry.
+
+Unlike ```ring_buffer_poll```, this method **does not poll for data** before attempting to consume.
+This reduces latency at the expense of higher CPU consumption. If you are unsure which to use,
+use ```ring_buffer_poll```.
+
+Example:
+
+```Python
+# loop with callback to print_event
+b["events"].open_ring_buffer(print_event)
+while 1:
+    try:
+        b.ring_buffer_consume()
+    except KeyboardInterrupt:
+        exit();
+```
+
+Examples in situ:
+[search /examples](https://github.com/iovisor/bcc/search?q=ring_buffer_consume+path%3Aexamples+language%3Apython&type=Code),
+
 ## Maps
 
 Maps are BPF data stores, and are used in bcc to implement a table, and then higher level objects on top of tables, including hashes and histograms.
@@ -1693,6 +1875,68 @@ This is an efficient way to summarize data, as the summarization is performed in
 Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=print_linear_hist+path%3Aexamples+language%3Apython&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=print_linear_hist+path%3Atools+language%3Apython&type=Code)
+
+### 8. open_ring_buffer()
+
+Syntax: ```table.open_ring_buffer(callback, ctx=None)```
+
+This operates on a table as defined in BPF as BPF_RINGBUF_OUTPUT(), and associates the callback Python function ```callback``` to be called when data is available in the ringbuf ring buffer. This is part of the new (Linux 5.8+) recommended mechanism for transferring per-event data from kernel to user space. Unlike perf buffers, ringbuf sizes are specified within the BPF program, as part of the ```BPF_RINGBUF_OUTPUT``` macro. If the callback is not processing data fast enough, some submitted data may be lost. In this case, the events should be polled more frequently and/or the size of the ring buffer should be increased.
+
+Example:
+
+```Python
+# process event
+def print_event(ctx, data, size):
+    event = ct.cast(data, ct.POINTER(Data)).contents
+    [...]
+
+# loop with callback to print_event
+b["events"].open_ring_buffer(print_event)
+while 1:
+    try:
+        b.ring_buffer_poll()
+    except KeyboardInterrupt:
+        exit()
+```
+
+Note that the data structure transferred will need to be declared in C in the BPF program. For example:
+
+```C
+// define output data structure in C
+struct data_t {
+    u32 pid;
+    u64 ts;
+    char comm[TASK_COMM_LEN];
+};
+BPF_RINGBUF_OUTPUT(events, 8);
+[...]
+```
+
+In Python, you can either let bcc generate the data structure from C declaration automatically (recommended):
+
+```Python
+def print_event(ctx, data, size):
+    event = b["events"].event(data)
+[...]
+```
+
+or define it manually:
+
+```Python
+# define output data structure in Python
+TASK_COMM_LEN = 16    # linux/sched.h
+class Data(ct.Structure):
+    _fields_ = [("pid", ct.c_ulonglong),
+                ("ts", ct.c_ulonglong),
+                ("comm", ct.c_char * TASK_COMM_LEN)]
+
+def print_event(ctx, data, size):
+    event = ct.cast(data, ct.POINTER(Data)).contents
+[...]
+```
+
+Examples in situ:
+[search /examples](https://github.com/iovisor/bcc/search?q=open_ring_buffer+path%3Aexamples+language%3Apython&type=Code),
 
 ## Helpers
 
