@@ -10,6 +10,7 @@ import subprocess
 from unittest import main, TestCase
 
 class TestRingbuf(TestCase):
+    @skipUnless(kernel_version_ge(5,8), "requires kernel >= 5.8")
     def test_ringbuf_output(self):
         self.counter = 0
 
@@ -43,6 +44,7 @@ int do_sys_nanosleep(void *ctx) {
         self.assertGreater(self.counter, 0)
         b.cleanup()
 
+    @skipUnless(kernel_version_ge(5,8), "requires kernel >= 5.8")
     def test_ringbuf_consume(self):
         self.counter = 0
 
@@ -76,6 +78,7 @@ int do_sys_nanosleep(void *ctx) {
         self.assertGreater(self.counter, 0)
         b.cleanup()
 
+    @skipUnless(kernel_version_ge(5,8), "requires kernel >= 5.8")
     def test_ringbuf_submit(self):
         self.counter = 0
 
@@ -112,6 +115,7 @@ int do_sys_nanosleep(void *ctx) {
         self.assertGreater(self.counter, 0)
         b.cleanup()
 
+    @skipUnless(kernel_version_ge(5,8), "requires kernel >= 5.8")
     def test_ringbuf_discard(self):
         self.counter = 0
 
