@@ -7,7 +7,7 @@ import ctypes as ct
 import random
 import time
 import subprocess
-from unittest import main, TestCase
+from unittest import main, TestCase, skipUnless
 
 class TestRingbuf(TestCase):
     @skipUnless(kernel_version_ge(5,8), "requires kernel >= 5.8")
