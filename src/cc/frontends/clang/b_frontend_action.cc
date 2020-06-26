@@ -1036,7 +1036,16 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
           } else if (memb_name == "get_local_storage") {
             prefix = "bpf_get_local_storage";
             suffix = ")";
-          } else {
+          } else if (memb_name == "push") {
+            prefix = "bpf_map_push_elem";
+            suffix = ")";
+          } else if (memb_name == "pop") {
+            prefix = "bpf_map_pop_elem";
+            suffix = ")";
+          } else if (memb_name == "peek") {
+            prefix = "bpf_map_peek_elem";
+            suffix = ")";
+           } else {
             error(GET_BEGINLOC(Call), "invalid bpf_table operation %0") << memb_name;
             return false;
           }
@@ -1419,6 +1428,12 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
       table.leaf_size = 0;
     } else if (section_attr == "maps/perf_array") {
       map_type = BPF_MAP_TYPE_PERF_EVENT_ARRAY;
+    } else if (section_attr == "maps/queue") {
+      table.key_size = 0;
+      map_type = BPF_MAP_TYPE_QUEUE;
+    } else if (section_attr == "maps/stack") {
+      table.key_size = 0;
+      map_type = BPF_MAP_TYPE_STACK;
     } else if (section_attr == "maps/cgroup_array") {
       map_type = BPF_MAP_TYPE_CGROUP_ARRAY;
     } else if (section_attr == "maps/stacktrace") {
