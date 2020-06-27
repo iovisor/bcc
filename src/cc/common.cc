@@ -60,7 +60,8 @@ std::string get_pid_exe(pid_t pid) {
   if (res >= static_cast<int>(sizeof(exe_path)))
     res = sizeof(exe_path) - 1;
   exe_path[res] = '\0';
-  return std::string(exe_path);
+
+  return tfm::format("/proc/%d/root%s", pid, exe_path);
 }
 
 enum class field_kind_t {
