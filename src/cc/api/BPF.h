@@ -176,6 +176,14 @@ class BPF {
     return BPFPercpuCgStorageTable<ValueType>({});
   }
 
+  template <class ValueType>
+  BPFQueueStackTable<ValueType> get_queuestack_table(const std::string& name) {
+    TableStorage::iterator it;
+    if (bpf_module_->table_storage().Find(Path({bpf_module_->id(), name}), it))
+      return BPFQueueStackTable<ValueType>(it->second);
+    return BPFQueueStackTable<ValueType>({});
+  }
+
   void* get_bsymcache(void) {
     if (bsymcache_ == NULL) {
       bsymcache_ = bcc_buildsymcache_new();

@@ -36,6 +36,44 @@
 
 namespace ebpf {
 
+template<class ValueType>
+class BPFQueueStackTableBase {
+ public:
+  size_t capacity() const { return desc.max_entries; }
+
+  StatusTuple string_to_leaf(const std::string& value_str, ValueType* value) {
+    return desc.leaf_sscanf(value_str.c_str(), value);
+  }
+
+  StatusTuple leaf_to_string(const ValueType* value, std::string& value_str) {
+    char buf[8 * desc.leaf_size];
+    StatusTuple rc = desc.leaf_snprintf(buf, sizeof(buf), value);
+    if (!rc.code())
+      value_str.assign(buf);
+    return rc;
+  }
+
+  int get_fd() { return desc.fd; }
+
+ protected:
+  explicit BPFQueueStackTableBase(const TableDesc& desc) : desc(desc) {}
+
+  bool pop(void *value) {
+    return bpf_lookup_and_delete(desc.fd, nullptr, value) >= 0;
+  }
+  // Flags are extremely useful, since they completely changes extraction behaviour
+  // (eg. if flag BPF_EXIST, then if the queue/stack is full remove the oldest one)
+  bool push(void *value, unsigned long long int flags) {
+    return bpf_update_elem(desc.fd, nullptr, value, flags) >= 0;
+  }
+
+  bool peek(void *value) {
+    return bpf_lookup_elem(desc.fd, nullptr, value) >= 0;
+  }
+
+  const TableDesc& desc;
+};
+
 template <class KeyType, class ValueType>
 class BPFTableBase {
  public:
@@ -123,6 +161,35 @@ template <class ValueType>
 void* get_value_addr(std::vector<ValueType>& t) {
   return t.data();
 }
+
+template<class ValueType>
+class BPFQueueStackTable : public BPFQueueStackTableBase<void> {
+ public:
+  explicit BPFQueueStackTable(const TableDesc& desc) : BPFQueueStackTableBase(desc) {
+    if (desc.type != BPF_MAP_TYPE_QUEUE &&
+        desc.type != BPF_MAP_TYPE_STACK)
+      throw std::invalid_argument("Table '" + desc.name +
+                                  "' is not a queue/stack table");
+  }
+
+  virtual StatusTuple pop_value(ValueType& value) {
+    if (!this->pop(get_value_addr(value)))
+      return StatusTuple(-1, "Error getting value: %s", std::strerror(errno));
+    return StatusTuple::OK();
+  }
+
+  virtual StatusTuple push_value(const ValueType& value, unsigned long long int flags = 0) {
+    if (!this->push(get_value_addr(const_cast<ValueType&>(value)), flags))
+      return StatusTuple(-1, "Error updating value: %s", std::strerror(errno));
+    return StatusTuple::OK();
+  }
+
+  virtual StatusTuple get_head(const ValueType& value) {
+    if (!this->peek(get_value_addr(const_cast<ValueType&>(value))))
+      return StatusTuple(-1, "Error peeking value: %s", std::strerror(errno));
+    return StatusTuple::OK();
+  }
+};
 
 template <class ValueType>
 class BPFArrayTable : public BPFTableBase<int, ValueType> {

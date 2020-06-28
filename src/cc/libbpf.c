@@ -322,6 +322,11 @@ int bpf_delete_elem(int fd, void *key)
   return bpf_map_delete_elem(fd, key);
 }
 
+int bpf_lookup_and_delete(int fd, void *key, void *value)
+{
+  return bpf_map_lookup_and_delete_elem(fd, key, value);
+}
+
 int bpf_get_first_key(int fd, void *key, size_t key_size)
 {
   int i, res;
