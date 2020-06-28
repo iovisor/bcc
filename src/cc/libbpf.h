@@ -44,6 +44,7 @@ int bpf_lookup_elem(int fd, void *key, void *value);
 int bpf_delete_elem(int fd, void *key);
 int bpf_get_first_key(int fd, void *key, size_t key_size);
 int bpf_get_next_key(int fd, void *key, void *next_key);
+int bpf_lookup_and_delete(int fd, void *key, void *value);
 
 /*
  * Load a BPF program, and return the FD of the loaded program.

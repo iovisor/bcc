@@ -26,6 +26,7 @@ set(TEST_LIBBCC_SOURCES
 	test_perf_event.cc
 	test_pinned_table.cc
 	test_prog_table.cc
+	test_queuestack_table.cc
 	test_shared_table.cc
 	test_sk_storage.cc
 	test_sock_table.cc
