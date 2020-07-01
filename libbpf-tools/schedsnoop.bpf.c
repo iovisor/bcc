@@ -140,7 +140,7 @@ static __always_inline void handle_trace(void *ctx, struct ti_key *tik, int type
 		 * itself. These events won't output to the console, but they
 		 * will still be recorded in statistic information.
 		 */
-		if (tik->syscall == 232 && tik->tid == cur_tid)
+		if ((tik->syscall == 232 || tik->syscall == 1) && tik->tid == cur_tid)
 			return;
 
 		struct trace_info ti = {
