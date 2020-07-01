@@ -30,7 +30,7 @@ local lat_map = bpf.map('array', bins)
 local trace_start = bpf.kprobe('myprobe:blk_start_request', function (ptregs)
 	map[ptregs.parm1] = time()
 end, false, -1, 0)
-local trace_end = bpf.kprobe('myprobe2:blk_account_io_completion', function (ptregs)
+local trace_end = bpf.kprobe('myprobe2:blk_account_io_done', function (ptregs)
 	-- The lines below are computing index
 	-- using log10(x)*10 = log2(x)*10/log2(10) = log2(x)*3
 	-- index = 29 ~ 1 usec
