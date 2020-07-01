@@ -126,7 +126,7 @@ return function(BPF, utils)
   bpf:attach_kprobe{event="blk_account_io_start", fn_name="trace_pid_start"}
   bpf:attach_kprobe{event="blk_start_request", fn_name="trace_req_start"}
   bpf:attach_kprobe{event="blk_mq_start_request", fn_name="trace_req_start"}
-  bpf:attach_kprobe{event="blk_account_io_completion",
+  bpf:attach_kprobe{event="blk_account_io_done",
       fn_name="trace_req_completion"}
 
   print("%-14s %-14s %-6s %-7s %-2s %-9s %-7s %7s" % {"TIME(s)", "COMM", "PID",

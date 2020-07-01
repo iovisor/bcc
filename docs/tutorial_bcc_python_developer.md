@@ -220,7 +220,7 @@ void trace_completion(struct pt_regs *ctx, struct request *req) {
 
 b.attach_kprobe(event="blk_start_request", fn_name="trace_start")
 b.attach_kprobe(event="blk_mq_start_request", fn_name="trace_start")
-b.attach_kprobe(event="blk_account_io_completion", fn_name="trace_completion")
+b.attach_kprobe(event="blk_account_io_done", fn_name="trace_completion")
 [...]
 ```
 
@@ -351,7 +351,7 @@ b = BPF(text="""
 
 BPF_HISTOGRAM(dist);
 
-int kprobe__blk_account_io_completion(struct pt_regs *ctx, struct request *req)
+int kprobe__blk_account_io_done(struct pt_regs *ctx, struct request *req)
 {
 	dist.increment(bpf_log2l(req->__data_len / 1024));
 	return 0;
@@ -374,7 +374,7 @@ b["dist"].print_log2_hist("kbytes")
 A recap from earlier lessons:
 
 - ```kprobe__```: This prefix means the rest will be treated as a kernel function name that will be instrumented using kprobe.
-- ```struct pt_regs *ctx, struct request *req```: Arguments to kprobe. The ```ctx``` is registers and BPF context, the ```req``` is the first argument to the instrumented function: ```blk_account_io_completion()```.
+- ```struct pt_regs *ctx, struct request *req```: Arguments to kprobe. The ```ctx``` is registers and BPF context, the ```req``` is the first argument to the instrumented function: ```blk_account_io_done()```.
 - ```req->__data_len```: Dereferencing that member.
 
 New things to learn:

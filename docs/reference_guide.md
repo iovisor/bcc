@@ -1602,7 +1602,7 @@ Example:
 b = BPF(text="""
 BPF_HISTOGRAM(dist);
 
-int kprobe__blk_account_io_completion(struct pt_regs *ctx, struct request *req)
+int kprobe__blk_account_io_done(struct pt_regs *ctx, struct request *req)
 {
 	dist.increment(bpf_log2l(req->__data_len / 1024));
 	return 0;
@@ -1653,7 +1653,7 @@ Example:
 b = BPF(text="""
 BPF_HISTOGRAM(dist);
 
-int kprobe__blk_account_io_completion(struct pt_regs *ctx, struct request *req)
+int kprobe__blk_account_io_done(struct pt_regs *ctx, struct request *req)
 {
 	dist.increment(req->__data_len / 1024);
 	return 0;
