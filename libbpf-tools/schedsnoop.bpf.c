@@ -9,22 +9,41 @@
 #define TASK_REPORT_MAX 0x0100
 
 const volatile pid_t targ_tid = 0;
+const volatile pid_t cur_tid = 0;
 const volatile bool trace_syscall = false;
+const volatile bool output_log = false;
 bool targ_exit = false;
 int trace_on = -1;
+int stat_count = 0;
+int sys_count = 0;
+__u64 p_time = 0;
 
-struct{
+struct {
 	__uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
 	__uint(key_size, sizeof(u32));
 	__uint(value_size, sizeof(u32));
 } events SEC(".maps");
 
-struct{
+struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
 	__uint(max_entries, NR_ENTRY_MAX);
-	__type(key, struct si_key);
+	__type(key, struct ti_key);
 	__type(value, u64);
-} syscall_info_maps SEC(".maps");
+} trace_info_maps SEC(".maps");
+
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__uint(max_entries, NR_ENTRY_MAX);
+	__type(key, struct ti_key);
+	__type(value, struct stat_info);
+} trace_stat_maps SEC(".maps");
+
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__uint(max_entries, NR_ENTRY_MAX);
+	__type(key, struct ti_key);
+	__type(value, struct stat_info);
+} syscall_stat_maps SEC(".maps");
 
 static __always_inline void set_trace_on(int cpu)
 {
@@ -41,34 +60,101 @@ static __always_inline int should_trace(int cpu)
 	return trace_on == cpu;
 }
 
-static __always_inline void emit_trace(void *ctx, struct trace_info* ti)
+static __always_inline void update_stat_info(void *map, struct ti_key *tik, __u64 duration)
 {
-	ti->ts = bpf_ktime_get_ns();
-	bpf_perf_event_output(ctx, &events, BPF_F_CURRENT_CPU, ti, sizeof(*ti));
+	struct stat_info *stat = bpf_map_lookup_elem(map, tik);
+	if (!stat) {
+		struct stat_info tmp = {
+			.count = 1,
+			.total = duration,
+			.longest = duration,
+		};
+		bpf_map_update_elem(map, tik, &tmp, BPF_ANY);
+		if (map == &trace_stat_maps)
+			stat_count += 1;
+		else
+			sys_count += 1;
+	} else {
+		stat->count = stat->count + 1;
+		stat->total = stat->total + duration;
+		stat->longest = stat->longest > duration ? stat->longest : duration;
+	}
 }
 
-static __always_inline void emit_and_update(void *ctx, struct trace_info* ti,
-	       	struct si_key* sik)
+static __always_inline void handle_trace(void *ctx, struct ti_key *tik, int type)
 {
-	__u64 *last_ts;
 	__u64 ts = bpf_ktime_get_ns();
-	switch (ti->type) {
+	__u64 duration = 0, *last_ts;
+	switch (type) {
+	case TYPE_MIGRATE:
+	case TYPE_ENQUEUE:
+		p_time = ts;
+		break;
+	case TYPE_EXECUTE:
+		if (tik->tid != targ_tid)
+			p_time = ts;
+		break;
+	case TYPE_WAIT:
+		if (tik->tid != targ_tid) {
+			duration = ts - p_time;
+			bpf_map_delete_elem(&trace_info_maps, tik);
+			update_stat_info(&trace_stat_maps, tik, duration);
+		}
+		break;
+	case TYPE_DEQUEUE:
+		if (tik->tid != targ_tid) {
+			duration = ts - p_time;
+			bpf_map_delete_elem(&trace_info_maps, tik);
+			update_stat_info(&trace_stat_maps, tik, duration);
+		}
+		break;
 	case TYPE_SYSCALL_ENTER:
-		bpf_map_update_elem(&syscall_info_maps, sik, &ts, BPF_ANY);
+		bpf_map_update_elem(&trace_info_maps, tik, &ts, BPF_ANY);
 		break;
 	case TYPE_SYSCALL_EXIT:
-		last_ts = bpf_map_lookup_elem(&syscall_info_maps, sik);
+		last_ts = bpf_map_lookup_elem(&trace_info_maps, tik);
 		if(!last_ts)
 			return;
-		ti->duration = ts - *last_ts;
-		bpf_map_delete_elem(&syscall_info_maps, sik);
-		break;
-	default:
+		duration = ts - *last_ts;
+		bpf_map_delete_elem(&trace_info_maps, tik);
+		update_stat_info(&syscall_stat_maps, tik, duration);
 		break;
 	}
 
-	ti->ts = ts;
-	bpf_perf_event_output(ctx, &events, BPF_F_CURRENT_CPU, ti, sizeof(*ti));
+	if (output_log) {
+		/*
+		 * The perf buffer is used to emit the events to user-space and
+		 * print them. During this process, the SYSCALL "epoll_wait" is
+		 * called to check the buffer.
+		 *
+		 * When tracing SYSCALL with this tool, there will be an endless 
+		 * loop. 
+		 *
+		 * emit event -------> user space capture the event
+		 *    /|\                           |
+		 *     |                           \|/
+		 * new event <------- SYSCALL "epoll_wait" called
+		 *
+		 * Thus, an extra condition is added here to avoid emit the 
+		 * SYSCALL "epoll_wait" events which are called by schedsnoop 
+		 * itself. These events won't output to the console, but they
+		 * will still be recorded in statistic information.
+		 */
+		if (tik->syscall == 232 && tik->tid == cur_tid)
+			return;
+
+		struct trace_info ti = {
+			.type = type,
+			.cpu = tik->cpu,
+			.syscall = tik->syscall,
+			.tid = tik->tid,
+			.ts = ts,
+			.duration = duration,
+		};
+		bpf_probe_read_kernel_str(&ti.comm, sizeof(ti.comm), tik->comm);
+
+		bpf_perf_event_output(ctx, &events, BPF_F_CURRENT_CPU, &ti, sizeof(ti));
+	}
 }
 
 SEC("tp_btf/sched_process_exit")
@@ -86,17 +172,17 @@ int BPF_PROG(handle__sched_migrate_task, struct task_struct *p, int dest_cpu)
 	if (targ_tid != p->pid)
 		return 0;
 
-	struct trace_info ti = {
+	struct ti_key tik = {
 		.cpu = dest_cpu,
 		.tid = p->pid,
-		.type = TYPE_MIGRATE,
+		.syscall = -1,
 	};
 
-	bpf_probe_read_kernel_str(&ti.comm, sizeof(ti.comm), p->comm);
+	bpf_probe_read_kernel_str(&tik.comm, sizeof(tik.comm), p->comm);
 
 	set_trace_on(dest_cpu);
 	
-	emit_trace(ctx, &ti);
+	handle_trace(ctx, &tik, TYPE_MIGRATE);
 
 	return 0;
 }
@@ -107,17 +193,17 @@ int BPF_PROG(handle__sched_wakeup, struct task_struct *p)
 	if (targ_tid != p->pid)
 		return 0;
 
-	struct trace_info ti = {
+	struct ti_key tik = {
 		.cpu = p->wake_cpu,
 		.tid = p->pid,
-		.type = TYPE_ENQUEUE,
+		.syscall = -1,
 	};
 
-	bpf_probe_read_kernel_str(&ti.comm, sizeof(ti.comm), p->comm);
+	bpf_probe_read_kernel_str(&tik.comm, sizeof(tik.comm), p->comm);
 
 	set_trace_on(p->wake_cpu);
 
-	emit_trace(ctx, &ti);
+	handle_trace(ctx, &tik, TYPE_ENQUEUE);
 
 	return 0;
 }
@@ -125,8 +211,9 @@ int BPF_PROG(handle__sched_wakeup, struct task_struct *p)
 SEC("tp_btf/sched_switch")
 int BPF_PROG(handle__sched_switch, bool preempt, struct task_struct *prev, struct task_struct *next)
 {
-	struct trace_info ti = {
+	struct ti_key tik = {
 		.cpu = bpf_get_smp_processor_id(),
+		.syscall = -1,
 	};
 
 	/*
@@ -138,19 +225,21 @@ int BPF_PROG(handle__sched_switch, bool preempt, struct task_struct *prev, struc
 	 * We add this check to avoid losing too much information 
 	 * when the situation discussed above happens.
 	 */
-	if (!should_trace(ti.cpu)) {
+	if (!should_trace(tik.cpu)) {
 		if (targ_tid != prev->pid &&
 		    targ_tid != next->pid)
 			return 0;
 
-		set_trace_on(ti.cpu);
+		set_trace_on(tik.cpu);
 
-		ti.tid = targ_tid;
-		ti.type = TYPE_MIGRATE;
-		bpf_probe_read_kernel_str(&ti.comm, sizeof(ti.comm), prev->comm);
-		emit_trace(ctx, &ti);
+		tik.tid = targ_tid;
+		bpf_probe_read_kernel_str(&tik.comm, sizeof(tik.comm), prev->comm);
+		handle_trace(ctx, &tik, TYPE_MIGRATE);
 	}
 	
+	tik.tid = prev->pid;
+	bpf_probe_read_kernel_str(&tik.comm, sizeof(tik.comm), prev->comm);
+
 	/*
 	 * Check the previous status to find out whether the previous
 	 * task is preempted or not.
@@ -166,22 +255,17 @@ int BPF_PROG(handle__sched_switch, bool preempt, struct task_struct *prev, struc
 	    prev->state != TASK_REPORT_MAX) {
 		if (targ_tid == prev->pid)
 			set_trace_off();
-		ti.type = TYPE_DEQUEUE;
+		handle_trace(ctx, &tik, TYPE_DEQUEUE);
 	} else {
-		ti.type = TYPE_WAIT;
+		handle_trace(ctx, &tik, TYPE_WAIT);
 	}
 
-	ti.tid = prev->pid;
-	bpf_probe_read_kernel_str(&ti.comm, sizeof(ti.comm), prev->comm);
-	emit_trace(ctx, &ti);
-
-	if (!should_trace(ti.cpu))
+	if (!should_trace(tik.cpu))
 		return 0;
 
-	ti.type = TYPE_EXECUTE;
-	ti.tid = next->pid;
-	bpf_probe_read_kernel_str(&ti.comm, sizeof(ti.comm), next->comm);
-	emit_trace(ctx, &ti);
+	tik.tid = next->pid;
+	bpf_probe_read_kernel_str(&tik.comm, sizeof(tik.comm), next->comm);
+	handle_trace(ctx, &tik, TYPE_EXECUTE);
 
 	return 0;
 }
@@ -194,21 +278,14 @@ int bpf_trace_sys_enter(struct trace_event_raw_sys_enter *args)
 
 	int cpu = bpf_get_smp_processor_id();
 	if (should_trace(cpu)) {
-		struct trace_info ti = {
+		struct ti_key tik = {
 			.cpu = cpu,
 			.tid = bpf_get_current_pid_tgid(),
-			.type = TYPE_SYSCALL_ENTER,
 			.syscall = args->id,
 		};
-		bpf_get_current_comm(&ti.comm, sizeof(ti.comm));
+		bpf_get_current_comm(&tik.comm, sizeof(tik.comm));
 
-		struct si_key sik = {
-			.cpu = cpu,
-			.pid = ti.tid,
-			.syscall = args->id,
-		};
-
-		emit_and_update(args, &ti, &sik);
+		handle_trace(args, &tik, TYPE_SYSCALL_ENTER);
 	}
 
 	return 0;
@@ -222,21 +299,14 @@ int bpf_trace_sys_exit(struct trace_event_raw_sys_exit *args)
 
 	int cpu = bpf_get_smp_processor_id();
 	if (should_trace(cpu)) {
-		struct trace_info ti = {
+		struct ti_key tik = {
 			.cpu = cpu,
 			.tid = bpf_get_current_pid_tgid(),
-			.type = TYPE_SYSCALL_EXIT,
 			.syscall = args->id,
 		};
-		bpf_get_current_comm(&ti.comm, sizeof(ti.comm));
+		bpf_get_current_comm(&tik.comm, sizeof(tik.comm));
 
-		struct si_key sik = {
-			.cpu = cpu,
-			.pid = ti.tid,
-			.syscall = args->id,
-		};
-
-		emit_and_update(args, &ti, &sik);
+		handle_trace(args, &tik, TYPE_SYSCALL_EXIT);
 	}
 
 	return 0;
