@@ -742,6 +742,22 @@ static __u64 (*bpf_ringbuf_query)(void *ringbuf, __u64 flags) =
 static int (*bpf_csum_level)(struct __sk_buff *skb, __u64 level) =
   (void *)BPF_FUNC_csum_level;
 
+struct tcp6_sock;
+struct tcp_sock;
+struct tcp_timewait_sock;
+struct tcp_request_sock;
+struct udp6_sock;
+static struct tcp6_sock *(*bpf_skc_to_tcp6_sock)(void *sk) =
+  (void *)BPF_FUNC_skc_to_tcp6_sock;
+static struct tcp_sock *(*bpf_skc_to_tcp_sock)(void *sk) =
+  (void *)BPF_FUNC_skc_to_tcp_sock;
+static struct tcp_timewait_sock *(*bpf_skc_to_tcp_timewait_sock)(void *sk) =
+  (void *)BPF_FUNC_skc_to_tcp_timewait_sock;
+static struct tcp_request_sock *(*bpf_skc_to_tcp_request_sock)(void *sk) =
+  (void *)BPF_FUNC_skc_to_tcp_request_sock;
+static struct udp6_sock *(*bpf_skc_to_udp6_sock)(void *sk) =
+  (void *)BPF_FUNC_skc_to_udp6_sock;
+
 /* llvm builtin functions that eBPF C program may use to
  * emit BPF_LD_ABS and BPF_LD_IND instructions
  */
