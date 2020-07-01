@@ -232,6 +232,11 @@ static struct bpf_helper helpers[] = {
   {"ringbuf_submit", "5.8"},
   {"ringbuf_discard", "5.8"},
   {"ringbuf_query", "5.8"},
+  {"skc_to_tcp6_sock", "5.9"},
+  {"skc_to_tcp_sock", "5.9"},
+  {"skc_to_tcp_timewait_sock", "5.9"},
+  {"skc_to_tcp_request_sock", "5.9"},
+  {"skc_to_udp6_sock", "5.9"},
 };
 
 static uint64_t ptr_to_u64(void *ptr)
