@@ -74,27 +74,47 @@ int KBuildHelper::get_flags(const char *uname_machine, vector<string> *cflags) {
   cflags->push_back("-isystem");
   cflags->push_back("/virtual/lib/clang/include");
 
-  // some module build directories split headers between source/ and build/
+  // The include order from kernel top Makefile:
+  //
+  // # Use USERINCLUDE when you must reference the UAPI directories only.
+  // USERINCLUDE    := \
+  //                 -I$(srctree)/arch/$(SRCARCH)/include/uapi \
+  //                 -I$(objtree)/arch/$(SRCARCH)/include/generated/uapi \
+  //                 -I$(srctree)/include/uapi \
+  //                 -I$(objtree)/include/generated/uapi \
+  //                 -include $(srctree)/include/linux/kconfig.h
+  //
+  // # Use LINUXINCLUDE when you must reference the include/ directory.
+  // # Needed to be compatible with the O= option
+  // LINUXINCLUDE    := \
+  //                 -I$(srctree)/arch/$(SRCARCH)/include \
+  //                 -I$(objtree)/arch/$(SRCARCH)/include/generated \
+  //                 $(if $(building_out_of_srctree),-I$(srctree)/include) \
+  //                 -I$(objtree)/include \
+  //                 $(USERINCLUDE)
+  //
+  // Some distros such as openSUSE/SUSE and Debian splits the headers between
+  // source/ and build/. In this case, just $(srctree) is source/ and
+  // $(objtree) is build/.
   if (has_source_dir_) {
-    cflags->push_back("-I" + kdir_ + "/build/arch/"+arch+"/include");
-    cflags->push_back("-I" + kdir_ + "/build/arch/"+arch+"/include/generated/uapi");
+    cflags->push_back("-Iarch/"+arch+"/include/");
     cflags->push_back("-I" + kdir_ + "/build/arch/"+arch+"/include/generated");
+    cflags->push_back("-Iinclude");
     cflags->push_back("-I" + kdir_ + "/build/include");
-    cflags->push_back("-I" + kdir_ + "/build/./arch/"+arch+"/include/uapi");
+    cflags->push_back("-Iarch/"+arch+"/include/uapi");
     cflags->push_back("-I" + kdir_ + "/build/arch/"+arch+"/include/generated/uapi");
-    cflags->push_back("-I" + kdir_ + "/build/include/uapi");
-    cflags->push_back("-I" + kdir_ + "/build/include/generated");
+    cflags->push_back("-Iinclude/uapi");
     cflags->push_back("-I" + kdir_ + "/build/include/generated/uapi");
+  } else {
+    cflags->push_back("-Iarch/"+arch+"/include/");
+    cflags->push_back("-Iarch/"+arch+"/include/generated");
+    cflags->push_back("-Iinclude");
+    cflags->push_back("-Iarch/"+arch+"/include/uapi");
+    cflags->push_back("-Iarch/"+arch+"/include/generated/uapi");
+    cflags->push_back("-Iinclude/uapi");
+    cflags->push_back("-Iinclude/generated/uapi");
   }
 
-  cflags->push_back("-I./arch/"+arch+"/include");
-  cflags->push_back("-Iarch/"+arch+"/include/generated/uapi");
-  cflags->push_back("-Iarch/"+arch+"/include/generated");
-  cflags->push_back("-Iinclude");
-  cflags->push_back("-I./arch/"+arch+"/include/uapi");
-  cflags->push_back("-Iarch/"+arch+"/include/generated/uapi");
-  cflags->push_back("-I./include/uapi");
-  cflags->push_back("-Iinclude/generated/uapi");
   cflags->push_back("-include");
   cflags->push_back("./include/linux/kconfig.h");
   cflags->push_back("-D__KERNEL__");
