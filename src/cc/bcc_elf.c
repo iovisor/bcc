@@ -562,6 +562,10 @@ static char *find_debug_via_symfs(Elf *e, const char* path) {
 
   check_build_id = find_buildid(e, buildid);
 
+  int ns_prefix_length = 0;
+  sscanf(path, "/proc/%*u/root/%n", &ns_prefix_length);
+  path += ns_prefix_length;
+
   snprintf(fullpath, sizeof(fullpath), "%s/%s", symfs, path);
   if (access(fullpath, F_OK) == -1)
     goto out;
