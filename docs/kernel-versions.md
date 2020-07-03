@@ -24,6 +24,8 @@ Sparc64 | 4.12 | [`7a12b5031c6b`](https://git.kernel.org/cgit/linux/kernel/git/t
 MIPS | 4.13 | [`f381bf6d82f0`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=f381bf6d82f032b7410185b35d000ea370ac706b)
 ARM32 | 4.14 | [`39c13c204bb1`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=39c13c204bb1150d401e27d41a9d8b332be47c49)
 x86\_32 | 4.18 |  [`03f5781be2c7`](https://git.kernel.org/cgit/linux/kernel/git/davem/net-next.git/commit/?id=03f5781be2c7b7e728d724ac70ba10799cc710d7)
+RISC-V RV64G | 5.1 | [`2353ecc6f91f`](https://git.kernel.org/cgit/linux/kernel/git/davem/net-next.git/commit/?id=2353ecc6f91fd15b893fa01bf85a1c7a823ee4f2)
+RISC-V RV32G | 5.7 | [`5f316b65e99f`](https://git.kernel.org/cgit/linux/kernel/git/davem/net-next.git/commit/?id=5f316b65e99f109942c556dc8790abd4c75bcb34)
 
 ## Main features
 
