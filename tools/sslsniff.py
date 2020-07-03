@@ -27,7 +27,7 @@ examples = """examples:
     ./sslsniff --no-openssl # don't show OpenSSL calls
     ./sslsniff --no-gnutls  # don't show GnuTLS calls
     ./sslsniff --no-nss     # don't show NSS calls
-    ./sslsniff --hex        # show data as hex instead of trying to decode it as UTF-8
+    ./sslsniff --hexdump    # show data as hex instead of trying to decode it as UTF-8
 """
 parser = argparse.ArgumentParser(
     description="Sniff SSL data",
