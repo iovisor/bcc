@@ -16,6 +16,8 @@
 from __future__ import print_function
 from bcc import BPF
 import argparse
+import binascii
+import textwrap
 
 # arguments
 examples = """examples:
@@ -25,6 +27,7 @@ examples = """examples:
     ./sslsniff --no-openssl # don't show OpenSSL calls
     ./sslsniff --no-gnutls  # don't show GnuTLS calls
     ./sslsniff --no-nss     # don't show NSS calls
+    ./sslsniff --hex        # show data as hex instead of trying to decode it as UTF-8
 """
 parser = argparse.ArgumentParser(
     description="Sniff SSL data",
@@ -43,6 +46,7 @@ parser.add_argument('-d', '--debug', dest='debug', action='count', default=0,
                     help='debug mode.')
 parser.add_argument("--ebpf", action="store_true",
                     help=argparse.SUPPRESS)
+parser.add_argument("--hexdump", action="store_true", dest="hexdump", help="show data as hexdump instead of trying to decode it as UTF-8")
 args = parser.parse_args()
 
 
@@ -211,7 +215,7 @@ def print_event(cpu, data, size, rw, evt):
     fmt = "%-12s %-18.9f %-16s %-6d %-6d\n%s\n%s\n%s\n\n"
     print(fmt % (rw, time_s, event.comm.decode('utf-8', 'replace'),
                  event.pid, event.len, s_mark,
-                 event.v0.decode('utf-8', 'replace'), e_mark))
+                 textwrap.fill(binascii.hexlify(event.v0).decode('utf-8', 'replace'),width=32) if args.hexdump else event.v0.decode('utf-8', 'replace'), e_mark))
 
 b["perf_SSL_write"].open_perf_buffer(print_event_write)
 b["perf_SSL_read"].open_perf_buffer(print_event_read)
