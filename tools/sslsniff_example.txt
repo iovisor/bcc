@@ -9,8 +9,8 @@ text.  Useful, for example, to sniff HTTP before encrypted with SSL.
 Output of tool executing in other shell "curl https://example.com"
 
 % sudo python sslsniff.py
-FUNC         TIME(s)            COMM             PID    LEN   
-WRITE/SEND   0.000000000        curl             12915  75    
+FUNC         TIME(s)            COMM             PID    LEN
+WRITE/SEND   0.000000000        curl             12915  75
 ----- DATA -----
 GET / HTTP/1.1
 Host: example.com
@@ -20,7 +20,7 @@ Accept: */*
 
 ----- END DATA -----
 
-READ/RECV    0.127144585        curl             12915  333   
+READ/RECV    0.127144585        curl             12915  333
 ----- DATA -----
 HTTP/1.1 200 OK
 Cache-Control: max-age=604800
@@ -38,7 +38,7 @@ Content-Length: 1270
 
 ----- END DATA -----
 
-READ/RECV    0.129967972        curl             12915  1270  
+READ/RECV    0.129967972        curl             12915  1270
 ----- DATA -----
 <!doctype html>
 <html>
@@ -54,7 +54,7 @@ READ/RECV    0.129967972        curl             12915  1270
         margin: 0;
         padding: 0;
         font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
-        
+
     }
     div {
         w
@@ -65,7 +65,7 @@ READ/RECV    0.129967972        curl             12915  1270
 
 USAGE message:
 
-usage: sslsniff.py [-h] [-p PID] [-c COMM] [-o] [-g] [-n] [-d]
+usage: sslsniff.py [-h] [-p PID] [-c COMM] [-o] [-g] [-n] [-d] [--hexdump]
 
 Sniff SSL data
 
@@ -77,6 +77,8 @@ optional arguments:
   -g, --no-gnutls       do not show GnuTLS calls.
   -n, --no-nss          do not show NSS calls.
   -d, --debug           debug mode.
+  --hexdump             show data as hexdump instead of trying to decode it as
+                        UTF-8
 
 examples:
     ./sslsniff              # sniff OpenSSL and GnuTLS functions
@@ -85,3 +87,4 @@ examples:
     ./sslsniff --no-openssl # don't show OpenSSL calls
     ./sslsniff --no-gnutls  # don't show GnuTLS calls
     ./sslsniff --no-nss     # don't show NSS calls
+    ./sslsniff --hexdump    # show data as hex instead of trying to decode it as UTF-8

@@ -46,7 +46,8 @@ parser.add_argument('-d', '--debug', dest='debug', action='count', default=0,
                     help='debug mode.')
 parser.add_argument("--ebpf", action="store_true",
                     help=argparse.SUPPRESS)
-parser.add_argument("--hexdump", action="store_true", dest="hexdump", help="show data as hexdump instead of trying to decode it as UTF-8")
+parser.add_argument("--hexdump", action="store_true", dest="hexdump",
+                    help="show data as hexdump instead of trying to decode it as UTF-8")
 args = parser.parse_args()
 
 
@@ -213,9 +214,13 @@ def print_event(cpu, data, size, rw, evt):
                 " bytes lost) " + "-" * 5
 
     fmt = "%-12s %-18.9f %-16s %-6d %-6d\n%s\n%s\n%s\n\n"
+    if args.hexdump:
+        unwrapped_data = binascii.hexlify(event.v0)
+        data = textwrap.fill(unwrapped_data.decode('utf-8', 'replace'),width=32)
+    else:
+        data = event.v0.decode('utf-8', 'replace')
     print(fmt % (rw, time_s, event.comm.decode('utf-8', 'replace'),
-                 event.pid, event.len, s_mark,
-                 textwrap.fill(binascii.hexlify(event.v0).decode('utf-8', 'replace'),width=32) if args.hexdump else event.v0.decode('utf-8', 'replace'), e_mark))
+                 event.pid, event.len, s_mark, data, e_mark))
 
 b["perf_SSL_write"].open_perf_buffer(print_event_write)
 b["perf_SSL_read"].open_perf_buffer(print_event_read)

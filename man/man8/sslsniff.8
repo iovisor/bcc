@@ -2,7 +2,7 @@
 .SH NAME
 sslsniff \- Print data passed to OpenSSL, GnuTLS or NSS. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B sslsniff [-h] [-p PID] [-c COMM] [-o] [-g] [-n] [-d]
+.B sslsniff [-h] [-p PID] [-c COMM] [-o] [-g] [-n] [-d] [--hexdump]
 .SH DESCRIPTION
 sslsniff prints data sent to write/send and read/recv functions of
 OpenSSL, GnuTLS and NSS, allowing us to read plain text content before
