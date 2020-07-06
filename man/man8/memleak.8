@@ -3,8 +3,8 @@
 memleak \- Print a summary of outstanding allocations and their call stacks to detect memory leaks. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
 .B memleak [-h] [-p PID] [-t] [-a] [-o OLDER] [-c COMMAND] [--combined-only]
-[-s SAMPLE_RATE] [-T TOP] [-z MIN_SIZE] [-Z MAX_SIZE] [-O OBJ] [INTERVAL]
-[COUNT]
+[--wa-missing-free] [-s SAMPLE_RATE] [-T TOP] [-z MIN_SIZE] [-Z MAX_SIZE]
+[-O OBJ] [INTERVAL] [COUNT]
 .SH DESCRIPTION
 memleak traces and matches memory allocation and deallocation requests, and
 collects call stacks for each allocation. memleak can then print a summary
@@ -52,6 +52,9 @@ Run the specified command and trace its allocations only. This traces libc alloc
 Use statistics precalculated in kernel space. Amount of data to be pulled from
 kernel significantly decreases, at the cost of losing capabilities of time-based
 false positives filtering (\-o).
+.TP
+\-\-wa-missing-free
+Make up the action of free to alleviate misjudgments when free is missing.
 .TP
 \-s SAMPLE_RATE
 Record roughly every SAMPLE_RATE-th allocation to reduce overhead.
@@ -108,6 +111,9 @@ also reduce overhead by capturing only allocations of specific sizes.
 Additionally, option \-\-combined-only saves processing time by reusing already
 calculated allocation statistics from kernel. It's faster, but lacks information
 about particular allocations.
+
+Also, option \-\-wa-missing-free makes memleak more accuracy in the complicated
+environment.
 
 To determine the rate at which your application is calling malloc/free, or the
 rate at which your kernel is calling kmalloc/kfree, place a probe with perf and
