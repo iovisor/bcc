@@ -68,7 +68,7 @@ packages use `bcc` in the name (e.g. `bcc-tools`), Ubuntu packages use `bpfcc` (
 Currently, BCC packages for both the Ubuntu Universe, and the iovisor builds are outdated. This is a known and tracked in:
 - [Universe - Ubuntu Launchpad](https://bugs.launchpad.net/ubuntu/+source/bpfcc/+bug/1848137)
 - [iovisor - BCC GitHub Issues](https://github.com/iovisor/bcc/issues/2678)
-Curently, [building from source](#ubuntu---source) is currently the only way to get up to date packaged version of bcc.
+Currently, [building from source](#ubuntu---source) is currently the only way to get up to date packaged version of bcc.
 
 **Ubuntu Packages**
 Source packages and the binary packages produced from them can be
@@ -383,7 +383,7 @@ sudo apt-get update
 sudo apt-get -y install bison build-essential cmake flex git libedit-dev \
   libllvm6.0 llvm-6.0-dev libclang-6.0-dev python zlib1g-dev libelf-dev
 
-# For Eon (19.10)
+# For Eoan (19.10)
 sudo apt install -y bison build-essential cmake flex git libedit-dev \
   libllvm7 llvm-7-dev libclang-7-dev python zlib1g-dev libelf-dev
 
