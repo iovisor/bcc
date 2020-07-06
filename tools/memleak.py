@@ -4,8 +4,8 @@
 #           memory leaks in user-mode processes and the kernel.
 #
 # USAGE: memleak [-h] [-p PID] [-t] [-a] [-o OLDER] [-c COMMAND]
-#                [--combined-only] [-s SAMPLE_RATE] [-T TOP] [-z MIN_SIZE]
-#                [-Z MAX_SIZE] [-O OBJ]
+#                [--combined-only] [--wa-missing-free] [-s SAMPLE_RATE]
+#                [-T TOP] [-z MIN_SIZE] [-Z MAX_SIZE] [-O OBJ]
 #                [interval] [count]
 #
 # Licensed under the Apache License, Version 2.0 (the "License")
@@ -88,6 +88,8 @@ parser.add_argument("-c", "--command",
         help="execute and trace the specified command")
 parser.add_argument("--combined-only", default=False, action="store_true",
         help="show combined allocation statistics only")
+parser.add_argument("--wa-missing-free", default=False, action="store_true",
+        help="Workaround to alleviate misjudgments when free is missing")
 parser.add_argument("-s", "--sample-rate", default=1, type=int,
         help="sample every N-th allocation to decrease the overhead")
 parser.add_argument("-T", "--top", type=int, default=10,
@@ -330,11 +332,15 @@ int pvalloc_exit(struct pt_regs *ctx) {
 bpf_source_kernel = """
 
 TRACEPOINT_PROBE(kmem, kmalloc) {
+        if (WORKAROUND_MISSING_FREE)
+            gen_free_enter((struct pt_regs *)args, (void *)args->ptr);
         gen_alloc_enter((struct pt_regs *)args, args->bytes_alloc);
         return gen_alloc_exit2((struct pt_regs *)args, (size_t)args->ptr);
 }
 
 TRACEPOINT_PROBE(kmem, kmalloc_node) {
+        if (WORKAROUND_MISSING_FREE)
+            gen_free_enter((struct pt_regs *)args, (void *)args->ptr);
         gen_alloc_enter((struct pt_regs *)args, args->bytes_alloc);
         return gen_alloc_exit2((struct pt_regs *)args, (size_t)args->ptr);
 }
@@ -344,11 +350,15 @@ TRACEPOINT_PROBE(kmem, kfree) {
 }
 
 TRACEPOINT_PROBE(kmem, kmem_cache_alloc) {
+        if (WORKAROUND_MISSING_FREE)
+            gen_free_enter((struct pt_regs *)args, (void *)args->ptr);
         gen_alloc_enter((struct pt_regs *)args, args->bytes_alloc);
         return gen_alloc_exit2((struct pt_regs *)args, (size_t)args->ptr);
 }
 
 TRACEPOINT_PROBE(kmem, kmem_cache_alloc_node) {
+        if (WORKAROUND_MISSING_FREE)
+            gen_free_enter((struct pt_regs *)args, (void *)args->ptr);
         gen_alloc_enter((struct pt_regs *)args, args->bytes_alloc);
         return gen_alloc_exit2((struct pt_regs *)args, (size_t)args->ptr);
 }
@@ -384,6 +394,10 @@ if kernel_trace:
                 bpf_source += bpf_source_percpu
         else:
                 bpf_source += bpf_source_kernel
+
+if kernel_trace:
+    bpf_source = bpf_source.replace("WORKAROUND_MISSING_FREE", "1"
+                                    if args.wa_missing_free else "0")
 
 bpf_source = bpf_source.replace("SHOULD_PRINT", "1" if trace_all else "0")
 bpf_source = bpf_source.replace("SAMPLE_EVERY_N", str(sample_every_n))

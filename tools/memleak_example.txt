@@ -146,13 +146,33 @@ Note that even though the application leaks 16 bytes of memory every second,
 the report (printed every 5 seconds) doesn't "see" all the allocations because
 of the sampling rate applied. 
 
+Profiling in memory part is hard to be accurate because of BPF infrastructure.
+memleak keeps misjudging memory leak on the complicated environment which has
+the action of free in hard/soft irq.
+Add workaround to alleviate misjudgments when free is missing:
+
+# ./memleak --wa-missing-free
+Attaching to kernel allocators, Ctrl+C to quit.
+...
+        248 bytes in 4 allocations from stack
+                 bpf_prog_load [kernel]
+                 sys_bpf [kernel]
+
+        328 bytes in 1 allocations from stack
+                 perf_mmap [kernel]
+                 mmap_region [kernel]
+                 do_mmap [kernel]
+                 vm_mmap_pgoff [kernel]
+                 sys_mmap_pgoff [kernel]
+                 sys_mmap [kernel]
+
 
 USAGE message:
 
 # ./memleak -h
 usage: memleak.py [-h] [-p PID] [-t] [-a] [-o OLDER] [-c COMMAND]
-                  [--combined-only] [-s SAMPLE_RATE] [-T TOP] [-z MIN_SIZE]
-                  [-Z MAX_SIZE] [-O OBJ]
+                  [--combined-only] [--wa-missing-free] [-s SAMPLE_RATE]
+                  [-T TOP] [-z MIN_SIZE] [-Z MAX_SIZE] [-O OBJ]
                   [interval] [count]
 
 Trace outstanding memory allocations that weren't freed.
@@ -177,6 +197,8 @@ optional arguments:
   -c COMMAND, --command COMMAND
                         execute and trace the specified command
   --combined-only       show combined allocation statistics only
+  --wa-missing-free     Workaround to alleviate misjudgments when free is
+                        missing
   -s SAMPLE_RATE, --sample-rate SAMPLE_RATE
                         sample every N-th allocation to decrease the overhead
   -T TOP, --top TOP     display only this many top allocating stacks (by size)
