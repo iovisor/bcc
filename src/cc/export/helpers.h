@@ -758,6 +758,11 @@ static struct tcp_request_sock *(*bpf_skc_to_tcp_request_sock)(void *sk) =
 static struct udp6_sock *(*bpf_skc_to_udp6_sock)(void *sk) =
   (void *)BPF_FUNC_skc_to_udp6_sock;
 
+struct task_struct;
+static long (*bpf_get_task_stack)(struct task_struct *task, void *buf,
+				  __u32 size, __u64 flags) =
+  (void *)BPF_FUNC_get_task_stack;
+
 /* llvm builtin functions that eBPF C program may use to
  * emit BPF_LD_ABS and BPF_LD_IND instructions
  */
