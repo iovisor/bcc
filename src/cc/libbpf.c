@@ -237,6 +237,7 @@ static struct bpf_helper helpers[] = {
   {"skc_to_tcp_timewait_sock", "5.9"},
   {"skc_to_tcp_request_sock", "5.9"},
   {"skc_to_udp6_sock", "5.9"},
+  {"bpf_get_task_stack", "5.9"},
 };
 
 static uint64_t ptr_to_u64(void *ptr)
