@@ -598,6 +598,25 @@ out:
   return result;
 }
 
+static char *find_debug_file(Elf* e, const char* path, int check_crc) {
+  char *debug_file = NULL;
+
+  // If there is a separate debuginfo file, try to locate and read it, first
+  // using symfs, then using the build-id section, finally using the debuglink
+  // section. These rules are what perf and gdb follow.
+  // See:
+  // - https://github.com/torvalds/linux/blob/v5.2/tools/perf/Documentation/perf-report.txt#L325
+  // - https://sourceware.org/gdb/onlinedocs/gdb/Separate-Debug-Files.html
+  debug_file = find_debug_via_symfs(e, path);
+  if (!debug_file)
+    debug_file = find_debug_via_buildid(e);
+  if (!debug_file)
+    debug_file = find_debug_via_debuglink(e, path, check_crc);
+
+  return debug_file;
+}
+
+
 static int foreach_sym_core(const char *path, bcc_elf_symcb callback,
                             bcc_elf_symcb_lazy callback_lazy,
                             struct bcc_symbol_option *option, void *payload,
@@ -612,21 +631,11 @@ static int foreach_sym_core(const char *path, bcc_elf_symcb callback,
   if (openelf(path, &e, &fd) < 0)
     return -1;
 
-  // If there is a separate debuginfo file, try to locate and read it, first
-  // using symfs, then using the build-id section, finally using the debuglink
-  // section. These rules are what perf and gdb follow.
-  // See:
-  // - https://github.com/torvalds/linux/blob/v5.2/tools/perf/Documentation/perf-report.txt#L325
-  // - https://sourceware.org/gdb/onlinedocs/gdb/Separate-Debug-Files.html
   if (option->use_debug_file && !is_debug_file) {
     // The is_debug_file argument helps avoid infinitely resolving debuginfo
     // files for debuginfo files and so on.
-    debug_file = find_debug_via_symfs(e, path);
-    if (!debug_file)
-      debug_file = find_debug_via_buildid(e);
-    if (!debug_file)
-      debug_file = find_debug_via_debuglink(e, path,
-                                            option->check_debug_file_crc);
+    debug_file = find_debug_file(e, path,
+                                 option->check_debug_file_crc);
     if (debug_file) {
       foreach_sym_core(debug_file, callback, callback_lazy, option, payload, 1);
       free(debug_file);
@@ -1002,10 +1011,7 @@ int bcc_elf_symbol_str(const char *path, size_t section_idx,
     return -1;
 
   if (debugfile) {
-    debug_file = find_debug_via_buildid(e);
-    if (!debug_file)
-      debug_file = find_debug_via_debuglink(e, path, 0); // No crc for speed
-
+    debug_file = find_debug_file(e, path, 0);
     if (!debug_file) {
       err = -1;
       goto exit;
