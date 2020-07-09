@@ -27,15 +27,19 @@ class Perf(object):
                         ('read_format', ct.c_ulong),
                         ('flags', ct.c_ulong),
                         ('wakeup_events', ct.c_uint),
-                        ('IGNORE3', ct.c_uint),
-                        ('IGNORE4', ct.c_ulong),
-                        ('IGNORE5', ct.c_ulong),
-                        ('IGNORE6', ct.c_ulong),
-                        ('IGNORE7', ct.c_uint),
-                        ('IGNORE8', ct.c_int),
-                        ('IGNORE9', ct.c_ulong),
-                        ('IGNORE10', ct.c_uint),
-                        ('IGNORE11', ct.c_uint)
+                        ('IGNORE3', ct.c_uint),  # bp_type
+                        ('IGNORE4', ct.c_ulong),  # bp_addr
+                        ('IGNORE5', ct.c_ulong),  # bp_len
+                        ('IGNORE6', ct.c_ulong),  # branch_sample_type
+                        ('IGNORE7', ct.c_ulong),  # sample_regs_user
+                        ('IGNORE8', ct.c_uint),  # sample_stack_user
+                        ('IGNORE9', ct.c_int),  # clockid
+                        ('IGNORE10', ct.c_ulong),  # sample_regs_intr
+                        ('IGNORE11', ct.c_uint),  # aux_watermark
+                        ('IGNORE12', ct.c_uint16),  # sample_max_stack
+                        ('IGNORE13', ct.c_uint16),  # __reserved_2
+                        ('IGNORE14', ct.c_uint),  # aux_sample_size
+                        ('IGNORE15', ct.c_uint),  # __reserved_3
                 ]
 
         # x86 specific, from arch/x86/include/generated/uapi/asm/unistd_64.h
