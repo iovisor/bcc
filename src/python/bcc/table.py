@@ -1004,6 +1004,9 @@ class RingBuf(TableBase):
         self._cbs[0] = fn
 
 class QueueStack:
+    # Flag for map.push
+    BPF_EXIST = 2
+
     def __init__(self, bpf, map_id, map_fd, leaftype):
         self.bpf = bpf
         self.map_id = map_id
@@ -1047,17 +1050,3 @@ class QueueStack:
         if res < 0:
             raise KeyError("Could not peek table")
         return leaf
-
-    def iterpop(self):
-        while True:
-            try:
-                yield self.pop()
-            except KeyError:
-                break
-
-    def clear(self):
-        while True:
-            try:
-                self.pop()
-            except KeyError:
-                break
