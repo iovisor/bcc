@@ -173,6 +173,7 @@ class bcc_symbol_option(ct.Structure):
     _fields_ = [
             ('use_debug_file', ct.c_int),
             ('check_debug_file_crc', ct.c_int),
+            ('lazy_symbolize', ct.c_int),
             ('use_symbol_type', ct.c_uint),
         ]
 
