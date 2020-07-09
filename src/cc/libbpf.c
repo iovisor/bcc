@@ -588,8 +588,18 @@ int bcc_prog_load_xattr(struct bpf_load_program_attr *attr, int prog_len,
 
     if (attr->prog_type == BPF_PROG_TYPE_TRACING ||
         attr->prog_type == BPF_PROG_TYPE_LSM) {
-      attr->attach_btf_id = libbpf_find_vmlinux_btf_id(attr->name + name_offset,
-                                                       expected_attach_type);
+      ret = libbpf_find_vmlinux_btf_id(attr->name + name_offset,
+                                       expected_attach_type);
+      if (ret == -EINVAL) {
+        fprintf(stderr, "bpf: vmlinux BTF is not found\n");
+        return ret;
+      } else if (ret < 0) {
+        fprintf(stderr, "bpf: %s is not found in vmlinux BTF\n",
+                attr->name + name_offset);
+        return ret;
+      }
+
+      attr->attach_btf_id = ret;
       attr->expected_attach_type = expected_attach_type;
     }
 
