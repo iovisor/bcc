@@ -1064,6 +1064,7 @@ BPF_HASH_OF_MAPS(maps_hash, "ex1", 10);
 Syntax: ```BPF_STACK(name, leaf_type, max_entries[, flags])```
 
 Creates a stack named ```name``` with value type ```leaf_type``` and max entries ```max_entries```.
+Stack and Queue maps are only available from Linux 4.20+.
 
 For example:
 
@@ -1083,6 +1084,7 @@ Examples in situ:
 Syntax: ```BPF_QUEUE(name, leaf_type, max_entries[, flags])```
 
 Creates a queue named ```name``` with value type ```leaf_type``` and max entries ```max_entries```.
+Stack and Queue maps are only available from Linux 4.20+.
 
 For example:
 

@@ -23,7 +23,7 @@ def kernel_version_ge(major, minor):
     return True
 
 class TestQueueStack(TestCase):
-    @skipUnless(kernel_version_ge(4,2), "requires kernel >= 4.2")
+    @skipUnless(kernel_version_ge(4,20), "requires kernel >= 4.20")
     def test_stack(self):
         text = """
         BPF_STACK(stack, u64, 10);
@@ -50,7 +50,7 @@ class TestQueueStack(TestCase):
 
         b.cleanup()
 
-    @skipUnless(kernel_version_ge(4,2), "requires kernel >= 4.2")
+    @skipUnless(kernel_version_ge(4,20), "requires kernel >= 4.20")
     def test_queue(self):
         text = """
         BPF_QUEUE(queue, u64, 10);
