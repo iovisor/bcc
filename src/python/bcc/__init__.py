@@ -24,7 +24,7 @@ import errno
 import sys
 
 from .libbcc import lib, bcc_symbol, bcc_symbol_option, bcc_stacktrace_build_id, _SYM_CB_TYPE
-from .table import Table, PerfEventArray, RingBuf
+from .table import Table, PerfEventArray, RingBuf, BPF_MAP_TYPE_QUEUE, BPF_MAP_TYPE_STACK
 from .perf import Perf
 from .utils import get_online_cpus, printb, _assert_is_bytes, ArgString, StrcmpRewrite
 from .version import __version__
@@ -499,9 +499,10 @@ class BPF(object):
         name = _assert_is_bytes(name)
         map_id = lib.bpf_table_id(self.module, name)
         map_fd = lib.bpf_table_fd(self.module, name)
+        is_queuestack = lib.bpf_table_type_id(self.module, map_id) in [BPF_MAP_TYPE_QUEUE, BPF_MAP_TYPE_STACK]
         if map_fd < 0:
             raise KeyError
-        if not keytype:
+        if not keytype and not is_queuestack:
             key_desc = lib.bpf_table_key_desc(self.module, name).decode("utf-8")
             if not key_desc:
                 raise Exception("Failed to load BPF Table %s key desc" % name)

@@ -57,16 +57,21 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
         - [12. BPF_XSKMAP](#12-bpf_xskmap)
         - [13. BPF_ARRAY_OF_MAPS](#13-bpf_array_of_maps)
         - [14. BPF_HASH_OF_MAPS](#14-bpf_hash_of_maps)
-        - [15. map.lookup()](#15-maplookup)
-        - [16. map.lookup_or_try_init()](#16-maplookup_or_try_init)
-        - [17. map.delete()](#17-mapdelete)
-        - [18. map.update()](#18-mapupdate)
-        - [19. map.insert()](#19-mapinsert)
-        - [20. map.increment()](#20-mapincrement)
-        - [21. map.get_stackid()](#21-mapget_stackid)
-        - [22. map.perf_read()](#22-mapperf_read)
-        - [23. map.call()](#23-mapcall)
-        - [24. map.redirect_map()](#24-mapredirect_map)
+        - [15. BPF_STACK](#15-bpf_stack)
+        - [16. BPF_QUEUE](#16-bpf_queue)
+        - [17. map.lookup()](#17-maplookup)
+        - [18. map.lookup_or_try_init()](#18-maplookup_or_try_init)
+        - [19. map.delete()](#19-mapdelete)
+        - [20. map.update()](#20-mapupdate)
+        - [21. map.insert()](#21-mapinsert)
+        - [22. map.increment()](#22-mapincrement)
+        - [23. map.get_stackid()](#23-mapget_stackid)
+        - [24. map.perf_read()](#24-mapperf_read)
+        - [25. map.call()](#25-mapcall)
+        - [26. map.redirect_map()](#26-mapredirect_map)
+        - [27. map.push()](#27-mappush)
+        - [28. map.pop()](#27-mappop)
+        - [29. map.peek()](#27-mappeek)
     - [Licensing](#licensing)
 
 - [bcc Python](#bcc-python)
@@ -95,8 +100,11 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
         - [4. values()](#4-values)
         - [5. clear()](#5-clear)
         - [6. print_log2_hist()](#6-print_log2_hist)
-        - [7. print_linear_hist()](#6-print_linear_hist)
+        - [7. print_linear_hist()](#7-print_linear_hist)
         - [8. open_ring_buffer()](#8-open_ring_buffer)
+        - [9. push()](#9-push)
+        - [10. pop()](#10-pop)
+        - [11. peek()](#11-peek)
     - [Helpers](#helpers)
         - [1. ksym()](#1-ksym)
         - [2. ksymname()](#2-ksymname)
@@ -1051,7 +1059,47 @@ BPF_ARRAY(ex2, int, 1024);
 BPF_HASH_OF_MAPS(maps_hash, "ex1", 10);
 ```
 
-### 15. map.lookup()
+### 15. BPF_STACK
+
+Syntax: ```BPF_STACK(name, leaf_type, max_entries[, flags])```
+
+Creates a stack named ```name``` with value type ```leaf_type``` and max entries ```max_entries```.
+Stack and Queue maps are only available from Linux 4.20+.
+
+For example:
+
+```C
+BPF_STACK(stack, struct event, 10240);
+```
+
+This creates a stack named ```stack``` where the value type is ```struct event```, that holds up to 10240 entries.
+
+Methods (covered later): map.push(), map.pop(), map.peek().
+
+Examples in situ:
+[search /tests](https://github.com/iovisor/bcc/search?q=BPF_STACK+path%3Atests&type=Code),
+
+### 16. BPF_QUEUE
+
+Syntax: ```BPF_QUEUE(name, leaf_type, max_entries[, flags])```
+
+Creates a queue named ```name``` with value type ```leaf_type``` and max entries ```max_entries```.
+Stack and Queue maps are only available from Linux 4.20+.
+
+For example:
+
+```C
+BPF_QUEUE(queue, struct event, 10240);
+```
+
+This creates a queue named ```queue``` where the value type is ```struct event```, that holds up to 10240 entries.
+
+Methods (covered later): map.push(), map.pop(), map.peek().
+
+Examples in situ:
+[search /tests](https://github.com/iovisor/bcc/search?q=BPF_QUEUE+path%3Atests&type=Code),
+
+### 17. map.lookup()
 
 Syntax: ```*val map.lookup(&key)```
 
@@ -1061,7 +1109,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=lookup+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=lookup+path%3Atools&type=Code)
 
-### 16. map.lookup_or_try_init()
+### 18. map.lookup_or_try_init()
 
 Syntax: ```*val map.lookup_or_try_init(&key, &zero)```
 
@@ -1074,7 +1122,7 @@ Examples in situ:
 Note: The old map.lookup_or_init() may cause return from the function, so lookup_or_try_init() is recommended as it
 does not have this side effect.
 
-### 17. map.delete()
+### 19. map.delete()
 
 Syntax: ```map.delete(&key)```
 
@@ -1084,7 +1132,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=delete+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=delete+path%3Atools&type=Code)
 
-### 18. map.update()
+### 20. map.update()
 
 Syntax: ```map.update(&key, &val)```
 
@@ -1094,7 +1142,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=update+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=update+path%3Atools&type=Code)
 
-### 19. map.insert()
+### 21. map.insert()
 
 Syntax: ```map.insert(&key, &val)```
 
@@ -1104,7 +1152,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=insert+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=insert+path%3Atools&type=Code)
 
-### 20. map.increment()
+### 22. map.increment()
 
 Syntax: ```map.increment(key[, increment_amount])```
 
@@ -1114,7 +1162,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=increment+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=increment+path%3Atools&type=Code)
 
-### 21. map.get_stackid()
+### 23. map.get_stackid()
 
 Syntax: ```int map.get_stackid(void *ctx, u64 flags)```
 
@@ -1124,7 +1172,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=get_stackid+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=get_stackid+path%3Atools&type=Code)
 
-### 22. map.perf_read()
+### 24. map.perf_read()
 
 Syntax: ```u64 map.perf_read(u32 cpu)```
 
@@ -1133,7 +1181,7 @@ This returns the hardware performance counter as configured in [5. BPF_PERF_ARRA
 Examples in situ:
 [search /tests](https://github.com/iovisor/bcc/search?q=perf_read+path%3Atests&type=Code)
 
-### 23. map.call()
+### 25. map.call()
 
 Syntax: ```void map.call(void *ctx, int index)```
 
@@ -1172,7 +1220,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?l=C&q=call+path%3Aexamples&type=Code),
 [search /tests](https://github.com/iovisor/bcc/search?l=C&q=call+path%3Atests&type=Code)
 
-### 24. map.redirect_map()
+### 26. map.redirect_map()
 
 Syntax: ```int map.redirect_map(int index, int flags)```
 
@@ -1209,6 +1257,39 @@ b.attach_xdp("eth1", out_fn, 0)
 
 Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?l=C&q=redirect_map+path%3Aexamples&type=Code),
+
+### 27. map.push()
+
+Syntax: ```int map.push(&val, int flags)```
+
+Push an element onto a Stack or Queue table.
+Passing BPF_EXIST as a flag causes the Queue or Stack to discard the oldest element if it is full.
+Returns 0 on success, negative error on failure.
+
+Examples in situ:
+[search /tests](https://github.com/iovisor/bcc/search?q=push+path%3Atests&type=Code),
+
+### 28. map.pop()
+
+Syntax: ```int map.pop(&val)```
+
+Pop an element from a Stack or Queue table. ```*val``` is populated with the result.
+Unlike peeking, popping removes the element.
+Returns 0 on success, negative error on failure.
+
+Examples in situ:
+[search /tests](https://github.com/iovisor/bcc/search?q=pop+path%3Atests&type=Code),
+
+### 29. map.peek()
+
+Syntax: ```int map.peek(&val)```
+
+Peek an element at the head of a Stack or Queue table. ```*val``` is populated with the result.
+Unlike popping, peeking does not remove the element.
+Returns 0 on success, negative error on failure.
+
+Examples in situ:
+[search /tests](https://github.com/iovisor/bcc/search?q=peek+path%3Atests&type=Code),
 
 ## Licensing
 
@@ -1937,6 +2018,37 @@ def print_event(ctx, data, size):
 
 Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=open_ring_buffer+path%3Aexamples+language%3Apython&type=Code),
+
+### 9. push()
+
+Syntax: ```table.push(leaf, flags=0)```
+
+Push an element onto a Stack or Queue table. Raises an exception if the operation does not succeed.
+Passing QueueStack.BPF_EXIST as a flag causes the Queue or Stack to discard the oldest element if it is full.
+
+Examples in situ:
+[search /tests](https://github.com/iovisor/bcc/search?q=push+path%3Atests+language%3Apython&type=Code),
+
+### 10. pop()
+
+Syntax: ```leaf = table.pop()```
+
+Pop an element from a Stack or Queue table. Unlike ```peek()```, ```pop()```
+removes the element from the table before returning it.
+Raises a KeyError exception if the operation does not succeed.
+
+Examples in situ:
+[search /tests](https://github.com/iovisor/bcc/search?q=pop+path%3Atests+language%3Apython&type=Code),
+
+### 11. peek()
+
+Syntax: ```leaf = table.peek()```
+
+Peek the element at the head of a Stack or Queue table. Unlike ```pop()```, ```peek()```
+does not remove the element from the table. Raises an exception if the operation does not succeed.
+
+Examples in situ:
+[search /tests](https://github.com/iovisor/bcc/search?q=peek+path%3Atests+language%3Apython&type=Code),
 
 ## Helpers
 

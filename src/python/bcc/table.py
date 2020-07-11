@@ -265,6 +265,8 @@ def Table(bpf, map_id, map_fd, keytype, leaftype, name, **kwargs):
         t = MapInMapArray(bpf, map_id, map_fd, keytype, leaftype)
     elif ttype == BPF_MAP_TYPE_HASH_OF_MAPS:
         t = MapInMapHash(bpf, map_id, map_fd, keytype, leaftype)
+    elif ttype == BPF_MAP_TYPE_QUEUE or ttype == BPF_MAP_TYPE_STACK:
+        t = QueueStack(bpf, map_id, map_fd, leaftype)
     elif ttype == BPF_MAP_TYPE_RINGBUF:
         t = RingBuf(bpf, map_id, map_fd, keytype, leaftype, name)
     if t == None:
@@ -1000,3 +1002,51 @@ class RingBuf(TableBase):
         self.bpf._open_ring_buffer(self.map_fd, fn, ctx)
         # keep a refcnt
         self._cbs[0] = fn
+
+class QueueStack:
+    # Flag for map.push
+    BPF_EXIST = 2
+
+    def __init__(self, bpf, map_id, map_fd, leaftype):
+        self.bpf = bpf
+        self.map_id = map_id
+        self.map_fd = map_fd
+        self.Leaf = leaftype
+        self.ttype = lib.bpf_table_type_id(self.bpf.module, self.map_id)
+        self.flags = lib.bpf_table_flags_id(self.bpf.module, self.map_id)
+
+    def leaf_sprintf(self, leaf):
+        buf = ct.create_string_buffer(ct.sizeof(self.Leaf) * 8)
+        res = lib.bpf_table_leaf_snprintf(self.bpf.module, self.map_id, buf,
+                                          len(buf), ct.byref(leaf))
+        if res < 0:
+            raise Exception("Could not printf leaf")
+        return buf.value
+
+    def leaf_scanf(self, leaf_str):
+        leaf = self.Leaf()
+        res = lib.bpf_table_leaf_sscanf(self.bpf.module, self.map_id, leaf_str,
+                                        ct.byref(leaf))
+        if res < 0:
+            raise Exception("Could not scanf leaf")
+        return leaf
+
+    def push(self, leaf, flags=0):
+        res = lib.bpf_update_elem(self.map_fd, None, ct.byref(leaf), flags)
+        if res < 0:
+            errstr = os.strerror(ct.get_errno())
+            raise Exception("Could not push to table: %s" % errstr)
+
+    def pop(self):
+        leaf = self.Leaf()
+        res = lib.bpf_lookup_and_delete(self.map_fd, None, ct.byref(leaf))
+        if res < 0:
+            raise KeyError("Could not pop from table")
+        return leaf
+
+    def peek(self):
+        leaf = self.Leaf()
+        res = lib.bpf_lookup_elem(self.map_fd, None, ct.byref(leaf))
+        if res < 0:
+            raise KeyError("Could not peek table")
+        return leaf

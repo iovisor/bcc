@@ -91,3 +91,5 @@ add_test(NAME py_test_lpm_trie WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   COMMAND ${TEST_WRAPPER} py_test_lpm_trie sudo ${CMAKE_CURRENT_SOURCE_DIR}/test_lpm_trie.py)
 add_test(NAME py_ringbuf WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   COMMAND ${TEST_WRAPPER} py_ringbuf sudo ${CMAKE_CURRENT_SOURCE_DIR}/test_ringbuf.py)
+add_test(NAME py_queuestack WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  COMMAND ${TEST_WRAPPER} py_queuestack sudo ${CMAKE_CURRENT_SOURCE_DIR}/test_queuestack.py)
