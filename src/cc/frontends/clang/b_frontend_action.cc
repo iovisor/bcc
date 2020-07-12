@@ -316,7 +316,10 @@ bool MapVisitor::VisitCallExpr(CallExpr *Call) {
 ProbeVisitor::ProbeVisitor(ASTContext &C, Rewriter &rewriter,
                            set<Decl *> &m, bool track_helpers) :
   C(C), rewriter_(rewriter), m_(m), track_helpers_(track_helpers),
-  addrof_stmt_(nullptr), is_addrof_(false) {}
+  addrof_stmt_(nullptr), is_addrof_(false) {
+  const char **calling_conv_regs = get_call_conv();
+  has_overlap_kuaddr_ = calling_conv_regs == calling_conv_regs_s390x;
+}
 
 bool ProbeVisitor::assignsExtPtr(Expr *E, int *nbDerefs) {
   if (IsContextMemberExpr(E)) {
@@ -488,7 +491,10 @@ bool ProbeVisitor::VisitUnaryOperator(UnaryOperator *E) {
   memb_visited_.insert(E);
   string pre, post;
   pre = "({ typeof(" + E->getType().getAsString() + ") _val; __builtin_memset(&_val, 0, sizeof(_val));";
-  pre += " bpf_probe_read(&_val, sizeof(_val), (u64)";
+  if (has_overlap_kuaddr_)
+    pre += " bpf_probe_read_kernel(&_val, sizeof(_val), (u64)";
+  else
+    pre += " bpf_probe_read(&_val, sizeof(_val), (u64)";
   post = "); _val; })";
   rewriter_.ReplaceText(expansionLoc(E->getOperatorLoc()), 1, pre);
   rewriter_.InsertTextAfterToken(expansionLoc(GET_ENDLOC(sub)), post);
@@ -549,7 +555,10 @@ bool ProbeVisitor::VisitMemberExpr(MemberExpr *E) {
   string base_type = base->getType()->getPointeeType().getAsString();
   string pre, post;
   pre = "({ typeof(" + E->getType().getAsString() + ") _val; __builtin_memset(&_val, 0, sizeof(_val));";
-  pre += " bpf_probe_read(&_val, sizeof(_val), (u64)&";
+  if (has_overlap_kuaddr_)
+    pre += " bpf_probe_read_kernel(&_val, sizeof(_val), (u64)&";
+  else
+    pre += " bpf_probe_read(&_val, sizeof(_val), (u64)&";
   post = rhs + "); _val; })";
   rewriter_.InsertText(expansionLoc(GET_BEGINLOC(E)), pre);
   rewriter_.ReplaceText(expansionRange(SourceRange(member, GET_ENDLOC(E))), post);
@@ -600,7 +609,10 @@ bool ProbeVisitor::VisitArraySubscriptExpr(ArraySubscriptExpr *E) {
     return true;
 
   pre = "({ typeof(" + E->getType().getAsString() + ") _val; __builtin_memset(&_val, 0, sizeof(_val));";
-  pre += " bpf_probe_read(&_val, sizeof(_val), (u64)((";
+  if (has_overlap_kuaddr_)
+    pre += " bpf_probe_read_kernel(&_val, sizeof(_val), (u64)((";
+  else
+    pre += " bpf_probe_read(&_val, sizeof(_val), (u64)((";
   if (isMemberDereference(base)) {
     pre += "&";
     // If the base of the array subscript is a member dereference, we'll rewrite
@@ -692,7 +704,10 @@ DiagnosticBuilder ProbeVisitor::error(SourceLocation loc, const char (&fmt)[N]) 
 }
 
 BTypeVisitor::BTypeVisitor(ASTContext &C, BFrontendAction &fe)
-    : C(C), diag_(C.getDiagnostics()), fe_(fe), rewriter_(fe.rewriter()), out_(llvm::errs()) {}
+    : C(C), diag_(C.getDiagnostics()), fe_(fe), rewriter_(fe.rewriter()), out_(llvm::errs()) {
+  const char **calling_conv_regs = get_call_conv();
+  has_overlap_kuaddr_ = calling_conv_regs == calling_conv_regs_s390x;
+}
 
 void BTypeVisitor::genParamDirectAssign(FunctionDecl *D, string& preamble,
                                         const char **calling_conv_regs) {
@@ -733,7 +748,10 @@ void BTypeVisitor::genParamIndirectAssign(FunctionDecl *D, string& preamble,
       size_t d = idx - 1;
       const char *reg = calling_conv_regs[d];
       preamble += "\n " + text + ";";
-      preamble += " bpf_probe_read";
+      if (has_overlap_kuaddr_)
+        preamble += " bpf_probe_read_kernel";
+      else
+        preamble += " bpf_probe_read";
       preamble += "(&" + arg->getName().str() + ", sizeof(" +
                   arg->getName().str() + "), &" + new_ctx + "->" +
                   string(reg) + ");";
