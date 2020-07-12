@@ -19,8 +19,8 @@
 #include <iostream>
 #include <linux/version.h>
 
-//Queue/Stack types are available only from 5.0.0
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 0, 0)
+//Queue/Stack types are available only from 4.20
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 20, 0)
 TEST_CASE("queue table", "[queue_table]") {
   const std::string BPF_PROGRAM = R"(
     BPF_QUEUE(myqueue, int, 30);
