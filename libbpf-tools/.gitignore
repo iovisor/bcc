@@ -7,5 +7,6 @@
 /opensnoop
 /runqslower
 /syscount
+/tcpconnect
 /vfsstat
 /xfsslower

@@ -7,6 +7,7 @@
 #include <bpf/bpf_tracing.h>
 #include <bpf/bpf_core_read.h>
 #include "syscount.h"
+#include "maps.bpf.h"
 
 const volatile bool count_by_process = false;
 const volatile bool measure_latency = false;
@@ -29,23 +30,6 @@ struct {
 	__type(value, struct data_t);
 	__uint(map_flags, BPF_F_NO_PREALLOC);
 } data SEC(".maps");
-
-static __always_inline
-void *bpf_map_lookup_or_try_init(void *map, void *key, const void *init)
-{
-	void *val;
-	int err;
-
-	val = bpf_map_lookup_elem(map, key);
-	if (val)
-		return val;
-
-	err = bpf_map_update_elem(map, key, init, 0);
-	if (err)
-		return (void *) 0;
-
-	return bpf_map_lookup_elem(map, key);
-}
 
 static __always_inline
 void save_proc_name(struct data_t *val)
