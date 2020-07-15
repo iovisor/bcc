@@ -73,6 +73,7 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
         - [28. map.pop()](#27-mappop)
         - [29. map.peek()](#27-mappeek)
     - [Licensing](#licensing)
+    - [Rewriter](#rewriter)
 
 - [bcc Python](#bcc-python)
     - [Initialization](#initialization)
@@ -1312,6 +1313,10 @@ Otherwise, the kernel may reject loading your program (see the [error descriptio
 Check the [BPF helpers reference](kernel-versions.md#helpers) to see which helpers are GPL-only and what the kernel understands as GPL-compatible.
 
 **If the macro is not specified, BCC will automatically define the license of the program as GPL.**
+
+## Rewriter
+
+One of jobs for rewriter is to turn implicit memory accesses to explicit ones using kernel helpers. Recent kernel introduced a config option ARCH_HAS_NON_OVERLAPPING_ADDRESS_SPACE which will be set for architectures who user address space and kernel address are disjoint. x86 and arm has this config option set while s390 does not. If ARCH_HAS_NON_OVERLAPPING_ADDRESS_SPACE is not set, the bpf old helper `bpf_probe_read()` will not be available. Some existing users may have implicit memory accesses to access user memory, so using `bpf_probe_read_kernel()` will cause their application to fail. Therefore, for non-s390, the rewriter will use `bpf_probe_read()` for these implicit memory accesses. For s390, `bpf_probe_read_kernel()` is used as default and users should use `bpf_probe_read_user()` explicitly when accessing user memories.
 
 # bcc Python
 
