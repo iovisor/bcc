@@ -11,11 +11,11 @@
 #include "maps.bpf.h"
 #include "tcpconnect.h"
 
-const volatile bool do_count;
-const volatile int filter_ports_len;
-const volatile int filter_ports[MAX_PORTS];
-const volatile pid_t filter_pid;
+SEC(".rodata") int filter_ports[MAX_PORTS];
+const volatile int filter_ports_len = 0;
 const volatile uid_t filter_uid = -1;
+const volatile pid_t filter_pid = 0;
+const volatile bool do_count = 0;
 
 /* Define here, because there are conflicts with include files */
 #define AF_INET		2

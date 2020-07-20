@@ -338,7 +338,7 @@ static void print_events(int perf_map_fd)
 	print_events_header();
 	while (hang_on) {
 		err = perf_buffer__poll(pb, 100);
-		if (err < 0) {
+		if (err < 0 && errno != EINTR) {
 			warn("Error polling perf buffer: %d\n", err);
 			goto cleanup;
 		}
