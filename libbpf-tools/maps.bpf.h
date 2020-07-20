@@ -4,7 +4,7 @@
 #define __MAPS_BPF_H
 
 #include <bpf/bpf_helpers.h>
-#include <errno.h>
+#include <asm-generic/errno.h>
 
 static __always_inline void *
 bpf_map_lookup_or_try_init(void *map, const void *key, const void *init)
