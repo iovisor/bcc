@@ -13,7 +13,7 @@
 
 const volatile bool do_count;
 const volatile int filter_ports_len;
-SEC(".rodata") int filter_ports[MAX_PORTS];
+const volatile int filter_ports[MAX_PORTS];
 const volatile pid_t filter_pid;
 const volatile uid_t filter_uid = -1;
 
