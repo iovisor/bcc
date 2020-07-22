@@ -20,6 +20,7 @@ APPS = \
 	runqslower \
 	syscount \
 	tcpconnect \
+	tcpconnlat \
 	vfsstat \
 	xfsslower \
 	#
