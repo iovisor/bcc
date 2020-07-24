@@ -31,6 +31,7 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
         - [9. bpf_get_prandom_u32()](#9-bpf_get_prandom_u32)
         - [10. bpf_probe_read_user()](#10-bpf_probe_read_user)
         - [11. bpf_probe_read_user_str()](#11-bpf_probe_read_user_str)
+        - [12. bpf_get_ns_current_pid_tgid()](#4-bpf_get_ns_current_pid_tgid)
     - [Debugging](#debugging)
         - [1. bpf_override_return()](#1-bpf_override_return)
     - [Output](#output)
@@ -574,6 +575,24 @@ This copies a `NULL` terminated string from user address space to the BPF stack,
 Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=bpf_probe_read_user_str+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=bpf_probe_read_user_str+path%3Atools&type=Code)
+  
+
+### 12. bpf_get_ns_current_pid_tgid()
+
+Syntax: ```u32 bpf_get_ns_current_pid_tgid(u64 dev, u64 ino, struct bpf_pidns_info* nsdata, u32 size)```
+
+Values for *pid* and *tgid* as seen from the current *namespace* will be returned in *nsdata*.
+
+Return 0 on success, or one of the following in case of failure:
+ 
+- **-EINVAL** if dev and inum supplied don't match dev_t and inode number with nsfs of current task, or if dev conversion to dev_t lost high bits.
+
+- **-ENOENT** if pidns does not exists for the current task.
+
+Examples in situ:
+[search /examples](https://github.com/iovisor/bcc/search?q=bpf_get_ns_current_pid_tgid+path%3Aexamples&type=Code),
+[search /tools](https://github.com/iovisor/bcc/search?q=bpf_get_ns_current_pid_tgid+path%3Atools&type=Code)
+
 
 ## Debugging
 
