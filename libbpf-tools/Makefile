@@ -12,6 +12,7 @@ ARCH := $(shell uname -m | sed 's/x86_64/x86/')
 APPS = \
 	biolatency \
 	biopattern \
+	biosnoop \
 	bitesize \
 	cpudist \
 	drsnoop \
