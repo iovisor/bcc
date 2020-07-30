@@ -712,7 +712,7 @@ static __u64 (*bpf_get_current_ancestor_cgroup_id)(int ancestor_level) =
   (void *)BPF_FUNC_get_current_ancestor_cgroup_id;
 
 struct sk_buff;
-static int (*bpf_sk_assign)(struct sk_buff *skb, struct bpf_sock *sk, __u64 flags) =
+static int (*bpf_sk_assign)(void *skb, struct bpf_sock *sk, __u64 flags) =
   (void *)BPF_FUNC_sk_assign;
 
 static __u64 (*bpf_ktime_get_boot_ns)(void) = (void *)BPF_FUNC_ktime_get_boot_ns;
