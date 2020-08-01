@@ -138,6 +138,19 @@ class Probe(object):
                 # The remainder of the text is the printf action
                 self._parse_action(text.lstrip())
 
+        def _parse_offset(self, func_and_offset):
+                func, offset_str = func_and_offset.split("+")
+                try:
+                        if "x" in offset_str or "X" in offset_str:
+                                offset = int(offset_str, 16)
+                        else:
+                                offset = int(offset_str)
+                except ValueError:
+                        self._bail("invalid offset format " +
+                                   " '%s', must be decimal or hexadecimal" % offset_str)
+
+                return func, offset
+
         def _parse_spec(self, spec):
                 parts = spec.split(":")
                 # Two special cases: 'func' means 'p::func', 'lib:func' means
@@ -155,6 +168,10 @@ class Probe(object):
                 else:
                         self._bail("probe type must be '', 'p', 't', 'r', " +
                                    "or 'u', but got '%s'" % parts[0])
+                self.offset = 0
+                if "+" in parts[-1]:
+                        parts[-1], self.offset = self._parse_offset(parts[-1])
+
                 if self.probe_type == "t":
                         self.tp_category = parts[1]
                         self.tp_event = parts[2]
@@ -629,7 +646,8 @@ BPF_PERF_OUTPUT(%s);
                                              fn_name=self.probe_name)
                 elif self.probe_type == "p":
                         bpf.attach_kprobe(event=self.function,
-                                          fn_name=self.probe_name)
+                                          fn_name=self.probe_name,
+                                          event_off=self.offset)
                 # Note that tracepoints don't need an explicit attach
 
         def _attach_u(self, bpf):
@@ -651,7 +669,8 @@ BPF_PERF_OUTPUT(%s);
                         bpf.attach_uprobe(name=libpath,
                                           sym=self.function,
                                           fn_name=self.probe_name,
-                                          pid=Probe.tgid)
+                                          pid=Probe.tgid,
+                                          sym_off=self.offset)
 
 class Tool(object):
         DEFAULT_PERF_BUFFER_PAGES = 64
@@ -660,6 +679,8 @@ EXAMPLES:
 
 trace do_sys_open
         Trace the open syscall and print a default trace message when entered
+trace kfree_skb+0x12
+        Trace the kfree_skb kernel function after the instruction on the 0x12 offset
 trace 'do_sys_open "%s", arg2'
         Trace the open syscall and print the filename being opened
 trace 'do_sys_open "%s", arg2' -n main
