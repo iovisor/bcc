@@ -322,10 +322,10 @@ objdump --disassemble=main --prefix-addresses a.out
 000000000000109e <main+0x3e> retq
 
 The 0xdead and later the 0xbeef values are moved into the edx register.
-As the dissassembly shows the edx register contains the 0xdead value
+As the disassembly shows the edx register contains the 0xdead value
 after the 0xd offset and 0xbeef after the 0x25 offset. To verify this
 with trace lets insert probes to those offsets. The following
-command insert two uprobe one after the 0xd offset and another one
+command inserts two uprobe one after the 0xd offset and another one
 after the 0x25 offset of the main function. The probe print the
 value of the edx register which will show us the correct values.
 
