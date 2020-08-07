@@ -50,6 +50,7 @@ static const char argp_program_doc[] =
 
 static const struct argp_option opts[] = {
 	{ "tid", 't', "TID", 0, "Thread ID to trace"},
+	{ "pid", 'p', "PID", 0, "Process ID to trace"},
 	{ "syscall", 's', NULL, 0, "Trace SYSCALL info"},
 	{ "debug", 'd', NULL, 0, "Debug: output raw timestamp"},
 	{ "log", 'l', NULL, 0, "Output all related events"},
@@ -58,6 +59,7 @@ static const struct argp_option opts[] = {
 
 static struct env {
 	int targ_tid;
+	int mode;
 	bool trace_syscall;
 	bool output_log;
 	bool debug;
@@ -72,6 +74,7 @@ struct timespec start_ts;
 struct tm *start_tm;
 int trace_stat_maps_fd;
 int syscall_stat_maps_fd;
+int mask_task_maps_fd;
 
 static error_t parse_arg(int key, char *arg, struct argp_state *state)
 {
@@ -84,6 +87,16 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 			argp_usage(state);
 		}
 		env.targ_tid = tid;
+		env.mode = MODE_TID;
+		break;
+	case 'p':
+		tid = strtol(arg, NULL, 10);
+		if (tid <= 0) {
+			fprintf(stderr, "Invalid thread ID: %s\n", arg);
+			argp_usage(state);
+		}
+		env.targ_tid = tid;
+		env.mode = MODE_PID;
 		break;
 	case 's':
 		env.trace_syscall = true;
@@ -96,7 +109,7 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 		break;
 	case ARGP_KEY_END:
 		if (!env.targ_tid) {
-			fprintf(stderr, "Target thread ID is required!\n");
+			fprintf(stderr, "Target ID is required!\n");
 			argp_usage(state);
 		}
 		break;
@@ -165,7 +178,7 @@ int comp(const void *a, const void *b)
 	return ((struct stat_info_node *)a)->avg < ((struct stat_info_node *)b)->avg;
 }
 
-static inline void pr_stat_info(int map_fd, int num, int type)
+static inline void pr_syscall_info(int num)
 {
 	struct ti_key key, prev_key;
 	struct stat_info stat;
@@ -173,20 +186,16 @@ static inline void pr_stat_info(int map_fd, int num, int type)
 	char comm_buf[2 * TASK_COMM_LEN];
 	char avg_buf[16],long_buf[16];
 	int err, idx = 0;
-	
-	switch (type) {
-	case PREEMPTION:
-		printf("\nPreemption Report:\n");
-		break;
-	case SYSCALL:
-		printf("\nSYSCALL Report:\n");
-		break;
-	default:
-		break;
+
+	if (num == 0) {
+		printf("\nNo SYSCALL traced!\n");
+		return;
 	}
 	
-	while (bpf_map_get_next_key(map_fd, &prev_key, &key) == 0) {
-		err = bpf_map_lookup_elem(map_fd, &key, &stat);
+	printf("\nSYSCALL Report:\n");
+
+	while (bpf_map_get_next_key(syscall_stat_maps_fd, &prev_key, &key) == 0) {
+		err = bpf_map_lookup_elem(syscall_stat_maps_fd, &key, &stat);
 		if (err < 0) {
 			fprintf(stderr, "Get stat info err %d\n", err);
 			break;
@@ -205,20 +214,16 @@ static inline void pr_stat_info(int map_fd, int num, int type)
 			snprintf(tmp.comm, sizeof(tmp.comm),
 				       	"%s[%d:%s]", key.comm,
 					key.syscall, comm_buf);
-		} else {
-			snprintf(tmp.comm, sizeof(tmp.comm),
-					"%s", key.comm);
+			stat_list[idx++] = tmp;
 		}
 
-		stat_list[idx++] = tmp;
 		prev_key = key;
 	}
 
 	qsort(stat_list, num, sizeof(struct stat_info_node), comp);
 
 	printf("%-5s%-7s%-30s%-7s%-10s%-10s\n", "CPU", "TID",
-		       	type == PREEMPTION ? "COMM" : "SYSCALL",
-		       	"Count", "Avg", "Longest");
+		       	"SYSCALL", "Count", "Avg", "Longest");
 	for (int i=0;i<(num>10?10:num);i++) {
 		time_to_str(stat_list[i].avg, avg_buf, sizeof(avg_buf));
 		time_to_str(stat_list[i].longest, long_buf, sizeof(long_buf));
@@ -226,6 +231,93 @@ static inline void pr_stat_info(int map_fd, int num, int type)
 				stat_list[i].cpu, stat_list[i].tid,
 			    	stat_list[i].comm, stat_list[i].count,
 				avg_buf, long_buf);
+	}
+}
+
+static inline void pr_stat_info(int num, int target_num)
+{
+	struct ti_key key, prev_key;
+	struct stat_info stat;
+	char avg_buf[16],long_buf[16];
+	int i, j, err;;
+	
+	if (target_num == 0 || num == 0) {
+		printf("\nNo Preemption traced!\n");
+		return;
+	}
+	
+	printf("\nPreemption Report:\n");
+	
+	int pidlist[target_num];
+	int idxs[target_num];
+	struct stat_info_node stat_list[target_num][num];
+
+	memset(idxs, 0, sizeof(idxs));
+
+	for (i = 0; i < target_num; i++)
+		bpf_map_lookup_elem(mask_task_maps_fd, &i, &pidlist[i]);
+
+	while (bpf_map_get_next_key(trace_stat_maps_fd, &prev_key, &key) == 0) {
+		err = bpf_map_lookup_elem(trace_stat_maps_fd, &key, &stat);
+		if (err < 0) {
+			fprintf(stderr, "Get stat info err %d\n", err);
+			break;
+		}
+
+		for (i = 0; i < target_num; i++) {
+			if (!(key.target.mask & (1 << i)))
+				continue;
+			for (j = 0; j < idxs[i]; j++) {
+				if (key.tid == stat_list[i][j].tid &&
+				    key.cpu == stat_list[i][j].cpu) {
+					stat_list[i][j].count += stat.count;
+					stat_list[i][j].avg += stat.total;
+					if (stat.longest > stat_list[i][j].longest)
+						stat_list[i][j].longest = stat.longest;
+					break;
+				}
+			}
+
+			if (j == idxs[i]) {
+				struct stat_info_node tmp =  {
+					.cpu = key.cpu,
+					.tid = key.tid,
+					.count = stat.count,
+					.avg = stat.total,
+					.longest = stat.longest,
+				};
+		
+				snprintf(tmp.comm, sizeof(tmp.comm),
+						"%s", key.comm);
+
+				stat_list[i][idxs[i]++] = tmp;
+				
+			}
+		}
+
+
+		prev_key = key;
+	}
+
+	for (i = 0; i < target_num; i++) {
+		printf("Target task %d\n", pidlist[i]);
+		for (j = 0; j < idxs[i]; j++) {
+			stat_list[i][j].avg /= stat_list[i][j].count;
+		}
+
+		qsort(stat_list[i], idxs[i], sizeof(struct stat_info_node), comp);
+
+		printf("%-5s%-7s%-30s%-7s%-10s%-10s\n", "CPU", "TID",
+			       	"COMM", "Count", "Avg", "Longest");
+		for (j = 0; j < (idxs[i] > 10 ? 10 : idxs[i]); j++) {
+			time_to_str(stat_list[i][j].avg, avg_buf, sizeof(avg_buf));
+			time_to_str(stat_list[i][j].longest, long_buf, sizeof(long_buf));
+			printf("%-5d%-7d%-30s%-7d%-10s%-10s\n",
+					stat_list[i][j].cpu, stat_list[i][j].tid,
+				    	stat_list[i][j].comm, stat_list[i][j].count,
+					avg_buf, long_buf);
+		}
+		printf("\n");
 	}
 }
 
@@ -251,9 +343,7 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	char d_str[16];
 	char comm_buf[2 * TASK_COMM_LEN];
 	char func[80];
-	static __u64 w_start, last_time;
-
-	time_to_str(ti->ts - last_time, d_str, sizeof(d_str));
+	static __u64 w_start;
 
 	switch (ti->type) {
 	case TYPE_MIGRATE:
@@ -267,6 +357,8 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 		break;
 	case TYPE_WAIT:
 		if (ti->tid == env.targ_tid) {
+			time_to_str(ti->ts - w_start,
+					d_str, sizeof(d_str));
 			w_start = ti->ts;
 			pr_ti(ti, "WAIT AFTER EXECUTED", d_str);
 		} else {
@@ -279,15 +371,18 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 		if (ti->tid == env.targ_tid) {
 			time_to_str(ti->ts - w_start,
 					d_str, sizeof(d_str));
+			w_start = ti->ts;
 			pr_ti(ti, "EXECUTE AFTER WAITED", d_str);
 		} else {
 			pr_ti(ti, "PREEMPT", NULL);
 		}
 		break;
 	case TYPE_DEQUEUE:
-		if (ti->tid == env.targ_tid)
+		if (ti->tid == env.targ_tid) {
+			time_to_str(ti->ts - w_start,
+					d_str, sizeof(d_str));
 			pr_ti(ti, "DEQUEUE AFTER EXECUTED", d_str);
-		else {
+		} else {
 			time_to_str(ti->duration,
 					d_str, sizeof(d_str));
 			pr_ti(ti, "DEQUEUE AFTER PREEMPTED", d_str);
@@ -309,8 +404,6 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	default:
 		break;
 	}
-
-	last_time = ti->ts;
 }
 
 void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
@@ -339,6 +432,9 @@ int main(int argc, char **argv)
 	if (err)
 		return err;
 
+	if (env.mode == MODE_PID)
+		env.output_log = false;
+
 	init_syscall_names();
 	
 	/* Increase rlimit */
@@ -357,6 +453,7 @@ int main(int argc, char **argv)
 
 	/* initialize global data (filtering options) */
 	obj->rodata->targ_tid = env.targ_tid;
+	obj->rodata->mode = env.mode;
 	obj->rodata->trace_syscall = env.trace_syscall;
 	obj->rodata->output_log = env.output_log;
 	obj->rodata->cur_tid = (int)getpid();
@@ -383,14 +480,22 @@ int main(int argc, char **argv)
 	
 	trace_stat_maps_fd = bpf_map__fd(obj->maps.trace_stat_maps);
 	syscall_stat_maps_fd = bpf_map__fd(obj->maps.syscall_stat_maps);
+	mask_task_maps_fd = bpf_map__fd(obj->maps.mask_task_maps);
 	
 	signal(SIGINT, int_exit);
 	signal(SIGTERM, int_exit);
 
-	printf("Start tracing schedule events related to tid %d", env.targ_tid);
+	printf("Start tracing schedule events related to ");
+	
+	if (env.mode == MODE_TID) {
+	 	printf("tid %d", env.targ_tid);
+	} else if (env.mode == MODE_PID){
+		printf("pid %d", env.targ_tid);
+	}
+
 	if (env.trace_syscall)
 		printf("(include SYSCALL)");
-	printf("\nPress CTRL+C or wait until target exits to see report\n");
+	printf("\nPress CTRL+C or wait until target exits to see reports\n");
 	
 	/* setup event callbacks */
 	if (env.output_log) {
@@ -412,7 +517,7 @@ int main(int argc, char **argv)
 			if (err < 0)
 				break;
 	       } else {
-		       sleep(1);
+			sleep(1);
 	       }
 	}
 	
@@ -425,9 +530,9 @@ int main(int argc, char **argv)
 	printf("Error polling perf buffer: %d\n", err);
 
 printinfo:
-	pr_stat_info(trace_stat_maps_fd, obj->bss->stat_count, PREEMPTION);
+	pr_stat_info(obj->bss->stat_count, obj->bss->targ_num);
 	if (env.trace_syscall)
-		pr_stat_info(syscall_stat_maps_fd, obj->bss->sys_count, SYSCALL);
+		pr_syscall_info(obj->bss->sys_count);
 cleanup:
 	perf_buffer__free(pb);
 	schedsnoop_bpf__destroy(obj);
