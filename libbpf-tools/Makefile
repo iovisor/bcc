@@ -19,6 +19,7 @@ APPS = \
 	execsnoop \
 	filelife \
 	opensnoop \
+	readahead \
 	runqslower \
 	syscount \
 	tcpconnect \
