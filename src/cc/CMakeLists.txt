@@ -12,7 +12,11 @@ include_directories(${LIBELF_INCLUDE_DIRS})
 # todo: if check for kernel version
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/libbpf/include)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/libbpf/include/uapi)
-add_definitions(${LLVM_DEFINITIONS})
+
+# add_definitions has a problem parsing "-D_GLIBCXX_USE_CXX11_ABI=0", this is safer
+separate_arguments(LLVM_DEFINITIONS)
+add_compile_options(${LLVM_DEFINITIONS})
+
 configure_file(libbcc.pc.in libbcc.pc @ONLY)
 configure_file(bcc_version.h.in bcc_version.h @ONLY)
 
