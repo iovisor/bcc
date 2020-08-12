@@ -9,10 +9,13 @@ netqtop accounts statistics of both transmitted and received packets on each que
 a specified network interface to help developers check if its traffic load is balanced. 
 The result is displayed as a table with columns of PPS, BPS, average size and 
 packet counts in range [0,64), [64, 5120), [512, 2048), [2048, 16K), [16K, 64K). 
-This is printed every given interval in seconds.
+This is printed every given interval (default 1) in seconds.
 
-This tool uses the net:net_dev_start_xmit and net:netif_receive_skb kernel tracepoints. 
-Since this uses BPF, only the root user can use this tool.
+The tool uses the net:net_dev_start_xmit and net:netif_receive_skb kernel tracepoints. 
+Since it uses tracepoint, the tool only works on Linux 4.7+.
+
+netqtop introduces significant overhead while network traffic is large. See OVERHEAD 
+section below.
 
 .SH REQUIREMENTS
 CONFIG_bpf and bcc
@@ -28,14 +31,13 @@ The default value is 1.
 .TP
 Account statistics of eth0 and output every 2 seconds:
 #
-.B netqtop -n eth0 -i 2
+.B netqtop -n eth0 -i 1
 .SH OVERHEAD
-netqtop introduces a maximum overhead of 20% sockperf PPS drop while 
-the tool(with printing interval set to 1 second) and sockperf 
-run on the same core. In multi-thread cases, the overhead could be 
-less significant. 
+In performance test, netqtop introduces a overhead of about 30% PPS drop 
+while printing interval is set to 1 second. With different overload of a 
+network interface, the overhead should be steady.
 
-It also increases ping-pong latency by 10%, which is about 0.4 usec. 
+It also increases ping-pong latency by about 1 usec. 
 .SH SOURCE
 This is from bcc
 .IP
