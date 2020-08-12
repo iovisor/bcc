@@ -199,13 +199,18 @@ b = BPF(text=bpf_text)
 # do_sync_read/do_sync_write), but those became static. So trace these from
 # the parent functions, at the cost of more overhead, instead.
 # Ultimately, we should be using [V]FS tracepoints.
-b.attach_kprobe(event="__vfs_read", fn_name="trace_read_entry")
-b.attach_kretprobe(event="__vfs_read", fn_name="trace_read_return")
+try:
+    b.attach_kprobe(event="__vfs_read", fn_name="trace_read_entry")
+    b.attach_kretprobe(event="__vfs_read", fn_name="trace_read_return")
+except Exception:
+    print('Current kernel does not have __vfs_read, try vfs_read instead')
+    b.attach_kprobe(event="vfs_read", fn_name="trace_read_entry")
+    b.attach_kretprobe(event="vfs_read", fn_name="trace_read_return")
 try:
     b.attach_kprobe(event="__vfs_write", fn_name="trace_write_entry")
     b.attach_kretprobe(event="__vfs_write", fn_name="trace_write_return")
 except Exception:
-    # older kernels don't have __vfs_write so try vfs_write instead
+    print('Current kernel does not have __vfs_write, try vfs_write instead')
     b.attach_kprobe(event="vfs_write", fn_name="trace_write_entry")
     b.attach_kretprobe(event="vfs_write", fn_name="trace_write_return")
 
