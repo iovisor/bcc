@@ -4,7 +4,6 @@
 #define TRACEPOINT_NETIF_RECEIVE_SKB_ENTRY 1234
 #define GROUPNUMS 5
 #define MAXQUEUENUM 1024
-static inline int filter_devname(struct sk_buff* skb);
 
 // name of specified network interface
 struct nameBuf{
@@ -32,6 +31,9 @@ struct Leaf{
     uint size65536;
 };
 
+static inline int filter_devname(struct sk_buff* skb);
+static void updateData(struct Leaf *data, u64 len);
+
 // array of length 1 for device name
 BPF_ARRAY(nameMap, struct nameBuf, 1);
 // table for transmit & receive packets
@@ -53,23 +55,7 @@ TRACEPOINT_PROBE(net, net_dev_start_xmit){
     if(!data){
         return 0;
     }
-    data->datalen += skb->len;
-    data->pkg ++;
-    if(skb->len / 64 == 0){
-        data->size64 ++;
-    }
-    else if(skb->len / 512 == 0){
-        data->size512 ++;
-    }
-    else if(skb->len / 2048 == 0){
-        data->size2048 ++;
-    }
-    else if(skb->len / 16384 == 0){
-        data->size16384 ++;
-    }
-    else if(skb->len / 65536 == 0){
-        data->size65536 ++;
-    }
+    updateData(data, skb->len);
 
 	return 0;
 }
@@ -87,23 +73,7 @@ TRACEPOINT_PROBE(net, netif_receive_skb){
     if(!data){
         return 0;
     }
-    data->datalen += skb->len;
-    data->pkg ++;
-    if(skb->len / 64 == 0){
-        data->size64 ++;
-    }
-    else if(skb->len / 512 == 0){
-        data->size512 ++;
-    }
-    else if(skb->len / 2048 == 0){
-        data->size2048 ++;
-    }
-    else if(skb->len / 16384 == 0){
-        data->size16384 ++;
-    }
-    else if(skb->len / 65536 == 0){
-        data->size65536 ++;
-    }
+    updateData(data, skb->len);
 
     return 0;
 }
@@ -127,4 +97,24 @@ static inline int filter_devname(struct sk_buff* skb){
     }
 
     return 1;
+}
+
+static void updateData(struct Leaf *data, u64 len){
+    data->datalen += len;
+    data->pkg ++;
+    if(len / 64 == 0){
+        data->size64 ++;
+    }
+    else if(len / 512 == 0){
+        data->size512 ++;
+    }
+    else if(len / 2048 == 0){
+        data->size2048 ++;
+    }
+    else if(len / 16384 == 0){
+        data->size16384 ++;
+    }
+    else if(len / 65536 == 0){
+        data->size65536 ++;
+    }
 }
