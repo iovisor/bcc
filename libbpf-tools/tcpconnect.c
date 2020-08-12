@@ -242,8 +242,8 @@ static void print_count_ipv6(int map_fd)
 	}
 
 	for (__u32 i = 0; i < n; i++) {
-		memcpy(src.s6_addr, &keys[i].saddr, sizeof(src.s6_addr));
-		memcpy(dst.s6_addr, &keys[i].daddr, sizeof(src.s6_addr));
+		memcpy(src.s6_addr, keys[i].saddr, sizeof(src.s6_addr));
+		memcpy(dst.s6_addr, keys[i].daddr, sizeof(src.s6_addr));
 
 		printf("%-25s %-25s %-20d %-10llu\n",
 		       inet_ntop(AF_INET6, &src, s, sizeof(s)),
@@ -289,8 +289,8 @@ static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 		s.x4.s_addr = event->saddr_v4;
 		d.x4.s_addr = event->daddr_v4;
 	} else if (event->af == AF_INET6) {
-		memcpy(&s.x6.s6_addr, &event->saddr_v6, sizeof(s.x6.s6_addr));
-		memcpy(&d.x6.s6_addr, &event->daddr_v6, sizeof(d.x6.s6_addr));
+		memcpy(&s.x6.s6_addr, event->saddr_v6, sizeof(s.x6.s6_addr));
+		memcpy(&d.x6.s6_addr, event->daddr_v6, sizeof(d.x6.s6_addr));
 	} else {
 		warn("broken event: event->af=%d", event->af);
 		return;
