@@ -6,11 +6,11 @@
 struct event {
 	union {
 		__u32 saddr_v4;
-		unsigned __int128 saddr_v6;
+		__u8 saddr_v6[16];
 	};
 	union {
 		__u32 daddr_v4;
-		unsigned __int128 daddr_v6;
+		__u8 daddr_v6[16];
 	};
 	char comm[TASK_COMM_LEN];
 	__u64 delta_us;

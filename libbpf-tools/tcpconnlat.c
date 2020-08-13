@@ -115,8 +115,8 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 		s.x4.s_addr = e->saddr_v4;
 		d.x4.s_addr = e->daddr_v4;
 	} else if (e->af == AF_INET6) {
-		memcpy(&s.x6.s6_addr, &e->saddr_v6, sizeof(s.x6.s6_addr));
-		memcpy(&d.x6.s6_addr, &e->daddr_v6, sizeof(d.x6.s6_addr));
+		memcpy(&s.x6.s6_addr, e->saddr_v6, sizeof(s.x6.s6_addr));
+		memcpy(&d.x6.s6_addr, e->daddr_v6, sizeof(d.x6.s6_addr));
 	} else {
 		fprintf(stderr, "broken event: event->af=%d", e->af);
 		return;
