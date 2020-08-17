@@ -1,120 +1,112 @@
 #include <linux/netdevice.h>
 #include <linux/ethtool.h>
-#define TRACEPOINT_NET_DEV_START_XMIT 1241
-#define TRACEPOINT_NETIF_RECEIVE_SKB_ENTRY 1234
-#define GROUPNUMS 5
-#define MAXQUEUENUM 1024
-
-// name of specified network interface
-struct nameBuf{
-    char name[IFNAMSIZ];
-};
+#if IFNAMSIZ != 16 
+#error "IFNAMSIZ != 16 is not supported"
+#endif
+#define MAX_QUEUE_NUM 1024
 
 /**
-* This struct is use to compare two strings
-* which has a maximum length of IFNAMSIZ (16)
+* This union is use to store name of the specified interface
+* and read it as two different data types
 */
-struct strcmp{
-    u64 hi;
-    u64 lo;
+union name_buf{
+    char name[IFNAMSIZ];
+    struct {
+        u64 hi;
+        u64 lo;
+    }name_int;
 };
 
-// data retrieved in tracepoints
-struct Leaf{
-    u64 datalen;
-    uint pkg;
-    // avg = datalen / pkg
-    uint size64;
-    uint size512;
-    uint size2048;
-    uint size16384;
-    uint size65536;
+/* data retrieved in tracepoints */
+struct queue_data{
+    u64 total_pkt_len;
+    u32 num_pkt;
+    u32 size_64B;
+    u32 size_512B;
+    u32 size_2K;
+    u32 size_16K;
+    u32 size_64K;
 };
 
-static inline int filter_devname(struct sk_buff* skb);
-static void updateData(struct Leaf *data, u64 len);
+/* array of length 1 for device name */
+BPF_ARRAY(name_map, union name_buf, 1);
+/* table for transmit & receive packets */
+BPF_HASH(tx_q, u16, struct queue_data, MAX_QUEUE_NUM);
+BPF_HASH(rx_q, u16, struct queue_data, MAX_QUEUE_NUM);
 
-// array of length 1 for device name
-BPF_ARRAY(nameMap, struct nameBuf, 1);
-// table for transmit & receive packets
-BPF_HASH(TXq, u16, struct Leaf, MAXQUEUENUM);
-BPF_HASH(RXq, u16, struct Leaf, MAXQUEUENUM);
-
-TRACEPOINT_PROBE(net, net_dev_start_xmit){
-    // ------------- read device name ------------------
-    struct sk_buff* skb = (struct sk_buff*)args->skbaddr;
-    if(!filter_devname(skb)){
-        return 0;
-    }
-
-    // --------- update table -----------------------------
-    u16 qid = skb->queue_mapping;
-    struct Leaf newdata = {};
-    __builtin_memset(&newdata, 0, sizeof(newdata));
-    struct Leaf *data = TXq.lookup_or_try_init(&qid, &newdata);
-    if(!data){
-        return 0;
-    }
-    updateData(data, skb->len);
-
-	return 0;
-}
-
-TRACEPOINT_PROBE(net, netif_receive_skb){
-    struct sk_buff* skb = (struct sk_buff*)args->skbaddr;
-    if(!filter_devname(skb)){
-        return 0;
-    }
-
-    u16 qid = skb->queue_mapping;
-    struct Leaf newdata = {};
-    __builtin_memset(&newdata, 0, sizeof(newdata));
-    struct Leaf *data = RXq.lookup_or_try_init(&qid, &newdata);
-    if(!data){
-        return 0;
-    }
-    updateData(data, skb->len);
-
-    return 0;
-}
-
-static inline int filter_devname(struct sk_buff* skb){
-    // ------------------- get device name from skb -------------------
-    struct strcmp real_devname = {};
+static inline int name_filter(struct sk_buff* skb){
+    /* get device name from skb */
+    union name_buf real_devname;
     struct net_device *dev;
-    bpf_probe_read(&dev, sizeof(skb->dev), ((char *)skb + offsetof(typeof(*skb), dev)));
+    bpf_probe_read(&dev, sizeof(skb->dev), ((char *)skb + offsetof(struct sk_buff, dev)));
     bpf_probe_read(&real_devname, IFNAMSIZ, dev->name);
 
-    // -------- read device name from bpf array (set in python) -------
     int key=0;
-    struct nameBuf *buf = nameMap.lookup(&key);
-    struct strcmp required_devname = {};
-    bpf_probe_read(&required_devname, IFNAMSIZ, buf->name);
-
-    // -------- compare -----------------------------------------------
-    if(real_devname.hi != required_devname.hi || real_devname.lo != required_devname.lo){
+    union name_buf *leaf = name_map.lookup(&key);
+    if(!leaf){
+        return 0;
+    }
+    if((leaf->name_int).hi != real_devname.name_int.hi || (leaf->name_int).lo != real_devname.name_int.lo){
         return 0;
     }
 
     return 1;
 }
 
-static void updateData(struct Leaf *data, u64 len){
-    data->datalen += len;
-    data->pkg ++;
+static void updata_data(struct queue_data *data, u64 len){
+    data->total_pkt_len += len;
+    data->num_pkt ++;
     if(len / 64 == 0){
-        data->size64 ++;
+        data->size_64B ++;
     }
     else if(len / 512 == 0){
-        data->size512 ++;
+        data->size_512B ++;
     }
     else if(len / 2048 == 0){
-        data->size2048 ++;
+        data->size_2K ++;
     }
     else if(len / 16384 == 0){
-        data->size16384 ++;
+        data->size_16K ++;
     }
     else if(len / 65536 == 0){
-        data->size65536 ++;
+        data->size_64K ++;
     }
+}
+
+TRACEPOINT_PROBE(net, net_dev_start_xmit){
+    /* read device name */
+    struct sk_buff* skb = (struct sk_buff*)args->skbaddr;
+    if(!name_filter(skb)){
+        return 0;
+    }
+
+    /* update table */
+    u16 qid = skb->queue_mapping;
+    struct queue_data newdata;
+    __builtin_memset(&newdata, 0, sizeof(newdata));
+    struct queue_data *data = tx_q.lookup_or_try_init(&qid, &newdata);
+    if(!data){
+        return 0;
+    }
+    updata_data(data, skb->len);
+    
+    return 0;
+}
+
+TRACEPOINT_PROBE(net, netif_receive_skb){
+    struct sk_buff* skb = (struct sk_buff*)args->skbaddr;
+    if(!name_filter(skb)){
+        return 0;
+    }
+
+    u16 qid = skb->queue_mapping;
+    struct queue_data newdata;
+    __builtin_memset(&newdata, 0, sizeof(newdata));
+    struct queue_data *data = rx_q.lookup_or_try_init(&qid, &newdata);
+    if(!data){
+        return 0;
+    }
+    updata_data(data, skb->len);
+    
+    return 0;
 }

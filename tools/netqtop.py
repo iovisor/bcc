@@ -12,6 +12,7 @@ import types
 ROOT_PATH = "/sys/class/net"
 IFNAMSIZ = 16
 COL_WIDTH = 10
+MAX_QUEUE_NUM = 1024
 
 # structure for network interface name array
 class Devname(Structure):
@@ -19,19 +20,8 @@ class Devname(Structure):
         ('name', c_char*IFNAMSIZ)
     ]
 
-class QueueData(Structure):
-    _fields_=[
-        ('datalen', c_ulonglong),
-        ('pkg', c_uint),
-        ('size64', c_uint),
-        ('size512', c_uint),
-        ('size2048', c_uint),
-        ('size16384', c_uint),
-        ('size65536', c_uint),
-    ]
-
 ################## printer for results ###################
-def toStr(num):
+def to_str(num):
     s = ""
     if num > 1000000:
         return str(round(num/(1024*1024.0), 2)) + 'M'
@@ -72,13 +62,13 @@ def print_table(table, qnum):
     tlen = 0
     for k, v in table.items():
         qids += [k.value]
-        tlen += v.datalen
-        tpkg += v.pkg
-        tGroup[0] += v.size64
-        tGroup[1] += v.size512
-        tGroup[2] += v.size2048
-        tGroup[3] += v.size16384
-        tGroup[4] += v.size65536
+        tlen += v.total_pkt_len
+        tpkg += v.num_pkt
+        tGroup[0] += v.size_64B
+        tGroup[1] += v.size_512B
+        tGroup[2] += v.size_2K
+        tGroup[3] += v.size_16K
+        tGroup[4] += v.size_64K
     tBPS = tlen / print_interval
     tPPS = tpkg / print_interval
     if tpkg != 0:
@@ -90,13 +80,13 @@ def print_table(table, qnum):
             item = table[c_ushort(k)]
             data = [
                 k,
-                item.datalen,
-                item.pkg,
-                item.size64,
-                item.size512,
-                item.size2048,
-                item.size16384,
-                item.size65536
+                item.total_pkt_len,
+                item.num_pkt,
+                item.size_64B,
+                item.size_512B,
+                item.size_2K,
+                item.size_16K,
+                item.size_64K
             ]
         else:
             data = [k,0,0,0,0,0,0,0]
@@ -109,26 +99,26 @@ def print_table(table, qnum):
             avg = data[1] / data[2]
         printb(b"%5d %11s %10s %10s %10s %10s %10s %10s %10s" % (
             data[0],
-            toStr(BPS),
-            toStr(PPS),
-            toStr(avg),
-            toStr(data[3]),
-            toStr(data[4]),
-            toStr(data[5]),
-            toStr(data[6]),
-            toStr(data[7])
+            to_str(BPS),
+            to_str(PPS),
+            to_str(avg),
+            to_str(data[3]),
+            to_str(data[4]),
+            to_str(data[5]),
+            to_str(data[6]),
+            to_str(data[7])
         ))
     
     # ------- print total --------------
     printb(b" Total %10s %10s %10s %10s %10s %10s %10s %10s" % (
-        toStr(tBPS),
-        toStr(tPPS),
-        toStr(tAVG),
-        toStr(tGroup[0]),
-        toStr(tGroup[1]),
-        toStr(tGroup[2]),
-        toStr(tGroup[3]),
-        toStr(tGroup[4])
+        to_str(tBPS),
+        to_str(tPPS),
+        to_str(tAVG),
+        to_str(tGroup[0]),
+        to_str(tGroup[1]),
+        to_str(tGroup[2]),
+        to_str(tGroup[3]),
+        to_str(tGroup[4])
     ))
 
 
@@ -136,17 +126,17 @@ def print_result(b):
     # --------- print tx queues ---------------
     print(asctime(localtime(time())))
     print("TX")
-    table = b['TXq']
+    table = b['tx_q']
     print_table(table, tx_num)
-    b['TXq'].clear()
+    b['tx_q'].clear()
 
     # --------- print rx queues ---------------
     print("")
     print("RX")
-    table = b['RXq']
+    table = b['rx_q']
     print_table(table, rx_num)
-    b['RXq'].clear()
-    print("-" * 100)
+    b['rx_q'].clear()
+    print("-" * 98)
 
 ############## specify network interface #################
 parser = argparse.ArgumentParser(description="")
@@ -181,10 +171,14 @@ for s in list:
     if s[0] == 't':
         tx_num += 1
 
+if tx_num > MAX_QUEUE_NUM or rx_num > MAX_QUEUE_NUM:
+    print "number of queues over 1024 is not supported."
+    exit()
+
 ################## start tracing ##################
 b = BPF(src_file = "netqtop.c")
 # --------- set hash array --------
-devname_map = b['nameMap']
+devname_map = b['name_map']
 _name = Devname()
 _name.name = dev_name
 devname_map[0] = _name
@@ -194,6 +188,8 @@ while 1:
         sleep(print_interval)
         print_result(b)
     except KeyboardInterrupt:
+        #b['tx_q'].clear()
+        #b['rx_q'].clear()
         exit()
 
 '''

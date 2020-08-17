@@ -34,8 +34,9 @@ Account statistics of eth0 and output every 2 seconds:
 .B netqtop -n eth0 -i 1
 .SH OVERHEAD
 In performance test, netqtop introduces a overhead of about 30% PPS drop 
-while printing interval is set to 1 second. With different overload of a 
-network interface, the overhead should be steady.
+while printing interval is set to 1 second. This is the case when different
+traffic load is applied. So be mindful of potential packet drop 
+when using this tool.
 
 It also increases ping-pong latency by about 1 usec. 
 .SH SOURCE
