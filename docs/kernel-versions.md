@@ -122,6 +122,12 @@ ringbuf | 5.8 | [`457f44363a88`](https://github.com/torvalds/linux/commit/457f44
 
 ### Table userspace API
 
+Some (but not all) of these *API features* translate to a subcommand beginning with `BPF_MAP_`.
+The list of subcommands supported in your kernel can be found in file
+[`include/uapi/linux/bpf.h`](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/include/uapi/linux/bpf.h):
+
+    git grep -W 'bpf_cmd {' include/uapi/linux/bpf.h
+
 Feature | Kernel version | Commit
 --------|----------------|-------
 Basic operations (lookup, update, delete, `GET_NEXT_KEY`) | 3.18 | [`db20fd2b0108`](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=db20fd2b01087bdfbe30bce314a198eefedcc42e)
