@@ -38,6 +38,9 @@ Use regular expressions for the search pattern.
 .TP
 \-D
 Print the BPF program before starting (for debugging purposes).
+.TP
+\-c CPU
+Trace on this CPU only.
 .SH EXAMPLES
 .TP
 Count kernel functions beginning with "vfs_", until Ctrl-C is hit:
@@ -75,6 +78,10 @@ Count all GC USDT probes in the Node process:
 Count all malloc() calls in libc:
 #
 .B funccount c:malloc
+.TP
+Count kernel functions beginning with "vfs_" on CPU 1 only:
+#
+.B funccount \-c 1 'vfs_*'
 .SH FIELDS
 .TP
 FUNC

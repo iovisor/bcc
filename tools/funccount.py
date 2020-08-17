@@ -4,7 +4,8 @@
 # funccount Count functions, tracepoints, and USDT probes.
 #           For Linux, uses BCC, eBPF.
 #
-# USAGE: funccount [-h] [-p PID] [-i INTERVAL] [-d DURATION] [-T] [-r] pattern
+# USAGE: funccount [-h] [-p PID] [-i INTERVAL] [-d DURATION] [-T] [-r]
+#                  [-c CPU] pattern
 #
 # The pattern is a string with optional '*' wildcards, similar to file
 # globbing. If you'd prefer to use regular expressions, use the -r option.
@@ -34,7 +35,7 @@ def verify_limit(num):
                         (probe_limit, num))
 
 class Probe(object):
-    def __init__(self, pattern, use_regex=False, pid=None):
+    def __init__(self, pattern, use_regex=False, pid=None, cpu=None):
         """Init a new probe.
 
         Init the probe from the pattern provided by the user. The supported
@@ -79,6 +80,7 @@ class Probe(object):
             self.library = libpath
 
         self.pid = pid
+        self.cpu = cpu
         self.matched = 0
         self.trace_functions = {}   # map location number to function name
 
@@ -164,7 +166,8 @@ class Probe(object):
     def load(self):
         trace_count_text = b"""
 int PROBE_FUNCTION(void *ctx) {
-    FILTER
+    FILTERPID
+    FILTERCPU
     int loc = LOCATION;
     u64 *val = counts.lookup(&loc);
     if (!val) {
@@ -182,11 +185,18 @@ BPF_ARRAY(counts, u64, NUMLOCATIONS);
         # We really mean the tgid from the kernel's perspective, which is in
         # the top 32 bits of bpf_get_current_pid_tgid().
         if self.pid:
-            trace_count_text = trace_count_text.replace(b'FILTER',
+            trace_count_text = trace_count_text.replace(b'FILTERPID',
                 b"""u32 pid = bpf_get_current_pid_tgid() >> 32;
                    if (pid != %d) { return 0; }""" % self.pid)
         else:
-            trace_count_text = trace_count_text.replace(b'FILTER', b'')
+            trace_count_text = trace_count_text.replace(b'FILTERPID', b'')
+
+        if self.cpu:
+            trace_count_text = trace_count_text.replace(b'FILTERCPU',
+                b"""u32 cpu = bpf_get_smp_processor_id();
+                   if (cpu != %d) { return 0; }""" % int(self.cpu))
+        else:
+            trace_count_text = trace_count_text.replace(b'FILTERCPU', b'')
 
         bpf_text += self._generate_functions(trace_count_text)
         bpf_text = bpf_text.replace(b"NUMLOCATIONS",
@@ -224,6 +234,7 @@ class Tool(object):
     ./funccount go:os.*             # count all "os.*" calls in libgo
     ./funccount -p 185 go:os.*      # count all "os.*" calls in libgo, PID 185
     ./funccount ./test:read*        # count "read*" calls in the ./test binary
+    ./funccount -c 1 'vfs_*'        # count vfs calls on CPU 1 only
     """
         parser = argparse.ArgumentParser(
             description="Count functions, tracepoints, and USDT probes",
@@ -241,13 +252,16 @@ class Tool(object):
             help="use regular expressions. Default is \"*\" wildcards only.")
         parser.add_argument("-D", "--debug", action="store_true",
             help="print BPF program before starting (for debugging purposes)")
+        parser.add_argument("-c", "--cpu",
+            help="trace this CPU only")
         parser.add_argument("pattern",
             type=ArgString,
             help="search expression for events")
         self.args = parser.parse_args()
         global debug
         debug = self.args.debug
-        self.probe = Probe(self.args.pattern, self.args.regexp, self.args.pid)
+        self.probe = Probe(self.args.pattern, self.args.regexp, self.args.pid,
+                           self.args.cpu)
         if self.args.duration and not self.args.interval:
             self.args.interval = self.args.duration
         if not self.args.interval:
