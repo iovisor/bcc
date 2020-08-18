@@ -106,7 +106,7 @@ LRU per-CPU hash | 4.10 | [`8f8449384ec3`](https://git.kernel.org/cgit/linux/ker
 LPM trie (longest-prefix match) | 4.11 | [`b95a5c4db09b`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=b95a5c4db09bc7c253636cb84dc9b12c577fd5a0)
 Array of maps | 4.12 | [`56f668dfe00d`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=56f668dfe00dcf086734f1c42ea999398fad6572)
 Hash of maps | 4.12 | [`bcc6b1b7ebf8`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=bcc6b1b7ebf857a9fe56202e2be3361131588c15)
-Netdevice references | 4.14 | [`546ac1ffb70d`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=546ac1ffb70d25b56c1126940e5ec639c4dd7413)
+Netdevice references (array) | 4.14 | [`546ac1ffb70d`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=546ac1ffb70d25b56c1126940e5ec639c4dd7413)
 Socket references (array) | 4.14 | [`174a79ff9515`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=174a79ff9515f400b9a6115643dafd62a635b7e6)
 CPU references | 4.15 | [`6710e1126934`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=6710e1126934d8b4372b4d2f9ae1646cd3f151bf)
 AF_XDP socket (XSK) references | 4.18 | [`fbfc504a24f5`](https://git.kernel.org/cgit/linux/kernel/git/davem/net-next.git/commit/?id=fbfc504a24f53f7ebe128ab55cb5dba634f4ece8)
