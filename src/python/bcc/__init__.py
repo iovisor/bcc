@@ -22,6 +22,7 @@ import re
 import struct
 import errno
 import sys
+import platform
 
 from .libbcc import lib, bcc_symbol, bcc_symbol_option, bcc_stacktrace_build_id, _SYM_CB_TYPE
 from .table import Table, PerfEventArray, RingBuf, BPF_MAP_TYPE_QUEUE, BPF_MAP_TYPE_STACK
@@ -895,6 +896,9 @@ class BPF(object):
 
     @staticmethod
     def support_kfunc():
+        # there's no trampoline support for other than x86_64 arch
+        if platform.machine() != 'x86_64':
+            return False;
         if not lib.bpf_has_kernel_btf():
             return False;
         # kernel symbol "bpf_trampoline_link_prog" indicates kfunc support
