@@ -13,6 +13,7 @@ APPS = \
 	biolatency \
 	biopattern \
 	biosnoop \
+	biostacks \
 	bitesize \
 	cpudist \
 	drsnoop \
