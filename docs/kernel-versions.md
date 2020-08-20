@@ -84,6 +84,8 @@ BPF LSM hook | 5.7 | [`fc611f47f218`](https://github.com/torvalds/linux/commit/f
 
 ## Tables (_a.k.a._ Maps)
 
+### Table types
+
 The list of map types supported in your kernel can be found in file
 [`include/uapi/linux/bpf.h`](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/include/uapi/linux/bpf.h):
 
@@ -98,14 +100,13 @@ Perf events | 4.3 | [`ea317b267e9d`](https://git.kernel.org/cgit/linux/kernel/gi
 Per-CPU hash | 4.6 | [`824bd0ce6c7c`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=824bd0ce6c7c43a9e1e210abf124958e54d88342)
 Per-CPU array | 4.6 | [`a10423b87a7e`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=a10423b87a7eae75da79ce80a8d9475047a674ee)
 Stack trace | 4.6 | [`d5a3b1f69186`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=d5a3b1f691865be576c2bffa708549b8cdccda19)
-Pre-alloc maps memory | 4.6 | [`6c9059817432`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=6c90598174322b8888029e40dd84a4eb01f56afe)
 cgroup array | 4.8 | [`4ed8ec521ed5`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=4ed8ec521ed57c4e207ad464ca0388776de74d4b)
 LRU hash | 4.10 | [`29ba732acbee`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=29ba732acbeece1e34c68483d1ec1f3720fa1bb3) [`3a08c2fd7634`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=3a08c2fd763450a927d1130de078d6f9e74944fb)
 LRU per-CPU hash | 4.10 | [`8f8449384ec3`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=8f8449384ec364ba2a654f11f94e754e4ff719e0) [`961578b63474`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=961578b63474d13ad0e2f615fcc2901c5197dda6)
 LPM trie (longest-prefix match) | 4.11 | [`b95a5c4db09b`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=b95a5c4db09bc7c253636cb84dc9b12c577fd5a0)
 Array of maps | 4.12 | [`56f668dfe00d`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=56f668dfe00dcf086734f1c42ea999398fad6572)
 Hash of maps | 4.12 | [`bcc6b1b7ebf8`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=bcc6b1b7ebf857a9fe56202e2be3361131588c15)
-Netdevice references | 4.14 | [`546ac1ffb70d`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=546ac1ffb70d25b56c1126940e5ec639c4dd7413)
+Netdevice references (array) | 4.14 | [`546ac1ffb70d`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=546ac1ffb70d25b56c1126940e5ec639c4dd7413)
 Socket references (array) | 4.14 | [`174a79ff9515`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=174a79ff9515f400b9a6115643dafd62a635b7e6)
 CPU references | 4.15 | [`6710e1126934`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=6710e1126934d8b4372b4d2f9ae1646cd3f151bf)
 AF_XDP socket (XSK) references | 4.18 | [`fbfc504a24f5`](https://git.kernel.org/cgit/linux/kernel/git/davem/net-next.git/commit/?id=fbfc504a24f53f7ebe128ab55cb5dba634f4ece8)
@@ -116,7 +117,36 @@ precpu cgroup storage | 4.20 | [`b741f1630346`](https://github.com/torvalds/linu
 queue | 4.20 | [`f1a2e44a3aec`](https://github.com/torvalds/linux/commit/f1a2e44a3aeccb3ff18d3ccc0b0203e70b95bd92)
 stack | 4.20 | [`f1a2e44a3aec`](https://github.com/torvalds/linux/commit/f1a2e44a3aeccb3ff18d3ccc0b0203e70b95bd92)
 socket local storage | 5.2 | [`6ac99e8f23d4`](https://github.com/torvalds/linux/commit/6ac99e8f23d4b10258406ca0dd7bffca5f31da9d)
-ringbuf | 5.8 | [`457f44363a88`](https://github.com/torvalds/linux/commit/457f44363a8894135c85b7a9afd2bd8196db24ab)
+Netdevice references (hashmap) | 5.4 | [`6f9d451ab1a3`](https://github.com/torvalds/linux/commit/6f9d451ab1a33728adb72d7ff66a7b374d665176)
+struct ops | 5.6 | [`85d33df357b6`](https://github.com/torvalds/linux/commit/85d33df357b634649ddbe0a20fd2d0fc5732c3cb)
+ring buffer | 5.8 | [`457f44363a88`](https://github.com/torvalds/linux/commit/457f44363a8894135c85b7a9afd2bd8196db24ab)
+
+### Table userspace API
+
+Some (but not all) of these *API features* translate to a subcommand beginning with `BPF_MAP_`.
+The list of subcommands supported in your kernel can be found in file
+[`include/uapi/linux/bpf.h`](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/include/uapi/linux/bpf.h):
+
+    git grep -W 'bpf_cmd {' include/uapi/linux/bpf.h
+
+Feature | Kernel version | Commit
+--------|----------------|-------
+Basic operations (lookup, update, delete, `GET_NEXT_KEY`) | 3.18 | [`db20fd2b0108`](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=db20fd2b01087bdfbe30bce314a198eefedcc42e)
+Pass flags to `UPDATE_ELEM` | 3.19 | [`3274f52073d8`](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=3274f52073d88b62f3c5ace82ae9d48546232e72)
+Pre-alloc map memory by default | 4.6 | [`6c9059817432`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=6c90598174322b8888029e40dd84a4eb01f56afe)
+Pass `NULL` to `GET_NEXT_KEY` | 4.12 | [`8fe45924387b`](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=8fe45924387be6b5c1be59a7eb330790c61d5d10)
+Creation: select NUMA node | 4.14 | [`96eabe7a40aa`](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=96eabe7a40aa17e613cf3db2c742ee8b1fc764d0)
+Restrict access from syscall side | 4.15 | [`6e71b04a8224`](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=6e71b04a82248ccf13a94b85cbc674a9fefe53f5)
+Creation: specify map name | 4.15 | [`ad5b177bd73f`](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=ad5b177bd73f5107d97c36f56395c4281fb6f089)
+`LOOKUP_AND_DELETE_ELEM` | 4.20 | [`bd513cd08f10`](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=bd513cd08f10cbe28856f99ae951e86e86803861)
+Creation: `BPF_F_ZERO_SEED` | 5.0 | [`96b3b6c9091d`](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=96b3b6c9091d23289721350e32c63cc8749686be)
+`BPF_F_LOCK` flag for lookup / update | 5.1 | [`96049f3afd50`](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=96049f3afd50fe8db69fa0068cdca822e747b1e4)
+Restrict access from BPF side | 5.2 | [`591fe9888d78`](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=591fe9888d7809d9ee5c828020b6c6ae27c37229)
+`FREEZE` | 5.2 | [`87df15de441b`](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=87df15de441bd4add7876ef584da8cabdd9a042a)
+mmap() support for array maps | 5.5 | [`fc9702273e2e`](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=fc9702273e2edb90400a34b3be76f7b08fa3344b)
+`LOOKUP_BATCH` | 5.6 | [`cb4d03ab499d`](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=cb4d03ab499d4c040f4ab6fd4389d2b49f42b5a5)
+`UPDATE_BATCH`, `DELETE_BATCH` | 5.6 | [`aa2e93b8e58e`](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=aa2e93b8e58e18442edfb2427446732415bc215e)
+`LOOKUP_AND_DELETE_BATCH` | 5.6 | [`057996380a42`](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=057996380a42bb64ccc04383cfa9c0ace4ea11f0)
 
 ## XDP
 
