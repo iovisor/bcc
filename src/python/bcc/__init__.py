@@ -109,6 +109,10 @@ class PerfType:
     # From perf_type_id in uapi/linux/perf_event.h
     HARDWARE = 0
     SOFTWARE = 1
+    TRACEPOINT = 2
+    HW_CACHE = 3
+    RAW = 4
+    BREAKPOINT = 5
 
 class PerfHWConfig:
     # From perf_hw_id in uapi/linux/perf_event.h
