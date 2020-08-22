@@ -768,7 +768,7 @@ union bpf_attr {
  *
  * 		Also, note that **bpf_trace_printk**\ () is slow, and should
  * 		only be used for debugging purposes. For this reason, a notice
- * 		bloc (spanning several lines) is printed to kernel logs and
+ * 		block (spanning several lines) is printed to kernel logs and
  * 		states that the helper should not be used "for production use"
  * 		the first time this helper is used (or more precisely, when
  * 		**trace_printk**\ () buffers are allocated). For passing values
@@ -1034,14 +1034,14 @@ union bpf_attr {
  *
  * 			int ret;
  * 			struct bpf_tunnel_key key = {};
- * 			
+ *
  * 			ret = bpf_skb_get_tunnel_key(skb, &key, sizeof(key), 0);
  * 			if (ret < 0)
  * 				return TC_ACT_SHOT;	// drop packet
- * 			
+ *
  * 			if (key.remote_ipv4 != 0x0a000001)
  * 				return TC_ACT_SHOT;	// drop packet
- * 			
+ *
  * 			return TC_ACT_OK;		// accept packet
  *
  * 		This interface can also be used with all encapsulation devices
@@ -1148,7 +1148,7 @@ union bpf_attr {
  * 	Description
  * 		Retrieve the realm or the route, that is to say the
  * 		**tclassid** field of the destination for the *skb*. The
- * 		indentifier retrieved is a user-provided tag, similar to the
+ * 		identifier retrieved is a user-provided tag, similar to the
  * 		one used with the net_cls cgroup (see description for
  * 		**bpf_get_cgroup_classid**\ () helper), but here this tag is
  * 		held by a route (a destination entry), not by a task.
@@ -4072,6 +4072,13 @@ struct bpf_link_info {
 			__u64 cgroup_id;
 			__u32 attach_type;
 		} cgroup;
+		struct {
+			__aligned_u64 target_name; /* in/out: target_name buffer ptr */
+			__u32 target_name_len;	   /* in/out: target_name buffer len */
+			union {
+				__u32 map_id;
+			} map;
+		} iter;
 		struct  {
 			__u32 netns_ino;
 			__u32 attach_type;

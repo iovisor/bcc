@@ -185,7 +185,7 @@ void BTF::adjust(uint8_t *btf_sec, uintptr_t btf_sec_size,
   }
 
   struct btf_header *hdr = (struct btf_header *)btf_sec;
-  struct btf_ext_header *ehdr = (struct btf_ext_header *)btf_ext_sec;
+  struct bcc_btf_ext_header *ehdr = (struct bcc_btf_ext_header *)btf_ext_sec;
 
   // Fixup btf for old kernels or kernel requirements.
   fixup_btf(btf_sec + hdr->hdr_len + hdr->type_off, hdr->type_len,
