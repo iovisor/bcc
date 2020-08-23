@@ -1,0 +1,76 @@
+.TH tcprtt 8  "2020-08-23" "USER COMMANDS"
+.SH NAME
+tcprtt \- Trace TCP RTT of established connections. Uses Linux eBPF/bcc.
+.SH SYNOPSIS
+.B tcprtt [\-h] [\-T] [\-D] [\-m] [\-i INTERVAL] [\-d DURATION]
+.SH DESCRIPTION
+This tool traces established connections RTT(round-trip time) to analyze the
+quality of network. This can be useful for general troubleshooting to
+distinguish the network latency is from user process or physical network.
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH OPTIONS
+.TP
+\-h
+Print usage message.
+.TP
+\-T
+Include a time column on output (HH:MM:SS).
+.TP
+\-D
+Show debug infomation of bpf text.
+.TP
+\-m
+Output histogram in milliseconds.
+.TP
+\-i INTERVAL
+Print output every interval seconds.
+.TP
+\-d DURATION
+Total duration of trace in seconds.
+.TP
+\-p SPORT
+Filter for source port.
+.TP
+\-P DPORT
+Filter for destination port.
+.TP
+\-a SADDR
+Filter for source address.
+.TP
+\-A DADDR
+Filter for destination address.
+.SH EXAMPLES
+.TP
+Trace TCP RTT and print 1 second summaries, 10 times:
+#
+.B tcprtt \-i 1 \-d 10
+.TP
+Summarize in millisecond, and timestamps:
+#
+.B tcprtt \-m \-T
+.TP
+Only trace TCP RTT for destination address 192.168.1.100 and destination port 80:
+#
+.B tcprtt \-i 1 \-d 10 -A 192.168.1.100 -P 80
+.SH OVERHEAD
+This traces the kernel tcp_rcv_established function and collects TCP RTT. The
+rate of this depends on your server application. If it is a web or proxy server
+accepting many tens of thousands of connections per second.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+zhenwei pi
+.SH SEE ALSO
+tcptracer(8), tcpconnect(8), funccount(8), tcpdump(8)
