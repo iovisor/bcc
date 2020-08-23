@@ -1,0 +1,83 @@
+Demonstrations of tcprtt, the Linux eBPF/bcc version.
+
+
+This program traces TCP RTT(round-trip time) to analyze the quality of
+network, then help us to distinguish the network latency trouble is from
+user process or physical network.
+
+For example, wrk show the http request latency distribution:
+# wrk -d 30 -c 10 --latency http://192.168.122.100/index.html
+Running 30s test @ http://192.168.122.100/index.html
+  2 threads and 10 connections
+  Thread Stats   Avg      Stdev     Max   +/- Stdev
+    Latency    86.75ms  153.76ms   1.54s    90.85%
+    Req/Sec   160.91     76.07   424.00     67.06%
+  Latency Distribution
+     50%   14.55ms
+     75%  119.21ms
+     90%  230.22ms
+     99%  726.90ms
+  9523 requests in 30.02s, 69.62MB read
+  Socket errors: connect 0, read 0, write 0, timeout 1
+
+During wrk testing, run tcprtt:
+# ./tcprtt -i 1 -d 10 -m
+Tracing TCP RTT... Hit Ctrl-C to end.
+     msecs               : count     distribution
+         0 -> 1          : 4        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 1055     |****************************************|
+         8 -> 15         : 26       |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 18       |                                        |
+       128 -> 255        : 14       |                                        |
+       256 -> 511        : 14       |                                        |
+       512 -> 1023       : 12       |                                        |
+
+The wrk output shows that the latency of web service is not stable, and tcprtt
+also shows unstable TCP RTT. So in this situation, we need to make sure the
+quality of network is good or not firstly.
+
+
+Use filter for address and(or) port. Ex, only collect source address 192.168.122.200
+and destination address 192.168.122.100 and destination port 80.
+# ./tcprtt -i 1 -d 10 -m -a 192.168.122.200 -A 192.168.122.100 -P 80
+
+
+Full USAGE:
+
+# ./tcprtt -h
+usage: tcprtt [-h] [-i INTERVAL] [-d DURATION] [-T] [-m] [-p SPORT]
+                 [-P DPORT] [-a SADDR] [-A DADDR] [-D]
+
+Summarize TCP RTT as a histogram
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -i INTERVAL, --interval INTERVAL
+                        summary interval, seconds
+  -d DURATION, --duration DURATION
+                        total duration of trace, seconds
+  -T, --timestamp       include timestamp on output
+  -m, --milliseconds    millisecond histogram
+  -p SPORT, --sport SPORT
+                        source port
+  -P DPORT, --dport DPORT
+                        destination port
+  -a SADDR, --saddr SADDR
+                        source address
+  -A DADDR, --daddr DADDR
+                        destination address
+  -D, --debug           print BPF program before starting (for debugging
+                        purposes)
+
+examples:
+    ./tcprtt            # summarize TCP RTT
+    ./tcprtt -i 1 -d 10 # print 1 second summaries, 10 times
+    ./tcprtt -m -T      # summarize in millisecond, and timestamps
+    ./tcprtt -p         # filter for source port
+    ./tcprtt -P         # filter for destination port
+    ./tcprtt -a         # filter for source address
+    ./tcprtt -A         # filter for destination address
+    ./tcprtt -D         # show debug bpf text
