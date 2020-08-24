@@ -417,6 +417,41 @@ More [examples](../tools/argdist_example.txt).
 
 More [examples](../tools/funccount_example.txt).
 
-## Networking
+### 3. Networking
 
-To do.
+#### 3.1 gethostlatency
+
+Show latency for getaddrinfo/gethostbyname  calls
+
+
+Example to show latency on getaddrinfo in ssh connections   
+
+```
+gethostlatency
+
+IME      PID    COMM                  LATms HOST
+17:58:45  20369  sshd                   0.09 187.140.225.101
+17:58:45  20369  sshd                   0.09 187.140.225.101
+17:58:45  20369  sshd                   0.10 187.140.225.101
+17:58:45  20375  sshd                   0.13 187.140.225.101
+17:58:46  20369  sshd                   0.10 187.140.225.101
+18:02:15  20369  sshd                   0.10 187.140.225.101
+18:02:15  20369  sshd                   0.06 187.140.225.101
+
+```
+
+Example to show latency on domain name resolution
+
+```
+gethostlatency
+
+TIME      PID    COMM                  LATms HOST
+18:03:36  29039  DNS Res~er #109       64.42 shavar.services.mozilla.com
+18:03:49  22113  DNS Res~er #103        8.92 mastodon.social
+18:03:50  29040  DNS Res~er #110       24.66 play.google.com
+18:04:03  22113  DNS Res~er #103       49.03 alive.github.com
+18:04:03  29040  DNS Res~er #110        3.83 alive.github.com
+18:04:18  16404  DNS Res~ver #85        6.13 play.google.com
+
+```
+More [examples](../tools/gethostlatency_example.txt).
