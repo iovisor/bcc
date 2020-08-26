@@ -1278,7 +1278,10 @@ class BPF(object):
             task = line[:16].lstrip()
             line = line[17:]
             ts_end = line.find(b":")
-            pid, cpu, flags, ts = line[:ts_end].split()
+            try:
+                pid, cpu, flags, ts = line[:ts_end].split()
+            except Exception as e:
+                continue
             cpu = cpu[1:-1]
             # line[ts_end:] will have ": [sym_or_addr]: msgs"
             # For trace_pipe debug output, the addr typically
@@ -1290,7 +1293,10 @@ class BPF(object):
             line = line[ts_end + 1:]
             sym_end = line.find(b":")
             msg = line[sym_end + 2:]
-            return (task, int(pid), int(cpu), flags, float(ts), msg)
+            try:
+                return (task, int(pid), int(cpu), flags, float(ts), msg)
+            except Exception as e:
+                return ("Unknown", 0, 0, "Unknown", 0.0, "Unknown")
 
     def trace_readline(self, nonblocking=False):
         """trace_readline(nonblocking=False)
