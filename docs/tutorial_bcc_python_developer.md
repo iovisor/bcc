@@ -48,7 +48,7 @@ Improve it by printing "Tracing sys_sync()... Ctrl-C to end." when the program f
 
 ### Lesson 3. hello_fields.py
 
-This program is in [examples/tracing/hello_fields.py](../examples/tracing/trace_fields.py). Sample output (run commands in another session):
+This program is in [examples/tracing/hello_fields.py](../examples/tracing/hello_fields.py). Sample output (run commands in another session):
 
 ```
 # ./examples/tracing/hello_fields.py
