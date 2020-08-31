@@ -1,0 +1,250 @@
+Demonstrations of kvm exit reasons, the Linux eBPF/bcc version.
+
+
+Considering virtual machines' frequent exits can cause performance problems,
+this tool aims to locate the frequent exited reasons and then find solutions
+to reduce or even avoid the exit, by displaying the detail exit reasons and
+the counts of each vm exit for all vms running on one physical machine.
+
+
+Features of this tool
+=====================
+
+- Although there is a patch: [KVM: x86: add full vm-exit reason debug entries]
+  (https://patchwork.kernel.org/project/kvm/patch/1555939499-30854-1-git-send-email-pizhenwei@bytedance.com/)
+  trying to fill more vm-exit reason debug entries, just as the comments said,
+  the code allocates lots of memory that may never be consumed, misses some
+  arch-specific kvm causes, and can not do kernel aggregation. Instead bcc, as
+  a user space tool, can implement all these functions more easily and flexibly.
+- The bcc python logic could provide nice kernel aggregation and custom output,
+  like collpasing all tids for one pid (e.i. one vm's qemu process id) with exit
+  reasons sorted in descending order. For more information, see the following
+  #USAGE message.
+- The bpf in-kernel percpu_array and percpu_cache further improves performance.
+  For more information, see the following #Help to understand.
+
+
+Limited
+=======
+
+In view of the hardware-assisted virtualization technology of
+different architectures, currently we only adapt on vmx in intel.
+And the amd feature is on the road..
+
+
+Example output:
+===============
+
+# ./kvmexit.py
+Display kvm exit reasons and statistics for all threads... Hit Ctrl-C to end.
+PID      TID      KVM_EXIT_REASON                     COUNT
+^C1273551  1273568  EXIT_REASON_HLT                     12
+1273551  1273568  EXIT_REASON_MSR_WRITE               6
+1274253  1274261  EXIT_REASON_EXTERNAL_INTERRUPT      1
+1274253  1274261  EXIT_REASON_HLT                     12
+1274253  1274261  EXIT_REASON_MSR_WRITE               4
+
+# ./kvmexit.py 6
+Display kvm exit reasons and statistics for all threads after sleeping 6 secs.
+PID      TID      KVM_EXIT_REASON                     COUNT
+1273903  1273922  EXIT_REASON_EXTERNAL_INTERRUPT      175
+1273903  1273922  EXIT_REASON_CPUID                   10
+1273903  1273922  EXIT_REASON_HLT                     6043
+1273903  1273922  EXIT_REASON_IO_INSTRUCTION          24
+1273903  1273922  EXIT_REASON_MSR_WRITE               15025
+1273903  1273922  EXIT_REASON_PAUSE_INSTRUCTION       11
+1273903  1273922  EXIT_REASON_EOI_INDUCED             12
+1273903  1273922  EXIT_REASON_EPT_VIOLATION           6
+1273903  1273922  EXIT_REASON_EPT_MISCONFIG           380
+1273903  1273922  EXIT_REASON_PREEMPTION_TIMER        194
+1273551  1273568  EXIT_REASON_EXTERNAL_INTERRUPT      18
+1273551  1273568  EXIT_REASON_HLT                     989
+1273551  1273568  EXIT_REASON_IO_INSTRUCTION          10
+1273551  1273568  EXIT_REASON_MSR_WRITE               2205
+1273551  1273568  EXIT_REASON_PAUSE_INSTRUCTION       1
+1273551  1273568  EXIT_REASON_EOI_INDUCED             5
+1273551  1273568  EXIT_REASON_EPT_MISCONFIG           61
+1273551  1273568  EXIT_REASON_PREEMPTION_TIMER        14
+
+# ./kvmexit.py -p 1273795 5
+Display kvm exit reasons and statistics for PID 1273795 after sleeping 5 secs.
+KVM_EXIT_REASON                     COUNT
+MSR_WRITE                           13467
+HLT                                 5060
+PREEMPTION_TIMER                    345
+EPT_MISCONFIG                       264
+EXTERNAL_INTERRUPT                  169
+EPT_VIOLATION                       18
+PAUSE_INSTRUCTION                   6
+IO_INSTRUCTION                      4
+EOI_INDUCED                         2
+
+# ./kvmexit.py -p 1273795 5 -a
+Display kvm exit reasons and statistics for PID 1273795 and its all threads after sleeping 5 secs.
+TID      KVM_EXIT_REASON                     COUNT
+1273819  EXTERNAL_INTERRUPT                  64
+1273819  HLT                                 2802
+1273819  IO_INSTRUCTION                      4
+1273819  MSR_WRITE                           7196
+1273819  PAUSE_INSTRUCTION                   2
+1273819  EOI_INDUCED                         2
+1273819  EPT_VIOLATION                       6
+1273819  EPT_MISCONFIG                       162
+1273819  PREEMPTION_TIMER                    194
+1273820  EXTERNAL_INTERRUPT                  78
+1273820  HLT                                 2054
+1273820  MSR_WRITE                           5199
+1273820  EPT_VIOLATION                       2
+1273820  EPT_MISCONFIG                       77
+1273820  PREEMPTION_TIMER                    102
+
+# ./kvmexit.py -p 1273795 -v 0
+Display kvm exit reasons and statistics for PID 1273795 VCPU 0... Hit Ctrl-C to end.
+KVM_EXIT_REASON                     COUNT
+^CMSR_WRITE                           2076
+HLT                                 795
+PREEMPTION_TIMER                    86
+EXTERNAL_INTERRUPT                  20
+EPT_MISCONFIG                       10
+PAUSE_INSTRUCTION                   2
+IO_INSTRUCTION                      2
+EPT_VIOLATION                       1
+EOI_INDUCED                         1
+
+# ./kvmexit.py -p 1273795 -v 0 4
+Display kvm exit reasons and statistics for PID 1273795 VCPU 0 after sleeping 4 secs.
+KVM_EXIT_REASON                     COUNT
+MSR_WRITE                           4726
+HLT                                 1827
+PREEMPTION_TIMER                    78
+EPT_MISCONFIG                       67
+EXTERNAL_INTERRUPT                  28
+IO_INSTRUCTION                      4
+EOI_INDUCED                         2
+PAUSE_INSTRUCTION                   2
+
+# ./kvmexit.py -p 1273795 -v 4 4
+Traceback (most recent call last):
+  File "tools/kvmexit.py", line 306, in <module>
+      raise Exception("There's no v%s for PID %d." % (tgt_vcpu, args.pid))
+      Exception: There's no vCPU 4 for PID 1273795.
+
+# ./kvmexit.py -t 1273819 10
+Display kvm exit reasons and statistics for TID 1273819 after sleeping 10 secs.
+KVM_EXIT_REASON                     COUNT
+MSR_WRITE                           13318
+HLT                                 5274
+EPT_MISCONFIG                       263
+PREEMPTION_TIMER                    171
+EXTERNAL_INTERRUPT                  109
+IO_INSTRUCTION                      8
+PAUSE_INSTRUCTION                   5
+EOI_INDUCED                         4
+EPT_VIOLATION                       2
+
+# ./kvmexit.py -T '1273820,1273819'
+Display kvm exit reasons and statistics for TIDS ['1273820', '1273819']... Hit Ctrl-C to end.
+TIDS     KVM_EXIT_REASON                     COUNT
+^C1273819  EXTERNAL_INTERRUPT                  300
+1273819  HLT                                 13718
+1273819  IO_INSTRUCTION                      26
+1273819  MSR_WRITE                           37457
+1273819  PAUSE_INSTRUCTION                   13
+1273819  EOI_INDUCED                         13
+1273819  EPT_VIOLATION                       53
+1273819  EPT_MISCONFIG                       654
+1273819  PREEMPTION_TIMER                    958
+1273820  EXTERNAL_INTERRUPT                  212
+1273820  HLT                                 9002
+1273820  MSR_WRITE                           25495
+1273820  PAUSE_INSTRUCTION                   2
+1273820  EPT_VIOLATION                       64
+1273820  EPT_MISCONFIG                       396
+1273820  PREEMPTION_TIMER                    268
+
+
+Help to understand
+==================
+
+We use a PERCPU_ARRAY: pcpuArrayA and a percpu_hash: hashA to collaboratively
+store each kvm exit reason and its count. The reason is there exists a rule when
+one vcpu exits and re-enters, it tends to continue to run on the same physical
+cpu (pcpu as follows) as the last cycle, which is also called 'cache hit'. Thus
+we turn to use a PERCPU_ARRAY to record the 'cache hit' situation to speed
+things up; and for other cases, then use a percpu_hash.
+
+BTW, we originally use a common hash to do this, with a u64(exit_reason)
+key and a struct exit_info {tgid_pid, exit_reason} value. But due to
+the big lock in bpf_hash, each updating is quite performance consuming.
+
+Now imagine here is a pid_tgidA (vcpu A) exits and is going to run on
+pcpuArrayA, the BPF code flow is as follows:
+
+               pid_tgidA keeps running on the same pcpu
+                        //               \\
+                       //                 \\
+                      // Y               N \\
+                     //                     \\
+             a. cache_hit               b. cache_miss
+(cacheA's pid_tgid matches pid_tgidA)        ||
+                  |                          ||
+                  |                          ||
+   "increase percpu exit_ct and return"      ||
+            [*Note*]                         ||
+                             pid_tgidA ever been exited on pcpuArrayA?
+                                           //   \\
+                                          //     \\
+                                         //       \\
+                                        // Y     N \\
+                                       //           \\
+                          b.a load_last_hashA   b.b initialize_hashA_with_zero
+                                          \       /
+                                           \     /
+                                            \   /
+                                      "increase percpu exit_ct"
+                                             ||
+                                             ||
+                           is another pid_tgid been running on pcpuArrayA?
+                                        //          \\
+                                       // Y        N \\
+                                      //              \\
+                       b.*.a save_theLastHit_hashB    do_nothing
+                                           \\       //
+                                            \\     //
+                                             \\   //
+                                       b.* save_to_pcpuArrayA
+
+
+[*Note*] we do not update the table in above "a.", in case the vcpu hit the same
+pcpu again when exits next time, instead we only update until this pcpu is not
+hitted by the same tgidpid(vcpu) again, which is in "b.*.a" and "b.*".
+
+
+USAGE message:
+==============
+
+# ./kvmexit.py -h
+usage: kvmexit.py [-h] [-p PID [-v VCPU | -a] ] [-t TID | -T 'TID1,TID2'] [duration]
+
+Display kvm_exit_reason and its statistics at a timed interval
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -p PID, --pid PID     display process with this PID only, collpase all tids with exit reasons sorted in descending order
+  -v VCPU, --v VCPU     display this VCPU only for this PID
+  -a, --alltids         display all TIDS for this PID
+  -t TID, --tid TID     display thread with this TID only with exit reasons sorted in descending order
+  -T 'TID1,TID2', --tids 'TID1,TID2'
+                        display threads for a union like {395490, 395491}
+  duration              duration of display, after sleeping several seconds
+
+examples:
+    ./kvmexit                         # Display kvm_exit_reason and its statistics in real-time until Ctrl-C
+    ./kvmexit 5                       # Display in real-time after sleeping 5s
+    ./kvmexit -p 3195281              # Collpase all tids for pid 3195281 with exit reasons sorted in descending order
+    ./kvmexit -p 3195281 20           # Collpase all tids for pid 3195281 with exit reasons sorted in descending order, and display after sleeping 20s
+    ./kvmexit -p 3195281 -v 0         # Display only vcpu0 for pid 3195281, descending sort by default
+    ./kvmexit -p 3195281 -a           # Display all tids for pid 3195281
+    ./kvmexit -t 395490               # Display only for tid 395490 with exit reasons sorted in descending order
+    ./kvmexit -t 395490 20            # Display only for tid 395490 with exit reasons sorted in descending order after sleeping 20s
+    ./kvmexit -T '395490,395491'      # Display for a union like {395490, 395491}
