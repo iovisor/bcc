@@ -97,6 +97,9 @@ capabilities = {
     35: "CAP_WAKE_ALARM",
     36: "CAP_BLOCK_SUSPEND",
     37: "CAP_AUDIT_READ",
+    38: "CAP_PERFMON",
+    39: "CAP_BPF",
+    40: "CAP_CHECKPOINT_RESTORE",
 }
 
 class Enum(set):
