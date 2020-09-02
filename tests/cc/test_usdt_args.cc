@@ -52,6 +52,10 @@ static void verify_register(USDT::ArgumentParser &parser, int arg_size,
   REQUIRE(arg.scale() == scale);
 }
 
+/* supported arches only */
+#if defined(__aarch64__) || defined(__powerpc64__) || \
+    defined(__s390x__) || defined(__x86_64__)
+
 TEST_CASE("test usdt argument parsing", "[usdt]") {
   SECTION("parse failure") {
 #ifdef __aarch64__
@@ -205,3 +209,5 @@ TEST_CASE("test usdt argument parsing", "[usdt]") {
     REQUIRE(parser.done());
   }
 }
+
+#endif /* supported arches only */
