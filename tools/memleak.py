@@ -209,10 +209,12 @@ static inline int gen_alloc_exit2(struct pt_regs *ctx, u64 address) {
         info.size = *size64;
         sizes.delete(&pid);
 
-        info.timestamp_ns = bpf_ktime_get_ns();
-        info.stack_id = stack_traces.get_stackid(ctx, STACK_FLAGS);
-        allocs.update(&address, &info);
-        update_statistics_add(info.stack_id, info.size);
+        if (address != 0) {
+                info.timestamp_ns = bpf_ktime_get_ns();
+                info.stack_id = stack_traces.get_stackid(ctx, STACK_FLAGS);
+                allocs.update(&address, &info);
+                update_statistics_add(info.stack_id, info.size);
+        }
 
         if (SHOULD_PRINT) {
                 bpf_trace_printk("alloc exited, size = %lu, result = %lx\\n",
