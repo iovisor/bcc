@@ -21,6 +21,7 @@ APPS = \
 	filelife \
 	opensnoop \
 	readahead \
+	runqlat \
 	runqslower \
 	syscount \
 	tcpconnect \

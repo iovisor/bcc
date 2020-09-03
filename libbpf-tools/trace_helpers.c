@@ -284,7 +284,7 @@ static void print_stars(unsigned int val, unsigned int val_max, int width)
 		printf("+");
 }
 
-void print_log2_hist(unsigned int *vals, int vals_size, char *val_type)
+void print_log2_hist(unsigned int *vals, int vals_size, const char *val_type)
 {
 	int stars_max = 40, idx_max = -1;
 	unsigned int val, val_max = 0;
