@@ -19,6 +19,7 @@ APPS = \
 	drsnoop \
 	execsnoop \
 	filelife \
+	hardirqs \
 	opensnoop \
 	readahead \
 	runqslower \
