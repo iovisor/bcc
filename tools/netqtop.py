@@ -160,8 +160,6 @@ parser.add_argument("--name", "-n", type=str, default="")
 parser.add_argument("--interval", "-i", type=float, default=1)
 parser.add_argument("--throughput", "-t", action="store_true")
 parser.add_argument("--ebpf", action="store_true", help=argparse.SUPPRESS)
-parser.add_argument("--cgroupmap", help="trace cgroups in this BPF map only")
-parser.add_argument("--mntnsmap", help="trace mount namespaces in this BPF map only")
 args = parser.parse_args()
 
 if args.ebpf:

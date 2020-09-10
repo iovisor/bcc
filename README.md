@@ -128,6 +128,7 @@ pair of .c and .py files, and some are directories of files.
 - tools/[memleak](tools/memleak.py): Display outstanding memory allocations to find memory leaks. [Examples](tools/memleak_example.txt).
 - tools/[mountsnoop](tools/mountsnoop.py): Trace mount and umount syscalls system-wide. [Examples](tools/mountsnoop_example.txt).
 - tools/[mysqld_qslower](tools/mysqld_qslower.py): Trace MySQL server queries slower than a threshold. [Examples](tools/mysqld_qslower_example.txt).
+- tools/[netqtop](tools/netqtop.py) tools/[netqtop.c](tools/netqtop.c): Trace and display packets distribution on NIC queues. [Examples](tools/netqtop_example.txt).
 - tools/[nfsslower](tools/nfsslower.py): Trace slow NFS operations. [Examples](tools/nfsslower_example.txt).
 - tools/[nfsdist](tools/nfsdist.py): Summarize NFS operation latency distribution as a histogram. [Examples](tools/nfsdist_example.txt).
 - tools/[offcputime](tools/offcputime.py): Summarize off-CPU time by kernel stack trace. [Examples](tools/offcputime_example.txt).

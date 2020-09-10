@@ -3,7 +3,7 @@
 netqtop \- Summarize PPS, BPS, average size of packets and packet counts ordered by packet sizes 
 on each queue of a network interface.
 .SH SYNOPSIS
-.B netqtop [\-n nic] [\-i interval] 
+.B netqtop [\-n nic] [\-i interval] [\-t throughput]
 .SH DESCRIPTION
 netqtop accounts statistics of both transmitted and received packets on each queue of 
 a specified network interface to help developers check if its traffic load is balanced. 
@@ -27,6 +27,9 @@ Specify the network interface card
 \-i INTERVAL
 Print results every INTERVAL seconds.
 The default value is 1.
+.TP
+\-t THROUGHPUT
+Print BPS and PPS of each queue.
 .SH EXAMPLES
 .TP
 Account statistics of eth0 and output every 2 seconds:
