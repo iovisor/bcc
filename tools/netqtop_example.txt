@@ -1,0 +1,190 @@
+Demonstrations of netqtop.
+
+
+netqtop traces the kernel functions performing packet transmit (xmit_one) 
+and packet receive (__netif_receive_skb_core) on data link layer. The tool 
+not only traces every packet via a specified network interface, but also accounts 
+the PPS, BPS and average size of packets as well as packet amounts (categorized by 
+size range) on sending and receiving direction respectively. Results are printed 
+as tables, which can be used to understand traffic load allocation on each queue 
+of interested network interface to see if it is balanced. And the overall performance 
+is provided in the buttom.
+
+For example, suppose you want to know current traffic on lo, and print result 
+every second:
+# ./netqtop.py -n lo -i 1
+Thu Sep 10 11:28:39 2020
+TX
+ QueueID    avg_size   [0, 64)   [64, 512)  [512, 2K)  [2K, 16K)  [16K, 64K)
+    0          88          0          9          0          0          0
+ Total         88          0          9          0          0          0
+
+RX
+ QueueID    avg_size   [0, 64)   [64, 512)  [512, 2K)  [2K, 16K)  [16K, 64K)
+    0          74          4          5          0          0          0
+ Total         74          4          5          0          0          0
+----------------------------------------------------------------------------
+Thu Sep 10 11:28:40 2020
+TX
+ QueueID    avg_size   [0, 64)   [64, 512)  [512, 2K)  [2K, 16K)  [16K, 64K)
+    0         233          0          3          1          0          0
+ Total        233          0          3          1          0          0
+
+RX
+ QueueID    avg_size   [0, 64)   [64, 512)  [512, 2K)  [2K, 16K)  [16K, 64K)
+    0         219          2          1          1          0          0
+ Total        219          2          1          1          0          0
+----------------------------------------------------------------------------
+
+or you can just use the default mode
+# ./netqtop.py -n lo
+Thu Sep 10 11:27:45 2020
+TX
+ QueueID    avg_size   [0, 64)   [64, 512)  [512, 2K)  [2K, 16K)  [16K, 64K)
+    0          92          0          7          0          0          0
+ Total         92          0          7          0          0          0
+
+RX
+ QueueID    avg_size   [0, 64)   [64, 512)  [512, 2K)  [2K, 16K)  [16K, 64K)
+    0          78          3          4          0          0          0
+ Total         78          3          4          0          0          0
+----------------------------------------------------------------------------
+Thu Sep 10 11:27:46 2020
+TX
+ QueueID    avg_size   [0, 64)   [64, 512)  [512, 2K)  [2K, 16K)  [16K, 64K)
+    0         179          0          5          1          0          0
+ Total        179          0          5          1          0          0
+
+RX
+ QueueID    avg_size   [0, 64)   [64, 512)  [512, 2K)  [2K, 16K)  [16K, 64K)
+    0         165          3          2          1          0          0
+ Total        165          3          2          1          0          0
+----------------------------------------------------------------------------
+
+This NIC only has 1 queue.
+If you want the tool to print results after a longer interval, specify seconds with -i:
+# ./netqtop.py -n lo -i 3
+Thu Sep 10 11:31:26 2020
+TX
+ QueueID    avg_size   [0, 64)   [64, 512)  [512, 2K)  [2K, 16K)  [16K, 64K)
+    0          85          0         11          0          0          0
+ Total         85          0         11          0          0          0
+
+RX
+ QueueID    avg_size   [0, 64)   [64, 512)  [512, 2K)  [2K, 16K)  [16K, 64K)
+    0          71          5          6          0          0          0
+ Total         71          5          6          0          0          0
+----------------------------------------------------------------------------
+Thu Sep 10 11:31:29 2020
+TX
+ QueueID    avg_size   [0, 64)   [64, 512)  [512, 2K)  [2K, 16K)  [16K, 64K)
+    0         153          0          7          1          0          0
+ Total        153          0          7          1          0          0
+
+RX
+ QueueID    avg_size   [0, 64)   [64, 512)  [512, 2K)  [2K, 16K)  [16K, 64K)
+    0         139          4          3          1          0          0
+ Total        139          4          3          1          0          0
+----------------------------------------------------------------------------
+
+To see PPS and BPS of each queue, use -t:
+# ./netqtop.py -n lo -i 1 -t
+Thu Sep 10 11:37:02 2020
+TX
+ QueueID    avg_size   [0, 64)   [64, 512)  [512, 2K)  [2K, 16K)  [16K, 64K)    BPS        PPS    
+    0         114          0         10          0          0          0      1.11K       10.0
+ Total        114          0         10          0          0          0      1.11K       10.0
+
+RX
+ QueueID    avg_size   [0, 64)   [64, 512)  [512, 2K)  [2K, 16K)  [16K, 64K)    BPS        PPS    
+    0         100          4          6          0          0          0     1000.0       10.0
+ Total        100          4          6          0          0          0     1000.0       10.0
+-----------------------------------------------------------------------------------------------
+Thu Sep 10 11:37:03 2020
+TX
+ QueueID    avg_size   [0, 64)   [64, 512)  [512, 2K)  [2K, 16K)  [16K, 64K)    BPS        PPS    
+    0         271          0          3          1          0          0      1.06K        4.0
+ Total        271          0          3          1          0          0      1.06K        4.0
+
+RX
+ QueueID    avg_size   [0, 64)   [64, 512)  [512, 2K)  [2K, 16K)  [16K, 64K)    BPS        PPS    
+    0         257          2          1          1          0          0       1.0K        4.0
+ Total        257          2          1          1          0          0       1.0K        4.0
+-----------------------------------------------------------------------------------------------
+
+When filtering multi-queue NICs, you do not need to specify the number of queues, 
+the tool calculates it for you:
+# ./netqtop.py -n eth0 -t
+Thu Sep 10 11:39:21 2020
+TX
+ QueueID    avg_size   [0, 64)   [64, 512)  [512, 2K)  [2K, 16K)  [16K, 64K)    BPS        PPS    
+    0           0          0          0          0          0          0        0.0        0.0
+    1           0          0          0          0          0          0        0.0        0.0
+    2           0          0          0          0          0          0        0.0        0.0
+    3           0          0          0          0          0          0        0.0        0.0
+    4           0          0          0          0          0          0        0.0        0.0
+    5           0          0          0          0          0          0        0.0        0.0
+    6           0          0          0          0          0          0        0.0        0.0
+    7           0          0          0          0          0          0        0.0        0.0
+    8          54          2          0          0          0          0      108.0        2.0
+    9         161          0          9          0          0          0      1.42K        9.0
+   10           0          0          0          0          0          0        0.0        0.0
+   11           0          0          0          0          0          0        0.0        0.0
+   12           0          0          0          0          0          0        0.0        0.0
+   13           0          0          0          0          0          0        0.0        0.0
+   14           0          0          0          0          0          0        0.0        0.0
+   15           0          0          0          0          0          0        0.0        0.0
+   16           0          0          0          0          0          0        0.0        0.0
+   17           0          0          0          0          0          0        0.0        0.0
+   18           0          0          0          0          0          0        0.0        0.0
+   19           0          0          0          0          0          0        0.0        0.0
+   20           0          0          0          0          0          0        0.0        0.0
+   21           0          0          0          0          0          0        0.0        0.0
+   22           0          0          0          0          0          0        0.0        0.0
+   23           0          0          0          0          0          0        0.0        0.0
+   24           0          0          0          0          0          0        0.0        0.0
+   25           0          0          0          0          0          0        0.0        0.0
+   26           0          0          0          0          0          0        0.0        0.0
+   27           0          0          0          0          0          0        0.0        0.0
+   28           0          0          0          0          0          0        0.0        0.0
+   29           0          0          0          0          0          0        0.0        0.0
+   30           0          0          0          0          0          0        0.0        0.0
+   31           0          0          0          0          0          0        0.0        0.0
+ Total        141          2          9          0          0          0      1.52K       11.0
+
+RX
+ QueueID    avg_size   [0, 64)   [64, 512)  [512, 2K)  [2K, 16K)  [16K, 64K)    BPS        PPS    
+    0         127          3          9          0          0          0       1.5K       12.0
+    1           0          0          0          0          0          0        0.0        0.0
+    2           0          0          0          0          0          0        0.0        0.0
+    3           0          0          0          0          0          0        0.0        0.0
+    4           0          0          0          0          0          0        0.0        0.0
+    5           0          0          0          0          0          0        0.0        0.0
+    6           0          0          0          0          0          0        0.0        0.0
+    7           0          0          0          0          0          0        0.0        0.0
+    8           0          0          0          0          0          0        0.0        0.0
+    9           0          0          0          0          0          0        0.0        0.0
+   10           0          0          0          0          0          0        0.0        0.0
+   11           0          0          0          0          0          0        0.0        0.0
+   12           0          0          0          0          0          0        0.0        0.0
+   13           0          0          0          0          0          0        0.0        0.0
+   14           0          0          0          0          0          0        0.0        0.0
+   15           0          0          0          0          0          0        0.0        0.0
+   16           0          0          0          0          0          0        0.0        0.0
+   17           0          0          0          0          0          0        0.0        0.0
+   18           0          0          0          0          0          0        0.0        0.0
+   19           0          0          0          0          0          0        0.0        0.0
+   20           0          0          0          0          0          0        0.0        0.0
+   21           0          0          0          0          0          0        0.0        0.0
+   22           0          0          0          0          0          0        0.0        0.0
+   23           0          0          0          0          0          0        0.0        0.0
+   24           0          0          0          0          0          0        0.0        0.0
+   25           0          0          0          0          0          0        0.0        0.0
+   26           0          0          0          0          0          0        0.0        0.0
+   27           0          0          0          0          0          0        0.0        0.0
+   28           0          0          0          0          0          0        0.0        0.0
+   29           0          0          0          0          0          0        0.0        0.0
+   30           0          0          0          0          0          0        0.0        0.0
+   31           0          0          0          0          0          0        0.0        0.0
+ Total        127          3          9          0          0          0       1.5K       12.0
+-----------------------------------------------------------------------------------------------
