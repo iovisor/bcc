@@ -22,6 +22,7 @@ APPS = \
 	opensnoop \
 	readahead \
 	runqslower \
+	schedsnoop \
 	syscount \
 	tcpconnect \
 	tcpconnlat \
