@@ -1,6 +1,8 @@
 #!/usr/bin/python3
 #
-# usbbuffer     Trace usb buffer
+# usb_buffer     Monitor usb buffer
+# This is an example to display a buffer of USB inputs and outputs.
+# It allows you to monitor the traffic that USB does, just like USBPcap.
 #
 # Copyright (c) 2020 gpioblink
 
@@ -20,15 +22,23 @@ struct data_t {
 };
 
 BPF_PERF_OUTPUT(events);
+
+// Instrument usb_hcd_giveback_urb() because the entity of
+// the USB block containing the buffer passed by the USB driver is returned
 int kprobe____usb_hcd_giveback_urb(struct pt_regs *ctx, struct urb *urb) {
   struct data_t data = {};
+  
+  // Get information on the USB device in order to identify the request
   struct usb_device *dev = urb->dev;
   data.vendor = dev->descriptor.idVendor;
   data.product = dev->descriptor.idProduct;
-  data.transfer_flags = urb->transfer_flags;
+  data.transfer_flags = urb->transfer_flags; // whether to send or receive.
   data.alen = urb->actual_length;
   data.buflen = urb->transfer_buffer_length;
+  
+  // Retrieve data sent or received from the USB buffer
   bpf_probe_read_kernel(data.buf, sizeof(data.buf), urb->transfer_buffer);
+  
   events.perf_submit(ctx, &data, sizeof(data));
   return 0;
 }
