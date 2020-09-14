@@ -663,10 +663,10 @@ static int (*bpf_skb_ecn_set_ce)(void *ctx) =
   (void *) BPF_FUNC_skb_ecn_set_ce;
 static struct bpf_sock *(*bpf_get_listener_sock)(struct bpf_sock *sk) =
   (void *) BPF_FUNC_get_listener_sock;
-static void *(*bpf_sk_storage_get)(void *map, struct bpf_sock *sk,
+static void *(*bpf_sk_storage_get)(void *map, void *sk,
                                    void *value, __u64 flags) =
   (void *) BPF_FUNC_sk_storage_get;
-static int (*bpf_sk_storage_delete)(void *map, struct bpf_sock *sk) =
+static int (*bpf_sk_storage_delete)(void *map, void *sk) =
   (void *)BPF_FUNC_sk_storage_delete;
 static int (*bpf_send_signal)(unsigned sig) = (void *)BPF_FUNC_send_signal;
 static long long (*bpf_tcp_gen_syncookie)(struct bpf_sock *sk, void *ip,
@@ -762,6 +762,29 @@ struct task_struct;
 static long (*bpf_get_task_stack)(struct task_struct *task, void *buf,
 				  __u32 size, __u64 flags) =
   (void *)BPF_FUNC_get_task_stack;
+
+struct bpf_sock_ops;
+static long (*bpf_load_hdr_opt)(struct bpf_sock_ops *skops, void *searchby_res,
+                                u32 len, u64 flags) =
+  (void *)BPF_FUNC_load_hdr_opt;
+static long (*bpf_store_hdr_opt)(struct bpf_sock_ops *skops, const void *from,
+                                 u32 len, u64 flags) =
+  (void *)BPF_FUNC_store_hdr_opt;
+static long (*bpf_reserve_hdr_opt)(struct bpf_sock_ops *skops, u32 len,
+                                   u64 flags) =
+  (void *)BPF_FUNC_reserve_hdr_opt;
+static void *(*bpf_inode_storage_get)(struct bpf_map *map, void *inode,
+                                      void *value, u64 flags) =
+  (void *)BPF_FUNC_inode_storage_get;
+static int (*bpf_inode_storage_delete)(struct bpf_map *map, void *inode) =
+  (void *)BPF_FUNC_inode_storage_delete;
+
+struct path;
+static long (*bpf_d_path)(struct path *path, char *buf, u32 sz) =
+  (void *)BPF_FUNC_d_path;
+
+static long (*bpf_copy_from_user)(void *dst, u32 size, const void *user_ptr) =
+  (void *)BPF_FUNC_copy_from_user;
 
 /* llvm builtin functions that eBPF C program may use to
  * emit BPF_LD_ABS and BPF_LD_IND instructions
