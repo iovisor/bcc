@@ -33,6 +33,7 @@ const struct partition *
 partitions__get_by_name(const struct partitions *partitions, const char *name);
 
 void print_log2_hist(unsigned int *vals, int vals_size, const char *val_type);
+void print_linear_hist(unsigned int *vals, int vals_size, const char *val_type);
 
 unsigned long long get_ktime_ns(void);
 int bump_memlock_rlimit(void);

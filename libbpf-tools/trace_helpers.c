@@ -323,6 +323,31 @@ void print_log2_hist(unsigned int *vals, int vals_size, const char *val_type)
 	}
 }
 
+void print_linear_hist(unsigned int *vals, int vals_size, const char *val_type)
+{
+	int i, stars_max = 40, idx_max = -1;
+	unsigned int val, val_max = 0;
+
+	for (i = 0; i < vals_size; i++) {
+		val = vals[i];
+		if (val > 0)
+			idx_max = i;
+		if (val > val_max)
+			val_max = val;
+	}
+
+	if (idx_max < 0)
+		return;
+
+	printf("     %-13s : count     distribution\n", val_type);
+	for (i = 0; i <= idx_max;  i++) {
+		val = vals[i];
+		printf("        %-10d : %-8d |", i, val);
+		print_stars(val, val_max, stars_max);
+		printf("|\n");
+	}
+}
+
 unsigned long long get_ktime_ns(void)
 {
 	struct timespec ts;
