@@ -23,6 +23,7 @@ APPS = \
 	opensnoop \
 	readahead \
 	runqlat \
+	runqlen \
 	runqslower \
 	softirqs \
 	syscount \
