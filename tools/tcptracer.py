@@ -73,12 +73,12 @@ struct tcp_ipv6_event_t {
     u32 type;
     u32 pid;
     char comm[TASK_COMM_LEN];
-    u8 ip;
     unsigned __int128 saddr;
     unsigned __int128 daddr;
     u16 sport;
     u16 dport;
     u32 netns;
+    u8 ip;
 };
 BPF_PERF_OUTPUT(tcp_ipv6_event);
 
