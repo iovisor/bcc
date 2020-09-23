@@ -4,7 +4,7 @@
 # tcprtt    Summarize TCP RTT as a histogram. For Linux, uses BCC, eBPF.
 #
 # USAGE: tcprtt [-h] [-T] [-D] [-m] [-i INTERVAL] [-d DURATION]
-#           [-p SPORT] [-P DPORT] [-a SADDR] [-A DADDR]
+#           [-p LPORT] [-P RPORT] [-a LADDR] [-A RADDR]
 #
 # Copyright (c) 2020 zhenwei pi
 # Licensed under the Apache License, Version 2.0 (the "License")
@@ -22,10 +22,10 @@ examples = """examples:
     ./tcprtt            # summarize TCP RTT
     ./tcprtt -i 1 -d 10 # print 1 second summaries, 10 times
     ./tcprtt -m -T      # summarize in millisecond, and timestamps
-    ./tcprtt -p         # filter for source port
-    ./tcprtt -P         # filter for destination port
-    ./tcprtt -a         # filter for source address
-    ./tcprtt -A         # filter for destination address
+    ./tcprtt -p         # filter for local port
+    ./tcprtt -P         # filter for remote port
+    ./tcprtt -a         # filter for local address
+    ./tcprtt -A         # filter for remote address
     ./tcprtt -D         # show debug bpf text
 """
 parser = argparse.ArgumentParser(
@@ -40,14 +40,14 @@ parser.add_argument("-T", "--timestamp", action="store_true",
     help="include timestamp on output")
 parser.add_argument("-m", "--milliseconds", action="store_true",
     help="millisecond histogram")
-parser.add_argument("-p", "--sport",
-    help="source port")
-parser.add_argument("-P", "--dport",
-    help="destination port")
-parser.add_argument("-a", "--saddr",
-    help="source address")
-parser.add_argument("-A", "--daddr",
-    help="destination address")
+parser.add_argument("-p", "--lport",
+    help="local port")
+parser.add_argument("-P", "--rport",
+    help="remote port")
+parser.add_argument("-a", "--laddr",
+    help="local address")
+parser.add_argument("-A", "--raddr",
+    help="remote address")
 parser.add_argument("-D", "--debug", action="store_true",
     help="print BPF program before starting (for debugging purposes)")
 parser.add_argument("--ebpf", action="store_true",
@@ -75,10 +75,10 @@ int trace_tcp_rcv(struct pt_regs *ctx, struct sock *sk, struct sk_buff *skb)
     u32 srtt = ts->srtt_us >> 3;
     const struct inet_sock *inet = inet_sk(sk);
 
-    SPORTFILTER
-    DPORTFILTER
-    SADDRFILTER
-    DADDRFILTER
+    LPORTFILTER
+    RPORTFILTER
+    LADDRFILTER
+    RADDRFILTER
     FACTOR
 
     hist_srtt.increment(bpf_log2l(srtt));
@@ -87,45 +87,45 @@ int trace_tcp_rcv(struct pt_regs *ctx, struct sock *sk, struct sk_buff *skb)
 }
 """
 
-# filter for source port
-if args.sport:
-    bpf_text = bpf_text.replace(b'SPORTFILTER',
+# filter for local port
+if args.lport:
+    bpf_text = bpf_text.replace(b'LPORTFILTER',
         b"""u16 sport = 0;
     bpf_probe_read_kernel(&sport, sizeof(sport), (void *)&inet->inet_sport);
     if (ntohs(sport) != %d)
-        return 0;""" % int(args.sport))
+        return 0;""" % int(args.lport))
 else:
-    bpf_text = bpf_text.replace(b'SPORTFILTER', b'')
+    bpf_text = bpf_text.replace(b'LPORTFILTER', b'')
 
-# filter for dest port
-if args.dport:
-    bpf_text = bpf_text.replace(b'DPORTFILTER',
+# filter for remote port
+if args.rport:
+    bpf_text = bpf_text.replace(b'RPORTFILTER',
         b"""u16 dport = 0;
     bpf_probe_read_kernel(&dport, sizeof(dport), (void *)&inet->inet_dport);
     if (ntohs(dport) != %d)
-        return 0;""" % int(args.dport))
+        return 0;""" % int(args.rport))
 else:
-    bpf_text = bpf_text.replace(b'DPORTFILTER', b'')
+    bpf_text = bpf_text.replace(b'RPORTFILTER', b'')
 
-# filter for source address
-if args.saddr:
-    bpf_text = bpf_text.replace(b'SADDRFILTER',
+# filter for local address
+if args.laddr:
+    bpf_text = bpf_text.replace(b'LADDRFILTER',
         b"""u32 saddr = 0;
     bpf_probe_read_kernel(&saddr, sizeof(saddr), (void *)&inet->inet_saddr);
     if (saddr != %d)
-        return 0;""" % struct.unpack("=I", socket.inet_aton(args.saddr))[0])
+        return 0;""" % struct.unpack("=I", socket.inet_aton(args.laddr))[0])
 else:
-    bpf_text = bpf_text.replace(b'SADDRFILTER', b'')
+    bpf_text = bpf_text.replace(b'LADDRFILTER', b'')
 
-# filter for source address
-if args.daddr:
-    bpf_text = bpf_text.replace(b'DADDRFILTER',
+# filter for remote address
+if args.raddr:
+    bpf_text = bpf_text.replace(b'RADDRFILTER',
         b"""u32 daddr = 0;
     bpf_probe_read_kernel(&daddr, sizeof(daddr), (void *)&inet->inet_daddr);
     if (daddr != %d)
-        return 0;""" % struct.unpack("=I", socket.inet_aton(args.daddr))[0])
+        return 0;""" % struct.unpack("=I", socket.inet_aton(args.raddr))[0])
 else:
-    bpf_text = bpf_text.replace(b'DADDRFILTER', b'')
+    bpf_text = bpf_text.replace(b'RADDRFILTER', b'')
 
 # show msecs or usecs[default]
 if args.milliseconds:

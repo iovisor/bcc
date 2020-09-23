@@ -31,17 +31,17 @@ Print output every interval seconds.
 \-d DURATION
 Total duration of trace in seconds.
 .TP
-\-p SPORT
-Filter for source port.
+\-p LPORT
+Filter for local port.
 .TP
-\-P DPORT
-Filter for destination port.
+\-P RPORT
+Filter for remote port.
 .TP
-\-a SADDR
-Filter for source address.
+\-a LADDR
+Filter for local address.
 .TP
-\-A DADDR
-Filter for destination address.
+\-A RADDR
+Filter for remote address.
 .SH EXAMPLES
 .TP
 Trace TCP RTT and print 1 second summaries, 10 times:
@@ -52,7 +52,7 @@ Summarize in millisecond, and timestamps:
 #
 .B tcprtt \-m \-T
 .TP
-Only trace TCP RTT for destination address 192.168.1.100 and destination port 80:
+Only trace TCP RTT for remote address 192.168.1.100 and remote port 80:
 #
 .B tcprtt \-i 1 \-d 10 -A 192.168.1.100 -P 80
 .SH OVERHEAD
