@@ -24,11 +24,11 @@ static struct env {
 } env = { };
 
 const char *argp_program_version = "filelife 0.1";
-const char *argp_program_bug_address = "<ethercflow@gmail.com>";
+const char *argp_program_bug_address = "<bpf@vger.kernel.org>";
 const char argp_program_doc[] =
 "Trace the lifespan of short-lived files.\n"
 "\n"
-"USAGE: filelife [-p PID]\n"
+"USAGE: filelife  [--help] [-p PID]\n"
 "\n"
 "EXAMPLES:\n"
 "    filelife         # trace all events\n"

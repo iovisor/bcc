@@ -2,6 +2,7 @@
 // Copyright (c) 2020 Wenbo Zhang
 #include "vmlinux.h"
 #include <bpf/bpf_helpers.h>
+#include <bpf/bpf_tracing.h>
 #include "drsnoop.h"
 
 const volatile pid_t targ_pid = 0;
@@ -27,7 +28,7 @@ struct {
 } events SEC(".maps");
 
 SEC("tp_btf/mm_vmscan_direct_reclaim_begin")
-int handle__mm_vmscan_direct_reclaim_begin(u64 *ctx)
+int BPF_PROG(direct_reclaim_begin)
 {
 	u64 *vm_zone_stat_kaddrp = (u64*)vm_zone_stat_kaddr;
 	u64 id = bpf_get_current_pid_tgid();
@@ -52,16 +53,14 @@ int handle__mm_vmscan_direct_reclaim_begin(u64 *ctx)
 }
 
 SEC("tp_btf/mm_vmscan_direct_reclaim_end")
-int handle__mm_vmscan_direct_reclaim_end(u64 *ctx)
+int BPF_PROG(direct_reclaim_end, unsigned long nr_reclaimed)
 {
 	u64 id = bpf_get_current_pid_tgid();
-	/* TP_PROTO(unsigned long nr_reclaimed) */
-	u64 nr_reclaimed = ctx[0];
 	struct piddata *piddatap;
 	struct event event = {};
 	u32 tgid = id >> 32;
 	u32 pid = id;
-	u64 delta_ns;
+	s64 delta_ns;
 
 	if (targ_tgid && targ_tgid != tgid)
 		return 0;
@@ -74,6 +73,8 @@ int handle__mm_vmscan_direct_reclaim_end(u64 *ctx)
 		return 0;   /* missed entry */
 
 	delta_ns = bpf_ktime_get_ns() - piddatap->ts;
+	if (delta_ns < 0)
+		goto cleanup;
 
 	event.pid = pid;
 	event.nr_reclaimed = nr_reclaimed;
@@ -85,6 +86,7 @@ int handle__mm_vmscan_direct_reclaim_end(u64 *ctx)
 	bpf_perf_event_output(ctx, &events, BPF_F_CURRENT_CPU,
 			      &event, sizeof(event));
 
+cleanup:
 	bpf_map_delete_elem(&start, &pid);
 	return 0;
 }

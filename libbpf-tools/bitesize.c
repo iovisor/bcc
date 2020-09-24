@@ -15,6 +15,7 @@
 #include "trace_helpers.h"
 
 static struct env {
+	char *disk;
 	char *comm;
 	int comm_len;
 	time_t interval;
@@ -29,11 +30,11 @@ static struct env {
 static volatile bool exiting;
 
 const char *argp_program_version = "bitesize 0.1";
-const char *argp_program_bug_address = "<ethercflow@gmail.com>";
+const char *argp_program_bug_address = "<bpf@vger.kernel.org>";
 const char argp_program_doc[] =
 "Summarize block device I/O size as a histogram.\n"
 "\n"
-"USAGE: bitesize [-h] [-T] [-m] [interval] [count]\n"
+"USAGE: bitesize [--help] [-T] [-c] [-d] [interval] [count]\n"
 "\n"
 "EXAMPLES:\n"
 "    bitesize              # summarize block I/O latency as a histogram\n"
@@ -42,9 +43,9 @@ const char argp_program_doc[] =
 "    bitesize -c fio       # trace fio only\n";
 
 static const struct argp_option opts[] = {
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
 	{ "timestamp", 'T', NULL, 0, "Include timestamp on output" },
 	{ "comm",  'c', "COMM",  0, "Trace this comm only" },
+	{ "disk",  'd', "DISK",  0, "Trace this disk only" },
 	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
 	{},
 };
@@ -57,13 +58,17 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 	case 'v':
 		env.verbose = true;
 		break;
-	case 'h':
-		argp_usage(state);
-		break;
 	case 'c':
 		env.comm = arg;
 		len = strlen(arg) + 1;
 		env.comm_len = len > TASK_COMM_LEN ? TASK_COMM_LEN : len;
+		break;
+	case 'd':
+		env.disk = arg;
+		if (strlen(arg) + 1 > DISK_NAME_LEN) {
+			fprintf(stderr, "invaild disk name: too long\n");
+			argp_usage(state);
+		}
 		break;
 	case 'T':
 		env.timestamp = true;
@@ -141,6 +146,8 @@ static int print_log2_hists(int fd)
 
 int main(int argc, char **argv)
 {
+	struct partitions *partitions = NULL;
+	const struct partition *partition;
 	static const struct argp argp = {
 		.options = opts,
 		.parser = parse_arg,
@@ -170,9 +177,23 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
+	partitions = partitions__load();
+	if (!partitions) {
+		fprintf(stderr, "failed to load partitions info\n");
+		goto cleanup;
+	}
+
 	/* initialize global data (filtering options) */
 	if (env.comm)
 		strncpy((char*)obj->rodata->targ_comm, env.comm, env.comm_len);
+	if (env.disk) {
+		partition = partitions__get_by_name(partitions, env.disk);
+		if (!partition) {
+			fprintf(stderr, "invaild partition name: not exist\n");
+			goto cleanup;
+		}
+		obj->rodata->targ_dev = partition->dev;
+	}
 
 	err = bitesize_bpf__load(obj);
 	if (err) {
@@ -214,6 +235,7 @@ int main(int argc, char **argv)
 
 cleanup:
 	bitesize_bpf__destroy(obj);
+	partitions__free(partitions);
 
 	return err != 0;
 }

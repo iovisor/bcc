@@ -20,7 +20,6 @@
 
 static struct env {
 	char *disk;
-	int disk_len;
 	int duration;
 	bool timestamp;
 	bool queued;
@@ -30,20 +29,19 @@ static struct env {
 static volatile __u64 start_ts;
 
 const char *argp_program_version = "biosnoop 0.1";
-const char *argp_program_bug_address = "<ethercflow@gmail.com>";
+const char *argp_program_bug_address = "<bpf@vger.kernel.org>";
 const char argp_program_doc[] =
-"Summarize block device I/O latency as a histogram.\n"
+"Trace block I/O.\n"
 "\n"
-"USAGE: biosnoop [-h] [-T] [-Q]\n"
+"USAGE: biosnoop [--help] [-d] [-Q]\n"
 "\n"
 "EXAMPLES:\n"
-"    biosnoop              # summarize block I/O latency as a histogram\n"
+"    biosnoop              # trace all block I/O\n"
 "    biosnoop -Q           # include OS queued time in I/O time\n"
 "    biosnoop 10           # trace for 10 seconds only\n"
 "    biosnoop -d sdc       # trace sdc only\n";
 
 static const struct argp_option opts[] = {
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
 	{ "queued", 'Q', NULL, 0, "Include OS queued time in I/O time" },
 	{ "disk",  'd', "DISK",  0, "Trace this disk only" },
 	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
@@ -58,16 +56,12 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 	case 'v':
 		env.verbose = true;
 		break;
-	case 'h':
-		argp_usage(state);
-		break;
 	case 'Q':
 		env.queued = true;
 		break;
 	case 'd':
 		env.disk = arg;
-		env.disk_len = strlen(arg) + 1;
-		if (env.disk_len > DISK_NAME_LEN) {
+		if (strlen(arg) + 1 > DISK_NAME_LEN) {
 			fprintf(stderr, "invaild disk name: too long\n");
 			argp_usage(state);
 		}
@@ -84,6 +78,7 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 			fprintf(stderr, "invalid delay (in us): %s\n", arg);
 			argp_usage(state);
 		}
+		break;
 	default:
 		return ARGP_ERR_UNKNOWN;
 	}
@@ -139,17 +134,22 @@ static void blk_fill_rwbs(char *rwbs, unsigned int op)
 	rwbs[i] = '\0';
 }
 
+static struct partitions *partitions;
+
 void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 {
+	const struct partition *partition;
 	const struct event *e = data;
 	char rwbs[RWBS_LEN];
 
 	if (!start_ts)
 		start_ts = e->ts;
 	blk_fill_rwbs(rwbs, e->cmd_flags);
+	partition = partitions__get_by_dev(partitions, e->dev);
 	printf("%-11.6f %-14.14s %-6d %-7s %-4s %-10lld %-7d ",
 		(e->ts - start_ts) / 1000000000.0,
-		e->comm, e->pid, e->disk, rwbs, e->sector, e->len);
+		e->comm, e->pid, partition ? partition->name : "Unknown", rwbs,
+		e->sector, e->len);
 	if (env.queued)
 		printf("%7.3f ", e->qdelta != -1 ?
 			e->qdelta / 1000000.0 : -1);
@@ -163,6 +163,7 @@ void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
 
 int main(int argc, char **argv)
 {
+	const struct partition *partition;
 	static const struct argp argp = {
 		.options = opts,
 		.parser = parse_arg,
@@ -193,9 +194,20 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
+	partitions = partitions__load();
+	if (!partitions) {
+		fprintf(stderr, "failed to load partitions info\n");
+		goto cleanup;
+	}
+
 	/* initialize global data (filtering options) */
-	if (env.disk)
-		strncpy((char*)obj->rodata->targ_disk, env.disk, env.disk_len);
+	if (env.disk) {
+		partition = partitions__get_by_name(partitions, env.disk);
+		if (!partition) {
+			fprintf(stderr, "invaild partition name: not exist\n");
+			goto cleanup;
+		}
+	}
 	obj->rodata->targ_queued = env.queued;
 
 	err = biosnoop_bpf__load(obj);
@@ -204,9 +216,9 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
-	obj->links.fentry__blk_account_io_start =
-		bpf_program__attach(obj->progs.fentry__blk_account_io_start);
-	err = libbpf_get_error(obj->links.fentry__blk_account_io_start);
+	obj->links.blk_account_io_start =
+		bpf_program__attach(obj->progs.blk_account_io_start);
+	err = libbpf_get_error(obj->links.blk_account_io_start);
 	if (err) {
 		fprintf(stderr, "failed to attach blk_account_io_start: %s\n",
 			strerror(err));
@@ -218,11 +230,9 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 	if (ksyms__get_symbol(ksyms, "blk_account_io_merge_bio")) {
-		obj->links.kprobe__blk_account_io_merge_bio =
-			bpf_program__attach(obj->
-					progs.kprobe__blk_account_io_merge_bio);
-		err = libbpf_get_error(obj->
-				links.kprobe__blk_account_io_merge_bio);
+		obj->links.blk_account_io_merge_bio =
+			bpf_program__attach(obj->progs.blk_account_io_merge_bio);
+		err = libbpf_get_error(obj->links.blk_account_io_merge_bio);
 		if (err) {
 			fprintf(stderr, "failed to attach "
 				"blk_account_io_merge_bio: %s\n",
@@ -231,26 +241,26 @@ int main(int argc, char **argv)
 		}
 	}
 	if (env.queued) {
-		obj->links.tp_btf__block_rq_insert =
-			bpf_program__attach(obj->progs.tp_btf__block_rq_insert);
-		err = libbpf_get_error(obj->links.tp_btf__block_rq_insert);
+		obj->links.block_rq_insert =
+			bpf_program__attach(obj->progs.block_rq_insert);
+		err = libbpf_get_error(obj->links.block_rq_insert);
 		if (err) {
 			fprintf(stderr, "failed to attach block_rq_insert: %s\n",
 				strerror(err));
 			goto cleanup;
 		}
 	}
-	obj->links.tp_btf__block_rq_issue =
-		bpf_program__attach(obj->progs.tp_btf__block_rq_issue);
-	err = libbpf_get_error(obj->links.tp_btf__block_rq_issue);
+	obj->links.block_rq_issue =
+		bpf_program__attach(obj->progs.block_rq_issue);
+	err = libbpf_get_error(obj->links.block_rq_issue);
 	if (err) {
 		fprintf(stderr, "failed to attach block_rq_issue: %s\n",
 			strerror(err));
 		goto cleanup;
 	}
-	obj->links.tp_btf__block_rq_complete =
-		bpf_program__attach(obj->progs.tp_btf__block_rq_complete);
-	err = libbpf_get_error(obj->links.tp_btf__block_rq_complete);
+	obj->links.block_rq_complete =
+		bpf_program__attach(obj->progs.block_rq_complete);
+	err = libbpf_get_error(obj->links.block_rq_complete);
 	if (err) {
 		fprintf(stderr, "failed to attach block_rq_complete: %s\n",
 			strerror(err));
@@ -290,6 +300,7 @@ int main(int argc, char **argv)
 cleanup:
 	biosnoop_bpf__destroy(obj);
 	ksyms__free(ksyms);
+	partitions__free(partitions);
 
 	return err != 0;
 }

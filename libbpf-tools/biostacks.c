@@ -23,11 +23,11 @@ static struct env {
 };
 
 const char *argp_program_version = "biostacks 0.1";
-const char *argp_program_bug_address = "<ethercflow@gmail.com>";
+const char *argp_program_bug_address = "<bpf@vger.kernel.org>";
 const char argp_program_doc[] =
 "Tracing block I/O with init stacks.\n"
 "\n"
-"USAGE: biostacks [--help] [-d disk] [duration]\n"
+"USAGE: biostacks [--help] [-d disk] [-m] [duration]\n"
 "\n"
 "EXAMPLES:\n"
 "    biostacks              # trace block I/O with init stacks.\n"
@@ -48,9 +48,6 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 	switch (key) {
 	case 'v':
 		env.verbose = true;
-		break;
-	case 'h':
-		argp_usage(state);
 		break;
 	case 'd':
 		env.disk = arg;
@@ -96,7 +93,7 @@ static void sig_handler(int sig)
 static
 void print_map(struct ksyms *ksyms, struct partitions *partitions, int fd)
 {
-	char *units = env.milliseconds ? "msecs" : "usecs";
+	const char *units = env.milliseconds ? "msecs" : "usecs";
 	struct rqinfo lookup_key = {}, next_key;
 	const struct partition *partition;
 	const struct ksym *ksym;
@@ -168,7 +165,7 @@ int main(int argc, char **argv)
 	if (env.disk) {
 		partition = partitions__get_by_name(partitions, env.disk);
 		if (!partition) {
-			fprintf(stderr, "invaild partition name: not exit\n");
+			fprintf(stderr, "invaild partition name: not exist\n");
 			goto cleanup;
 		}
 		obj->rodata->targ_dev = partition->dev;

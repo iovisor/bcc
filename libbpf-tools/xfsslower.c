@@ -33,7 +33,7 @@ static struct env {
 };
 
 const char *argp_program_version = "xfsslower 0.1";
-const char *argp_program_bug_address = "<ethercflow@gmail.com>";
+const char *argp_program_bug_address = "<bpf@vger.kernel.org>";
 const char argp_program_doc[] =
 "Trace common XFS file operations slower than a threshold.\n"
 "\n"
@@ -48,7 +48,6 @@ const char argp_program_doc[] =
 static const struct argp_option opts[] = {
 	{ "csv", 'c', NULL, 0, "Output as csv" },
 	{ "duration", 'd', "DURATION", 0, "Total duration of trace in seconds" },
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help"},
 	{ "pid", 'p', "PID", 0, "Process PID to trace" },
 	{ "min", 'm', "MIN", 0, "Min latency of trace in ms (default 10)" },
 	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
@@ -64,9 +63,6 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 	switch (key) {
 	case 'v':
 		env.verbose = true;
-		break;
-	case 'h':
-		argp_usage(state);
 		break;
 	case 'c':
 		env.csv = true;

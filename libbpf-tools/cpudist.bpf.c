@@ -7,7 +7,7 @@
 #include "cpudist.h"
 #include "bits.bpf.h"
 
-#define TASK_RUNNING 0
+#define TASK_RUNNING	0
 
 const volatile bool targ_per_process = false;
 const volatile bool targ_per_thread = false;
@@ -76,7 +76,7 @@ static __always_inline void update_hist(struct task_struct *task,
 }
 
 SEC("kprobe/finish_task_switch")
-int BPF_KPROBE(kprobe__finish_task_switch, struct task_struct *prev)
+int BPF_KPROBE(finish_task_switch, struct task_struct *prev)
 {
 	u32 prev_tgid = BPF_CORE_READ(prev, tgid);
 	u32 prev_pid = BPF_CORE_READ(prev, pid);

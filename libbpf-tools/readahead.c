@@ -23,18 +23,17 @@ static struct env {
 static volatile bool exiting;
 
 const char *argp_program_version = "readahead 0.1";
-const char *argp_program_bug_address = "<ethercflow@gmail.com>";
+const char *argp_program_bug_address = "<bpf@vger.kernel.org>";
 const char argp_program_doc[] =
 "Show fs automatic read-ahead usage.\n"
 "\n"
-"USAGE: readahead [-d DURATION]\n"
+"USAGE: readahead [--help] [-d DURATION]\n"
 "\n"
 "EXAMPLES:\n"
 "    readahead              # summarize on-CPU time as a histogram"
 "    readahead -d 10        # trace for 10 seconds only\n";
 
 static const struct argp_option opts[] = {
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
 	{ "duration", 'd', "DURATION", 0, "Duration to trace"},
 	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
 	{},
@@ -53,9 +52,6 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 			fprintf(stderr, "Invalid duration: %s\n", arg);
 			argp_usage(state);
 		}
-		break;
-	case 'h':
-		argp_usage(state);
 		break;
 	default:
 		return ARGP_ERR_UNKNOWN;

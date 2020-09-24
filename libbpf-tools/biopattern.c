@@ -14,63 +14,53 @@
 #include "biopattern.skel.h"
 #include "trace_helpers.h"
 
-#define MINORBITS	20
-#define MINORMASK	((1U << MINORBITS) - 1)
-
-#define MAJOR(dev)	((unsigned int) ((dev) >> MINORBITS))
-#define MINOR(dev)	((unsigned int) ((dev) & MINORMASK))
-#define MKDEV(ma,mi)	(((ma) << MINORBITS) | (mi))
-
 static struct env {
+	char *disk;
 	time_t interval;
 	bool timestamp;
 	bool verbose;
 	int times;
-	__u32 dev;
 } env = {
 	.interval = 99999999,
 	.times = 99999999,
-	.dev = -1,
 };
 
 static volatile bool exiting;
 
 const char *argp_program_version = "biopattern 0.1";
-const char *argp_program_bug_address = "<ethercflow@gmail.com>";
+const char *argp_program_bug_address = "<bpf@vger.kernel.org>";
 const char argp_program_doc[] =
 "Show block device I/O pattern.\n"
 "\n"
-"USAGE: biopattern [-h] [-T] [-m] [interval] [count]\n"
+"USAGE: biopattern [--help] [-T] [-d] [interval] [count]\n"
 "\n"
 "EXAMPLES:\n"
 "    biopattern              # show block I/O pattern\n"
 "    biopattern 1 10         # print 1 second summaries, 10 times\n"
 "    biopattern -T 1         # 1s summaries with timestamps\n"
-"    biopattern -d 8:0       # trace 8:0 only\n";
+"    biopattern -d sdc       # trace sdc only\n";
 
 static const struct argp_option opts[] = {
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
 	{ "timestamp", 'T', NULL, 0, "Include timestamp on output" },
-	{ "dev",  'd', "DEV",  0, "Trace this dev only" },
+	{ "disk",  'd', "DISK",  0, "Trace this disk only" },
 	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
 	{},
 };
 
 static error_t parse_arg(int key, char *arg, struct argp_state *state)
 {
-	static __u32 major, minor;
 	static int pos_args;
 
 	switch (key) {
 	case 'v':
 		env.verbose = true;
 		break;
-	case 'h':
-		argp_usage(state);
-		break;
 	case 'd':
-		sscanf(arg,"%d:%d", &major, &minor);
-		env.dev = MKDEV(major, minor);
+		env.disk = arg;
+		if (strlen(arg) + 1 > DISK_NAME_LEN) {
+			fprintf(stderr, "invaild disk name: too long\n");
+			argp_usage(state);
+		}
 		break;
 	case 'T':
 		env.timestamp = true;
@@ -115,14 +105,15 @@ static void sig_handler(int sig)
 	exiting = true;
 }
 
-static int print_map(int fd)
+static int print_map(struct bpf_map *counters, struct partitions *partitions)
 {
 	__u32 total, lookup_key = -1, next_key;
+	int err, fd = bpf_map__fd(counters);
+	const struct partition *partition;
 	struct counter counter;
 	struct tm *tm;
 	char ts[32];
 	time_t t;
-	int err;
 
 	while (!bpf_map_get_next_key(fd, &lookup_key, &next_key)) {
 		err = bpf_map_lookup_elem(fd, &next_key, &counter);
@@ -140,8 +131,10 @@ static int print_map(int fd)
 			strftime(ts, sizeof(ts), "%H:%M:%S", tm);
 			printf("%-9s ", ts);
 		}
-		printf("%3d:%-2d %5ld %5ld %8d %10lld\n", MAJOR(next_key),
-			MINOR(next_key), counter.random * 100L / total,
+		partition = partitions__get_by_dev(partitions, next_key);
+		printf("%-7s %5ld %5ld %8d %10lld\n",
+			partition ? partition->name : "Unknown",
+			counter.random * 100L / total,
 			counter.sequential * 100L / total, total,
 			counter.bytes / 1024);
 	}
@@ -161,6 +154,8 @@ static int print_map(int fd)
 
 int main(int argc, char **argv)
 {
+	struct partitions *partitions = NULL;
+	const struct partition *partition;
 	static const struct argp argp = {
 		.options = opts,
 		.parser = parse_arg,
@@ -187,8 +182,21 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	if (env.dev != -1)
-		obj->rodata->targ_dev = env.dev;
+	partitions = partitions__load();
+	if (!partitions) {
+		fprintf(stderr, "failed to load partitions info\n");
+		goto cleanup;
+	}
+
+	/* initialize global data (filtering options) */
+	if (env.disk) {
+		partition = partitions__get_by_name(partitions, env.disk);
+		if (!partition) {
+			fprintf(stderr, "invaild partition name: not exist\n");
+			goto cleanup;
+		}
+		obj->rodata->targ_dev = partition->dev;
+	}
 
 	err = biopattern_bpf__load(obj);
 	if (err) {
@@ -208,14 +216,14 @@ int main(int argc, char **argv)
 		"end.\n");
 	if (env.timestamp)
 		printf("%-9s ", "TIME");
-	printf("%-6s %5s %5s %8s %10s\n", "  DEV", "%RND", "%SEQ",
+	printf("%-7s %5s %5s %8s %10s\n", "DISK", "%RND", "%SEQ",
 		"COUNT", "KBYTES");
 
 	/* main: poll */
 	while (1) {
 		sleep(env.interval);
 
-		err = print_map(bpf_map__fd(obj->maps.counters));
+		err = print_map(obj->maps.counters, partitions);
 		if (err)
 			break;
 
@@ -225,6 +233,7 @@ int main(int argc, char **argv)
 
 cleanup:
 	biopattern_bpf__destroy(obj);
+	partitions__free(partitions);
 
 	return err != 0;
 }

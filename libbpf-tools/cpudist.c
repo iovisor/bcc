@@ -33,11 +33,11 @@ static struct env {
 static volatile bool exiting;
 
 const char *argp_program_version = "cpudist 0.1";
-const char *argp_program_bug_address = "<ethercflow@gmail.com>";
+const char *argp_program_bug_address = "<bpf@vger.kernel.org>";
 const char argp_program_doc[] =
 "Summarize on-CPU time per task as a histogram.\n"
 "\n"
-"USAGE: cpudist [-h] [-O] [-T] [-m] [-P] [-L] [-p PID] [interval] [count]\n"
+"USAGE: cpudist [--help] [-O] [-T] [-m] [-P] [-L] [-p PID] [interval] [count]\n"
 "\n"
 "EXAMPLES:\n"
 "    cpudist              # summarize on-CPU time as a histogram"
@@ -48,7 +48,6 @@ const char argp_program_doc[] =
 "    cpudist -p 185       # trace PID 185 only";
 
 static const struct argp_option opts[] = {
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
 	{ "offcpu", 'O', NULL, 0, "Measure off-CPU time" },
 	{ "timestamp", 'T', NULL, 0, "Include timestamp on output" },
 	{ "milliseconds", 'm', NULL, 0, "Millisecond histogram" },
@@ -66,9 +65,6 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 	switch (key) {
 	case 'v':
 		env.verbose = true;
-		break;
-	case 'h':
-		argp_usage(state);
 		break;
 	case 'm':
 		env.milliseconds = true;
