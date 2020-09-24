@@ -3,10 +3,12 @@
 #include "vmlinux.h"
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_tracing.h>
+#include <bpf/bpf_core_read.h>
 #include "bitesize.h"
 #include "bits.bpf.h"
 
 const volatile char targ_comm[TASK_COMM_LEN] = {};
+const volatile dev_t targ_dev = -1;
 
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
@@ -18,7 +20,7 @@ struct {
 
 static struct hist initial_hist;
 
-static __always_inline bool comm_filtered(const char *comm)
+static __always_inline bool comm_allowed(const char *comm)
 {
 	int i;
 
@@ -30,15 +32,23 @@ static __always_inline bool comm_filtered(const char *comm)
 }
 
 SEC("tp_btf/block_rq_issue")
-int BPF_PROG(tp_btf__block_rq_issue, struct request_queue *q,
-	     struct request *rq)
+int BPF_PROG(block_rq_issue, struct request_queue *q, struct request *rq)
 {
 	struct hist_key hkey;
 	struct hist *histp;
 	u64 slot;
 
+	if (targ_dev != -1) {
+		struct gendisk *disk = BPF_CORE_READ(rq, rq_disk);
+		dev_t dev;
+
+		dev = disk ? MKDEV(BPF_CORE_READ(disk, major),
+				BPF_CORE_READ(disk, first_minor)) : 0;
+		if (targ_dev != dev)
+			return 0;
+	}
 	bpf_get_current_comm(&hkey.comm, sizeof(hkey.comm));
-	if (!comm_filtered(hkey.comm))
+	if (!comm_allowed(hkey.comm))
 		return 0;
 
 	histp = bpf_map_lookup_elem(&hists, &hkey);

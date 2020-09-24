@@ -1,4 +1,8 @@
 /* SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause) */
+// Copyright (c) 2020 Wenbo Zhang
+//
+// Based on ksyms improvements from Andrii Nakryiko, add more helpers.
+// 28-Feb-2020   Wenbo Zhang   Created this.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -18,7 +22,7 @@
 #define MINORBITS	20
 #define MINORMASK	((1U << MINORBITS) - 1)
 
-#define MKDEV(ma,mi)	(((ma) << MINORBITS) | (mi))
+#define MKDEV(ma, mi)	(((ma) << MINORBITS) | (mi))
 
 struct ksyms {
 	struct ksym *syms;

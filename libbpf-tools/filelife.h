@@ -2,8 +2,8 @@
 #ifndef __FILELIFE_H
 #define __FILELIFE_H
 
-#define DNAME_INLINE_LEN 32
-#define TASK_COMM_LEN    16
+#define DNAME_INLINE_LEN	32
+#define TASK_COMM_LEN		16
 
 struct event {
 	char file[DNAME_INLINE_LEN];

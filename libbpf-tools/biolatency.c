@@ -20,7 +20,6 @@
 
 static struct env {
 	char *disk;
-	int disk_len;
 	time_t interval;
 	int times;
 	bool timestamp;
@@ -37,23 +36,22 @@ static struct env {
 static volatile bool exiting;
 
 const char *argp_program_version = "biolatency 0.1";
-const char *argp_program_bug_address = "<ethercflow@gmail.com>";
+const char *argp_program_bug_address = "<bpf@vger.kernel.org>";
 const char argp_program_doc[] =
-	"Summarize block device I/O latency as a histogram.\n"
-	"\n"
-	"USAGE: biolatency [-h] [-T] [-m] [-Q] [-D] [-F] [-d] [interval] [count]\n"
-	"\n"
-	"EXAMPLES:\n"
-	"    biolatency              # summarize block I/O latency as a histogram\n"
-	"    biolatency 1 10         # print 1 second summaries, 10 times\n"
-	"    biolatency -mT 1        # 1s summaries, milliseconds, and timestamps\n"
-	"    biolatency -Q           # include OS queued time in I/O time\n"
-	"    biolatency -D           # show each disk device separately\n"
-	"    biolatency -F           # show I/O flags separately\n"
-	"    biolatency -d sdc       # Trace sdc only\n";
+"Summarize block device I/O latency as a histogram.\n"
+"\n"
+"USAGE: biolatency [--help] [-T] [-m] [-Q] [-D] [-F] [-d] [interval] [count]\n"
+"\n"
+"EXAMPLES:\n"
+"    biolatency              # summarize block I/O latency as a histogram\n"
+"    biolatency 1 10         # print 1 second summaries, 10 times\n"
+"    biolatency -mT 1        # 1s summaries, milliseconds, and timestamps\n"
+"    biolatency -Q           # include OS queued time in I/O time\n"
+"    biolatency -D           # show each disk device separately\n"
+"    biolatency -F           # show I/O flags separately\n"
+"    biolatency -d sdc       # Trace sdc only\n";
 
 static const struct argp_option opts[] = {
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
 	{ "timestamp", 'T', NULL, 0, "Include timestamp on output" },
 	{ "milliseconds", 'm', NULL, 0, "Millisecond histogram" },
 	{ "queued", 'Q', NULL, 0, "Include OS queued time in I/O time" },
@@ -72,9 +70,6 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 	case 'v':
 		env.verbose = true;
 		break;
-	case 'h':
-		argp_usage(state);
-		break;
 	case 'm':
 		env.milliseconds = true;
 		break;
@@ -87,10 +82,12 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 	case 'F':
 		env.per_flag = true;
 		break;
+	case 'T':
+		env.timestamp = true;
+		break;
 	case 'd':
 		env.disk = arg;
-		env.disk_len = strlen(arg) + 1;
-		if (env.disk_len > DISK_NAME_LEN) {
+		if (strlen(arg) + 1 > DISK_NAME_LEN) {
 			fprintf(stderr, "invaild disk name: too long\n");
 			argp_usage(state);
 		}
@@ -183,12 +180,14 @@ static void print_cmd_flags(int cmd_flags)
 		printf("Unknown");
 }
 
-static int print_log2_hists(int fd)
+static
+int print_log2_hists(struct bpf_map *hists, struct partitions *partitions)
 {
 	struct hist_key lookup_key = { .cmd_flags = -1 }, next_key;
-	char *units = env.milliseconds ? "msecs" : "usecs";
+	const char *units = env.milliseconds ? "msecs" : "usecs";
+	const struct partition *partition;
+	int err, fd = bpf_map__fd(hists);
 	struct hist hist;
-	int err;
 
 	while (!bpf_map_get_next_key(fd, &lookup_key, &next_key)) {
 		err = bpf_map_lookup_elem(fd, &next_key, &hist);
@@ -196,9 +195,12 @@ static int print_log2_hists(int fd)
 			fprintf(stderr, "failed to lookup hist: %d\n", err);
 			return -1;
 		}
-		if (env.per_disk)
-			printf("\ndisk = %s\t", next_key.disk[0] != '\0' ?
-				next_key.disk : "unnamed");
+		if (env.per_disk) {
+			partition = partitions__get_by_dev(partitions,
+							next_key.dev);
+			printf("\ndisk = %s\t", partition ? partition->name :
+				"Unknown");
+		}
 		if (env.per_flag)
 			print_cmd_flags(next_key.cmd_flags);
 		printf("\n");
@@ -221,6 +223,8 @@ static int print_log2_hists(int fd)
 
 int main(int argc, char **argv)
 {
+	struct partitions *partitions = NULL;
+	const struct partition *partition;
 	static const struct argp argp = {
 		.options = opts,
 		.parser = parse_arg,
@@ -250,9 +254,21 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
+	partitions = partitions__load();
+	if (!partitions) {
+		fprintf(stderr, "failed to load partitions info\n");
+		goto cleanup;
+	}
+
 	/* initialize global data (filtering options) */
-	if (env.disk)
-		strncpy((char*)obj->rodata->targ_disk, env.disk, env.disk_len);
+	if (env.disk) {
+		partition = partitions__get_by_name(partitions, env.disk);
+		if (!partition) {
+			fprintf(stderr, "invaild partition name: not exist\n");
+			goto cleanup;
+		}
+		obj->rodata->targ_dev = partition->dev;
+	}
 	obj->rodata->targ_per_disk = env.per_disk;
 	obj->rodata->targ_per_flag = env.per_flag;
 	obj->rodata->targ_ms = env.milliseconds;
@@ -265,24 +281,24 @@ int main(int argc, char **argv)
 	}
 
 	if (env.queued) {
-		obj->links.tp_btf__block_rq_insert =
-			bpf_program__attach(obj->progs.tp_btf__block_rq_insert);
-		err = libbpf_get_error(obj->links.tp_btf__block_rq_insert);
+		obj->links.block_rq_insert =
+			bpf_program__attach(obj->progs.block_rq_insert);
+		err = libbpf_get_error(obj->links.block_rq_insert);
 		if (err) {
 			fprintf(stderr, "failed to attach: %s\n", strerror(-err));
 			goto cleanup;
 		}
 	}
-	obj->links.tp_btf__block_rq_issue =
-		bpf_program__attach(obj->progs.tp_btf__block_rq_issue);
-	err = libbpf_get_error(obj->links.tp_btf__block_rq_issue);
+	obj->links.block_rq_issue =
+		bpf_program__attach(obj->progs.block_rq_issue);
+	err = libbpf_get_error(obj->links.block_rq_issue);
 	if (err) {
 		fprintf(stderr, "failed to attach: %s\n", strerror(-err));
 		goto cleanup;
 	}
-	obj->links.tp_btf__block_rq_complete =
-		bpf_program__attach(obj->progs.tp_btf__block_rq_complete);
-	err = libbpf_get_error(obj->links.tp_btf__block_rq_complete);
+	obj->links.block_rq_complete =
+		bpf_program__attach(obj->progs.block_rq_complete);
+	err = libbpf_get_error(obj->links.block_rq_complete);
 	if (err) {
 		fprintf(stderr, "failed to attach: %s\n", strerror(-err));
 		goto cleanup;
@@ -304,7 +320,7 @@ int main(int argc, char **argv)
 			printf("%-8s\n", ts);
 		}
 
-		err = print_log2_hists(bpf_map__fd(obj->maps.hists));
+		err = print_log2_hists(obj->maps.hists, partitions);
 		if (err)
 			break;
 
@@ -314,6 +330,7 @@ int main(int argc, char **argv)
 
 cleanup:
 	biolatency_bpf__destroy(obj);
+	partitions__free(partitions);
 
 	return err != 0;
 }

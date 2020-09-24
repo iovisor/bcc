@@ -27,7 +27,7 @@ static struct env {
 } env = { };
 
 const char *argp_program_version = "drsnoop 0.1";
-const char *argp_program_bug_address = "<ethercflow@gmail.com>";
+const char *argp_program_bug_address = "<bpf@vger.kernel.org>";
 const char argp_program_doc[] =
 "Trace direct reclaim latency.\n"
 "\n"
@@ -115,7 +115,7 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	tm = localtime(&t);
 	strftime(ts, sizeof(ts), "%H:%M:%S", tm);
 	printf("%-8s %-16s %-6d %8.3f %5lld",
-	       ts, e->task, e->pid, (double)e->delta_ns / 1000000,
+	       ts, e->task, e->pid, e->delta_ns / 1000000.0,
 	       e->nr_reclaimed);
 	if (env.extended)
 		printf(" %8llu", e->nr_free_pages * page_size / 1024);

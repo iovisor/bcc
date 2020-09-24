@@ -20,7 +20,7 @@ static struct env {
 static volatile bool exiting;
 
 const char *argp_program_version = "numamove 0.1";
-const char *argp_program_bug_address = "<ethercflow@gmail.com>";
+const char *argp_program_bug_address = "<bpf@vger.kernel.org>";
 const char argp_program_doc[] =
 "Show page migrations of type NUMA misplaced per second.\n"
 "\n"
@@ -30,7 +30,7 @@ const char argp_program_doc[] =
 "    numamove              # Show page migrations' count and latency";
 
 static const struct argp_option opts[] = {
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
+	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
 	{},
 };
 
@@ -39,9 +39,6 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 	switch (key) {
 	case 'v':
 		env.verbose = true;
-		break;
-	case 'h':
-		argp_usage(state);
 		break;
 	default:
 		return ARGP_ERR_UNKNOWN;

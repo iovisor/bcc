@@ -4,7 +4,7 @@
 #include <bpf/bpf_helpers.h>
 #include "runqslower.h"
 
-#define TASK_RUNNING 0
+#define TASK_RUNNING	0
 
 const volatile __u64 min_us = 0;
 const volatile pid_t targ_pid = 0;

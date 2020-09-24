@@ -25,11 +25,11 @@ static struct env {
 } env;
 
 const char *argp_program_version = "tcpconnlat 0.1";
-const char *argp_program_bug_address = "<ethercflow@gmail.com>";
+const char *argp_program_bug_address = "<bpf@vger.kernel.org>";
 const char argp_program_doc[] =
 "\nTrace TCP connects and show connection latency.\n"
 "\n"
-"USAGE: tcpconnlat [-h] [-t] [-p PID]\n"
+"USAGE: tcpconnlat [--help] [-t] [-p PID]\n"
 "\n"
 "EXAMPLES:\n"
 "    tcpconnlat              # summarize on-CPU time as a histogram"
@@ -39,7 +39,6 @@ const char argp_program_doc[] =
 "    tcpconnlat -p 185       # trace PID 185 only";
 
 static const struct argp_option opts[] = {
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
 	{ "timestamp", 't', NULL, 0, "Include timestamp on output" },
 	{ "pid", 'p', "PID", 0, "Trace this PID only" },
 	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
@@ -53,9 +52,6 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 	switch (key) {
 	case 'v':
 		env.verbose = true;
-		break;
-	case 'h':
-		argp_usage(state);
 		break;
 	case 'p':
 		errno = 0;

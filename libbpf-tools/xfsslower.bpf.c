@@ -6,7 +6,7 @@
 #include <bpf/bpf_tracing.h>
 #include "xfsslower.h"
 
-#define NULL    0
+#define NULL	0
 
 const volatile pid_t targ_tgid = 0;
 const volatile __u64 min_lat = 0;
@@ -53,7 +53,7 @@ probe_entry(struct file *fp, loff_t s, loff_t e)
 }
 
 SEC("kprobe/xfs_file_read_iter")
-int BPF_KPROBE(kprobe__xfs_file_read_iter, struct kiocb *iocb)
+int BPF_KPROBE(xfs_file_read_iter, struct kiocb *iocb)
 {
 	struct file *fp = BPF_CORE_READ(iocb, ki_filp);
 	loff_t start = BPF_CORE_READ(iocb, ki_pos);
@@ -62,7 +62,7 @@ int BPF_KPROBE(kprobe__xfs_file_read_iter, struct kiocb *iocb)
 }
 
 SEC("kprobe/xfs_file_write_iter")
-int BPF_KPROBE(kprobe__xfs_file_write_iter, struct kiocb *iocb)
+int BPF_KPROBE(xfs_file_write_iter, struct kiocb *iocb)
 {
 	struct file *fp = BPF_CORE_READ(iocb, ki_filp);
 	loff_t start = BPF_CORE_READ(iocb, ki_pos);
@@ -71,13 +71,13 @@ int BPF_KPROBE(kprobe__xfs_file_write_iter, struct kiocb *iocb)
 }
 
 SEC("kprobe/xfs_file_open")
-int BPF_KPROBE(kprobe__xfs_file_open, struct inode *inode, struct file *file)
+int BPF_KPROBE(xfs_file_open, struct inode *inode, struct file *file)
 {
 	return probe_entry(file, 0, 0);
 }
 
 SEC("kprobe/xfs_file_fsync")
-int BPF_KPROBE(kprobe__xfs_file_fsync, struct file *file, loff_t start,
+int BPF_KPROBE(xfs_file_fsync, struct file *file, loff_t start,
 	       loff_t end)
 {
 	return probe_entry(file, start, end);
@@ -134,25 +134,25 @@ probe_exit(struct pt_regs *ctx, char type, ssize_t size)
 }
 
 SEC("kretprobe/xfs_file_read_iter")
-int BPF_KRETPROBE(kretprobe__xfs_file_read_iters, ssize_t ret)
+int BPF_KRETPROBE(xfs_file_read_iters_ret, ssize_t ret)
 {
 	return probe_exit(ctx, TRACE_READ, ret);
 }
 
 SEC("kretprobe/xfs_file_write_iter")
-int BPF_KRETPROBE(kretprobe__xfs_file_write_iter, ssize_t ret)
+int BPF_KRETPROBE(xfs_file_write_iter_ret, ssize_t ret)
 {
 	return probe_exit(ctx, TRACE_WRITE, ret);
 }
 
 SEC("kretprobe/xfs_file_open")
-int BPF_KRETPROBE(kretprobe__xfs_file_open)
+int BPF_KRETPROBE(xfs_file_open_ret)
 {
 	return probe_exit(ctx, TRACE_OPEN, 0);
 }
 
 SEC("kretprobe/xfs_file_fsync")
-int BPF_KRETPROBE(kretprobe__xfs_file_sync)
+int BPF_KRETPROBE(xfs_file_sync_ret)
 {
 	return probe_exit(ctx, TRACE_FSYNC, 0);
 }

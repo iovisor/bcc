@@ -10,7 +10,7 @@
 #define MINORBITS	20
 #define MINORMASK	((1U << MINORBITS) - 1)
 
-#define MKDEV(ma,mi)	(((ma) << MINORBITS) | (mi))
+#define MKDEV(ma, mi)	(((ma) << MINORBITS) | (mi))
 
 struct rqinfo {
 	__u32 pid;

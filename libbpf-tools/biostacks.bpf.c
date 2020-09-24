@@ -99,9 +99,9 @@ int BPF_PROG(blk_account_io_done, struct request *rq)
 	if (!histp)
 		goto cleanup;
 	if (targ_ms)
-		delta /= 1000000;
+		delta /= 1000000U;
 	else
-		delta /= 1000;
+		delta /= 1000U;
 	slot = log2l(delta);
 	if (slot >= MAX_SLOTS)
 		slot = MAX_SLOTS - 1;
