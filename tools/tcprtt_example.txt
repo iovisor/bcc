@@ -45,11 +45,52 @@ and remote address 192.168.122.100 and remote port 80.
 # ./tcprtt -i 1 -d 10 -m -a 192.168.122.200 -A 192.168.122.100 -P 80
 
 
+Tracing at server side, show each clients with its own histogram.
+For example, run tcprtt on a storage node to show initiators' rtt histogram:
+# ./tcprtt -i 1 -m --lport 3260 --byraddr
+Tracing TCP RTT... Hit Ctrl-C to end.
+
+Remote Address:  = 10.131.90.16
+     msecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 2        |****************************************|
+
+Remote Address:  = 10.131.90.13
+     msecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 4        |**************************              |
+         8 -> 15         : 6        |****************************************|
+
+Remote Address:  = 10.131.89.153
+     msecs               : count     distribution
+         0 -> 1          : 120      |****************************************|
+         2 -> 3          : 31       |**********                              |
+         4 -> 7          : 32       |**********                              |
+
+Remote Address:  = 10.131.89.150
+     msecs               : count     distribution
+         0 -> 1          : 12       |****************************************|
+         2 -> 3          : 12       |****************************************|
+         4 -> 7          : 9        |******************************          |
+         8 -> 15         : 3        |**********                              |
+
+Remote Address:  = 10.131.89.148
+     msecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 4        |****************************************|
+
+....
+
+
 Full USAGE:
 
 # ./tcprtt -h
 usage: tcprtt.py [-h] [-i INTERVAL] [-d DURATION] [-T] [-m] [-p LPORT]
-                 [-P RPORT] [-a LADDR] [-A RADDR] [-D]
+                 [-P RPORT] [-a LADDR] [-A RADDR] [-b] [-B] [-D]
 
 Summarize TCP RTT as a histogram
 
@@ -62,13 +103,15 @@ optional arguments:
   -T, --timestamp       include timestamp on output
   -m, --milliseconds    millisecond histogram
   -p LPORT, --lport LPORT
-                        local port
+                        filter for local port
   -P RPORT, --rport RPORT
-                        remote port
+                        filter for remote port
   -a LADDR, --laddr LADDR
-                        local address
+                        filter for local address
   -A RADDR, --raddr RADDR
-                        remote address
+                        filter for remote address
+  -b, --byladdr         show sockets histogram by local address
+  -B, --byraddr         show sockets histogram by remote address
   -D, --debug           print BPF program before starting (for debugging
                         purposes)
 
@@ -80,4 +123,6 @@ examples:
     ./tcprtt -P         # filter for remote port
     ./tcprtt -a         # filter for local address
     ./tcprtt -A         # filter for remote address
+    ./tcprtt -b         # show sockets histogram by local address
+    ./tcprtt -B         # show sockets histogram by remote address
     ./tcprtt -D         # show debug bpf text

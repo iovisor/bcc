@@ -4,7 +4,7 @@
 # tcprtt    Summarize TCP RTT as a histogram. For Linux, uses BCC, eBPF.
 #
 # USAGE: tcprtt [-h] [-T] [-D] [-m] [-i INTERVAL] [-d DURATION]
-#           [-p LPORT] [-P RPORT] [-a LADDR] [-A RADDR]
+#           [-p LPORT] [-P RPORT] [-a LADDR] [-A RADDR] [-b] [-B]
 #
 # Copyright (c) 2020 zhenwei pi
 # Licensed under the Apache License, Version 2.0 (the "License")
@@ -14,6 +14,7 @@
 from __future__ import print_function
 from bcc import BPF
 from time import sleep, strftime
+from socket import inet_ntop, AF_INET
 import socket, struct
 import argparse
 
@@ -26,6 +27,8 @@ examples = """examples:
     ./tcprtt -P         # filter for remote port
     ./tcprtt -a         # filter for local address
     ./tcprtt -A         # filter for remote address
+    ./tcprtt -b         # show sockets histogram by local address
+    ./tcprtt -B         # show sockets histogram by remote address
     ./tcprtt -D         # show debug bpf text
 """
 parser = argparse.ArgumentParser(
@@ -41,13 +44,17 @@ parser.add_argument("-T", "--timestamp", action="store_true",
 parser.add_argument("-m", "--milliseconds", action="store_true",
     help="millisecond histogram")
 parser.add_argument("-p", "--lport",
-    help="local port")
+    help="filter for local port")
 parser.add_argument("-P", "--rport",
-    help="remote port")
+    help="filter for remote port")
 parser.add_argument("-a", "--laddr",
-    help="local address")
+    help="filter for local address")
 parser.add_argument("-A", "--raddr",
-    help="remote address")
+    help="filter for remote address")
+parser.add_argument("-b", "--byladdr", action="store_true",
+    help="show sockets histogram by local address")
+parser.add_argument("-B", "--byraddr", action="store_true",
+    help="show sockets histogram by remote address")
 parser.add_argument("-D", "--debug", action="store_true",
     help="print BPF program before starting (for debugging purposes)")
 parser.add_argument("--ebpf", action="store_true",
@@ -67,21 +74,36 @@ bpf_text = """
 #include <net/inet_sock.h>
 #include <bcc/proto.h>
 
-BPF_HISTOGRAM(hist_srtt);
+typedef struct sock_key {
+    u64 addr;
+    u64 slot;
+} sock_key_t;
+
+STORAGE
 
 int trace_tcp_rcv(struct pt_regs *ctx, struct sock *sk, struct sk_buff *skb)
 {
     struct tcp_sock *ts = tcp_sk(sk);
     u32 srtt = ts->srtt_us >> 3;
     const struct inet_sock *inet = inet_sk(sk);
+    u16 sport = 0;
+    u16 dport = 0;
+    u32 saddr = 0;
+    u32 daddr = 0;
+
+    bpf_probe_read_kernel(&sport, sizeof(sport), (void *)&inet->inet_sport);
+    bpf_probe_read_kernel(&dport, sizeof(dport), (void *)&inet->inet_dport);
+    bpf_probe_read_kernel(&saddr, sizeof(saddr), (void *)&inet->inet_saddr);
+    bpf_probe_read_kernel(&daddr, sizeof(daddr), (void *)&inet->inet_daddr);
 
     LPORTFILTER
     RPORTFILTER
     LADDRFILTER
     RADDRFILTER
+
     FACTOR
 
-    hist_srtt.increment(bpf_log2l(srtt));
+    STORE
 
     return 0;
 }
@@ -90,9 +112,7 @@ int trace_tcp_rcv(struct pt_regs *ctx, struct sock *sk, struct sk_buff *skb)
 # filter for local port
 if args.lport:
     bpf_text = bpf_text.replace(b'LPORTFILTER',
-        b"""u16 sport = 0;
-    bpf_probe_read_kernel(&sport, sizeof(sport), (void *)&inet->inet_sport);
-    if (ntohs(sport) != %d)
+        b"""if (ntohs(sport) != %d)
         return 0;""" % int(args.lport))
 else:
     bpf_text = bpf_text.replace(b'LPORTFILTER', b'')
@@ -100,9 +120,7 @@ else:
 # filter for remote port
 if args.rport:
     bpf_text = bpf_text.replace(b'RPORTFILTER',
-        b"""u16 dport = 0;
-    bpf_probe_read_kernel(&dport, sizeof(dport), (void *)&inet->inet_dport);
-    if (ntohs(dport) != %d)
+        b"""if (ntohs(dport) != %d)
         return 0;""" % int(args.rport))
 else:
     bpf_text = bpf_text.replace(b'RPORTFILTER', b'')
@@ -110,9 +128,7 @@ else:
 # filter for local address
 if args.laddr:
     bpf_text = bpf_text.replace(b'LADDRFILTER',
-        b"""u32 saddr = 0;
-    bpf_probe_read_kernel(&saddr, sizeof(saddr), (void *)&inet->inet_saddr);
-    if (saddr != %d)
+        b"""if (saddr != %d)
         return 0;""" % struct.unpack("=I", socket.inet_aton(args.laddr))[0])
 else:
     bpf_text = bpf_text.replace(b'LADDRFILTER', b'')
@@ -120,9 +136,7 @@ else:
 # filter for remote address
 if args.raddr:
     bpf_text = bpf_text.replace(b'RADDRFILTER',
-        b"""u32 daddr = 0;
-    bpf_probe_read_kernel(&daddr, sizeof(daddr), (void *)&inet->inet_daddr);
-    if (daddr != %d)
+        b"""if (daddr != %d)
         return 0;""" % struct.unpack("=I", socket.inet_aton(args.raddr))[0])
 else:
     bpf_text = bpf_text.replace(b'RADDRFILTER', b'')
@@ -135,6 +149,30 @@ else:
     bpf_text = bpf_text.replace('FACTOR', '')
     label = "usecs"
 
+print_header = "srtt"
+# show byladdr/byraddr histogram
+if args.byladdr:
+    bpf_text = bpf_text.replace('STORAGE',
+        'BPF_HISTOGRAM(hist_srtt, sock_key_t);')
+    bpf_text = bpf_text.replace('STORE',
+        b"""sock_key_t key;
+    key.addr = saddr;
+    key.slot = bpf_log2l(srtt);
+    hist_srtt.increment(key);""")
+    print_header = "Local Address: "
+elif args.byraddr:
+    bpf_text = bpf_text.replace('STORAGE',
+        'BPF_HISTOGRAM(hist_srtt, sock_key_t);')
+    bpf_text = bpf_text.replace('STORE',
+        b"""sock_key_t key;
+    key.addr = daddr;
+    key.slot = bpf_log2l(srtt);
+    hist_srtt.increment(key);""")
+    print_header = "Remote Address: "
+else:
+    bpf_text = bpf_text.replace('STORAGE', 'BPF_HISTOGRAM(hist_srtt);')
+    bpf_text = bpf_text.replace('STORE', 'hist_srtt.increment(bpf_log2l(srtt));')
+
 # debug/dump ebpf enable or not
 if args.debug or args.ebpf:
     print(bpf_text)
@@ -146,6 +184,12 @@ b = BPF(text=bpf_text)
 b.attach_kprobe(event="tcp_rcv_established", fn_name="trace_tcp_rcv")
 
 print("Tracing TCP RTT... Hit Ctrl-C to end.")
+
+def print_section(addr):
+    if args.byladdr:
+        return inet_ntop(AF_INET, struct.pack("I", addr)).encode()
+    elif args.byraddr:
+        return inet_ntop(AF_INET, struct.pack("I", addr)).encode()
 
 # output
 exiting = 0 if args.interval else 1
@@ -162,7 +206,7 @@ while (1):
     if args.timestamp:
         print("%-8s\n" % strftime("%H:%M:%S"), end="")
 
-    dist.print_log2_hist(label, "srtt")
+    dist.print_log2_hist(label, section_header=print_header, section_print_fn=print_section)
     dist.clear()
 
     if exiting or seconds >= args.duration:
