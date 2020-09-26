@@ -255,6 +255,7 @@ while (1):
     if args.duration and seconds >= args.duration:
         exiting = 1
 
+    print()
     if args.timestamp:
         print("%-8s\n" % strftime("%H:%M:%S"), end="")
 
@@ -273,7 +274,7 @@ while (1):
         elif label == 'usecs':
             total /= 1000
         avg = total/counts
-        print("avg = %ld %s, total: %ld %s, count: %ld\n" %(total/counts, label, total, label, counts))
+        print("\navg = %ld %s, total: %ld %s, count: %ld\n" %(total/counts, label, total, label, counts))
 
     if exiting:
         print("Detaching...")
