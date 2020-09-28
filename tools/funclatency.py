@@ -111,6 +111,7 @@ typedef struct hist_key {
 } hist_key_t;
 
 BPF_HASH(start, u32);
+BPF_ARRAY(avg, u64, 2);
 STORAGE
 
 int trace_func_entry(struct pt_regs *ctx)
@@ -141,6 +142,14 @@ int trace_func_return(struct pt_regs *ctx)
     }
     delta = bpf_ktime_get_ns() - *tsp;
     start.delete(&pid);
+
+    u32 lat = 0;
+    u32 cnt = 1;
+    u64 *sum = avg.lookup(&lat);
+    if (sum) lock_xadd(sum, delta);
+    u64 *cnts = avg.lookup(&cnt);
+    if (cnts) lock_xadd(cnts, 1);
+
     FACTOR
 
     // store as histogram
@@ -256,6 +265,16 @@ while (1):
     else:
         dist.print_log2_hist(label)
     dist.clear()
+
+    total  = b['avg'][0].value
+    counts = b['avg'][1].value
+    if counts > 0:
+        if label == 'msecs':
+            total /= 1000000
+        elif label == 'usecs':
+            total /= 1000
+        avg = total/counts
+        print("\navg = %ld %s, total: %ld %s, count: %ld\n" %(total/counts, label, total, label, counts))
 
     if exiting:
         print("Detaching...")

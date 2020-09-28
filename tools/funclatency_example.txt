@@ -29,6 +29,9 @@ Tracing do_sys_open... Hit Ctrl-C to end.
   524288 -> 1048575  : 0        |                                      |
  1048576 -> 2097151  : 0        |                                      |
  2097152 -> 4194303  : 1        |                                      |
+ 
+avg = 13746 nsecs, total: 6543360 nsecs, count: 476
+
 Detaching...
 
 The output shows a histogram of function latency (call time), measured from when
@@ -74,6 +77,9 @@ Tracing 1 function for "pthread:pthread_mutex_lock"... Hit Ctrl-C to end.
     262144 -> 524287     : 5        |                                        |
     524288 -> 1048575    : 1        |                                        |
    1048576 -> 2097151    : 9        |                                        |
+
+avg = 4317 nsecs, total: 2654426112 nsecs, count: 614752
+
 Detaching...
 
 It seems that most calls to pthread_mutex_lock completed rather quickly (in
@@ -130,6 +136,9 @@ Function = insert_result [6556]
      32768 -> 65535      : 106      |                                        |
      65536 -> 131071     : 5        |                                        |
     131072 -> 262143     : 4        |                                        |
+
+avg = 3404 nsecs, total: 5862276096 nsecs, count: 1721727
+
 Detaching...
 
 From the results, we can see that the is_prime function has something resembling
@@ -165,6 +174,9 @@ Tracing vfs_read... Hit Ctrl-C to end.
   131072 -> 262143   : 7        |                                      |
   262144 -> 524287   : 3        |                                      |
   524288 -> 1048575  : 7        |                                      |
+
+avg = 4229 nsecs, total: 8789145 nsecs, count: 2078
+
 Detaching...
 
 This shows a bimodal distribution. Many vfs_read() calls were faster than 15
@@ -195,6 +207,9 @@ Tracing do_nanosleep... Hit Ctrl-C to end.
     8192 -> 16383    : 0        |                                      |
    16384 -> 32767    : 0        |                                      |
    32768 -> 65535    : 2        |                                      |
+
+avg = 1510 nsecs, total: 546816 nsecs, count: 326
+
 Detaching...
 
 This looks like it has found threads that are sleeping every 1, 5, and 60
@@ -221,6 +236,8 @@ Tracing vfs_read... Hit Ctrl-C to end.
      256 -> 511      : 1        |                                      |
      512 -> 1023     : 7        |                                      |
 
+avg = 5 nsecs, total: 8259 nsecs, count: 1521
+
 20:10:13
      msecs           : count     distribution
        0 -> 1        : 1251     |*************************************+|
@@ -234,6 +251,8 @@ Tracing vfs_read... Hit Ctrl-C to end.
      256 -> 511      : 3        |                                      |
      512 -> 1023     : 6        |                                      |
     1024 -> 2047     : 2        |                                      |
+
+avg = 9 nsecs, total: 11736 nsecs, count: 1282
 
 20:10:18
      msecs           : count     distribution
@@ -249,6 +268,9 @@ Tracing vfs_read... Hit Ctrl-C to end.
      512 -> 1023     : 5        |                                      |
     1024 -> 2047     : 0        |                                      |
     2048 -> 4095     : 1        |                                      |
+
+avg = 8 nsecs, total: 11219 nsecs, count: 1303
+
 ^C
 20:10:20
      msecs           : count     distribution
@@ -262,6 +284,9 @@ Tracing vfs_read... Hit Ctrl-C to end.
      128 -> 255      : 0        |                                      |
      256 -> 511      : 0        |                                      |
      512 -> 1023     : 1        |                                      |
+
+avg = 4 nsecs, total: 1029 nsecs, count: 251
+
 Detaching...
 
 
@@ -282,6 +307,9 @@ Tracing vfs_read... Hit Ctrl-C to end.
       64 -> 127      : 13       |**************************************|
      128 -> 255      : 10       |*****************************         |
      256 -> 511      : 4        |***********                           |
+
+avg = 153 nsecs, total: 4765 nsecs, count: 31
+
 Detaching...
 
 The distribution between 64 and 511 milliseconds shows keystroke latency.
@@ -324,6 +352,9 @@ Function = vfs_rename
          8 -> 15         : 0        |                                        |
         16 -> 31         : 6        |*************                           |
         32 -> 63         : 18       |****************************************|
+
+avg = 5087 nsecs, total: 8287001 nsecs, count: 1629
+
 Detaching...
 
 
