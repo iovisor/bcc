@@ -2,7 +2,7 @@
 .SH NAME
 tcprtt \- Trace TCP RTT of established connections. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B tcprtt [\-h] [\-T] [\-D] [\-m] [\-i INTERVAL] [\-d DURATION]
+.B tcprtt [\-h] [\-T] [\-D] [\-m] [\-i INTERVAL] [\-d DURATION] [\-b] [\-B]
 .SH DESCRIPTION
 This tool traces established connections RTT(round-trip time) to analyze the
 quality of network. This can be useful for general troubleshooting to
@@ -31,17 +31,23 @@ Print output every interval seconds.
 \-d DURATION
 Total duration of trace in seconds.
 .TP
-\-p SPORT
-Filter for source port.
+\-p LPORT
+Filter for local port.
 .TP
-\-P DPORT
-Filter for destination port.
+\-P RPORT
+Filter for remote port.
 .TP
-\-a SADDR
-Filter for source address.
+\-a LADDR
+Filter for local address.
 .TP
-\-A DADDR
-Filter for destination address.
+\-A RADDR
+Filter for remote address.
+.TP
+\-b
+Show sockets histogram by local address.
+.TP
+\-B
+Show sockets histogram by remote address.
 .SH EXAMPLES
 .TP
 Trace TCP RTT and print 1 second summaries, 10 times:
@@ -52,9 +58,13 @@ Summarize in millisecond, and timestamps:
 #
 .B tcprtt \-m \-T
 .TP
-Only trace TCP RTT for destination address 192.168.1.100 and destination port 80:
+Only trace TCP RTT for remote address 192.168.1.100 and remote port 80:
 #
-.B tcprtt \-i 1 \-d 10 -A 192.168.1.100 -P 80
+.B tcprtt \-i 1 \-d 10 \-A 192.168.1.100 \-P 80
+.TP
+Trace local port and show a breakdown of remote hosts RTT:
+#
+.B tcprtt \-i 3 --lport 80 --byraddr
 .SH OVERHEAD
 This traces the kernel tcp_rcv_established function and collects TCP RTT. The
 rate of this depends on your server application. If it is a web or proxy server

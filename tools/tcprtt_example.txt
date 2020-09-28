@@ -40,16 +40,57 @@ also shows unstable TCP RTT. So in this situation, we need to make sure the
 quality of network is good or not firstly.
 
 
-Use filter for address and(or) port. Ex, only collect source address 192.168.122.200
-and destination address 192.168.122.100 and destination port 80.
+Use filter for address and(or) port. Ex, only collect local address 192.168.122.200
+and remote address 192.168.122.100 and remote port 80.
 # ./tcprtt -i 1 -d 10 -m -a 192.168.122.200 -A 192.168.122.100 -P 80
+
+
+Tracing at server side, show each clients with its own histogram.
+For example, run tcprtt on a storage node to show initiators' rtt histogram:
+# ./tcprtt -i 1 -m --lport 3260 --byraddr
+Tracing TCP RTT... Hit Ctrl-C to end.
+
+Remote Address:  = 10.131.90.16
+     msecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 2        |****************************************|
+
+Remote Address:  = 10.131.90.13
+     msecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 4        |**************************              |
+         8 -> 15         : 6        |****************************************|
+
+Remote Address:  = 10.131.89.153
+     msecs               : count     distribution
+         0 -> 1          : 120      |****************************************|
+         2 -> 3          : 31       |**********                              |
+         4 -> 7          : 32       |**********                              |
+
+Remote Address:  = 10.131.89.150
+     msecs               : count     distribution
+         0 -> 1          : 12       |****************************************|
+         2 -> 3          : 12       |****************************************|
+         4 -> 7          : 9        |******************************          |
+         8 -> 15         : 3        |**********                              |
+
+Remote Address:  = 10.131.89.148
+     msecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 4        |****************************************|
+
+....
 
 
 Full USAGE:
 
 # ./tcprtt -h
-usage: tcprtt [-h] [-i INTERVAL] [-d DURATION] [-T] [-m] [-p SPORT]
-                 [-P DPORT] [-a SADDR] [-A DADDR] [-D]
+usage: tcprtt.py [-h] [-i INTERVAL] [-d DURATION] [-T] [-m] [-p LPORT]
+                 [-P RPORT] [-a LADDR] [-A RADDR] [-b] [-B] [-D]
 
 Summarize TCP RTT as a histogram
 
@@ -61,14 +102,16 @@ optional arguments:
                         total duration of trace, seconds
   -T, --timestamp       include timestamp on output
   -m, --milliseconds    millisecond histogram
-  -p SPORT, --sport SPORT
-                        source port
-  -P DPORT, --dport DPORT
-                        destination port
-  -a SADDR, --saddr SADDR
-                        source address
-  -A DADDR, --daddr DADDR
-                        destination address
+  -p LPORT, --lport LPORT
+                        filter for local port
+  -P RPORT, --rport RPORT
+                        filter for remote port
+  -a LADDR, --laddr LADDR
+                        filter for local address
+  -A RADDR, --raddr RADDR
+                        filter for remote address
+  -b, --byladdr         show sockets histogram by local address
+  -B, --byraddr         show sockets histogram by remote address
   -D, --debug           print BPF program before starting (for debugging
                         purposes)
 
@@ -76,8 +119,10 @@ examples:
     ./tcprtt            # summarize TCP RTT
     ./tcprtt -i 1 -d 10 # print 1 second summaries, 10 times
     ./tcprtt -m -T      # summarize in millisecond, and timestamps
-    ./tcprtt -p         # filter for source port
-    ./tcprtt -P         # filter for destination port
-    ./tcprtt -a         # filter for source address
-    ./tcprtt -A         # filter for destination address
+    ./tcprtt -p         # filter for local port
+    ./tcprtt -P         # filter for remote port
+    ./tcprtt -a         # filter for local address
+    ./tcprtt -A         # filter for remote address
+    ./tcprtt -b         # show sockets histogram by local address
+    ./tcprtt -B         # show sockets histogram by remote address
     ./tcprtt -D         # show debug bpf text
