@@ -20,6 +20,7 @@ APPS = \
 	execsnoop \
 	filelife \
 	hardirqs \
+	llcstat \
 	numamove \
 	opensnoop \
 	readahead \
