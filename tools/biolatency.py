@@ -15,7 +15,6 @@ from __future__ import print_function
 from bcc import BPF
 from time import sleep, strftime
 import argparse
-import signal
 
 # arguments
 examples = """examples:
@@ -194,7 +193,15 @@ def flags_print(flags):
         desc = "NoWait-" + desc
     return desc
 
-def print_hist():
+# output
+exiting = 0 if args.interval else 1
+dist = b.get_table("dist")
+while (1):
+    try:
+        sleep(int(args.interval))
+    except KeyboardInterrupt:
+        exiting = 1
+
     print()
     if args.timestamp:
         print("%-8s\n" % strftime("%H:%M:%S"), end="")
@@ -205,28 +212,6 @@ def print_hist():
         dist.print_log2_hist(label, "disk")
     dist.clear()
 
-def exit_handler():
-    print_hist()
-    exit()
-
-def signal_handler(sig, frame):
-    exit_handler()
-
-signal.signal(signal.SIGTERM, signal_handler)
-signal.signal(signal.SIGINT, signal_handler)
-signal.signal(signal.SIGQUIT, signal_handler)
-
-exiting = 0 if args.interval else 1
-dist = b.get_table("dist")
-
-while (1):
-    try:
-        sleep(int(args.interval))
-    except KeyboardInterrupt:
-        exiting = 1
-
-    print_hist()
-
     countdown -= 1
     if exiting or countdown == 0:
-        exit_handler()
+        exit()
