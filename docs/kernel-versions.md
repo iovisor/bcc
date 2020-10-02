@@ -200,10 +200,12 @@ Helper | Kernel version | License | Commit |
 -------|----------------|---------|--------|
 `BPF_FUNC_bind()` | 4.17 |  | [`d74bad4e74ee`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=d74bad4e74ee373787a9ae24197c17b7cdc428d5) |
 `BPF_FUNC_clone_redirect()` | 4.2 |  | [`3896d655f4d4`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=3896d655f4d491c67d669a15f275a39f713410f8)
+`BPF_FUNC_copy_from_user()` | 5.10 |  | [`07be4c4a3e7a`](https://git.kernel.org/pub/scm/linux/kernel/git/netdev/net-next.git/commit?id=07be4c4a3e7a0db148e44b16c5190e753d1c8569)
 `BPF_FUNC_csum_diff()` | 4.6 |  | [`7d672345ed29`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=7d672345ed295b1356a5d9f7111da1d1d7d65867)
 `BPF_FUNC_csum_level()` | 5.7 |  | [`7cdec54f9713`](https://github.com/torvalds/linux/commit/7cdec54f9713256bb170873a1fc5c75c9127c9d2)
 `BPF_FUNC_csum_update()` | 4.9 |  | [`36bbef52c7eb`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=36bbef52c7eb646ed6247055a2acd3851e317857)
 `BPF_FUNC_current_task_under_cgroup()` | 4.9 |  | [`60d20f9195b2`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=60d20f9195b260bdf0ac10c275ae9f6016f9c069)
+`BPF_FUNC_d_path()` | 5.10 |  | [`6e22ab9da793`](https://git.kernel.org/pub/scm/linux/kernel/git/netdev/net-next.git/commit?id=6e22ab9da79343532cd3cde39df25e5a5478c692)
 `BPF_FUNC_fib_lookup()` | 4.18 | GPL | [`87f5fc7e48dd`](https://git.kernel.org/cgit/linux/kernel/git/davem/net-next.git/commit/?id=87f5fc7e48dd3175b30dd03b41564e1a8e136323)
 `BPF_FUNC_get_current_ancestor_cgroup_id()` | 5.6 |  | [`b4490c5c4e02`](https://github.com/torvalds/linux/commit/b4490c5c4e023f09b7d27c9a9d3e7ad7d09ea6bf)
 `BPF_FUNC_get_cgroup_classid()` | 4.3 |  | [`8d20aabe1c76`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=8d20aabe1c76cccac544d9fcc3ad7823d9e98a2d)
@@ -227,11 +229,14 @@ Helper | Kernel version | License | Commit |
 `BPF_FUNC_get_stackid()` | 4.6 | GPL | [`d5a3b1f69186`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=d5a3b1f691865be576c2bffa708549b8cdccda19)
 `BPF_FUNC_get_task_stack()` | 5.9 | | [`fa28dcb82a38`](https://kernel.googlesource.com/pub/scm/linux/kernel/git/bpf/bpf-next/+/fa28dcb82a38f8e3993b0fae9106b1a80b59e4f0)
 `BPF_FUNC_getsockopt()` | 4.15 |  | [`cd86d1fd2102`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=cd86d1fd21025fdd6daf23d1288da405e7ad0ec6)
+`BPF_FUNC_inode_storage_delete()` | 5.10 |  | [`8ea636848aca`](https://git.kernel.org/pub/scm/linux/kernel/git/netdev/net-next.git/commit?id=8ea636848aca35b9f97c5b5dee30225cf2dd0fe6)
+`BPF_FUNC_inode_storage_get()` | 5.10 |  | [`8ea636848aca`](https://git.kernel.org/pub/scm/linux/kernel/git/netdev/net-next.git/commit?id=8ea636848aca35b9f97c5b5dee30225cf2dd0fe6)
 `BPF_FUNC_jiffies64()` | 5.5 |  | [`5576b991e9c1`](https://git.kernel.org/pub/scm/linux/kernel/git/bpf/bpf-next.git/commit/?id=5576b991e9c1a11d2cc21c4b94fc75ec27603896)
 `BPF_FUNC_ktime_get_boot_ns()` | 5.7 | GPL | [`71d19214776e`](https://kernel.googlesource.com/pub/scm/linux/kernel/git/bpf/bpf-next/+/71d19214776e61b33da48f7c1b46e522c7f78221)
 `BPF_FUNC_ktime_get_ns()` | 4.1 | GPL | [`d9847d310ab4`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=d9847d310ab4003725e6ed1822682e24bd406908)
 `BPF_FUNC_l3_csum_replace()` | 4.1 |  | [`91bc4822c3d6`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=91bc4822c3d61b9bb7ef66d3b77948a4f9177954)
 `BPF_FUNC_l4_csum_replace()` | 4.1 |  | [`91bc4822c3d6`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=91bc4822c3d61b9bb7ef66d3b77948a4f9177954)
+`BPF_FUNC_load_hdr_opt()` | 5.10 |  | [`0813a841566f`](https://git.kernel.org/pub/scm/linux/kernel/git/netdev/net-next.git/commit?id=0813a841566f0962a5551be7749b43c45f0022a0)
 `BPF_FUNC_lwt_push_encap()` | 4.18 |  | [`fe94cc290f53`](https://git.kernel.org/cgit/linux/kernel/git/davem/net-next.git/commit/?id=fe94cc290f535709d3c5ebd1e472dfd0aec7ee79)
 `BPF_FUNC_lwt_seg6_action()` | 4.18 |  | [`fe94cc290f53`](https://git.kernel.org/cgit/linux/kernel/git/davem/net-next.git/commit/?id=fe94cc290f535709d3c5ebd1e472dfd0aec7ee79)
 `BPF_FUNC_lwt_seg6_adjust_srh()` | 4.18 |  | [`fe94cc290f53`](https://git.kernel.org/cgit/linux/kernel/git/davem/net-next.git/commit/?id=fe94cc290f535709d3c5ebd1e472dfd0aec7ee79)
@@ -266,6 +271,8 @@ Helper | Kernel version | License | Commit |
 `BPF_FUNC_read_branch_records()` | 5.6 | GPL | [`fff7b64355ea`](https://github.com/torvalds/linux/commit/fff7b64355eac6e29b50229ad1512315bc04b44e)
 `BPF_FUNC_redirect()` | 4.4 |  | [`27b29f63058d`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=27b29f63058d26c6c1742f1993338280d5a41dc6)
 `BPF_FUNC_redirect_map()` | 4.14 |  | [`97f91a7cf04f`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=97f91a7cf04ff605845c20948b8a80e54cbd3376)
+`BPF_FUNC_redirect_neigh()` | 5.10 |  | [`b4ab31414970`](https://git.kernel.org/pub/scm/linux/kernel/git/netdev/net-next.git/commit/?id=b4ab31414970a7a03a5d55d75083f2c101a30592)
+`BPF_FUNC_reserve_hdr_opt()` | 5.10 |  | [`0813a841566f`](https://git.kernel.org/pub/scm/linux/kernel/git/netdev/net-next.git/commit?id=0813a841566f0962a5551be7749b43c45f0022a0)
 `BPF_FUNC_ringbuf_discard()` | 5.8 |  | [`457f44363a88`](https://github.com/torvalds/linux/commit/457f44363a8894135c85b7a9afd2bd8196db24ab)
 `BPF_FUNC_ringbuf_output()` | 5.8 |  | [`457f44363a88`](https://github.com/torvalds/linux/commit/457f44363a8894135c85b7a9afd2bd8196db24ab)
 `BPF_FUNC_ringbuf_query()` | 5.8 |  | [`457f44363a88`](https://github.com/torvalds/linux/commit/457f44363a8894135c85b7a9afd2bd8196db24ab)
@@ -274,6 +281,7 @@ Helper | Kernel version | License | Commit |
 `BPF_FUNC_send_signal()` | 5.3 |  | [`8b401f9ed244`](https://git.kernel.org/pub/scm/linux/kernel/git/bpf/bpf-next.git/commit/?id=8b401f9ed2441ad9e219953927a842d24ed051fc)
 `BPF_FUNC_send_signal_thread()` | 5.5 |  | [`8482941f0906`](https://git.kernel.org/pub/scm/linux/kernel/git/bpf/bpf-next.git/commit/?id=8482941f09067da42f9c3362e15bfb3f3c19d610)
 `BPF_FUNC_seq_printf()` | 5.7 | GPL | [`492e639f0c22`](https://kernel.googlesource.com/pub/scm/linux/kernel/git/bpf/bpf-next/+/492e639f0c222784e2e0f121966375f641c61b15)
+`BPF_FUNC_seq_printf_btf()` | 5.10 | | [`eb411377aed9`](https://git.kernel.org/pub/scm/linux/kernel/git/netdev/net-next.git/commit/?id=eb411377aed9e27835e77ee0710ee8f4649958f3)
 `BPF_FUNC_seq_write()` | 5.7 | GPL | [`492e639f0c22`](https://kernel.googlesource.com/pub/scm/linux/kernel/git/bpf/bpf-next/+/492e639f0c222784e2e0f121966375f641c61b15)
 `BPF_FUNC_set_hash()` | 4.13 |  | [`ded092cd73c2`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=ded092cd73c2c56a394b936f86897f29b2e131c0)
 `BPF_FUNC_set_hash_invalid()` | 4.9 |  | [`7a4b28c6cc9f`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=7a4b28c6cc9ffac50f791b99cc7e46106436e5d8)
@@ -296,6 +304,7 @@ Helper | Kernel version | License | Commit |
 `BPF_FUNC_skb_change_proto()` | 4.8 |  | [`6578171a7ff0`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=6578171a7ff0c31dc73258f93da7407510abf085)
 `BPF_FUNC_skb_change_tail()` | 4.9 |  | [`5293efe62df8`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=5293efe62df81908f2e90c9820c7edcc8e61f5e9)
 `BPF_FUNC_skb_change_type()` | 4.8 |  | [`d2485c4242a8`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=d2485c4242a826fdf493fd3a27b8b792965b9b9e)
+`BPF_FUNC_skb_cgroup_classid()` | 5.10 |  | [`b426ce83baa7`](https://git.kernel.org/pub/scm/linux/kernel/git/netdev/net-next.git/commit/?id=b426ce83baa7dff947fb354118d3133f2953aac8)
 `BPF_FUNC_skb_cgroup_id()` | 4.18 |  | [`cb20b08ead40`](https://github.com/torvalds/linux/commit/cb20b08ead401fd17627a36f035c0bf5bfee5567)
 `BPF_FUNC_skb_ecn_set_ce()` | 5.1 |  | [`f7c917ba11a6`](https://github.com/torvalds/linux/commit/f7c917ba11a67632a8452ea99fe132f626a7a2cc)
 `BPF_FUNC_skb_get_tunnel_key()` | 4.3 |  | [`d3aa45ce6b94`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=d3aa45ce6b94c65b83971257317867db13e5f492)
@@ -317,10 +326,12 @@ Helper | Kernel version | License | Commit |
 `BPF_FUNC_skc_to_tcp_timewait_sock()` | 5.9 |  | [`478cfbdf5f13`](https://kernel.googlesource.com/pub/scm/linux/kernel/git/bpf/bpf-next/+/478cfbdf5f13dfe09cfd0b1cbac821f5e27f6108)
 `BPF_FUNC_skc_to_tcp6_sock()` | 5.9 |  | [`af7ec1383361`](https://kernel.googlesource.com/pub/scm/linux/kernel/git/bpf/bpf-next/+/af7ec13833619e17f03aa73a785a2f871da6d66b)
 `BPF_FUNC_skc_to_udp6_sock()` | 5.9 |  | [`0d4fad3e57df`](https://kernel.googlesource.com/pub/scm/linux/kernel/git/bpf/bpf-next/+/0d4fad3e57df2bf61e8ffc8d12a34b1caf9b8835)
+`BPF_FUNC_snprintf_btf()` | 5.10 | | [`c4d0bfb45068`](https://git.kernel.org/pub/scm/linux/kernel/git/netdev/net-next.git/commit/?id=c4d0bfb45068d853a478b9067a95969b1886a30f)
 `BPF_FUNC_sock_hash_update()` | 4.18 |  | [`81110384441a`](https://git.kernel.org/cgit/linux/kernel/git/davem/net-next.git/commit/?id=81110384441a59cff47430f20f049e69b98c17f4)
 `BPF_FUNC_sock_map_update()` | 4.14 |  | [`174a79ff9515`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=174a79ff9515f400b9a6115643dafd62a635b7e6)
 `BPF_FUNC_spin_lock()` | 5.1 |  | [`d83525ca62cf`](https://git.kernel.org/pub/scm/linux/kernel/git/davem/net-next.git/commit/?id=d83525ca62cf8ebe3271d14c36fb900c294274a2)
 `BPF_FUNC_spin_unlock()` | 5.1 |  | [`d83525ca62cf`](https://git.kernel.org/pub/scm/linux/kernel/git/davem/net-next.git/commit/?id=d83525ca62cf8ebe3271d14c36fb900c294274a2)
+`BPF_FUNC_store_hdr_opt()` | 5.10 |  | [`0813a841566f`](https://git.kernel.org/pub/scm/linux/kernel/git/netdev/net-next.git/commit?id=0813a841566f0962a5551be7749b43c45f0022a0)
 `BPF_FUNC_strtol()` | 5.2 |  | [`d7a4cb9b6705`](https://kernel.googlesource.com/pub/scm/linux/kernel/git/davem/net-next/+/d7a4cb9b6705a89937d12c8158a35a3145dc967a)
 `BPF_FUNC_strtoul()` | 5.2 |  | [`d7a4cb9b6705`](https://kernel.googlesource.com/pub/scm/linux/kernel/git/davem/net-next/+/d7a4cb9b6705a89937d12c8158a35a3145dc967a)
 `BPF_FUNC_sysctl_get_current_value()` | 5.2 |  | [`1d11b3016cec`](https://kernel.googlesource.com/pub/scm/linux/kernel/git/davem/net-next/+/1d11b3016cec4ed9770b98e82a61708c8f4926e7)
@@ -361,7 +372,7 @@ The list of program types and supported helper functions can be retrieved with:
 |`BPF_PROG_TYPE_SOCKET_FILTER`|`BPF_FUNC_skb_load_bytes()` <br> `BPF_FUNC_skb_load_bytes_relative()` <br> `BPF_FUNC_get_socket_cookie()` <br> `BPF_FUNC_get_socket_uid()` <br> `BPF_FUNC_perf_event_output()` <br> `Base functions`|
 |`BPF_PROG_TYPE_KPROBE`|`BPF_FUNC_perf_event_output()` <br> `BPF_FUNC_get_stackid()` <br> `BPF_FUNC_get_stack()` <br> `BPF_FUNC_perf_event_read_value()` <br> `BPF_FUNC_override_return()` <br> `Tracing functions`|
 |`BPF_PROG_TYPE_SCHED_CLS` <br> `BPF_PROG_TYPE_SCHED_ACT`|`BPF_FUNC_skb_store_bytes()` <br> `BPF_FUNC_skb_load_bytes()` <br> `BPF_FUNC_skb_load_bytes_relative()` <br> `BPF_FUNC_skb_pull_data()` <br> `BPF_FUNC_csum_diff()` <br> `BPF_FUNC_csum_update()` <br> `BPF_FUNC_l3_csum_replace()` <br> `BPF_FUNC_l4_csum_replace()` <br> `BPF_FUNC_clone_redirect()` <br> `BPF_FUNC_get_cgroup_classid()` <br> `BPF_FUNC_skb_vlan_push()` <br> `BPF_FUNC_skb_vlan_pop()` <br> `BPF_FUNC_skb_change_proto()` <br> `BPF_FUNC_skb_change_type()` <br> `BPF_FUNC_skb_adjust_room()` <br> `BPF_FUNC_skb_change_tail()` <br> `BPF_FUNC_skb_get_tunnel_key()` <br> `BPF_FUNC_skb_set_tunnel_key()` <br> `BPF_FUNC_skb_get_tunnel_opt()` <br> `BPF_FUNC_skb_set_tunnel_opt()` <br> `BPF_FUNC_redirect()` <br> `BPF_FUNC_get_route_realm()` <br> `BPF_FUNC_get_hash_recalc()` <br> `BPF_FUNC_set_hash_invalid()` <br> `BPF_FUNC_set_hash()` <br> `BPF_FUNC_perf_event_output()` <br> `BPF_FUNC_get_smp_processor_id()` <br> `BPF_FUNC_skb_under_cgroup()` <br> `BPF_FUNC_get_socket_cookie()` <br> `BPF_FUNC_get_socket_uid()` <br> `BPF_FUNC_fib_lookup()` <br> `BPF_FUNC_skb_get_xfrm_state()` <br> `BPF_FUNC_skb_cgroup_id()` <br> `Base functions`|
-|`BPF_PROG_TYPE_TRACEPOINT`|`BPF_FUNC_perf_event_output()` <br> `BPF_FUNC_get_stackid()` <br> `BPF_FUNC_get_stack()` <br> `Tracing functions`|
+|`BPF_PROG_TYPE_TRACEPOINT`|`BPF_FUNC_perf_event_output()` <br> `BPF_FUNC_get_stackid()` <br> `BPF_FUNC_get_stack()` <br> `BPF_FUNC_d_path()` <br> `Tracing functions`|
 |`BPF_PROG_TYPE_XDP`| `BPF_FUNC_perf_event_output()` <br> `BPF_FUNC_get_smp_processor_id()` <br> `BPF_FUNC_csum_diff()` <br> `BPF_FUNC_xdp_adjust_head()` <br> `BPF_FUNC_xdp_adjust_meta()` <br> `BPF_FUNC_redirect()` <br> `BPF_FUNC_redirect_map()` <br> `BPF_FUNC_xdp_adjust_tail()` <br> `BPF_FUNC_fib_lookup()` <br> `Base functions`|
 |`BPF_PROG_TYPE_PERF_EVENT`| `BPF_FUNC_perf_event_output()` <br> `BPF_FUNC_get_stackid()` <br> `BPF_FUNC_get_stack()` <br> `BPF_FUNC_perf_prog_read_value()` <br> `Tracing functions`|
 |`BPF_PROG_TYPE_CGROUP_SKB`|`BPF_FUNC_skb_load_bytes()` <br> `BPF_FUNC_skb_load_bytes_relative()` <br> `BPF_FUNC_get_socket_cookie()` <br> `BPF_FUNC_get_socket_uid()` <br> `Base functions`|

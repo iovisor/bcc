@@ -237,7 +237,18 @@ static struct bpf_helper helpers[] = {
   {"skc_to_tcp_timewait_sock", "5.9"},
   {"skc_to_tcp_request_sock", "5.9"},
   {"skc_to_udp6_sock", "5.9"},
-  {"bpf_get_task_stack", "5.9"},
+  {"get_task_stack", "5.9"},
+  {"load_hdr_opt", "5.10"},
+  {"store_hdr_opt", "5.10"},
+  {"reserve_hdr_opt", "5.10"},
+  {"inode_storage_get", "5.10"},
+  {"inode_storage_delete", "5.10"},
+  {"d_path", "5.10"},
+  {"copy_from_user", "5.10"},
+  {"snprintf_btf", "5.10"},
+  {"seq_printf_btf", "5.10"},
+  {"skb_cgroup_classid", "5.10"},
+  {"redirect_neigh", "5.10"},
 };
 
 static uint64_t ptr_to_u64(void *ptr)
