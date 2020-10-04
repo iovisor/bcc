@@ -19,6 +19,7 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
         - [9. kfuncs](#9-kfuncs)
         - [10. kretfuncs](#10-kretfuncs)
         - [11. lsm probes](#11-lsm-probes)
+        - [12. bpf iterators](#12-bpf-iterators)
     - [Data](#data)
         - [1. bpf_probe_read_kernel()](#1-bpf_probe_read_kernel)
         - [2. bpf_probe_read_kernel_str()](#2-bpf_probe_read_kernel_str)
@@ -423,6 +424,29 @@ LSM probes require at least a 5.7+ kernel with the following configuation option
 Examples in situ:
 [search /tests](https://github.com/iovisor/bcc/search?q=LSM_PROBE+path%3Atests&type=Code)
 
+### 12. BPF ITERATORS
+
+Syntax: BPF_ITER(target)
+
+This is a macro to define a program signature for a bpf iterator program. The argument *target* specifies what to iterate for the program.
+
+Currently, kernel does not have interface to discover what targets are supported. A good place to find what is supported is in [tools/testing/selftests/bpf/prog_test/bpf_iter.c](https://github.com/torvalds/linux/blob/master/tools/testing/selftests/bpf/prog_tests/bpf_iter.c) and some sample bpf iter programs are in [tools/testing/selftests/bpf/progs](https://github.com/torvalds/linux/tree/master/tools/testing/selftests/bpf/progs) with file name prefix *bpf_iter*.
+
+The following example defines a program for target *task*, which traverses all tasks in the kernel.
+```C
+BPF_ITER(task)
+{
+  struct seq_file *seq = ctx->meta->seq;
+  struct task_struct *task = ctx->task;
+
+  if (task == (void *)0)
+    return 0;
+
+  ... task->pid, task->tgid, task->comm, ...
+  return 0;
+}
+
+BPF iterators are introduced in 5.8 kernel for task, task_file, bpf_map, netlink_sock and ipv6_route . In 5.9, support is added to tcp/udp sockets and bpf map element (hashmap, arraymap and sk_local_storage_map) traversal.
 
 ## Data
 

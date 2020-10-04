@@ -595,6 +595,9 @@ int bcc_prog_load_xattr(struct bpf_load_program_attr *attr, int prog_len,
     } else if (strncmp(attr->name, "lsm__", 5) == 0) {
       name_offset = 5;
       expected_attach_type = BPF_LSM_MAC;
+    } else if (strncmp(attr->name, "bpf_iter__", 10) == 0) {
+      name_offset = 10;
+      expected_attach_type = BPF_TRACE_ITER;
     }
 
     if (attr->prog_type == BPF_PROG_TYPE_TRACING ||
@@ -1462,4 +1465,19 @@ int bpf_poll_ringbuf(struct ring_buffer *rb, int timeout_ms) {
  * consumed, or a negative number if any callbacks returned an error. */
 int bpf_consume_ringbuf(struct ring_buffer *rb) {
     return ring_buffer__consume(rb);
+}
+
+int bcc_iter_attach(int prog_fd, union bpf_iter_link_info *link_info,
+                    uint32_t link_info_len)
+{
+    DECLARE_LIBBPF_OPTS(bpf_link_create_opts, link_create_opts);
+
+    link_create_opts.iter_info = link_info;
+    link_create_opts.iter_info_len = link_info_len;
+    return bpf_link_create(prog_fd, 0, BPF_TRACE_ITER, &link_create_opts);
+}
+
+int bcc_iter_create(int link_fd)
+{
+    return bpf_iter_create(link_fd);
 }
