@@ -1174,6 +1174,9 @@ static int ____##name(unsigned long long *ctx, ##args)
 #define LSM_PROBE(event, args...) \
         BPF_PROG(lsm__ ## event, args)
 
+#define BPF_ITER(target) \
+        int bpf_iter__ ## target (struct bpf_iter__ ## target *ctx)
+
 #define TP_DATA_LOC_READ_CONST(dst, field, length)                        \
         do {                                                              \
             unsigned short __offset = args->data_loc_##field & 0xFFFF;    \

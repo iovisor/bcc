@@ -38,6 +38,12 @@ target_link_libraries(UseExternalMap bcc-static)
 add_executable(CGroupTest CGroupTest.cc)
 target_link_libraries(CGroupTest bcc-static)
 
+add_executable(TaskIterator TaskIterator.cc)
+target_link_libraries(TaskIterator bcc-static)
+
+add_executable(SkLocalStorageIterator SkLocalStorageIterator.cc)
+target_link_libraries(SkLocalStorageIterator bcc-static)
+
 if(INSTALL_CPP_EXAMPLES)
   install (TARGETS HelloWorld DESTINATION share/bcc/examples/cpp)
   install (TARGETS CPUDistribution DESTINATION share/bcc/examples/cpp)
