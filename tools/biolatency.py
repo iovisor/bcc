@@ -56,6 +56,7 @@ if args.flags and args.disks:
 bpf_text = """
 #include <uapi/linux/ptrace.h>
 #include <linux/blkdev.h>
+#include <linux/blk_types.h>
 
 typedef struct disk_key {
     char disk[DISK_NAME_LEN];
@@ -69,6 +70,36 @@ typedef struct flag_key {
 
 BPF_HASH(start, struct request *);
 STORAGE
+
+BPF_HASH(bio_start, struct bio *);
+
+// time block I/O
+int trace_bio_submit(struct pt_regs *ctx, struct bio *bio)
+{
+    u64 ts = bpf_ktime_get_ns();
+    bio_start.update(&bio, &ts);
+    return 0;
+}
+
+// output
+int trace_bio_endio(struct pt_regs *ctx, struct bio *bio)
+{
+    u64 *tsp, delta;
+
+    // fetch timestamp and calculate delta
+    tsp = bio_start.lookup(&bio);
+    if (tsp == 0) {
+        return 0;   // missed issue
+    }
+    delta = bpf_ktime_get_ns() - *tsp;
+    FACTOR
+
+    // store as histogram
+    SAVE_BIO
+
+    bio_start.delete(&bio);
+    return 0;
+}
 
 // time block I/O
 int trace_req_start(struct pt_regs *ctx, struct request *req)
@@ -114,6 +145,11 @@ if args.disks:
         'void *__tmp = (void *)req->rq_disk->disk_name; ' +
         'bpf_probe_read_kernel(&key.disk, sizeof(key.disk), __tmp); ' +
         'dist.increment(key);')
+    bpf_text = bpf_text.replace('SAVE_BIO',
+                                'disk_key_t key = {.slot = bpf_log2l(delta)}; ' +
+                                'void *__tmp = (void *)bio->bi_disk->disk_name; ' +
+                                'bpf_probe_read_kernel(&key.disk, sizeof(key.disk), __tmp); ' +
+                                'dist.increment(key);')
 elif args.flags:
     bpf_text = bpf_text.replace('STORAGE',
         'BPF_HISTOGRAM(dist, flag_key_t);')
@@ -121,6 +157,10 @@ elif args.flags:
         'flag_key_t key = {.slot = bpf_log2l(delta)}; ' +
         'key.flags = req->cmd_flags; ' +
         'dist.increment(key);')
+    bpf_text = bpf_text.replace('SAVE_BIO',
+                                'flag_key_t key = {.slot = bpf_log2l(delta)}; ' +
+                                'key.flags = bio->bi_opf; ' +
+                                'dist.increment(key);')
 else:
     bpf_text = bpf_text.replace('STORAGE', 'BPF_HISTOGRAM(dist);')
     bpf_text = bpf_text.replace('STORE',
@@ -141,6 +181,8 @@ else:
 b.attach_kprobe(event="blk_account_io_done",
     fn_name="trace_req_done")
 
+b.attach_kprobe(event="submit_bio", fn_name="trace_bio_submit")
+b.attach_kprobe(event="bio_endio", fn_name="trace_bio_endio")
 print("Tracing block device I/O... Hit Ctrl-C to end.")
 
 # see blk_fill_rwbs():
