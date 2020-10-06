@@ -8,7 +8,7 @@
 
 const volatile bool targ_per_cpu = false;
 
-struct hist hists[MAX_CPU_NR];
+struct hist hists[MAX_CPU_NR] = {};
 
 SEC("perf_event")
 int do_sample(struct bpf_perf_event_data *ctx)
