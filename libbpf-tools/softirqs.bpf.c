@@ -17,8 +17,8 @@ struct {
 	__type(value, u64);
 } start SEC(".maps");
 
-__u64 counts[NR_SOFTIRQS];
-struct hist hists[NR_SOFTIRQS];
+__u64 counts[NR_SOFTIRQS] = {};
+struct hist hists[NR_SOFTIRQS] = {};
 
 SEC("tp_btf/softirq_entry")
 int BPF_PROG(softirq_entry, unsigned int vec_nr)
