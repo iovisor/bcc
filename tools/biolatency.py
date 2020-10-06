@@ -43,6 +43,8 @@ parser.add_argument("interval", nargs="?", default=99999999,
     help="output interval, in seconds")
 parser.add_argument("count", nargs="?", default=99999999,
     help="number of outputs")
+parser.add_argument("-b", "--bio", action="store_true",
+    help="trace bio submition and complition")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
 args = parser.parse_args()
@@ -165,24 +167,35 @@ else:
     bpf_text = bpf_text.replace('STORAGE', 'BPF_HISTOGRAM(dist);')
     bpf_text = bpf_text.replace('STORE',
         'dist.increment(bpf_log2l(delta));')
+    bpf_text = bpf_text.replace('SAVE_BIO',
+                                'dist.increment(bpf_log2l(delta));')
 if debug or args.ebpf:
     print(bpf_text)
     if args.ebpf:
         exit()
 
+def set_bio_kprobes():
+    b.attach_kprobe(event="submit_bio", fn_name="trace_bio_submit")
+    b.attach_kprobe(event="bio_endio", fn_name="trace_bio_endio")
+
+def set_req_kprobes(args):
+    if args.queued:
+        b.attach_kprobe(event="blk_account_io_start", fn_name="trace_req_start")
+    else:
+        if BPF.get_kprobe_functions(b'blk_start_request'):
+            b.attach_kprobe(event="blk_start_request",
+                            fn_name="trace_req_start")
+        b.attach_kprobe(event="blk_mq_start_request", fn_name="trace_req_start")
+    b.attach_kprobe(event="blk_account_io_done",
+                    fn_name="trace_req_done")
 # load BPF program
 b = BPF(text=bpf_text)
-if args.queued:
-    b.attach_kprobe(event="blk_account_io_start", fn_name="trace_req_start")
-else:
-    if BPF.get_kprobe_functions(b'blk_start_request'):
-        b.attach_kprobe(event="blk_start_request", fn_name="trace_req_start")
-    b.attach_kprobe(event="blk_mq_start_request", fn_name="trace_req_start")
-b.attach_kprobe(event="blk_account_io_done",
-    fn_name="trace_req_done")
 
-b.attach_kprobe(event="submit_bio", fn_name="trace_bio_submit")
-b.attach_kprobe(event="bio_endio", fn_name="trace_bio_endio")
+if args.bio:
+    set_bio_kprobes()
+else:
+    set_req_kprobes(args)
+
 print("Tracing block device I/O... Hit Ctrl-C to end.")
 
 # see blk_fill_rwbs():
