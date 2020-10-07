@@ -445,6 +445,7 @@ BPF_ITER(task)
   ... task->pid, task->tgid, task->comm, ...
   return 0;
 }
+```
 
 BPF iterators are introduced in 5.8 kernel for task, task_file, bpf_map, netlink_sock and ipv6_route . In 5.9, support is added to tcp/udp sockets and bpf map element (hashmap, arraymap and sk_local_storage_map) traversal.
 
