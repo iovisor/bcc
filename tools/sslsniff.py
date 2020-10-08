@@ -197,7 +197,7 @@ def print_event(cpu, data, size, rw, evt):
 
     # Filter events by command
     if args.comm:
-        if not args.comm == event.comm:
+        if not args.comm == event.comm.decode('utf-8', 'replace'):
             return
 
     if start == 0:
