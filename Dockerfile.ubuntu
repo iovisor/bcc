@@ -23,5 +23,5 @@ COPY --from=builder /root/bcc/*.deb /root/bcc/
 
 RUN \
   apt-get update -y && \
-  DEBIAN_FRONTEND=noninteractive apt-get install -y python python3 binutils libelf1 kmod && \
+  DEBIAN_FRONTEND=noninteractive apt-get install -y python python3 binutils libelf1 kmod python-dnslib python-cachetools python3-dnslib python3-cachetools && \
   dpkg -i /root/bcc/*.deb

@@ -325,7 +325,7 @@ apt-get -t jessie-backports install linux-base linux-image-4.9.0-0.bpo.2-amd64 l
 apt-get install debhelper cmake libllvm3.8 llvm-3.8-dev libclang-3.8-dev \
   libelf-dev bison flex libedit-dev clang-format-3.8 python python-netaddr \
   python-pyroute2 luajit libluajit-5.1-dev arping iperf netperf ethtool \
-  devscripts zlib1g-dev libfl-dev
+  devscripts zlib1g-dev libfl-dev python-dnslib python-cachetools
 ```
 
 #### Sudo
@@ -419,7 +419,7 @@ popd
 ```
 sudo dnf install -y bison cmake ethtool flex git iperf libstdc++-static \
   python-netaddr python-pip gcc gcc-c++ make zlib-devel \
-  elfutils-libelf-devel
+  elfutils-libelf-devel python-cachetools
 sudo dnf install -y luajit luajit-devel  # for Lua support
 sudo dnf install -y \
   http://repo.iovisor.org/yum/extra/mageia/cauldron/x86_64/netperf-2.7.0-1.mga6.x86_64.rpm
@@ -548,7 +548,7 @@ Tested on Amazon Linux AMI release 2018.03 (kernel 4.14.47-56.37.amzn1.x86_64)
 # enable epel to get iperf, luajit, luajit-devel, cmake3 (cmake3 is required to support c++11)
 sudo yum-config-manager --enable epel
 
-sudo yum install -y bison cmake3 ethtool flex git iperf libstdc++-static python-netaddr gcc gcc-c++ make zlib-devel elfutils-libelf-devel
+sudo yum install -y bison cmake3 ethtool flex git iperf libstdc++-static python-netaddr python-cachetools gcc gcc-c++ make zlib-devel elfutils-libelf-devel
 sudo yum install -y luajit luajit-devel
 sudo yum install -y http://repo.iovisor.org/yum/extra/mageia/cauldron/x86_64/netperf-2.7.0-1.mga6.x86_64.rpm
 sudo pip install pyroute2
@@ -590,7 +590,7 @@ sudo /usr/share/bcc/tools/execsnoop
 # enable epel to get iperf, luajit, luajit-devel, cmake3 (cmake3 is required to support c++11)
 sudo yum-config-manager --enable epel
 
-sudo yum install -y bison cmake3 ethtool flex git iperf libstdc++-static python-netaddr gcc gcc-c++ make zlib-devel elfutils-libelf-devel
+sudo yum install -y bison cmake3 ethtool flex git iperf libstdc++-static python-netaddr python-cachetools gcc gcc-c++ make zlib-devel elfutils-libelf-devel
 sudo yum install -y luajit luajit-devel
 sudo yum install -y http://repo.iovisor.org/yum/extra/mageia/cauldron/x86_64/netperf-2.7.0-1.mga6.x86_64.rpm
 sudo pip install pyroute2
