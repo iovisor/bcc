@@ -241,7 +241,7 @@ if args.port:
     dports = [int(dport) for dport in args.port.split(',')]
     dports_if = ' && '.join(['dport != %d' % ntohs(dport) for dport in dports])
     bpf_text = bpf_text.replace('FILTER_PORT',
-        'if (%s) { currsock.delete(&pid); return 0; }' % dports_if)
+        'if (%s) { currsock.delete(&tid); return 0; }' % dports_if)
 if args.uid:
     bpf_text = bpf_text.replace('FILTER_UID',
         'if (uid != %s) { return 0; }' % args.uid)
