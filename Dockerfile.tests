@@ -50,8 +50,8 @@ RUN apt-get update && apt-get install -y \
       libtinfo5 \
       libtinfo-dev
 
-RUN pip3 install pyroute2 netaddr
-RUN pip install pyroute2 netaddr
+RUN pip3 install pyroute2 netaddr dnslib cachetools
+RUN pip install pyroute2 netaddr dnslib cachetools
 
 # FIXME this is faster than building from source, but it seems there is a bug
 # in probing libruby.so rather than ruby binary

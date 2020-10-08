@@ -37,6 +37,23 @@ TIME(s)  PID    COMM         IP SADDR            DADDR            DPORT
 The output shows some periodic connections (or attempts) from a "local_agent"
 process to various other addresses. A few connections occur every minute.
 
+The -d option tracks DNS responses and tries to associate each connection with
+the a previous DNS query issued before it.  If a DNS response matching the IP
+is found, it will be printed. If no match was found, "No DNS Query" is printed
+in this column. Queries for 127.0.0.1 and ::1 are automatically associated with
+"localhost". If the time between when the DNS response was received and a
+connect call was traced exceeds 100ms, the tool will print the time delta
+after the query name.  See below for www.domain.com for an example.
+
+# ./tcpconnect -d
+PID    COMM         IP SADDR            DADDR            DPORT QUERY
+1543   amazon-ssm-a 4  10.66.75.54      176.32.119.67    443   ec2messages.us-west-1.amazonaws.com
+1479   telnet       4  127.0.0.1        127.0.0.1        23    localhost
+1469   curl         4  10.201.219.236   54.245.105.25    80    www.domain.com (123.342ms)
+1469   curl         4  10.201.219.236   54.67.101.145    80    No DNS Query
+1991   telnet       6  ::1              ::1              23    localhost
+2015   ssh          6  fe80::2000:bff:fe82:3ac fe80::2000:bff:fe82:3ac 22    anotherhost.org
+
 
 The -U option prints a UID column:
 
@@ -79,8 +96,9 @@ For more details, see docs/special_filtering.md
 USAGE message:
 
 # ./tcpconnect -h
+
 usage: tcpconnect.py [-h] [-t] [-p PID] [-P PORT] [-U] [-u UID] [-c]
-                     [--cgroupmap CGROUPMAP] [--mntnsmap MNTNSMAP]
+                     [--cgroupmap CGROUPMAP] [--mntnsmap MNTNSMAP] [-d]
 
 Trace TCP connects
 
@@ -94,6 +112,8 @@ optional arguments:
   -c, --count           count connects per src ip and dest ip/port
   --cgroupmap CGROUPMAP
                         trace cgroups in this BPF map only
+  --mntnsmap MNTNSMAP   trace mount namespaces in this BPF map only
+  -d, --dns             include likely DNS query associated with each connect
 
 examples:
     ./tcpconnect           # trace all TCP connect()s
