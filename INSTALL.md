@@ -4,7 +4,7 @@
 * [Packages](#packages)
   - [Ubuntu](#ubuntu---binary)
   - [Fedora](#fedora---binary)
-  - [Arch](#arch---aur)
+  - [Arch](#arch---binary)
   - [Gentoo](#gentoo---portage)
   - [openSUSE](#opensuse---binary)
   - [RHEL](#rhel---binary)
@@ -160,15 +160,12 @@ echo -e '[iovisor]\nbaseurl=https://repo.iovisor.org/yum/main/f27/$basearch\nena
 sudo dnf install bcc-tools kernel-devel-$(uname -r) kernel-headers-$(uname -r)
 ```
 
-## Arch - AUR
+## Arch - Binary
 
-Upgrade the kernel to minimum 4.3.1-1 first; the ```CONFIG_BPF_SYSCALL=y``` configuration was not added until [this kernel release](https://bugs.archlinux.org/task/47008).
-
-Install these packages using any AUR helper such as [pacaur](https://aur.archlinux.org/packages/pacaur), [yaourt](https://aur.archlinux.org/packages/yaourt), [cower](https://aur.archlinux.org/packages/cower), etc.:
+bcc is available in the standard Arch repos, so it can be installed with the `pacman` command:
 ```
-bcc bcc-tools python-bcc
+# pacman -S bcc bcc-tools python-bcc
 ```
-All build and install dependencies are listed [in the PKGBUILD](https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=bcc) and should install automatically.
 
 ## Gentoo - Portage
 
