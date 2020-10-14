@@ -2,6 +2,7 @@ FROM ubuntu:18.04
 
 ARG LLVM_VERSION="8"
 ENV LLVM_VERSION=$LLVM_VERSION
+ARG UTIL_LINUX="2.36"
 
 RUN apt-get update && apt-get install -y curl gnupg &&\
     llvmRepository="\n\
@@ -13,7 +14,6 @@ deb-src http://apt.llvm.org/bionic/ llvm-toolchain-bionic-${LLVM_VERSION} main\n
     curl -L https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add -
 
 RUN apt-get update && apt-get install -y \
-      util-linux \
       bison \
       binutils-dev \
       cmake \
@@ -60,10 +60,22 @@ RUN pip install pyroute2 netaddr
 #    apt-add-repository ppa:brightbox/ruby-ng && \
 #    apt-get update -qq && apt-get install -y ruby2.6 ruby2.6-dev
 
-RUN wget -O ruby-install-0.7.0.tar.gz \
-         https://github.com/postmodern/ruby-install/archive/v0.7.0.tar.gz && \
-    tar -xzvf ruby-install-0.7.0.tar.gz && \
-    cd ruby-install-0.7.0/ && \
-    make install
+# To run container related tests, we need a newer version of unshare than is
+# available in ubuntu software repositories, to use --kill-child
+RUN wget -O /util-linux-${UTIL_LINUX}.tar.gz \
+         https://mirrors.edge.kernel.org/pub/linux/utils/util-linux/v${UTIL_LINUX}/util-linux-${UTIL_LINUX}.tar.gz && \
+    tar -xzvf /util-linux-${UTIL_LINUX}.tar.gz && \
+    cd /util-linux-${UTIL_LINUX}/ && \
+    ./configure && \
+    make unshare && cp unshare /usr/bin/unshare && \
+    rm -rf /util-linux-${UTIL_LINUX}/ && \
+    rm -f /util-linux-${UTIL_LINUX}.tar.gz
 
-RUN ruby-install --system ruby 2.6.0 -- --enable-dtrace
+#RUN wget -O ruby-install-0.7.0.tar.gz \
+#         https://github.com/postmodern/ruby-install/archive/v0.7.0.tar.gz && \
+#    tar -xzvf ruby-install-0.7.0.tar.gz && \
+#    cd ruby-install-0.7.0/ && \
+#    make install
+
+
+#RUN ruby-install --system ruby 2.6.0 -- --enable-dtrace
