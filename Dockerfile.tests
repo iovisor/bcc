@@ -68,14 +68,17 @@ RUN wget -O /util-linux-${UTIL_LINUX}.tar.gz \
     cd /util-linux-${UTIL_LINUX}/ && \
     ./configure && \
     make unshare && cp unshare /usr/bin/unshare && \
+    cd / && \
     rm -rf /util-linux-${UTIL_LINUX}/ && \
     rm -f /util-linux-${UTIL_LINUX}.tar.gz
 
-#RUN wget -O ruby-install-0.7.0.tar.gz \
-#         https://github.com/postmodern/ruby-install/archive/v0.7.0.tar.gz && \
-#    tar -xzvf ruby-install-0.7.0.tar.gz && \
-#    cd ruby-install-0.7.0/ && \
-#    make install
+RUN wget -O /ruby-install-0.7.0.tar.gz \
+         https://github.com/postmodern/ruby-install/archive/v0.7.0.tar.gz && \
+    tar -xzvf /ruby-install-0.7.0.tar.gz && \
+    cd /ruby-install-0.7.0/ && \
+    make install && \
+    cd / && \
+    rm -rf /ruby-install-0.7.0.tar.gz && \
+    rm -rf /ruby-install-0.7.0/
 
-
-#RUN ruby-install --system ruby 2.6.0 -- --enable-dtrace
+RUN ruby-install --system ruby 2.6.0 -- --enable-dtrace
