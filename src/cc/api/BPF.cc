@@ -225,7 +225,8 @@ StatusTuple BPF::attach_uprobe(const std::string& binary_path,
                                const std::string& probe_func,
                                uint64_t symbol_addr,
                                bpf_probe_attach_type attach_type, pid_t pid,
-                               uint64_t symbol_offset) {
+                               uint64_t symbol_offset,
+                               uint32_t ref_ctr_offset) {
 
   if (symbol_addr != 0 && symbol_offset != 0)
     return StatusTuple(-1,
@@ -245,7 +246,8 @@ StatusTuple BPF::attach_uprobe(const std::string& binary_path,
   TRY2(load_func(probe_func, BPF_PROG_TYPE_KPROBE, probe_fd));
 
   int res_fd = bpf_attach_uprobe(probe_fd, attach_type, probe_event.c_str(),
-                                 binary_path.c_str(), offset, pid);
+                                 binary_path.c_str(), offset, pid,
+                                 ref_ctr_offset);
 
   if (res_fd < 0) {
     TRY2(unload_func(probe_func));
