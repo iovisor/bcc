@@ -94,8 +94,6 @@ jobs:
 
 # To debug weird issues, you can add this step to be able to SSH to the test environment
 #     https://github.com/marketplace/actions/debugging-with-tmate
-#    - name: Setup tmate session
-#      uses: mxschmitt/action-tmate@v1
 
   # Optionally publish container images, guarded by the GitHub secret
   # DOCKER_PUBLISH.
