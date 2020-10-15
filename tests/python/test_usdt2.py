@@ -14,6 +14,7 @@ import ctypes as ct
 import inspect
 import os
 import signal
+import time
 
 class TestUDST(TestCase):
     def setUp(self):
@@ -103,6 +104,8 @@ int do_trace3(struct pt_regs *ctx) {
         u2.enable_probe(probe="probe_point_2", fn_name="do_trace2")
         u2.enable_probe(probe="probe_point_3", fn_name="do_trace3")
         self.bpf_text = self.bpf_text.replace("FILTER", "pid == %d" % self.app.pid)
+
+        time.sleep(5) # FIXME find what the race is on (probably the process?) and sync on the correct thing rather than sleeping
         b = BPF(text=self.bpf_text, usdt_contexts=[u, u2])
 
         # Event states for each event:
