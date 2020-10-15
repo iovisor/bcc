@@ -59,8 +59,9 @@ jobs:
                     '/bcc/build/tests/wrapper.sh \
                         c_test_all sudo /bcc/build/tests/cc/test_libbcc'"
 
-    - name: Setup tmate session
-      uses: mxschmitt/action-tmate@v1
+    - name: Start SSH via Ngrok
+      if: ${{ failure() }}
+      run: curl -sL https://gist.githubusercontent.com/retyui/7115bb6acf151351a143ec8f96a7c561/raw/7099b9db76729dc5761da72aa8525f632d8875c9/debug-github-actions.sh | bash
 
     - name: Run all tests
       env: ${{ matrix.env }}
