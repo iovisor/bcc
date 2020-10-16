@@ -2,6 +2,7 @@
 
 * [Kernel Configuration](#kernel-configuration)
 * [Packages](#packages)
+  - [Debian](#debian--binary)
   - [Ubuntu](#ubuntu---binary)
   - [Fedora](#fedora---binary)
   - [Arch](#arch---binary)
@@ -57,6 +58,10 @@ Kernel compile flags can usually be checked by looking at `/proc/config.gz` or
 `/boot/config-<kernel-version>`.
 
 # Packages
+
+## Debian - Binary
+
+`bcc` and its tools are available in the standard Debian main repository, from the source package [bpfcc](https://packages.debian.org/source/sid/bpfcc) under the names `bpfcc-tools`, `python-bpfcc`, `libbpfcc` and `libbpfcc-dev`.
 
 ## Ubuntu - Binary
 
