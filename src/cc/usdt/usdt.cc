@@ -54,12 +54,13 @@ Location::Location(uint64_t addr, const std::string &bin_path, const char *arg_f
 }
 
 Probe::Probe(const char *bin_path, const char *provider, const char *name,
-             uint64_t semaphore, const optional<int> &pid,
-             uint8_t mod_match_inode_only)
+             uint64_t semaphore, uint64_t semaphore_offset,
+             const optional<int> &pid, uint8_t mod_match_inode_only)
     : bin_path_(bin_path),
       provider_(provider),
       name_(name),
       semaphore_(semaphore),
+      semaphore_offset_(semaphore_offset),
       pid_(pid),
       mod_match_inode_only_(mod_match_inode_only)
       {}
@@ -262,8 +263,8 @@ void Context::add_probe(const char *binpath, const struct bcc_elf_usdt *probe) {
   }
 
   probes_.emplace_back(
-    new Probe(binpath, probe->provider, probe->name, probe->semaphore, pid_,
-              mod_match_inode_only_)
+    new Probe(binpath, probe->provider, probe->name, probe->semaphore,
+              probe->semaphore_offset, pid_, mod_match_inode_only_)
   );
   probes_.back()->add_location(probe->pc, binpath, probe->arg_fmt);
 }
@@ -347,6 +348,7 @@ void Context::each(each_cb callback) {
     info.bin_path = probe->bin_path().c_str();
     info.name = probe->name().c_str();
     info.semaphore = probe->semaphore();
+    info.semaphore_offset = probe->semaphore_offset();
     info.num_locations = probe->num_locations();
     info.num_arguments = probe->num_arguments();
     callback(&info);
