@@ -148,7 +148,10 @@ def get_searched_ids(root_directories):
     inodes = "{"
     total_dirs = 0
     for root_directory in root_directories.split(','):
-        searched_dirs = glob(root_directory, recursive=True)
+        try:
+            searched_dirs = glob(root_directory, recursive=True)
+        except TypeError:
+            searched_dirs = glob(root_directory)
         if not searched_dirs:
             continue
 
