@@ -111,35 +111,35 @@ int trace_tcp_rcv(struct pt_regs *ctx, struct sock *sk, struct sk_buff *skb)
 
 # filter for local port
 if args.lport:
-    bpf_text = bpf_text.replace(b'LPORTFILTER',
-        b"""if (ntohs(sport) != %d)
+    bpf_text = bpf_text.replace('LPORTFILTER',
+        """if (ntohs(sport) != %d)
         return 0;""" % int(args.lport))
 else:
-    bpf_text = bpf_text.replace(b'LPORTFILTER', b'')
+    bpf_text = bpf_text.replace('LPORTFILTER', '')
 
 # filter for remote port
 if args.rport:
-    bpf_text = bpf_text.replace(b'RPORTFILTER',
-        b"""if (ntohs(dport) != %d)
+    bpf_text = bpf_text.replace('RPORTFILTER',
+        """if (ntohs(dport) != %d)
         return 0;""" % int(args.rport))
 else:
-    bpf_text = bpf_text.replace(b'RPORTFILTER', b'')
+    bpf_text = bpf_text.replace('RPORTFILTER', '')
 
 # filter for local address
 if args.laddr:
-    bpf_text = bpf_text.replace(b'LADDRFILTER',
-        b"""if (saddr != %d)
+    bpf_text = bpf_text.replace('LADDRFILTER',
+        """if (saddr != %d)
         return 0;""" % struct.unpack("=I", socket.inet_aton(args.laddr))[0])
 else:
-    bpf_text = bpf_text.replace(b'LADDRFILTER', b'')
+    bpf_text = bpf_text.replace('LADDRFILTER', '')
 
 # filter for remote address
 if args.raddr:
-    bpf_text = bpf_text.replace(b'RADDRFILTER',
-        b"""if (daddr != %d)
+    bpf_text = bpf_text.replace('RADDRFILTER',
+        """if (daddr != %d)
         return 0;""" % struct.unpack("=I", socket.inet_aton(args.raddr))[0])
 else:
-    bpf_text = bpf_text.replace(b'RADDRFILTER', b'')
+    bpf_text = bpf_text.replace('RADDRFILTER', '')
 
 # show msecs or usecs[default]
 if args.milliseconds:

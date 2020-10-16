@@ -51,7 +51,7 @@ def print_table(table, qnum):
         headers.append("PPS")
 
     for hd in headers:
-		print(hd.center(COL_WIDTH)),
+        print(hd.center(COL_WIDTH))
     print
 
     # ------- calculates --------------
@@ -180,7 +180,7 @@ if len(dev_name) > IFNAMSIZ-1:
 
 print_interval = args.interval + 0.0
 if print_interval == 0:
-    print "print interval must be non-zero"
+    print ("print interval must be non-zero")
     exit()
 
 ################ get number of queues #####################
@@ -188,7 +188,7 @@ tx_num = 0
 rx_num = 0
 path = ROOT_PATH + "/" + dev_name + "/queues"
 if not os.path.exists(path):
-	print "Net interface", dev_name, "does not exits."
+	print ("Net interface", dev_name, "does not exits.")
 	exit()
 
 list = os.listdir(path)
@@ -199,7 +199,7 @@ for s in list:
         tx_num += 1
 
 if tx_num > MAX_QUEUE_NUM or rx_num > MAX_QUEUE_NUM:
-    print "number of queues over 1024 is not supported."
+    print ("number of queues over 1024 is not supported.")
     exit()
 
 ################## start tracing ##################
@@ -207,7 +207,7 @@ b = BPF(src_file = EBPF_FILE)
 # --------- set hash array --------
 devname_map = b['name_map']
 _name = Devname()
-_name.name = dev_name
+_name.name = dev_name.encode()
 devname_map[0] = _name
 
 while 1:
