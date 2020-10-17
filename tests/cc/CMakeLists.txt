@@ -22,6 +22,7 @@ set(TEST_LIBBCC_SOURCES
 	test_bpf_table.cc
 	test_cg_storage.cc
 	test_hash_table.cc
+	test_isra.cc
 	test_map_in_map.cc
 	test_perf_event.cc
 	test_pinned_table.cc
