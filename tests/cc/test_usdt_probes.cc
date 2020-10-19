@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#include <linux/version.h>
 #include <signal.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -33,6 +34,17 @@ static int a_probed_function() {
   free(a_pointer);
   return an_int;
 }
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 20, 0)
+FOLLY_SDT_DEFINE_SEMAPHORE(libbcc_test, sample_probe_2)
+static int a_probed_function_with_sem() {
+  int an_int = 23 + getpid();
+  void *a_pointer = malloc(4);
+  FOLLY_SDT_WITH_SEMAPHORE(libbcc_test, sample_probe_2, an_int, a_pointer);
+  free(a_pointer);
+  return an_int;
+}
+#endif // linux version  >= 4.20
 
 extern "C" int lib_probed_function();
 
@@ -394,3 +406,26 @@ TEST_CASE("test probing running Ruby process in namespaces",
     REQUIRE(std::string(sym.module).find(pid_root, 1) == std::string::npos);
   }
 }
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 20, 0)
+TEST_CASE("Test uprobe refcnt semaphore activation", "[usdt]") {
+    ebpf::BPF bpf;
+
+    REQUIRE(!FOLLY_SDT_IS_ENABLED(libbcc_test, sample_probe_2));
+
+    ebpf::USDT u("/proc/self/exe", "libbcc_test", "sample_probe_2", "on_event");
+
+    auto res = bpf.init("int on_event() { return 0; }", {}, {u});
+    REQUIRE(res.code() == 0);
+
+    res = bpf.attach_usdt(u);
+    REQUIRE(res.code() == 0);
+
+    REQUIRE(FOLLY_SDT_IS_ENABLED(libbcc_test, sample_probe_2));
+
+    res = bpf.detach_usdt(u);
+    REQUIRE(res.code() == 0);
+
+    REQUIRE(a_probed_function_with_sem() != 0);
+}
+#endif // linux version  >= 4.20
