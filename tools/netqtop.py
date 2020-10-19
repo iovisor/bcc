@@ -6,7 +6,6 @@ from ctypes import *
 import argparse
 import os
 from time import sleep,time,localtime,asctime
-import types
 
 # pre defines -------------------------------
 ROOT_PATH = "/sys/class/net"
