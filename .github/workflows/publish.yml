@@ -19,6 +19,8 @@ jobs:
           OS_RELEASE: 16.04
         - NAME: bionic-release
           OS_RELEASE: 18.04
+        - NAME: focal-release
+          OS_RELEASE: 20.04
     steps:
 
     - uses: actions/checkout@v1
