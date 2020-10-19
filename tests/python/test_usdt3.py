@@ -82,20 +82,20 @@ int do_trace(struct pt_regs *ctx) {
         self.tmp_dir = tempfile.mkdtemp()
         print("temp directory: " + self.tmp_dir)
         _create_file(self.tmp_dir + "/common.h", common_h)
-        _create_file(self.tmp_dir + "/a.c", a_c)
-        _create_file(self.tmp_dir + "/b.c", b_c)
-        _create_file(self.tmp_dir + "/m.c", m_c)
+        _create_file(self.tmp_dir + "/a.cpp", a_c)
+        _create_file(self.tmp_dir + "/b.cpp", b_c)
+        _create_file(self.tmp_dir + "/m.cpp", m_c)
 
         # Compilation
         # the usdt test:probe exists in liba.so, libb.so and a.out
         include_path = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))) + "/include"
-        a_src = self.tmp_dir + "/a.c"
+        a_src = self.tmp_dir + "/a.cpp"
         a_obj = self.tmp_dir + "/a.o"
         a_lib = self.tmp_dir + "/liba.so"
-        b_src = self.tmp_dir + "/b.c"
+        b_src = self.tmp_dir + "/b.cpp"
         b_obj = self.tmp_dir + "/b.o"
         b_lib = self.tmp_dir + "/libb.so"
-        m_src = self.tmp_dir + "/m.c"
+        m_src = self.tmp_dir + "/m.cpp"
         m_bin = self.tmp_dir + "/a.out"
         m_linker_opt = " -L" + self.tmp_dir + " -la -lb"
         self.assertEqual(os.system("gcc -I" + include_path + " -fpic -c -o " + a_obj + " " + a_src), 0)
