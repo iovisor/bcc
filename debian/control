@@ -4,12 +4,12 @@ Section: misc
 Priority: optional
 Standards-Version: 3.9.5
 Build-Depends: debhelper (>= 9), cmake,
-    libllvm3.7 [!arm64] | libllvm3.8 [!arm64] | libllvm6.0,
-    llvm-3.7-dev [!arm64] | llvm-3.8-dev [!arm64] | llvm-6.0-dev,
-    libclang-3.7-dev [!arm64] | libclang-3.8-dev [!arm64] | libclang-6.0-dev,
-    clang-format | clang-format-3.7 [!arm64] | clang-format-3.8 [!arm64] | clang-format-6.0,
+    libllvm3.7 [!arm64] | libllvm3.8 [!arm64] | libllvm6.0 | libllvm8.0 | libllvm9,
+    llvm-3.7-dev [!arm64] | llvm-3.8-dev [!arm64] | llvm-6.0-dev | llvm-8.0-dev | llvm-9-dev,
+    libclang-3.7-dev [!arm64] | libclang-3.8-dev [!arm64] | libclang-6.0-dev | libclang-8.0-dev | libclang-9-dev,
+    clang-format | clang-format-3.7 [!arm64] | clang-format-3.8 [!arm64] | clang-format-6.0 | clang-format-8.0 | clang-format-9,
     libelf-dev, bison, flex, libfl-dev, libedit-dev, zlib1g-dev, git,
-    python (>= 2.7), python-netaddr, python-pyroute2, luajit,
+    python (>= 2.7), python-netaddr, python-pyroute2 | python3-pyroute2, luajit,
     libluajit-5.1-dev, arping, inetutils-ping | iputils-ping, iperf, netperf,
     ethtool, devscripts, python3, dh-python
 Homepage: https://github.com/iovisor/bcc
