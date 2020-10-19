@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# helper script to be invoked by jenkins/buildbot
+# helper script to be invoked by jenkins/buildbot or github actions
 
 # $1 [optional]: the build type - release | nightly | test
 buildtype=${1:-test}

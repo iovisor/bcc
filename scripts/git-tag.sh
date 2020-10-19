@@ -1,4 +1,4 @@
-git_tag_latest=$(git describe --abbrev=0)
+git_tag_latest=$(git describe --tags --abbrev=0)
 git_rev_count=$(git rev-list $git_tag_latest.. --count)
 git_rev_count=$[$git_rev_count+1]
 git_subject=$(git log --pretty="%s" -n 1)

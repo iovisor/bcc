@@ -1,4 +1,9 @@
-FROM ubuntu:bionic as builder
+ARG OS_TAG=18.04
+FROM ubuntu:${OS_TAG} as builder
+
+ARG OS_TAG
+ARG BUILD_TYPE=release
+ARG DEBIAN_FRONTEND=noninteractive
 
 MAINTAINER Brenden Blanco <bblanco@gmail.com>
 
@@ -10,10 +15,9 @@ COPY ./ /root/bcc
 WORKDIR /root/bcc
 
 RUN /usr/lib/pbuilder/pbuilder-satisfydepends && \
-    ./scripts/build-deb.sh
+    ./scripts/build-deb.sh ${BUILD_TYPE}
 
-
-FROM ubuntu:bionic
+FROM ubuntu:${OS_TAG}
 
 COPY --from=builder /root/bcc/*.deb /root/bcc/
 
