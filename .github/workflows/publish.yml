@@ -59,6 +59,8 @@ jobs:
 
     # Uploads the packages built in docker to the github build as an artifact for convenience
     - uses: actions/upload-artifact@v1
+      if: >
+        steps.vars.outputs.QUAY_PUBLISH
       with:
         name: ${{ matrix.env['NAME'] }}
         path: output
