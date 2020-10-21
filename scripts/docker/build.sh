@@ -1,5 +1,5 @@
 #!/bin/bash
-
+set -e
 # Builds debian packages using docker wrapper
 
 function help() {
@@ -23,5 +23,5 @@ echo "Building ${distro} ${os_tag} release docker image for ${docker_repo}:${doc
 docker build -t ${docker_repo}:${docker_tag} --build-arg OS_TAG=${os_tag} -f Dockerfile.${distro} .
 
 echo "Copying build artifacts to $(pwd)/output"
-mkdir output
+mkdir -p output
 docker run -v $(pwd)/output:/output ${docker_repo}:${docker_tag} /bin/bash -c "cp /root/bcc/* /output"
