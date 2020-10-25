@@ -385,7 +385,7 @@ sudo apt-get update
 sudo apt-get -y install bison build-essential cmake flex git libedit-dev \
   libllvm6.0 llvm-6.0-dev libclang-6.0-dev python zlib1g-dev libelf-dev
 
-# For Eoan (19.10)
+# For Eoan (19.10) or Focal (20.04.1 LTS)
 sudo apt install -y bison build-essential cmake flex git libedit-dev \
   libllvm7 llvm-7-dev libclang-7-dev python zlib1g-dev libelf-dev
 
