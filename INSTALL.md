@@ -387,7 +387,7 @@ sudo apt-get -y install bison build-essential cmake flex git libedit-dev \
 
 # For Eoan (19.10) or Focal (20.04.1 LTS)
 sudo apt install -y bison build-essential cmake flex git libedit-dev \
-  libllvm7 llvm-7-dev libclang-7-dev python zlib1g-dev libelf-dev
+  libllvm7 llvm-7-dev libclang-7-dev python zlib1g-dev libelf-dev libfl-dev
 
 # For other versions
 sudo apt-get -y install bison build-essential cmake flex git libedit-dev \
