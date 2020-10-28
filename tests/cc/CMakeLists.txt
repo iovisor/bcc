@@ -38,7 +38,7 @@ set(TEST_LIBBCC_SOURCES
 add_executable(test_libbcc ${TEST_LIBBCC_SOURCES})
 
 file(COPY dummy_proc_map.txt DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
-add_library(usdt_test_lib SHARED usdt_test_lib.c)
+add_library(usdt_test_lib SHARED usdt_test_lib.cc)
 
 add_dependencies(test_libbcc bcc-shared)
 target_link_libraries(test_libbcc ${PROJECT_BINARY_DIR}/src/cc/libbcc.so dl usdt_test_lib)

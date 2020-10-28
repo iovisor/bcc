@@ -91,6 +91,8 @@
 
 #define UNUSED(expr) do { (void)(expr); } while (0)
 
+#define PERF_UPROBE_REF_CTR_OFFSET_SHIFT 32
+
 struct bpf_helper {
   char *name;
   char *required_version;
@@ -838,7 +840,8 @@ static int bpf_get_retprobe_bit(const char *event_type)
  * the [k,u]probe. This function tries to create pfd with the perf_kprobe PMU.
  */
 static int bpf_try_perf_event_open_with_probe(const char *name, uint64_t offs,
-             int pid, const char *event_type, int is_return)
+             int pid, const char *event_type, int is_return,
+             uint64_t ref_ctr_offset)
 {
   struct perf_event_attr attr = {};
   int type = bpf_find_probe_type(event_type);
@@ -851,6 +854,7 @@ static int bpf_try_perf_event_open_with_probe(const char *name, uint64_t offs,
   attr.wakeup_events = 1;
   if (is_return)
     attr.config |= 1 << is_return_bit;
+  attr.config |= (ref_ctr_offset << PERF_UPROBE_REF_CTR_OFFSET_SHIFT);
 
   /*
    * struct perf_event_attr in latest perf_event.h has the following
@@ -1019,7 +1023,8 @@ error:
 // see bpf_try_perf_event_open_with_probe().
 static int bpf_attach_probe(int progfd, enum bpf_probe_attach_type attach_type,
                             const char *ev_name, const char *config1, const char* event_type,
-                            uint64_t offset, pid_t pid, int maxactive)
+                            uint64_t offset, pid_t pid, int maxactive,
+                            uint32_t ref_ctr_offset)
 {
   int kfd, pfd = -1;
   char buf[PATH_MAX], fname[256];
@@ -1028,7 +1033,8 @@ static int bpf_attach_probe(int progfd, enum bpf_probe_attach_type attach_type,
   if (maxactive <= 0)
     // Try create the [k,u]probe Perf Event with perf_event_open API.
     pfd = bpf_try_perf_event_open_with_probe(config1, offset, pid, event_type,
-                                             attach_type != BPF_PROBE_ENTRY);
+                                             attach_type != BPF_PROBE_ENTRY,
+                                             ref_ctr_offset);
 
   // If failed, most likely Kernel doesn't support the perf_kprobe PMU
   // (e12f03d "perf/core: Implement the 'perf_kprobe' PMU") yet.
@@ -1092,17 +1098,17 @@ int bpf_attach_kprobe(int progfd, enum bpf_probe_attach_type attach_type,
 {
   return bpf_attach_probe(progfd, attach_type,
                           ev_name, fn_name, "kprobe",
-                          fn_offset, -1, maxactive);
+                          fn_offset, -1, maxactive, 0);
 }
 
 int bpf_attach_uprobe(int progfd, enum bpf_probe_attach_type attach_type,
                       const char *ev_name, const char *binary_path,
-                      uint64_t offset, pid_t pid)
+                      uint64_t offset, pid_t pid, uint32_t ref_ctr_offset)
 {
 
   return bpf_attach_probe(progfd, attach_type,
                           ev_name, binary_path, "uprobe",
-                          offset, pid, -1);
+                          offset, pid, -1, ref_ctr_offset);
 }
 
 static int bpf_detach_probe(const char *ev_name, const char *event_type)

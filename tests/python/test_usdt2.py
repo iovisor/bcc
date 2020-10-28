@@ -81,7 +81,7 @@ int do_trace3(struct pt_regs *ctx) {
         self.ftemp = NamedTemporaryFile(delete=False)
         self.ftemp.close()
         comp = Popen(["gcc", "-I", "%s/include" % os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))),
-                      "-x", "c", "-o", self.ftemp.name, "-"],
+                      "-x", "c++", "-o", self.ftemp.name, "-"],
                      stdin=PIPE)
         comp.stdin.write(app_text)
         comp.stdin.close()
