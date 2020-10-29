@@ -784,16 +784,22 @@ static long (*bpf_d_path)(struct path *path, char *buf, u32 sz) =
 static long (*bpf_copy_from_user)(void *dst, u32 size, const void *user_ptr) =
   (void *)BPF_FUNC_copy_from_user;
 
-static long (*bpf_snprintf_btf)(char *str, __u32 str_size, struct btf_ptr *ptr,
-				__u32 btf_ptr_size, __u64 flags) =
+static long (*bpf_snprintf_btf)(char *str, u32 str_size, struct btf_ptr *ptr,
+				u32 btf_ptr_size, u64 flags) =
   (void *)BPF_FUNC_snprintf_btf;
 static long (*bpf_seq_printf_btf)(struct seq_file *m, struct btf_ptr *ptr,
-				  __u32 ptr_size, __u64 flags) =
+				  u32 ptr_size, u64 flags) =
   (void *)BPF_FUNC_seq_printf_btf;
-static __u64 (*bpf_skb_cgroup_classid)(struct __sk_buff *skb) =
+static u64 (*bpf_skb_cgroup_classid)(struct sk_buff *skb) =
   (void *)BPF_FUNC_skb_cgroup_classid;
-static long (*bpf_redirect_neigh)(__u32 ifindex, __u64 flags) =
+static long (*bpf_redirect_neigh)(u32 ifindex, struct bpf_redir_neigh *params,
+				  u64 flags) =
   (void *)BPF_FUNC_redirect_neigh;
+static void * (*bpf_per_cpu_ptr)(const void *percpu_ptr, u32 cpu) =
+  (void *)BPF_FUNC_bpf_per_cpu_ptr;
+static void * (*bpf_this_cpu_ptr)(const void *percpu_ptr) =
+  (void *)BPF_FUNC_bpf_this_cpu_ptr;
+long (*bpf_redirect_peer)(u32 ifindex, u64 flags) = (void *)BPF_FUNC_redirect_peer;
 
 /* llvm builtin functions that eBPF C program may use to
  * emit BPF_LD_ABS and BPF_LD_IND instructions
