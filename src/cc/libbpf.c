@@ -251,6 +251,9 @@ static struct bpf_helper helpers[] = {
   {"seq_printf_btf", "5.10"},
   {"skb_cgroup_classid", "5.10"},
   {"redirect_neigh", "5.10"},
+  {"per_cpu_ptr", "5.10"},
+  {"this_cpu_ptr", "5.10"},
+  {"redirect_peer", "5.10"},
 };
 
 static uint64_t ptr_to_u64(void *ptr)
