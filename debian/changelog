@@ -1,3 +1,16 @@
+bcc (0.17.0-1) unstable; urgency=low
+
+  * Support for kernel up to 5.9
+  * usdt: add uprobe refcnt support
+  * use newer llvm/clang versions in debian packaging if possible
+  * add bpf iterator C++ support
+  * new bcc tools: tcprtt, netqtop, swapin, tcpsynbl, threadsnoop
+  * tcpconnect: add DNS correlation to connect tracking
+  * new libbpf-tools: llcstat, numamove, runqlen, runqlat, softirgs, hardirqs
+  * doc update, bug fixes and some additional arguments for tools
+
+ -- Yonghong Song <ys114321@gmail.com>  Thu, 29 Oct 2020 17:00:00 +0000
+
 bcc (0.16.0-1) unstable; urgency=low
 
   * Support for kernel up to 5.8
