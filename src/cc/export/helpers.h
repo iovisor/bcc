@@ -1099,6 +1099,7 @@ int bpf_usdt_readarg_p(int argc, struct pt_regs *ctx, void *buf, u64 len) asm("l
 #define PT_REGS_PARM2(ctx)	((ctx)->si)
 #define PT_REGS_PARM3(ctx)	((ctx)->dx)
 #define PT_REGS_PARM4(ctx)	((ctx)->cx)
+#define PT_REGS_PARM4_SYSCALL(ctx)	((ctx)->r10) /* for syscall only */
 #define PT_REGS_PARM5(ctx)	((ctx)->r8)
 #define PT_REGS_PARM6(ctx)	((ctx)->r9)
 #define PT_REGS_RET(ctx)	((ctx)->sp)

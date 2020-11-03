@@ -253,7 +253,7 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, TableStorage &ts,
   return 0;
 }
 
-void *get_clang_target_cb(bcc_arch_t arch)
+void *get_clang_target_cb(bcc_arch_t arch, bool for_syscall)
 {
   const char *ret;
 
