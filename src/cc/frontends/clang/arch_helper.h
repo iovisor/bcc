@@ -25,9 +25,9 @@ typedef enum {
   BCC_ARCH_X86
 } bcc_arch_t;
 
-typedef void *(*arch_callback_t)(bcc_arch_t arch);
+typedef void *(*arch_callback_t)(bcc_arch_t arch, bool for_syscall);
 
-static void *run_arch_callback(arch_callback_t fn)
+static void *run_arch_callback(arch_callback_t fn, bool for_syscall = false)
 {
   const char *archenv = getenv("ARCH");
 
@@ -35,31 +35,31 @@ static void *run_arch_callback(arch_callback_t fn)
   if (!archenv) {
 #if defined(__powerpc64__)
 #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-    return fn(BCC_ARCH_PPC_LE);
+    return fn(BCC_ARCH_PPC_LE, for_syscall);
 #else
-    return fn(BCC_ARCH_PPC);
+    return fn(BCC_ARCH_PPC, for_syscall);
 #endif
 #elif defined(__s390x__)
-    return fn(BCC_ARCH_S390X);
+    return fn(BCC_ARCH_S390X, for_syscall);
 #elif defined(__aarch64__)
-    return fn(BCC_ARCH_ARM64);
+    return fn(BCC_ARCH_ARM64, for_syscall);
 #else
-    return fn(BCC_ARCH_X86);
+    return fn(BCC_ARCH_X86, for_syscall);
 #endif
   }
 
   /* Otherwise read it from ARCH */
   if (!strcmp(archenv, "powerpc")) {
 #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-    return fn(BCC_ARCH_PPC_LE);
+    return fn(BCC_ARCH_PPC_LE, for_syscall);
 #else
-    return fn(BCC_ARCH_PPC);
+    return fn(BCC_ARCH_PPC, for_syscall);
 #endif
   } else if (!strcmp(archenv, "s390x")) {
-    return fn(BCC_ARCH_S390X);
+    return fn(BCC_ARCH_S390X, for_syscall);
   } else if (!strcmp(archenv, "arm64")) {
-    return fn(BCC_ARCH_ARM64);
+    return fn(BCC_ARCH_ARM64, for_syscall);
   } else {
-    return fn(BCC_ARCH_X86);
+    return fn(BCC_ARCH_X86, for_syscall);
   }
 }

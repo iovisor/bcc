@@ -45,6 +45,9 @@ constexpr int MAX_CALLING_CONV_REGS = 6;
 const char *calling_conv_regs_x86[] = {
   "di", "si", "dx", "cx", "r8", "r9"
 };
+const char *calling_conv_syscall_regs_x86[] = {
+  "di", "si", "dx", "r10", "r8", "r9"
+};
 const char *calling_conv_regs_ppc[] = {"gpr[3]", "gpr[4]", "gpr[5]",
                                        "gpr[6]", "gpr[7]", "gpr[8]"};
 
@@ -54,7 +57,7 @@ const char *calling_conv_regs_s390x[] = {"gprs[2]", "gprs[3]", "gprs[4]",
 const char *calling_conv_regs_arm64[] = {"regs[0]", "regs[1]", "regs[2]",
                                        "regs[3]", "regs[4]", "regs[5]"};
 
-void *get_call_conv_cb(bcc_arch_t arch)
+void *get_call_conv_cb(bcc_arch_t arch, bool for_syscall)
 {
   const char **ret;
 
@@ -70,16 +73,19 @@ void *get_call_conv_cb(bcc_arch_t arch)
       ret = calling_conv_regs_arm64;
       break;
     default:
-      ret = calling_conv_regs_x86;
+      if (for_syscall)
+        ret = calling_conv_syscall_regs_x86;
+      else
+        ret = calling_conv_regs_x86;
   }
 
   return (void *)ret;
 }
 
-const char **get_call_conv(void) {
+const char **get_call_conv(bool for_syscall = false) {
   const char **ret;
 
-  ret = (const char **)run_arch_callback(get_call_conv_cb);
+  ret = (const char **)run_arch_callback(get_call_conv_cb, for_syscall);
   return ret;
 }
 
@@ -760,7 +766,7 @@ void BTypeVisitor::genParamIndirectAssign(FunctionDecl *D, string& preamble,
 }
 
 void BTypeVisitor::rewriteFuncParam(FunctionDecl *D) {
-  const char **calling_conv_regs = get_call_conv();
+  const char **calling_conv_regs = get_call_conv(true);
 
   string preamble = "{\n";
   if (D->param_size() > 1) {
