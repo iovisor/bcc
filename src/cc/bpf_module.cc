@@ -466,7 +466,9 @@ int BPFModule::finalize() {
   builder.setErrorStr(&err);
   builder.setMCJITMemoryManager(ebpf::make_unique<MyMemoryManager>(sections_p));
   builder.setMArch("bpf");
+#if LLVM_MAJOR_VERSION <= 11
   builder.setUseOrcMCJITReplacement(false);
+#endif
   engine_ = unique_ptr<ExecutionEngine>(builder.create());
   if (!engine_) {
     fprintf(stderr, "Could not create ExecutionEngine: %s\n", err.c_str());

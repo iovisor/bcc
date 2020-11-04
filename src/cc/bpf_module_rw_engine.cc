@@ -356,7 +356,9 @@ unique_ptr<ExecutionEngine> BPFModule::finalize_rw(unique_ptr<Module> m) {
   string err;
   EngineBuilder builder(move(m));
   builder.setErrorStr(&err);
+#if LLVM_MAJOR_VERSION <= 11
   builder.setUseOrcMCJITReplacement(false);
+#endif
   auto engine = unique_ptr<ExecutionEngine>(builder.create());
   if (!engine)
     fprintf(stderr, "Could not create ExecutionEngine: %s\n", err.c_str());
