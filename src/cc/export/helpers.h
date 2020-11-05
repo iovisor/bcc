@@ -1075,31 +1075,20 @@ int bpf_usdt_readarg_p(int argc, struct pt_regs *ctx, void *buf, u64 len) asm("l
 
 #if defined(bpf_target_powerpc)
 #define PT_REGS_PARM1(ctx)	((ctx)->gpr[3])
-#define PT_REGS_PARM1_SYSCALL(ctx)	PT_REGS_PARM1(ctx)
 #define PT_REGS_PARM2(ctx)	((ctx)->gpr[4])
-#define PT_REGS_PARM2_SYSCALL(ctx)	PT_REGS_PARM2(ctx)
 #define PT_REGS_PARM3(ctx)	((ctx)->gpr[5])
-#define PT_REGS_PARM3_SYSCALL(ctx)	PT_REGS_PARM3(ctx)
 #define PT_REGS_PARM4(ctx)	((ctx)->gpr[6])
-#define PT_REGS_PARM4_SYSCALL(ctx)	PT_REGS_PARM4(ctx)
 #define PT_REGS_PARM5(ctx)	((ctx)->gpr[7])
-#define PT_REGS_PARM5_SYSCALL(ctx)	PT_REGS_PARM5(ctx)
 #define PT_REGS_PARM6(ctx)	((ctx)->gpr[8])
-#define PT_REGS_PARM6_SYSCALL(ctx)	PT_REGS_PARM6(ctx)
 #define PT_REGS_RC(ctx)		((ctx)->gpr[3])
 #define PT_REGS_IP(ctx)		((ctx)->nip)
 #define PT_REGS_SP(ctx)		((ctx)->gpr[1])
 #elif defined(bpf_target_s390x)
 #define PT_REGS_PARM1(x) ((x)->gprs[2])
-#define PT_REGS_PARM1_SYSCALL(ctx)	PT_REGS_PARM1(ctx)
 #define PT_REGS_PARM2(x) ((x)->gprs[3])
-#define PT_REGS_PARM2_SYSCALL(ctx)	PT_REGS_PARM2(ctx)
 #define PT_REGS_PARM3(x) ((x)->gprs[4])
-#define PT_REGS_PARM3_SYSCALL(ctx)	PT_REGS_PARM3(ctx)
 #define PT_REGS_PARM4(x) ((x)->gprs[5])
-#define PT_REGS_PARM4_SYSCALL(ctx)	PT_REGS_PARM4(ctx)
 #define PT_REGS_PARM5(x) ((x)->gprs[6])
-#define PT_REGS_PARM5_SYSCALL(ctx)	PT_REGS_PARM5(ctx)
 #define PT_REGS_RET(x) ((x)->gprs[14])
 #define PT_REGS_FP(x) ((x)->gprs[11]) /* Works only with CONFIG_FRAME_POINTER */
 #define PT_REGS_RC(x) ((x)->gprs[2])
@@ -1107,17 +1096,11 @@ int bpf_usdt_readarg_p(int argc, struct pt_regs *ctx, void *buf, u64 len) asm("l
 #define PT_REGS_IP(x) ((x)->psw.addr)
 #elif defined(bpf_target_x86)
 #define PT_REGS_PARM1(ctx)	((ctx)->di)
-#define PT_REGS_PARM1_SYSCALL(ctx)	PT_REGS_PARM1(ctx)
 #define PT_REGS_PARM2(ctx)	((ctx)->si)
-#define PT_REGS_PARM2_SYSCALL(ctx)	PT_REGS_PARM2(ctx)
 #define PT_REGS_PARM3(ctx)	((ctx)->dx)
-#define PT_REGS_PARM3_SYSCALL(ctx)	PT_REGS_PARM3(ctx)
 #define PT_REGS_PARM4(ctx)	((ctx)->cx)
-#define PT_REGS_PARM4_SYSCALL(ctx)	((ctx)->r10) /* for syscall only */
 #define PT_REGS_PARM5(ctx)	((ctx)->r8)
-#define PT_REGS_PARM5_SYSCALL(ctx)	PT_REGS_PARM5(ctx)
 #define PT_REGS_PARM6(ctx)	((ctx)->r9)
-#define PT_REGS_PARM6_SYSCALL(ctx)	PT_REGS_PARM6(ctx)
 #define PT_REGS_RET(ctx)	((ctx)->sp)
 #define PT_REGS_FP(ctx)         ((ctx)->bp) /* Works only with CONFIG_FRAME_POINTER */
 #define PT_REGS_RC(ctx)		((ctx)->ax)
@@ -1125,17 +1108,11 @@ int bpf_usdt_readarg_p(int argc, struct pt_regs *ctx, void *buf, u64 len) asm("l
 #define PT_REGS_SP(ctx)		((ctx)->sp)
 #elif defined(bpf_target_arm64)
 #define PT_REGS_PARM1(x)	((x)->regs[0])
-#define PT_REGS_PARM1_SYSCALL(ctx)	PT_REGS_PARM1(ctx)
 #define PT_REGS_PARM2(x)	((x)->regs[1])
-#define PT_REGS_PARM2_SYSCALL(ctx)	PT_REGS_PARM2(ctx)
 #define PT_REGS_PARM3(x)	((x)->regs[2])
-#define PT_REGS_PARM3_SYSCALL(ctx)	PT_REGS_PARM3(ctx)
 #define PT_REGS_PARM4(x)	((x)->regs[3])
-#define PT_REGS_PARM4_SYSCALL(ctx)	PT_REGS_PARM4(ctx)
 #define PT_REGS_PARM5(x)	((x)->regs[4])
-#define PT_REGS_PARM5_SYSCALL(ctx)	PT_REGS_PARM5(ctx)
 #define PT_REGS_PARM6(x)	((x)->regs[5])
-#define PT_REGS_PARM6_SYSCALL(ctx)	PT_REGS_PARM6(ctx)
 #define PT_REGS_RET(x)		((x)->regs[30])
 #define PT_REGS_FP(x)		((x)->regs[29]) /*  Works only with CONFIG_FRAME_POINTER */
 #define PT_REGS_RC(x)		((x)->regs[0])
@@ -1143,6 +1120,26 @@ int bpf_usdt_readarg_p(int argc, struct pt_regs *ctx, void *buf, u64 len) asm("l
 #define PT_REGS_IP(x)		((x)->pc)
 #else
 #error "bcc does not support this platform yet"
+#endif
+
+#if defined(CONFIG_ARCH_HAS_SYSCALL_WRAPPER) && !defined(__s390x__)
+#define PT_REGS_SYSCALL_CTX(ctx)	((struct pt_regs *)PT_REGS_PARM1(ctx))
+#else
+#define PT_REGS_SYSCALL_CTX(ctx)	(ctx)
+#endif
+/* Helpers for syscall params. Pass in a ctx returned from PT_REGS_SYSCALL_CTX.
+ */
+#define PT_REGS_PARM1_SYSCALL(ctx)	PT_REGS_PARM1(ctx)
+#define PT_REGS_PARM2_SYSCALL(ctx)	PT_REGS_PARM2(ctx)
+#define PT_REGS_PARM3_SYSCALL(ctx)	PT_REGS_PARM3(ctx)
+#if defined(bpf_target_x86)
+#define PT_REGS_PARM4_SYSCALL(ctx)	((ctx)->r10) /* for syscall only */
+#else
+#define PT_REGS_PARM4_SYSCALL(ctx)	PT_REGS_PARM4(ctx)
+#endif
+#define PT_REGS_PARM5_SYSCALL(ctx)	PT_REGS_PARM5(ctx)
+#ifdef PT_REGS_PARM6
+#define PT_REGS_PARM6_SYSCALL(ctx)	PT_REGS_PARM6(ctx)
 #endif
 
 #define lock_xadd(ptr, val) ((void)__sync_fetch_and_add(ptr, val))
