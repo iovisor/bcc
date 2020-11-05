@@ -44,6 +44,9 @@ target_link_libraries(TaskIterator bcc-static)
 add_executable(SkLocalStorageIterator SkLocalStorageIterator.cc)
 target_link_libraries(SkLocalStorageIterator bcc-static)
 
+add_executable(KFuncExample KFuncExample.cc)
+target_link_libraries(KFuncExample bcc-static)
+
 if(INSTALL_CPP_EXAMPLES)
   install (TARGETS HelloWorld DESTINATION share/bcc/examples/cpp)
   install (TARGETS CPUDistribution DESTINATION share/bcc/examples/cpp)
@@ -54,6 +57,7 @@ if(INSTALL_CPP_EXAMPLES)
   install (TARGETS FollyRequestContextSwitch DESTINATION share/bcc/examples/cpp)
   install (TARGETS UseExternalMap DESTINATION share/bcc/examples/cpp)
   install (TARGETS CGroupTest DESTINATION share/bcc/examples/cpp)
+  install (TARGETS KFuncExample DESTINATION share/bcc/examples/cpp)
 endif(INSTALL_CPP_EXAMPLES)
 
 add_subdirectory(pyperf)
