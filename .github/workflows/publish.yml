@@ -15,8 +15,6 @@ jobs:
     strategy:
       matrix:
         env:
-        - NAME: xenial-release
-          OS_RELEASE: 16.04
         - NAME: bionic-release
           OS_RELEASE: 18.04
         - NAME: focal-release
