@@ -185,6 +185,7 @@ Solarflare `sfc` driver | 5.5 | [`eb9a36be7f3e`](https://git.kernel.org/cgit/lin
 Marvell `mvneta` driver | 5.5 | [`0db51da7a8e9`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=0db51da7a8e99f0803ec3a8e25c1a66234a219cb)
 Microsoft `hv_netvsc` driver | 5.6 | [`351e1581395f`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=351e1581395fcc7fb952bbd7dda01238f69968fd)
 Amazon `ena` driver | 5.6 | [`838c93dc5449`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=838c93dc5449e5d6378bae117b0a65a122cf7361)
+Intel `igb` driver | 5.10 | [`9cbc948b5a20`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=9cbc948b5a20c9c054d9631099c0426c16da546b)
 Intel `e1000` driver | | [Not upstream yet](https://git.kernel.org/pub/scm/linux/kernel/git/ast/bpf.git/commit/?h=xdp&id=0afee87cfc800bf3317f4dc8847e6f36539b820c)
 Intel `e1000e` driver | | [Not planned for upstream at this time](https://github.com/adjavon/e1000e_xdp)
 
