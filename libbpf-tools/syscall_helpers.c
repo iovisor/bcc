@@ -59,8 +59,8 @@ void init_syscall_names(void)
 		goto close;
 	}
 
-	/* skip the header */
-	fgets(buf, sizeof(buf), f);
+	/* skip the header, ignore the result of fgets, outwit the comiler */
+	(void) !!fgets(buf, sizeof(buf), f);
 
 	while (fgets(buf, sizeof(buf), f)) {
 		if (buf[strlen(buf) - 1] == '\n')
