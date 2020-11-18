@@ -202,16 +202,25 @@ DNAME_INLINE_LEN = 32  # linux/dcache.h
 print('Tracing... Output every %d secs. Hit Ctrl-C to end' % interval)
 
 
-def sort_fn(counts):
+def sort_metrics(metrics):
     """Define how to sort the columns"""
+    inode = metrics[1]
     if args.sort == "all":
-        return (counts[1].rbytes + counts[1].wbytes + counts[1].reads + counts[1].writes)
+        return (inode["rbytes"] +
+                inode["wbytes"] +
+                inode["reads"] +
+                inode["writes"])
     else:
-        return getattr(counts[1], args.sort)
+        return inode[args.sort]
 
 
 # output
 exiting = 0
+
+# metric is a dict where key is an inode_id and value a
+# dictionary of datas collected for this inode _id
+metrics = {}
+
 while 1:
     try:
         sleep(interval)
@@ -227,39 +236,46 @@ while 1:
         print("%-8s loadavg: %s" % (strftime("%H:%M:%S"), stats.read()))
 
     print("%-6s %-6s %-8s %-8s %s" %
-          ("READS", "WRITES", "R_Kb", "W_Kb", "PATH"))
-    # by-TID output
+          ("READS", "WRITES", "R_KiB", "W_KiB", "PATH"))
+
     counts = b.get_table("counts")
     line = 0
-    reads = {}
-    writes = {}
-    reads_Kb = {}
-    writes_Kb = {}
-    for k, v in reversed(sorted(counts.items(),
-                                key=sort_fn)):
-        # If it's the first time we see this inode
-        if k.inode_id not in reads:
-            # let's create a new entry
-            reads[k.inode_id] = v.reads
-            writes[k.inode_id] = v.writes
-            reads_Kb[k.inode_id] = v.rbytes / 1024
-            writes_Kb[k.inode_id] = v.wbytes / 1024
-        else:
-            # unless add the current performance metrics
-            # to the previous ones
-            reads[k.inode_id] += v.reads
-            writes[k.inode_id] += v.writes
-            reads_Kb[k.inode_id] += v.rbytes / 1024
-            writes_Kb[k.inode_id] += v.wbytes / 1024
 
-    for node_id in reads:
-        print("%-6d %-6d %-8d %-8d %s" %
-              (reads[node_id], writes[node_id], reads_Kb[node_id], writes_Kb[node_id], inodes_to_path[node_id]))
+    for k, v in counts.items():
+        # Init if this k.inode_id is not in metrics
+        if k.inode_id not in metrics:
+            metrics[k.inode_id] = {
+                "reads": v.reads,
+                "writes": v.writes,
+                "rbytes": v.rbytes,
+                "wbytes": v.wbytes,
+                "reads_total": 0,
+                "writes_total": 0,
+                "rbytes_total": 0,
+                "wbytes_total": 0
+            }
+
+        i = k.inode_id
+        metrics[i]["reads"] = v.reads - metrics[i]["reads_total"]
+        metrics[i]["writes"] = v.writes - metrics[i]["writes_total"]
+        metrics[i]["rbytes"] = v.rbytes - metrics[i]["rbytes_total"]
+        metrics[i]["wbytes"] = v.wbytes - metrics[i]["wbytes_total"]
+
+        # Now store the *_total for next iteration
+        metrics[i]["reads_total"] = v.reads
+        metrics[i]["writes_total"] = v.writes
+        metrics[i]["rbytes_total"] = v.rbytes
+        metrics[i]["wbytes_total"] = v.wbytes
+
+    for inode_id, v in sorted(metrics.items(), key=sort_metrics, reverse=True):
         line += 1
-        if line >= maxrows:
-            break
-
-    counts.clear()
+        if line <= maxrows:
+            if v["reads"] != 0 or v["reads"] != 0:
+                print("%-6d %-6d %-8d %-8d %s" % (v["reads"],
+                                                  v["writes"],
+                                                  v["rbytes"]/1024,
+                                                  v["wbytes"]/1024,
+                                                  inodes_to_path[inode_id]))
 
     countdown -= 1
     if exiting or countdown == 0:
