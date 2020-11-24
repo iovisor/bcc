@@ -481,7 +481,7 @@ Examples in situ:
 
 Syntax: ```u64 bpf_ktime_get_ns(void)```
 
-Return: current time in nanoseconds
+Return: u64 number of nanoseconds. Starts at system boot time but stops during suspend.
 
 Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=bpf_ktime_get_ns+path%3Aexamples&type=Code),
@@ -600,7 +600,7 @@ This copies a `NULL` terminated string from user address space to the BPF stack,
 Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=bpf_probe_read_user_str+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=bpf_probe_read_user_str+path%3Atools&type=Code)
-  
+
 
 ### 12. bpf_get_ns_current_pid_tgid()
 
@@ -609,7 +609,7 @@ Syntax: ```u32 bpf_get_ns_current_pid_tgid(u64 dev, u64 ino, struct bpf_pidns_in
 Values for *pid* and *tgid* as seen from the current *namespace* will be returned in *nsdata*.
 
 Return 0 on success, or one of the following in case of failure:
- 
+
 - **-EINVAL** if dev and inum supplied don't match dev_t and inode number with nsfs of current task, or if dev conversion to dev_t lost high bits.
 
 - **-ENOENT** if pidns does not exists for the current task.
