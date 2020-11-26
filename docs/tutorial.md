@@ -10,7 +10,7 @@ Some quick wins.
 
 ### 0. Before bcc
 
-Before using bcc, you should start with the Linux basics. One reference is the [Linux Performance Analysis in 60s](http://techblog.netflix.com/2015/11/linux-performance-analysis-in-60s.html) post, which covers these commands:
+Before using bcc, you should start with the Linux basics. One reference is the [Linux Performance Analysis in 60,000 Milliseconds](https://netflixtechblog.com/linux-performance-analysis-in-60-000-milliseconds-accc10403c55) post, which covers these commands:
 
 1. uptime
 1. dmesg | tail
