@@ -17,14 +17,14 @@ const volatile pid_t targ_tgid = -1;
 
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
+	__uint(map_flags, BPF_F_NO_PREALLOC);
 	__type(key, u32);
 	__type(value, u64);
 } start SEC(".maps");
 
-static struct hist initial_hist;
-
 struct {
-	__uint(type, BPF_MAP_TYPE_HASH);
+	__uint(type, BPF_MAP_TYPE_ARRAY);
+	__uint(map_flags, BPF_F_MMAPABLE);
 	__type(key, u32);
 	__type(value, struct hist);
 } hists SEC(".maps");
@@ -55,15 +55,12 @@ static __always_inline void update_hist(struct task_struct *task,
 	else if (targ_per_thread)
 		id = pid;
 	else
-		id = -1;
+		id = 0;
 	histp = bpf_map_lookup_elem(&hists, &id);
-	if (!histp) {
-		bpf_map_update_elem(&hists, &id, &initial_hist, 0);
-		histp = bpf_map_lookup_elem(&hists, &id);
-		if (!histp)
-			return;
+	if (!histp)
+		return;
+	if (!histp->comm[0])
 		BPF_CORE_READ_STR_INTO(&histp->comm, task, comm);
-	}
 	delta = ts - *tsp;
 	if (targ_ms)
 		delta /= 1000000;

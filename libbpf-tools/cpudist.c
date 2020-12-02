@@ -6,6 +6,7 @@
 #include <argp.h>
 #include <signal.h>
 #include <stdio.h>
+#include <sys/mman.h>
 #include <unistd.h>
 #include <time.h>
 #include <bpf/libbpf.h>
@@ -143,48 +144,42 @@ static void sig_handler(int sig)
 	exiting = true;
 }
 
-static int print_log2_hists(int fd)
+static int roundup_page(int sz)
 {
-	char *units = env.milliseconds ? "msecs" : "usecs";
-	__u32 lookup_key = -2, next_key;
-	struct hist hist;
-	int err;
+	int page_size = sysconf(_SC_PAGE_SIZE);
 
-	while (!bpf_map_get_next_key(fd, &lookup_key, &next_key)) {
-		err = bpf_map_lookup_elem(fd, &next_key, &hist);
-		if (err < 0) {
-			fprintf(stderr, "failed to lookup hist: %d\n", err);
-			return -1;
-		}
-		if (env.per_process)
-			printf("\npid = %d %s\n", next_key, hist.comm);
-		if (env.per_thread)
-			printf("\ntid = %d %s\n", next_key, hist.comm);
-		print_log2_hist(hist.slots, MAX_SLOTS, units);
-		lookup_key = next_key;
+	return (sz + page_size - 1) / page_size * page_size;
+}
+
+static struct hist zero;
+
+static int print_log2_hists(struct hist *hists, int hists_nr)
+{
+	const char *units = env.milliseconds ? "msecs" : "usecs";
+	int i;
+
+	for (i = 0; i < hists_nr; i++) {
+		if (env.per_process && hists[i].comm[0])
+			printf("\npid = %d %s\n", i, hists[i].comm);
+		if (env.per_thread && hists[i].comm[0])
+			printf("\ntid = %d %s\n", i, hists[i].comm);
+		print_log2_hist(hists[i].slots, MAX_SLOTS, units);
+		hists[i] = zero;
 	}
 
-	lookup_key = -2;
-	while (!bpf_map_get_next_key(fd, &lookup_key, &next_key)) {
-		err = bpf_map_delete_elem(fd, &next_key);
-		if (err < 0) {
-			fprintf(stderr, "failed to cleanup hist : %d\n", err);
-			return -1;
-		}
-		lookup_key = next_key;
-	}
 	return 0;
 }
 
 int main(int argc, char **argv)
 {
+	int pid_max, hists_nr, hists_sz, err;
 	static const struct argp argp = {
 		.options = opts,
 		.parser = parse_arg,
 		.doc = argp_program_doc,
 	};
+	void *hists_mmaped = NULL;
 	struct cpudist_bpf *obj;
-	int pid_max, fd, err;
 	struct tm *tm;
 	char ts[32];
 	time_t t;
@@ -221,10 +216,8 @@ int main(int argc, char **argv)
 	}
 
 	bpf_map__resize(obj->maps.start, pid_max);
-	if (!env.per_process && !env.per_thread)
-		bpf_map__resize(obj->maps.hists, 1);
-	else
-		bpf_map__resize(obj->maps.hists, pid_max);
+	hists_nr = env.per_process || env.per_thread ? pid_max : 1;
+	bpf_map__resize(obj->maps.hists, hists_nr);
 
 	err = cpudist_bpf__load(obj);
 	if (err) {
@@ -238,7 +231,14 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
-	fd = bpf_map__fd(obj->maps.hists);
+	hists_sz = roundup_page(hists_nr * sizeof(struct hist));
+	hists_mmaped = mmap(NULL, hists_sz, PROT_READ | PROT_WRITE, MAP_SHARED,
+			bpf_map__fd(obj->maps.hists), 0);
+	if (hists_mmaped == MAP_FAILED) {
+		fprintf(stderr, "failed to mmap hists: %d\n", errno);
+		hists_mmaped = NULL;
+		goto cleanup;
+	}
 
 	signal(SIGINT, sig_handler);
 
@@ -256,7 +256,7 @@ int main(int argc, char **argv)
 			printf("%-8s\n", ts);
 		}
 
-		err = print_log2_hists(fd);
+		err = print_log2_hists(hists_mmaped, hists_nr);
 		if (err)
 			break;
 
@@ -265,6 +265,8 @@ int main(int argc, char **argv)
 	}
 
 cleanup:
+	if (hists_mmaped)
+		munmap(hists_mmaped, hists_sz);
 	cpudist_bpf__destroy(obj);
 
 	return err != 0;
