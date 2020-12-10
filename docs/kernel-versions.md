@@ -84,7 +84,6 @@ BPF LSM hook | 5.7 | [`fc611f47f218`](https://github.com/torvalds/linux/commit/f
 BPF socket lookup hook | 5.9 | [`e9ddbb7707ff`](https://github.com/torvalds/linux/commit/e9ddbb7707ff5891616240026062b8c1e29864ca)
 Pass map values to map helpers | 4.18 | [`d71962f3e627`](https://github.com/torvalds/linux/commit/d71962f3e627b5941804036755c844fabfb65ff5)
 
-
 ## Tables (_a.k.a._ Maps)
 
 ### Table types
