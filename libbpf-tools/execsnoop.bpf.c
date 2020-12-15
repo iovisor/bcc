@@ -60,7 +60,7 @@ int tracepoint__syscalls__sys_enter_execve(struct trace_event_raw_sys_enter* ctx
 	event->args_count = 0;
 	event->args_size = 0;
 
-	ret = bpf_probe_read_str(event->args, ARGSIZE, (const char*)ctx->args[0]);
+	ret = bpf_probe_read_user_str(event->args, ARGSIZE, (const char*)ctx->args[0]);
 	if (ret <= ARGSIZE) {
 		event->args_size += ret;
 	} else {
@@ -72,14 +72,14 @@ int tracepoint__syscalls__sys_enter_execve(struct trace_event_raw_sys_enter* ctx
 	event->args_count++;
 	#pragma unroll
 	for (int i = 1; i < TOTAL_MAX_ARGS && i < max_args; i++) {
-		bpf_probe_read(&argp, sizeof(argp), &args[i]);
+		bpf_probe_read_user(&argp, sizeof(argp), &args[i]);
 		if (!argp)
 			return 0;
 
 		if (event->args_size > LAST_ARG)
 			return 0;
 
-		ret = bpf_probe_read_str(&event->args[event->args_size], ARGSIZE, argp);
+		ret = bpf_probe_read_user_str(&event->args[event->args_size], ARGSIZE, argp);
 		if (ret > ARGSIZE)
 			return 0;
 
@@ -87,7 +87,7 @@ int tracepoint__syscalls__sys_enter_execve(struct trace_event_raw_sys_enter* ctx
 		event->args_size += ret;
 	}
 	/* try to read one more argument to check if there is one */
-	bpf_probe_read(&argp, sizeof(argp), &args[max_args]);
+	bpf_probe_read_user(&argp, sizeof(argp), &args[max_args]);
 	if (!argp)
 		return 0;
 
