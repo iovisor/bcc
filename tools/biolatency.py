@@ -219,7 +219,7 @@ while (1):
                 hist_dict[int(k.value)] = v.value
             elif k.value <= max_nonzero_idx+1:
                 index = index * 2
-                hist_dict[int(index)] = v.value
+                hist_dict[int(index)] = int(v.value)
         if args.file:
             path = os.path.dirname(args.file)
             if not os.path.exists(path):
