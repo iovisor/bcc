@@ -15,6 +15,8 @@ from __future__ import print_function
 from bcc import BPF
 from time import sleep, strftime
 import argparse
+import json
+import os.path
 
 # arguments
 examples = """examples:
@@ -24,30 +26,39 @@ examples = """examples:
     ./biolatency -Q         # include OS queued time in I/O time
     ./biolatency -D         # show each disk device separately
     ./biolatency -F         # show I/O flags separately
+    ./biolatency -j         # output a dict                                 # github.com/swiftomkar
 """
 parser = argparse.ArgumentParser(
     description="Summarize block device I/O latency as a histogram",
     formatter_class=argparse.RawDescriptionHelpFormatter,
     epilog=examples)
 parser.add_argument("-T", "--timestamp", action="store_true",
-    help="include timestamp on output")
+                    help="include timestamp on output")
 parser.add_argument("-Q", "--queued", action="store_true",
-    help="include OS queued time in I/O time")
+                    help="include OS queued time in I/O time")
 parser.add_argument("-m", "--milliseconds", action="store_true",
-    help="millisecond histogram")
+                    help="millisecond histogram")
 parser.add_argument("-D", "--disks", action="store_true",
-    help="print a histogram per disk device")
+                    help="print a histogram per disk device")
 parser.add_argument("-F", "--flags", action="store_true",
-    help="print a histogram per set of I/O flags")
+                    help="print a histogram per set of I/O flags")
 parser.add_argument("interval", nargs="?", default=99999999,
-    help="output interval, in seconds")
+                    help="output interval, in seconds")
 parser.add_argument("count", nargs="?", default=99999999,
-    help="number of outputs")
+                    help="number of outputs")
 parser.add_argument("--ebpf", action="store_true",
-    help=argparse.SUPPRESS)
+                    help=argparse.SUPPRESS)
+parser.add_argument("-j", "--json", action="store_true",
+    help="json output")
+parser.add_argument("-f", "--file", type=str)
+
 args = parser.parse_args()
 countdown = int(args.count)
 debug = 0
+if args.file and not args.json:
+    print("ERROR: can only use -f with -j. Exiting.")
+    exit()
+
 if args.flags and args.disks:
     print("ERROR: can only use -D or -F. Exiting.")
     exit()
@@ -56,20 +67,16 @@ if args.flags and args.disks:
 bpf_text = """
 #include <uapi/linux/ptrace.h>
 #include <linux/blkdev.h>
-
 typedef struct disk_key {
     char disk[DISK_NAME_LEN];
     u64 slot;
 } disk_key_t;
-
 typedef struct flag_key {
     u64 flags;
     u64 slot;
 } flag_key_t;
-
 BPF_HASH(start, struct request *);
 STORAGE
-
 // time block I/O
 int trace_req_start(struct pt_regs *ctx, struct request *req)
 {
@@ -77,12 +84,10 @@ int trace_req_start(struct pt_regs *ctx, struct request *req)
     start.update(&req, &ts);
     return 0;
 }
-
 // output
 int trace_req_done(struct pt_regs *ctx, struct request *req)
 {
     u64 *tsp, delta;
-
     // fetch timestamp and calculate delta
     tsp = start.lookup(&req);
     if (tsp == 0) {
@@ -90,10 +95,8 @@ int trace_req_done(struct pt_regs *ctx, struct request *req)
     }
     delta = bpf_ktime_get_ns() - *tsp;
     FACTOR
-
     // store as histogram
     STORE
-
     start.delete(&req);
     return 0;
 }
@@ -108,23 +111,23 @@ else:
     label = "usecs"
 if args.disks:
     bpf_text = bpf_text.replace('STORAGE',
-        'BPF_HISTOGRAM(dist, disk_key_t);')
+                                'BPF_HISTOGRAM(dist, disk_key_t);')
     bpf_text = bpf_text.replace('STORE',
-        'disk_key_t key = {.slot = bpf_log2l(delta)}; ' +
-        'void *__tmp = (void *)req->rq_disk->disk_name; ' +
-        'bpf_probe_read_kernel(&key.disk, sizeof(key.disk), __tmp); ' +
-        'dist.increment(key);')
+                                'disk_key_t key = {.slot = bpf_log2l(delta)}; ' +
+                                'void *__tmp = (void *)req->rq_disk->disk_name; ' +
+                                'bpf_probe_read_kernel(&key.disk, sizeof(key.disk), __tmp); ' +
+                                'dist.increment(key);')
 elif args.flags:
     bpf_text = bpf_text.replace('STORAGE',
-        'BPF_HISTOGRAM(dist, flag_key_t);')
+                                'BPF_HISTOGRAM(dist, flag_key_t);')
     bpf_text = bpf_text.replace('STORE',
-        'flag_key_t key = {.slot = bpf_log2l(delta)}; ' +
-        'key.flags = req->cmd_flags; ' +
-        'dist.increment(key);')
+                                'flag_key_t key = {.slot = bpf_log2l(delta)}; ' +
+                                'key.flags = req->cmd_flags; ' +
+                                'dist.increment(key);')
 else:
     bpf_text = bpf_text.replace('STORAGE', 'BPF_HISTOGRAM(dist);')
     bpf_text = bpf_text.replace('STORE',
-        'dist.increment(bpf_log2l(delta));')
+                                'dist.increment(bpf_log2l(delta));')
 if debug or args.ebpf:
     print(bpf_text)
     if args.ebpf:
@@ -139,9 +142,9 @@ else:
         b.attach_kprobe(event="blk_start_request", fn_name="trace_req_start")
     b.attach_kprobe(event="blk_mq_start_request", fn_name="trace_req_start")
 b.attach_kprobe(event="blk_account_io_done",
-    fn_name="trace_req_done")
+                fn_name="trace_req_done")
 
-print("Tracing block device I/O... Hit Ctrl-C to end.")
+# print("Tracing block device I/O... Hit Ctrl-C to end.")
 
 # see blk_fill_rwbs():
 req_opf = {
@@ -203,6 +206,30 @@ while (1):
         exiting = 1
 
     print()
+    if args.json:
+        hist_dict = dict()
+        max_nonzero_idx = 0
+        for k, v in dist.items():
+            if v.value !=0:
+                max_nonzero_idx = k.value
+        index = 1
+        for k, v in dist.items():
+            if k.value == 0 and k.value <= max_nonzero_idx+1:
+                hist_dict[int(k.value)] = v.value
+            elif k.value <= max_nonzero_idx+1:
+                index = index * 2
+                hist_dict[int(index)] = v.value
+        if args.file:
+            path = os.path.dirname(args.file)
+            if not os.path.exists(path):
+                os.makedirs(path)
+            filebuf = open(args.file, "w")
+            filebuf.write(json.dumps(hist_dict))
+            filebuf.write("\n")
+            filebuf.close()
+        else:
+            print(hist_dict)
+
     if args.timestamp:
         print("%-8s\n" % strftime("%H:%M:%S"), end="")
 
