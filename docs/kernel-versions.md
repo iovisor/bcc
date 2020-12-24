@@ -82,7 +82,9 @@ BPF cgroup sysctl | 5.2 | [`7b146cebe30c`](https://github.com/torvalds/linux/com
 BPF raw tracepoint writable | 5.2 | [`9df1c28bb752`](https://github.com/torvalds/linux/commit/9df1c28bb75217b244257152ab7d788bb2a386d0)
 BPF trampoline | 5.5 | [`fec56f5890d9`](https://github.com/torvalds/linux/commit/fec56f5890d93fc2ed74166c397dc186b1c25951)
 BPF LSM hook | 5.7 | [`fc611f47f218`](https://github.com/torvalds/linux/commit/fc611f47f2188ade2b48ff6902d5cce8baac0c58) [`641cd7b06c91`](https://github.com/torvalds/linux/commit/641cd7b06c911c5935c34f24850ea18690649917)
+BPF iterator | 5.8 | [`180139dca8b3`](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=180139dca8b38c858027b8360ee10064fdb2fbf7)
 BPF socket lookup hook | 5.9 | [`e9ddbb7707ff`](https://github.com/torvalds/linux/commit/e9ddbb7707ff5891616240026062b8c1e29864ca)
+Sleepable BPF programs | 5.10 | [`1e6c62a88215`](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=1e6c62a8821557720a9b2ea9617359b264f2f67c)
 
 ## Tables (_a.k.a._ Maps)
 
@@ -122,6 +124,8 @@ socket local storage | 5.2 | [`6ac99e8f23d4`](https://github.com/torvalds/linux/
 Netdevice references (hashmap) | 5.4 | [`6f9d451ab1a3`](https://github.com/torvalds/linux/commit/6f9d451ab1a33728adb72d7ff66a7b374d665176)
 struct ops | 5.6 | [`85d33df357b6`](https://github.com/torvalds/linux/commit/85d33df357b634649ddbe0a20fd2d0fc5732c3cb)
 ring buffer | 5.8 | [`457f44363a88`](https://github.com/torvalds/linux/commit/457f44363a8894135c85b7a9afd2bd8196db24ab)
+inode storage | 5.10 | [`8ea636848aca`](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=8ea636848aca35b9f97c5b5dee30225cf2dd0fe6)
+task storage | 5.11 | [`4cf1bc1f1045`](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=4cf1bc1f10452065a29d576fc5693fc4fab5b919)
 
 ### Table userspace API
 
@@ -186,6 +190,7 @@ Solarflare `sfc` driver | 5.5 | [`eb9a36be7f3e`](https://git.kernel.org/cgit/lin
 Marvell `mvneta` driver | 5.5 | [`0db51da7a8e9`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=0db51da7a8e99f0803ec3a8e25c1a66234a219cb)
 Microsoft `hv_netvsc` driver | 5.6 | [`351e1581395f`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=351e1581395fcc7fb952bbd7dda01238f69968fd)
 Amazon `ena` driver | 5.6 | [`838c93dc5449`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=838c93dc5449e5d6378bae117b0a65a122cf7361)
+`xen-netfront` driver | 5.9 | [`6c5aa6fc4def`](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=6c5aa6fc4defc2a0977a2c59e4710d50fa1e834c)
 Intel `igb` driver | 5.10 | [`9cbc948b5a20`](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=9cbc948b5a20c9c054d9631099c0426c16da546b)
 Intel `e1000` driver | | [Not upstream yet](https://git.kernel.org/pub/scm/linux/kernel/git/ast/bpf.git/commit/?h=xdp&id=0afee87cfc800bf3317f4dc8847e6f36539b820c)
 Intel `e1000e` driver | | [Not planned for upstream at this time](https://github.com/adjavon/e1000e_xdp)
