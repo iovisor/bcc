@@ -925,8 +925,8 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
           // events.perf_submit(ctx, &data, sizeof(data));
           // ...
           //                       &data   ->     data    ->  typeof(data)        ->   data_t
-          auto type_arg1 = Call->getArg(1)->IgnoreCasts()->getType().getTypePtr()->getPointeeType().getTypePtr();
-          if (type_arg1->isStructureType()) {
+          auto type_arg1 = Call->getArg(1)->IgnoreCasts()->getType().getTypePtr()->getPointeeType().getTypePtrOrNull();
+          if (type_arg1 && type_arg1->isStructureType()) {
             auto event_type = type_arg1->getAsTagDecl();
             const auto *r = dyn_cast<RecordDecl>(event_type);
             std::vector<std::string> perf_event;
