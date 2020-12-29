@@ -36,6 +36,12 @@ Print a histogram per disk device.
 \-F
 Print a histogram per set of I/O flags.
 .TP
+\-j
+Print a histogram dictionary along with the histogram
+.TP
+\-f
+Write the histogram dictionary to the specified file path. Used with -j
+.TP
 interval
 Output interval, in seconds.
 .TP
@@ -63,6 +69,14 @@ Include OS queued time in I/O time:
 Show a latency histogram for each disk device separately:
 #
 .B biolatency \-D
+.TP
+Show a latency histogram in a dictionary format:
+#
+.B biolatency \-j
+.TP
+Store the histogram dictionary in the specified file:
+#
+.B biolatency \-jf ./histogram.json
 .SH FIELDS
 .TP
 usecs
