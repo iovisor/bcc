@@ -1204,8 +1204,8 @@ Syntax: ```map.increment(key[, increment_amount])```
 Increments the key's value by `increment_amount`, which defaults to 1. Used for histograms.
 
 Examples in situ:
-[search /examples](https://github.com/iovisor/bcc/search?q=.increment(+path%3Aexamples&type=Code),
-[search /tools](https://github.com/iovisor/bcc/search?q=.increment(+path%3Atools&type=Code)
+[search /examples](https://github.com/iovisor/bcc/search?q=increment+path%3Aexamples&type=Code),
+[search /tools](https://github.com/iovisor/bcc/search?q=increment+path%3Atools&type=Code)
 
 ### 23. map.get_stackid()
 
