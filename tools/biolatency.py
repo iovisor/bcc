@@ -153,7 +153,7 @@ else:
 b.attach_kprobe(event="blk_account_io_done",
     fn_name="trace_req_done")
 
-if not args.json and not args.file:
+if not (args.json and args.file):
     print("Tracing block device I/O... Hit Ctrl-C to end.")
 
 # see blk_fill_rwbs():
