@@ -94,7 +94,7 @@ int trace_req_start(struct pt_regs *ctx, struct request *req)
 int trace_req_done(struct pt_regs *ctx, struct request *req)
 {
     u64 *tsp, delta;
-    
+
     // fetch timestamp and calculate delta
     tsp = start.lookup(&req);
     if (tsp == 0) {
@@ -102,10 +102,10 @@ int trace_req_done(struct pt_regs *ctx, struct request *req)
     }
     delta = bpf_ktime_get_ns() - *tsp;
     FACTOR
-    
+
     // store as histogram
     STORE
-    
+
     start.delete(&req);
     return 0;
 }
