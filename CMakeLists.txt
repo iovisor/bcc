@@ -48,13 +48,14 @@ if (CMAKE_USE_LIBBPF_PACKAGE)
   find_package(LibBpf)
 endif()
 
-if(NOT PYTHON_ONLY AND ENABLE_CLANG_JIT)
-find_package(BISON)
-find_package(FLEX)
+if(NOT PYTHON_ONLY)
 find_package(LLVM REQUIRED CONFIG)
 message(STATUS "Found LLVM: ${LLVM_INCLUDE_DIRS} ${LLVM_PACKAGE_VERSION}")
-find_package(LibElf REQUIRED)
 
+if(ENABLE_CLANG_JIT)
+find_package(BISON)
+find_package(FLEX)
+find_package(LibElf REQUIRED)
 if(CLANG_DIR)
   set(CMAKE_FIND_ROOT_PATH "${CLANG_DIR}")
   include_directories("${CLANG_DIR}/include")
@@ -82,6 +83,7 @@ endif()
 FOREACH(DIR ${LLVM_INCLUDE_DIRS})
   include_directories("${DIR}/../tools/clang/include")
 ENDFOREACH()
+endif(ENABLE_CLANG_JIT)
 
 # Set to a string path if system places kernel lib directory in
 # non-default location.
@@ -109,7 +111,7 @@ endif()
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_STANDARD 14)
 
-endif(NOT PYTHON_ONLY AND ENABLE_CLANG_JIT)
+endif(NOT PYTHON_ONLY)
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall ${CXX_ISYSTEM_DIRS}")
