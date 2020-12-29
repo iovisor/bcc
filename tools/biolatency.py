@@ -51,7 +51,8 @@ parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
 parser.add_argument("-j", "--json", action="store_true",
     help="json output")
-parser.add_argument("-f", "--file", type=str)
+parser.add_argument("-f", "--file", type=str,
+    help="write json output to specified file")
 
 args = parser.parse_args()
 countdown = int(args.count)
@@ -229,6 +230,7 @@ while (1):
             elif k.value <= max_nonzero_idx+1:
                 index = index * 2
                 hist_dict[int(index)] = int(v.value)
+        hist_dict.pop(0, None)
         if args.file:
             path = os.path.dirname(args.file)
             if not os.path.exists(path):

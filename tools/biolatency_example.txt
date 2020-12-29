@@ -292,11 +292,62 @@ flags = Priority-Metadata-Write
 These can be handled differently by the storage device, and this mode lets us
 examine their performance in isolation.
 
+The -j option prints a dictionary of the histogram.
+In most cases, this flag will be used with the -f flag. For example:
+
+# ./biolatency.py -j
+Tracing block device I/O... Hit Ctrl-C to end.
+^C
+{32: 4, 2: 0, 4096: 32, 4: 0, 1024: 10, 8192: 0, 8: 0, 64: 38, 128: 42, 256: 5, 16: 0, 512: 1, 2048: 0}
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 4        |***                                     |
+        32 -> 63         : 38       |************************************    |
+        64 -> 127        : 42       |****************************************|
+       128 -> 255        : 5        |****                                    |
+       256 -> 511        : 1        |                                        |
+       512 -> 1023       : 10       |*********                               |
+      1024 -> 2047       : 0        |                                        |
+      2048 -> 4095       : 32       |******************************          |
+
+Each value in the dictionary represents the number of block I/O's that took less usecs than the key but
+more usecs than the previous key. eg: in the above example, there were 10 I/O operations with latency between 512
+and 1024 usecs. You can use the tabular histogram to compare and understand the histogram dictionary.
+
+
+The -j and -f option together lets you write the histogram dictionary into a json file.
+With these flags, it is possible to store the histogram as a dictionary/json file which
+can be imported easily to be analyzed with libraries like Pandas.
+
+# ./biolatency.py -j -f ./histogram.json
+^C
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 7        |*******                                 |
+        64 -> 127        : 23       |************************                |
+       128 -> 255        : 33       |***********************************     |
+       256 -> 511        : 4        |****                                    |
+       512 -> 1023       : 16       |*****************                       |
+      1024 -> 2047       : 4        |****                                    |
+      2048 -> 4095       : 37       |****************************************|
+# ls
+biolatency.py  histogram.json
+# cat histogram.json
+{"32": 0, "2": 0, "4096": 37, "4": 0, "1024": 16, "8192": 0, "8": 0, "64": 7, "128": 23, "256": 32, "16": 0, "512": 4, "2048": 4}
+The histogram.json file contains the histogram data.
 
 USAGE message:
 
 # ./biolatency -h
-usage: biolatency [-h] [-T] [-Q] [-m] [-D] [-F] [interval] [count]
+usage: biolatency_2.py [-h] [-T] [-Q] [-m] [-D] [-F] [-j] [-f FILE]
+                       [interval] [count]
 
 Summarize block device I/O latency as a histogram
 
@@ -305,17 +356,21 @@ positional arguments:
   count               number of outputs
 
 optional arguments:
-  -h, --help          show this help message and exit
-  -T, --timestamp     include timestamp on output
-  -Q, --queued        include OS queued time in I/O time
-  -m, --milliseconds  millisecond histogram
-  -D, --disks         print a histogram per disk device
-  -F, --flags         print a histogram per set of I/O flags
+  -h, --help            show this help message and exit
+  -T, --timestamp       include timestamp on output
+  -Q, --queued          include OS queued time in I/O time
+  -m, --milliseconds    millisecond histogram
+  -D, --disks           print a histogram per disk device
+  -F, --flags           print a histogram per set of I/O flags
+  -j, --json            json output
+  -f FILE, --file FILE  write json output to specified file
 
 examples:
-    ./biolatency            # summarize block I/O latency as a histogram
-    ./biolatency 1 10       # print 1 second summaries, 10 times
-    ./biolatency -mT 1      # 1s summaries, milliseconds, and timestamps
-    ./biolatency -Q         # include OS queued time in I/O time
-    ./biolatency -D         # show each disk device separately
-    ./biolatency -F         # show I/O flags separately
+    ./biolatency                    # summarize block I/O latency as a histogram
+    ./biolatency 1 10               # print 1 second summaries, 10 times
+    ./biolatency -mT 1              # 1s summaries, milliseconds, and timestamps
+    ./biolatency -Q                 # include OS queued time in I/O time
+    ./biolatency -D                 # show each disk device separately
+    ./biolatency -F                 # show I/O flags separately
+    ./biolatency -j                 # print a dictionary
+    ./biolatency -j -f name.json    # Dump the histogram dictionary to name.json file
