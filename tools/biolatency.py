@@ -39,6 +39,8 @@ parser.add_argument("-D", "--disks", action="store_true",
     help="print a histogram per disk device")
 parser.add_argument("-F", "--flags", action="store_true",
     help="print a histogram per set of I/O flags")
+parser.add_argument("-p", "--pid",
+    help="trace this PID only")
 parser.add_argument("interval", nargs="?", default=99999999,
     help="output interval, in seconds")
 parser.add_argument("count", nargs="?", default=99999999,
@@ -73,6 +75,9 @@ STORAGE
 // time block I/O
 int trace_req_start(struct pt_regs *ctx, struct request *req)
 {
+    u32 pid = bpf_get_current_pid_tgid() >> 32;
+    FILTER
+    
     u64 ts = bpf_ktime_get_ns();
     start.update(&req, &ts);
     return 0;
@@ -86,7 +91,7 @@ int trace_req_done(struct pt_regs *ctx, struct request *req)
     // fetch timestamp and calculate delta
     tsp = start.lookup(&req);
     if (tsp == 0) {
-        return 0;   // missed issue
+        return 0;   // missed issue or filtered out
     }
     delta = bpf_ktime_get_ns() - *tsp;
     FACTOR
@@ -100,6 +105,11 @@ int trace_req_done(struct pt_regs *ctx, struct request *req)
 """
 
 # code substitutions
+if args.pid:
+    bpf_text = bpf_text.replace('FILTER',
+                                'if (pid != %s) { return 0; }' % args.pid)
+else:
+    bpf_text = bpf_text.replace('FILTER', '')
 if args.milliseconds:
     bpf_text = bpf_text.replace('FACTOR', 'delta /= 1000000;')
     label = "msecs"
