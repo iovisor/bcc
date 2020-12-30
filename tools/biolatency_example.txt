@@ -293,61 +293,46 @@ These can be handled differently by the storage device, and this mode lets us
 examine their performance in isolation.
 
 The -j option prints a dictionary of the histogram.
-In most cases, this flag will be used with the -f flag. For example:
+For example:
 
 # ./biolatency.py -j
-Tracing block device I/O... Hit Ctrl-C to end.
 ^C
-{32: 4, 2: 0, 4096: 32, 4: 0, 1024: 10, 8192: 0, 8: 0, 64: 38, 128: 42, 256: 5, 16: 0, 512: 1, 2048: 0}
-     usecs               : count     distribution
-         0 -> 1          : 0        |                                        |
-         2 -> 3          : 0        |                                        |
-         4 -> 7          : 0        |                                        |
-         8 -> 15         : 0        |                                        |
-        16 -> 31         : 4        |***                                     |
-        32 -> 63         : 38       |************************************    |
-        64 -> 127        : 42       |****************************************|
-       128 -> 255        : 5        |****                                    |
-       256 -> 511        : 1        |                                        |
-       512 -> 1023       : 10       |*********                               |
-      1024 -> 2047       : 0        |                                        |
-      2048 -> 4095       : 32       |******************************          |
+{'ts': '2020-12-30 14:33:03', 'val_type': 'usecs', 'data': [{'interval-start': 0, 'interval-end': 1, 'count': 0}, {'interval-start': 2, 'interval-end': 3, 'count': 0}, {'interval-start': 4, 'interval-end': 7, 'count': 0}, {'interval-start': 8, 'interval-end': 15, 'count': 0}, {'interval-start': 16, 'interval-end': 31, 'count': 0}, {'interval-start': 32, 'interval-end': 63, 'count': 2}, {'interval-start': 64, 'interval-end': 127, 'count': 75}, {'interval-start': 128, 'interval-end': 255, 'count': 7}, {'interval-start': 256, 'interval-end': 511, 'count': 0}, {'interval-start': 512, 'interval-end': 1023, 'count': 6}, {'interval-start': 1024, 'interval-end': 2047, 'count': 3}, {'interval-start': 2048, 'interval-end': 4095, 'count': 31}]}
 
-Each value in the dictionary represents the number of block I/O's that took less usecs than the key but
-more usecs than the previous key. eg: in the above example, there were 10 I/O operations with latency between 512
-and 1024 usecs. You can use the tabular histogram to compare and understand the histogram dictionary.
+the key `data` is the list of the log2 histogram intervals. The `interval-start` and `interval-end` define the
+latency bucket and `count` is the number of I/O's that lie in that latency range.
 
 
 The -j and -f option together lets you write the histogram dictionary into a json file.
 With these flags, it is possible to store the histogram as a dictionary/json file which
 can be imported easily to be analyzed with libraries like Pandas.
 
-# ./biolatency.py -j -f ./histogram.json
+# ./biolatency.py -jF
 ^C
-     usecs               : count     distribution
-         0 -> 1          : 0        |                                        |
-         2 -> 3          : 0        |                                        |
-         4 -> 7          : 0        |                                        |
-         8 -> 15         : 0        |                                        |
-        16 -> 31         : 0        |                                        |
-        32 -> 63         : 7        |*******                                 |
-        64 -> 127        : 23       |************************                |
-       128 -> 255        : 33       |***********************************     |
-       256 -> 511        : 4        |****                                    |
-       512 -> 1023       : 16       |*****************                       |
-      1024 -> 2047       : 4        |****                                    |
-      2048 -> 4095       : 37       |****************************************|
-# ls
-biolatency.py  histogram.json
-# cat histogram.json
-{"32": 0, "2": 0, "4096": 37, "4": 0, "1024": 16, "8192": 0, "8": 0, "64": 7, "128": 23, "256": 32, "16": 0, "512": 4, "2048": 4}
-The histogram.json file contains the histogram data.
+{'ts': '2020-12-30 14:37:59', 'val_type': 'usecs', 'data': [{'interval-start': 0, 'interval-end': 1, 'count': 0}, {'interval-start': 2, 'interval-end': 3, 'count': 0}, {'interval-start': 4, 'interval-end': 7, 'count': 0}, {'interval-start': 8, 'interval-end': 15, 'count': 0}, {'interval-start': 16, 'interval-end': 31, 'count': 1}, {'interval-start': 32, 'interval-end': 63, 'count': 1}, {'interval-start': 64, 'interval-end': 127, 'count': 0}, {'interval-start': 128, 'interval-end': 255, 'count': 0}, {'interval-start': 256, 'interval-end': 511, 'count': 0}, {'interval-start': 512, 'interval-end': 1023, 'count': 0}, {'interval-start': 1024, 'interval-end': 2047, 'count': 2}], 'flags': 'Sync-Write'}
+{'ts': '2020-12-30 14:37:59', 'val_type': 'usecs', 'data': [{'interval-start': 0, 'interval-end': 1, 'count': 0}, {'interval-start': 2, 'interval-end': 3, 'count': 0}, {'interval-start': 4, 'interval-end': 7, 'count': 0}, {'interval-start': 8, 'interval-end': 15, 'count': 0}, {'interval-start': 16, 'interval-end': 31, 'count': 0}, {'interval-start': 32, 'interval-end': 63, 'count': 0}, {'interval-start': 64, 'interval-end': 127, 'count': 0}, {'interval-start': 128, 'interval-end': 255, 'count': 2}, {'interval-start': 256, 'interval-end': 511, 'count': 0}, {'interval-start': 512, 'interval-end': 1023, 'count': 2}, {'interval-start': 1024, 'interval-end': 2047, 'count': 1}], 'flags': 'Unknown'}
+{'ts': '2020-12-30 14:37:59', 'val_type': 'usecs', 'data': [{'interval-start': 0, 'interval-end': 1, 'count': 0}, {'interval-start': 2, 'interval-end': 3, 'count': 0}, {'interval-start': 4, 'interval-end': 7, 'count': 0}, {'interval-start': 8, 'interval-end': 15, 'count': 0}, {'interval-start': 16, 'interval-end': 31, 'count': 0}, {'interval-start': 32, 'interval-end': 63, 'count': 0}, {'interval-start': 64, 'interval-end': 127, 'count': 0}, {'interval-start': 128, 'interval-end': 255, 'count': 0}, {'interval-start': 256, 'interval-end': 511, 'count': 0}, {'interval-start': 512, 'interval-end': 1023, 'count': 0}, {'interval-start': 1024, 'interval-end': 2047, 'count': 1}], 'flags': 'Write'}
+{'ts': '2020-12-30 14:37:59', 'val_type': 'usecs', 'data': [{'interval-start': 0, 'interval-end': 1, 'count': 0}, {'interval-start': 2, 'interval-end': 3, 'count': 0}, {'interval-start': 4, 'interval-end': 7, 'count': 0}, {'interval-start': 8, 'interval-end': 15, 'count': 0}, {'interval-start': 16, 'interval-end': 31, 'count': 0}, {'interval-start': 32, 'interval-end': 63, 'count': 0}, {'interval-start': 64, 'interval-end': 127, 'count': 0}, {'interval-start': 128, 'interval-end': 255, 'count': 0}, {'interval-start': 256, 'interval-end': 511, 'count': 0}, {'interval-start': 512, 'interval-end': 1023, 'count': 4}], 'flags': 'Flush'}
+
+The -j option used with -F prints a histogram dictionary per set of I/O flags.
+
+# ./biolatency.py -jD
+^C
+{'ts': '2020-12-30 14:40:00', 'val_type': 'usecs', 'data': [{'interval-start': 0, 'interval-end': 1, 'count': 0}, {'interval-start': 2, 'interval-end': 3, 'count': 0}, {'interval-start': 4, 'interval-end': 7, 'count': 0}, {'interval-start': 8, 'interval-end': 15, 'count': 0}, {'interval-start': 16, 'interval-end': 31, 'count': 0}, {'interval-start': 32, 'interval-end': 63, 'count': 1}, {'interval-start': 64, 'interval-end': 127, 'count': 1}, {'interval-start': 128, 'interval-end': 255, 'count': 1}, {'interval-start': 256, 'interval-end': 511, 'count': 1}, {'interval-start': 512, 'interval-end': 1023, 'count': 6}, {'interval-start': 1024, 'interval-end': 2047, 'count': 1}, {'interval-start': 2048, 'interval-end': 4095, 'count': 3}], 'Bucket ptr': b'sda'}
+
+The -j option used with -D prints a histogram dictionary per disk device.
+
+# ./biolatency.py -jm
+^C
+{'ts': '2020-12-30 14:42:03', 'val_type': 'msecs', 'data': [{'interval-start': 0, 'interval-end': 1, 'count': 11}, {'interval-start': 2, 'interval-end': 3, 'count': 3}]}
+
+The -j with -m prints a millisecond histogram dictionary. The `value_type` key is set to msecs.
 
 USAGE message:
 
 # ./biolatency -h
-usage: biolatency_2.py [-h] [-T] [-Q] [-m] [-D] [-F] [-j] [-f FILE]
-                       [interval] [count]
+usage: biolatency.py [-h] [-T] [-Q] [-m] [-D] [-F] [-j]
+                              [interval] [count]
 
 Summarize block device I/O latency as a histogram
 
@@ -356,14 +341,13 @@ positional arguments:
   count               number of outputs
 
 optional arguments:
-  -h, --help            show this help message and exit
-  -T, --timestamp       include timestamp on output
-  -Q, --queued          include OS queued time in I/O time
-  -m, --milliseconds    millisecond histogram
-  -D, --disks           print a histogram per disk device
-  -F, --flags           print a histogram per set of I/O flags
-  -j, --json            json output
-  -f FILE, --file FILE  write json output to specified file
+  -h, --help          show this help message and exit
+  -T, --timestamp     include timestamp on output
+  -Q, --queued        include OS queued time in I/O time
+  -m, --milliseconds  millisecond histogram
+  -D, --disks         print a histogram per disk device
+  -F, --flags         print a histogram per set of I/O flags
+  -j, --json          json output
 
 examples:
     ./biolatency                    # summarize block I/O latency as a histogram
@@ -373,4 +357,3 @@ examples:
     ./biolatency -D                 # show each disk device separately
     ./biolatency -F                 # show I/O flags separately
     ./biolatency -j                 # print a dictionary
-    ./biolatency -j -f name.json    # Dump the histogram dictionary to name.json file
