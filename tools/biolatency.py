@@ -15,8 +15,6 @@ from __future__ import print_function
 from bcc import BPF
 from time import sleep, strftime
 import argparse
-import json
-import os.path
 
 # arguments
 examples = """examples:
@@ -27,7 +25,6 @@ examples = """examples:
     ./biolatency -D                 # show each disk device separately
     ./biolatency -F                 # show I/O flags separately
     ./biolatency -j                 # print a dictionary
-    ./biolatency -j -f name.json    # Dump the histogram dictionary to name.json file
 """
 parser = argparse.ArgumentParser(
     description="Summarize block device I/O latency as a histogram",
@@ -51,15 +48,10 @@ parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
 parser.add_argument("-j", "--json", action="store_true",
     help="json output")
-parser.add_argument("-f", "--file", type=str,
-    help="write json output to specified file")
 
 args = parser.parse_args()
 countdown = int(args.count)
 debug = 0
-if args.file and not args.json:
-    print("ERROR: can only use -f with -j. Exiting.")
-    exit()
 
 if args.flags and args.disks:
     print("ERROR: can only use -D or -F. Exiting.")
@@ -154,7 +146,7 @@ else:
 b.attach_kprobe(event="blk_account_io_done",
     fn_name="trace_req_done")
 
-if not (args.json and args.file):
+if not args.json:
     print("Tracing block device I/O... Hit Ctrl-C to end.")
 
 # see blk_fill_rwbs():
@@ -207,6 +199,30 @@ def flags_print(flags):
         desc = "NoWait-" + desc
     return desc
 
+
+def print_json_hist(self):
+    hist_list = []
+    max_nonzero_idx = 0
+    for k, v in self.items():
+        if v.value != 0:
+            max_nonzero_idx = k.value
+    index = 1
+    prev = 0
+    for k, v in self.items():
+        if k.value != 0 and k.value <= max_nonzero_idx:
+            index = index * 2
+
+            list_obj = {}
+            list_obj['interval-start'] = prev
+            list_obj['interval-end'] = int(index) - 1
+            list_obj['count'] = int(v.value)
+
+            hist_list.append(list_obj)
+
+            prev = index
+    print(hist_list)
+
+
 # output
 exiting = 0 if args.interval else 1
 dist = b.get_table("dist")
@@ -217,40 +233,19 @@ while (1):
         exiting = 1
 
     print()
-    if args.json:
-        hist_dict = dict()
-        max_nonzero_idx = 0
-        for k, v in dist.items():
-            if v.value !=0:
-                max_nonzero_idx = k.value
-        index = 1
-        for k, v in dist.items():
-            if k.value == 0 and k.value <= max_nonzero_idx+1:
-                hist_dict[int(k.value)] = v.value
-            elif k.value <= max_nonzero_idx+1:
-                index = index * 2
-                hist_dict[int(index)] = int(v.value)
-        hist_dict.pop(0, None)
-        if args.file:
-            path = os.path.dirname(args.file)
-            if not os.path.exists(path):
-                os.makedirs(path)
-            filebuf = open(args.file, "w")
-            filebuf.write(json.dumps(hist_dict))
-            filebuf.write("\n")
-            filebuf.close()
-        else:
-            print(hist_dict)
-
     if args.timestamp:
         print("%-8s\n" % strftime("%H:%M:%S"), end="")
 
+    if args.json:
+        print_json_hist(dist)
+
     if args.flags:
         dist.print_log2_hist(label, "flags", flags_print)
-    else:
+    elif not args.json:
         dist.print_log2_hist(label, "disk")
     dist.clear()
 
     countdown -= 1
     if exiting or countdown == 0:
         exit()
+
