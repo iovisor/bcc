@@ -1,7 +1,7 @@
 # only turn on static-libstdc++ if also linking statically against clang
 string(REGEX MATCH ".*[.]a$" LIBCLANG_ISSTATIC "${libclangBasic}")
 # if gcc 4.9 or higher is used, static libstdc++ is a good option
-if (CMAKE_COMPILER_IS_GNUCC AND LIBCLANG_ISSTATIC)
+if (CMAKE_COMPILER_IS_GNUCC AND LIBCLANG_ISSTATIC AND (NOT ENABLE_LLVM_SHARED OR libclang-shared STREQUAL "libclang-shared-NOTFOUND"))
   execute_process(COMMAND ${CMAKE_C_COMPILER} -dumpversion OUTPUT_VARIABLE GCC_VERSION)
   if (GCC_VERSION VERSION_GREATER 4.9 OR GCC_VERSION VERSION_EQUAL 4.9)
     execute_process(COMMAND ${CMAKE_C_COMPILER} -print-libgcc-file-name OUTPUT_VARIABLE GCC_LIB)
