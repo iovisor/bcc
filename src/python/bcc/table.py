@@ -437,7 +437,7 @@ class TableBase(MutableMapping):
             raise StopIteration()
         return next_key
 
-    def foo(self, tmp, buckets, bucket_fn, bucket_sort_fn): #TODO: Name this function
+    def decode_c_struct(self, tmp, buckets, bucket_fn, bucket_sort_fn):
         f1 = self.Key._fields_[0][0]
         f2 = self.Key._fields_[1][0]
         # The above code assumes that self.Key._fields_[1][0] holds the
@@ -481,7 +481,7 @@ class TableBase(MutableMapping):
         if isinstance(self.Key(), ct.Structure):
             tmp = {}
             buckets = []
-            self.foo(tmp, buckets, bucket_fn, bucket_sort_fn)
+            self.decode_c_struct(tmp, buckets, bucket_fn, bucket_sort_fn)
             for bucket in buckets:
                 vals = tmp[bucket]
                 if section_print_fn:
@@ -521,7 +521,7 @@ class TableBase(MutableMapping):
         if isinstance(self.Key(), ct.Structure):
             tmp = {}
             buckets = []
-            self.foo(tmp, buckets, bucket_fn, bucket_sort_fn)
+            self.decode_c_struct(tmp, buckets, bucket_fn, bucket_sort_fn)
             for bucket in buckets:
                 vals = tmp[bucket]
                 if section_print_fn:
@@ -558,7 +558,7 @@ class TableBase(MutableMapping):
         if isinstance(self.Key(), ct.Structure):
             tmp = {}
             buckets = []
-            self.foo(tmp, buckets, bucket_fn, bucket_sort_fn)
+            self.decode_c_struct(tmp, buckets, bucket_fn, bucket_sort_fn)
 
             for bucket in buckets:
                 vals = tmp[bucket]
