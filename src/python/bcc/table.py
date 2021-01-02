@@ -17,6 +17,7 @@ try:
     from collections.abc import MutableMapping
 except ImportError:
     from collections import MutableMapping
+from time import strftime
 import ctypes as ct
 from functools import reduce
 import multiprocessing
@@ -104,6 +105,30 @@ def _stars(val, val_max, width):
         text = text[:-1] + "+"
     return text
 
+def _print_json_hist(vals, val_type, section_bucket=None):
+    hist_list = []
+    max_nonzero_idx = 0
+    for i in range(len(vals)):
+        if vals[i] != 0:
+            max_nonzero_idx = i
+    index = 1
+    prev = 0
+    for i in range(len(vals)):
+        if i != 0 and i <= max_nonzero_idx:
+            index = index * 2
+
+            list_obj = {}
+            list_obj['interval-start'] = prev
+            list_obj['interval-end'] = int(index) - 1
+            list_obj['count'] = int(vals[i])
+
+            hist_list.append(list_obj)
+
+            prev = index
+    histogram = {"ts": strftime("%Y-%m-%d %H:%M:%S"), "val_type": val_type, "data": hist_list}
+    if section_bucket:
+        histogram[section_bucket[0]] = section_bucket[1]
+    print(histogram)
 
 def _print_log2_hist(vals, val_type, strip_leading_zero):
     global stars_max
@@ -412,6 +437,44 @@ class TableBase(MutableMapping):
             raise StopIteration()
         return next_key
 
+    def foo(self, tmp, buckets, bucket_fn, bucket_sort_fn): #TODO: Name this function
+        f1 = self.Key._fields_[0][0]
+        f2 = self.Key._fields_[1][0]
+        if f2 == '__pad_1' and len(self.Key._fields_) == 3:
+            f2 = self.Key._fields_[2][0]
+        for k, v in self.items():
+            bucket = getattr(k, f1)
+            if bucket_fn:
+                bucket = bucket_fn(bucket)
+            vals = tmp[bucket] = tmp.get(bucket, [0] * log2_index_max)
+            slot = getattr(k, f2)
+            vals[slot] = v.value
+        buckets_lst = list(tmp.keys())
+        if bucket_sort_fn:
+            buckets_lst = bucket_sort_fn(buckets_lst)
+        for bucket in buckets_lst:
+            buckets.append(bucket)
+
+    def print_json_hist(self, val_type="value", section_header="Bucket ptr",
+                        section_print_fn=None, bucket_fn=None, bucket_sort_fn=None):
+        if isinstance(self.Key(), ct.Structure):
+            tmp = {}
+            buckets = []
+            self.foo(tmp, buckets, bucket_fn, bucket_sort_fn)
+            for bucket in buckets:
+                vals = tmp[bucket]
+                if section_print_fn:
+                    section_bucket = (section_header, section_print_fn(bucket))
+                else:
+                    section_bucket = (section_header, bucket)
+                _print_json_hist(vals, val_type, section_bucket)
+
+        else:
+            vals = [0] * log2_index_max
+            for k, v in self.items():
+                vals[k.value] = v.value
+            _print_json_hist(vals, val_type)
+
     def print_log2_hist(self, val_type="value", section_header="Bucket ptr",
             section_print_fn=None, bucket_fn=None, strip_leading_zero=None,
             bucket_sort_fn=None):
@@ -436,29 +499,8 @@ class TableBase(MutableMapping):
         """
         if isinstance(self.Key(), ct.Structure):
             tmp = {}
-            f1 = self.Key._fields_[0][0]
-            f2 = self.Key._fields_[1][0]
-
-            # The above code assumes that self.Key._fields_[1][0] holds the
-            # slot. But a padding member may have been inserted here, which
-            # breaks the assumption and leads to chaos.
-            # TODO: this is a quick fix. Fixing/working around in the BCC
-            # internal library is the right thing to do.
-            if f2 == '__pad_1' and len(self.Key._fields_) == 3:
-                f2 = self.Key._fields_[2][0]
-
-            for k, v in self.items():
-                bucket = getattr(k, f1)
-                if bucket_fn:
-                    bucket = bucket_fn(bucket)
-                vals = tmp[bucket] = tmp.get(bucket, [0] * log2_index_max)
-                slot = getattr(k, f2)
-                vals[slot] = v.value
-
-            buckets = list(tmp.keys())
-            if bucket_sort_fn:
-                buckets = bucket_sort_fn(buckets)
-
+            buckets = []
+            self.foo(tmp, buckets, bucket_fn, bucket_sort_fn)
             for bucket in buckets:
                 vals = tmp[bucket]
                 if section_print_fn:
