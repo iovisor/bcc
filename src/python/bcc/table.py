@@ -536,19 +536,8 @@ class TableBase(MutableMapping):
         """
         if isinstance(self.Key(), ct.Structure):
             tmp = {}
-            f1 = self.Key._fields_[0][0]
-            f2 = self.Key._fields_[1][0]
-            for k, v in self.items():
-                bucket = getattr(k, f1)
-                if bucket_fn:
-                    bucket = bucket_fn(bucket)
-                vals = tmp[bucket] = tmp.get(bucket, [0] * linear_index_max)
-                slot = getattr(k, f2)
-                vals[slot] = v.value
-
-            buckets = tmp.keys()
-            if bucket_sort_fn:
-                buckets = bucket_sort_fn(buckets)
+            buckets = []
+            self.foo(tmp, buckets, bucket_fn, bucket_sort_fn)
 
             for bucket in buckets:
                 vals = tmp[bucket]

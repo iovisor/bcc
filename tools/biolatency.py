@@ -216,11 +216,11 @@ while (1):
 
         if args.flags:
             # print_json_hist(dist, label, "flags", flags_print)
-            self.print_json_hist(label, "flags", flags_print)
+            dist.print_json_hist(label, "flags", flags_print)
 
         else:
             # print_json_hist(dist, label)
-            self.print_json_hist(label)
+            dist.print_json_hist(label)
 
     else:
         if args.timestamp:
