@@ -200,68 +200,6 @@ def flags_print(flags):
         desc = "NoWait-" + desc
     return desc
 
-
-def _print_json_hist(vals, val_type, section_bucket=None):
-    hist_list = []
-    max_nonzero_idx = 0
-    for i in range(len(vals)):
-        if vals[i] != 0:
-            max_nonzero_idx = i
-    index = 1
-    prev = 0
-    for i in range(len(vals)):
-        if i != 0 and i <= max_nonzero_idx:
-            index = index * 2
-
-            list_obj = {}
-            list_obj['interval-start'] = prev
-            list_obj['interval-end'] = int(index) - 1
-            list_obj['count'] = int(vals[i])
-
-            hist_list.append(list_obj)
-
-            prev = index
-    histogram = {"ts": strftime("%Y-%m-%d %H:%M:%S"), "val_type": val_type, "data": hist_list}
-    if section_bucket:
-        histogram[section_bucket[0]] = section_bucket[1]
-    print(histogram)
-
-
-def print_json_hist(self, val_type="value", section_header="Bucket ptr",
-                       section_print_fn=None, bucket_fn=None, bucket_sort_fn=None):
-    log2_index_max = 65 # this is a temporary workaround. Variable available in table.py
-    if isinstance(self.Key(), ct.Structure):
-        tmp = {}
-        f1 = self.Key._fields_[0][0]
-        f2 = self.Key._fields_[1][0]
-
-        if f2 == '__pad_1' and len(self.Key._fields_) == 3:
-            f2 = self.Key._fields_[2][0]
-        for k, v in self.items():
-            bucket = getattr(k, f1)
-            if bucket_fn:
-                bucket = bucket_fn(bucket)
-            vals = tmp[bucket] = tmp.get(bucket, [0] * log2_index_max)
-            slot = getattr(k, f2)
-            vals[slot] = v.value
-        buckets = list(tmp.keys())
-        if bucket_sort_fn:
-            buckets = bucket_sort_fn(buckets)
-        for bucket in buckets:
-            vals = tmp[bucket]
-            if section_print_fn:
-                section_bucket = (section_header, section_print_fn(bucket))
-            else:
-                section_bucket = (section_header, bucket)
-            _print_json_hist(vals, val_type, section_bucket)
-
-    else:
-        vals = [0] * log2_index_max
-        for k, v in self.items():
-            vals[k.value] = v.value
-        _print_json_hist(vals, val_type)
-
-
 # output
 exiting = 0 if args.interval else 1
 dist = b.get_table("dist")
@@ -277,10 +215,10 @@ while (1):
             print("%-8s\n" % strftime("%H:%M:%S"), end="")
 
         if args.flags:
-            print_json_hist(dist, label, "flags", flags_print)
+            dist.print_json_hist(label, "flags", flags_print)
 
         else:
-            print_json_hist(dist, label)
+            dist.print_json_hist(label)
 
     else:
         if args.timestamp:
