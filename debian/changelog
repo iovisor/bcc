@@ -1,3 +1,15 @@
+bcc (0.18.0-1) unstable; urgency=low
+
+  * Support for kernel up to 5.10
+  * add bpf kfunc/kretfunc C++ example
+  * add PT_REGS_PARMx_SYSCALL helper macro
+  * biolatency: allow json output
+  * biolatpcts: support measuring overall latencies between two events
+  * fix build when ENABLE_CLANG_JIT is disabled
+  * doc update and bug fixes
+
+ -- Yonghong Song <ys114321@gmail.com>  Mon, 4 Jan 2021 17:00:00 +0000
+
 bcc (0.17.0-1) unstable; urgency=low
 
   * Support for kernel up to 5.9
