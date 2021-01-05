@@ -1119,7 +1119,11 @@ StatusTuple CodegenLLVM::visit_table_decl_stmt_node(TableDeclStmtNode *n) {
     StructType *key_stype, *leaf_stype;
     TRY2(lookup_struct_type(n->key_type_, &key_stype));
     TRY2(lookup_struct_type(n->leaf_type_, &leaf_stype));
+#if LLVM_MAJOR_VERSION >= 12
+    StructType *decl_struct = StructType::getTypeByName(mod_->getContext(), "_struct." + n->id_->name_);
+#else
     StructType *decl_struct = mod_->getTypeByName("_struct." + n->id_->name_);
+#endif
     if (!decl_struct)
       decl_struct = StructType::create(ctx(), "_struct." + n->id_->name_);
     if (decl_struct->isOpaque())
@@ -1182,7 +1186,11 @@ StatusTuple CodegenLLVM::visit_func_decl_stmt_node(FuncDeclStmtNode *n) {
       StructType *stype;
       //TRY2(lookup_struct_type(formal, &stype));
       auto var = (StructVariableDeclStmtNode *)formal;
+#if LLVM_MAJOR_VERSION >= 12
+      stype = StructType::getTypeByName(mod_->getContext(), "_struct." + var->struct_id_->name_);
+#else
       stype = mod_->getTypeByName("_struct." + var->struct_id_->name_);
+#endif
       if (!stype) return mkstatus_(n, "could not find type %s", var->struct_id_->c_str());
       formals.push_back(PointerType::getUnqual(stype));
     } else {
