@@ -796,10 +796,28 @@ static long (*bpf_redirect_neigh)(u32 ifindex, struct bpf_redir_neigh *params,
 				  u64 flags) =
   (void *)BPF_FUNC_redirect_neigh;
 static void * (*bpf_per_cpu_ptr)(const void *percpu_ptr, u32 cpu) =
-  (void *)BPF_FUNC_bpf_per_cpu_ptr;
+  (void *)BPF_FUNC_per_cpu_ptr;
 static void * (*bpf_this_cpu_ptr)(const void *percpu_ptr) =
-  (void *)BPF_FUNC_bpf_this_cpu_ptr;
-long (*bpf_redirect_peer)(u32 ifindex, u64 flags) = (void *)BPF_FUNC_redirect_peer;
+  (void *)BPF_FUNC_this_cpu_ptr;
+static long (*bpf_redirect_peer)(u32 ifindex, u64 flags) = (void *)BPF_FUNC_redirect_peer;
+
+static void *(*bpf_task_storage_get)(void *map, struct task_struct *task,
+				     void *value, __u64 flags) =
+  (void *)BPF_FUNC_task_storage_get;
+static long (*bpf_task_storage_delete)(void *map, struct task_struct *task) =
+  (void *)BPF_FUNC_task_storage_delete;
+static struct task_struct *(*bpf_get_current_task_btf)(void) =
+  (void *)BPF_FUNC_get_current_task_btf;
+struct linux_binprm;
+static long (*bpf_bprm_opts_set)(struct linux_binprm *bprm, __u64 flags) =
+  (void *)BPF_FUNC_bprm_opts_set;
+static __u64 (*bpf_ktime_get_coarse_ns)(void) = (void *)BPF_FUNC_ktime_get_coarse_ns;
+struct inode;
+static long (*bpf_ima_inode_hash)(struct inode *inode, void *dst, __u32 size) =
+  (void *)BPF_FUNC_ima_inode_hash;
+struct file;
+static struct socket *(*bpf_sock_from_file)(struct file *file) =
+  (void *)BPF_FUNC_sock_from_file;
 
 /* llvm builtin functions that eBPF C program may use to
  * emit BPF_LD_ABS and BPF_LD_IND instructions
