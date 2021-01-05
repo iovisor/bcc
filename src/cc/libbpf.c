@@ -254,6 +254,13 @@ static struct bpf_helper helpers[] = {
   {"per_cpu_ptr", "5.10"},
   {"this_cpu_ptr", "5.10"},
   {"redirect_peer", "5.10"},
+  {"task_storage_get", "5.11"},
+  {"task_storage_delete", "5.11"},
+  {"get_current_task_btf", "5.11"},
+  {"bprm_opts_set", "5.11"},
+  {"ktime_get_coarse_ns", "5.11"},
+  {"ima_inode_hash", "5.11"},
+  {"sock_from_file", "5.11"},
 };
 
 static uint64_t ptr_to_u64(void *ptr)
