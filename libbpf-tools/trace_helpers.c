@@ -1099,3 +1099,22 @@ slow_path:
 	fclose(f);
 	return false;
 }
+
+bool vmlinux_btf_exists(void)
+{
+	if (!access("/sys/kernel/btf/vmlinux", R_OK))
+		return true;
+	return false;
+}
+
+bool module_btf_exists(const char *mod)
+{
+	char sysfs_mod[80];
+
+	if (mod) {
+		snprintf(sysfs_mod, sizeof(sysfs_mod), "/sys/kernel/btf/%s", mod);
+		if (!access(sysfs_mod, R_OK))
+			return true;
+	}
+	return false;
+}

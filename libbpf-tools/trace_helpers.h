@@ -92,4 +92,7 @@ bool fentry_exists(const char *name, const char *mod);
  */
 bool kprobe_exists(const char *name);
 
+bool vmlinux_btf_exists(void);
+bool module_btf_exists(const char *mod);
+
 #endif /* __TRACE_HELPERS_H */
