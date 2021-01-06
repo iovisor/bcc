@@ -140,7 +140,7 @@ int main(int argc, char **argv)
 		.doc = argp_program_doc,
 		.args_doc = args_doc,
 	};
-	struct vfsstat_bpf *obj;
+	struct vfsstat_bpf *skel;
 	int err;
 
 	err = argp_parse(&argp, argc, argv, 0, NULL, NULL);
@@ -156,13 +156,34 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	obj = vfsstat_bpf__open_and_load();
-	if (!obj) {
-		fprintf(stderr, "failed to open and/or load BPF object\n");
+	skel = vfsstat_bpf__open();
+	if (!skel) {
+		fprintf(stderr, "failed to open BPF skelect\n");
 		return 1;
 	}
 
-	err = vfsstat_bpf__attach(obj);
+	/* It fallbacks to kprobes when kernel does not support fentry. */
+	if (vmlinux_btf_exists() && fentry_exists("vfs_read", NULL)) {
+		bpf_program__set_autoload(skel->progs.kprobe_vfs_read, false);
+		bpf_program__set_autoload(skel->progs.kprobe_vfs_write, false);
+		bpf_program__set_autoload(skel->progs.kprobe_vfs_fsync, false);
+		bpf_program__set_autoload(skel->progs.kprobe_vfs_open, false);
+		bpf_program__set_autoload(skel->progs.kprobe_vfs_create, false);
+	} else {
+		bpf_program__set_autoload(skel->progs.fentry_vfs_read, false);
+		bpf_program__set_autoload(skel->progs.fentry_vfs_write, false);
+		bpf_program__set_autoload(skel->progs.fentry_vfs_fsync, false);
+		bpf_program__set_autoload(skel->progs.fentry_vfs_open, false);
+		bpf_program__set_autoload(skel->progs.fentry_vfs_create, false);
+	}
+
+	err = vfsstat_bpf__load(skel);
+	if (err) {
+		fprintf(stderr, "failed to load BPF skelect: %d\n", err);
+		goto cleanup;
+	}
+
+	err = vfsstat_bpf__attach(skel);
 	if (err) {
 		fprintf(stderr, "failed to attach BPF programs: %s\n",
 				strerror(-err));
@@ -172,11 +193,11 @@ int main(int argc, char **argv)
 	print_header();
 	do {
 		sleep(env.interval);
-		print_and_reset_stats(obj->bss->stats);
+		print_and_reset_stats(skel->bss->stats);
 	} while (!env.count || --env.count);
 
 cleanup:
-	vfsstat_bpf__destroy(obj);
+	vfsstat_bpf__destroy(skel);
 
 	return err != 0;
 }
