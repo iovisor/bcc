@@ -119,6 +119,9 @@ class SmokeTests(TestCase):
     def test_cpudist(self):
         self.run_with_duration("cpudist.py 1 1")
 
+    def test_cpuload(self):
+        self.run_with_int("cpuload.py")
+
     @skipUnless(kernel_version_ge(4,9), "requires kernel >= 4.9")
     def test_cpuunclaimed(self):
         self.run_with_duration("cpuunclaimed.py 1 1")

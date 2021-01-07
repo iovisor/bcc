@@ -1,0 +1,90 @@
+Demonstrations of cpuload, the Linux eBPF/bcc version.
+
+
+cpuload display top N tasks use more than U percent cpu resource when
+the cpu doesn't enter idle state for more than T ns.
+
+Example output (manual trigger by stress-ng --cpu-method pi -c 4):
+
+# ./cpuload -u 0
+Tracing task switch. Output when cpu is overload. Ctrl-C to end.
+DATE                COMM           PID     CPU  TIME(ms) USAGE
+2021-01-19 09:58:03 stress-ng-cpu  1568611 0    998.930  99.89%
+2021-01-19 09:58:03 rcu_sched      10      0    0.813    00.08%
+2021-01-19 09:58:03 kworker/0:0    1576494 0    0.162    00.02%
+2021-01-19 09:58:03 stress-ng-cpu  1568613 2    998.422  99.17%
+2021-01-19 09:58:03 cpuload.py     1576917 2    7.128    00.71%
+2021-01-19 09:58:03 kworker/2:2    1555250 2    0.798    00.08%
+2021-01-19 09:58:03 stress-ng-cpu  1568612 1    1176.318 99.92%
+2021-01-19 09:58:03 systemd        1       1    0.390    00.03%
+2021-01-19 09:58:03 irqbalance     798     1    0.143    00.01%
+2021-01-19 09:58:03 stress-ng-cpu  1568614 3    1636.553 99.97%
+2021-01-19 09:58:03 systemd-udevd  574     3    0.435    00.03%
+2021-01-19 09:58:03 sysmonitor     909     3    0.051    00.00%
+^C
+
+cpuload can be useful for discovering which tasks cause CPU high load.
+
+The minimum nsec to print can be set with the -t option. For example, print
+when cpu is not idle for 100ms:
+
+# ./cpuload.py -t 100000000
+Tracing task switch. Output when cpu is overload. Ctrl-C to end.
+DATE                COMM           PID     CPU  TIME(ms) USAGE
+2021-01-19 10:05:03 stress-ng-cpu  1641020 0    101.939  99.89%
+2021-01-19 10:05:03 stress-ng-cpu  1641018 1    106.332  100.00%
+2021-01-19 10:05:03 stress-ng-cpu  1641021 2    105.701  99.90%
+2021-01-19 10:05:03 stress-ng-cpu  1641019 3    122.149  100.00%
+^C
+
+The maximum tasks to print can be set with the -n option. For example, print
+top two tasks:
+
+# ./cpuload.py -n 2
+Tracing task switch. Output when cpu is overload. Ctrl-C to end.
+DATE                COMM           PID     CPU  TIME(ms) USAGE
+2021-01-19 10:05:38 stress-ng-cpu  1642489 0    503.999  50.00%
+2021-01-19 10:05:38 stress-ng-cpu  1642488 0    503.828  49.98%
+^C
+
+The minimum usage to print can be set with the -u option. For example, print
+tasks which use more than 30 percent of cpu:
+
+# ./cpuload.py -u 30
+Tracing task switch. Output when cpu is overload. Ctrl-C to end.
+DATE                COMM           PID     CPU  TIME(ms) USAGE
+2021-01-19 10:06:23 stress-ng-cpu  1642488 0    503.940  49.99%
+2021-01-19 10:06:23 stress-ng-cpu  1642489 0    503.903  49.99%
+^C
+
+The -c option can control which cpus are printed. For example, only print cpu0
+and cpu1:
+
+# ./cpuload.py -c 3
+Tracing task switch. Output when cpu is overload. Ctrl-C to end.
+DATE                COMM           PID     CPU  TIME(ms) USAGE
+2021-01-19 10:08:52 stress-ng-cpu  1643807 1    1019.648 99.99%
+2021-01-19 10:08:52 stress-ng-cpu  1643808 0    1067.828 99.99%
+^C
+
+# ./cpuload.py -h
+usage: cpuload.py [-h] [-t TIME] [-n NUMBER] [-u USAGE] [-c CPUMASK]
+
+display tasks when cpu overload
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -t TIME, --time TIME  minimum nsec to print, default 1000000000
+  -n NUMBER, --number NUMBER
+                        maximum tasks to print, default 3
+  -u USAGE, --usage USAGE
+                        minimum usage to print, default 30
+  -c CPUMASK, --cpumask CPUMASK
+                        target cpus' mask to print, default all cpus
+
+examples:
+    ./cpuload                # display tasks when cpu overload
+    ./cpuload -t 100000000   # display when non-idle for 100000000 ns
+    ./cpuload -n 5           # display top 5 tasks details
+    ./cpuload -u 30          # display tasks use more than 30 percent cpu
+    ./cpuload -c 3           # only display cpu0 and cpu1

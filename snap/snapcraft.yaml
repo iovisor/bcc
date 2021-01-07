@@ -123,6 +123,8 @@ apps:
         command: bcc-wrapper compactsnoop
     cpudist:
         command: bcc-wrapper cpudist
+    cpuload:
+        command: bcc-wrapper cpuload
     cpuunclaimed:
         command: bcc-wrapper cpuunclaimed
     dbslower:
