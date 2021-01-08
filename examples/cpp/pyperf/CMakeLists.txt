@@ -10,7 +10,7 @@ target_link_libraries(PyPerf bcc-static)
 if(NOT CMAKE_USE_LIBBPF_PACKAGE)
   target_link_libraries(PyPerf bcc-static)
 else()
-  target_link_libraries(PyPerf bcc-shared-no-libbpf)
+  target_link_libraries(PyPerf bcc-shared)
 endif()
 
 if(INSTALL_CPP_EXAMPLES)
