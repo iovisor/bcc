@@ -18,8 +18,6 @@
 #include "runqlen.skel.h"
 #include "trace_helpers.h"
 
-#define FREQ	99
-
 #define max(x, y) ({				 \
 	typeof(x) _max1 = (x);			 \
 	typeof(y) _max2 = (y);			 \
@@ -31,11 +29,13 @@ struct env {
 	bool runqocc;
 	bool timestamp;
 	time_t interval;
+	bool freq;
 	int times;
 	bool verbose;
 } env = {
 	.interval = 99999999,
 	.times = 99999999,
+	.freq = 99,
 };
 
 static volatile bool exiting;
@@ -45,17 +45,19 @@ const char *argp_program_bug_address = "<bpf@vger.kernel.org>";
 const char argp_program_doc[] =
 "Summarize scheduler run queue length as a histogram.\n"
 "\n"
-"USAGE: runqlen [--help] [-C] [-O] [-T] [interval] [count]\n"
+"USAGE: runqlen [--help] [-C] [-O] [-T] [-f FREQUENCY] [interval] [count]\n"
 "\n"
 "EXAMPLES:\n"
 "    runqlen         # summarize run queue length as a histogram\n"
 "    runqlen 1 10    # print 1 second summaries, 10 times\n"
 "    runqlen -T 1    # 1s summaries and timestamps\n"
 "    runqlen -O      # report run queue occupancy\n"
-"    runqlen -C      # show each CPU separately\n";
+"    runqlen -C      # show each CPU separately\n"
+"    runqlen -f 199  # sample at 199HZ\n";
 
 static const struct argp_option opts[] = {
 	{ "cpus", 'C', NULL, 0, "Print output for each CPU separately" },
+	{ "frequency", 'f', "FREQUENCY", 0, "Sample with a certain frequency" },
 	{ "runqocc", 'O', NULL, 0, "Report run queue occupancy" },
 	{ "timestamp", 'T', NULL, 0, "Include timestamp on output" },
 	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
@@ -78,6 +80,14 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 		break;
 	case 'T':
 		env.timestamp = true;
+		break;
+	case 'f':
+		errno = 0;
+		env.freq = strtol(arg, NULL, 10);
+		if (errno || env.freq <= 0) {
+			fprintf(stderr, "Invalid freq (in hz): %s\n", arg);
+			argp_usage(state);
+		}
 		break;
 	case ARGP_KEY_ARG:
 		errno = 0;
@@ -122,6 +132,9 @@ static int open_and_attach_perf_event(int freq, struct bpf_program *prog,
 	for (i = 0; i < nr_cpus; i++) {
 		fd = syscall(__NR_perf_event_open, &attr, -1, i, -1, 0);
 		if (fd < 0) {
+			/* Ignore CPU that is offline */
+			if (errno == ENODEV)
+				continue;
 			fprintf(stderr, "failed to init perf sampling: %s\n",
 				strerror(errno));
 			return -1;
@@ -203,7 +216,7 @@ int main(int argc, char **argv)
 		.parser = parse_arg,
 		.doc = argp_program_doc,
 	};
-	struct bpf_link **links = NULL;
+	struct bpf_link *links[MAX_CPU_NR] = {};
 	struct runqlen_bpf *obj;
 	struct tm *tm;
 	char ts[32];
@@ -222,22 +235,22 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	obj = runqlen_bpf__open();
-	if (!obj) {
-		fprintf(stderr, "failed to open and/or load BPF object\n");
+	nr_cpus = libbpf_num_possible_cpus();
+	if (nr_cpus < 0) {
+		printf("failed to get # of possible cpus: '%s'!\n",
+		       strerror(-nr_cpus));
 		return 1;
 	}
-
-	nr_cpus = libbpf_num_possible_cpus();
 	if (nr_cpus > MAX_CPU_NR) {
-		fprintf(stderr, "The number of cpu cores is too much, please "
+		fprintf(stderr, "the number of cpu cores is too big, please "
 			"increase MAX_CPU_NR's value and recompile");
 		return 1;
 	}
-	links = calloc(nr_cpus, sizeof(*links));
-	if (!links) {
-		fprintf(stderr, "failed to alloc links\n");
-		goto cleanup;
+
+	obj = runqlen_bpf__open();
+	if (!obj) {
+		fprintf(stderr, "failed to open BPF object\n");
+		return 1;
 	}
 
 	/* initialize global data (filtering options) */
@@ -249,7 +262,8 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
-	if (open_and_attach_perf_event(FREQ, obj->progs.do_sample, links))
+	err = open_and_attach_perf_event(env.freq, obj->progs.do_sample, links);
+	if (err)
 		goto cleanup;
 
 	printf("Sampling run queue length... Hit Ctrl-C to end.\n");
@@ -279,7 +293,6 @@ int main(int argc, char **argv)
 cleanup:
 	for (i = 0; i < nr_cpus; i++)
 		bpf_link__destroy(links[i]);
-	free(links);
 	runqlen_bpf__destroy(obj);
 
 	return err != 0;
