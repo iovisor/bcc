@@ -192,7 +192,7 @@ static void print_linear_hists(struct runqlen_bpf__bss *bss)
 		bss->hists[i] = zero;
 		if (env.per_cpu)
 			printf("cpu = %d\n", i);
-		print_linear_hist(hist.slots, MAX_SLOTS, "runqlen");
+		print_linear_hist(hist.slots, MAX_SLOTS, 0, 1, "runqlen");
 	} while (env.per_cpu && ++i < nr_cpus);
 }
 
