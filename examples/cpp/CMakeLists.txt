@@ -19,7 +19,7 @@ foreach(EXAMPLE ${EXAMPLES})
   if(NOT CMAKE_USE_LIBBPF_PACKAGE)
     target_link_libraries(${NAME} bcc-static)
   else()
-    target_link_libraries(${NAME} bcc-shared)
+    target_link_libraries(${NAME} bcc-shared-no-libbpf)
   endif()
 
   if(INSTALL_CPP_EXAMPLES)
