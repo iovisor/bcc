@@ -16,6 +16,7 @@ APPS = \
 	biostacks \
 	bitesize \
 	cpudist \
+	cpufreq \
 	drsnoop \
 	execsnoop \
 	filelife \
