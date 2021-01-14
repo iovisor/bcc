@@ -146,8 +146,13 @@ int oncpu(struct pt_regs *ctx, struct task_struct *prev) {
     }
 
     // calculate current thread's delta time
-    u64 delta = bpf_ktime_get_ns() - *tsp;
+    u64 t_start = *tsp;
+    u64 t_end = bpf_ktime_get_ns();
     start.delete(&pid);
+    if (t_start > t_end) {
+        return 0;
+    }
+    u64 delta = t_end - t_start;
     delta = delta / 1000;
     if ((delta < MINBLOCK_US) || (delta > MAXBLOCK_US)) {
         return 0;
