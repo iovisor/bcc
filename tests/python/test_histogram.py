@@ -59,10 +59,15 @@ int kprobe__htab_map_delete_elem(struct pt_regs *ctx, struct bpf_map *map, u64 *
         b = BPF(text="""
 #include <uapi/linux/ptrace.h>
 #include <linux/sched.h>
+#include <linux/version.h>
 typedef struct { char name[TASK_COMM_LEN]; u64 slot; } Key;
 BPF_HISTOGRAM(hist1, Key, 1024);
 int kprobe__finish_task_switch(struct pt_regs *ctx, struct task_struct *prev) {
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,5,0)
     Key k = {.slot = bpf_log2l(prev->real_start_time)};
+#else
+    Key k = {.slot = bpf_log2l(prev->start_boottime)};
+#endif
     if (!bpf_get_current_comm(&k.name, sizeof(k.name)))
         hist1.increment(k);
     return 0;
