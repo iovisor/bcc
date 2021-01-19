@@ -852,7 +852,11 @@ int trace_read_entry(struct pt_regs *ctx, struct file *file) {
 }
         """
         b = BPF(text=text)
-        b.attach_kprobe(event="__vfs_read", fn_name="trace_read_entry")
+        try:
+            b.attach_kprobe(event="__vfs_read", fn_name="trace_read_entry")
+        except Exception:
+            print('Current kernel does not have __vfs_read, try vfs_read instead')
+            b.attach_kprobe(event="vfs_read", fn_name="trace_read_entry")
 
     def test_printk_f(self):
         text = """
