@@ -28,17 +28,6 @@ find_path (LIBBPF_INCLUDE_DIR
     /sw/include
     ENV CPATH)
 
-find_library (LIBBPF_STATIC_LIBRARIES
-  NAMES
-    libbpf.a
-  PATHS
-    /usr/lib
-    /usr/local/lib
-    /opt/local/lib
-    /sw/lib
-    ENV LIBRARY_PATH
-    ENV LD_LIBRARY_PATH)
-
 find_library (LIBBPF_LIBRARIES
   NAMES
     bpf
@@ -49,13 +38,33 @@ find_library (LIBBPF_LIBRARIES
     /sw/lib
     ENV LIBRARY_PATH
     ENV LD_LIBRARY_PATH)
+if(LIBBPF_LIBRARIES)
+list(APPEND PATHS LIBBPF_LIBRARIES)
+endif()
 
+find_library (LIBBPF_STATIC_LIBRARIES
+  NAMES
+    libbpf.a
+  PATHS
+    /usr/lib
+    /usr/local/lib
+    /opt/local/lib
+    /sw/lib
+    ENV LIBRARY_PATH
+    ENV LD_LIBRARY_PATH)
+if(LIBBPF_STATIC_LIBRARIES)
+list(APPEND PATHS LIBBPF_STATIC_LIBRARIES)
+endif()
+
+if(LIBBPF_STATIC_LIBRARIES OR LIBBPF_LIBRARIES)
 include (FindPackageHandleStandardArgs)
 
 # handle the QUIETLY and REQUIRED arguments and set LIBBPF_FOUND to TRUE if all listed variables are TRUE
 FIND_PACKAGE_HANDLE_STANDARD_ARGS(LibBpf "Please install the libbpf development package"
-  LIBBPF_LIBRARIES
-  LIBBPF_STATIC_LIBRARIES
+  ${PATHS}
   LIBBPF_INCLUDE_DIR)
 
-mark_as_advanced(LIBBPF_INCLUDE_DIR LIBBPF_STATIC_LIBRARIES LIBBPF_LIBRARIES)
+mark_as_advanced(LIBBPF_INCLUDE_DIR ${PATHS})
+else()
+message(Please install the libbpf development package)
+endif()
