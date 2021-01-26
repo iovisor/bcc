@@ -318,7 +318,7 @@ int ClangLoader::do_compile(unique_ptr<llvm::Module> *mod, TableStorage &ts,
   driver::Driver drv("", target_triple, diags);
 
 #if LLVM_MAJOR_VERSION >= 4
-  if (target_triple == "x86_64-unknown-linux-gnu")
+  if (target_triple == "x86_64-unknown-linux-gnu" || target_triple == "aarch64-unknown-linux-gnu")
     flags_cstr.push_back("-fno-jump-tables");
 #endif
 
