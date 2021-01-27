@@ -40,12 +40,12 @@ const char *argp_program_bug_address = "<bpf@vger.kernel.org>";
 const char argp_program_doc[] =
 "Summarize block device I/O latency as a histogram.\n"
 "\n"
-"USAGE: biolatency [--help] [-T] [-m] [-Q] [-D] [-F] [-d] [interval] [count]\n"
+"USAGE: biolatency [--help] [-T] [-M] [-Q] [-D] [-F] [-d DISK] [interval] [count]\n"
 "\n"
 "EXAMPLES:\n"
 "    biolatency              # summarize block I/O latency as a histogram\n"
 "    biolatency 1 10         # print 1 second summaries, 10 times\n"
-"    biolatency -mT 1        # 1s summaries, milliseconds, and timestamps\n"
+"    biolatency -MT 1        # 1s summaries, milliseconds, and timestamps\n"
 "    biolatency -Q           # include OS queued time in I/O time\n"
 "    biolatency -D           # show each disk device separately\n"
 "    biolatency -F           # show I/O flags separately\n"
@@ -53,7 +53,7 @@ const char argp_program_doc[] =
 
 static const struct argp_option opts[] = {
 	{ "timestamp", 'T', NULL, 0, "Include timestamp on output" },
-	{ "milliseconds", 'm', NULL, 0, "Millisecond histogram" },
+	{ "milliseconds", 'M', NULL, 0, "Millisecond histogram" },
 	{ "queued", 'Q', NULL, 0, "Include OS queued time in I/O time" },
 	{ "disk", 'D', NULL, 0, "Print a histogram per disk device" },
 	{ "flag", 'F', NULL, 0, "Print a histogram per set of I/O flags" },
@@ -70,7 +70,7 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 	case 'v':
 		env.verbose = true;
 		break;
-	case 'm':
+	case 'M':
 		env.milliseconds = true;
 		break;
 	case 'Q':
@@ -250,7 +250,7 @@ int main(int argc, char **argv)
 
 	obj = biolatency_bpf__open();
 	if (!obj) {
-		fprintf(stderr, "failed to open and/or load BPF ojbect\n");
+		fprintf(stderr, "failed to open BPF object\n");
 		return 1;
 	}
 

@@ -394,7 +394,7 @@ int main(int argc, char **argv)
 
 	obj = syscount_bpf__open();
 	if (!obj) {
-		warn("failed to open and/or load BPF object\n");
+		warn("failed to open BPF object\n");
 		err = 1;
 		goto free_names;
 	}

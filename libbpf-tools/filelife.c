@@ -117,7 +117,7 @@ int main(int argc, char **argv)
 
 	obj = filelife_bpf__open();
 	if (!obj) {
-		fprintf(stderr, "failed to open and/or load BPF object\n");
+		fprintf(stderr, "failed to open BPF object\n");
 		return 1;
 	}
 

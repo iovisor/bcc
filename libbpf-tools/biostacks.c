@@ -27,7 +27,7 @@ const char *argp_program_bug_address = "<bpf@vger.kernel.org>";
 const char argp_program_doc[] =
 "Tracing block I/O with init stacks.\n"
 "\n"
-"USAGE: biostacks [--help] [-d disk] [-m] [duration]\n"
+"USAGE: biostacks [--help] [-d DISK] [-M] [duration]\n"
 "\n"
 "EXAMPLES:\n"
 "    biostacks              # trace block I/O with init stacks.\n"
@@ -36,7 +36,7 @@ const char argp_program_doc[] =
 
 static const struct argp_option opts[] = {
 	{ "disk",  'd', "DISK",  0, "Trace this disk only" },
-	{ "milliseconds", 'm', NULL, 0, "Millisecond histogram" },
+	{ "milliseconds", 'M', NULL, 0, "Millisecond histogram" },
 	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
 	{},
 };
@@ -56,7 +56,7 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 			argp_usage(state);
 		}
 		break;
-	case 'm':
+	case 'M':
 		env.milliseconds = true;
 		break;
 	case ARGP_KEY_ARG:
@@ -151,7 +151,7 @@ int main(int argc, char **argv)
 
 	obj = biostacks_bpf__open();
 	if (!obj) {
-		fprintf(stderr, "failed to open and/or load BPF ojbect\n");
+		fprintf(stderr, "failed to open BPF object\n");
 		return 1;
 	}
 

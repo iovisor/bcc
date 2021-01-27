@@ -97,7 +97,7 @@ int main(int argc, char **argv)
 
 	obj = readahead_bpf__open_and_load();
 	if (!obj) {
-		fprintf(stderr, "failed to open and/or load BPF ojbect\n");
+		fprintf(stderr, "failed to open and/or load BPF object\n");
 		return 1;
 	}
 

@@ -48,24 +48,24 @@ const char *argp_program_bug_address = "<bpf@vger.kernel.org>";
 const char argp_program_doc[] =
 "Trace open family syscalls\n"
 "\n"
-"USAGE: opensnoop [-h] [-T] [-U] [-x] [-p PID] [-t TID] [-u UID] [-d DURATION]\n"
-"                 [-n NAME] [-e]\n"
+"USAGE: opensnoop [-h] [-T] [-U] [-X] [-p PID] [-t TID] [-u UID] [-d DURATION]\n"
+"                 [-n NAME] [-E]\n"
 "\n"
 "EXAMPLES:\n"
 "    ./opensnoop           # trace all open() syscalls\n"
 "    ./opensnoop -T        # include timestamps\n"
 "    ./opensnoop -U        # include UID\n"
-"    ./opensnoop -x        # only show failed opens\n"
+"    ./opensnoop -X        # only show failed opens\n"
 "    ./opensnoop -p 181    # only trace PID 181\n"
 "    ./opensnoop -t 123    # only trace TID 123\n"
 "    ./opensnoop -u 1000   # only trace UID 1000\n"
 "    ./opensnoop -d 10     # trace for 10 seconds only\n"
 "    ./opensnoop -n main   # only print process names containing \"main\"\n"
-"    ./opensnoop -e        # show extended fields\n";
+"    ./opensnoop -E        # show extended fields\n";
 
 static const struct argp_option opts[] = {
 	{ "duration", 'd', "DURATION", 0, "Duration to trace"},
-	{ "extended-fields", 'e', NULL, 0, "Print extended fields"},
+	{ "extended-fields", 'E', NULL, 0, "Print extended fields"},
 	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help"},
 	{ "name", 'n', "NAME", 0, "Trace process names containing this"},
 	{ "pid", 'p', "PID", 0, "Process ID to trace"},
@@ -74,7 +74,7 @@ static const struct argp_option opts[] = {
 	{ "uid", 'u', "UID", 0, "User ID to trace"},
 	{ "print-uid", 'U', NULL, 0, "Print UID"},
 	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
-	{ "failed", 'x', NULL, 0, "Failed opens only"},
+	{ "failed", 'X', NULL, 0, "Failed opens only"},
 	{},
 };
 
@@ -84,7 +84,7 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 	long int pid, uid, duration;
 
 	switch (key) {
-	case 'e':
+	case 'E':
 		env.extended = true;
 		break;
 	case 'h':
@@ -99,7 +99,7 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 	case 'v':
 		env.verbose = true;
 		break;
-	case 'x':
+	case 'X':
 		env.failed = true;
 		break;
 	case 'd':
@@ -231,7 +231,7 @@ int main(int argc, char **argv)
 
 	obj = opensnoop_bpf__open();
 	if (!obj) {
-		fprintf(stderr, "failed to open and/or load BPF object\n");
+		fprintf(stderr, "failed to open BPF object\n");
 		return 1;
 	}
 

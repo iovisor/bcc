@@ -31,18 +31,18 @@ const char *argp_program_bug_address = "<bpf@vger.kernel.org>";
 const char argp_program_doc[] =
 "Trace direct reclaim latency.\n"
 "\n"
-"USAGE: drsnoop [--help] [-p PID] [-t TID] [-d DURATION] [-e]\n"
+"USAGE: drsnoop [--help] [-p PID] [-t TID] [-d DURATION] [-E]\n"
 "\n"
 "EXAMPLES:\n"
 "    drsnoop         # trace all direct reclaim events\n"
 "    drsnoop -p 123  # trace pid 123\n"
 "    drsnoop -t 123  # trace tid 123 (use for threads only)\n"
 "    drsnoop -d 10   # trace for 10 seconds only\n"
-"    drsnoop -e      # trace all direct reclaim events with extended faileds\n";
+"    drsnoop -E      # trace all direct reclaim events with extended faileds\n";
 
 static const struct argp_option opts[] = {
 	{ "duration", 'd', "DURATION", 0, "Total duration of trace in seconds" },
-	{ "extended", 'e', NULL, 0, "Extended fields output" },
+	{ "extended", 'E', NULL, 0, "Extended fields output" },
 	{ "pid", 'p', "PID", 0, "Process PID to trace" },
 	{ "tid", 't', "TID", 0, "Thread TID to trace" },
 	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
@@ -69,7 +69,7 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 		}
 		env.duration = duration;
 		break;
-	case 'e':
+	case 'E':
 		env.extended = true;
 		break;
 	case 'p':
@@ -156,7 +156,7 @@ int main(int argc, char **argv)
 
 	obj = drsnoop_bpf__open();
 	if (!obj) {
-		fprintf(stderr, "failed to open and/or load BPF object\n");
+		fprintf(stderr, "failed to open BPF object\n");
 		return 1;
 	}
 

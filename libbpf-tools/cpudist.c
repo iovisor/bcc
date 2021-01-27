@@ -37,20 +37,20 @@ const char *argp_program_bug_address = "<bpf@vger.kernel.org>";
 const char argp_program_doc[] =
 "Summarize on-CPU time per task as a histogram.\n"
 "\n"
-"USAGE: cpudist [--help] [-O] [-T] [-m] [-P] [-L] [-p PID] [interval] [count]\n"
+"USAGE: cpudist [--help] [-O] [-T] [-M] [-P] [-L] [-p PID] [interval] [count]\n"
 "\n"
 "EXAMPLES:\n"
 "    cpudist              # summarize on-CPU time as a histogram"
 "    cpudist -O           # summarize off-CPU time as a histogram"
 "    cpudist 1 10         # print 1 second summaries, 10 times"
-"    cpudist -mT 1        # 1s summaries, milliseconds, and timestamps"
+"    cpudist -MT 1        # 1s summaries, milliseconds, and timestamps"
 "    cpudist -P           # show each PID separately"
 "    cpudist -p 185       # trace PID 185 only";
 
 static const struct argp_option opts[] = {
 	{ "offcpu", 'O', NULL, 0, "Measure off-CPU time" },
 	{ "timestamp", 'T', NULL, 0, "Include timestamp on output" },
-	{ "milliseconds", 'm', NULL, 0, "Millisecond histogram" },
+	{ "milliseconds", 'M', NULL, 0, "Millisecond histogram" },
 	{ "pids", 'P', NULL, 0, "Print a histogram per process ID" },
 	{ "tids", 'L', NULL, 0, "Print a histogram per thread ID" },
 	{ "pid", 'p', "PID", 0, "Trace this PID only" },
@@ -66,7 +66,7 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 	case 'v':
 		env.verbose = true;
 		break;
-	case 'm':
+	case 'M':
 		env.milliseconds = true;
 		break;
 	case 'p':
@@ -203,7 +203,7 @@ int main(int argc, char **argv)
 
 	obj = cpudist_bpf__open();
 	if (!obj) {
-		fprintf(stderr, "failed to open and/or load BPF ojbect\n");
+		fprintf(stderr, "failed to open BPF object\n");
 		return 1;
 	}
 

@@ -38,12 +38,12 @@ const char *argp_program_bug_address = "<bpf@vger.kernel.org>";
 const char argp_program_doc[] =
 "Summarize run queue (scheduler) latency as a histogram.\n"
 "\n"
-"USAGE: runqlat [--help] [-T] [-m] [--pidnss] [-L] [-P] [-p PID] [interval] [count]\n"
+"USAGE: runqlat [--help] [-T] [-M] [--pidnss] [-L] [-P] [-p PID] [interval] [count]\n"
 "\n"
 "EXAMPLES:\n"
 "    runqlat         # summarize run queue latency as a histogram\n"
 "    runqlat 1 10    # print 1 second summaries, 10 times\n"
-"    runqlat -mT 1   # 1s summaries, milliseconds, and timestamps\n"
+"    runqlat -MT 1   # 1s summaries, milliseconds, and timestamps\n"
 "    runqlat -P      # show each PID separately\n"
 "    runqlat -p 185  # trace PID 185 only\n";
 
@@ -51,7 +51,7 @@ const char argp_program_doc[] =
 
 static const struct argp_option opts[] = {
 	{ "timestamp", 'T', NULL, 0, "Include timestamp on output" },
-	{ "milliseconds", 'm', NULL, 0, "Millisecond histogram" },
+	{ "milliseconds", 'M', NULL, 0, "Millisecond histogram" },
 	{ "pidnss", OPT_PIDNSS, NULL, 0, "Print a histogram per PID namespace" },
 	{ "pids", 'P', NULL, 0, "Print a histogram per process ID" },
 	{ "tids", 'L', NULL, 0, "Print a histogram per thread ID" },
@@ -68,7 +68,7 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 	case 'v':
 		env.verbose = true;
 		break;
-	case 'm':
+	case 'M':
 		env.milliseconds = true;
 		break;
 	case 'p':
@@ -199,7 +199,7 @@ int main(int argc, char **argv)
 
 	obj = runqlat_bpf__open();
 	if (!obj) {
-		fprintf(stderr, "failed to open and/or load BPF object\n");
+		fprintf(stderr, "failed to open BPF object\n");
 		return 1;
 	}
 

@@ -40,26 +40,26 @@ const char *argp_program_bug_address = "<bpf@vger.kernel.org>";
 const char argp_program_doc[] =
 "Trace open family syscalls\n"
 "\n"
-"USAGE: execsnoop [-h] [-T] [-t] [-x] [-u UID] [-q] [-n NAME] [-l LINE] [-U]\n"
+"USAGE: execsnoop [-h] [-T] [-t] [-X] [-u UID] [-Q] [-n NAME] [-l LINE] [-U]\n"
 "                 [--max-args MAX_ARGS]\n"
 "\n"
 "EXAMPLES:\n"
 "   ./execsnoop           # trace all exec() syscalls\n"
-"   ./execsnoop -x        # include failed exec()s\n"
+"   ./execsnoop -X        # include failed exec()s\n"
 "   ./execsnoop -T        # include time (HH:MM:SS)\n"
 "   ./execsnoop -U        # include UID\n"
 "   ./execsnoop -u 1000   # only trace UID 1000\n"
 "   ./execsnoop -t        # include timestamps\n"
-"   ./execsnoop -q        # add \"quotemarks\" around arguments\n"
+"   ./execsnoop -Q        # add \"quotemarks\" around arguments\n"
 "   ./execsnoop -n main   # only print command lines containing \"main\"\n"
 "   ./execsnoop -l tpkg   # only print command where arguments contains \"tpkg\"";
 
 static const struct argp_option opts[] = {
 	{ "time", 'T', NULL, 0, "include time column on output (HH:MM:SS)"},
 	{ "timestamp", 't', NULL, 0, "include timestamp on output"},
-	{ "fails", 'x', NULL, 0, "include failed exec()s"},
+	{ "fails", 'X', NULL, 0, "include failed exec()s"},
 	{ "uid", 'u', "UID", 0, "trace this UID only"},
-	{ "quote", 'q', NULL, 0, "Add quotemarks (\") around arguments"},
+	{ "quote", 'Q', NULL, 0, "Add quotemarks (\") around arguments"},
 	{ "name", 'n', "NAME", 0, "only print commands matching this name, any arg"},
 	{ "line", 'l', "LINE", 0, "only print commands where arg contains this line"},
 	{ "print-uid", 'U', NULL, 0, "print UID column"},
@@ -83,7 +83,7 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 	case 't':
 		env.timestamp = true;
 		break;
-	case 'x':
+	case 'X':
 		env.fails = true;
 		break;
 	case 'u':
@@ -95,7 +95,7 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 		}
 		env.uid = uid;
 		break;
-	case 'q':
+	case 'Q':
 		env.quote = true;
 		break;
 	case 'n':
@@ -271,7 +271,7 @@ int main(int argc, char **argv)
 
 	obj = execsnoop_bpf__open();
 	if (!obj) {
-		fprintf(stderr, "failed to open and/or load BPF object\n");
+		fprintf(stderr, "failed to open BPF object\n");
 		return 1;
 	}
 
