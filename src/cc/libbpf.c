@@ -601,6 +601,9 @@ int bcc_prog_load_xattr(struct bpf_load_program_attr *attr, int prog_len,
     else if (strncmp(attr->name, "kfunc__", 7) == 0) {
       name_offset = 7;
       expected_attach_type = BPF_TRACE_FENTRY;
+    } else if (strncmp(attr->name, "kmod_ret__", 10) == 0) {
+      name_offset = 10;
+      expected_attach_type = BPF_MODIFY_RETURN;
     } else if (strncmp(attr->name, "kretfunc__", 10) == 0) {
       name_offset = 10;
       expected_attach_type = BPF_TRACE_FEXIT;

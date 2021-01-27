@@ -907,7 +907,7 @@ int BPFModule::bcc_func_load(int prog_type, const char *name,
                 const struct bpf_insn *insns, int prog_len,
                 const char *license, unsigned kern_version,
                 int log_level, char *log_buf, unsigned log_buf_size,
-                const char *dev_name) {
+                const char *dev_name, unsigned flags) {
   struct bpf_load_program_attr attr = {};
   unsigned func_info_cnt, line_info_cnt, finfo_rec_size, linfo_rec_size;
   void *func_info = NULL, *line_info = NULL;
@@ -921,6 +921,7 @@ int BPFModule::bcc_func_load(int prog_type, const char *name,
       attr.prog_type != BPF_PROG_TYPE_EXT) {
     attr.kern_version = kern_version;
   }
+  attr.prog_flags = flags;
   attr.log_level = log_level;
   if (dev_name)
     attr.prog_ifindex = if_nametoindex(dev_name);

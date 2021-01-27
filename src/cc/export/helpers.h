@@ -1215,6 +1215,9 @@ static int ____##name(unsigned long long *ctx, ##args)
 #define KRETFUNC_PROBE(event, args...) \
         BPF_PROG(kretfunc__ ## event, args)
 
+#define KMOD_RET(event, args...) \
+        BPF_PROG(kmod_ret__ ## event, args)
+
 #define LSM_PROBE(event, args...) \
         BPF_PROG(lsm__ ## event, args)
 
