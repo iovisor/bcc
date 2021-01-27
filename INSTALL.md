@@ -2,7 +2,7 @@
 
 * [Kernel Configuration](#kernel-configuration)
 * [Packages](#packages)
-  - [Debian](#debian--binary)
+  - [Debian](#debian---binary)
   - [Ubuntu](#ubuntu---binary)
   - [Fedora](#fedora---binary)
   - [Arch](#arch---binary)
