@@ -17,6 +17,14 @@ WORKDIR /root/bcc
 RUN /usr/lib/pbuilder/pbuilder-satisfydepends && \
     ./scripts/build-deb.sh ${BUILD_TYPE}
 
+# libbpf-tools
+RUN apt-get -qq update && \
+    apt-get -y install build-essential libelf-dev libfl-dev clang-10 libcap-dev
+
+RUN cd /root/bcc/src/cc/libbpf/src/ && make
+RUN cd /root/bcc/libbpf-tools/ && \
+  CLANG=clang-10 LLVM_STRIP=llvm-strip-10 make -j $(nproc) DESTDIR=/libbpf-tools/ prefix="" install
+
 FROM ubuntu:${OS_TAG}
 
 COPY --from=builder /root/bcc/*.deb /root/bcc/
@@ -30,3 +38,6 @@ RUN \
   fi ; \
   pip3 install dnslib cachetools  && \
   dpkg -i /root/bcc/*.deb
+
+# libbpf-tools
+COPY --from=builder /libbpf-tools/bin/* /bin/libbpf-tools/
