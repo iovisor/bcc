@@ -7,6 +7,7 @@
 const volatile bool ignore_failed = true;
 const volatile uid_t targ_uid = INVALID_UID;
 const volatile int max_args = DEFAULT_MAXARGS;
+const volatile bool filter_by_mnt_ns = false;
 
 static const struct event empty_event = {};
 
@@ -22,6 +23,13 @@ struct {
 	__uint(key_size, sizeof(u32));
 	__uint(value_size, sizeof(u32));
 } events SEC(".maps");
+
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__uint(max_entries, 1024);
+	__uint(key_size, sizeof(u64));
+	__uint(value_size, sizeof(u32));
+} mount_ns_set SEC(".maps");
 
 static __always_inline bool valid_uid(uid_t uid) {
 	return uid != INVALID_UID;
@@ -39,8 +47,15 @@ int tracepoint__syscalls__sys_enter_execve(struct trace_event_raw_sys_enter* ctx
 	const char *argp;
 	uid_t uid = (u32)bpf_get_current_uid_gid();
 	int i;
+	u64 mntns_id;
 
 	if (valid_uid(targ_uid) && targ_uid != uid)
+		return 0;
+
+	task = (struct task_struct*)bpf_get_current_task();
+	mntns_id = (u64) BPF_CORE_READ(task, nsproxy, mnt_ns, ns.inum);
+
+	if (filter_by_mnt_ns && !bpf_map_lookup_elem(&mount_ns_set, &mntns_id))
 		return 0;
 
 	id = bpf_get_current_pid_tgid();
@@ -55,10 +70,10 @@ int tracepoint__syscalls__sys_enter_execve(struct trace_event_raw_sys_enter* ctx
 
 	event->pid = tgid;
 	event->uid = uid;
-	task = (struct task_struct*)bpf_get_current_task();
 	event->ppid = (pid_t)BPF_CORE_READ(task, real_parent, tgid);
 	event->args_count = 0;
 	event->args_size = 0;
+	event->mntns_id = mntns_id;
 
 	ret = bpf_probe_read_user_str(event->args, ARGSIZE, (const char*)ctx->args[0]);
 	if (ret <= ARGSIZE) {

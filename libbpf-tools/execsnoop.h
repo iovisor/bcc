@@ -16,6 +16,7 @@ struct event {
 	pid_t pid;
 	pid_t ppid;
 	uid_t uid;
+	__u64 mntns_id;
 	int retval;
 	int args_count;
 	unsigned int args_size;

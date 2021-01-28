@@ -10,6 +10,7 @@
 #include <unistd.h>
 #include <bpf/libbpf.h>
 #include <bpf/bpf.h>
+#include "containers.h"
 #include "execsnoop.h"
 #include "execsnoop.skel.h"
 #include "trace_helpers.h"
@@ -18,6 +19,7 @@
 #define PERF_POLL_TIMEOUT_MS	100
 #define NSEC_PRECISION (NSEC_PER_SEC / 1000)
 #define MAX_ARGS_KEY 259
+#define CONTAINERS_MAP_KEY 260
 
 static volatile sig_atomic_t exiting = 0;
 
@@ -32,12 +34,15 @@ static struct env {
 	bool print_uid;
 	bool verbose;
 	int max_args;
+	const char *mntnsmap;
+	const char *containersmap;
 } env = {
 	.max_args = DEFAULT_MAXARGS,
 	.uid = INVALID_UID
 };
 
 static struct timespec start_time;
+static int containers_map_fd;
 
 const char *argp_program_version = "execsnoop 0.1";
 const char *argp_program_bug_address =
@@ -71,6 +76,9 @@ static const struct argp_option opts[] = {
 	{ "max-args", MAX_ARGS_KEY, "MAX_ARGS", 0,
 		"maximum number of arguments parsed and displayed, defaults to 20" },
 	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
+	{ "mntnsmap", 'm', "mountnspath", 0, "Trace mount namespaces in this BPF map only" },
+	{ "containersmap", CONTAINERS_MAP_KEY, "CONTAINERSMAP", 0, "Print additional information about containers using this map" },
+	{ "json", 'j', NULL, 0, "Output using json format" },
 	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
 	{},
 };
@@ -127,6 +135,15 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 		}
 		env.max_args = max_args;
 		break;
+	case 'm':
+		env.mntnsmap = arg;
+		break;
+	case CONTAINERS_MAP_KEY:
+		env.containersmap = arg;
+		break;
+	case 'j':
+		fprintf(stderr, "--json is not supported\n");
+		return ENOSYS;
 	default:
 		return ARGP_ERR_UNKNOWN;
 	}
@@ -237,6 +254,11 @@ static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	tm = localtime(&t);
 	strftime(ts, sizeof(ts), "%H:%M:%S", tm);
 
+	if (env.containersmap) {
+		struct container c = get_container_info(containers_map_fd, e->mntns_id);
+		printf("%-16s %-16s %-16s %-16s", c.node, c.kubernetes_namespace, c.kubernetes_pod, c.kubernetes_container);
+	}
+
 	if (env.time) {
 		printf("%-8s ", ts);
 	}
@@ -292,10 +314,29 @@ int main(int argc, char **argv)
 	obj->rodata->targ_uid = env.uid;
 	obj->rodata->max_args = env.max_args;
 
+	if (env.mntnsmap != NULL) {
+		obj->rodata->filter_by_mnt_ns = true;
+
+		/* TODO: is there a way to avoid creating this map? */
+		err = bpf_map__set_pin_path(obj->maps.mount_ns_set, env.mntnsmap);
+		if (err) {
+			fprintf(stderr, "failed to set pin path for mntnsmap\n");
+			goto cleanup;
+		}
+	}
+
 	err = execsnoop_bpf__load(obj);
 	if (err) {
 		fprintf(stderr, "failed to load BPF object: %d\n", err);
 		goto cleanup;
+	}
+
+	if (env.containersmap) {
+		containers_map_fd = bpf_obj_get(env.containersmap);
+		if (containers_map_fd < 0) {
+			fprintf(stderr, "failed to open containers map %s: %d\n", env.containersmap, err);
+			return 1;
+		}
 	}
 
 	clock_gettime(CLOCK_MONOTONIC, &start_time);
@@ -305,6 +346,9 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 	/* print headers */
+	if (env.containersmap) {
+		printf("%-16s %-16s %-16s %-16s", "NODE", "NAMESPACE", "PODNAME", "CONTAINERNAME");
+	}
 	if (env.time) {
 		printf("%-9s", "TIME");
 	}
