@@ -65,7 +65,7 @@ from ctypes import c_uint
 from netaddr import IPAddress, EUI
 from bcc import BPF
 from pyroute2 import IPRoute, NetNS, IPDB, NSPopen
-from utils import NSPopenWithCheck
+from utils import NSPopenWithCheck, mayFail
 import sys
 from time import sleep
 from unittest import main, TestCase
@@ -147,6 +147,7 @@ class TestBPFSocket(TestCase):
         self.br1_rtr[c_uint(0)] = c_uint(self.nsrtr_eth0_out.index)
         self.br2_rtr[c_uint(0)] = c_uint(self.nsrtr_eth1_out.index)
 
+    @mayFail("If the 'iperf', 'netserver' and 'netperf' binaries are unavailable, this is allowed to fail.")
     def test_brb(self):
         try:
             b = BPF(src_file=arg1, debug=0)
