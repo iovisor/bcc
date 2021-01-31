@@ -34,7 +34,7 @@ const char *argp_program_bug_address = "<bpf@vger.kernel.org>";
 const char argp_program_doc[] =
 "Summarize block device I/O size as a histogram.\n"
 "\n"
-"USAGE: bitesize [--help] [-T] [-c] [-d] [interval] [count]\n"
+"USAGE: bitesize [--help] [-T] [-c COMM] [-d DISK] [interval] [count]\n"
 "\n"
 "EXAMPLES:\n"
 "    bitesize              # summarize block I/O latency as a histogram\n"
@@ -173,7 +173,7 @@ int main(int argc, char **argv)
 
 	obj = bitesize_bpf__open();
 	if (!obj) {
-		fprintf(stderr, "failed to open and/or load BPF ojbect\n");
+		fprintf(stderr, "failed to open BPF object\n");
 		return 1;
 	}
 
