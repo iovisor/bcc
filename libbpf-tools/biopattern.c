@@ -32,7 +32,7 @@ const char *argp_program_bug_address = "<bpf@vger.kernel.org>";
 const char argp_program_doc[] =
 "Show block device I/O pattern.\n"
 "\n"
-"USAGE: biopattern [--help] [-T] [-d] [interval] [count]\n"
+"USAGE: biopattern [--help] [-T] [-d DISK] [interval] [count]\n"
 "\n"
 "EXAMPLES:\n"
 "    biopattern              # show block I/O pattern\n"
@@ -178,7 +178,7 @@ int main(int argc, char **argv)
 
 	obj = biopattern_bpf__open();
 	if (!obj) {
-		fprintf(stderr, "failed to open and/or load BPF ojbect\n");
+		fprintf(stderr, "failed to open BPF object\n");
 		return 1;
 	}
 

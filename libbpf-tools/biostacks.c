@@ -27,7 +27,7 @@ const char *argp_program_bug_address = "<bpf@vger.kernel.org>";
 const char argp_program_doc[] =
 "Tracing block I/O with init stacks.\n"
 "\n"
-"USAGE: biostacks [--help] [-d disk] [-m] [duration]\n"
+"USAGE: biostacks [--help] [-d DISK] [-m] [duration]\n"
 "\n"
 "EXAMPLES:\n"
 "    biostacks              # trace block I/O with init stacks.\n"
@@ -151,7 +151,7 @@ int main(int argc, char **argv)
 
 	obj = biostacks_bpf__open();
 	if (!obj) {
-		fprintf(stderr, "failed to open and/or load BPF ojbect\n");
+		fprintf(stderr, "failed to open BPF object\n");
 		return 1;
 	}
 
