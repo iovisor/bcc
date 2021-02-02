@@ -63,7 +63,8 @@ int test(struct bpf_sock_ops *skops)
     REQUIRE(res.code() != 0);
   }
 }
-
+#endif
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 20, 0)
 TEST_CASE("test percpu cgroup storage", "[percpu_cgroup_storage]") {
   {
     const std::string BPF_PROGRAM = R"(
