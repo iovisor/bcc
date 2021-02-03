@@ -101,7 +101,9 @@ struct key_t {
 BPF_HASH(counts, struct key_t);
 BPF_HASH(start, u32);
 BPF_STACK_TRACE(stack_traces, STACK_STORAGE_SIZE);
+"""
 
+bpf_text_kprobe = """
 int offcpu(struct pt_regs *ctx) {
     u32 pid = bpf_get_current_pid_tgid();
     struct task_struct *p = (struct task_struct *) bpf_get_current_task();
@@ -143,6 +145,61 @@ int waker(struct pt_regs *ctx, struct task_struct *p) {
     return 0;
 }
 """
+
+bpf_text_raw_tp = """
+RAW_TRACEPOINT_PROBE(sched_switch)
+{
+    // TP_PROTO(bool preempt, struct task_struct *prev, struct task_struct *next)
+    u32 pid = bpf_get_current_pid_tgid();
+    struct task_struct *p = (struct task_struct *)ctx->args[1];
+    u64 ts;
+
+    if (FILTER)
+        return 0;
+
+    ts = bpf_ktime_get_ns();
+    start.update(&pid, &ts);
+    return 0;
+}
+
+RAW_TRACEPOINT_PROBE(sched_wakeup)
+{
+    // TP_PROTO(struct task_struct *p)
+    struct task_struct *p = (struct task_struct *)ctx->args[0];
+    u32 pid = p->pid;
+    u64 delta, *tsp, ts;
+
+    tsp = start.lookup(&pid);
+    if (tsp == 0)
+        return 0;        // missed start
+    start.delete(&pid);
+
+    if (FILTER)
+        return 0;
+
+    // calculate delta time
+    delta = bpf_ktime_get_ns() - *tsp;
+    delta = delta / 1000;
+    if ((delta < MINBLOCK_US) || (delta > MAXBLOCK_US))
+        return 0;
+
+    struct key_t key = {};
+
+    key.w_k_stack_id = stack_traces.get_stackid(ctx, 0);
+    bpf_probe_read_kernel(&key.target, sizeof(key.target), p->comm);
+    bpf_get_current_comm(&key.waker, sizeof(key.waker));
+
+    counts.increment(key, delta);
+    return 0;
+}
+"""
+
+is_support_raw_tp = BPF.support_raw_tracepoint()
+if is_support_raw_tp:
+    bpf_text += bpf_text_raw_tp
+else:
+    bpf_text += bpf_text_kprobe
+
 if args.pid:
     filter = 'pid != %s' % args.pid
 elif args.useronly:
@@ -163,12 +220,13 @@ if debug or args.ebpf:
 
 # initialize BPF
 b = BPF(text=bpf_text)
-b.attach_kprobe(event="schedule", fn_name="offcpu")
-b.attach_kprobe(event="try_to_wake_up", fn_name="waker")
-matched = b.num_open_kprobes()
-if matched == 0:
-    print("0 functions traced. Exiting.")
-    exit()
+if not is_support_raw_tp:
+    b.attach_kprobe(event="schedule", fn_name="offcpu")
+    b.attach_kprobe(event="try_to_wake_up", fn_name="waker")
+    matched = b.num_open_kprobes()
+    if matched == 0:
+        print("0 functions traced. Exiting.")
+        exit()
 
 # header
 if not folded:
