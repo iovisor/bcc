@@ -64,7 +64,7 @@ bool Argument::assign_to_local(std::ostream &stream,
                                const std::string &binpath,
                                const optional<int> &pid) const {
   if (constant_) {
-    tfm::format(stream, "%s = %d;", local_name, *constant_);
+    tfm::format(stream, "%s = %lld;", local_name, *constant_);
     return true;
   }
 
@@ -228,7 +228,7 @@ bool ArgumentParser_aarch64::parse(Argument *dest) {
     dest->deref_offset_ = offset;
   } else {
     // Parse ...@<value>
-    optional<int> val;
+    optional<long long> val;
     new_pos = parse_number(cur_pos, &val);
     if (cur_pos == new_pos)
       return error_return(cur_pos, cur_pos);
@@ -268,7 +268,7 @@ bool ArgumentParser_powerpc64::parse(Argument *dest) {
     arg_str = &arg_[cur_pos_];
 
     if (std::regex_search(arg_str, matches, arg_op_regex_const)) {
-      dest->constant_ = stoi(matches.str(1));
+      dest->constant_ = (long long)stoull(matches.str(1));
     } else if (std::regex_search(arg_str, matches, arg_op_regex_reg)) {
       dest->base_register_name_ = "gpr[" + matches.str(1) + "]";
     } else if (std::regex_search(arg_str, matches, arg_op_regex_breg_off)) {
@@ -327,7 +327,7 @@ bool ArgumentParser_s390x::parse(Argument *dest) {
     cur_pos_ += matches.length(0);
 
     if (std::regex_search(arg_ + cur_pos_, matches, arg_op_regex_imm)) {
-      dest->constant_ = stoi(matches.str(1));
+      dest->constant_ = (long long)stoull(matches.str(1));
     } else if (std::regex_search(arg_ + cur_pos_, matches, arg_op_regex_reg)) {
       dest->base_register_name_ = "gprs[" + matches.str(1) + "]";
     } else if (std::regex_search(arg_ + cur_pos_, matches, arg_op_regex_mem)) {

@@ -23,7 +23,7 @@ using std::experimental::optional;
 using std::experimental::nullopt;
 
 static void verify_register(USDT::ArgumentParser &parser, int arg_size,
-                            int constant) {
+                            long long constant) {
   USDT::Argument arg;
   REQUIRE(parser.parse(&arg));
   REQUIRE(arg.arg_size() == arg_size);
@@ -177,6 +177,8 @@ TEST_CASE("test usdt argument parsing", "[usdt]") {
 #elif defined(__x86_64__)
     USDT::ArgumentParser_x64 parser(
         "-4@$0 8@$1234 %rdi %rax %rsi "
+        "8@$9223372036854775806 8@$18446744073709551614 "
+        "-8@$-1 "
         "-8@%rbx 4@%r12 8@-8(%rbp) 4@(%rax) "
         "-4@global_max_action(%rip) "
         "8@24+mp_(%rip) "
@@ -191,6 +193,9 @@ TEST_CASE("test usdt argument parsing", "[usdt]") {
     verify_register(parser, 8, "di");
     verify_register(parser, 8, "ax");
     verify_register(parser, 8, "si");
+    verify_register(parser, 8, 9223372036854775806ll);
+    verify_register(parser, 8, (long long)18446744073709551614ull);
+    verify_register(parser, -8, -1);
     verify_register(parser, -8, "bx");
     verify_register(parser, 4, "r12");
 

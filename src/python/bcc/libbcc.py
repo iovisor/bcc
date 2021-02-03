@@ -285,7 +285,7 @@ class bcc_usdt_argument(ct.Structure):
     _fields_ = [
             ('size', ct.c_int),
             ('valid', ct.c_int),
-            ('constant', ct.c_int),
+            ('constant', ct.c_longlong),
             ('deref_offset', ct.c_int),
             ('deref_ident', ct.c_char_p),
             ('base_register_name', ct.c_char_p),
