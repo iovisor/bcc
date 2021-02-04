@@ -14,9 +14,20 @@ endif()
 enable_testing()
 
 # populate submodules (libbpf)
-if(NOT CMAKE_USE_LIBBPF_PACKAGE AND NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/cc/libbpf/src)
-  execute_process(COMMAND git submodule update --init --recursive
+if(NOT CMAKE_USE_LIBBPF_PACKAGE)
+   if(NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/cc/libbpf/src)
+	execute_process(COMMAND git submodule update --init --recursive
                   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+   else()
+	execute_process(COMMAND git diff --shortstat ${CMAKE_CURRENT_SOURCE_DIR}/src/cc/libbpf/
+		OUTPUT_VARIABLE DIFF_STATUS)
+	if("${DIFF_STATUS}" STREQUAL "")
+		execute_process(COMMAND git submodule update --init --recursive
+			WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+	else()
+		message(WARNING "submodule libbpf dirty, so no sync")
+	endif()
+   endif()
 endif()
 
 # It's possible to use other kernel headers with
