@@ -8,6 +8,8 @@ LIBBPF_OBJ := $(abspath $(OUTPUT)/libbpf.a)
 INCLUDES := -I$(OUTPUT)
 CFLAGS := -g -O2 -Wall
 ARCH := $(shell uname -m | sed 's/x86_64/x86/')
+INSTALL ?= install
+prefix ?= /usr/local
 
 APPS = \
 	biolatency \
@@ -91,6 +93,11 @@ $(LIBBPF_OBJ): $(wildcard $(LIBBPF_SRC)/*.[ch]) | $(OUTPUT)/libbpf
 		    OBJDIR=$(dir $@)/libbpf DESTDIR=$(dir $@)		      \
 		    INCLUDEDIR= LIBDIR= UAPIDIR=			      \
 		    install
+
+install: $(APPS)
+	$(call msg, INSTALL libbpf-tools)
+	$(Q)$(INSTALL) -m 0755 -d $(DESTDIR)$(prefix)/bin
+	$(Q)$(INSTALL) $(APPS) $(DESTDIR)$(prefix)/bin
 
 # delete failed targets
 .DELETE_ON_ERROR:
