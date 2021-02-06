@@ -26,8 +26,8 @@ struct {
 
 static struct hist hist;
 
-SEC("fentry/__do_page_cache_readahead")
-int BPF_PROG(do_page_cache_readahead)
+SEC("fentry/do_page_cache_ra")
+int BPF_PROG(do_page_cache_ra)
 {
 	u32 pid = bpf_get_current_pid_tgid();
 	u64 one = 1;
@@ -53,8 +53,8 @@ int BPF_PROG(page_cache_alloc_ret, gfp_t gfp, struct page *ret)
 	return 0;
 }
 
-SEC("fexit/__do_page_cache_readahead")
-int BPF_PROG(do_page_cache_readahead_ret)
+SEC("fexit/do_page_cache_ra")
+int BPF_PROG(do_page_cache_ra_ret)
 {
 	u32 pid = bpf_get_current_pid_tgid();
 
