@@ -72,6 +72,24 @@ static void sig_handler(int sig)
 	exiting = true;
 }
 
+static int readahead__set_attach_target(struct bpf_program *prog)
+{
+	int err;
+
+	err = bpf_program__set_attach_target(prog, 0, "do_page_cache_ra");
+	if (!err)
+		return 0;
+
+	err = bpf_program__set_attach_target(prog, 0,
+					"__do_page_cache_readahead");
+	if (!err)
+		return 0;
+
+	fprintf(stderr, "failed to set attach target to %s: %s\n",
+		bpf_program__section_name(prog), strerror(-err));
+	return err;
+}
+
 int main(int argc, char **argv)
 {
 	static const struct argp argp = {
@@ -95,10 +113,27 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	obj = readahead_bpf__open_and_load();
+	obj = readahead_bpf__open();
 	if (!obj) {
-		fprintf(stderr, "failed to open and/or load BPF ojbect\n");
+		fprintf(stderr, "failed to open BPF object\n");
 		return 1;
+	}
+
+	/*
+	 * Starting from v5.10-rc1 (8238287), __do_page_cache_readahead has
+	 * renamed to do_page_cache_ra. So we specify the function dynamically.
+	 */
+	err = readahead__set_attach_target(obj->progs.do_page_cache_ra);
+	if (err)
+		goto cleanup;
+	err = readahead__set_attach_target(obj->progs.do_page_cache_ra_ret);
+	if (err)
+		goto cleanup;
+
+	err = readahead_bpf__load(obj);
+	if (err) {
+		fprintf(stderr, "failed to load BPF object\n");
+		goto cleanup;
 	}
 
 	err = readahead_bpf__attach(obj);
