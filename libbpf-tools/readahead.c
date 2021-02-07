@@ -85,8 +85,8 @@ static int readahead__set_attach_target(struct bpf_program *prog)
 	if (!err)
 		return 0;
 
-	fprintf(stderr, "failed to set attach target to %s: %s\n",
-		bpf_program__section_name(prog), strerror(-err));
+	fprintf(stderr, "failed to set attach target for %s: %s\n",
+		bpf_program__name(prog), strerror(-err));
 	return err;
 }
 
