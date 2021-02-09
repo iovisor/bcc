@@ -2,7 +2,7 @@
 // Copyright (c) 2020 Anton Protopopov
 //
 // Based on vfsstat(8) from BCC by Brendan Gregg
-#include "vmlinux.h"
+#include <vmlinux.h>
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_tracing.h>
 #include "vfsstat.h"

@@ -2,7 +2,7 @@
 // Copyright (c) 2020 Anton Protopopov
 //
 // Based on syscount(8) from BCC by Sasha Goldshtein
-#include "vmlinux.h"
+#include <vmlinux.h>
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_tracing.h>
 #include <bpf/bpf_core_read.h>
