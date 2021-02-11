@@ -303,7 +303,7 @@ StatusTuple BPF::attach_uprobe(const std::string& binary_path,
 StatusTuple BPF::attach_usdt_without_validation(const USDT& u, pid_t pid) {
   auto& probe = *static_cast<::USDT::Probe*>(u.probe_.get());
   if (!uprobe_ref_ctr_supported() && !probe.enable(u.probe_func_))
-    return StatusTuple(-1, "Unable to enable USDT %s" + u.print_name());
+    return StatusTuple(-1, "Unable to enable USDT %s", u.print_name().c_str());
 
   bool failed = false;
   std::string err_msg;
