@@ -841,7 +841,9 @@ Maps are BPF data stores, and are the basis for higher level object types includ
 
 Syntax: ```BPF_TABLE(_table_type, _key_type, _leaf_type, _name, _max_entries)```
 
-Creates a map named ```_name```. Most of the time this will be used via higher-level macros, like BPF_HASH, BPF_HIST, etc.
+Creates a map named ```_name```. Most of the time this will be used via higher-level macros, like BPF_HASH, BPF_ARRAY, BPF_HISTGRAM, etc.
+
+`BPF_F_TABLE` is a variant that takes a flag in the last parameter. `BPF_TABLE(...)` is actually a wrapper to `BPF_F_TABLE(..., 0 /* flag */)`.
 
 Methods (covered later): map.lookup(), map.lookup_or_try_init(), map.delete(), map.update(), map.insert(), map.increment().
 
@@ -876,6 +878,8 @@ BPF_HASH(start, struct request *);
 
 This creates a hash named ```start``` where the key is a ```struct request *```, and the value defaults to u64. This hash is used by the disksnoop.py example for saving timestamps for each I/O request, where the key is the pointer to struct request, and the value is the timestamp.
 
+This is a wrapper macro for `BPF_TABLE("hash", ...)`.
+
 Methods (covered later): map.lookup(), map.lookup_or_try_init(), map.delete(), map.update(), map.insert(), map.increment().
 
 Examples in situ:
@@ -897,6 +901,8 @@ BPF_ARRAY(counts, u64, 32);
 ```
 
 This creates an array named ```counts``` where with 32 buckets and 64-bit integer values. This array is used by the funccount.py example for saving call count of each function.
+
+This is a wrapper macro for `BPF_TABLE("array", ...)`.
 
 Methods (covered later): map.lookup(), map.update(), map.increment(). Note that all array elements are pre-allocated with zero values and can not be deleted.
 
@@ -920,6 +926,8 @@ BPF_HISTOGRAM(dist);
 
 This creates a histogram named ```dist```, which defaults to 64 buckets indexed by keys of type int.
 
+This is a wrapper macro for `BPF_TABLE("histgram", ...)`.
+
 Methods (covered later): map.increment().
 
 Examples in situ:
@@ -939,6 +947,8 @@ BPF_STACK_TRACE(stack_traces, 1024);
 ```
 
 This creates stack trace map named ```stack_traces```, with a maximum number of stack trace entries of 1024.
+
+This is a wrapper macro for `BPF_TABLE("stacktrace", ...)`.
 
 Methods (covered later): map.get_stackid().
 
@@ -989,6 +999,8 @@ BPF_PERCPU_ARRAY(counts, u64, 32);
 
 This creates NUM_CPU arrays named ```counts``` where with 32 buckets and 64-bit integer values.
 
+This is a wrapper macro for `BPF_TABLE("percpu_array", ...)`.
+
 Methods (covered later): map.lookup(), map.update(), map.increment(). Note that all array elements are pre-allocated with zero values and can not be deleted.
 
 Examples in situ:
@@ -1011,6 +1023,8 @@ BPF_LPM_TRIE(trie, struct key_v6);
 
 This creates an LPM trie map named `trie` where the key is a `struct key_v6`, and the value defaults to u64.
 
+This is a wrapper macro to `BPF_F_TABLE("lpm_trie", ..., BPF_F_NO_PREALLOC)`.
+
 Methods (covered later): map.lookup(), map.lookup_or_try_init(), map.delete(), map.update(), map.insert(), map.increment().
 
 Examples in situ:
@@ -1022,6 +1036,8 @@ Examples in situ:
 Syntax: ```BPF_PROG_ARRAY(name, size)```
 
 This creates a program array named ```name``` with ```size``` entries. Each entry of the array is either a file descriptor to a bpf program or ```NULL```. The array acts as a jump table so that bpf programs can "tail-call" other bpf programs.
+
+This is a wrapper macro for `BPF_TABLE("prog", ...)`.
 
 Methods (covered later): map.call().
 
