@@ -397,12 +397,10 @@ class TableBase(MutableMapping):
         for k in self.keys():
             self.__delitem__(k)
 
-    def items_lookup_and_delete_batch(self, batch_size=0):
-        # By default batch size is the biggest possible (max_entries in
-        # the map) unless user wants to override it.
-        if batch_size <= 0:  # no value set by user
-            batch_size = self.max_entries
 
+    def items_lookup_and_delete_batch(self):
+        # batch size is set to the maximum
+        batch_size = self.max_entries
         in_batch = ct.c_void_p(0)
         out_batch = ct.c_void_p(0)
         keys = (type(self.Key()) * batch_size)()
