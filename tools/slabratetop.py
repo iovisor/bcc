@@ -62,6 +62,7 @@ def signal_ignore(signal, frame):
 bpf_text = """
 #include <uapi/linux/ptrace.h>
 #include <linux/mm.h>
+#include <linux/kasan.h>
 
 // memcg_cache_params is a part of kmem_cache, but is not publicly exposed in
 // kernel versions 5.4 to 5.8.  Define an empty struct for it here to allow the
