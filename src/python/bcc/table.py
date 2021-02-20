@@ -397,22 +397,21 @@ class TableBase(MutableMapping):
         for k in self.keys():
             self.__delitem__(k)
 
-
     def items_lookup_and_delete_batch(self):
         # batch size is set to the maximum
         batch_size = self.max_entries
-        in_batch = ct.c_void_p(0)
-        out_batch = ct.c_void_p(0)
+        out_batch = ct.c_uint32(0)
         keys = (type(self.Key()) * batch_size)()
         values = (type(self.Leaf()) * batch_size)()
         count = ct.c_uint32(batch_size)
         res = lib.bpf_lookup_and_delete_batch(self.map_fd,
-                                              ct.byref(in_batch),
+                                              None,
                                               ct.byref(out_batch),
                                               ct.byref(keys),
                                               ct.byref(values),
                                               ct.byref(count)
                                               )
+
         errcode = ct.get_errno()
         if (errcode == errno.EINVAL):
             raise Exception("BPF_MAP_LOOKUP_AND_DELETE_BATCH is invalid.")
