@@ -359,12 +359,8 @@ int bpf_lookup_and_delete(int fd, void *key, void *value)
 int bpf_lookup_and_delete_batch(int fd, __u32 *in_batch, __u32 *out_batch, void *keys,
                                 void *values, __u32 *count)
 {
-  DECLARE_LIBBPF_OPTS(bpf_map_batch_opts,
-                      opts,
-                      .elem_flags = 0,
-                      .flags = 0,);
   return bpf_map_lookup_and_delete_batch(fd, in_batch, out_batch, keys, values,
-                                         count, &opts);
+                                         count, NULL);
 }
 
 int bpf_get_first_key(int fd, void *key, size_t key_size)
