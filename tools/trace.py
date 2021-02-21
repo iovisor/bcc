@@ -13,7 +13,7 @@
 from __future__ import print_function
 from bcc import BPF, USDT, StrcmpRewrite
 from functools import partial
-from time import sleep, strftime
+from time import strftime
 import time
 import argparse
 import re
@@ -74,7 +74,12 @@ class Probe(object):
                 self.probe_name = re.sub(r'[^A-Za-z0-9_]', '_',
                                          self.probe_name)
                 self.cgroup_map_name = cgroup_map_name
-                self.name = name
+                if name is None:
+                    # An empty bytestring is always contained in the command
+                    # name so this will always succeed.
+                    self.name = b''
+                else:
+                    self.name = name.encode('ascii')
                 self.msg_filter = msg_filter
                 # compiler can generate proper codes for function
                 # signatures with "syscall__" prefix
@@ -275,7 +280,7 @@ class Probe(object):
                 "$pid": "(unsigned)(bpf_get_current_pid_tgid() & 0xffffffff)",
                 "$tgid": "(unsigned)(bpf_get_current_pid_tgid() >> 32)",
                 "$cpu": "bpf_get_smp_processor_id()",
-                "$task" : "((struct task_struct *)bpf_get_current_task())"
+                "$task": "((struct task_struct *)bpf_get_current_task())"
         }
 
         def _rewrite_expr(self, expr):
@@ -372,7 +377,7 @@ class Probe(object):
                 self.stacks_name = "%s_stacks" % self.probe_name
                 stack_type = "BPF_STACK_TRACE" if self.build_id_enabled is False \
                              else "BPF_STACK_TRACE_BUILDID"
-                stack_table = "%s(%s, 1024);" % (stack_type,self.stacks_name) \
+                stack_table = "%s(%s, 1024);" % (stack_type, self.stacks_name) \
                               if (self.kernel_stack or self.user_stack) else ""
                 data_fields = ""
                 for i, field_type in enumerate(self.types):
@@ -596,12 +601,12 @@ BPF_PERF_OUTPUT(%s);
                 # Cast as the generated structure type and display
                 # according to the format string in the probe.
                 event = ct.cast(data, ct.POINTER(self.python_struct)).contents
-                if self.name and bytes(self.name) not in event.comm:
+                if self.name not in event.comm:
                     return
                 values = map(lambda i: getattr(event, "v%d" % i),
                              range(0, len(self.values)))
                 msg = self._format_message(bpf, event.tgid, values)
-                if self.msg_filter and bytes(self.msg_filter) not in msg:
+                if self.msg_filter and self.msg_filter not in msg:
                     return
                 if Probe.print_time:
                     time = strftime("%H:%M:%S") if Probe.use_localtime else \
@@ -762,8 +767,8 @@ trace -I 'linux/fs_struct.h' 'mntns_install "users = %d", $task->fs->users'
                   help="print time column")
                 parser.add_argument("-C", "--print_cpu", action="store_true",
                   help="print CPU id")
-                parser.add_argument("-c", "--cgroup-path", type=str, \
-                  metavar="CGROUP_PATH", dest="cgroup_path", \
+                parser.add_argument("-c", "--cgroup-path", type=str,
+                  metavar="CGROUP_PATH", dest="cgroup_path",
                   help="cgroup path")
                 parser.add_argument("-n", "--name", type=str,
                                     help="only print process names containing this name")
@@ -771,8 +776,8 @@ trace -I 'linux/fs_struct.h' 'mntns_install "users = %d", $task->fs->users'
                                     help="only print the msg of event containing this string")
                 parser.add_argument("-B", "--bin_cmp", action="store_true",
                   help="allow to use STRCMP with binary values")
-                parser.add_argument('-s', "--sym_file_list", type=str, \
-                  metavar="SYM_FILE_LIST", dest="sym_file_list", \
+                parser.add_argument('-s', "--sym_file_list", type=str,
+                  metavar="SYM_FILE_LIST", dest="sym_file_list",
                   help="coma separated list of symbol files to use \
                   for symbol resolution")
                 parser.add_argument("-K", "--kernel-stack",
@@ -868,9 +873,9 @@ trace -I 'linux/fs_struct.h' 'mntns_install "users = %d", $task->fs->users'
                 # Print header
                 if self.args.timestamp or self.args.time:
                     col_fmt = "%-17s " if self.args.unix_timestamp else "%-8s "
-                    print(col_fmt % "TIME", end="");
+                    print(col_fmt % "TIME", end="")
                 if self.args.print_cpu:
-                    print("%-3s " % "CPU", end="");
+                    print("%-3s " % "CPU", end="")
                 print("%-7s %-7s %-15s %-16s %s" %
                       ("PID", "TID", "COMM", "FUNC",
                       "-" if not all_probes_trivial else ""))
