@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include "common.h"
 #include "parser.h"
 #include "type_check.h"
 #include "codegen_llvm.h"
