@@ -201,9 +201,11 @@ To check which probes are present in the process, use the tplist tool.
 
     # This is called by the BPF module's __init__ when it realizes that there
     # is a USDT context and probes need to be attached.
-    def attach_uprobes(self, bpf):
+    def attach_uprobes(self, bpf, attach_usdt_ignore_pid):
         probes = self.enumerate_active_probes()
         for (binpath, fn_name, addr, pid) in probes:
+            if attach_usdt_ignore_pid:
+                pid = -1
             bpf.attach_uprobe(name=binpath.decode(), fn_name=fn_name.decode(),
                               addr=addr, pid=pid)
 
