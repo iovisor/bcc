@@ -43,6 +43,8 @@ CONFIG_HAVE_BPF_JIT=y
 CONFIG_HAVE_EBPF_JIT=y
 # [optional, for kprobes]
 CONFIG_BPF_EVENTS=y
+# Need kernel headers through /sys/kern/kheaders.tar.xz
+CONFIG_IKHEADERS=y
 ```
 
 There are a few optional kernel flags needed for running bcc networking examples on vanilla kernel:
