@@ -59,7 +59,7 @@ b = BPF(text = """
 #include <linux/ipv6.h>
 
 
-BPF_TABLE("percpu_array", uint32_t, long, dropcnt, 256);
+BPF_PERCPU_ARRAY(dropcnt, long, 256);
 
 static inline int parse_ipv4(void *data, u64 nh_off, void *data_end) {
     struct iphdr *iph = data + nh_off;

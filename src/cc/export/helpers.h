@@ -255,6 +255,25 @@ struct _name##_table_t _name = { .max_entries = (_max_entries) }
 #define BPF_HASH(...) \
   BPF_HASHX(__VA_ARGS__, BPF_HASH4, BPF_HASH3, BPF_HASH2, BPF_HASH1)(__VA_ARGS__)
 
+#define BPF_PERCPU_HASH1(_name) \
+  BPF_TABLE("percpu_hash", u64, u64, _name, 10240)
+#define BPF_PERCPU_HASH2(_name, _key_type) \
+  BPF_TABLE("percpu_hash", _key_type, u64, _name, 10240)
+#define BPF_PERCPU_HASH3(_name, _key_type, _leaf_type) \
+  BPF_TABLE("percpu_hash", _key_type, _leaf_type, _name, 10240)
+#define BPF_PERCPU_HASH4(_name, _key_type, _leaf_type, _size) \
+  BPF_TABLE("percpu_hash", _key_type, _leaf_type, _name, _size)
+
+// helper for default-variable macro function
+#define BPF_PERCPU_HASHX(_1, _2, _3, _4, NAME, ...) NAME
+
+// Define a hash function, some arguments optional
+// BPF_PERCPU_HASH(name, key_type=u64, leaf_type=u64, size=10240)
+#define BPF_PERCPU_HASH(...)                                            \
+  BPF_PERCPU_HASHX(                                                     \
+    __VA_ARGS__, BPF_PERCPU_HASH4, BPF_PERCPU_HASH3, BPF_PERCPU_HASH2, BPF_PERCPU_HASH1) \
+           (__VA_ARGS__)
+
 #define BPF_ARRAY1(_name) \
   BPF_TABLE("array", int, u64, _name, 10240)
 #define BPF_ARRAY2(_name, _leaf_type) \
