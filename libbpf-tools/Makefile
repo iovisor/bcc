@@ -38,6 +38,7 @@ APPS = \
 	syscount \
 	tcpconnect \
 	tcpconnlat \
+	tcptop \
 	vfsstat \
 	xfsslower \
 	#
