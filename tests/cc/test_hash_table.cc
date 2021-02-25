@@ -94,8 +94,8 @@ TEST_CASE("test hash table", "[hash_table]") {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4,6,0)
 TEST_CASE("percpu hash table", "[percpu_hash_table]") {
   const std::string BPF_PROGRAM = R"(
-    BPF_TABLE("percpu_hash", int, u64, myhash, 128);
-    BPF_TABLE("percpu_array", int, u64, myarray, 64);
+    BPF_PERCPU_HASH(myhash, int, u64, 128);
+    BPF_PERCPU_ARRAY(myarray, u64, 64);
   )";
 
   ebpf::BPF bpf;
