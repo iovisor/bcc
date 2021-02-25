@@ -61,6 +61,12 @@ bpf_text = """
 #include <uapi/linux/ptrace.h>
 #include <linux/blkdev.h>
 
+// for saving the timestamp and __data_len of each request
+struct start_req_t {
+    u64 ts;
+    u64 data_len;
+};
+
 // for saving process info by request
 struct who_t {
     u32 pid;
@@ -83,7 +89,7 @@ struct val_t {
     u32 io;
 };
 
-BPF_HASH(start, struct request *);
+BPF_HASH(start, struct request *, struct start_req_t);
 BPF_HASH(whobyreq, struct request *, struct who_t);
 BPF_HASH(counts, struct info_t, struct val_t);
 
@@ -103,28 +109,28 @@ int trace_pid_start(struct pt_regs *ctx, struct request *req)
 // time block I/O
 int trace_req_start(struct pt_regs *ctx, struct request *req)
 {
-    u64 ts;
-
-    ts = bpf_ktime_get_ns();
-    start.update(&req, &ts);
-
+    struct start_req_t start_req = {
+        .ts = bpf_ktime_get_ns(),
+        .data_len = req->__data_len
+    };
+    start.update(&req, &start_req);
     return 0;
 }
 
 // output
 int trace_req_completion(struct pt_regs *ctx, struct request *req)
 {
-    u64 *tsp;
+    struct start_req_t *startp;
 
     // fetch timestamp and calculate delta
-    tsp = start.lookup(&req);
-    if (tsp == 0) {
+    startp = start.lookup(&req);
+    if (startp == 0) {
         return 0;    // missed tracing issue
     }
 
     struct who_t *whop;
     struct val_t *valp, zero = {};
-    u64 delta_us = (bpf_ktime_get_ns() - *tsp) / 1000;
+    u64 delta_us = (bpf_ktime_get_ns() - startp->ts) / 1000;
 
     // setup info_t key
     struct info_t info = {};
@@ -158,7 +164,7 @@ int trace_req_completion(struct pt_regs *ctx, struct request *req)
     if (valp) {
         // save stats
         valp->us += delta_us;
-        valp->bytes += req->__data_len;
+        valp->bytes += startp->data_len;
         valp->io++;
     }
 
