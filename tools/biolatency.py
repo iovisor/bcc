@@ -74,6 +74,7 @@ typedef struct flag_key {
 } flag_key_t;
 
 BPF_HASH(start, struct request *);
+BPF_ARRAY(dropped, u64, 1);
 STORAGE
 
 // time block I/O
@@ -95,6 +96,12 @@ int trace_req_done(struct pt_regs *ctx, struct request *req)
         return 0;   // missed issue
     }
     delta = bpf_ktime_get_ns() - *tsp;
+    // check if time isn't going backwards
+    if ((s64)delta < 0) {
+        dropped.increment(0);
+        start.delete(&req);
+        return 0;
+    }
     FACTOR
 
     // store as histogram
@@ -203,6 +210,7 @@ def flags_print(flags):
 # output
 exiting = 0 if args.interval else 1
 dist = b.get_table("dist")
+dropped = b.get_table("dropped")
 while (1):
     try:
         sleep(int(args.interval))
@@ -231,7 +239,11 @@ while (1):
             dist.print_log2_hist(label, "disk")
 
     dist.clear()
-
+    
+    if dropped[0].value > 0:
+        print("%-34s dropped %6d events due to backwards time" % (" ",dropped[0].value))
+        dropped.clear()
+        
     countdown -= 1
     if exiting or countdown == 0:
         exit()
