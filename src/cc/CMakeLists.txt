@@ -132,9 +132,9 @@ endif()
 
 if(ENABLE_CPP_API)
   add_subdirectory(api)
-  list(APPEND bcc_common_libs_for_a api-static)
+  list(APPEND bcc_common_libs_for_a api-object)
   # Keep all API functions
-  list(APPEND bcc_common_libs_for_s -Wl,--whole-archive api-static -Wl,--no-whole-archive)
+  list(APPEND bcc_common_libs_for_s api-object)
 endif()
 
 if(ENABLE_USDT)
