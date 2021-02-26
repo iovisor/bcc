@@ -6,19 +6,16 @@
 #include <bpf/bpf_core_read.h>
 #include "tcptop.h"
 
-
 char LICENSE[] SEC("license") = "Dual BSD/GPL";
 
 /* Define here, because there are conflicts with include files */
-#define AF_INET		2 || 5
+#define AF_INET		2
 #define AF_INET6	10
-
 
 struct {
 	__uint(type, BPF_MAP_TYPE_RINGBUF);
 	__uint(max_entries, 256 * 1024);
 } rb SEC(".maps");
-
 
 struct {
     __uint(type, BPF_MAP_TYPE_HASH);
@@ -48,9 +45,7 @@ struct {
     __type(value, int);
 } ipv6_recv_bytes SEC(".maps");
 
-
 const volatile pid_t filter_pid = 0;
-
 
 static __always_inline void
 trace_v4(struct pt_regs *ctx, struct ipv4_key_t k4, bool is_send, u16 family)
@@ -124,18 +119,15 @@ trace_v6(struct pt_regs *ctx, struct ipv6_key_t k6, bool is_send, u16 family)
     bpf_ringbuf_submit(e, 0);
 }
 
-static __always_inline
-int tcp_sendmsg_handler(struct pt_regs *ctx, struct sock *sk,
-    struct msghdr *msg, size_t size)
+SEC("kprobe/tcp_sendmsg")
+int BPF_KPROBE(tcp_sendmsg, struct sock *sk, struct msghdr *msg, size_t size)
 {
     u32 pid = bpf_get_current_pid_tgid() >> 32;
-
 
 	if (filter_pid && pid != filter_pid) {
 		return 0;
 	}
 
-    //u16 dport = 0, family;
     u16 family;
 	BPF_CORE_READ_INTO(&family, sk, __sk_common.skc_family);
 
@@ -157,14 +149,12 @@ int tcp_sendmsg_handler(struct pt_regs *ctx, struct sock *sk,
         bpf_map_update_elem(&ipv6_send_bytes, &ipv6_key, &size, 0 /* flags: BPF_ANY */);
         trace_v6(ctx, ipv6_key, true, family);
     }
-    /*else { //drop | this is commented for testing purposes
-		return 0;
-	}*/
+
 	return 0;
 }
 
-static __always_inline
-int tcp_cleanup_rbuf_handler(struct pt_regs *ctx, struct sock *sk, int copied)
+SEC("kprobe/tcp_cleanup_rbuf")
+int BPF_KPROBE(tcp_cleanup_rbuf, struct sock *sk, int copied)
 {
     u32 pid = bpf_get_current_pid_tgid() >> 32;
 
@@ -196,20 +186,6 @@ int tcp_cleanup_rbuf_handler(struct pt_regs *ctx, struct sock *sk, int copied)
         bpf_map_update_elem(&ipv6_recv_bytes, &ipv6_key, &copied, 0 /* flags: BPF_ANY */);
         trace_v6(ctx, ipv6_key, false, family);
     }
-    /*else { //drop
-		return 0;
-	}*/	
+
 	return 0;
-}
-
-SEC("kprobe/tcp_sendmsg")
-int BPF_KPROBE(tcp_sendmsg, struct sock *sk, struct msghdr *msg, size_t size)
-{
-	return tcp_sendmsg_handler(ctx, sk, msg, size);
-}
-
-SEC("kprobe/tcp_cleanup_rbuf")
-int BPF_KPROBE(tcp_cleanup_rbuf, struct sock *sk, int copied)
-{
-	return tcp_cleanup_rbuf_handler(ctx, sk, copied);
 }
