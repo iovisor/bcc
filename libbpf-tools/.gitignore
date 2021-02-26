@@ -9,6 +9,7 @@
 /drsnoop
 /execsnoop
 /filelife
+/funclatency
 /hardirqs
 /llcstat
 /numamove
