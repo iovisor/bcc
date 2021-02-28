@@ -149,6 +149,7 @@ int BPF_KPROBE(tcp_sendmsg, struct sock *sk, struct msghdr *msg, size_t size)
         bpf_map_update_elem(&ipv6_send_bytes, &ipv6_key, &size, 0 /* flags: BPF_ANY */);
         trace_v6(ctx, ipv6_key, true, family);
     }
+    // else drop
 
 	return 0;
 }
@@ -186,6 +187,7 @@ int BPF_KPROBE(tcp_cleanup_rbuf, struct sock *sk, int copied)
         bpf_map_update_elem(&ipv6_recv_bytes, &ipv6_key, &copied, 0 /* flags: BPF_ANY */);
         trace_v6(ctx, ipv6_key, false, family);
     }
+    // else drop
 
 	return 0;
 }
