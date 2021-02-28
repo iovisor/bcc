@@ -20,7 +20,6 @@ from __future__ import print_function
 from bcc import ArgString, BPF, USDT
 from time import sleep, strftime
 import argparse
-import os
 import re
 import signal
 import sys
@@ -74,7 +73,7 @@ class Probe(object):
             libpath = BPF.find_library(self.library)
             if libpath is None:
                 # This might be an executable (e.g. 'bash')
-                libpath = BPF.find_exe(self.library)
+                libpath = BPF.find_exe(str(self.library))
             if libpath is None or len(libpath) == 0:
                 raise Exception("unable to find library %s" % self.library)
             self.library = libpath
@@ -147,7 +146,7 @@ class Probe(object):
             for tracepoint in tracepoints:
                 text += self._add_function(template, tracepoint)
         elif self.type == b"u":
-            self.usdt = USDT(path=self.library, pid=self.pid)
+            self.usdt = USDT(path=str(self.library), pid=self.pid)
             matches = []
             for probe in self.usdt.enumerate_probes():
                 if not self.pid and (probe.bin_path != self.library):
