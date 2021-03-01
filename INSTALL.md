@@ -283,87 +283,36 @@ To alleviate this problem, starting at release v0.11.0, source code with corresp
 libbpf submodule codes will be released as well. See https://github.com/iovisor/bcc/releases.
 
 ## Debian - Source
-### Jessie
+### sid
 #### Repositories
-
-The automated tests that run as part of the build process require `netperf`.  Since netperf's license is not "certified"
-as an open-source license, it is in Debian's `non-free` repository.
 
 `/etc/apt/sources.list` should include the `non-free` repository and look something like this:
 
 ```
-deb http://httpredir.debian.org/debian/ jessie main non-free
-deb-src http://httpredir.debian.org/debian/ jessie main non-free
-
-deb http://security.debian.org/ jessie/updates main non-free
-deb-src http://security.debian.org/ jessie/updates main non-free
-
-# wheezy-updates, previously known as 'volatile'
-deb http://ftp.us.debian.org/debian/ jessie-updates main non-free
-deb-src http://ftp.us.debian.org/debian/ jessie-updates main non-free
-```
-
-BCC also requires kernel version 4.1 or above.  Those kernels are available in the `jessie-backports` repository.  To
-add the `jessie-backports` repository to your system create the file `/etc/apt/sources.list.d/jessie-backports.list`
-with the following contents:
-
-```
-deb http://httpredir.debian.org/debian jessie-backports main
-deb-src http://httpredir.debian.org/debian jessie-backports main
+deb http://deb.debian.org/debian sid main contrib non-free
+deb-src http://deb.debian.org/debian sid main contrib non-free
 ```
 
 #### Install Build Dependencies
-
-Note, check for the latest `linux-image-4.x` version in `jessie-backports` before proceeding.  Also, have a look at the
-`Build-Depends:` section in `debian/control` file.
-
 ```
 # Before you begin
 apt-get update
-
-# Update kernel and linux-base package
-apt-get -t jessie-backports install linux-base linux-image-4.9.0-0.bpo.2-amd64 linux-headers-4.9.0-0.bpo.2-amd64
-
+# According to https://packages.debian.org/source/sid/bpfcc,
 # BCC build dependencies:
-apt-get install debhelper cmake libllvm3.8 llvm-3.8-dev libclang-3.8-dev \
-  libelf-dev bison flex libedit-dev clang-format-3.8 python python-netaddr \
-  python-pyroute2 luajit libluajit-5.1-dev arping iperf netperf ethtool \
-  devscripts zlib1g-dev libfl-dev python-dnslib python-cachetools
+sudo apt-get install arping bison clang-format cmake dh-python \
+  dpkg-dev pkg-kde-tools ethtool flex inetutils-ping iperf \
+  libbpf-dev libclang-dev libclang-cpp-dev libedit-dev libelf-dev \
+  libfl-dev libzip-dev linux-libc-dev llvm-dev libluajit-5.1-dev \
+  luajit python3-netaddr python3-pyroute2 python3-distutils python3
 ```
 
-#### Sudo
-
-Adding eBPF probes to the kernel and removing probes from it requires root privileges.  For the build to complete
-successfully, you must build from an account with `sudo` access.  (You may also build as root, but it is bad style.)
-
-`/etc/sudoers` or `/etc/sudoers.d/build-user` should contain
-
+#### Install and compile BCC
 ```
-build-user ALL = (ALL) NOPASSWD: ALL
-```
-
-or
-
-```
-build-user ALL = (ALL) ALL
-```
-
-If using the latter sudoers configuration, please keep an eye out for sudo's password prompt while the build is running.
-
-#### Build
-
-```
-cd <preferred development directory>
 git clone https://github.com/iovisor/bcc.git
-cd bcc
-debuild -b -uc -us
-```
-
-#### Install
-
-```
-cd ..
-sudo dpkg -i *bcc*.deb
+mkdir bcc/build; cd bcc/build
+cmake ..
+make
+sudo make install
 ```
 
 ## Ubuntu - Source
