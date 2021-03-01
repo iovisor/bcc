@@ -164,7 +164,7 @@ RAW_TRACEPOINT_PROBE(sched_switch)
 RAW_TRACEPOINT_PROBE(sched_wakeup)
 {
     // TP_PROTO(struct task_struct *p)
-    struct task_struct *p = (struct task_struct *) bpf_get_current_task();
+    struct task_struct *p = (struct task_struct *)ctx->args[0];
     return wakeup(ctx, p);
 }
 """
