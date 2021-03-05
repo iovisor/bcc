@@ -159,8 +159,12 @@ TRACEPOINT_PROBE(sock, inet_sock_set_state)
         ipv6_events.perf_submit(args, &data6, sizeof(data6));
     }
 
-    u64 ts = bpf_ktime_get_ns();
-    last.update(&sk, &ts);
+    if (args->newstate == TCP_CLOSE) {
+        last.delete(&sk);
+    } else {
+        u64 ts = bpf_ktime_get_ns();
+        last.update(&sk, &ts);
+    }
 
     return 0;
 }
@@ -224,8 +228,12 @@ int kprobe__tcp_set_state(struct pt_regs *ctx, struct sock *sk, int state)
         ipv6_events.perf_submit(ctx, &data6, sizeof(data6));
     }
 
-    u64 ts = bpf_ktime_get_ns();
-    last.update(&sk, &ts);
+    if (state == TCP_CLOSE) {
+        last.delete(&sk);
+    } else {
+        u64 ts = bpf_ktime_get_ns();
+        last.update(&sk, &ts);
+    }
 
     return 0;
 
