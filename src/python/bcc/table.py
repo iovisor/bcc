@@ -14,9 +14,9 @@
 
 from __future__ import print_function
 try:
-    from collections.abc import MutableMapping
+    from collections.abc import MutableMapping  # type: ignore
 except ImportError:
-    from collections import MutableMapping
+    from collections import MutableMapping  # type: ignore
 from time import strftime
 import ctypes as ct
 from functools import reduce

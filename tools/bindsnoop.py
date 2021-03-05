@@ -33,7 +33,7 @@ from bcc.utils import printb
 import argparse
 import re
 from os import strerror
-from socket import (
+from socket import (  # type: ignore
     inet_ntop, AF_INET, AF_INET6, __all__ as socket_all, __dict__ as socket_dct
 )
 from struct import pack
@@ -367,7 +367,7 @@ if args.wide:
     output_fmt = b"%10d %-12.12s %-4s %-39s %5d %-5s %2d"
     error_header_fmt = "%-25s "
     error_output_fmt = b"%-25s "
-    error_value_fmt = strerror
+    error_value_fmt = strerror  # type: ignore
 
 if args.ebpf:
     print(bpf_text)

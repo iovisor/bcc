@@ -28,8 +28,8 @@ if len(sys.argv) < 2:
 if sys.argv[1][0:1] == "-":
     usage()
 pid = int(sys.argv[1])
-min_ns = 1 * 1000000
-min_ms_text = 1
+min_ns = 1 * 1000000  # type: int | float
+min_ms_text = '1'
 if len(sys.argv) == 3:
     min_ns = float(sys.argv[2]) * 1000000
     min_ms_text = sys.argv[2]

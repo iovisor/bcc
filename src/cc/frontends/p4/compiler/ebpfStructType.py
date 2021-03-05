@@ -1,7 +1,7 @@
 # Copyright (c) Barefoot Networks, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
 
-from p4_hlir.hlir import P4_SIGNED, P4_SATURATING
+from p4_hlir.hlir import P4_SIGNED, P4_SATURATING  # type: ignore
 from ebpfScalarType import *
 
 

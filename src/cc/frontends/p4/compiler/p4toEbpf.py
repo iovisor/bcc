@@ -16,7 +16,7 @@ import os
 import traceback
 import sys
 import target
-from p4_hlir.main import HLIR
+from p4_hlir.main import HLIR  # type: ignore
 from ebpfProgram import EbpfProgram
 from compilationException import *
 from programSerializer import ProgramSerializer

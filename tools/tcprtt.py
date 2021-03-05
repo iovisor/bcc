@@ -155,7 +155,7 @@ if args.byladdr:
     bpf_text = bpf_text.replace('STORAGE',
         'BPF_HISTOGRAM(hist_srtt, sock_key_t);')
     bpf_text = bpf_text.replace('STORE',
-        b"""sock_key_t key;
+        """sock_key_t key;
     key.addr = saddr;
     key.slot = bpf_log2l(srtt);
     hist_srtt.increment(key);""")
@@ -164,7 +164,7 @@ elif args.byraddr:
     bpf_text = bpf_text.replace('STORAGE',
         'BPF_HISTOGRAM(hist_srtt, sock_key_t);')
     bpf_text = bpf_text.replace('STORE',
-        b"""sock_key_t key;
+        """sock_key_t key;
     key.addr = daddr;
     key.slot = bpf_log2l(srtt);
     hist_srtt.increment(key);""")

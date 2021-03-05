@@ -1,9 +1,10 @@
 # Copyright (c) Barefoot Networks, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
 
-from p4_hlir.hlir import p4_header_instance, p4_table, \
-     p4_conditional_node, p4_action, p4_parse_state
-from p4_hlir.main import HLIR
+from p4_hlir.hlir import (  # type: ignore
+    p4_header_instance, p4_table, p4_conditional_node, p4_action, p4_parse_state
+)
+from p4_hlir.main import HLIR  # type: ignore
 import typeFactory
 import ebpfTable
 import ebpfParser

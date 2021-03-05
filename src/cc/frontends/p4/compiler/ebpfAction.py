@@ -1,7 +1,7 @@
 # Copyright (c) Barefoot Networks, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
 
-from p4_hlir.hlir import p4_action, p4_field
+from p4_hlir.hlir import p4_action, p4_field  # type: ignore
 from p4_hlir.hlir import p4_signature_ref, p4_header_instance
 import ebpfProgram
 from programSerializer import ProgramSerializer

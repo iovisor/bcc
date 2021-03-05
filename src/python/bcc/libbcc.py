@@ -124,7 +124,7 @@ lib.bpf_attach_kfunc.argtypes = [ct.c_int]
 lib.bpf_attach_lsm.restype = ct.c_int
 lib.bpf_attach_lsm.argtypes = [ct.c_int]
 lib.bpf_has_kernel_btf.restype = ct.c_bool
-lib.bpf_has_kernel_btf.argtypes = None
+lib.bpf_has_kernel_btf.argtypes = []
 lib.bpf_open_perf_buffer.restype = ct.c_void_p
 lib.bpf_open_perf_buffer.argtypes = [_RAW_CB_TYPE, _LOST_CB_TYPE, ct.py_object, ct.c_int, ct.c_int, ct.c_int]
 lib.bpf_open_perf_event.restype = ct.c_int
@@ -133,18 +133,18 @@ lib.perf_reader_poll.restype = ct.c_int
 lib.perf_reader_poll.argtypes = [ct.c_int, ct.POINTER(ct.c_void_p), ct.c_int]
 lib.perf_reader_free.restype = None
 lib.perf_reader_free.argtypes = [ct.c_void_p]
-lib.perf_reader_fd.restype = int
+lib.perf_reader_fd.restype = ct.c_int
 lib.perf_reader_fd.argtypes = [ct.c_void_p]
 
 lib.bpf_attach_xdp.restype = ct.c_int
 lib.bpf_attach_xdp.argtypes = [ct.c_char_p, ct.c_int, ct.c_uint]
 
 lib.bpf_attach_perf_event.restype = ct.c_int
-lib.bpf_attach_perf_event.argtype = [ct.c_int, ct.c_uint, ct.c_uint, ct.c_ulonglong, ct.c_ulonglong,
+lib.bpf_attach_perf_event.argtypes = [ct.c_int, ct.c_uint, ct.c_uint, ct.c_ulonglong, ct.c_ulonglong,
         ct.c_int, ct.c_int, ct.c_int]
 
 lib.bpf_close_perf_event_fd.restype = ct.c_int
-lib.bpf_close_perf_event_fd.argtype = [ct.c_int]
+lib.bpf_close_perf_event_fd.argtypes = [ct.c_int]
 
 _RINGBUF_CB_TYPE = ct.CFUNCTYPE(ct.c_int, ct.c_void_p, ct.c_void_p, ct.c_int)
 lib.bpf_new_ringbuf.restype = ct.c_void_p
@@ -210,7 +210,7 @@ lib.bcc_free_symcache.restype = ct.c_void_p
 lib.bcc_free_symcache.argtypes = [ct.c_void_p, ct.c_int]
 
 lib.bcc_buildsymcache_new.restype = ct.c_void_p
-lib.bcc_buildsymcache_new.argtypes = None
+lib.bcc_buildsymcache_new.argtypes = []
 
 lib.bcc_free_buildsymcache.restype = None
 lib.bcc_free_buildsymcache.argtypes = [ct.c_void_p]
@@ -238,7 +238,7 @@ lib.bcc_symcache_refresh.restype = None
 lib.bcc_symcache_refresh.argtypes = [ct.c_void_p]
 
 lib.bcc_free_memory.restype = ct.c_int
-lib.bcc_free_memory.argtypes = None
+lib.bcc_free_memory.argtypes = []
 
 lib.bcc_usdt_new_frompid.restype = ct.c_void_p
 lib.bcc_usdt_new_frompid.argtypes = [ct.c_int, ct.c_char_p]

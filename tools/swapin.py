@@ -33,7 +33,6 @@ parser.add_argument("--ebpf", action="store_true",
 args = parser.parse_args()
 interval = int(args.interval)
 countdown = int(args.count)
-debug = 0
 
 # load BPF program
 b = BPF(text="""
@@ -57,10 +56,9 @@ int kprobe__swap_readpage(struct pt_regs *ctx)
     return 0;
 }
 """)
-if debug or args.ebpf:
-    print(bpf_text)
-    if args.ebpf:
-        exit()
+
+if args.ebpf:
+    exit()
 
 print("Counting swap ins. Ctrl-C to end.");
 

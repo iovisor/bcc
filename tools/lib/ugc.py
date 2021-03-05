@@ -144,11 +144,11 @@ if language == "java":
     bpf_probe_read_user(&event.string2, sizeof(event.string2), (void *)pool);
     """
 
-    def formatter(e):
+    def java_formatter(e):
         "%s %s used=%d->%d max=%d->%d" % \
             (e.string1, e.string2, e.field1, e.field3, e.field2, e.field4)
     probes.append(Probe("mem__pool__gc__begin", "mem__pool__gc__end",
-                        begin_save, end_save, formatter))
+                        begin_save, end_save, java_formatter))
     probes.append(Probe("gc__begin", "gc__end",
                         "", "", lambda _: "no additional info available"))
 #
@@ -182,11 +182,11 @@ elif language == "python":
     event.field2 = objs;
     """
 
-    def formatter(event):
+    def python_formatter(event):
         "gen %d GC collected %d objects" % \
             (event.field1, event.field2)
     probes.append(Probe("gc__start", "gc__done",
-                        begin_save, end_save, formatter))
+                        begin_save, end_save, python_formatter))
 #
 # Ruby
 #

@@ -1,7 +1,7 @@
 # Copyright (c) Barefoot Networks, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
 
-from p4_hlir.hlir import p4_counter, P4_DIRECT, P4_COUNTER_BYTES
+from p4_hlir.hlir import p4_counter, P4_DIRECT, P4_COUNTER_BYTES  # type: ignore
 from programSerializer import ProgramSerializer
 from compilationException import *
 import ebpfTable

@@ -47,8 +47,8 @@ elif args.preemptoff:
     preemptoff = True
     irqoff = False
 
-debugfs_path = subprocess.Popen ("cat /proc/mounts | grep -w debugfs" +
-    " | awk '{print $2}'",
+debugfs_path = subprocess.Popen(  # type: ignore
+    "cat /proc/mounts | grep -w debugfs | awk '{print $2}'",
     shell=True,
     stdout=subprocess.PIPE).stdout.read().split(b"\n")[0]
 

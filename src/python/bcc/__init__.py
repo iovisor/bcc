@@ -28,7 +28,7 @@ from .libbcc import lib, bcc_symbol, bcc_symbol_option, bcc_stacktrace_build_id,
 from .table import Table, PerfEventArray, RingBuf, BPF_MAP_TYPE_QUEUE, BPF_MAP_TYPE_STACK
 from .perf import Perf
 from .utils import get_online_cpus, printb, _assert_is_bytes, ArgString, StrcmpRewrite
-from .version import __version__
+from .version import __version__  # type: ignore
 from .disassembler import disassemble_prog, decode_map
 
 try:
@@ -183,7 +183,7 @@ class BPF(object):
     TRACE_FEXIT  = 25
 
     _probe_repl = re.compile(b"[^a-zA-Z0-9_]")
-    _sym_caches = {}
+    _sym_caches = {}  # type: dict
     _bsymcache =  lib.bcc_buildsymcache_new()
 
     _auto_includes = {

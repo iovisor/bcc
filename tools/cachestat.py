@@ -149,7 +149,7 @@ while 1:
     if hits < 0:
         misses = total
         hits = 0
-    ratio = 0
+    ratio = 0  # type: int | float
     if total > 0:
         ratio = float(hits) / total
 

@@ -233,7 +233,7 @@ while (1):
             keys[k] = v
 
     # to hold json data
-    data = {}
+    data = {}  # type: dict
 
     # output
     now = dt.now()

@@ -198,7 +198,7 @@ if debug or args.ebpf:
     if args.ebpf:
         exit()
 
-TCPSessionKey = namedtuple('TCPSession', ['pid', 'laddr', 'lport', 'daddr', 'dport'])
+TCPSessionKey = namedtuple('TCPSession', ['pid', 'laddr', 'lport', 'daddr', 'dport'])  # type: ignore
 
 def pid_to_comm(pid):
     try:
@@ -250,7 +250,7 @@ while i != args.count and not exiting:
             print("%-8s loadavg: %s" % (strftime("%H:%M:%S"), stats.read()))
 
     # IPv4: build dict of all seen keys
-    ipv4_throughput = defaultdict(lambda: [0, 0])
+    ipv4_throughput = defaultdict(lambda: [0, 0])  # type: dict
     for k, v in ipv4_send_bytes.items():
         key = get_ipv4_session_key(k)
         ipv4_throughput[key][0] = v.value
@@ -276,7 +276,7 @@ while i != args.count and not exiting:
             int(recv_bytes / 1024), int(send_bytes / 1024)))
 
     # IPv6: build dict of all seen keys
-    ipv6_throughput = defaultdict(lambda: [0, 0])
+    ipv6_throughput = defaultdict(lambda: [0, 0])  # type: dict
     for k, v in ipv6_send_bytes.items():
         key = get_ipv6_session_key(k)
         ipv6_throughput[key][0] = v.value

@@ -37,7 +37,7 @@ def comm_for_pid(pid):
     except:
         return "[unknown]"
 
-counts = {}
+counts = {}  # type: dict
 
 def parse_probes(typ):
     if args.verbosity > 1:
@@ -78,7 +78,11 @@ for pdir in os.listdir('/proc'):
             continue
 
 items = counts.items()
-max_type_len = items and max(list(map(lambda t: len(t[0][1]), items))) or 0
+max_type_len = 0
+for item in items:
+    type_len = len(item[0][1])
+    if type_len > max_type_len:
+        max_type_len = type_len
 print_format = "%%-6s %%-16s %%-%ss %%s" % (max_type_len + 1)
 
 print(print_format % ("PID", "COMM", "TYPE", "COUNT"))

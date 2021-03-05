@@ -1,0 +1,25 @@
+name: BCC MyPy
+
+on: push
+
+jobs:
+  mypy_bcc:
+    runs-on: ubuntu-20.04
+    strategy:
+      fail-fast: false
+      matrix:
+        env:
+        - MYPYFLAG: --py2
+        - MYPYFLAG:
+    steps:
+    - uses: actions/checkout@v2
+    - name: System info
+      run: |
+        uname -a
+        ip addr
+        python3 --version
+    - name: Install mypy
+      run: /bin/sh -c "python3 -m pip install mypy"
+    - name: Run mypy on bcc
+      env: ${{ matrix.env }}
+      run: /bin/sh -c "python3 -m mypy --exclude tools/old ${MYPYFLAG} src tools"

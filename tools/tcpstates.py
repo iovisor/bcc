@@ -287,7 +287,7 @@ if args.csv:
 
 if args.journal:
     try:
-        from systemd import journal
+        from systemd import journal  # type: ignore
     except ImportError:
         print("ERROR: Journal logging requires the systemd.journal module")
         exit(1)

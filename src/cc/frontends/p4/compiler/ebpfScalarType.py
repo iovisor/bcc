@@ -1,7 +1,7 @@
 # Copyright (c) Barefoot Networks, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
 
-from p4_hlir.hlir import P4_AUTO_WIDTH
+from p4_hlir.hlir import P4_AUTO_WIDTH  # type: ignore
 from ebpfType import *
 from compilationException import *
 from programSerializer import ProgramSerializer
