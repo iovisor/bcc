@@ -587,6 +587,12 @@ class BPF(object):
                     if fn == b'__irqentry_text_start':
                         in_irq_section = 1
                         continue
+                    # __irqentry_text_end is not always after
+                    # __irqentry_text_start. But only happens when
+                    # no functions between two irqentry_text
+                    elif fn == b'__irqentry_text_end':
+                        in_irq_section = 2
+                        continue
                 elif in_irq_section == 1:
                     if fn == b'__irqentry_text_end':
                         in_irq_section = 2
