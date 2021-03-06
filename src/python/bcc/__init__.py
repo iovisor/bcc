@@ -255,11 +255,12 @@ class BPF(object):
 
     @staticmethod
     def _find_file(filename):
+        # type: (str) -> str
         """ If filename is invalid, search in ./ of argv[0] """
         if filename:
             if not os.path.isfile(filename):
                 argv0 = ArgString(sys.argv[0])
-                t = b"/".join([os.path.abspath(os.path.dirname(argv0.__bytes__())), filename])
+                t = "/".join([os.path.abspath(os.path.dirname(str(argv0))), filename])
                 if os.path.isfile(t):
                     filename = t
                 else:

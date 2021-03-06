@@ -59,6 +59,7 @@ def printb(s, file=sys.stdout, nl=1):
         buf.write(b"\n")
     file.flush()
 
+
 class ArgString(object):
     """
     ArgString(arg)
@@ -68,16 +69,20 @@ class ArgString(object):
     never be en/decode()'ed).
     """
     def __init__(self, arg):
-        if sys.version_info[0] >= 3:
-            self.s = arg
-        else:
-            self.s = arg.decode(FILESYSTEMENCODING)
+        # type: (str) -> None
+        self.s = arg
 
     def __bytes__(self):
-        return self.s.encode(FILESYSTEMENCODING)
+        # type: () -> bytes
+        if sys.version_info[0] >= 3:
+            return self.s.encode(FILESYSTEMENCODING)
+        else:
+            return self.s
 
     def __str__(self):
+        # type: () -> str
         return self.s
+
 
 def warn_with_traceback(message, category, filename, lineno, file=None, line=None):
     log = file if hasattr(file, "write") else sys.stderr

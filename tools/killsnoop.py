@@ -14,7 +14,7 @@
 
 from __future__ import print_function
 from bcc import BPF
-from bcc.utils import ArgString, printb
+from bcc.utils import printb
 import argparse
 from time import strftime
 
