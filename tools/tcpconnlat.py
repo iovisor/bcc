@@ -13,6 +13,7 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
 # 19-Feb-2016   Brendan Gregg   Created this.
+# 05-Mar-2021   Suresh Kumar    Added LPORT option
 
 from __future__ import print_function
 from bcc import BPF
@@ -85,6 +86,7 @@ struct ipv4_data_t {
     u32 saddr;
     u32 daddr;
     u64 ip;
+    u16 lport;
     u16 dport;
     u64 delta_us;
     char task[TASK_COMM_LEN];
@@ -97,6 +99,7 @@ struct ipv6_data_t {
     unsigned __int128 saddr;
     unsigned __int128 daddr;
     u64 ip;
+    u16 lport;
     u16 dport;
     u64 delta_us;
     char task[TASK_COMM_LEN];
@@ -142,8 +145,9 @@ int trace_tcp_rcv_state_process(struct pt_regs *ctx, struct sock *skp)
 #endif
 
     // pull in details
-    u16 family = 0, dport = 0;
+    u16 family = 0, lport = 0, dport = 0;
     family = skp->__sk_common.skc_family;
+    lport = skp->__sk_common.skc_num;
     dport = skp->__sk_common.skc_dport;
 
     // emit to appropriate data path
@@ -152,6 +156,8 @@ int trace_tcp_rcv_state_process(struct pt_regs *ctx, struct sock *skp)
         data4.ts_us = now / 1000;
         data4.saddr = skp->__sk_common.skc_rcv_saddr;
         data4.daddr = skp->__sk_common.skc_daddr;
+        u16 lport = skp->__sk_common.skc_num;
+        data4.lport = lport;
         data4.dport = ntohs(dport);
         data4.delta_us = delta_us;
         __builtin_memcpy(&data4.task, infop->task, sizeof(data4.task));
@@ -164,6 +170,7 @@ int trace_tcp_rcv_state_process(struct pt_regs *ctx, struct sock *skp)
             skp->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
         bpf_probe_read_kernel(&data6.daddr, sizeof(data6.daddr),
             skp->__sk_common.skc_v6_daddr.in6_u.u6_addr32);
+        data6.lport = lport;
         data6.dport = ntohs(dport);
         data6.delta_us = delta_us;
         __builtin_memcpy(&data6.task, infop->task, sizeof(data6.task));
@@ -208,9 +215,9 @@ def print_ipv4_event(cpu, data, size):
         if start_ts == 0:
             start_ts = event.ts_us
         print("%-9.3f" % ((float(event.ts_us) - start_ts) / 1000000), end="")
-    print("%-6d %-12.12s %-2d %-16s %-16s %-5d %.2f" % (event.pid,
+    print("%-6d %-12.12s %-2d %-16s %-6d %-16s %-6d %.2f" % (event.pid,
         event.task.decode('utf-8', 'replace'), event.ip,
-        inet_ntop(AF_INET, pack("I", event.saddr)),
+        inet_ntop(AF_INET, pack("I", event.saddr)), event.lport, 
         inet_ntop(AF_INET, pack("I", event.daddr)), event.dport,
         float(event.delta_us) / 1000))
 
@@ -221,16 +228,16 @@ def print_ipv6_event(cpu, data, size):
         if start_ts == 0:
             start_ts = event.ts_us
         print("%-9.3f" % ((float(event.ts_us) - start_ts) / 1000000), end="")
-    print("%-6d %-12.12s %-2d %-16s %-16s %-5d %.2f" % (event.pid,
+    print("%-6d %-12.12s %-2d %-16s %-6d %-16s %-6d %.2f" % (event.pid,
         event.task.decode('utf-8', 'replace'), event.ip,
-        inet_ntop(AF_INET6, event.saddr), inet_ntop(AF_INET6, event.daddr),
-        event.dport, float(event.delta_us) / 1000))
+        inet_ntop(AF_INET6, event.saddr), event.lport,
+        inet_ntop(AF_INET6, event.daddr), event.dport, float(event.delta_us) / 1000))
 
 # header
 if args.timestamp:
     print("%-9s" % ("TIME(s)"), end="")
-print("%-6s %-12s %-2s %-16s %-16s %-5s %s" % ("PID", "COMM", "IP", "SADDR",
-    "DADDR", "DPORT", "LAT(ms)"))
+print("%-6s %-12s %-2s %-16s %-6s %-16s %-6s %s" % ("PID", "COMM", "IP", "SADDR",
+    "LPORT", "DADDR", "DPORT", "LAT(ms)"))
 
 # read events
 b["ipv4_events"].open_perf_buffer(print_ipv4_event)
