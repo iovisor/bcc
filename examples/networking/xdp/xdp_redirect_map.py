@@ -100,7 +100,7 @@ while 1:
         time.sleep(1)
     except KeyboardInterrupt:
         print("Removing filter from device")
-        break;
+        break
 
 b.remove_xdp(in_if, flags)
 b.remove_xdp(out_if, flags)
