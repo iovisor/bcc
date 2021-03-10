@@ -4,7 +4,7 @@
 # virtiostat    Show virtio devices input/output statistics.
 #               For Linux, uses BCC, eBPF.
 #
-# USAGE: virtiostat [-h] [-T] [-D] [INTERVAL] [COUNT]
+# USAGE: virtiostat [-h] [-T] [-D] [-d DRIVER] [-n DEVNAME] [INTERVAL] [COUNT]
 #
 # Copyright (c) 2021 zhenwei pi
 # Licensed under the Apache License, Version 2.0 (the "License")
@@ -18,10 +18,12 @@ import argparse
 
 # arguments
 examples = """examples:
-    ./virtiostat            # print 3(default) second summaries
-    ./virtiostat  1  10     # print 1 second summaries, 10 times
-    ./virtiostat -T         # show timestamps
-    ./virtiostat -D         # show debug bpf text
+    ./virtiostat                 # print 3(default) second summaries
+    ./virtiostat  1  10          # print 1 second summaries, 10 times
+    ./virtiostat -T              # show timestamps
+    ./virtiostat -d virtio_blk   # only show virtio block devices
+    ./virtiostat -n virtio0      # only show virtio0 device
+    ./virtiostat -D              # show debug bpf text
 """
 parser = argparse.ArgumentParser(
     description="Show virtio devices input/output statistics",
@@ -33,6 +35,10 @@ parser.add_argument("count", nargs="?", default=99999999,
     help="number of outputs")
 parser.add_argument("-T", "--timestamp", action="store_true",
     help="show timestamp on output")
+parser.add_argument("-d", "--driver",
+    help="filter for driver name")
+parser.add_argument("-n", "--devname",
+    help="filter for device name")
 parser.add_argument("-D", "--debug", action="store_true",
     help="print BPF program before starting (for debugging purposes)")
 parser.add_argument("--ebpf", action="store_true",
@@ -51,6 +57,25 @@ bpf_text = """
 #define VIRTIO_MAX_SGS  6
 /* typically virtio blk has max SEG of 128 */
 #define SG_MAX          128
+
+/* local strcmp function, max length 16 to protect instruction loops */
+#define CMPMAX	16
+
+static int local_strcmp(const char *cs, const char *ct)
+{
+    int len = 0;
+    unsigned char c1, c2;
+
+    while (len++ < CMPMAX) {
+        c1 = *cs++;
+        c2 = *ct++;
+        if (c1 != c2)
+            return c1 < c2 ? -1 : 1;
+        if (!c1)
+            break;
+    }
+    return 0;
+}
 
 typedef struct virtio_stat {
     char driver[16];
@@ -128,6 +153,9 @@ static void record(struct virtqueue *vq, struct scatterlist **sgs,
     u64 key = (u64)vq;
     u64 in_bw = 0;
 
+    DRIVERFILTER
+    DEVNAMEFILTER
+
     /* Workaround: separate two count_len() calls, one here and the
      * other below. Otherwise, compiler may generate some spills which
      * harms verifier pruning. This happens in llvm12, but not llvm4.
@@ -138,9 +166,9 @@ static void record(struct virtqueue *vq, struct scatterlist **sgs,
 
     vs = stats.lookup(&key);
     if (!vs) {
-        bpf_probe_read_kernel(newvs.driver, sizeof(newvs.driver), vq->vdev->dev.driver->name);
-        bpf_probe_read_kernel(newvs.dev, sizeof(newvs.dev), vq->vdev->dev.kobj.name);
-        bpf_probe_read_kernel(newvs.vqname, sizeof(newvs.vqname), vq->name);
+        bpf_probe_read_kernel_str(newvs.driver, sizeof(newvs.driver), vq->vdev->dev.driver->name);
+        bpf_probe_read_kernel_str(newvs.dev, sizeof(newvs.dev), vq->vdev->dev.kobj.name);
+        bpf_probe_read_kernel_str(newvs.vqname, sizeof(newvs.vqname), vq->name);
         newvs.out_sgs = out_sgs;
         newvs.in_sgs = in_sgs;
         if (out_sgs)
@@ -193,6 +221,29 @@ int trace_virtqueue_add_inbuf_ctx(struct pt_regs *ctx, struct virtqueue *vq,
     return 0;
 }
 """
+
+# filter for driver name
+if args.driver:
+    bpf_text = bpf_text.replace('DRIVERFILTER',
+        """char filter_driver[] = \"%s\";
+        char driver[16];
+        bpf_probe_read_kernel_str(driver, sizeof(driver), vq->vdev->dev.driver->name);
+        if (local_strcmp(filter_driver, driver))
+        return;""" % (args.driver))
+else:
+    bpf_text = bpf_text.replace('DRIVERFILTER', '')
+
+# filter for dev name
+if args.devname:
+    bpf_text = bpf_text.replace('DEVNAMEFILTER',
+        """char filter_devname[] = \"%s\";
+        char devname[16];
+        bpf_probe_read_kernel_str(devname, sizeof(devname), vq->vdev->dev.kobj.name);
+        if (local_strcmp(filter_devname, devname))
+        return;""" % (args.devname))
+else:
+    bpf_text = bpf_text.replace('DEVNAMEFILTER', '')
+
 
 # debug mode: print bpf text
 if args.debug:
