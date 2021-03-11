@@ -27,7 +27,8 @@ struct data_ext_t {
 #define warn(...) fprintf(stderr, __VA_ARGS__)
 
 const char *argp_program_version = "syscount 0.1";
-const char *argp_program_bug_address = "<bpf@vger.kernel.org>";
+const char *argp_program_bug_address =
+	"https://github.com/iovisor/bcc/tree/master/libbpf-tools";
 static const char argp_program_doc[] =
 "\nsyscount: summarize syscall counts and latencies\n"
 "\n"

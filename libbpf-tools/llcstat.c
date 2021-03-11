@@ -28,7 +28,8 @@ struct env {
 static volatile bool exiting;
 
 const char *argp_program_version = "llcstat 0.1";
-const char *argp_program_bug_address = "<bpf@vger.kernel.org>";
+const char *argp_program_bug_address =
+	"https://github.com/iovisor/bcc/tree/master/libbpf-tools";
 const char argp_program_doc[] =
 "Summarize cache references and misses by PID.\n"
 "\n"
