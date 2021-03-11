@@ -27,7 +27,8 @@ static struct env {
 } env = { };
 
 const char *argp_program_version = "drsnoop 0.1";
-const char *argp_program_bug_address = "<bpf@vger.kernel.org>";
+const char *argp_program_bug_address =
+	"https://github.com/iovisor/bcc/tree/master/libbpf-tools";
 const char argp_program_doc[] =
 "Trace direct reclaim latency.\n"
 "\n"

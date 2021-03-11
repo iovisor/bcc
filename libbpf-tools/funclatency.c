@@ -41,7 +41,8 @@ static struct prog_env {
 };
 
 const char *argp_program_version = "funclatency 0.1";
-const char *argp_program_bug_address = "<bpf@vger.kernel.org>";
+const char *argp_program_bug_address =
+	"https://github.com/iovisor/bcc/tree/master/libbpf-tools";
 static const char args_doc[] = "FUNCTION";
 static const char program_doc[] =
 "Time functions and print latency as a histogram\n"
