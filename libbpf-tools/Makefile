@@ -21,6 +21,7 @@ APPS = \
 	biosnoop \
 	biostacks \
 	bitesize \
+	cachestat \
 	cpudist \
 	cpufreq \
 	drsnoop \
