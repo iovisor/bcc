@@ -1,0 +1,82 @@
+Demonstrations of skbstat, the Linux BPF/bcc version.
+
+
+skbstat prints detailed information about the packet (skb) processed by the kernel,
+including ingress/egress/drop. we can pass filter parameters to it, such as "-p tcp -P 80":
+
+# ./skbstat.py -p tcp -P 80 --input --output
+TIME     NUM    FUNC/STACK
+20:04:29        [INGRESS]
+         1      tcp_v4_rcv
+         1      ip_local_deliver_finish
+         1      ip_local_deliver
+         1      ip_route_input_noref
+         1      ip_rcv_finish
+         1      ip_rcv
+         1      netif_receive_skb_internal
+
+TIME     NUM    FUNC/STACK
+20:04:30        [EGRESS]
+         1      ip_output
+         1      ip_finish_output
+         1      ip_finish_output2
+         1      __dev_queue_xmit
+         1      dev_hard_start_xmit
+
+TIME     NUM    FUNC/STACK
+20:04:30        [DROP]
+         1
+                kfree_skb+0x1
+                tcp_v4_rcv+0x164
+                ip_protocol_deliver_rcu+0x36
+                ip_local_deliver_finish+0x44
+                ip_local_deliver+0x6b
+                ip_rcv+0x52
+                __netif_receive_skb_one_core+0x50
+                netif_receive_skb_internal+0x2f
+                napi_gro_receive+0x107
+
+[...]
+
+The last column shows the number of function calls or skb dropped stacks.
+
+This tool is useful for debugging why a particular packet (skb) was dropped.
+
+USAGE:
+
+# ./skbstat.py -h
+usage: skbstat.py [-h] [-i INTERVAL] [-s SADDR] [-d DADDR] [-N ADDR]
+                   [-S SPORT] [-D DPORT] [-P PORT] [-p PROTO] [--input]
+                   [--output] [--consume]
+
+Trace skb event (ingress/egress/consume/drop) of the kernel
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -i INTERVAL, --interval INTERVAL
+                        interval in seconds to print backtrace
+  -s SADDR, --saddr SADDR
+                        source ip/ipv6 address/network
+  -d DADDR, --daddr DADDR
+                        destination ip/ipv6 address/network
+  -N ADDR, --addr ADDR  source or destination ip/ipv6 address/network
+  -S SPORT, --sport SPORT
+                        source tcp/udp port
+  -D DPORT, --dport DPORT
+                        destination tcp/udp port
+  -P PORT, --port PORT  source or destination tcp/udp port
+  -p PROTO, --proto PROTO
+                        protocol ( tcp/udp/icmp ... )
+  --input               trace skb input
+  --output              trace skb output
+  --consume             dump consume_skb backtrace
+
+examples:
+    ./skbstat                               # dump all skb dropping backtraces
+    ./skbstat --ingress                     # dump skb ingress routines
+    ./skbstat --egress                      # dump skb egress routines
+    ./skbstat -s 10.0.0.1                   # only trace packet comming from 10.0.0.1
+    ./skbstat -N 10.0.0.1                   # only trace packet comming from or going to 10.0.0.1
+    ./skbstat -p tcp                        # only trace TCP packet
+    ./skbstat -p tcp -D 80                  # only trace ingress HTTP packet
+    ./skbstat -p tcp -P 80                  # only trace ingress or egress HTTP packet
