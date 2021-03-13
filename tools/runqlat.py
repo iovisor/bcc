@@ -252,7 +252,8 @@ b = BPF(text=bpf_text)
 if not is_support_raw_tp:
     b.attach_kprobe(event="ttwu_do_wakeup", fn_name="trace_ttwu_do_wakeup")
     b.attach_kprobe(event="wake_up_new_task", fn_name="trace_wake_up_new_task")
-    b.attach_kprobe(event="finish_task_switch", fn_name="trace_run")
+    b.attach_kprobe(event_re="^finish_task_switch$|^finish_task_switch\.isra\.\d$",
+                    fn_name="trace_run")
 
 print("Tracing run queue latency... Hit Ctrl-C to end.")
 
