@@ -34,22 +34,24 @@ if the response is a RST (port closed).
 USAGE message:
 
 # ./tcpconnlat -h
-usage: tcpconnlat [-h] [-t] [-p PID] [min_ms]
+usage: tcpconnlat [-h] [-t] [-p PID] [-L] [-v] [duration_ms]
 
 Trace TCP connects and show connection latency
 
 positional arguments:
-  min_ms             minimum duration to trace, in ms (default 0)
+  duration_ms        minimum duration to trace (ms)
 
 optional arguments:
   -h, --help         show this help message and exit
   -t, --timestamp    include timestamp on output
   -p PID, --pid PID  trace this PID only
+  -L, --lport        include LPORT on output
+  -v, --verbose      print the BPF program for debugging purposes
 
 examples:
     ./tcpconnlat           # trace all TCP connect()s
+    ./tcpconnlat 1         # trace connection latency slower than 1 ms
+    ./tcpconnlat 0.1       # trace connection latency slower than 100 us
     ./tcpconnlat -t        # include timestamps
     ./tcpconnlat -p 181    # only trace PID 181
-    ./tcpconnlat 1         # only show connects longer than 1 ms
-    ./tcpconnlat 0.1       # only show connects longer than 100 us
-    ./tcpconnlat -v        # Show the BPF program
+    ./tcpconnlat -L        # include LPORT while printing outputs
