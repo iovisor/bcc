@@ -199,7 +199,7 @@ static void close_elf(Elf *e, int fd_close)
 off_t get_elf_func_offset(const char *path, const char *func)
 {
 	off_t ret = -1;
-	int fd = -1;
+	int i, fd = -1;
 	Elf *e;
 	Elf_Scn *scn;
 	Elf_Data *data;
@@ -221,7 +221,7 @@ off_t get_elf_func_offset(const char *path, const char *func)
 			continue;
 		data = NULL;
 		while ((data = elf_getdata(scn, data))) {
-			for (int i = 0; gelf_getsym(data, i, sym); i++) {
+			for (i = 0; gelf_getsym(data, i, sym); i++) {
 				n = elf_strptr(e, shdr->sh_link, sym->st_name);
 				if (!n)
 					continue;

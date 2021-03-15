@@ -38,6 +38,7 @@ int tracepoint__syscalls__sys_enter_execve(struct trace_event_raw_sys_enter* ctx
 	const char **args = (const char **)(ctx->args[1]);
 	const char *argp;
 	uid_t uid = (u32)bpf_get_current_uid_gid();
+	int i;
 
 	if (valid_uid(targ_uid) && targ_uid != uid)
 		return 0;
@@ -71,7 +72,7 @@ int tracepoint__syscalls__sys_enter_execve(struct trace_event_raw_sys_enter* ctx
 
 	event->args_count++;
 	#pragma unroll
-	for (int i = 1; i < TOTAL_MAX_ARGS && i < max_args; i++) {
+	for (i = 1; i < TOTAL_MAX_ARGS && i < max_args; i++) {
 		bpf_probe_read_user(&argp, sizeof(argp), &args[i]);
 		if (!argp)
 			return 0;

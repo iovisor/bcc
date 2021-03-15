@@ -109,8 +109,10 @@ static const char *stat_types_names[] = {
 
 static void print_header(void)
 {
+	int i;
+
 	printf("%-8s  ", "TIME");
-	for (int i = 0; i < S_MAXSTAT; i++)
+	for (i = 0; i < S_MAXSTAT; i++)
 		printf(" %6s/s", stat_types_names[i]);
 	printf("\n");
 }
@@ -119,9 +121,10 @@ static void print_and_reset_stats(__u64 stats[S_MAXSTAT])
 {
 	char s[16];
 	__u64 val;
+	int i;
 
 	printf("%-8s: ", strftime_now(s, sizeof(s), "%H:%M:%S"));
-	for (int i = 0; i < S_MAXSTAT; i++) {
+	for (i = 0; i < S_MAXSTAT; i++) {
 		val = __atomic_exchange_n(&stats[i], 0, __ATOMIC_RELAXED);
 		printf(" %8llu", val / env.interval);
 	}

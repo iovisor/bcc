@@ -274,7 +274,7 @@ int main(int argc, char **argv)
 		.doc = program_doc,
 	};
 	struct funclatency_bpf *obj;
-	int err;
+	int i, err;
 	struct tm *tm;
 	char ts[32];
 	time_t t;
@@ -312,7 +312,7 @@ int main(int argc, char **argv)
 
 	printf("Tracing %s.  Hit Ctrl-C to exit\n", env.funcname);
 
-	for (int i = 0; i < env.iterations && !exiting; i++) {
+	for (i = 0; i < env.iterations && !exiting; i++) {
 		sleep(env.interval);
 
 		printf("\n");

@@ -174,13 +174,14 @@ static void inline quoted_symbol(char c) {
 
 static void print_args(const struct event *e, bool quote)
 {
-	int args_counter = 0;
+	int i, args_counter = 0;
 
 	if (env.quote)
 		putchar('"');
 
-	for (int i = 0; i < e->args_size && args_counter < e->args_count; i++) {
+	for (i = 0; i < e->args_size && args_counter < e->args_count; i++) {
 		char c = e->args[i];
+
 		if (env.quote) {
 			if (c == '\0') {
 				args_counter++;
