@@ -6,6 +6,7 @@
 #include <bpf/bpf_tracing.h>
 #include "biolatency.h"
 #include "bits.bpf.h"
+#include <linux/version.h>
 
 #define MAX_ENTRIES	10240
 
@@ -52,18 +53,34 @@ int trace_rq_start(struct request *rq)
 }
 
 SEC("tp_btf/block_rq_insert")
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 11, 1)
+int BPF_PROG(block_rq_insert, struct request *rq)
+{
+	return trace_rq_start(rq);
+}
+#else
 int BPF_PROG(block_rq_insert, struct request_queue *q, struct request *rq)
 {
 	return trace_rq_start(rq);
 }
+#endif
 
 SEC("tp_btf/block_rq_issue")
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 11, 1)
+int BPF_PROG(block_rq_issue, struct request *rq)
+{
+	if (targ_queued && BPF_CORE_READ(rq->q, elevator))
+		return 0;
+	return trace_rq_start(rq);
+}
+#else
 int BPF_PROG(block_rq_issue, struct request_queue *q, struct request *rq)
 {
 	if (targ_queued && BPF_CORE_READ(q, elevator))
 		return 0;
 	return trace_rq_start(rq);
 }
+#endif
 
 SEC("tp_btf/block_rq_complete")
 int BPF_PROG(block_rq_complete, struct request *rq, int error,
