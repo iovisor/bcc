@@ -1,12 +1,15 @@
 #!/usr/bin/python
 # @lint-avoid-python-3-compatibility-imports
 #
-# skbstat Trace skb events(ingress/egress/consume/drop) of kernel.
+# skbstat Trace skb events(input/output/consume/drop) of kernel.
 #         For Linux, uses BCC, eBPF. Embedded C.
 #
-# USAGE: skbstat [-h] [-i INTERVAL] [-s SADDR] [-d DADDR] [-N ADDR]
-#                  [-S SPORT] [-D DPORT] [-P PORT] [-p PROTO] [--input]
-#                                    [--output] [--consume]
+# usage: skbstat.py [-h] [-i INTERVAL] [-s SADDR] [-d DADDR] [-N ADDR]
+#                   [-S SPORT] [-D DPORT] [-P PORT] [-p PROTO] [--input]
+#                   [--output] [--consume] [--no_drop]
+#
+# This uses dynamic tracing of kernel functions, and will need to be updated
+# to match kernel changes.
 #
 # Copyright (c) 2021 Dongdong Wang <wangdongdong.6@bytedance.com>
 # Licensed under the Apache License, Version 2.0 (the "License")
@@ -15,6 +18,7 @@
 
 from __future__ import print_function
 from bcc import BPF
+import sys
 import argparse
 import ipaddress
 from time import strftime
@@ -23,17 +27,26 @@ from time import sleep
 
 # arguments
 examples = """examples:
-    ./skbstat                               # dump all skb dropping backtraces
-    ./skbstat --ingress                     # dump skb ingress routines
-    ./skbstat --egress                      # dump skb egress routines
-    ./skbstat -s 10.0.0.1                   # only trace packet comming from 10.0.0.1
-    ./skbstat -N 10.0.0.1                   # only trace packet comming from or going to 10.0.0.1
-    ./skbstat -p tcp                        # only trace TCP packet
-    ./skbstat -p tcp -D 80                  # only trace ingress HTTP packet
-    ./skbstat -p tcp -P 80                  # only trace ingress or egress HTTP packet
+    skbstat                               # dump kernel skb drop backtraces (default)
+    skbstat --no_drop                     # do not dump kernel skb drop backtraces
+    skbstat --input                       # dump kernel skb input backtraces
+    skbstat --output                      # dump kernel skb output backtraces
+    skbstat --consume                     # dump kernel skb consume routines
+    skbstat -s 10.0.0.1                   # only trace packet comming from 10.0.0.1
+    skbstat -N 10.0.0.1                   # only trace packet comming from or going to 10.0.0.1
+    skbstat -N 1000::1                    # only trace packet comming from or going to 1000::1
+    skbstat -p tcp                        # only trace TCP packet
+    skbstat -p tcp -D 80                  # only trace input HTTP packet
+    skbstat -p tcp -P 80                  # only trace input or output HTTP packet
 """
 parser = argparse.ArgumentParser(
-    description="Trace skb event (ingress/egress/consume/drop) of the kernel",
+    description="""
+    Trace skb event (input/output/consume/drop) of the kernel.
+
+    WARNING: When run with `--input/output/consume` options, 
+    this tool will trace high traffic kernel functions and may lead to 
+    some noticeable overhead. Use it carefully on production system.
+""",
     formatter_class=argparse.RawDescriptionHelpFormatter,
     epilog=examples)
 
@@ -62,12 +75,20 @@ parser.add_argument("--output", action="store_true",
     help="trace skb output")
 parser.add_argument("--consume", action="store_true",
     help="dump consume_skb backtrace")
+parser.add_argument("--no_drop", action="store_true",
+    help="don't dump kfree_skb backtrace")
 
 args = parser.parse_args()
 
 # parse args
 ip_version = 0
 interval = args.interval
+
+def ip_network(addr):
+    if sys.version_info[0] < 3:
+        return ipaddress.ip_network(unicode(addr))
+
+    return ipaddress.ip_network(addr)
 
 def init_ip_version(cur, new):
     if cur == 0:
@@ -78,7 +99,7 @@ def init_ip_version(cur, new):
     return cur
 
 def init_addr_filter(addr_str, pos):
-    net = ipaddress.ip_network(unicode(addr_str))
+    net = ip_network(addr_str)
     addr = net.network_address
     mask = net.netmask
 
@@ -248,8 +269,8 @@ static inline int port_match1(u16 sport, u16 dport, struct filter *filter)
 
 static inline int port_match(u16 sport, u16 dport, struct filter *filter)
 {
-	return (filter->flags & SKB_PORT_MATCH_1) ? port_match1(sport, dport,
-								filter) :
+	return (filter->flags & SKB_PORT_MATCH_1) ? 
+            port_match1(sport, dport, filter) :
 	    port_match2(sport, dport, filter);
 }
 
@@ -259,23 +280,19 @@ static inline int proto_match(u8 proto, struct filter *filter)
 }
 
 static inline int ip6_addr_match2(unsigned __int128 saddr,
-				  unsigned __int128 daddr,
-				  struct filter *filter)
+				  unsigned __int128 daddr, struct filter *filter)
 {
-	unsigned __int128 saddr_expect =
-	    *((unsigned __int128 *)(filter->addr6[0])), daddr_expect =
-	    *((unsigned __int128 *)(filter->addr6[1]));
-	unsigned __int128 saddr_mask =
-	    *((unsigned __int128 *)(filter->mask6[0])), daddr_mask =
-	    *((unsigned __int128 *)(filter->mask6[1]));
+	unsigned __int128 saddr_expect = *((unsigned __int128 *)(filter->addr6[0])), 
+            daddr_expect = *((unsigned __int128 *)(filter->addr6[1]));
+	unsigned __int128 saddr_mask = *((unsigned __int128 *)(filter->mask6[0])), 
+            daddr_mask = *((unsigned __int128 *)(filter->mask6[1]));
 
 	return (saddr_expect ? (saddr & saddr_mask) == saddr_expect : 1)
 	    && (daddr_expect ? (daddr & daddr_mask) == daddr_expect : 1);
 }
 
 static inline int ip6_addr_match1(unsigned __int128 saddr,
-				  unsigned __int128 daddr,
-				  struct filter *filter)
+				  unsigned __int128 daddr, struct filter *filter)
 {
 	unsigned __int128 addr_expect =
 	    *((unsigned __int128 *)(filter->addr6[0]));
@@ -289,14 +306,12 @@ static inline int ip6_addr_match1(unsigned __int128 saddr,
 static inline int ip6_addr_match(unsigned __int128 saddr,
 				 unsigned __int128 daddr, struct filter *filter)
 {
-	return (filter->flags & SKB_ADDR_MATCH_1) ? ip6_addr_match1(saddr,
-								    daddr,
-								    filter) :
+	return (filter->flags & SKB_ADDR_MATCH_1) ? 
+            ip6_addr_match1(saddr, daddr, filter) :
 	    ip6_addr_match2(saddr, daddr, filter);
 }
 
-static inline int ip_addr_match2(__be32 saddr, __be32 daddr,
-				 struct filter *filter)
+static inline int ip_addr_match2(__be32 saddr, __be32 daddr, struct filter *filter)
 {
 	return (filter->addr[0] ? (saddr & filter->mask[0]) ==
 		filter->addr[0] : 1)
@@ -304,18 +319,16 @@ static inline int ip_addr_match2(__be32 saddr, __be32 daddr,
 		filter->addr[1] : 1);
 }
 
-static inline int ip_addr_match1(__be32 saddr, __be32 daddr,
-				 struct filter *filter)
+static inline int ip_addr_match1(__be32 saddr, __be32 daddr, struct filter *filter)
 {
 	return ((saddr & filter->mask[0]) == filter->addr[0])
 	    || ((daddr & filter->mask[0]) == filter->addr[0]);
 }
 
-static inline int ip_addr_match(__be32 saddr, __be32 daddr,
-				struct filter *filter)
+static inline int ip_addr_match(__be32 saddr, __be32 daddr, struct filter *filter)
 {
-	return (filter->flags & SKB_ADDR_MATCH_1) ? ip_addr_match1(saddr, daddr,
-								   filter) :
+	return (filter->flags & SKB_ADDR_MATCH_1) ? 
+            ip_addr_match1(saddr, daddr, filter) :
 	    ip_addr_match2(saddr, daddr, filter);
 }
 
@@ -374,6 +387,7 @@ static inline int skb_l4_match(u8 proto, union l4hdr *hdr,
 			return port_match(src, dst, filter);
 		}
 	default:
+                // TODO: parse other protocols and do some match.
 		break;
 	}
 	return 1;
@@ -716,9 +730,20 @@ if args.ebpf:
 # initialize BPF
 b = BPF(text=bpf_text)
 
-# probe list
+# PROBE LIST
+# the dict key is function to probe, value is tuple.
+# the first entry of tuple is probe function, the second
+# one is the output priority, which can be used by sorter()
+# function. the name of probe function with biggest output 
+# priority number sits at last of output lines.
+
+# NOTE: those kernel functions may be inlined by compiler
+# or just not exists in some kernel versions. so it may 
+# lead to some potential issues. If you find it, please 
+# report to us.
+
 probe_list_input_dev = {
-    "netif_receive_skb_internal": ("trace_skb_input", 30),
+    "__netif_receive_skb_core": ("trace_skb_input", 30),
 }
 
 probe_list_input_ip = {
@@ -822,10 +847,10 @@ probe_list_output = [
 ]
 
 def try_probe(b, e, fn):
-    events = b.get_kprobe_functions("^" + e + "$")
+    events = b.get_kprobe_functions(str.encode("^" + e + "$"))
     if len(events) == 0:
         print("ERROR: %s() kernel function not found or traceable. "
-            "Older kernel versions not supported." % e)
+            "The function may have been inlined by compiler or just not exists." % e)
         return
 
     b.attach_kprobe(event=e, fn_name=fn)
@@ -958,39 +983,41 @@ def print_backtraces(b, stacks, stack_traces):
     for stack_id, count in sorted(stacks.items(), 
             key=lambda kv: sum(kv[1])):
         print("%-8s %-6d" %(" ", sum(count)))
-        for addr in stack_traces.walk(stack_id.value):
-            sym = b.ksym(addr, show_offset=True)
-            print("%-8s %-6s %s" % (" ", " ", sym))
+        try:
+            for addr in stack_traces.walk(stack_id.value):
+                sym = b.ksym(addr, show_offset=True)
+                print("%-8s %-6s %s" % (" ", " ", sym))
+        except KeyError:
+                print("%-8s %-6s [lost kernel stack id %d]" %(" ", " ", stack_id.value))
 
 def print_drop_backtraces():
     print_routines_header("DROP")
     print_backtraces(b, drop_stacks, stack_traces)
+    drop_stacks.clear()
 
 def print_consume_backtraces():
     print_routines_header("CONSUME")
     print_backtraces(b, consume_stacks, stack_traces)
-
-def print_all_backtraces(consume, drop):
-    if drop:
-        print_drop_backtraces()
-    if consume:
-        print_consume_backtraces()
-
-    drop_stacks.clear()
     consume_stacks.clear()
-    stack_traces.clear()
 
 # read events
 while 1:
     try:
         sleep(interval)
+
+        if args.input:
+            print_input_routines()
+
+        if args.output:
+            print_output_routines()
+
+        if args.consume:
+            print_consume_backtraces()
+
+        if not args.no_drop:
+            print_drop_backtraces()
+
+        stack_traces.clear()
+
     except KeyboardInterrupt:
         exit()
-
-    if args.input:
-        print_input_routines()
-
-    if args.output:
-        print_output_routines()
-
-    print_all_backtraces(args.consume, True)

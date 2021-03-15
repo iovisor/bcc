@@ -1,0 +1,88 @@
+.TH skbstat 8  "2021-03-17" "USER COMMANDS"
+.SH NAME
+skbstat \- Trace socket buffer (skb) event (input/output/consume/drop) of the kernel. Uses Linux eBPF/bcc.
+.SH SYNOPSIS
+.B skbstat.py [-h] [-i INTERVAL] [-s SADDR] [-d DADDR] [-N ADDR] [-S SPORT] [-D DPORT] [-P PORT] [-p PROTO] [--input] [--output] [--consume] [--no_drop]
+.SH DESCRIPTION
+This tool traces socket buffer (skb) mainly processed routine by the kernel network stack.
+Prints the function name and number of calls, or the backtrace of the drop/consume routine.
+It can receive filter options and filter none related skb for us, just like `tcpdump`.
+
+This tool is useful for debugging why a particular packet (skb) was dropped.
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH OPTIONS
+.TP
+-h, --help      
+show this help message and exit
+.TP
+-i INTERVAL, --interval INTERVAL
+interval in seconds to print backtrace
+.TP
+-s SADDR, --saddr SADDR
+source ip/ipv6 address/network
+.TP
+-d DADDR, --daddr DADDR
+destination ip/ipv6 address/network
+.TP
+-N ADDR, --addr ADDR  
+source or destination ip/ipv6 address/network
+.TP
+-S SPORT, --sport SPORT
+source tcp/udp port
+.TP
+-D DPORT, --dport DPORT
+destination tcp/udp port
+.TP
+-P PORT, --port PORT  
+source or destination tcp/udp port
+.TP
+-p PROTO, --proto PROTO
+protocol ( tcp/udp/icmp ... )
+.TP
+--input         
+trace skb input
+.TP
+--output        
+trace skb output
+.TP
+--consume       
+dump consume_skb backtrace
+.TP
+--no_drop       
+don't dump kfree_skb backtrace
+.SH FIELDS
+.TP
+TIME
+Time of the event, in HH:MM:SS format.
+.TP
+NUM
+Number of the function calls or stacks.
+.TP
+FUNC/STACK
+Function name or stack.
+.SH OVERHEAD
+When run with option `--input` or `--output` or `--consume`, this tool will trace
+high traffic kernel functions which may probably lead to noticable overhead. Try
+it carefully when your workloads is high, especially on production system.
+
+With no such options above, this tool will only trace `kfree_skb()` function,
+which should be low frequency and no noticable overhead.
+
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Dongdong Wang <wangdongdong.6@bytedance.com>
+.SH SEE ALSO
+tcpdrop(8), tcplife(8), tcpaccept(8), tcpconnect(8), tcptop(8)

@@ -2,32 +2,37 @@ Demonstrations of skbstat, the Linux BPF/bcc version.
 
 
 skbstat prints detailed information about the packet (skb) processed by the kernel,
-including ingress/egress/drop. we can pass filter parameters to it, such as "-p tcp -P 80":
+including input/output/consume/drop. we can pass filter parameters to it, such as "-p tcp -P 80":
 
-# ./skbstat.py -p tcp -P 80 --input --output
+# skbstat.py -p tcp -P 80 --input --output
 TIME     NUM    FUNC/STACK
-20:04:29        [INGRESS]
-         1      tcp_v4_rcv
-         1      ip_local_deliver_finish
-         1      ip_local_deliver
+17:53:34        [INGRESS]
+         5      tcp_v4_rcv
+         5      ip_local_deliver_finish
+         5      ip_local_deliver
          1      ip_route_input_noref
-         1      ip_rcv_finish
-         1      ip_rcv
-         1      netif_receive_skb_internal
+         5      ip_rcv_finish
+         5      ip_rcv
 
 TIME     NUM    FUNC/STACK
-20:04:30        [EGRESS]
-         1      ip_output
-         1      ip_finish_output
-         1      ip_finish_output2
-         1      __dev_queue_xmit
-         1      dev_hard_start_xmit
+17:53:34        [EGRESS]
+         7      ip_output
+         7      ip_finish_output
+         7      ip_finish_output2
+         7      net:net_dev_queue
+         7      net:net_dev_xmit
 
 TIME     NUM    FUNC/STACK
-20:04:30        [DROP]
+17:53:34        [DROP]
          1
                 kfree_skb+0x1
-                tcp_v4_rcv+0x164
+                sk_stream_kill_queues+0x52
+                inet_csk_destroy_sock+0x4f
+                tcp_fin+0xe7
+                tcp_data_queue+0x572
+                tcp_rcv_state_process+0x28d
+                tcp_v4_do_rcv+0x70
+                tcp_v4_rcv+0x91b
                 ip_protocol_deliver_rcu+0x36
                 ip_local_deliver_finish+0x44
                 ip_local_deliver+0x6b
@@ -38,18 +43,30 @@ TIME     NUM    FUNC/STACK
 
 [...]
 
-The last column shows the number of function calls or skb dropped stacks.
+The "NUM" column shows the number of function calls or skb dropped stacks.
+The "FUNC/STACK" column shows either the function name or function backtrace.
 
 This tool is useful for debugging why a particular packet (skb) was dropped.
 
+For example, when you see HTTP requsts arrive at your machine by tcpdump,
+and get lost in kernel. Then you can run `skbstat -p tcp -P 80` to see which
+kernel routine dropped those packets.
+
+WARNING: When run with `--input/output/consume` options,
+this tool will trace high traffic kernel functions and may lead to
+some noticeable overhead. Use it carefully on production system.
+
 USAGE:
 
-# ./skbstat.py -h
 usage: skbstat.py [-h] [-i INTERVAL] [-s SADDR] [-d DADDR] [-N ADDR]
-                   [-S SPORT] [-D DPORT] [-P PORT] [-p PROTO] [--input]
-                   [--output] [--consume]
+                  [-S SPORT] [-D DPORT] [-P PORT] [-p PROTO] [--input]
+                  [--output] [--consume] [--no_drop]
 
-Trace skb event (ingress/egress/consume/drop) of the kernel
+    Trace skb event (input/output/consume/drop) of the kernel.
+
+    WARNING: When run with `--input/output/consume` options,
+    this tool will trace high traffic kernel functions and may lead to
+    some noticeable overhead. Use it carefully on production system.
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -70,13 +87,17 @@ optional arguments:
   --input               trace skb input
   --output              trace skb output
   --consume             dump consume_skb backtrace
+  --no_drop             don't dump kfree_skb backtrace
 
 examples:
-    ./skbstat                               # dump all skb dropping backtraces
-    ./skbstat --ingress                     # dump skb ingress routines
-    ./skbstat --egress                      # dump skb egress routines
-    ./skbstat -s 10.0.0.1                   # only trace packet comming from 10.0.0.1
-    ./skbstat -N 10.0.0.1                   # only trace packet comming from or going to 10.0.0.1
-    ./skbstat -p tcp                        # only trace TCP packet
-    ./skbstat -p tcp -D 80                  # only trace ingress HTTP packet
-    ./skbstat -p tcp -P 80                  # only trace ingress or egress HTTP packet
+    skbstat                               # dump kernel skb drop backtraces (default)
+    skbstat --no_drop                     # do not dump kernel skb drop backtraces
+    skbstat --input                       # dump kernel skb input backtraces
+    skbstat --output                      # dump kernel skb output backtraces
+    skbstat --consume                     # dump kernel skb consume routines
+    skbstat -s 10.0.0.1                   # only trace packet comming from 10.0.0.1
+    skbstat -N 10.0.0.1                   # only trace packet comming from or going to 10.0.0.1
+    skbstat -N 1000::1                    # only trace packet comming from or going to 1000::1
+    skbstat -p tcp                        # only trace TCP packet
+    skbstat -p tcp -D 80                  # only trace input HTTP packet
+    skbstat -p tcp -P 80                  # only trace input or output HTTP packet
