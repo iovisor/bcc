@@ -1,9 +1,9 @@
 # Copyright (c) Facebook, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
 
-include_directories(${CMAKE_SOURCE_DIR}/src/cc)
-include_directories(${CMAKE_SOURCE_DIR}/src/cc/api)
-include_directories(${CMAKE_SOURCE_DIR}/src/cc/libbpf/include/uapi)
+include_directories(${PROJECT_SOURCE_DIR}/src/cc)
+include_directories(${PROJECT_SOURCE_DIR}/src/cc/api)
+include_directories(${PROJECT_SOURCE_DIR}/src/cc/libbpf/include/uapi)
 
 option(INSTALL_INTROSPECTION "Install BPF introspection tools" ON)
 option(BPS_LINK_RT "Pass -lrt to linker when linking bps tool" ON)
