@@ -93,6 +93,9 @@ static int open_and_attach_perf_event(__u64 config, int period,
 	for (i = 0; i < nr_cpus; i++) {
 		fd = syscall(__NR_perf_event_open, &attr, -1, i, -1, 0);
 		if (fd < 0) {
+			/* Ignore CPU that is offline */
+			if (errno == ENODEV)
+				continue;
 			fprintf(stderr, "failed to init perf sampling: %s\n",
 				strerror(errno));
 			return -1;
@@ -185,23 +188,22 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	obj = llcstat_bpf__open();
-	if (!obj) {
-		fprintf(stderr, "failed to open BPF object\n");
+	nr_cpus = libbpf_num_possible_cpus();
+	if (nr_cpus < 0) {
+		fprintf(stderr, "failed to get # of possible cpus: '%s'!\n",
+			strerror(-nr_cpus));
 		return 1;
 	}
-
-	nr_cpus = libbpf_num_possible_cpus();
 	mlinks = calloc(nr_cpus, sizeof(*mlinks));
 	rlinks = calloc(nr_cpus, sizeof(*rlinks));
 	if (!mlinks || !rlinks) {
 		fprintf(stderr, "failed to alloc mlinks or rlinks\n");
-		goto cleanup;
+		return 1;
 	}
 
-	err = llcstat_bpf__load(obj);
-	if (err) {
-		fprintf(stderr, "failed to load BPF object: %d\n", err);
+	obj = llcstat_bpf__open_and_load();
+	if (!obj) {
+		fprintf(stderr, "failed to open and/or load BPF object\n");
 		goto cleanup;
 	}
 

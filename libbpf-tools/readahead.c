@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause)
 // Copyright (c) 2020 Wenbo Zhang
 //
-// Based on readahead(8) from from BPF-Perf-Tools-Book by Brendan Gregg.
+// Based on readahead(8) from BPF-Perf-Tools-Book by Brendan Gregg.
 // 8-Jun-2020   Wenbo Zhang   Created this.
 #include <argp.h>
 #include <signal.h>
