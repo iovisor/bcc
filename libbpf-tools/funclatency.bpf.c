@@ -7,8 +7,8 @@
 #include "funclatency.h"
 #include "bits.bpf.h"
 
-const volatile pid_t targ_tgid;
-const volatile int units;
+const volatile pid_t targ_tgid = 0;
+const volatile int units = 0;
 
 /* key: pid.  value: start time */
 struct {
@@ -18,7 +18,7 @@ struct {
 	__type(value, u64);
 } starts SEC(".maps");
 
-__u32 hist[MAX_SLOTS];
+__u32 hist[MAX_SLOTS] = {};
 
 SEC("kprobe/dummy_kprobe")
 int BPF_KPROBE(dummy_kprobe)

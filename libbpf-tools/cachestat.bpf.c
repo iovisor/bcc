@@ -4,9 +4,9 @@
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_tracing.h>
 
-__s64 total;	/* total cache accesses without counting dirties */
-__s64 misses;	/* total of add to lru because of read misses */
-__u64 mbd;	/* total of mark_buffer_dirty events */
+__s64 total = 0;	/* total cache accesses without counting dirties */
+__s64 misses = 0;	/* total of add to lru because of read misses */
+__u64 mbd = 0;  	/* total of mark_buffer_dirty events */
 
 SEC("fentry/add_to_page_cache_lru")
 int BPF_PROG(add_to_page_cache_lru)
