@@ -8,13 +8,13 @@ Q: hello_world.py fails with:
    OSError: libbcc.so: cannot open shared object file: No such file or directory
 A: make sure to 'make install' and add the directory
    where libbcc.so was installed into your LD_LIBRARY_PATH
-   export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
+   export LD_LIBRARY_PATH=$(dirname `find /usr -name libbcc.so`):$LD_LIBRARY_PATH
 
 Q: hello_world.py fails with:
    ImportError: No module named bcc
 A: checkout "sudo make install" output to find out bpf package installation site,
    add it to the PYTHONPATH env variable before running the program.
-   sudo bash -c 'PYTHONPATH=/usr/lib/python2.7/site-packages python examples/hello_world.py'
+   export PYTHONPATH=$(dirname `find /usr/lib -name bcc`):$PYTHONPATH
 
 Q: hello_world.py still fails with:
    bpf: Operation not permitted
