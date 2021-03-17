@@ -4,6 +4,7 @@
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_core_read.h>
 #include <bpf/bpf_tracing.h>
+#include <linux/version.h>
 #include "biolatency.h"
 #include "bits.bpf.h"
 
@@ -14,6 +15,8 @@ const volatile bool targ_per_flag = false;
 const volatile bool targ_queued = false;
 const volatile bool targ_ms = false;
 const volatile dev_t targ_dev = -1;
+
+extern __u32 LINUX_KERNEL_VERSION __kconfig;
 
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
@@ -52,14 +55,27 @@ int trace_rq_start(struct request *rq)
 }
 
 SEC("tp_btf/block_rq_insert")
-int BPF_PROG(block_rq_insert, struct request_queue *q, struct request *rq)
+int BPF_PROG(block_rq_insert)
 {
+	if (LINUX_KERNEL_VERSION > KERNEL_VERSION(5, 10, 0)) {
+		struct request *rq = (void *)ctx[0];
+		return trace_rq_start(rq);
+	}
+	struct request *rq = (void *)ctx[1];
 	return trace_rq_start(rq);
 }
 
 SEC("tp_btf/block_rq_issue")
-int BPF_PROG(block_rq_issue, struct request_queue *q, struct request *rq)
+int BPF_PROG(block_rq_issue)
 {
+	if (LINUX_KERNEL_VERSION > KERNEL_VERSION(5, 10, 0)) {
+		struct request *rq = (void *)ctx[0];
+		if (targ_queued && BPF_CORE_READ(rq, q, elevator))
+			return 0;
+		return trace_rq_start(rq);
+	}
+	struct request_queue *q = (void *)ctx[0];
+	struct request *rq = (void *)ctx[1];
 	if (targ_queued && BPF_CORE_READ(q, elevator))
 		return 0;
 	return trace_rq_start(rq);
