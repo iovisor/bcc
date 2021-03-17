@@ -711,7 +711,44 @@ int trace_skb_consume(struct pt_regs *ctx, struct sk_buff *skb)
 
 	return skb_match_and_trace(ctx, skb, &args, &record_skb_backtrace);
 }
+
+int trace_net_dev_xmit(struct tracepoint__net__net_dev_xmit *args)
+{
+        struct pt_regs ctx = {};
+        struct sk_buff *skb = (struct sk_buff *)args->skbaddr;
+
+        PT_REGS_IP(&ctx) = net:net_dev_xmit;
+
+        return __trace_skb_output(&ctx, skb);
+}
+
+int trace_net_dev_queue(struct tracepoint__net__net_dev_queue *args)
+{
+        struct pt_regs ctx = {};
+        struct sk_buff *skb = (struct sk_buff *)args->skbaddr;
+
+        PT_REGS_IP(&ctx) = net:net_dev_queue;
+
+        return __trace_skb_output(&ctx, skb);
+}
+
+int trace_netif_receive_skb(struct tracepoint__net__netif_receive_skb *args)
+{
+        struct pt_regs ctx = {};
+        struct sk_buff *skb = (struct sk_buff *)args->skbaddr;
+
+        PT_REGS_IP(&ctx) = net:netif_receive_skb;
+
+        return __trace_skb_input(&ctx, skb);
+}
 """
+
+# internal address for tracepoint.
+tracepoint_addr2func = {
+    1: "net:netif_receive_skb",
+    2: "net:net_dev_queue",
+    3: "net:net_dev_xmit",
+}
 
 # apply filters
 bpf_text = bpf_text.replace('SADDR_FILTER', saddr_filter)
@@ -721,6 +758,10 @@ bpf_text = bpf_text.replace('DPORT_FILTER', dport_filter)
 bpf_text = bpf_text.replace('PROTO_FILTER', proto_filter)
 bpf_text = bpf_text.replace('FLAGS_FILTER', flags_filter)
 bpf_text = bpf_text.replace('IP_VERSION_FILTER', ip_version_filter)
+
+# replace tracepoint address.
+for addr, tp in tracepoint_addr2func.items():
+    bpf_text = bpf_text.replace(tp, str(addr))
 
 # dump ebpf and exit
 if args.ebpf:
@@ -743,7 +784,7 @@ b = BPF(text=bpf_text)
 # report to us.
 
 probe_list_input_dev = {
-    "__netif_receive_skb_core": ("trace_skb_input", 30),
+    "net:netif_receive_skb": ("trace_netif_receive_skb", 30),
 }
 
 probe_list_input_ip = {
@@ -834,8 +875,8 @@ probe_list_output_ip6 = {
 }
 
 probe_list_output_dev = {
-    "__dev_queue_xmit": ("trace_skb_output", 20),
-    "dev_hard_start_xmit": ("trace_skb_output", 21),
+    "net:net_dev_queue": ("trace_net_dev_queue", 20),
+    "net:net_dev_xmit": ("trace_net_dev_xmit", 21),
 }
 
 probe_list_output = [
@@ -847,13 +888,23 @@ probe_list_output = [
 ]
 
 def try_probe(b, e, fn):
-    events = b.get_kprobe_functions(str.encode("^" + e + "$"))
-    if len(events) == 0:
-        print("ERROR: %s() kernel function not found or traceable. "
-            "The function may have been inlined by compiler or just not exists." % e)
-        return
+    if e.find(":") != -1:
+        # tracepoint
+        events = b.get_tracepoints(str.encode("^" + e + "$"))
+        if len(events) == 0:
+            print("ERROR: %s() kernel tracepoint not found. " % e)
+            return
 
-    b.attach_kprobe(event=e, fn_name=fn)
+        b.attach_tracepoint(tp=e, fn_name=fn)
+    else:
+        # kprobe
+        events = b.get_kprobe_functions(str.encode("^" + e + "$"))
+        if len(events) == 0:
+            print("ERROR: %s() kernel function not found or traceable. "
+                "The function may have been inlined by compiler or just not exists." % e)
+            return
+
+        b.attach_kprobe(event=e, fn_name=fn)
 
 def try_probe_list(b, l):
     for k, v in l.items():
@@ -960,8 +1011,13 @@ def output_sorter(item):
 def print_routines(b, maps, sorter):
     funcs = []
     for addr, count in maps.items():
-        funcs.append([b.ksym(addr), sum(count), ""])
+        func_name = ""
+        if addr.value in tracepoint_addr2func:
+            func_name = tracepoint_addr2func[addr.value]
+        else:
+            func_name = b.ksym(addr)
 
+        funcs.append([func_name, sum(count), ""])
     for item in sorted(funcs, key=sorter):
         print("%-8s %-6d %s" %(" ", item[1], item[0]))
 
