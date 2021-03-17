@@ -10,6 +10,10 @@
 
 #define MAX_ENTRIES	10240
 
+#define KERNEL_VERSION(a, b, c) (((a) << 16) + ((b) << 8) + (c))
+
+extern int LINUX_KERNEL_VERSION __kconfig;
+
 const volatile bool targ_per_disk = false;
 const volatile bool targ_per_flag = false;
 const volatile bool targ_queued = false;
@@ -53,34 +57,30 @@ int trace_rq_start(struct request *rq)
 }
 
 SEC("tp_btf/block_rq_insert")
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 11, 1)
-int BPF_PROG(block_rq_insert, struct request *rq)
+int block_rq_insert (u64 *ctx)
 {
+	/**
+	 * commit a54895fa (v5.11-rc1) changed tracepoint argument list
+	 * from TP_PROTO(struct request_queue *q, struct request *rq)
+	 * to TP_PROTO(struct request *rq)
+	 */
+	struct request *rq = LINUX_KERNEL_VERSION >= KERNEL_VERSION(5, 11, 1) ? (void *)ctx[0] : (void *)ctx[1];
 	return trace_rq_start(rq);
 }
-#else
-int BPF_PROG(block_rq_insert, struct request_queue *q, struct request *rq)
-{
-	return trace_rq_start(rq);
-}
-#endif
 
 SEC("tp_btf/block_rq_issue")
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 11, 1)
-int BPF_PROG(block_rq_issue, struct request *rq)
+int block_rq_issue (u64 *ctx)
 {
+	/**
+	 * commit a54895fa (v5.11-rc1) changed tracepoint argument list
+	 * from TP_PROTO(struct request_queue *q, struct request *rq)
+	 * to TP_PROTO(struct request *rq)
+	 */
+	struct request *rq = LINUX_KERNEL_VERSION >= KERNEL_VERSION(5, 11, 1) ? (void *)ctx[0] : (void *)ctx[1];
 	if (targ_queued && BPF_CORE_READ(rq->q, elevator))
 		return 0;
 	return trace_rq_start(rq);
 }
-#else
-int BPF_PROG(block_rq_issue, struct request_queue *q, struct request *rq)
-{
-	if (targ_queued && BPF_CORE_READ(q, elevator))
-		return 0;
-	return trace_rq_start(rq);
-}
-#endif
 
 SEC("tp_btf/block_rq_complete")
 int BPF_PROG(block_rq_complete, struct request *rq, int error,
