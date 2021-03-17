@@ -52,15 +52,15 @@ int trace_rq_start(struct request *rq)
 }
 
 SEC("tp_btf/block_rq_insert")
-int BPF_PROG(block_rq_insert, struct request_queue *q, struct request *rq)
+int BPF_PROG(block_rq_insert, struct request *rq)
 {
 	return trace_rq_start(rq);
 }
 
 SEC("tp_btf/block_rq_issue")
-int BPF_PROG(block_rq_issue, struct request_queue *q, struct request *rq)
+int BPF_PROG(block_rq_issue, struct request *rq)
 {
-	if (targ_queued && BPF_CORE_READ(q, elevator))
+	if (targ_queued)
 		return 0;
 	return trace_rq_start(rq);
 }
