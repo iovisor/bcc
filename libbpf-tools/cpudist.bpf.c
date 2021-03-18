@@ -75,8 +75,7 @@ static __always_inline void update_hist(struct task_struct *task,
 	__sync_fetch_and_add(&histp->slots[slot], 1);
 }
 
-SEC("kprobe/finish_task_switch")
-int BPF_KPROBE(finish_task_switch, struct task_struct *prev)
+static __always_inline int probe(struct task_struct *prev)
 {
 	u32 prev_tgid = BPF_CORE_READ(prev, tgid);
 	u32 prev_pid = BPF_CORE_READ(prev, pid);
@@ -93,6 +92,18 @@ int BPF_KPROBE(finish_task_switch, struct task_struct *prev)
 		store_start(tgid, pid, ts);
 	}
 	return 0;
+}
+
+SEC("kprobe/finish_task_switch")
+int BPF_KPROBE(finish_task_switch, struct task_struct *prev)
+{
+	return probe(prev);
+}
+
+SEC("kprobe/finish_task_switch.isra.0")
+int BPF_KPROBE(finish_task_switch_isra_0, struct task_struct *prev)
+{
+	return probe(prev);
 }
 
 char LICENSE[] SEC("license") = "GPL";

@@ -189,6 +189,7 @@ int main(int argc, char **argv)
 	struct tm *tm;
 	char ts[32];
 	time_t t;
+	struct ksyms *ksyms = NULL;
 
 	err = argp_parse(&argp, argc, argv, 0, NULL, NULL);
 	if (err)
@@ -233,10 +234,31 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
-	err = cpudist_bpf__attach(obj);
-	if (err) {
-		fprintf(stderr, "failed to attach BPF programs\n");
+	ksyms = ksyms__load();
+	if (!ksyms) {
+		fprintf(stderr, "failed to load kallsyms\n");
 		goto cleanup;
+	}
+	if (ksyms__get_symbol(ksyms, "finish_task_switch.isra.0")) {
+		obj->links.finish_task_switch_isra_0 =
+			bpf_program__attach(obj->progs.finish_task_switch_isra_0);
+		err = libbpf_get_error(obj->links.finish_task_switch_isra_0);
+		if (err) {
+			fprintf(stderr, "failed to attach "
+				"finish_task_switch.isra.0: %s\n",
+				strerror(err));
+			goto cleanup;
+		}
+	} else {
+		obj->links.finish_task_switch =
+			bpf_program__attach(obj->progs.finish_task_switch);
+		err = libbpf_get_error(obj->links.finish_task_switch);
+		if (err) {
+			fprintf(stderr, "failed to attach "
+				"finish_task_switch: %s\n",
+				strerror(err));
+			goto cleanup;
+		}
 	}
 
 	fd = bpf_map__fd(obj->maps.hists);
