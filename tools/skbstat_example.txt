@@ -52,10 +52,6 @@ For example, when you see HTTP requsts arrive at your machine by tcpdump,
 and get lost in kernel. Then you can run `skbstat -p tcp -P 80` to see which
 kernel routine dropped those packets.
 
-WARNING: When run with `--input/output/consume` options,
-this tool will trace high traffic kernel functions and may lead to
-some noticeable overhead. Use it carefully on production system.
-
 USAGE:
 
 usage: skbstat.py [-h] [-i INTERVAL] [-s SADDR] [-d DADDR] [-N ADDR]
@@ -63,10 +59,6 @@ usage: skbstat.py [-h] [-i INTERVAL] [-s SADDR] [-d DADDR] [-N ADDR]
                   [--output] [--consume] [--no_drop]
 
     Trace skb event (input/output/consume/drop) of the kernel.
-
-    WARNING: When run with `--input/output/consume` options,
-    this tool will trace high traffic kernel functions and may lead to
-    some noticeable overhead. Use it carefully on production system.
 
 optional arguments:
   -h, --help            show this help message and exit

@@ -10,6 +10,10 @@
 #
 # This uses dynamic tracing of kernel functions, and will need to be updated
 # to match kernel changes.
+# 
+# WARNING: When run with `--input/output/consume` options,
+# this tool will trace high traffic kernel functions and may lead to
+# some noticeable overhead. Use it carefully on production system.
 #
 # Copyright (c) 2021 Dongdong Wang <wangdongdong.6@bytedance.com>
 # Licensed under the Apache License, Version 2.0 (the "License")
@@ -40,13 +44,7 @@ examples = """examples:
     skbstat -p tcp -P 80                  # only trace input or output HTTP packet
 """
 parser = argparse.ArgumentParser(
-    description="""
-    Trace skb event (input/output/consume/drop) of the kernel.
-
-    WARNING: When run with `--input/output/consume` options, 
-    this tool will trace high traffic kernel functions and may lead to 
-    some noticeable overhead. Use it carefully on production system.
-""",
+    description="Trace skb event (input/output/consume/drop) of the kernel",
     formatter_class=argparse.RawDescriptionHelpFormatter,
     epilog=examples)
 
@@ -269,9 +267,8 @@ static inline int port_match1(u16 sport, u16 dport, struct filter *filter)
 
 static inline int port_match(u16 sport, u16 dport, struct filter *filter)
 {
-	return (filter->flags & SKB_PORT_MATCH_1) ? 
-            port_match1(sport, dport, filter) :
-	    port_match2(sport, dport, filter);
+	return (filter->flags & SKB_PORT_MATCH_1) ?
+	    port_match1(sport, dport, filter) : port_match2(sport, dport, filter);
 }
 
 static inline int proto_match(u8 proto, struct filter *filter)
@@ -282,10 +279,10 @@ static inline int proto_match(u8 proto, struct filter *filter)
 static inline int ip6_addr_match2(unsigned __int128 saddr,
 				  unsigned __int128 daddr, struct filter *filter)
 {
-	unsigned __int128 saddr_expect = *((unsigned __int128 *)(filter->addr6[0])), 
-            daddr_expect = *((unsigned __int128 *)(filter->addr6[1]));
-	unsigned __int128 saddr_mask = *((unsigned __int128 *)(filter->mask6[0])), 
-            daddr_mask = *((unsigned __int128 *)(filter->mask6[1]));
+	unsigned __int128 saddr_expect = *((unsigned __int128 *)(filter->addr6[0])),
+	    daddr_expect = *((unsigned __int128 *)(filter->addr6[1]));
+	unsigned __int128 saddr_mask = *((unsigned __int128 *)(filter->mask6[0])),
+	    daddr_mask = *((unsigned __int128 *)(filter->mask6[1]));
 
 	return (saddr_expect ? (saddr & saddr_mask) == saddr_expect : 1)
 	    && (daddr_expect ? (daddr & daddr_mask) == daddr_expect : 1);
@@ -294,10 +291,8 @@ static inline int ip6_addr_match2(unsigned __int128 saddr,
 static inline int ip6_addr_match1(unsigned __int128 saddr,
 				  unsigned __int128 daddr, struct filter *filter)
 {
-	unsigned __int128 addr_expect =
-	    *((unsigned __int128 *)(filter->addr6[0]));
-	unsigned __int128 addr_mask =
-	    *((unsigned __int128 *)(filter->mask6[0]));
+	unsigned __int128 addr_expect = *((unsigned __int128 *)(filter->addr6[0]));
+	unsigned __int128 addr_mask = *((unsigned __int128 *)(filter->mask6[0]));
 
 	return ((saddr & addr_mask) == addr_expect)
 	    || ((daddr & addr_mask) == addr_expect);
@@ -306,17 +301,14 @@ static inline int ip6_addr_match1(unsigned __int128 saddr,
 static inline int ip6_addr_match(unsigned __int128 saddr,
 				 unsigned __int128 daddr, struct filter *filter)
 {
-	return (filter->flags & SKB_ADDR_MATCH_1) ? 
-            ip6_addr_match1(saddr, daddr, filter) :
-	    ip6_addr_match2(saddr, daddr, filter);
+	return (filter->flags & SKB_ADDR_MATCH_1) ?
+	    ip6_addr_match1(saddr, daddr, filter) : ip6_addr_match2(saddr, daddr, filter);
 }
 
 static inline int ip_addr_match2(__be32 saddr, __be32 daddr, struct filter *filter)
 {
-	return (filter->addr[0] ? (saddr & filter->mask[0]) ==
-		filter->addr[0] : 1)
-	    && (filter->addr[1] ? (daddr & filter->mask[1]) ==
-		filter->addr[1] : 1);
+	return (filter->addr[0] ? (saddr & filter->mask[0]) == filter->addr[0] : 1)
+	    && (filter->addr[1] ? (daddr & filter->mask[1]) == filter->addr[1] : 1);
 }
 
 static inline int ip_addr_match1(__be32 saddr, __be32 daddr, struct filter *filter)
@@ -327,9 +319,8 @@ static inline int ip_addr_match1(__be32 saddr, __be32 daddr, struct filter *filt
 
 static inline int ip_addr_match(__be32 saddr, __be32 daddr, struct filter *filter)
 {
-	return (filter->flags & SKB_ADDR_MATCH_1) ? 
-            ip_addr_match1(saddr, daddr, filter) :
-	    ip_addr_match2(saddr, daddr, filter);
+	return (filter->flags & SKB_ADDR_MATCH_1) ?
+	    ip_addr_match1(saddr, daddr, filter) : ip_addr_match2(saddr, daddr, filter);
 }
 
 static inline int record_skb(struct pt_regs *ctx, union filter_args *args)
@@ -343,11 +334,9 @@ static inline int record_skb(struct pt_regs *ctx, union filter_args *args)
 	} else if (args->forward) {
 		count = forward.lookup_or_try_init(&ip, &zero);
 	}
-
 	if (count) {
 		*count += 1;
 	}
-
 	return 0;
 }
 
@@ -356,8 +345,7 @@ static inline int record_sk(struct pt_regs *ctx, union filter_args *args)
 	return record_skb(ctx, args);
 }
 
-static inline int record_skb_backtrace(struct pt_regs *ctx,
-				       union filter_args *args)
+static inline int record_skb_backtrace(struct pt_regs *ctx, union filter_args *args)
 {
 	u32 stack_id = stack_traces.get_stackid(ctx, 0);
 	u64 *count, zero = 0;
@@ -367,16 +355,13 @@ static inline int record_skb_backtrace(struct pt_regs *ctx,
 	} else {
 		count = consume_stacks.lookup_or_try_init(&stack_id, &zero);
 	}
-
 	if (count) {
 		*count += 1;
 	}
-
 	return 0;
 }
 
-static inline int skb_l4_match(u8 proto, union l4hdr *hdr,
-			       struct filter *filter)
+static inline int skb_l4_match(u8 proto, union l4hdr *hdr, struct filter *filter)
 {
 	switch (proto) {
 	case IPPROTO_TCP:
@@ -387,32 +372,27 @@ static inline int skb_l4_match(u8 proto, union l4hdr *hdr,
 			return port_match(src, dst, filter);
 		}
 	default:
-                // TODO: parse other protocols and do some match.
+		// TODO: parse other protocols and do some match.
 		break;
 	}
 	return 1;
 }
 
-static inline int skb_l4hdr(struct sk_buff *skb, union l4hdr *l4h,
-			    int l3_offset)
+static inline int skb_l4hdr(struct sk_buff *skb, union l4hdr *l4h, int l3_offset)
 {
 	// transport header was set
 	if (skb->transport_header != (typeof(skb->transport_header)) ~ 0U &&
 	    skb->transport_header != skb->network_header) {
 		if (bpf_probe_read_kernel
-		    (l4h, sizeof(union l4hdr),
-		     skb->head + skb->transport_header)) {
+		    (l4h, sizeof(union l4hdr), skb->head + skb->transport_header)) {
 			goto err;
 		}
 		goto success;
 	}
-
 	if (bpf_probe_read_kernel
-	    (l4h, sizeof(union l4hdr),
-	     skb->head + skb->network_header + l3_offset)) {
+	    (l4h, sizeof(union l4hdr), skb->head + skb->network_header + l3_offset)) {
 		goto err;
 	}
-
 success:
 	return 0;
 err:
@@ -425,19 +405,15 @@ static inline int skb_l3hdr(struct sk_buff *skb, void *l3h, int l3h_len)
 	if (!skb->network_header) {
 		goto err;
 	}
-
-	if (bpf_probe_read_kernel
-	    (l3h, l3h_len, skb->head + skb->network_header)) {
+	if (bpf_probe_read_kernel(l3h, l3h_len, skb->head + skb->network_header)) {
 		goto err;
 	}
-
 	return 0;
 err:
 	return -1;
 }
 
-static inline int sk_ip6_match(struct sock *sk, struct filter *filter,
-			       union filter_args *args)
+static inline int sk_ip6_match(struct sock *sk, struct filter *filter, union filter_args *args)
 {
 	unsigned __int128 saddr, daddr;
 	u16 sport, dport;
@@ -456,7 +432,6 @@ static inline int sk_ip6_match(struct sock *sk, struct filter *filter,
 	} else {
 		goto miss;
 	}
-
 	if (ip6_addr_match(saddr, daddr, filter)) {
 		return port_match(htons(sport), htons(dport), filter);
 	}
@@ -472,25 +447,20 @@ static inline int skb_ip6_match(struct sk_buff *skb, struct filter *filter)
 	if (skb_l3hdr(skb, &ip6h, sizeof(struct ipv6hdr))) {
 		goto miss;
 	}
-
 	if (!ip6_addr_match
-	    (*((unsigned __int128 *)(&ip6h.saddr)),
-	     *((unsigned __int128 *)(&ip6h.daddr)), filter)
+	    (*((unsigned __int128 *)(&ip6h.saddr)), *((unsigned __int128 *)(&ip6h.daddr)), filter)
 	    || !proto_match(ip6h.nexthdr, filter)) {
 		goto miss;
 	}
-
 	if (skb_l4hdr(skb, &l4h, sizeof(struct ipv6hdr))) {
 		goto miss;
 	}
-
 	return skb_l4_match(ip6h.nexthdr, &l4h, filter);
 miss:
 	return 0;
 }
 
-static inline int sk_ip_match(struct sock *sk, struct filter *filter,
-			      union filter_args *args)
+static inline int sk_ip_match(struct sock *sk, struct filter *filter, union filter_args *args)
 {
 	u32 saddr, daddr;
 	u16 sport, dport;
@@ -509,7 +479,6 @@ static inline int sk_ip_match(struct sock *sk, struct filter *filter,
 	} else {
 		goto miss;
 	}
-
 	if (ip_addr_match(saddr, daddr, filter)) {
 		return port_match(htons(sport), htons(dport), filter);
 	}
@@ -525,16 +494,13 @@ static inline int skb_ip_match(struct sk_buff *skb, struct filter *filter)
 	if (skb_l3hdr(skb, &iph, sizeof(struct iphdr))) {
 		goto miss;
 	}
-
 	if (!ip_addr_match(iph.saddr, iph.daddr, filter)
 	    || !proto_match(iph.protocol, filter)) {
 		goto miss;
 	}
-
 	if (skb_l4hdr(skb, &l4h, iph.ihl * 4)) {
 		goto miss;
 	}
-
 	return skb_l4_match(iph.protocol, &l4h, filter);
 miss:
 	return 0;
@@ -565,16 +531,15 @@ static inline void filter_init(struct filter *filter)
 	SADDR_FILTER
 	DADDR_FILTER
 	SPORT_FILTER
-	DPORT_FILTER 
-	PROTO_FILTER 
-	FLAGS_FILTER 
+	DPORT_FILTER
+	PROTO_FILTER
+	FLAGS_FILTER
 	IP_VERSION_FILTER
 }
 
 static inline int sk_match_and_trace(struct pt_regs *ctx, struct sock *sk,
 				     union filter_args *args,
-				     int (*cb) (struct pt_regs *,
-						union filter_args *))
+				     int (*cb) (struct pt_regs *, union filter_args *))
 {
 	struct filter filter = { };
 
@@ -591,14 +556,12 @@ static inline int sk_match_and_trace(struct pt_regs *ctx, struct sock *sk,
 			return cb(ctx, args);
 		}
 	}
-
 	return 0;
 }
 
 static inline int skb_match_and_trace(struct pt_regs *ctx, struct sk_buff *skb,
 				      union filter_args *args,
-				      int (*cb) (struct pt_regs *,
-						 union filter_args *))
+				      int (*cb) (struct pt_regs *, union filter_args *))
 {
 	struct filter filter = { };
 
@@ -615,7 +578,6 @@ static inline int skb_match_and_trace(struct pt_regs *ctx, struct sk_buff *skb,
 			return cb(ctx, args);
 		}
 	}
-
 	return 0;
 }
 
@@ -624,7 +586,6 @@ static inline int __trace_sk_input(struct pt_regs *ctx, struct sock *sk)
 	union filter_args args = { };
 
 	args.input = true;
-
 	return sk_match_and_trace(ctx, sk, &args, &record_sk);
 }
 
@@ -633,7 +594,6 @@ static inline int __trace_skb_input(struct pt_regs *ctx, struct sk_buff *skb)
 	union filter_args args = { };
 
 	args.input = true;
-
 	return skb_match_and_trace(ctx, skb, &args, &record_skb);
 }
 
@@ -642,7 +602,6 @@ static inline int __trace_sk_output(struct pt_regs *ctx, struct sock *sk)
 	union filter_args args = { };
 
 	args.output = true;
-
 	return sk_match_and_trace(ctx, sk, &args, &record_sk);
 }
 
@@ -651,7 +610,6 @@ static inline int __trace_skb_output(struct pt_regs *ctx, struct sk_buff *skb)
 	union filter_args args = { };
 
 	args.output = true;
-
 	return skb_match_and_trace(ctx, skb, &args, &record_skb);
 }
 
@@ -660,8 +618,7 @@ int trace_sk_input(struct pt_regs *ctx, struct sock *sk)
 	return __trace_sk_input(ctx, sk);
 }
 
-int trace_skb_input_arg3(struct pt_regs *ctx, void *arg1, void *arg2,
-			 struct sk_buff *skb)
+int trace_skb_input_arg3(struct pt_regs *ctx, void *arg1, void *arg2, struct sk_buff *skb)
 {
 	return __trace_skb_input(ctx, skb);
 }
@@ -676,8 +633,7 @@ int trace_sk_output(struct pt_regs *ctx, struct sock *sk)
 	return __trace_sk_output(ctx, sk);
 }
 
-int trace_skb_output_arg3(struct pt_regs *ctx, void *arg1, void *arg2,
-			  struct sk_buff *skb)
+int trace_skb_output_arg3(struct pt_regs *ctx, void *arg1, void *arg2, struct sk_buff *skb)
 {
 	return __trace_skb_output(ctx, skb);
 }
@@ -692,7 +648,6 @@ int trace_skb_forward(struct pt_regs *ctx, struct sk_buff *skb)
 	union filter_args args = { };
 
 	args.forward = true;
-
 	return skb_match_and_trace(ctx, skb, &args, &record_skb);
 }
 
@@ -701,7 +656,6 @@ int trace_skb_drop(struct pt_regs *ctx, struct sk_buff *skb)
 	union filter_args args = { };
 
 	args.drop = true;
-
 	return skb_match_and_trace(ctx, skb, &args, &record_skb_backtrace);
 }
 
@@ -714,32 +668,29 @@ int trace_skb_consume(struct pt_regs *ctx, struct sk_buff *skb)
 
 int trace_net_dev_xmit(struct tracepoint__net__net_dev_xmit *args)
 {
-        struct pt_regs ctx = {};
-        struct sk_buff *skb = (struct sk_buff *)args->skbaddr;
+	struct pt_regs ctx = { };
+	struct sk_buff *skb = (struct sk_buff *)args->skbaddr;
 
-        PT_REGS_IP(&ctx) = net:net_dev_xmit;
-
-        return __trace_skb_output(&ctx, skb);
+	PT_REGS_IP(&ctx) = net:net_dev_xmit;
+	return __trace_skb_output(&ctx, skb);
 }
 
 int trace_net_dev_queue(struct tracepoint__net__net_dev_queue *args)
 {
-        struct pt_regs ctx = {};
-        struct sk_buff *skb = (struct sk_buff *)args->skbaddr;
+	struct pt_regs ctx = { };
+	struct sk_buff *skb = (struct sk_buff *)args->skbaddr;
 
-        PT_REGS_IP(&ctx) = net:net_dev_queue;
-
-        return __trace_skb_output(&ctx, skb);
+	PT_REGS_IP(&ctx) = net:net_dev_queue;
+	return __trace_skb_output(&ctx, skb);
 }
 
 int trace_netif_receive_skb(struct tracepoint__net__netif_receive_skb *args)
 {
-        struct pt_regs ctx = {};
-        struct sk_buff *skb = (struct sk_buff *)args->skbaddr;
+	struct pt_regs ctx = { };
+	struct sk_buff *skb = (struct sk_buff *)args->skbaddr;
 
-        PT_REGS_IP(&ctx) = net:netif_receive_skb;
-
-        return __trace_skb_input(&ctx, skb);
+	PT_REGS_IP(&ctx) = net:netif_receive_skb;
+	return __trace_skb_input(&ctx, skb);
 }
 """
 
