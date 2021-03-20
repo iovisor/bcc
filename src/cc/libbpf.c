@@ -261,6 +261,8 @@ static struct bpf_helper helpers[] = {
   {"ktime_get_coarse_ns", "5.11"},
   {"ima_inode_hash", "5.11"},
   {"sock_from_file", "5.11"},
+  {"check_mtu", "5.12"},
+  {"for_each_map_elem", "5.13"},
 };
 
 static uint64_t ptr_to_u64(void *ptr)
