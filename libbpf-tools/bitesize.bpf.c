@@ -10,6 +10,8 @@
 const volatile char targ_comm[TASK_COMM_LEN] = {};
 const volatile dev_t targ_dev = -1;
 
+extern __u32 LINUX_KERNEL_VERSION __kconfig;
+
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
 	__uint(max_entries, 10240);
@@ -31,8 +33,7 @@ static __always_inline bool comm_allowed(const char *comm)
 	return true;
 }
 
-SEC("tp_btf/block_rq_issue")
-int BPF_PROG(block_rq_issue, struct request_queue *q, struct request *rq)
+static int trace_rq_issue(struct request *rq)
 {
 	struct hist_key hkey;
 	struct hist *histp;
@@ -64,6 +65,20 @@ int BPF_PROG(block_rq_issue, struct request_queue *q, struct request *rq)
 	__sync_fetch_and_add(&histp->slots[slot], 1);
 
 	return 0;
+}
+
+SEC("tp_btf/block_rq_issue")
+int BPF_PROG(block_rq_issue)
+{
+	/**
+	 * commit a54895fa (v5.11-rc1) changed tracepoint argument list
+	 * from TP_PROTO(struct request_queue *q, struct request *rq)
+	 * to TP_PROTO(struct request *rq)
+	 */
+	if (LINUX_KERNEL_VERSION > KERNEL_VERSION(5, 10, 0))
+		return trace_rq_issue((void *)ctx[0]);
+	else
+		return trace_rq_issue((void *)ctx[1]);
 }
 
 char LICENSE[] SEC("license") = "GPL";
