@@ -91,7 +91,7 @@ void count_lookup(struct pt_regs *ctx) {
 
 # load BPF program
 b = BPF(text=bpf_text)
-b.attach_kprobe(event="lookup_fast", fn_name="count_fast")
+b.attach_kprobe(event_re="^lookup_fast$|^lookup_fast.constprop.*.\d$", fn_name="count_fast")
 b.attach_kretprobe(event="d_lookup", fn_name="count_lookup")
 
 # stat column labels and indexes
