@@ -1,3 +1,17 @@
+bcc (0.19.0-1) unstable; urgency=low
+
+  * Support for kernel up to 5.11
+  * allow BCC as a cmake subproject
+  * add LPORT support in tcpconnlat and tcpconnect
+  * added bpf_map_lookup_and_delete_batch support
+  * new tools: virtiostat
+  * new libbpf-tools: cpufreq, funclatency, cachestat
+  * add install target to libbpf-tools
+  * a few lua fixes
+  * doc update and bug fixes
+
+ -- Yonghong Song <ys114321@gmail.com>  Mon, 19 Mar 2021 17:00:00 +0000
+
 bcc (0.18.0-1) unstable; urgency=low
 
   * Support for kernel up to 5.10
