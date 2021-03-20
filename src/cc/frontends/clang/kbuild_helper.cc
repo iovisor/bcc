@@ -115,6 +115,11 @@ int KBuildHelper::get_flags(const char *uname_machine, vector<string> *cflags) {
     cflags->push_back("-Iinclude/generated/uapi");
   }
 
+  if (arch == "mips") {
+    cflags->push_back("-Iarch/mips/include/asm/mach-loongson64");
+    cflags->push_back("-Iarch/mips/include/asm/mach-generic");
+  }
+
   cflags->push_back("-include");
   cflags->push_back("./include/linux/kconfig.h");
   cflags->push_back("-D__KERNEL__");
