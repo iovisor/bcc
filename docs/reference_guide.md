@@ -39,11 +39,12 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
         - [1. bpf_trace_printk()](#1-bpf_trace_printk)
         - [2. BPF_PERF_OUTPUT](#2-bpf_perf_output)
         - [3. perf_submit()](#3-perf_submit)
-        - [4. BPF_RINGBUF_OUTPUT](#4-bpf_ringbuf_output)
-        - [5. ringbuf_output()](#5-ringbuf_output)
-        - [6. ringbuf_reserve()](#6-ringbuf_reserve)
-        - [7. ringbuf_submit()](#7-ringbuf_submit)
-        - [8. ringbuf_discard()](#8-ringbuf_submit)
+        - [4. perf_submit_skb()](#4-perf_submit_skb)
+        - [5. BPF_RINGBUF_OUTPUT](#5-bpf_ringbuf_output)
+        - [6. ringbuf_output()](#6-ringbuf_output)
+        - [7. ringbuf_reserve()](#7-ringbuf_reserve)
+        - [8. ringbuf_submit()](#8-ringbuf_submit)
+        - [9. ringbuf_discard()](#9-ringbuf_submit)
     - [Maps](#maps)
         - [1. BPF_TABLE](#1-bpf_table)
         - [2. BPF_HASH](#2-bpf_hash)
@@ -710,7 +711,19 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=perf_submit+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=perf_submit+path%3Atools&type=Code)
 
-### 4. BPF_RINGBUF_OUTPUT
+### 4. perf_submit_skb()
+
+Syntax: ```int perf_submit_skb((void *)ctx, u32 packet_size, (void *)data, u32 data_size)```
+
+Return: 0 on success
+
+A method of a BPF_PERF_OUTPUT table available in networking program types, for submitting custom event data to user space, along with the first ```packet_size``` bytes of the packet buffer. See the BPF_PERF_OUTPUT entry. (This ultimately calls bpf_perf_event_output().)
+
+Examples in situ:
+[search /examples](https://github.com/iovisor/bcc/search?q=perf_submit_skb+path%3Aexamples&type=Code),
+[search /tools](https://github.com/iovisor/bcc/search?q=perf_submit_skb+path%3Atools&type=Code)
+
+### 5. BPF_RINGBUF_OUTPUT
 
 Syntax: ```BPF_RINGBUF_OUTPUT(name, page_cnt)```
 
@@ -774,7 +787,7 @@ The output table is named ```events```. Data is allocated via ```events.ringbuf_
 Examples in situ: <!-- TODO -->
 [search /examples](https://github.com/iovisor/bcc/search?q=BPF_RINGBUF_OUTPUT+path%3Aexamples&type=Code),
 
-### 5. ringbuf_output()
+### 6. ringbuf_output()
 
 Syntax: ```int ringbuf_output((void *)data, u64 data_size, u64 flags)```
 
@@ -790,7 +803,7 @@ although it does not require a ctx argument.
 Examples in situ: <!-- TODO -->
 [search /examples](https://github.com/iovisor/bcc/search?q=ringbuf_output+path%3Aexamples&type=Code),
 
-### 6. ringbuf_reserve()
+### 7. ringbuf_reserve()
 
 Syntax: ```void* ringbuf_reserve(u64 data_size)```
 
@@ -802,7 +815,7 @@ allocating a data struct for output. Must be used with one of ```ringbuf_submit`
 Examples in situ: <!-- TODO -->
 [search /examples](https://github.com/iovisor/bcc/search?q=ringbuf_reserve+path%3Aexamples&type=Code),
 
-### 7. ringbuf_submit()
+### 8. ringbuf_submit()
 
 Syntax: ```void ringbuf_submit((void *)data, u64 flags)```
 
@@ -818,7 +831,7 @@ A method of the BPF_RINGBUF_OUTPUT table, for submitting custom event data to us
 Examples in situ: <!-- TODO -->
 [search /examples](https://github.com/iovisor/bcc/search?q=ringbuf_submit+path%3Aexamples&type=Code),
 
-### 8. ringbuf_discard()
+### 9. ringbuf_discard()
 
 Syntax: ```void ringbuf_discard((void *)data, u64 flags)```
 
