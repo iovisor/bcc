@@ -57,29 +57,42 @@ int trace_rq_start(struct request *rq)
 }
 
 SEC("tp_btf/block_rq_insert")
-int block_rq_insert (u64 *ctx)
+int block_rq_insert(u64 *ctx)
 {
 	/**
 	 * commit a54895fa (v5.11-rc1) changed tracepoint argument list
 	 * from TP_PROTO(struct request_queue *q, struct request *rq)
 	 * to TP_PROTO(struct request *rq)
 	 */
-	struct request *rq = LINUX_KERNEL_VERSION >= KERNEL_VERSION(5, 11, 1) ? (void *)ctx[0] : (void *)ctx[1];
-	return trace_rq_start(rq);
+	if (LINUX_KERNEL_VERSION <= KERNEL_VERSION(5, 10, 0))
+		return trace_rq_start((void *)ctx[1]);
+	else
+		return trace_rq_start((void *)ctx[0]);
+}
+
+static __always_inline
+int f(u64 *ctx, int idx)
+{
+	/**
+	 * Verifier happens to be more friendly to pointer arithmetic starting v5.11
+	 */
+	if (targ_queued && BPF_CORE_READ(((struct request *)ctx[idx])->q, elevator))
+		return 0;
+	return trace_rq_start((void *)ctx[idx]);
 }
 
 SEC("tp_btf/block_rq_issue")
-int block_rq_issue (u64 *ctx)
+int block_rq_issue(u64 *ctx)
 {
 	/**
 	 * commit a54895fa (v5.11-rc1) changed tracepoint argument list
 	 * from TP_PROTO(struct request_queue *q, struct request *rq)
 	 * to TP_PROTO(struct request *rq)
 	 */
-	struct request *rq = LINUX_KERNEL_VERSION >= KERNEL_VERSION(5, 11, 1) ? (void *)ctx[0] : (void *)ctx[1];
-	if (targ_queued && BPF_CORE_READ(rq->q, elevator))
-		return 0;
-	return trace_rq_start(rq);
+	if (LINUX_KERNEL_VERSION <= KERNEL_VERSION(5, 10, 0))
+		return f(ctx, 1);
+	else
+		return f(ctx, 0);
 }
 
 SEC("tp_btf/block_rq_complete")
