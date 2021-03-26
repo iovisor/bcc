@@ -6,8 +6,6 @@
 #include <bpf/bpf_tracing.h>
 #include "xfsslower.h"
 
-#define NULL	0
-
 const volatile pid_t targ_tgid = 0;
 const volatile __u64 min_lat = 0;
 

@@ -9,7 +9,6 @@
 #include "maps.bpf.h"
 
 #define MAX_ENTRIES	10240
-#define NULL		0
 
 const volatile bool targ_ms = false;
 const volatile dev_t targ_dev = -1;
