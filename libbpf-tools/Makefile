@@ -26,6 +26,7 @@ APPS = \
 	cpufreq \
 	drsnoop \
 	execsnoop \
+	ext4dist \
 	filelife \
 	funclatency \
 	hardirqs \

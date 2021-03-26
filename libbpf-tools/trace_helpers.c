@@ -6,7 +6,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdbool.h>
 #include <sys/resource.h>
 #include <time.h>
 #include "trace_helpers.h"
@@ -372,4 +371,27 @@ int bump_memlock_rlimit(void)
 	};
 
 	return setrlimit(RLIMIT_MEMLOCK, &rlim_new);
+}
+
+bool is_kernel_module(const char *name)
+{
+	bool found = false;
+	char buf[64];
+	FILE *f;
+
+	f = fopen("/proc/modules", "r");
+	if (!f)
+		return false;
+
+	while (fgets(buf, sizeof(buf), f) != NULL) {
+		if (sscanf(buf, "%s %*s\n", buf) != 1)
+			break;
+		if (!strcmp(buf, name)) {
+			found = true;
+			break;
+		}
+	}
+
+	fclose(f);
+	return found;
 }

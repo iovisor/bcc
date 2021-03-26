@@ -2,6 +2,8 @@
 #ifndef __TRACE_HELPERS_H
 #define __TRACE_HELPERS_H
 
+#include <stdbool.h>
+
 #define NSEC_PER_SEC		1000000000ULL
 
 struct ksym {
@@ -38,5 +40,7 @@ void print_linear_hist(unsigned int *vals, int vals_size, unsigned int base,
 
 unsigned long long get_ktime_ns(void);
 int bump_memlock_rlimit(void);
+
+bool is_kernel_module(const char *name);
 
 #endif /* __TRACE_HELPERS_H */
