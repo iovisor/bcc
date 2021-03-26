@@ -6,7 +6,6 @@
 #include <bpf/bpf_tracing.h>
 #include "biolatency.h"
 #include "bits.bpf.h"
-#include <linux/version.h>
 
 #define MAX_ENTRIES	10240
 
@@ -39,8 +38,11 @@ struct {
 } hists SEC(".maps");
 
 static __always_inline
-int trace_rq_start(struct request *rq)
+int trace_rq_start(struct request *rq, int issue)
 {
+	if (issue && targ_queued && BPF_CORE_READ(rq->q, elevator))
+		return 0;
+
 	u64 ts = bpf_ktime_get_ns();
 
 	if (targ_dev != -1) {
@@ -65,20 +67,9 @@ int block_rq_insert(u64 *ctx)
 	 * to TP_PROTO(struct request *rq)
 	 */
 	if (LINUX_KERNEL_VERSION <= KERNEL_VERSION(5, 10, 0))
-		return trace_rq_start((void *)ctx[1]);
+		return trace_rq_start((void *)ctx[1], false);
 	else
-		return trace_rq_start((void *)ctx[0]);
-}
-
-static __always_inline
-int f(u64 *ctx, int idx)
-{
-	/**
-	 * Verifier happens to be more friendly to pointer arithmetic starting v5.11
-	 */
-	if (targ_queued && BPF_CORE_READ(((struct request *)ctx[idx])->q, elevator))
-		return 0;
-	return trace_rq_start((void *)ctx[idx]);
+		return trace_rq_start((void *)ctx[0], false);
 }
 
 SEC("tp_btf/block_rq_issue")
@@ -90,9 +81,9 @@ int block_rq_issue(u64 *ctx)
 	 * to TP_PROTO(struct request *rq)
 	 */
 	if (LINUX_KERNEL_VERSION <= KERNEL_VERSION(5, 10, 0))
-		return f(ctx, 1);
+		return trace_rq_start((void *)ctx[1], true);
 	else
-		return f(ctx, 0);
+		return trace_rq_start((void *)ctx[0], true);
 }
 
 SEC("tp_btf/block_rq_complete")
