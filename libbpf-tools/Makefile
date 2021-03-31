@@ -9,7 +9,7 @@ INCLUDES := -I$(OUTPUT)
 CFLAGS := -g -O2 -Wall
 INSTALL ?= install
 prefix ?= /usr/local
-ARCH := $(shell uname -m | sed 's/x86_64/x86/' | sed 's/aarch64/arm64/' | sed 's/ppc64le/powerpc/')
+ARCH := $(shell uname -m | sed 's/x86_64/x86/' | sed 's/aarch64/arm64/' | sed 's/ppc64le/powerpc/' | sed 's/mips.*/mips/')
 
 ifeq ($(wildcard $(ARCH)/),)
 $(error Architecture $(ARCH) is not supported yet. Please open an issue)
@@ -21,11 +21,13 @@ APPS = \
 	biosnoop \
 	biostacks \
 	bitesize \
+	cachestat \
 	cpudist \
 	cpufreq \
 	drsnoop \
 	execsnoop \
 	filelife \
+	funclatency \
 	hardirqs \
 	llcstat \
 	numamove \
@@ -47,6 +49,7 @@ COMMON_OBJ = \
 	$(OUTPUT)/syscall_helpers.o \
 	$(OUTPUT)/errno_helpers.o \
 	$(OUTPUT)/map_helpers.o \
+	$(OUTPUT)/uprobe_helpers.o \
 	#
 
 .PHONY: all

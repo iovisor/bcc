@@ -39,11 +39,12 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
         - [1. bpf_trace_printk()](#1-bpf_trace_printk)
         - [2. BPF_PERF_OUTPUT](#2-bpf_perf_output)
         - [3. perf_submit()](#3-perf_submit)
-        - [4. BPF_RINGBUF_OUTPUT](#4-bpf_ringbuf_output)
-        - [5. ringbuf_output()](#5-ringbuf_output)
-        - [6. ringbuf_reserve()](#6-ringbuf_reserve)
-        - [7. ringbuf_submit()](#7-ringbuf_submit)
-        - [8. ringbuf_discard()](#8-ringbuf_submit)
+        - [4. perf_submit_skb()](#4-perf_submit_skb)
+        - [5. BPF_RINGBUF_OUTPUT](#5-bpf_ringbuf_output)
+        - [6. ringbuf_output()](#6-ringbuf_output)
+        - [7. ringbuf_reserve()](#7-ringbuf_reserve)
+        - [8. ringbuf_submit()](#8-ringbuf_submit)
+        - [9. ringbuf_discard()](#9-ringbuf_submit)
     - [Maps](#maps)
         - [1. BPF_TABLE](#1-bpf_table)
         - [2. BPF_HASH](#2-bpf_hash)
@@ -51,29 +52,30 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
         - [4. BPF_HISTOGRAM](#4-bpf_histogram)
         - [5. BPF_STACK_TRACE](#5-bpf_stack_trace)
         - [6. BPF_PERF_ARRAY](#6-bpf_perf_array)
-        - [7. BPF_PERCPU_ARRAY](#7-bpf_percpu_array)
-        - [8. BPF_LPM_TRIE](#8-bpf_lpm_trie)
-        - [9. BPF_PROG_ARRAY](#9-bpf_prog_array)
-        - [10. BPF_DEVMAP](#10-bpf_devmap)
-        - [11. BPF_CPUMAP](#11-bpf_cpumap)
-        - [12. BPF_XSKMAP](#12-bpf_xskmap)
-        - [13. BPF_ARRAY_OF_MAPS](#13-bpf_array_of_maps)
-        - [14. BPF_HASH_OF_MAPS](#14-bpf_hash_of_maps)
-        - [15. BPF_STACK](#15-bpf_stack)
-        - [16. BPF_QUEUE](#16-bpf_queue)
-        - [17. map.lookup()](#17-maplookup)
-        - [18. map.lookup_or_try_init()](#18-maplookup_or_try_init)
-        - [19. map.delete()](#19-mapdelete)
-        - [20. map.update()](#20-mapupdate)
-        - [21. map.insert()](#21-mapinsert)
-        - [22. map.increment()](#22-mapincrement)
-        - [23. map.get_stackid()](#23-mapget_stackid)
-        - [24. map.perf_read()](#24-mapperf_read)
-        - [25. map.call()](#25-mapcall)
-        - [26. map.redirect_map()](#26-mapredirect_map)
-        - [27. map.push()](#27-mappush)
-        - [28. map.pop()](#28-mappop)
-        - [29. map.peek()](#29-mappeek)
+        - [7. BPF_PERCPU_HASH](#7-bpf_percpu_hash)
+        - [8. BPF_PERCPU_ARRAY](#8-bpf_percpu_array)
+        - [9. BPF_LPM_TRIE](#9-bpf_lpm_trie)
+        - [10. BPF_PROG_ARRAY](#10-bpf_prog_array)
+        - [11. BPF_DEVMAP](#11-bpf_devmap)
+        - [12. BPF_CPUMAP](#12-bpf_cpumap)
+        - [13. BPF_XSKMAP](#13-bpf_xskmap)
+        - [14. BPF_ARRAY_OF_MAPS](#14-bpf_array_of_maps)
+        - [15. BPF_HASH_OF_MAPS](#15-bpf_hash_of_maps)
+        - [16. BPF_STACK](#16-bpf_stack)
+        - [17. BPF_QUEUE](#17-bpf_queue)
+        - [18. map.lookup()](#18-maplookup)
+        - [19. map.lookup_or_try_init()](#19-maplookup_or_try_init)
+        - [20. map.delete()](#20-mapdelete)
+        - [21. map.update()](#21-mapupdate)
+        - [22. map.insert()](#22-mapinsert)
+        - [23. map.increment()](#23-mapincrement)
+        - [24. map.get_stackid()](#24-mapget_stackid)
+        - [25. map.perf_read()](#25-mapperf_read)
+        - [26. map.call()](#26-mapcall)
+        - [27. map.redirect_map()](#27-mapredirect_map)
+        - [28. map.push()](#28-mappush)
+        - [29. map.pop()](#29-mappop)
+        - [30. map.peek()](#30-mappeek)
     - [Licensing](#licensing)
     - [Rewriter](#rewriter)
 
@@ -102,12 +104,13 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
         - [3. items()](#3-items)
         - [4. values()](#4-values)
         - [5. clear()](#5-clear)
-        - [6. print_log2_hist()](#6-print_log2_hist)
-        - [7. print_linear_hist()](#7-print_linear_hist)
-        - [8. open_ring_buffer()](#8-open_ring_buffer)
-        - [9. push()](#9-push)
-        - [10. pop()](#10-pop)
-        - [11. peek()](#11-peek)
+        - [6. items_lookup_and_delete_batch()](#6-items_lookup_and_delete_batch)
+        - [7. print_log2_hist()](#7-print_log2_hist)
+        - [8. print_linear_hist()](#8-print_linear_hist)
+        - [9. open_ring_buffer()](#9-open_ring_buffer)
+        - [10. push()](#10-push)
+        - [11. pop()](#11-pop)
+        - [12. peek()](#12-peek)
     - [Helpers](#helpers)
         - [1. ksym()](#1-ksym)
         - [2. ksymname()](#2-ksymname)
@@ -708,7 +711,19 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=perf_submit+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=perf_submit+path%3Atools&type=Code)
 
-### 4. BPF_RINGBUF_OUTPUT
+### 4. perf_submit_skb()
+
+Syntax: ```int perf_submit_skb((void *)ctx, u32 packet_size, (void *)data, u32 data_size)```
+
+Return: 0 on success
+
+A method of a BPF_PERF_OUTPUT table available in networking program types, for submitting custom event data to user space, along with the first ```packet_size``` bytes of the packet buffer. See the BPF_PERF_OUTPUT entry. (This ultimately calls bpf_perf_event_output().)
+
+Examples in situ:
+[search /examples](https://github.com/iovisor/bcc/search?q=perf_submit_skb+path%3Aexamples&type=Code),
+[search /tools](https://github.com/iovisor/bcc/search?q=perf_submit_skb+path%3Atools&type=Code)
+
+### 5. BPF_RINGBUF_OUTPUT
 
 Syntax: ```BPF_RINGBUF_OUTPUT(name, page_cnt)```
 
@@ -772,7 +787,7 @@ The output table is named ```events```. Data is allocated via ```events.ringbuf_
 Examples in situ: <!-- TODO -->
 [search /examples](https://github.com/iovisor/bcc/search?q=BPF_RINGBUF_OUTPUT+path%3Aexamples&type=Code),
 
-### 5. ringbuf_output()
+### 6. ringbuf_output()
 
 Syntax: ```int ringbuf_output((void *)data, u64 data_size, u64 flags)```
 
@@ -788,7 +803,7 @@ although it does not require a ctx argument.
 Examples in situ: <!-- TODO -->
 [search /examples](https://github.com/iovisor/bcc/search?q=ringbuf_output+path%3Aexamples&type=Code),
 
-### 6. ringbuf_reserve()
+### 7. ringbuf_reserve()
 
 Syntax: ```void* ringbuf_reserve(u64 data_size)```
 
@@ -800,7 +815,7 @@ allocating a data struct for output. Must be used with one of ```ringbuf_submit`
 Examples in situ: <!-- TODO -->
 [search /examples](https://github.com/iovisor/bcc/search?q=ringbuf_reserve+path%3Aexamples&type=Code),
 
-### 7. ringbuf_submit()
+### 8. ringbuf_submit()
 
 Syntax: ```void ringbuf_submit((void *)data, u64 flags)```
 
@@ -816,7 +831,7 @@ A method of the BPF_RINGBUF_OUTPUT table, for submitting custom event data to us
 Examples in situ: <!-- TODO -->
 [search /examples](https://github.com/iovisor/bcc/search?q=ringbuf_submit+path%3Aexamples&type=Code),
 
-### 8. ringbuf_discard()
+### 9. ringbuf_discard()
 
 Syntax: ```void ringbuf_discard((void *)data, u64 flags)```
 
@@ -979,7 +994,36 @@ Methods (covered later): map.perf_read().
 Examples in situ:
 [search /tests](https://github.com/iovisor/bcc/search?q=BPF_PERF_ARRAY+path%3Atests&type=Code)
 
-### 7. BPF_PERCPU_ARRAY
+### 7. BPF_PERCPU_HASH
+
+Syntax: ```BPF_PERCPU_HASH(name [, key_type [, leaf_type [, size]]])```
+
+Creates NUM_CPU int-indexed hash maps (associative arrays) named ```name```, with optional parameters. Each CPU will have a separate copy of this array. The copies are not kept synchronized in any way.
+
+Note that due to limits defined in the kernel (in linux/mm/percpu.c), the ```leaf_type``` cannot have a size of more than 32KB.
+In other words, ```BPF_PERCPU_HASH``` elements cannot be larger than 32KB in size.
+
+
+Defaults: ```BPF_PERCPU_HASH(name, key_type=u64, leaf_type=u64, size=10240)```
+
+For example:
+
+```C
+BPF_PERCPU_HASH(start, struct request *);
+```
+
+This creates NUM_CPU hashes named ```start``` where the key is a ```struct request *```, and the value defaults to u64.
+
+This is a wrapper macro for `BPF_TABLE("percpu_hash", ...)`.
+
+Methods (covered later): map.lookup(), map.lookup_or_try_init(), map.delete(), map.update(), map.insert(), map.increment().
+
+Examples in situ:
+[search /examples](https://github.com/iovisor/bcc/search?q=BPF_PERCPU_HASH+path%3Aexamples&type=Code),
+[search /tools](https://github.com/iovisor/bcc/search?q=BPF_PERCPU_HASH+path%3Atools&type=Code)
+
+
+### 8. BPF_PERCPU_ARRAY
 
 Syntax: ```BPF_PERCPU_ARRAY(name [, leaf_type [, size]])```
 
@@ -1007,7 +1051,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=BPF_PERCPU_ARRAY+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=BPF_PERCPU_ARRAY+path%3Atools&type=Code)
 
-### 8. BPF_LPM_TRIE
+### 9. BPF_LPM_TRIE
 
 Syntax: `BPF_LPM_TRIE(name [, key_type [, leaf_type [, size]]])`
 
@@ -1031,7 +1075,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=BPF_LPM_TRIE+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=BPF_LPM_TRIE+path%3Atools&type=Code)
 
-### 9. BPF_PROG_ARRAY
+### 10. BPF_PROG_ARRAY
 
 Syntax: ```BPF_PROG_ARRAY(name, size)```
 
@@ -1046,7 +1090,7 @@ Examples in situ:
 [search /tests](https://github.com/iovisor/bcc/search?q=BPF_PROG_ARRAY+path%3Atests&type=Code),
 [assign fd](https://github.com/iovisor/bcc/blob/master/examples/networking/tunnel_monitor/monitor.py#L24-L26)
 
-### 10. BPF_DEVMAP
+### 11. BPF_DEVMAP
 
 Syntax: ```BPF_DEVMAP(name, size)```
 
@@ -1062,7 +1106,7 @@ Methods (covered later): map.redirect_map().
 Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=BPF_DEVMAP+path%3Aexamples&type=Code),
 
-### 11. BPF_CPUMAP
+### 12. BPF_CPUMAP
 
 Syntax: ```BPF_CPUMAP(name, size)```
 
@@ -1078,7 +1122,7 @@ Methods (covered later): map.redirect_map().
 Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=BPF_CPUMAP+path%3Aexamples&type=Code),
 
-### 12. BPF_XSKMAP
+### 13. BPF_XSKMAP
 
 Syntax: ```BPF_XSKMAP(name, size)```
 
@@ -1094,7 +1138,7 @@ Methods (covered later): map.redirect_map(). map.lookup()
 Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=BPF_XSKMAP+path%3Aexamples&type=Code),
 
-### 13. BPF_ARRAY_OF_MAPS
+### 14. BPF_ARRAY_OF_MAPS
 
 Syntax: ```BPF_ARRAY_OF_MAPS(name, inner_map_name, size)```
 
@@ -1107,7 +1151,7 @@ BPF_TABLE("hash", int, int, ex2, 1024);
 BPF_ARRAY_OF_MAPS(maps_array, "ex1", 10);
 ```
 
-### 14. BPF_HASH_OF_MAPS
+### 15. BPF_HASH_OF_MAPS
 
 Syntax: ```BPF_HASH_OF_MAPS(name, inner_map_name, size)```
 
@@ -1120,7 +1164,7 @@ BPF_ARRAY(ex2, int, 1024);
 BPF_HASH_OF_MAPS(maps_hash, "ex1", 10);
 ```
 
-### 15. BPF_STACK
+### 16. BPF_STACK
 
 Syntax: ```BPF_STACK(name, leaf_type, max_entries[, flags])```
 
@@ -1140,7 +1184,7 @@ Methods (covered later): map.push(), map.pop(), map.peek().
 Examples in situ:
 [search /tests](https://github.com/iovisor/bcc/search?q=BPF_STACK+path%3Atests&type=Code),
 
-### 16. BPF_QUEUE
+### 17. BPF_QUEUE
 
 Syntax: ```BPF_QUEUE(name, leaf_type, max_entries[, flags])```
 
@@ -1160,7 +1204,7 @@ Methods (covered later): map.push(), map.pop(), map.peek().
 Examples in situ:
 [search /tests](https://github.com/iovisor/bcc/search?q=BPF_QUEUE+path%3Atests&type=Code),
 
-### 17. map.lookup()
+### 18. map.lookup()
 
 Syntax: ```*val map.lookup(&key)```
 
@@ -1170,7 +1214,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=lookup+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=lookup+path%3Atools&type=Code)
 
-### 18. map.lookup_or_try_init()
+### 19. map.lookup_or_try_init()
 
 Syntax: ```*val map.lookup_or_try_init(&key, &zero)```
 
@@ -1183,7 +1227,7 @@ Examples in situ:
 Note: The old map.lookup_or_init() may cause return from the function, so lookup_or_try_init() is recommended as it
 does not have this side effect.
 
-### 19. map.delete()
+### 20. map.delete()
 
 Syntax: ```map.delete(&key)```
 
@@ -1193,7 +1237,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=delete+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=delete+path%3Atools&type=Code)
 
-### 20. map.update()
+### 21. map.update()
 
 Syntax: ```map.update(&key, &val)```
 
@@ -1203,7 +1247,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=update+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=update+path%3Atools&type=Code)
 
-### 21. map.insert()
+### 22. map.insert()
 
 Syntax: ```map.insert(&key, &val)```
 
@@ -1213,7 +1257,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=insert+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=insert+path%3Atools&type=Code)
 
-### 22. map.increment()
+### 23. map.increment()
 
 Syntax: ```map.increment(key[, increment_amount])```
 
@@ -1223,7 +1267,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=increment+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=increment+path%3Atools&type=Code)
 
-### 23. map.get_stackid()
+### 24. map.get_stackid()
 
 Syntax: ```int map.get_stackid(void *ctx, u64 flags)```
 
@@ -1233,7 +1277,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=get_stackid+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=get_stackid+path%3Atools&type=Code)
 
-### 24. map.perf_read()
+### 25. map.perf_read()
 
 Syntax: ```u64 map.perf_read(u32 cpu)```
 
@@ -1242,7 +1286,7 @@ This returns the hardware performance counter as configured in [5. BPF_PERF_ARRA
 Examples in situ:
 [search /tests](https://github.com/iovisor/bcc/search?q=perf_read+path%3Atests&type=Code)
 
-### 25. map.call()
+### 26. map.call()
 
 Syntax: ```void map.call(void *ctx, int index)```
 
@@ -1281,7 +1325,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?l=C&q=call+path%3Aexamples&type=Code),
 [search /tests](https://github.com/iovisor/bcc/search?l=C&q=call+path%3Atests&type=Code)
 
-### 26. map.redirect_map()
+### 27. map.redirect_map()
 
 Syntax: ```int map.redirect_map(int index, int flags)```
 
@@ -1319,7 +1363,7 @@ b.attach_xdp("eth1", out_fn, 0)
 Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?l=C&q=redirect_map+path%3Aexamples&type=Code),
 
-### 27. map.push()
+### 28. map.push()
 
 Syntax: ```int map.push(&val, int flags)```
 
@@ -1330,7 +1374,7 @@ Returns 0 on success, negative error on failure.
 Examples in situ:
 [search /tests](https://github.com/iovisor/bcc/search?q=push+path%3Atests&type=Code),
 
-### 28. map.pop()
+### 29. map.pop()
 
 Syntax: ```int map.pop(&val)```
 
@@ -1341,7 +1385,7 @@ Returns 0 on success, negative error on failure.
 Examples in situ:
 [search /tests](https://github.com/iovisor/bcc/search?q=pop+path%3Atests&type=Code),
 
-### 29. map.peek()
+### 30. map.peek()
 
 Syntax: ```int map.peek(&val)```
 
@@ -1912,7 +1956,25 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=clear+path%3Aexamples+language%3Apython&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=clear+path%3Atools+language%3Apython&type=Code)
 
-### 6. print_log2_hist()
+### 6. items_lookup_and_delete_batch()
+
+Syntax: ```table.items_lookup_and_delete_batch()```
+
+Returns an array of the keys in a table with a single call to BPF syscall. This can be used with BPF_HASH maps to fetch, and iterate, over the keys. It also clears the table: deletes all entries.
+You should rather use table.items_lookup_and_delete_batch() than table.items() followed by table.clear().
+
+Example:
+
+```Python
+# print call rate per second:
+print("%9s-%9s-%8s-%9s" % ("PID", "COMM", "fname", "counter"))
+while True:
+    for k, v in sorted(b['map'].items_lookup_and_delete_batch(), key=lambda kv: (kv[0]).pid):
+        print("%9s-%9s-%8s-%9d" % (k.pid, k.comm, k.fname, v.counter))
+    sleep(1)
+```
+
+### 7. print_log2_hist()
 
 Syntax: ```table.print_log2_hist(val_type="value", section_header="Bucket ptr", section_print_fn=None)```
 
@@ -1963,7 +2025,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=print_log2_hist+path%3Aexamples+language%3Apython&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=print_log2_hist+path%3Atools+language%3Apython&type=Code)
 
-### 6. print_linear_hist()
+### 8. print_linear_hist()
 
 Syntax: ```table.print_linear_hist(val_type="value", section_header="Bucket ptr", section_print_fn=None)```
 
@@ -2022,7 +2084,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=print_linear_hist+path%3Aexamples+language%3Apython&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=print_linear_hist+path%3Atools+language%3Apython&type=Code)
 
-### 8. open_ring_buffer()
+### 9. open_ring_buffer()
 
 Syntax: ```table.open_ring_buffer(callback, ctx=None)```
 
@@ -2084,7 +2146,7 @@ def print_event(ctx, data, size):
 Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=open_ring_buffer+path%3Aexamples+language%3Apython&type=Code),
 
-### 9. push()
+### 10. push()
 
 Syntax: ```table.push(leaf, flags=0)```
 
@@ -2094,7 +2156,7 @@ Passing QueueStack.BPF_EXIST as a flag causes the Queue or Stack to discard the 
 Examples in situ:
 [search /tests](https://github.com/iovisor/bcc/search?q=push+path%3Atests+language%3Apython&type=Code),
 
-### 10. pop()
+### 11. pop()
 
 Syntax: ```leaf = table.pop()```
 
@@ -2105,7 +2167,7 @@ Raises a KeyError exception if the operation does not succeed.
 Examples in situ:
 [search /tests](https://github.com/iovisor/bcc/search?q=pop+path%3Atests+language%3Apython&type=Code),
 
-### 11. peek()
+### 12. peek()
 
 Syntax: ```leaf = table.peek()```
 

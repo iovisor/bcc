@@ -83,6 +83,9 @@ lib.bpf_update_elem.argtypes = [ct.c_int, ct.c_void_p, ct.c_void_p,
         ct.c_ulonglong]
 lib.bpf_delete_elem.restype = ct.c_int
 lib.bpf_delete_elem.argtypes = [ct.c_int, ct.c_void_p]
+lib.bpf_lookup_and_delete_batch.restype = ct.c_int
+lib.bpf_lookup_and_delete_batch.argtypes = [ct.c_int, ct.POINTER(ct.c_uint32),
+        ct.POINTER(ct.c_uint32),ct.c_void_p, ct.c_void_p, ct.c_void_p]
 lib.bpf_open_raw_sock.restype = ct.c_int
 lib.bpf_open_raw_sock.argtypes = [ct.c_char_p]
 lib.bpf_attach_socket.restype = ct.c_int
@@ -282,7 +285,7 @@ class bcc_usdt_argument(ct.Structure):
     _fields_ = [
             ('size', ct.c_int),
             ('valid', ct.c_int),
-            ('constant', ct.c_int),
+            ('constant', ct.c_longlong),
             ('deref_offset', ct.c_int),
             ('deref_ident', ct.c_char_p),
             ('base_register_name', ct.c_char_p),

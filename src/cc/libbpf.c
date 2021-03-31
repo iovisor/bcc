@@ -261,6 +261,8 @@ static struct bpf_helper helpers[] = {
   {"ktime_get_coarse_ns", "5.11"},
   {"ima_inode_hash", "5.11"},
   {"sock_from_file", "5.11"},
+  {"check_mtu", "5.12"},
+  {"for_each_map_elem", "5.13"},
 };
 
 static uint64_t ptr_to_u64(void *ptr)
@@ -354,6 +356,13 @@ int bpf_delete_elem(int fd, void *key)
 int bpf_lookup_and_delete(int fd, void *key, void *value)
 {
   return bpf_map_lookup_and_delete_elem(fd, key, value);
+}
+
+int bpf_lookup_and_delete_batch(int fd, __u32 *in_batch, __u32 *out_batch, void *keys,
+                                void *values, __u32 *count)
+{
+  return bpf_map_lookup_and_delete_batch(fd, in_batch, out_batch, keys, values,
+                                         count, NULL);
 }
 
 int bpf_get_first_key(int fd, void *key, size_t key_size)

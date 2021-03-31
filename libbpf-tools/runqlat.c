@@ -34,7 +34,8 @@ struct env {
 static volatile bool exiting;
 
 const char *argp_program_version = "runqlat 0.1";
-const char *argp_program_bug_address = "<bpf@vger.kernel.org>";
+const char *argp_program_bug_address =
+	"https://github.com/iovisor/bcc/tree/master/libbpf-tools";
 const char argp_program_doc[] =
 "Summarize run queue (scheduler) latency as a histogram.\n"
 "\n"

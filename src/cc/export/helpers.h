@@ -255,6 +255,25 @@ struct _name##_table_t _name = { .max_entries = (_max_entries) }
 #define BPF_HASH(...) \
   BPF_HASHX(__VA_ARGS__, BPF_HASH4, BPF_HASH3, BPF_HASH2, BPF_HASH1)(__VA_ARGS__)
 
+#define BPF_PERCPU_HASH1(_name) \
+  BPF_TABLE("percpu_hash", u64, u64, _name, 10240)
+#define BPF_PERCPU_HASH2(_name, _key_type) \
+  BPF_TABLE("percpu_hash", _key_type, u64, _name, 10240)
+#define BPF_PERCPU_HASH3(_name, _key_type, _leaf_type) \
+  BPF_TABLE("percpu_hash", _key_type, _leaf_type, _name, 10240)
+#define BPF_PERCPU_HASH4(_name, _key_type, _leaf_type, _size) \
+  BPF_TABLE("percpu_hash", _key_type, _leaf_type, _name, _size)
+
+// helper for default-variable macro function
+#define BPF_PERCPU_HASHX(_1, _2, _3, _4, NAME, ...) NAME
+
+// Define a hash function, some arguments optional
+// BPF_PERCPU_HASH(name, key_type=u64, leaf_type=u64, size=10240)
+#define BPF_PERCPU_HASH(...)                                            \
+  BPF_PERCPU_HASHX(                                                     \
+    __VA_ARGS__, BPF_PERCPU_HASH4, BPF_PERCPU_HASH3, BPF_PERCPU_HASH2, BPF_PERCPU_HASH1) \
+           (__VA_ARGS__)
+
 #define BPF_ARRAY1(_name) \
   BPF_TABLE("array", int, u64, _name, 10240)
 #define BPF_ARRAY2(_name, _leaf_type) \
@@ -818,6 +837,12 @@ static long (*bpf_ima_inode_hash)(struct inode *inode, void *dst, __u32 size) =
 struct file;
 static struct socket *(*bpf_sock_from_file)(struct file *file) =
   (void *)BPF_FUNC_sock_from_file;
+static long (*bpf_check_mtu)(void *ctx, __u32 ifindex, __u32 *mtu_len,
+                             __s32 len_diff, __u64 flags) =
+  (void *)BPF_FUNC_check_mtu;
+static long (*bpf_for_each_map_elem)(void *map, void *callback_fn,
+                                     void *callback_ctx, __u64 flags) =
+  (void *)BPF_FUNC_for_each_map_elem;
 
 /* llvm builtin functions that eBPF C program may use to
  * emit BPF_LD_ABS and BPF_LD_IND instructions
@@ -1074,6 +1099,9 @@ int bpf_usdt_readarg_p(int argc, struct pt_regs *ctx, void *buf, u64 len) asm("l
 #elif defined(__TARGET_ARCH_powerpc)
 #define bpf_target_powerpc
 #define bpf_target_defined
+#elif defined(__TARGET_ARCH_mips)
+#define bpf_target_mips
+#define bpf_target_defined
 #else
 #undef bpf_target_defined
 #endif
@@ -1088,6 +1116,8 @@ int bpf_usdt_readarg_p(int argc, struct pt_regs *ctx, void *buf, u64 len) asm("l
 #define bpf_target_arm64
 #elif defined(__powerpc__)
 #define bpf_target_powerpc
+#elif defined(__mips__)
+#define bpf_target_mips
 #endif
 #endif
 
@@ -1136,6 +1166,18 @@ int bpf_usdt_readarg_p(int argc, struct pt_regs *ctx, void *buf, u64 len) asm("l
 #define PT_REGS_RC(x)		((x)->regs[0])
 #define PT_REGS_SP(x)		((x)->sp)
 #define PT_REGS_IP(x)		((x)->pc)
+#elif defined(bpf_target_mips)
+#define PT_REGS_PARM1(x) ((x)->regs[4])
+#define PT_REGS_PARM2(x) ((x)->regs[5])
+#define PT_REGS_PARM3(x) ((x)->regs[6])
+#define PT_REGS_PARM4(x) ((x)->regs[7])
+#define PT_REGS_PARM5(x) ((x)->regs[8])
+#define PT_REGS_PARM6(x) ((x)->regs[9])
+#define PT_REGS_RET(x) ((x)->regs[31])
+#define PT_REGS_FP(x) ((x)->regs[30]) /* Works only with CONFIG_FRAME_POINTER */
+#define PT_REGS_RC(x) ((x)->regs[2])
+#define PT_REGS_SP(x) ((x)->regs[29])
+#define PT_REGS_IP(x) ((x)->cp0_epc)
 #else
 #error "bcc does not support this platform yet"
 #endif

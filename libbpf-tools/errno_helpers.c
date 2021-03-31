@@ -159,7 +159,7 @@ static int errno_by_name_x86_64(const char *errno_name)
 /* Try to find the errno number using the errno(1) program */
 static int errno_by_name_dynamic(const char *errno_name)
 {
-	int len = strlen(errno_name);
+	int i, len = strlen(errno_name);
 	int err, number = -1;
 	char buf[128];
 	char cmd[64];
@@ -168,7 +168,7 @@ static int errno_by_name_dynamic(const char *errno_name)
 	FILE *f;
 
 	/* sanity check to not call popen with random input */
-	for (int i = 0; i < len; i++) {
+	for (i = 0; i < len; i++) {
 		if (errno_name[i] < 'A' || errno_name[i] > 'Z') {
 			warn("errno_name contains invalid char 0x%02x: %s\n",
 					errno_name[i], errno_name);

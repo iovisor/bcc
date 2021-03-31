@@ -129,7 +129,7 @@ if args.ebpf:
 # initialize BPF
 b = BPF(text=bpf_text)
 if args.all:
-    b.attach_kprobe(event="lookup_fast", fn_name="trace_fast")
+    b.attach_kprobe(event_re="^lookup_fast$|^lookup_fast.constprop.*.\d$", fn_name="trace_fast")
 
 mode_s = {
     0: 'M',

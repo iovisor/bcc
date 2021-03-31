@@ -19,6 +19,7 @@
 # 09-Jan-2019   Takuma Kume     Support filtering by UID
 # 30-Jul-2019   Xiaozhou Liu    Count connects.
 # 07-Oct-2020   Nabil Schear    Correlate connects with DNS responses
+# 08-Mar-2021   Suresh Kumar    Added LPORT option
 
 from __future__ import print_function
 from bcc import BPF
@@ -41,6 +42,7 @@ examples = """examples:
     ./tcpconnect -U        # include UID
     ./tcpconnect -u 1000   # only trace UID 1000
     ./tcpconnect -c        # count connects per src ip and dest ip/port
+    ./tcpconnect -L        # include LPORT while printing outputs
     ./tcpconnect --cgroupmap mappath  # only trace cgroups in this BPF map
     ./tcpconnect --mntnsmap mappath   # only trace mount namespaces in the map
 """
@@ -54,6 +56,8 @@ parser.add_argument("-p", "--pid",
     help="trace this PID only")
 parser.add_argument("-P", "--port",
     help="comma-separated list of destination ports to trace.")
+parser.add_argument("-L", "--lport", action="store_true",
+    help="include LPORT on output")
 parser.add_argument("-U", "--print-uid", action="store_true",
     help="include UID on output")
 parser.add_argument("-u", "--uid",
@@ -87,6 +91,7 @@ struct ipv4_data_t {
     u32 saddr;
     u32 daddr;
     u64 ip;
+    u16 lport;
     u16 dport;
     char task[TASK_COMM_LEN];
 };
@@ -99,6 +104,7 @@ struct ipv6_data_t {
     unsigned __int128 saddr;
     unsigned __int128 daddr;
     u64 ip;
+    u16 lport;
     u16 dport;
     char task[TASK_COMM_LEN];
 };
@@ -161,6 +167,7 @@ static int trace_connect_return(struct pt_regs *ctx, short ipver)
 
     // pull in details
     struct sock *skp = *skpp;
+    u16 lport = skp->__sk_common.skc_num;
     u16 dport = skp->__sk_common.skc_dport;
 
     FILTER_PORT
@@ -202,6 +209,7 @@ struct_init = {'ipv4':
                data4.ts_us = bpf_ktime_get_ns() / 1000;
                data4.saddr = skp->__sk_common.skc_rcv_saddr;
                data4.daddr = skp->__sk_common.skc_daddr;
+               data4.lport = lport;
                data4.dport = ntohs(dport);
                bpf_get_current_comm(&data4.task, sizeof(data4.task));
                ipv4_events.perf_submit(ctx, &data4, sizeof(data4));"""
@@ -225,6 +233,7 @@ struct_init = {'ipv4':
                    skp->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
                bpf_probe_read_kernel(&data6.daddr, sizeof(data6.daddr),
                    skp->__sk_common.skc_v6_daddr.in6_u.u6_addr32);
+               data6.lport = lport;
                data6.dport = ntohs(dport);
                bpf_get_current_comm(&data6.task, sizeof(data6.task));
                ipv6_events.perf_submit(ctx, &data6, sizeof(data6));"""
@@ -354,10 +363,16 @@ def print_ipv4_event(cpu, data, size):
     if args.print_uid:
         printb(b"%-6d" % event.uid, nl="")
     dest_ip = inet_ntop(AF_INET, pack("I", event.daddr)).encode()
-    printb(b"%-6d %-12.12s %-2d %-16s %-16s %-6d %s" % (event.pid,
-        event.task, event.ip,
-        inet_ntop(AF_INET, pack("I", event.saddr)).encode(),
-        dest_ip, event.dport, print_dns(dest_ip)))
+    if args.lport:
+        printb(b"%-6d %-12.12s %-2d %-16s %-6d %-16s %-6d %s" % (event.pid,
+            event.task, event.ip,
+            inet_ntop(AF_INET, pack("I", event.saddr)).encode(), event.lport,
+            dest_ip, event.dport, print_dns(dest_ip)))
+    else:
+        printb(b"%-6d %-12.12s %-2d %-16s %-16s %-6d %s" % (event.pid,
+            event.task, event.ip,
+            inet_ntop(AF_INET, pack("I", event.saddr)).encode(),
+            dest_ip, event.dport, print_dns(dest_ip)))
 
 def print_ipv6_event(cpu, data, size):
     event = b["ipv6_events"].event(data)
@@ -369,10 +384,16 @@ def print_ipv6_event(cpu, data, size):
     if args.print_uid:
         printb(b"%-6d" % event.uid, nl="")
     dest_ip = inet_ntop(AF_INET6, event.daddr).encode()
-    printb(b"%-6d %-12.12s %-2d %-16s %-16s %-6d %s" % (event.pid,
-        event.task, event.ip,
-        inet_ntop(AF_INET6, event.saddr).encode(), dest_ip,
-        event.dport, print_dns(dest_ip)))
+    if args.lport:
+        printb(b"%-6d %-12.12s %-2d %-16s %-6d %-16s %-6d %s" % (event.pid,
+            event.task, event.ip,
+            inet_ntop(AF_INET6, event.saddr).encode(), event.lport,
+            dest_ip, event.dport, print_dns(dest_ip)))
+    else:
+        printb(b"%-6d %-12.12s %-2d %-16s %-16s %-6d %s" % (event.pid,
+            event.task, event.ip,
+            inet_ntop(AF_INET6, event.saddr).encode(),
+            dest_ip, event.dport, print_dns(dest_ip)))
 
 def depict_cnt(counts_tab, l3prot='ipv4'):
     for k, v in sorted(counts_tab.items(),
@@ -490,8 +511,12 @@ else:
         print("%-9s" % ("TIME(s)"), end="")
     if args.print_uid:
         print("%-6s" % ("UID"), end="")
-    print("%-6s %-12s %-2s %-16s %-16s %-6s" % ("PID", "COMM", "IP", "SADDR",
-        "DADDR", "DPORT"), end="")
+    if args.lport:
+        print("%-6s %-12s %-2s %-16s %-6s %-16s %-6s" % ("PID", "COMM", "IP", "SADDR",
+            "LPORT", "DADDR", "DPORT"), end="")
+    else:
+        print("%-6s %-12s %-2s %-16s %-16s %-6s" % ("PID", "COMM", "IP", "SADDR",
+            "DADDR", "DPORT"), end="")
     if args.dns:
         print(" QUERY")
     else:

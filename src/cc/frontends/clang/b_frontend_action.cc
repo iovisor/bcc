@@ -57,6 +57,9 @@ const char *calling_conv_regs_s390x[] = {"gprs[2]", "gprs[3]", "gprs[4]",
 const char *calling_conv_regs_arm64[] = {"regs[0]", "regs[1]", "regs[2]",
                                        "regs[3]", "regs[4]", "regs[5]"};
 
+const char *calling_conv_regs_mips[] = {"regs[4]", "regs[5]", "regs[6]",
+                                       "regs[7]", "regs[8]", "regs[9]"};
+
 void *get_call_conv_cb(bcc_arch_t arch, bool for_syscall)
 {
   const char **ret;
@@ -71,6 +74,9 @@ void *get_call_conv_cb(bcc_arch_t arch, bool for_syscall)
       break;
     case BCC_ARCH_ARM64:
       ret = calling_conv_regs_arm64;
+      break;
+    case BCC_ARCH_MIPS:
+      ret = calling_conv_regs_mips;
       break;
     default:
       if (for_syscall)
@@ -766,17 +772,20 @@ void BTypeVisitor::genParamIndirectAssign(FunctionDecl *D, string& preamble,
 }
 
 void BTypeVisitor::rewriteFuncParam(FunctionDecl *D) {
-  const char **calling_conv_regs = get_call_conv(true);
-
   string preamble = "{\n";
   if (D->param_size() > 1) {
+    bool is_syscall = false;
+    if (strncmp(D->getName().str().c_str(), "syscall__", 9) == 0 ||
+        strncmp(D->getName().str().c_str(), "kprobe____x64_sys_", 18) == 0)
+      is_syscall = true;
+    const char **calling_conv_regs = get_call_conv(is_syscall);
+
     // If function prefix is "syscall__" or "kprobe____x64_sys_",
     // the function will attach to a kprobe syscall function.
     // Guard parameter assiggnment with CONFIG_ARCH_HAS_SYSCALL_WRAPPER.
     // For __x64_sys_* syscalls, this is always true, but we guard
     // it in case of "syscall__" for other architectures.
-    if (strncmp(D->getName().str().c_str(), "syscall__", 9) == 0 ||
-        strncmp(D->getName().str().c_str(), "kprobe____x64_sys_", 18) == 0) {
+    if (is_syscall) {
       preamble += "#if defined(CONFIG_ARCH_HAS_SYSCALL_WRAPPER) && !defined(__s390x__)\n";
       genParamIndirectAssign(D, preamble, calling_conv_regs);
       preamble += "\n#else\n";

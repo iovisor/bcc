@@ -397,6 +397,31 @@ class TableBase(MutableMapping):
         for k in self.keys():
             self.__delitem__(k)
 
+    def items_lookup_and_delete_batch(self):
+        # batch size is set to the maximum
+        batch_size = self.max_entries
+        out_batch = ct.c_uint32(0)
+        keys = (type(self.Key()) * batch_size)()
+        values = (type(self.Leaf()) * batch_size)()
+        count = ct.c_uint32(batch_size)
+        res = lib.bpf_lookup_and_delete_batch(self.map_fd,
+                                              None,
+                                              ct.byref(out_batch),
+                                              ct.byref(keys),
+                                              ct.byref(values),
+                                              ct.byref(count)
+                                              )
+
+        errcode = ct.get_errno()
+        if (errcode == errno.EINVAL):
+            raise Exception("BPF_MAP_LOOKUP_AND_DELETE_BATCH is invalid.")
+
+        if (res != 0 and errcode != errno.ENOENT):
+            raise Exception("BPF_MAP_LOOKUP_AND_DELETE_BATCH has failed")
+
+        for i in range(0, count.value):
+            yield (keys[i], values[i])
+
     def zero(self):
         # Even though this is not very efficient, we grab the entire list of
         # keys before enumerating it. This helps avoid a potential race where
@@ -584,6 +609,8 @@ class TableBase(MutableMapping):
 class HashTable(TableBase):
     def __init__(self, *args, **kwargs):
         super(HashTable, self).__init__(*args, **kwargs)
+        self.max_entries = int(lib.bpf_table_max_entries_id(self.bpf.module,
+                                                            self.map_id))
 
     def __len__(self):
         i = 0

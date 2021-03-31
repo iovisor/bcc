@@ -46,7 +46,7 @@ static const std::string COMPILER_BARRIER =
 class Argument {
 private:
   optional<int> arg_size_;
-  optional<int> constant_;
+  optional<long long> constant_;
   optional<int> deref_offset_;
   optional<std::string> deref_ident_;
   optional<std::string> base_register_name_;
@@ -75,7 +75,7 @@ public:
     return index_register_name_;
   }
   const optional<int> scale() const { return scale_; }
-  const optional<int> constant() const { return constant_; }
+  const optional<long long> constant() const { return constant_; }
   const optional<int> deref_offset() const { return deref_offset_; }
 
   friend class ArgumentParser;
@@ -96,6 +96,13 @@ class ArgumentParser {
   ssize_t parse_number(ssize_t pos, optional<int> *result) {
     char *endp;
     int number = strtol(arg_ + pos, &endp, 0);
+    if (endp > arg_ + pos)
+      *result = number;
+    return endp - arg_;
+  }
+  ssize_t parse_number(ssize_t pos, optional<long long> *result) {
+    char *endp;
+    long long number = (long long)strtoull(arg_ + pos, &endp, 0);
     if (endp > arg_ + pos)
       *result = number;
     return endp - arg_;

@@ -4,13 +4,11 @@
 // Based on xfsslower(8) from BCC by Brendan Gregg & Dina Goldshtein.
 // 9-Mar-2020   Wenbo Zhang   Created this.
 #include <argp.h>
-#include <limits.h>
-#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 #include <time.h>
+#include <unistd.h>
 #include <bpf/libbpf.h>
 #include <bpf/bpf.h>
 #include "xfsslower.h"
@@ -20,7 +18,6 @@
 #define PERF_BUFFER_PAGES	64
 #define PERF_BUFFER_TIME_MS	10
 #define PERF_POLL_TIMEOUT_MS	100
-
 
 static struct env {
 	pid_t pid;
@@ -33,7 +30,8 @@ static struct env {
 };
 
 const char *argp_program_version = "xfsslower 0.1";
-const char *argp_program_bug_address = "<bpf@vger.kernel.org>";
+const char *argp_program_bug_address =
+	"https://github.com/iovisor/bcc/tree/master/libbpf-tools";
 const char argp_program_doc[] =
 "Trace common XFS file operations slower than a threshold.\n"
 "\n"
@@ -168,7 +166,7 @@ int main(int argc, char **argv)
 
 	obj = xfsslower_bpf__open();
 	if (!obj) {
-		fprintf(stderr, "failed to open and/or load BPF object\n");
+		fprintf(stderr, "failed to open BPF object\n");
 		return 1;
 	}
 

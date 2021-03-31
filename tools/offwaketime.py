@@ -288,7 +288,8 @@ if args.ebpf:
 
 # initialize BPF
 b = BPF(text=bpf_text)
-b.attach_kprobe(event="finish_task_switch", fn_name="oncpu")
+b.attach_kprobe(event_re="^finish_task_switch$|^finish_task_switch\.isra\.\d$",
+                fn_name="oncpu")
 b.attach_kprobe(event="try_to_wake_up", fn_name="waker")
 matched = b.num_open_kprobes()
 if matched == 0:

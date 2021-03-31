@@ -4,11 +4,13 @@
 /biosnoop
 /biostacks
 /bitesize
+/cachestat
 /cpudist
 /cpufreq
 /drsnoop
 /execsnoop
 /filelife
+/funclatency
 /hardirqs
 /llcstat
 /numamove

@@ -53,10 +53,12 @@ struct {
 
 static __always_inline bool filter_port(__u16 port)
 {
+	int i;
+
 	if (filter_ports_len == 0)
 		return false;
 
-	for (int i = 0; i < filter_ports_len; i++) {
+	for (i = 0; i < filter_ports_len; i++) {
 		if (port == filter_ports[i])
 			return false;
 	}

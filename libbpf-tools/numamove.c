@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause)
 // Copyright (c) 2020 Wenbo Zhang
 //
-// Based on numamove(8) from from BPF-Perf-Tools-Book by Brendan Gregg.
+// Based on numamove(8) from BPF-Perf-Tools-Book by Brendan Gregg.
 // 8-Jun-2020   Wenbo Zhang   Created this.
 #include <argp.h>
 #include <signal.h>
@@ -20,7 +20,8 @@ static struct env {
 static volatile bool exiting;
 
 const char *argp_program_version = "numamove 0.1";
-const char *argp_program_bug_address = "<bpf@vger.kernel.org>";
+const char *argp_program_bug_address =
+	"https://github.com/iovisor/bcc/tree/master/libbpf-tools";
 const char argp_program_doc[] =
 "Show page migrations of type NUMA misplaced per second.\n"
 "\n"

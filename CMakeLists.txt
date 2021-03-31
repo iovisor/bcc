@@ -38,6 +38,8 @@ endif()
 #  $ cmake -DKERNEL_INCLUDE_DIRS=/tmp/headers/include/ ...
 include_directories(${KERNEL_INCLUDE_DIRS})
 
+option(ENABLE_NO_PIE "Build bcc-lua without PIE" ON)
+
 include(cmake/GetGitRevisionDescription.cmake)
 include(cmake/version.cmake)
 include(CMakeDependentOption)

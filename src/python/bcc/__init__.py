@@ -289,7 +289,8 @@ class BPF(object):
         return None
 
     def __init__(self, src_file=b"", hdr_file=b"", text=None, debug=0,
-            cflags=[], usdt_contexts=[], allow_rlimit=True, device=None):
+            cflags=[], usdt_contexts=[], allow_rlimit=True, device=None,
+            attach_usdt_ignore_pid=False):
         """Create a new BPF module with the given source code.
 
         Note:
@@ -364,7 +365,7 @@ class BPF(object):
             raise Exception("Failed to compile BPF module %s" % (src_file or "<text>"))
 
         for usdt_context in usdt_contexts:
-            usdt_context.attach_uprobes(self)
+            usdt_context.attach_uprobes(self, attach_usdt_ignore_pid)
 
         # If any "kprobe__" or "tracepoint__" or "raw_tracepoint__"
         # prefixed functions were defined,
@@ -585,6 +586,12 @@ class BPF(object):
                 if in_irq_section == 0:
                     if fn == b'__irqentry_text_start':
                         in_irq_section = 1
+                        continue
+                    # __irqentry_text_end is not always after
+                    # __irqentry_text_start. But only happens when
+                    # no functions between two irqentry_text
+                    elif fn == b'__irqentry_text_end':
+                        in_irq_section = 2
                         continue
                 elif in_irq_section == 1:
                     if fn == b'__irqentry_text_end':

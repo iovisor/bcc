@@ -195,6 +195,15 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, TableStorage &ts,
                                    "-fno-asynchronous-unwind-tables",
                                    "-x", "c", "-c", abs_file.c_str()});
 
+  const char *arch = getenv("ARCH");
+  if (!arch)
+    arch = un.machine;
+
+  if (!strncmp(arch, "mips", 4)) {
+    flags_cstr.push_back("-D__MIPSEL__");
+    flags_cstr.push_back("-D_MIPS_SZLONG=64");
+  }
+
   KBuildHelper kbuild_helper(kpath_env ? kpath : kdir, has_kpath_source);
 
   vector<string> kflags;
@@ -269,6 +278,9 @@ void *get_clang_target_cb(bcc_arch_t arch, bool for_syscall)
       break;
     case BCC_ARCH_ARM64:
       ret = "aarch64-unknown-linux-gnu";
+      break;
+    case BCC_ARCH_MIPS:
+      ret = "mips64el-unknown-linux-gnuabi64";
       break;
     default:
       ret = "x86_64-unknown-linux-gnu";

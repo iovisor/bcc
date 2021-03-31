@@ -1,10 +1,10 @@
 # Copyright (c) PLUMgrid, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
 
-include_directories(${CMAKE_SOURCE_DIR}/src/cc)
-include_directories(${CMAKE_SOURCE_DIR}/src/cc/api)
-include_directories(${CMAKE_SOURCE_DIR}/src/cc/libbpf/include/uapi)
-include_directories(${CMAKE_SOURCE_DIR}/tests/python/include)
+include_directories(${PROJECT_SOURCE_DIR}/src/cc)
+include_directories(${PROJECT_SOURCE_DIR}/src/cc/api)
+include_directories(${PROJECT_SOURCE_DIR}/src/cc/libbpf/include/uapi)
+include_directories(${PROJECT_SOURCE_DIR}/tests/python/include)
 
 add_executable(test_static test_static.c)
 if(NOT CMAKE_USE_LIBBPF_PACKAGE)

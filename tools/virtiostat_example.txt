@@ -1,0 +1,63 @@
+Demonstrations of virtiostat, the Linux eBPF/bcc version.
+
+
+This program traces virtio devices to analyze the IO operations and
+throughput. For example, guest side mounts a 9p fs, and we can't get
+io statistics by `iostat` command any more. In this scenario, we can
+only get statistics from VIRTIO layer instead of block layer.
+
+Example
+#./virtiostat -T
+Tracing virtio devices statistics ... Hit Ctrl-C to end.
+14:48:30
+        Driver   Device    VQ Name  In SGs Out SGs          In BW         Out BW
+    virtio_net  virtio0    input.0  260669       0      406743040              0
+    virtio_net  virtio0   output.0       0    9873              0         833344
+    virtio_blk  virtio4      req.0      28      46            448         278976
+  9pnet_virtio  virtio6   requests   99083   99354        1883687      137537263
+14:48:33
+        Driver   Device    VQ Name  In SGs Out SGs          In BW         Out BW
+    virtio_net  virtio0    input.0  260718       0      406819328              0
+    virtio_net  virtio0   output.0       0    7139              0         562355
+    virtio_blk  virtio4      req.0      11      18            176         110768
+  9pnet_virtio  virtio6   requests   91520   91141        1737364      125320785
+
+
+Show virtio block devices only:
+#./virtiostat.py -d virtio_blk
+Tracing virtio devices statistics ... Hit Ctrl-C to end.
+--------
+        Driver   Device    VQ Name  In SGs Out SGs          In BW         Out BW
+    virtio_blk  virtio4      req.0       4       6              4          24640
+    virtio_blk  virtio5      req.0  678756  339378     1390431666        5430048
+
+
+Full USAGE:
+
+#./virtiostat -h
+usage: virtiostat.py [-h] [-T] [-d DRIVER] [-n DEVNAME] [-D]
+                     [interval] [count]
+
+Show virtio devices input/output statistics
+
+positional arguments:
+  interval              output interval, in seconds
+  count                 number of outputs
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -T, --timestamp       show timestamp on output
+  -d DRIVER, --driver DRIVER
+                        filter for driver name
+  -n DEVNAME, --devname DEVNAME
+                        filter for device name
+  -D, --debug           print BPF program before starting (for debugging
+                        purposes)
+
+examples:
+    ./virtiostat                 # print 3(default) second summaries
+    ./virtiostat  1  10          # print 1 second summaries, 10 times
+    ./virtiostat -T              # show timestamps
+    ./virtiostat -d virtio_blk   # only show virtio block devices
+    ./virtiostat -n virtio0      # only show virtio0 device
+    ./virtiostat -D              # show debug bpf text

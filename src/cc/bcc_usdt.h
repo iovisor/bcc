@@ -54,7 +54,7 @@ struct bcc_usdt_location {
 struct bcc_usdt_argument {
     int size;
     int valid;
-    int constant;
+    long long constant;
     int deref_offset;
     const char *deref_ident;
     const char *base_register_name;

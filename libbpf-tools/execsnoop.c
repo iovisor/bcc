@@ -36,7 +36,8 @@ static struct env {
 static struct timespec start_time;
 
 const char *argp_program_version = "execsnoop 0.1";
-const char *argp_program_bug_address = "<bpf@vger.kernel.org>";
+const char *argp_program_bug_address =
+	"https://github.com/iovisor/bcc/tree/master/libbpf-tools";
 const char argp_program_doc[] =
 "Trace open family syscalls\n"
 "\n"
@@ -174,13 +175,14 @@ static void inline quoted_symbol(char c) {
 
 static void print_args(const struct event *e, bool quote)
 {
-	int args_counter = 0;
+	int i, args_counter = 0;
 
 	if (env.quote)
 		putchar('"');
 
-	for (int i = 0; i < e->args_size && args_counter < e->args_count; i++) {
+	for (i = 0; i < e->args_size && args_counter < e->args_count; i++) {
 		char c = e->args[i];
+
 		if (env.quote) {
 			if (c == '\0') {
 				args_counter++;
