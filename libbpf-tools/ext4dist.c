@@ -152,7 +152,7 @@ static bool should_fallback(void)
 	 * we can use fentry to get better performance, otherwise we need
 	 * to fall back to use kprobe to be compatible with the old kernel.
 	 */
-	if (is_kernel_module("ext4") && !access("/sys/kernel/btf/ext4", R_OK))
+	if (is_kernel_module("ext4") && access("/sys/kernel/btf/ext4", R_OK))
 		return true;
 	return false;
 }
