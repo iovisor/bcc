@@ -12,7 +12,7 @@ const volatile pid_t targ_tgid = 0;
 
 #define MAX_ENTRIES	10240
 
-struct hist hists[__MAX_FOP_TYPE];
+struct hist hists[__MAX_FOP_TYPE] = {};
 
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
