@@ -12,6 +12,7 @@
 /ext4dist
 /filelife
 /funclatency
+/gethostlatency
 /hardirqs
 /llcstat
 /numamove
