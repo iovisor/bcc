@@ -29,6 +29,7 @@ APPS = \
 	ext4dist \
 	filelife \
 	funclatency \
+	gethostlatency \
 	hardirqs \
 	llcstat \
 	numamove \
@@ -112,4 +113,3 @@ install: $(APPS)
 .DELETE_ON_ERROR:
 # keep intermediate (.skel.h, .bpf.o, etc) targets
 .SECONDARY:
-
