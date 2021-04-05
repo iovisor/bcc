@@ -242,6 +242,16 @@ int main(int argc, char **argv)
 	obj->rodata->targ_uid = env.uid;
 	obj->rodata->targ_failed = env.failed;
 
+#ifdef __aarch64__
+	/* aarch64 has no open syscall, only openat variants.
+	 * Disable associated tracepoints that do not exist. See #3344.
+	 */
+	bpf_program__set_autoload(
+		obj->progs.tracepoint__syscalls__sys_enter_open, false);
+	bpf_program__set_autoload(
+		obj->progs.tracepoint__syscalls__sys_exit_open, false);
+#endif
+
 	err = opensnoop_bpf__load(obj);
 	if (err) {
 		fprintf(stderr, "failed to load BPF object: %d\n", err);
