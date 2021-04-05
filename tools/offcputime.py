@@ -134,7 +134,13 @@ struct warn_event_t {
 };
 BPF_PERF_OUTPUT(warn_events);
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 19, 0)
+struct rq;
+
+int oncpu(struct pt_regs *ctx, struct rq *rq, struct task_struct *prev) {
+#else
 int oncpu(struct pt_regs *ctx, struct task_struct *prev) {
+#endif
     u32 pid = prev->pid;
     u32 tgid = prev->tgid;
     u64 ts, *tsp;

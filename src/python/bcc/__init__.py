@@ -560,7 +560,7 @@ class BPF(object):
             with open(blacklist_file, "rb") as blacklist_f:
                 blacklist = set([line.rstrip().split()[1] for line in blacklist_f])
         except IOError as e:
-            if e.errno != errno.EPERM:
+            if e.errno != errno.EPERM and e.errno != errno.ENOENT:
                 raise e
             blacklist = set([])
 

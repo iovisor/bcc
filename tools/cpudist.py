@@ -94,7 +94,13 @@ static inline void update_hist(u32 tgid, u32 pid, u64 ts)
     STORE
 }
 
-int sched_switch(struct pt_regs *ctx, struct task_struct *prev)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 19, 0)
+struct rq;
+
+int sched_switch(struct pt_regs *ctx, struct rq *rq, struct task_struct *prev) 
+#else
+int sched_switch(struct pt_regs *ctx, struct task_struct *prev) 
+#endif
 {
     u64 ts = bpf_ktime_get_ns();
     u64 pid_tgid = bpf_get_current_pid_tgid();

@@ -188,7 +188,13 @@ int waker(struct pt_regs *ctx, struct task_struct *p) {
     return 0;
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 19, 0)
+struct rq;
+
+int oncpu(struct pt_regs *ctx, struct rq *rq, struct task_struct *p) {
+#else
 int oncpu(struct pt_regs *ctx, struct task_struct *p) {
+#endif
     // PID and TGID of the previous Process (Process going into waiting)
     u32 pid = p->pid;
     u32 tgid = p->tgid;

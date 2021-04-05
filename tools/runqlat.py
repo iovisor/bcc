@@ -111,7 +111,14 @@ int trace_ttwu_do_wakeup(struct pt_regs *ctx, struct rq *rq, struct task_struct 
 }
 
 // calculate latency
-int trace_run(struct pt_regs *ctx, struct task_struct *prev)
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 19, 0)
+struct rq;
+
+int trace_run(struct pt_regs *ctx, struct rq *rq, struct task_struct *prev) 
+#else
+int trace_run(struct pt_regs *ctx, struct task_struct *prev) 
+#endif
 {
     u32 pid, tgid;
 
