@@ -9,8 +9,6 @@
 
 #define MAX_ENTRIES	10240
 
-#define KERNEL_VERSION(a, b, c) (((a) << 16) + ((b) << 8) + (c))
-
 extern int LINUX_KERNEL_VERSION __kconfig;
 
 const volatile bool targ_per_disk = false;
