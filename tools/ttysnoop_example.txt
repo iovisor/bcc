@@ -73,11 +73,16 @@ positional arguments:
   device         path to a tty device (eg, /dev/tty0) or pts number
 
 optional arguments:
-  -h, --help     show this help message and exit
-  -C, --noclear  don't clear the screen
+  -h, --help      show this help message and exit
+  -C, --noclear   don't clear the screen
+  -s, --datasize  size of the transmitting buffer (default 256)
+  -c, --datacount number of times ttysnop checks for data (default 16)
 
 examples:
-    ./ttysnoop /dev/pts/2    # snoop output from /dev/pts/2
-    ./ttysnoop 2             # snoop output from /dev/pts/2 (shortcut)
-    ./ttysnoop /dev/console  # snoop output from the system console
-    ./ttysnoop /dev/tty0     # snoop output from /dev/tty0
+    ./ttysnoop /dev/pts/2          # snoop output from /dev/pts/2
+    ./ttysnoop 2                   # snoop output from /dev/pts/2 (shortcut)
+    ./ttysnoop /dev/console        # snoop output from the system console
+    ./ttysnoop /dev/tty0           # snoop output from /dev/tty0
+    ./ttysnoop /dev/pts/2 -s 1024  # snoop output from /dev/pts/2 with data size 1024
+    ./ttysnoop /dev/pts/2 -c 2     # snoop output from /dev/pts/2 with 2 checks for 256 bytes of data in buffer
+                                     (potentionaly retrieving 512 bytes)
