@@ -70,19 +70,33 @@ struct data_t {
     char buf[BUFSIZE];
 };
 
+BPF_ARRAY(data_map, struct data_t, 1);
 BPF_PERF_OUTPUT(events);
 
 static int do_tty_write(void *ctx, const char __user *buf, size_t count)
 {
+    int zero = 0;
+    struct data_t *data;
+
+/* We can't read data to map data before v4.11 */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+    struct data_t _data = {};
+
+    data = &_data;
+#else
+    data = data_map.lookup(&zero);
+    if (!data)
+        return 0;
+#endif
+
     // bpf_probe_read_user() can only use a fixed size, so truncate to count
     // in user space:
-    struct data_t data = {};
-    bpf_probe_read_user(&data.buf, BUFSIZE, (void *)buf);
+    bpf_probe_read_user(&data->buf, BUFSIZE, (void *)buf);
     if (count > BUFSIZE)
-        data.count = BUFSIZE;
+        data->count = BUFSIZE;
     else
-        data.count = count;
-    events.perf_submit(ctx, &data, sizeof(data));
+        data->count = count;
+    events.perf_submit(ctx, data, sizeof(*data));
 
     return 0;
 };
