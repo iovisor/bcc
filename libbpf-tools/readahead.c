@@ -73,6 +73,10 @@ static void sig_handler(int sig)
 	exiting = true;
 }
 
+/*
+ * Starting from v5.10-rc1 (8238287), __do_page_cache_readahead has
+ * renamed to do_page_cache_ra. So we specify the function dynamically.
+ */
 static int readahead__set_attach_target(struct bpf_program *prog)
 {
 	int err;
@@ -91,6 +95,21 @@ static int readahead__set_attach_target(struct bpf_program *prog)
 	return err;
 }
 
+static long readahead__probe_target(struct bpf_program *prog, bool retprobe)
+{
+	struct bpf_link *link;
+
+	link = bpf_program__attach_kprobe(prog, retprobe, "do_page_cache_ra");
+	if ((long)link != -2 /*ENOENT*/)
+		return 0;
+
+	link = bpf_program__attach_kprobe(prog, retprobe, "__do_page_cache_readahead");
+	if ((long)link != -2 /*ENOENT*/)
+		return 0;
+
+	return (long)link;
+}
+
 int main(int argc, char **argv)
 {
 	static const struct argp argp = {
@@ -101,6 +120,7 @@ int main(int argc, char **argv)
 	struct readahead_bpf *obj;
 	struct hist *histp;
 	int err;
+	struct bpf_link *link;
 
 	err = argp_parse(&argp, argc, argv, 0, NULL, NULL);
 	if (err)
@@ -119,28 +139,35 @@ int main(int argc, char **argv)
 		fprintf(stderr, "failed to open BPF object\n");
 		return 1;
 	}
-
-	/*
-	 * Starting from v5.10-rc1 (8238287), __do_page_cache_readahead has
-	 * renamed to do_page_cache_ra. So we specify the function dynamically.
-	 */
-	err = readahead__set_attach_target(obj->progs.do_page_cache_ra);
-	if (err)
-		goto cleanup;
-	err = readahead__set_attach_target(obj->progs.do_page_cache_ra_ret);
-	if (err)
-		goto cleanup;
-
 	err = readahead_bpf__load(obj);
 	if (err) {
 		fprintf(stderr, "failed to load BPF object\n");
 		goto cleanup;
 	}
 
-	err = readahead_bpf__attach(obj);
-	if (err) {
-		fprintf(stderr, "failed to attach BPF programs\n");
-		goto cleanup;
+	link = bpf_program__attach_trace(obj->progs.fexit_page_cache_alloc_ret);
+	if ((long)link == -524 /*ENOTSUPP*/) {
+		err = readahead__probe_target(obj->progs.kprobe_do_page_cache_ra, false);
+		if (err)
+			goto cleanup;
+		err = readahead__probe_target(obj->progs.kprobe_do_page_cache_ra, true);
+		if (err)
+			goto cleanup;
+		bpf_program__attach_kprobe(obj->progs.kretprobe_page_cache_alloc_ret,
+			true, "__page_cache_alloc");
+		bpf_program__attach_kprobe(obj->progs.kprobe_mark_page_accessed,
+			false, "mark_page_accessed");
+	}
+	else {
+		err = readahead__set_attach_target(obj->progs.fentry_do_page_cache_ra);
+		if (err)
+			goto cleanup;
+		err = readahead__set_attach_target(obj->progs.fexit_do_page_cache_ra);
+		if (err)
+			goto cleanup;
+		bpf_program__attach_trace(obj->progs.fentry_do_page_cache_ra);
+		bpf_program__attach_trace(obj->progs.fexit_do_page_cache_ra);
+		bpf_program__attach_trace(obj->progs.fentry_mark_page_accessed);
 	}
 
 	signal(SIGINT, sig_handler);
