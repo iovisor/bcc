@@ -1685,7 +1685,7 @@ This is an explicit way to instrument tracepoints. The ```RAW_TRACEPOINT_PROBE``
 For example:
 
 ```Python
-b.attach_raw_tracepoint("sched_swtich", "do_trace")
+b.attach_raw_tracepoint("sched_switch", "do_trace")
 ```
 
 Examples in situ:
