@@ -12,11 +12,16 @@
 # The pattern is a string with optional '*' wildcards, similar to file
 # globbing. If you'd prefer to use regular expressions, use the -r option.
 #
+# Without the '-l' option, only the innermost calls will be recorded.
+# Use '-l LEVEL' to record the outermost n levels of nested/recursive functions.
+#
 # Copyright (c) 2015 Brendan Gregg.
+# Copyright (c) 2021 Chenyue Zhou.
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
 # 20-Sep-2015   Brendan Gregg       Created this.
 # 06-Oct-2016   Sasha Goldshtein    Added user function support.
+# 14-Apr-2021   Chenyue Zhou        Added nested or recursive function support.
 
 from __future__ import print_function
 from bcc import BPF
@@ -173,7 +178,7 @@ else:
 if need_key:
     pid = '-1' if not library else 'tgid'
 
-    if args.level > 1:
+    if args.level and args.level > 1:
         bpf_text = bpf_text.replace('TYPEDEF',
             """
 #define STACK_DEPTH %s
@@ -204,7 +209,6 @@ static inline int stack_pop(func_stack_t *stack, func_cache_t *cache) {
     }
 
     u32 index = --stack->head;
-
     if (index < STACK_DEPTH) {
         /* bound check */
         cache->ip       = stack->cache[index].ip;
@@ -219,12 +223,10 @@ static inline int stack_push(func_stack_t *stack, func_cache_t *cache) {
 
     if (index > STACK_DEPTH - 1) {
         /* bound check */
-
         return -1;
     }
 
     stack->head++;
-
     stack->cache[index].ip       = cache->ip;
     stack->cache[index].start_ts = cache->start_ts;
 
@@ -264,7 +266,6 @@ static inline int stack_push(func_stack_t *stack, func_cache_t *cache) {
     func_stack_t *stack = func_stack.lookup(&pid);
     if (!stack) {
         /* miss start */
-
         return 0;
     }
 
@@ -274,7 +275,6 @@ static inline int stack_push(func_stack_t *stack, func_cache_t *cache) {
 
         return 0;
     }
-
     ip       = cache.ip;
     start_ts = cache.start_ts;
     delta    = bpf_ktime_get_ns() - start_ts;
@@ -290,7 +290,6 @@ static inline int stack_push(func_stack_t *stack, func_cache_t *cache) {
 
     if (stack->head == 0) {
         /* empty */
-
         func_stack.delete(&pid);
     }
             """ % pid)
