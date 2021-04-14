@@ -29,7 +29,7 @@ Tracing do_sys_open... Hit Ctrl-C to end.
   524288 -> 1048575  : 0        |                                      |
  1048576 -> 2097151  : 0        |                                      |
  2097152 -> 4194303  : 1        |                                      |
- 
+
 avg = 13746 nsecs, total: 6543360 nsecs, count: 476
 
 Detaching...
@@ -383,6 +383,8 @@ optional arguments:
   -F, --function        show a separate histogram per function
   -r, --regexp          use regular expressions. Default is "*" wildcards
                         only.
+  -l LEVEL, --level LEVEL
+                        set the level of nested or recursive functions
   -v, --verbose         print the BPF program (for debugging purposes)
 
 examples:
