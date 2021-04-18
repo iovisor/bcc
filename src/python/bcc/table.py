@@ -397,31 +397,6 @@ class TableBase(MutableMapping):
         for k in self.keys():
             self.__delitem__(k)
 
-    def items_update_batch(self, dictionary):
-        # batch size is set to the maximum
-        nb_key = len(dictionary)
-        count = ct.c_uint32(nb_key)
-
-        # fill the keys / values
-        keys = (type(self.Key()) * nb_key)()
-        values = (type(self.Leaf()) * nb_key)()
-        for i, k in enumerate(dictionary):
-            keys[i] = k
-            values[i] = dictionary[k]
-
-        res = lib.bpf_update_batch(self.map_fd,
-                                   ct.byref(keys),
-                                   ct.byref(values),
-                                   ct.byref(count)
-                                   )
-
-        errcode = ct.get_errno()
-        if (errcode == errno.EINVAL):
-            raise Exception("BPF_MAP_UPDATE_BATCH is invalid.")
-
-        if (res != 0 and errcode != errno.ENOENT):
-            raise Exception("BPF_MAP_UPDATE_BATCH has failed")
-
     def items_lookup_batch(self):
         # batch size is set to the maximum
         batch_size = self.max_entries
