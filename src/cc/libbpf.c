@@ -358,8 +358,20 @@ int bpf_lookup_and_delete(int fd, void *key, void *value)
   return bpf_map_lookup_and_delete_elem(fd, key, value);
 }
 
-int bpf_lookup_and_delete_batch(int fd, __u32 *in_batch, __u32 *out_batch, void *keys,
-                                void *values, __u32 *count)
+int bpf_lookup_batch(int fd, __u32 *in_batch, __u32 *out_batch, void *keys,
+                     void *values, __u32 *count)
+{
+  return bpf_map_lookup_batch(fd, in_batch, out_batch, keys, values, count,
+                              NULL);
+}
+
+int bpf_delete_batch(int fd,  void *keys, __u32 *count)
+{
+  return bpf_map_delete_batch(fd, keys, count, NULL);
+}
+
+int bpf_lookup_and_delete_batch(int fd, __u32 *in_batch, __u32 *out_batch,
+                                void *keys, void *values, __u32 *count)
 {
   return bpf_map_lookup_and_delete_batch(fd, in_batch, out_batch, keys, values,
                                          count, NULL);
