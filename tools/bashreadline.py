@@ -59,6 +59,9 @@ int printret(struct pt_regs *ctx) {
         events.perf_submit(ctx,&data,sizeof(data));
     }
 
+    if (comm[0] == 's' && comm[1] == 'h' && comm[2] == 0 ) {
+        events.perf_submit(ctx,&data,sizeof(data));
+    }
 
     return 0;
 };
