@@ -1995,9 +1995,14 @@ while True:
 
 ### 8. items_delete_batch()
 
-Syntax: ```table.items_delete_batch()```
+Syntax: ```table.items_delete_batch(keys)```
 
-It clears all entries of a BPF_HASH map. It is more efficient than table.clear() since it generates only one system call. It requires kernel v5.6.
+Arguments:
+
+- keys is optional and by default is None.
+In that case, it clears all entries of a BPF_HASH map when keys is None. It is more efficient than table.clear() since it generates only one system call.
+If a list of keys is given then only those keys and their associated values will be deleted.
+It requires kernel v5.6.
 
 
 ### 9. print_log2_hist()
