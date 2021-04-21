@@ -75,6 +75,8 @@ struct data_t {
             /* current->nsproxy->mnt_ns->ns.inum */
             unsigned int mnt_ns;
             char comm[TASK_COMM_LEN];
+            char pcomm[TASK_COMM_LEN];
+            pid_t ppid;
             unsigned long flags;
         } enter;
         /*
@@ -105,6 +107,8 @@ int syscall__mount(struct pt_regs *ctx, char __user *source,
     bpf_get_current_comm(event.enter.comm, sizeof(event.enter.comm));
     event.enter.flags = flags;
     task = (struct task_struct *)bpf_get_current_task();
+    event.enter.ppid = task->real_parent->tgid;
+    bpf_probe_read_kernel_str(&event.enter.pcomm, TASK_COMM_LEN, task->real_parent->comm);
     nsproxy = task->nsproxy;
     mnt_ns = nsproxy->mnt_ns;
     event.enter.mnt_ns = mnt_ns->ns.inum;
@@ -160,6 +164,8 @@ int syscall__umount(struct pt_regs *ctx, char __user *target, int flags)
     bpf_get_current_comm(event.enter.comm, sizeof(event.enter.comm));
     event.enter.flags = flags;
     task = (struct task_struct *)bpf_get_current_task();
+    event.enter.ppid = task->real_parent->tgid;
+    bpf_probe_read_kernel_str(&event.enter.pcomm, TASK_COMM_LEN, task->real_parent->comm);
     nsproxy = task->nsproxy;
     mnt_ns = nsproxy->mnt_ns;
     event.enter.mnt_ns = mnt_ns->ns.inum;
@@ -246,6 +252,8 @@ class EnterData(ctypes.Structure):
     _fields_ = [
         ('mnt_ns', ctypes.c_uint),
         ('comm', ctypes.c_char * TASK_COMM_LEN),
+        ('pcomm', ctypes.c_char * TASK_COMM_LEN),
+        ('ppid', ctypes.c_uint),
         ('flags', ctypes.c_ulong),
     ]
 
@@ -333,7 +341,7 @@ else:
         return '"{}"'.format(''.join(escape_character(c) for c in s))
 
 
-def print_event(mounts, umounts, cpu, data, size):
+def print_event(mounts, umounts, parent, cpu, data, size):
     event = ctypes.cast(data, ctypes.POINTER(Event)).contents
 
     try:
@@ -344,6 +352,8 @@ def print_event(mounts, umounts, cpu, data, size):
                 'mnt_ns': event.union.enter.mnt_ns,
                 'comm': event.union.enter.comm,
                 'flags': event.union.enter.flags,
+                'ppid': event.union.enter.ppid,
+                'pcomm': event.union.enter.pcomm,
             }
         elif event.type == EventType.EVENT_MOUNT_SOURCE:
             mounts[event.pid]['source'] = event.union.str
@@ -361,6 +371,8 @@ def print_event(mounts, umounts, cpu, data, size):
                 'mnt_ns': event.union.enter.mnt_ns,
                 'comm': event.union.enter.comm,
                 'flags': event.union.enter.flags,
+                'ppid': event.union.enter.ppid,
+                'pcomm': event.union.enter.pcomm,
             }
         elif event.type == EventType.EVENT_UMOUNT_TARGET:
             umounts[event.pid]['target'] = event.union.str
@@ -382,9 +394,15 @@ def print_event(mounts, umounts, cpu, data, size):
                     target=decode_mount_string(syscall['target']),
                     flags=decode_umount_flags(syscall['flags']),
                     retval=decode_errno(event.union.retval))
-            print('{:16} {:<7} {:<7} {:<11} {}'.format(
-                syscall['comm'].decode('utf-8', 'replace'), syscall['tgid'],
-                syscall['pid'], syscall['mnt_ns'], call))
+            if parent:
+                print('{:16} {:<7} {:<7} {:16} {:<7} {:<11} {}'.format(
+                    syscall['comm'].decode('utf-8', 'replace'), syscall['tgid'],
+                    syscall['pid'], syscall['pcomm'].decode('utf-8', 'replace'),
+                    syscall['ppid'], syscall['mnt_ns'], call))
+            else:
+                print('{:16} {:<7} {:<7} {:<11} {}'.format(
+                    syscall['comm'].decode('utf-8', 'replace'), syscall['tgid'],
+                    syscall['pid'], syscall['mnt_ns'], call))
     except KeyError:
         # This might happen if we lost an event.
         pass
@@ -396,6 +414,8 @@ def main():
     )
     parser.add_argument("--ebpf", action="store_true",
         help=argparse.SUPPRESS)
+    parser.add_argument("-P", "--parent_process", action="store_true",
+        help="also snoop the parent process")
     args = parser.parse_args()
 
     mounts = {}
@@ -411,9 +431,15 @@ def main():
     b.attach_kprobe(event=umount_fnname, fn_name="syscall__umount")
     b.attach_kretprobe(event=umount_fnname, fn_name="do_ret_sys_umount")
     b['events'].open_perf_buffer(
-        functools.partial(print_event, mounts, umounts))
-    print('{:16} {:<7} {:<7} {:<11} {}'.format(
-        'COMM', 'PID', 'TID', 'MNT_NS', 'CALL'))
+        functools.partial(print_event, mounts, umounts, args.parent_process))
+
+    if args.parent_process:
+        print('{:16} {:<7} {:<7} {:16} {:<7} {:<11} {}'.format(
+              'COMM', 'PID', 'TID', 'PCOMM', 'PPID', 'MNT_NS', 'CALL'))
+    else:
+        print('{:16} {:<7} {:<7} {:<11} {}'.format(
+            'COMM', 'PID', 'TID', 'MNT_NS', 'CALL'))
+
     while True:
         try:
             b.perf_buffer_poll()
