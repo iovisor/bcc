@@ -6,8 +6,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include <sys/resource.h>
 #include <time.h>
+#include <bpf/btf.h>
+#include <bpf/libbpf.h>
 #include "trace_helpers.h"
 
 #define min(x, y) ({				 \
@@ -394,4 +397,106 @@ bool is_kernel_module(const char *name)
 
 	fclose(f);
 	return found;
+}
+
+bool fentry_exists(const char *name, const char *mod)
+{
+	const char sysfs_vmlinux[] = "/sys/kernel/btf/vmlinux";
+	struct btf *base, *btf = NULL;
+	const struct btf_type *type;
+	const struct btf_enum *e;
+	char sysfs_mod[80];
+	int id = -1, i;
+
+	base = btf__parse(sysfs_vmlinux, NULL);
+	if (libbpf_get_error(base)) {
+		fprintf(stderr, "failed to parse vmlinux BTF at '%s': %s\n",
+			sysfs_vmlinux, strerror(-libbpf_get_error(base)));
+		goto err_out;
+	}
+	if (mod) {
+		snprintf(sysfs_mod, sizeof(sysfs_mod), "/sys/kernel/btf/%s", mod);
+		btf = btf__parse_split(sysfs_mod, base);
+		if (libbpf_get_error(btf)) {
+			fprintf(stderr, "failed to load BTF from %s: %s\n",
+				sysfs_mod, strerror(-libbpf_get_error(btf)));
+			goto err_out;
+		}
+	} else {
+		btf = base;
+	}
+
+	id = btf__find_by_name_kind(btf, "bpf_attach_type", BTF_KIND_ENUM);
+	if (id < 0)
+		goto err_out;
+	type = btf__type_by_id(btf, id);
+
+	/*
+         * As kernel BTF is exposed starting from 5.4 kernel, but fentry/fexit
+         * is actually supported starting from 5.5, so that's check this gap
+         * first, then check if target func has btf type.
+	 */
+	for (id = -1, i = 0, e = btf_enum(type); i < btf_vlen(type); i++, e++) {
+		if (!strcmp(btf__name_by_offset(btf, e->name_off),
+			    "BPF_TRACE_FENTRY")) {
+			id = btf__find_by_name_kind(btf, name, BTF_KIND_FUNC);
+			break;
+		}
+	}
+
+err_out:
+	if (mod)
+		btf__free(btf);
+	btf__free(base);
+	return id > 0;
+}
+
+bool kprobe_exists(const char *name)
+{
+	char sym_name[256];
+	FILE *f;
+	int ret;
+
+	f = fopen("/sys/kernel/debug/tracing/available_filter_functions", "r");
+	if (!f)
+		goto slow_path;
+
+	while (true) {
+		ret = fscanf(f, "%s%*[^\n]\n", sym_name);
+		if (ret == EOF && feof(f))
+			break;
+		if (ret != 1) {
+			fprintf(stderr, "failed to read symbol from available_filter_functions\n");
+			break;
+		}
+		if (!strcmp(name, sym_name)) {
+			fclose(f);
+			return true;
+		}
+	}
+
+	fclose(f);
+	return false;
+
+slow_path:
+	f = fopen("/proc/kallsyms", "r");
+	if (!f)
+		return false;
+
+	while (true) {
+		ret = fscanf(f, "%*x %*c %s%*[^\n]\n", sym_name);
+		if (ret == EOF && feof(f))
+			break;
+		if (ret != 1) {
+			fprintf(stderr, "failed to read symbol from kallsyms\n");
+			break;
+		}
+		if (!strcmp(name, sym_name)) {
+			fclose(f);
+			return true;
+		}
+	}
+
+	fclose(f);
+	return false;
 }
