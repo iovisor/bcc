@@ -43,4 +43,34 @@ int bump_memlock_rlimit(void);
 
 bool is_kernel_module(const char *name);
 
+/*
+ * When attempting to use kprobe/kretprobe, please check out new fentry/fexit
+ * probes, as they provide better performance and usability. But in some
+ * situations we have to fallback to kprobe/kretprobe probes. This helper
+ * is used to detect fentry/fexit support for the specified kernel function.
+ *
+ *	1. A gap between kernel versions, kernel BTF is exposed
+ * 	   starting from 5.4 kernel. but fentry/fexit is actually
+ * 	   supported starting from 5.5.
+ *	2. Whether kernel supports module BTF or not
+ *
+ * *name* is the name of a kernel function to be attached to, which can be
+ * from vmlinux or a kernel module.
+ * *mod* is the name of a kernel module, if NULL, it means *name*
+ * belongs to vmlinux.
+ */
+bool fentry_exists(const char *name, const char *mod);
+
+/*
+ * The name of a kernel function to be attached to may be changed between
+ * kernel releases. This helper is used to confirm whether the target kernel
+ * uses a certain function name before attaching.
+ *
+ * It is achieved by scaning
+ * 	/sys/kernel/debug/tracing/available_filter_functions
+ * If this file does not exist, it fallbacks to parse /proc/kallsyms,
+ * which is slower.
+ */
+bool kprobe_exists(const char *name);
+
 #endif /* __TRACE_HELPERS_H */
