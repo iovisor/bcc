@@ -105,12 +105,14 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
         - [4. values()](#4-values)
         - [5. clear()](#5-clear)
         - [6. items_lookup_and_delete_batch()](#6-items_lookup_and_delete_batch)
-        - [7. print_log2_hist()](#7-print_log2_hist)
-        - [8. print_linear_hist()](#8-print_linear_hist)
-        - [9. open_ring_buffer()](#9-open_ring_buffer)
-        - [10. push()](#10-push)
-        - [11. pop()](#11-pop)
-        - [12. peek()](#12-peek)
+        - [7. items_lookup_batch()](#7-items_lookup_batch)
+        - [8. items_delete_batch()](#8-items_delete_batch)
+        - [9. print_log2_hist()](#9-print_log2_hist)
+        - [10. print_linear_hist()](#10-print_linear_hist)
+        - [11. open_ring_buffer()](#11-open_ring_buffer)
+        - [12. push()](#12-push)
+        - [13. pop()](#13-pop)
+        - [14. peek()](#14-peek)
     - [Helpers](#helpers)
         - [1. ksym()](#1-ksym)
         - [2. ksymname()](#2-ksymname)
@@ -1961,7 +1963,7 @@ Examples in situ:
 Syntax: ```table.items_lookup_and_delete_batch()```
 
 Returns an array of the keys in a table with a single call to BPF syscall. This can be used with BPF_HASH maps to fetch, and iterate, over the keys. It also clears the table: deletes all entries.
-You should rather use table.items_lookup_and_delete_batch() than table.items() followed by table.clear().
+You should rather use table.items_lookup_and_delete_batch() than table.items() followed by table.clear(). It requires kernel v5.6.
 
 Example:
 
@@ -1974,7 +1976,36 @@ while True:
     sleep(1)
 ```
 
-### 7. print_log2_hist()
+### 7. items_lookup_batch()
+
+Syntax: ```table.items_lookup_batch()```
+
+Returns an array of the keys in a table with a single call to BPF syscall. This can be used with BPF_HASH maps to fetch, and iterate, over the keys.
+You should rather use table.items_lookup_batch() than table.items(). It requires kernel v5.6.
+
+Example:
+
+```Python
+# print current value of map:
+print("%9s-%9s-%8s-%9s" % ("PID", "COMM", "fname", "counter"))
+while True:
+    for k, v in sorted(b['map'].items_lookup_batch(), key=lambda kv: (kv[0]).pid):
+        print("%9s-%9s-%8s-%9d" % (k.pid, k.comm, k.fname, v.counter))
+```
+
+### 8. items_delete_batch()
+
+Syntax: ```table.items_delete_batch(keys)```
+
+Arguments:
+
+- keys is optional and by default is None.
+In that case, it clears all entries of a BPF_HASH map when keys is None. It is more efficient than table.clear() since it generates only one system call.
+If a list of keys is given then only those keys and their associated values will be deleted.
+It requires kernel v5.6.
+
+
+### 9. print_log2_hist()
 
 Syntax: ```table.print_log2_hist(val_type="value", section_header="Bucket ptr", section_print_fn=None)```
 
@@ -2025,7 +2056,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=print_log2_hist+path%3Aexamples+language%3Apython&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=print_log2_hist+path%3Atools+language%3Apython&type=Code)
 
-### 8. print_linear_hist()
+### 10. print_linear_hist()
 
 Syntax: ```table.print_linear_hist(val_type="value", section_header="Bucket ptr", section_print_fn=None)```
 
@@ -2084,7 +2115,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=print_linear_hist+path%3Aexamples+language%3Apython&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=print_linear_hist+path%3Atools+language%3Apython&type=Code)
 
-### 9. open_ring_buffer()
+### 11. open_ring_buffer()
 
 Syntax: ```table.open_ring_buffer(callback, ctx=None)```
 
@@ -2146,7 +2177,7 @@ def print_event(ctx, data, size):
 Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=open_ring_buffer+path%3Aexamples+language%3Apython&type=Code),
 
-### 10. push()
+### 12. push()
 
 Syntax: ```table.push(leaf, flags=0)```
 
@@ -2156,7 +2187,7 @@ Passing QueueStack.BPF_EXIST as a flag causes the Queue or Stack to discard the 
 Examples in situ:
 [search /tests](https://github.com/iovisor/bcc/search?q=push+path%3Atests+language%3Apython&type=Code),
 
-### 11. pop()
+### 13. pop()
 
 Syntax: ```leaf = table.pop()```
 
@@ -2167,7 +2198,7 @@ Raises a KeyError exception if the operation does not succeed.
 Examples in situ:
 [search /tests](https://github.com/iovisor/bcc/search?q=pop+path%3Atests+language%3Apython&type=Code),
 
-### 12. peek()
+### 14. peek()
 
 Syntax: ```leaf = table.peek()```
 

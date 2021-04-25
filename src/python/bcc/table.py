@@ -397,6 +397,67 @@ class TableBase(MutableMapping):
         for k in self.keys():
             self.__delitem__(k)
 
+    def items_lookup_batch(self):
+        # batch size is set to the maximum
+        batch_size = self.max_entries
+        out_batch = ct.c_uint32(0)
+        keys = (type(self.Key()) * batch_size)()
+        values = (type(self.Leaf()) * batch_size)()
+        count = ct.c_uint32(batch_size)
+        res = lib.bpf_lookup_batch(self.map_fd,
+                                   None,
+                                   ct.byref(out_batch),
+                                   ct.byref(keys),
+                                   ct.byref(values),
+                                   ct.byref(count)
+                                   )
+
+        errcode = ct.get_errno()
+        if (errcode == errno.EINVAL):
+            raise Exception("BPF_MAP_LOOKUP_BATCH is invalid.")
+
+        if (res != 0 and errcode != errno.ENOENT):
+            raise Exception("BPF_MAP_LOOKUP_BATCH has failed")
+
+        for i in range(0, count.value):
+            yield (keys[i], values[i])
+
+    def items_delete_batch(self, keys=None):
+        """Delete all the key-value pairs in the map if no key are given.
+        In that case, it is faster to call lib.bpf_lookup_and_delete_batch than
+        create keys list and then call lib.bpf_delete_batch on these keys.
+        If a list of keys is given then it deletes the related key-value.
+        """
+        if keys is not None:
+            # a list is expected
+            if type(keys) != list:
+                raise TypeError
+
+            batch_size = len(keys)
+            if batch_size < 1 and batch_size > self.max_entries:
+                raise KeyError
+
+            count = ct.c_uint32(batch_size)
+
+            # build the array aka list of key_t that will be deleted
+            keylist = (type(self.Key()) * batch_size)()
+            for i, k in enumerate(keys):
+                keylist[i] = k
+
+            res = lib.bpf_delete_batch(self.map_fd,
+                                       ct.byref(keylist),
+                                       ct.byref(count)
+                                       )
+            errcode = ct.get_errno()
+            if (errcode == errno.EINVAL):
+                raise Exception("BPF_MAP_DELETE_BATCH is invalid.")
+
+            if (res != 0 and errcode != errno.ENOENT):
+                raise Exception("BPF_MAP_DELETE_BATCH has failed")
+        else:
+            for _ in self.items_lookup_and_delete_batch():
+                return
+
     def items_lookup_and_delete_batch(self):
         # batch size is set to the maximum
         batch_size = self.max_entries
