@@ -252,7 +252,7 @@ class BPF(object):
         if filename:
             if not os.path.isfile(filename):
                 argv0 = ArgString(sys.argv[0])
-                t = b"/".join([os.path.abspath(os.path.dirname(argv0.__str__())), filename])
+                t = b"/".join([os.path.abspath(os.path.dirname(argv0.__bytes__())), filename])
                 if os.path.isfile(t):
                     filename = t
                 else:
