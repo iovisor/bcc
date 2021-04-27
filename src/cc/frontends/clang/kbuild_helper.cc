@@ -134,6 +134,7 @@ int KBuildHelper::get_flags(const char *uname_machine, vector<string> *cflags) {
 
   cflags->push_back("-Wno-unused-value");
   cflags->push_back("-Wno-pointer-sign");
+  cflags->push_back("-Wno-macro-redefined");
   cflags->push_back("-fno-stack-protector");
 
   return 0;
