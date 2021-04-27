@@ -67,7 +67,7 @@ TEST_CASE("test pinned table", "[pinned_table]") {
     REQUIRE(t[key] == value);
   }
 
-  // test failure
+  // test create if not exist
   {
     const std::string BPF_PROGRAM = R"(
       BPF_TABLE_PINNED("hash", u64, u64, ids, 1024, "/sys/fs/bpf/test_pinned_table");
@@ -76,7 +76,8 @@ TEST_CASE("test pinned table", "[pinned_table]") {
     ebpf::BPF bpf;
     ebpf::StatusTuple res(0);
     res = bpf.init(BPF_PROGRAM);
-    REQUIRE(res.code() != 0);
+    REQUIRE(res.code() == 0);
+    unlink("/sys/fs/bpf/test_pinned_table");
   }
 
   if (mounted) {
