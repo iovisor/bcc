@@ -292,6 +292,32 @@ flags = Priority-Metadata-Write
 These can be handled differently by the storage device, and this mode lets us
 examine their performance in isolation.
 
+
+The -e option shows extension summary(total, average)
+For example:
+# ./biolatency.py -e
+^C
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 4        |***********                             |
+       128 -> 255        : 2        |*****                                   |
+       256 -> 511        : 4        |***********                             |
+       512 -> 1023       : 14       |****************************************|
+      1024 -> 2047       : 0        |                                        |
+      2048 -> 4095       : 1        |**                                      |
+
+avg = 663 usecs, total: 16575 usecs, count: 25
+
+Sometimes 512 -> 1023 usecs is not enough for throughput tuning.
+Especially a little difference in performance downgrade.
+By this extension, we know the value in log2 range is about 663 usecs.
+
+
 The -j option prints a dictionary of the histogram.
 For example:
 
@@ -342,6 +368,7 @@ optional arguments:
   -m, --milliseconds  millisecond histogram
   -D, --disks         print a histogram per disk device
   -F, --flags         print a histogram per set of I/O flags
+  -e, --extension     also show extension summary(total, average)
   -j, --json          json output
 
 examples:
@@ -352,3 +379,4 @@ examples:
     ./biolatency -D                 # show each disk device separately
     ./biolatency -F                 # show I/O flags separately
     ./biolatency -j                 # print a dictionary
+    ./biolatency -e                 # show extension summary(total, average)
