@@ -1157,6 +1157,8 @@ class QueueStack:
         self.Leaf = leaftype
         self.ttype = lib.bpf_table_type_id(self.bpf.module, self.map_id)
         self.flags = lib.bpf_table_flags_id(self.bpf.module, self.map_id)
+        self.max_entries = int(lib.bpf_table_max_entries_id(self.bpf.module,
+                self.map_id))
 
     def leaf_sprintf(self, leaf):
         buf = ct.create_string_buffer(ct.sizeof(self.Leaf) * 8)
@@ -1193,3 +1195,16 @@ class QueueStack:
         if res < 0:
             raise KeyError("Could not peek table")
         return leaf
+    
+    def itervalues(self):
+        # to avoid infinite loop, set maximum pops to max_entries
+        cnt = self.max_entries
+        while cnt:
+            try:
+                yield(self.pop())
+                cnt -= 1
+            except KeyError:
+                return
+
+    def values(self):
+        return [value for value in self.itervalues()]
