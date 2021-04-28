@@ -428,26 +428,23 @@ class TableBase(MutableMapping):
         """Delete all the key-value pairs in the map if no key are given.
         In that case, it is faster to call lib.bpf_lookup_and_delete_batch than
         create keys list and then call lib.bpf_delete_batch on these keys.
-        If a list of keys is given then it deletes the related key-value.
+        If the array of keys is given then it deletes the related key-value.
         """
         if keys is not None:
-            # a list is expected
-            if type(keys) != list:
+            # a ct.Array is expected
+            if not isinstance(keys, ct.Array):
                 raise TypeError
 
             batch_size = len(keys)
-            if batch_size < 1 and batch_size > self.max_entries:
+
+            # check that batch between limits and coherent with the provided values
+            if batch_size < 1 or batch_size > self.max_entries:
                 raise KeyError
 
             count = ct.c_uint32(batch_size)
 
-            # build the array aka list of key_t that will be deleted
-            keylist = (type(self.Key()) * batch_size)()
-            for i, k in enumerate(keys):
-                keylist[i] = k
-
             res = lib.bpf_delete_batch(self.map_fd,
-                                       ct.byref(keylist),
+                                       ct.byref(keys),
                                        ct.byref(count)
                                        )
             errcode = ct.get_errno()
