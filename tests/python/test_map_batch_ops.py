@@ -81,9 +81,9 @@ class TestMapBatch(TestCase):
         hmap = self.fill_hashmap()
         # Get 4 keys in this map.
         subset_size = 32
-        keys = [None] * subset_size
+        keys = (hmap.Key * subset_size)()
         i = 0
-        for k, v in hmap.items_lookup_batch():
+        for k, _ in hmap.items_lookup_batch():
             if i < subset_size:
                 keys[i] = k
                 i += 1
