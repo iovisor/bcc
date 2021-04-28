@@ -396,7 +396,6 @@ while (1):
             bucket_fn=lambda k: (k.ip, k.pid))
     else:
         dist.print_log2_hist(label)
-    dist.clear()
 
     total  = b['avg'][0].value
     counts = b['avg'][1].value
@@ -407,6 +406,9 @@ while (1):
             total /= 1000
         avg = total/counts
         print("\navg = %ld %s, total: %ld %s, count: %ld\n" %(total/counts, label, total, label, counts))
+
+    dist.clear()
+    b['avg'].clear()
 
     if exiting:
         print("Detaching...")
