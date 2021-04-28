@@ -314,6 +314,8 @@ class TableBase(MutableMapping):
         self.flags = lib.bpf_table_flags_id(self.bpf.module, self.map_id)
         self._cbs = {}
         self._name = name
+        self.max_entries = int(lib.bpf_table_max_entries_id(self.bpf.module,
+                self.map_id))
 
     def get_fd(self):
         return self.map_fd
@@ -670,9 +672,7 @@ class TableBase(MutableMapping):
 class HashTable(TableBase):
     def __init__(self, *args, **kwargs):
         super(HashTable, self).__init__(*args, **kwargs)
-        self.max_entries = int(lib.bpf_table_max_entries_id(self.bpf.module,
-                                                            self.map_id))
-
+        
     def __len__(self):
         i = 0
         for k in self: i += 1
@@ -685,9 +685,7 @@ class LruHash(HashTable):
 class ArrayBase(TableBase):
     def __init__(self, *args, **kwargs):
         super(ArrayBase, self).__init__(*args, **kwargs)
-        self.max_entries = int(lib.bpf_table_max_entries_id(self.bpf.module,
-                self.map_id))
-
+        
     def _normalize_key(self, key):
         if isinstance(key, int):
             if key < 0:
