@@ -85,6 +85,9 @@ lib.bpf_delete_elem.restype = ct.c_int
 lib.bpf_delete_elem.argtypes = [ct.c_int, ct.c_void_p]
 lib.bpf_delete_batch.restype = ct.c_int
 lib.bpf_delete_batch.argtypes = [ct.c_int, ct.c_void_p, ct.c_void_p]
+lib.bpf_update_batch.restype = ct.c_int
+lib.bpf_update_batch.argtypes = [ct.c_int, ct.c_void_p, ct.c_void_p,
+        ct.POINTER(ct.c_uint32)]
 lib.bpf_lookup_batch.restype = ct.c_int
 lib.bpf_lookup_batch.argtypes = [ct.c_int, ct.POINTER(ct.c_uint32),
         ct.POINTER(ct.c_uint32), ct.c_void_p, ct.c_void_p, ct.c_void_p]
