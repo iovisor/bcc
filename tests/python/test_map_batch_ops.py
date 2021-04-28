@@ -6,11 +6,12 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 
 from __future__ import print_function
-from bcc import BPF
-import distutils.version
 from unittest import main, skipUnless, TestCase
-import ctypes as ct
+from bcc import BPF
+
 import os
+import distutils.version
+import ctypes as ct
 
 
 def kernel_version_ge(major, minor):
@@ -93,6 +94,21 @@ class TestMapBatch(TestCase):
         # check the delete has worked, i.e map is now empty
         count = sum(1 for _ in hmap.items())
         self.assertEqual(count, self.MAPSIZE - subset_size)
+
+    def test_update_batch(self):
+        hmap = self.fill_hashmap()
+
+        # preparing keys and new values arrays
+        keys = (hmap.Key * self.MAPSIZE)()
+        new_values = (hmap.Leaf * self.MAPSIZE)()
+        for i in range(self.MAPSIZE):
+            keys[i] = ct.c_int(i)
+            new_values[i] = ct.c_int(-1)
+        hmap.items_update_batch(keys, new_values)
+
+        # check the update has worked, i.e sum of values is -NUM_KEYS
+        count = sum(v.value for v in hmap.values())
+        self.assertEqual(count, -1*self.MAPSIZE)
 
 
 if __name__ == "__main__":

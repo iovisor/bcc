@@ -107,12 +107,13 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
         - [6. items_lookup_and_delete_batch()](#6-items_lookup_and_delete_batch)
         - [7. items_lookup_batch()](#7-items_lookup_batch)
         - [8. items_delete_batch()](#8-items_delete_batch)
-        - [9. print_log2_hist()](#9-print_log2_hist)
-        - [10. print_linear_hist()](#10-print_linear_hist)
-        - [11. open_ring_buffer()](#11-open_ring_buffer)
-        - [12. push()](#12-push)
-        - [13. pop()](#13-pop)
-        - [14. peek()](#14-peek)
+        - [9. items_update_batch()](#9-items_update_batch)
+        - [10. print_log2_hist()](#10-print_log2_hist)
+        - [11. print_linear_hist()](#11-print_linear_hist)
+        - [12. open_ring_buffer()](#12-open_ring_buffer)
+        - [13. push()](#13-push)
+        - [14. pop()](#14-pop)
+        - [15. peek()](#15-peek)
     - [Helpers](#helpers)
         - [1. ksym()](#1-ksym)
         - [2. ksymname()](#2-ksymname)
@@ -2005,7 +2006,19 @@ If a list of keys is given then only those keys and their associated values will
 It requires kernel v5.6.
 
 
-### 9. print_log2_hist()
+### 9. items_update_batch()
+
+Syntax: ```table.items_update_batch(keys, values)```
+
+Update all the provided keys with new values. The two arguments must be the same length and within the map limits (between 1 and the maximum entries).
+
+Arguments:
+
+- keys is the list of keys to be updated
+- values is the list containing the new values.
+
+
+### 10. print_log2_hist()
 
 Syntax: ```table.print_log2_hist(val_type="value", section_header="Bucket ptr", section_print_fn=None)```
 
@@ -2056,7 +2069,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=print_log2_hist+path%3Aexamples+language%3Apython&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=print_log2_hist+path%3Atools+language%3Apython&type=Code)
 
-### 10. print_linear_hist()
+### 11. print_linear_hist()
 
 Syntax: ```table.print_linear_hist(val_type="value", section_header="Bucket ptr", section_print_fn=None)```
 
@@ -2115,7 +2128,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=print_linear_hist+path%3Aexamples+language%3Apython&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=print_linear_hist+path%3Atools+language%3Apython&type=Code)
 
-### 11. open_ring_buffer()
+### 12. open_ring_buffer()
 
 Syntax: ```table.open_ring_buffer(callback, ctx=None)```
 
@@ -2177,7 +2190,7 @@ def print_event(ctx, data, size):
 Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=open_ring_buffer+path%3Aexamples+language%3Apython&type=Code),
 
-### 12. push()
+### 13. push()
 
 Syntax: ```table.push(leaf, flags=0)```
 
@@ -2187,7 +2200,7 @@ Passing QueueStack.BPF_EXIST as a flag causes the Queue or Stack to discard the 
 Examples in situ:
 [search /tests](https://github.com/iovisor/bcc/search?q=push+path%3Atests+language%3Apython&type=Code),
 
-### 13. pop()
+### 14. pop()
 
 Syntax: ```leaf = table.pop()```
 
@@ -2198,7 +2211,7 @@ Raises a KeyError exception if the operation does not succeed.
 Examples in situ:
 [search /tests](https://github.com/iovisor/bcc/search?q=pop+path%3Atests+language%3Apython&type=Code),
 
-### 14. peek()
+### 15. peek()
 
 Syntax: ```leaf = table.peek()```
 

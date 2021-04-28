@@ -370,6 +370,11 @@ int bpf_delete_batch(int fd,  void *keys, __u32 *count)
   return bpf_map_delete_batch(fd, keys, count, NULL);
 }
 
+int bpf_update_batch(int fd, void *keys, void *values, __u32 *count)
+{
+  return bpf_map_update_batch(fd, keys, values, count, NULL);
+}
+
 int bpf_lookup_and_delete_batch(int fd, __u32 *in_batch, __u32 *out_batch,
                                 void *keys, void *values, __u32 *count)
 {

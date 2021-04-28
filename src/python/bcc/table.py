@@ -460,6 +460,34 @@ class TableBase(MutableMapping):
             for _ in self.items_lookup_and_delete_batch():
                 return
 
+    def items_update_batch(self, keys, values):
+        """Update all the key-value pairs in the map provided.
+        The lists must be the same length, between 1 and the maximum number of entries.
+        """
+        # two ct.Array are expected
+        if not isinstance(keys, ct.Array) or not isinstance(values, ct.Array):
+            raise TypeError
+
+        batch_size = len(keys)
+
+        # check that batch between limits and coherent with the provided values
+        if batch_size < 1 or batch_size > self.max_entries or batch_size != len(values):
+            raise KeyError
+
+        count = ct.c_uint32(batch_size)
+        res = lib.bpf_update_batch(self.map_fd,
+                                   ct.byref(keys),
+                                   ct.byref(values),
+                                   ct.byref(count)
+                                   )
+
+        errcode = ct.get_errno()
+        if (errcode == errno.EINVAL):
+            raise Exception("BPF_MAP_UPDATE_BATCH is invalid.")
+
+        if (res != 0 and errcode != errno.ENOENT):
+            raise Exception("BPF_MAP_UPDATE_BATCH has failed")
+
     def items_lookup_and_delete_batch(self):
         # batch size is set to the maximum
         batch_size = self.max_entries
