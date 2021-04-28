@@ -4,7 +4,7 @@
 # biolatency    Summarize block device I/O latency as a histogram.
 #       For Linux, uses BCC, eBPF.
 #
-# USAGE: biolatency [-h] [-T] [-Q] [-m] [-D] [interval] [count]
+# USAGE: biolatency [-h] [-T] [-Q] [-m] [-D] [-e] [interval] [count]
 #
 # Copyright (c) 2015 Brendan Gregg.
 # Licensed under the Apache License, Version 2.0 (the "License")
@@ -26,6 +26,7 @@ examples = """examples:
     ./biolatency -D                 # show each disk device separately
     ./biolatency -F                 # show I/O flags separately
     ./biolatency -j                 # print a dictionary
+    ./biolatency -e                 # show extension summary(total, average)
 """
 parser = argparse.ArgumentParser(
     description="Summarize block device I/O latency as a histogram",
@@ -41,6 +42,8 @@ parser.add_argument("-D", "--disks", action="store_true",
     help="print a histogram per disk device")
 parser.add_argument("-F", "--flags", action="store_true",
     help="print a histogram per set of I/O flags")
+parser.add_argument("-e", "--extension", action="store_true",
+    help="summarize average/total value")
 parser.add_argument("interval", nargs="?", default=99999999,
     help="output interval, in seconds")
 parser.add_argument("count", nargs="?", default=99999999,
@@ -73,6 +76,11 @@ typedef struct flag_key {
     u64 slot;
 } flag_key_t;
 
+typedef struct ext_val {
+    u64 total;
+    u64 count;
+} ext_val_t;
+
 BPF_HASH(start, struct request *);
 STORAGE
 
@@ -95,6 +103,9 @@ int trace_req_done(struct pt_regs *ctx, struct request *req)
         return 0;   // missed issue
     }
     delta = bpf_ktime_get_ns() - *tsp;
+
+    EXTENSION
+
     FACTOR
 
     // store as histogram
@@ -112,25 +123,43 @@ if args.milliseconds:
 else:
     bpf_text = bpf_text.replace('FACTOR', 'delta /= 1000;')
     label = "usecs"
+
+storage_str = ""
+store_str = ""
 if args.disks:
-    bpf_text = bpf_text.replace('STORAGE',
-        'BPF_HISTOGRAM(dist, disk_key_t);')
-    bpf_text = bpf_text.replace('STORE',
-        'disk_key_t key = {.slot = bpf_log2l(delta)}; ' +
-        'void *__tmp = (void *)req->rq_disk->disk_name; ' +
-        'bpf_probe_read_kernel(&key.disk, sizeof(key.disk), __tmp); ' +
-        'dist.increment(key);')
+    storage_str += "BPF_HISTOGRAM(dist, disk_key_t);"
+    store_str += """
+    disk_key_t key = {.slot = bpf_log2l(delta)};
+    void *__tmp = (void *)req->rq_disk->disk_name;
+    bpf_probe_read(&key.disk, sizeof(key.disk), __tmp);
+    dist.increment(key);
+    """
 elif args.flags:
-    bpf_text = bpf_text.replace('STORAGE',
-        'BPF_HISTOGRAM(dist, flag_key_t);')
-    bpf_text = bpf_text.replace('STORE',
-        'flag_key_t key = {.slot = bpf_log2l(delta)}; ' +
-        'key.flags = req->cmd_flags; ' +
-        'dist.increment(key);')
+    storage_str += "BPF_HISTOGRAM(dist, flag_key_t);"
+    store_str += """
+    flag_key_t key = {.slot = bpf_log2l(delta)};
+    key.flags = req->cmd_flags;
+    dist.increment(key);
+    """
 else:
-    bpf_text = bpf_text.replace('STORAGE', 'BPF_HISTOGRAM(dist);')
-    bpf_text = bpf_text.replace('STORE',
-        'dist.increment(bpf_log2l(delta));')
+    storage_str += "BPF_HISTOGRAM(dist);"
+    store_str += "dist.increment(bpf_log2l(delta));"
+
+if args.extension:
+    storage_str += "BPF_ARRAY(extension, ext_val_t, 1);"
+    bpf_text = bpf_text.replace('EXTENSION', """
+    u32 index = 0;
+    ext_val_t *ext_val = extension.lookup(&index);
+    if (ext_val) {
+        lock_xadd(&ext_val->total, delta);
+        lock_xadd(&ext_val->count, 1);
+    }
+    """)
+else:
+    bpf_text = bpf_text.replace('EXTENSION', '')
+bpf_text = bpf_text.replace("STORAGE", storage_str)
+bpf_text = bpf_text.replace("STORE", store_str)
+
 if debug or args.ebpf:
     print(bpf_text)
     if args.ebpf:
@@ -203,6 +232,8 @@ def flags_print(flags):
 # output
 exiting = 0 if args.interval else 1
 dist = b.get_table("dist")
+if args.extension:
+    extension = b.get_table("extension")
 while (1):
     try:
         sleep(int(args.interval))
@@ -226,9 +257,20 @@ while (1):
             
         if args.flags:
             dist.print_log2_hist(label, "flags", flags_print)
-
         else:
             dist.print_log2_hist(label, "disk")
+        if args.extension:
+            total = extension[0].total
+            counts = extension[0].count
+            if counts > 0:
+                if label == 'msecs':
+                    total /= 1000000
+                elif label == 'usecs':
+                    total /= 1000
+                avg = total / counts
+                print("\navg = %ld %s, total: %ld %s, count: %ld\n" %
+                      (total / counts, label, total, label, counts))
+            extension.clear()
 
     dist.clear()
 
