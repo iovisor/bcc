@@ -40,18 +40,6 @@ R"********(
 #endif
 #define asm_volatile_goto(x...) asm volatile("invalid use of asm_volatile_goto")
 
-/* common kernel macros to manipulate data structures. */
-#ifndef offsetof
-#define offsetof(TYPE, MEMBER)  ((unsigned long)&((TYPE *)0)->MEMBER)
-#endif
-#ifndef container_of
-#define container_of(ptr, type, member)                         \
-        ({                                                      \
-                void *__mptr = (void *)(ptr);                   \
-                ((type *)(__mptr - offsetof(type, member)));    \
-        })
-#endif
-
 /* In 4.18 and later, when CONFIG_FUNCTION_TRACER is defined, kernel Makefile adds
  * -DCC_USING_FENTRY. Let do the same for bpf programs.
  */
