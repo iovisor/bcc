@@ -45,6 +45,8 @@ parser.add_argument("interval", nargs="?", default=99999999,
     help="output interval, in seconds")
 parser.add_argument("count", nargs="?", default=99999999,
     help="number of outputs")
+parser.add_argument("-b", "--bio", action="store_true",
+    help="trace bio submition and complition")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
 parser.add_argument("-j", "--json", action="store_true",
@@ -62,6 +64,7 @@ if args.flags and args.disks:
 bpf_text = """
 #include <uapi/linux/ptrace.h>
 #include <linux/blkdev.h>
+#include <linux/blk_types.h>
 
 typedef struct disk_key {
     char disk[DISK_NAME_LEN];
@@ -75,6 +78,36 @@ typedef struct flag_key {
 
 BPF_HASH(start, struct request *);
 STORAGE
+
+BPF_HASH(bio_start, struct bio *);
+
+// time block I/O
+int trace_bio_submit(struct pt_regs *ctx, struct bio *bio)
+{
+    u64 ts = bpf_ktime_get_ns();
+    bio_start.update(&bio, &ts);
+    return 0;
+}
+
+// output
+int trace_bio_endio(struct pt_regs *ctx, struct bio *bio)
+{
+    u64 *tsp, delta;
+
+    // fetch timestamp and calculate delta
+    tsp = bio_start.lookup(&bio);
+    if (tsp == 0) {
+        return 0;   // missed issue
+    }
+    delta = bpf_ktime_get_ns() - *tsp;
+    FACTOR
+
+    // store as histogram
+    SAVE_BIO
+
+    bio_start.delete(&bio);
+    return 0;
+}
 
 // time block I/O
 int trace_req_start(struct pt_regs *ctx, struct request *req)
@@ -120,6 +153,11 @@ if args.disks:
         'void *__tmp = (void *)req->rq_disk->disk_name; ' +
         'bpf_probe_read_kernel(&key.disk, sizeof(key.disk), __tmp); ' +
         'dist.increment(key);')
+    bpf_text = bpf_text.replace('SAVE_BIO',
+                                'disk_key_t key = {.slot = bpf_log2l(delta)}; ' +
+                                'void *__tmp = (void *)bio->bi_disk->disk_name; ' +
+                                'bpf_probe_read_kernel(&key.disk, sizeof(key.disk), __tmp); ' +
+                                'dist.increment(key);')
 elif args.flags:
     bpf_text = bpf_text.replace('STORAGE',
         'BPF_HISTOGRAM(dist, flag_key_t);')
@@ -127,25 +165,42 @@ elif args.flags:
         'flag_key_t key = {.slot = bpf_log2l(delta)}; ' +
         'key.flags = req->cmd_flags; ' +
         'dist.increment(key);')
+    bpf_text = bpf_text.replace('SAVE_BIO',
+                                'flag_key_t key = {.slot = bpf_log2l(delta)}; ' +
+                                'key.flags = bio->bi_opf; ' +
+                                'dist.increment(key);')
 else:
     bpf_text = bpf_text.replace('STORAGE', 'BPF_HISTOGRAM(dist);')
     bpf_text = bpf_text.replace('STORE',
         'dist.increment(bpf_log2l(delta));')
+    bpf_text = bpf_text.replace('SAVE_BIO',
+                                'dist.increment(bpf_log2l(delta));')
 if debug or args.ebpf:
     print(bpf_text)
     if args.ebpf:
         exit()
 
+def set_bio_kprobes():
+    b.attach_kprobe(event="submit_bio", fn_name="trace_bio_submit")
+    b.attach_kprobe(event="bio_endio", fn_name="trace_bio_endio")
+
+def set_req_kprobes(args):
+    if args.queued:
+        b.attach_kprobe(event="blk_account_io_start", fn_name="trace_req_start")
+    else:
+        if BPF.get_kprobe_functions(b'blk_start_request'):
+            b.attach_kprobe(event="blk_start_request",
+                            fn_name="trace_req_start")
+        b.attach_kprobe(event="blk_mq_start_request", fn_name="trace_req_start")
+    b.attach_kprobe(event="blk_account_io_done",
+                    fn_name="trace_req_done")
 # load BPF program
 b = BPF(text=bpf_text)
-if args.queued:
-    b.attach_kprobe(event="blk_account_io_start", fn_name="trace_req_start")
+
+if args.bio:
+    set_bio_kprobes()
 else:
-    if BPF.get_kprobe_functions(b'blk_start_request'):
-        b.attach_kprobe(event="blk_start_request", fn_name="trace_req_start")
-    b.attach_kprobe(event="blk_mq_start_request", fn_name="trace_req_start")
-b.attach_kprobe(event="blk_account_io_done",
-    fn_name="trace_req_done")
+    set_req_kprobes(args)
 
 if not args.json:
     print("Tracing block device I/O... Hit Ctrl-C to end.")
