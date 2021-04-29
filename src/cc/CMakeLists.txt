@@ -9,6 +9,9 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/frontends/b)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/frontends/clang)
 include_directories(${LLVM_INCLUDE_DIRS})
 include_directories(${LIBELF_INCLUDE_DIRS})
+if (LIBDEBUGINFOD_FOUND)
+  include_directories(${LIBDEBUGINFOD_INCLUDE_DIRS})
+endif (LIBDEBUGINFOD_FOUND)
 # todo: if check for kernel version
 if (CMAKE_USE_LIBBPF_PACKAGE AND LIBBPF_FOUND)
   include_directories(${LIBBPF_INCLUDE_DIRS})
@@ -116,6 +119,9 @@ set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${llvm_lib_exclude_f
 set(bcc_common_libs b_frontend clang_frontend
   -Wl,--whole-archive ${clang_libs} ${llvm_libs} -Wl,--no-whole-archive
   ${LIBELF_LIBRARIES})
+if (LIBDEBUGINFOD_FOUND)
+  list(APPEND bcc_common_libs ${LIBDEBUGINFOD_LIBRARIES})
+endif (LIBDEBUGINFOD_FOUND)
 set(bcc_common_libs_for_a ${bcc_common_libs})
 set(bcc_common_libs_for_s ${bcc_common_libs})
 set(bcc_common_libs_for_lua b_frontend clang_frontend

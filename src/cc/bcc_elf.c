@@ -24,6 +24,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <limits.h>
+#ifdef HAVE_LIBDEBUGINFOD
+#include <elfutils/debuginfod.h>
+#endif
 
 #include <gelf.h>
 #include "bcc_elf.h"
@@ -621,6 +624,31 @@ out:
   return result;
 }
 
+#ifdef HAVE_LIBDEBUGINFOD
+static char *find_debug_via_debuginfod(Elf *e){
+  char buildid[128];
+  char *debugpath = NULL;
+  int fd = -1;
+
+  if (!find_buildid(e, buildid))
+    return NULL;
+
+  debuginfod_client *client = debuginfod_begin();
+  if (!client)
+    return NULL;
+
+  // In case of an error, the function returns a negative error code and
+  // debugpath stays NULL.
+  fd = debuginfod_find_debuginfo(client, (const unsigned char *) buildid, 0,
+                                 &debugpath);
+  if (fd >= 0)
+    close(fd);
+
+  debuginfod_end(client);
+  return debugpath;
+}
+#endif
+
 static char *find_debug_file(Elf* e, const char* path, int check_crc) {
   char *debug_file = NULL;
 
@@ -635,6 +663,10 @@ static char *find_debug_file(Elf* e, const char* path, int check_crc) {
     debug_file = find_debug_via_buildid(e);
   if (!debug_file)
     debug_file = find_debug_via_debuglink(e, path, check_crc);
+#ifdef HAVE_LIBDEBUGINFOD
+  if (!debug_file)
+    debug_file = find_debug_via_debuginfod(e);
+#endif
 
   return debug_file;
 }
