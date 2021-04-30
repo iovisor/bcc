@@ -871,8 +871,9 @@ Examples in situ:
 
 #### Pinned Maps
 
-Maps that were pinned to the BPF filesystem can be accessed through an extended syntax: ```BPF_TABLE_PINNED(_table_type, _key_type, _leaf_type, _name, _max_entries, "/sys/fs/bpf/xyz")```
-The type information is not enforced and the actual map type depends on the map that got pinned to the location.
+Syntax: ```BPF_TABLE_PINNED(_table_type, _key_type, _leaf_type, _name, _max_entries, "/sys/fs/bpf/xyz")```
+
+Create a new map if it doesn't exist and pin it to the bpffs as a FILE, otherwise use the map that was pinned to the bpffs. The type information is not enforced and the actual map type depends on the map that got pinned to the location.
 
 For example:
 

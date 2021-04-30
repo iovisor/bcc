@@ -147,6 +147,8 @@ int bpf_obj_get_info_by_fd(int prog_fd, void *info, uint32_t *info_len);
 int bcc_iter_attach(int prog_fd, union bpf_iter_link_info *link_info,
                     uint32_t link_info_len);
 int bcc_iter_create(int link_fd);
+int bcc_make_parent_dir(const char *path);
+int bcc_check_bpffs_path(const char *path);
 
 #define LOG_BUF_SIZE 65536
 

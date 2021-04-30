@@ -177,7 +177,8 @@ class BFrontendAction : public clang::ASTFrontendAction {
   // negative fake_fd to be different from real fd in bpf_pseudo_fd.
   int get_next_fake_fd() { return next_fake_fd_--; }
   void add_map_def(int fd,
-    std::tuple<int, std::string, int, int, int, int, unsigned int, std::string> map_def) {
+    std::tuple<int, std::string, int, int, int, int, int, std::string,
+               std::string> map_def) {
     fake_fd_map_[fd] = move(map_def);
   }
 

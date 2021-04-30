@@ -1392,24 +1392,36 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
       ++i;
     }
 
-    std::string section_attr = string(A->getName());
+    std::string section_attr = string(A->getName()), pinned;
     size_t pinned_path_pos = section_attr.find(":");
-    unsigned int pinned_id = 0; // 0 is not a valid map ID, they start with 1
+    // 0 is not a valid map ID, -1 is to create and pin it to file
+    int pinned_id = 0;
 
     if (pinned_path_pos != std::string::npos) {
-      std::string pinned = section_attr.substr(pinned_path_pos + 1);
+      pinned = section_attr.substr(pinned_path_pos + 1);
       section_attr = section_attr.substr(0, pinned_path_pos);
       int fd = bpf_obj_get(pinned.c_str());
-      struct bpf_map_info info = {};
-      unsigned int info_len = sizeof(info);
+      if (fd < 0) {
+        if (bcc_make_parent_dir(pinned.c_str()) ||
+            bcc_check_bpffs_path(pinned.c_str())) {
+          return false;
+        }
 
-      if (bpf_obj_get_info_by_fd(fd, &info, &info_len)) {
-        error(GET_BEGINLOC(Decl), "map not found: %0") << pinned;
-        return false;
+        pinned_id = -1;
+      } else {
+        struct bpf_map_info info = {};
+        unsigned int info_len = sizeof(info);
+
+        if (bpf_obj_get_info_by_fd(fd, &info, &info_len)) {
+          error(GET_BEGINLOC(Decl), "get map info failed: %0")
+                << strerror(errno);
+          return false;
+        }
+
+        pinned_id = info.id;
       }
 
       close(fd);
-      pinned_id = info.id;
     }
 
     // Additional map specific information
@@ -1535,7 +1547,7 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
       fe_.add_map_def(table.fake_fd, std::make_tuple((int)map_type, std::string(table.name),
                       (int)table.key_size, (int)table.leaf_size,
                       (int)table.max_entries, table.flags, pinned_id,
-                      inner_map_name));
+                      inner_map_name, pinned));
     }
 
     if (!table.is_extern)
