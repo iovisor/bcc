@@ -1529,51 +1529,47 @@ int bcc_iter_create(int link_fd)
 }
 
 int bcc_make_parent_dir(const char *path) {
-    int   err = 0;
-    char *dname, *dir;
+  int   err = 0;
+  char *dname, *dir;
 
-    dname = strdup(path);
-    if (dname == NULL) {
-        return -ENOMEM;
-    }
+  dname = strdup(path);
+  if (dname == NULL)
+    return -ENOMEM;
 
-    dir = dirname(dname);
-    if (mkdir(dir, 0700) && errno != EEXIST) {
-        err = -errno;
-    }
+  dir = dirname(dname);
+  if (mkdir(dir, 0700) && errno != EEXIST)
+    err = -errno;
 
-    free(dname);
-    if (err) {
-        fprintf(stderr, "failed to mkdir %s: %s\n", path, strerror(-err));
-    }
-    return err;
+  free(dname);
+  if (err)
+    fprintf(stderr, "failed to mkdir %s: %s\n", path, strerror(-err));
+
+  return err;
 }
 
 int bcc_check_bpffs_path(const char *path) {
-    struct statfs st_fs;
-	char  *dname, *dir;
-	int    err = 0;
+  struct statfs st_fs;
+  char  *dname, *dir;
+  int    err = 0;
 
-    if (path == NULL) {
-        return -EINVAL;
-    }
+  if (path == NULL)
+    return -EINVAL;
 
-    dname = strdup(path);
-    if (dname == NULL) {
-        return -ENOMEM;
-    }
+  dname = strdup(path);
+  if (dname == NULL)
+    return -ENOMEM;
 
-    dir = dirname(dname);
-    if (statfs(dir, &st_fs)) {
-        err = -errno;
-        fprintf(stderr, "failed to statfs %s: %s\n", path, strerror(-err));
-    }
+  dir = dirname(dname);
+  if (statfs(dir, &st_fs)) {
+    err = -errno;
+    fprintf(stderr, "failed to statfs %s: %s\n", path, strerror(-err));
+  }
 
-    free(dname);
-    if (!err && st_fs.f_type != BPF_FS_MAGIC) {
-        err = -EINVAL;
-        fprintf(stderr, "specified path %s is not on BPF FS\n", path);
-    }
+  free(dname);
+  if (!err && st_fs.f_type != BPF_FS_MAGIC) {
+    err = -EINVAL;
+    fprintf(stderr, "specified path %s is not on BPF FS\n", path);
+  }
 
-    return err;
+  return err;
 }
