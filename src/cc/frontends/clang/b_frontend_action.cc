@@ -1413,7 +1413,9 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
         unsigned int info_len = sizeof(info);
 
         if (bpf_obj_get_info_by_fd(fd, &info, &info_len)) {
-          error(GET_BEGINLOC(Decl), "map not found: %0") << pinned;
+          error(GET_BEGINLOC(Decl), "get map info failed: %0")
+                << strerror(errno);
+          return false;
         }
 
         pinned_id = info.id;
