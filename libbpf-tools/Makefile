@@ -32,6 +32,7 @@ APPS = \
 	hardirqs \
 	llcstat \
 	numamove \
+	offcputime \
 	opensnoop \
 	readahead \
 	runqlat \
