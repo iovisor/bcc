@@ -314,6 +314,8 @@ int ClangLoader::do_compile(unique_ptr<llvm::Module> *mod, TableStorage &ts,
     flags_cstr.push_back("-include");
     flags_cstr.push_back("/virtual/include/bcc/bpf.h");
   }
+  flags_cstr.push_back("-include");
+  flags_cstr.push_back("/virtual/include/bcc/bpf_workaround.h");
   flags_cstr.insert(flags_cstr.end(), flags_cstr_rem.begin(),
                     flags_cstr_rem.end());
 
