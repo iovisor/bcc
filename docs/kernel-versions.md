@@ -342,6 +342,7 @@ Helper | Kernel version | License | Commit |
 `BPF_FUNC_skc_to_tcp_timewait_sock()` | 5.9 |  | [`478cfbdf5f13`](https://kernel.googlesource.com/pub/scm/linux/kernel/git/bpf/bpf-next/+/478cfbdf5f13dfe09cfd0b1cbac821f5e27f6108)
 `BPF_FUNC_skc_to_tcp6_sock()` | 5.9 |  | [`af7ec1383361`](https://kernel.googlesource.com/pub/scm/linux/kernel/git/bpf/bpf-next/+/af7ec13833619e17f03aa73a785a2f871da6d66b)
 `BPF_FUNC_skc_to_udp6_sock()` | 5.9 |  | [`0d4fad3e57df`](https://kernel.googlesource.com/pub/scm/linux/kernel/git/bpf/bpf-next/+/0d4fad3e57df2bf61e8ffc8d12a34b1caf9b8835)
+`BPF_FUNC_snprintf()` | 5.13 | | [`7b15523a989b`](https://github.com/torvalds/linux/commit/7b15523a989b63927c2bb08e9b5b0bbc10b58bef)
 `BPF_FUNC_snprintf_btf()` | 5.10 | | [`c4d0bfb45068`](https://git.kernel.org/pub/scm/linux/kernel/git/netdev/net-next.git/commit/?id=c4d0bfb45068d853a478b9067a95969b1886a30f)
 `BPF_FUNC_sock_from_file()` | 5.11 |  | [`4f19cab76136`](https://github.com/torvalds/linux/commit/4f19cab76136e800a3f04d8c9aa4d8e770e3d3d8)
 `BPF_FUNC_sock_hash_update()` | 4.18 |  | [`81110384441a`](https://git.kernel.org/cgit/linux/kernel/git/davem/net-next.git/commit/?id=81110384441a59cff47430f20f049e69b98c17f4)
