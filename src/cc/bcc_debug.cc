@@ -128,11 +128,16 @@ void SourceDebugger::dump() {
     return;
   }
 
-  MCObjectFileInfo MOFI;
-  MCContext Ctx(MAI.get(), MRI.get(), &MOFI, nullptr);
-  MOFI.InitMCObjectFileInfo(TheTriple, false, Ctx, false);
   std::unique_ptr<MCSubtargetInfo> STI(
       T->createMCSubtargetInfo(TripleStr, "", ""));
+  MCObjectFileInfo MOFI;
+#if LLVM_MAJOR_VERSION >= 13
+  MCContext Ctx(TheTriple, MAI.get(), MRI.get(), &MOFI, STI.get(), nullptr);
+  MOFI.initMCObjectFileInfo(Ctx, false, false);
+#else
+  MCContext Ctx(MAI.get(), MRI.get(), &MOFI, nullptr);
+  MOFI.InitMCObjectFileInfo(TheTriple, false, Ctx, false);
+#endif
 
   std::unique_ptr<MCInstrInfo> MCII(T->createMCInstrInfo());
   MCInstPrinter *IP = T->createMCInstPrinter(TheTriple, 0, *MAI, *MCII, *MRI);
