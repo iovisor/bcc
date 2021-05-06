@@ -1,3 +1,17 @@
+bcc (0.20.0-1) unstable; urgency=low
+
+  * Support for kernel up to 5.12
+  * Some basic support for MIPS
+  * added bpf_map_lookup_batch and bpf_map_delete_batch support
+  * tools/funclatency.py support nested or recursive functions
+  * tools/biolatency.py can optionally print out average/total value
+  * fix possible marco HAVE_BUILTIN_BSWAP redefine warning for kernel >= 5.10.
+  * new tools: virtiostat
+  * new libbpf-tools: ext4dist
+  * doc update and bug fixes
+
+ -- Yonghong Song <ys114321@gmail.com>  Mon, 5 May 2021 17:00:00 +0000
+
 bcc (0.19.0-1) unstable; urgency=low
 
   * Support for kernel up to 5.11
