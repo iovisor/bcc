@@ -843,6 +843,9 @@ static long (*bpf_check_mtu)(void *ctx, __u32 ifindex, __u32 *mtu_len,
 static long (*bpf_for_each_map_elem)(void *map, void *callback_fn,
                                      void *callback_ctx, __u64 flags) =
   (void *)BPF_FUNC_for_each_map_elem;
+static long (*bpf_snprintf)(char *str, __u32 str_size, const char *fmt,
+                            __u64 *data, __u32 data_len) =
+  (void *)BPF_FUNC_snprintf;
 
 /* llvm builtin functions that eBPF C program may use to
  * emit BPF_LD_ABS and BPF_LD_IND instructions

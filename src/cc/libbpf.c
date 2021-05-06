@@ -269,6 +269,7 @@ static struct bpf_helper helpers[] = {
   {"sock_from_file", "5.11"},
   {"check_mtu", "5.12"},
   {"for_each_map_elem", "5.13"},
+  {"snprintf", "5.13"},
 };
 
 static uint64_t ptr_to_u64(void *ptr)
