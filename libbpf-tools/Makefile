@@ -31,6 +31,7 @@ APPS = \
 	funclatency \
 	hardirqs \
 	llcstat \
+	memleak \
 	numamove \
 	offcputime \
 	opensnoop \
@@ -112,4 +113,3 @@ install: $(APPS)
 .DELETE_ON_ERROR:
 # keep intermediate (.skel.h, .bpf.o, etc) targets
 .SECONDARY:
-
