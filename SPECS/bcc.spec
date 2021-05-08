@@ -38,6 +38,8 @@
 %endif
 
 %define debug_package %{nil}
+%define _unpackaged_files_terminate_build 0
+
 
 Name:           bcc
 Version:        @REVISION@
