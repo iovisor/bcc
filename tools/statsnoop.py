@@ -56,42 +56,43 @@ struct data_t {
     char fname[NAME_MAX];
 };
 
-BPF_HASH(args_filename, u32, const char *);
 BPF_HASH(infotmp, u32, struct val_t);
 BPF_PERF_OUTPUT(events);
 
 int syscall__entry(struct pt_regs *ctx, const char __user *filename)
 {
     struct val_t val = {};
-    u32 pid = bpf_get_current_pid_tgid();
+    u64 pid_tgid = bpf_get_current_pid_tgid();
+    u32 pid = pid_tgid >> 32;
+    u32 tid = (u32)pid_tgid;
 
     FILTER
     val.fname = filename;
-    infotmp.update(&pid, &val);
+    infotmp.update(&tid, &val);
 
     return 0;
 };
 
 int trace_return(struct pt_regs *ctx)
 {
-    u32 pid = bpf_get_current_pid_tgid();
+    u64 pid_tgid = bpf_get_current_pid_tgid();
+    u32 tid = (u32)pid_tgid;
     struct val_t *valp;
 
-    valp = infotmp.lookup(&pid);
+    valp = infotmp.lookup(&tid);
     if (valp == 0) {
         // missed entry
         return 0;
     }
 
-    struct data_t data = {.pid = pid};
+    struct data_t data = {.pid = pid_tgid >> 32};
     bpf_probe_read_user(&data.fname, sizeof(data.fname), (void *)valp->fname);
     bpf_get_current_comm(&data.comm, sizeof(data.comm));
     data.ts_ns = bpf_ktime_get_ns();
     data.ret = PT_REGS_RC(ctx);
 
     events.perf_submit(ctx, &data, sizeof(data));
-    infotmp.delete(&pid);
-    args_filename.delete(&pid);
+    infotmp.delete(&tid);
 
     return 0;
 }
@@ -135,7 +136,7 @@ delta = 0
 # header
 if args.timestamp:
     print("%-14s" % ("TIME(s)"), end="")
-print("%-6s %-16s %4s %3s %s" % ("PID", "COMM", "FD", "ERR", "PATH"))
+print("%-7s %-16s %4s %3s %s" % ("PID", "COMM", "FD", "ERR", "PATH"))
 
 # process event
 def print_event(cpu, data, size):
@@ -147,6 +148,8 @@ def print_event(cpu, data, size):
 
     # split return value into FD and errno columns
     if event.ret >= 0:
+        if args.failed:
+            return
         fd_s = event.ret
         err = 0
     else:
@@ -159,7 +162,7 @@ def print_event(cpu, data, size):
     if args.timestamp:
         print("%-14.9f" % (float(event.ts_ns - start_ts) / 1000000000), end="")
 
-    print("%-6d %-16s %4d %3d %s" % (event.pid,
+    print("%-7d %-16s %4d %3d %s" % (event.pid,
         event.comm.decode('utf-8', 'replace'), fd_s, err,
         event.fname.decode('utf-8', 'replace')))
 
