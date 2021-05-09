@@ -62,6 +62,7 @@ except:
 bpf_text = """
 #include <uapi/linux/ptrace.h>
 #include <linux/fs.h>
+#include <linux/uio.h>
 
 #define BUFSIZE 256
 struct data_t {
@@ -71,12 +72,8 @@ struct data_t {
 
 BPF_PERF_OUTPUT(events);
 
-int kprobe__tty_write(struct pt_regs *ctx, struct file *file,
-    const char __user *buf, size_t count)
+static int do_tty_write(void *ctx, const char __user *buf, size_t count)
 {
-    if (file->f_inode->i_ino != PTS)
-        return 0;
-
     // bpf_probe_read_user() can only use a fixed size, so truncate to count
     // in user space:
     struct data_t data = {};
@@ -89,6 +86,40 @@ int kprobe__tty_write(struct pt_regs *ctx, struct file *file,
 
     return 0;
 };
+
+/**
+ * commit 9bb48c82aced (v5.11-rc4) tty: implement write_iter
+ * changed arguments of tty_write function
+ */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 11, 0)
+int kprobe__tty_write(struct pt_regs *ctx, struct file *file,
+    const char __user *buf, size_t count)
+{
+    if (file->f_inode->i_ino != PTS)
+        return 0;
+
+    return do_tty_write(ctx, buf, count);
+}
+#else
+KFUNC_PROBE(tty_write, struct kiocb *iocb, struct iov_iter *from)
+{
+    const char __user *buf;
+    const struct kvec *kvec;
+    size_t count;
+
+    if (iocb->ki_filp->f_inode->i_ino != PTS)
+        return 0;
+
+    if (from->type != (ITER_IOVEC + WRITE))
+        return 0;
+
+    kvec  = from->kvec;
+    buf   = kvec->iov_base;
+    count = kvec->iov_len;
+
+    return do_tty_write(ctx, kvec->iov_base, kvec->iov_len);
+}
+#endif
 """
 
 bpf_text = bpf_text.replace('PTS', str(pi.st_ino))
