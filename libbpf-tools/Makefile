@@ -39,6 +39,7 @@ APPS = \
 	runqlen \
 	runqslower \
 	softirqs \
+	statsnoop \
 	syscount \
 	tcpconnect \
 	tcpconnlat \
@@ -112,4 +113,3 @@ install: $(APPS)
 .DELETE_ON_ERROR:
 # keep intermediate (.skel.h, .bpf.o, etc) targets
 .SECONDARY:
-
