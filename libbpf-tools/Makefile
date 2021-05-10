@@ -40,6 +40,7 @@ APPS = \
 	runqlen \
 	runqslower \
 	softirqs \
+	statsnoop \
 	syscount \
 	tcpconnect \
 	tcpconnlat \
