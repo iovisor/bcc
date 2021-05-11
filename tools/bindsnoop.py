@@ -43,7 +43,7 @@ from time import sleep
 examples = """examples:
     ./bindsnoop           # trace all TCP bind()s
     ./bindsnoop -t        # include timestamps
-    ./tcplife -w        # wider columns (fit IPv6)
+    ./bindsnoop -w        # wider columns (fit IPv6)
     ./bindsnoop -p 181    # only trace PID 181
     ./bindsnoop -P 80     # only trace port 80
     ./bindsnoop -P 80,81  # only trace port 80 and 81
