@@ -117,7 +117,7 @@ void print_map(struct ksyms *ksyms, struct partitions *partitions, int fd)
 			ksym = ksyms__map_addr(ksyms, next_key.kern_stack[i]);
 			printf("%s\n", ksym ? ksym->name : "Unknown");
 		}
-		print_log2_hist(hist.slots, MAX_SLOTS, units);
+		print_log2_hist(hist.slots, MAX_SLOTS, units, NULL);
 		printf("\n");
 		lookup_key = next_key;
 	}

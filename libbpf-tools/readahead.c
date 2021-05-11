@@ -154,7 +154,7 @@ int main(int argc, char **argv)
 
 	printf("Readahead unused/total pages: %d/%d\n",
 		histp->unused, histp->total);
-	print_log2_hist(histp->slots, MAX_SLOTS, "msecs");
+	print_log2_hist(histp->slots, MAX_SLOTS, "msecs", NULL);
 
 cleanup:
 	readahead_bpf__destroy(obj);

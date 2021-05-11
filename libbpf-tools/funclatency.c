@@ -6,7 +6,7 @@
  *
  * TODO:
  * - support uprobes on libraries without -p PID. (parse ld.so.cache)
- * - support regexp pattern matching and per-function histograms
+ * - support regexp pattern matching user function and per-function histograms
  */
 #include <argp.h>
 #include <errno.h>
@@ -24,6 +24,8 @@
 #include "trace_helpers.h"
 #include "map_helpers.h"
 #include "uprobe_helpers.h"
+#include "kprobe_helpers.h"
+#include "string_helpers.h"
 
 #define warn(...) fprintf(stderr, __VA_ARGS__)
 
@@ -49,12 +51,14 @@ static const char program_doc[] =
 "\n"
 "Usage: funclatency [-h] [-m|-u] [-p PID] [-d DURATION] [ -i INTERVAL ]\n"
 "                   [-T] FUNCTION\n"
-"       Choices for FUNCTION: FUNCTION         (kprobe)\n"
+"       Choices for FUNCTION: FUNCTION/PATTERN (kprobe or kprobe pattern)\n"
 "                             LIBRARY:FUNCTION (uprobe a library in -p PID)\n"
 "                             :FUNCTION        (uprobe the binary of -p PID)\n"
 "                             PROGRAM:FUNCTION (uprobe the binary PROGRAM)\n"
 "\v"
 "Examples:\n"
+"  ./funclatency -m 'vfs_*'          # show one histogram per matched function\n"
+"  ./funclatency -u vfs_read         # time vfs_read(), in microseconds\n"
 "  ./funclatency do_sys_open         # time the do_sys_open() kernel function\n"
 "  ./funclatency -m do_nanosleep     # time do_nanosleep(), in milliseconds\n"
 "  ./funclatency -u vfs_read         # time vfs_read(), in microseconds\n"
@@ -169,13 +173,13 @@ static const char *unit_str(void)
 	return "bad units";
 }
 
-static int attach_kprobes(struct funclatency_bpf *obj)
+static int attach_kprobes(struct funclatency_bpf *obj, char *funcname)
 {
 	long err;
 
 	obj->links.dummy_kprobe =
 		bpf_program__attach_kprobe(obj->progs.dummy_kprobe, false,
-					   env.funcname);
+					   funcname);
 	err = libbpf_get_error(obj->links.dummy_kprobe);
 	if (err) {
 		warn("failed to attach kprobe: %ld\n", err);
@@ -184,7 +188,7 @@ static int attach_kprobes(struct funclatency_bpf *obj)
 
 	obj->links.dummy_kretprobe =
 		bpf_program__attach_kprobe(obj->progs.dummy_kretprobe, true,
-					   env.funcname);
+					   funcname);
 	err = libbpf_get_error(obj->links.dummy_kretprobe);
 	if (err) {
 		warn("failed to attach kretprobe: %ld\n", err);
@@ -194,7 +198,7 @@ static int attach_kprobes(struct funclatency_bpf *obj)
 	return 0;
 }
 
-static int attach_uprobes(struct funclatency_bpf *obj)
+static int attach_uprobes(struct funclatency_bpf *obj, char *funcname)
 {
 	char *binary, *function;
 	char bin_path[PATH_MAX];
@@ -202,7 +206,7 @@ static int attach_uprobes(struct funclatency_bpf *obj)
 	int ret = -1;
 	long err;
 
-	binary = strdup(env.funcname);
+	binary = strdup(funcname);
 	if (!binary) {
 		warn("strdup failed");
 		return -1;
@@ -250,11 +254,11 @@ out_binary:
 	return ret;
 }
 
-static int attach_probes(struct funclatency_bpf *obj)
+static int attach_probes(struct funclatency_bpf *obj, char *funcname)
 {
-	if (strchr(env.funcname, ':'))
-		return attach_uprobes(obj);
-	return attach_kprobes(obj);
+  if (strchr(funcname, ':'))
+    return attach_uprobes(obj, funcname);
+  return attach_kprobes(obj, funcname);
 }
 
 static volatile bool exiting;
@@ -268,17 +272,21 @@ static struct sigaction sigact = {.sa_handler = sig_hand};
 
 int main(int argc, char **argv)
 {
-	static const struct argp argp = {
-		.options = opts,
-		.parser = parse_arg,
-		.args_doc = args_doc,
-		.doc = program_doc,
-	};
-	struct funclatency_bpf *obj;
-	int i, err;
-	struct tm *tm;
-	char ts[32];
-	time_t t;
+  static const struct argp argp = {
+    .options = opts,
+    .parser = parse_arg,
+    .args_doc = args_doc,
+    .doc = program_doc,
+  };
+  struct funclatency_bpf **obj = malloc(sizeof(struct funclatency_bpf *));
+  int i, j, k, err;
+  struct tm *tm;
+  char ts[32];
+  time_t t;
+  char **func_list = malloc(sizeof(char *)), *pattern = NULL,
+       **label = malloc(sizeof(char *));
+  size_t size = 1;
+  ssize_t pattern_len = 0;
 
 	err = argp_parse(&argp, argc, argv, 0, NULL, &env);
 	if (err)
@@ -292,45 +300,83 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	obj = funclatency_bpf__open();
-	if (!obj) {
-		warn("failed to open BPF object\n");
-		return 1;
-	}
+  if (strchr(env.funcname, ':')) {
+    func_list[0] = strdup(env.funcname);
+  } else {
+    if ((err = string_replace(env.funcname, strlen(env.funcname), "*", ".*",
+                              &pattern, &pattern_len))) {
+      warn("failed to replace '*' to '.*': %s\n", strerror(err));
+      return 1;
+    }
 
-	obj->rodata->units = env.units;
-	obj->rodata->targ_tgid = env.pid;
+    if ((err = get_kprobe_functions(pattern, &func_list, &size))) {
+      if (err == ERANGE)
+        warn("the number of matched functions is large than: %d\n",
+             KPROBE_LIMIT);
+      else {
+        warn("failed to read from /proc/kallsyms: %s\n", strerror(err));
+        free(pattern);
+        return 1;
+      }
+    }
 
-	err = funclatency_bpf__load(obj);
-	if (err) {
-		warn("failed to load BPF object\n");
-		return 1;
-	}
+    obj = realloc(obj, size * sizeof(struct funclatency_bpf *));
+    label = realloc(label, size * sizeof(char *));
+  }
 
-	err = attach_probes(obj);
-	if (err)
-		goto cleanup;
+  for (i = 0; i < size; i++) {
+    obj[i] = funclatency_bpf__open();
+    if (!obj[i]) {
+      warn("failed to open BPF object\n");
+      return 1;
+    }
 
-	printf("Tracing %s.  Hit Ctrl-C to exit\n", env.funcname);
+    obj[i]->rodata->units = env.units;
+    obj[i]->rodata->targ_tgid = env.pid;
 
-	for (i = 0; i < env.iterations && !exiting; i++) {
-		sleep(env.interval);
+    err = funclatency_bpf__load(obj[i]);
+    if (err) {
+      warn("failed to load BPF object\n");
+      return 1;
+    }
 
-		printf("\n");
-		if (env.timestamp) {
-			time(&t);
-			tm = localtime(&t);
-			strftime(ts, sizeof(ts), "%H:%M:%S", tm);
-			printf("%-8s\n", ts);
-		}
+    label[i] = malloc(sizeof("\nFunction=") + strlen(func_list[i]));
+    sprintf(label[i], "\nFunction=%s", func_list[i]);
+    err = attach_probes(obj[i], func_list[i]);
+    if (err)
+      goto cleanup;
+  }
 
-		print_log2_hist(obj->bss->hist, MAX_SLOTS, unit_str());
-	}
+  printf("Tracing %ld functions for '%s'.  Hit Ctrl-C to exit\n", size,
+         env.funcname);
 
-	printf("Exiting trace of %s\n", env.funcname);
+  for (j = 0; j < env.iterations && !exiting; j++) {
+    sleep(env.interval);
+    printf("\n");
+    if (env.timestamp) {
+      time(&t);
+      tm = localtime(&t);
+      strftime(ts, sizeof(ts), "%H:%M:%S", tm);
+      printf("%-8s\n", ts);
+    }
+
+    for (k = 0; k < size; k++) {
+      print_log2_hist(obj[k]->bss->hist, MAX_SLOTS, unit_str(), label[k]);
+      /* TODO clean old hist (atomic?) */
+    }
+  }
+
+  printf("\nDetaching...\n");
 
 cleanup:
-	funclatency_bpf__destroy(obj);
+  for (j = 0; j < i; j++) {
+    free(label[j]);
+    funclatency_bpf__destroy(obj[j]);
+  }
 
-	return err != 0;
+  free(label);
+  free(pattern);
+  free_kprobe_functions(func_list, size);
+
+  return err != 0;
 }

@@ -161,7 +161,7 @@ static int print_log2_hists(int fd)
 			printf("\npid = %d %s\n", next_key, hist.comm);
 		if (env.per_thread)
 			printf("\ntid = %d %s\n", next_key, hist.comm);
-		print_log2_hist(hist.slots, MAX_SLOTS, units);
+		print_log2_hist(hist.slots, MAX_SLOTS, units, NULL);
 		lookup_key = next_key;
 	}
 

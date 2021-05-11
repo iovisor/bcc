@@ -205,7 +205,7 @@ int print_log2_hists(struct bpf_map *hists, struct partitions *partitions)
 		if (env.per_flag)
 			print_cmd_flags(next_key.cmd_flags);
 		printf("\n");
-		print_log2_hist(hist.slots, MAX_SLOTS, units);
+		print_log2_hist(hist.slots, MAX_SLOTS, units, NULL);
 		lookup_key = next_key;
 	}
 

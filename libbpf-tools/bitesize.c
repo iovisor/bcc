@@ -128,7 +128,7 @@ static int print_log2_hists(int fd)
 			return -1;
 		}
 		printf("\nProcess Name = %s\n", next_key.comm);
-		print_log2_hist(hist.slots, MAX_SLOTS, "Kbytes");
+		print_log2_hist(hist.slots, MAX_SLOTS, "Kbytes", NULL);
 		lookup_key = next_key;
 	}
 

@@ -141,7 +141,7 @@ static int print_map(struct bpf_map *map)
 			const char *units = env.nanoseconds ? "nsecs" : "usecs";
 
 			printf("hardirq = %s\n", next_key.name);
-			print_log2_hist(info.slots, MAX_SLOTS, units);
+			print_log2_hist(info.slots, MAX_SLOTS, units, NULL);
 		}
 		lookup_key = next_key;
 	}

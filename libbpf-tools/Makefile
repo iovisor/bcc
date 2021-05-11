@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause)
 OUTPUT := .output
 CLANG ?= clang
+C++ ?= c++
 LLVM_STRIP ?= llvm-strip
 BPFTOOL ?= bin/bpftool
 LIBBPF_SRC := $(abspath ../src/cc/libbpf/src)
@@ -53,6 +54,11 @@ COMMON_OBJ = \
 	$(OUTPUT)/errno_helpers.o \
 	$(OUTPUT)/map_helpers.o \
 	$(OUTPUT)/uprobe_helpers.o \
+	$(OUTPUT)/string_helpers.o \
+	#
+
+COMMON_CC_OBJ = \
+	$(OUTPUT)/kprobe_helpers.o \
 	#
 
 .PHONY: all
@@ -76,15 +82,19 @@ $(OUTPUT) $(OUTPUT)/libbpf:
 	$(call msg,MKDIR,$@)
 	$(Q)mkdir -p $@
 
-$(APPS): %: $(OUTPUT)/%.o $(LIBBPF_OBJ) $(COMMON_OBJ) | $(OUTPUT)
+$(APPS): %: $(OUTPUT)/%.o $(LIBBPF_OBJ) $(COMMON_OBJ) $(COMMON_CC_OBJ) | $(OUTPUT)
 	$(call msg,BINARY,$@)
-	$(Q)$(CC) $(CFLAGS) $^ -lelf -lz -o $@
+	$(Q)$(CC) $(CFLAGS) $^ -lelf -lz -lstdc++ -o $@
 
 $(patsubst %,$(OUTPUT)/%.o,$(APPS)): %.o: %.skel.h
 
 $(OUTPUT)/%.o: %.c $(wildcard %.h) | $(OUTPUT)
 	$(call msg,CC,$@)
 	$(Q)$(CC) $(CFLAGS) $(INCLUDES) -c $(filter %.c,$^) -o $@
+
+$(OUTPUT)/%.o: %.cc $(wildcard %.h) | $(OUTPUT)
+	$(call msg,C++,$@)
+	$(Q)$(C++) $(CFLAGS) $(INCLUDES) -c $(filter %.cc,$^) -o $@
 
 $(OUTPUT)/%.skel.h: $(OUTPUT)/%.bpf.o | $(OUTPUT)
 	$(call msg,GEN-SKEL,$@)

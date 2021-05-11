@@ -151,7 +151,7 @@ static int print_log2_hists(struct bpf_map *hists)
 			printf("\ntid = %d %s\n", next_key, hist.comm);
 		else if (env.per_pidns)
 			printf("\npidns = %u %s\n", next_key, hist.comm);
-		print_log2_hist(hist.slots, MAX_SLOTS, units);
+		print_log2_hist(hist.slots, MAX_SLOTS, units, NULL);
 		lookup_key = next_key;
 	}
 

@@ -168,7 +168,7 @@ static int print_hist(struct softirqs_bpf__bss *bss)
 		if (!memcmp(&zero, &hist, sizeof(hist)))
 			continue;
 		printf("softirq = %s\n", vec_names[vec]);
-		print_log2_hist(hist.slots, MAX_SLOTS, units);
+		print_log2_hist(hist.slots, MAX_SLOTS, units, NULL);
 		printf("\n");
 	}
 

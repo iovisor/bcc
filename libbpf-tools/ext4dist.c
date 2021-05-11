@@ -135,7 +135,7 @@ static int print_hists(struct ext4dist_bpf__bss *bss)
 		if (!memcmp(&zero, &hist, sizeof(hist)))
 			continue;
 		printf("operation = '%s'\n", fop_names[type]);
-		print_log2_hist(hist.slots, MAX_SLOTS, units);
+		print_log2_hist(hist.slots, MAX_SLOTS, units, NULL);
 		printf("\n");
 	}
 
