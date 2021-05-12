@@ -78,7 +78,7 @@ private:
   int ret_;
 
   bool use_enum_code_ = false;
-  Code code_;
+  Code code_ = Code::UNKNOWN;
 
   std::string msg_;
 };
