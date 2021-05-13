@@ -6,7 +6,7 @@
  *
  * TODO:
  * - support uprobes on libraries without -p PID. (parse ld.so.cache)
- * - support regexp pattern matching user function and per-function histograms
+ * - support regexp pattern matching and per-function histograms
  */
 #include <argp.h>
 #include <errno.h>
@@ -256,9 +256,9 @@ out_binary:
 
 static int attach_probes(struct funclatency_bpf *obj, char *funcname)
 {
-  if (strchr(funcname, ':'))
-    return attach_uprobes(obj, funcname);
-  return attach_kprobes(obj, funcname);
+    if (strchr(funcname, ':'))
+        return attach_uprobes(obj, funcname);
+    return attach_kprobes(obj, funcname);
 }
 
 static volatile bool exiting;
