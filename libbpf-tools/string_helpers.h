@@ -10,6 +10,7 @@ int string_splitlen(const char *s, ssize_t len, const char *seq, int seqlen,
                     char ***res, int *count);
 int string_join(char **argv, int argc, char *sep, int seqlen, char **res,
                 ssize_t *res_len);
-int string_replace(char *s, ssize_t s_len, char *from, char *to, char **res, ssize_t *res_len);
+int string_replace(char *s, ssize_t s_len, char *from, char *to, char **res,
+                   ssize_t *res_len);
 
 #endif /* STRING_HELPERS_H */

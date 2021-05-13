@@ -36,7 +36,6 @@ void string_free_split(char **array, int count) {
  */
 int string_splitlen(const char *s, ssize_t len, const char *seq, int seqlen,
                     char ***res, int *count) {
-
   int elements = 0, slots = (*count) < 0 ? 0 : (*count) , err = 0;
   char **tmp;
   ssize_t i, start = 0;
