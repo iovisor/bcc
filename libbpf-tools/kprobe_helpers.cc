@@ -12,8 +12,6 @@
 
 #include "kprobe_helpers.h"
 
-using namespace std;
-
 #define startswith(str, prefix) ((str).find(prefix) == 0)
 
 /**
@@ -34,13 +32,13 @@ using namespace std;
  *  OTHERR: Failed to read from `/proc/kallsyms`. `sz` was set to 0.
  */
 int get_kprobe_functions(const char *pattern, char ***list, size_t *sz) {
-  string line;
-  set<string> kprobe_blacklist_set, matched_function_set;
-  ifstream kprobe_blacklist_stream { KPROBE_BLACKLIST_FILE };
+  std::string line;
+  std::set<std::string> kprobe_blacklist_set, matched_function_set;
+  std::ifstream kprobe_blacklist_stream { KPROBE_BLACKLIST_FILE };
 
-  while (getline(kprobe_blacklist_stream, line)) {
+  while (std::getline(kprobe_blacklist_stream, line)) {
     size_t pos = line.find("\t");
-    if (pos != string::npos) {
+    if (pos != std::string::npos) {
       line = line.substr(pos + 1);
       kprobe_blacklist_set.insert(line);
     }
@@ -48,31 +46,31 @@ int get_kprobe_functions(const char *pattern, char ***list, size_t *sz) {
 
   size_t count = 0, list_size = (*sz) < 0 ? 0 : (*sz);
   int in_init_section = 0, in_irq_section = 0;
-  regex pt("^.*\\.cold(\\.\\d+)?$");
-  regex event_re (pattern);
-  ifstream kallsyms_stream { "/proc/kallsyms" };
+  std::regex pt("^.*\\.cold(\\.\\d+)?$");
+  std::regex event_re (pattern);
+  std::ifstream kallsyms_stream { "/proc/kallsyms" };
   if (!kallsyms_stream) {
     *sz = 0;
     return errno;
   }
 
-  while (getline(kallsyms_stream, line)) {
-    string tp;
+  while (std::getline(kallsyms_stream, line)) {
+    std::string tp;
     size_t type_pos = line.find(" ");
-    if (type_pos == string::npos)
+    if (type_pos == std::string::npos)
       continue;
 
     line = line.substr(type_pos + 1);
     size_t name_pos = line.find(" ");
-    if (name_pos == string::npos)
+    if (name_pos == std::string::npos)
       continue;
 
     tp = line.substr(0, name_pos);
-    transform(tp.begin(), tp.end(), tp.begin(),
-              [](unsigned char c){ return tolower(c); });
+    std::transform(tp.begin(), tp.end(), tp.begin(),
+                   [](unsigned char c){ return std::tolower(c); });
     line = line.substr(name_pos + 1);
     size_t name_pos_end = line.find(" ");
-    if (name_pos_end != string::npos) {
+    if (name_pos_end != std::string::npos) {
       line = line.substr(0, name_pos_end);
     }
 
@@ -128,11 +126,11 @@ int get_kprobe_functions(const char *pattern, char ***list, size_t *sz) {
       continue;
 
     /* Exclude all gcc 8's extra .cold functions */
-    if (regex_match(line, pt))
+    if (std::regex_match(line, pt))
       continue;
 
     if (!tp.compare("t") || !tp.compare("w")) {
-      if (regex_match(line, event_re) &&
+      if (std::regex_match(line, event_re) &&
           kprobe_blacklist_set.find(line) == kprobe_blacklist_set.end()) {
         if (matched_function_set.find(line) == matched_function_set.end()) {
           matched_function_set.insert(line);

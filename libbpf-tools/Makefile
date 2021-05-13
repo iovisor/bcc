@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause)
 OUTPUT := .output
 CLANG ?= clang
-C++ ?= c++
+CXX ?= c++
 LLVM_STRIP ?= llvm-strip
 BPFTOOL ?= bin/bpftool
 LIBBPF_SRC := $(abspath ../src/cc/libbpf/src)
@@ -93,8 +93,8 @@ $(OUTPUT)/%.o: %.c $(wildcard %.h) | $(OUTPUT)
 	$(Q)$(CC) $(CFLAGS) $(INCLUDES) -c $(filter %.c,$^) -o $@
 
 $(OUTPUT)/%.o: %.cc $(wildcard %.h) | $(OUTPUT)
-	$(call msg,C++,$@)
-	$(Q)$(C++) $(CFLAGS) $(INCLUDES) -c $(filter %.cc,$^) -o $@
+	$(call msg,CXX,$@)
+	$(Q)$(CXX) $(CXXFLAGS) $(INCLUDES) -c $(filter %.cc,$^) -o $@
 
 $(OUTPUT)/%.skel.h: $(OUTPUT)/%.bpf.o | $(OUTPUT)
 	$(call msg,GEN-SKEL,$@)
