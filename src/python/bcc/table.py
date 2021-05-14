@@ -23,6 +23,7 @@ from functools import reduce
 import multiprocessing
 import os
 import errno
+import json
 import re
 import sys
 
@@ -30,6 +31,7 @@ from .libbcc import lib, _RAW_CB_TYPE, _LOST_CB_TYPE, _RINGBUF_CB_TYPE
 from .perf import Perf
 from .utils import get_online_cpus
 from .utils import get_possible_cpus
+from datetime import datetime
 from subprocess import check_output
 
 BPF_MAP_TYPE_HASH = 1
@@ -692,6 +694,53 @@ class TableBase(MutableMapping):
                     raise IndexError(("Index in print_linear_hist() of %d " +
                         "exceeds max of %d.") % (k.value, linear_index_max))
             _print_linear_hist(vals, val_type)
+
+    def print_json(self, struct_keys, key_decode_funcs, val_type="Values",
+                   timestamp=True, skip_empty=True):
+        """print_json(struct_keys=None, key_decode_funcs=None,
+                      val_type="value", timestamp=True, skip_empty=True)
+        Prints the table as new-line separated json documents. The keys and
+        the functions to decode them must be passed as iterables of the same
+        length. The last key_decode_func is likely the struct key "slot" and
+        a well designed function can do a log2 histogram:
+
+        eg:
+            lambda x: int(2 ** (x-1))  #This will provide a log2 labeled hist
+
+            lambda x: x   # This will return the value unchanged. Should be
+                          #  used as the default decode function
+        """
+        tmp = {}
+        if timestamp:
+            tmp['timestamp'] = str(datetime.now())
+
+        for _input in (struct_keys, key_decode_funcs):
+            if not hasattr(_input, "__iter__"):
+                raise TypeError('struct_keys and key_decode_funcs need to '
+                                'be iterables like lists or tuples')
+
+        if len(struct_keys) != len(key_decode_funcs):
+            raise ValueError('struct_keys and key_decode_funcs require the'
+                             ' same number of members')
+
+        if skip_empty and not self.items():
+            return
+
+        for k, v in self.items():
+            # Each struct key is a nested bucket
+            buckets = []
+            for struct_key, decode_func in zip(struct_keys, key_decode_funcs):
+                buckets.append(decode_func(getattr(k, struct_key)))
+
+            tmp[val_type] = tmp.get(val_type, {})
+            tmp_pointer = tmp[val_type]
+            for i, bucket in enumerate(buckets):
+                tmp_pointer[bucket] = tmp_pointer.get(bucket, {})
+                if i == len(buckets) - 1:
+                    tmp_pointer[bucket] = v.value
+                tmp_pointer = tmp_pointer[bucket]
+
+        print(json.dumps(tmp))
 
 
 class HashTable(TableBase):

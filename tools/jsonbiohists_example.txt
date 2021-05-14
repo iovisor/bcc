@@ -1,0 +1,12 @@
+Example of jsonbiohists.py
+
+The aim of this tool is to show I/O distribution for block size and latency by device and IO type flag
+  in new-line separated json documents for easy integration with other tools.
+
+# ./jsonbiohists.py 10
+{"timestamp": "2019-12-17 12:56:21.330251", "Latency (us)": {"nvme0n1": {"Flush": {"65536": 1}}}}
+{"timestamp": "2019-12-17 12:56:21.330628", "Size (kB)": {"nvme0n1": {"Sync-Write": {"1": 1}}}}
+{"timestamp": "2019-12-17 12:56:51.361450", "Latency (us)": {"nvme0n1": {"NoMerge-Write": {"128": 26, "32": 9, "4096": 364, "1048576": 1, "64": 9, "256": 66, "16384": 90, "512": 115, "2048": 466, "1024": 221}, "Read": {"256": 1, "65536": 1}, "ForcedUnitAccess-Sync-Write": {"512": 1}, "Write": {"64": 3, "4096": 22, "1048576": 1, "128": 2, "256": 6, "16384": 6, "512": 7, "2048": 31, "1024": 14}, "Sync-Write": {"1024": 1}, "Flush": {"2097152": 1}}}}
+{"timestamp": "2019-12-17 12:56:51.363065", "Size (kB)": {"nvme0n1": {"NoMerge-Write": {"128": 1367}, "Write": {"64": 1, "32": 1, "128": 90}, "Read": {"16": 1, "32": 1}, "ForcedUnitAccess-Sync-Write": {"1": 1, "4": 1}, "Sync-Write": {"16": 1}}}}
+^C{"timestamp": "2019-12-17 12:56:57.290776", "Latency (us)": {"nvme0n1": {"ForcedUnitAccess-Sync-Write": {"256": 1}, "Sync-Write": {"1024": 1}, "Flush": {"256": 1}}}}
+{"timestamp": "2019-12-17 12:56:57.291308", "Size (kB)": {"nvme0n1": {"ForcedUnitAccess-Sync-Write": {"1": 1, "4": 1}, "Sync-Write": {"32": 1}}}}
