@@ -48,6 +48,7 @@ static const struct argp_option opts[] = {
 	{ "comm",  'c', "COMM",  0, "Trace this comm only" },
 	{ "disk",  'd', "DISK",  0, "Trace this disk only" },
 	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
 	{},
 };
 
@@ -56,6 +57,9 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 	static int pos_args, len;
 
 	switch (key) {
+	case 'h':
+		argp_state_help(state, stderr, ARGP_HELP_STD_HELP);
+		break;
 	case 'v':
 		env.verbose = true;
 		break;

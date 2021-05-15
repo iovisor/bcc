@@ -67,6 +67,7 @@ static const struct argp_option opts[] = {
 	{ "max-args", MAX_ARGS_KEY, "MAX_ARGS", 0,
 		"maximum number of arguments parsed and displayed, defaults to 20"},
 	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
 	{},
 };
 
@@ -76,7 +77,7 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 
 	switch (key) {
 	case 'h':
-		argp_usage(state);
+		argp_state_help(state, stderr, ARGP_HELP_STD_HELP);
 		break;
 	case 'T':
 		env.time = true;

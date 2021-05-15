@@ -43,12 +43,16 @@ static const struct argp_option opts[] = {
 	{ "duration", 'd', "DURATION", 0, "Duration to sample in seconds" },
 	{ "frequency", 'f', "FREQUENCY", 0, "Sample with a certain frequency" },
 	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
 	{},
 };
 
 static error_t parse_arg(int key, char *arg, struct argp_state *state)
 {
 	switch (key) {
+	case 'h':
+		argp_state_help(state, stderr, ARGP_HELP_STD_HELP);
+		break;
 	case 'v':
 		env.verbose = true;
 		break;

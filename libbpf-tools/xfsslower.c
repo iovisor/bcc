@@ -49,6 +49,7 @@ static const struct argp_option opts[] = {
 	{ "pid", 'p', "PID", 0, "Process PID to trace" },
 	{ "min", 'm', "MIN", 0, "Min latency of trace in ms (default 10)" },
 	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
 	{},
 };
 
@@ -59,6 +60,9 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 	int pid;
 
 	switch (key) {
+	case 'h':
+		argp_state_help(state, stderr, ARGP_HELP_STD_HELP);
+		break;
 	case 'v':
 		env.verbose = true;
 		break;

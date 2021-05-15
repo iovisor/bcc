@@ -56,6 +56,7 @@ static const struct argp_option opts[] = {
 	{ "errno", 'e', "ERRNO", 0, "Trace only syscalls that return this error"
 				 "(numeric or EPERM, etc.)" },
 	{ "list", 'l', NULL, 0, "Print list of recognized syscalls and exit" },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
 	{},
 };
 
@@ -288,6 +289,9 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 	int err;
 
 	switch (key) {
+	case 'h':
+		argp_state_help(state, stderr, ARGP_HELP_STD_HELP);
+		break;
 	case 'v':
 		env.verbose = true;
 		break;
