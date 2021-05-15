@@ -111,6 +111,7 @@ static const struct argp_option opts[] = {
 	  "Comma-separated list of destination ports to trace" },
 	{ "cgroupmap", 'C', "PATH", 0, "trace cgroups in this map" },
 	{ "mntnsmap", 'M', "PATH", 0, "trace mount namespaces in this map" },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
 	{},
 };
 
@@ -133,6 +134,9 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 	int nports;
 
 	switch (key) {
+	case 'h':
+		argp_state_help(state, stderr, ARGP_HELP_STD_HELP);
+		break;
 	case 'v':
 		env.verbose = true;
 		break;
