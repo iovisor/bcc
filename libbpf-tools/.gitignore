@@ -27,4 +27,5 @@
 /tcpconnect
 /tcpconnlat
 /vfsstat
+/xfsdist
 /xfsslower

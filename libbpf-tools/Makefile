@@ -44,6 +44,7 @@ APPS = \
 	tcpconnect \
 	tcpconnlat \
 	vfsstat \
+	xfsdist \
 	xfsslower \
 	#
 
