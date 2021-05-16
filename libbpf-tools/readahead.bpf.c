@@ -26,8 +26,8 @@ struct {
 
 static struct hist hist;
 
-SEC("fentry/do_page_cache_ra")
-int BPF_PROG(do_page_cache_ra)
+static __always_inline
+int __do_page_cache_ra()
 {
 	u32 pid = bpf_get_current_pid_tgid();
 	u64 one = 1;
@@ -36,8 +36,17 @@ int BPF_PROG(do_page_cache_ra)
 	return 0;
 }
 
-SEC("fexit/__page_cache_alloc")
-int BPF_PROG(page_cache_alloc_ret, gfp_t gfp, struct page *ret)
+static __always_inline
+int __do_page_cache_ra_ret()
+{
+	u32 pid = bpf_get_current_pid_tgid();
+
+	bpf_map_delete_elem(&in_readahead, &pid);
+	return 0;
+}
+
+static __always_inline
+int __page_cache_alloc_ret(struct page *ret)
 {
 	u32 pid = bpf_get_current_pid_tgid();
 	u64 ts;
@@ -53,17 +62,8 @@ int BPF_PROG(page_cache_alloc_ret, gfp_t gfp, struct page *ret)
 	return 0;
 }
 
-SEC("fexit/do_page_cache_ra")
-int BPF_PROG(do_page_cache_ra_ret)
-{
-	u32 pid = bpf_get_current_pid_tgid();
-
-	bpf_map_delete_elem(&in_readahead, &pid);
-	return 0;
-}
-
-SEC("fentry/mark_page_accessed")
-int BPF_PROG(mark_page_accessed, struct page *page)
+static __always_inline
+int __mark_page_accessed(struct page *page)
 {
 	u64 *tsp, slot, ts = bpf_ktime_get_ns();
 	s64 delta;
@@ -84,6 +84,53 @@ update_and_cleanup:
 	bpf_map_delete_elem(&birth, &page);
 
 	return 0;
+}
+
+SEC("kprobe/do_page_cache_ra")
+int BPF_KPROBE(kprobe_do_page_cache_ra)
+{
+	return __do_page_cache_ra();
+}
+
+SEC("fentry/do_page_cache_ra")
+int BPF_PROG(fentry_do_page_cache_ra)
+{
+	return __do_page_cache_ra();
+}
+
+SEC("kretprobe/do_page_cache_ra")
+int BPF_KPROBE(kretprobe_do_page_cache_ra)
+{
+	return __do_page_cache_ra_ret();
+}
+
+SEC("fexit/do_page_cache_ra")
+int BPF_PROG(fexit_do_page_cache_ra)
+{
+	return __do_page_cache_ra_ret();
+}
+
+SEC("kretprobe/__page_cache_alloc")
+int BPF_KRETPROBE(kretprobe_page_cache_alloc_ret, struct page *ret)
+{
+	return __page_cache_alloc_ret(ret);
+}
+
+SEC("fexit/__page_cache_alloc")
+int BPF_PROG(fexit_page_cache_alloc_ret, struct page *ret)
+{
+	return __page_cache_alloc_ret(ret);
+}
+
+SEC("kprobe/mark_page_accessed")
+int BPF_KPROBE(kprobe_mark_page_accessed, struct page *page)
+{
+	return __mark_page_accessed(page);
+}
+SEC("fentry/mark_page_accessed")
+int BPF_PROG(fentry_mark_page_accessed, struct page *page)
+{
+	return __mark_page_accessed(page);
 }
 
 char LICENSE[] SEC("license") = "GPL";
