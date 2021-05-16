@@ -32,6 +32,7 @@ APPS = \
 	gethostlatency \
 	hardirqs \
 	llcstat \
+	nfsdist \
 	numamove \
 	offcputime \
 	opensnoop \
