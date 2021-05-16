@@ -237,7 +237,7 @@ int oncpu(struct pt_regs *ctx, struct task_struct *p) {
         wokeby.delete(&pid);
     }
 
-    counts.increment(key, delta);
+    counts.increment(key);
     return 0;
 }
 """

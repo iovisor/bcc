@@ -182,7 +182,7 @@ int oncpu(struct pt_regs *ctx, struct task_struct *prev) {
     key.kernel_stack_id = KERNEL_STACK_GET;
     bpf_get_current_comm(&key.name, sizeof(key.name));
 
-    counts.increment(key, delta);
+    counts.increment(key);
     return 0;
 }
 """
