@@ -97,7 +97,7 @@ int trace_tcp_drop(struct pt_regs *ctx, struct sock *sk, struct sk_buff *skb)
 {
     if (sk == NULL)
         return 0;
-    u32 pid = bpf_get_current_pid_tgid();
+    u32 pid = bpf_get_current_pid_tgid() >> 32;
 
     // pull in details from the packet headers and the sock struct
     u16 family = sk->__sk_common.skc_family;
@@ -155,7 +155,7 @@ if debug or args.ebpf:
 # process event
 def print_ipv4_event(cpu, data, size):
     event = b["ipv4_events"].event(data)
-    print("%-8s %-6d %-2d %-20s > %-20s %s (%s)" % (
+    print("%-8s %-7d %-2d %-20s > %-20s %s (%s)" % (
         strftime("%H:%M:%S"), event.pid, event.ip,
         "%s:%d" % (inet_ntop(AF_INET, pack('I', event.saddr)), event.sport),
         "%s:%s" % (inet_ntop(AF_INET, pack('I', event.daddr)), event.dport),
@@ -167,7 +167,7 @@ def print_ipv4_event(cpu, data, size):
 
 def print_ipv6_event(cpu, data, size):
     event = b["ipv6_events"].event(data)
-    print("%-8s %-6d %-2d %-20s > %-20s %s (%s)" % (
+    print("%-8s %-7d %-2d %-20s > %-20s %s (%s)" % (
         strftime("%H:%M:%S"), event.pid, event.ip,
         "%s:%d" % (inet_ntop(AF_INET6, event.saddr), event.sport),
         "%s:%d" % (inet_ntop(AF_INET6, event.daddr), event.dport),
@@ -188,7 +188,7 @@ else:
 stack_traces = b.get_table("stack_traces")
 
 # header
-print("%-8s %-6s %-2s %-20s > %-20s %s (%s)" % ("TIME", "PID", "IP",
+print("%-8s %-7s %-2s %-20s > %-20s %s (%s)" % ("TIME", "PID", "IP",
     "SADDR:SPORT", "DADDR:DPORT", "STATE", "FLAGS"))
 
 # read events

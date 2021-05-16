@@ -58,7 +58,7 @@ bpf_text = """
 // Common structure for UDP/TCP IPv4/IPv6
 struct listen_evt_t {
     u64 ts_us;
-    u64 pid_tgid;
+    u64 pid;
     u64 backlog;
     u64 netns;
     u64 proto;    // familiy << 16 | type
@@ -90,7 +90,7 @@ int kprobe__inet_listen(struct pt_regs *ctx, struct socket *sock, int backlog)
         evt.proto = family << 16 | SOCK_STREAM;
 
         // Get PID
-        evt.pid_tgid = bpf_get_current_pid_tgid();
+        evt.pid = bpf_get_current_pid_tgid() >> 32;
 
         ##FILTER_PID##
 
@@ -130,7 +130,7 @@ def event_printer(show_netns):
         # Decode event
         event = b["listen_evt"].event(data)
 
-        pid = event.pid_tgid & 0xffffffff
+        pid = event.pid
         proto_family = event.proto & 0xff
         proto_type = event.proto >> 16 & 0xff
 
@@ -151,12 +151,12 @@ def event_printer(show_netns):
 
         # Display
         if show_netns:
-            printb(b"%-6d %-12.12s %-12d %-6s %-8d %-5d %-39s" % (
+            printb(b"%-7d %-12.12s %-12d %-6s %-8d %-5d %-39s" % (
                 pid, event.task, event.netns, protocol.encode(), event.backlog,
                 event.lport, address.encode(),
             ))
         else:
-            printb(b"%-6d %-12.12s %-6s %-8d %-5d %-39s" % (
+            printb(b"%-7d %-12.12s %-6s %-8d %-5d %-39s" % (
                 pid, event.task, protocol.encode(), event.backlog,
                 event.lport, address.encode(),
             ))
@@ -171,7 +171,7 @@ if __name__ == "__main__":
     netns_filter = ""
 
     if args.pid:
-        pid_filter = "if (evt.pid_tgid != %d) return 0;" % args.pid
+        pid_filter = "if (evt.pid != %d) return 0;" % args.pid
     if args.netns:
         netns_filter = "if (evt.netns != %d) return 0;" % args.netns
 
@@ -188,10 +188,10 @@ if __name__ == "__main__":
 
     # Print headers
     if args.show_netns:
-        print("%-6s %-12s %-12s %-6s %-8s %-5s %-39s" %
+        print("%-7s %-12s %-12s %-6s %-8s %-5s %-39s" %
               ("PID", "COMM", "NETNS", "PROTO", "BACKLOG", "PORT", "ADDR"))
     else:
-        print("%-6s %-12s %-6s %-8s %-5s %-39s" %
+        print("%-7s %-12s %-6s %-8s %-5s %-39s" %
               ("PID", "COMM", "PROTO", "BACKLOG", "PORT", "ADDR"))
 
     # Read events
