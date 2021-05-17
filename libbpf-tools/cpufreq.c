@@ -216,6 +216,11 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
+	if (!obj->bss) {
+		fprintf(stderr, "Memory-mapping BPF maps is supported starting from Linux 5.7, please upgrade.\n");
+		goto cleanup;
+	}
+
 	err = init_freqs_hmz(obj->bss->freqs_mhz, nr_cpus);
 	if (err) {
 		fprintf(stderr, "failed to init freqs\n");

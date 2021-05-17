@@ -218,6 +218,11 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
+	if (!skel->bss) {
+		fprintf(stderr, "Memory-mapping BPF maps is supported starting from Linux 5.7, please upgrade.\n");
+		goto cleanup;
+	}
+
 	err = ext4dist_bpf__attach(skel);
 	if (err) {
 		fprintf(stderr, "failed to attach BPF programs\n");

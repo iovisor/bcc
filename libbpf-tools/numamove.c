@@ -90,6 +90,11 @@ int main(int argc, char **argv)
 		fprintf(stderr, "failed to open and/or load BPF object\n");
 		return 1;
 	}
+	
+	if (!obj->bss) {
+		fprintf(stderr, "Memory-mapping BPF maps is supported starting from Linux 5.7, please upgrade.\n");
+		goto cleanup;
+	}
 
 	err = numamove_bpf__attach(obj);
 	if (err) {

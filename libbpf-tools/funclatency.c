@@ -307,6 +307,11 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
+	if (!obj->bss) {
+		warn("Memory-mapping BPF maps is supported starting from Linux 5.7, please upgrade.\n");
+		goto cleanup;
+	}
+
 	err = attach_probes(obj);
 	if (err)
 		goto cleanup;
