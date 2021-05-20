@@ -90,7 +90,7 @@ void submit_event(struct pt_regs *ctx, void *name, int type, u32 pid)
 
 int trace_fast(struct pt_regs *ctx, struct nameidata *nd, struct path *path)
 {
-    u32 pid = bpf_get_current_pid_tgid();
+    u32 pid = bpf_get_current_pid_tgid() >> 32;
     submit_event(ctx, (void *)nd->last.name, LOOKUP_REFERENCE, pid);
     return 1;
 }
@@ -98,26 +98,34 @@ int trace_fast(struct pt_regs *ctx, struct nameidata *nd, struct path *path)
 int kprobe__d_lookup(struct pt_regs *ctx, const struct dentry *parent,
     const struct qstr *name)
 {
-    u32 pid = bpf_get_current_pid_tgid();
+    u32 tid = bpf_get_current_pid_tgid();
     struct entry_t entry = {};
     const char *fname = name->name;
     if (fname) {
         bpf_probe_read_kernel(&entry.name, sizeof(entry.name), (void *)fname);
     }
-    entrybypid.update(&pid, &entry);
+    entrybypid.update(&tid, &entry);
     return 0;
 }
 
 int kretprobe__d_lookup(struct pt_regs *ctx)
 {
-    u32 pid = bpf_get_current_pid_tgid();
+    u64 pid_tgid = bpf_get_current_pid_tgid();
+    u32 pid = pid_tgid >> 32;
+    u32 tid = (u32)pid_tgid;
     struct entry_t *ep;
-    ep = entrybypid.lookup(&pid);
-    if (ep == 0 || PT_REGS_RC(ctx) != 0) {
-        return 0;   // missed entry or lookup didn't fail
+
+    ep = entrybypid.lookup(&tid);
+    if (ep == 0) {
+        return 0;   // missed entry
     }
+    if (PT_REGS_RC(ctx) != 0) {
+        entrybypid.delete(&tid);
+        return 0;   // lookup didn't fail
+    }
+
     submit_event(ctx, (void *)ep->name, LOOKUP_MISS, pid);
-    entrybypid.delete(&pid);
+    entrybypid.delete(&tid);
     return 0;
 }
 """
