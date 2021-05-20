@@ -103,7 +103,9 @@ BPF_HASH(start, u32);
 BPF_STACK_TRACE(stack_traces, STACK_STORAGE_SIZE);
 
 static int offcpu_sched_switch() {
-    u32 pid = bpf_get_current_pid_tgid();
+    u64 pid_tgid = bpf_get_current_pid_tgid();
+    u32 pid = pid_tgid >> 32;
+    u32 tid = (u32)pid_tgid;
     struct task_struct *p = (struct task_struct *) bpf_get_current_task();
     u64 ts;
 
@@ -111,18 +113,19 @@ static int offcpu_sched_switch() {
         return 0;
 
     ts = bpf_ktime_get_ns();
-    start.update(&pid, &ts);
+    start.update(&tid, &ts);
     return 0;
 }
 
 static int wakeup(ARG0, struct task_struct *p) {
-    u32 pid = p->pid;
+    u32 pid = p->tgid;
+    u32 tid = p->pid;
     u64 delta, *tsp, ts;
 
-    tsp = start.lookup(&pid);
+    tsp = start.lookup(&tid);
     if (tsp == 0)
         return 0;        // missed start
-    start.delete(&pid);
+    start.delete(&tid);
 
     if (FILTER)
         return 0;

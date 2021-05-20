@@ -58,19 +58,21 @@ BPF_HASH(start_tmp, u32, struct start_t);
 BPF_PERF_OUTPUT(events);
 
 int do_start(struct pt_regs *ctx) {
-    u32 pid = bpf_get_current_pid_tgid();
+    u32 tid = bpf_get_current_pid_tgid();
     struct start_t start = {};
     start.ts = bpf_ktime_get_ns();
     bpf_usdt_readarg(1, ctx, &start.query);
-    start_tmp.update(&pid, &start);
+    start_tmp.update(&tid, &start);
     return 0;
 };
 
 int do_done(struct pt_regs *ctx) {
-    u32 pid = bpf_get_current_pid_tgid();
+    u64 pid_tgid = bpf_get_current_pid_tgid();
+    u32 pid = pid_tgid >> 32;
+    u32 tid = (u32)pid_tgid;
     struct start_t *sp;
 
-    sp = start_tmp.lookup(&pid);
+    sp = start_tmp.lookup(&tid);
     if (sp == 0) {
         // missed tracing start
         return 0;
@@ -85,7 +87,7 @@ int do_done(struct pt_regs *ctx) {
         events.perf_submit(ctx, &data, sizeof(data));
     }
 
-    start_tmp.delete(&pid);
+    start_tmp.delete(&tid);
 
     return 0;
 };

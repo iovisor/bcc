@@ -157,8 +157,8 @@ def handle_loop(stdscr, args):
         u32 uid = bpf_get_current_uid_gid();
 
         key.ip = PT_REGS_IP(ctx);
-        key.pid = pid & 0xFFFFFFFF;
-        key.uid = uid & 0xFFFFFFFF;
+        key.pid = pid >> 32;
+        key.uid = uid;
         bpf_get_current_comm(&(key.comm), 16);
 
         counts.increment(key);

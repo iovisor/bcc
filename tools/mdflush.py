@@ -32,7 +32,7 @@ BPF_PERF_OUTPUT(events);
 int kprobe__md_flush_request(struct pt_regs *ctx, void *mddev, struct bio *bio)
 {
     struct data_t data = {};
-    u32 pid = bpf_get_current_pid_tgid();
+    u32 pid = bpf_get_current_pid_tgid() >> 32;
     data.pid = pid;
     bpf_get_current_comm(&data.comm, sizeof(data.comm));
 /*
