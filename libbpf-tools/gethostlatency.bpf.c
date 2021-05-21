@@ -29,7 +29,9 @@ int probe_entry(struct pt_regs *ctx) {
 		return 0;
 
 	struct val_t val = {};
-	__u32 pid = bpf_get_current_pid_tgid() >> 32;
+	__u64 pid_tgid = bpf_get_current_pid_tgid();
+	__u32 pid = pid_tgid >> 32;
+	__u32 tid = (__u32)pid_tgid;
 
 	if (targ_tgid && targ_tgid != pid)
 		return 0;
@@ -39,7 +41,7 @@ int probe_entry(struct pt_regs *ctx) {
 					   (void *)PT_REGS_PARM1(ctx));
 		val.pid = pid;
 		val.time = bpf_ktime_get_ns();
-		bpf_map_update_elem(&start, &pid, &val, BPF_ANY);
+		bpf_map_update_elem(&start, &tid, &val, BPF_ANY);
 	}
 
 	return 0;
@@ -48,10 +50,12 @@ int probe_entry(struct pt_regs *ctx) {
 static __always_inline
 int probe_return(struct pt_regs *ctx) {
 	struct val_t *valp;
-	__u32 pid = bpf_get_current_pid_tgid() >> 32;
+	__u64 pid_tgid = bpf_get_current_pid_tgid();
+	__u32 pid = pid_tgid >> 32;
+	__u32 tid = (__u32)pid_tgid;
 	__u64 now = bpf_ktime_get_ns();
 
-	valp = bpf_map_lookup_elem(&start, &pid);
+	valp = bpf_map_lookup_elem(&start, &tid);
 	if (!valp)
 		return 0;
 
@@ -59,7 +63,7 @@ int probe_return(struct pt_regs *ctx) {
 	valp->time = now - valp->time;
 	bpf_perf_event_output(ctx, &events, BPF_F_CURRENT_CPU, valp,
 			sizeof(*valp));
-	bpf_map_delete_elem(&start, &pid);
+	bpf_map_delete_elem(&start, &tid);
 	return 0;
 }
 
