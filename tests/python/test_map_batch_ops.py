@@ -67,8 +67,9 @@ class TestMapBatch(TestCase):
 
     def check_hashmap_values(self, it):
         i = 0
-        for k, v in it:
-            self.assertEqual(k, v)
+        for k, v in sorted(it):
+            self.assertEqual(k, i)
+            self.assertEqual(v, i)
             i += 1
         return i
 
@@ -84,19 +85,6 @@ class TestMapBatch(TestCase):
         count = sum(1 for _ in hmap.items())
         self.assertEqual(count, 0)
 
-    def test_lookup_and_delete_batch_subset(self):
-        # Delete only a subset of key/value in the map
-        # fill the hashmap
-        hmap = self.fill_hashmap()
-        keys = self.prepare_keys_subset(hmap)
-        # check values and count them
-        count = sum(1 for _ in hmap.items_lookup_and_delete_batch(keys))
-        self.assertEqual(count, self.SUBSET_SIZE)
-
-        # and check the delete has worked.
-        count = sum(1 for _ in hmap.items())
-        self.assertEqual(count, self.MAPSIZE - self.SUBSET_SIZE)
-
     def test_lookup_batch_all_keys(self):
         # fill the hashmap
         hmap = self.fill_hashmap()
@@ -104,15 +92,6 @@ class TestMapBatch(TestCase):
         # check values and count them
         count = self.check_hashmap_values(hmap.items_lookup_batch())
         self.assertEqual(count, self.MAPSIZE)
-
-    def test_lookup_batch_subset(self):
-        # fill the hashmap
-        hmap = self.fill_hashmap()
-        keys = self.prepare_keys_subset(hmap, count=self.SUBSET_SIZE)
-
-        # check values and count them
-        count = self.check_hashmap_values(hmap.items_lookup_batch(keys))
-        self.assertEqual(count, self.SUBSET_SIZE)
 
     def test_delete_batch_all_keys(self):
         # Delete all key/value in the map

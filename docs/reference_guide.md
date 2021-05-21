@@ -1962,16 +1962,10 @@ Examples in situ:
 
 ### 6. items_lookup_and_delete_batch()
 
-Syntax: ```table.items_lookup_and_delete_batch(keys)```
+Syntax: ```table.items_lookup_and_delete_batch()```
 
 Returns an array of the keys in a table with a single call to BPF syscall. This can be used with BPF_HASH maps to fetch, and iterate, over the keys. It also clears the table: deletes all entries.
-You should rather use table.items_lookup_and_delete_batch() than table.items() followed by table.clear(). You can lookup and delete a subset of a map by giving an array of keys as parameter. Those keys and their associated values will be returned.
-It requires kernel v5.6.
-
-Arguments:
-
-- keys is optional and by default is None.
-
+You should rather use table.items_lookup_and_delete_batch() than table.items() followed by table.clear(). It requires kernel v5.6.
 
 Example:
 
@@ -1986,15 +1980,10 @@ while True:
 
 ### 7. items_lookup_batch()
 
-Syntax: ```table.items_lookup_batch(keys)```
+Syntax: ```table.items_lookup_batch()```
 
 Returns an array of the keys in a table with a single call to BPF syscall. This can be used with BPF_HASH maps to fetch, and iterate, over the keys.
-You should rather use table.items_lookup_batch() than table.items(). You can look up a subset of a map by giving an array of keys as parameter. Those keys and their associated values will be returned.
-It requires kernel v5.6.
-
-Arguments:
-
-- keys is optional and by default is None.
+You should rather use table.items_lookup_batch() than table.items(). It requires kernel v5.6.
 
 Example:
 

@@ -427,15 +427,13 @@ class TableBase(MutableMapping):
             raise ValueError("Wrong count")
 
         if alloc_k:
-            #keys = (self.Key * count)()
-            keys = (self.Key * self.max_entries)()
+            keys = (self.Key * count)()
         if alloc_v:
-            #values = (self.Leaf * count)()
-            values = (self.Leaf * self.max_entries)()
+            values = (self.Leaf * count)()
 
         return (ct.c_uint32(count), keys, values)
 
-    def sanity_check_keys_values(self, keys=None, values=None):
+    def _sanity_check_keys_values(self, keys=None, values=None):
         """Check if the given keys or values have the right type and size.
 
         Args:
@@ -465,26 +463,20 @@ class TableBase(MutableMapping):
 
         return ct.c_uint32(arr_len)
 
-    def items_lookup_batch(self, ct_keys=None):
+    def items_lookup_batch(self):
         """Lookup the key-value pairs related to the keys given as parameters.
 
         Args:
-            ct_keys (ct.Array): keys array to lookup. If an array
-            of keys is given then it lookups all the related keys-values.
-            If keys is None (default) then it looks up every entries.
+            None
         Yields:
             tuple: The tuple of (key,value) for every entries that have
             been looked up.
         Raises:
             Exception: If bpf syscall has failed or is invalid
+        Notes: lookup batch on a keys subset is not supported by the kernel.
         """
-        if ct_keys is None:
-            ct_cnt, ct_keys, ct_values = self._alloc_keys_values(alloc_k=True,
-                                                                 alloc_v=True)
-        else:
-            ct_cnt = self.sanity_check_keys_values(keys=ct_keys)
-            ct_cnt, _, ct_values = self._alloc_keys_values(alloc_v=True,
-                                                           count=ct_cnt.value)
+        ct_cnt, ct_keys, ct_values = self._alloc_keys_values(alloc_k=True,
+                                                             alloc_v=True)
 
         res = lib.bpf_lookup_batch(self.map_fd,
                                    None,
@@ -521,7 +513,7 @@ class TableBase(MutableMapping):
             Exception: If bpf syscall has failed or is invalid
         """
         if ct_keys is not None:
-            ct_cnt = self.sanity_check_keys_values(keys=ct_keys)
+            ct_cnt = self._sanity_check_keys_values(keys=ct_keys)
             res = lib.bpf_delete_batch(self.map_fd,
                                        ct.byref(ct_keys),
                                        ct.byref(ct_cnt)
@@ -547,7 +539,7 @@ class TableBase(MutableMapping):
         Raises:
             Exception: If bpf syscall has failed or is invalid
         """
-        ct_cnt = self.sanity_check_keys_values(keys=ct_keys, values=ct_values)
+        ct_cnt = self._sanity_check_keys_values(keys=ct_keys, values=ct_values)
         res = lib.bpf_update_batch(self.map_fd,
                                    ct.byref(ct_keys),
                                    ct.byref(ct_values),
@@ -561,29 +553,24 @@ class TableBase(MutableMapping):
         if (res != 0 and errcode != errno.ENOENT):
             raise Exception("BPF_MAP_UPDATE_BATCH has failed")
 
-    def items_lookup_and_delete_batch(self, ct_keys=None):
+    def items_lookup_and_delete_batch(self):
         """Look up and delete the key-value pairs related to the keys given
         as parameters.
 
         Args:
-            ct_keys (ct.Array): keys array to lookup and delete. If an array
-            of keys is given then it lookups and deletes all the related
-            keys-values. If keys is None (default) then it looks up and deletes
-            every entries.
+            None
         Yields:
             tuple: The tuple of (key,value) for every entries that have
-            been deleted.
+            been looked up and deleted.
         Raises:
             Exception: If bpf syscall has failed or is invalid
+        Notes: lookup and delete batch on a keys subset is not supported by
+        the kernel.
         """
-        if ct_keys is None:
-            # alloc keys and values to the max size
-            ct_cnt, ct_keys, ct_values = self._alloc_keys_values(alloc_k=True,
-                                                                 alloc_v=True)
-        else:
-            ct_cnt = self.sanity_check_keys_values(keys=ct_keys)
-            ct_cnt, _, ct_values = self._alloc_keys_values(alloc_v=True,
-                                                           count=ct_cnt.value)
+        # alloc keys and values to the max size
+        ct_cnt, ct_keys, ct_values = self._alloc_keys_values(alloc_k=True,
+                                                             alloc_v=True)
+
         res = lib.bpf_lookup_and_delete_batch(self.map_fd,
                                               None,
                                               ct.byref(ct_cnt),
