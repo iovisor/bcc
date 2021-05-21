@@ -19,8 +19,8 @@
 #define PERF_POLL_TIMEOUT_MS 100
 #define warn(...) fprintf(stderr, __VA_ARGS__)
 
-volatile sig_atomic_t canceled = 0;
-pid_t traced_pid = 0;
+static volatile sig_atomic_t exiting = 0;
+static pid_t traced_pid = 0;
 
 const char *argp_program_version = "gethostlatency 0.1";
 const char *argp_program_bug_address =
@@ -35,8 +35,8 @@ const char argp_program_doc[] =
 "    gethostlatency -p 1216     # only trace PID 1216\n";
 
 static const struct argp_option opts[] = {
-	{"pid", 'p', "PID", 0, "Process ID to trace"},
-	{NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help"},
+	{ "pid", 'p', "PID", 0, "Process ID to trace" },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
 	{},
 };
 
@@ -65,7 +65,7 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 
 static void sig_int(int signo)
 {
-	canceled = 1;
+	exiting = 1;
 }
 
 static const char *strftime_now(char *s, size_t max, const char *format)
@@ -86,7 +86,7 @@ static const char *strftime_now(char *s, size_t max, const char *format)
 	return s;
 }
 
-void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
+static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 {
 	const struct val_t *e = data;
 	char s[16] = {};
@@ -97,7 +97,7 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 		now, e->pid, e->comm, (double)e->time/1000000, e->host);
 }
 
-void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
+static void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
 {
 	warn("lost %llu events on CPU #%d\n", lost_cnt, cpu);
 }
@@ -273,7 +273,7 @@ int main(int argc, char **argv)
 	while (1) {
 		if ((err = perf_buffer__poll(pb, PERF_POLL_TIMEOUT_MS)) < 0)
 			break;
-		if (canceled)
+		if (exiting)
 			goto cleanup;
 	}
 	warn("error polling perf buffer: %d\n", err);
