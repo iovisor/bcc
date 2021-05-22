@@ -12,7 +12,6 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
 # 19-Oct-2015   Brendan Gregg   Created this.
-# 22-May-2021   Hengqi Chen     Migrated to kernel tracepoints.
 
 from __future__ import print_function
 from bcc import BPF
@@ -71,68 +70,60 @@ typedef struct irq_key {
     char name[32];
     u64 slot;
 } irq_key_t;
-
-typedef struct irq_name {
-    char name[32];
-} irq_name_t;
-
 BPF_HASH(start, u32);
-BPF_HASH(irqnames, u32, irq_name_t);
+BPF_HASH(irqdesc, u32, struct irq_desc *);
 BPF_HISTOGRAM(dist, irq_key_t);
-"""
 
-bpf_text_count = """
-TRACEPOINT_PROBE(irq, irq_handler_entry)
+// count IRQ
+int count_only(struct pt_regs *ctx, struct irq_desc *desc)
 {
+    u32 pid = bpf_get_current_pid_tgid();
+
+    struct irqaction *action = desc->action;
+    char *name = (char *)action->name;
+
     irq_key_t key = {.slot = 0 /* ignore */};
-    TP_DATA_LOC_READ_CONST(&key.name, name, sizeof(key.name));
+    bpf_probe_read_kernel(&key.name, sizeof(key.name), name);
     dist.increment(key);
+
     return 0;
 }
-"""
 
-bpf_text_time = """
-TRACEPOINT_PROBE(irq, irq_handler_entry)
+// time IRQ
+int trace_start(struct pt_regs *ctx, struct irq_desc *desc)
 {
-    u32 tid = bpf_get_current_pid_tgid();
+    u32 pid = bpf_get_current_pid_tgid();
     u64 ts = bpf_ktime_get_ns();
-    irq_name_t name = {};
-
-    TP_DATA_LOC_READ_CONST(&name.name, name, sizeof(name));
-    irqnames.update(&tid, &name);
-    start.update(&tid, &ts);
+    start.update(&pid, &ts);
+    irqdesc.update(&pid, &desc);
     return 0;
 }
 
-TRACEPOINT_PROBE(irq, irq_handler_exit)
+int trace_completion(struct pt_regs *ctx)
 {
     u64 *tsp, delta;
-    irq_name_t *namep;
-    u32 tid = bpf_get_current_pid_tgid();
+    struct irq_desc **descp;
+    u32 pid = bpf_get_current_pid_tgid();
 
     // fetch timestamp and calculate delta
-    tsp = start.lookup(&tid);
-    namep = irqnames.lookup(&tid);
-    if (tsp == 0 || namep == 0) {
+    tsp = start.lookup(&pid);
+    descp = irqdesc.lookup(&pid);
+    if (tsp == 0 || descp == 0) {
         return 0;   // missed start
     }
-
-    char *name = (char *)namep->name;
+    struct irq_desc *desc = *descp;
+    struct irqaction *action = desc->action;
+    char *name = (char *)action->name;
     delta = bpf_ktime_get_ns() - *tsp;
 
     // store as sum or histogram
     STORE
 
-    start.delete(&tid);
-    irqnames.delete(&tid);
+    start.delete(&pid);
+    irqdesc.delete(&pid);
     return 0;
 }
 """
-
-if args.count:
-    bpf_text += bpf_text_count
-else:
-    bpf_text += bpf_text_time
 
 # code substitutions
 if args.dist:
@@ -153,9 +144,14 @@ if debug or args.ebpf:
 # load BPF program
 b = BPF(text=bpf_text)
 
+# these should really use irq:irq_handler_entry/exit tracepoints:
 if args.count:
+    b.attach_kprobe(event="handle_irq_event_percpu", fn_name="count_only")
     print("Tracing hard irq events... Hit Ctrl-C to end.")
 else:
+    b.attach_kprobe(event="handle_irq_event_percpu", fn_name="trace_start")
+    b.attach_kretprobe(event="handle_irq_event_percpu",
+        fn_name="trace_completion")
     print("Tracing hard irq event time... Hit Ctrl-C to end.")
 
 # output
