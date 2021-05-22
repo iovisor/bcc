@@ -9,9 +9,10 @@ show this time as either totals or histogram distributions. A system-wide
 summary of this time is shown by the %irq column of mpstat(1), and event
 counts (but not times) are shown by /proc/interrupts.
 
-WARNING: This currently uses dynamic tracing of hard interrupts. You should
-understand what this means before use. Try in a test environment. Future
-versions should switch to tracepoints.
+This tool uses the irq:irq_handler_entry and irq:irq_handler_exit kernel
+tracepoints, which is a stable tracing mechanism. BPF programs can attach to
+tracepoints from Linux 4.7 only. An older version of this tool is available
+in tools/old, and uses kprobes instead of tracepoints.
 
 Since this uses BPF, only the root user can use this tool.
 .SH REQUIREMENTS
@@ -90,6 +91,6 @@ Linux
 .SH STABILITY
 Unstable - in development.
 .SH AUTHOR
-Brendan Gregg
+Brendan Gregg, Hengqi Chen
 .SH SEE ALSO
 softirqs(8)

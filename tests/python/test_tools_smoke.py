@@ -195,6 +195,7 @@ class SmokeTests(TestCase):
     def test_gethostlatency(self):
         self.run_with_int("gethostlatency.py")
 
+    @skipUnless(kernel_version_ge(4,7), "requires kernel >= 4.7")
     def test_hardirqs(self):
         self.run_with_duration("hardirqs.py 1 1")
 
