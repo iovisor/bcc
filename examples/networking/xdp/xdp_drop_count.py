@@ -33,12 +33,12 @@ maptype = "percpu_array"
 if len(sys.argv) == 3:
     if "-S" in sys.argv:
         # XDP_FLAGS_SKB_MODE
-        flags |= (1 << 1)
+        flags |= BPF.XDP_FLAGS_SKB_MODE
     if "-H" in sys.argv:
         # XDP_FLAGS_HW_MODE
         maptype = "array"
         offload_device = device
-        flags |= (1 << 3)
+        flags |= BPF.XDP_FLAGS_HW_MODE
 
 mode = BPF.XDP
 #mode = BPF.SCHED_CLS

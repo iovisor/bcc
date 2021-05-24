@@ -171,6 +171,13 @@ class BPF(object):
     XDP_TX = 3
     XDP_REDIRECT = 4
 
+    # from xdp_flags uapi/linux/if_link.h
+    XDP_FLAGS_UPDATE_IF_NOEXIST = (1 << 0)
+    XDP_FLAGS_SKB_MODE = (1 << 1)
+    XDP_FLAGS_DRV_MODE = (1 << 2)
+    XDP_FLAGS_HW_MODE = (1 << 3)
+    XDP_FLAGS_REPLACE = (1 << 4)
+
     # from bpf_attach_type uapi/linux/bpf.h
     TRACE_FENTRY = 24
     TRACE_FEXIT  = 25
