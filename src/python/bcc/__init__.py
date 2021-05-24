@@ -177,10 +177,6 @@ class BPF(object):
     XDP_FLAGS_DRV_MODE = (1 << 2)
     XDP_FLAGS_HW_MODE = (1 << 3)
     XDP_FLAGS_REPLACE = (1 << 4)
-    XDP_FLAGS_MODES = (XDP_FLAGS_SKB_MODE | XDP_FLAGS_DRV_MODE | \
-                       XDP_FLAGS_HW_MODE)
-    XDP_FLAGS_MASK = (XDP_FLAGS_UPDATE_IF_NOEXIST | XDP_FLAGS_MODES | \
-                      XDP_FLAGS_REPLACE)
 
     # from bpf_attach_type uapi/linux/bpf.h
     TRACE_FENTRY = 24
