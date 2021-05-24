@@ -92,6 +92,7 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
         - [6. USDT.enable_probe()](#6-usdtenable_probe)
         - [7. attach_raw_tracepoint()](#7-attach_raw_tracepoint)
         - [8. attach_raw_socket()](#8-attach_raw_socket)
+        - [9. attach_xdp()](#9-attach_xdp)
     - [Debug Output](#debug-output)
         - [1. trace_print()](#1-trace_print)
         - [2. trace_fields()](#2-trace_fields)
@@ -1721,6 +1722,24 @@ BPF.attach_raw_socket(bpf_func, ifname)
 
 Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=attach_raw_socket+path%3Aexamples+language%3Apython&type=Code)
+### 9. attach_xdp()
+Syntax: ```BPF.attach_xdp(dev="device", fn=b.load_func("fn_name",BPF_XDP))```
+
+Instruments the network driver described by ```dev``` , and then receives the packet, run the BPF function ```fn_name()```.
+
+For example:
+
+```Python
+b.attach_xdp(dev="ens1", fn=b.load_func("do_xdp", BPF.XDP))
+```
+
+This will instrument the network device ```ens1``` , which will then run our BPF defined ```do_xdp()``` function each time it receives packets.
+
+Don't forget to call ```b.remove_xdp("ens1")``` at the end!
+
+Examples in situ:
+[search /examples](https://github.com/iovisor/bcc/search?q=attach_xdp+path%3Aexamples+language%3Apython&type=Code),
+[search /tools](https://github.com/iovisor/bcc/search?q=attach_xdp+path%3Atools+language%3Apython&type=Code)
 
 ## Debug Output
 
