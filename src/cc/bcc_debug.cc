@@ -132,7 +132,8 @@ void SourceDebugger::dump() {
       T->createMCSubtargetInfo(TripleStr, "", ""));
   MCObjectFileInfo MOFI;
 #if LLVM_MAJOR_VERSION >= 13
-  MCContext Ctx(TheTriple, MAI.get(), MRI.get(), &MOFI, STI.get(), nullptr);
+  MCContext Ctx(TheTriple, MAI.get(), MRI.get(), STI.get(), nullptr);
+  Ctx.setObjectFileInfo(&MOFI);
   MOFI.initMCObjectFileInfo(Ctx, false, false);
 #else
   MCContext Ctx(MAI.get(), MRI.get(), &MOFI, nullptr);
