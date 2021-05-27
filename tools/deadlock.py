@@ -475,7 +475,8 @@ def main():
             print('%s. Is the process (pid=%d) running?' % (str(e), args.pid))
             sys.exit(1)
 
-    text = open('deadlock.c').read()
+    with open('deadlock.c') as f:
+        text = f.read()
     text = text.replace(b'MAX_THREADS', str(args.threads));
     text = text.replace(b'MAX_EDGES', str(args.edges));
     bpf = BPF(text=text)
