@@ -28,6 +28,7 @@ APPS = \
 	execsnoop \
 	ext4dist \
 	filelife \
+	fsslower \
 	funclatency \
 	gethostlatency \
 	hardirqs \
