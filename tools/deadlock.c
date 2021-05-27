@@ -30,7 +30,7 @@ struct thread_to_held_mutex_leaf_t {
 };
 
 // Map of thread ID -> array of (mutex addresses, stack id)
-BPF_HASH(thread_to_held_mutexes, u32, struct thread_to_held_mutex_leaf_t, 2097152);
+BPF_HASH(thread_to_held_mutexes, u32, struct thread_to_held_mutex_leaf_t, MAX_THREADS);
 
 // Key type for edges. Represents an edge from mutex1 => mutex2.
 struct edges_key_t {
@@ -47,7 +47,7 @@ struct edges_leaf_t {
 };
 
 // Represents all edges currently in the mutex wait graph.
-BPF_HASH(edges, struct edges_key_t, struct edges_leaf_t, 2097152);
+BPF_HASH(edges, struct edges_key_t, struct edges_leaf_t, MAX_EDGES);
 
 // Info about parent thread when a child thread is created.
 struct thread_created_leaf_t {
