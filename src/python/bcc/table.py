@@ -408,14 +408,15 @@ class TableBase(MutableMapping):
             alloc_v (bool): True to allocate values array, False otherwise.
             Default is False.
             count (int): number of elements in the array(s) to allocate. If
-            count is None then it allocates the maximum nb of elements i.e
+            count is None then it allocates the maximum number of elements i.e
             self.max_entries.
 
         Returns:
             tuple: (count, keys, values). Where count is ct.c_uint32,
             and keys and values an instance of ct.Array
         Raises:
-            ValueError: If count is not < 1 or > self.max_entries
+            ValueError: If count is less than 1 or greater than
+            self.max_entries.
         """
         keys = values = None
         if not alloc_k and not alloc_v:
@@ -442,8 +443,8 @@ class TableBase(MutableMapping):
         Returns:
             ct.c_uint32 : the size of the array(s)
         Raises:
-            ValueError: If length of arrays is < 1 or > self.max_entries, or
-            when both arrays length are different.
+            ValueError: If length of arrays is less than 1 or greater than
+            self.max_entries, or when both arrays length are different.
             TypeError: If the keys and values are not an instance of ct.Array
         """
         arr_len = 0
@@ -464,37 +465,18 @@ class TableBase(MutableMapping):
         return ct.c_uint32(arr_len)
 
     def items_lookup_batch(self):
-        """Lookup the key-value pairs related to the keys given as parameters.
+        """Look up all the key-value pairs in the map.
 
         Args:
             None
         Yields:
             tuple: The tuple of (key,value) for every entries that have
             been looked up.
-        Raises:
-            Exception: If bpf syscall has failed or is invalid
         Notes: lookup batch on a keys subset is not supported by the kernel.
         """
-        ct_cnt, ct_keys, ct_values = self._alloc_keys_values(alloc_k=True,
-                                                             alloc_v=True)
-
-        res = lib.bpf_lookup_batch(self.map_fd,
-                                   None,
-                                   ct.byref(ct_cnt),
-                                   ct.byref(ct_keys),
-                                   ct.byref(ct_values),
-                                   ct.byref(ct_cnt)
-                                   )
-
-        errcode = ct.get_errno()
-        if (errcode == errno.EINVAL):
-            raise Exception("BPF_MAP_LOOKUP_BATCH is invalid.")
-
-        if (res != 0 and errcode != errno.ENOENT):
-            raise Exception("BPF_MAP_LOOKUP_BATCH has failed")
-
-        for i in range(0, ct_cnt.value):
-            yield (ct_keys[i], ct_values[i])
+        for k, v in self._items_lookup_and_optionally_delete_batch(delete=False):
+            yield(k, v)
+        return
 
     def items_delete_batch(self, ct_keys=None):
         """Delete the key-value pairs related to the keys given as parameters.
@@ -505,12 +487,12 @@ class TableBase(MutableMapping):
         Args:
             ct_keys (ct.Array): keys array to delete. If an array of keys is
             given then it deletes all the related keys-values.
-            If keys is None (default) then it deletes every entries.
+            If keys is None (default) then it deletes all entries.
         Yields:
             tuple: The tuple of (key,value) for every entries that have
             been deleted.
         Raises:
-            Exception: If bpf syscall has failed or is invalid
+            Exception: If bpf syscall return value indicates an error.
         """
         if ct_keys is not None:
             ct_cnt = self._sanity_check_keys_values(keys=ct_keys)
@@ -518,12 +500,10 @@ class TableBase(MutableMapping):
                                        ct.byref(ct_keys),
                                        ct.byref(ct_cnt)
                                        )
-            errcode = ct.get_errno()
-            if (errcode == errno.EINVAL):
-                raise Exception("BPF_MAP_DELETE_BATCH is invalid.")
+            if (res != 0):
+                raise Exception("BPF_MAP_DELETE_BATCH has failed: %s"
+                                % os.strerror(ct.get_errno()))
 
-            if (res != 0 and errcode != errno.ENOENT):
-                raise Exception("BPF_MAP_DELETE_BATCH has failed")
         else:
             for _ in self.items_lookup_and_delete_batch():
                 return
@@ -537,7 +517,7 @@ class TableBase(MutableMapping):
             ct_keys (ct.Array): keys array to update
             ct_values (ct.Array): values array to update
         Raises:
-            Exception: If bpf syscall has failed or is invalid
+            Exception: If bpf syscall return value indicates an error.
         """
         ct_cnt = self._sanity_check_keys_values(keys=ct_keys, values=ct_values)
         res = lib.bpf_update_batch(self.map_fd,
@@ -545,51 +525,70 @@ class TableBase(MutableMapping):
                                    ct.byref(ct_values),
                                    ct.byref(ct_cnt)
                                    )
-
-        errcode = ct.get_errno()
-        if (errcode == errno.EINVAL):
-            raise Exception("BPF_MAP_UPDATE_BATCH is invalid.")
-
-        if (res != 0 and errcode != errno.ENOENT):
-            raise Exception("BPF_MAP_UPDATE_BATCH has failed")
+        if (res != 0):
+            raise Exception("BPF_MAP_UPDATE_BATCH has failed: %s"
+                            % os.strerror(ct.get_errno()))
 
     def items_lookup_and_delete_batch(self):
-        """Look up and delete the key-value pairs related to the keys given
-        as parameters.
+        """Look up and delete all the key-value pairs in the map.
 
         Args:
             None
         Yields:
             tuple: The tuple of (key,value) for every entries that have
             been looked up and deleted.
-        Raises:
-            Exception: If bpf syscall has failed or is invalid
         Notes: lookup and delete batch on a keys subset is not supported by
         the kernel.
         """
+        for k, v in self._items_lookup_and_optionally_delete_batch(delete=True):
+            yield(k, v)
+        return
+
+    def _items_lookup_and_optionally_delete_batch(self, delete=True):
+        """Look up and optionally delete all the key-value pairs in the map.
+
+        Args:
+            delete (bool) : look up and delete the key-value pairs when True,
+            else just look up.
+        Yields:
+            tuple: The tuple of (key,value) for every entries that have
+            been looked up and deleted.
+        Raises:
+            Exception: If bpf syscall return value indicates an error.
+        Notes: lookup and delete batch on a keys subset is not supported by
+        the kernel.
+        """
+        if delete is True:
+            bpf_batch = lib.bpf_lookup_and_delete_batch
+            bpf_cmd = "BPF_MAP_LOOKUP_AND_DELETE_BATCH"
+        else:
+            bpf_batch = lib.bpf_lookup_batch
+            bpf_cmd = "BPF_MAP_LOOKUP_BATCH"
+
         # alloc keys and values to the max size
         ct_cnt, ct_keys, ct_values = self._alloc_keys_values(alloc_k=True,
                                                              alloc_v=True)
+        out_batch = ct.c_uint32(0)
+        total = 0
+        while True:
+            res = bpf_batch(self.map_fd,
+                            ct.byref(out_batch) if total else None,
+                            ct.byref(out_batch),
+                            ct.byref(ct_keys, ct.sizeof(self.Key) * total),
+                            ct.byref(ct_values, ct.sizeof(self.Leaf) * total),
+                            ct.byref(ct_cnt)
+                            )
+            errcode = ct.get_errno()
+            total += ct_cnt.value
+            if (res != 0 and errcode != errno.ENOENT):
+                raise Exception("%s has failed: %s" % (bpf_cmd,
+                                                       os.strerror(errcode)))
 
-        res = lib.bpf_lookup_and_delete_batch(self.map_fd,
-                                              None,
-                                              ct.byref(ct_cnt),
-                                              ct.byref(ct_keys),
-                                              ct.byref(ct_values),
-                                              ct.byref(ct_cnt)
-                                              )
+            if res != 0:
+                break  # success
 
-        errcode = ct.get_errno()
-        if (errcode == errno.EINVAL):
-            raise Exception("BPF_MAP_LOOKUP_AND_DELETE_BATCH is invalid.")
-
-        if (res != 0 and errcode != errno.ENOENT):
-            raise Exception("BPF_MAP_LOOKUP_AND_DELETE_BATCH has failed")
-
-        for i in range(0, ct_cnt.value):
+        for i in range(0, total):
             yield (ct_keys[i], ct_values[i])
-
-
 
     def zero(self):
         # Even though this is not very efficient, we grab the entire list of
