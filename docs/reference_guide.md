@@ -91,6 +91,7 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
         - [5. attach_uretprobe()](#5-attach_uretprobe)
         - [6. USDT.enable_probe()](#6-usdtenable_probe)
         - [7. attach_raw_tracepoint()](#7-attach_raw_tracepoint)
+        - [8. attach_raw_socket()](#8-attach_raw_socket)
     - [Debug Output](#debug-output)
         - [1. trace_print()](#1-trace_print)
         - [2. trace_fields()](#2-trace_fields)
@@ -1694,6 +1695,31 @@ b.attach_raw_tracepoint("sched_switch", "do_trace")
 
 Examples in situ:
 [search /tools](https://github.com/iovisor/bcc/search?q=attach_raw_tracepoint+path%3Atools+language%3Apython&type=Code)
+
+### 8. attach_raw_socket()
+
+Syntax: ```BPF.attach_raw_socket(fn, dev)```
+
+Attache a BPF function to the specified network interface.
+
+The ```fn``` must be the type of ```BPF.function``` and the bpf_prog type needs to be ```BPF_PROG_TYPE_SOCKET_FILTER```  (```fn=BPF.load_func(func_name, BPF.SOCKET_FILTER)```)
+
+```fn.sock``` is a non-blocking raw socket that was created and bound to ```dev```.
+
+All network packets processed by ```dev``` are copied to the ```recv-q``` of ```fn.sock``` after being processed by bpf_prog. Try to recv packet form ```fn.sock``` with rev/recvfrom/recvmsg. Note that if the ```recv-q``` is not read in time after the ```recv-q``` is full, the copied packets will be discarded.
+
+We can use this feature to capture network packets just like ```tcpdump```.
+
+We can use ```ss --bpf --packet -p``` to observe ```fn.sock```.
+
+Example:
+
+```Python
+BPF.attach_raw_socket(bpf_func, ifname)
+```
+
+Examples in situ:
+[search /examples](https://github.com/iovisor/bcc/search?q=attach_raw_socket+path%3Aexamples+language%3Apython&type=Code)
 
 ## Debug Output
 
