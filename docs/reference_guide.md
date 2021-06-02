@@ -1449,6 +1449,7 @@ The `debug` flags control debug output, and can be or'ed together:
 - `DEBUG_PREPROCESSOR = 0x4` pre-processor result
 - `DEBUG_SOURCE = 0x8` ASM instructions embedded with source
 - `DEBUG_BPF_REGISTER_STATE = 0x10` register state on all instructions in addition to DEBUG_BPF
+- `DEBUG_BTF = 0x20` print the messages from the `libbpf` library.
 
 Examples:
 
