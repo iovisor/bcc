@@ -168,7 +168,7 @@ def _print_log2_hist(vals, val_type, strip_leading_zero):
             print(body % (low, high, val, stars,
                           _stars(val, val_max, stars)))
 
-def _print_linear_hist(vals, val_type):
+def _print_linear_hist(vals, val_type, strip_leading_zero):
     global stars_max
     log2_dist_max = 64
     idx_max = -1
@@ -186,8 +186,15 @@ def _print_linear_hist(vals, val_type):
         print(header % val_type);
     for i in range(0, idx_max + 1):
         val = vals[i]
-        print(body % (i, val, stars,
-                      _stars(val, val_max, stars)))
+
+        if strip_leading_zero:
+            if val:
+                print(body % (i, val, stars,
+                              _stars(val, val_max, stars)))
+                strip_leading_zero = False
+        else:
+                print(body % (i, val, stars,
+                              _stars(val, val_max, stars)))
 
 
 def get_table_type_name(ttype):
@@ -650,10 +657,11 @@ class TableBase(MutableMapping):
             _print_log2_hist(vals, val_type, strip_leading_zero)
 
     def print_linear_hist(self, val_type="value", section_header="Bucket ptr",
-            section_print_fn=None, bucket_fn=None, bucket_sort_fn=None):
+            section_print_fn=None, bucket_fn=None, strip_leading_zero=None,
+            bucket_sort_fn=None):
         """print_linear_hist(val_type="value", section_header="Bucket ptr",
                            section_print_fn=None, bucket_fn=None,
-                           bucket_sort_fn=None)
+                           strip_leading_zero=None, bucket_sort_fn=None)
 
         Prints a table as a linear histogram. This is intended to span integer
         ranges, eg, from 0 to 100. The val_type argument is optional, and is a
@@ -662,6 +670,8 @@ class TableBase(MutableMapping):
         each.  If section_print_fn is not None, it will be passed the bucket
         value to format into a string as it sees fit. If bucket_fn is not None,
         it will be used to produce a bucket value for the histogram keys.
+        If the value of strip_leading_zero is not False, prints a histogram
+        that is omitted leading zeros from the beginning.
         If bucket_sort_fn is not None, it will be used to sort the buckets
         before iterating them, and it is useful when there are multiple fields
         in the secondary key.
@@ -680,7 +690,7 @@ class TableBase(MutableMapping):
                         section_print_fn(bucket)))
                 else:
                     print("\n%s = %r" % (section_header, bucket))
-                _print_linear_hist(vals, val_type)
+                _print_linear_hist(vals, val_type, strip_leading_zero)
         else:
             vals = [0] * linear_index_max
             for k, v in self.items():
@@ -691,7 +701,7 @@ class TableBase(MutableMapping):
                     # function be rewritten to avoid having one.
                     raise IndexError(("Index in print_linear_hist() of %d " +
                         "exceeds max of %d.") % (k.value, linear_index_max))
-            _print_linear_hist(vals, val_type)
+            _print_linear_hist(vals, val_type, strip_leading_zero)
 
 
 class HashTable(TableBase):
