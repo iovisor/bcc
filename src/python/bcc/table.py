@@ -566,14 +566,15 @@ class TableBase(MutableMapping):
             bpf_cmd = "BPF_MAP_LOOKUP_BATCH"
 
         # alloc keys and values to the max size
-        ct_cnt, ct_keys, ct_values = self._alloc_keys_values(alloc_k=True,
-                                                             alloc_v=True)
-        out_batch = ct.c_uint32(0)
+        ct_buf_size, ct_keys, ct_values = self._alloc_keys_values(alloc_k=True,
+                                                                  alloc_v=True)
+        ct_out_batch = ct_cnt = ct.c_uint32(0)
         total = 0
         while True:
+            ct_cnt.value = ct_buf_size.value - total
             res = bpf_batch(self.map_fd,
-                            ct.byref(out_batch) if total else None,
-                            ct.byref(out_batch),
+                            ct.byref(ct_out_batch) if total else None,
+                            ct.byref(ct_out_batch),
                             ct.byref(ct_keys, ct.sizeof(self.Key) * total),
                             ct.byref(ct_values, ct.sizeof(self.Leaf) * total),
                             ct.byref(ct_cnt)
@@ -586,6 +587,14 @@ class TableBase(MutableMapping):
 
             if res != 0:
                 break  # success
+
+            if total == ct_buf_size.value:  # buffer full, we can't progress
+                break
+
+            if ct_cnt.value == 0:
+                # no progress, probably because concurrent update
+                # puts too many elements in one bucket.
+                break
 
         for i in range(0, total):
             yield (ct_keys[i], ct_values[i])
