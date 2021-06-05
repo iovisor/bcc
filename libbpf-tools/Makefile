@@ -29,6 +29,7 @@ APPS = \
 	ext4dist \
 	filelife \
 	fsdist \
+	fsslower \
 	funclatency \
 	gethostlatency \
 	hardirqs \
@@ -46,8 +47,11 @@ APPS = \
 	tcpconnect \
 	tcpconnlat \
 	vfsstat \
-	xfsslower \
 	#
+
+FSSLOWER_ALIASES = btrfsslower ext4slower nfsslower xfsslower
+
+APP_ALIASES = $(FSSLOWER_ALIASES)
 
 COMMON_OBJ = \
 	$(OUTPUT)/trace_helpers.o \
@@ -58,7 +62,7 @@ COMMON_OBJ = \
 	#
 
 .PHONY: all
-all: $(APPS)
+all: $(APPS) $(APP_ALIASES)
 
 ifeq ($(V),1)
 Q =
@@ -72,7 +76,7 @@ endif
 .PHONY: clean
 clean:
 	$(call msg,CLEAN)
-	$(Q)rm -rf $(OUTPUT) $(APPS)
+	$(Q)rm -rf $(OUTPUT) $(APPS) $(APP_ALIASES)
 
 $(OUTPUT) $(OUTPUT)/libbpf:
 	$(call msg,MKDIR,$@)
@@ -106,10 +110,15 @@ $(LIBBPF_OBJ): $(wildcard $(LIBBPF_SRC)/*.[ch]) | $(OUTPUT)/libbpf
 		    INCLUDEDIR= LIBDIR= UAPIDIR=			      \
 		    install
 
-install: $(APPS)
+$(FSSLOWER_ALIASES): fsslower
+	$(call msg,SYMLINK,$@)
+	$(Q)ln -s $^ $@
+
+install: $(APPS) $(APP_ALIASES)
 	$(call msg, INSTALL libbpf-tools)
 	$(Q)$(INSTALL) -m 0755 -d $(DESTDIR)$(prefix)/bin
 	$(Q)$(INSTALL) $(APPS) $(DESTDIR)$(prefix)/bin
+	$(Q)cp -a $(APP_ALIASES) $(DESTDIR)$(prefix)/bin
 
 # delete failed targets
 .DELETE_ON_ERROR:
