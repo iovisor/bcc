@@ -92,6 +92,7 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
         - [6. USDT.enable_probe()](#6-usdtenable_probe)
         - [7. attach_raw_tracepoint()](#7-attach_raw_tracepoint)
         - [8. attach_raw_socket()](#8-attach_raw_socket)
+        - [9. attach_xdp()](#9-attach_xdp)
     - [Debug Output](#debug-output)
         - [1. trace_print()](#1-trace_print)
         - [2. trace_fields()](#2-trace_fields)
@@ -1721,6 +1722,55 @@ BPF.attach_raw_socket(bpf_func, ifname)
 
 Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=attach_raw_socket+path%3Aexamples+language%3Apython&type=Code)
+### 9. attach_xdp()
+Syntax: ```BPF.attach_xdp(dev="device", fn=b.load_func("fn_name",BPF_XDP), flags)```
+
+Instruments the network driver described by ```dev``` , and then receives the packet, run the BPF function ```fn_name()``` with flags.
+
+Here is a list of optional flags. 
+
+```Python
+# from xdp_flags uapi/linux/if_link.h
+XDP_FLAGS_UPDATE_IF_NOEXIST = (1 << 0)
+XDP_FLAGS_SKB_MODE = (1 << 1)
+XDP_FLAGS_DRV_MODE = (1 << 2)
+XDP_FLAGS_HW_MODE = (1 << 3)
+XDP_FLAGS_REPLACE = (1 << 4)
+```
+
+You can use flags like this ```BPF.attach_xdp(dev="device", fn=b.load_func("fn_name",BPF_XDP), flags=BPF.XDP_FLAGS_UPDATE_IF_NOEXIST)```
+
+The default value of flgas is 0. This means if there is no xdp program with `device`, the fn will run with that device. If there is an xdp program running with device, the old program will be replaced with new fn program.
+
+Currently, bcc does not support XDP_FLAGS_REPLACE flag. The following are the descriptions of other flags.
+
+#### 1. XDP_FLAGS_UPDATE_IF_NOEXIST
+If an XDP program is already attached to the specified driver, attaching the XDP program again will fail.
+
+#### 2. XDP_FLAGS_SKB_MODE
+Driver doesn’t have support for XDP, but the kernel fakes it.   
+XDP program works, but there’s no real performance benefit because packets are handed to kernel stack anyways which then emulates XDP – this is usually supported with generic network drivers used in home computers, laptops, and virtualized HW.
+
+#### 3. XDP_FLAGS_DRV_MODE
+A driver has XDP support and can hand then to XDP without kernel stack interaction – Few drivers can support it and those are usually for enterprise HW.
+
+#### 4. XDP_FLAGS_HW_MODE
+XDP can be loaded and executed directly on the NIC – just a handful of NICs can do that.
+
+
+For example:
+
+```Python
+b.attach_xdp(dev="ens1", fn=b.load_func("do_xdp", BPF.XDP))
+```
+
+This will instrument the network device ```ens1``` , which will then run our BPF defined ```do_xdp()``` function each time it receives packets.
+
+Don't forget to call ```b.remove_xdp("ens1")``` at the end!
+
+Examples in situ:
+[search /examples](https://github.com/iovisor/bcc/search?q=attach_xdp+path%3Aexamples+language%3Apython&type=Code),
+[search /tools](https://github.com/iovisor/bcc/search?q=attach_xdp+path%3Atools+language%3Apython&type=Code)
 
 ## Debug Output
 
