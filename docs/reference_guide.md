@@ -1723,9 +1723,9 @@ BPF.attach_raw_socket(bpf_func, ifname)
 Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=attach_raw_socket+path%3Aexamples+language%3Apython&type=Code)
 ### 9. attach_xdp()
-Syntax: ```BPF.attach_xdp(dev="device", fn=b.load_func("fn_name",BPF_XDP))```
+Syntax: ```BPF.attach_xdp(dev="device", fn=b.load_func("fn_name",BPF_XDP), flags)```
 
-Instruments the network driver described by ```dev``` , and then receives the packet, run the BPF function ```fn_name()```.
+Instruments the network driver described by ```dev``` , and then receives the packet, run the BPF function ```fn_name()``` with flags.
 
 Here is a list of optional flags. 
 
@@ -1740,7 +1740,9 @@ XDP_FLAGS_REPLACE = (1 << 4)
 
 You can use flags like this ```BPF.attach_xdp(dev="device", fn=b.load_func("fn_name",BPF_XDP), flags=BPF.XDP_FLAGS_UPDATE_IF_NOEXIST)```
 
-For historical reasons, XDP_FLAGS_REPLACE does not make sense in BCC. The default value of 0 has the same meaning.
+The default value of flgas is 0. This means if there is no xdp program with `device`, the fn will run with that device. If there is an xdp program running with device, the old program will be replaced with new fn program.
+
+Currently, bcc does not support XDP_FLAGS_REPLACE flag. The following are the descriptions of other flags.
 
 #### 1. XDP_FLAGS_UPDATE_IF_NOEXIST
 If an XDP program is already attached to the specified driver, attaching the XDP program again will fail.
@@ -1755,8 +1757,6 @@ A driver has XDP support and can hand then to XDP without kernel stack interacti
 #### 4. XDP_FLAGS_HW_MODE
 XDP can be loaded and executed directly on the NIC – just a handful of NICs can do that.
 
-#### 5. XDP_FLAGS_REPLACE
-If an XDP program is already attached to the specified driver, replacing the XDP program.
 
 For example:
 
