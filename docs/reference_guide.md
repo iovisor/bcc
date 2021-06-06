@@ -2026,19 +2026,19 @@ while True:
 
 Syntax: ```table.items_delete_batch(keys)```
 
+It clears all entries of a BPF_HASH map when keys is None. It is more efficient than table.clear() since it generates only one system call. You can delete a subset of a map by giving an array of keys as parameter. Those keys and their associated values will be deleted. It requires kernel v5.6.
+
 Arguments:
 
 - keys is optional and by default is None.
-In that case, it clears all entries of a BPF_HASH map when keys is None. It is more efficient than table.clear() since it generates only one system call.
-If a list of keys is given then only those keys and their associated values will be deleted.
-It requires kernel v5.6.
+
 
 
 ### 9. items_update_batch()
 
 Syntax: ```table.items_update_batch(keys, values)```
 
-Update all the provided keys with new values. The two arguments must be the same length and within the map limits (between 1 and the maximum entries).
+Update all the provided keys with new values. The two arguments must be the same length and within the map limits (between 1 and the maximum entries). It requires kernel v5.6.
 
 Arguments:
 

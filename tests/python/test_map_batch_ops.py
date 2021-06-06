@@ -29,6 +29,7 @@ def kernel_version_ge(major, minor):
 @skipUnless(kernel_version_ge(5, 6), "requires kernel >= 5.6")
 class TestMapBatch(TestCase):
     MAPSIZE = 1024
+    SUBSET_SIZE = 32
 
     def fill_hashmap(self):
         b = BPF(text=b"""BPF_HASH(map, int, int, %d);""" % self.MAPSIZE)
@@ -36,6 +37,33 @@ class TestMapBatch(TestCase):
         for i in range(0, self.MAPSIZE):
             hmap[ct.c_int(i)] = ct.c_int(i)
         return hmap
+
+    def prepare_keys_subset(self, hmap, count=None):
+        if not count:
+            count = self.SUBSET_SIZE
+        keys = (hmap.Key * count)()
+        i = 0
+        for k, _ in sorted(hmap.items_lookup_batch()):
+            if i < count:
+                keys[i] = k
+                i += 1
+            else:
+                break
+
+        return keys
+
+    def prepare_values_subset(self, hmap, count=None):
+        if not count:
+            count = self.SUBSET_SIZE
+        values = (hmap.Leaf * count)()
+        i = 0
+        for _, v in sorted(hmap.items_lookup_batch()):
+            if i < count:
+                values[i] = v*v
+                i += 1
+            else:
+                break
+        return values
 
     def check_hashmap_values(self, it):
         i = 0
@@ -45,7 +73,7 @@ class TestMapBatch(TestCase):
             i += 1
         return i
 
-    def test_lookup_and_delete_batch(self):
+    def test_lookup_and_delete_batch_all_keys(self):
         # fill the hashmap
         hmap = self.fill_hashmap()
 
@@ -54,10 +82,10 @@ class TestMapBatch(TestCase):
         self.assertEqual(count, self.MAPSIZE)
 
         # and check the delete has worked, i.e map is now empty
-        count = sum(1 for _ in hmap.items_lookup_batch())
+        count = sum(1 for _ in hmap.items())
         self.assertEqual(count, 0)
 
-    def test_lookup_batch(self):
+    def test_lookup_batch_all_keys(self):
         # fill the hashmap
         hmap = self.fill_hashmap()
 
@@ -65,7 +93,7 @@ class TestMapBatch(TestCase):
         count = self.check_hashmap_values(hmap.items_lookup_batch())
         self.assertEqual(count, self.MAPSIZE)
 
-    def test_delete_batch_all_keysp(self):
+    def test_delete_batch_all_keys(self):
         # Delete all key/value in the map
         # fill the hashmap
         hmap = self.fill_hashmap()
@@ -79,23 +107,14 @@ class TestMapBatch(TestCase):
         # Delete only a subset of key/value in the map
         # fill the hashmap
         hmap = self.fill_hashmap()
-        # Get 4 keys in this map.
-        subset_size = 32
-        keys = (hmap.Key * subset_size)()
-        i = 0
-        for k, _ in hmap.items_lookup_batch():
-            if i < subset_size:
-                keys[i] = k
-                i += 1
-            else:
-                break
+        keys = self.prepare_keys_subset(hmap)
 
         hmap.items_delete_batch(keys)
         # check the delete has worked, i.e map is now empty
         count = sum(1 for _ in hmap.items())
-        self.assertEqual(count, self.MAPSIZE - subset_size)
+        self.assertEqual(count, self.MAPSIZE - self.SUBSET_SIZE)
 
-    def test_update_batch(self):
+    def test_update_batch_all_keys(self):
         hmap = self.fill_hashmap()
 
         # preparing keys and new values arrays
@@ -109,6 +128,27 @@ class TestMapBatch(TestCase):
         # check the update has worked, i.e sum of values is -NUM_KEYS
         count = sum(v.value for v in hmap.values())
         self.assertEqual(count, -1*self.MAPSIZE)
+
+    def test_update_batch_subset(self):
+        # fill the hashmap
+        hmap = self.fill_hashmap()
+        keys = self.prepare_keys_subset(hmap, count=self.SUBSET_SIZE)
+        new_values = self.prepare_values_subset(hmap, count=self.SUBSET_SIZE)
+
+        hmap.items_update_batch(keys, new_values)
+
+        # check all the values in the map
+        # the first self.SUBSET_SIZE keys follow this rule value = keys * keys
+        # the remaning keys follow this rule : value = keys
+        i = 0
+        for k, v in sorted(hmap.items_lookup_batch()):
+            if i < self.SUBSET_SIZE:
+                self.assertEqual(v, k*k)  # values are the square of the keys
+                i += 1
+            else:
+                self.assertEqual(v, k)  # values = keys
+
+        self.assertEqual(i, self.SUBSET_SIZE)
 
 
 if __name__ == "__main__":
