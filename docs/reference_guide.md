@@ -1434,7 +1434,7 @@ Returns 0 on success, negative error on failure.
 Examples in situ:
 [search /tests](https://github.com/iovisor/bcc/search?q=peek+path%3Atests&type=Code),
 
-### 32. map.sock_hash_update
+### 32. map.sock_hash_update()
 
 Syntax: ```int map.sock_hash_update(struct bpf_sock_ops *, &key, int flags)```
 
