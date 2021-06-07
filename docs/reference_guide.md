@@ -63,19 +63,21 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
         - [15. BPF_HASH_OF_MAPS](#15-bpf_hash_of_maps)
         - [16. BPF_STACK](#16-bpf_stack)
         - [17. BPF_QUEUE](#17-bpf_queue)
-        - [18. map.lookup()](#18-maplookup)
-        - [19. map.lookup_or_try_init()](#19-maplookup_or_try_init)
-        - [20. map.delete()](#20-mapdelete)
-        - [21. map.update()](#21-mapupdate)
-        - [22. map.insert()](#22-mapinsert)
-        - [23. map.increment()](#23-mapincrement)
-        - [24. map.get_stackid()](#24-mapget_stackid)
-        - [25. map.perf_read()](#25-mapperf_read)
-        - [26. map.call()](#26-mapcall)
-        - [27. map.redirect_map()](#27-mapredirect_map)
-        - [28. map.push()](#28-mappush)
-        - [29. map.pop()](#29-mappop)
-        - [30. map.peek()](#30-mappeek)
+        - [18. BPF_SOCKHASH](#18-bpf_sockhash)
+        - [19. map.lookup()](#19-maplookup)
+        - [20. map.lookup_or_try_init()](#20-maplookup_or_try_init)
+        - [21. map.delete()](#21-mapdelete)
+        - [22. map.update()](#22-mapupdate)
+        - [23. map.insert()](#23-mapinsert)
+        - [24. map.increment()](#24-mapincrement)
+        - [25. map.get_stackid()](#25-mapget_stackid)
+        - [26. map.perf_read()](#26-mapperf_read)
+        - [27. map.call()](#27-mapcall)
+        - [28. map.redirect_map()](#28-mapredirect_map)
+        - [29. map.push()](#29-mappush)
+        - [30. map.pop()](#30-mappop)
+        - [31. map.peek()](#31-mappeek)
+        - [32. map.sock_hash_update()](#32-mapsock_hash_update)
     - [Licensing](#licensing)
     - [Rewriter](#rewriter)
 
@@ -1210,7 +1212,37 @@ Methods (covered later): map.push(), map.pop(), map.peek().
 Examples in situ:
 [search /tests](https://github.com/iovisor/bcc/search?q=BPF_QUEUE+path%3Atests&type=Code),
 
-### 18. map.lookup()
+### 18. BPF_SOCKHASH
+
+Syntax: ```BPF_SOCKHASH(name[, key_type [, max_entries)```
+
+Creates a hash named ```name```, with optional parameters. sockhash is only available from Linux 4.18+.
+
+Default: ```BPF_SOCKHASH(name, key_type=u32, max_entries=10240)```
+
+For example:
+
+```C
+struct sock_key {
+  u32 remote_ip4;
+  u32 local_ip4;
+  u32 remote_port;
+  u32 local_port;
+};
+BPF_HASH(skh, struct sock_key, 65535);
+```
+
+This creates a hash named ```skh``` where the key is a ```struct sock_key```.
+
+A sockhash is a BPF map type that holds references to sock structs. Then with a new sk/msg redirect bpf helper BPF programs can use the map to redirect skbs/msgs between sockets (```bpf_sk_redirect_hash/bpf_msg_redirect_hash```).
+
+The difference between ```BPF_SOCKHASH``` and ```BPF_SOCKMAP``` is that ```BPF_SOCKMAP``` is implemented based on an array, and enforces keys to be four bytes. While ```BPF_SOCKHASH``` is implemented based on hash table, and the type of key can be specified freely.
+
+Methods (covered later): map.sock_hash_update().
+
+[search /tests](https://github.com/iovisor/bcc/search?q=BPF_SOCKHASH+path%3Atests&type=Code)
+
+### 19. map.lookup()
 
 Syntax: ```*val map.lookup(&key)```
 
@@ -1220,7 +1252,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=lookup+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=lookup+path%3Atools&type=Code)
 
-### 19. map.lookup_or_try_init()
+### 20. map.lookup_or_try_init()
 
 Syntax: ```*val map.lookup_or_try_init(&key, &zero)```
 
@@ -1233,7 +1265,7 @@ Examples in situ:
 Note: The old map.lookup_or_init() may cause return from the function, so lookup_or_try_init() is recommended as it
 does not have this side effect.
 
-### 20. map.delete()
+### 21. map.delete()
 
 Syntax: ```map.delete(&key)```
 
@@ -1243,7 +1275,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=delete+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=delete+path%3Atools&type=Code)
 
-### 21. map.update()
+### 22. map.update()
 
 Syntax: ```map.update(&key, &val)```
 
@@ -1253,7 +1285,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=update+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=update+path%3Atools&type=Code)
 
-### 22. map.insert()
+### 23. map.insert()
 
 Syntax: ```map.insert(&key, &val)```
 
@@ -1263,7 +1295,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=insert+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=insert+path%3Atools&type=Code)
 
-### 23. map.increment()
+### 24. map.increment()
 
 Syntax: ```map.increment(key[, increment_amount])```
 
@@ -1273,7 +1305,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=increment+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=increment+path%3Atools&type=Code)
 
-### 24. map.get_stackid()
+### 25. map.get_stackid()
 
 Syntax: ```int map.get_stackid(void *ctx, u64 flags)```
 
@@ -1283,7 +1315,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=get_stackid+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=get_stackid+path%3Atools&type=Code)
 
-### 25. map.perf_read()
+### 26. map.perf_read()
 
 Syntax: ```u64 map.perf_read(u32 cpu)```
 
@@ -1292,7 +1324,7 @@ This returns the hardware performance counter as configured in [5. BPF_PERF_ARRA
 Examples in situ:
 [search /tests](https://github.com/iovisor/bcc/search?q=perf_read+path%3Atests&type=Code)
 
-### 26. map.call()
+### 27. map.call()
 
 Syntax: ```void map.call(void *ctx, int index)```
 
@@ -1331,7 +1363,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?l=C&q=call+path%3Aexamples&type=Code),
 [search /tests](https://github.com/iovisor/bcc/search?l=C&q=call+path%3Atests&type=Code)
 
-### 27. map.redirect_map()
+### 28. map.redirect_map()
 
 Syntax: ```int map.redirect_map(int index, int flags)```
 
@@ -1369,7 +1401,7 @@ b.attach_xdp("eth1", out_fn, 0)
 Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?l=C&q=redirect_map+path%3Aexamples&type=Code),
 
-### 28. map.push()
+### 29. map.push()
 
 Syntax: ```int map.push(&val, int flags)```
 
@@ -1380,7 +1412,7 @@ Returns 0 on success, negative error on failure.
 Examples in situ:
 [search /tests](https://github.com/iovisor/bcc/search?q=push+path%3Atests&type=Code),
 
-### 29. map.pop()
+### 30. map.pop()
 
 Syntax: ```int map.pop(&val)```
 
@@ -1391,7 +1423,7 @@ Returns 0 on success, negative error on failure.
 Examples in situ:
 [search /tests](https://github.com/iovisor/bcc/search?q=pop+path%3Atests&type=Code),
 
-### 30. map.peek()
+### 31. map.peek()
 
 Syntax: ```int map.peek(&val)```
 
@@ -1401,6 +1433,25 @@ Returns 0 on success, negative error on failure.
 
 Examples in situ:
 [search /tests](https://github.com/iovisor/bcc/search?q=peek+path%3Atests&type=Code),
+
+### 32. map.sock_hash_update()
+
+Syntax: ```int map.sock_hash_update(struct bpf_sock_ops *, &key, int flags)```
+
+Add an entry to, or update a sockhash map referencing sockets. The skops is used as a new value for the entry associated to key. flags is one of:
+
+```
+BPF_NOEXIST: The entry for key must not exist in the map.
+BPF_EXIST: The entry for key must already exist in the map.
+BPF_ANY: No condition on the existence of the entry for key.
+```
+
+If the map has eBPF programs (parser and verdict), those will be inherited by the socket being added. If the socket is already attached to eBPF programs, this results in an error.
+
+Return 0 on success, or a negative error in case of failure.
+
+Examples in situ:
+[search /tests](https://github.com/iovisor/bcc/search?q=sock_hash_update+path%3Atests&type=Code),
 
 ## Licensing
 
@@ -1727,7 +1778,7 @@ Syntax: ```BPF.attach_xdp(dev="device", fn=b.load_func("fn_name",BPF_XDP), flags
 
 Instruments the network driver described by ```dev``` , and then receives the packet, run the BPF function ```fn_name()``` with flags.
 
-Here is a list of optional flags. 
+Here is a list of optional flags.
 
 ```Python
 # from xdp_flags uapi/linux/if_link.h
@@ -1748,7 +1799,7 @@ Currently, bcc does not support XDP_FLAGS_REPLACE flag. The following are the de
 If an XDP program is already attached to the specified driver, attaching the XDP program again will fail.
 
 #### 2. XDP_FLAGS_SKB_MODE
-Driver doesn’t have support for XDP, but the kernel fakes it.   
+Driver doesn’t have support for XDP, but the kernel fakes it.
 XDP program works, but there’s no real performance benefit because packets are handed to kernel stack anyways which then emulates XDP – this is usually supported with generic network drivers used in home computers, laptops, and virtualized HW.
 
 #### 3. XDP_FLAGS_DRV_MODE

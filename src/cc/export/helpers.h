@@ -403,7 +403,7 @@ struct _name##_table_t { \
   u32 key; \
   int leaf; \
   int (*update) (u32 *, int *); \
-  int (*delete) (int *); \
+  int (*delete) (u32 *); \
   /* ret = map.sock_map_update(ctx, key, flag) */ \
   int (* _helper_name) (void *, void *, u64); \
   u32 max_entries; \
@@ -415,8 +415,31 @@ BPF_ANNOTATE_KV_PAIR(_name, u32, int)
 #define BPF_SOCKMAP(_name, _max_entries) \
   BPF_SOCKMAP_COMMON(_name, _max_entries, "sockmap", sock_map_update)
 
-#define BPF_SOCKHASH(_name, _max_entries) \
-  BPF_SOCKMAP_COMMON(_name, _max_entries, "sockhash", sock_hash_update)
+#define BPF_SOCKHASH_COMMON(_name, _key_type, _max_entries) \
+struct _name##_table_t {\
+  _key_type key;\
+  int leaf; \
+  int (*update) (_key_type *, int *); \
+  int (*delete) (_key_type *); \
+  int (*sock_hash_update) (void *, void *, u64); \
+  u32 max_entries; \
+}; \
+__attribute__((section("maps/sockhash"))) \
+struct _name##_table_t _name = { .max_entries = (_max_entries) }; \
+BPF_ANNOTATE_KV_PAIR(_name, _key_type, int)
+
+#define BPF_SOCKHASH1(_name) \
+  BPF_SOCKHASH_COMMON(_name, u32, 10240)
+#define BPF_SOCKHASH2(_name, _key_type) \
+  BPF_SOCKHASH_COMMON(_name, _key_type, 10240)
+#define BPF_SOCKHASH3(_name, _key_type, _max_entries) \
+  BPF_SOCKHASH_COMMON(_name, _key_type, _max_entries)
+
+#define BPF_SOCKHASHX(_1, _2, _3, NAME, ...) NAME
+// We can define a five-tuple as the key, and basically never define the val type.
+// BPF_SOCKHASH(name, key_type=u64, size=10240)
+#define BPF_SOCKHASH(...) \
+  BPF_SOCKHASHX(__VA_ARGS__, BPF_SOCKHASH3, BPF_SOCKHASH2, BPF_SOCKHASH1)(__VA_ARGS__)
 
 #define BPF_CGROUP_STORAGE_COMMON(_name, _leaf_type, _kind) \
 struct _name##_table_t { \
