@@ -1234,7 +1234,7 @@ BPF_HASH(skh, struct sock_key, 65535);
 
 This creates a hash named ```skh``` where the key is a ```struct sock_key```.
 
-A sockhash is a BPF map type that holds references to sock structs. Then with a new sk/msg redirect bpf helper BPF programs can use the map to redirect skbs/msgs between sockets with ```bpf_sk_redirect_hash/bpf_msg_redirect_hash```.
+A sockhash is a BPF map type that holds references to sock structs. Then with a new sk/msg redirect bpf helper BPF programs can use the map to redirect skbs/msgs between sockets (```bpf_sk_redirect_hash/bpf_msg_redirect_hash```).
 
 The difference between ```BPF_SOCKHASH``` and ```BPF_SOCKMAP``` is that ```BPF_SOCKMAP``` is implemented based on an array, and enforces keys to be four bytes. While ```BPF_SOCKHASH``` is implemented based on hash table, and the type of key can be specified freely.
 
