@@ -1216,7 +1216,7 @@ Examples in situ:
 
 Syntax: ```BPF_SOCKHASH(name[, key_type [, max_entries)```
 
-Creates a hash named ```name```, with optional parameters.
+Creates a hash named ```name```, with optional parameters. sockhash is only available from Linux 4.18+.
 
 Default: ```BPF_SOCKHASH(name, key_type=u32, max_entries=10240)```
 
