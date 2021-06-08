@@ -422,6 +422,8 @@ struct _name##_table_t {\
   int (*update) (_key_type *, int *); \
   int (*delete) (_key_type *); \
   int (*sock_hash_update) (void *, void *, u64); \
+  int (*msg_redirect_hash) (void *, void *, u64); \
+  int (*sk_redirect_hash) (void *, void *, u64); \
   u32 max_entries; \
 }; \
 __attribute__((section("maps/sockhash"))) \
