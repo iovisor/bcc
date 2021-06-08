@@ -78,6 +78,8 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
         - [30. map.pop()](#30-mappop)
         - [31. map.peek()](#31-mappeek)
         - [32. map.sock_hash_update()](#32-mapsock_hash_update)
+        - [33. map.msg_redirect_hash()](#33-mapmsg_redirect_hash)
+        - [34. map.sk_redirect_hash()](#34-mapsk_redirect_hash)
     - [Licensing](#licensing)
     - [Rewriter](#rewriter)
 
@@ -1234,11 +1236,11 @@ BPF_HASH(skh, struct sock_key, 65535);
 
 This creates a hash named ```skh``` where the key is a ```struct sock_key```.
 
-A sockhash is a BPF map type that holds references to sock structs. Then with a new sk/msg redirect bpf helper BPF programs can use the map to redirect skbs/msgs between sockets (```bpf_sk_redirect_hash/bpf_msg_redirect_hash```).
+A sockhash is a BPF map type that holds references to sock structs. Then with a new sk/msg redirect bpf helper BPF programs can use the map to redirect skbs/msgs between sockets (```map.sk_redirect_hash()/map.msg_redirect_hash()```).
 
 The difference between ```BPF_SOCKHASH``` and ```BPF_SOCKMAP``` is that ```BPF_SOCKMAP``` is implemented based on an array, and enforces keys to be four bytes. While ```BPF_SOCKHASH``` is implemented based on hash table, and the type of key can be specified freely.
 
-Methods (covered later): map.sock_hash_update().
+Methods (covered later): map.sock_hash_update(), map.msg_redirect_hash(), map.sk_redirect_hash().
 
 [search /tests](https://github.com/iovisor/bcc/search?q=BPF_SOCKHASH+path%3Atests&type=Code)
 
@@ -1436,7 +1438,7 @@ Examples in situ:
 
 ### 32. map.sock_hash_update()
 
-Syntax: ```int map.sock_hash_update(struct bpf_sock_ops *, &key, int flags)```
+Syntax: ```int map.sock_hash_update(struct bpf_sock_ops *skops, &key, int flags)```
 
 Add an entry to, or update a sockhash map referencing sockets. The skops is used as a new value for the entry associated to key. flags is one of:
 
@@ -1452,6 +1454,28 @@ Return 0 on success, or a negative error in case of failure.
 
 Examples in situ:
 [search /tests](https://github.com/iovisor/bcc/search?q=sock_hash_update+path%3Atests&type=Code),
+
+### 33. map.msg_redirect_hash()
+
+Syntax: ```int map.msg_redirect_hash(struct sk_msg_buff *msg, void *key, u64 flags)```
+
+This helper is used in programs implementing policies at the socket level. If the message msg is allowed to pass (i.e. if the verdict eBPF program returns SK_PASS), redirect it to the socket referenced by map (of type BPF_MAP_TYPE_SOCKHASH) using hash key. Both ingress and egress interfaces can be used for redirection. The BPF_F_INGRESS value in flags is used to make the distinction (ingress path is selected if the flag is present, egress path otherwise). This is the only flag supported for now.
+
+Return SK_PASS on success, or SK_DROP on error.
+
+Examples in situ:
+[search /tests](https://github.com/iovisor/bcc/search?q=msg_redirect_hash+path%3Atests&type=Code),
+
+### 34. map.sk_redirect_hash()
+
+Syntax: ```int map.sk_redirect_hash(struct sk_buff *skb, void *key, u64 flags)```
+
+This helper is used in programs implementing policies at the skb socket level. If the sk_buff skb is allowed to pass (i.e. if the verdict eBPF program returns SK_PASS), redirect it to the socket referenced by map (of  type  BPF_MAP_TYPE_SOCKHASH) using hash key. Both ingress and egress interfaces can be used for redirection. The BPF_F_INGRESS value in flags is used to make the distinction (ingress path is selected if the flag is present, egress otherwise). This is the only flag supported for now.
+
+Return SK_PASS on success, or SK_DROP on error.
+
+Examples in situ:
+[search /tests](https://github.com/iovisor/bcc/search?q=sk_redirect_hash+path%3Atests&type=Code),
 
 ## Licensing
 

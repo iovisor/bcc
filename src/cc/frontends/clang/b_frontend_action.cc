@@ -1029,6 +1029,13 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
             }
             fe_.perf_events_[name] = perf_event;
           }
+        } else if (memb_name == "msg_redirect_hash" || memb_name == "sk_redirect_hash") {
+          string arg0 = rewriter_.getRewrittenText(expansionRange(Call->getArg(0)->getSourceRange()));
+          string args_other = rewriter_.getRewrittenText(expansionRange(SourceRange(GET_BEGINLOC(Call->getArg(1)),
+                                                           GET_ENDLOC(Call->getArg(2)))));
+
+          txt = "bpf_" + string(memb_name) + "(" + arg0 + ", (void *)bpf_pseudo_fd(1, " + fd + "), ";
+          txt += args_other + ")";
         } else {
           if (memb_name == "lookup") {
             prefix = "bpf_map_lookup_elem";
