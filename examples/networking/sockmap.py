@@ -10,7 +10,7 @@ import time
 import atexit
 import argparse
 
-from bcc import BPF, DEBUG_PREPROCESSOR, DEBUG_BTF, lib
+from bcc import BPF, lib
 
 
 examples = """examples:
