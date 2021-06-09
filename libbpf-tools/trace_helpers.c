@@ -1013,16 +1013,18 @@ bool fentry_exists(const char *name, const char *mod)
 			sysfs_vmlinux, strerror(-libbpf_get_error(base)));
 		goto err_out;
 	}
-	if (mod) {
+	if (mod && module_btf_exists(mod)) {
 		snprintf(sysfs_mod, sizeof(sysfs_mod), "/sys/kernel/btf/%s", mod);
 		btf = btf__parse_split(sysfs_mod, base);
 		if (libbpf_get_error(btf)) {
 			fprintf(stderr, "failed to load BTF from %s: %s\n",
 				sysfs_mod, strerror(-libbpf_get_error(btf)));
-			goto err_out;
+			btf = base;
+			base = NULL;
 		}
 	} else {
 		btf = base;
+		base = NULL;
 	}
 
 	id = btf__find_by_name_kind(btf, "bpf_attach_type", BTF_KIND_ENUM);
@@ -1044,8 +1046,7 @@ bool fentry_exists(const char *name, const char *mod)
 	}
 
 err_out:
-	if (mod)
-		btf__free(btf);
+	btf__free(btf);
 	btf__free(base);
 	return id > 0;
 }
