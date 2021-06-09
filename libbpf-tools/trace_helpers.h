@@ -75,8 +75,8 @@ bool is_kernel_module(const char *name);
  *
  * *name* is the name of a kernel function to be attached to, which can be
  * from vmlinux or a kernel module.
- * *mod* is the name of a kernel module, if NULL, it means *name*
- * belongs to vmlinux.
+ * *mod* is a hint that indicates the *name* may reside in module BTF,
+ * if NULL, it means *name* belongs to vmlinux.
  */
 bool fentry_exists(const char *name, const char *mod);
 
