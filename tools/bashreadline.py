@@ -39,6 +39,8 @@ bpf_text = """
 
 struct str_t {
     u64 pid;
+    u32 uid;
+    u32 gid;
     char str[80];
 };
 
@@ -48,10 +50,14 @@ int printret(struct pt_regs *ctx) {
     struct str_t data  = {};
     char comm[TASK_COMM_LEN] = {};
     u32 pid;
+    u64 uid_gid;
     if (!PT_REGS_RC(ctx))
         return 0;
     pid = bpf_get_current_pid_tgid() >> 32;
+    uid_gid = bpf_get_current_uid_gid();
     data.pid = pid;
+    data.uid = (u32)uid_gid;
+    data.gid = uid_gid >> 32;
     bpf_probe_read_user(&data.str, sizeof(data.str), (void *)PT_REGS_RC(ctx));
 
     bpf_get_current_comm(&comm, sizeof(comm));
@@ -68,12 +74,12 @@ b = BPF(text=bpf_text)
 b.attach_uretprobe(name=name, sym="readline", fn_name="printret")
 
 # header
-print("%-9s %-6s %s" % ("TIME", "PID", "COMMAND"))
+print("%-9s %-6s %-6s %-6s %s" % ("TIME", "PID", "UID", "GID", "COMMAND"))
 
 def print_event(cpu, data, size):
     event = b["events"].event(data)
-    print("%-9s %-6d %s" % (strftime("%H:%M:%S"), event.pid,
-                            event.str.decode('utf-8', 'replace')))
+    print("%-9s %-6d %-6s %-6s %s" % (strftime("%H:%M:%S"), event.pid, event.uid,
+        event.gid, event.str.decode('utf-8', 'replace')))
 
 b["events"].open_perf_buffer(print_event)
 while 1:
