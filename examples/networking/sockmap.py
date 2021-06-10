@@ -17,7 +17,7 @@ examples = """examples:
     ./sockmap.py /root/cgroup # attach to /root/cgroup
 """
 parser = argparse.ArgumentParser(
-        description="socket to socket forward demo",
+        description="pipe data across multiple sockets",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=examples)
 parser.add_argument("-c", "--cgroup", required=True,
