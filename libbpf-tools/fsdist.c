@@ -3,8 +3,12 @@
 /*
  * fsdist  Summarize file system operations latency.
  *
+ * Copyright (c) 2021 Wenbo Zhang
  * Copyright (c) 2021 Hengqi Chen
- * 20-May-2021   Hengqi Chen   Created this.
+ *
+ * Based on ext4dist(8) from BCC by Brendan Gregg.
+ * 9-Feb-2021   Wenbo Zhang   Created this.
+ * 20-May-2021   Hengqi Chen  Migrated to fsdist.
  */
 #include <argp.h>
 #include <libgen.h>

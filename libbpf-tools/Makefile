@@ -26,7 +26,6 @@ APPS = \
 	cpufreq \
 	drsnoop \
 	execsnoop \
-	ext4dist \
 	filelife \
 	fsdist \
 	fsslower \
@@ -49,9 +48,9 @@ APPS = \
 	vfsstat \
 	#
 
+FSDIST_ALIASES = btrfsdist ext4dist nfsdist xfsdist
 FSSLOWER_ALIASES = btrfsslower ext4slower nfsslower xfsslower
-
-APP_ALIASES = $(FSSLOWER_ALIASES)
+APP_ALIASES = $(FSDIST_ALIASES) $(FSSLOWER_ALIASES)
 
 COMMON_OBJ = \
 	$(OUTPUT)/trace_helpers.o \
@@ -112,7 +111,11 @@ $(LIBBPF_OBJ): $(wildcard $(LIBBPF_SRC)/*.[ch]) | $(OUTPUT)/libbpf
 
 $(FSSLOWER_ALIASES): fsslower
 	$(call msg,SYMLINK,$@)
-	$(Q)ln -s $^ $@
+	$(Q)ln -f -s $^ $@
+
+$(FSDIST_ALIASES): fsdist
+	$(call msg,SYMLINK,$@)
+	$(Q)ln -f -s $^ $@
 
 install: $(APPS) $(APP_ALIASES)
 	$(call msg, INSTALL libbpf-tools)

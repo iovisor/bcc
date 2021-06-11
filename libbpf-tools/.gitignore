@@ -4,6 +4,7 @@
 /biosnoop
 /biostacks
 /bitesize
+/btrfsdist
 /btrfsslower
 /cachestat
 /cpudist
@@ -19,6 +20,7 @@
 /gethostlatency
 /hardirqs
 /llcstat
+/nfsdist
 /nfsslower
 /numamove
 /offcputime
@@ -33,4 +35,5 @@
 /tcpconnect
 /tcpconnlat
 /vfsstat
+/xfsdist
 /xfsslower
