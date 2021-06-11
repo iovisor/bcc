@@ -50,24 +50,24 @@ class USDTProbeArgument(object):
         if self.valid & BCC_USDT_ARGUMENT_FLAGS.CONSTANT != 0:
             return "%d" % self.constant
         if self.valid & BCC_USDT_ARGUMENT_FLAGS.DEREF_OFFSET == 0:
-            return "%s" % self.base_register_name
+            return "%s" % self.base_register_name.decode()
         if self.valid & BCC_USDT_ARGUMENT_FLAGS.DEREF_OFFSET != 0 and \
            self.valid & BCC_USDT_ARGUMENT_FLAGS.DEREF_IDENT == 0:
             if self.valid & BCC_USDT_ARGUMENT_FLAGS.INDEX_REGISTER_NAME != 0:
-                index_offset = " + %s" % self.index_register_name
+                index_offset = " + %s" % self.index_register_name.decode()
                 if self.valid & BCC_USDT_ARGUMENT_FLAGS.SCALE != 0:
                     index_offset += " * %d" % self.scale
             else:
                 index_offset = ""
             sign = '+' if self.deref_offset >= 0 else '-'
-            return "*(%s %s %d%s)" % (self.base_register_name,
-                                    sign, abs(self.deref_offset), index_offset)
+            return "*(%s %s %d%s)" % (self.base_register_name.decode(),
+                                      sign, abs(self.deref_offset), index_offset)
         if self.valid & BCC_USDT_ARGUMENT_FLAGS.DEREF_OFFSET != 0 and \
            self.valid & BCC_USDT_ARGUMENT_FLAGS.DEREF_IDENT != 0 and \
            self.valid & BCC_USDT_ARGUMENT_FLAGS.BASE_REGISTER_NAME != 0 and \
            self.base_register_name == "ip":
             sign = '+' if self.deref_offset >= 0 else '-'
-            return "*(&%s %s %d)" % (self.deref_ident,
+            return "*(&%s %s %d)" % (self.deref_ident.decode(),
                                      sign, abs(self.deref_offset))
         # If we got here, this is an unrecognized case. Doesn't mean it's
         # necessarily bad, so just provide the raw data. It just means that
@@ -86,7 +86,7 @@ class USDTProbeLocation(object):
         self.bin_path = location.bin_path
 
     def __str__(self):
-        return "%s 0x%x" % (self.bin_path, self.address)
+        return "%s 0x%x" % (self.bin_path.decode(), self.address)
 
     def get_argument(self, index):
         arg = bcc_usdt_argument()
@@ -111,10 +111,10 @@ class USDTProbe(object):
 
     def __str__(self):
         return "%s:%s [sema 0x%x]" % \
-               (self.provider, self.name, self.semaphore)
+               (self.provider.decode(), self.name.decode(), self.semaphore)
 
     def short_name(self):
-        return "%s:%s" % (self.provider, self.name)
+        return "%s:%s" % (self.provider.decode(), self.name.decode())
 
     def get_location(self, index):
         loc = bcc_usdt_location()
