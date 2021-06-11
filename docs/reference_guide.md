@@ -1851,15 +1851,15 @@ Examples in situ:
 
 ### 10. attach_func()
 
-Syntax: ```BPF.attach_func(fn, attach_type [, attachable_fd [, flags)```
+Syntax: ```BPF.attach_func(fn, attachable_fd, attach_type [, flags)```
 
-Attaches a BPF function of the specified type.
+Attaches a BPF function of the specified type to a particular ```attachable_fd```. if the ```attach_type``` is ```BPF_FLOW_DISSECTOR```, the function is expected to attach to current net namespace and ```attachable_fd``` must be 0.
 
 For example:
 
 ```Python
-b.attach_func(fn, b.CGROUP_SOCK_OPS, cgroup_fd)
-b.attach_func(fn, b.SK_MSG_VERDICT, map_fd)
+b.attach_func(fn, cgroup_fd, b.CGROUP_SOCK_OPS)
+b.attach_func(fn, map_fd, b.SK_MSG_VERDICT)
 ```
 
 Note. When attached to "global" hooks (xdp, tc, lwt, cgroup). If the "BPF function" is no longer needed after the program terminates, be sure to call `detach_func` when the program exits.
@@ -1870,15 +1870,15 @@ Examples in situ:
 
 ### 11. detach_func()
 
-Syntax: ```BPF.detach_func(fn, detach_type [, target_fd)```
+Syntax: ```BPF.detach_func(fn, attachable_fd, attach_type)```
 
 Detaches a BPF function of the specified type.
 
 For example:
 
 ```Python
-b.detach_func(fn, b.CGROUP_SOCK_OPS, cgroup_fd)
-b.detach_func(fn, b.SK_MSG_VERDICT, map_fd)
+b.detach_func(fn, cgroup_fd, b.CGROUP_SOCK_OPS)
+b.detach_func(fn, map_fd, b.SK_MSG_VERDICT)
 ```
 
 Examples in situ:

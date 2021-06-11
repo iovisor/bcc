@@ -582,7 +582,7 @@ class BPF(object):
         return self.tables.__iter__()
 
     @staticmethod
-    def attach_func(fn, attach_type, attachable_fd=0, flags=0):
+    def attach_func(fn, attachable_fd, attach_type, flags=0):
         if not isinstance(fn, BPF.Function):
             raise Exception("arg 1 must be of type BPF.Function")
 
@@ -592,14 +592,14 @@ class BPF(object):
                             "{0}: {1}".format(attach_type, os.strerror(-res)))
 
     @staticmethod
-    def detach_func(fn, detach_type, target_fd=0):
+    def detach_func(fn, attachable_fd, attach_type):
         if not isinstance(fn, BPF.Function):
             raise Exception("arg 1 must be of type BPF.Function")
 
-        res = lib.bpf_prog_detach2(fn.fd, target_fd, detach_type)
+        res = lib.bpf_prog_detach2(fn.fd, attachable_fd, attach_type)
         if res < 0:
-            raise Exception("Failed to detach BPF function with detach_type "\
-                            "{0}: {1}".format(detach_type, os.strerror(-res)))
+            raise Exception("Failed to detach BPF function with attach_type "\
+                            "{0}: {1}".format(attach_type, os.strerror(-res)))
 
     @staticmethod
     def attach_raw_socket(fn, dev):
