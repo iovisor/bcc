@@ -206,24 +206,24 @@ while (1):
     if args.runqocc:
         if args.cpus:
             # run queue occupancy, per-CPU summary
-            idle = {}
-            queued = {}
+            idlemap = {}
+            queuedmap = {}
             cpumax = 0
             for k, v in dist.items():
                 if k.cpu > cpumax:
                     cpumax = k.cpu
             for c in range(0, cpumax + 1):
-                idle[c] = 0
-                queued[c] = 0
+                idlemap[c] = 0
+                queuedmap[c] = 0
             for k, v in dist.items():
                 if k.slot == 0:
-                    idle[k.cpu] += v.value
+                    idlemap[k.cpu] += v.value
                 else:
-                    queued[k.cpu] += v.value
+                    queuedmap[k.cpu] += v.value
             for c in range(0, cpumax + 1):
-                samples = idle[c] + queued[c]
+                samples = idlemap[c] + queuedmap[c]
                 if samples:
-                    runqocc = float(queued[c]) / samples
+                    runqocc = float(queuedmap[c]) / samples
                 else:
                     runqocc = 0
                 print("runqocc, CPU %-3d %6.2f%%" % (c, 100 * runqocc))

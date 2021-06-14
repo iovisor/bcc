@@ -1,10 +1,12 @@
 # Copyright (c) Barefoot Networks, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
 
-from p4_hlir.hlir import parse_call, p4_field, p4_parse_value_set, \
-    P4_DEFAULT, p4_parse_state, p4_table, \
-    p4_conditional_node, p4_parser_exception, \
+from p4_hlir.hlir import (  # type: ignore
+    parse_call, p4_field, p4_parse_value_set,
+    P4_DEFAULT, p4_parse_state, p4_table,
+    p4_conditional_node, p4_parser_exception,
     p4_header_instance, P4_NEXT
+)
 import ebpfProgram
 import ebpfStructType
 import ebpfInstance

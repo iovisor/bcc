@@ -17,7 +17,7 @@ import os
 def drop_extension(filename):
     return os.path.splitext(os.path.basename(filename))[0]
 
-filesFailed = {}  # map error kind -> list[ (file, error) ]
+filesFailed = {}  # type: dict # map error kind -> list[ (file, error) ]
 
 def set_error(kind, file, error):
     if kind in filesFailed:

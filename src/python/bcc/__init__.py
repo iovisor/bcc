@@ -28,7 +28,7 @@ from .libbcc import lib, bcc_symbol, bcc_symbol_option, bcc_stacktrace_build_id,
 from .table import Table, PerfEventArray, RingBuf, BPF_MAP_TYPE_QUEUE, BPF_MAP_TYPE_STACK
 from .perf import Perf
 from .utils import get_online_cpus, printb, _assert_is_bytes, ArgString, StrcmpRewrite
-from .version import __version__
+from .version import __version__  # type: ignore
 from .disassembler import disassemble_prog, decode_map
 
 try:
@@ -220,7 +220,7 @@ class BPF(object):
     SK_SKB_VERDICT = 38
 
     _probe_repl = re.compile(b"[^a-zA-Z0-9_]")
-    _sym_caches = {}
+    _sym_caches = {}  # type: dict
     _bsymcache =  lib.bcc_buildsymcache_new()
 
     _auto_includes = {
@@ -292,11 +292,12 @@ class BPF(object):
 
     @staticmethod
     def _find_file(filename):
+        # type: (str) -> str
         """ If filename is invalid, search in ./ of argv[0] """
         if filename:
             if not os.path.isfile(filename):
                 argv0 = ArgString(sys.argv[0])
-                t = b"/".join([os.path.abspath(os.path.dirname(argv0.__bytes__())), filename])
+                t = "/".join([os.path.abspath(os.path.dirname(str(argv0))), filename])
                 if os.path.isfile(t):
                     filename = t
                 else:

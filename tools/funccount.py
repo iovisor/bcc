@@ -35,6 +35,7 @@ def verify_limit(num):
 
 class Probe(object):
     def __init__(self, pattern, use_regex=False, pid=None, cpu=None):
+        # type: (ArgString, bool, int, str) -> None
         """Init a new probe.
 
         Init the probe from the pattern provided by the user. The supported
@@ -58,7 +59,7 @@ class Probe(object):
             if parts[0] == b"t":
                 parts = [b"t", b"", b"%s:%s" % tuple(parts[1:])]
             if parts[0] not in [b"p", b"t", b"u"]:
-                raise Exception("Type must be 'p', 't', or 'u', but got %s" %
+                raise Exception("Type must be 'p', 't', or 'u', but got %r" %
                                 parts[0])
         else:
             raise Exception("Too many ':'-separated components in pattern %s" %
@@ -75,13 +76,13 @@ class Probe(object):
                 # This might be an executable (e.g. 'bash')
                 libpath = BPF.find_exe(str(self.library))
             if libpath is None or len(libpath) == 0:
-                raise Exception("unable to find library %s" % self.library)
+                raise Exception("unable to find library %r" % self.library)
             self.library = libpath
 
         self.pid = pid
         self.cpu = cpu
         self.matched = 0
-        self.trace_functions = {}   # map location number to function name
+        self.trace_functions = {}  # type: dict # map location number to function name
 
     def is_kernel_probe(self):
         return self.type == b"t" or (self.type == b"p" and self.library == b"")

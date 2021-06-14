@@ -249,13 +249,12 @@ TRACEPOINT_PROBE(raw_syscalls, sys_exit) {
    .replace("DEFINE_LATENCY", "#define LATENCY" if args.latency else "") \
    .replace("DEFINE_SYSCALLS", "#define SYSCALLS" if args.syscalls else "")
 
+usdt = None
 if language:
     usdt = USDT(pid=args.pid)
     usdt.enable_probe_or_bail(entry_probe, "trace_entry")
     if args.latency:
         usdt.enable_probe_or_bail(return_probe, "trace_return")
-else:
-    usdt = None
 
 if args.ebpf or args.verbose:
     if args.verbose and usdt:

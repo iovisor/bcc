@@ -216,7 +216,7 @@ while 1:
 
     # by-PID output
     counts = b.get_table("counts")
-    line = 0
+    row = 0
     for k, v in reversed(sorted(counts.items(),
                                 key=lambda counts: counts[1].bytes)):
 
@@ -233,8 +233,8 @@ while 1:
             k.name.decode('utf-8', 'replace'), "W" if k.rwflag else "R",
             k.major, k.minor, diskname, v.io, v.bytes / 1024, avg_ms))
 
-        line += 1
-        if line >= maxrows:
+        row += 1
+        if row >= maxrows:
             break
     counts.clear()
 

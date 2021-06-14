@@ -15,8 +15,8 @@ import time
 import sys
 import os
 from bcc import BPF
-from pyroute2 import IPRoute, NSPopen, NetNS
-from netaddr import IPAddress
+from pyroute2 import IPRoute, NSPopen, NetNS  # type: ignore
+from netaddr import IPAddress  # type: ignore
 
 ### This part is a simple generic network simulaton toolkit
 

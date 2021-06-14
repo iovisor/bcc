@@ -1,7 +1,7 @@
 # Copyright (c) Barefoot Networks, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
 
-from p4_hlir.hlir import p4_conditional_node, p4_expression
+from p4_hlir.hlir import p4_conditional_node, p4_expression  # type: ignore
 from p4_hlir.hlir import p4_header_instance, p4_field
 from programSerializer import ProgramSerializer
 from compilationException import CompilationException

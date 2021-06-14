@@ -292,7 +292,7 @@ while keep_running:
             for pi in range(len(args.pcts)):
                 lats[args.pcts[pi]] = rwdf_lat[iot][pi] / SEC
             result[io_type[iot]] = lats
-        print(json.dumps(result), flush=True)
+        print(json.dumps(result), flush=True)  # type: ignore
     else:
         print('\n{:<7}'.format(os.path.basename(args.dev)), end='')
         widths = []

@@ -248,7 +248,7 @@ else:
           "Hit Ctrl-C to end.") % args.interval)
 
 samples = {}
-group = {}
+group = {}  # type: dict
 last = 0
 
 # process event
@@ -382,7 +382,7 @@ while 1:
 
     if not args.csv:
         total = running + idle
-        unclaimed = util = 0
+        unclaimed = util = 0  # type: int | float
 
         if debug:
             print("DEBUG: hit %d running %d idle %d total %d buffered %d" % (
