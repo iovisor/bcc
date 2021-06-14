@@ -1851,7 +1851,7 @@ Examples in situ:
 
 ### 10. attach_func()
 
-Syntax: ```BPF.attach_func(fn, attachable_fd, attach_type [, flags)```
+Syntax: ```BPF.attach_func(fn, attachable_fd, attach_type [, flags])```
 
 Attaches a BPF function of the specified type to a particular ```attachable_fd```. if the ```attach_type``` is ```BPF_FLOW_DISSECTOR```, the function is expected to attach to current net namespace and ```attachable_fd``` must be 0.
 

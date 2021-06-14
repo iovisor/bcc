@@ -14,7 +14,7 @@ from bcc import BPF, lib
 
 
 examples = """examples:
-    ./sockmap.py /root/cgroup # attach to /root/cgroup
+    ./sockmap.py -c /root/cgroup # attach to /root/cgroup
 """
 parser = argparse.ArgumentParser(
         description="pipe data across multiple sockets",
@@ -25,7 +25,6 @@ parser.add_argument("-c", "--cgroup", required=True,
 
 bpf_text = '''
 #include <net/sock.h>
-#include <bcc/proto.h>
 
 #define MAX_SOCK_OPS_MAP_ENTRIES 65535
 
