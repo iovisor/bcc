@@ -179,8 +179,45 @@ class BPF(object):
     XDP_FLAGS_REPLACE = (1 << 4)
 
     # from bpf_attach_type uapi/linux/bpf.h
+    CGROUP_INET_INGRESS = 0
+    CGROUP_INET_EGRESS = 1
+    CGROUP_INET_SOCK_CREATE = 2
+    CGROUP_SOCK_OPS = 3
+    SK_SKB_STREAM_PARSER = 4
+    SK_SKB_STREAM_VERDICT = 5
+    CGROUP_DEVICE = 6
+    SK_MSG_VERDICT = 7
+    CGROUP_INET4_BIND = 8
+    CGROUP_INET6_BIND = 9
+    CGROUP_INET4_CONNECT = 10
+    CGROUP_INET6_CONNECT = 11
+    CGROUP_INET4_POST_BIND = 12
+    CGROUP_INET6_POST_BIND = 13
+    CGROUP_UDP4_SENDMSG = 14
+    CGROUP_UDP6_SENDMSG = 15
+    LIRC_MODE2 = 16
+    FLOW_DISSECTOR = 17
+    CGROUP_SYSCTL = 18
+    CGROUP_UDP4_RECVMSG = 19
+    CGROUP_UDP6_RECVMSG = 20
+    CGROUP_GETSOCKOPT = 21
+    CGROUP_SETSOCKOPT = 22
+    TRACE_RAW_TP = 23
     TRACE_FENTRY = 24
     TRACE_FEXIT  = 25
+    MODIFY_RETURN = 26
+    LSM_MAC = 27
+    TRACE_ITER = 28
+    CGROUP_INET4_GETPEERNAME = 29
+    CGROUP_INET6_GETPEERNAME = 30
+    CGROUP_INET4_GETSOCKNAME = 31
+    CGROUP_INET6_GETSOCKNAME = 32
+    XDP_DEVMAP = 33
+    CGROUP_INET_SOCK_RELEASE = 34
+    XDP_CPUMAP = 35
+    SK_LOOKUP = 36
+    XDP = 37
+    SK_SKB_VERDICT = 38
 
     _probe_repl = re.compile(b"[^a-zA-Z0-9_]")
     _sym_caches = {}
@@ -543,6 +580,26 @@ class BPF(object):
 
     def __iter__(self):
         return self.tables.__iter__()
+
+    @staticmethod
+    def attach_func(fn, attachable_fd, attach_type, flags=0):
+        if not isinstance(fn, BPF.Function):
+            raise Exception("arg 1 must be of type BPF.Function")
+
+        res = lib.bpf_prog_attach(fn.fd, attachable_fd, attach_type, flags)
+        if res < 0:
+            raise Exception("Failed to attach BPF function with attach_type "\
+                            "{0}: {1}".format(attach_type, os.strerror(-res)))
+
+    @staticmethod
+    def detach_func(fn, attachable_fd, attach_type):
+        if not isinstance(fn, BPF.Function):
+            raise Exception("arg 1 must be of type BPF.Function")
+
+        res = lib.bpf_prog_detach2(fn.fd, attachable_fd, attach_type)
+        if res < 0:
+            raise Exception("Failed to detach BPF function with attach_type "\
+                            "{0}: {1}".format(attach_type, os.strerror(-res)))
 
     @staticmethod
     def attach_raw_socket(fn, dev):

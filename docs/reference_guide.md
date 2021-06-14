@@ -97,6 +97,8 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
         - [7. attach_raw_tracepoint()](#7-attach_raw_tracepoint)
         - [8. attach_raw_socket()](#8-attach_raw_socket)
         - [9. attach_xdp()](#9-attach_xdp)
+        - [10. attach_func()](#10-attach_func)
+        - [11. detach_func()](#11-detach_func)
     - [Debug Output](#debug-output)
         - [1. trace_print()](#1-trace_print)
         - [2. trace_fields()](#2-trace_fields)
@@ -1777,7 +1779,7 @@ Examples in situ:
 
 Syntax: ```BPF.attach_raw_socket(fn, dev)```
 
-Attache a BPF function to the specified network interface.
+Attaches a BPF function to the specified network interface.
 
 The ```fn``` must be the type of ```BPF.function``` and the bpf_prog type needs to be ```BPF_PROG_TYPE_SOCKET_FILTER```  (```fn=BPF.load_func(func_name, BPF.SOCKET_FILTER)```)
 
@@ -1846,6 +1848,42 @@ Don't forget to call ```b.remove_xdp("ens1")``` at the end!
 Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=attach_xdp+path%3Aexamples+language%3Apython&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=attach_xdp+path%3Atools+language%3Apython&type=Code)
+
+### 10. attach_func()
+
+Syntax: ```BPF.attach_func(fn, attachable_fd, attach_type [, flags])```
+
+Attaches a BPF function of the specified type to a particular ```attachable_fd```. if the ```attach_type``` is ```BPF_FLOW_DISSECTOR```, the function is expected to attach to current net namespace and ```attachable_fd``` must be 0.
+
+For example:
+
+```Python
+b.attach_func(fn, cgroup_fd, b.CGROUP_SOCK_OPS)
+b.attach_func(fn, map_fd, b.SK_MSG_VERDICT)
+```
+
+Note. When attached to "global" hooks (xdp, tc, lwt, cgroup). If the "BPF function" is no longer needed after the program terminates, be sure to call `detach_func` when the program exits.
+
+Examples in situ:
+
+[search /examples](https://github.com/iovisor/bcc/search?q=attach_func+path%3Aexamples+language%3Apython&type=Code),
+
+### 11. detach_func()
+
+Syntax: ```BPF.detach_func(fn, attachable_fd, attach_type)```
+
+Detaches a BPF function of the specified type.
+
+For example:
+
+```Python
+b.detach_func(fn, cgroup_fd, b.CGROUP_SOCK_OPS)
+b.detach_func(fn, map_fd, b.SK_MSG_VERDICT)
+```
+
+Examples in situ:
+
+[search /examples](https://github.com/iovisor/bcc/search?q=detach_func+path%3Aexamples+language%3Apython&type=Code),
 
 ## Debug Output
 
