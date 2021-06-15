@@ -16,6 +16,7 @@ $(error Architecture $(ARCH) is not supported yet. Please open an issue)
 endif
 
 APPS = \
+	bindsnoop \
 	biolatency \
 	biopattern \
 	biosnoop \
