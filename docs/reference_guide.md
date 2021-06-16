@@ -1858,8 +1858,8 @@ Attaches a BPF function of the specified type to a particular ```attachable_fd``
 For example:
 
 ```Python
-b.attach_func(fn, cgroup_fd, b.CGROUP_SOCK_OPS)
-b.attach_func(fn, map_fd, b.SK_MSG_VERDICT)
+b.attach_func(fn, cgroup_fd, BPFAttachType.CGROUP_SOCK_OPS)
+b.attach_func(fn, map_fd, BPFAttachType.SK_MSG_VERDICT)
 ```
 
 Note. When attached to "global" hooks (xdp, tc, lwt, cgroup). If the "BPF function" is no longer needed after the program terminates, be sure to call `detach_func` when the program exits.
@@ -1877,8 +1877,8 @@ Detaches a BPF function of the specified type.
 For example:
 
 ```Python
-b.detach_func(fn, cgroup_fd, b.CGROUP_SOCK_OPS)
-b.detach_func(fn, map_fd, b.SK_MSG_VERDICT)
+b.detach_func(fn, cgroup_fd, BPFAttachType.CGROUP_SOCK_OPS)
+b.detach_func(fn, map_fd, BPFAttachType.SK_MSG_VERDICT)
 ```
 
 Examples in situ:

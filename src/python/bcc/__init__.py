@@ -141,7 +141,7 @@ class PerfSWConfig:
     DUMMY = 9
     BPF_OUTPUT = 10
 
-class BPF(object):
+class BPFProgType:
     # From bpf_prog_type in uapi/linux/bpf.h
     SOCKET_FILTER = 1
     KPROBE = 2
@@ -164,20 +164,7 @@ class BPF(object):
     TRACING = 26
     LSM = 29
 
-    # from xdp_action uapi/linux/bpf.h
-    XDP_ABORTED = 0
-    XDP_DROP = 1
-    XDP_PASS = 2
-    XDP_TX = 3
-    XDP_REDIRECT = 4
-
-    # from xdp_flags uapi/linux/if_link.h
-    XDP_FLAGS_UPDATE_IF_NOEXIST = (1 << 0)
-    XDP_FLAGS_SKB_MODE = (1 << 1)
-    XDP_FLAGS_DRV_MODE = (1 << 2)
-    XDP_FLAGS_HW_MODE = (1 << 3)
-    XDP_FLAGS_REPLACE = (1 << 4)
-
+class BPFAttachType:
     # from bpf_attach_type uapi/linux/bpf.h
     CGROUP_INET_INGRESS = 0
     CGROUP_INET_EGRESS = 1
@@ -218,6 +205,62 @@ class BPF(object):
     SK_LOOKUP = 36
     XDP = 37
     SK_SKB_VERDICT = 38
+
+class XDPAction:
+    # from xdp_action uapi/linux/bpf.h
+    XDP_ABORTED = 0
+    XDP_DROP = 1
+    XDP_PASS = 2
+    XDP_TX = 3
+    XDP_REDIRECT = 4
+
+class XDPFlags:
+    # from xdp_flags uapi/linux/if_link.h
+    # unlike similar enum-type holder classes in this file, source for these
+    # is #define XDP_FLAGS_UPDATE_IF_NOEXIST, #define XDP_FLAGS_SKB_MODE, ...
+    UPDATE_IF_NOEXIST = (1 << 0)
+    SKB_MODE = (1 << 1)
+    DRV_MODE = (1 << 2)
+    HW_MODE = (1 << 3)
+    REPLACE = (1 << 4)
+
+class BPF(object):
+    # Here for backwards compatibility only, add new enum members and types
+    # the appropriate wrapper class elsewhere in this file to avoid namespace
+    # collision issues
+    SOCKET_FILTER = BPFProgType.SOCKET_FILTER
+    KPROBE = BPFProgType.KPROBE
+    SCHED_CLS = BPFProgType.SCHED_CLS
+    SCHED_ACT = BPFProgType.SCHED_ACT
+    TRACEPOINT = BPFProgType.TRACEPOINT
+    XDP = BPFProgType.XDP
+    PERF_EVENT = BPFProgType.PERF_EVENT
+    CGROUP_SKB = BPFProgType.CGROUP_SKB
+    CGROUP_SOCK = BPFProgType.CGROUP_SOCK
+    LWT_IN = BPFProgType.LWT_IN
+    LWT_OUT = BPFProgType.LWT_OUT
+    LWT_XMIT = BPFProgType.LWT_XMIT
+    SOCK_OPS = BPFProgType.SOCK_OPS
+    SK_SKB = BPFProgType.SK_SKB
+    CGROUP_DEVICE = BPFProgType.CGROUP_DEVICE
+    SK_MSG = BPFProgType.SK_MSG
+    RAW_TRACEPOINT = BPFProgType.RAW_TRACEPOINT
+    CGROUP_SOCK_ADDR = BPFProgType.CGROUP_SOCK_ADDR
+    TRACING = BPFProgType.TRACING
+    LSM = BPFProgType.LSM
+
+    XDP_ABORTED = XDPAction.XDP_ABORTED
+    XDP_DROP = XDPAction.XDP_DROP
+    XDP_PASS = XDPAction.XDP_PASS
+    XDP_TX = XDPAction.XDP_TX
+    XDP_REDIRECT = XDPAction.XDP_REDIRECT
+
+    XDP_FLAGS_UPDATE_IF_NOEXIST = XDPFlags.UPDATE_IF_NOEXIST
+    XDP_FLAGS_SKB_MODE = XDPFlags.SKB_MODE
+    XDP_FLAGS_DRV_MODE = XDPFlags.DRV_MODE
+    XDP_FLAGS_HW_MODE = XDPFlags.HW_MODE
+    XDP_FLAGS_REPLACE = XDPFlags.REPLACE
+    # END enum backwards compat
 
     _probe_repl = re.compile(b"[^a-zA-Z0-9_]")
     _sym_caches = {}
