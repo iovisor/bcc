@@ -782,11 +782,17 @@ class BPF(object):
         if event_re:
             matches = BPF.get_kprobe_functions(event_re)
             self._check_probe_quota(len(matches))
+            failed = 0
+            probes = []
             for line in matches:
                 try:
                     self.attach_kprobe(event=line, fn_name=fn_name)
                 except:
-                    pass
+                    failed += 1
+                    probes.append(line)
+            if failed == len(matches):
+                raise Exception("Failed to attach BPF program %s to kprobe %s" %
+                                (fn_name, '/'.join(probes)))
             return
 
         self._check_probe_quota(1)
@@ -806,12 +812,19 @@ class BPF(object):
 
         # allow the caller to glob multiple functions together
         if event_re:
-            for line in BPF.get_kprobe_functions(event_re):
+            matches = BPF.get_kprobe_functions(event_re)
+            failed = 0
+            probes = []
+            for line in matches:
                 try:
                     self.attach_kretprobe(event=line, fn_name=fn_name,
                                           maxactive=maxactive)
                 except:
-                    pass
+                    failed += 1
+                    probes.append(line)
+            if failed == len(matches):
+                raise Exception("Failed to attach BPF program %s to kretprobe %s" %
+                                (fn_name, '/'.join(probes)))
             return
 
         self._check_probe_quota(1)
