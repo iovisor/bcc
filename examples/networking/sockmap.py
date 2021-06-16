@@ -10,7 +10,7 @@ import time
 import atexit
 import argparse
 
-from bcc import BPF, lib
+from bcc import BPF, BPFAttachType, lib
 
 
 examples = """examples:
@@ -112,12 +112,12 @@ func_sock_redir = bpf.load_func("bpf_redir", bpf.SK_MSG)
 # raise if error
 fd = os.open(args.cgroup, os.O_RDONLY)
 map_fd = lib.bpf_table_fd(bpf.module, b"sock_hash")
-bpf.attach_func(func_sock_ops, fd, bpf.CGROUP_SOCK_OPS)
-bpf.attach_func(func_sock_redir, map_fd, bpf.SK_MSG_VERDICT)
+bpf.attach_func(func_sock_ops, fd, BPFAttachType.CGROUP_SOCK_OPS)
+bpf.attach_func(func_sock_redir, map_fd, BPFAttachType.SK_MSG_VERDICT)
 
 def detach_all():
-    bpf.detach_func(func_sock_ops, fd, bpf.CGROUP_SOCK_OPS)
-    bpf.detach_func(func_sock_redir, map_fd, bpf.SK_MSG_VERDICT)
+    bpf.detach_func(func_sock_ops, fd, BPFAttachType.CGROUP_SOCK_OPS)
+    bpf.detach_func(func_sock_redir, map_fd, BPFAttachType.SK_MSG_VERDICT)
     print("Detaching...")
 
 atexit.register(detach_all)
