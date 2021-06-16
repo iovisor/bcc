@@ -20,17 +20,14 @@ except ImportError:
 from time import strftime
 import ctypes as ct
 from functools import reduce
-import multiprocessing
 import os
 import errno
 import re
 import sys
 
 from .libbcc import lib, _RAW_CB_TYPE, _LOST_CB_TYPE, _RINGBUF_CB_TYPE
-from .perf import Perf
 from .utils import get_online_cpus
 from .utils import get_possible_cpus
-from subprocess import check_output
 
 BPF_MAP_TYPE_HASH = 1
 BPF_MAP_TYPE_ARRAY = 2
@@ -183,7 +180,7 @@ def _print_linear_hist(vals, val_type, strip_leading_zero):
     stars = stars_max
 
     if idx_max >= 0:
-        print(header % val_type);
+        print(header % val_type)
     for i in range(0, idx_max + 1):
         val = vals[i]
 
@@ -796,7 +793,7 @@ class TableBase(MutableMapping):
 class HashTable(TableBase):
     def __init__(self, *args, **kwargs):
         super(HashTable, self).__init__(*args, **kwargs)
-        
+
     def __len__(self):
         i = 0
         for k in self: i += 1
@@ -809,7 +806,7 @@ class LruHash(HashTable):
 class ArrayBase(TableBase):
     def __init__(self, *args, **kwargs):
         super(ArrayBase, self).__init__(*args, **kwargs)
-        
+
     def _normalize_key(self, key):
         if isinstance(key, int):
             if key < 0:
@@ -1317,7 +1314,7 @@ class QueueStack:
         if res < 0:
             raise KeyError("Could not peek table")
         return leaf
-    
+
     def itervalues(self):
         # to avoid infinite loop, set maximum pops to max_entries
         cnt = self.max_entries

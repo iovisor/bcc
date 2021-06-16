@@ -19,7 +19,6 @@ import fcntl
 import json
 import os
 import re
-import struct
 import errno
 import sys
 import platform
@@ -30,6 +29,7 @@ from .perf import Perf
 from .utils import get_online_cpus, printb, _assert_is_bytes, ArgString, StrcmpRewrite
 from .version import __version__
 from .disassembler import disassemble_prog, decode_map
+from .usdt import USDT, USDTException
 
 try:
     basestring
@@ -488,7 +488,7 @@ class BPF(object):
                 lib.bpf_function_size(self.module, func_name),
                 lib.bpf_module_license(self.module),
                 lib.bpf_module_kern_version(self.module),
-                log_level, None, 0, device);
+                log_level, None, 0, device)
 
         if fd < 0:
             atexit.register(self.donothing)
@@ -988,7 +988,7 @@ class BPF(object):
         fd = lib.bpf_attach_raw_tracepoint(fn.fd, tp)
         if fd < 0:
             raise Exception("Failed to attach BPF to raw tracepoint")
-        self.raw_tracepoint_fds[tp] = fd;
+        self.raw_tracepoint_fds[tp] = fd
         return self
 
     def detach_raw_tracepoint(self, tp=b""):
@@ -1016,9 +1016,9 @@ class BPF(object):
     def support_kfunc():
         # there's no trampoline support for other than x86_64 arch
         if platform.machine() != 'x86_64':
-            return False;
+            return False
         if not lib.bpf_has_kernel_btf():
-            return False;
+            return False
         # kernel symbol "bpf_trampoline_link_prog" indicates kfunc support
         if BPF.ksymname("bpf_trampoline_link_prog") != -1:
             return True
@@ -1062,7 +1062,7 @@ class BPF(object):
         fd = lib.bpf_attach_kfunc(fn.fd)
         if fd < 0:
             raise Exception("Failed to attach BPF to entry kernel func")
-        self.kfunc_entry_fds[fn_name] = fd;
+        self.kfunc_entry_fds[fn_name] = fd
         return self
 
     def attach_kretfunc(self, fn_name=b""):
@@ -1076,7 +1076,7 @@ class BPF(object):
         fd = lib.bpf_attach_kfunc(fn.fd)
         if fd < 0:
             raise Exception("Failed to attach BPF to exit kernel func")
-        self.kfunc_exit_fds[fn_name] = fd;
+        self.kfunc_exit_fds[fn_name] = fd
         return self
 
     def detach_lsm(self, fn_name=b""):
@@ -1099,7 +1099,7 @@ class BPF(object):
         fd = lib.bpf_attach_lsm(fn.fd)
         if fd < 0:
             raise Exception("Failed to attach LSM")
-        self.lsm_fds[fn_name] = fd;
+        self.lsm_fds[fn_name] = fd
         return self
 
     @staticmethod
@@ -1486,7 +1486,7 @@ class BPF(object):
           b = bcc_stacktrace_build_id()
           b.status = addr.status
           b.build_id = addr.build_id
-          b.u.offset = addr.offset;
+          b.u.offset = addr.offset
           res = lib.bcc_buildsymcache_resolve(BPF._bsymcache,
                                               ct.byref(b),
                                               ct.byref(sym))
@@ -1664,6 +1664,3 @@ class BPF(object):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.cleanup()
-
-
-from .usdt import USDT, USDTException
