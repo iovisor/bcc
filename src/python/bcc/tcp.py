@@ -28,31 +28,31 @@ tcpstate[11] = 'CLOSING'
 tcpstate[12] = 'NEW_SYN_RECV'
 
 # from include/net/tcp.h:
-TCPHDR_FIN = 0x01;
-TCPHDR_SYN = 0x02;
-TCPHDR_RST = 0x04;
-TCPHDR_PSH = 0x08;
-TCPHDR_ACK = 0x10;
-TCPHDR_URG = 0x20;
-TCPHDR_ECE = 0x40;
-TCPHDR_CWR = 0x80;
+TCPHDR_FIN = 0x01
+TCPHDR_SYN = 0x02
+TCPHDR_RST = 0x04
+TCPHDR_PSH = 0x08
+TCPHDR_ACK = 0x10
+TCPHDR_URG = 0x20
+TCPHDR_ECE = 0x40
+TCPHDR_CWR = 0x80
 
 def flags2str(flags):
-    arr = [];
+    arr = []
     if flags & TCPHDR_FIN:
-        arr.append("FIN");
+        arr.append("FIN")
     if flags & TCPHDR_SYN:
-        arr.append("SYN");
+        arr.append("SYN")
     if flags & TCPHDR_RST:
-        arr.append("RST");
+        arr.append("RST")
     if flags & TCPHDR_PSH:
-        arr.append("PSH");
+        arr.append("PSH")
     if flags & TCPHDR_ACK:
-        arr.append("ACK");
+        arr.append("ACK")
     if flags & TCPHDR_URG:
-        arr.append("URG");
+        arr.append("URG")
     if flags & TCPHDR_ECE:
-        arr.append("ECE");
+        arr.append("ECE")
     if flags & TCPHDR_CWR:
-        arr.append("CWR");
-    return "|".join(arr);
+        arr.append("CWR")
+    return "|".join(arr)

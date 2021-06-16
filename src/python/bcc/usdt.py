@@ -14,7 +14,7 @@
 
 from __future__ import print_function
 import ctypes as ct
-import os, sys
+import sys
 from .libbcc import lib, _USDT_CB, _USDT_PROBE_CB, \
                     bcc_usdt_location, bcc_usdt_argument, \
                     BCC_USDT_ARGUMENT_FLAGS
