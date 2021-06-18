@@ -1254,7 +1254,8 @@ int test(struct pt_regs *ctx, struct mm_struct *mm) {
 struct bpf_map;
 BPF_HASH(map);
 int map_delete(struct pt_regs *ctx, struct bpf_map *bpfmap, u64 *k) {
-    map.increment(42, 10);
+    map.increment(42, 5);
+    map.atomic_increment(42, 5);
     return 0;
 }
 """)

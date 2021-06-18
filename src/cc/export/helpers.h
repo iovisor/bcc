@@ -101,6 +101,7 @@ struct _name##_table_t { \
   int (*delete) (_key_type *); \
   void (*call) (void *, int index); \
   void (*increment) (_key_type, ...); \
+  void (*atomic_increment) (_key_type, ...); \
   int (*get_stackid) (void *, u64); \
   u32 max_entries; \
   int flags; \

@@ -899,7 +899,7 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
           }
           txt += "}";
           txt += "leaf;})";
-        } else if (memb_name == "increment") {
+        } else if (memb_name == "increment" || memb_name == "atomic_increment") {
           string name = string(Ref->getDecl()->getName());
           string arg0 = rewriter_.getRewrittenText(expansionRange(Call->getArg(0)->getSourceRange()));
 
@@ -913,8 +913,13 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
           string update = "bpf_map_update_elem_(bpf_pseudo_fd(1, " + fd + ")";
           txt  = "({ typeof(" + name + ".key) _key = " + arg0 + "; ";
           txt += "typeof(" + name + ".leaf) *_leaf = " + lookup + ", &_key); ";
+          txt += "if (_leaf) ";
 
-          txt += "if (_leaf) (*_leaf) += " + increment_value + ";";
+          if (memb_name == "atomic_increment") {
+            txt += "lock_xadd(_leaf, " + increment_value + ");";
+          } else {
+            txt += "(*_leaf) += " + increment_value + ";";
+          }
           if (desc->second.type == BPF_MAP_TYPE_HASH) {
             txt += "else { typeof(" + name + ".leaf) _zleaf; __builtin_memset(&_zleaf, 0, sizeof(_zleaf)); ";
             txt += "_zleaf += " + increment_value + ";";
