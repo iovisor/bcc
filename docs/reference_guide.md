@@ -1305,6 +1305,10 @@ Syntax: ```map.increment(key[, increment_amount])```
 
 Increments the key's value by `increment_amount`, which defaults to 1. Used for histograms.
 
+```map.increment()``` are not atomic. In the concurrency case. If you want more accurate results, use ```map.atomic_increment()``` instead of ```map.increment()```. The overhead of ```map.increment()``` and ```map.atomic_increment()``` is similar.
+
+Note. When using ```map.atomic_increment()``` to operate on a BPF map of type ```BPF_MAP_TYPE_HASH```, ```map.atomic_increment()``` does not guarantee the atomicity of the operation when the specified key does not exist.
+
 Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=increment+path%3Aexamples&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=increment+path%3Atools&type=Code)
