@@ -3,7 +3,9 @@
 //
 // Based on ksyms improvements from Andrii Nakryiko, add more helpers.
 // 28-Feb-2020   Wenbo Zhang   Created this.
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
