@@ -53,8 +53,7 @@ int tracepoint__syscalls__sys_enter_execve(struct trace_event_raw_sys_enter* ctx
 	if (!event)
 		return 0;
 
-	event->pid = pid;
-	event->tgid = tgid;
+	event->pid = tgid;
 	event->uid = uid;
 	task = (struct task_struct*)bpf_get_current_task();
 	event->ppid = (pid_t)BPF_CORE_READ(task, real_parent, tgid);

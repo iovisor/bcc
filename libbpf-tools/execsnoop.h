@@ -13,14 +13,13 @@
 #define LAST_ARG (FULL_MAX_ARGS_ARR - ARGSIZE)
 
 struct event {
-	char comm[TASK_COMM_LEN];
 	pid_t pid;
-	pid_t tgid;
 	pid_t ppid;
 	uid_t uid;
 	int retval;
 	int args_count;
 	unsigned int args_size;
+	char comm[TASK_COMM_LEN];
 	char args[FULL_MAX_ARGS_ARR];
 };
 
