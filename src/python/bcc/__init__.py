@@ -1123,6 +1123,18 @@ class BPF(object):
             return True
         return False
 
+    @staticmethod
+    def support_raw_tracepoint_in_module():
+        # kernel symbol "bpf_trace_modules" indicates raw tp support in modules, ref: kernel commit a38d1107
+        kallsyms = "/proc/kallsyms"
+        with open(kallsyms) as syms:
+            for line in syms:
+                (_, _, name) = line.rstrip().split(" ", 2)
+                name = name.split("\t")[0]
+                if name == "bpf_trace_modules":
+                    return True
+            return False
+
     def detach_tracepoint(self, tp=b""):
         """detach_tracepoint(tp="")
 
